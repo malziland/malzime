@@ -16,7 +16,7 @@
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
-    "@google-cloud/vertexai": "^1.10.0",
+    "@google-cloud/vertexai": "^1.10.4",
     "@google-cloud/vision": "^5.3.5",
     "busboy": "^1.6.0",
     "firebase-admin": "^13.6.1",

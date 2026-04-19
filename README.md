@@ -208,7 +208,8 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - **Tests + Lint** bei jedem Push und Pull Request (Backend + Frontend)
 - **Secret-Scan** via gitleaks (prueft auf versehentlich committete API-Keys)
 - **Dependabot** prueft monatlich auf unsichere Dependencies (npm + GitHub Actions)
-- **npm audit** im Backend-Job (blockiert bei kritischen Schwachstellen)
+- **npm audit** im Backend-Job (blockiert bei hohen und kritischen Schwachstellen)
+- **Branch Protection** fuer `main`: Merges erst nach gruenen Status-Checks (`test-backend`, `test-frontend`, `test-e2e`, `secret-scan`)
 - Deploy erfolgt manuell per `npx firebase deploy`
 
 ## Tech-Stack

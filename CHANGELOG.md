@@ -4,6 +4,23 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.3.1] — 2026-04-19
+
+### Sicherheit
+
+- **protobufjs RCE gefixt (CRITICAL)**: `protobufjs` auf 7.5.5 aktualisiert — schliesst Arbitrary-Code-Execution-Luecke (GHSA-xq3m-2v4x-88gg), die transitiv ueber `@google-cloud/firestore` + `@google-cloud/vision` + `firebase-admin` in die Cloud Functions gelangte.
+- **Weitere High-Luecken gefixt**: `node-forge` 1.3.3 → 1.4.0 (Signature Forgery, DoS), `path-to-regexp` 0.1.12 → 0.1.13 (ReDoS), `fast-xml-parser` (Entity Expansion Bypass).
+- **CI-Audit-Schwelle strenger**: `npm audit --audit-level` von `critical` auf `high` angehoben. Hohe Schwachstellen (z. B. ReDoS, Signature Forgery) werden jetzt in der CI sichtbar gemacht statt unbemerkt durchzurutschen.
+
+### Wartung
+
+- **Backend-Dependencies aktualisiert**: `@google-cloud/vertexai` 1.10.0 → 1.12.0, `@google-cloud/vision` 5.3.4 → 5.3.5, `firebase-admin` 13.7.0 → 13.8.0, `firebase-functions` 7.0.6 → 7.2.5, `jest` 30.2.0 → 30.3.0, `eslint` 10.0.2 → 10.2.1, `prettier` 3.8.1 → 3.8.3.
+- **Frontend-Dependencies aktualisiert**: `vitest` + `@vitest/coverage-v8` 4.0.18 → 4.1.4, `@playwright/test` 1.58.2 → 1.59.1, `jsdom` 28.1.0 → 29.0.2 (Major-Bump, alle 139 Frontend-Tests bleiben gruen), `eslint` 10.0.0 → 10.2.1, `prettier` 3.8.1 → 3.8.3.
+
+### Ops
+
+- **Branch Protection fuer `main`**: Required Status Checks aktiv fuer `test-backend`, `test-frontend`, `test-e2e` und `secret-scan`. Dependabot-Auto-Merge greift jetzt nur noch bei nachweislich gruener CI. `strict=true` (Branch muss up-to-date sein), `allow_force_pushes=false`, `allow_deletions=false`.
+
 ## [1.3.0] — 2026-03-07
 
 ### Neu

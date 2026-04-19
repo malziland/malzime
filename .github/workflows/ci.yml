@@ -22,7 +22,7 @@ jobs:
           cache-dependency-path: functions/package-lock.json
 
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=critical
+      - run: npm audit --omit=dev --audit-level=high
 
       - run: npm run lint
       - run: npm run format:check

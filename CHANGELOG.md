@@ -4,6 +4,20 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.4.0] — 2026-05-11
+
+### Wartung (zukunftssichernd)
+
+- **SDK-Migration auf `@google/genai` 2.0.1**: Die alte `@google-cloud/vertexai` SDK (1.12.0) wird am 24.06.2026 von Google entfernt. Komplettes Refactor von `functions/src/gemini.js` auf die neue, einheitliche Gen-AI-SDK:
+  - `new VertexAI({ project, location })` → `new GoogleGenAI({ vertexai: true, project, location })`
+  - `vertexAI.getGenerativeModel({...}).generateContent({...})` → `genai.models.generateContent({ model, contents, config })`
+  - Response-Struktur: Verschachteltes `response.response.candidates` wird flach zu `response.candidates`.
+  - `generationConfig` + `safetySettings` jetzt zusammen unter `config`.
+  - Verhalten bleibt identisch — gleicher Output-Parser, gleiche Fehler-Klassifikation, gleiche Modelle (`gemini-2.5-flash` + `gemini-2.0-flash-001` Fallback).
+  - 269 Backend-Tests gruen. Tests-Mocks von alter auf neue SDK-Surface umgestellt.
+  - `setGenAIForTest()` als zusaetzlicher Export fuer einfacheres Mocking.
+- **gitleaks-action auf Node.js 24 vorgezogen**: ENV-Variable `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` im `secret-scan`-Job. GitHub forced ab 02.06.2026 ohnehin Node 24; mit dem Override verschwindet die Deprecation-Warnung schon jetzt aus den CI-Logs. Action-Version auf `v2.3.9` gepinnt (Latest).
+
 ## [1.3.2] — 2026-05-11
 
 ### Verbesserungen

@@ -241,7 +241,7 @@ describe("escapeXml", () => {
 
 /* ── describeImage + generateBothProfiles (mit gemocktem Vertex AI) ── */
 
-describe("describeImage (mocked Vertex AI)", () => {
+describe("describeImage (mocked @google/genai)", () => {
   let describeImage;
   let mockGenerateContent;
 
@@ -249,11 +249,11 @@ describe("describeImage (mocked Vertex AI)", () => {
     jest.resetModules();
 
     mockGenerateContent = jest.fn();
-    jest.doMock("@google-cloud/vertexai", () => ({
-      VertexAI: jest.fn(() => ({
-        getGenerativeModel: jest.fn(() => ({
+    jest.doMock("@google/genai", () => ({
+      GoogleGenAI: jest.fn(() => ({
+        models: {
           generateContent: mockGenerateContent,
-        })),
+        },
       })),
       HarmCategory: {
         HARM_CATEGORY_HATE_SPEECH: "H1",
@@ -269,15 +269,15 @@ describe("describeImage (mocked Vertex AI)", () => {
   });
 
   function makeResponse(text, finishReason = "STOP") {
+    /* @google/genai gibt das Response-Objekt direkt zurueck, ohne
+       den verschachtelten .response-Wrapper aus @google-cloud/vertexai. */
     return {
-      response: {
-        candidates: [
-          {
-            content: { parts: [{ text }] },
-            finishReason,
-          },
-        ],
-      },
+      candidates: [
+        {
+          content: { parts: [{ text }] },
+          finishReason,
+        },
+      ],
     };
   }
 
@@ -326,7 +326,7 @@ describe("describeImage (mocked Vertex AI)", () => {
   });
 });
 
-describe("generateBothProfiles (mocked Vertex AI)", () => {
+describe("generateBothProfiles (mocked @google/genai)", () => {
   let generateBothProfiles;
   let mockGenerateContent;
 
@@ -334,11 +334,11 @@ describe("generateBothProfiles (mocked Vertex AI)", () => {
     jest.resetModules();
 
     mockGenerateContent = jest.fn();
-    jest.doMock("@google-cloud/vertexai", () => ({
-      VertexAI: jest.fn(() => ({
-        getGenerativeModel: jest.fn(() => ({
+    jest.doMock("@google/genai", () => ({
+      GoogleGenAI: jest.fn(() => ({
+        models: {
           generateContent: mockGenerateContent,
-        })),
+        },
       })),
       HarmCategory: {
         HARM_CATEGORY_HATE_SPEECH: "H1",
@@ -362,14 +362,12 @@ describe("generateBothProfiles (mocked Vertex AI)", () => {
 
   function makeProfileResponse(profile) {
     return {
-      response: {
-        candidates: [
-          {
-            content: { parts: [{ text: JSON.stringify(profile) }] },
-            finishReason: "STOP",
-          },
-        ],
-      },
+      candidates: [
+        {
+          content: { parts: [{ text: JSON.stringify(profile) }] },
+          finishReason: "STOP",
+        },
+      ],
     };
   }
 
@@ -384,14 +382,12 @@ describe("generateBothProfiles (mocked Vertex AI)", () => {
 
   test("handles JSON wrapped in markdown code blocks", async () => {
     mockGenerateContent.mockResolvedValue({
-      response: {
-        candidates: [
-          {
-            content: { parts: [{ text: "```json\n" + JSON.stringify(validProfile) + "\n```" }] },
-            finishReason: "STOP",
-          },
-        ],
-      },
+      candidates: [
+        {
+          content: { parts: [{ text: "```json\n" + JSON.stringify(validProfile) + "\n```" }] },
+          finishReason: "STOP",
+        },
+      ],
     });
     const result = await generateBothProfiles("A person", [], {}, []);
     expect(result.normal).not.toBeNull();
@@ -400,14 +396,12 @@ describe("generateBothProfiles (mocked Vertex AI)", () => {
 
   test("returns null for invalid JSON response", async () => {
     mockGenerateContent.mockResolvedValue({
-      response: {
-        candidates: [
-          {
-            content: { parts: [{ text: "This is not JSON at all" }] },
-            finishReason: "STOP",
-          },
-        ],
-      },
+      candidates: [
+        {
+          content: { parts: [{ text: "This is not JSON at all" }] },
+          finishReason: "STOP",
+        },
+      ],
     });
     const result = await generateBothProfiles("A person", [], {}, []);
     expect(result.normal).toBeNull();

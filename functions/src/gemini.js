@@ -1,4 +1,4 @@
-const { VertexAI, HarmCategory, HarmBlockThreshold } = require("@google-cloud/vertexai");
+const { GoogleGenAI, HarmCategory, HarmBlockThreshold } = require("@google/genai");
 const { DESCRIBE_MODELS, PROFILE_MODELS, API_TIMEOUT_MS } = require("./config");
 const { loadPrompts } = require("./i18n");
 
@@ -9,7 +9,8 @@ function isQuotaError(err) {
     msg.includes("quota") ||
     msg.includes("too many requests") ||
     msg.includes("429") ||
-    err.code === 8
+    err.code === 8 ||
+    err.status === 429
   );
 }
 
@@ -32,25 +33,25 @@ function getSafetySettings() {
   ];
 }
 
-let vertexInstance = null;
-function getVertexAI() {
-  if (!vertexInstance) {
+let genaiInstance = null;
+function getGenAI() {
+  if (!genaiInstance) {
     const project = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "malzime";
     const location = process.env.VERTEX_LOCATION || "europe-west1";
-    vertexInstance = new VertexAI({ project, location });
+    genaiInstance = new GoogleGenAI({ vertexai: true, project, location });
   }
-  return vertexInstance;
+  return genaiInstance;
 }
 
-async function describeImageWithModel(vertexAI, modelName, imageBuffer, mimeType, prompt, timeoutMs) {
-  const model = vertexAI.getGenerativeModel({
-    model: modelName,
-    generationConfig: { temperature: 0.2, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
-    safetySettings: getSafetySettings(),
-  });
+/* Nur fuer Tests: erlaubt Mock-Injection ohne neue Instanz pro Modul-Load. */
+function setGenAIForTest(instance) {
+  genaiInstance = instance;
+}
 
+async function describeImageWithModel(genai, modelName, imageBuffer, mimeType, prompt, timeoutMs) {
   let timeoutId;
-  const apiPromise = model.generateContent({
+  const apiPromise = genai.models.generateContent({
+    model: modelName,
     contents: [
       {
         role: "user",
@@ -60,6 +61,12 @@ async function describeImageWithModel(vertexAI, modelName, imageBuffer, mimeType
         ],
       },
     ],
+    config: {
+      temperature: 0.2,
+      maxOutputTokens: 2048,
+      thinkingConfig: { thinkingBudget: 0 },
+      safetySettings: getSafetySettings(),
+    },
   });
   const effectiveTimeout = timeoutMs != null ? Math.min(API_TIMEOUT_MS, timeoutMs) : API_TIMEOUT_MS;
   const timeoutPromise = new Promise((_, reject) => {
@@ -72,8 +79,14 @@ async function describeImageWithModel(vertexAI, modelName, imageBuffer, mimeType
     clearTimeout(timeoutId);
   }
 
-  const candidates = response.response.candidates || [];
-  const text = candidates[0]?.content?.parts?.map((p) => p.text).join("") || "";
+  /* @google/genai gibt das GenerateContentResponse direkt zurueck — kein
+     verschachteltes .response wie bei @google-cloud/vertexai. */
+  const candidates = response.candidates || [];
+  const text =
+    candidates[0]?.content?.parts
+      ?.map((p) => p.text)
+      .filter(Boolean)
+      .join("") || "";
   const finishReason = candidates[0]?.finishReason || "NO_CANDIDATES";
 
   return { text: text.trim(), finishReason, candidateCount: candidates.length };
@@ -81,7 +94,7 @@ async function describeImageWithModel(vertexAI, modelName, imageBuffer, mimeType
 
 async function describeImage(imageBuffer, mimeType, remainingBudget, lang) {
   const prompts = loadPrompts(lang || "de");
-  const vertexAI = getVertexAI();
+  const genai = getGenAI();
   let quotaHit = false;
 
   for (const modelName of DESCRIBE_MODELS) {
@@ -89,7 +102,7 @@ async function describeImage(imageBuffer, mimeType, remainingBudget, lang) {
       const budget = remainingBudget ? remainingBudget() : undefined;
       if (budget != null && budget <= 0) break;
       const result = await describeImageWithModel(
-        vertexAI,
+        genai,
         modelName,
         imageBuffer,
         mimeType,
@@ -122,7 +135,7 @@ async function describeImage(imageBuffer, mimeType, remainingBudget, lang) {
       const budget = remainingBudget ? remainingBudget() : undefined;
       if (budget != null && budget <= 0) break;
       const result = await describeImageWithModel(
-        vertexAI,
+        genai,
         modelName,
         imageBuffer,
         mimeType,
@@ -185,7 +198,7 @@ function buildDescriptionFromLabels(visionResult, exif, lang) {
     parts.push(`${prompts.labelCamera}: ${[exif.make, exif.model].filter(Boolean).join(" ")}.`);
   }
   /* dateTimeOriginal bewusst NICHT an Gemini senden —
-     verleitet das Modell zu falschen Altersschätzungen bei älteren Fotos */
+     verleitet das Modell zu falschen Altersschaetzungen bei aelteren Fotos */
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
@@ -209,7 +222,7 @@ ${prompts.workshopNote}
 ${schema}`;
 }
 
-async function runProfileWithFallback(vertexAI, prompt, temperature, mode, remainingBudget) {
+async function runProfileWithFallback(genai, prompt, temperature, mode, remainingBudget) {
   let quotaHit = false;
   for (const modelName of PROFILE_MODELS) {
     const budget = remainingBudget ? remainingBudget() : undefined;
@@ -217,13 +230,15 @@ async function runProfileWithFallback(vertexAI, prompt, temperature, mode, remai
     const effectiveTimeout = budget != null ? Math.min(API_TIMEOUT_MS, budget) : API_TIMEOUT_MS;
     let timeoutId;
     try {
-      const model = vertexAI.getGenerativeModel({
+      const apiPromise = genai.models.generateContent({
         model: modelName,
-        generationConfig: { temperature, maxOutputTokens: 8192, thinkingConfig: { thinkingBudget: 0 } },
-        safetySettings: getSafetySettings(),
-      });
-      const apiPromise = model.generateContent({
         contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: {
+          temperature,
+          maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 0 },
+          safetySettings: getSafetySettings(),
+        },
       });
       const timeoutPromise = new Promise((_, reject) => {
         timeoutId = setTimeout(() => reject(new Error("Gemini profile timeout")), effectiveTimeout);
@@ -231,8 +246,12 @@ async function runProfileWithFallback(vertexAI, prompt, temperature, mode, remai
       const response = await Promise.race([apiPromise, timeoutPromise]);
       clearTimeout(timeoutId);
 
-      const candidate = response.response.candidates?.[0];
-      const text = candidate?.content?.parts?.map((p) => p.text).join("") || "";
+      const candidate = response.candidates?.[0];
+      const text =
+        candidate?.content?.parts
+          ?.map((p) => p.text)
+          .filter(Boolean)
+          .join("") || "";
 
       if (!text.trim()) {
         console.log(
@@ -259,7 +278,7 @@ async function runProfileWithFallback(vertexAI, prompt, temperature, mode, remai
       try {
         const parsed = JSON.parse(cleaned);
 
-        /* SEC-004: Output-Schema-Validierung — nur gültige Profile durchlassen */
+        /* SEC-004: Output-Schema-Validierung — nur gueltige Profile durchlassen */
         if (!parsed || typeof parsed !== "object" || !parsed.categories || typeof parsed.categories !== "object") {
           console.log(JSON.stringify({ step: `profile-${mode}`, model: modelName, status: "invalid-schema" }));
           continue;
@@ -318,7 +337,7 @@ async function runProfileWithFallback(vertexAI, prompt, temperature, mode, remai
 
 async function generateBothProfiles(imageDescription, visionLabels, exifData, privacyRisks, remainingBudget, lang) {
   const prompts = loadPrompts(lang || "de");
-  const vertexAI = getVertexAI();
+  const genai = getGenAI();
 
   const { dateTimeOriginal: _dateTimeOriginal, ...exifWithoutDate } = exifData;
   const exifContext =
@@ -346,8 +365,8 @@ async function generateBothProfiles(imageDescription, visionLabels, exifData, pr
   );
 
   const [normal, boost] = await Promise.all([
-    runProfileWithFallback(vertexAI, normalPrompt, 0.7, "normal", remainingBudget),
-    runProfileWithFallback(vertexAI, boostPrompt, 1.0, "boost", remainingBudget),
+    runProfileWithFallback(genai, normalPrompt, 0.7, "normal", remainingBudget),
+    runProfileWithFallback(genai, boostPrompt, 1.0, "boost", remainingBudget),
   ]);
 
   return { normal, boost };
@@ -360,4 +379,5 @@ module.exports = {
   buildPrompt,
   escapeXml,
   isQuotaError,
+  setGenAIForTest,
 };

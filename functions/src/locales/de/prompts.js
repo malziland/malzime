@@ -146,6 +146,10 @@ WICHTIG zum Ton: Schreibe IMMER in der zweiten Person direkt an die Person. NIEM
 
 FORMATIERUNG: Schreibe ALLE Beschreibungen als zusammenhängenden Fließtext. KEINE Nummerierungen (1. 2. 3.), KEINE Aufzählungszeichen (- oder •), KEINE Listen. Jedes Feld ist ein oder mehrere zusammenhängende Sätze.
 
+BELEGPFLICHT: Jede Aussage MUSS durch ein konkretes, sichtbares Element aus der Bildbeschreibung gedeckt sein. Nenne das Element wortwörtlich (z.B. "Das sichtbare GOREWEAR-Logo zeigt..." statt "Deine Kleidung deutet auf..."). Wo das Bild keinen klaren Beweis liefert, schreibe explizit: "Hierzu sind keine sichtbaren Hinweise vorhanden." KEINE Spekulationen ohne Bildbezug.
+
+LÄNGE: Jede Kategorie hat mindestens 2 vollständige Sätze (mindestens 30 Wörter). Knappe Etiketten wie "Du bist mitteleuropäisch." sind NICHT zulässig — füge immer Begründung + konkreten Bildbezug hinzu.
+
 Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
 {
   "categories": {
@@ -164,14 +168,31 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
     "werbeprofil": { "label": "Werbeprofil", "value": "3-5 Sätze mit algorithmischen Ad-Kategorien wie sie in einem echten Google/Meta Ad-Manager stehen würden. Nüchtern, datengetrieben.", "confidence": 0.0-1.0 }
   },
   "ad_targeting": ["Exaktes Produkt/Marke 1", "Exaktes Produkt/Marke 2", "...insgesamt 8-12 konkrete Einträge — wie eine echte Ad-Targeting-Liste"],
-  "manipulation_triggers": ["4-6 psychologische Muster die Systeme bei diesem Profil ausnutzen würden. Analytisch formuliert, wie eine Forschungsstudie — nicht reißerisch."],
+  "manipulation_triggers": ["4-6 AUSFORMULIERTE Sätze (mindestens 15 Wörter pro Eintrag). KEINE Stichworte, KEINE Fachbegriffe als Listenpunkte. Jeder Eintrag muss das Manipulationsmuster vollständig erklären UND einen konkreten Bezug zum Bild herstellen. Analytisch formuliert, nicht reißerisch. Beispiel: 'Die Angst etwas zu verpassen (FOMO) wird durch zeitlich begrenzte Angebote für neue Bikepacking-Ausrüstung getriggert.' FALSCH wäre: 'Statusangst durch Vergleich.'"],
   "profileText": "5-8 Sätze. Liest sich wie ein Datenbroker-Profil oder Versicherungsbericht. Sachlich, direkt ('Du bist...'), ausgewogen — Stärken und Risikofaktoren. Keine Übertreibung, keine Wertung. Die nüchterne Wahrheit reicht um zu erschrecken."
 }`,
 
   jsonSchemaBoost: `
-WICHTIG zum Ton: Schreibe IMMER in der zweiten Person direkt an die Person. NIEMALS "Basierend auf dem Foto...", "Die Person wird als..." oder passiv. IMMER direkt: "Du bist...", "Dein...", "Du trägst...", "Wir wissen, dass du...". Jedes Feld soll zynisch, spöttisch und unterhaltsam formuliert sein.
+WICHTIG zum Ton: Schreibe IMMER in der zweiten Person direkt an die Person. Verwende konsequent die Algorithmus-/Konzern-Perspektive: "Wir wissen, dass du...", "Wir bombardieren dich mit...", "Wir verkaufen dir...", "Wir nutzen aus, dass du...". Jedes Feld zynisch, spöttisch und unterhaltsam.
+
+Die Härte richtet sich primär gegen das SYSTEM (Algorithmen, Konzerne, Marketing) und wie es die Person ausbeutet. Persönliche Bewertungen sind ERLAUBT — aber NUR mit klarem Bildbeleg.
+
+REGEL: Belegpflicht für persönliche Aussagen.
+ERLAUBT (mit sichtbarem Anker im Bild):
+- "Dein müder Blick und die hängenden Schultern zeigen jemanden, der innerlich leer läuft."
+- "Die zusammengepressten Lippen und die starre Haltung verraten chronischen Druck — wir verkaufen dir dafür Wellness-Abos."
+VERBOTEN (Spekulation ohne Bildbasis):
+- "Deine Ehe ist eine Zweckgemeinschaft" (kein Hinweis im Bild)
+- "Du bist ein wandelndes Klischee" (Pauschaletikettierung)
+- "Du leidest unter emotionaler Leere" (wenn nichts sichtbar darauf hindeutet)
+- Reine Beschimpfungen wie "Mitläufer", "Looser"
+Faustregel: Wenn du eine harte persönliche Aussage triffst, nenne im SELBEN Satz das sichtbare Element, das sie stützt.
 
 FORMATIERUNG: Schreibe ALLE Beschreibungen als zusammenhängenden Fließtext. KEINE Nummerierungen (1. 2. 3.), KEINE Aufzählungszeichen (- oder •), KEINE Listen. Jedes Feld ist ein oder mehrere zusammenhängende Sätze.
+
+BELEGPFLICHT (für sachliche Aussagen): Jede sachliche Aussage MUSS durch ein konkretes Element aus der Bildbeschreibung gedeckt sein. Wo das Bild keinen Beweis liefert, schreibe: "Hierzu sind keine sichtbaren Hinweise vorhanden."
+
+LÄNGE: Jede Kategorie hat mindestens 2 vollständige Sätze (mindestens 30 Wörter). Keine knappen Etiketten.
 
 Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
 {
@@ -191,7 +212,7 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
     "werbeprofil": { "label": "Werbeprofil", "value": "3-5 Sätze mit der Werbung die dich am härtesten trifft — und warum du drauf reinfällst. Mit exakten Marken/Produkten.", "confidence": 0.0-1.0 }
   },
   "ad_targeting": ["Exaktes Produkt/Marke 1", "Exaktes Produkt/Marke 2", "...insgesamt 8-12 konkrete Einträge — provokant und überzeichnet"],
-  "manipulation_triggers": ["Konkreter, ABWECHSLUNGSREICHER Trigger 1 — nicht immer FOMO/Peer-Vergleich", "...insgesamt 4-6 kreative, bildspezifische Einträge — provokant und persönlich"],
+  "manipulation_triggers": ["4-6 AUSFORMULIERTE Sätze (mindestens 15 Wörter pro Eintrag). KEINE Stichworte, KEINE Fachbegriffe als Listenpunkte. Jeder Eintrag muss das Manipulationsmuster vollständig erklären UND einen konkreten Bezug zum Bild herstellen. Provokant und bildspezifisch. ABWECHSLUNGSREICH — nicht immer FOMO oder Peer-Vergleich. Beispiel: 'Wir locken dich mit limitierten Pro-Level-Editionen exklusiver Bikepacking-Ausrüstung, weil dein sichtbarer Markenfokus auf GOREWEAR zeigt, dass du dich über Equipment definierst.' FALSCH wäre: 'Statusangst.'"],
   "profileText": "10-15 Sätze. Sprich die Person DIREKT an: 'Du bist...', 'Wir wissen, dass du...', 'Dein Profil zeigt...'. Kein 'Basierend auf' oder Passiv. Zynisch, spöttisch, unterhaltsam. Jeder Satz ein Treffer. Benenne mindestens 2 unangenehme Wahrheiten über Gewohnheiten oder Schwächen — aber nur wenn das Bild Anhaltspunkte liefert."
 }`,
 

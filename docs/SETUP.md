@@ -107,6 +107,39 @@ npm run format:frontend:check
 
 CI prueft Lint + Format automatisch bei jedem Push und Pull Request.
 
+## 7a. Modellvergleich (Dev-Tool)
+
+Wenn du verschiedene Gemini-Modelle gegeneinander testen willst — z.B. um zu beurteilen, ob ein neues Modell die alte Qualitaet erreicht oder uebertrifft — gibt es `functions/scripts/compare-models.js`. Das Skript faehrt die komplette malzime-Pipeline (Vision API + Bildbeschreibung + Normal-Profil + Boost-Profil) parallel mit zwei Modellen durch und erzeugt einen HTML-Vergleichsbericht.
+
+**Aufruf:**
+
+```bash
+node functions/scripts/compare-models.js <pfad-zum-bild>
+```
+
+Drag&Drop unter macOS funktioniert: Befehl mit Leerzeichen am Ende tippen, dann Bilddatei aus dem Finder ins Terminal ziehen.
+
+**Voraussetzungen:**
+
+- Lokale ADC eingerichtet (`gcloud auth application-default login`).
+- Vertex AI API + Vision API im Projekt aktiviert (sind sie auf einer laufenden malzime-Instanz ohnehin).
+
+**Was es tut:**
+
+- Schickt das Bild durch Vision API (Labels + OCR) — einmal.
+- Generiert die Bildbeschreibung mit Variante A und Variante B (separate Modellketten).
+- Generiert je Modell Normal- + Boost-Profil aus der jeweiligen Beschreibung.
+- Misst Dauer, verbrauchte Tokens und geschaetzte Kosten.
+- Schreibt `compare-result.html` ins Projekt-Root (in `.gitignore` aufgenommen — der Report enthaelt Test-Bilder und Profile, gehoert nicht ins Repo).
+
+**Was es nicht tut:**
+
+- Schreibt nichts in Firestore — der Stunden-Zaehler bleibt unberuehrt.
+- Beruehrt das Live-System oder den Deploy nicht.
+- Aendert keine Modell-Konfiguration in `functions/src/config.js`.
+
+**Konfiguration:** Die zu vergleichenden Modelle stehen oben im Skript in der `VARIANTS`-Liste. Anpassen falls andere Modelle getestet werden sollen.
+
 ## 8. Deploy
 
 ```bash

@@ -4,6 +4,27 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.3.2] — 2026-05-11
+
+### Verbesserungen
+
+- **Profil-Schemas geschaerft**: Vier zusaetzliche Regeln in `jsonSchemaNormal` und `jsonSchemaBoost`, damit Gemini-Modelle sich strenger an die Vorgaben halten — speziell juengere Modelle wie `gemini-3.1-flash-lite` neigten sonst zu pauschalen Stichworten und persoenlichen Spekulationen ohne Bildbezug.
+  - **Belegpflicht**: Jede Aussage muss durch ein konkretes, sichtbares Element aus der Bildbeschreibung gedeckt sein. Element wird wortwoertlich zitiert. Wo das Bild keinen Beweis liefert, schreibt das Modell jetzt explizit "Hierzu sind keine sichtbaren Hinweise vorhanden" statt zu spekulieren.
+  - **Mindestlaenge pro Kategorie**: Mindestens 2 vollstaendige Saetze, ~30 Woerter. Knappe Etiketten wie "Du bist mitteleuropaeisch." sind nicht mehr zulaessig.
+  - **Manipulation-Trigger als Fliesstext**: Bisher generierten kleinere Modelle nur Stichworte ("Statusangst durch Vergleich"). Jetzt sind 4-6 ausformulierte Saetze mit mindestens 15 Woertern pro Eintrag und konkretem Bildbezug vorgeschrieben — inkl. Beispiel-Eintrag und Negativ-Beispiel im Prompt.
+  - **Boost-Tonalitaet fokussiert**: Boost-Modus richtet die Haerte jetzt explizit gegen das System (Algorithmen, Konzerne, Marketing) statt persoenlich gegen die Person. Persoenliche Bewertungen bleiben erlaubt, aber nur mit klarem Bildbeleg — Pauschalbeleidigungen ("Mitlaeufer", "wandelndes Klischee") sind verboten.
+
+### Tooling
+
+- **Neues Dev-Tool `functions/scripts/compare-models.js`**: Lokales Side-by-Side-Skript zum Vergleichen verschiedener Gemini-Modelle (z.B. 2.5 Flash vs 3.1 Flash-Lite) mit dem gleichen Bild. Faehrt die komplette malzime-Pipeline (Vision API + Beschreibung + Normal-Profil + Boost-Profil) parallel mit beiden Modellen, miss Tokens und Kosten und erzeugt einen HTML-Vergleichsbericht. Schreibt nicht in Firestore, beruehrt das Live-System nicht. Anleitung in `docs/SETUP.md`.
+- **Vergleichsbericht-Output ausgeschlossen**: `compare-result.html` ist in `.gitignore` aufgenommen — der Bericht enthaelt Test-Bilder und generierte Profile, die nicht ins oeffentliche Repo gehoeren.
+
+### Wartung
+
+- **Backend-Dependencies aktualisiert**: `@google-cloud/vision` 5.3.5 → 5.3.6, `firebase-admin` 13.8.0 → 13.9.0, `jest` 30.3.0 → 30.4.2, `eslint` 10.2.1 → 10.3.0. Alle 269 Backend-Tests bleiben gruen.
+- **Frontend-Dependencies aktualisiert**: `vitest` + `@vitest/coverage-v8` 4.1.4 → 4.1.5, `jsdom` 29.0.2 → 29.1.1, `eslint` 10.2.1 → 10.3.0. Alle 139 Frontend-Tests bleiben gruen.
+- **firebase-tools CLI aktualisiert**: 15.5.1 → 15.17.0 (global via `npm install -g firebase-tools@latest`).
+
 ## [1.3.1] — 2026-04-19
 
 ### Sicherheit

@@ -4,6 +4,35 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.5.0] — 2026-05-12
+
+### Verbesserungen (Phase 1 der Mistral-Migration)
+
+- **Prompt-Haertung mit zwei neuen Bloecken** in `functions/src/locales/de/prompts.js` und `functions/src/locales/en/prompts.js`:
+  - **`AGE_ANCHOR`** — kalibriert Altersschaetzung in zwei Richtungen:
+    - **Primaere Achse Koerperproportionen**: Schultern-zu-Kopf-Verhaeltnis und Handgroesse entscheiden zuerst die Spanne (Kind 2-10 J / Pre-Teen-Teen 10-15 J / Teen-Jung-Erwachsen 15-22 J), Hautmerkmale verfeinern danach. Verhindert, dass Make-up, Frisur oder Kleidung die Reife jugendlicher Gesichter nach oben verzerren.
+    - **Zwangs-Mapping fuer Erwachsene** mit Mindest-Alter pro sichtbarem Merkmal (Nasolabialfalten ≥38 J, Lid-Erschlaffung ≥45 J, Pigmentflecken Haende ≥45 J, etc.). Kombinations-Regel: drei oder mehr Merkmale gleichzeitig → Pflicht-Spanne 40-55 J, egal wie jung das Gesamtbild wirkt. Adressiert systematische Unterschaetzung von Erwachsenen, die im Alltag oft juenger geschaetzt werden.
+    - **Begruendungspflicht**: Wenn das Modell trotz sichtbarer Merkmale juenger schaetzen will, muss es im Beschreibungstext explizit erklaeren, warum das Merkmal NICHT sichtbar ist.
+  - **`SCHEMA_RULES`** — Laengen-Vorgaben und Format-Saeuberung in beiden Profil-Schemas:
+    - Pro Kategorie 3-5 Saetze, ca. 50-80 Woerter (statt unbegrenzt mit Mindest-30-Woerter).
+    - `ad_targeting` jetzt 6-8 Eintraege a 1-3 Woerter (statt 8-12 mit unklarem Limit).
+    - `manipulation_triggers` max. 30 Woerter pro Eintrag (statt mindestens 15 ohne Obergrenze).
+    - `profileText` Normal max. 100 Woerter, Boost max. 150 Woerter (statt 5-8 bzw. 10-15 Saetze ohne Hard-Cap).
+    - **Keine Preisangaben** in `ad_targeting`/`werbeprofil`/`kaufkraft` — nur Marken-, Produkt- oder Modellnamen (Einkommens-Spannen bleiben bei `einkommen` erlaubt).
+    - **Reines JSON** ohne Markdown-Wrapping, keine \`\`\`json-Codebloecke, keine erklaerenden Saetze drumherum.
+  - Beide Bloecke werden an `describePrompt`, `describeFallback`, `jsonSchemaNormal` und `jsonSchemaBoost` angehaengt (Doppelsicherung: Modell sieht Anker sowohl in der Bildbeschreibungs-Phase als auch in der Profil-Phase).
+- **Konflikt-Aufloesung im Schema**: Alte Live-Regel `ad_targeting: 8-12 Eintraege` wurde durch `6-8 Eintraege a 1-3 Woerter` ersetzt; alte `manipulation_triggers: mindestens 15 Woerter` durch `1-2 Saetze, maximal 30 Woerter`; alte `profileText Normal: 5-8 Saetze` durch `max 100 Woerter`; alte `profileText Boost: 10-15 Saetze` durch `max 150 Woerter, etwa 8-10 Saetze`. So widersprechen sich die neue Vorgabe und die alte Anweisung nicht mehr im selben Prompt.
+- **`functions/scripts/test-prompts.js` als Pass-Through**: Frueher hat dieses Script die Anker zusaetzlich zu den Live-Prompts angehaengt — jetzt liegen die Anker direkt in den Live-Prompts, daher ist `test-prompts.js` nur noch ein 1:1-Re-Export der Live-Prompts. Verhindert, dass `compare-models.js` doppelte Anker anwendet.
+
+### Beobachtete Effekte aus Spot-Test (Mädchen 14 J)
+
+- **Kosten Gemini Live**: $0,0214 → $0,0187 (-12,6 %)
+- **Kosten Hybrid (Large 3 + Small 4)**: $0,0093 → $0,0083 (-10,7 %)
+- **Token-Output**: Profile sind knapper und kompakter, `ad_targeting` reduziert auf 7-8 saubere Eintraege.
+- **Alters-Genauigkeit**: bei diesem konkreten Bild keine Verbesserung — die Schultern-zu-Kopf-Proportion war bereits adult-aehnlich und der Anker ordnet das korrekt in 18-22 J ein. Anker zeigt erwartbare Wirkung bei klar erwachsenen Personen, die im Alltag juenger geschaetzt werden (Zwangs-Mapping greift dort).
+- **JSON-Parsefehler**: keine, beide Anbieter.
+- **269 Backend-Tests** weiterhin gruen.
+
 ## [1.4.0] — 2026-05-11
 
 ### Wartung (zukunftssichernd)

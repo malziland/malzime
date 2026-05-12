@@ -11,3 +11,4 @@ test-results/
 # Modellvergleichs-Outputs (enthalten Test-Bilder + generierte Profile)
 compare-result.html
 compare-result-*.html
+compare-failed-*.txt

@@ -232,7 +232,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 - **EU Vision API** (`eu-vision.googleapis.com`) unterstuetzt nur `TEXT_DETECTION` und `LABEL_DETECTION`. `FACE_DETECTION` und `OBJECT_LOCALIZATION` sind nicht verfuegbar und wuerden den gesamten API-Call crashen.
 - **Safety-Filter**: Googles Sicherheitsfilter blockieren die Bildbeschreibung bei Fotos von Kindern oder Jugendlichen. In diesem Fall wird ein Fallback ueber Vision-API-Labels genutzt.
-- **Alters-Labels**: Vision API Labels wie "Toddler" oder "Baby" sind unzuverlaessig und werden gefiltert. Altersschaetzung erfolgt ausschliesslich durch Gemini anhand physischer Merkmale.
+- **Alters-Labels**: Vision API Labels wie "Toddler" oder "Baby" sind unzuverlaessig und werden gefiltert. Altersschaetzung erfolgt ausschliesslich durch Gemini anhand physischer Merkmale. Seit v1.5.0 mit zwei Anker-Bloecken in den Prompts: Koerperproportionen (Schulter-zu-Kopf, Hand) als primaere Achse fuer Kinder/Teens, plus Zwangs-Mapping fuer Erwachsene (sichtbare Falten/Lid-Erschlaffung/Pigmentflecken haben Mindest-Alter-Schwellen).
 - **Personen-Erkennung**: Die EU Vision API erkennt Personen in Outdoor-/Natur-Szenen oft nicht. Nur bei reinen Tier-Labels wird die Analyse blockiert — in allen anderen Faellen entscheidet Gemini.
 
 ## Datenschutz

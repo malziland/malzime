@@ -10,7 +10,7 @@ const { resolveLanguage, loadPrompts } = require("./i18n");
 const { checkAndIncrement, incrementTotals, getMaintenanceStatus } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
-const { getFeatureFlags } = require("./feature-flags");
+const { getFeatureFlags, resolveProvider } = require("./feature-flags");
 
 const { describeImage, buildDescriptionFromLabels, generateBothProfiles } = gemini;
 
@@ -193,12 +193,25 @@ async function handleAnalyze(req, res, secrets) {
       return;
     }
 
-    /* ── Provider-Wahl per Feature-Flag ──
+    /* ── Provider-Wahl per Feature-Flag (Phase 3 + 4) ──
        Default ist "gemini" — der heutige Live-Pfad. "hybrid" aktiviert
-       Mistral als Primär-Provider mit Gemini als Schicht-Fallback. */
-    const flags = await getFeatureFlags();
-    const provider = flags.aiProvider;
-    console.log(JSON.stringify({ requestId, step: "provider-choice", provider }));
+       Mistral als Primär-Provider mit Gemini als Schicht-Fallback.
+
+       Phase 4 Ramp-Up: bei aiProvider="hybrid" entscheidet aiProviderHybridPct
+       (0-100) welcher Anteil der Analysen tatsächlich Hybrid bekommt. Wir
+       nutzen die Client-IP als Sample-Key, damit derselbe Nutzer über mehrere
+       Analysen konsistent denselben Pfad sieht (Sticky-Behavior). */
+    const flags = (await getFeatureFlags()) || { aiProvider: "gemini", aiProviderHybridPct: 100 };
+    const provider = resolveProvider(flags, ip);
+    console.log(
+      JSON.stringify({
+        requestId,
+        step: "provider-choice",
+        provider,
+        flag: flags.aiProvider,
+        rampPct: flags.aiProviderHybridPct,
+      })
+    );
 
     /* ── Stage 1: Bildbeschreibung mit Fallback-Chain ── */
     const describeResult = await runDescribeStage({

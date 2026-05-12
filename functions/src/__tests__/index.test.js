@@ -55,6 +55,9 @@ jest.mock("../mistral", () => ({
 const mockGetFeatureFlags = jest.fn();
 jest.mock("../feature-flags", () => ({
   getFeatureFlags: mockGetFeatureFlags,
+  /* resolveProvider behält die echte Implementierung — wir wollen Hash-basierte
+     Sample-Verteilung im Test verifizieren, nicht mocken. */
+  resolveProvider: jest.requireActual("../feature-flags").resolveProvider,
 }));
 
 const mockBuildPrivacyRisks = jest.fn();
@@ -1330,6 +1333,115 @@ describe("analyze handler", () => {
 
       expect(mockMistralDescribeImage).not.toHaveBeenCalled();
       expect(res.statusCode).toBe(200);
+    });
+
+    /* ── Phase 4: Ramp-Up via aiProviderHybridPct ────────────────────── */
+
+    test("hybrid + pct=0 always routes to gemini (kill-switch)", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 0 });
+      mockDescribeImage.mockResolvedValue("Gemini-Beschreibung");
+      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralDescribeImage).not.toHaveBeenCalled();
+      expect(mockMistralGenerateBothProfiles).not.toHaveBeenCalled();
+      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
+      expect(mockGenerateBothProfiles).toHaveBeenCalledTimes(1);
+    });
+
+    test("hybrid + pct=100 always routes to hybrid", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 100 });
+      mockMistralDescribeImage.mockResolvedValue("Mistral-Beschreibung");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
+      expect(mockMistralGenerateBothProfiles).toHaveBeenCalledTimes(1);
+    });
+
+    test("hybrid + pct=50 distributes across many IPs roughly 50/50", async () => {
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
+      mockMistralDescribeImage.mockResolvedValue("M");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+      mockDescribeImage.mockResolvedValue("G");
+      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      let mistralCount = 0;
+      let geminiCount = 0;
+
+      for (let i = 0; i < 200; i++) {
+        jest.clearAllMocks();
+        mockGetClientIp.mockReturnValue(`10.0.0.${i % 256}`);
+        mockCheckRateLimit.mockReturnValue(true);
+        mockBuildPrivacyRisks.mockReturnValue([]);
+        mockGetMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
+        mockCheckAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
+        mockIncrementTotals.mockResolvedValue();
+        mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
+        setupBaseMocks();
+        mockMistralDescribeImage.mockResolvedValue("M");
+        mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+        mockDescribeImage.mockResolvedValue("G");
+        mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+        const req = mockReq();
+        const res = mockRes();
+        await analyze(req, res);
+
+        if (mockMistralDescribeImage.mock.calls.length > 0) mistralCount++;
+        else geminiCount++;
+      }
+
+      /* Tolerance: ±20 von 200 (also 80-120 jeweils) — SHA-256 ist gut verteilt */
+      expect(mistralCount).toBeGreaterThan(80);
+      expect(mistralCount).toBeLessThan(120);
+      expect(geminiCount).toBeGreaterThan(80);
+      expect(geminiCount).toBeLessThan(120);
+    });
+
+    test("same IP gets same provider on repeated requests (sticky)", async () => {
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
+      mockGetClientIp.mockReturnValue("192.168.42.99");
+
+      mockMistralDescribeImage.mockResolvedValue("M");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+      mockDescribeImage.mockResolvedValue("G");
+      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const providers = [];
+      for (let i = 0; i < 5; i++) {
+        jest.clearAllMocks();
+        mockGetClientIp.mockReturnValue("192.168.42.99");
+        mockCheckRateLimit.mockReturnValue(true);
+        mockBuildPrivacyRisks.mockReturnValue([]);
+        mockGetMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
+        mockCheckAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
+        mockIncrementTotals.mockResolvedValue();
+        mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
+        setupBaseMocks();
+        mockMistralDescribeImage.mockResolvedValue("M");
+        mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+        mockDescribeImage.mockResolvedValue("G");
+        mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+        const req = mockReq();
+        const res = mockRes();
+        await analyze(req, res);
+
+        providers.push(mockMistralDescribeImage.mock.calls.length > 0 ? "hybrid" : "gemini");
+      }
+
+      /* Alle 5 Aufrufe von derselben IP müssen denselben Provider gewählt haben */
+      const unique = new Set(providers);
+      expect(unique.size).toBe(1);
     });
   });
 });

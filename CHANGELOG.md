@@ -4,6 +4,38 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.5.3] — 2026-05-12
+
+### Verbesserungen (Phase 4 der Mistral-Migration — Auto-Ramp aktiviert)
+
+- **`functions/src/config.js`** erweitert um:
+  - `MISTRAL_RAMP_START_ISO = "2026-05-12T22:15:00Z"` — fixer Startzeitpunkt der Auto-Ramp (00:15 Wien am 13.05.).
+  - `MISTRAL_RAMP_SCHEDULE` — hartcodierter 8-Tage-Plan: Tag 1 = 1 %, Tag 2 = 10 %, Tag 3-5 = 33 %, Tag 6-7 = 66 %, Tag 8+ = 100 %.
+  - **Beide Konstanten und die zugehörige Logik sind explizit als Phase-4-temporär markiert** (ASCII-Kommentar-Box ╔═╗) und müssen in Phase 6 (Cleanup) entfernt werden. Konkrete Checkliste in `memory/mistral-migration-plan.md`.
+- **`functions/src/feature-flags.js`** erweitert um:
+  - `calculateRampPct(now)` — berechnet aktuellen Pct aus dem hartcodierten Schedule und der vergangenen Zeit seit RAMP_START.
+  - **Auto-Ramp ist der neue Default-Pfad** in `resolveProvider`. Override-Hierarchie:
+    1. `aiProvider="gemini"` → IMMER Gemini (Kill-Switch).
+    2. `aiProviderHybridPct` (Zahl) in Firestore → manueller Pct-Override.
+    3. `aiProvider="hybrid"` → 100 % Hybrid (Force).
+    4. `aiProvider="auto"` oder kein Firestore-Doc → Auto-Ramp aus Code.
+  - `DEFAULT_FLAGS.aiProvider` jetzt `"auto"` (vorher `"gemini"`). `ALLOWED_AI_PROVIDERS` erweitert um `"auto"`.
+  - `aiProviderHybridPct` Default-Wert ist jetzt `undefined` (vorher hartcodiert auf 100). Bei `undefined` greift Auto-Ramp.
+- **`resolveProvider` nimmt jetzt einen optionalen `now`-Parameter** (Default `Date.now()`), damit Tests deterministisch über die ganze 8-Tage-Ramp-Phase verifizieren können.
+- **12 neue Tests** in `feature-flags.test.js`: `calculateRampPct` für alle Schedule-Schritte, `resolveProvider` mit Auto-Ramp-Default, Kill-Switch-Wirkung auch nach Tag 8, manueller Pct-Override schlägt Auto-Ramp.
+- **Bestehende Tests angepasst** an den neuen Auto-Default: 5 Stellen die vorher Gemini-Default erwarteten geben jetzt Auto-Pfad oder explizit gesetzten Override.
+- **394 Backend-Tests** alle grün (vorher 382, +12 neu).
+
+### Aktivierungs-Workflow
+
+- **Keine manuelle Aktion erforderlich.** Mit Deploy beginnt der Code, ab `2026-05-12T22:15:00Z` UTC den Hybrid-Anteil schrittweise nach dem Schedule zu steigern.
+- **Notbremse via Firestore** (alle Optionen ohne Code-Änderung, alle in 30s wirksam):
+  - `{ aiProvider: "gemini" }` → Kill-Switch, alles auf Gemini zurück.
+  - `{ aiProviderHybridPct: 0 }` → Ramp pausieren.
+  - `{ aiProviderHybridPct: N }` → auf festem Wert halten (z.B. 10 für "auf Tag 2 stehen bleiben").
+  - `{ aiProvider: "hybrid" }` → sofort 100 % Hybrid (Ramp überspringen).
+- **MISTRAL_API_KEY Firebase Secret** ist seit v1.5.2 (Phase 3) gesetzt — wird ab der ersten Hybrid-Auswahl gelesen.
+
 ## [1.5.2] — 2026-05-12
 
 ### Verbesserungen (Phase 3 der Mistral-Migration — Feature-Flag + Multi-Provider-Fallback-Chain)

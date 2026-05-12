@@ -4,6 +4,27 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.5.1] — 2026-05-12
+
+### Verbesserungen (Phase 2 der Mistral-Migration — dormanter Schatten-Code)
+
+- **`functions/src/json-repair.js`** neu (~310 Zeilen): provider-agnostische 4-stufige JSON-Reparatur-Schicht.
+  - Stufe 1: direkter `JSON.parse`
+  - Stufe 2: heuristisches Cleanup (Markdown-Fencing, Smart-Quotes, Trailing-Commas, Control-Char-Escape, Inner-Quote-Escape)
+  - Stufe 3: `json5.parse` als toleranter Backup
+  - Stufe 4: Truncation-Recovery via Stack-Snapshot — findet letzten sauber geschlossenen Wert, schließt offene Brackets programmatisch
+  - Output-Bounds (SEC-004) integriert
+- **`functions/src/mistral.js`** neu (~260 Zeilen): Mistral-Provider mit derselben Schnittstelle wie `gemini.js`. Hybrid-Architektur (Large 3 Describe → Small 4 Profile-Generation), Fallback auf Voll-Large 3 bei Small-4-Failure, JSON-Repair-Layer integriert. API-Key kommt ausschliesslich aus `process.env.MISTRAL_API_KEY`.
+- **`functions/src/config.js`** um Mistral-Konstanten erweitert (Modelle, Endpoint, Pricing, Timeouts) — backward-compatible.
+- **`mistralDescribeAddendum`** in `de/prompts.js` und `en/prompts.js` — der Zusatz-Prompt der Mistral anweist, Bild-Text in die Beschreibung zu integrieren (kein separater Vision-Schritt).
+- **`json5` ^2.2.3** als Production-Dependency in `functions/package.json`.
+- **57 neue Tests** (`json-repair.test.js` 34, `mistral.test.js` 22, `config.test.js` +1) — Backend-Test-Suite jetzt bei 326 Tests, alle gruen.
+- **Test-Fixtures** aus den realen Mistral-Failures vom 12.05. (`compare-failed-mistral-large-3-*.txt`) zur Verifikation des JSON-Repair-Layers.
+
+### Wichtig
+
+- **Live-System unverändert**: weder `handle-analyze.js` noch `gemini.js` importieren die neuen Module. Der Code ist dormant und wird erst in Phase 3 (Feature-Flag + Multi-Provider-Fallback) aktiviert. Deploy ist daher rein additiv ohne Verhaltens-Aenderung in Produktion.
+
 ## [1.5.0] — 2026-05-12
 
 ### Verbesserungen (Phase 1 der Mistral-Migration)

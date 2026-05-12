@@ -328,6 +328,19 @@ Reply EXCLUSIVELY with valid JSON in this format:
   labelVisionLabels: "Vision API labels",
   labelPrivacyRisks: "Detected privacy risks",
 
+  /* ── Mistral-specific describe addendum (Phase 2 of migration) ──
+     Because Mistral has no separate Vision-API step, the describe prompt must
+     explicitly instruct extraction of visible text from the image (otherwise
+     signs/logos/imprints would be lost downstream). */
+
+  mistralDescribeAddendum: `
+
+ADDITIONAL TASK (no separate vision step):
+At the end of the image description, list every text visible on the image —
+verbatim where possible (signs, street names, brand logos, tattoos,
+T-shirt/jersey imprints, captions, display readouts).
+Format: "Visible text: <text 1>; <text 2>; ..." — leave empty if no text.`,
+
   /* ── Blocked image hint (used in index.js) ── */
 
   blockedImageHint:

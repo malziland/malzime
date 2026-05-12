@@ -355,6 +355,19 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
   labelVisionLabels: "Vision-API-Labels",
   labelPrivacyRisks: "Erkannte Datenschutz-Risiken",
 
+  /* ── Mistral-spezifisches Describe-Addendum (Phase 2 der Migration) ──
+     Weil Mistral keinen separaten Vision-API-Schritt hat, muss der Describe-
+     Prompt explizit anweisen, sichtbaren Text aus dem Bild in die Beschreibung
+     zu integrieren (sonst gehen Schilder/Logos/Aufdrucke verloren). */
+
+  mistralDescribeAddendum: `
+
+ZUSATZAUFGABE (kein separater Vision-Schritt):
+Liste am Ende der Bildbeschreibung jeden auf dem Bild sichtbaren Text auf —
+wortgenau wenn möglich (Schilder, Straßennamen, Marken-Logos, Tattoos,
+T-Shirt-/Trikot-Aufdrucke, Bildunterschriften, Display-Anzeigen).
+Format: "Sichtbarer Text: <Text 1>; <Text 2>; ..." — leer lassen wenn kein Text.`,
+
   /* ── Blocked-Image-Hinweis (verwendet in index.js) ── */
 
   blockedImageHint:

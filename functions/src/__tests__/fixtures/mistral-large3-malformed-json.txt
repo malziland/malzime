@@ -1,0 +1,25 @@
+{
+  "categories": {
+    "alter_geschlecht": {
+      "label": "Alter & Geschlecht",
+      "value": "Du bist männlich, ca. 38–42 Jahre alt. Die sichtbaren Nasolabialfalten, Krähenfüße und erste graue Strähnen an den Schläfen (10–15 % Grauanteil) zeigen ein Mindestalter von 38 Jahren. Die definierte Kieferlinie, der beginnende Volumenverlust an den Wangen und die leichten horizontalen Halslinien bestätigen diese Spanne. Deine Körperhaltung und Proportionen wirken erwachsen und athletisch, ohne jugendliche Weichheit.",
+      "confidence": 0.92
+    },
+    "herkunft": {
+      "label": "Ethnische Herkunft",
+      "value": "Du bist mitteleuropäisch. Dein heller Hautton, die mandelförmigen, leicht tiefliegenden Augen, die gerade Nasenform und die dunkelbraunen, leicht gewellten Haare sind typische Merkmale für diese Herkunft. Die Gesichtszüge zeigen keine süd- oder osteuropäischen, asiatischen oder afrikanischen Anteile.",
+      "confidence": 0.88
+    },
+    "einkommen": {
+      "label": "Geschätztes Einkommen",
+      "value": "Dein Einkommen liegt bei 3.500–5.000 Euro brutto monatlich. Die funktionale, aber hochwertige Outdoor-Kleidung (olivgrüne Jacke, schwarzes Shirt) deutet auf ein mittleres bis gehobenes Einkommenssegment hin. Die Teilnahme an einem unsupported bikepacking event (SALT & LAKE Trail) erfordert finanzielle Mittel für Ausrüstung und Zeit, was auf eine stabile berufliche Position schließen lässt.",
+      "confidence": 0.85
+    },
+    "bildung": {
+      "label": "Bildungsniveau",
+      "value": "Du verfügst über ein hohes Bildungsniveau, wahrscheinlich einen Hochschulabschluss. Die Kombination aus sportlicher Aktivität (Bikepacking), funktionaler Kleidung und der selbstbewussten Haltung in einer organisierten Veranstaltung zeigt strukturiertes Denken und Zielorientierung. Solche Events ziehen oft Personen mit akademischem Hintergrund oder technischer Ausbildung an.",
+      "confidence": 0.80
+    },
+    "beziehungsstatus": {
+      "label": "Beziehungsstatus",
+      "Hierzu sind keine sichtbaren Hinweise vorhanden. Es gibt keinen Ehering, keine Begleitung oder andere Indikatoren für einen Beziehungsstatus. Deine Haltung und das Setting lassen keine Rückschlüsse auf Partnerschaft oder Single-Dasein zu, da solche Events sowohl allein als auch in Gruppen besucht werden können."

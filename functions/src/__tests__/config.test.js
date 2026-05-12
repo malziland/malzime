@@ -18,4 +18,14 @@ describe("config", () => {
   test("API_TIMEOUT_MS is a reasonable value", () => {
     expect(config.API_TIMEOUT_MS).toBe(45000);
   });
+
+  test("Mistral constants are set for Phase 2", () => {
+    expect(config.MISTRAL_DESCRIBE_MODEL).toBe("mistral-large-latest");
+    expect(config.MISTRAL_PROFILE_MODEL).toBe("mistral-small-2603");
+    expect(config.MISTRAL_FALLBACK_MODEL).toBe("mistral-large-latest");
+    expect(config.MISTRAL_ENDPOINT).toMatch(/^https:\/\/api\.mistral\.ai/);
+    expect(config.MISTRAL_DESCRIBE_MAX_TOKENS).toBeGreaterThan(0);
+    expect(config.MISTRAL_PROFILE_MAX_TOKENS).toBeGreaterThan(5000);
+    expect(config.MISTRAL_TIMEOUT_MS).toBeGreaterThan(config.API_TIMEOUT_MS);
+  });
 });

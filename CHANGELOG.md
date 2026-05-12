@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.5.2] — 2026-05-12
+
+### Verbesserungen (Phase 3 der Mistral-Migration — Feature-Flag + Multi-Provider-Fallback-Chain)
+
+- **`functions/src/feature-flags.js`** neu: liest `aiProvider` aus Firestore-Doc `featureFlags/current` mit 30s Cache, fail-open auf `"gemini"` (Default). Akzeptiert nur `"gemini"` oder `"hybrid"` — ungültige Werte fallen still auf Default zurück. 13 Tests.
+- **`functions/src/throttle.js`** neu: per-Instance-Semaphore mit Default-Limit 6 (matched Mistral Scale-Tier RPS). FIFO-Queue mit Timeout, idempotenter Release. Schützt vor Workshop-Bursts. 9 Tests. Noch nicht in mistral.js eingebunden — Aktivierung bei Bedarf in Phase 4.
+- **`functions/src/handle-analyze.js`** refaktoriert: zwei neue Helper `runDescribeStage` und `runProfileStage` realisieren die Multi-Provider-Fallback-Chain:
+  - **Stage 1 Describe:** bei `aiProvider="hybrid"` zuerst Mistral, dann Gemini als Fallback, dann Vision-Labels-Heuristik
+  - **Stage 2 Profile:** analog Mistral → Gemini
+  - **Default-Pfad `aiProvider="gemini"`:** verhalten unveraendert, ruft nur Gemini-Funktionen
+- **`functions/src/index.js`** deklariert `MISTRAL_API_KEY` via `defineSecret` und bindet das Secret an die `analyze`-Function. Secret wird erst beim ersten Hybrid-Provider-Call gelesen — der Default-Pfad braucht den Key nicht.
+- **`functions/src/__tests__/index.test.js`** um 8 Phase-3-Tests erweitert: alle Fallback-Pfade (Mistral OK, Mistral→Gemini, Mistral+Gemini→Vision-Labels, alles versagt, Default-Flag bleibt Gemini-only).
+- **356 Backend-Tests** alle gruen (vorher 326, +30 neu in Phase 3: 13 feature-flags + 9 throttle + 8 fallback-chain).
+
+### Wichtig
+
+- **Live-Verhalten bleibt unveraendert.** Default-Flag-Wert ist `"gemini"`, Firestore-Doc `featureFlags/current` existiert nicht, Default greift. Die Live-Pipeline ruft weiterhin ausschliesslich Gemini-Funktionen wie bisher.
+- **Aktivierung erst in Phase 4** durch Setzen des Firestore-Docs auf `{ aiProvider: "hybrid" }`. Rueckschalten durch `{ aiProvider: "gemini" }` — beide Pfade sind ueber denselben Code-Pfad jederzeit waehlbar.
+- **`MISTRAL_API_KEY` Firebase Secret ist gesetzt** (Version 1 in Secret Manager) — wartet auf den ersten Hybrid-Call der ihn liest.
+
 ## [1.5.1] — 2026-05-12
 
 ### Verbesserungen (Phase 2 der Mistral-Migration — dormanter Schatten-Code)

@@ -3,12 +3,16 @@ const { getClientIp, checkRateLimit } = require("./middleware");
 const { parseMultipart, parseJsonBody } = require("./upload");
 const { analyzeWithVision } = require("./vision");
 const { buildPrivacyRisks } = require("./privacy");
-const { describeImage, buildDescriptionFromLabels, generateBothProfiles, isQuotaError } = require("./gemini");
+const gemini = require("./gemini");
+const mistral = require("./mistral");
 const { classifyLabels, buildAnimalProfiles, AGE_LABELS } = require("./animal");
 const { resolveLanguage, loadPrompts } = require("./i18n");
 const { checkAndIncrement, incrementTotals, getMaintenanceStatus } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
+const { getFeatureFlags } = require("./feature-flags");
+
+const { describeImage, buildDescriptionFromLabels, generateBothProfiles } = gemini;
 
 async function handleAnalyze(req, res, secrets) {
   const requestId = Math.random().toString(36).slice(2, 10);
@@ -189,70 +193,47 @@ async function handleAnalyze(req, res, secrets) {
       return;
     }
 
-    /* ── Bildbeschreibung via Gemini ── */
-    let imageDescription = null;
-    let describeBlocked = false;
-    let describeError = false;
-    let quotaError = false;
-    try {
-      imageDescription = await describeImage(imageBuffer, file.mimeType, remainingBudget, lang);
-      if (!imageDescription) describeBlocked = true;
-      console.log(
-        JSON.stringify({
-          requestId,
-          step: "describe",
-          status: imageDescription ? "ok" : "blocked",
-          length: imageDescription?.length || 0,
-        })
-      );
-    } catch (err) {
-      if (isQuotaError(err)) quotaError = true;
-      describeError = true;
-      console.log(JSON.stringify({ requestId, warning: "Image description failed", error: err.message }));
-    }
+    /* ── Provider-Wahl per Feature-Flag ──
+       Default ist "gemini" — der heutige Live-Pfad. "hybrid" aktiviert
+       Mistral als Primär-Provider mit Gemini als Schicht-Fallback. */
+    const flags = await getFeatureFlags();
+    const provider = flags.aiProvider;
+    console.log(JSON.stringify({ requestId, step: "provider-choice", provider }));
 
-    /* ── Fallback: Vision-API-Labels ── */
-    let usedFallback = false;
-    if (!imageDescription) {
-      imageDescription = buildDescriptionFromLabels(visionResult, exif, lang);
-      if (describeBlocked && imageDescription) {
-        imageDescription += loadPrompts(lang).blockedImageHint;
-      }
-      if (imageDescription) {
-        usedFallback = true;
-        console.log(
-          JSON.stringify({
-            requestId,
-            step: "describe-fallback",
-            status: "using-labels",
-            length: imageDescription.length,
-          })
-        );
-      }
-    }
+    /* ── Stage 1: Bildbeschreibung mit Fallback-Chain ── */
+    const describeResult = await runDescribeStage({
+      provider,
+      imageBuffer,
+      mimeType: file.mimeType,
+      visionResult,
+      exif,
+      remainingBudget,
+      lang,
+      requestId,
+    });
+    let imageDescription = describeResult.text;
+    const describeBlocked = describeResult.blocked;
+    const describeError = describeResult.errored;
+    let quotaError = describeResult.quotaHit;
+    const usedFallback = describeResult.usedLabelFallback;
 
-    /* ── Profile generieren ── */
+    /* ── Stage 2: Profile generieren mit Fallback-Chain ── */
     let profiles = { normal: null, boost: null };
     let profileBlocked = false;
     if (imageDescription) {
-      try {
-        profiles = await generateBothProfiles(
-          imageDescription,
-          visionResult.labels,
-          exif,
-          privacyRisks,
-          remainingBudget,
-          lang
-        );
-        profileBlocked = !profiles.normal && !profiles.boost;
-        console.log(
-          JSON.stringify({ requestId, step: "profiles", normal: !!profiles.normal, boost: !!profiles.boost })
-        );
-      } catch (err) {
-        if (isQuotaError(err)) quotaError = true;
-        profileBlocked = true;
-        console.log(JSON.stringify({ requestId, warning: "Profile generation failed", error: err.message }));
-      }
+      const profileResult = await runProfileStage({
+        provider,
+        imageDescription,
+        visionResult,
+        exif,
+        privacyRisks,
+        remainingBudget,
+        lang,
+        requestId,
+      });
+      profiles = profileResult.profiles;
+      profileBlocked = profileResult.blocked;
+      if (profileResult.quotaHit) quotaError = true;
     }
 
     /* ── Response ── */
@@ -328,6 +309,170 @@ async function handleAnalyze(req, res, secrets) {
     console.log(JSON.stringify({ requestId, status: "error", code }));
     res.status(status).json({ error: "Analyze failed", code });
   }
+}
+
+/* ── Multi-Provider-Pipeline-Helfer (Phase 3 Mistral-Migration) ──
+   Diese Funktionen kapseln die Fallback-Chain pro Stage. Live-Pfad bleibt
+   unverändert solange aiProvider="gemini" gesetzt ist (Default). */
+
+async function runDescribeStage({
+  provider,
+  imageBuffer,
+  mimeType,
+  visionResult,
+  exif,
+  remainingBudget,
+  lang,
+  requestId,
+}) {
+  const result = {
+    text: null,
+    blocked: false,
+    errored: false,
+    quotaHit: false,
+    usedLabelFallback: false,
+  };
+
+  /* Reihenfolge der Provider abhängig vom Flag. */
+  const order = provider === "hybrid" ? ["mistral", "gemini"] : ["gemini"];
+
+  for (const p of order) {
+    try {
+      const text =
+        p === "mistral"
+          ? await mistral.describeImage(imageBuffer, mimeType, remainingBudget, lang)
+          : await describeImage(imageBuffer, mimeType, remainingBudget, lang);
+
+      console.log(
+        JSON.stringify({
+          requestId,
+          step: "describe",
+          provider: p,
+          status: text ? "ok" : "blocked",
+          length: text ? text.length : 0,
+        })
+      );
+
+      if (text) {
+        result.text = text;
+        return result;
+      }
+      /* Leerer Text: bei Gemini = Safety-Block. Bei Mistral = unwahrscheinlich
+         aber theoretisch möglich. Wir markieren describe als blockiert nur wenn
+         AUCH der letzte Provider in der Chain leer kam. */
+      result.blocked = true;
+    } catch (err) {
+      result.errored = true;
+      if (gemini.isQuotaError(err) || /rate_limit|quota/i.test(err.message || "")) {
+        result.quotaHit = true;
+      }
+      console.log(
+        JSON.stringify({
+          requestId,
+          step: "describe",
+          provider: p,
+          status: "error",
+          error: err.message,
+        })
+      );
+      /* Bei Mistral-Fehler weiter zu Gemini fallen. Bei Gemini-Fehler ist die Chain
+         hier vorbei und der Label-Fallback unten greift. */
+    }
+  }
+
+  /* Letzter Fallback: Vision-API-Labels in Fließtext bauen. Funktioniert für
+     beide Provider — der Profil-Schritt kommt sowieso mit Text aus. */
+  const labelDesc = buildDescriptionFromLabels(visionResult, exif, lang);
+  if (labelDesc) {
+    let text = labelDesc;
+    if (result.blocked) {
+      text += loadPrompts(lang).blockedImageHint;
+    }
+    result.text = text;
+    result.usedLabelFallback = true;
+    console.log(
+      JSON.stringify({
+        requestId,
+        step: "describe-fallback",
+        status: "using-labels",
+        length: text.length,
+      })
+    );
+  }
+
+  return result;
+}
+
+async function runProfileStage({
+  provider,
+  imageDescription,
+  visionResult,
+  exif,
+  privacyRisks,
+  remainingBudget,
+  lang,
+  requestId,
+}) {
+  const result = { profiles: { normal: null, boost: null }, blocked: false, quotaHit: false };
+
+  const order = provider === "hybrid" ? ["mistral", "gemini"] : ["gemini"];
+
+  for (const p of order) {
+    try {
+      const profiles =
+        p === "mistral"
+          ? await mistral.generateBothProfiles(
+              imageDescription,
+              visionResult.labels,
+              exif,
+              privacyRisks,
+              remainingBudget,
+              lang
+            )
+          : await generateBothProfiles(
+              imageDescription,
+              visionResult.labels,
+              exif,
+              privacyRisks,
+              remainingBudget,
+              lang
+            );
+
+      console.log(
+        JSON.stringify({
+          requestId,
+          step: "profiles",
+          provider: p,
+          normal: !!(profiles && profiles.normal),
+          boost: !!(profiles && profiles.boost),
+        })
+      );
+
+      const hasAny = profiles && (profiles.normal || profiles.boost);
+      if (hasAny) {
+        result.profiles = profiles;
+        return result;
+      }
+      /* Beide leer: nächster Provider in der Chain. */
+    } catch (err) {
+      if (gemini.isQuotaError(err) || /rate_limit|quota/i.test(err.message || "")) {
+        result.quotaHit = true;
+      }
+      console.log(
+        JSON.stringify({
+          requestId,
+          step: "profiles",
+          provider: p,
+          status: "error",
+          error: err.message,
+        })
+      );
+      /* Fallback zum nächsten Provider. */
+    }
+  }
+
+  result.blocked = true;
+  return result;
 }
 
 module.exports = { handleAnalyze };

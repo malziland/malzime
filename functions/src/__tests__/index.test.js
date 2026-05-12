@@ -45,6 +45,18 @@ jest.mock("../gemini", () => ({
   isQuotaError: mockIsQuotaError,
 }));
 
+const mockMistralDescribeImage = jest.fn();
+const mockMistralGenerateBothProfiles = jest.fn();
+jest.mock("../mistral", () => ({
+  describeImage: mockMistralDescribeImage,
+  generateBothProfiles: mockMistralGenerateBothProfiles,
+}));
+
+const mockGetFeatureFlags = jest.fn();
+jest.mock("../feature-flags", () => ({
+  getFeatureFlags: mockGetFeatureFlags,
+}));
+
 const mockBuildPrivacyRisks = jest.fn();
 jest.mock("../privacy", () => ({
   buildPrivacyRisks: mockBuildPrivacyRisks,
@@ -106,6 +118,8 @@ beforeEach(() => {
   mockCheckAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
   mockIncrementTotals.mockResolvedValue();
   mockNotifyLimitReached.mockResolvedValue();
+  /* Default-Flag: Gemini (Live-Pfad). Hybrid-Tests setzen das pro Fall um. */
+  mockGetFeatureFlags.mockResolvedValue({ aiProvider: "gemini" });
 });
 
 describe("analyze handler", () => {
@@ -1157,5 +1171,165 @@ describe("analyze handler", () => {
     await analyze(req, res);
 
     expect(res.statusCode).toBe(200);
+  });
+
+  /* ── Phase 3 Mistral-Migration: Multi-Provider-Fallback-Chain ── */
+
+  describe("Mistral Hybrid Provider Pipeline", () => {
+    function setupBaseMocks() {
+      mockParseJsonBody.mockReturnValue({
+        imageBase64: VALID_JPEG_B64,
+        mimeType: "image/jpeg",
+      });
+      mockAnalyzeWithVision.mockResolvedValue({
+        labels: ["Person"],
+        landmarks: [],
+        ocrText: "",
+        ocrTextRaw: "",
+        faces: [],
+        objects: [],
+      });
+    }
+
+    const validProfile = {
+      categories: { a: { label: "A", value: "v", confidence: 0.5 } },
+      ad_targeting: [],
+      manipulation_triggers: [],
+      profileText: "",
+    };
+
+    test("hybrid flag activates Mistral describe and Mistral profiles", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
+      mockMistralDescribeImage.mockResolvedValue("Beschreibung von Mistral");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
+      expect(mockMistralGenerateBothProfiles).toHaveBeenCalledTimes(1);
+      /* Gemini darf in der Happy-Path-Variante GAR NICHT angefasst werden */
+      expect(mockDescribeImage).not.toHaveBeenCalled();
+      expect(mockGenerateBothProfiles).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(200);
+    });
+
+    test("hybrid falls back to Gemini describe when Mistral returns null", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
+      mockMistralDescribeImage.mockResolvedValue(null); /* Mistral describe leer */
+      mockDescribeImage.mockResolvedValue("Beschreibung von Gemini Fallback");
+      /* Profile-Stage darf trotzdem zuerst Mistral versuchen */
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
+      expect(mockDescribeImage).toHaveBeenCalledTimes(1); /* Gemini-Describe als Fallback */
+      expect(res.statusCode).toBe(200);
+    });
+
+    test("hybrid falls back to Gemini profiles when Mistral profiles fail", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
+      mockMistralDescribeImage.mockResolvedValue("Beschreibung");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: null, boost: null });
+      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralGenerateBothProfiles).toHaveBeenCalledTimes(1);
+      expect(mockGenerateBothProfiles).toHaveBeenCalledTimes(1);
+      expect(res.statusCode).toBe(200);
+    });
+
+    test("hybrid falls back to Gemini when Mistral describe throws", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
+      mockMistralDescribeImage.mockRejectedValue(new Error("Mistral 500 internal error"));
+      mockDescribeImage.mockResolvedValue("Gemini-Beschreibung");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
+      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
+      expect(res.statusCode).toBe(200);
+    });
+
+    test("hybrid uses Vision-label-fallback when BOTH Mistral and Gemini describe fail", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
+      mockMistralDescribeImage.mockResolvedValue(null);
+      mockDescribeImage.mockResolvedValue(null); /* Auch Gemini blockiert */
+      mockBuildDescriptionFromLabels.mockReturnValue("Labels-basierte Beschreibung");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      /* Beide Describe-Provider versucht */
+      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
+      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
+      /* Label-Fallback verwendet */
+      expect(mockBuildDescriptionFromLabels).toHaveBeenCalled();
+      expect(res.statusCode).toBe(200);
+    });
+
+    test("hybrid returns blocked when all providers including Vision-labels fail", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
+      mockMistralDescribeImage.mockResolvedValue(null);
+      mockDescribeImage.mockResolvedValue(null);
+      mockBuildDescriptionFromLabels.mockReturnValue(null);
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.profiles).toBeNull();
+      expect(res.body.blockedReason).toBeDefined();
+    });
+
+    test("gemini flag (default) does NOT call any Mistral function", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "gemini" });
+      mockDescribeImage.mockResolvedValue("Gemini-Beschreibung");
+      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralDescribeImage).not.toHaveBeenCalled();
+      expect(mockMistralGenerateBothProfiles).not.toHaveBeenCalled();
+      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
+      expect(mockGenerateBothProfiles).toHaveBeenCalledTimes(1);
+      expect(res.statusCode).toBe(200);
+    });
+
+    test("unknown provider value falls back to gemini path (fail-safe)", async () => {
+      setupBaseMocks();
+      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "gemini" }); /* Feature-Flag normalisiert ja zu gemini */
+      mockDescribeImage.mockResolvedValue("Beschreibung");
+      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+
+      const req = mockReq();
+      const res = mockRes();
+      await analyze(req, res);
+
+      expect(mockMistralDescribeImage).not.toHaveBeenCalled();
+      expect(res.statusCode).toBe(200);
+    });
   });
 });

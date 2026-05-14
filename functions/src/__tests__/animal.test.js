@@ -102,6 +102,12 @@ describe("detectAnimalType", () => {
     /* 'pig' ist NICHT in unseren TYPE_KEYWORDS — kein False Positive moeglich */
     expect(detectAnimalType("Pigment auf der Leinwand.")).toBe("generic");
   });
+
+  test("picks the most-mentioned animal when the description mixes types", () => {
+    /* 'Hund' einmal, 'Katze' mehrfach → Katze gewinnt (haeufigstes Tier, nicht erstes) */
+    const desc = "Eine Katze liegt da. Die Katze hat oranges Fell. Kein Hund weit und breit, nur diese Katze.";
+    expect(detectAnimalType(desc)).toBe("cat");
+  });
 });
 
 describe("buildAnimalProfiles", () => {

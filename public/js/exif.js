@@ -49,6 +49,10 @@ export async function prepareImage(file) {
         reject(new Error("image_decode_failed"));
         return;
       }
+      /* Hochwertiges Resampling beim Verkleinern — sonst verschmiert der Canvas
+         feine Details (Hautstruktur, feine Linien), die die KI fuer die
+         Altersschaetzung braucht. */
+      ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, width, height);
       resolve(canvas.toDataURL("image/jpeg", 0.82).split(",")[1] || "");
     };

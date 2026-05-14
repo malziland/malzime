@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.6.1] — 2026-05-14
+
+### Behoben / Verbessert
+
+Erste Live-Uploads nach dem v1.6.0-Deploy zeigten drei Genauigkeitsschwaechen — alle drei adressiert:
+
+- **Tierart-Erkennung** (`animal.js` + Prompts): Eine orange Langhaarkatze wurde als Hund eingestuft. Zwei Ursachen behoben:
+  - `detectAnimalType` nimmt jetzt das **haeufigste** Tier-Stichwort im Beschreibungstext statt des erstbesten in fester Reihenfolge — ein einzeln erwaehnter "Hund" verliert gegen eine mehrfach genannte "Katze".
+  - `mistralDescribeAddendum` (de + en) bekam eine Merkmals-Checkliste (Katze: dreieckige Ohren, Schnurrhaare, kurze Schnauze; Hund: laengere Schnauze), damit Mistral die Tierart vor dem Festlegen gezielt prueft.
+- **Geschlechts-Kalibrierung** (Prompts): Eine Frau wurde als Mann erkannt. Neuer `GENDER_ANCHOR`-Block in `describePrompt` + `describeFallback` (de + en): Geschlecht zuerst aus echten Gesichtsmerkmalen bestimmen, nicht aus Frisur/Kleidung; "nicht eindeutig erkennbar" nur als Notausgang fuer echt mehrdeutige Faelle erlaubt — nicht als Standardantwort.
+- **Bild-Schaerfe** (`public/js/exif.js`): Beim Verkleinern im Browser wird jetzt `imageSmoothingQuality = "high"` gesetzt — das verkleinerte Bild bleibt schaerfer, die KI sieht mehr Details (relevant fuer die Altersschaetzung). Cache-Buster auf `?v=2026051402`.
+
+### Hinweis
+
+Das sind Feinschliff-Massnahmen, kein Allheilmittel — Mistrals Grundgenauigkeit bei Alter/Geschlecht/Tierart bleibt modellbedingt schwankend. Fuer die Workshop-Hauptzielgruppe (Schueler 10–17) ist Mistral laut Evaluierung weiterhin die bessere Wahl als Gemini.
+
+### Tests
+
+- 283 Backend-Tests + 139 Frontend-Tests gruen.
+
 ## [1.6.0] — 2026-05-14
 
 ### Architektur-Wechsel: Pure-Mistral-only (Vision + Gemini entfernt)

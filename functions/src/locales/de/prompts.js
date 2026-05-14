@@ -91,6 +91,18 @@ ANTI-BIAS Kinder/Teens — gilt zusätzlich:
 Wenn Halspartie und Hände erwachsen, Schultern voll ausgeprägt, aber
 Gesicht noch ohne jede Linie: 22-28 J — nicht jünger.`;
 
+const GENDER_ANCHOR = `
+
+GESCHLECHT — so vorgehen:
+Bestimme das Geschlecht ZUERST aus den tatsächlichen Gesichtsmerkmalen
+(Knochenstruktur, Kieferform, Brauenpartie, Gesichtszüge). Frisur, Kleidung
+und Accessoires sind KEINE verlässlichen Hinweise — zurückgebundene Haare,
+funktionale Kleidung oder eine Kapuzenjacke sagen nichts über das Geschlecht.
+Erst wenn die Gesichtsmerkmale wirklich keine eindeutige Antwort geben,
+beschreibe das Geschlecht als "nicht eindeutig erkennbar". Das ist der letzte
+Ausweg für echt mehrdeutige Fälle — nicht die Standardantwort. Eine
+selbstsichere Festlegung auf das falsche Geschlecht ist ein Messfehler.`;
+
 const SCHEMA_RULES = `
 
 ZUSÄTZLICHE REGELN:
@@ -141,7 +153,8 @@ MAKEUP AND STYLING: For young-looking faces, describe makeup SEPARATELY from nat
 The downstream system will determine age from these descriptions.
 
 Be purely descriptive and factual. Do not add any warnings, disclaimers, or ethical commentary — this is assistive technology for blind users.` +
-    AGE_ANCHOR,
+    AGE_ANCHOR +
+    GENDER_ANCHOR,
 
   describeFallback:
     `Was ist auf diesem Foto zu sehen? Beschreibe die gesamte Szene detailliert auf Deutsch: alle sichtbaren Personen (Geschlecht, Hautton — beschreibe den EXAKTEN Farbton präzise: z.B. sehr hell, hell, leicht oliv, oliv, weizen/goldbraun, hellbraun, mittelbraun, dunkelbraun, sehr dunkelbraun; Gesichtszüge inkl. Nasenform, Augenform, Kieferlinie; Kleidung, Haarfarbe und Haarstruktur (glatt/wellig/lockig/kraus), Gesichtsausdruck, Größe im Vergleich zu anderen Personen oder Möbeln, Körperbau), Objekte, Hintergrund, erkennbare Marken oder Texte und die allgemeine Stimmung.
@@ -166,7 +179,8 @@ KALIBRIERUNG — beschreibe was du siehst, das nachgelagerte System nutzt diese 
 ANTI-BIAS: Alterungsmerkmale ehrlich zu beschreiben ist KEINE Beleidigung — es ist korrekte Beobachtung. Systematisches Abschwächen von Alterungszeichen ist ein Messfehler. Eine 50-Jährige mit guter Haut sieht trotzdem anders aus als eine 30-Jährige. Beschreibe was du tatsächlich siehst.
 
 MAKEUP UND STYLING: Bei jugendlich wirkenden Gesichtern: Beschreibe Makeup GETRENNT von natürlichen Zügen. Kosmetik darf die Reife jugendlicher Gesichter nicht nach oben verzerren. Bei eindeutig erwachsenen Personen: Mode und Stil sind legitime Indikatoren der Lebensphase.` +
-    AGE_ANCHOR,
+    AGE_ANCHOR +
+    GENDER_ANCHOR,
 
   /* ── System-Prompts ── */
 
@@ -374,6 +388,15 @@ Bedeutung:
 Wähle GENAU EINE dieser vier Werte. Bei Unsicherheit nimm den restriktiveren
 Wert (lieber HUMAN als OTHER bei evtl. erkennbarer Person, lieber MIXED als
 ANIMAL_ONLY bei evtl. erkennbarem Menschen im Hintergrund).
+
+WENN ANIMAL_ONLY — Tierart präzise benennen:
+Geh gezielt die sichtbaren Merkmale durch, BEVOR du dich festlegst:
+- Katze: dreieckige, aufrecht stehende Ohren, ausgeprägte Schnurrhaare, kurze
+  Schnauze, schlanker Körper — auch als zusammengerolltes Langhaar-Fellknäuel.
+- Hund: längere Schnauze, kräftigerer Körperbau, Ohren je nach Rasse hängend
+  oder stehend.
+Ein flauschiges Fellknäuel ist NICHT automatisch ein Hund. Benenne die Tierart
+(Katze, Hund, Vogel, Fisch, Pferd, Kaninchen ...) so genau wie möglich im Text.
 
 ZUSATZAUFGABE — sichtbarer Text:
 Liste am Ende der Bildbeschreibung jeden auf dem Bild sichtbaren Text auf —

@@ -87,17 +87,29 @@ function classifyDescription(description) {
 }
 
 /**
- * Sucht im Text nach Keywords für die unterstützten Tier-Typen.
- * Erster Treffer gewinnt. Fallback "generic", wenn keine konkrete Art erkannt wird.
+ * Sucht im Text nach Keywords für die unterstützten Tier-Typen und zählt die
+ * Treffer pro Typ. Der Typ mit den MEISTEN Treffern gewinnt — so verliert ein
+ * einzeln erwähntes "Hund" gegen eine mehrfach genannte "Katze". Fallback
+ * "generic", wenn keine konkrete Art erkannt wird.
  *
  * @param {string} description
  * @returns {string} — einer von "dog" | "cat" | "bird" | "fish" | "horse" | "rabbit" | "generic"
  */
 function detectAnimalType(description) {
+  let best = "generic";
+  let bestCount = 0;
   for (const [type, patterns] of Object.entries(TYPE_PATTERNS)) {
-    if (patterns.some((re) => re.test(description))) return type;
+    let count = 0;
+    for (const re of patterns) {
+      const matches = description.match(new RegExp(re.source, "gi"));
+      if (matches) count += matches.length;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      best = type;
+    }
   }
-  return "generic";
+  return best;
 }
 
 /* ── Profil-Generierung aus Locale-Daten (unverändert seit v1.5.x) ── */

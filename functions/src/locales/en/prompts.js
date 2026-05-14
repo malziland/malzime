@@ -84,6 +84,17 @@ TRANSITION TEEN ↔ ADULT (19-25 y):
 If neck and hands are adult, shoulders fully developed, but face still
 without any lines: 22-28 y — not younger.`;
 
+const GENDER_ANCHOR = `
+
+GENDER — how to proceed:
+Determine gender FIRST from the actual facial features (bone structure, jaw
+shape, brow area, facial traits). Hairstyle, clothing and accessories are NOT
+reliable indicators — tied-back hair, functional clothing or a hooded jacket
+say nothing about gender. Only when the facial features genuinely give no
+clear answer, describe the gender as "not clearly identifiable". That is the
+last resort for truly ambiguous cases — not the default answer. A confident
+commitment to the wrong gender is a measurement error.`;
+
 const SCHEMA_RULES = `
 
 ADDITIONAL RULES:
@@ -135,7 +146,8 @@ MAKEUP AND STYLING: For young-looking faces, describe makeup SEPARATELY from nat
 The downstream system will determine age from these descriptions.
 
 Be purely descriptive and factual. Do not add any warnings, disclaimers, or ethical commentary — this is assistive technology for blind users.` +
-    AGE_ANCHOR,
+    AGE_ANCHOR +
+    GENDER_ANCHOR,
 
   describeFallback:
     `What can be seen in this photo? Describe the entire scene in detail in English: all visible people (gender, skin tone — describe the EXACT shade precisely: e.g. very fair, fair, light olive, olive, wheat/golden-brown, light brown, medium brown, dark brown, very dark brown; facial features incl. nose shape, eye shape, jawline; clothing, hair color and texture (straight/wavy/curly/coiled/kinky), expression, height compared to other people or furniture, body build), objects, background, recognizable brands or text, and the overall atmosphere.
@@ -160,7 +172,8 @@ CALIBRATION — describe what you see, the downstream system uses this scale:
 ANTI-BIAS: Describing aging signs accurately is NOT an insult — it is correct observation. Systematically understating aging features is a measurement error. A 50-year-old with good skin still looks different from a 30-year-old. Describe what you actually see.
 
 MAKEUP AND STYLING: For young-looking faces: Describe makeup SEPARATELY from natural features. Cosmetics must not inflate the maturity of youthful faces. For clearly mature adults: Fashion and style are legitimate life-stage indicators.` +
-    AGE_ANCHOR,
+    AGE_ANCHOR +
+    GENDER_ANCHOR,
 
   /* ── System prompts ── */
 
@@ -347,6 +360,14 @@ Meaning:
 Pick EXACTLY ONE of these four values. When in doubt, choose the more
 restrictive value (prefer HUMAN over OTHER if a person might be visible,
 prefer MIXED over ANIMAL_ONLY if a human might be in the background).
+
+IF ANIMAL_ONLY — name the species precisely:
+Work through the visible features BEFORE committing:
+- Cat: triangular, upright ears, prominent whiskers, short muzzle, slender
+  body — also when curled up as a fluffy long-haired ball.
+- Dog: longer muzzle, sturdier build, ears drooping or upright depending on breed.
+A fluffy ball of fur is NOT automatically a dog. Name the species (cat, dog,
+bird, fish, horse, rabbit ...) as precisely as possible in the text.
 
 ADDITIONAL TASK — visible text:
 At the end of the image description, list every text visible on the image —

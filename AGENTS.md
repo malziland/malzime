@@ -30,24 +30,30 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   lib/exifr/         Self-hosted: exifr lite ESM (Browser EXIF-Parsing)
 
 functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
-  index.js           HTTP-Handler: orchestriert Module, Tier-Check, Magic-Byte-Validierung
-  config.js          Konstanten, Modell-Listen (Gemini 2.5 Flash), Limits, HOURLY_LIMIT (500)
-  counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset
+  index.js           Cloud-Function-Exports (analyze, stats, admin), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
+  handle-analyze.js  Mistral-only Pipeline: Validation -> Mistral Describe -> SUBJECT-Parsing -> Mistral Profile / Easter-Egg -> Response
+  handle-stats.js    Stats-Handler (GET-only)
+  handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
+  config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (500)
+  counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance-Mode
   notify.js          ntfy Push-Benachrichtigungen bei Limit-Erreichung
-  animal.js          Personen-/Tier-Erkennung (Word-Boundary-Matching) + Easter-Egg-Profile
-  middleware.js       Rate Limiting (IP-basiert, 200/10min), IP-Extraktion
+  animal.js          SUBJECT-Klassifikation aus Mistral-Beschreibungstext + Easter-Egg-Profile (Hund/Katze/Vogel/...)
+  middleware.js      Rate Limiting (IP-basiert, 200/10min), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
-  vision.js          Google Cloud Vision API (EU-Endpoint, TEXT + LABEL_DETECTION)
-  privacy.js         Privacy-Risiko-Erkennung aus OCR/Labels
-  gemini.js          Vertex AI Gemini: Bildbeschreibung (multimodal) + Profilgenerierung (text)
+  privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
+  mistral.js         Mistral AI Hybrid: Large 3 (Describe, multimodal) + Small 4 (Profile, text-only)
+  json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
+  throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (gebaut + getestet, noch nicht angebunden)
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   locales/           Backend-Locale-Dateien
     manifest.json    Verfuegbare Sprachen + Default
-    de/prompts.js    Deutsche Gemini-Prompts (System-Prompts, Labels, jsonSchemaNormal + jsonSchemaBoost)
+    de/prompts.js    Deutsche Prompts (System-Prompts, AGE_ANCHOR + SCHEMA_RULES, Labels, jsonSchemaNormal + jsonSchemaBoost, mistralDescribeAddendum mit SUBJECT-Klassifikation)
     de/animals.js    Deutsche Tier-Easter-Egg-Profile
-  __tests__/         Jest Unit-Tests
+    en/prompts.js    Englische Prompts (Spiegelung von de/prompts.js)
+  __tests__/         Jest Unit-Tests + fixtures/ fuer json-repair
+  scripts/           Dev-Tools (test-subject.js — Tiererkennung gegen echte Bilder pruefen)
 
 docs/                Setup-Dokumentation
 .github/             CI/CD Workflows (ci.yml, deploy.yml)
@@ -57,7 +63,7 @@ docs/                Setup-Dokumentation
 
 - `cd functions && npm install` — install backend dependencies
 - `npm install` (root) — install frontend test/lint dependencies (Vitest, ESLint, Prettier)
-- `cd functions && npm test` — run Jest backend unit tests (269 tests)
+- `cd functions && npm test` — run Jest backend unit tests (279 tests as of v1.6.0)
 - `npm run test:frontend` — run Vitest frontend unit tests (139 tests)
 - `npm run test:e2e` — run Playwright E2E smoke tests (2 tests)
 - `cd functions && npm run lint` — ESLint backend
@@ -110,11 +116,19 @@ docs/                Setup-Dokumentation
 - Prompt-Injection-Schutz: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
 - Admin-Aktionen: GET zeigt Bestaetigungsseite, POST+Nonce fuehrt Mutation aus (SEC-001)
 
-## EU Vision API Einschraenkungen
+## Mistral-only-Architektur (seit v1.6.0)
 
-- `eu-vision.googleapis.com` unterstuetzt NUR: `TEXT_DETECTION`, `LABEL_DETECTION`
-- NICHT unterstuetzt: `FACE_DETECTION`, `OBJECT_LOCALIZATION` (crashen den gesamten Call!)
-- Alters-Labels ("Toddler", "Baby", etc.) werden in index.js gefiltert (unzuverlaessig)
+Die komplette KI-Pipeline laeuft ueber Mistral AI:
+
+1. **Describe-Stage**: `mistral.js` ruft Mistral Large 3 mit dem Bild + Describe-Prompt + SUBJECT-Klassifikations-Addendum auf
+2. **SUBJECT-Parsing**: `animal.js` parst die `SUBJECT:`-Kopfzeile (`ANIMAL_ONLY|HUMAN|MIXED|OTHER`)
+3. **Privacy-Risks**: `privacy.js` extrahiert die `Sichtbarer Text:`-Zeile aus der Beschreibung und matched Telefon-/Adress-/Kennzeichen-Patterns
+4. **Profile-Stage**: bei `ANIMAL_ONLY` → Easter-Egg aus `locales/{lang}/animals.js`; sonst Mistral Small 4 fuer Normal + Boost parallel
+5. **JSON-Repair**: alle LLM-Outputs gehen durch `json-repair.js` (4-stufige defensive Reparatur)
+
+`MISTRAL_API_KEY` ist als Firebase Secret hinterlegt und wird in `index.js` an den `analyze`-Endpunkt gebunden. `mistral.js` liest den Key aus `process.env.MISTRAL_API_KEY`.
+
+Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. Der User bekommt eine `blocked.apiError`- oder `blocked.overloaded`-Response. Google bleibt nur fuer die Infrastruktur-Schicht (Firebase Hosting + Cloud Functions + Firestore in `europe-west1`).
 
 ## Agent-Specific Instructions
 

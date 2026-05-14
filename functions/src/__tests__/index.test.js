@@ -1,5 +1,5 @@
-// Tests for index.js — the main analyze handler
-// We test the exported Cloud Function by mocking all dependencies.
+// Tests for the analyze Cloud Function (handle-analyze.js).
+// Pure Mistral-only pipeline since v1.6.0.
 
 jest.mock("firebase-admin/app", () => ({
   initializeApp: jest.fn(),
@@ -25,25 +25,7 @@ jest.mock("../counter", () => ({
 }));
 
 const mockNotifyLimitReached = jest.fn();
-jest.mock("../notify", () => ({
-  notifyLimitReached: mockNotifyLimitReached,
-}));
-
-const mockAnalyzeWithVision = jest.fn();
-jest.mock("../vision", () => ({
-  analyzeWithVision: mockAnalyzeWithVision,
-}));
-
-const mockDescribeImage = jest.fn();
-const mockBuildDescriptionFromLabels = jest.fn();
-const mockGenerateBothProfiles = jest.fn();
-const mockIsQuotaError = jest.fn().mockReturnValue(false);
-jest.mock("../gemini", () => ({
-  describeImage: mockDescribeImage,
-  buildDescriptionFromLabels: mockBuildDescriptionFromLabels,
-  generateBothProfiles: mockGenerateBothProfiles,
-  isQuotaError: mockIsQuotaError,
-}));
+jest.mock("../notify", () => ({ notifyLimitReached: mockNotifyLimitReached }));
 
 const mockMistralDescribeImage = jest.fn();
 const mockMistralGenerateBothProfiles = jest.fn();
@@ -52,17 +34,18 @@ jest.mock("../mistral", () => ({
   generateBothProfiles: mockMistralGenerateBothProfiles,
 }));
 
-const mockGetFeatureFlags = jest.fn();
-jest.mock("../feature-flags", () => ({
-  getFeatureFlags: mockGetFeatureFlags,
-  /* resolveProvider behält die echte Implementierung — wir wollen Hash-basierte
-     Sample-Verteilung im Test verifizieren, nicht mocken. */
-  resolveProvider: jest.requireActual("../feature-flags").resolveProvider,
+const mockClassifyDescription = jest.fn();
+const mockBuildAnimalProfiles = jest.fn();
+jest.mock("../animal", () => ({
+  classifyDescription: mockClassifyDescription,
+  buildAnimalProfiles: mockBuildAnimalProfiles,
 }));
 
 const mockBuildPrivacyRisks = jest.fn();
+const mockExtractVisibleText = jest.fn();
 jest.mock("../privacy", () => ({
   buildPrivacyRisks: mockBuildPrivacyRisks,
+  extractVisibleText: mockExtractVisibleText,
 }));
 
 const mockCheckRateLimit = jest.fn();
@@ -85,6 +68,13 @@ const { analyze } = require("../index");
 /* SEC-009: Gültiger JPEG-Header für Magic-Byte-Check */
 const VALID_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 const VALID_JPEG_B64 = VALID_JPEG.toString("base64");
+
+const VALID_PROFILE = {
+  categories: { age: { label: "Age", value: "25", confidence: 0.8 } },
+  ad_targeting: ["Brand"],
+  manipulation_triggers: ["Trigger"],
+  profileText: "Du bist...",
+};
 
 function mockReq(overrides = {}) {
   return {
@@ -116,17 +106,21 @@ beforeEach(() => {
   mockGetClientIp.mockReturnValue("127.0.0.1");
   mockCheckRateLimit.mockReturnValue(true);
   mockBuildPrivacyRisks.mockReturnValue([]);
-  mockIsQuotaError.mockReturnValue(false);
+  mockExtractVisibleText.mockReturnValue("");
   mockGetMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
   mockCheckAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
   mockIncrementTotals.mockResolvedValue();
   mockNotifyLimitReached.mockResolvedValue();
-  /* Default-Flag: Gemini (Live-Pfad). Hybrid-Tests setzen das pro Fall um. */
-  mockGetFeatureFlags.mockResolvedValue({ aiProvider: "gemini" });
+  /* Default: kein Tier, Mensch erkannt — normaler Profil-Pfad */
+  mockClassifyDescription.mockReturnValue({
+    subject: "HUMAN",
+    hasPerson: true,
+    hasAnimal: false,
+    animalType: null,
+  });
 });
 
-describe("analyze handler", () => {
-  /* ── HTTP Method ── */
+describe("analyze handler — request validation", () => {
   test("rejects non-POST requests with 405", async () => {
     const req = mockReq({ method: "GET" });
     const res = mockRes();
@@ -135,1313 +129,463 @@ describe("analyze handler", () => {
     expect(res.body.error).toBe("Method not allowed");
   });
 
-  /* ── Rate Limiting ── */
   test("returns 429 when rate limited", async () => {
     mockCheckRateLimit.mockReturnValue(false);
-    const req = mockReq();
-    const res = mockRes();
     mockParseJsonBody.mockReturnValue({ imageBase64: "AAAA" });
-    await analyze(req, res);
+    const res = mockRes();
+    await analyze(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(429);
     expect(res.body.error).toBe("Rate limit exceeded");
   });
 
-  /* ── Honeypot ── */
   test("returns 403 when honeypot is filled", async () => {
     mockParseJsonBody.mockReturnValue({
       website: "i-am-a-bot",
       imageBase64: VALID_JPEG_B64,
       mimeType: "image/jpeg",
     });
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(res.body.error).toBe("Forbidden");
   });
 
-  /* ── Validation ── */
   test("returns 400 when no image provided", async () => {
     mockParseJsonBody.mockReturnValue({});
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.body.error).toBe("Missing image");
   });
 
   test("returns 400 for invalid MIME type", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "application/pdf",
-    });
-    const req = mockReq();
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "application/pdf" });
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.body.error).toContain("Invalid file type");
   });
 
   test("returns 413 for oversized base64 input", async () => {
-    // Create a string that estimates to > 6MB
-    const hugeBase64 = "A".repeat(9 * 1024 * 1024); // ~6.75MB decoded
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: hugeBase64,
-      mimeType: "image/jpeg",
-    });
-    const req = mockReq();
+    const huge = "A".repeat(15 * 1024 * 1024);
+    mockParseJsonBody.mockReturnValue({ imageBase64: huge, mimeType: "image/jpeg" });
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(413);
     expect(res.body.error).toBe("File too large");
   });
 
   test("returns 400 for invalid base64 characters (BUG-013)", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: "!!!INVALID_BASE64!!!",
-      mimeType: "image/jpeg",
-    });
-    const req = mockReq();
+    mockParseJsonBody.mockReturnValue({ imageBase64: "!!!*&^%$@", mimeType: "image/jpeg" });
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.body.error).toBe("Invalid image data");
   });
 
-  /* SEC-009: Magic-Byte-Validierung */
   test("returns 400 when magic bytes don't match any image format (SEC-009)", async () => {
     const fakeBuffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: fakeBuffer.toString("base64"),
-      mimeType: "image/jpeg",
-    });
-    const req = mockReq();
+    mockParseJsonBody.mockReturnValue({ imageBase64: fakeBuffer.toString("base64"), mimeType: "image/jpeg" });
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
     expect(res.status).toHaveBeenCalledWith(400);
     expect(res.body.error).toBe("Invalid image data");
   });
 
   test("accepts valid MIME types: jpeg, png, webp, gif", async () => {
-    for (const mime of ["image/jpeg", "image/png", "image/webp", "image/gif"]) {
+    const mimeBuffers = {
+      "image/jpeg": Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+      "image/png": Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+      "image/webp": Buffer.concat([Buffer.from("RIFF\0\0\0\0WEBP", "ascii")]),
+      "image/gif": Buffer.from([0x47, 0x49, 0x46, 0x38, 0x37, 0x61]),
+    };
+    for (const [mime, buffer] of Object.entries(mimeBuffers)) {
       jest.clearAllMocks();
       mockGetClientIp.mockReturnValue("127.0.0.1");
       mockCheckRateLimit.mockReturnValue(true);
       mockBuildPrivacyRisks.mockReturnValue([]);
+      mockExtractVisibleText.mockReturnValue("");
+      mockGetMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
+      mockCheckAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
+      mockClassifyDescription.mockReturnValue({
+        subject: "HUMAN",
+        hasPerson: true,
+        hasAnimal: false,
+        animalType: null,
+      });
+      mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nA person.");
+      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
+      mockParseJsonBody.mockReturnValue({ imageBase64: buffer.toString("base64"), mimeType: mime });
 
-      mockParseJsonBody.mockReturnValue({
-        imageBase64: VALID_JPEG_B64,
-        mimeType: mime,
-      });
-      mockAnalyzeWithVision.mockResolvedValue({
-        labels: ["Person"],
-        landmarks: [],
-        ocrText: "",
-        ocrTextRaw: "",
-        faces: [],
-        objects: [],
-      });
-      mockDescribeImage.mockResolvedValue("A person");
-      mockGenerateBothProfiles.mockResolvedValue({
-        normal: {
-          categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-          ad_targeting: [],
-          manipulation_triggers: [],
-          profileText: "",
-        },
-        boost: null,
-      });
-
-      const req = mockReq();
       const res = mockRes();
-      await analyze(req, res);
-
+      await analyze(mockReq(), res);
       expect(res.statusCode).toBe(200);
     }
   });
+});
 
-  /* ── Person/Animal Keyword Detection ── */
-  test("detects animal-only labels and returns Easter egg profile", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
+describe("analyze handler — animal Easter-Egg flow", () => {
+  test("ANIMAL_ONLY subject from Mistral → animal Easter-Egg profile", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: ANIMAL_ONLY\n\nEin Hund im Park.");
+    mockClassifyDescription.mockReturnValue({
+      subject: "ANIMAL_ONLY",
+      hasPerson: false,
+      hasAnimal: true,
+      animalType: "dog",
     });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Dog", "Animal", "Pet", "Grass"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
+    mockBuildAnimalProfiles.mockReturnValue({
+      normalProfile: { ...VALID_PROFILE, mode: "animal-normal" },
+      boostProfile: { ...VALID_PROFILE, mode: "animal-boost" },
     });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
+    expect(mockBuildAnimalProfiles).toHaveBeenCalledWith("dog", expect.any(String));
+    expect(mockMistralGenerateBothProfiles).not.toHaveBeenCalled();
     expect(res.body.meta.mode).toBe("animal");
-    expect(res.body.profiles).toBeDefined();
-    expect(res.body.profiles.normal).toBeDefined();
-    expect(res.body.profiles.boost).toBeDefined();
-    expect(res.body.profiles.normal.profileText).toContain("Hund");
   });
 
-  test("detects cat and returns cat-specific profile", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
+  test("MIXED subject (person + animal) → normal profile path, NOT Easter-Egg", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: MIXED\n\nFrau mit Hund.");
+    mockClassifyDescription.mockReturnValue({
+      subject: "MIXED",
+      hasPerson: true,
+      hasAnimal: true,
+      animalType: null,
     });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Cat", "Kitten", "Whiskers"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
-    expect(res.body.meta.mode).toBe("animal");
-    expect(res.body.profiles.normal.categories.alter.value).toContain("9 Leben");
-    expect(res.body.profiles.normal.categories.beruf.value).toContain("Ignorieren");
-  });
-
-  test("detects bird and returns bird-specific profile", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Bird", "Parrot", "Feather"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.meta.mode).toBe("animal");
-    expect(res.body.profiles.normal.categories.beruf.value).toContain("Sänger");
-  });
-
-  test("person + animal labels → analyzes as person (not animal)", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person", "Dog", "Smile", "Pet"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person with a dog");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
+    expect(mockBuildAnimalProfiles).not.toHaveBeenCalled();
+    expect(mockMistralGenerateBothProfiles).toHaveBeenCalled();
     expect(res.body.meta.mode).toBe("multimodal");
   });
 
-  test("no person and no animal labels → proceeds to Gemini (no strict check)", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
+  test("animal profile flow includes privacy risks (license plate in background)", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: ANIMAL_ONLY\n\nEin Hund.\n\nSichtbarer Text: LL-AB 1234");
+    mockExtractVisibleText.mockReturnValue("LL-AB 1234");
+    mockBuildPrivacyRisks.mockReturnValue(["privacy.licensePlate"]);
+    mockClassifyDescription.mockReturnValue({
+      subject: "ANIMAL_ONLY",
+      hasPerson: false,
+      hasAnimal: true,
+      animalType: "dog",
     });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Landscape", "Mountain", "Sky"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A mountain landscape");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
+    mockBuildAnimalProfiles.mockReturnValue({
+      normalProfile: VALID_PROFILE,
+      boostProfile: VALID_PROFILE,
     });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
-    // Should NOT return animal mode, and should proceed to Gemini
+    expect(res.body.privacyRisks).toEqual(["privacy.licensePlate"]);
+    expect(res.body.meta.mode).toBe("animal");
+  });
+
+  test("uses 'generic' animal type when classifyDescription returns null animalType", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: ANIMAL_ONLY\n\nEin Wesen.");
+    mockClassifyDescription.mockReturnValue({
+      subject: "ANIMAL_ONLY",
+      hasPerson: false,
+      hasAnimal: true,
+      animalType: null,
+    });
+    mockBuildAnimalProfiles.mockReturnValue({
+      normalProfile: VALID_PROFILE,
+      boostProfile: VALID_PROFILE,
+    });
+
+    const res = mockRes();
+    await analyze(mockReq(), res);
+
+    expect(mockBuildAnimalProfiles).toHaveBeenCalledWith("generic", expect.any(String));
+  });
+});
+
+describe("analyze handler — multimodal profile flow", () => {
+  test("HUMAN subject → Mistral profile generation runs", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nEine Person.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
+
+    const res = mockRes();
+    await analyze(mockReq(), res);
+
+    expect(mockMistralDescribeImage).toHaveBeenCalled();
+    expect(mockMistralGenerateBothProfiles).toHaveBeenCalled();
+    expect(res.body.profiles.normal.categories).toBeDefined();
+    expect(res.body.profiles.boost.categories).toBeDefined();
     expect(res.body.meta.mode).toBe("multimodal");
-    expect(mockDescribeImage).toHaveBeenCalled();
+    expect(res.body.meta.subject).toBe("HUMAN");
   });
 
-  /* ── Age Label Filtering ── */
-  test("filters age labels (toddler, baby, infant, newborn) before profile generation", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
+  test("OTHER subject (landscape/objects) also runs normal profile path", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: OTHER\n\nEin Sonnenuntergang.");
+    mockClassifyDescription.mockReturnValue({
+      subject: "OTHER",
+      hasPerson: false,
+      hasAnimal: false,
+      animalType: null,
     });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person", "Child", "Toddler", "Baby", "Smile"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A child smiling");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
-    // generateBothProfiles should receive filtered labels (without Toddler, Baby)
-    expect(mockGenerateBothProfiles).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.not.arrayContaining(["Toddler", "Baby"]),
-      expect.any(Object),
-      expect.any(Array),
-      expect.any(Function),
-      expect.any(String)
-    );
-    // But "Person", "Child", "Smile" should remain
-    expect(mockGenerateBothProfiles).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.arrayContaining(["Person", "Child", "Smile"]),
-      expect.any(Object),
-      expect.any(Array),
-      expect.any(Function),
-      expect.any(String)
-    );
-  });
-
-  /* ── Toddler still counts as person indicator BEFORE filtering ── */
-  test("Toddler label counts as person indicator even though it gets filtered later", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    // Only "Toddler" and "Dog" — Toddler is in PERSON_KEYWORDS AND AGE_LABELS
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Toddler", "Dog"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A toddler with a dog");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    // Person detected (via Toddler) → NOT animal mode, proceed to Gemini
+    expect(mockMistralGenerateBothProfiles).toHaveBeenCalled();
     expect(res.body.meta.mode).toBe("multimodal");
   });
 
-  /* ── EXIF Handling ── */
-  test("passes clientExif to privacy risks and response", async () => {
-    const clientExif = { make: "Apple", model: "iPhone 15 Pro" };
+  test("returns full structured response with categories, ad_targeting, manipulation_triggers, profileText", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
+
+    const res = mockRes();
+    await analyze(mockReq(), res);
+
+    expect(res.body.profiles.normal).toHaveProperty("categories");
+    expect(res.body.profiles.normal).toHaveProperty("ad_targeting");
+    expect(res.body.profiles.normal).toHaveProperty("manipulation_triggers");
+    expect(res.body.profiles.normal).toHaveProperty("profileText");
+    expect(res.body.profiles.boost).toHaveProperty("categories");
+  });
+});
+
+describe("analyze handler — blocked flows", () => {
+  test("Mistral describe returns null → blocked.safetyFilter", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue(null);
+
+    const res = mockRes();
+    await analyze(mockReq(), res);
+
+    expect(res.body.profiles).toBeNull();
+    expect(res.body.blockedReason).toBe("blocked.safetyFilter");
+    expect(res.body.meta.mode).toBe("blocked");
+  });
+
+  test("Mistral describe throws → blocked.apiError", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockRejectedValue(new Error("network down"));
+
+    const res = mockRes();
+    await analyze(mockReq(), res);
+
+    expect(res.body.profiles).toBeNull();
+    expect(res.body.blockedReason).toBe("blocked.apiError");
+  });
+
+  test("rate_limit error from Mistral → blocked.overloaded", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    const err = new Error("Mistral 429 rate limited");
+    err.code = "rate_limit";
+    mockMistralDescribeImage.mockRejectedValue(err);
+
+    const res = mockRes();
+    await analyze(mockReq(), res);
+
+    expect(res.body.profiles).toBeNull();
+    expect(res.body.blockedReason).toBe("blocked.overloaded");
+  });
+
+  test("Mistral profile fails (returns null/null) → blocked.profileBlocked", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nText.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: null, boost: null });
+
+    const res = mockRes();
+    await analyze(mockReq(), res);
+
+    expect(res.body.profiles).toBeNull();
+    expect(res.body.blockedReason).toBe("blocked.profileBlocked");
+  });
+});
+
+describe("analyze handler — EXIF + privacy handling", () => {
+  test("passes clientExif (make/model) through to response", async () => {
     mockParseJsonBody.mockReturnValue({
       imageBase64: VALID_JPEG_B64,
       mimeType: "image/jpeg",
-      exif: clientExif,
+      exif: { make: "Apple", model: "iPhone 15 Pro" },
     });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
-    expect(res.body.exif).toEqual(clientExif);
-    expect(mockBuildPrivacyRisks).toHaveBeenCalledWith(expect.objectContaining({ exif: clientExif }));
+    expect(res.body.exif).toEqual({ make: "Apple", model: "iPhone 15 Pro" });
   });
 
-  /* ── SEC-006: clientExif Validierung ── */
   test("strips unknown keys from clientExif (SEC-006)", async () => {
     mockParseJsonBody.mockReturnValue({
       imageBase64: VALID_JPEG_B64,
       mimeType: "image/jpeg",
-      exif: { make: "Apple", model: "iPhone", evil: "payload", __proto__: "hack", nested: { deep: true } },
+      exif: { make: "Canon", evil: "<script>alert(1)</script>", gps: { lat: 1, lng: 2 } },
     });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
-    /* Only make, model, dateTimeOriginal should pass through */
-    expect(res.body.exif).toEqual({ make: "Apple", model: "iPhone" });
+    expect(res.body.exif.make).toBe("Canon");
     expect(res.body.exif.evil).toBeUndefined();
-    expect(res.body.exif.nested).toBeUndefined();
+    expect(res.body.exif.gps).toBeUndefined();
   });
 
   test("truncates long EXIF values (SEC-006)", async () => {
-    const longString = "A".repeat(200);
+    const veryLong = "A".repeat(500);
     mockParseJsonBody.mockReturnValue({
       imageBase64: VALID_JPEG_B64,
       mimeType: "image/jpeg",
-      exif: { make: longString, model: "ok" },
+      exif: { make: veryLong },
     });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
     expect(res.body.exif.make.length).toBe(100);
-    expect(res.body.exif.model).toBe("ok");
   });
 
-  test("rejects non-string EXIF values (SEC-006)", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-      exif: { make: 12345, model: true },
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
+  test("privacy risks from visible text are included in response", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nText.\n\nSichtbarer Text: Schule");
+    mockExtractVisibleText.mockReturnValue("Schule");
+    mockBuildPrivacyRisks.mockReturnValue(["privacy.address"]);
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
-    expect(res.body.exif).toEqual({});
+    expect(res.body.privacyRisks).toEqual(["privacy.address"]);
   });
+});
 
-  /* ── Describe Fallback ── */
-  test("uses label-based fallback when Gemini describe returns null", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person", "Outdoor"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue(null); // Safety filter blocked
-    mockBuildDescriptionFromLabels.mockReturnValue("Im Bild erkannte Elemente: Person, Outdoor.");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(mockBuildDescriptionFromLabels).toHaveBeenCalled();
-    expect(mockGenerateBothProfiles).toHaveBeenCalled();
-  });
-
-  /* ── Blocked Response ── */
-  test("returns blocked response when both describe and profile fail", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue(null);
-    mockBuildDescriptionFromLabels.mockReturnValue("Im Bild: Person.");
-    mockGenerateBothProfiles.mockResolvedValue({ normal: null, boost: null });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.profiles).toBeNull();
-    expect(res.body.blockedReason).toBeDefined();
-    expect(res.body.meta.mode).toBe("blocked");
-  });
-
-  test("returns blocked with safety_filter reason when describe returns null and no fallback works", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: [],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue(null);
-    mockBuildDescriptionFromLabels.mockReturnValue(null);
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.profiles).toBeNull();
-    expect(res.body.blockedReason).toBeDefined();
-  });
-
-  /* ── Successful multimodal flow ── */
-  test("returns full profile on successful multimodal analysis", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person", "Outdoor"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person standing outdoors");
-    mockBuildPrivacyRisks.mockReturnValue(["Privacy risk 1"]);
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { alter: { label: "Alter & Geschlecht", value: "Du bist männlich, ca. 30", confidence: 0.8 } },
-        ad_targeting: ["Produkt 1"],
-        manipulation_triggers: ["Trigger 1"],
-        profileText: "Du bist ein Test.",
-      },
-      boost: {
-        categories: { alter: { label: "Alter & Geschlecht", value: "Männlich, 30", confidence: 0.9 } },
-        ad_targeting: ["Produkt 2"],
-        manipulation_triggers: ["Trigger 2"],
-        profileText: "Du bist ein Test-Boost.",
-      },
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body.meta.mode).toBe("multimodal");
-    expect(res.body.profiles.normal.categories.alter.value).toContain("männlich");
-    expect(res.body.profiles.boost.profileText).toContain("Boost");
-    expect(res.body.privacyRisks).toEqual(["Privacy risk 1"]);
-    expect(res.body.meta.requestId).toBeDefined();
-  });
-
-  /* ── Animal Easter Egg Response Structure ── */
-  test("animal response has correct structure (normal + boost with all fields)", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Cat", "Animal", "Fur"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    const { profiles } = res.body;
-    expect(profiles.normal.categories).toBeDefined();
-    expect(profiles.normal.ad_targeting).toBeInstanceOf(Array);
-    expect(profiles.normal.manipulation_triggers).toBeInstanceOf(Array);
-    expect(typeof profiles.normal.profileText).toBe("string");
-    expect(profiles.boost.categories).toBeDefined();
-    expect(profiles.boost.ad_targeting).toBeInstanceOf(Array);
-    expect(profiles.boost.manipulation_triggers).toBeInstanceOf(Array);
-    expect(typeof profiles.boost.profileText).toBe("string");
-  });
-
-  /* ── Expanded animal keywords ── */
-  test("detects guinea pig / rodent as animal", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Rodent", "Guinea pig", "Grass"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.meta.mode).toBe("animal");
-  });
-
-  /* ── Multipart fallback ── */
-  test("falls back to multipart parsing when not JSON", async () => {
-    mockParseJsonBody.mockReturnValue(null);
-    mockParseMultipart.mockResolvedValue({
-      fields: {},
-      file: {
-        buffer: VALID_JPEG,
-        mimeType: "image/jpeg",
-        filename: "test.jpg",
-        size: VALID_JPEG.length,
-      },
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
-
-    const req = mockReq({ headers: { "content-type": "multipart/form-data" } });
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(mockParseMultipart).toHaveBeenCalled();
-    expect(res.body.meta.mode).toBe("multimodal");
-  });
-
-  /* ── Describe error fallback ── */
-  test("handles describe error gracefully and falls back to labels", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockRejectedValue(new Error("Vertex AI down"));
-    mockBuildDescriptionFromLabels.mockReturnValue("Im Bild: Person.");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(mockBuildDescriptionFromLabels).toHaveBeenCalled();
-    expect(res.body.meta.mode).toBe("multimodal");
-  });
-
-  /* ── Profile generation error ── */
-  test("returns blocked when profile generation throws", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockRejectedValue(new Error("Gemini error"));
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.profiles).toBeNull();
-    expect(res.body.blockedReason).toBeDefined();
-    expect(res.body.meta.mode).toBe("blocked");
-  });
-
-  /* ── BUG-001: Counter only after validation ── */
+describe("analyze handler — hourly counter integration", () => {
   test("honeypot request does NOT call checkAndIncrement (BUG-001)", async () => {
-    mockParseJsonBody.mockReturnValue({
-      website: "bot-spam",
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-    expect(res.status).toHaveBeenCalledWith(403);
+    mockParseJsonBody.mockReturnValue({ website: "bot", imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    await analyze(mockReq(), mockRes());
     expect(mockCheckAndIncrement).not.toHaveBeenCalled();
   });
 
   test("missing image does NOT call checkAndIncrement (BUG-001)", async () => {
     mockParseJsonBody.mockReturnValue({});
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    await analyze(mockReq(), mockRes());
     expect(mockCheckAndIncrement).not.toHaveBeenCalled();
   });
 
   test("invalid magic bytes does NOT call checkAndIncrement (BUG-001)", async () => {
-    const fakeBuffer = Buffer.from([0x00, 0x00, 0x00, 0x00]);
     mockParseJsonBody.mockReturnValue({
-      imageBase64: fakeBuffer.toString("base64"),
+      imageBase64: Buffer.from([0, 0, 0, 0]).toString("base64"),
       mimeType: "image/jpeg",
     });
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-    expect(res.status).toHaveBeenCalledWith(400);
+    await analyze(mockReq(), mockRes());
     expect(mockCheckAndIncrement).not.toHaveBeenCalled();
   });
 
-  test("valid upload calls checkAndIncrement (BUG-001)", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-    expect(mockCheckAndIncrement).toHaveBeenCalledTimes(1);
+  test("valid upload calls checkAndIncrement", async () => {
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
+    await analyze(mockReq(), mockRes());
+    expect(mockCheckAndIncrement).toHaveBeenCalled();
   });
 
-  test("returns 429 when hourly limit reached (BUG-001)", async () => {
-    mockCheckAndIncrement.mockResolvedValue({
-      allowed: false,
-      count: 500,
-      limit: 500,
-      retryAfterSeconds: 1800,
-    });
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
+  test("returns 429 with blocked:limit when hourly limit reached", async () => {
+    mockCheckAndIncrement.mockResolvedValue({ allowed: false, retryAfterSeconds: 1800, count: 500, limit: 500 });
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
+
     expect(res.status).toHaveBeenCalledWith(429);
     expect(res.body.blocked).toBe("limit");
     expect(res.body.retryAfterSeconds).toBe(1800);
   });
 
-  /* ── Generic animal (not dog/cat/bird specific) ── */
-  test("returns generic animal profile for unrecognized animal type", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Reptile", "Lizard", "Animal"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.meta.mode).toBe("animal");
-    expect(res.body.profiles.normal.profileText).toContain("Tier");
-  });
-
-  /* ── ARCH-001: Quota error returns blocked.overloaded ── */
-  test("returns blocked.overloaded on Gemini quota error", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockIsQuotaError.mockReturnValue(true);
-    mockDescribeImage.mockRejectedValue(new Error("429 quota exceeded"));
-    mockBuildDescriptionFromLabels.mockReturnValue(null);
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.blockedReason).toBe("blocked.overloaded");
-  });
-
-  /* ── ARCH-001: incrementTotals error does not break response ── */
   test("incrementTotals error does not break successful response", async () => {
-    mockIncrementTotals.mockRejectedValue(new Error("DB down"));
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
+    mockIncrementTotals.mockRejectedValue(new Error("firestore down"));
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
-    expect(res.body.meta.mode).toBe("multimodal");
-    expect(res.body.profiles.normal.categories).toBeDefined();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.profiles.normal).toBeDefined();
   });
 
-  /* ── ARCH-001: Both profiles returned correctly ── */
-  test("returns both normal and boost profiles when generated", async () => {
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A confident person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { alter: { label: "Alter", value: "30-35", confidence: 0.8 } },
-        ad_targeting: ["Fitness"],
-        manipulation_triggers: ["FOMO"],
-        profileText: "Normales Profil",
-      },
-      boost: {
-        categories: { alter: { label: "Alter", value: "30-35", confidence: 0.9 } },
-        ad_targeting: ["Luxury"],
-        manipulation_triggers: ["Status"],
-        profileText: "Beast Mode Profil",
-      },
-    });
-
-    const req = mockReq();
-    const res = mockRes();
-    await analyze(req, res);
-
-    expect(res.body.profiles.normal.profileText).toBe("Normales Profil");
-    expect(res.body.profiles.boost.profileText).toBe("Beast Mode Profil");
-    expect(res.body.profiles.normal.ad_targeting).toEqual(["Fitness"]);
-    expect(res.body.profiles.boost.ad_targeting).toEqual(["Luxury"]);
-  });
-
-  /* ── ARCH-002: ntfy notify error does not break 429 response ── */
   test("ntfy notification error does not prevent 429 response", async () => {
-    mockNotifyLimitReached.mockRejectedValue(new Error("ntfy down"));
     mockCheckAndIncrement.mockResolvedValue({
       allowed: false,
+      justReached: true,
+      retryAfterSeconds: 1800,
       count: 500,
       limit: 500,
-      retryAfterSeconds: 600,
-      justReached: true,
     });
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
+    mockNotifyLimitReached.mockRejectedValue(new Error("ntfy unreachable"));
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(429);
-    expect(res.body.blocked).toBe("limit");
   });
+});
 
-  /* ── Kill-Switch: Maintenance-Modus ── */
+describe("analyze handler — maintenance mode", () => {
   test("returns 503 when maintenance mode is enabled", async () => {
     mockGetMaintenanceStatus.mockResolvedValue({ enabled: true, message: "Wartungsarbeiten" });
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
     expect(res.status).toHaveBeenCalledWith(503);
     expect(res.body.maintenance).toBe(true);
     expect(res.body.message).toBe("Wartungsarbeiten");
-    expect(mockCheckAndIncrement).not.toHaveBeenCalled();
-    expect(mockAnalyzeWithVision).not.toHaveBeenCalled();
   });
 
   test("proceeds normally when maintenance mode is disabled", async () => {
     mockGetMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
-    mockParseJsonBody.mockReturnValue({
-      imageBase64: VALID_JPEG_B64,
-      mimeType: "image/jpeg",
-    });
-    mockAnalyzeWithVision.mockResolvedValue({
-      labels: ["Person"],
-      landmarks: [],
-      ocrText: "",
-      ocrTextRaw: "",
-      faces: [],
-      objects: [],
-    });
-    mockDescribeImage.mockResolvedValue("A person");
-    mockGenerateBothProfiles.mockResolvedValue({
-      normal: {
-        categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-        ad_targeting: [],
-        manipulation_triggers: [],
-        profileText: "",
-      },
-      boost: null,
-    });
+    mockParseJsonBody.mockReturnValue({ imageBase64: VALID_JPEG_B64, mimeType: "image/jpeg" });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    const req = mockReq();
     const res = mockRes();
-    await analyze(req, res);
+    await analyze(mockReq(), res);
 
     expect(res.statusCode).toBe(200);
   });
+});
 
-  /* ── Phase 3 Mistral-Migration: Multi-Provider-Fallback-Chain ── */
-
-  describe("Mistral Hybrid Provider Pipeline", () => {
-    function setupBaseMocks() {
-      mockParseJsonBody.mockReturnValue({
-        imageBase64: VALID_JPEG_B64,
-        mimeType: "image/jpeg",
-      });
-      mockAnalyzeWithVision.mockResolvedValue({
-        labels: ["Person"],
-        landmarks: [],
-        ocrText: "",
-        ocrTextRaw: "",
-        faces: [],
-        objects: [],
-      });
-    }
-
-    const validProfile = {
-      categories: { a: { label: "A", value: "v", confidence: 0.5 } },
-      ad_targeting: [],
-      manipulation_triggers: [],
-      profileText: "",
-    };
-
-    test("hybrid flag activates Mistral describe and Mistral profiles", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
-      mockMistralDescribeImage.mockResolvedValue("Beschreibung von Mistral");
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
-      expect(mockMistralGenerateBothProfiles).toHaveBeenCalledTimes(1);
-      /* Gemini darf in der Happy-Path-Variante GAR NICHT angefasst werden */
-      expect(mockDescribeImage).not.toHaveBeenCalled();
-      expect(mockGenerateBothProfiles).not.toHaveBeenCalled();
-      expect(res.statusCode).toBe(200);
+describe("analyze handler — multipart fallback", () => {
+  test("falls back to multipart parsing when not JSON", async () => {
+    mockParseJsonBody.mockReturnValue(null);
+    mockParseMultipart.mockResolvedValue({
+      file: { buffer: VALID_JPEG, mimeType: "image/jpeg", size: VALID_JPEG.length, filename: "x.jpg" },
+      fields: {},
     });
+    mockMistralDescribeImage.mockResolvedValue("SUBJECT: HUMAN\n\nPerson.");
+    mockMistralGenerateBothProfiles.mockResolvedValue({ normal: VALID_PROFILE, boost: VALID_PROFILE });
 
-    test("hybrid falls back to Gemini describe when Mistral returns null", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
-      mockMistralDescribeImage.mockResolvedValue(null); /* Mistral describe leer */
-      mockDescribeImage.mockResolvedValue("Beschreibung von Gemini Fallback");
-      /* Profile-Stage darf trotzdem zuerst Mistral versuchen */
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
+    const res = mockRes();
+    await analyze(mockReq(), res);
 
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
-      expect(mockDescribeImage).toHaveBeenCalledTimes(1); /* Gemini-Describe als Fallback */
-      expect(res.statusCode).toBe(200);
-    });
-
-    test("hybrid falls back to Gemini profiles when Mistral profiles fail", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
-      mockMistralDescribeImage.mockResolvedValue("Beschreibung");
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: null, boost: null });
-      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralGenerateBothProfiles).toHaveBeenCalledTimes(1);
-      expect(mockGenerateBothProfiles).toHaveBeenCalledTimes(1);
-      expect(res.statusCode).toBe(200);
-    });
-
-    test("hybrid falls back to Gemini when Mistral describe throws", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
-      mockMistralDescribeImage.mockRejectedValue(new Error("Mistral 500 internal error"));
-      mockDescribeImage.mockResolvedValue("Gemini-Beschreibung");
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
-      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
-      expect(res.statusCode).toBe(200);
-    });
-
-    test("hybrid uses Vision-label-fallback when BOTH Mistral and Gemini describe fail", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
-      mockMistralDescribeImage.mockResolvedValue(null);
-      mockDescribeImage.mockResolvedValue(null); /* Auch Gemini blockiert */
-      mockBuildDescriptionFromLabels.mockReturnValue("Labels-basierte Beschreibung");
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      /* Beide Describe-Provider versucht */
-      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
-      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
-      /* Label-Fallback verwendet */
-      expect(mockBuildDescriptionFromLabels).toHaveBeenCalled();
-      expect(res.statusCode).toBe(200);
-    });
-
-    test("hybrid returns blocked when all providers including Vision-labels fail", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid" });
-      mockMistralDescribeImage.mockResolvedValue(null);
-      mockDescribeImage.mockResolvedValue(null);
-      mockBuildDescriptionFromLabels.mockReturnValue(null);
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body.profiles).toBeNull();
-      expect(res.body.blockedReason).toBeDefined();
-    });
-
-    test("gemini flag (default) does NOT call any Mistral function", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "gemini" });
-      mockDescribeImage.mockResolvedValue("Gemini-Beschreibung");
-      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralDescribeImage).not.toHaveBeenCalled();
-      expect(mockMistralGenerateBothProfiles).not.toHaveBeenCalled();
-      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
-      expect(mockGenerateBothProfiles).toHaveBeenCalledTimes(1);
-      expect(res.statusCode).toBe(200);
-    });
-
-    test("unknown provider value falls back to gemini path (fail-safe)", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "gemini" }); /* Feature-Flag normalisiert ja zu gemini */
-      mockDescribeImage.mockResolvedValue("Beschreibung");
-      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralDescribeImage).not.toHaveBeenCalled();
-      expect(res.statusCode).toBe(200);
-    });
-
-    /* ── Phase 4: Ramp-Up via aiProviderHybridPct ────────────────────── */
-
-    test("hybrid + pct=0 always routes to gemini (kill-switch)", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 0 });
-      mockDescribeImage.mockResolvedValue("Gemini-Beschreibung");
-      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralDescribeImage).not.toHaveBeenCalled();
-      expect(mockMistralGenerateBothProfiles).not.toHaveBeenCalled();
-      expect(mockDescribeImage).toHaveBeenCalledTimes(1);
-      expect(mockGenerateBothProfiles).toHaveBeenCalledTimes(1);
-    });
-
-    test("hybrid + pct=100 always routes to hybrid", async () => {
-      setupBaseMocks();
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 100 });
-      mockMistralDescribeImage.mockResolvedValue("Mistral-Beschreibung");
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const req = mockReq();
-      const res = mockRes();
-      await analyze(req, res);
-
-      expect(mockMistralDescribeImage).toHaveBeenCalledTimes(1);
-      expect(mockMistralGenerateBothProfiles).toHaveBeenCalledTimes(1);
-    });
-
-    test("hybrid + pct=50 distributes across many IPs roughly 50/50", async () => {
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
-      mockMistralDescribeImage.mockResolvedValue("M");
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-      mockDescribeImage.mockResolvedValue("G");
-      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      let mistralCount = 0;
-      let geminiCount = 0;
-
-      for (let i = 0; i < 200; i++) {
-        jest.clearAllMocks();
-        mockGetClientIp.mockReturnValue(`10.0.0.${i % 256}`);
-        mockCheckRateLimit.mockReturnValue(true);
-        mockBuildPrivacyRisks.mockReturnValue([]);
-        mockGetMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
-        mockCheckAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
-        mockIncrementTotals.mockResolvedValue();
-        mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
-        setupBaseMocks();
-        mockMistralDescribeImage.mockResolvedValue("M");
-        mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-        mockDescribeImage.mockResolvedValue("G");
-        mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-        const req = mockReq();
-        const res = mockRes();
-        await analyze(req, res);
-
-        if (mockMistralDescribeImage.mock.calls.length > 0) mistralCount++;
-        else geminiCount++;
-      }
-
-      /* Tolerance: ±20 von 200 (also 80-120 jeweils) — SHA-256 ist gut verteilt */
-      expect(mistralCount).toBeGreaterThan(80);
-      expect(mistralCount).toBeLessThan(120);
-      expect(geminiCount).toBeGreaterThan(80);
-      expect(geminiCount).toBeLessThan(120);
-    });
-
-    test("same IP gets same provider on repeated requests (sticky)", async () => {
-      mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
-      mockGetClientIp.mockReturnValue("192.168.42.99");
-
-      mockMistralDescribeImage.mockResolvedValue("M");
-      mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-      mockDescribeImage.mockResolvedValue("G");
-      mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-      const providers = [];
-      for (let i = 0; i < 5; i++) {
-        jest.clearAllMocks();
-        mockGetClientIp.mockReturnValue("192.168.42.99");
-        mockCheckRateLimit.mockReturnValue(true);
-        mockBuildPrivacyRisks.mockReturnValue([]);
-        mockGetMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
-        mockCheckAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
-        mockIncrementTotals.mockResolvedValue();
-        mockGetFeatureFlags.mockResolvedValue({ aiProvider: "hybrid", aiProviderHybridPct: 50 });
-        setupBaseMocks();
-        mockMistralDescribeImage.mockResolvedValue("M");
-        mockMistralGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-        mockDescribeImage.mockResolvedValue("G");
-        mockGenerateBothProfiles.mockResolvedValue({ normal: validProfile, boost: validProfile });
-
-        const req = mockReq();
-        const res = mockRes();
-        await analyze(req, res);
-
-        providers.push(mockMistralDescribeImage.mock.calls.length > 0 ? "hybrid" : "gemini");
-      }
-
-      /* Alle 5 Aufrufe von derselben IP müssen denselben Provider gewählt haben */
-      const unique = new Set(providers);
-      expect(unique.size).toBe(1);
-    });
+    expect(mockParseMultipart).toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
   });
 });

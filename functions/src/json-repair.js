@@ -27,7 +27,7 @@ try {
   json5 = null;
 }
 
-/* Maximale Größe pro String-Feld nach Repair (gleiche Bounds wie SEC-004 in gemini.js). */
+/* Maximale Größe pro String-Feld nach Repair (SEC-004 Bounds). */
 const STRING_BOUND_CATEGORY = 800;
 const STRING_BOUND_AD_TARGETING = 300;
 const STRING_BOUND_MANIPULATION = 500;

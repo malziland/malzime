@@ -4,37 +4,107 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.6.0] — 2026-05-14
+
+### Architektur-Wechsel: Pure-Mistral-only (Vision + Gemini entfernt)
+
+malziME nutzt seit v1.6.0 ausschliesslich **Mistral AI** (Paris, EU) als KI-Anbieter. Google Vertex AI (Gemini) und Google Cloud Vision API sind komplett aus der Pipeline entfernt. Google bleibt nur fuer Firebase Hosting + Cloud Functions + Firestore (alles in `europe-west1`).
+
+**Hintergrund:** v1.5.x hatte Mistral schrittweise neben Gemini eingefuehrt. User-Entscheidung am 2026-05-13: keine weiteren Zwischenversionen — naechster Live-Deploy soll bereits die saubere Mistral-only-Architektur enthalten.
+
+### Entfernt
+
+- **`functions/src/gemini.js`** — komplett geloescht. Vertex AI Gemini wird nicht mehr aufgerufen.
+- **`functions/src/vision.js`** — komplett geloescht. Cloud Vision API wird nicht mehr aufgerufen.
+- **`functions/src/feature-flags.js`** — komplett geloescht. Provider-Auswahl entfaellt, weil es nur noch einen Provider gibt.
+- **`functions/src/__tests__/gemini.test.js`, `vision.test.js`, `feature-flags.test.js`** — komplett geloescht.
+- **`@google-cloud/vision`** und **`@google/genai`** aus `functions/package.json` Dependencies entfernt. `package-lock.json` regeneriert.
+- **`config.js`:** `DESCRIBE_MODELS`, `PROFILE_MODELS` und weitere nicht mehr genutzte Konstanten raus.
+- **`index.js`:** Vertex-AI-bezogene Initialisierung raus (war ohnehin nur noch im Kommentar). `MISTRAL_API_KEY`-Secret-Bindings bleiben.
+- **Multi-Provider-Fallback-Chain** in `handle-analyze.js` entfernt — die Pipeline ruft direkt Mistral, ohne Wahllogik.
+
+### Geaendert
+
+- **`functions/src/handle-analyze.js`:** komplett vereinfacht.
+  - Keine Vision-API-Vorabverarbeitung mehr — die Pipeline ruft direkt Mistral Large 3 fuer die Bildbeschreibung.
+  - SUBJECT-Klassifikation aus der `SUBJECT:`-Kopfzeile in Mistrals Antwort (siehe Prompt-Aenderung unten) entscheidet, ob ein Tier-Easter-Egg oder ein normales Profil generiert wird.
+  - Privacy-Risks werden aus dem "Sichtbarer Text:"-Marker in der Mistral-Beschreibung extrahiert.
+  - Wenn Mistral fehlschlaegt, gibt es keinen Fallback-Provider — der User bekommt eine `blocked.apiError`- oder `blocked.overloaded`-Response.
+- **`functions/src/animal.js`:** komplett umgebaut.
+  - `classifyLabels(labels)` -> `classifyDescription(description)`. Parsing der `SUBJECT:`-Zeile (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`). Bei `ANIMAL_ONLY`: zusaetzliches Keyword-Matching im Beschreibungstext, um den konkreten Tier-Typ fuer das Easter-Egg-Profil zu bestimmen.
+  - `buildAnimalProfiles(rawLabelsLower, lang)` -> `buildAnimalProfiles(animalType, lang)`. Direkter Tier-Typ-Parameter statt Label-Liste.
+  - `AGE_LABELS`-Export entfaellt (gab es zur Vision-API-Label-Filterung — wird nicht mehr gebraucht).
+- **`functions/src/privacy.js`:** komplett umgebaut.
+  - Neuer Helper `extractVisibleText(description)` parst die `"Sichtbarer Text:"`- bzw. `"Visible text:"`-Zeile aus der Mistral-Antwort.
+  - `buildPrivacyRisks({ visibleText, fullDescription })` ersetzt die alte Signatur mit `{ ocrText, labels }`. Adresse + Telefon werden nur auf der "Sichtbarer Text:"-Zeile gesucht (sonst False Positives aus der Prosa), das Kfz-Kennzeichen-Muster laeuft ueber die ganze Beschreibung.
+- **`functions/src/locales/{de,en}/prompts.js`:** Der `mistralDescribeAddendum` enthaelt jetzt eine vorgegebene `SUBJECT:`-Kopfzeile zusaetzlich zur bestehenden "Sichtbarer Text:"-Pflicht. Mistral muss die Kopfzeile als allererste Zeile seiner Antwort liefern.
+- **`functions/src/__tests__/i18n-guardian.test.js`:** `animal.js` zur Allowlist hinzugefuegt (enthaelt deutsche Keywords als Suchpatterns — kein UI-Text).
+
+### Frontend-Locales
+
+- **`public/locales/de.json` + `en.json`:** `blocked.safetyFilter` und `blocked.safetyFilterFallback` neutralisiert — keine Google-Referenzen mehr (Texte sprechen jetzt von "KI-Anbieter" allgemein).
+
+### Datenschutzerklaerung + Nutzungsbedingungen
+
+- **`public/datenschutz.html`:**
+  - Schritt 3 "Was passiert mit meinem Foto?" komplett neu: nur noch Mistral AI als KI-Verarbeiter.
+  - "Wer ist beteiligt?"-Tabelle: Vertex AI Gemini-Zeile + Cloud Vision API-Zeile entfernt. Nur Mistral, Firebase Hosting/Functions, Firestore, OpenStreetMap.
+  - "Das Rechtliche"-Abschnitt: Mistral AI SAS (Paris) als Auftragsverarbeiter; Google nur noch als Infrastruktur-Partner ohne KI-Zugriff. Verweis auf Mistral DPA + Trust Center.
+  - Stand-Datum 13. Mai 2026. Cache-Buster `?v=2026051301`.
+- **`public/nutzungsbedingungen.html`:** Abschnitt 5 + 6 (illegale Inhalte, KI-Anbieter) angepasst.
+
+### Dokumentation
+
+- `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/SETUP.md`, `docs/SELF-HOSTING.md`, `SECURITY.md`, `CONTRIBUTING.md` — alle auf Mistral-only-Architektur umgeschrieben. Vision-API-Hinweise + Gemini-Modelle + Multi-Provider-Fallback-Chain-Beschreibungen entfernt.
+
+### Timeouts angehoben (Mistral ist langsamer als Gemini)
+
+Mistral Large 3 braucht laut Tests rund 3,5x so lang wie Gemini 2.5 Flash. Mit der bisherigen Timeout-Kaskade (60s Frontend / 60s Mistral-Call / 90s Backend-Budget / 120s Cloud-Function) waren Frontend-Abbrueche bei langsamen Describes praktisch garantiert. Neue Werte:
+
+- **`MISTRAL_TIMEOUT_MS`** (`functions/src/config.js`): 60s -> **90s**
+- **`REQUEST_BUDGET_MS`** (`functions/src/config.js`): 90s -> **120s**
+- **`FETCH_TIMEOUT_MS`** (`public/js/api.js`): 60s -> **180s**
+- **Cloud-Function `timeoutSeconds`** (`functions/src/index.js`): 120s -> **180s**
+
+Kaskade ist jetzt: Mistral-Call (90s) < Backend-Budget (120s) < Cloud-Function-Hardlimit (180s) = Frontend-Wartezeit. Frontend bricht nicht mehr ab, bevor das Backend fertig sein kann.
+
+### Behoben
+
+- **Kfz-Kennzeichen-Erkennung verbreitert** (`privacy.js`): Der Kennzeichen-Regex lief nur auf der "Sichtbarer Text:"-Zeile. Erwaehnt Mistral ein Kennzeichen nur im Beschreibungs-Fliesstext, ging es verloren. Jetzt scannt das Muster die komplette Beschreibung — das Muster (`X-XX 1234`) ist spezifisch genug, dass das keine False Positives erzeugt.
+- **API-Fehler korrekt gelabelt** (`mistral.js`): Ein echter Mistral-API-/Netzwerk-Fehler (HTTP 5xx) wurde stillschweigend als `null` zurueckgegeben und vom Caller faelschlich als `blocked.safetyFilter` ausgewiesen. `tryDescribeWithPrompt` wirft jetzt `code: "api_error"`, `describeImage` propagiert ihn — der User bekommt `blocked.apiError`. Echte leere Antworten bleiben `blocked.safetyFilter`.
+
+### Dev-Tools
+
+- **`functions/scripts/compare-models.js` + `test-prompts.js` geloescht** — waren das Gemini-vs-Mistral-Vergleichstooling, in v1.6.0 funktionslos (haengen an geloeschtem `gemini.js`/`vision.js`).
+- **`functions/scripts/test-subject.js` neu** — prueft die v1.6.0-Tiererkennung gegen echte Bilder ohne Deploy: ruft `mistral.describeImage()` + `classifyDescription()` auf und zeigt pro Durchlauf die `SUBJECT:`-Kopfzeile + Einordnung. Siehe `docs/SETUP.md`.
+
+### Tests
+
+- 282 Backend-Tests gruen (vorher 394 in v1.5.3; rueckwirkend weniger weil ganze Test-Suiten fuer entfernte Module weggefallen sind, dann +3 fuer die Behoben-Fixes).
+- 139 Frontend-Tests gruen.
+- ESLint + Prettier sauber.
+
+### Migrations-Hinweise fuer Self-Hoster
+
+- `MISTRAL_API_KEY` Firebase Secret muss gesetzt sein — siehe `docs/SETUP.md`.
+- Cloud Vision API und Vertex AI im Google Cloud Console koennen nach Deploy deaktiviert werden (sparen Kosten).
+- Firestore-Doc `featureFlags/current` aus Phase 3/4 wird nicht mehr gelesen — kann manuell geloescht werden, ist aber harmlos wenn es liegen bleibt.
+
 ## [1.5.3] — 2026-05-12
 
-### Verbesserungen (Phase 4 der Mistral-Migration — Auto-Ramp aktiviert)
+### Phase 4 der Mistral-Migration — Auto-Ramp (in v1.6.0 wieder entfernt)
 
-- **`functions/src/config.js`** erweitert um:
-  - `MISTRAL_RAMP_START_ISO = "2026-05-12T22:15:00Z"` — fixer Startzeitpunkt der Auto-Ramp (00:15 Wien am 13.05.).
-  - `MISTRAL_RAMP_SCHEDULE` — hartcodierter 8-Tage-Plan: Tag 1 = 1 %, Tag 2 = 10 %, Tag 3-5 = 33 %, Tag 6-7 = 66 %, Tag 8+ = 100 %.
-  - **Beide Konstanten und die zugehörige Logik sind explizit als Phase-4-temporär markiert** (ASCII-Kommentar-Box ╔═╗) und müssen in Phase 6 (Cleanup) entfernt werden. Konkrete Checkliste in `memory/mistral-migration-plan.md`.
-- **`functions/src/feature-flags.js`** erweitert um:
-  - `calculateRampPct(now)` — berechnet aktuellen Pct aus dem hartcodierten Schedule und der vergangenen Zeit seit RAMP_START.
-  - **Auto-Ramp ist der neue Default-Pfad** in `resolveProvider`. Override-Hierarchie:
-    1. `aiProvider="gemini"` → IMMER Gemini (Kill-Switch).
-    2. `aiProviderHybridPct` (Zahl) in Firestore → manueller Pct-Override.
-    3. `aiProvider="hybrid"` → 100 % Hybrid (Force).
-    4. `aiProvider="auto"` oder kein Firestore-Doc → Auto-Ramp aus Code.
-  - `DEFAULT_FLAGS.aiProvider` jetzt `"auto"` (vorher `"gemini"`). `ALLOWED_AI_PROVIDERS` erweitert um `"auto"`.
-  - `aiProviderHybridPct` Default-Wert ist jetzt `undefined` (vorher hartcodiert auf 100). Bei `undefined` greift Auto-Ramp.
-- **`resolveProvider` nimmt jetzt einen optionalen `now`-Parameter** (Default `Date.now()`), damit Tests deterministisch über die ganze 8-Tage-Ramp-Phase verifizieren können.
-- **12 neue Tests** in `feature-flags.test.js`: `calculateRampPct` für alle Schedule-Schritte, `resolveProvider` mit Auto-Ramp-Default, Kill-Switch-Wirkung auch nach Tag 8, manueller Pct-Override schlägt Auto-Ramp.
-- **Bestehende Tests angepasst** an den neuen Auto-Default: 5 Stellen die vorher Gemini-Default erwarteten geben jetzt Auto-Pfad oder explizit gesetzten Override.
-- **394 Backend-Tests** alle grün (vorher 382, +12 neu).
+v1.5.3 brachte einen hartcodierten 8-Tage-Auto-Ramp, der den Mistral-Anteil
+schrittweise hochfahren sollte. Die Provider-Wahl lief ueber IP-Hash-Sampling
+in `feature-flags.js`, mit einer Firestore-Notbremse als Override.
 
-### Aktivierungs-Workflow
-
-- **Keine manuelle Aktion erforderlich.** Mit Deploy beginnt der Code, ab `2026-05-12T22:15:00Z` UTC den Hybrid-Anteil schrittweise nach dem Schedule zu steigern.
-- **Notbremse via Firestore** (alle Optionen ohne Code-Änderung, alle in 30s wirksam):
-  - `{ aiProvider: "gemini" }` → Kill-Switch, alles auf Gemini zurück.
-  - `{ aiProviderHybridPct: 0 }` → Ramp pausieren.
-  - `{ aiProviderHybridPct: N }` → auf festem Wert halten (z.B. 10 für "auf Tag 2 stehen bleiben").
-  - `{ aiProvider: "hybrid" }` → sofort 100 % Hybrid (Ramp überspringen).
-- **MISTRAL_API_KEY Firebase Secret** ist seit v1.5.2 (Phase 3) gesetzt — wird ab der ersten Hybrid-Auswahl gelesen.
+**Der Ramp hat in der Praxis nicht wie gedacht funktioniert.** Das IP-basierte
+Sampling ist "sticky" pro IP — bei Workshop-Gruppen hinter einer gemeinsamen
+NAT-IP landet die ganze Gruppe im selben Sample-Bucket, also entweder 0 % oder
+100 % Mistral, nie ein echter gradueller Ramp. In den Live-Logs kam ueber den
+Tag-1-Anteil (1 %) dadurch kein einziger Mistral-Call zustande. Der gesamte
+Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
+`feature-flags.js`) wurde in v1.6.0 ersatzlos entfernt.
 
 ## [1.5.2] — 2026-05-12
 

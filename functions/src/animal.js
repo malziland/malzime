@@ -1,155 +1,116 @@
 "use strict";
 
 /**
- * animal.js — Label-Klassifizierung (Person/Tier) und Tier-Profil-Generierung.
+ * animal.js — Subject-Klassifikation aus Mistral-Beschreibungstext.
  *
- * Extrahiert aus index.js, damit die Logik testbar und wiederverwendbar ist.
- * Deutsche Texte liegen in locales/de/animals.js (i18n-Vorbereitung).
+ * Seit v1.6.0 (Pure-Mistral-Architektur) gibt es KEINE Vision-API mehr.
+ * Tier-/Personen-Erkennung läuft jetzt über zwei Quellen:
+ *
+ *  1. SUBJECT-Kopfzeile in Mistrals Bildbeschreibung
+ *     (Format "SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER" — siehe
+ *     prompts.js mistralDescribeAddendum).
+ *
+ *  2. Wenn SUBJECT == ANIMAL_ONLY: Keyword-Match im Beschreibungstext,
+ *     um die konkrete Tierart fürs Easter-Egg-Profil zu wählen
+ *     (Hund/Katze/Vogel/Fisch/Pferd/Kaninchen/generic).
+ *
+ * Die deutschen Tier-Profile selbst liegen in locales/de/animals.js.
  */
 
 const { loadAnimals } = require("./i18n");
 
-const PERSON_KEYWORDS = [
-  "person",
-  "people",
-  "human",
-  "man",
-  "woman",
-  "boy",
-  "girl",
-  "child",
-  "baby",
-  "toddler",
-  "infant",
-  "face",
-  "selfie",
-  "portrait",
-  "skin",
-  "head",
-  "smile",
-  "beard",
-  "hair",
-  "eyebrow",
-  "forehead",
-  "teenager",
-  "adolescent",
-  "youth",
-  "adult",
-  "senior",
-  "standing",
-  "sitting",
-  "walking",
-  "arm",
-  "leg",
-  "hand",
-  "finger",
-  "shoulder",
-  "neck",
-  "clothing",
-  "fashion",
-  "outerwear",
-  "footwear",
-  "jeans",
-  "denim",
-  "jacket",
-  "sweater",
-  "shirt",
-  "dress",
-  "pants",
-  "shorts",
-  "sneakers",
-  "shoe",
-  "boot",
-  "hat",
-  "cap",
-];
+const VALID_SUBJECTS = new Set(["ANIMAL_ONLY", "HUMAN", "MIXED", "OTHER"]);
+const SUBJECT_REGEX = /^SUBJECT:\s*(ANIMAL_ONLY|HUMAN|MIXED|OTHER)\b/im;
 
-const ANIMAL_KEYWORDS = [
-  "dog",
-  "cat",
-  "animal",
-  "pet",
-  "bird",
-  "fish",
-  "horse",
-  "kitten",
-  "puppy",
-  "rabbit",
-  "hamster",
-  "turtle",
-  "parrot",
-  "cow",
-  "sheep",
-  "goat",
-  "deer",
-  "wildlife",
-  "insect",
-  "butterfly",
-  "reptile",
-  "frog",
-  "lizard",
-  "snake",
-  "rodent",
-  "guinea pig",
-  "chinchilla",
-  "ferret",
-  "hedgehog",
-  "mouse",
-  "rat",
-  "pony",
-  "donkey",
-  "pig",
-  "chicken",
-  "duck",
-  "goose",
-  "owl",
-  "penguin",
-  "dolphin",
-  "whale",
-  "squirrel",
-];
+/* Tier-Typ-Keywords für Easter-Egg-Auswahl. Pro Typ deutsche UND englische
+   Begriffe, damit das System auch in den anderen Locales funktioniert. */
+const TYPE_KEYWORDS = Object.freeze({
+  dog: ["hund", "hunde", "welpe", "welpen", "dog", "dogs", "puppy", "puppies"],
+  cat: ["katze", "katzen", "kätzchen", "kater", "cat", "cats", "kitten", "kittens"],
+  bird: [
+    "vogel",
+    "vögel",
+    "papagei",
+    "papageien",
+    "huhn",
+    "ente",
+    "eule",
+    "bird",
+    "birds",
+    "parrot",
+    "owl",
+    "chicken",
+    "duck",
+    "penguin",
+  ],
+  fish: ["fisch", "fische", "goldfisch", "goldfische", "fish", "goldfish", "shark"],
+  horse: ["pferd", "pferde", "pony", "fohlen", "esel", "horse", "horses", "donkey"],
+  rabbit: ["kaninchen", "hase", "hasen", "hamster", "meerschweinchen", "rabbit", "bunny", "hamster", "guinea pig"],
+});
 
-/* Alters-Labels der Vision API sind unzuverlässig und vergiften die
-   Profilgenerierung (z.B. "Toddler" für 10-Jährige). Rausfiltern. */
-const AGE_LABELS = ["toddler", "baby", "infant", "newborn"];
-
-/* BUG-014: Pre-compiled Word-Boundary-Patterns statt Substring-Matching.
-   Verhindert False Positives wie "armchair" → "arm" → hasPerson. */
-const PERSON_PATTERNS = PERSON_KEYWORDS.map((kw) => new RegExp(`\\b${kw}\\b`));
-const ANIMAL_PATTERNS = ANIMAL_KEYWORDS.map((kw) => new RegExp(`\\b${kw}\\b`));
+const TYPE_PATTERNS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(TYPE_KEYWORDS).map(([type, kws]) => [
+      type,
+      kws.map((kw) => new RegExp(`\\b${kw.replace(/\s+/g, "\\s+")}\\b`, "i")),
+    ])
+  )
+);
 
 /**
- * Löst einen typ-spezifischen oder gemeinsamen Wert auf.
+ * Parst die SUBJECT-Kopfzeile aus Mistrals Bildbeschreibung und entscheidet:
+ * Mensch im Bild? Tier im Bild? Wenn Tier-only: welche Art?
  *
- * @param {string|object} data — String (gemeinsam) oder Object mit Typ-Keys + `_` Default
- * @param {string} type — Tier-Typ-Key (z.B. "dog", "cat", "generic")
- * @returns {string}
+ * Fail-safe: wenn keine SUBJECT-Zeile vorhanden ist, gilt das Bild als HUMAN
+ * (restriktivste Annahme — kein Easter-Egg, normale Profil-Pipeline läuft).
+ *
+ * @param {string} description — Mistral-Beschreibungstext (mit SUBJECT-Kopfzeile)
+ * @returns {{ subject: string, hasPerson: boolean, hasAnimal: boolean, animalType: string|null }}
  */
+function classifyDescription(description) {
+  if (!description || typeof description !== "string") {
+    return { subject: "HUMAN", hasPerson: true, hasAnimal: false, animalType: null };
+  }
+
+  const match = description.match(SUBJECT_REGEX);
+  const subject = match && VALID_SUBJECTS.has(match[1].toUpperCase()) ? match[1].toUpperCase() : "HUMAN";
+
+  const hasPerson = subject === "HUMAN" || subject === "MIXED";
+  const hasAnimal = subject === "ANIMAL_ONLY" || subject === "MIXED";
+
+  let animalType = null;
+  if (subject === "ANIMAL_ONLY") {
+    animalType = detectAnimalType(description);
+  }
+
+  return { subject, hasPerson, hasAnimal, animalType };
+}
+
+/**
+ * Sucht im Text nach Keywords für die unterstützten Tier-Typen.
+ * Erster Treffer gewinnt. Fallback "generic", wenn keine konkrete Art erkannt wird.
+ *
+ * @param {string} description
+ * @returns {string} — einer von "dog" | "cat" | "bird" | "fish" | "horse" | "rabbit" | "generic"
+ */
+function detectAnimalType(description) {
+  for (const [type, patterns] of Object.entries(TYPE_PATTERNS)) {
+    if (patterns.some((re) => re.test(description))) return type;
+  }
+  return "generic";
+}
+
+/* ── Profil-Generierung aus Locale-Daten (unverändert seit v1.5.x) ── */
+
 function resolve(data, type) {
   if (typeof data === "string") return data;
   return data[type] || data._ || "";
 }
 
-/**
- * Ersetzt {{placeholder}} in einem Text durch Werte aus vars.
- *
- * @param {string} text — Text mit {{key}}-Platzhaltern
- * @param {object} vars — Key-Value-Paare für die Ersetzung
- * @returns {string}
- */
 function fillTemplate(text, vars) {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] || key);
 }
 
-/**
- * Baut ein Profil-Objekt (normal oder boost) aus Locale-Daten.
- *
- * @param {object} modeData — normal- oder boost-Daten aus der Locale-Datei
- * @param {object} labels — Label-Übersetzungen (z.B. { alter: "Alter", ... })
- * @param {object} typeInfo — Typ-Infos (tierName, dein, Dein, deinem)
- * @param {string} type — Tier-Typ-Key
- * @returns {object}
- */
 function buildProfile(modeData, labels, typeInfo, type) {
   const categories = {};
   for (const [key, catData] of Object.entries(modeData.categories)) {
@@ -171,61 +132,27 @@ function buildProfile(modeData, labels, typeInfo, type) {
 }
 
 /**
- * Klassifiziert rohe Vision-Labels in Person/Tier.
+ * Erzeugt das Normal- und Boost-Profil für eine erkannte Tierart.
  *
- * @param {string[]} labels — Rohe Label-Strings von der Vision API
- * @returns {{ hasPerson: boolean, hasAnimal: boolean, rawLabelsLower: string[] }}
- */
-function classifyLabels(labels) {
-  const rawLabelsLower = labels.map((l) => l.toLowerCase());
-  const hasPerson = rawLabelsLower.some((l) => PERSON_PATTERNS.some((re) => re.test(l)));
-  const hasAnimal = rawLabelsLower.some((l) => ANIMAL_PATTERNS.some((re) => re.test(l)));
-  return { hasPerson, hasAnimal, rawLabelsLower };
-}
-
-/**
- * Erzeugt das Normal- und Boost-Profil für ein erkanntes Tier.
- *
- * @param {string[]} rawLabelsLower — Bereits klein-geschriebene Labels
+ * @param {string} animalType — aus classifyDescription().animalType (oder "generic")
+ * @param {string} lang — Sprachcode
  * @returns {{ normalProfile: object, boostProfile: object }}
  */
-function buildAnimalProfiles(rawLabelsLower, lang) {
+function buildAnimalProfiles(animalType, lang) {
   const animalData = loadAnimals(lang || "de");
-  const detectedAnimals = rawLabelsLower.filter((l) => ANIMAL_PATTERNS.some((re) => re.test(l)));
-  const isDog = detectedAnimals.some((l) => l.includes("dog") || l.includes("puppy"));
-  const isCat = detectedAnimals.some((l) => l.includes("cat") || l.includes("kitten"));
-  const isBird = detectedAnimals.some((l) => l.includes("bird") || l.includes("parrot"));
-  const isFish = detectedAnimals.some((l) => l.includes("fish"));
-  const isHorse = detectedAnimals.some((l) => l.includes("horse"));
-  const isRabbit = detectedAnimals.some((l) => l.includes("rabbit") || l.includes("hamster"));
-
-  const type = isDog
-    ? "dog"
-    : isCat
-      ? "cat"
-      : isBird
-        ? "bird"
-        : isFish
-          ? "fish"
-          : isHorse
-            ? "horse"
-            : isRabbit
-              ? "rabbit"
-              : "generic";
-
+  const type = animalType && animalData.types[animalType] ? animalType : "generic";
   const typeInfo = animalData.types[type];
   const { labels } = animalData;
-
   const normalProfile = buildProfile(animalData.normal, labels, typeInfo, type);
   const boostProfile = buildProfile(animalData.boost, labels, typeInfo, type);
-
   return { normalProfile, boostProfile };
 }
 
 module.exports = {
-  PERSON_KEYWORDS,
-  ANIMAL_KEYWORDS,
-  AGE_LABELS,
-  classifyLabels,
+  classifyDescription,
+  detectAnimalType,
   buildAnimalProfiles,
+  TYPE_KEYWORDS,
+  VALID_SUBJECTS,
+  SUBJECT_REGEX,
 };

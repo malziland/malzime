@@ -21,7 +21,18 @@ git clone https://github.com/DEIN-USERNAME/malzime.git
 cd malzime
 ```
 
-## 2. Google Cloud Projekt erstellen
+## 2a. Mistral AI Account einrichten
+
+malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
+
+1. Account erstellen auf [console.mistral.ai](https://console.mistral.ai/)
+2. Stripe-Karte hinterlegen, **Scale Tier** aktivieren — Free Tier reicht nicht fuer Image-Calls
+3. API-Key generieren unter https://console.mistral.ai/api-keys/
+4. Key sofort sichern (wird nur einmal angezeigt) — wird in Schritt 5g als Firebase Secret hinterlegt
+
+Kosten: Pay-per-Use, ein Workshop mit 30 Teilnehmer:innen kostet ca. $0.35.
+
+## 2b. Google Cloud Projekt erstellen (nur fuer Infrastruktur)
 
 1. Gehe zu [console.cloud.google.com](https://console.cloud.google.com)
 2. Erstelle ein neues Projekt (z.B. `mein-malzime`)
@@ -29,13 +40,11 @@ cd malzime
 
 ### APIs aktivieren
 
-Im Google Cloud Console unter **APIs & Services > Library** diese beiden APIs aktivieren:
+Im Google Cloud Console unter **APIs & Services > Library**:
 
-- **Cloud Vision API** — fuer Texterkennung und Label-Erkennung
-- **Vertex AI API** — fuer Gemini (Bildbeschreibung + Profilgenerierung)
-- **Cloud Firestore** — fuer den Analyse-Zaehler und das Stundenlimit (wird automatisch mit Firebase aktiviert)
+- **Cloud Firestore** — fuer den Analyse-Zaehler, das Stundenlimit und den Maintenance-Modus (wird automatisch mit Firebase aktiviert)
 
-> **Wichtig**: Die EU Vision API (`eu-vision.googleapis.com`) unterstuetzt nur `TEXT_DETECTION` und `LABEL_DETECTION`. Andere Features wie `FACE_DETECTION` oder `OBJECT_LOCALIZATION` wuerden den gesamten API-Call crashen.
+Cloud Vision API und Vertex AI sind NICHT mehr noetig (seit v1.6.0). Falls du sie zuvor aktiviert hattest, kannst du sie zur Kosten-Einsparung deaktivieren — die Pipeline nutzt sie nicht.
 
 ## 3. Firebase Projekt erstellen
 
@@ -88,19 +97,9 @@ const ALLOWED_ORIGINS = [
 ];
 ```
 
-### 5b. Backend: Projekt-ID Fallback
+### 5b. Backend: Projekt-ID Fallback (entfaellt seit v1.6.0)
 
-**Datei:** `functions/src/gemini.js` (Zeile 83)
-
-```js
-// Vorher:
-const project = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "malzime";
-
-// Nachher — deine Projekt-ID:
-const project = process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || "DEIN-PROJEKT";
-```
-
-> Normalerweise wird die Projekt-ID automatisch erkannt. Der Fallback greift nur in seltenen Faellen.
+Vor v1.6.0 stand in `gemini.js` ein hartcodierter Projekt-Fallback (`"malzime"`). Mit dem Cleanup ist die Datei entfernt — Cloud Functions erkennt die Projekt-ID heute automatisch via `process.env.GCLOUD_PROJECT`. Keine Anpassung noetig.
 
 ### 5c. Frontend: Nominatim User-Agent
 
@@ -153,16 +152,22 @@ Wenn du die Texte anpassen oder eine neue Sprache hinzufuegen willst:
 
 ### 5g. Firebase Secrets
 
-Die Cloud Functions benoetigen Firebase Secrets fuer Admin-Endpunkte und optionale Push-Benachrichtigungen:
+Die Cloud Functions benoetigen Firebase Secrets fuer Admin-Endpunkte, den Mistral-Provider und optionale Push-Benachrichtigungen:
 
 ```bash
 # Pflicht: Admin-Token fuer Boost/Reset-Endpunkte
 firebase functions:secrets:set ADMIN_SECRET
 
+# Pflicht: Mistral API-Key fuer Primaer-Provider (Hybrid)
+# WICHTIG: printf statt echo, damit kein Trailing-Newline im Secret landet!
+printf "%s" "DEIN_MISTRAL_KEY" | firebase functions:secrets:set MISTRAL_API_KEY --data-file=-
+
 # Optional: ntfy Push-Benachrichtigungen bei Limit-Erreichung
 firebase functions:secrets:set NTFY_URL      # z.B. https://ntfy.example.com
 firebase functions:secrets:set NTFY_TOPIC    # z.B. malzime-alerts
 ```
+
+Wenn `MISTRAL_API_KEY` fehlt oder ungueltig ist, faellt die Pipeline automatisch auf den Gemini-Fallback zurueck — die App bleibt funktionsfaehig.
 
 Wenn du keine ntfy-Benachrichtigungen willst, setze die Secrets auf einen Platzhalter-Wert (z.B. `none`). Der Code erkennt ungueltige URLs und sendet dann keine Benachrichtigungen.
 
@@ -228,7 +233,7 @@ Bevor du live gehst:
 - [ ] User-Agent in geocoding.js enthaelt deinen Projektnamen
 - [ ] Eigenes OG-Image erstellt
 - [ ] Locale-Dateien angepasst (falls gewuenscht)
-- [ ] Firebase Secrets gesetzt: ADMIN_SECRET (+ optional NTFY_URL, NTFY_TOPIC)
+- [ ] Firebase Secrets gesetzt: ADMIN_SECRET, MISTRAL_API_KEY (+ optional NTFY_URL, NTFY_TOPIC)
 - [ ] Firestore Security Rules deployed: `firebase deploy --only firestore`
 - [ ] Tests laufen: `cd functions && npm test` und `npm run test:frontend`
 - [ ] Lokal getestet: Bild hochladen funktioniert
@@ -239,33 +244,39 @@ Bevor du live gehst:
 
 | API | Aufrufe | Was |
 |-----|---------|-----|
-| **Vision API** | 1 Call, 2 Features | TEXT_DETECTION + LABEL_DETECTION |
-| **Gemini 2.5 Flash** | 3 Calls | 1x Bildbeschreibung (multimodal) + 2x Profil (normal + boost, parallel) |
-| **Cloud Functions** | 1 Invocation | ~5–15 Sekunden, 512 MiB RAM |
+| **Mistral Large 3** | 1 Call | Multimodale Bildbeschreibung mit SUBJECT-Klassifikation |
+| **Mistral Small 4** | 2 Calls | Profilgenerierung (Normal + Boost, parallel) |
+| **Cloud Functions** | 1 Invocation | ~3–8 Sekunden, 512 MiB RAM |
 
-### Preise (Stand Februar 2026, Vertex AI Standard Tier)
+Bei Tier-Fotos entfaellt der Small-4-Call — Easter-Egg aus statischen Locales.
+
+### Preise (Stand Mai 2026)
+
+**Mistral Scale Tier** (pro 1M Tokens):
+
+| Modell | Input | Output |
+|--------|-------|--------|
+| Large 3 | $0.50 | $1.50 |
+| Small 4 | $0.15 | $0.60 |
+
+**Google Cloud (nur Infrastruktur):**
 
 | Posten | Preis | Kostenlos/Monat |
 |--------|-------|-----------------|
-| Vision API (pro Feature) | $1.50 / 1.000 Bilder | Erste 1.000 Bilder pro Feature |
-| Gemini 2.5 Flash Input | $0.30 / 1 Mio. Tokens | — |
-| Gemini 2.5 Flash Output | $2.50 / 1 Mio. Tokens | — |
 | Firebase Hosting | $0.15 / GB Transfer | 10 GB/Monat |
 | Cloud Functions | nutzungsbasiert | 2 Mio. Aufrufe/Monat |
+| Cloud Firestore | nutzungsbasiert | 50 K Reads/Tag, 20 K Writes/Tag |
 
 ### Rechenbeispiel: Workshop mit 30 Teilnehmer:innen
 
 | Posten | Rechnung | Kosten |
 |--------|----------|--------|
-| Vision API | 60 Units (innerhalb Frei-Kontingent) | **$0.00** |
-| Gemini Input | ~150.000 Tokens | **$0.05** |
-| Gemini Output | ~150.000 Tokens | **$0.38** |
+| Mistral Large 3 Describe | 30 × ~10.000 Input + ~1.500 Output Tokens | **~$0.22** |
+| Mistral Small 4 Profile (2x) | 30 × 2 × ~5.000 Tokens je in/out | **~$0.13** |
 | Cloud Functions + Hosting | minimal | **$0.00** |
-| **Gesamt** | | **~$0.43** |
+| **Gesamt** | | **~$0.35** |
 
-Bei kleinen Workshops (unter 1.000 Bilder/Monat) ist die Vision API kostenlos. Hauptkostentreiber ist Gemini Output (~90% der Kosten).
-
-Neue Google Cloud Konten erhalten **$300 Startguthaben**. Die vollstaendige Kostenaufstellung mit Preistabellen findest du in [`docs/SETUP.md`](SETUP.md#kosten).
+Neue Google Cloud Konten erhalten **$300 Startguthaben**.
 
 ## Fragen?
 

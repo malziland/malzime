@@ -1,95 +1,112 @@
 "use strict";
 
-const { classifyLabels, buildAnimalProfiles } = require("../animal");
+const { classifyDescription, detectAnimalType, buildAnimalProfiles } = require("../animal");
 
-describe("classifyLabels", () => {
-  test("detects person labels", () => {
-    const { hasPerson, hasAnimal } = classifyLabels(["Person", "Sky", "Tree"]);
-    expect(hasPerson).toBe(true);
-    expect(hasAnimal).toBe(false);
+describe("classifyDescription", () => {
+  test("parses SUBJECT: ANIMAL_ONLY from Mistral header", () => {
+    const desc = "SUBJECT: ANIMAL_ONLY\n\nEin Hund spielt im Park.";
+    const result = classifyDescription(desc);
+    expect(result.subject).toBe("ANIMAL_ONLY");
+    expect(result.hasAnimal).toBe(true);
+    expect(result.hasPerson).toBe(false);
   });
 
-  test("detects animal labels", () => {
-    const { hasPerson, hasAnimal } = classifyLabels(["Dog", "Grass", "Park"]);
-    expect(hasPerson).toBe(false);
-    expect(hasAnimal).toBe(true);
+  test("parses SUBJECT: HUMAN", () => {
+    const desc = "SUBJECT: HUMAN\n\nEine Frau mit dunklen Haaren.";
+    const result = classifyDescription(desc);
+    expect(result.subject).toBe("HUMAN");
+    expect(result.hasPerson).toBe(true);
+    expect(result.hasAnimal).toBe(false);
   });
 
-  test("detects both person and animal", () => {
-    const { hasPerson, hasAnimal } = classifyLabels(["Person", "Dog"]);
-    expect(hasPerson).toBe(true);
-    expect(hasAnimal).toBe(true);
+  test("parses SUBJECT: MIXED (animal + human)", () => {
+    const desc = "SUBJECT: MIXED\n\nEine Frau mit ihrem Hund.";
+    const result = classifyDescription(desc);
+    expect(result.subject).toBe("MIXED");
+    expect(result.hasPerson).toBe(true);
+    expect(result.hasAnimal).toBe(true);
   });
 
-  test("detects neither", () => {
-    const { hasPerson, hasAnimal } = classifyLabels(["Sky", "Mountain", "Cloud"]);
-    expect(hasPerson).toBe(false);
-    expect(hasAnimal).toBe(false);
+  test("parses SUBJECT: OTHER (landscape, objects)", () => {
+    const desc = "SUBJECT: OTHER\n\nEin Sonnenuntergang über Bergen.";
+    const result = classifyDescription(desc);
+    expect(result.subject).toBe("OTHER");
+    expect(result.hasPerson).toBe(false);
+    expect(result.hasAnimal).toBe(false);
   });
 
-  /* BUG-014: False Positives durch Substring-Matching */
-
-  test("does NOT match 'armchair' as person (arm)", () => {
-    const { hasPerson } = classifyLabels(["Armchair", "Furniture", "Room"]);
-    expect(hasPerson).toBe(false);
+  test("defaults to HUMAN when SUBJECT line missing (sicherste Annahme)", () => {
+    const result = classifyDescription("Eine Beschreibung ohne SUBJECT-Header.");
+    expect(result.subject).toBe("HUMAN");
+    expect(result.hasPerson).toBe(true);
   });
 
-  test("does NOT match 'necklace' as person (neck)", () => {
-    const { hasPerson } = classifyLabels(["Necklace", "Jewelry", "Gold"]);
-    expect(hasPerson).toBe(false);
+  test("defaults to HUMAN for empty/null input", () => {
+    expect(classifyDescription("").subject).toBe("HUMAN");
+    expect(classifyDescription(null).subject).toBe("HUMAN");
+    expect(classifyDescription(undefined).subject).toBe("HUMAN");
   });
 
-  test("does NOT match 'headlight' as person (head)", () => {
-    const { hasPerson } = classifyLabels(["Headlight", "Car", "Vehicle"]);
-    expect(hasPerson).toBe(false);
+  test("animalType is null when subject is HUMAN", () => {
+    const result = classifyDescription("SUBJECT: HUMAN\n\nEin Mann.");
+    expect(result.animalType).toBeNull();
   });
 
-  test("does NOT match 'skincare' as person (skin)", () => {
-    const { hasPerson } = classifyLabels(["Skincare", "Bottle", "Product"]);
-    expect(hasPerson).toBe(false);
+  test("animalType detected from German keyword when subject is ANIMAL_ONLY", () => {
+    const desc = "SUBJECT: ANIMAL_ONLY\n\nEin brauner Hund läuft durch den Park.";
+    expect(classifyDescription(desc).animalType).toBe("dog");
   });
 
-  test("does NOT match 'caterpillar' as animal (cat)", () => {
-    const { hasAnimal } = classifyLabels(["Caterpillar", "Leaf", "Plant"]);
-    expect(hasAnimal).toBe(false);
+  test("animalType=generic when no specific type recognised", () => {
+    const desc = "SUBJECT: ANIMAL_ONLY\n\nEin seltsames Wesen im Gras.";
+    expect(classifyDescription(desc).animalType).toBe("generic");
+  });
+});
+
+describe("detectAnimalType", () => {
+  test("detects dog from German + English variants", () => {
+    expect(detectAnimalType("Ein süßer Welpe spielt.")).toBe("dog");
+    expect(detectAnimalType("A puppy in the garden.")).toBe("dog");
+    expect(detectAnimalType("Hunde im Park.")).toBe("dog");
   });
 
-  test("does NOT match 'pigment' as animal (pig)", () => {
-    const { hasAnimal } = classifyLabels(["Pigment", "Paint", "Art"]);
-    expect(hasAnimal).toBe(false);
+  test("detects cat with German feminine forms", () => {
+    expect(detectAnimalType("Eine Katze schläft.")).toBe("cat");
+    expect(detectAnimalType("Mehrere Kätzchen spielen.")).toBe("cat");
   });
 
-  test("does NOT match 'cowl' as animal (cow)", () => {
-    const { hasAnimal } = classifyLabels(["Cowl", "Clothing", "Fabric"]);
-    expect(hasAnimal).toBe(false);
+  test("detects bird including specific species", () => {
+    expect(detectAnimalType("Ein Vogel auf dem Ast.")).toBe("bird");
+    expect(detectAnimalType("Ein Papagei spricht.")).toBe("bird");
+    expect(detectAnimalType("Eine Eule sitzt auf dem Baum.")).toBe("bird");
   });
 
-  /* Positive Compound-Labels die weiterhin matchen sollen */
-
-  test("still matches 'black cat' as animal", () => {
-    const { hasAnimal } = classifyLabels(["Black cat", "Night"]);
-    expect(hasAnimal).toBe(true);
+  test("detects fish", () => {
+    expect(detectAnimalType("Goldfische im Aquarium.")).toBe("fish");
   });
 
-  test("still matches 'human face' as person", () => {
-    const { hasPerson } = classifyLabels(["Human face", "Close-up"]);
-    expect(hasPerson).toBe(true);
+  test("detects horse", () => {
+    expect(detectAnimalType("Ein Pferd auf der Weide.")).toBe("horse");
   });
 
-  test("still matches 'guinea pig' as animal", () => {
-    const { hasAnimal } = classifyLabels(["Guinea pig", "Cage"]);
-    expect(hasAnimal).toBe(true);
+  test("detects rabbit/hamster family", () => {
+    expect(detectAnimalType("Ein Kaninchen knabbert.")).toBe("rabbit");
+    expect(detectAnimalType("Hamster im Käfig.")).toBe("rabbit");
   });
 
-  test("lowercases labels correctly", () => {
-    const { rawLabelsLower } = classifyLabels(["PERSON", "Dog"]);
-    expect(rawLabelsLower).toEqual(["person", "dog"]);
+  test("returns generic when no match", () => {
+    expect(detectAnimalType("Eine Eidechse auf einem Stein.")).toBe("generic");
+  });
+
+  test("matches whole words only — does NOT match 'pigment' as pig (negative test)", () => {
+    /* 'pig' ist NICHT in unseren TYPE_KEYWORDS — kein False Positive moeglich */
+    expect(detectAnimalType("Pigment auf der Leinwand.")).toBe("generic");
   });
 });
 
 describe("buildAnimalProfiles", () => {
-  test("returns normalProfile and boostProfile", () => {
-    const { normalProfile, boostProfile } = buildAnimalProfiles(["dog", "park"]);
+  test("returns normalProfile and boostProfile for dog", () => {
+    const { normalProfile, boostProfile } = buildAnimalProfiles("dog", "de");
     expect(normalProfile).toBeDefined();
     expect(boostProfile).toBeDefined();
     expect(normalProfile.categories).toBeDefined();
@@ -98,18 +115,23 @@ describe("buildAnimalProfiles", () => {
     expect(normalProfile.profileText).toBeDefined();
   });
 
-  test("detects dog correctly", () => {
-    const { normalProfile } = buildAnimalProfiles(["dog", "grass"]);
+  test("dog profile mentions Stöckchen", () => {
+    const { normalProfile } = buildAnimalProfiles("dog", "de");
     expect(normalProfile.categories.beruf.value).toContain("Stöckchen");
   });
 
-  test("detects cat correctly with feminine grammar", () => {
-    const { normalProfile } = buildAnimalProfiles(["cat", "sofa"]);
+  test("cat profile uses feminine grammar", () => {
+    const { normalProfile } = buildAnimalProfiles("cat", "de");
     expect(normalProfile.profileText).toContain("deine Katze");
   });
 
-  test("returns generic Tier for unknown animal", () => {
-    const { normalProfile } = buildAnimalProfiles(["animal", "nature"]);
+  test("returns generic Tier profile for unknown type", () => {
+    const { normalProfile } = buildAnimalProfiles("xyz_unknown", "de");
+    expect(normalProfile.profileText).toContain("Tier");
+  });
+
+  test("returns generic when called with 'generic' type explicitly", () => {
+    const { normalProfile } = buildAnimalProfiles("generic", "de");
     expect(normalProfile.profileText).toContain("Tier");
   });
 });

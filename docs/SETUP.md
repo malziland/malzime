@@ -14,19 +14,33 @@ firebase login
 firebase use --add   # Projekt-ID waehlen
 ```
 
-## 2. Google Cloud APIs aktivieren
+## 2. Mistral AI einrichten
 
-Im [Google Cloud Console](https://console.cloud.google.com):
+malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
 
-- **Cloud Vision API** — Texterkennung + Label-Erkennung
-- **Vertex AI API** — Gemini Multimodal (Bildbeschreibung + Profilerstellung)
-- **Cloud Firestore** — Analyse-Zaehler + Stundenlimit (automatisch mit Firebase aktiviert)
+1. Account erstellen auf [console.mistral.ai](https://console.mistral.ai/)
+2. Stripe-Karte hinterlegen, **Scale Tier** aktivieren (Free Tier reicht NICHT fuer Image-Calls auf Small 4 — Limit 50 K TPM)
+3. API-Key generieren unter https://console.mistral.ai/api-keys/ — Key NUR EINMAL angezeigt, sofort sichern
+4. Key spaeter als Firebase Secret hinterlegen (Schritt 4)
+
+Genutzte Modelle (in `functions/src/config.js`):
+- `mistral-large-latest` (Large 3) fuer multimodale Bildbeschreibung
+- `mistral-small-2603` (Small 4) fuer Profilgenerierung (Text-only, schneller + guenstiger)
+- `mistral-large-latest` als Backup wenn Small 4 invalides JSON liefert (Mistral-intern)
+
+Wenn der Mistral-Call fehlschlaegt, gibt es keinen anderen KI-Provider als Fallback. Der User sieht eine `blocked.apiError`- oder `blocked.overloaded`-Antwort.
+
+## 3. Google Cloud (nur fuer Infrastruktur)
+
+Im [Google Cloud Console](https://console.cloud.google.com) brauchst du nur eine API zusaetzlich zu Firebase:
+
+- **Cloud Firestore** — Analyse-Zaehler + Maintenance-Flag (wird automatisch mit Firebase aktiviert)
+
+Cloud Vision API und Vertex AI werden seit v1.6.0 NICHT mehr genutzt — falls vorher aktiviert, kannst du sie im Cloud Console deaktivieren (sparen Kosten, nicht zwingend).
 
 Region: `europe-west1` (Belgien, EU)
 
-**Wichtig**: Die EU Vision API (`eu-vision.googleapis.com`) unterstuetzt nur `TEXT_DETECTION` und `LABEL_DETECTION`. Andere Features wie `FACE_DETECTION` oder `OBJECT_LOCALIZATION` sind nicht verfuegbar und wuerden den gesamten API-Call crashen.
-
-## 3. Dependencies installieren
+## 4. Dependencies installieren
 
 ```bash
 # Backend
@@ -36,7 +50,7 @@ cd functions && npm install && cd ..
 npm install
 ```
 
-## 4. Umgebungsvariablen
+## 5. Umgebungsvariablen
 
 Kopiere `functions/.env.example` nach `functions/.env` und passe die Werte an:
 
@@ -46,10 +60,7 @@ cp functions/.env.example functions/.env
 
 | Variable | Standard | Beschreibung |
 |----------|----------|--------------|
-| `VERTEX_LOCATION` | `europe-west1` | Vertex AI Region |
-| `GCLOUD_PROJECT` | (auto-detect) | Google Cloud Projekt-ID |
-
-Fuer den EU-Endpoint der Vision API: In `functions/src/vision.js` wird `eu-vision.googleapis.com` verwendet.
+| `GCLOUD_PROJECT` | (auto-detect) | Google Cloud Projekt-ID (fuer Firestore) |
 
 ### Firebase Secrets
 
@@ -57,17 +68,27 @@ Die folgenden Secrets werden ueber `firebase functions:secrets:set` konfiguriert
 
 ```bash
 firebase functions:secrets:set ADMIN_SECRET    # Beliebiger Token fuer Admin-Endpunkte
+firebase functions:secrets:set MISTRAL_API_KEY # Key aus console.mistral.ai (Scale Tier)
 firebase functions:secrets:set NTFY_URL        # ntfy Server-URL (z.B. https://ntfy.example.com)
 firebase functions:secrets:set NTFY_TOPIC      # ntfy Topic-Name
+```
+
+Beim Setzen des Mistral-Keys WICHTIG: `printf` statt `echo` benutzen, damit kein trailing Newline im Secret-Wert landet:
+
+```bash
+printf "%s" "DEIN_MISTRAL_KEY" | firebase functions:secrets:set MISTRAL_API_KEY --data-file=-
 ```
 
 | Secret | Pflicht | Beschreibung |
 |--------|---------|--------------|
 | `ADMIN_SECRET` | Ja | Bearer-Token fuer Admin-Endpunkte (Boost, Reset) |
+| `MISTRAL_API_KEY` | Ja (seit v1.5.2) | Mistral AI API-Key fuer Hybrid-Provider |
 | `NTFY_URL` | Nein | URL des ntfy-Servers fuer Push-Benachrichtigungen |
 | `NTFY_TOPIC` | Nein | ntfy-Topic fuer Limit-Benachrichtigungen |
 
 Wenn `NTFY_URL` oder `NTFY_TOPIC` leer sind, werden keine Push-Benachrichtigungen gesendet.
+
+Hinweis: Wenn `MISTRAL_API_KEY` fehlt oder ungueltig ist, wird die Pipeline automatisch auf den Gemini-Fallback umschalten (Multi-Provider-Fallback-Chain).
 
 ## 5. Lokal testen
 
@@ -89,7 +110,7 @@ cd functions && npm test
 npm run test:frontend
 ```
 
-**Backend (266 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Vision API, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Gemini-Integration.
+**Backend (394 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Vision API, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Gemini-Integration, Mistral-Integration (Mocked-Fetch), JSON-Repair (4-Stufen), Feature-Flags + Auto-Ramp, Throttle-Semaphore, Multi-Provider-Fallback-Chain.
 **Frontend (139 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Stats-Seite, i18n-Modul, i18n-Guardian.
 **E2E (2 Tests):** Playwright Smoke-Tests — Demo-Flow + fehlerfreies Laden.
 
@@ -107,38 +128,29 @@ npm run format:frontend:check
 
 CI prueft Lint + Format automatisch bei jedem Push und Pull Request.
 
-## 7a. Modellvergleich (Dev-Tool)
+## 7a. Tiererkennung testen (Dev-Tool)
 
-Wenn du verschiedene Gemini-Modelle gegeneinander testen willst — z.B. um zu beurteilen, ob ein neues Modell die alte Qualitaet erreicht oder uebertrifft — gibt es `functions/scripts/compare-models.js`. Das Skript faehrt die komplette malzime-Pipeline (Vision API + Bildbeschreibung + Normal-Profil + Boost-Profil) parallel mit zwei Modellen durch und erzeugt einen HTML-Vergleichsbericht.
+Die Tiererkennung in v1.6.0 haengt daran, dass Mistral Large 3 in der Bildbeschreibung eine `SUBJECT:`-Kopfzeile (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`) liefert. Mit `functions/scripts/test-subject.js` laesst sich gegen echte Bilder pruefen, ob Mistral diese Kopfzeile zuverlaessig setzt — ohne Deploy.
 
 **Aufruf:**
 
 ```bash
-node functions/scripts/compare-models.js <pfad-zum-bild>
+MISTRAL_API_KEY=<dein-key> node functions/scripts/test-subject.js <pfad-zum-bild> [anzahl-durchlaeufe]
 ```
-
-Drag&Drop unter macOS funktioniert: Befehl mit Leerzeichen am Ende tippen, dann Bilddatei aus dem Finder ins Terminal ziehen.
-
-**Voraussetzungen:**
-
-- Lokale ADC eingerichtet (`gcloud auth application-default login`).
-- Vertex AI API + Vision API im Projekt aktiviert (sind sie auf einer laufenden malzime-Instanz ohnehin).
 
 **Was es tut:**
 
-- Schickt das Bild durch Vision API (Labels + OCR) — einmal.
-- Generiert die Bildbeschreibung mit Variante A und Variante B (separate Modellketten).
-- Generiert je Modell Normal- + Boost-Profil aus der jeweiligen Beschreibung.
-- Misst Dauer, verbrauchte Tokens und geschaetzte Kosten.
-- Schreibt `compare-result.html` ins Projekt-Root (in `.gitignore` aufgenommen — der Report enthaelt Test-Bilder und Profile, gehoert nicht ins Repo).
+- Verkleinert das Bild wie das Live-Frontend (1280px / JPEG 82%, via `sips` auf macOS).
+- Ruft genau den v1.6.0-Pfad auf: `mistral.describeImage()` + `classifyDescription()` + `extractVisibleText()`.
+- Zeigt pro Durchlauf die gelieferte `SUBJECT:`-Zeile, die Einordnung (Mensch/Tier/Tierart) und den sichtbaren Text.
+- Bei mehreren Durchlaeufen: Verteilung am Ende — so wird Run-to-Run-Varianz sichtbar.
 
 **Was es nicht tut:**
 
-- Schreibt nichts in Firestore — der Stunden-Zaehler bleibt unberuehrt.
-- Beruehrt das Live-System oder den Deploy nicht.
-- Aendert keine Modell-Konfiguration in `functions/src/config.js`.
+- Schreibt nichts in Firestore, beruehrt das Live-System nicht.
+- Generiert keine Profile — nur die Describe- + Klassifikations-Stufe.
 
-**Konfiguration:** Die zu vergleichenden Modelle stehen oben im Skript in der `VARIANTS`-Liste. Anpassen falls andere Modelle getestet werden sollen.
+**Voraussetzung:** `MISTRAL_API_KEY` als Umgebungsvariable gesetzt.
 
 ## 8. Deploy
 
@@ -168,35 +180,42 @@ Format: `?v=YYYYMMDDNN` (Datum + laufende Nummer)
 
 | API | Aufrufe | Was |
 |-----|---------|-----|
-| **Vision API** | 1 Call, 2 Features | TEXT_DETECTION + LABEL_DETECTION |
-| **Gemini 2.5 Flash** | 3 Calls | 1x Bildbeschreibung (multimodal) + 2x Profil (normal + boost, parallel) |
-| **Cloud Functions** | 1 Invocation | ~5–15 Sekunden, 512 MiB RAM |
+| **Mistral Large 3** | 1 Call | multimodale Bildbeschreibung mit SUBJECT-Klassifikation + sichtbarem Text |
+| **Mistral Small 4** | 2 Calls | Profilgenerierung (Normal + Boost, parallel, Text-only) |
+| **Cloud Functions** | 1 Invocation | ~3–8 Sekunden, 512 MiB RAM |
 
-Thinking ist deaktiviert (`thinkingBudget: 0`) fuer Kostenreduktion.
+Bei Tier-Erkennung (SUBJECT=ANIMAL_ONLY) entfaellt der Small-4-Profile-Call — das Easter-Egg-Profil wird aus statischen Locale-Daten gebaut.
 
-### Preise (Stand Februar 2026, Vertex AI Standard Tier)
+### Preise (Stand Mai 2026)
+
+**Mistral Scale Tier** (pro 1M Tokens):
+
+| Modell | Input | Output |
+|--------|-------|--------|
+| Large 3 (`mistral-large-latest`) | $0.50 | $1.50 |
+| Small 4 (`mistral-small-2603`) | $0.15 | $0.60 |
+
+**Google Cloud (nur Infrastruktur):**
 
 | Posten | Preis | Kostenlos/Monat |
 |--------|-------|-----------------|
-| Vision API (TEXT_DETECTION) | $1.50 / 1.000 Bilder | Erste 1.000 Bilder |
-| Vision API (LABEL_DETECTION) | $1.50 / 1.000 Bilder | Erste 1.000 Bilder |
-| Gemini 2.5 Flash Input | $0.30 / 1 Mio. Tokens | — |
-| Gemini 2.5 Flash Output | $2.50 / 1 Mio. Tokens | — |
 | Firebase Hosting | $0.15 / GB Transfer | 10 GB/Monat |
 | Cloud Functions | nutzungsbasiert | 2 Mio. Aufrufe/Monat |
+| Cloud Firestore | nutzungsbasiert | 50 K Reads/Tag, 20 K Writes/Tag |
 
-### Rechenbeispiel: Workshop mit 30 Teilnehmer:innen
+### Rechenbeispiel: Workshop mit 30 Teilnehmer:innen (Hybrid-Mistral-Pfad)
 
 | Posten | Rechnung | Kosten |
 |--------|----------|--------|
-| Vision API | 30 Bilder × 2 Features = 60 Units (innerhalb Frei-Kontingent) | **$0.00** |
-| Gemini Input | 30 × ~5.000 Tokens = ~150.000 Tokens | **$0.05** |
-| Gemini Output | 30 × ~5.000 Tokens = ~150.000 Tokens | **$0.38** |
-| Cloud Functions | 30 Aufrufe × ~10s | **$0.00** |
+| Mistral Large 3 (Describe) | 30 × ~10.000 Input + ~1.500 Output Tokens = 300K in, 45K out | **~$0.22** |
+| Mistral Small 4 (Profile, 2x) | 30 × 2 × ~2.500 Input + ~2.500 Output = 150K in, 150K out je | **~$0.13** |
+| Cloud Functions | 30 Aufrufe × ~5s | **$0.00** |
 | Firebase Hosting | Statische Dateien, wenige MB | **$0.00** |
-| **Gesamt** | | **~$0.43** |
+| **Gesamt Hybrid** | | **~$0.35** |
 
-Bei kleinen Workshops (unter 1.000 Bilder/Monat) ist die Vision API komplett kostenlos. Der Hauptkostentreiber ist Gemini Output.
+Zum Vergleich Gemini-Fallback-Pfad: ~$0.43 (siehe Tabelle oben).
+
+Der Hybrid spart ~20% gegenueber dem reinen Gemini-Pfad. Bei langsam laufenden Workshops greift fast immer der Mistral-Hybrid. Mistral berechnet pro 1M Tokens unabhaengig vom Volumen, kein Frei-Kontingent.
 
 ### Tipp fuer neue Google Cloud Konten
 

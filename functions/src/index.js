@@ -10,14 +10,11 @@ const { ALLOWED_ORIGINS } = require("./domains");
 const adminSecret = defineSecret("ADMIN_SECRET");
 const ntfyUrl = defineSecret("NTFY_URL");
 const ntfyTopic = defineSecret("NTFY_TOPIC");
-/* Phase 3 Mistral-Migration: Key wird via process.env.MISTRAL_API_KEY von
-   mistral.js gelesen. Firebase Functions injiziert Secrets automatisch als
-   env-Vars wenn sie hier deklariert sind. Wird erst beim ersten Hybrid-
-   Provider-Call genutzt — der Live-Pfad (aiProvider="gemini") braucht den
-   Key nicht. Solange das Secret nicht in Firebase Secret Manager gesetzt
-   ist, ist die env-Var leer; das ist OK weil mistral.js erst beim Aufruf
-   eine entsprechende Fehlermeldung wirft, und der Aufruf passiert nur bei
-   aktivem Hybrid-Flag. */
+/* Mistral AI API-Key — Pflicht seit v1.6.0 (Mistral-only Pipeline).
+   Wird via process.env.MISTRAL_API_KEY von mistral.js gelesen. Firebase
+   injiziert das Secret automatisch als env-Var wenn es in `secrets`
+   deklariert ist. Wenn das Secret fehlt, schlagen alle Analyse-Calls
+   mit code "no_api_key" fehl. */
 const mistralApiKey = defineSecret("MISTRAL_API_KEY");
 
 initializeApp();
@@ -30,7 +27,7 @@ exports.analyze = onRequest(
     cors: ALLOWED_ORIGINS,
     invoker: "public",
     maxInstances: 10,
-    timeoutSeconds: 120,
+    timeoutSeconds: 180,
     secrets: [ntfyUrl, ntfyTopic, adminSecret, mistralApiKey],
   },
   (req, res) => handleAnalyze(req, res, { ntfyUrl, ntfyTopic, adminSecret, mistralApiKey })

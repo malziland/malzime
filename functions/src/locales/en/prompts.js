@@ -335,7 +335,20 @@ Reply EXCLUSIVELY with valid JSON in this format:
 
   mistralDescribeAddendum: `
 
-ADDITIONAL TASK (no separate vision step):
+MANDATORY HEADER LINE of your response (exactly this form, then blank line):
+SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER
+
+Meaning:
+- ANIMAL_ONLY: only animals in the image, no recognizable humans
+- HUMAN: one or more humans in the image (even partially, e.g. only face)
+- MIXED: both humans and animals
+- OTHER: landscape, objects, plants, architecture, abstract content without recognizable humans or animals
+
+Pick EXACTLY ONE of these four values. When in doubt, choose the more
+restrictive value (prefer HUMAN over OTHER if a person might be visible,
+prefer MIXED over ANIMAL_ONLY if a human might be in the background).
+
+ADDITIONAL TASK — visible text:
 At the end of the image description, list every text visible on the image —
 verbatim where possible (signs, street names, brand logos, tattoos,
 T-shirt/jersey imprints, captions, display readouts).

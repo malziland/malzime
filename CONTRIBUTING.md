@@ -51,7 +51,15 @@ Diese Regeln sind nicht verhandelbar:
 - **Keine Tracking-Cookies, Analytics oder Werbung.**
 - **Keine Speicherung von Bildern oder Profilen.**
 - **Kein Firebase SDK im Frontend.**
-- **dateTimeOriginal wird nicht an Gemini gesendet.** (Verleitet zu falschen Altersschaetzungen.)
+- **dateTimeOriginal wird nicht an die KI gesendet.** (Verleitet zu falschen Altersschaetzungen.)
+- **API-Keys und Secrets niemals committen.** `gitleaks` laeuft in CI als Backstop.
+
+## KI-Provider und Architektur
+
+Seit v1.5.2 nutzt malziME eine Multi-Provider-Architektur mit Mistral AI (primaer) und Google Gemini (Fallback). Details:
+- Code-Aufbau: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- Setup mit Mistral-API-Key: [`docs/SETUP.md`](docs/SETUP.md#firebase-secrets)
+- Tests laufen mit Mocked-Fetch — kein echter Key fuer `npm test` noetig.
 
 ## Uebersetzungen
 

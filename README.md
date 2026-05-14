@@ -54,27 +54,34 @@ public/                     Firebase Hosting (SPA, kein Build-Schritt)
   lib/exifr/                Self-hosted: exifr lite (EXIF-Parsing im Browser)
 
 functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)
-  index.js                  HTTP-Handler (analyze + stats + admin Endpunkte)
-  config.js                 Konstanten, Modell-Listen, Limits
-  animal.js                 Personen-/Tier-Erkennung (Word-Boundary-Matching) + Easter-Egg-Profile
-  counter.js                Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset
+  index.js                  Cloud-Function-Exports + Firebase Secret Bindings
+  config.js                 Konstanten + Mistral-Modell-IDs + Limits
+  handle-analyze.js         Pipeline-Orchestrierung (Mistral-only)
+  handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
+  handle-stats.js           Stats-Endpunkt
+  mistral.js                Mistral AI Hybrid: Large 3 Describe + Small 4 Profile-Generierung
+  json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
+  throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (bereit, nicht angebunden)
+  animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
+  privacy.js                OCR-Privacy-Risiken aus Mistrals "Sichtbarer Text"
+  counter.js                Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance
   auth.js                   HMAC-basierte Admin-Token + Nonces
   domains.js                Zentrale CORS-/Origin-Whitelist
   notify.js                 ntfy Push-Benachrichtigungen bei Limit-Erreichung
-  middleware.js              Rate Limiting (IP-basiert, 200/10min), IP-Extraktion
+  middleware.js             Rate Limiting (IP-basiert, 200/10min), IP-Extraktion
   upload.js                 Multipart- und JSON-Body-Parsing
-  vision.js                 Google Cloud Vision API (EU-Endpoint, TEXT + LABEL_DETECTION)
-  privacy.js                Datenschutz-Risiko-Erkennung aus OCR/Labels
-  gemini.js                 Vertex AI Gemini (Bildbeschreibung + Profilgenerierung)
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
-  locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, manifest.json)
-  __tests__/                Jest Unit-Tests
+  locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
+  __tests__/                Jest Unit-Tests + fixtures/ fuer json-repair
+  scripts/                  Dev-Tools (test-subject.js — Tiererkennung gegen echte Bilder pruefen)
 ```
 
 ## Privacy-Architektur
 
 Datenschutz ist kein Feature — es ist das Fundament:
 
+- **EU-Hosting fuer KI-Analysen**: Alle Bild-Analysen laufen ueber Mistral AI (Paris, EU-DSGVO). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO. Auf dem genutzten kostenpflichtigen API-Tier ist Training auf Eingaben/Ausgaben laut Anbieter-Zusage deaktiviert.
+- **Keine US-KI-Anbieter mehr**: Seit v1.6.0 wurden Google Vertex AI und Cloud Vision aus der Pipeline entfernt. Google bleibt nur fuer die Infrastruktur (Firebase Hosting + Cloud Functions + Firestore, alles in `europe-west1`).
 - **EXIF-Extraktion im Browser**: exifr parsed die Metadaten lokal, GPS verlässt nie den Client
 - **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell (ohne GPS, ohne dateTimeOriginal)
 - **Geocoding direkt vom Browser**: Nominatim wird client-seitig aufgerufen, nicht ueber den Server
@@ -175,7 +182,7 @@ Bei blockierten Bildern ist `profiles: null` und `blockedReason` enthaelt den Gr
 ## Tests
 
 ```bash
-# Backend (Jest, 266 Tests)
+# Backend (Jest, 394 Tests)
 cd functions && npm test
 
 # Frontend (Vitest + jsdom, 139 Tests)
@@ -195,7 +202,7 @@ cd functions && npm run format:check   # Backend Prettier
 npm run format:frontend:check          # Frontend Prettier
 ```
 
-**Backend (266 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Vision API, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Gemini-Integration.
+**Backend (279 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore.
 
 **Frontend (139 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Stats-Seite, i18n-Modul, i18n-Guardian.
 
@@ -216,13 +223,13 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 | Komponente | Technologie |
 |-----------|-------------|
-| Hosting | Firebase Hosting |
-| Backend | Firebase Cloud Functions (2nd Gen, Node 24) |
-| KI-Beschreibung | Vertex AI Gemini 2.5 Flash (Multimodal) |
-| KI-Profile | Vertex AI Gemini 2.5 Flash (Text) |
-| Bilderkennung | Google Cloud Vision API (EU-Endpoint) |
-| Karten | Leaflet + OpenStreetMap (self-hosted) |
-| Geocoding | Nominatim (client-seitig) |
+| Hosting | Firebase Hosting (Google Ireland, europe-west1) |
+| Backend | Firebase Cloud Functions (2nd Gen, Node 24, europe-west1) |
+| Datenbank | Cloud Firestore (anonymer Zaehler + Maintenance-Flag, europe-west1) |
+| KI-Beschreibung | Mistral Large 3 (multimodal, Paris/EU) |
+| KI-Profile | Mistral Small 4 (Text-Generierung aus Beschreibung) |
+| Karten | Leaflet + OpenStreetMap (self-hosted Lib + OSM-Tiles) |
+| Geocoding | Nominatim (client-seitig, OpenStreetMap Foundation) |
 | EXIF-Parsing | exifr (client-seitig im Browser) |
 | Fonts | Inter + JetBrains Mono (self-hosted, woff2) |
 | i18n | Eigenes Micro-Modul (Frontend JSON + Backend CommonJS Locales) |
@@ -230,17 +237,18 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 ## Einschraenkungen
 
-- **EU Vision API** (`eu-vision.googleapis.com`) unterstuetzt nur `TEXT_DETECTION` und `LABEL_DETECTION`. `FACE_DETECTION` und `OBJECT_LOCALIZATION` sind nicht verfuegbar und wuerden den gesamten API-Call crashen.
-- **Safety-Filter**: Googles Sicherheitsfilter blockieren die Bildbeschreibung bei Fotos von Kindern oder Jugendlichen. In diesem Fall wird ein Fallback ueber Vision-API-Labels genutzt.
-- **Alters-Labels**: Vision API Labels wie "Toddler" oder "Baby" sind unzuverlaessig und werden gefiltert. Altersschaetzung erfolgt ausschliesslich durch Gemini anhand physischer Merkmale. Seit v1.5.0 mit zwei Anker-Bloecken in den Prompts: Koerperproportionen (Schulter-zu-Kopf, Hand) als primaere Achse fuer Kinder/Teens, plus Zwangs-Mapping fuer Erwachsene (sichtbare Falten/Lid-Erschlaffung/Pigmentflecken haben Mindest-Alter-Schwellen).
-- **Personen-Erkennung**: Die EU Vision API erkennt Personen in Outdoor-/Natur-Szenen oft nicht. Nur bei reinen Tier-Labels wird die Analyse blockiert — in allen anderen Faellen entscheidet Gemini.
+- **Mistral-Abh&auml;ngigkeit**: Wenn Mistral nicht erreichbar ist, schlaegt die Analyse fehl (keine Fallback-Provider mehr seit v1.6.0). Der User sieht eine `blocked.apiError`-Antwort. Mistrals SLA + Multi-Region-Setup machen das selten.
+- **Safety-Filter**: Mistrals Sicherheitsfilter koennen die Bildbeschreibung bei sensiblen Inhalten blockieren. In dem Fall sieht der User `blocked.safetyFilter`.
+- **SUBJECT-Klassifikation**: Tier-Easter-Egg-Profile werden ueber die `SUBJECT:`-Kopfzeile in Mistrals Antwort und Keyword-Matching im Beschreibungstext bestimmt (siehe `animal.js`). Bei Unsicherheit faellt die Pipeline auf den normalen Profil-Pfad zur&uuml;ck.
+- **Alters-Schaetzung**: erfolgt ausschliesslich durch Mistral anhand physischer Merkmale. Seit v1.5.0 mit zwei Anker-Bloecken in den Prompts: Koerperproportionen (Schulter-zu-Kopf, Hand) als primaere Achse fuer Kinder/Teens, plus Zwangs-Mapping fuer Erwachsene (sichtbare Falten/Lid-Erschlaffung/Pigmentflecken haben Mindest-Alter-Schwellen).
 
 ## Datenschutz
 
 - Keine Bilder, Profile oder Nutzerdaten werden gespeichert
 - Keine Tracking-Cookies, keine Analytics, keine Werbung
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
-- KI-Analyse laeuft ueber Google Cloud (EU, europe-west1)
+- KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.
+- Infrastruktur (Hosting, Cloud Functions, Firestore) bei Google Ireland in europe-west1 — auch als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
 - GPS-Daten verlassen nie den Browser des Nutzers
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 

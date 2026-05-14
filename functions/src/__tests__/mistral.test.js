@@ -274,6 +274,20 @@ describe("describeImage", () => {
       code: "rate_limit",
     });
   }, 10000);
+
+  test("throws code api_error on a non-429 HTTP error (not blocked.safetyFilter)", async () => {
+    setFetchForTest(async () => ({
+      ok: false,
+      status: 500,
+      text: async () => "internal server error",
+    }));
+
+    /* Ein echter API-Fehler darf NICHT als null durchgehen (→ würde im Caller
+       fälschlich als safetyFilter gelabelt) — describeImage muss api_error werfen. */
+    await expect(mistral.describeImage(Buffer.from("img"), "image/jpeg", undefined, "de")).rejects.toMatchObject({
+      code: "api_error",
+    });
+  });
 });
 
 /* ── generateBothProfiles: erfolgreicher Lauf ──────────────────── */
@@ -302,14 +316,7 @@ describe("generateBothProfiles", () => {
       };
     });
 
-    const result = await mistral.generateBothProfiles(
-      "Eine junge Frau mit langen Haaren.",
-      [],
-      {},
-      [],
-      undefined,
-      "de"
-    );
+    const result = await mistral.generateBothProfiles("Eine junge Frau mit langen Haaren.", {}, undefined, "de");
 
     expect(result.normal).not.toBeNull();
     expect(result.boost).not.toBeNull();
@@ -339,7 +346,7 @@ describe("generateBothProfiles", () => {
       };
     });
 
-    const result = await mistral.generateBothProfiles("Ein Beschreibungstext.", [], {}, [], undefined, "de");
+    const result = await mistral.generateBothProfiles("Ein Beschreibungstext.", {}, undefined, "de");
 
     expect(result.normal).not.toBeNull();
     expect(result.boost).not.toBeNull();
@@ -357,12 +364,12 @@ describe("generateBothProfiles", () => {
       }),
     }));
 
-    const result = await mistral.generateBothProfiles("text", [], {}, [], undefined, "de");
+    const result = await mistral.generateBothProfiles("text", {}, undefined, "de");
     expect(result.normal).toBeNull();
     expect(result.boost).toBeNull();
   });
 
-  test("ignores visionLabels and privacyRisks (Hybrid mode)", async () => {
+  test("includes EXIF camera data in the prompt", async () => {
     let capturedBody;
     setFetchForTest(async (_url, opts) => {
       if (!capturedBody) capturedBody = JSON.parse(opts.body);
@@ -376,18 +383,9 @@ describe("generateBothProfiles", () => {
       };
     });
 
-    await mistral.generateBothProfiles(
-      "image description",
-      ["should not appear"],
-      { make: "Canon" },
-      ["should also not appear"],
-      undefined,
-      "de"
-    );
+    await mistral.generateBothProfiles("image description", { make: "Canon" }, undefined, "de");
 
     const prompt = capturedBody.messages[0].content;
-    expect(prompt).not.toContain("should not appear");
-    /* EXIF darf rein */
     expect(prompt).toContain("Canon");
   });
 });

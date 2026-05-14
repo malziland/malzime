@@ -40,4 +40,29 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **Rate limiting**: Per-IP request limits
 - **Prompt injection protection**: User data isolated in XML tags
 - **Input validation**: File type, size, and format checks
-- **Gemini output bounds**: Response size limits enforced server-side
+- **LLM output bounds**: Response size limits enforced server-side (categories, ad_targeting, manipulation_triggers, profileText)
+- **Defensive JSON parser**: 4-stage repair layer for LLM responses (`json-repair.js`) — direct parse → heuristic cleanup → json5 → truncation recovery
+- **Multi-provider fallback**: Mistral AI (primary) → Gemini (fallback) → Vision-Labels heuristic — single provider failure does not break the service
+- **Per-instance throttle**: Semaphore module built but not yet activated — available if Workshop bursts exceed Mistral Scale-Tier limits
+
+## AI Vendors
+
+malziME relies on external AI providers as data processors (Art. 28 GDPR). See [datenschutz.html](public/datenschutz.html) for the full data processing terms.
+
+| Vendor | Role | Data Region |
+|--------|------|-------------|
+| Mistral AI SAS (Paris, FR) | Primary AI (Large 3 + Small 4) | EU by default |
+| Google Vertex AI / Cloud Vision | Fallback AI | europe-west1, Belgium |
+
+Both vendors are contractually bound to not use uploaded images for training on the paid tiers we use. See provider DPAs:
+- [Mistral DPA](https://legal.mistral.ai/terms/data-processing-addendum)
+- [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum)
+
+## Secrets management
+
+All production secrets are stored in Google Cloud Secret Manager and bound to Cloud Functions via Firebase's `defineSecret`. Secrets are never committed to git. Gitleaks runs on every push as a backstop.
+
+Required secrets:
+- `ADMIN_SECRET` — Bearer token for admin endpoints (Boost, Reset, Maintenance)
+- `MISTRAL_API_KEY` — Mistral AI API key (Scale tier)
+- `NTFY_URL`, `NTFY_TOPIC` — optional, for limit-reached push notifications

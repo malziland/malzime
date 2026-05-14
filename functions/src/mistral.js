@@ -1,21 +1,15 @@
 "use strict";
 
 /**
- * mistral.js — Mistral-Anbieter für die Hybrid-Pipeline.
+ * mistral.js — Mistral-Anbieter (einziger KI-Anbieter seit v1.6.0).
  *
- * Spiegelt die Schnittstelle von gemini.js, damit handle-analyze.js
- * provider-agnostisch bleibt:
  *   - describeImage(buffer, mimeType, remainingBudget, lang) → text | null
- *   - generateBothProfiles(description, ...) → { normal, boost }
+ *   - generateBothProfiles(description, exif, remainingBudget, lang) → { normal, boost }
  *
- * Hybrid-Architektur:
+ * Architektur:
  *   - Describe: Mistral Large 3 (multimodal, sieht das Bild direkt)
  *   - Normal/Boost: Mistral Small 4 (text-only, schneller + billiger)
- *
- * Mistral hat KEINE Vision-API-Safety-Filter, daher keine separate Fallback-
- * Beschreibung wie bei Gemini. Sollte Large 3 doch fehlschlagen, gibt
- * describeImage null zurück — die nachgelagerte Fallback-Chain (Gemini etc.)
- * springt dann ein (siehe handle-analyze.js in Phase 3).
+ *   - Fallback pro Profil: Large 3, falls Small 4 nicht parsebares JSON liefert
  *
  * API-Key kommt aus process.env.MISTRAL_API_KEY (Firebase Secret).
  */
@@ -150,19 +144,40 @@ async function describeImage(imageBuffer, mimeType, remainingBudget, lang) {
   const prompts = loadPrompts(lang || "de");
   const addendum = prompts.mistralDescribeAddendum || "";
 
+  let lastError = null;
+
   /* Versuch 1: regulärer Describe-Prompt */
-  const result = await tryDescribeWithPrompt(prompts.describePrompt + addendum, imageBuffer, mimeType, remainingBudget);
-  if (result && result.text) return result.text;
+  try {
+    const result = await tryDescribeWithPrompt(
+      prompts.describePrompt + addendum,
+      imageBuffer,
+      mimeType,
+      remainingBudget
+    );
+    if (result && result.text) return result.text;
+  } catch (err) {
+    if (err && err.code === "rate_limit") throw err; /* Rate-Limit sofort durchreichen */
+    lastError = err;
+  }
 
   /* Versuch 2: Fallback-Prompt (weniger triggerig) */
-  const fallback = await tryDescribeWithPrompt(
-    prompts.describeFallback + addendum,
-    imageBuffer,
-    mimeType,
-    remainingBudget
-  );
-  if (fallback && fallback.text) return fallback.text;
+  try {
+    const fallback = await tryDescribeWithPrompt(
+      prompts.describeFallback + addendum,
+      imageBuffer,
+      mimeType,
+      remainingBudget
+    );
+    if (fallback && fallback.text) return fallback.text;
+  } catch (err) {
+    if (err && err.code === "rate_limit") throw err;
+    lastError = err;
+  }
 
+  /* Beide Versuche durch. Trat ein echter API-/Netzwerk-Fehler auf, werfen wir
+     ihn (→ blocked.apiError im Caller). Liefen beide Versuche sauber durch, aber
+     mit leerem Text, geben wir null zurück (→ blocked.safetyFilter). */
+  if (lastError) throw lastError;
   return null;
 }
 
@@ -207,29 +222,25 @@ async function tryDescribeWithPrompt(prompt, imageBuffer, mimeType, remainingBud
       e.code = "rate_limit";
       throw e;
     }
-    /* Andere Fehler bewusst NICHT propagieren — Caller bekommt null und fällt auf
-       die nächste Schicht (Gemini etc.) zurück. */
-    return null;
+    /* Echte API-/Netzwerk-Fehler als api_error markiert weiterwerfen. describeImage
+       sammelt den Fehler, versucht noch den Fallback-Prompt und propagiert ihn am
+       Ende — damit der Caller blocked.apiError statt blocked.safetyFilter zeigt. */
+    const e = new Error(`Mistral describe failed: ${err.message}`);
+    e.code = "api_error";
+    throw e;
   }
 }
 
 /* ── Public: generateBothProfiles (Hybrid mit Small 4) ────────────── */
 
-async function generateBothProfiles(imageDescription, visionLabels, exifData, privacyRisks, remainingBudget, lang) {
+async function generateBothProfiles(imageDescription, exifData, remainingBudget, lang) {
   const prompts = loadPrompts(lang || "de");
 
-  /* Im Hybrid-Modus IGNORIEREN wir visionLabels und privacyRisks — Mistral
-     bekommt nur die Beschreibung (Large 3 hat oben das Bild selbst gesehen).
+  /* Mistral bekommt nur die Beschreibung (Large 3 hat oben das Bild selbst gesehen).
      EXIF-Kameradaten (make/model) bleiben sinnvoll und werden mitgegeben. */
   const { dateTimeOriginal: _dateTimeOriginal, ...exifWithoutDate } = exifData || {};
   const exifContext =
     Object.keys(exifWithoutDate).length > 0 ? `\n${prompts.labelExif}: ${JSON.stringify(exifWithoutDate)}` : "";
-
-  /* visionLabels und privacyRisks sind im Hybrid-Mistral-Pfad bewusst leer.
-     Die Variablen werden trotzdem entgegengenommen, damit handle-analyze.js
-     mit derselben Signatur beide Provider aufrufen kann. */
-  void visionLabels;
-  void privacyRisks;
 
   const normalPrompt = buildProfilePrompt(
     prompts,
@@ -255,8 +266,6 @@ async function generateBothProfiles(imageDescription, visionLabels, exifData, pr
 }
 
 function buildProfilePrompt(prompts, systemContext, imageDescription, exifContext, schema) {
-  /* Selbe XML-Injection-Defense wie in gemini.js — escapeXml wird hier
-     manuell gespiegelt, damit wir keine Cross-Dependency haben. */
   const safeDesc = escapeXml(imageDescription || "");
   const safeExif = exifContext ? escapeXml(exifContext) : "";
   return `${systemContext}

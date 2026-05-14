@@ -79,8 +79,8 @@
   "verdict.title": "So denkt die KI über dich",
 
   "blocked.overloaded": "Gerade nutzen sehr viele Menschen malziME gleichzeitig. Bitte warte einen Moment und versuche es dann nochmal.",
-  "blocked.safetyFilter": "Die KI hat das Bild nicht analysiert, weil der Inhalt als sensibel eingestuft wurde \u2014 z.\u00a0B. weil Kinder oder Jugendliche erkannt wurden, oder weil das Bild als gesch\u00fctzt gilt. Googles Sicherheitsfilter blockieren die Auswertung in solchen F\u00e4llen automatisch.",
-  "blocked.safetyFilterFallback": "Die KI durfte das Bild nicht direkt ansehen (Sicherheitsfilter von Google). Die Analyse \u00fcber erkannte Bildelemente wurde ebenfalls blockiert \u2014 der Bildinhalt wurde als zu sensibel eingestuft.",
+  "blocked.safetyFilter": "Die KI hat das Bild nicht analysiert, weil der Inhalt als sensibel eingestuft wurde \u2014 z.\u00a0B. weil Kinder oder Jugendliche erkannt wurden, oder weil das Bild als gesch\u00fctzt gilt. Die Sicherheitsfilter der KI-Anbieter blockieren die Auswertung in solchen F\u00e4llen automatisch.",
+  "blocked.safetyFilterFallback": "Die KI durfte das Bild nicht direkt ansehen (Sicherheitsfilter des KI-Anbieters). Die Analyse \u00fcber erkannte Bildelemente wurde ebenfalls blockiert \u2014 der Bildinhalt wurde als zu sensibel eingestuft.",
   "blocked.apiError": "Bei der Bildanalyse ist ein technischer Fehler aufgetreten. Das kann an einer vor\u00fcbergehenden Serverst\u00f6rung liegen. Versuch es in ein paar Sekunden nochmal.",
   "blocked.profileBlocked": "Das Bild wurde erkannt, aber die KI hat die Profilerstellung verweigert. Das passiert, wenn der Bildinhalt als zu sensibel f\u00fcr eine Auswertung eingestuft wird.",
   "blocked.noContent": "Im Bild wurde nichts Auswertbares erkannt \u2014 kein Gesicht, keine Objekte, kein Text. Versuch es mit einem anderen Foto.",

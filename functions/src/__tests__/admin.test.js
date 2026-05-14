@@ -65,18 +65,14 @@ jest.mock("../counter", () => ({
 jest.mock("../notify", () => ({ notifyLimitReached: jest.fn() }));
 jest.mock("../middleware", () => ({ checkRateLimit: jest.fn(), getClientIp: jest.fn() }));
 jest.mock("../upload", () => ({ parseMultipart: jest.fn(), parseJsonBody: jest.fn() }));
-jest.mock("../vision", () => ({ analyzeWithVision: jest.fn() }));
-jest.mock("../privacy", () => ({ buildPrivacyRisks: jest.fn() }));
-jest.mock("../gemini", () => ({
+jest.mock("../privacy", () => ({ buildPrivacyRisks: jest.fn(), extractVisibleText: jest.fn() }));
+jest.mock("../mistral", () => ({
   describeImage: jest.fn(),
-  buildDescriptionFromLabels: jest.fn(),
   generateBothProfiles: jest.fn(),
-  isQuotaError: jest.fn(),
 }));
 jest.mock("../animal", () => ({
-  classifyLabels: jest.fn(),
+  classifyDescription: jest.fn(),
   buildAnimalProfiles: jest.fn(),
-  AGE_LABELS: [],
 }));
 jest.mock("../i18n", () => ({
   resolveLanguage: jest.fn(),

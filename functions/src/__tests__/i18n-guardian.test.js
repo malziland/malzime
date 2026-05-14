@@ -119,6 +119,7 @@ describe("i18n Guardian (Backend)", () => {
      */
     const ALLOWLIST = [
       "privacy.js", // OCR detection patterns (straße, ÄÖÜ) — not translatable
+      "animal.js", // German + English animal keywords for SUBJECT classification — not translatable
     ];
 
     /* Infrastructure files — no user-facing text, permanently excluded */

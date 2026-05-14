@@ -362,7 +362,20 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
 
   mistralDescribeAddendum: `
 
-ZUSATZAUFGABE (kein separater Vision-Schritt):
+PFLICHT-KOPFZEILE deiner Antwort (genau diese Form, dann Leerzeile):
+SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER
+
+Bedeutung:
+- ANIMAL_ONLY: ausschließlich Tiere im Bild, keine erkennbaren Menschen
+- HUMAN: eine oder mehrere Menschen im Bild (auch teilweise, z.B. nur Gesicht)
+- MIXED: sowohl Menschen als auch Tiere
+- OTHER: Landschaft, Gegenstände, Pflanzen, Architektur, abstrakte Inhalte ohne erkennbare Menschen oder Tiere
+
+Wähle GENAU EINE dieser vier Werte. Bei Unsicherheit nimm den restriktiveren
+Wert (lieber HUMAN als OTHER bei evtl. erkennbarer Person, lieber MIXED als
+ANIMAL_ONLY bei evtl. erkennbarem Menschen im Hintergrund).
+
+ZUSATZAUFGABE — sichtbarer Text:
 Liste am Ende der Bildbeschreibung jeden auf dem Bild sichtbaren Text auf —
 wortgenau wenn möglich (Schilder, Straßennamen, Marken-Logos, Tattoos,
 T-Shirt-/Trikot-Aufdrucke, Bildunterschriften, Display-Anzeigen).

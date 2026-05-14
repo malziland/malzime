@@ -18,7 +18,7 @@ const MIN_INTERACTION_MS = 2000;
 /* BUG-006: Relative URL nutzt Firebase Hosting Rewrite (/analyze → function:analyze).
    Keine hardcoded Domain — funktioniert auf allen Deployments. */
 const ANALYZE_URL = "/analyze";
-const FETCH_TIMEOUT_MS = 60000;
+const FETCH_TIMEOUT_MS = 180000;
 
 export async function analyzeImage() {
   if (state.isAnalyzing) return;

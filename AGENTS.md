@@ -96,7 +96,7 @@ docs/                Setup-Dokumentation
 - Run frontend: `npm run test:frontend`
 - Backend: test pure functions (privacy, config, middleware, upload)
 - Frontend: test DOM helpers, state, UI components, geocoding, render, API integration
-- API-dependent modules (vision, gemini) tested via integration/manual
+- API-dependent module (`mistral.js`) tested via mocked-fetch unit tests
 
 ## Privacy-Architektur (KRITISCH)
 
@@ -138,8 +138,8 @@ Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. D
 - Run `cd functions && npm run lint && npm run format:check` before committing backend changes
 - Run `npm run lint:frontend && npm run format:frontend:check` before committing frontend changes
 - Update cache-buster `?v=YYYYMMDDNN` on CSS/JS when editing frontend files
-- Both profiles (normal + boost) are generated in parallel — changes to prompts affect `gemini.js`
+- Both profiles (normal + boost) are generated in parallel — changes to prompts affect `mistral.js`
 - Bei Aenderungen an der Architektur oder neuen Features: README.md, AGENTS.md, CHANGELOG.md, docs/SETUP.md und docs/SELF-HOSTING.md aktualisieren
 - Bei neuen Features: Dokumentation und Anleitungen mitliefern
-- dateTimeOriginal wird NICHT an Gemini gesendet (verleitet zu falschen Altersschaetzungen)
+- dateTimeOriginal wird NICHT an die KI gesendet (verleitet zu falschen Altersschaetzungen)
 - Describe-Prompt: kein konkretes Alter nennen, nur physische Merkmale beschreiben

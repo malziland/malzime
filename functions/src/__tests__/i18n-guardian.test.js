@@ -123,7 +123,7 @@ describe("i18n Guardian (Backend)", () => {
     ];
 
     /* Infrastructure files — no user-facing text, permanently excluded */
-    const EXCLUDED = ["i18n.js", "config.js", "middleware.js", "vision.js"];
+    const EXCLUDED = ["i18n.js", "config.js", "middleware.js"];
 
     it("non-allowlisted backend JS files have no hardcoded German", () => {
       const violations = [];

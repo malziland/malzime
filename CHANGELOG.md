@@ -4,6 +4,24 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.7.2] — 2026-05-14
+
+### Aufgeraeumt — Gemini-Aera-Reste entfernt
+
+Nach der Pure-Mistral-Umstellung (v1.6.0) waren in Doku und Kommentaren noch veraltete Verweise auf Google Gemini / Vertex AI / Cloud Vision uebrig — teils schlicht falsch (z.B. „faellt automatisch auf Gemini-Fallback zurueck", obwohl es seit v1.6.0 keinen Fallback-Anbieter mehr gibt). Bereinigt:
+
+- **`CONTRIBUTING.md`, `SECURITY.md`, `docs/SETUP.md`, `docs/SELF-HOSTING.md`, `AGENTS.md`** — falsche Multi-Provider-/Fallback-/Vision-API-Aussagen korrigiert. `SECURITY.md`: obsolete `@google-cloud/vision`-Vulnerability-Zeile + Vertex-AI-Vendor-Zeile entfernt, veraltete „Throttle nicht aktiviert"-Notiz auf den v1.7.0-Stand gebracht. Test-Zahlen in `SETUP.md` auf 290 Backend / 141 Frontend aktualisiert.
+- **`functions/.env.example`** — verwies auf `VERTEX_LOCATION` / `GCLOUD_PROJECT`, jetzt auf `MISTRAL_API_KEY`.
+- **`functions/src/locales/de/prompts.js` + `en/prompts.js`** — Header-Kommentare („Gemini-Prompts", „aus gemini.js") korrigiert; toter Locale-Key `labelVisionLabels` entfernt (wurde seit v1.6.0 nirgends mehr genutzt).
+- **`functions/src/__tests__/i18n-guardian.test.js`** — `vision.js` aus der Ausschlussliste entfernt (Datei existiert seit v1.6.0 nicht mehr).
+- Verwaiste lokale Artefakte geloescht (`compare-result.html`, `compare-failed-*.txt`, diverse `.DS_Store`).
+
+`CHANGELOG.md` bleibt bewusst unangetastet — alte Eintraege sind historisches Protokoll.
+
+### Tests
+
+- 290 Backend-Tests + 141 Frontend-Tests gruen. Reine Doku-/Kommentar-Bereinigung, keine Funktionsaenderung.
+
 ## [1.7.1] — 2026-05-14
 
 ### Behoben / Verbessert

@@ -28,7 +28,6 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 | No authentication required | By design — workshop participants should not need accounts | Accepted |
 | Counter fail-open on Firestore errors (`counter.js`) | App stays available during DB outages; worst case: a few extra analyses beyond hourly limit | Accepted — availability over strict cost control |
 | Nonce replay protection fail-open on Firestore errors (`auth.js`) | Admin actions remain functional during DB outages; nonces are short-lived (5 min TTL) and require valid HMAC | Accepted — admin availability over strict replay prevention |
-| `minimatch` ReDoS in `@google-cloud/vision` transitive dependency (`vision → google-gax → rimraf → glob → minimatch <10.2.1`) | Not exploitable in this context (no user-controlled glob patterns reach minimatch). Vision API 5.3.4 is latest; fix requires upstream update by Google | Accepted — monitored via Dependabot |
 
 ## Security Measures
 
@@ -42,8 +41,7 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **Input validation**: File type, size, and format checks
 - **LLM output bounds**: Response size limits enforced server-side (categories, ad_targeting, manipulation_triggers, profileText)
 - **Defensive JSON parser**: 4-stage repair layer for LLM responses (`json-repair.js`) — direct parse → heuristic cleanup → json5 → truncation recovery
-- **Multi-provider fallback**: Mistral AI (primary) → Gemini (fallback) → Vision-Labels heuristic — single provider failure does not break the service
-- **Per-instance throttle**: Semaphore module built but not yet activated — available if Workshop bursts exceed Mistral Scale-Tier limits
+- **Per-instance throttle**: Semaphore (`throttle.js`) caps concurrent Mistral API calls per Cloud Function instance — smooths workshop-burst load against provider rate limits
 
 ## AI Vendors
 
@@ -51,12 +49,9 @@ malziME relies on external AI providers as data processors (Art. 28 GDPR). See [
 
 | Vendor | Role | Data Region |
 |--------|------|-------------|
-| Mistral AI SAS (Paris, FR) | Primary AI (Large 3 + Small 4) | EU by default |
-| Google Vertex AI / Cloud Vision | Fallback AI | europe-west1, Belgium |
+| Mistral AI SAS (Paris, FR) | Sole AI provider (Large 3 + Small 4) | EU by default |
 
-Both vendors are contractually bound to not use uploaded images for training on the paid tiers we use. See provider DPAs:
-- [Mistral DPA](https://legal.mistral.ai/terms/data-processing-addendum)
-- [Google Cloud DPA](https://cloud.google.com/terms/data-processing-addendum)
+Mistral is the only AI provider since v1.6.0 — no Google AI in the pipeline. Mistral is contractually bound to not use uploaded images for training on the paid tier we use. See [Mistral DPA](https://legal.mistral.ai/terms/data-processing-addendum). (Google remains an infrastructure processor for Firebase Hosting / Cloud Functions / Firestore — see [datenschutz.html](public/datenschutz.html).)
 
 ## Secrets management
 

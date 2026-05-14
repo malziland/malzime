@@ -137,12 +137,12 @@ Deploy ist manuell per `firebase deploy` — es gibt keinen automatischen Deploy
 
 ### 5f. Locale-Dateien (optional)
 
-Die UI-Texte, Gemini-Prompts und Tier-Profile liegen in Locale-Dateien:
+Die UI-Texte, KI-Prompts und Tier-Profile liegen in Locale-Dateien:
 
 | Dateien | Inhalt |
 |---------|--------|
 | `public/locales/de.json` | Alle Frontend-UI-Strings |
-| `functions/src/locales/de/prompts.js` | Gemini-Prompts (System-Prompts, Labels, jsonSchemaNormal + jsonSchemaBoost) |
+| `functions/src/locales/de/prompts.js` | KI-Prompts (System-Prompts, Labels, jsonSchemaNormal + jsonSchemaBoost) |
 | `functions/src/locales/de/animals.js` | Tier-Easter-Egg-Profile |
 
 Wenn du die Texte anpassen oder eine neue Sprache hinzufuegen willst:
@@ -167,7 +167,7 @@ firebase functions:secrets:set NTFY_URL      # z.B. https://ntfy.example.com
 firebase functions:secrets:set NTFY_TOPIC    # z.B. malzime-alerts
 ```
 
-Wenn `MISTRAL_API_KEY` fehlt oder ungueltig ist, faellt die Pipeline automatisch auf den Gemini-Fallback zurueck — die App bleibt funktionsfaehig.
+`MISTRAL_API_KEY` ist Pflicht — Mistral ist seit v1.6.0 der einzige KI-Anbieter. Fehlt der Key, schlagen alle Analyse-Anfragen mit einer blockierten Antwort fehl (es gibt keinen Fallback-Anbieter).
 
 Wenn du keine ntfy-Benachrichtigungen willst, setze die Secrets auf einen Platzhalter-Wert (z.B. `none`). Der Code erkennt ungueltige URLs und sendet dann keine Benachrichtigungen.
 
@@ -203,7 +203,7 @@ firebase emulators:start --only functions,hosting
 
 Oeffne http://localhost:5000 — die App sollte funktionieren.
 
-> **Tipp**: Im Emulator brauchen die Vision und Vertex AI APIs trotzdem Internet-Zugang — sie laufen nicht lokal.
+> **Tipp**: Im Emulator braucht die Mistral-API trotzdem Internet-Zugang — die KI-Analyse laeuft nicht lokal.
 
 ## 7. Deploy
 

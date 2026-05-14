@@ -56,7 +56,7 @@ Diese Regeln sind nicht verhandelbar:
 
 ## KI-Provider und Architektur
 
-Seit v1.5.2 nutzt malziME eine Multi-Provider-Architektur mit Mistral AI (primaer) und Google Gemini (Fallback). Details:
+Seit v1.6.0 nutzt malziME ausschliesslich Mistral AI (Paris, EU) als KI-Anbieter — keine weiteren Provider, kein Fallback. Details:
 - Code-Aufbau: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Setup mit Mistral-API-Key: [`docs/SETUP.md`](docs/SETUP.md#firebase-secrets)
 - Tests laufen mit Mocked-Fetch — kein echter Key fuer `npm test` noetig.

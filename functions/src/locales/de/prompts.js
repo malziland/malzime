@@ -1,10 +1,10 @@
 "use strict";
 
 /**
- * locales/de/prompts.js — Deutsche Texte für Gemini-Prompts und Profilgenerierung.
+ * locales/de/prompts.js — Deutsche Texte für die KI-Prompts und Profilgenerierung.
  *
- * Alle deutschen Strings aus gemini.js und der blocked-image-Hinweis aus index.js,
- * extrahiert für i18n-Vorbereitung.
+ * Alle deutschen Strings für die Mistral-Pipeline (mistral.js) und der
+ * blocked-image-Hinweis, ausgelagert für i18n.
  *
  * v1.5.0 (Phase 1 der Mistral-Migration):
  *   - AGE_ANCHOR: Körperproportionen als primäre Alters-Achse,
@@ -372,7 +372,6 @@ Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
   /* ── Kontext-Label-Präfixe für generateBothProfiles() ── */
 
   labelExif: "EXIF-Metadaten",
-  labelVisionLabels: "Vision-API-Labels",
   labelPrivacyRisks: "Erkannte Datenschutz-Risiken",
 
   /* ── Mistral-spezifisches Describe-Addendum (Phase 2 der Migration) ──

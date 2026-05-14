@@ -88,7 +88,7 @@ printf "%s" "DEIN_MISTRAL_KEY" | firebase functions:secrets:set MISTRAL_API_KEY 
 
 Wenn `NTFY_URL` oder `NTFY_TOPIC` leer sind, werden keine Push-Benachrichtigungen gesendet.
 
-Hinweis: Wenn `MISTRAL_API_KEY` fehlt oder ungueltig ist, wird die Pipeline automatisch auf den Gemini-Fallback umschalten (Multi-Provider-Fallback-Chain).
+Hinweis: `MISTRAL_API_KEY` ist Pflicht — Mistral ist seit v1.6.0 der einzige KI-Anbieter. Fehlt der Key, schlagen alle Analyse-Anfragen mit einer blockierten Antwort fehl (kein Fallback-Anbieter).
 
 ## 5. Lokal testen
 
@@ -98,7 +98,7 @@ firebase emulators:start --only functions,hosting
 
 Dann: http://localhost:5000
 
-**Hinweis**: Fuer die lokale Entwicklung muss `gcloud auth application-default login` ausgefuehrt werden, damit die Vertex AI und Vision APIs funktionieren.
+**Hinweis**: Damit die Analyse-Pipeline lokal funktioniert, muss `MISTRAL_API_KEY` in `functions/.env` gesetzt sein (siehe `functions/.env.example`). Der Firestore-Emulator startet automatisch mit, ein Google-Login ist fuer die lokale Entwicklung nicht noetig.
 
 ## 6. Tests ausfuehren
 
@@ -110,8 +110,8 @@ cd functions && npm test
 npm run test:frontend
 ```
 
-**Backend (394 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Vision API, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Gemini-Integration, Mistral-Integration (Mocked-Fetch), JSON-Repair (4-Stufen), Feature-Flags + Auto-Ramp, Throttle-Semaphore, Multi-Provider-Fallback-Chain.
-**Frontend (139 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Stats-Seite, i18n-Modul, i18n-Guardian.
+**Backend (290 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mocked-Fetch), JSON-Repair (4-Stufen), Throttle-Semaphore.
+**Frontend (141 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Stats-Seite, i18n-Modul, i18n-Guardian.
 **E2E (2 Tests):** Playwright Smoke-Tests — Demo-Flow + fehlerfreies Laden.
 
 ## 7. Linting + Formatting
@@ -203,7 +203,7 @@ Bei Tier-Erkennung (SUBJECT=ANIMAL_ONLY) entfaellt der Small-4-Profile-Call — 
 | Cloud Functions | nutzungsbasiert | 2 Mio. Aufrufe/Monat |
 | Cloud Firestore | nutzungsbasiert | 50 K Reads/Tag, 20 K Writes/Tag |
 
-### Rechenbeispiel: Workshop mit 30 Teilnehmer:innen (Hybrid-Mistral-Pfad)
+### Rechenbeispiel: Workshop mit 30 Teilnehmer:innen
 
 | Posten | Rechnung | Kosten |
 |--------|----------|--------|
@@ -211,11 +211,9 @@ Bei Tier-Erkennung (SUBJECT=ANIMAL_ONLY) entfaellt der Small-4-Profile-Call — 
 | Mistral Small 4 (Profile, 2x) | 30 × 2 × ~2.500 Input + ~2.500 Output = 150K in, 150K out je | **~$0.13** |
 | Cloud Functions | 30 Aufrufe × ~5s | **$0.00** |
 | Firebase Hosting | Statische Dateien, wenige MB | **$0.00** |
-| **Gesamt Hybrid** | | **~$0.35** |
+| **Gesamt** | | **~$0.35** |
 
-Zum Vergleich Gemini-Fallback-Pfad: ~$0.43 (siehe Tabelle oben).
-
-Der Hybrid spart ~20% gegenueber dem reinen Gemini-Pfad. Bei langsam laufenden Workshops greift fast immer der Mistral-Hybrid. Mistral berechnet pro 1M Tokens unabhaengig vom Volumen, kein Frei-Kontingent.
+Mistral berechnet pro 1M Tokens unabhaengig vom Volumen, kein Frei-Kontingent. Die Describe-Stage laeuft ueber Mistral Large 3, die beiden Profile ueber das guenstigere Small 4.
 
 ### Tipp fuer neue Google Cloud Konten
 
@@ -245,7 +243,7 @@ Falls du malziME auf deinem eigenen Firebase-Projekt betreiben willst: [`docs/SE
 
 ## Mehrsprachigkeit (i18n)
 
-malziME hat ein vollstaendiges i18n-System. Alle UI-Texte, Gemini-Prompts und Tier-Profile sind in Locale-Dateien ausgelagert.
+malziME hat ein vollstaendiges i18n-System. Alle UI-Texte, KI-Prompts und Tier-Profile sind in Locale-Dateien ausgelagert.
 
 ### Aufbau
 
@@ -256,7 +254,7 @@ public/locales/                Frontend-Locales
 
 functions/src/locales/         Backend-Locales
   manifest.json                Verfuegbare Sprachen + Default-Sprache
-  de/prompts.js                Deutsche Gemini-Prompts
+  de/prompts.js                Deutsche KI-Prompts (System-Prompts, Schemas)
   de/animals.js                Deutsche Tier-Easter-Egg-Profile
 ```
 
@@ -281,5 +279,4 @@ Sprache per URL-Parameter testen: `https://malzi.me/?lang=XX`
 
 - IP-basierte Rate Limits sind in-memory (pro Cloud Functions Instanz). Das globale Stundenlimit verwendet Firestore und ist instanzuebergreifend
 - Logs enthalten nur Request-ID, Status und Modell-Info — keine Bilddaten
-- Safety-Filter von Google blockieren die Bildbeschreibung bei Kinderfotos. Der Code hat einen mehrstufigen Fallback: alternativer Prompt, dann Vision-API-Labels
-- Alters-Labels der Vision API (Toddler, Baby, Infant, Newborn) werden gefiltert, da sie unzuverlaessig sind
+- Wenn Mistral die Bildbeschreibung verweigert (z.B. bei Grenzfall-Bildern), versucht der Code automatisch einen zweiten, weniger triggernden Prompt. Schlaegt auch der fehl, bekommt der User eine blockierte Antwort

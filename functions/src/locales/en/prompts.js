@@ -1,10 +1,10 @@
 "use strict";
 
 /**
- * locales/en/prompts.js — English texts for Gemini prompts and profile generation.
+ * locales/en/prompts.js — English texts for the AI prompts and profile generation.
  *
- * All English strings for gemini.js and the blocked-image hint from index.js,
- * extracted for i18n.
+ * All English strings for the Mistral pipeline (mistral.js) and the
+ * blocked-image hint, extracted for i18n.
  *
  * v1.5.0 (Phase 1 of Mistral migration):
  *   - AGE_ANCHOR: body proportions as primary age axis,
@@ -343,7 +343,6 @@ Reply EXCLUSIVELY with valid JSON in this format:
   /* ── Context label prefixes for generateBothProfiles() ── */
 
   labelExif: "EXIF metadata",
-  labelVisionLabels: "Vision API labels",
   labelPrivacyRisks: "Detected privacy risks",
 
   /* ── Mistral-specific describe addendum (Phase 2 of migration) ──

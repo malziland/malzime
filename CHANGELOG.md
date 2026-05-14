@@ -4,6 +4,12 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.6.2] — 2026-05-14
+
+### Behoben
+
+- **Alter inkonsistent zwischen Normal- und Beast-Modus** (Prompts de + en): Bisher nannte die Bildbeschreibung absichtlich kein Alter — sie beschrieb nur die Merkmale, und beide Profil-Anfragen legten das Alter danach jeweils selbst fest. Dadurch kamen sie auf unterschiedliche Werte. Jetzt legt die bildsehende Stufe (Mistral Large 3) die Altersspanne EINMAL fest, beide Profile (Normal + Beast) uebernehmen sie unveraendert. Umgesetzt ueber `describePrompt` + `describeFallback` (Alter wird jetzt explizit geschaetzt) plus neue `ALTER`-Regel in `SCHEMA_RULES`. `AGE_ANCHOR`-Kalibrierung unveraendert. Reiner Prompt-Eingriff, keine zusaetzliche API-Anfrage.
+
 ## [1.6.1.1] — 2026-05-14
 
 ### Behoben

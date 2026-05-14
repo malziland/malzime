@@ -88,8 +88,20 @@ async function checkAndIncrement() {
 
     return result;
   } catch (err) {
-    /* Fail-open: Lieber ein paar Analysen zu viel als alle User blockieren */
-    console.log(JSON.stringify({ warning: "counter-error", error: err.message }));
+    /* Fail-open: Lieber ein paar Analysen zu viel als alle User blockieren.
+       REL-02: Der Stundenzaehler ist die einzige globale Kostenbremse fuer
+       Mistral-Calls. Faellt er aus, ist diese Bremse weg — darum als ERROR
+       (statt nur log) mit eindeutigem alert-Marker eskalieren, damit ein
+       Log-basierter Alert in Cloud Logging anschlagen kann. */
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        alert: "counter-fail-open",
+        warning: "counter-error",
+        message: "Stundenlimit-Zaehler fehlgeschlagen — globale Kostenbremse momentan inaktiv",
+        error: err.message,
+      })
+    );
     return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: err.message };
   }
 }

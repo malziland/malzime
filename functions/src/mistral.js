@@ -25,6 +25,7 @@ const {
 } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely } = require("./json-repair");
+const { withMistralSlot } = require("./throttle");
 
 /* Wird beim Modul-Load via env-Variable gelesen. NICHT hartcodiert. */
 function getApiKey() {
@@ -52,7 +53,18 @@ function isRateLimitError(err) {
 
 /* ── Low-Level: HTTP-Call mit Timeout + Retry bei 429 ── */
 
-async function callMistralRaw({ model, messages, maxTokens, temperature, forceJSON, timeoutMs }) {
+/* REL-01: Jeder Mistral-HTTP-Call läuft durch die Per-Instance-Semaphore aus
+   throttle.js. Damit kann eine einzelne Cloud-Function-Instanz bei einem
+   Workshop-Burst (viele gleichzeitige Uploads, je 3 Mistral-Calls) nicht mehr
+   beliebig viele Requests gleichzeitig gegen Mistrals RPS-Limit feuern —
+   überzählige Calls warten geordnet auf einen freien Slot, statt sofort 429 zu
+   kassieren. Der Slot wird über die kompletten 429-Retry-Backoffs gehalten,
+   was den Burst zusätzlich entzerrt. */
+async function callMistralRaw(options) {
+  return withMistralSlot(() => callMistralRawUnthrottled(options));
+}
+
+async function callMistralRawUnthrottled({ model, messages, maxTokens, temperature, forceJSON, timeoutMs }) {
   const apiKey = getApiKey();
 
   const body = {

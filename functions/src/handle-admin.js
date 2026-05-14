@@ -1,5 +1,5 @@
 const { getStats, boostLimit, resetCounter, setMaintenanceMode, getMaintenanceStatus } = require("./counter");
-const { verifyAdminToken, createNonce, verifyNonce, consumeNonce, cleanupNonces } = require("./auth");
+const { verifyAdminToken, createNonce, verifyNonce, consumeNonce, cleanupNonces, safeCompare } = require("./auth");
 
 function escapeHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -96,7 +96,8 @@ async function handleAdmin(req, res, secrets) {
   const hmacToken = req.query.hmac || "";
   const nonceToken = (req.body && req.body.nonce) || "";
 
-  const isBearerAuth = bearerToken && bearerToken === secrets.adminSecret.value();
+  /* SEC-01: Konstantzeitiger Vergleich — kein Timing-Seitenkanal aufs Admin-Secret. */
+  const isBearerAuth = bearerToken && safeCompare(bearerToken, secrets.adminSecret.value());
   const isHmacAuth =
     hmacToken &&
     action &&

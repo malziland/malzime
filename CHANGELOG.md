@@ -4,6 +4,27 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.7.0] — 2026-05-14
+
+### Sicherheit & Stabilitaet — Audit-Massnahmen
+
+Dieses Release setzt die Befunde eines internen Security-, Privacy- und Reliability-Audits (Stand Commit f6d1a47) um. Vier Befunde wurden im Code behoben, jeweils mit Test:
+
+- **REL-01 — Burst-Bremse aktiviert** (`mistral.js` + `throttle.js`): Die Per-Instance-Semaphore aus `throttle.js` war fertig implementiert und getestet, aber nirgends in die Pipeline eingebunden. Jeder Mistral-HTTP-Call laeuft jetzt durch `withMistralSlot` — bei einem Workshop-Burst (viele gleichzeitige Uploads, je 3 Mistral-Calls) warten ueberzaehlige Calls geordnet auf einen freien Slot, statt Mistrals RPS-Limit zu reissen und als `blocked.overloaded` fehlzuschlagen.
+- **SEC-02 — XSS-Haertung beim Ergebnis-Rendering** (`public/js/dom.js` + `json-repair.js`): `escapeHtml` escaped jetzt auch Anfuehrungszeichen (`"` / `'`) — die Funktion wird in `render.js` im Attribut-Kontext (`data-key="..."`) verwendet, wo ein nicht-escaptes `"` einen Attribut-Breakout erlaubt haette. Zusaetzlich filtert `applyBounds` Kategorie-Keys serverseitig gegen eine Whitelist (`[a-zA-Z0-9_]`), damit ein prompt-injizierter Modell-Output keinen Key mit Sonderzeichen ins DOM bringen kann (Defense-in-depth).
+- **SEC-01 — Admin-Token konstantzeitig vergleichen** (`auth.js` + `handle-admin.js`): Der Bearer-Token-Vergleich nutzte `===` (timing-anfaellig), waehrend der HMAC-Pfad bereits `crypto.timingSafeEqual` verwendete. Neue zentrale `safeCompare`-Funktion in `auth.js`, im Admin-Handler eingesetzt — kein Timing-Seitenkanal mehr aufs Admin-Secret.
+- **REL-02 — Kostenbremse-Ausfall wird alarmiert** (`counter.js`): Faellt der Firestore-Stundenzaehler aus, laeuft das System bewusst fail-open weiter — der Zaehler ist aber die einzige globale Kostenbremse fuer Mistral-Calls. Der Fehlerfall wird jetzt als `console.error` mit `alert: "counter-fail-open"`-Marker (statt stillem `console.log`) eskaliert, sodass ein Log-basierter Alert in Cloud Logging anschlagen kann.
+
+Nicht-Code-Befunde des Audits: Das Mistral-Ausgabenlimit (100 EUR/Monat, harte Notbremse) deckt die Kostenseite von REL-02 extern ab. Branch Protection (`enforce_admins=false`) bleibt als bewusster Solo-Entwickler-Trade-off bestehen.
+
+### Tests
+
+- 290 Backend-Tests + 140 Frontend-Tests gruen (neue Tests fuer alle vier Befunde).
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051403`.
+
 ## [1.6.2] — 2026-05-14
 
 ### Behoben

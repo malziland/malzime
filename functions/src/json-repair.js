@@ -320,7 +320,15 @@ function applyBounds(parsed) {
   if (!parsed || typeof parsed !== "object") return null;
 
   if (parsed.categories && typeof parsed.categories === "object") {
-    const catKeys = Object.keys(parsed.categories).slice(0, 20);
+    /* SEC-02: Kategorie-Keys landen im Frontend in einem HTML-Attribut
+       (render.js: data-key="..."). Nur schema-konforme Keys durchlassen —
+       Keys mit Sonderzeichen (z.B. Anführungszeichen aus einem prompt-
+       injizierten Modell-Output) werden hier verworfen, statt ins DOM zu
+       gelangen. Defense-in-depth zusätzlich zum escapeHtml im Frontend. */
+    const SAFE_CATEGORY_KEY = /^[a-zA-Z0-9_]{1,50}$/;
+    const catKeys = Object.keys(parsed.categories)
+      .filter((key) => SAFE_CATEGORY_KEY.test(key))
+      .slice(0, 20);
     const bounded = {};
     for (const key of catKeys) {
       const cat = parsed.categories[key];

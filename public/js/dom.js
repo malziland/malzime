@@ -27,5 +27,9 @@ export const elements = {
 export function escapeHtml(str) {
   const div = document.createElement("div");
   div.appendChild(document.createTextNode(str));
-  return div.innerHTML;
+  /* SEC-02: Die textNode-Serialisierung escaped <, > und & — aber NICHT
+     Anführungszeichen. escapeHtml wird teils im Attribut-Kontext verwendet
+     (z.B. render.js: data-key="${escapeHtml(key)}"). Ohne " / ' zu escapen
+     könnte ein Wert mit Anführungszeichen aus dem Attribut ausbrechen. */
+  return div.innerHTML.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }

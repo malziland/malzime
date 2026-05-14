@@ -182,6 +182,35 @@ describe("callMistralRaw 429 retry behavior", () => {
   }, 15000);
 });
 
+/* ── callMistralRaw: Throttle-Integration (REL-01) ─────────────── */
+
+describe("callMistralRaw throttle integration (REL-01)", () => {
+  const { getMistralStats, DEFAULT_MAX_CONCURRENT } = require("../throttle");
+
+  test("routes every call through the per-instance semaphore — concurrency stays capped", async () => {
+    let maxObserved = 0;
+    setFetchForTest(async () => {
+      maxObserved = Math.max(maxObserved, getMistralStats().inFlight);
+      await new Promise((r) => setTimeout(r, 20));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: {} }),
+      };
+    });
+
+    /* Mehr gleichzeitige Calls losschicken als das Limit erlaubt */
+    const calls = Array.from({ length: DEFAULT_MAX_CONCURRENT + 6 }, () =>
+      _callMistralRaw({ model: "x", messages: [], maxTokens: 1, temperature: 0 })
+    );
+    await Promise.all(calls);
+
+    expect(maxObserved).toBeGreaterThan(1); /* echte Parallelität fand statt */
+    expect(maxObserved).toBeLessThanOrEqual(DEFAULT_MAX_CONCURRENT); /* aber gedeckelt durch die Semaphore */
+    expect(getMistralStats().inFlight).toBe(0); /* alle Slots wieder freigegeben */
+  }, 10000);
+});
+
 /* ── callMistralRaw: Fehler-Behandlung ─────────────────────────── */
 
 describe("callMistralRaw error paths", () => {

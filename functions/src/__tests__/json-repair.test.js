@@ -201,6 +201,22 @@ describe("applyBounds", () => {
     const bounded = applyBounds({ categories: tooMany });
     expect(Object.keys(bounded.categories).length).toBe(20);
   });
+
+  test("SEC-02: drops category keys with unsafe characters (attribute-breakout protection)", () => {
+    /* Kategorie-Keys landen im Frontend in einem HTML-Attribut (data-key="...").
+       Ein Key mit Anführungszeichen aus prompt-injiziertem Modell-Output muss
+       hier verworfen werden, statt ins DOM zu gelangen. */
+    const parsed = {
+      categories: {
+        alter_geschlecht: { label: "OK", value: "x", confidence: 0.5 },
+        'x" onmouseover="alert(1)': { label: "BÖSE", value: "x", confidence: 0.5 },
+        "cat-with-dash": { label: "auch raus", value: "x", confidence: 0.5 },
+        "<script>": { label: "raus", value: "x", confidence: 0.5 },
+      },
+    };
+    const bounded = applyBounds(parsed);
+    expect(Object.keys(bounded.categories)).toEqual(["alter_geschlecht"]);
+  });
 });
 
 /* ── parseSafely Hauptfunktion ────────────────────────────────────── */

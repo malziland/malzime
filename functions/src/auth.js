@@ -87,6 +87,20 @@ async function cleanupNonces() {
   await batch.commit();
 }
 
+/**
+ * SEC-01: Konstantzeitiger String-Vergleich fuer Secrets/Tokens.
+ * Verhindert Timing-Seitenkanaele, ueber die ein Angreifer ein Secret
+ * byteweise rekonstruieren koennte. Ein Laengen-Mismatch wird frueh und
+ * ohne Vergleich abgefangen — die Laenge ist ohnehin kein Geheimnis.
+ */
+function safeCompare(a, b) {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 module.exports = {
   createAdminToken,
   verifyAdminToken,
@@ -94,6 +108,7 @@ module.exports = {
   verifyNonce,
   consumeNonce,
   cleanupNonces,
+  safeCompare,
   DEFAULT_TTL_MS,
   NONCE_TTL_MS,
 };

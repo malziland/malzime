@@ -25,6 +25,7 @@ const {
   verifyNonce,
   consumeNonce,
   cleanupNonces,
+  safeCompare,
   NONCE_TTL_MS,
 } = require("../auth");
 
@@ -32,6 +33,31 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockCreate.mockResolvedValue();
   mockGet.mockResolvedValue({ empty: true, docs: [] });
+});
+
+describe("safeCompare (SEC-01)", () => {
+  test("returns true for identical strings", () => {
+    expect(safeCompare("admin-secret-xyz", "admin-secret-xyz")).toBe(true);
+  });
+
+  test("returns false for different strings of same length", () => {
+    expect(safeCompare("admin-secret-xyz", "admin-secret-XYZ")).toBe(false);
+  });
+
+  test("returns false for strings of different length without throwing", () => {
+    expect(safeCompare("short", "a-much-longer-secret")).toBe(false);
+  });
+
+  test("returns false for non-string input", () => {
+    expect(safeCompare(undefined, "x")).toBe(false);
+    expect(safeCompare("x", null)).toBe(false);
+    expect(safeCompare(123, 123)).toBe(false);
+  });
+
+  test("handles empty strings", () => {
+    expect(safeCompare("", "")).toBe(true);
+    expect(safeCompare("", "x")).toBe(false);
+  });
 });
 
 describe("createAdminToken", () => {

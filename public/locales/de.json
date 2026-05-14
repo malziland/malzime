@@ -64,6 +64,7 @@
   "error.offline": "Keine Internetverbindung. Bitte prüfe dein WLAN.",
   "error.maintenance": "malziME ist gerade im Wartungsmodus. Bitte versuch es später nochmal.",
   "error.networkError": "Verbindung zum Server fehlgeschlagen. Prüfe dein Internet und versuch es nochmal.",
+  "error.suspended": "Die Analyse wurde unterbrochen, weil das Gerät in den Ruhezustand ging. Bitte versuch es nochmal und lass den Bildschirm an.",
 
   "render.blockedFallback": "Die Analyse konnte nicht abgeschlossen werden. Versuch es mit einem anderen Foto.",
   "render.emptyProfile": "Die KI hat ein leeres Profil zurückgeliefert. Versuch es mit einem anderen Foto oder wechsle den Modus.",

@@ -4,6 +4,21 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.7.1] — 2026-05-14
+
+### Behoben / Verbessert
+
+- **Wake-Lock gegen Analyse-Abbruch** (`public/js/api.js` + Locales): Eine Analyse kann bis ~3 min dauern. Ging das Geraet in der Zeit in Standby, fror der Browser die Seite ein und die laufende fetch-Anfrage starb — der User sah beim Aufwachen einen Fehler, obwohl der Server fertig gerechnet hatte. Jetzt fordert der Browser waehrend der Analyse einen Screen-Wake-Lock an (Bildschirm bleibt an) und gibt ihn danach wieder frei. Best-Effort: nicht jedes Geraet unterstuetzt die API, und ein manueller Power-Knopf-Druck sperrt weiterhin.
+- **Treffende Fehlermeldung bei Standby-Abbruch**: Ging die Seite waehrend des Requests doch in den Hintergrund, zeigt malziME jetzt "Die Analyse wurde unterbrochen, weil das Geraet in den Ruhezustand ging..." (neuer Locale-Key `error.suspended`, de + en) statt eines generischen Netzwerkfehlers.
+
+### Tests
+
+- 290 Backend-Tests + 141 Frontend-Tests gruen.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051404`.
+
 ## [1.7.0] — 2026-05-14
 
 ### Sicherheit & Stabilitaet — Audit-Massnahmen

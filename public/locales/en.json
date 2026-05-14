@@ -64,6 +64,7 @@
   "error.offline": "No internet connection. Please check your WiFi.",
   "error.maintenance": "malziME is currently in maintenance mode. Please try again later.",
   "error.networkError": "Connection to server failed. Check your internet and try again.",
+  "error.suspended": "The analysis was interrupted because the device went to sleep. Please try again and keep the screen on.",
 
   "render.blockedFallback": "The analysis could not be completed. Try with a different photo.",
   "render.emptyProfile": "The AI returned an empty profile. Try with a different photo or switch the mode.",

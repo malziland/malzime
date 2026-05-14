@@ -20,6 +20,44 @@ const MIN_INTERACTION_MS = 2000;
 const ANALYZE_URL = "/analyze";
 const FETCH_TIMEOUT_MS = 180000;
 
+/* ── Wake-Lock ──────────────────────────────────────────────────────
+   Verhindert, dass das Gerät während der (bis ~3 min langen) Analyse in
+   Standby geht. Geht es schlafen, friert der Browser die Seite ein und die
+   laufende fetch-Anfrage stirbt — der User sieht beim Aufwachen einen Fehler,
+   obwohl der Server fertig gerechnet hat. Best-Effort: nicht jedes Gerät
+   unterstützt die API, und ein manueller Power-Knopf-Druck sperrt trotzdem. */
+let wakeLock = null;
+
+async function acquireWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+  } catch (_) {
+    /* Verweigert/nicht verfügbar — kein Abbruch, läuft ohne Wake-Lock weiter. */
+    wakeLock = null;
+  }
+}
+
+function releaseWakeLock() {
+  if (!wakeLock) return;
+  wakeLock.release().catch(() => {});
+  wakeLock = null;
+}
+
+/* Merkt sich, ob die Seite während einer laufenden Analyse in den Hintergrund
+   ging (Gerät gesperrt / Tab gewechselt) — für eine treffende Fehlermeldung. */
+let pageHiddenDuringRequest = false;
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    if (state.isAnalyzing) pageHiddenDuringRequest = true;
+  } else if (state.isAnalyzing && !wakeLock) {
+    /* Seite wieder sichtbar und Analyse läuft noch — der Browser gibt den
+       Wake-Lock beim Verstecken automatisch frei, also neu anfordern. */
+    acquireWakeLock();
+  }
+});
+
 export async function analyzeImage() {
   if (state.isAnalyzing) return;
   state.isAnalyzing = true;
@@ -27,6 +65,7 @@ export async function analyzeImage() {
   /* BUG-001/002: Jeder Analyse-Lauf bekommt eine eindeutige ID.
      Stale catch/finally/Callbacks prüfen ob sie noch "aktuell" sind. */
   const myId = ++state.requestId;
+  pageHiddenDuringRequest = false;
 
   setStatus("");
   elements.facts.innerHTML = "";
@@ -70,6 +109,9 @@ export async function analyzeImage() {
   /* BUG-001: timeoutId VOR try deklarieren → im catch/finally erreichbar */
   let timeoutId;
   try {
+    /* Wake-Lock anfordern — Bildschirm bleibt während der Analyse an. */
+    await acquireWakeLock();
+
     /* Bild komprimieren + EXIF extrahieren (client-seitig) */
     if (!state.lastPrepared) {
       state.lastPrepared = await prepareImage(file);
@@ -182,12 +224,16 @@ export async function analyzeImage() {
     /* BUG-002: Stale catch darf UI des neuen Laufs nicht überschreiben */
     if (state.requestId !== myId) return;
     stopScanAnim();
-    if (err.name === "AbortError") {
-      setStatus(t("error.timeout"));
-    } else if (err.message === "read_failed") {
+    if (err.message === "read_failed") {
       setStatus(t("error.readFailed"));
     } else if (err.message === "image_decode_failed") {
       setStatus(t("error.decodeFailed"));
+    } else if (pageHiddenDuringRequest) {
+      /* Wake-Lock: Seite war während des Requests im Hintergrund → das Gerät
+         ist vermutlich in Standby gegangen und hat die fetch-Anfrage gekillt. */
+      setStatus(t("error.suspended"));
+    } else if (err.name === "AbortError") {
+      setStatus(t("error.timeout"));
     } else if (!navigator.onLine) {
       setStatus(t("error.offline"));
     } else {
@@ -196,6 +242,8 @@ export async function analyzeImage() {
   } finally {
     /* BUG-001: Timeout immer aufräumen */
     clearTimeout(timeoutId);
+    /* Wake-Lock immer freigeben — Analyse ist durch (Erfolg, Fehler, Stale). */
+    releaseWakeLock();
     /* BUG-002: Nur eigenen isAnalyzing-Flag zurücksetzen */
     if (state.requestId === myId) state.isAnalyzing = false;
   }

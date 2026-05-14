@@ -183,6 +183,19 @@ describe("analyzeImage", () => {
     expect(elements.status.textContent).toBe("error.networkError");
   });
 
+  it("shows suspend message when the page was hidden during the request (Wake-Lock)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      /* Gerät geht während des Requests in Standby → Seite wird versteckt */
+      Object.defineProperty(document, "hidden", { value: true, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+      throw new Error("network");
+    });
+    await analyzeImage();
+    expect(elements.status.textContent).toBe("error.suspended");
+    /* Cleanup für nachfolgende Tests */
+    Object.defineProperty(document, "hidden", { value: false, configurable: true });
+  });
+
   it("injects GPS data client-side", async () => {
     prepareImage.mockResolvedValue({
       imageBase64: "QUFB",

@@ -1,65 +1,111 @@
-# E-Mail-Benachrichtigung bei Cloud Function Fehlern
+# Fehler-Benachrichtigung bei Cloud-Function-Fehlern
 
 ## Was ist das?
 
-Wenn die Cloud Function abstuerzt (z.B. Speicherfehler, API-Timeout), wirst du per E-Mail benachrichtigt. So erfaehrst du von Problemen sofort statt nach Tagen.
+Wenn eine Cloud Function einen Fehler loggt (Absturz, Speicherfehler, API-Timeout,
+ausgefallene Kostenbremse), wird der Betreiber sofort benachrichtigt — statt es
+erst Tage später zu merken.
 
-## Einrichtung (einmalig)
+## Wie es funktioniert
 
-### Schritt 1: E-Mail-Kanal erstellen
+```
+Function loggt severity>=ERROR
+        │
+        ▼
+Cloud Monitoring  ── log-basierte Alert-Policy "malziME Function Errors"
+        │
+        ▼
+Notification Channel  ── Webhook
+        │
+        ▼
+Benachrichtigung (malziME nutzt ntfy-Push aufs Handy)
+```
 
-1. Oeffne: https://console.cloud.google.com/monitoring/alerting/notifications?project=malzime
-2. Scroll runter zum Bereich **Email** (steht unter Webhooks, SMS usw.)
-3. Klick rechts daneben auf **"Add New"**
-4. **Email Address:** deine E-Mail-Adresse
-5. **Display Name:** `malziME Alerts` (frei waehlbar, nur ein Label fuer dich)
-6. Klick **"Save"**
+Bewusst **log-basiert**, nicht metrik-basiert: Die Functions laufen als 2nd-Gen
+(Cloud Run) — ihre Logs liegen zuverlässig unter `resource.type="cloud_run_revision"`.
+Ein log-basierter Alert auf `severity>=ERROR` ist dafür robuster als die alte
+metrik-basierte Variante.
 
-### Schritt 2: Alert Policy erstellen
+## Einrichtung (einmalig, per gcloud)
 
-1. Oeffne: https://console.cloud.google.com/monitoring/alerting?project=malzime
-2. Klick oben auf **"+ Create policy"**
+### 1. Notification Channel anlegen
 
-#### Metrik waehlen
+Cloud Monitoring kennt nur `webhook_basicauth` und `webhook_tokenauth` — beides
+erfordert formal eine Auth-Angabe. `webhook_tokenauth` ist die einfachere Wahl,
+wenn das Ziel (z.B. ein ntfy-Server) keinen Auth braucht — der Token wird dann
+ignoriert.
 
-3. Klick auf **"Messwert auswaehlen"**
-4. Links unter **AKTIVE RESSOURCEN** klick auf **"Cloud Function"**
-5. In der mittleren Spalte klick auf **"Function"**
-6. In der rechten Spalte klick auf **"Executions"**
-7. Klick unten auf **"Anwenden"**
+Channel-Definition als JSON (`channel.json`):
 
-#### Filter setzen
+```json
+{
+  "type": "webhook_tokenauth",
+  "displayName": "<Anzeigename>",
+  "labels": { "url": "<Webhook-URL>" }
+}
+```
 
-8. Klick auf **"Filter hinzufuegen"**
-9. Klick auf das Dropdown **"Filter"** (links) — ein Suchfeld oeffnet sich
-10. Klick auf **"status"** (unter Messwertlabels)
-11. Klick **"Ok"**
-12. Jetzt siehst du drei Felder: Filter = status, Vergleichsoperator = "=", Wert
-13. Im Feld **"Wert"** tippe `error`
-14. Klick auf **"Fertig"**
+```bash
+gcloud alpha monitoring channels create \
+  --channel-content-from-file=channel.json --project=<PROJECT>
+```
 
-#### Trigger konfigurieren
+> malziME pusht an einen eigenen ntfy-Server. Die URL nutzt ntfy-Templating
+> (`?template=1`), um `title`/`message` aus dem Cloud-Monitoring-Incident-JSON
+> zu rendern (`{{.incident.summary}}`, `{{.incident.url}}`). Wichtig: ntfy
+> templatet nur `title` und `message` — **nicht** `click`. Tap-Links daher in
+> den Nachrichtentext legen.
 
-15. Scroll runter und klick **"Next"**
-16. **Condition Type:** "Threshold" (ist schon ausgewaehlt)
-17. Im Feld **"Grenzwert"** tippe `0.001` (entspricht ca. 3-4 Fehlern pro Stunde)
-18. Klick **"Next"**
+### 2. Log-basierte Alert-Policy anlegen
 
-#### Benachrichtigung und Name
+Policy-Definition als JSON (`policy.json`):
 
-19. Klick auf das Dropdown **"Benachrichtigungskanaele"** und waehle **"malziME Alerts"**
-20. Im Feld **"Betreffzeile der Benachrichtigung"** tippe: `malziME Cloud Function Errors`
-21. Scroll ganz nach unten zum Feld **"Richtlinienname"** und tippe: `malziME Cloud Function Errors`
-22. Klick auf **"Richtlinie erstellen"** (blauer Button ganz unten)
+```json
+{
+  "displayName": "malziME Function Errors",
+  "documentation": {
+    "subject": "malziME: Function-Fehler",
+    "mimeType": "text/markdown",
+    "content": "Eine Cloud Function hat einen Fehler geloggt (severity>=ERROR)."
+  },
+  "conditions": [{
+    "displayName": "ERROR-Log in malziME-Functions",
+    "conditionMatchedLog": {
+      "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=(\"analyze\" OR \"admin\" OR \"stats\") AND severity>=ERROR"
+    }
+  }],
+  "combiner": "OR",
+  "alertStrategy": {
+    "notificationRateLimit": { "period": "300s" },
+    "autoClose": "1800s"
+  },
+  "notificationChannels": ["<CHANNEL-RESOURCE-NAME>"],
+  "enabled": true
+}
+```
 
-### Was passiert dann?
+```bash
+gcloud alpha monitoring policies create \
+  --policy-from-file=policy.json --project=<PROJECT>
+```
 
-- Wenn die Cloud Function zu oft fehlschlaegt, bekommst du eine E-Mail
-- Die E-Mail enthaelt: Fehlername, Haeufigkeit, Link zur Console
-- Keine Nutzerdaten in der E-Mail (kein Foto, kein Profil, keine IP)
+Der `notificationRateLimit` (300s) verhindert Push-Spam bei einem Fehler-Sturm.
 
-### Datenschutz
+## Was passiert dann?
 
-- Kein externer Dienst — Google Cloud Monitoring ist Teil der bestehenden Infrastruktur
-- Die E-Mail geht von Google direkt an dich
-- Kompatibel mit dem Datenschutztext (keine zusaetzlichen personenbezogenen Daten)
+- Loggt eine Function einen Fehler, kommt eine Benachrichtigung — bei malziME
+  als Push mit ⚠️-Symbol, Fehlertext und Link zur Cloud Console.
+- Handled per-Request-Fehler (HTTP 4xx/5xx an den Client, nur `console.log`)
+  lösen **nicht** aus — nur echte `severity>=ERROR`-Logs (Abstürze, OOM,
+  Timeouts, eskalierte Fehler wie `counter-fail-open`).
+
+## Datenschutz
+
+- Kein externer Dienst nötig — Cloud Monitoring ist Teil der bestehenden Infrastruktur.
+- Keine Nutzerdaten in der Benachrichtigung (kein Foto, kein Profil, keine IP).
+
+## Hinweis für das produktive malziME-Setup
+
+Die konkreten Config-Dateien (mit der ntfy-Server-URL) liegen **außerhalb dieses
+Repos** — es ist eine private Betriebs-Funktion. Dieses Dokument beschreibt nur
+das allgemeine Muster, das auch Self-Hoster nachbauen können.

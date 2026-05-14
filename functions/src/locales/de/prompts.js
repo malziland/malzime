@@ -106,6 +106,9 @@ selbstsichere Festlegung auf das falsche Geschlecht ist ein Messfehler.`;
 const SCHEMA_RULES = `
 
 ZUSÄTZLICHE REGELN:
+- GESCHLECHT: Das Geschlecht der Person ist in der Bildbeschreibung bereits
+  bestimmt. Übernimm es exakt — interpretiere es NICHT neu und ändere es NICHT
+  zur dramatischen Wirkung. Steht dort "nicht eindeutig erkennbar", bleibt es dabei.
 - KEINE Preisangaben (€, $, EUR, USD, "kostet X Euro", "ab X €") in den Feldern
   ad_targeting, werbeprofil und kaufkraft. Nur Marken-, Produkt- oder Modellnamen.
 - Beim Feld einkommen sind Einkommens-Spannen weiterhin erlaubt

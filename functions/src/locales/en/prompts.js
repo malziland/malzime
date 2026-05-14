@@ -98,6 +98,9 @@ commitment to the wrong gender is a measurement error.`;
 const SCHEMA_RULES = `
 
 ADDITIONAL RULES:
+- GENDER: The person's gender is already determined in the image description.
+  Use it exactly as stated — do NOT reinterpret it and do NOT change it for
+  dramatic effect. If it says "not clearly identifiable", keep it that way.
 - NO price strings (€, $, EUR, USD, "costs X euros", "from X €") in the
   fields ad_targeting, werbeprofil and kaufkraft. Only brand, product or
   model names.

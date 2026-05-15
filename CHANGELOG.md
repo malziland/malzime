@@ -4,6 +4,27 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.8.0] — 2026-05-15
+
+### Behoben — Hosting-Edge-Timeout umgangen
+
+Beobachtet: Bei langsameren Mistral-Antworten (z.B. heute Vormittag um ~30 % erhoehte Latenz) reisst die komplette Pipeline (describe + 2x profile) die 60-Sekunden-Grenze des Firebase-Hosting-Rewrite-Edges. Symptom im Browser: „Server-Fehler" nach ~60–70 s, obwohl die Cloud Function selber sauber mit `status:"ok"` antwortet — der Hosting-Proxy davor kappt die Antwort.
+
+- **`public/js/api.js`**: `ANALYZE_URL` zeigt jetzt direkt auf die Cloud-Run-URL der `analyze`-Function (`https://analyze-5ymhpdpqcq-ew.a.run.app`) statt auf den `/analyze`-Rewrite. Damit greift der Cloud-Run-Function-Timeout (180 s laut `index.js`) statt des Hosting-Edge-Timeouts (~60 s).
+- **`firebase.json`**: CSP `connect-src` um die Cloud-Run-URL erweitert, damit der Browser den Cross-Origin-Fetch zulaesst.
+- **`e2e/smoke.test.js`**: Route-Pattern auf `**/analyze*` erweitert, damit der Mock weiter greift.
+- **CORS** regelt `firebase-functions/v2` bereits automatisch via `cors: ALLOWED_ORIGINS` (`functions/src/index.js`) — keine Anpassung am Backend noetig.
+
+Der bisherige `/analyze`-Rewrite in `firebase.json` bleibt als sanfter Fallback erhalten (wird vom Frontend nicht mehr genutzt). Eine eigene Subdomain `api.malzi.me` statt der unschoenen `.run.app`-URL ist als naechster Schritt vorgemerkt — DNS-Mapping erfolgt direkt von Cloud Run auf IONOS (NICHT ueber Firebase Hosting, sonst zurueck in den Edge-Timeout).
+
+### Tests
+
+- Bestandstests laufen weiter; Smoke-Test-Pattern auf neue URL angepasst.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051501`.
+
 ## [1.7.2] — 2026-05-14
 
 ### Aufgeraeumt — Gemini-Aera-Reste entfernt

@@ -15,9 +15,11 @@ import { t, getLanguage } from "./i18n.js";
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
-/* BUG-006: Relative URL nutzt Firebase Hosting Rewrite (/analyze → function:analyze).
-   Keine hardcoded Domain — funktioniert auf allen Deployments. */
-const ANALYZE_URL = "/analyze";
+/* Direkt-Aufruf der Cloud-Run-URL statt Firebase-Hosting-Rewrite — der Hosting-Edge
+   schneidet Antworten nach ~60s ab, was die Mistral-Pipeline bei Latenz-Spitzen reisst.
+   Direkt-Aufruf nutzt den Cloud-Run-Timeout (180s, siehe functions/src/index.js).
+   CORS regelt firebase-functions/v2 automatisch via `cors: ALLOWED_ORIGINS`. */
+const ANALYZE_URL = "https://analyze-5ymhpdpqcq-ew.a.run.app";
 const FETCH_TIMEOUT_MS = 180000;
 
 /* ── Wake-Lock ──────────────────────────────────────────────────────

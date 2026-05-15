@@ -27,7 +27,7 @@ const MOCK_RESPONSE = {
 
 test("Smoke: Demo-Foto → Disclaimer → Profil wird angezeigt", async ({ page }) => {
   /* API-Calls abfangen */
-  await page.route("**/analyze", (route) =>
+  await page.route("**/analyze*", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",

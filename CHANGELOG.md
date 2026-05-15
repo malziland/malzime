@@ -4,6 +4,32 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.9.0] — 2026-05-15
+
+### Neu — Anonymes Client-Error-Logging (DSGVO-konform)
+
+Bisher waren Frontend-Fehler nur als pauschale UI-Meldung sichtbar (z.B. „Server-Fehler", „Verbindung fehlgeschlagen") — ohne Hinweis auf Fehler-Typ, Phase oder Dauer. Reproduktion und Diagnose von Reports waren reine Vermutungssache. Jetzt landet jeder Frontend-Fehler strukturiert in Cloud Logging.
+
+- **`functions/src/handle-errors.js`** (neu): nimmt POST mit JSON-Body, validiert Felder gegen eine Whitelist mit Laengenlimits, schreibt strukturierten Eintrag mit `console.error` (severity ERROR in Cloud Logging). DSGVO: keine PII, keine IP-Speicherung (nur Rate-Limit-Bucket), keine Cookies, keine persistente Speicherung — Daten liegen ausschliesslich in Cloud Logging mit der projektweiten Retention.
+- **`functions/src/index.js`**: neue `errors`-Function (europe-west1, 128 MiB, 3 max instances, 10s timeout, public CORS auf `ALLOWED_ORIGINS`).
+- **`firebase.json`**: Hosting-Rewrite `/api/errors` → function `errors` (Same-Origin → keine CSP-Aenderung noetig).
+- **`public/js/error-logger.js`** (neu): `logClientError(error, context)` sendet anonymisierte Fehler-Metadaten an `/api/errors`. `keepalive:true` damit der Beacon auch beim Tab-Schliessen durchgeht. Fehler des Loggers selbst werden still geschluckt — der User-Flow haengt nie davon ab.
+- **`public/js/api.js`**: catch-Block setzt jetzt eine eindeutige `phase` (`image-read` / `image-decode` / `page-hidden` / `client-timeout` / `offline` / `network` / `fetch`) und ruft `logClientError(err, { phase, durationMs, requestId })`. Auch HTTP-Fehler-Responses (>=400) werden mit Phase `http-error` geloggt. UI-Meldungen bleiben identisch.
+
+### Datenfelder (Whitelist, alles optional)
+- `errorName` (max 100), `errorMessage` (max 500), `phase` (max 50), `url` Pfad-Teil (max 200), `userAgent` gekuerzt (max 250), `requestId` (max 50)
+- `durationMs` (0–600000), `online`, `hidden`
+
+Was NICHT geloggt wird: IPs persistent, Cookies, Bilder, EXIF, GPS, beliebige Header.
+
+### Tests
+
+- Bestandstests werden vor Deploy ausgefuehrt.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051502`.
+
 ## [1.8.0] — 2026-05-15
 
 ### Behoben — Hosting-Edge-Timeout umgangen

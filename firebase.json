@@ -86,6 +86,10 @@
         "function": "stats"
       },
       {
+        "source": "/api/errors",
+        "function": "errors"
+      },
+      {
         "source": "/api/admin/**",
         "function": "admin"
       },

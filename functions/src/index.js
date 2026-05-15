@@ -5,6 +5,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { handleAnalyze } = require("./handle-analyze");
 const { handleStats } = require("./handle-stats");
 const { handleAdmin } = require("./handle-admin");
+const { handleErrors } = require("./handle-errors");
 const { ALLOWED_ORIGINS } = require("./domains");
 
 const adminSecret = defineSecret("ADMIN_SECRET");
@@ -54,4 +55,16 @@ exports.admin = onRequest(
     secrets: [adminSecret],
   },
   (req, res) => handleAdmin(req, res, { adminSecret })
+);
+
+exports.errors = onRequest(
+  {
+    region: "europe-west1",
+    memory: "128MiB",
+    cors: ALLOWED_ORIGINS,
+    invoker: "public",
+    maxInstances: 3,
+    timeoutSeconds: 10,
+  },
+  handleErrors
 );

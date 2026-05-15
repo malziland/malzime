@@ -12,6 +12,7 @@ import {
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import { t, getLanguage } from "./i18n.js";
+import { logClientError } from "./error-logger.js";
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
@@ -67,6 +68,7 @@ export async function analyzeImage() {
   /* BUG-001/002: Jeder Analyse-Lauf bekommt eine eindeutige ID.
      Stale catch/finally/Callbacks prüfen ob sie noch "aktuell" sind. */
   const myId = ++state.requestId;
+  const analyzeStartTime = Date.now();
   pageHiddenDuringRequest = false;
 
   setStatus("");
@@ -195,6 +197,11 @@ export async function analyzeImage() {
         /* response parse failed — use default msg */
       }
       setStatus(msg);
+      logClientError(new Error(`HTTP ${response.status}`), {
+        phase: "http-error",
+        durationMs: Date.now() - analyzeStartTime,
+        requestId: String(myId),
+      });
       return;
     }
 
@@ -226,21 +233,33 @@ export async function analyzeImage() {
     /* BUG-002: Stale catch darf UI des neuen Laufs nicht überschreiben */
     if (state.requestId !== myId) return;
     stopScanAnim();
+
+    let phase = "fetch";
     if (err.message === "read_failed") {
+      phase = "image-read";
       setStatus(t("error.readFailed"));
     } else if (err.message === "image_decode_failed") {
+      phase = "image-decode";
       setStatus(t("error.decodeFailed"));
     } else if (pageHiddenDuringRequest) {
-      /* Wake-Lock: Seite war während des Requests im Hintergrund → das Gerät
-         ist vermutlich in Standby gegangen und hat die fetch-Anfrage gekillt. */
+      phase = "page-hidden";
       setStatus(t("error.suspended"));
     } else if (err.name === "AbortError") {
+      phase = "client-timeout";
       setStatus(t("error.timeout"));
     } else if (!navigator.onLine) {
+      phase = "offline";
       setStatus(t("error.offline"));
     } else {
+      phase = "network";
       setStatus(t("error.networkError"));
     }
+
+    logClientError(err, {
+      phase,
+      durationMs: Date.now() - analyzeStartTime,
+      requestId: String(myId),
+    });
   } finally {
     /* BUG-001: Timeout immer aufräumen */
     clearTimeout(timeoutId);

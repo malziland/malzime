@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.9.1] — 2026-05-15
+
+### Geaendert — Upload-Limit von 6 MB auf 25 MB hochgesetzt
+
+Frontend verkleinert das Bild ohnehin per Canvas-Resize (`exif.js`), bevor es an die API gesendet wird. Das alte 6-MB-Hardlimit blockierte aber bereits die Rohdatei — typische Handy-Originale (iPhone, iPad, Pixel) liegen oft bei 4–10 MB und scheiterten daran ohne Grund. Neues 25-MB-Limit laesst alle ueblichen Handy-Fotos durch, schuetzt aber weiterhin vor versehentlich hochgeladenen RAW-Dateien oder Videos.
+
+- **`functions/src/config.js`**: `MAX_UPLOAD_BYTES` von 6 auf 25 MiB
+- **`public/js/api.js`**: Client-seitige Pre-Check-Grenze von 6 auf 25 MB
+- **`public/locales/de.json` + `en.json`**: Hint + Fehlermeldung („max 6 MB" → „max 25 MB")
+- **`public/index.html`**: drop-hint Text
+- Tests angepasst: `config.test.js`, `api.test.js` (Oversize-Test von 21 auf 30 MB), `index.test.js` (Base64-Oversize-Test von 15 auf 40 MB).
+
+### Tests
+
+- 290 Backend-Tests + 141 Frontend-Tests gruen.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051503`.
+
 ## [1.9.0] — 2026-05-15
 
 ### Neu — Anonymes Client-Error-Logging (DSGVO-konform)

@@ -3,7 +3,7 @@
   "hero.title": "We see more than your photo.",
   "hero.lead": "Upload an image. The AI creates a complete profile about you in seconds — from a single photo.",
   "upload.label": "Select photo or drag it here",
-  "upload.hint": "JPEG, PNG, WEBP · max 6 MB",
+  "upload.hint": "JPEG, PNG, WEBP · max 25 MB",
   "bias.normalTooltip": "Factual assessment — the way real algorithms categorize you in the background. Direct, concrete, without exaggeration.",
   "bias.normalLabel": "Serious Analysis",
   "bias.boostLabel": "Beast Mode",
@@ -51,7 +51,7 @@
   "print.note": "This information was invented by the AI – None of it is true!",
 
   "error.noFile": "Please select an image first.",
-  "error.fileTooLarge": "File too large. Max 6 MB.",
+  "error.fileTooLarge": "File too large. Max 25 MB.",
   "error.generic": "Something went wrong. Try again.",
   "error.rateLimit": "Too many requests from your network. Wait a moment and try again shortly.",
   "error.imageTooLarge": "The image is too large. Please use a smaller photo.",

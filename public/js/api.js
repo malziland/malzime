@@ -89,7 +89,7 @@ export async function analyzeImage() {
     state.isAnalyzing = false;
     return;
   }
-  if (file.size > 6 * 1024 * 1024) {
+  if (file.size > 25 * 1024 * 1024) {
     stopScanAnim();
     setStatus(t("error.fileTooLarge"));
     state.isAnalyzing = false;

@@ -3,7 +3,7 @@
   "hero.title": "Wir sehen mehr als dein Foto.",
   "hero.lead": "Lade ein Bild hoch. Die KI erstellt in Sekunden ein komplettes Profil über dich — aus einem einzigen Foto.",
   "upload.label": "Foto auswählen oder hierhin ziehen",
-  "upload.hint": "JPEG, PNG, WEBP · max 6 MB",
+  "upload.hint": "JPEG, PNG, WEBP · max 25 MB",
   "bias.normalTooltip": "Sachliche Einschätzung — so wie echte Algorithmen dich im Hintergrund kategorisieren. Direkt, konkret, ohne Übertreibung.",
   "bias.normalLabel": "Seriöse Analyse",
   "bias.boostLabel": "Beast Mode",
@@ -51,7 +51,7 @@
   "print.note": "Diese Informationen sind von der KI erfunden – Nichts davon ist wahr!",
 
   "error.noFile": "Bitte zuerst ein Bild auswählen.",
-  "error.fileTooLarge": "Datei zu groß. Max 6 MB.",
+  "error.fileTooLarge": "Datei zu groß. Max 25 MB.",
   "error.generic": "Da ist etwas schiefgelaufen. Versuch es nochmal.",
   "error.rateLimit": "Zu viele Anfragen aus eurem Netzwerk. Wartet kurz und versucht es gleich nochmal.",
   "error.imageTooLarge": "Das Bild ist zu groß. Bitte ein kleineres Foto verwenden.",

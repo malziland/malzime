@@ -2,7 +2,7 @@ const config = require("../config");
 
 describe("config", () => {
   test("exports expected constants", () => {
-    expect(config.MAX_UPLOAD_BYTES).toBe(6 * 1024 * 1024);
+    expect(config.MAX_UPLOAD_BYTES).toBe(25 * 1024 * 1024);
     expect(config.RATE_LIMIT).toBe(200);
     expect(config.RATE_WINDOW_MS).toBe(10 * 60 * 1000);
     expect(config.ALLOWED_MIME).toEqual(["image/jpeg", "image/png", "image/webp", "image/gif"]);

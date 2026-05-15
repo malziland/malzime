@@ -167,7 +167,7 @@ describe("analyze handler — request validation", () => {
   });
 
   test("returns 413 for oversized base64 input", async () => {
-    const huge = "A".repeat(15 * 1024 * 1024);
+    const huge = "A".repeat(40 * 1024 * 1024);
     mockParseJsonBody.mockReturnValue({ imageBase64: huge, mimeType: "image/jpeg" });
     const res = mockRes();
     await analyze(mockReq(), res);

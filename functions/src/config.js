@@ -8,7 +8,7 @@
  * entfernt. Die heute aktive Pipeline nutzt ausschließlich Mistral AI.
  */
 
-const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const RATE_LIMIT = 200;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];

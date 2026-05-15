@@ -115,7 +115,7 @@ describe("analyzeImage", () => {
   });
 
   it("shows error for oversized file", async () => {
-    state.lastFile = new File([new ArrayBuffer(21 * 1024 * 1024)], "big.jpg", { type: "image/jpeg" });
+    state.lastFile = new File([new ArrayBuffer(30 * 1024 * 1024)], "big.jpg", { type: "image/jpeg" });
     await analyzeImage();
     expect(elements.status.textContent).toBe("error.fileTooLarge");
   });

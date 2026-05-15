@@ -502,6 +502,15 @@ h1 {
 
 .status.visible { display: block; }
 
+.status__trace {
+  display: block;
+  margin-top: 6px;
+  font-size: 0.72rem;
+  opacity: 0.55;
+  user-select: text;
+  letter-spacing: 0.02em;
+}
+
 /* ── Kategorie-Karten (einspaltig) ── */
 
 .facts-grid {

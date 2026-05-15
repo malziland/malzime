@@ -45,10 +45,3 @@ export function collectClientContext() {
   return ctx;
 }
 
-export function isDebugMode() {
-  try {
-    return new URLSearchParams(location.search).get("debug") === "1";
-  } catch (_) {
-    return false;
-  }
-}

@@ -5,14 +5,28 @@ import { t } from "./i18n.js";
 
 let scanInterval = null;
 
-export function setStatus(text) {
+export function setStatus(text, traceId) {
   if (!text) {
     elements.status.textContent = "";
     elements.status.classList.remove("visible");
     elements.status.removeAttribute("role");
     return;
   }
-  elements.status.textContent = text;
+  if (traceId) {
+    /* Bei Fehlern wird die Trace-ID dezent als zweite Zeile angehaengt,
+       damit User sie an Support weitergeben koennen. Per createElement
+       statt innerHTML, um XSS-Risiken durch traceId/text zu vermeiden. */
+    elements.status.textContent = "";
+    const main = document.createElement("span");
+    main.textContent = text;
+    const small = document.createElement("small");
+    small.className = "status__trace";
+    small.textContent = `Code: ${traceId}`;
+    elements.status.appendChild(main);
+    elements.status.appendChild(small);
+  } else {
+    elements.status.textContent = text;
+  }
   elements.status.classList.add("visible");
   /* A11y: Fehlermeldungen als role="alert" fuer robuste Screenreader-Ankuendigung */
   elements.status.setAttribute("role", "alert");

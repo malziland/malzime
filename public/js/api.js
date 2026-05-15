@@ -14,7 +14,7 @@ import { renderCurrentMode } from "./render.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
 import { logTelemetry } from "./telemetry-logger.js";
-import { generateTraceId, isDebugMode } from "./client-context.js";
+import { generateTraceId } from "./client-context.js";
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
@@ -62,16 +62,6 @@ document.addEventListener("visibilitychange", () => {
     acquireWakeLock();
   }
 });
-
-/* Im ?debug=1-Modus die Trace-ID anhaengen, damit der User sie bei
-   Fehlern an den Support weitergeben kann. */
-function appendTraceIdInDebug(traceId) {
-  if (!isDebugMode() || !traceId) return;
-  const current = elements.status.textContent || "";
-  if (current && !current.includes(traceId)) {
-    elements.status.textContent = `${current} [Trace: ${traceId}]`;
-  }
-}
 
 export async function analyzeImage() {
   if (state.isAnalyzing) return;
@@ -185,7 +175,7 @@ export async function analyzeImage() {
           const body = await response.clone().json();
           if (body.blocked === "limit") {
             showLimitBanner(body.retryAfterSeconds || 600);
-            setStatus(t("error.rateLimit"));
+            setStatus(t("error.rateLimit"), traceId);
             return;
           }
         } catch (_) {
@@ -218,8 +208,7 @@ export async function analyzeImage() {
       } catch (_) {
         /* response parse failed — use default msg */
       }
-      setStatus(msg);
-      appendTraceIdInDebug(traceId);
+      setStatus(msg, traceId);
       logClientError(new Error(`HTTP ${response.status}`), {
         phase: "http-error",
         durationMs: Date.now() - analyzeStartTime,
@@ -280,25 +269,24 @@ export async function analyzeImage() {
     let phase = "fetch";
     if (err.message === "read_failed") {
       phase = "image-read";
-      setStatus(t("error.readFailed"));
+      setStatus(t("error.readFailed"), traceId);
     } else if (err.message === "image_decode_failed") {
       phase = "image-decode";
-      setStatus(t("error.decodeFailed"));
+      setStatus(t("error.decodeFailed"), traceId);
     } else if (pageHiddenDuringRequest) {
       phase = "page-hidden";
-      setStatus(t("error.suspended"));
+      setStatus(t("error.suspended"), traceId);
     } else if (err.name === "AbortError") {
       phase = "client-timeout";
-      setStatus(t("error.timeout"));
+      setStatus(t("error.timeout"), traceId);
     } else if (!navigator.onLine) {
       phase = "offline";
-      setStatus(t("error.offline"));
+      setStatus(t("error.offline"), traceId);
     } else {
       phase = "network";
-      setStatus(t("error.networkError"));
+      setStatus(t("error.networkError"), traceId);
     }
 
-    appendTraceIdInDebug(traceId);
     logClientError(err, {
       phase,
       durationMs: Date.now() - analyzeStartTime,

@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.1] — 2026-05-15
+
+### Geaendert — Trace-ID standardmaessig in Fehlermeldungen
+
+`?debug=1`-Toggle entfernt — der Diagnose-Code (Trace-ID) wird jetzt bei **jedem** Fehler dezent als zweite Zeile unter der User-Meldung angezeigt. So kann jeder Workshop-Teilnehmer im Fehlerfall den Code an den Support weitergeben, ohne dass URL-Tricks noetig sind. Der Code bleibt anonym (keine PII), zeigt nur die Quittungsnummer fuer das zugehoerige Cloud-Logging-Bundle.
+
+- **`public/js/ui.js`**: `setStatus(text, traceId)` nimmt jetzt eine optionale Trace-ID. Trace-Anzeige als eigenes `<small class="status__trace">`-Element (XSS-sicher via createElement/textContent).
+- **`public/styles.css`**: Neue Klasse `.status__trace` — kleiner, dezent grau, monospace, mit `user-select: text` damit der Code per Maus markierbar ist.
+- **`public/js/api.js`**: Alle Fehler-`setStatus`-Aufrufe (catch-Block + HTTP-Error + Rate-Limit) reichen `traceId` mit. `appendTraceIdInDebug` + `isDebugMode`-Aufruf entfernt.
+- **`public/js/client-context.js`**: `isDebugMode()`-Export entfernt (nicht mehr benoetigt).
+- **`public/__tests__/api.test.js`**: 7 Tests von `toBe(...)` auf `toContain(...)` umgestellt, weil `textContent` jetzt auch die Trace-Zeile enthaelt.
+
+### Tests
+
+- 290 Backend-Tests + 141 Frontend-Tests gruen.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051505`.
+
 ## [1.10.0] — 2026-05-15
 
 ### Neu — State-of-the-Art Logging-Pipeline (anonym, DSGVO-konform)

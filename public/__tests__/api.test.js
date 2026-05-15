@@ -138,7 +138,7 @@ describe("analyzeImage", () => {
       text: () => Promise.resolve("{}"),
     });
     await analyzeImage();
-    expect(elements.status.textContent).toBe("error.rateLimit");
+    expect(elements.status.textContent).toContain("error.rateLimit");
   });
 
   it("shows user-friendly message on 413", async () => {
@@ -148,7 +148,7 @@ describe("analyzeImage", () => {
       text: () => Promise.resolve("{}"),
     });
     await analyzeImage();
-    expect(elements.status.textContent).toBe("error.imageTooLarge");
+    expect(elements.status.textContent).toContain("error.imageTooLarge");
   });
 
   it("shows user-friendly message on 400", async () => {
@@ -158,7 +158,7 @@ describe("analyzeImage", () => {
       text: () => Promise.resolve("{}"),
     });
     await analyzeImage();
-    expect(elements.status.textContent).toBe("error.invalidFormat");
+    expect(elements.status.textContent).toContain("error.invalidFormat");
   });
 
   it("shows server error on 500", async () => {
@@ -168,19 +168,19 @@ describe("analyzeImage", () => {
       text: () => Promise.resolve("{}"),
     });
     await analyzeImage();
-    expect(elements.status.textContent).toBe("error.serverError");
+    expect(elements.status.textContent).toContain("error.serverError");
   });
 
   it("handles AbortError (timeout)", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(Object.assign(new Error("aborted"), { name: "AbortError" }));
     await analyzeImage();
-    expect(elements.status.textContent).toBe("error.timeout");
+    expect(elements.status.textContent).toContain("error.timeout");
   });
 
   it("handles network error", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("network"));
     await analyzeImage();
-    expect(elements.status.textContent).toBe("error.networkError");
+    expect(elements.status.textContent).toContain("error.networkError");
   });
 
   it("shows suspend message when the page was hidden during the request (Wake-Lock)", async () => {
@@ -191,7 +191,7 @@ describe("analyzeImage", () => {
       throw new Error("network");
     });
     await analyzeImage();
-    expect(elements.status.textContent).toBe("error.suspended");
+    expect(elements.status.textContent).toContain("error.suspended");
     /* Cleanup für nachfolgende Tests */
     Object.defineProperty(document, "hidden", { value: false, configurable: true });
   });

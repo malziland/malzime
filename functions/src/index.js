@@ -6,6 +6,7 @@ const { handleAnalyze } = require("./handle-analyze");
 const { handleStats } = require("./handle-stats");
 const { handleAdmin } = require("./handle-admin");
 const { handleErrors } = require("./handle-errors");
+const { handleTelemetry } = require("./handle-telemetry");
 const { ALLOWED_ORIGINS } = require("./domains");
 
 const adminSecret = defineSecret("ADMIN_SECRET");
@@ -67,4 +68,16 @@ exports.errors = onRequest(
     timeoutSeconds: 10,
   },
   handleErrors
+);
+
+exports.telemetry = onRequest(
+  {
+    region: "europe-west1",
+    memory: "128MiB",
+    cors: ALLOWED_ORIGINS,
+    invoker: "public",
+    maxInstances: 3,
+    timeoutSeconds: 10,
+  },
+  handleTelemetry
 );

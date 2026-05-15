@@ -90,6 +90,10 @@
         "function": "errors"
       },
       {
+        "source": "/api/telemetry",
+        "function": "telemetry"
+      },
+      {
         "source": "/api/admin/**",
         "function": "admin"
       },

@@ -4,6 +4,34 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.0] — 2026-05-15
+
+### Neu — State-of-the-Art Logging-Pipeline (anonym, DSGVO-konform)
+
+Das v1.9.0-Logging deckte nur Fehler ab und liess Frontend ↔ Backend unverbunden. v1.10.0 macht daraus eine richtige Telemetrie-Pipeline: pro Analyse eine durchgaengige Trace-ID, alle Pipeline-Schritte mit Timings, Erfolge und Fehler beide strukturiert, mit Hardware-/Netzwerk-Kontext fuer Diagnose von Mobile-Issues.
+
+- **Trace-ID-Korrelation Frontend ↔ Backend** (`public/js/client-context.js` neu): Frontend generiert pro Analyse-Lauf eine 16-Zeichen-Trace-ID, sendet sie im `analyze`-Body mit. Backend (`handle-analyze.js`) validiert sie (Regex-Whitelist), nimmt sie in alle Log-Eintraege auf und setzt sie als `X-Trace-Id`-Response-Header. Damit ist jeder Frontend-Error einem konkreten Backend-Request zuordenbar.
+- **Strukturierte Pipeline-Timings im Backend** (`handle-analyze.js`): Jeder Mistral-Schritt loggt `durationMs`. Final-Log enthaelt `totalMs`, `describeMs`, `profilesMs` — kein Zusammenrechnen aus Timestamps mehr noetig. Auch Blocked- und Error-Pfade enthalten `totalMs`.
+- **Neuer `/api/telemetry`-Endpoint** (`functions/src/handle-telemetry.js`, `firebase.json`): Spiegel zu `/api/errors`, aber `console.log` (severity INFO) statt `console.error` (ERROR) — Success-Events bleiben getrennt von Fehlern im Cloud Logging. Whitelist + Laengenlimits identisch zur Errors-Function.
+- **Anonymer Hardware-/Netzwerk-Kontext** (`public/js/client-context.js`): `collectClientContext()` sammelt `effectiveType` (`4g`/`3g`), `downlinkMbps`, `rttMs`, `saveData`, `deviceMemoryGb`, `hardwareConcurrency`, `language`, `screen` (BxH), `dpr`. KEINE IP, KEINE Cookies, keine UUIDs persistent — nur grobe Klassen fuer Performance-/Mobile-Diagnose.
+- **Telemetrie-Logger Frontend** (`public/js/telemetry-logger.js` neu): `logTelemetry(eventType, context)` sendet anonymisierte Performance-Daten. `keepalive: true` fuer Beacons beim Tab-Schliessen.
+- **Phase-Timings im Frontend** (`public/js/api.js`): Misst und meldet `prepareImageMs`, `fetchMs`, `parseMs`, `renderMs`, `totalMs`. Bei Success: `logTelemetry("analyze-success", ...)`. Bei Fehler: vorhandene Timings landen mit im Error-Report.
+- **Error-Logger erweitert** (`public/js/error-logger.js`, `handle-errors.js`): `traceId`, `httpStatus`, `timings`, `client` zusaetzlich akzeptiert + validiert.
+- **`?debug=1` URL-Parameter** (`public/js/client-context.js`): Aktiviert Trace-ID-Anzeige in der Status-Zeile bei Fehlern — User kann die ID einfach an Support weitergeben.
+- **Trace-ID im State** (`public/js/state.js`): `state.lastTraceId` fuer Wiederverwendung.
+
+### DSGVO-Bilanz
+
+Geloggt: Fehler-Typ + -Message (gekuerzt), Phase, Dauer, gekuerzter User-Agent, anonyme Hardware-Klassen (Memory-Stufe / CPU-Cores / grobe Bandbreite), Trace-ID (ephemer, kein Profil), URL-Pfad. Nicht geloggt: IP persistent, Cookies, Bilder, EXIF, GPS, exakte Browser-Versionen, Timezones. Daten liegen ausschliesslich in Cloud Logging mit projektweiter Retention.
+
+### Tests
+
+- 290 Backend-Tests + 141 Frontend-Tests gruen.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051504`.
+
 ## [1.9.1] — 2026-05-15
 
 ### Geaendert — Upload-Limit von 6 MB auf 25 MB hochgesetzt

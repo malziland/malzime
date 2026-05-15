@@ -34,6 +34,7 @@ async function handleAnalyze(req, res, secrets) {
   const requestId = Math.random().toString(36).slice(2, 10);
   const requestStart = Date.now();
   const remainingBudget = () => Math.max(0, REQUEST_BUDGET_MS - (Date.now() - requestStart));
+  let traceId = null;
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -107,6 +108,15 @@ async function handleAnalyze(req, res, secrets) {
     const requestedLang = (jsonBody && jsonBody.lang) || (multipartFields && multipartFields.lang) || "";
     const lang = resolveLanguage(requestedLang);
 
+    /* Trace-ID vom Frontend uebernehmen (sanitized): kurze alphanumerische
+       ID, dient nur zur Korrelation mit Client-Logs. Falls fehlend → null. */
+    const rawTraceId =
+      (jsonBody && jsonBody.traceId) || (multipartFields && multipartFields.traceId) || "";
+    if (typeof rawTraceId === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(rawTraceId)) {
+      traceId = rawTraceId;
+    }
+    if (traceId) res.setHeader("X-Trace-Id", traceId);
+
     /* BUG-004: Honeypot-Check für JSON und Multipart */
     const hpValue = (jsonBody && jsonBody.website) || (multipartFields && multipartFields.website) || "";
     if (hpValue) {
@@ -178,23 +188,37 @@ async function handleAnalyze(req, res, secrets) {
     let describeBlocked = false;
     let describeError = false;
     let quotaError = false;
+    let describeMs = 0;
+    const describeStart = Date.now();
     try {
       imageDescription = await mistral.describeImage(imageBuffer, file.mimeType, remainingBudget, lang);
+      describeMs = Date.now() - describeStart;
       if (!imageDescription) describeBlocked = true;
       console.log(
         JSON.stringify({
           requestId,
+          traceId,
           step: "describe",
           status: imageDescription ? "ok" : "blocked",
           length: imageDescription ? imageDescription.length : 0,
+          durationMs: describeMs,
         })
       );
     } catch (err) {
+      describeMs = Date.now() - describeStart;
       if (err && (err.code === "rate_limit" || /rate_limit|quota|429/i.test(err.message || ""))) {
         quotaError = true;
       }
       describeError = true;
-      console.log(JSON.stringify({ requestId, warning: "describe-failed", error: err.message }));
+      console.log(
+        JSON.stringify({
+          requestId,
+          traceId,
+          warning: "describe-failed",
+          error: err.message,
+          durationMs: describeMs,
+        })
+      );
     }
 
     /* ── Stage 2: SUBJECT-Klassifikation + sichtbarer Text aus Beschreibung ── */
@@ -202,7 +226,7 @@ async function handleAnalyze(req, res, secrets) {
     const visibleText = extractVisibleText(imageDescription || "");
     const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: imageDescription || "" });
 
-    console.log(JSON.stringify({ requestId, step: "subject-classify", subject, animalType }));
+    console.log(JSON.stringify({ requestId, traceId, step: "subject-classify", subject, animalType }));
 
     /* ── Stage 3a: Tier-Easter-Egg-Pfad (nur Tier im Bild) ── */
     if (imageDescription && !hasPerson && hasAnimal) {
@@ -217,28 +241,56 @@ async function handleAnalyze(req, res, secrets) {
         profiles: { normal: normalProfile, boost: boostProfile },
         privacyRisks,
         exif,
-        meta: { requestId, mode: "animal" },
+        meta: { requestId, traceId, mode: "animal" },
       });
-      console.log(JSON.stringify({ requestId, status: "ok", mode: "animal" }));
+      console.log(
+        JSON.stringify({
+          requestId,
+          traceId,
+          status: "ok",
+          mode: "animal",
+          totalMs: Date.now() - requestStart,
+          describeMs,
+        })
+      );
       return;
     }
 
     /* ── Stage 3b: Profile-Generierung via Mistral Small 4 (mit Mistral-internem Large-3-Fallback) ── */
     let profiles = { normal: null, boost: null };
     let profileBlocked = false;
+    let profilesMs = 0;
     if (imageDescription) {
+      const profilesStart = Date.now();
       try {
         profiles = await mistral.generateBothProfiles(imageDescription, exif, remainingBudget, lang);
+        profilesMs = Date.now() - profilesStart;
         profileBlocked = !profiles.normal && !profiles.boost;
         console.log(
-          JSON.stringify({ requestId, step: "profiles", normal: !!profiles.normal, boost: !!profiles.boost })
+          JSON.stringify({
+            requestId,
+            traceId,
+            step: "profiles",
+            normal: !!profiles.normal,
+            boost: !!profiles.boost,
+            durationMs: profilesMs,
+          })
         );
       } catch (err) {
+        profilesMs = Date.now() - profilesStart;
         if (err && (err.code === "rate_limit" || /rate_limit|quota|429/i.test(err.message || ""))) {
           quotaError = true;
         }
         profileBlocked = true;
-        console.log(JSON.stringify({ requestId, warning: "profile-failed", error: err.message }));
+        console.log(
+          JSON.stringify({
+            requestId,
+            traceId,
+            warning: "profile-failed",
+            error: err.message,
+            durationMs: profilesMs,
+          })
+        );
       }
     }
 
@@ -269,9 +321,20 @@ async function handleAnalyze(req, res, secrets) {
         },
         privacyRisks,
         exif,
-        meta: { requestId, mode: "multimodal", subject },
+        meta: { requestId, traceId, mode: "multimodal", subject },
       });
-      console.log(JSON.stringify({ requestId, status: "ok" }));
+      console.log(
+        JSON.stringify({
+          requestId,
+          traceId,
+          status: "ok",
+          mode: "multimodal",
+          subject,
+          totalMs: Date.now() - requestStart,
+          describeMs,
+          profilesMs,
+        })
+      );
       return;
     }
 
@@ -298,6 +361,7 @@ async function handleAnalyze(req, res, secrets) {
       exif,
       meta: {
         requestId,
+        traceId,
         mode: "blocked",
         reason: describeBlocked
           ? "safety_filter"
@@ -308,11 +372,29 @@ async function handleAnalyze(req, res, secrets) {
               : "no_content",
       },
     });
-    console.log(JSON.stringify({ requestId, status: "blocked", reason: blockedReason }));
+    console.log(
+      JSON.stringify({
+        requestId,
+        traceId,
+        status: "blocked",
+        reason: blockedReason,
+        totalMs: Date.now() - requestStart,
+        describeMs,
+        profilesMs,
+      })
+    );
   } catch (err) {
     const status = err.status || 500;
     const code = err.code || "unknown_error";
-    console.log(JSON.stringify({ requestId, status: "error", code }));
+    console.log(
+      JSON.stringify({
+        requestId,
+        traceId,
+        status: "error",
+        code,
+        totalMs: Date.now() - requestStart,
+      })
+    );
     res.status(status).json({ error: "Analyze failed", code });
   }
 }

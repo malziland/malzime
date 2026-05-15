@@ -13,6 +13,8 @@ import {
 import { renderCurrentMode } from "./render.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
+import { logTelemetry } from "./telemetry-logger.js";
+import { generateTraceId, isDebugMode } from "./client-context.js";
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
@@ -61,6 +63,16 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
+/* Im ?debug=1-Modus die Trace-ID anhaengen, damit der User sie bei
+   Fehlern an den Support weitergeben kann. */
+function appendTraceIdInDebug(traceId) {
+  if (!isDebugMode() || !traceId) return;
+  const current = elements.status.textContent || "";
+  if (current && !current.includes(traceId)) {
+    elements.status.textContent = `${current} [Trace: ${traceId}]`;
+  }
+}
+
 export async function analyzeImage() {
   if (state.isAnalyzing) return;
   state.isAnalyzing = true;
@@ -69,7 +81,12 @@ export async function analyzeImage() {
      Stale catch/finally/Callbacks prüfen ob sie noch "aktuell" sind. */
   const myId = ++state.requestId;
   const analyzeStartTime = Date.now();
+  const traceId = generateTraceId();
+  state.lastTraceId = traceId;
   pageHiddenDuringRequest = false;
+
+  /* Strukturierte Timings — werden bei Success-Telemetrie + Error-Logging mitgesendet. */
+  const timings = {};
 
   setStatus("");
   elements.facts.innerHTML = "";
@@ -117,9 +134,11 @@ export async function analyzeImage() {
     await acquireWakeLock();
 
     /* Bild komprimieren + EXIF extrahieren (client-seitig) */
+    const prepareStart = Date.now();
     if (!state.lastPrepared) {
       state.lastPrepared = await prepareImage(file);
     }
+    timings.prepareImageMs = Date.now() - prepareStart;
 
     /* BUG-012: Nach prepareImage prüfen ob inzwischen ein neuer Lauf gestartet wurde
        (handleNewFile setzt isAnalyzing=false + neuen requestId) */
@@ -135,6 +154,7 @@ export async function analyzeImage() {
     state.currentAbortController = controller;
     timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
+    const fetchStart = Date.now();
     const response = await fetch(ANALYZE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -144,9 +164,11 @@ export async function analyzeImage() {
         mimeType: "image/jpeg",
         filename: "upload.jpg",
         lang: getLanguage(),
+        traceId,
       }),
       signal: controller.signal,
     });
+    timings.fetchMs = Date.now() - fetchStart;
 
     clearTimeout(timeoutId);
     state.currentAbortController = null;
@@ -197,15 +219,21 @@ export async function analyzeImage() {
         /* response parse failed — use default msg */
       }
       setStatus(msg);
+      appendTraceIdInDebug(traceId);
       logClientError(new Error(`HTTP ${response.status}`), {
         phase: "http-error",
         durationMs: Date.now() - analyzeStartTime,
         requestId: String(myId),
+        traceId,
+        httpStatus: response.status,
+        timings: { ...timings, totalMs: Date.now() - analyzeStartTime },
       });
       return;
     }
 
+    const parseStart = Date.now();
     const data = await response.json();
+    timings.parseMs = Date.now() - parseStart;
 
     /* Client-seitige Daten injizieren — GPS und dateTimeOriginal verlassen nie den Browser */
     if (!data.exif) data.exif = {};
@@ -218,6 +246,7 @@ export async function analyzeImage() {
     }
 
     /* BUG-002: Guard in Modal-Callback — stale Daten nicht übernehmen */
+    const renderStart = Date.now();
     showDisclaimerModal(() => {
       if (state.requestId !== myId) return;
       state.lastData = data;
@@ -228,6 +257,20 @@ export async function analyzeImage() {
       setTimeout(() => {
         if (elements.resultsPanel) elements.resultsPanel.focus({ preventScroll: true });
       }, 300);
+      timings.renderMs = Date.now() - renderStart;
+      timings.totalMs = Date.now() - analyzeStartTime;
+
+      const meta = data && data.meta ? data.meta : {};
+      logTelemetry("analyze-success", {
+        traceId,
+        durationMs: timings.totalMs,
+        timings,
+        meta: {
+          subject: typeof meta.subject === "string" ? meta.subject : undefined,
+          mode: typeof meta.mode === "string" ? meta.mode : undefined,
+          lang: getLanguage(),
+        },
+      });
     });
   } catch (err) {
     /* BUG-002: Stale catch darf UI des neuen Laufs nicht überschreiben */
@@ -255,10 +298,13 @@ export async function analyzeImage() {
       setStatus(t("error.networkError"));
     }
 
+    appendTraceIdInDebug(traceId);
     logClientError(err, {
       phase,
       durationMs: Date.now() - analyzeStartTime,
       requestId: String(myId),
+      traceId,
+      timings: { ...timings, totalMs: Date.now() - analyzeStartTime },
     });
   } finally {
     /* BUG-001: Timeout immer aufräumen */

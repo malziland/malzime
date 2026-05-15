@@ -8,4 +8,5 @@ export const state = {
   lastFile: null,
   lastData: null,
   requestId: 0,
+  lastTraceId: null,
 };

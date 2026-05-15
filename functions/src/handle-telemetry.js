@@ -1,31 +1,26 @@
 "use strict";
 
 /**
- * handle-errors.js — Anonymes Client-Error-Logging.
+ * handle-telemetry.js — Anonyme Performance-/Success-Telemetrie.
  *
+ * Spiegel zu handle-errors.js, aber INFO-severity (statt ERROR), getrennter
+ * Endpoint damit Cloud Logging Success-Events sauber von Fehlern trennt.
  * DSGVO: keine PII, keine IP-Speicherung, keine Cookies, keine persistente
- * Speicherung. Felder sind whitelist-validiert + laengenbegrenzt. Logs landen
- * in Cloud Logging und werden ueber die konfigurierte Retention automatisch
- * geloescht. Rate-Limit identisch zur restlichen API.
- *
- * Loggt mit severity ERROR. Gegenstueck: handle-telemetry.js fuer Success-
- * Events mit severity INFO.
+ * Speicherung. Whitelist + Laengenlimits identisch zum Error-Endpoint.
  */
 
 const { checkRateLimit, getClientIp } = require("./middleware");
 
 const STRING_FIELDS = {
-  errorName: 100,
-  errorMessage: 500,
-  phase: 50,
+  eventType: 50,
   url: 200,
   userAgent: 250,
-  requestId: 50,
   traceId: 50,
 };
-const NUMBER_FIELDS = ["durationMs", "httpStatus"];
+const NUMBER_FIELDS = ["durationMs"];
 const BOOLEAN_FIELDS = ["online", "hidden"];
 
+/* Erlaubte Felder im verschachtelten timings-Objekt — Whitelist + Wertgrenzen. */
 const TIMING_KEYS = [
   "prepareImageMs",
   "fetchMs",
@@ -37,6 +32,9 @@ const TIMING_KEYS = [
 const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
 const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];
 const CLIENT_BOOL_KEYS = ["saveData"];
+
+const META_STRING_KEYS = { subject: 30, mode: 30, lang: 10, reason: 100 };
+const META_BOOL_KEYS = ["maintenanceTriggered"];
 
 function sanitizeTimings(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -65,7 +63,19 @@ function sanitizeClient(raw) {
   return Object.keys(out).length > 0 ? out : null;
 }
 
-async function handleErrors(req, res) {
+function sanitizeMeta(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  const out = {};
+  for (const [key, maxLen] of Object.entries(META_STRING_KEYS)) {
+    if (typeof raw[key] === "string") out[key] = raw[key].slice(0, maxLen);
+  }
+  for (const key of META_BOOL_KEYS) {
+    if (typeof raw[key] === "boolean") out[key] = raw[key];
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
+async function handleTelemetry(req, res) {
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -92,7 +102,7 @@ async function handleErrors(req, res) {
       return;
     }
 
-    const sanitized = { type: "client-error" };
+    const sanitized = { type: "client-telemetry" };
 
     for (const [key, maxLen] of Object.entries(STRING_FIELDS)) {
       const value = body[key];
@@ -103,7 +113,7 @@ async function handleErrors(req, res) {
     for (const key of NUMBER_FIELDS) {
       const value = body[key];
       if (typeof value === "number" && isFinite(value)) {
-        sanitized[key] = Math.max(-1, Math.min(600000, Math.round(value)));
+        sanitized[key] = Math.max(0, Math.min(600000, Math.round(value)));
       }
     }
     for (const key of BOOLEAN_FIELDS) {
@@ -116,14 +126,17 @@ async function handleErrors(req, res) {
     const client = sanitizeClient(body.client);
     if (client) sanitized.client = client;
 
-    /* console.error → severity ERROR in Cloud Logging → alarmierbar. */
-    console.error(JSON.stringify(sanitized));
+    const meta = sanitizeMeta(body.meta);
+    if (meta) sanitized.meta = meta;
+
+    /* console.log → severity DEFAULT/INFO in Cloud Logging. */
+    console.log(JSON.stringify(sanitized));
 
     res.status(204).end();
   } catch (err) {
-    console.log(JSON.stringify({ warning: "errors-handler-failed", error: err.message }));
+    console.log(JSON.stringify({ warning: "telemetry-handler-failed", error: err.message }));
     res.status(204).end();
   }
 }
 
-module.exports = { handleErrors };
+module.exports = { handleTelemetry };

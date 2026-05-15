@@ -1,25 +1,23 @@
 /**
- * error-logger.js — Anonymes Client-Error-Logging.
+ * telemetry-logger.js — Anonyme Success-/Performance-Telemetrie.
  *
- * Sendet strukturierte Fehler-Metadaten an /api/errors. DSGVO: keine PII,
- * keine IP-Speicherung serverseitig, keine Cookies, kein User-Tracking —
- * nur Fehler-Typ, Phase, Dauer, anonyme Hardware-/Netzwerk-Klassen + grober
- * User-Agent. Logging-Fehler werden still geschluckt, damit der User-Flow
- * nie davon abhaengt.
+ * Sendet strukturierte Performance-Metriken an /api/telemetry. DSGVO-Profil
+ * identisch zu error-logger: keine PII, keine IP, kein Cookie, keine
+ * persistente Speicherung — nur grobe Hardware-/Netzwerk-Klassen + Timings.
+ * Gegenstueck zum error-logger, separater Endpoint (INFO severity statt
+ * ERROR), damit Cloud Logging die Klassen sauber trennt.
  */
 
 import { collectClientContext } from "./client-context.js";
 
-const ERROR_ENDPOINT = "/api/errors";
+const TELEMETRY_ENDPOINT = "/api/telemetry";
 
-export function logClientError(error, context = {}) {
+export function logTelemetry(eventType, context = {}) {
   try {
     const clientCtx = collectClientContext();
 
     const payload = {
-      errorName: (error && error.name) || "Error",
-      errorMessage: ((error && error.message) || "").slice(0, 500),
-      phase: typeof context.phase === "string" ? context.phase : "unknown",
+      eventType: typeof eventType === "string" ? eventType : "unknown",
       durationMs:
         typeof context.durationMs === "number" && isFinite(context.durationMs)
           ? context.durationMs
@@ -28,17 +26,13 @@ export function logClientError(error, context = {}) {
       hidden: typeof document !== "undefined" ? document.hidden : false,
       userAgent: (navigator && navigator.userAgent) || "",
       url: (typeof location !== "undefined" && location.pathname) || "",
-      requestId:
-        typeof context.requestId === "string" ? context.requestId : null,
       traceId: typeof context.traceId === "string" ? context.traceId : null,
-      httpStatus:
-        typeof context.httpStatus === "number" ? context.httpStatus : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
+      meta: context.meta && typeof context.meta === "object" ? context.meta : null,
       client: clientCtx,
     };
 
-    /* keepalive: damit der Beacon auch beim Tab-Schliessen durchgeht. */
-    fetch(ERROR_ENDPOINT, {
+    fetch(TELEMETRY_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

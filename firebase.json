@@ -36,7 +36,7 @@
           },
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org https://api.malzi.me https://analyze-5ymhpdpqcq-ew.a.run.app; frame-src 'none'; object-src 'none'; base-uri 'self'"
+            "value": "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org https://api.malzi.me; frame-src 'none'; object-src 'none'; base-uri 'self'"
           },
           {
             "key": "Permissions-Policy",
@@ -77,10 +77,6 @@
       }
     ],
     "rewrites": [
-      {
-        "source": "/analyze",
-        "function": "analyze"
-      },
       {
         "source": "/api/stats",
         "function": "stats"

@@ -4,6 +4,25 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.3] — 2026-05-15
+
+### Geaendert — Hosting-Fallback-Pfade entfernt
+
+Nach erfolgreicher Verifikation von `api.malzi.me` (v1.10.2) jetzt die beiden Fallbacks aufgeraeumt, die als Sicherheitsnetz waehrend des Uebergangs drin waren:
+
+- **`firebase.json` CSP `connect-src`**: alte Cloud-Run-URL `https://analyze-5ymhpdpqcq-ew.a.run.app` entfernt. Nur noch `api.malzi.me` (+ Nominatim) erlaubt — engerer Schutz, kein Bypass mehr ueber die alte URL moeglich.
+- **`firebase.json` rewrites**: `/analyze → function analyze` entfernt. War der urspruengliche Hosting-Rewrite mit dem 60s-Edge-Timeout-Bug — wird vom aktuellen Frontend nicht mehr aufgerufen, und Clients mit gecachtem alten Frontend laufen nach Cache-Buster-Update (`?v=2026051507`) automatisch auf die neue api.js mit `api.malzi.me`.
+
+Cloud-Run-Services bleiben unveraendert; nur Frontend-Hosting-Konfig.
+
+### Tests
+
+- Bestandstests laufen weiter, keine Logik-Aenderung.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051507`.
+
 ## [1.10.2] — 2026-05-15
 
 ### Geaendert — Analyze-Endpoint nutzt jetzt `api.malzi.me`

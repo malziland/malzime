@@ -4,6 +4,24 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.2] — 2026-05-15
+
+### Geaendert — Analyze-Endpoint nutzt jetzt `api.malzi.me`
+
+Custom Domain `api.malzi.me` ist via Cloud Run Domain Mapping eingerichtet (CNAME → `ghs.googlehosted.com`, SSL automatisch ueber Lets Encrypt). Damit weg von der unschoenen `.run.app`-URL und in DevTools/Network-Tab sauber unter eigener Domain sichtbar. Funktional identisch zur direkten Cloud-Run-URL — Edge-Timeout-Falle bleibt umgangen.
+
+- **`public/js/api.js`**: `ANALYZE_URL` auf `https://api.malzi.me`
+- **`firebase.json`**: CSP `connect-src` um `https://api.malzi.me` ergaenzt; alte `analyze-5ymhpdpqcq-ew.a.run.app` bleibt vorerst als Fallback drin fuer User mit gecachtem alten Frontend-Build
+- DNS-/SSL-/CORS-Setup live verifiziert (HTTP 405 / 204 Preflight, `server: Google Frontend`, `access-control-allow-origin: https://malzi.me`)
+
+### Tests
+
+- Bestandstests laufen weiter, keine Logik-Aenderung.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051506`.
+
 ## [1.10.1] — 2026-05-15
 
 ### Geaendert — Trace-ID standardmaessig in Fehlermeldungen

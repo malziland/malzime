@@ -18,11 +18,12 @@ import { generateTraceId } from "./client-context.js";
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
-/* Direkt-Aufruf der Cloud-Run-URL statt Firebase-Hosting-Rewrite — der Hosting-Edge
-   schneidet Antworten nach ~60s ab, was die Mistral-Pipeline bei Latenz-Spitzen reisst.
-   Direkt-Aufruf nutzt den Cloud-Run-Timeout (180s, siehe functions/src/index.js).
-   CORS regelt firebase-functions/v2 automatisch via `cors: ALLOWED_ORIGINS`. */
-const ANALYZE_URL = "https://analyze-5ymhpdpqcq-ew.a.run.app";
+/* Direkt-Aufruf via Custom Domain `api.malzi.me` → Cloud Run Domain Mapping
+   auf die analyze-Function. Umgeht den Firebase-Hosting-Rewrite-Edge-Timeout
+   (~60s) und nutzt stattdessen den Cloud-Run-Function-Timeout (180s, siehe
+   functions/src/index.js). CORS regelt firebase-functions/v2 automatisch via
+   `cors: ALLOWED_ORIGINS`. Custom Domain SSL: Lets Encrypt via Google. */
+const ANALYZE_URL = "https://api.malzi.me";
 const FETCH_TIMEOUT_MS = 180000;
 
 /* ── Wake-Lock ──────────────────────────────────────────────────────

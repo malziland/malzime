@@ -21,13 +21,7 @@ const NUMBER_FIELDS = ["durationMs"];
 const BOOLEAN_FIELDS = ["online", "hidden"];
 
 /* Erlaubte Felder im verschachtelten timings-Objekt — Whitelist + Wertgrenzen. */
-const TIMING_KEYS = [
-  "prepareImageMs",
-  "fetchMs",
-  "parseMs",
-  "renderMs",
-  "totalMs",
-];
+const TIMING_KEYS = ["prepareImageMs", "fetchMs", "parseMs", "renderMs", "totalMs"];
 
 const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
 const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];

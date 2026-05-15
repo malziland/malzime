@@ -29,12 +29,17 @@ const { resolveLanguage } = require("./i18n");
 const { checkAndIncrement, incrementTotals, getMaintenanceStatus } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
+const { startHeartbeat } = require("./heartbeat");
 
 async function handleAnalyze(req, res, secrets) {
   const requestId = Math.random().toString(36).slice(2, 10);
   const requestStart = Date.now();
   const remainingBudget = () => Math.max(0, REQUEST_BUDGET_MS - (Date.now() - requestStart));
   let traceId = null;
+  /* Heartbeat-Handle wird erst NACH allen 4xx-Pfaden gestartet, damit Status
+     400/413/429/503 nicht ueberschrieben werden. Nach dem Start ist der Status
+     auf 200 committed, Fehler werden ueber den JSON-Body signalisiert. */
+  let heartbeat = null;
   try {
     if (req.method !== "POST") {
       res.status(405).json({ error: "Method not allowed" });
@@ -110,8 +115,7 @@ async function handleAnalyze(req, res, secrets) {
 
     /* Trace-ID vom Frontend uebernehmen (sanitized): kurze alphanumerische
        ID, dient nur zur Korrelation mit Client-Logs. Falls fehlend → null. */
-    const rawTraceId =
-      (jsonBody && jsonBody.traceId) || (multipartFields && multipartFields.traceId) || "";
+    const rawTraceId = (jsonBody && jsonBody.traceId) || (multipartFields && multipartFields.traceId) || "";
     if (typeof rawTraceId === "string" && /^[a-zA-Z0-9_-]{1,50}$/.test(rawTraceId)) {
       traceId = rawTraceId;
     }
@@ -183,6 +187,12 @@ async function handleAnalyze(req, res, secrets) {
     const imageBuffer = file.buffer;
     const exif = file.clientExif || {};
 
+    /* Heartbeat starten — ab hier laeuft die Mistral-Pipeline (40-120 s).
+       Status ist auf 200 committed, alle weiteren Antworten gehen ueber
+       heartbeat.finish(body) statt res.json(). Verhindert dass Safari
+       (und andere Clients mit Idle-Timeout) die Verbindung killen. */
+    heartbeat = startHeartbeat(res);
+
     /* ── Stage 1: Bildbeschreibung via Mistral Large 3 ── */
     let imageDescription = null;
     let describeBlocked = false;
@@ -237,7 +247,7 @@ async function handleAnalyze(req, res, secrets) {
       incrementTotals().catch((err) => {
         console.log(JSON.stringify({ warning: "incrementTotals-error", error: err.message }));
       });
-      res.json({
+      heartbeat.finish({
         profiles: { normal: normalProfile, boost: boostProfile },
         privacyRisks,
         exif,
@@ -304,7 +314,7 @@ async function handleAnalyze(req, res, secrets) {
       });
       const normalData = profiles.normal || {};
       const boostData = profiles.boost || {};
-      res.json({
+      heartbeat.finish({
         profiles: {
           normal: {
             categories: normalData.categories || {},
@@ -354,7 +364,7 @@ async function handleAnalyze(req, res, secrets) {
       blockedReason = "blocked.generic";
     }
 
-    res.json({
+    heartbeat.finish({
       profiles: null,
       blockedReason,
       privacyRisks,
@@ -395,7 +405,19 @@ async function handleAnalyze(req, res, secrets) {
         totalMs: Date.now() - requestStart,
       })
     );
-    res.status(status).json({ error: "Analyze failed", code });
+    if (heartbeat) {
+      /* Heartbeat lief schon → Status ist auf 200 committed. Fehler als
+         normaler blocked-Pfad signalisieren, damit der Client das kennt. */
+      heartbeat.finish({
+        profiles: null,
+        blockedReason: "blocked.apiError",
+        privacyRisks: [],
+        exif: {},
+        meta: { requestId, traceId, mode: "blocked", reason: "api_error", code },
+      });
+    } else {
+      res.status(status).json({ error: "Analyze failed", code });
+    }
   }
 }
 

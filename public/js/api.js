@@ -50,14 +50,8 @@ function releaseWakeLock() {
   wakeLock = null;
 }
 
-/* Merkt sich, ob die Seite während einer laufenden Analyse in den Hintergrund
-   ging (Gerät gesperrt / Tab gewechselt) — für eine treffende Fehlermeldung. */
-let pageHiddenDuringRequest = false;
-
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
-    if (state.isAnalyzing) pageHiddenDuringRequest = true;
-  } else if (state.isAnalyzing && !wakeLock) {
+  if (!document.hidden && state.isAnalyzing && !wakeLock) {
     /* Seite wieder sichtbar und Analyse läuft noch — der Browser gibt den
        Wake-Lock beim Verstecken automatisch frei, also neu anfordern. */
     acquireWakeLock();
@@ -74,7 +68,6 @@ export async function analyzeImage() {
   const analyzeStartTime = Date.now();
   const traceId = generateTraceId();
   state.lastTraceId = traceId;
-  pageHiddenDuringRequest = false;
 
   /* Strukturierte Timings — werden bei Success-Telemetrie + Error-Logging mitgesendet. */
   const timings = {};
@@ -267,14 +260,17 @@ export async function analyzeImage() {
     if (state.requestId !== myId) return;
     stopScanAnim();
 
-    let phase = "fetch";
+    let phase;
     if (err.message === "read_failed") {
       phase = "image-read";
       setStatus(t("error.readFailed"), traceId);
     } else if (err.message === "image_decode_failed") {
       phase = "image-decode";
       setStatus(t("error.decodeFailed"), traceId);
-    } else if (pageHiddenDuringRequest) {
+    } else if (document.hidden) {
+      /* Page ist JETZT noch hidden — Browser hat fetch eingefroren, weil Tab/Gerät
+         im Hintergrund. Sticky-Flag früher war fehleranfällig: Safari feuert
+         visibilitychange auch bei kurzem Display-Dimm, ohne dass der User wechselt. */
       phase = "page-hidden";
       setStatus(t("error.suspended"), traceId);
     } else if (err.name === "AbortError") {

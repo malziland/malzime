@@ -26,13 +26,7 @@ const STRING_FIELDS = {
 const NUMBER_FIELDS = ["durationMs", "httpStatus"];
 const BOOLEAN_FIELDS = ["online", "hidden"];
 
-const TIMING_KEYS = [
-  "prepareImageMs",
-  "fetchMs",
-  "parseMs",
-  "renderMs",
-  "totalMs",
-];
+const TIMING_KEYS = ["prepareImageMs", "fetchMs", "parseMs", "renderMs", "totalMs"];
 
 const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
 const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];

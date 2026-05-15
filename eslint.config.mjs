@@ -13,6 +13,7 @@ export default [
         document: "readonly",
         window: "readonly",
         navigator: "readonly",
+        screen: "readonly",
         fetch: "readonly",
         console: "readonly",
         setTimeout: "readonly",

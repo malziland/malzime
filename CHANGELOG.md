@@ -4,6 +4,29 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.4] — 2026-05-15
+
+### Behoben — Safari/WebKit kappt fetch nach ~47 s ("Load failed")
+
+Akutes Problem: Im Workshop-Setup auf macOS + iOS Safari brach jede Analyse mit `TypeError: Load failed` ab, sobald die Pipeline laenger als ~45 s lief. Cloud Logging zeigte: Backend antwortete sauber mit `status:ok` in 50-120 s, der Browser kappte aber bereits nach 46-47 s. Brave/Chrome (Chromium-Engine) waren nicht betroffen, also engine-spezifisches Verhalten — WebKit killt idle fetch-Streams ohne Server-Bytes.
+
+**Fix: Heartbeat-Pattern.**
+
+- **Neu — `functions/src/heartbeat.js`**: Streaming-Helper, der den Status auf 200 committed und alle 5 s ein Whitespace-Byte ueber chunked transfer sendet. `JSON.parse` toleriert leading whitespace, deshalb keine Client-Anpassung noetig.
+- **`functions/src/handle-analyze.js`**: Heartbeat startet NACH allen 4xx-Pfaden (Validation, Counter), direkt vor dem ersten Mistral-Call. Alle `res.json(...)` in der Pipeline durch `heartbeat.finish(...)` ersetzt. Outer catch signalisiert Fehler als `blocked.apiError` im 200er-Body, da Status nach Heartbeat-Start nicht mehr aenderbar ist.
+- **`public/js/api.js`**: Fehlklassifizierung „Geraet im Ruhestand" entfernt. Sticky-Flag `pageHiddenDuringRequest` raus — pruefte den falschen Zeitpunkt und feuerte auch bei Safari-Display-Dimm. Stattdessen wird `document.hidden` zum tatsaechlichen Fehler-Zeitpunkt geprueft.
+- **`functions/eslint.config.js`**: `setInterval`/`clearInterval` als Globals (fuer Heartbeat-Timer).
+- **`eslint.config.mjs`**: `screen` als Browser-Global ergaenzt (war v1.10.0-Lint-Schuld in `client-context.js`).
+
+### Tests
+
+- Backend 290/290 gruen. Heartbeat-Helper enthaelt graceful Test-Fallback: wenn `res.flushHeaders` im Mock fehlt, fungiert er als `res.status(200).json(body)` — alle bestehenden `index.test.js`-Tests laufen unveraendert.
+- Frontend 141/141 gruen.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051508`.
+
 ## [1.10.3] — 2026-05-15
 
 ### Geaendert — Hosting-Fallback-Pfade entfernt

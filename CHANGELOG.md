@@ -4,6 +4,22 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.5] — 2026-05-15
+
+### Behoben — Spinner verschwand mid-Pipeline mit Heartbeat
+
+Direkt nach v1.10.4-Deploy gemeldet: Spinner verschwand nach wenigen Sekunden, dann ~1 Minute leere UI, dann ploetzlich das Ergebnis. Ursache: `await fetch(...)` returnt bei chunked transfer **sofort sobald Headers da sind** (statt erst beim kompletten Body wie bei `Content-Length`-Response). `stopScanAnim()` lief deshalb mid-Pipeline statt erst beim fertigen JSON.
+
+- **`public/js/api.js`**: `stopScanAnim()` aus dem fetch-Direct-Path entfernt. Stopp jetzt entweder im 4xx-Block oder nach `await response.json()` — dann ist der Body wirklich da und der User sieht den Wechsel von Spinner zu Ergebnis ohne Lücke.
+
+### Tests
+
+- Frontend 141/141 gruen.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051509`.
+
 ## [1.10.4] — 2026-05-15
 
 ### Behoben — Safari/WebKit kappt fetch nach ~47 s ("Load failed")

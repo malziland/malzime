@@ -156,12 +156,15 @@ export async function analyzeImage() {
 
     clearTimeout(timeoutId);
     state.currentAbortController = null;
-    stopScanAnim();
+    /* Spinner laeuft weiter — bei chunked transfer (Heartbeat) returnt fetch
+       sofort nach den Headers, der Body kommt erst spaeter ueber response.json().
+       Wuerden wir hier stoppen, sieht der User mid-Pipeline einen leeren Bildschirm. */
 
     /* BUG-002: Prüfen ob dieser Lauf noch aktuell ist */
     if (state.requestId !== myId) return;
 
     if (!response.ok) {
+      stopScanAnim();
       let msg = t("error.generic");
       if (response.status === 429) {
         /* Limit-Block vom Firestore-Zähler erkennen */
@@ -217,6 +220,7 @@ export async function analyzeImage() {
     const parseStart = Date.now();
     const data = await response.json();
     timings.parseMs = Date.now() - parseStart;
+    stopScanAnim();
 
     /* Client-seitige Daten injizieren — GPS und dateTimeOriginal verlassen nie den Browser */
     if (!data.exif) data.exif = {};

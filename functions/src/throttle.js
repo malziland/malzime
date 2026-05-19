@@ -117,11 +117,13 @@ const mistralSemaphore = createSemaphore();
  * Implementierung: serialisierte Warteschlange, jeder Caller darf erst dann
  * weiter, wenn seit dem letzten Token-Start TOKEN_INTERVAL_MS verstrichen sind.
  */
-/* v1.10.6: 1000ms → 1500ms nach Lasttest-Erkenntnis. 1 Sekunde war
-   formal genug fuer 6 RPS bei 6 Instanzen, aber in der Praxis hat Mistral
-   beim Cold-Start-Burst trotzdem mit 429 reagiert. 1500ms = 0.67 RPS/Instanz,
-   bei max 4 Instanzen = 2.67 RPS gesamt, sicher unter 6 RPS-Limit. */
-const TOKEN_INTERVAL_MS = 1500;
+/* v1.10.7: 1500ms → 2500ms. Hintergrund: Mistral-Account-Dashboard zeigt
+   fuer mistral-small-2603 (unser aktives Profile-Modell) ein RPS-Limit
+   von 1.67/s (nicht 6/s wie urspruenglich angenommen). Mit 2500ms-Interval
+   und max 4 Instanzen ergibt das 4 × 0.4 = 1.6 RPS gesamt, sicher unter
+   1.67 RPS. Eliminiert die strukturelle 429-Quelle, kostet pro Mistral-Call
+   ~1s zusaetzliche Wartezeit unter Last. */
+const TOKEN_INTERVAL_MS = 2500;
 /* v1.10.6: Initial-Jitter beim allerersten Token-Acquire pro Instanz.
    Verhindert, dass mehrere Instanzen gleichzeitig cold-starten und
    alle ihren ersten Mistral-Call in derselben Millisekunde feuern.

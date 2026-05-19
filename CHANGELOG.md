@@ -4,6 +4,43 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.7] — 2026-05-19 (Abend)
+
+### Behoben — Modell-Limits korrekt erfasst, Token-Bucket entsprechend kalibriert
+
+Spaeter Abend nach v1.10.6-Deploy zeigten sich anhaltende Mistral-429er-Probleme und 3-Minuten-Hänger. Diagnose ueber das Mistral-Account-Dashboard offenbarte den eigentlichen Fehler: Unsere `throttle.js`-Annahme „Mistral-Scale-Tier hat 6 RPS" stammte aus einem alten Audit und war fuer das aktuelle Modell falsch.
+
+**Tatsaechliche Account-Limits (Dashboard 2026-05-19):**
+- `mistral-small-2603` (unser Profile-Modell): **100K TPM, 1.67 RPS**
+- `mistral-small-2506` (deprecated, aelter): 5M TPM, 20.83 RPS
+- `mistral-large-2512` (Describe + Fallback): 2M TPM, 6 RPS
+- `mistral-large-2411` (aelter): 600K TPM, 1.67 RPS
+
+Mistral hat fuer die neueste Small-Variante (-2603) auffaellig restriktive Limits gesetzt — vermutlich gestaffelte Freischaltung neuer Modelle. Mit unseren v1.10.6-Werten (`maxInstances=4 × 1500ms-Token-Bucket = 2.67 RPS`) lagen wir strukturell ueber dem Small-Limit.
+
+**Aenderungen:**
+
+- **`functions/src/throttle.js`**: `TOKEN_INTERVAL_MS: 1500 → 2500` ms. Damit ergibt sich `4 × 0.4 = 1.6 RPS` gesamt, sicher unter dem 1.67-RPS-Limit von -2603. Kostet ~1 s extra Queue-Wartezeit pro Mistral-Call unter Last, eliminiert aber die strukturelle 429-Quelle.
+- **`functions/src/config.js`**: Large-Modelle fest gepinnt — `MISTRAL_DESCRIBE_MODEL` und `MISTRAL_FALLBACK_MODEL` von `mistral-large-latest` auf `mistral-large-2512` (verifizierte gute Limits: 2M TPM, 6 RPS). Verhindert dass Mistral uns ueber den `-latest`-Alias auf ein moeglicherweise restriktiv limitiertes Nachfolge-Modell umschiebt.
+- **`functions/src/config.js`**: Erweiterte Kommentar-Doku mit den verifizierten Limits zu jedem Modell, damit Folge-Audits nicht wieder auf falschen Annahmen aufbauen.
+
+### Nicht uebernommen — Modell-Wechsel auf Small 3.2
+
+Zwischenzeitlich testweise ausprobiert: `MISTRAL_PROFILE_MODEL` auf `mistral-small-2506` umgestellt. Limits 50× besser, aber **Live-Test zeigte 30-80 % Qualitaetsregression beim `ad_targeting`** (kaum noch echte Markennamen, generische Targeting-Begriffe). Didaktischer Wert des Tools haengt aber an konkreten Marken — daher sofortiger Revert zurueck auf `mistral-small-2603`.
+
+Lesson learned: Versions-Sprung Small 3.2 → Small 4 ist bei spezifischen Fähigkeiten (Brand-Knowledge) substanziell, nicht nur „3-8 % Benchmark-Verbesserung" wie meine Schätzung vorher.
+
+### Folge-Lessons aus dem Abend
+
+- **Vor Architektur-Entscheidungen immer das Account-Dashboard pruefen**, nicht den Code-Kommentar oder die generische Doku.
+- **Modell-spezifische Limits sind nicht uniform** — neueste Versionen koennen drastisch restriktiver sein als deprecated Vorgaenger.
+- **-latest-Aliase fuer Modelle vermeiden** — Versions-Pinning gibt uns Kontrolle.
+
+### Tests
+
+- Backend 295/295 gruen (Test-Konstanten an neue Modell-IDs angepasst).
+- Frontend 143/143 gruen (unveraendert).
+
 ## [1.10.6] — 2026-05-19
 
 ### Behoben — Workshop-Tauglichkeit fuer 25-50 gleichzeitige Teilnehmer

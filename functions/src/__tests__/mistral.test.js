@@ -403,14 +403,14 @@ describe("generateBothProfiles", () => {
       calls++;
       const body = JSON.parse(opts.body);
       /* Small 4 antwortet mit Müll, Large 3 antwortet mit gültigem JSON */
-      const isSmall4 = body.model === "mistral-small-2603";
+      const isSmall = body.model === "mistral-small-2603";
       return {
         ok: true,
         status: 200,
         json: async () => ({
           choices: [
             {
-              message: { content: isSmall4 ? "totally not json" : validProfileJson },
+              message: { content: isSmall ? "totally not json" : validProfileJson },
               finish_reason: "stop",
             },
           ],

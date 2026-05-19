@@ -18,9 +18,9 @@ describe("config", () => {
   });
 
   test("Mistral constants are set", () => {
-    expect(config.MISTRAL_DESCRIBE_MODEL).toBe("mistral-large-latest");
+    expect(config.MISTRAL_DESCRIBE_MODEL).toBe("mistral-large-2512");
     expect(config.MISTRAL_PROFILE_MODEL).toBe("mistral-small-2603");
-    expect(config.MISTRAL_FALLBACK_MODEL).toBe("mistral-large-latest");
+    expect(config.MISTRAL_FALLBACK_MODEL).toBe("mistral-large-2512");
     expect(config.MISTRAL_ENDPOINT).toMatch(/^https:\/\/api\.mistral\.ai/);
     expect(config.MISTRAL_DESCRIBE_MAX_TOKENS).toBeGreaterThan(0);
     expect(config.MISTRAL_PROFILE_MAX_TOKENS).toBeGreaterThan(5000);

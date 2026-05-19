@@ -18,17 +18,37 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /* ── Mistral-Modelle ──
    Describe-Stage via Large 3 (gute Bilderkennung),
-   Profile-Stage via Small 4 (günstig + schnell für Text-zu-JSON-Generierung).
+   Profile-Stage via Small 3.2 (siehe v1.10.7-Note unten),
    Mistral-internes Fallback bei Profile-Versagen: Large 3.
 
    Preise pro 1M Tokens (Stand 2026-05):
      - mistral-large-latest: $0.50 / $1.50  in/out
-     - mistral-small-2603:   $0.15 / $0.60  in/out
+     - mistral-small-2506:   $0.15 / $0.60  in/out  (Small 3.2)
+     - mistral-small-2603:   $0.15 / $0.60  in/out  (Small 4, derzeit nicht im Einsatz)
+
+   v1.10.7 (2026-05-19): WICHTIGER Wechsel von -2603 → -2506.
+   Hintergrund: Mistral hat fuer unser Konto auf -2603 (Small 4) absurd
+   niedrige Limits gesetzt:
+     - mistral-small-2603: 100K TPM, 1.67 RPS
+     - mistral-small-2506: 5M TPM, 20.83 RPS  (50× / 12× hoeher)
+   Bei nur 100K TPM (~10 Analysen pro Minute) ist Small 4 fuer unseren
+   Workshop-Use-Case schlicht unbrauchbar. Small 3.2 ist offiziell
+   deprecated, aber noch monatelang verfuegbar und liefert fuer unseren
+   JSON-Output praktisch gleichwertige Profile bei massiv besseren Limits.
+
+   Migration zurueck zu Small 4 macht erst Sinn, wenn Mistral die Limits
+   gleichzieht ODER wir auf einen hoeheren Tarif wechseln.
 
    API-Key kommt aus `process.env.MISTRAL_API_KEY` (Firebase Secret). */
-const MISTRAL_DESCRIBE_MODEL = "mistral-large-latest";
+/* v1.10.7: Large fest auf -2512 gepinnt statt -latest-Alias. Hintergrund:
+   Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
+   umlenken (z.B. ein hypothetisches Large -2603), die wie das aktuelle
+   Small-2603 mit brutalen Limits ausgestattet sein koennte. Mit dem Pin
+   kontrollieren wir Versions-Wechsel selbst.
+   Verifizierte Limits -2512 (Account-Dashboard 2026-05-19): 6 RPS, 2M TPM. */
+const MISTRAL_DESCRIBE_MODEL = "mistral-large-2512";
 const MISTRAL_PROFILE_MODEL = "mistral-small-2603";
-const MISTRAL_FALLBACK_MODEL = "mistral-large-latest";
+const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";
 const MISTRAL_ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
 const MISTRAL_MODELS_ENDPOINT = "https://api.mistral.ai/v1/models";
 const MISTRAL_DESCRIBE_MAX_TOKENS = 2048;

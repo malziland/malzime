@@ -1,17 +1,27 @@
 const mistral = require("../mistral");
 const { isRateLimitError, setFetchForTest, _callMistralRaw } = mistral;
+const { _setRateIntervalMs, _resetRateBucket } = require("../throttle");
 
 /* Speichert ursprüngliche env, restored in afterEach */
 const ORIGINAL_API_KEY = process.env.MISTRAL_API_KEY;
 
 beforeEach(() => {
   process.env.MISTRAL_API_KEY = "test-key-not-real";
+  /* v1.10.6: Token-Bucket-Rate-Limiter im Throttle deaktivieren, sonst
+     serialisiert er parallele Calls auf 1 RPS und sprengt Test-Timeouts. */
+  _setRateIntervalMs(0);
+  _resetRateBucket();
 });
 
 afterEach(() => {
   if (ORIGINAL_API_KEY === undefined) delete process.env.MISTRAL_API_KEY;
   else process.env.MISTRAL_API_KEY = ORIGINAL_API_KEY;
   setFetchForTest(null);
+});
+
+afterAll(() => {
+  _setRateIntervalMs(1000);
+  _resetRateBucket();
 });
 
 /* ── isRateLimitError ──────────────────────────────────────────── */
@@ -34,6 +44,12 @@ describe("isRateLimitError", () => {
   test("does not match other errors", () => {
     expect(isRateLimitError(new Error("Network timeout"))).toBe(false);
     expect(isRateLimitError(new Error("500 Internal Server Error"))).toBe(false);
+  });
+
+  test("detects throttle_timeout (v1.10.6: eigene Drossel als Ueberlast-Signal)", () => {
+    const err = new Error("Throttle queue timeout after 360000ms");
+    err.code = "throttle_timeout";
+    expect(isRateLimitError(err)).toBe(true);
   });
 });
 
@@ -177,9 +193,37 @@ describe("callMistralRaw 429 retry behavior", () => {
     await expect(_callMistralRaw({ model: "x", messages: [], maxTokens: 1, temperature: 0 })).rejects.toMatchObject({
       status: 429,
     });
-    /* 3 Versuche total: initial + 2 retries */
-    expect(attempts).toBe(3);
+    /* v1.10.6: 2 Versuche total (initial + 1 retry), war [1000,3000] → [2000] */
+    expect(attempts).toBe(2);
   }, 15000);
+
+  test("v1.10.6: Einzel-Call-Timeout cappt bei MISTRAL_TIMEOUT_MS auch wenn budget groesser ist", async () => {
+    /* Wenn das REQUEST_BUDGET_MS gross ist (z.B. 480s), darf der einzelne
+       Mistral-Call trotzdem nicht laenger als MISTRAL_TIMEOUT_MS laufen.
+       Simuliert wird via Mock-Fetch, der nie returnt — dann sollte
+       AbortController nach MISTRAL_TIMEOUT_MS feuern, nicht nach 480s. */
+    const { MISTRAL_TIMEOUT_MS } = require("../config");
+    let abortedAt = null;
+    const start = Date.now();
+    setFetchForTest(async (_url, opts) => {
+      return new Promise((_resolve, reject) => {
+        opts.signal.addEventListener("abort", () => {
+          abortedAt = Date.now() - start;
+          reject(Object.assign(new Error("aborted"), { name: "AbortError" }));
+        });
+      });
+    });
+
+    /* Budget 480000 absichtlich gross gewaehlt — Cap muss greifen */
+    await expect(
+      _callMistralRaw({ model: "x", messages: [], maxTokens: 1, temperature: 0, timeoutMs: 480000 })
+    ).rejects.toMatchObject({ code: "timeout" });
+
+    /* AbortController muss bei ~MISTRAL_TIMEOUT_MS (90s) feuern, nicht bei 480s.
+       Wir geben grosszuegig Toleranz, weil Fake-Timing im Jest-Setup nicht
+       exakt arbeitet — wichtig ist: deutlich < 480s. */
+    expect(abortedAt).toBeLessThan(MISTRAL_TIMEOUT_MS + 5000);
+  }, 100000);
 });
 
 /* ── callMistralRaw: Throttle-Integration (REL-01) ─────────────── */

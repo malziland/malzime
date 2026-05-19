@@ -1,4 +1,26 @@
-const { createSemaphore, withMistralSlot, getMistralStats, DEFAULT_MAX_CONCURRENT } = require("../throttle");
+const {
+  createSemaphore,
+  withMistralSlot,
+  getMistralStats,
+  DEFAULT_MAX_CONCURRENT,
+  _setRateIntervalMs,
+  _resetRateBucket,
+} = require("../throttle");
+
+/* v1.10.6: Token-Bucket fuer Tests deaktivieren — der modul-globale Rate-Limiter
+   (1 RPS in Production) wuerde alle Mehrfach-Operation-Tests auf je >=1s
+   ausdehnen. Fuer Test-Isolation reicht es, die Pause zu deaktivieren; die
+   Rate-Limit-Logik wird separat getestet. */
+beforeEach(() => {
+  _setRateIntervalMs(0);
+  _resetRateBucket();
+});
+
+afterAll(() => {
+  /* Wiederherstellen, falls andere Test-Files den Token-Bucket sehen */
+  _setRateIntervalMs(1000);
+  _resetRateBucket();
+});
 
 describe("createSemaphore — basic acquire/release", () => {
   test("allows up to maxConcurrent calls without waiting", async () => {
@@ -114,4 +136,35 @@ describe("module constants", () => {
   test("DEFAULT_MAX_CONCURRENT matches Mistral Scale-Tier RPS limit", () => {
     expect(DEFAULT_MAX_CONCURRENT).toBe(6);
   });
+});
+
+describe("token-bucket rate limiter (v1.10.6)", () => {
+  test("verteilt mehrere parallele Slot-Operationen auf das Interval", async () => {
+    /* Interval bewusst klein, damit der Test schnell laeuft, aber gross genug
+       um den Effekt messen zu koennen. */
+    _setRateIntervalMs(200);
+    _resetRateBucket();
+
+    const startTimes = [];
+    const ops = Array.from({ length: 5 }, () =>
+      withMistralSlot(async () => {
+        startTimes.push(Date.now());
+        await new Promise((r) => setTimeout(r, 10));
+      })
+    );
+    const begin = Date.now();
+    await Promise.all(ops);
+    const elapsed = Date.now() - begin;
+
+    /* 5 Ops bei 200ms Interval = mind. 4 × 200ms = 800ms Spread.
+       (Erste Op darf sofort starten, dann je 200ms.) */
+    expect(elapsed).toBeGreaterThanOrEqual(800);
+    /* Start-Zeitpunkte sollten je ~200ms auseinander liegen */
+    expect(startTimes.length).toBe(5);
+    for (let i = 1; i < startTimes.length; i++) {
+      expect(startTimes[i] - startTimes[i - 1]).toBeGreaterThanOrEqual(180);
+    }
+
+    _setRateIntervalMs(0); /* zurueck zu „deaktiviert" fuer andere Tests */
+  }, 10000);
 });

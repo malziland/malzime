@@ -29,9 +29,9 @@ describe("checkRateLimit", () => {
     }
   });
 
-  test("blocks request at rate limit boundary (201st request)", () => {
+  test("blocks request at rate limit boundary (501st request)", () => {
     const key = "boundary-test-" + Date.now();
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 500; i++) {
       expect(checkRateLimit(key)).toBe(true);
     }
     expect(checkRateLimit(key)).toBe(false);

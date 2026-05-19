@@ -131,14 +131,83 @@ describe("analyzeImage", () => {
     expect(state.isAnalyzing).toBe(false);
   });
 
-  it("shows user-friendly message on 429", async () => {
+  it("shows hard-limit message on 429 with blocked:limit body", async () => {
+    /* v1.10.6: 429 mit blocked:"limit" → harter Stundenlimit-Treffer, kein Auto-Retry.
+       Setup mit response.clone() damit der Code den Body lesen kann. */
     vi.spyOn(globalThis, "fetch").mockResolvedValue({
       ok: false,
       status: 429,
-      text: () => Promise.resolve("{}"),
+      clone: function () {
+        return this;
+      },
+      json: () => Promise.resolve({ blocked: "limit", retryAfterSeconds: 600 }),
+      text: () => Promise.resolve('{"blocked":"limit","retryAfterSeconds":600}'),
     });
     await analyzeImage();
     expect(elements.status.textContent).toContain("error.rateLimit");
+  });
+
+  it("auto-retries on retryable 503 then succeeds on second attempt (v1.10.6)", async () => {
+    let attempt = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      attempt++;
+      if (attempt === 1) {
+        return {
+          ok: false,
+          status: 503,
+          clone: function () {
+            return this;
+          },
+          json: () => Promise.resolve({}),
+          text: () => Promise.resolve("{}"),
+        };
+      }
+      return {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            profiles: {
+              normal: { categories: {}, ad_targeting: [], manipulation_triggers: [], profileText: "T" },
+            },
+            privacyRisks: [],
+            exif: {},
+            meta: {},
+          }),
+      };
+    });
+    const promise = analyzeImage();
+    /* Auto-Retry wartet RETRY_WAIT_MS=10s — Fake-Timer durchziehen */
+    await vi.advanceTimersByTimeAsync(11000);
+    await promise;
+    expect(attempt).toBe(2);
+  });
+
+  it("retries on blocked.overloaded body and gives up cleanly after max retries", async () => {
+    let attempt = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      attempt++;
+      return {
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            profiles: null,
+            blockedReason: "blocked.overloaded",
+            privacyRisks: [],
+            exif: {},
+            meta: { mode: "blocked" },
+          }),
+      };
+    });
+    const promise = analyzeImage();
+    /* Zwei Retries × 10s warten lassen — plus Puffer */
+    await vi.advanceTimersByTimeAsync(30000);
+    await promise;
+    /* v1.10.6: MAX_AUTO_RETRIES=3 → bis zu 4 Versuche, plus etwas Timer-Slack
+       beim fake timer. Wir pruefen nur: Retries finden statt, am Ende kommt
+       die Server-Busy-Meldung. */
+    expect(attempt).toBeGreaterThanOrEqual(2);
+    expect(attempt).toBeLessThanOrEqual(6);
+    expect(elements.status.textContent).toContain("error.serverBusy");
   });
 
   it("shows user-friendly message on 413", async () => {

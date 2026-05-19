@@ -4,6 +4,55 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.6] — 2026-05-19
+
+### Behoben — Workshop-Tauglichkeit fuer 25-50 gleichzeitige Teilnehmer
+
+Heutiger 13:00-15:00-Workshop hat die Pipeline gerissen: ab ~15 Geraeten gleichzeitig kamen reihenweise "Server-Fehler" und Abbrueche. Logs zeigten Throttle-Queue-Timeouts, Mistral-429-Kaskaden und Analysen, die statt 60-90 s plötzlich 250-328 s dauerten.
+
+**Wurzelursache** war nicht Mistral selbst, sondern eine Kette von Config-Schwaechen, die sich gegenseitig verstaerkt haben:
+
+1. Cloud-Run-`concurrency: 20` packte alle eingehenden Requests auf eine einzelne Instanz, statt horizontal zu skalieren.
+2. Die Per-Instance-Drossel (`throttle.js`, 6 Slots) staute sich dadurch sofort.
+3. Auf 429-Antworten von Mistral versuchte der Code 2× Retry mit kurzem Backoff — drei Wellen Anfragen gegen ein bereits ueberlastetes Rate-Limit verstaerkten den Stau exponentiell.
+4. Der Throttle-Queue-Timeout (90 s) feuerte unter Last reihenweise → Anfragen schlugen fehl, ohne dass Mistral je wirklich angesprochen wurde.
+5. Frontend hatte keine Auto-Retry-Logik fuer transienten Server-Druck → User sah einen einzigen generischen Fehler nach 60-180 s.
+
+**Fixes** (zusammen wirksam):
+
+- **`functions/src/index.js`**: `concurrency: 20 → 8`, `maxInstances: 10 → 4`, `timeoutSeconds: 180 → 540` (Cloud-Run-Maximum). Mit `concurrency=8` zwingt Cloud Run das Hochfahren neuer Instanzen, statt eine zu fluten. `maxInstances=4` × 6 Throttle-Slots ergibt einen echten globalen Cap von 24 parallelen Mistral-Calls (~2,7 RPS sustained mit Token-Bucket), weit unter Mistrals 6-RPS-Limit.
+- **`functions/src/throttle.js`**: `DEFAULT_QUEUE_TIMEOUT_MS: 90 000 → 360 000` (6 Minuten). Mistral braucht 60-90 s pro Call, ein Slot wird also nur alle ~15 s frei. Mit kurzem Timeout lief eine Anfrage in Queue-Position 3+ schon mitten im Anstehen ins Out. 6 Minuten Warte-Spielraum + 540 s Function-Timeout = praktisch kein Throttle-Failure mehr im Normalbetrieb.
+- **`functions/src/mistral.js`**: 429-Retry-Backoffs `[1000, 3000] → [2000]` (1 statt 2 Retries). `isRateLimitError` erkennt jetzt auch `throttle_timeout` als Ueberlast-Signal. `runProfile`/`tryProfileCall` schlucken Rate-Limit-Fehler nicht mehr, sondern propagieren sie sauber zu `handle-analyze.js` (→ `blocked.overloaded` im Response-Body → Frontend retried). Per-Call-Timeout via `Math.min(timeoutMs || MISTRAL_TIMEOUT_MS, MISTRAL_TIMEOUT_MS)` gecappt — verhindert, dass das gestiegene `REQUEST_BUDGET_MS` einen einzelnen Mistral-Call ueber 90 s laufen laesst (Outer-Budget gilt fuer die Pipeline, nicht fuer Einzelaufrufe).
+- **`functions/src/throttle.js`**: **Token-Bucket-Rate-Limiter + Initial-Jitter.** Die bisherige Semaphore limitierte nur PARALLELITAET (max 6 in-flight) — nicht die RATE. Lasttests mit 20 parallelen Anfragen haben das aufgedeckt: Slots wurden gleichzeitig frei, neue Calls bursteten in derselben Millisekunde gegen Mistral, × N Cloud-Run-Instanzen = bis zu 36 RPS Instant-Burst (Limit: 6 RPS). Resultat: 40 % HTTP 429. Token-Bucket erlaubt jetzt max 1 Mistral-Call alle 1500 ms pro Instanz (= 0,67 RPS); bei `maxInstances=4` ergibt das ~2,7 RPS gesamt, sicher unter Mistrals 6-RPS-Limit. **Initial-Jitter 0-2000 ms** beim allerersten Token-Acquire pro Instanz verhindert, dass mehrere frisch geboorene Cold-Start-Instanzen ihren ersten Call in derselben Millisekunde feuern.
+- **`functions/src/counter.js`**: Eigene 2-Retry-Schleife auf `runTransaction` bei Firestore-ABORTED-Kontention. Das SDK retried intern 5×, das reichte unter Workshop-Burst nicht — die `counter-fail-open`-Alarme bei meinen Lasttests waren genau diese Kontention, kein echter DB-Ausfall. Jetzt 2 Retries mit 80–240 ms Backoff+Jitter VOR dem ERROR-Pfad; nur wenn auch die noch versagen, wird der Alarm ausgeloest. Routinemaessige Workshop-Last triggert keinen Alarm mehr; echte Firestore-Ausfaelle alarmieren weiter sauber.
+- **`functions/src/config.js`**: `HOURLY_LIMIT: 500 → 1500` (Puffer fuer mehrere Workshops kurz hintereinander + Auto-Retry-Volumen), `REQUEST_BUDGET_MS: 120 000 → 480 000` (matched neues Function-Timeout, gibt Mistral auch nach langer Queue-Wartezeit volle 90 s), `RATE_LIMIT: 200 → 500` pro 10 Minuten (Schul-WLAN teilt sich eine IP — bei 25 Geraeten mit Auto-Retries war 200 zu knapp).
+- **`public/js/api.js`**: Auto-Retry-Loop um den Fetch-Block. Max 3 Retries (4 Versuche total), 8 s Basis-Wartezeit mit ±2 s Jitter, retried bei HTTP 429/503 ohne `blocked:"limit"`/`maintenance`-Body und bei `blockedReason: "blocked.overloaded"` im 200er-Body (Heartbeat-Pfad). `FETCH_TIMEOUT_MS: 180 000 → 540 000` matched das neue Backend-Timeout. Jitter zwischen Retries verhindert synchrone Retry-Wellen aller Workshop-Geraete.
+- **`public/locales/de.json` + `en.json`**: Neue Keys `error.serverBusy` ("System gerade stark belastet, bitte ein bis zwei Minuten warten") und `status.serverBusyRetrying` ("Sehr viele Anfragen gerade — versuche es automatisch nochmal …") fuer die Auto-Retry-UX.
+
+### Erwartete Kapazitaet nach diesen Aenderungen
+
+| Workshop-Groesse | Verhalten |
+|---|---|
+| 15-25 | Sauber, alle in 1-2 Minuten fertig, kein User-sichtbarer Fehler |
+| 25-50 | Sauber, alle in 2-4 Minuten, vereinzelt Auto-Retry mit „versuche es automatisch nochmal …"-Meldung |
+| 50-100 | Mit Auto-Retry meistens sauber; einzelne sehen evtl. die Server-Busy-Meldung |
+| 100+ | Knapp bis enger Engpass — fuer 200 braucht es die echte Queue-Architektur (separater Plan) |
+
+### Was bewusst NICHT angefasst wurde
+
+- **`MISTRAL_PROFILE_MAX_TOKENS` bleibt 8000.** Erste Idee war 4500, aber Live-Beobachtung im Workshop zeigte abgeschnittene Profile — die kamen von Timeout-Truncation, nicht vom Token-Cap. Eine Reduktion haette die Truncations verschlimmert statt verbessert.
+- **Heartbeat-Pattern (v1.10.4) bleibt unangetastet.** Wird erst mit v2.0-Streaming obsolet.
+
+### Tests
+
+- Backend 293/293 gruen (3 Tests fuer geaenderte Konstanten angepasst, 1 neuer Test fuer `isRateLimitError` mit `throttle_timeout`, 1 neuer Test fuer Einzel-Call-Timeout-Cap, 1 neuer Test fuer Token-Bucket-Rate-Limiter).
+- Frontend 143/143 gruen (1 bestehender 429-Test auf Hard-Limit-Pfad umgestellt, 2 neue Tests fuer Auto-Retry-Verhalten: 503-Retry-mit-Success und blocked.overloaded-mit-Exhaustion).
+- Lint + Prettier auf allen geaenderten Files gruen.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026051910`.
+
 ## [1.10.5] — 2026-05-15
 
 ### Behoben — Spinner verschwand mid-Pipeline mit Heartbeat

@@ -47,6 +47,11 @@ function setFetchForTest(impl) {
 /* ── Rate-Limit-Detection (für Telemetrie + Fallback-Entscheidung) ── */
 
 function isRateLimitError(err) {
+  /* v1.10.6: Throttle-Queue-Timeout wird auch als Rate-Limit-Signal behandelt.
+     Wenn unsere eigene Drossel in throttle.js auflaeuft, ist Mistral aus
+     Pipeline-Sicht ueberlastet — Caller (handle-analyze) soll das als
+     blocked.overloaded melden, damit der Client den Auto-Retry triggert. */
+  if (err && err.code === "throttle_timeout") return true;
   const msg = (err.message || "").toLowerCase();
   return err.status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("rate_limited");
 }
@@ -75,13 +80,23 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
   };
   if (forceJSON) body.response_format = { type: "json_object" };
 
-  /* Bis zu 2 Retry-Versuche bei 429 (kurzer Burst); danach Fehler nach oben. */
-  const backoffs = [1000, 3000];
+  /* v1.10.6: Von 2 auf 1 Retry reduziert. Hintergrund: Bei Workshop-Bursts
+     hat die alte 2-Retry-Strategie den 429-Stau verstaerkt — drei Wellen
+     gegen dasselbe Rate-Limit. Jetzt 1 Retry mit 2s Wartezeit; bleibt es
+     dabei, wird die Anfrage als Ueberlast nach oben propagiert und der
+     Client kann via Auto-Retry sauber zurueckkommen. */
+  const backoffs = [2000];
   let lastError;
 
   for (let attempt = 0; attempt <= backoffs.length; attempt++) {
     const controller = new AbortController();
-    const effectiveTimeout = timeoutMs || MISTRAL_TIMEOUT_MS;
+    /* v1.10.6 Fix: Cap bei MISTRAL_TIMEOUT_MS (90s). Verhindert, dass ein
+       grosses REQUEST_BUDGET_MS (480s) den Timeout fuer Einzel-Calls mit
+       hochzieht. Das Outer-Budget gilt fuer die GESAMTE Pipeline, nicht fuer
+       Einzelaufrufe. Ein einzelner haengender Mistral-Call soll nach 90s
+       abbrechen, damit der Client-seitige Auto-Retry greift, statt 8 Minuten
+       Spinner zu zeigen. */
+    const effectiveTimeout = Math.min(timeoutMs || MISTRAL_TIMEOUT_MS, MISTRAL_TIMEOUT_MS);
     const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
     let res;
@@ -304,27 +319,39 @@ function escapeXml(str) {
 async function runProfile(prompt, temperature, mode, remainingBudget) {
   const messages = [{ role: "user", content: prompt }];
 
-  /* Versuch 1: Small 4 als Hybrid-Default */
-  const small4 = await tryProfileCall({
-    model: MISTRAL_PROFILE_MODEL,
-    messages,
-    temperature,
-    mode,
-    remainingBudget,
-    isFallback: false,
-  });
-  if (small4) return small4;
+  /* Versuch 1: Small 4 als Hybrid-Default. v1.10.6: rate_limit/throttle_timeout
+     wird hochpropagiert, sonst probieren wir noch Large 3 als Fallback. */
+  try {
+    const small4 = await tryProfileCall({
+      model: MISTRAL_PROFILE_MODEL,
+      messages,
+      temperature,
+      mode,
+      remainingBudget,
+      isFallback: false,
+    });
+    if (small4) return small4;
+  } catch (err) {
+    if (err && err.code === "rate_limit") throw err;
+    /* andere Fehler: weiter zum Fallback */
+  }
 
-  /* Versuch 2: Large 3 als Fallback wenn Small 4 ausfällt */
-  const large3 = await tryProfileCall({
-    model: MISTRAL_FALLBACK_MODEL,
-    messages,
-    temperature,
-    mode,
-    remainingBudget,
-    isFallback: true,
-  });
-  return large3;
+  /* Versuch 2: Large 3 als Fallback wenn Small 4 ausfällt. v1.10.6: bei
+     rate_limit jetzt auch hier durchreichen statt schlucken. */
+  try {
+    const large3 = await tryProfileCall({
+      model: MISTRAL_FALLBACK_MODEL,
+      messages,
+      temperature,
+      mode,
+      remainingBudget,
+      isFallback: true,
+    });
+    return large3;
+  } catch (err) {
+    if (err && err.code === "rate_limit") throw err;
+    return null;
+  }
 }
 
 async function tryProfileCall({ model, messages, temperature, mode, remainingBudget, isFallback }) {
@@ -387,6 +414,14 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
         isFallback,
       })
     );
+    /* v1.10.6: Rate-Limit/Throttle-Ueberlast nicht schlucken — sonst maskiert
+       sich blocked.overloaded als generischer blocked.profileBlocked und der
+       Client weiss nicht, dass ein Auto-Retry helfen wuerde. */
+    if (isRateLimitError(err)) {
+      const e = new Error("Mistral rate limit exceeded");
+      e.code = "rate_limit";
+      throw e;
+    }
     return null;
   }
 }

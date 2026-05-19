@@ -34,76 +34,103 @@ function calcRetrySeconds(recent, limit, now, windowMs) {
  * Bei Firestore-Fehler: fail-open (allowed: true).
  */
 async function checkAndIncrement() {
-  try {
-    const db = getFirestore();
-    const ref = db.doc(CURRENT_DOC);
+  /* v1.10.6: Eigene Retry-Schleife OBEN auf das Firestore-SDK-Retry (default 5).
+     Hintergrund: Bei hoher Last (>=20 parallele Anfragen) kollidieren mehrere
+     Transactions am selben Counter-Dokument → Firestore wirft ABORTED. Das
+     SDK retried intern bis zu 5×, aber unter Workshop-Burst reicht das manchmal
+     nicht. Unsere Schleife versucht bei ABORTED noch 2× mit Backoff+Jitter,
+     bevor wir fail-open + ERROR eskalieren. Andere Firestore-Fehler (Netz,
+     Permission, etc.) gehen sofort in den ERROR-Pfad. */
+  const ABORTED_RETRIES = 2;
+  let lastErr = null;
+  for (let attempt = 0; attempt <= ABORTED_RETRIES; attempt++) {
+    try {
+      const db = getFirestore();
+      const ref = db.doc(CURRENT_DOC);
 
-    const result = await db.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      const data = snap.exists ? snap.data() : {};
+      const result = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.exists ? snap.data() : {};
 
-      const limit = data.limit || HOURLY_LIMIT;
-      const wm = data.windowMinutes || HOURLY_WINDOW_MINUTES;
-      const windowMs = wm * 60 * 1000;
-      const now = Date.now();
+        const limit = data.limit || HOURLY_LIMIT;
+        const wm = data.windowMinutes || HOURLY_WINDOW_MINUTES;
+        const windowMs = wm * 60 * 1000;
+        const now = Date.now();
 
-      /* Rollendes Fenster: nur Analysen der letzten Stunde */
-      const recent = filterRecent(data.recentAnalyses, now, windowMs);
+        /* Rollendes Fenster: nur Analysen der letzten Stunde */
+        const recent = filterRecent(data.recentAnalyses, now, windowMs);
 
-      /* Limit erreicht → blockieren */
-      if (recent.length >= limit) {
-        const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
+        /* Limit erreicht → blockieren */
+        if (recent.length >= limit) {
+          const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
+          return {
+            allowed: false,
+            retryAfterSeconds,
+            count: recent.length,
+            limit,
+            hourlyTotal: recent.length,
+          };
+        }
+
+        /* Unter dem Limit → Analyse erlauben */
+        recent.push(now);
+        const justReached = recent.length === limit;
+
+        if (snap.exists) {
+          tx.update(ref, { recentAnalyses: recent });
+        } else {
+          tx.set(ref, {
+            recentAnalyses: recent,
+            limit: HOURLY_LIMIT,
+            windowMinutes: HOURLY_WINDOW_MINUTES,
+          });
+        }
+
         return {
-          allowed: false,
-          retryAfterSeconds,
+          allowed: true,
+          retryAfterSeconds: 0,
           count: recent.length,
           limit,
           hourlyTotal: recent.length,
+          justReached,
         };
+      });
+
+      return result;
+    } catch (err) {
+      lastErr = err;
+      const isAborted = err.code === 10 || /ABORTED/i.test(err.message || "");
+      if (isAborted && attempt < ABORTED_RETRIES) {
+        /* Backoff mit Jitter: 80ms beim 1. Retry, 160ms beim 2. — plus 0-80ms
+           Zufall, damit nicht alle Caller im gleichen Moment zurueckkommen. */
+        const backoff = 80 * (attempt + 1) + Math.random() * 80;
+        await new Promise((r) => setTimeout(r, backoff));
+        continue;
       }
-
-      /* Unter dem Limit → Analyse erlauben */
-      recent.push(now);
-      const justReached = recent.length === limit;
-
-      if (snap.exists) {
-        tx.update(ref, { recentAnalyses: recent });
-      } else {
-        tx.set(ref, {
-          recentAnalyses: recent,
-          limit: HOURLY_LIMIT,
-          windowMinutes: HOURLY_WINDOW_MINUTES,
-        });
-      }
-
-      return {
-        allowed: true,
-        retryAfterSeconds: 0,
-        count: recent.length,
-        limit,
-        hourlyTotal: recent.length,
-        justReached,
-      };
-    });
-
-    return result;
-  } catch (err) {
-    /* Fail-open: Lieber ein paar Analysen zu viel als alle User blockieren.
-       REL-02: Der Stundenzaehler ist die einzige globale Kostenbremse fuer
-       Mistral-Calls. Faellt er aus, ist diese Bremse weg — darum als ERROR
-       (statt nur log) mit eindeutigem alert-Marker eskalieren, damit ein
-       Log-basierter Alert in Cloud Logging anschlagen kann. */
-    console.error(
-      JSON.stringify({
-        severity: "ERROR",
-        alert: "counter-fail-open",
-        warning: "counter-error",
-        message: "Stundenlimit-Zaehler fehlgeschlagen — globale Kostenbremse momentan inaktiv",
-        error: err.message,
-      })
-    );
-    return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: err.message };
+      /* Fail-open: Lieber ein paar Analysen zu viel als alle User blockieren.
+         REL-02: Der Stundenzaehler ist die einzige globale Kostenbremse fuer
+         Mistral-Calls. Faellt er aus, ist diese Bremse weg — darum als ERROR
+         (statt nur log) mit eindeutigem alert-Marker eskalieren, damit ein
+         Log-basierter Alert in Cloud Logging anschlagen kann.
+         v1.10.6: Routinemaessige ABORTED-Kontention wird VORHER 2× geretried
+         und triggert hier nur den ERROR-Pfad, wenn auch das nicht reicht. */
+      const reason = isAborted ? "aborted-retries-exhausted" : "firestore-error";
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          alert: "counter-fail-open",
+          warning: "counter-error",
+          reason,
+          message: "Stundenlimit-Zaehler fehlgeschlagen — globale Kostenbremse momentan inaktiv",
+          error: err.message,
+        })
+      );
+      return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: err.message };
+    }
   }
+  /* Unerreichbar — der Loop kommt aus jedem Iteration entweder mit return
+     oder via continue heraus. Sicherheitshalber fail-open. */
+  return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: lastErr && lastErr.message };
 }
 
 /**

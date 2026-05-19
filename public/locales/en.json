@@ -57,6 +57,8 @@
   "error.imageTooLarge": "The image is too large. Please use a smaller photo.",
   "error.invalidFormat": "That didn't work. Is it really a photo? Try JPEG or PNG.",
   "error.serverError": "The server is having an issue right now. Wait a moment and try again.",
+  "error.serverBusy": "The AI is overloaded right now. We already tried automatically three times — please wait 2-3 minutes before trying again.",
+  "status.serverBusyRetrying": "Lots of requests right now — the system is retrying automatically, please wait …",
   "error.missingImage": "No image detected. Please select a photo.",
   "error.timeout": "The analysis is taking too long. Try again or use a different photo.",
   "error.readFailed": "The image could not be read. Try a different photo.",

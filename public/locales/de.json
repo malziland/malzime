@@ -57,6 +57,8 @@
   "error.imageTooLarge": "Das Bild ist zu groß. Bitte ein kleineres Foto verwenden.",
   "error.invalidFormat": "Das hat nicht geklappt. Ist das wirklich ein Foto? Versuche JPEG oder PNG.",
   "error.serverError": "Der Server hat gerade ein Problem. Wartet einen Moment und versucht es nochmal.",
+  "error.serverBusy": "Die KI ist gerade ueberlastet. Wir haben es automatisch dreimal probiert — bitte 2-3 Minuten warten, bevor du es erneut versuchst.",
+  "status.serverBusyRetrying": "Sehr viele Anfragen gerade — das System probiert es automatisch erneut, bitte warten …",
   "error.missingImage": "Kein Bild erkannt. Bitte ein Foto auswählen.",
   "error.timeout": "Die Analyse dauert zu lange. Versuch es nochmal oder nimm ein anderes Foto.",
   "error.readFailed": "Das Bild konnte nicht gelesen werden. Versuch ein anderes Foto.",

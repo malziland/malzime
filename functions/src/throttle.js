@@ -28,10 +28,14 @@
    einfach mistral.js's Retry-Backoff. */
 const DEFAULT_MAX_CONCURRENT = 6;
 
-/* Wenn ein Slot nach diesem Timeout nicht frei wurde, geben wir auf —
-   sonst staut sich die Queue endlos. Cloud-Function-Limit ist 120s, also
-   nicht zu nah dran. */
-const DEFAULT_QUEUE_TIMEOUT_MS = 90000;
+/* v1.10.6: Queue-Timeout von 90s auf 360s (6 Minuten) hochgesetzt.
+   Hintergrund: Mistral braucht 60-90s pro Call, ein Slot wird also nur
+   alle ~15s frei. Mit 45s/90s Queue-Timeout lief eine Anfrage in Position
+   3+ schon mitten im Anstehen ins Out, ohne Mistral je angerufen zu haben.
+   Mit 360s reicht es, dass der spaeteste Wartende immer noch durchkommt
+   (~24 Plaetze × 15s = 360s). Cloud-Function-Timeout ist 540s, also
+   bleibt nach dem Anstehen genug Zeit fuer den eigentlichen Mistral-Call. */
+const DEFAULT_QUEUE_TIMEOUT_MS = 360000;
 
 /**
  * Erzeugt einen neuen Semaphore.
@@ -97,12 +101,86 @@ function createSemaphore(options = {}) {
 const mistralSemaphore = createSemaphore();
 
 /**
- * Wrapper-Helper: führt eine Mistral-Operation aus, sobald ein Slot frei ist.
- * Slot wird IMMER released — auch wenn die Operation wirft.
+ * Token-Bucket-Rate-Limiter — v1.10.6 Fix nach Lasttest-Erkenntnis.
+ *
+ * Hintergrund: Die Semaphore limitiert PARALLELITAET (max 6 in-flight), aber
+ * nicht die RATE. Wenn 6 Slots gleichzeitig frei sind und 6 neue Anfragen
+ * reinkommen, bursten alle in derselben Millisekunde gegen Mistral → 6 RPS
+ * Instant-Burst. × 6 Cloud-Run-Instanzen = bis zu 36 RPS Burst.
+ * Mistrals Scale-Tier-Limit: 6 RPS sustained.
+ *
+ * Loesung: Pro Instanz darf maximal 1 Mistral-Call pro Sekunde *gestartet*
+ * werden (1 RPS). 6 Instanzen × 1 RPS = 6 RPS — passt genau auf Mistrals Limit.
+ * Slots bleiben weiter parallel (6 in-flight), aber der Start neuer Calls wird
+ * geordnet entzerrt.
+ *
+ * Implementierung: serialisierte Warteschlange, jeder Caller darf erst dann
+ * weiter, wenn seit dem letzten Token-Start TOKEN_INTERVAL_MS verstrichen sind.
+ */
+/* v1.10.6: 1000ms → 1500ms nach Lasttest-Erkenntnis. 1 Sekunde war
+   formal genug fuer 6 RPS bei 6 Instanzen, aber in der Praxis hat Mistral
+   beim Cold-Start-Burst trotzdem mit 429 reagiert. 1500ms = 0.67 RPS/Instanz,
+   bei max 4 Instanzen = 2.67 RPS gesamt, sicher unter 6 RPS-Limit. */
+const TOKEN_INTERVAL_MS = 1500;
+/* v1.10.6: Initial-Jitter beim allerersten Token-Acquire pro Instanz.
+   Verhindert, dass mehrere Instanzen gleichzeitig cold-starten und
+   alle ihren ersten Mistral-Call in derselben Millisekunde feuern.
+   Random 0-2000ms entzerrt diesen Cold-Start-Burst zuverlaessig. */
+const INITIAL_JITTER_MAX_MS = 2000;
+let currentTokenIntervalMs = TOKEN_INTERVAL_MS;
+let currentInitialJitterMs = INITIAL_JITTER_MAX_MS;
+let lastTokenAt = 0;
+let isFirstAcquire = true;
+let tokenChain = Promise.resolve();
+
+async function acquireRateToken() {
+  /* Serialisierung: jeder Aufruf wartet auf den vorherigen, dann pruefen wir
+     wie viel Zeit seit dem letzten Token-Start verstrichen ist und warten
+     den Rest des Intervalls ab. Beim allerersten Call dieser Instanz wird
+     zusaetzlich ein Initial-Jitter eingehaengt. */
+  const myTurn = tokenChain.then(async () => {
+    if (currentTokenIntervalMs <= 0) {
+      lastTokenAt = Date.now();
+      isFirstAcquire = false;
+      return;
+    }
+    if (isFirstAcquire && currentInitialJitterMs > 0) {
+      const jitter = Math.random() * currentInitialJitterMs;
+      if (jitter > 0) await new Promise((r) => setTimeout(r, jitter));
+      isFirstAcquire = false;
+    }
+    const now = Date.now();
+    const wait = Math.max(0, currentTokenIntervalMs - (now - lastTokenAt));
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastTokenAt = Date.now();
+  });
+  tokenChain = myTurn.catch(() => {
+    /* Fehler im Token-Loop nicht weitertragen — naechster Caller darf normal weiter */
+  });
+  return myTurn;
+}
+
+/* Fuer Tests: erlaubt den Rate-Limit-Cap zu deaktivieren oder verkuerzen,
+   damit Test-Suites nicht von 1-Sekunden-Pausen serialisiert werden. */
+function _setRateIntervalMs(ms) {
+  currentTokenIntervalMs = Math.max(0, ms || 0);
+}
+
+/* Fuer Tests: Initial-Jitter deaktivieren, damit Tests nicht durch
+   Zufalls-Pausen ueberraschend ausbremsen. */
+function _setInitialJitterMs(ms) {
+  currentInitialJitterMs = Math.max(0, ms || 0);
+}
+
+/**
+ * Wrapper-Helper: führt eine Mistral-Operation aus, sobald ein Slot frei ist
+ * UND ein Rate-Token verfuegbar ist. Slot wird IMMER released — auch wenn die
+ * Operation wirft.
  */
 async function withMistralSlot(fn) {
   const release = await mistralSemaphore.acquire();
   try {
+    await acquireRateToken();
     return await fn();
   } finally {
     release();
@@ -113,10 +191,23 @@ function getMistralStats() {
   return mistralSemaphore.stats();
 }
 
+/* Fuer Tests: erlaubt den Token-Bucket zu resetten, damit Test-Reihenfolge
+   nicht stoert. */
+function _resetRateBucket() {
+  lastTokenAt = 0;
+  isFirstAcquire = true;
+  tokenChain = Promise.resolve();
+}
+
 module.exports = {
   createSemaphore,
   withMistralSlot,
   getMistralStats,
   DEFAULT_MAX_CONCURRENT,
   DEFAULT_QUEUE_TIMEOUT_MS,
+  TOKEN_INTERVAL_MS,
+  INITIAL_JITTER_MAX_MS,
+  _resetRateBucket,
+  _setRateIntervalMs,
+  _setInitialJitterMs,
 };

@@ -272,6 +272,38 @@ describe("checkAndIncrement", () => {
     expect(result.error).toBe("Firestore unavailable");
   });
 
+  test("v1.10.6: retries on ABORTED, succeeds on 2nd try", async () => {
+    let calls = 0;
+    mockRunTransaction.mockImplementation(async (fn) => {
+      calls++;
+      if (calls === 1) {
+        const err = new Error("10 ABORTED: Aborted due to cross-transaction contention.");
+        err.code = 10;
+        throw err;
+      }
+      const tx = { get: jest.fn(), set: jest.fn(), update: jest.fn() };
+      tx.get.mockResolvedValue({ exists: true, data: () => ({ recentAnalyses: [], limit: 500 }) });
+      return fn(tx);
+    });
+
+    const result = await checkAndIncrement();
+    expect(result.allowed).toBe(true);
+    expect(result.error).toBeUndefined();
+    expect(calls).toBe(2);
+  });
+
+  test("v1.10.6: fail-open with aborted-retries-exhausted reason after all retries fail", async () => {
+    const abortedErr = new Error("10 ABORTED: Aborted due to cross-transaction contention.");
+    abortedErr.code = 10;
+    mockRunTransaction.mockRejectedValue(abortedErr);
+
+    const result = await checkAndIncrement();
+    expect(result.allowed).toBe(true);
+    expect(result.error).toContain("ABORTED");
+    /* mockRunTransaction wurde 3× aufgerufen (initial + 2 Retries) */
+    expect(mockRunTransaction).toHaveBeenCalledTimes(3);
+  });
+
   test("uses default limit when not set in document", async () => {
     mockRunTransaction.mockImplementation(async (fn) => {
       const tx = { get: jest.fn(), set: jest.fn(), update: jest.fn() };

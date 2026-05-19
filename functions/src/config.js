@@ -9,7 +9,10 @@
  */
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-const RATE_LIMIT = 200;
+/* v1.10.6: RATE_LIMIT 200 → 500. Schul-WLAN teilt sich eine IP. Bei einem
+   25er-Workshop mit Auto-Retries kann eine Schul-IP locker 200/10min
+   ueberschreiten und alle blockieren. 500 gibt grosszuegigen Puffer. */
+const RATE_LIMIT = 500;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
@@ -32,13 +35,20 @@ const MISTRAL_DESCRIBE_MAX_TOKENS = 2048;
 const MISTRAL_PROFILE_MAX_TOKENS = 8000;
 const MISTRAL_TIMEOUT_MS = 90000;
 
-/* ── Globales Stundenlimit ── */
-const HOURLY_LIMIT = 500;
+/* ── Globales Stundenlimit ──
+   v1.10.6: Von 500 auf 1500 hochgesetzt. Mit Auto-Retries auf Client-Seite
+   plus moeglichen Demo-Klicks kann ein 25er-Workshop locker 200-300
+   Analysen im Stundenfenster verbrennen. 1500 laesst grosszuegig Puffer
+   fuer mehrere Workshops kurz hintereinander. */
+const HOURLY_LIMIT = 1500;
 const HOURLY_WINDOW_MINUTES = 60;
 
 /* BUG-003: Globales Budget pro Request — verhindert dass die Summe aller
-   internen Timeouts das Cloud-Function-Limit (180s) übersteigt. */
-const REQUEST_BUDGET_MS = 120000;
+   internen Timeouts das Cloud-Function-Limit übersteigt.
+   v1.10.6: Function-Timeout ist jetzt 540s (Maximum). Budget auf 480s
+   gehoben — Mistral bekommt damit auch nach langer Throttle-Queue-Wartezeit
+   noch seine vollen 90s, statt nach 119s schon kein Budget mehr zu haben. */
+const REQUEST_BUDGET_MS = 480000;
 
 /* Laufzeit-Validierung — fehlerhafte Config crasht sofort statt leise falsch zu laufen */
 if (HOURLY_LIMIT < 1) throw new Error("Config: HOURLY_LIMIT must be >= 1");

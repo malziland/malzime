@@ -13,7 +13,7 @@
   "scan.srEnd": "Analysis complete",
   "export.button": "Save result as PDF",
   "disclaimer.main": "<strong>malziME</strong> is a learning tool for media literacy and data privacy awareness. The AI profiles are fictional and only show what algorithms could claim – none of it is true or proven.",
-  "disclaimer.workshop": "For workshops, stock photos or older images can also be used. No uploaded image is saved or retrievable after analysis.",
+  "disclaimer.workshop": "For workshops, stock photos or older images can also be used. No uploaded image is permanently stored or retrievable after analysis.",
   "opensource.link": "Open Source on GitHub",
   "support.headline": "No paywall. No bullshit.",
   "support.text": "And you keep it running.",

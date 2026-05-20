@@ -108,6 +108,14 @@ const LIVENESS_GRACE_MS = 3 * 60 * 1000;
 const QUEUE_AVG_JOB_SECONDS = 120;
 const QUEUE_DISPATCH_CONCURRENCY = 3;
 
+/* Aufbewahrungsfenster der Job-Dokumente. Ein Job-Dokument enthält bis zum
+   Abschluss das fertige Profil im Feld `result`; danach wird es nicht mehr
+   gebraucht (der Client hat es längst abgeholt). Der Reaper löscht jedes
+   Job-Dokument, das älter als das hier ist — Datensparsamkeit, damit nichts
+   unbegrenzt liegen bleibt. 24 h sind großzügig über jedem realistischen
+   Abhol-Zeitfenster (Poll dauert Minuten, Reload-Wiederaufnahme Sekunden). */
+const JOB_RETENTION_MS = 24 * 60 * 60 * 1000;
+
 /* Lokal-Modus für den Firebase-Emulator (Phase 3): Da es für Google Cloud
    Tasks keinen Emulator gibt, werden im Lokal-Modus Cloud Tasks und der
    GCS-Bucket durch lokale Ersatz-Implementierungen abgelöst (direkter HTTP-
@@ -155,6 +163,7 @@ module.exports = {
   QUEUE_UPLOAD_PREFIX,
   QUEUE_AVG_JOB_SECONDS,
   QUEUE_DISPATCH_CONCURRENCY,
+  JOB_RETENTION_MS,
   LIVENESS_GRACE_MS,
   isLocalQueueMode,
   localQueueConcurrency,

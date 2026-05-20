@@ -24,7 +24,7 @@
  */
 
 const { getFirestore } = require("firebase-admin/firestore");
-const { LIVENESS_GRACE_MS } = require("./config");
+const { LIVENESS_GRACE_MS, JOB_RETENTION_MS } = require("./config");
 
 const JOBS_COLLECTION = "jobs";
 
@@ -231,6 +231,26 @@ async function findStaleProcessingJobs(limit = 200) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+/**
+ * Liefert Job-Dokumente, die älter als JOB_RETENTION_MS sind — egal welchen
+ * Status. Arbeitsliste des Reapers für die Datensparsamkeits-Aufräumung; ein
+ * derart altes Dokument ist in jedem Status fertig (ein realer Job lebt
+ * Sekunden bis Minuten). Einfache Ungleichheit auf `createdAt`, daher vom
+ * automatischen Einzelfeld-Index abgedeckt — kein zusammengesetzter Index.
+ */
+async function findExpiredJobs(limit = 200) {
+  const cutoff = Date.now() - JOB_RETENTION_MS;
+  const snap = await jobsRef().where("createdAt", "<", cutoff).limit(limit).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Löscht ein Job-Dokument endgültig.
+ */
+async function deleteJob(jobId) {
+  await jobsRef().doc(jobId).delete();
+}
+
 module.exports = {
   JOBS_COLLECTION,
   PROCESSING_TIMEOUT_MS,
@@ -246,5 +266,7 @@ module.exports = {
   isAbandoned,
   findAbandonedJobs,
   findStaleProcessingJobs,
+  findExpiredJobs,
+  deleteJob,
   countProcessingJobs,
 };

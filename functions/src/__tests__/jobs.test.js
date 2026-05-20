@@ -29,6 +29,9 @@ jest.mock("firebase-admin/firestore", () => {
         if (cur === undefined) throw new Error("update on missing doc");
         mockStore.set(id, { ...cur, ...patch });
       },
+      async delete() {
+        mockStore.delete(id);
+      },
     };
   }
   function query(conditions, limitN) {
@@ -92,7 +95,7 @@ jest.mock("firebase-admin/firestore", () => {
 });
 
 const jobs = require("../jobs");
-const { LIVENESS_GRACE_MS } = require("../config");
+const { LIVENESS_GRACE_MS, JOB_RETENTION_MS } = require("../config");
 
 beforeEach(() => {
   mockStore.clear();
@@ -349,5 +352,39 @@ describe("findStaleProcessingJobs", () => {
     const id = await jobs.createJob({ imagePath: "queue-uploads/q.jpg" });
     mockStore.get(id).startedAt = Date.now() - jobs.PROCESSING_TIMEOUT_MS - 5000;
     expect(await jobs.findStaleProcessingJobs()).toEqual([]);
+  });
+});
+
+/* ── findExpiredJobs / deleteJob ──────────────────────────────── */
+
+describe("findExpiredJobs", () => {
+  test("liefert nur Job-Dokumente über dem Aufbewahrungsfenster — Status egal", async () => {
+    const oldDone = await jobs.createJob({ imagePath: "queue-uploads/o.jpg" });
+    const oldQueued = await jobs.createJob({ imagePath: "queue-uploads/p.jpg" });
+    const fresh = await jobs.createJob({ imagePath: "queue-uploads/r.jpg" });
+    mockStore.get(oldDone).createdAt = Date.now() - JOB_RETENTION_MS - 5000;
+    mockStore.get(oldDone).status = "done";
+    mockStore.get(oldQueued).createdAt = Date.now() - JOB_RETENTION_MS - 5000;
+
+    const found = await jobs.findExpiredJobs();
+    expect(found.map((j) => j.id).sort()).toEqual([oldDone, oldQueued].sort());
+    expect(found.some((j) => j.id === fresh)).toBe(false);
+  });
+
+  test("limit deckelt die Batch-Größe", async () => {
+    for (let i = 0; i < 5; i++) {
+      const id = await jobs.createJob({ imagePath: `queue-uploads/e${i}.jpg` });
+      mockStore.get(id).createdAt = Date.now() - JOB_RETENTION_MS - 5000;
+    }
+    expect((await jobs.findExpiredJobs(3)).length).toBe(3);
+  });
+});
+
+describe("deleteJob", () => {
+  test("löscht das Job-Dokument endgültig", async () => {
+    const id = await jobs.createJob({ imagePath: "queue-uploads/del.jpg" });
+    expect(await jobs.getJob(id)).not.toBeNull();
+    await jobs.deleteJob(id);
+    expect(await jobs.getJob(id)).toBeNull();
   });
 });

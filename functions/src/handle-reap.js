@@ -3,7 +3,7 @@
 /**
  * handle-reap.js — Reaper für hängengebliebene Queue-Jobs (v2.0).
  *
- * Läuft als geplante Function im Minutentakt und räumt zwei Sorten auf:
+ * Läuft als geplante Function im Minutentakt und räumt drei Sorten auf:
  *
  *  1. Verlassene wartende Jobs — Status `queued`, aber der Client-Herzschlag
  *     (`lastSeenAt`) ist älter als das Karenz-Fenster: Der Browser pollt nicht
@@ -15,14 +15,25 @@
  *     (Worker abgestürzt). `markFailedIfStale` greift nur, wenn ein Client
  *     pollt; pollt keiner mehr, bliebe das Dokument ewig liegen. → `failed`.
  *
- * Das zwischengespeicherte Bild wird jeweils mitgelöscht (die GCS-Lifecycle-
- * Regel bleibt nur das Sicherheitsnetz).
+ *  3. Abgelaufene Job-Dokumente — älter als JOB_RETENTION_MS. Das Dokument
+ *     wird endgültig gelöscht (Datensparsamkeit: das fertige Profil im Feld
+ *     `result` soll nicht unbegrenzt liegen bleiben).
+ *
+ * Bei (1) und (2) wird das zwischengespeicherte Bild mitgelöscht (die GCS-
+ * Lifecycle-Regel bleibt nur das Sicherheitsnetz).
  *
  * Solange die Queue dormant ist (Feature-Flag `useQueue` AUS), gibt es keine
  * Jobs — der Lauf ist dann ein leerer, vernachlässigbar günstiger Query.
  */
 
-const { findAbandonedJobs, findStaleProcessingJobs, abandonJob, failJob } = require("./jobs");
+const {
+  findAbandonedJobs,
+  findStaleProcessingJobs,
+  findExpiredJobs,
+  abandonJob,
+  failJob,
+  deleteJob,
+} = require("./jobs");
 const { deleteImage } = require("./queue-storage");
 
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
@@ -57,8 +68,24 @@ async function reapJobs() {
     }
   }
 
-  console.log(JSON.stringify({ step: "reap", abandoned: reapedAbandoned, staleProcessing: reapedStale }));
-  return { abandoned: reapedAbandoned, staleProcessing: reapedStale };
+  /* (3) Abgelaufene Job-Dokumente → gelöscht. */
+  const expired = await findExpiredJobs(REAP_BATCH_LIMIT);
+  let reapedExpired = 0;
+  for (const job of expired) {
+    try {
+      await deleteJob(job.id);
+      reapedExpired += 1;
+    } catch (err) {
+      console.log(
+        JSON.stringify({ step: "reap", jobId: job.id, warning: "delete-expired-failed", error: err.message })
+      );
+    }
+  }
+
+  console.log(
+    JSON.stringify({ step: "reap", abandoned: reapedAbandoned, staleProcessing: reapedStale, expired: reapedExpired })
+  );
+  return { abandoned: reapedAbandoned, staleProcessing: reapedStale, expired: reapedExpired };
 }
 
 module.exports = { reapJobs };

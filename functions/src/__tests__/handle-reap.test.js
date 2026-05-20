@@ -3,8 +3,10 @@
 jest.mock("../jobs", () => ({
   findAbandonedJobs: jest.fn(),
   findStaleProcessingJobs: jest.fn(),
+  findExpiredJobs: jest.fn(),
   abandonJob: jest.fn(),
   failJob: jest.fn(),
+  deleteJob: jest.fn(),
 }));
 jest.mock("../queue-storage", () => ({
   deleteImage: jest.fn(),
@@ -18,17 +20,20 @@ beforeEach(() => {
   jest.clearAllMocks();
   jobs.findAbandonedJobs.mockResolvedValue([]);
   jobs.findStaleProcessingJobs.mockResolvedValue([]);
+  jobs.findExpiredJobs.mockResolvedValue([]);
   jobs.abandonJob.mockResolvedValue();
   jobs.failJob.mockResolvedValue();
+  jobs.deleteJob.mockResolvedValue();
   storage.deleteImage.mockResolvedValue();
 });
 
 describe("reapJobs", () => {
   test("leerer Lauf — nichts zu tun", async () => {
     const result = await reapJobs();
-    expect(result).toEqual({ abandoned: 0, staleProcessing: 0 });
+    expect(result).toEqual({ abandoned: 0, staleProcessing: 0, expired: 0 });
     expect(jobs.abandonJob).not.toHaveBeenCalled();
     expect(jobs.failJob).not.toHaveBeenCalled();
+    expect(jobs.deleteJob).not.toHaveBeenCalled();
   });
 
   test("verlassene wartende Jobs → abandoned, Bild gelöscht", async () => {
@@ -51,11 +56,20 @@ describe("reapJobs", () => {
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/p1.jpg");
   });
 
-  test("räumt beide Sorten in einem Lauf ab", async () => {
+  test("abgelaufene Job-Dokumente → gelöscht", async () => {
+    jobs.findExpiredJobs.mockResolvedValue([{ id: "e1" }, { id: "e2" }]);
+    const result = await reapJobs();
+    expect(result.expired).toBe(2);
+    expect(jobs.deleteJob).toHaveBeenCalledWith("e1");
+    expect(jobs.deleteJob).toHaveBeenCalledWith("e2");
+  });
+
+  test("räumt alle drei Sorten in einem Lauf ab", async () => {
     jobs.findAbandonedJobs.mockResolvedValue([{ id: "a1", imagePath: "a" }]);
     jobs.findStaleProcessingJobs.mockResolvedValue([{ id: "p1", imagePath: "p" }]);
+    jobs.findExpiredJobs.mockResolvedValue([{ id: "e1" }]);
     const result = await reapJobs();
-    expect(result).toEqual({ abandoned: 1, staleProcessing: 1 });
+    expect(result).toEqual({ abandoned: 1, staleProcessing: 1, expired: 1 });
   });
 
   test("ein einzelner fehlschlagender Job stoppt den Lauf nicht", async () => {

@@ -4,6 +4,25 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.0.0-rc5] — 2026-05-20
+
+### Queue-Architektur — Phase 5: Go-Live
+
+Fünfter Schritt: Die Warteschlange geht für echte Nutzer scharf. Das Frontend mit dem Queue-Code wird ausgeliefert, das Feature-Flag `useQueue` wird auf AN gestellt — ab jetzt läuft jeder Upload über die Warteschlange. Der synchrone `/analyze`-Pfad bleibt unangetastet als sofortiger Rückfall: Flag zurück auf AUS genügt.
+
+#### Datensparsamkeit — Aufräumung der Job-Dokumente
+
+- Der Reaper (`reapJobs`, Minutentakt) löscht zusätzlich jedes Job-Dokument, das älter als 24 Stunden ist. Ein Job-Dokument enthält bis zum Abschluss das fertige Profil; danach wird es nicht mehr gebraucht — so bleibt nichts unbegrenzt liegen.
+- `JOB_RETENTION_MS` (24 h) ist großzügig über jedem realistischen Abhol-Fenster gewählt; der Client holt das Ergebnis binnen Minuten ab.
+
+#### Datenschutzerklärung
+
+Die Datenschutzerklärung benennt jetzt die kurze Bild-Zwischenspeicherung in der Warteschlange ehrlich:
+
+- Das komprimierte Bild liegt für die kurze Wartezeit auf einem EU-Server — unangetastet, bis es an der Reihe ist — und wird unmittelbar nach der Analyse automatisch gelöscht.
+- Das fertige Profil liegt bis zum Abruf durch den Browser kurz auf dem Server (ohne Personenbezug) und wird spätestens nach 24 Stunden gelöscht.
+- Mitgezogen: Nutzungsbedingungen, Impressum, Startseite und Meta-Beschreibungen — überall heißt es jetzt korrekt „keine dauerhafte Speicherung".
+
 ## [2.0.0-rc4] — 2026-05-20
 
 ### Queue-Architektur — Phase 4: Production-Deploy (dormant) + Echt-Test

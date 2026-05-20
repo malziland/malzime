@@ -443,6 +443,10 @@ const JOB_ID_STORAGE_KEY = "malzime.queueJobId";
    er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
    das Ergebnis liegt serverseitig sicher. */
 const MAX_POLL_FAILURES = 5;
+/* Gesamt-Obergrenze fürs Pollen. Selbst eine tiefe Warteschlange ist deutlich
+   darunter; greift nur, falls ein Job dauerhaft hängt (z.B. Cloud-Tasks-
+   Ausfall) — dann nicht endlos pollen, sondern sauber abbrechen. */
+const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
 
 function storeJobId(jobId) {
   try {
@@ -477,10 +481,15 @@ export function getStoredJobId() {
  */
 async function pollJob(jobId, myId) {
   let failures = 0;
+  const pollStart = Date.now();
   for (;;) {
     if (state.requestId !== myId) return null;
     await sleep(POLL_INTERVAL_MS);
     if (state.requestId !== myId) return null;
+    /* Hängt der Job dauerhaft → nicht endlos weiterpollen. */
+    if (Date.now() - pollStart > MAX_POLL_DURATION_MS) {
+      return { error: t("error.timeout") };
+    }
 
     let data;
     try {

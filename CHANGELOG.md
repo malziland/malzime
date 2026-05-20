@@ -29,9 +29,19 @@ Der Durchklick im Emulator hat drei Lücken aufgedeckt, die im selben Zug behobe
 - **Lokale Drosselung:** Der Emulator fährt mehrere Worker-Prozesse, daher kann der lokale Cloud-Tasks-Ersatz nicht über Modul-Variablen drosseln. `processJob` zählt jetzt im Lokal-Modus die laufenden Jobs in Firestore (prozess-übergreifend) und vertagt sich bei voller Drossel — so staut sich im Emulator eine echte Warteschlange mit sichtbaren Positionen, wie unter echtem Cloud Tasks.
 - ETA-Schätzung (`QUEUE_AVG_JOB_SECONDS`) bewusst großzügig auf 120 s gesetzt — die Wartezeit-Anzeige soll lieber über- als unterschätzen.
 
+### Audit-Nachbesserungen
+
+Ein kritischer Durchgang durch den gesamten Queue-Code (vor Phase 4) brachte fünf Befunde — alle behoben:
+
+- **B1:** `pollJob` brach nicht ab, falls ein Job dauerhaft hängt (Cloud-Tasks-Ausfall) — jetzt Gesamt-Obergrenze von 30 Min, danach sauberer Abbruch.
+- **B2:** In `processing` hängende Jobs ohne pollenden Client wurden nie aufgeräumt — der Reaper setzt jetzt auch sie auf `failed` (nicht nur verlassene `queued`-Jobs). Neuer Index (`status`, `startedAt`).
+- **B3:** `getQueuePosition` las den Job doppelt — nimmt jetzt das bereits geladene Job-Objekt entgegen (ein Firestore-Read pro Poll gespart).
+- **B4:** Klarstellung im Code: `QUEUE_DISPATCH_CONCURRENCY` muss in Phase 4 zum echten Cloud-Tasks-`maxConcurrentDispatches` passen.
+- **B5** (vorbestehend, nicht Queue): Die Balken im Ergebnis (`render.js`) setzten ihre Breite per inline `style="…"` — von der strikten CSP blockiert. Jetzt per CSSOM (`element.style.width`) gesetzt, CSP-konform. Betrifft auch die Live-Seite.
+
 ### Tests
 
-- Backend 402/402, Frontend 152/152 grün (+7 Tests für Lokal-Shims und Drosselung).
+- Backend 407/407, Frontend 152/152 grün. Lint + Format sauber.
 
 ## [2.0.0-rc2] — 2026-05-20
 

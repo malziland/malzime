@@ -102,7 +102,9 @@ const LIVENESS_GRACE_MS = 3 * 60 * 1000;
    über- als unterschätzen, damit Wartende nicht enttäuscht werden. Mistral
    schwankt stark (Lasttests 2026-05-20: Median ~81-90s, Worst ~261s);
    120s liegt klar über dem Median. Wird in Phase 4 anhand echter Messungen
-   kalibriert — dann weiter eher konservativ (hoch) wählen. */
+   kalibriert — dann weiter eher konservativ (hoch) wählen.
+   QUEUE_DISPATCH_CONCURRENCY muss in Phase 4 dem `maxConcurrentDispatches`
+   der echten Cloud-Tasks-Queue entsprechen, sonst geht die ETA daneben. */
 const QUEUE_AVG_JOB_SECONDS = 120;
 const QUEUE_DISPATCH_CONCURRENCY = 3;
 

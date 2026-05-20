@@ -208,15 +208,19 @@ describe("getQueuePosition", () => {
     mockStore.get(id2).createdAt = 2000;
     mockStore.get(id3).createdAt = 3000;
 
-    expect(await jobs.getQueuePosition(id1)).toBe(0); // als nächstes dran
-    expect(await jobs.getQueuePosition(id2)).toBe(1);
-    expect(await jobs.getQueuePosition(id3)).toBe(2);
+    expect(await jobs.getQueuePosition(await jobs.getJob(id1))).toBe(0); // als nächstes dran
+    expect(await jobs.getQueuePosition(await jobs.getJob(id2))).toBe(1);
+    expect(await jobs.getQueuePosition(await jobs.getJob(id3))).toBe(2);
   });
 
   test("gibt 0 zurück für einen Job, der nicht mehr queued ist", async () => {
     const id = await jobs.createJob({ imagePath: "queue-uploads/g.jpg" });
     await jobs.claimJob(id);
-    expect(await jobs.getQueuePosition(id)).toBe(0);
+    expect(await jobs.getQueuePosition(await jobs.getJob(id))).toBe(0);
+  });
+
+  test("gibt 0 zurück für null", async () => {
+    expect(await jobs.getQueuePosition(null)).toBe(0);
   });
 
   test("bereits abgearbeitete Jobs zählen nicht zur Position", async () => {
@@ -227,7 +231,7 @@ describe("getQueuePosition", () => {
     await jobs.claimJob(idDone);
     await jobs.completeJob(idDone, {});
     /* idDone ist jetzt done → zählt nicht mehr als „vor mir wartend" */
-    expect(await jobs.getQueuePosition(idWaiting)).toBe(0);
+    expect(await jobs.getQueuePosition(await jobs.getJob(idWaiting))).toBe(0);
   });
 });
 
@@ -326,5 +330,24 @@ describe("findAbandonedJobs", () => {
       mockStore.get(id).lastSeenAt = 1000;
     }
     expect((await jobs.findAbandonedJobs(3)).length).toBe(3);
+  });
+});
+
+describe("findStaleProcessingJobs", () => {
+  test("liefert nur processing-Jobs über dem Verarbeitungs-Timeout", async () => {
+    const stale = await jobs.createJob({ imagePath: "queue-uploads/s.jpg" });
+    const fresh = await jobs.createJob({ imagePath: "queue-uploads/f.jpg" });
+    await jobs.claimJob(stale);
+    await jobs.claimJob(fresh);
+    mockStore.get(stale).startedAt = Date.now() - jobs.PROCESSING_TIMEOUT_MS - 5000;
+
+    const found = await jobs.findStaleProcessingJobs();
+    expect(found.map((j) => j.id)).toEqual([stale]);
+  });
+
+  test("ein wartender (queued) Job zählt nicht", async () => {
+    const id = await jobs.createJob({ imagePath: "queue-uploads/q.jpg" });
+    mockStore.get(id).startedAt = Date.now() - jobs.PROCESSING_TIMEOUT_MS - 5000;
+    expect(await jobs.findStaleProcessingJobs()).toEqual([]);
   });
 });

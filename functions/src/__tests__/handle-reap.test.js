@@ -1,51 +1,70 @@
-/* Tests für handle-reap.js — Reaper für verlassene Queue-Jobs. */
+/* Tests für handle-reap.js — Reaper für hängengebliebene Queue-Jobs. */
 
 jest.mock("../jobs", () => ({
   findAbandonedJobs: jest.fn(),
+  findStaleProcessingJobs: jest.fn(),
   abandonJob: jest.fn(),
+  failJob: jest.fn(),
 }));
 jest.mock("../queue-storage", () => ({
   deleteImage: jest.fn(),
 }));
 
-const { reapAbandonedJobs } = require("../handle-reap");
+const { reapJobs } = require("../handle-reap");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jobs.findAbandonedJobs.mockResolvedValue([]);
+  jobs.findStaleProcessingJobs.mockResolvedValue([]);
   jobs.abandonJob.mockResolvedValue();
+  jobs.failJob.mockResolvedValue();
   storage.deleteImage.mockResolvedValue();
 });
 
-describe("reapAbandonedJobs", () => {
+describe("reapJobs", () => {
   test("leerer Lauf — nichts zu tun", async () => {
-    jobs.findAbandonedJobs.mockResolvedValue([]);
-    const result = await reapAbandonedJobs();
-    expect(result).toEqual({ scanned: 0, reaped: 0 });
+    const result = await reapJobs();
+    expect(result).toEqual({ abandoned: 0, staleProcessing: 0 });
     expect(jobs.abandonJob).not.toHaveBeenCalled();
+    expect(jobs.failJob).not.toHaveBeenCalled();
   });
 
-  test("markiert verlassene Jobs als abandoned und löscht ihre Bilder", async () => {
+  test("verlassene wartende Jobs → abandoned, Bild gelöscht", async () => {
     jobs.findAbandonedJobs.mockResolvedValue([
-      { id: "j1", imagePath: "queue-uploads/1.jpg" },
-      { id: "j2", imagePath: "queue-uploads/2.jpg" },
+      { id: "a1", imagePath: "queue-uploads/a1.jpg" },
+      { id: "a2", imagePath: "queue-uploads/a2.jpg" },
     ]);
-    const result = await reapAbandonedJobs();
-    expect(result).toEqual({ scanned: 2, reaped: 2 });
-    expect(jobs.abandonJob).toHaveBeenCalledWith("j1");
-    expect(jobs.abandonJob).toHaveBeenCalledWith("j2");
-    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/1.jpg");
-    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/2.jpg");
+    const result = await reapJobs();
+    expect(result.abandoned).toBe(2);
+    expect(jobs.abandonJob).toHaveBeenCalledWith("a1");
+    expect(jobs.abandonJob).toHaveBeenCalledWith("a2");
+    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/a1.jpg");
+  });
+
+  test("in processing hängende Jobs → failed (processing_timeout), Bild gelöscht", async () => {
+    jobs.findStaleProcessingJobs.mockResolvedValue([{ id: "p1", imagePath: "queue-uploads/p1.jpg" }]);
+    const result = await reapJobs();
+    expect(result.staleProcessing).toBe(1);
+    expect(jobs.failJob).toHaveBeenCalledWith("p1", "processing_timeout");
+    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/p1.jpg");
+  });
+
+  test("räumt beide Sorten in einem Lauf ab", async () => {
+    jobs.findAbandonedJobs.mockResolvedValue([{ id: "a1", imagePath: "a" }]);
+    jobs.findStaleProcessingJobs.mockResolvedValue([{ id: "p1", imagePath: "p" }]);
+    const result = await reapJobs();
+    expect(result).toEqual({ abandoned: 1, staleProcessing: 1 });
   });
 
   test("ein einzelner fehlschlagender Job stoppt den Lauf nicht", async () => {
     jobs.findAbandonedJobs.mockResolvedValue([
-      { id: "j1", imagePath: "queue-uploads/1.jpg" },
-      { id: "j2", imagePath: "queue-uploads/2.jpg" },
+      { id: "a1", imagePath: "x" },
+      { id: "a2", imagePath: "y" },
     ]);
     jobs.abandonJob.mockResolvedValueOnce().mockRejectedValueOnce(new Error("firestore blip"));
-    const result = await reapAbandonedJobs();
-    expect(result).toEqual({ scanned: 2, reaped: 1 });
+    const result = await reapJobs();
+    expect(result.abandoned).toBe(1);
   });
 });

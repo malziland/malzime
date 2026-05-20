@@ -51,7 +51,7 @@ async function handleJobStatus(req, res) {
   if (job.status === "queued") {
     /* Liveness-Herzschlag: Dieser Poll belegt, dass der Client noch da ist. */
     await touchJob(jobId);
-    const position = await getQueuePosition(jobId);
+    const position = await getQueuePosition(job);
     res.status(200).json({
       status: "queued",
       position,

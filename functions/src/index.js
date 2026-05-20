@@ -11,7 +11,7 @@ const { handleTelemetry } = require("./handle-telemetry");
 const { handleEnqueue } = require("./handle-enqueue");
 const { handleProcessJob } = require("./handle-process-job");
 const { handleJobStatus } = require("./handle-job-status");
-const { reapAbandonedJobs } = require("./handle-reap");
+const { reapJobs } = require("./handle-reap");
 const { ALLOWED_ORIGINS } = require("./domains");
 
 const adminSecret = defineSecret("ADMIN_SECRET");
@@ -170,5 +170,5 @@ exports.reapJobs = onSchedule(
     memory: "256MiB",
     timeoutSeconds: 120,
   },
-  () => reapAbandonedJobs()
+  () => reapJobs()
 );

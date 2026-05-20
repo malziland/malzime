@@ -137,14 +137,16 @@ async function failJob(jobId, reason) {
  * Warteschlangen-Position: Anzahl der Jobs mit Status `queued`, die VOR
  * diesem Job erstellt wurden. 0 = als nächstes dran.
  *
+ * Nimmt das bereits geladene Job-Objekt entgegen (der Aufrufer hat es ohnehin
+ * schon) — spart einen zusätzlichen Firestore-Read pro Poll.
+ *
  * Nutzt eine Firestore-`count()`-Aggregation — liest nicht alle Dokumente,
  * daher auch bei voller Queue günstig. Benötigt den zusammengesetzten Index
  * (status ASC, createdAt ASC) aus firestore.indexes.json.
  *
  * Für Jobs, die nicht (mehr) `queued` sind, gibt die Funktion 0 zurück.
  */
-async function getQueuePosition(jobId) {
-  const job = await getJob(jobId);
+async function getQueuePosition(job) {
   if (!job || job.status !== "queued") return 0;
   const agg = await jobsRef().where("status", "==", "queued").where("createdAt", "<", job.createdAt).count().get();
   return agg.data().count;
@@ -217,6 +219,18 @@ async function findAbandonedJobs(limit = 200) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+/**
+ * Liefert Jobs, die über PROCESSING_TIMEOUT_MS hinaus in `processing` hängen
+ * (Worker abgestürzt, niemand pollt mehr → `markFailedIfStale` greift nie).
+ * Arbeitsliste des Reapers, damit solche Dokumente nicht ewig liegen bleiben.
+ * Benötigt den zusammengesetzten Index (status, startedAt).
+ */
+async function findStaleProcessingJobs(limit = 200) {
+  const cutoff = Date.now() - PROCESSING_TIMEOUT_MS;
+  const snap = await jobsRef().where("status", "==", "processing").where("startedAt", "<", cutoff).limit(limit).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
 module.exports = {
   JOBS_COLLECTION,
   PROCESSING_TIMEOUT_MS,
@@ -231,5 +245,6 @@ module.exports = {
   abandonJob,
   isAbandoned,
   findAbandonedJobs,
+  findStaleProcessingJobs,
   countProcessingJobs,
 };

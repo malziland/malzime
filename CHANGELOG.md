@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.0.0] — 2026-05-20
+
+**Release.** Die Queue-Architektur ist live: Das Feature-Flag `useQueue` ist aktiviert, jeder Upload läuft über die Google-Cloud-Tasks-Warteschlange. Damit ist die Release-Candidate-Phase (rc1–rc5, die fünf Bauphasen unten) abgeschlossen — dies ist das eigentliche v2.0.0-Release.
+
+Die Warteschlange fängt Workshop-Lastspitzen strukturell ab: Statt unter Stoßlast in eine 429-Fehlerkaskade zu laufen, werden Uploads dosiert und in fairer Reihenfolge abgearbeitet — kein verlorener Job, keine harten Fehler. Der synchrone `/analyze`-Pfad bleibt als sofortiger Rückfall erhalten (Feature-Flag umlegen, kein Deploy).
+
+### Nach dem Go-Live
+
+- Doku (README, ARCHITECTURE, SETUP, SELF-HOSTING, CONTRIBUTING, SECURITY) auf die Queue-Architektur aktualisiert.
+- Warteschlangen-ETA-Schätzung von 120 s auf 100 s justiert — echte Messungen zeigen ~65–100 s reine Verarbeitung pro Job.
+- Cloud-Tasks-Parallelität eingemessen: Bei 3 läuft Mistral sauber, bei 6 antwortet es mit 429 (die Hälfte der Jobs kommt als `blocked.overloaded` zurück). 3 bleibt das Maximum, das die aktuellen Mistral-Limits hergeben.
+
 ## [2.0.0-rc5] — 2026-05-20
 
 ### Queue-Architektur — Phase 5: Go-Live

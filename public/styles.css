@@ -473,6 +473,22 @@ h1 {
   overflow: hidden;
 }
 
+/* Warteschlangen-Anzeige (Queue-Modus) — unter dem Scan-Balken */
+.queue-status {
+  display: none;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  margin-top: 0.5rem;
+  min-height: 1.2em;
+}
+
+.queue-status.visible {
+  display: block;
+}
+
 .scan-fill {
   height: 100%;
   width: 40%;

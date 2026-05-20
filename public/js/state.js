@@ -9,4 +9,7 @@ export const state = {
   lastData: null,
   requestId: 0,
   lastTraceId: null,
+  /* Queue-Architektur (v2.0): vom /api/stats-Flag beim Seitenstart gesetzt.
+     Default false → bewährter synchroner Pfad, bis das Flag geladen ist. */
+  useQueue: false,
 };

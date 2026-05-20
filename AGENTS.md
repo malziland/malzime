@@ -7,13 +7,13 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   index.html         Hauptseite (Cache-Busting: ?v=YYYYMMDDNN an CSS/JS)
   app.js             Entry Point (ES Module)
   js/                Frontend-Module
-    api.js           API-Client (fetch, AbortController, Stale-Guard)
+    api.js           API-Client: synchroner /analyze-Pfad + Queue-Modus (analyzeImageQueued, Polling, resumeQueueJob) — Pfad-Wahl via state.useQueue
     dom.js           DOM-Helpers (escapeHtml, sanitize)
     exif.js          Client-seitige EXIF-Extraktion (exifr)
     geocoding.js     Nominatim Reverse Geocoding (client-seitig)
     render.js        Ergebnis-Rendering (Profile, EXIF, Karte, Datenwert)
     state.js         Globaler State (requestId, isAnalyzing)
-    ui.js            UI-Komponenten (Disclaimer-Modal, Maintenance-Modal, Scan-Animation, Bias-Toggle, Limit-Banner)
+    ui.js            UI-Komponenten (Disclaimer-Modal, Maintenance-Modal, Scan-Animation, Bias-Toggle, Limit-Banner, Warteschlangen-Anzeige)
     demo.js          Demo-Foto-Initialisierung (Click-Handler fuer Stock-Fotos)
     stats.js         Stats-Seite: Fetch /api/stats, Limit-Balken, Countdown
     i18n.js          i18n Micro-Modul (initI18n, t, getLanguage, applyTranslations)

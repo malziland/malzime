@@ -1,7 +1,7 @@
 import { initI18n, applyTranslations, t } from "./js/i18n.js";
 import { elements } from "./js/dom.js";
 import { state } from "./js/state.js";
-import { analyzeImage, acquireWakeLock } from "./js/api.js";
+import { analyzeImage, acquireWakeLock, resumeQueueJob } from "./js/api.js";
 import { renderCurrentMode } from "./js/render.js";
 import {
   dismissDisclaimerModal,
@@ -19,10 +19,17 @@ applyTranslations();
 /* ── Demo-Fotos initialisieren ── */
 initDemo();
 
+/* ── Queue-Modus: offenes Ergebnis nach einem Reload weiter abholen ──
+   No-Op, wenn keine jobId aus einem früheren Seitenbesuch vorliegt. */
+resumeQueueJob();
+
 /* ── Limit- und Maintenance-Check beim Seitenstart ── */
 fetch("/api/stats")
   .then((r) => (r.ok ? r.json() : null))
   .then((data) => {
+    /* Queue-Feature-Flag übernehmen. Bleibt es aus (Flag false oder Fetch
+       fehlgeschlagen), läuft der bewährte synchrone Pfad. */
+    if (data?.useQueue === true) state.useQueue = true;
     if (data?.maintenance?.enabled) {
       showMaintenanceModal(data.maintenance.message);
       return;

@@ -7,6 +7,7 @@ const ids = [
   "dataValue",
   "scanAnim",
   "scanText",
+  "queueStatus",
   "status",
   "facts",
   "privacy",

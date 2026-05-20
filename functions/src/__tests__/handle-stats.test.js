@@ -1,7 +1,9 @@
 const { handleStats } = require("../handle-stats");
 
 jest.mock("../counter");
+jest.mock("../feature-flags");
 const { getStats, getMaintenanceStatus } = require("../counter");
+const { isQueueEnabled } = require("../feature-flags");
 
 function mockReq(method = "GET") {
   return { method };
@@ -18,6 +20,7 @@ function mockRes() {
 }
 
 describe("handleStats", () => {
+  beforeEach(() => isQueueEnabled.mockResolvedValue(false));
   afterEach(() => jest.restoreAllMocks());
 
   test("returns 405 for POST", async () => {
@@ -52,7 +55,7 @@ describe("handleStats", () => {
     const res = mockRes();
     await handleStats(mockReq(), res);
     expect(res.statusCode).toBe(200);
-    expect(res.json).toHaveBeenCalledWith({ ...statsData, maintenance: false });
+    expect(res.json).toHaveBeenCalledWith({ ...statsData, maintenance: false, useQueue: false });
   });
 
   test("includes maintenance: true when maintenance is active", async () => {
@@ -61,5 +64,14 @@ describe("handleStats", () => {
     const res = mockRes();
     await handleStats(mockReq(), res);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ maintenance: true }));
+  });
+
+  test("reicht das useQueue-Feature-Flag durch", async () => {
+    getStats.mockResolvedValue({ current: { count: 0 } });
+    getMaintenanceStatus.mockResolvedValue(false);
+    isQueueEnabled.mockResolvedValue(true);
+    const res = mockRes();
+    await handleStats(mockReq(), res);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ useQueue: true }));
   });
 });

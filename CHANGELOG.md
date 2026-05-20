@@ -4,6 +4,24 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.0.0-rc2] — 2026-05-20
+
+### Queue-Architektur — Phase 2: Frontend (Warteschlangen-UI)
+
+Zweiter Entwicklungsschritt: das Frontend zur Queue-Architektur. Der Browser reicht das Bild bei `/api/enqueue` ein, erhält sofort eine `jobId` und pollt `/api/job-status` im 2-Sekunden-Takt bis zum Ergebnis. Jeder Poll ist zugleich der Liveness-Herzschlag.
+
+**Weiterhin ohne Auswirkung auf echte Nutzer:** Solange das Feature-Flag `useQueue` AUS ist, läuft jeder Upload über den unveränderten synchronen Pfad. Der Queue-Pfad ist rein additiv — `analyzeImage()` verzweigt nur, wenn das Flag an ist.
+
+- **Feature-Flag-Auslieferung:** `/api/stats` liefert jetzt zusätzlich `useQueue` (das Frontend holt die Stats ohnehin beim Seitenstart). `state.useQueue` steuert die Pfad-Wahl; Default false → fail-safe der bewährte synchrone Pfad.
+- **`api.js` Queue-Modus:** `analyzeImageQueued()` — Einreihen, Polling, Zustandsbehandlung (`queued`/`processing`/`done`/`failed`/`abandoned`). Der synchrone `analyzeImage`-Pfad bleibt unangetastet.
+- **Warteschlangen-UI:** Während der Wartezeit zeigt die Oberfläche Position und geschätzte Restzeit. Die rotierenden Analyse-Meldungen entfallen im Wartezustand — sie wären irreführend, solange der Job nur wartet.
+- **Ergebnis-Abholung nach Reload:** Die `jobId` liegt in `sessionStorage`. Lädt der Nutzer die Seite neu, holt `resumeQueueJob()` das laufende oder fertige Ergebnis ab — kein „Geister-Durchlauf" mehr.
+- Hosting-Rewrites `/api/enqueue` und `/api/job-status`; neue Locale-Keys (de + en) für die Warteschlangen-Anzeige.
+
+### Tests
+
+- Backend 395/395, Frontend 152/152 grün (+9 Queue-Frontend-Tests mit gemocktem Fetch/Polling). Lint sauber.
+
 ## [2.0.0-rc1] — 2026-05-20
 
 ### Queue-Architektur — Phase 1: Backend-Infrastruktur (dormant)

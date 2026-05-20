@@ -86,6 +86,14 @@
         "function": "telemetry"
       },
       {
+        "source": "/api/enqueue",
+        "function": "enqueue"
+      },
+      {
+        "source": "/api/job-status",
+        "function": "jobStatus"
+      },
+      {
         "source": "/api/admin/**",
         "function": "admin"
       },

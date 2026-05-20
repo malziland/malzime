@@ -67,6 +67,15 @@
   "error.maintenance": "malziME ist gerade im Wartungsmodus. Bitte versuch es später nochmal.",
   "error.networkError": "Verbindung zum Server fehlgeschlagen. Prüfe dein Internet und versuch es nochmal.",
   "error.suspended": "Die Analyse wurde unterbrochen. Bitte versuch es nochmal und lass die Seite dabei geöffnet im Vordergrund.",
+  "error.queueFailed": "Es ist ein Fehler aufgetreten. Bitte versuch es noch einmal.",
+  "error.queueAbandoned": "Die Analyse wurde abgebrochen, weil die Seite zu lange geschlossen war. Bitte lade das Foto erneut hoch.",
+
+  "queue.working": "Bitte die Seite geöffnet lassen …",
+  "queue.position": "Warteschlange · {{n}} vor dir",
+  "queue.next": "Du bist als Nächstes dran …",
+  "queue.processing": "Dein Profil wird jetzt erstellt …",
+  "queue.etaUnderMin": "noch unter 1 Min",
+  "queue.etaMinutes": "noch ca. {{min}} Min",
 
   "render.blockedFallback": "Die Analyse konnte nicht abgeschlossen werden. Versuch es mit einem anderen Foto.",
   "render.emptyProfile": "Die KI hat ein leeres Profil zurückgeliefert. Versuch es mit einem anderen Foto oder wechsle den Modus.",

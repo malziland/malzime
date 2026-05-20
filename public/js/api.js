@@ -9,6 +9,8 @@ import {
   showDisclaimerModal,
   showLimitBanner,
   showMaintenanceModal,
+  showQueueStatus,
+  hideQueueStatus,
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import { t, getLanguage } from "./i18n.js";
@@ -101,6 +103,10 @@ function releaseWakeLock() {
 
 export async function analyzeImage() {
   if (state.isAnalyzing) return;
+  /* Queue-Modus: ist das Feature-Flag an, läuft die Analyse über die
+     Warteschlange statt über die lange synchrone Verbindung. Der gesamte
+     synchrone Pfad unten bleibt davon unberührt. */
+  if (state.useQueue) return analyzeImageQueued();
   state.isAnalyzing = true;
 
   /* BUG-001/002: Jeder Analyse-Lauf bekommt eine eindeutige ID.
@@ -407,6 +413,381 @@ export async function analyzeImage() {
     /* Wake-Lock immer freigeben — Analyse ist durch (Erfolg, Fehler, Stale). */
     releaseWakeLock();
     /* BUG-002: Nur eigenen isAnalyzing-Flag zurücksetzen */
+    if (state.requestId === myId) state.isAnalyzing = false;
+  }
+}
+
+/* ── Queue-Modus (v2.0) ─────────────────────────────────────────────
+   Aktiv, wenn das Feature-Flag `useQueue` an ist. Statt einer langen offenen
+   Verbindung: Bild an /api/enqueue, danach /api/job-status alle 2 s pollen.
+   Jeder Poll ist zugleich der Liveness-Herzschlag (siehe Backend).
+
+   Parallel-Pfad: Der synchrone analyzeImage-Pfad oben bleibt unangetastet.
+   Prep und Ergebnis-Rendering ähneln ihm bewusst — beide Pfade bleiben
+   getrennt, bis Phase 6 den synchronen Pfad sauber entfernt. */
+
+const ENQUEUE_URL = "/api/enqueue";
+const JOB_STATUS_URL = "/api/job-status";
+const POLL_INTERVAL_MS = 2000;
+const JOB_ID_STORAGE_KEY = "malzime.queueJobId";
+/* Aufeinanderfolgende job-status-Fehler, die der Poll-Loop toleriert, bevor
+   er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
+   das Ergebnis liegt serverseitig sicher. */
+const MAX_POLL_FAILURES = 5;
+
+function storeJobId(jobId) {
+  try {
+    sessionStorage.setItem(JOB_ID_STORAGE_KEY, jobId);
+  } catch (_) {
+    /* sessionStorage kann im privaten Modus werfen — kein harter Fehler. */
+  }
+}
+
+function clearStoredJobId() {
+  try {
+    sessionStorage.removeItem(JOB_ID_STORAGE_KEY);
+  } catch (_) {
+    /* dito */
+  }
+}
+
+/** Gibt eine offene jobId aus einem früheren Seitenbesuch zurück (oder null). */
+export function getStoredJobId() {
+  try {
+    return sessionStorage.getItem(JOB_ID_STORAGE_KEY);
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * Pollt /api/job-status bis zu einem Terminal-Status. Jeder Poll erneuert
+ * serverseitig den Liveness-Herzschlag des Jobs.
+ * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
+ *          — oder null, wenn ein neuer Upload den Lauf abgelöst hat.
+ */
+async function pollJob(jobId, myId) {
+  let failures = 0;
+  for (;;) {
+    if (state.requestId !== myId) return null;
+    await sleep(POLL_INTERVAL_MS);
+    if (state.requestId !== myId) return null;
+
+    let data;
+    try {
+      const resp = await fetch(`${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}`);
+      if (!resp.ok) {
+        /* 404 = Job existiert nicht (mehr) — kein transienter Fehler. */
+        if (resp.status === 404) return { error: t("error.queueFailed") };
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      data = await resp.json();
+      failures = 0;
+    } catch (_) {
+      failures += 1;
+      if (failures >= MAX_POLL_FAILURES) return { error: t("error.networkError") };
+      continue;
+    }
+
+    if (state.requestId !== myId) return null;
+
+    switch (data.status) {
+      case "queued":
+        showQueueStatus("queued", data.position, data.etaSeconds);
+        break;
+      case "processing":
+        showQueueStatus("processing");
+        break;
+      case "done":
+        return { result: data.result };
+      case "failed":
+        return { error: t("error.queueFailed"), reason: data.errorReason };
+      case "abandoned":
+        return { abandoned: true };
+      default:
+        return { error: t("error.queueFailed") };
+    }
+  }
+}
+
+/**
+ * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie der Sync-Pfad
+ * (Disclaimer-Modal → renderCurrentMode → Success-Telemetrie).
+ */
+function renderQueueResult(data, myId, traceId, timings) {
+  if (!data) {
+    setStatus(t("error.queueFailed"), traceId);
+    return;
+  }
+  /* Client-seitige Daten injizieren — GPS/dateTimeOriginal verlassen nie den
+     Browser. Nach einem Reload fehlt state.lastPrepared; dann bleibt GPS leer. */
+  if (!data.exif) data.exif = {};
+  if (state.lastPrepared && state.lastPrepared.gps) {
+    data.exif.gpsLatitude = state.lastPrepared.gps.latitude;
+    data.exif.gpsLongitude = state.lastPrepared.gps.longitude;
+  }
+  if (state.lastPrepared && state.lastPrepared.dateTimeOriginal) {
+    data.exif.dateTimeOriginal = state.lastPrepared.dateTimeOriginal;
+  }
+
+  const renderStart = Date.now();
+  showDisclaimerModal(() => {
+    if (state.requestId !== myId) return;
+    state.lastData = data;
+    renderCurrentMode(data);
+    setStatus("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => {
+      if (elements.resultsPanel) elements.resultsPanel.focus({ preventScroll: true });
+    }, 300);
+    const meta = data.meta || {};
+    logTelemetry("analyze-success", {
+      traceId,
+      durationMs: timings.totalMs,
+      timings: { ...timings, renderMs: Date.now() - renderStart },
+      meta: {
+        subject: typeof meta.subject === "string" ? meta.subject : undefined,
+        mode: typeof meta.mode === "string" ? meta.mode : undefined,
+        lang: getLanguage(),
+        wakeLock: wakeLockStatus,
+        queue: true,
+      },
+    });
+  });
+}
+
+async function analyzeImageQueued() {
+  state.isAnalyzing = true;
+  const myId = ++state.requestId;
+  const analyzeStartTime = Date.now();
+  const traceId = generateTraceId();
+  state.lastTraceId = traceId;
+  const timings = {};
+
+  setStatus("");
+  elements.facts.innerHTML = "";
+  elements.privacy.innerHTML = "";
+  elements.gpsMap.innerHTML = "";
+  elements.targeting.innerHTML = "";
+  elements.dataValue.innerHTML = "";
+  elements.simulation.innerHTML = "";
+  elements.exportPdf.classList.add("export-btn--hidden");
+
+  /* Augen-Animation ohne die rotierenden Analyse-Meldungen — die wären
+     irreführend, solange der Job nur in der Warteschlange wartet. */
+  startScanAnim(false);
+  elements.scanText.textContent = t("queue.working");
+
+  const file = state.lastFile || elements.fileInput.files[0];
+  if (!file) {
+    stopScanAnim();
+    setStatus(t("error.noFile"));
+    state.isAnalyzing = false;
+    return;
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    stopScanAnim();
+    setStatus(t("error.fileTooLarge"));
+    state.isAnalyzing = false;
+    return;
+  }
+  /* Honeypot — Bots füllen unsichtbare Felder aus */
+  const hp = document.getElementById("website");
+  if (hp && hp.value) {
+    stopScanAnim();
+    state.isAnalyzing = false;
+    return;
+  }
+  /* Mindest-Interaktionszeit — kein Mensch lädt in < 2s hoch */
+  if (Date.now() - PAGE_LOADED_AT < MIN_INTERACTION_MS) {
+    await sleep(MIN_INTERACTION_MS - (Date.now() - PAGE_LOADED_AT));
+  }
+
+  try {
+    await acquireWakeLock();
+
+    /* Bild komprimieren + EXIF extrahieren (client-seitig) */
+    const prepareStart = Date.now();
+    if (!state.lastPrepared) {
+      state.lastPrepared = await prepareImage(file);
+    }
+    timings.prepareImageMs = Date.now() - prepareStart;
+    if (state.requestId !== myId) return;
+
+    /* Geocoding parallel starten wenn GPS vorhanden */
+    if (state.lastPrepared.gps) {
+      startGeocoding(state.lastPrepared.gps.latitude, state.lastPrepared.gps.longitude);
+    }
+
+    /* ── Job einreihen ── */
+    const enqueueStart = Date.now();
+    const enqueueResp = await fetch(ENQUEUE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageBase64: state.lastPrepared.imageBase64,
+        exif: state.lastPrepared.exif,
+        mimeType: "image/jpeg",
+        filename: "upload.jpg",
+        lang: getLanguage(),
+        traceId,
+      }),
+    });
+    timings.enqueueMs = Date.now() - enqueueStart;
+    if (state.requestId !== myId) return;
+
+    if (!enqueueResp.ok) {
+      stopScanAnim();
+      let parsed = null;
+      try {
+        parsed = await enqueueResp.clone().json();
+      } catch (_) {
+        /* kein JSON-Body */
+      }
+      if (enqueueResp.status === 429 && parsed && parsed.blocked === "limit") {
+        showLimitBanner(parsed.retryAfterSeconds || 600);
+        setStatus(t("error.rateLimit"), traceId);
+      } else if (enqueueResp.status === 503 && parsed && parsed.maintenance) {
+        showMaintenanceModal(parsed.message);
+      } else if (enqueueResp.status === 413) {
+        setStatus(t("error.imageTooLarge"), traceId);
+      } else if (enqueueResp.status === 400) {
+        setStatus(t("error.invalidFormat"), traceId);
+      } else {
+        setStatus(t("error.serverBusy"), traceId);
+      }
+      logClientError(new Error(`enqueue HTTP ${enqueueResp.status}`), {
+        phase: "queue-enqueue",
+        durationMs: Date.now() - analyzeStartTime,
+        requestId: String(myId),
+        traceId,
+        httpStatus: enqueueResp.status,
+        wakeLock: wakeLockStatus,
+      });
+      return;
+    }
+
+    const enqueueData = await enqueueResp.json();
+    const jobId = enqueueData && enqueueData.jobId;
+    if (!jobId) {
+      stopScanAnim();
+      setStatus(t("error.queueFailed"), traceId);
+      return;
+    }
+    storeJobId(jobId);
+
+    /* ── Auf das Ergebnis pollen (jeder Poll = Liveness-Herzschlag) ── */
+    const outcome = await pollJob(jobId, myId);
+    if (state.requestId !== myId) return;
+
+    clearStoredJobId();
+    stopScanAnim();
+    hideQueueStatus();
+    elements.scanText.textContent = "";
+
+    if (!outcome) return;
+
+    if (outcome.abandoned) {
+      setStatus(t("error.queueAbandoned"), traceId);
+      return;
+    }
+    if (outcome.error) {
+      setStatus(outcome.error, traceId);
+      logClientError(new Error(outcome.reason || "queue_failed"), {
+        phase: "queue-poll",
+        durationMs: Date.now() - analyzeStartTime,
+        requestId: String(myId),
+        traceId,
+        wakeLock: wakeLockStatus,
+      });
+      return;
+    }
+
+    timings.totalMs = Date.now() - analyzeStartTime;
+    renderQueueResult(outcome.result, myId, traceId, timings);
+  } catch (err) {
+    if (state.requestId !== myId) return;
+    stopScanAnim();
+    hideQueueStatus();
+    elements.scanText.textContent = "";
+
+    let phase;
+    if (err.message === "read_failed") {
+      phase = "image-read";
+      setStatus(t("error.readFailed"), traceId);
+    } else if (err.message === "image_decode_failed") {
+      phase = "image-decode";
+      setStatus(t("error.decodeFailed"), traceId);
+    } else if (!navigator.onLine) {
+      phase = "offline";
+      setStatus(t("error.offline"), traceId);
+    } else {
+      phase = "queue-network";
+      setStatus(t("error.networkError"), traceId);
+    }
+    logClientError(err, {
+      phase,
+      durationMs: Date.now() - analyzeStartTime,
+      requestId: String(myId),
+      traceId,
+      wakeLock: wakeLockStatus,
+    });
+  } finally {
+    releaseWakeLock();
+    if (state.requestId === myId) state.isAnalyzing = false;
+  }
+}
+
+/**
+ * Holt nach einem Seiten-Neuladen ein noch offenes Queue-Ergebnis ab: Liegt
+ * eine jobId aus einem früheren Seitenbesuch in sessionStorage, wird das
+ * Polling fortgesetzt und das Ergebnis angezeigt. Das eliminiert die
+ * „Geister-Durchläufe" — der User bekommt sein Profil auch dann, wenn er die
+ * Seite versehentlich neu geladen oder kurz verlassen hat. Wird beim
+ * Seitenstart aufgerufen; ohne offene jobId ein No-Op.
+ */
+export async function resumeQueueJob() {
+  const jobId = getStoredJobId();
+  if (!jobId || state.isAnalyzing) return;
+
+  state.isAnalyzing = true;
+  const myId = ++state.requestId;
+  const traceId = generateTraceId();
+  const startTime = Date.now();
+
+  /* state.lastPrepared ist nach einem Reload leer — GPS kann nicht mehr
+     injiziert werden (verlässt den Browser ohnehin nie). Das Profil selbst
+     liegt vollständig serverseitig. */
+  startScanAnim(false);
+  elements.scanText.textContent = t("queue.working");
+
+  try {
+    const outcome = await pollJob(jobId, myId);
+    if (state.requestId !== myId) return;
+
+    clearStoredJobId();
+    stopScanAnim();
+    hideQueueStatus();
+    elements.scanText.textContent = "";
+
+    if (!outcome) return;
+    if (outcome.abandoned) {
+      setStatus(t("error.queueAbandoned"), traceId);
+      return;
+    }
+    if (outcome.error) {
+      setStatus(outcome.error, traceId);
+      return;
+    }
+    renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime });
+  } catch (err) {
+    if (state.requestId !== myId) return;
+    stopScanAnim();
+    hideQueueStatus();
+    elements.scanText.textContent = "";
+    setStatus(t("error.networkError"), traceId);
+    logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });
+  } finally {
     if (state.requestId === myId) state.isAnalyzing = false;
   }
 }

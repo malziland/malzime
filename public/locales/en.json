@@ -67,6 +67,15 @@
   "error.maintenance": "malziME is currently in maintenance mode. Please try again later.",
   "error.networkError": "Connection to server failed. Check your internet and try again.",
   "error.suspended": "The analysis was interrupted. Please try again and keep this page open in the foreground.",
+  "error.queueFailed": "Something went wrong. Please try again.",
+  "error.queueAbandoned": "The analysis was cancelled because the page was closed for too long. Please upload the photo again.",
+
+  "queue.working": "Please keep this page open …",
+  "queue.position": "Queue · {{n}} ahead of you",
+  "queue.next": "You're next in line …",
+  "queue.processing": "Your profile is being created now …",
+  "queue.etaUnderMin": "under 1 min left",
+  "queue.etaMinutes": "about {{min}} min left",
 
   "render.blockedFallback": "The analysis could not be completed. Try with a different photo.",
   "render.emptyProfile": "The AI returned an empty profile. Try with a different photo or switch the mode.",

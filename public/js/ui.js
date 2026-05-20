@@ -36,11 +36,15 @@ export function getBiasMode() {
   return elements.biasSwitch.checked ? "boost" : "normal";
 }
 
-export function startScanAnim() {
+export function startScanAnim(rotateMessages = true) {
   stopScanAnim(); /* BUG-009: alten Intervall aufräumen bevor neuer startet */
   elements.scanAnim.classList.add("active");
   /* A11y: Screenreader-Ankuendigung */
   if (elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srStart");
+  /* Queue-Modus (rotateMessages=false): nur die Animation laufen lassen, den
+     scan-Text setzt der Aufrufer selbst. Die rotierenden Analyse-Meldungen
+     ("Gesicht erkannt…") wären irreführend, solange der Job nur wartet. */
+  if (!rotateMessages) return;
   let idx = 0;
   const messages = t("scan.messages");
   const shuffled = [...(Array.isArray(messages) ? messages : [])].sort(() => Math.random() - 0.5);
@@ -218,6 +222,40 @@ function maintenanceKeyHandler(e) {
     e.preventDefault();
     elements.maintenanceReload.focus();
   }
+}
+
+/* ── Warteschlangen-Anzeige (Queue-Modus, v2.0) ── */
+
+function formatEta(seconds) {
+  if (!seconds || seconds <= 0) return "";
+  if (seconds < 60) return t("queue.etaUnderMin");
+  return t("queue.etaMinutes", { min: Math.round(seconds / 60) });
+}
+
+/**
+ * Zeigt den Warteschlangen-Stand an, während der Queue-Job läuft.
+ * @param {"queued"|"processing"} status
+ * @param {number} [position]    Jobs vor diesem (0 = als Nächstes dran)
+ * @param {number} [etaSeconds]  geschätzte Restwartezeit
+ */
+export function showQueueStatus(status, position, etaSeconds) {
+  if (!elements.queueStatus) return;
+  let text;
+  if (status === "processing") {
+    text = t("queue.processing");
+  } else {
+    const posText = position > 0 ? t("queue.position", { n: position }) : t("queue.next");
+    const etaText = formatEta(etaSeconds);
+    text = etaText ? `${posText} · ${etaText}` : posText;
+  }
+  elements.queueStatus.textContent = text;
+  elements.queueStatus.classList.add("visible");
+}
+
+export function hideQueueStatus() {
+  if (!elements.queueStatus) return;
+  elements.queueStatus.textContent = "";
+  elements.queueStatus.classList.remove("visible");
 }
 
 /* ── PDF-Export Hilfsfunktionen ── */

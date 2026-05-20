@@ -14,6 +14,7 @@ export default [
         window: "readonly",
         navigator: "readonly",
         screen: "readonly",
+        sessionStorage: "readonly",
         fetch: "readonly",
         console: "readonly",
         setTimeout: "readonly",
@@ -90,6 +91,7 @@ export default [
         beforeAll: "readonly",
         afterAll: "readonly",
         vi: "readonly",
+        sessionStorage: "readonly",
       },
     },
     rules: {

@@ -198,6 +198,15 @@ function isAbandoned(job) {
 }
 
 /**
+ * Zählt die Jobs im Status `processing`. Prozess-übergreifende Wahrheit für
+ * die Drosselung des lokalen Cloud-Tasks-Ersatzes (siehe handle-process-job).
+ */
+async function countProcessingJobs() {
+  const agg = await jobsRef().where("status", "==", "processing").count().get();
+  return agg.data().count;
+}
+
+/**
  * Liefert wartende Jobs, deren Client-Herzschlag älter als das Karenz-Fenster
  * ist — die Arbeitsliste des Reapers. `limit` deckelt die Batch-Größe pro
  * Lauf. Benötigt den zusammengesetzten Index (status, lastSeenAt).
@@ -222,4 +231,5 @@ module.exports = {
   abandonJob,
   isAbandoned,
   findAbandonedJobs,
+  countProcessingJobs,
 };

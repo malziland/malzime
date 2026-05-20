@@ -70,10 +70,8 @@
   "error.queueFailed": "Es ist ein Fehler aufgetreten. Bitte versuch es noch einmal.",
   "error.queueAbandoned": "Die Analyse wurde abgebrochen, weil die Seite zu lange geschlossen war. Bitte lade das Foto erneut hoch.",
 
-  "queue.working": "Bitte die Seite geöffnet lassen …",
   "queue.position": "Warteschlange · {{n}} vor dir",
   "queue.next": "Du bist als Nächstes dran …",
-  "queue.processing": "Dein Profil wird jetzt erstellt …",
   "queue.etaUnderMin": "noch unter 1 Min",
   "queue.etaMinutes": "noch ca. {{min}} Min",
 

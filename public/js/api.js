@@ -9,8 +9,8 @@ import {
   showDisclaimerModal,
   showLimitBanner,
   showMaintenanceModal,
-  showQueueStatus,
-  hideQueueStatus,
+  showQueueWaiting,
+  resetQueueWaiting,
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import { t, getLanguage } from "./i18n.js";
@@ -102,6 +102,15 @@ function releaseWakeLock() {
 }
 
 export async function analyzeImage() {
+  if (state.isAnalyzing) return;
+  /* Sofort sichtbares Feedback — die Scan-Animation läuft schon, während wir
+     ggf. noch kurz auf das Feature-Flag warten. */
+  startScanAnim(false);
+  /* Feature-Flag muss feststehen, bevor Sync vs. Queue entschieden wird.
+     Der /api/stats-Aufruf beim Seitenstart setzt es; ist er noch nicht durch
+     (sehr schneller Upload), hier darauf warten. state.statsReady löst dank
+     Timeout immer zeitnah auf. */
+  if (state.statsReady) await state.statsReady;
   if (state.isAnalyzing) return;
   /* Queue-Modus: ist das Feature-Flag an, läuft die Analyse über die
      Warteschlange statt über die lange synchrone Verbindung. Der gesamte
@@ -493,10 +502,10 @@ async function pollJob(jobId, myId) {
 
     switch (data.status) {
       case "queued":
-        showQueueStatus("queued", data.position, data.etaSeconds);
+        showQueueWaiting("queued", data.position, data.etaSeconds);
         break;
       case "processing":
-        showQueueStatus("processing");
+        showQueueWaiting("processing");
         break;
       case "done":
         return { result: data.result };
@@ -573,10 +582,11 @@ async function analyzeImageQueued() {
   elements.simulation.innerHTML = "";
   elements.exportPdf.classList.add("export-btn--hidden");
 
-  /* Augen-Animation ohne die rotierenden Analyse-Meldungen — die wären
-     irreführend, solange der Job nur in der Warteschlange wartet. */
+  /* Warte-Animation starten — Phase wird in showQueueWaiting weitergeschaltet:
+     queued zeigt die Position, processing die gewohnten Analyse-Meldungen. */
+  resetQueueWaiting();
   startScanAnim(false);
-  elements.scanText.textContent = t("queue.working");
+  elements.scanText.textContent = "";
 
   const file = state.lastFile || elements.fileInput.files[0];
   if (!file) {
@@ -682,7 +692,6 @@ async function analyzeImageQueued() {
 
     clearStoredJobId();
     stopScanAnim();
-    hideQueueStatus();
     elements.scanText.textContent = "";
 
     if (!outcome) return;
@@ -708,7 +717,6 @@ async function analyzeImageQueued() {
   } catch (err) {
     if (state.requestId !== myId) return;
     stopScanAnim();
-    hideQueueStatus();
     elements.scanText.textContent = "";
 
     let phase;
@@ -758,8 +766,9 @@ export async function resumeQueueJob() {
   /* state.lastPrepared ist nach einem Reload leer — GPS kann nicht mehr
      injiziert werden (verlässt den Browser ohnehin nie). Das Profil selbst
      liegt vollständig serverseitig. */
+  resetQueueWaiting();
   startScanAnim(false);
-  elements.scanText.textContent = t("queue.working");
+  elements.scanText.textContent = "";
 
   try {
     const outcome = await pollJob(jobId, myId);
@@ -767,7 +776,6 @@ export async function resumeQueueJob() {
 
     clearStoredJobId();
     stopScanAnim();
-    hideQueueStatus();
     elements.scanText.textContent = "";
 
     if (!outcome) return;
@@ -783,7 +791,6 @@ export async function resumeQueueJob() {
   } catch (err) {
     if (state.requestId !== myId) return;
     stopScanAnim();
-    hideQueueStatus();
     elements.scanText.textContent = "";
     setStatus(t("error.networkError"), traceId);
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });

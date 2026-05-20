@@ -23,8 +23,13 @@ initDemo();
    No-Op, wenn keine jobId aus einem früheren Seitenbesuch vorliegt. */
 resumeQueueJob();
 
-/* ── Limit- und Maintenance-Check beim Seitenstart ── */
-fetch("/api/stats")
+/* ── Limit-, Maintenance- und Feature-Flag-Check beim Seitenstart ──
+   In state.statsReady abgelegt, damit analyzeImage darauf warten kann, bevor
+   es Sync vs. Queue entscheidet. Mit hartem Timeout: antwortet /api/stats
+   nicht, löst das Promise trotzdem auf (Fail-safe → synchroner Pfad). */
+const statsAbort = new AbortController();
+const statsTimer = setTimeout(() => statsAbort.abort(), 20000);
+state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
   .then((r) => (r.ok ? r.json() : null))
   .then((data) => {
     /* Queue-Feature-Flag übernehmen. Bleibt es aus (Flag false oder Fetch
@@ -38,7 +43,8 @@ fetch("/api/stats")
       showLimitBanner(data.current.retryAfterSeconds || 600);
     }
   })
-  .catch(() => {});
+  .catch(() => {})
+  .finally(() => clearTimeout(statsTimer));
 
 /* Maintenance-Modal: Seite neu laden */
 elements.maintenanceReload.addEventListener("click", () => location.reload());

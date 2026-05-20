@@ -7,6 +7,14 @@
     "source": "functions",
     "runtime": "nodejs24"
   },
+  "emulators": {
+    "functions": { "port": 5001 },
+    "firestore": { "port": 8080 },
+    "hosting": { "port": 5050 },
+    "pubsub": { "port": 8085 },
+    "ui": { "enabled": true },
+    "singleProjectMode": true
+  },
   "hosting": {
     "public": "public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/__tests__/**"],
@@ -75,27 +83,27 @@
     "rewrites": [
       {
         "source": "/api/stats",
-        "function": "stats"
+        "function": { "functionId": "stats", "region": "europe-west1" }
       },
       {
         "source": "/api/errors",
-        "function": "errors"
+        "function": { "functionId": "errors", "region": "europe-west1" }
       },
       {
         "source": "/api/telemetry",
-        "function": "telemetry"
+        "function": { "functionId": "telemetry", "region": "europe-west1" }
       },
       {
         "source": "/api/enqueue",
-        "function": "enqueue"
+        "function": { "functionId": "enqueue", "region": "europe-west1" }
       },
       {
         "source": "/api/job-status",
-        "function": "jobStatus"
+        "function": { "functionId": "jobStatus", "region": "europe-west1" }
       },
       {
         "source": "/api/admin/**",
-        "function": "admin"
+        "function": { "functionId": "admin", "region": "europe-west1" }
       },
       {
         "source": "/stats",

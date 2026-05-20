@@ -4,6 +4,35 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.0.0-rc3] — 2026-05-20
+
+### Queue-Architektur — Phase 3: Lokale Testumgebung (Emulator)
+
+Dritter Schritt: das komplette System lokal lauffähig machen — für den Durchklick der Warteschlangen-UX und kostenlose Mock-Lasttests. Reine Test- und Entwicklungs-Infrastruktur, keine Produktions-Auswirkung.
+
+**Google Cloud Tasks hat keinen Emulator.** Daher zwei sauber per Umgebungsschalter (`QUEUE_LOCAL=1`) getrennte lokale Ersatz-Implementierungen — in Produktion ist `QUEUE_LOCAL` nie gesetzt, dort bleibt es bei Cloud Tasks und dem GCS-Bucket:
+
+- `cloud-tasks.js`: Im Lokal-Modus stößt `enqueue` die `processJob`-Function direkt per HTTP an, statt einen Cloud-Task zu erzeugen.
+- `queue-storage.js`: Im Lokal-Modus liegen die Bilder in einem Temp-Verzeichnis statt im GCS-Bucket.
+- `feature-flags.js`: Im Lokal-Modus gilt die Queue als aktiv — der Emulator-Lauf dient ja gerade ihrem Test.
+
+- `firebase.json`: Emulator-Konfiguration (functions / firestore / hosting / pubsub). `functions/.env.local` aktiviert die Lokal-Schalter und wird von `firebase deploy` ignoriert.
+- npm-Skript `emulator` startet das System lokal; `docs/QUEUE-EMULATOR.md` beschreibt den Durchklick.
+- `functions/scripts/queue-emulator-loadtest.js`: feuert N Mock-Jobs gegen die lokale Queue und verifiziert, dass keiner verloren geht.
+
+### Korrekturen aus dem Durchklick
+
+Der Durchklick im Emulator hat drei Lücken aufgedeckt, die im selben Zug behoben wurden:
+
+- **Routing-Race:** Ein sehr schneller Upload entschied sich fälschlich für den synchronen Pfad, bevor das `useQueue`-Flag von `/api/stats` geladen war. `analyzeImage` wartet jetzt auf `state.statsReady` (mit hartem Timeout), bevor es Sync vs. Queue wählt.
+- **Warte-Bildschirm vereinfacht:** Das zusätzliche `#queueStatus`-Element samt Sonder-CSS wurde wieder entfernt; der Warte-Bildschirm nutzt den bestehenden Scan-Text — in der Warteschlange die Position, bei der Verarbeitung die gewohnten Meldungen. Keine doppelten Texte.
+- **Lokale Drosselung:** Der Emulator fährt mehrere Worker-Prozesse, daher kann der lokale Cloud-Tasks-Ersatz nicht über Modul-Variablen drosseln. `processJob` zählt jetzt im Lokal-Modus die laufenden Jobs in Firestore (prozess-übergreifend) und vertagt sich bei voller Drossel — so staut sich im Emulator eine echte Warteschlange mit sichtbaren Positionen, wie unter echtem Cloud Tasks.
+- ETA-Schätzung (`QUEUE_AVG_JOB_SECONDS`) bewusst großzügig auf 120 s gesetzt — die Wartezeit-Anzeige soll lieber über- als unterschätzen.
+
+### Tests
+
+- Backend 402/402, Frontend 152/152 grün (+7 Tests für Lokal-Shims und Drosselung).
+
 ## [2.0.0-rc2] — 2026-05-20
 
 ### Queue-Architektur — Phase 2: Frontend (Warteschlangen-UI)
@@ -124,6 +153,7 @@ Nach Auswertung des Workshop-Vormittags (2026-05-20): Der Server lief stabil (ke
 Spaeter Abend nach v1.10.6-Deploy zeigten sich anhaltende Mistral-429er-Probleme und 3-Minuten-Hänger. Diagnose ueber das Mistral-Account-Dashboard offenbarte den eigentlichen Fehler: Unsere `throttle.js`-Annahme „Mistral-Scale-Tier hat 6 RPS" stammte aus einem alten Audit und war fuer das aktuelle Modell falsch.
 
 **Tatsaechliche Account-Limits (Dashboard 2026-05-19):**
+
 - `mistral-small-2603` (unser Profile-Modell): **100K TPM, 1.67 RPS**
 - `mistral-small-2506` (deprecated, aelter): 5M TPM, 20.83 RPS
 - `mistral-large-2512` (Describe + Fallback): 2M TPM, 6 RPS
@@ -181,12 +211,12 @@ Heutiger 13:00-15:00-Workshop hat die Pipeline gerissen: ab ~15 Geraeten gleichz
 
 ### Erwartete Kapazitaet nach diesen Aenderungen
 
-| Workshop-Groesse | Verhalten |
-|---|---|
-| 15-25 | Sauber, alle in 1-2 Minuten fertig, kein User-sichtbarer Fehler |
-| 25-50 | Sauber, alle in 2-4 Minuten, vereinzelt Auto-Retry mit „versuche es automatisch nochmal …"-Meldung |
-| 50-100 | Mit Auto-Retry meistens sauber; einzelne sehen evtl. die Server-Busy-Meldung |
-| 100+ | Knapp bis enger Engpass — fuer 200 braucht es die echte Queue-Architektur (separater Plan) |
+| Workshop-Groesse | Verhalten                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------- |
+| 15-25            | Sauber, alle in 1-2 Minuten fertig, kein User-sichtbarer Fehler                                    |
+| 25-50            | Sauber, alle in 2-4 Minuten, vereinzelt Auto-Retry mit „versuche es automatisch nochmal …"-Meldung |
+| 50-100           | Mit Auto-Retry meistens sauber; einzelne sehen evtl. die Server-Busy-Meldung                       |
+| 100+             | Knapp bis enger Engpass — fuer 200 braucht es die echte Queue-Architektur (separater Plan)         |
 
 ### Was bewusst NICHT angefasst wurde
 
@@ -360,6 +390,7 @@ Bisher waren Frontend-Fehler nur als pauschale UI-Meldung sichtbar (z.B. „Serv
 - **`public/js/api.js`**: catch-Block setzt jetzt eine eindeutige `phase` (`image-read` / `image-decode` / `page-hidden` / `client-timeout` / `offline` / `network` / `fetch`) und ruft `logClientError(err, { phase, durationMs, requestId })`. Auch HTTP-Fehler-Responses (>=400) werden mit Phase `http-error` geloggt. UI-Meldungen bleiben identisch.
 
 ### Datenfelder (Whitelist, alles optional)
+
 - `errorName` (max 100), `errorMessage` (max 500), `phase` (max 50), `url` Pfad-Teil (max 200), `userAgent` gekuerzt (max 250), `requestId` (max 50)
 - `durationMs` (0–600000), `online`, `hidden`
 

@@ -14,6 +14,11 @@
  * serverseitig über das Admin-SDK, kein Browser-Zugriff. Kein Firebase-
  * Storage-Default-Bucket — Client-SDK-Features brauchen wir nicht.
  *
+ * Lokal-Modus (QUEUE_LOCAL=1, Emulator): Statt des GCS-Buckets wird ein
+ * Temp-Verzeichnis auf der Festplatte genutzt — der Storage-Pfad bleibt
+ * formgleich (`queue-uploads/<uuid>.<ext>`), sodass der übrige Code keinen
+ * Unterschied sieht.
+ *
  * DSGVO: Das Bild enthält kein GPS (wird client-seitig entfernt — unverändert
  * zur bisherigen Architektur). Die Ablage ist kurzlebig und auf europe-west1
  * begrenzt.
@@ -23,8 +28,11 @@
  */
 
 const crypto = require("crypto");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { getStorage } = require("firebase-admin/storage");
-const { QUEUE_BUCKET, QUEUE_UPLOAD_PREFIX } = require("./config");
+const { QUEUE_BUCKET, QUEUE_UPLOAD_PREFIX, isLocalQueueMode } = require("./config");
 
 const EXT_BY_MIME = {
   "image/jpeg": "jpg",
@@ -33,10 +41,27 @@ const EXT_BY_MIME = {
   "image/gif": "gif",
 };
 
+const MIME_BY_EXT = {
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  gif: "image/gif",
+};
+
 let bucketOverride = null;
 
 function bucket() {
   return bucketOverride || getStorage().bucket(QUEUE_BUCKET);
+}
+
+/* Temp-Verzeichnis der Lokal-Modus-Ablage. */
+function localDir() {
+  return path.join(os.tmpdir(), "malzime-queue-uploads");
+}
+
+/* Mappt einen Storage-Pfad (`queue-uploads/<name>`) auf die lokale Datei. */
+function localPathFor(objectPath) {
+  return path.join(localDir(), path.basename(objectPath));
 }
 
 /**
@@ -45,22 +70,35 @@ function bucket() {
  */
 async function storeImage(buffer, mimeType) {
   const ext = EXT_BY_MIME[mimeType] || "jpg";
-  const path = `${QUEUE_UPLOAD_PREFIX}${crypto.randomUUID()}.${ext}`;
+  const objectPath = `${QUEUE_UPLOAD_PREFIX}${crypto.randomUUID()}.${ext}`;
+
+  if (isLocalQueueMode()) {
+    await fs.promises.mkdir(localDir(), { recursive: true });
+    await fs.promises.writeFile(localPathFor(objectPath), buffer);
+    return objectPath;
+  }
+
   await bucket()
-    .file(path)
+    .file(objectPath)
     .save(buffer, {
       contentType: mimeType || "image/jpeg",
       resumable: false,
     });
-  return path;
+  return objectPath;
 }
 
 /**
  * Lädt ein zuvor abgelegtes Bild.
  * @returns {Promise<{buffer: Buffer, mimeType: string}>}
  */
-async function loadImage(path) {
-  const file = bucket().file(path);
+async function loadImage(objectPath) {
+  if (isLocalQueueMode()) {
+    const buffer = await fs.promises.readFile(localPathFor(objectPath));
+    const ext = path.extname(objectPath).slice(1).toLowerCase();
+    return { buffer, mimeType: MIME_BY_EXT[ext] || "image/jpeg" };
+  }
+
+  const file = bucket().file(objectPath);
   const [buffer] = await file.download();
   const [metadata] = await file.getMetadata();
   return { buffer, mimeType: (metadata && metadata.contentType) || "image/jpeg" };
@@ -71,12 +109,16 @@ async function loadImage(path) {
  * harter Fehler — die Lifecycle-Regel räumt ohnehin nach. Der Aufrufer
  * (processJob) soll deshalb nie an einer fehlgeschlagenen Löschung scheitern.
  */
-async function deleteImage(path) {
-  if (!path) return;
+async function deleteImage(objectPath) {
+  if (!objectPath) return;
   try {
-    await bucket().file(path).delete();
+    if (isLocalQueueMode()) {
+      await fs.promises.unlink(localPathFor(objectPath));
+      return;
+    }
+    await bucket().file(objectPath).delete();
   } catch (err) {
-    console.log(JSON.stringify({ warning: "queue-image-delete-failed", path, error: err.message }));
+    console.log(JSON.stringify({ warning: "queue-image-delete-failed", path: objectPath, error: err.message }));
   }
 }
 

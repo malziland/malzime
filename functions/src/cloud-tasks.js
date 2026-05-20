@@ -19,7 +19,7 @@
  * Test echte GCP-Credentials.
  */
 
-const { QUEUE_NAME, QUEUE_REGION, PROCESS_JOB_FUNCTION } = require("./config");
+const { QUEUE_NAME, QUEUE_REGION, PROCESS_JOB_FUNCTION, isLocalQueueMode } = require("./config");
 
 let client = null;
 let clientOverride = null;
@@ -60,6 +60,10 @@ function invokerServiceAccount() {
  * @returns {Promise<string>} der von Cloud Tasks vergebene Task-Name
  */
 async function enqueueJob(jobId) {
+  /* Lokal-Modus (Emulator): Es gibt keinen Cloud-Tasks-Emulator — daher
+     processJob direkt anstoßen statt einen echten Task zu erzeugen. */
+  if (isLocalQueueMode()) return enqueueJobLocal(jobId);
+
   const c = getClient();
   const parent = c.queuePath(projectId(), QUEUE_REGION, QUEUE_NAME);
   const url = processJobUrl();
@@ -79,6 +83,52 @@ async function enqueueJob(jobId) {
   return created.name;
 }
 
+/* URL der processJob-Function im laufenden Firebase-Emulator. */
+function localProcessJobUrl() {
+  if (process.env.QUEUE_LOCAL_PROCESS_URL) return process.env.QUEUE_LOCAL_PROCESS_URL;
+  const port = process.env.FUNCTIONS_EMULATOR_PORT || "5001";
+  return `http://127.0.0.1:${port}/${projectId() || "malzime"}/${QUEUE_REGION}/processJob`;
+}
+
+/* Stößt processJob lokal per HTTP an (Emulator). */
+function dispatchLocal(jobId) {
+  fetch(localProcessJobUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ jobId }),
+  }).catch((err) => {
+    console.log(JSON.stringify({ warning: "local-dispatch-failed", jobId, error: err.message }));
+  });
+}
+
+/**
+ * Lokaler Cloud-Tasks-Ersatz: stößt processJob direkt per HTTP an. Fire-and-
+ * forget — enqueue wartet NICHT auf die Verarbeitung, genau wie beim echten
+ * Cloud-Tasks-Dispatch. Nur aktiv bei QUEUE_LOCAL=1.
+ *
+ * Die Drosselung (maxConcurrentDispatches bei echtem Cloud Tasks) übernimmt
+ * im Lokal-Modus processJob selbst: Es zählt vor der Verarbeitung die laufenden
+ * Jobs in Firestore und vertagt sich via `redispatchJobLocal`, wenn die Grenze
+ * erreicht ist. Firestore ist die prozess-übergreifende Wahrheit — nötig, weil
+ * der Emulator mehrere Worker-Prozesse fährt (Modul-Variablen sind nicht
+ * geteilt). Siehe handle-process-job.js.
+ */
+function enqueueJobLocal(jobId) {
+  dispatchLocal(jobId);
+  return Promise.resolve(`local-dispatch/${jobId}`);
+}
+
+/* Verzögerung, nach der ein vertagter Job erneut angestoßen wird. */
+const LOCAL_REDISPATCH_MS = 2500;
+
+/**
+ * Stößt einen vertagten Job (Lokal-Modus, Drossel war voll) nach kurzer
+ * Verzögerung erneut an. So lange wiederholt, bis ein Slot frei ist.
+ */
+function redispatchJobLocal(jobId) {
+  setTimeout(() => dispatchLocal(jobId), LOCAL_REDISPATCH_MS);
+}
+
 /* Nur für Tests — ersetzt den CloudTasksClient durch eine Attrappe. */
 function setClientForTest(impl) {
   clientOverride = impl;
@@ -86,6 +136,7 @@ function setClientForTest(impl) {
 
 module.exports = {
   enqueueJob,
+  redispatchJobLocal,
   processJobUrl,
   invokerServiceAccount,
   setClientForTest,

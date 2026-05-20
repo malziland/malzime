@@ -9,6 +9,7 @@ jest.mock("../jobs", () => ({
   completeJob: jest.fn(),
   isAbandoned: jest.fn(),
   abandonJob: jest.fn(),
+  countProcessingJobs: jest.fn(),
 }));
 jest.mock("../queue-storage", () => ({
   loadImage: jest.fn(),
@@ -17,11 +18,15 @@ jest.mock("../queue-storage", () => ({
 jest.mock("../counter", () => ({
   incrementTotals: jest.fn(() => Promise.resolve()),
 }));
+jest.mock("../cloud-tasks", () => ({
+  redispatchJobLocal: jest.fn(),
+}));
 
 const { handleProcessJob } = require("../handle-process-job");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const counter = require("../counter");
+const tasks = require("../cloud-tasks");
 
 const JOB = {
   id: "job-1",
@@ -59,6 +64,7 @@ beforeEach(() => {
   jobs.completeJob.mockResolvedValue();
   jobs.isAbandoned.mockReturnValue(false);
   jobs.abandonJob.mockResolvedValue();
+  jobs.countProcessingJobs.mockResolvedValue(0);
   storage.loadImage.mockResolvedValue({ buffer: Buffer.from("img"), mimeType: "image/jpeg" });
   storage.deleteImage.mockResolvedValue();
 });
@@ -114,6 +120,37 @@ describe("handleProcessJob — Abweisungen", () => {
     expect(jobs.claimJob).not.toHaveBeenCalled();
     expect(jobs.completeJob).not.toHaveBeenCalled();
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/x.jpg");
+  });
+
+  test("Lokal-Modus, Drossel voll → Job vertagt, kein Claim, Re-Dispatch geplant", async () => {
+    process.env.QUEUE_LOCAL = "1";
+    process.env.QUEUE_LOCAL_CONCURRENCY = "3";
+    jobs.countProcessingJobs.mockResolvedValue(3);
+    const res = makeRes();
+    try {
+      await handleProcessJob(postReq("job-1"), res);
+      expect(res.body.reason).toBe("deferred");
+      expect(jobs.claimJob).not.toHaveBeenCalled();
+      expect(tasks.redispatchJobLocal).toHaveBeenCalledWith("job-1");
+    } finally {
+      delete process.env.QUEUE_LOCAL;
+      delete process.env.QUEUE_LOCAL_CONCURRENCY;
+    }
+  });
+
+  test("Lokal-Modus, Drossel frei → Job wird normal verarbeitet", async () => {
+    process.env.QUEUE_LOCAL = "1";
+    process.env.QUEUE_LOCAL_CONCURRENCY = "3";
+    jobs.countProcessingJobs.mockResolvedValue(1);
+    const res = makeRes();
+    try {
+      await handleProcessJob(postReq("job-1"), res);
+      expect(jobs.claimJob).toHaveBeenCalledWith("job-1");
+      expect(tasks.redispatchJobLocal).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.QUEUE_LOCAL;
+      delete process.env.QUEUE_LOCAL_CONCURRENCY;
+    }
   });
 });
 

@@ -9,6 +9,9 @@ afterEach(() => {
   delete process.env.GCLOUD_PROJECT;
   delete process.env.GCP_PROJECT;
   delete process.env.QUEUE_INVOKER_SA;
+  delete process.env.QUEUE_LOCAL;
+  delete process.env.QUEUE_LOCAL_PROCESS_URL;
+  delete process.env.QUEUE_LOCAL_CONCURRENCY;
 });
 
 describe("processJobUrl / invokerServiceAccount", () => {
@@ -62,5 +65,40 @@ describe("enqueueJob", () => {
       },
     });
     await expect(tasks.enqueueJob("job-1")).rejects.toThrow("tasks unavailable");
+  });
+});
+
+describe("enqueueJob — Lokal-Modus (Emulator, QUEUE_LOCAL=1)", () => {
+  test("stößt processJob lokal per HTTP an, ohne Cloud Tasks zu nutzen", async () => {
+    process.env.QUEUE_LOCAL = "1";
+    process.env.GCLOUD_PROJECT = "malzime";
+    const realFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    const createTask = jest.fn();
+    tasks.setClientForTest({ queuePath: () => "q", createTask });
+    try {
+      const name = await tasks.enqueueJob("job-77");
+      expect(name).toBe("local-dispatch/job-77");
+      expect(createTask).not.toHaveBeenCalled();
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      const [url, opts] = global.fetch.mock.calls[0];
+      expect(String(url)).toContain("/processJob");
+      expect(JSON.parse(opts.body)).toEqual({ jobId: "job-77" });
+    } finally {
+      global.fetch = realFetch;
+    }
+  });
+
+  test("QUEUE_LOCAL_PROCESS_URL überschreibt die Dispatch-URL", async () => {
+    process.env.QUEUE_LOCAL = "1";
+    process.env.QUEUE_LOCAL_PROCESS_URL = "http://127.0.0.1:9999/custom-process";
+    const realFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({ ok: true });
+    try {
+      await tasks.enqueueJob("job-1");
+      expect(String(global.fetch.mock.calls[0][0])).toBe("http://127.0.0.1:9999/custom-process");
+    } finally {
+      global.fetch = realFetch;
+    }
   });
 });

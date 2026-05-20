@@ -70,10 +70,8 @@
   "error.queueFailed": "Something went wrong. Please try again.",
   "error.queueAbandoned": "The analysis was cancelled because the page was closed for too long. Please upload the photo again.",
 
-  "queue.working": "Please keep this page open …",
   "queue.position": "Queue · {{n}} ahead of you",
   "queue.next": "You're next in line …",
-  "queue.processing": "Your profile is being created now …",
   "queue.etaUnderMin": "under 1 min left",
   "queue.etaMinutes": "about {{min}} min left",
 

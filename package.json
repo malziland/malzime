@@ -9,7 +9,8 @@
     "lint:frontend:fix": "eslint public/js/ public/app.js public/__tests__/ --fix",
     "format:frontend": "prettier --write public/js/ public/app.js public/__tests__/",
     "format:frontend:check": "prettier --check public/js/ public/app.js public/__tests__/",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "emulator": "firebase emulators:start --only functions,firestore,hosting,pubsub"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

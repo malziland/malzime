@@ -27,12 +27,13 @@
  * Stale-Timeout in jobs.js aufgefangen.
  */
 
-const { REQUEST_BUDGET_MS } = require("./config");
+const { REQUEST_BUDGET_MS, isLocalQueueMode, localQueueConcurrency } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { incrementTotals } = require("./counter");
-const { getJob, claimJob, completeJob, isAbandoned, abandonJob } = require("./jobs");
+const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
+const { redispatchJobLocal } = require("./cloud-tasks");
 
 /* Mistral-Provider: im Mock-Modus die kostenlose Attrappe, sonst die echte
    API. Umschaltbar über die Umgebungsvariable MISTRAL_MOCK ("1" = Mock) —
@@ -188,6 +189,21 @@ async function handleProcessJob(req, res) {
     console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
     res.status(200).json({ ok: false, reason: "abandoned" });
     return;
+  }
+
+  /* Lokal-Modus-Drosselung: Cloud Tasks gibt es im Emulator nicht. Sind schon
+     genug Jobs in Verarbeitung, diesen Job vertagen — er bleibt `queued` und
+     wird kurz darauf erneut angestoßen. So staut sich eine echte Warteschlange
+     mit sichtbaren Positionen. In Produktion (kein QUEUE_LOCAL) ist dieser
+     Block inaktiv — dort drosselt das echte Cloud Tasks. */
+  if (isLocalQueueMode() && job.status === "queued") {
+    const processing = await countProcessingJobs();
+    if (processing >= localQueueConcurrency()) {
+      redispatchJobLocal(jobId);
+      console.log(JSON.stringify({ step: "process-job", jobId, status: "deferred", processing }));
+      res.status(200).json({ ok: false, reason: "deferred" });
+      return;
+    }
   }
 
   /* Idempotenter Claim — verhindert Doppelverarbeitung bei Task-Wiederholung. */

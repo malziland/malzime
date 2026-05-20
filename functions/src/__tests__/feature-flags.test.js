@@ -54,3 +54,14 @@ describe("isQueueEnabled", () => {
     expect(await flags.isQueueEnabled()).toBe(false);
   });
 });
+
+describe("Lokal-Modus (QUEUE_LOCAL=1)", () => {
+  afterEach(() => delete process.env.QUEUE_LOCAL);
+
+  test("die Queue gilt im Emulator-Modus als an — ohne Firestore-Read", async () => {
+    process.env.QUEUE_LOCAL = "1";
+    flags._clearCache();
+    expect(await flags.getFeatureFlags()).toEqual({ useQueue: true });
+    expect(mockGet).not.toHaveBeenCalled();
+  });
+});

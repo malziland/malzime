@@ -6,7 +6,6 @@ export const elements = {
   dataValue: document.getElementById("dataValue"),
   scanAnim: document.getElementById("scanAnim"),
   scanText: document.getElementById("scanText"),
-  queueStatus: document.getElementById("queueStatus"),
   status: document.getElementById("status"),
   facts: document.getElementById("facts"),
   privacy: document.getElementById("privacy"),

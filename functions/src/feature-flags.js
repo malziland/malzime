@@ -17,6 +17,7 @@
  */
 
 const { getFirestore } = require("firebase-admin/firestore");
+const { isLocalQueueMode } = require("./config");
 
 const FLAGS_DOC = "featureFlags/current";
 const CACHE_TTL_MS = 30 * 1000;
@@ -27,6 +28,10 @@ let cache = { data: null, expiresAt: 0 };
  * Liefert die aktuellen Feature-Flags. Aktuell: `{ useQueue: boolean }`.
  */
 async function getFeatureFlags() {
+  /* Lokal-Modus (Emulator): Die Queue ist per Definition an — der Emulator-
+     Lauf dient ja gerade ihrem Test. Kein Firestore-Read, kein Seeding nötig. */
+  if (isLocalQueueMode()) return { useQueue: true };
+
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
   try {

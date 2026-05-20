@@ -224,7 +224,10 @@ function maintenanceKeyHandler(e) {
   }
 }
 
-/* ── Warteschlangen-Anzeige (Queue-Modus, v2.0) ── */
+/* ── Warteschlangen-Anzeige (Queue-Modus, v2.0) ──
+   Bewusst KEIN eigenes Design: nutzt dieselbe Scan-Animation wie der
+   synchrone Pfad. In der Warteschlange steht die Position im scan-Text,
+   bei der Verarbeitung laufen die gewohnten rotierenden Meldungen. */
 
 function formatEta(seconds) {
   if (!seconds || seconds <= 0) return "";
@@ -232,30 +235,39 @@ function formatEta(seconds) {
   return t("queue.etaMinutes", { min: Math.round(seconds / 60) });
 }
 
+/* Aktuelle Warte-Phase — damit die Animation nur beim Phasenwechsel
+   umgeschaltet wird, nicht bei jedem Poll. */
+let queuePhase = null;
+
 /**
- * Zeigt den Warteschlangen-Stand an, während der Queue-Job läuft.
+ * Aktualisiert den Warte-Bildschirm im Queue-Modus.
  * @param {"queued"|"processing"} status
  * @param {number} [position]    Jobs vor diesem (0 = als Nächstes dran)
  * @param {number} [etaSeconds]  geschätzte Restwartezeit
  */
-export function showQueueStatus(status, position, etaSeconds) {
-  if (!elements.queueStatus) return;
-  let text;
+export function showQueueWaiting(status, position, etaSeconds) {
   if (status === "processing") {
-    text = t("queue.processing");
-  } else {
-    const posText = position > 0 ? t("queue.position", { n: position }) : t("queue.next");
-    const etaText = formatEta(etaSeconds);
-    text = etaText ? `${posText} · ${etaText}` : posText;
+    /* Verarbeitung läuft → die gewohnten rotierenden Analyse-Meldungen,
+       genau wie im synchronen Pfad. */
+    if (queuePhase !== "processing") {
+      startScanAnim(true);
+      queuePhase = "processing";
+    }
+    return;
   }
-  elements.queueStatus.textContent = text;
-  elements.queueStatus.classList.add("visible");
+  /* queued → Animation ohne Rotation, Position als stabiler scan-Text. */
+  if (queuePhase !== "queued") {
+    startScanAnim(false);
+    queuePhase = "queued";
+  }
+  const posText = position > 0 ? t("queue.position", { n: position }) : t("queue.next");
+  const etaText = formatEta(etaSeconds);
+  elements.scanText.textContent = etaText ? `${posText} · ${etaText}` : posText;
 }
 
-export function hideQueueStatus() {
-  if (!elements.queueStatus) return;
-  elements.queueStatus.textContent = "";
-  elements.queueStatus.classList.remove("visible");
+/** Setzt die Phasen-Verfolgung zurück — vor jedem neuen Queue-Lauf aufrufen. */
+export function resetQueueWaiting() {
+  queuePhase = null;
 }
 
 /* ── PDF-Export Hilfsfunktionen ── */

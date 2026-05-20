@@ -86,3 +86,35 @@ describe("deleteImage", () => {
     await expect(storage.deleteImage(null)).resolves.toBeUndefined();
   });
 });
+
+describe("Lokal-Modus (QUEUE_LOCAL=1, Emulator)", () => {
+  const os = require("os");
+  const nodePath = require("path");
+  const fs = require("fs");
+  const localDir = nodePath.join(os.tmpdir(), "malzime-queue-uploads");
+
+  beforeEach(() => {
+    process.env.QUEUE_LOCAL = "1";
+  });
+
+  afterEach(async () => {
+    delete process.env.QUEUE_LOCAL;
+    await fs.promises.rm(localDir, { recursive: true, force: true });
+  });
+
+  test("storeImage → loadImage → deleteImage über das Dateisystem", async () => {
+    const objectPath = await storage.storeImage(Buffer.from("lokaler-inhalt"), "image/png");
+    expect(objectPath).toMatch(/^queue-uploads\/.+\.png$/);
+
+    const loaded = await storage.loadImage(objectPath);
+    expect(loaded.buffer.toString()).toBe("lokaler-inhalt");
+    expect(loaded.mimeType).toBe("image/png");
+
+    await storage.deleteImage(objectPath);
+    await expect(storage.loadImage(objectPath)).rejects.toBeDefined();
+  });
+
+  test("deleteImage auf eine fehlende Datei wirft nicht", async () => {
+    await expect(storage.deleteImage("queue-uploads/gibt-es-nicht.jpg")).resolves.toBeUndefined();
+  });
+});

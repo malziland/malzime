@@ -12,4 +12,7 @@ export const state = {
   /* Queue-Architektur (v2.0): vom /api/stats-Flag beim Seitenstart gesetzt.
      Default false → bewährter synchroner Pfad, bis das Flag geladen ist. */
   useQueue: false,
+  /* Promise des /api/stats-Aufrufs. analyzeImage wartet darauf, damit die
+     Pfad-Wahl (Sync vs. Queue) nicht gegen den Flag-Abruf rennt. */
+  statsReady: null,
 };

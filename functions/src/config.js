@@ -98,10 +98,31 @@ const LIVENESS_GRACE_MS = 3 * 60 * 1000;
 
 /* Schätzwerte für die Warteschlangen-ETA im job-status-Endpoint:
    durchschnittliche Verarbeitungsdauer pro Job und Anzahl parallel
-   dispatchter Jobs. Erste Näherung aus den Lasttests 2026-05-20
-   (Median ~81-90s); wird in Phase 3/4 anhand echter Messungen kalibriert. */
-const QUEUE_AVG_JOB_SECONDS = 90;
+   dispatchter Jobs. BEWUSST großzügig angesetzt — die ETA soll lieber
+   über- als unterschätzen, damit Wartende nicht enttäuscht werden. Mistral
+   schwankt stark (Lasttests 2026-05-20: Median ~81-90s, Worst ~261s);
+   120s liegt klar über dem Median. Wird in Phase 4 anhand echter Messungen
+   kalibriert — dann weiter eher konservativ (hoch) wählen. */
+const QUEUE_AVG_JOB_SECONDS = 120;
 const QUEUE_DISPATCH_CONCURRENCY = 3;
+
+/* Lokal-Modus für den Firebase-Emulator (Phase 3): Da es für Google Cloud
+   Tasks keinen Emulator gibt, werden im Lokal-Modus Cloud Tasks und der
+   GCS-Bucket durch lokale Ersatz-Implementierungen abgelöst (direkter HTTP-
+   Dispatch bzw. Dateisystem-Ablage). Aktiv per QUEUE_LOCAL=1 — ausschließlich
+   für lokalen Durchklick/Lasttest, NIE in Produktion gesetzt. Zur Laufzeit
+   gelesen, damit Tests es pro Fall setzen können. */
+function isLocalQueueMode() {
+  return process.env.QUEUE_LOCAL === "1";
+}
+
+/* Drosselung des lokalen Cloud-Tasks-Ersatzes: so viele Jobs gleichzeitig in
+   `processing`. Im Lokal-Modus übernimmt processJob die Drosselung (Cloud
+   Tasks gibt es im Emulator nicht). Niedrig halten, damit sich im Durchklick
+   eine sichtbare Warteschlange staut. Nur im Lokal-Modus relevant. */
+function localQueueConcurrency() {
+  return Math.max(1, Number(process.env.QUEUE_LOCAL_CONCURRENCY) || 3);
+}
 
 /* Laufzeit-Validierung — fehlerhafte Config crasht sofort statt leise falsch zu laufen */
 if (HOURLY_LIMIT < 1) throw new Error("Config: HOURLY_LIMIT must be >= 1");
@@ -133,4 +154,6 @@ module.exports = {
   QUEUE_AVG_JOB_SECONDS,
   QUEUE_DISPATCH_CONCURRENCY,
   LIVENESS_GRACE_MS,
+  isLocalQueueMode,
+  localQueueConcurrency,
 };

@@ -18,10 +18,7 @@ export function logTelemetry(eventType, context = {}) {
 
     const payload = {
       eventType: typeof eventType === "string" ? eventType : "unknown",
-      durationMs:
-        typeof context.durationMs === "number" && isFinite(context.durationMs)
-          ? context.durationMs
-          : 0,
+      durationMs: typeof context.durationMs === "number" && isFinite(context.durationMs) ? context.durationMs : 0,
       online: typeof navigator !== "undefined" ? navigator.onLine : true,
       hidden: typeof document !== "undefined" ? document.hidden : false,
       userAgent: (navigator && navigator.userAgent) || "",

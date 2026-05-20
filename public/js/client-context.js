@@ -27,8 +27,7 @@ export function collectClientContext() {
         if (typeof conn.saveData === "boolean") ctx.saveData = conn.saveData;
       }
       if (typeof navigator.deviceMemory === "number") ctx.deviceMemoryGb = navigator.deviceMemory;
-      if (typeof navigator.hardwareConcurrency === "number")
-        ctx.hardwareConcurrency = navigator.hardwareConcurrency;
+      if (typeof navigator.hardwareConcurrency === "number") ctx.hardwareConcurrency = navigator.hardwareConcurrency;
       if (typeof navigator.language === "string") ctx.language = navigator.language.slice(0, 10);
     }
     if (typeof screen !== "undefined") {
@@ -44,4 +43,3 @@ export function collectClientContext() {
   }
   return ctx;
 }
-

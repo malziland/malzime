@@ -4,6 +4,29 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.9] — 2026-05-20
+
+### Behoben — Wake-Lock wird wieder im User-Gesture-Kontext angefordert
+
+Die v1.10.8-Wake-Lock-Telemetrie lieferte sofort ein klares Ergebnis: Auf einem iPhone (voller Akku, KEIN Stromsparmodus) kam `wakeLock: "denied:NotAllowedError"`, auf einem Mac `"acquired"`.
+
+Ursache: `navigator.wakeLock.request("screen")` wurde tief in der asynchronen `analyzeImage`-Pipeline aufgerufen — nach mehreren `await`-Punkten (u.a. der `MIN_INTERACTION_MS`-Wartepause). iOS Safari erlaubt die Wake-Lock-Anfrage aber nur, solange noch **transiente User-Aktivierung** besteht — also unmittelbar nach dem Tippen, vor jedem `await`. Desktop-Safari ist hier lax (→ „acquired"), iOS streng (→ `NotAllowedError`). Es war also kein Geräte-Problem, sondern ein Reihenfolge-Bug bei uns.
+
+**Fix:**
+
+- **`public/app.js`**: `handleNewFile()` ruft `acquireWakeLock()` jetzt synchron als ALLERERSTES auf — direkt im `change`/`drop`-Event-Handler, bevor irgendein `await` läuft. Damit ist die User-Aktivierung noch „live", wenn die Wake-Lock-Anfrage rausgeht.
+- **`public/js/api.js`**: `acquireWakeLock` exportiert + Guard `wakeLockRequested` ergänzt — ein zweiter (post-`await`) Aufruf aus `analyzeImage` würde sonst auf iOS scheitern und den bereits gewonnenen Status überschreiben. `releaseWakeLock` setzt den Guard zurück. Der `analyzeImage`-Aufruf bleibt als Fallback für Pfade ohne `handleNewFile` (Demo-Bilder). Der nicht mehr funktionsfähige `visibilitychange`-Re-Acquire-Listener wurde entfernt (durch den Guard ohnehin wirkungslos, und Re-Acquire ohne Gesture scheitert auf iOS sowieso).
+
+Erwartung: Auf iPhones sollte aus `denied:NotAllowedError` künftig `acquired` werden — verifizierbar in den Telemetrie-Logs ab dem nächsten Workshop. Wichtig bleibt die Einordnung aus v1.10.8: Ein funktionierender Wake-Lock behebt nur die Bildschirm-Auto-Sperre, nicht das Tab-Einfrieren oder App-Wechsel.
+
+### Tests
+
+- Frontend 143/143 grün. Backend unverändert (298/298).
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026052002`.
+
 ## [1.10.8] — 2026-05-20
 
 ### Behoben — modell-bewusster Token-Bucket + Wake-Lock-Diagnose

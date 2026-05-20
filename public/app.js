@@ -1,7 +1,7 @@
 import { initI18n, applyTranslations, t } from "./js/i18n.js";
 import { elements } from "./js/dom.js";
 import { state } from "./js/state.js";
-import { analyzeImage } from "./js/api.js";
+import { analyzeImage, acquireWakeLock } from "./js/api.js";
 import { renderCurrentMode } from "./js/render.js";
 import {
   dismissDisclaimerModal,
@@ -49,6 +49,14 @@ if (typeof L !== "undefined" && L.Icon && L.Icon.Default) {
 /* ── Foto-Vorschau + Auto-Start ── */
 
 function handleNewFile(file) {
+  /* v1.10.8: Wake-Lock SOFORT anfordern — synchron im User-Gesture-Kontext
+     (handleNewFile wird direkt aus dem change/drop-Event aufgerufen). iOS
+     Safari erlaubt navigator.wakeLock.request nur, solange die transiente
+     User-Aktivierung noch lebt — also vor jedem `await`. Frueher lief die
+     Anfrage erst tief in der asynchronen analyzeImage-Pipeline und wurde von
+     iOS mit NotAllowedError abgelehnt. */
+  acquireWakeLock();
+
   /* Laufende Analyse abbrechen */
   if (state.currentAbortController) {
     state.currentAbortController.abort();

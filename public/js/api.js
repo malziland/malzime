@@ -61,8 +61,22 @@ function retryWaitMs() {
    "unsupported", "acquired", "denied:<FehlerName>". */
 let wakeLock = null;
 let wakeLockStatus = "not-attempted";
+/* v1.10.8: Guard gegen Doppel-Anfrage. acquireWakeLock wird jetzt aus dem
+   User-Gesture-Kontext heraus aufgerufen (app.js handleNewFile, direkt im
+   change/drop-Event) — und zusaetzlich als Fallback in analyzeImage. Der
+   Guard stellt sicher, dass nur die ERSTE Anfrage zaehlt: ein zweiter Aufruf
+   nach `await`-Punkten wuerde auf iOS mit NotAllowedError scheitern und den
+   bereits gewonnenen Status ueberschreiben. */
+let wakeLockRequested = false;
 
-async function acquireWakeLock() {
+/* WICHTIG: iOS Safari erlaubt navigator.wakeLock.request("screen") nur,
+   solange noch transiente User-Aktivierung besteht — also unmittelbar nach
+   dem Tippen, VOR jedem `await`. Deshalb wird diese Funktion aus dem
+   synchronen change/drop-Handler (app.js) aufgerufen, nicht erst tief in der
+   asynchronen analyzeImage-Pipeline. */
+export async function acquireWakeLock() {
+  if (wakeLockRequested) return;
+  wakeLockRequested = true;
   if (!("wakeLock" in navigator)) {
     wakeLockStatus = "unsupported";
     return;
@@ -78,18 +92,12 @@ async function acquireWakeLock() {
 }
 
 function releaseWakeLock() {
+  /* Guard zuruecksetzen, damit die naechste Analyse wieder anfordern darf. */
+  wakeLockRequested = false;
   if (!wakeLock) return;
   wakeLock.release().catch(() => {});
   wakeLock = null;
 }
-
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && state.isAnalyzing && !wakeLock) {
-    /* Seite wieder sichtbar und Analyse läuft noch — der Browser gibt den
-       Wake-Lock beim Verstecken automatisch frei, also neu anfordern. */
-    acquireWakeLock();
-  }
-});
 
 export async function analyzeImage() {
   if (state.isAnalyzing) return;

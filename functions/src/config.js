@@ -98,14 +98,13 @@ const LIVENESS_GRACE_MS = 3 * 60 * 1000;
 
 /* Schätzwerte für die Warteschlangen-ETA im job-status-Endpoint:
    durchschnittliche Verarbeitungsdauer pro Job und Anzahl parallel
-   dispatchter Jobs. BEWUSST großzügig angesetzt — die ETA soll lieber
-   über- als unterschätzen, damit Wartende nicht enttäuscht werden. Mistral
-   schwankt stark (Lasttests 2026-05-20: Median ~81-90s, Worst ~261s);
-   120s liegt klar über dem Median. Wird in Phase 4 anhand echter Messungen
-   kalibriert — dann weiter eher konservativ (hoch) wählen.
-   QUEUE_DISPATCH_CONCURRENCY muss in Phase 4 dem `maxConcurrentDispatches`
-   der echten Cloud-Tasks-Queue entsprechen, sonst geht die ETA daneben. */
-const QUEUE_AVG_JOB_SECONDS = 120;
+   dispatchter Jobs. BEWUSST leicht großzügig — die ETA soll lieber über-
+   als unterschätzen, damit Wartende nicht enttäuscht werden. Echte
+   Messungen (2026-05-20, Queue in Produktion): ein Job dauert ~65–100s
+   reine Verarbeitung; 100s liegt am oberen Rand und ist damit konservativ.
+   QUEUE_DISPATCH_CONCURRENCY muss dem `maxConcurrentDispatches` der echten
+   Cloud-Tasks-Queue entsprechen, sonst geht die ETA daneben. */
+const QUEUE_AVG_JOB_SECONDS = 100;
 const QUEUE_DISPATCH_CONCURRENCY = 3;
 
 /* Aufbewahrungsfenster der Job-Dokumente. Ein Job-Dokument enthält bis zum

@@ -70,6 +70,39 @@ const HOURLY_WINDOW_MINUTES = 60;
    noch seine vollen 90s, statt nach 119s schon kein Budget mehr zu haben. */
 const REQUEST_BUDGET_MS = 480000;
 
+/* ── Queue-Architektur (v2.0) ──
+   Konstanten für den Cloud-Tasks-Queue-Pfad. Werden ausschließlich von den
+   neuen Queue-Functions (enqueue / processJob / jobStatus) genutzt — der
+   synchrone /analyze-Pfad ist davon unberührt. Solange das Feature-Flag
+   `useQueue` AUS ist, liegen diese Functions dormant. */
+const QUEUE_NAME = "analyze-queue";
+const QUEUE_REGION = "europe-west1";
+/* Firebase-Function-Name des Workers — Cloud Tasks dispatcht an dessen URL. */
+const PROCESS_JOB_FUNCTION = "processJob";
+/* Dedizierter Cloud-Storage-Bucket für die temporäre Bild-Ablage der Queue.
+   Eigener Bucket (kein Firebase-Storage-Default-Bucket) — auf ihn greift nur
+   der Server via Admin-SDK zu, nie ein Browser. Per QUEUE_BUCKET-env
+   überschreibbar (z.B. für den Storage-Emulator). */
+const QUEUE_BUCKET = process.env.QUEUE_BUCKET || "malzime-queue-uploads";
+/* Storage-Prefix innerhalb des Buckets. Eine GCS-Lifecycle-Regel löscht
+   alles unter diesem Prefix nach 1 Tag (Sicherheitsnetz; die aktive Löschung
+   in processJob greift sofort nach der Verarbeitung). */
+const QUEUE_UPLOAD_PREFIX = "queue-uploads/";
+/* Karenz-Fenster der Client-Liveness: Aktualisiert der Browser eines
+   wartenden Jobs länger als das hier seinen Herzschlag nicht (job-status
+   schreibt bei jedem Poll `lastSeenAt`), gilt der Client als weg → der Job
+   wird `abandoned` und kostet keinen Mistral-Call. Großzügig bemessen, weil
+   iOS Tabs beim App-Wechsel/Display-Sperren einfriert und das Pollen
+   pausiert, ohne dass der Nutzer wirklich weg ist. */
+const LIVENESS_GRACE_MS = 3 * 60 * 1000;
+
+/* Schätzwerte für die Warteschlangen-ETA im job-status-Endpoint:
+   durchschnittliche Verarbeitungsdauer pro Job und Anzahl parallel
+   dispatchter Jobs. Erste Näherung aus den Lasttests 2026-05-20
+   (Median ~81-90s); wird in Phase 3/4 anhand echter Messungen kalibriert. */
+const QUEUE_AVG_JOB_SECONDS = 90;
+const QUEUE_DISPATCH_CONCURRENCY = 3;
+
 /* Laufzeit-Validierung — fehlerhafte Config crasht sofort statt leise falsch zu laufen */
 if (HOURLY_LIMIT < 1) throw new Error("Config: HOURLY_LIMIT must be >= 1");
 if (RATE_LIMIT < 1) throw new Error("Config: RATE_LIMIT must be >= 1");
@@ -92,4 +125,12 @@ module.exports = {
   REQUEST_BUDGET_MS,
   HOURLY_LIMIT,
   HOURLY_WINDOW_MINUTES,
+  QUEUE_NAME,
+  QUEUE_REGION,
+  PROCESS_JOB_FUNCTION,
+  QUEUE_BUCKET,
+  QUEUE_UPLOAD_PREFIX,
+  QUEUE_AVG_JOB_SECONDS,
+  QUEUE_DISPATCH_CONCURRENCY,
+  LIVENESS_GRACE_MS,
 };

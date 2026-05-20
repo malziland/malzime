@@ -122,8 +122,10 @@ describe("i18n Guardian (Backend)", () => {
       "animal.js", // German + English animal keywords for SUBJECT classification — not translatable
     ];
 
-    /* Infrastructure files — no user-facing text, permanently excluded */
-    const EXCLUDED = ["i18n.js", "config.js", "middleware.js"];
+    /* Infrastructure files — no user-facing text, permanently excluded.
+       mistral-mock.js is a test fixture: its bilingual canned profile data
+       simulates Mistral API output and is not localised content. */
+    const EXCLUDED = ["i18n.js", "config.js", "middleware.js", "mistral-mock.js"];
 
     it("non-allowlisted backend JS files have no hardcoded German", () => {
       const violations = [];

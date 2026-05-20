@@ -1,4 +1,5 @@
 const { onRequest } = require("firebase-functions/v2/https");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { initializeApp } = require("firebase-admin/app");
 const { defineSecret } = require("firebase-functions/params");
 
@@ -7,6 +8,10 @@ const { handleStats } = require("./handle-stats");
 const { handleAdmin } = require("./handle-admin");
 const { handleErrors } = require("./handle-errors");
 const { handleTelemetry } = require("./handle-telemetry");
+const { handleEnqueue } = require("./handle-enqueue");
+const { handleProcessJob } = require("./handle-process-job");
+const { handleJobStatus } = require("./handle-job-status");
+const { reapAbandonedJobs } = require("./handle-reap");
 const { ALLOWED_ORIGINS } = require("./domains");
 
 const adminSecret = defineSecret("ADMIN_SECRET");
@@ -99,4 +104,71 @@ exports.telemetry = onRequest(
     timeoutSeconds: 10,
   },
   handleTelemetry
+);
+
+/* ── Queue-Architektur (v2.0) ──
+   Parallel-Pfad zum synchronen /analyze. Diese drei Functions liegen
+   dormant: Solange das Feature-Flag `useQueue` (Firestore featureFlags/
+   current) AUS ist, leitet das Frontend keinen Nutzer hierher — jeder
+   echte Request laeuft weiter ueber /analyze. Siehe memory/queue-plan. */
+
+/* enqueue — public Annahme-Endpoint: validiert, speichert das Bild,
+   legt den Job an und reiht ihn in Cloud Tasks ein. */
+exports.enqueue = onRequest(
+  {
+    region: "europe-west1",
+    memory: "512MiB",
+    cors: ALLOWED_ORIGINS,
+    invoker: "public",
+    maxInstances: 10,
+    timeoutSeconds: 60,
+    secrets: [ntfyUrl, ntfyTopic, adminSecret],
+  },
+  (req, res) => handleEnqueue(req, res, { ntfyUrl, ntfyTopic, adminSecret })
+);
+
+/* processJob — Worker, NICHT public. Nur Cloud Tasks ruft ihn auf:
+   invoker "private" → Cloud Run verlangt Authentifizierung; der Cloud-
+   Tasks-Service-Account erhaelt beim Deploy die Invoker-Rolle. concurrency
+   1 = ein Job pro Instanz, die Dosierung uebernimmt die Cloud-Tasks-Queue.
+   MISTRAL_API_KEY wird als Secret injiziert (mistral.js liest die env-Var). */
+exports.processJob = onRequest(
+  {
+    region: "europe-west1",
+    memory: "512MiB",
+    invoker: "private",
+    concurrency: 1,
+    maxInstances: 10,
+    timeoutSeconds: 540,
+    secrets: [mistralApiKey],
+  },
+  handleProcessJob
+);
+
+/* jobStatus — public, leichtgewichtiger Polling-Endpoint fuer den Client.
+   Jeder Poll ist zugleich der Liveness-Herzschlag des wartenden Jobs. */
+exports.jobStatus = onRequest(
+  {
+    region: "europe-west1",
+    memory: "128MiB",
+    cors: ALLOWED_ORIGINS,
+    invoker: "public",
+    maxInstances: 10,
+    timeoutSeconds: 10,
+  },
+  handleJobStatus
+);
+
+/* reapJobs — geplanter Lauf (jede Minute): markiert wartende Jobs, deren
+   Client nicht mehr pollt, als `abandoned`, gibt ihren Warteschlangen-Platz
+   frei und loescht ihr Bild. Siehe handle-reap.js. Laeuft auch bei dormanter
+   Queue — dann ein leerer, vernachlaessigbarer Query. */
+exports.reapJobs = onSchedule(
+  {
+    region: "europe-west1",
+    schedule: "every 1 minutes",
+    memory: "256MiB",
+    timeoutSeconds: 120,
+  },
+  () => reapAbandonedJobs()
 );

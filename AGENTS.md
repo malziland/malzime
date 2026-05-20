@@ -30,7 +30,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   lib/exifr/         Self-hosted: exifr lite ESM (Browser EXIF-Parsing)
 
 functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
-  index.js           Cloud-Function-Exports (analyze, stats, admin), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
+  index.js           Cloud-Function-Exports (analyze, stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
   handle-analyze.js  Mistral-only Pipeline: Validation -> Mistral Describe -> SUBJECT-Parsing -> Mistral Profile / Easter-Egg -> Response
   handle-stats.js    Stats-Handler (GET-only)
   handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
@@ -47,6 +47,16 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
+  feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useQueue), 30s-Cache, fail-safe
+  --- Queue-Architektur (v2.0) — Parallel-Pfad, dormant bis Feature-Flag useQueue ---
+  handle-enqueue.js  Queue-Annahme: Validierung -> Bild in Storage -> Job anlegen -> in Cloud Tasks einreihen
+  handle-process-job.js  Queue-Worker (nur Cloud Tasks): claimt Job, fuehrt Mistral-Pipeline aus, schreibt Ergebnis
+  handle-job-status.js   Queue-Polling: Status, Warteschlangen-Position, ETA, Ergebnis; jeder Poll ist Liveness-Herzschlag
+  handle-reap.js     Queue-Reaper (geplant, Minutentakt): markiert verlassene Jobs als abandoned, gibt ihren Platz frei
+  jobs.js            Queue-Job-Lebenszyklus in Firestore (createJob/claimJob/completeJob/failJob/getQueuePosition/touchJob/abandonJob)
+  cloud-tasks.js     Queue: Wrapper um Google Cloud Tasks (enqueueJob)
+  queue-storage.js   Queue: temporaere Bild-Ablage in Firebase Storage (storeImage/loadImage/deleteImage)
+  mistral-mock.js    Mistral-Attrappe fuer kostenlose Tests (Unit-Tests, Emulator-Durchklick, Mock-Lasttest)
   locales/           Backend-Locale-Dateien
     manifest.json    Verfuegbare Sprachen + Default
     de/prompts.js    Deutsche Prompts (System-Prompts, AGE_ANCHOR + SCHEMA_RULES, Labels, jsonSchemaNormal + jsonSchemaBoost, mistralDescribeAddendum mit SUBJECT-Klassifikation)

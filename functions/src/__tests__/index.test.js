@@ -9,6 +9,10 @@ jest.mock("firebase-functions/v2/https", () => ({
   onRequest: jest.fn((opts, handler) => handler),
 }));
 
+jest.mock("firebase-functions/v2/scheduler", () => ({
+  onSchedule: jest.fn((opts, handler) => handler),
+}));
+
 const mockCheckAndIncrement = jest.fn();
 const mockIncrementTotals = jest.fn();
 const mockGetStats = jest.fn();

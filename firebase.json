@@ -1,6 +1,7 @@
 {
   "firestore": {
-    "rules": "firestore.rules"
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
   },
   "functions": {
     "source": "functions",
@@ -8,12 +9,7 @@
   },
   "hosting": {
     "public": "public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**",
-      "**/__tests__/**"
-    ],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/__tests__/**"],
     "headers": [
       {
         "source": "**",

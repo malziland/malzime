@@ -4,6 +4,53 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.0.0-rc1] — 2026-05-20
+
+### Queue-Architektur — Phase 1: Backend-Infrastruktur (dormant)
+
+Erster Entwicklungsschritt der Queue-Architektur (siehe `memory/queue-plan.md`). Statt die Analyse synchron in einer 60–180 s offenen Verbindung abzuwickeln, werden Anfragen künftig in eine Cloud-Tasks-Queue gelegt, dosiert abgearbeitet und das Ergebnis serverseitig gespeichert. Das löst die 429er bei Burst-Last strukturell und macht Ergebnisse gegen Verbindungsabbrüche robust.
+
+**Diese rc1 enthält ausschließlich Backend-Infrastruktur. Sie verändert das Live-Verhalten NICHT:** Solange das Feature-Flag `useQueue` (Firestore `featureFlags/current`) AUS ist, läuft jeder echte Nutzer unverändert über den synchronen `/analyze`-Pfad. Der alte Pfad wurde nicht angefasst.
+
+#### Neue Module (`functions/src/`)
+
+- **`jobs.js`** — Job-Lebenszyklus in der Firestore-Collection `jobs`: `createJob`, `claimJob` (idempotenter Übergang `queued → processing` per Transaction), `completeJob`, `failJob`, `getQueuePosition` (Firestore-`count()`-Aggregation), `markFailedIfStale` (Timeout-Sicherung gegen hängende Jobs).
+- **`cloud-tasks.js`** — Wrapper um Google Cloud Tasks (`enqueueJob`). Neue Abhängigkeit `@google-cloud/tasks`.
+- **`queue-storage.js`** — temporäre Bild-Ablage in Firebase Storage (`queue-uploads/`), wird nach der Verarbeitung sofort gelöscht.
+- **`feature-flags.js`** — Laufzeit-Feature-Flags aus Firestore, 30 s Cache, fail-safe auf `false`.
+- **`mistral-mock.js`** — Mistral-Attrappe für kostenlose Tests (Unit-Tests, Emulator-Durchklick, Mock-Lasttests), umschaltbar per `MISTRAL_MOCK=1`.
+- **`handle-enqueue.js`** — Function `enqueue` (public): validiert die Anfrage (identisch zum `/analyze`-Pfad), legt das Bild ab, erzeugt den Job, reiht ihn ein, antwortet sofort mit der `jobId`.
+- **`handle-process-job.js`** — Function `processJob` (NICHT public, nur via Cloud Tasks): führt die bestehende Mistral-Pipeline aus und schreibt das Ergebnis ins Job-Dokument.
+- **`handle-job-status.js`** — Function `jobStatus` (public, leichtgewichtig): liefert dem pollenden Client Status, Warteschlangen-Position, ETA und Ergebnis.
+- **`handle-reap.js`** — geplante Function `reapJobs` (Minutentakt): räumt verlassene Jobs ab (siehe Client-Liveness).
+
+#### Konfiguration & Infrastruktur
+
+- `firestore.indexes.json` neu: zwei zusammengesetzte Indizes auf `jobs` — `status`+`createdAt` (Warteschlangen-Position) und `status`+`lastSeenAt` (Reaper); in `firebase.json` verdrahtet.
+- Dedizierter Cloud-Storage-Bucket `gs://malzime-queue-uploads` angelegt (`europe-west1`, nicht öffentlich, Public-Access dauerhaft gesperrt, Uniform Bucket-Level Access). Kein Firebase-Storage-Default-Bucket — auf den Bucket greift nur der Server via Admin-SDK zu. Dem Function-Runtime-Service-Account wurde Objekt-Zugriff erteilt.
+- `storage-lifecycle.json` neu + auf den Bucket angewendet: GCS-Lifecycle-Regel löscht `queue-uploads/`-Objekte als Sicherheitsnetz nach 1 Tag (GCS-Minimum). Die aktive Löschung in `processJob` greift unmittelbar nach der Verarbeitung — der Lifecycle fängt nur den seltenen Crash-Fall ab.
+
+#### Client-Liveness (Keep-Alive) — von Anfang an Kernmechanismus
+
+Damit die Queue keine Mistral-Calls für Anfragen verbraucht, deren Nutzer die Seite längst verlassen haben:
+
+- Jeder `job-status`-Poll des Clients ist zugleich ein Herzschlag (`lastSeenAt` im Job-Dokument).
+- Pollt der Browser eines wartenden Jobs länger als das Karenz-Fenster (`LIVENESS_GRACE_MS`, 3 min) nicht mehr, gilt der Client als weg.
+- Die geplante Function `reapJobs` setzt solche Jobs im Minutentakt auf `abandoned` und löscht ihr Bild — kein Mistral-Call, und der Warteschlangen-Platz wird frei, sodass Wartende nachrücken. `processJob` prüft die Liveness zusätzlich selbst, bevor es Mistral aufruft.
+- Das Karenz-Fenster ist bewusst großzügig, weil iOS Tabs beim App-Wechsel/Display-Sperren einfriert (das Pollen pausiert, ohne dass der Nutzer wirklich weg ist).
+
+Der Job-Lebenszyklus hat damit einen fünften Zustand: `abandoned`. Die Client-Hälfte (das eigentliche Pollen) baut Phase 2 — das Backend ist von Anfang an darauf ausgelegt.
+
+#### Offene Setup-Schritte vor Go-Live (NICHT Teil dieser rc)
+
+- Cloud-Tasks-Queue `analyze-queue` (`europe-west1`) anlegen, Dispatch-Rate setzen.
+- IAM: Cloud-Tasks-Service-Account die Invoker-Rolle auf `processJob` geben.
+- `firestore.indexes.json` deployen.
+
+### Tests
+
+- Backend 394/394 grün (+96 neue Tests für die Queue-Module inkl. Client-Liveness). Frontend unverändert 143/143.
+
 ## [1.10.9] — 2026-05-20
 
 ### Behoben — Wake-Lock wird wieder im User-Gesture-Kontext angefordert

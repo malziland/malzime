@@ -1,0 +1,248 @@
+"use strict";
+
+/**
+ * handle-process-job.js — Worker der Queue-Architektur (v2.0).
+ *
+ * Wird AUSSCHLIESSLICH von Cloud Tasks aufgerufen (POST mit { jobId }).
+ * Der Schutz vor öffentlichem Aufruf liegt auf IAM-Ebene: die processJob-
+ * Function wird NICHT public deployt — nur der Service-Account von Cloud
+ * Tasks erhält die Invoker-Rolle (siehe index.js + Deploy-Schritt). Cloud
+ * Run weist unauthentifizierte Aufrufe damit ab, bevor dieser Code läuft.
+ *
+ * Ablauf:
+ *  1. Job aus Firestore lesen, claimen (idempotent: queued → processing).
+ *  2. Bild aus Storage laden.
+ *  3. Mistral-Pipeline (Beschreibung → Klassifikation → Privacy → Profile) —
+ *     dieselben Module wie der synchrone /analyze-Pfad.
+ *  4. Ergebnis ins Job-Dokument schreiben (completeJob).
+ *  5. Bild aus Storage löschen (immer — Erfolg ODER Fehler).
+ *
+ * Idempotenz: Liefert Cloud Tasks denselben Task doppelt, schlägt der
+ * zweite claimJob fehl → der Worker bestätigt nur (200) und tut nichts.
+ *
+ * Fehlerverhalten: Jeder Pipeline-Fehler wird zu einem regulären „blocked"-
+ * Ergebnis (completeJob mit blockedReason) — der Client bekommt eine saubere,
+ * renderbare Antwort, exakt wie im synchronen Pfad. Der Worker antwortet
+ * immer mit 200; ein Job, der den Worker zum Absturz bringt, wird vom
+ * Stale-Timeout in jobs.js aufgefangen.
+ */
+
+const { REQUEST_BUDGET_MS } = require("./config");
+const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
+const { classifyDescription, buildAnimalProfiles } = require("./animal");
+const { incrementTotals } = require("./counter");
+const { getJob, claimJob, completeJob, isAbandoned, abandonJob } = require("./jobs");
+const { loadImage, deleteImage } = require("./queue-storage");
+
+/* Mistral-Provider: im Mock-Modus die kostenlose Attrappe, sonst die echte
+   API. Umschaltbar über die Umgebungsvariable MISTRAL_MOCK ("1" = Mock) —
+   für Unit-Tests, Emulator-Durchklick und Mock-Lasttests. */
+function getMistral() {
+  return process.env.MISTRAL_MOCK === "1" ? require("./mistral-mock") : require("./mistral");
+}
+
+const hasCategories = (obj) => obj && obj.categories && Object.keys(obj.categories).length > 0;
+
+function isQuotaError(err) {
+  return !!(err && (err.code === "rate_limit" || /rate_limit|quota|429/i.test(err.message || "")));
+}
+
+/**
+ * Führt die Mistral-Pipeline für einen Job aus.
+ * @returns {Promise<{result: object, success: boolean}>}  result hat dieselbe
+ *          Struktur wie die synchrone /analyze-Antwort; success=false bei einem
+ *          blocked-Ergebnis.
+ */
+async function runPipeline(job) {
+  const mistral = getMistral();
+  const start = Date.now();
+  const remainingBudget = () => Math.max(0, REQUEST_BUDGET_MS - (Date.now() - start));
+  const lang = job.lang || "de";
+  const exif = job.exif || {};
+
+  const { buffer, mimeType } = await loadImage(job.imagePath);
+
+  /* Stage 1: Bildbeschreibung */
+  let description = null;
+  let describeBlocked = false;
+  let describeError = false;
+  let quotaError = false;
+  try {
+    description = await mistral.describeImage(buffer, mimeType, remainingBudget, lang);
+    if (!description) describeBlocked = true;
+  } catch (err) {
+    if (isQuotaError(err)) quotaError = true;
+    describeError = true;
+  }
+
+  /* Stage 2: SUBJECT-Klassifikation + sichtbarer Text */
+  const { subject, hasPerson, hasAnimal, animalType } = classifyDescription(description || "");
+  const visibleText = extractVisibleText(description || "");
+  const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: description || "" });
+
+  /* Stage 3a: Tier-Easter-Egg-Pfad (nur Tier im Bild) */
+  if (description && !hasPerson && hasAnimal) {
+    const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
+    return {
+      result: {
+        profiles: { normal: normalProfile, boost: boostProfile },
+        privacyRisks,
+        exif,
+        meta: { traceId: job.traceId || null, mode: "animal" },
+      },
+      success: true,
+    };
+  }
+
+  /* Stage 3b: Profil-Generierung */
+  let profiles = { normal: null, boost: null };
+  let profileBlocked = false;
+  if (description) {
+    try {
+      profiles = await mistral.generateBothProfiles(description, exif, remainingBudget, lang);
+      profileBlocked = !profiles.normal && !profiles.boost;
+    } catch (err) {
+      if (isQuotaError(err)) quotaError = true;
+      profileBlocked = true;
+    }
+  }
+
+  const hasAnyProfile = hasCategories(profiles.normal) || hasCategories(profiles.boost);
+  if (hasAnyProfile) {
+    const n = profiles.normal || {};
+    const b = profiles.boost || {};
+    return {
+      result: {
+        profiles: {
+          normal: {
+            categories: n.categories || {},
+            ad_targeting: n.ad_targeting || [],
+            manipulation_triggers: n.manipulation_triggers || [],
+            profileText: n.profileText || "",
+          },
+          boost: {
+            categories: b.categories || {},
+            ad_targeting: b.ad_targeting || [],
+            manipulation_triggers: b.manipulation_triggers || [],
+            profileText: b.profileText || "",
+          },
+        },
+        privacyRisks,
+        exif,
+        meta: { traceId: job.traceId || null, mode: "multimodal", subject },
+      },
+      success: true,
+    };
+  }
+
+  /* Blocked-Pfad — kein Profil zustande gekommen. Reason-Reihenfolge
+     identisch zum synchronen /analyze-Pfad. */
+  let blockedReason;
+  if (quotaError) blockedReason = "blocked.overloaded";
+  else if (describeBlocked) blockedReason = "blocked.safetyFilter";
+  else if (describeError) blockedReason = "blocked.apiError";
+  else if (profileBlocked) blockedReason = "blocked.profileBlocked";
+  else if (!description) blockedReason = "blocked.noContent";
+  else blockedReason = "blocked.generic";
+
+  return {
+    result: {
+      profiles: null,
+      blockedReason,
+      privacyRisks,
+      exif,
+      meta: { traceId: job.traceId || null, mode: "blocked" },
+    },
+    success: false,
+  };
+}
+
+async function handleProcessJob(req, res) {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  const jobId = req.body && req.body.jobId;
+  if (!jobId || typeof jobId !== "string") {
+    /* Kein gültiger Task-Body — bestätigen, damit Cloud Tasks nicht endlos
+       einen kaputten Task wiederholt. */
+    console.log(JSON.stringify({ step: "process-job", status: "missing-jobId" }));
+    res.status(200).json({ ok: false, reason: "missing_jobId" });
+    return;
+  }
+
+  const job = await getJob(jobId);
+  if (!job) {
+    console.log(JSON.stringify({ step: "process-job", jobId, status: "job-not-found" }));
+    res.status(200).json({ ok: false, reason: "job_not_found" });
+    return;
+  }
+
+  /* Liveness: Hat der Client die Seite verlassen, während der Job wartete?
+     Dann gar nicht erst Mistral aufrufen — Job auf `abandoned` setzen, Bild
+     löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
+  if (isAbandoned(job)) {
+    await abandonJob(jobId);
+    await deleteImage(job.imagePath);
+    console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
+    res.status(200).json({ ok: false, reason: "abandoned" });
+    return;
+  }
+
+  /* Idempotenter Claim — verhindert Doppelverarbeitung bei Task-Wiederholung. */
+  const claimed = await claimJob(jobId);
+  if (!claimed) {
+    console.log(JSON.stringify({ step: "process-job", jobId, status: "already-claimed", jobStatus: job.status }));
+    res.status(200).json({ ok: false, reason: "already_claimed" });
+    return;
+  }
+
+  const start = Date.now();
+  try {
+    const { result, success } = await runPipeline(job);
+    await completeJob(jobId, result);
+    if (success) {
+      incrementTotals().catch((err) =>
+        console.log(JSON.stringify({ warning: "incrementTotals-error", error: err.message }))
+      );
+    }
+    console.log(
+      JSON.stringify({
+        step: "process-job",
+        jobId,
+        traceId: job.traceId || null,
+        status: success ? "done" : "blocked",
+        mode: result.meta.mode,
+        totalMs: Date.now() - start,
+      })
+    );
+  } catch (err) {
+    /* Unerwarteter Fehler → trotzdem ein sauberes, renderbares blocked-
+       Ergebnis liefern (wie der synchrone Pfad). */
+    console.log(
+      JSON.stringify({
+        step: "process-job",
+        jobId,
+        status: "error",
+        error: err.message,
+        totalMs: Date.now() - start,
+      })
+    );
+    await completeJob(jobId, {
+      profiles: null,
+      blockedReason: "blocked.apiError",
+      privacyRisks: [],
+      exif: job.exif || {},
+      meta: { traceId: job.traceId || null, mode: "blocked" },
+    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", jobId, error: e.message })));
+  } finally {
+    /* Bild immer löschen — Erfolg ODER Fehler. Die Storage-Lifecycle-Regel
+       ist das zweite Sicherheitsnetz. */
+    await deleteImage(job.imagePath);
+  }
+
+  res.status(200).json({ ok: true });
+}
+
+module.exports = { handleProcessJob, runPipeline };

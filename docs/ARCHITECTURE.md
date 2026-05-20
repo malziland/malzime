@@ -1,16 +1,16 @@
 # Architektur — malziME
 
-Dieses Dokument beschreibt die End-to-End-Architektur von malziME ab Version 1.6.0 (Mistral-only Pipeline).
+Dieses Dokument beschreibt die End-to-End-Architektur von malziME. Die KI-Pipeline läuft seit v1.6.0 über Mistral AI; seit v2.0 wird sie über eine Cloud-Tasks-Warteschlange ausgeführt (siehe Abschnitt »Queue-Architektur«).
 
 ## Aktueller Stand
 
-Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google-KI-Dienste (Vertex AI Gemini, Cloud Vision API) sind aus der Pipeline entfernt. Google ist nur noch für die Infrastruktur-Schicht zuständig: Firebase Hosting + Cloud Functions + Firestore, alles in `europe-west1` (Belgien).
+Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google-KI-Dienste (Vertex AI Gemini, Cloud Vision API) sind aus der Pipeline entfernt. Google ist nur noch für die Infrastruktur-Schicht zuständig: Firebase Hosting, Cloud Functions, Firestore, Cloud Tasks und Cloud Storage, alles in `europe-west1` (Belgien). Seit v2.0 wird die Pipeline über eine Warteschlange ausgeführt — siehe Abschnitt »Queue-Architektur«.
 
 | Phase | Primaer | Modell | Region |
 |-------|---------|--------|--------|
-| Describe (Bildbeschreibung) | Mistral AI | `mistral-large-latest` (Large 3) | EU-Default |
+| Describe (Bildbeschreibung) | Mistral AI | `mistral-large-2512` (Large 3) | EU-Default |
 | Profile (Normal + Boost) | Mistral AI | `mistral-small-2603` (Small 4) | EU-Default |
-| Profile-Fallback (intern) | Mistral AI | `mistral-large-latest` (Large 3) | EU-Default |
+| Profile-Fallback (intern) | Mistral AI | `mistral-large-2512` (Large 3) | EU-Default |
 | Hosting + Functions + DB | Google | Firebase | `europe-west1` |
 
 ## Datenfluss
@@ -82,6 +82,42 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 └──────────────────────────────────────────────────────────────────┘
 ```
 
+## Queue-Architektur (v2.0)
+
+Seit v2.0 läuft die Analyse nicht mehr synchron, sondern über eine Warteschlange. Grund: Workshop-Last ist stoßweise (z. B. 25 Uploads in zwei Minuten), und jeder KI-Anbieter hat Rate-Limits. Die Queue nimmt den Stoß auf und arbeitet ihn dosiert ab, statt im Limit-Fall Fehler zu produzieren.
+
+Welcher Pfad aktiv ist, entscheidet das Firestore-Feature-Flag `useQueue` (`featureFlags/current`, 30 s Cache, fail-safe `false`). Das Flag ist der zentrale Betriebsschalter — ohne Deploy umlegbar, jederzeit zurück auf den synchronen `/analyze`-Pfad.
+
+```
+Browser ──POST /api/enqueue──► enqueue
+                                 │ Bild → GCS-Bucket
+                                 │ Job-Dokument → Firestore-Collection `jobs` (queued)
+                                 │ Task → Cloud-Tasks-Queue `analyze-queue`
+                                 ▼  Antwort: { jobId }
+                          Cloud Tasks  (dosiert, maxConcurrentDispatches)
+                                 ▼
+                          processJob  (OIDC-geschützt, nicht öffentlich)
+                                 │ claimJob: queued → processing (idempotente Transaktion)
+                                 │ Liveness-Check: pollt der Client nicht mehr → abandoned
+                                 │ Bild aus dem Bucket → dieselbe Mistral-Pipeline wie /analyze
+                                 │ Ergebnis → Job-Dokument (done), Bild gelöscht
+                                 ▼
+Browser ◄──GET /api/job-status?jobId=──  Polling alle 2 s (= Liveness-Herzschlag)
+            Antwort: status, queuePosition, etaSeconds, result (bei done)
+```
+
+### Client-Liveness
+
+Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-Poll schreibt `lastSeenAt`. Bleibt das Lebenszeichen länger als `LIVENESS_GRACE_MS` (3 min) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
+
+### Reaper
+
+`reapJobs` läuft im Minutentakt und räumt drei Sorten auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Timeout → `failed`) und abgelaufene Job-Dokumente (älter als `JOB_RETENTION_MS` = 24 h → gelöscht).
+
+### Lokaler Betrieb
+
+Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`) ersetzen Shims Cloud Tasks (direkter HTTP-Dispatch) und den GCS-Bucket (Dateisystem-Ablage). Siehe `docs/QUEUE-EMULATOR.md`.
+
 ## Komponenten-Verantwortlichkeiten
 
 ### Frontend (`public/`)
@@ -91,7 +127,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call) |
-| `js/api.js` | API-Client mit AbortController + Stale-Guard |
+| `js/api.js` | API-Client (synchroner Pfad + Queue-Polling) mit AbortController + Stale-Guard |
 | `js/render.js` | Profile-Rendering, Bias-Toggle, Privacy-Cards, Karte |
 | `js/ui.js` | Disclaimer-Modal, Maintenance-Modal, Limit-Banner, Scan-Animation |
 | `js/state.js` | Globaler State (`requestId`, `isAnalyzing`) |
@@ -108,10 +144,18 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 | `handle-analyze.js` | Mistral-only Pipeline: Validation → Mistral Describe → SUBJECT → Easter-Egg / Profile-Gen |
 | `handle-stats.js` | GET-only Stats-Endpunkt |
 | `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
+| `handle-enqueue.js` | Queue: Job anlegen, Bild in den Bucket, Task einreihen |
+| `handle-process-job.js` | Queue-Worker: claimt den Job, ruft die Mistral-Pipeline, schreibt das Ergebnis |
+| `handle-job-status.js` | Queue: Status-Polling für den Client + Liveness-Herzschlag |
+| `handle-reap.js` | Queue: Reaper (Minutentakt) für verlassene / hängende / abgelaufene Jobs |
+| `jobs.js` | Queue: Job-Lebenszyklus + Firestore-Zugriff auf die `jobs`-Collection |
+| `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
+| `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
+| `feature-flags.js` | Laufzeit-Feature-Flag `useQueue` (Firestore, 30 s Cache) |
 | `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
 | `mistral.js` | Mistral AI Hybrid — Large 3 Describe + Small 4 Profile, mit Mistral-internem Large-3-Backup |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
-| `throttle.js` | In-Memory-Semaphore gegen Mistral-Bursts (gebaut, noch nicht aktiviert) |
+| `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
 | `counter.js` | Firestore-Zaehler: Stundenlimit (rollend), Totals, Stats, Boost, Reset, Maintenance |
 | `animal.js` | SUBJECT-Klassifikation aus Mistral-Beschreibung + Easter-Egg-Profile |
 | `privacy.js` | OCR-basiertes Privacy-Risiko-Mapping aus Mistrals "Sichtbarer Text" |
@@ -129,7 +173,9 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 | **Mistral AI API** | Alle KI-Analysen | Mistral AI SAS, Paris, FR — EU-Hosting Default |
 | **Firebase Hosting** | SPA-Auslieferung | Google Ireland Ltd. — Edge-Caches weltweit, Origin EU |
 | **Firebase Cloud Functions** | Backend-Runtime | Google Ireland Ltd. — `europe-west1` |
-| **Cloud Firestore** | Zaehler, Maintenance-Flag | Google Ireland Ltd. — `europe-west1` |
+| **Google Cloud Tasks** | Dosierter Job-Dispatch (Queue) | Google Ireland Ltd. — `europe-west1` |
+| **Google Cloud Storage** | Temporaere Bild-Ablage der Queue | Google Ireland Ltd. — `europe-west1` |
+| **Cloud Firestore** | Zaehler, Maintenance-Flag, Queue-Jobs | Google Ireland Ltd. — `europe-west1` |
 | **OpenStreetMap / Nominatim** | Reverse-Geocoding (direkt vom Browser) | OpenStreetMap Foundation, UK |
 | **ntfy** | Push-Benachrichtigungen bei Limit | Self-hosted oder ntfy.sh, je nach Setup |
 
@@ -188,7 +234,7 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 - **escapeXml()** auf alle dynamischen Prompt-Inhalte (SEC-003)
 - **Output-Bounds** auf Profil-Strings (max 800 chars / Kategorie, SEC-004)
 - **Maintenance-Kill-Switch** via Firestore-Doc (30s Cache)
-- **Per-Instance-Throttle** (gebaut in `throttle.js`, nicht angebunden — Aktivierung bei Bedarf)
+- **Per-Instance-Throttle** (`throttle.js` — Semaphore + Token-Bucket, seit v1.7.0 in `mistral.js` aktiv)
 
 ## Privacy-Architektur
 
@@ -197,5 +243,5 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr)
 - CSP nur self + OpenStreetMap Tiles + Nominatim
-- Keine Persistenz: Bilder und Profile bleiben im RAM, alles wird verworfen
+- Keine dauerhafte Persistenz: im Queue-Betrieb liegt das Bild kurz im GCS-Bucket und wird unmittelbar nach der Verarbeitung gelöscht; das Job-Dokument spätestens nach 24 h
 - Anwendungs-Logs enthalten keine Bildinhalte und keine personenbezogenen Daten — nur Request-ID, Step-Name, Status, Token-Counts

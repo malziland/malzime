@@ -49,14 +49,14 @@ Diese Regeln sind nicht verhandelbar:
 - **GPS verlässt nie den Browser.** Keine Ausnahmen.
 - **Keine externen Scripts.** Alles muss self-hosted sein.
 - **Keine Tracking-Cookies, Analytics oder Werbung.**
-- **Keine Speicherung von Bildern oder Profilen.**
+- **Keine dauerhafte Speicherung von Bildern oder Profilen.** (Im Queue-Betrieb liegt das Bild kurz im Storage — es muss unmittelbar nach der Verarbeitung gelöscht werden.)
 - **Kein Firebase SDK im Frontend.**
 - **dateTimeOriginal wird nicht an die KI gesendet.** (Verleitet zu falschen Altersschaetzungen.)
 - **API-Keys und Secrets niemals committen.** `gitleaks` laeuft in CI als Backstop.
 
 ## KI-Provider und Architektur
 
-Seit v1.6.0 nutzt malziME ausschliesslich Mistral AI (Paris, EU) als KI-Anbieter — keine weiteren Provider, kein Fallback. Details:
+Seit v1.6.0 nutzt malziME ausschliesslich Mistral AI (Paris, EU) als KI-Anbieter — keine weiteren Provider, kein Fallback. Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange (umschaltbar per Feature-Flag `useQueue`). Details:
 - Code-Aufbau: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Setup mit Mistral-API-Key: [`docs/SETUP.md`](docs/SETUP.md#firebase-secrets)
 - Tests laufen mit Mocked-Fetch — kein echter Key fuer `npm test` noetig.

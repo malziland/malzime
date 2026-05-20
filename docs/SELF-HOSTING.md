@@ -42,7 +42,9 @@ Kosten: Pay-per-Use, ein Workshop mit 30 Teilnehmer:innen kostet ca. $0.35.
 
 Im Google Cloud Console unter **APIs & Services > Library**:
 
-- **Cloud Firestore** — fuer den Analyse-Zaehler, das Stundenlimit und den Maintenance-Modus (wird automatisch mit Firebase aktiviert)
+- **Cloud Firestore** — Analyse-Zaehler, Stundenlimit, Maintenance-Modus, Queue-Jobs (wird automatisch mit Firebase aktiviert)
+- **Cloud Tasks API** — Warteschlange fuer die Analyse-Jobs (seit v2.0)
+- **Cloud Storage** — temporaere Bild-Ablage der Queue (seit v2.0)
 
 Cloud Vision API und Vertex AI sind NICHT mehr noetig (seit v1.6.0). Falls du sie zuvor aktiviert hattest, kannst du sie zur Kosten-Einsparung deaktivieren — die Pipeline nutzt sie nicht.
 
@@ -187,6 +189,41 @@ Ersetze `malzime` mit deinem eigenen Buy-Me-a-Coffee-Username, oder entferne die
 
 ---
 
+## 5j. Queue-Architektur einrichten (v2.0)
+
+Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange (Details: [`ARCHITECTURE.md`](ARCHITECTURE.md)). Für eine eigene Instanz brauchst du:
+
+**1. Cloud-Tasks-Queue anlegen:**
+
+```bash
+gcloud tasks queues create analyze-queue --location=europe-west1
+```
+
+Die Parallelität (`--max-concurrent-dispatches`) richtet sich nach den Rate-Limits deines Mistral-Tarifs — starte konservativ (z. B. 3) und taste dich mit Lasttests hoch. Zu hoch gewählt, antwortet Mistral mit `429` und Analysen kommen als `blocked.overloaded` zurück.
+
+**2. GCS-Bucket für die temporäre Bild-Ablage:**
+
+```bash
+gcloud storage buckets create gs://DEIN-PROJEKT-queue-uploads \
+  --location=europe-west1 --uniform-bucket-level-access --public-access-prevention
+```
+
+Trage den Bucket-Namen in `functions/src/config.js` (`QUEUE_BUCKET`) oder als Umgebungsvariable `QUEUE_BUCKET` ein. Empfohlen: eine Lifecycle-Regel, die Objekte nach 1 Tag löscht (Sicherheitsnetz — die aktive Löschung passiert ohnehin sofort nach der Verarbeitung).
+
+**3. Firestore-Indizes deployen:**
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
+**4. Feature-Flag:** Der Queue-Pfad ist erst aktiv, wenn das Firestore-Dokument `featureFlags/current` das Feld `useQueue: true` hat. Fehlt das Dokument oder steht es auf `false`, läuft der synchrone `/analyze`-Pfad. Das Flag ist dein Betriebsschalter — umlegbar ohne Deploy.
+
+Die IAM-Rolle, mit der Cloud Tasks den Worker `processJob` aufrufen darf, vergibt `firebase deploy` automatisch.
+
+Lokaler Test der Queue ohne Cloud Tasks: [`QUEUE-EMULATOR.md`](QUEUE-EMULATOR.md).
+
+---
+
 ## 6. Lokal testen
 
 Fuer lokale Entwicklung muessen die Google Cloud APIs authentifiziert sein:
@@ -201,7 +238,7 @@ Dann den Emulator starten:
 firebase emulators:start --only functions,hosting
 ```
 
-Oeffne http://localhost:5000 — die App sollte funktionieren.
+Oeffne http://localhost:5050 — die App sollte funktionieren.
 
 > **Tipp**: Im Emulator braucht die Mistral-API trotzdem Internet-Zugang — die KI-Analyse laeuft nicht lokal.
 
@@ -235,6 +272,7 @@ Bevor du live gehst:
 - [ ] Locale-Dateien angepasst (falls gewuenscht)
 - [ ] Firebase Secrets gesetzt: ADMIN_SECRET, MISTRAL_API_KEY (+ optional NTFY_URL, NTFY_TOPIC)
 - [ ] Firestore Security Rules deployed: `firebase deploy --only firestore`
+- [ ] Queue eingerichtet: Cloud-Tasks-Queue + GCS-Bucket + `QUEUE_BUCKET` gesetzt + Firestore-Indizes deployt (siehe »Queue-Architektur einrichten«)
 - [ ] Tests laufen: `cd functions && npm test` und `npm run test:frontend`
 - [ ] Lokal getestet: Bild hochladen funktioniert
 

@@ -24,21 +24,33 @@ malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
 4. Key spaeter als Firebase Secret hinterlegen (Schritt 4)
 
 Genutzte Modelle (in `functions/src/config.js`):
-- `mistral-large-latest` (Large 3) fuer multimodale Bildbeschreibung
+- `mistral-large-2512` (Large 3) fuer multimodale Bildbeschreibung
 - `mistral-small-2603` (Small 4) fuer Profilgenerierung (Text-only, schneller + guenstiger)
-- `mistral-large-latest` als Backup wenn Small 4 invalides JSON liefert (Mistral-intern)
+- `mistral-large-2512` als Backup wenn Small 4 invalides JSON liefert (Mistral-intern)
 
 Wenn der Mistral-Call fehlschlaegt, gibt es keinen anderen KI-Provider als Fallback. Der User sieht eine `blocked.apiError`- oder `blocked.overloaded`-Antwort.
 
 ## 3. Google Cloud (nur fuer Infrastruktur)
 
-Im [Google Cloud Console](https://console.cloud.google.com) brauchst du nur eine API zusaetzlich zu Firebase:
+Im [Google Cloud Console](https://console.cloud.google.com) brauchst du diese APIs zusaetzlich zu Firebase:
 
-- **Cloud Firestore** — Analyse-Zaehler + Maintenance-Flag (wird automatisch mit Firebase aktiviert)
+- **Cloud Firestore** — Analyse-Zaehler, Maintenance-Flag und Queue-Jobs (wird automatisch mit Firebase aktiviert)
+- **Cloud Tasks** — Warteschlange fuer die Analyse-Jobs (seit v2.0)
+- **Cloud Storage** — temporaere Bild-Ablage der Queue (seit v2.0)
 
 Cloud Vision API und Vertex AI werden seit v1.6.0 NICHT mehr genutzt — falls vorher aktiviert, kannst du sie im Cloud Console deaktivieren (sparen Kosten, nicht zwingend).
 
 Region: `europe-west1` (Belgien, EU)
+
+## 3a. Queue-Architektur (v2.0)
+
+Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange — Details in [`docs/ARCHITECTURE.md`](ARCHITECTURE.md). Eingerichtet sind:
+
+- Cloud-Tasks-Queue `analyze-queue` (`europe-west1`, `maxConcurrentDispatches` an Mistrals Limits angepasst)
+- GCS-Bucket `malzime-queue-uploads` fuer die temporaere Bild-Ablage (Lifecycle-Regel: 1 Tag)
+- Firestore-Feature-Flag `featureFlags/current.useQueue` — schaltet zwischen Queue und synchronem `/analyze`-Pfad, **ohne Deploy** (zentraler Betriebsschalter)
+
+Lokaler Durchklick der Queue ohne Cloud Tasks: [`docs/QUEUE-EMULATOR.md`](QUEUE-EMULATOR.md).
 
 ## 4. Dependencies installieren
 
@@ -110,8 +122,8 @@ cd functions && npm test
 npm run test:frontend
 ```
 
-**Backend (290 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mocked-Fetch), JSON-Repair (4-Stufen), Throttle-Semaphore.
-**Frontend (141 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Stats-Seite, i18n-Modul, i18n-Guardian.
+**Backend (411 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mocked-Fetch), JSON-Repair (4-Stufen), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung).
+**Frontend (152 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Stats-Seite, i18n-Modul, i18n-Guardian.
 **E2E (2 Tests):** Playwright Smoke-Tests — Demo-Flow + fehlerfreies Laden.
 
 ## 7. Linting + Formatting
@@ -192,7 +204,7 @@ Bei Tier-Erkennung (SUBJECT=ANIMAL_ONLY) entfaellt der Small-4-Profile-Call — 
 
 | Modell | Input | Output |
 |--------|-------|--------|
-| Large 3 (`mistral-large-latest`) | $0.50 | $1.50 |
+| Large 3 (`mistral-large-2512`) | $0.50 | $1.50 |
 | Small 4 (`mistral-small-2603`) | $0.15 | $0.60 |
 
 **Google Cloud (nur Infrastruktur):**
@@ -226,7 +238,7 @@ Die Privacy-Architektur ist ein Kernbestandteil des Projekts:
 1. **EXIF im Browser**: Die Library exifr (self-hosted unter `public/lib/exifr/`) parsed Metadaten client-seitig
 2. **GPS bleibt lokal**: GPS-Koordinaten werden nie an den Server gesendet. Geocoding (Nominatim) wird direkt vom Browser aufgerufen
 3. **Server bekommt**: Komprimiertes Bild (max 1280px, JPEG 0.82) + Kamera-Hersteller/Modell. Kein GPS, kein dateTimeOriginal.
-4. **Keine Speicherung**: Bilder werden im RAM verarbeitet und sofort verworfen
+4. **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird unmittelbar danach geloescht; das Job-Dokument spaetestens nach 24 h. Im synchronen Pfad bleibt das Bild im RAM
 5. **Keine externen Scripts**: Fonts, Leaflet und exifr sind self-hosted. Kein CDN, kein Google Fonts, kein Firebase SDK im Frontend
 6. **Bot-Schutz ohne Tracking**: Rate Limiting (IP-basiert), Honeypot-Feld, Timing-Check. Kein reCAPTCHA.
 

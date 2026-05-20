@@ -31,7 +31,8 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 
 ## Security Measures
 
-- **No data storage**: Images and profiles exist only in RAM during processing
+- **No permanent data storage**: In queue mode the image is briefly held in a dedicated EU storage bucket and deleted immediately after processing; job documents (including the result) are removed within 24 h. No profiles are stored permanently
+- **Queue worker not publicly reachable**: `processJob` runs with `invoker: private` — only Google Cloud Tasks can invoke it, authenticated via an OIDC service-account token
 - **No tracking**: No cookies, no analytics, no advertising
 - **GPS stays in browser**: GPS coordinates are never sent to the server
 - **Content Security Policy**: Strict whitelist (self + OpenStreetMap + Cloud Functions)

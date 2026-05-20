@@ -12,6 +12,17 @@ function fmtNum(val, decimals = 2) {
   }).format(val);
 }
 
+/* Setzt Balken-Breiten per CSSOM (element.style.width) statt per inline
+   style="…"-Attribut. Inline-style-Attribute verstoßen gegen die strikte
+   CSP (style-src 'self') und werden vom Browser blockiert; das Setzen über
+   das style-Property in JS ist davon nicht betroffen. Aufrufen, nachdem ein
+   Container mit [data-bar-width]-Elementen befüllt wurde. */
+function applyBarWidths(container) {
+  container.querySelectorAll("[data-bar-width]").forEach((el) => {
+    el.style.width = el.dataset.barWidth + "%";
+  });
+}
+
 /* ── Aktuellen Modus rendern (aus gecachten Daten) ── */
 
 export function renderCurrentMode(data) {
@@ -86,11 +97,12 @@ function renderCategories(profile) {
             <span class="cat-conf ${cls}">${pct}%</span>
           </div>
           <p class="cat-value">${escapeHtml(cat.value)}</p>
-          <div class="conf-track"><div class="conf-bar ${cls}" style="width:${pct}%"></div></div>
+          <div class="conf-track"><div class="conf-bar ${cls}" data-bar-width="${pct}"></div></div>
         </div>
       `;
     })
     .join("");
+  applyBarWidths(elements.facts);
 }
 
 /* ── Rendering: Werbung + Manipulation ── */
@@ -423,7 +435,7 @@ function renderDataValue(profile) {
           <div class="dv-bar-row">
             <span class="dv-bar-label">${escapeHtml(item.label)}</span>
             <div class="dv-bar-track">
-              <div class="dv-bar-fill" style="width:${Math.round((item.value / maxVal) * 100)}%"></div>
+              <div class="dv-bar-fill" data-bar-width="${Math.round((item.value / maxVal) * 100)}"></div>
             </div>
             <span class="dv-bar-val">${fmtNum(item.value)} \u20ac</span>
           </div>
@@ -435,4 +447,5 @@ function renderDataValue(profile) {
       <p class="dv-footnote">${t("dv.footnote")}</p>
     </div>
   `;
+  applyBarWidths(elements.dataValue);
 }

@@ -27,7 +27,7 @@ const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
 const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];
 const CLIENT_BOOL_KEYS = ["saveData"];
 
-const META_STRING_KEYS = { subject: 30, mode: 30, lang: 10, reason: 100 };
+const META_STRING_KEYS = { subject: 30, mode: 30, lang: 10, reason: 100, wakeLock: 40 };
 const META_BOOL_KEYS = ["maintenanceTriggered"];
 
 function sanitizeTimings(raw) {

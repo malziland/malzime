@@ -64,9 +64,17 @@ function isRateLimitError(err) {
    beliebig viele Requests gleichzeitig gegen Mistrals RPS-Limit feuern —
    überzählige Calls warten geordnet auf einen freien Slot, statt sofort 429 zu
    kassieren. Der Slot wird über die kompletten 429-Retry-Backoffs gehalten,
-   was den Burst zusätzlich entzerrt. */
+   was den Burst zusätzlich entzerrt.
+
+   v1.10.8: modelClass ("large"/"small") wird an withMistralSlot durchgereicht,
+   damit der modell-bewusste Token-Bucket den richtigen Rate-Bucket waehlt —
+   Large darf schneller feuern (6 RPS) als Small (1.67 RPS). */
+function modelClassOf(model) {
+  return /large/i.test(model || "") ? "large" : "small";
+}
+
 async function callMistralRaw(options) {
-  return withMistralSlot(() => callMistralRawUnthrottled(options));
+  return withMistralSlot(() => callMistralRawUnthrottled(options), modelClassOf(options.model));
 }
 
 async function callMistralRawUnthrottled({ model, messages, maxTokens, temperature, forceJSON, timeoutMs }) {

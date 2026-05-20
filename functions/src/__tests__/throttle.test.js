@@ -1,8 +1,11 @@
 const {
   createSemaphore,
+  createRateBucket,
   withMistralSlot,
   getMistralStats,
   DEFAULT_MAX_CONCURRENT,
+  LARGE_TOKEN_INTERVAL_MS,
+  SMALL_TOKEN_INTERVAL_MS,
   _setRateIntervalMs,
   _resetRateBucket,
 } = require("../throttle");
@@ -138,7 +141,7 @@ describe("module constants", () => {
   });
 });
 
-describe("token-bucket rate limiter (v1.10.6)", () => {
+describe("token-bucket rate limiter", () => {
   test("verteilt mehrere parallele Slot-Operationen auf das Interval", async () => {
     /* Interval bewusst klein, damit der Test schnell laeuft, aber gross genug
        um den Effekt messen zu koennen. */
@@ -166,5 +169,40 @@ describe("token-bucket rate limiter (v1.10.6)", () => {
     }
 
     _setRateIntervalMs(0); /* zurueck zu „deaktiviert" fuer andere Tests */
+  }, 10000);
+});
+
+describe("model-aware token buckets (v1.10.8)", () => {
+  test("Large-Interval ist kuerzer als Small-Interval (Large darf schneller feuern)", () => {
+    expect(LARGE_TOKEN_INTERVAL_MS).toBeLessThan(SMALL_TOKEN_INTERVAL_MS);
+  });
+
+  test("withMistralSlot fuehrt fn aus, egal ob modelClass large oder small", async () => {
+    _setRateIntervalMs(0);
+    _resetRateBucket();
+    const large = await withMistralSlot(async () => "L", "large");
+    const small = await withMistralSlot(async () => "S", "small");
+    expect(large).toBe("L");
+    expect(small).toBe("S");
+  });
+
+  test("zwei separate Buckets bremsen sich NICHT gegenseitig aus", async () => {
+    /* Ein langsamer Bucket (300ms) und ein schneller (0ms) — der schnelle
+       darf nicht vom langsamen ausgebremst werden. */
+    const slow = createRateBucket(300);
+    const fast = createRateBucket(0);
+
+    const fastStart = Date.now();
+    for (let i = 0; i < 4; i++) await fast.acquire();
+    const fastElapsed = Date.now() - fastStart;
+
+    /* 4 schnelle Acquires ohne Interval — praktisch instant (< 100ms) */
+    expect(fastElapsed).toBeLessThan(100);
+
+    /* Der langsame Bucket arbeitet unabhaengig mit seinem eigenen Tempo */
+    const slowStart = Date.now();
+    for (let i = 0; i < 3; i++) await slow.acquire();
+    const slowElapsed = Date.now() - slowStart;
+    expect(slowElapsed).toBeGreaterThanOrEqual(550);
   }, 10000);
 });

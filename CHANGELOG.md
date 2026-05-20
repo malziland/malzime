@@ -4,6 +4,31 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [1.10.8] — 2026-05-20
+
+### Behoben — modell-bewusster Token-Bucket + Wake-Lock-Diagnose
+
+Nach Auswertung des Workshop-Vormittags (2026-05-20): Der Server lief stabil (keine 429er, keine Mistral-Hänger), aber einzelne Schüler warteten bis ~110 s, und manche mussten mehrfach hochladen. Drei Ursachen-Maßnahmen:
+
+- **`functions/src/throttle.js` — modell-bewusster Token-Bucket.** Bisher drosselte EIN gemeinsamer Token-Bucket alle Mistral-Calls auf 1,6 RPS — orientiert am langsamsten Modell (`mistral-small-2603`, 1,67 RPS). Damit wurden auch die `describe`-Calls über `mistral-large-2512` (Limit 6 RPS) unnötig auf 1,6 RPS gebremst. Jetzt zwei getrennte Buckets: Large 800 ms/Instanz (= ~5 RPS gesamt bei 4 Instanzen, unter 6-RPS-Limit), Small 2500 ms/Instanz (= ~1,6 RPS, unter 1,67-Limit). Die Bildbeschreibung läuft damit ~3× schneller → kürzerer Wartezeit-Tail unter Workshop-Last. `withMistralSlot` bekommt einen `modelClass`-Parameter; `mistral.js` leitet `large`/`small` aus dem Modellnamen ab.
+- **`public/js/api.js` — Wake-Lock-Telemetrie.** Das `acquireWakeLock()`-`catch` verschluckte bisher jeden Fehler stumm — wir hatten null Daten, warum der Bildschirm-Wachhalter auf keinem Gerät zu greifen scheint. Jetzt wird der Status erfasst (`not-attempted` / `unsupported` / `acquired` / `denied:<FehlerName>`) und in Success-Telemetrie (`meta.wakeLock`) sowie Client-Error-Logs (`wakeLock`) mitgeschickt. Ab dem nächsten Workshop liefern die Logs echte Daten.
+- **`public/locales/de.json` + `en.json` — `error.suspended` neutral formuliert.** Die alte Meldung behauptete fälschlich „Gerät ging in Ruhezustand". Das stützte sich auf `document.hidden`, das aber aus vielen Gründen `true` wird (App-Wechsel, Benachrichtigungs-Leiste, Browser-Energiesparmodus — speziell Samsung Internet friert Tabs bei eingeschaltetem Bildschirm ein). Neue Meldung: „Die Analyse wurde unterbrochen. Bitte versuch es nochmal und lass die Seite dabei geöffnet im Vordergrund." — keine falsche Ursachen-Behauptung mehr.
+
+### Begleitende Whitelist-Erweiterungen
+
+- `functions/src/handle-telemetry.js`: `wakeLock` (max 40 Zeichen) in `META_STRING_KEYS`.
+- `functions/src/handle-errors.js`: `wakeLock` (max 40 Zeichen) in `STRING_FIELDS`.
+- `public/js/error-logger.js`: reicht `context.wakeLock` in den Error-Payload durch.
+
+### Tests
+
+- Backend 298/298 grün (3 neue Tests für die modell-bewussten Token-Buckets).
+- Frontend 143/143 grün.
+
+### Sonstiges
+
+- Cache-Buster auf `?v=2026052001`.
+
 ## [1.10.7] — 2026-05-19 (Abend)
 
 ### Behoben — Modell-Limits korrekt erfasst, Token-Bucket entsprechend kalibriert

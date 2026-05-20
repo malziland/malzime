@@ -22,6 +22,7 @@ const STRING_FIELDS = {
   userAgent: 250,
   requestId: 50,
   traceId: 50,
+  wakeLock: 40,
 };
 const NUMBER_FIELDS = ["durationMs", "httpStatus"];
 const BOOLEAN_FIELDS = ["online", "hidden"];

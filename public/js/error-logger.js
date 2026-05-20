@@ -20,19 +20,15 @@ export function logClientError(error, context = {}) {
       errorName: (error && error.name) || "Error",
       errorMessage: ((error && error.message) || "").slice(0, 500),
       phase: typeof context.phase === "string" ? context.phase : "unknown",
-      durationMs:
-        typeof context.durationMs === "number" && isFinite(context.durationMs)
-          ? context.durationMs
-          : 0,
+      durationMs: typeof context.durationMs === "number" && isFinite(context.durationMs) ? context.durationMs : 0,
       online: typeof navigator !== "undefined" ? navigator.onLine : true,
       hidden: typeof document !== "undefined" ? document.hidden : false,
       userAgent: (navigator && navigator.userAgent) || "",
       url: (typeof location !== "undefined" && location.pathname) || "",
-      requestId:
-        typeof context.requestId === "string" ? context.requestId : null,
+      requestId: typeof context.requestId === "string" ? context.requestId : null,
       traceId: typeof context.traceId === "string" ? context.traceId : null,
-      httpStatus:
-        typeof context.httpStatus === "number" ? context.httpStatus : null,
+      httpStatus: typeof context.httpStatus === "number" ? context.httpStatus : null,
+      wakeLock: typeof context.wakeLock === "string" ? context.wakeLock : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
       client: clientCtx,
     };

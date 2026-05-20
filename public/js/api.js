@@ -52,16 +52,28 @@ function retryWaitMs() {
    Standby geht. Geht es schlafen, friert der Browser die Seite ein und die
    laufende fetch-Anfrage stirbt — der User sieht beim Aufwachen einen Fehler,
    obwohl der Server fertig gerechnet hat. Best-Effort: nicht jedes Gerät
-   unterstützt die API, und ein manueller Power-Knopf-Druck sperrt trotzdem. */
+   unterstützt die API, und ein manueller Power-Knopf-Druck sperrt trotzdem.
+
+   v1.10.8: wakeLockStatus erfasst, ob/warum der Wake-Lock scheitert. Wird in
+   der Telemetrie (Success + Error) mitgeschickt. Hintergrund: Der Wake-Lock
+   greift offenbar auf keinem Geraet — bisher verschluckte das catch jeden
+   Fehler stumm, wir hatten null Diagnose-Daten. Werte: "not-attempted",
+   "unsupported", "acquired", "denied:<FehlerName>". */
 let wakeLock = null;
+let wakeLockStatus = "not-attempted";
 
 async function acquireWakeLock() {
-  if (!("wakeLock" in navigator)) return;
+  if (!("wakeLock" in navigator)) {
+    wakeLockStatus = "unsupported";
+    return;
+  }
   try {
     wakeLock = await navigator.wakeLock.request("screen");
-  } catch (_) {
+    wakeLockStatus = "acquired";
+  } catch (err) {
     /* Verweigert/nicht verfügbar — kein Abbruch, läuft ohne Wake-Lock weiter. */
     wakeLock = null;
+    wakeLockStatus = "denied:" + (err && err.name ? err.name : "unknown");
   }
 }
 
@@ -267,6 +279,7 @@ export async function analyzeImage() {
           requestId: String(myId),
           traceId,
           httpStatus: response.status,
+          wakeLock: wakeLockStatus,
           timings: { ...timings, totalMs: Date.now() - analyzeStartTime },
         });
         httpFailureHandled = true;
@@ -298,6 +311,7 @@ export async function analyzeImage() {
         durationMs: Date.now() - analyzeStartTime,
         requestId: String(myId),
         traceId,
+        wakeLock: wakeLockStatus,
         timings: { ...timings, totalMs: Date.now() - analyzeStartTime },
       });
       return;
@@ -338,6 +352,7 @@ export async function analyzeImage() {
           subject: typeof meta.subject === "string" ? meta.subject : undefined,
           mode: typeof meta.mode === "string" ? meta.mode : undefined,
           lang: getLanguage(),
+          wakeLock: wakeLockStatus,
         },
       });
     });
@@ -375,6 +390,7 @@ export async function analyzeImage() {
       durationMs: Date.now() - analyzeStartTime,
       requestId: String(myId),
       traceId,
+      wakeLock: wakeLockStatus,
       timings: { ...timings, totalMs: Date.now() - analyzeStartTime },
     });
   } finally {

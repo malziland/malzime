@@ -101,88 +101,106 @@ function createSemaphore(options = {}) {
 const mistralSemaphore = createSemaphore();
 
 /**
- * Token-Bucket-Rate-Limiter — v1.10.6 Fix nach Lasttest-Erkenntnis.
+ * Token-Bucket-Rate-Limiter — modell-bewusst seit v1.10.8.
  *
  * Hintergrund: Die Semaphore limitiert PARALLELITAET (max 6 in-flight), aber
- * nicht die RATE. Wenn 6 Slots gleichzeitig frei sind und 6 neue Anfragen
- * reinkommen, bursten alle in derselben Millisekunde gegen Mistral → 6 RPS
- * Instant-Burst. × 6 Cloud-Run-Instanzen = bis zu 36 RPS Burst.
- * Mistrals Scale-Tier-Limit: 6 RPS sustained.
+ * nicht die RATE. Wenn mehrere Slots gleichzeitig frei werden, bursten neue
+ * Calls in derselben Millisekunde gegen Mistrals RPS-Limit. Der Token-Bucket
+ * entzerrt das: jeder Caller wartet, bis seit dem letzten Start des gleichen
+ * Modell-Typs genug Zeit verstrichen ist.
  *
- * Loesung: Pro Instanz darf maximal 1 Mistral-Call pro Sekunde *gestartet*
- * werden (1 RPS). 6 Instanzen × 1 RPS = 6 RPS — passt genau auf Mistrals Limit.
- * Slots bleiben weiter parallel (6 in-flight), aber der Start neuer Calls wird
- * geordnet entzerrt.
+ * v1.10.8 — getrennte Buckets pro Modell-Typ: Das Mistral-Account-Dashboard
+ * zeigt SEHR unterschiedliche Limits je Modell:
+ *   - mistral-large-2512 (Describe + Profile-Fallback): 6 RPS, 2M TPM
+ *   - mistral-small-2603 (Profile normal/boost):        1.67 RPS, 100K TPM
+ * Ein gemeinsamer Bucket muss sich am LANGSAMSTEN Modell orientieren — wir
+ * haetten also auch die Large-Describe-Calls auf 1.6 RPS gedrosselt, obwohl
+ * Large 6 RPS koennte. Mit getrennten Buckets laeuft Describe ~3x schneller,
+ * was den Wartezeit-Tail unter Workshop-Last spuerbar kuerzt.
  *
- * Implementierung: serialisierte Warteschlange, jeder Caller darf erst dann
- * weiter, wenn seit dem letzten Token-Start TOKEN_INTERVAL_MS verstrichen sind.
+ * Intervalle (bei maxInstances=4, siehe index.js):
+ *   - Large: 800ms/Instanz → 4 × 1.25 = 5 RPS gesamt, unter dem 6-RPS-Limit
+ *   - Small: 2500ms/Instanz → 4 × 0.4 = 1.6 RPS gesamt, unter dem 1.67-Limit
  */
-/* v1.10.7: 1500ms → 2500ms. Hintergrund: Mistral-Account-Dashboard zeigt
-   fuer mistral-small-2603 (unser aktives Profile-Modell) ein RPS-Limit
-   von 1.67/s (nicht 6/s wie urspruenglich angenommen). Mit 2500ms-Interval
-   und max 4 Instanzen ergibt das 4 × 0.4 = 1.6 RPS gesamt, sicher unter
-   1.67 RPS. Eliminiert die strukturelle 429-Quelle, kostet pro Mistral-Call
-   ~1s zusaetzliche Wartezeit unter Last. */
-const TOKEN_INTERVAL_MS = 2500;
-/* v1.10.6: Initial-Jitter beim allerersten Token-Acquire pro Instanz.
-   Verhindert, dass mehrere Instanzen gleichzeitig cold-starten und
-   alle ihren ersten Mistral-Call in derselben Millisekunde feuern.
-   Random 0-2000ms entzerrt diesen Cold-Start-Burst zuverlaessig. */
+const LARGE_TOKEN_INTERVAL_MS = 800;
+const SMALL_TOKEN_INTERVAL_MS = 2500;
+/* Initial-Jitter beim allerersten Token-Acquire pro Instanz. Verhindert, dass
+   mehrere frisch gestartete Cloud-Run-Instanzen ihren ersten Call in derselben
+   Millisekunde feuern. */
 const INITIAL_JITTER_MAX_MS = 2000;
-let currentTokenIntervalMs = TOKEN_INTERVAL_MS;
-let currentInitialJitterMs = INITIAL_JITTER_MAX_MS;
-let lastTokenAt = 0;
-let isFirstAcquire = true;
-let tokenChain = Promise.resolve();
 
-async function acquireRateToken() {
-  /* Serialisierung: jeder Aufruf wartet auf den vorherigen, dann pruefen wir
-     wie viel Zeit seit dem letzten Token-Start verstrichen ist und warten
-     den Rest des Intervalls ab. Beim allerersten Call dieser Instanz wird
-     zusaetzlich ein Initial-Jitter eingehaengt. */
-  const myTurn = tokenChain.then(async () => {
-    if (currentTokenIntervalMs <= 0) {
+/**
+ * Erzeugt einen unabhaengigen Token-Bucket. Jeder Modell-Typ bekommt einen
+ * eigenen, damit langsame Modelle nicht die schnellen ausbremsen.
+ */
+function createRateBucket(defaultIntervalMs) {
+  let intervalMs = defaultIntervalMs;
+  let initialJitterMs = INITIAL_JITTER_MAX_MS;
+  let lastTokenAt = 0;
+  let isFirstAcquire = true;
+  let chain = Promise.resolve();
+
+  async function acquire() {
+    /* Serialisierung: jeder Aufruf wartet auf den vorherigen, dann pruefen wir
+       wie viel Zeit seit dem letzten Token-Start verstrichen ist und warten
+       den Rest des Intervalls ab. */
+    const myTurn = chain.then(async () => {
+      if (intervalMs <= 0) {
+        lastTokenAt = Date.now();
+        isFirstAcquire = false;
+        return;
+      }
+      if (isFirstAcquire && initialJitterMs > 0) {
+        const jitter = Math.random() * initialJitterMs;
+        if (jitter > 0) await new Promise((r) => setTimeout(r, jitter));
+        isFirstAcquire = false;
+      }
+      const now = Date.now();
+      const wait = Math.max(0, intervalMs - (now - lastTokenAt));
+      if (wait > 0) await new Promise((r) => setTimeout(r, wait));
       lastTokenAt = Date.now();
-      isFirstAcquire = false;
-      return;
-    }
-    if (isFirstAcquire && currentInitialJitterMs > 0) {
-      const jitter = Math.random() * currentInitialJitterMs;
-      if (jitter > 0) await new Promise((r) => setTimeout(r, jitter));
-      isFirstAcquire = false;
-    }
-    const now = Date.now();
-    const wait = Math.max(0, currentTokenIntervalMs - (now - lastTokenAt));
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    lastTokenAt = Date.now();
-  });
-  tokenChain = myTurn.catch(() => {
-    /* Fehler im Token-Loop nicht weitertragen — naechster Caller darf normal weiter */
-  });
-  return myTurn;
+    });
+    chain = myTurn.catch(() => {
+      /* Fehler im Token-Loop nicht weitertragen — naechster Caller darf normal weiter */
+    });
+    return myTurn;
+  }
+
+  return {
+    acquire,
+    setIntervalMs(ms) {
+      intervalMs = Math.max(0, ms || 0);
+    },
+    setInitialJitterMs(ms) {
+      initialJitterMs = Math.max(0, ms || 0);
+    },
+    reset() {
+      lastTokenAt = 0;
+      isFirstAcquire = true;
+      chain = Promise.resolve();
+    },
+  };
 }
 
-/* Fuer Tests: erlaubt den Rate-Limit-Cap zu deaktivieren oder verkuerzen,
-   damit Test-Suites nicht von 1-Sekunden-Pausen serialisiert werden. */
-function _setRateIntervalMs(ms) {
-  currentTokenIntervalMs = Math.max(0, ms || 0);
-}
+const largeBucket = createRateBucket(LARGE_TOKEN_INTERVAL_MS);
+const smallBucket = createRateBucket(SMALL_TOKEN_INTERVAL_MS);
 
-/* Fuer Tests: Initial-Jitter deaktivieren, damit Tests nicht durch
-   Zufalls-Pausen ueberraschend ausbremsen. */
-function _setInitialJitterMs(ms) {
-  currentInitialJitterMs = Math.max(0, ms || 0);
+function bucketFor(modelClass) {
+  return modelClass === "large" ? largeBucket : smallBucket;
 }
 
 /**
  * Wrapper-Helper: führt eine Mistral-Operation aus, sobald ein Slot frei ist
- * UND ein Rate-Token verfuegbar ist. Slot wird IMMER released — auch wenn die
- * Operation wirft.
+ * UND ein Rate-Token des passenden Modell-Typs verfuegbar ist. Slot wird IMMER
+ * released — auch wenn die Operation wirft.
+ *
+ * @param {Function} fn         auszufuehrende Mistral-Operation
+ * @param {string}   modelClass "large" oder "small" — bestimmt den Token-Bucket
  */
-async function withMistralSlot(fn) {
+async function withMistralSlot(fn, modelClass) {
   const release = await mistralSemaphore.acquire();
   try {
-    await acquireRateToken();
+    await bucketFor(modelClass).acquire();
     return await fn();
   } finally {
     release();
@@ -193,21 +211,32 @@ function getMistralStats() {
   return mistralSemaphore.stats();
 }
 
-/* Fuer Tests: erlaubt den Token-Bucket zu resetten, damit Test-Reihenfolge
-   nicht stoert. */
+/* Fuer Tests: beide Buckets zugleich konfigurieren/zuruecksetzen — sonst
+   serialisiert der Rate-Limiter parallele Test-Operationen auf Sekunden. */
+function _setRateIntervalMs(ms) {
+  largeBucket.setIntervalMs(ms);
+  smallBucket.setIntervalMs(ms);
+}
+
+function _setInitialJitterMs(ms) {
+  largeBucket.setInitialJitterMs(ms);
+  smallBucket.setInitialJitterMs(ms);
+}
+
 function _resetRateBucket() {
-  lastTokenAt = 0;
-  isFirstAcquire = true;
-  tokenChain = Promise.resolve();
+  largeBucket.reset();
+  smallBucket.reset();
 }
 
 module.exports = {
   createSemaphore,
+  createRateBucket,
   withMistralSlot,
   getMistralStats,
   DEFAULT_MAX_CONCURRENT,
   DEFAULT_QUEUE_TIMEOUT_MS,
-  TOKEN_INTERVAL_MS,
+  LARGE_TOKEN_INTERVAL_MS,
+  SMALL_TOKEN_INTERVAL_MS,
   INITIAL_JITTER_MAX_MS,
   _resetRateBucket,
   _setRateIntervalMs,

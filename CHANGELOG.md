@@ -4,6 +4,31 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.0.0-rc4] — 2026-05-20
+
+### Queue-Architektur — Phase 4: Production-Deploy (dormant) + Echt-Test
+
+Vierter Schritt: Die Queue geht in Produktion — aber dormant. Es wurde kein App-Code geändert; deployt wurde der bereits committete Stand (rc3 inkl. Audit-Fixes).
+
+**Für echte Nutzer ändert sich nichts:** Das Feature-Flag `useQueue` bleibt AUS, jeder Upload läuft weiter über den synchronen `/analyze`-Pfad.
+
+#### Infrastruktur
+
+- Alle Functions deployt — neu live: `enqueue`, `processJob`, `jobStatus`, `reapJobs`. Sie liegen dormant, bis das Flag in Phase 5 umgelegt wird.
+- Cloud-Tasks-Queue `analyze-queue` angelegt (`europe-west1`, `maxConcurrentDispatches` 3).
+- IAM: Der Invoker-Service-Account darf `processJob` per OIDC aufrufen; `processJob` selbst ist nicht öffentlich erreichbar.
+- Firestore-Indizes deployt.
+
+#### Echter End-to-End-Test
+
+Ein einmaliger Lauf mit 20 echten Analysen über die deployte Queue (echtes Mistral):
+
+- **20/20 erfolgreich**, kein verlorener Job, kein harter Fehler.
+- **Null 429er** — die Cloud-Tasks-Drosselung verhindert die Mistral-Überlast strukturell, wie vorgesehen. Der Kernzweck der Queue ist damit am echten System bewiesen.
+- Gemessene Bearbeitungszeit ~95–100 s/Job; die ETA-Schätzkonstante (120 s) liegt bewusst darüber — bestätigt, keine Änderung nötig.
+
+Das Test-Werkzeug bleibt als Betreiber-Skript außerhalb des öffentlichen Repos.
+
 ## [2.0.0-rc3] — 2026-05-20
 
 ### Queue-Architektur — Phase 3: Lokale Testumgebung (Emulator)

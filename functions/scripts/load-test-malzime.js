@@ -40,6 +40,13 @@ const MAX_AUTO_RETRIES = 3;
 const RETRY_WAIT_BASE_MS = 8000;
 const RETRY_WAIT_JITTER_MS = 2000;
 
+/* SPREAD_MS: verteilt die CONCURRENT Anfragen gleichmaessig ueber dieses
+   Zeitfenster, statt alle gleichzeitig abzufeuern. Realistischer fuer einen
+   echten Workshop (Schueler klicken nicht in derselben Millisekunde).
+   SPREAD_MS=0 (Default) = alle parallel. SPREAD_MS=10000 = 20 Anfragen
+   ueber 10 s = eine alle ~500 ms. */
+const SPREAD_MS = Number(process.env.SPREAD_MS || 0);
+
 function retryWaitMs() {
   return RETRY_WAIT_BASE_MS + (Math.random() * 2 - 1) * RETRY_WAIT_JITTER_MS;
 }
@@ -141,13 +148,21 @@ async function main() {
   process.stdout.write(
     `Mode: ${WITH_RETRY ? `Browser-Auto-Retry (max ${MAX_AUTO_RETRIES} Retries, ~${RETRY_WAIT_BASE_MS / 1000}s ± ${RETRY_WAIT_JITTER_MS / 1000}s zwischen Versuchen)` : "One-Shot (kein Retry)"}\n`
   );
+  process.stdout.write(
+    `Verteilung: ${SPREAD_MS > 0 ? `${CONCURRENT} Anfragen gestaffelt ueber ${SPREAD_MS / 1000}s (alle ~${Math.round(SPREAD_MS / (CONCURRENT - 1))}ms)` : "alle gleichzeitig (Burst)"}\n`
+  );
 
   const startedAt = new Date();
   process.stdout.write(`\nStarted at: ${startedAt.toISOString()}\n`);
 
+  /* Gestaffelter Start: jede Anfrage i startet i × gap Millisekunden spaeter. */
+  const gap = SPREAD_MS > 0 && CONCURRENT > 1 ? SPREAD_MS / (CONCURRENT - 1) : 0;
   const t0 = Date.now();
   const results = await Promise.all(
-    Array.from({ length: CONCURRENT }, (_, i) => singleRequest(i, imageBase64))
+    Array.from({ length: CONCURRENT }, async (_, i) => {
+      if (gap > 0) await sleep(i * gap);
+      return singleRequest(i, imageBase64);
+    })
   );
   const totalElapsed = Date.now() - t0;
   const finishedAt = new Date();

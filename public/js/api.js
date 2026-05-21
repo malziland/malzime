@@ -414,6 +414,7 @@ export async function analyzeImage() {
       requestId: String(myId),
       traceId,
       wakeLock: wakeLockStatus,
+      fileFormat: err.fileFormat,
       timings: { ...timings, totalMs: Date.now() - analyzeStartTime },
     });
   } finally {
@@ -748,6 +749,7 @@ async function analyzeImageQueued() {
       requestId: String(myId),
       traceId,
       wakeLock: wakeLockStatus,
+      fileFormat: err.fileFormat,
     });
   } finally {
     releaseWakeLock();

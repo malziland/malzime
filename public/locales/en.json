@@ -62,7 +62,7 @@
   "error.missingImage": "No image detected. Please select a photo.",
   "error.timeout": "The analysis is taking too long. Try again or use a different photo.",
   "error.readFailed": "The image could not be read. Try a different photo.",
-  "error.decodeFailed": "The image format is not supported. Try JPEG or PNG.",
+  "error.decodeFailed": "This image couldn't be opened – the format is unsupported or the file is damaged. Try a different photo, ideally JPEG or PNG.",
   "error.offline": "No internet connection. Please check your WiFi.",
   "error.maintenance": "malziME is currently in maintenance mode. Please try again later.",
   "error.networkError": "Connection to server failed. Check your internet and try again.",

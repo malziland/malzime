@@ -23,6 +23,7 @@ const STRING_FIELDS = {
   requestId: 50,
   traceId: 50,
   wakeLock: 40,
+  fileFormat: 40,
 };
 const NUMBER_FIELDS = ["durationMs", "httpStatus"];
 const BOOLEAN_FIELDS = ["online", "hidden"];

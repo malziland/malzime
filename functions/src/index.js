@@ -146,11 +146,13 @@ exports.processJob = onRequest(
 );
 
 /* jobStatus — public, leichtgewichtiger Polling-Endpoint fuer den Client.
-   Jeder Poll ist zugleich der Liveness-Herzschlag des wartenden Jobs. */
+   Jeder Poll ist zugleich der Liveness-Herzschlag des wartenden Jobs.
+   memory 256MiB: 128MiB hatte keinen Puffer ueber dem firebase-admin-
+   Grundbedarf — beim Workshop 2026-05-21 ein OOM unter Poll-Last. */
 exports.jobStatus = onRequest(
   {
     region: "europe-west1",
-    memory: "128MiB",
+    memory: "256MiB",
     cors: ALLOWED_ORIGINS,
     invoker: "public",
     maxInstances: 10,

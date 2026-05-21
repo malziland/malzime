@@ -29,6 +29,7 @@ export function logClientError(error, context = {}) {
       traceId: typeof context.traceId === "string" ? context.traceId : null,
       httpStatus: typeof context.httpStatus === "number" ? context.httpStatus : null,
       wakeLock: typeof context.wakeLock === "string" ? context.wakeLock : null,
+      fileFormat: typeof context.fileFormat === "string" ? context.fileFormat : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
       client: clientCtx,
     };

@@ -1,5 +1,35 @@
 import exifr from "../lib/exifr/lite.esm.mjs";
 
+/* Erkennt die Formatklasse einer Datei an ihren ersten Bytes ("Magic Bytes").
+   Dient der Diagnose, WAS hochgeladen wurde, wenn der Browser ein Bild nicht
+   oeffnen kann (image_decode_failed) — z.B. heic von einem Nicht-Apple-Geraet.
+   Liest nur die ersten 16 Byte: kein Dateiname, kein Bildinhalt, nur die
+   Format-Art. */
+async function sniffFileFormat(file) {
+  try {
+    const buf = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+    if (buf.length < 12) return "leer";
+    const hex4 = [...buf.slice(0, 4)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const at8 = String.fromCharCode(buf[8], buf[9], buf[10], buf[11]);
+    if (buf[0] === 0xff && buf[1] === 0xd8) return "jpeg";
+    if (hex4 === "89504e47") return "png";
+    if (hex4 === "47494638") return "gif";
+    if (hex4 === "52494646" && at8 === "WEBP") return "webp";
+    if (hex4 === "49492a00" || hex4 === "4d4d002a") return "tiff";
+    if (buf[0] === 0x42 && buf[1] === 0x4d) return "bmp";
+    /* ISO-BMFF (HEIC/HEIF/AVIF): Byte 4-7 = "ftyp", danach die Marke. */
+    if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) {
+      const brand = at8.toLowerCase();
+      if (brand.startsWith("hei") || brand.startsWith("mif") || brand.startsWith("msf")) return "heic";
+      if (brand.startsWith("avi")) return "avif";
+      return "isobmff-" + brand.replace(/[^a-z0-9]/g, "");
+    }
+    return "unbekannt";
+  } catch (_) {
+    return "lesefehler";
+  }
+}
+
 export async function prepareImage(file) {
   /* EXIF im Browser parsen — GPS bleibt lokal, nur Kamera-Daten an Server */
   let exif = {};
@@ -28,9 +58,12 @@ export async function prepareImage(file) {
   const imageBase64 = await new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onerror = () => {
+    img.onerror = async () => {
       URL.revokeObjectURL(url);
-      reject(new Error("image_decode_failed"));
+      /* Diagnose: festhalten, welche Formatklasse der Browser nicht oeffnen konnte. */
+      const err = new Error("image_decode_failed");
+      err.fileFormat = await sniffFileFormat(file);
+      reject(err);
     };
     img.onload = () => {
       URL.revokeObjectURL(url);

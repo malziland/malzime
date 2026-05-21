@@ -4,165 +4,52 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.0.1] — 2026-05-21
+
+### Behoben
+
+- Speicher der Warteschlangen-Statusabfrage (`jobStatus`) von 128 auf 256 MB angehoben. 128 MB hatte keinen Puffer über dem firebase-admin-Grundbedarf und lief beim Workshop am 21.05. unter Poll-Last in einen Speicherüberlauf.
+
+### Geändert
+
+- Die Fehlermeldung bei nicht lesbaren Bildern benennt jetzt beide möglichen Ursachen — nicht unterstütztes Format oder beschädigte Datei — statt nur das Format.
+
+### Hinzugefügt
+
+- Diagnose-Logging: Scheitert das Öffnen eines Bildes im Browser, wird die Formatklasse der Datei (an den ersten Bytes erkannt, etwa `heic` oder `tiff`) anonym mitgeloggt — kein Dateiname, kein Bildinhalt, nur die Format-Art.
+
 ## [2.0.0] — 2026-05-20
 
-**Release.** Die Queue-Architektur ist live: Das Feature-Flag `useQueue` ist aktiviert, jeder Upload läuft über die Google-Cloud-Tasks-Warteschlange. Damit ist die Release-Candidate-Phase (rc1–rc5, die fünf Bauphasen unten) abgeschlossen — dies ist das eigentliche v2.0.0-Release.
+**Release: Queue-Architektur.** Jeder Upload läuft jetzt über eine Google-Cloud-Tasks-Warteschlange statt über eine lange offene Verbindung. Das fängt Workshop-Lastspitzen strukturell ab: Statt unter Stoßlast in eine 429-Fehlerkaskade zu laufen, werden Uploads dosiert und in fairer Reihenfolge abgearbeitet — kein verlorener Job, keine harten Fehler. Gesteuert über das Firestore-Feature-Flag `useQueue`; der synchrone `/analyze`-Pfad bleibt als sofortiger Rückfall erhalten (Flag umlegen, kein Deploy).
 
-Die Warteschlange fängt Workshop-Lastspitzen strukturell ab: Statt unter Stoßlast in eine 429-Fehlerkaskade zu laufen, werden Uploads dosiert und in fairer Reihenfolge abgearbeitet — kein verlorener Job, keine harten Fehler. Der synchrone `/analyze`-Pfad bleibt als sofortiger Rückfall erhalten (Feature-Flag umlegen, kein Deploy).
+Diese Version fasst die fünf Entwicklungsphasen rc1–rc5 zusammen.
 
-### Nach dem Go-Live
+### Hinzugefügt
 
-- Doku (README, ARCHITECTURE, SETUP, SELF-HOSTING, CONTRIBUTING, SECURITY) auf die Queue-Architektur aktualisiert.
-- Warteschlangen-ETA-Schätzung von 120 s auf 100 s justiert — echte Messungen zeigen ~65–100 s reine Verarbeitung pro Job.
-- Cloud-Tasks-Parallelität eingemessen: Bei 3 läuft Mistral sauber, bei 6 antwortet es mit 429 (die Hälfte der Jobs kommt als `blocked.overloaded` zurück). 3 bleibt das Maximum, das die aktuellen Mistral-Limits hergeben.
+- **Backend-Warteschlange:** vier neue Functions — `enqueue` (nimmt den Upload an, reiht ihn ein, antwortet sofort mit einer `jobId`), `processJob` (Worker, nur über Cloud Tasks erreichbar, nicht öffentlich), `jobStatus` (leichtgewichtiger Polling-Endpunkt) und `reapJobs` (geplanter Aufräumlauf im Minutentakt). Neue Module: `jobs.js`, `cloud-tasks.js`, `queue-storage.js`, `feature-flags.js`, `handle-enqueue.js`, `handle-process-job.js`, `handle-job-status.js`, `handle-reap.js`.
+- **Frontend-Warteschlange:** Der Browser reicht das Bild bei `/api/enqueue` ein und pollt `/api/job-status` im 2-Sekunden-Takt. Während der Wartezeit zeigt die Oberfläche Position und geschätzte Restzeit. Nach einem Seiten-Neuladen holt `resumeQueueJob()` ein laufendes oder fertiges Ergebnis nach — kein „Geister-Durchlauf" mehr.
+- **Client-Liveness:** Jeder Poll ist zugleich ein Herzschlag. Pollt der Browser eines wartenden Jobs länger als 3 Minuten nicht mehr, setzt `reapJobs` den Job auf `abandoned`, gibt seinen Warteschlangen-Platz frei und löscht sein Bild — kein Mistral-Call für längst abgewanderte Nutzer.
+- **Infrastruktur:** Cloud-Tasks-Queue `analyze-queue` (`europe-west1`, `maxConcurrentDispatches` 3), dedizierter nicht-öffentlicher Storage-Bucket `malzime-queue-uploads`, zwei zusammengesetzte Firestore-Indizes auf der `jobs`-Collection.
+- **Feature-Flag** `useQueue` (Firestore `featureFlags/current`, 30 s Cache, fail-safe auf `false`); `/api/stats` liefert es an das Frontend aus.
+- Lokale Emulator-Testumgebung für Entwicklung und Mock-Lasttests (`QUEUE_LOCAL`, `mistral-mock.js`, `docs/QUEUE-EMULATOR.md`).
 
-## [2.0.0-rc5] — 2026-05-20
+### Geändert
 
-### Queue-Architektur — Phase 5: Go-Live
+- **Datensparsamkeit:** Das komprimierte Bild liegt nur für die kurze Wartezeit auf einem EU-Server und wird unmittelbar nach der Analyse gelöscht; `reapJobs` entfernt zusätzlich jedes Job-Dokument, das älter als 24 Stunden ist. Datenschutzerklärung, Nutzungsbedingungen, Impressum und Startseite benennen die kurze Zwischenspeicherung jetzt ehrlich.
+- Warteschlangen-ETA-Schätzung auf 100 s justiert — echte Messungen zeigen ~65–100 s reine Verarbeitung pro Job.
+- Dokumentation (README, ARCHITECTURE, SETUP, SELF-HOSTING, CONTRIBUTING, SECURITY) auf die Queue-Architektur aktualisiert.
 
-Fünfter Schritt: Die Warteschlange geht für echte Nutzer scharf. Das Frontend mit dem Queue-Code wird ausgeliefert, das Feature-Flag `useQueue` wird auf AN gestellt — ab jetzt läuft jeder Upload über die Warteschlange. Der synchrone `/analyze`-Pfad bleibt unangetastet als sofortiger Rückfall: Flag zurück auf AUS genügt.
+### Behoben
 
-#### Datensparsamkeit — Aufräumung der Job-Dokumente
+- **Routing-Race:** Ein sehr schneller Upload konnte sich für den synchronen Pfad entscheiden, bevor das `useQueue`-Flag geladen war — `analyzeImage` wartet jetzt darauf (mit hartem Timeout).
+- **CSP-Verstoß in der Ergebnis-Anzeige (betraf auch die Live-Seite):** Die Balken in `render.js` setzten ihre Breite per inline-`style` und wurden von der strikten Content-Security-Policy blockiert — jetzt CSP-konform per CSSOM gesetzt.
+- `pollJob` bricht nach 30 Minuten sauber ab, falls ein Job dauerhaft hängt; `reapJobs` räumt auch in `processing` hängende Jobs ohne pollenden Client auf.
 
-- Der Reaper (`reapJobs`, Minutentakt) löscht zusätzlich jedes Job-Dokument, das älter als 24 Stunden ist. Ein Job-Dokument enthält bis zum Abschluss das fertige Profil; danach wird es nicht mehr gebraucht — so bleibt nichts unbegrenzt liegen.
-- `JOB_RETENTION_MS` (24 h) ist großzügig über jedem realistischen Abhol-Fenster gewählt; der Client holt das Ergebnis binnen Minuten ab.
+### Tests & Validierung
 
-#### Datenschutzerklärung
-
-Die Datenschutzerklärung benennt jetzt die kurze Bild-Zwischenspeicherung in der Warteschlange ehrlich:
-
-- Das komprimierte Bild liegt für die kurze Wartezeit auf einem EU-Server — unangetastet, bis es an der Reihe ist — und wird unmittelbar nach der Analyse automatisch gelöscht.
-- Das fertige Profil liegt bis zum Abruf durch den Browser kurz auf dem Server (ohne Personenbezug) und wird spätestens nach 24 Stunden gelöscht.
-- Mitgezogen: Nutzungsbedingungen, Impressum, Startseite und Meta-Beschreibungen — überall heißt es jetzt korrekt „keine dauerhafte Speicherung".
-
-## [2.0.0-rc4] — 2026-05-20
-
-### Queue-Architektur — Phase 4: Production-Deploy (dormant) + Echt-Test
-
-Vierter Schritt: Die Queue geht in Produktion — aber dormant. Es wurde kein App-Code geändert; deployt wurde der bereits committete Stand (rc3 inkl. Audit-Fixes).
-
-**Für echte Nutzer ändert sich nichts:** Das Feature-Flag `useQueue` bleibt AUS, jeder Upload läuft weiter über den synchronen `/analyze`-Pfad.
-
-#### Infrastruktur
-
-- Alle Functions deployt — neu live: `enqueue`, `processJob`, `jobStatus`, `reapJobs`. Sie liegen dormant, bis das Flag in Phase 5 umgelegt wird.
-- Cloud-Tasks-Queue `analyze-queue` angelegt (`europe-west1`, `maxConcurrentDispatches` 3).
-- IAM: Der Invoker-Service-Account darf `processJob` per OIDC aufrufen; `processJob` selbst ist nicht öffentlich erreichbar.
-- Firestore-Indizes deployt.
-
-#### Echter End-to-End-Test
-
-Ein einmaliger Lauf mit 20 echten Analysen über die deployte Queue (echtes Mistral):
-
-- **20/20 erfolgreich**, kein verlorener Job, kein harter Fehler.
-- **Null 429er** — die Cloud-Tasks-Drosselung verhindert die Mistral-Überlast strukturell, wie vorgesehen. Der Kernzweck der Queue ist damit am echten System bewiesen.
-- Gemessene Bearbeitungszeit ~95–100 s/Job; die ETA-Schätzkonstante (120 s) liegt bewusst darüber — bestätigt, keine Änderung nötig.
-
-Das Test-Werkzeug bleibt als Betreiber-Skript außerhalb des öffentlichen Repos.
-
-## [2.0.0-rc3] — 2026-05-20
-
-### Queue-Architektur — Phase 3: Lokale Testumgebung (Emulator)
-
-Dritter Schritt: das komplette System lokal lauffähig machen — für den Durchklick der Warteschlangen-UX und kostenlose Mock-Lasttests. Reine Test- und Entwicklungs-Infrastruktur, keine Produktions-Auswirkung.
-
-**Google Cloud Tasks hat keinen Emulator.** Daher zwei sauber per Umgebungsschalter (`QUEUE_LOCAL=1`) getrennte lokale Ersatz-Implementierungen — in Produktion ist `QUEUE_LOCAL` nie gesetzt, dort bleibt es bei Cloud Tasks und dem GCS-Bucket:
-
-- `cloud-tasks.js`: Im Lokal-Modus stößt `enqueue` die `processJob`-Function direkt per HTTP an, statt einen Cloud-Task zu erzeugen.
-- `queue-storage.js`: Im Lokal-Modus liegen die Bilder in einem Temp-Verzeichnis statt im GCS-Bucket.
-- `feature-flags.js`: Im Lokal-Modus gilt die Queue als aktiv — der Emulator-Lauf dient ja gerade ihrem Test.
-
-- `firebase.json`: Emulator-Konfiguration (functions / firestore / hosting / pubsub). `functions/.env.local` aktiviert die Lokal-Schalter und wird von `firebase deploy` ignoriert.
-- npm-Skript `emulator` startet das System lokal; `docs/QUEUE-EMULATOR.md` beschreibt den Durchklick.
-- `functions/scripts/queue-emulator-loadtest.js`: feuert N Mock-Jobs gegen die lokale Queue und verifiziert, dass keiner verloren geht.
-
-### Korrekturen aus dem Durchklick
-
-Der Durchklick im Emulator hat drei Lücken aufgedeckt, die im selben Zug behoben wurden:
-
-- **Routing-Race:** Ein sehr schneller Upload entschied sich fälschlich für den synchronen Pfad, bevor das `useQueue`-Flag von `/api/stats` geladen war. `analyzeImage` wartet jetzt auf `state.statsReady` (mit hartem Timeout), bevor es Sync vs. Queue wählt.
-- **Warte-Bildschirm vereinfacht:** Das zusätzliche `#queueStatus`-Element samt Sonder-CSS wurde wieder entfernt; der Warte-Bildschirm nutzt den bestehenden Scan-Text — in der Warteschlange die Position, bei der Verarbeitung die gewohnten Meldungen. Keine doppelten Texte.
-- **Lokale Drosselung:** Der Emulator fährt mehrere Worker-Prozesse, daher kann der lokale Cloud-Tasks-Ersatz nicht über Modul-Variablen drosseln. `processJob` zählt jetzt im Lokal-Modus die laufenden Jobs in Firestore (prozess-übergreifend) und vertagt sich bei voller Drossel — so staut sich im Emulator eine echte Warteschlange mit sichtbaren Positionen, wie unter echtem Cloud Tasks.
-- ETA-Schätzung (`QUEUE_AVG_JOB_SECONDS`) bewusst großzügig auf 120 s gesetzt — die Wartezeit-Anzeige soll lieber über- als unterschätzen.
-
-### Audit-Nachbesserungen
-
-Ein kritischer Durchgang durch den gesamten Queue-Code (vor Phase 4) brachte fünf Befunde — alle behoben:
-
-- **B1:** `pollJob` brach nicht ab, falls ein Job dauerhaft hängt (Cloud-Tasks-Ausfall) — jetzt Gesamt-Obergrenze von 30 Min, danach sauberer Abbruch.
-- **B2:** In `processing` hängende Jobs ohne pollenden Client wurden nie aufgeräumt — der Reaper setzt jetzt auch sie auf `failed` (nicht nur verlassene `queued`-Jobs). Neuer Index (`status`, `startedAt`).
-- **B3:** `getQueuePosition` las den Job doppelt — nimmt jetzt das bereits geladene Job-Objekt entgegen (ein Firestore-Read pro Poll gespart).
-- **B4:** Klarstellung im Code: `QUEUE_DISPATCH_CONCURRENCY` muss in Phase 4 zum echten Cloud-Tasks-`maxConcurrentDispatches` passen.
-- **B5** (vorbestehend, nicht Queue): Die Balken im Ergebnis (`render.js`) setzten ihre Breite per inline `style="…"` — von der strikten CSP blockiert. Jetzt per CSSOM (`element.style.width`) gesetzt, CSP-konform. Betrifft auch die Live-Seite.
-
-### Tests
-
-- Backend 407/407, Frontend 152/152 grün. Lint + Format sauber.
-
-## [2.0.0-rc2] — 2026-05-20
-
-### Queue-Architektur — Phase 2: Frontend (Warteschlangen-UI)
-
-Zweiter Entwicklungsschritt: das Frontend zur Queue-Architektur. Der Browser reicht das Bild bei `/api/enqueue` ein, erhält sofort eine `jobId` und pollt `/api/job-status` im 2-Sekunden-Takt bis zum Ergebnis. Jeder Poll ist zugleich der Liveness-Herzschlag.
-
-**Weiterhin ohne Auswirkung auf echte Nutzer:** Solange das Feature-Flag `useQueue` AUS ist, läuft jeder Upload über den unveränderten synchronen Pfad. Der Queue-Pfad ist rein additiv — `analyzeImage()` verzweigt nur, wenn das Flag an ist.
-
-- **Feature-Flag-Auslieferung:** `/api/stats` liefert jetzt zusätzlich `useQueue` (das Frontend holt die Stats ohnehin beim Seitenstart). `state.useQueue` steuert die Pfad-Wahl; Default false → fail-safe der bewährte synchrone Pfad.
-- **`api.js` Queue-Modus:** `analyzeImageQueued()` — Einreihen, Polling, Zustandsbehandlung (`queued`/`processing`/`done`/`failed`/`abandoned`). Der synchrone `analyzeImage`-Pfad bleibt unangetastet.
-- **Warteschlangen-UI:** Während der Wartezeit zeigt die Oberfläche Position und geschätzte Restzeit. Die rotierenden Analyse-Meldungen entfallen im Wartezustand — sie wären irreführend, solange der Job nur wartet.
-- **Ergebnis-Abholung nach Reload:** Die `jobId` liegt in `sessionStorage`. Lädt der Nutzer die Seite neu, holt `resumeQueueJob()` das laufende oder fertige Ergebnis ab — kein „Geister-Durchlauf" mehr.
-- Hosting-Rewrites `/api/enqueue` und `/api/job-status`; neue Locale-Keys (de + en) für die Warteschlangen-Anzeige.
-
-### Tests
-
-- Backend 395/395, Frontend 152/152 grün (+9 Queue-Frontend-Tests mit gemocktem Fetch/Polling). Lint sauber.
-
-## [2.0.0-rc1] — 2026-05-20
-
-### Queue-Architektur — Phase 1: Backend-Infrastruktur (dormant)
-
-Erster Entwicklungsschritt der Queue-Architektur (siehe `memory/queue-plan.md`). Statt die Analyse synchron in einer 60–180 s offenen Verbindung abzuwickeln, werden Anfragen künftig in eine Cloud-Tasks-Queue gelegt, dosiert abgearbeitet und das Ergebnis serverseitig gespeichert. Das löst die 429er bei Burst-Last strukturell und macht Ergebnisse gegen Verbindungsabbrüche robust.
-
-**Diese rc1 enthält ausschließlich Backend-Infrastruktur. Sie verändert das Live-Verhalten NICHT:** Solange das Feature-Flag `useQueue` (Firestore `featureFlags/current`) AUS ist, läuft jeder echte Nutzer unverändert über den synchronen `/analyze`-Pfad. Der alte Pfad wurde nicht angefasst.
-
-#### Neue Module (`functions/src/`)
-
-- **`jobs.js`** — Job-Lebenszyklus in der Firestore-Collection `jobs`: `createJob`, `claimJob` (idempotenter Übergang `queued → processing` per Transaction), `completeJob`, `failJob`, `getQueuePosition` (Firestore-`count()`-Aggregation), `markFailedIfStale` (Timeout-Sicherung gegen hängende Jobs).
-- **`cloud-tasks.js`** — Wrapper um Google Cloud Tasks (`enqueueJob`). Neue Abhängigkeit `@google-cloud/tasks`.
-- **`queue-storage.js`** — temporäre Bild-Ablage in Firebase Storage (`queue-uploads/`), wird nach der Verarbeitung sofort gelöscht.
-- **`feature-flags.js`** — Laufzeit-Feature-Flags aus Firestore, 30 s Cache, fail-safe auf `false`.
-- **`mistral-mock.js`** — Mistral-Attrappe für kostenlose Tests (Unit-Tests, Emulator-Durchklick, Mock-Lasttests), umschaltbar per `MISTRAL_MOCK=1`.
-- **`handle-enqueue.js`** — Function `enqueue` (public): validiert die Anfrage (identisch zum `/analyze`-Pfad), legt das Bild ab, erzeugt den Job, reiht ihn ein, antwortet sofort mit der `jobId`.
-- **`handle-process-job.js`** — Function `processJob` (NICHT public, nur via Cloud Tasks): führt die bestehende Mistral-Pipeline aus und schreibt das Ergebnis ins Job-Dokument.
-- **`handle-job-status.js`** — Function `jobStatus` (public, leichtgewichtig): liefert dem pollenden Client Status, Warteschlangen-Position, ETA und Ergebnis.
-- **`handle-reap.js`** — geplante Function `reapJobs` (Minutentakt): räumt verlassene Jobs ab (siehe Client-Liveness).
-
-#### Konfiguration & Infrastruktur
-
-- `firestore.indexes.json` neu: zwei zusammengesetzte Indizes auf `jobs` — `status`+`createdAt` (Warteschlangen-Position) und `status`+`lastSeenAt` (Reaper); in `firebase.json` verdrahtet.
-- Dedizierter Cloud-Storage-Bucket `gs://malzime-queue-uploads` angelegt (`europe-west1`, nicht öffentlich, Public-Access dauerhaft gesperrt, Uniform Bucket-Level Access). Kein Firebase-Storage-Default-Bucket — auf den Bucket greift nur der Server via Admin-SDK zu. Dem Function-Runtime-Service-Account wurde Objekt-Zugriff erteilt.
-- `storage-lifecycle.json` neu + auf den Bucket angewendet: GCS-Lifecycle-Regel löscht `queue-uploads/`-Objekte als Sicherheitsnetz nach 1 Tag (GCS-Minimum). Die aktive Löschung in `processJob` greift unmittelbar nach der Verarbeitung — der Lifecycle fängt nur den seltenen Crash-Fall ab.
-
-#### Client-Liveness (Keep-Alive) — von Anfang an Kernmechanismus
-
-Damit die Queue keine Mistral-Calls für Anfragen verbraucht, deren Nutzer die Seite längst verlassen haben:
-
-- Jeder `job-status`-Poll des Clients ist zugleich ein Herzschlag (`lastSeenAt` im Job-Dokument).
-- Pollt der Browser eines wartenden Jobs länger als das Karenz-Fenster (`LIVENESS_GRACE_MS`, 3 min) nicht mehr, gilt der Client als weg.
-- Die geplante Function `reapJobs` setzt solche Jobs im Minutentakt auf `abandoned` und löscht ihr Bild — kein Mistral-Call, und der Warteschlangen-Platz wird frei, sodass Wartende nachrücken. `processJob` prüft die Liveness zusätzlich selbst, bevor es Mistral aufruft.
-- Das Karenz-Fenster ist bewusst großzügig, weil iOS Tabs beim App-Wechsel/Display-Sperren einfriert (das Pollen pausiert, ohne dass der Nutzer wirklich weg ist).
-
-Der Job-Lebenszyklus hat damit einen fünften Zustand: `abandoned`. Die Client-Hälfte (das eigentliche Pollen) baut Phase 2 — das Backend ist von Anfang an darauf ausgelegt.
-
-#### Offene Setup-Schritte vor Go-Live (NICHT Teil dieser rc)
-
-- Cloud-Tasks-Queue `analyze-queue` (`europe-west1`) anlegen, Dispatch-Rate setzen.
-- IAM: Cloud-Tasks-Service-Account die Invoker-Rolle auf `processJob` geben.
-- `firestore.indexes.json` deployen.
-
-### Tests
-
-- Backend 394/394 grün (+96 neue Tests für die Queue-Module inkl. Client-Liveness). Frontend unverändert 143/143.
+- End-to-End-Lauf mit 20 echten Analysen über die deployte Queue: 20/20 erfolgreich, null 429er — die Cloud-Tasks-Drosselung verhindert die Mistral-Überlast strukturell.
+- Cloud-Tasks-Parallelität eingemessen: 3 ist das Maximum, das die aktuellen Mistral-Limits sauber hergeben (bei 6 kommt die Hälfte der Jobs als `blocked.overloaded` zurück).
+- Umfangreiche neue Tests für alle Queue-Module (Backend + Frontend), inklusive Client-Liveness und gemocktem Polling.
 
 ## [1.10.9] — 2026-05-20
 

@@ -62,7 +62,7 @@
   "error.missingImage": "Kein Bild erkannt. Bitte ein Foto auswählen.",
   "error.timeout": "Die Analyse dauert zu lange. Versuch es nochmal oder nimm ein anderes Foto.",
   "error.readFailed": "Das Bild konnte nicht gelesen werden. Versuch ein anderes Foto.",
-  "error.decodeFailed": "Das Bildformat wird nicht unterstützt. Versuch JPEG oder PNG.",
+  "error.decodeFailed": "Dieses Bild konnte nicht geöffnet werden – das Format wird nicht unterstützt oder die Datei ist beschädigt. Versuch ein anderes Foto, am besten JPEG oder PNG.",
   "error.offline": "Keine Internetverbindung. Bitte prüfe dein WLAN.",
   "error.maintenance": "malziME ist gerade im Wartungsmodus. Bitte versuch es später nochmal.",
   "error.networkError": "Verbindung zum Server fehlgeschlagen. Prüfe dein Internet und versuch es nochmal.",

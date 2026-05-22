@@ -4,6 +4,20 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zurückkehrende Nutzer schneller, und die vier Phasen einer Analyse — Upload → Warteschlange → Verarbeitung → Auslieferung — sind ab jetzt einzeln im Log messbar.
+
+### Hinzugefügt
+
+- **Sofort-Nachfrage beim Zurückkehren in den Vordergrund:** Wird der Browser-Tab während der Warteschlangen-Wartezeit in den Hintergrund geschoben (Handy gesperrt, App gewechselt), drosseln Browser das Status-Pollen stark — bis hin zum Einfrieren. Das fertige Ergebnis wurde dadurch verzögert abgeholt. Der Poll-Loop weckt jetzt über das `visibilitychange`-Ereignis sofort auf, sobald der Tab wieder sichtbar wird, und holt das (meist längst fertige) Ergebnis ohne Wartezeit.
+- **Auslieferungs-Messung:** Beim ersten Ausliefern eines fertigen Jobs hält `jobStatus` den Zeitpunkt fest (`deliveredAt`) und loggt eine `job-delivered`-Zeile mit `deliveryGapMs` (fertig gerechnet → beim Client angekommen) und `totalMs` (erstellt → ausgeliefert). Das trennt „fertig" von „tatsächlich abgeholt" — unabhängig von der best-effort Client-Telemetrie.
+- **Warteschlangen-Wartezeit im Log:** Die `process-job`-Erfolgsmeldung enthält jetzt zusätzlich `queueWaitMs` — die Zeit zwischen Einreihen und Verarbeitungsbeginn.
+
+### Geändert
+
+- Die client-seitig gemessene Upload-Dauer (`enqueueMs`) wird in der Erfolgs-Telemetrie nicht mehr verworfen — sie fehlte bisher auf der Server-Whitelist und ist jetzt mitgeloggt.
+
 ## [2.0.1] — 2026-05-21
 
 ### Behoben

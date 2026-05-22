@@ -5,6 +5,7 @@ jest.mock("../jobs", () => ({
   getQueuePosition: jest.fn(),
   markFailedIfStale: jest.fn(),
   touchJob: jest.fn(),
+  markDelivered: jest.fn(),
 }));
 
 const { handleJobStatus } = require("../handle-job-status");
@@ -31,6 +32,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   jobs.markFailedIfStale.mockImplementation(async (job) => job);
   jobs.touchJob.mockResolvedValue();
+  jobs.markDelivered.mockResolvedValue();
 });
 
 /* ── Abweisungen ─────────────────────────────────────────────────── */
@@ -134,5 +136,43 @@ describe("handleJobStatus — Stale-Timeout", () => {
     expect(jobs.markFailedIfStale).toHaveBeenCalled();
     expect(res.body.status).toBe("failed");
     expect(res.body.errorReason).toBe("processing_timeout");
+  });
+});
+
+/* ── Auslieferungs-Messung ───────────────────────────────────────── */
+
+describe("handleJobStatus — Auslieferungs-Messung", () => {
+  test("erstes Ausliefern eines done-Jobs → markDelivered + job-delivered-Log", async () => {
+    jobs.getJob.mockResolvedValue({
+      id: "job-1",
+      status: "done",
+      result: {},
+      traceId: "trace1",
+      createdAt: 1000,
+      finishedAt: 5000,
+    });
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    await handleJobStatus(getReq("job-1"), makeRes());
+    expect(jobs.markDelivered).toHaveBeenCalledWith("job-1");
+    const delivered = logSpy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0]);
+        } catch (_) {
+          return null;
+        }
+      })
+      .find((o) => o && o.step === "job-delivered");
+    logSpy.mockRestore();
+    expect(delivered).toBeTruthy();
+    expect(delivered.jobId).toBe("job-1");
+    expect(typeof delivered.deliveryGapMs).toBe("number");
+    expect(typeof delivered.totalMs).toBe("number");
+  });
+
+  test("bereits ausgelieferter Job → kein erneutes markDelivered", async () => {
+    jobs.getJob.mockResolvedValue({ id: "job-1", status: "done", result: {}, deliveredAt: 9999 });
+    await handleJobStatus(getReq("job-1"), makeRes());
+    expect(jobs.markDelivered).not.toHaveBeenCalled();
   });
 });

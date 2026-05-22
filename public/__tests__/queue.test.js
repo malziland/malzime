@@ -122,6 +122,32 @@ describe("Queue-Modus", () => {
     expect(renderCurrentMode).toHaveBeenCalled();
   });
 
+  it("Tab kehrt in den Vordergrund zurück → sofortiger Poll statt das 2s-Intervall abzuwarten", async () => {
+    let pollCount = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-vis" });
+      pollCount += 1;
+      if (pollCount === 1) return jsonResponse({ status: "queued", position: 2, etaSeconds: 120 });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+    const p = analyzeImage();
+    /* In kleinen Schritten vorrücken, bis genau der erste Status-Poll passiert
+       ist — danach stehen wir frisch (< 200 ms) im 2-Sekunden-Intervall vor
+       dem zweiten Poll. */
+    for (let i = 0; i < 100 && pollCount < 1; i++) {
+      await vi.advanceTimersByTimeAsync(200);
+    }
+    expect(pollCount).toBe(1);
+    /* Tab war im Hintergrund, kommt jetzt zurück. Der nächste Poll soll sofort
+       feuern — bei nur 100 ms Vorlauf wäre das 2000-ms-Intervall noch lange
+       nicht abgelaufen, ein zweiter Poll beweist also den visibilitychange-Wecker. */
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(pollCount).toBe(2);
+    await vi.advanceTimersByTimeAsync(100);
+    await p;
+  });
+
   it("speichert die jobId und räumt sie nach Abschluss wieder auf", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-xyz" });

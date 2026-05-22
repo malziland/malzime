@@ -31,6 +31,7 @@ const tasks = require("../cloud-tasks");
 const JOB = {
   id: "job-1",
   status: "queued",
+  createdAt: Date.now() - 5000,
   lang: "de",
   traceId: "trace1",
   imagePath: "queue-uploads/x.jpg",
@@ -172,6 +173,24 @@ describe("handleProcessJob — Erfolgsfall", () => {
 
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/x.jpg");
     expect(counter.incrementTotals).toHaveBeenCalledTimes(1);
+  });
+
+  test("Erfolgs-Log enthält queueWaitMs (Wartezeit in der Warteschlange)", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    await handleProcessJob(postReq("job-1"), makeRes());
+    const doneLog = logSpy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0]);
+        } catch (_) {
+          return null;
+        }
+      })
+      .find((o) => o && o.step === "process-job" && o.status === "done");
+    logSpy.mockRestore();
+    expect(doneLog).toBeTruthy();
+    expect(typeof doneLog.queueWaitMs).toBe("number");
+    expect(doneLog.queueWaitMs).toBeGreaterThanOrEqual(0);
   });
 });
 

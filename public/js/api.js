@@ -475,6 +475,34 @@ export function getStoredJobId() {
 }
 
 /**
+ * Wartet bis zum nächsten Poll — weckt aber sofort auf, sobald der Tab wieder
+ * sichtbar wird. Hintergrund: Browser drosseln Timer in versteckten Tabs
+ * massiv (am Handy frieren sie ganz ein). Ohne dieses Aufwecken holt ein
+ * zurückkehrender Nutzer sein längst fertiges Ergebnis erst nach der
+ * gedrosselten Verzögerung ab — das fühlt sich wie Minuten totes Warten an.
+ * Mit dem visibilitychange-Wecker erscheint das Ergebnis ~1 s nach Rückkehr.
+ * Der Listener wird pro Wartezyklus sauber wieder abgemeldet.
+ */
+function waitForNextPoll(ms) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let timer = null;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") finish();
+    };
+    function finish() {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+      resolve();
+    }
+    timer = setTimeout(finish, ms);
+    document.addEventListener("visibilitychange", onVisible);
+  });
+}
+
+/**
  * Pollt /api/job-status bis zu einem Terminal-Status. Jeder Poll erneuert
  * serverseitig den Liveness-Herzschlag des Jobs.
  * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
@@ -485,7 +513,7 @@ async function pollJob(jobId, myId) {
   const pollStart = Date.now();
   for (;;) {
     if (state.requestId !== myId) return null;
-    await sleep(POLL_INTERVAL_MS);
+    await waitForNextPoll(POLL_INTERVAL_MS);
     if (state.requestId !== myId) return null;
     /* Hängt der Job dauerhaft → nicht endlos weiterpollen. */
     if (Date.now() - pollStart > MAX_POLL_DURATION_MS) {

@@ -57,6 +57,7 @@ async function createJob({ lang, traceId, imagePath, exif }) {
     lastSeenAt: now,
     startedAt: null,
     finishedAt: null,
+    deliveredAt: null,
     lang: lang || "de",
     traceId: traceId || null,
     imagePath: imagePath || null,
@@ -179,6 +180,17 @@ async function touchJob(jobId) {
 }
 
 /**
+ * Hält den Zeitpunkt der ERSTEN Auslieferung eines fertigen Jobs fest
+ * (`deliveredAt`). Diagnose-Messung: trennt „fertig gerechnet" von „tatsächlich
+ * beim Client angekommen" — unabhängig von der best-effort Client-Telemetrie.
+ * Der job-status-Handler ruft das genau einmal pro Job (Guard dort: nur wenn
+ * `deliveredAt` noch nicht gesetzt ist).
+ */
+async function markDelivered(jobId) {
+  await jobsRef().doc(jobId).update({ deliveredAt: Date.now() });
+}
+
+/**
  * Markiert einen Job als `abandoned` — der Client hat die Seite verlassen,
  * bevor der Job verarbeitet wurde. Kein Fehler, sondern ein bewusst
  * eingesparter Lauf (kein Mistral-Call).
@@ -262,6 +274,7 @@ module.exports = {
   getQueuePosition,
   markFailedIfStale,
   touchJob,
+  markDelivered,
   abandonJob,
   isAbandoned,
   findAbandonedJobs,

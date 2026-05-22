@@ -16,7 +16,7 @@
  */
 
 const { QUEUE_AVG_JOB_SECONDS, QUEUE_DISPATCH_CONCURRENCY } = require("./config");
-const { getJob, getQueuePosition, markFailedIfStale, touchJob } = require("./jobs");
+const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
 
 /* Grobe Wartezeit-Schätzung aus der Warteschlangen-Position.
    Kalibrierung der Konstanten erfolgt in Phase 3/4 (config.js). */
@@ -70,6 +70,29 @@ async function handleJobStatus(req, res) {
   }
 
   if (job.status === "done") {
+    /* Auslieferungs-Messung (Diagnose): Beim ERSTEN Ausliefern eines fertigen
+       Jobs den Zeitpunkt festhalten und die Auslieferungs-Lücke loggen —
+       `deliveryGapMs` = fertig gerechnet → tatsächlich beim Client angekommen,
+       `totalMs` = erstellt → ausgeliefert (die volle serverseitige Kette).
+       Erlaubt „done vs. wirklich abgeholt" sauber zu trennen, unabhängig von
+       der best-effort Client-Telemetrie. Wiederholte Polls (Reload, zweiter
+       Tab) loggen nicht erneut. Der Schreibvorgang läuft nebenläufig — er darf
+       die Antwort an den wartenden Client nicht verzögern. */
+    if (!job.deliveredAt) {
+      const now = Date.now();
+      markDelivered(job.id).catch((err) =>
+        console.log(JSON.stringify({ warning: "markDelivered-error", jobId: job.id, error: err.message }))
+      );
+      console.log(
+        JSON.stringify({
+          step: "job-delivered",
+          jobId: job.id,
+          traceId: job.traceId || null,
+          deliveryGapMs: typeof job.finishedAt === "number" ? now - job.finishedAt : null,
+          totalMs: typeof job.createdAt === "number" ? now - job.createdAt : null,
+        })
+      );
+    }
     res.status(200).json({
       status: "done",
       result: job.result || null,

@@ -230,6 +230,9 @@ async function handleProcessJob(req, res) {
         traceId: job.traceId || null,
         status: success ? "done" : "blocked",
         mode: result.meta.mode,
+        /* Wartezeit in der Warteschlange: erstellt → Verarbeitungsbeginn.
+           `start` wird unmittelbar nach dem erfolgreichen Claim gesetzt. */
+        queueWaitMs: typeof job.createdAt === "number" ? start - job.createdAt : null,
         totalMs: Date.now() - start,
       })
     );

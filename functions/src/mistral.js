@@ -74,7 +74,18 @@ function modelClassOf(model) {
 }
 
 async function callMistralRaw(options) {
-  return withMistralSlot(() => callMistralRawUnthrottled(options), modelClassOf(options.model));
+  /* waitMs misst, wie lange der Call auf einen freien Semaphore-Slot UND einen
+     Token-Bucket-Tick gewartet hat — der reine Drossel-Anteil an der Wartezeit.
+     httpMs (in callMistralRawUnthrottled gemessen) ist davon getrennt der reine
+     Mistral-Roundtrip. Beide zusammen erlauben nach einem Workshop die Frage zu
+     beantworten: bremst Mistral oder bremsen wir? */
+  const t0 = Date.now();
+  let waitMs = 0;
+  const result = await withMistralSlot(() => {
+    waitMs = Date.now() - t0;
+    return callMistralRawUnthrottled(options);
+  }, modelClassOf(options.model));
+  return { ...result, waitMs };
 }
 
 async function callMistralRawUnthrottled({ model, messages, maxTokens, temperature, forceJSON, timeoutMs }) {
@@ -107,6 +118,7 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
     const effectiveTimeout = Math.min(timeoutMs || MISTRAL_TIMEOUT_MS, MISTRAL_TIMEOUT_MS);
     const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
+    const httpStart = Date.now();
     let res;
     try {
       res = await fetchImpl(MISTRAL_ENDPOINT, {
@@ -166,6 +178,7 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
       finishReason: choice?.finish_reason || "unknown",
       promptTokens: usage.prompt_tokens || 0,
       outputTokens: usage.completion_tokens || 0,
+      httpMs: Date.now() - httpStart,
     };
   }
 
@@ -245,6 +258,10 @@ async function tryDescribeWithPrompt(prompt, imageBuffer, mimeType, remainingBud
         status: result.text ? "ok" : "empty",
         finishReason: result.finishReason,
         length: result.text.length,
+        promptTokens: result.promptTokens,
+        outputTokens: result.outputTokens,
+        httpMs: result.httpMs,
+        waitMs: result.waitMs,
       })
     );
     return result;
@@ -409,6 +426,10 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
         finishReason: result.finishReason,
         isFallback,
         repairStages: stages,
+        promptTokens: result.promptTokens,
+        outputTokens: result.outputTokens,
+        httpMs: result.httpMs,
+        waitMs: result.waitMs,
       })
     );
     return parsed;

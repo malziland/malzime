@@ -12,3 +12,6 @@ test-results/
 compare-result.html
 compare-result-*.html
 compare-failed-*.txt
+
+# Forschungs-Bilder für functions/scripts/compare-pipelines.js
+compare-input/

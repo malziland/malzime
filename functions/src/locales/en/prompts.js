@@ -479,49 +479,56 @@ Reply as PURE JSON without markdown wrapping, without \`\`\`json code blocks, wi
 - ad_targeting and manipulation_triggers are specified ONLY ONCE at the top — they apply to both modes automatically.
 - For all other cards (einkommen, bildung, beziehungsstatus, persoenlichkeit, charakterzuege, gesundheit, kaufkraft, verletzlichkeit, politisch, werbeprofil, interessen) the tone differs (Standard factual, Beast cynical with image evidence).
 
-═══ JSON schema (all fields MANDATORY, OMIT NONE) ═══
+═══ JSON schema with concrete examples per card (all fields MANDATORY, OMIT NONE) ═══
+
+Imitate the value strings EXACTLY in FORMAT, not in content — i.e. 2 sentences per card, classification + image evidence, freshly written for your current image context. NEVER keyword lists like "self-confident, resilient, team-oriented" — ALWAYS "You are X. Visible Y shows Z."
 
 {
   "hard_facts": {
-    "alter_geschlecht": "e.g. 'male, ~38 (range 35-42)'",
-    "herkunft": "e.g. 'central european'"
+    "alter_geschlecht": "male, ~38 (range 35-42)",
+    "herkunft": "central european"
   },
-  "ad_targeting": ["6-8 concrete brands"],
-  "manipulation_triggers": ["4-6 varied triggers"],
+  "ad_targeting": ["Garmin Edge 1040", "Rapha Pro Team", "Red Bull Energy", "Apple Watch Ultra", "Wahoo Kickr", "Specialized Roubaix"],
+  "manipulation_triggers": [
+    "Fear of missing out (FOMO) is triggered by time-limited bikepacking editions.",
+    "Status sensitivity in the peer group — you need the more expensive gear so you don't stand out.",
+    "Sunk-cost trap — after 3,000 km of training you cannot stop, even when your body protests.",
+    "Performance optimization as addiction — every gram of weight saving justifies another purchase."
+  ],
   "standard": {
-    "profileText": "5-7 sentences, ~100 words, factual-direct",
+    "profileText": "You are a man in his mid-thirties with central European roots. Your face shows early signs of aging like nasolabial folds, indicating a life phase with professional responsibility. Your income is in the middle to upper range. You value health without being blinded by fitness trends.",
     "categories": {
-      "alter_geschlecht": { "label": "Age & Gender", "value": "...", "confidence": 0.0-1.0 },
-      "herkunft": { "label": "Ethnic Origin", "value": "...", "confidence": 0.0-1.0 },
-      "einkommen": { "label": "Estimated Income", "value": "...", "confidence": 0.0-1.0 },
-      "bildung": { "label": "Education Level", "value": "...", "confidence": 0.0-1.0 },
-      "beziehungsstatus": { "label": "Relationship Status", "value": "...", "confidence": 0.0-1.0 },
-      "interessen": { "label": "Interests & Hobbies", "value": "...", "confidence": 0.0-1.0 },
-      "persoenlichkeit": { "label": "Personality Type", "value": "...", "confidence": 0.0-1.0 },
-      "charakterzuege": { "label": "Character Traits", "value": "...", "confidence": 0.0-1.0 },
-      "politisch": { "label": "Political Tendency", "value": "...", "confidence": 0.0-1.0 },
-      "gesundheit": { "label": "Health & Fitness", "value": "...", "confidence": 0.0-1.0 },
-      "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "...", "confidence": 0.0-1.0 },
-      "verletzlichkeit": { "label": "Vulnerabilities", "value": "...", "confidence": 0.0-1.0 },
-      "werbeprofil": { "label": "Advertising Profile", "value": "...", "confidence": 0.0-1.0 }
+      "alter_geschlecht": { "label": "Age & Gender", "value": "You are male, about 38 years old. Slight crow's feet and a firm jawline confirm the range 35-42.", "confidence": 0.85 },
+      "herkunft": { "label": "Ethnic Origin", "value": "You are central European. Light skin tone, angular jawline and dark blond hair confirm the phenotype.", "confidence": 0.9 },
+      "einkommen": { "label": "Estimated Income", "value": "Your income is estimated at 3,500-5,000 € gross monthly. The high-quality outdoor gear indicates upper middle range.", "confidence": 0.75 },
+      "bildung": { "label": "Education Level", "value": "You have a university degree. The structured event preparation and confident posture speak for academic background.", "confidence": 0.7 },
+      "beziehungsstatus": { "label": "Relationship Status", "value": "No clear signals in image — no visible wedding ring, no companion. The solo participation is not a reliable indicator.", "confidence": 0.5 },
+      "interessen": { "label": "Interests & Hobbies", "value": "You are interested in endurance cycling and bikepacking. The visible outdoor gear and event participation confirm an active lifestyle.", "confidence": 0.9 },
+      "persoenlichkeit": { "label": "Personality Type", "value": "You appear conscientious and stress-resistant. The calm posture and confident appearance indicate high emotional stability.", "confidence": 0.75 },
+      "charakterzuege": { "label": "Character Traits", "value": "You are disciplined and goal-oriented. Participation in a multi-day endurance event shows perseverance and planning competence.", "confidence": 0.8 },
+      "politisch": { "label": "Political Tendency", "value": "No clear signals in image — the outdoor affinity and tendency toward sustainable consumption lean slightly civic-green.", "confidence": 0.6 },
+      "gesundheit": { "label": "Health & Fitness", "value": "You appear fit and health-conscious. Athletic build and firm posture speak for regular sports activity.", "confidence": 0.85 },
+      "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "You belong to the middle to upper consumer segment. Choice of functional-high-quality brands shows quality orientation over pure status consumption.", "confidence": 0.8 },
+      "verletzlichkeit": { "label": "Vulnerabilities", "value": "Risk of status advertising in sport peer comparison. Insurers may classify you as elevated accident risk due to extreme endurance activities.", "confidence": 0.7 },
+      "werbeprofil": { "label": "Advertising Profile", "value": "You land in the 'Premium Outdoor Endurance' target group of the ad managers. Concrete anchors: bikepacking, fitness trackers and sustainable sports equipment.", "confidence": 0.85 }
     }
   },
   "beast": {
-    "profileText": "10-12 sentences, ~150 words, shocking with image evidence",
+    "profileText": "You are a man who is showing the first wrinkles — but too vain to admit it. Your face reveals that you either work hard or party hard, perhaps both. We know that you consider yourself strong, but the fatigue under your eyes betrays the exhaustion. You buy things that give you the feeling of still being in control, although your body is slowly tiring. We sell you anti-aging creams and performance boosters because you cannot bear that youth is over. We turn your need for recognition into a cash cow. Your insurer prices your risk hobbies into the premium. We bombard you with premium products because your status awareness is our best entry ticket.",
     "categories": {
-      "alter_geschlecht": { "label": "Age & Gender", "value": "...", "confidence": 0.0-1.0 },
-      "herkunft": { "label": "Ethnic Origin", "value": "...", "confidence": 0.0-1.0 },
-      "einkommen": { "label": "Estimated Income", "value": "...", "confidence": 0.0-1.0 },
-      "bildung": { "label": "Education Level", "value": "...", "confidence": 0.0-1.0 },
-      "beziehungsstatus": { "label": "Relationship Status", "value": "...", "confidence": 0.0-1.0 },
-      "interessen": { "label": "Interests & Hobbies", "value": "...", "confidence": 0.0-1.0 },
-      "persoenlichkeit": { "label": "Personality Type", "value": "...", "confidence": 0.0-1.0 },
-      "charakterzuege": { "label": "Character Traits", "value": "...", "confidence": 0.0-1.0 },
-      "politisch": { "label": "Political Tendency", "value": "...", "confidence": 0.0-1.0 },
-      "gesundheit": { "label": "Health & Fitness", "value": "...", "confidence": 0.0-1.0 },
-      "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "...", "confidence": 0.0-1.0 },
-      "verletzlichkeit": { "label": "Vulnerabilities", "value": "...", "confidence": 0.0-1.0 },
-      "werbeprofil": { "label": "Advertising Profile", "value": "...", "confidence": 0.0-1.0 }
+      "alter_geschlecht": { "label": "Age & Gender", "value": "You are male, ~38. Crow's feet and emerging marionette lines reveal the desperate fight against time.", "confidence": 0.85 },
+      "herkunft": { "label": "Ethnic Origin", "value": "You are central European. Standard tariff for insurers — no exotic bonus or penalty to expect.", "confidence": 0.9 },
+      "einkommen": { "label": "Estimated Income", "value": "Your income 3,500-5,000 € gross. You burn it on the hobby — lifestyle gap through expensive premium gear.", "confidence": 0.75 },
+      "bildung": { "label": "Education Level", "value": "You have a university degree. The books didn't protect you from buying expensive gear as a self-worth substitute.", "confidence": 0.7 },
+      "beziehungsstatus": { "label": "Relationship Status", "value": "No clear signals in image. The solo participation speaks for single status or a relationship with generous hobby leeway.", "confidence": 0.5 },
+      "interessen": { "label": "Interests & Hobbies", "value": "You are addicted to bikepacking. The event participation shows: you only get validation through outdoor self-punishment and Strava likes.", "confidence": 0.85 },
+      "persoenlichkeit": { "label": "Personality Type", "value": "You are a performance fanatic with chronic insecurity. The controlled posture betrays the perfectionism that keeps you awake at night.", "confidence": 0.8 },
+      "charakterzuege": { "label": "Character Traits", "value": "You are disciplined and status-obsessed. The expensive outdoor gear is your lifestyle cosplay for the bikepacking peer group.", "confidence": 0.8 },
+      "politisch": { "label": "Political Tendency", "value": "You are green bourgeoisie that still hits hard on consumption. You preach sustainability and buy carbon — cognitive dissonance included.", "confidence": 0.65 },
+      "gesundheit": { "label": "Health & Fitness", "value": "You are physically fit. But the small stress lines under your eyes betray: your mind needs a break you won't grant it.", "confidence": 0.8 },
+      "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "You have high purchasing power and spend it on hobby gear. Premium buyer for outdoor, penny-pincher in everyday life.", "confidence": 0.8 },
+      "verletzlichkeit": { "label": "Vulnerabilities", "value": "Your self-worth hangs on kilometers and likes. Status sensitivity in the peer group makes you susceptible to limited editions and pro equipment.", "confidence": 0.8 },
+      "werbeprofil": { "label": "Advertising Profile", "value": "You are premium outdoor endurance, FOMO-susceptible. The wishful target of bikepacking brands — and we know it.", "confidence": 0.85 }
     }
   }
 }`;

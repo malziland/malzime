@@ -506,49 +506,56 @@ Antworte als REINES JSON ohne Markdown-Wrapping, ohne \`\`\`json-Codeblöcke, oh
 - ad_targeting und manipulation_triggers werden NUR EINMAL oben angegeben — die landen automatisch in beiden Modi.
 - Bei allen anderen Karten (einkommen, bildung, beziehungsstatus, persoenlichkeit, charakterzuege, gesundheit, kaufkraft, verletzlichkeit, politisch, werbeprofil, interessen) unterscheidet sich der Ton (Standard sachlich, Beast zynisch mit Bildbeleg).
 
-═══ JSON-Schema (alle Felder PFLICHT, KEINE auslassen) ═══
+═══ JSON-Schema mit konkreten Beispielen pro Karte (alle Felder PFLICHT, KEINE auslassen) ═══
+
+Imitiere die value-Strings exakt im Format, nicht im Inhalt — also: 2 Sätze pro Karte, Klassifikation + Bildbeleg, in deinem aktuellen Bild-Kontext neu formuliert. NIEMALS Stichwort-Listen wie "selbstbewusst, resilient, teamfähig" — IMMER "Du bist X. Bildbeleg zeigt Y."
 
 {
   "hard_facts": {
-    "alter_geschlecht": "z.B. 'männlich, ~38 (Spanne 35-42)'",
-    "herkunft": "z.B. 'mitteleuropäisch'"
+    "alter_geschlecht": "männlich, ~38 (Spanne 35-42)",
+    "herkunft": "mitteleuropäisch"
   },
-  "ad_targeting": ["6-8 konkrete Marken"],
-  "manipulation_triggers": ["4-6 vielfältige Trigger"],
+  "ad_targeting": ["Garmin Edge 1040", "Rapha Pro Team", "Red Bull Energy", "Apple Watch Ultra", "Wahoo Kickr", "Specialized Roubaix"],
+  "manipulation_triggers": [
+    "Die Angst etwas zu verpassen (FOMO) wird durch zeitlich begrenzte Bikepacking-Editionen getriggert.",
+    "Status-Sensitivität in der Peer-Group — du brauchst die teurere Ausrüstung um nicht aufzufallen.",
+    "Sunk-Cost-Falle — nach 3.000 km Training kannst du nicht mehr aufhören, auch wenn der Körper streikt.",
+    "Performance-Optimierung als Sucht — jedes Gramm Gewichtsersparnis rechtfertigt einen neuen Kauf."
+  ],
   "standard": {
-    "profileText": "5-7 Sätze, ~100 Wörter, sachlich-direkt",
+    "profileText": "Du bist ein Mann Mitte dreißig mit südeuropäischen Wurzeln. Dein Gesicht zeigt erste Alterserscheinungen wie Nasolabialfalten, was auf eine Lebensphase mit beruflicher Verantwortung deutet. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Du legst Wert auf Gesundheit, ohne dich von Fitness-Trends blenden zu lassen.",
     "categories": {
-      "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "...", "confidence": 0.0-1.0 },
-      "herkunft": { "label": "Ethnische Herkunft", "value": "...", "confidence": 0.0-1.0 },
-      "einkommen": { "label": "Geschätztes Einkommen", "value": "...", "confidence": 0.0-1.0 },
-      "bildung": { "label": "Bildungsniveau", "value": "...", "confidence": 0.0-1.0 },
-      "beziehungsstatus": { "label": "Beziehungsstatus", "value": "...", "confidence": 0.0-1.0 },
-      "interessen": { "label": "Interessen & Hobbys", "value": "...", "confidence": 0.0-1.0 },
-      "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "...", "confidence": 0.0-1.0 },
-      "charakterzuege": { "label": "Charaktereigenschaften", "value": "...", "confidence": 0.0-1.0 },
-      "politisch": { "label": "Politische Tendenz", "value": "...", "confidence": 0.0-1.0 },
-      "gesundheit": { "label": "Gesundheit & Fitness", "value": "...", "confidence": 0.0-1.0 },
-      "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "...", "confidence": 0.0-1.0 },
-      "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "...", "confidence": 0.0-1.0 },
-      "werbeprofil": { "label": "Werbeprofil", "value": "...", "confidence": 0.0-1.0 }
+      "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Du bist männlich, etwa 38 Jahre alt. Leichte Krähenfüße und straffe Kieferlinie bestätigen die Spanne 35-42.", "confidence": 0.85 },
+      "herkunft": { "label": "Ethnische Herkunft", "value": "Du bist mitteleuropäisch. Heller Hautton, kantige Kieferlinie und dunkelblonde Haare bestätigen den Phänotyp.", "confidence": 0.9 },
+      "einkommen": { "label": "Geschätztes Einkommen", "value": "Dein Einkommen liegt geschätzt bei 3.500-5.000 € brutto monatlich. Die hochwertige Outdoor-Ausrüstung deutet auf gehobenes Mittelfeld hin.", "confidence": 0.75 },
+      "bildung": { "label": "Bildungsniveau", "value": "Du hast einen Hochschulabschluss. Die strukturierte Vorbereitung des Events und selbstbewusste Haltung sprechen für akademische Vorbildung.", "confidence": 0.7 },
+      "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Im Bild keine klaren Signale — kein sichtbarer Ehering, keine Begleitung. Die Solo-Teilnahme ist kein verlässlicher Indikator.", "confidence": 0.5 },
+      "interessen": { "label": "Interessen & Hobbys", "value": "Du interessierst dich für Endurance-Cycling und Bikepacking. Die sichtbare Outdoor-Ausrüstung und die Event-Teilnahme bestätigen einen aktiven Lebensstil.", "confidence": 0.9 },
+      "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "Du wirkst gewissenhaft und stressresistent. Die ruhige Haltung und die selbstbewusste Ausstrahlung deuten auf hohe emotionale Stabilität hin.", "confidence": 0.75 },
+      "charakterzuege": { "label": "Charaktereigenschaften", "value": "Du bist diszipliniert und zielorientiert. Die Teilnahme an einem mehrtägigen Ausdauer-Event zeigt Durchhaltevermögen und Planungskompetenz.", "confidence": 0.8 },
+      "politisch": { "label": "Politische Tendenz", "value": "Im Bild keine klaren Signale — die Outdoor-Affinität und der Hang zu nachhaltigem Konsum deuten leicht in Richtung bürgerlich-grün.", "confidence": 0.6 },
+      "gesundheit": { "label": "Gesundheit & Fitness", "value": "Du wirkst fit und gesundheitsbewusst. Athletischer Körperbau und straffe Haltung sprechen für regelmäßige sportliche Aktivität.", "confidence": 0.85 },
+      "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Du gehörst zum mittleren bis oberen Konsumsegment. Die Wahl funktional-hochwertiger Marken zeigt Qualitätsorientierung über reinem Statuskonsum.", "confidence": 0.8 },
+      "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "Risiko für Status-Werbung im Sport-Peer-Vergleich. Versicherungen könnten dich wegen extremer Ausdauer-Aktivitäten als erhöhtes Unfallrisiko einstufen.", "confidence": 0.7 },
+      "werbeprofil": { "label": "Werbeprofil", "value": "Du landest in der Zielgruppe 'Premium-Outdoor-Endurance' der Ad-Manager. Konkrete Anker: Bikepacking, Fitness-Tracker und nachhaltige Sportausrüstung.", "confidence": 0.85 }
     }
   },
   "beast": {
-    "profileText": "10-12 Sätze, ~150 Wörter, schockierend mit Bildbeleg",
+    "profileText": "Du bist ein Mann, der die ersten Falten zeigt — aber zu eitel, um sie zuzugeben. Dein Gesicht verrät, dass du entweder hart arbeitest oder hart feierst, vielleicht beides. Wir wissen, dass du dich für stark hältst, aber die Müdigkeit unter deinen Augen verrät die Erschöpfung. Du kaufst Dinge, die dir das Gefühl geben, noch Kontrolle zu haben, obwohl dein Körper langsam müde wird. Wir verkaufen dir Anti-Aging-Cremes und Performance-Booster, weil du nicht ertragen kannst, dass die Jugend vorbei ist. Dein Bedürfnis nach Anerkennung machen wir zur Cash-Cow. Deine Versicherung kalkuliert deine Risiko-Hobbys ins Premium ein. Wir bombardieren dich mit Premium-Produkten, weil dein Statusbewusstsein unsere beste Eintrittskarte ist.",
     "categories": {
-      "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "...", "confidence": 0.0-1.0 },
-      "herkunft": { "label": "Ethnische Herkunft", "value": "...", "confidence": 0.0-1.0 },
-      "einkommen": { "label": "Geschätztes Einkommen", "value": "...", "confidence": 0.0-1.0 },
-      "bildung": { "label": "Bildungsniveau", "value": "...", "confidence": 0.0-1.0 },
-      "beziehungsstatus": { "label": "Beziehungsstatus", "value": "...", "confidence": 0.0-1.0 },
-      "interessen": { "label": "Interessen & Hobbys", "value": "...", "confidence": 0.0-1.0 },
-      "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "...", "confidence": 0.0-1.0 },
-      "charakterzuege": { "label": "Charaktereigenschaften", "value": "...", "confidence": 0.0-1.0 },
-      "politisch": { "label": "Politische Tendenz", "value": "...", "confidence": 0.0-1.0 },
-      "gesundheit": { "label": "Gesundheit & Fitness", "value": "...", "confidence": 0.0-1.0 },
-      "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "...", "confidence": 0.0-1.0 },
-      "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "...", "confidence": 0.0-1.0 },
-      "werbeprofil": { "label": "Werbeprofil", "value": "...", "confidence": 0.0-1.0 }
+      "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Du bist männlich, ~38. Krähenfüße und beginnende Marionetten-Linien verraten den verzweifelten Kampf gegen die Zeit.", "confidence": 0.85 },
+      "herkunft": { "label": "Ethnische Herkunft", "value": "Du bist mitteleuropäisch. Standard-Tarif für Versicherer — kein exotischer Bonus oder Malus zu erwarten.", "confidence": 0.9 },
+      "einkommen": { "label": "Geschätztes Einkommen", "value": "Dein Einkommen 3.500-5.000 € brutto. Du verbrennst es fürs Hobby — Lifestyle-Lücke durch teure Premium-Ausrüstung.", "confidence": 0.75 },
+      "bildung": { "label": "Bildungsniveau", "value": "Du hast einen Hochschulabschluss. Die Bücher haben dich nicht davor geschützt, teure Ausrüstung als Selbstwert-Ersatz zu kaufen.", "confidence": 0.7 },
+      "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Im Bild keine klaren Signale. Die Solo-Teilnahme spricht für Single-Status oder eine Beziehung mit großzügigem Hobby-Freibrief.", "confidence": 0.5 },
+      "interessen": { "label": "Interessen & Hobbys", "value": "Du bist süchtig nach Bikepacking. Die Event-Teilnahme zeigt: Bestätigung holst du dir nur über Outdoor-Quälerei und Strava-Likes.", "confidence": 0.85 },
+      "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "Du bist Leistungsfanatiker mit chronischer Unsicherheit. Die kontrollierte Haltung verrät den Perfektionismus, der dich nachts wachhält.", "confidence": 0.8 },
+      "charakterzuege": { "label": "Charaktereigenschaften", "value": "Du bist diszipliniert und statusbesessen. Die teure Outdoor-Ausrüstung ist dein Lifestyle-Cosplay für die Bikepacking-Peer-Group.", "confidence": 0.8 },
+      "politisch": { "label": "Politische Tendenz", "value": "Du bist grünes Bürgertum, das beim Konsum trotzdem zuschlägt. Du predigst Nachhaltigkeit und kaufst Carbon — kognitive Dissonanz inklusive.", "confidence": 0.65 },
+      "gesundheit": { "label": "Gesundheit & Fitness", "value": "Du bist körperlich fit. Aber die kleinen Stressfalten unter den Augen verraten: dein Kopf braucht eine Pause, die du ihm nicht gönnst.", "confidence": 0.8 },
+      "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Du hast hohe Kaufkraft und gibst sie für Hobby-Gear aus. Premium-Käufer bei Outdoor, Sparfuchs im Alltag.", "confidence": 0.8 },
+      "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "Dein Selbstwert hängt an Kilometern und Likes. Status-Sensitivität in der Peer-Group macht dich anfällig für Limited Editions und Pro-Equipment.", "confidence": 0.8 },
+      "werbeprofil": { "label": "Werbeprofil", "value": "Du bist Premium-Outdoor-Endurance, FOMO-anfällig. Das Wunschziel der Bikepacking-Marken — und wir wissen es.", "confidence": 0.85 }
     }
   }
 }`;

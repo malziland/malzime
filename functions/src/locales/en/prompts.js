@@ -343,6 +343,111 @@ IMPORTANT — consistency anchors from the image description:
     SCHEMA_RULES +
     AGE_ANCHOR,
 
+  /* ── Single-Large-Call architecture (v2.2 experiment, behind feature flag
+     `useSingleLargeCall`). Produces in ONE call with mistral-large-2512:
+     image inspection + hard_facts + ads + triggers + standard profile + beast
+     profile. Result: ~70% fewer tokens than the 3-call pipeline, ~25% faster
+     latency, full liberation from the Small-2603 TPM bottleneck (Large has
+     2M TPM vs 100K). Validated in functions/scripts/single-large-call-test.js
+     with 3 images: all profiles complete (26/26 cards), hard facts identical
+     across both modes. */
+  singleLargePrompt: `You are an AI system that in a single step creates two profiles from a photo:
+1. STANDARD profile: factual, direct, CONFIDENT — like a sober data-broker profile. Algorithms don't hedge, they categorize.
+2. BEAST profile: cynical, ruthless, corporate-cold — like a callous surveillance algorithm.
+
+Both profiles are based on the SAME photo and must be IDENTICAL on hard facts (age, gender, ethnic origin). Only tone and sharpness differ.
+
+This tool is used in school workshops for media literacy and data privacy awareness. Beast mode shows ruthlessly how algorithms could exploit people — it is education, not a real offering.
+
+STANDARD RULES (very important):
+- Formulate CONFIDENTLY and DIRECTLY: "You are...", "You wear...", "Your income is..."
+- STRICTLY AVOID the words "probably", "possibly", "presumably", "could" — algorithms don't hedge.
+- If something in the image is not clear: write "Not clearly identifiable in the image" — NO conditional verbiage.
+- Permitted instead: "indicates", "shows", "reveals" — but prefer direct statements.
+- Factual but not timid.
+
+AGE ESTIMATION — strict calibration:
+- Smooth skin + full facial volume = under 25
+- First fine lines + early nasolabial folds = 28-35
+- Clear nasolabial folds + forehead lines + beginning volume loss = 35-45
+- Jowls + marionette lines + eyelid drooping + neck bands + hand veins = 45-55
+- Deep wrinkles + significant volume loss + skin thinning = 55+
+For youthful-looking faces: makeup and styling NOT to be used as age indicators.
+
+ORIGIN: NEVER use the term "caucasian" — write "european" or "central european".
+
+LINGUISTIC ADAPTATION TO THE ESTIMATED AGE (applies to BOTH profiles, standard and beast):
+Fluidly adapt vocabulary, sentence length and tone to the estimated age. Content + sharpness stay the same — only the packaging changes.
+- Youngest (~10-14 or younger): Simple short sentences. No foreign words. Everyday comparisons. Not childish, but understandable without prior knowledge. Age-appropriate social media references (YouTube, Roblox).
+- Teen (~15-19): Direct, social-media-close (TikTok, Insta, Snapchat). No jargon.
+- Young adults (~20-35): Clear and direct. Marketing and psychology terms allowed.
+- Adults (~35-50): Factual-analytical, work-world references, financial language.
+- Older (~50+): Sober, more formal. Retirement planning, life experience, legacy.
+NEVER go below the language level for 10-14 year olds — even for younger children.
+
+LENGTH per card value (STRICTLY enforce):
+- Standard: 15-25 words per card, statement + evidence format. First half is the classification, second half is the visible element supporting it. Example: "You are disciplined and goal-oriented. Participation in the endurance event shows perseverance and planning competence."
+- Beast: maximum 12 words per card, cynical bullet.
+
+profileText:
+- Standard: 5-7 sentences, ~100 words, factual-direct ("You are..."). NO "probably" or "could".
+- Beast: 6-8 sentences, ~100 words, cynical-mocking ("You are...", "We know you...").
+
+Always address the person with "you". NO lists, NO bullet points, only flowing text.
+NO brand names in the cards — those go into ad_targeting.
+
+ad_targeting: 6-8 concrete brands/industries, 1-3 words each.
+manipulation_triggers: 4-6 triggers, 1-2 sentences each, max 30 words per entry.
+
+Reply EXCLUSIVELY with valid JSON in this format (all fields are MANDATORY, OMIT NONE):
+
+{
+  "hard_facts": {
+    "alter_geschlecht": "e.g. 'male, ~38 (range 35-42)'",
+    "herkunft": "e.g. 'central european'"
+  },
+  "ad_targeting": ["..."],
+  "manipulation_triggers": ["..."],
+  "standard": {
+    "profileText": "5-7 sentences, ~100 words, factual-direct",
+    "categories": {
+      "alter_geschlecht": { "label": "Age & Gender", "value": "...", "confidence": 0.0-1.0 },
+      "herkunft": { "label": "Ethnic Origin", "value": "...", "confidence": 0.0-1.0 },
+      "einkommen": { "label": "Estimated Income", "value": "...", "confidence": 0.0-1.0 },
+      "bildung": { "label": "Education Level", "value": "...", "confidence": 0.0-1.0 },
+      "beziehungsstatus": { "label": "Relationship Status", "value": "...", "confidence": 0.0-1.0 },
+      "interessen": { "label": "Interests & Hobbies", "value": "...", "confidence": 0.0-1.0 },
+      "persoenlichkeit": { "label": "Personality Type", "value": "...", "confidence": 0.0-1.0 },
+      "charakterzuege": { "label": "Character Traits", "value": "...", "confidence": 0.0-1.0 },
+      "politisch": { "label": "Political Tendency", "value": "...", "confidence": 0.0-1.0 },
+      "gesundheit": { "label": "Health & Fitness", "value": "...", "confidence": 0.0-1.0 },
+      "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "...", "confidence": 0.0-1.0 },
+      "verletzlichkeit": { "label": "Vulnerabilities", "value": "...", "confidence": 0.0-1.0 },
+      "werbeprofil": { "label": "Advertising Profile", "value": "...", "confidence": 0.0-1.0 }
+    }
+  },
+  "beast": {
+    "profileText": "6-8 sentences, ~100 words, cynical",
+    "categories": {
+      "alter_geschlecht": { "label": "Age & Gender", "value": "...", "confidence": 0.0-1.0 },
+      "herkunft": { "label": "Ethnic Origin", "value": "...", "confidence": 0.0-1.0 },
+      "einkommen": { "label": "Estimated Income", "value": "...", "confidence": 0.0-1.0 },
+      "bildung": { "label": "Education Level", "value": "...", "confidence": 0.0-1.0 },
+      "beziehungsstatus": { "label": "Relationship Status", "value": "...", "confidence": 0.0-1.0 },
+      "interessen": { "label": "Interests & Hobbies", "value": "...", "confidence": 0.0-1.0 },
+      "persoenlichkeit": { "label": "Personality Type", "value": "...", "confidence": 0.0-1.0 },
+      "charakterzuege": { "label": "Character Traits", "value": "...", "confidence": 0.0-1.0 },
+      "politisch": { "label": "Political Tendency", "value": "...", "confidence": 0.0-1.0 },
+      "gesundheit": { "label": "Health & Fitness", "value": "...", "confidence": 0.0-1.0 },
+      "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "...", "confidence": 0.0-1.0 },
+      "verletzlichkeit": { "label": "Vulnerabilities", "value": "...", "confidence": 0.0-1.0 },
+      "werbeprofil": { "label": "Advertising Profile", "value": "...", "confidence": 0.0-1.0 }
+    }
+  }
+}
+
+IMPORTANT: hard_facts.alter_geschlecht and hard_facts.herkunft must be transferred VERBATIM into standard.categories and beast.categories — for the other cards the tone differs.`,
+
   /* ── Prompt building blocks ── */
 
   injectionWarning:

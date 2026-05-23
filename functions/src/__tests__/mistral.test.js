@@ -496,3 +496,146 @@ describe("mistralDescribeAddendum locale entries", () => {
     expect(prompts.mistralDescribeAddendum).toContain("ADDITIONAL TASK");
   });
 });
+
+/* ── singleLargePrompt locale entries (v2.2) ───────────────────── */
+
+describe("singleLargePrompt locale entries", () => {
+  test("de locale exposes singleLargePrompt", () => {
+    const { loadPrompts } = require("../i18n");
+    const prompts = loadPrompts("de");
+    expect(prompts.singleLargePrompt).toBeDefined();
+    expect(prompts.singleLargePrompt).toContain("STANDARD-Profil");
+    expect(prompts.singleLargePrompt).toContain("BEAST-Profil");
+    expect(prompts.singleLargePrompt).toContain("hard_facts");
+  });
+
+  test("en locale exposes singleLargePrompt", () => {
+    const { loadPrompts } = require("../i18n");
+    const prompts = loadPrompts("en");
+    expect(prompts.singleLargePrompt).toBeDefined();
+    expect(prompts.singleLargePrompt).toContain("STANDARD profile");
+    expect(prompts.singleLargePrompt).toContain("BEAST profile");
+    expect(prompts.singleLargePrompt).toContain("hard_facts");
+  });
+});
+
+/* ── runSingleLargeCall (v2.2) ─────────────────────────────────── */
+
+describe("runSingleLargeCall", () => {
+  const { runSingleLargeCall } = mistral;
+  const REQUIRED_KEYS = [
+    "alter_geschlecht",
+    "herkunft",
+    "einkommen",
+    "bildung",
+    "beziehungsstatus",
+    "interessen",
+    "persoenlichkeit",
+    "charakterzuege",
+    "politisch",
+    "gesundheit",
+    "kaufkraft",
+    "verletzlichkeit",
+    "werbeprofil",
+  ];
+
+  function makeFullCategories(prefix) {
+    const out = {};
+    for (const k of REQUIRED_KEYS) {
+      out[k] = { label: k, value: `${prefix} ${k}`, confidence: 0.8 };
+    }
+    return out;
+  }
+
+  function makeCompleteResponse() {
+    return {
+      hard_facts: { alter_geschlecht: "männlich, ~38 (Spanne 35-42)", herkunft: "mitteleuropäisch" },
+      ad_targeting: ["Bio-Kosmetik", "Premium-Reisen"],
+      manipulation_triggers: ["Trigger A", "Trigger B"],
+      standard: { profileText: "Du bist sachlich beschrieben.", categories: makeFullCategories("Standard") },
+      beast: { profileText: "Du bist zynisch beschrieben.", categories: makeFullCategories("Beast") },
+    };
+  }
+
+  test("returns normal+boost with overridden hard facts when response is complete", async () => {
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(makeCompleteResponse()) }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 4000, completion_tokens: 2000 },
+      }),
+    }));
+
+    const result = await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
+    expect(result.normal).toBeTruthy();
+    expect(result.boost).toBeTruthy();
+    /* Hard-Facts müssen WORTGENAU aus hard_facts kommen — selbst wenn Standard/Beast
+       in den categories etwas anderes geschrieben hätten. */
+    expect(result.normal.categories.alter_geschlecht.value).toBe("männlich, ~38 (Spanne 35-42)");
+    expect(result.boost.categories.alter_geschlecht.value).toBe("männlich, ~38 (Spanne 35-42)");
+    expect(result.normal.categories.herkunft.value).toBe("mitteleuropäisch");
+    expect(result.boost.categories.herkunft.value).toBe("mitteleuropäisch");
+    /* ads + triggers in beide Modi geschrieben. */
+    expect(result.normal.ad_targeting).toEqual(["Bio-Kosmetik", "Premium-Reisen"]);
+    expect(result.boost.ad_targeting).toEqual(["Bio-Kosmetik", "Premium-Reisen"]);
+    expect(result.normal.manipulation_triggers).toEqual(["Trigger A", "Trigger B"]);
+    expect(result.boost.manipulation_triggers).toEqual(["Trigger A", "Trigger B"]);
+    /* profileText übernommen. */
+    expect(result.normal.profileText).toBe("Du bist sachlich beschrieben.");
+    expect(result.boost.profileText).toBe("Du bist zynisch beschrieben.");
+  });
+
+  test("retries with completion-hint when first call missed cards", async () => {
+    const incompleteFirst = makeCompleteResponse();
+    /* Standard und Beast jeweils eine Karte weglassen */
+    delete incompleteFirst.standard.categories.werbeprofil;
+    delete incompleteFirst.beast.categories.kaufkraft;
+
+    let callCount = 0;
+    setFetchForTest(async () => {
+      callCount++;
+      const body = callCount === 1 ? incompleteFirst : makeCompleteResponse();
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify(body) }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 4000, completion_tokens: 2000 },
+        }),
+      };
+    });
+
+    const result = await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
+    expect(callCount).toBe(2); /* genau ein Retry */
+    /* Aus Retry gemergte Karten müssen jetzt da sein */
+    expect(result.normal.categories.werbeprofil).toBeTruthy();
+    expect(result.boost.categories.kaufkraft).toBeTruthy();
+  });
+
+  test("returns {normal: null, boost: null} when JSON unparseable in both attempts", async () => {
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: "<<< not json at all >>>" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 50 },
+      }),
+    }));
+
+    const result = await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
+    expect(result).toEqual({ normal: null, boost: null });
+  });
+
+  test("propagates rate_limit code so caller can mark blocked.overloaded", async () => {
+    setFetchForTest(async () => ({
+      ok: false,
+      status: 429,
+      text: async () => "rate limited",
+    }));
+
+    await expect(runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de")).rejects.toMatchObject({
+      code: "rate_limit",
+    });
+  });
+});

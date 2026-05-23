@@ -4,6 +4,28 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.1.1] — 2026-05-23
+
+Architektur-Experiment „Single-Large-Call" eingebaut, **dormant hinter Feature-Flag** — Live-Code läuft weiterhin auf der bewährten 3-Call-Pipeline (Describe Large + 2× Profile Small 2603). Erst wenn `featureFlags/current.useSingleLargeCall` in Firestore manuell auf `true` gesetzt wird, schaltet die Queue-Pipeline für jeden neuen Job auf einen einzigen `mistral-large-2512`-Aufruf um, der Bild-Beschreibung, Standard-Profil und Beast-Profil in einer Antwort liefert. Lokale Validierung gegen die Mistral-Produktion (3 Bilder, Tests in `functions/scripts/single-large-call-test.js`) zeigte: ~73 % weniger Tokens pro Analyse (5.700 statt 21.300), ~22 % schnellere Latenz (~30 s statt 38 s), Hard-Facts und Vollständigkeit in beiden Modi sauber. Echte Workshop-Validierung steht noch aus — deshalb dormant. Diese Release ändert für Endnutzer NICHTS, sie legt nur die Infrastruktur für das Experiment.
+
+### Hinzugefügt
+
+- **Feature-Flag `useSingleLargeCall` in Firestore (`featureFlags/current.useSingleLargeCall`)** — schaltet ohne Deploy zwischen den zwei Pipelines. Default `false`; im Lokal-Modus (`QUEUE_LOCAL=1`) immer `false`, damit Emulator-Klicks die bewährte Pipeline treffen. Cache-TTL 30 s wie beim bestehenden `useQueue`-Flag. Fail-safe: jeder Firestore-Lesefehler → 3-Call-Pipeline.
+- **Neue Funktion `runSingleLargeCall(buffer, mimeType, remainingBudget, lang)` in `functions/src/mistral.js`** — einziger `mistral-large-2512`-Call mit Bild + zusammengeführtem Prompt + großem JSON-Schema. Liefert dasselbe `{ normal, boost }`-Shape wie `generateBothProfiles`, damit `handle-process-job.js` nichts anderes anpassen muss als den Pipeline-Branch. Inklusive: Vollständigkeits-Check (alle 13 Karten pro Modus), gezielter Retry mit Hinweis auf fehlende Karten, Hard-Facts-Konsistenz server-seitig (alter_geschlecht + herkunft werden wortgenau in beide Modi überschrieben), zentrale Übernahme von `ad_targeting` + `manipulation_triggers` in beide Modi — analog zum v2.1-Konsistenz-Anker, nur in einer Antwort statt aus dem Describe-Footer.
+- **Single-Large-Pipeline in `handle-process-job.js` (`runPipelineSingleLarge`)** — kompletter Branch der Queue-Pipeline. Tier-Easter-Egg (reine Tier-Bilder bekommen vordefinierte Profile) und Privacy-Risks bleiben funktionsfähig: weil der Single-Call kein separates Description-Feld liefert, baut die Funktion eine Pseudo-Beschreibung aus `profileText` + allen Karten-Werten zusammen — reicht für die Schlüsselwort-Heuristiken (Hund, Katze, sichtbarer Text). Tracking-Meta-Feld `meta.pipeline = "single-large"` zur späteren Log-Auswertung.
+- **Wechsel-Scripts `scripts/cloudtasks-concurrency-3.sh` und `scripts/cloudtasks-concurrency-10.sh`** — passen die Cloud-Tasks-Queue-Drossel an die jeweilige Pipeline an. 3 für die bewährte 3-Call-Pipeline (Small-2603-TPM-Decke), 10 für Single-Large (Large-2M-TPM-Decke entlastet komplett). Cloud-Tasks-Konfiguration ist nicht runtime-toggle-bar, daher zwei separate gcloud-Befehle. Workflow im Script-Header dokumentiert: erst Flag in Firestore umlegen, dann Concurrency-Script ausführen.
+- **Forschungs-Tool `functions/scripts/single-large-call-test.js`** — eigenständiger Test gegen die Mistral-Produktion (kein Live-Deploy, kein Firestore-Schreibzugriff). Wählt 3 zufällige Bilder aus `compare-input/` (oder feste über `TEST_IMAGES=...`), misst Tokens + Latenz + Vollständigkeit, generiert HTML-Vergleich + JSON-Rohdaten. Kosten ~12 ct pro Lauf. War die Grundlage, um die ursprünglich gefürchteten +85 % Mehrkosten als Schätzung zu widerlegen und die echte +6 %-Realität nachzuweisen.
+- **Locale-Schlüssel `singleLargePrompt` in `functions/src/locales/de/prompts.js` und `en/prompts.js`** — ein langer Prompt mit allen wichtigen Live-Standards: kein „wahrscheinlich"/„könnte" (Algorithmen hedgen nicht), strenge Altersanpassungs-Skala, sprachliche Anpassung an das geschätzte Alter (5 Stufen vom Grundschulkind bis Senior), 15-25-Wörter-Längenvorgabe für Standard-Karten + max 12 Wörter für Beast, hard_facts-Konsistenz, vollständiges JSON-Schema mit allen 26 Karten. EN-Lokalisierung ist eine vollständige Übersetzung, keine Notlösung.
+
+### Geändert
+
+- **`feature-flags.js` liefert jetzt zwei Flags statt einem** — `{ useQueue, useSingleLargeCall }`. Bestehender Aufruf-Code (`isQueueEnabled`) unverändert, neue Funktion `isSingleLargeCallEnabled` analog. Caller in `handle-process-job.js` nutzt den Safe-Wrapper `isSingleLargeCallEnabledSafe`, damit ein Firestore-Fehler die Pipeline nicht blockiert.
+
+### Geprüft (aber nicht umgesetzt)
+
+- **Concurrency-Erhöhung der bestehenden 3-Call-Pipeline von 3 auf 4:** Ursprünglich als kleiner Wartezeit-Hebel angedacht. Mit den jetzt exakten Token-Werten aus den Live-Logs neu gerechnet: heutige Pipeline liegt mit Concurrency 3 bei ~95 % der 2603-TPM-Decke. Concurrency 4 würde uns rechnerisch ~27 % über die Decke heben — also nicht „knapp drüber", sondern deutlich. Verworfen. Sauberere Lösung ist der Single-Large-Call-Branch oben, der das 2603-Konto komplett entlastet (Large hat 2M TPM statt 100K).
+- **Mistral-Support für höhere 2603-TPM-Limits anschreiben:** Bei realistischer Betrachtung ist die Erfolgs-Chance gering. Mistrals Antwort wäre vermutlich „nutzen Sie Large" oder „upgraden Sie auf Enterprise" (Mindestumsatz). Unser Pay-as-you-go-Volumen ist zu klein, um Kulanz-Druck zu erzeugen. Wenn Single-Large funktioniert, brauchen wir die Anfrage gar nicht mehr.
+
 ## [2.1.0] — 2026-05-23
 
 Großer Konsistenz- und UX-Sprung. Standard- und Beast-Modus zeigen jetzt

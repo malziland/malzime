@@ -422,12 +422,15 @@ function buildProfilePrompt(prompts, systemContext, imageDescription, exifContex
   /* Hard-Facts werden zusätzlich als expliziter, gut sichtbarer Block oberhalb
      der Beschreibung eingefügt — Mistral folgt expliziten Anker-Blöcken besser
      als regex-eingebetteten Anweisungen im Schema. */
-  const hardFactsBlock = hardFacts && (hardFacts.alter_geschlecht || hardFacts.herkunft)
-    ? `\n<hard_facts_anker>\n${[
-        hardFacts.alter_geschlecht ? `alter_geschlecht: ${escapeXml(hardFacts.alter_geschlecht)}` : "",
-        hardFacts.herkunft ? `herkunft: ${escapeXml(hardFacts.herkunft)}` : "",
-      ].filter(Boolean).join("\n")}\n</hard_facts_anker>\n`
-    : "";
+  const hardFactsBlock =
+    hardFacts && (hardFacts.alter_geschlecht || hardFacts.herkunft)
+      ? `\n<hard_facts_anker>\n${[
+          hardFacts.alter_geschlecht ? `alter_geschlecht: ${escapeXml(hardFacts.alter_geschlecht)}` : "",
+          hardFacts.herkunft ? `herkunft: ${escapeXml(hardFacts.herkunft)}` : "",
+        ]
+          .filter(Boolean)
+          .join("\n")}\n</hard_facts_anker>\n`
+      : "";
   return `${systemContext}${hardFactsBlock}
 ${prompts.injectionWarning}
 
@@ -454,9 +457,19 @@ function escapeXml(str) {
    das clientseitig und triggern einen Retry mit explizitem Hinweis auf die
    fehlenden Karten. */
 const REQUIRED_CARDS = [
-  "alter_geschlecht", "herkunft", "einkommen", "bildung", "beziehungsstatus",
-  "interessen", "persoenlichkeit", "charakterzuege", "politisch",
-  "gesundheit", "kaufkraft", "verletzlichkeit", "werbeprofil",
+  "alter_geschlecht",
+  "herkunft",
+  "einkommen",
+  "bildung",
+  "beziehungsstatus",
+  "interessen",
+  "persoenlichkeit",
+  "charakterzuege",
+  "politisch",
+  "gesundheit",
+  "kaufkraft",
+  "verletzlichkeit",
+  "werbeprofil",
 ];
 
 function findMissingCards(parsed) {
@@ -493,12 +506,14 @@ async function runProfile(prompt, temperature, mode, remainingBudget) {
     const missing = findMissingCards(small4Result);
     if (missing.length === 0) return small4Result;
     if (missing.length < REQUIRED_CARDS.length) {
-      console.log(JSON.stringify({
-        step: `mistral-profile-${mode}`,
-        status: "incomplete-retry",
-        missingCards: missing,
-        deliveredCards: REQUIRED_CARDS.length - missing.length,
-      }));
+      console.log(
+        JSON.stringify({
+          step: `mistral-profile-${mode}`,
+          status: "incomplete-retry",
+          missingCards: missing,
+          deliveredCards: REQUIRED_CARDS.length - missing.length,
+        })
+      );
       const retryPrompt = `${prompt}\n\nHINWEIS: Im letzten Versuch hast du folgende Karten ausgelassen: ${missing.join(", ")}. Liefere bitte ALLE 13 Karten im categories-Objekt — keine darf fehlen.`;
       try {
         const retryResult = await tryProfileCall({
@@ -532,11 +547,13 @@ async function runProfile(prompt, temperature, mode, remainingBudget) {
         }
       } catch (err) {
         /* Retry-Fehler nicht propagieren — wir haben ja schon small4Result */
-        console.log(JSON.stringify({
-          step: `mistral-profile-${mode}`,
-          status: "incomplete-retry-failed",
-          error: err.message,
-        }));
+        console.log(
+          JSON.stringify({
+            step: `mistral-profile-${mode}`,
+            status: "incomplete-retry-failed",
+            error: err.message,
+          })
+        );
       }
       return small4Result;
     }
@@ -636,9 +653,184 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
   }
 }
 
+/* ── v2.2: Single-Large-Call ──
+   Macht in EINEM mistral-large-2512-Call:
+     Bild sehen + Beschreibung + hard_facts + ads + triggers + Standard + Beast.
+   Ersetzt die 3-Call-Pipeline (Describe + 2× Profile) durch einen Aufruf.
+   Token-Einsparung in lokalen Tests (3 Bilder): ~70% (21.300 → ~5.700).
+   Liefert dasselbe { normal, boost }-Shape wie generateBothProfiles —
+   handle-process-job.js braucht nichts anzupassen außer dem Branch.
+   Kosten-Hinweis: alle Tokens landen im teureren Large 2512 statt im billigen
+   Small 2603 — Mehrkosten ~+6% gegenüber heutiger Pipeline (siehe CHANGELOG). */
+
+const MISTRAL_SINGLE_LARGE_MAX_TOKENS = 8000;
+
+async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang) {
+  const prompts = loadPrompts(lang || "de");
+  const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBuffer.toString("base64")}`;
+  const messages = [
+    {
+      role: "user",
+      content: [
+        { type: "text", text: prompts.singleLargePrompt },
+        { type: "image_url", image_url: dataUrl },
+      ],
+    },
+  ];
+
+  /* Erster Versuch */
+  let parsed = await callSingleLarge(messages, remainingBudget, "first");
+  let missing = parsed
+    ? collectMissingForBothModes(parsed)
+    : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };
+
+  /* Retry bei Unvollständigkeit — analog zu runProfile. Nur ein Retry. */
+  const stillIncomplete = missing.standard.length > 0 || missing.beast.length > 0;
+  if (stillIncomplete && parsed) {
+    const hint =
+      `\n\nHINWEIS: Im letzten Versuch hast du folgende Karten ausgelassen — bitte liefere ALLE 13 Karten in BEIDEN modes (standard + beast).` +
+      (missing.standard.length > 0 ? `\nStandard fehlt: ${missing.standard.join(", ")}.` : "") +
+      (missing.beast.length > 0 ? `\nBeast fehlt: ${missing.beast.join(", ")}.` : "");
+    console.log(
+      JSON.stringify({
+        step: "mistral-single-large",
+        status: "incomplete-retry",
+        missingStandard: missing.standard,
+        missingBeast: missing.beast,
+      })
+    );
+    const retryMessages = [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompts.singleLargePrompt + hint },
+          { type: "image_url", image_url: dataUrl },
+        ],
+      },
+    ];
+    try {
+      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry");
+      if (retryParsed) {
+        /* Fehlende Karten aus Retry in Originalergebnis mergen (analog runProfile) */
+        for (const mode of ["standard", "beast"]) {
+          if (!parsed[mode]) parsed[mode] = retryParsed[mode];
+          else if (retryParsed[mode]) {
+            if (!parsed[mode].categories) parsed[mode].categories = {};
+            const retryCats = retryParsed[mode].categories || {};
+            for (const key of REQUIRED_CARDS) {
+              if (!parsed[mode].categories[key] && retryCats[key]) {
+                parsed[mode].categories[key] = retryCats[key];
+              }
+            }
+            if (!parsed[mode].profileText && retryParsed[mode].profileText) {
+              parsed[mode].profileText = retryParsed[mode].profileText;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.log(
+        JSON.stringify({
+          step: "mistral-single-large",
+          status: "incomplete-retry-failed",
+          error: err.message,
+        })
+      );
+    }
+  }
+
+  if (!parsed) return { normal: null, boost: null };
+
+  /* Hard-Facts server-seitig in beide Modi überschreiben — exakt wie in
+     generateBothProfiles. Mistral kann die Vorgabe ignorieren; hier garantieren
+     wir Konsistenz. */
+  const hardFacts = parsed.hard_facts || {};
+  const ads = Array.isArray(parsed.ad_targeting) ? parsed.ad_targeting : [];
+  const triggers = Array.isArray(parsed.manipulation_triggers) ? parsed.manipulation_triggers : [];
+
+  function buildProfile(modeKey) {
+    const src = parsed[modeKey];
+    if (!src || !src.categories) return null;
+    if (hardFacts.alter_geschlecht && src.categories.alter_geschlecht) {
+      src.categories.alter_geschlecht.value = hardFacts.alter_geschlecht;
+    }
+    if (hardFacts.herkunft && src.categories.herkunft) {
+      src.categories.herkunft.value = hardFacts.herkunft;
+    }
+    return {
+      categories: src.categories,
+      profileText: src.profileText || "",
+      ad_targeting: ads,
+      manipulation_triggers: triggers,
+    };
+  }
+
+  return {
+    normal: buildProfile("standard"),
+    boost: buildProfile("beast"),
+  };
+}
+
+function collectMissingForBothModes(parsed) {
+  return {
+    standard: parsed.standard ? findMissingCards(parsed.standard) : REQUIRED_CARDS.slice(),
+    beast: parsed.beast ? findMissingCards(parsed.beast) : REQUIRED_CARDS.slice(),
+  };
+}
+
+async function callSingleLarge(messages, remainingBudget, attemptLabel) {
+  try {
+    const budget = remainingBudget ? remainingBudget() : undefined;
+    const result = await callMistralRaw({
+      model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — multimodal, 2M TPM */,
+      messages,
+      maxTokens: MISTRAL_SINGLE_LARGE_MAX_TOKENS,
+      temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
+      forceJSON: true,
+      timeoutMs: budget,
+    });
+    const stages = [];
+    const parsed = parseSafely(result.text, {
+      requireSchema: false /* unser Schema unterscheidet sich vom Live-Schema (categories sitzt unter standard/beast) */,
+      onRepair: (stage, err) => stages.push(stage + (err ? `:${err.message.slice(0, 60)}` : "")),
+    });
+    console.log(
+      JSON.stringify({
+        step: "mistral-single-large",
+        model: MISTRAL_DESCRIBE_MODEL,
+        attempt: attemptLabel,
+        status: parsed ? "ok" : "parse-failed",
+        finishReason: result.finishReason,
+        promptTokens: result.promptTokens,
+        outputTokens: result.outputTokens,
+        httpMs: result.httpMs,
+        waitMs: result.waitMs,
+        repairStages: stages,
+      })
+    );
+    return parsed;
+  } catch (err) {
+    console.log(
+      JSON.stringify({
+        step: "mistral-single-large",
+        attempt: attemptLabel,
+        status: "error",
+        error: err.message,
+      })
+    );
+    if (isRateLimitError(err)) {
+      const e = new Error("Mistral rate limit exceeded");
+      e.code = "rate_limit";
+      throw e;
+    }
+    throw err;
+  }
+}
+
 module.exports = {
   describeImage,
   generateBothProfiles,
+  runSingleLargeCall,
   isRateLimitError,
   /* Für Tests */
   setFetchForTest,

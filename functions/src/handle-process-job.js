@@ -34,6 +34,7 @@ const { incrementTotals } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
+const { isSingleLargeCallEnabled } = require("./feature-flags");
 
 /* Mistral-Provider: im Mock-Modus die kostenlose Attrappe, sonst die echte
    API. Umschaltbar über die Umgebungsvariable MISTRAL_MOCK ("1" = Mock) —
@@ -62,6 +63,17 @@ async function runPipeline(job) {
   const exif = job.exif || {};
 
   const { buffer, mimeType } = await loadImage(job.imagePath);
+
+  /* v2.2: Architektur-Branch über Feature-Flag.
+       useSingleLargeCall=true  → 1× Large 2512 macht alles (Beschreibung + beide Profile).
+       useSingleLargeCall=false → bewährte 3-Call-Pipeline (Describe Large + 2× Profile Small).
+     Lokale Tests + Mocks bleiben auf 3-Call-Pipeline (siehe feature-flags.js
+     isLocalQueueMode-Zweig + mistral-mock.js, das kein runSingleLargeCall hat). */
+  const singleLargeCall = mistral.runSingleLargeCall ? await isSingleLargeCallEnabledSafe() : false;
+
+  if (singleLargeCall) {
+    return runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, job, remainingBudget });
+  }
 
   /* Stage 1: Bildbeschreibung */
   let description = null;
@@ -156,6 +168,116 @@ async function runPipeline(job) {
     },
     success: false,
   };
+}
+
+/* v2.2: Single-Large-Call-Pipeline. Ersetzt Describe + 2× Profile durch
+   einen einzigen Large-Aufruf, der das Bild ansieht und beide Profile in
+   einer Antwort liefert. Tier-Easter-Egg und Privacy-Risks bleiben unmittelbar
+   nutzbar; sie laufen heute über die Beschreibung — die liegt im Single-Call
+   aber NICHT mehr als String vor, sondern verteilt im JSON. Wir rekonstruieren
+   einen "kompakten Beschreibungs-Text" aus profileText, damit
+   classifyDescription/extractVisibleText weiter funktionieren. Pragmatischer
+   Workaround, bis der Tier-Pfad bei Bedarf nativ eingebaut wird. */
+async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, job, remainingBudget }) {
+  let profiles = { normal: null, boost: null };
+  let quotaError = false;
+  let pipelineError = false;
+  try {
+    profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang);
+  } catch (err) {
+    if (isQuotaError(err)) quotaError = true;
+    else pipelineError = true;
+  }
+
+  /* Pseudo-Beschreibung für classifyDescription / extractVisibleText.
+     Der Single-Large-Call liefert kein separates description-Feld; die
+     Heuristiken brauchen aber irgendetwas zum Lesen. Wir geben ihnen den
+     gesamten Standard-profileText + alle Karten-Werte als String. Reicht für
+     Tier-Erkennung (Wörter wie "Hund", "Katze") und groben sichtbaren Text. */
+  const pseudoDescription = buildPseudoDescription(profiles.normal);
+  const { subject, hasPerson, hasAnimal, animalType } = classifyDescription(pseudoDescription);
+  const visibleText = extractVisibleText(pseudoDescription);
+  const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: pseudoDescription });
+
+  /* Tier-Easter-Egg: Nur reines Tier-Bild → vordefinierte Profile. */
+  if (pseudoDescription && !hasPerson && hasAnimal) {
+    const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
+    return {
+      result: {
+        profiles: { normal: normalProfile, boost: boostProfile },
+        privacyRisks,
+        exif,
+        meta: { traceId: job.traceId || null, mode: "animal", pipeline: "single-large" },
+      },
+      success: true,
+    };
+  }
+
+  const hasAnyProfile = hasCategories(profiles.normal) || hasCategories(profiles.boost);
+  if (hasAnyProfile) {
+    const n = profiles.normal || {};
+    const b = profiles.boost || {};
+    return {
+      result: {
+        profiles: {
+          normal: {
+            categories: n.categories || {},
+            ad_targeting: n.ad_targeting || [],
+            manipulation_triggers: n.manipulation_triggers || [],
+            profileText: n.profileText || "",
+          },
+          boost: {
+            categories: b.categories || {},
+            ad_targeting: b.ad_targeting || [],
+            manipulation_triggers: b.manipulation_triggers || [],
+            profileText: b.profileText || "",
+          },
+        },
+        privacyRisks,
+        exif,
+        meta: { traceId: job.traceId || null, mode: "multimodal", subject, pipeline: "single-large" },
+      },
+      success: true,
+    };
+  }
+
+  let blockedReason;
+  if (quotaError) blockedReason = "blocked.overloaded";
+  else if (pipelineError) blockedReason = "blocked.apiError";
+  else blockedReason = "blocked.profileBlocked";
+
+  return {
+    result: {
+      profiles: null,
+      blockedReason,
+      privacyRisks,
+      exif,
+      meta: { traceId: job.traceId || null, mode: "blocked", pipeline: "single-large" },
+    },
+    success: false,
+  };
+}
+
+function buildPseudoDescription(normalProfile) {
+  if (!normalProfile) return "";
+  const parts = [normalProfile.profileText || ""];
+  const cats = normalProfile.categories || {};
+  for (const key of Object.keys(cats)) {
+    if (cats[key] && cats[key].value) parts.push(cats[key].value);
+  }
+  return parts.filter(Boolean).join(" ").trim();
+}
+
+/* Fail-safe Flag-Lesen: jeder Fehler beim Firestore-Read → 3-Call-Pipeline.
+   Vermeidet, dass ein vorübergehender Firestore-Fehler die ganze Pipeline
+   blockiert. */
+async function isSingleLargeCallEnabledSafe() {
+  try {
+    return await isSingleLargeCallEnabled();
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "single-large-flag-read-error", error: err.message }));
+    return false;
+  }
 }
 
 async function handleProcessJob(req, res) {

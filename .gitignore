@@ -19,3 +19,5 @@ compare-results.json
 compare-prototype.html
 loadtest-results-*.json
 loadtest-run.log
+single-large-call-result.html
+single-large-call-results.json

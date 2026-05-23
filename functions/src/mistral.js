@@ -247,7 +247,10 @@ async function tryDescribeWithPrompt(prompt, imageBuffer, mimeType, remainingBud
       model: MISTRAL_DESCRIBE_MODEL,
       messages,
       maxTokens: MISTRAL_DESCRIBE_MAX_TOKENS,
-      temperature: 0.2,
+      /* v2.0.4: 0.2 → 0.1. Reduziert Run-to-Run-Schwankungen bei Alter/Geschlecht
+         (Memory-Eintrag bestätigt Schwankungen als modellbedingt). Niedrigere
+         Temperatur macht das Modell deterministischer ohne Token-Mehrkosten. */
+      temperature: 0.1,
       forceJSON: false,
       timeoutMs: budget,
     });
@@ -283,13 +286,72 @@ async function tryDescribeWithPrompt(prompt, imageBuffer, mimeType, remainingBud
   }
 }
 
-/* ── Public: generateBothProfiles (Hybrid mit Small 4) ────────────── */
+/* ── Footer-Parser (v2.1) ──
+   Extrahiert die strukturierten Anker-Blöcke (HARD_FACTS, ADS, TRIGGERS) am Ende
+   der Bildbeschreibung. Diese werden vom Describe-Prompt (mistralDescribeAddendum)
+   eingeleitet und liefern beide Profile-Calls einen konsistenten Anker:
+     - alter_geschlecht + herkunft werden wortgenau übernommen → Normal/Beast-Konsistenz
+     - ads + triggers werden zentral am Job-Result gesetzt → identisch in beiden Modi
+
+   Fallback-Verhalten: Wenn ein Block fehlt oder kaputt ist, gibt der Parser leere
+   Defaults zurück — handle-process-job.js entscheidet dann, ob die Profile-Calls
+   diese Felder ersatzweise selbst füllen müssen (alter Verhalten). */
+function parseDescribeFooter(text) {
+  if (typeof text !== "string" || text.length === 0) {
+    return { description: "", hardFacts: {}, ads: [], triggers: [] };
+  }
+
+  /* Wir splitten den Text in Description + Footer. Marker ist das erste
+     Auftreten von "HARD_FACTS:" am Zeilenanfang (case-sensitive — Mistral hält
+     sich an den exakten Marker). */
+  const hardFactsIdx = text.search(/(^|\n)HARD_FACTS:/);
+  if (hardFactsIdx < 0) {
+    /* Kein Footer gefunden — alter Live-Stil oder Mistral hat sich nicht ans
+       Format gehalten. Beschreibung bleibt der ganze Text, Anker leer. */
+    return { description: text.trim(), hardFacts: {}, ads: [], triggers: [] };
+  }
+
+  const description = text.slice(0, hardFactsIdx).trim();
+  const footer = text.slice(hardFactsIdx);
+
+  /* Hard-Facts-Block parsen — nur die zwei fixierten Felder. */
+  const hardFacts = {};
+  const hfBlock = (footer.match(/HARD_FACTS:\s*([\s\S]*?)(?:\n\s*(?:ADS:|TRIGGERS:)|$)/) || ["", ""])[1];
+  for (const line of hfBlock.split(/\n/)) {
+    const m = line.match(/^\s*(alter_geschlecht|herkunft)\s*:\s*(.+?)\s*$/i);
+    if (m) hardFacts[m[1].toLowerCase()] = m[2].trim();
+  }
+
+  /* ADS-Block: jede nicht-leere Zeile nach "ADS:" bis vor "TRIGGERS:" ist ein Eintrag. */
+  const ads = [];
+  const adsBlock = (footer.match(/ADS:\s*([\s\S]*?)(?:\n\s*TRIGGERS:|$)/) || ["", ""])[1];
+  for (const raw of adsBlock.split(/\n/)) {
+    const v = raw.trim();
+    if (v && !v.startsWith("<") && v.length <= 60) ads.push(v);
+  }
+
+  /* TRIGGERS-Block: jede nicht-leere Zeile nach "TRIGGERS:" bis Ende. */
+  const triggers = [];
+  const trBlock = (footer.match(/TRIGGERS:\s*([\s\S]*)$/) || ["", ""])[1];
+  for (const raw of trBlock.split(/\n/)) {
+    const v = raw.trim();
+    if (v && !v.startsWith("<") && v.length <= 250) triggers.push(v);
+  }
+
+  return { description, hardFacts, ads: ads.slice(0, 12), triggers: triggers.slice(0, 8) };
+}
+
+/* ── Public: generateBothProfiles ────────────────────────────────── */
 
 async function generateBothProfiles(imageDescription, exifData, remainingBudget, lang) {
   const prompts = loadPrompts(lang || "de");
 
-  /* Mistral bekommt nur die Beschreibung (Large 3 hat oben das Bild selbst gesehen).
-     EXIF-Kameradaten (make/model) bleiben sinnvoll und werden mitgegeben. */
+  /* v2.1: Footer aus der Beschreibung extrahieren — liefert die strukturierten
+     Anker für Konsistenz zwischen Normal- und Beast-Modus. */
+  const { description: cleanDescription, hardFacts, ads, triggers } = parseDescribeFooter(imageDescription);
+
+  /* Mistral bekommt nur die (bereinigte) Beschreibung. EXIF-Kameradaten
+     (make/model) bleiben sinnvoll und werden mitgegeben. */
   const { dateTimeOriginal: _dateTimeOriginal, ...exifWithoutDate } = exifData || {};
   const exifContext =
     Object.keys(exifWithoutDate).length > 0 ? `\n${prompts.labelExif}: ${JSON.stringify(exifWithoutDate)}` : "";
@@ -297,16 +359,18 @@ async function generateBothProfiles(imageDescription, exifData, remainingBudget,
   const normalPrompt = buildProfilePrompt(
     prompts,
     prompts.systemNormal,
-    imageDescription,
+    cleanDescription,
     exifContext,
-    prompts.jsonSchemaNormal
+    prompts.jsonSchemaNormal,
+    hardFacts
   );
   const boostPrompt = buildProfilePrompt(
     prompts,
     prompts.systemBoost,
-    imageDescription,
+    cleanDescription,
     exifContext,
-    prompts.jsonSchemaBoost
+    prompts.jsonSchemaBoost,
+    hardFacts
   );
 
   const [normal, boost] = await Promise.all([
@@ -314,14 +378,52 @@ async function generateBothProfiles(imageDescription, exifData, remainingBudget,
     runProfile(boostPrompt, 1.0, "boost", remainingBudget),
   ]);
 
+  /* Konsistenz-Anker durchsetzen: Profile-Calls könnten trotz Prompt-Pflicht
+     die Hard-Facts ignorieren. Wir überschreiben alter_geschlecht/herkunft
+     server-seitig, damit Normal und Beast garantiert dieselben Werte zeigen. */
+  function enforceHardFacts(profile) {
+    if (!profile || !profile.categories) return profile;
+    if (hardFacts.alter_geschlecht && profile.categories.alter_geschlecht) {
+      profile.categories.alter_geschlecht.value = hardFacts.alter_geschlecht;
+    }
+    if (hardFacts.herkunft && profile.categories.herkunft) {
+      profile.categories.herkunft.value = hardFacts.herkunft;
+    }
+    return profile;
+  }
+  enforceHardFacts(normal);
+  enforceHardFacts(boost);
+
+  /* Marken und Triggers vom Large in BEIDE Modi schreiben — sie sind
+     modus-übergreifend identisch. Profile-Calls liefern sie nicht mehr;
+     wir setzen sie hier zentral. Falls der Footer leer war (alter Live-Stil
+     oder Parse-Fehler), bleiben ad_targeting/manipulation_triggers, die das
+     Profil eventuell trotzdem geliefert hat, als Fallback erhalten. */
+  function applyTopLevelAdsTriggers(profile) {
+    if (!profile) return profile;
+    if (ads.length > 0) profile.ad_targeting = ads;
+    if (triggers.length > 0) profile.manipulation_triggers = triggers;
+    return profile;
+  }
+  applyTopLevelAdsTriggers(normal);
+  applyTopLevelAdsTriggers(boost);
+
   return { normal, boost };
 }
 
-function buildProfilePrompt(prompts, systemContext, imageDescription, exifContext, schema) {
+function buildProfilePrompt(prompts, systemContext, imageDescription, exifContext, schema, hardFacts) {
   const safeDesc = escapeXml(imageDescription || "");
   const safeExif = exifContext ? escapeXml(exifContext) : "";
-  return `${systemContext}
-
+  /* Hard-Facts werden zusätzlich als expliziter, gut sichtbarer Block oberhalb
+     der Beschreibung eingefügt — Mistral folgt expliziten Anker-Blöcken besser
+     als regex-eingebetteten Anweisungen im Schema. */
+  const hardFactsBlock = hardFacts && (hardFacts.alter_geschlecht || hardFacts.herkunft)
+    ? `\n<hard_facts_anker>\n${[
+        hardFacts.alter_geschlecht ? `alter_geschlecht: ${escapeXml(hardFacts.alter_geschlecht)}` : "",
+        hardFacts.herkunft ? `herkunft: ${escapeXml(hardFacts.herkunft)}` : "",
+      ].filter(Boolean).join("\n")}\n</hard_facts_anker>\n`
+    : "";
+  return `${systemContext}${hardFactsBlock}
 ${prompts.injectionWarning}
 
 <bildbeschreibung>

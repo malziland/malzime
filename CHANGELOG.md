@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Beast-Profil bricht bei schwierigen Bildern nicht mehr mitten im JSON ab:** Maximales Antwort-Budget pro Profil-Call von 8.000 auf 12.000 Tokens erhöht. Hintergrund: Bei einem Workshop-typischen Bild (junges Mädchen) hat Mistral das alte 8.000er-Limit ausgereizt und ist im Beast-Output mittendrin abgebrochen — der eingebaute Fallback-Mechanismus auf Large 2512 hat das aufgefangen, kostete aber einen zusätzlichen Mistral-Call (Geld + Latenz). Mit dem höheren Sicherheitsdeckel greift der Fallback nur noch in echten Ausnahmefällen. Kostenneutral, da Mistral nur tatsächlich generierte Tokens berechnet — das Maximum dient nur als Sicherheitsdeckel.
+
+### Geändert
+
+- **Profil-Karten sind jetzt knapper und scanbarer:** Die 13 Kategorien (Alter, Einkommen, Persönlichkeit usw.) werden in 1–2 prägnanten Sätzen formuliert statt in 3–5-Sätzen-Fließtext. Workshop-Teilnehmer können das Profil in 5–10 Sekunden überfliegen statt 2–3 Minuten zu lesen, ohne dass die wesentliche Aussage verloren geht. Marken werden nur noch in der Marken-Tag-Cloud und im Verdict-Text genannt, nicht mehr zusätzlich in den Karten — das vermeidet Doppelungen.
+- **Karten-Anzeige neu gegliedert:** Die 13 Karten erscheinen jetzt in vier farblich markierten Themengruppen mit Mini-Überschriften: „Wer du bist" (Alter/Herkunft/Beziehung), „Was dich ausmacht" (Bildung/Persönlichkeit/Charakter/Interessen), „Was du kaufst" (Einkommen/Kaufkraft/Werbeprofil), „Wo du verwundbar bist" (Verletzlichkeit/Gesundheit/Politik). Schlüsselbegriffe in den Karten-Werten werden automatisch hervorgehoben. Konfidenz als drei farbige Punkte statt Prozent + Balken.
+- **Beschreibungs-Würfeln minimiert:** Temperatur beim Bildbeschreibungs-Call von 0.2 auf 0.1 gesenkt. Reduziert Run-to-Run-Schwankungen bei der Alters- und Geschlechts-Schätzung leicht — kostet keine Tokens, ändert keine Inhalte.
+
 ## [2.0.3] — 2026-05-23
 
 Konsistenz im UI und Messbarkeit auf der Mistral-Seite: Die Profil-Karten erscheinen jetzt in beiden Modi in derselben festen Reihenfolge, und jeder Mistral-Call protokolliert Token-Verbrauch und Wartezeit getrennt.

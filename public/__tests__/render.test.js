@@ -89,13 +89,16 @@ describe("Render helpers", () => {
   });
 
   describe("Confidence zero handling (BUG-004)", () => {
-    it("renders confidence=0 as 0% instead of treating it as missing", async () => {
+    it("renders confidence=0 with a dot indicator (1 of 3 dots) instead of treating as missing", async () => {
       const { renderCurrentMode } = await import("../js/render.js");
 
       const mockData = {
         profiles: {
           normal: {
-            categories: { alter: { label: "Alter", value: "25", confidence: 0 } },
+            /* v2.1: nur Karten mit bekannten CATEGORY_GROUPS-Keys werden gerendert. */
+            categories: {
+              alter_geschlecht: { label: "Alter & Geschlecht", value: "männlich, 25", confidence: 0 },
+            },
             ad_targeting: [],
             manipulation_triggers: [],
             profileText: "Test",
@@ -109,8 +112,10 @@ describe("Render helpers", () => {
 
       renderCurrentMode(mockData);
 
-      /* Category card should show 0% */
-      expect(elements.facts.innerHTML).toContain("0%");
+      /* v2.1: Konfidenz wird jetzt als 3 Punkte dargestellt — bei confidence=0
+         ist immer noch genau 1 Punkt aktiv (low-Klasse), nie 0 Punkte. */
+      expect(elements.facts.innerHTML).toContain("conf-dot");
+      expect(elements.facts.innerHTML).toMatch(/conf-dot on/);
       /* Data value should use confidence 0, not fallback 0.5 */
       expect(elements.dataValue.innerHTML).not.toContain("NaN");
     });
@@ -149,7 +154,8 @@ describe("Render helpers", () => {
       const mockData = {
         profiles: {
           normal: {
-            categories: { alter: { label: "Alter", value: "30", confidence: 0.7 } },
+            /* v2.1: bekannte Karten-Keys aus CATEGORY_GROUPS */
+            categories: { alter_geschlecht: { label: "Alter & Geschlecht", value: "männlich, 30", confidence: 0.7 } },
             ad_targeting: [],
             manipulation_triggers: [],
             profileText: "",
@@ -172,10 +178,11 @@ describe("Render helpers", () => {
       const mockData = {
         profiles: {
           normal: {
+            /* v2.1: bekannte Karten-Keys aus CATEGORY_GROUPS, sonst werden Karten ignoriert */
             categories: {
-              alter: { label: "Alter", value: "25-30", confidence: 0.8 },
-              beruf: { label: "Beruf", value: "Designer", confidence: 0.6 },
-              stil: { label: "Stil", value: "Sportlich", confidence: 0.9 },
+              alter_geschlecht: { label: "Alter & Geschlecht", value: "männlich, 25-30", confidence: 0.8 },
+              bildung: { label: "Bildungsniveau", value: "Designer", confidence: 0.6 },
+              interessen: { label: "Interessen & Hobbys", value: "Sportlich", confidence: 0.9 },
             },
             ad_targeting: ["Mode", "Sport"],
             manipulation_triggers: ["FOMO"],

@@ -1,4 +1,8 @@
 {
+  "groups.identity": "Who you are",
+  "groups.ability": "What defines you",
+  "groups.money": "What you buy",
+  "groups.risk": "Where you are vulnerable",
   "hero.badge": "SYSTEM ACTIVE",
   "hero.title": "We see more than your photo.",
   "hero.lead": "Upload an image. The AI creates a complete profile about you in seconds — from a single photo.",
@@ -25,13 +29,10 @@
   "modal.text1": "malziME is a <strong>learning tool for media literacy and data privacy awareness</strong>.",
   "modal.text2": "The AI profiles are <strong>fictional</strong> and only show what algorithms could claim — <strong>none of it is true or proven</strong>.",
   "modal.button": "Understood – Show result",
-
   "maintenance.title": "Maintenance Mode",
   "maintenance.text": "malziME is currently in maintenance mode. Please try again later.",
   "maintenance.button": "Reload page",
-
   "preview.alt": "Preview",
-
   "scan.messages": [
     "Face detected…",
     "Clothing being analyzed…",
@@ -49,7 +50,6 @@
     "Income level being classified…"
   ],
   "print.note": "This information was invented by the AI – None of it is true!",
-
   "error.noFile": "Please select an image first.",
   "error.fileTooLarge": "File too large. Max 25 MB.",
   "error.generic": "Something went wrong. Try again.",
@@ -69,12 +69,10 @@
   "error.suspended": "The analysis was interrupted. Please try again and keep this page open in the foreground.",
   "error.queueFailed": "Something went wrong. Please try again.",
   "error.queueAbandoned": "The analysis was cancelled because the page was closed for too long. Please upload the photo again.",
-
   "queue.position": "Queue · {{n}} ahead of you",
   "queue.next": "You're next in line …",
   "queue.etaUnderMin": "under 1 min left",
   "queue.etaMinutes": "about {{min}} min left",
-
   "render.blockedFallback": "The analysis could not be completed. Try with a different photo.",
   "render.emptyProfile": "The AI returned an empty profile. Try with a different photo or switch the mode.",
   "targeting.adsTitle": "The ads you would see",
@@ -87,7 +85,6 @@
   "gps.sectionTitle": "Where you were located",
   "gps.popup": "Your location",
   "verdict.title": "This is what the AI thinks about you",
-
   "blocked.overloaded": "A lot of people are using malziME at the same time right now. Please wait a moment and try again.",
   "blocked.safetyFilter": "The AI did not analyze the image because the content was classified as sensitive — e.g. because children or minors were detected, or because the image is considered protected. Google's safety filters automatically block evaluation in such cases.",
   "blocked.safetyFilterFallback": "The AI was not allowed to view the image directly (Google's safety filter). The analysis via detected image elements was also blocked — the image content was classified as too sensitive.",
@@ -95,11 +92,9 @@
   "blocked.profileBlocked": "The image was detected, but the AI refused to create a profile. This happens when the image content is classified as too sensitive for evaluation.",
   "blocked.noContent": "Nothing analyzable was detected in the image — no face, no objects, no text. Try with a different photo.",
   "blocked.generic": "The analysis could not be completed. Try with a different photo.",
-
   "privacy.address": "An address or school-related reference may be readable in the image.",
   "privacy.phone": "A phone number might be readable.",
   "privacy.licensePlate": "A license plate might be visible.",
-
   "dv.title": "Your Data Value",
   "dv.heroValue": "€{{value}}",
   "dv.subtitle": "This is how much your profile is worth to data brokers — in a single sale.",
@@ -142,7 +137,6 @@
   "demo.selfie": "Selfie at St. Stephen's Cathedral",
   "demo.cafe": "In a café in Salzburg",
   "demo.hiker": "Hiking near Hallstatt",
-
   "limit.title": "Short break.",
   "limit.text": "malziME has been used very frequently this hour and has reached the limit. Analysis is temporarily disabled to prevent costs from exploding.",
   "limit.textMuted": "malziME is a privately funded project — free, ad-free and without tracking. This limit protects the project from unexpected server costs.",
@@ -152,11 +146,9 @@
   "limit.supportText": "With a donation you help increase the limits and keep malziME running.",
   "limit.supportButton": "Support the project",
   "limit.statsLink": "View current utilization",
-
   "footer.startseite": "Home",
   "footer.nutzungsbedingungen": "Terms of Use",
   "footer.stats": "Stats",
-
   "stats.backLink": "← Back to homepage",
   "stats.errorText": "Stats could not be loaded. Please try again later.",
   "stats.heroBadge": "SYSTEM ACTIVE",

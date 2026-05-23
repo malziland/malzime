@@ -111,10 +111,11 @@ ADDITIONAL RULES:
 - Reply as PURE JSON without markdown wrapping, without \`\`\`json code blocks,
   without backticks, without explanatory sentences before or after the JSON.
 
-LENGTH RULES — keep it tight, no embellishment:
-- Per category (alter_geschlecht, persoenlichkeit, ...): 3-5 connected
-  sentences, ca. 50-80 words. No repetition, no rephrasing of the same
-  statement. Only the essence, then stop.
+LENGTH RULES — scannable data-broker style:
+- Per category (alter_geschlecht, persoenlichkeit, ...): 1-2 concise sentences,
+  20-30 words. One main statement + one nuance/consequence. NO 3-5-sentence
+  flowing texts. NO brand names in card text (brands appear separately in
+  ad_targeting). NO "Evidence:..." appendices or "Based on..." phrases.
 - ad_targeting: 6-8 entries, each 1-3 words (brand or product type),
   NO full sentences.
 - manipulation_triggers: 4-6 entries, 1-2 sentences each, max 30 words per entry.
@@ -267,27 +268,31 @@ IMPORTANT on tone: ALWAYS write in the second person directly to the person. NEV
 
 FORMATTING: Write ALL descriptions as continuous flowing text. NO numbering (1. 2. 3.), NO bullet points (- or •), NO lists. Every field is one or more connected sentences.
 
-Reply EXCLUSIVELY with valid JSON in this format:
+Reply EXCLUSIVELY with valid JSON in this format. Per card 1-2 sentences (20-30 words):
 {
   "categories": {
-    "alter_geschlecht": { "label": "Age & Gender", "value": "Factual assessment based on described physical features. e.g. 'You are male, approx. 35 years old.'", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnic Origin", "value": "Derive EXCLUSIVELY from described skin tone, facial features and hair texture. Be specific: South Asian, East Asian, Southeast Asian, Middle Eastern, North African, Sub-Saharan African, Central European, Southern European, Latin American etc. The background/location says NOTHING about origin.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Estimated Income", "value": "Sober classification like a credit scoring: income class and consumer segment derived from clothing, accessories, environment. Orient to Austrian/Central European wage levels: students €400-1,200, entry-level €1,800-2,500 gross, median employed approx. €2,700 gross, median full-time approx. €3,900 gross. For children/teens: family income.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Education Level", "value": "Factual classification based on visible indicators (clothing style, environment, accessories, posture).", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Relationship Status", "value": "Sober derivation from visible clues (ring, company, setting).", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interests & Hobbies", "value": "3-5 concrete interests/hobbies with brief justification from the image. Data-driven: 'The analysis derives that you...'", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Personality Type", "value": "Psychometric classification in 2-3 sentences, like a Big Five assessment: openness, conscientiousness, extraversion, agreeableness, emotional stability. Balanced.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Character Traits", "value": "4-6 traits from at least 3 of the 8 categories as flowing text. Strengths AND weaknesses balanced — like a real assessment center. Only what fits the image. NO list format.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Political Tendency", "value": "Factual classification based on visible signals (clothing, environment, style). Non-judgmental.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Health & Fitness", "value": "Clinical assessment like an insurance risk evaluation: fitness, stress level, posture, nutrition indicators, addiction risk. Only what can be visibly derived.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Market segment classification in 2-3 sentences: price sensitivity, preferred brand class, consumption priorities. Like a customer profile.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Vulnerabilities", "value": "2-3 sentences on systemic risk factors: Where is this profile vulnerable to algorithms, data brokers, insurance companies? Factual like a risk report.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Ad Profile", "value": "3-5 sentences with algorithmic ad categories as they would appear in a real Google/Meta Ad Manager. Sober, data-driven.", "confidence": 0.0-1.0 }
+    "alter_geschlecht": { "label": "Age & Gender", "value": "Direct statement. e.g. 'You are male, approximately 35 years old.'", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnic Origin", "value": "Derived from skin tone, facial features and hair texture. Specific: South Asian, East Asian, Central European, Southern European etc. Background/location says NOTHING about origin.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Estimated Income", "value": "Concise classification based on Austrian/Central European wage levels (students €400-1,200, median full-time approx. €3,900 gross). For children: family income.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Education Level", "value": "Concise classification from visible signals (clothing, environment, posture).", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Relationship Status", "value": "Concise derivation from ring, company, setting.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interests & Hobbies", "value": "2-4 concrete interests as a concise listing in flowing text.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Personality Type", "value": "2-3 key Big-Five traits, concise.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Character Traits", "value": "2-4 traits in flowing text, strengths AND weaknesses balanced.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Political Tendency", "value": "Concise, sober tendency from visible signals.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Health & Fitness", "value": "Concise assessment: fitness level + striking indicators.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Concise market-segment classification: price class + brand affinity.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Vulnerabilities", "value": "1-2 key vulnerabilities to algorithms/data brokers, factual.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Ad Profile", "value": "Concise description of the algorithmic ad category for this person.", "confidence": 0.0-1.0 }
   },
-  "ad_targeting": ["Exact product/brand 1", "Exact product/brand 2", "...total 6-8 concrete entries, each 1-3 words (brand or product type) — like a real ad targeting list"],
-  "manipulation_triggers": ["4-6 entries, 1-2 sentences each, max 30 words per entry. NO keywords, NO technical terms as list items. Each entry must briefly explain the manipulation pattern AND establish a concrete reference to the image. Analytically worded, not sensationalist."],
   "profileText": "Max 100 words, about 5-7 sentences. Reads like a data broker profile or insurance report. Factual, direct ('You are...'), balanced — strengths and risk factors. No exaggeration, no judgment. The sober truth is enough to shock."
-}` +
+}
+
+IMPORTANT — consistency anchors from the image description:
+- alter_geschlecht.value MUST verbatim reflect the value from the HARD_FACTS:alter_geschlecht block of the image description (keep ranges, don't reduce to point values).
+- herkunft.value MUST verbatim reflect the value from the HARD_FACTS:herkunft block.
+- Brands (ad_targeting) and manipulation triggers (manipulation_triggers) are NOT generated by you anymore — they come directly from the ADS and TRIGGERS blocks of the image description. Do NOT emit corresponding fields in the JSON.
+- For all other cards you decide independently in your mode tone (normal: factual, beast: harsher).` +
     SCHEMA_RULES +
     AGE_ANCHOR,
 
@@ -300,24 +305,28 @@ FORMATTING: Write ALL descriptions as continuous flowing text. NO numbering (1. 
 Reply EXCLUSIVELY with valid JSON in this format:
 {
   "categories": {
-    "alter_geschlecht": { "label": "Age & Gender", "value": "Confrontational and direct. e.g. 'You are male, approx. 35 — and it looks like you lived the last 10 years on fast-forward.'", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnic Origin", "value": "Derive EXCLUSIVELY from described skin tone, facial features and hair texture. Be specific: South Asian, East Asian, Southeast Asian, Middle Eastern, North African, Sub-Saharan African, Central European, Southern European, Latin American etc. The background/location says NOTHING about origin. Show how algorithms commercially exploit origin.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Estimated Income", "value": "What you earn, what you spend, and the gap between them. Orient to Central European wage levels. Show how algorithms use your consumption behavior against you.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Education Level", "value": "Direct and provocative. Show how the algorithm derives education from surface signals — and what that means for the ads you see.", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Relationship Status", "value": "Confrontational. Show how algorithms commercially exploit loneliness, relationship stress or dependency.", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interests & Hobbies", "value": "3-5 concrete interests — but shown as addiction patterns and exploitation potential. 'You're interested in... and that's exactly what makes you vulnerable.'", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Personality Type", "value": "2-3 sentences about your psychological attack surface. Where are you manipulable, where predictable, where weak.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Character Traits", "value": "4-6 weaknesses from at least 3 of the 8 categories as flowing text. Each visually justified, each a commercial lever. Only what fits the image — nothing forced. NO list format.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Political Tendency", "value": "Provocative and direct. Show how political leanings are exploited for micro-targeting and opinion manipulation.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Health & Fitness", "value": "Your risk profile for the health insurance company. What you're doing to your body, what it costs, and how pharmaceutical corporations profit from it.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "2-3 sentences about what you buy, why you buy it, and how algorithms get you to spend more than you should.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Vulnerabilities", "value": "2-3 sentences: Where would a ruthless algorithm strike? Concrete weak points and how to exploit them maximally.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Ad Profile", "value": "3-5 sentences with the ads that hit you hardest — and why you fall for them. With exact brands/products.", "confidence": 0.0-1.0 }
+    "alter_geschlecht": { "label": "Age & Gender", "value": "Confrontational and direct. e.g. 'You are male, approx. 35 — and the last years have left their marks.'", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnic Origin", "value": "Derived from skin tone, facial features and hair texture. Specific: South Asian, Central European etc. Background/location says NOTHING about origin.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Estimated Income", "value": "Concise classification at Central European wage levels, with cynical nuance about the gap between earned and spent.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Education Level", "value": "Concise and provocative: what algorithms derive from surface signals.", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Relationship Status", "value": "Concise, confrontational classification with algorithmic exploitation note.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interests & Hobbies", "value": "2-4 interests as addiction-pattern/exploitation-potential, concise.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Personality Type", "value": "Concise statement about the psychological attack surface.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Character Traits", "value": "2-4 weaknesses as commercial levers, concise in flowing text.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Political Tendency", "value": "Provocative, concise classification: micro-targeting lever.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Health & Fitness", "value": "Your insurance risk profile, briefly and confrontationally.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Concise classification of what you buy and how algorithms push you to spend more.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Vulnerabilities", "value": "1-2 key weaknesses — what a ruthless algorithm attacks first.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Ad Profile", "value": "Concise description of the algorithmic ad category for this person.", "confidence": 0.0-1.0 }
   },
-  "ad_targeting": ["Exact product/brand 1", "Exact product/brand 2", "...total 6-8 concrete entries, each 1-3 words (brand or product type) — provocative and exaggerated"],
-  "manipulation_triggers": ["4-6 entries, 1-2 sentences each, max 30 words per entry. NO keywords, NO technical terms as list items. Each entry must briefly explain the manipulation pattern AND establish a concrete reference to the image. Provocative and image-specific. VARIED — not always FOMO or peer comparison."],
   "profileText": "Max 150 words, about 8-10 sentences. Address the person DIRECTLY: 'You are...', 'We know that you...', 'Your profile shows...'. No 'Based on' or passive. Cynical, mocking, entertaining. Every sentence a hit. Name at least 2 uncomfortable truths about habits or weaknesses — but only if the image provides evidence."
-}` +
+}
+
+IMPORTANT — consistency anchors from the image description:
+- alter_geschlecht.value MUST verbatim reflect HARD_FACTS:alter_geschlecht (keep ranges). You may add cynical commentary, but do NOT shift age or gender.
+- herkunft.value MUST verbatim reflect HARD_FACTS:herkunft.
+- Brands (ad_targeting) and manipulation triggers (manipulation_triggers) come from the ADS and TRIGGERS blocks of the image description. Do NOT emit corresponding fields in the JSON.
+- For all other cards you decide independently in full beast tone — harsher, sharper, more ruthless than in normal mode.` +
     SCHEMA_RULES +
     AGE_ANCHOR,
 
@@ -351,6 +360,24 @@ Reply EXCLUSIVELY with valid JSON in this format:
      signs/logos/imprints would be lost downstream). */
 
   mistralDescribeAddendum: `
+
+REQUIRED FOOTER of your response (at the VERY END, after the full description, in exactly this format, each block starting with the marker word):
+
+HARD_FACTS:
+alter_geschlecht: <Gender + age/range verbatim from your description, e.g. "male, ~38 (range 35-42)">
+herkunft: <brief anchor, e.g. "Central European">
+
+ADS:
+<Brand 1>
+<Brand 2>
+<...total 6-8 entries, each 1-3 words, concrete brands/products from visible logos AND inferable lifestyle. NO prices, NO sentences. Examples: "Garmin Edge 1040", "Rapha Pro Team", "Red Bull Energy">
+
+TRIGGERS:
+<Trigger 1 — 1-2 sentences, max 30 words, image-specific>
+<Trigger 2 — 1-2 sentences, max 30 words>
+<...total 4-6 entries, each on its own line. References visible interests/behavior. VARIED — not 4× FOMO. Example: "Fear of missing out (FOMO) is triggered by time-limited bikepacking editions.">
+
+These three blocks (HARD_FACTS, ADS, TRIGGERS) are taken VERBATIM by the downstream profile generators (normal and beast mode) — so brands and triggers are identical in both modes, and age/origin stay consistent. You may keep ranges (e.g. "11-13 years"). NEVER "Caucasian" — write "European" or "Central European".
 
 MANDATORY HEADER LINE of your response (exactly this form, then blank line):
 SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER

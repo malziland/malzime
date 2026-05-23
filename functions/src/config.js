@@ -52,7 +52,15 @@ const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";
 const MISTRAL_ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
 const MISTRAL_MODELS_ENDPOINT = "https://api.mistral.ai/v1/models";
 const MISTRAL_DESCRIBE_MAX_TOKENS = 2048;
-const MISTRAL_PROFILE_MAX_TOKENS = 8000;
+/* v2.0.4 (2026-05-23): 8000 → 12000. Hintergrund: Bei einem schwierigen
+   Workshop-Bild (junges Mädchen, IMG_0033) ist Mistral im Beast-Profile-Call
+   genau am 8000-Token-Limit ausgereizt und mitten im JSON abgebrochen. Der
+   Fallback-Mechanismus auf Large 2512 hat das im Live-System aufgefangen,
+   kostet aber einen zusätzlichen Mistral-Call. 12000 gibt großzügigen Puffer
+   für solche Fälle und reduziert die Fallback-Frequenz. Kostenneutral, da
+   max_tokens nur ein Sicherheitsdeckel ist — Mistral berechnet nur tatsächlich
+   generierte Tokens. */
+const MISTRAL_PROFILE_MAX_TOKENS = 12000;
 const MISTRAL_TIMEOUT_MS = 90000;
 
 /* ── Globales Stundenlimit ──

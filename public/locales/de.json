@@ -1,4 +1,8 @@
 {
+  "groups.identity": "Wer du bist",
+  "groups.ability": "Was dich ausmacht",
+  "groups.money": "Was du kaufst",
+  "groups.risk": "Wo du verwundbar bist",
   "hero.badge": "SYSTEM AKTIV",
   "hero.title": "Wir sehen mehr als dein Foto.",
   "hero.lead": "Lade ein Bild hoch. Die KI erstellt in Sekunden ein komplettes Profil über dich — aus einem einzigen Foto.",

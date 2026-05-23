@@ -448,13 +448,32 @@ function escapeXml(str) {
     .replace(/'/g, "&#39;");
 }
 
+/* v2.1: Vollständigkeits-Check. Mistral hat sich in Live-Tests trotz Schema-
+   Pflicht "alle 13 Karten" gelegentlich entschieden, früh aufzuhören —
+   `finishReason: "stop"`, aber categories enthielt nur 7 von 13. Wir prüfen
+   das clientseitig und triggern einen Retry mit explizitem Hinweis auf die
+   fehlenden Karten. */
+const REQUIRED_CARDS = [
+  "alter_geschlecht", "herkunft", "einkommen", "bildung", "beziehungsstatus",
+  "interessen", "persoenlichkeit", "charakterzuege", "politisch",
+  "gesundheit", "kaufkraft", "verletzlichkeit", "werbeprofil",
+];
+
+function findMissingCards(parsed) {
+  if (!parsed || !parsed.categories || typeof parsed.categories !== "object") {
+    return REQUIRED_CARDS.slice();
+  }
+  return REQUIRED_CARDS.filter((key) => !parsed.categories[key] || !parsed.categories[key].value);
+}
+
 async function runProfile(prompt, temperature, mode, remainingBudget) {
   const messages = [{ role: "user", content: prompt }];
 
   /* Versuch 1: Small 4 als Hybrid-Default. v1.10.6: rate_limit/throttle_timeout
      wird hochpropagiert, sonst probieren wir noch Large 3 als Fallback. */
+  let small4Result = null;
   try {
-    const small4 = await tryProfileCall({
+    small4Result = await tryProfileCall({
       model: MISTRAL_PROFILE_MODEL,
       messages,
       temperature,
@@ -462,10 +481,65 @@ async function runProfile(prompt, temperature, mode, remainingBudget) {
       remainingBudget,
       isFallback: false,
     });
-    if (small4) return small4;
   } catch (err) {
     if (err && err.code === "rate_limit") throw err;
     /* andere Fehler: weiter zum Fallback */
+  }
+
+  /* v2.1: Vollständigkeits-Check für den Small-4-Output. Wenn Karten fehlen,
+     Retry mit explizitem Hinweis. NUR ein Retry — danach geht's mit dem
+     unvollständigen Ergebnis weiter oder über den Large-Fallback. */
+  if (small4Result) {
+    const missing = findMissingCards(small4Result);
+    if (missing.length === 0) return small4Result;
+    if (missing.length < REQUIRED_CARDS.length) {
+      console.log(JSON.stringify({
+        step: `mistral-profile-${mode}`,
+        status: "incomplete-retry",
+        missingCards: missing,
+        deliveredCards: REQUIRED_CARDS.length - missing.length,
+      }));
+      const retryPrompt = `${prompt}\n\nHINWEIS: Im letzten Versuch hast du folgende Karten ausgelassen: ${missing.join(", ")}. Liefere bitte ALLE 13 Karten im categories-Objekt — keine darf fehlen.`;
+      try {
+        const retryResult = await tryProfileCall({
+          model: MISTRAL_PROFILE_MODEL,
+          messages: [{ role: "user", content: retryPrompt }],
+          temperature,
+          mode,
+          remainingBudget,
+          isFallback: false,
+        });
+        /* Wenn Retry alle 13 hat → nehmen. Sonst: das vollständigere Ergebnis
+           der beiden behalten (oder small4Result als Basis, mit den im Retry
+           neu gelieferten Karten ergänzt). */
+        if (retryResult) {
+          const retryMissing = findMissingCards(retryResult);
+          if (retryMissing.length < missing.length) {
+            /* Retry war besser — mergen: small4Result als Basis,
+               fehlende Karten aus Retry ergänzen. So gehen keine Werte
+               verloren falls Mistral im Retry andere Karten ausgelassen hat. */
+            if (!small4Result.categories) small4Result.categories = {};
+            for (const key of REQUIRED_CARDS) {
+              if (!small4Result.categories[key] && retryResult.categories && retryResult.categories[key]) {
+                small4Result.categories[key] = retryResult.categories[key];
+              }
+            }
+            /* profileText aus Retry übernehmen, falls Original-Versuch keinen hatte */
+            if (!small4Result.profileText && retryResult.profileText) {
+              small4Result.profileText = retryResult.profileText;
+            }
+          }
+        }
+      } catch (err) {
+        /* Retry-Fehler nicht propagieren — wir haben ja schon small4Result */
+        console.log(JSON.stringify({
+          step: `mistral-profile-${mode}`,
+          status: "incomplete-retry-failed",
+          error: err.message,
+        }));
+      }
+      return small4Result;
+    }
   }
 
   /* Versuch 2: Large 3 als Fallback wenn Small 4 ausfällt. v1.10.6: bei

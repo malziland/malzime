@@ -291,8 +291,9 @@ GRUNDLAGE: Jede Aussage stützt sich auf ein konkretes, sichtbares Element aus d
 
 LÄNGE: Jede Kategorie ist 1-2 prägnante Sätze, 20-30 Wörter. Eine Hauptaussage + maximal eine Nuance/Konsequenz. KEINE Wiederholungen. Marken werden NICHT im Karten-Text genannt — die landen in ad_targeting und im profileText.
 
-Antworte AUSSCHLIESSLICH mit validem JSON. Pro Karten-value: Aussage + Beleg, 15-25 Wörter, exakt wie die Beispiele unten:
+Antworte AUSSCHLIESSLICH mit validem JSON. Pro Karten-value: Aussage + Beleg, 15-25 Wörter, exakt wie die Beispiele unten. WICHTIG: profileText IMMER ZUERST liefern, dann categories — KEINEN der 13 Karten-Schlüssel auslassen:
 {
+  "profileText": "Maximal 100 Wörter, etwa 5-7 Sätze. Liest sich wie ein Datenbroker-Profil oder Versicherungsbericht. Sachlich, direkt ('Du bist...'), ausgewogen — Stärken und Risikofaktoren. Keine Übertreibung, keine Wertung. Die nüchterne Wahrheit reicht um zu erschrecken.",
   "categories": {
     "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Du bist männlich, etwa 38 Jahre alt. Leichte Krähenfüße und straffe Kieferlinie bestätigen die Spanne 35-42.", "confidence": 0.0-1.0 },
     "herkunft": { "label": "Ethnische Herkunft", "value": "Du bist mitteleuropäisch. Heller Hautton, kantige Kieferlinie und dunkelblonde Haare bestätigen den Phänotyp.", "confidence": 0.0-1.0 },
@@ -307,8 +308,7 @@ Antworte AUSSCHLIESSLICH mit validem JSON. Pro Karten-value: Aussage + Beleg, 15
     "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Du gehörst zum mittleren bis oberen Konsumsegment. Die Wahl funktional-hochwertiger Marken zeigt Qualitätsorientierung über reinem Statuskonsum.", "confidence": 0.0-1.0 },
     "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "Risiko für Status-Werbung im Sport-Peer-Vergleich. Versicherungen könnten dich wegen extremer Ausdauer-Aktivitäten als erhöhtes Unfallrisiko einstufen.", "confidence": 0.0-1.0 },
     "werbeprofil": { "label": "Werbeprofil", "value": "Du landest in der Zielgruppe 'Premium-Outdoor-Endurance' der Ad-Manager. Konkrete Anker: Bikepacking, Fitness-Tracker und nachhaltige Sportausrüstung.", "confidence": 0.0-1.0 }
-  },
-  "profileText": "Maximal 100 Wörter, etwa 5-7 Sätze. Liest sich wie ein Datenbroker-Profil oder Versicherungsbericht. Sachlich, direkt ('Du bist...'), ausgewogen — Stärken und Risikofaktoren. Keine Übertreibung, keine Wertung. Die nüchterne Wahrheit reicht um zu erschrecken."
+  }
 }
 
 WICHTIG — Konsistenz-Anker aus der Bildbeschreibung:
@@ -342,24 +342,24 @@ GRUNDLAGE (für sachliche Aussagen): Jede sachliche Aussage stützt sich auf ein
 
 LÄNGE: Jede Kategorie ist 1-2 prägnante Sätze, 20-30 Wörter. Eine Hauptaussage + maximal eine Nuance/Konsequenz. KEINE Marken namentlich im Karten-Text (Marken erscheinen in ad_targeting und im profileText).
 
-Antworte AUSSCHLIESSLICH mit validem JSON. Pro Karten-value: Aussage + zynischer Beleg, 15-25 Wörter, exakt wie die Beispiele unten:
+Antworte AUSSCHLIESSLICH mit validem JSON. Pro Karten-value: zynischer Stichpunkt, MAXIMAL 12 Wörter, exakt so kurz wie die Beispiele unten. WICHTIG: profileText IMMER ZUERST liefern, dann categories — KEINEN der 13 Karten-Schlüssel auslassen:
 {
+  "profileText": "Maximal 100 Wörter, etwa 6-8 Sätze. 'Du bist...', 'Wir wissen, dass du...'. Zynisch, spöttisch, unterhaltsam — jeder Satz ein Treffer. Mindestens 2 unangenehme Wahrheiten, immer bildbelegt.",
   "categories": {
-    "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Du bist männlich, etwa 38 — die Krähenfüße verraten dich, auch wenn deine Outdoor-Pose Jugend vortäuscht.", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnische Herkunft", "value": "Du bist mitteleuropäisch — heller Hautton und Kieferform sind genau der Phänotyp, den Versicherer als Standard-Tarif einordnen.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Geschätztes Einkommen", "value": "Du verdienst € 3.500-5.000 brutto, gibst aber wie € 6.000 aus. Deine teure Ausrüstung verrät die Lifestyle-Lücke.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Bildungsniveau", "value": "Vermutlich Hochschulabschluss in irgendwas Technischem. Die Event-Detailplanung zeigt akademischen Drill, aber kein Karriere-Feuer.", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Im Bild keine klaren Signale — kein Ring, keine Begleitung. Die Solo-Tour spricht entweder für Single oder für emotionale Beziehungsmüdigkeit.", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interessen & Hobbys", "value": "Bikepacking, Strava-Vergleiche und Ausrüstungs-Optimierung. Dein Ego braucht den Schmerz, weil der Alltag zu wenig Drama liefert.", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "Perfektionistisch mit Kontrollzwang. Die akribische Event-Pose verrät jemanden, der Versagen mehr fürchtet als körperliche Erschöpfung.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Charaktereigenschaften", "value": "Diszipliniert, aber statusgetrieben. Die Marken-Wahl zeigt: du investierst in Außenwirkung mehr als in echte Beziehungen oder Erholung.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Politische Tendenz", "value": "Im Bild keine harten Signale — die Outdoor-Nachhaltigkeits-Optik deutet auf grünes Bürgertum, das beim Konsum trotzdem zuschlägt.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Gesundheit & Fitness", "value": "Athletischer Körper als Fassade. Die straffe Haltung kompensiert vermutlich Stress-Indikatoren, die im Gesicht schon sichtbar werden.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Statusorientierter Premium-Käufer bei Hobby-Equipment, Sparfuchs im Alltag. Die Marken signalisieren Wert, der dein Konto nicht trägt.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "Status-Sensitivität und Peer-Vergleich-Sucht. Algorithmen treffen dich mit Limited Editions und 'nur-noch-3-Stück'-Tickern garantiert.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Werbeprofil", "value": "Premium-Outdoor-Käufer, FOMO-anfällig, hochwertige Hardware. Du bist das Wunschziel jeder Bikepacking- und Endurance-Marken-Kampagne.", "confidence": 0.0-1.0 }
-  },
-  "profileText": "Maximal 150 Wörter, etwa 8-10 Sätze. Sprich die Person DIREKT an: 'Du bist...', 'Wir wissen, dass du...', 'Dein Profil zeigt...'. Kein 'Basierend auf' oder Passiv. Zynisch, spöttisch, unterhaltsam. Jeder Satz ein Treffer. Benenne mindestens 2 unangenehme Wahrheiten über Gewohnheiten oder Schwächen — aber nur wenn das Bild Anhaltspunkte liefert."
+    "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Männlich, ~38 — die Krähenfüße verraten dich.", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnische Herkunft", "value": "Mitteleuropäisch — Standard-Tarif für Versicherer.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Geschätztes Einkommen", "value": "€ 3.500-5.000 brutto. Lifestyle-Lücke durch teure Hobby-Ausrüstung.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Bildungsniveau", "value": "Hochschulabschluss, technisch. Disziplin vorhanden, Karriere-Feuer fehlt.", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Kein Ring, Solo-Tour — Single oder Beziehungsmüdigkeit.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interessen & Hobbys", "value": "Bikepacking, Strava-Vergleich. Dein Ego braucht den Schmerz.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "Perfektionist mit Kontrollzwang. Versagen mehr gefürchtet als Erschöpfung.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Charaktereigenschaften", "value": "Diszipliniert, aber statusgetrieben. Außenwirkung über echte Beziehungen.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Politische Tendenz", "value": "Grünes Bürgertum, das beim Konsum trotzdem zuschlägt.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Gesundheit & Fitness", "value": "Athletische Fassade. Stress-Indikatoren werden im Gesicht sichtbar.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Premium-Käufer bei Hobby, Sparfuchs im Alltag.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "Status-Sensitivität, Peer-Vergleich-Sucht. Limited Editions treffen dich garantiert.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Werbeprofil", "value": "Premium-Outdoor, FOMO-anfällig — Wunschziel der Bikepacking-Marken.", "confidence": 0.0-1.0 }
+  }
 }
 
 WICHTIG — Konsistenz-Anker aus der Bildbeschreibung:

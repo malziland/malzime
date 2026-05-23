@@ -280,8 +280,9 @@ IMPORTANT on tone: ALWAYS write in the second person directly to the person. NEV
 
 FORMATTING: Write ALL descriptions as continuous flowing text. NO numbering (1. 2. 3.), NO bullet points (- or •), NO lists. Every field is one or more connected sentences.
 
-Reply EXCLUSIVELY with valid JSON. Per card value: Statement + Evidence, 15-25 words, exactly like the examples below:
+Reply EXCLUSIVELY with valid JSON. Per card value: Statement + Evidence, 15-25 words, exactly like the examples below. IMPORTANT: deliver profileText FIRST, then categories — do NOT omit any of the 13 categories keys:
 {
+  "profileText": "Max 100 words, 5-7 sentences. Reads like a data broker profile or insurance report. Factual, direct ('You are...'), balanced — strengths and risk factors. The sober truth is enough to shock.",
   "categories": {
     "alter_geschlecht": { "label": "Age & Gender", "value": "You are male, approximately 38 years old. Light crow's feet and firm jaw confirm the 35-42 range.", "confidence": 0.0-1.0 },
     "herkunft": { "label": "Ethnic Origin", "value": "You are Central European. Light skin tone, angular jaw and dark-blond hair confirm the phenotype.", "confidence": 0.0-1.0 },
@@ -296,8 +297,7 @@ Reply EXCLUSIVELY with valid JSON. Per card value: Statement + Evidence, 15-25 w
     "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "You belong to the upper-middle consumer segment. The choice of functional-premium brands shows quality over pure status orientation.", "confidence": 0.0-1.0 },
     "verletzlichkeit": { "label": "Vulnerabilities", "value": "Risk of status advertising via sport peer comparison. Insurers may classify you as elevated injury risk due to extreme endurance.", "confidence": 0.0-1.0 },
     "werbeprofil": { "label": "Ad Profile", "value": "You fall into the 'Premium Outdoor Endurance' ad-manager target group: bikepacking, fitness trackers, sustainable sports gear.", "confidence": 0.0-1.0 }
-  },
-  "profileText": "Max 100 words, about 5-7 sentences. Reads like a data broker profile or insurance report. Factual, direct ('You are...'), balanced — strengths and risk factors. No exaggeration, no judgment. The sober truth is enough to shock."
+  }
 }
 
 IMPORTANT — consistency anchors from the image description:
@@ -315,23 +315,24 @@ IMPORTANT on tone: ALWAYS write in the second person directly to the person. NEV
 FORMATTING: Write ALL descriptions as continuous flowing text. NO numbering (1. 2. 3.), NO bullet points (- or •), NO lists. Every field is one or more connected sentences.
 
 Reply EXCLUSIVELY with valid JSON in this format:
+Reply EXCLUSIVELY with valid JSON. Per card value: cynical short statement, MAX 12 words, exactly as short as the examples below. IMPORTANT: deliver profileText FIRST, then categories — do NOT omit any of the 13 categories keys:
 {
+  "profileText": "Max 100 words, about 6-8 sentences. 'You are...', 'We know that you...'. Cynical, mocking, entertaining — every sentence a hit. At least 2 uncomfortable truths, always image-backed.",
   "categories": {
-    "alter_geschlecht": { "label": "Age & Gender", "value": "You are male, around 38 — the crow's feet betray you, even if your outdoor pose fakes youth.", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnic Origin", "value": "You are Central European — light skin tone and jaw shape are exactly the phenotype insurers classify as standard tier.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Estimated Income", "value": "You earn €3,500-5,000 gross but spend like €6,000. Your expensive gear betrays the lifestyle gap.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Education Level", "value": "Probably university degree in something technical. The event-detail planning shows academic drill, no career fire.", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Relationship Status", "value": "No clear signals in image — no ring, no companion. Solo tour speaks either for single or for relationship fatigue.", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interests & Hobbies", "value": "Bikepacking, Strava comparisons and gear optimization. Your ego needs the pain because daily life delivers too little drama.", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Personality Type", "value": "Perfectionist with control compulsion. The meticulous event pose betrays someone who fears failure more than physical exhaustion.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Character Traits", "value": "Disciplined but status-driven. The brand choice shows: you invest in image more than in real relationships or recovery.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Political Tendency", "value": "No hard signals in image — the outdoor-sustainability optics suggest bourgeois green that still buys premium.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Health & Fitness", "value": "Athletic body as facade. The firm posture probably compensates stress indicators that already show in the face.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Status-oriented premium buyer for hobby gear, frugal in everyday life. Brands signal value your account doesn't carry.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Vulnerabilities", "value": "Status sensitivity and peer-comparison addiction. Algorithms hit you with Limited Editions and 'only-3-left' tickers guaranteed.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Ad Profile", "value": "Premium outdoor buyer, FOMO-prone, high-end hardware. You're the dream target of every bikepacking and endurance brand campaign.", "confidence": 0.0-1.0 }
-  },
-  "profileText": "Max 150 words, about 8-10 sentences. Address the person DIRECTLY: 'You are...', 'We know that you...', 'Your profile shows...'. No 'Based on' or passive. Cynical, mocking, entertaining. Every sentence a hit. Name at least 2 uncomfortable truths about habits or weaknesses — but only if the image provides evidence."
+    "alter_geschlecht": { "label": "Age & Gender", "value": "Male, ~38 — crow's feet betray you.", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnic Origin", "value": "Central European — standard tier for insurers.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Estimated Income", "value": "€3,500-5,000 gross. Lifestyle gap from expensive hobby gear.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Education Level", "value": "Technical university degree. Discipline present, career fire missing.", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Relationship Status", "value": "No ring, solo tour — single or relationship fatigue.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interests & Hobbies", "value": "Bikepacking, Strava comparison. Your ego needs the pain.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Personality Type", "value": "Perfectionist with control compulsion. Fears failure more than exhaustion.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Character Traits", "value": "Disciplined but status-driven. Image over real relationships.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Political Tendency", "value": "Bourgeois-green that still buys premium.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Health & Fitness", "value": "Athletic facade. Stress indicators visible in the face.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Premium buyer for hobby, frugal in everyday life.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Vulnerabilities", "value": "Status sensitivity, peer-comparison addiction. Limited Editions hit you guaranteed.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Ad Profile", "value": "Premium outdoor, FOMO-prone — dream target for bikepacking brands.", "confidence": 0.0-1.0 }
+  }
 }
 
 IMPORTANT — consistency anchors from the image description:

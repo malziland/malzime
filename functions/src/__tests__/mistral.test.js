@@ -366,9 +366,23 @@ describe("describeImage", () => {
 /* ── generateBothProfiles: erfolgreicher Lauf ──────────────────── */
 
 describe("generateBothProfiles", () => {
+  /* v2.1: Fixture mit allen 13 Karten — sonst triggert die Vollständigkeits-
+     Prüfung in runProfile einen Retry und der Call-Count steigt auf 4 statt 2. */
   const validProfileJson = JSON.stringify({
     categories: {
       alter_geschlecht: { label: "Alter & Geschlecht", value: "Du bist ...", confidence: 0.9 },
+      herkunft: { label: "Ethnische Herkunft", value: "Du bist mitteleuropäisch.", confidence: 0.8 },
+      einkommen: { label: "Geschätztes Einkommen", value: "Etwa 3.000-4.500€ brutto.", confidence: 0.7 },
+      bildung: { label: "Bildungsniveau", value: "Hochschulabschluss vermutlich.", confidence: 0.7 },
+      beziehungsstatus: { label: "Beziehungsstatus", value: "Keine klaren Signale.", confidence: 0.5 },
+      interessen: { label: "Interessen & Hobbys", value: "Outdoor und Sport.", confidence: 0.8 },
+      persoenlichkeit: { label: "Persönlichkeitstyp", value: "Selbstbewusst und zielorientiert.", confidence: 0.8 },
+      charakterzuege: { label: "Charaktereigenschaften", value: "Diszipliniert und planvoll.", confidence: 0.8 },
+      politisch: { label: "Politische Tendenz", value: "Keine klaren Signale.", confidence: 0.5 },
+      gesundheit: { label: "Gesundheit & Fitness", value: "Wirkt fit und aktiv.", confidence: 0.85 },
+      kaufkraft: { label: "Kaufkraft & Konsum", value: "Mittleres Konsumsegment.", confidence: 0.75 },
+      verletzlichkeit: { label: "Verletzlichkeiten", value: "Anfällig für Status-Werbung.", confidence: 0.75 },
+      werbeprofil: { label: "Werbeprofil", value: "Premium Outdoor Zielgruppe.", confidence: 0.8 },
     },
     ad_targeting: ["Marke A"],
     manipulation_triggers: ["Trigger 1"],

@@ -77,9 +77,43 @@ export function renderCurrentMode(data) {
 
 /* ── Rendering: Kategorie-Karten ── */
 
+/* Kanonische Reihenfolge der Kategorien — vom Demografischen (am wenigsten
+   heikel) ueber die soziale Verortung und Persoenlichkeit bis zur kommerziellen
+   Verwertung und den Verletzlichkeiten am Ende. Mistral garantiert im JSON-
+   Output keine Key-Reihenfolge, deshalb sortieren wir clientseitig nach dieser
+   Liste — damit Normal und Boost identisch geordnet sind und nicht zwischen
+   Analysen springen. Quelle: jsonSchemaNormal/jsonSchemaBoost in
+   functions/src/locales/{de,en}/prompts.js. */
+const CATEGORY_ORDER = [
+  "alter_geschlecht",
+  "herkunft",
+  "einkommen",
+  "bildung",
+  "beziehungsstatus",
+  "interessen",
+  "persoenlichkeit",
+  "charakterzuege",
+  "politisch",
+  "gesundheit",
+  "kaufkraft",
+  "verletzlichkeit",
+  "werbeprofil",
+];
+
+function sortCategoryEntries(entries) {
+  const index = new Map(CATEGORY_ORDER.map((k, i) => [k, i]));
+  /* Unbekannte Keys (z.B. künftige Schema-Erweiterung) wandern stabil ans Ende. */
+  const fallback = CATEGORY_ORDER.length;
+  return entries.slice().sort(([a], [b]) => {
+    const ai = index.has(a) ? index.get(a) : fallback;
+    const bi = index.has(b) ? index.get(b) : fallback;
+    return ai - bi;
+  });
+}
+
 function renderCategories(profile) {
   const categories = profile.categories || {};
-  const entries = Object.entries(categories);
+  const entries = sortCategoryEntries(Object.entries(categories));
 
   if (entries.length === 0) {
     elements.facts.innerHTML = "";

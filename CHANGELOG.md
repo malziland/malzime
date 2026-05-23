@@ -10,6 +10,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 - **Pro-Call-Forensik für Mistral:** Jede `mistral-describe`- und `mistral-profile-*`-Log-Zeile trägt jetzt `promptTokens`, `outputTokens`, `httpMs` (reiner Mistral-Roundtrip) und `waitMs` (Wartezeit auf Semaphore-Slot + Token-Bucket). Beantwortet nach dem nächsten Workshop die Frage, ob die Mistral-TPM-Decke, die RPS-Decke oder die eigene Drossel die Wartezeit erzeugt — die Werte kamen schon vorher in jeder Mistral-Antwort, wurden aber verworfen.
 
+### Behoben
+
+- **Reihenfolge der Profil-Kategorien stabil:** Die Karten erscheinen jetzt immer in der gleichen, sinnvollen Reihenfolge (vom Demografischen über die soziale Verortung und Persönlichkeit bis zu Kaufkraft, Verletzlichkeiten und Werbeprofil am Ende) — egal ob Standard- oder Beast-Modus. Vorher entschied Mistral die Reihenfolge je Antwort selbst, weshalb dieselbe Person im Standard- und Beast-Profil unterschiedlich sortierte Karten hatte und auch zwei Aufrufe nacheinander voneinander abweichen konnten. Behoben durch eine feste, im Frontend hinterlegte Reihenfolge.
+
 ## [2.0.2] — 2026-05-22
 
 Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zurückkehrende Nutzer schneller, und die vier Phasen einer Analyse — Upload → Warteschlange → Verarbeitung → Auslieferung — sind ab jetzt einzeln im Log messbar.

@@ -24,7 +24,6 @@ Architektur-Experiment „Single-Large-Call" eingebaut, **dormant hinter Feature
 ### Geprüft (aber nicht umgesetzt)
 
 - **Concurrency-Erhöhung der bestehenden 3-Call-Pipeline von 3 auf 4:** Ursprünglich als kleiner Wartezeit-Hebel angedacht. Mit den jetzt exakten Token-Werten aus den Live-Logs neu gerechnet: heutige Pipeline liegt mit Concurrency 3 bei ~95 % der 2603-TPM-Decke. Concurrency 4 würde uns rechnerisch ~27 % über die Decke heben — also nicht „knapp drüber", sondern deutlich. Verworfen. Sauberere Lösung ist der Single-Large-Call-Branch oben, der das 2603-Konto komplett entlastet (Large hat 2M TPM statt 100K).
-- **Mistral-Support für höhere 2603-TPM-Limits anschreiben:** Bei realistischer Betrachtung ist die Erfolgs-Chance gering. Mistrals Antwort wäre vermutlich „nutzen Sie Large" oder „upgraden Sie auf Enterprise" (Mindestumsatz). Unser Pay-as-you-go-Volumen ist zu klein, um Kulanz-Druck zu erzeugen. Wenn Single-Large funktioniert, brauchen wir die Anfrage gar nicht mehr.
 
 ## [2.1.0] — 2026-05-23
 

@@ -17,3 +17,5 @@ compare-failed-*.txt
 compare-input/
 compare-results.json
 compare-prototype.html
+loadtest-results-*.json
+loadtest-run.log

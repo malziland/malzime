@@ -106,13 +106,19 @@ const LIVENESS_GRACE_MS = 3 * 60 * 1000;
 /* Schätzwerte für die Warteschlangen-ETA im job-status-Endpoint:
    durchschnittliche Verarbeitungsdauer pro Job und Anzahl parallel
    dispatchter Jobs. BEWUSST leicht großzügig — die ETA soll lieber über-
-   als unterschätzen, damit Wartende nicht enttäuscht werden. Echte
-   Messungen (2026-05-20, Queue in Produktion): ein Job dauert ~65–100s
-   reine Verarbeitung; 100s liegt am oberen Rand und ist damit konservativ.
+   als unterschätzen, damit Wartende nicht enttäuscht werden.
    QUEUE_DISPATCH_CONCURRENCY muss dem `maxConcurrentDispatches` der echten
-   Cloud-Tasks-Queue entsprechen, sonst geht die ETA daneben. */
-const QUEUE_AVG_JOB_SECONDS = 100;
-const QUEUE_DISPATCH_CONCURRENCY = 3;
+   Cloud-Tasks-Queue entsprechen, sonst geht die ETA daneben.
+
+   v2.2.0-rc1 (2026-05-23 abends): von 100s/3 auf 65s/10 angepasst nach
+   Lasttest mit Single-Large-Pipeline + Cloud-Tasks-Concurrency 10. Reale
+   Messung (35 Jobs): Median 58s/Job, P95 65s. Concurrency wurde via
+   `scripts/cloudtasks-concurrency-10.sh` auf 10 gesetzt. Falls Flag
+   `useSingleLargeCall` wieder deaktiviert wird, muessen beide Werte
+   zurueck (100 / 3) — und die Cloud-Tasks-Queue per
+   `scripts/cloudtasks-concurrency-3.sh` ebenfalls. */
+const QUEUE_AVG_JOB_SECONDS = 65;
+const QUEUE_DISPATCH_CONCURRENCY = 10;
 
 /* Aufbewahrungsfenster der Job-Dokumente. Ein Job-Dokument enthält bis zum
    Abschluss das fertige Profil im Feld `result`; danach wird es nicht mehr

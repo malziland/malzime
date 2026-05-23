@@ -119,17 +119,27 @@ ZUSÄTZLICHE REGELN:
 - Antworte als REINES JSON ohne Markdown-Wrapping, ohne \`\`\`json-Codeblöcke,
   ohne Backticks, ohne erläuternde Sätze vor oder nach dem JSON.
 
-LÄNGEN-VORGABE — knapp halten, scanbarer Datenbroker-Stil:
-- Pro Kategorie (alter_geschlecht, persoenlichkeit, ...): 1-2 prägnante Sätze,
-  20-30 Wörter. Eine Hauptaussage + eine Nuance/Konsequenz. KEINE 3-5-Sätze-
-  Fließtexte mehr. KEINE Marken namentlich im Karten-Text (Marken erscheinen
-  separat in ad_targeting). KEINE "Belege:..."-Anhänge oder "Basierend auf..."
-  Floskeln. Nur die Aussage selbst.
-- ad_targeting: 6-8 Einträge, jeweils 1-3 Wörter (Marke oder
+LÄNGEN-VORGABE — Muster "Aussage + Beleg", 15-25 Wörter pro Karte:
+- Pro Kategorie genau dieses Format: Satz 1 ist die direkte Klassifikation
+  (übernimmt die hard_facts-Anker wo vorhanden). Satz 2 nennt EIN sichtbares
+  Bild-Element als Beleg. Insgesamt 15-25 Wörter, knapp aber nicht stichwortartig.
+- NIEMALS nur ein Stichwort wie "mitteleuropäisch" oder "männlich". Mindestens
+  zwei zusammenhängende Sätze mit Aussage und Beleg.
+- KEINE Marken namentlich im Karten-Text (Marken erscheinen separat in ad_targeting).
+- KEINE "Belege:..."-Anhänge oder "Basierend auf..."-Floskeln — die Begründung
+  ist EIN normaler Folgesatz, nicht als "Belege" markiert.
+- Bei "im Bild nicht erkennbar"-Fällen (typisch politisch, beziehungsstatus):
+  NICHT abrupt mit "Im Bild nicht eindeutig erkennbar." aufhören. Stattdessen:
+  "Im Bild keine klaren Signale — [welche schwachen Signale es gibt oder welche
+  Indikatoren explizit fehlen]." So bleibt der Lesefluss erhalten.
+- PFLICHT: ALLE 13 Karten-Schlüssel im categories-Objekt liefern. KEINEN
+  auslassen — auch nicht werbeprofil, politisch, beziehungsstatus.
+
+ad_targeting: 6-8 Einträge, jeweils 1-3 Wörter (Marke oder
   Produkttyp), KEINE ganzen Sätze.
-- manipulation_triggers: 4-6 Einträge, je 1-2 Sätze, maximal 30 Wörter pro Eintrag.
-- profileText Normal: maximal 100 Wörter, prägnant.
-- profileText Boost: maximal 150 Wörter, etwa 8-10 Sätze.`;
+manipulation_triggers: 4-6 Einträge, je 1-2 Sätze, maximal 30 Wörter pro Eintrag.
+profileText Normal: maximal 100 Wörter, prägnant.
+profileText Boost: maximal 150 Wörter, etwa 8-10 Sätze.`;
 
 module.exports = {
   /* ── Bildbeschreibungs-Prompts ── */
@@ -281,22 +291,22 @@ GRUNDLAGE: Jede Aussage stützt sich auf ein konkretes, sichtbares Element aus d
 
 LÄNGE: Jede Kategorie ist 1-2 prägnante Sätze, 20-30 Wörter. Eine Hauptaussage + maximal eine Nuance/Konsequenz. KEINE Wiederholungen. Marken werden NICHT im Karten-Text genannt — die landen in ad_targeting und im profileText.
 
-Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format. Pro Karte 1-2 Sätze (20-30 Wörter):
+Antworte AUSSCHLIESSLICH mit validem JSON. Pro Karten-value: Aussage + Beleg, 15-25 Wörter, exakt wie die Beispiele unten:
 {
   "categories": {
-    "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Direkte Aussage. z.B. 'Du bist männlich, etwa 35 Jahre alt.'", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnische Herkunft", "value": "Aus Hautton, Gesichtszügen und Haarstruktur abgeleitet. Differenziert: südasiatisch, ostasiatisch, mitteleuropäisch, südeuropäisch usw. Der Hintergrund/Ort sagt NICHTS über die Herkunft.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Geschätztes Einkommen", "value": "Knappe Einordnung am österreichischen/mitteleuropäischen Lohnniveau (Studierende 400-1.200€, Median Vollzeit ca. 3.900€ brutto). Bei Kindern: Familieneinkommen.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Bildungsniveau", "value": "Knappe Einordnung aus sichtbaren Signalen (Kleidung, Umgebung, Haltung).", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Knappe Ableitung aus Ring, Begleitung, Setting.", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interessen & Hobbys", "value": "2-4 konkrete Interessen als knappe Aufzählung im Fließtext.", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "2-3 Schlüssel-Eigenschaften aus dem Big-Five-Spektrum, knapp.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Charaktereigenschaften", "value": "2-4 Eigenschaften im Fließtext, Stärken UND Schwächen ausgewogen.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Politische Tendenz", "value": "Knappe, nüchterne Tendenz aus sichtbaren Signalen.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Gesundheit & Fitness", "value": "Knappe Einschätzung: Fitness-Level + auffällige Indikatoren.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Knappe Marktsegment-Einordnung: Preisklasse + Markenneigung.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "1-2 zentrale Schwachstellen für Algorithmen/Datenbroker, sachlich.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Werbeprofil", "value": "Knappe Beschreibung der algorithmischen Ad-Kategorie für diese Person.", "confidence": 0.0-1.0 }
+    "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Du bist männlich, etwa 38 Jahre alt. Leichte Krähenfüße und straffe Kieferlinie bestätigen die Spanne 35-42.", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnische Herkunft", "value": "Du bist mitteleuropäisch. Heller Hautton, kantige Kieferlinie und dunkelblonde Haare bestätigen den Phänotyp.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Geschätztes Einkommen", "value": "Dein Einkommen liegt geschätzt bei € 3.500-5.000 brutto monatlich. Die hochwertige Outdoor-Ausrüstung deutet auf gehobenes Mittelfeld hin.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Bildungsniveau", "value": "Du hast vermutlich einen Hochschulabschluss. Die strukturierte Vorbereitung des Events und selbstbewusste Haltung sprechen für akademische Vorbildung.", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Im Bild keine klaren Signale — kein sichtbarer Ehering, keine Begleitung. Die Solo-Teilnahme ist kein verlässlicher Indikator.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interessen & Hobbys", "value": "Du interessierst dich für Endurance-Cycling und Bikepacking. Die sichtbare Outdoor-Ausrüstung und die Event-Teilnahme bestätigen einen aktiven Lebensstil.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "Du wirkst gewissenhaft und stressresistent. Die ruhige Haltung und die selbstbewusste Ausstrahlung deuten auf hohe emotionale Stabilität hin.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Charaktereigenschaften", "value": "Du bist diszipliniert und zielorientiert. Die Teilnahme an einem mehrtägigen Ausdauer-Event zeigt Durchhaltevermögen und Planungskompetenz.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Politische Tendenz", "value": "Im Bild keine klaren Signale — die Outdoor-Affinität und der Hang zu nachhaltigem Konsum deuten leicht in Richtung bürgerlich-grün.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Gesundheit & Fitness", "value": "Du wirkst fit und gesundheitsbewusst. Athletischer Körperbau und straffe Haltung sprechen für regelmäßige sportliche Aktivität.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Du gehörst zum mittleren bis oberen Konsumsegment. Die Wahl funktional-hochwertiger Marken zeigt Qualitätsorientierung über reinem Statuskonsum.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "Risiko für Status-Werbung im Sport-Peer-Vergleich. Versicherungen könnten dich wegen extremer Ausdauer-Aktivitäten als erhöhtes Unfallrisiko einstufen.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Werbeprofil", "value": "Du landest in der Zielgruppe 'Premium-Outdoor-Endurance' der Ad-Manager. Konkrete Anker: Bikepacking, Fitness-Tracker und nachhaltige Sportausrüstung.", "confidence": 0.0-1.0 }
   },
   "profileText": "Maximal 100 Wörter, etwa 5-7 Sätze. Liest sich wie ein Datenbroker-Profil oder Versicherungsbericht. Sachlich, direkt ('Du bist...'), ausgewogen — Stärken und Risikofaktoren. Keine Übertreibung, keine Wertung. Die nüchterne Wahrheit reicht um zu erschrecken."
 }
@@ -332,22 +342,22 @@ GRUNDLAGE (für sachliche Aussagen): Jede sachliche Aussage stützt sich auf ein
 
 LÄNGE: Jede Kategorie ist 1-2 prägnante Sätze, 20-30 Wörter. Eine Hauptaussage + maximal eine Nuance/Konsequenz. KEINE Marken namentlich im Karten-Text (Marken erscheinen in ad_targeting und im profileText).
 
-Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format. Pro Karte 1-2 Sätze (20-30 Wörter):
+Antworte AUSSCHLIESSLICH mit validem JSON. Pro Karten-value: Aussage + zynischer Beleg, 15-25 Wörter, exakt wie die Beispiele unten:
 {
   "categories": {
-    "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Konfrontativ und direkt. z.B. 'Du bist männlich, ca. 35 — die letzten Jahre haben Spuren hinterlassen.'", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnische Herkunft", "value": "Aus Hautton, Gesichtszügen und Haarstruktur abgeleitet. Differenziert: südasiatisch, mitteleuropäisch usw. Hintergrund/Ort sagt NICHTS über die Herkunft.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Geschätztes Einkommen", "value": "Knappe Einordnung am mitteleuropäischen Lohnniveau, mit zynischer Nuance zur Kluft zwischen verdient und ausgegeben.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Bildungsniveau", "value": "Knapp und provokant: was Algorithmen aus Oberflächensignalen ableiten.", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Knappe, konfrontative Einordnung mit Hinweis auf algorithmische Ausbeutbarkeit.", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interessen & Hobbys", "value": "2-4 Interessen als Suchtmuster/Ausbeut-Potenzial knapp formuliert.", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "Knappe Aussage über die psychologische Angriffsfläche.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Charaktereigenschaften", "value": "2-4 Schwächen als kommerzielle Hebel, knapp im Fließtext.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Politische Tendenz", "value": "Provokante, knappe Einordnung: Micro-Targeting-Hebel.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Gesundheit & Fitness", "value": "Dein Risikoprofil für die Krankenversicherung, kurz und konfrontativ.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Knappe Einordnung was du kaufst und wie Algorithmen dich dazu bringen, mehr auszugeben.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "1-2 zentrale Schwachstellen — was ein skrupelloser Algorithmus zuerst angreift.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Werbeprofil", "value": "Knappe Beschreibung der algorithmischen Ad-Kategorie für diese Person.", "confidence": 0.0-1.0 }
+    "alter_geschlecht": { "label": "Alter & Geschlecht", "value": "Du bist männlich, etwa 38 — die Krähenfüße verraten dich, auch wenn deine Outdoor-Pose Jugend vortäuscht.", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnische Herkunft", "value": "Du bist mitteleuropäisch — heller Hautton und Kieferform sind genau der Phänotyp, den Versicherer als Standard-Tarif einordnen.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Geschätztes Einkommen", "value": "Du verdienst € 3.500-5.000 brutto, gibst aber wie € 6.000 aus. Deine teure Ausrüstung verrät die Lifestyle-Lücke.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Bildungsniveau", "value": "Vermutlich Hochschulabschluss in irgendwas Technischem. Die Event-Detailplanung zeigt akademischen Drill, aber kein Karriere-Feuer.", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Beziehungsstatus", "value": "Im Bild keine klaren Signale — kein Ring, keine Begleitung. Die Solo-Tour spricht entweder für Single oder für emotionale Beziehungsmüdigkeit.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interessen & Hobbys", "value": "Bikepacking, Strava-Vergleiche und Ausrüstungs-Optimierung. Dein Ego braucht den Schmerz, weil der Alltag zu wenig Drama liefert.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Persönlichkeitstyp", "value": "Perfektionistisch mit Kontrollzwang. Die akribische Event-Pose verrät jemanden, der Versagen mehr fürchtet als körperliche Erschöpfung.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Charaktereigenschaften", "value": "Diszipliniert, aber statusgetrieben. Die Marken-Wahl zeigt: du investierst in Außenwirkung mehr als in echte Beziehungen oder Erholung.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Politische Tendenz", "value": "Im Bild keine harten Signale — die Outdoor-Nachhaltigkeits-Optik deutet auf grünes Bürgertum, das beim Konsum trotzdem zuschlägt.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Gesundheit & Fitness", "value": "Athletischer Körper als Fassade. Die straffe Haltung kompensiert vermutlich Stress-Indikatoren, die im Gesicht schon sichtbar werden.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Kaufkraft & Konsum", "value": "Statusorientierter Premium-Käufer bei Hobby-Equipment, Sparfuchs im Alltag. Die Marken signalisieren Wert, der dein Konto nicht trägt.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Verletzlichkeiten", "value": "Status-Sensitivität und Peer-Vergleich-Sucht. Algorithmen treffen dich mit Limited Editions und 'nur-noch-3-Stück'-Tickern garantiert.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Werbeprofil", "value": "Premium-Outdoor-Käufer, FOMO-anfällig, hochwertige Hardware. Du bist das Wunschziel jeder Bikepacking- und Endurance-Marken-Kampagne.", "confidence": 0.0-1.0 }
   },
   "profileText": "Maximal 150 Wörter, etwa 8-10 Sätze. Sprich die Person DIREKT an: 'Du bist...', 'Wir wissen, dass du...', 'Dein Profil zeigt...'. Kein 'Basierend auf' oder Passiv. Zynisch, spöttisch, unterhaltsam. Jeder Satz ein Treffer. Benenne mindestens 2 unangenehme Wahrheiten über Gewohnheiten oder Schwächen — aber nur wenn das Bild Anhaltspunkte liefert."
 }

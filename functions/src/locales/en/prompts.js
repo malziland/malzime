@@ -111,16 +111,28 @@ ADDITIONAL RULES:
 - Reply as PURE JSON without markdown wrapping, without \`\`\`json code blocks,
   without backticks, without explanatory sentences before or after the JSON.
 
-LENGTH RULES — scannable data-broker style:
-- Per category (alter_geschlecht, persoenlichkeit, ...): 1-2 concise sentences,
-  20-30 words. One main statement + one nuance/consequence. NO 3-5-sentence
-  flowing texts. NO brand names in card text (brands appear separately in
-  ad_targeting). NO "Evidence:..." appendices or "Based on..." phrases.
-- ad_targeting: 6-8 entries, each 1-3 words (brand or product type),
+LENGTH RULES — "Statement + Evidence" pattern, 15-25 words per card:
+- Per category exactly this format: Sentence 1 is the direct classification
+  (takes the hard_facts anchors verbatim where present). Sentence 2 cites
+  ONE visible image element as evidence. Total 15-25 words, concise but not
+  one-word stubs.
+- NEVER just a single keyword like "Central European" or "male". At least two
+  connected sentences with statement and evidence.
+- NO brand names in card text (brands appear separately in ad_targeting).
+- NO "Evidence:..." appendices or "Based on..." phrases — the justification is
+  a normal follow-up sentence, not labelled as evidence.
+- For "not detectable in image" cases (typically politisch, beziehungsstatus):
+  do NOT stop abruptly with "Not clearly visible in image." Instead: "No clear
+  signals in image — [which weak signals exist or which indicators are missing]."
+  Keeps reading flow intact.
+- MANDATORY: deliver ALL 13 categories keys in the categories object. NEVER
+  omit any — including werbeprofil, politisch, beziehungsstatus.
+
+ad_targeting: 6-8 entries, each 1-3 words (brand or product type),
   NO full sentences.
-- manipulation_triggers: 4-6 entries, 1-2 sentences each, max 30 words per entry.
-- profileText normal mode: max 100 words, concise.
-- profileText boost mode: max 150 words, about 8-10 sentences.`;
+manipulation_triggers: 4-6 entries, 1-2 sentences each, max 30 words per entry.
+profileText normal mode: max 100 words, concise.
+profileText boost mode: max 150 words, about 8-10 sentences.`;
 
 module.exports = {
   /* ── Image description prompts ── */
@@ -268,22 +280,22 @@ IMPORTANT on tone: ALWAYS write in the second person directly to the person. NEV
 
 FORMATTING: Write ALL descriptions as continuous flowing text. NO numbering (1. 2. 3.), NO bullet points (- or •), NO lists. Every field is one or more connected sentences.
 
-Reply EXCLUSIVELY with valid JSON in this format. Per card 1-2 sentences (20-30 words):
+Reply EXCLUSIVELY with valid JSON. Per card value: Statement + Evidence, 15-25 words, exactly like the examples below:
 {
   "categories": {
-    "alter_geschlecht": { "label": "Age & Gender", "value": "Direct statement. e.g. 'You are male, approximately 35 years old.'", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnic Origin", "value": "Derived from skin tone, facial features and hair texture. Specific: South Asian, East Asian, Central European, Southern European etc. Background/location says NOTHING about origin.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Estimated Income", "value": "Concise classification based on Austrian/Central European wage levels (students €400-1,200, median full-time approx. €3,900 gross). For children: family income.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Education Level", "value": "Concise classification from visible signals (clothing, environment, posture).", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Relationship Status", "value": "Concise derivation from ring, company, setting.", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interests & Hobbies", "value": "2-4 concrete interests as a concise listing in flowing text.", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Personality Type", "value": "2-3 key Big-Five traits, concise.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Character Traits", "value": "2-4 traits in flowing text, strengths AND weaknesses balanced.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Political Tendency", "value": "Concise, sober tendency from visible signals.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Health & Fitness", "value": "Concise assessment: fitness level + striking indicators.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Concise market-segment classification: price class + brand affinity.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Vulnerabilities", "value": "1-2 key vulnerabilities to algorithms/data brokers, factual.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Ad Profile", "value": "Concise description of the algorithmic ad category for this person.", "confidence": 0.0-1.0 }
+    "alter_geschlecht": { "label": "Age & Gender", "value": "You are male, approximately 38 years old. Light crow's feet and firm jaw confirm the 35-42 range.", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnic Origin", "value": "You are Central European. Light skin tone, angular jaw and dark-blond hair confirm the phenotype.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Estimated Income", "value": "Your income is estimated at €3,500-5,000 gross monthly. High-quality outdoor gear suggests upper middle bracket.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Education Level", "value": "Likely a university degree. The structured event preparation and confident posture suggest academic background.", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Relationship Status", "value": "No clear signals in image — no visible ring, no companion. Solo participation is not a reliable indicator.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interests & Hobbies", "value": "You are interested in endurance cycling and bikepacking. Visible gear and event participation confirm an active lifestyle.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Personality Type", "value": "You appear conscientious and stress-resistant. The calm posture and confident demeanor indicate high emotional stability.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Character Traits", "value": "You are disciplined and goal-oriented. Multi-day endurance event participation shows perseverance and planning competence.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Political Tendency", "value": "No clear signals in image — outdoor affinity and sustainable consumption lean slightly bourgeois-green without certainty.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Health & Fitness", "value": "You appear fit and health-conscious. Athletic build and firm posture indicate regular physical activity.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "You belong to the upper-middle consumer segment. The choice of functional-premium brands shows quality over pure status orientation.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Vulnerabilities", "value": "Risk of status advertising via sport peer comparison. Insurers may classify you as elevated injury risk due to extreme endurance.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Ad Profile", "value": "You fall into the 'Premium Outdoor Endurance' ad-manager target group: bikepacking, fitness trackers, sustainable sports gear.", "confidence": 0.0-1.0 }
   },
   "profileText": "Max 100 words, about 5-7 sentences. Reads like a data broker profile or insurance report. Factual, direct ('You are...'), balanced — strengths and risk factors. No exaggeration, no judgment. The sober truth is enough to shock."
 }
@@ -305,19 +317,19 @@ FORMATTING: Write ALL descriptions as continuous flowing text. NO numbering (1. 
 Reply EXCLUSIVELY with valid JSON in this format:
 {
   "categories": {
-    "alter_geschlecht": { "label": "Age & Gender", "value": "Confrontational and direct. e.g. 'You are male, approx. 35 — and the last years have left their marks.'", "confidence": 0.0-1.0 },
-    "herkunft": { "label": "Ethnic Origin", "value": "Derived from skin tone, facial features and hair texture. Specific: South Asian, Central European etc. Background/location says NOTHING about origin.", "confidence": 0.0-1.0 },
-    "einkommen": { "label": "Estimated Income", "value": "Concise classification at Central European wage levels, with cynical nuance about the gap between earned and spent.", "confidence": 0.0-1.0 },
-    "bildung": { "label": "Education Level", "value": "Concise and provocative: what algorithms derive from surface signals.", "confidence": 0.0-1.0 },
-    "beziehungsstatus": { "label": "Relationship Status", "value": "Concise, confrontational classification with algorithmic exploitation note.", "confidence": 0.0-1.0 },
-    "interessen": { "label": "Interests & Hobbies", "value": "2-4 interests as addiction-pattern/exploitation-potential, concise.", "confidence": 0.0-1.0 },
-    "persoenlichkeit": { "label": "Personality Type", "value": "Concise statement about the psychological attack surface.", "confidence": 0.0-1.0 },
-    "charakterzuege": { "label": "Character Traits", "value": "2-4 weaknesses as commercial levers, concise in flowing text.", "confidence": 0.0-1.0 },
-    "politisch": { "label": "Political Tendency", "value": "Provocative, concise classification: micro-targeting lever.", "confidence": 0.0-1.0 },
-    "gesundheit": { "label": "Health & Fitness", "value": "Your insurance risk profile, briefly and confrontationally.", "confidence": 0.0-1.0 },
-    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Concise classification of what you buy and how algorithms push you to spend more.", "confidence": 0.0-1.0 },
-    "verletzlichkeit": { "label": "Vulnerabilities", "value": "1-2 key weaknesses — what a ruthless algorithm attacks first.", "confidence": 0.0-1.0 },
-    "werbeprofil": { "label": "Ad Profile", "value": "Concise description of the algorithmic ad category for this person.", "confidence": 0.0-1.0 }
+    "alter_geschlecht": { "label": "Age & Gender", "value": "You are male, around 38 — the crow's feet betray you, even if your outdoor pose fakes youth.", "confidence": 0.0-1.0 },
+    "herkunft": { "label": "Ethnic Origin", "value": "You are Central European — light skin tone and jaw shape are exactly the phenotype insurers classify as standard tier.", "confidence": 0.0-1.0 },
+    "einkommen": { "label": "Estimated Income", "value": "You earn €3,500-5,000 gross but spend like €6,000. Your expensive gear betrays the lifestyle gap.", "confidence": 0.0-1.0 },
+    "bildung": { "label": "Education Level", "value": "Probably university degree in something technical. The event-detail planning shows academic drill, no career fire.", "confidence": 0.0-1.0 },
+    "beziehungsstatus": { "label": "Relationship Status", "value": "No clear signals in image — no ring, no companion. Solo tour speaks either for single or for relationship fatigue.", "confidence": 0.0-1.0 },
+    "interessen": { "label": "Interests & Hobbies", "value": "Bikepacking, Strava comparisons and gear optimization. Your ego needs the pain because daily life delivers too little drama.", "confidence": 0.0-1.0 },
+    "persoenlichkeit": { "label": "Personality Type", "value": "Perfectionist with control compulsion. The meticulous event pose betrays someone who fears failure more than physical exhaustion.", "confidence": 0.0-1.0 },
+    "charakterzuege": { "label": "Character Traits", "value": "Disciplined but status-driven. The brand choice shows: you invest in image more than in real relationships or recovery.", "confidence": 0.0-1.0 },
+    "politisch": { "label": "Political Tendency", "value": "No hard signals in image — the outdoor-sustainability optics suggest bourgeois green that still buys premium.", "confidence": 0.0-1.0 },
+    "gesundheit": { "label": "Health & Fitness", "value": "Athletic body as facade. The firm posture probably compensates stress indicators that already show in the face.", "confidence": 0.0-1.0 },
+    "kaufkraft": { "label": "Purchasing Power & Consumption", "value": "Status-oriented premium buyer for hobby gear, frugal in everyday life. Brands signal value your account doesn't carry.", "confidence": 0.0-1.0 },
+    "verletzlichkeit": { "label": "Vulnerabilities", "value": "Status sensitivity and peer-comparison addiction. Algorithms hit you with Limited Editions and 'only-3-left' tickers guaranteed.", "confidence": 0.0-1.0 },
+    "werbeprofil": { "label": "Ad Profile", "value": "Premium outdoor buyer, FOMO-prone, high-end hardware. You're the dream target of every bikepacking and endurance brand campaign.", "confidence": 0.0-1.0 }
   },
   "profileText": "Max 150 words, about 8-10 sentences. Address the person DIRECTLY: 'You are...', 'We know that you...', 'Your profile shows...'. No 'Based on' or passive. Cynical, mocking, entertaining. Every sentence a hit. Name at least 2 uncomfortable truths about habits or weaknesses — but only if the image provides evidence."
 }

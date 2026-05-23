@@ -375,7 +375,12 @@ async function generateBothProfiles(imageDescription, exifData, remainingBudget,
 
   const [normal, boost] = await Promise.all([
     runProfile(normalPrompt, 0.7, "normal", remainingBudget),
-    runProfile(boostPrompt, 1.0, "boost", remainingBudget),
+    /* v2.1 (2026-05-23 nachmittags): Beast-Temperatur 1.0 -> 0.8. Hintergrund:
+       Beim ersten v2.1-Live-Test schrieb Beast trotz Längen-Vorgabe (20-30 Wörter)
+       jede Karte mit 5-8 Sätzen und schnitt am max_tokens-Limit ab. Niedrigere
+       Temperatur macht Mistral disziplinierter beim Schema-Einhalten, der zynische
+       Beast-Ton kommt aus dem systemBoost-Prompt (nicht aus der Temperatur). */
+    runProfile(boostPrompt, 0.8, "boost", remainingBudget),
   ]);
 
   /* Konsistenz-Anker durchsetzen: Profile-Calls könnten trotz Prompt-Pflicht

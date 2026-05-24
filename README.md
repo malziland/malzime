@@ -287,4 +287,4 @@ MIT — siehe [LICENSE](LICENSE)
 
 ---
 
-Erstellt von [malziland — digitale Wissensgestaltung](https://malziland.at)
+Erstellt von [malziland - learning | training | consulting e.U.](https://malziland.at)

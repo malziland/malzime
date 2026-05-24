@@ -4,6 +4,21 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.0-rc2] — 2026-05-24
+
+Kleinere Anpassungen am RC, bleibt prerelease. Single-Large-Pipeline weiterhin live aktiv hinter Feature-Flag.
+
+### Geändert
+
+- **Firmenname aktualisiert** auf „malziland - learning | training | consulting e.U." (vorher „malziland – digitale Wissensgestaltung e.U.") in Impressum, Datenschutz, Nutzungsbedingungen, JSON-LD schema.org und Meta-Tags. Inhaber-Name, Adresse, GISA, UID, FN unverändert.
+- **`QUEUE_DISPATCH_CONCURRENCY` 3 → 10** und **`QUEUE_AVG_JOB_SECONDS` 100 → 65** in `functions/src/config.js` an die Realwerte aus dem Single-Large-Lasttest angepasst. Frontend-ETA zeigt jetzt realistische Wartezeit-Schätzungen für User — vorher rechnete sie noch mit den Werten der alten 3-Call-Pipeline und überschätzte die Wartezeit ~3×.
+- **Cache-Buster aller HTML-Dateien** auf `v=2026052401` angehoben. `impressum.html` war noch auf `v=2026022106` (Februar) — überfällig.
+
+### Validiert
+
+- Zweiter Lasttest gegen Produktion (35 Jobs gegen Single-Large, Cloud-Tasks-Concurrency 10): 35/35 done, 0 Fehler, 0 × 429, 0 Retries. Mistral-Latenz Median 60 s, P95 69 s. Interner Throttle-Wait Median 0 ms. Bestätigt die Stabilität aus dem ersten Lasttest am 23.05. abends.
+- Sonntag-Vormittag (24.05. seit 00:00): 5 echte User-Jobs, alle 5 done über Single-Large-Pipeline, 0 Fehler. Median 51 s pro Job, Median 13.130 Tokens.
+
 ## [2.2.0-rc1] — 2026-05-23
 
 **Architektur-Experiment „Single-Large-Call" eingebaut, dormant hinter Feature-Flag.** Live-Pipeline läuft weiterhin auf der bewährten 3-Call-Architektur (Describe Large + 2× Profile Small 2603). Erst wenn `featureFlags/current.useSingleLargeCall` in Firestore manuell auf `true` gesetzt wird, schaltet die Queue-Pipeline für jeden neuen Job auf einen einzigen `mistral-large-2512`-Aufruf um, der Bild-Beschreibung, Standard-Profil und Beast-Profil in einer Antwort liefert. **Release Candidate** — Workshop-Validierung steht aus, daher RC-Status. Diese Release ändert für Endnutzer mit deaktiviertem Flag NICHTS.

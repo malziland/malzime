@@ -4,6 +4,40 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.0-rc3] — 2026-05-27
+
+Konsolidierter Single-Large-Prompt mit Sicherheits- und Qualitäts-Härtungen. Verhalten der Live-Pipeline (Single-Large hinter Feature-Flag) bleibt strukturell gleich; Prompt wurde gegen den RC2-Stand A/B-getestet (15 Bilder × 3 Läufe = 90 Mistral-Calls) und an den zwei messbaren Schwachpunkten nachgeschärft.
+
+### Geändert
+
+- **`singleLargePrompt` in `functions/src/locales/de/prompts.js` konsolidiert.** Bisher ein Template-Literal aus den 3-Call-Bausteinen (`systemNormal`/`systemBoost`/`AGE_ANCHOR`/`GENDER_ANCHOR`); jetzt ein eigenständiger Prompt mit gemeinsamen Regeln (GEMEINSAME REGELN-Block für beide Modi), geteilten Charakter-Pools (8 Bereiche mit STANDARD-Stärken, STANDARD-Schwächen und BEAST-Schwächen pro Bereich) und konsistenter „keine klaren Bildsignale"-Phrase als einheitlichem Ausweg für nicht-beurteilbare Felder. Die 3-Call-Pipeline-Bausteine bleiben unverändert; nur Single-Large hat ab rc3 einen getrennten Prompt-Text (Pflege-Notiz im Header der Datei).
+- **Sicherheits-Klausel ergänzt:** Explizites Verbot sexualisierter Zuschreibungen bei Minderjährigen (war im Live-Prompt zuvor nicht codifiziert, sondern nur durch Mistrals Eigenvorsicht abgedeckt). Zentrale Schutzregel für Workshop-Tool mit Schüler:innen.
+- **Anti-Halluzinations-Härtungen:** „Erfinde KEINE Markennamen — nur real existierende Marken aus dem mitteleuropäischen Markt" in AD_TARGETING; expliziter Anti-Leakage-Block vor dem JSON-Schema („Übernimm NIEMALS die konkreten Beispiel-Inhalte wie Bikepacking oder Garmin Edge 1040, wenn das Foto sie nicht hergibt").
+- **Konsistenz-Pflicht zwischen Modi geschärft:** `hard_facts.alter_geschlecht` und `hard_facts.herkunft` müssen jetzt wortgenau in die jeweiligen Karten-Values übernommen werden (Satzanfang). A/B-Test zeigte: Substring-strikte Konsistenz 0 % → 100 %.
+- **Confidence-Differenzierung explizit gefordert:** Bei klarem Bildbeleg 0,75–0,95, bei „keine klaren Bildsignale" deutlich niedriger (typisch unter 0,60). A/B-Test zeigte: Confidence-Streuung 0,104 → 0,143 (ehrlicher differenziert).
+- **Karten-Wort-Untergrenze hart:** „MINDESTENS 15 Wörter pro Karte, MAXIMAL 25, 2 vollständige Sätze. Karten unter 15 Wörtern sind unvollständig und gelten als Fehler." Exemplar-Test mit den zwei A/B-Worst-Performern reduzierte zu-kurze Karten von ~26 % auf ~8 %.
+- **Anti-Stichwort-Listen-Regel mit Negativ-Beispiel** in GEMEINSAME REGELN hochgezogen: „FALSCH: 'unsicher, ängstlich, perfektionistisch.' RICHTIG: 'Du bist unsicher und perfektionistisch. Die hochgezogenen Schultern und der angespannte Kiefer verraten Anpassungsdruck.'" Exemplar-Test eliminierte Stichwort-Listen vollständig (vorher 6 in 3 Läufen, nachher 0).
+- **Beast-Variations-Pool** für korporative Stimme: Liste mit zehn Wir-Formulierungen („Wir wissen", „Wir verkaufen dir", „Wir kalkulieren", „Algorithmen sehen dich als", „Versicherer rechnen dich als", …), Empfehlung zur Variation gegen monotone Wiederholungen.
+- **Multi-Person-Regel:** Falls das Bild mehrere Personen zeigt, wird die Person im Vordergrund/in der Bildmitte analysiert.
+- **Marken-Spezifik gefördert:** „möglichst mit Modellnummer/Linie" in AD_TARGETING. Test zeigte spezifischere Werbe-Vorschläge wie „L'Oréal Paris True Match Foundation", „Nike Phantom GX 2 Elite", „L.O.L. Surprise! O.M.G. Fashion Dolls" (statt nur „L'Oréal", „Nike", „L.O.L. Surprise!").
+
+### Hinzugefügt (Test-Infrastruktur)
+
+- **`functions/scripts/single-large-ab-runner.js`** — generischer A/B-Test-Runner: fährt alle Bilder aus `compare-input/` mehrfach gegen Live- und Kandidat-Prompt, bewertet 7 automatische Metriken (Karten-Wort-Bereich, Stichwort-Listen, Confidence-Streuung, Leakage-Hits, Hard-Facts-Konsistenz, Beast-Opener-Wiederholungen, ad_targeting-Plausibilität), schreibt Markdown-Report. Wiederverwendbar für künftige Prompt-Iterationen.
+- **`functions/scripts/prompts-v2.2.1-rc1.js`** — Snapshot des in rc3 deployten Prompts, separat als Test-Referenz für spätere A/B-Läufe gegen die dann-aktuelle Live-Version.
+- **`PROMPT_VARIANT=rc1` ENV-Schalter in `functions/scripts/single-large-call-test.js`** — erlaubt schnellen Vergleich zwischen Live-Locale und Kandidat-Datei ohne Anpassung am Test-Skript.
+
+### Validiert
+
+- **A/B-Test 15 Bilder × 3 Läufe × 2 Varianten = 90 Calls** (kostete 2,69 EUR, dauerte 16,5 Min). Korrigierte Befunde nach Bereinigung um Mess-Artefakte (HTTP-Timeouts bei 2 Bildern und defekte „inventedBrands"-Heuristik): 6–7 echte Verbesserungen, 2 marginale Verschlechterungen im statistischen Rauschen. Wichtigste Verbesserungen: Hard-Facts-Konsistenz 0 % → 100 %, Confidence-Streuung 0,104 → 0,143, Marken spezifischer mit Modellbezeichnung, Karten näher am 15–25-Wort-Korridor.
+- **Exemplar-Stresstest** an den zwei A/B-Worst-Performern (`IMG_0378.jpg`, `IMG_0584.jpg`) mit den zwei Polituren (harte Wort-Untergrenze + Anti-Stichwort-Liste in GEMEINSAME REGELN): zu-kurze Karten von ~26 % auf ~8 % gefallen, Stichwort-Listen vollständig eliminiert.
+- **Tagesbilanz Live-Workshop 2026-05-27 vor Deploy:** 56 Jobs auf Single-Large-Pipeline, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Server-Median ~57 s, Client-End-to-End ~59 s. Zwei stille Verluste (deliveredAt=null) — bekannter offener Punkt zum Auslieferungs-Loch, unverändert; Datenschutz-Entscheidung des Inhabers bleibt: kein `localStorage` (geteilte Schul-Geräte).
+
+### Nicht geändert
+
+- **EN-Locale `singleLargePrompt`** wurde NICHT überarbeitet — bleibt der ursprüngliche Baustein-zusammengesetzte Prompt. Tech-Debt für eine spätere Iteration, wenn EN-Traffic relevant wird (heute fast ausschließlich `de-DE`/`de-AT`-Locale).
+- **3-Call-Pipeline-Bausteine** (`systemNormal`, `systemBoost`, `AGE_ANCHOR`, `GENDER_ANCHOR`) unverändert — Fallback bei Rückschalten des Feature-Flags `useSingleLargeCall` auf `false` verhält sich identisch zu rc2.
+
 ## [2.2.0-rc2] — 2026-05-24
 
 Kleinere Anpassungen am RC, bleibt prerelease. Single-Large-Pipeline weiterhin live aktiv hinter Feature-Flag.

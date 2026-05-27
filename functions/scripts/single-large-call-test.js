@@ -28,10 +28,14 @@ const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
 
+/* PROMPT_VARIANT=rc1 → testet den Kandidat-Prompt aus functions/scripts/prompts-v2.2.1-rc1.js
+   PROMPT_VARIANT=live (Default) → testet den aktuellen Live-Prompt. */
+const PROMPT_VARIANT = process.env.PROMPT_VARIANT === "rc1" ? "rc1" : "live";
+
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const INPUT_DIR = path.join(REPO_ROOT, "compare-input");
-const OUTPUT_JSON = path.join(REPO_ROOT, "single-large-call-results.json");
-const OUTPUT_HTML = path.join(REPO_ROOT, "single-large-call-result.html");
+const OUTPUT_JSON = path.join(REPO_ROOT, `single-large-call-results-${PROMPT_VARIANT}.json`);
+const OUTPUT_HTML = path.join(REPO_ROOT, `single-large-call-result-${PROMPT_VARIANT}.html`);
 
 const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
 const MODEL = "mistral-large-2512";
@@ -99,10 +103,14 @@ function pickTestImages(count = 3) {
  * Single-Large-Call-Prompt
  * ────────────────────────────────────────────────────────────────────────── */
 
-/* Holt den aktuellen Prompt aus dem Live-Locale-Modul — Single Source of Truth.
-   Damit testen wir IMMER gegen denselben Prompt wie Production. */
+/* Holt den Prompt — Default ist der Live-Prompt aus dem Locale (Production-identisch).
+   Mit PROMPT_VARIANT=rc1 wird stattdessen der Kandidat-Prompt geladen — getrennte
+   Output-Dateien, sodass beide Läufe nebeneinander ausgewertet werden können. */
 const LIVE_PROMPTS = require("../src/locales/de/prompts");
-const SINGLE_CALL_PROMPT_FROM_LOCALE = LIVE_PROMPTS.singleLargePrompt;
+const RC1_PROMPTS = require("./prompts-v2.2.1-rc1");
+const SINGLE_CALL_PROMPT_FROM_LOCALE =
+  PROMPT_VARIANT === "rc1" ? RC1_PROMPTS.singleLargePrompt : LIVE_PROMPTS.singleLargePrompt;
+console.log(`Prompt-Variante: ${PROMPT_VARIANT}  |  Output: single-large-call-result-${PROMPT_VARIANT}.html`);
 
 
 /* ──────────────────────────────────────────────────────────────────────────

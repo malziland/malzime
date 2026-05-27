@@ -10,7 +10,7 @@ Konsolidierter Single-Large-Prompt mit Sicherheits- und Qualitäts-Härtungen. V
 
 ### Geändert
 
-- **`singleLargePrompt` in `functions/src/locales/de/prompts.js` konsolidiert.** Bisher ein Template-Literal aus den 3-Call-Bausteinen (`systemNormal`/`systemBoost`/`AGE_ANCHOR`/`GENDER_ANCHOR`); jetzt ein eigenständiger Prompt mit gemeinsamen Regeln (GEMEINSAME REGELN-Block für beide Modi), geteilten Charakter-Pools (8 Bereiche mit STANDARD-Stärken, STANDARD-Schwächen und BEAST-Schwächen pro Bereich) und konsistenter „keine klaren Bildsignale"-Phrase als einheitlichem Ausweg für nicht-beurteilbare Felder. Die 3-Call-Pipeline-Bausteine bleiben unverändert; nur Single-Large hat ab rc3 einen getrennten Prompt-Text (Pflege-Notiz im Header der Datei).
+- **`singleLargePrompt` in beiden Locales (`functions/src/locales/de/prompts.js` UND `functions/src/locales/en/prompts.js`) konsolidiert.** Bisher ein Template-Literal aus den 3-Call-Bausteinen (`systemNormal`/`systemBoost`/`AGE_ANCHOR`/`GENDER_ANCHOR`); jetzt ein eigenständiger Prompt mit gemeinsamen Regeln (GEMEINSAME REGELN-Block für beide Modi), geteilten Charakter-Pools (8 Bereiche mit STANDARD-Stärken, STANDARD-Schwächen und BEAST-Schwächen pro Bereich) und konsistenter „keine klaren Bildsignale"-Phrase als einheitlichem Ausweg für nicht-beurteilbare Felder. Die 3-Call-Pipeline-Bausteine bleiben in beiden Locales unverändert; nur Single-Large hat ab rc3 einen getrennten Prompt-Text (Pflege-Notiz im Header beider Dateien — DE und EN sind ab jetzt parallel zu pflegen).
 - **Sicherheits-Klausel ergänzt:** Explizites Verbot sexualisierter Zuschreibungen bei Minderjährigen (war im Live-Prompt zuvor nicht codifiziert, sondern nur durch Mistrals Eigenvorsicht abgedeckt). Zentrale Schutzregel für Workshop-Tool mit Schüler:innen.
 - **Anti-Halluzinations-Härtungen:** „Erfinde KEINE Markennamen — nur real existierende Marken aus dem mitteleuropäischen Markt" in AD_TARGETING; expliziter Anti-Leakage-Block vor dem JSON-Schema („Übernimm NIEMALS die konkreten Beispiel-Inhalte wie Bikepacking oder Garmin Edge 1040, wenn das Foto sie nicht hergibt").
 - **Konsistenz-Pflicht zwischen Modi geschärft:** `hard_facts.alter_geschlecht` und `hard_facts.herkunft` müssen jetzt wortgenau in die jeweiligen Karten-Values übernommen werden (Satzanfang). A/B-Test zeigte: Substring-strikte Konsistenz 0 % → 100 %.
@@ -35,8 +35,11 @@ Konsolidierter Single-Large-Prompt mit Sicherheits- und Qualitäts-Härtungen. V
 
 ### Nicht geändert
 
-- **EN-Locale `singleLargePrompt`** wurde NICHT überarbeitet — bleibt der ursprüngliche Baustein-zusammengesetzte Prompt. Tech-Debt für eine spätere Iteration, wenn EN-Traffic relevant wird (heute fast ausschließlich `de-DE`/`de-AT`-Locale).
-- **3-Call-Pipeline-Bausteine** (`systemNormal`, `systemBoost`, `AGE_ANCHOR`, `GENDER_ANCHOR`) unverändert — Fallback bei Rückschalten des Feature-Flags `useSingleLargeCall` auf `false` verhält sich identisch zu rc2.
+- **3-Call-Pipeline-Bausteine** (`systemNormal`, `systemBoost`, `AGE_ANCHOR`, `GENDER_ANCHOR`) in beiden Locales unverändert — Fallback bei Rückschalten des Feature-Flags `useSingleLargeCall` auf `false` verhält sich identisch zu rc2.
+
+### Hinweis zur EN-Variante
+
+EN-Locale wurde strukturell parallel zur DE-Variante übersetzt (nicht separat A/B-getestet, da Live-Traffic >95 % de-DE/de-AT). Sollte EN-Traffic in Zukunft wachsen, wäre ein eigenständiger EN-A/B-Test gegen einen englischsprachigen Bilder-Pool sinnvoll. Beide Locales sind ab jetzt parallel zu pflegen.
 
 ## [2.2.0-rc2] — 2026-05-24
 

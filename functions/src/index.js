@@ -85,7 +85,7 @@ exports.admin = onRequest(
 exports.errors = onRequest(
   {
     region: "europe-west1",
-    memory: "128MiB",
+    memory: "256MiB",
     cors: ALLOWED_ORIGINS,
     invoker: "public",
     maxInstances: 3,
@@ -97,7 +97,7 @@ exports.errors = onRequest(
 exports.telemetry = onRequest(
   {
     region: "europe-west1",
-    memory: "128MiB",
+    memory: "256MiB",
     cors: ALLOWED_ORIGINS,
     invoker: "public",
     maxInstances: 3,

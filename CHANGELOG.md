@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.0] — 2026-05-28
+
+Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) ist damit abgeschlossen — die seit rc3 live laufende Architektur (Single-Large hinter Feature-Flag, Cloud-Tasks-Concurrency 10) wird unverändert zur stabilen Version erklärt. Zusätzlich zwei kleine Verbesserungen aus dem Betrieb: lesbarere Altersbeschreibungen und gehärtete Diagnose-Endpunkte.
+
+### Geändert
+
+- **Alterszeichen jetzt in Alltagssprache statt Fachbegriffen** (`singleLargePrompt` in beiden Locales). Neue Regel „ALTERSZEICHEN IN ALLTAGSSPRACHE" für beide Modi + entschärfte Few-Shot-Beispiele (profileText und Alterskarten in Standard und Beast): „Nasolabialfalten" → „die Falten von der Nase zu den Mundwinkeln", „Krähenfüße" → „feine Fältchen um die Augen" usw. **Die Alterskalibrierung selbst bleibt unangetastet** — die KI rechnet intern weiter mit den biometrischen Merkmalen, gibt sie aber laienverständlich aus. Hintergrund: im Live-Betrieb erschienen medizinische Fachbegriffe in den sichtbaren Profiltexten, die im Workshop-Kontext kaum lesbar waren.
+- **Speicherlimit `telemetry` und `errors` von 128 MiB auf 256 MiB** (`functions/src/index.js`). Am 2026-05-28 riss `telemetry` das 128-MiB-Limit (132 MiB genutzt) und stürzte mitten in einer Anfrage ab — dabei gehen Diagnose-Beacons still verloren. 256 MiB gibt Puffer über dem Node-24-/firebase-admin-Grundbedarf (gleiches Muster wie bei `jobStatus` bereits angewendet). Kostenneutral (bleibt im dauerhaft kostenlosen Kontingent).
+
+### Validiert
+
+- **Erster Werktag-Vormittag unter rc3** (2026-05-28, Do): 27 Jobs, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Job-Median ~50 s (P95 67 s). Echte Gleichzeitigkeit im Burst 08:02–08:14 CEST (~24 Uploads in ~12 Min) ohne Überlast. Damit ist das zuvor offene Werktags-Verhalten der Single-Large-Pipeline bestätigt.
+
 ## [2.2.0-rc3] — 2026-05-27
 
 Konsolidierter Single-Large-Prompt mit Sicherheits- und Qualitäts-Härtungen. Verhalten der Live-Pipeline (Single-Large hinter Feature-Flag) bleibt strukturell gleich; Prompt wurde gegen den RC2-Stand A/B-getestet (15 Bilder × 3 Läufe = 90 Mistral-Calls) und an den zwei messbaren Schwachpunkten nachgeschärft.

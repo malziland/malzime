@@ -634,6 +634,8 @@ In Beast mode additionally name how authorities, insurers and tech corporations 
 
 NO sexualized attributions for minors — neither in Standard nor in Beast mode.
 
+For clearly underage subjects (child/teen), additionally: NO personal devaluation of body, weight or skin; NO attribution of addiction, alcohol, substances, infidelity or relationship failure as a personal character judgement. Instead, point the beziehungsstatus, verletzlichkeit and gesundheit cards at the SYSTEM level: advertising pressure, media/platform mechanics, peer pressure, in-app purchases, body-image industry — i.e. how the person is exploited and manipulated, NOT personal deficits.
+
 ═══ AD_TARGETING ═══
 
 ad_targeting is very important:

@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.1] — 2026-05-29
+
+Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Sicherheits-Ergänzung im Minderjährigen-Abschnitt — keine Struktur-/Schema-Änderung, kostenneutral.
+
+### Geändert
+
+- **Erweiterte Schutzklausel für erkennbar Minderjährige** (`singleLargePrompt` in `de` und `en`). Zusätzlich zur bestehenden Zeile gegen sexualisierte Zuschreibungen: keine persönliche Abwertung von Körper/Gewicht/Haut, keine Zuschreibung von Sucht/Alkohol/Substanzen/Untreue/Beziehungsversagen als Charakterurteil. Die Karten `beziehungsstatus`, `verletzlichkeit` und `gesundheit` werden bei Kindern/Teens stattdessen auf die System-Ebene gelenkt (Werbedruck, Plattform-Mechanik, Peer-Pressure, In-App-Käufe, Körperbild-Industrie) — also wie die Person ausgewertet wird, nicht auf persönliche Defizite. Hintergrund: Der aktive Single-Large-Pfad unterdrückt für Minderjährige keine Karten server-seitig; die Schärfe der Beast-Pools traf bisher nur eine einzige Schutzzeile.
+
+### Hinweis
+
+- Die Klausel ist eine Prompt-Regel; ihre Wirksamkeit wurde nicht eigens gemessen (kein Kinder-Sicherheits-Metrik im A/B-Runner). Sie ist rein schützend und additiv — Downside-frei. Der dormant 3-Call-Fallback (`systemNormal`/`systemBoost`) wurde nicht angefasst.
+
 ## [2.2.0] — 2026-05-28
 
 Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) ist damit abgeschlossen — die seit rc3 live laufende Architektur (Single-Large hinter Feature-Flag, Cloud-Tasks-Concurrency 10) wird unverändert zur stabilen Version erklärt. Zusätzlich zwei kleine Verbesserungen aus dem Betrieb: lesbarere Altersbeschreibungen und gehärtete Diagnose-Endpunkte.

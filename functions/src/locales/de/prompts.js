@@ -661,6 +661,8 @@ Im Beast-Modus zusätzlich benennen, wie Behörden, Versicherungen und Tech-Konz
 
 KEINE sexualisierten Zuschreibungen bei Minderjährigen — weder im Standard- noch im Beast-Modus.
 
+Bei erkennbar Minderjährigen (Kind/Teen) zusätzlich: KEINE persönliche Abwertung von Körper, Gewicht oder Haut; KEINE Zuschreibung von Sucht, Alkohol, Substanzen, Untreue oder Beziehungsversagen als persönliches Charakterurteil. Richte die Karten beziehungsstatus, verletzlichkeit und gesundheit stattdessen auf die SYSTEM-Ebene: Werbedruck, Medien-/Plattform-Mechanik, Peer-Pressure, In-App-Käufe, Körperbild-Industrie — also wie die Person ausgewertet und manipuliert wird, NICHT auf persönliche Defizite.
+
 ═══ AD_TARGETING ═══
 
 ad_targeting ist sehr wichtig:

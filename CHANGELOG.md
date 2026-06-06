@@ -12,10 +12,12 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
 
 - **PRIV-002 — Datenschutz-Warnung + Tier-Easter-Egg im aktiven Single-Large-Pfad reaktiviert (deployt).** Der seit v2.2.0 live laufende Single-Large-Pfad speiste die OCR-Datenschutzwarnung („das hast du ungewollt verraten" — Adresse/Telefon) und die Tier-Erkennung aus `buildPseudoDescription`, das keine `SUBJECT:`-/`Sichtbarer Text:`-Marker enthält — die Warnung feuerte daher **nie**, das Tier-Easter-Egg war tot. Fix (rein additiv, fallback-sicher): zwei Pflichtfelder `subject` + `visible_text` im `singleLargePrompt` (DE + EN), `runSingleLargeCall` liest sie aus, `handle-process-job` verdrahtet sie zu den erwarteten Markern. Live gegen Mistral verifiziert (Felder kommen durch, Profile bleiben vollständig); neuer Regressions-Test `handle-process-job-priv002.test.js`. Rollback: `featureFlags/current.useSingleLargeCall=false`.
 - **PRIV-001 — `.gitignore`-Lücke geschlossen.** Ungetrackte Test-Artefakte (`ab-test-*`, `single-large-call-*-rc*`, `compare-prototype-home.html`) mit aus echten Testbildern abgeleiteten Profilen (inkl. Minderjähriger) waren von keinem Ignore-Muster erfasst — ein `git add -A` hätte sie ins öffentliche Repo committet. Breite Schutzmuster ergänzt, Profil-Ausgaben aus dem Repo entfernt (lokal gesichert), Forschungs-Skripte bewusst ignoriert.
+- **NTFY-001 — selbst-gehosteter `ntfy`-Benachrichtigungs-Server abgesichert + aktualisiert.** War öffentlich erreichbar und anonym lesbar (Image v2.22.0, außerhalb des Repos) → die Limit-Benachrichtigungen mit Admin-Aktionslinks waren für Fremde mitlesbar. Jetzt: eigenes Image auf **ntfy v2.24.0** (via Cloud Build), Passwortschutz (`NTFY_AUTH_DEFAULT_ACCESS=write-only` — die App sendet weiterhin ohne Änderung, Lesen nur mit Konto `malzime` + Passwort aus Secret `ntfy-owner-pass`), iPhone-Push über die Apple-Weiterleitung (`upstream-base-url` + `base-url`) live verifiziert. Rollback: Server-Env auf `read-write`.
 
 ### Geändert (Härtung)
 
 - **OPS-003 — GitHub-Actions auf Commit-SHA gepinnt** (`ci.yml`: checkout, setup-node, gitleaks, lighthouse; `dependabot-automerge.yml`: fetch-metadata). Schutz gegen Tag-Repointing auf Schadcode.
+- **gitleaks-action auf v3.0.0 aktualisiert** (SHA-gepinnt). v3 läuft nativ auf Node 24 — der frühere `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`-Workaround entfällt; v2 wird mit der Node-20-Abschaltung im September 2026 unbrauchbar. (Erledigt PR #24.)
 - **OPS-002 — Dependabot-Auto-Merge auf semver patch+minor begrenzt** (fetch-metadata-Gate). Major-Updates brauchen jetzt manuelle Freigabe.
 - **OPS-001 — GCS-Lifecycle-Setup in `deploy.sh` dokumentiert** (wird von `firebase deploy` nicht ausgerollt; Bucket-Regel als aktiv verifiziert).
 - **DOC — Doku-Drift korrigiert:** `throttle.js` in README/AGENTS als AKTIV beschrieben (war fälschlich „nicht angebunden"); Rate-Limit 200 → 500; Sprachstatus DE+EN; `config.js`-Modell-Kommentar an aktiven Stand (`mistral-small-2603`); LICENSE-Copyright auf aktuellen Firmennamen; `deploy.yml`-Verweis → `dependabot-automerge.yml`.
@@ -27,10 +29,9 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
 
 ### Offen (für einen Folge-Lauf)
 
-- **NTFY-001 (P2):** öffentlich erreichbaren, anonym lesbaren, ungewarteten `ntfy`-Server (Image v2.22.0, außerhalb des Repos) absichern oder stilllegen.
 - **BUG-001 / PRIV-003 / PRIV-004 / UX-001 / BIZ-001 (P3):** Job-Zustandsmaschine + Timeout, jobStatus-Abruf-Token, kürzere Profil-Retention, iOS-Liveness-Fenster, Stundenzähler beim Erfolg statt beim Upload.
 - **DOC-Rest:** Single-Large-Architektur in README/ARCHITECTURE/SETUP beschreiben; Test-Zahlen aktualisieren (Backend real 428).
-- **6 offene Dependabot-PRs** (#24–#29) zur Sichtung; #24 (gitleaks-action v3, Major) getrennt prüfen.
+- **Dependabot-PRs #25–#29** (patch/minor) mergen per Auto-Merge selbst durch; #24 (gitleaks v3) wurde manuell übernommen (s. o.).
 
 ## [2.2.1] — 2026-05-29
 

@@ -624,7 +624,7 @@ describe("runSingleLargeCall", () => {
     }));
 
     const result = await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
-    expect(result).toEqual({ normal: null, boost: null });
+    expect(result).toEqual({ normal: null, boost: null, subject: "", visibleText: "" });
   });
 
   test("propagates rate_limit code so caller can mark blocked.overloaded", async () => {

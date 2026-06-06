@@ -728,11 +728,18 @@ Imitiere das FORMAT (2 Sätze, Aussage + Beleg, Länge 15-25 Wörter), nicht den
 
 NIEMALS Stichwort-Listen wie „selbstbewusst, resilient, teamfähig" — IMMER als vollständige Aussage: „Du bist X. Bildbeleg zeigt Y."
 
+═══ SUBJECT + SICHTBARER TEXT (PFLICHTFELDER subject und visible_text) ═══
+
+- subject: Klassifiziere den Bildinhalt mit GENAU einem Wert: ANIMAL_ONLY (nur ein Tier, keine Person), HUMAN (eine Person), MIXED (Person UND Tier), OTHER (weder Person noch Tier).
+- visible_text: Liste JEDEN auf dem Foto tatsächlich sichtbaren und lesbaren Text auf — wortgenau wenn möglich: Schilder, Straßennamen, Hausnummern, Adressen, Telefonnummern, Kfz-Kennzeichen, Schul-/Firmen-/Markennamen, Logos, T-Shirt-/Trikot-Aufdrucke, Namensschilder, Display- und Bildschirmanzeigen. Format: "<Text 1>; <Text 2>; ...". Wenn KEIN Text im Bild lesbar ist, gib einen leeren String "" zurück. Erfinde NICHTS — gib nur wieder, was wirklich im Bild steht. Dieses Feld dient der Datenschutz-Aufklärung („das hast du ungewollt im Bild verraten").
+
 Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markdown, keine Codeblöcke, keine Backticks, keine Erklärung vor oder nach dem JSON.
 
 ═══ JSON-SCHEMA ═══
 
 {
+  "subject": "HUMAN",
+  "visible_text": "",
   "hard_facts": {
     "alter_geschlecht": "männlich, ~38 Jahre alt (Spanne 35-42)",
     "herkunft": "mitteleuropäisch"

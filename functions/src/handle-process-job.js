@@ -189,18 +189,23 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
     else pipelineError = true;
   }
 
-  /* Pseudo-Beschreibung für classifyDescription / extractVisibleText.
-     Der Single-Large-Call liefert kein separates description-Feld; die
-     Heuristiken brauchen aber irgendetwas zum Lesen. Wir geben ihnen den
-     gesamten Standard-profileText + alle Karten-Werte als String. Reicht für
-     Tier-Erkennung (Wörter wie "Hund", "Katze") und groben sichtbaren Text. */
+  /* v2.2.x (Audit PRIV-002): Der Single-Large-Call liefert subject + visible_text
+     jetzt direkt im JSON. Wir bauen daraus eine synthetische Beschreibung mit den
+     Markern, die classifyDescription ("SUBJECT:") und extractVisibleText
+     ("Sichtbarer Text:") erwarten — so funktionieren das Tier-Easter-Egg UND die
+     Datenschutz-Warnung ("das hast du ungewollt verraten") im Single-Large-Pfad
+     wieder. Fallback: fehlen die Felder (alter Prompt), bleibt es beim bisherigen
+     Pseudo-Description-Verhalten (kein Regress). */
   const pseudoDescription = buildPseudoDescription(profiles.normal);
-  const { subject, hasPerson, hasAnimal, animalType } = classifyDescription(pseudoDescription);
-  const visibleText = extractVisibleText(pseudoDescription);
-  const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: pseudoDescription });
+  const subjectLine = profiles.subject ? `SUBJECT: ${profiles.subject}\n` : "";
+  const visibleLine = profiles.visibleText ? `\nSichtbarer Text: ${profiles.visibleText}` : "";
+  const enrichedDescription = `${subjectLine}${pseudoDescription}${visibleLine}`;
+  const { subject, hasPerson, hasAnimal, animalType } = classifyDescription(enrichedDescription);
+  const visibleText = extractVisibleText(enrichedDescription);
+  const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: enrichedDescription });
 
   /* Tier-Easter-Egg: Nur reines Tier-Bild → vordefinierte Profile. */
-  if (pseudoDescription && !hasPerson && hasAnimal) {
+  if (enrichedDescription && !hasPerson && hasAnimal) {
     const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
     return {
       result: {

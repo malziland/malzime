@@ -739,7 +739,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang) 
     }
   }
 
-  if (!parsed) return { normal: null, boost: null };
+  if (!parsed) return { normal: null, boost: null, subject: "", visibleText: "" };
 
   /* Hard-Facts server-seitig in beide Modi überschreiben — exakt wie in
      generateBothProfiles. Mistral kann die Vorgabe ignorieren; hier garantieren
@@ -765,9 +765,17 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang) 
     };
   }
 
+  /* v2.2.x (Audit PRIV-002): subject + visible_text aus dem KI-JSON mitgeben,
+     damit die Datenschutz-Warnung + das Tier-Easter-Egg im Single-Large-Pfad
+     wieder funktionieren (server-seitige Verdrahtung in handle-process-job.js). */
+  const subject = typeof parsed.subject === "string" ? parsed.subject.trim().toUpperCase().slice(0, 20) : "";
+  const visibleText = typeof parsed.visible_text === "string" ? parsed.visible_text.slice(0, 500) : "";
+
   return {
     normal: buildProfile("standard"),
     boost: buildProfile("beast"),
+    subject,
+    visibleText,
   };
 }
 

@@ -701,11 +701,18 @@ Imitate the FORMAT (2 sentences, statement + evidence, length 15-25 words), not 
 
 NEVER keyword lists like "self-confident, resilient, team-oriented" — ALWAYS as complete statement: "You are X. Visible Y shows Z."
 
+═══ SUBJECT + VISIBLE TEXT (MANDATORY FIELDS subject and visible_text) ═══
+
+- subject: Classify the image content with EXACTLY one value: ANIMAL_ONLY (one animal, no person), HUMAN (one person), MIXED (person AND animal), OTHER (neither person nor animal).
+- visible_text: List EVERY text actually visible and readable in the photo — verbatim when possible: signs, street names, house numbers, addresses, phone numbers, license plates, school/company/brand names, logos, T-shirt/jersey prints, name tags, display and screen readouts. Format: "<text 1>; <text 2>; ...". If NO text is readable in the image, return an empty string "". Invent NOTHING — only reproduce what is actually in the image. This field powers the privacy-awareness warning ("you accidentally revealed this in the image").
+
 Reply NOW with the JSON object, beginning with { and ending with }. No markdown, no code blocks, no backticks, no explanation before or after the JSON.
 
 ═══ JSON SCHEMA ═══
 
 {
+  "subject": "HUMAN",
+  "visible_text": "",
   "hard_facts": {
     "alter_geschlecht": "male, ~38 years old (range 35-42)",
     "herkunft": "central european"

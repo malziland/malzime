@@ -1,0 +1,46 @@
+name: Auto-Release aus CHANGELOG
+
+# Legt automatisch einen GitHub-Release an, sobald im CHANGELOG oben eine neue
+# stabile Version (x.y.z) steht und das auf main landet. Manuell ausloesbar ueber
+# "Run workflow". Idempotent: existiert der Tag schon, passiert nichts.
+
+on:
+  push:
+    branches: [main]
+    paths: ["CHANGELOG.md"]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Neueste CHANGELOG-Version pruefen und Release anlegen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Oberste stabile Version (x.y.z, keine -rc) aus dem CHANGELOG holen
+          VERSION="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ' || true)"
+          if [ -z "$VERSION" ]; then
+            echo "Keine stabile Version oben im CHANGELOG gefunden — nichts zu tun."
+            exit 0
+          fi
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG existiert bereits — nichts zu tun."
+            exit 0
+          fi
+          # Release-Notizen = der Abschnitt genau dieser Version
+          awk -v v="## [$VERSION]" '
+            index($0, v)==1 {f=1; next}
+            /^## \[/ {if (f) exit}
+            f {print}
+          ' CHANGELOG.md > notes.md
+          echo "Lege Release $TAG an ..."
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md
+          echo "Fertig: $TAG"

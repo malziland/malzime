@@ -21,3 +21,20 @@ loadtest-results-*.json
 loadtest-run.log
 single-large-call-result.html
 single-large-call-results.json
+
+# A/B- und Single-Large-Test-Outputs — enthalten aus echten Testbildern
+# abgeleitete Profile und dürfen NIE ins öffentliche Repo. Breite Muster,
+# damit auch künftige Namensvarianten (-rc1, -v2, _final …) erfasst werden.
+ab-test-*.json
+ab-test-*.md
+single-large-call-result*.html
+single-large-call-results*.json
+single-large-call-result-*.html
+single-large-call-results-*.json
+compare-prototype*.html
+compare-result*.json
+
+# Forschungs-/Prototyp-Skripte: bleiben lokal nutzbar, werden aber NICHT
+# automatisch committet (bewusst mit `git add -f` einzeln freizugeben).
+functions/scripts/prompts-candidate-*.js
+functions/scripts/single-large-ab-runner-v2.js

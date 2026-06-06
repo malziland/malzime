@@ -4,6 +4,34 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.2] — 2026-06-06
+
+Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverlässigkeit, Architektur, OSS, Lieferkette) mit Multi-Agent-Prüfung, adversarialer Gegenprüfung und Live-Verifikation gegen die echten Cloud-Dienste. **Keine ausnutzbare Sicherheitslücke (0× P0).** Die Codebasis ist solide; dieser Release bündelt eine funktionale Reparatur (PRIV-002, deployt) und mehrere Härtungen in Repository, CI/CD und Doku.
+
+### Behoben
+
+- **PRIV-002 — Datenschutz-Warnung + Tier-Easter-Egg im aktiven Single-Large-Pfad reaktiviert (deployt).** Der seit v2.2.0 live laufende Single-Large-Pfad speiste die OCR-Datenschutzwarnung („das hast du ungewollt verraten" — Adresse/Telefon) und die Tier-Erkennung aus `buildPseudoDescription`, das keine `SUBJECT:`-/`Sichtbarer Text:`-Marker enthält — die Warnung feuerte daher **nie**, das Tier-Easter-Egg war tot. Fix (rein additiv, fallback-sicher): zwei Pflichtfelder `subject` + `visible_text` im `singleLargePrompt` (DE + EN), `runSingleLargeCall` liest sie aus, `handle-process-job` verdrahtet sie zu den erwarteten Markern. Live gegen Mistral verifiziert (Felder kommen durch, Profile bleiben vollständig); neuer Regressions-Test `handle-process-job-priv002.test.js`. Rollback: `featureFlags/current.useSingleLargeCall=false`.
+- **PRIV-001 — `.gitignore`-Lücke geschlossen.** Ungetrackte Test-Artefakte (`ab-test-*`, `single-large-call-*-rc*`, `compare-prototype-home.html`) mit aus echten Testbildern abgeleiteten Profilen (inkl. Minderjähriger) waren von keinem Ignore-Muster erfasst — ein `git add -A` hätte sie ins öffentliche Repo committet. Breite Schutzmuster ergänzt, Profil-Ausgaben aus dem Repo entfernt (lokal gesichert), Forschungs-Skripte bewusst ignoriert.
+
+### Geändert (Härtung)
+
+- **OPS-003 — GitHub-Actions auf Commit-SHA gepinnt** (`ci.yml`: checkout, setup-node, gitleaks, lighthouse; `dependabot-automerge.yml`: fetch-metadata). Schutz gegen Tag-Repointing auf Schadcode.
+- **OPS-002 — Dependabot-Auto-Merge auf semver patch+minor begrenzt** (fetch-metadata-Gate). Major-Updates brauchen jetzt manuelle Freigabe.
+- **OPS-001 — GCS-Lifecycle-Setup in `deploy.sh` dokumentiert** (wird von `firebase deploy` nicht ausgerollt; Bucket-Regel als aktiv verifiziert).
+- **DOC — Doku-Drift korrigiert:** `throttle.js` in README/AGENTS als AKTIV beschrieben (war fälschlich „nicht angebunden"); Rate-Limit 200 → 500; Sprachstatus DE+EN; `config.js`-Modell-Kommentar an aktiven Stand (`mistral-small-2603`); LICENSE-Copyright auf aktuellen Firmennamen; `deploy.yml`-Verweis → `dependabot-automerge.yml`.
+
+### Validiert (Live-Verifikation, read-only)
+
+- `processJob` nicht öffentlich (IAM korrekt, kein `allUsers`); GCS-Löschregel aktiv (Bilder zusätzlich sofort nach Analyse gelöscht — die 24 h betreffen nur das Text-Profil-Dokument, nicht das Foto); Branch-Protection aktiv (Pflicht-Checks + `strict`); alle Firestore-Indizes `READY`; 24-h-Reaper räumt zuverlässig.
+- 428 Backend-Tests grün, Lint + Prettier grün.
+
+### Offen (für einen Folge-Lauf)
+
+- **NTFY-001 (P2):** öffentlich erreichbaren, anonym lesbaren, ungewarteten `ntfy`-Server (Image v2.22.0, außerhalb des Repos) absichern oder stilllegen.
+- **BUG-001 / PRIV-003 / PRIV-004 / UX-001 / BIZ-001 (P3):** Job-Zustandsmaschine + Timeout, jobStatus-Abruf-Token, kürzere Profil-Retention, iOS-Liveness-Fenster, Stundenzähler beim Erfolg statt beim Upload.
+- **DOC-Rest:** Single-Large-Architektur in README/ARCHITECTURE/SETUP beschreiben; Test-Zahlen aktualisieren (Backend real 428).
+- **6 offene Dependabot-PRs** (#24–#29) zur Sichtung; #24 (gitleaks-action v3, Major) getrennt prüfen.
+
 ## [2.2.1] — 2026-05-29
 
 Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Sicherheits-Ergänzung im Minderjährigen-Abschnitt — keine Struktur-/Schema-Änderung, kostenneutral.

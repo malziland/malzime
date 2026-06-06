@@ -5,6 +5,7 @@
 jest.mock("../counter", () => ({
   getMaintenanceStatus: jest.fn(),
   checkAndIncrement: jest.fn(),
+  releaseHourlySlot: jest.fn(() => Promise.resolve()),
 }));
 jest.mock("../middleware", () => ({
   getClientIp: jest.fn(() => "1.2.3.4"),
@@ -165,14 +166,19 @@ describe("handleEnqueue — Erfolgsfall", () => {
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
     expect(res.statusCode).toBe(200);
-    expect(res.body).toEqual({ jobId: "job-abc" });
+    expect(res.body.jobId).toBe("job-abc");
+    /* PRIV-003: enqueue gibt zusätzlich ein Abhol-Ticket zurück. */
+    expect(typeof res.body.resultToken).toBe("string");
+    expect(res.body.resultToken.length).toBeGreaterThan(0);
     expect(storage.storeImage).toHaveBeenCalledTimes(1);
-    expect(jobs.createJob).toHaveBeenCalledWith({
-      lang: "de",
-      traceId: null,
-      imagePath: "queue-uploads/test.jpg",
-      exif: {},
-    });
+    expect(jobs.createJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lang: "de",
+        traceId: null,
+        imagePath: "queue-uploads/test.jpg",
+        exif: {},
+      })
+    );
     expect(tasks.enqueueJob).toHaveBeenCalledWith("job-abc");
   });
 

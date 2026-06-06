@@ -176,3 +176,50 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
     expect(jobs.markDelivered).not.toHaveBeenCalled();
   });
 });
+
+/* ── PRIV-003: Abhol-Ticket (resultToken) ───────────────────────── */
+
+describe("handleJobStatus — PRIV-003 Abhol-Ticket", () => {
+  const doneJob = (extra = {}) => ({
+    id: "job-1",
+    status: "done",
+    result: { profileText: "geheim" },
+    resultToken: "ticket-abc",
+    createdAt: 1000,
+    finishedAt: 5000,
+    ...extra,
+  });
+
+  test("richtiges Ticket → Ergebnis wird zurückgegeben", async () => {
+    jobs.getJob.mockResolvedValue(doneJob());
+    const res = makeRes();
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
+    expect(res.body.status).toBe("done");
+    expect(res.body.result).toEqual({ profileText: "geheim" });
+  });
+
+  test("falsches Ticket → KEIN Ergebnis (tokenRequired), kein markDelivered", async () => {
+    jobs.getJob.mockResolvedValue(doneJob());
+    const res = makeRes();
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "falsch" } }, res);
+    expect(res.body.status).toBe("done");
+    expect(res.body.result).toBeNull();
+    expect(res.body.tokenRequired).toBe(true);
+    expect(jobs.markDelivered).not.toHaveBeenCalled();
+  });
+
+  test("fehlendes Ticket → KEIN Ergebnis", async () => {
+    jobs.getJob.mockResolvedValue(doneJob());
+    const res = makeRes();
+    await handleJobStatus(getReq("job-1"), res);
+    expect(res.body.result).toBeNull();
+    expect(res.body.tokenRequired).toBe(true);
+  });
+
+  test("Alt-Job ohne resultToken → Ergebnis bleibt abwärtskompatibel abrufbar", async () => {
+    jobs.getJob.mockResolvedValue(doneJob({ resultToken: null }));
+    const res = makeRes();
+    await handleJobStatus(getReq("job-1"), res);
+    expect(res.body.result).toEqual({ profileText: "geheim" });
+  });
+});

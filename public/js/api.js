@@ -440,6 +440,7 @@ const ENQUEUE_URL = "/api/enqueue";
 const JOB_STATUS_URL = "/api/job-status";
 const POLL_INTERVAL_MS = 2000;
 const JOB_ID_STORAGE_KEY = "malzime.queueJobId";
+const JOB_TOKEN_STORAGE_KEY = "malzime.queueResultToken"; /* PRIV-003: Abhol-Ticket */
 /* Aufeinanderfolgende job-status-Fehler, die der Poll-Loop toleriert, bevor
    er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
    das Ergebnis liegt serverseitig sicher. */
@@ -449,9 +450,11 @@ const MAX_POLL_FAILURES = 5;
    Ausfall) — dann nicht endlos pollen, sondern sauber abbrechen. */
 const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
 
-function storeJobId(jobId) {
+function storeJobId(jobId, resultToken) {
   try {
     sessionStorage.setItem(JOB_ID_STORAGE_KEY, jobId);
+    /* PRIV-003: Abhol-Ticket zusammen mit der jobId merken (überlebt Reload/Tab). */
+    if (resultToken) sessionStorage.setItem(JOB_TOKEN_STORAGE_KEY, resultToken);
   } catch (_) {
     /* sessionStorage kann im privaten Modus werfen — kein harter Fehler. */
   }
@@ -460,6 +463,7 @@ function storeJobId(jobId) {
 function clearStoredJobId() {
   try {
     sessionStorage.removeItem(JOB_ID_STORAGE_KEY);
+    sessionStorage.removeItem(JOB_TOKEN_STORAGE_KEY);
   } catch (_) {
     /* dito */
   }
@@ -469,6 +473,15 @@ function clearStoredJobId() {
 export function getStoredJobId() {
   try {
     return sessionStorage.getItem(JOB_ID_STORAGE_KEY);
+  } catch (_) {
+    return null;
+  }
+}
+
+/** PRIV-003: Gibt das gespeicherte Abhol-Ticket zurück (oder null). */
+function getStoredResultToken() {
+  try {
+    return sessionStorage.getItem(JOB_TOKEN_STORAGE_KEY);
   } catch (_) {
     return null;
   }
@@ -508,7 +521,7 @@ function waitForNextPoll(ms) {
  * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
  *          — oder null, wenn ein neuer Upload den Lauf abgelöst hat.
  */
-async function pollJob(jobId, myId) {
+async function pollJob(jobId, myId, resultToken) {
   let failures = 0;
   const pollStart = Date.now();
   for (;;) {
@@ -522,7 +535,8 @@ async function pollJob(jobId, myId) {
 
     let data;
     try {
-      const resp = await fetch(`${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}`);
+      const tokenParam = resultToken ? `&token=${encodeURIComponent(resultToken)}` : "";
+      const resp = await fetch(`${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}${tokenParam}`);
       if (!resp.ok) {
         /* 404 = Job existiert nicht (mehr) — kein transienter Fehler. */
         if (resp.status === 404) return { error: t("error.queueFailed") };
@@ -722,10 +736,12 @@ async function analyzeImageQueued() {
       setStatus(t("error.queueFailed"), traceId);
       return;
     }
-    storeJobId(jobId);
+    /* PRIV-003: Abhol-Ticket vom Server merken + bei jedem Poll mitschicken. */
+    const resultToken = enqueueData.resultToken || null;
+    storeJobId(jobId, resultToken);
 
     /* ── Auf das Ergebnis pollen (jeder Poll = Liveness-Herzschlag) ── */
-    const outcome = await pollJob(jobId, myId);
+    const outcome = await pollJob(jobId, myId, resultToken);
     if (state.requestId !== myId) return;
 
     clearStoredJobId();
@@ -796,6 +812,8 @@ async function analyzeImageQueued() {
 export async function resumeQueueJob() {
   const jobId = getStoredJobId();
   if (!jobId || state.isAnalyzing) return;
+  /* PRIV-003: das gespeicherte Abhol-Ticket mitnehmen (überlebt den Reload). */
+  const resultToken = getStoredResultToken();
 
   state.isAnalyzing = true;
   const myId = ++state.requestId;
@@ -810,7 +828,7 @@ export async function resumeQueueJob() {
   elements.scanText.textContent = "";
 
   try {
-    const outcome = await pollJob(jobId, myId);
+    const outcome = await pollJob(jobId, myId, resultToken);
     if (state.requestId !== myId) return;
 
     clearStoredJobId();

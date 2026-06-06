@@ -104,8 +104,15 @@ const QUEUE_UPLOAD_PREFIX = "queue-uploads/";
    schreibt bei jedem Poll `lastSeenAt`), gilt der Client als weg → der Job
    wird `abandoned` und kostet keinen Mistral-Call. Großzügig bemessen, weil
    iOS Tabs beim App-Wechsel/Display-Sperren einfriert und das Pollen
-   pausiert, ohne dass der Nutzer wirklich weg ist. */
-const LIVENESS_GRACE_MS = 3 * 60 * 1000;
+   pausiert, ohne dass der Nutzer wirklich weg ist.
+
+   UX-001 (Audit 2026-06): von 3 auf 8 Minuten angehoben. Im Workshop legen
+   Schüler:innen das Handy oft länger weg (Pause, App-Wechsel, Display-Sperre);
+   3 Min waren zu knapp und ließen Jobs sterben, obwohl der Nutzer nur kurz weg
+   war. 8 Min deckt realistische Abwesenheiten ab. Kostenneutral — ein
+   abandoned Job macht ohnehin keinen Mistral-Call; es wird nur der Bild-
+   Zwischenspeicher + der Warteschlangen-Platz etwas länger gehalten. */
+const LIVENESS_GRACE_MS = 8 * 60 * 1000;
 
 /* Schätzwerte für die Warteschlangen-ETA im job-status-Endpoint:
    durchschnittliche Verarbeitungsdauer pro Job und Anzahl parallel
@@ -128,9 +135,15 @@ const QUEUE_DISPATCH_CONCURRENCY = 10;
    Abschluss das fertige Profil im Feld `result`; danach wird es nicht mehr
    gebraucht (der Client hat es längst abgeholt). Der Reaper löscht jedes
    Job-Dokument, das älter als das hier ist — Datensparsamkeit, damit nichts
-   unbegrenzt liegen bleibt. 24 h sind großzügig über jedem realistischen
-   Abhol-Zeitfenster (Poll dauert Minuten, Reload-Wiederaufnahme Sekunden). */
-const JOB_RETENTION_MS = 24 * 60 * 60 * 1000;
+   unbegrenzt liegen bleibt.
+
+   PRIV-004 (Audit 2026-06): von 24 h auf 2 h gesenkt. Das Job-Dokument enthält
+   das fertige Profil einer (oft minderjährigen) Person — Datensparsamkeit
+   verlangt, es nicht länger als nötig zu halten. Ein realer Job lebt Sekunden
+   bis Minuten; 2 h decken jedes realistische Reload-/Abhol-Fenster großzügig ab
+   (Poll dauert Minuten, Reload-Wiederaufnahme Sekunden), reduzieren die
+   Aufbewahrung der abgeleiteten Profile aber um das 12-fache. */
+const JOB_RETENTION_MS = 2 * 60 * 60 * 1000;
 
 /* Lokal-Modus für den Firebase-Emulator (Phase 3): Da es für Google Cloud
    Tasks keinen Emulator gibt, werden im Lokal-Modus Cloud Tasks und der

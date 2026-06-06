@@ -18,8 +18,12 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /* ── Mistral-Modelle ──
    Describe-Stage via Large 3 (gute Bilderkennung),
-   Profile-Stage via Small 3.2 (siehe v1.10.7-Note unten),
+   Profile-Stage via Small 4 = mistral-small-2603 (aktive Konstante unten),
    Mistral-internes Fallback bei Profile-Versagen: Large 3.
+
+   STAND HEUTE: aktiv ist mistral-small-2603 (siehe MISTRAL_PROFILE_MODEL). Die
+   folgende v1.10.7-Notiz zum Wechsel auf -2506 ist HISTORISCH und entspricht
+   nicht mehr dem aktiven Stand (2506 wird von Mistral zurueckgezogen).
 
    Preise pro 1M Tokens (Stand 2026-05):
      - mistral-large-latest: $0.50 / $1.50  in/out

@@ -32,7 +32,7 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 - **Easter Egg**: Tierfotos bekommen ein lustiges Spass-Profil
 - **PDF-Export**: Ergebnisse als PDF speichern (fuer Workshop-Diskussionen)
 - **Demo-Fotos**: 3 anklickbare Stock-Fotos mit Fake-EXIF fuer Workshops (echte KI-Analyse, kein vorgefertigtes Ergebnis)
-- **Mehrsprachig vorbereitet**: i18n-System fuer UI, Prompts und Tierprofile (aktuell Deutsch)
+- **Mehrsprachig**: i18n-System fuer UI, Prompts und Tierprofile (Deutsch + Englisch aktiv)
 - **Wartungsmodus**: Admin-gesteuerter Wartungsmodus mit rotem Warn-Modal (blockiert Seite komplett)
 - **Queue-Architektur**: Cloud-Tasks-Warteschlange faengt Workshop-Lastspitzen ab (seit v2.0)
 - **Kein Tracking**: Keine Cookies, keine Analytics, keine Werbung, keine dauerhafte Speicherung
@@ -71,14 +71,14 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
   mistral.js                Mistral AI Hybrid: Large 3 Describe + Small 4 Profile-Generierung
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
-  throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (bereit, nicht angebunden)
+  throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
   animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
   privacy.js                OCR-Privacy-Risiken aus Mistrals "Sichtbarer Text"
   counter.js                Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance
   auth.js                   HMAC-basierte Admin-Token + Nonces
   domains.js                Zentrale CORS-/Origin-Whitelist
   notify.js                 ntfy Push-Benachrichtigungen bei Limit-Erreichung
-  middleware.js             Rate Limiting (IP-basiert, 200/10min), IP-Extraktion
+  middleware.js             Rate Limiting (IP-basiert, 500/10min), IP-Extraktion
   upload.js                 Multipart- und JSON-Body-Parsing
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
@@ -200,7 +200,7 @@ Im Queue-Betrieb (Feature-Flag `useQueue`) nutzt das Frontend statt `/analyze` z
 - **X-Content-Type-Options: nosniff**
 - **Magic-Byte-Validierung**: Server prueft JPEG/PNG/WebP/GIF-Header
 - **Honeypot-Feld** gegen Bots
-- **Rate Limiting**: 200 Requests / 10 Minuten pro IP
+- **Rate Limiting**: 500 Requests / 10 Minuten pro IP
 - **Timing-Check**: Requests innerhalb von 2s nach Seitenaufruf werden verzoegert
 - **Prompt-Injection-Schutz**: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
 - **HMAC-Admin-Tokens**: Kurzlebige signierte Tokens (30 Min) + Nonces (5 Min) fuer Admin-Aktionen

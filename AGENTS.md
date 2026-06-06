@@ -43,7 +43,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
   mistral.js         Mistral AI Hybrid: Large 3 (Describe, multimodal) + Small 4 (Profile, text-only)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
-  throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (gebaut + getestet, noch nicht angebunden)
+  throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
@@ -66,7 +66,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   scripts/           Dev-Tools (test-subject.js — Tiererkennung gegen echte Bilder pruefen)
 
 docs/                Setup-Dokumentation
-.github/             CI/CD Workflows (ci.yml, deploy.yml)
+.github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml)
 ```
 
 ## Build, Test, and Development Commands

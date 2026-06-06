@@ -10,6 +10,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# ── Einmaliges Infra-Setup (NICHT Teil des regulaeren Deploys) ──
+# Die GCS-Lifecycle-Regel, die zwischengespeicherte Bilder als Sicherheitsnetz
+# nach 1 Tag loescht, wird von `firebase deploy` NICHT mit ausgerollt. Sie muss
+# beim ersten Setup (oder einem Bucket-Neuaufbau) EINMAL gesetzt werden:
+#   gsutil lifecycle set storage-lifecycle.json gs://malzime-queue-uploads
+# Pruefen:  gsutil lifecycle get gs://malzime-queue-uploads
+# (Stand 2026-06-06 verifiziert: Regel am Produktiv-Bucket aktiv.)
+
 # ── Cache-Busting-Version generieren (sekundengenau, eindeutig pro Deploy) ──
 VERSION=$(date +"%Y%m%d%H%M%S")
 echo "Cache-Busting-Version: ?v=$VERSION"

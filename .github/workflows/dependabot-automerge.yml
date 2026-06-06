@@ -11,9 +11,18 @@ jobs:
     runs-on: ubuntu-latest
     if: github.actor == 'dependabot[bot]'
     steps:
-      - uses: actions/checkout@v6
+      - name: Dependabot-Metadaten holen
+        id: meta
+        uses: dependabot/fetch-metadata@21025c705c08248db411dc16f3619e6b5f9ea21a # v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Enable auto-merge
+      # Auto-Merge NUR fuer patch + minor. Major-Updates (und alles andere)
+      # brauchen bewusste manuelle Freigabe — verhindert, dass ein groesserer
+      # oder kompromittierter Versionssprung ungeprueft auf main landet
+      # (Supply-Chain-Haertung, Audit OPS-002).
+      - name: Auto-Merge (nur patch + minor)
+        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

@@ -63,7 +63,7 @@ Seit v1.6.0 nutzt malziME ausschliesslich Mistral AI (Paris, EU) als KI-Anbieter
 
 ## Uebersetzungen
 
-malziME hat ein vollstaendiges i18n-System — aktuell ist nur Deutsch verfuegbar. So fuegst du eine neue Sprache hinzu:
+malziME hat ein vollstaendiges i18n-System — aktuell sind Deutsch und Englisch verfuegbar. So fuegst du eine weitere Sprache hinzu:
 
 ### Frontend (UI-Strings)
 

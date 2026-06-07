@@ -17,6 +17,7 @@
 
 const { QUEUE_AVG_JOB_SECONDS, QUEUE_DISPATCH_CONCURRENCY } = require("./config");
 const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
+const { safeCompare } = require("./auth");
 
 /* Grobe Wartezeit-Schätzung aus der Warteschlangen-Position.
    Kalibrierung der Konstanten erfolgt in Phase 3/4 (config.js). */
@@ -35,6 +36,10 @@ async function handleJobStatus(req, res) {
     res.status(400).json({ error: "Missing jobId" });
     return;
   }
+  /* PRIV-003: Abhol-Ticket fürs Ergebnis (vom enqueue an genau diesen Browser
+     ausgegeben). Status/Position bleiben ohne Ticket abrufbar; nur das fertige
+     `result` ist an das Ticket gebunden. */
+  const token = req.query && typeof req.query.token === "string" ? req.query.token : "";
 
   let job = await getJob(jobId);
   if (!job) {
@@ -70,6 +75,13 @@ async function handleJobStatus(req, res) {
   }
 
   if (job.status === "done") {
+    /* PRIV-003: das fertige Profil nur an den Browser herausgeben, der das
+       Abhol-Ticket besitzt. Alt-Jobs ohne resultToken (vor diesem Stand
+       angelegt) bleiben abwärtskompatibel offen. */
+    if (job.resultToken && !safeCompare(token, job.resultToken)) {
+      res.status(200).json({ status: "done", result: null, tokenRequired: true });
+      return;
+    }
     /* Auslieferungs-Messung (Diagnose): Beim ERSTEN Ausliefern eines fertigen
        Jobs den Zeitpunkt festhalten und die Auslieferungs-Lücke loggen —
        `deliveryGapMs` = fertig gerechnet → tatsächlich beim Client angekommen,

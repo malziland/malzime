@@ -29,10 +29,16 @@ const { LIVENESS_GRACE_MS, JOB_RETENTION_MS } = require("./config");
 const JOBS_COLLECTION = "jobs";
 
 /* Ein Job, der länger als das hier in `processing` hängt, gilt als verloren
-   (Worker abgestürzt o.ä.) und wird von `markFailedIfStale` auf `failed`
-   gesetzt, damit kein Client ewig pollt. Großzügig über dem Cloud-Function-
-   Timeout (540s) angesetzt. */
-const PROCESSING_TIMEOUT_MS = 10 * 60 * 1000;
+   (Worker abgestürzt o.ä.) und wird auf `failed` gesetzt, damit kein Client
+   ewig pollt.
+   BUG-001 (Audit 2026-06): von 600s auf 540s gesenkt = exakt das Cloud-
+   Function-Timeout. Ein Job kann nicht länger als 540s legitim in `processing`
+   sein (Cloud Run killt den Worker dann). Bei 600s blieb der Job nach einem
+   Worker-Kill bis zu 60s länger als „wird verarbeitet" hängen. Das globale
+   Pipeline-Budget (REQUEST_BUDGET_MS=480s) liegt darunter, daher werden echte
+   Jobs (≈480s + Overhead) NICHT fälschlich gescheitert — und die jetzt
+   bedingten Statusübergänge (s. completeJob/failJob) verhindern jede Race. */
+const PROCESSING_TIMEOUT_MS = 9 * 60 * 1000;
 
 function jobsRef() {
   return getFirestore().collection(JOBS_COLLECTION);
@@ -48,7 +54,7 @@ function jobsRef() {
  * @param {object} [params.exif]     sanitisierte Kamera-Metadaten (make/model),
  *                                   die der Worker an die Profil-Stufe weiterreicht
  */
-async function createJob({ lang, traceId, imagePath, exif }) {
+async function createJob({ lang, traceId, imagePath, exif, resultToken }) {
   const ref = jobsRef().doc();
   const now = Date.now();
   await ref.set({
@@ -62,6 +68,10 @@ async function createJob({ lang, traceId, imagePath, exif }) {
     traceId: traceId || null,
     imagePath: imagePath || null,
     exif: exif && typeof exif === "object" ? exif : {},
+    /* PRIV-003 (Audit 2026-06): zweites Schloss auf das Ergebnis. Nur wer dieses
+       Ticket hat (der Browser, der den Job angelegt hat), bekommt von job-status
+       das `result` zurück — nicht jeder, der die jobId kennt. */
+    resultToken: resultToken || null,
     result: null,
     errorReason: null,
     attempts: 0,
@@ -108,30 +118,45 @@ async function claimJob(jobId) {
 }
 
 /**
- * Schließt einen Job erfolgreich ab: `processing` → `done` mit Ergebnis.
+ * Schließt einen Job erfolgreich ab: NUR `processing` → `done` mit Ergebnis.
+ *
+ * BUG-001 (Audit 2026-06): bedingter Übergang in einer Transaktion. Ein
+ * nachlaufender Worker, dessen Job inzwischen vom Reaper auf `failed`/`abandoned`
+ * gesetzt wurde, überschreibt diesen Terminalzustand NICHT mehr.
+ * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
 async function completeJob(jobId, result) {
-  await jobsRef()
-    .doc(jobId)
-    .update({
-      status: "done",
-      finishedAt: Date.now(),
-      result: result || null,
-      errorReason: null,
-    });
+  const db = getFirestore();
+  const ref = db.collection(JOBS_COLLECTION).doc(jobId);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.data().status !== "processing") return false;
+    tx.update(ref, { status: "done", finishedAt: Date.now(), result: result || null, errorReason: null });
+    return true;
+  });
 }
 
 /**
- * Markiert einen Job als gescheitert: → `failed` mit Grund.
+ * Markiert einen Job als gescheitert: NUR aus `queued`/`processing` → `failed`.
+ *
+ * BUG-001: bedingt — ein bereits `done`/`abandoned` Job wird NICHT überschrieben.
+ * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
 async function failJob(jobId, reason) {
-  await jobsRef()
-    .doc(jobId)
-    .update({
+  const db = getFirestore();
+  const ref = db.collection(JOBS_COLLECTION).doc(jobId);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return false;
+    const st = snap.data().status;
+    if (st !== "queued" && st !== "processing") return false;
+    tx.update(ref, {
       status: "failed",
       finishedAt: Date.now(),
       errorReason: typeof reason === "string" ? reason.slice(0, 300) : "unknown",
     });
+    return true;
+  });
 }
 
 /**
@@ -164,8 +189,12 @@ async function markFailedIfStale(job) {
   if (!job || job.status !== "processing") return job;
   const startedAt = job.startedAt || job.createdAt || 0;
   if (Date.now() - startedAt < PROCESSING_TIMEOUT_MS) return job;
-  await failJob(job.id, "processing_timeout");
-  return { ...job, status: "failed", errorReason: "processing_timeout" };
+  const failed = await failJob(job.id, "processing_timeout");
+  if (failed) return { ...job, status: "failed", errorReason: "processing_timeout" };
+  /* BUG-001: failJob hat NICHT gegriffen — der Job ist inzwischen terminal
+     (z.B. der Worker hat doch noch `done` geschrieben). Frischen Stand lesen,
+     statt fälschlich „failed" zu melden. */
+  return (await getJob(job.id)) || job;
 }
 
 /* ── Client-Liveness ──────────────────────────────────────────────── */
@@ -196,9 +225,15 @@ async function markDelivered(jobId) {
  * eingesparter Lauf (kein Mistral-Call).
  */
 async function abandonJob(jobId) {
-  await jobsRef().doc(jobId).update({
-    status: "abandoned",
-    finishedAt: Date.now(),
+  const db = getFirestore();
+  const ref = db.collection(JOBS_COLLECTION).doc(jobId);
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    /* BUG-001: nur einen noch `queued` Job verlassen — ein inzwischen in
+       Verarbeitung gegangener (oder fertiger) Job wird NICHT abgewürgt. */
+    if (!snap.exists || snap.data().status !== "queued") return false;
+    tx.update(ref, { status: "abandoned", finishedAt: Date.now() });
+    return true;
   });
 }
 

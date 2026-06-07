@@ -18,11 +18,12 @@
  * Strategie) — dann wird der synchrone Pfad vollständig entfernt.
  */
 
+const crypto = require("crypto");
 const { ALLOWED_MIME, MAX_UPLOAD_BYTES } = require("./config");
 const { getClientIp, checkRateLimit } = require("./middleware");
 const { parseMultipart, parseJsonBody } = require("./upload");
 const { resolveLanguage } = require("./i18n");
-const { checkAndIncrement, getMaintenanceStatus } = require("./counter");
+const { checkAndIncrement, getMaintenanceStatus, releaseHourlySlot } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 const { createJob, failJob } = require("./jobs");
@@ -170,7 +171,10 @@ async function handleEnqueue(req, res, secrets) {
 
     /* ── Bild ablegen → Job anlegen → in Cloud Tasks einreihen ── */
     const imagePath = await storeImage(file.buffer, file.mimeType);
-    const jobId = await createJob({ lang, traceId, imagePath, exif });
+    /* PRIV-003: Abhol-Ticket fürs Ergebnis — nur dieser Browser bekommt es von
+       job-status zurück (zweites Schloss zusätzlich zur unerratbaren jobId). */
+    const resultToken = crypto.randomUUID();
+    const jobId = await createJob({ lang, traceId, imagePath, exif, resultToken });
 
     try {
       await enqueueJob(jobId);
@@ -180,13 +184,15 @@ async function handleEnqueue(req, res, secrets) {
          `failed` markieren und das Bild gleich wieder löschen. */
       console.log(JSON.stringify({ requestId, traceId, jobId, warning: "enqueue-failed", error: err.message }));
       await failJob(jobId, "enqueue_failed");
+      /* BIZ-001: Slot zurückgeben — dieser Job löst nie eine echte Analyse aus. */
+      releaseHourlySlot().catch(() => {});
       await deleteImage(imagePath);
       res.status(503).json({ error: "Queue unavailable", code: "enqueue_failed" });
       return;
     }
 
     console.log(JSON.stringify({ requestId, traceId, jobId, step: "enqueue", status: "ok" }));
-    res.status(200).json({ jobId });
+    res.status(200).json({ jobId, resultToken });
   } catch (err) {
     const status = err.status || 500;
     const code = err.code || "unknown_error";

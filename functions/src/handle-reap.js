@@ -35,6 +35,7 @@ const {
   deleteJob,
 } = require("./jobs");
 const { deleteImage } = require("./queue-storage");
+const { releaseHourlySlot } = require("./counter");
 
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
    dass ein extremer Rückstau einen Lauf überlange macht. Der nächste Lauf
@@ -47,7 +48,9 @@ async function reapJobs() {
   let reapedAbandoned = 0;
   for (const job of abandoned) {
     try {
-      await abandonJob(job.id);
+      const ok = await abandonJob(job.id);
+      /* BIZ-001: Stunden-Slot zurückgeben — verlassener Job machte nie eine Analyse. */
+      if (ok) await releaseHourlySlot();
       await deleteImage(job.imagePath);
       reapedAbandoned += 1;
     } catch (err) {

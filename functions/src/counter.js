@@ -293,6 +293,36 @@ async function resetCounter() {
   await ref.set({ recentAnalyses: [], limit: HOURLY_LIMIT }, { merge: true });
 }
 
+/**
+ * BIZ-001 (Audit 2026-06): Gibt EINEN belegten Slot im rollenden Stundenfenster
+ * wieder frei. Der Stundenzähler wird beim enqueue gezogen; Jobs, die danach
+ * abgebrochen werden (abandoned) oder gar nicht in die Queue kamen
+ * (enqueue_failed), haben aber NIE eine echte Mistral-Analyse ausgelöst. Ohne
+ * Freigabe würden solche „Phantom-Analysen" das globale Budget verbrauchen und
+ * echte Nutzer früher als nötig aussperren. Entfernt den jüngsten
+ * recentAnalyses-Eintrag in einer Transaktion. Fail-safe: bei Fehler passiert
+ * nichts (das Limit bleibt dann konservativ — kostet nur etwas Verfügbarkeit).
+ */
+async function releaseHourlySlot() {
+  try {
+    const db = getFirestore();
+    const ref = db.doc(CURRENT_DOC);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const arr = snap.data().recentAnalyses;
+      if (!Array.isArray(arr) || arr.length === 0) return;
+      const normalized = arr.map((ts) => (ts && ts.toMillis ? ts.toMillis() : ts));
+      let maxIdx = 0;
+      for (let i = 1; i < normalized.length; i++) if (normalized[i] > normalized[maxIdx]) maxIdx = i;
+      normalized.splice(maxIdx, 1);
+      tx.update(ref, { recentAnalyses: normalized });
+    });
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "release-slot-error", error: err.message }));
+  }
+}
+
 /* ── Maintenance-Modus (Kill-Switch) ── */
 
 let maintenanceCache = { data: null, expiresAt: 0 };
@@ -346,6 +376,7 @@ module.exports = {
   getStats,
   boostLimit,
   resetCounter,
+  releaseHourlySlot,
   getMaintenanceStatus,
   setMaintenanceMode,
   _clearMaintenanceCache,

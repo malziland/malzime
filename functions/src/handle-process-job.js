@@ -30,7 +30,7 @@
 const { REQUEST_BUDGET_MS, isLocalQueueMode, localQueueConcurrency } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
-const { incrementTotals } = require("./counter");
+const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
@@ -311,7 +311,10 @@ async function handleProcessJob(req, res) {
      Dann gar nicht erst Mistral aufrufen — Job auf `abandoned` setzen, Bild
      löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
   if (isAbandoned(job)) {
-    await abandonJob(jobId);
+    const didAbandon = await abandonJob(jobId);
+    /* BIZ-001: nur freigeben, wenn DIESER Aufruf den Job wirklich verlassen hat
+       (sonst Doppel-Freigabe, falls der Reaper parallel war). */
+    if (didAbandon) releaseHourlySlot().catch(() => {});
     await deleteImage(job.imagePath);
     console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
     res.status(200).json({ ok: false, reason: "abandoned" });

@@ -58,8 +58,15 @@ jobs:
 
   test-e2e:
     runs-on: ubuntu-latest
-    # Hartes Job-Limit, damit ein haengender Schritt nie wieder bis zum
-    # 6h-GitHub-Maximum laeuft (`--with-deps` blieb genau dort haengen).
+    # Offizielles Playwright-Image mit VORINSTALLIERTEM Chromium (Browser-Version
+    # exakt passend zu @playwright/test 1.59.1). Damit entfaellt der
+    # fehleranfaellige Browser-Download von cdn.playwright.dev komplett — der
+    # blieb in der CI zuverlaessig nach dem 100%-Download beim Entpacken/
+    # Finalisieren haengen und blockierte als Pflicht-Check JEDEN PR.
+    # WICHTIG: Bei einem Minor-Update von @playwright/test (z.B. 1.59 -> 1.60)
+    # muss dieser Image-Tag mitgezogen werden, sonst passt der Browser nicht mehr.
+    container:
+      image: mcr.microsoft.com/playwright:v1.59.1-jammy
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
@@ -71,22 +78,6 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm ci
-      # Chromium-Browser fuer Playwright installieren. Dieser Schritt hing in der
-      # CI schon zweimal: erst `--with-deps` an apt (bis 6h), danach blieb auch
-      # der reine Browser-Download von cdn.playwright.dev minutenlang stehen
-      # (CDN-Stall) und lief erst ins Job-Timeout — DAS war der Grund, warum
-      # Dependabot-PRs nie durchkamen (e2e ist Pflicht-Check). Loesung: jeder
-      # Download-Versuch bekommt ein hartes 4-Minuten-Limit; bei Haenger bis zu
-      # 3 Versuche. Ein gesunder Download ist in ~30s durch.
-      - name: Chromium installieren (Timeout + Retry gegen CDN-Download-Haenger)
-        run: |
-          for i in 1 2 3; do
-            timeout 240 npx playwright install chromium && exit 0
-            echo "Versuch $i: Chromium-Download haengt/abgebrochen — neuer Versuch in 5s ..."
-            sleep 5
-          done
-          echo "::error::Chromium-Download nach 3 Versuchen fehlgeschlagen (cdn.playwright.dev)"
-          exit 1
       - run: npm run test:e2e
 
   lighthouse:

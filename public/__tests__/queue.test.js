@@ -236,4 +236,25 @@ describe("Queue-Modus", () => {
     expect(elements.status.textContent).toBe("");
     expect(getStoredJobId()).toBeNull();
   });
+
+  it("resumeQueueJob überspringt den Hinweis-Dialog, wenn er für den Job schon bestätigt war", async () => {
+    sessionStorage.setItem("malzime.queueJobId", "job-acked");
+    sessionStorage.setItem("malzime.queueDisclaimerAcked", "job-acked");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "done", result: DONE_RESULT }));
+    const p = resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(6000);
+    await p;
+    /* Kein disclaimerConfirm.click() nötig — direkt gerendert, weil schon bestätigt. */
+    expect(renderCurrentMode).toHaveBeenCalled();
+  });
+
+  it("resumeQueueJob zeigt den Foto-gelöscht-Datenschutzhinweis statt des Fotos", async () => {
+    sessionStorage.setItem("malzime.queueJobId", "job-note");
+    sessionStorage.setItem("malzime.queueDisclaimerAcked", "job-note");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "done", result: DONE_RESULT }));
+    const p = resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(6000);
+    await p;
+    expect(elements.imagePreview.querySelector(".photo-deleted-note")).not.toBeNull();
+  });
 });

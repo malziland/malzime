@@ -33,6 +33,8 @@
   "maintenance.text": "malziME is currently in maintenance mode. Please try again later.",
   "maintenance.button": "Reload page",
   "preview.alt": "Preview",
+  "reload.photoTitle": "Your photo is already deleted.",
+  "reload.photoBody": "We delete it right after the analysis — good for your privacy. Only your profile below was kept briefly for you.",
   "scan.messages": [
     "Face detected…",
     "Clothing being analyzed…",

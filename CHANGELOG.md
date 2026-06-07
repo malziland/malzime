@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.6] — 2026-06-07
+
+Weiterer Feinschliff der Reload-Erfahrung (zwei Punkte aus dem Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 157 Frontend-Tests grün.
+
+### Behoben
+
+- **Der „Nichts davon ist wahr"-Hinweis erscheint beim Reload nicht erneut.** Hat man ihn beim ersten Ergebnis bereits bestätigt (weggeklickt), wird er beim Neuladen übersprungen — pro Job gemerkt, überlebt den Reload. Beim allerersten Anzeigen und bei jedem neuen Upload erscheint er wie gehabt. (`public/js/api.js`)
+
+### Geändert (bewusste Datenschutz-Entscheidung)
+
+- **Das hochgeladene Foto wird nach einem Reload bewusst NICHT wiederhergestellt — und das wird zum sichtbaren Datenschutz-Lerneffekt.** Das Foto wird unmittelbar nach der Analyse gelöscht und absichtlich nirgends — auch nicht im Browser — zwischengespeichert. An die Stelle, wo das Foto war, tritt nach dem Reload ein kurzer, positiver Hinweis: „Dein Foto ist schon gelöscht — gut für deine Privatsphäre." Zweisprachig (DE/EN), als Klasse `photo-deleted-note`. Das passt zur Bildungs-Mission des Tools: Datensparsamkeit sichtbar machen statt verstecken. (`public/js/api.js`, `public/styles.css`, `public/locales/de.json`, `public/locales/en.json`)
+
 ## [2.2.5] — 2026-06-07
 
 Feinschliff der Reload-Wiederherstellung aus v2.2.4 (zwei UX-Reparaturen nach Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.

@@ -441,6 +441,9 @@ const JOB_STATUS_URL = "/api/job-status";
 const POLL_INTERVAL_MS = 2000;
 const JOB_ID_STORAGE_KEY = "malzime.queueJobId";
 const JOB_TOKEN_STORAGE_KEY = "malzime.queueResultToken"; /* PRIV-003: Abhol-Ticket */
+/* Merkt, für welchen Job der „Nichts davon ist wahr"-Hinweis schon bestätigt
+   wurde — überlebt den Reload, damit der Dialog nicht erneut aufpoppt. */
+const JOB_DISCLAIMER_ACK_KEY = "malzime.queueDisclaimerAcked";
 /* Aufeinanderfolgende job-status-Fehler, die der Poll-Loop toleriert, bevor
    er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
    das Ergebnis liegt serverseitig sicher. */
@@ -464,6 +467,7 @@ function clearStoredJobId() {
   try {
     sessionStorage.removeItem(JOB_ID_STORAGE_KEY);
     sessionStorage.removeItem(JOB_TOKEN_STORAGE_KEY);
+    sessionStorage.removeItem(JOB_DISCLAIMER_ACK_KEY);
   } catch (_) {
     /* dito */
   }
@@ -482,6 +486,24 @@ export function getStoredJobId() {
 function getStoredResultToken() {
   try {
     return sessionStorage.getItem(JOB_TOKEN_STORAGE_KEY);
+  } catch (_) {
+    return null;
+  }
+}
+
+/** Merkt, dass der Hinweis-Dialog für diesen Job bestätigt wurde. */
+function setStoredDisclaimerAck(jobId) {
+  try {
+    sessionStorage.setItem(JOB_DISCLAIMER_ACK_KEY, jobId);
+  } catch (_) {
+    /* dito */
+  }
+}
+
+/** Gibt zurück, für welchen Job der Hinweis-Dialog schon bestätigt wurde. */
+function getStoredDisclaimerAck() {
+  try {
+    return sessionStorage.getItem(JOB_DISCLAIMER_ACK_KEY);
   } catch (_) {
     return null;
   }
@@ -582,7 +604,40 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
  * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie der Sync-Pfad
  * (Disclaimer-Modal → renderCurrentMode → Success-Telemetrie).
  */
-function renderQueueResult(data, myId, traceId, timings) {
+/* DATENSCHUTZ-ENTSCHEIDUNG (bewusst): Nach einem Reload zeigen wir das
+   hochgeladene Foto NICHT wieder. Es wird unmittelbar nach der Analyse
+   serverseitig gelöscht und absichtlich NIRGENDS — auch nicht im Browser —
+   zwischengespeichert; Datensparsamkeit hat Vorrang. Statt einer leeren Lücke
+   setzen wir an die Stelle des Fotos einen kurzen, positiven Datenschutz-
+   Hinweis: der „verschwundene" Anblick wird so zum Lerneffekt. */
+function showPhotoDeletedNotice() {
+  if (!elements.imagePreview) return;
+  const note = document.createElement("div");
+  note.className = "photo-deleted-note";
+  note.setAttribute("role", "note");
+
+  /* Das Schloss-Symbol kommt rein dekorativ aus dem CSS (::before) — so bleibt
+     kein hartcodierter Text im JS (i18n-Guardian), und Screenreader lesen es
+     nicht vor. Der eigentliche Text läuft über t() (DE/EN). */
+  const text = document.createElement("span");
+  text.className = "photo-deleted-text";
+  const strong = document.createElement("strong");
+  strong.textContent = t("reload.photoTitle");
+  text.appendChild(strong);
+  text.appendChild(document.createTextNode(" " + t("reload.photoBody")));
+
+  note.appendChild(text);
+  elements.imagePreview.innerHTML = "";
+  elements.imagePreview.appendChild(note);
+}
+
+/**
+ * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie der Sync-Pfad
+ * (Disclaimer-Modal → renderCurrentMode → Success-Telemetrie). Bei einem
+ * Reload-Resume eines bereits bestätigten Ergebnisses wird der Disclaimer
+ * übersprungen (skipDisclaimer); die jobId dient dazu, die Bestätigung zu merken.
+ */
+function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) {
   if (!data) {
     setStatus(t("error.queueFailed"), traceId);
     return;
@@ -599,7 +654,7 @@ function renderQueueResult(data, myId, traceId, timings) {
   }
 
   const renderStart = Date.now();
-  showDisclaimerModal(() => {
+  const finishRender = () => {
     if (state.requestId !== myId) return;
     state.lastData = data;
     renderCurrentMode(data);
@@ -608,6 +663,9 @@ function renderQueueResult(data, myId, traceId, timings) {
     setTimeout(() => {
       if (elements.resultsPanel) elements.resultsPanel.focus({ preventScroll: true });
     }, 300);
+    /* Hinweis-Dialog für genau diesen Job als bestätigt merken → ein Reload
+       zeigt ihn nicht erneut (der User hat ihn ja schon weggeklickt). */
+    if (jobId) setStoredDisclaimerAck(jobId);
     const meta = data.meta || {};
     logTelemetry("analyze-success", {
       traceId,
@@ -621,7 +679,15 @@ function renderQueueResult(data, myId, traceId, timings) {
         queue: true,
       },
     });
-  });
+  };
+
+  /* Bereits bestätigt (Reload eines schon gesehenen Ergebnisses) → direkt
+     rendern, kein erneuter Hinweis-Dialog. Sonst wie gehabt mit Dialog. */
+  if (skipDisclaimer) {
+    finishRender();
+  } else {
+    showDisclaimerModal(finishRender);
+  }
 }
 
 async function analyzeImageQueued() {
@@ -781,7 +847,8 @@ async function analyzeImageQueued() {
        Eintrag vom nächsten Upload; ist der Job serverseitig schon weg, räumt
        resumeQueueJob beim nächsten Seitenstart still auf. */
     timings.totalMs = Date.now() - analyzeStartTime;
-    renderQueueResult(outcome.result, myId, traceId, timings);
+    /* Erste Anzeige nach dem Upload → Hinweis-Dialog wie gewohnt zeigen. */
+    renderQueueResult(outcome.result, myId, traceId, timings, jobId, false);
   } catch (err) {
     if (state.requestId !== myId) return;
     stopScanAnim();
@@ -861,7 +928,21 @@ export async function resumeQueueJob() {
     /* Erfolg: Ticket behalten, damit auch ein weiterer Reload das Ergebnis
        wieder zeigt (bis zum nächsten Upload oder bis der Job serverseitig
        abläuft). */
-    renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime });
+    /* Foto ist nach dem Reload weg (Datenschutz, s. showPhotoDeletedNotice) →
+       an seine Stelle den positiven Datenschutz-Hinweis setzen. */
+    showPhotoDeletedNotice();
+    /* Hinweis-Dialog nur zeigen, wenn er für genau diesen Job noch NICHT
+       bestätigt wurde — sonst (User hat ihn beim ersten Ergebnis schon
+       weggeklickt) direkt rendern. */
+    const disclaimerAlreadyAcked = getStoredDisclaimerAck() === jobId;
+    renderQueueResult(
+      outcome.result,
+      myId,
+      traceId,
+      { totalMs: Date.now() - startTime },
+      jobId,
+      disclaimerAlreadyAcked
+    );
   } catch (err) {
     if (state.requestId !== myId) return;
     clearStoredJobId();

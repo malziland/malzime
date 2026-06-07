@@ -35,6 +35,8 @@
   "maintenance.button": "Seite neu laden",
 
   "preview.alt": "Vorschau",
+  "reload.photoTitle": "Dein Foto ist schon gelöscht.",
+  "reload.photoBody": "Direkt nach der Analyse löschen wir es — gut für deine Privatsphäre. Nur dein Profil unten lag noch kurz für dich bereit.",
 
   "scan.messages": [
     "Gesicht erkannt…",

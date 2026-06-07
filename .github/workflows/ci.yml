@@ -58,6 +58,9 @@ jobs:
 
   test-e2e:
     runs-on: ubuntu-latest
+    # Hartes Job-Limit, damit ein haengender Schritt nie wieder bis zum
+    # 6h-GitHub-Maximum laeuft (`--with-deps` blieb genau dort haengen).
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
 
@@ -68,7 +71,10 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      # Browser-only Install. `--with-deps` ruft `apt` auf und hing in der CI bis
+      # zum 6h-Limit; die GitHub-ubuntu-Runner haben die Chromium-Systemlibs eh
+      # vorinstalliert.
+      - run: npx playwright install chromium
       - run: npm run test:e2e
 
   lighthouse:

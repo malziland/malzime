@@ -223,6 +223,15 @@ h1 {
   display: none;
 }
 
+/* Das Ergebnis-Panel bekommt nach dem Schließen des Hinweis-Dialogs
+   programmatisch den Fokus, damit Screenreader direkt beim Ergebnis landen.
+   Den sichtbaren Standard-Fokusrahmen um das GANZE Panel unterdrücken — er
+   wirkt sonst wie eine versehentliche blaue Auswahl. tabindex=-1 ⇒ per Tastatur
+   ohnehin nicht erreichbar, die A11y-Fokusansage bleibt erhalten. */
+#resultsPanel:focus {
+  outline: none;
+}
+
 .image-preview img {
   width: 50%;
   border-radius: 14px;

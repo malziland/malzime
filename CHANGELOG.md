@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.5] — 2026-06-07
+
+Feinschliff der Reload-Wiederherstellung aus v2.2.4 (zwei UX-Reparaturen nach Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.
+
+### Behoben
+
+- **Kein langer „Nachdenk"-Balken mehr beim Reload.** `resumeQueueJob` fragt den Job-Status jetzt sofort ab (ohne den 2-Sekunden-Vorlauf des regulären Poll-Takts) — ein bereits fertiges Ergebnis erscheint in ~0,3 s statt nach 2 s, die Scan-Animation blitzt nur noch kurz auf. (`public/js/api.js`)
+- **Kein blauer „Auswahl"-Rahmen mehr um das Ergebnis.** Das Ergebnis-Panel bekommt aus Barrierefreiheits-Gründen nach dem Hinweis-Dialog programmatisch den Fokus; der sichtbare Standard-Fokusrahmen ums ganze Panel (sah wie eine versehentliche Auswahl aus) wird jetzt unterdrückt — die Screenreader-Fokusansage bleibt erhalten. (`public/styles.css`)
+
+### Hinweis
+
+- Das hochgeladene Foto erscheint nach einem Reload bewusst NICHT wieder: Es wird aus Datenschutzgründen sofort gelöscht und nirgends zwischengespeichert. Das Ergebnis-Profil (serverseitig bis 2 h, ticket-geschützt) kommt zurück, das Foto nicht; das leere Vorschau-Feld kollabiert sauber.
+
 ## [2.2.4] — 2026-06-07
 
 Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte und der Doku mit dem aktuellen Stand (Single-Large-Pipeline, 2-h-Aufbewahrung aus v2.2.3). Reiner Hosting-/Doku-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.

@@ -521,12 +521,19 @@ function waitForNextPoll(ms) {
  * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
  *          — oder null, wenn ein neuer Upload den Lauf abgelöst hat.
  */
-async function pollJob(jobId, myId, resultToken) {
+async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
   let failures = 0;
+  let firstPoll = true;
   const pollStart = Date.now();
   for (;;) {
     if (state.requestId !== myId) return null;
-    await waitForNextPoll(POLL_INTERVAL_MS);
+    /* Beim Reload-Resume sofort EINMAL fragen statt erst nach 2s — ein bereits
+       fertiges Ergebnis ist dann in ~0,3s da, der „Nachdenk"-Balken blitzt nur
+       kurz auf statt 2s zu laufen. Danach normaler 2s-Takt. */
+    if (!(firstPoll && pollImmediately)) {
+      await waitForNextPoll(POLL_INTERVAL_MS);
+    }
+    firstPoll = false;
     if (state.requestId !== myId) return null;
     /* Hängt der Job dauerhaft → nicht endlos weiterpollen. */
     if (Date.now() - pollStart > MAX_POLL_DURATION_MS) {
@@ -835,7 +842,8 @@ export async function resumeQueueJob() {
   elements.scanText.textContent = "";
 
   try {
-    const outcome = await pollJob(jobId, myId, resultToken);
+    /* pollImmediately=true: das fertige Ergebnis sofort holen, ohne 2s-Vorlauf. */
+    const outcome = await pollJob(jobId, myId, resultToken, true);
     if (state.requestId !== myId) return;
 
     stopScanAnim();

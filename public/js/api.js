@@ -744,17 +744,18 @@ async function analyzeImageQueued() {
     const outcome = await pollJob(jobId, myId, resultToken);
     if (state.requestId !== myId) return;
 
-    clearStoredJobId();
     stopScanAnim();
     elements.scanText.textContent = "";
 
     if (!outcome) return;
 
     if (outcome.abandoned) {
+      clearStoredJobId();
       setStatus(t("error.queueAbandoned"), traceId);
       return;
     }
     if (outcome.error) {
+      clearStoredJobId();
       setStatus(outcome.error, traceId);
       logClientError(new Error(outcome.reason || "queue_failed"), {
         phase: "queue-poll",
@@ -766,6 +767,12 @@ async function analyzeImageQueued() {
       return;
     }
 
+    /* Erfolg: jobId + Abhol-Ticket bewusst NICHT löschen. So holt ein Reload
+       der Seite das Ergebnis erneut ab — es liegt serverseitig noch bis zu 2 h
+       (PRIV-004) und ist durch das Ticket geschützt. Das ist der häufigste
+       „Mein Profil ist nach dem Neuladen weg"-Fall. Überschrieben wird der
+       Eintrag vom nächsten Upload; ist der Job serverseitig schon weg, räumt
+       resumeQueueJob beim nächsten Seitenstart still auf. */
     timings.totalMs = Date.now() - analyzeStartTime;
     renderQueueResult(outcome.result, myId, traceId, timings);
   } catch (err) {
@@ -831,25 +838,28 @@ export async function resumeQueueJob() {
     const outcome = await pollJob(jobId, myId, resultToken);
     if (state.requestId !== myId) return;
 
-    clearStoredJobId();
     stopScanAnim();
     elements.scanText.textContent = "";
 
-    if (!outcome) return;
-    if (outcome.abandoned) {
-      setStatus(t("error.queueAbandoned"), traceId);
+    /* Resume ist eine stille Hintergrund-Wiederherstellung beim Seitenstart.
+       Ist der Job weg oder fehlgeschlagen (abgelaufen / abgebrochen / nach 2 h
+       serverseitig gelöscht → 404), den User NICHT mit einer Fehlermeldung
+       erschrecken: still aufräumen und die normale Startseite zeigen. */
+    if (!outcome || outcome.abandoned || outcome.error) {
+      clearStoredJobId();
+      setStatus("");
       return;
     }
-    if (outcome.error) {
-      setStatus(outcome.error, traceId);
-      return;
-    }
+    /* Erfolg: Ticket behalten, damit auch ein weiterer Reload das Ergebnis
+       wieder zeigt (bis zum nächsten Upload oder bis der Job serverseitig
+       abläuft). */
     renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime });
   } catch (err) {
     if (state.requestId !== myId) return;
+    clearStoredJobId();
     stopScanAnim();
     elements.scanText.textContent = "";
-    setStatus(t("error.networkError"), traceId);
+    setStatus(""); /* stiller Fehler beim Seitenstart — kein Banner */
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });
   } finally {
     if (state.requestId === myId) state.isAnalyzing = false;

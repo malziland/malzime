@@ -69,7 +69,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket
   feature-flags.js          Laufzeit-Feature-Flag `useQueue` (Firestore, 30s-Cache)
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
-  mistral.js                Mistral AI Hybrid: Large 3 Describe + Small 4 Profile-Generierung
+  mistral.js                Mistral AI: aktiv Single-Large-Call (Large erstellt Beschreibung + beide Profile); 3-Call-Hybrid (Large Describe + Small Profile) als Fallback
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
   animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
@@ -93,7 +93,7 @@ Workshop-Last ist stossweise: 25 Uploads in zwei Minuten. Damit kein Upload an d
 - **`/api/enqueue`** legt einen Job an und reiht ihn in **Google Cloud Tasks** ein. Das Bild liegt waehrenddessen kurz in einem dedizierten EU-Storage-Bucket.
 - Cloud Tasks dispatcht die Jobs **dosiert** an den Worker (`processJob`) — die Anbieter-Limits werden so strukturell eingehalten statt im Fehlerfall abgefangen.
 - Der Browser pollt **`/api/job-status`**; jeder Poll ist zugleich ein Liveness-Herzschlag. Verlaesst der Nutzer die Seite, wird der Job verworfen, bevor er einen KI-Call kostet.
-- Das Bild wird unmittelbar nach der Verarbeitung geloescht, das Job-Dokument (inkl. Ergebnis) spaetestens nach 24 h.
+- Das Bild wird unmittelbar nach der Verarbeitung geloescht, das Job-Dokument (inkl. Ergebnis) spaetestens nach 2 h.
 
 Umgeschaltet wird ueber das Firestore-Feature-Flag `useQueue` — ohne Deploy, jederzeit auf den synchronen `/analyze`-Pfad zurueckschaltbar.
 
@@ -106,7 +106,7 @@ Datenschutz ist kein Feature — es ist das Fundament:
 - **EXIF-Extraktion im Browser**: exifr parsed die Metadaten lokal, GPS verlässt nie den Client
 - **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell (ohne GPS, ohne dateTimeOriginal)
 - **Geocoding direkt vom Browser**: Nominatim wird client-seitig aufgerufen, nicht ueber den Server
-- **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 24 h. Kein Profil bleibt dauerhaft gespeichert
+- **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
 - **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK
 - **Bot-Schutz ohne Tracking**: Rate Limiting (IP), Honeypot-Feld, Timing-Check
 - **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim
@@ -205,15 +205,15 @@ Im Queue-Betrieb (Feature-Flag `useQueue`) nutzt das Frontend statt `/analyze` z
 - **Prompt-Injection-Schutz**: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
 - **HMAC-Admin-Tokens**: Kurzlebige signierte Tokens (30 Min) + Nonces (5 Min) fuer Admin-Aktionen
 - **Stundenlimit**: Rollendes 60-Minuten-Fenster (500 Analysen/Stunde, anonyme Timestamps in Firestore)
-- **Keine dauerhafte Datenspeicherung**: Bilder nur kurz zur Verarbeitung gehalten, Job-Daten spaetestens nach 24 h geloescht, kein Logging von Bilddaten
+- **Keine dauerhafte Datenspeicherung**: Bilder nur kurz zur Verarbeitung gehalten, Job-Daten spaetestens nach 2 h geloescht, kein Logging von Bilddaten
 
 ## Tests
 
 ```bash
-# Backend (Jest, 411 Tests)
+# Backend (Jest, 432 Tests)
 cd functions && npm test
 
-# Frontend (Vitest + jsdom, 152 Tests)
+# Frontend (Vitest + jsdom, 155 Tests)
 npm run test:frontend
 
 # E2E (Playwright, 2 Tests)
@@ -230,9 +230,9 @@ cd functions && npm run format:check   # Backend Prettier
 npm run format:frontend:check          # Frontend Prettier
 ```
 
-**Backend (411 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung).
+**Backend (432 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
 
-**Frontend (152 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Stats-Seite, i18n-Modul, i18n-Guardian.
+**Frontend (155 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Queue-Reload-Wiederherstellung, Stats-Seite, i18n-Modul, i18n-Guardian.
 
 **E2E (2 Tests):** Playwright Smoke-Tests — Demo-Flow und fehlerfreies Laden.
 
@@ -255,8 +255,8 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 | Backend | Firebase Cloud Functions (2nd Gen, Node 24, europe-west1) |
 | Queue | Google Cloud Tasks (dosierter Job-Dispatch, europe-west1) |
 | Datenbank | Cloud Firestore (Zaehler, Maintenance-Flag, Queue-Jobs, europe-west1) |
-| KI-Beschreibung | Mistral Large 3 (multimodal, Paris/EU) |
-| KI-Profile | Mistral Small 4 (Text-Generierung aus Beschreibung) |
+| KI-Analyse (aktiv) | Mistral Large (multimodal, Paris/EU) — ein Single-Call erstellt Bildbeschreibung + beide Profile |
+| KI-Fallback | Klassische 3-Call-Pipeline (Large beschreibt, Small profiliert), per Feature-Flag umschaltbar |
 | Karten | Leaflet + OpenStreetMap (self-hosted Lib + OSM-Tiles) |
 | Geocoding | Nominatim (client-seitig, OpenStreetMap Foundation) |
 | EXIF-Parsing | exifr (client-seitig im Browser) |
@@ -273,7 +273,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 ## Datenschutz
 
-- Keine dauerhafte Speicherung: Bilder werden nur kurz zur Verarbeitung gehalten und sofort geloescht, Job-Daten spaetestens nach 24 h
+- Keine dauerhafte Speicherung: Bilder werden nur kurz zur Verarbeitung gehalten und sofort geloescht, Job-Daten spaetestens nach 2 h
 - Keine Tracking-Cookies, keine Analytics, keine Werbung
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
 - KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.

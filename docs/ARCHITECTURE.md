@@ -8,10 +8,12 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 
 | Phase | Primaer | Modell | Region |
 |-------|---------|--------|--------|
-| Describe (Bildbeschreibung) | Mistral AI | `mistral-large-2512` (Large 3) | EU-Default |
-| Profile (Normal + Boost) | Mistral AI | `mistral-small-2603` (Small 4) | EU-Default |
-| Profile-Fallback (intern) | Mistral AI | `mistral-large-2512` (Large 3) | EU-Default |
+| KI-Analyse (aktiv, Single-Call) | Mistral AI | `mistral-large-2512` — Beschreibung + beide Profile in einem Call | EU-Default |
+| Describe (Fallback-Pipeline) | Mistral AI | `mistral-large-2512` | EU-Default |
+| Profile (Fallback-Pipeline) | Mistral AI | `mistral-small-2603` | EU-Default |
 | Hosting + Functions + DB | Google | Firebase | `europe-west1` |
+
+> **Zwei Modi:** Aktiv ist seit v2.2 der **Single-Large-Call** (Feature-Flag `featureFlags/current.useSingleLargeCall`): ein Aufruf an `mistral-large-2512` liefert Bildbeschreibung + beide Profile. Die klassische **3-Call-Pipeline** (Large beschreibt, Small profiliert, Large als internes JSON-Backup) bleibt als Fallback im Code und ist per Flag umschaltbar.
 
 ## Datenfluss
 
@@ -112,7 +114,7 @@ Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-
 
 ### Reaper
 
-`reapJobs` läuft im Minutentakt und räumt drei Sorten auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Timeout → `failed`) und abgelaufene Job-Dokumente (älter als `JOB_RETENTION_MS` = 24 h → gelöscht).
+`reapJobs` läuft im Minutentakt und räumt drei Sorten auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Timeout → `failed`) und abgelaufene Job-Dokumente (älter als `JOB_RETENTION_MS` = 2 h → gelöscht).
 
 ### Lokaler Betrieb
 
@@ -243,5 +245,5 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr)
 - CSP nur self + OpenStreetMap Tiles + Nominatim
-- Keine dauerhafte Persistenz: im Queue-Betrieb liegt das Bild kurz im GCS-Bucket und wird unmittelbar nach der Verarbeitung gelöscht; das Job-Dokument spätestens nach 24 h
+- Keine dauerhafte Persistenz: im Queue-Betrieb liegt das Bild kurz im GCS-Bucket und wird unmittelbar nach der Verarbeitung gelöscht; das Job-Dokument spätestens nach 2 h
 - Anwendungs-Logs enthalten keine Bildinhalte und keine personenbezogenen Daten — nur Request-ID, Step-Name, Status, Token-Counts

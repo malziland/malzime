@@ -4,6 +4,23 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.4] — 2026-06-07
+
+Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte und der Doku mit dem aktuellen Stand (Single-Large-Pipeline, 2-h-Aufbewahrung aus v2.2.3). Reiner Hosting-/Doku-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.
+
+### Behoben
+
+- **Queue-Ergebnis überlebt jetzt einen Seiten-Reload.** Bisher warf der Browser das Abhol-Ticket (PRIV-003) sofort nach dem Rendern weg — ein Reload konnte das (serverseitig noch bis zu 2 h vorhandene) Profil nicht mehr abholen, es war „weg". Jetzt bleibt das Ticket im Tab erhalten: Ein Reload holt das Ergebnis ticket-geschützt erneut ab. Aufgeräumt wird beim nächsten Upload, bei Fehler/Abbruch oder wenn der Job serverseitig abgelaufen ist; der Resume beim Seitenstart ist still (kein Fehler-Banner bei bereits gelöschtem Job). Zwei neue Frontend-Tests decken das ab. (`public/js/api.js`, `public/__tests__/queue.test.js`)
+
+### Geändert
+
+- **Datenschutz + Nutzungsbedingungen aktualisiert.** Aufbewahrung des Job-Dokuments „spätestens nach 24 Stunden" → „spätestens nach rund 2 Stunden" (Gleichlauf mit PRIV-004 aus v2.2.3 — stärkere Datensparsamkeit). Modell-Beschreibung von der alten 3-Call-Darstellung („Large 3 + Small 4") auf die aktive Single-Large-Pipeline umgestellt. Stand-Datum beider Rechtsseiten auf den 7. Juni 2026 gesetzt. (`public/datenschutz.html`, `public/nutzungsbedingungen.html`)
+
+### Doku (DOC-Rest)
+
+- **Single-Large-Architektur beschrieben** in `README.md`, `AGENTS.md`, `docs/ARCHITECTURE.md`, `docs/SETUP.md` (aktiver Single-Call vs. dokumentierter 3-Call-Fallback, umschaltbar über `featureFlags/current.useSingleLargeCall`).
+- **Test-Zahlen aktualisiert** auf real 432 Backend / 155 Frontend; alle verbliebenen „24 h"-Aufbewahrungsangaben in der Doku auf 2 h korrigiert.
+
 ## [2.2.3] — 2026-06-07
 
 Fünf kleinere Reparaturen aus dem Audit (alle P3) an der Queue-/Reliability-Schicht. Vorab gegen den Firestore-Emulator end-to-end getestet (Abhol-Ticket-Flow + voller Job-Lebenszyklus); 432 Backend- + 153 Frontend-Tests grün.

@@ -148,7 +148,7 @@ describe("Queue-Modus", () => {
     await p;
   });
 
-  it("speichert die jobId und räumt sie nach Abschluss wieder auf", async () => {
+  it("behält die jobId nach Erfolg, damit ein Reload das Ergebnis wieder zeigt", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-xyz" });
       return jsonResponse({ status: "done", result: DONE_RESULT });
@@ -156,10 +156,12 @@ describe("Queue-Modus", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(8000);
     await p;
-    expect(getStoredJobId()).toBeNull();
+    /* Bewusst NICHT gelöscht: das (serverseitig noch vorhandene, ticket-
+       geschützte) Ergebnis soll einen Seiten-Reload überleben. */
+    expect(getStoredJobId()).toBe("job-xyz");
   });
 
-  it("Status failed → zeigt eine Fehlermeldung", async () => {
+  it("Status failed → zeigt eine Fehlermeldung und räumt die jobId auf", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-1" });
       return jsonResponse({ status: "failed", errorReason: "processing_timeout" });
@@ -168,9 +170,10 @@ describe("Queue-Modus", () => {
     await vi.advanceTimersByTimeAsync(8000);
     await p;
     expect(elements.status.textContent).toContain("error.queueFailed");
+    expect(getStoredJobId()).toBeNull();
   });
 
-  it("Status abandoned → zeigt die Abbruch-Meldung", async () => {
+  it("Status abandoned → zeigt die Abbruch-Meldung und räumt die jobId auf", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-1" });
       return jsonResponse({ status: "abandoned" });
@@ -179,6 +182,7 @@ describe("Queue-Modus", () => {
     await vi.advanceTimersByTimeAsync(8000);
     await p;
     expect(elements.status.textContent).toContain("error.queueAbandoned");
+    expect(getStoredJobId()).toBeNull();
   });
 
   it("enqueue 429 mit blocked:limit → Rate-Limit-Meldung, kein Polling", async () => {
@@ -209,5 +213,27 @@ describe("Queue-Modus", () => {
     expect(urls.some((u) => u.includes("/api/job-status?jobId=job-resumed"))).toBe(true);
     elements.disclaimerConfirm.click();
     expect(renderCurrentMode).toHaveBeenCalled();
+  });
+
+  it("resumeQueueJob schickt das gespeicherte Abhol-Ticket mit", async () => {
+    sessionStorage.setItem("malzime.queueJobId", "job-tok");
+    sessionStorage.setItem("malzime.queueResultToken", "ticket-abc");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "done", result: DONE_RESULT }));
+    const p = resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(6000);
+    await p;
+    const urls = globalThis.fetch.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("token=ticket-abc"))).toBe(true);
+  });
+
+  it("resumeQueueJob: ist der Job serverseitig weg (404), still aufräumen — kein Fehler-Banner", async () => {
+    sessionStorage.setItem("malzime.queueJobId", "job-gone");
+    sessionStorage.setItem("malzime.queueResultToken", "ticket-1");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ error: "Job not found" }, false, 404));
+    const p = resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(6000);
+    await p;
+    expect(elements.status.textContent).toBe("");
+    expect(getStoredJobId()).toBeNull();
   });
 });

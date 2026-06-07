@@ -31,7 +31,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
 
 functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   index.js           Cloud-Function-Exports (analyze, stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
-  handle-analyze.js  Mistral-only Pipeline: Validation -> Mistral Describe -> SUBJECT-Parsing -> Mistral Profile / Easter-Egg -> Response
+  handle-analyze.js  Synchroner Legacy-Pfad (Fallback): Validation -> Mistral Describe -> SUBJECT-Parsing -> Mistral Profile / Easter-Egg -> Response. Live laeuft die Analyse ueber die Queue (handle-process-job.js).
   handle-stats.js    Stats-Handler (GET-only)
   handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
   config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (500)
@@ -41,7 +41,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   middleware.js      Rate Limiting (IP-basiert, 200/10min), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
-  mistral.js         Mistral AI Hybrid: Large 3 (Describe, multimodal) + Small 4 (Profile, text-only)
+  mistral.js         Mistral AI: AKTIV runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call); Fallback 3-Call-Hybrid Large (Describe) + Small (Profile) hinter Feature-Flag useSingleLargeCall
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
@@ -73,8 +73,8 @@ docs/                Setup-Dokumentation
 
 - `cd functions && npm install` — install backend dependencies
 - `npm install` (root) — install frontend test/lint dependencies (Vitest, ESLint, Prettier)
-- `cd functions && npm test` — run Jest backend unit tests (279 tests as of v1.6.0)
-- `npm run test:frontend` — run Vitest frontend unit tests (139 tests)
+- `cd functions && npm test` — run Jest backend unit tests (432 tests)
+- `npm run test:frontend` — run Vitest frontend unit tests (155 tests)
 - `npm run test:e2e` — run Playwright E2E smoke tests (2 tests)
 - `cd functions && npm run lint` — ESLint backend
 - `cd functions && npm run format:check` — Prettier backend
@@ -126,17 +126,27 @@ docs/                Setup-Dokumentation
 - Prompt-Injection-Schutz: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
 - Admin-Aktionen: GET zeigt Bestaetigungsseite, POST+Nonce fuehrt Mutation aus (SEC-001)
 
-## Mistral-only-Architektur (seit v1.6.0)
+## Mistral-Architektur (seit v1.6.0)
 
-Die komplette KI-Pipeline laeuft ueber Mistral AI:
+Die komplette KI-Pipeline laeuft ueber Mistral AI. Es gibt zwei Modi, umschaltbar
+ueber das Firestore-Feature-Flag `featureFlags/current.useSingleLargeCall`:
 
-1. **Describe-Stage**: `mistral.js` ruft Mistral Large 3 mit dem Bild + Describe-Prompt + SUBJECT-Klassifikations-Addendum auf
+**AKTIV — Single-Large-Call (seit v2.2):** `runSingleLargeCall` in `mistral.js`
+schickt das Bild EINMAL an Mistral Large (2512) und erhaelt Beschreibung + beide
+Profile (Normal + Beast) in einer Antwort. Das entlastet das knappe TPM-Limit des
+Small-Modells und erlaubt hoehere Cloud-Tasks-Concurrency. Laeuft im Queue-Worker
+`handle-process-job.js`; SUBJECT-Klassifikation + Privacy-Risks werden aus den
+`subject`/`visible_text`-Feldern der Antwort abgeleitet.
+
+**FALLBACK — 3-Call-Hybrid (bis v2.1, bleibt im Code):**
+
+1. **Describe-Stage**: `mistral.js` ruft Mistral Large mit dem Bild + Describe-Prompt + SUBJECT-Klassifikations-Addendum auf
 2. **SUBJECT-Parsing**: `animal.js` parst die `SUBJECT:`-Kopfzeile (`ANIMAL_ONLY|HUMAN|MIXED|OTHER`)
 3. **Privacy-Risks**: `privacy.js` extrahiert die `Sichtbarer Text:`-Zeile aus der Beschreibung und matched Telefon-/Adress-/Kennzeichen-Patterns
-4. **Profile-Stage**: bei `ANIMAL_ONLY` → Easter-Egg aus `locales/{lang}/animals.js`; sonst Mistral Small 4 fuer Normal + Boost parallel
+4. **Profile-Stage**: bei `ANIMAL_ONLY` → Easter-Egg aus `locales/{lang}/animals.js`; sonst Mistral Small fuer Normal + Boost parallel
 5. **JSON-Repair**: alle LLM-Outputs gehen durch `json-repair.js` (4-stufige defensive Reparatur)
 
-`MISTRAL_API_KEY` ist als Firebase Secret hinterlegt und wird in `index.js` an den `analyze`-Endpunkt gebunden. `mistral.js` liest den Key aus `process.env.MISTRAL_API_KEY`.
+`MISTRAL_API_KEY` ist als Firebase Secret hinterlegt und wird in `index.js` an die KI-Endpunkte gebunden. `mistral.js` liest den Key aus `process.env.MISTRAL_API_KEY`.
 
 Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. Der User bekommt eine `blocked.apiError`- oder `blocked.overloaded`-Response. Google bleibt nur fuer die Infrastruktur-Schicht (Firebase Hosting + Cloud Functions + Firestore in `europe-west1`).
 

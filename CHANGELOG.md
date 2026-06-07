@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.3] — 2026-06-07
+
+Fünf kleinere Reparaturen aus dem Audit (alle P3) an der Queue-/Reliability-Schicht. Vorab gegen den Firestore-Emulator end-to-end getestet (Abhol-Ticket-Flow + voller Job-Lebenszyklus); 432 Backend- + 153 Frontend-Tests grün.
+
+### Behoben / Geändert
+
+- **PRIV-003 — Abhol-Ticket fürs Ergebnis.** `enqueue` erzeugt pro Auftrag ein zufälliges Ticket (UUID), gibt es an den Browser zurück und speichert es am Job; `job-status` liefert das fertige Profil nur noch an den Browser mit dem passenden Ticket (`safeCompare`). Zweites Schloss zusätzlich zur unerratbaren jobId — schützt die abgeleiteten Profile (oft Minderjähriger) gegen Zugriff über eine geleakte jobId. Alt-Jobs ohne Ticket bleiben abwärtskompatibel. (`handle-enqueue.js`, `jobs.js`, `handle-job-status.js`, `public/js/api.js`)
+- **BUG-001 — saubere Job-Zustandsübergänge.** `completeJob`/`failJob`/`abandonJob` sind jetzt bedingte Firestore-Transaktionen (nur aus dem erwarteten Vorzustand) — ein nachlaufender Worker überschreibt keinen bereits gereapten Terminalzustand mehr. `PROCESSING_TIMEOUT_MS` 600s → 540s (= Cloud-Function-Timeout): hängende Aufträge brechen bis zu 60s früher sauber ab. (`jobs.js`)
+- **PRIV-004 — kürzere Aufbewahrung.** Job-Dokumente (mit dem fertigen Profil) werden statt nach 24 h schon nach 2 h gelöscht. Datensparsamkeit; deckt jedes realistische Reload-Fenster großzügig ab. (`config.js`)
+- **UX-001 — mehr Geduld bei weggelegtem Handy.** Karenz-Fenster für „verlassene" wartende Aufträge 3 → 8 Minuten. Schüler:innen verlieren ihren Auftrag nicht mehr, wenn sie das Handy in der Pause kurz weglegen. (`config.js`)
+- **BIZ-001 — Kostenbremse zählt nur echte Analysen.** Der Stundenzähler wird beim Upload gezogen; abgebrochene Aufträge (abandoned / enqueue_failed) geben ihren Slot jetzt wieder frei (`counter.releaseHourlySlot`), damit „Phantom-Analysen" echte Nutzer nicht früher als nötig aussperren. (`counter.js`, `handle-reap.js`, `handle-process-job.js`, `handle-enqueue.js`)
+
+### Validiert
+
+- Emulator-Rundlauf (echte Firestore, Mock-KI): Upload → Ticket → done; Ergebnis nur mit korrektem Ticket, ohne/falsches Ticket gesperrt; voller Queue-Lebenszyklus mit den neuen Zustandsübergängen.
+
+### Hinweis
+
+- e2e-CI-Check repariert (Playwright-Install-Hänger + hartes Job-Timeout). Der veraltete Disclaimer-Smoke-Test ist als `test.fixme` markiert — er testet den abgelösten synchronen Pfad; Rewrite auf den Queue-Pfad bleibt offen.
+
 ## [2.2.2] — 2026-06-06
 
 Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverlässigkeit, Architektur, OSS, Lieferkette) mit Multi-Agent-Prüfung, adversarialer Gegenprüfung und Live-Verifikation gegen die echten Cloud-Dienste. **Keine ausnutzbare Sicherheitslücke (0× P0).** Die Codebasis ist solide; dieser Release bündelt eine funktionale Reparatur (PRIV-002, deployt) und mehrere Härtungen in Repository, CI/CD und Doku.

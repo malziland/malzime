@@ -4,8 +4,8 @@ const MOCK_RESPONSE = {
   profiles: {
     normal: {
       categories: {
-        alter: { label: "Geschätztes Alter", value: "25-30 Jahre", confidence: 0.8 },
-        beruf: { label: "Vermuteter Beruf", value: "Kreativbranche", confidence: 0.6 },
+        alter_geschlecht: { label: "Alter & Geschlecht", value: "25-30 Jahre, männlich", confidence: 0.8 },
+        herkunft: { label: "Herkunft", value: "Mitteleuropa", confidence: 0.6 },
       },
       ad_targeting: ["Outdoor-Werbung", "Reise-Angebote"],
       manipulation_triggers: ["FOMO", "Statusvergleich"],
@@ -13,7 +13,7 @@ const MOCK_RESPONSE = {
     },
     boost: {
       categories: {
-        alter: { label: "Geschätztes Alter", value: "25-30 Jahre", confidence: 0.9 },
+        alter_geschlecht: { label: "Alter & Geschlecht", value: "25-30 Jahre, männlich", confidence: 0.9 },
       },
       ad_targeting: ["Premium-Werbung"],
       manipulation_triggers: ["Statusangst"],
@@ -25,22 +25,11 @@ const MOCK_RESPONSE = {
   meta: { requestId: "smoke-test-123", mode: "multimodal" },
 };
 
-/* VERALTET / TODO neu schreiben: Dieser Test mockt den synchronen `/analyze`-
-   Pfad. Der Live-Betrieb läuft seit v2.0 über die QUEUE (`/api/enqueue` +
-   `/api/job-status`), die dieser Test nicht abbildet — dadurch erreicht der
-   Ablauf das Disclaimer-Modal nicht und der Test scheitert. Die App selbst
-   funktioniert in Produktion einwandfrei (täglich im Einsatz). Bis zum Rewrite
-   auf den Queue-Pfad mit `test.fixme` als bekannt-defekt markiert, damit der
-   e2e-Check nicht an einem veralteten Test scheitert. */
-test.fixme("Smoke: Demo-Foto → Disclaimer → Profil wird angezeigt", async ({ page }) => {
-  /* API-Calls abfangen */
-  await page.route("**/analyze*", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(MOCK_RESPONSE),
-    })
-  );
+/* Voller Durchklick über den QUEUE-Pfad (Live-Pfad seit v2.0): Demo-Foto →
+   /api/enqueue → /api/job-status (done) → Disclaimer → Profil. Die drei
+   Queue-Endpunkte werden gemockt, damit der Test ohne echtes Backend läuft. */
+test("Smoke: Demo-Foto → Queue → Disclaimer → Profil wird angezeigt", async ({ page }) => {
+  /* Feature-Flag „Queue an" + Limit-Infos */
   await page.route("**/api/stats", (route) =>
     route.fulfill({
       status: 200,
@@ -48,7 +37,24 @@ test.fixme("Smoke: Demo-Foto → Disclaimer → Profil wird angezeigt", async ({
       body: JSON.stringify({
         current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 10, week: 50, month: 200, total: 1000 },
+        useQueue: true,
       }),
+    })
+  );
+  /* Upload in die Warteschlange → liefert jobId + Abhol-Ticket zurück */
+  await page.route("**/api/enqueue", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ jobId: "smoke-job-1", resultToken: "smoke-token-1" }),
+    })
+  );
+  /* Status-Poll → sofort „done" mit dem fertigen Ergebnis */
+  await page.route("**/api/job-status**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ status: "done", result: MOCK_RESPONSE }),
     })
   );
   /* Nominatim abfangen (kein externer Call im Test) */
@@ -62,11 +68,12 @@ test.fixme("Smoke: Demo-Foto → Disclaimer → Profil wird angezeigt", async ({
   await expect(page.locator("h1")).toBeVisible();
   await expect(page.locator('[data-demo="selfie"]')).toBeVisible();
 
-  /* Demo-Foto klicken */
+  /* Demo-Foto klicken → Queue-Analyse startet */
   await page.click('[data-demo="selfie"]');
 
-  /* Disclaimer-Modal sollte erscheinen */
-  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 15000 });
+  /* Disclaimer-Modal erscheint nach dem ersten Status-Poll. Großzügiges
+     Timeout: Mindest-Interaktionszeit (2s) + Poll-Intervall (2s) + Bild-Prep. */
+  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });
 
   /* Bestaetigen */
   await page.click("#disclaimerConfirm");

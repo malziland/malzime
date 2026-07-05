@@ -4,7 +4,9 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [2.2.7] — 2026-07-05
+
+Wartungs- und Sicherheits-Release: Backend-Grundbibliothek `firebase-admin` auf Version 14 (schließt alle 3 hohen bekannten Sicherheitslücken), gesammelte Werkzeug- und CI-Updates, Mistral-2506-Aufräumen. Reiner Functions-Deploy, keine Frontend-Änderung. 432 Backend- + 157 Frontend-Tests grün, E2E in der CI grün.
 
 ### Gewartet
 

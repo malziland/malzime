@@ -17,31 +17,26 @@ const RATE_WINDOW_MS = 10 * 60 * 1000;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /* ── Mistral-Modelle ──
-   Describe-Stage via Large 3 (gute Bilderkennung),
+   Describe-Stage via Large 3 = mistral-large-2512 (gute Bilderkennung),
    Profile-Stage via Small 4 = mistral-small-2603 (aktive Konstante unten),
    Mistral-internes Fallback bei Profile-Versagen: Large 3.
-
-   STAND HEUTE: aktiv ist mistral-small-2603 (siehe MISTRAL_PROFILE_MODEL). Die
-   folgende v1.10.7-Notiz zum Wechsel auf -2506 ist HISTORISCH und entspricht
-   nicht mehr dem aktiven Stand (2506 wird von Mistral zurueckgezogen).
+   Im Single-Large-Betrieb (featureFlags/current.useSingleLargeCall) laeuft
+   alles ueber Large 3 — Small 4 bleibt der 3-Call-Fallback-Pfad.
 
    Preise pro 1M Tokens (Stand 2026-05):
-     - mistral-large-latest: $0.50 / $1.50  in/out
-     - mistral-small-2506:   $0.15 / $0.60  in/out  (Small 3.2)
-     - mistral-small-2603:   $0.15 / $0.60  in/out  (Small 4, derzeit nicht im Einsatz)
+     - mistral-large-2512: $0.50 / $1.50  in/out  (Large 3)
+     - mistral-small-2603: $0.15 / $0.60  in/out  (Small 4)
 
-   v1.10.7 (2026-05-19): WICHTIGER Wechsel von -2603 → -2506.
-   Hintergrund: Mistral hat fuer unser Konto auf -2603 (Small 4) absurd
-   niedrige Limits gesetzt:
-     - mistral-small-2603: 100K TPM, 1.67 RPS
-     - mistral-small-2506: 5M TPM, 20.83 RPS  (50× / 12× hoeher)
-   Bei nur 100K TPM (~10 Analysen pro Minute) ist Small 4 fuer unseren
-   Workshop-Use-Case schlicht unbrauchbar. Small 3.2 ist offiziell
-   deprecated, aber noch monatelang verfuegbar und liefert fuer unseren
-   JSON-Output praktisch gleichwertige Profile bei massiv besseren Limits.
+   Verifizierte Limits (Account-Dashboard 2026-05-19):
+     - mistral-small-2603: 100K TPM, 1.67 RPS  (absurd niedrig — deshalb
+       Single-Large als Standard-Pfad; vor Architektur-Entscheidungen IMMER
+       das Account-Dashboard pruefen, Limits variieren je Modellversion)
+     - mistral-large-2512: 2M TPM, 6 RPS
 
-   Migration zurueck zu Small 4 macht erst Sinn, wenn Mistral die Limits
-   gleichzieht ODER wir auf einen hoeheren Tarif wechseln.
+   Historie: v1.10.7 (2026-05-19) wich wegen der 2603-Limits voruebergehend
+   auf mistral-small-2506 (Small 3.2, 5M TPM) aus; seit der Queue-/Single-
+   Large-Architektur ist 2603 wieder aktiv. 2506 wurde von Mistral zum
+   31.07.2026 ZURUECKGEZOGEN (Retirement) — als Modell-Option dauerhaft tot.
 
    API-Key kommt aus `process.env.MISTRAL_API_KEY` (Firebase Secret). */
 /* v1.10.7: Large fest auf -2512 gepinnt statt -latest-Alias. Hintergrund:

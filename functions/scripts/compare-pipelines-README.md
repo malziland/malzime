@@ -3,6 +3,11 @@
 Lokales Skript zum Vergleich der aktuellen Live-Pipeline mit zwei
 neuen V2-Architektur-Varianten — **ohne Production anzufassen**.
 
+> **Hinweis (2026-07):** `mistral-small-2506` wurde von Mistral zum
+> **31.07.2026 zurückgezogen** — Pipeline B ist seither nicht mehr
+> lauffähig. Für neue Modellvergleiche die `MODELS`-Konstanten in
+> `compare-pipelines.js` auf aktuelle Modell-IDs umstellen.
+
 ## Was es macht
 
 Schickt jedes Bild aus `compare-input/` durch drei Pipelines parallel:

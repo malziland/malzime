@@ -10,6 +10,11 @@
  *
  * NICHT Production-Pfad. NICHT von functions/src/ geladen.
  *
+ * HINWEIS (2026-07): mistral-small-2506 wurde von Mistral zum 31.07.2026
+ * zurueckgezogen (Retirement) — Pipeline B ist seither NICHT mehr
+ * lauffaehig (API-Fehler). Fuer neue Modellvergleiche die MODELS-
+ * Konstanten unten auf aktuelle Modell-IDs umstellen.
+ *
  * Pipelines:
  *   A = Status quo Live: 1× Describe (Large 2512) + 2× Profile (Small 2603)
  *   B = Neu V2 mit 2506: 1× Large-Bundle + 2× Karten (2506) + 2× profileText (2603)
@@ -45,7 +50,7 @@ const OUTPUT_JSON = path.join(REPO_ROOT, "compare-results.json");
 const MODELS = {
   LARGE: "mistral-large-2512",
   SMALL_2603: "mistral-small-2603",
-  SMALL_2506: "mistral-small-2506",
+  SMALL_2506: "mistral-small-2506", // RETIRED 31.07.2026 — Pipeline B nicht mehr lauffaehig
 };
 
 const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";

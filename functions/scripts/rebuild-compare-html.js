@@ -4,6 +4,8 @@
 /**
  * rebuild-compare-html.js — Rendert compare-result.html neu aus dem
  * compare-results.json-Cache, ohne neue Mistral-Calls zu machen.
+ * (Funktioniert weiterhin — reine Cache-Auswertung. Das Label "2506"
+ * bezeichnet historische Daten; das Modell wurde zum 31.07.2026 retired.)
  *
  * Design: Live-Frontend-Look. Pro Bild zwei Reihen (Standard- und Beast-Modus),
  * jede Reihe mit drei nebeneinanderstehenden Live-Profil-Views (A=Live,

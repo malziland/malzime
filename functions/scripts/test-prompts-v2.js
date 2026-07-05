@@ -3,6 +3,9 @@
 /**
  * test-prompts-v2.js — Prompt-Entwürfe für die V2-Pipeline (Forschung).
  *
+ * HINWEIS (2026-07): mistral-small-2506 wurde zum 31.07.2026 zurueckgezogen —
+ * die 2506-Varianten unten sind nur noch historische Referenz.
+ *
  * Aktuelle Architektur (nach Verwurf von Option 1):
  *   Call 1  Large MIT Bild   → description + ads + triggers + hard_facts (JSON)
  *   Call 2a Small 2506/2603  → 13 Karten Variante B Normal

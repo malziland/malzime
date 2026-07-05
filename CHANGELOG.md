@@ -4,6 +4,12 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Sicherheit
+
+- **Backend-Grundbibliothek `firebase-admin` von Version 13 auf 14 angehoben** (dazu `@google-cloud/tasks` 6.2.2 → 6.2.3, Fehlerkorrektur-Update). Damit sind alle 3 hohen und mehrere mittlere bekannte Sicherheitslücken geschlossen, die über veraltete Unterbibliotheken (`uuid`, `google-gax`, Firestore-Client 7) hereinkamen; der Firestore-Client springt auf Version 8. Übrig bleiben 7 mittlere Meldungen in Googles Storage-Unterbau, die erst Google selbst beheben kann (unterhalb der CI-Gate-Schwelle „hoch"). Der eigene Backend-Code brauchte **keine** Änderung — er nutzt seit jeher ausschließlich den modernen modularen Import-Stil, den Version 14 voraussetzt; alle 432 Backend-Tests grün. Technische Notiz: `firebase-functions` 7.2.5 erlaubt `firebase-admin` 14 formal noch nicht als Peer-Abhängigkeit — per `overrides`-Eintrag in `functions/package.json` aufgelöst (etabliertes npm-Muster; die tatsächliche Berührungsfläche der beiden Bibliotheken ist in diesem Projekt praktisch null). Nebenwirkung behoben: Das npm-audit-Sicherheits-Gate im CI (`test-backend`) war wegen dieser Lücken seit Ende Juni rot und blockierte jeden Pull Request — es ist jetzt wieder grün. (`functions/package.json`, `functions/package-lock.json`)
+
 ## [2.2.6] — 2026-06-07
 
 Weiterer Feinschliff der Reload-Erfahrung (zwei Punkte aus dem Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 157 Frontend-Tests grün.

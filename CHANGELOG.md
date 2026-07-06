@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.2.8] — 2026-07-06
+
+Reaktion auf den Workshop-Vorfall vom selben Vormittag: Foto-Einlesen abgehärtet, irreführende Fehlermeldung ersetzt, Fehler-Diagnose erweitert und anonyme Diagnose-Logs 30 Tage aufbewahrt (bisher war jede Häufigkeits-Analyse nach 1 Tag blind). Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests grün.
+
+### Behoben
+
+- **„Dieses Bild konnte nicht geöffnet werden" auf einzelnen Android-Handys — Foto-Einlesen grundlegend robuster gemacht (Workshop-Vorfall 2026-07-06).** Manche Geräte übergeben der Webseite eine Foto-Referenz, deren Inhalt der Browser gar nicht lesen kann (z.&nbsp;B. nach Speicherdruck, bei Cloud-only-Fotos oder defekter Galerie-App) — dann scheiterte bisher erst der Bild-Decoder, und die Fehlermeldung riet fälschlich zu „JPEG oder PNG", was betroffenen Nutzern nicht helfen konnte (auch ein Screenshot scheiterte identisch). Drei Änderungen: (1)&nbsp;Das Foto wird jetzt sofort nach der Auswahl einmal komplett in den Speicher der Seite kopiert, mit automatischem zweitem Versuch — alle weiteren Schritte (EXIF, Verkleinern) arbeiten auf dieser Kopie, die nicht mehr kaputtgehen kann; ein Teil der Fälle (kurzzeitige Aussetzer des Geräts) wird damit ganz verhindert. (2)&nbsp;Kann das Gerät die Datei endgültig nicht liefern, kommt eine ehrliche, eigene Fehlermeldung mit Tipps, die wirklich helfen (Browser neu starten, Speicherplatz prüfen, Foto lokal speichern, anderes Gerät) statt des irreführenden Format-Hinweises — zweisprachig DE/EN. (3)&nbsp;Die anonyme Fehler-Diagnose überträgt jetzt zusätzlich den genauen technischen Fehlergrund (`errorDetail`, z.&nbsp;B. `NotReadableError`) und die Dateigröße (`fileSizeKb`), damit künftige Fälle in den Logs eindeutig zuzuordnen sind — weiterhin ohne Dateinamen oder Bildinhalt. (`public/js/exif.js`, `public/js/api.js`, `public/js/error-logger.js`, `functions/src/handle-errors.js`, `public/locales/de.json`, `public/locales/en.json`)
+
+### Geändert
+
+- **Anonyme Diagnose-Daten werden jetzt 30 Tage aufbewahrt (bisher 1 Tag) — personenbezogene Infrastruktur-Logs weiterhin nur 1 Tag.** Hintergrund: Die gesamte Log-Aufbewahrung stand auf 1 Tag; damit war keinerlei Aussage möglich, wie oft ein Fehler über mehrere Workshops hinweg auftritt. Umsetzung datenschutzkonform über einen separaten Log-Speicher (`client-diagnostics`, EU-Region `europe-west1`, 30 Tage), in den ausschließlich die vollständig anonymen Client-Diagnose-Einträge (`client-error`/`client-telemetry` — Fehler-Typ, Geräteklasse, Dauer; keine IP-Adressen, keine Bilder, keine Dateinamen) gespiegelt werden. Der Standard-Log-Speicher mit Googles Infrastruktur-Fehlerlogs (enthalten IPs) bleibt unverändert bei 1 Tag — das Versprechen der Datenschutzerklärung gilt weiter. Die Datenschutzerklärung wurde um die 30-Tage-Aufbewahrung der anonymen Diagnose-Daten ergänzt (Stand-Datum aktualisiert). (Cloud-Logging-Konfiguration, `public/datenschutz.html`)
+
 ## [2.2.7] — 2026-07-05
 
 Wartungs- und Sicherheits-Release: Backend-Grundbibliothek `firebase-admin` auf Version 14 (schließt alle 3 hohen bekannten Sicherheitslücken), gesammelte Werkzeug- und CI-Updates, Mistral-2506-Aufräumen. Reiner Functions-Deploy, keine Frontend-Änderung. 432 Backend- + 157 Frontend-Tests grün, E2E in der CI grün.

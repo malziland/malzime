@@ -67,7 +67,7 @@
   "status.serverBusyRetrying": "Sehr viele Anfragen gerade — das System probiert es automatisch erneut, bitte warten …",
   "error.missingImage": "Kein Bild erkannt. Bitte ein Foto auswählen.",
   "error.timeout": "Die Analyse dauert zu lange. Versuch es nochmal oder nimm ein anderes Foto.",
-  "error.readFailed": "Das Bild konnte nicht gelesen werden. Versuch ein anderes Foto.",
+  "error.readFailed": "Dein Gerät hat das Foto nicht an den Browser übergeben – am Foto selbst liegt es nicht. Was meistens hilft: Browser komplett schließen und neu öffnen, freien Speicherplatz prüfen, das Foto einmal lokal speichern statt aus der Cloud zu wählen – oder kurz ein anderes Gerät nehmen.",
   "error.decodeFailed": "Dieses Bild konnte nicht geöffnet werden – das Format wird nicht unterstützt oder die Datei ist beschädigt. Versuch ein anderes Foto, am besten JPEG oder PNG.",
   "error.offline": "Keine Internetverbindung. Bitte prüfe dein WLAN.",
   "error.maintenance": "malziME ist gerade im Wartungsmodus. Bitte versuch es später nochmal.",

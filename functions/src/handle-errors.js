@@ -24,8 +24,9 @@ const STRING_FIELDS = {
   traceId: 50,
   wakeLock: 40,
   fileFormat: 40,
+  errorDetail: 60,
 };
-const NUMBER_FIELDS = ["durationMs", "httpStatus"];
+const NUMBER_FIELDS = ["durationMs", "httpStatus", "fileSizeKb"];
 const BOOLEAN_FIELDS = ["online", "hidden"];
 
 const TIMING_KEYS = ["prepareImageMs", "fetchMs", "parseMs", "renderMs", "totalMs"];

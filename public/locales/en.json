@@ -63,7 +63,7 @@
   "status.serverBusyRetrying": "Lots of requests right now — the system is retrying automatically, please wait …",
   "error.missingImage": "No image detected. Please select a photo.",
   "error.timeout": "The analysis is taking too long. Try again or use a different photo.",
-  "error.readFailed": "The image could not be read. Try a different photo.",
+  "error.readFailed": "Your device didn't hand the photo over to the browser – the photo itself is fine. What usually helps: fully close and reopen the browser, check your free storage, save the photo locally instead of picking it from the cloud – or quickly try another device.",
   "error.decodeFailed": "This image couldn't be opened – the format is unsupported or the file is damaged. Try a different photo, ideally JPEG or PNG.",
   "error.offline": "No internet connection. Please check your WiFi.",
   "error.maintenance": "malziME is currently in maintenance mode. Please try again later.",

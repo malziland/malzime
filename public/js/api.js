@@ -415,6 +415,8 @@ export async function analyzeImage() {
       traceId,
       wakeLock: wakeLockStatus,
       fileFormat: err.fileFormat,
+      errorDetail: err.errorDetail,
+      fileSizeKb: err.fileSizeKb,
       timings: { ...timings, totalMs: Date.now() - analyzeStartTime },
     });
   } finally {
@@ -875,6 +877,8 @@ async function analyzeImageQueued() {
       traceId,
       wakeLock: wakeLockStatus,
       fileFormat: err.fileFormat,
+      errorDetail: err.errorDetail,
+      fileSizeKb: err.fileSizeKb,
     });
   } finally {
     releaseWakeLock();

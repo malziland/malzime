@@ -30,6 +30,8 @@ export function logClientError(error, context = {}) {
       httpStatus: typeof context.httpStatus === "number" ? context.httpStatus : null,
       wakeLock: typeof context.wakeLock === "string" ? context.wakeLock : null,
       fileFormat: typeof context.fileFormat === "string" ? context.fileFormat : null,
+      errorDetail: typeof context.errorDetail === "string" ? context.errorDetail : null,
+      fileSizeKb: typeof context.fileSizeKb === "number" && isFinite(context.fileSizeKb) ? context.fileSizeKb : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
       client: clientCtx,
     };

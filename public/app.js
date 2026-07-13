@@ -142,7 +142,21 @@ document.addEventListener("drop", (e) => e.preventDefault());
 
 /* ── Toggle-Wechsel: Sofort umschalten ohne neuen API-Call ── */
 
+/* Modus-Theme-Kopplung (malziland Design System): Seriöse Analyse = heller
+   Papier-Look, Beast Mode = dunkles Theme. Das Theme hängt am Modus — es
+   gibt bewusst keinen separaten Hell/Dunkel-Schalter und keine Speicherung
+   (Beast startet immer ausgeschaltet). */
+function applyModeTheme() {
+  const boost = elements.biasSwitch.checked;
+  document.documentElement.setAttribute("data-mode", boost ? "boost" : "normal");
+  document.documentElement.setAttribute("data-theme", boost ? "dark" : "light");
+}
+/* Beim Start anwenden — Browser können den Checkbox-Zustand nach einem
+   Reload wiederherstellen, dann muss das Theme mitziehen. */
+applyModeTheme();
+
 elements.biasSwitch.addEventListener("change", () => {
+  applyModeTheme();
   if (state.lastData) {
     renderCurrentMode(state.lastData);
   }

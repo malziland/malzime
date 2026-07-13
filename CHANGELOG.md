@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.3.1] — 2026-07-13
+
+Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teilen-Bild, README-Screenshots) plus ein Sicherheitsupdate im Backend. Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
+
+### Geändert
+
+- **Alle Marken-Bildflächen auf das malziland-Design gebracht.** Neues Favicon-Set als m-Medaillon nach Farbleitfaden (weißes m auf Teal-Kreis: `favicon.svg`, `favicon.ico`, 192/512-px-Icons; Apple-Touch-Icon als Teal-Kachel), neues Teilen-Vorschaubild `og-image.png` (1200×630, Papier-Look mit Wasserzeichen und m-Medaillon — das sehen Empfänger in WhatsApp/Signal/Teams), PWA-Manifest-Farben auf Teal/Warmweiß, neue `theme-color`-Meta auf allen Seiten (mobile Browser-Farbleiste folgt jetzt auch dem Beast-Modus). README-Screenshots erneuert: Desktop hell + Mobil im Beast-Dunkel. (`public/favicon*`, `public/apple-touch-icon.png`, `public/og-image.png`, `public/site.webmanifest`, alle HTML-Seiten, `public/app.js`, `docs/screenshots/`)
+
+### Sicherheit
+
+- **`uuid` 9.0.1 → 11.1.1 im Backend** (Dependabot-Meldung „medium": fehlende Puffer-Grenzenprüfung in v3/v5/v6 bei übergebenem `buf`). uuid kommt transitiv über `firebase-admin` → `@google-cloud/storage`, deren Versionsbereiche noch auf 9.x zeigen — daher per `overrides`-Eintrag in `functions/package.json` angehoben (gleiches Muster wie der bestehende firebase-admin-Override; zurückbauen, sobald die Google-Pakete uuid ≥ 11 selbst anfordern). Lockfile sauber neu aufgebaut, `npm audit`: 0 Meldungen, alle 435 Backend-Tests grün. (`functions/package.json`, `functions/package-lock.json`)
+
 ## [2.3.0] — 2026-07-13
 
 Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und vom Inhaber freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.

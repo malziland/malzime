@@ -2,10 +2,18 @@
   "name": "malziME",
   "short_name": "malziME",
   "icons": [
-    { "src": "./favicon-192x192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "./favicon-512x512.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "./favicon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./favicon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ],
-  "theme_color": "#0a0a0f",
-  "background_color": "#0a0a0f",
+  "theme_color": "#156480",
+  "background_color": "#f9f7f4",
   "display": "standalone"
 }

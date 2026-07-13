@@ -150,6 +150,9 @@ function applyModeTheme() {
   const boost = elements.biasSwitch.checked;
   document.documentElement.setAttribute("data-mode", boost ? "boost" : "normal");
   document.documentElement.setAttribute("data-theme", boost ? "dark" : "light");
+  /* Browser-Farbleiste (mobile Adressleiste) folgt dem Modus */
+  const themeMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeMeta) themeMeta.setAttribute("content", boost ? "#171d1f" : "#f9f7f4");
 }
 /* Beim Start anwenden — Browser können den Checkbox-Zustand nach einem
    Reload wiederherstellen, dann muss das Theme mitziehen. */

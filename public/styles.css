@@ -1,39 +1,155 @@
 /* ═══════════════════════════════════════════════
-   Malzime — AI Stalker Aesthetic
+   malziME — malziland Design System
+   Quelle: Corporate-Identity-Farbleitfaden 2026 (malziland Design
+   System, Claude-Design-Projekt) — Farben, Typografie, Abstände,
+   Linien-System, Dark-Regeln (Leitfaden Kap. 11).
+   Kopplung: Seriöse Analyse = Hell (Papier), Beast Mode = Dunkel.
    ═══════════════════════════════════════════════ */
 
-/* ── Self-hosted Fonts ── */
+/* ── Selbst gehostete Schrift: Poppins (OFL) —
+   offizieller Ersatz der Hausschrift Como lt. Design-System ── */
 
 @font-face {
-  font-family: "Inter";
+  font-family: "Poppins";
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 300;
   font-display: swap;
-  src: url("./fonts/inter/inter-latin.woff2") format("woff2");
+  src: url("./fonts/poppins/poppins-300-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("./fonts/poppins/poppins-300-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0;
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/poppins/poppins-400-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/poppins/poppins-400-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0;
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/poppins/poppins-500-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("./fonts/poppins/poppins-500-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0;
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/poppins/poppins-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+2000-206F, U+20AC, U+2122, U+2212, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/poppins/poppins-700-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+1E00-1E9F, U+2020, U+20A0-20AB, U+20AD-20C0;
 }
 
-@font-face {
-  font-family: "JetBrains Mono";
-  font-style: normal;
-  font-weight: 400 500;
-  font-display: swap;
-  src: url("./fonts/jetbrains-mono/jetbrains-mono-latin.woff2") format("woff2");
-}
+/* ── Design-Token (Hell = Standard: Seriöse Analyse, Papier-Look) ── */
 
 :root {
-  --bg: #0a0c10;
-  --surface: #111318;
-  --card: #161921;
-  --border: #1e222d;
-  --text: #c8cdd8;
-  --text-hi: #e8ecf4;
-  --muted: #9ca3af;
-  --accent: #38bdf8;
-  --accent-dim: rgba(56, 189, 248, 0.1);
-  --warn: #f87171;
-  --warn-dim: rgba(248, 113, 113, 0.1);
-  --boost: #f87171;
-  --boost-dim: rgba(248, 113, 113, 0.12);
+  /* Markenfarben (Vollton) */
+  --ml-teal: #156480;
+  --ml-rust: #9c4e36;
+  --ml-gold: #bfb542;
+  --ml-anthracite: #404749;
+  --ml-warmgray: #82796e;
+  --ml-grad-teal: linear-gradient(135deg, #1a7a9c 0%, #156480 48%, #0e4a60 100%);
+  --ml-grad-teal-line: linear-gradient(90deg, #1a7a9c 0%, #156480 48%, #0e4a60 100%);
+
+  /* Flächen & Text */
+  --bg: #f9f7f4;
+  --surface: #ffffff;
+  --border: rgba(130, 121, 110, 0.4);
+  --border-soft: rgba(130, 121, 110, 0.15);
+  --text: #404749;
+  --muted: #82796e;
+  --heading: #156480;
+  --teal-text: #156480;
+  --rust-text: #9c4e36;
+  --tint-teal: rgba(21, 100, 128, 0.07);
+  --tint-teal-strong: rgba(21, 100, 128, 0.15);
+  --tint-rust: rgba(156, 78, 54, 0.07);
+  --tint-rust-strong: rgba(156, 78, 54, 0.15);
+  --track: rgba(21, 100, 128, 0.15);
+  --hover: rgba(21, 100, 128, 0.08);
+  --shadow: 0 4px 14px rgba(64, 71, 73, 0.06);
+  --lift: 0 10px 24px rgba(64, 71, 73, 0.1);
+  --scrim: rgba(64, 71, 73, 0.45);
+
+  /* Zahlen-Plakette (Gold): auf Hell Gold-Fläche + dunkle Schrift —
+     Gold-TEXT auf Weiß hätte zu wenig Kontrast (WCAG) */
+  --num-chip-bg: rgba(191, 181, 66, 0.4);
+  --num-chip-text: #404749;
+
+  /* Gruppen-Akzente = die vier Markenfarben (nie neue Farbtöne) */
+  --grp-identity: #156480;
+  --grp-ability: #82796e;
+  --grp-money: #bfb542;
+  --grp-risk: #9c4e36;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ls-label: 0.08em;
+}
+
+/* ── Dunkel = Beast Mode (Leitfaden Kap. 11): Flächen/Balken/Buttons
+   behalten die ECHTEN Markenfarben; farbiger Text nutzt die definierte
+   hellere Stufe im identischen Farbton; Überschriften bleiben hell. ── */
+
+:root[data-theme="dark"] {
+  --bg: #171d1f;
+  --surface: #1e2629;
+  --border: rgba(255, 255, 255, 0.18);
+  --border-soft: rgba(255, 255, 255, 0.1);
+  --text: #eef1f0;
+  --muted: #a9b2b0;
+  --heading: #eef1f0;
+  --teal-text: #4698b9;
+  --rust-text: #c17d67;
+  --tint-teal: rgba(21, 100, 128, 0.22);
+  --tint-teal-strong: rgba(21, 100, 128, 0.38);
+  --tint-rust: rgba(156, 78, 54, 0.16);
+  --tint-rust-strong: rgba(156, 78, 54, 0.28);
+  --track: rgba(255, 255, 255, 0.1);
+  --hover: rgba(21, 100, 128, 0.18);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --lift: 0 10px 24px rgba(0, 0, 0, 0.45);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --num-chip-bg: rgba(191, 181, 66, 0.18);
+  --num-chip-text: #bfb542;
 }
 
 *,
@@ -48,29 +164,49 @@ html {
 
 body {
   font-family:
-    "Inter",
+    "Poppins",
+    system-ui,
     -apple-system,
+    "Segoe UI",
     sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   line-height: 1.55;
+  transition:
+    background-color 0.2s var(--ease),
+    color 0.2s var(--ease);
 }
 
-/* ── Scan-Line Overlay ── */
+/* ── m-Wasserzeichen (Leitfaden Kap. 07): 1× pro Fläche, randbeschnitten,
+   4–6 % Petrol auf hell / 7–9 % Weiß auf dunkel ── */
 
-.scan-lines {
+.brand-watermark {
   position: fixed;
-  inset: 0;
+  right: -140px;
+  bottom: -150px;
+  width: 560px;
   z-index: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(56, 189, 248, 0.012) 2px,
-    rgba(56, 189, 248, 0.012) 4px
-  );
+  user-select: none;
+}
+.brand-watermark img {
+  width: 100%;
+  display: block;
+}
+.brand-watermark .wm-light {
+  display: block;
+  opacity: 0.05;
+}
+.brand-watermark .wm-dark {
+  display: none;
+  opacity: 0.08;
+}
+:root[data-theme="dark"] .brand-watermark .wm-light {
+  display: none;
+}
+:root[data-theme="dark"] .brand-watermark .wm-dark {
+  display: block;
 }
 
 /* ── Container ── */
@@ -94,42 +230,35 @@ body {
   align-items: center;
   gap: 8px;
   padding: 5px 14px 5px 10px;
-  background: var(--accent-dim);
-  border: 1px solid rgba(56, 189, 248, 0.18);
-  border-radius: 100px;
+  background: var(--tint-teal);
+  border: 1px solid rgba(21, 100, 128, 0.3);
+  border-radius: var(--radius-pill);
   margin-bottom: 18px;
 }
 
+/* Statuspunkt statisch — das Design-System verzichtet auf Endlos-Animationen */
 .pulse {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--accent);
-  animation: blink 2s ease-in-out infinite;
+  background: var(--ml-teal);
 }
-
-@keyframes blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.25;
-  }
+:root[data-theme="dark"] .pulse {
+  background: var(--teal-text);
 }
 
 .badge-text {
-  font-family: "JetBrains Mono", monospace;
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.14em;
-  color: var(--accent);
+  text-transform: uppercase;
+  color: var(--teal-text);
 }
 
 h1 {
   font-size: clamp(1.6rem, 4.5vw, 2.4rem);
   font-weight: 700;
-  color: var(--text-hi);
+  color: var(--text);
   line-height: 1.2;
   margin-bottom: 10px;
 }
@@ -152,19 +281,21 @@ h1 {
   align-items: center;
   justify-content: center;
   border: 1.5px dashed var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 32px 20px;
   cursor: pointer;
   background: var(--surface);
+  box-shadow: var(--shadow);
   transition:
-    border-color 0.2s,
-    background 0.2s;
+    border-color 0.2s var(--ease),
+    background 0.2s var(--ease);
 }
 
 .file-drop:hover,
-.file-drop.drag-over {
-  border-color: var(--accent);
-  background: var(--accent-dim);
+.file-drop.drag-over,
+.file-drop:focus-within {
+  border-color: var(--ml-teal);
+  background: var(--tint-teal);
 }
 
 .file-drop input {
@@ -176,10 +307,6 @@ h1 {
   margin: 0;
   opacity: 0;
   cursor: pointer;
-}
-.file-drop:focus-within {
-  border-color: var(--accent);
-  background: var(--accent-dim);
 }
 
 .drop-content {
@@ -198,13 +325,13 @@ h1 {
 }
 
 .file-drop:hover .drop-icon {
-  color: var(--accent);
+  color: var(--teal-text);
 }
 
 .drop-label {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1rem;
-  color: var(--text-hi);
+  color: var(--text);
 }
 
 .drop-hint {
@@ -214,7 +341,7 @@ h1 {
 
 .image-preview {
   margin-top: 14px;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   line-height: 0;
 }
@@ -223,26 +350,23 @@ h1 {
   display: none;
 }
 
-/* Das Ergebnis-Panel bekommt nach dem Schließen des Hinweis-Dialogs
-   programmatisch den Fokus, damit Screenreader direkt beim Ergebnis landen.
-   Den sichtbaren Standard-Fokusrahmen um das GANZE Panel unterdrücken — er
-   wirkt sonst wie eine versehentliche blaue Auswahl. tabindex=-1 ⇒ per Tastatur
-   ohnehin nicht erreichbar, die A11y-Fokusansage bleibt erhalten. */
+/* Ergebnis-Panel bekommt nach dem Hinweis-Dialog programmatisch den Fokus —
+   sichtbaren Fokusrahmen unterdrücken (tabindex=-1, A11y-Ansage bleibt). */
 #resultsPanel:focus {
   outline: none;
 }
 
-/* Datenschutz-Hinweis an der Stelle, wo nach einem Reload das (bewusst nicht
-   wiederhergestellte) Foto war — positiver Lerneffekt statt leerer Lücke. */
+/* Datenschutz-Hinweis anstelle des (bewusst nicht wiederhergestellten)
+   Fotos nach einem Reload — ruhige Teal-Infofläche (Callout). */
 .photo-deleted-note {
   margin-top: 14px;
   display: flex;
   gap: 10px;
   align-items: flex-start;
   padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--accent-dim);
+  border-radius: var(--radius-md);
+  border-left: 2px solid var(--ml-teal);
+  background: var(--tint-teal);
   color: var(--text);
   font-size: 0.92rem;
   line-height: 1.5;
@@ -256,19 +380,19 @@ h1 {
 }
 
 .photo-deleted-text strong {
-  color: var(--text-hi);
+  color: var(--teal-text);
 }
 
 .image-preview img {
   width: 50%;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border);
   background: var(--surface);
   display: block;
   margin: 0 auto;
 }
 
-/* ── Honeypot (unsichtbar f\u00fcr Menschen, sichtbar f\u00fcr Bots) ── */
+/* ── Honeypot (unsichtbar für Menschen, sichtbar für Bots) ── */
 
 .hp-field {
   position: absolute;
@@ -279,7 +403,7 @@ h1 {
   pointer-events: none;
 }
 
-/* ── Bias Toggle ── */
+/* ── Bias Toggle (Seriöse Analyse ↔ Beast Mode) ── */
 
 .bias-toggle-wrap {
   display: flex;
@@ -294,46 +418,16 @@ h1 {
   padding: 8px 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 100px;
-  animation: toggleShake 4.2s ease 3s infinite both;
-}
-
-@keyframes toggleShake {
-  0% {
-    transform: skewX(0deg);
-  }
-  2% {
-    transform: skewX(-8deg);
-  }
-  4.5% {
-    transform: skewX(8deg);
-  }
-  7% {
-    transform: skewX(-6deg);
-  }
-  9.5% {
-    transform: skewX(6deg);
-  }
-  12% {
-    transform: skewX(0deg);
-  }
-  100% {
-    transform: skewX(0deg);
-  }
-}
-
-/* Animation pausieren wenn Tooltip offen — transform bricht position:fixed */
-.bias-toggle:has(.tooltip-open) {
-  animation: none;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow);
 }
 
 .bias-opt {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--muted);
-  transition: color 0.2s;
+  transition: color 0.2s var(--ease);
   user-select: none;
 }
 
@@ -360,14 +454,13 @@ h1 {
   height: 15px;
   border-radius: 50%;
   border: 1px solid currentColor;
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.58rem;
-  font-weight: 600;
+  font-weight: 700;
   font-style: normal;
   color: inherit;
   line-height: 1;
-  opacity: 0.5;
-  transition: opacity 0.2s;
+  opacity: 0.55;
+  transition: opacity 0.2s var(--ease);
 }
 
 .info-icon:hover .info-i,
@@ -383,27 +476,25 @@ h1 {
   transform: translateX(-50%);
   width: min(320px, calc(100vw - 32px));
   padding: 14px 16px;
-  background: linear-gradient(165deg, #151a28 0%, #0e1018 100%);
-  border: 1px solid rgba(56, 189, 248, 0.15);
-  border-radius: 12px;
-  font-family: "Inter", sans-serif;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-family: inherit;
   font-size: 0.82rem;
   font-weight: 400;
   line-height: 1.6;
   letter-spacing: 0;
   color: var(--text);
   text-transform: none;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.4),
-    0 0 20px rgba(56, 189, 248, 0.04);
+  box-shadow: var(--lift);
   z-index: 50;
   pointer-events: none;
-  animation: tooltipIn 0.2s ease;
+  animation: tooltipIn 0.2s var(--ease);
 }
 
 .tooltip strong {
-  color: var(--accent);
-  font-weight: 600;
+  color: var(--teal-text);
+  font-weight: 700;
 }
 
 .tooltip::after {
@@ -413,14 +504,14 @@ h1 {
   left: 50%;
   transform: translateX(-50%);
   border: 6px solid transparent;
-  border-top-color: rgba(56, 189, 248, 0.15);
+  border-top-color: var(--border);
 }
 
 .tooltip.below::after {
   top: auto;
   bottom: 100%;
   border-top-color: transparent;
-  border-bottom-color: rgba(56, 189, 248, 0.15);
+  border-bottom-color: var(--border);
 }
 
 /* Desktop: Hover öffnet Tooltip — aber nur wenn kein anderer offen ist */
@@ -445,14 +536,14 @@ h1 {
   }
 }
 
-/* Active states based on checkbox */
+/* Aktiver Modus färbt sein Label: Teal (sachlich) bzw. Rost (Beast) */
 #biasSwitch:not(:checked) ~ .bias-toggle .bias-opt[data-mode="normal"],
 .bias-toggle:has(#biasSwitch:not(:checked)) .bias-opt[data-mode="normal"] {
-  color: var(--accent);
+  color: var(--teal-text);
 }
 
 .bias-toggle:has(#biasSwitch:checked) .bias-opt[data-mode="boost"] {
-  color: var(--boost);
+  color: var(--rust-text);
 }
 
 .toggle-switch {
@@ -471,7 +562,7 @@ h1 {
   cursor: pointer;
 }
 .toggle-switch input:focus-visible + .toggle-track {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ml-teal);
   outline-offset: 2px;
 }
 
@@ -480,12 +571,12 @@ h1 {
   width: 44px;
   height: 24px;
   border-radius: 12px;
-  background: rgba(56, 189, 248, 0.15);
-  border: 1px solid rgba(56, 189, 248, 0.25);
+  background: var(--track);
+  border: 1px solid rgba(21, 100, 128, 0.4);
   position: relative;
   transition:
-    background 0.25s,
-    border-color 0.25s;
+    background 0.25s var(--ease),
+    border-color 0.25s var(--ease);
 }
 
 .toggle-thumb {
@@ -495,23 +586,23 @@ h1 {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--ml-teal);
   transition:
-    transform 0.25s,
-    background 0.25s;
+    transform 0.25s var(--ease),
+    background 0.25s var(--ease);
 }
 
 #biasSwitch:checked + .toggle-track {
-  background: var(--boost-dim);
-  border-color: rgba(248, 113, 113, 0.35);
+  background: var(--tint-rust-strong);
+  border-color: rgba(156, 78, 54, 0.4);
 }
 
 #biasSwitch:checked + .toggle-track .toggle-thumb {
   transform: translateX(20px);
-  background: var(--boost);
+  background: var(--ml-rust);
 }
 
-/* ── Scan-Animation ── */
+/* ── Scan-Animation (funktionaler Fortschritt — bewegt nur während der Analyse) ── */
 
 .scan-anim {
   display: none;
@@ -529,8 +620,8 @@ h1 {
 .scan-eye {
   width: 64px;
   height: 64px;
-  color: var(--accent);
-  animation: eyePulse 2.5s ease-in-out infinite;
+  color: var(--teal-text);
+  animation: eyePulse 2.5s var(--ease) infinite;
 }
 
 .scan-eye svg {
@@ -545,19 +636,19 @@ h1 {
     opacity: 0.7;
   }
   50% {
-    transform: scale(1.1);
+    transform: scale(1.06);
     opacity: 1;
   }
 }
 
 .scan-text {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.82rem;
-  color: var(--accent);
+  font-weight: 500;
+  color: var(--teal-text);
   letter-spacing: 0.02em;
   text-align: center;
   min-height: 1.2em;
-  animation: textFade 1.8s ease-in-out infinite;
+  animation: textFade 1.8s var(--ease) infinite;
 }
 
 @keyframes textFade {
@@ -566,14 +657,14 @@ h1 {
     opacity: 1;
   }
   50% {
-    opacity: 0.5;
+    opacity: 0.55;
   }
 }
 
 .scan-bar {
   width: 200px;
   height: 3px;
-  background: var(--border);
+  background: var(--track);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -581,9 +672,9 @@ h1 {
 .scan-fill {
   height: 100%;
   width: 40%;
-  background: var(--accent);
+  background: var(--ml-teal);
   border-radius: 2px;
-  animation: scanSlide 1.5s ease-in-out infinite;
+  animation: scanSlide 1.5s var(--ease) infinite;
 }
 
 @keyframes scanSlide {
@@ -595,16 +686,15 @@ h1 {
   }
 }
 
-/* ── Status ── */
+/* ── Status (Warteschlange, Fehler, Hinweise) ── */
 
 .status {
-  font-family: "JetBrains Mono", monospace;
   font-size: 1rem;
   padding: 10px 14px;
-  border-radius: 8px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--tint-teal);
+  border-left: 2px solid var(--ml-teal);
+  color: var(--text);
   margin-bottom: 18px;
   display: none;
 }
@@ -617,7 +707,7 @@ h1 {
   display: block;
   margin-top: 6px;
   font-size: 0.72rem;
-  opacity: 0.55;
+  color: var(--muted);
   user-select: text;
   letter-spacing: 0.02em;
 }
@@ -636,16 +726,17 @@ h1 {
 }
 
 .cat-card {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 16px;
-  animation: fadeUp 0.35s ease both;
-  transition: border-color 0.2s;
+  animation: fadeUp 0.35s var(--ease) both;
+  transition: border-color 0.2s var(--ease);
 }
 
 .cat-card:hover {
-  border-color: rgba(56, 189, 248, 0.25);
+  border-color: rgba(21, 100, 128, 0.4);
 }
 
 .cat-card:nth-child(1) {
@@ -689,34 +780,34 @@ h1 {
   margin-bottom: 6px;
 }
 
+/* Eyebrow-Label des Design-Systems: klein, fett, versal, Teal (dunkel: hell) */
 .cat-label {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
+  letter-spacing: var(--ls-label);
+  color: var(--heading);
 }
 
 .cat-conf {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 700;
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
+/* Legacy-Konfidenz-Pillen (ältere Datenstände): Teal / Gold / Rost */
 .cat-conf.high {
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ade80;
+  background: var(--tint-teal-strong);
+  color: var(--teal-text);
 }
 .cat-conf.med {
-  background: rgba(251, 191, 36, 0.1);
-  color: #fbbf24;
+  background: var(--num-chip-bg);
+  color: var(--num-chip-text);
 }
 .cat-conf.low {
-  background: var(--warn-dim);
-  color: var(--warn);
+  background: var(--tint-rust-strong);
+  color: var(--rust-text);
 }
 
 .cat-value {
@@ -728,7 +819,7 @@ h1 {
 
 .conf-track {
   height: 3px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--track);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -736,28 +827,21 @@ h1 {
 .conf-bar {
   height: 100%;
   border-radius: 2px;
-  transition: width 0.8s ease;
+  transition: width 0.8s var(--ease);
 }
 
+/* Balken behalten echte Markenfarben — hell wie dunkel */
 .conf-bar.high {
-  background: #4ade80;
+  background: var(--ml-teal);
 }
 .conf-bar.med {
-  background: #fbbf24;
+  background: var(--ml-gold);
 }
 .conf-bar.low {
-  background: var(--warn);
+  background: var(--ml-rust);
 }
 
-/* ── v2.0.4: Karten-Gruppen + Punkt-Konfidenz + Akzent-Linien ── */
-
-/* Gruppen-Akzentfarben — vier Themengruppen */
-:root {
-  --grp-identity: #60a5fa; /* blau — Wer du bist */
-  --grp-ability: #4ade80; /* grün — Was dich ausmacht */
-  --grp-money: #fbbf24; /* gelb — Was du kaufst */
-  --grp-risk: #f87171; /* rot  — Wo du verwundbar bist */
-}
+/* ── Karten-Gruppen + Punkt-Konfidenz + Akzent-Linien ── */
 
 /* Gruppen-Überschrift zwischen den Karten */
 .cat-group-head {
@@ -772,11 +856,10 @@ h1 {
   margin-top: 0;
 }
 .cat-group-title {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 700;
   margin: 0;
   color: var(--muted);
 }
@@ -799,7 +882,7 @@ h1 {
   background: var(--grp-risk);
 }
 
-/* Akzent-Linie links an jeder Karte je nach Gruppe */
+/* Akzent-Linie links an jeder Karte je nach Gruppe (echte Markenfarben) */
 .cat-card[data-grp="identity"] {
   border-left: 3px solid var(--grp-identity);
 }
@@ -815,11 +898,11 @@ h1 {
 
 /* Schlüsselbegriffe im Karten-Text automatisch fett (gesetzt von render.js) */
 .cat-value strong {
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: var(--text);
 }
 
-/* Konfidenz als drei farbige Punkte statt Prozent + Balken */
+/* Konfidenz als drei farbige Punkte */
 .cat-conf--dots {
   background: transparent !important;
   padding: 0 !important;
@@ -831,9 +914,9 @@ h1 {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--border);
+  background: var(--track);
   display: inline-block;
-  transition: background 0.2s;
+  transition: background 0.2s var(--ease);
 }
 .cat-card[data-grp="identity"] .cat-conf--dots .conf-dot.on {
   background: var(--grp-identity);
@@ -847,9 +930,9 @@ h1 {
 .cat-card[data-grp="risk"] .cat-conf--dots .conf-dot.on {
   background: var(--grp-risk);
 }
-/* Fallback wenn keine data-grp (z. B. Migration alter Daten): Akzent-Farbe */
+/* Fallback ohne data-grp: Teal */
 .cat-conf--dots .conf-dot.on {
-  background: var(--accent);
+  background: var(--ml-teal);
 }
 
 /* ── Privacy / EXIF (einspaltig) ── */
@@ -868,32 +951,32 @@ h1 {
 }
 
 .meta-card {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 16px;
 }
 
 .meta-card h3 {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
+  letter-spacing: var(--ls-label);
+  color: var(--heading);
   margin-bottom: 10px;
 }
 
 .meta-card.warn {
-  border-color: rgba(248, 113, 113, 0.2);
+  border-left: 3px solid var(--ml-rust);
 }
 .meta-card.warn h3 {
-  color: var(--warn);
+  color: var(--rust-text);
 }
 
 .meta-card ul {
   padding-left: 16px;
-  color: var(--warn);
+  color: var(--rust-text);
   font-size: 1rem;
   line-height: 1.6;
 }
@@ -913,7 +996,6 @@ h1 {
   color: var(--muted);
   padding-right: 12px;
   white-space: nowrap;
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.78rem;
 }
 
@@ -927,36 +1009,36 @@ h1 {
 }
 
 .map-wrapper {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 16px;
 }
 
 .map-wrapper h3 {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--warn);
+  letter-spacing: var(--ls-label);
+  color: var(--rust-text);
   margin-bottom: 12px;
 }
 
 .gps-address {
   font-size: 1rem;
-  color: var(--warn);
+  color: var(--rust-text);
   margin-bottom: 12px;
   padding: 10px 14px;
-  background: var(--warn-dim);
-  border-radius: 8px;
-  border: 1px solid rgba(248, 113, 113, 0.15);
+  background: var(--tint-rust);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(156, 78, 54, 0.25);
   line-height: 1.5;
 }
 
 #gpsMapLeaflet {
   height: 240px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
 }
 
@@ -973,30 +1055,34 @@ h1 {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  animation: fadeUp 0.5s ease;
+  animation: fadeUp 0.5s var(--ease);
 }
 
 .target-card {
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 16px;
 }
 
 .target-card h3 {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--accent);
+  letter-spacing: var(--ls-label);
+  color: var(--heading);
   margin-bottom: 12px;
 }
 
+.target-card.warn {
+  border-left: 3px solid var(--ml-rust);
+}
 .target-card.warn h3 {
-  color: var(--warn);
+  color: var(--rust-text);
 }
 
+/* Tag-Komponente des Design-Systems: Teal-Pille, 7 %-Fläche, 40 %-Rahmen */
 .tag-cloud {
   display: flex;
   flex-wrap: wrap;
@@ -1004,19 +1090,19 @@ h1 {
 }
 
 .tag {
-  font-size: 1rem;
-  font-weight: 500;
+  font-size: 0.92rem;
+  font-weight: 400;
   padding: 4px 10px;
-  border-radius: 6px;
-  background: var(--accent-dim);
-  color: var(--accent);
-  border: 1px solid rgba(56, 189, 248, 0.12);
+  border-radius: var(--radius-pill);
+  background: var(--tint-teal);
+  color: var(--teal-text);
+  border: 1px solid rgba(21, 100, 128, 0.4);
 }
 
 .trigger-list {
   padding-left: 16px;
   font-size: 1rem;
-  color: var(--warn);
+  color: var(--rust-text);
   line-height: 1.6;
 }
 
@@ -1024,7 +1110,7 @@ h1 {
   margin-bottom: 4px;
 }
 
-/* ── Profil-Verdict ── */
+/* ── Profil-Verdict (= Callout „highlight": Rost-Fläche + Akzentbalken) ── */
 
 .simulation {
   margin-bottom: 20px;
@@ -1034,11 +1120,11 @@ h1 {
 }
 
 .verdict {
-  background: linear-gradient(135deg, #16111c 0%, #12101a 100%);
-  border: 1px solid rgba(248, 113, 113, 0.18);
-  border-radius: 14px;
-  padding: 22px;
-  animation: fadeUp 0.5s ease;
+  background: var(--tint-rust);
+  border-left: 2px solid var(--ml-rust);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
+  animation: fadeUp 0.5s var(--ease);
 }
 
 .verdict-head {
@@ -1051,34 +1137,32 @@ h1 {
 .verdict-icon {
   width: 18px;
   height: 18px;
-  color: var(--warn);
+  color: var(--rust-text);
   flex-shrink: 0;
 }
 
 .verdict-head h3 {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--warn);
+  letter-spacing: var(--ls-label);
+  color: var(--rust-text);
 }
 
 .verdict-text {
   font-size: 1rem;
   line-height: 1.75;
-  color: var(--text-hi);
+  color: var(--text);
 }
 
-/* ── Disclaimer-Modal ── */
+/* ── Hinweis-Dialog (ruhige weiße Karte, ohne Glüh-Effekte) ── */
 
 .modal-overlay {
   display: none;
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(5, 7, 10, 0.92);
-  backdrop-filter: blur(12px);
+  background: var(--scrim);
   align-items: center;
   justify-content: center;
   padding: 20px;
@@ -1086,7 +1170,7 @@ h1 {
 
 .modal-overlay.active {
   display: flex;
-  animation: modalFadeIn 0.4s ease;
+  animation: modalFadeIn 0.2s var(--ease);
 }
 
 @keyframes modalFadeIn {
@@ -1100,56 +1184,24 @@ h1 {
 
 .modal-box {
   position: relative;
-  background: linear-gradient(165deg, #111520 0%, #0c0e14 50%, #10121c 100%);
-  border: 1px solid rgba(56, 189, 248, 0.15);
-  border-radius: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 40px 32px 36px;
   max-width: 500px;
   width: 100%;
   text-align: center;
-  animation: modalSlideUp 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-  overflow: hidden;
-  box-shadow:
-    0 0 40px rgba(56, 189, 248, 0.06),
-    0 0 80px rgba(56, 189, 248, 0.03),
-    0 24px 48px rgba(0, 0, 0, 0.5);
-}
-
-/* Scan-Lines im Modal */
-.modal-box::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(56, 189, 248, 0.02) 2px,
-    rgba(56, 189, 248, 0.02) 4px
-  );
-  border-radius: 18px;
-}
-
-/* Glühender Rand oben */
-.modal-box::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 10%;
-  right: 10%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent), transparent);
-  opacity: 0.5;
+  box-shadow: var(--lift);
+  animation: modalSlideUp 0.2s var(--ease);
 }
 
 @keyframes modalSlideUp {
   from {
-    transform: translateY(30px) scale(0.96);
+    transform: translateY(12px);
     opacity: 0;
   }
   to {
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
     opacity: 1;
   }
 }
@@ -1158,21 +1210,7 @@ h1 {
   width: 56px;
   height: 56px;
   margin: 0 auto 20px;
-  color: var(--accent);
-  filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.4));
-  animation: modalIconPulse 2.5s ease-in-out infinite;
-}
-
-@keyframes modalIconPulse {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 12px rgba(56, 189, 248, 0.4));
-  }
-  50% {
-    transform: scale(1.08);
-    filter: drop-shadow(0 0 20px rgba(56, 189, 248, 0.6));
-  }
+  color: var(--teal-text);
 }
 
 .modal-icon svg {
@@ -1181,12 +1219,9 @@ h1 {
 }
 
 .modal-box h2 {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.8rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: var(--accent);
+  font-size: 1.19rem;
+  font-weight: 700;
+  color: var(--heading);
   margin-bottom: 18px;
 }
 
@@ -1199,148 +1234,86 @@ h1 {
 }
 
 .modal-box p strong {
-  color: var(--text-hi);
+  color: var(--teal-text);
 }
 
 .modal-divider {
   width: 60px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent);
+  height: 2px;
+  background: var(--ml-teal);
   margin: 18px auto;
 }
 
+/* Primärbutton des Design-Systems: Teal-Verlauf, Text weiß */
 .modal-btn {
   position: relative;
   display: inline-block;
   margin-top: 22px;
-  padding: 14px 32px;
-  background: transparent;
-  color: var(--accent);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.82rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 10px;
+  padding: 13px 26px;
+  background: var(--ml-grad-teal);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: filter 0.2s var(--ease);
 }
 
 .modal-btn:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
-  transform: translateY(-1px);
+  filter: brightness(0.92);
 }
 
-.modal-btn:active {
-  transform: translateY(0);
-}
-
-/* ── Maintenance-Modal (Warn-Theme) ── */
-
-.modal-box--warn {
-  border-color: rgba(248, 113, 113, 0.2);
-  box-shadow:
-    0 0 40px rgba(248, 113, 113, 0.06),
-    0 0 80px rgba(248, 113, 113, 0.03),
-    0 24px 48px rgba(0, 0, 0, 0.5);
-}
-
-.modal-box--warn::before {
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(248, 113, 113, 0.02) 2px,
-    rgba(248, 113, 113, 0.02) 4px
-  );
-}
-
-.modal-box--warn::after {
-  background: linear-gradient(90deg, transparent, var(--warn), transparent);
-}
+/* ── Wartungs-Dialog (Rost-Signal) ── */
 
 .modal-box--warn .modal-icon {
-  color: var(--warn);
-  filter: drop-shadow(0 0 12px rgba(248, 113, 113, 0.4));
-  animation: warnIconPulse 2.5s ease-in-out infinite;
-}
-
-@keyframes warnIconPulse {
-  0%,
-  100% {
-    transform: scale(1);
-    filter: drop-shadow(0 0 12px rgba(248, 113, 113, 0.4));
-  }
-  50% {
-    transform: scale(1.08);
-    filter: drop-shadow(0 0 20px rgba(248, 113, 113, 0.6));
-  }
+  color: var(--rust-text);
 }
 
 .modal-box--warn h2 {
-  color: var(--warn);
+  color: var(--rust-text);
 }
 
 .modal-box--warn .modal-divider {
-  background: linear-gradient(90deg, transparent, rgba(248, 113, 113, 0.3), transparent);
+  background: var(--ml-rust);
 }
 
 .modal-box--warn .modal-btn {
-  color: var(--warn);
-  border-color: rgba(248, 113, 113, 0.3);
+  background: var(--ml-rust);
 }
 
-.modal-box--warn .modal-btn:hover {
-  background: var(--warn-dim);
-  border-color: var(--warn);
-  box-shadow: 0 0 20px rgba(248, 113, 113, 0.15);
-}
-
-/* ── Disclaimer ── */
+/* ── Disclaimer (= Callout „info": ruhige Teal-Fläche + Akzentbalken) ── */
 
 .disclaimer {
   margin-top: 32px;
   padding: 16px 20px;
-  background: var(--accent-dim);
-  border: 1px solid rgba(56, 189, 248, 0.18);
-  border-radius: 10px;
-  text-align: center;
-  animation: disclaimerPulse 4s ease-in-out infinite;
+  background: var(--tint-teal);
+  border-left: 2px solid var(--ml-teal);
+  border-radius: var(--radius-md);
 }
 
 .disclaimer p {
   font-size: 0.88rem;
   line-height: 1.6;
-  color: var(--accent);
+  color: var(--text);
   margin: 0;
 }
 
-@keyframes disclaimerPulse {
-  0%,
-  100% {
-    transform: scale(1) rotate(0deg);
-  }
-  25% {
-    transform: scale(1.012) rotate(0.3deg);
-  }
-  50% {
-    transform: scale(1.02) rotate(-0.2deg);
-  }
-  75% {
-    transform: scale(1.012) rotate(0.15deg);
-  }
+.disclaimer p strong {
+  color: var(--teal-text);
+  font-weight: 700;
 }
 
-/* ── Site Footer ── */
+/* ── Site Footer: kräftige Teal-Linie = Briefpapier-Zitat ── */
 
 .site-footer {
   text-align: center;
   padding: 24px 20px;
-  border-top: 1px solid var(--border);
+  border-top: 2px solid var(--ml-teal);
   margin-top: 20px;
+  position: relative;
+  z-index: 1;
 }
 
 .footer-inner {
@@ -1365,11 +1338,11 @@ h1 {
 .site-footer a {
   color: var(--muted);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.2s var(--ease);
 }
 
 .site-footer a:hover {
-  color: var(--accent);
+  color: var(--teal-text);
 }
 
 /* ── Open Source Box ── */
@@ -1388,22 +1361,23 @@ h1 {
   align-items: center;
   gap: 8px;
   padding: 10px 22px;
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.78rem;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: var(--muted);
   text-decoration: none;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
-  transition: all 0.25s ease;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition:
+    color 0.2s var(--ease),
+    border-color 0.2s var(--ease),
+    transform 0.2s var(--ease);
 }
 
 .opensource-link:hover {
-  color: var(--text-hi);
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  color: var(--teal-text);
+  border-color: var(--ml-teal);
   transform: translateY(-1px);
 }
 
@@ -1430,11 +1404,11 @@ h1 {
 }
 
 .support-headline {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.82rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: var(--text-hi);
+  font-weight: 700;
+  letter-spacing: var(--ls-label);
+  text-transform: uppercase;
+  color: var(--heading);
   margin: 0 0 4px;
 }
 
@@ -1444,24 +1418,24 @@ h1 {
   margin: 0 0 14px;
 }
 
+/* Unterstützen-Button = Primärbutton in der Hauptfarbe (Teal-Verlauf) */
 .support-btn {
   display: inline-block;
-  padding: 10px 24px;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  color: var(--accent);
+  padding: 12px 26px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
   text-decoration: none;
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  border-radius: 8px;
-  background: var(--accent-dim);
-  transition: all 0.25s ease;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--ml-grad-teal);
+  transition:
+    filter 0.2s var(--ease),
+    transform 0.2s var(--ease);
 }
 
 .support-btn:hover {
-  border-color: var(--accent);
-  box-shadow: 0 0 16px rgba(56, 189, 248, 0.15);
+  filter: brightness(0.92);
   transform: translateY(-1px);
 }
 
@@ -1469,7 +1443,7 @@ h1 {
   transform: translateY(0);
 }
 
-/* ── Limit-Banner ── */
+/* ── Limit-Banner (Rost-Signal + Gold-Countdown) ── */
 
 .limit-banner {
   display: none;
@@ -1479,10 +1453,10 @@ h1 {
   gap: 10px;
   padding: 28px 24px;
   margin-bottom: 24px;
-  background: var(--warn-dim);
-  border: 1px solid rgba(248, 113, 113, 0.25);
-  border-radius: 14px;
-  animation: fadeUp 0.4s ease;
+  background: var(--tint-rust);
+  border-left: 2px solid var(--ml-rust);
+  border-radius: var(--radius-md);
+  animation: fadeUp 0.4s var(--ease);
 }
 
 .limit-banner.active {
@@ -1492,7 +1466,7 @@ h1 {
 .limit-banner__icon {
   width: 40px;
   height: 40px;
-  color: var(--warn);
+  color: var(--rust-text);
 }
 
 .limit-banner__icon svg {
@@ -1501,12 +1475,11 @@ h1 {
 }
 
 .limit-banner__title {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.82rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--warn);
+  color: var(--rust-text);
 }
 
 .limit-banner__text {
@@ -1515,14 +1488,15 @@ h1 {
   color: var(--text);
 }
 
+/* Countdown = Zahl → Gold-Plakette (dunkle Schrift, WCAG-fest) */
 .limit-banner__countdown {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.92rem;
-  font-weight: 500;
-  color: var(--warn);
+  font-weight: 700;
+  color: var(--num-chip-text);
   padding: 6px 14px;
-  background: rgba(248, 113, 113, 0.08);
-  border-radius: 8px;
+  background: var(--num-chip-bg);
+  border-radius: var(--radius-md);
+  font-variant-numeric: tabular-nums;
 }
 
 .limit-banner__muted {
@@ -1547,10 +1521,10 @@ h1 {
   font-size: 0.75rem;
   color: var(--muted);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.2s var(--ease);
 }
 .limit-banner__stats:hover {
-  color: var(--text);
+  color: var(--teal-text);
 }
 
 .upload-section--limited {
@@ -1570,10 +1544,9 @@ h1 {
 }
 
 .stats-hero__title {
-  font-family: "JetBrains Mono", monospace;
   font-size: clamp(1.4rem, 4vw, 2rem);
   font-weight: 700;
-  color: var(--text-hi);
+  color: var(--text);
   margin-bottom: 8px;
 }
 
@@ -1587,11 +1560,11 @@ h1 {
   display: none;
   text-align: center;
   padding: 24px;
-  background: var(--warn-dim);
-  border: 1px solid rgba(248, 113, 113, 0.25);
-  border-radius: 12px;
+  background: var(--tint-rust);
+  border: 1px solid rgba(156, 78, 54, 0.25);
+  border-radius: var(--radius-lg);
   margin-bottom: 24px;
-  color: var(--warn);
+  color: var(--rust-text);
 }
 
 .stats-live {
@@ -1600,7 +1573,6 @@ h1 {
   justify-content: center;
   gap: 10px;
   margin-bottom: 24px;
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.82rem;
   color: var(--muted);
 }
@@ -1609,13 +1581,13 @@ h1 {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #4ade80;
-  animation: blink 2s ease-in-out infinite;
+  background: var(--ml-teal);
 }
 
 .stats-live__num {
-  color: var(--text-hi);
-  font-weight: 600;
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .stats-total {
@@ -1624,16 +1596,19 @@ h1 {
   padding: 28px 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
 }
 
+/* Große Zahl: leichter Schnitt in Textfarbe (Dashboard-Idiom des Design-Systems) */
 .stats-total__value {
-  font-family: "JetBrains Mono", monospace;
   font-size: clamp(2.4rem, 7vw, 3.6rem);
-  font-weight: 700;
-  color: var(--text-hi);
+  font-weight: 300;
+  color: var(--text);
   line-height: 1.1;
   margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .stats-total__label {
@@ -1644,7 +1619,7 @@ h1 {
 
 .stats-total__since {
   font-size: 0.78rem;
-  color: var(--accent);
+  color: var(--teal-text);
 }
 
 .stats-grid {
@@ -1657,17 +1632,18 @@ h1 {
 .stats-card {
   text-align: center;
   padding: 18px 12px;
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
 }
 
 .stats-card__value {
-  font-family: "JetBrains Mono", monospace;
   font-size: 1.4rem;
   font-weight: 700;
-  color: var(--text-hi);
+  color: var(--text);
   margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
 }
 
 .stats-card__label {
@@ -1675,18 +1651,25 @@ h1 {
   color: var(--muted);
 }
 
+/* Durchschnitt = kleiner Zähler → Gold-Plakette */
 .stats-card__avg {
-  font-family: "JetBrains Mono", monospace;
+  display: inline-block;
   font-size: 0.72rem;
-  color: var(--accent);
+  font-weight: 700;
+  color: var(--num-chip-text);
+  background: var(--num-chip-bg);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
   margin-top: 6px;
+  font-variant-numeric: tabular-nums;
 }
 
 .stats-limit {
   padding: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   margin-bottom: 28px;
 }
 
@@ -1698,35 +1681,33 @@ h1 {
 }
 
 .stats-limit__title {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-label);
   color: var(--muted);
 }
 
 .stats-limit__badge {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.68rem;
-  font-weight: 500;
+  font-weight: 700;
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
 }
 
 .stats-limit__badge--ok {
-  background: rgba(74, 222, 128, 0.12);
-  color: #4ade80;
+  background: var(--tint-teal-strong);
+  color: var(--teal-text);
 }
 
 .stats-limit__badge--warn {
-  background: var(--warn-dim);
-  color: var(--warn);
+  background: var(--tint-rust-strong);
+  color: var(--rust-text);
 }
 
 .stats-limit__bar-wrap {
   height: 6px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--track);
   border-radius: 3px;
   overflow: hidden;
   margin-bottom: 8px;
@@ -1735,33 +1716,33 @@ h1 {
 .stats-limit__bar-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.6s ease;
+  transition: width 0.6s var(--ease);
 }
 
+/* Ampel in echten Markenfarben: Teal → Gold → Rost */
 .stats-limit__bar-fill--low {
-  background: #4ade80;
+  background: var(--ml-teal);
 }
 .stats-limit__bar-fill--mid {
-  background: #fbbf24;
+  background: var(--ml-gold);
 }
 .stats-limit__bar-fill--high {
-  background: var(--warn);
+  background: var(--ml-rust);
 }
 
 .stats-limit__labels {
   display: flex;
   justify-content: space-between;
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
   color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .stats-limit__countdown {
   display: none;
   margin-top: 10px;
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.82rem;
-  color: var(--warn);
+  color: var(--rust-text);
   text-align: center;
 }
 
@@ -1774,9 +1755,10 @@ h1 {
 
 .stats-info {
   padding: 20px;
-  background: var(--card);
+  background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
 }
 
 .stats-info--full {
@@ -1787,7 +1769,7 @@ h1 {
 .stats-info__icon {
   width: 28px;
   height: 28px;
-  color: var(--accent);
+  color: var(--teal-text);
   margin-bottom: 10px;
 }
 
@@ -1797,8 +1779,8 @@ h1 {
 
 .stats-info__title {
   font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--text-hi);
+  font-weight: 700;
+  color: var(--heading);
   margin-bottom: 6px;
 }
 
@@ -1812,24 +1794,38 @@ h1 {
   margin-top: 14px;
 }
 
-/* ── Legal Pages ── */
+/* ── Unterseiten: Seitenkopf wie Briefpapier ── */
+
+.page-eyebrow {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--teal-text);
+  margin-bottom: 10px;
+}
+
+.eyebrow-home {
+  color: var(--teal-text);
+  text-decoration: none;
+}
+.eyebrow-home:hover {
+  text-decoration: underline;
+}
+
+.page-rule {
+  height: 2px;
+  background: var(--ml-grad-teal-line);
+  border: none;
+  margin: 18px 0 28px;
+}
+
+/* ── Rechtsseiten ── */
 
 .legal-page {
   max-width: 640px;
   padding-bottom: 40px;
-}
-
-.back-link {
-  display: inline-block;
-  margin-bottom: 24px;
-  font-size: 1rem;
-  color: var(--accent);
-  text-decoration: none;
-  transition: opacity 0.2s;
-}
-
-.back-link:hover {
-  opacity: 0.7;
 }
 
 .legal-page h1 {
@@ -1839,26 +1835,56 @@ h1 {
 .legal-subtitle {
   color: var(--muted);
   font-size: 1rem;
-  margin-bottom: 28px;
+  margin-bottom: 0;
 }
 
+/* Jeder Abschnitt = weiße Karte */
 .legal-section {
-  margin-bottom: 28px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 18px 20px;
+  margin-bottom: 14px;
 }
 
 .legal-section h2 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-hi);
-  margin-bottom: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--heading);
+  margin-bottom: 12px;
+}
+
+/* Abschnittsnummern: Gold-Plakette (Zahlen sind im Leitfaden Gold-Gelb) */
+.sec-num {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--num-chip-text);
+  background: var(--num-chip-bg);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .legal-block {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-top: 2px solid var(--ml-teal);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 16px;
   margin-bottom: 14px;
+}
+
+/* Boxen IN einer Abschnitts-Karte: Papierton statt Karte-in-Karte */
+.legal-section .legal-block {
+  background: var(--bg);
+  border: 1px solid var(--border-soft);
+  box-shadow: none;
 }
 
 .legal-block p {
@@ -1873,7 +1899,7 @@ h1 {
 }
 
 .legal-block a {
-  color: var(--accent);
+  color: var(--teal-text);
   text-decoration: none;
 }
 
@@ -1889,7 +1915,7 @@ h1 {
 }
 
 .legal-section a {
-  color: var(--accent);
+  color: var(--teal-text);
   text-decoration: none;
 }
 
@@ -1909,13 +1935,45 @@ h1 {
   margin-bottom: 6px;
 }
 
-.legal-list code {
-  font-family: "JetBrains Mono", monospace;
+/* Aufzählungspunkte in Teal */
+ul.legal-list li::marker {
+  color: var(--teal-text);
+}
+
+/* Nummerierte Schritt-Listen: Gold-Plaketten wie 01 / 02 / 03 */
+ol.legal-list {
+  list-style: none;
+  counter-reset: steps;
+  padding-left: 0;
+}
+ol.legal-list > li {
+  counter-increment: steps;
+  position: relative;
+  padding-left: 46px;
+  margin-bottom: 14px;
+}
+ol.legal-list > li::before {
+  content: counter(steps, decimal-leading-zero);
+  position: absolute;
+  left: 0;
+  top: 2px;
   font-size: 0.82rem;
-  background: var(--surface);
+  font-weight: 700;
+  color: var(--num-chip-text);
+  background: var(--num-chip-bg);
+  padding: 2px 7px;
+  border-radius: var(--radius-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.legal-list code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.82rem;
+  background: var(--tint-teal);
   padding: 1px 5px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
 }
 
 .legal-table-wrap {
@@ -1931,20 +1989,19 @@ h1 {
 
 .legal-table th {
   text-align: left;
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--accent);
+  color: var(--heading);
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .legal-table td {
   padding: 8px 10px;
   color: var(--text);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-soft);
   vertical-align: top;
 }
 
@@ -1953,14 +2010,14 @@ h1 {
 }
 
 .legal-table tbody tr {
-  transition: background 0.15s;
+  transition: background 0.15s var(--ease);
 }
 
 .legal-table tbody tr:hover {
-  background: rgba(56, 189, 248, 0.03);
+  background: var(--hover);
 }
 
-/* ── Datenwert-Rechner ── */
+/* ── Datenwert-Rechner (Zahlen = Gold, ruhige Teal-Infoflächen) ── */
 
 .data-value-section {
   margin-bottom: 16px;
@@ -1970,11 +2027,13 @@ h1 {
 }
 
 .dv-card {
-  background: linear-gradient(135deg, #0f1a12 0%, #0e1118 60%, #12101a 100%);
-  border: 1px solid rgba(74, 222, 128, 0.18);
-  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--ml-gold);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   padding: 24px;
-  animation: fadeUp 0.5s ease;
+  animation: fadeUp 0.5s var(--ease);
 }
 
 .dv-header {
@@ -1987,27 +2046,26 @@ h1 {
 .dv-icon {
   width: 22px;
   height: 22px;
-  color: #4ade80;
+  color: var(--ml-gold);
   flex-shrink: 0;
 }
 
 .dv-header h3 {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #4ade80;
+  letter-spacing: var(--ls-label);
+  color: var(--heading);
 }
 
 .dv-hero-value {
-  font-family: "JetBrains Mono", monospace;
   font-size: clamp(2.2rem, 6vw, 3.2rem);
-  font-weight: 700;
-  color: #4ade80;
+  font-weight: 300;
+  color: var(--text);
   line-height: 1.1;
   margin-bottom: 6px;
-  text-shadow: 0 0 30px rgba(74, 222, 128, 0.3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
 }
 
 .dv-subtitle {
@@ -2022,15 +2080,15 @@ h1 {
   gap: 8px;
   margin-bottom: 22px;
   padding: 14px 16px;
-  background: rgba(74, 222, 128, 0.05);
-  border: 1px solid rgba(74, 222, 128, 0.1);
-  border-radius: 10px;
+  background: var(--tint-teal);
+  border-radius: var(--radius-md);
 }
 
 .dv-scale-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .dv-scale-label {
@@ -2038,41 +2096,50 @@ h1 {
   color: var(--text);
 }
 
+/* Werte = Gold-Plakette (dunkle Schrift auf Gold-Fläche, WCAG-fest) */
 .dv-scale-value {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: #4ade80;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--num-chip-text);
+  background: var(--num-chip-bg);
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.dv-scale-muted .dv-scale-label,
-.dv-scale-muted .dv-scale-value {
+.dv-scale-muted .dv-scale-label {
   color: var(--muted);
   font-weight: 400;
   font-size: 0.82rem;
 }
+.dv-scale-muted .dv-scale-value {
+  background: transparent;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.82rem;
+  padding: 0;
+}
 
 .dv-divider {
   height: 1px;
-  background: var(--border);
+  background: var(--border-soft);
   margin: 4px 0;
 }
 
 .dv-explain {
   margin-bottom: 16px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
 }
 
 .dv-explain h4 {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #4ade80;
+  letter-spacing: var(--ls-label);
+  color: var(--heading);
   margin-bottom: 8px;
 }
 
@@ -2088,12 +2155,13 @@ h1 {
 }
 
 .dv-explain strong {
-  color: var(--text-hi);
+  color: var(--text);
+  font-weight: 700;
 }
 
 .dv-explain-highlight {
-  background: rgba(74, 222, 128, 0.06);
-  border-color: rgba(74, 222, 128, 0.15);
+  background: var(--tint-teal);
+  border-color: transparent;
 }
 
 .dv-breakdown {
@@ -2101,11 +2169,10 @@ h1 {
 }
 
 .dv-breakdown h4 {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.68rem;
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: var(--ls-label);
   color: var(--muted);
   margin-bottom: 10px;
 }
@@ -2127,35 +2194,38 @@ h1 {
 .dv-bar-track {
   flex: 1;
   height: 4px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--track);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .dv-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4ade80, #22d3ee);
+  background: var(--ml-teal);
   border-radius: 2px;
-  transition: width 0.8s ease;
+  transition: width 0.8s var(--ease);
 }
 
 .dv-bar-val {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
-  color: #4ade80;
-  width: 48px;
+  font-weight: 700;
+  color: var(--num-chip-text);
+  background: var(--num-chip-bg);
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  min-width: 52px;
   text-align: right;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 .dv-footnote {
   font-size: 0.76rem;
   color: var(--muted);
-  opacity: 0.7;
   line-height: 1.5;
 }
 
-/* ── Export-Button ── */
+/* ── Export-Button (Sekundärbutton des Design-Systems) ── */
 
 .export-wrap {
   display: flex;
@@ -2168,23 +2238,22 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 14px 28px;
-  background: transparent;
-  color: var(--accent);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 0.82rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  border-radius: 10px;
+  padding: 10px 20px;
+  background: var(--surface);
+  color: var(--teal-text);
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  border: 2px solid var(--ml-teal);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition:
+    filter 0.2s var(--ease),
+    transform 0.2s var(--ease);
 }
 
 .export-btn:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
+  filter: brightness(0.94);
   transform: translateY(-1px);
 }
 
@@ -2205,7 +2274,6 @@ h1 {
 }
 
 .demo-label {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.78rem;
   font-weight: 500;
   letter-spacing: 0.04em;
@@ -2228,23 +2296,26 @@ h1 {
   padding: 0;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
   overflow: hidden;
   cursor: pointer;
   transition:
-    border-color 0.2s,
-    transform 0.2s;
+    border-color 0.2s var(--ease),
+    transform 0.2s var(--ease),
+    box-shadow 0.2s var(--ease);
   font: inherit;
   color: inherit;
 }
 
 .demo-thumb:hover {
-  border-color: var(--accent);
+  border-color: var(--ml-teal);
   transform: translateY(-2px);
+  box-shadow: var(--lift);
 }
 
 .demo-thumb:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ml-teal);
   outline-offset: 2px;
 }
 
@@ -2259,18 +2330,17 @@ h1 {
 }
 
 .demo-caption {
-  font-family: "JetBrains Mono", monospace;
   font-size: 0.68rem;
   font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--muted);
   padding: 6px 8px 10px;
   text-align: center;
-  transition: color 0.2s;
+  transition: color 0.2s var(--ease);
 }
 
 .demo-thumb:hover .demo-caption {
-  color: var(--accent);
+  color: var(--teal-text);
 }
 
 /* ── Skip-to-Content (Barrierefreiheit) ── */
@@ -2280,10 +2350,10 @@ h1 {
   top: -100%;
   left: 0;
   padding: 8px 16px;
-  background: var(--accent);
-  color: #000;
+  background: var(--ml-teal);
+  color: #ffffff;
   z-index: 1000;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
 }
 .skip-link:focus {
@@ -2310,13 +2380,18 @@ h1 {
 }
 .disclaimer__workshop {
   margin-top: 8px;
+  color: var(--muted) !important;
 }
 .export-btn--hidden {
   display: none;
 }
-.legal-block--highlight {
-  border-color: rgba(56, 189, 248, 0.25);
-  background: rgba(56, 189, 248, 0.04);
+.legal-block--highlight,
+.legal-section .legal-block--highlight {
+  background: var(--tint-teal);
+  border: none;
+  border-left: 2px solid var(--ml-teal);
+  border-radius: var(--radius-md);
+  box-shadow: none;
 }
 .legal-list--flush {
   margin-bottom: 0;
@@ -2396,24 +2471,34 @@ h1 {
   .limit-banner {
     padding: 20px 16px;
   }
+  .dv-bar-label {
+    width: 120px;
+  }
 }
 
 /* ═══════════════════════════════════════════════
-   Print Styles — PDF-Export
+   Print Styles — PDF-Export (heller Papier-Look der Marke)
    ═══════════════════════════════════════════════ */
 
 @media print {
-  /* Reset Farben für Papier */
-  :root {
+  /* Druck immer im hellen Marken-Look — unabhängig vom Beast Mode */
+  :root,
+  :root[data-theme="dark"] {
     --bg: #ffffff;
-    --surface: #f8f9fa;
-    --card: #ffffff;
-    --border: #d1d5db;
-    --text: #1f2937;
-    --text-hi: #111827;
-    --muted: #6b7280;
-    --accent: #0369a1;
-    --warn: #b91c1c;
+    --surface: #ffffff;
+    --border: rgba(130, 121, 110, 0.4);
+    --border-soft: rgba(130, 121, 110, 0.15);
+    --text: #404749;
+    --muted: #82796e;
+    --heading: #156480;
+    --teal-text: #156480;
+    --rust-text: #9c4e36;
+    --tint-teal: rgba(21, 100, 128, 0.07);
+    --tint-teal-strong: rgba(21, 100, 128, 0.15);
+    --tint-rust: rgba(156, 78, 54, 0.07);
+    --tint-rust-strong: rgba(156, 78, 54, 0.15);
+    --num-chip-bg: rgba(191, 181, 66, 0.4);
+    --num-chip-text: #404749;
   }
 
   * {
@@ -2427,26 +2512,26 @@ h1 {
 
   body {
     background: #fff;
-    color: #1f2937;
+    color: #404749;
     font-size: 11pt;
   }
 
-  /* ── Print-Disclaimer: Box auf Seite 1 oben ── */
+  /* ── Print-Disclaimer: Box auf Seite 1 oben (Teal-Infofläche) ── */
   .print-disclaimer {
     display: block;
     margin: 0 0 16px;
     padding: 12px 20px;
-    background: #e0f2fe;
-    border: 1.5px solid #7dd3fc;
-    border-radius: 14px;
+    background: rgba(21, 100, 128, 0.07);
+    border: 1.5px solid rgba(21, 100, 128, 0.4);
+    border-radius: 10px;
     font-size: 8.5pt;
     line-height: 1.4;
-    color: #0c4a6e;
+    color: #404749;
     text-align: center;
   }
 
   .print-disclaimer strong {
-    color: #0369a1;
+    color: #156480;
   }
 
   /* Container */
@@ -2456,8 +2541,8 @@ h1 {
     margin: 0;
   }
 
-  /* ── Ausblenden: Nicht druckbare Elemente ── */
-  .scan-lines,
+  /* ── Ausblenden: Nicht druckbare Elemente (Wasserzeichen NIE auf Druck — Leitfaden) ── */
+  .brand-watermark,
   .hero,
   .upload-section,
   .demo-section,
@@ -2492,88 +2577,88 @@ h1 {
     width: 100%;
     box-sizing: border-box;
     vertical-align: top;
-    border: 1px solid #d1d5db;
+    border: 1px solid rgba(130, 121, 110, 0.4);
     box-shadow: none;
     background: #fff;
     break-inside: avoid;
   }
 
   .verdict {
-    background: #fef2f2;
-    border-color: #fca5a5;
+    background: rgba(156, 78, 54, 0.07);
+    border-left: 2px solid #9c4e36;
   }
 
   /* ── Kategorie-Labels + Confidence im Print ── */
   .cat-label {
-    color: #0369a1;
+    color: #156480;
   }
   .cat-conf.high {
-    background: #dcfce7;
-    color: #166534;
+    background: rgba(21, 100, 128, 0.15);
+    color: #156480;
   }
   .cat-conf.med {
-    background: #fef9c3;
-    color: #854d0e;
+    background: rgba(191, 181, 66, 0.4);
+    color: #404749;
   }
   .cat-conf.low {
-    background: #fee2e2;
-    color: #991b1b;
+    background: rgba(156, 78, 54, 0.15);
+    color: #9c4e36;
   }
 
   .conf-bar.high {
-    background: #22c55e;
+    background: #156480;
   }
   .conf-bar.med {
-    background: #eab308;
+    background: #bfb542;
   }
   .conf-bar.low {
-    background: #ef4444;
+    background: #9c4e36;
   }
 
   /* ── Verdict ── */
   .verdict-head h3 {
-    color: #b91c1c;
+    color: #9c4e36;
   }
   .verdict-icon {
-    color: #b91c1c;
+    color: #9c4e36;
   }
 
   /* ── Targeting ── */
   .target-card h3 {
-    color: #0369a1;
+    color: #156480;
   }
   .target-card.warn h3 {
-    color: #b91c1c;
+    color: #9c4e36;
   }
   .tag {
-    background: #e0f2fe;
-    color: #0369a1;
-    border-color: #7dd3fc;
+    background: rgba(21, 100, 128, 0.07);
+    color: #156480;
+    border-color: rgba(21, 100, 128, 0.4);
   }
   .trigger-list {
-    color: #b91c1c;
+    color: #9c4e36;
   }
 
   /* ── Privacy ── */
   .meta-card h3 {
-    color: #6b7280;
+    color: #156480;
   }
   .meta-card.warn h3 {
-    color: #b91c1c;
+    color: #9c4e36;
   }
   .meta-card ul {
-    color: #b91c1c;
+    color: #9c4e36;
   }
 
   /* ── Bild-Vorschau ── */
   .image-preview img {
     max-width: 200px;
-    border: 1px solid #d1d5db;
+    border: 1px solid rgba(130, 121, 110, 0.4);
   }
 
   /* ── Links druckbar ── */
   a {
-    color: #0369a1;
+    color: #156480;
     text-decoration: underline;
   }
 
@@ -2582,9 +2667,9 @@ h1 {
     display: block;
     text-align: center;
     font-size: 8pt;
-    color: #6b7280;
+    color: #82796e;
     padding: 10px 0 6px;
-    border-top: 1px solid #d1d5db;
+    border-top: 1px solid rgba(130, 121, 110, 0.4);
     margin: 8px 0;
   }
 

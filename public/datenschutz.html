@@ -15,15 +15,20 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=2026060701" />
+    <link rel="stylesheet" href="./styles.css?v=2026071301" />
   </head>
   <body>
     <a href="#main" class="skip-link" tabindex="0">Zum Inhalt springen</a>
-    <div class="scan-lines"></div>
+        <!-- m-Wasserzeichen (Leitfaden Kap. 07): 1x pro Flaeche, randbeschnitten -->
+    <div class="brand-watermark" aria-hidden="true">
+      <img class="wm-light" src="./img/brand/malziland-m-petrol.png" alt="" />
+      <img class="wm-dark" src="./img/brand/malziland-m-white.png" alt="" />
+    </div>
     <main id="main" class="container legal-page">
-      <a href="/" class="back-link" tabindex="0">&larr; Zur&uuml;ck zur Startseite</a>
+      <span class="page-eyebrow"><a href="/" class="eyebrow-home">malziME</a> &middot; Rechtliches</span>
       <h1>Datenschutz</h1>
       <p class="legal-subtitle">Verst&auml;ndlich erkl&auml;rt &middot; Stand: 6. Juli 2026</p>
+      <div class="page-rule"></div>
       <div class="disclaimer disclaimer--flush">
         <p><strong>malziME</strong> ist ein Lern-Tool f&uuml;r Medienkompetenz und Datenschutz-Sensibilisierung. Die KI-Profile sind erfunden und zeigen nur, was Algorithmen behaupten k&ouml;nnten &ndash; nichts davon ist wahr oder bewiesen.</p>
         <p class="disclaimer__workshop">F&uuml;r Workshops k&ouml;nnen auch Stock-Fotos oder &auml;ltere Bilder verwendet werden. Kein hochgeladenes Bild wird dauerhaft gespeichert oder ist nach der Analyse abrufbar.</p>
@@ -154,6 +159,8 @@
     <footer class="site-footer">
       <div class="footer-inner">
         <span class="footer-copy">&copy; 2026 malziME &bull; powered by malziland</span>
+        <span class="footer-sep">&middot;</span>
+        <a href="/" tabindex="0">Startseite</a>
         <span class="footer-sep">&middot;</span>
         <a href="/impressum" tabindex="0">Impressum</a>
         <span class="footer-sep">&middot;</span>

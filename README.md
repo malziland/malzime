@@ -45,12 +45,12 @@ public/                     Firebase Hosting (SPA, kein Build-Schritt)
   app.js                    Entry Point (ES Module)
   js/                       Frontend-Module (api, dom, demo, exif, geocoding, i18n, render, state, stats, ui)
   locales/                  Frontend-Locale-Dateien (de.json, manifest.json)
-  styles.css                Dark-Theme CSS + Print Styles
+  styles.css                malziland Design System (Hell/Dunkel via Beast-Mode-Kopplung) + Print Styles
   __tests__/                Vitest Frontend-Tests
   impressum.html            Impressum
   datenschutz.html          Datenschutzerklaerung
   stats.html                Oeffentliche Nutzungsstatistik
-  fonts/                    Self-hosted: Inter + JetBrains Mono (woff2)
+  fonts/                    Self-hosted: Poppins (woff2, OFL)
   lib/leaflet/              Self-hosted: Leaflet 1.9.4
   lib/exifr/                Self-hosted: exifr lite (EXIF-Parsing im Browser)
 
@@ -260,7 +260,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 | Karten | Leaflet + OpenStreetMap (self-hosted Lib + OSM-Tiles) |
 | Geocoding | Nominatim (client-seitig, OpenStreetMap Foundation) |
 | EXIF-Parsing | exifr (client-seitig im Browser) |
-| Fonts | Inter + JetBrains Mono (self-hosted, woff2) |
+| Fonts | Poppins (self-hosted, woff2, OFL) |
 | i18n | Eigenes Micro-Modul (Frontend JSON + Backend CommonJS Locales) |
 | Frontend | Vanilla JS, kein Framework, kein Build-Schritt |
 
@@ -283,7 +283,15 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 ## Lizenz
 
-MIT — siehe [LICENSE](LICENSE)
+Der Quellcode steht unter MIT — siehe [LICENSE](LICENSE).
+
+**Ausnahme Markenzeichen:** Die malziland-/malziME-Logos und Markendateien unter
+`public/img/brand/` sind **nicht** von der MIT-Lizenz umfasst. Alle Rechte vorbehalten;
+Nutzung ausserhalb dieses Projekts nur mit schriftlicher Zustimmung von
+malziland - learning | training | consulting e.U. Details: [public/img/brand/LICENSE.md](public/img/brand/LICENSE.md).
+
+**Schriften:** Poppins ist unter der SIL Open Font License 1.1 lizenziert
+(OFL-Text liegt im Ordner `public/fonts/poppins/`).
 
 ---
 

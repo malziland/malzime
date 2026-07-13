@@ -66,11 +66,16 @@
     <link rel="dns-prefetch" href="https://nominatim.openstreetmap.org" />
     <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin />
     <link rel="stylesheet" href="./lib/leaflet/leaflet.css" />
-    <link rel="stylesheet" href="./styles.css?v=2026070601" />
+    <link rel="stylesheet" href="./styles.css?v=2026071301" />
   </head>
   <body>
     <a href="#main" class="skip-link" tabindex="0">Zum Inhalt springen</a>
-    <div class="scan-lines"></div>
+
+    <!-- m-Wasserzeichen (Leitfaden Kap. 07): 1x pro Flaeche, randbeschnitten -->
+    <div class="brand-watermark" aria-hidden="true">
+      <img class="wm-light" src="./img/brand/malziland-m-petrol.png" alt="" />
+      <img class="wm-dark" src="./img/brand/malziland-m-white.png" alt="" />
+    </div>
 
     <main id="main" class="container">
       <!-- Print-Disclaimer (nur im Druck, nur Seite 1) -->
@@ -217,13 +222,13 @@
       <div class="footer-inner">
         <span class="footer-copy" data-i18n="footer.copy">&copy; 2026 malziME &bull; powered by malziland</span>
         <span class="footer-sep">&middot;</span>
-        <a href="/impressum" tabindex="0" data-i18n="footer.impressum">Impressum</a>
+        <a href="/impressum" target="_blank" rel="noopener" tabindex="0" data-i18n="footer.impressum">Impressum</a>
         <span class="footer-sep">&middot;</span>
-        <a href="/datenschutz" tabindex="0" data-i18n="footer.datenschutz">Datenschutz</a>
+        <a href="/datenschutz" target="_blank" rel="noopener" tabindex="0" data-i18n="footer.datenschutz">Datenschutz</a>
         <span class="footer-sep">&middot;</span>
-        <a href="/nutzungsbedingungen" tabindex="0" data-i18n="footer.nutzungsbedingungen">Nutzungsbedingungen</a>
+        <a href="/nutzungsbedingungen" target="_blank" rel="noopener" tabindex="0" data-i18n="footer.nutzungsbedingungen">Nutzungsbedingungen</a>
         <span class="footer-sep">&middot;</span>
-        <a href="/stats" tabindex="0" data-i18n="footer.stats">Stats</a>
+        <a href="/stats" target="_blank" rel="noopener" tabindex="0" data-i18n="footer.stats">Stats</a>
       </div>
     </footer>
 
@@ -258,6 +263,6 @@
     <div id="srAnnounce" class="sr-only" aria-live="assertive"></div>
 
     <script src="./lib/leaflet/leaflet.js"></script>
-    <script type="module" src="./app.js?v=2026070601"></script>
+    <script type="module" src="./app.js?v=2026071301"></script>
   </body>
 </html>

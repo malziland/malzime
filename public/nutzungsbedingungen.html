@@ -15,18 +15,23 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=2026060701" />
+    <link rel="stylesheet" href="./styles.css?v=2026071301" />
   </head>
   <body>
     <a href="#main" class="skip-link" tabindex="0">Zum Inhalt springen</a>
-    <div class="scan-lines"></div>
+        <!-- m-Wasserzeichen (Leitfaden Kap. 07): 1x pro Flaeche, randbeschnitten -->
+    <div class="brand-watermark" aria-hidden="true">
+      <img class="wm-light" src="./img/brand/malziland-m-petrol.png" alt="" />
+      <img class="wm-dark" src="./img/brand/malziland-m-white.png" alt="" />
+    </div>
     <main id="main" class="container legal-page">
-      <a href="/" class="back-link" tabindex="0">&larr; Zur&uuml;ck zur Startseite</a>
+      <span class="page-eyebrow"><a href="/" class="eyebrow-home">malziME</a> &middot; Rechtliches</span>
       <h1>Nutzungsbedingungen</h1>
       <p class="legal-subtitle">malziME by malziland &middot; Stand: 7. Juni 2026</p>
+      <div class="page-rule"></div>
       <!-- 1. Geltungsbereich -->
       <section class="legal-section">
-        <h2>1. Geltungsbereich</h2>
+        <h2><span class="sec-num">01</span> Geltungsbereich</h2>
         <p>Diese Nutzungsbedingungen gelten f&uuml;r die Nutzung von malziME (erreichbar unter <a href="https://malzi.me" tabindex="0">https://malzi.me</a>), einem Lern-Tool f&uuml;r Medienkompetenz und Datenschutz-Sensibilisierung, betrieben von:</p>
         <div class="legal-block">
           <p>malziland - learning | training | consulting e.U.<br />
@@ -40,7 +45,7 @@
       </section>
       <!-- 2. Was malziME ist -->
       <section class="legal-section">
-        <h2>2. Was malziME ist &ndash; und was nicht</h2>
+        <h2><span class="sec-num">02</span> Was malziME ist &ndash; und was nicht</h2>
         <p>malziME ist ein Bildungs- und Sensibilisierungstool. Es zeigt anhand eines hochgeladenen Fotos, was KI-Algorithmen und Datenbroker &uuml;ber eine Person behaupten k&ouml;nnten.</p>
         <div class="legal-block legal-block--highlight">
           <ul class="legal-list legal-list--flush">
@@ -52,7 +57,7 @@
       </section>
       <!-- 3. Zielgruppe -->
       <section class="legal-section">
-        <h2>3. Zielgruppe und Altersempfehlung</h2>
+        <h2><span class="sec-num">03</span> Zielgruppe und Altersempfehlung</h2>
         <p>malziME richtet sich an Sch&uuml;ler:innen, Lehrkr&auml;fte, Eltern und alle, die verstehen wollen, wie algorithmisches Profiling funktioniert.</p>
         <ul class="legal-list">
           <li><strong>Unter 10 Jahren:</strong> Die Nutzung wird nicht empfohlen. Die Inhalte setzen ein Grundverst&auml;ndnis von Datenverarbeitung und Medienkompetenz voraus.</li>
@@ -62,7 +67,7 @@
       </section>
       <!-- 4. Erlaubte Nutzung -->
       <section class="legal-section">
-        <h2>4. Erlaubte Nutzung</h2>
+        <h2><span class="sec-num">04</span> Erlaubte Nutzung</h2>
         <p>Du darfst malziME nutzen, um:</p>
         <ul class="legal-list">
           <li>dich selbst oder im Rahmen von Workshops andere &uuml;ber algorithmisches Profiling und Datenschutz aufzukl&auml;ren,</li>
@@ -72,7 +77,7 @@
       </section>
       <!-- 5. Verbotene Nutzung -->
       <section class="legal-section">
-        <h2>5. Verbotene Nutzung</h2>
+        <h2><span class="sec-num">05</span> Verbotene Nutzung</h2>
         <p>Folgende Nutzungen sind ausdr&uuml;cklich untersagt:</p>
         <ul class="legal-list">
           <li><strong>Missbrauch der Ergebnisse:</strong> Profile d&uuml;rfen nicht als Tatsachenbehauptungen &uuml;ber reale Personen verbreitet werden. Du darfst die Ergebnisse nicht verwenden, um andere Personen zu beleidigen, zu diskriminieren, zu mobben oder blo&szlig;zustellen.</li>
@@ -85,7 +90,7 @@
       </section>
       <!-- 6. Fotos und Datenverarbeitung -->
       <section class="legal-section">
-        <h2>6. Fotos und Datenverarbeitung</h2>
+        <h2><span class="sec-num">06</span> Fotos und Datenverarbeitung</h2>
         <p>Die vollst&auml;ndige Beschreibung der Datenverarbeitung findest du in unserer <a href="/datenschutz" tabindex="0">Datenschutzerkl&auml;rung</a>. Zusammengefasst:</p>
         <ul class="legal-list">
           <li>Dein Foto wird nur f&uuml;r die Analyse kurz verarbeitet und unmittelbar danach gel&ouml;scht &ndash; es wird nicht dauerhaft gespeichert.</li>
@@ -97,7 +102,7 @@
       </section>
       <!-- 7. Haftungsausschluss -->
       <section class="legal-section">
-        <h2>7. Haftungsausschluss</h2>
+        <h2><span class="sec-num">07</span> Haftungsausschluss</h2>
         <ul class="legal-list">
           <li><strong>Keine Gew&auml;hr f&uuml;r Ergebnisse:</strong> Die KI-Profile sind fiktiv. malziland &uuml;bernimmt keine Haftung f&uuml;r die Richtigkeit, Vollst&auml;ndigkeit oder Angemessenheit der generierten Inhalte.</li>
           <li><strong>Keine Haftung f&uuml;r Missbrauch:</strong> Wenn du Ergebnisse entgegen dieser Nutzungsbedingungen verwendest (z.&thinsp;B. zur Blo&szlig;stellung Dritter), tr&auml;gst du die alleinige Verantwortung.</li>
@@ -107,7 +112,7 @@
       </section>
       <!-- 8. Geistiges Eigentum -->
       <section class="legal-section">
-        <h2>8. Geistiges Eigentum</h2>
+        <h2><span class="sec-num">08</span> Geistiges Eigentum</h2>
         <ul class="legal-list">
           <li>Der Quellcode von malziME ist Open Source und auf <a href="https://github.com/malziland/malzime" target="_blank" rel="noopener" tabindex="0">GitHub</a> verf&uuml;gbar. Es gelten die dort hinterlegten Lizenzbedingungen.</li>
           <li>Die Marke malziME und das Design der Website sind urheberrechtlich gesch&uuml;tzt.</li>
@@ -116,7 +121,7 @@
       </section>
       <!-- 9. Workshops -->
       <section class="legal-section">
-        <h2>9. Workshops und p&auml;dagogischer Einsatz</h2>
+        <h2><span class="sec-num">09</span> Workshops und p&auml;dagogischer Einsatz</h2>
         <p>malziME wurde f&uuml;r den Einsatz in betreuten Workshops konzipiert. F&uuml;r Workshop-Veranstalter gilt:</p>
         <ul class="legal-list">
           <li>Die Verantwortung f&uuml;r die altersgerechte Aufbereitung der Ergebnisse liegt bei der durchf&uuml;hrenden Lehrperson bzw. dem Workshopleiter.</li>
@@ -127,18 +132,18 @@
       </section>
       <!-- 10. Aenderungen -->
       <section class="legal-section">
-        <h2>10. &Auml;nderungen der Nutzungsbedingungen</h2>
+        <h2><span class="sec-num">10</span> &Auml;nderungen der Nutzungsbedingungen</h2>
         <p>malziland beh&auml;lt sich vor, diese Nutzungsbedingungen jederzeit zu &auml;ndern. &Auml;nderungen werden auf dieser Seite ver&ouml;ffentlicht. Die fortgesetzte Nutzung von malziME nach einer &Auml;nderung gilt als Zustimmung zu den aktualisierten Bedingungen.</p>
       </section>
       <!-- 11. Recht und Gerichtsstand -->
       <section class="legal-section">
-        <h2>11. Anwendbares Recht und Gerichtsstand</h2>
+        <h2><span class="sec-num">11</span> Anwendbares Recht und Gerichtsstand</h2>
         <p>Es gilt &ouml;sterreichisches Recht unter Ausschluss des UN-Kaufrechts. F&uuml;r Verbraucher:innen gelten die zwingenden Bestimmungen des Konsumentenschutzgesetzes (KSchG) uneingeschr&auml;nkt. Gerichtsstand ist, soweit gesetzlich zul&auml;ssig, Linz, &Ouml;sterreich.</p>
         <p>F&uuml;r die au&szlig;ergerichtliche Beilegung von Verbraucherstreitigkeiten stellt die EU eine Online-Plattform bereit: <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener" tabindex="0">https://ec.europa.eu/consumers/odr</a></p>
       </section>
       <!-- 12. Kontakt -->
       <section class="legal-section">
-        <h2>12. Kontakt</h2>
+        <h2><span class="sec-num">12</span> Kontakt</h2>
         <p>Bei Fragen zu diesen Nutzungsbedingungen:</p>
         <ul class="legal-list">
           <li>Allgemein: <a href="mailto:info@malzi.me" tabindex="0">info@malzi.me</a></li>
@@ -160,6 +165,8 @@
     <footer class="site-footer">
       <div class="footer-inner">
         <span class="footer-copy">&copy; 2026 malziME &bull; powered by malziland</span>
+        <span class="footer-sep">&middot;</span>
+        <a href="/" tabindex="0">Startseite</a>
         <span class="footer-sep">&middot;</span>
         <a href="/impressum" tabindex="0">Impressum</a>
         <span class="footer-sep">&middot;</span>

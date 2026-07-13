@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.3.0] — 2026-07-13
+
+Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und vom Inhaber freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
+
+### Geändert
+
+- **Neues Erscheinungsbild nach dem malziland Design System — heller Papier-Look statt dunkler „AI-Stalker"-Ästhetik.** Grundfläche Warmweiß `#f9f7f4` mit weißen Karten (Warmgrau-Haarlinie, weiche Schatten, 10-px-Radius), Markenfarben nach Leitfaden-Rollen: Teal `#156480` als konstante Stimme (Überschriften-Labels, Buttons, Links, Trennlinien), Rost `#9c4e36` als Signal (Verdict, Manipulation, GPS-Warnung, Limit-Banner, Wartungs-Dialog), Gold-Gelb `#bfb542` ausschließlich für Zahlen/Zähler/Marker. Die vier Kategorie-Gruppen tragen die vier Markenfarben (Wer-du-bist=Teal, Was-dich-ausmacht=Warmgrau, Was-du-kaufst=Gold, Verwundbar=Rost). Schrift: selbst gehostete **Poppins** (OFL; offizieller Ersatz der Hausschrift Como lt. Design-System) ersetzt Inter + JetBrains Mono; Mono-Labels wurden zu versalen Eyebrow-Labels des Design-Systems. Statt der Scan-Linien liegt das m-Monogramm als dezentes Wasserzeichen auf der Seite (Leitfaden Kap. 07: max. 1×/Fläche, 4–6 % hell / 7–9 % dunkel). Endlos-Animationen (Puls-Punkt, Toggle-Wackeln, Disclaimer-Pulsieren, Modal-Glühen) entfernt — die Scan-Animation während der Analyse bleibt als funktionaler Fortschritt. (`public/styles.css`, `public/index.html`)
+- **Beast-Mode-Theme-Kopplung: Seriöse Analyse = Hell, Beast Mode = Dunkel.** Der Modus-Schalter kippt jetzt zugleich das Erscheinungsbild — das dunkle Theme folgt exakt Leitfaden Kap. 11 (Flächen/Balken/Buttons behalten die echten Markenfarben; farbiger Text nur in den definierten helleren Stufen `#4698b9`/`#c17d67`; Überschriften bleiben hell). Es gibt bewusst keinen separaten Hell/Dunkel-Schalter und keine Speicherung: Beast startet immer ausgeschaltet (Datenschutz + Pädagogik). Druck/PDF-Export bleibt unabhängig vom Modus immer im hellen Marken-Look; das Wasserzeichen erscheint nie im Druck (Leitfaden-Regel). (`public/app.js`, `public/styles.css`)
+- **Unterseiten (Impressum, Datenschutz, Nutzungsbedingungen, Stats) im Dokument-Look.** Briefpapier-Kopf (klickbare Wortmarke „malziME" als Heimweg + Teal-Verlaufslinie), jeder Abschnitt als Karte, Gold-Nummern für nummerierte Abschnitte und Schrittlisten, Teal-Aufzählungspunkte, „Startseite" als erster Footer-Eintrag. Der „Zurück zur Startseite"-Link entfällt: Die Startseite öffnet die Unterseiten jetzt in einem neuen Tab, damit laufende Analysen (Schalterstellung, Ergebnis) unangetastet bleiben. Unterseiten sind bewusst immer hell — Dunkel bleibt exklusiv die Beast-Bühne der Analyse-Seite. Neuer i18n-Key `stats.eyebrow` (DE `Statistik` / EN `Statistics`); der vorhandene Key `footer.startseite` wird jetzt genutzt, `stats.backLink` ist stillgelegt. (`public/impressum.html`, `public/datenschutz.html`, `public/nutzungsbedingungen.html`, `public/stats.html`, `public/locales/de.json`, `public/locales/en.json`)
+- **Barrierefreiheit: Gold-Zahlen als Plaketten statt Gold-Text.** Gold-Gelb als kleiner Text auf Weiß hätte nur ~1,9:1 Kontrast (WCAG-Durchfaller, relevant für Beamer/Sehschwächen). Alle Gold-Zahlen (Ø-Werte, Datenwert-Beträge, Abschnittsnummern, Countdown) sitzen deshalb auf einer Gold-Fläche (40 %) mit Anthrazit-Schrift; im dunklen Theme Gold-Text auf Gold-Tint (dort kontraststark). Bewegungs-Reduktion (`prefers-reduced-motion`) bleibt vollständig respektiert. (`public/styles.css`)
+
+### Hinzugefügt
+
+- **Marken-Ordner `public/img/brand/` mit Lizenz-Ausnahme.** Das m-Monogramm (petrol + weiß) liegt im Repo, ist aber ausdrücklich **nicht** MIT-lizenziert — Klarstellung in `public/img/brand/LICENSE.md` (DE/EN, alle Rechte vorbehalten) und im README-Lizenzabschnitt. Begründung: Verstecken schützt nicht (die Live-Seite ist öffentlich), die Lizenz schützt; ein Weglassen aus dem Repo hätte zudem CI-Tests gebrochen und Repo ≠ Live gemacht. (`public/img/brand/`, `README.md`)
+- **Schriftlizenz dokumentiert:** SIL-OFL-1.1-Text für Poppins (`public/fonts/poppins/OFL.txt`).
+
+### Entfernt
+
+- **Inter + JetBrains Mono** (`public/fonts/inter/`, `public/fonts/jetbrains-mono/`) — nach dem Umbau ungenutzt; über die git-Historie jederzeit wiederherstellbar. README-Angaben zu Schriften und Design entsprechend aktualisiert.
+
 ## [2.2.8] — 2026-07-06
 
 Reaktion auf den Workshop-Vorfall vom selben Vormittag: Foto-Einlesen abgehärtet, irreführende Fehlermeldung ersetzt, Fehler-Diagnose erweitert und anonyme Diagnose-Logs 30 Tage aufbewahrt (bisher war jede Häufigkeits-Analyse nach 1 Tag blind). Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests grün.

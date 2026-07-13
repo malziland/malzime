@@ -4,9 +4,9 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [2.3.0] — 2026-07-13
 
-Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026). Reines Frontend (Hosting) — Backend/Functions unberührt. Deploy erst nach Preview-Freigabe durch den Inhaber. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
+Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und vom Inhaber freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
 
 ### Geändert
 

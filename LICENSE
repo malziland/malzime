@@ -19,19 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-TRADEMARK / BRAND EXCEPTION — Markenzeichen-Ausnahme
-
-The malziland and malziME names, logos and brand assets (in particular the
-files under public/img/brand/) are NOT covered by the MIT license above.
-They are trademarks / protected brand design of
-malziland - learning | training | consulting e.U., Austria — all rights
-reserved. Unmodified use within this project (running and locally developing
-malziME) is permitted; any other use requires prior written permission
-(info@malziland.at). Details: public/img/brand/LICENSE.md
-
-Die Namen, Logos und Markendateien von malziland und malziME (insbesondere
-unter public/img/brand/) sind von der obigen MIT-Lizenz NICHT umfasst —
-alle Rechte vorbehalten. Details: public/img/brand/LICENSE.md

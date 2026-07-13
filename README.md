@@ -283,7 +283,15 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 ## Lizenz
 
-MIT — siehe [LICENSE](LICENSE)
+Der Quellcode steht unter MIT — siehe [LICENSE](LICENSE).
+
+**Ausnahme Markenzeichen:** Die malziland-/malziME-Logos und Markendateien unter
+`public/img/brand/` sind **nicht** von der MIT-Lizenz umfasst. Alle Rechte vorbehalten;
+Nutzung ausserhalb dieses Projekts nur mit schriftlicher Zustimmung von
+malziland - learning | training | consulting e.U. Details: [public/img/brand/LICENSE.md](public/img/brand/LICENSE.md).
+
+**Schriften:** Poppins, Inter und JetBrains Mono sind unter der SIL Open Font License 1.1
+lizenziert (OFL-Texte liegen in den jeweiligen Ordnern unter `public/fonts/`).
 
 ---
 

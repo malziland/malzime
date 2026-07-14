@@ -131,5 +131,6 @@ Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über
 
 Verfahren: Release-Tag in einem temporären `git worktree` auschecken, `npm ci`
 (Root + `functions/`), Test-Suiten laufen lassen; Ergebnis mit Commit/Exit-Status in
-`docs/VERIFICATION.md` festhalten. Erste dokumentierte Probe: steht aus (geplant als
-Phase 2 der Governance-Nachrüstung, siehe ADR-0001).
+[VERIFICATION.md](VERIFICATION.md) festhalten. Zuletzt durchgeführt am 2026-07-14
+mit Tag `v2.3.1`: Setup und beide Test-Suiten grün (435 + 165 Tests). Wiederholen
+bei größeren Toolchain-Wechseln (Node-Major, Test-Runner).

@@ -12,6 +12,7 @@ Governance-Nachrüstung Phase 1: Betriebs- und Sicherheitswissen wandert aus dem
 
 - **Betriebs- und Governance-Doku:** `docs/RUNBOOK.md` (Deploy-Ablauf, alle fünf Rollback-Hebel vom Wartungsmodus bis zum Hosting-Rollback, Störungs-Rezepte inkl. Scanner-Rauschen und `error.readFailed`, Log-Aufbewahrung), `docs/FLAGS.md` (Feature-Flag-Register mit Entfernungs-Kriterien und der 3-Schritt-Warnung für `useSingleLargeCall`), `docs/SECURITY-MODEL.md` (Schutzgüter, Rollen, Vertrauensgrenzen, Missbrauchsfälle mit Gegenmaßnahmen, Aufbewahrungs-Tabelle, Privacy-Notiz) und `docs/adr/0001-grundentscheidungen.md` (nachträglich dokumentierte Grundentscheidungen inkl. bewusster Abweichungen: keine Pre-commit-Hooks, Deutsch statt Englisch, leichtgewichtige Tags). README verlinkt das Runbook.
 - **Toolchain-Kleindateien:** `.nvmrc` (Node 24, gleicht Editor/Terminal an `functions/engines` und CI an), `.editorconfig`, `.gitattributes` (LF-Zeilenenden, Binärdatei-Markierung).
+- **Verifikationsmatrix `docs/VERIFICATION.md`** (Phase 2): Welche Anforderung ist wodurch belegt — Tests, Secret-Scan, Dependency-Audit, Lighthouse, Profilpflichten (inkl. zweier ehrlich als offen ausgewiesener Punkte: automatisierter A11y-Check, dokumentierter Tastatur-Smoketest) und externe Kontrollen. Dazu die **erste dokumentierte Rollback-Probe**: Tag `v2.3.1` in temporärem worktree ausgecheckt, `npm ci` + beide Test-Suiten grün (435 + 165) — der Rücksprung auf den letzten Release-Stand ist damit nachgewiesen, nicht nur beschrieben. (`docs/VERIFICATION.md`, `docs/RUNBOOK.md`)
 
 ### Geändert
 

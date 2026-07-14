@@ -71,11 +71,20 @@ docs/                Setup-Dokumentation
 
 ## Build, Test, and Development Commands
 
+Sammel-Befehle (Root, decken Frontend + Backend ab):
+
+- `npm run setup` — install everything (root + functions, via npm ci)
+- `npm test` — run all unit tests (backend Jest + frontend Vitest)
+- `npm run lint` — ESLint frontend + backend
+- `npm run format:check` — Prettier check frontend + backend
+
+Einzelbefehle:
+
 - `cd functions && npm install` — install backend dependencies
 - `npm install` (root) — install frontend test/lint dependencies (Vitest, ESLint, Prettier)
 - `cd functions && npm test` — run Jest backend unit tests (435 tests)
 - `npm run test:frontend` — run Vitest frontend unit tests (165 tests)
-- `npm run test:e2e` — run Playwright E2E smoke tests (2 tests)
+- `npm run test:e2e` — run Playwright E2E tests (Smoke + axe-A11y-Gate; neue ernste A11y-Verstöße brechen CI, Bestands-Ausnahmen siehe e2e/a11y.test.js)
 - `cd functions && npm run lint` — ESLint backend
 - `cd functions && npm run format:check` — Prettier backend
 - `npm run lint:frontend` — ESLint frontend

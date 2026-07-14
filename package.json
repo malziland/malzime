@@ -2,6 +2,11 @@
   "name": "malzime",
   "private": true,
   "scripts": {
+    "setup": "npm ci && npm ci --prefix functions",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "npm test --prefix functions",
+    "lint": "npm run lint:frontend && npm run lint --prefix functions",
+    "format:check": "npm run format:frontend:check && npm run format:check --prefix functions",
     "test:frontend": "vitest run",
     "test:frontend:watch": "vitest",
     "test:frontend:coverage": "vitest run --coverage",
@@ -13,6 +18,7 @@
     "emulator": "firebase emulators:start --only functions,firestore,hosting,pubsub"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@vitest/coverage-v8": "^4.1.9",

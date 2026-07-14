@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+Governance-Nachrüstung Phase 1: Betriebs- und Sicherheitswissen wandert aus dem Kopf/Assistenten-Gedächtnis ins Repo. Reine Dokumentation plus drei Konfigurations-Kleindateien — kein Code, kein Deploy, das Live-Verhalten ist unberührt.
+
+### Hinzugefügt
+
+- **Betriebs- und Governance-Doku:** `docs/RUNBOOK.md` (Deploy-Ablauf, alle fünf Rollback-Hebel vom Wartungsmodus bis zum Hosting-Rollback, Störungs-Rezepte inkl. Scanner-Rauschen und `error.readFailed`, Log-Aufbewahrung), `docs/FLAGS.md` (Feature-Flag-Register mit Entfernungs-Kriterien und der 3-Schritt-Warnung für `useSingleLargeCall`), `docs/SECURITY-MODEL.md` (Schutzgüter, Rollen, Vertrauensgrenzen, Missbrauchsfälle mit Gegenmaßnahmen, Aufbewahrungs-Tabelle, Privacy-Notiz) und `docs/adr/0001-grundentscheidungen.md` (nachträglich dokumentierte Grundentscheidungen inkl. bewusster Abweichungen: keine Pre-commit-Hooks, Deutsch statt Englisch, leichtgewichtige Tags). README verlinkt das Runbook.
+- **Toolchain-Kleindateien:** `.nvmrc` (Node 24, gleicht Editor/Terminal an `functions/engines` und CI an), `.editorconfig`, `.gitattributes` (LF-Zeilenenden, Binärdatei-Markierung).
+
+### Geändert
+
+- **Doku-Drift korrigiert:** AGENTS.md nannte das Stundenlimit noch mit 500 (Code: 1500) und ließ `release.yml` unerwähnt; `docs/ARCHITECTURE.md` nannte das Limit ebenfalls mit 500 und die Liveness-Karenz mit 3 min (Code: 8 min seit v2.2.3/UX-001). (`AGENTS.md`, `docs/ARCHITECTURE.md`)
+
 ## [2.3.1] — 2026-07-13
 
 Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teilen-Bild, README-Screenshots) plus ein Sicherheitsupdate im Backend. Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.

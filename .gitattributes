@@ -1,0 +1,15 @@
+# Zeilenenden vereinheitlichen (LF), Binärdateien unangetastet lassen
+* text=auto eol=lf
+
+# Vendorierte Fremd-Bibliotheken byte-identisch zum Upstream lassen
+public/lib/** -text
+public/fonts/** -text
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff2 binary
+*.pdf binary

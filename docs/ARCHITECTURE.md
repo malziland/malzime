@@ -40,7 +40,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
 │     ├─ Rate-Limit (IP-basiert, 200/10min, In-Memory pro Instanz)  │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
-│     └─ Hourly-Limit-Check (Firestore, 500/Stunde rollendes Fenster)│
+│     └─ Hourly-Limit-Check (Firestore, 1500/Std. rollendes Fenster) │
 │                                                                    │
 │  2. Mistral Large 3 — Beschreibung                                 │
 │     ├─ mistral.js → POST api.mistral.ai/v1/chat/completions        │
@@ -110,7 +110,7 @@ Browser ◄──GET /api/job-status?jobId=──  Polling alle 2 s (= Liveness-
 
 ### Client-Liveness
 
-Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-Poll schreibt `lastSeenAt`. Bleibt das Lebenszeichen länger als `LIVENESS_GRACE_MS` (3 min) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
+Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-Poll schreibt `lastSeenAt`. Bleibt das Lebenszeichen länger als `LIVENESS_GRACE_MS` (8 min) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
 
 ### Reaper
 

@@ -34,7 +34,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   handle-analyze.js  Synchroner Legacy-Pfad (Fallback): Validation -> Mistral Describe -> SUBJECT-Parsing -> Mistral Profile / Easter-Egg -> Response. Live laeuft die Analyse ueber die Queue (handle-process-job.js).
   handle-stats.js    Stats-Handler (GET-only)
   handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
-  config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (500)
+  config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (1500)
   counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance-Mode
   notify.js          ntfy Push-Benachrichtigungen bei Limit-Erreichung
   animal.js          SUBJECT-Klassifikation aus Mistral-Beschreibungstext + Easter-Egg-Profile (Hund/Katze/Vogel/...)
@@ -66,15 +66,15 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   scripts/           Dev-Tools (test-subject.js — Tiererkennung gegen echte Bilder pruefen)
 
 docs/                Setup-Dokumentation
-.github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml)
+.github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml, release.yml)
 ```
 
 ## Build, Test, and Development Commands
 
 - `cd functions && npm install` — install backend dependencies
 - `npm install` (root) — install frontend test/lint dependencies (Vitest, ESLint, Prettier)
-- `cd functions && npm test` — run Jest backend unit tests (432 tests)
-- `npm run test:frontend` — run Vitest frontend unit tests (155 tests)
+- `cd functions && npm test` — run Jest backend unit tests (435 tests)
+- `npm run test:frontend` — run Vitest frontend unit tests (165 tests)
 - `npm run test:e2e` — run Playwright E2E smoke tests (2 tests)
 - `cd functions && npm run lint` — ESLint backend
 - `cd functions && npm run format:check` — Prettier backend

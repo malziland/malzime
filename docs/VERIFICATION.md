@@ -27,7 +27,7 @@ bewusst als offen ausgewiesen.
 | Profil | Pflicht | Status |
 |---|---|---|
 | UI | E2E-Test des kritischsten Nutzerflusses | ✅ `e2e/smoke.test.js` (CI-Pflicht-Check) |
-| UI | Automatisierter Accessibility-Check dieses Flows | ✅ `e2e/a11y.test.js` (axe-core im Playwright-E2E, CI-Pflicht-Check; Gate: neue serious/critical-Verstöße brechen die CI) — **mit 3 dokumentierten Bestands-Ausnahmen** (`color-contrast`, `aria-prohibited-attr`, `link-in-text-block`, Aufnahme 2026-07-14): deren Behebung ändert Farbwerte des Design-Systems, Sanierungs-Entscheidung des Inhabers **offen** |
+| UI | Automatisierter Accessibility-Check dieses Flows | ✅ `e2e/a11y.test.js` (axe-core im Playwright-E2E, CI-Pflicht-Check): serious/critical-Verstöße brechen die CI — **ohne Ausnahmen seit v2.3.2** (Warmgrau-Textstufe `#6e675e`, `role="img"` an Konfidenz-Punkten, Attribution-Unterstreichung; Messung mit reducedMotion gegen Animations-Artefakte). 4/4 grün, 2026-07-14 |
 | UI | Dokumentierter manueller Tastatur-Smoketest | **offen** — bisher nicht dokumentiert durchgeführt |
 | SERVICE_API | Request-/Upload-/Response-Grenzen, Rate Limits | ✅ Upload-/Größen-Limits + Magic-Byte-Check (`upload.js`), IP-Rate-Limit (`middleware.js`), Stundenlimit + Output-Bounds (`config.js`, `handle-*.js`) — durch Unit-Tests abgedeckt |
 | SERVICE_API | Autorisierung fail-closed | ✅ Admin nur mit HMAC-Token + Nonce (`auth.js`, Tests); `processJob` nur via OIDC (Cloud Tasks) |

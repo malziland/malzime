@@ -168,7 +168,7 @@ function renderCategories(profile) {
           <div class="cat-card" data-key="${escapeHtml(key)}" data-grp="${grp.id}">
             <div class="cat-head">
               <span class="cat-label">${escapeHtml(cat.label)}</span>
-              <span class="cat-conf cat-conf--dots ${cls}" aria-label="Konfidenz">${dotsHtml}</span>
+              <span class="cat-conf cat-conf--dots ${cls}" role="img" aria-label="Konfidenz">${dotsHtml}</span>
             </div>
             <p class="cat-value">${highlightKeyTerms(escapeHtml(cat.value))}</p>
           </div>

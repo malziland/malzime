@@ -356,7 +356,7 @@ function renderSimulation(text) {
     <div class="verdict">
       <div class="verdict-head">
         <svg class="verdict-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M3.6 19.8h16.8a1.2 1.2 0 001.04-1.8L13.04 4.2a1.2 1.2 0 00-2.08 0L2.56 18a1.2 1.2 0 001.04 1.8z"/></svg>
-        <h3>${t("verdict.title")}</h3>
+        <h2>${t("verdict.title")}</h2>
       </div>
       <p class="verdict-text">${escapeHtml(text)}</p>
     </div>

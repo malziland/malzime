@@ -1150,12 +1150,13 @@ h1 {
   flex-shrink: 0;
 }
 
-.verdict-head h3 {
+.verdict-head h2 {
   font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: var(--ls-label);
   color: var(--rust-text);
+  margin: 1em 0; /* war h3 (Browser-Default 1em); h2 nur wegen Überschriften-Reihenfolge (WCAG) */
 }
 
 .verdict-text {
@@ -2625,7 +2626,7 @@ ol.legal-list > li::before {
   }
 
   /* ── Verdict ── */
-  .verdict-head h3 {
+  .verdict-head h2 {
     color: #9c4e36;
   }
   .verdict-icon {

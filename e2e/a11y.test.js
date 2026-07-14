@@ -3,19 +3,14 @@ import AxeBuilder from "@axe-core/playwright";
 
 /* Automatisierter Accessibility-Check (axe-core) des kritischsten Nutzerflusses:
    Startseite und fertige Profil-Ansicht. Gate: Verstöße mit Impact "serious"
-   oder "critical" brechen den Test; leichtere Funde werden nur geloggt, damit
-   sie sichtbar bleiben, ohne jeden PR zu blockieren. */
+   oder "critical" brechen den Test — OHNE Ausnahmen (Altlasten in v2.3.2
+   behoben); leichtere Funde werden nur geloggt, damit sie sichtbar bleiben,
+   ohne jeden PR zu blockieren.
 
-/* Bestandsschutz: Diese Regeln schlagen im Design-Stand v2.3.x an (Aufnahme
-   2026-07-14) und sind als OFFENE Sanierungs-Punkte in docs/VERIFICATION.md
-   dokumentiert — Behebung ändert das Erscheinungsbild (Farbwerte des
-   malziland Design Systems) und braucht die Freigabe des Inhabers. Sie werden
-   geloggt, brechen aber den Test nicht. Jede NEUE ernste Regel bricht die CI.
-   - color-contrast: Warmgrau-Text auf Warmweiß unter 4,5:1 (Startseite,
-     Footer, Datenwert-Bereich)
-   - aria-prohibited-attr: aria-label auf span ohne Rolle (.high/.med)
-   - link-in-text-block: Leaflet-Attributions-Link nur per Farbe erkennbar */
-const BEKANNTE_ALTLASTEN = ["color-contrast", "aria-prohibited-attr", "link-in-text-block"];
+   Gemessen wird mit reduzierter Bewegung: Ohne das erwischt axe Elemente
+   mitten in der Einblend-Animation (halbtransparenter Text → Schein-Funde
+   mit Kontrast ~1:1). Die Seite respektiert prefers-reduced-motion ohnehin
+   vollständig — gemessen wird also ein realer Endzustand. */
 
 const MOCK_RESPONSE = {
   profiles: {
@@ -52,9 +47,7 @@ async function checkA11y(page, kontext) {
       alle.map((v) => `${v.id} (${v.impact}) × ${v.nodes.length}`).join(", ")
     );
   }
-  const ernst = alle.filter(
-    (v) => (v.impact === "serious" || v.impact === "critical") && !BEKANNTE_ALTLASTEN.includes(v.id)
-  );
+  const ernst = alle.filter((v) => v.impact === "serious" || v.impact === "critical");
   expect(
     ernst.map((v) => ({ regel: v.id, impact: v.impact, elemente: v.nodes.map((n) => n.target.join(" ")) })),
     `Ernste A11y-Verstöße auf ${kontext}`
@@ -72,6 +65,7 @@ test("A11y: Startseite ohne ernste Verstöße", async ({ page }) => {
     })
   );
 
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
 
@@ -109,6 +103,7 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
     route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
   );
 
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await page.click('[data-demo="selfie"]');
   await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });

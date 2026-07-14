@@ -4,21 +4,24 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [2.3.2] — 2026-07-14
 
-Governance-Nachrüstung Phase 1: Betriebs- und Sicherheitswissen wandert aus dem Kopf/Assistenten-Gedächtnis ins Repo. Reine Dokumentation plus drei Konfigurations-Kleindateien — kein Code, kein Deploy, das Live-Verhalten ist unberührt.
+Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus Governance-Nachrüstung (Phasen 1–3: Betriebs-Doku, Verifikationsmatrix, A11y-Gate, Sammel-Scripts). Nur-Hosting-Deploy — Functions unberührt. 165 Frontend- + 435 Backend-Tests, 4 E2E (A11y-Gate ohne Ausnahmen), Lint und Format grün.
+
+### Geändert
+
+- **Barrierefreiheit: Nebentexte auf „Warmgrau-Textstufe" `#6e675e`** (Field Decision im malziland Design System, 2026-07-14). Das Marken-Warmgrau `#82796e` verfehlte als Textfarbe die WCAG-Norm 4,5:1 auf allen hellen Flächen knapp (4,0:1 auf Papier / 4,3:1 auf Weiß / 3,6:1 im Hinweis-Kasten des Foto-Dialogs) — 22 Stellen, gefunden vom neuen A11y-Gate. Die Textstufe behält den identischen Farbton (33°/8 %) und ist nur so dunkel wie nötig (jetzt 5,2 / 5,6 / 4,7). Linien, Rahmen, Flächen und der Gruppenakzent behalten den Vollton; gilt auch für die Druck-Stile. Analog zu den bestehenden Dark-Theme-Textstufen (`#4698b9`/`#c17d67`) — die CI-Lücke betraf alle malziland-Dokumente, nicht nur malziME. (`public/styles.css`)
+- **Barrierefreiheit, zwei Kleinigkeiten:** Die Konfidenz-Punkte neben den Profil-Kategorien tragen jetzt `role="img"` — damit ist das vorhandene `aria-label` für Screenreader technisch gültig (vorher wurde es ignoriert). Der OpenStreetMap-Quellenhinweis unter der GPS-Karte ist als Link unterstrichen (war nur an der Farbe erkennbar). (`public/js/render.js`, `public/styles.css`)
+- **A11y-Gate voll scharf:** Der Wächter misst jetzt mit reduzierter Bewegung — vorher erwischte axe Elemente mitten in der Einblend-Animation, was ~60 Schein-Funde mit Kontrast ~1:1 erzeugte. Die Bestands-Ausnahmeliste aus dem ersten Wurf ist komplett entfernt: Jeder ernste Verstoß (serious/critical) bricht ab sofort die CI. (`e2e/a11y.test.js`)
+- **Doku-Drift korrigiert:** AGENTS.md nannte das Stundenlimit noch mit 500 (Code: 1500) und ließ `release.yml` unerwähnt; `docs/ARCHITECTURE.md` nannte das Limit ebenfalls mit 500 und die Liveness-Karenz mit 3 min (Code: 8 min seit v2.2.3/UX-001). (`AGENTS.md`, `docs/ARCHITECTURE.md`)
 
 ### Hinzugefügt
 
 - **Betriebs- und Governance-Doku:** `docs/RUNBOOK.md` (Deploy-Ablauf, alle fünf Rollback-Hebel vom Wartungsmodus bis zum Hosting-Rollback, Störungs-Rezepte inkl. Scanner-Rauschen und `error.readFailed`, Log-Aufbewahrung), `docs/FLAGS.md` (Feature-Flag-Register mit Entfernungs-Kriterien und der 3-Schritt-Warnung für `useSingleLargeCall`), `docs/SECURITY-MODEL.md` (Schutzgüter, Rollen, Vertrauensgrenzen, Missbrauchsfälle mit Gegenmaßnahmen, Aufbewahrungs-Tabelle, Privacy-Notiz) und `docs/adr/0001-grundentscheidungen.md` (nachträglich dokumentierte Grundentscheidungen inkl. bewusster Abweichungen: keine Pre-commit-Hooks, Deutsch statt Englisch, leichtgewichtige Tags). README verlinkt das Runbook.
 - **Toolchain-Kleindateien:** `.nvmrc` (Node 24, gleicht Editor/Terminal an `functions/engines` und CI an), `.editorconfig`, `.gitattributes` (LF-Zeilenenden, Binärdatei-Markierung).
-- **Barrierefreiheits-Gate im E2E** (Phase 3): neuer Playwright-Test `e2e/a11y.test.js` prüft Startseite + fertige Profil-Ansicht mit axe-core (`@axe-core/playwright`, dev-only). Jeder **neue** ernste Verstoß (serious/critical) bricht ab jetzt die CI. Drei Bestands-Funde des aktuellen Designs sind dokumentiert ausgenommen und warten auf Sanierungs-Entscheidung (Kontrast Warmgrau-auf-Warmweiß u. a. bei Fließtext/Footer/Datenwert-Bereich; `aria-label` auf den Konfidenz-Badges; Leaflet-Attributions-Link) — Details in `docs/VERIFICATION.md` und im Test-Kommentar. (`e2e/a11y.test.js`, `package.json`)
+- **Barrierefreiheits-Gate im E2E** (Phase 3): neuer Playwright-Test `e2e/a11y.test.js` prüft Startseite + fertige Profil-Ansicht mit axe-core (`@axe-core/playwright`, dev-only). Jeder **neue** ernste Verstoß (serious/critical) bricht ab jetzt die CI. Die drei beim ersten Lauf gefundenen Bestands-Punkte des Designs wurden noch im selben Release behoben (siehe „Barrierefreiheit" unter Geändert). (`e2e/a11y.test.js`, `package.json`)
 - **Sammel-Befehle im Root** (Phase 3): `npm run setup` / `npm test` / `npm run lint` / `npm run format:check` decken jetzt Frontend + Backend in einem Aufruf ab (reine Aliasse auf die bestehenden Einzel-Scripts). (`package.json`, `AGENTS.md`)
 - **Verifikationsmatrix `docs/VERIFICATION.md`** (Phase 2): Welche Anforderung ist wodurch belegt — Tests, Secret-Scan, Dependency-Audit, Lighthouse, Profilpflichten (inkl. zweier ehrlich als offen ausgewiesener Punkte: automatisierter A11y-Check, dokumentierter Tastatur-Smoketest) und externe Kontrollen. Dazu die **erste dokumentierte Rollback-Probe**: Tag `v2.3.1` in temporärem worktree ausgecheckt, `npm ci` + beide Test-Suiten grün (435 + 165) — der Rücksprung auf den letzten Release-Stand ist damit nachgewiesen, nicht nur beschrieben. (`docs/VERIFICATION.md`, `docs/RUNBOOK.md`)
-
-### Geändert
-
-- **Doku-Drift korrigiert:** AGENTS.md nannte das Stundenlimit noch mit 500 (Code: 1500) und ließ `release.yml` unerwähnt; `docs/ARCHITECTURE.md` nannte das Limit ebenfalls mit 500 und die Liveness-Karenz mit 3 min (Code: 8 min seit v2.2.3/UX-001). (`AGENTS.md`, `docs/ARCHITECTURE.md`)
 
 ## [2.3.1] — 2026-07-13
 

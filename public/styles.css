@@ -92,7 +92,10 @@
   --border: rgba(130, 121, 110, 0.4);
   --border-soft: rgba(130, 121, 110, 0.15);
   --text: #404749;
-  --muted: #82796e;
+  /* Warmgrau-TEXTSTUFE (Field Decision 2026-07-14): identischer Ton wie
+     --ml-warmgray (33°/8 %), abgedunkelt auf WCAG 4,5:1 gegen Papier, Weiß
+     und Tint-Flächen. Linien/Rahmen/Flächen bleiben beim Vollton #82796e. */
+  --muted: #6e675e;
   --heading: #156480;
   --teal-text: #156480;
   --rust-text: #9c4e36;
@@ -1023,6 +1026,12 @@ h1 {
   letter-spacing: var(--ls-label);
   color: var(--rust-text);
   margin-bottom: 12px;
+}
+
+/* Quellenhinweis-Links der Karte: als Link erkennbar, nicht nur per Farbe
+   (WCAG link-in-text-block; eigene Regel statt Eingriff in lib/leaflet) */
+.leaflet-control-attribution a {
+  text-decoration: underline;
 }
 
 .gps-address {
@@ -2489,7 +2498,7 @@ ol.legal-list > li::before {
     --border: rgba(130, 121, 110, 0.4);
     --border-soft: rgba(130, 121, 110, 0.15);
     --text: #404749;
-    --muted: #82796e;
+    --muted: #6e675e; /* Warmgrau-Textstufe, siehe :root */
     --heading: #156480;
     --teal-text: #156480;
     --rust-text: #9c4e36;
@@ -2667,7 +2676,7 @@ ol.legal-list > li::before {
     display: block;
     text-align: center;
     font-size: 8pt;
-    color: #82796e;
+    color: #6e675e; /* Warmgrau-Textstufe, siehe :root */
     padding: 10px 0 6px;
     border-top: 1px solid rgba(130, 121, 110, 0.4);
     margin: 8px 0;

@@ -84,7 +84,7 @@ Einzelbefehle:
 - `npm install` (root) — install frontend test/lint dependencies (Vitest, ESLint, Prettier)
 - `cd functions && npm test` — run Jest backend unit tests (435 tests)
 - `npm run test:frontend` — run Vitest frontend unit tests (165 tests)
-- `npm run test:e2e` — run Playwright E2E tests (Smoke + axe-A11y-Gate ohne Ausnahmen; misst mit reducedMotion, sonst Schein-Funde durch Einblend-Animation)
+- `npm run test:e2e` — run Playwright E2E tests (Smoke + axe-A11y-Gate ohne Ausnahmen + Tastatur-Durchlauf; A11y misst mit reducedMotion, sonst Schein-Funde durch Einblend-Animation)
 - `cd functions && npm run lint` — ESLint backend
 - `cd functions && npm run format:check` — Prettier backend
 - `npm run lint:frontend` — ESLint frontend

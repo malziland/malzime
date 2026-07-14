@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.3.3] — 2026-07-14
+
+Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten) axe-Hinweise behoben und der Tastatur-Durchlauf als dauerhafter Test verankert — der Wächter meldet jetzt **null Funde über alle Schweregrade**. Nur-Hosting-Deploy. 165 Frontend- + 435 Backend-Tests, 5 E2E, Lint und Format grün.
+
+### Geändert
+
+- **Landmarken vervollständigt:** GitHub-Hinweis und Unterstützungs-Box lagen zwischen `</main>` und `<footer>` außerhalb jeder Landmarke — für die Screenreader-Schnellnavigation unsichtbar. Beide sitzen jetzt in einem `<aside>`; optisch unverändert. (`public/index.html`)
+- **Überschriften-Reihenfolge im Ergebnis:** Die Verdict-Überschrift war ein `h3` direkt nach dem `h1` (übersprungene Ebene) — jetzt `h2`, mit explizit fixiertem Abstand pixelgleich zum bisherigen Aussehen. (`public/js/render.js`, `public/styles.css`)
+
+### Hinzugefügt
+
+- **Tastatur-Smoketest als dauerhafter E2E-Test** (`e2e/keyboard.test.js`, CI-Pflicht-Check): kompletter Weg Demo-Foto → Disclaimer → Profil nur mit Tab + Enter, inklusive Prüfung, dass die Fokus-Markierung sichtbar ist. Damit ist der letzte offene Punkt der Verifikationsmatrix geschlossen — statt eines einmaligen manuellen Durchklicks wird die Tastatur-Bedienbarkeit jetzt bei jedem PR bewiesen. (`e2e/keyboard.test.js`, `docs/VERIFICATION.md`)
+
 ## [2.3.2] — 2026-07-14
 
 Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus Governance-Nachrüstung (Phasen 1–3: Betriebs-Doku, Verifikationsmatrix, A11y-Gate, Sammel-Scripts). Nur-Hosting-Deploy — Functions unberührt. 165 Frontend- + 435 Backend-Tests, 4 E2E (A11y-Gate ohne Ausnahmen), Lint und Format grün.

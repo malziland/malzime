@@ -295,4 +295,4 @@ malziland - learning | training | consulting e.U. Details: [TRADEMARKS.md](TRADE
 
 ---
 
-Erstellt von [malziland - learning | training | consulting e.U.](https://malziland.at)
+Erstellt von [malziland - learning | training | consulting e.U.](https://malziland.at) &mdash; Inhaber: [Christoph Krieger](https://www.linkedin.com/in/christophkrieger/) &middot; Live unter [malzi.me](https://malzi.me)

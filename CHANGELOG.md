@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [2.3.4] — 2026-07-16
 
 Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar mit malziland und Christoph Krieger verknüpft — an der sichtbaren Seite ändert sich nichts. Bewusst KEIN Link auf malziland.at (Seite im Relaunch; Entscheidung des Inhabers, 2026-07-16). Nur-Hosting-Deploy, keine Funktionsänderung.
 

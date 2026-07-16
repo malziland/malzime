@@ -17,7 +17,7 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
 
 ### Geändert
 
-- **Impressum-Seitentitel korrigiert:** „malziland e.U." ist keine existierende Firmierung — jetzt „Impressum — malziME by malziland". (`public/impressum.html`)
+- **Impressum-Seitentitel korrigiert:** nannte bisher eine nicht existierende Kurz-Firmierung — jetzt „Impressum — malziME by malziland". Die Firma heißt überall vollständig „malziland - learning | training | consulting e.U." (Schreibweise laut Impressum). (`public/impressum.html`)
 - **Sitemap-Änderungsdaten aktualisiert** (standen seit Februar unverändert). (`public/sitemap.xml`)
 - **README nennt den Inhaber:** Attribution am Seitenende um Christoph Krieger (LinkedIn) und den Live-Link malzi.me ergänzt. (`README.md`)
 

@@ -4,6 +4,23 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.3.4] — 2026-07-16
+
+Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar mit malziland und Christoph Krieger verknüpft — an der sichtbaren Seite ändert sich nichts. Bewusst KEIN Link auf malziland.at (Seite im Relaunch; Entscheidung des Inhabers, 2026-07-16). Nur-Hosting-Deploy, keine Funktionsänderung.
+
+### Hinzugefügt
+
+- **`llms.txt`:** maschinenlesbare Kurzbeschreibung für KI-Crawler — was malziME ist, wer dahinter steht (malziland - learning | training | consulting e.U., Inhaber Christoph Krieger), Datenschutz-Kernpunkte, Seitenübersicht, Zitierhinweis mit Fiktiv-Klarstellung. (`public/llms.txt`)
+- **Strukturierte Betreiber-Daten im Impressum:** schema.org-Organization mit Anschrift, UID, Gründer Christoph Krieger (inkl. LinkedIn-Verweis) und GitHub-Profil. (`public/impressum.html`)
+- **Urheber in den strukturierten Daten der Startseite:** Christoph Krieger als `creator` und als Gründer der Betreiber-Organisation, Verweis aufs GitHub-Repository (`sameAs`); Autor-Meta-Tag nennt jetzt Person + Firma. (`public/index.html`)
+- **Alternativtexte fürs Teilen-Vorschaubild** (`og:image:alt`, `twitter:image:alt`). (`public/index.html`)
+
+### Geändert
+
+- **Impressum-Seitentitel korrigiert:** nannte bisher eine nicht existierende Kurz-Firmierung — jetzt „Impressum — malziME by malziland". Die Firma heißt überall vollständig „malziland - learning | training | consulting e.U." (Schreibweise laut Impressum). (`public/impressum.html`)
+- **Sitemap-Änderungsdaten aktualisiert** (standen seit Februar unverändert). (`public/sitemap.xml`)
+- **README nennt den Inhaber:** Attribution am Seitenende um Christoph Krieger (LinkedIn) und den Live-Link malzi.me ergänzt. (`README.md`)
+
 ## [2.3.3] — 2026-07-14
 
 Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten) axe-Hinweise behoben und der Tastatur-Durchlauf als dauerhafter Test verankert — der Wächter meldet jetzt **null Funde über alle Schweregrade**. Nur-Hosting-Deploy. 165 Frontend- + 435 Backend-Tests, 5 E2E, Lint und Format grün.

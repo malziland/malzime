@@ -30,7 +30,8 @@ Das startet Functions-, Firestore-, Hosting- und Pub/Sub-Emulator. Warten bis
 
 ## Was im Lokal-Modus anders ist
 
-`functions/.env.local` setzt `QUEUE_LOCAL=1` und `MISTRAL_MOCK=1`. Damit:
+`functions/.env.local` setzt `QUEUE_LOCAL=1` und `MISTRAL_MOCK=1` (Datei ist
+un-getrackt — einmalig anlegen per `cp functions/.env.local.example functions/.env.local`). Damit:
 
 - **Mistral** ist eine Attrappe — vorgefertigte `[MOCK-PROFIL]`-Profile,
   konfigurierbare Verzögerung (`MISTRAL_MOCK_DELAY_MS`). Keine Kosten.

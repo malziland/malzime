@@ -49,8 +49,11 @@ async function reapJobs() {
   for (const job of abandoned) {
     try {
       const ok = await abandonJob(job.id);
+      /* Schlug der Übergang fehl, hat ein Worker den Job zwischen Query und
+         Abbruch geclaimt — er läuft noch und braucht das Bild: nichts anfassen. */
+      if (!ok) continue;
       /* BIZ-001: Stunden-Slot zurückgeben — verlassener Job machte nie eine Analyse. */
-      if (ok) await releaseHourlySlot();
+      await releaseHourlySlot();
       await deleteImage(job.imagePath);
       reapedAbandoned += 1;
     } catch (err) {

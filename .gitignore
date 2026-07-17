@@ -1,5 +1,8 @@
 node_modules/
 .env
+# .env.local ist die verbreitete Konvention für lokale Secrets — darf nie ins
+# öffentliche Repo (Vorlage: functions/.env.local.example).
+.env.local
 .DS_Store
 .firebase/
 .grok/

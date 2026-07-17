@@ -1,5 +1,11 @@
 name: CI
 
+# GITHUB_TOKEN minimal halten. Der Repo-Default steht bereits auf "read" —
+# hier festgeschrieben, damit ein künftiges Umstellen des Defaults die CI
+# nicht still mit Schreibrechten ausstattet.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -81,6 +87,9 @@ jobs:
       - run: npm run test:e2e
 
   lighthouse:
+    # Misst die LIVE-Domain, nicht den PR-Stand — als Post-Deploy-Monitor nur
+    # auf push sinnvoll; auf PRs wäre ein grünes Ergebnis irreführend.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

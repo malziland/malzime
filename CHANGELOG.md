@@ -4,6 +4,30 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+Sanierung nach LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter vergröbert, latente Secret-Falle entschärft, CI gehärtet. Keine Verhaltensänderung im Normalpfad.
+
+### Behoben
+
+- **Reaper/Worker-Race:** Reaper und Worker löschten das zwischengespeicherte Bild auch dann, wenn ihr `abandonJob`-Übergang das Race verloren hatte (Job inzwischen von einem Worker geclaimt) — der laufende Job fand sein Bild nicht mehr und endete als `blocked.apiError`. Aufräumen (Bild + Stunden-Slot) passiert jetzt nur noch nach **erfolgreichem** Statusübergang (`handle-reap.js`, `handle-process-job.js`; je ein neuer Race-Test).
+- **Stunden-Slot-Leck im Enqueue-Fehlerpfad:** Scheiterte `storeImage`/`createJob` NACH dem Ziehen des Stunden-Slots, blieb der Slot bis zu 60 min belegt und ein ggf. schon abgelegtes Bild bis zur 1-Tag-Lifecycle-Regel liegen. Jetzt wird analog zum bestehenden `enqueueJob`-Fehlerpfad aufgeräumt (Slot zurück + Bild weg, neuer Fehlercode `store_failed`; zwei neue Tests).
+- **Queue-Fetches ohne Timeout:** `enqueue`- und Poll-Fetch konnten bei nie settelnden Verbindungen (Mobilfunk-Blackhole) den Wartefluss einfrieren — der Sync-Pfad hatte längst einen Timeout. Jetzt `fetchWithTimeout` (Enqueue 90 s, Poll 30 s; Client gibt nie vor dem Server auf, Timeouts laufen in die bestehende 5-Fehler-Toleranz).
+
+### Geändert
+
+- **Diagnose-Daten weiter vergröbert (Privacy):** Die Fehler-/Telemetrie-Logger senden statt des vollen User-Agent-Strings nur noch die grobe Form „Browser Hauptversion / OS" (`coarseUserAgent()`), statt der exakten Bildschirmauflösung nur noch eine Größenklasse (small/medium/large). Serverseitig `userAgent`-Längenlimit 250 → 80 als zweites Netz. Damit deckt der Code die Zusage „vollständig anonym, Geräteklasse" aus der Datenschutzerklärung wieder wortgenau.
+- **Job-Abholung fail-closed:** Der tote Abwärtskompatibilitäts-Zweig „Alt-Jobs ohne Abhol-Ticket bleiben offen" ist entfernt — jeder Job trägt seit v2.0 ein Ticket (`createJob` setzt es unkonditional); fehlt es wider Erwarten, wird nie ausgeliefert.
+
+### Sicherheit / CI
+
+- **`functions/.env.local` enttrackt** (war seit v2.0.0-rc3 im öffentlichen Repo, enthielt nie Secrets — nur Emulator-Flags) + `.gitignore` deckt jetzt `.env.local`; getrackte Vorlage neu als `functions/.env.local.example`.
+- **ci.yml:** `permissions: contents: read` festgeschrieben (Repo-Default war bereits read); Lighthouse-Job läuft nur noch auf `push` — er misst die Live-Domain, auf PRs war ein grünes Ergebnis irreführend.
+
+### Betrieb (außerhalb des Repos, 2026-07-17)
+
+- **Fehler-Alarm-Policy erweitert** (LANGAUDIT OPS-001): Filter deckt jetzt auch `enqueue`, `processjob`, `jobstatus`, `reapjobs` ab — der Live-Analysepfad war seit der Queue-Umstellung (v2.0) ohne ntfy-Alarm. `errors`/`telemetry` bewusst ausgespart (Client-Fehlerberichte loggen als ERROR → wären Alarm-Spam). Backfill-Release v2.2.1 nachgetragen; gitleaks-Voll-Historien-Scan lokal: 0 Funde.
+
 ## [2.3.4] — 2026-07-16
 
 Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar mit malziland und Christoph Krieger verknüpft — an der sichtbaren Seite ändert sich nichts. Bewusst KEIN Link auf malziland.at (Seite im Relaunch; Entscheidung des Inhabers, 2026-07-16). Nur-Hosting-Deploy, keine Funktionsänderung.

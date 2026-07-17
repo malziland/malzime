@@ -19,7 +19,9 @@ const STRING_FIELDS = {
   errorMessage: 500,
   phase: 50,
   url: 200,
-  userAgent: 250,
+  /* Client sendet nur noch den vergröberten UA ("Chrome 126 / Android");
+     das knappe Limit ist das zweite Netz gegen volle UA-Strings alter Clients. */
+  userAgent: 80,
   requestId: 50,
   traceId: 50,
   wakeLock: 40,

@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.3.6] — 2026-07-17
+
+Korrektur eines Werts, den der Live-Smoke von v2.3.5 aufgedeckt hat: Das global durchgesetzte Stundenlimit ist **500/h** (rollendes 60-Minuten-Fenster) — der seit jeher gewünschte und live gefahrene Betriebswert. Der Wert wird aus Firestore `stats/current.limit` gelesen; die Code-Konstante `HOURLY_LIMIT` diente nur als Fallback und als Reset-Wert und stand irrtümlich auf 1500. v2.3.5 hatte im Zuge des Doku-Sweeps mehrere Stellen fälschlich auf 1500 angehoben — inklusive der öffentlichen Nutzungsbedingungen. Kein Verhaltenswechsel im Live-Betrieb (dort galt durchgehend 500).
+
+### Behoben
+
+- **Stundenlimit überall konsistent auf 500.** Code-Konstante `HOURLY_LIMIT` 1500 → **500** (`functions/src/config.js`) — damit ein Admin-„Reset" das Firestore-Limit nicht mehr ungewollt auf 1500 hochsetzt (der Reset schreibt die Konstante). Firestore `stats/current.limit` war bereits 500 (unverändert).
+- **Doku-Rückkorrektur:** README, AGENTS, ARCHITECTURE, RUNBOOK, SECURITY-MODEL, SELF-HOSTING, VERIFICATION und die öffentlichen Nutzungsbedingungen von fälschlich 1500 zurück auf 500. In ARCHITECTURE zusätzlich die Einlass-Politik geschärft: 500/h liegt knapp unter dem Verarbeitungs-Durchsatz (~550/h), sodass sich unter dem Limit gar kein Rückstau bilden kann (ARCH-001 damit faktisch entschärft).
+
+### Betrieb (außerhalb des Repos, 2026-07-17)
+
+- **ntfy-Alarm-Topic rotiert:** Der Benachrichtigungs-Kanal lag auf einem kurzen, erratbaren Namen (nur Geheimhaltung schützt ein ntfy-Topic). Neuer langer Zufalls-Kanal als Secret-Version gesetzt, Functions ziehen ihn seit dem v2.3.6-Deploy; Zustellung auf das Gerät des Inhabers verifiziert.
+
 ## [2.3.5] — 2026-07-17
 
 Sanierung nach LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter vergröbert, latente Secret-Falle entschärft, CI gehärtet. Keine Verhaltensänderung im Normalpfad.

@@ -40,7 +40,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
 │     ├─ Rate-Limit (IP-basiert, 500/10min, In-Memory pro Instanz)  │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
-│     └─ Hourly-Limit-Check (Firestore, 1500/Std. rollendes Fenster) │
+│     └─ Hourly-Limit-Check (Firestore, 500/Std. rollendes Fenster)  │
 │                                                                    │
 │  2. Mistral Large 3 — Beschreibung                                 │
 │     ├─ mistral.js → POST api.mistral.ai/v1/chat/completions        │
@@ -118,7 +118,7 @@ Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-
 
 ### Einlass-Politik
 
-Der Enqueue prüft bewusst **keine Queue-Tiefe** — der Einlass ist allein durch das Stundenlimit begrenzt (1500/h), das über dem Durchsatz liegt (~550 Analysen/h bei Concurrency 10 × ~65 s/Job). Begründung: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten; Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück (Selbstregulation); realer Workshop-Verkehr liegt weit unter dem Durchsatz. Der Client deckelt das Polling bei 30 min. Bewusste Entscheidung, bestätigt im LANGAUDIT 2026-07 (ARCH-001).
+Der Enqueue prüft bewusst **keine Queue-Tiefe** — der Einlass ist allein durch das Stundenlimit begrenzt (500/h). Das liegt sogar knapp **unter** dem Verarbeitungs-Durchsatz (~550 Analysen/h bei Concurrency 10 × ~65 s/Job), sodass sich unter dem Limit gar kein nennenswerter Rückstau aufbauen kann — das Stundenlimit deckelt den Einlass, bevor die Queue-Tiefe je zum Problem wird. Zusätzlich: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten; Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück (Selbstregulation). Der Client deckelt das Polling bei 30 min. Bewusste Entscheidung, bestätigt im LANGAUDIT 2026-07 (ARCH-001).
 
 ### Lokaler Betrieb
 

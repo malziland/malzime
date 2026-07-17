@@ -34,7 +34,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   handle-analyze.js  Synchroner Legacy-Pfad (Fallback): Validation -> Mistral Describe -> SUBJECT-Parsing -> Mistral Profile / Easter-Egg -> Response. Live laeuft die Analyse ueber die Queue (handle-process-job.js).
   handle-stats.js    Stats-Handler (GET-only)
   handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
-  config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (1500)
+  config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (500)
   counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance-Mode
   notify.js          ntfy Push-Benachrichtigungen bei Limit-Erreichung
   animal.js          SUBJECT-Klassifikation aus Mistral-Beschreibungstext + Easter-Egg-Profile (Hund/Katze/Vogel/...)

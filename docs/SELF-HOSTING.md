@@ -181,10 +181,10 @@ Wenn du keine ntfy-Benachrichtigungen willst, setze die Secrets auf einen Platzh
 
 ### 5h. Stundenlimit anpassen (optional)
 
-Das Standard-Stundenlimit liegt bei 1500 Analysen/Stunde. Du kannst es in `functions/src/config.js` aendern:
+Das Standard-Stundenlimit liegt bei 500 Analysen/Stunde. Du kannst es in `functions/src/config.js` aendern:
 
 ```js
-HOURLY_LIMIT: 1500,  // Maximale Analysen pro Stunde
+HOURLY_LIMIT: 500,  // Maximale Analysen pro Stunde
 ```
 
 ### 5i. Spenden-Button (optional)

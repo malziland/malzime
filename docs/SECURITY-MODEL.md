@@ -49,7 +49,7 @@ CI vs. Laufzeit (CI ohne Cloud-Rechte).
 
 | Missbrauchsfall | Gegenmaßnahmen |
 |---|---|
-| Bot-Massen-Uploads / Kostenexplosion | IP-Rate-Limit (500/10 min), Honeypot + Timing-Check, Stundenlimit 1500 (rollend), Cloud-Tasks-Concurrency-Deckel, Budget-Alarm (extern) |
+| Bot-Massen-Uploads / Kostenexplosion | IP-Rate-Limit (500/10 min), Honeypot + Timing-Check, Stundenlimit 500 (rollend), Cloud-Tasks-Concurrency-Deckel, Budget-Alarm (extern) |
 | Prompt-Injection über Bildinhalte/sichtbaren Text | User-Daten in XML-Tags isoliert + `escapeXml()`, JSON-Schema, defensiver JSON-Repair, Output-Bounds; LLM-Ausgaben steuern keine Tools oder Folgeprozesse |
 | Upload fremder/heikler Fotos | Datenschutz-Hinweis direkt am Upload-Bereich (neu 2026-07) + Nach-Analyse-Warnung vor ungewollt preisgegebenen Bilddetails (PRIV-002), Kinderschutz-Härtung in den Prompts (DE + EN immer parallel pflegen), keine Persistenz über 2 h hinaus |
 | Ergebnis-Abgriff durch Dritte | Abhol-Ticket (PRIV-003): Job-Status und Ergebnis nur mit Ticket; Ticket lebt im Tab (`sessionStorage`) und stirbt mit ihm |

@@ -2392,6 +2392,16 @@ ol.legal-list > li::before {
   margin-top: 8px;
   color: var(--muted) !important;
 }
+/* Datenschutz-Link im Upload-Hinweis: CI-Petrol wie die übrigen Inline-Links
+   (Rechtstexte), nicht das Browser-Standardblau. !important überstimmt die
+   geerbte --muted-Farbe des Absatzes. */
+.disclaimer__workshop a {
+  color: var(--teal-text) !important;
+  text-decoration: none;
+}
+.disclaimer__workshop a:hover {
+  text-decoration: underline;
+}
 .export-btn--hidden {
   display: none;
 }

@@ -4,6 +4,14 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.4.1] — 2026-07-17
+
+Visueller Feinschliff: Der Datenschutz-Link im neuen Upload-Hinweis (2.4.0) erschien im Browser-Standardblau statt in der Markenfarbe.
+
+### Behoben
+
+- **Datenschutz-Link im Upload-Hinweis in CI-Petrol** (`var(--teal-text)`) statt Browser-Blau — konsistent mit den übrigen Inline-Links (Rechtstexte, Footer). Umgesetzt über den Kontext-Selektor `.disclaimer__workshop a` (`public/styles.css`); HTML und Sprachdateien unverändert. Cache-Buster 2026071703.
+
 ## [2.4.0] — 2026-07-17
 
 Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter anonymisiert, eine latente Secret-Falle entschärft, die CI gehärtet und die gesamte Doku auf den tatsächlichen Live-Stand gebracht. Keine Verhaltensänderung im Normalpfad — der Live-Betrieb (u. a. das globale Stundenlimit von 500/h) lief durchgehend stabil weiter.

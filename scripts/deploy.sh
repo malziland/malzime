@@ -36,7 +36,13 @@ fi
 TODAY=$(date +"%Y%m%d")
 CURRENT=$(grep -o 'styles\.css?v=[0-9]*' public/index.html | head -1 | grep -o '[0-9]*$' || true)
 if [ "${#CURRENT}" -eq 10 ] && [ "${CURRENT:0:8}" = "$TODAY" ]; then
-  VERSION=$(printf "%s%02d" "$TODAY" "$((10#${CURRENT:8:2} + 1))")
+  NEXT=$((10#${CURRENT:8:2} + 1))
+  if [ "$NEXT" -gt 99 ]; then
+    echo "FEHLER: 99 Hosting-Deploys heute erreicht — die 2-stellige Buster-Nummer läuft über." >&2
+    echo "Das ist praktisch nie ein echter Fall; falls doch, Konvention manuell erweitern." >&2
+    exit 1
+  fi
+  VERSION=$(printf "%s%02d" "$TODAY" "$NEXT")
 else
   VERSION="${TODAY}01"
 fi

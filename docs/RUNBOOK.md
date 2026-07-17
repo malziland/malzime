@@ -12,7 +12,7 @@ das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
   (`featureFlags/current`: `useQueue = true`, `useSingleLargeCall = true`),
   Cloud-Tasks-Concurrency **10**.
 - **Limits:** Stundenlimit 1500 Analysen (rollendes Fenster), IP-Rate-Limit
-  200 Requests / 10 min pro Instanz.
+  500 Requests / 10 min pro Instanz.
 - **Lastprofil:** Workshops sind Stoßlast (Mo–Fr vormittags); genau dafür ist die
   Queue da. Mistral-Latenz schwankt mit Tageszeit/Wochentag — Messungen immer im
   repräsentativen Zeitfenster bewerten.
@@ -31,9 +31,12 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 3. CHANGELOG: Sobald deployt wird, ist das ein Release — den
    `[Unveröffentlicht]`-Abschnitt im selben Schritt auf neue Versionsnummer und
    Datum stempeln.
-4. Deploy über `./scripts/deploy.sh [hosting|functions]` — das Script zählt den
-   Cache-Buster (`?v=…`) in allen HTML-Seiten automatisch hoch (nur bei
-   Hosting-Deploys relevant; reine Functions-Deploys brauchen keinen).
+4. Deploy über `./scripts/deploy.sh [hosting|functions]` — das Script führt
+   zuerst Lint + Unit-Tests aus (Test-Guard; nur im Notfall mit `SKIP_TESTS=1`
+   überspringbar, mit Warnhinweis) und zählt dann den Cache-Buster in allen
+   fünf HTML-Seiten automatisch hoch (Konvention `?v=YYYYMMDDNN`: gleicher Tag
+   → laufende Nummer +1, sonst neuer Tag mit `01`; nur bei Hosting-Deploys
+   relevant, reine Functions-Deploys brauchen keinen).
 5. `release.yml` legt automatisch einen GitHub-Release an, sobald die neue
    CHANGELOG-Version auf `main` landet (idempotent).
 

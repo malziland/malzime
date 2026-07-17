@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # malziME Deploy-Script
-# Aktualisiert Cache-Busting-Versionen und deployed auf Firebase.
+# Fuehrt Lint + Unit-Tests aus, aktualisiert Cache-Busting-Versionen
+# (Konvention ?v=YYYYMMDDNN) und deployed auf Firebase.
 #
 # Nutzung:
 #   ./scripts/deploy.sh              # Hosting + Functions
 #   ./scripts/deploy.sh hosting      # Nur Hosting
 #   ./scripts/deploy.sh functions    # Nur Functions
+#
+#   SKIP_TESTS=1 ./scripts/deploy.sh # Test-Guard ueberspringen (nur im Notfall!)
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -18,12 +21,29 @@ cd "$(dirname "$0")/.."
 # Pruefen:  gsutil lifecycle get gs://malzime-queue-uploads
 # (Stand 2026-06-06 verifiziert: Regel am Produktiv-Bucket aktiv.)
 
-# ── Cache-Busting-Version generieren (sekundengenau, eindeutig pro Deploy) ──
-VERSION=$(date +"%Y%m%d%H%M%S")
+# ── Test-Guard: Lint + Unit-Tests muessen gruen sein (Deploy-Konvention) ──
+if [ "${SKIP_TESTS:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_TESTS=1 gesetzt — Lint und Tests werden UEBERSPRUNGEN."
+else
+  npm run lint
+  npm test --prefix functions
+  npm run test:frontend
+fi
+
+# ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
+# Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,
+# sonst neuer Tag mit laufender Nummer 01.
+TODAY=$(date +"%Y%m%d")
+CURRENT=$(grep -o 'styles\.css?v=[0-9]*' public/index.html | head -1 | grep -o '[0-9]*$' || true)
+if [ "${#CURRENT}" -eq 10 ] && [ "${CURRENT:0:8}" = "$TODAY" ]; then
+  VERSION=$(printf "%s%02d" "$TODAY" "$((10#${CURRENT:8:2} + 1))")
+else
+  VERSION="${TODAY}01"
+fi
 echo "Cache-Busting-Version: ?v=$VERSION"
 
 # Alle HTML-Dateien mit ?v= aktualisieren
-for f in public/index.html public/datenschutz.html public/impressum.html public/stats.html; do
+for f in public/index.html public/datenschutz.html public/impressum.html public/nutzungsbedingungen.html public/stats.html; do
   if [ -f "$f" ]; then
     # BUG-009: Cross-platform sed (macOS + Linux)
     if sed --version >/dev/null 2>&1; then

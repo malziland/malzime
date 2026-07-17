@@ -6,7 +6,7 @@ aufbewahrt. Das ist eine Arbeits-Skizze, kein vollständiges Threat Model und ke
 Rechtsberatung — die Tiefenprüfung übernehmen die Audits, die für Nutzer maßgebliche
 Erklärung ist die [Datenschutzerklärung](../public/datenschutz.html). Technische
 Details: [ARCHITECTURE.md](ARCHITECTURE.md) (Abschnitte Sicherheits- und
-Privacy-Architektur). Stand: 2026-07-14.
+Privacy-Architektur). Stand: 2026-07-17.
 
 ## Schutzgüter (Assets)
 
@@ -49,9 +49,9 @@ CI vs. Laufzeit (CI ohne Cloud-Rechte).
 
 | Missbrauchsfall | Gegenmaßnahmen |
 |---|---|
-| Bot-Massen-Uploads / Kostenexplosion | IP-Rate-Limit (200/10 min), Honeypot + Timing-Check, Stundenlimit 1500 (rollend), Cloud-Tasks-Concurrency-Deckel, Budget-Alarm (extern) |
+| Bot-Massen-Uploads / Kostenexplosion | IP-Rate-Limit (500/10 min), Honeypot + Timing-Check, Stundenlimit 1500 (rollend), Cloud-Tasks-Concurrency-Deckel, Budget-Alarm (extern) |
 | Prompt-Injection über Bildinhalte/sichtbaren Text | User-Daten in XML-Tags isoliert + `escapeXml()`, JSON-Schema, defensiver JSON-Repair, Output-Bounds; LLM-Ausgaben steuern keine Tools oder Folgeprozesse |
-| Upload fremder/heikler Fotos | Datenschutz-Warnung vor dem Upload (PRIV-002), Kinderschutz-Härtung in den Prompts (DE + EN immer parallel pflegen), keine Persistenz über 2 h hinaus |
+| Upload fremder/heikler Fotos | Datenschutz-Hinweis direkt am Upload-Bereich (neu 2026-07) + Nach-Analyse-Warnung vor ungewollt preisgegebenen Bilddetails (PRIV-002), Kinderschutz-Härtung in den Prompts (DE + EN immer parallel pflegen), keine Persistenz über 2 h hinaus |
 | Ergebnis-Abgriff durch Dritte | Abhol-Ticket (PRIV-003): Job-Status und Ergebnis nur mit Ticket; Ticket lebt im Tab (`sessionStorage`) und stirbt mit ihm |
 | Admin-Missbrauch / Replay | HMAC-signierte Tokens, Nonce-Replay-Schutz, GET zeigt nur Bestätigungsseite, erst POST mutiert |
 | Scanner / automatisiertes Probing | ungültige Anfragen enden als 4xx ohne Schaden; Einordnungs-Rezept im [RUNBOOK](RUNBOOK.md) |
@@ -86,7 +86,10 @@ CI vs. Laufzeit (CI ohne Cloud-Rechte).
 
 ## Sicherheitsausnahmen
 
-Derzeit **keine** offenen Ausnahmen. Neue Ausnahmen nur dokumentiert mit
+Bewusst akzeptierte Restrisiken sind in [SECURITY.md](../SECURITY.md) (Abschnitt
+„Known Accepted Risks") dokumentiert — z. B. In-Memory-Rate-Limit pro Instanz und
+Fail-open des Zählers bei Firestore-Ausfällen. Darüber hinaus gibt es derzeit
+**keine** offenen Verifikations-Ausnahmen. Neue Ausnahmen nur dokumentiert mit
 Begründung, Owner und Ablaufdatum — hier eingetragen und im nächsten Audit geprüft.
 
 ## Externe Kontrollen (außerhalb des Repos)

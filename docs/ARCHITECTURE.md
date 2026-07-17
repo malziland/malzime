@@ -38,7 +38,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │                                                                    │
 │  1. Validation in handle-analyze.js                                │
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
-│     ├─ Rate-Limit (IP-basiert, 200/10min, In-Memory pro Instanz)  │
+│     ├─ Rate-Limit (IP-basiert, 500/10min, In-Memory pro Instanz)  │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
 │     └─ Hourly-Limit-Check (Firestore, 1500/Std. rollendes Fenster) │
 │                                                                    │
@@ -116,6 +116,10 @@ Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-
 
 `reapJobs` läuft im Minutentakt und räumt drei Sorten auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Timeout → `failed`) und abgelaufene Job-Dokumente (älter als `JOB_RETENTION_MS` = 2 h → gelöscht).
 
+### Einlass-Politik
+
+Der Enqueue prüft bewusst **keine Queue-Tiefe** — der Einlass ist allein durch das Stundenlimit begrenzt (1500/h), das über dem Durchsatz liegt (~550 Analysen/h bei Concurrency 10 × ~65 s/Job). Begründung: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten; Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück (Selbstregulation); realer Workshop-Verkehr liegt weit unter dem Durchsatz. Der Client deckelt das Polling bei 30 min. Bewusste Entscheidung, bestätigt im LANGAUDIT 2026-07 (ARCH-001).
+
 ### Lokaler Betrieb
 
 Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`) ersetzen Shims Cloud Tasks (direkter HTTP-Dispatch) und den GCS-Bucket (Dateisystem-Ablage). Siehe `docs/QUEUE-EMULATOR.md`.
@@ -134,9 +138,12 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `js/ui.js` | Disclaimer-Modal, Maintenance-Modal, Limit-Banner, Scan-Animation |
 | `js/state.js` | Globaler State (`requestId`, `isAnalyzing`) |
 | `js/i18n.js` | i18n Micro-Modul (`initI18n`, `t`, `applyTranslations`) |
-| `js/demo.js` | Demo-Bild-Logik (Stock-Fotos durch echte KI schicken) |
+| `js/demo.js` | Demo-Bild-Logik (KI-generierte Demo-Fotos durch die echte KI schicken — keine realen Personen, siehe `public/img/demo/LICENSE.md`) |
 | `js/stats.js` | Stats-Seite mit Limit-Balken + Countdown |
 | `js/dom.js` | DOM-Helpers (`escapeHtml`, sanitize) |
+| `js/error-logger.js` | Anonymes Client-Fehler-Logging an `/api/errors` (Fehler-Typ, Phase, Dauer — grober User-Agent, keine PII) |
+| `js/telemetry-logger.js` | Anonyme Success-/Performance-Telemetrie an `/api/telemetry` (Spiegel zum Error-Logger, Timings statt Fehler) |
+| `js/client-context.js` | Anonyme Geräte-/Netzwerk-Klassen für die Diagnose (`coarseUserAgent`, Bildschirm-Größenklasse, Netzwerk-Klasse) + Trace-ID |
 
 ### Backend (`functions/src/`)
 
@@ -146,6 +153,8 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `handle-analyze.js` | Mistral-only Pipeline: Validation → Mistral Describe → SUBJECT → Easter-Egg / Profile-Gen |
 | `handle-stats.js` | GET-only Stats-Endpunkt |
 | `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
+| `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |
+| `handle-telemetry.js` | Anonyme Success-/Performance-Telemetrie (Spiegel zu `handle-errors.js`, severity INFO, eigener Endpoint) |
 | `handle-enqueue.js` | Queue: Job anlegen, Bild in den Bucket, Task einreihen |
 | `handle-process-job.js` | Queue-Worker: claimt den Job, ruft die Mistral-Pipeline, schreibt das Ergebnis |
 | `handle-job-status.js` | Queue: Status-Polling für den Client + Liveness-Herzschlag |
@@ -153,11 +162,12 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `jobs.js` | Queue: Job-Lebenszyklus + Firestore-Zugriff auf die `jobs`-Collection |
 | `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
-| `feature-flags.js` | Laufzeit-Feature-Flag `useQueue` (Firestore, 30 s Cache) |
+| `feature-flags.js` | Laufzeit-Feature-Flags `useQueue` + `useSingleLargeCall` (Firestore, 30 s Cache, fail-safe `false`) |
 | `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
-| `mistral.js` | Mistral AI Hybrid — Large 3 Describe + Small 4 Profile, mit Mistral-internem Large-3-Backup |
+| `mistral.js` | Mistral AI: Single-Large aktiv (1 Call `mistral-large-2512` liefert Beschreibung + beide Profile); 3-Call-Fallback (Describe Large + 2× Profil Small) mit Mistral-internem Large-3-Backup |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
+| `heartbeat.js` | Chunked-Response-Heartbeat: hält lange Analyse-Antworten offen (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
 | `counter.js` | Firestore-Zaehler: Stundenlimit (rollend), Totals, Stats, Boost, Reset, Maintenance |
 | `animal.js` | SUBJECT-Klassifikation aus Mistral-Beschreibung + Easter-Egg-Profile |
 | `privacy.js` | OCR-basiertes Privacy-Risiko-Mapping aus Mistrals "Sichtbarer Text" |
@@ -228,7 +238,7 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 
 ## Sicherheits-Architektur
 
-- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim
+- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim + `api.malzi.me` (eigener Sync-Endpunkt)
 - **HSTS** mit Preload
 - **Magic-Byte-Validierung** der hochgeladenen Bilder
 - **Honeypot-Feld** + **Timing-Check** als Bot-Defense
@@ -244,6 +254,6 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 - GPS verlaesst NIEMALS den Browser — Nominatim wird direkt vom Client aufgerufen
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr)
-- CSP nur self + OpenStreetMap Tiles + Nominatim
+- CSP nur self + OpenStreetMap Tiles + Nominatim + `api.malzi.me` (eigener Sync-Endpunkt)
 - Keine dauerhafte Persistenz: im Queue-Betrieb liegt das Bild kurz im GCS-Bucket und wird unmittelbar nach der Verarbeitung gelöscht; das Job-Dokument spätestens nach 2 h
 - Anwendungs-Logs enthalten keine Bildinhalte und keine personenbezogenen Daten — nur Request-ID, Step-Name, Status, Token-Counts

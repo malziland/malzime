@@ -110,7 +110,7 @@ Hinweis: `MISTRAL_API_KEY` ist Pflicht — Mistral ist seit v1.6.0 der einzige K
 firebase emulators:start --only functions,hosting
 ```
 
-Dann: http://localhost:5000
+Dann: http://localhost:5050
 
 **Hinweis**: Damit die Analyse-Pipeline lokal funktioniert, muss `MISTRAL_API_KEY` in `functions/.env` gesetzt sein (siehe `functions/.env.example`). Der Firestore-Emulator startet automatisch mit, ein Google-Login ist fuer die lokale Entwicklung nicht noetig.
 
@@ -124,9 +124,9 @@ cd functions && npm test
 npm run test:frontend
 ```
 
-**Backend (432 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mocked-Fetch), JSON-Repair (4-Stufen), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
-**Frontend (155 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Queue-Reload-Wiederherstellung, Stats-Seite, i18n-Modul, i18n-Guardian.
-**E2E (2 Tests):** Playwright Smoke-Tests — Demo-Flow + fehlerfreies Laden.
+**Backend (439 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung, Config, Counter, Middleware (Rate Limiting), Privacy-Risiken, Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mocked-Fetch), JSON-Repair (4-Stufen), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
+**Frontend (165 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Queue-Reload-Wiederherstellung, Stats-Seite, i18n-Modul, i18n-Guardian.
+**E2E (5 Tests):** Playwright Smoke-, A11y- und Tastatur-Tests — Demo-Flow, fehlerfreies Laden, axe-A11y-Gate (Startseite + Profil-Ansicht), Tastatur-Durchlauf.
 
 ## 7. Linting + Formatting
 
@@ -191,6 +191,8 @@ Format: `?v=YYYYMMDDNN` (Datum + laufende Nummer)
 ## Kosten
 
 ### Was pro Analyse passiert
+
+Aktiv ist seit v2.2 der **Single-Large-Pfad**: ein einziger Call an `mistral-large-2512` liefert Bildbeschreibung + beide Profile. Die folgende Tabelle beschreibt den **3-Call-Fallback** (Feature-Flag `useSingleLargeCall` aus) — sie bleibt stehen, weil sie die einzelnen Posten am besten nachvollziehbar macht; die Gesamtkosten pro Analyse liegen in beiden Modi in derselben Groessenordnung.
 
 | API | Aufrufe | Was |
 |-----|---------|-----|

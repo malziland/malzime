@@ -10,12 +10,13 @@ bewusst als offen ausgewiesen.
 
 | Anforderung | Nachweisweg | Letztes Ergebnis |
 |---|---|---|
-| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 435/435 grün — CI-Run 29312808034 (PR #44 → Commit `9ef949d`), 2026-07-14 |
-| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 165/165 grün — CI-Run 29312808034, 2026-07-14 |
-| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 2/2 grün — CI-Run 29312808034, 2026-07-14 |
-| Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — CI-Run 29312808034, 2026-07-14 |
-| Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29312808034, 2026-07-14 |
-| Dependency-Audit | CI-Job `test-backend`: `npm audit --omit=dev --audit-level=high` (Gate, bricht Build) | ✅ 0 Meldungen — Stand v2.3.1 (uuid-Override), CI-Run 29312808034, 2026-07-14 |
+| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 439/439 grün — CI-Run 29562535095 (PR #50), 2026-07-17 |
+| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 165/165 grün — CI-Run 29562535095, 2026-07-17 |
+| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 5/5 grün (Smoke 2, A11y 2, Tastatur 1) — CI-Run 29562535095, 2026-07-17 |
+| Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — CI-Run 29562535095, 2026-07-17 |
+| Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29562535095, 2026-07-17 |
+| Dependency-Audit | CI-Job `test-backend`: `npm audit --omit=dev --audit-level=high` (Gate, bricht Build) | ✅ 0 Meldungen — Stand v2.3.1 (uuid-Override), CI-Run 29562535095, 2026-07-17 |
+| Queue-Robustheit unter Stoßlast (kein Job verloren) | Queue-Emulator-Lasttest: `firebase emulators:exec` + `functions/scripts/queue-emulator-loadtest.js` (Mistral-Mock, `QUEUE_LOCAL=1`) | ✅ 100 Jobs: 100 done / 0 failed / 0 abandoned / 0 verloren — 2026-07-17 |
 | Performance-/Qualitäts-Budget | CI-Job `lighthouse` gegen malzi.me, /datenschutz, /impressum mit Budget-Datei | ✅ pass — CI-Run 29312808034, 2026-07-14 |
 | Reproduzierbares Setup (frischer Checkout) | `npm ci` (Root + `functions/`, Lockfiles committet, Node per `.nvmrc`/`engines`/CI gepinnt) | ✅ belegt durch Rollback-Probe (unten), 2026-07-14 |
 | Reproduzierbarer Build | — entfällt: kein Build-Schritt (Vanilla-JS-Frontend wird direkt ausgeliefert, Functions deployen Quellcode) | n/a, Begründung links |

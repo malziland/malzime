@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [2.3.5] — 2026-07-17
 
 Sanierung nach LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter vergröbert, latente Secret-Falle entschärft, CI gehärtet. Keine Verhaltensänderung im Normalpfad.
 
@@ -17,7 +17,7 @@ Sanierung nach LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Ag
 ### Geändert
 
 - **Diagnose-Daten weiter vergröbert (Privacy):** Die Fehler-/Telemetrie-Logger senden statt des vollen User-Agent-Strings nur noch die grobe Form „Browser Hauptversion / OS" (`coarseUserAgent()`), statt der exakten Bildschirmauflösung nur noch eine Größenklasse (small/medium/large). Serverseitig `userAgent`-Längenlimit 250 → 80 als zweites Netz. Damit deckt der Code die Zusage „vollständig anonym, Geräteklasse" aus der Datenschutzerklärung wieder wortgenau.
-- **Job-Abholung fail-closed:** Der tote Abwärtskompatibilitäts-Zweig „Alt-Jobs ohne Abhol-Ticket bleiben offen" ist entfernt — jeder Job trägt seit v2.0 ein Ticket (`createJob` setzt es unkonditional); fehlt es wider Erwarten, wird nie ausgeliefert.
+- **Job-Abholung fail-closed:** Der tote Abwärtskompatibilitäts-Zweig „Alt-Jobs ohne Abhol-Ticket bleiben offen" ist entfernt — jeder Job trägt seit v2.2.3 (PRIV-003) ein Ticket (`createJob` setzt es unkonditional); fehlt es wider Erwarten, wird nie ausgeliefert.
 
 ### Sicherheit / CI
 

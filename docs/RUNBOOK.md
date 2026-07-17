@@ -11,7 +11,7 @@ das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 - **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call
   (`featureFlags/current`: `useQueue = true`, `useSingleLargeCall = true`),
   Cloud-Tasks-Concurrency **10**.
-- **Limits:** Stundenlimit 1500 Analysen (rollendes Fenster), IP-Rate-Limit
+- **Limits:** Stundenlimit 500 Analysen (rollendes Fenster), IP-Rate-Limit
   500 Requests / 10 min pro Instanz.
 - **Lastprofil:** Workshops sind Stoßlast (Mo–Fr vormittags); genau dafür ist die
   Queue da. Mistral-Latenz schwankt mit Tageszeit/Wochentag — Messungen immer im
@@ -116,7 +116,7 @@ und **Account-Dashboard** prüfen (Limits unterscheiden sich drastisch je
 Modellversion — immer das Dashboard, nicht Code-Kommentare). Notfalls Wartungsmodus
 (Hebel 1).
 
-### Stundenlimit erreicht (1500/h rollend)
+### Stundenlimit erreicht (500/h rollend)
 
 Gewollte Kostenbremse; der ntfy-Push kommt automatisch. Braucht ein Workshop mehr:
 Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über

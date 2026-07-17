@@ -207,7 +207,7 @@ Im Queue-Betrieb (Feature-Flag `useQueue`) nutzt das Frontend statt `/analyze` z
 - **Timing-Check**: Requests innerhalb von 2s nach Seitenaufruf werden verzoegert
 - **Prompt-Injection-Schutz**: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
 - **HMAC-Admin-Tokens**: Kurzlebige signierte Tokens (30 Min) + Nonces (5 Min) fuer Admin-Aktionen
-- **Stundenlimit**: Rollendes 60-Minuten-Fenster (1500 Analysen/Stunde, anonyme Timestamps in Firestore)
+- **Stundenlimit**: Rollendes 60-Minuten-Fenster (500 Analysen/Stunde, anonyme Timestamps in Firestore)
 - **Keine dauerhafte Datenspeicherung**: Bilder nur kurz zur Verarbeitung gehalten, Job-Daten spaetestens nach 2 h geloescht, kein Logging von Bilddaten
 
 ## Tests

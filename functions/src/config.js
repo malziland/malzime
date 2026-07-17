@@ -62,11 +62,17 @@ const MISTRAL_PROFILE_MAX_TOKENS = 16000;
 const MISTRAL_TIMEOUT_MS = 90000;
 
 /* ── Globales Stundenlimit ──
-   v1.10.6: Von 500 auf 1500 hochgesetzt. Mit Auto-Retries auf Client-Seite
-   plus moeglichen Demo-Klicks kann ein 25er-Workshop locker 200-300
-   Analysen im Stundenfenster verbrennen. 1500 laesst grosszuegig Puffer
-   fuer mehrere Workshops kurz hintereinander. */
-const HOURLY_LIMIT = 1500;
+   500 Analysen pro rollendem 60-Minuten-Fenster — der gewuenschte Betriebswert
+   (kostenstabil beim aktuellen Budget). Mit Auto-Retries auf Client-Seite plus
+   Demo-Klicks verbraucht ein 25er-Workshop rund 200-300 Analysen/Stunde, 500
+   laesst dafuer Puffer.
+
+   WICHTIG: Der LIVE durchgesetzte Wert steht in Firestore `stats/current.limit`
+   und wird dort gelesen (counter.js). Diese Konstante ist (a) der Fallback bei
+   fehlendem Feld und (b) der Wert, auf den `resetHourly` das Dokument setzt.
+   Beide muessen zum Live-Wert passen — sonst kippt ein Admin-Reset das Limit
+   ungewollt. Bei Aenderung IMMER auch `stats/current.limit` mitziehen. */
+const HOURLY_LIMIT = 500;
 const HOURLY_WINDOW_MINUTES = 60;
 
 /* BUG-003: Globales Budget pro Request — verhindert dass die Summe aller

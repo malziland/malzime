@@ -4,25 +4,13 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [2.3.6] — 2026-07-17
+## [2.4.0] — 2026-07-17
 
-Korrektur eines Werts, den der Live-Smoke von v2.3.5 aufgedeckt hat: Das global durchgesetzte Stundenlimit ist **500/h** (rollendes 60-Minuten-Fenster) — der seit jeher gewünschte und live gefahrene Betriebswert. Der Wert wird aus Firestore `stats/current.limit` gelesen; die Code-Konstante `HOURLY_LIMIT` diente nur als Fallback und als Reset-Wert und stand irrtümlich auf 1500. v2.3.5 hatte im Zuge des Doku-Sweeps mehrere Stellen fälschlich auf 1500 angehoben — inklusive der öffentlichen Nutzungsbedingungen. Kein Verhaltenswechsel im Live-Betrieb (dort galt durchgehend 500).
-
-### Behoben
-
-- **Stundenlimit überall konsistent auf 500.** Code-Konstante `HOURLY_LIMIT` 1500 → **500** (`functions/src/config.js`) — damit ein Admin-„Reset" das Firestore-Limit nicht mehr ungewollt auf 1500 hochsetzt (der Reset schreibt die Konstante). Firestore `stats/current.limit` war bereits 500 (unverändert).
-- **Doku-Rückkorrektur:** README, AGENTS, ARCHITECTURE, RUNBOOK, SECURITY-MODEL, SELF-HOSTING, VERIFICATION und die öffentlichen Nutzungsbedingungen von fälschlich 1500 zurück auf 500. In ARCHITECTURE zusätzlich die Einlass-Politik geschärft: 500/h liegt knapp unter dem Verarbeitungs-Durchsatz (~550/h), sodass sich unter dem Limit gar kein Rückstau bilden kann (ARCH-001 damit faktisch entschärft).
-
-### Betrieb (außerhalb des Repos, 2026-07-17)
-
-- **ntfy-Alarm-Topic rotiert:** Der Benachrichtigungs-Kanal lag auf einem kurzen, erratbaren Namen (nur Geheimhaltung schützt ein ntfy-Topic). Neuer langer Zufalls-Kanal als Secret-Version gesetzt, Functions ziehen ihn seit dem v2.3.6-Deploy; Zustellung auf das Gerät des Inhabers verifiziert.
-
-## [2.3.5] — 2026-07-17
-
-Sanierung nach LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter vergröbert, latente Secret-Falle entschärft, CI gehärtet. Keine Verhaltensänderung im Normalpfad.
+Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter anonymisiert, eine latente Secret-Falle entschärft, die CI gehärtet und die gesamte Doku auf den tatsächlichen Live-Stand gebracht. Keine Verhaltensänderung im Normalpfad — der Live-Betrieb (u. a. das globale Stundenlimit von 500/h) lief durchgehend stabil weiter.
 
 ### Behoben
 
+- **Stundenlimit konsistent auf 500/h verankert.** Der durchgesetzte Wert kommt aus Firestore `stats/current.limit` (= 500, rollendes 60-Minuten-Fenster); die Code-Konstante `HOURLY_LIMIT` (Fallback + Reset-Wert) wurde auf **500** angeglichen (`functions/src/config.js`), damit ein Admin-„Reset" das Limit nicht ungewollt verändert. In ARCHITECTURE zusätzlich die Einlass-Politik geschärft: 500/h liegt knapp unter dem Verarbeitungs-Durchsatz (~550/h), sodass sich gar kein Rückstau bilden kann (ARCH-001 entschärft).
 - **Reaper/Worker-Race:** Reaper und Worker löschten das zwischengespeicherte Bild auch dann, wenn ihr `abandonJob`-Übergang das Race verloren hatte (Job inzwischen von einem Worker geclaimt) — der laufende Job fand sein Bild nicht mehr und endete als `blocked.apiError`. Aufräumen (Bild + Stunden-Slot) passiert jetzt nur noch nach **erfolgreichem** Statusübergang (`handle-reap.js`, `handle-process-job.js`; je ein neuer Race-Test).
 - **Stunden-Slot-Leck im Enqueue-Fehlerpfad:** Scheiterte `storeImage`/`createJob` NACH dem Ziehen des Stunden-Slots, blieb der Slot bis zu 60 min belegt und ein ggf. schon abgelegtes Bild bis zur 1-Tag-Lifecycle-Regel liegen. Jetzt wird analog zum bestehenden `enqueueJob`-Fehlerpfad aufgeräumt (Slot zurück + Bild weg, neuer Fehlercode `store_failed`; zwei neue Tests).
 - **Queue-Fetches ohne Timeout:** `enqueue`- und Poll-Fetch konnten bei nie settelnden Verbindungen (Mobilfunk-Blackhole) den Wartefluss einfrieren — der Sync-Pfad hatte längst einen Timeout. Jetzt `fetchWithTimeout` (Enqueue 90 s, Poll 30 s; Client gibt nie vor dem Server auf, Timeouts laufen in die bestehende 5-Fehler-Toleranz).
@@ -39,7 +27,7 @@ Sanierung nach LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Ag
 
 ### Dokumentation
 
-- **Zahlen-Drift korrigiert** (LANGAUDIT DOC-001): IP-Rate-Limit überall 500/10 min (Code seit v1.10.6; RUNBOOK, ARCHITECTURE, SECURITY-MODEL, AGENTS.md, Nutzungsbedingungen), Stundenlimit 1500 (README, SELF-HOSTING, Nutzungsbedingungen), Job-Aufbewahrung ~2 h statt 24 h (SECURITY.md), Testzahlen 439/165/5, Emulator-Port 5050; Kostentabellen in SETUP/SELF-HOSTING als 3-Call-**Fallback** gerahmt (aktiv: Single-Large).
+- **Zahlen-Drift korrigiert** (LANGAUDIT DOC-001): IP-Rate-Limit überall 500/10 min (Code seit v1.10.6; RUNBOOK, ARCHITECTURE, SECURITY-MODEL, AGENTS.md, Nutzungsbedingungen), Stundenlimit überall 500/h (README, SELF-HOSTING, Nutzungsbedingungen — konsistent zum Live-Wert, siehe „Behoben"), Job-Aufbewahrung ~2 h statt 24 h (SECURITY.md), Testzahlen 439/165/5, Emulator-Port 5050; Kostentabellen in SETUP/SELF-HOSTING als 3-Call-**Fallback** gerahmt (aktiv: Single-Large).
 - **Architektur-Kommentare und -Tabellen auf den Live-Stand Queue + Single-Large** (DOC-002): „dormant"/„heutige 3-Call-Architektur"-Formulierungen ersetzt (`feature-flags.js`, `index.js`, `config.js`, `handle-reap.js`, `scripts/cloudtasks-concurrency-3.sh`), Komponententabellen um `handle-errors.js`/`handle-telemetry.js`/`heartbeat.js` bzw. `error-logger.js`/`telemetry-logger.js`/`client-context.js` ergänzt, CSP-Beschreibung um `api.malzi.me`; AGENTS.md auf Poppins/Design-System/en.json aktualisiert.
 - **Datenschutz-Hinweis am Upload-Bereich + PRIV-002-Korrektur** (DOC-003): neue Hinweiszeile unter der Dropzone (i18n-Key `upload.privacyHint`, DE + EN) — Foto wird nach der Analyse sofort gelöscht, Link auf die Datenschutzerklärung; SECURITY-MODEL beschreibt PRIV-002 jetzt korrekt als Nach-Analyse-Warnung. Datenschutzerklärung präzisiert die Diagnose-Datenfelder (grobe Browser-/OS-Klasse, Bildschirm-Größenklasse, Netzwerk-Klasse) passend zum vergröberten Logging.
 - **deploy.sh auf Konvention + Test-Guard** (OPS-002): Cache-Buster im Format `?v=YYYYMMDDNN` (gleicher Tag → Nummer +1) statt sekundengenauem Zeitstempel, `nutzungsbedingungen.html` in der HTML-Liste, Lint + Unit-Tests laufen vor der Deploy-Bestätigung (`SKIP_TESTS=1` als dokumentierte Notfall-Ausnahme mit Warnung).
@@ -49,6 +37,7 @@ Sanierung nach LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Ag
 ### Betrieb (außerhalb des Repos, 2026-07-17)
 
 - **Fehler-Alarm-Policy erweitert** (LANGAUDIT OPS-001): Filter deckt jetzt auch `enqueue`, `processjob`, `jobstatus`, `reapjobs` ab — der Live-Analysepfad war seit der Queue-Umstellung (v2.0) ohne ntfy-Alarm. `errors`/`telemetry` bewusst ausgespart (Client-Fehlerberichte loggen als ERROR → wären Alarm-Spam). Backfill-Release v2.2.1 nachgetragen; gitleaks-Voll-Historien-Scan lokal: 0 Funde.
+- **ntfy-Alarm-Topic rotiert:** Der Benachrichtigungs-Kanal lag auf einem kurzen, erratbaren Namen (nur Geheimhaltung schützt ein ntfy-Topic). Neuer langer Zufalls-Kanal als Secret-Version gesetzt, Functions ziehen ihn seit dem Deploy; Zustellung auf das Gerät des Inhabers verifiziert.
 
 ## [2.3.4] — 2026-07-16
 

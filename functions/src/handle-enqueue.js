@@ -170,11 +170,24 @@ async function handleEnqueue(req, res, secrets) {
     }
 
     /* ── Bild ablegen → Job anlegen → in Cloud Tasks einreihen ── */
-    const imagePath = await storeImage(file.buffer, file.mimeType);
     /* PRIV-003: Abhol-Ticket fürs Ergebnis — nur dieser Browser bekommt es von
        job-status zurück (zweites Schloss zusätzlich zur unerratbaren jobId). */
     const resultToken = crypto.randomUUID();
-    const jobId = await createJob({ lang, traceId, imagePath, exif, resultToken });
+    let imagePath;
+    let jobId;
+    try {
+      imagePath = await storeImage(file.buffer, file.mimeType);
+      jobId = await createJob({ lang, traceId, imagePath, exif, resultToken });
+    } catch (err) {
+      /* Der Stunden-Slot ist hier schon gezogen, aber es entsteht nie eine
+         Analyse — Slot zurückgeben und ein evtl. schon abgelegtes Bild nicht
+         bis zur Lifecycle-Regel liegen lassen. */
+      console.log(JSON.stringify({ requestId, traceId, warning: "store-or-create-failed", error: err.message }));
+      releaseHourlySlot().catch(() => {});
+      if (imagePath) await deleteImage(imagePath);
+      res.status(503).json({ error: "Queue unavailable", code: "store_failed" });
+      return;
+    }
 
     try {
       await enqueueJob(jobId);

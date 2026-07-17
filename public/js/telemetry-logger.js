@@ -8,7 +8,7 @@
  * ERROR), damit Cloud Logging die Klassen sauber trennt.
  */
 
-import { collectClientContext } from "./client-context.js";
+import { collectClientContext, coarseUserAgent } from "./client-context.js";
 
 const TELEMETRY_ENDPOINT = "/api/telemetry";
 
@@ -21,7 +21,7 @@ export function logTelemetry(eventType, context = {}) {
       durationMs: typeof context.durationMs === "number" && isFinite(context.durationMs) ? context.durationMs : 0,
       online: typeof navigator !== "undefined" ? navigator.onLine : true,
       hidden: typeof document !== "undefined" ? document.hidden : false,
-      userAgent: (navigator && navigator.userAgent) || "",
+      userAgent: coarseUserAgent(),
       url: (typeof location !== "undefined" && location.pathname) || "",
       traceId: typeof context.traceId === "string" ? context.traceId : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,

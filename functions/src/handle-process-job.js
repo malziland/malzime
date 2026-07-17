@@ -312,9 +312,17 @@ async function handleProcessJob(req, res) {
      löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
   if (isAbandoned(job)) {
     const didAbandon = await abandonJob(jobId);
+    if (!didAbandon) {
+      /* Übergang verloren: Entweder hat der Reaper parallel abgeräumt (Bild
+         dort gelöscht) oder ein zweiter Dispatch hat den Job geclaimt und
+         braucht das Bild noch — in beiden Fällen gehört das Aufräumen ihm. */
+      console.log(JSON.stringify({ step: "process-job", jobId, status: "abandon-raced" }));
+      res.status(200).json({ ok: false, reason: "abandoned" });
+      return;
+    }
     /* BIZ-001: nur freigeben, wenn DIESER Aufruf den Job wirklich verlassen hat
        (sonst Doppel-Freigabe, falls der Reaper parallel war). */
-    if (didAbandon) releaseHourlySlot().catch(() => {});
+    releaseHourlySlot().catch(() => {});
     await deleteImage(job.imagePath);
     console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
     res.status(200).json({ ok: false, reason: "abandoned" });

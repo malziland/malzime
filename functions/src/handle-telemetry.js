@@ -14,7 +14,8 @@ const { checkRateLimit, getClientIp } = require("./middleware");
 const STRING_FIELDS = {
   eventType: 50,
   url: 200,
-  userAgent: 250,
+  /* Client sendet nur noch den vergröberten UA — knappes Limit als zweites Netz. */
+  userAgent: 80,
   traceId: 50,
 };
 const NUMBER_FIELDS = ["durationMs"];

@@ -211,3 +211,29 @@ describe("handleEnqueue — Cloud-Tasks-Ausfall", () => {
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
   });
 });
+
+/* ── Storage-/Firestore-Ausfall nach gezogenem Stunden-Slot ──────── */
+
+describe("handleEnqueue — Ausfall zwischen Slot und Task", () => {
+  test("schlägt storeImage fehl → 503, Slot zurückgegeben, kein deleteImage nötig", async () => {
+    storage.storeImage.mockRejectedValue(new Error("gcs down"));
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(503);
+    expect(res.body.code).toBe("store_failed");
+    expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(tasks.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  test("schlägt createJob fehl → 503, Slot zurückgegeben UND Bild-Waise gelöscht", async () => {
+    jobs.createJob.mockRejectedValue(new Error("firestore blip"));
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(503);
+    expect(res.body.code).toBe("store_failed");
+    expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
+    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
+    expect(tasks.enqueueJob).not.toHaveBeenCalled();
+  });
+});

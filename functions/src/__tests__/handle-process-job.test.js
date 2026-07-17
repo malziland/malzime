@@ -17,6 +17,7 @@ jest.mock("../queue-storage", () => ({
 }));
 jest.mock("../counter", () => ({
   incrementTotals: jest.fn(() => Promise.resolve()),
+  releaseHourlySlot: jest.fn(() => Promise.resolve()),
 }));
 jest.mock("../cloud-tasks", () => ({
   redispatchJobLocal: jest.fn(),
@@ -64,7 +65,7 @@ beforeEach(() => {
   jobs.claimJob.mockResolvedValue(true);
   jobs.completeJob.mockResolvedValue();
   jobs.isAbandoned.mockReturnValue(false);
-  jobs.abandonJob.mockResolvedValue();
+  jobs.abandonJob.mockResolvedValue(true);
   jobs.countProcessingJobs.mockResolvedValue(0);
   storage.loadImage.mockResolvedValue({ buffer: Buffer.from("img"), mimeType: "image/jpeg" });
   storage.deleteImage.mockResolvedValue();
@@ -121,6 +122,18 @@ describe("handleProcessJob — Abweisungen", () => {
     expect(jobs.claimJob).not.toHaveBeenCalled();
     expect(jobs.completeJob).not.toHaveBeenCalled();
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/x.jpg");
+    expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
+  });
+
+  test("abandonJob verliert das Race → Bild bleibt (gehört dem Gewinner), kein Slot zurück", async () => {
+    jobs.isAbandoned.mockReturnValue(true);
+    jobs.abandonJob.mockResolvedValue(false);
+    const res = makeRes();
+    await handleProcessJob(postReq("job-1"), res);
+    expect(res.body.reason).toBe("abandoned");
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(counter.releaseHourlySlot).not.toHaveBeenCalled();
+    expect(jobs.claimJob).not.toHaveBeenCalled();
   });
 
   test("Lokal-Modus, Drossel voll → Job vertagt, kein Claim, Re-Dispatch geplant", async () => {

@@ -90,11 +90,11 @@ describe("handleJobStatus — Status-Antworten", () => {
     expect(res.body.etaSeconds).toBeGreaterThan(0);
   });
 
-  test("done → Status done samt Ergebnis", async () => {
+  test("done → Status done samt Ergebnis (mit Abhol-Ticket)", async () => {
     const result = { profiles: { normal: {}, boost: {} }, meta: { mode: "multimodal" } };
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "done", result });
+    jobs.getJob.mockResolvedValue({ id: "job-1", status: "done", result, resultToken: "ticket-abc" });
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
     expect(res.body.status).toBe("done");
     expect(res.body.result).toEqual(result);
   });
@@ -147,12 +147,13 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
       id: "job-1",
       status: "done",
       result: {},
+      resultToken: "ticket-abc",
       traceId: "trace1",
       createdAt: 1000,
       finishedAt: 5000,
     });
     const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    await handleJobStatus(getReq("job-1"), makeRes());
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, makeRes());
     expect(jobs.markDelivered).toHaveBeenCalledWith("job-1");
     const delivered = logSpy.mock.calls
       .map((c) => {
@@ -171,8 +172,14 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
   });
 
   test("bereits ausgelieferter Job → kein erneutes markDelivered", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "done", result: {}, deliveredAt: 9999 });
-    await handleJobStatus(getReq("job-1"), makeRes());
+    jobs.getJob.mockResolvedValue({
+      id: "job-1",
+      status: "done",
+      result: {},
+      resultToken: "ticket-abc",
+      deliveredAt: 9999,
+    });
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, makeRes());
     expect(jobs.markDelivered).not.toHaveBeenCalled();
   });
 });
@@ -216,10 +223,14 @@ describe("handleJobStatus — PRIV-003 Abhol-Ticket", () => {
     expect(res.body.tokenRequired).toBe(true);
   });
 
-  test("Alt-Job ohne resultToken → Ergebnis bleibt abwärtskompatibel abrufbar", async () => {
+  test("Job ohne resultToken (darf nicht vorkommen) → wird NIE ausgeliefert", async () => {
+    /* createJob setzt das Ticket unkonditional; der frühere Abwärts-
+       kompatibilitäts-Zweig (Alt-Jobs offen ausliefern) ist entfernt —
+       fail-closed statt leise offen. */
     jobs.getJob.mockResolvedValue(doneJob({ resultToken: null }));
     const res = makeRes();
     await handleJobStatus(getReq("job-1"), res);
-    expect(res.body.result).toEqual({ profileText: "geheim" });
+    expect(res.body.result).toBeNull();
+    expect(res.body.tokenRequired).toBe(true);
   });
 });

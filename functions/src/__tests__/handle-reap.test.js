@@ -11,20 +11,25 @@ jest.mock("../jobs", () => ({
 jest.mock("../queue-storage", () => ({
   deleteImage: jest.fn(),
 }));
+jest.mock("../counter", () => ({
+  releaseHourlySlot: jest.fn(),
+}));
 
 const { reapJobs } = require("../handle-reap");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
+const counter = require("../counter");
 
 beforeEach(() => {
   jest.clearAllMocks();
   jobs.findAbandonedJobs.mockResolvedValue([]);
   jobs.findStaleProcessingJobs.mockResolvedValue([]);
   jobs.findExpiredJobs.mockResolvedValue([]);
-  jobs.abandonJob.mockResolvedValue();
-  jobs.failJob.mockResolvedValue();
+  jobs.abandonJob.mockResolvedValue(true);
+  jobs.failJob.mockResolvedValue(true);
   jobs.deleteJob.mockResolvedValue();
   storage.deleteImage.mockResolvedValue();
+  counter.releaseHourlySlot.mockResolvedValue();
 });
 
 describe("reapJobs", () => {
@@ -46,6 +51,17 @@ describe("reapJobs", () => {
     expect(jobs.abandonJob).toHaveBeenCalledWith("a1");
     expect(jobs.abandonJob).toHaveBeenCalledWith("a2");
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/a1.jpg");
+    /* BIZ-001: pro erfolgreich verlassenem Job kommt der Stunden-Slot zurück. */
+    expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(2);
+  });
+
+  test("abandonJob verliert das Race (Job inzwischen geclaimt) → Bild bleibt, kein Slot zurück", async () => {
+    jobs.findAbandonedJobs.mockResolvedValue([{ id: "a1", imagePath: "queue-uploads/a1.jpg" }]);
+    jobs.abandonJob.mockResolvedValue(false);
+    const result = await reapJobs();
+    expect(result.abandoned).toBe(0);
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(counter.releaseHourlySlot).not.toHaveBeenCalled();
   });
 
   test("in processing hängende Jobs → failed (processing_timeout), Bild gelöscht", async () => {
@@ -77,7 +93,7 @@ describe("reapJobs", () => {
       { id: "a1", imagePath: "x" },
       { id: "a2", imagePath: "y" },
     ]);
-    jobs.abandonJob.mockResolvedValueOnce().mockRejectedValueOnce(new Error("firestore blip"));
+    jobs.abandonJob.mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("firestore blip"));
     const result = await reapJobs();
     expect(result.abandoned).toBe(1);
   });

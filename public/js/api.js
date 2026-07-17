@@ -450,10 +450,24 @@ const JOB_DISCLAIMER_ACK_KEY = "malzime.queueDisclaimerAcked";
    er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
    das Ergebnis liegt serverseitig sicher. */
 const MAX_POLL_FAILURES = 5;
-/* Gesamt-Obergrenze fürs Pollen. Selbst eine tiefe Warteschlange ist deutlich
-   darunter; greift nur, falls ein Job dauerhaft hängt (z.B. Cloud-Tasks-
-   Ausfall) — dann nicht endlos pollen, sondern sauber abbrechen. */
+/* Gesamt-Obergrenze fürs Pollen. Bei randvollem Stundenbudget kann die ehrliche
+   Wartezeit darüber liegen (Extremfall: ~950 wartende Jobs ≈ 100 min ETA) —
+   dieser Deckel ist der bewusste Schlussstrich, damit kein Tab stundenlang
+   pollt. Der aufgegebene Job wird nach der Herzschlag-Karenz gereapt und gibt
+   seinen Stunden-Slot zurück. */
 const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
+/* Timeouts für die Queue-Fetches: Der Client darf nie vor dem Server aufgeben
+   (enqueue-Function 60 s, job-status 10 s), aber ein Fetch, der nie settelt
+   (Netz-Blackhole auf Mobilgeräten), darf den Wartefluss nicht einfrieren —
+   der Sync-Pfad hat denselben Schutz (FETCH_TIMEOUT_MS). */
+const ENQUEUE_TIMEOUT_MS = 90000;
+const POLL_TIMEOUT_MS = 30000;
+
+function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 
 function storeJobId(jobId, resultToken) {
   try {
@@ -567,7 +581,11 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
     let data;
     try {
       const tokenParam = resultToken ? `&token=${encodeURIComponent(resultToken)}` : "";
-      const resp = await fetch(`${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}${tokenParam}`);
+      const resp = await fetchWithTimeout(
+        `${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}${tokenParam}`,
+        {},
+        POLL_TIMEOUT_MS
+      );
       if (!resp.ok) {
         /* 404 = Job existiert nicht (mehr) — kein transienter Fehler. */
         if (resp.status === 404) return { error: t("error.queueFailed") };
@@ -758,18 +776,22 @@ async function analyzeImageQueued() {
 
     /* ── Job einreihen ── */
     const enqueueStart = Date.now();
-    const enqueueResp = await fetch(ENQUEUE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        imageBase64: state.lastPrepared.imageBase64,
-        exif: state.lastPrepared.exif,
-        mimeType: "image/jpeg",
-        filename: "upload.jpg",
-        lang: getLanguage(),
-        traceId,
-      }),
-    });
+    const enqueueResp = await fetchWithTimeout(
+      ENQUEUE_URL,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: state.lastPrepared.imageBase64,
+          exif: state.lastPrepared.exif,
+          mimeType: "image/jpeg",
+          filename: "upload.jpg",
+          lang: getLanguage(),
+          traceId,
+        }),
+      },
+      ENQUEUE_TIMEOUT_MS
+    );
     timings.enqueueMs = Date.now() - enqueueStart;
     if (state.requestId !== myId) return;
 

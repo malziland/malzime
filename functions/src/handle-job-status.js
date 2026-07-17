@@ -76,9 +76,10 @@ async function handleJobStatus(req, res) {
 
   if (job.status === "done") {
     /* PRIV-003: das fertige Profil nur an den Browser herausgeben, der das
-       Abhol-Ticket besitzt. Alt-Jobs ohne resultToken (vor diesem Stand
-       angelegt) bleiben abwärtskompatibel offen. */
-    if (job.resultToken && !safeCompare(token, job.resultToken)) {
+       Abhol-Ticket besitzt. Jeder Job trägt ein Ticket (createJob setzt es
+       unkonditional) — fehlt es wider Erwarten, wird nie ausgeliefert statt
+       offen zu bleiben. */
+    if (!job.resultToken || !safeCompare(token, job.resultToken)) {
       res.status(200).json({ status: "done", result: null, tokenRequired: true });
       return;
     }

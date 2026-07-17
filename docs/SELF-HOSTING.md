@@ -13,6 +13,12 @@ Diese Anleitung erklaert Schritt fuer Schritt, wie du eine eigene Instanz von ma
 - Ein Google-Konto mit Kreditkarte (fuer Google Cloud Abrechnung)
 - Git
 
+> **Marke ersetzen (rechtlich wichtig):** Die MIT-Lizenz gilt fuer den Code,
+> **nicht** fuer Logo und Marke. Die malziland-Brand-Assets unter
+> `public/img/brand/` sind ausdruecklich von der MIT-Lizenz ausgenommen — wer
+> eine eigene Instanz betreibt, muss sie durch eigene Grafiken ersetzen.
+> Details: [`TRADEMARKS.md`](../TRADEMARKS.md) und `public/img/brand/LICENSE.md`.
+
 ## 1. Repo forken und klonen
 
 ```bash
@@ -175,10 +181,10 @@ Wenn du keine ntfy-Benachrichtigungen willst, setze die Secrets auf einen Platzh
 
 ### 5h. Stundenlimit anpassen (optional)
 
-Das Standard-Stundenlimit liegt bei 500 Analysen/Stunde. Du kannst es in `functions/src/config.js` aendern:
+Das Standard-Stundenlimit liegt bei 1500 Analysen/Stunde. Du kannst es in `functions/src/config.js` aendern:
 
 ```js
-HOURLY_LIMIT: 500,  // Maximale Analysen pro Stunde
+HOURLY_LIMIT: 1500,  // Maximale Analysen pro Stunde
 ```
 
 ### 5i. Spenden-Button (optional)
@@ -279,6 +285,8 @@ Bevor du live gehst:
 ## Kosten
 
 ### Was pro Analyse passiert
+
+Aktiv ist seit v2.2 der **Single-Large-Pfad**: ein einziger Call an `mistral-large-2512` liefert Bildbeschreibung + beide Profile. Die folgende Tabelle beschreibt den **3-Call-Fallback** (Feature-Flag `useSingleLargeCall` aus) — sie bleibt stehen, weil sie die einzelnen Posten am besten nachvollziehbar macht; die Gesamtkosten pro Analyse liegen in beiden Modi in derselben Groessenordnung.
 
 | API | Aufrufe | Was |
 |-----|---------|-----|

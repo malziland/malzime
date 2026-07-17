@@ -71,7 +71,7 @@ Policy-Definition als JSON (`policy.json`):
   "conditions": [{
     "displayName": "ERROR-Log in malziME-Functions",
     "conditionMatchedLog": {
-      "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=(\"analyze\" OR \"admin\" OR \"stats\") AND severity>=ERROR"
+      "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=(\"analyze\" OR \"admin\" OR \"stats\" OR \"enqueue\" OR \"processjob\" OR \"jobstatus\" OR \"reapjobs\") AND severity>=ERROR"
     }
   }],
   "combiner": "OR",
@@ -90,6 +90,14 @@ gcloud alpha monitoring policies create \
 ```
 
 Der `notificationRateLimit` (300s) verhindert Push-Spam bei einem Fehler-Sturm.
+
+Der Filter wurde am 2026-07-17 (LANGAUDIT OPS-001) um die Queue-Functions
+`enqueue`, `processjob`, `jobstatus` und `reapjobs` erweitert — der Live-Analysepfad
+war seit der Queue-Umstellung (v2.0) ohne Alarm. Die Functions `errors` und
+`telemetry` sind **bewusst ausgespart**: `handle-errors.js` loggt jeden
+Client-Fehlerbericht mit severity ERROR — im Filter wäre das Alarm-Spam.
+Client-Fehler erreichen den Betreiber stattdessen über den Log-Bucket
+`client-diagnostics` (30 Tage Aufbewahrung), nicht über ntfy.
 
 ## Was passiert dann?
 

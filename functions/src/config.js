@@ -78,9 +78,10 @@ const REQUEST_BUDGET_MS = 480000;
 
 /* ── Queue-Architektur (v2.0) ──
    Konstanten für den Cloud-Tasks-Queue-Pfad. Werden ausschließlich von den
-   neuen Queue-Functions (enqueue / processJob / jobStatus) genutzt — der
-   synchrone /analyze-Pfad ist davon unberührt. Solange das Feature-Flag
-   `useQueue` AUS ist, liegen diese Functions dormant. */
+   Queue-Functions (enqueue / processJob / jobStatus) genutzt — der
+   synchrone /analyze-Pfad ist davon unberührt. Die Queue ist seit v2.0 der
+   Live-Pfad (`useQueue` live true); bei useQueue=false fällt alles auf
+   /analyze zurück. */
 const QUEUE_NAME = "analyze-queue";
 const QUEUE_REGION = "europe-west1";
 /* Firebase-Function-Name des Workers — Cloud Tasks dispatcht an dessen URL. */

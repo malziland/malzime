@@ -31,7 +31,7 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 - **GPS-Karte**: Zeigt den Aufnahmeort auf einer Karte (GPS verlässt nie den Browser)
 - **Easter Egg**: Tierfotos bekommen ein lustiges Spass-Profil
 - **PDF-Export**: Ergebnisse als PDF speichern (fuer Workshop-Diskussionen)
-- **Demo-Fotos**: 3 anklickbare Stock-Fotos mit Fake-EXIF fuer Workshops (echte KI-Analyse, kein vorgefertigtes Ergebnis)
+- **Demo-Fotos**: 3 anklickbare KI-generierte Demo-Fotos (keine realen Personen, siehe `public/img/demo/LICENSE.md`) mit Fake-EXIF fuer Workshops (echte KI-Analyse, kein vorgefertigtes Ergebnis)
 - **Mehrsprachig**: i18n-System fuer UI, Prompts und Tierprofile (Deutsch + Englisch aktiv)
 - **Wartungsmodus**: Admin-gesteuerter Wartungsmodus mit rotem Warn-Modal (blockiert Seite komplett)
 - **Queue-Architektur**: Cloud-Tasks-Warteschlange faengt Workshop-Lastspitzen ab (seit v2.0)
@@ -43,7 +43,7 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 public/                     Firebase Hosting (SPA, kein Build-Schritt)
   index.html                Hauptseite
   app.js                    Entry Point (ES Module)
-  js/                       Frontend-Module (api, dom, demo, exif, geocoding, i18n, render, state, stats, ui)
+  js/                       Frontend-Module (api, client-context, demo, dom, error-logger, exif, geocoding, i18n, render, state, stats, telemetry-logger, ui)
   locales/                  Frontend-Locale-Dateien (de.json, manifest.json)
   styles.css                malziland Design System (Hell/Dunkel via Beast-Mode-Kopplung) + Print Styles
   __tests__/                Vitest Frontend-Tests
@@ -60,6 +60,8 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   handle-analyze.js         Synchrone Analyse-Pipeline (Mistral-only)
   handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
   handle-stats.js           Stats-Endpunkt
+  handle-errors.js          Anonymes Client-Fehler-Logging (whitelist-validiert, keine PII, severity ERROR)
+  handle-telemetry.js       Anonyme Success-/Performance-Telemetrie (Spiegel zu handle-errors.js, severity INFO)
   handle-enqueue.js         Queue: Job anlegen + in Cloud Tasks einreihen
   handle-process-job.js     Queue: Worker — claimt Job, ruft Mistral, schreibt Ergebnis
   handle-job-status.js      Queue: Status-Polling + Liveness-Herzschlag
@@ -72,6 +74,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   mistral.js                Mistral AI: aktiv Single-Large-Call (Large erstellt Beschreibung + beide Profile); 3-Call-Hybrid (Large Describe + Small Profile) als Fallback
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
+  heartbeat.js              Chunked-Response-Heartbeat: haelt lange Analyse-Antworten offen (Safari kappt Streams nach ~47 s)
   animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
   privacy.js                OCR-Privacy-Risiken aus Mistrals "Sichtbarer Text"
   counter.js                Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance
@@ -109,7 +112,7 @@ Datenschutz ist kein Feature — es ist das Fundament:
 - **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
 - **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK
 - **Bot-Schutz ohne Tracking**: Rate Limiting (IP), Honeypot-Feld, Timing-Check
-- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim
+- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + `api.malzi.me` (eigener Sync-Endpunkt)
 
 ## Schnellstart
 
@@ -194,7 +197,7 @@ Im Queue-Betrieb (Feature-Flag `useQueue`) nutzt das Frontend statt `/analyze` z
 
 ## Sicherheit
 
-- **Content Security Policy** mit strikter Whitelist
+- **Content Security Policy** mit strikter Whitelist (`self` + OpenStreetMap Tiles + Nominatim + `api.malzi.me`)
 - **HSTS** mit Preload
 - **X-Frame-Options: DENY**
 - **X-Content-Type-Options: nosniff**
@@ -204,19 +207,19 @@ Im Queue-Betrieb (Feature-Flag `useQueue`) nutzt das Frontend statt `/analyze` z
 - **Timing-Check**: Requests innerhalb von 2s nach Seitenaufruf werden verzoegert
 - **Prompt-Injection-Schutz**: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
 - **HMAC-Admin-Tokens**: Kurzlebige signierte Tokens (30 Min) + Nonces (5 Min) fuer Admin-Aktionen
-- **Stundenlimit**: Rollendes 60-Minuten-Fenster (500 Analysen/Stunde, anonyme Timestamps in Firestore)
+- **Stundenlimit**: Rollendes 60-Minuten-Fenster (1500 Analysen/Stunde, anonyme Timestamps in Firestore)
 - **Keine dauerhafte Datenspeicherung**: Bilder nur kurz zur Verarbeitung gehalten, Job-Daten spaetestens nach 2 h geloescht, kein Logging von Bilddaten
 
 ## Tests
 
 ```bash
-# Backend (Jest, 432 Tests)
+# Backend (Jest, 439 Tests)
 cd functions && npm test
 
-# Frontend (Vitest + jsdom, 155 Tests)
+# Frontend (Vitest + jsdom, 165 Tests)
 npm run test:frontend
 
-# E2E (Playwright, 2 Tests)
+# E2E (Playwright, 5 Tests)
 npm run test:e2e
 
 # Coverage
@@ -230,11 +233,11 @@ cd functions && npm run format:check   # Backend Prettier
 npm run format:frontend:check          # Frontend Prettier
 ```
 
-**Backend (432 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
+**Backend (439 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
 
-**Frontend (155 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Queue-Reload-Wiederherstellung, Stats-Seite, i18n-Modul, i18n-Guardian.
+**Frontend (165 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Queue-Reload-Wiederherstellung, Stats-Seite, i18n-Modul, i18n-Guardian.
 
-**E2E (2 Tests):** Playwright Smoke-Tests — Demo-Flow und fehlerfreies Laden.
+**E2E (5 Tests):** Playwright — Smoke-Tests (Demo-Flow, fehlerfreies Laden), axe-A11y-Gate (Startseite + Profil-Ansicht) und Tastatur-Durchlauf.
 
 ## CI/CD
 

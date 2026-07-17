@@ -14,18 +14,18 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
     render.js        Ergebnis-Rendering (Profile, EXIF, Karte, Datenwert)
     state.js         Globaler State (requestId, isAnalyzing)
     ui.js            UI-Komponenten (Disclaimer-Modal, Maintenance-Modal, Scan-Animation, Bias-Toggle, Limit-Banner, Warteschlangen-Anzeige)
-    demo.js          Demo-Foto-Initialisierung (Click-Handler fuer Stock-Fotos)
+    demo.js          Demo-Foto-Initialisierung (Click-Handler fuer die KI-generierten Demo-Fotos, siehe public/img/demo/LICENSE.md)
     stats.js         Stats-Seite: Fetch /api/stats, Limit-Balken, Countdown
     i18n.js          i18n Micro-Modul (initI18n, t, getLanguage, applyTranslations)
   locales/           Frontend-Locale-Dateien
     manifest.json    Verfuegbare Sprachen + Default
-    de.json          Deutsche UI-Strings (Keys fuer alle data-i18n-Elemente)
+    de.json + en.json  Deutsche + englische UI-Strings (Keys fuer alle data-i18n-Elemente; i18n-Guardian erzwingt Schluessel-Gleichstand)
   __tests__/         Vitest Frontend-Tests
-  styles.css         Dark-Theme CSS + Print Styles + Self-hosted @font-face
+  styles.css         malziland Design System (heller Papier-Look, Beast-Mode-Dunkel-Kopplung) + Print Styles + Self-hosted @font-face
   impressum.html     Impressum
   datenschutz.html   Datenschutzerklaerung
   stats.html         Oeffentliche Nutzungsstatistik
-  fonts/             Self-hosted: Inter + JetBrains Mono (woff2)
+  fonts/             Self-hosted: Poppins (woff2, OFL)
   lib/leaflet/       Self-hosted: Leaflet 1.9.4 (JS, CSS, Marker-Images)
   lib/exifr/         Self-hosted: exifr lite ESM (Browser EXIF-Parsing)
 
@@ -38,7 +38,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance-Mode
   notify.js          ntfy Push-Benachrichtigungen bei Limit-Erreichung
   animal.js          SUBJECT-Klassifikation aus Mistral-Beschreibungstext + Easter-Egg-Profile (Hund/Katze/Vogel/...)
-  middleware.js      Rate Limiting (IP-basiert, 200/10min), IP-Extraktion
+  middleware.js      Rate Limiting (IP-basiert, 500/10min), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
   mistral.js         Mistral AI: AKTIV runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call); Fallback 3-Call-Hybrid Large (Describe) + Small (Profile) hinter Feature-Flag useSingleLargeCall
@@ -48,7 +48,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useQueue), 30s-Cache, fail-safe
-  --- Queue-Architektur (v2.0) — Parallel-Pfad, dormant bis Feature-Flag useQueue ---
+  --- Queue-Architektur (v2.0) — Live-Pfad (Feature-Flag useQueue live true; bei false Rueckfall auf /analyze) ---
   handle-enqueue.js  Queue-Annahme: Validierung -> Bild in Storage -> Job anlegen -> in Cloud Tasks einreihen
   handle-process-job.js  Queue-Worker (nur Cloud Tasks): claimt Job, fuehrt Mistral-Pipeline aus, schreibt Ergebnis
   handle-job-status.js   Queue-Polling: Status, Warteschlangen-Position, ETA, Ergebnis; jeder Poll ist Liveness-Herzschlag
@@ -82,7 +82,7 @@ Einzelbefehle:
 
 - `cd functions && npm install` — install backend dependencies
 - `npm install` (root) — install frontend test/lint dependencies (Vitest, ESLint, Prettier)
-- `cd functions && npm test` — run Jest backend unit tests (435 tests)
+- `cd functions && npm test` — run Jest backend unit tests (439 tests)
 - `npm run test:frontend` — run Vitest frontend unit tests (165 tests)
 - `npm run test:e2e` — run Playwright E2E tests (Smoke + axe-A11y-Gate ohne Ausnahmen + Tastatur-Durchlauf; A11y misst mit reducedMotion, sonst Schein-Funde durch Einblend-Animation)
 - `cd functions && npm run lint` — ESLint backend

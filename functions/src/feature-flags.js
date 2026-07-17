@@ -3,13 +3,14 @@
 /**
  * feature-flags.js — Laufzeit-Feature-Flags (Firestore).
  *
- * Flags:
+ * Flags (live stehen BEIDE auf true — Queue + Single-Large = Normalbetrieb;
+ * `false` ist jeweils nur der fail-safe Default bei unlesbarem Dokument):
  *   - `useQueue` (seit v2.0): schaltet zwischen dem synchronen /analyze-Pfad
- *     (false, Default) und der Queue-Architektur (true).
- *   - `useSingleLargeCall` (v2.2 Experiment): schaltet innerhalb der Pipeline
- *     zwischen heutiger 3-Call-Architektur (Describe Large + 2× Profile Small,
- *     Default false) und der Single-Call-Large-Architektur (1× Large macht
- *     alles). Wird nur ausgewertet, wenn die Queue an ist (im synchronen Pfad
+ *     (false, Rückfall-Pfad) und der Queue-Architektur (true, Live-Pfad).
+ *   - `useSingleLargeCall` (seit v2.2): schaltet innerhalb der Pipeline
+ *     zwischen der 3-Call-Fallback-Architektur (Describe Large + 2× Profile
+ *     Small, false) und der Single-Large-Architektur (1× Large macht alles,
+ *     true). Wird nur ausgewertet, wenn die Queue an ist (im synchronen Pfad
  *     bleibt die 3-Call-Pipeline aktiv, weil dort nicht relevant).
  *
  * Beide Flags liegen im Firestore-Dokument `featureFlags/current`. Umlegen

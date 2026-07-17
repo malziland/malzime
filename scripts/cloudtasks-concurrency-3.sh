@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Setzt die Cloud-Tasks-Queue `analyze-queue` auf Concurrency 3.
-# Passend zur HEUTIGEN 3-Call-Pipeline (Describe Large + 2× Profile Small 2603).
-# 2603 hat 100K TPM — bei Concurrency 3 sind wir bei ~95% Auslastung (siehe
-# Memory). Höher gehen wäre risikobehaftet ohne Architektur-Wechsel.
+# Rollback-Hebel für den 3-Call-FALLBACK (Describe Large + 2× Profile Small
+# 2603) — heute läuft live der Single-Large-Pfad mit Concurrency 10 (siehe
+# docs/RUNBOOK.md, Hebel 3). 2603 hat 100K TPM — bei Concurrency 3 sind wir
+# bei ~95% Auslastung. Höher gehen wäre im 3-Call-Betrieb risikobehaftet.
 #
 # Wechsel-Workflow:
 #   1. featureFlags/current.useSingleLargeCall in Firestore auf false setzen

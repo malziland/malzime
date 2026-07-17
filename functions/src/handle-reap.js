@@ -22,8 +22,9 @@
  * Bei (1) und (2) wird das zwischengespeicherte Bild mitgelöscht (die GCS-
  * Lifecycle-Regel bleibt nur das Sicherheitsnetz).
  *
- * Solange die Queue dormant ist (Feature-Flag `useQueue` AUS), gibt es keine
- * Jobs — der Lauf ist dann ein leerer, vernachlässigbar günstiger Query.
+ * Ist die Queue per Flag deaktiviert (`useQueue` = false, Rückfall auf den
+ * synchronen /analyze-Pfad), gibt es keine Jobs — der Lauf ist dann ein
+ * leerer, vernachlässigbar günstiger Query.
  */
 
 const {

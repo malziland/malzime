@@ -107,10 +107,11 @@ exports.telemetry = onRequest(
 );
 
 /* ── Queue-Architektur (v2.0) ──
-   Parallel-Pfad zum synchronen /analyze. Diese drei Functions liegen
-   dormant: Solange das Feature-Flag `useQueue` (Firestore featureFlags/
-   current) AUS ist, leitet das Frontend keinen Nutzer hierher — jeder
-   echte Request laeuft weiter ueber /analyze. Siehe memory/queue-plan. */
+   Der Live-Pfad: Seit v2.0 laeuft jeder Upload ueber diese Functions
+   (Feature-Flag `useQueue` in Firestore featureFlags/current, live true).
+   Bei useQueue=false faellt alles auf den synchronen /analyze-Pfad
+   zurueck — der Rueckfall-Hebel ohne Deploy (docs/RUNBOOK.md, Hebel 2).
+   Siehe docs/ARCHITECTURE.md, Abschnitt Queue-Architektur. */
 
 /* enqueue — public Annahme-Endpoint: validiert, speichert das Bild,
    legt den Job an und reiht ihn in Cloud Tasks ein. */
@@ -163,8 +164,9 @@ exports.jobStatus = onRequest(
 
 /* reapJobs — geplanter Lauf (jede Minute): markiert wartende Jobs, deren
    Client nicht mehr pollt, als `abandoned`, gibt ihren Warteschlangen-Platz
-   frei und loescht ihr Bild. Siehe handle-reap.js. Laeuft auch bei dormanter
-   Queue — dann ein leerer, vernachlaessigbarer Query. */
+   frei und loescht ihr Bild. Siehe handle-reap.js. Laeuft auch, wenn die
+   Queue per Flag deaktiviert ist (useQueue=false, Rueckfall auf /analyze) —
+   dann ein leerer, vernachlaessigbarer Query. */
 exports.reapJobs = onSchedule(
   {
     region: "europe-west1",

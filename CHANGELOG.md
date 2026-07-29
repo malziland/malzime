@@ -4,6 +4,31 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.4.3] — 2026-07-29
+
+Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst erzeugt hat — gebündelt statt einzeln, und einer davon vollständig ohne Zutun durchgelaufen. Der Backend-Anteil enthält einen Major-Sprung im Innenleben (Express 4 → 5), der bewusst geprüft statt automatisch durchgewunken wurde.
+
+### Geändert
+
+- **Backend (PR #58):** `firebase-functions` 7.2.5 → 7.3.2, `firebase-admin` 14.1.0 → 14.2.0, `@google-cloud/tasks` 6.2.3 → 6.3.0, `eslint` 10.7.0 → 10.8.0, `prettier` 3.9.5 → 3.9.6.
+  - **Transitiv darin: Express 4.22.2 → 5.2.1** samt `body-parser` 2.x und `path-to-regexp` 8.x. Der Sammel-PR war als `minor` eingestuft — die Auto-Merge-Regel hätte ihn durchgewunken. **Auto-Merge wurde deshalb bewusst deaktiviert und der PR von Hand geprüft.** Befunde:
+    - **Upload-Pfad (`req.pipe(busboy)` in `upload.js`) unter Express 5: 10/10 identisch zu Express 4** — gemessen mit einem echten HTTP-Server gegen den echten Projekt-Parser, inklusive 900-KB-Datei über mehrere Chunks (byte-genau vollständig), Textfelder, MIME-Erkennung und beiden Fehlerpfaden (`unsupported_content_type`, `missing_image`).
+    - **Query-Parser** (Express 5 wechselt von `extended` auf `simple`): identische Ausgabe, auch bei Mehrfach-Parametern. Die drei Lesestellen (`handle-job-status.js` 2×, `handle-admin.js` 1×) sind unberührt.
+    - **`path-to-regexp` 0.1 → 8** (die riskanteste Express-5-Änderung): **kein Risiko** — der Code definiert keine eigenen Express-Routen, ausschließlich `onRequest`-Handler.
+    - **`firebase-functions` 7.3.2 im HTTPS-Provider**: nur CORS-Auflösung als Helfer ausgelagert und Trigger-Typ-Weitergabe — nichts am Body- oder Stream-Handling.
+    - **Neue `timeoutSeconds`-Validierung aus 7.3.0** (HTTPS ≤ 3600 s, Ereignis ≤ 540 s): alle 9 Funktionen validiert, kein Verstoß.
+- **Frontend-Werkzeuge (PR #59):** `@playwright/test` 1.61.1 → 1.62.0, `eslint` 10.6.0 → 10.8.0, `prettier` 3.9.4 → 3.9.6.
+  - **Bewährungsprobe für die v2.4.2-Automatik bestanden:** Der CI-Job `playwright-version` hat den Container-Tag selbstständig auf `v1.62.0-jammy` nachgezogen, `test-e2e` lief grün. Unter der alten Doppelpflege hätte genau dieser PR zwangsläufig scheitern müssen.
+- **Test-Werkzeug (PR #60):** `jsdom` 29.1.1 → 30.0.1. Einziger Breaking Change ist die angehobene Node-Mindestversion (`^22.22.2 || ^24.15.0 || >=26`) — Projekt läuft auf Node 24.
+- **CI (PR #57):** `actions/setup-node` 6.4.0 → 7.0.0 (SHA-gepinnt). Breaking Changes sind der ESM-Umbau und der Wegfall eines npm-Publish-Tokens, den dieses Repo nicht nutzt; die CI dieses PRs lief bereits mit v7 vollständig grün.
+- **PR #56** (`actions/checkout` 7.0.0 → 7.0.1, gebündelt) ist **ohne jeden Handgriff auto-gemergt** — der erste Durchlauf der reparierten Kette.
+
+### Erkenntnisse
+
+- **Ein `minor`-Update eines Wrapper-Pakets kann einen `major`-Sprung seines Innenlebens transportieren.** Die Auto-Merge-Regel (patch + minor) sieht nur das Etikett. Bei Sammel-PRs, die Backend-Produktivpakete anfassen, lohnt ein Blick in den Lockfile-Diff, bevor man sie laufen lässt.
+- **Der Functions-Emulator kann den Upload-Pfad nicht abbilden:** Er liest den Request-Body vorab aus, `req.pipe(busboy)` bekommt nur einen abgeschnittenen Strom und scheitert mit `bad_multipart: Unexpected end of form` — **unter Express 4 genauso wie unter Express 5**. Nur der Gegenversuch mit dem alten Stand hat das als Emulator-Artefakt entlarvt statt es fälschlich Express 5 anzulasten. Entsprechend ist der Durchklick aus `docs/QUEUE-EMULATOR.md` für den Upload selbst nicht aussagekräftig.
+- **Die Backend-Unit-Tests decken die Express-Schicht nicht ab** — sie ersetzen `onRequest` durch eine Attrappe und treffen die Handler direkt. Die 439 grünen Tests sagen über Multipart-Streaming, Query-Parsing und Body-Handling nichts aus. Für diese Schicht gibt es derzeit **keinen dauerhaften Test**; die Prüfung oben lief über einen eigens gebauten Prüfstand. → offener Punkt.
+
 ## [2.4.2] — 2026-07-29
 
 Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft. Ausgangspunkt war die Beobachtung, dass laufend Dependabot-Mails eintrudeln: Ursache war nicht Dependabot selbst, sondern zwei dauerhaft rote CI-Tore, an denen jeder Update-PR hängenblieb — die Auto-Merge-Automatik funktionierte, kam aber nie zum Zug.

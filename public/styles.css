@@ -2394,13 +2394,19 @@ ol.legal-list > li::before {
 }
 /* Datenschutz-Link im Upload-Hinweis: CI-Petrol wie die übrigen Inline-Links
    (Rechtstexte), nicht das Browser-Standardblau. !important überstimmt die
-   geerbte --muted-Farbe des Absatzes. */
+   geerbte --muted-Farbe des Absatzes.
+   Die Unterstreichung ist PFLICHT und darf nicht entfernt werden: der Link
+   steht mitten in einem Textabsatz und hat gegen dessen --muted-Farbe nur
+   1,19:1 Kontrast. Ohne Unterstreichung wäre er allein an der Farbe zu
+   erkennen — WCAG 1.4.1 verletzt, axe meldet `link-in-text-block` als
+   "serious" (genau daran ist die CI nach v2.4.1 gescheitert). */
 .disclaimer__workshop a {
   color: var(--teal-text) !important;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .disclaimer__workshop a:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 .export-btn--hidden {
   display: none;

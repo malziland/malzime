@@ -15,7 +15,7 @@ bewusst als offen ausgewiesen.
 | E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 5/5 grün (Smoke 2, A11y 2, Tastatur 1) — CI-Run 29562535095, 2026-07-17 |
 | Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — CI-Run 29562535095, 2026-07-17 |
 | Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29562535095, 2026-07-17 |
-| Dependency-Audit | CI-Job `test-backend`: `npm audit --omit=dev --audit-level=high` (Gate, bricht Build) | ✅ 0 Meldungen — Stand v2.3.1 (uuid-Override), CI-Run 29562535095, 2026-07-17 |
+| Dependency-Audit | CI-Job `test-backend`: `node scripts/audit-gate.mjs functions` (Gate, bricht Build; High/Critical blockieren, Ausnahmen nur begründet **und mit Ablaufdatum** in `.github/audit-allowlist.json`) | ✅ 0 ungedeckte Meldungen — 1 begründete Ausnahme (`brace-expansion`, upstream unrepariert, Prüfdatum 2026-10-31), Stand v2.4.2, 2026-07-29 |
 | Queue-Robustheit unter Stoßlast (kein Job verloren) | Queue-Emulator-Lasttest: `firebase emulators:exec` + `functions/scripts/queue-emulator-loadtest.js` (Mistral-Mock, `QUEUE_LOCAL=1`) | ✅ 100 Jobs: 100 done / 0 failed / 0 abandoned / 0 verloren — 2026-07-17 |
 | Performance-/Qualitäts-Budget | CI-Job `lighthouse` gegen malzi.me, /datenschutz, /impressum mit Budget-Datei | ✅ pass — CI-Run 29312808034, 2026-07-14 |
 | Reproduzierbares Setup (frischer Checkout) | `npm ci` (Root + `functions/`, Lockfiles committet, Node per `.nvmrc`/`engines`/CI gepinnt) | ✅ belegt durch Rollback-Probe (unten), 2026-07-14 |
@@ -43,7 +43,7 @@ ist bei jedem Audit **extern** zu verifizieren (z. B. `gh api`), Stand hier nur
 nachrichtlich (2026-07):
 
 - Branch Protection auf `main` mit Pflicht-Checks `test-backend`, `test-frontend`, `test-e2e`, `secret-scan` (strict).
-- Dependabot Security-Alerts aktiviert (0 offene Alerts, Stand v2.3.1); Auto-Merge nur patch/minor.
+- Dependabot Security-Alerts **und Security-Updates** aktiviert (Letztere seit 2026-07-29 — vorher meldete Dependabot Lücken nur, ohne einen Reparatur-PR zu öffnen). Version-Updates monatlich und je Bereich gebündelt; Auto-Merge nur patch/minor.
 - GCP-Budget-Alarm und ntfy-Fehleralarm (log-basiert, siehe [ERROR-ALERTING.md](ERROR-ALERTING.md)).
 
 ## Pflege

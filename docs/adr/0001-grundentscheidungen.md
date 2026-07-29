@@ -35,8 +35,10 @@ getroffen — sowie die bewussten Abweichungen vom Standard.
    npm-audit-Gate) plus Branch Protection; lokale Hooks würden das für einen
    Solo-Entwickler nur doppeln.
 7. **Umgebungskapselung: Toolchain-Pinning statt Dev-Container.** Node 24 über
-   `.nvmrc`, `engines` und CI; die Playwright-Version ist an den
-   CI-Container-Tag gekoppelt (siehe Kommentar in `ci.yml`). Solo-Entwicklung auf
+   `.nvmrc`, `engines` und CI; der Playwright-Container-Tag wird aus dem
+   Lockfile abgeleitet (Job `playwright-version` in `ci.yml`) — seit 2026-07-29
+   also nur noch EINE Quelle der Wahrheit statt zweier von Hand synchron
+   gehaltener Stellen. Solo-Entwicklung auf
    macOS — ein Dev-Container brächte keinen Nutzen.
 8. **Feature-Flags über Firestore** (`featureFlags/current`, 30-s-Cache,
    fail-safe `false`) statt Umgebungsvariablen. Grund: Umlegen ohne Deploy, auch

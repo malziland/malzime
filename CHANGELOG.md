@@ -4,6 +4,28 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft. Ausgangspunkt war die Beobachtung, dass laufend Dependabot-Mails eintrudeln: Ursache war nicht Dependabot selbst, sondern zwei dauerhaft rote CI-Tore, an denen jeder Update-PR hängenblieb — die Auto-Merge-Automatik funktionierte, kam aber nie zum Zug.
+
+### Behoben
+
+- **Barrierefreiheits-Regression aus v2.4.1 (macht auch die CI wieder grün).** Der Datenschutz-Link im Upload-Hinweis war seit v2.4.1 nur noch an seiner Farbe zu erkennen (`text-decoration: none`), hat gegen die `--muted`-Farbe des umgebenden Absatzes aber nur **1,19:1** Kontrast — axe meldet das als ernsten Verstoß `link-in-text-block` (WCAG 1.4.1 „Use of Color"). Der Pflicht-Check `test-e2e` war dadurch seit dem v2.4.1-Deploy dauerhaft rot und blockierte jeden Pull Request. Der Link ist jetzt permanent unterstrichen (`text-underline-offset: 2px`, Hover verdickt die Linie); das CI-Petrol bleibt unverändert. E2E wieder 5/5 grün. (`public/styles.css`, Cache-Buster 2026072901)
+- **`fast-xml-parser` 5.10.0 → 5.10.1 im Backend** (Dependabot-Alert vom 2026-07-24, „high": wiederholte DOCTYPE-Deklarationen setzen die Grenze für Entity-Expansion zurück). Kommt transitiv über `firebase-admin` → `@google-cloud/storage`; per `npm audit fix` gehoben, Lockfile bleibt vollständig (alle 60 plattformspezifischen Linux-Einträge erhalten — die bekannte macOS-Lockfile-Falle ist nicht zugeschlagen). (`functions/package-lock.json`)
+
+### Geändert
+
+- **Audit-Gate mit begründeter, ablaufender Ausnahmeliste** (`scripts/audit-gate.mjs` + `.github/audit-allowlist.json`) ersetzt das nackte `npm audit --omit=dev --audit-level=high` im CI-Job `test-backend`. Grund: Das alte Gate war ein Alles-oder-nichts-Schalter — erschien irgendwo tief in einer fremden Abhängigkeitskette ein High-Advisory ohne verfügbare Reparatur, blockierte es **jeden** PR. Genau daran sind am 2026-07-01 alle acht Dependabot-PRs gescheitert (#30–#37, alle an `test-backend`), die deshalb von Hand weggeräumt werden mussten. Neu: High/Critical blockieren weiterhin, eine Ausnahme braucht Begründung **und** Ablaufdatum, danach fällt das Gate von selbst wieder auf rot; ein neues Advisory ist nie automatisch ausgenommen. Das Gate fasst außerdem Ketten korrekt zusammen (6 npm-Meldungen = 1 echte Lücke). Verhalten in allen vier Fällen gemessen: ungedeckt → rot, abgelaufen → rot, gedeckt → grün, verwaist → Hinweis.
+  - Einziger Eintrag derzeit: `GHSA-mh99-v99m-4gvg` (`brace-expansion`, über `@google-cloud/tasks` → `google-gax` → `rimraf` → `glob` → `minimatch`). Upstream unrepariert (`google-gax` steht bei 5.0.8 und liegt selbst im betroffenen Bereich), und ein `overrides`-Erzwingen von `brace-expansion` 5.0.8 ist **nachgemessen unmöglich**: dessen CommonJS-Export ist ein Objekt statt einer Funktion, `minimatch` und `glob` brechen damit zur Laufzeit. Praktische Auswirkung hier null (DoS über sehr große Klammer-Muster; die Muster stammen ausschließlich aus dem Aufräum-Code von `google-gax`, nie aus Nutzereingaben). Prüfdatum 2026-10-31.
+- **Playwright-Container-Tag kommt jetzt aus dem Lockfile** (neuer CI-Job `playwright-version`, `test-e2e` hängt daran). Vorher stand die Version an zwei Stellen (`package.json` und Image-Tag in `ci.yml`) und musste von Hand synchron gehalten werden — jedes Dependabot-Playwright-Update musste dadurch zwangsläufig scheitern. Von Hand zu pflegen bleibt nur noch der Basis-Name `-jammy`. Ergibt heute unverändert `v1.61.1-jammy`. (`.github/workflows/ci.yml`)
+- **Dependabot bündelt Updates je Bereich zu einem PR** statt einen pro Paket (`applies-to: version-updates`, nur `minor` + `patch`). Am 2026-07-01 waren es acht einzelne PRs — gebündelt wären es drei gewesen, die mit dem bestehenden Auto-Merge ohne Zutun durchlaufen. Major-Updates bleiben bewusst einzeln, weil sie ohnehin eine manuelle Freigabe brauchen und in einem Sammel-PR untergehen würden. (`.github/dependabot.yml`)
+- **Dependabot Security-Updates aktiviert** (Repo-Einstellung, war aus). Bisher meldete Dependabot eine Lücke nur per Mail, ohne einen Reparatur-PR zu öffnen — Nörgeln statt Reparieren, jede Lücke musste von Hand gehoben werden. Security-PRs sind zusätzlich je Bereich gebündelt.
+
+### Dokumentation
+
+- RUNBOOK: neues Störungs-Rezept „Audit-Gate rot / Dependabot-PRs bleiben liegen" (was tun bei reparierbar, bei upstream-unrepariert, bei abgelaufener Ausnahme).
+- VERIFICATION: Audit-Zeile auf das neue Gate umgestellt; Security-Updates-Status ergänzt. SECURITY-MODEL, README und ADR-0001 (Playwright-Kopplung) nachgezogen.
+
 ## [2.4.1] — 2026-07-17
 
 Visueller Feinschliff: Der Datenschutz-Link im neuen Upload-Hinweis (2.4.0) erschien im Browser-Standardblau statt in der Markenfarbe.

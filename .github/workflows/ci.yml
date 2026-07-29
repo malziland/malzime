@@ -28,7 +28,12 @@ jobs:
           cache-dependency-path: functions/package-lock.json
 
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=high
+
+      # Audit-Gate mit begruendeter, ABLAUFENDER Ausnahmeliste statt nacktem
+      # `npm audit --audit-level=high`. Grund: das nackte audit blockiert bei
+      # einer unreparierbaren Fremd-Luecke JEDEN PR — am 2026-07-01 sind daran
+      # alle acht Dependabot-PRs gescheitert. Details: scripts/audit-gate.mjs
+      - run: node ../scripts/audit-gate.mjs functions
 
       - run: npm run lint
       - run: npm run format:check
@@ -62,17 +67,35 @@ jobs:
       - run: npm run format:frontend:check
       - run: npm run test:frontend
 
+  # Liest die Playwright-Version aus dem Lockfile und reicht sie an test-e2e
+  # weiter. Frueher stand die Version an zwei Stellen (package.json UND
+  # Container-Tag) und musste von Hand synchron gehalten werden — jedes
+  # Dependabot-Playwright-Update ist dadurch zwangslaeufig gescheitert.
+  # Jetzt gibt es nur noch eine Quelle der Wahrheit: das Lockfile.
+  playwright-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.lesen.outputs.version }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - id: lesen
+        run: |
+          VERSION=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          echo "Playwright laut Lockfile: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
   test-e2e:
+    needs: playwright-version
     runs-on: ubuntu-latest
     # Offizielles Playwright-Image mit VORINSTALLIERTEM Chromium (Browser-Version
-    # exakt passend zu @playwright/test 1.61.1). Damit entfaellt der
+    # exakt passend zur installierten @playwright/test). Damit entfaellt der
     # fehleranfaellige Browser-Download von cdn.playwright.dev komplett — der
     # blieb in der CI zuverlaessig nach dem 100%-Download beim Entpacken/
     # Finalisieren haengen und blockierte als Pflicht-Check JEDEN PR.
-    # WICHTIG: Bei einem Minor-Update von @playwright/test (z.B. 1.59 -> 1.60)
-    # muss dieser Image-Tag mitgezogen werden, sonst passt der Browser nicht mehr.
+    # Der Tag wird aus dem Lockfile abgeleitet, siehe Job playwright-version.
+    # Von Hand zu pflegen bleibt nur noch der Basis-Name (-jammy).
     container:
-      image: mcr.microsoft.com/playwright:v1.61.1-jammy
+      image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.version }}-jammy
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0

@@ -122,6 +122,29 @@ Gewollte Kostenbremse; der ntfy-Push kommt automatisch. Braucht ein Workshop meh
 Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über
 `/api/admin/reset` (jeweils HMAC-Token + Nonce-Bestätigung).
 
+### Audit-Gate rot / Dependabot-PRs bleiben liegen
+
+Erst nachsehen, **was** rot ist: `node scripts/audit-gate.mjs functions` (läuft
+lokal identisch zur CI und nennt Paket, Advisory und Kette).
+
+- **Es gibt eine reparierte Version** → `npm audit fix --prefix functions`, Tests
+  laufen lassen, committen. Normalfall.
+- **Upstream hat noch keine Reparatur** → begründeten Eintrag in
+  `.github/audit-allowlist.json` anlegen: `ghsa`, `paket`, `grund` (warum nicht
+  reparierbar **und** warum hier ungefährlich) und `pruefen_bis`. Ohne
+  Ablaufdatum bleibt das Gate rot — das ist Absicht.
+- **Ausnahme abgelaufen** → nicht blind verlängern. Erst prüfen, ob es inzwischen
+  eine reparierte Version gibt (`npm view <paket> version`).
+
+Hintergrund: Vor 2026-07-29 lief hier das nackte `npm audit --audit-level=high`.
+Das kannte keine Ausnahmen und blockierte deshalb bei einer einzigen
+unreparierbaren Fremd-Lücke **jeden** Pull Request — am 2026-07-01 sind daran
+alle acht Dependabot-PRs gescheitert und mussten von Hand weggeräumt werden.
+
+Bleiben Dependabot-PRs trotz grünem Gate liegen, ist meist ein anderer
+Pflicht-Check rot: `gh pr checks <nr>` zeigt welcher. Auto-Merge ist dann zwar
+scharf gestellt, wartet aber auf einen Check, der nie grün wird.
+
 ## Logs und Aufbewahrung
 
 | Log | Aufbewahrung | Inhalt |

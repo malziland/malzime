@@ -1,0 +1,24 @@
+{
+  "_hinweis": [
+    "Begruendete Ausnahmen fuer das Audit-Gate (scripts/audit-gate.mjs).",
+    "Diese Liste ist ABSICHTLICH LEER und soll es bleiben.",
+    "",
+    "Hier gehoert nur herein, was sich nachweislich nicht reparieren laesst: eine",
+    "Luecke tief in einer fremden Abhaengigkeitskette, fuer die es upstream noch",
+    "keine reparierte Version gibt UND die sich auch nicht per overrides umgehen",
+    "laesst. Alles, was sich mit einem Update oder einem override beheben laesst,",
+    "wird behoben statt eingetragen.",
+    "",
+    "Pflichtfelder eines Eintrags: ghsa, paket, schwere, eingetragen, kette,",
+    "grund (warum nicht reparierbar UND warum hier ungefaehrlich) und",
+    "pruefen_bis. Nach dem Pruefdatum faellt das Gate wieder auf rot — das ist",
+    "Absicht, so kann keine Ausnahme still liegenbleiben.",
+    "",
+    "Wozu die Liste ueberhaupt, wenn sie leer ist: das nackte npm-audit ist ein",
+    "Alles-oder-nichts-Schalter. Am 2026-07-01 hat eine einzige unreparierbare",
+    "Fremd-Luecke ALLE acht Dependabot-PRs blockiert. Die Liste ist das Ventil",
+    "fuer genau diesen Fall — mit Begruendungs- und Ablaufpflicht, damit sie",
+    "nicht zur stillen Muellhalde wird."
+  ],
+  "ausnahmen": []
+}

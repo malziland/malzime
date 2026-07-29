@@ -245,8 +245,8 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 - **Tests + Lint** bei jedem Push und Pull Request (Backend + Frontend)
 - **Secret-Scan** via gitleaks (prueft auf versehentlich committete API-Keys)
-- **Dependabot** prueft monatlich auf unsichere Dependencies (npm + GitHub Actions)
-- **npm audit** im Backend-Job (blockiert bei hohen und kritischen Schwachstellen)
+- **Dependabot** prueft monatlich auf Updates (npm + GitHub Actions, je Bereich zu einem PR gebuendelt) und oeffnet bei gemeldeten Sicherheitsluecken sofort einen Reparatur-PR
+- **Audit-Gate** im Backend-Job (`scripts/audit-gate.mjs`): blockiert bei hohen und kritischen Schwachstellen. Laesst sich eine Luecke tief in einer fremden Abhaengigkeitskette nachweislich (noch) nicht reparieren, kann sie **begruendet und mit Ablaufdatum** in `.github/audit-allowlist.json` ausgenommen werden — danach faellt das Gate von selbst wieder auf rot
 - **Branch Protection** fuer `main`: Merges erst nach gruenen Status-Checks (`test-backend`, `test-frontend`, `test-e2e`, `secret-scan`)
 - Deploy erfolgt manuell per `npx firebase deploy`
 

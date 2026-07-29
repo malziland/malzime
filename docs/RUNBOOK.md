@@ -122,6 +122,55 @@ Gewollte Kostenbremse; der ntfy-Push kommt automatisch. Braucht ein Workshop meh
 Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über
 `/api/admin/reset` (jeweils HMAC-Token + Nonce-Bestätigung).
 
+### Audit-Gate rot / Dependabot-PRs bleiben liegen
+
+Erst nachsehen, **was** rot ist: `node scripts/audit-gate.mjs functions` (läuft
+lokal identisch zur CI und nennt Paket, Advisory und Kette).
+
+- **Es gibt eine reparierte Version** → anheben, Tests laufen lassen, committen.
+  **Danach IMMER `npm ci --dry-run` in Root und `functions/`** (siehe Kasten
+  unten) — sonst bricht die Linux-CI, obwohl lokal alles grün aussieht.
+- **Upstream hat noch keine Reparatur, aber die Kette lässt sich umgehen** →
+  nicht das verwundbare Paket selbst übersteuern, sondern dessen **Nutzer**
+  anheben (Beispiel: `brace-expansion` ließ sich nicht erzwingen, aber
+  `rimraf`/`glob`/`test-exclude` anzuheben hat die Kette aufgelöst). Jede
+  Übersteuerung braucht eine notierte Rückbau-Bedingung im CHANGELOG.
+- **Upstream hat keine Reparatur und die Kette lässt sich nicht umgehen** →
+  begründeten Eintrag in
+  `.github/audit-allowlist.json` anlegen: `ghsa`, `paket`, `grund` (warum nicht
+  reparierbar **und** warum hier ungefährlich) und `pruefen_bis`. Ohne
+  Ablaufdatum bleibt das Gate rot — das ist Absicht.
+- **Ausnahme abgelaufen** → nicht blind verlängern. Erst prüfen, ob es inzwischen
+  eine reparierte Version gibt (`npm view <paket> version`).
+
+Hintergrund: Vor 2026-07-29 lief hier das nackte `npm audit --audit-level=high`.
+Das kannte keine Ausnahmen und blockierte deshalb bei einer einzigen
+unreparierbaren Fremd-Lücke **jeden** Pull Request — am 2026-07-01 sind daran
+alle acht Dependabot-PRs gescheitert und mussten von Hand weggeräumt werden.
+
+Bleiben Dependabot-PRs trotz grünem Gate liegen, ist meist ein anderer
+Pflicht-Check rot: `gh pr checks <nr>` zeigt welcher. Auto-Merge ist dann zwar
+scharf gestellt, wartet aber auf einen Check, der nie grün wird.
+
+> **macOS-Lockfile-Falle — vor jedem Lockfile-Commit prüfen.**
+> `npm audit fix`, `npm update --package-lock-only` **und** `npm install`
+> schneiden auf macOS optionale Einträge aus dem Lockfile (`@emnapi/core`,
+> `@emnapi/runtime`, `@pkgjs/parseargs`). Lokal fällt das nicht auf; die
+> Linux-CI bricht dann in `npm ci` mit `EUSAGE … Missing … from lock file` ab.
+>
+> **Pflichtprüfung: `npm ci --dry-run`** (Root *und* `functions/`). Exit 0 =
+> gut. Das reproduziert den CI-Fehler lokal in Sekunden. Eine Textsuche nach
+> „linux" im Lockfile reicht **nicht** — die betroffenen Pakete tragen kein
+> „linux" im Namen.
+>
+> Reparatur ohne Kollateralschaden: die weggeschnittenen Einträge aus dem
+> vorherigen Lockfile-Stand zurückschreiben (`git show <ref>:<lockfile>`).
+> Ein vollständiger Neuaufbau (`rm -rf node_modules package-lock.json &&
+> npm install`) repariert es zwar auch, hebt aber nebenbei alle Pakete auf den
+> neuesten Stand innerhalb ihrer Bereiche — im Backend zuletzt bis hin zu
+> `firebase-functions` 7.3.2 und damit Express 4 → 5. Das gehört in einen
+> eigenen, bewusst freigegebenen Schritt.
+
 ## Logs und Aufbewahrung
 
 | Log | Aufbewahrung | Inhalt |

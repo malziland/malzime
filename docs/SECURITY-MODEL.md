@@ -55,7 +55,7 @@ CI vs. Laufzeit (CI ohne Cloud-Rechte).
 | Ergebnis-Abgriff durch Dritte | Abhol-Ticket (PRIV-003): Job-Status und Ergebnis nur mit Ticket; Ticket lebt im Tab (`sessionStorage`) und stirbt mit ihm |
 | Admin-Missbrauch / Replay | HMAC-signierte Tokens, Nonce-Replay-Schutz, GET zeigt nur Bestätigungsseite, erst POST mutiert |
 | Scanner / automatisiertes Probing | ungültige Anfragen enden als 4xx ohne Schaden; Einordnungs-Rezept im [RUNBOOK](RUNBOOK.md) |
-| Kompromittierte Abhängigkeiten (Supply Chain) | committete Lockfiles, npm-audit-Gate (Level high) in CI, Dependabot-Alerts + Auto-Merge nur patch/minor, Actions auf Commit-SHAs gepinnt, gitleaks-Secret-Scan |
+| Kompromittierte Abhängigkeiten (Supply Chain) | committete Lockfiles, Audit-Gate in CI (`scripts/audit-gate.mjs`, High/Critical blockieren; Ausnahmen nur begründet und mit Ablaufdatum), Dependabot-Alerts + Security-Updates + Auto-Merge nur patch/minor, Actions auf Commit-SHAs gepinnt, gitleaks-Secret-Scan |
 | Hochgeladenes Nicht-Bild / manipulierte Datei | MIME- + Magic-Byte-Validierung, Größenlimits |
 
 ## Aufbewahrung und Löschung

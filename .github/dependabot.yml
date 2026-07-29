@@ -1,4 +1,15 @@
 version: 2
+
+# Gebuendelte Updates: Dependabot fasst alle harmlosen Updates (patch + minor)
+# je Bereich zu EINEM Pull Request zusammen, statt fuer jedes Paket einen
+# eigenen aufzumachen. Am 2026-07-01 waren es acht einzelne PRs — mit
+# Buendelung waeren es drei gewesen. Zusammen mit dem funktionierenden
+# Auto-Merge (.github/workflows/dependabot-automerge.yml) laufen die drei
+# ohne Zutun durch.
+#
+# Major-Updates bleiben BEWUSST ungebuendelt und einzeln: die brauchen ohnehin
+# eine manuelle Freigabe, und in einem Sammel-PR wuerde man sie uebersehen.
+
 updates:
   # Root-Projekt (Frontend devDependencies)
   - package-ecosystem: "npm"
@@ -8,6 +19,18 @@ updates:
     open-pull-requests-limit: 3
     labels:
       - "dependencies"
+    groups:
+      frontend-tooling:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      frontend-sicherheit:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   # Cloud Functions (Backend)
   - package-ecosystem: "npm"
@@ -17,6 +40,18 @@ updates:
     open-pull-requests-limit: 3
     labels:
       - "dependencies"
+    groups:
+      backend-abhaengigkeiten:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      backend-sicherheit:
+        applies-to: security-updates
+        patterns:
+          - "*"
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
@@ -25,3 +60,11 @@ updates:
       interval: "monthly"
     labels:
       - "ci"
+    groups:
+      ci-actions:
+        applies-to: version-updates
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

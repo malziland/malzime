@@ -142,6 +142,11 @@ Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md) | Eigene Instanz aufset
 
 `POST /analyze` — JSON oder multipart/form-data
 
+Das mitgelieferte Frontend nutzt **ausschliesslich den JSON-Weg** (Bild als
+`imageBase64`); der multipart-Weg existiert fuer eigene Clients und
+Selbst-Hosting. Beide sind seit v2.4.4 durch Tests abgedeckt
+(`functions/src/__tests__/upload-http.test.js`).
+
 ### Request (JSON)
 
 ```json

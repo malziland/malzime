@@ -41,8 +41,20 @@ updates:
     labels:
       - "dependencies"
     groups:
-      backend-abhaengigkeiten:
+      # Getrennt nach produktiv/Werkzeug, damit der Auto-Merge-Workflow beides
+      # unterschiedlich behandeln kann: Werkzeuge laufen durch, Produktivpakete
+      # brauchen eine Handprüfung (siehe dependabot-automerge.yml).
+      backend-werkzeuge:
         applies-to: version-updates
+        dependency-type: development
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      backend-produktiv:
+        applies-to: version-updates
+        dependency-type: production
         patterns:
           - "*"
         update-types:

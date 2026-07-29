@@ -21,8 +21,22 @@ jobs:
       # brauchen bewusste manuelle Freigabe — verhindert, dass ein groesserer
       # oder kompromittierter Versionssprung ungeprueft auf main landet
       # (Supply-Chain-Haertung, Audit OPS-002).
-      - name: Auto-Merge (nur patch + minor)
-        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+      #
+      # ZUSAETZLICH ausgeschlossen: Produktiv-Abhaengigkeiten des Backends
+      # (`/functions`, `direct:production`). Grund aus der Praxis (2026-07-29):
+      # Der Sammel-PR #58 war als `minor` eingestuft (firebase-functions
+      # 7.2.5 -> 7.3.2), transportierte darin aber einen MAJOR-Sprung seines
+      # Innenlebens — Express 4 -> 5 samt body-parser 2 und path-to-regexp 8.
+      # Die reine update-type-Pruefung sieht nur das Etikett des aeusseren
+      # Pakets, nicht was im Lockfile darunter passiert. Fuer Code, der im
+      # Produktivbetrieb Uploads verarbeitet, ist das zu wenig.
+      # Backend-WERKZEUGE (eslint, prettier, jest) laufen weiterhin durch.
+      - name: Auto-Merge (patch + minor, ohne Backend-Produktivpakete)
+        if: >
+          (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
+           steps.meta.outputs.update-type == 'version-update:semver-minor') &&
+          !(steps.meta.outputs.directory == '/functions' &&
+            steps.meta.outputs.dependency-type == 'direct:production')
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

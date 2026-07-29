@@ -4,6 +4,28 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.4.4] — 2026-07-29
+
+Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu lassen.
+
+### Behoben
+
+- **Der in README zugesagte multipart-Weg auf `POST /analyze` funktioniert wieder.** Er war in der Produktion faktisch tot: Die Cloud-Functions-Laufzeit liest den Request-Body vorab vollständig aus und legt ihn als `req.rawBody` ab — der Stream ist danach leer, und das bisherige `req.pipe(busboy)` scheiterte zuverlässig mit `Unexpected end of form` (`bad_multipart`). Betroffen war jeder Fremd-Client, der die dokumentierte Schnittstelle nutzt (Self-Hosting, eigene Integrationen); das eigene Frontend nie, weil es ausschließlich JSON mit `imageBase64` schickt. `parseMultipart` füttert busboy jetzt direkt mit `rawBody`, wenn vorhanden — der `pipe`-Zweig bleibt für Umgebungen ohne `rawBody` (blankes Express, Selbst-Hosting hinter eigenem Server). **Nicht gelöscht, sondern repariert:** die Schnittstelle ist öffentlich zugesagt (`README.md`, MIT-Lizenz, Self-Hosting-Anleitung). (`functions/src/upload.js`)
+
+### Hinzugefügt
+
+- **Dauerhafte Web-Schicht-Tests** (`functions/src/__tests__/upload-http.test.js`, +12 Tests, Backend jetzt 451). Sie starten einen echten HTTP-Server mit echtem Express und fahren den echten Projekt-Parser dagegen — in **beiden** Betriebsarten: `pipe` (blankes Express) und `rawBody` (Firebase-Produktion nachgebildet). Abgedeckt: Multipart vollständig und byte-genau, 600-KB-Datei über mehrere Chunks, falscher Content-Type, fehlendes Bild, JSON-Body, `req.query`-Typen.
+  - **Warum das nötig war:** Alle übrigen Backend-Tests ersetzen `onRequest` durch eine Attrappe und überspringen die Express-Schicht komplett. Beim Sprung Express 4 → 5 konnte deshalb **kein einziger** der 439 Tests eine Regression dort bemerken; die Prüfung lief über einen Wegwerf-Prüfstand.
+  - **Gegenprobe gemacht:** Ohne die `rawBody`-Reparatur fallen genau 3 der 12 neuen Tests durch — der Test misst also wirklich etwas.
+
+### Geändert
+
+- **Auto-Merge schließt Backend-Produktivpakete aus.** Neu zusätzlich zur patch/minor-Regel: PRs in `/functions` mit `dependency-type: direct:production` laufen **nicht** mehr automatisch durch. Anlass ist der Vorfall aus v2.4.3 — Sammel-PR #58 war als `minor` etikettiert (`firebase-functions` 7.2.5 → 7.3.2), transportierte darin aber Express 4 → 5. Die update-type-Prüfung sieht nur das Etikett des äußeren Pakets, nicht den Lockfile darunter. Backend-**Werkzeuge** (eslint, prettier, jest) laufen weiterhin ohne Zutun durch; dafür trennt `dependabot.yml` die Bündel jetzt in `backend-werkzeuge` und `backend-produktiv`. (`.github/workflows/dependabot-automerge.yml`, `.github/dependabot.yml`)
+
+### Aufgeräumt
+
+- Vier veraltete lokale Zweige entfernt (PRs #50–#53, alle per Squash gemergt), Remote-Referenzen bereinigt.
+
 ## [2.4.3] — 2026-07-29
 
 Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst erzeugt hat — gebündelt statt einzeln, und einer davon vollständig ohne Zutun durchgelaufen. Der Backend-Anteil enthält einen Major-Sprung im Innenleben (Express 4 → 5), der bewusst geprüft statt automatisch durchgewunken wurde.

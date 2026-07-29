@@ -86,7 +86,26 @@ function parseMultipart(req) {
       error.code = "bad_multipart";
       reject(error);
     });
-    req.pipe(busboy);
+
+    /* WICHTIG — zwei Wege, und der erste ist in der Produktion der einzig
+       funktionierende:
+
+       Die Firebase-/Cloud-Functions-Laufzeit liest den Request-Body VORAB
+       vollstaendig aus und legt ihn als `req.rawBody` ab. Der Stream ist danach
+       leer. Ein `req.pipe(busboy)` bekommt dort nichts mehr und scheitert
+       zuverlaessig mit "Unexpected end of form" (Fehlercode `bad_multipart`) —
+       der in README dokumentierte multipart-Weg auf `POST /analyze` war dadurch
+       in der Produktion faktisch tot, obwohl er zugesagt ist. Der
+       Functions-Emulator verhaelt sich identisch.
+
+       Deshalb: liegt `rawBody` vor, wird busboy direkt damit gefuettert.
+       Der `pipe`-Zweig bleibt fuer Umgebungen ohne `rawBody` (blankes Express,
+       Tests, Selbst-Hosting hinter einem eigenen Server). */
+    if (req.rawBody) {
+      busboy.end(req.rawBody);
+    } else {
+      req.pipe(busboy);
+    }
   });
 }
 

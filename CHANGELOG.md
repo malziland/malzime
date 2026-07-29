@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [2.4.2] — 2026-07-29
 
 Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft. Ausgangspunkt war die Beobachtung, dass laufend Dependabot-Mails eintrudeln: Ursache war nicht Dependabot selbst, sondern zwei dauerhaft rote CI-Tore, an denen jeder Update-PR hängenblieb — die Auto-Merge-Automatik funktionierte, kam aber nie zum Zug.
 

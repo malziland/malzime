@@ -1,23 +1,24 @@
 {
   "_hinweis": [
     "Begruendete Ausnahmen fuer das Audit-Gate (scripts/audit-gate.mjs).",
-    "Hier gehoert NUR herein, was sich derzeit nachweislich nicht reparieren laesst:",
-    "eine Luecke tief in einer fremden Abhaengigkeitskette, fuer die es upstream noch",
-    "keine reparierte Version gibt. Alles, was sich mit einem Update beheben laesst,",
+    "Diese Liste ist ABSICHTLICH LEER und soll es bleiben.",
+    "",
+    "Hier gehoert nur herein, was sich nachweislich nicht reparieren laesst: eine",
+    "Luecke tief in einer fremden Abhaengigkeitskette, fuer die es upstream noch",
+    "keine reparierte Version gibt UND die sich auch nicht per overrides umgehen",
+    "laesst. Alles, was sich mit einem Update oder einem override beheben laesst,",
     "wird behoben statt eingetragen.",
-    "Pflichtfeld 'pruefen_bis': danach faellt das Gate wieder auf rot. Das ist Absicht —",
-    "so kann keine Ausnahme still liegenbleiben."
+    "",
+    "Pflichtfelder eines Eintrags: ghsa, paket, schwere, eingetragen, kette,",
+    "grund (warum nicht reparierbar UND warum hier ungefaehrlich) und",
+    "pruefen_bis. Nach dem Pruefdatum faellt das Gate wieder auf rot — das ist",
+    "Absicht, so kann keine Ausnahme still liegenbleiben.",
+    "",
+    "Wozu die Liste ueberhaupt, wenn sie leer ist: das nackte npm-audit ist ein",
+    "Alles-oder-nichts-Schalter. Am 2026-07-01 hat eine einzige unreparierbare",
+    "Fremd-Luecke ALLE acht Dependabot-PRs blockiert. Die Liste ist das Ventil",
+    "fuer genau diesen Fall — mit Begruendungs- und Ablaufpflicht, damit sie",
+    "nicht zur stillen Muellhalde wird."
   ],
-  "ausnahmen": [
-    {
-      "ghsa": "GHSA-mh99-v99m-4gvg",
-      "paket": "brace-expansion",
-      "schwere": "high",
-      "eingetragen": "2026-07-29",
-      "pruefen_bis": "2026-10-31",
-      "kette": "@google-cloud/tasks -> google-gax -> rimraf -> glob -> minimatch -> brace-expansion",
-      "grund": "Upstream noch nicht repariert: google-gax ist bei 5.0.8 stehen (selbst im betroffenen Bereich), und die reparierte brace-expansion 5.0.8 laesst sich nicht per overrides erzwingen — ihr CommonJS-Export ist ein Objekt statt einer Funktion, wodurch minimatch und glob zur Laufzeit brechen (nachgemessen 2026-07-29). Praktische Auswirkung hier gleich null: die Luecke ist ein Speicherfresser-DoS ueber sehr grosse Klammer-Muster, und die Muster in dieser Kette kommen ausschliesslich aus google-gax' eigenem Aufraeum-Code — nie aus Nutzereingaben. Aufloesung: sobald google-gax > 5.0.8 erscheint, Ausnahme loeschen.",
-      "beobachten": "npm view google-gax version"
-    }
-  ]
+  "ausnahmen": []
 }

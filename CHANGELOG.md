@@ -4,6 +4,12 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.5.1] — 2026-08-08
+
+### Behoben
+
+- **Audit-Gate wieder grün** (`main` war nach dem v2.5.0-Push rot). Ursache war kein Fehler in v2.5.0, sondern ein neu veröffentlichtes Advisory: `brace-expansion` < 5.0.9 (GHSA-rgw5-rvv9-x895, high, DoS). Das Paket kommt rein über die Entwicklungskette `eslint → minimatch → brace-expansion` und läuft **nie** in Produktion — `npm audit --omit=dev` filtert transitive Dev-Abhängigkeiten aber nicht zuverlässig heraus, deshalb schlug das Gate an. Behoben mit `overrides.brace-expansion: ^5.0.9` (der zulässige Bereich von `minimatch@10.2.5` ist `^5.0.5`, `npm update` hob es nur nicht von selbst). Keine Allowlist-Ausnahme, weil eine reparierte Version existiert. **Rückbau-Bedingung:** entfällt, sobald `eslint`/`minimatch` von sich aus ≥ 5.0.9 ziehen — damit jetzt 6 overrides in `functions/package.json`. Lockfile-Falle geprüft: `npm ci --dry-run` in Root und `functions/` je exit 0, optionale Einträge (`@emnapi/*`) unverändert. (`functions/package.json`, `functions/package-lock.json`)
+
 ## [2.5.0] — 2026-08-08
 
 Kostensenkung im Live-Pfad: Prompt-Caching bei Mistral, gemessen statt geschätzt.

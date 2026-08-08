@@ -34,7 +34,7 @@ const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
-const { isSingleLargeCallEnabled } = require("./feature-flags");
+const { isSingleLargeCallEnabled, isPromptCacheEnabled } = require("./feature-flags");
 
 /* Mistral-Provider: im Mock-Modus die kostenlose Attrappe, sonst die echte
    API. Umschaltbar über die Umgebungsvariable MISTRAL_MOCK ("1" = Mock) —
@@ -182,8 +182,13 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   let profiles = { normal: null, boost: null };
   let quotaError = false;
   let pipelineError = false;
+  /* v2.5: Prompt-Cache-Flag. Reine Kostenmassnahme, ohne Einfluss auf Modell
+     oder Ergebnis — abschaltbar in Firestore ohne Deploy (~30 s Cache). */
+  const usePromptCache = await isPromptCacheEnabledSafe();
   try {
-    profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang);
+    profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, {
+      usePromptCache,
+    });
   } catch (err) {
     if (isQuotaError(err)) quotaError = true;
     else pipelineError = true;
@@ -281,6 +286,18 @@ async function isSingleLargeCallEnabledSafe() {
     return await isSingleLargeCallEnabled();
   } catch (err) {
     console.log(JSON.stringify({ warning: "single-large-flag-read-error", error: err.message }));
+    return false;
+  }
+}
+
+/* Analog fail-safe: Kann das Prompt-Cache-Flag nicht gelesen werden, laeuft der
+   Call ohne Cache-Key — also exakt wie vor v2.5. Ein Firestore-Wackler darf
+   eine reine Kostenoptimierung niemals zum Ausfall eskalieren. */
+async function isPromptCacheEnabledSafe() {
+  try {
+    return await isPromptCacheEnabled();
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "prompt-cache-flag-read-error", error: err.message }));
     return false;
   }
 }

@@ -638,4 +638,111 @@ describe("runSingleLargeCall", () => {
       code: "rate_limit",
     });
   });
+
+  /* ── v2.5: Prompt-Caching ──────────────────────────────────────
+     Der Cache-Key ist eine reine Kostenmassnahme. Diese Tests sichern die drei
+     Eigenschaften, auf die wir uns dabei verlassen: er ist standardmaessig AUS,
+     er ist ohne Nutzerbezug, und das Bild bleibt ausserhalb des Cache-Praefix. */
+
+  function captureBody() {
+    const seen = [];
+    setFetchForTest(async (_url, init) => {
+      seen.push(JSON.parse(init.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify(makeCompleteResponse()) }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 10821, completion_tokens: 2600, prompt_tokens_details: { cached_tokens: 9500 } },
+        }),
+      };
+    });
+    return seen;
+  }
+
+  test("schickt KEINEN prompt_cache_key, solange das Flag aus ist (Ist-Zustand vor v2.5)", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).not.toHaveProperty("prompt_cache_key");
+  });
+
+  test("schickt prompt_cache_key, wenn das Flag an ist", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de", { usePromptCache: true });
+    expect(seen[0].prompt_cache_key).toBe("malzime-single-large-de");
+  });
+
+  test("Cache-Key ist sprachgetrennt — de und en haben verschiedene Prompts", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "en", { usePromptCache: true });
+    expect(seen[0].prompt_cache_key).toBe("malzime-single-large-en");
+  });
+
+  test("Cache-Key traegt keinen Nutzerbezug — konstant ueber mehrere Aufrufe", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("bild-eins"), "image/jpeg", () => 60000, "de", { usePromptCache: true });
+    await runSingleLargeCall(Buffer.from("bild-zwei"), "image/jpeg", () => 60000, "de", { usePromptCache: true });
+    expect(seen[0].prompt_cache_key).toBe(seen[1].prompt_cache_key);
+  });
+
+  /* Struktur-Tests. Der Aufbau ist hier kein Stilfrage, sondern die Bedingung
+     dafuer, dass der Cache ueberhaupt greift — an der echten API gemessen:
+     Text+Bild in einer user-Message => 0% Treffer, system-Split => 82-100%. */
+
+  test("ohne Cache: unveraenderte Struktur aus v2.4 — Text und Bild in EINER user-Message", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
+    expect(seen[0].messages).toHaveLength(1);
+    expect(seen[0].messages[0].role).toBe("user");
+    const parts = seen[0].messages[0].content;
+    expect(parts[0].type).toBe("text");
+    expect(parts[1].type).toBe("image_url");
+  });
+
+  test("mit Cache: statischer Text als system-Message, Bild getrennt in user", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de", { usePromptCache: true });
+    const [sys, user] = seen[0].messages;
+    expect(sys.role).toBe("system");
+    expect(typeof sys.content).toBe("string");
+    expect(sys.content.length).toBeGreaterThan(1000);
+    expect(user.role).toBe("user");
+    expect(user.content[0].type).toBe("image_url");
+  });
+
+  test("der statische Teil ist ueber Aufrufe hinweg bitgleich — sonst kein Cache-Treffer", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("bild-eins"), "image/jpeg", () => 60000, "de", { usePromptCache: true });
+    await runSingleLargeCall(Buffer.from("bild-zwei"), "image/jpeg", () => 60000, "de", { usePromptCache: true });
+    expect(seen[0].messages[0].content).toBe(seen[1].messages[0].content);
+  });
+
+  test("Retry haengt den Hinweis UNTEN an — die system-Message bleibt unveraendert", async () => {
+    const seen = [];
+    let call = 0;
+    setFetchForTest(async (_url, init) => {
+      seen.push(JSON.parse(init.body));
+      /* 1. Antwort unvollstaendig => loest den Retry aus, 2. vollstaendig. */
+      const incomplete = { ...makeCompleteResponse(), beast: { profileText: "x", categories: {} } };
+      const payload = call++ === 0 ? incomplete : makeCompleteResponse();
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: JSON.stringify(payload) }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 11237, completion_tokens: 2600 },
+        }),
+      };
+    });
+
+    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de", { usePromptCache: true });
+    expect(seen).toHaveLength(2);
+    /* Der cachebare Anfang muss in beiden Anfragen identisch sein ... */
+    expect(seen[1].messages[0].role).toBe("system");
+    expect(seen[1].messages[0].content).toBe(seen[0].messages[0].content);
+    /* ... und der Hinweis unten in der user-Message stehen. */
+    const retryUser = seen[1].messages[1].content;
+    expect(retryUser[retryUser.length - 1].text).toContain("HINWEIS");
+  });
 });

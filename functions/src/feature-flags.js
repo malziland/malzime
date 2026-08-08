@@ -12,6 +12,12 @@
  *     Small, false) und der Single-Large-Architektur (1× Large macht alles,
  *     true). Wird nur ausgewertet, wenn die Queue an ist (im synchronen Pfad
  *     bleibt die 3-Call-Pipeline aktiv, weil dort nicht relevant).
+ *   - `usePromptCache` (seit v2.5): schickt `prompt_cache_key` an Mistral mit,
+ *     damit der immer gleiche Prompt-Anfang (~9.500 der 10.821 Eingabe-Tokens)
+ *     nur zu 10% berechnet wird. Reine Kostenmassnahme — das Modell, die
+ *     Antwortqualitaet und die Laufzeit bleiben unveraendert (gecacht wird die
+ *     Vorarbeit am statischen Text, NICHT die Antwort und NICHT das Bild).
+ *     `false` = Ist-Zustand vor v2.5, jederzeit ohne Deploy erreichbar.
  *
  * Beide Flags liegen im Firestore-Dokument `featureFlags/current`. Umlegen
  * geht OHNE Deploy (Firestore-Console, auch vom Handy aus) — damit ist der
@@ -39,7 +45,7 @@ async function getFeatureFlags() {
      Lauf dient ja gerade ihrem Test. Single-Large-Call bleibt im Lokal-Modus
      standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
      Kein Firestore-Read, kein Seeding nötig. */
-  if (isLocalQueueMode()) return { useQueue: true, useSingleLargeCall: false };
+  if (isLocalQueueMode()) return { useQueue: true, useSingleLargeCall: false, usePromptCache: false };
 
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
@@ -49,12 +55,13 @@ async function getFeatureFlags() {
     const flags = {
       useQueue: data.useQueue === true,
       useSingleLargeCall: data.useSingleLargeCall === true,
+      usePromptCache: data.usePromptCache === true,
     };
     cache = { data: flags, expiresAt: now + CACHE_TTL_MS };
     return flags;
   } catch (err) {
     console.log(JSON.stringify({ warning: "feature-flags-read-error", error: err.message }));
-    return { useQueue: false, useSingleLargeCall: false };
+    return { useQueue: false, useSingleLargeCall: false, usePromptCache: false };
   }
 }
 
@@ -72,9 +79,23 @@ async function isSingleLargeCallEnabled() {
   return (await getFeatureFlags()).useSingleLargeCall;
 }
 
+/**
+ * Kurzform: Soll `prompt_cache_key` an Mistral mitgeschickt werden?
+ */
+async function isPromptCacheEnabled() {
+  return (await getFeatureFlags()).usePromptCache;
+}
+
 /* Nur für Tests — Cache zurücksetzen. */
 function _clearCache() {
   cache = { data: null, expiresAt: 0 };
 }
 
-module.exports = { getFeatureFlags, isQueueEnabled, isSingleLargeCallEnabled, FLAGS_DOC, _clearCache };
+module.exports = {
+  getFeatureFlags,
+  isQueueEnabled,
+  isSingleLargeCallEnabled,
+  isPromptCacheEnabled,
+  FLAGS_DOC,
+  _clearCache,
+};

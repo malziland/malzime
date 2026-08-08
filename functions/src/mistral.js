@@ -73,6 +73,22 @@ function modelClassOf(model) {
   return /large/i.test(model || "") ? "large" : "small";
 }
 
+/* v2.5: Wie viele Eingabe-Tokens kamen aus dem Prompt-Cache (10% Preis statt
+   100%)? Das ist die einzige belastbare Erfolgskontrolle fuers Caching — ohne
+   diese Zahl waere die Ersparnis Behauptung statt Messung.
+   Defensiv gegen mehrere Feldnamen: Mistral folgt weitgehend der
+   OpenAI-Konvention (`prompt_tokens_details.cached_tokens`), garantiert das
+   aber nicht vertraglich. Unbekanntes Feld => 0, nie ein Fehler. */
+function readCachedTokens(usage) {
+  const candidates = [
+    usage?.prompt_tokens_details?.cached_tokens,
+    usage?.cached_tokens,
+    usage?.prompt_cache_hit_tokens,
+  ];
+  const hit = candidates.find((v) => typeof v === "number");
+  return hit || 0;
+}
+
 async function callMistralRaw(options) {
   /* waitMs misst, wie lange der Call auf einen freien Semaphore-Slot UND einen
      Token-Bucket-Tick gewartet hat — der reine Drossel-Anteil an der Wartezeit.
@@ -88,7 +104,7 @@ async function callMistralRaw(options) {
   return { ...result, waitMs };
 }
 
-async function callMistralRawUnthrottled({ model, messages, maxTokens, temperature, forceJSON, timeoutMs }) {
+async function callMistralRawUnthrottled({ model, messages, maxTokens, temperature, forceJSON, timeoutMs, cacheKey }) {
   const apiKey = getApiKey();
 
   const body = {
@@ -98,6 +114,20 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
     temperature,
   };
   if (forceJSON) body.response_format = { type: "json_object" };
+  /* v2.5: Prompt-Caching. `prompt_cache_key` erhoeht die Chance, dass Mistral
+     den immer gleichen Prompt-ANFANG (unser statischer Anweisungstext, ~9.500
+     der 10.821 Eingabe-Tokens) wiederverwendet statt neu zu berechnen —
+     gecachte Tokens kosten 10% des normalen Eingabepreises.
+     WICHTIG, drei Punkte:
+       1. Gecacht wird nur VORARBEIT am statischen Text, nie die Antwort. Jedes
+          Foto wird weiterhin komplett neu analysiert — Qualitaet unveraendert.
+       2. Das Bild steht im messages-Array HINTER dem Text und ist pro Anfrage
+          verschieden. Es liegt damit ausserhalb des cachebaren Praefix und
+          landet nie im Cache (Datenschutz).
+       3. Der Key ist ein KONSTANTER Text pro Prompt-Variante — niemals Job-ID
+          oder etwas Nutzerbezogenes, sonst waeren Anfragen verknuepfbar.
+     Ohne Key (Flag aus) verhaelt sich der Call exakt wie vor v2.5. */
+  if (cacheKey) body.prompt_cache_key = cacheKey;
 
   /* v1.10.6: Von 2 auf 1 Retry reduziert. Hintergrund: Bei Workshop-Bursts
      hat die alte 2-Retry-Strategie den 429-Stau verstaerkt — drei Wellen
@@ -178,6 +208,7 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
       finishReason: choice?.finish_reason || "unknown",
       promptTokens: usage.prompt_tokens || 0,
       outputTokens: usage.completion_tokens || 0,
+      cachedTokens: readCachedTokens(usage),
       httpMs: Date.now() - httpStart,
     };
   }
@@ -665,21 +696,46 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
 
 const MISTRAL_SINGLE_LARGE_MAX_TOKENS = 8000;
 
-async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang) {
+async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, opts = {}) {
   const prompts = loadPrompts(lang || "de");
   const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBuffer.toString("base64")}`;
-  const messages = [
-    {
-      role: "user",
-      content: [
-        { type: "text", text: prompts.singleLargePrompt },
-        { type: "image_url", image_url: dataUrl },
-      ],
-    },
-  ];
+
+  /* v2.5: Cache-Schluessel pro Sprache — de und en haben verschiedene Prompts
+     und damit verschiedene Praefixe. Ein gemeinsamer Key wuerde die Trefferquote
+     nur verwaessern. Konstant, ohne Nutzerbezug (siehe callMistralRawUnthrottled). */
+  const cacheKey = opts.usePromptCache ? `malzime-single-large-${lang || "de"}` : null;
+
+  /* v2.5: Nachrichten-Aufbau haengt vom Caching ab — MESSERGEBNIS, nicht Theorie:
+       ohne Cache: user[ text, bild ]        (Struktur bis v2.4, unveraendert)
+       mit Cache:  system(text) + user[bild]
+     Gemessen an der echten API mit wechselnden Bildern:
+       - Text+Bild in EINER user-Message  => 0% Treffer (Mistral cacht einen
+         multimodalen content-Array offenbar nur als Ganzes; da das Bild pro
+         Anfrage wechselt, faellt der komplette Praefix aus dem Cache).
+       - Text als eigene system-Message    => 82-100% Treffer.
+       - Text als eigene *user*-Message    => 0% Treffer. Der Rollenwechsel ist
+         also nicht umgehbar, blosses Auftrennen genuegt nicht.
+     Qualitaetsgegenprobe (3 Demo-Bilder, volle Analysen, beide Strukturen):
+     identische hard_facts, 0 fehlende Karten, gleiche Ausgabelaenge.
+     Die alte Struktur bleibt der Pfad bei ausgeschaltetem Flag — damit ist der
+     Rueckfall bitgenau der Stand vor v2.5. */
+  const messages = cacheKey
+    ? [
+        { role: "system", content: prompts.singleLargePrompt },
+        { role: "user", content: [{ type: "image_url", image_url: dataUrl }] },
+      ]
+    : [
+        {
+          role: "user",
+          content: [
+            { type: "text", text: prompts.singleLargePrompt },
+            { type: "image_url", image_url: dataUrl },
+          ],
+        },
+      ];
 
   /* Erster Versuch */
-  let parsed = await callSingleLarge(messages, remainingBudget, "first");
+  let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey);
   let missing = parsed
     ? collectMissingForBothModes(parsed)
     : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };
@@ -699,17 +755,33 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang) 
         missingBeast: missing.beast,
       })
     );
-    const retryMessages = [
-      {
-        role: "user",
-        content: [
-          { type: "text", text: prompts.singleLargePrompt + hint },
-          { type: "image_url", image_url: dataUrl },
-        ],
-      },
-    ];
+    /* v2.5: Im Cache-Pfad gehoert der Hinweis in die user-Message, NICHT in die
+       system-Message — sonst aendert sich der statische Anfang und der Treffer
+       faellt aus. Statisch oben, dynamisch unten. */
+    const retryMessages = cacheKey
+      ? [
+          { role: "system", content: prompts.singleLargePrompt },
+          {
+            role: "user",
+            content: [
+              { type: "image_url", image_url: dataUrl },
+              { type: "text", text: hint },
+            ],
+          },
+        ]
+      : [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompts.singleLargePrompt + hint },
+              { type: "image_url", image_url: dataUrl },
+            ],
+          },
+        ];
     try {
-      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry");
+      /* Gleicher cacheKey wie im ersten Versuch — der statische Anfang ist in
+         beiden Versuchen bitgleich, der Cache traegt also auch den Retry. */
+      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry", cacheKey);
       if (retryParsed) {
         /* Fehlende Karten aus Retry in Originalergebnis mergen (analog runProfile) */
         for (const mode of ["standard", "beast"]) {
@@ -786,7 +858,7 @@ function collectMissingForBothModes(parsed) {
   };
 }
 
-async function callSingleLarge(messages, remainingBudget, attemptLabel) {
+async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey) {
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
     const result = await callMistralRaw({
@@ -796,6 +868,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel) {
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
       forceJSON: true,
       timeoutMs: budget,
+      cacheKey,
     });
     const stages = [];
     const parsed = parseSafely(result.text, {
@@ -811,6 +884,9 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel) {
         finishReason: result.finishReason,
         promptTokens: result.promptTokens,
         outputTokens: result.outputTokens,
+        /* v2.5: Erfolgskontrolle Prompt-Cache. cachedTokens/promptTokens ist die
+           Trefferquote; 0 bei ausgeschaltetem Flag ODER Cache-Miss. */
+        cachedTokens: result.cachedTokens,
         httpMs: result.httpMs,
         waitMs: result.waitMs,
         repairStages: stages,

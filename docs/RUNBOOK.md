@@ -72,6 +72,18 @@ drohen massenhaft 429-Fehler (gemessen 2026-05-20: bei Parallelität 6 kamen 6 v
 12 Jobs als 429 zurück). Rückweg: `./scripts/cloudtasks-concurrency-10.sh`, Werte in
 `config.js` zurück, Flag wieder `true`.
 
+### 3b. Prompt-Caching aus (~30 s, kein Deploy, keine Begleitschritte)
+
+`featureFlags/current.usePromptCache = false` in der Firestore-Console setzen.
+Danach wird weder ein `prompt_cache_key` gesendet noch der Nachrichten-Aufbau
+umgestellt — der Pfad ist bitgenau der Stand v2.4.4.
+
+Anders als bei `useSingleLargeCall` (Punkt 3) gibt es hier **keine** Kopplung an
+Concurrency oder `config.js`: Es ist eine reine Kostenmaßnahme ohne Einfluss auf
+Modell, Durchsatz oder Rate-Limits. Wenn unklar ist, ob das Caching an einer
+Störung beteiligt ist, kostet das Umlegen nichts außer der Ersparnis — im Zweifel
+ausschalten. Details → [FLAGS.md](FLAGS.md#usepromptcache-seit-v25).
+
 ### 4. Functions-Rollback auf einen früheren Stand (~2 min)
 
 ```bash

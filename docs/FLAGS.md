@@ -13,6 +13,7 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 |---|---|---|---|---|
 | `useQueue` | Operations-/Kill-Switch | `true` | `false` | Christoph Krieger |
 | `useSingleLargeCall` | Architektur-Schalter (Kill-Switch-Funktion) | `true` | `false` | Christoph Krieger |
+| `usePromptCache` | Kostenschalter | offen (siehe unten) | `false` | Christoph Krieger |
 
 ### `useQueue` (seit v2.0)
 
@@ -38,6 +39,42 @@ die Queue an ist.
 
 **Entfernungs-Kriterium:** entfällt erst, wenn die 3-Call-Pipeline abgebaut wird
 („Phase 6" — nur mit ausdrücklicher Freigabe des Inhabers).
+
+### `usePromptCache` (seit v2.5)
+
+Schickt `prompt_cache_key` an Mistral mit **und** stellt dafür den Nachrichten-Aufbau
+des Single-Large-Calls um: statischer Anweisungstext als `system`-Message, Bild
+getrennt in `user`. Reine Kostenmaßnahme — Modell, Ausgabequalität und Laufzeit
+bleiben unverändert.
+
+**Warum der Umbau nötig ist** (an der echten API gemessen, wechselnde Bilder):
+
+| Aufbau | Cache-Treffer |
+|---|---|
+| `user[ text, bild ]` (Stand bis v2.4) | 0 % |
+| `system(text)` + `user[ bild ]` | 82–100 % |
+| `user[ text ]` + `user[ bild ]` | 0 % |
+
+Mistral cacht einen multimodalen `content`-Array nur als Ganzes. Da das Bild pro
+Anfrage wechselt, fällt ohne den Rollenwechsel der komplette Präfix aus dem Cache —
+der Parameter allein bringt **nichts**.
+
+**Erwartbarer Effekt:** unter Produktionsmuster (Parallelität 10, ohne Pause)
+76,4 % der Eingabe-Tokens aus dem Cache, ~8,10 € → ~4,80 € pro 1000 Analysen. Bei
+vereinzelten Uploads mit Pausen dazwischen greift der Cache dagegen kaum (0–9 %);
+Mistral garantiert keine Trefferquote. Ein Fehlschlag kostet den bisherigen Preis —
+teurer als der Ist-Zustand kann es nicht werden.
+
+**Erfolgskontrolle:** `cachedTokens` in jeder `mistral-single-large`-Logzeile.
+Nach dem ersten Workshop `cachedTokens / promptTokens` auswerten, statt zu schätzen.
+
+**Rückfall:** Flag auf `false` → weder Cache-Key noch geänderter Aufbau, bitgenau
+der Stand v2.4.4. Ohne Deploy, ~30 s Cache. Anders als bei `useSingleLargeCall`
+sind **keine** Begleitschritte nötig (keine Concurrency-Anpassung).
+
+**Entfernungs-Kriterium:** Zeigt die Auswertung nach zwei Workshops eine dauerhafte
+Trefferquote > 50 %, kann das Flag entfallen und der `system`-Aufbau fest werden.
+Bleibt sie darunter, Flag auf `false` und Code zurückbauen.
 
 ## Weitere Betriebsschalter (kein `featureFlags`-Feld)
 

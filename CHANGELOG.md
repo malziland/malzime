@@ -4,6 +4,28 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.5.0] — 2026-08-08
+
+Kostensenkung im Live-Pfad: Prompt-Caching bei Mistral, gemessen statt geschätzt.
+
+### Hinzugefügt
+
+- **Prompt-Caching bei Mistral, hinter dem Flag `usePromptCache` (Standard: aus).** Der statische Anweisungstext macht ~9.500 der ~11.200 Eingabe-Tokens jeder Analyse aus und wurde bisher bei jedem Upload voll bezahlt. Mit gesetztem `prompt_cache_key` berechnet Mistral ihn wieder und kostet dafür nur 10 % des Eingabepreises. **Gemessen unter Produktionsmuster** (20 Anfragen, Parallelität 10, ohne Pause, wechselnde Bilder): **76,4 % aller Eingabe-Tokens aus dem Cache**, Median pro Anfrage 99,8 %, 16 von 20 Anfragen mit klarem Treffer. Das entspricht ~8,10 € → ~4,80 € pro 1000 Analysen. (`functions/src/mistral.js`, `functions/src/feature-flags.js`, `functions/src/handle-process-job.js`)
+  - **Der Nachrichten-Aufbau musste dafür umgestellt werden — das ist der eigentliche Kern der Änderung.** An der echten API gemessen, mit wechselnden Bildern:
+
+    | Aufbau | Cache-Treffer |
+    | --- | --- |
+    | `user[ text, bild ]` (Stand bis v2.4) | **0 %** |
+    | `system(text)` + `user[ bild ]` | **82–100 %** |
+    | `user[ text ]` + `user[ bild ]` | **0 %** |
+
+    Mistral cacht einen multimodalen `content`-Array offenbar nur als Ganzes; da das Bild pro Anfrage wechselt, fällt der komplette Präfix aus dem Cache. Blosses Auftrennen genügt nicht — der Rollenwechsel nach `system` ist die Bedingung. Der Parameter allein hätte **nichts** gebracht.
+  - **Qualitätsgegenprobe vor der Umstellung:** drei Demo-Fotos, volle Analysen, beide Aufbauten. Identische `hard_facts` (22/28/22 Jahre, gleiche Spannen und Geschlechter), 0 fehlende Karten in beiden Modi, vergleichbare Ausgabelänge. Die Umstellung verändert die Profile nicht.
+  - **Trefferquote ist anbieterseitig nicht garantiert** („erhöht die Chance, garantiert sie nicht", Mistral-Doku). Einzelaufrufe mit Pause treffen unzuverlässig (0–9 %); erst Dauerlast hält den Cache warm. Für den Workshop-Betrieb ist das der Normalfall, für vereinzelte Uploads nicht. Ein Fehlschlag kostet exakt den bisherigen Preis — die Maßnahme kann nicht teurer werden als der Ist-Zustand.
+  - **Erfolgskontrolle im Protokoll:** `cachedTokens` steht jetzt in jeder `mistral-single-large`-Zeile. Nach dem ersten Workshop lässt sich die reale Ersparnis damit belegen statt schätzen.
+  - **Rückfall bitgenau:** Bei ausgeschaltetem Flag wird weder ein Cache-Key gesendet noch der Aufbau geändert — der Pfad ist identisch mit v2.4.4. Umlegen ohne Deploy über `featureFlags/current` (~30 s Cache).
+  - Tests: +12 (Backend **463**), darunter der Nachweis, dass der Wiederholungsversuch den Hinweis **unten** anhängt und die `system`-Message bitgleich lässt — sonst bräche der Cache dort unbemerkt weg.
+
 ## [2.4.4] — 2026-07-29
 
 Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu lassen.

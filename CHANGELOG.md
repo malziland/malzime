@@ -4,6 +4,12 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.5.2] — 2026-08-08
+
+### Behoben
+
+- **Letzter offener Dependabot-Alert geschlossen:** `js-yaml` 3.15.0 → 3.15.1 (GHSA quadratic CPU consumption in `!!omap`, high). Kommt über die Testkette `jest → @jest/transform → babel-plugin-istanbul → @istanbuljs/load-nyc-config` und ist damit **development-scope** — das Audit-Gate war deshalb bereits grün, der GitHub-Alert aber offen. **Ohne neuen override gelöst** (`npm update js-yaml` reichte, die 3.x-Linie hat den Fix in 3.15.1) — es bleibt bei 6 overrides. Lockfile-Falle geprüft: `npm ci --dry-run` Root und `functions/` je exit 0, `@emnapi/*` unverändert. Tests 463 grün. (`functions/package-lock.json`)
+
 ## [2.5.1] — 2026-08-08
 
 ### Behoben

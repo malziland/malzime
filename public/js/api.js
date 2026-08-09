@@ -103,6 +103,9 @@ function releaseWakeLock() {
 
 export async function analyzeImage() {
   if (state.isAnalyzing) return;
+  /* Voriges Ergebnis ist ab jetzt ungueltig — der Umschalter darf waehrend der
+     neuen Analyse nicht mehr oben kleben (styles.css: html[data-has-result]). */
+  document.documentElement.removeAttribute("data-has-result");
   /* Sofort sichtbares Feedback — die Scan-Animation läuft schon, während wir
      ggf. noch kurz auf das Feature-Flag warten. */
   startScanAnim(false);

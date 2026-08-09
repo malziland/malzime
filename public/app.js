@@ -11,6 +11,7 @@ import {
   showMaintenanceModal,
 } from "./js/ui.js";
 import { initDemo } from "./js/demo.js";
+import { initStickyToggle, renderKeepingScrollAnchor } from "./js/sticky-toggle.js";
 
 /* ── i18n initialisieren (vor allem anderen) ── */
 await initI18n();
@@ -158,10 +159,13 @@ function applyModeTheme() {
    Reload wiederherstellen, dann muss das Theme mitziehen. */
 applyModeTheme();
 
+/* Sticky-Umschalter aktivieren (Logik in js/sticky-toggle.js) */
+initStickyToggle();
+
 elements.biasSwitch.addEventListener("change", () => {
   applyModeTheme();
   if (state.lastData) {
-    renderCurrentMode(state.lastData);
+    renderKeepingScrollAnchor(() => renderCurrentMode(state.lastData));
   }
 });
 

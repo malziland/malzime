@@ -33,6 +33,7 @@ export default [
         URLSearchParams: "readonly",
         requestAnimationFrame: "readonly",
         cancelAnimationFrame: "readonly",
+        IntersectionObserver: "readonly",
         Image: "readonly",
         alert: "readonly",
         location: "readonly",

@@ -23,6 +23,16 @@ function applyBarWidths(container) {
   });
 }
 
+/* Markiert am <html>, ob gerade ein vollstaendiges Ergebnis sichtbar ist.
+   Steuert allein das Kleben des Umschalters (siehe styles.css) — ohne
+   Ergebnis gibt es nichts zu vergleichen, dann soll er im Fluss bleiben und
+   auf der Startseite keinen Platz kosten. */
+function setHasResult(on) {
+  const root = document.documentElement;
+  if (on) root.setAttribute("data-has-result", "1");
+  else root.removeAttribute("data-has-result");
+}
+
 /* ── Aktuellen Modus rendern (aus gecachten Daten) ── */
 
 export function renderCurrentMode(data) {
@@ -36,6 +46,7 @@ export function renderCurrentMode(data) {
     elements.targeting.innerHTML = "";
     elements.dataValue.innerHTML = "";
     elements.exportPdf.classList.add("export-btn--hidden");
+    setHasResult(false);
 
     renderPrivacyRisks(data);
     renderGpsMap(data);
@@ -55,6 +66,7 @@ export function renderCurrentMode(data) {
     elements.targeting.innerHTML = "";
     elements.dataValue.innerHTML = "";
     elements.exportPdf.classList.add("export-btn--hidden");
+    setHasResult(false);
 
     renderPrivacyRisks(data);
     renderGpsMap(data);
@@ -73,6 +85,7 @@ export function renderCurrentMode(data) {
     renderDataValue(profile);
   }
   elements.exportPdf.classList.remove("export-btn--hidden");
+  setHasResult(true);
 }
 
 /* ── Rendering: Kategorie-Karten ── */

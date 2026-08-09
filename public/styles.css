@@ -414,6 +414,77 @@ h1 {
   margin-bottom: 24px;
 }
 
+/* ── Sticky-Umschalter ──────────────────────────────────────────────────────
+   Sobald ein Ergebnis vorliegt, bleibt der Umschalter beim Scrollen oben
+   stehen. Grund: Der Vergleich derselben Karte in beiden Modi ist der
+   didaktische Kern — ohne Sticky muss man hoch, umschalten, wieder runter
+   und die Karte neu suchen.
+
+   Bewusst KEIN zweites Bedienelement: derselbe Schalter wechselt nur seine
+   Position. Ein Duplikat unten wuerde einen zweiten Tab-Stopp erzeugen (der
+   Tastatur-E2E-Test ist CI-Pflicht) und die fixed positionierten Tooltips
+   ein zweites Mal ausrichten muessen. */
+
+html[data-has-result] .bias-toggle-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  /* Negativer Rand + Innenabstand: die Leiste deckt beim Kleben die volle
+     Containerbreite ab, damit durchlaufender Text nicht seitlich vorbeiblitzt. */
+  margin-left: -20px;
+  margin-right: -20px;
+  padding: 10px 20px;
+}
+
+/* Ruhezustand: unsichtbarer Untergrund, damit die Leiste im Seitenfluss
+   nicht wie ein Kasten wirkt. */
+html[data-has-result] .bias-toggle-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease);
+  pointer-events: none;
+}
+
+/* Geklebt: Untergrund einblenden + feine Trennkante, damit der Inhalt
+   darunter nicht durchscheint. */
+html[data-has-result] .bias-toggle-wrap.is-stuck::before {
+  opacity: 0.97;
+  box-shadow: 0 1px 0 var(--border-soft);
+}
+
+html[data-has-result] .bias-toggle-wrap > .bias-toggle {
+  position: relative;
+  z-index: 1;
+}
+
+/* Geklebt kompakter — der Inhalt darunter soll so wenig wie moeglich
+   verdeckt werden. */
+html[data-has-result] .bias-toggle-wrap.is-stuck > .bias-toggle {
+  padding: 5px 16px;
+  gap: 10px;
+  transition:
+    padding 0.2s var(--ease),
+    gap 0.2s var(--ease);
+}
+
+/* Sentinel: nullhohe Marke direkt ueber der Leiste. Kreuzt sie den oberen
+   Rand, ist die Leiste geklebt (per IntersectionObserver in app.js). */
+.bias-sticky-sentinel {
+  height: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+/* Tastatur-Navigation: Ohne diesen Abstand springt der Fokus hinter die
+   geklebte Leiste, wenn man sich durch die Ergebniskarten tabbt. */
+html[data-has-result] {
+  scroll-padding-top: 72px;
+}
+
 .bias-toggle {
   display: inline-flex;
   align-items: center;
@@ -2480,6 +2551,20 @@ ol.legal-list > li::before {
     padding: 6px 14px;
     gap: 10px;
   }
+  /* Workshop-Geraete sind Handys — die geklebte Leiste muss so flach wie
+     moeglich bleiben. Bewusst wird NICHTS ausgeblendet: die Info-Icons haben
+     tabindex="0", ein Ein-/Ausblenden beim Scrollen wuerde die Tab-Reihenfolge
+     waehrend der Bedienung veraendern. */
+  html[data-has-result] .bias-toggle-wrap {
+    padding: 6px 20px;
+  }
+  html[data-has-result] .bias-toggle-wrap.is-stuck > .bias-toggle {
+    padding: 4px 12px;
+    gap: 8px;
+  }
+  html[data-has-result] {
+    scroll-padding-top: 60px;
+  }
   .demo-grid {
     gap: 8px;
   }
@@ -2530,6 +2615,18 @@ ol.legal-list > li::before {
   * {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  /* Im PDF nichts kleben lassen — sonst wandert die Leiste auf jede Seite
+     bzw. ueberdeckt den Seitenanfang. */
+  html[data-has-result] .bias-toggle-wrap {
+    position: static;
+    margin-left: 0;
+    margin-right: 0;
+    padding: 0;
+  }
+  html[data-has-result] .bias-toggle-wrap::before {
+    display: none;
   }
 
   @page {

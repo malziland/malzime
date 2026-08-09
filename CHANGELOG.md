@@ -4,6 +4,24 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht] — wird v2.6.0
+
+### Hinzugefügt
+
+- **Sticky-Umschalter zwischen „Seriöse Analyse" und „Beast Mode".** Sobald ein Ergebnis vorliegt, bleibt der Umschalter beim Scrollen oben stehen. Grund ist didaktisch, nicht bequemlichkeitshalber: Der Vergleich derselben Karte in beiden Modi ist der Kern des Tools, bisher musste man dafür hoch, umschalten, wieder runter und die Karte neu suchen. Umgesetzt als **Positionswechsel des bestehenden Schalters** (`position: sticky`), bewusst NICHT als zweite Leiste — ein Duplikat hätte einen zweiten Tab-Stopp erzeugt (der Tastatur-E2E-Test ist CI-Pflicht) und die `position: fixed`-Tooltips ein zweites Mal ausrichten müssen. Auf der Startseite klebt nichts: gesteuert über `html[data-has-result]`, das `renderCurrentMode` nur bei vollständigem Ergebnis setzt. (`public/js/sticky-toggle.js` neu, `public/styles.css`, `public/app.js`, `public/js/render.js`, `public/js/api.js`)
+- **Leseposition bleibt beim Moduswechsel erhalten** (`renderKeepingScrollAnchor`). Beast-Texte sind deutlich länger als die sachlichen; ohne Ausgleich rutscht die gerade gelesene Karte um **rund 250 Pixel** weg — gemessen, und per Mutationstest abgesichert (ohne den Anker wird der E2E-Test rot). Die oberste sichtbare Karte wird über ihren `data-key` gemerkt und nach dem Neuaufbau wieder auf dieselbe Bildschirmhöhe geholt. Zwei Fallen, die dabei aufgetreten sind und im Code kommentiert stehen: (1) Während des `innerHTML`-Neuaufbaus ist die Seite kurzzeitig kürzer, der Browser klemmt die Scrollposition ans neue Seitenende — deshalb wird die Höhe von `#resultsPanel` für die Dauer des Renderns festgehalten. (2) Die Korrektur setzt eine **absolute** Zielposition (`scrollTo`) statt eines Deltas (`scrollBy`), weil sich die Scrollposition zwischen Messung und Korrektur selbst verändern kann.
+- **Tastatur-Navigation berücksichtigt die geklebte Leiste** (`scroll-padding-top`) — ohne den Abstand springt der Fokus beim Durchtabben der Ergebniskarten hinter die Leiste.
+- **Tests:** 9 neue Unit-Tests (`public/__tests__/sticky-toggle.test.js`) für Scroll-Anker und Geklebt-Zustand, 4 neue E2E-Tests (`e2e/sticky-toggle.test.js`) für echtes Layout, echtes Scrollen und `position: sticky` in beiden Modi. Frontend gesamt 174 grün, E2E 9 grün inklusive axe und Tastatur-Smoketest.
+- **Messwerkzeug für den Werbe-Umbau** (`functions/scripts/single-large-ab-runner-v3-ads.js`, additiv, TEST-ONLY, kein Produktionscode). Vergleicht Live-Prompt gegen einen Kandidaten mit getrennten Werbelisten je Modus. Misst Marken- und Produkt-Überlappung zwischen Standard und Beast, Anker-Rate (Marken aus den Prompt-Beispielen), Cross-Image-Markenvielfalt, Konkretheit, Ground-Truth-Treffer für Alter/Geschlecht sowie abgeschnittene Antworten. Fährt beide Varianten mit `system`/`user`-Split wie der Live-Cache-Pfad, damit die Messung cache-treu ist.
+
+### Im Druck
+
+- Die geklebte Leiste wird im PDF-Export auf `position: static` zurückgesetzt — sonst wandert sie auf jede Seite.
+
+### Bekannt / offen
+
+- **Werbe-Auftrennung Standard ↔ Beast ist gemessen, aber noch nicht übernommen.** Erste A/B-Messung (14 Bilder × 3 Läufe × 2 Varianten, 84 Calls, 2,99 €) zeigt: Anker-Rate 8,6 % → 0,7 %, verschiedene Marken 88 → 216, Produkt-Überlappung 100 % → 3,1 %, Konkretheit unverändert (99,0 % → 99,8 %), keine abgeschnittenen Antworten. Offen sind zwei Punkte: die **Marken**-Überlappung liegt noch bei 37,9 % (Ziel unter 30 %, Standard und Beast nennen oft dieselbe Marke mit anderem Produkt), und bei einem Kinderfoto kippten die Vorschläge von Spielzeug auf reine Bekleidungsketten. Prompt wird nachgeschärft und erneut gemessen, bevor etwas an den Produktivcode geht.
+
 ## [2.5.2] — 2026-08-08
 
 ### Behoben

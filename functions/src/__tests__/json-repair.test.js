@@ -343,4 +343,88 @@ describe("real-world fixtures from compare-models failures", () => {
     /* Truncation-Recovery sollte hier greifen (oder eine frühere Stufe schon) */
     expect(stages.some((s) => ["direct", "heuristic", "lenient", "truncation-recovery"].includes(s))).toBe(true);
   });
+  /* ── Bounds im Single-Large-Pfad (standard/beast statt top-level) ──
+     Vor dieser Erweiterung griffen die Groessenbegrenzungen dort NUR fuer das
+     obere ad_targeting; Kartentexte, profileText und confidence aus
+     standard/beast liefen ungeprueft durch, obwohl SECURITY.md sie als
+     serverseitig begrenzt zusagt. */
+  describe("Output-Bounds im Single-Large-Shape", () => {
+    function singleLarge(overrides = {}) {
+      return JSON.stringify({
+        hard_facts: { alter_geschlecht: "m, 40" },
+        standard: {
+          profileText: "P".repeat(5000),
+          ad_targeting: ["A".repeat(5000)],
+          manipulation_triggers: ["T".repeat(5000)],
+          categories: { einkommen: { label: "L", value: "X".repeat(5000), confidence: 5 } },
+        },
+        beast: {
+          profileText: "P".repeat(5000),
+          ad_targeting: ["B".repeat(5000)],
+          categories: { einkommen: { label: "L", value: "X".repeat(5000), confidence: -3 } },
+        },
+        ...overrides,
+      });
+    }
+
+    test("begrenzt ad_targeting in BEIDEN Modus-Ebenen", () => {
+      const r = parseSafely(singleLarge(), { requireSchema: false });
+      expect(r.standard.ad_targeting[0].length).toBe(300);
+      expect(r.beast.ad_targeting[0].length).toBe(300);
+    });
+
+    test("begrenzt Kartentexte und profileText in beiden Modi", () => {
+      const r = parseSafely(singleLarge(), { requireSchema: false });
+      expect(r.standard.categories.einkommen.value.length).toBe(800);
+      expect(r.beast.categories.einkommen.value.length).toBe(800);
+      expect(r.standard.profileText.length).toBe(2000);
+      expect(r.beast.profileText.length).toBe(2000);
+    });
+
+    test("klemmt confidence auf 0..1 — auch im Beast-Block", () => {
+      const r = parseSafely(singleLarge(), { requireSchema: false });
+      expect(r.standard.categories.einkommen.confidence).toBe(1);
+      expect(r.beast.categories.einkommen.confidence).toBe(0);
+    });
+
+    test("begrenzt manipulation_triggers je Ebene", () => {
+      const r = parseSafely(singleLarge(), { requireSchema: false });
+      expect(r.standard.manipulation_triggers[0].length).toBeLessThanOrEqual(500);
+    });
+
+    test("verwirft Kategorie-Keys mit Sonderzeichen auch in standard/beast (SEC-02)", () => {
+      const raw = JSON.stringify({
+        standard: {
+          categories: {
+            'boese"key': { label: "L", value: "v", confidence: 0.5 },
+            gutkey: { label: "L", value: "v", confidence: 0.5 },
+          },
+        },
+        beast: { categories: {} },
+      });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(Object.keys(r.standard.categories)).toEqual(["gutkey"]);
+    });
+
+    test("erfindet keine Felder, die das Modell gar nicht geliefert hat", () => {
+      const raw = JSON.stringify({ standard: { categories: {} }, beast: { categories: {} } });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(r.standard.ad_targeting).toBeUndefined();
+      expect(r.standard.profileText).toBeUndefined();
+    });
+
+    test("3-Call-Shape (alles top-level) funktioniert unveraendert weiter", () => {
+      const raw = JSON.stringify({
+        categories: { einkommen: { label: "L", value: "X".repeat(5000), confidence: 5 } },
+        ad_targeting: ["A".repeat(5000)],
+        manipulation_triggers: ["T".repeat(5000)],
+        profileText: "P".repeat(5000),
+      });
+      const r = parseSafely(raw);
+      expect(r.categories.einkommen.value.length).toBe(800);
+      expect(r.categories.einkommen.confidence).toBe(1);
+      expect(r.ad_targeting[0].length).toBe(300);
+      expect(r.profileText.length).toBe(2000);
+    });
+  });
 });

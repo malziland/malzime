@@ -27,7 +27,23 @@ try {
   json5 = null;
 }
 
-/* Maximale Größe pro String-Feld nach Repair (SEC-004 Bounds). */
+/* Maximale Größe pro String-Feld nach Repair (SEC-004 Bounds).
+ *
+ * Das sind NOTBREMSEN, keine Formatvorgabe — für die Form ist der Prompt
+ * zuständig. Sie sollen nur greifen, wenn etwas grundsätzlich schiefgeht
+ * (Modell dreht durch, eingeschleuster Text über ein manipuliertes Foto).
+ * Im Normalbetrieb dürfen sie einen legitimen Wert NIE berühren: ein
+ * mitten im Wort abgeschnittener Kartentext sieht im Workshop schlechter
+ * aus als einer, der etwas zu lang ist.
+ *
+ * Abstand zur Realität, gemessen an 84 echten Analysen (2026-08-09,
+ * mistral-large-2512, Temperatur 0.5 — längster beobachteter Wert):
+ *   Kartentext      168 Zeichen → Faktor 4,8
+ *   Werbe-Eintrag    36 Zeichen → Faktor 8,3
+ *   Trigger         119 Zeichen → Faktor 4,2
+ *   Profiltext    1.116 Zeichen → Faktor 1,8  (knappster Wert)
+ * Vor dem Verkleinern erst nachmessen — der Puffer ist Absicht.
+ */
 const STRING_BOUND_CATEGORY = 800;
 const STRING_BOUND_AD_TARGETING = 300;
 const STRING_BOUND_MANIPULATION = 500;
@@ -316,8 +332,69 @@ function tryParseTruncated(cleanedText) {
 
 /* ── Output-Bounds (Schutz vor übergroßen Werten, identisch zu SEC-004) ── */
 
+/* Begrenzt EINE Profil-Ebene. Der 3-Call-Pfad legt diese Felder ganz oben ab,
+   der Single-Large-Pfad zusätzlich unter "standard" und "beast" — applyBounds
+   ruft das deshalb für jede vorhandene Ebene auf.
+
+   Vorher griffen die Bounds im Single-Large-Pfad NUR fuer das obere
+   ad_targeting; Kartentexte, profileText und confidence aus standard/beast
+   liefen ungeprueft durch (5.000 Zeichen blieben 5.000, confidence: 5 blieb 5),
+   obwohl SECURITY.md sie als serverseitig begrenzt zusagt. */
+function boundProfileLevel(level) {
+  if (!level || typeof level !== "object") return;
+
+  if (level.categories && typeof level.categories === "object") {
+    /* SEC-02: Kategorie-Keys landen im Frontend in einem HTML-Attribut
+       (render.js: data-key="..."). Nur schema-konforme Keys durchlassen. */
+    const SAFE_CATEGORY_KEY = /^[a-zA-Z0-9_]{1,50}$/;
+    const catKeys = Object.keys(level.categories)
+      .filter((key) => SAFE_CATEGORY_KEY.test(key))
+      .slice(0, 20);
+    const bounded = {};
+    for (const key of catKeys) {
+      const cat = level.categories[key];
+      if (cat && typeof cat === "object") {
+        bounded[key] = {
+          label: typeof cat.label === "string" ? cat.label.slice(0, 200) : String(key),
+          value: typeof cat.value === "string" ? cat.value.slice(0, STRING_BOUND_CATEGORY) : "",
+          confidence: typeof cat.confidence === "number" ? Math.max(0, Math.min(1, cat.confidence)) : 0.5,
+        };
+      }
+    }
+    level.categories = bounded;
+  }
+
+  if (!Array.isArray(level.ad_targeting)) {
+    if (level.ad_targeting !== undefined) level.ad_targeting = [];
+  } else {
+    level.ad_targeting = level.ad_targeting
+      .filter((s) => typeof s === "string")
+      .map((s) => s.slice(0, STRING_BOUND_AD_TARGETING))
+      .slice(0, 20);
+  }
+
+  if (!Array.isArray(level.manipulation_triggers)) {
+    if (level.manipulation_triggers !== undefined) level.manipulation_triggers = [];
+  } else {
+    level.manipulation_triggers = level.manipulation_triggers
+      .filter((s) => typeof s === "string")
+      .map((s) => s.slice(0, STRING_BOUND_MANIPULATION))
+      .slice(0, 10);
+  }
+
+  if (typeof level.profileText === "string") {
+    level.profileText = level.profileText.slice(0, STRING_BOUND_PROFILE_TEXT);
+  } else if (level.profileText !== undefined) {
+    level.profileText = "";
+  }
+}
+
 function applyBounds(parsed) {
   if (!parsed || typeof parsed !== "object") return null;
+
+  /* Single-Large-Pfad: die beiden Modus-Ebenen mitnehmen. */
+  boundProfileLevel(parsed.standard);
+  boundProfileLevel(parsed.beast);
 
   if (parsed.categories && typeof parsed.categories === "object") {
     /* SEC-02: Kategorie-Keys landen im Frontend in einem HTML-Attribut

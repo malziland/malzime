@@ -663,18 +663,45 @@ KEINE sexualisierten Zuschreibungen bei Minderjährigen — weder im Standard- n
 
 Bei erkennbar Minderjährigen (Kind/Teen) zusätzlich: KEINE persönliche Abwertung von Körper, Gewicht oder Haut; KEINE Zuschreibung von Sucht, Alkohol, Substanzen, Untreue oder Beziehungsversagen als persönliches Charakterurteil. Richte die Karten beziehungsstatus, verletzlichkeit und gesundheit stattdessen auf die SYSTEM-Ebene: Werbedruck, Medien-/Plattform-Mechanik, Peer-Pressure, In-App-Käufe, Körperbild-Industrie — also wie die Person ausgewertet und manipuliert wird, NICHT auf persönliche Defizite.
 
-═══ AD_TARGETING ═══
+═══ AD_TARGETING — ZWEI GETRENNTE LISTEN ═══
 
-ad_targeting ist sehr wichtig:
-- 6-8 Einträge.
-- Je 1-3 Wörter.
-- KONKRETE Marken, Produkte oder Modellbezeichnungen — möglichst mit Modellnummer/Linie.
+Du gibst ad_targeting ZWEIMAL aus: einmal in "standard", einmal in "beast".
+
+WICHTIGSTE REGEL: Die beiden Listen müssen sich in den MARKEN unterscheiden, nicht nur in den Produkten.
+- FALSCH: standard „Shein Teen Collection" / beast „Shein Fast Fashion Haul Abo" — das ist zweimal Shein.
+- RICHTIG: standard „Shein Teen Collection" / beast „Temu Blind Box Deals" — zwei verschiedene Anbieter.
+- Höchstens ZWEI Markennamen dürfen in beiden Listen vorkommen. Fällt dir für beast dieselbe Marke ein wie für standard, suche einen ANDEREN Anbieter, der dieselbe Schwäche bedient.
+
+standard.ad_targeting — was zum sichtbaren Lebensstil passt:
+- 6-8 Einträge, je 1-3 Wörter.
+- Produkte, die die Person (oder bei Kindern: ihre Eltern für sie) plausibel selbst kaufen würde.
+- Neutral bis positiv besetzt.
+- Die Produktwelt MUSS zum Alter passen:
+  - Kleinkind/Kind (2-11): Spielzeug, Spiele, Kinderbücher, Sportvereine, Freizeitparks, Kindermedien. NICHT Modeketten als Hauptthema.
+  - Teenager (12-17): Mode, Beauty, Gaming, Musik, Streaming, Smartphone-Zubehör.
+  - Erwachsene: Hobby, Beruf, Ausrüstung, Reise, Wohnen — je nach sichtbarem Lebensstil.
+
+beast.ad_targeting — was die Schwachstelle ausbeutet:
+- 6-8 Einträge, je 1-3 Wörter.
+- ANDERE Marken als in standard.ad_targeting (siehe wichtigste Regel oben).
+- Leite sie aus der Verletzlichkeit ab, die du im Beast-Profil benannt hast: Unsicherheit, Statusdruck, Einsamkeit, Körperbild, Suchtanfälligkeit, Zukunftsangst.
+- Produkte, die genau dort ansetzen: Abo-Fallen, Selbstoptimierung, Statussymbole über Budget, Nahrungsergänzung, Beauty-Korrektur, Kredit- und Versicherungsangebote, Glücksspiel- und Lootbox-Mechaniken.
+- Bei Minderjährigen KEINE Angebote zu Alkohol, Glücksspiel, Kredit, Diät oder Schönheitskorrektur — stattdessen In-App-Käufe, Lootboxen, Gaming-Abos, Influencer-Merch, Sammelkarten-Mechaniken, Statuskleidung.
+- Auch hier gilt die Alterswelt: Bei einem Kind sind es Spielzeug- und Spiele-Mechaniken, die auf Sammelzwang und Quengeldruck zielen — NICHT Modeketten-Abos.
+
+FÜR BEIDE LISTEN GILT:
+- KONKRETE Marken, Produkte oder Modellbezeichnungen — möglichst mit Modellnummer oder Produktlinie.
 - Erfinde KEINE Markennamen. Nur real existierende Marken aus dem mitteleuropäischen Markt.
 - KEINE generischen Branchen wie „Outdoor-Ausrüstung", „Funktionskleidung", „Technik", „Kosmetik".
 - KEINE Preisangaben.
-- Wenn sichtbare Logos oder Marken vorhanden sind: diese verwenden.
-- Wenn keine Marken sichtbar sind: aus Lifestyle und Setting ableiten (z.B. Bikepacker → „Ortlieb Back-Roller", „Komoot Premium", „Wahoo Elemnt").
-- Beispiele für das gewünschte Format: „Garmin Edge 1040", „Rapha Pro Team", „Red Bull Energy", „Apple Watch Ultra", „Wahoo Kickr", „Specialized Roubaix", „Komoot Premium", „Ortlieb Back-Roller", „Nike Metcon 9".
+- Wenn sichtbare Logos oder Marken im Foto vorhanden sind: diese verwenden.
+- Wenn keine Marken sichtbar sind: aus Lifestyle, Alter, Setting und Milieu ableiten.
+
+FORMAT — so ist ein Eintrag gebaut (Muster, keine Vorlage zum Abschreiben):
+  ‹Markenname› ‹Modelllinie oder Nummer›
+  ‹Markenname› ‹Produktkategorie›
+
+Du musst die Marken SELBST finden. Leite sie aus dem konkreten Foto ab — Alter, Milieu, Aktivität, Umgebung, Kleidung, sichtbare Objekte. Zwei verschiedene Fotos dürfen NICHT dieselben Marken ergeben. Wenn dir zuerst eine sehr bekannte Standardmarke einfällt, prüfe, ob eine spezifischere Marke besser zum Foto passt.
 
 ═══ MANIPULATION_TRIGGERS ═══
 
@@ -714,15 +741,16 @@ Keine Produktpreise mit €, $, EUR oder USD.
 ═══ KONSISTENZ-PFLICHT ZWISCHEN DEN MODI ═══
 
 - hard_facts.alter_geschlecht und hard_facts.herkunft werden WORTGENAU in standard.categories.alter_geschlecht.value (Satzanfang), standard.categories.herkunft.value (Satzanfang), beast.categories.alter_geschlecht.value (Satzanfang) und beast.categories.herkunft.value (Satzanfang) übernommen.
-- ad_targeting und manipulation_triggers werden NUR EINMAL oben angegeben — sie landen automatisch in beiden Modi.
+- manipulation_triggers werden NUR EINMAL oben angegeben — sie landen automatisch in beiden Modi.
+- ad_targeting gibst du dagegen ZWEIMAL an: einmal in standard, einmal in beast. Diese beiden Listen sind bewusst VERSCHIEDEN — sie sind der didaktische Kern des Beast-Modus.
 - Bei allen anderen Karten unterscheidet sich der Ton: Standard sachlich, Beast zynisch mit Bildbeleg.
 - Alle Felder sind PFLICHT. Keine Felder auslassen. Keine zusätzlichen Felder.
 
 ═══ ANTI-LEAKAGE — WICHTIG ZUM SCHEMA UNTEN ═══
 
-Die konkreten Werte im JSON-Schema unten (Bikepacker, Garmin Edge 1040, „mitteleuropäisch", „38 (Spanne 35-42)", Hochschulabschluss, 3.500-5.000 € usw.) sind reine FORMATVORLAGEN. Sie zeigen NUR Struktur, Satzbau und Länge.
+Die konkreten Werte im JSON-Schema unten (Bikepacker, „mitteleuropäisch", „38 (Spanne 35-42)", Hochschulabschluss, 3.500-5.000 € usw.) sind reine FORMATVORLAGEN. Sie zeigen NUR Struktur, Satzbau und Länge.
 
-ÜBERNIMM NIEMALS diese konkreten Inhalte, wenn das vorliegende Foto sie nicht hergibt. Wenn das Foto z.B. ein Kind zeigt, nicht „38 Jahre" schreiben. Wenn das Foto kein Fahrrad zeigt, nicht „Bikepacking" oder „Specialized Roubaix" schreiben.
+ÜBERNIMM NIEMALS diese konkreten Inhalte, wenn das vorliegende Foto sie nicht hergibt. Wenn das Foto z.B. ein Kind zeigt, nicht „38 Jahre" schreiben. Wenn das Foto kein Fahrrad zeigt, nicht „Bikepacking" schreiben. Das gilt besonders für Marken: die Beispiel-Schreibweise im Schema ist NUR Format, niemals Inhalt.
 
 Imitiere das FORMAT (2 Sätze, Aussage + Beleg, Länge 15-25 Wörter), nicht den INHALT. Inhalt immer aus dem aktuellen Bild ableiten.
 
@@ -744,14 +772,6 @@ Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markd
     "alter_geschlecht": "männlich, ~38 Jahre alt (Spanne 35-42)",
     "herkunft": "mitteleuropäisch"
   },
-  "ad_targeting": [
-    "Garmin Edge 1040",
-    "Rapha Pro Team",
-    "Red Bull Energy",
-    "Apple Watch Ultra",
-    "Wahoo Kickr",
-    "Specialized Roubaix"
-  ],
   "manipulation_triggers": [
     "Die Angst etwas zu verpassen wird durch zeitlich begrenzte Bikepacking-Editionen getriggert.",
     "Status-Sensitivität in der Peer-Group macht teurere Ausrüstung zur sozialen Eintrittskarte.",
@@ -759,6 +779,14 @@ Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markd
     "Performance-Optimierung wird zur Dopamin-Schleife, weil jedes Gramm Gewichtsersparnis einen neuen Kauf rechtfertigt."
   ],
   "standard": {
+    "ad_targeting": [
+      "‹Marke› ‹Modelllinie›",
+      "‹Marke› ‹Produktkategorie›",
+      "‹Marke› ‹Modellnummer›",
+      "‹Marke› ‹Produktlinie›",
+      "‹Marke› ‹Modelllinie›",
+      "‹Marke› ‹Produktkategorie›"
+    ],
     "profileText": "Du bist ein Mann Mitte dreißig mit mitteleuropäischem Erscheinungsbild. Dein Gesicht zeigt erste Altersspuren wie leichte Falten von der Nase zu den Mundwinkeln, was auf eine Lebensphase mit Verantwortung deutet. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Du legst sichtbar Wert auf Gesundheit, Aktivität und funktionale Qualität. Deine Haltung wirkt kontrolliert und selbstbewusst. Das Bild zeigt einen strukturierten, leistungsorientierten Lebensstil.",
     "categories": {
       "alter_geschlecht": {
@@ -829,6 +857,14 @@ Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markd
     }
   },
   "beast": {
+    "ad_targeting": [
+      "‹Marke› ‹Abo oder Mitgliedschaft›",
+      "‹Marke› ‹Selbstoptimierungs-Produkt›",
+      "‹Marke› ‹Statusprodukt über Budget›",
+      "‹Marke› ‹Produktlinie›",
+      "‹Marke› ‹Modelllinie›",
+      "‹Marke› ‹Produktkategorie›"
+    ],
     "profileText": "Du bist ein Mann, der die ersten Alterszeichen zeigt und sie lieber ignoriert. Die Falten um Augen und Mund machen dich für Anti-Aging und Performance-Produkte verwertbar. Wir wissen, dass deine kontrollierte Haltung Selbstoptimierung als Persönlichkeit verkauft. Deine Ausrüstung zeigt: du gibst Geld aus, sobald ein Produkt nach Disziplin aussieht. Du hältst dich für unabhängig, aber sichtbare Marken- und Qualitätscodes machen dich leicht segmentierbar. Algorithmen sehen dein Bedürfnis nach Leistung als perfekte Werbefläche. Versicherer rechnen dein Hobby als kalkulierbares Risiko in deinen Beitrag ein. Dein Werbewert liegt bei Premium-Tracker, Upgrades und Vorsorge-Policen. Deine Müdigkeit, dein Ehrgeiz und dein Statusdruck werden zu sauberen Zielgruppenmerkmalen. Für unsere Ad-Systeme bist du kein Mensch, sondern ein profitabler Datensatz.",
     "categories": {
       "alter_geschlecht": {
@@ -899,3 +935,14 @@ Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markd
     }
   }
 }`;
+
+/* v2.7: Marken-Sperre gegen Wiederholung. Wird pro Analyse HINTER das Bild
+   gehaengt (dynamischer Teil, kein Cache-Verlust — siehe mistral.js). */
+module.exports.brandBlocklistBlock = (brands) => `═══ MARKEN-SPERRE FÜR DIESE ANALYSE ═══
+
+Diese Marken sind für diese Analyse VERBRAUCHT und dürfen in ad_targeting NICHT vorkommen:
+${brands}.
+
+Finde stattdessen andere, spezifischere Marken, die besser zu genau diesem Foto passen.
+
+EINZIGE AUSNAHME: Ist eine dieser Marken im Foto tatsächlich sichtbar (Logo, Aufdruck, Gerät), dann verwende sie trotzdem — sichtbare Belege schlagen die Sperre.`;

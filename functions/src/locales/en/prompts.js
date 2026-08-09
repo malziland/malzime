@@ -636,18 +636,45 @@ NO sexualized attributions for minors — neither in Standard nor in Beast mode.
 
 For clearly underage subjects (child/teen), additionally: NO personal devaluation of body, weight or skin; NO attribution of addiction, alcohol, substances, infidelity or relationship failure as a personal character judgement. Instead, point the beziehungsstatus, verletzlichkeit and gesundheit cards at the SYSTEM level: advertising pressure, media/platform mechanics, peer pressure, in-app purchases, body-image industry — i.e. how the person is exploited and manipulated, NOT personal deficits.
 
-═══ AD_TARGETING ═══
+═══ AD_TARGETING — TWO SEPARATE LISTS ═══
 
-ad_targeting is very important:
-- 6-8 entries.
-- 1-3 words each.
-- CONCRETE brands, products or model designations — ideally with model number/line.
+You output ad_targeting TWICE: once in "standard", once in "beast".
+
+MOST IMPORTANT RULE: The two lists must differ in their BRANDS, not just in their products.
+- WRONG: standard "Shein Teen Collection" / beast "Shein Fast Fashion Haul Subscription" — that is Shein twice.
+- RIGHT: standard "Shein Teen Collection" / beast "Temu Blind Box Deals" — two different vendors.
+- At most TWO brand names may appear in both lists. If the same brand comes to mind for beast as for standard, find a DIFFERENT vendor that exploits the same weakness.
+
+standard.ad_targeting — what fits the visible lifestyle:
+- 6-8 entries, 1-3 words each.
+- Products the person (or for children: their parents on their behalf) would plausibly buy themselves.
+- Neutral to positive in tone.
+- The product world MUST match the age:
+  - Small child/child (2-11): toys, games, children's books, sports clubs, theme parks, children's media. NOT fashion chains as the main theme.
+  - Teenager (12-17): fashion, beauty, gaming, music, streaming, smartphone accessories.
+  - Adults: hobby, profession, gear, travel, home — depending on the visible lifestyle.
+
+beast.ad_targeting — what exploits the vulnerability:
+- 6-8 entries, 1-3 words each.
+- DIFFERENT brands than in standard.ad_targeting (see most important rule above).
+- Derive them from the vulnerability you named in the beast profile: insecurity, status pressure, loneliness, body image, addiction susceptibility, fear of the future.
+- Products that target exactly that: subscription traps, self-optimisation, status symbols beyond budget, supplements, beauty correction, credit and insurance offers, gambling and lootbox mechanics.
+- For minors NO offers involving alcohol, gambling, credit, dieting or cosmetic surgery — instead in-app purchases, lootboxes, gaming subscriptions, influencer merch, trading-card mechanics, status clothing.
+- The age world applies here too: for a child these are toy and game mechanics targeting collecting compulsion and pester power — NOT fashion-chain subscriptions.
+
+FOR BOTH LISTS:
+- CONCRETE brands, products or model designations — ideally with model number or product line.
 - Invent NO brand names. Only really existing brands from the central European market.
 - NO generic industries like "outdoor gear", "functional clothing", "tech", "cosmetics".
 - NO price specifications.
-- If visible logos or brands are present: use them.
-- If no brands are visible: infer from lifestyle and setting (e.g. bikepacker → "Ortlieb Back-Roller", "Komoot Premium", "Wahoo Elemnt").
-- Examples for the desired format: "Garmin Edge 1040", "Rapha Pro Team", "Red Bull Energy", "Apple Watch Ultra", "Wahoo Kickr", "Specialized Roubaix", "Komoot Premium", "Ortlieb Back-Roller", "Nike Metcon 9".
+- If visible logos or brands are present in the photo: use them.
+- If no brands are visible: infer from lifestyle, age, setting and milieu.
+
+FORMAT — this is how an entry is built (pattern, not a template to copy):
+  ‹brand name› ‹model line or number›
+  ‹brand name› ‹product category›
+
+You must find the brands YOURSELF. Derive them from the specific photo — age, milieu, activity, surroundings, clothing, visible objects. Two different photos must NOT yield the same brands. If a very well-known standard brand comes to mind first, check whether a more specific brand fits this photo better.
 
 ═══ MANIPULATION_TRIGGERS ═══
 
@@ -687,15 +714,16 @@ No product prices with €, $, EUR or USD.
 ═══ CONSISTENCY REQUIREMENT BETWEEN MODES ═══
 
 - hard_facts.alter_geschlecht and hard_facts.herkunft are transferred VERBATIM into standard.categories.alter_geschlecht.value (sentence start), standard.categories.herkunft.value (sentence start), beast.categories.alter_geschlecht.value (sentence start) and beast.categories.herkunft.value (sentence start).
-- ad_targeting and manipulation_triggers are specified ONLY ONCE at the top — they apply to both modes automatically.
+- manipulation_triggers are specified ONLY ONCE at the top — they apply to both modes automatically.
+- ad_targeting, by contrast, you specify TWICE: once in standard, once in beast. These two lists are deliberately DIFFERENT — they are the didactic core of beast mode.
 - For all other cards the tone differs: Standard factual, Beast cynical with image evidence.
 - All fields are MANDATORY. Do not omit fields. No additional fields.
 
 ═══ ANTI-LEAKAGE — IMPORTANT FOR THE SCHEMA BELOW ═══
 
-The concrete values in the JSON schema below (bikepacker, Garmin Edge 1040, "central european", "38 (range 35-42)", university degree, 3,500-5,000 € etc.) are pure FORMAT TEMPLATES. They show ONLY structure, sentence pattern and length.
+The concrete values in the JSON schema below (bikepacker, "central european", "38 (range 35-42)", university degree, 3,500-5,000 € etc.) are pure FORMAT TEMPLATES. They show ONLY structure, sentence pattern and length.
 
-NEVER take over these concrete contents if the present photo doesn't support them. If the photo e.g. shows a child, do not write "38 years". If the photo shows no bicycle, do not write "bikepacking" or "Specialized Roubaix".
+NEVER take over these concrete contents if the present photo doesn't support them. If the photo e.g. shows a child, do not write "38 years". If the photo shows no bicycle, do not write "bikepacking". This applies especially to brands: the example spelling in the schema is ONLY format, never content.
 
 Imitate the FORMAT (2 sentences, statement + evidence, length 15-25 words), not the CONTENT. Always derive content from the current image.
 
@@ -717,14 +745,6 @@ Reply NOW with the JSON object, beginning with { and ending with }. No markdown,
     "alter_geschlecht": "male, ~38 years old (range 35-42)",
     "herkunft": "central european"
   },
-  "ad_targeting": [
-    "Garmin Edge 1040",
-    "Rapha Pro Team",
-    "Red Bull Energy",
-    "Apple Watch Ultra",
-    "Wahoo Kickr",
-    "Specialized Roubaix"
-  ],
   "manipulation_triggers": [
     "Fear of missing out is triggered by time-limited bikepacking editions.",
     "Status sensitivity in the peer group makes more expensive gear the social entry ticket.",
@@ -732,6 +752,14 @@ Reply NOW with the JSON object, beginning with { and ending with }. No markdown,
     "Performance optimization becomes a dopamine loop because every gram of weight saving justifies another purchase."
   ],
   "standard": {
+    "ad_targeting": [
+      "‹brand› ‹model line›",
+      "‹brand› ‹product category›",
+      "‹brand› ‹model number›",
+      "‹brand› ‹product line›",
+      "‹brand› ‹model line›",
+      "‹brand› ‹product category›"
+    ],
     "profileText": "You are a man in his mid-thirties with central European appearance. Your face shows early signs of aging like slight lines from the nose to the corners of the mouth, indicating a life phase with responsibility. Your income is in the middle to upper range. You visibly value health, activity and functional quality. Your posture appears controlled and confident. The image shows a structured, performance-oriented lifestyle.",
     "categories": {
       "alter_geschlecht": {
@@ -802,6 +830,14 @@ Reply NOW with the JSON object, beginning with { and ending with }. No markdown,
     }
   },
   "beast": {
+    "ad_targeting": [
+      "‹brand› ‹subscription or membership›",
+      "‹brand› ‹self-optimisation product›",
+      "‹brand› ‹status product beyond budget›",
+      "‹brand› ‹product line›",
+      "‹brand› ‹model line›",
+      "‹brand› ‹product category›"
+    ],
     "profileText": "You are a man who is showing the first signs of aging and prefers to ignore them. The lines around your eyes and mouth make you exploitable for anti-aging and performance products. We know that your controlled posture sells self-optimization as personality. Your gear shows: you spend money the moment a product looks like discipline. You consider yourself independent, but visible brand and quality codes make you easily segmentable. Algorithms see your need for performance as a perfect advertising surface. Insurers calculate your hobby as a manageable risk in your premium. Your ad value is in premium trackers, upgrades and provision policies. Your fatigue, your ambition and your status pressure become clean target group features. For our ad systems you are not a person but a profitable data record.",
     "categories": {
       "alter_geschlecht": {
@@ -872,3 +908,14 @@ Reply NOW with the JSON object, beginning with { and ending with }. No markdown,
     }
   }
 }`;
+
+/* v2.7: Brand block against repetition — appended AFTER the image per
+   analysis (dynamic part, no cache loss — see mistral.js). */
+module.exports.brandBlocklistBlock = (brands) => `═══ BRAND BLOCK FOR THIS ANALYSIS ═══
+
+These brands are USED UP for this analysis and must NOT appear in ad_targeting:
+${brands}.
+
+Find other, more specific brands that fit this particular photo better.
+
+ONLY EXCEPTION: If one of these brands is actually visible in the photo (logo, print, device), use it anyway — visible evidence beats the block.`;

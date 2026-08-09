@@ -696,6 +696,55 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
 
 const MISTRAL_SINGLE_LARGE_MAX_TOKENS = 8000;
 
+/* ── Marken-Sperre (v2.7) ─────────────────────────────────────────────────
+   Mistral folgt Beispielen, nicht Regeln. Solange konkrete Marken im Prompt
+   standen, kamen sie auch zurueck: bei einem Radsport-Foto lieferte die alte
+   Fassung ALLE acht Marken aus der Beispielliste. Die Beispiele sind deshalb
+   ersatzlos aus dem Prompt geflogen (nur noch Format-Platzhalter) — und hier
+   steht eine ROTIERENDE Sperrliste dagegen, damit das Modell nicht einfach
+   einen neuen Liebling entwickelt.
+
+   Set 0 sind die im alten Prompt verbrannten Dauerbrenner; die weiteren Sets
+   decken die Marken ab, die erfahrungsgemaess als Zweitwahl nachruecken, damit
+   die Rotation nicht bloss von Anker A auf Anker B umschaltet.
+
+   Gemessen (84 Analysen, 2026-08-09): Anteil Werbe-Eintraege aus den
+   Prompt-Beispielen 7,5 % -> 0,9 %, verschiedene Marken 95 -> 270,
+   Sperrlisten-Verstoesse 0. */
+const BRAND_BLOCKLIST_SETS = [
+  ["Garmin", "Rapha", "Wahoo", "Specialized", "Komoot", "Ortlieb", "Red Bull", "Apple Watch", "Nike Metcon"],
+  ["Garmin", "Rapha", "Wahoo", "Specialized", "Nike", "Adidas", "Apple", "Samsung", "Puma"],
+  ["Garmin", "Komoot", "Ortlieb", "Red Bull", "Zalando", "H&M", "Zara", "Douglas", "Sephora"],
+  [
+    "Garmin",
+    "Rapha",
+    "Apple Watch",
+    "Lululemon",
+    "Under Armour",
+    "The North Face",
+    "Patagonia",
+    "Salomon",
+    "On Running",
+  ],
+  ["Garmin", "Wahoo", "Specialized", "Nike", "L'Oréal", "Maybelline", "Nivea", "Rituals", "Yves Rocher"],
+  ["Garmin", "Red Bull", "Apple", "PlayStation", "Nintendo", "Xbox", "Netflix", "Spotify", "TikTok"],
+];
+
+function buildBrandBlocklistBlock(lang, index) {
+  /* Ohne vorgegebenen Index zufaellig rotieren. Determinismus ist hier nicht
+     noetig (es geht nur um Abwechslung), aber Tests koennen ihn vorgeben. */
+  const i =
+    typeof index === "number" && Number.isFinite(index)
+      ? Math.abs(Math.trunc(index))
+      : Math.floor(Math.random() * BRAND_BLOCKLIST_SETS.length);
+  const set = BRAND_BLOCKLIST_SETS[i % BRAND_BLOCKLIST_SETS.length];
+
+  /* Der Text selbst liegt in den Locale-Dateien — Backend-JS bleibt frei von
+     hartcodierter Sprache (i18n-Guardian). */
+  const prompts = loadPrompts(lang || "de");
+  return prompts.brandBlocklistBlock(set.join(", "));
+}
+
 async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, opts = {}) {
   const prompts = loadPrompts(lang || "de");
   const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBuffer.toString("base64")}`;
@@ -719,10 +768,23 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      identische hard_facts, 0 fehlende Karten, gleiche Ausgabelaenge.
      Die alte Struktur bleibt der Pfad bei ausgeschaltetem Flag — damit ist der
      Rueckfall bitgenau der Stand vor v2.5. */
+  /* v2.7: Marken-Sperre gegen Wiederholung. Sie sitzt bewusst HINTER dem Bild
+     in der user-Message — dort war ohnehin nie Cache, die Rotation kostet also
+     KEINEN Treffer. Waere sie im system-Teil, wechselte der statische Anfang
+     bei jeder Analyse und die Trefferquote fiele auf 0 (siehe v2.5-Messung
+     oben). Statisch oben, dynamisch unten. */
+  const blocklistBlock = buildBrandBlocklistBlock(lang, opts.blocklistIndex);
+
   const messages = cacheKey
     ? [
         { role: "system", content: prompts.singleLargePrompt },
-        { role: "user", content: [{ type: "image_url", image_url: dataUrl }] },
+        {
+          role: "user",
+          content: [
+            { type: "image_url", image_url: dataUrl },
+            { type: "text", text: blocklistBlock },
+          ],
+        },
       ]
     : [
         {
@@ -730,6 +792,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
           content: [
             { type: "text", text: prompts.singleLargePrompt },
             { type: "image_url", image_url: dataUrl },
+            { type: "text", text: blocklistBlock },
           ],
         },
       ];
@@ -758,6 +821,9 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     /* v2.5: Im Cache-Pfad gehoert der Hinweis in die user-Message, NICHT in die
        system-Message — sonst aendert sich der statische Anfang und der Treffer
        faellt aus. Statisch oben, dynamisch unten. */
+    /* Die Marken-Sperre gilt auch im Retry — sonst duerfte das Modell im
+       zweiten Anlauf wieder auf die verbrauchten Marken zurueckfallen.
+       Bleibt im dynamischen Teil, der statische Anfang ist bitgleich. */
     const retryMessages = cacheKey
       ? [
           { role: "system", content: prompts.singleLargePrompt },
@@ -765,7 +831,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
             role: "user",
             content: [
               { type: "image_url", image_url: dataUrl },
-              { type: "text", text: hint },
+              { type: "text", text: blocklistBlock + hint },
             ],
           },
         ]
@@ -775,6 +841,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
             content: [
               { type: "text", text: prompts.singleLargePrompt + hint },
               { type: "image_url", image_url: dataUrl },
+              { type: "text", text: blocklistBlock },
             ],
           },
         ];
@@ -829,10 +896,18 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     if (hardFacts.herkunft && src.categories.herkunft) {
       src.categories.herkunft.value = hardFacts.herkunft;
     }
+    /* v2.7: ad_targeting kommt jetzt PRO MODUS aus dem Modell — Standard zeigt
+       den passenden Lebensstil, Beast beutet die benannte Schwachstelle aus.
+       Vorher landete eine einzige Liste in beiden Modi, was den Beast-Modus
+       didaktisch entwertete (zynischer Text, brave Werbung darunter).
+       Rueckfall auf die obere Liste, falls das Modell die alte Form liefert —
+       dann ist es wie frueher, statt gar keiner Werbung. */
+    const modeAds = Array.isArray(src.ad_targeting) && src.ad_targeting.length > 0 ? src.ad_targeting : ads;
+
     return {
       categories: src.categories,
       profileText: src.profileText || "",
-      ad_targeting: ads,
+      ad_targeting: modeAds,
       manipulation_triggers: triggers,
     };
   }
@@ -919,4 +994,6 @@ module.exports = {
   /* Für Tests */
   setFetchForTest,
   _callMistralRaw: callMistralRaw,
+  _buildBrandBlocklistBlock: buildBrandBlocklistBlock,
+  _BRAND_BLOCKLIST_SETS: BRAND_BLOCKLIST_SETS,
 };

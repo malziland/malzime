@@ -4,6 +4,27 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.7.0] — 2026-08-09
+
+### Geändert
+
+- **Beast Mode zeigt jetzt eigene Werbung.** Bisher landete EINE Werbeliste in beiden Modi (`mistral.js`, `ad_targeting: ads`) — der Beast-Text war zynisch und ausbeutend, die Werbung darunter dieselbe brave Liste wie im Standard. Das entwertete genau den Moment, auf den das Tool didaktisch hinarbeitet. Jetzt liefert das Modell **zwei getrennte Listen**: Standard zeigt, was zum sichtbaren Lebensstil passt, Beast zeigt, was die im Beast-Profil benannte Schwachstelle ausbeutet (Abo-Fallen, Ratenzahlung, Statusprodukte über Budget, bei Kindern Sammelzwang- und Quengel-Mechaniken). **Gemessen an 84 Analysen: Marken-Überlappung zwischen den Modi 100 % → 2,8 %, Produkt-Überlappung 100 % → 0,0 %.** Beispiel (14-jähriges Mädchen): Standard „Puma × Stranger Things, Converse Run Star Hike, Spotify Premium Student" — Beast „Zalando Lounge Abo, ASOS Premier Membership, Boohoo Trend-Abo, Wish Mystery Beauty Box". (`locales/de/prompts.js`, `locales/en/prompts.js`, `mistral.js`)
+- **Die immer gleichen Marken sind weg.** Ursache war kein Zufall, sondern der Prompt selbst: Er nannte neun Beispielmarken an vier Stellen, inklusive einer fertig ausgefüllten Liste im JSON-Schema. Mistral folgt Beispielen, nicht Regeln — bei einem Radsport-Foto kamen **alle acht** Marken aus der Beispielliste zurück (Garmin Edge 1040, Rapha, Specialized, Komoot, Wahoo, Red Bull, Ortlieb). Die Beispiele sind jetzt **ersatzlos entfernt** (nur noch Format-Platzhalter wie `‹Marke› ‹Modelllinie›`). **Gemessen: Anteil Werbe-Einträge aus den Prompt-Beispielen 7,5 % → 0,9 %, verschiedene Marken über alle Fotos 95 → 270, Top-3-Konzentration 11,9 % → 6,2 %.** Dasselbe Foto liefert jetzt Evoc, Schwalbe, Tubolito, Lezyne, Deuter, Vaude, Endura, Crankbrothers.
+  - **Warum das diesmal funktioniert:** Der Vielfalt-Umbau vom 29.05. (v2.3.0-Kandidat) hatte Beispielmarken durch *andere* Beispielmarken ersetzt und war durchgefallen — „nintendo switch" wurde einfach zum neuen Anker. Der Unterschied jetzt: gar kein Beispiel mehr zum Abschreiben, plus eine rotierende Sperrliste.
+- **Rotierende Marken-Sperre** (`BRAND_BLOCKLIST_SETS`, 6 Sets). Sie sitzt bewusst **hinter dem Bild in der user-Message** — dort war nie Cache, die Rotation kostet damit **keinen einzigen Prompt-Cache-Treffer**. Läge sie im `system`-Teil, wechselte der statische Anfang pro Analyse und die Trefferquote fiele auf 0 (die v2.5-Messung ist im Code dokumentiert). Ein Test prüft genau das: gleicher `system`-Inhalt über verschiedene Sperrlisten hinweg. Sichtbare Marken im Foto schlagen die Sperre ausdrücklich. Gemessen: 0 Sperrlisten-Verstöße in 42 Läufen.
+
+### Behoben
+
+- **Größenbegrenzungen greifen wieder im aktiven Pfad.** `applyBounds` prüfte nur die oberste Ebene — im Single-Large-Pfad (live seit v2.2.0) liefen damit **Kartentexte, Profiltexte und Sicherheitswerte aus `standard`/`beast` ungeprüft durch**: 5.000 Zeichen blieben 5.000, ein `confidence: 5` blieb 5. `SECURITY.md` sagt diese Begrenzung aber ausdrücklich zu. Gefunden beim Umbau, weil `ad_targeting` sonst seine letzte Begrenzung verloren hätte. Jetzt wird jede vorhandene Profil-Ebene begrenzt; der 3-Call-Pfad bleibt unverändert. Ohne Feld-Erfindung: Was das Modell nicht geliefert hat, wird nicht angelegt. (+7 Tests, `json-repair.js`)
+- Die Grenzwerte sind jetzt mit ihrem Realbezug dokumentiert (längster gemessener Wert je Feld, Faktor zum Grenzwert), damit sie niemand ohne Messung verengt. Sie sind Notbremsen, keine Formatvorgabe — ein mitten im Wort abgeschnittener Kartentext sieht im Workshop schlechter aus als ein etwas zu langer.
+
+### Hinweise
+
+- **Mehrverbrauch:** Eingabe +8,8 %, Ausgabe +7,1 % pro Analyse. Die Eingabe ist zwischenspeicherbar, die Ausgabe nicht — überschlägig **rund 1 bis 1,50 € mehr pro 1.000 Analysen**. Keine abgeschnittenen Antworten in 42 Läufen, `MAX_TOKENS` bleibt bei 8000.
+- **Qualität gehalten:** Konkretheit der Marken 97,6 % → 100 %, Geschlechtstreffer unverändert 64,3 %, Alterstreffer 35,7 % → 33,3 % (ein Treffer von 42 = Rauschen). 0 Parse-Fehler, 0 Transport-Fehler.
+- **Was die Messung NICHT belegt:** Ob sich bei vielen *ähnlichen* Fotos (echte Schulklasse) weniger wiederholt. Die 14 Testbilder sind maximal verschieden; dort liegt die Marken-Überlappung zwischen Fotos bei beiden Varianten unter 6 %. Genau diese Einschränkung war schon die Lehre aus dem Test vom 29.05. Belegt ist das Ende des Abschreibens aus dem Prompt und die dreifache Markenvielfalt.
+- **Der 3-Call-Fallback-Pfad** (`useSingleLargeCall = false`) liefert weiterhin eine gemeinsame Werbeliste für beide Modi. Er ist Rückfall, nicht aktiver Pfad — bewusst nicht mitgeändert.
+
 ## [2.6.0] — 2026-08-09
 
 ### Hinzugefügt

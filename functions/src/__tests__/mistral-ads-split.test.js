@@ -49,15 +49,16 @@ function answerSplit() {
     subject: "HUMAN",
     visible_text: "",
     hard_facts: { alter_geschlecht: "weiblich, ~14 Jahre alt", herkunft: "mitteleuropäisch" },
-    manipulation_triggers: ["FOMO"],
     standard: {
       profileText: "Sachlich.",
       ad_targeting: ["Lego Friends", "Thalia Erstleser"],
+      manipulation_triggers: ["Zeitdruck erzeugt Handlungsbereitschaft."],
       categories: fullCategories(),
     },
     beast: {
       profileText: "Zynisch.",
       ad_targeting: ["Temu Sammelkarten", "Netto Quengelware"],
+      manipulation_triggers: ["Wir setzen dir eine Frist, dann kaufst du."],
       categories: fullCategories(),
     },
   });
@@ -112,11 +113,41 @@ describe("Getrennte Werbelisten je Modus (v2.7)", () => {
     expect(r.boost.ad_targeting).toEqual(["Alte Marke A", "Alte Marke B"]);
   });
 
-  test("manipulation_triggers bleiben bewusst modusübergreifend", async () => {
+  test("manipulation_triggers sind ab v2.8 ebenfalls getrennt", async () => {
     mockAnswer(answerSplit());
+    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+
+    expect(r.normal.manipulation_triggers).toEqual(["Zeitdruck erzeugt Handlungsbereitschaft."]);
+    expect(r.boost.manipulation_triggers).toEqual(["Wir setzen dir eine Frist, dann kaufst du."]);
+    /* Der Punkt: sie stehen im Frontend direkt neben der Werbung. Gleiche
+       Trigger neben unterschiedlicher Werbung wirken widersprüchlich. */
+    expect(r.normal.manipulation_triggers).not.toEqual(r.boost.manipulation_triggers);
+  });
+
+  test("Rückfall auf die obere Trigger-Liste, wenn das Modell die alte Form liefert", async () => {
+    mockAnswer(answerLegacy());
     const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
     expect(r.normal.manipulation_triggers).toEqual(["FOMO"]);
     expect(r.boost.manipulation_triggers).toEqual(["FOMO"]);
+  });
+
+  test("Werbung und Trigger fallen unabhängig voneinander zurück", async () => {
+    /* Gemischte Antwort: Werbung getrennt, Trigger noch alt oben */
+    mockAnswer(
+      JSON.stringify({
+        subject: "HUMAN",
+        visible_text: "",
+        hard_facts: { alter_geschlecht: "weiblich, ~14 Jahre alt", herkunft: "mitteleuropäisch" },
+        manipulation_triggers: ["Nur oben"],
+        standard: { profileText: "S.", ad_targeting: ["A"], categories: fullCategories() },
+        beast: { profileText: "B.", ad_targeting: ["B"], categories: fullCategories() },
+      })
+    );
+    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+    expect(r.normal.ad_targeting).toEqual(["A"]);
+    expect(r.boost.ad_targeting).toEqual(["B"]);
+    expect(r.normal.manipulation_triggers).toEqual(["Nur oben"]);
+    expect(r.boost.manipulation_triggers).toEqual(["Nur oben"]);
   });
 });
 

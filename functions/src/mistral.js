@@ -904,11 +904,22 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        dann ist es wie frueher, statt gar keiner Werbung. */
     const modeAds = Array.isArray(src.ad_targeting) && src.ad_targeting.length > 0 ? src.ad_targeting : ads;
 
+    /* v2.8: manipulation_triggers ebenfalls pro Modus. Sie stehen im Frontend
+       direkt neben der Werbung (public/js/render.js) — identische Trigger neben
+       unterschiedlicher Werbung wirken widerspruechlich. Standard bleibt
+       sachlich-aufklaerend, Beast beschreibt dieselben Hebel aus Taetersicht.
+       Gleicher Rueckfall wie bei der Werbung: liefert das Modell die alte Form,
+       gilt die obere Liste fuer beide Modi. */
+    const modeTriggers =
+      Array.isArray(src.manipulation_triggers) && src.manipulation_triggers.length > 0
+        ? src.manipulation_triggers
+        : triggers;
+
     return {
       categories: src.categories,
       profileText: src.profileText || "",
       ad_targeting: modeAds,
-      manipulation_triggers: triggers,
+      manipulation_triggers: modeTriggers,
     };
   }
 

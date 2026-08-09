@@ -4,6 +4,32 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+
+- **Serverseitige Vorbereitung für getrennte Manipulations-Trigger** (`mistral.js`). `buildProfile` liest `manipulation_triggers` jetzt pro Modus, analog zu `ad_targeting` seit v2.7.0, mit Rückfall auf die gemeinsame obere Liste. **Ohne Prompt-Änderung ist das ein No-Op** — das Modell liefert weiterhin eine Liste, der Rückfall greift, das Verhalten ist unverändert. +3 Tests (Trennung, Rückfall, unabhängiger Rückfall von Werbung und Triggern), Mutationsprobe bestanden.
+- **Messwerkzeug `functions/scripts/single-large-ab-runner-v4-vuln.js`** (additiv, TEST-ONLY). Misst, was die v2.7.0-Messung verfehlt hat: ob die Beast-Werbung an der benannten Schwachstelle ansetzt statt nur die Marke zu wechseln. Drei neue Größen — Ausbeutungs-Mechanik-Quote (Abo, Ratenzahlung, Anti-Aging, Kredit, Lootbox, Sammelzwang …), Produktwelt-Überlappung zwischen den Modi, Wort-Ähnlichkeit der Trigger. 25 Offline-Selbsttests; die Metrik erkennt den v2.7.0-Fehler nachweislich (Ausbeutungsquote 0 %, Produktwelt 100 % überlappend).
+
+### Untersucht und NICHT übernommen
+
+- **Beast-Werbung enger an die Verletzlichkeit koppeln + Trigger trennen** — drei A/B-Messungen über je 84 Analysen (~10 €), Ergebnis: **kein Kandidat ist unterm Strich besser als der Live-Stand.** Deshalb bewusst nicht deployt.
+
+  | Variante | Alterstreffer | Trigger getrennt | Beast-Mechanik | Marken-Überlappung |
+  |---|---|---|---|---|
+  | Live v2.7.0 | Basis | nein (100 %) | ~33 % | ~6,5 % |
+  | Werbung + Trigger | **−11,9 Pp** | ja (6,5 %) | 54,1 % | 40,1 % |
+  | dieselbe, Prompt gestrafft | **−11,9 Pp** | ja (6,7 %) | 48,6 % | 25,2 % |
+  | nur Trigger | ±0 | ja (9,1 %) | **17,6 %** | 15,8 % |
+
+  **Befund 1 — die Werbe-Anweisung kostet Alterstreffer.** Der Einbruch von 11,9 Prozentpunkten trat in beiden Läufen mit Werbe-Änderung auf, auf die Nachkommastelle gleich; ohne sie blieb der Wert exakt unverändert. Ein längerer Prompt mit mehr Pflichtquoten zieht Aufmerksamkeit von der Altersschätzung ab. Alter ist eine Kernaussage des Tools — das ist kein akzeptabler Preis.
+
+  **Befund 2 — die Mindestquote hebelt die Marken-Trennung aus.** Auf „mindestens 4 Einträge mit Mechanik" antwortet das Modell mit derselben Marke plus Zusatz („Decathlon Riverside 500 Abo", obwohl Decathlon schon im Standard steht). Damit war der v2.7.0-Gewinn halb verloren. Ein ausdrücklicher Anbieter- und Branchenwechsel in Runde 2 hat es gemildert (40,1 % → 25,2 %), aber nicht auf das Live-Niveau zurückgebracht.
+
+  **Befund 3 — Zielkonflikt zwischen Werbung und Triggern.** Trennt man nur die Trigger, halbiert sich die Ausbeutungs-Mechanik in der Werbung (33 % → 17,6 %). Das Modell erfüllt die Ausbeutungslogik dann in den Trigger-Texten und lässt die Werbung braver — es verschlechtert also genau das, was der Umbau verbessern sollte.
+
+  **Lehre für den nächsten Anlauf:** Nicht weiter Anweisungen hinzufügen. Jede zusätzliche Pflichtregel wird woanders bezahlt (erst Alter, dann Markenvielfalt, dann Mechanik). Erfolgversprechender wäre, bestehende Prompt-Teile zu kürzen und die Verletzlichkeits-Kopplung in den vorhandenen Beast-Block zu falten, statt ihn zu erweitern.
+
 ## [2.7.0] — 2026-08-09
 
 ### Geändert

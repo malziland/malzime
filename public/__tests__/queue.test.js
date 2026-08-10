@@ -148,6 +148,65 @@ describe("Queue-Modus", () => {
     await p;
   });
 
+  it("Abfragen scheitern im Hintergrund → Lauf bricht NICHT ab, Ergebnis kommt nach der Rückkehr", async () => {
+    /* v2.9.2 — realer Vorfall: Der Browser lag im Hintergrund, alle Abfragen
+       schlugen fehl, nach fünf davon zeigte der Client "Netzwerkfehler".
+       Serverseitig lief der Job ungestört weiter und war 85 s später fertig.
+       Im Hintergrund friert der Browser fetch ein — das ist erwartetes
+       Verhalten, kein Netzproblem, und darf den Lauf nicht beenden. */
+    let pollCount = 0;
+    let versteckt = true;
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => versteckt });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-bg" });
+      /* NUR die Status-Abfragen zählen — Telemetrie und Fehler-Logs laufen
+         über dieselbe fetch-Attrappe und würden den Zähler verfälschen. */
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      pollCount += 1;
+      /* Solange die Seite versteckt ist, schlägt jede Abfrage fehl —
+         deutlich öfter als die fünf, die früher zum Abbruch geführt haben. */
+      if (versteckt) throw new Error("Failed to fetch");
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(pollCount).toBeGreaterThan(5);
+
+    /* Nutzer kehrt zurück: Ab jetzt liefert der Server das fertige Ergebnis. */
+    versteckt = false;
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(3000);
+    await p;
+
+    elements.disclaimerConfirm.click();
+    expect(renderCurrentMode).toHaveBeenCalled();
+    delete document.hidden;
+  });
+
+  it("Abfragen scheitern im Vordergrund → nach mehreren Versuchen Fehlermeldung", async () => {
+    /* Gegenprobe zur Mutationsprobe: Der Abbruch MUSS erhalten bleiben, wenn
+       die Seite sichtbar ist — sonst hängt bei echtem Netzausfall die Anzeige
+       stumm bis zur 30-Minuten-Grenze. */
+    Object.defineProperty(document, "hidden", { configurable: true, get: () => false });
+    let pollCount = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-fg" });
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      pollCount += 1;
+      throw new Error("Failed to fetch");
+    });
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(60000);
+    const outcome = await p;
+    /* Der Punkt ist, DASS er aufhört: Ohne Abbruch liefe die Schleife die
+       vollen 30 Minuten weiter und hätte in 60 s rund 30 Abfragen gemacht. */
+    expect(pollCount).toBeLessThan(12);
+    expect(outcome).toBeUndefined();
+    delete document.hidden;
+  });
+
   it("behält die jobId nach Erfolg, damit ein Reload das Ergebnis wieder zeigt", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-xyz" });

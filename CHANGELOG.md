@@ -4,6 +4,16 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.9.2] — 2026-08-10
+
+### Behoben
+
+- **„Netzwerkfehler", während das Handy in der Tasche war.** Gemeldet aus dem laufenden Betrieb: Der Browser lag im Hintergrund, es erschien eine Fehlermeldung — obwohl serverseitig alles lief. Im Log war der Job 85 Sekunden später sauber fertig und ausgeliefert; der Client hatte da längst aufgegeben.
+
+  Ursache: Der Browser friert laufende `fetch`-Aufrufe ein, sobald der Tab in den Hintergrund geht. Diese Fehlschläge zählten mit, und nach fünf davon brach der Lauf ab — rund zehn Sekunden Bildschirmsperre genügten. Der zweite Teil des Problems saß in der Fehleranzeige: Sie prüft `document.hidden` erst beim Auswerten des Fehlers. Wer zurückkehrt, bevor das passiert, bekommt statt des freundlichen „unterbrochen"-Hinweises die härteste Meldung der Kette — „Netzwerkfehler". Ursache war der Hintergrund, gemeldet wurde ein Netzproblem.
+
+  Der Job läuft in der Warteschlange unabhängig vom Browser weiter, und das Ergebnis liegt rund zwei Stunden bereit — genau dafür wurde sie gebaut. Fehlgeschlagene Abfragen im Hintergrund zählen deshalb nicht mehr mit; nach der Rückkehr wird der Zähler einmal zurückgesetzt, weil die Verbindung dann oft noch einen Moment braucht. Die Obergrenze von 30 Minuten bleibt, und bei sichtbarer Seite bricht der Lauf weiterhin nach fünf Fehlversuchen ab — sonst hinge die Anzeige bei echtem Netzausfall stumm. (`public/js/api.js`, +2 Tests, Mutationsprobe bestanden)
+
 ## [2.9.1] — 2026-08-10
 
 ### Behoben

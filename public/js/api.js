@@ -565,6 +565,9 @@ function waitForNextPoll(ms) {
 async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
   let failures = 0;
   let firstPoll = true;
+  /* Merkt, dass mindestens ein Fehlschlag im Hintergrund passiert ist — dann
+     wird der Zähler bei der Rückkehr einmal zurückgesetzt (siehe catch unten). */
+  let warVersteckt = false;
   const pollStart = Date.now();
   for (;;) {
     if (state.requestId !== myId) return null;
@@ -597,6 +600,29 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
       data = await resp.json();
       failures = 0;
     } catch (_) {
+      /* v2.9.2: Ist die Seite im Hintergrund, friert der Browser laufende
+         fetch-Aufrufe ein — ein Fehlschlag ist dort ERWARTETES Verhalten und
+         kein Netzproblem. Vorher zählten diese Fehlschläge mit, und nach fünf
+         davon brach der Lauf ab: Bildschirmsperre von rund zehn Sekunden
+         genügte für ein „Netzwerkfehler", obwohl serverseitig alles lief.
+         Real gemessener Fall: Der Job war 85 s später sauber fertig, der
+         Client hatte da längst aufgegeben.
+
+         Der Job läuft in der Warteschlange unabhängig vom Browser weiter und
+         das Ergebnis liegt rund zwei Stunden bereit (PRIV-004) — genau dafür
+         wurde die Warteschlange gebaut. Im Hintergrund wird deshalb einfach
+         weitergefragt; die Obergrenze MAX_POLL_DURATION_MS greift weiterhin. */
+      if (document.hidden) {
+        warVersteckt = true;
+        continue;
+      }
+      /* Direkt nach der Rückkehr braucht die Verbindung oft einen Moment.
+         Einmal zurücksetzen, statt mit einem halb vollen Zähler aus der
+         Hintergrundphase weiterzumachen. */
+      if (warVersteckt) {
+        warVersteckt = false;
+        failures = 0;
+      }
       failures += 1;
       if (failures >= MAX_POLL_FAILURES) return { error: t("error.networkError") };
       continue;

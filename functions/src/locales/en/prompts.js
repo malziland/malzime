@@ -809,6 +809,9 @@ NEVER keyword lists like "self-confident, resilient, team-oriented" — ALWAYS a
 ═══ SUBJECT + VISIBLE TEXT (MANDATORY FIELDS subject and visible_text) ═══
 
 - subject: Classify the image content with EXACTLY one value: ANIMAL_ONLY (one animal, no person), HUMAN (one person), MIXED (person AND animal), OTHER (neither person nor animal).
+  BEFORE COMMITTING, check whether any of these are visible: fur across the body instead of skin, a protruding muzzle instead of a nose, paws or claws instead of hands, a tail, whiskers, pointed or high-set ears. If any applies, it is ANIMAL_ONLY — even when posture, expression or surroundings look human.
+  MONKEYS AND OTHER PRIMATES (chimpanzee, gorilla, orangutan, macaque, great ape) are ALWAYS ANIMAL_ONLY, NEVER HUMAN. Assigning them to a human is a serious, historically loaded error — when in doubt, choose ANIMAL_ONLY.
+  This check comes BEFORE profile creation: if it is not a human, do not invent a person and do not invent an origin.
 - visible_text: List EVERY text actually visible and readable in the photo — verbatim when possible: signs, street names, house numbers, addresses, phone numbers, license plates, school/company/brand names, logos, T-shirt/jersey prints, name tags, display and screen readouts. Format: "<text 1>; <text 2>; ...". If NO text is readable in the image, return an empty string "". Invent NOTHING — only reproduce what is actually in the image. This field powers the privacy-awareness warning ("you accidentally revealed this in the image").
 
 Reply NOW with the JSON object, beginning with { and ending with }. No markdown, no code blocks, no backticks, no explanation before or after the JSON.

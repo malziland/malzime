@@ -30,7 +30,7 @@
 const { REQUEST_BUDGET_MS, isLocalQueueMode, localQueueConcurrency } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { applyMinorSafety } = require("./minor-safety");
-const { classifyDescription, buildAnimalProfiles } = require("./animal");
+const { classifyDescription, buildAnimalProfiles, pruefeTierWiderspruch } = require("./animal");
 const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
@@ -94,8 +94,16 @@ async function runPipeline(job) {
   const visibleText = extractVisibleText(description || "");
   const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: description || "" });
 
+  /* Netz gegen Tier-als-Mensch (v2.9.1): Meldet das Modell HUMAN, beschreibt
+     aber Fell, Schnauze, Pfoten oder einen Primaten, ist die Antwort in sich
+     widersprüchlich. Dann lieber das Tier-Easter-Egg als ein erfundenes
+     Menschenprofil — Anlass war ein Affenbild, aus dem ein Profil eines
+     afrikanischen Kleinkindes wurde. Ein falsches Tierprofil ist harmlos, ein
+     rassistisches Menschenprofil nicht. */
+  const tierWiderspruch = pruefeTierWiderspruch(subject, description || "");
+
   /* Stage 3a: Tier-Easter-Egg-Pfad (nur Tier im Bild) */
-  if (description && !hasPerson && hasAnimal) {
+  if (description && ((!hasPerson && hasAnimal) || tierWiderspruch.widerspruch)) {
     const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
     return {
       result: {
@@ -243,8 +251,21 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   const visibleText = extractVisibleText(enrichedDescription);
   const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: enrichedDescription });
 
+  /* Netz gegen Tier-als-Mensch (v2.9.1) — siehe Begründung im 3-Call-Pfad oben. */
+  const tierWiderspruch = pruefeTierWiderspruch(subject, enrichedDescription);
+  if (tierWiderspruch.widerspruch) {
+    console.log(
+      JSON.stringify({
+        step: "tier-widerspruch",
+        traceId: job.traceId || null,
+        treffer: tierWiderspruch.treffer,
+        pipeline: "single-large",
+      })
+    );
+  }
+
   /* Tier-Easter-Egg: Nur reines Tier-Bild → vordefinierte Profile. */
-  if (enrichedDescription && !hasPerson && hasAnimal) {
+  if (enrichedDescription && ((!hasPerson && hasAnimal) || tierWiderspruch.widerspruch)) {
     const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
     return {
       result: {

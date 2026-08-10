@@ -86,6 +86,72 @@ function classifyDescription(description) {
   return { subject, hasPerson, hasAnimal, animalType };
 }
 
+/* ── Netz gegen Tier-als-Mensch ───────────────────────────────────────────
+   ANLASS (Vorfall in einem Workshop, gemeldet 2026-08-10): Ein Schueler hat
+   das Bild eines Affen hochgeladen, und das Modell hat daraus ein Profil eines
+   afrikanischen Kleinkindes erzeugt. Die Verwechslung Primat/schwarzer Mensch
+   ist ein dokumentiertes Muster in Bildmodellen (Google Photos 2015, dort nie
+   behoben — nur die Kategorie entfernt), kein Zufall dieses einen Bildes.
+
+   Die vorhandene Tiererkennung hat NICHT versagt: Sie folgt dem Feld `subject`,
+   und das Modell hatte HUMAN gemeldet. Eine zusaetzliche Vorpruefung "ist ein
+   Mensch im Bild?" wuerde deshalb nichts bringen — sie existiert bereits und
+   traefe dieselbe Fehlentscheidung.
+
+   Dieses Netz greift eine Ebene tiefer: Wenn das Modell HUMAN meldet, aber im
+   Text Merkmale beschreibt, die es bei Menschen nicht gibt, ist die Antwort in
+   sich widerspruechlich — dann wird nicht ausgeliefert.
+
+   GRENZE, ehrlich benannt: Beschreibt das Modell durchgehend einen Menschen,
+   findet auch dieses Netz nichts. Es faengt die inkonsistenten Faelle, nicht
+   die vollstaendig falschen. Der Haupthebel bleibt die Regel im Prompt. */
+
+/* Begriffe, die es bei einem Menschen NICHT gibt. Bewusst eng gehalten:
+   Ein zu scharfer Filter blockiert echte Fotos, und das waere im Workshop
+   schlimmer als ein seltener Durchrutscher. */
+const TIER_MERKMALE = [
+  /\b(?:affe|affen|schimpanse|gorilla|orang-?utan|makake|menschenaffe|primat)\w*\b/i,
+  /\b(?:monkey|monkeys|chimpanzee|ape|apes|primate)\w*\b/i,
+  /\bschnauze\b|\bmuzzle\b|\bsnout\b/i,
+  /\b(?:pfote|pfoten|tatze|tatzen|kralle|krallen)\b/i,
+  /\b(?:paw|paws|claw|claws)\b/i,
+  /\bschnurrhaar\w*\b|\bwhiskers\b/i,
+  /\bfell\b|\bpelz\b|\bfur\b/i,
+];
+
+/* Ausnahmen: Woerter, die ein Tier-Merkmal enthalten, aber nichts damit zu tun
+   haben. "Pferdeschwanz" ist eine Frisur, "Fellweste" ein Kleidungsstueck,
+   "Katzenaugen" ein Make-up. Ohne diese Liste blockiert das Netz Alltagsfotos. */
+const KEIN_TIER = [
+  /pferdeschwanz|ponytail/i,
+  /fell(?:weste|jacke|kragen|imitat|mantel|muetze|mütze)/i,
+  /kunstfell|fake ?fur|faux ?fur/i,
+  /katzenaugen|cat ?eye/i,
+];
+
+/**
+ * Widerspruchsprüfung: Meldet das Modell einen Menschen, obwohl es Tier-
+ * merkmale beschreibt?
+ *
+ * @param {string} subject — Wert aus classifyDescription
+ * @param {string} description — Beschreibungstext des Modells
+ * @returns {{ widerspruch: boolean, treffer: string|null }}
+ */
+function pruefeTierWiderspruch(subject, description) {
+  const leer = { widerspruch: false, treffer: null };
+  if (subject !== "HUMAN" || !description || typeof description !== "string") return leer;
+
+  /* Erst die Ausnahmen entfernen, dann suchen — sonst schlägt "Pferdeschwanz"
+     über das enthaltene "Schwanz" an. */
+  const bereinigt = KEIN_TIER.reduce((text, re) => text.replace(new RegExp(re.source, "gi"), " "), description);
+
+  for (const re of TIER_MERKMALE) {
+    const m = bereinigt.match(re);
+    if (m) return { widerspruch: true, treffer: m[0] };
+  }
+  return leer;
+}
+
 /**
  * Sucht im Text nach Keywords für die unterstützten Tier-Typen und zählt die
  * Treffer pro Typ. Der Typ mit den MEISTEN Treffern gewinnt — so verliert ein
@@ -163,6 +229,7 @@ function buildAnimalProfiles(animalType, lang) {
 module.exports = {
   classifyDescription,
   detectAnimalType,
+  pruefeTierWiderspruch,
   buildAnimalProfiles,
   TYPE_KEYWORDS,
   VALID_SUBJECTS,

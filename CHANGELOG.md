@@ -4,6 +4,22 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.9.1] — 2026-08-10
+
+### Behoben
+
+- **Ein Affenbild wurde als Profil eines afrikanischen Kleinkindes analysiert.** Gemeldet aus einem Workshop, wo ein Schüler das Bild hochgeladen hat. Die Verwechslung Primat/schwarzer Mensch ist ein dokumentiertes Muster in Bildmodellen (Google Photos hat 2015 Schwarze als „Gorillas" einsortiert und das nie behoben, sondern nur die Kategorie entfernt) — kein Zufall dieses einen Bildes.
+
+  **Die vorhandene Tiererkennung hat dabei nicht versagt.** Der Prompt verlangt ein Pflichtfeld `subject`, bei `ANIMAL_ONLY` kommt statt eines Profils das Tier-Easter-Egg, und das läuft in beiden Pipelines. Das Modell hatte schlicht `HUMAN` gemeldet — ab da folgt die Erkennung korrekt einer Einschätzung, die schon falsch war. Eine zusätzliche Vorprüfung „ist ein Mensch im Bild?" würde deshalb nichts ändern; sie existiert bereits und träfe dieselbe Fehlentscheidung.
+
+  Zwei Änderungen setzen deshalb tiefer an:
+  - **Im Prompt** eine Merkmals-Prüfliste vor der Festlegung (Fell statt Haut, Schnauze statt Nase, Pfoten statt Händen, Schwanz, Schnurrhaare, Ohrform) und die ausdrückliche Regel, dass Primaten **immer** `ANIMAL_ONLY` sind, niemals `HUMAN` — mit dem Hinweis, dass die Zuordnung zu einem Menschen ein schwerer, historisch belasteter Fehler ist. Bei Zweifel gilt `ANIMAL_ONLY`.
+  - **Serverseitig ein Netz** (`animal.js` `pruefeTierWiderspruch`): Meldet das Modell `HUMAN`, beschreibt im Text aber Fell, Schnauze, Pfoten oder einen Primaten, ist die Antwort in sich widersprüchlich — dann kommt das Tier-Easter-Egg statt eines erfundenen Menschenprofils. Ein falsches Tierprofil ist harmlos, ein rassistisches Menschenprofil nicht.
+
+  Bewusst eng gefasst, mit Ausnahmeliste für Pferdeschwanz, Fellweste, Kunstfell und Katzenaugen-Lidstrich: Ein zu scharfer Filter würde echte Fotos blockieren, und das wäre im Workshop schlimmer als ein seltener Durchrutscher. (+13 Tests)
+
+  **Grenze, die dazugehört:** Beschreibt das Modell durchgehend einen Menschen, findet auch dieses Netz nichts. Es fängt die widersprüchlichen Fälle, nicht die vollständig falschen. Der Haupthebel bleibt die Regel im Prompt.
+
 ## [2.9.0] — 2026-08-10
 
 ### Hinzugefügt

@@ -141,3 +141,50 @@ describe("buildAnimalProfiles", () => {
     expect(normalProfile.profileText).toContain("Tier");
   });
 });
+
+describe("Netz gegen Tier-als-Mensch (v2.9.1)", () => {
+  const { pruefeTierWiderspruch } = require("../animal");
+
+  /* ANLASS: Ein Schüler hat das Bild eines Affen hochgeladen, das Modell hat
+     daraus ein Profil eines afrikanischen Kleinkindes erzeugt. Die vorhandene
+     Tiererkennung folgt dem Feld `subject` — und das Modell hatte HUMAN
+     gemeldet. Dieses Netz prüft eine Ebene tiefer: Beschreibt die Antwort
+     Merkmale, die es bei Menschen nicht gibt, obwohl HUMAN dasteht? */
+
+  test.each([
+    ["Ein Affe sitzt auf einem Ast.", "affe"],
+    ["Das Gesicht eines Schimpansen, frontal.", "schimpanse"],
+    ["A gorilla looking at the camera.", "gorilla"],
+    ["Das Tier hat eine lange Schnauze.", "schnauze"],
+    ["Die Pfoten liegen auf dem Boden.", "pfoten"],
+    ["Dichtes Fell bedeckt den Körper.", "fell"],
+  ])("erkennt den Widerspruch in %s", (text) => {
+    const r = pruefeTierWiderspruch("HUMAN", text);
+    expect(r.widerspruch).toBe(true);
+    expect(typeof r.treffer).toBe("string");
+  });
+
+  test("greift NICHT, wenn das Modell ohnehin ein Tier gemeldet hat", () => {
+    /* Dann läuft der reguläre Easter-Egg-Pfad — kein Grund einzugreifen. */
+    expect(pruefeTierWiderspruch("ANIMAL_ONLY", "Ein Hund mit Fell.").widerspruch).toBe(false);
+    expect(pruefeTierWiderspruch("MIXED", "Frau mit Hund, Pfoten sichtbar.").widerspruch).toBe(false);
+  });
+
+  test.each([
+    ["Sie trägt ihre Haare zu einem Pferdeschwanz gebunden."],
+    ["Er trägt eine Fellweste über dem Hemd."],
+    ["Die Jacke hat einen Fellkragen aus Kunstfell."],
+    ["Sie hat Katzenaugen als Lidstrich geschminkt."],
+  ])("blockiert kein echtes Foto: %s", (text) => {
+    /* Ein zu scharfer Filter wäre im Workshop schlimmer als ein seltener
+       Durchrutscher — diese Wörter enthalten Tier-Begriffe, meinen aber
+       Frisur, Kleidung oder Make-up. */
+    expect(pruefeTierWiderspruch("HUMAN", text).widerspruch).toBe(false);
+  });
+
+  test("kommt mit leerer oder fehlender Beschreibung klar", () => {
+    expect(pruefeTierWiderspruch("HUMAN", "").widerspruch).toBe(false);
+    expect(pruefeTierWiderspruch("HUMAN", null).widerspruch).toBe(false);
+    expect(pruefeTierWiderspruch(null, "Ein Affe.").widerspruch).toBe(false);
+  });
+});

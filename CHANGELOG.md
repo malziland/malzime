@@ -4,6 +4,16 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.9.2] — 2026-08-10
+
+### Geändert
+
+- **Fünf von sieben Abhängigkeits-Ausnahmen entfernt.** Diese `overrides` zwingen ein Paket, eine bestimmte Version einer tief liegenden Abhängigkeit zu nutzen — nötig, solange dort eine Sicherheitslücke steckt, die der Hersteller noch nicht selbst geschlossen hat. Nachgemessen mit entfernten Ausnahmen in einer Arbeitskopie: `glob`, `test-exclude`, `rimraf` und `brace-expansion` (Root **und** functions) melden inzwischen **keine Schwachstelle mehr** — die Pakete haben nachgezogen, die Ausnahmen hielten nur noch Versionen fest, die ohnehin kämen.
+
+  **Übrig bleiben zwei, die wirklich etwas tun:** `uuid ^11.1.1` verhindert allein sieben Meldungen (Puffergrößen-Prüfung, GHSA-w5hq-g745-h8pq; die Kette läuft über Google-Cloud-Storage bis firebase-functions), und die Kopplung `firebase-functions → firebase-admin: $firebase-admin` hält beide auf derselben Version.
+
+  Bewusst in Kauf genommen: Ohne die Ausnahmen zieht npm bei einigen Nebenpaketen wieder ältere Stände (z.B. `cliui` 9.0.0 → 8.0.2). Der Zweck dieser Sonderregeln ist Sicherheit, nicht Aktualität — und ungepflegte Sonderregeln sind selbst eine Fehlerquelle. `npm audit` bleibt in beiden Projekten bei 0/0, mit und ohne Entwicklungspakete. Die Lockfile-Falle wurde geprüft (`npm ci --dry-run` in Root und functions, beide exit 0).
+
 ## [2.9.1] — 2026-08-10
 
 ### Behoben

@@ -27,8 +27,5 @@
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "vitest": "^4.1.9"
-  },
-  "overrides": {
-    "brace-expansion": "^5.0.9"
   }
 }

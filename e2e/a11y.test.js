@@ -112,4 +112,23 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
   await expect(page.locator(".cat-card").first()).toBeVisible();
 
   await checkA11y(page, "Profil-Ansicht");
+
+  /* TEST-003 (Audit 2026-08-10): Beast Mode wurde nie gemessen.
+     Das Umschalten wechselt das GESAMTE Farbschema (data-theme="dark") — ein
+     Kontrastproblem dort fiel durch jede Pruefung, obwohl das Gate als „ohne
+     Ausnahmen" gilt. Und der Beast Mode ist im Workshop die Haelfte der
+     Nutzung; er ist der Modus, um den es didaktisch geht. */
+  /* Die Checkbox ist visuell durch den Schalter ersetzt und daher nicht
+     direkt klickbar — wie in sticky-toggle.test.js ueber das Element selbst. */
+  await page.evaluate(() => document.getElementById("biasSwitch").click());
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator(".cat-card").first()).toBeVisible();
+
+  await checkA11y(page, "Profil-Ansicht im Beast Mode");
+
+  /* Und der geklebte Umschalter im gescrollten Zustand — er liegt dann ueber
+     dem Inhalt und war ebenfalls nie gemessen. */
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  await page.waitForTimeout(300);
+  await checkA11y(page, "Beast Mode, Umschalter geklebt");
 });

@@ -72,12 +72,11 @@ exports.telemetry = onRequest(
   handleTelemetry
 );
 
-/* ── Queue-Architektur (v2.0) ──
-   Der Live-Pfad: Seit v2.0 laeuft jeder Upload ueber diese Functions
-   (Feature-Flag `useQueue` in Firestore featureFlags/current, live true).
-   Bei useQueue=false faellt alles auf den synchronen /analyze-Pfad
-   zurueck — der Rueckfall-Hebel ohne Deploy (docs/RUNBOOK.md, Hebel 2).
-   Siehe docs/ARCHITECTURE.md, Abschnitt Queue-Architektur. */
+/* ── Queue-Architektur ──
+   Der einzige Weg: Jeder Upload laeuft ueber diese Functions. Der frueher
+   frueher vorhandene synchrone Rueckfall ist mit v2.10 ersatzlos abgebaut;
+   als Betriebshebel dient jetzt der Wartungsmodus (docs/RUNBOOK.md, Hebel 1).
+   Siehe docs/ARCHITECTURE.md. */
 
 /* enqueue — public Annahme-Endpoint: validiert, speichert das Bild,
    legt den Job an und reiht ihn in Cloud Tasks ein. */
@@ -131,8 +130,7 @@ exports.jobStatus = onRequest(
 /* reapJobs — geplanter Lauf (jede Minute): markiert wartende Jobs, deren
    Client nicht mehr pollt, als `abandoned`, gibt ihren Warteschlangen-Platz
    frei und loescht ihr Bild. Siehe handle-reap.js. Laeuft auch, wenn die
-   Queue per Flag deaktiviert ist (useQueue=false, Rueckfall auf /analyze) —
-   dann ein leerer, vernachlaessigbarer Query. */
+   */
 exports.reapJobs = onSchedule(
   {
     region: "europe-west1",

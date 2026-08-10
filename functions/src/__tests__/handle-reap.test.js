@@ -2,6 +2,7 @@
 
 jest.mock("../jobs", () => ({
   findAbandonedJobs: jest.fn(),
+  findUeberfaelligeJobs: jest.fn(),
   findStaleProcessingJobs: jest.fn(),
   findExpiredJobs: jest.fn(),
   abandonJob: jest.fn(),
@@ -23,6 +24,7 @@ const counter = require("../counter");
 beforeEach(() => {
   jest.clearAllMocks();
   jobs.findAbandonedJobs.mockResolvedValue([]);
+  jobs.findUeberfaelligeJobs.mockResolvedValue([]);
   jobs.findStaleProcessingJobs.mockResolvedValue([]);
   jobs.findExpiredJobs.mockResolvedValue([]);
   jobs.abandonJob.mockResolvedValue(true);
@@ -35,7 +37,7 @@ beforeEach(() => {
 describe("reapJobs", () => {
   test("leerer Lauf — nichts zu tun", async () => {
     const result = await reapJobs();
-    expect(result).toEqual({ abandoned: 0, staleProcessing: 0, expired: 0 });
+    expect(result).toEqual({ abandoned: 0, staleProcessing: 0, expired: 0, ueberfaellig: 0 });
     expect(jobs.abandonJob).not.toHaveBeenCalled();
     expect(jobs.failJob).not.toHaveBeenCalled();
     expect(jobs.deleteJob).not.toHaveBeenCalled();
@@ -85,7 +87,7 @@ describe("reapJobs", () => {
     jobs.findStaleProcessingJobs.mockResolvedValue([{ id: "p1", imagePath: "p" }]);
     jobs.findExpiredJobs.mockResolvedValue([{ id: "e1" }]);
     const result = await reapJobs();
-    expect(result).toEqual({ abandoned: 1, staleProcessing: 1, expired: 1 });
+    expect(result).toEqual({ abandoned: 1, staleProcessing: 1, expired: 1, ueberfaellig: 0 });
   });
 
   test("ein einzelner fehlschlagender Job stoppt den Lauf nicht", async () => {
@@ -96,5 +98,40 @@ describe("reapJobs", () => {
     jobs.abandonJob.mockResolvedValueOnce(true).mockRejectedValueOnce(new Error("firestore blip"));
     const result = await reapJobs();
     expect(result.abandoned).toBe(1);
+  });
+});
+
+describe("SEC-003 — Jobs, die nur durch Pollen am Leben bleiben", () => {
+  /* Jeder Poll erneuert `lastSeenAt`, deshalb sieht Zweig (1) sie nie. Ohne
+     Obergrenze kann jemand 500 Mini-Uploads anlegen, im Takt weiterfragen und
+     damit das ganze Stundenfenster dauerhaft blockieren — ohne dass je ein
+     Platz zurückkommt. */
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jobs.findAbandonedJobs.mockResolvedValue([]);
+    jobs.findUeberfaelligeJobs.mockResolvedValue([]);
+    jobs.findStaleProcessingJobs.mockResolvedValue([]);
+    jobs.findExpiredJobs.mockResolvedValue([]);
+    jobs.abandonJob.mockResolvedValue(true);
+    jobs.failJob.mockResolvedValue(true);
+    jobs.deleteJob.mockResolvedValue(true);
+  });
+
+  test("überfälliger Job wird abgebrochen, Platz und Bild kommen zurück", async () => {
+    jobs.findUeberfaelligeJobs.mockResolvedValue([{ id: "u1", imagePath: "queue-uploads/u1.jpg" }]);
+    const r = await reapJobs();
+    expect(jobs.abandonJob).toHaveBeenCalledWith("u1");
+    expect(counter.releaseHourlySlot).toHaveBeenCalled();
+    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/u1.jpg");
+    expect(r.ueberfaellig).toBe(1);
+  });
+
+  test("verliert der Übergang das Rennen, bleibt alles unangetastet", async () => {
+    jobs.findUeberfaelligeJobs.mockResolvedValue([{ id: "u2", imagePath: "queue-uploads/u2.jpg" }]);
+    jobs.abandonJob.mockResolvedValue(false);
+    const r = await reapJobs();
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(counter.releaseHourlySlot).not.toHaveBeenCalled();
+    expect(r.ueberfaellig).toBe(0);
   });
 });

@@ -45,7 +45,7 @@ async function getFeatureFlags() {
      Lauf dient ja gerade ihrem Test. Single-Large-Call bleibt im Lokal-Modus
      standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
      Kein Firestore-Read, kein Seeding nötig. */
-  if (isLocalQueueMode()) return { useSingleLargeCall: false, usePromptCache: false };
+  if (isLocalQueueMode()) return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true };
 
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
@@ -55,12 +55,22 @@ async function getFeatureFlags() {
     const flags = {
       useSingleLargeCall: data.useSingleLargeCall === true,
       usePromptCache: data.usePromptCache === true,
+      /* OPS-009 (Audit 2026-08-10): Notausschalter fuer den zweiten
+         Mistral-Aufruf. Fehlt das Feld, ist er AN — der Zweitaufruf ist der
+         Normalbetrieb seit v2.8. Ausschalten kostet nur die bessere
+         Beast-Werbung; die Analyse laeuft unveraendert weiter. Gebraucht wird
+         er, wenn die Anfragen pro Minute knapp werden: Er verdoppelt sie, und
+         bisher gab es keinen Weg, ihn ohne Deploy stillzulegen. */
+      useBeastAdsCall: data.useBeastAdsCall !== false,
     };
     cache = { data: flags, expiresAt: now + CACHE_TTL_MS };
     return flags;
   } catch (err) {
     console.log(JSON.stringify({ warning: "feature-flags-read-error", error: err.message }));
-    return { useSingleLargeCall: false, usePromptCache: false };
+    /* Fail-safe: bewaehrte Pipeline, kein Cache — der Zweitaufruf bleibt aber
+       AN, denn er ist der Normalbetrieb und sein Ausfall waere ein stiller
+       Qualitaetsverlust statt einer Absicherung. */
+    return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true };
   }
 }
 
@@ -81,6 +91,13 @@ async function isPromptCacheEnabled() {
   return (await getFeatureFlags()).usePromptCache;
 }
 
+/**
+ * Kurzform: Soll der zweite Mistral-Aufruf fuer die Beast-Werbung laufen?
+ */
+async function isBeastAdsCallEnabled() {
+  return (await getFeatureFlags()).useBeastAdsCall;
+}
+
 /* Nur für Tests — Cache zurücksetzen. */
 function _clearCache() {
   cache = { data: null, expiresAt: 0 };
@@ -90,6 +107,7 @@ module.exports = {
   getFeatureFlags,
   isSingleLargeCallEnabled,
   isPromptCacheEnabled,
+  isBeastAdsCallEnabled,
   FLAGS_DOC,
   _clearCache,
 };

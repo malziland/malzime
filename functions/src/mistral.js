@@ -630,7 +630,7 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
     const stages = [];
     const parsed = parseSafely(result.text, {
       onRepair: (stage, err) => {
-        stages.push(stage + (err ? `:${err.message.slice(0, 60)}` : ""));
+        stages.push(stage + (err ? `:${err.name || "Error"}` : ""));
       },
     });
 
@@ -887,14 +887,41 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   const ads = Array.isArray(parsed.ad_targeting) ? parsed.ad_targeting : [];
   const triggers = Array.isArray(parsed.manipulation_triggers) ? parsed.manipulation_triggers : [];
 
+  /* BIZ-001 (Audit 2026-08-10): Der Anker aus hard_facts wird VORANGESTELLT,
+     nicht mehr eingesetzt. Vorher ueberschrieb er den ganzen Kartenwert — und
+     warf damit den zweiten Satz weg, den der Prompt ausdruecklich verlangt:
+     das konkrete, im Workshop vorfuehrbare Merkmal ("Deine Wangen sind noch
+     rund und die Zaehne wirken gross fuers Gesicht"). Die v2.9-Messung
+     "100 % Antworten mit konkretem Merkmal" wurde an der Modellantwort
+     erhoben, nicht am ausgelieferten Ergebnis — auf der Karte kam sie nie an.
+     Nebeneffekt vorher: Standard- und Beast-Modus zeigten an dieser Karte
+     denselben nackten Anker. */
+  function mitAnkerVoran(anker, modellwert) {
+    const a = String(anker || "")
+      .trim()
+      .replace(/[.\s]+$/, "");
+    if (!a) return String(modellwert || "");
+    /* Der erste Satz der Modellantwort SOLL der Anker sein — er wird durch die
+       verbindliche Fassung ersetzt, alles DANACH bleibt erhalten.
+       Hat die Antwort gar keinen Satzabschluss, gibt es auch keinen zweiten
+       Satz: dann bleibt es beim reinen Anker wie bisher, statt den Anker
+       doppelt zu schreiben. */
+    const m = String(modellwert || "").match(/^[^.!?]*[.!?]\s*(.+)$/s);
+    const rest = m ? m[1].trim() : "";
+    return rest ? `${a}. ${rest}` : a;
+  }
+
   function buildProfile(modeKey) {
     const src = parsed[modeKey];
     if (!src || !src.categories) return null;
     if (hardFacts.alter_geschlecht && src.categories.alter_geschlecht) {
-      src.categories.alter_geschlecht.value = hardFacts.alter_geschlecht;
+      src.categories.alter_geschlecht.value = mitAnkerVoran(
+        hardFacts.alter_geschlecht,
+        src.categories.alter_geschlecht.value
+      );
     }
     if (hardFacts.herkunft && src.categories.herkunft) {
-      src.categories.herkunft.value = hardFacts.herkunft;
+      src.categories.herkunft.value = mitAnkerVoran(hardFacts.herkunft, src.categories.herkunft.value);
     }
     /* v2.7: ad_targeting kommt jetzt PRO MODUS aus dem Modell — Standard zeigt
        den passenden Lebensstil, Beast beutet die benannte Schwachstelle aus.
@@ -934,6 +961,12 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     boost: buildProfile("beast"),
     subject,
     visibleText,
+    /* Der verbindliche Altersanker aus hard_facts, getrennt von der Karte.
+       Der Kinderschutz-Filter liest sein Alter hieraus statt aus dem
+       Kartentext — seit BIZ-001 steht dort naemlich auch der Beleg-Satz, und
+       eine Zahl darin ("der Kopf passt 7-mal in die Koerperhoehe") wuerde die
+       Altersauslese sonst nach unten ziehen. */
+    alterAnker: hardFacts.alter_geschlecht || null,
   };
 }
 
@@ -946,13 +979,14 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
    Der Aufruf ist klein (~870 Tokens) und laeuft auf demselben Modell wie die
    Analyse. Faellt er aus, bleibt die Werbung aus dem Hauptaufruf stehen — eine
    Analyse darf daran NIE scheitern. */
-async function generateBeastAds(boostProfile, standardAds, lang) {
+async function generateBeastAds(boostProfile, standardAds, lang, opts = {}) {
+  const cachenErlaubt = opts.usePromptCache !== false;
   if (!boostProfile || !boostProfile.categories) return null;
   const prompts = loadPrompts(lang || "de");
-  if (typeof prompts.beastAdsPrompt !== "function") return null;
+  if (typeof prompts.beastAdsSystem !== "string" || typeof prompts.beastAdsUser !== "function") return null;
 
   const c = boostProfile.categories;
-  const prompt = prompts.beastAdsPrompt({
+  const nutzerteil = prompts.beastAdsUser({
     alter: c.alter_geschlecht?.value || "",
     verletzlichkeit: c.verletzlichkeit?.value || "",
     gesundheit: c.gesundheit?.value || "",
@@ -964,14 +998,21 @@ async function generateBeastAds(boostProfile, standardAds, lang) {
   try {
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — gleiches Modell wie die Analyse */,
-      messages: [{ role: "user", content: prompt }],
+      /* OPS-008: system = konstante Anweisungen, user = nur das Profil.
+         Der Cache greift ausschliesslich auf einem konstanten Anfang. */
+      messages: [
+        { role: "system", content: prompts.beastAdsSystem },
+        { role: "user", content: nutzerteil },
+      ],
       maxTokens: 600,
       temperature: 0.5,
       forceJSON: true,
       timeoutMs: 30_000,
-      /* Der Anweisungsteil ist konstant, nur das Profil dahinter wechselt —
-         damit ist der Anfang cachebar. Konstanter Text, kein Nutzerbezug. */
-      cacheKey: `malzime-beast-ads-${lang || "de"}`,
+      /* Der Cache-Schluessel wird nur gesetzt, wenn das Flag es erlaubt —
+         sonst behauptete RUNBOOK-Hebel 3b faelschlich, nach dem Umlegen werde
+         "weder ein prompt_cache_key gesendet noch der Nachrichten-Aufbau
+         umgestellt" (Audit OPS-008). */
+      cacheKey: cachenErlaubt ? `malzime-beast-ads-${lang || "de"}` : null,
     });
     const parsed = parseSafely(result.text, { requireSchema: false });
     const ads = Array.isArray(parsed?.ad_targeting)
@@ -991,7 +1032,21 @@ async function generateBeastAds(boostProfile, standardAds, lang) {
     return ads.length ? ads : null;
   } catch (err) {
     /* Bewusst still: Der Hauptpfad hat bereits eine Werbeliste. */
-    console.log(JSON.stringify({ step: "mistral-beast-ads", status: "failed", error: err.message }));
+    /* OPS-004 (Audit 2026-08-10): console.error statt console.log — das ergibt
+       severity ERROR in Cloud Logging und faellt damit unter die bestehende
+       Alarm-Policy. Vorher war ein dauerhaft fehlschlagender Zweitaufruf
+       voellig unsichtbar: Der Fallback greift, der Nutzer merkt nichts, und
+       jede Analyse liefe still mit der schlechteren Werbung aus dem
+       Hauptaufruf. Der Fallback selbst bleibt unveraendert richtig. */
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        alert: "beast-ads-failed",
+        step: "mistral-beast-ads",
+        status: "failed",
+        error: err.message,
+      })
+    );
     return null;
   }
 }
@@ -1018,7 +1073,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     const stages = [];
     const parsed = parseSafely(result.text, {
       requireSchema: false /* unser Schema unterscheidet sich vom Live-Schema (categories sitzt unter standard/beast) */,
-      onRepair: (stage, err) => stages.push(stage + (err ? `:${err.message.slice(0, 60)}` : "")),
+      onRepair: (stage, err) => stages.push(stage + (err ? `:${err.name || "Error"}` : "")),
     });
     console.log(
       JSON.stringify({

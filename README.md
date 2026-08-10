@@ -57,8 +57,7 @@ public/                     Firebase Hosting (SPA, kein Build-Schritt)
 functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)
   index.js                  Cloud-Function-Exports + Firebase Secret Bindings
   config.js                 Konstanten + Mistral-Modell-IDs + Limits
-  handle-analyze.js         Synchrone Analyse-Pipeline (Mistral-only)
-  handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
+    handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
   handle-stats.js           Stats-Endpunkt
   handle-errors.js          Anonymes Client-Fehler-Logging (whitelist-validiert, keine PII, severity ERROR)
   handle-telemetry.js       Anonyme Success-/Performance-Telemetrie (Spiegel zu handle-errors.js, severity INFO)
@@ -74,8 +73,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   mistral.js                Mistral AI: aktiv Single-Large-Call (Large erstellt Beschreibung + beide Profile); 3-Call-Hybrid (Large Describe + Small Profile) als Fallback
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
-  heartbeat.js              Chunked-Response-Heartbeat: haelt lange Analyse-Antworten offen (Safari kappt Streams nach ~47 s)
-  animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
+    animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
   privacy.js                OCR-Privacy-Risiken aus Mistrals "Sichtbarer Text"
   counter.js                Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance
   auth.js                   HMAC-basierte Admin-Token + Nonces
@@ -112,7 +110,7 @@ Datenschutz ist kein Feature — es ist das Fundament:
 - **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
 - **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK
 - **Bot-Schutz ohne Tracking**: Rate Limiting (IP), Honeypot-Feld, Timing-Check
-- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + `api.malzi.me` (eigener Sync-Endpunkt)
+- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + `/api/…` (gleiche Domain)
 
 ## Schnellstart
 
@@ -222,10 +220,10 @@ zurueckkehrt, und ein Neuladen funktioniert ebenfalls.
 ## Tests
 
 ```bash
-# Backend (Jest, 439 Tests)
+# Backend (Jest, 611 Tests)
 cd functions && npm test
 
-# Frontend (Vitest + jsdom, 165 Tests)
+# Frontend (Vitest + jsdom, 193 Tests)
 npm run test:frontend
 
 # E2E (Playwright, 5 Tests)
@@ -242,9 +240,9 @@ cd functions && npm run format:check   # Backend Prettier
 npm run format:frontend:check          # Frontend Prettier
 ```
 
-**Backend (439 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
+**Backend (611 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
 
-**Frontend (165 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
+**Frontend (193 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
 
 **E2E (5 Tests):** Playwright — Smoke-Tests (Demo-Flow, fehlerfreies Laden), axe-A11y-Gate (Startseite + Profil-Ansicht) und Tastatur-Durchlauf.
 

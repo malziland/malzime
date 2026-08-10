@@ -95,4 +95,41 @@ describe("handle-process-job — PRIV-002 (Single-Large Datenschutz-Warnung)", (
     expect(success).toBe(true);
     expect(Array.isArray(result.privacyRisks)).toBe(true);
   });
+
+  /* ── Regressionsschutz zum Audit-Befund BUG-001 (2026-08-10) ──────────────
+     Bis v2.9.1 lief hier eine Widerspruchspruefung, die NICHT die Bild-
+     beschreibung des Modells prüfte, sondern den daraus erzeugten Profiltext
+     (der im Single-Large-Pfad aus profileText + allen Kartenwerten
+     zusammengesetzt wird). Ein Jugendlicher mit „Apex Legends" in den
+     Interessen bekam dadurch statt seiner Analyse ein Tier-Profil — „ape"
+     steckte im Wortstamm. Umgekehrt griff sie beim echten Affenbild nie.
+
+     Diese Tests halten fest: Solange das Modell HUMAN meldet, bleibt es ein
+     Menschenprofil — egal welche Wörter im Text stehen. */
+
+  test.each([
+    ["Gaming", "Du spielst Apex Legends und Fortnite jeden Abend."],
+    ["Impulskauf", "Du handelst aus dem Affekt heraus und kaufst impulsiv."],
+    ["Winterjacke", "Der Kragen deiner Jacke ist mit Fell besetzt."],
+    ["Redewendung", "Du hast die Schnauze voll von Werbung."],
+    ["Englisch", "She wears a fur coat and a fur hat."],
+  ])("HUMAN bleibt HUMAN, auch bei Tier-Wörtern im Profiltext: %s", async (_name, text) => {
+    mistral.runSingleLargeCall.mockResolvedValue({
+      normal: {
+        categories: {
+          alter_geschlecht: { value: "Du bist männlich, ~15 (Spanne 13-17).", label: "Alter", confidence: 0.7 },
+          interessen: { value: text, label: "Interessen", confidence: 0.8 },
+        },
+        profileText: text,
+        ad_targeting: [],
+        manipulation_triggers: [],
+      },
+      boost: profileWithCategory(),
+      subject: "HUMAN",
+      visibleText: "",
+    });
+    const { result } = await runPipeline({ lang: "de", exif: {}, imagePath: "p" });
+    expect(result.meta.mode).toBe("multimodal");
+    expect(result.meta.mode).not.toBe("animal");
+  });
 });

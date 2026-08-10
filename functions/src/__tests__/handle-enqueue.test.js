@@ -14,6 +14,7 @@ jest.mock("../middleware", () => ({
 jest.mock("../jobs", () => ({
   createJob: jest.fn(),
   failJob: jest.fn(),
+  countQueuedJobs: jest.fn(() => Promise.resolve(0)),
 }));
 jest.mock("../queue-storage", () => ({
   storeImage: jest.fn(),
@@ -32,6 +33,7 @@ const middleware = require("../middleware");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const tasks = require("../cloud-tasks");
+const { MAX_QUEUE_DEPTH } = require("../config");
 
 const VALID_JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(20)]);
 
@@ -235,5 +237,162 @@ describe("handleEnqueue — Ausfall zwischen Slot und Task", () => {
     expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
     expect(tasks.enqueueJob).not.toHaveBeenCalled();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Audit 2026-08-10 — SEC-002 und ARCH-001
+   ══════════════════════════════════════════════════════════════════════ */
+
+describe("SEC-002 — Größe aus der Kopfzeile", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    counter.getMaintenanceStatus.mockResolvedValue({ enabled: false });
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
+    jobs.countQueuedJobs.mockResolvedValue(0);
+    middleware.checkRateLimit.mockReturnValue(true);
+  });
+
+  test("übergroßer Rumpf wird mit 413 abgelehnt, bevor gezählt oder gespeichert wird", async () => {
+    /* Die Laufzeit liest den Rumpf VORAB vollständig ein — gemessen rund
+       170 MB Arbeitsspeicher je gleichzeitiger Anfrage bei 512 MiB Grenze.
+       Die Prüfung weiter unten kommt dafür zu spät. */
+    const req = jsonReq();
+    req.headers["content-length"] = String(40 * 1024 * 1024); /* 40 MB */
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+
+    expect(res.statusCode).toBe(413);
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+    expect(storage.storeImage).not.toHaveBeenCalled();
+  });
+
+  test("normale Größe geht durch (Positivkontrolle)", async () => {
+    const req = jsonReq();
+    req.headers["content-length"] = String(200 * 1024);
+    jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
+    storage.storeImage.mockResolvedValue("pfad.jpg");
+    tasks.enqueueJob.mockResolvedValue();
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+
+    expect(res.statusCode).not.toBe(413);
+    expect(counter.checkAndIncrement).toHaveBeenCalled();
+  });
+});
+
+describe("ARCH-001 — Warteschlangen-Tiefe", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    counter.getMaintenanceStatus.mockResolvedValue({ enabled: false });
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
+    middleware.checkRateLimit.mockReturnValue(true);
+    storage.storeImage.mockResolvedValue("pfad.jpg");
+    jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
+    tasks.enqueueJob.mockResolvedValue();
+  });
+
+  test("bei zu tiefer Warteschlange wird ehrlich abgelehnt — ohne Stunden-Platz zu verbrauchen", async () => {
+    /* Ohne diese Bremse nimmt der Einlass Aufträge an, die den 30-Minuten-
+       Deckel des Browsers garantiert überschreiten: Der Teilnehmer sieht einen
+       Timeout, der Job läuft trotzdem und kostet Geld. */
+    jobs.countQueuedJobs.mockResolvedValue(MAX_QUEUE_DEPTH);
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(429);
+    expect(res.body.blocked).toBe("queueFull");
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+    expect(storage.storeImage).not.toHaveBeenCalled();
+  });
+
+  test("knapp unter der Grenze geht durch (Positivkontrolle)", async () => {
+    jobs.countQueuedJobs.mockResolvedValue(MAX_QUEUE_DEPTH - 1);
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.body && res.body.blocked).not.toBe("queueFull");
+    expect(counter.checkAndIncrement).toHaveBeenCalled();
+  });
+
+  test("klemmt die Abfrage, wird angenommen statt blockiert (fail-open)", async () => {
+    /* Eine Kapazitätsbremse darf nie zum Ausfall eskalieren. */
+    jobs.countQueuedJobs.mockRejectedValue(new Error("Firestore weg"));
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.body && res.body.blocked).not.toBe("queueFull");
+    expect(counter.checkAndIncrement).toHaveBeenCalled();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   TEST-002 (Audit 2026-08-10) — mit v2.10.0 verlorene Zusicherungen.
+
+   Der Abbau des synchronen Pfads hat `index.test.js` (595 Zeilen) ersatzlos
+   entfernt. Ein Teil der dortigen Prüfungen betraf aber Verhalten, das in
+   handle-enqueue.js UNVERÄNDERT weiterlebt: Zeichensatz-Prüfung des Base64,
+   413-Grenze, MIME-Liste, 100-Zeichen-Kappung der EXIF-Werte und die
+   Reihenfolge „Honeypot vor Zähler". Suchbefehle über den gesamten übrigen
+   Testbestand ergaben für jede dieser Zusicherungen null Treffer — sie sind
+   hier nachgezogen.
+   ══════════════════════════════════════════════════════════════════════ */
+
+describe("TEST-002 — nachgezogene Upload-Prüfungen", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    counter.getMaintenanceStatus.mockResolvedValue({ enabled: false });
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
+    jobs.countQueuedJobs.mockResolvedValue(0);
+    jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
+    middleware.checkRateLimit.mockReturnValue(true);
+    storage.storeImage.mockResolvedValue("pfad.jpg");
+    tasks.enqueueJob.mockResolvedValue();
+  });
+
+  test("Base64 mit Fremdzeichen → 400, nichts wird gezählt", async () => {
+    const req = jsonReq({ imageBase64: "<script>alert(1)</script>" });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toBe("Invalid image data");
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+  });
+
+  test("überlanges Base64 → 413", async () => {
+    const req = jsonReq({ imageBase64: "A".repeat(40 * 1024 * 1024) });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    expect(res.statusCode).toBe(413);
+    expect(res.body.error).toBe("File too large");
+  });
+
+  test("nicht erlaubter MIME-Typ → 400", async () => {
+    const req = jsonReq({ mimeType: "image/tiff" });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain("Invalid file type");
+  });
+
+  test("EXIF-Werte werden auf 100 Zeichen gekappt (SEC-006 aus dem Juni-Audit)", async () => {
+    const req = jsonReq({ exif: { make: "M".repeat(500), model: "X".repeat(500) } });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    const uebergeben = jobs.createJob.mock.calls[0][0].exif;
+    expect(uebergeben.make).toHaveLength(100);
+    expect(uebergeben.model).toHaveLength(100);
+  });
+
+  test("Honeypot läuft VOR dem Zähler — ein Bot verbraucht kein Budget", async () => {
+    /* Bräche die Reihenfolge, verbrennt jeder Bot-Aufruf einen Platz des
+       Stundenlimits. Ein einziger Scanner-Lauf könnte damit ein
+       Workshop-Kontingent leeren, bevor die erste Klasse hochlädt. */
+    const req = jsonReq({ website: "ich-bin-ein-bot" });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    expect(res.statusCode).toBe(403);
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+    expect(storage.storeImage).not.toHaveBeenCalled();
   });
 });

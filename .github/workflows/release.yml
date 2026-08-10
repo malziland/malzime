@@ -18,6 +18,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Tags werden gebraucht, damit die Kollisionspruefung unten
+          # `git rev-parse refs/tags/...` aufloesen kann. Ohne das ist der
+          # Checkout flach und ohne Tags — die Pruefung liefe ins Leere.
+          fetch-depth: 0
 
       - name: Neueste CHANGELOG-Version pruefen und Release anlegen
         env:
@@ -32,7 +37,24 @@ jobs:
           fi
           TAG="v$VERSION"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG existiert bereits — nichts zu tun."
+            # Der Tag ist schon da. Zeigt er auch auf DIESEN Stand? Wenn nicht,
+            # wurde eine bereits veroeffentlichte Nummer wiederverwendet — dann
+            # beschreibt der CHANGELOG-Abschnitt anderen Code als der gleich-
+            # namige Tag, und ein Rollback ueber den Tag landet am falschen
+            # Stand. Genau das ist am 2026-08-10 passiert: v2.9.2 zeigte auf
+            # einen Stand, der Minuten spaeter zurueckgenommen wurde
+            # (Audit 2026-08-10, OPS-002). Frueher stieg der Lauf hier still
+            # mit Erfolg aus und hat die Fehlzuordnung nie gemeldet.
+            # --verify ist wichtig: ohne das gibt git bei unbekanntem Tag den
+            # Suchbegriff selbst aus statt zu scheitern, und die Pruefung
+            # schluege faelschlich an.
+            TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || echo "")"
+            if [ -n "$TAG_SHA" ] && [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
+              echo "::error::Version $VERSION steht oben im CHANGELOG, aber Tag $TAG zeigt auf $TAG_SHA statt auf $GITHUB_SHA."
+              echo "::error::Eine veroeffentlichte Versionsnummer darf nicht wiederverwendet werden — bitte die naechste freie Nummer vergeben."
+              exit 1
+            fi
+            echo "Release $TAG existiert bereits und zeigt auf diesen Stand — nichts zu tun."
             exit 0
           fi
           # Release-Notizen = der Abschnitt genau dieser Version

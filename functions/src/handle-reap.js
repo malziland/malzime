@@ -22,13 +22,11 @@
  * Bei (1) und (2) wird das zwischengespeicherte Bild mitgelöscht (die GCS-
  * Lifecycle-Regel bleibt nur das Sicherheitsnetz).
  *
- * Ist die Queue per Flag deaktiviert (`useQueue` = false, Rückfall auf den
- * synchronen /analyze-Pfad), gibt es keine Jobs — der Lauf ist dann ein
- * leerer, vernachlässigbar günstiger Query.
  */
 
 const {
   findAbandonedJobs,
+  findUeberfaelligeJobs,
   findStaleProcessingJobs,
   findExpiredJobs,
   abandonJob,
@@ -75,11 +73,42 @@ async function reapJobs() {
     }
   }
 
+  /* (2b) SEC-003: Jobs, die nur noch durch Pollen am Leben gehalten werden.
+     Jeder Poll erneuert `lastSeenAt`, deshalb sieht Zweig (1) sie nie. Ohne
+     diese Grenze kann jemand 500 Mini-Uploads anlegen, im Takt weiterfragen und
+     damit das komplette Stundenfenster dauerhaft blockieren — ohne dass je ein
+     Platz zurueckkommt. Nach 35 Minuten wartet niemand mehr ernsthaft; der
+     Browser gibt bereits nach 30 auf. */
+  const ueberfaellig = await findUeberfaelligeJobs(REAP_BATCH_LIMIT);
+  let reapedUeberfaellig = 0;
+  for (const job of ueberfaellig) {
+    try {
+      const ok = await abandonJob(job.id);
+      if (!ok) continue;
+      await releaseHourlySlot();
+      await deleteImage(job.imagePath);
+      reapedUeberfaellig += 1;
+    } catch (err) {
+      console.log(JSON.stringify({ step: "reap", jobId: job.id, warning: "overdue-failed", error: err.message }));
+    }
+  }
+
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
   const expired = await findExpiredJobs(REAP_BATCH_LIMIT);
   let reapedExpired = 0;
   for (const job of expired) {
     try {
+      /* BUG-002 (Audit 2026-08-10): Zuerst das Bild, dann das Dokument.
+         Mit dem Dokument verschwindet `imagePath` — danach kennt niemand mehr
+         den Pfad, und ein Bild, das ein anderer Pfad liegen gelassen hat,
+         waere endgueltig verwaist. Dieser Zweig sieht JEDEN abgelaufenen Job
+         unabhaengig vom Status und ist damit die einzige Stelle, die jede
+         denkbare Waise erwischt: Stirbt der Worker hart, kippt der erste
+         Client-Poll den Job ueber `markFailedIfStale` auf `failed` — ohne
+         Loeschung — und Zweig (2) sucht nur nach `processing`, findet ihn also
+         nie wieder. Deckelt die Verweildauer auf 2 h statt auf die
+         Lifecycle-Regel (1 Tag). */
+      if (job.imagePath) await deleteImage(job.imagePath);
       await deleteJob(job.id);
       reapedExpired += 1;
     } catch (err) {
@@ -90,9 +119,20 @@ async function reapJobs() {
   }
 
   console.log(
-    JSON.stringify({ step: "reap", abandoned: reapedAbandoned, staleProcessing: reapedStale, expired: reapedExpired })
+    JSON.stringify({
+      step: "reap",
+      abandoned: reapedAbandoned,
+      staleProcessing: reapedStale,
+      expired: reapedExpired,
+      ueberfaellig: reapedUeberfaellig,
+    })
   );
-  return { abandoned: reapedAbandoned, staleProcessing: reapedStale, expired: reapedExpired };
+  return {
+    abandoned: reapedAbandoned,
+    staleProcessing: reapedStale,
+    expired: reapedExpired,
+    ueberfaellig: reapedUeberfaellig,
+  };
 }
 
 module.exports = { reapJobs };

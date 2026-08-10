@@ -126,10 +126,34 @@ const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
 const ENQUEUE_TIMEOUT_MS = 90000;
 const POLL_TIMEOUT_MS = 30000;
 
+/* BUG-003 (offen seit dem KURZAUDIT 07/2026, geschlossen 08/2026): Der Timer
+   lief frueher im `.finally()` der fetch-Promise aus — also sobald die
+   Kopfzeilen da waren. Bricht die Verbindung danach mitten im Antwort-Rumpf ab,
+   ohne sich zu schliessen (typisch beim Zellenwechsel im Schulgebaeude), settelt
+   `resp.json()` nie und die Warteschleife friert lautlos ein.
+   Jetzt laeuft der Timer weiter, bis der Rumpf gelesen ist: `fetchWithTimeout`
+   liefert die Antwort samt einer `jsonMitTimeout()`-Methode, die den Abbruch
+   mit abdeckt. */
 function fetchWithTimeout(url, options, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+  return fetch(url, { ...options, signal: controller.signal }).then(
+    (resp) => {
+      const roh = typeof resp.json === "function" ? resp.json.bind(resp) : null;
+      /* Bei Fehlerantworten ist der Rumpf klein und wird ueber clone() gelesen —
+         da braucht es keinen laufenden Timer mehr. Nur im Erfolgsfall bleibt er
+         scharf, bis der Rumpf tatsaechlich gelesen ist. */
+      if (!resp.ok || !roh) clearTimeout(timer);
+      resp.jsonMitTimeout = roh
+        ? () => roh().finally(() => clearTimeout(timer))
+        : () => Promise.reject(new Error("Antwort ohne JSON-Rumpf"));
+      return resp;
+    },
+    (err) => {
+      clearTimeout(timer);
+      throw err;
+    }
+  );
 }
 
 function storeJobId(jobId, resultToken) {
@@ -254,7 +278,7 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
         if (resp.status === 404) return { error: t("error.queueFailed") };
         throw new Error(`HTTP ${resp.status}`);
       }
-      data = await resp.json();
+      data = await resp.jsonMitTimeout();
       failures = 0;
       /* Zeitstempel des letzten erfolgreichen Polls: Daran erkennt die
          Wiederaufnahme, ob diese Schleife noch lebt oder in einem eingefrorenen
@@ -315,22 +339,66 @@ const STECKENGEBLIEBEN_MS = 8000;
  * weiter und das Ergebnis liegt rund zwei Stunden bereit — genau dafuer wurde
  * die Warteschlange gebaut.
  */
+/* PRIV-004 (Audit 2026-08-10): Obergrenze, wie lange ein fertiges Ergebnis im
+   Tab abrufbar bleibt.
+
+   Nach einer erfolgreichen Analyse bleiben Job-Nummer und Abhol-Ticket bewusst
+   stehen, damit ein Neuladen das Profil wiederholt. Im Klassenzimmer wird ein
+   Tablet aber weitergereicht, ohne den Tab zu schliessen — und dann sieht das
+   naechste Kind das Profil des vorigen, inklusive Altersschaetzung und
+   Manipulations-Triggern, ohne den "Nichts davon ist wahr"-Hinweis (die
+   Quittung liegt fuer diesen Job ja schon vor).
+
+   Das Sicherheitsmodell fuehrte diesen Fall als abgedeckt ("Ticket lebt im Tab
+   und stirbt mit ihm") — aber der Dritte im Klassenzimmer ist derselbe Tab.
+
+   Kompromiss: Ein kurzer App-Wechsel aendert nichts (Reload-Wiederholung bleibt
+   erhalten), eine laengere Pause laesst das Ticket fallen. Ein weitergereichtes
+   Geraet liegt praktisch immer laenger als das hier still. */
+const UEBERGABE_PAUSE_MS = 3 * 60 * 1000;
+let seitWannVerborgen = 0;
+
 export function initHintergrundWiederaufnahme() {
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible") return;
+    if (document.visibilityState !== "visible") {
+      seitWannVerborgen = Date.now();
+      return;
+    }
+
+    /* War die Seite lange genug weg, gilt das Geraet als weitergereicht. */
+    if (seitWannVerborgen && Date.now() - seitWannVerborgen > UEBERGABE_PAUSE_MS) {
+      seitWannVerborgen = 0;
+      clearStoredJobId();
+      return;
+    }
+    seitWannVerborgen = 0;
+
+    /* UX-001: Ist gerade ein Upload unterwegs, der noch keine Job-Nummer hat,
+       niemals dazwischenfunken. Sonst verdraengt die Wiederaufnahme den
+       laufenden Durchgang (ueber state.requestId) und rendert das VORIGE
+       Ergebnis neben dem NEUEN Foto — waehrend das neue Foto nie hochgeladen
+       wird. Dieselbe Sperre schliesst das Fenster beim Warten auf /api/stats. */
+    if (state.uploadLaeuft) return;
+
     if (!getStoredJobId()) return;
 
     /* Laeuft die Schleife normal weiter, nichts tun — der visibilitychange-
-       Wecker in waitForNextPoll holt das Ergebnis von selbst. */
+       Wecker in waitForNextPoll holt das Ergebnis von selbst.
+       UX-002: Auch nach einer FERTIGEN Analyse nichts tun. Die Job-Nummer
+       bleibt dann bewusst stehen (Reload soll das Ergebnis wiederholen), aber
+       `isAnalyzing` ist false — ohne diese Bedingung loeste jeder Tab-Wechsel
+       eine volle Wiederaufnahme samt Sprung an den Seitenanfang aus. */
+    if (!state.isAnalyzing) return;
+
     const stillSeit = Date.now() - (state.lastPollOk || 0);
-    if (state.isAnalyzing && stillSeit < STECKENGEBLIEBEN_MS) return;
+    if (stillSeit < STECKENGEBLIEBEN_MS) return;
 
     resumeQueueJob({ force: true });
   });
 }
 
 /**
- * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie der Sync-Pfad
+ * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie im Normalfall
  * (Disclaimer-Modal → renderCurrentMode → Success-Telemetrie).
  */
 /* DATENSCHUTZ-ENTSCHEIDUNG (bewusst): Nach einem Reload zeigen wir das
@@ -361,7 +429,7 @@ function showPhotoDeletedNotice() {
 }
 
 /**
- * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie der Sync-Pfad
+ * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie im Normalfall
  * (Disclaimer-Modal → renderCurrentMode → Success-Telemetrie). Bei einem
  * Reload-Resume eines bereits bestätigten Ergebnisses wird der Disclaimer
  * übersprungen (skipDisclaimer); die jobId dient dazu, die Bestätigung zu merken.
@@ -421,6 +489,16 @@ function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) 
 
 async function analyzeImageQueued() {
   state.isAnalyzing = true;
+  /* UX-001 (Audit 2026-08-10): Ab hier gehoert der Bildschirm dem NEUEN Foto.
+     Die Job-Nummer des vorigen Durchgangs bleibt nach einem Erfolg bewusst
+     stehen (damit ein Reload das Ergebnis wiederholen kann) — sie darf aber
+     nicht mehr abgeholt werden, sobald ein neues Foto unterwegs ist. Ohne diese
+     zwei Zeilen holte ein Tab-Wechsel waehrend des Uploads das ALTE Ergebnis
+     und zeigte es neben dem NEUEN Foto; das neue Foto wurde nie hochgeladen. */
+  clearStoredJobId();
+  state.uploadLaeuft = true;
+  state.lastPollOk = Date.now();
+
   const myId = ++state.requestId;
   const analyzeStartTime = Date.now();
   const traceId = generateTraceId();
@@ -447,12 +525,14 @@ async function analyzeImageQueued() {
     stopScanAnim();
     setStatus(t("error.noFile"));
     state.isAnalyzing = false;
+    state.uploadLaeuft = false;
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
     stopScanAnim();
     setStatus(t("error.fileTooLarge"));
     state.isAnalyzing = false;
+    state.uploadLaeuft = false;
     return;
   }
   /* Honeypot — Bots füllen unsichtbare Felder aus */
@@ -460,6 +540,7 @@ async function analyzeImageQueued() {
   if (hp && hp.value) {
     stopScanAnim();
     state.isAnalyzing = false;
+    state.uploadLaeuft = false;
     return;
   }
   /* Mindest-Interaktionszeit — kein Mensch lädt in < 2s hoch */
@@ -535,7 +616,7 @@ async function analyzeImageQueued() {
       return;
     }
 
-    const enqueueData = await enqueueResp.json();
+    const enqueueData = await enqueueResp.jsonMitTimeout();
     const jobId = enqueueData && enqueueData.jobId;
     if (!jobId) {
       stopScanAnim();
@@ -545,6 +626,9 @@ async function analyzeImageQueued() {
     /* PRIV-003: Abhol-Ticket vom Server merken + bei jedem Poll mitschicken. */
     const resultToken = enqueueData.resultToken || null;
     storeJobId(jobId, resultToken);
+    /* Ab hier gibt es wieder eine Job-Nummer, die zum aktuellen Foto gehoert —
+       die Hintergrund-Wiederaufnahme darf also wieder uebernehmen. */
+    state.uploadLaeuft = false;
 
     /* ── Auf das Ergebnis pollen (jeder Poll = Liveness-Herzschlag) ── */
     const outcome = await pollJob(jobId, myId, resultToken);
@@ -617,7 +701,10 @@ async function analyzeImageQueued() {
     });
   } finally {
     releaseWakeLock();
-    if (state.requestId === myId) state.isAnalyzing = false;
+    if (state.requestId === myId) {
+      state.isAnalyzing = false;
+      state.uploadLaeuft = false;
+    }
   }
 }
 

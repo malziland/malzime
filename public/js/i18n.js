@@ -79,6 +79,17 @@ export function applyTranslations() {
     if (text !== key) el.alt = text;
   });
 
+  /* A11Y-001 (Audit 2026-08-10): aria-label war nicht uebersetzbar. Der
+     Hauptumschalter wurde englischsprachigen Screenreader-Nutzern als
+     „Beast Mode aktivieren" vorgelesen, die Konfidenz-Punkte 13x als
+     „Konfidenz". axe kann das nicht sehen — es prueft nur, DASS eine
+     Beschriftung existiert, nicht in welcher Sprache. */
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-aria");
+    const text = t(key);
+    if (text !== key) el.setAttribute("aria-label", text);
+  });
+
   document.querySelectorAll("[data-i18n-title]").forEach((el) => {
     const key = el.getAttribute("data-i18n-title");
     const text = t(key);

@@ -24,7 +24,7 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 | Risk | Mitigation | Status |
 |------|-----------|--------|
 | In-memory rate limit (per instance, not global) | `maxInstances` cap + per-IP rate limit | Accepted for workshop scale |
-| Public endpoint (`invoker: "public"`) | Rate limiting + CORS + honeypot + timing check | Accepted for workshop scale |
+| Public endpoint (`invoker: "public"`) | Rate limiting + body-size cap + queue-depth cap + hourly limit (honeypot and timing check are browser-side heuristics and do not stop a direct call) | Accepted for workshop scale |
 | No authentication required | By design — workshop participants should not need accounts | Accepted |
 | Counter fail-open on Firestore errors (`counter.js`) | App stays available during DB outages; worst case: a few extra analyses beyond hourly limit | Accepted — availability over strict cost control |
 | Nonce replay protection fail-open on Firestore errors (`auth.js`) | Admin actions remain functional during DB outages; nonces are short-lived (5 min TTL) and require valid HMAC | Accepted — admin availability over strict replay prevention |
@@ -35,10 +35,10 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **Queue worker not publicly reachable**: `processJob` runs with `invoker: private` — only Google Cloud Tasks can invoke it, authenticated via an OIDC service-account token
 - **No tracking**: No cookies, no analytics, no advertising
 - **GPS stays in browser**: GPS coordinates are never sent to the server
-- **Content Security Policy**: Strict whitelist (self + OpenStreetMap + Cloud Functions)
+- **Content Security Policy**: Strict whitelist (self + OpenStreetMap tiles + Nominatim)
 - **HSTS with preload**
 - **Rate limiting**: Per-IP request limits
-- **Prompt injection protection**: User data isolated in XML tags
+- **Prompt injection protection**: user data isolated in XML tags (3-call path); the active single-large prompt states explicitly that text visible in the image is content, never an instruction
 - **Input validation**: File type, size, and format checks
 - **LLM output bounds**: Response size limits enforced server-side (categories, ad_targeting, manipulation_triggers, profileText)
 - **Defensive JSON parser**: 4-stage repair layer for LLM responses (`json-repair.js`) — direct parse → heuristic cleanup → json5 → truncation recovery

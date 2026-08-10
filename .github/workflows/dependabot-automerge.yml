@@ -32,11 +32,23 @@ jobs:
       # Produktivbetrieb Uploads verarbeitet, ist das zu wenig.
       # Backend-WERKZEUGE (eslint, prettier, jest) laufen weiterhin durch.
       - name: Auto-Merge (patch + minor, ohne Backend-Produktivpakete)
+        # OPS-006 (Audit 2026-08-10): Die Ausnahme prueft NICHT mehr auf
+        # Gleichheit. Vorher musste `dependency-type` exakt 'direct:production'
+        # sein — bei einem GRUPPIERTEN PR (die Gruppe `backend-sicherheit` in
+        # dependabot.yml hat keinen dependency-type-Filter und mischt deshalb
+        # Produktiv- und Werkzeugpakete) liefert die Metadaten-Action nicht
+        # diesen Einzelwert, und die Ausnahme lief ins Leere. Ebenso ungedeckt
+        # war 'indirect', also ein Sicherheitsupdate, das ein transitives
+        # Produktivpaket in functions/ anhebt.
+        # Jetzt gilt: Sobald functions/ ueberhaupt betroffen ist, keine
+        # automatische Zusammenfuehrung — Handpruefung. Backend-WERKZEUGE
+        # (eslint, prettier, jest) laufen dadurch ebenfalls ueber die Hand;
+        # das ist der bewusst in Kauf genommene Preis, weil die Unterscheidung
+        # im gruppierten Fall nicht verlaesslich ist.
         if: >
           (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
            steps.meta.outputs.update-type == 'version-update:semver-minor') &&
-          !(steps.meta.outputs.directory == '/functions' &&
-            steps.meta.outputs.dependency-type == 'direct:production')
+          !contains(steps.meta.outputs.directory, '/functions')
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

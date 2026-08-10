@@ -557,6 +557,38 @@ describe("runSingleLargeCall", () => {
     };
   }
 
+  /* BIZ-001 (Audit 2026-08-10): Der Anker wird VORANGESTELLT, nicht eingesetzt.
+     Vorher überschrieb er den ganzen Kartenwert und warf damit den zweiten Satz
+     weg — das konkrete, im Workshop vorführbare Merkmal, das der Prompt
+     ausdrücklich verlangt. Die v2.9-Messung „100 % mit konkretem Merkmal" wurde
+     an der Modellantwort erhoben; auf der Karte kam es nie an. */
+  test("BIZ-001: der Beleg-Satz des Modells überlebt den Hard-Facts-Anker", async () => {
+    const body = makeCompleteResponse();
+    body.standard.categories.alter_geschlecht.value =
+      "Du bist männlich, etwa 38. Die Linien um die Augen bleiben auch ohne Lächeln sichtbar.";
+    body.beast.categories.alter_geschlecht.value = "Männlich, ~38. Die Krähenfüße verraten dich.";
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(body) }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 4000, completion_tokens: 2000 },
+      }),
+    }));
+    const result = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+
+    /* Der verbindliche Anker steht vorn ... */
+    expect(result.normal.categories.alter_geschlecht.value).toMatch(/^männlich, ~38 \(Spanne 35-42\)\./);
+    /* ... und der Beleg-Satz ist noch da. */
+    expect(result.normal.categories.alter_geschlecht.value).toContain("Die Linien um die Augen");
+    /* Standard und Beast unterscheiden sich an dieser Karte wieder. */
+    expect(result.boost.categories.alter_geschlecht.value).toContain("Krähenfüße");
+    expect(result.normal.categories.alter_geschlecht.value).not.toBe(result.boost.categories.alter_geschlecht.value);
+    /* Und der Filter bekommt den Anker separat, damit Zahlen aus dem
+       Beleg-Satz die Altersauslese nicht nach unten ziehen. */
+    expect(result.alterAnker).toBe("männlich, ~38 (Spanne 35-42)");
+  });
+
   test("returns normal+boost with overridden hard facts when response is complete", async () => {
     setFetchForTest(async () => ({
       ok: true,

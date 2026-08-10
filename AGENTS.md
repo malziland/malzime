@@ -30,8 +30,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   lib/exifr/         Self-hosted: exifr lite ESM (Browser EXIF-Parsing)
 
 functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
-  index.js           Cloud-Function-Exports (analyze, stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
-  handle-analyze.js  Synchroner Legacy-Pfad (Fallback): Validation -> Mistral Describe -> SUBJECT-Parsing -> Mistral Profile / Easter-Egg -> Response. Live laeuft die Analyse ueber die Queue (handle-process-job.js).
+  index.js           Cloud-Function-Exports (stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
   handle-stats.js    Stats-Handler (GET-only)
   handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
   config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (500)
@@ -82,8 +81,8 @@ Einzelbefehle:
 
 - `cd functions && npm install` — install backend dependencies
 - `npm install` (root) — install frontend test/lint dependencies (Vitest, ESLint, Prettier)
-- `cd functions && npm test` — run Jest backend unit tests (439 tests)
-- `npm run test:frontend` — run Vitest frontend unit tests (165 tests)
+- `cd functions && npm test` — run Jest backend unit tests (611 tests)
+- `npm run test:frontend` — run Vitest frontend unit tests (193 tests)
 - `npm run test:e2e` — run Playwright E2E tests (Smoke + axe-A11y-Gate ohne Ausnahmen + Tastatur-Durchlauf; A11y misst mit reducedMotion, sonst Schein-Funde durch Einblend-Animation)
 - `cd functions && npm run lint` — ESLint backend
 - `cd functions && npm run format:check` — Prettier backend

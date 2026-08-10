@@ -4,6 +4,154 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.11.0] — 2026-08-11
+
+Sanierung des LANGAUDIT vom 2026-08-10 (`docs/audit-2026-08-11.md`).
+**36 der 38 Befunde geschlossen**, jeder mit einer Prüfung dahinter und einer
+Rückbauprobe: Quellcode zurückgedreht, Prüfung behalten, rot gesehen,
+wiederhergestellt.
+
+Die beiden übrigen: Der Firestore-Umzug in die EU (PRIV-001) folgt bewusst als
+eigener, isolierter Schritt auf einem geprüften Stand. Bei der Alarmierung
+(OPS-003) ist die Zustellung an den richtigen Kanal repariert und belegt — dass
+die Meldung als Push auf dem Sperrbildschirm ankommt, ist noch offen.
+
+Einer der 36 ist ausdrücklich **verworfen statt behoben**: das anonyme Schreiben
+am geteilten ntfy-Dienst (SEC-005). Begründung in `docs/SECURITY-MODEL.md` —
+das Topic ist seit der Rotation ein 30-stelliger Zufallswert, und eine Sperre
+würde die Benachrichtigungen anderer Projekte brechen, die nicht Teil dieses
+Audits sind.
+
+### Behoben
+
+- **Jugendliche bekamen ein Tier-Profil statt ihrer Analyse.** Das Netz gegen
+  „Tier wird als Mensch analysiert" prüfte im aktiven Weg nicht die
+  Bildbeschreibung, sondern den daraus erzeugten Profiltext — „Apex Legends"
+  enthält „ape", „Affekt" enthält „affe". Beim eigentlichen Anlassfall, dem
+  Affenbild, sprang es dagegen nie an: Dort schreibt das Modell ein
+  Kinderprofil ohne Tierwörter. Es fing also seinen eigenen Anlassfall nie und
+  ausschließlich Fehlalarme — deshalb **ersatzlos entfernt** statt die Wortliste
+  zu entschärfen. Der Schutz liegt jetzt allein in der Prompt-Regel „Primaten
+  sind immer ANIMAL_ONLY", die bisher nur im aktiven Prompt stand und nun in
+  **beiden** Pfaden und **beiden** Sprachen steht.
+- **Der Kinderschutz-Filter hatte drei Löcher.** Bei englischsprachigen
+  Durchgängen rutschten 10 von 12 Werbephrasen durch, darunter Pornografie,
+  Schusswaffen und Neonazi-Kleidung — also die Stufe, die altersunabhängig
+  greifen soll. Im Deutschen traf `\bkredit` zwar „Kredit", aber weder
+  „Sofortkredit" noch „Ratenkredit", also genau die übliche Wortbildung. Und
+  geprüft wurden nur zwei von rund fünfzehn Textfeldern: Derselbe Begriff wurde
+  aus der Werbeliste entfernt und im Profiltext ausgeliefert. Alles drei
+  behoben; im Fließtext wird bewusst nur **gemeldet**, nicht herausgeschnitten.
+- **Der Filter war zugleich zu scharf.** Auf die Manipulations-Trigger wirkte
+  dieselbe Werbeliste — dadurch verschwand bei Kindern der Satz „Lootboxen
+  arbeiten mit denselben Mechaniken wie Glücksspiel, nur ohne Altersgrenze".
+  Das ist die Kernaussage des Workshops. Dort greift jetzt nur noch die harte
+  Stufe.
+- **Das Profil des vorigen Kindes konnte neben dem neuen Foto erscheinen** —
+  und das neue Foto wurde dabei nie hochgeladen. Wechselte jemand während des
+  Uploads kurz die App, holte die Wiederaufnahme das alte Ergebnis und verdrängte
+  den laufenden Durchgang. Außerdem setzte nach einer fertigen Analyse **jeder**
+  Tab-Wechsel das Ergebnis neu (Sprung an den Seitenanfang, Fokus-Sprung,
+  zusätzlicher Telemetrie-Erfolg).
+- **Auf geteilten Tablets blieb das Ergebnis erreichbar**, bis der Tab
+  geschlossen wurde — im Klassenzimmer der unwahrscheinlichste Vorgang. Nach
+  einer Pause von drei Minuten wird das Abhol-Ticket jetzt fallen gelassen; ein
+  kurzer App-Wechsel ändert weiterhin nichts.
+- **Der Beleg-Satz auf der Alterskarte kam nie an.** Der Server überschrieb den
+  Kartenwert vollständig mit dem kurzen Anker und warf damit den zweiten Satz
+  weg — das konkrete, vorführbare Merkmal, das v2.9.0 eingeführt hatte. Er wird
+  jetzt vorangestellt statt eingesetzt; Standard- und Beast-Ansicht
+  unterscheiden sich an dieser Karte wieder.
+- **Un-gekennzeichnete Fassungen der KI-Demo-Fotos waren öffentlich abrufbar.**
+  Der Sicherungsordner des Wasserzeichen-Skripts lag innerhalb des
+  Hosting-Verzeichnisses und wurde mit ausgeliefert.
+- **Ein abreißender Antwort-Rumpf fror die Warteschleife ein.** Der Zeitgeber
+  endete, sobald die Kopfzeilen da waren; bricht die Verbindung danach mitten im
+  Rumpf ab, kam nie ein Fehler und nie ein Ergebnis.
+- **Ein Foto konnte liegen bleiben**, wenn der Worker hart starb: Der Aufräumer
+  löschte das Job-Dokument samt Bildpfad, ohne das Bild selbst anzufassen.
+- **Die englischen Fehlermeldungen nannten „Google's safety filters".** Seit
+  v1.6 läuft ausschließlich Mistral.
+
+### Geändert
+
+- **Der Einlass bremst ab 155 Wartenden.** Seit die Parallelität in v2.8 von 10
+  auf 7 sank, schafft die Warteschlange rund 387 Analysen pro Stunde, der
+  Einlass lässt aber 500 zu. Wer hinter etwa 190 Wartenden einreiht, läuft
+  garantiert in den 30-Minuten-Deckel des Browsers — der Job lebt weiter und
+  kostet Geld, der Teilnehmer sieht einen Timeout. Statt das Stundenlimit zu
+  senken (das würde einem laufenden Workshop den Hahn zudrehen) lehnt der
+  Einlass ab dieser Tiefe ehrlich ab.
+- **Zu große Uploads werden an der Türschwelle abgelehnt.** Ein 23-MB-Bild
+  kostet als Base64 rund 170 MB Arbeitsspeicher — bei 512 MiB Grenze reichten
+  wenige gleichzeitige Uploads, um die Instanz zu töten. Die bisherige Prüfung
+  kam zu spät, weil die Laufzeit den Rumpf vorab vollständig einliest.
+- **Wer nur pollt, hält seinen Job nicht mehr ewig am Leben.** Jede Abfrage
+  erneuerte den Herzschlag; damit ließ sich das gesamte Stundenfenster dauerhaft
+  blockieren, ohne dass je ein Platz zurückkam. Nach 35 Minuten wird jetzt
+  abgeräumt — der Browser gibt ohnehin nach 30 auf.
+- **Sichtbarer Text im Bild gilt ausdrücklich als Bildinhalt, nie als
+  Anweisung.** Die Warnung stand bisher nur im inaktiven Rückfall-Prompt.
+- **Neues Flag `useBeastAdsCall`** — Notausschalter für den zweiten
+  Mistral-Aufruf, ohne Deploy. Er verdoppelt die Anfragen pro Minute; bisher gab
+  es keinen Weg, ihn unter Last stillzulegen.
+- **Der Prompt-Cache am zweiten Aufruf war wirkungslos.** Alles steckte in einer
+  Nachricht, das Profil stand vor den Anweisungen: live 0 % Trefferquote gegen
+  87 % beim Hauptaufruf. Jetzt getrennt in konstanten und wechselnden Teil.
+- **Ein fehlschlagender zweiter Aufruf löst jetzt Alarm aus.** Vorher war ein
+  dauerhafter Ausfall unsichtbar — der Rückfall greift, niemand merkt etwas, und
+  jede Analyse liefe still mit der schlechteren Werbung.
+- **Der Kinderschutz-Filter protokolliert bei jeder Analyse**, auch ohne
+  Treffer. Vorher entstand nur bei einem Treffer eine Zeile; ein systematischer
+  Ausfall war von „alles sauber" nicht zu unterscheiden.
+- **Beschriftungen für Screenreader sind übersetzbar** (`data-i18n-aria`).
+
+### Betrieb
+
+- **Der Alarm-Kanal zeigte seit dem 17. Juli auf das alte ntfy-Topic.** Die
+  Rotation war nur zur Hälfte ausgeführt: Die Functions pushten auf das neue
+  Topic, Cloud Monitoring auf das alte. Fehleralarme kamen damit drei Wochen
+  lang nirgends an — auch nicht der für die ausgefallene Kostenbremse.
+- **Gelöschte Fotos sind nicht mehr sieben Tage wiederherstellbar.** Google hat
+  Soft-Delete nachträglich für alle Buckets aktiviert; die Zusage „unmittelbar
+  gelöscht" stimmte dadurch nicht.
+- **Versionsnummern zeigen wieder auf den Code, den ihr Abschnitt beschreibt.**
+  `v2.9.2` zeigte auf einen Stand, der Minuten später zurückgenommen wurde — ein
+  Rollback wäre dort gelandet. `release.yml` läuft jetzt rot, wenn eine bereits
+  veröffentlichte Nummer wiederverwendet wird, statt still auszusteigen.
+- **Die Pflicht-Prüfungen gelten jetzt auch für den Besitzer**
+  (`enforce_admins`). Sie existierten, hatten aber eine Ausnahme für genau die
+  einzige Person, die etwas hochlädt — vier Veröffentlichungen gingen an einer
+  roten Prüfung vorbei. `playwright-version` ist zusätzlich Pflicht-Prüfung,
+  damit der E2E-Test nicht stillschweigend übersprungen werden kann.
+- **Dependabot führt nichts mehr automatisch zusammen, was `functions/`
+  berührt.** Die bisherige Ausnahme prüfte auf einen Einzelwert und lief bei
+  gruppierten Sicherheits-Aktualisierungen ins Leere.
+- **Verwaister Testdienst `ntfy-authtest` gelöscht** — öffentlich erreichbar,
+  seit Juni nicht aktualisiert, im Repo nirgends erwähnt.
+- **`api.malzi.me` aus der Sicherheitsrichtlinie entfernt.** Der Host zeigt auf
+  eine gelöschte Funktion; der DNS-Eintrag muss vor der Cloud-Run-Zuordnung weg
+  (Anleitung im RUNBOOK).
+
+### Tests
+
+- **Das Escaping der Modellausgabe ist jetzt abgesichert.** Es war korrekt, aber
+  eine Mutationsprobe zeigte: Entfernt man jedes `escapeHtml` aus `render.js`,
+  bleiben alle Tests grün. Fünf Nutzlasten prüfen es jetzt am DOM.
+- **Die mit v2.10 verlorenen Upload-Prüfungen sind nachgezogen** — Zeichensatz,
+  Größe, MIME-Liste, Kappung der Kamera-Metadaten und die Reihenfolge „Honeypot
+  vor Zähler". Letztere hätte gebrochen werden können, ohne dass ein Test rot
+  wird; jeder Bot-Aufruf hätte dann einen Platz des Stundenlimits verbrannt.
+- **Beast Mode wird auf Barrierefreiheit geprüft** — er wechselt das gesamte
+  Farbschema und war nie gemessen. Der Umschalter ist jetzt auch im
+  Tastaturtest. Beide Prüfungen finden keine Verstöße.
+- 611 Backend-, 193 Frontend- und 10 E2E-Tests.
+
+### Entfernt
+
+- `functions/src/heartbeat.js` — hatte seit v2.10 keinen Aufrufer mehr, wurde
+  aber in README und ARCHITECTURE weiter als aktive Komponente geführt.
+
 ## [2.10.0] — 2026-08-10
 
 ### Entfernt
@@ -132,7 +280,7 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 ### Hinweise
 
 - **Kosten praktisch unverändert:** Der Hauptaufruf wird kleiner, weil die Werbung dort wegfällt (gemessen 1.522 Eingabe- und 339 Ausgabe-Tokens weniger). Das gleicht den zweiten Aufruf fast aus — **4,44 € statt 4,35 € je 1.000 Analysen** im Workshop-Betrieb.
-- **Wartezeit:** Der zweite Aufruf verdoppelt die Anfragen je Analyse. Bei `mistral-large-2512` gilt ein Limit von **15 Anfragen pro Minute** (am 2026-08-10 an der API gemessen; die frühere Notiz „6 Anfragen pro Sekunde" ist überholt). Die Warteschlange erzeugt bei Parallelität 10 und 56 Sekunden je Analyse rund 11 Anfragen pro Minute — mit dem zweiten Aufruf wären es 22. **Die Parallelität muss deshalb von 10 auf 7 gesenkt werden** (`scripts/cloudtasks-concurrency-7.sh`), sonst gibt es 429-Fehler. Folge: eine Klasse mit 25 Schülern ist nach ~3,3 statt ~2,7 Minuten durch.
+- **Wartezeit:** Der zweite Aufruf verdoppelt die Anfragen je Analyse. Bei `mistral-large-2512` gilt ein Limit von **15 Anfragen pro Minute** (am 2026-08-10 an der API gemessen; die frühere Notiz „6 Anfragen pro Sekunde" ist überholt). Die Warteschlange erzeugt bei Parallelität 10 und 56 Sekunden je Analyse rund 11 Anfragen pro Minute — mit dem zweiten Aufruf wären es 22. **Die Parallelität muss deshalb von 10 auf 7 gesenkt werden** (`scripts/cloudtasks-concurrency-7.sh`), sonst gibt es 429-Fehler. Folge: eine Klasse mit 25 Schülern ist nach ~3,9 statt ~2,2 Minuten (live nachgemessen im Audit 2026-08-10) durch.
 - Kostenformel an der echten Mistral-Abrechnung geeicht (Abweichung < 3 %). Preise Stand 08/2026: Large 0,50/1,50 $, Medium 1,50/7,50 $ je Million Tokens; gecachte Eingabe-Tokens 10 %.
 
 ## [2.7.0] — 2026-08-09

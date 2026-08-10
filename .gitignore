@@ -55,3 +55,8 @@ prototype-malziland/
 redesign-preview/
 age-ab-v29-results.json
 age-ab-v29-report.md
+
+# Un-gewasserzeichnete Originale der KI-Demo-Fotos. Duerfen NIE ausgeliefert
+# werden (Kennzeichnungspflicht) und gehoeren deshalb weder nach public/ noch
+# ins Repo — Audit 2026-08-10, PRIV-002.
+.demo-originale/

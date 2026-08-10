@@ -3,30 +3,27 @@
 /**
  * handle-enqueue.js — POST /enqueue (Queue-Architektur v2.0).
  *
- * Annahme-Endpoint der Queue. Validiert die Anfrage mit denselben Prüfungen
- * wie der synchrone /analyze-Pfad (Method, Maintenance, Rate-Limit, Honeypot,
- * MIME, Magic-Bytes, Größe, Stundenlimit), legt das Bild kurz in Storage ab,
+ * Annahme-Endpoint der Queue — seit v2.10 der einzige Upload-Weg. Validiert
+ * die Anfrage (Method, Maintenance, Rate-Limit, Body-Größe, Honeypot, MIME,
+ * Magic-Bytes, Warteschlangen-Tiefe, Stundenlimit), legt das Bild kurz ab,
  * erzeugt ein Job-Dokument und reiht es in Cloud Tasks ein. Antwortet SOFORT
  * mit der `jobId` — die eigentliche Mistral-Pipeline läuft asynchron im
  * Worker `processJob`.
  *
- * Public erreichbar; die Bot-Abwehr ist identisch zum /analyze-Pfad.
- *
- * Hinweis zur Code-Trennung: Der synchrone /analyze-Pfad hat eine eigene,
- * inline implementierte Variante derselben Validierung. Beide Pfade bleiben
- * bis zum bewussten Cleanup in Phase 6 absichtlich getrennt (Parallel-Pfad-
- * Strategie) — dann wird der synchrone Pfad vollständig entfernt.
+ * Public erreichbar. Honeypot und Zeitmessung sind Browser-Heuristiken und
+ * halten einen Aufruf per curl nicht auf — die tragenden Bremsen sind das
+ * IP-Rate-Limit, die Body-Größe, die Warteschlangen-Tiefe und das Stundenlimit.
  */
 
 const crypto = require("crypto");
-const { ALLOWED_MIME, MAX_UPLOAD_BYTES } = require("./config");
+const { ALLOWED_MIME, MAX_UPLOAD_BYTES, MAX_QUEUE_DEPTH } = require("./config");
 const { getClientIp, checkRateLimit } = require("./middleware");
 const { parseMultipart, parseJsonBody } = require("./upload");
 const { resolveLanguage } = require("./i18n");
 const { checkAndIncrement, getMaintenanceStatus, releaseHourlySlot } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
-const { createJob, failJob } = require("./jobs");
+const { createJob, failJob, countQueuedJobs } = require("./jobs");
 const { storeImage, deleteImage } = require("./queue-storage");
 const { enqueueJob } = require("./cloud-tasks");
 
@@ -76,6 +73,22 @@ async function handleEnqueue(req, res, secrets) {
     const ip = getClientIp(req);
     if (!checkRateLimit(ip)) {
       res.status(429).json({ error: "Rate limit exceeded" });
+      return;
+    }
+
+    /* SEC-002 (Audit 2026-08-10): Groesse aus der Kopfzeile ablehnen, BEVOR
+       irgendetwas mit dem Rumpf passiert. Gemessen kostet ein 23-MB-Bild als
+       Base64 rund 170 MB Arbeitsspeicher pro gleichzeitiger Anfrage — bei
+       512 MiB Grenze reichen wenige parallele Grossuploads, um die Instanz zu
+       toeten. Die eigentliche Groessenpruefung weiter unten kommt dafuer zu
+       spaet: Die Laufzeit liest den Rumpf vorab vollstaendig ein.
+       Base64 blaeht um Faktor 4/3, dazu etwas Rahmen — deshalb wird gegen die
+       Base64-Laenge geprueft, nicht gegen die Bildgroesse. */
+    const gemeldeteLaenge = Number(req.headers["content-length"] || 0);
+    const MAX_BODY_BYTES = Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 64 * 1024;
+    if (gemeldeteLaenge > MAX_BODY_BYTES) {
+      console.log(JSON.stringify({ requestId, warning: "body-too-large", bytes: gemeldeteLaenge }));
+      res.status(413).json({ error: "File too large" });
       return;
     }
 
@@ -143,6 +156,25 @@ async function handleEnqueue(req, res, secrets) {
     if (file.size > MAX_UPLOAD_BYTES) {
       res.status(413).json({ error: "File too large" });
       return;
+    }
+
+    /* ── ARCH-001: Warteschlangen-Tiefe ──
+       Vor dem Zähler, damit ein abgelehnter Auftrag keinen Stunden-Platz
+       verbraucht. Fail-open: Klemmt die Abfrage, wird angenommen wie bisher —
+       eine Kapazitätsbremse darf nie zum Ausfall eskalieren. */
+    try {
+      const wartende = await countQueuedJobs();
+      if (wartende >= MAX_QUEUE_DEPTH) {
+        console.log(JSON.stringify({ requestId, warning: "queue-too-deep", wartende, grenze: MAX_QUEUE_DEPTH }));
+        res.status(429).json({
+          blocked: "queueFull",
+          retryAfterSeconds: 300,
+          message: "Gerade warten sehr viele Analysen — bitte in ein paar Minuten nochmal.",
+        });
+        return;
+      }
+    } catch (err) {
+      console.log(JSON.stringify({ requestId, warning: "queue-depth-check-failed", error: err.message }));
     }
 
     /* ── Globales Stundenlimit (Firestore-Zähler) ──

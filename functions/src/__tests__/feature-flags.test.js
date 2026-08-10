@@ -20,6 +20,7 @@ describe("getFeatureFlags", () => {
     expect(await flags.getFeatureFlags()).toEqual({
       useSingleLargeCall: false,
       usePromptCache: false,
+      useBeastAdsCall: true,
     });
   });
 
@@ -36,6 +37,7 @@ describe("getFeatureFlags", () => {
     expect(await flags.getFeatureFlags()).toEqual({
       useSingleLargeCall: true,
       usePromptCache: false,
+      useBeastAdsCall: true,
     });
   });
 
@@ -44,6 +46,7 @@ describe("getFeatureFlags", () => {
     expect(await flags.getFeatureFlags()).toEqual({
       useSingleLargeCall: false,
       usePromptCache: true,
+      useBeastAdsCall: true,
     });
   });
 
@@ -52,6 +55,7 @@ describe("getFeatureFlags", () => {
     expect(await flags.getFeatureFlags()).toEqual({
       useSingleLargeCall: false,
       usePromptCache: false,
+      useBeastAdsCall: true,
     });
   });
 
@@ -60,6 +64,7 @@ describe("getFeatureFlags", () => {
     expect(await flags.getFeatureFlags()).toEqual({
       useSingleLargeCall: false,
       usePromptCache: false,
+      useBeastAdsCall: true,
     });
   });
 });

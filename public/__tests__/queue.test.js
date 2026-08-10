@@ -214,6 +214,57 @@ describe("Queue-Modus", () => {
     expect(statusAbfragen).toBe(0);
   });
 
+  it("UX-001: laufender Upload wird von der Wiederaufnahme nicht verdrängt", async () => {
+    /* Audit 2026-08-10: Nach einer fertigen Analyse bleibt die Job-Nummer
+       bewusst stehen. Wählte das Kind ein zweites Foto und wechselte während
+       des Uploads kurz die App, holte die Wiederaufnahme das ALTE Ergebnis und
+       zeigte es neben dem NEUEN Foto — das neue Foto wurde nie hochgeladen.
+       `state.uploadLaeuft` sperrt dieses Fenster. */
+    const { initHintergrundWiederaufnahme } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-ALT");
+    sessionStorage.setItem("malzime.queueResultToken", "tok-alt");
+    state.isAnalyzing = true;
+    state.uploadLaeuft = true; /* Upload unterwegs, noch keine neue Nummer */
+    state.lastPollOk = Date.now() - 60000; /* alt genug, dass der 8-s-Wächter nicht greift */
+
+    let alteAbfragen = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("job-ALT")) alteAbfragen += 1;
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    initHintergrundWiederaufnahme();
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(alteAbfragen).toBe(0);
+  });
+
+  it("UX-002: nach fertiger Analyse löst ein Tab-Wechsel keine Wiederaufnahme aus", async () => {
+    /* Audit 2026-08-10: `isAnalyzing` ist nach dem Rendern false, die
+       Job-Nummer bleibt aber stehen. Ohne die Prüfung darauf setzte JEDER
+       Tab-Wechsel das fertige Ergebnis neu — Scan-Animation, Sprung an den
+       Seitenanfang, Fokus-Sprung, plus ein zusätzlicher Telemetrie-Erfolg. */
+    const { initHintergrundWiederaufnahme } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-fertig");
+    state.isAnalyzing = false; /* Analyse ist durch */
+    state.uploadLaeuft = false;
+    state.lastPollOk = Date.now() - 60000;
+
+    let abfragen = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("job-status")) abfragen += 1;
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    initHintergrundWiederaufnahme();
+    document.dispatchEvent(new Event("visibilitychange"));
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(abfragen).toBe(0);
+  });
+
   it("Wiederaufnahme im laufenden Fenster: das Foto bleibt stehen", async () => {
     /* Bei der Rückkehr aus dem Hintergrund lief die Seite durchgehend — das
        Foto steht noch im Fenster. Der Datenschutz-Hinweis „Foto gelöscht" ist
@@ -358,5 +409,83 @@ describe("Queue-Modus", () => {
     await vi.advanceTimersByTimeAsync(6000);
     await p;
     expect(elements.imagePreview.querySelector(".photo-deleted-note")).not.toBeNull();
+  });
+
+  it("BUG-003: haengender Antwort-Rumpf laeuft in den Timeout statt einzufrieren", async () => {
+    /* Audit 2026-08-10: Der Zeitgeber lief frueher aus, sobald die Kopfzeilen
+       da waren. Bricht die Verbindung danach mitten im Rumpf ab, ohne sich zu
+       schliessen (Zellenwechsel im Schulgebaeude), settelte `resp.json()` nie
+       und die Warteschleife fror lautlos ein — kein Fehler, kein Ergebnis.
+       Jetzt deckt der Zeitgeber auch das Lesen ab. */
+    const { analyzeImage } = await import("../js/api.js");
+    let jsonAufgeloest = false;
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, opts) => {
+      if (String(url).includes("/api/enqueue")) {
+        return {
+          ok: true,
+          status: 200,
+          clone() {
+            return this;
+          },
+          /* Der Rumpf kommt nie — aber der Abbruch-Signalgeber muss ihn kippen. */
+          json: () =>
+            new Promise((_, reject) => {
+              opts.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+            }).finally(() => {
+              jsonAufgeloest = true;
+            }),
+          text: () => Promise.resolve("{}"),
+        };
+      }
+      return jsonResponse({ ok: true });
+    });
+
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(95000); /* ueber ENQUEUE_TIMEOUT_MS (90 s) */
+    await p;
+
+    expect(jsonAufgeloest).toBe(true);
+    expect(state.isAnalyzing).toBe(false);
+  });
+  it("PRIV-004: nach langer Pause wird das Abhol-Ticket fallen gelassen (geteiltes Tablet)", async () => {
+    /* Audit 2026-08-10: Nach einer fertigen Analyse bleiben Job-Nummer und
+       Ticket bewusst stehen, damit ein Neuladen das Profil wiederholt. Im
+       Klassenzimmer wird das Tablet aber weitergereicht, ohne den Tab zu
+       schliessen — dann sah das nächste Kind das Profil des vorigen, ohne den
+       „Nichts davon ist wahr"-Hinweis. Kurzer App-Wechsel: unverändert.
+       Längere Pause: Ticket weg. */
+    const { initHintergrundWiederaufnahme } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-vom-vorigen-kind");
+    sessionStorage.setItem("malzime.queueResultToken", "tok");
+    sessionStorage.setItem("malzime.queueDisclaimerAcked", "job-vom-vorigen-kind");
+    initHintergrundWiederaufnahme();
+
+    /* Seite geht in den Hintergrund ... */
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    /* ... vier Minuten vergehen ... */
+    await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
+    /* ... und das Gerät wird weitergereicht. */
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(sessionStorage.getItem("malzime.queueJobId")).toBeNull();
+    expect(sessionStorage.getItem("malzime.queueResultToken")).toBeNull();
+  });
+
+  it("PRIV-004 Gegenprobe: kurzer App-Wechsel lässt das Ergebnis erreichbar", async () => {
+    const { initHintergrundWiederaufnahme } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-eigenes");
+    sessionStorage.setItem("malzime.queueResultToken", "tok");
+    initHintergrundWiederaufnahme();
+
+    Object.defineProperty(document, "visibilityState", { value: "hidden", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(20000); /* 20 Sekunden */
+    Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(sessionStorage.getItem("malzime.queueJobId")).toBe("job-eigenes");
   });
 });

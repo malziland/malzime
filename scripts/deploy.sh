@@ -69,7 +69,17 @@ echo "Deploy-Ziel: $TARGET"
 echo "Weiter? (Enter = ja, Ctrl+C = abbrechen)"
 read -r
 
-npx firebase deploy --only "$TARGET"
+# Global installierte CLI bevorzugen. `npx firebase` scheitert, wenn firebase-tools
+# nicht im Projekt liegt: npm versucht dann einen Registry-Abruf und bricht mit
+# "could not determine executable to run" ab. Genau daran ist das Skript zuletzt
+# gescheitert — vermutlich der eigentliche Grund, warum es seit dem 2026-07-29
+# nicht mehr benutzt wurde und die Deploys stattdessen von Hand liefen
+# (Audit 2026-08-10, OPS-001).
+if command -v firebase >/dev/null 2>&1; then
+  firebase deploy --only "$TARGET"
+else
+  npx firebase deploy --only "$TARGET"
+fi
 
 echo ""
 echo "Deploy abgeschlossen. Version: ?v=$VERSION"

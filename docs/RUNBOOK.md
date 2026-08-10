@@ -229,23 +229,79 @@ Verfahren: Release-Tag in einem temporären `git worktree` auschecken, `npm ci`
 mit Tag `v2.3.1`: Setup und beide Test-Suiten grün (435 + 165 Tests). Wiederholen
 bei größeren Toolchain-Wechseln (Node-Major, Test-Runner).
 
-## OFFEN: `api.malzi.me` abbauen (Audit 2026-08-10, OPS-007)
+## DNS-Zone `malzi.me` bei IONOS — Sollstand
 
-**Status: offen, nicht dringend.** Der Host schadet nicht, solange er steht.
+**Diese Tabelle ist die einzige schriftliche Quelle der DNS-Einträge.** Sie
+existierte bis 2026-08-10 nicht — siehe den Vorfall weiter unten.
 
-Der Host zeigt auf die mit v2.10 gelöschte Cloud-Function `analyze` und liefert
-HTTP 404. Kein Code ruft ihn mehr auf; der CSP-Eintrag ist bereits entfernt.
+| Typ | Name | Wert | Wofür |
+|-----|------|------|-------|
+| A | `@` | `199.36.158.100` | Firebase Hosting (malzi.me). **Ohne diesen Eintrag ist die Seite offline.** |
+| MX | `@` | `mx00.ionos.de`, `mx01.ionos.de` (Prio 10) | E-Mail-Empfang |
+| TXT | `@` | `v=spf1 include:_spf-eu.ionos.com ~all` | SPF, sonst landen ausgehende Mails im Spam |
 
-**Reihenfolge ist wichtig — erst DNS, dann die Zuordnung:**
+Weitere Einträge gibt es nicht und soll es nicht geben. Insbesondere **kein
+`api`** mehr (siehe unten).
 
-**Vorbedingung:** Nach dem v2.11.0-Deploy eine echte Analyse auf malzi.me
-durchlaufen lassen. Erst mit diesem Deploy faellt der Host aus der
-Content-Security-Policy — laeuft die Analyse danach normal, ist bewiesen, dass
-nichts mehr an der Subdomain haengt. Vorher nichts loeschen.
+Prüfbefehl (fragt IONOS direkt, umgeht alle Zwischenspeicher):
 
-1. Bei IONOS den CNAME `api` (→ `ghs.googlehosted.com`) löschen.
-2. Erst danach: `gcloud beta run domain-mappings delete --domain=api.malzi.me --region=europe-west1 --project=malzime`
+```bash
+dig +short malzi.me A   @ns1091.ui-dns.de   # muss 199.36.158.100 liefern
+dig +short malzi.me MX  @ns1091.ui-dns.de
+dig +short malzi.me TXT @ns1091.ui-dns.de
+```
 
+Ob Firebase einen Eintrag vermisst, beantwortet Google selbst — fehlt etwas,
+steht in der Antwort ein Feld `requiredDnsUpdates`:
+
+```bash
+curl -s -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+     -H "x-goog-user-project: malzime" \
+  "https://firebasehosting.googleapis.com/v1beta1/projects/malzime/sites/malzime/customDomains/malzi.me"
+```
+
+Erwartet: `hostState: HOST_ACTIVE`, `ownershipState: OWNERSHIP_ACTIVE`,
+`cert.state: CERT_ACTIVE`, **kein** `requiredDnsUpdates`.
+
+### Vorfall 2026-08-10: A-Record versehentlich gelöscht
+
+Beim Abbau von `api.malzi.me` wurde in der IONOS-Oberfläche nicht nur die Zeile
+`api`, sondern auch der A-Eintrag der Hauptdomain entfernt. Folge: malzi.me war
+nicht mehr auflösbar. MX und SPF blieben unberührt, die E-Mail lief durch.
+
+Wiederhergestellt wurde der Wert aus zwei unabhängigen Quellen: dem noch warmen
+Resolver-Cache eines beteiligten Rechners (`dscacheutil -q host -a name malzi.me`)
+und dem Firebase-Standardnamen (`dig +short malzime.web.app A`) — beide
+`199.36.158.100`. Die Registrierung bei Firebase war nie betroffen; es fehlte
+ausschließlich der Wegweiser bei IONOS.
+
+**Zwei Lehren:**
+
+1. **DNS-Einträge gehören dokumentiert, bevor jemand daran arbeitet.** Sie lagen
+   nirgends schriftlich vor — die Rettung hing an einem Cache, der Minuten
+   später verfallen wäre. Deshalb die Tabelle oben.
+2. **Arbeitsanweisungen an einer fremden Oberfläche müssen benennen, was NICHT
+   angefasst wird.** „Lösch den DNS-Eintrag" war die Anweisung; gemeint war
+   ausschließlich die Zeile `api`. Bei DNS, Firewall und Berechtigungen immer
+   Positiv- UND Negativliste angeben.
+
+## `api.malzi.me` — abgebaut (Audit 2026-08-10, OPS-007)
+
+**Status 2026-08-10: DNS-Eintrag gelöscht.** Die Subdomain löst nicht mehr auf.
+Der CSP-Eintrag ist seit v2.11.0 draußen, eine echte Analyse auf malzi.me lief
+danach normal durch — damit ist belegt, dass nichts mehr daran hing.
+
+**Rest:** In Cloud Run steht die Zuordnung `api.malzi.me → analyze` noch (der
+Dienst `analyze` existiert seit v2.10 nicht mehr). Ohne DNS zeigt nichts mehr
+darauf; das ist eine Karteileiche, kein Risiko. Aufräumen:
+
+```bash
+curl -X DELETE -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+     -H "x-goog-user-project: malzime" \
+  "https://europe-west1-run.googleapis.com/apis/domains.cloudrun.com/v1/namespaces/malzime/domainmappings/api.malzi.me"
+```
+
+**Reihenfolge war und bleibt wichtig: erst DNS, dann die Zuordnung.**
 Andersherum entstünde ein Zeitfenster, in dem der DNS-Eintrag auf Googles
 Hosting zeigt, ohne dass jemand den Anspruch hält — eine übernehmbare Subdomain
 unter der eigenen Marke. Deshalb wurde der CSP-Eintrag vorgezogen: Selbst wenn

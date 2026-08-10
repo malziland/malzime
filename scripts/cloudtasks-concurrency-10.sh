@@ -8,13 +8,15 @@
 #   1. featureFlags/current.useSingleLargeCall in Firestore auf true setzen
 #   2. Warten ~30s, bis der Flag-Cache durch ist
 #   3. Dieses Script ausführen
+# HINWEIS: --max-burst-size wurde 2026-08-10 entfernt — die aktuelle
+# gcloud-CLI kennt den Parameter nicht mehr (Google leitet den Wert selbst
+# ab, aktuell 10). Mit dem Parameter bricht das Script mit einem Fehler ab.
 set -euo pipefail
 gcloud tasks queues update analyze-queue \
   --location=europe-west1 \
   --project=malzime \
   --max-concurrent-dispatches=10 \
-  --max-dispatches-per-second=3 \
-  --max-burst-size=20
+  --max-dispatches-per-second=3
 echo "Concurrency: 10 (Single-Large-Call-Pipeline, Large 2512)"
 gcloud tasks queues describe analyze-queue \
   --location=europe-west1 --project=malzime \

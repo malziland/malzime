@@ -9,13 +9,15 @@
 #   1. featureFlags/current.useSingleLargeCall in Firestore auf false setzen
 #   2. Dieses Script ausführen
 #   3. Warten bis aktuelle Jobs durch sind
+# HINWEIS: --max-burst-size wurde 2026-08-10 entfernt — die aktuelle
+# gcloud-CLI kennt den Parameter nicht mehr (Google leitet den Wert selbst
+# ab, aktuell 10). Mit dem Parameter bricht das Script mit einem Fehler ab.
 set -euo pipefail
 gcloud tasks queues update analyze-queue \
   --location=europe-west1 \
   --project=malzime \
   --max-concurrent-dispatches=3 \
-  --max-dispatches-per-second=1 \
-  --max-burst-size=10
+  --max-dispatches-per-second=1
 echo "Concurrency: 3 (3-Call-Pipeline, Small 2603)"
 gcloud tasks queues describe analyze-queue \
   --location=europe-west1 --project=malzime \

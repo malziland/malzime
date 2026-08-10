@@ -18,7 +18,18 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Untersucht und verworfen
 
-- **Fünf Prompt-Varianten für die Verletzlichkeits-Kopplung im gemeinsamen Aufruf** (je 84 Analysen). Keine war unterm Strich besser: Mit Werbe-Anweisung stieg die Ausbeutungs-Mechanik auf 48-54 %, aber die Marken-Trennung aus v2.7.0 brach ein (6 % → 25-40 %), weil das Modell dieselbe Marke nimmt und „Abo" anhängt. Ohne sie halbierte sich die Mechanik. **Lehre: Jede zusätzliche Pflichtregel im Prompt wird woanders bezahlt.**
+- **Fünf Prompt-Varianten für die Verletzlichkeits-Kopplung im gemeinsamen Aufruf**, je 84 Analysen:
+
+  | Variante | Alters-Trefferquote | Trigger getrennt | Beast-Mechanik | Marken-Überlappung |
+  |---|---|---|---|---|
+  | Live v2.7.0 | Basis | nein (100 %) | ~33 % | ~6,5 % |
+  | Werbung + Trigger | −11,9 Pp | ja (6,5 %) | 54,1 % | 40,1 % |
+  | dieselbe, gestrafft | −11,9 Pp | ja (6,7 %) | 48,6 % | 25,2 % |
+  | nur Trigger | ±0 | ja (9,1 %) | 17,6 % | 15,8 % |
+  | Trigger + Feldreihenfolge | ±0 | ja (14,8 %) | 21,3 % | 11,2 % |
+  | nur Werbung | ±0 | nein | 53,4 % | 12,5 % |
+
+  Drei Befunde: (1) Die **Mindestquote hebelt die Marken-Trennung aus** — auf „mindestens 4 Einträge mit Mechanik" antwortet das Modell mit derselben Marke plus „Abo" („Decathlon Riverside 500 Abo", obwohl Decathlon schon im Standard steht). (2) **Zielkonflikt zwischen Werbung und Triggern:** Trennt man nur die Trigger, halbiert sich die Mechanik in der Werbung — das Modell erfüllt die Ausbeutungslogik dann in den Trigger-Texten. (3) Der scheinbare **Alterseinbruch war ein Messartefakt**: Die Trefferquote ist binär (±2 Jahre bei Minderjährigen), die tatsächliche Abweichung blieb mit ±8,3 Jahren unverändert. Die Feldreihenfolge im Schema (`ad_targeting` stand vor `categories`, das Modell konnte sich also gar nicht auf die Verletzlichkeit beziehen) war ebenfalls nicht der Hebel. **Lehre: Jede zusätzliche Pflichtregel im Prompt wird woanders bezahlt.**
 - **Prompt um 14 % kürzen** (Werbung und Trigger komplett raus): verändert weder Grundfakten noch Textqualität. Altersabweichung ±8,3 → ±8,2 Jahre, Geschlecht 64 % → 64 %. **Alter und Geschlecht sind keine Prompt-Frage** — über sechs Messungen konstant, unbeeindruckt von jeder Änderung.
 - **Modellwechsel auf Medium 3.5** (vollständiger Lauf, identischer Prompt): 4,6-fache Kosten (19,85 € statt 4,35 € je 1.000 im Workshop), Altersabweichung nur ±7,5 statt ±8,1 Jahre, Geschlecht 66,7 statt 64,3 % — und zwei Kinderschutz-Verstöße, wo Large in 42 Analysen sauber blieb. Textqualität war besser (Hedge-Wörter 2,4 statt 7,1 %), rechtfertigt den Aufpreis aber nicht.
 - **Zweiter Aufruf auf `mistral-small-2603`:** liefert Werbesprüche statt Marken („Luxus-Vitamine", „Dein Like-Count ist dein Spiegel") und ignoriert die Anzahlvorgabe (18 statt 6-8 Einträge).
@@ -28,32 +39,6 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **Kosten praktisch unverändert:** Der Hauptaufruf wird kleiner, weil die Werbung dort wegfällt (gemessen 1.522 Eingabe- und 339 Ausgabe-Tokens weniger). Das gleicht den zweiten Aufruf fast aus — **4,44 € statt 4,35 € je 1.000 Analysen** im Workshop-Betrieb.
 - **Wartezeit:** Der zweite Aufruf verdoppelt die Anfragen je Analyse. Bei `mistral-large-2512` gilt ein Limit von **15 Anfragen pro Minute** (am 2026-08-10 an der API gemessen; die frühere Notiz „6 Anfragen pro Sekunde" ist überholt). Die Warteschlange erzeugt bei Parallelität 10 und 56 Sekunden je Analyse rund 11 Anfragen pro Minute — mit dem zweiten Aufruf wären es 22. **Die Parallelität muss deshalb von 10 auf 7 gesenkt werden** (`scripts/cloudtasks-concurrency-7.sh`), sonst gibt es 429-Fehler. Folge: eine Klasse mit 25 Schülern ist nach ~3,3 statt ~2,7 Minuten durch.
 - Kostenformel an der echten Mistral-Abrechnung geeicht (Abweichung < 3 %). Preise Stand 08/2026: Large 0,50/1,50 $, Medium 1,50/7,50 $ je Million Tokens; gecachte Eingabe-Tokens 10 %.
-
-## [Unveröffentlicht]
-
-### Hinzugefügt
-
-- **Serverseitige Vorbereitung für getrennte Manipulations-Trigger** (`mistral.js`). `buildProfile` liest `manipulation_triggers` jetzt pro Modus, analog zu `ad_targeting` seit v2.7.0, mit Rückfall auf die gemeinsame obere Liste. **Ohne Prompt-Änderung ist das ein No-Op** — das Modell liefert weiterhin eine Liste, der Rückfall greift, das Verhalten ist unverändert. +3 Tests (Trennung, Rückfall, unabhängiger Rückfall von Werbung und Triggern), Mutationsprobe bestanden.
-- **Messwerkzeug `functions/scripts/single-large-ab-runner-v4-vuln.js`** (additiv, TEST-ONLY). Misst, was die v2.7.0-Messung verfehlt hat: ob die Beast-Werbung an der benannten Schwachstelle ansetzt statt nur die Marke zu wechseln. Drei neue Größen — Ausbeutungs-Mechanik-Quote (Abo, Ratenzahlung, Anti-Aging, Kredit, Lootbox, Sammelzwang …), Produktwelt-Überlappung zwischen den Modi, Wort-Ähnlichkeit der Trigger. 25 Offline-Selbsttests; die Metrik erkennt den v2.7.0-Fehler nachweislich (Ausbeutungsquote 0 %, Produktwelt 100 % überlappend).
-
-### Untersucht und NICHT übernommen
-
-- **Beast-Werbung enger an die Verletzlichkeit koppeln + Trigger trennen** — drei A/B-Messungen über je 84 Analysen (~10 €), Ergebnis: **kein Kandidat ist unterm Strich besser als der Live-Stand.** Deshalb bewusst nicht deployt.
-
-  | Variante | Alterstreffer | Trigger getrennt | Beast-Mechanik | Marken-Überlappung |
-  |---|---|---|---|---|
-  | Live v2.7.0 | Basis | nein (100 %) | ~33 % | ~6,5 % |
-  | Werbung + Trigger | **−11,9 Pp** | ja (6,5 %) | 54,1 % | 40,1 % |
-  | dieselbe, Prompt gestrafft | **−11,9 Pp** | ja (6,7 %) | 48,6 % | 25,2 % |
-  | nur Trigger | ±0 | ja (9,1 %) | **17,6 %** | 15,8 % |
-
-  **Befund 1 — die Werbe-Anweisung kostet Alterstreffer.** Der Einbruch von 11,9 Prozentpunkten trat in beiden Läufen mit Werbe-Änderung auf, auf die Nachkommastelle gleich; ohne sie blieb der Wert exakt unverändert. Ein längerer Prompt mit mehr Pflichtquoten zieht Aufmerksamkeit von der Altersschätzung ab. Alter ist eine Kernaussage des Tools — das ist kein akzeptabler Preis.
-
-  **Befund 2 — die Mindestquote hebelt die Marken-Trennung aus.** Auf „mindestens 4 Einträge mit Mechanik" antwortet das Modell mit derselben Marke plus Zusatz („Decathlon Riverside 500 Abo", obwohl Decathlon schon im Standard steht). Damit war der v2.7.0-Gewinn halb verloren. Ein ausdrücklicher Anbieter- und Branchenwechsel in Runde 2 hat es gemildert (40,1 % → 25,2 %), aber nicht auf das Live-Niveau zurückgebracht.
-
-  **Befund 3 — Zielkonflikt zwischen Werbung und Triggern.** Trennt man nur die Trigger, halbiert sich die Ausbeutungs-Mechanik in der Werbung (33 % → 17,6 %). Das Modell erfüllt die Ausbeutungslogik dann in den Trigger-Texten und lässt die Werbung braver — es verschlechtert also genau das, was der Umbau verbessern sollte.
-
-  **Lehre für den nächsten Anlauf:** Nicht weiter Anweisungen hinzufügen. Jede zusätzliche Pflichtregel wird woanders bezahlt (erst Alter, dann Markenvielfalt, dann Mechanik). Erfolgversprechender wäre, bestehende Prompt-Teile zu kürzen und die Verletzlichkeits-Kopplung in den vorhandenen Beast-Block zu falten, statt ihn zu erweitern.
 
 ## [2.7.0] — 2026-08-09
 

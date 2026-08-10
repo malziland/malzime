@@ -20,13 +20,15 @@
 # max-dispatches-per-second bleibt bei 3. Der Wert ist heute wirkungslos, weil
 # die Concurrency vorher greift; er wuerde erst bei deutlich hoeherer
 # Parallelitaet relevant. Siehe docs/RUNBOOK.md.
+# HINWEIS: --max-burst-size wurde 2026-08-10 entfernt — die aktuelle
+# gcloud-CLI kennt den Parameter nicht mehr (Google leitet den Wert selbst
+# ab, aktuell 10). Mit dem Parameter bricht das Script mit einem Fehler ab.
 set -euo pipefail
 gcloud tasks queues update analyze-queue \
   --location=europe-west1 \
   --project=malzime \
   --max-concurrent-dispatches=7 \
-  --max-dispatches-per-second=3 \
-  --max-burst-size=20
+  --max-dispatches-per-second=3
 echo "Concurrency: 7 (v2.8 — zwei Mistral-Aufrufe je Analyse)"
 gcloud tasks queues describe analyze-queue \
   --location=europe-west1 --project=malzime \

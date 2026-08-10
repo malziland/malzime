@@ -4,6 +4,61 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.11.1] — 2026-08-11
+
+Drei Fehler, die in der Browser-Konsole sichtbar waren, plus der echte Fehler
+dahinter. Ausgelöst durch eine Meldung des Betreibers aus dem laufenden Betrieb.
+
+### Behoben
+
+- **Karten-Bibliothek verwies auf eine Datei, die es nicht gibt.**
+  `leaflet.js` endete mit `//# sourceMappingURL=leaflet.js.map`; diese
+  Begleitdatei wurde nie mitausgeliefert. Firebase Hosting antwortet für
+  unbekannte Pfade mit der **Startseite** (HTTP 200, `text/html`, 20396 Bytes)
+  — der Browser wollte JSON parsen und meldete
+  `JSON Parse error: Unrecognized token '<'`. Verweis entfernt.
+- **Formatierung im HTML, die die eigene Sicherheitsrichtlinie verbietet.**
+  `stats.html` setzte die Startbreite der Limit-Anzeige als
+  `style="width: 0%"`. Die CSP erlaubt `style-src 'self'` ohne
+  `'unsafe-inline'`; der Browser verwarf das Attribut und meldete es bei jedem
+  Aufruf. Startbreite nach `styles.css` verschoben. Was JavaScript über die
+  CSSOM setzt, war und bleibt erlaubt.
+- **Reduzierte Bewegung schaltete nur die Dauer ab, nicht die Verzögerung.**
+  Die Profilkarten laufen mit `animation: fadeUp … both` und gestaffelten
+  `animation-delay` bis 0,33 s. `both` hält während der Wartezeit den
+  Startzustand `opacity: 0`. Wer Animationen ausdrücklich abbestellt hatte, sah
+  die Karten also weiterhin nacheinander aufpoppen — nur ohne Bewegung.
+  `animation-delay` und `transition-delay` werden jetzt mit zurückgesetzt.
+
+### Neue Dauerprüfungen
+
+- Jeder Source-Map-Verweis im Hosting-Ordner muss auf eine real vorhandene
+  Datei zeigen — geprüft am **Dateibestand**, nicht über HTTP. Grund: Ein
+  HTTP 200 von diesem Hosting beweist nicht, dass eine Datei existiert.
+- Keine `style`-Attribute in den ausgelieferten HTML-Seiten.
+- Bei reduzierter Bewegung darf keine Profilkarte unsichtbar bleiben (E2E,
+  Prüfung auf die Ursache statt auf das Symptom, dadurch nicht flackernd).
+
+Alle drei mit Rückbauprobe belegt. Frontend 203 Tests, E2E 10.
+
+### Wie der dritte Fehler gefunden wurde
+
+Der A11y-Test meldete im CI 19 ernste Kontrastverstöße im Beast Mode — an
+Elementen, die niemand angefasst hatte. Es sah nach einem flackernden Test aus.
+Tatsächlich maß axe unsichtbaren Text: Die Karten warteten noch auf ihre
+Einblende-Verzögerung. Der Fund war echt, nur nicht dort, wo er zu stehen
+schien.
+
+### Betrieb (nicht im Code sichtbar)
+
+- Die Alarm-Richtlinie schickt jetzt zusätzlich an einen **E-Mail-Kanal**. Der
+  ntfy-Push war nicht als zugestellt nachweisbar; Priorität, Weiterleitung und
+  Kanalzuordnung schieden als Ursache aus. Zustellung der E-Mail mit einem
+  Testalarm **belegt**. Rezept in `docs/ERROR-ALERTING.md`.
+- Die DNS-Zone von `malzi.me` steht erstmals schriftlich im
+  [RUNBOOK](docs/RUNBOOK.md) — samt Prüfbefehlen und einer Vorfallnotiz.
+- `api.malzi.me` ist vollständig abgebaut (DNS und Cloud-Run-Zuordnung).
+
 ## [2.11.0] — 2026-08-11
 
 Sanierung des LANGAUDIT vom 2026-08-10 (Bericht wird nicht veröffentlicht).

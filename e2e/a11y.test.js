@@ -124,6 +124,23 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(page.locator(".cat-card").first()).toBeVisible();
 
+  /* Bei reduzierter Bewegung darf KEINE Karte unsichtbar sein.
+     Die Karten laufen mit `animation: fadeUp … both` und gestaffelten
+     `animation-delay` bis 0,33 s; `both` haelt waehrend der Wartezeit den
+     Startzustand `opacity: 0`. Der reduced-motion-Block setzte lange nur die
+     Dauer zurueck, nicht die Verzoegerung — die Karten poppten also auch fuer
+     Menschen nacheinander auf, die Animationen ausdruecklich abbestellt haben.
+
+     Fuer axe sah das aus wie unsichtbarer Text: Kontrast 1:1, 19 ernste
+     Verstoesse (CI 2026-08-10). Der Fund war echt, nur nicht dort, wo er zu
+     stehen schien — deshalb hier eine Pruefung auf die URSACHE statt auf das
+     Symptom. Sie haengt nicht am Zeitpunkt der Messung und kann daher nicht
+     flackern. */
+  const unsichtbar = await page.$$eval(".cat-card", (karten) =>
+    karten.map((k, i) => ({ i, opacity: Number(getComputedStyle(k).opacity) })).filter((k) => k.opacity < 1)
+  );
+  expect(unsichtbar, "Karten, die bei reduzierter Bewegung unsichtbar bleiben").toEqual([]);
+
   await checkA11y(page, "Profil-Ansicht im Beast Mode");
 
   /* Und der geklebte Umschalter im gescrollten Zustand — er liegt dann ueber

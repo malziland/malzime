@@ -4,3 +4,11 @@ License: BSD-2-Clause
 (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade
 
 Self-hosted copy — no external CDN requests.
+
+Aenderung gegenueber dem Original: Die letzte Zeile
+`//# sourceMappingURL=leaflet.js.map` wurde entfernt. Die Begleitdatei
+leaflet.js.map wird bewusst nicht mitausgeliefert (Debug-Hilfe, ~250 KB,
+fuer Besucher nutzlos). Ohne die Entfernung fragen die Entwicklerwerkzeuge
+sie an, Firebase liefert wegen der Catch-all-Weiterleitung die Startseite
+zurueck (HTTP 200, text/html) und der Browser meldet in der Konsole
+"JSON Parse error: Unrecognized token '<'".

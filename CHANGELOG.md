@@ -4,6 +4,43 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.11.2] — 2026-08-11
+
+Vorbereitung des Firestore-Umzugs nach Europa. **Ändert das Verhalten nicht** —
+der Schalter steht weiterhin auf der alten Datenbank.
+
+### Warum
+
+Die Datenschutzerklärung verspricht Europa; die Datenbank liegt in `nam5` (USA),
+und ein Job-Dokument enthält bis zu zwei Stunden lang das fertige Profil eines
+oft minderjährigen Menschen. Der Standort einer Firestore-Datenbank ist
+**unveränderlich** — es gibt keinen Umzugsknopf. Der Wechsel läuft deshalb über
+eine zweite Datenbank.
+
+### Vorbereitet
+
+- Datenbank `malzime-eu` in `europe-west1` angelegt — dort liegen auch die
+  Functions und der Foto-Bucket. Regeln und Indizes auf beide ausgerollt.
+- Die drei dauerhaften Dokumente kopiert und als identisch nachgewiesen.
+  `jobs/*` (2 h) und `usedNonces/*` verfallen von selbst und ziehen nicht mit.
+- Neue Datei `functions/src/db.js`: `datenbank()` ist die **einzige** Stelle,
+  an der eine Firestore-Verbindung entsteht. 22 direkte Aufrufe in vier
+  Dateien darauf umgestellt.
+- `scripts/firestore-umzug-sync.mjs` überträgt die Dokumente in beide
+  Richtungen — der Rückweg ist damit genauso vorbereitet wie der Hinweg.
+
+### Der eigentliche Schutz
+
+Beim Umschalten hätte eine übersehene Stelle **still weiter nach Amerika
+geschrieben** — ohne Fehler, ohne Log. Genau so war die Zusage „Daten in
+Europa" drei Audits lang unbemerkt falsch. `db-zentral.test.js` verbietet den
+Import von `getFirestore` ausserhalb `db.js`, prüft beide Schalterstellungen
+und hält fest, worauf der Schalter steht — beim Umschalten wird er absichtlich
+rot, als eingebaute Erinnerung, die Dokumentation mitzuziehen.
+
+Backend 618 Tests (611 + 7 neue). Ablauf, Nachweis und Rückweg:
+[RUNBOOK](docs/RUNBOOK.md), Abschnitt „Firestore-Umzug".
+
 ## [2.11.1] — 2026-08-11
 
 Drei Fehler, die in der Browser-Konsole sichtbar waren, plus der echte Fehler

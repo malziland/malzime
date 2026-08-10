@@ -72,7 +72,9 @@ const RUNS_PER_IMAGE = Number(process.env.RUNS_PER_IMAGE || 3);
 const CONCURRENCY = Number(process.env.CONCURRENCY || 4);
 
 const LIVE_PROMPT = require("../src/locales/de/prompts").singleLargePrompt;
-const CANDIDATE = require("./prompts-candidate-v2.8.0");
+/* Kandidat per ENV waehlbar — erlaubt denselben Runner fuer verschiedene
+   Fragestellungen (Werbe-Kandidat vs. gekuerzter Prompt). */
+const CANDIDATE = require(process.env.CAND_MODULE || "./prompts-candidate-v2.8.0");
 const { brandBlocklistBlock } = require("../src/locales/de/prompts");
 const { _BRAND_BLOCKLIST_SETS } = require("../src/mistral");
 
@@ -607,7 +609,7 @@ function generateReport(live, cand, liveDiv, candDiv, meta) {
   return `# A/B-Test: Werbung auftrennen + Wiederholungen brechen
 
 Modell ${meta.model} · Temperatur ${meta.temperature} · ${meta.runsPerImage} Läufe je Bild
-${meta.images} Bilder · ${meta.totalCalls} Calls · ${meta.durationMin.toFixed(1)} Min · ca. ${meta.costEUR.toFixed(2)} EUR
+${meta.images} Bilder · ${meta.totalCalls} Calls · ${meta.durationMin.toFixed(1)} Min · max. ${meta.costEUR.toFixed(2)} EUR (real ~halb so viel)
 Gefahren am ${meta.startedAt}
 
 ---
@@ -760,6 +762,11 @@ async function main() {
   const allCalls = results.filter((r) => r.totalTokens > 0);
   const totalIn = allCalls.reduce((a, r) => a + (r.promptTokens || 0), 0);
   const totalOut = allCalls.reduce((a, r) => a + (r.outputTokens || 0), 0);
+  /* OBERGRENZE, nicht Ist-Kosten: Listenpreis ohne Prompt-Cache. An der echten
+     Mistral-Abrechnung geprueft (2026-08-09: ~180 Anfragen = 3,40 EUR, also
+     ~1,9 ct/Analyse) liegt der reale Wert bei rund der HAELFTE dieser Zahl.
+     Bewusst nicht "optimiert" — eine zu hohe Schaetzung ist harmlos, eine zu
+     niedrige fuehrt zu ungeplanten Kosten. */
   const costEUR = ((totalIn / 1_000_000) * 2 + (totalOut / 1_000_000) * 6) * 0.92;
 
   const meta = {

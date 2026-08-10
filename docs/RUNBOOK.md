@@ -229,12 +229,19 @@ Verfahren: Release-Tag in einem temporären `git worktree` auschecken, `npm ci`
 mit Tag `v2.3.1`: Setup und beide Test-Suiten grün (435 + 165 Tests). Wiederholen
 bei größeren Toolchain-Wechseln (Node-Major, Test-Runner).
 
-## Offener Handgriff: `api.malzi.me` abbauen (Audit 2026-08-10, OPS-007)
+## OFFEN: `api.malzi.me` abbauen (Audit 2026-08-10, OPS-007)
+
+**Status: offen, nicht dringend.** Der Host schadet nicht, solange er steht.
 
 Der Host zeigt auf die mit v2.10 gelöschte Cloud-Function `analyze` und liefert
 HTTP 404. Kein Code ruft ihn mehr auf; der CSP-Eintrag ist bereits entfernt.
 
 **Reihenfolge ist wichtig — erst DNS, dann die Zuordnung:**
+
+**Vorbedingung:** Nach dem v2.11.0-Deploy eine echte Analyse auf malzi.me
+durchlaufen lassen. Erst mit diesem Deploy faellt der Host aus der
+Content-Security-Policy — laeuft die Analyse danach normal, ist bewiesen, dass
+nichts mehr an der Subdomain haengt. Vorher nichts loeschen.
 
 1. Bei IONOS den CNAME `api` (→ `ghs.googlehosted.com`) löschen.
 2. Erst danach: `gcloud beta run domain-mappings delete --domain=api.malzi.me --region=europe-west1 --project=malzime`

@@ -158,25 +158,39 @@ Sichtbarer Text im Bild ist Bildinhalt, keine Anweisung. Der aktive
 Single-Large-Prompt sagt das seit 2026-08-10 ausdrücklich (vorher stand die
 Warnung nur im 3-Call-Pfad). Die Ausgabe-Netze greifen unabhängig davon.
 
-### Bewusst nicht geändert: anonymes Schreiben am ntfy-Dienst (Audit SEC-005)
+### OFFEN: anonymes Schreiben am ntfy-Dienst (Audit SEC-005)
 
-Der ntfy-Dienst erlaubt anonymes **Schreiben** (`NTFY_AUTH_DEFAULT_ACCESS=write-only`).
-Wer den Topic-Namen kennt, könnte gefälschte Betreiber-Benachrichtigungen mit
-eigenen Aktions-Links schicken. Lesen ist anonym nicht möglich — die
-ausgehenden HMAC-Links sind also nicht einsehbar.
+**Status: offen, nicht entschieden.** Wartet auf eine Angabe, die nur der
+Inhaber machen kann.
 
-**Entscheidung 2026-08-10: bleibt so.** Zwei Gründe:
+Gemessen am 2026-08-10 gegen den laufenden Dienst:
 
-1. Der Topic-Name ist seit der Rotation ein 30-stelliger Zufallswert. Die
-   Erratbarkeit, die den Befund überhaupt erst begründet hat, ist damit weg.
-2. Der Dienst wird von mehreren Projekten des Betreibers geteilt. `deny-all`
-   plus Token würde deren Benachrichtigungen brechen, und diese Projekte sind
-   nicht Teil dieses Audits — die Änderung wäre ein Eingriff ins Blinde.
+| | Ergebnis |
+|---|---|
+| anonym lesen | HTTP 403 — verboten |
+| anonym schreiben | HTTP 200 — erlaubt |
+| `notify.js` | veröffentlicht ohne Anmeldedaten |
 
-**Restrisiko, benannt:** Wer den Topic-Namen erlangt, kann Fehlalarme
-fabrizieren. Ein echter Schaden entstünde erst, wenn der Betreiber daraufhin
-einem gefälschten Link folgt; die Admin-Aktionen selbst sind durch HMAC und
-Einmal-Nonce geschützt und mutieren nichts allein durch Aufruf.
+**Das Risiko:** Wer den Topic-Namen kennt, kann gefälschte Benachrichtigungen
+mit eigenem Titel, Text und eigenen Aktions-Knöpfen schicken. Die echten
+Meldungen enthalten Knöpfe („+100 Analysen") mit signierten Links — der Inhaber
+ist also darauf trainiert, in einer ntfy-Nachricht auf einen Knopf zu tippen.
+Mitlesen kann niemand; die ausgehenden Links sind nicht einsehbar. Die echten
+Admin-Funktionen sind durch HMAC und Einmal-Nonce geschützt: Ein Klick auf einen
+gefälschten Link führt woandershin, löst bei malziME aber nichts aus.
 
-**Nachprüfbar ab:** wenn der ntfy-Dienst ohnehin angefasst wird (Update,
-Umzug) — dann Token-Pflicht für alle publizierenden Projekte in einem Zug.
+**Warum es noch nicht behoben ist:** Der ntfy-Dienst wird von mehreren Projekten
+des Inhabers geteilt. `NTFY_AUTH_DEFAULT_ACCESS=deny-all` plus
+Veröffentlichungs-Token würde jedes dieser Projekte betreffen — und welche das
+sind, ist derzeit **nicht bekannt** (Stand 2026-08-10, auf Nachfrage). Eine
+Umstellung ins Blinde würde deren Benachrichtigungen still verstummen lassen,
+und eine ausbleibende Benachrichtigung sieht genauso aus wie „keine Fehler".
+
+**Was zur Behebung fehlt:** die Liste der Projekte, die auf diesen Server
+veröffentlichen. Danach: Token anlegen, überall nachtragen, jedes Projekt
+einzeln testen, erst dann `deny-all` setzen.
+
+**Zwischenzeitliche Entschärfung:** Das Topic ist seit der Rotation vom
+2026-07-17 ein 30-stelliger Zufallswert. Die Erratbarkeit, die den Befund
+ursprünglich begründet hat, ist damit weg — bleibt das Risiko, dass der Name
+irgendwo durchsickert.

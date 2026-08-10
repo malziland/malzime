@@ -225,6 +225,42 @@ describe("Queue-Modus", () => {
     expect(statusAbfragen).toBe(0);
   });
 
+  it("Wiederaufnahme im laufenden Fenster: das Foto bleibt stehen", async () => {
+    /* Bei der Rückkehr aus dem Hintergrund lief die Seite durchgehend — das
+       Foto steht noch im Fenster. Der Datenschutz-Hinweis „Foto gelöscht" ist
+       nur nach einem echten Reload richtig; ihn hier zu setzen würde dem
+       Nutzer sein gerade ausgewähltes Bild wegnehmen. */
+    const { resumeQueueJob } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-mit-foto");
+    elements.imagePreview.innerHTML = '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="">';
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    await resumeQueueJob({ force: true });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(elements.imagePreview.querySelector("img")).not.toBeNull();
+  });
+
+  it("Wiederaufnahme nach echtem Reload: Datenschutz-Hinweis statt Foto", async () => {
+    /* Gegenprobe — nach einem Reload ist das Foto tatsächlich weg (es wird
+       bewusst nirgends zwischengespeichert), dann gehört der Hinweis hin. */
+    const { resumeQueueJob } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-ohne-foto");
+    elements.imagePreview.innerHTML = "";
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    await resumeQueueJob({ force: true });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(elements.imagePreview.querySelector(".photo-deleted-note")).not.toBeNull();
+  });
+
   it("behält die jobId nach Erfolg, damit ein Reload das Ergebnis wieder zeigt", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-xyz" });

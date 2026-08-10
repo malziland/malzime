@@ -4,6 +4,14 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.9.1] — 2026-08-10
+
+### Behoben
+
+- **Das Foto verschwand, wenn die Analyse aus dem Hintergrund zurückkam.** An seiner Stelle stand der Hinweis „Foto gelöscht" — obwohl gar kein Neuladen stattgefunden hatte. Die Wiederaufnahme war ursprünglich nur für den Reload-Fall gebaut, wo das Foto tatsächlich weg ist, und setzte den Hinweis unbesehen. Kommt die Seite dagegen aus dem Hintergrund zurück, lief sie durchgehend und das Bild steht noch im Fenster. Der Hinweis erscheint jetzt nur noch, wenn wirklich kein Foto mehr da ist.
+
+  Datenschutzrechtlich ändert das nichts: Gespeichert wird nach wie vor nirgends etwas, weder im Browser noch serverseitig. Es wird lediglich nicht weggeworfen, was ohnehin schon angezeigt wird. (+2 Tests, Mutationsprobe bestanden)
+
 ## [2.9.0] — 2026-08-10
 
 ### Hinzugefügt

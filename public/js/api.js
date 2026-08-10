@@ -1012,9 +1012,16 @@ export async function resumeQueueJob({ force = false } = {}) {
     /* Erfolg: Ticket behalten, damit auch ein weiterer Reload das Ergebnis
        wieder zeigt (bis zum nächsten Upload oder bis der Job serverseitig
        abläuft). */
-    /* Foto ist nach dem Reload weg (Datenschutz, s. showPhotoDeletedNotice) →
-       an seine Stelle den positiven Datenschutz-Hinweis setzen. */
-    showPhotoDeletedNotice();
+    /* Foto ist nach einem Reload weg (Datenschutz, s. showPhotoDeletedNotice) →
+       an seine Stelle den positiven Datenschutz-Hinweis setzen.
+
+       ABER NUR DANN. Bei der Wiederaufnahme aus dem Hintergrund lief die Seite
+       durchgehend, das Foto steht also noch im Fenster — es hier zu entfernen
+       wäre ein unnötiger Verlust: Der Nutzer hat sein Bild gerade eben selbst
+       ausgewählt und will es neben dem Ergebnis sehen. Datenschutzrechtlich
+       ändert das nichts, denn gespeichert wird nach wie vor nirgends etwas;
+       es wird nur nicht weggeworfen, was ohnehin schon angezeigt wird. */
+    if (!elements.imagePreview?.querySelector("img")) showPhotoDeletedNotice();
     /* Hinweis-Dialog nur zeigen, wenn er für genau diesen Job noch NICHT
        bestätigt wurde — sonst (User hat ihn beim ersten Ergebnis schon
        weggeklickt) direkt rendern. */

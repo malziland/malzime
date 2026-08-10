@@ -2534,6 +2534,18 @@ ol.legal-list > li::before {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    /* Verzögerungen müssen mit zurückgesetzt werden, nicht nur die Dauer.
+       Die Profilkarten laufen mit `animation: fadeUp … both` und gestaffelten
+       `animation-delay` bis 0,33 s. `both` hält während der Wartezeit den
+       Startzustand — und der ist `opacity: 0`. Ohne diese beiden Zeilen sieht
+       also gerade die Person, die Animationen abbestellt hat, die Karten
+       weiterhin nacheinander aufpoppen; nur eben ohne Bewegung.
+
+       Nebenwirkung im Test: axe misst dann unsichtbaren Text und meldet
+       Kontrast 1:1 als ernsten Verstoß (19 Elemente, Beast Mode, CI 2026-08-10).
+       Der Fund war echt — nur nicht dort, wo er zu stehen schien. */
+    animation-delay: 0s !important;
+    transition-delay: 0s !important;
   }
 }
 

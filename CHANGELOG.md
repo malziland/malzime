@@ -6,7 +6,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [2.11.0] — 2026-08-11
 
-Sanierung des LANGAUDIT vom 2026-08-10 (`docs/audit-2026-08-11.md`).
+Sanierung des LANGAUDIT vom 2026-08-10 (Bericht wird nicht veröffentlicht).
 **36 der 38 Befunde geschlossen**, jeder mit einer Prüfung dahinter und einer
 Rückbauprobe: Quellcode zurückgedreht, Prüfung behalten, rot gesehen,
 wiederhergestellt.

@@ -60,3 +60,9 @@ age-ab-v29-report.md
 # werden (Kennzeichnungspflicht) und gehoeren deshalb weder nach public/ noch
 # ins Repo — Audit 2026-08-10, PRIV-002.
 .demo-originale/
+
+# Audit- und Sanierungsberichte bleiben lokal.
+# Das Repo ist oeffentlich; ein Prueffbericht ist eine Landkarte des Systems
+# und gehoert nicht dorthin. Ablage stattdessen ausserhalb des Repos.
+docs/audit-*.md
+docs/sanierung-*.md

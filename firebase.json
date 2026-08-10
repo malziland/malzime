@@ -1,8 +1,9 @@
 {
-  "firestore": {
-    "rules": "firestore.rules",
-    "indexes": "firestore.indexes.json"
-  },
+  "_kommentar_firestore": "Zwei Datenbanken: (default) liegt in nam5 (USA), malzime-eu in europe-west1. Der Wechsel laeuft ueber FIRESTORE_DATABASE_ID in functions/src/config.js. Regeln und Indizes sind fuer beide identisch, damit ein Umschalten sofort traegt und der Rueckweg jederzeit offen ist.",
+  "firestore": [
+    { "database": "(default)", "rules": "firestore.rules", "indexes": "firestore.indexes.json" },
+    { "database": "malzime-eu", "rules": "firestore.rules", "indexes": "firestore.indexes.json" }
+  ],
   "functions": {
     "source": "functions",
     "runtime": "nodejs24"

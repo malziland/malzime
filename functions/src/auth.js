@@ -60,9 +60,9 @@ function verifyNonce(nonce, action, secret) {
  * bereits verbraucht wurde. Fail-open bei Firestore-Fehlern.
  */
 async function consumeNonce(nonce) {
-  const { getFirestore } = require("firebase-admin/firestore");
+  const { datenbank } = require("./db");
   const hash = crypto.createHash("sha256").update(nonce).digest("hex").slice(0, 16);
-  const ref = getFirestore().collection("usedNonces").doc(hash);
+  const ref = datenbank().collection("usedNonces").doc(hash);
   try {
     await ref.create({ usedAt: Date.now() });
     return true;
@@ -78,11 +78,11 @@ async function consumeNonce(nonce) {
  * Fire-and-forget, max 50 pro Aufruf.
  */
 async function cleanupNonces() {
-  const { getFirestore } = require("firebase-admin/firestore");
+  const { datenbank } = require("./db");
   const cutoff = Date.now() - NONCE_TTL_MS;
-  const snapshot = await getFirestore().collection("usedNonces").where("usedAt", "<", cutoff).limit(50).get();
+  const snapshot = await datenbank().collection("usedNonces").where("usedAt", "<", cutoff).limit(50).get();
   if (snapshot.empty) return;
-  const batch = getFirestore().batch();
+  const batch = datenbank().batch();
   snapshot.docs.forEach((doc) => batch.delete(doc.ref));
   await batch.commit();
 }

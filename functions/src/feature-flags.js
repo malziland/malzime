@@ -29,7 +29,7 @@
  * als `false` — im Zweifel also der bewährte Pfad.
  */
 
-const { getFirestore } = require("firebase-admin/firestore");
+const { datenbank } = require("./db");
 const { isLocalQueueMode } = require("./config");
 
 const FLAGS_DOC = "featureFlags/current";
@@ -50,7 +50,7 @@ async function getFeatureFlags() {
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
   try {
-    const snap = await getFirestore().doc(FLAGS_DOC).get();
+    const snap = await datenbank().doc(FLAGS_DOC).get();
     const data = snap.exists ? snap.data() : {};
     const flags = {
       useSingleLargeCall: data.useSingleLargeCall === true,

@@ -1,7 +1,7 @@
 import { initI18n, applyTranslations, t } from "./js/i18n.js";
 import { elements } from "./js/dom.js";
 import { state } from "./js/state.js";
-import { analyzeImage, acquireWakeLock, resumeQueueJob } from "./js/api.js";
+import { analyzeImage, acquireWakeLock, resumeQueueJob, initHintergrundWiederaufnahme } from "./js/api.js";
 import { renderCurrentMode } from "./js/render.js";
 import {
   dismissDisclaimerModal,
@@ -23,6 +23,10 @@ initDemo();
 /* ── Queue-Modus: offenes Ergebnis nach einem Reload weiter abholen ──
    No-Op, wenn keine jobId aus einem früheren Seitenbesuch vorliegt. */
 resumeQueueJob();
+
+/* Holt das Ergebnis auch dann nach, wenn das Handy zwischendurch gesperrt war
+   und die Abfrage-Schleife dabei steckengeblieben ist. */
+initHintergrundWiederaufnahme();
 
 /* ── Limit-, Maintenance- und Feature-Flag-Check beim Seitenstart ──
    In state.statsReady abgelegt, damit analyzeImage darauf warten kann, bevor

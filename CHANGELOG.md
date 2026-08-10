@@ -22,6 +22,16 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
   **Die vorhandene Tiererkennung hat dabei nicht versagt.** Der Prompt verlangt ein Pflichtfeld `subject`, bei `ANIMAL_ONLY` kommt statt eines Profils das Tier-Easter-Egg, und das läuft in beiden Pipelines. Das Modell hatte schlicht `HUMAN` gemeldet — ab da folgt die Erkennung korrekt einer Einschätzung, die schon falsch war. Eine zusätzliche Vorprüfung „ist ein Mensch im Bild?" würde deshalb nichts ändern; sie existiert bereits und träfe dieselbe Fehlentscheidung. Zwei Änderungen setzen tiefer an: eine Merkmals-Prüfliste im Prompt (Fell statt Haut, Schnauze statt Nase, Pfoten statt Händen) samt der Regel, dass Primaten **immer** `ANIMAL_ONLY` sind, und serverseitig ein Netz (`animal.js` `pruefeTierWiderspruch`), das bei `HUMAN` plus beschriebenen Tiermerkmalen das Tier-Easter-Egg ausliefert statt eines erfundenen Menschenprofils. Bewusst eng gefasst, mit Ausnahmeliste für Pferdeschwanz, Fellweste, Kunstfell und Katzenaugen-Lidstrich. **Grenze:** Beschreibt das Modell durchgehend einen Menschen, findet auch dieses Netz nichts.
 
+- **Die Analyse ging verloren, wenn das Handy zwischendurch gesperrt war.** Es erschien „Netzwerkfehler", und auch ein Neuladen brachte das Ergebnis nicht zurück — obwohl der Job serverseitig weiterlief und rund zwei Stunden bereitlag.
+
+  Die eigentliche Ursache lag nicht bei der Fehlermeldung, sondern eine Zeile weiter: **Bei jedem Fehler wurde die Job-Nummer weggeworfen** (`clearStoredJobId`), auch bei einem bloßen Verbindungsabbruch. Damit war das fertige Profil unerreichbar, denn die Nummer ist der einzige Weg dorthin. Sie bleibt jetzt erhalten, wenn nur die Verbindung weg ist; aufgeräumt wird nur, wenn der Job wirklich weg ist (404, fehlgeschlagen, abgelaufen).
+
+  Dazu setzt der Durchgang sich bei der Rückkehr aus dem Hintergrund **neu auf**, statt auf die alte Schleife zu vertrauen: Beim Sperren friert der Browser nicht nur die Netzwerkanfrage ein, sondern die JavaScript-Ausführung insgesamt — die Schleife kann danach in einem `fetch` feststecken, der nie zurückkommt. Ist seit der letzten erfolgreichen Statusabfrage zu viel Zeit vergangen, wird deshalb neu abgefragt. Ein kurzer Tab-Wechsel löst das nicht aus.
+
+  Die Meldung sagt jetzt außerdem, was Sache ist: „Verbindung unterbrochen. Deine Analyse läuft weiter" statt „Netzwerkfehler".
+
+  **Ein erster Anlauf hatte nur die Fehlerzählung angefasst** — Fehlschläge im Hintergrund nicht mitzählen — und wurde nach kurzer Zeit zurückgenommen: Er beseitigte die Fehlermeldung, hinterließ aber einen stillen toten Zustand ohne Spinner, Status oder Ergebnis. Das ist schlechter als eine falsche Meldung, weil es nicht einmal zum Neuladen auffordert. Der zugehörige Test war grün und bestand die Mutationsprobe, bildete die Realität eines gesperrten Handys aber nicht ab: `document.hidden` zu setzen und Anfragen scheitern zu lassen ist etwas anderes als ein eingefrorener Tab. (+4 Tests, drei Mutationsproben bestanden)
+
 - **Vollbilder der Demo-Fotos wurden mit einem Cache-Buster vom Februar geladen** (`demo.js`) — ein Bildwechsel wäre bei niemandem angekommen, der die Seite schon einmal besucht hat.
 
 ### Gemessen

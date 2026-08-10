@@ -148,6 +148,83 @@ describe("Queue-Modus", () => {
     await p;
   });
 
+  it("Verbindungsabbruch: Job-Nummer bleibt erhalten, damit das Ergebnis erreichbar bleibt", async () => {
+    /* DER KERN DES FEHLERS (2026-08-10): Bei JEDEM Fehler wurde die Job-Nummer
+       weggeworfen — auch bei einem vorübergehenden Verbindungsabbruch. Danach
+       war das fertige Profil unerreichbar, obwohl es serverseitig noch rund
+       zwei Stunden bereitliegt. Ein Neuladen half deshalb nicht. */
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-abbruch" });
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      throw new Error("Failed to fetch");
+    });
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(60000);
+    await p;
+    expect(sessionStorage.getItem("malzime.queueJobId")).toBe("job-abbruch");
+  });
+
+  it("Job serverseitig weg (404): Job-Nummer wird aufgeräumt", async () => {
+    /* Gegenprobe — sonst würde die Nummer ewig stehen bleiben und bei jedem
+       Seitenstart einen sinnlosen Abholversuch auslösen. */
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-weg" });
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      return new Response("{}", { status: 404 });
+    });
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(20000);
+    await p;
+    expect(sessionStorage.getItem("malzime.queueJobId")).toBeNull();
+  });
+
+  it("Rückkehr aus dem Hintergrund: steckengebliebener Durchgang wird neu aufgesetzt", async () => {
+    /* Sperrt man das Handy, friert der Browser die Seite ein — nicht nur die
+       Netzwerkanfrage, sondern die JavaScript-Ausführung. Die Schleife kann
+       danach in einem fetch feststecken, der nie zurückkommt: kein Fehler,
+       kein Ergebnis, kein Spinner. Ein erster Anlauf hat nur die Fehlerzählung
+       angefasst und genau diesen stillen toten Zustand erzeugt. Deshalb wird
+       jetzt neu aufgesetzt statt repariert. */
+    const { initHintergrundWiederaufnahme } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-eingefroren");
+    state.isAnalyzing = true;
+    state.lastPollOk = Date.now() - 60000; /* seit einer Minute nichts mehr */
+
+    let statusAbfragen = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      statusAbfragen += 1;
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    initHintergrundWiederaufnahme();
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(statusAbfragen).toBeGreaterThan(0);
+  });
+
+  it("Rückkehr bei laufendem Durchgang: kein unnötiger Neustart", async () => {
+    /* Gegenprobe: Ein kurzer Tab-Wechsel darf keinen zweiten Durchgang
+       auslösen — dafür gibt es den visibilitychange-Wecker in waitForNextPoll. */
+    const { initHintergrundWiederaufnahme } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-laeuft");
+    state.isAnalyzing = true;
+    state.lastPollOk = Date.now(); /* gerade eben noch erfolgreich */
+
+    let statusAbfragen = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("job-status")) statusAbfragen += 1;
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    initHintergrundWiederaufnahme();
+    document.dispatchEvent(new Event("visibilitychange"));
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(statusAbfragen).toBe(0);
+  });
+
   it("behält die jobId nach Erfolg, damit ein Reload das Ergebnis wieder zeigt", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-xyz" });

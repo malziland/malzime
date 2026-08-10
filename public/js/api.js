@@ -596,9 +596,19 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
       }
       data = await resp.json();
       failures = 0;
+      /* Zeitstempel des letzten erfolgreichen Polls: Daran erkennt die
+         Wiederaufnahme, ob diese Schleife noch lebt oder in einem eingefrorenen
+         fetch feststeckt. */
+      state.lastPollOk = Date.now();
     } catch (_) {
       failures += 1;
-      if (failures >= MAX_POLL_FAILURES) return { error: t("error.networkError") };
+      if (failures >= MAX_POLL_FAILURES) {
+        /* transient: Die Verbindung ist weg, NICHT der Job. Der läuft
+           serverseitig weiter und das Ergebnis liegt rund zwei Stunden bereit.
+           Der Aufrufer darf die Job-Nummer deshalb nicht wegwerfen — sonst ist
+           das fertige Profil unerreichbar, obwohl es existiert. */
+        return { error: t("error.connectionLost"), transient: true };
+      }
       continue;
     }
 
@@ -621,6 +631,42 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
         return { error: t("error.queueFailed") };
     }
   }
+}
+
+/* Wie lange ohne erfolgreiche Statusabfrage, bis der Durchgang als
+   steckengeblieben gilt. Zwei normale Abfrage-Intervalle plus Puffer — kurz
+   genug, dass niemand lange vor einer toten Seite sitzt, lang genug, dass ein
+   kurzer Tab-Wechsel keinen Neustart ausloest. */
+const STECKENGEBLIEBEN_MS = 8000;
+
+/**
+ * Holt das Ergebnis nach, wenn die Seite aus dem Hintergrund zurueckkommt.
+ *
+ * WARUM DAS NOETIG IST: Sperrt man das Handy, friert der Browser die Seite
+ * ein — nicht nur die laufende Netzwerkanfrage, sondern die JavaScript-
+ * Ausfuehrung insgesamt. Beim Zurueckkommen kann die Abfrage-Schleife in einem
+ * fetch feststecken, der nie zurueckkommt: kein Fehler, kein Ergebnis, kein
+ * Spinner. Ein erster Anlauf hat nur die Fehlerzaehlung angefasst und genau
+ * diesen stillen toten Zustand erzeugt.
+ *
+ * Deshalb wird hier nicht repariert, sondern neu aufgesetzt: Ist seit der
+ * letzten erfolgreichen Statusabfrage zu viel Zeit vergangen, startet der
+ * Durchgang neu. Der Job laeuft serverseitig ohnehin unabhaengig vom Browser
+ * weiter und das Ergebnis liegt rund zwei Stunden bereit — genau dafuer wurde
+ * die Warteschlange gebaut.
+ */
+export function initHintergrundWiederaufnahme() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (!getStoredJobId()) return;
+
+    /* Laeuft die Schleife normal weiter, nichts tun — der visibilitychange-
+       Wecker in waitForNextPoll holt das Ergebnis von selbst. */
+    const stillSeit = Date.now() - (state.lastPollOk || 0);
+    if (state.isAnalyzing && stillSeit < STECKENGEBLIEBEN_MS) return;
+
+    resumeQueueJob({ force: true });
+  });
 }
 
 /**
@@ -855,7 +901,11 @@ async function analyzeImageQueued() {
       return;
     }
     if (outcome.error) {
-      clearStoredJobId();
+      /* Nur aufräumen, wenn der Job WIRKLICH weg ist (404, failed, abgelaufen).
+         Bei einem Verbindungsabbruch bleibt die Nummer stehen: Sie ist der
+         einzige Weg zurück zum fertigen Ergebnis — über die automatische
+         Wiederaufnahme oder ein Neuladen der Seite. */
+      if (!outcome.transient) clearStoredJobId();
       setStatus(outcome.error, traceId);
       logClientError(new Error(outcome.reason || "queue_failed"), {
         phase: "queue-poll",
@@ -919,9 +969,14 @@ async function analyzeImageQueued() {
  * Seite versehentlich neu geladen oder kurz verlassen hat. Wird beim
  * Seitenstart aufgerufen; ohne offene jobId ein No-Op.
  */
-export async function resumeQueueJob() {
+export async function resumeQueueJob({ force = false } = {}) {
   const jobId = getStoredJobId();
-  if (!jobId || state.isAnalyzing) return;
+  if (!jobId) return;
+  /* Normalerweise nicht dazwischenfunken, wenn gerade eine Analyse laeuft.
+     force=true kommt von der Hintergrund-Wiederaufnahme: Dort ist der laufende
+     Durchgang nachweislich stehengeblieben, und ein neuer Anlauf ist der Sinn
+     der Sache. Das ++state.requestId unten beendet den alten sauber. */
+  if (state.isAnalyzing && !force) return;
   /* PRIV-003: das gespeicherte Abhol-Ticket mitnehmen (überlebt den Reload). */
   const resultToken = getStoredResultToken();
 

@@ -180,5 +180,6 @@
   "stats.infoLimitText": "Each analysis costs money (AI + image recognition). The hourly limit protects the project from unexpected costs.",
   "stats.infoFundingTitle": "Privately funded — free for everyone",
   "stats.infoFundingText": "malziME is ad-free, without tracking and without paywall. With a donation you help increase the limits and keep the project running.",
-  "stats.infoFundingButton": "Support the project"
+  "stats.infoFundingButton": "Support the project",
+  "error.connectionLost": "Connection lost. Your analysis is still running – it will appear automatically once you are back online."
 }

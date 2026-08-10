@@ -23,7 +23,7 @@
  * vergleichbar, konsistent mit counter.js, kein FieldValue nötig.
  */
 
-const { getFirestore } = require("firebase-admin/firestore");
+const { datenbank } = require("./db");
 const { LIVENESS_GRACE_MS, JOB_RETENTION_MS } = require("./config");
 
 const JOBS_COLLECTION = "jobs";
@@ -41,7 +41,7 @@ const JOBS_COLLECTION = "jobs";
 const PROCESSING_TIMEOUT_MS = 9 * 60 * 1000;
 
 function jobsRef() {
-  return getFirestore().collection(JOBS_COLLECTION);
+  return datenbank().collection(JOBS_COLLECTION);
 }
 
 /**
@@ -101,7 +101,7 @@ async function getJob(jobId) {
  * genau einer.
  */
 async function claimJob(jobId) {
-  const db = getFirestore();
+  const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -126,7 +126,7 @@ async function claimJob(jobId) {
  * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
 async function completeJob(jobId, result) {
-  const db = getFirestore();
+  const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -143,7 +143,7 @@ async function completeJob(jobId, result) {
  * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
 async function failJob(jobId, reason) {
-  const db = getFirestore();
+  const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -243,7 +243,7 @@ async function markDelivered(jobId) {
  * eingesparter Lauf (kein Mistral-Call).
  */
 async function abandonJob(jobId) {
-  const db = getFirestore();
+  const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);

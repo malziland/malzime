@@ -1,4 +1,5 @@
-const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { FieldValue } = require("firebase-admin/firestore");
+const { datenbank } = require("./db");
 const { HOURLY_LIMIT, HOURLY_WINDOW_MINUTES } = require("./config");
 
 const CURRENT_DOC = "stats/current";
@@ -45,7 +46,7 @@ async function checkAndIncrement() {
   let lastErr = null;
   for (let attempt = 0; attempt <= ABORTED_RETRIES; attempt++) {
     try {
-      const db = getFirestore();
+      const db = datenbank();
       const ref = db.doc(CURRENT_DOC);
 
       const result = await db.runTransaction(async (tx) => {
@@ -170,7 +171,7 @@ function getDateKeys(now = new Date()) {
  */
 async function incrementTotals() {
   try {
-    const db = getFirestore();
+    const db = datenbank();
     const ref = db.doc(TOTALS_DOC);
 
     const { todayDate, weekStart, monthKey, yearKey } = getDateKeys();
@@ -227,7 +228,7 @@ async function incrementTotals() {
  */
 async function getStats() {
   try {
-    const db = getFirestore();
+    const db = datenbank();
     const [currentSnap, totalsSnap] = await Promise.all([db.doc(CURRENT_DOC).get(), db.doc(TOTALS_DOC).get()]);
 
     const current = currentSnap.exists
@@ -278,7 +279,7 @@ async function getStats() {
  * Wenn der aktuelle Count unter dem neuen Limit liegt, ist das System sofort frei.
  */
 async function boostLimit(amount = 100) {
-  const db = getFirestore();
+  const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
   await ref.set({ limit: FieldValue.increment(amount) }, { merge: true });
 }
@@ -288,7 +289,7 @@ async function boostLimit(amount = 100) {
  * Leert recentAnalyses → Count sofort 0, System sofort frei.
  */
 async function resetCounter() {
-  const db = getFirestore();
+  const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
   await ref.set({ recentAnalyses: [], limit: HOURLY_LIMIT }, { merge: true });
 }
@@ -305,7 +306,7 @@ async function resetCounter() {
  */
 async function releaseHourlySlot() {
   try {
-    const db = getFirestore();
+    const db = datenbank();
     const ref = db.doc(CURRENT_DOC);
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
@@ -338,7 +339,7 @@ async function getMaintenanceStatus() {
     return maintenanceCache.data;
   }
   try {
-    const db = getFirestore();
+    const db = datenbank();
     const snap = await db.doc(MAINTENANCE_DOC).get();
     const result =
       snap.exists && snap.data().enabled
@@ -356,7 +357,7 @@ async function getMaintenanceStatus() {
  * Setzt den Maintenance-Modus (Admin-Funktion).
  */
 async function setMaintenanceMode(enabled, message) {
-  const db = getFirestore();
+  const db = datenbank();
   await db.doc(MAINTENANCE_DOC).set({
     enabled: !!enabled,
     message: message || "",

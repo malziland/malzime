@@ -185,6 +185,30 @@ function localQueueConcurrency() {
   return Math.max(1, Number(process.env.QUEUE_LOCAL_CONCURRENCY) || 3);
 }
 
+/* ── Firestore-Standort (Audit 2026-08-10, PRIV-001) ──────────────────────
+   Die Datenschutzerklärung verspricht Europa. Die ursprüngliche Datenbank
+   liegt in `nam5` (USA) — und in den Job-Dokumenten steht bis zu zwei Stunden
+   lang das fertige Profil eines (oft minderjährigen) Menschen.
+
+   Der Standort einer Firestore-Datenbank steht bei der Erstellung fest und
+   lässt sich NIE ändern. Es gibt keinen Umzugsknopf. Der Wechsel läuft
+   deshalb über eine ZWEITE Datenbank, auf die hier umgeschaltet wird:
+
+     ""    → Standard-Datenbank, Standort nam5 (USA)
+     "malzime-eu" → Datenbank `malzime-eu`, Standort europe-west1 (dort, wo
+                    auch die Functions und der Foto-Bucket liegen)
+
+   ═══ UMSCHALTEN ═══
+   Diesen einen Wert ändern, dann `firebase deploy --only functions`.
+   Zurück geht es genauso — der Wert ist der gesamte Hebel.
+   Ablauf, Kontrollen und Rückweg: docs/RUNBOOK.md, Abschnitt „Firestore-Umzug".
+
+   Der Zugriff läuft ausschließlich über `db()` aus `db.js`; ein direkter
+   `getFirestore()`-Aufruf würde diesen Schalter umgehen und still in die
+   falsche Datenbank schreiben. Genau das verhindert eine eigene Prüfung
+   (`__tests__/db-zentral.test.js`). */
+const FIRESTORE_DATABASE_ID = "";
+
 /* Laufzeit-Validierung — fehlerhafte Config crasht sofort statt leise falsch zu laufen */
 if (HOURLY_LIMIT < 1) throw new Error("Config: HOURLY_LIMIT must be >= 1");
 if (RATE_LIMIT < 1) throw new Error("Config: RATE_LIMIT must be >= 1");
@@ -192,6 +216,7 @@ if (MAX_UPLOAD_BYTES < 1) throw new Error("Config: MAX_UPLOAD_BYTES must be >= 1
 if (MISTRAL_PROFILE_MAX_TOKENS < 1) throw new Error("Config: MISTRAL_PROFILE_MAX_TOKENS must be >= 1");
 
 module.exports = {
+  FIRESTORE_DATABASE_ID,
   MAX_UPLOAD_BYTES,
   RATE_LIMIT,
   RATE_WINDOW_MS,

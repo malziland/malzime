@@ -99,10 +99,58 @@ Client-Fehlerbericht mit severity ERROR — im Filter wäre das Alarm-Spam.
 Client-Fehler erreichen den Betreiber stattdessen über den Log-Bucket
 `client-diagnostics` (30 Tage Aufbewahrung), nicht über ntfy.
 
+## Zweiter Kanal: E-Mail (seit 2026-08-10)
+
+Die Richtlinie schickt an **zwei** Kanäle. Grund: Am 2026-08-10 war nicht
+belegbar, dass der ntfy-Push auf dem Sperrbildschirm ankommt — die Meldung war
+in der App sichtbar, aber nur nach aktivem Öffnen. Priorität hochsetzen,
+`upstream-base-url` und Kanalzuordnung wurden geprüft und schieden als Ursache
+aus; die verbleibende Ursache liegt in der App bzw. den iOS-Einstellungen und
+damit ausserhalb dessen, was am Server reparierbar ist.
+
+Statt weiter daran zu schrauben, kam ein davon unabhängiger Weg dazu:
+
+```bash
+gcloud alpha monitoring channels create \
+  --display-name="malziME Stoerungsmeldung (E-Mail)" \
+  --type=email \
+  --channel-labels=email_address=<ADRESSE> \
+  --project=<PROJECT>
+
+gcloud alpha monitoring policies update <POLICY-ID> \
+  --add-notification-channels=<CHANNEL-RESOURCE-NAME> --project=<PROJECT>
+```
+
+**Zustellung nachgewiesen** — nicht angenommen. Prüfung ohne echten Störfall:
+eine synthetische Logzeile schreiben, die exakt auf den Filter passt.
+
+```bash
+gcloud logging write malzime-alarmtest \
+  "TESTMELDUNG (kein echter Fehler): …" \
+  --severity=ERROR \
+  --monitored-resource-type=cloud_run_revision \
+  --monitored-resource-labels=service_name=stats,location=europe-west1,revision_name=alarmtest,configuration_name=stats,project_id=malzime \
+  --project=malzime
+```
+
+Der Alarm feuert binnen ein bis zwei Minuten und schliesst sich nach 30 Minuten
+selbst (`autoClose: 1800s`). Am 2026-08-10 so verifiziert: E-Mail kam an.
+
+> **Lehre daraus:** Ein eingerichteter Benachrichtigungsweg ist kein
+> zugestellter Benachrichtigungsweg. Nach jeder Änderung an Kanälen oder
+> Richtlinie diesen Test fahren — er kostet nichts und ist der einzige Beleg.
+
+**Bekannter, harmloser Rest:** Der Filter nennt weiterhin den Dienst `analyze`,
+den es seit v2.10 nicht mehr gibt. Die Bedingung kann darüber nie auslösen; ein
+Aufräumen ist reine Kosmetik. Bewusst nicht angefasst, solange die Zustellung
+frisch nachgewiesen ist — an einer beweisbar funktionierenden Alarmkette ohne
+Not zu schrauben, wäre der schlechtere Handel.
+
 ## Was passiert dann?
 
 - Loggt eine Function einen Fehler, kommt eine Benachrichtigung — bei malziME
-  als Push mit ⚠️-Symbol, Fehlertext und Link zur Cloud Console.
+  per E-Mail (nachweislich zugestellt) und zusätzlich als ntfy-Push mit
+  ⚠️-Symbol, Fehlertext und Link zur Cloud Console.
 - Handled per-Request-Fehler (HTTP 4xx/5xx an den Client, nur `console.log`)
   lösen **nicht** aus — nur echte `severity>=ERROR`-Logs (Abstürze, OOM,
   Timeouts, eskalierte Fehler wie `counter-fail-open`).

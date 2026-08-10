@@ -1,0 +1,198 @@
+#!/usr/bin/env node
+/**
+ * ki-wasserzeichen.mjs — Brennt die Kennzeichnung „KI ERSTELLT" in die
+ * Demo-Bilder und schreibt die maschinenlesbaren Metadaten dazu.
+ *
+ * WARUM: Die drei Demo-Fotos auf der Startseite sind KI-generiert (siehe
+ * public/img/demo/LICENSE.md). Seit August 2026 müssen solche Bilder
+ * gekennzeichnet sein — sichtbar für Menschen UND maschinenlesbar. Ein
+ * CSS-Overlay allein reicht dafür nicht: Es verschwindet, sobald jemand das
+ * Bild speichert oder weitergibt. Deshalb wird das Zeichen in die Pixel
+ * gebrannt und zusätzlich in die Metadaten geschrieben.
+ *
+ * WORTLAUT: „KI ERSTELLT", nicht „KI BEARBEITET" — die Bilder sind vollständig
+ * erzeugt, nicht nachträglich verändert.
+ *
+ * WERKZEUG: Playwright rendert das Bild mit Badge und schießt einen Screenshot.
+ * Bewusst KEINE neue Abhängigkeit wie sharp: Deren optionale Plattform-Pakete
+ * schneidet npm auf macOS aus der Lockfile, worauf die Linux-CI in `npm ci`
+ * bricht (siehe RUNBOOK, „Lockfile-Falle"). Playwright liegt für die E2E-Tests
+ * ohnehin im Projekt.
+ *
+ * EINMAL-WERKZEUG, aber bewusst im Repo: Kommen neue Demo-Bilder dazu oder
+ * ändert sich die Vorgabe, ist der Vorgang damit wiederholbar statt
+ * handgeklickt.
+ *
+ * Aufruf:  node scripts/ki-wasserzeichen.mjs [--dry]
+ *          --dry schreibt nach /tmp statt in public/img/demo (zum Ansehen).
+ */
+
+import { chromium } from "playwright";
+import { readFileSync, writeFileSync, copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HIER = path.dirname(fileURLToPath(import.meta.url));
+const REPO = path.resolve(HIER, "..");
+const DEMO_DIR = path.join(REPO, "public/img/demo");
+const SICHERUNG = path.join(DEMO_DIR, "original");
+
+const TROCKEN = process.argv.includes("--dry");
+const ZIEL_DIR = TROCKEN ? "/tmp/ki-wasserzeichen" : DEMO_DIR;
+
+const BILDER = [
+  "demo-selfie.jpg",
+  "demo-selfie-thumb.jpg",
+  "demo-cafe.jpg",
+  "demo-cafe-thumb.jpg",
+  "demo-hiker.jpg",
+  "demo-hiker-thumb.jpg",
+];
+
+/* Badge-Größe skaliert mit der Bildbreite, damit es auf dem 200-px-Thumbnail
+   genauso lesbar bleibt wie auf dem 1280er. Unten begrenzt, sonst wird die
+   Schrift auf den Thumbnails unleserlich klein. */
+function badgeMasse(breite) {
+  /* Bewusst klein gehalten: Das Zeichen soll die Kennzeichnungspflicht
+     erfüllen, nicht das Motiv dominieren. Erster Anlauf war rund doppelt so
+     groß und wirkte auf den Kacheln aufdringlich. */
+  const schrift = Math.max(9, Math.round(breite * 0.014));
+  return {
+    schrift,
+    abstand: Math.max(6, Math.round(breite * 0.016)),
+    polsterX: Math.round(schrift * 0.62),
+    polsterY: Math.round(schrift * 0.4),
+    radius: Math.round(schrift * 0.4),
+  };
+}
+
+function seite(dataUrl, breite, hoehe) {
+  const m = badgeMasse(breite);
+  return `<!doctype html><html><head><meta charset="utf-8"><style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:${breite}px; height:${hoehe}px; overflow:hidden; }
+  .rahmen { position:relative; width:${breite}px; height:${hoehe}px; }
+  .rahmen img { width:100%; height:100%; display:block; object-fit:cover; }
+  /* RECHTS UNTEN — die übliche Ecke für Bildnachweise und ausdrücklich so
+     gewünscht.
+     ZU WISSEN: Auf der Startseite ist das Badge dort NICHT zu sehen. Die
+     Kacheln zeigen die Hochformat-Bilder in 3/2 mit Ausrichtung nach oben
+     (styles.css ~2405), die untere Bildhälfte fällt also weg. Sichtbar wird
+     es, sobald das Bild groß erscheint — in der Vorschau nach dem Klick und
+     überall dort, wo die Datei weitergegeben wird. Für die Kachel-Ansicht
+     trägt die Zeile darüber den Hinweis „(mit KI erstellt)". */
+  .badge {
+    position:absolute; right:${m.abstand}px; bottom:${m.abstand}px;
+    display:flex; align-items:center; gap:${Math.round(m.schrift * 0.45)}px;
+    background:rgba(17,17,17,.86); border-radius:${m.radius}px;
+    padding:${m.polsterY}px ${m.polsterX}px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    font-size:${m.schrift}px; line-height:1; color:#fff;
+    /* Leichter Schein nach aussen, damit das Badge auch auf dunklem
+       Bildinhalt eine erkennbare Kante behaelt. */
+    box-shadow:0 0 0 1px rgba(255,255,255,.18), 0 ${Math.round(m.schrift * 0.15)}px ${Math.round(m.schrift * 0.5)}px rgba(0,0,0,.45);
+  }
+  .kuerzel {
+    border:${Math.max(1, Math.round(m.schrift * 0.09))}px solid #fff;
+    border-radius:${Math.round(m.radius * 0.5)}px;
+    padding:${Math.round(m.schrift * 0.12)}px ${Math.round(m.schrift * 0.26)}px;
+    font-weight:700; letter-spacing:.02em;
+  }
+  .wort { font-weight:600; letter-spacing:.08em; }
+  </style></head><body>
+  <div class="rahmen">
+    <img src="${dataUrl}" alt="">
+    <div class="badge"><span class="kuerzel">KI</span><span class="wort">ERSTELLT</span></div>
+  </div></body></html>`;
+}
+
+function masse(datei) {
+  const roh = execFileSync("sips", ["-g", "pixelWidth", "-g", "pixelHeight", datei], {
+    encoding: "utf8",
+  });
+  const b = Number(roh.match(/pixelWidth:\s*(\d+)/)?.[1]);
+  const h = Number(roh.match(/pixelHeight:\s*(\d+)/)?.[1]);
+  if (!b || !h) throw new Error(`Masse nicht lesbar: ${datei}`);
+  return { breite: b, hoehe: h };
+}
+
+/* Der offizielle IPTC-Wert für „vollständig von einem Algorithmus erzeugt".
+   Nicht zu verwechseln mit compositeWithTrainedAlgorithmicMedia — das wäre ein
+   echtes Foto mit KI-Anteilen, also „bearbeitet" statt „erstellt". */
+const IPTC_QUELLE = "https://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia";
+
+/**
+ * Überträgt die Metadaten des Originals auf das gebrannte Bild und ergänzt die
+ * maschinenlesbare KI-Kennzeichnung.
+ *
+ * WARUM DAS ÜBERTRAGEN NÖTIG IST: Der Screenshot erzeugt eine nackte
+ * JPEG-Datei — alle EXIF-Daten sind weg. Bei den Demo-Bildern sind Kamera,
+ * Ort und Datum aber ABSICHTLICH gesetzt (fiktiv, siehe LICENSE.md): Genau
+ * daran führt malziME vor, welche versteckten Daten in einem Foto stecken.
+ * Ohne diesen Schritt wäre die Demo nach dem Wasserzeichen kaputt.
+ */
+function metadatenSetzen(quelle, ziel) {
+  execFileSync("exiftool", [
+    "-overwrite_original",
+    "-quiet",
+    /* Erst alles vom Original übernehmen … */
+    "-TagsFromFile",
+    quelle,
+    "-all:all",
+    /* … dann die KI-Kennzeichnung obendrauf. Reihenfolge zählt: umgekehrt
+       würde das Übernehmen die Kennzeichnung wieder überschreiben. */
+    `-XMP-iptcExt:DigitalSourceType=${IPTC_QUELLE}`,
+    "-XMP-dc:Creator=malziland - learning | training | consulting e.U.",
+    "-XMP-dc:Description=Mit KI erstelltes Bild. Zeigt keine reale Person.",
+    "-IPTC:Credit=KI erstellt",
+    "-IPTC:Source=Generative KI",
+    "-XMP-photoshop:Credit=KI erstellt",
+    ziel,
+  ]);
+}
+
+async function main() {
+  if (!existsSync(ZIEL_DIR)) mkdirSync(ZIEL_DIR, { recursive: true });
+
+  /* Originale einmalig sichern — die Bilder liegen im Repo, aber ein
+     versehentlich doppelt aufgebranntes Badge waere sonst nur ueber git
+     zurueckzuholen. */
+  if (!TROCKEN && !existsSync(SICHERUNG)) {
+    mkdirSync(SICHERUNG, { recursive: true });
+    for (const name of BILDER) copyFileSync(path.join(DEMO_DIR, name), path.join(SICHERUNG, name));
+    console.log(`Originale gesichert in ${SICHERUNG}`);
+  }
+
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+
+  for (const name of BILDER) {
+    const quelle = existsSync(path.join(SICHERUNG, name))
+      ? path.join(SICHERUNG, name)
+      : path.join(DEMO_DIR, name);
+    const { breite, hoehe } = masse(quelle);
+    const dataUrl = `data:image/jpeg;base64,${readFileSync(quelle).toString("base64")}`;
+
+    await page.setViewportSize({ width: breite, height: hoehe });
+    await page.setContent(seite(dataUrl, breite, hoehe));
+    await page.waitForLoadState("networkidle");
+
+    /* Qualitaet 92: Die Demo-Bilder sollen nicht sichtbar schlechter werden als
+       das Original — sie laufen anschliessend durch dieselbe KI-Analyse wie
+       Nutzerfotos. */
+    const puffer = await page.screenshot({ type: "jpeg", quality: 92 });
+    const ziel = path.join(ZIEL_DIR, name);
+    writeFileSync(ziel, puffer);
+    metadatenSetzen(quelle, ziel);
+    console.log(`  ${name}  ${breite}x${hoehe}  ${(puffer.length / 1024).toFixed(0)} KB`);
+  }
+
+  await browser.close();
+  console.log(TROCKEN ? `\nProbelauf — Ergebnisse in ${ZIEL_DIR}` : "\nFertig.");
+}
+
+main().catch((e) => {
+  console.error("Abbruch:", e.message);
+  process.exit(1);
+});

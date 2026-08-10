@@ -136,7 +136,7 @@
   "dv.billions": "€{{value}} billion",
   "dv.millions": "€{{value}} million",
   "dv.euro": "€{{value}}",
-  "demo.label": "No photo handy? Try a sample image:",
+  "demo.label": "No photo handy? Try a sample image (AI-generated):",
   "demo.selfie": "Selfie at St. Stephen's Cathedral",
   "demo.cafe": "In a café in Salzburg",
   "demo.hiker": "Hiking near Hallstatt",

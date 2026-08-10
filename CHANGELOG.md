@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.9.4] — 2026-08-10
+
+### Hinzugefügt
+
+- **Die Demo-Fotos auf der Startseite tragen jetzt die Kennzeichnung „KI ERSTELLT".** Sie sind KI-generiert (siehe `public/img/demo/LICENSE.md`) und fallen damit unter die seit August 2026 geltende Kennzeichnungspflicht. Umgesetzt auf drei Ebenen:
+  - **Sichtbar, in die Pixel gebrannt** — klein, rechts unten (`scripts/ki-wasserzeichen.mjs`). Bewusst kein CSS-Overlay: Das verschwindet, sobald jemand das Bild speichert oder weitergibt. Der Wortlaut ist „ERSTELLT", nicht „BEARBEITET" — die Bilder sind vollständig erzeugt, nicht nachträglich verändert.
+  - **Maschinenlesbar in den Metadaten:** `DigitalSourceType = trainedAlgorithmicMedia` (offizieller IPTC-Wert für vollständig algorithmisch erzeugte Bilder), dazu Credit, Quelle und Beschreibung.
+  - **Für Suchmaschinen** über strukturierte Daten und die Bildbeschreibungen.
+
+  Zwei Fallen, beide beim ersten Anlauf zugeschlagen und im Skript dokumentiert: **Der Vorgang löscht alle EXIF-Daten** — und die sind bei den Demo-Bildern absichtlich (fiktiv) gesetzt, weil malziME daran vorführt, welche versteckten Daten in einem Foto stecken. Sie werden jetzt vom Original übernommen. Und: Die Startseite zeigt die Hochformat-Bilder in Kacheln mit 3:2 und Ausrichtung nach oben — die untere Bildhälfte fällt dort weg. Das Badge sitzt bewusst trotzdem rechts unten (übliche Ecke für Bildnachweise); sichtbar wird es in der Vorschau nach dem Klick und überall dort, wo die Datei weitergegeben wird. Für die Kachel-Ansicht trägt die Zeile darüber den Hinweis „(mit KI erstellt)".
+
+  Nebenbefund behoben: Die Vollbilder wurden in `demo.js` noch mit dem Cache-Buster vom Februar geladen — ein Bildwechsel wäre bei niemandem angekommen, der die Seite schon einmal besucht hat. (Cache-Buster 2026081005)
+
 ## [2.9.3] — 2026-08-10
 
 ### Behoben

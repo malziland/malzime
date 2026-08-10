@@ -29,7 +29,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │    ├─ Geocoding via Nominatim (direkter Browser-Call)             │
 │    └─ Bild-Kompression: max 1280px, JPEG q82                       │
 │                                                                    │
-│  POST /analyze {imageBase64, mimeType, exif:{make,model}, lang}    │
+│  POST /api/enqueue {imageBase64, mimeType, exif:{make,model}, lang}│
 └────────────────────────────────────┬───────────────────────────────┘
                                      │
                                      ↓ HTTPS, eu-west1
@@ -88,7 +88,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 
 Seit v2.0 läuft die Analyse nicht mehr synchron, sondern über eine Warteschlange. Grund: Workshop-Last ist stoßweise (z. B. 25 Uploads in zwei Minuten), und jeder KI-Anbieter hat Rate-Limits. Die Queue nimmt den Stoß auf und arbeitet ihn dosiert ab, statt im Limit-Fall Fehler zu produzieren.
 
-Welcher Pfad aktiv ist, entscheidet das Firestore-Feature-Flag `useQueue` (`featureFlags/current`, 30 s Cache, fail-safe `false`). Das Flag ist der zentrale Betriebsschalter — ohne Deploy umlegbar, jederzeit zurück auf den synchronen `/analyze`-Pfad.
+Seit v2.10 ist die Warteschlange der einzige Weg. Der synchrone `/analyze`-Pfad ist entfernt: Er war seit Mai 2026 nur noch Rückfall über ein Feature-Flag und hätte bei Stoßlast genau das Problem zurückgebracht, wegen dem die Warteschlange gebaut wurde. Als Notfall-Hebel dient der Wartungsmodus ([RUNBOOK.md](RUNBOOK.md)).
 
 ```
 Browser ──POST /api/enqueue──► enqueue
@@ -101,7 +101,7 @@ Browser ──POST /api/enqueue──► enqueue
                           processJob  (OIDC-geschützt, nicht öffentlich)
                                  │ claimJob: queued → processing (idempotente Transaktion)
                                  │ Liveness-Check: pollt der Client nicht mehr → abandoned
-                                 │ Bild aus dem Bucket → dieselbe Mistral-Pipeline wie /analyze
+                                 │ Bild aus dem Bucket → Mistral-Pipeline                     
                                  │ Ergebnis → Job-Dokument (done), Bild gelöscht
                                  ▼
 Browser ◄──GET /api/job-status?jobId=──  Polling alle 2 s (= Liveness-Herzschlag)
@@ -133,7 +133,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call) |
-| `js/api.js` | API-Client (synchroner Pfad + Queue-Polling) mit AbortController + Stale-Guard |
+| `js/api.js` | API-Client: Einreihen, Statusabfrage, Wiederaufnahme — mit AbortController + Stale-Guard |
 | `js/render.js` | Profile-Rendering, Bias-Toggle, Privacy-Cards, Karte |
 | `js/ui.js` | Disclaimer-Modal, Maintenance-Modal, Limit-Banner, Scan-Animation |
 | `js/state.js` | Globaler State (`requestId`, `isAnalyzing`) |
@@ -162,7 +162,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `jobs.js` | Queue: Job-Lebenszyklus + Firestore-Zugriff auf die `jobs`-Collection |
 | `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
-| `feature-flags.js` | Laufzeit-Feature-Flags `useQueue` + `useSingleLargeCall` (Firestore, 30 s Cache, fail-safe `false`) |
+| `feature-flags.js` | Laufzeit-Feature-Flags `useSingleLargeCall` + `usePromptCache` (Firestore, 30 s Cache, fail-safe `false`) |
 | `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
 | `mistral.js` | Mistral AI: Single-Large aktiv (1 Call `mistral-large-2512` liefert Beschreibung + beide Profile); 3-Call-Fallback (Describe Large + 2× Profil Small) mit Mistral-internem Large-3-Backup |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |

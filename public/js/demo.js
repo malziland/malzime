@@ -5,9 +5,9 @@ import { dismissDisclaimerModal } from "./ui.js";
 import { t } from "./i18n.js";
 
 const DEMO_IMAGES = {
-  selfie: "./img/demo/demo-selfie.jpg?v=2026081009",
-  cafe: "./img/demo/demo-cafe.jpg?v=2026081009",
-  hiker: "./img/demo/demo-hiker.jpg?v=2026081009",
+  selfie: "./img/demo/demo-selfie.jpg?v=2026081010",
+  cafe: "./img/demo/demo-cafe.jpg?v=2026081010",
+  hiker: "./img/demo/demo-hiker.jpg?v=2026081010",
 };
 
 export function initDemo() {

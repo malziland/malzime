@@ -39,7 +39,6 @@ state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
   .then((data) => {
     /* Queue-Feature-Flag übernehmen. Bleibt es aus (Flag false oder Fetch
        fehlgeschlagen), läuft der bewährte synchrone Pfad. */
-    if (data?.useQueue === true) state.useQueue = true;
     if (data?.maintenance?.enabled) {
       showMaintenanceModal(data.maintenance.message);
       return;

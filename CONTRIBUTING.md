@@ -56,7 +56,7 @@ Diese Regeln sind nicht verhandelbar:
 
 ## KI-Provider und Architektur
 
-Seit v1.6.0 nutzt malziME ausschliesslich Mistral AI (Paris, EU) als KI-Anbieter — keine weiteren Provider, kein Fallback. Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange (umschaltbar per Feature-Flag `useQueue`). Details:
+Seit v1.6.0 nutzt malziME ausschliesslich Mistral AI (Paris, EU) als KI-Anbieter — keine weiteren Provider, kein Fallback. Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange; seit v2.10 ist sie der einzige Weg. Details:
 - Code-Aufbau: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 - Setup mit Mistral-API-Key: [`docs/SETUP.md`](docs/SETUP.md#firebase-secrets)
 - Tests laufen mit Mocked-Fetch — kein echter Key fuer `npm test` noetig.

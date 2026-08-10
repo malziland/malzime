@@ -23,7 +23,7 @@ bewusst als offen ausgewiesen.
 | Reproduzierbares Setup (frischer Checkout) | `npm ci` (Root + `functions/`, Lockfiles committet, Node per `.nvmrc`/`engines`/CI gepinnt) | ✅ belegt durch Rollback-Probe (unten), 2026-07-14 |
 | Reproduzierbarer Build | — entfällt: kein Build-Schritt (Vanilla-JS-Frontend wird direkt ausgeliefert, Functions deployen Quellcode) | n/a, Begründung links |
 | **Rollback-Probe** (Release-Stand aus sich heraus lauffähig) | Release-Tag in temporärem `git worktree` auschecken, `npm ci` Root + functions, beide Test-Suiten | ✅ Tag `v2.3.1` (Commit `8d39a10`): Setup ok, 435/435 + 165/165 Tests grün, Exit 0 — 2026-07-14, Node 24, macOS; Worktree danach entfernt |
-| Betriebs-Rollback ohne Deploy (Feature-Flags) | Firestore-Flags `useQueue`/`useSingleLargeCall`, Verfahren in [RUNBOOK.md](RUNBOOK.md) | ✅ produktiv erprobt (Architektur-Umstellungen v2.0/v2.2 liefen über genau diese Schalter) |
+| Betriebs-Rollback ohne Deploy (Feature-Flags) | Firestore-Flag `useSingleLargeCall`, Verfahren in [RUNBOOK.md](RUNBOOK.md) | ✅ produktiv erprobt (Architektur-Umstellungen v2.0/v2.2 liefen über genau diese Schalter) |
 
 ## Profilpflichten
 

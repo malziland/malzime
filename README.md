@@ -69,7 +69,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   jobs.js                   Queue: Job-Lebenszyklus (Firestore-Collection `jobs`)
   cloud-tasks.js            Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim fuer Emulator)
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket
-  feature-flags.js          Laufzeit-Feature-Flag `useQueue` (Firestore, 30s-Cache)
+  feature-flags.js          Laufzeit-Feature-Flags aus Firestore (30s-Cache)
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
   mistral.js                Mistral AI: aktiv Single-Large-Call (Large erstellt Beschreibung + beide Profile); 3-Call-Hybrid (Large Describe + Small Profile) als Fallback
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
@@ -98,7 +98,7 @@ Workshop-Last ist stossweise: 25 Uploads in zwei Minuten. Damit kein Upload an d
 - Der Browser pollt **`/api/job-status`**; jeder Poll ist zugleich ein Liveness-Herzschlag. Verlaesst der Nutzer die Seite, wird der Job verworfen, bevor er einen KI-Call kostet.
 - Das Bild wird unmittelbar nach der Verarbeitung geloescht, das Job-Dokument (inkl. Ergebnis) spaetestens nach 2 h.
 
-Umgeschaltet wird ueber das Firestore-Feature-Flag `useQueue` — ohne Deploy, jederzeit auf den synchronen `/analyze`-Pfad zurueckschaltbar.
+Seit v2.10 ist die Warteschlange der einzige Weg. Der frühere synchrone `/analyze`-Pfad — eine 30-60 s offene Verbindung — ist entfernt: Er war seit Mai 2026 nur noch Rückfall und hätte bei Stoßlast genau das Problem zurückgebracht, wegen dem die Warteschlange gebaut wurde. Als Notfall-Hebel dient stattdessen der Wartungsmodus (siehe [`docs/RUNBOOK.md`](docs/RUNBOOK.md)).
 
 ## Privacy-Architektur
 
@@ -140,12 +140,16 @@ Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md) | Eigene Instanz aufset
 
 ## API
 
-`POST /analyze` — JSON oder multipart/form-data
+Jede Analyse laeuft ueber zwei Endpunkte — Bild einreihen, Ergebnis abholen:
 
-Das mitgelieferte Frontend nutzt **ausschliesslich den JSON-Weg** (Bild als
-`imageBase64`); der multipart-Weg existiert fuer eigene Clients und
-Selbst-Hosting. Beide sind seit v2.4.4 durch Tests abgedeckt
-(`functions/src/__tests__/upload-http.test.js`).
+`POST /api/enqueue` — JSON mit dem Bild als `imageBase64`. Antwort: `{ "jobId": "..." }`
+
+`GET /api/job-status?jobId=...` — Antwort: `{ "status": "...", "queuePosition": 0, "etaSeconds": 0, "result": { ... } }`.
+`status` ist `queued`, `processing`, `done`, `failed` oder `abandoned`; `result`
+ist gesetzt, sobald `status` `done` ist.
+
+Jede Statusabfrage ist zugleich ein Lebenszeichen: Verlaesst der Nutzer die
+Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
 
 ### Request (JSON)
 
@@ -193,12 +197,12 @@ Selbst-Hosting. Beide sind seit v2.4.4 durch Tests abgedeckt
 Bei Tieren enthalten `profiles.normal` und `profiles.boost` ein lustiges Easter-Egg-Profil.
 Bei blockierten Bildern ist `profiles: null` und `blockedReason` enthaelt den Grund.
 
-### Queue-Endpunkte (v2.0)
+### Wiederaufnahme
 
-Im Queue-Betrieb (Feature-Flag `useQueue`) nutzt das Frontend statt `/analyze` zwei Endpunkte:
-
-- **`POST /api/enqueue`** — gleicher Request-Body wie `/analyze`. Antwort: `{ "jobId": "..." }`
-- **`GET /api/job-status?jobId=...`** — Antwort: `{ "status": "...", "queuePosition": 0, "etaSeconds": 0, "result": { ... } }`. `status` ist `queued`, `processing`, `done`, `failed` oder `abandoned`; `result` ist gesetzt, sobald `status` `done` ist (gleiche Struktur wie die `/analyze`-Response).
+Die Job-Nummer liegt im Browser (`sessionStorage`), das Ergebnis serverseitig
+rund zwei Stunden. Bricht die Verbindung ab oder wird das Geraet gesperrt,
+laeuft der Job weiter — die Seite holt das Ergebnis nach, sobald sie
+zurueckkehrt, und ein Neuladen funktioniert ebenfalls.
 
 ## Sicherheit
 
@@ -240,7 +244,7 @@ npm run format:frontend:check          # Frontend Prettier
 
 **Backend (439 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
 
-**Frontend (165 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration (synchron + Queue), Queue-Reload-Wiederherstellung, Stats-Seite, i18n-Modul, i18n-Guardian.
+**Frontend (165 Tests):** DOM-Helpers, State, Scan-Animation, Disclaimer-Modal, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
 
 **E2E (5 Tests):** Playwright — Smoke-Tests (Demo-Flow, fehlerfreies Laden), axe-A11y-Gate (Startseite + Profil-Ansicht) und Tastatur-Durchlauf.
 

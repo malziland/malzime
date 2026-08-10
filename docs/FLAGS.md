@@ -11,18 +11,18 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 
 | Flag | Typ | Soll live | Fail-safe | Owner |
 |---|---|---|---|---|
-| `useQueue` | Operations-/Kill-Switch | `true` | `false` | Christoph Krieger |
 | `useSingleLargeCall` | Architektur-Schalter (Kill-Switch-Funktion) | `true` | `false` | Christoph Krieger |
 | `usePromptCache` | Kostenschalter | offen (siehe unten) | `false` | Christoph Krieger |
 
-### `useQueue` (seit v2.0)
+### `useQueue` — ENTFERNT mit v2.10
 
-Schaltet zwischen der Queue-Architektur (`true`: Upload → Cloud Tasks → dosierte
-Verarbeitung) und dem synchronen `/analyze`-Pfad (`false`). Der synchrone Pfad
-bleibt bewusst als Rückfall im Code.
-**Entfernungs-Kriterium:** entfällt erst, wenn der synchrone Pfad abgebaut wird
-(„Phase 6" — nur nach ausdrücklicher Freigabe). Bis dahin ist das ein
-gewollter Dauer-Betriebsschalter, kein abgelaufenes Flag.
+Das Flag schaltete zwischen der Warteschlange und dem synchronen
+`/analyze`-Pfad. Mit dem Abbau dieses Pfads ist es gegenstandslos und aus dem
+Code entfernt; ein eventuell noch vorhandener Firestore-Eintrag wird nicht mehr
+gelesen und kann gelöscht werden.
+
+Das damals notierte Entfernungs-Kriterium — „entfällt, wenn der synchrone Pfad
+abgebaut wird" — ist damit erfüllt.
 
 ### `useSingleLargeCall` (seit v2.2)
 

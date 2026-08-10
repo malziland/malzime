@@ -4,6 +4,24 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.10.0] — 2026-08-10
+
+### Entfernt
+
+- **Der synchrone `/analyze`-Pfad ist abgebaut.** Der alte Weg vor der Warteschlange: Browser schickt das Bild, hält die Verbindung 30 bis 60 Sekunden offen, wartet auf die Antwort. Seit Mai 2026 trägt die Warteschlange jeden Upload; der synchrone Weg war nur noch Rückfall über ein Feature-Flag.
+
+  **Warum er weg kann:** Der Notausstieg half gegen die meisten Störungen ohnehin nicht — Mistral langsam oder überlastet, Budget-Stopp, Stundenlimit, Firestore-Störung oder ein Fehler im gemeinsamen Code treffen beide Wege gleich. Nur eine reine Cloud-Tasks-Störung wäre der Fall gewesen, für den er gebaut wurde. Und bei Stoßlast wäre der Rückfall selbst das Problem geworden: Die Warteschlange existiert genau wegen der Fünfundzwanzig-gleichzeitig-Situation, in der lange offene Verbindungen wegbrechen und der Bildschirm-Wachhalter auf iPhones nicht greift. In über 5.000 Analysen seit Mai gab es keine einzige dokumentierte Störung der Warteschlange.
+
+  **Was verschwindet:** `handle-analyze.js` (439 Zeilen), der synchrone Zweig im Frontend (330 Zeilen) samt Auto-Wiederholung, die Route `exports.analyze`, das Feature-Flag `useQueue` und 39 Tests, die nur den alten Weg prüften. Der Nebeneffekt zählt fast mehr als die Zeilen: Solange beide Wege existierten, musste jede Änderung am Profil-Zusammenbau **doppelt** gebaut werden — beim Werbe-Umbau in v2.8 ist das konkret aufgeschlagen.
+
+  **Ersatz für den Rollback-Hebel:** Der Wartungsmodus (Hebel 1 im Betriebshandbuch) übernimmt. Er sagt der Klasse ehrlich „gleich zurück", statt sie auf einen Weg zu schicken, der unter Last auch nicht trägt. Das Betriebshandbuch führt Hebel 2 jetzt als entfallen mit Begründung.
+
+  **Übergang für alte Clients:** `/api/stats` meldet weiterhin `useQueue: true`. Wer die Seite aus dem Zwischenspeicher lädt, prüft dieses Feld und würde ohne es auf einen Weg fallen, den es nicht mehr gibt. Kann in einigen Wochen ersatzlos weg.
+
+### Geändert
+
+- **Dokumentation auf den aktuellen Stand gebracht.** Dreiunddreißig Stellen in zehn Dateien beschrieben noch den synchronen Pfad als aktiven oder rückfallfähigen Weg — README (Schnittstellen-Beschreibung), ARCHITECTURE, FLAGS, RUNBOOK, SETUP, SELF-HOSTING, VERIFICATION, QUEUE-EMULATOR, CONTRIBUTING und AGENTS. In `FLAGS.md` ist damit auch das dort notierte Entfernungs-Kriterium erfüllt und abgehakt.
+
 ## [2.9.2] — 2026-08-10
 
 ### Geändert

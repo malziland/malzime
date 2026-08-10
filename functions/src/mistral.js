@@ -49,7 +49,7 @@ function setFetchForTest(impl) {
 function isRateLimitError(err) {
   /* v1.10.6: Throttle-Queue-Timeout wird auch als Rate-Limit-Signal behandelt.
      Wenn unsere eigene Drossel in throttle.js auflaeuft, ist Mistral aus
-     Pipeline-Sicht ueberlastet — Caller (handle-analyze) soll das als
+     Pipeline-Sicht ueberlastet — Der Aufrufer soll das als
      blocked.overloaded melden, damit der Client den Auto-Retry triggert. */
   if (err && err.code === "throttle_timeout") return true;
   const msg = (err.message || "").toLowerCase();

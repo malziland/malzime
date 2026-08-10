@@ -5,7 +5,7 @@
  *
  * Flags (live stehen BEIDE auf true — Queue + Single-Large = Normalbetrieb;
  * `false` ist jeweils nur der fail-safe Default bei unlesbarem Dokument):
- *   - `useQueue` (seit v2.0): schaltet zwischen dem synchronen /analyze-Pfad
+ *   - `useQueue`: ENTFERNT mit v2.10 — es gibt nur noch die Warteschlange
  *     (false, Rückfall-Pfad) und der Queue-Architektur (true, Live-Pfad).
  *   - `useSingleLargeCall` (seit v2.2): schaltet innerhalb der Pipeline
  *     zwischen der 3-Call-Fallback-Architektur (Describe Large + 2× Profile
@@ -38,14 +38,14 @@ const CACHE_TTL_MS = 30 * 1000;
 let cache = { data: null, expiresAt: 0 };
 
 /**
- * Liefert die aktuellen Feature-Flags. Aktuell: `{ useQueue: boolean }`.
+ * Liefert die aktuellen Feature-Flags.
  */
 async function getFeatureFlags() {
   /* Lokal-Modus (Emulator): Die Queue ist per Definition an — der Emulator-
      Lauf dient ja gerade ihrem Test. Single-Large-Call bleibt im Lokal-Modus
      standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
      Kein Firestore-Read, kein Seeding nötig. */
-  if (isLocalQueueMode()) return { useQueue: true, useSingleLargeCall: false, usePromptCache: false };
+  if (isLocalQueueMode()) return { useSingleLargeCall: false, usePromptCache: false };
 
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
@@ -53,7 +53,6 @@ async function getFeatureFlags() {
     const snap = await getFirestore().doc(FLAGS_DOC).get();
     const data = snap.exists ? snap.data() : {};
     const flags = {
-      useQueue: data.useQueue === true,
       useSingleLargeCall: data.useSingleLargeCall === true,
       usePromptCache: data.usePromptCache === true,
     };
@@ -61,17 +60,13 @@ async function getFeatureFlags() {
     return flags;
   } catch (err) {
     console.log(JSON.stringify({ warning: "feature-flags-read-error", error: err.message }));
-    return { useQueue: false, useSingleLargeCall: false, usePromptCache: false };
+    return { useSingleLargeCall: false, usePromptCache: false };
   }
 }
 
 /**
  * Kurzform: Ist der Queue-Pfad aktiv?
  */
-async function isQueueEnabled() {
-  return (await getFeatureFlags()).useQueue;
-}
-
 /**
  * Kurzform: Ist die Single-Large-Call-Architektur aktiv?
  */
@@ -93,7 +88,6 @@ function _clearCache() {
 
 module.exports = {
   getFeatureFlags,
-  isQueueEnabled,
   isSingleLargeCallEnabled,
   isPromptCacheEnabled,
   FLAGS_DOC,

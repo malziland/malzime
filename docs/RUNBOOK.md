@@ -9,7 +9,7 @@ das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 ## Normalbetrieb (Soll-Zustand)
 
 - **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call
-  (`featureFlags/current`: `useQueue = true`, `useSingleLargeCall = true`),
+  (`featureFlags/current`: `useSingleLargeCall = true`),
   Cloud-Tasks-Concurrency **7** (seit v2.8 — zwei Mistral-Aufrufe je Analyse).
 - **Limits:** Stundenlimit 500 Analysen (rollendes Fenster), IP-Rate-Limit
   500 Requests / 10 min pro Instanz.
@@ -52,10 +52,23 @@ Bestätigungsseite, POST mit Nonce schaltet). Zustand liegt im Firestore-Dokumen
 `config/maintenance` (30-s-Cache). Nutzer sehen einen Wartungs-Dialog statt der
 Analyse.
 
-### 2. Queue aus → synchroner Pfad (~30 s, kein Deploy)
+### 2. ENTFALLEN mit v2.10 — es gibt keinen zweiten Weg mehr
 
-`featureFlags/current.useQueue = false` in der Firestore-Console setzen (geht auch
-vom Handy). Rückfall auf den synchronen `/analyze`-Pfad.
+Bis v2.9 stand hier: „Queue aus → synchroner Pfad". Der synchrone `/analyze`-Pfad
+ist mit v2.10 entfernt.
+
+**Warum kein Ersatz nötig ist:** Der Hebel half gegen die meisten Störungen
+ohnehin nicht — Mistral langsam oder überlastet, Budget-Stopp, Stundenlimit,
+Firestore-Störung, Fehler im gemeinsamen Code treffen beide Wege gleich. Nur ein
+reines Cloud-Tasks-Problem wäre der Fall gewesen, für den er gebaut wurde. Und
+bei Stoßlast wäre der Rückfall selbst das Problem geworden: Die Warteschlange
+existiert genau wegen der Fünfundzwanzig-gleichzeitig-Situation, in der lange
+offene Verbindungen wegbrechen und der Bildschirm-Wachhalter auf iPhones nicht
+greift.
+
+**Was stattdessen greift:** Hebel 1 (Wartungsmodus). Er sagt der Klasse
+ehrlich „gleich zurück", statt sie auf einen Weg zu schicken, der unter Last
+auch nicht trägt.
 
 ### 3. Single-Large-Call aus — IMMER alle drei Schritte
 

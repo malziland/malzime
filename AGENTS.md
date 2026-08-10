@@ -7,7 +7,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   index.html         Hauptseite (Cache-Busting: ?v=YYYYMMDDNN an CSS/JS)
   app.js             Entry Point (ES Module)
   js/                Frontend-Module
-    api.js           API-Client: synchroner /analyze-Pfad + Queue-Modus (analyzeImageQueued, Polling, resumeQueueJob) — Pfad-Wahl via state.useQueue
+    api.js           API-Client: Einreihen, Statusabfrage, Wiederaufnahme (analyzeImageQueued, pollJob, resumeQueueJob)
     dom.js           DOM-Helpers (escapeHtml, sanitize)
     exif.js          Client-seitige EXIF-Extraktion (exifr)
     geocoding.js     Nominatim Reverse Geocoding (client-seitig)
@@ -47,8 +47,8 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
-  feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useQueue), 30s-Cache, fail-safe
-  --- Queue-Architektur (v2.0) — Live-Pfad (Feature-Flag useQueue live true; bei false Rueckfall auf /analyze) ---
+  feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useSingleLargeCall, usePromptCache), 30s-Cache, fail-safe
+  --- Queue-Architektur (v2.0) — der einzige Pfad seit v2.10 ---
   handle-enqueue.js  Queue-Annahme: Validierung -> Bild in Storage -> Job anlegen -> in Cloud Tasks einreihen
   handle-process-job.js  Queue-Worker (nur Cloud Tasks): claimt Job, fuehrt Mistral-Pipeline aus, schreibt Ergebnis
   handle-job-status.js   Queue-Polling: Status, Warteschlangen-Position, ETA, Ergebnis; jeder Poll ist Liveness-Herzschlag

@@ -38,7 +38,7 @@ un-getrackt — einmalig anlegen per `cp functions/.env.local.example functions/
 - **Cloud Tasks** (hat keinen Emulator) wird ersetzt: `enqueue` stößt
   `processJob` direkt per HTTP an.
 - **Storage** läuft über ein Temp-Verzeichnis statt über den GCS-Bucket.
-- Das Feature-Flag `useQueue` gilt als **an** — der Emulator dient ja gerade
+- Die Warteschlange ist der einzige Weg — der Emulator dient ja gerade
   dem Queue-Test.
 
 `firebase deploy` ignoriert `.env.local` — die Produktion ist davon nie betroffen.

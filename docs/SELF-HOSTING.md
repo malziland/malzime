@@ -222,7 +222,7 @@ Trage den Bucket-Namen in `functions/src/config.js` (`QUEUE_BUCKET`) oder als Um
 firebase deploy --only firestore:indexes
 ```
 
-**4. Feature-Flag:** Der Queue-Pfad ist erst aktiv, wenn das Firestore-Dokument `featureFlags/current` das Feld `useQueue: true` hat. Fehlt das Dokument oder steht es auf `false`, läuft der synchrone `/analyze`-Pfad. Das Flag ist dein Betriebsschalter — umlegbar ohne Deploy.
+**4. Feature-Flags:** Die Warteschlange läuft immer; seit v2.10 gibt es keinen zweiten Weg mehr. Im Dokument `featureFlags/current` steuerst du `useSingleLargeCall` (Ein-Aufruf-Pipeline) und `usePromptCache` — beide ohne Deploy umlegbar.
 
 Die IAM-Rolle, mit der Cloud Tasks den Worker `processJob` aufrufen darf, vergibt `firebase deploy` automatisch.
 

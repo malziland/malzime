@@ -71,7 +71,6 @@ describe("Queue-Modus", () => {
     state.requestId = 0;
     state.lastPrepared = null;
     state.lastData = null;
-    state.useQueue = true;
     state.lastFile = new File(["test"], "test.jpg", { type: "image/jpeg" });
   });
 
@@ -79,16 +78,6 @@ describe("Queue-Modus", () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     sessionStorage.clear();
-  });
-
-  it("Flag aus → synchroner Pfad: kein Aufruf an /api/enqueue", async () => {
-    state.useQueue = false;
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(DONE_RESULT));
-    const p = analyzeImage();
-    await vi.advanceTimersByTimeAsync(3000);
-    await p;
-    const urls = globalThis.fetch.mock.calls.map((c) => String(c[0]));
-    expect(urls.some((u) => u.includes("/api/enqueue"))).toBe(false);
   });
 
   it("Flag an → reiht via /api/enqueue ein und pollt /api/job-status", async () => {

@@ -35,8 +35,39 @@
  * wegschneiden, um die es geht.
  */
 
-/* Altersgrenze. Bezieht sich auf die Schätzung des Modells, nicht auf Wahrheit. */
+/* ── Altersgrenze mit Sicherheitsabstand ──────────────────────────────────
+   Bezieht sich auf die Schaetzung des Modells, nicht auf Wahrheit — und genau
+   das ist der Punkt.
+
+   WARUM NICHT EINFACH 18 (geaendert 2026-08-10):
+   Aus rund 5000 begleiteten Workshop-Analysen berichtet der Inhaber ein
+   durchgaengiges Muster: Maedchen werden bis zu fuenf, sechs Jahre ZU ALT
+   geschaetzt, Jungen eher zu jung. Ursache ist, dass die Schaetzung an
+   koerperlicher Reife haengt — die bei Maedchen rund zwei Jahre frueher
+   einsetzt (siehe Merkmalsraster in den prompts.js der locales).
+
+   Mit einer Schwelle bei exakt 18 faellt damit ein vierzehnjaehriges Maedchen,
+   das auf neunzehn geschaetzt wird, aus dem Schutz: Gluecksspiel, Alkohol,
+   Kredit, Diaetmittel und Schoenheits-OP waeren wieder erlaubt. Im
+   Klassenzimmer, an die Wand projiziert.
+
+   Zwei Massnahmen dagegen, beide bewusst konservativ:
+     1. Nicht der Punktwert zaehlt, sondern die UNTERGRENZE der Spanne, die
+        das Modell selbst liefert. Wer "16-22" sein koennte, wird geschuetzt.
+        Das ist keine Willkuer, sondern nutzt die vom Modell angegebene
+        Unsicherheit.
+     2. Darauf ein Sicherheitsabstand, weil auch die Untergrenze zu hoch
+        liegen kann.
+
+   PREIS, bewusst in Kauf genommen: Ein tatsaechlich Neunzehn- bis
+   Einundzwanzigjaehriger sieht keine Kredit- oder Alkoholwerbung mehr, obwohl
+   sie dort legitimer Lerninhalt waere. In Schulklassen wiegt das leichter als
+   der umgekehrte Fehler. Die Abwaegung ist asymmetrisch: Eine Vierzehnjaehrige
+   mit Gluecksspielwerbung ist ein Schaden, einem Neunzehnjaehrigen fehlt nur
+   ein Beispiel. */
 const VOLLJAEHRIG_AB = 18;
+const SICHERHEITSABSTAND_JAHRE = 3;
+const SCHUTZ_BIS = VOLLJAEHRIG_AB + SICHERHEITSABSTAND_JAHRE;
 
 /* ── Zwei Stufen ──────────────────────────────────────────────────────────
    IMMER_VERBOTEN gilt unabhaengig vom geschaetzten Alter. Das ist bewusst so:
@@ -81,14 +112,39 @@ function istBeiMinderjaehrigenVerboten(eintrag) {
   return NUR_MINDERJAEHRIG.some((re) => re.test(s));
 }
 
-/* Alter aus dem hard-facts-Text lesen. Gleiche Heuristik wie in den
-   Messwerkzeugen: bevorzugt den Punktwert ("~14"), sonst die erste Zahl. */
-function geschaetztesAlter(text) {
+/* Die UNTERE Altersgrenze aus dem hard-facts-Text lesen — also das jüngste
+   Alter, das die Angabe des Modells noch zulässt.
+
+   Beispiele (alle real so vorgekommen):
+     "Du bist weiblich, ~14 Jahre alt (Spanne 12-16)."  -> 12
+     "Männlich, ~38 — die Krähenfüße verraten dich."     -> 38
+     "Du bist männlich, etwa 38. Spanne 35-42."          -> 35
+     "weiblich, 16 bis 22"                               -> 16
+
+   Bewusst das MINIMUM aller plausiblen Alterswerte im Text: Streut eine
+   Fremdzahl herein, zieht sie das Ergebnis nach unten und damit in Richtung
+   MEHR Schutz. Der Fehler geht so immer auf die sichere Seite. Nach oben kann
+   ihn keine Zahl verschieben — das wäre die gefährliche Richtung. */
+function untereAltersgrenze(text) {
   const s = String(text || "").toLowerCase();
-  const punkt = s.match(/~\s*(\d{1,2})/);
-  if (punkt) return Number(punkt[1]);
-  const zahlen = (s.match(/\b(\d{1,2})\b/g) || []).map(Number).filter((n) => n >= 1 && n <= 100);
-  return zahlen.length ? zahlen[0] : null;
+  const plausibel = (n) => Number.isFinite(n) && n >= 1 && n <= 100;
+  const kandidaten = [];
+
+  /* Spannen zuerst — "12-16", "12–16", "12 bis 16". Die Untergrenze zählt. */
+  for (const m of s.matchAll(/\b(\d{1,2})\s*(?:[-–—]|bis)\s*(\d{1,2})\b/g)) {
+    const von = Number(m[1]);
+    const nach = Number(m[2]);
+    if (plausibel(von) && plausibel(nach) && nach >= von) kandidaten.push(von);
+  }
+
+  /* Dazu jede freistehende Zahl — deckt Punktwerte wie "~14" und "40 Jahre"
+     ab. Bei einer Spanne findet das ohnehin dieselbe Untergrenze noch einmal. */
+  for (const roh of s.match(/\b\d{1,2}\b/g) || []) {
+    const n = Number(roh);
+    if (plausibel(n)) kandidaten.push(n);
+  }
+
+  return kandidaten.length ? Math.min(...kandidaten) : null;
 }
 
 /**
@@ -109,10 +165,12 @@ function applyMinorSafety(profiles, opts = {}) {
     profiles.normal?.categories?.alter_geschlecht?.value ||
     profiles.boost?.categories?.alter_geschlecht?.value ||
     "";
-  const alter = geschaetztesAlter(quelle);
-  bericht.alter = alter;
+  const untergrenze = untereAltersgrenze(quelle);
+  bericht.alter = untergrenze;
 
-  const minderjaehrig = alter !== null && alter < VOLLJAEHRIG_AB;
+  /* "Koennte minderjaehrig sein", nicht "ist es wahrscheinlich". Siehe die
+     Begruendung bei SCHUTZ_BIS oben. */
+  const minderjaehrig = untergrenze !== null && untergrenze < SCHUTZ_BIS;
   bericht.minderjaehrig = minderjaehrig;
 
   /* Ist kein Alter erkennbar, wird NICHT als minderjaehrig behandelt — sonst
@@ -150,6 +208,7 @@ module.exports = {
   /* Für Tests */
   _istImmerVerboten: istImmerVerboten,
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,
-  _geschaetztesAlter: geschaetztesAlter,
+  _untereAltersgrenze: untereAltersgrenze,
   _VOLLJAEHRIG_AB: VOLLJAEHRIG_AB,
+  _SCHUTZ_BIS: SCHUTZ_BIS,
 };

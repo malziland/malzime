@@ -72,25 +72,29 @@ describe("Cloud-Tasks-Scripts", () => {
          die Folgezeile — genau so ist das Script beim Reparieren einmal
          kaputtgegangen. */
       expect(code).not.toMatch(/--max-dispatches-per-second=[\d.]+ \\\s*\necho/);
-    },
+    }
   );
 
   const gcloudDa = hatGcloud();
   const testWennGcloud = gcloudDa ? test : test.skip;
 
-  testWennGcloud("alle verwendeten gcloud-Parameter existieren noch", () => {
-    const hilfe = execSync("gcloud tasks queues update --help 2>&1", {
-      encoding: "utf8",
-      timeout: 60000,
-    });
-    const fehlend = [];
-    for (const { name, code } of scripts) {
-      for (const p of benutzteParameter(code)) {
-        if (!hilfe.includes(p)) fehlend.push(`${name}: ${p}`);
+  testWennGcloud(
+    "alle verwendeten gcloud-Parameter existieren noch",
+    () => {
+      const hilfe = execSync("gcloud tasks queues update --help 2>&1", {
+        encoding: "utf8",
+        timeout: 60000,
+      });
+      const fehlend = [];
+      for (const { name, code } of scripts) {
+        for (const p of benutzteParameter(code)) {
+          if (!hilfe.includes(p)) fehlend.push(`${name}: ${p}`);
+        }
       }
-    }
-    expect(fehlend).toEqual([]);
-  }, 90000);
+      expect(fehlend).toEqual([]);
+    },
+    90000
+  );
 
   if (!gcloudDa) {
     test("Hinweis: gcloud fehlt, Parameter-Abgleich übersprungen", () => {

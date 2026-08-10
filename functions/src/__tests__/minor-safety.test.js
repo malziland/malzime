@@ -2,7 +2,8 @@ const {
   applyMinorSafety,
   _istImmerVerboten,
   _istBeiMinderjaehrigenVerboten,
-  _geschaetztesAlter,
+  _untereAltersgrenze,
+  _SCHUTZ_BIS,
 } = require("../minor-safety");
 
 function profil(alterText, ads, trigger = []) {
@@ -20,16 +21,56 @@ function profil(alterText, ads, trigger = []) {
   };
 }
 
-describe("Altersauslesung", () => {
-  test("liest den Punktwert", () => {
-    expect(_geschaetztesAlter("Du bist weiblich, ~14 Jahre alt (Spanne 12-16).")).toBe(14);
+describe("Untere Altersgrenze", () => {
+  test("nimmt die Untergrenze der Spanne, nicht den Punktwert", () => {
+    /* Kern der Änderung vom 2026-08-10: Für den Schutz zählt das jüngste
+       Alter, das die Angabe zulässt — nicht der wahrscheinlichste Wert. */
+    expect(_untereAltersgrenze("Du bist weiblich, ~14 Jahre alt (Spanne 12-16).")).toBe(12);
+    expect(_untereAltersgrenze("Du bist männlich, etwa 38. Spanne 35-42.")).toBe(35);
   });
-  test("nimmt sonst die erste Zahl", () => {
-    expect(_geschaetztesAlter("Du bist männlich, 40 Jahre alt.")).toBe(40);
+  test("versteht die verschiedenen Spannen-Schreibweisen", () => {
+    expect(_untereAltersgrenze("weiblich, 16 bis 22")).toBe(16);
+    expect(_untereAltersgrenze("weiblich, 16–22")).toBe(16);
+    expect(_untereAltersgrenze("weiblich, 16-22")).toBe(16);
+  });
+  test("nimmt den Punktwert, wenn keine Spanne dasteht", () => {
+    expect(_untereAltersgrenze("Du bist männlich, 40 Jahre alt.")).toBe(40);
+    expect(_untereAltersgrenze("Männlich, ~38 — die Krähenfüße verraten dich.")).toBe(38);
   });
   test("gibt null zurück, wenn kein Alter drinsteht", () => {
-    expect(_geschaetztesAlter("Keine klaren Bildsignale.")).toBeNull();
-    expect(_geschaetztesAlter("")).toBeNull();
+    expect(_untereAltersgrenze("Keine klaren Bildsignale.")).toBeNull();
+    expect(_untereAltersgrenze("")).toBeNull();
+  });
+});
+
+describe("Sicherheitsabstand über 18 hinaus", () => {
+  /* Diese Gruppe deckt genau den Fall ab, wegen dem umgestellt wurde: Eine
+     14-Jährige, die zu alt geschätzt wird, darf den Schutz nicht verlieren. */
+  const gluecksspiel = ["Bet365 Live-Wetten", "Nike Air Max"];
+
+  test("14-Jährige, auf 19 geschätzt — Schutz greift trotzdem", () => {
+    const p = profil("Du bist weiblich, ~19 Jahre alt.", gluecksspiel);
+    const b = applyMinorSafety(p);
+    expect(b.minderjaehrig).toBe(true);
+    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  });
+
+  test("Spanne, die bis unter 18 reicht — Schutz greift", () => {
+    const p = profil("weiblich, ~20 Jahre (Spanne 17-23).", gluecksspiel);
+    applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  });
+
+  test("eindeutig erwachsen — Glücksspiel bleibt als Lerninhalt stehen", () => {
+    const p = profil("Du bist männlich, etwa 38. Spanne 35-42.", gluecksspiel);
+    const b = applyMinorSafety(p);
+    expect(b.minderjaehrig).toBe(false);
+    expect(p.normal.ad_targeting).toEqual(gluecksspiel);
+  });
+
+  test("die Schwelle liegt über der Volljährigkeit", () => {
+    /* Mutationsprobe: Fällt der Abstand weg, wird dieser Test rot. */
+    expect(_SCHUTZ_BIS).toBeGreaterThan(18);
   });
 });
 
@@ -93,14 +134,20 @@ describe("Stufe 2 — nur bei Minderjährigen", () => {
     expect(p.normal.ad_targeting).toEqual(heikel);
   });
 
-  test("17 gilt als minderjährig, 18 nicht", () => {
-    const p17 = profil("~17 Jahre alt", ["Tipico Wetten"]);
-    applyMinorSafety(p17);
-    expect(p17.normal.ad_targeting).toEqual([]);
+  test("die Schwelle liegt bei 21, nicht bei 18", () => {
+    /* GEÄNDERT 2026-08-10. Vorher schnitt der Filter bei exakt 18 — bei einer
+       Schätzung, die Mädchen laut Workshop-Erfahrung bis zu sechs Jahre zu alt
+       einordnet. Genau die Kinder, die den Schutz am nötigsten haben, fielen
+       so heraus. Begründung siehe SCHUTZ_BIS in minor-safety.js. */
+    for (const alter of [17, 18, 20]) {
+      const p = profil(`~${alter} Jahre alt`, ["Tipico Wetten"]);
+      applyMinorSafety(p);
+      expect(p.normal.ad_targeting).toEqual([]);
+    }
 
-    const p18 = profil("~18 Jahre alt", ["Tipico Wetten"]);
-    applyMinorSafety(p18);
-    expect(p18.normal.ad_targeting).toEqual(["Tipico Wetten"]);
+    const erwachsen = profil("~21 Jahre alt", ["Tipico Wetten"]);
+    applyMinorSafety(erwachsen);
+    expect(erwachsen.normal.ad_targeting).toEqual(["Tipico Wetten"]);
   });
 });
 

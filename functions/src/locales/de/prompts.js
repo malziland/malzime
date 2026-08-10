@@ -6,10 +6,21 @@
  * Alle deutschen Strings für die Mistral-Pipeline (mistral.js) und der
  * blocked-image-Hinweis, ausgelagert für i18n.
  *
+ * v2.9.0: AGE_ANCHOR bei Kindern und Jugendlichen auf Merkmale umgestellt,
+ *   die bei Jungen und Mädchen gleich schnell laufen (Augenlinie, Zahnstand,
+ *   Wangenfett, Nasenrücken, Kopf-Körper-Verhältnis). Vorher war die primäre
+ *   Achse die Schulterbreite und eine Zusatzregel schob Mädchen mit glatter
+ *   Haut nach oben — beides zusammen erklärt das aus rund 5000 Workshop-
+ *   Analysen berichtete Muster: Mädchen zu alt, Jungen zu jung. Pubertäts-
+ *   merkmale sind jetzt ausdrücklich als untauglich benannt, weil ihr Beginn
+ *   zwischen 8 und 14 streut. ACHTUNG: Die Kalibrierung steht ZWEIMAL in
+ *   dieser Datei — hier in AGE_ANCHOR (3-Call-Fallback) und noch einmal
+ *   wörtlich im eigenständigen singleLargePrompt (aktiver Pfad). Änderungen
+ *   immer an beiden Stellen.
+ *
  * v1.5.0 (Phase 1 der Mistral-Migration):
- *   - AGE_ANCHOR: Körperproportionen als primäre Alters-Achse,
- *     ZWANGS-MAPPING für Erwachsene mit Mindest-Alter pro Merkmal,
- *     Anti-Bias gegen Höflichkeits-Unterschätzung
+ *   - AGE_ANCHOR: ZWANGS-MAPPING für Erwachsene mit Mindest-Alter pro
+ *     Merkmal, Anti-Bias gegen Höflichkeits-Unterschätzung
  *   - SCHEMA_RULES: Längen-Vorgabe → ~25 % Token-Ersparnis,
  *     keine Preisangaben in Targeting-Feldern, reines JSON ohne Markdown
  */
@@ -18,34 +29,53 @@ const AGE_ANCHOR = `
 
 KALIBRIERUNG ALTER 2-19:
 
-PRIMÄRE Achse — zuerst Körperproportionen prüfen:
-- Schultern schmaler als der Kopf + Hand sehr klein im Verhältnis zum
-  Gesicht + kindliche Statur → KIND-Spanne (2-10 J), dann unten verfeinern.
-- Schultern etwa kopfbreit, Statur noch jugendlich-schlank, Hand nähert
-  sich erwachsener Größe → PRE-TEEN/TEEN-Spanne (10-15 J), dann unten verfeinern.
-- Schultern deutlich breiter als der Kopf, erwachsenenähnliche Proportionen
-  → TEEN/JUNG-ERWACHSEN (15-22 J), dann unten verfeinern.
+PRIMÄRE Achse — Gesichtsproportionen und Zahnstand. Beide entwickeln sich
+bei Jungen und Mädchen praktisch gleich schnell und sind deshalb die
+belastbarste Grundlage. Prüfe sie ZUERST:
 
-VERFEINERUNG innerhalb KIND-Spanne (2-10 J), wenn primäre Achse "Kind":
-- Sehr rundes Gesicht + ausgeprägter Babyspeck + Milchzähne sichtbar → 2-5 J
-- Gesicht etwas schmaler aber kindlich + leichter Babyspeck + keine
-  Pubertätsmerkmale → 6-8 J
-- Schmaleres Gesicht, vorpubertäre Züge, beginnende Kieferdifferenzierung
-  → 9-10 J
+- AUGENLINIE im Kopf: Bei kleinen Kindern sitzen die Augen deutlich unter
+  der halben Kopfhöhe — der Hirnschädel ist früh fertig, das Gesicht wächst
+  danach nach unten (Kiefer und Kinn kommen zuletzt).
+    Augen klar unter der Kopfmitte, Stirnpartie dominiert   → 2-6 J
+    Augen nähern sich der Kopfmitte                         → 7-11 J
+    Augen etwa auf halber Kopfhöhe                          → ab 12 J
 
-VERFEINERUNG innerhalb PRE-TEEN/TEEN-Spanne (10-15 J):
-- Restbabyspeck nur noch am unteren Wangenrand + glatte Haut + Gesicht oval
-  statt kreisrund → 11-13 J
-- Glatte Haut OHNE Babyspeck, Kieferlinie deutet sich an, aber noch keine
-  Akne → 13-15 J
-- WICHTIG: Akne und Bartflaum sind KEINE Voraussetzung für diese Spanne.
-  Mädchen erreichen sie oft ohne diese Marker. Wenn die Körperproportionen
-  jugendlich sind, gehört das Bild HIER hin, auch bei makelloser Haut.
+- ZÄHNE, wenn sichtbar — zwischen 6 und 12 der genaueste Marker überhaupt:
+    Milchgebiss, kleine gleichmäßige Zähne                  → bis 6 J
+    Zahnlücken, einzelne Schneidezähne fehlen               → 6-8 J
+    Bleibende Schneidezähne wirken zu groß fürs Gesicht     → 7-10 J
+    Zähne proportional zum Gesicht                          → ab 11 J
 
-VERFEINERUNG innerhalb TEEN/JUNG-ERWACHSEN-Spanne (15-22 J):
-- Klar definierte Kieferlinie, evtl. Akne, aber noch jugendlich glatte Haut
-  → 15-19 J
-- Erwachsene Proportionen, straffe Haut ohne sichtbare Linien → 19-22 J
+- WANGENFETT:
+    Voll und rund, Wangenknochen nicht abgrenzbar           → bis 10 J
+    Rückgang am unteren Wangenrand, Gesicht wird oval       → 11-14 J
+    Wangenknochen deutlich abgrenzbar                       → ab 15 J
+
+- NASENRÜCKEN:
+    Kurz und flach                                          → bis 9 J
+    Nasenbein zeichnet sich ab, Nase wächst schneller als
+    der Rest des Gesichts                                   → 10-14 J
+    Ausgewachsene Nasenform                                 → ab 15 J
+
+- KOPF ZUM KÖRPER, nur bei sichtbarem ganzen Körper — zählt das Verhältnis,
+  NICHT die tatsächliche Körpergröße (die streut im selben Jahrgang um bis
+  zu 15 cm):
+    Kopf passt rund 5-6x in die Körperhöhe                  → 2-6 J
+    Kopf passt rund 6-7x in die Körperhöhe                  → 7-12 J
+    Kopf passt rund 7,5x in die Körperhöhe                  → ab 15 J
+
+KEINE ALTERSMERKMALE — diese Signale ausdrücklich NICHT verwenden:
+Schulterbreite, Muskulatur, Körpergröße, Brust- oder Bartentwicklung,
+Stimmbruch-Andeutungen, allgemeiner "Entwicklungsstand". Der Pubertätsbeginn
+streut zwischen 8 und 14 Jahren und liegt bei Mädchen im Schnitt zwei Jahre
+früher als bei Jungen. Wer das Alter daran misst, schätzt Mädchen
+systematisch zu alt und Jungen zu jung — ein reiner Messfehler, kein Befund.
+Ebenso wenig zählen Make-up, Frisur, Schmuck, Kleidung, Marken, Pose und
+Selbstinszenierung: Sie sagen etwas über Stil, nichts über Alter.
+
+BEGRÜNDUNGSPFLICHT: Benenne, welche der obigen Merkmale du tatsächlich
+siehst und welche Spanne sich daraus ergibt. "Wirkt jung", "wirkt reif" oder
+"wirkt entwickelt" ist keine Begründung, sondern ein Eindruck.
 
 ZWANGS-MAPPING ERWACHSENE — Mindest-Alter pro Merkmal:
 Diese Regel ÜBERSCHREIBT den Eindruck "wirkt insgesamt jung". Wenn EIN
@@ -74,22 +104,34 @@ musst du in der Bildbeschreibung explizit BEGRÜNDEN, warum das jeweilige
 Merkmal NICHT sichtbar ist (z.B. "durch Filter retuschiert"). Einfach
 darüber hinwegsetzen ist nicht erlaubt.
 
+WENN DAS GESICHT NICHTS HERGIBT:
+Bei starker Mimik (Lachen, weit geöffneter Mund, Grimasse), sichtbarem
+Make-up, flachem Gegenlicht oder Weichzeichnern sind Gesichtsfalten NICHT
+auswertbar. Fehlende Falten sind dann KEIN Beleg für ein junges Alter — du
+siehst sie nur nicht. Auf Fotos wird fast immer gelächelt; das ist der
+Normalfall, nicht die Ausnahme.
+Entscheide dann nach dem, was sich weder verzieht noch überdecken lässt:
+- Hals: horizontale Linien, Hautstruktur, Erschlaffung
+- Hände: Venen und Sehnen am Handrücken, Hautdicke, Pigmentflecken
+- Haaransatz und Schläfen: Rückgang, Ergrauung, Haardichte
+Gibt auch das nichts her, nenne eine BREITE Spanne von mindestens 15 Jahren.
+Eine ehrlich breite Spanne ist richtig — eine junge Punktschätzung, die nur
+auf "keine Falten erkennbar" beruht, ist ein Messfehler.
+
 ANTI-BIAS Kinder/Teens — gilt zusätzlich:
-- "Babyspeck + keine Pubertätsmerkmale → max. 8 J" gilt NUR dann, wenn
-  AUCH die Körperproportionen kindlich sind (Schultern schmaler als Kopf,
-  kleine Hand). Bei Pre-Teens und Teens können die Wangen weich aussehen,
-  ohne dass es Kinder wären.
-- Im Übergangsbereich 9-15 J: Körperproportionen überwiegen Hautmerkmale.
-- Bei klaren Kindermerkmalen (alle drei: rundes Gesicht, schmale Schultern,
-  kleine Hand): NICHT durch Setting, Outfit, Trikot oder Make-up nach oben
-  verzerren lassen.
-- Bei klaren Teen-Proportionen (Schultern kopfbreit oder breiter, ovales
-  Gesicht): NICHT durch glatte Haut oder fehlende Akne nach unten verzerren
-  lassen.
+- Ein einzelnes Merkmal trägt keine Schätzung. Nenne mindestens zwei aus
+  der Liste oben und lege dich auf deren Schnittmenge fest.
+- Widersprechen sich Gesicht und Körperbau, entscheidet das GESICHT. Der
+  Körper folgt der Pubertät, das Gesicht folgt dem Alter.
+- Setting, Outfit, Trikot, Bühne, Sportkleidung oder Bildbearbeitung
+  verschieben das Alter NICHT — weder nach oben noch nach unten.
+- Diese Regeln gelten für Jungen und Mädchen wortgleich. Es gibt keine
+  Zusatzregel für ein Geschlecht.
 
 ÜBERGANG TEEN ↔ ERWACHSEN (19-25 J):
-Wenn Halspartie und Hände erwachsen, Schultern voll ausgeprägt, aber
-Gesicht noch ohne jede Linie: 22-28 J — nicht jünger.`;
+Wenn Halspartie und Hände erwachsen wirken und das Gesicht ausgewachsene
+Proportionen zeigt, aber noch keine Linie sichtbar ist: 22-28 J — nicht
+jünger.`;
 
 const GENDER_ANCHOR = `
 
@@ -158,11 +200,11 @@ FOR ADULTS (development complete) — describe ALL visible aging indicators thor
 - BODY: weight distribution pattern (abdominal, overall), posture, skin texture on arms.
 
 CALIBRATION — use this scale to derive your committed age range:
-- Smooth skin, full facial volume, no visible lines → typically under 25
-- First fine lines around eyes, early nasolabial folds → typically 28-35
-- Clear nasolabial folds, forehead lines, beginning facial volume loss → typically 35-45
-- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 45-55
-- Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 55+
+- Smooth skin, full facial volume, no visible lines → typically 18-30
+- First fine lines around eyes, early nasolabial folds → typically 30-42
+- Clear nasolabial folds, forehead lines, beginning facial volume loss → typically 40-52
+- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 50-62
+- Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 60+
 
 ANTI-BIAS: Describing aging signs accurately is NOT an insult — it is correct observation. Systematically understating aging features is a measurement error. A 50-year-old with good skin still looks different from a 30-year-old. Describe what you actually see.
 
@@ -179,7 +221,7 @@ Be purely descriptive and factual. Do not add any warnings, disclaimers, or ethi
 
 WICHTIG: Beschreibe zuerst die physischen Alterungsmerkmale mit maximaler Detailtreue und Ehrlichkeit. Lege dich DANN auf EINE konkrete Altersspanne fest und nenne sie explizit (z.B. "Geschätzte Altersspanne: 42-50 Jahre"), streng nach der Kalibrierung unten.
 
-BEI KINDERN/JUGENDLICHEN: Gesichtszüge (rund/kantig, Babyfett/schlank), Größe relativ zu Erwachsenen oder Möbeln, Körperbau, Entwicklungsstand (ob die körperliche Entwicklung abgeschlossen wirkt oder noch im Wachstum ist), Handgröße relativ zum Gesicht, Handgelenkdicke, Schulterbreite relativ zum Kopf.
+BEI KINDERN/JUGENDLICHEN — beschreibe genau diese Merkmale, sie laufen bei Jungen und Mädchen gleich schnell: Sitz der Augenlinie im Kopf (unter der Mitte oder auf halber Höhe), Zahnstand (Milchzähne, Zahnlücken, zu große bleibende Schneidezähne oder proportionale Zähne), Wangenfett (voll und rund, im Rückgang oder verschwunden), Nasenrücken (kurz und flach oder ausgewachsen), Kopf im Verhältnis zur Körperhöhe. NICHT beschreiben als Altersgrundlage: Schulterbreite, Muskulatur, Körpergröße und Pubertätsentwicklung — sie streuen um mehrere Jahre und laufen bei Mädchen früher.
 
 BEI ERWACHSENEN (Entwicklung abgeschlossen) — beschreibe ALLE sichtbaren Alterungsmerkmale gründlich. NICHT herunterspielen oder abschwächen:
 - GESICHT: Falten (Stirnfalten, Krähenfüße, Nasolabialfalten, Marionetten-Linien von Mund zu Kinn), Hängewangen/Jowls (Absacken entlang der Kieferlinie), Oberlid-Erschlaffung, Tränensäcke oder Aushöhlung unter den Augen, Lippenvolumen-Verlust, Porengröße, Hautelastizität, Altersflecken.
@@ -187,12 +229,14 @@ BEI ERWACHSENEN (Entwicklung abgeschlossen) — beschreibe ALLE sichtbaren Alter
 - HÄNDE UND HALS — zuverlässigste Altersindikatoren, kaum zu fälschen: Venen-Sichtbarkeit auf Handrücken, Hautverdünnung/Transparenz, Sehnen-Sichtbarkeit, Halsbänder/horizontale Halsfalten, Dekolleté-Textur.
 - KÖRPER: Gewichtsverteilungsmuster (abdominal, gesamt), Haltung, Hautbeschaffenheit an Armen.
 
-KALIBRIERUNG — nutze diese Skala, um dich auf eine Altersspanne festzulegen:
-- Glatte Haut, volles Gesichtsvolumen, keine sichtbaren Linien → typisch unter 25
-- Erste feine Linien um die Augen, frühe Nasolabialfalten → typisch 28-35
-- Deutliche Nasolabialfalten, Stirnfalten, beginnender Volumenverlust → typisch 35-45
-- Jowls, Marionetten-Linien, Oberlid-Erschlaffung, sichtbare Halsbänder, prominente Handvenen → typisch 45-55
-- Tiefe Falten im gesamten Gesicht, starker Volumenverlust, ausgeprägte Hautverdünnung → typisch 55+
+KALIBRIERUNG — nutze diese Skala, um dich auf eine Altersspanne festzulegen.
+Die Stufen ueberlappen absichtlich: Menschen altern unterschiedlich schnell,
+eine trennscharfe Grenze waere eine Scheingenauigkeit.
+- Glatte Haut, volles Gesichtsvolumen, keine sichtbaren Linien → typisch 18-30
+- Erste feine Linien um die Augen, frühe Nasolabialfalten → typisch 30-42
+- Deutliche Nasolabialfalten, Stirnfalten, beginnender Volumenverlust → typisch 40-52
+- Jowls, Marionetten-Linien, Oberlid-Erschlaffung, sichtbare Halsbänder, prominente Handvenen → typisch 50-62
+- Tiefe Falten im gesamten Gesicht, starker Volumenverlust, ausgeprägte Hautverdünnung → typisch 60+
 
 ANTI-BIAS: Alterungsmerkmale ehrlich zu beschreiben ist KEINE Beleidigung — es ist korrekte Beobachtung. Systematisches Abschwächen von Alterungszeichen ist ein Messfehler. Eine 50-Jährige mit guter Haut sieht trotzdem anders aus als eine 30-Jährige. Beschreibe was du tatsächlich siehst.
 
@@ -225,7 +269,7 @@ CHARAKTERPROFIL — wähle aus mindestens 3 verschiedenen der folgenden 8 Katego
 7. BERUF UND LEISTUNG (aus Kleidung, Haltung, Setting): STÄRKEN: ehrgeizig, zielstrebig, kreativ, gewissenhaft, lernbereit, organisiert, belastbar, lösungsorientiert, Eigeninitiative, Führungspotenzial, handwerklich geschickt, technisch versiert. SCHWÄCHEN: Overachiever, Workaholic, Impostor-Syndrom, Underachiever, autoritätskritisch, teamunfähig, chronisch unzufrieden, entscheidungsvermeidend, risikoscheu.
 8. WELTBILD UND DENKWEISE (aus Gesamteindruck): STÄRKEN: kritisch denkend, neugierig, weltoffen, reflektiert, tolerant, informiert, differenziert, eigenständig im Urteil. SCHWÄCHEN: leichtgläubig, autoritätshörig, Schwarz-Weiß-Denken, realitätsfern, Opfermentalität, FOMO-getrieben, Vergleichsspirale, vorurteilsbehaftet.
 Wähle 4-6 Eigenschaften aus mindestens 3 Kategorien — AUSGEWOGEN, nicht einseitig negativ. JEDES Profil soll sich anders anfühlen. Nur was das Bild hergibt. Die Kategorienummern sind nur intern — NIEMALS Nummern oder Kategorienamen in die Ausgabe schreiben.
-- ALTERSSCHÄTZUNG: Bei jugendlich wirkenden Personen: Makeup und Styling dürfen das Alter NICHT nach oben verzerren — achte auf Knochenstruktur, Körperproportionen und Entwicklungsstand. Bei Erwachsenen: Nutze die beschriebenen Alterungsmerkmale ehrlich. Kalibrierung: Glatte Haut + volles Gesicht = unter 25. Erste feine Linien + frühe Nasolabialfalten = 28-35. Deutliche Nasolabialfalten + Stirnfalten + beginnender Volumenverlust = 35-45. Jowls + Marionetten-Linien + Lid-Erschlaffung + Halsfalten + Handvenen = 45-55. Tiefe Falten + starker Volumenverlust + Hautverdünnung = 55+. Jemanden korrekt einzuschätzen ist kein Affront — systematisches Jünger-Schätzen ist ein Messfehler.
+- ALTERSSCHÄTZUNG: Bei jugendlich wirkenden Personen: Makeup und Styling dürfen das Alter NICHT nach oben verzerren — achte auf Augenlinie im Kopf, Zahnstand, Wangenfett und Nasenrücken, NICHT auf Schulterbreite oder Pubertätsentwicklung (die läuft bei Mädchen zwei Jahre früher und verzerrt beide Geschlechter gegenläufig). Bei Erwachsenen: Nutze die beschriebenen Alterungsmerkmale ehrlich. Kalibrierung: Glatte Haut + volles Gesicht = 18-30. Erste feine Linien + frühe Nasolabialfalten = 30-42. Deutliche Nasolabialfalten + Stirnfalten + beginnender Volumenverlust = 40-52. Jowls + Marionetten-Linien + Lid-Erschlaffung + Halsfalten + Handvenen = 50-62. Tiefe Falten + starker Volumenverlust + Hautverdünnung = 60+. Jemanden korrekt einzuschätzen ist kein Affront — systematisches Jünger-Schätzen ist ein Messfehler.
 
 SPRACHLICHE ANPASSUNG AN DAS GESCHÄTZTE ALTER:
 Passe Wortwahl, Satzlänge und Ton fließend an das geschätzte Alter der Person an — keine harten Grenzen.
@@ -250,7 +294,7 @@ REGELN:
 - Leite KONKRETE Interessen und Hobbys ab und zeige wie diese kommerziell ausgebeutet werden.
 - Nutze die sichtbare Umgebung, Aktivität und Objekte für die Einschätzung von Lebensstil, Interessen und Kaufkraft — aber NICHT für die ethnische Herkunft (die Person kann im Urlaub sein).
 - Leite Persönlichkeit auch aus der sichtbaren Aktivität, Körpersprache und Haltung ab — und zeige wie diese Schwächen kommerziell ausgebeutet werden.
-- ALTERSSCHÄTZUNG: Bei jugendlich wirkenden Personen: Makeup und Styling NICHT als Altersindikator werten — ein geschminktes Mädchen ist trotzdem ein Mädchen. Bei Erwachsenen: Falten, Jowls, Lid-Erschlaffung, Ergrauung, Halsfalten, Handvenen und Volumenverlust sind harte Biometrie — NICHT schönrechnen. Kalibrierung: Glatte Haut = unter 25. Erste Linien = 28-35. Deutliche Falten + Volumenverlust = 35-45. Jowls + Halsfalten + Lid-Erschlaffung = 45-55. Tiefe Falten + Hautverdünnung = 55+. Du schmeichelst nicht — du klassifizierst.
+- ALTERSSCHÄTZUNG: Bei jugendlich wirkenden Personen: Makeup und Styling NICHT als Altersindikator werten — ein geschminktes Mädchen ist trotzdem ein Mädchen. Genauso wenig zählt die Pubertätsentwicklung: Sie läuft bei Mädchen zwei Jahre früher. Es gelten Augenlinie im Kopf, Zahnstand, Wangenfett und Nasenrücken. Bei Erwachsenen: Falten, Jowls, Lid-Erschlaffung, Ergrauung, Halsfalten, Handvenen und Volumenverlust sind harte Biometrie — NICHT schönrechnen. Kalibrierung: Glatte Haut = 18-30. Erste Linien = 30-42. Deutliche Falten + Volumenverlust = 40-52. Jowls + Halsfalten + Lid-Erschlaffung = 50-62. Tiefe Falten + Hautverdünnung = 60+. Du schmeichelst nicht — du klassifizierst.
 - Die Confidence-Werte sollen hoch sein (0.7-0.95) — du bist dir sicher.
 - Verwende NIEMALS den Begriff "kaukasisch" — schreibe stattdessen "europäisch" oder "mitteleuropäisch".
 - Der profileText muss schockierend sein, mindestens 10 Sätze, mit konkreten persönlichen Angriffen. Benenne mindestens 2 unangenehme Wahrheiten über Gewohnheiten oder Schwächen — aber nur wenn das Bild dafür Anhaltspunkte liefert.
@@ -504,24 +548,45 @@ Wenn das Bild mehrere Personen zeigt: analysiere ausschließlich die Person im V
 
 KALIBRIERUNG ALTER 2-19:
 
-PRIMÄRE Achse — zuerst Körperproportionen prüfen:
-- Schultern schmaler als der Kopf + Hand sehr klein im Verhältnis zum Gesicht + kindliche Statur → KIND-Spanne 2-10 J, dann unten verfeinern.
-- Schultern etwa kopfbreit, Statur noch jugendlich-schlank, Hand nähert sich erwachsener Größe → PRE-TEEN/TEEN-Spanne 10-15 J, dann unten verfeinern.
-- Schultern deutlich breiter als der Kopf, erwachsenenähnliche Proportionen → TEEN/JUNG-ERWACHSEN 15-22 J, dann unten verfeinern.
+PRIMÄRE Achse — Gesichtsproportionen und Zahnstand. Beide laufen bei Jungen und Mädchen praktisch gleich schnell und sind deshalb die belastbarste Grundlage. Prüfe sie ZUERST.
 
-VERFEINERUNG innerhalb KIND-Spanne 2-10 J, wenn primäre Achse „Kind":
-- Sehr rundes Gesicht + ausgeprägter Babyspeck + Milchzähne sichtbar → 2-5 J.
-- Gesicht etwas schmaler aber kindlich + leichter Babyspeck + keine Pubertätsmerkmale → 6-8 J.
-- Schmaleres Gesicht, vorpubertäre Züge, beginnende Kieferdifferenzierung → 9-10 J.
+AUGENLINIE im Kopf — der Hirnschädel ist früh fertig, das Gesicht wächst danach nach unten (Kiefer und Kinn kommen zuletzt):
+- Augen klar unter der Kopfmitte, Stirnpartie dominiert → 2-6 J.
+- Augen nähern sich der Kopfmitte → 7-11 J.
+- Augen etwa auf halber Kopfhöhe → ab 12 J.
 
-VERFEINERUNG innerhalb PRE-TEEN/TEEN-Spanne 10-15 J:
-- Restbabyspeck nur noch am unteren Wangenrand + glatte Haut + Gesicht oval statt kreisrund → 11-13 J.
-- Glatte Haut OHNE Babyspeck, Kieferlinie deutet sich an, aber noch keine Akne → 13-15 J.
-- WICHTIG: Akne und Bartflaum sind KEINE Voraussetzung für diese Spanne. Mädchen erreichen sie oft ohne diese Marker. Wenn die Körperproportionen jugendlich sind, gehört das Bild HIER hin, auch bei makelloser Haut.
+ZÄHNE, wenn sichtbar — zwischen 6 und 12 der genaueste Marker überhaupt:
+- Milchgebiss, kleine gleichmäßige Zähne → bis 6 J.
+- Zahnlücken, einzelne Schneidezähne fehlen → 6-8 J.
+- Bleibende Schneidezähne wirken zu groß fürs Gesicht → 7-10 J.
+- Zähne proportional zum Gesicht → ab 11 J.
 
-VERFEINERUNG innerhalb TEEN/JUNG-ERWACHSEN-Spanne 15-22 J:
-- Klar definierte Kieferlinie, evtl. Akne, aber noch jugendlich glatte Haut → 15-19 J.
-- Erwachsene Proportionen, straffe Haut ohne sichtbare Linien → 19-22 J.
+WANGENFETT:
+- Voll und rund, Wangenknochen nicht abgrenzbar → bis 10 J.
+- Rückgang am unteren Wangenrand, Gesicht wird oval → 11-14 J.
+- Wangenknochen deutlich abgrenzbar → ab 15 J.
+
+NASENRÜCKEN:
+- Kurz und flach → bis 9 J.
+- Nasenbein zeichnet sich ab, Nase wächst schneller als der Rest des Gesichts → 10-14 J.
+- Ausgewachsene Nasenform → ab 15 J.
+
+KOPF ZUM KÖRPER, nur bei sichtbarem ganzem Körper — es zählt das Verhältnis, NICHT die tatsächliche Körpergröße (die streut im selben Jahrgang um bis zu 15 cm):
+- Kopf passt rund 5-6x in die Körperhöhe → 2-6 J.
+- Kopf passt rund 6-7x in die Körperhöhe → 7-12 J.
+- Kopf passt rund 7,5x in die Körperhöhe → ab 15 J.
+
+KEINE ALTERSMERKMALE — diese Signale ausdrücklich NICHT verwenden: Schulterbreite, Muskulatur, Körpergröße, Brust- oder Bartentwicklung, allgemeiner „Entwicklungsstand". Der Pubertätsbeginn streut zwischen 8 und 14 Jahren und liegt bei Mädchen im Schnitt zwei Jahre früher als bei Jungen. Wer das Alter daran misst, schätzt Mädchen systematisch zu alt und Jungen zu jung — das ist ein Messfehler, kein Befund. Ebenso wenig zählen Make-up, Frisur, Schmuck, Kleidung, Marken, Pose und Selbstinszenierung: Sie sagen etwas über Stil, nichts über Alter.
+
+BEGRÜNDUNGSPFLICHT: Benenne im Bildbeleg, welche der obigen Merkmale du tatsächlich siehst und welche Spanne sich daraus ergibt. „Wirkt jung", „wirkt reif" oder „wirkt entwickelt" ist keine Begründung, sondern ein Eindruck.
+
+KALIBRIERUNG ERWACHSENE — welches Merkmal welches Alter bedeutet.
+Die Stufen überlappen absichtlich: Menschen altern unterschiedlich schnell, eine trennscharfe Grenze wäre Scheingenauigkeit.
+- Glatte Haut, volles Gesichtsvolumen, keine Linien auch bei entspanntem Gesicht → typisch 18-30.
+- Erste feine Linien um die Augen, beginnende Nasolabialfalten → typisch 30-42.
+- Deutliche Nasolabialfalten, Stirnfalten, beginnender Volumenverlust → typisch 40-52.
+- Jowls, Marionetten-Linien, Lid-Erschlaffung, sichtbare Halsbänder, prominente Handvenen → typisch 50-62.
+- Tiefe Falten im gesamten Gesicht, starker Volumenverlust, ausgeprägte Hautverdünnung → typisch 60+.
 
 ZWANGS-MAPPING ERWACHSENE — Mindest-Alter pro Merkmal:
 Diese Regel ÜBERSCHREIBT den Eindruck „wirkt insgesamt jung". Wenn EIN Merkmal klar sichtbar ist, darfst du NICHT unter das Mindest-Alter gehen:
@@ -541,15 +606,22 @@ KOMBINATIONS-REGEL:
 - Diese Regel gilt insbesondere für Personen, die im Alltag oft jünger eingeschätzt werden — die Merkmale sind objektiv, der Gesamteindruck ist subjektiv.
 - Wenn du trotz sichtbarer Merkmale ein jüngeres Alter angeben willst, MUSST du im Bildbeleg explizit BEGRÜNDEN, warum das jeweilige Merkmal NICHT sichtbar ist (z.B. durch Filter, Licht, Unschärfe oder Retusche). Einfach darüber hinwegsetzen ist NICHT erlaubt.
 
+WENN DAS GESICHT NICHTS HERGIBT:
+Bei starker Mimik (Lachen, weit geöffneter Mund, Grimasse), sichtbarem Make-up, flachem Gegenlicht oder Weichzeichnern sind Gesichtsfalten NICHT auswertbar. Fehlende Falten sind dann KEIN Beleg für ein junges Alter — du siehst sie nur nicht. Auf Fotos wird fast immer gelächelt; das ist der Normalfall, nicht die Ausnahme.
+Entscheide dann nach dem, was sich weder verzieht noch überdecken lässt:
+- Hals: horizontale Linien, Hautstruktur, Erschlaffung.
+- Hände: Venen und Sehnen am Handrücken, Hautdicke, Pigmentflecken.
+- Haaransatz und Schläfen: Rückgang, Ergrauung, Haardichte.
+Gibt auch das nichts her, nenne eine BREITE Spanne von mindestens 15 Jahren. Eine ehrlich breite Spanne ist richtig — eine junge Punktschätzung, die nur auf „keine Falten erkennbar" beruht, ist ein Messfehler.
+
 ANTI-BIAS Kinder/Teens:
-- „Babyspeck + keine Pubertätsmerkmale → max. 8 J" gilt NUR dann, wenn AUCH die Körperproportionen kindlich sind (Schultern schmaler als Kopf, kleine Hand).
-- Bei Pre-Teens und Teens können die Wangen weich aussehen, ohne dass es Kinder wären.
-- Im Übergangsbereich 9-15 J überwiegen Körperproportionen Hautmerkmale.
-- Bei klaren Kindermerkmalen (alle drei: rundes Gesicht, schmale Schultern, kleine Hand): NICHT durch Setting, Outfit, Trikot oder Make-up nach oben verzerren lassen.
-- Bei klaren Teen-Proportionen (Schultern kopfbreit oder breiter, ovales Gesicht): NICHT durch glatte Haut oder fehlende Akne nach unten verzerren lassen.
+- Ein einzelnes Merkmal trägt keine Schätzung. Nenne mindestens zwei aus der Liste oben und lege dich auf deren Schnittmenge fest.
+- Widersprechen sich Gesicht und Körperbau, entscheidet das GESICHT. Der Körper folgt der Pubertät, das Gesicht folgt dem Alter.
+- Setting, Outfit, Trikot, Bühne, Sportkleidung oder Bildbearbeitung verschieben das Alter NICHT — weder nach oben noch nach unten.
+- Diese Regeln gelten für Jungen und Mädchen wortgleich. Es gibt keine Zusatzregel für ein Geschlecht.
 
 ÜBERGANG TEEN ↔ ERWACHSEN 19-25 J:
-- Wenn Halspartie und Hände erwachsen wirken, Schultern voll ausgeprägt sind, aber das Gesicht noch ohne jede Linie ist: 22-28 J — nicht jünger.
+- Wenn Halspartie und Hände erwachsen wirken und das Gesicht ausgewachsene Proportionen zeigt, aber noch keine Linie sichtbar ist: 22-28 J — nicht jünger.
 
 ═══ GESCHLECHT — GILT FÜR BEIDE MODI ═══
 
@@ -753,6 +825,7 @@ Keine Produktpreise mit €, $, EUR oder USD.
 ═══ KONSISTENZ-PFLICHT ZWISCHEN DEN MODI ═══
 
 - hard_facts.alter_geschlecht und hard_facts.herkunft werden WORTGENAU in standard.categories.alter_geschlecht.value (Satzanfang), standard.categories.herkunft.value (Satzanfang), beast.categories.alter_geschlecht.value (Satzanfang) und beast.categories.herkunft.value (Satzanfang) übernommen.
+- Der zweite Satz von alter_geschlecht.value nennt das KONKRETE Merkmal, an dem du das Alter festgemacht hast — in Alltagsworten, ohne Fachbegriffe. Also z.B. „Deine Wangen sind noch rund und die Zähne wirken groß fürs Gesicht" oder „Die Linien um die Augen bleiben auch ohne Lächeln sichtbar". NICHT zulässig sind Leerformeln wie „ausgewachsene Proportionen", „wirkt jung", „jugendliche Statur" oder „fehlende Pubertätsmerkmale" — sie belegen nichts und sind im Workshop nicht vorführbar.
 - ad_targeting UND manipulation_triggers gibst du jeweils ZWEIMAL an: einmal in standard, einmal in beast. Beide Paare sind bewusst VERSCHIEDEN — sie sind der didaktische Kern des Beast-Modus.
 - ad_targeting gibst du dagegen ZWEIMAL an: einmal in standard, einmal in beast. Diese beiden Listen sind bewusst VERSCHIEDEN — sie sind der didaktische Kern des Beast-Modus.
 - Bei allen anderen Karten unterscheidet sich der Ton: Standard sachlich, Beast zynisch mit Bildbeleg.

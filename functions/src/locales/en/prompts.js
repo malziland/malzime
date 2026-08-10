@@ -18,31 +18,53 @@ const AGE_ANCHOR = `
 
 AGE CALIBRATION 2-19:
 
-PRIMARY axis — check body proportions first:
-- Shoulders narrower than the head + hand very small relative to face
-  + childlike stature → CHILD range (2-10 y), then refine below.
-- Shoulders about head-width, build still youthful-slim, hand approaching
-  adult size → PRE-TEEN/TEEN range (10-15 y), then refine below.
-- Shoulders distinctly wider than the head, adult-like proportions
-  → TEEN/YOUNG-ADULT (15-22 y), then refine below.
+PRIMARY axis — facial proportions and dentition. Both develop at
+practically the same pace in boys and girls and are therefore the most
+reliable basis. Check these FIRST:
 
-REFINEMENT within CHILD range (2-10 y), if primary axis is "child":
-- Very round face + pronounced baby fat + milk teeth visible → 2-5 y
-- Slightly slimmer face but still childlike + light baby fat + no
-  puberty markers → 6-8 y
-- Slimmer face, pre-pubertal traits, jaw starting to differentiate → 9-10 y
+- EYE LINE within the head: In young children the eyes sit clearly below
+  half the head height — the braincase finishes early, the face then grows
+  downwards (jaw and chin come last).
+    Eyes clearly below head midline, forehead dominates      → 2-6 y
+    Eyes approaching the head midline                        → 7-11 y
+    Eyes at roughly half the head height                     → 12 y and up
 
-REFINEMENT within PRE-TEEN/TEEN range (10-15 y):
-- Remaining baby fat only on lower cheeks + smooth skin + face oval
-  rather than round → 11-13 y
-- Smooth skin WITHOUT baby fat, jawline emerging, but no acne yet → 13-15 y
-- IMPORTANT: Acne and facial hair are NOT prerequisites for this range.
-  Girls often reach it without these markers. If body proportions are
-  youthful, the image belongs HERE, even with flawless skin.
+- TEETH, when visible — the single most accurate marker between 6 and 12:
+    Milk teeth, small and evenly sized                       → up to 6 y
+    Gaps, individual incisors missing                        → 6-8 y
+    Permanent incisors look too large for the face           → 7-10 y
+    Teeth proportionate to the face                          → 11 y and up
 
-REFINEMENT within TEEN/YOUNG-ADULT range (15-22 y):
-- Clearly defined jawline, possible acne, still youthful smooth skin → 15-19 y
-- Adult proportions, taut skin without visible lines → 19-22 y
+- CHEEK FAT:
+    Full and round, cheekbones not discernible               → up to 10 y
+    Receding along the lower cheek, face turning oval        → 11-14 y
+    Cheekbones clearly discernible                           → 15 y and up
+
+- NASAL BRIDGE:
+    Short and flat                                           → up to 9 y
+    Nasal bone emerging, nose growing faster than the rest
+    of the face                                              → 10-14 y
+    Fully grown nose shape                                   → 15 y and up
+
+- HEAD TO BODY, only when the whole body is visible — what counts is the
+  RATIO, not actual height (which varies by up to 15 cm within one year
+  group):
+    Head fits about 5-6x into body height                    → 2-6 y
+    Head fits about 6-7x into body height                    → 7-12 y
+    Head fits about 7.5x into body height                    → 15 y and up
+
+NOT AGE MARKERS — explicitly do NOT use these signals: shoulder width,
+musculature, body height, breast or facial-hair development, general
+"developmental stage". Puberty onset varies between ages 8 and 14 and
+begins on average two years earlier in girls. Estimating age from it
+systematically ages girls up and boys down — that is a measurement error,
+not a finding. Nor do makeup, hairstyle, jewellery, clothing, brands, pose
+and self-presentation count: they say something about style, nothing about
+age.
+
+DUTY TO JUSTIFY: Name which of the markers above you actually see and
+which range follows from them. "Looks young", "looks mature" or "looks
+developed" is an impression, not a justification.
 
 FORCED MAPPING ADULTS — minimum age per feature:
 This rule OVERRIDES the impression "looks young overall". If ONE feature
@@ -70,19 +92,33 @@ If you want to give a younger age despite visible features, you MUST
 explicitly JUSTIFY in the image description why the respective feature
 is NOT visible (e.g. "retouched by filter"). Simply ignoring is not allowed.
 
+WHEN THE FACE GIVES NOTHING AWAY:
+With strong facial expression (laughing, wide open mouth, grimace), visible
+makeup, flat backlighting or soft-focus filters, facial lines are NOT
+evaluable. Absent lines are then NO evidence of a young age — you simply
+cannot see them. People almost always smile in photos; that is the normal
+case, not the exception.
+Decide instead by what neither distorts nor can be covered up:
+- Neck: horizontal lines, skin texture, slackening.
+- Hands: veins and tendons on the back of the hand, skin thickness, age spots.
+- Hairline and temples: recession, greying, hair density.
+If that gives nothing either, state a WIDE range of at least 15 years. An
+honestly wide range is correct — a young point estimate resting only on "no
+lines visible" is a measurement error.
+
 ANTI-BIAS Children/Teens — additionally:
-- "Baby fat + no puberty markers → max. 8 y" applies ONLY when body
-  proportions are ALSO childlike (shoulders narrower than head, small
-  hand). Pre-teens and teens can have soft cheeks without being children.
-- In the transition range 9-15 y: body proportions outweigh skin features.
-- With clear child markers (all three: round face, narrow shoulders,
-  small hand): do NOT let setting, outfit, jersey or makeup distort upward.
-- With clear teen proportions (shoulders head-width or wider, oval face):
-  do NOT let smooth skin or absence of acne distort downward.
+- A single marker carries no estimate. Name at least two from the list
+  above and commit to their intersection.
+- Where face and build contradict each other, the FACE decides. The body
+  follows puberty, the face follows age.
+- Setting, outfit, jersey, stage, sportswear or image editing do NOT shift
+  the age — neither upwards nor downwards.
+- These rules apply word for word to boys and girls alike. There is no
+  additional rule for one gender.
 
 TRANSITION TEEN ↔ ADULT (19-25 y):
-If neck and hands are adult, shoulders fully developed, but face still
-without any lines: 22-28 y — not younger.`;
+If neck and hands look adult and the face shows fully grown proportions,
+but no line is visible yet: 22-28 y — not younger.`;
 
 const GENDER_ANCHOR = `
 
@@ -142,7 +178,7 @@ module.exports = {
 
 IMPORTANT: First describe the physical age indicators with maximum detail and honesty. THEN commit to ONE concrete estimated age range and state it explicitly (e.g. "Estimated age range: 42-50 years"), derived strictly from the calibration below.
 
-FOR CHILDREN/TEENS: facial features (round/angular, baby fat/lean), height compared to adults or furniture, body build, developmental stage (whether physical development appears complete or still in progress), hand size relative to face, wrist thickness, shoulder width relative to head.
+FOR CHILDREN/TEENS — describe exactly these markers, which develop at the same pace in boys and girls: where the eye line sits within the head (below the midline or at half height), dentition (milk teeth, gaps, oversized permanent incisors, or proportionate teeth), cheek fat (full and round, receding, or gone), nasal bridge (short and flat or fully grown), head relative to body height. Do NOT describe as a basis for age: shoulder width, musculature, body height and pubertal development — they vary by several years and run earlier in girls.
 
 FOR ADULTS (development complete) — describe ALL visible aging indicators thoroughly. Do NOT downplay or soften them:
 - FACE: wrinkles (forehead lines, crow's feet, nasolabial folds, marionette lines from mouth to chin), jowls (sagging along jawline), eyelid drooping/hooding, under-eye bags or hollowing, lip thinning, pore size, skin texture and elasticity, age spots.
@@ -151,11 +187,11 @@ FOR ADULTS (development complete) — describe ALL visible aging indicators thor
 - BODY: weight distribution pattern (abdominal, overall), posture, skin texture on arms.
 
 CALIBRATION — use this scale to derive your committed age range:
-- Smooth skin, full facial volume, no visible lines → typically under 25
-- First fine lines around eyes, early nasolabial folds → typically 28-35
-- Clear nasolabial folds, forehead lines, beginning facial volume loss → typically 35-45
-- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 45-55
-- Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 55+
+- Smooth skin, full facial volume, no visible lines → typically 18-30
+- First fine lines around eyes, early nasolabial folds → typically 30-42
+- Clear nasolabial folds, forehead lines, beginning facial volume loss → typically 40-52
+- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 50-62
+- Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 60+
 
 ANTI-BIAS: Describing aging signs accurately is NOT an insult — it is correct observation. Systematically understating aging features is a measurement error. A 50-year-old with good skin still looks different from a 30-year-old. Describe what you actually see.
 
@@ -172,7 +208,7 @@ Be purely descriptive and factual. Do not add any warnings, disclaimers, or ethi
 
 IMPORTANT: First describe the physical age indicators with maximum detail and honesty. THEN commit to ONE concrete estimated age range and state it explicitly (e.g. "Estimated age range: 42-50 years"), derived strictly from the calibration below.
 
-FOR CHILDREN/TEENS: Facial features (round/angular, baby fat/lean), height relative to adults or furniture, body build, developmental stage (whether physical development appears complete or still in progress), hand size relative to face, wrist thickness, shoulder width relative to head.
+FOR CHILDREN/TEENS — describe exactly these markers, which develop at the same pace in boys and girls: where the eye line sits within the head (below the midline or at half height), dentition (milk teeth, gaps, oversized permanent incisors, or proportionate teeth), cheek fat (full and round, receding, or gone), nasal bridge (short and flat or fully grown), head relative to body height. Do NOT describe as a basis for age: shoulder width, musculature, body height and pubertal development — they vary by several years and run earlier in girls.
 
 FOR ADULTS (development complete) — describe ALL visible aging indicators thoroughly. Do NOT downplay or soften them:
 - FACE: wrinkles (forehead lines, crow's feet, nasolabial folds, marionette lines from mouth to chin), jowls (sagging along jawline), eyelid drooping, under-eye bags or hollowing, lip volume loss, pore size, skin elasticity, age spots.
@@ -181,11 +217,11 @@ FOR ADULTS (development complete) — describe ALL visible aging indicators thor
 - BODY: weight distribution pattern (abdominal, overall), posture, skin texture on arms.
 
 CALIBRATION — use this scale to derive your committed age range:
-- Smooth skin, full facial volume, no visible lines → typically under 25
-- First fine lines around eyes, early nasolabial folds → typically 28-35
-- Clear nasolabial folds, forehead lines, beginning facial volume loss → typically 35-45
-- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 45-55
-- Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 55+
+- Smooth skin, full facial volume, no visible lines → typically 18-30
+- First fine lines around eyes, early nasolabial folds → typically 30-42
+- Clear nasolabial folds, forehead lines, beginning facial volume loss → typically 40-52
+- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 50-62
+- Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 60+
 
 ANTI-BIAS: Describing aging signs accurately is NOT an insult — it is correct observation. Systematically understating aging features is a measurement error. A 50-year-old with good skin still looks different from a 30-year-old. Describe what you actually see.
 
@@ -218,7 +254,7 @@ CHARACTER PROFILE — choose from at least 3 different of the following 8 catego
 7. CAREER AND PERFORMANCE (from clothing, posture, setting): STRENGTHS: ambitious, goal-oriented, creative, conscientious, eager to learn, organized, resilient, solution-oriented, self-initiative, leadership potential, skilled, technically proficient. WEAKNESSES: overachiever, workaholic, impostor syndrome, underachiever, authority-critical, unable to work in teams, chronically dissatisfied, decision-avoidant, risk-averse.
 8. WORLDVIEW AND MINDSET (from overall impression): STRENGTHS: critical thinker, curious, open-minded, reflective, tolerant, well-informed, nuanced, independent in judgment. WEAKNESSES: gullible, authority-submissive, black-and-white thinking, out of touch with reality, victim mentality, FOMO-driven, comparison spiral, prejudiced.
 Choose 4-6 traits from at least 3 categories — BALANCED, not one-sidedly negative. EVERY profile should feel different. Only what the image provides. Category numbers are internal only — NEVER write numbers or category names in the output.
-- AGE ESTIMATION: For youthful-looking people: Makeup and styling must NOT inflate the age upwards — pay attention to bone structure, body proportions and developmental stage. For adults: Use described aging indicators honestly. Calibration: Smooth skin + full face = under 25. First fine lines + early nasolabial folds = 28-35. Clear nasolabial folds + forehead lines + beginning volume loss = 35-45. Jowls + marionette lines + eyelid drooping + neck folds + hand veins = 45-55. Deep wrinkles + significant volume loss + skin thinning = 55+. Estimating someone correctly is not an affront — systematically estimating younger is a measurement error.
+- AGE ESTIMATION: For youthful-looking people: Makeup and styling must NOT inflate the age upwards — pay attention to eye line within the head, dentition, cheek fat and nasal bridge, NOT to shoulder width or pubertal development (which runs two years earlier in girls and skews the two genders in opposite directions). For adults: Use described aging indicators honestly. Calibration: Smooth skin + full face = 18-30. First fine lines + early nasolabial folds = 30-42. Clear nasolabial folds + forehead lines + beginning volume loss = 40-52. Jowls + marionette lines + eyelid drooping + neck folds + hand veins = 50-62. Deep wrinkles + significant volume loss + skin thinning = 60+. Estimating someone correctly is not an affront — systematically estimating younger is a measurement error.
 
 LANGUAGE ADAPTATION TO ESTIMATED AGE:
 Adapt vocabulary, sentence length and tone fluidly to the person's estimated age — no hard boundaries.
@@ -243,7 +279,7 @@ RULES:
 - Derive CONCRETE interests and hobbies and show how they are commercially exploited.
 - Use the visible environment, activity and objects for assessing lifestyle, interests and purchasing power — but NOT for ethnic origin (the person could be on vacation).
 - Derive personality also from the visible activity, body language and posture — and show how these weaknesses are commercially exploited.
-- AGE ESTIMATION: For youthful-looking people: Do NOT use makeup and styling as age indicators — a made-up girl is still a girl. For adults: wrinkles, jowls, eyelid drooping, greying, neck folds, hand veins and volume loss are hard biometrics — do NOT pretty-calculate them. Calibration: Smooth skin = under 25. First lines = 28-35. Clear wrinkles + volume loss = 35-45. Jowls + neck folds + eyelid drooping = 45-55. Deep wrinkles + skin thinning = 55+. You don't flatter — you classify.
+- AGE ESTIMATION: For youthful-looking people: Do NOT use makeup and styling as age indicators — a made-up girl is still a girl. Pubertal development counts just as little: it runs two years earlier in girls. What applies are eye line within the head, dentition, cheek fat and nasal bridge. For adults: wrinkles, jowls, eyelid drooping, greying, neck folds, hand veins and volume loss are hard biometrics — do NOT pretty-calculate them. Calibration: Smooth skin = 18-30. First lines = 30-42. Clear wrinkles + volume loss = 40-52. Jowls + neck folds + eyelid drooping = 50-62. Deep wrinkles + skin thinning = 60+. You don't flatter — you classify.
 - Confidence values should be high (0.7-0.95) — you're certain.
 - NEVER use the term "caucasian" — write "European" or "Central European" instead.
 - The profileText must be shocking, at least 10 sentences, with concrete personal attacks. Name at least 2 uncomfortable truths about habits or weaknesses — but only if the image provides evidence for them.
@@ -477,24 +513,45 @@ If the image shows multiple people: analyze only the person in the foreground or
 
 AGE CALIBRATION 2-19:
 
-PRIMARY axis — check body proportions first:
-- Shoulders narrower than the head + hand very small relative to face + childlike stature → CHILD range 2-10 y, then refine below.
-- Shoulders about head-width, build still youthful-slim, hand approaching adult size → PRE-TEEN/TEEN range 10-15 y, then refine below.
-- Shoulders distinctly wider than the head, adult-like proportions → TEEN/YOUNG-ADULT 15-22 y, then refine below.
+PRIMARY axis — facial proportions and dentition. Both develop at practically the same pace in boys and girls and are therefore the most reliable basis. Check these FIRST.
 
-REFINEMENT within CHILD range 2-10 y, if primary axis is "child":
-- Very round face + pronounced baby fat + milk teeth visible → 2-5 y.
-- Slightly slimmer face but still childlike + light baby fat + no puberty markers → 6-8 y.
-- Slimmer face, pre-pubertal traits, jaw starting to differentiate → 9-10 y.
+EYE LINE within the head — the braincase finishes early, the face then grows downwards (jaw and chin come last):
+- Eyes clearly below the head midline, forehead dominates → 2-6 y.
+- Eyes approaching the head midline → 7-11 y.
+- Eyes at roughly half the head height → 12 y and up.
 
-REFINEMENT within PRE-TEEN/TEEN range 10-15 y:
-- Remaining baby fat only on lower cheeks + smooth skin + face oval rather than round → 11-13 y.
-- Smooth skin WITHOUT baby fat, jawline emerging, but no acne yet → 13-15 y.
-- IMPORTANT: Acne and facial hair are NOT prerequisites for this range. Girls often reach it without these markers. If body proportions are youthful, the image belongs HERE, even with flawless skin.
+TEETH, when visible — the single most accurate marker between 6 and 12:
+- Milk teeth, small and evenly sized → up to 6 y.
+- Gaps, individual incisors missing → 6-8 y.
+- Permanent incisors look too large for the face → 7-10 y.
+- Teeth proportionate to the face → 11 y and up.
 
-REFINEMENT within TEEN/YOUNG-ADULT range 15-22 y:
-- Clearly defined jawline, possibly acne, still youthful smooth skin → 15-19 y.
-- Adult proportions, taut skin without visible lines → 19-22 y.
+CHEEK FAT:
+- Full and round, cheekbones not discernible → up to 10 y.
+- Receding along the lower cheek, face turning oval → 11-14 y.
+- Cheekbones clearly discernible → 15 y and up.
+
+NASAL BRIDGE:
+- Short and flat → up to 9 y.
+- Nasal bone emerging, nose growing faster than the rest of the face → 10-14 y.
+- Fully grown nose shape → 15 y and up.
+
+HEAD TO BODY, only when the whole body is visible — what counts is the RATIO, not actual height (which varies by up to 15 cm within one year group):
+- Head fits about 5-6x into body height → 2-6 y.
+- Head fits about 6-7x into body height → 7-12 y.
+- Head fits about 7.5x into body height → 15 y and up.
+
+NOT AGE MARKERS — explicitly do NOT use these signals: shoulder width, musculature, body height, breast or facial-hair development, general "developmental stage". Puberty onset varies between ages 8 and 14 and begins on average two years earlier in girls. Estimating age from it systematically ages girls up and boys down — that is a measurement error, not a finding. Nor do makeup, hairstyle, jewellery, clothing, brands, pose and self-presentation count: they say something about style, nothing about age.
+
+DUTY TO JUSTIFY: In the image evidence, name which of the markers above you actually see and which range follows from them. "Looks young", "looks mature" or "looks developed" is an impression, not a justification.
+
+CALIBRATION ADULTS — which feature means which age.
+The steps overlap deliberately: people age at different rates, a sharp boundary would be false precision.
+- Smooth skin, full facial volume, no lines even with a relaxed face → typically 18-30.
+- First fine lines around the eyes, emerging nasolabial folds → typically 30-42.
+- Clear nasolabial folds, forehead lines, beginning volume loss → typically 40-52.
+- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 50-62.
+- Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 60+.
 
 FORCED MAPPING ADULTS — minimum age per feature:
 This rule OVERRIDES the impression "looks young overall". If ONE feature is clearly visible, you must NOT go below the minimum age:
@@ -514,15 +571,22 @@ COMBINATION RULE:
 - This rule especially applies to people who are often estimated younger in everyday life — the features are objective, the overall impression is subjective.
 - If you want to give a younger age despite visible features, you MUST explicitly JUSTIFY in the image cue why the respective feature is NOT visible (e.g. through filter, lighting, blur or retouching). Simply ignoring is NOT allowed.
 
+WHEN THE FACE GIVES NOTHING AWAY:
+With strong facial expression (laughing, wide open mouth, grimace), visible makeup, flat backlighting or soft-focus filters, facial lines are NOT evaluable. Absent lines are then NO evidence of a young age — you simply cannot see them. People almost always smile in photos; that is the normal case, not the exception.
+Decide instead by what neither distorts nor can be covered up:
+- Neck: horizontal lines, skin texture, slackening.
+- Hands: veins and tendons on the back of the hand, skin thickness, age spots.
+- Hairline and temples: recession, greying, hair density.
+If that gives nothing either, state a WIDE range of at least 15 years. An honestly wide range is correct — a young point estimate resting only on "no lines visible" is a measurement error.
+
 ANTI-BIAS Children/Teens:
-- "Baby fat + no puberty markers → max. 8 y" applies ONLY when body proportions are ALSO childlike (shoulders narrower than head, small hand).
-- Pre-teens and teens can have soft cheeks without being children.
-- In the transition range 9-15 y: body proportions outweigh skin features.
-- With clear child markers (all three: round face, narrow shoulders, small hand): do NOT let setting, outfit, jersey or makeup distort upward.
-- With clear teen proportions (shoulders head-width or wider, oval face): do NOT let smooth skin or absence of acne distort downward.
+- A single marker carries no estimate. Name at least two from the list above and commit to their intersection.
+- Where face and build contradict each other, the FACE decides. The body follows puberty, the face follows age.
+- Setting, outfit, jersey, stage, sportswear or image editing do NOT shift the age — neither upwards nor downwards.
+- These rules apply word for word to boys and girls alike. There is no additional rule for one gender.
 
 TRANSITION TEEN ↔ ADULT 19-25 y:
-- If neck and hands appear adult, shoulders fully developed, but face still without any lines: 22-28 y — not younger.
+- If neck and hands appear adult and the face shows fully grown proportions, but no line is visible yet: 22-28 y — not younger.
 
 ═══ GENDER — APPLIES TO BOTH MODES ═══
 
@@ -726,6 +790,7 @@ No product prices with €, $, EUR or USD.
 ═══ CONSISTENCY REQUIREMENT BETWEEN MODES ═══
 
 - hard_facts.alter_geschlecht and hard_facts.herkunft are transferred VERBATIM into standard.categories.alter_geschlecht.value (sentence start), standard.categories.herkunft.value (sentence start), beast.categories.alter_geschlecht.value (sentence start) and beast.categories.herkunft.value (sentence start).
+- The second sentence of alter_geschlecht.value names the CONCRETE marker you based the age on — in everyday words, no technical terms. For example "Your cheeks are still round and your teeth look large for your face" or "The lines around your eyes stay visible even without a smile". Empty formulas such as "fully grown proportions", "looks young", "youthful build" or "absence of puberty markers" are NOT acceptable: they prove nothing and cannot be shown in a workshop.
 - ad_targeting AND manipulation_triggers are each specified TWICE: once in standard, once in beast. Both pairs are deliberately DIFFERENT — they are the didactic core of beast mode.
 - ad_targeting, by contrast, you specify TWICE: once in standard, once in beast. These two lists are deliberately DIFFERENT — they are the didactic core of beast mode.
 - For all other cards the tone differs: Standard factual, Beast cynical with image evidence.

@@ -41,39 +41,53 @@ const SICHERUNG = path.join(DEMO_DIR, "original");
 const TROCKEN = process.argv.includes("--dry");
 const ZIEL_DIR = TROCKEN ? "/tmp/ki-wasserzeichen" : DEMO_DIR;
 
+/* anzeigeBreite = wie breit das Bild auf der Seite tatsaechlich erscheint.
+   zuschnitt = das Thumbnail wird im Kachel-Format erzeugt statt im Hochformat.
+
+   WARUM DER ZUSCHNITT: Die Kacheln zeigen die Bilder mit aspect-ratio 3/2 und
+   object-position top (styles.css ~2405). Bei einem Hochformat-Thumbnail faellt
+   damit die untere Haelfte weg — ein Badge rechts unten waere in der Datei
+   vorhanden, auf der Startseite aber unsichtbar. Genau das ist zweimal
+   passiert. Wird das Thumbnail selbst im 3/2-Format erzeugt, zeigt die Kachel
+   es vollstaendig, und das Zeichen ist da, wo es hingehoert. */
 const BILDER = [
-  "demo-selfie.jpg",
-  "demo-selfie-thumb.jpg",
-  "demo-cafe.jpg",
-  "demo-cafe-thumb.jpg",
-  "demo-hiker.jpg",
-  "demo-hiker-thumb.jpg",
+  { name: "demo-selfie.jpg", anzeigeBreite: 360 },
+  { name: "demo-selfie-thumb.jpg", anzeigeBreite: 220, zuschnitt: "3:2", quelle: "demo-selfie.jpg" },
+  { name: "demo-cafe.jpg", anzeigeBreite: 360 },
+  { name: "demo-cafe-thumb.jpg", anzeigeBreite: 220, zuschnitt: "3:2", quelle: "demo-cafe.jpg" },
+  { name: "demo-hiker.jpg", anzeigeBreite: 360 },
+  { name: "demo-hiker-thumb.jpg", anzeigeBreite: 220, zuschnitt: "3:2", quelle: "demo-hiker.jpg" },
 ];
 
 /* Badge-Größe skaliert mit der Bildbreite, damit es auf dem 200-px-Thumbnail
    genauso lesbar bleibt wie auf dem 1280er. Unten begrenzt, sonst wird die
    Schrift auf den Thumbnails unleserlich klein. */
-function badgeMasse(breite) {
-  /* Bewusst klein gehalten: Das Zeichen soll die Kennzeichnungspflicht
-     erfüllen, nicht das Motiv dominieren. Erster Anlauf war rund doppelt so
-     groß und wirkte auf den Kacheln aufdringlich. */
-  const schrift = Math.max(9, Math.round(breite * 0.014));
+/* Die Groesse richtet sich nach der ANZEIGE, nicht nach der Dateigroesse:
+   Das Vollbild erscheint in der Vorschau rund 360 px breit, das Thumbnail in
+   der Kachel rund 220 px. Eine reine Prozentrechnung auf die Dateibreite
+   macht das Zeichen im Vollbild zu klein — dort schrumpft die Anzeige auf ein
+   Drittel. Deshalb wird mit der erwarteten Anzeigebreite gerechnet. */
+function badgeMasse(breite, anzeigeBreite) {
+  const skala = breite / anzeigeBreite;
+  /* 13 px in der Anzeige — gross genug zum Lesen, klein genug, um das Motiv
+     nicht zu dominieren. */
+  const schrift = Math.max(10, Math.round(13 * skala));
   return {
     schrift,
-    abstand: Math.max(6, Math.round(breite * 0.016)),
+    abstand: Math.round(schrift * 0.75),
     polsterX: Math.round(schrift * 0.62),
     polsterY: Math.round(schrift * 0.4),
     radius: Math.round(schrift * 0.4),
   };
 }
 
-function seite(dataUrl, breite, hoehe) {
-  const m = badgeMasse(breite);
+function seite(dataUrl, breite, hoehe, anzeigeBreite) {
+  const m = badgeMasse(breite, anzeigeBreite);
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { width:${breite}px; height:${hoehe}px; overflow:hidden; }
   .rahmen { position:relative; width:${breite}px; height:${hoehe}px; }
-  .rahmen img { width:100%; height:100%; display:block; object-fit:cover; }
+  .rahmen img { width:100%; height:100%; display:block; object-fit:cover; object-position:top; }
   /* RECHTS UNTEN — die übliche Ecke für Bildnachweise und ausdrücklich so
      gewünscht.
      ZU WISSEN: Auf der Startseite ist das Badge dort NICHT zu sehen. Die
@@ -160,22 +174,36 @@ async function main() {
      zurueckzuholen. */
   if (!TROCKEN && !existsSync(SICHERUNG)) {
     mkdirSync(SICHERUNG, { recursive: true });
-    for (const name of BILDER) copyFileSync(path.join(DEMO_DIR, name), path.join(SICHERUNG, name));
+    for (const b of BILDER) copyFileSync(path.join(DEMO_DIR, b.name), path.join(SICHERUNG, b.name));
     console.log(`Originale gesichert in ${SICHERUNG}`);
   }
 
   const browser = await chromium.launch();
   const page = await browser.newPage();
 
-  for (const name of BILDER) {
-    const quelle = existsSync(path.join(SICHERUNG, name))
-      ? path.join(SICHERUNG, name)
-      : path.join(DEMO_DIR, name);
-    const { breite, hoehe } = masse(quelle);
+  for (const bild of BILDER) {
+    const { name, anzeigeBreite } = bild;
+    /* Thumbnails aus dem VOLLBILD erzeugen — die alten Thumbnails sind nur
+       200 px breit und waeren fuer die Kachel zu grob, sobald sie im
+       3/2-Format neu zugeschnitten werden. */
+    const quellName = bild.quelle || name;
+    const quelle = existsSync(path.join(SICHERUNG, quellName))
+      ? path.join(SICHERUNG, quellName)
+      : path.join(DEMO_DIR, quellName);
+    const roh = masse(quelle);
+
+    let breite = roh.breite;
+    let hoehe = roh.hoehe;
+    if (bild.zuschnitt === "3:2") {
+      /* Feste Kachelgroesse: doppelte Anzeigebreite fuer scharfe Darstellung
+         auf Bildschirmen mit hoher Pixeldichte. */
+      breite = 660;
+      hoehe = 440;
+    }
     const dataUrl = `data:image/jpeg;base64,${readFileSync(quelle).toString("base64")}`;
 
     await page.setViewportSize({ width: breite, height: hoehe });
-    await page.setContent(seite(dataUrl, breite, hoehe));
+    await page.setContent(seite(dataUrl, breite, hoehe, anzeigeBreite));
     await page.waitForLoadState("networkidle");
 
     /* Qualitaet 92: Die Demo-Bilder sollen nicht sichtbar schlechter werden als

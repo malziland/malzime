@@ -4,73 +4,32 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [2.9.4] — 2026-08-10
-
-### Hinzugefügt
-
-- **Die Demo-Fotos auf der Startseite tragen jetzt die Kennzeichnung „KI ERSTELLT".** Sie sind KI-generiert (siehe `public/img/demo/LICENSE.md`) und fallen damit unter die seit August 2026 geltende Kennzeichnungspflicht. Umgesetzt auf drei Ebenen:
-  - **Sichtbar, in die Pixel gebrannt** — klein, rechts unten (`scripts/ki-wasserzeichen.mjs`). Bewusst kein CSS-Overlay: Das verschwindet, sobald jemand das Bild speichert oder weitergibt. Der Wortlaut ist „ERSTELLT", nicht „BEARBEITET" — die Bilder sind vollständig erzeugt, nicht nachträglich verändert.
-  - **Maschinenlesbar in den Metadaten:** `DigitalSourceType = trainedAlgorithmicMedia` (offizieller IPTC-Wert für vollständig algorithmisch erzeugte Bilder), dazu Credit, Quelle und Beschreibung.
-  - **Für Suchmaschinen** über strukturierte Daten und die Bildbeschreibungen.
-
-  Zwei Fallen, beide beim ersten Anlauf zugeschlagen und im Skript dokumentiert: **Der Vorgang löscht alle EXIF-Daten** — und die sind bei den Demo-Bildern absichtlich (fiktiv) gesetzt, weil malziME daran vorführt, welche versteckten Daten in einem Foto stecken. Sie werden jetzt vom Original übernommen. Und: Die Startseite zeigt die Hochformat-Bilder in Kacheln mit 3:2 und Ausrichtung nach oben — die untere Bildhälfte fällt dort weg. Das Badge sitzt bewusst trotzdem rechts unten (übliche Ecke für Bildnachweise); sichtbar wird es in der Vorschau nach dem Klick und überall dort, wo die Datei weitergegeben wird. Für die Kachel-Ansicht trägt die Zeile darüber den Hinweis „(mit KI erstellt)".
-
-  Nebenbefund behoben: Die Vollbilder wurden in `demo.js` noch mit dem Cache-Buster vom Februar geladen — ein Bildwechsel wäre bei niemandem angekommen, der die Seite schon einmal besucht hat. (Cache-Buster 2026081005)
-
-## [2.9.3] — 2026-08-10
-
-### Behoben
-
-- **v2.9.2 zurückgenommen.** Der Fix hat den Abbruch beseitigt, aber einen schlimmeren Zustand erzeugt: Nach der Rückkehr aus dem Hintergrund erschien zwar keine Fehlermeldung mehr, es kam aber auch kein Ergebnis — kein Spinner, kein Status, nichts. Ein stiller toter Zustand ist schlechter als eine falsche Fehlermeldung, weil er nicht einmal zum Neuladen auffordert. Der Stand entspricht wieder v2.9.1; die Ursache wird untersucht, bevor ein zweiter Anlauf kommt. (Cache-Buster 2026081003)
-
-## [2.9.2] — 2026-08-10 — ZURÜCKGENOMMEN mit 2.9.3
-
-### Behoben
-
-- **„Netzwerkfehler", während das Handy in der Tasche war.** Gemeldet aus dem laufenden Betrieb: Der Browser lag im Hintergrund, es erschien eine Fehlermeldung — obwohl serverseitig alles lief. Im Log war der Job 85 Sekunden später sauber fertig und ausgeliefert; der Client hatte da längst aufgegeben.
-
-  Ursache: Der Browser friert laufende `fetch`-Aufrufe ein, sobald der Tab in den Hintergrund geht. Diese Fehlschläge zählten mit, und nach fünf davon brach der Lauf ab — rund zehn Sekunden Bildschirmsperre genügten. Der zweite Teil des Problems saß in der Fehleranzeige: Sie prüft `document.hidden` erst beim Auswerten des Fehlers. Wer zurückkehrt, bevor das passiert, bekommt statt des freundlichen „unterbrochen"-Hinweises die härteste Meldung der Kette — „Netzwerkfehler". Ursache war der Hintergrund, gemeldet wurde ein Netzproblem.
-
-  Der Job läuft in der Warteschlange unabhängig vom Browser weiter, und das Ergebnis liegt rund zwei Stunden bereit — genau dafür wurde sie gebaut. Fehlgeschlagene Abfragen im Hintergrund zählen deshalb nicht mehr mit; nach der Rückkehr wird der Zähler einmal zurückgesetzt, weil die Verbindung dann oft noch einen Moment braucht. Die Obergrenze von 30 Minuten bleibt, und bei sichtbarer Seite bricht der Lauf weiterhin nach fünf Fehlversuchen ab — sonst hinge die Anzeige bei echtem Netzausfall stumm. (`public/js/api.js`, +2 Tests, Mutationsprobe bestanden)
-
-## [2.9.1] — 2026-08-10
-
-### Behoben
-
-- **Ein Affenbild wurde als Profil eines afrikanischen Kleinkindes analysiert.** Gemeldet aus einem Workshop, wo ein Schüler das Bild hochgeladen hat. Die Verwechslung Primat/schwarzer Mensch ist ein dokumentiertes Muster in Bildmodellen (Google Photos hat 2015 Schwarze als „Gorillas" einsortiert und das nie behoben, sondern nur die Kategorie entfernt) — kein Zufall dieses einen Bildes.
-
-  **Die vorhandene Tiererkennung hat dabei nicht versagt.** Der Prompt verlangt ein Pflichtfeld `subject`, bei `ANIMAL_ONLY` kommt statt eines Profils das Tier-Easter-Egg, und das läuft in beiden Pipelines. Das Modell hatte schlicht `HUMAN` gemeldet — ab da folgt die Erkennung korrekt einer Einschätzung, die schon falsch war. Eine zusätzliche Vorprüfung „ist ein Mensch im Bild?" würde deshalb nichts ändern; sie existiert bereits und träfe dieselbe Fehlentscheidung.
-
-  Zwei Änderungen setzen deshalb tiefer an:
-  - **Im Prompt** eine Merkmals-Prüfliste vor der Festlegung (Fell statt Haut, Schnauze statt Nase, Pfoten statt Händen, Schwanz, Schnurrhaare, Ohrform) und die ausdrückliche Regel, dass Primaten **immer** `ANIMAL_ONLY` sind, niemals `HUMAN` — mit dem Hinweis, dass die Zuordnung zu einem Menschen ein schwerer, historisch belasteter Fehler ist. Bei Zweifel gilt `ANIMAL_ONLY`.
-  - **Serverseitig ein Netz** (`animal.js` `pruefeTierWiderspruch`): Meldet das Modell `HUMAN`, beschreibt im Text aber Fell, Schnauze, Pfoten oder einen Primaten, ist die Antwort in sich widersprüchlich — dann kommt das Tier-Easter-Egg statt eines erfundenen Menschenprofils. Ein falsches Tierprofil ist harmlos, ein rassistisches Menschenprofil nicht.
-
-  Bewusst eng gefasst, mit Ausnahmeliste für Pferdeschwanz, Fellweste, Kunstfell und Katzenaugen-Lidstrich: Ein zu scharfer Filter würde echte Fotos blockieren, und das wäre im Workshop schlimmer als ein seltener Durchrutscher. (+13 Tests)
-
-  **Grenze, die dazugehört:** Beschreibt das Modell durchgehend einen Menschen, findet auch dieses Netz nichts. Es fängt die widersprüchlichen Fälle, nicht die vollständig falschen. Der Haupthebel bleibt die Regel im Prompt.
-
 ## [2.9.0] — 2026-08-10
 
 ### Hinzugefügt
 
-- **Der Kinderschutz-Filter schneidet nicht mehr bei exakt 18.** Er nimmt jetzt die **Untergrenze** der Altersspanne, die das Modell selbst liefert — wer „16-22" sein könnte, gilt als schutzbedürftig — und darauf drei Jahre Sicherheitsabstand. Anlass: Aus rund 5.000 begleiteten Workshop-Analysen ist bekannt, dass Mädchen bis zu sechs Jahre zu alt geschätzt werden. Mit einer harten 18er-Grenze verlor damit ausgerechnet ein zu alt geschätztes vierzehnjähriges Mädchen den Schutz vor Glücksspiel-, Alkohol-, Kredit- und Diätwerbung — im Klassenzimmer, an die Wand projiziert. Der Preis ist bewusst in Kauf genommen: Ein tatsächlich Neunzehn- bis Einundzwanzigjähriger sieht diese Werbung nicht mehr, obwohl sie dort legitimer Lerninhalt wäre. Die Abwägung ist asymmetrisch — eine Vierzehnjährige mit Glücksspielwerbung ist ein Schaden, einem Neunzehnjährigen fehlt ein Beispiel. (`minor-safety.js`, +8 Tests)
-- **Altersmerkmale für Kinder und Jugendliche, die bei beiden Geschlechtern gleich schnell laufen.** Vorher war die *primäre* Alters-Achse die **Schulterbreite**, dazu kam eine Zusatzregel, die nur für Mädchen galt („Mädchen erreichen diese Spanne oft ohne Akne und Bartflaum" — sie verbot, ein Mädchen mit glatter Haut jünger einzuordnen). Beides hängt an der Pubertät, und die beginnt zwischen 8 und 14 Jahren, bei Mädchen im Schnitt zwei Jahre früher. Wer daran das Alter misst, schätzt Mädchen zwangsläufig zu alt und Jungen zu jung — das beobachtete Muster stand also wörtlich in der eigenen Anweisung. Neu sind Augenlinie im Kopf, Zahnstand, Wangenfett, Nasenrücken und Kopf-Körper-Verhältnis; Reifemerkmale sind ausdrücklich als untauglich benannt, mit Begründung. **Kein Ausgleich, keine Korrekturzahl** — nur bessere Merkmale. (`locales/{de,en}/prompts.js`, +33 Tests in `age-markers.test.js`)
+- **Der Kinderschutz-Filter schneidet nicht mehr bei exakt 18.** Er nimmt jetzt die **Untergrenze** der Altersspanne, die das Modell selbst liefert — wer „16-22" sein könnte, gilt als schutzbedürftig — und darauf drei Jahre Sicherheitsabstand. Anlass: Aus rund 5.000 begleiteten Workshop-Analysen ist bekannt, dass Mädchen bis zu sechs Jahre zu alt geschätzt werden. Mit einer harten 18er-Grenze verlor damit ausgerechnet ein zu alt geschätztes vierzehnjähriges Mädchen den Schutz vor Glücksspiel-, Alkohol-, Kredit- und Diätwerbung — im Klassenzimmer, an die Wand projiziert. Der Preis ist bewusst in Kauf genommen: Ein tatsächlich Neunzehn- bis Einundzwanzigjähriger sieht diese Werbung nicht mehr, obwohl sie dort legitimer Lerninhalt wäre. Die Abwägung ist asymmetrisch — eine Vierzehnjährige mit Glücksspielwerbung ist ein Schaden, einem Neunzehnjährigen fehlt ein Beispiel. (`minor-safety.js`)
 
-### Geändert
+- **Altersmerkmale für Kinder und Jugendliche, die bei beiden Geschlechtern gleich schnell laufen.** Vorher war die *primäre* Alters-Achse die **Schulterbreite**, dazu kam eine Zusatzregel, die nur für Mädchen galt („Mädchen erreichen diese Spanne oft ohne Akne und Bartflaum"). Beides hängt an der Pubertät, und die beginnt zwischen 8 und 14 Jahren, bei Mädchen im Schnitt zwei Jahre früher. Wer daran das Alter misst, schätzt Mädchen zwangsläufig zu alt und Jungen zu jung — das aus der Praxis berichtete Muster stand also wörtlich in der eigenen Anweisung. Neu sind Augenlinie im Kopf, Zahnstand, Wangenfett, Nasenrücken und Kopf-Körper-Verhältnis; Reifemerkmale sind ausdrücklich als untauglich benannt, mit Begründung. **Kein Ausgleich, keine Korrekturzahl** — nur bessere Merkmale. Bei Erwachsenen gelten fehlende Falten nicht mehr als Beleg für Jugend: Bei Mimik, Make-up oder flachem Gegenlicht entscheiden Hals, Hände und Haaransatz, und die Alters-Skala ist neu geeicht (18-30 / 30-42 / 40-52 / 50-62 / 60+).
 
-- **Fehlende Falten gelten nicht mehr als Beleg für Jugend.** Das Zwangs-Mapping zählte Falten nur, wenn sie „auch bei entspanntem Gesicht" sichtbar sind — fachlich richtig, aber auf Fotos wird gelächelt, also griff die Regel praktisch nie. Das Modell fiel dann auf „glatte Haut = jung" zurück und begründete wörtlich mit „ohne sichtbare Falten". Jetzt entscheiden bei Mimik, Make-up oder flachem Gegenlicht Hals, Hände und Haaransatz; gibt auch das nichts her, ist eine breite Spanne zu nennen statt einer jungen Punktschätzung.
-- **Alters-Skala für Erwachsene neu geeicht:** „erste feine Linien" bedeutete bisher 28-35 und schickte damit jeden gut erhaltenen Vierzigjährigen in die Dreißiger. Die Stufen liegen jetzt bei 18-30 / 30-42 / 40-52 / 50-62 / 60+ und überlappen absichtlich. Nebenbefund: Die Skala fehlte im **aktiven** Pfad komplett und stand nur im Fallback-Prompt — beide Sprachdateien führen die Kalibrierung doppelt, was beim Ändern leicht übersehen wird. Ein Test prüft jetzt alle vier Stellen.
+- **KI-Kennzeichnung auf den drei Demo-Fotos.** Sie sind KI-generiert (`public/img/demo/LICENSE.md`) und fallen unter die seit August 2026 geltende Kennzeichnungspflicht. Sichtbar in die Pixel gebrannt („KI ERSTELLT", rechts unten), maschinenlesbar über `DigitalSourceType = trainedAlgorithmicMedia` (offizieller IPTC-Wert für vollständig algorithmisch erzeugte Bilder) und für Suchmaschinen über strukturierte Daten, alt-Texte und den Hinweis „(mit KI erstellt)" in beiden Sprachen. Bewusst kein reines CSS-Overlay: Das verschwindet, sobald jemand das Bild speichert oder weitergibt. Werkzeug: `scripts/ki-wasserzeichen.mjs`.
+
+### Behoben
+
+- **Ein Affenbild wurde als Profil eines afrikanischen Kleinkindes analysiert.** Gemeldet aus einem Workshop. Die Verwechslung Primat/schwarzer Mensch ist ein dokumentiertes Muster in Bildmodellen (Google Photos hat 2015 Schwarze als „Gorillas" einsortiert und das nie behoben, sondern nur die Kategorie entfernt) — kein Zufall dieses einen Bildes.
+
+  **Die vorhandene Tiererkennung hat dabei nicht versagt.** Der Prompt verlangt ein Pflichtfeld `subject`, bei `ANIMAL_ONLY` kommt statt eines Profils das Tier-Easter-Egg, und das läuft in beiden Pipelines. Das Modell hatte schlicht `HUMAN` gemeldet — ab da folgt die Erkennung korrekt einer Einschätzung, die schon falsch war. Eine zusätzliche Vorprüfung „ist ein Mensch im Bild?" würde deshalb nichts ändern; sie existiert bereits und träfe dieselbe Fehlentscheidung. Zwei Änderungen setzen tiefer an: eine Merkmals-Prüfliste im Prompt (Fell statt Haut, Schnauze statt Nase, Pfoten statt Händen) samt der Regel, dass Primaten **immer** `ANIMAL_ONLY` sind, und serverseitig ein Netz (`animal.js` `pruefeTierWiderspruch`), das bei `HUMAN` plus beschriebenen Tiermerkmalen das Tier-Easter-Egg ausliefert statt eines erfundenen Menschenprofils. Bewusst eng gefasst, mit Ausnahmeliste für Pferdeschwanz, Fellweste, Kunstfell und Katzenaugen-Lidstrich. **Grenze:** Beschreibt das Modell durchgehend einen Menschen, findet auch dieses Netz nichts.
+
+- **Vollbilder der Demo-Fotos wurden mit einem Cache-Buster vom Februar geladen** (`demo.js`) — ein Bildwechsel wäre bei niemandem angekommen, der die Seite schon einmal besucht hat.
 
 ### Gemessen
 
-84 Analysen über 14 Fotos, drei Läufe je Bild, gegen die am 2026-08-10 korrigierte Wahrheitsliste:
+84 Analysen über 14 Fotos, drei Läufe je Bild, gegen die am 2026-08-10 geprüfte und korrigierte Wahrheitsliste:
 
-| Größe | Live | v2.9.0 |
+| Größe | vorher | v2.9.0 |
 |---|---|---|
 | Abweichung Kinder/Jugendliche | 0,8 J | 0,8 J |
 | Abweichung Erwachsene | −7,2 J | −6,5 J |
-| Richtung Mädchen | −0,3 J | 0,0 J |
-| Richtung Jungen | +1,0 J | +1,4 J |
 | Antworten mit konkretem, zeigbarem Merkmal | 95 % | **100 %** |
 | Antworten mit Leerformel | 43 % | **38 %** |
 | Geschlecht richtig | 85,7 % | 85,7 % |
@@ -78,12 +37,13 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 Der belastbare Gewinn liegt bei den **Begründungen**: statt „kindliche Gesichtszüge und glatte Haut bestätigen diese Altersspanne ohne sichtbare Pubertätsmerkmale" steht dort jetzt „deine Zähne sind bleibend, aber noch etwas groß fürs Gesicht, und die Wangen sind rund ohne sichtbare Wangenknochen". „Schultern" und „Statur" kommen in keiner Antwort mehr vor (vorher in acht). Das ist im Workshop vorlesbar und am Bild zeigbar.
 
-Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minderjährige, drei je Geschlecht — ein einzelnes Bild kippt den Mittelwert, und das beobachtete Geschlechtsmuster tritt in diesen sechs Fotos gar nicht auf. Ob die Änderung es behebt, zeigt sich erst im Workshop-Betrieb.
+Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minderjährige, drei je Geschlecht — ein einzelnes Bild kippt den Mittelwert, und das aus der Praxis berichtete Geschlechtsmuster tritt in diesen sechs Fotos gar nicht auf. Ob die Änderung es behebt, zeigt sich erst im Workshop-Betrieb.
 
 ### Untersucht und verworfen
 
-- **Bildauflösung als Ursache des Erwachsenen-Fehlers.** Verdacht war, dass die Verkleinerung auf 1280 px feine Linien wegschneidet. Zwei Gegentests widerlegen das: Bei **halber** Auflösung (640 px) landen dieselben Fotos auf die Kommastelle genau wieder bei 28 und 32 — die Zahl stammt aus der Regel, nicht aus dem Bild. Bei **voller** Auflösung (2252×4000 statt 1280) verbessert sich die Schätzung um zwei Jahre, kostet aber das Sechsfache an Upload bei nur vier Prozent mehr Tokens. Für zwei Jahre nicht vertretbar; die Verkleinerung bleibt wie sie ist.
-- **Der Jung-Bias bei Erwachsenen bleibt bestehen** (−6,5 Jahre). Vier der sieben Erwachsenenfotos landen unverändert auf exakt 28. Damit ist zum achten Mal bestätigt, was seit v2.8 im CHANGELOG steht: Alter ist keine Prompt-Frage. Die Neu-Eichung hat einen Denkfehler — die unterste Stufe wurde auf 18-30 verbreitert und bestätigt damit den 28er-Wert, der das Problem ist. Sie bleibt trotzdem drin, weil sie ein Foto um sechs Jahre verbessert und keines verschlechtert.
+- **Bildauflösung als Ursache des Erwachsenen-Fehlers.** Zwei Gegentests widerlegen den Verdacht: Bei **halber** Auflösung (640 px) landen dieselben Fotos auf die Kommastelle genau wieder bei 28 und 32 — die Zahl stammt aus der Regel, nicht aus dem Bild. Bei **voller** Auflösung (2252×4000 statt 1280) verbessert sich die Schätzung um zwei Jahre, kostet aber das Sechsfache an Upload bei nur vier Prozent mehr Tokens. Die Verkleinerung bleibt wie sie ist.
+- **Der Jung-Bias bei Erwachsenen bleibt bestehen** (−6,5 Jahre). Vier der sieben Erwachsenenfotos landen unverändert auf exakt 28. Damit ist zum achten Mal bestätigt, was seit v2.8 im CHANGELOG steht: Alter ist keine Prompt-Frage. Die Neu-Eichung hat einen bekannten Denkfehler — die unterste Stufe wurde auf 18-30 verbreitert und bestätigt damit den 28er-Wert, der das Problem ist. Sie bleibt trotzdem drin, weil sie ein Foto um sechs Jahre verbessert und keines verschlechtert.
+- **Ein erster Anlauf gegen den Abbruch im Hintergrund** („Netzwerkfehler", während das Handy in der Tasche liegt) wurde nach kurzer Zeit wieder zurückgenommen: Er beseitigte zwar die Fehlermeldung, hinterließ aber einen stillen toten Zustand — kein Spinner, kein Status, kein Ergebnis. Das ist schlechter als eine falsche Fehlermeldung, weil es nicht einmal zum Neuladen auffordert. Der Test dazu war grün und bestand sogar die Mutationsprobe, bildete die Realität eines gesperrten Handys aber nicht ab. Ursache wird untersucht, bevor ein zweiter Anlauf kommt.
 
 ## [2.8.1] — 2026-08-10
 

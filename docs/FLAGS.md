@@ -21,7 +21,7 @@ Schaltet zwischen der Queue-Architektur (`true`: Upload → Cloud Tasks → dosi
 Verarbeitung) und dem synchronen `/analyze`-Pfad (`false`). Der synchrone Pfad
 bleibt bewusst als Rückfall im Code.
 **Entfernungs-Kriterium:** entfällt erst, wenn der synchrone Pfad abgebaut wird
-(„Phase 6" — nur mit ausdrücklicher Freigabe des Inhabers). Bis dahin ist das ein
+(„Phase 6" — nur nach ausdrücklicher Freigabe). Bis dahin ist das ein
 gewollter Dauer-Betriebsschalter, kein abgelaufenes Flag.
 
 ### `useSingleLargeCall` (seit v2.2)
@@ -38,7 +38,7 @@ die Queue an ist.
 > (Flag + `cloudtasks-concurrency-3.sh` + `config.js`-Werte).
 
 **Entfernungs-Kriterium:** entfällt erst, wenn die 3-Call-Pipeline abgebaut wird
-(„Phase 6" — nur mit ausdrücklicher Freigabe des Inhabers).
+(„Phase 6" — nur nach ausdrücklicher Freigabe).
 
 ### `usePromptCache` (seit v2.5)
 

@@ -19,7 +19,7 @@ das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 
 ## Deploy
 
-**Grundregel: Kein Deploy ohne ausdrückliche Freigabe des Inhabers.** Mit Freigabe
+**Grundregel: Kein Deploy ohne ausdrückliche Freigabe.** Mit Freigabe
 läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 
 1. Tests, Lint und Format müssen grün sein:

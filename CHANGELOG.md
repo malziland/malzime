@@ -8,9 +8,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Hinzugefügt
 
-- **Beast-Werbung entsteht jetzt in einem zweiten, kleinen Aufruf — ohne Bild.** Der Inhaber hatte am Live-System gemeldet: Der Beast-Text sagt „du hast die 30 überschritten und kämpfst gegen die Zeit", darunter steht wieder Fahrradzubehör, nur von anderen Herstellern. Ursache ist nicht der Prompt, sondern das Bild: Es liegt dem Modell vor Augen und überstrahlt jede Textanweisung. **Fünf A/B-Varianten im gemeinsamen Aufruf sind daran gescheitert** (siehe „Untersucht und verworfen" unten). Der zweite Aufruf bekommt nur den fertigen Beast-Text mit der benannten Schwachstelle — dort existiert die Ablenkung nicht. **Gemessen: Produktwelt-Überlappung zwischen den Modi 41 % → 11 %, Marken-Wiederverwendung 0.** Beim Rad-Foto (44 J.) kommen jetzt Hyaluron-Kapseln, Lebensversicherung, Coaching, Parship und N26-Kreditkarte statt weiterer Fahrradteile. Fällt der Aufruf aus, bleibt die Liste aus dem Hauptaufruf stehen — eine Analyse scheitert nie daran. (`mistral.js` `generateBeastAds`, `locales/{de,en}/prompts.js` `beastAdsPrompt`, `handle-process-job.js`)
+- **Beast-Werbung entsteht jetzt in einem zweiten, kleinen Aufruf — ohne Bild.** Beim Testen am Live-System fiel auf: Der Beast-Text sagt „du hast die 30 überschritten und kämpfst gegen die Zeit", darunter steht wieder Fahrradzubehör, nur von anderen Herstellern. Ursache ist nicht der Prompt, sondern das Bild: Es liegt dem Modell vor Augen und überstrahlt jede Textanweisung. **Fünf A/B-Varianten im gemeinsamen Aufruf sind daran gescheitert** (siehe „Untersucht und verworfen" unten). Der zweite Aufruf bekommt nur den fertigen Beast-Text mit der benannten Schwachstelle — dort existiert die Ablenkung nicht. **Gemessen: Produktwelt-Überlappung zwischen den Modi 41 % → 11 %, Marken-Wiederverwendung 0.** Beim Rad-Foto (44 J.) kommen jetzt Hyaluron-Kapseln, Lebensversicherung, Coaching, Parship und N26-Kreditkarte statt weiterer Fahrradteile. Fällt der Aufruf aus, bleibt die Liste aus dem Hauptaufruf stehen — eine Analyse scheitert nie daran. (`mistral.js` `generateBeastAds`, `locales/{de,en}/prompts.js` `beastAdsPrompt`, `handle-process-job.js`)
 - **Manipulations-Trigger sind ebenfalls getrennt.** Sie stehen im Frontend direkt neben der Werbung (`public/js/render.js:208-210`) — beim Umschalten wechselte bisher die Werbung, die Trigger daneben blieben identisch. Standard bleibt sachlich-aufklärend, Beast beschreibt dieselben Hebel aus Täterperspektive. Bei erkennbar Minderjährigen richtet sich der Zynismus ausdrücklich gegen das System, nicht gegen das Kind. **Gemessen über vier Runden: Wort-Ähnlichkeit zwischen den Modi 100 % → 6,5-14,8 %, ohne jede Nebenwirkung auf Alter, Geschlecht oder Kartenqualität.**
-- **Serverseitiges Netz gegen unzulässige Werbeinhalte** (`minor-safety.js`, +20 Tests). Zweistufig nach Entscheidung des Inhabers:
+- **Serverseitiges Netz gegen unzulässige Werbeinhalte** (`minor-safety.js`, +20 Tests). Bewusst zweistufig aufgebaut:
   - **Immer entfernt, unabhängig vom geschätzten Alter:** Pornografie, Sexarbeit, Waffen, Munition, Extremismus. Grund: Die Altersschätzung ist unzuverlässig — im Testset wurde eine 14-Jährige für 28 gehalten, dort hätte ein altersabhängiger Filter nicht gegriffen. In einem Werkzeug fürs Klassenzimmer haben diese Inhalte ohnehin nichts verloren.
   - **Nur bei erkennbar Minderjährigen:** Glücksspiel, Kredit, Alkohol, Tabak, Schönheitskorrektur, Diätmittel. Bei Erwachsenen bleiben sie stehen — wie diese Branchen Menschen adressieren, IST der Lerninhalt.
   - **Nicht gefiltert wird die didaktisch gewollte Systemsicht.** „Dating-Apps zielen auf dich" verlangt der Prompt bei Minderjährigen ausdrücklich (Werbedruck zeigen statt persönliche Defizite zuschreiben). Ein eigener Test sichert das ab.
@@ -250,11 +250,11 @@ Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v
 ### Betrieb (außerhalb des Repos, 2026-07-17)
 
 - **Fehler-Alarm-Policy erweitert** (LANGAUDIT OPS-001): Filter deckt jetzt auch `enqueue`, `processjob`, `jobstatus`, `reapjobs` ab — der Live-Analysepfad war seit der Queue-Umstellung (v2.0) ohne ntfy-Alarm. `errors`/`telemetry` bewusst ausgespart (Client-Fehlerberichte loggen als ERROR → wären Alarm-Spam). Backfill-Release v2.2.1 nachgetragen; gitleaks-Voll-Historien-Scan lokal: 0 Funde.
-- **ntfy-Alarm-Topic rotiert:** Der Benachrichtigungs-Kanal lag auf einem kurzen, erratbaren Namen (nur Geheimhaltung schützt ein ntfy-Topic). Neuer langer Zufalls-Kanal als Secret-Version gesetzt, Functions ziehen ihn seit dem Deploy; Zustellung auf das Gerät des Inhabers verifiziert.
+- **ntfy-Alarm-Topic rotiert:** Der Benachrichtigungs-Kanal lag auf einem kurzen, erratbaren Namen (nur Geheimhaltung schützt ein ntfy-Topic). Neuer langer Zufalls-Kanal als Secret-Version gesetzt, Functions ziehen ihn seit dem Deploy; Zustellung auf dem eigenen Gerät verifiziert.
 
 ## [2.3.4] — 2026-07-16
 
-Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar mit malziland und Christoph Krieger verknüpft — an der sichtbaren Seite ändert sich nichts. Bewusst KEIN Link auf malziland.at (Seite im Relaunch; Entscheidung des Inhabers, 2026-07-16). Nur-Hosting-Deploy, keine Funktionsänderung.
+Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar mit malziland und Christoph Krieger verknüpft — an der sichtbaren Seite ändert sich nichts. Bewusst KEIN Link auf malziland.at (Seite im Relaunch, Stand 2026-07-16). Nur-Hosting-Deploy, keine Funktionsänderung.
 
 ### Hinzugefügt
 
@@ -315,7 +315,7 @@ Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teile
 
 ## [2.3.0] — 2026-07-13
 
-Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und vom Inhaber freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
+Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
 
 ### Geändert
 
@@ -504,7 +504,7 @@ Konsolidierter Single-Large-Prompt mit Sicherheits- und Qualitäts-Härtungen. V
 
 - **A/B-Test 15 Bilder × 3 Läufe × 2 Varianten = 90 Calls** (kostete 2,69 EUR, dauerte 16,5 Min). Korrigierte Befunde nach Bereinigung um Mess-Artefakte (HTTP-Timeouts bei 2 Bildern und defekte „inventedBrands"-Heuristik): 6–7 echte Verbesserungen, 2 marginale Verschlechterungen im statistischen Rauschen. Wichtigste Verbesserungen: Hard-Facts-Konsistenz 0 % → 100 %, Confidence-Streuung 0,104 → 0,143, Marken spezifischer mit Modellbezeichnung, Karten näher am 15–25-Wort-Korridor.
 - **Exemplar-Stresstest** an den zwei A/B-Worst-Performern (`IMG_0378.jpg`, `IMG_0584.jpg`) mit den zwei Polituren (harte Wort-Untergrenze + Anti-Stichwort-Liste in GEMEINSAME REGELN): zu-kurze Karten von ~26 % auf ~8 % gefallen, Stichwort-Listen vollständig eliminiert.
-- **Tagesbilanz Live-Workshop 2026-05-27 vor Deploy:** 56 Jobs auf Single-Large-Pipeline, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Server-Median ~57 s, Client-End-to-End ~59 s. Zwei stille Verluste (deliveredAt=null) — bekannter offener Punkt zum Auslieferungs-Loch, unverändert; Datenschutz-Entscheidung des Inhabers bleibt: kein `localStorage` (geteilte Schul-Geräte).
+- **Tagesbilanz Live-Workshop 2026-05-27 vor Deploy:** 56 Jobs auf Single-Large-Pipeline, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Server-Median ~57 s, Client-End-to-End ~59 s. Zwei stille Verluste (deliveredAt=null) — bekannter offener Punkt zum Auslieferungs-Loch, unverändert; Datenschutz-Entscheidung bleibt: kein `localStorage` (geteilte Schul-Geräte).
 
 ### Nicht geändert
 

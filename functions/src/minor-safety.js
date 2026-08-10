@@ -16,7 +16,7 @@
  * Textanweisung hält. Dieses Modul prüft das fertige Ergebnis, bevor es
  * ausgeliefert wird, und entfernt eindeutig unzulässige Einträge.
  *
- * ZWEI STUFEN (Entscheidung des Inhabers, 2026-08-10):
+ * ZWEI STUFEN, bewusst so gewaehlt:
  *   1. Pornografie, Sexarbeit, Waffen und Extremismus fliegen IMMER raus —
  *      unabhängig vom geschätzten Alter. Grund: Die Altersschätzung ist
  *      unzuverlässig (im Testset wurde eine 14-Jährige für 28 gehalten), und

@@ -44,7 +44,7 @@ getroffen — sowie die bewussten Abweichungen vom Standard.
    fail-safe `false`) statt Umgebungsvariablen. Grund: Umlegen ohne Deploy, auch
    vom Handy — zentrales Betriebssicherheits-Element. Register:
    [FLAGS.md](../FLAGS.md). Die Fallback-Pfade (synchroner `/analyze`,
-   3-Call-Pipeline) bleiben bewusst im Code, bis der Inhaber ihren Abbau
+   3-Call-Pipeline) bleiben bewusst im Code, bis ihr Abbau
    ausdrücklich freigibt („Phase 6").
 9. **Release-Tags leichtgewichtig** (durch `release.yml`/GitHub-Releases erzeugt)
    — Abweichung von „annotierte Tags": die Metadaten (Notizen, Datum, Urheber)
@@ -52,7 +52,7 @@ getroffen — sowie die bewussten Abweichungen vom Standard.
 10. **Kein SBOM, keine Build-Provenance:** es werden keine Artefakte an Dritte
     ausgeliefert (Web-App, direkt deployt). Bei Bedarf neu bewerten.
 11. **Deploy-Governance:** Kein Deploy, Push auf `main`, Release oder Löschen
-    ohne ausdrückliche Freigabe des Inhabers. Mit Freigabe läuft der dokumentierte
+    ohne ausdrückliche Freigabe. Mit Freigabe läuft der dokumentierte
     Ablauf ([RUNBOOK.md](../RUNBOOK.md)) vollständig durch.
 
 ## Konsequenzen

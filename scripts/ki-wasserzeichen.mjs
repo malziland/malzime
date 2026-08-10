@@ -51,12 +51,12 @@ const ZIEL_DIR = TROCKEN ? "/tmp/ki-wasserzeichen" : DEMO_DIR;
    passiert. Wird das Thumbnail selbst im 3/2-Format erzeugt, zeigt die Kachel
    es vollstaendig, und das Zeichen ist da, wo es hingehoert. */
 const BILDER = [
-  { name: "demo-selfie.jpg", anzeigeBreite: 360 },
-  { name: "demo-selfie-thumb.jpg", anzeigeBreite: 220, zuschnitt: "3:2", quelle: "demo-selfie.jpg" },
-  { name: "demo-cafe.jpg", anzeigeBreite: 360 },
-  { name: "demo-cafe-thumb.jpg", anzeigeBreite: 220, zuschnitt: "3:2", quelle: "demo-cafe.jpg" },
-  { name: "demo-hiker.jpg", anzeigeBreite: 360 },
-  { name: "demo-hiker-thumb.jpg", anzeigeBreite: 220, zuschnitt: "3:2", quelle: "demo-hiker.jpg" },
+  { name: "demo-selfie.jpg", anzeigeBreite: 360, zielSchrift: 13 },
+  { name: "demo-selfie-thumb.jpg", anzeigeBreite: 220, zielSchrift: 7, zuschnitt: "3:2", quelle: "demo-selfie.jpg" },
+  { name: "demo-cafe.jpg", anzeigeBreite: 360, zielSchrift: 13 },
+  { name: "demo-cafe-thumb.jpg", anzeigeBreite: 220, zielSchrift: 7, zuschnitt: "3:2", quelle: "demo-cafe.jpg" },
+  { name: "demo-hiker.jpg", anzeigeBreite: 360, zielSchrift: 13 },
+  { name: "demo-hiker-thumb.jpg", anzeigeBreite: 220, zielSchrift: 7, zuschnitt: "3:2", quelle: "demo-hiker.jpg" },
 ];
 
 /* Badge-Größe skaliert mit der Bildbreite, damit es auf dem 200-px-Thumbnail
@@ -67,11 +67,9 @@ const BILDER = [
    der Kachel rund 220 px. Eine reine Prozentrechnung auf die Dateibreite
    macht das Zeichen im Vollbild zu klein — dort schrumpft die Anzeige auf ein
    Drittel. Deshalb wird mit der erwarteten Anzeigebreite gerechnet. */
-function badgeMasse(breite, anzeigeBreite) {
+function badgeMasse(breite, anzeigeBreite, zielSchrift) {
   const skala = breite / anzeigeBreite;
-  /* 13 px in der Anzeige — gross genug zum Lesen, klein genug, um das Motiv
-     nicht zu dominieren. */
-  const schrift = Math.max(10, Math.round(13 * skala));
+  const schrift = Math.max(10, Math.round(zielSchrift * skala));
   return {
     schrift,
     abstand: Math.round(schrift * 0.75),
@@ -81,8 +79,8 @@ function badgeMasse(breite, anzeigeBreite) {
   };
 }
 
-function seite(dataUrl, breite, hoehe, anzeigeBreite) {
-  const m = badgeMasse(breite, anzeigeBreite);
+function seite(dataUrl, breite, hoehe, anzeigeBreite, zielSchrift) {
+  const m = badgeMasse(breite, anzeigeBreite, zielSchrift);
   return `<!doctype html><html><head><meta charset="utf-8"><style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { width:${breite}px; height:${hoehe}px; overflow:hidden; }
@@ -203,7 +201,7 @@ async function main() {
     const dataUrl = `data:image/jpeg;base64,${readFileSync(quelle).toString("base64")}`;
 
     await page.setViewportSize({ width: breite, height: hoehe });
-    await page.setContent(seite(dataUrl, breite, hoehe, anzeigeBreite));
+    await page.setContent(seite(dataUrl, breite, hoehe, anzeigeBreite, bild.zielSchrift));
     await page.waitForLoadState("networkidle");
 
     /* Qualitaet 92: Die Demo-Bilder sollen nicht sichtbar schlechter werden als

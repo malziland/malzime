@@ -6,10 +6,21 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [2.11.0] — 2026-08-11
 
-Sanierung des LANGAUDIT vom 2026-08-10 (`docs/audit-2026-08-11.md`). 26 von 38
-Befunden geschlossen, jeder mit einer Prüfung dahinter und einer Rückbauprobe:
-Quellcode zurückgedreht, Prüfung behalten, rot gesehen, wiederhergestellt. Der
-Datenbank-Umzug in die EU folgt bewusst als eigener, isolierter Schritt.
+Sanierung des LANGAUDIT vom 2026-08-10 (`docs/audit-2026-08-11.md`).
+**36 der 38 Befunde geschlossen**, jeder mit einer Prüfung dahinter und einer
+Rückbauprobe: Quellcode zurückgedreht, Prüfung behalten, rot gesehen,
+wiederhergestellt.
+
+Die beiden übrigen: Der Firestore-Umzug in die EU (PRIV-001) folgt bewusst als
+eigener, isolierter Schritt auf einem geprüften Stand. Bei der Alarmierung
+(OPS-003) ist die Zustellung an den richtigen Kanal repariert und belegt — dass
+die Meldung als Push auf dem Sperrbildschirm ankommt, ist noch offen.
+
+Einer der 36 ist ausdrücklich **verworfen statt behoben**: das anonyme Schreiben
+am geteilten ntfy-Dienst (SEC-005). Begründung in `docs/SECURITY-MODEL.md` —
+das Topic ist seit der Rotation ein 30-stelliger Zufallswert, und eine Sperre
+würde die Benachrichtigungen anderer Projekte brechen, die nicht Teil dieses
+Audits sind.
 
 ### Behoben
 

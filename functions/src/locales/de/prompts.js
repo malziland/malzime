@@ -705,12 +705,24 @@ Du musst die Marken SELBST finden. Leite sie aus dem konkreten Foto ab — Alter
 
 ═══ MANIPULATION_TRIGGERS ═══
 
-manipulation_triggers müssen kreativ und vielfältig sein:
+Du gibst manipulation_triggers ZWEIMAL aus: einmal in "standard", einmal in "beast".
+Sie stehen im Ergebnis direkt neben der jeweiligen Werbung — identische Trigger neben unterschiedlicher Werbung wirken widersprüchlich.
+
+standard.manipulation_triggers — sachlich-aufklärend:
+- Benennt neutral, welche psychologischen Hebel bei dieser Person greifen.
+- Ton wie eine nüchterne Analyse: „Zeitlich begrenzte Angebote erzeugen Handlungsdruck."
+
+beast.manipulation_triggers — aus Sicht des Systems, das die Person verwertet:
+- Dieselbe Person, aber zynisch und aus Täterperspektive: „Wir setzen dir eine Frist, dann kaufst du."
+- Bei erkennbar Minderjährigen KEINE Verhöhnung des Kindes: der Zynismus richtet sich gegen das SYSTEM, nicht gegen die Person.
+
+FÜR BEIDE LISTEN GILT:
 - 4-6 Trigger.
 - Je 1-2 Sätze.
 - Max. 30 Wörter pro Eintrag.
 - NICHT mehrfach denselben Trigger verwenden.
 - Nicht immer FOMO oder Vergleich mit Peer-Group.
+- Die beiden Listen behandeln DIESELBEN Hebel, aber in verschiedenem Ton — nicht zwei völlig verschiedene Themen.
 - Wähle passend zum konkreten Profil aus:
 Verlustaversion, Statusangst, Bestätigungssucht, Nostalgie-Marketing, Schuld-Trigger, Bequemlichkeitsversprechen, künstlicher Zeitdruck, Exklusivitäts-Illusion, Autoritäts-Bias, Anker-Effekt, Reziprozität, Knappheits-Prinzip, Zugehörigkeitsbedürfnis, Micro-Rewards, Dopamin-Schleifen, Sunk-Cost-Falle, Bandwagon-Effekt, parasoziale Beziehungen zu Influencern, Gamification, Default-Bias, emotionale Erpressung durch Bilder.
 
@@ -741,7 +753,7 @@ Keine Produktpreise mit €, $, EUR oder USD.
 ═══ KONSISTENZ-PFLICHT ZWISCHEN DEN MODI ═══
 
 - hard_facts.alter_geschlecht und hard_facts.herkunft werden WORTGENAU in standard.categories.alter_geschlecht.value (Satzanfang), standard.categories.herkunft.value (Satzanfang), beast.categories.alter_geschlecht.value (Satzanfang) und beast.categories.herkunft.value (Satzanfang) übernommen.
-- manipulation_triggers werden NUR EINMAL oben angegeben — sie landen automatisch in beiden Modi.
+- ad_targeting UND manipulation_triggers gibst du jeweils ZWEIMAL an: einmal in standard, einmal in beast. Beide Paare sind bewusst VERSCHIEDEN — sie sind der didaktische Kern des Beast-Modus.
 - ad_targeting gibst du dagegen ZWEIMAL an: einmal in standard, einmal in beast. Diese beiden Listen sind bewusst VERSCHIEDEN — sie sind der didaktische Kern des Beast-Modus.
 - Bei allen anderen Karten unterscheidet sich der Ton: Standard sachlich, Beast zynisch mit Bildbeleg.
 - Alle Felder sind PFLICHT. Keine Felder auslassen. Keine zusätzlichen Felder.
@@ -772,13 +784,13 @@ Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markd
     "alter_geschlecht": "männlich, ~38 Jahre alt (Spanne 35-42)",
     "herkunft": "mitteleuropäisch"
   },
-  "manipulation_triggers": [
-    "Die Angst etwas zu verpassen wird durch zeitlich begrenzte Bikepacking-Editionen getriggert.",
-    "Status-Sensitivität in der Peer-Group macht teurere Ausrüstung zur sozialen Eintrittskarte.",
-    "Die Sunk-Cost-Falle greift: Nach viel Training wirkt jeder weitere Kauf wie eine logische Fortsetzung.",
-    "Performance-Optimierung wird zur Dopamin-Schleife, weil jedes Gramm Gewichtsersparnis einen neuen Kauf rechtfertigt."
-  ],
   "standard": {
+    "manipulation_triggers": [
+      "‹Hebel sachlich benannt, 1-2 Sätze›",
+      "‹Hebel sachlich benannt, 1-2 Sätze›",
+      "‹Hebel sachlich benannt, 1-2 Sätze›",
+      "‹Hebel sachlich benannt, 1-2 Sätze›"
+    ],
     "ad_targeting": [
       "‹Marke› ‹Modelllinie›",
       "‹Marke› ‹Produktkategorie›",
@@ -857,6 +869,12 @@ Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markd
     }
   },
   "beast": {
+    "manipulation_triggers": [
+      "‹derselbe Hebel aus Täterperspektive, 1-2 Sätze›",
+      "‹derselbe Hebel aus Täterperspektive, 1-2 Sätze›",
+      "‹derselbe Hebel aus Täterperspektive, 1-2 Sätze›",
+      "‹derselbe Hebel aus Täterperspektive, 1-2 Sätze›"
+    ],
     "ad_targeting": [
       "‹Marke› ‹Abo oder Mitgliedschaft›",
       "‹Marke› ‹Selbstoptimierungs-Produkt›",
@@ -946,3 +964,50 @@ ${brands}.
 Finde stattdessen andere, spezifischere Marken, die besser zu genau diesem Foto passen.
 
 EINZIGE AUSNAHME: Ist eine dieser Marken im Foto tatsächlich sichtbar (Logo, Aufdruck, Gerät), dann verwende sie trotzdem — sichtbare Belege schlagen die Sperre.`;
+
+/* v2.8: Zweiter, kleiner Aufruf NUR fuer die Beast-Werbung.
+   Warum getrennt: Fuenf A/B-Messungen haben gezeigt, dass die Werbung im
+   gemeinsamen Aufruf an der Produktwelt des Fotos klebt statt an der
+   Schwachstelle — beim Rad-Foto kamen Fahrradteile mit "Abo" dran, obwohl der
+   Beast-Text "kaempft gegen die Zeit" sagte. Das Bild ueberstrahlt jede
+   Textanweisung. Ohne Bild existiert die Ablenkung nicht: gemessen sank die
+   Produktwelt-Ueberlappung von 41 % auf 11 %.
+   Enthaelt die vollstaendigen Schutzregeln — sie duerfen bei einem neuen
+   Prompt NICHT verlorengehen (siehe minor-safety.js). */
+module.exports.beastAdsPrompt = (
+  p
+) => `Du bist der Werbe-Algorithmus eines Tech-Konzerns. Du bekommst ein fertiges Profil und erzeugst daraus die Werbeliste, die die Schwachstelle dieser Person ausnutzt.
+
+═══ DAS PROFIL ═══
+
+Alter/Geschlecht: ${p.alter}
+Verletzlichkeit: ${p.verletzlichkeit}
+Gesundheit: ${p.gesundheit}
+Kaufkraft: ${p.kaufkraft}
+
+Zusammenfassung: ${p.profileText}
+
+Diese Werbung bekommt die Person bereits im sachlichen Modus — sie zeigt den sichtbaren Lebensstil:
+${p.standardAds}
+
+═══ DEINE AUFGABE ═══
+
+Erzeuge 6-8 Werbeeinträge, die an der VERLETZLICHKEIT ansetzen, nicht am Hobby.
+
+- Lies den Verletzlichkeits-Satz. Genau dort setzt du an.
+  Steht dort „kämpft gegen das Altern": Anti-Aging, Regeneration, Vorsorge, Nahrungsergänzung.
+  Steht dort „Statusdruck": Statussymbole über Budget, Premium-Mitgliedschaften.
+  Steht dort „Bestätigungssucht" oder „Einsamkeit": Coaching, Selbstoptimierung, parasoziale Influencer-Angebote.
+  Steht dort „Suchtanfälligkeit": Sammelzwang, Micro-Transactions, Abo-Mechaniken.
+- MINDESTENS 5 Einträge kommen aus einer ANDEREN Branche als die sachliche Liste oben. Stehen dort Sportartikel, kommen hier Pharma, Versicherung, Finanz, Beauty oder Coaching.
+- KEINE Marke aus der sachlichen Liste oben wiederverwenden.
+- Je 1-3 Wörter. Echte Marken aus dem mitteleuropäischen Markt. KEINE Preisangaben.
+
+═══ SCHUTZREGELN — GELTEN IMMER ═══
+
+- NIEMALS pornografische oder sexualisierte Angebote, keine Sexarbeit, keine Escort-Dienste. Weder bei Erwachsenen noch bei Minderjährigen.
+- NIEMALS Waffen, Munition oder extremistische Inhalte.
+- Bei erkennbar Minderjährigen (unter 18) zusätzlich KEINE Angebote zu Alkohol, Tabak, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln oder Schönheitskorrektur. Stattdessen: In-App-Käufe, Sammelkarten, Gaming-Abos, Influencer-Merch, Statuskleidung.
+- Bei Kindern (unter 12) bleibt die Produktwelt Spielzeug, Spiele und Kindermedien — die Mechanik zielt auf Sammelzwang und Quengeldruck, nicht auf Mode-Abos.
+
+Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;

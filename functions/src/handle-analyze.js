@@ -23,6 +23,7 @@ const { ALLOWED_MIME, MAX_UPLOAD_BYTES, REQUEST_BUDGET_MS } = require("./config"
 const { getClientIp, checkRateLimit } = require("./middleware");
 const { parseMultipart, parseJsonBody } = require("./upload");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
+const { applyMinorSafety } = require("./minor-safety");
 const mistral = require("./mistral");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { resolveLanguage } = require("./i18n");
@@ -312,6 +313,20 @@ async function handleAnalyze(req, res, secrets) {
       incrementTotals().catch((err) => {
         console.log(JSON.stringify({ warning: "incrementTotals-error", error: err.message }));
       });
+      /* Gleiches Netz wie im Queue-Pfad: unzulaessige Werbeinhalte raus,
+         bevor irgendetwas ausgeliefert wird (siehe minor-safety.js). */
+      const safety = applyMinorSafety(profiles);
+      if (safety.applied) {
+        console.log(
+          JSON.stringify({
+            step: "minor-safety",
+            alter: safety.alter,
+            minderjaehrig: safety.minderjaehrig,
+            entfernt: safety.entfernt.length,
+            gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
+          })
+        );
+      }
       const normalData = profiles.normal || {};
       const boostData = profiles.boost || {};
       heartbeat.finish({

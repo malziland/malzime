@@ -30,6 +30,11 @@ single-large-call-results.json
 # damit auch künftige Namensvarianten (-rc1, -v2, _final …) erfasst werden.
 ab-test-*.json
 ab-test-*.md
+# Modellvergleich + Zweitcall-Prototyp: enthalten vollstaendige Profile aus
+# echten Testfotos (Familienbilder) — duerfen NIE ins oeffentliche Repo
+model-compare-*.json
+model-compare-*.md
+secondcall-prototype-*.md
 single-large-call-result*.html
 single-large-call-results*.json
 single-large-call-result-*.html

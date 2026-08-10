@@ -234,3 +234,97 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
     expect(_buildBrandBlocklistBlock("en", 0)).toMatch(/visible/i);
   });
 });
+
+describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
+  const boostProfil = {
+    profileText: "Du bist ein Mann, der die ersten Alterszeichen zeigt.",
+    ad_targeting: ["Assos Bib Shorts", "Mavic Crossmax"],
+    categories: {
+      alter_geschlecht: { label: "Alter", value: "Du bist männlich, ~44 Jahre alt.", confidence: 0.8 },
+      verletzlichkeit: { label: "V", value: "Du kämpfst gegen die Zeit.", confidence: 0.8 },
+      gesundheit: { label: "G", value: "Du bist fit.", confidence: 0.8 },
+      kaufkraft: { label: "K", value: "Gut verwertbar.", confidence: 0.8 },
+    },
+  };
+
+  test("liefert die neue Liste und schickt KEIN Bild mit", async () => {
+    const captured = [];
+    setFetchForTest(async (_url, opts) => {
+      captured.push(JSON.parse(opts.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: '{"ad_targeting":["Nivea Men Anti-Age","Allianz Vorsorge"]}' } }],
+          usage: { prompt_tokens: 700, completion_tokens: 90 },
+        }),
+      };
+    });
+
+    const ads = await mistral.generateBeastAds(boostProfil, ["Gore Wear", "Schwalbe"], "de");
+    expect(ads).toEqual(["Nivea Men Anti-Age", "Allianz Vorsorge"]);
+
+    const body = captured[0];
+    /* Der Kern der Idee: kein Bild, deshalb keine Ablenkung durch die
+       Produktwelt des Fotos. */
+    expect(JSON.stringify(body)).not.toContain("image_url");
+    /* Die Verletzlichkeit muss im Prompt stehen — daran soll die Werbung ansetzen */
+    expect(body.messages[0].content).toContain("kämpfst gegen die Zeit");
+    /* Und die sachliche Liste, damit andere Marken gewählt werden */
+    expect(body.messages[0].content).toContain("Gore Wear");
+  });
+
+  test("enthält die vollständigen Schutzregeln", async () => {
+    const captured = [];
+    setFetchForTest(async (_url, opts) => {
+      captured.push(JSON.parse(opts.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: '{"ad_targeting":["A"]}' } }], usage: {} }),
+      };
+    });
+    await mistral.generateBeastAds(boostProfil, [], "de");
+    const prompt = captured[0].messages[0].content;
+    /* Genau diese Regel hatte ich im Prototyp vergessen — Medium schlug
+       daraufhin einem Kind ein Pornografie-Abo vor. */
+    expect(prompt).toMatch(/pornografisch/i);
+    expect(prompt).toMatch(/Waffen/i);
+    expect(prompt).toMatch(/Glücksspiel/i);
+    expect(prompt).toMatch(/unter 18/i);
+  });
+
+  test("gibt null zurück, wenn der Aufruf scheitert — Analyse läuft weiter", async () => {
+    setFetchForTest(async () => ({ ok: false, status: 500, text: async () => "boom" }));
+    const ads = await mistral.generateBeastAds(boostProfil, [], "de");
+    expect(ads).toBeNull();
+  });
+
+  test("gibt null zurück bei leerer Antwort", async () => {
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: '{"ad_targeting":[]}' } }], usage: {} }),
+    }));
+    expect(await mistral.generateBeastAds(boostProfil, [], "de")).toBeNull();
+  });
+
+  test("verträgt ein Profil ohne Kategorien", async () => {
+    expect(await mistral.generateBeastAds(null, [], "de")).toBeNull();
+    expect(await mistral.generateBeastAds({}, [], "de")).toBeNull();
+  });
+
+  test("nutzt einen Cache-Schlüssel, der Anweisungsteil ist konstant", async () => {
+    const captured = [];
+    setFetchForTest(async (_url, opts) => {
+      captured.push(JSON.parse(opts.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: '{"ad_targeting":["A"]}' } }], usage: {} }),
+      };
+    });
+    await mistral.generateBeastAds(boostProfil, [], "de");
+    expect(captured[0].prompt_cache_key).toBe("malzime-beast-ads-de");
+  });
+});

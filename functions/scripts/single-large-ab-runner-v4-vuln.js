@@ -153,7 +153,12 @@ async function callMistral({ variant, image, runIndex, apiKey }) {
     { type: "text", text: brandBlocklistBlock(set.join(", ")) },
   ];
 
+  /* Cache-Schluessel je Variante — live und cand haben VERSCHIEDENE Prompts,
+     ein gemeinsamer Schluessel wuerde die Praefixe gegenseitig verdraengen.
+     Ohne Schluessel trifft der Cache nur zufaellig (gemessen: 11 % statt der
+     82-99 %, die die Produktion bei Dauerlast erreicht). */
   const body = {
+    prompt_cache_key: `malzime-ab-${variant}`,
     model: MODEL,
     messages: [
       { role: "system", content: systemText },

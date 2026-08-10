@@ -937,6 +937,65 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   };
 }
 
+/* ── v2.8: Zweiter Aufruf nur fuer die Beast-Werbung ──────────────────────
+   Bekommt KEIN Bild, sondern nur den fertigen Beast-Text. Fuenf A/B-Messungen
+   haben gezeigt, dass die Werbung im gemeinsamen Aufruf an der Produktwelt des
+   Fotos klebt statt an der Schwachstelle — das Bild ueberstrahlt jede
+   Textanweisung. Ohne Bild sank die Produktwelt-Ueberlappung von 41 % auf 11 %.
+
+   Der Aufruf ist klein (~870 Tokens) und laeuft auf demselben Modell wie die
+   Analyse. Faellt er aus, bleibt die Werbung aus dem Hauptaufruf stehen — eine
+   Analyse darf daran NIE scheitern. */
+async function generateBeastAds(boostProfile, standardAds, lang) {
+  if (!boostProfile || !boostProfile.categories) return null;
+  const prompts = loadPrompts(lang || "de");
+  if (typeof prompts.beastAdsPrompt !== "function") return null;
+
+  const c = boostProfile.categories;
+  const prompt = prompts.beastAdsPrompt({
+    alter: c.alter_geschlecht?.value || "",
+    verletzlichkeit: c.verletzlichkeit?.value || "",
+    gesundheit: c.gesundheit?.value || "",
+    kaufkraft: c.kaufkraft?.value || "",
+    profileText: (boostProfile.profileText || "").slice(0, 700),
+    standardAds: (Array.isArray(standardAds) ? standardAds : []).join(", "),
+  });
+
+  try {
+    const result = await callMistralRaw({
+      model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — gleiches Modell wie die Analyse */,
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 600,
+      temperature: 0.5,
+      forceJSON: true,
+      timeoutMs: 30_000,
+      /* Der Anweisungsteil ist konstant, nur das Profil dahinter wechselt —
+         damit ist der Anfang cachebar. Konstanter Text, kein Nutzerbezug. */
+      cacheKey: `malzime-beast-ads-${lang || "de"}`,
+    });
+    const parsed = parseSafely(result.text, { requireSchema: false });
+    const ads = Array.isArray(parsed?.ad_targeting)
+      ? parsed.ad_targeting.filter((e) => typeof e === "string" && e.trim()).slice(0, 12)
+      : [];
+    console.log(
+      JSON.stringify({
+        step: "mistral-beast-ads",
+        status: ads.length ? "ok" : "empty",
+        count: ads.length,
+        promptTokens: result.promptTokens,
+        outputTokens: result.outputTokens,
+        cachedTokens: result.cachedTokens,
+        httpMs: result.httpMs,
+      })
+    );
+    return ads.length ? ads : null;
+  } catch (err) {
+    /* Bewusst still: Der Hauptpfad hat bereits eine Werbeliste. */
+    console.log(JSON.stringify({ step: "mistral-beast-ads", status: "failed", error: err.message }));
+    return null;
+  }
+}
+
 function collectMissingForBothModes(parsed) {
   return {
     standard: parsed.standard ? findMissingCards(parsed.standard) : REQUIRED_CARDS.slice(),
@@ -1001,6 +1060,7 @@ module.exports = {
   describeImage,
   generateBothProfiles,
   runSingleLargeCall,
+  generateBeastAds,
   isRateLimitError,
   /* Für Tests */
   setFetchForTest,

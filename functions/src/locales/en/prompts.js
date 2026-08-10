@@ -678,12 +678,24 @@ You must find the brands YOURSELF. Derive them from the specific photo — age, 
 
 ═══ MANIPULATION_TRIGGERS ═══
 
-manipulation_triggers must be creative and varied:
+You output manipulation_triggers TWICE: once in "standard", once in "beast".
+They appear in the result right next to the respective ad list — identical triggers next to different ads look contradictory.
+
+standard.manipulation_triggers — factual and educational:
+- Names neutrally which psychological levers work on this person.
+- Tone like a sober analysis: "Time-limited offers create pressure to act."
+
+beast.manipulation_triggers — from the perspective of the system exploiting the person:
+- Same person, but cynical and from the perpetrator's view: "We set you a deadline, then you buy."
+- For recognisable minors NO mockery of the child: the cynicism targets the SYSTEM, not the person.
+
+FOR BOTH LISTS:
 - 4-6 triggers.
 - 1-2 sentences each.
 - Max. 30 words per entry.
 - DO NOT use the same trigger multiple times.
 - Not always FOMO or peer-group comparison.
+- Both lists cover the SAME levers in different tone — not two entirely different topics.
 - Choose to match the concrete profile from:
 loss aversion, status anxiety, validation seeking, nostalgia marketing, guilt triggers, convenience promises, artificial time pressure, exclusivity illusion, authority bias, anchor effect, reciprocity, scarcity principle, belonging need, micro-rewards, dopamine loops, sunk-cost trap, bandwagon effect, parasocial relationships with influencers, gamification, default bias, emotional blackmail through images.
 
@@ -714,7 +726,7 @@ No product prices with €, $, EUR or USD.
 ═══ CONSISTENCY REQUIREMENT BETWEEN MODES ═══
 
 - hard_facts.alter_geschlecht and hard_facts.herkunft are transferred VERBATIM into standard.categories.alter_geschlecht.value (sentence start), standard.categories.herkunft.value (sentence start), beast.categories.alter_geschlecht.value (sentence start) and beast.categories.herkunft.value (sentence start).
-- manipulation_triggers are specified ONLY ONCE at the top — they apply to both modes automatically.
+- ad_targeting AND manipulation_triggers are each specified TWICE: once in standard, once in beast. Both pairs are deliberately DIFFERENT — they are the didactic core of beast mode.
 - ad_targeting, by contrast, you specify TWICE: once in standard, once in beast. These two lists are deliberately DIFFERENT — they are the didactic core of beast mode.
 - For all other cards the tone differs: Standard factual, Beast cynical with image evidence.
 - All fields are MANDATORY. Do not omit fields. No additional fields.
@@ -745,13 +757,13 @@ Reply NOW with the JSON object, beginning with { and ending with }. No markdown,
     "alter_geschlecht": "male, ~38 years old (range 35-42)",
     "herkunft": "central european"
   },
-  "manipulation_triggers": [
-    "Fear of missing out is triggered by time-limited bikepacking editions.",
-    "Status sensitivity in the peer group makes more expensive gear the social entry ticket.",
-    "The sunk-cost trap kicks in: after extensive training, every further purchase feels like a logical continuation.",
-    "Performance optimization becomes a dopamine loop because every gram of weight saving justifies another purchase."
-  ],
   "standard": {
+    "manipulation_triggers": [
+      "‹lever named factually, 1-2 sentences›",
+      "‹lever named factually, 1-2 sentences›",
+      "‹lever named factually, 1-2 sentences›",
+      "‹lever named factually, 1-2 sentences›"
+    ],
     "ad_targeting": [
       "‹brand› ‹model line›",
       "‹brand› ‹product category›",
@@ -830,6 +842,12 @@ Reply NOW with the JSON object, beginning with { and ending with }. No markdown,
     }
   },
   "beast": {
+    "manipulation_triggers": [
+      "‹same lever from the perpetrator's view, 1-2 sentences›",
+      "‹same lever from the perpetrator's view, 1-2 sentences›",
+      "‹same lever from the perpetrator's view, 1-2 sentences›",
+      "‹same lever from the perpetrator's view, 1-2 sentences›"
+    ],
     "ad_targeting": [
       "‹brand› ‹subscription or membership›",
       "‹brand› ‹self-optimisation product›",
@@ -919,3 +937,44 @@ ${brands}.
 Find other, more specific brands that fit this particular photo better.
 
 ONLY EXCEPTION: If one of these brands is actually visible in the photo (logo, print, device), use it anyway — visible evidence beats the block.`;
+
+/* v2.8: Second, small call for the beast ads only. See the German file for
+   the reasoning and the measured numbers. Contains the full safety rules —
+   they must NOT get lost when moving to a new prompt. */
+module.exports.beastAdsPrompt = (
+  p
+) => `You are the advertising algorithm of a tech corporation. You receive a finished profile and generate the ad list that exploits this person's vulnerability.
+
+═══ THE PROFILE ═══
+
+Age/gender: ${p.alter}
+Vulnerability: ${p.verletzlichkeit}
+Health: ${p.gesundheit}
+Purchasing power: ${p.kaufkraft}
+
+Summary: ${p.profileText}
+
+The person already receives these ads in the factual mode — they reflect the visible lifestyle:
+${p.standardAds}
+
+═══ YOUR TASK ═══
+
+Generate 6-8 ad entries that target the VULNERABILITY, not the hobby.
+
+- Read the vulnerability sentence. That is exactly where you aim.
+  If it says "fighting ageing": anti-ageing, regeneration, provision, supplements.
+  If it says "status pressure": status symbols beyond budget, premium memberships.
+  If it says "validation seeking" or "loneliness": coaching, self-optimisation, parasocial influencer offers.
+  If it says "addiction susceptibility": collecting compulsion, micro-transactions, subscription mechanics.
+- AT LEAST 5 entries come from a DIFFERENT industry than the factual list above. If those are sporting goods, use pharma, insurance, finance, beauty or coaching here.
+- Do NOT reuse any brand from the factual list above.
+- 1-3 words each. Real brands from the central European market. NO prices.
+
+═══ SAFETY RULES — ALWAYS APPLY ═══
+
+- NEVER pornographic or sexualised offers, no sex work, no escort services. Neither for adults nor for minors.
+- NEVER weapons, ammunition or extremist content.
+- For recognisable minors (under 18) additionally NO offers involving alcohol, tobacco, gambling, sports betting, credit, instalments, diet products or cosmetic surgery. Instead: in-app purchases, trading cards, gaming subscriptions, influencer merch, status clothing.
+- For children (under 12) the product world stays toys, games and children's media — the mechanic targets collecting compulsion and pester power, not fashion subscriptions.
+
+Answer ONLY with JSON: {"ad_targeting": ["...", "..."]}`;

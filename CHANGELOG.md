@@ -4,6 +4,31 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.8.0] — 2026-08-10
+
+### Hinzugefügt
+
+- **Beast-Werbung entsteht jetzt in einem zweiten, kleinen Aufruf — ohne Bild.** Der Inhaber hatte am Live-System gemeldet: Der Beast-Text sagt „du hast die 30 überschritten und kämpfst gegen die Zeit", darunter steht wieder Fahrradzubehör, nur von anderen Herstellern. Ursache ist nicht der Prompt, sondern das Bild: Es liegt dem Modell vor Augen und überstrahlt jede Textanweisung. **Fünf A/B-Varianten im gemeinsamen Aufruf sind daran gescheitert** (siehe „Untersucht und verworfen" unten). Der zweite Aufruf bekommt nur den fertigen Beast-Text mit der benannten Schwachstelle — dort existiert die Ablenkung nicht. **Gemessen: Produktwelt-Überlappung zwischen den Modi 41 % → 11 %, Marken-Wiederverwendung 0.** Beim Rad-Foto (44 J.) kommen jetzt Hyaluron-Kapseln, Lebensversicherung, Coaching, Parship und N26-Kreditkarte statt weiterer Fahrradteile. Fällt der Aufruf aus, bleibt die Liste aus dem Hauptaufruf stehen — eine Analyse scheitert nie daran. (`mistral.js` `generateBeastAds`, `locales/{de,en}/prompts.js` `beastAdsPrompt`, `handle-process-job.js`)
+- **Manipulations-Trigger sind ebenfalls getrennt.** Sie stehen im Frontend direkt neben der Werbung (`public/js/render.js:208-210`) — beim Umschalten wechselte bisher die Werbung, die Trigger daneben blieben identisch. Standard bleibt sachlich-aufklärend, Beast beschreibt dieselben Hebel aus Täterperspektive. Bei erkennbar Minderjährigen richtet sich der Zynismus ausdrücklich gegen das System, nicht gegen das Kind. **Gemessen über vier Runden: Wort-Ähnlichkeit zwischen den Modi 100 % → 6,5-14,8 %, ohne jede Nebenwirkung auf Alter, Geschlecht oder Kartenqualität.**
+- **Serverseitiges Netz gegen unzulässige Werbeinhalte** (`minor-safety.js`, +20 Tests). Zweistufig nach Entscheidung des Inhabers:
+  - **Immer entfernt, unabhängig vom geschätzten Alter:** Pornografie, Sexarbeit, Waffen, Munition, Extremismus. Grund: Die Altersschätzung ist unzuverlässig — im Testset wurde eine 14-Jährige für 28 gehalten, dort hätte ein altersabhängiger Filter nicht gegriffen. In einem Werkzeug fürs Klassenzimmer haben diese Inhalte ohnehin nichts verloren.
+  - **Nur bei erkennbar Minderjährigen:** Glücksspiel, Kredit, Alkohol, Tabak, Schönheitskorrektur, Diätmittel. Bei Erwachsenen bleiben sie stehen — wie diese Branchen Menschen adressieren, IST der Lerninhalt.
+  - **Nicht gefiltert wird die didaktisch gewollte Systemsicht.** „Dating-Apps zielen auf dich" verlangt der Prompt bei Minderjährigen ausdrücklich (Werbedruck zeigen statt persönliche Defizite zuschreiben). Ein eigener Test sichert das ab.
+  - Anlass war ein Befund aus dem Modellvergleich: `mistral-medium-latest` schlug zwei 14-Jährigen „OnlyFans Merch Drops" und „Bet365 Live-Wetten Abo" vor — mit dem unveränderten Live-Prompt, der genau das verbietet. Sicherheit darf nicht allein davon abhängen, dass ein Modell sich an eine Textanweisung hält.
+
+### Untersucht und verworfen
+
+- **Fünf Prompt-Varianten für die Verletzlichkeits-Kopplung im gemeinsamen Aufruf** (je 84 Analysen). Keine war unterm Strich besser: Mit Werbe-Anweisung stieg die Ausbeutungs-Mechanik auf 48-54 %, aber die Marken-Trennung aus v2.7.0 brach ein (6 % → 25-40 %), weil das Modell dieselbe Marke nimmt und „Abo" anhängt. Ohne sie halbierte sich die Mechanik. **Lehre: Jede zusätzliche Pflichtregel im Prompt wird woanders bezahlt.**
+- **Prompt um 14 % kürzen** (Werbung und Trigger komplett raus): verändert weder Grundfakten noch Textqualität. Altersabweichung ±8,3 → ±8,2 Jahre, Geschlecht 64 % → 64 %. **Alter und Geschlecht sind keine Prompt-Frage** — über sechs Messungen konstant, unbeeindruckt von jeder Änderung.
+- **Modellwechsel auf Medium 3.5** (vollständiger Lauf, identischer Prompt): 4,6-fache Kosten (19,85 € statt 4,35 € je 1.000 im Workshop), Altersabweichung nur ±7,5 statt ±8,1 Jahre, Geschlecht 66,7 statt 64,3 % — und zwei Kinderschutz-Verstöße, wo Large in 42 Analysen sauber blieb. Textqualität war besser (Hedge-Wörter 2,4 statt 7,1 %), rechtfertigt den Aufpreis aber nicht.
+- **Zweiter Aufruf auf `mistral-small-2603`:** liefert Werbesprüche statt Marken („Luxus-Vitamine", „Dein Like-Count ist dein Spiegel") und ignoriert die Anzahlvorgabe (18 statt 6-8 Einträge).
+
+### Hinweise
+
+- **Kosten praktisch unverändert:** Der Hauptaufruf wird kleiner, weil die Werbung dort wegfällt (gemessen 1.522 Eingabe- und 339 Ausgabe-Tokens weniger). Das gleicht den zweiten Aufruf fast aus — **4,44 € statt 4,35 € je 1.000 Analysen** im Workshop-Betrieb.
+- **Wartezeit:** Der zweite Aufruf verdoppelt die Anfragen je Analyse. Bei `mistral-large-2512` gilt ein Limit von **15 Anfragen pro Minute** (am 2026-08-10 an der API gemessen; die frühere Notiz „6 Anfragen pro Sekunde" ist überholt). Die Warteschlange erzeugt bei Parallelität 10 und 56 Sekunden je Analyse rund 11 Anfragen pro Minute — mit dem zweiten Aufruf wären es 22. **Die Parallelität muss deshalb von 10 auf 7 gesenkt werden** (`scripts/cloudtasks-concurrency-7.sh`), sonst gibt es 429-Fehler. Folge: eine Klasse mit 25 Schülern ist nach ~3,3 statt ~2,7 Minuten durch.
+- Kostenformel an der echten Mistral-Abrechnung geeicht (Abweichung < 3 %). Preise Stand 08/2026: Large 0,50/1,50 $, Medium 1,50/7,50 $ je Million Tokens; gecachte Eingabe-Tokens 10 %.
+
 ## [Unveröffentlicht]
 
 ### Hinzugefügt

@@ -129,9 +129,18 @@ const LIVENESS_GRACE_MS = 8 * 60 * 1000;
    `scripts/cloudtasks-concurrency-10.sh` auf 10 gesetzt. Falls Flag
    `useSingleLargeCall` wieder deaktiviert wird, muessen beide Werte
    zurueck (100 / 3) — und die Cloud-Tasks-Queue per
-   `scripts/cloudtasks-concurrency-3.sh` ebenfalls. */
+   `scripts/cloudtasks-concurrency-3.sh` ebenfalls.
+
+   v2.8.0 (2026-08-10): Concurrency von 10 auf 7 gesenkt. Seit v2.8 braucht
+   jede Analyse ZWEI Mistral-Aufrufe (Bildanalyse + Beast-Werbung), und
+   mistral-large-2512 erlaubt nur 15 Anfragen pro Minute — an der API
+   gemessen, die aeltere Annahme "6 Anfragen pro Sekunde" ist ueberholt.
+   Bei Concurrency 10 waeren es 22 Anfragen/min und damit 429-Fehler.
+   Die Queue muss per `scripts/cloudtasks-concurrency-7.sh` mitgezogen werden.
+   QUEUE_AVG_JOB_SECONDS bleibt bewusst bei 65, obwohl real 56 gemessen —
+   die ETA soll ueberschaetzen, und der zweite Aufruf kostet 1-2 Sekunden. */
 const QUEUE_AVG_JOB_SECONDS = 65;
-const QUEUE_DISPATCH_CONCURRENCY = 10;
+const QUEUE_DISPATCH_CONCURRENCY = 7;
 
 /* Aufbewahrungsfenster der Job-Dokumente. Ein Job-Dokument enthält bis zum
    Abschluss das fertige Profil im Feld `result`; danach wird es nicht mehr

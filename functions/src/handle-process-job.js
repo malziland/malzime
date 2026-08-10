@@ -29,6 +29,7 @@
 
 const { REQUEST_BUDGET_MS, isLocalQueueMode, localQueueConcurrency } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
+const { applyMinorSafety } = require("./minor-safety");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
@@ -122,6 +123,39 @@ async function runPipeline(job) {
 
   const hasAnyProfile = hasCategories(profiles.normal) || hasCategories(profiles.boost);
   if (hasAnyProfile) {
+    /* v2.8: Beast-Werbung in einem zweiten, kleinen Aufruf ohne Bild erzeugen.
+       Im gemeinsamen Aufruf klebt sie an der Produktwelt des Fotos statt an der
+       Schwachstelle (gemessen ueber fuenf A/B-Runden). Faellt der Aufruf aus,
+       bleibt die Liste aus dem Hauptaufruf stehen — die Analyse scheitert nie
+       daran. */
+    if (profiles.boost && hasCategories(profiles.boost) && typeof mistral.generateBeastAds === "function") {
+      try {
+        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang);
+        if (neueAds) profiles.boost.ad_targeting = neueAds;
+      } catch (err) {
+        /* Nie die Analyse daran scheitern lassen — die Liste aus dem
+           Hauptaufruf bleibt als Rueckfall stehen. */
+        console.log(JSON.stringify({ step: "beast-ads-skip", error: err.message }));
+      }
+    }
+
+    /* Serverseitiges Netz, bevor irgendetwas ausgeliefert wird: Pornografie,
+       Waffen und Extremismus fliegen immer raus, Gluecksspiel/Kredit/Alkohol
+       zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
+       Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
+    const safety = applyMinorSafety(profiles);
+    if (safety.applied) {
+      console.log(
+        JSON.stringify({
+          step: "minor-safety",
+          traceId: job.traceId || null,
+          alter: safety.alter,
+          minderjaehrig: safety.minderjaehrig,
+          entfernt: safety.entfernt.length,
+          gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
+        })
+      );
+    }
     const n = profiles.normal || {};
     const b = profiles.boost || {};
     return {
@@ -225,6 +259,39 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
 
   const hasAnyProfile = hasCategories(profiles.normal) || hasCategories(profiles.boost);
   if (hasAnyProfile) {
+    /* v2.8: Beast-Werbung in einem zweiten, kleinen Aufruf ohne Bild erzeugen.
+       Im gemeinsamen Aufruf klebt sie an der Produktwelt des Fotos statt an der
+       Schwachstelle (gemessen ueber fuenf A/B-Runden). Faellt der Aufruf aus,
+       bleibt die Liste aus dem Hauptaufruf stehen — die Analyse scheitert nie
+       daran. */
+    if (profiles.boost && hasCategories(profiles.boost) && typeof mistral.generateBeastAds === "function") {
+      try {
+        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang);
+        if (neueAds) profiles.boost.ad_targeting = neueAds;
+      } catch (err) {
+        /* Nie die Analyse daran scheitern lassen — die Liste aus dem
+           Hauptaufruf bleibt als Rueckfall stehen. */
+        console.log(JSON.stringify({ step: "beast-ads-skip", error: err.message }));
+      }
+    }
+
+    /* Serverseitiges Netz, bevor irgendetwas ausgeliefert wird: Pornografie,
+       Waffen und Extremismus fliegen immer raus, Gluecksspiel/Kredit/Alkohol
+       zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
+       Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
+    const safety = applyMinorSafety(profiles);
+    if (safety.applied) {
+      console.log(
+        JSON.stringify({
+          step: "minor-safety",
+          traceId: job.traceId || null,
+          alter: safety.alter,
+          minderjaehrig: safety.minderjaehrig,
+          entfernt: safety.entfernt.length,
+          gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
+        })
+      );
+    }
     const n = profiles.normal || {};
     const b = profiles.boost || {};
     return {

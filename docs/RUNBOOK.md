@@ -10,7 +10,7 @@ das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 
 - **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call
   (`featureFlags/current`: `useQueue = true`, `useSingleLargeCall = true`),
-  Cloud-Tasks-Concurrency **10**.
+  Cloud-Tasks-Concurrency **7** (seit v2.8 — zwei Mistral-Aufrufe je Analyse).
 - **Limits:** Stundenlimit 500 Analysen (rollendes Fenster), IP-Rate-Limit
   500 Requests / 10 min pro Instanz.
 - **Lastprofil:** Workshops sind Stoßlast (Mo–Fr vormittags); genau dafür ist die
@@ -62,15 +62,32 @@ vom Handy). Rückfall auf den synchronen `/analyze`-Pfad.
 1. `featureFlags/current.useSingleLargeCall = false` (Firestore-Console).
 2. `./scripts/cloudtasks-concurrency-3.sh` ausführen (setzt die Queue auf
    Concurrency 3).
-3. In `functions/src/config.js`: `QUEUE_DISPATCH_CONCURRENCY` 10 → 3 und
+3. In `functions/src/config.js`: `QUEUE_DISPATCH_CONCURRENCY` 7 → 3 und
    `QUEUE_AVG_JOB_SECONDS` 65 → 100, dann `firebase deploy --only functions` —
    sonst zeigt das Frontend falsche Wartezeit-Schätzungen.
 
 Schritte 1+2 wirken in ~30 s, Schritt 3 dauert ~2 min. **Warum die Kopplung:** Die
 3-Call-Pipeline nutzt `mistral-small` (nur 100K Tokens/min) — bei Concurrency über 3
 drohen massenhaft 429-Fehler (gemessen 2026-05-20: bei Parallelität 6 kamen 6 von
-12 Jobs als 429 zurück). Rückweg: `./scripts/cloudtasks-concurrency-10.sh`, Werte in
-`config.js` zurück, Flag wieder `true`.
+12 Jobs als 429 zurück). Rückweg: `./scripts/cloudtasks-concurrency-7.sh`, Werte in
+`config.js` zurück (7 / 65), Flag wieder `true`.
+
+### 3a. Beast-Werbung im zweiten Aufruf zurückbauen (v2.8)
+
+Seit v2.8 erzeugt ein zweiter, kleiner Mistral-Aufruf die Beast-Werbung — ohne
+Bild, damit sie an der Schwachstelle ansetzt statt am Foto. Er ist so gebaut,
+dass ein Ausfall folgenlos bleibt: Schlägt er fehl, steht die Werbeliste aus dem
+Hauptaufruf. **Ein eigener Notfall-Hebel ist deshalb nicht nötig.**
+
+Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback):
+`./scripts/cloudtasks-concurrency-10.sh` ausführen und
+`QUEUE_DISPATCH_CONCURRENCY` in `config.js` auf 10 zurücksetzen — sonst läuft
+die Queue unnötig langsam.
+
+**Warum Concurrency 7:** `mistral-large-2512` erlaubt **15 Anfragen pro Minute**
+(am 2026-08-10 direkt an der API gemessen — die frühere Annahme von 6 Anfragen
+pro *Sekunde* ist überholt). Bei 56 s je Analyse erzeugt Concurrency 7 rund
+15 Anfragen/min, Concurrency 10 dagegen 22 und damit 429-Fehler.
 
 ### 3b. Prompt-Caching aus (~30 s, kein Deploy, keine Begleitschritte)
 

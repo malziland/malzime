@@ -157,7 +157,14 @@ async function callMistral({ variant, image, runIndex, apiKey }) {
     { type: "text", text: brandBlocklistBlock(set.join(", ")) },
   ];
 
+  /* Prompt-Cache wie in Produktion anfordern. OHNE diesen Schluessel routet
+     Mistral die Anfrage auf eine beliebige Instanz und der Cache trifft nur
+     zufaellig — gemessen 37 von 42 Analysen ganz ohne Treffer, obwohl der
+     Prompt identisch war. Die Kostenzahlen waeren sonst reine Obergrenzen
+     statt realistischer Werte (src/mistral.js:130 macht es genauso).
+     Konstanter Text, kein Nutzerbezug. */
   const body = {
+    prompt_cache_key: `malzime-modelcompare-${variant}`,
     model: MODELLE[variant],
     messages: [
       { role: "system", content: systemText },

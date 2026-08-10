@@ -4,7 +4,13 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [2.9.2] — 2026-08-10
+## [2.9.3] — 2026-08-10
+
+### Behoben
+
+- **v2.9.2 zurückgenommen.** Der Fix hat den Abbruch beseitigt, aber einen schlimmeren Zustand erzeugt: Nach der Rückkehr aus dem Hintergrund erschien zwar keine Fehlermeldung mehr, es kam aber auch kein Ergebnis — kein Spinner, kein Status, nichts. Ein stiller toter Zustand ist schlechter als eine falsche Fehlermeldung, weil er nicht einmal zum Neuladen auffordert. Der Stand entspricht wieder v2.9.1; die Ursache wird untersucht, bevor ein zweiter Anlauf kommt. (Cache-Buster 2026081003)
+
+## [2.9.2] — 2026-08-10 — ZURÜCKGENOMMEN mit 2.9.3
 
 ### Behoben
 

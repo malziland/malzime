@@ -94,7 +94,7 @@ function parseMultipart(req) {
        vollstaendig aus und legt ihn als `req.rawBody` ab. Der Stream ist danach
        leer. Ein `req.pipe(busboy)` bekommt dort nichts mehr und scheitert
        zuverlaessig mit "Unexpected end of form" (Fehlercode `bad_multipart`) —
-       der in README dokumentierte multipart-Weg auf `POST /analyze` war dadurch
+       der multipart-Weg auf `POST /api/enqueue` war dadurch
        in der Produktion faktisch tot, obwohl er zugesagt ist. Der
        Functions-Emulator verhaelt sich identisch.
 

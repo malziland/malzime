@@ -268,10 +268,19 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
     /* Der Kern der Idee: kein Bild, deshalb keine Ablenkung durch die
        Produktwelt des Fotos. */
     expect(JSON.stringify(body)).not.toContain("image_url");
+    /* OPS-008: seit dem Audit zwei Nachrichten — konstante Anweisungen als
+       system, das wechselnde Profil als user. Nur so greift der Prompt-Cache
+       (docs/FLAGS.md: system-Split 82-100 %, eine user-Nachricht 0 %). */
+    const sys = body.messages.find((m) => m.role === "system").content;
+    const usr = body.messages.find((m) => m.role === "user").content;
     /* Die Verletzlichkeit muss im Prompt stehen — daran soll die Werbung ansetzen */
-    expect(body.messages[0].content).toContain("kämpfst gegen die Zeit");
+    expect(usr).toContain("kämpfst gegen die Zeit");
     /* Und die sachliche Liste, damit andere Marken gewählt werden */
-    expect(body.messages[0].content).toContain("Gore Wear");
+    expect(usr).toContain("Gore Wear");
+    /* Der cachebare Teil darf NICHTS Wechselndes enthalten. */
+    expect(sys).not.toContain("kämpfst gegen die Zeit");
+    expect(sys).not.toContain("Gore Wear");
+    expect(sys).toContain("SCHUTZREGELN");
   });
 
   test("enthält die vollständigen Schutzregeln", async () => {
@@ -285,7 +294,7 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
       };
     });
     await mistral.generateBeastAds(boostProfil, [], "de");
-    const prompt = captured[0].messages[0].content;
+    const prompt = captured[0].messages.map((m) => m.content).join("\n");
     /* Genau diese Regel hatte ich im Prototyp vergessen — Medium schlug
        daraufhin einem Kind ein Pornografie-Abo vor. */
     expect(prompt).toMatch(/pornografisch/i);
@@ -325,6 +334,60 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
       };
     });
     await mistral.generateBeastAds(boostProfil, [], "de");
+    expect(captured[0].prompt_cache_key).toBe("malzime-beast-ads-de");
+  });
+});
+
+describe("OPS-008 — Prompt-Cache am Zweitaufruf", () => {
+  const boostProfil = {
+    profileText: "Du bist ein Mann, der die ersten Alterszeichen zeigt.",
+    ad_targeting: ["Assos Bib Shorts"],
+    categories: {
+      alter_geschlecht: { label: "Alter", value: "Du bist männlich, ~44 Jahre alt.", confidence: 0.8 },
+      verletzlichkeit: { label: "V", value: "Du kämpfst gegen die Zeit.", confidence: 0.8 },
+      gesundheit: { label: "G", value: "Du bist fit.", confidence: 0.8 },
+      kaufkraft: { label: "K", value: "Gut verwertbar.", confidence: 0.8 },
+    },
+  };
+
+  /* Audit 2026-08-10: Der Cache-Schlüssel war gesetzt, aber wirkungslos —
+     alles steckte in EINER user-Nachricht, und das Profil stand VOR den
+     Anweisungen. Live gemessen: cachedTokens = 0 in 20 von 20 Aufrufen,
+     während der Hauptaufruf 87 % erreichte. Zusätzlich versprach RUNBOOK-Hebel
+     3b, nach dem Umlegen werde „weder ein prompt_cache_key gesendet noch der
+     Nachrichten-Aufbau umgestellt" — der Zweitaufruf schickte ihn trotzdem. */
+
+  function fangen() {
+    const captured = [];
+    setFetchForTest(async (_url, opts) => {
+      captured.push(JSON.parse(opts.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: '{"ad_targeting":["A"]}' } }], usage: {} }),
+      };
+    });
+    return captured;
+  }
+
+  test("der cachebare Anfang ist eine eigene system-Nachricht und steht VOR dem Profil", async () => {
+    const captured = fangen();
+    await mistral.generateBeastAds(boostProfil, ["Gore Wear"], "de");
+    const msgs = captured[0].messages;
+    expect(msgs[0].role).toBe("system");
+    expect(msgs[1].role).toBe("user");
+    expect(msgs[0].content.length).toBeGreaterThan(500);
+  });
+
+  test("ausgeschaltetes Flag schickt keinen Cache-Schlüssel mehr", async () => {
+    const captured = fangen();
+    await mistral.generateBeastAds(boostProfil, [], "de", { usePromptCache: false });
+    expect(captured[0].prompt_cache_key ?? null).toBeNull();
+  });
+
+  test("eingeschaltetes Flag schickt ihn (Positivkontrolle)", async () => {
+    const captured = fangen();
+    await mistral.generateBeastAds(boostProfil, [], "de", { usePromptCache: true });
     expect(captured[0].prompt_cache_key).toBe("malzime-beast-ads-de");
   });
 });

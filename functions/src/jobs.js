@@ -179,6 +179,24 @@ async function getQueuePosition(job) {
 }
 
 /**
+ * ARCH-001 (Audit 2026-08-10): Wie viele Jobs warten gerade?
+ *
+ * Seit v2.8 die Parallelität von 10 auf 7 gesenkt wurde, schafft die
+ * Warteschlange rund 387 Analysen pro Stunde — der Einlass lässt aber 500 zu.
+ * Bei Dauerlast wächst der Rückstau also, und ab etwa 190 Wartenden
+ * überschreitet die Wartezeit den 30-Minuten-Deckel des Browsers: Der
+ * Teilnehmer sieht einen Timeout, obwohl sein Job noch lebt.
+ *
+ * Statt das Stundenlimit zu senken (das würde einem großen Workshop mitten im
+ * Betrieb den Hahn zudrehen) lehnt der Einlass ab einer Schwelle ehrlich ab.
+ * Zählende Abfrage — günstig, unabhängig von der Warteschlangenlänge.
+ */
+async function countQueuedJobs() {
+  const agg = await jobsRef().where("status", "==", "queued").count().get();
+  return agg.data().count;
+}
+
+/**
  * Prüft, ob ein `processing`-Job über PROCESSING_TIMEOUT_MS hinaus hängt
  * (Worker tot/abgestürzt). Wenn ja, wird er auf `failed` gesetzt.
  *
@@ -266,6 +284,25 @@ async function findAbandonedJobs(limit = 200) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+/* SEC-003 (Audit 2026-08-10): Obergrenze, wie lange ein Job allein durch
+   Pollen am Leben gehalten werden kann.
+
+   Jeder Poll erneuert `lastSeenAt` — wer also einfach weiterfragt, haelt seinen
+   Job unbegrenzt in der Warteschlange und blockiert damit einen Platz im
+   Stundenfenster. Das ist der billigste Hebel, den Dienst fuer eine Schulklasse
+   unbrauchbar zu machen: 500 Mini-Uploads anlegen, danach im Takt pollen, und
+   der Reaper gibt nie einen Platz zurueck.
+
+   Eine ehrliche Wartezeit liegt bei wenigen Minuten; der Browser gibt nach
+   30 Minuten ohnehin auf. Alles darueber ist kein wartender Nutzer mehr. */
+const MAX_QUEUED_AGE_MS = 35 * 60 * 1000;
+
+async function findUeberfaelligeJobs(limit = 200) {
+  const cutoff = Date.now() - MAX_QUEUED_AGE_MS;
+  const snap = await jobsRef().where("status", "==", "queued").where("createdAt", "<", cutoff).limit(limit).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
 /**
  * Liefert Jobs, die über PROCESSING_TIMEOUT_MS hinaus in `processing` hängen
  * (Worker abgestürzt, niemand pollt mehr → `markFailedIfStale` greift nie).
@@ -307,12 +344,15 @@ module.exports = {
   completeJob,
   failJob,
   getQueuePosition,
+  countQueuedJobs,
   markFailedIfStale,
   touchJob,
   markDelivered,
   abandonJob,
   isAbandoned,
   findAbandonedJobs,
+  findUeberfaelligeJobs,
+  MAX_QUEUED_AGE_MS,
   findStaleProcessingJobs,
   findExpiredJobs,
   deleteJob,

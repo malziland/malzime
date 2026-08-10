@@ -6,7 +6,7 @@ aufbewahrt. Das ist eine Arbeits-Skizze, kein vollständiges Threat Model und ke
 Rechtsberatung — die Tiefenprüfung übernehmen die Audits, die für Nutzer maßgebliche
 Erklärung ist die [Datenschutzerklärung](../public/datenschutz.html). Technische
 Details: [ARCHITECTURE.md](ARCHITECTURE.md) (Abschnitte Sicherheits- und
-Privacy-Architektur). Stand: 2026-07-17.
+Privacy-Architektur). Stand: 2026-08-10.
 
 ## Schutzgüter (Assets)
 
@@ -51,7 +51,7 @@ CI vs. Laufzeit (CI ohne Cloud-Rechte).
 |---|---|
 | Bot-Massen-Uploads / Kostenexplosion | IP-Rate-Limit (500/10 min), Honeypot + Timing-Check, Stundenlimit 500 (rollend), Cloud-Tasks-Concurrency-Deckel, Budget-Alarm (extern) |
 | Prompt-Injection über Bildinhalte/sichtbaren Text | User-Daten in XML-Tags isoliert + `escapeXml()`, JSON-Schema, defensiver JSON-Repair, Output-Bounds; LLM-Ausgaben steuern keine Tools oder Folgeprozesse |
-| Upload fremder/heikler Fotos | Datenschutz-Hinweis direkt am Upload-Bereich (neu 2026-07) + Nach-Analyse-Warnung vor ungewollt preisgegebenen Bilddetails (PRIV-002), Kinderschutz-Härtung in den Prompts (DE + EN immer parallel pflegen), keine Persistenz über 2 h hinaus |
+| Upload fremder/heikler Fotos | Datenschutz-Hinweis direkt am Upload-Bereich (neu 2026-07) + Nach-Analyse-Warnung vor ungewollt preisgegebenen Bilddetails (PRIV-002), Kinderschutz-Härtung in den Prompts (DE + EN immer parallel pflegen) + **serverseitiges Netz `minor-safety.js`** vor der Auslieferung, keine Persistenz über 2 h hinaus |
 | Ergebnis-Abgriff durch Dritte | Abhol-Ticket (PRIV-003): Job-Status und Ergebnis nur mit Ticket; Ticket lebt im Tab (`sessionStorage`) und stirbt mit ihm |
 | Admin-Missbrauch / Replay | HMAC-signierte Tokens, Nonce-Replay-Schutz, GET zeigt nur Bestätigungsseite, erst POST mutiert |
 | Scanner / automatisiertes Probing | ungültige Anfragen enden als 4xx ohne Schaden; Einordnungs-Rezept im [RUNBOOK](RUNBOOK.md) |
@@ -98,3 +98,85 @@ Branch Protection mit Pflicht-Checks, aktivierte Dependabot-Alerts, GCP-Budget-A
 und der ntfy-Fehleralarm liegen außerhalb des Repositories. Sie werden hier nur
 benannt; ob sie tatsächlich greifen, ist im Audit extern zu verifizieren (nicht aus
 dem Repo-Inhalt ableitbar).
+
+
+## Serverseitige Netze über der Modellausgabe
+
+Ergänzt 2026-08-10 (Audit, DOC-001). Beide Netze fehlten hier bislang — mit der
+Folge, dass ein späterer Umbau sie hätte entfernen können, ohne dass ein
+Dokument widerspricht.
+
+### `minor-safety.js` — unzulässige Werbung
+
+Prüft das fertige Profil, bevor irgendetwas ausgeliefert wird. Zwei Stufen:
+
+- **Immer entfernt, unabhängig vom geschätzten Alter:** Pornografie und
+  Sexarbeit, Waffen und Munition, Extremismus. Begründung: Die Altersschätzung
+  ist unzuverlässig, und in einem Werkzeug fürs Klassenzimmer haben diese
+  Inhalte auch bei Erwachsenen nichts verloren.
+- **Nur bei erkennbar Minderjährigen:** Glücksspiel, Kredit, Alkohol und Tabak,
+  Schönheitskorrektur, Diätmittel. Bei Erwachsenen sind sie legitimer
+  Lerninhalt — wie diese Branchen Menschen adressieren, IST das Thema.
+
+Maßgeblich ist die **Untergrenze** der Altersspanne plus drei Jahre
+Sicherheitsabstand (`SCHUTZ_BIS`), nicht der Punktwert. Grund: Mädchen werden in
+der Praxis bis zu sechs Jahre zu alt geschätzt; eine harte 18er-Grenze nahm
+ausgerechnet ihnen den Schutz.
+
+**Grenzen, ehrlich benannt (Stand 2026-08-10):**
+
+- Auf `profileText` und die Kategorie-Karten wird **nur protokolliert, nicht
+  entfernt**. Ein herausgeschnittener Halbsatz macht den Text unlesbar, und der
+  Profiltext ist die Stelle, an der die Aufklärung stattfindet. Treffer
+  erscheinen als `durchgerutscht` in der Logzeile `step:"minor-safety"`.
+- Auf die `manipulation_triggers` wirkt **nur** die harte Stufe. Die
+  altersabhängige Liste würde dort genau die Aufklärung wegschneiden, um die es
+  geht („Lootboxen arbeiten mit denselben Mechaniken wie Glücksspiel").
+- Die Wortlisten sind zweisprachig, aber nicht vollständig. Sie fangen, was
+  unzweifelhaft nicht zu Kindern gehört — nicht jede Umschreibung.
+- Ist im Alterstext keine Zahl erkennbar, gilt die Person **nicht** als
+  minderjährig (die harte Stufe greift trotzdem). Die Logzeile mit `alter: null`
+  ist der Hinweis darauf.
+
+Die Logzeile entsteht bei **jeder** Analyse, auch ohne Treffer — sonst wäre ein
+systematischer Ausfall von „alles sauber" nicht zu unterscheiden.
+
+### Entferntes Netz gegen „Tier als Mensch"
+
+`pruefeTierWiderspruch` prüfte, ob das Modell `HUMAN` meldet und zugleich
+Tiermerkmale beschreibt. Es ist am 2026-08-10 **ersatzlos entfernt** worden: Im
+aktiven Pfad bekam es nicht die Bildbeschreibung zu sehen, sondern den daraus
+erzeugten Profiltext — dadurch machte „Apex Legends" aus einem Jugendlichen ein
+Tier, während es beim eigentlichen Anlassfall (Affenbild → Kleinkindprofil) nie
+ansprang. Der Schutz liegt jetzt allein in der Prompt-Regel „Primaten sind immer
+`ANIMAL_ONLY`", die in **beiden** Pfaden und **beiden** Sprachen steht und durch
+`primaten-regel.test.js` festgehalten wird.
+
+### Prompt-Injektion über Bildinhalt
+
+Sichtbarer Text im Bild ist Bildinhalt, keine Anweisung. Der aktive
+Single-Large-Prompt sagt das seit 2026-08-10 ausdrücklich (vorher stand die
+Warnung nur im 3-Call-Pfad). Die Ausgabe-Netze greifen unabhängig davon.
+
+### Bewusst nicht geändert: anonymes Schreiben am ntfy-Dienst (Audit SEC-005)
+
+Der ntfy-Dienst erlaubt anonymes **Schreiben** (`NTFY_AUTH_DEFAULT_ACCESS=write-only`).
+Wer den Topic-Namen kennt, könnte gefälschte Betreiber-Benachrichtigungen mit
+eigenen Aktions-Links schicken. Lesen ist anonym nicht möglich — die
+ausgehenden HMAC-Links sind also nicht einsehbar.
+
+**Entscheidung 2026-08-10: bleibt so.** Zwei Gründe:
+
+1. Der Topic-Name ist seit der Rotation ein 30-stelliger Zufallswert. Die
+   Erratbarkeit, die den Befund überhaupt erst begründet hat, ist damit weg.
+2. Der Dienst wird von mehreren Projekten des Betreibers geteilt. `deny-all`
+   plus Token würde deren Benachrichtigungen brechen, und diese Projekte sind
+   nicht Teil dieses Audits — die Änderung wäre ein Eingriff ins Blinde.
+
+**Restrisiko, benannt:** Wer den Topic-Namen erlangt, kann Fehlalarme
+fabrizieren. Ein echter Schaden entstünde erst, wenn der Betreiber daraufhin
+einem gefälschten Link folgt; die Admin-Aktionen selbst sind durch HMAC und
+Einmal-Nonce geschützt und mutieren nichts allein durch Aufruf.
+
+**Nachprüfbar ab:** wenn der ntfy-Dienst ohnehin angefasst wird (Update,
+Umzug) — dann Token-Pflicht für alle publizierenden Projekte in einem Zug.

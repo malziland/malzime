@@ -248,7 +248,7 @@ let queuePhase = null;
 export function showQueueWaiting(status, position, etaSeconds) {
   if (status === "processing") {
     /* Verarbeitung läuft → die gewohnten rotierenden Analyse-Meldungen,
-       genau wie im synchronen Pfad. */
+       wie gewohnt. */
     if (queuePhase !== "processing") {
       startScanAnim(true);
       queuePhase = "processing";

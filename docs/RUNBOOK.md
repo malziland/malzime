@@ -99,7 +99,7 @@ die Queue unnötig langsam.
 
 **Warum Concurrency 7:** `mistral-large-2512` erlaubt **15 Anfragen pro Minute**
 (am 2026-08-10 direkt an der API gemessen — die frühere Annahme von 6 Anfragen
-pro *Sekunde* ist überholt). Bei 56 s je Analyse erzeugt Concurrency 7 rund
+pro *Sekunde* ist überholt). Bei 65 s je Analyse (live gemessen 2026-08-10) erzeugt Concurrency 7 rund
 15 Anfragen/min, Concurrency 10 dagegen 22 und damit 429-Fehler.
 
 ### 3b. Prompt-Caching aus (~30 s, kein Deploy, keine Begleitschritte)
@@ -228,3 +228,18 @@ Verfahren: Release-Tag in einem temporären `git worktree` auschecken, `npm ci`
 [VERIFICATION.md](VERIFICATION.md) festhalten. Zuletzt durchgeführt am 2026-07-14
 mit Tag `v2.3.1`: Setup und beide Test-Suiten grün (435 + 165 Tests). Wiederholen
 bei größeren Toolchain-Wechseln (Node-Major, Test-Runner).
+
+## Offener Handgriff: `api.malzi.me` abbauen (Audit 2026-08-10, OPS-007)
+
+Der Host zeigt auf die mit v2.10 gelöschte Cloud-Function `analyze` und liefert
+HTTP 404. Kein Code ruft ihn mehr auf; der CSP-Eintrag ist bereits entfernt.
+
+**Reihenfolge ist wichtig — erst DNS, dann die Zuordnung:**
+
+1. Bei IONOS den CNAME `api` (→ `ghs.googlehosted.com`) löschen.
+2. Erst danach: `gcloud beta run domain-mappings delete --domain=api.malzi.me --region=europe-west1 --project=malzime`
+
+Andersherum entstünde ein Zeitfenster, in dem der DNS-Eintrag auf Googles
+Hosting zeigt, ohne dass jemand den Anspruch hält — eine übernehmbare Subdomain
+unter der eigenen Marke. Deshalb wurde der CSP-Eintrag vorgezogen: Selbst wenn
+das passierte, dürfte die Seite den Host nicht mehr kontaktieren.

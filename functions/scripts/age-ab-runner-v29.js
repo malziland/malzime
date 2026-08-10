@@ -160,10 +160,7 @@ const MARKER_LEERFORMEL = [
 function loadApiKey() {
   if (process.env.MISTRAL_API_KEY) return process.env.MISTRAL_API_KEY;
   try {
-    const key = execSync("firebase functions:secrets:access MISTRAL_API_KEY --project=malzime", {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
-    }).trim();
+    const key = (() => { throw new Error("MISTRAL_API_KEY muss ausdruecklich gesetzt werden — dieses Skript holt den Produktivschluessel nicht mehr von selbst (Audit 2026-08-10, OSS-002)."); })().trim();
     if (!key || key.length < 10) throw new Error("Leerer Secret");
     return key;
   } catch (err) {

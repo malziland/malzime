@@ -12,8 +12,7 @@
  * Ablauf:
  *  1. Job aus Firestore lesen, claimen (idempotent: queued → processing).
  *  2. Bild aus Storage laden.
- *  3. Mistral-Pipeline (Beschreibung → Klassifikation → Privacy → Profile) —
- *     dieselben Module wie der synchrone /analyze-Pfad.
+ *  3. Mistral-Pipeline (Beschreibung → Klassifikation → Privacy → Profile).
  *  4. Ergebnis ins Job-Dokument schreiben (completeJob).
  *  5. Bild aus Storage löschen (immer — Erfolg ODER Fehler).
  *
@@ -22,7 +21,7 @@
  *
  * Fehlerverhalten: Jeder Pipeline-Fehler wird zu einem regulären „blocked"-
  * Ergebnis (completeJob mit blockedReason) — der Client bekommt eine saubere,
- * renderbare Antwort, exakt wie im synchronen Pfad. Der Worker antwortet
+ * renderbare Antwort. Der Worker antwortet
  * immer mit 200; ein Job, der den Worker zum Absturz bringt, wird vom
  * Stale-Timeout in jobs.js aufgefangen.
  */
@@ -30,12 +29,12 @@
 const { REQUEST_BUDGET_MS, isLocalQueueMode, localQueueConcurrency } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { applyMinorSafety } = require("./minor-safety");
-const { classifyDescription, buildAnimalProfiles, pruefeTierWiderspruch } = require("./animal");
+const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
-const { isSingleLargeCallEnabled, isPromptCacheEnabled } = require("./feature-flags");
+const { isSingleLargeCallEnabled, isPromptCacheEnabled, isBeastAdsCallEnabled } = require("./feature-flags");
 
 /* Mistral-Provider: im Mock-Modus die kostenlose Attrappe, sonst die echte
    API. Umschaltbar über die Umgebungsvariable MISTRAL_MOCK ("1" = Mock) —
@@ -94,16 +93,11 @@ async function runPipeline(job) {
   const visibleText = extractVisibleText(description || "");
   const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: description || "" });
 
-  /* Netz gegen Tier-als-Mensch (v2.9.1): Meldet das Modell HUMAN, beschreibt
-     aber Fell, Schnauze, Pfoten oder einen Primaten, ist die Antwort in sich
-     widersprüchlich. Dann lieber das Tier-Easter-Egg als ein erfundenes
-     Menschenprofil — Anlass war ein Affenbild, aus dem ein Profil eines
-     afrikanischen Kleinkindes wurde. Ein falsches Tierprofil ist harmlos, ein
-     rassistisches Menschenprofil nicht. */
-  const tierWiderspruch = pruefeTierWiderspruch(subject, description || "");
-
-  /* Stage 3a: Tier-Easter-Egg-Pfad (nur Tier im Bild) */
-  if (description && ((!hasPerson && hasAnimal) || tierWiderspruch.widerspruch)) {
+  /* Stage 3a: Tier-Easter-Egg-Pfad (nur Tier im Bild).
+     Hier stand bis zum Audit 2026-08-10 zusaetzlich eine Widerspruchspruefung
+     (`pruefeTierWiderspruch`). Sie ist entfernt — Begruendung in animal.js.
+     Massgeblich ist wieder allein das `subject`-Feld des Modells. */
+  if (description && !hasPerson && hasAnimal) {
     const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
     return {
       result: {
@@ -136,9 +130,16 @@ async function runPipeline(job) {
        Schwachstelle (gemessen ueber fuenf A/B-Runden). Faellt der Aufruf aus,
        bleibt die Liste aus dem Hauptaufruf stehen — die Analyse scheitert nie
        daran. */
-    if (profiles.boost && hasCategories(profiles.boost) && typeof mistral.generateBeastAds === "function") {
+    if (
+      profiles.boost &&
+      hasCategories(profiles.boost) &&
+      typeof mistral.generateBeastAds === "function" &&
+      (await isBeastAdsCallEnabledSafe())
+    ) {
       try {
-        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang);
+        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang, {
+          usePromptCache: await isPromptCacheEnabledSafe(),
+        });
         if (neueAds) profiles.boost.ad_targeting = neueAds;
       } catch (err) {
         /* Nie die Analyse daran scheitern lassen — die Liste aus dem
@@ -151,19 +152,25 @@ async function runPipeline(job) {
        Waffen und Extremismus fliegen immer raus, Gluecksspiel/Kredit/Alkohol
        zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
        Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
-    const safety = applyMinorSafety(profiles);
-    if (safety.applied) {
-      console.log(
-        JSON.stringify({
-          step: "minor-safety",
-          traceId: job.traceId || null,
-          alter: safety.alter,
-          minderjaehrig: safety.minderjaehrig,
-          entfernt: safety.entfernt.length,
-          gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
-        })
-      );
-    }
+    const safety = applyMinorSafety(profiles, { lang, alterText: profiles.alterAnker || undefined });
+    /* IMMER loggen, nicht nur wenn etwas entfernt wurde (Audit SEC-001).
+       Vorher entstand nur bei einem Treffer eine Logzeile — ein systematischer
+       Ausfall (z.B. englischsprachiger Durchgang, oder gar kein erkanntes
+       Alter) erzeugte damit exakt null Spuren und war von "alles sauber" nicht
+       zu unterscheiden. `alter: null` ist die wichtigste dieser Zeilen. */
+    console.log(
+      JSON.stringify({
+        step: "minor-safety",
+        traceId: job.traceId || null,
+        lang,
+        alter: safety.alter,
+        minderjaehrig: safety.minderjaehrig,
+        entfernt: safety.entfernt.length,
+        gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
+        /* Treffer im Fliesstext: nicht entfernt, aber gemeldet. */
+        durchgerutscht: safety.durchgerutscht.length,
+      })
+    );
     const n = profiles.normal || {};
     const b = profiles.boost || {};
     return {
@@ -190,8 +197,7 @@ async function runPipeline(job) {
     };
   }
 
-  /* Blocked-Pfad — kein Profil zustande gekommen. Reason-Reihenfolge
-     identisch zum synchronen /analyze-Pfad. */
+  /* Blocked-Pfad — kein Profil zustande gekommen. */
   let blockedReason;
   if (quotaError) blockedReason = "blocked.overloaded";
   else if (describeBlocked) blockedReason = "blocked.safetyFilter";
@@ -251,21 +257,11 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   const visibleText = extractVisibleText(enrichedDescription);
   const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: enrichedDescription });
 
-  /* Netz gegen Tier-als-Mensch (v2.9.1) — siehe Begründung im 3-Call-Pfad oben. */
-  const tierWiderspruch = pruefeTierWiderspruch(subject, enrichedDescription);
-  if (tierWiderspruch.widerspruch) {
-    console.log(
-      JSON.stringify({
-        step: "tier-widerspruch",
-        traceId: job.traceId || null,
-        treffer: tierWiderspruch.treffer,
-        pipeline: "single-large",
-      })
-    );
-  }
-
-  /* Tier-Easter-Egg: Nur reines Tier-Bild → vordefinierte Profile. */
-  if (enrichedDescription && ((!hasPerson && hasAnimal) || tierWiderspruch.widerspruch)) {
+  /* Tier-Easter-Egg: Nur reines Tier-Bild → vordefinierte Profile.
+     Die frueher hier stehende Widerspruchspruefung ist mit dem Audit
+     2026-08-10 entfernt — sie pruefte in diesem Pfad nicht die Bild-
+     beschreibung, sondern den erzeugten Profiltext (siehe animal.js). */
+  if (enrichedDescription && !hasPerson && hasAnimal) {
     const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
     return {
       result: {
@@ -285,9 +281,16 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
        Schwachstelle (gemessen ueber fuenf A/B-Runden). Faellt der Aufruf aus,
        bleibt die Liste aus dem Hauptaufruf stehen — die Analyse scheitert nie
        daran. */
-    if (profiles.boost && hasCategories(profiles.boost) && typeof mistral.generateBeastAds === "function") {
+    if (
+      profiles.boost &&
+      hasCategories(profiles.boost) &&
+      typeof mistral.generateBeastAds === "function" &&
+      (await isBeastAdsCallEnabledSafe())
+    ) {
       try {
-        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang);
+        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang, {
+          usePromptCache: await isPromptCacheEnabledSafe(),
+        });
         if (neueAds) profiles.boost.ad_targeting = neueAds;
       } catch (err) {
         /* Nie die Analyse daran scheitern lassen — die Liste aus dem
@@ -300,19 +303,25 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
        Waffen und Extremismus fliegen immer raus, Gluecksspiel/Kredit/Alkohol
        zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
        Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
-    const safety = applyMinorSafety(profiles);
-    if (safety.applied) {
-      console.log(
-        JSON.stringify({
-          step: "minor-safety",
-          traceId: job.traceId || null,
-          alter: safety.alter,
-          minderjaehrig: safety.minderjaehrig,
-          entfernt: safety.entfernt.length,
-          gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
-        })
-      );
-    }
+    const safety = applyMinorSafety(profiles, { lang, alterText: profiles.alterAnker || undefined });
+    /* IMMER loggen, nicht nur wenn etwas entfernt wurde (Audit SEC-001).
+       Vorher entstand nur bei einem Treffer eine Logzeile — ein systematischer
+       Ausfall (z.B. englischsprachiger Durchgang, oder gar kein erkanntes
+       Alter) erzeugte damit exakt null Spuren und war von "alles sauber" nicht
+       zu unterscheiden. `alter: null` ist die wichtigste dieser Zeilen. */
+    console.log(
+      JSON.stringify({
+        step: "minor-safety",
+        traceId: job.traceId || null,
+        lang,
+        alter: safety.alter,
+        minderjaehrig: safety.minderjaehrig,
+        entfernt: safety.entfernt.length,
+        gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
+        /* Treffer im Fliesstext: nicht entfernt, aber gemeldet. */
+        durchgerutscht: safety.durchgerutscht.length,
+      })
+    );
     const n = profiles.normal || {};
     const b = profiles.boost || {};
     return {
@@ -381,6 +390,18 @@ async function isSingleLargeCallEnabledSafe() {
 /* Analog fail-safe: Kann das Prompt-Cache-Flag nicht gelesen werden, laeuft der
    Call ohne Cache-Key — also exakt wie vor v2.5. Ein Firestore-Wackler darf
    eine reine Kostenoptimierung niemals zum Ausfall eskalieren. */
+/* Fail-safe wie die anderen Flags: Ist das Flag nicht lesbar, laeuft der
+   Zweitaufruf wie im Normalbetrieb weiter — eine Kostenoptimierung darf keinen
+   Funktionsausfall ausloesen. */
+async function isBeastAdsCallEnabledSafe() {
+  try {
+    return await isBeastAdsCallEnabled();
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "beast-ads-flag-read-error", error: err.message }));
+    return true;
+  }
+}
+
 async function isPromptCacheEnabledSafe() {
   try {
     return await isPromptCacheEnabled();

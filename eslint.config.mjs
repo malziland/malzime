@@ -62,6 +62,13 @@ export default [
         window: "readonly",
         navigator: "readonly",
         fetch: "readonly",
+        /* Response gehoert wie fetch zur Web-Schnittstelle und wird in
+           queue.test.js zum Nachstellen von Serverantworten gebraucht. Ohne
+           diesen Eintrag scheitert `npm run lint:frontend` — und damit der
+           Pflicht-Check test-frontend (Audit 2026-08-10, OPS-001). */
+        Response: "readonly",
+        /* Wird zum Nachstellen eines abgebrochenen fetch gebraucht (BUG-003). */
+        DOMException: "readonly",
         console: "readonly",
         setTimeout: "readonly",
         clearTimeout: "readonly",

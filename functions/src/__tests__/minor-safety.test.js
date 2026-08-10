@@ -198,3 +198,118 @@ describe("Robustheit", () => {
     expect(b.alter).toBe(14);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Audit 2026-08-10, SEC-001 — drei belegte Lücken im Kinderschutz-Netz.
+   Das Modul begründet sich selbst mit dem Satz „Sicherheit darf nicht allein
+   davon abhängen, dass ein Modell sich an eine Textanweisung hält" — und tat
+   in diesen drei Konstellationen genau das.
+   ══════════════════════════════════════════════════════════════════════ */
+
+describe("SEC-001 a — englischsprachige Durchgänge", () => {
+  /* Gemessen: 10 von 12 realistischen englischen Werbephrasen rutschten durch,
+     darunter Pornografie, Schusswaffen und Neonazi-Kleidung — also die Stufe,
+     die altersunabhängig greifen soll. Erreichbar über ?lang=en. */
+
+  test.each([
+    ["Porn Subscription", "immer"],
+    ["Handgun Accessories", "immer"],
+    ["Neo-Nazi Clothing", "immer"],
+    ["Adult Webcam", "immer"],
+  ])("%s fliegt immer raus", (phrase) => {
+    expect(_istImmerVerboten(phrase)).toBe(true);
+  });
+
+  test.each([
+    ["Heineken Beer Sixpack"],
+    ["Instant Loan App"],
+    ["Sports Betting App"],
+    ["Online Gambling"],
+    ["Slimming Pills"],
+    ["Cosmetic Surgery Clinic"],
+    ["Cigarettes Carton"],
+  ])("%s wird bei Minderjährigen entfernt", (phrase) => {
+    expect(_istBeiMinderjaehrigenVerboten(phrase)).toBe(true);
+  });
+
+  test("englische Werbung verschwindet aus dem Profil einer 14-Jährigen", () => {
+    const p = profil("female, ~14 years old (range 12-16)", ["Sports Betting App", "Lego Friends"]);
+    applyMinorSafety(p, { lang: "en" });
+    expect(p.normal.ad_targeting).toEqual(["Lego Friends"]);
+  });
+});
+
+describe("SEC-001 b — deutsche Komposita", () => {
+  /* `\bkredit` traf „Kredit", aber weder „Sofortkredit" noch „Ratenkredit" —
+     also genau die Wortbildung, die im Deutschen die Regel ist. */
+
+  test.each([["Sofortkredit"], ["Ratenkredit ohne Schufa"], ["Autokredit Vergleich"], ["Minikredit App"]])(
+    "%s wird erkannt",
+    (phrase) => {
+      expect(_istBeiMinderjaehrigenVerboten(phrase)).toBe(true);
+    }
+  );
+
+  test.each([["Aperol Spritz Set"], ["Wegovy Abnehmen"], ["Tipp3 Kombiwette"], ["Nasenkorrektur Klinik"]])(
+    "auch die zuvor fehlenden Produktwelten: %s",
+    (phrase) => {
+      expect(_istBeiMinderjaehrigenVerboten(phrase)).toBe(true);
+    }
+  );
+});
+
+describe("SEC-001 c — Aufklärung bleibt stehen", () => {
+  /* Auf die Manipulations-Trigger wurde dieselbe Werbe-Liste angewandt. Von
+     sieben prompt-konformen Sätzen für Minderjährige verschwanden dadurch
+     fünf — darunter die zentrale Lernaussage des Workshops. */
+
+  const aufklaerung = [
+    "Lootboxen arbeiten mit denselben Mechaniken wie Glücksspiel — nur ohne Altersgrenze.",
+    "In-App-Käufe gewöhnen dich an Ratenzahlung, bevor du ein Konto hast.",
+    "Die Körperbild-Industrie verkauft dir Diätpillen, sobald du unsicher wirst.",
+    "Sportwetten-Werbung im Fußball-Livestream erreicht dich schon heute.",
+    "Wir trainieren dich mit Sammelkarten-Mechaniken auf Glücksspiel-Verhalten.",
+  ];
+
+  test("alle fünf Aufklärungssätze überleben bei einer 14-Jährigen", () => {
+    const p = profil("Du bist weiblich, ~14 Jahre alt.", [], aufklaerung);
+    applyMinorSafety(p);
+    expect(p.normal.manipulation_triggers).toEqual(aufklaerung);
+  });
+
+  test("die harte Stufe greift in den Triggern trotzdem", () => {
+    const p = profil("Du bist weiblich, ~14 Jahre alt.", [], ["OnlyFans wirbt um dich.", ...aufklaerung]);
+    applyMinorSafety(p);
+    expect(p.normal.manipulation_triggers).toEqual(aufklaerung);
+  });
+});
+
+describe("SEC-001 d — Fließtext wird gemeldet", () => {
+  /* Gefiltert wurden nur zwei von rund fünfzehn Feldern. Derselbe String
+     „OnlyFans" wurde in ad_targeting entfernt und in profileText ausgeliefert.
+     Entfernen wäre hier falsch (ein herausgeschnittener Halbsatz macht den Text
+     unlesbar) — gemeldet werden muss es. */
+
+  test("Treffer im profileText erscheint im Bericht, der Text bleibt unangetastet", () => {
+    const p = profil("Du bist weiblich, ~13 Jahre alt.", []);
+    p.normal.profileText = "Wir verkaufen dir Bet365 Live-Wetten, sobald du 18 bist.";
+    const b = applyMinorSafety(p);
+    expect(b.durchgerutscht.length).toBeGreaterThan(0);
+    expect(b.durchgerutscht[0]).toMatchObject({ modus: "normal", feld: "profileText" });
+    expect(p.normal.profileText).toContain("Bet365");
+  });
+
+  test("Treffer in einer Kategorie-Karte wird ebenfalls gemeldet", () => {
+    const p = profil("Du bist weiblich, ~13 Jahre alt.", []);
+    p.normal.categories.werbeprofil = { value: "Tipico und Bet365 kaufen dein Segment." };
+    const b = applyMinorSafety(p);
+    expect(b.durchgerutscht.some((d) => d.feld === "categories.werbeprofil")).toBe(true);
+  });
+
+  test("sauberer Fließtext meldet nichts (Positivkontrolle)", () => {
+    const p = profil("Du bist weiblich, ~13 Jahre alt.", []);
+    p.normal.profileText = "Du magst Musik und triffst dich gern mit Freundinnen.";
+    const b = applyMinorSafety(p);
+    expect(b.durchgerutscht).toEqual([]);
+  });
+});

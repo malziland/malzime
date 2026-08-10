@@ -83,11 +83,8 @@ const HOURLY_WINDOW_MINUTES = 60;
 const REQUEST_BUDGET_MS = 480000;
 
 /* ── Queue-Architektur (v2.0) ──
-   Konstanten für den Cloud-Tasks-Queue-Pfad. Werden ausschließlich von den
-   Queue-Functions (enqueue / processJob / jobStatus) genutzt — der
-   synchrone /analyze-Pfad ist davon unberührt. Die Queue ist seit v2.0 der
-   Live-Pfad (`useQueue` live true); bei useQueue=false fällt alles auf
-   /analyze zurück. */
+   Konstanten für den Cloud-Tasks-Queue-Pfad. Seit v2.10 ist die Queue der
+   einzige Weg — der synchrone /analyze-Pfad ist abgebaut. */
 const QUEUE_NAME = "analyze-queue";
 const QUEUE_REGION = "europe-west1";
 /* Firebase-Function-Name des Workers — Cloud Tasks dispatcht an dessen URL. */
@@ -141,6 +138,20 @@ const LIVENESS_GRACE_MS = 8 * 60 * 1000;
    die ETA soll ueberschaetzen, und der zweite Aufruf kostet 1-2 Sekunden. */
 const QUEUE_AVG_JOB_SECONDS = 65;
 const QUEUE_DISPATCH_CONCURRENCY = 7;
+
+/* ARCH-001 (Audit 2026-08-10): Obergrenze der Warteschlangen-Tiefe beim Einlass.
+   Der Browser gibt nach 30 Minuten auf (MAX_POLL_DURATION_MS in api.js). Bei
+   7 parallel und ~65 s je Analyse sind in 30 Minuten rund 190 Jobs zu schaffen
+   — wer dahinter einreiht, sieht garantiert einen Timeout, obwohl sein Job
+   noch lebt und Geld kostet. Deshalb wird ab dieser Schwelle ehrlich abgelehnt
+   statt einen aussichtslosen Auftrag anzunehmen.
+
+   Bewusst NICHT das Stundenlimit gesenkt: Ein Vormittag kann 1000-2000
+   Analysen bedeuten, ein niedrigeres Limit wuerde einem laufenden Workshop den
+   Hahn zudrehen. Die Tiefenpruefung bremst nur dann, wenn es ohnehin nicht mehr
+   aufgeht — und sie loest sich von selbst wieder auf.
+   Mit 20 % Sicherheitsabstand unter der rechnerischen Grenze. */
+const MAX_QUEUE_DEPTH = Math.floor(((30 * 60) / QUEUE_AVG_JOB_SECONDS) * QUEUE_DISPATCH_CONCURRENCY * 0.8);
 
 /* Aufbewahrungsfenster der Job-Dokumente. Ein Job-Dokument enthält bis zum
    Abschluss das fertige Profil im Feld `result`; danach wird es nicht mehr
@@ -203,6 +214,7 @@ module.exports = {
   QUEUE_UPLOAD_PREFIX,
   QUEUE_AVG_JOB_SECONDS,
   QUEUE_DISPATCH_CONCURRENCY,
+  MAX_QUEUE_DEPTH,
   JOB_RETENTION_MS,
   LIVENESS_GRACE_MS,
   isLocalQueueMode,

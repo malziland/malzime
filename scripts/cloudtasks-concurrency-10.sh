@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+#
+# ACHTUNG — NICHT MEHR AKTUELL (Audit 2026-08-10):
+# Seit v2.8 braucht jede Analyse ZWEI Mistral-Aufrufe. Mit Concurrency 10
+# waeren das rund 22 Anfragen/min. Dieses Skript ist NUR noch zulaessig,
+# nachdem der v2.8-Codestand zurueckgebaut wurde (siehe docs/RUNBOOK.md).
+# Im Normalbetrieb gilt cloudtasks-concurrency-7.sh.
 # Setzt die Cloud-Tasks-Queue `analyze-queue` auf Concurrency 10.
 # Passend zur SINGLE-LARGE-CALL-PIPELINE (1× Large 2512 macht alles).
 # Large 2512 hat 2M TPM — bei Concurrency 10 sind wir bei ~30K Tokens × 12

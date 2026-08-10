@@ -43,9 +43,9 @@ getroffen — sowie die bewussten Abweichungen vom Standard.
 8. **Feature-Flags über Firestore** (`featureFlags/current`, 30-s-Cache,
    fail-safe `false`) statt Umgebungsvariablen. Grund: Umlegen ohne Deploy, auch
    vom Handy — zentrales Betriebssicherheits-Element. Register:
-   [FLAGS.md](../FLAGS.md). Die Fallback-Pfade (synchroner `/analyze`,
-   3-Call-Pipeline) bleiben bewusst im Code, bis ihr Abbau
-   ausdrücklich freigibt („Phase 6").
+   Der Fallback-Pfad 3-Call-Pipeline bleibt bewusst im Code, bis sein Abbau
+   ausdruecklich freigegeben wird. **Aktualisiert 2026-08-10:** Der synchrone
+   `/analyze`-Pfad ist mit v2.10 abgebaut; die dortige Ausnahme entfaellt.
 9. **Release-Tags leichtgewichtig** (durch `release.yml`/GitHub-Releases erzeugt)
    — Abweichung von „annotierte Tags": die Metadaten (Notizen, Datum, Urheber)
    trägt der GitHub-Release. Akzeptiert.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Setzt die Cloud-Tasks-Queue `analyze-queue` auf Concurrency 3.
 # Rollback-Hebel für den 3-Call-FALLBACK (Describe Large + 2× Profile Small
-# 2603) — heute läuft live der Single-Large-Pfad mit Concurrency 10 (siehe
+# 2603) — heute laeuft live der Single-Large-Pfad mit Concurrency 7 (siehe
 # docs/RUNBOOK.md, Hebel 3). 2603 hat 100K TPM — bei Concurrency 3 sind wir
 # bei ~95% Auslastung. Höher gehen wäre im 3-Call-Betrieb risikobehaftet.
 #

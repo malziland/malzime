@@ -34,9 +34,9 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
                                      │
                                      ↓ HTTPS, eu-west1
 ┌──────────────────────────────────────────────────────────────────┐
-│  Cloud Function "analyze" (europe-west1, Node 24, 512 MiB)         │
+│  Cloud Function "enqueue" (europe-west1, Node 24, 512 MiB)         │
 │                                                                    │
-│  1. Validation in handle-analyze.js                                │
+│  1. Validation in handle-enqueue.js                                │
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
 │     ├─ Rate-Limit (IP-basiert, 500/10min, In-Memory pro Instanz)  │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
@@ -118,7 +118,7 @@ Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-
 
 ### Einlass-Politik
 
-Der Enqueue prüft bewusst **keine Queue-Tiefe** — der Einlass ist allein durch das Stundenlimit begrenzt (500/h). Das liegt sogar knapp **unter** dem Verarbeitungs-Durchsatz (~550 Analysen/h bei Concurrency 10 × ~65 s/Job), sodass sich unter dem Limit gar kein nennenswerter Rückstau aufbauen kann — das Stundenlimit deckelt den Einlass, bevor die Queue-Tiefe je zum Problem wird. Zusätzlich: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten; Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück (Selbstregulation). Der Client deckelt das Polling bei 30 min. Bewusste Entscheidung, bestätigt im LANGAUDIT 2026-07 (ARCH-001).
+Der Enqueue prüft bewusst **keine Queue-Tiefe** — der Einlass ist allein durch das Stundenlimit begrenzt (500/h). Das liegt sogar knapp **unter** dem Verarbeitungs-Durchsatz (~387 Analysen/h bei Concurrency 7 × ~65 s/Job), der Durchsatz liegt damit UNTER dem Einlass. Deshalb bremst der Einlass seit dem Audit 2026-08-10 ab einer Warteschlangen-Tiefe von 155 (`MAX_QUEUE_DEPTH`) ehrlich ab, statt Auftraege anzunehmen, die den 30-Minuten-Deckel des Browsers ueberschreiten — das Stundenlimit deckelt den Einlass, bevor die Queue-Tiefe je zum Problem wird. Zusätzlich: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten; Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück (Selbstregulation). Der Client deckelt das Polling bei 30 min. Bewusste Entscheidung, bestätigt im LANGAUDIT 2026-07 (ARCH-001).
 
 ### Lokaler Betrieb
 
@@ -150,7 +150,6 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | Modul | Verantwortlich fuer |
 |-------|---------------------|
 | `index.js` | Cloud-Function-Exports, Secret-Deklarationen (`ADMIN_SECRET`, `MISTRAL_API_KEY`, `NTFY_*`) |
-| `handle-analyze.js` | Mistral-only Pipeline: Validation → Mistral Describe → SUBJECT → Easter-Egg / Profile-Gen |
 | `handle-stats.js` | GET-only Stats-Endpunkt |
 | `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
 | `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |
@@ -167,7 +166,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `mistral.js` | Mistral AI: Single-Large aktiv (1 Call `mistral-large-2512` liefert Beschreibung + beide Profile); 3-Call-Fallback (Describe Large + 2× Profil Small) mit Mistral-internem Large-3-Backup |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
-| `heartbeat.js` | Chunked-Response-Heartbeat: hält lange Analyse-Antworten offen (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
+| ~~`heartbeat.js`~~ | Entfernt mit dem Audit 2026-08-10 — hatte seit v2.10 keinen Aufrufer mehr (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
 | `counter.js` | Firestore-Zaehler: Stundenlimit (rollend), Totals, Stats, Boost, Reset, Maintenance |
 | `animal.js` | SUBJECT-Klassifikation aus Mistral-Beschreibung + Easter-Egg-Profile |
 | `privacy.js` | OCR-basiertes Privacy-Risiko-Mapping aus Mistrals "Sichtbarer Text" |
@@ -207,7 +206,7 @@ Sichtbarer Text: <Text 1>; <Text 2>; ...
 
 `animal.js:classifyDescription()` parst die SUBJECT-Zeile und routet:
 - `ANIMAL_ONLY` → Tier-Easter-Egg-Pfad (Profile aus `animals.js`, keine zweite KI-Anfrage)
-- `HUMAN` / `MIXED` / `OTHER` → Normaler Profil-Pfad (Mistral Small 4)
+- `HUMAN` / `MIXED` / `OTHER` → Normaler Profil-Pfad im 3-Call-Fallback (Mistral Small 4); aktiv laeuft alles ueber Large 3
 
 Bei fehlender SUBJECT-Zeile fällt das System fail-safe auf `HUMAN` zurück — d.h. kein versehentliches Easter-Egg bei kaputter Mistral-Antwort.
 
@@ -238,7 +237,7 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 
 ## Sicherheits-Architektur
 
-- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim + `api.malzi.me` (eigener Sync-Endpunkt)
+- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim + `/api/…` (gleiche Domain)
 - **HSTS** mit Preload
 - **Magic-Byte-Validierung** der hochgeladenen Bilder
 - **Honeypot-Feld** + **Timing-Check** als Bot-Defense
@@ -254,6 +253,6 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 - GPS verlaesst NIEMALS den Browser — Nominatim wird direkt vom Client aufgerufen
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr)
-- CSP nur self + OpenStreetMap Tiles + Nominatim + `api.malzi.me` (eigener Sync-Endpunkt)
+- CSP nur self + OpenStreetMap Tiles + Nominatim + `/api/…` (gleiche Domain)
 - Keine dauerhafte Persistenz: im Queue-Betrieb liegt das Bild kurz im GCS-Bucket und wird unmittelbar nach der Verarbeitung gelöscht; das Job-Dokument spätestens nach 2 h
 - Anwendungs-Logs enthalten keine Bildinhalte und keine personenbezogenen Daten — nur Request-ID, Step-Name, Status, Token-Counts

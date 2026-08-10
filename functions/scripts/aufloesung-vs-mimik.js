@@ -29,7 +29,7 @@
  *
  * Aufruf:
  *   MISTRAL_API_KEY=<key> node functions/scripts/aufloesung-vs-mimik.js
- *   Optional: BILD=ich-voll.jpg  ECHTES_ALTER=44  RUNS=3
+ *   PFLICHT:  BILD=<datei.jpg> ECHTES_ALTER=<zahl>   Optional: RUNS=3
  */
 
 const fs = require("fs");
@@ -41,8 +41,8 @@ const { parseSafely } = require("../src/json-repair");
 const REPO_ROOT = path.resolve(__dirname, "../..");
 const INPUT_DIR = path.join(REPO_ROOT, "compare-input");
 
-const BILD = process.env.BILD || "ich-voll.jpg";
-const ECHTES_ALTER = Number(process.env.ECHTES_ALTER || 44);
+const BILD = process.env.BILD || "";
+const ECHTES_ALTER = Number(process.env.ECHTES_ALTER || 0);
 const RUNS = Number(process.env.RUNS || 3);
 
 const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
@@ -67,10 +67,7 @@ const LIVE = (() => {
 
 function apiKey() {
   if (process.env.MISTRAL_API_KEY) return process.env.MISTRAL_API_KEY;
-  return execSync("firebase functions:secrets:access MISTRAL_API_KEY --project=malzime", {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "pipe"],
-  }).trim();
+  return (() => { throw new Error("MISTRAL_API_KEY muss ausdruecklich gesetzt werden — dieses Skript holt den Produktivschluessel nicht mehr von selbst (Audit 2026-08-10, OSS-002)."); })().trim();
 }
 
 /* Die Produktion verkleinert im Browser auf 1280 px lange Kante bei 82 %

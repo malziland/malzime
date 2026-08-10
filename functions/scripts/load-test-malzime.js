@@ -28,7 +28,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ANALYZE_URL = "https://api.malzi.me";
+const ANALYZE_URL = "https://malzi.me/api/enqueue";
 const CONCURRENT = Number(process.env.CONCURRENT || 20);
 const WITH_RETRY = process.env.WITH_RETRY === "1";
 const TEST_IMAGE = path.join(__dirname, "..", "..", "public", "img", "demo", "demo-selfie.jpg");

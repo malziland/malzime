@@ -100,3 +100,21 @@ Bleibt sie darunter, Flag auf `false` und Code zurückbauen.
   sind davon ausgenommen, solange ihr jeweiliger Fallback-Pfad bewusst im Code
   bleibt (Entscheidung siehe [ADR-0001](adr/0001-grundentscheidungen.md)).
 - Feature-Flags sind kein Ersatz für Autorisierung und kein Versteck für Secrets.
+
+### `useBeastAdsCall` — Notausschalter fuer den zweiten Mistral-Aufruf
+
+Neu mit dem Audit 2026-08-10 (OPS-009). Seit v2.8 macht jede Analyse **zwei**
+Mistral-Aufrufe: die Bildanalyse und einen zweiten, kleinen Aufruf ohne Bild für
+die Beast-Werbung. Das verdoppelt die Anfragen pro Minute — und bis zum Audit
+gab es keinen Weg, den zweiten Aufruf ohne Deploy stillzulegen.
+
+- **Fehlt das Feld, ist der Aufruf AN.** Das ist der Normalbetrieb.
+- **Auf `false` gesetzt** entfällt der Zweitaufruf. Die Werbeliste aus dem
+  Hauptaufruf bleibt stehen — die Analyse läuft unverändert, nur die
+  Beast-Werbung klebt wieder an der Produktwelt des Fotos statt an der
+  Schwachstelle (Überlappung 41 % statt 11 %).
+- **Wann ziehen:** wenn die Anfragen pro Minute knapp werden (429-Fehler unter
+  Stoßlast). Wirkt nach ~30 s Cache, kein Deploy.
+- **Entfernungs-Kriterium:** sobald die Anfragerate dauerhaft unkritisch ist —
+  dann Flag und Zweig entfernen.
+

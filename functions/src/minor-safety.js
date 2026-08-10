@@ -81,25 +81,49 @@ const SCHUTZ_BIS = VOLLJAEHRIG_AB + SICHERHEITSABSTAND_JAHRE;
    legitimer Teil der Aufklaerung ist: Wie Kredit-, Alkohol- oder
    Schoenheitsindustrie Menschen adressieren, IST der Lerninhalt. */
 
+/* ── Warum die Listen zweisprachig sind (Audit 2026-08-10, SEC-001) ───────
+   Die Listen waren rein deutsch und markenzentriert. Gemessen an zwoelf
+   realistischen englischen Werbephrasen rutschten ZEHN durch — darunter
+   "Porn Subscription", "Handgun Accessories" und "Neo-Nazi Clothing", also
+   ausgerechnet die Stufe, die altersunabhaengig greifen soll. Erreichbar ist
+   die englische Fassung ueber ?lang=en oder ein englisch eingestelltes Geraet.
+   Deshalb steht jeder Begriff jetzt in beiden Sprachen.
+
+   Und: Deutsche Komposita brauchen KEINE linke Wortgrenze. `\bkredit` traf
+   "Kredit", aber weder "Sofortkredit" noch "Ratenkredit" noch "Autokredit" —
+   also genau die Wortbildung, die im Deutschen die Regel ist. */
+
 const IMMER_VERBOTEN = [
   /* Pornografie und Sexarbeit */
   /onlyfans|fansly|pornhub|xhamster|camgirl|cam-?girl|escort|bordell|erotikportal|sexshop|sexcam/i,
+  /\bporno?\b|pornografie|pornography|adult ?webcam|strip ?club|brothel|sex ?toys?/i,
   /* Gewaltverherrlichung, Waffen, Extremismus */
   /schusswaffe|munition|waffenhandel|glock|kalaschnikow|ar-?15|schlagring|butterflymesser/i,
-  /extremis|rechtsradikal|neonazi|terror/i,
+  /\bgun\b|\bguns\b|handgun|rifle|firearm|ammunition|\bammo\b|silencer/i,
+  /extremis|rechtsradikal|neo-?nazi|terror|white ?supremac/i,
 ];
 
+/* Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei Minderjaehrigen.
+   Fuer die Manipulations-Trigger wird sie bewusst NICHT angewandt — siehe
+   applyMinorSafety. */
 const NUR_MINDERJAEHRIG = [
   /* Gluecksspiel und Sportwetten */
-  /bet365|tipico|bwin|betano|winamax|lottoland|casino|jackpot|sportwetten|gl[uü]cksspiel/i,
-  /* Kredit und Ratenfinanzierung */
-  /\bkredit|darlehen|ratenkauf|ratenzahlung|klarna|schufa|inkasso|leasing/i,
+  /bet365|tipico|bwin|betano|winamax|lottoland|tipp3|casino|jackpot|sportwetten|gl[uü]cksspiel/i,
+  /wettanbieter|buchmacher|kombiwette|online-?wetten|\bwetten\b/i,
+  /gambling|betting|bookmaker|slot ?machines?|\bpoker\b|\bbet\b/i,
+  /* Kredit und Ratenfinanzierung — ohne linke Wortgrenze wegen der Komposita */
+  /kredit|darlehen|ratenkauf|ratenzahlung|klarna|schufa|inkasso|leasing|mikrofinanz/i,
+  /\bloan\b|\bloans\b|payday|instal?lment ?plan|buy ?now ?pay ?later|credit ?card/i,
   /* Alkohol und Tabak */
-  /\bbier\b|\bwein\b|vodka|whisky|spirituose|zigarett|vape|e-?shisha|nikotin/i,
+  /\bbier\b|bier(?:abo|kasten)|\bwein\b|wein(?:probe|abo)|rotwein|wei[ßs]wein|gl[uü]hwein|sekt\b|prosecco|aperol|\bgin\b|\brum\b|tequila|cocktail|spirituose|vodka|whisky/i,
+  /zigarett|tabak|\bvape\b|e-?shisha|nikotin|\bsnus\b/i,
+  /\bbeer\b|\bwine\b|liquor|alcohol|cigarettes?|nicotine ?pouch/i,
   /* Schoenheitskorrektur */
-  /botox|filler|sch[oö]nheits-?op|fettabsaug|brustvergr[oö]ss|lippenaufspritz/i,
+  /botox|hyaluron|\bfiller\b|sch[oö]nheits-?(?:op|chirurgie)|beauty-?op|fettabsaug|brustvergr[oö]ss|lippen ?aufspritz|nasenkorrektur/i,
+  /cosmetic ?surgery|breast ?augmentation|liposuction|lip ?fillers?/i,
   /* Diaet- und Abnehmindustrie */
-  /di[aä]tpille|abnehmspritze|ozempic|appetitz[uü]gler|fatburner|schlankheitsmittel/i,
+  /di[aä]t(?:pille|shake|produkt)|abnehm(?:spritze|coaching|kur)|ozempic|wegovy|mounjaro|almased|slimfast|formula-?di[aä]t|detox ?kur|appetitz[uü]gler|fatburner|schlankheitsmittel/i,
+  /slimming ?pills?|diet ?pills?|weight ?loss|appetite ?suppressant|fat ?burner/i,
 ];
 
 function istImmerVerboten(eintrag) {
@@ -155,7 +179,7 @@ function untereAltersgrenze(text) {
  * kann daraus loggen, ohne dass hier Log-Abhängigkeiten entstehen.
  */
 function applyMinorSafety(profiles, opts = {}) {
-  const bericht = { applied: false, alter: null, entfernt: [] };
+  const bericht = { applied: false, alter: null, entfernt: [], durchgerutscht: [], lang: opts.lang || null };
   if (!profiles || typeof profiles !== "object") return bericht;
 
   /* Alter aus dem Profil selbst holen — die Karte alter_geschlecht wird
@@ -179,7 +203,22 @@ function applyMinorSafety(profiles, opts = {}) {
   for (const modus of ["normal", "boost"]) {
     const p = profiles[modus];
     if (!p) continue;
-    for (const feld of ["ad_targeting", "manipulation_triggers"]) {
+
+    /* ── Werbung: beide Stufen ──────────────────────────────────────────
+       ad_targeting sind Produktanpreisungen von 1-3 Woertern. Hier greift der
+       Filter voll. */
+    /* ── Manipulations-Trigger: NUR die harte Stufe ─────────────────────
+       SEC-001 (Audit 2026-08-10): Trigger sind ganze Erklaersaetze darueber,
+       WIE eine Branche Menschen adressiert — genau der Lerninhalt. Mit der
+       Werbe-Liste darauf verschwanden bei Minderjaehrigen fuenf von sieben
+       prompt-konformen Saetzen, darunter "Lootboxen arbeiten mit denselben
+       Mechaniken wie Gluecksspiel — nur ohne Altersgrenze". Das ist die
+       Kernaussage des Workshops und darf nicht weggefiltert werden.
+       Pornografie, Waffen und Extremismus fliegen weiterhin auch hier raus. */
+    for (const [feld, mitAltersstufe] of [
+      ["ad_targeting", true],
+      ["manipulation_triggers", false],
+    ]) {
       if (!Array.isArray(p[feld])) continue;
       const vorher = p[feld];
       const nachher = [];
@@ -189,7 +228,7 @@ function applyMinorSafety(profiles, opts = {}) {
           bericht.entfernt.push({ modus, feld, grund: "immer", eintrag: String(e).slice(0, 80) });
           continue;
         }
-        if (minderjaehrig && istBeiMinderjaehrigenVerboten(e)) {
+        if (mitAltersstufe && minderjaehrig && istBeiMinderjaehrigenVerboten(e)) {
           bericht.applied = true;
           bericht.entfernt.push({ modus, feld, grund: "minor", eintrag: String(e).slice(0, 80) });
           continue;
@@ -197,6 +236,28 @@ function applyMinorSafety(profiles, opts = {}) {
         nachher.push(e);
       }
       if (nachher.length !== vorher.length) p[feld] = nachher;
+    }
+
+    /* ── Fliesstext: nur melden, nicht entfernen ────────────────────────
+       SEC-001: Der Filter fasste nur zwei von rund fuenfzehn Textfeldern an.
+       Derselbe String "OnlyFans" wurde in ad_targeting entfernt und in
+       profileText ausgeliefert — auch die altersunabhaengige Stufe.
+       Hier wird bewusst NICHT entfernt: Ein herausgeschnittener Halbsatz macht
+       den Text unlesbar, und der Profiltext ist die Stelle, an der die
+       Aufklaerung stattfindet. Stattdessen wird der Durchrutscher gemeldet,
+       damit er im Log sichtbar wird und man dem Prompt nachgehen kann. */
+    const fliesstext = [["profileText", p.profileText]];
+    for (const [key, kat] of Object.entries(p.categories || {})) {
+      if (kat && typeof kat.value === "string") fliesstext.push([`categories.${key}`, kat.value]);
+    }
+    for (const [feld, text] of fliesstext) {
+      if (typeof text !== "string" || !text) continue;
+      const grund = istImmerVerboten(text)
+        ? "immer"
+        : minderjaehrig && istBeiMinderjaehrigenVerboten(text)
+          ? "minor"
+          : null;
+      if (grund) bericht.durchgerutscht.push({ modus, feld, grund });
     }
   }
 

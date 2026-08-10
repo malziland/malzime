@@ -36,7 +36,13 @@ import { fileURLToPath } from "node:url";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HIER, "..");
 const DEMO_DIR = path.join(REPO, "public/img/demo");
-const SICHERUNG = path.join(DEMO_DIR, "original");
+/* WICHTIG (Audit 2026-08-10, PRIV-002): Die Sicherung der un-gewasserzeichneten
+   Originale liegt AUSSERHALB von public/. Frueher stand sie in
+   public/img/demo/original/ — und wurde damit von Firebase Hosting mit
+   ausgeliefert. Unter malzi.me/img/demo/original/ waren die KI-Bilder ohne
+   jede Kennzeichnung oeffentlich abrufbar, also genau das, was die
+   Kennzeichnungspflicht verhindern soll. Nie wieder nach public/ legen. */
+const SICHERUNG = path.join(REPO, ".demo-originale");
 
 const TROCKEN = process.argv.includes("--dry");
 const ZIEL_DIR = TROCKEN ? "/tmp/ki-wasserzeichen" : DEMO_DIR;

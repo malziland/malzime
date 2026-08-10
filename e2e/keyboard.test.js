@@ -107,4 +107,23 @@ test("Tastatur: Demo-Foto → Disclaimer → Profil, nur mit Tab + Enter", async
   /* 4. Profil wird angezeigt */
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 5000 });
   await expect(page.locator(".cat-card").first()).toBeVisible();
+
+  /* TEST-003 (Audit 2026-08-10): Der Umschalter war im Tastaturtest gar nicht
+     enthalten — weder seine Erreichbarkeit noch die sichtbare Fokus-Markierung.
+     Er ist das wichtigste Bedienelement der Seite. */
+  await page.keyboard.press("Tab");
+  const erreichbar = await page.evaluate(() => {
+    const el = document.getElementById("biasSwitch");
+    if (!el) return "fehlt";
+    el.focus();
+    if (document.activeElement !== el) return "nicht fokussierbar";
+    const s = getComputedStyle(el, ":focus-visible");
+    return s.outlineStyle !== "none" || s.boxShadow !== "none" ? "ok" : "keine Fokus-Markierung";
+  });
+  expect(erreichbar).toBe("ok");
+
+  /* Mit der Leertaste umschalten — nicht nur mit der Maus. */
+  await page.evaluate(() => document.getElementById("biasSwitch").focus());
+  await page.keyboard.press("Space");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });

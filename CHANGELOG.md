@@ -4,6 +4,12 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.8.1] — 2026-08-10
+
+### Behoben
+
+- **Umschalten ganz oben auf der Seite sprang zur Ergebnisliste.** Stand man bei der Überschrift und wechselte den Modus, scrollte die Seite nach unten und die Überschrift verschwand — der Einstieg begann plötzlich bei der Foto-Auswahl. Ursache war der Scroll-Anker aus v2.6.0: Er suchte die erste Karte, die unter der geklebten Leiste hervorschaut, und fand dabei auch Karten, die noch gar nicht im Bild waren. Beim Umschalten wurde dann dorthin gescrollt. Jetzt muss die Ankerkarte zusätzlich **innerhalb des Bildschirms beginnen** — steht keine Karte im Bild, ist man nicht in der Liste und es gibt nichts zu verankern. (`public/js/sticky-toggle.js`, +2 Unit-Tests, +1 E2E-Test, Mutationsprobe bestanden)
+
 ## [2.8.0] — 2026-08-10
 
 ### Hinzugefügt

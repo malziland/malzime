@@ -221,3 +221,29 @@ test("Sticky: im Beast Mode klebt der Umschalter genauso", async ({ page }) => {
   const pos = await page.locator("#biasToggleWrap").evaluate((el) => getComputedStyle(el).position);
   expect(pos).toBe("sticky");
 });
+
+test("Sticky: Umschalten ganz oben laesst die Ueberschrift stehen", async ({ page }) => {
+  await mockBackend(page);
+  await runAnalysis(page);
+
+  /* Ganz nach oben — dort steht die Ueberschrift "Wir sehen mehr als dein Foto" */
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(200);
+
+  const h1Vorher = await page.locator("h1").boundingBox();
+  expect(h1Vorher).not.toBeNull();
+  expect(h1Vorher.y).toBeGreaterThan(-10);
+
+  await page.evaluate(() => document.getElementById("biasSwitch").click());
+  await page.waitForTimeout(400);
+
+  /* Die Ueberschrift muss sichtbar bleiben. Vor dem Fix sprang die Seite zur
+     ersten Ergebniskarte, weil der Anker sie auch dann griff, wenn sie noch
+     gar nicht im Bild war. */
+  const h1Nachher = await page.locator("h1").boundingBox();
+  expect(h1Nachher).not.toBeNull();
+  expect(h1Nachher.y).toBeGreaterThan(-10);
+  const scrollY = await page.evaluate(() => window.scrollY);
+  expect(scrollY).toBeLessThan(50);
+});
+

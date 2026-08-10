@@ -108,5 +108,21 @@ function cards() {
 function findAnchorCard() {
   const wrap = elements.biasToggleWrap;
   const barBottom = wrap ? wrap.getBoundingClientRect().bottom : 0;
-  return cards().find((c) => c.getBoundingClientRect().bottom > barBottom + ANCHOR_TOLERANCE_PX) || null;
+  const sichtbareHoehe = typeof window.innerHeight === "number" ? window.innerHeight : 0;
+
+  /* Zwei Bedingungen, beide nötig:
+       1. Die Karte schaut unter der geklebten Leiste hervor (nicht verdeckt).
+       2. Sie beginnt INNERHALB des Bildschirms.
+
+     Ohne die zweite Bedingung griff der Anker auch dann, wenn man ganz oben
+     bei der Überschrift steht — die erste Karte liegt ja irgendwo weiter unten
+     und erfüllt Bedingung 1 trivial. Beim Umschalten wurde dann dorthin
+     gescrollt und die Überschrift verschwand. Steht keine Karte im Bild, ist
+     man nicht in der Kartenliste und es gibt nichts zu verankern. */
+  return (
+    cards().find((c) => {
+      const r = c.getBoundingClientRect();
+      return r.bottom > barBottom + ANCHOR_TOLERANCE_PX && r.top < sichtbareHoehe;
+    }) || null
+  );
 }

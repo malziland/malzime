@@ -38,6 +38,9 @@ describe("Sticky-Umschalter", () => {
     setupDOM();
     scrollSpy = vi.fn();
     window.scrollTo = scrollSpy;
+    /* jsdom meldet 768 — explizit setzen, damit die Sichtbarkeitsprüfung im
+       Anker berechenbar ist. */
+    Object.defineProperty(window, "innerHeight", { value: 800, writable: true, configurable: true });
   });
 
   afterEach(() => {
@@ -184,6 +187,41 @@ describe("Sticky-Umschalter", () => {
       const { initStickyToggle } = await import("../js/sticky-toggle.js");
       expect(() => initStickyToggle()).not.toThrow();
       expect(document.querySelector(".bias-sticky-sentinel")).toBeNull();
+    });
+  });
+
+  describe("Kein Ankern, wenn man gar nicht in der Kartenliste steht", () => {
+    it("scrollt nicht, wenn alle Karten unterhalb des Bildschirms liegen", async () => {
+      /* Genau der gemeldete Fall: Man steht ganz oben bei der Überschrift und
+         schaltet um. Vorher griff der Anker die erste Karte (die weit unten
+         liegt) und scrollte dorthin — die Überschrift verschwand. */
+      const { renderKeepingScrollAnchor } = await import("../js/sticky-toggle.js");
+      stubToggleBar(50);
+      makeCards([
+        { key: "alter_geschlecht", top: 1200, bottom: 1340 },
+        { key: "einkommen", top: 1350, bottom: 1490 },
+      ]);
+
+      renderKeepingScrollAnchor(() => {
+        makeCards([
+          { key: "alter_geschlecht", top: 1600, bottom: 1800 },
+          { key: "einkommen", top: 1810, bottom: 2010 },
+        ]);
+      });
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+    });
+
+    it("ankert weiterhin, sobald eine Karte im Bild steht", async () => {
+      const { renderKeepingScrollAnchor } = await import("../js/sticky-toggle.js");
+      stubToggleBar(50);
+      makeCards([{ key: "einkommen", top: 700, bottom: 840 }]);
+
+      renderKeepingScrollAnchor(() => {
+        makeCards([{ key: "einkommen", top: 760, bottom: 900 }]);
+      });
+
+      expect(scrollSpy).toHaveBeenCalled();
     });
   });
 });

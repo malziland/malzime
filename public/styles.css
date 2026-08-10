@@ -1796,6 +1796,11 @@ html[data-has-result] {
 
 .stats-limit__bar-fill {
   height: 100%;
+  /* Startbreite gehört hierher, nicht als style="width: 0%" ins HTML: Die
+     Content-Security-Policy erlaubt kein style-Attribut, der Browser hätte es
+     verworfen und in der Konsole gemeldet. stats.js setzt die Breite danach
+     über die CSSOM — das ist von der Richtlinie erlaubt. */
+  width: 0;
   border-radius: 3px;
   transition: width 0.6s var(--ease);
 }

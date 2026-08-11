@@ -320,12 +320,13 @@ export function augeInsBild(versuch = 0) {
      steht (aktiv UND gemessene Höhe), dann genau einmal anfahren. Bricht der
      Nutzer die Führung ab, sterben auch die Nachfass-Versuche (fuehrungAktiv
      wird je Versuch frisch geprüft). */
-  let steht = false;
-  try {
-    steht = !!auge && auge.classList.contains("active") && auge.getBoundingClientRect().height > 0;
-  } catch (_e) {
-    steht = false;
-  }
+  const steht = (() => {
+    try {
+      return !!auge && auge.classList.contains("active") && auge.getBoundingClientRect().height > 0;
+    } catch (_e) {
+      return false;
+    }
+  })();
   if (!steht) {
     if (versuch < 10) setTimeout(() => augeInsBild(versuch + 1), 200);
     return;

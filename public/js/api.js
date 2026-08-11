@@ -592,6 +592,20 @@ async function analyzeImageQueued() {
   resetQueueWaiting();
   startScanAnim(false);
   elements.scanText.textContent = t("scan.upload");
+  /* v3.0.3 Blick-Führung: Ab jetzt gehört der Blick diesem Lauf — die
+     Übernahme-Wache startet EINMAL pro Analyse (ein eigener Scroll des
+     Nutzers stoppt alle automatischen Bewegungen dauerhaft), und das Auge
+     wird ins Bild geholt, falls es unter der Sichtkante liegt (am Handy
+     sieht man sonst nur das Foto, aber nicht, dass etwas passiert). Die
+     Wiederaufnahme nach einem Neuladen bleibt bewusst ohne Führung. */
+  /* v3.0.3 Blick-Führung: Ab jetzt gehört der Blick diesem Lauf — die
+     Übernahme-Wache startet EINMAL pro Analyse (ein eigener Scroll des
+     Nutzers stoppt alle automatischen Bewegungen dauerhaft), und das Auge
+     wird ins Bild geholt, falls es unter der Sichtkante liegt (am Handy
+     sieht man sonst nur das Foto, aber nicht, dass etwas passiert). Die
+     Wiederaufnahme nach einem Neuladen bleibt bewusst ohne Führung. */
+  liveAnzeige.fuehrungStarten();
+  liveAnzeige.augeInsBild();
 
   const file = state.lastFile || elements.fileInput.files[0];
   if (!file) {

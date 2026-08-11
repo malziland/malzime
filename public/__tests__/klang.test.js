@@ -23,12 +23,17 @@ function baueMockAudioContext() {
       this.destination = {};
       this.quellen = 0;
       this.oszillatoren = 0;
+      /* Alle erzeugten Gain-Knoten in Reihenfolge — der ERSTE ist der Master
+         (klang.js legt ihn vor Echo-Rückführung und -Mix an). */
+      this.gains = [];
     }
     createBuffer(_kanaele, laenge) {
       return { getChannelData: () => new Float32Array(laenge) };
     }
     createGain() {
-      return new MockGain();
+      const g = new MockGain();
+      this.gains.push(g);
+      return g;
     }
     createDelay() {
       return { delayTime: { value: 0 }, connect() {} };
@@ -99,6 +104,18 @@ describe("Klang (v3.0)", () => {
     /* Mehrfach aktivieren erzeugt keinen zweiten Context. */
     klang.klangAktivieren();
     expect(Mock.instanzen.length).toBe(1);
+  });
+
+  it("v3.0.3: die Master-Lautstärke steht auf 0,96 — +20 % auf Ansage des Inhabers (11.08. abends)", async () => {
+    const Mock = baueMockAudioContext();
+    Mock.instanzen = [];
+    window.AudioContext = Mock;
+    const klang = await import("../js/klang.js");
+    klang.klangAktivieren();
+    /* Der Master ist der erste erzeugte Gain-Knoten (siehe klang.js).
+       (Rückbauprobe: Wird die Lautstärke auf die alten 0,8 zurückgesetzt,
+       wird diese Erwartung ROT.) */
+    expect(Mock.instanzen[0].gains[0].gain.value).toBeCloseTo(0.96, 5);
   });
 
   it("Ton-Funktionen schlucken interne Fehler — Audio darf nie etwas kaputt machen", async () => {

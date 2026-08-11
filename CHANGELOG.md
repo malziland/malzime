@@ -4,6 +4,32 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.3] — 2026-08-11
+
+Blick-Führung von Anfang an — dein Blick ist immer dort, wo gerade etwas
+passiert:
+
+- **Nach der Foto-Wahl ist das Auge im Bild:** Sobald die Analyse startet,
+  holt die Seite das arbeitende Auge sanft ins Sichtfeld. Vorher sah man am
+  Handy oft nur das gewählte Foto — aber nicht, dass schon etwas passiert.
+  Auf großen Bildschirmen, wo das Auge ohnehin zu sehen ist, bewegt sich
+  nichts.
+- **Beim Tipp-Start ist die Karte im Bild:** In dem Moment, in dem die KI
+  zu tippen beginnt, wird die Schreib-Karte sanft ins Sichtfeld geholt —
+  wieder nur, wenn das nötig ist.
+- **Die letzte Zeile bleibt beim Tippen sichtbar:** Wächst der getippte Text
+  auf kleinen Bildschirmen unten aus dem Bild, scrollt die Seite in kleinen,
+  sanften Schritten mit — nur nach unten, damit du immer siehst, was gerade
+  geschrieben wird.
+- **Die Enthüllung führt ab der ersten Box:** Jede aufpoppende Box wird von
+  Anfang an in die Bildmitte geholt — die Führung ist vom ersten Moment an
+  spürbar, nicht erst weiter unten auf der Seite.
+- **Töne etwas lauter:** Tipp- und Pop-Klang sind um rund 20 Prozent lauter.
+- **Du behältst die Kontrolle:** Sobald du selbst scrollst (Finger, Mausrad
+  oder Scroll-Taste), stoppt jede automatische Bewegung sofort — und bleibt
+  für den Rest dieser Analyse aus. Wer im System „Bewegung reduzieren"
+  eingestellt hat, bekommt weiterhin gar kein automatisches Scrollen.
+
 ## [3.0.2] — 2026-08-11
 
 Dramaturgie-Feinschliff nach dem ersten Live-Tag:

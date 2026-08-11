@@ -8,7 +8,7 @@
  *   2. popTon()   — weicher Sinus-Pop 340→240 Hz (~120 ms) für ankommende
  *                   Ergebnis-Boxen.
  *
- * Beide laufen durch denselben Master (Gain 0,8) plus einen dezenten
+ * Beide laufen durch denselben Master (Gain 0,96) plus einen dezenten
  * Echo-Bus (Delay 90 ms, Feedback 0,25, Mix 0,22) — ein Klangbild, kein Zoo.
  * JEDER Ton bekommt weiche Hüllkurven-Rampen (linearRamp an, exponentialRamp
  * aus): abrupte Oszillator-Starts erzeugen das billige Klicken.
@@ -42,9 +42,11 @@ export function klangAktivieren() {
       const daten = puffer.getChannelData(0);
       for (let i = 0; i < daten.length; i++) daten[i] = Math.random() * 2 - 1;
 
-      /* Gemeinsamer Bus: Master + dezentes Feedback-Echo (90 ms). */
+      /* Gemeinsamer Bus: Master + dezentes Feedback-Echo (90 ms).
+         0,96 statt 0,8: Die Töne waren dem Inhaber im Live-Test zu leise —
+         +20 % auf seine Ansage (11.08. abends, v3.0.3). */
       const master = ctx.createGain();
-      master.gain.value = 0.8;
+      master.gain.value = 0.96;
       master.connect(ctx.destination);
       const echo = ctx.createDelay(0.5);
       echo.delayTime.value = 0.09;

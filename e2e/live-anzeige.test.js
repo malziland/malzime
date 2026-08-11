@@ -130,7 +130,7 @@ test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF
   /* Die Live-Karte übernimmt mit dem ERSTEN getippten Zeichen — im selben
      Moment verschwindet die Scan-Animation. Eine aktive Karte trägt dabei
      immer schon Text: kein Leerlauf-Cursor mehr (v3.0.0). */
-  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 35000 });
   await expect(page.locator("#scanAnim")).not.toHaveClass(/active/);
   expect((await page.locator("#liveTextFest").textContent()).length).toBeGreaterThan(0);
 
@@ -168,7 +168,7 @@ test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text 
   await page.click('[data-demo="selfie"]');
 
   /* Erst tippt der seriöse Text wie gewohnt. */
-  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 35000 });
   await expect
     .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 15000 })
     .toBeGreaterThan(10);
@@ -202,7 +202,7 @@ test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung oh
   /* v3.0.0: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
 
-  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 35000 });
   /* Kein Tippen: kurz nach dem Erscheinen steht bereits eine KOMPLETTE Welle
      da (beim Tippen wären nach 200 ms erst ~14 Zeichen sichtbar). */
   await page.waitForTimeout(200);

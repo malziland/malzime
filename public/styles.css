@@ -769,11 +769,13 @@ html[data-has-result] {
 .live-karte {
   display: none;
   margin: 18px 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
-  padding: 16px;
+  /* Von Anfang an das Kleid der späteren Zusammenfassungs-Box (.verdict):
+     Der Text wandert nach dem Tippen genau dorthin — ein Farbwechsel der
+     Karte wirkte wie ein Bruch (Live-Test 11.08. abends). */
+  background: var(--tint-rust);
+  border-left: 2px solid var(--ml-rust);
+  border-radius: var(--radius-md);
+  padding: 16px 20px;
 }
 
 .live-karte.active {

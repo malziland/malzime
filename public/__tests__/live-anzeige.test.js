@@ -820,6 +820,36 @@ describe("Live-Anzeige (v3.0)", () => {
     }
   });
 
+  it("Auge-Nachwache: rutscht das Auge NACH der ersten Prüfung aus dem Bild (Foto-Vorschau lädt), holt die Wache es zurück — genau einmal je Episode", async () => {
+    const spy = vi.fn();
+    elements.scanAnim.scrollIntoView = spy;
+    elements.scanAnim.classList.add("active");
+    /* Beim Aufruf steht das Auge noch im Bild — exakt der Handy-Befund. */
+    elements.scanAnim.getBoundingClientRect = imFenster;
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      await vi.advanceTimersByTimeAsync(850);
+      expect(spy).not.toHaveBeenCalled();
+
+      /* Jetzt lädt die Vorschau fertig und schiebt das Auge unter die
+         Sichtkante. (RUECKBAUPROBE: Ohne die Nachwache bleibt der Spy für
+         immer still — der dreimal durchgerutschte Handy-Fehler.) */
+      elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+      await vi.advanceTimersByTimeAsync(850);
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      /* Bleibt es (im Test-Mock) „unsichtbar", wird NICHT dauernd weiter
+         gezogen — eine Episode, ein Scroll. */
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete elements.scanAnim.scrollIntoView;
+      delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
+    }
+  });
+
   it("v3.0.5 Übernahme: bloßes Antippen (touchstart) beendet die Führung NICHT — erst echtes Wischen (touchmove)", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;

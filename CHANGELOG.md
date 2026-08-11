@@ -4,106 +4,57 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [3.0.5] — 2026-08-11
-
-Zwei Handy-Befunde aus dem Abend-Test behoben:
-
-- **Der Sprung zum Auge nach der Foto-Wahl kommt jetzt wirklich:** Beim
-  Analyse-Start war das Auge oft noch nicht fertig aufgebaut, und ein
-  unsichtbares Element galt der Sichtfeld-Prüfung fälschlich als „schon
-  sichtbar" — der Scroll unterblieb kommentarlos. Jetzt fasst die
-  Blick-Führung nach, bis das Auge wirklich steht, und fährt es dann an.
-- **Antippen beendet die Führung nicht mehr:** Am Handy zählt erst echtes
-  Wischen als „ich übernehme" — ein bloßer Tipp (etwa auf den
-  Beast-Schalter) lässt das automatische Mitscrollen weiterlaufen.
-- **Fertige Ergebnisse verschwinden am Server jetzt wenige Minuten nach der
-  Abholung** (vorher: erst nach bis zu zwei Stunden) — exakt deckungsgleich
-  mit dem 15-Minuten-Fenster, in dem dein Browser ein zugestelltes Ergebnis
-  noch einmal anzeigen darf. Nie abgeholte Ergebnisse räumt der Server
-  weiterhin spätestens nach zwei Stunden ab; die Datenschutzerklärung sagt
-  es jetzt genau so.
-
-## [3.0.4] — 2026-08-11
-
-Datenschutz-Härtung nach der großen Zusagen-Prüfung (Code, Infrastruktur
-und Mistral-Verträge wurden unabhängig gegengeprüft):
-
-- **KI-Analyse jetzt vertraglich in Europa:** Wir nutzen den
-  EU-Regional-Endpunkt von Mistral — die Bildanalyse läuft damit laut
-  Vertrag in Rechenzentren in der EU bzw. EFTA (vorher galt nur
-  „standardmäßig EU"). Kostet 10 % Aufpreis und ist es wert.
-- **Zero Data Retention bei Mistral aktiviert:** Auf unseren Antrag hat
-  Mistral für malziME Null-Datenspeicherung freigeschaltet (schriftlich
-  bestätigt und in der Konsole aktiv) — Ein- und Ausgaben, also auch
-  Fotos, werden dort nicht über die unmittelbare Verarbeitung hinaus
-  gespeichert oder protokolliert.
-- **Datenschutzerklärung präzisiert:** Die GPS-Erklärung sagt jetzt exakt,
-  was passiert („erreichen nie unsere Server" — die Orts-Anfrage stellt
-  dein Browser direkt an OpenStreetMap), und die Hosting-Beschreibung
-  unterscheidet sauber zwischen Datenverarbeitung (ausschließlich
-  EU-Region Belgien) und der weltweiten Auslieferung der statischen
-  Seiten.
-
-## [3.0.3] — 2026-08-11
-
-Blick-Führung von Anfang an — dein Blick ist immer dort, wo gerade etwas
-passiert:
-
-- **Nach der Foto-Wahl ist das Auge im Bild:** Sobald die Analyse startet,
-  holt die Seite das arbeitende Auge sanft ins Sichtfeld. Vorher sah man am
-  Handy oft nur das gewählte Foto — aber nicht, dass schon etwas passiert.
-  Auf großen Bildschirmen, wo das Auge ohnehin zu sehen ist, bewegt sich
-  nichts.
-- **Beim Tipp-Start ist die Karte im Bild:** In dem Moment, in dem die KI
-  zu tippen beginnt, wird die Schreib-Karte sanft ins Sichtfeld geholt —
-  wieder nur, wenn das nötig ist.
-- **Die letzte Zeile bleibt beim Tippen sichtbar:** Wächst der getippte Text
-  auf kleinen Bildschirmen unten aus dem Bild, scrollt die Seite in kleinen,
-  sanften Schritten mit — nur nach unten, damit du immer siehst, was gerade
-  geschrieben wird.
-- **Die Enthüllung führt ab der ersten Box:** Jede aufpoppende Box wird von
-  Anfang an in die Bildmitte geholt — die Führung ist vom ersten Moment an
-  spürbar, nicht erst weiter unten auf der Seite.
-- **Töne etwas lauter:** Tipp- und Pop-Klang sind um rund 20 Prozent lauter.
-- **Du behältst die Kontrolle:** Sobald du selbst scrollst (Finger, Mausrad
-  oder Scroll-Taste), stoppt jede automatische Bewegung sofort — und bleibt
-  für den Rest dieser Analyse aus. Wer im System „Bewegung reduzieren"
-  eingestellt hat, bekommt weiterhin gar kein automatisches Scrollen.
-
-## [3.0.2] — 2026-08-11
-
-Dramaturgie-Feinschliff nach dem ersten Live-Tag:
-
-- **Längerer Anlauf (~25 s):** Vor dem ersten getippten Zeichen sammelt die
-  Seite jetzt rund 25 Sekunden Text (statt 20). So enden Tippen und Analyse
-  näher beieinander — vorher war die Box oft fertig, und dann passierte
-  eine ganze Weile nichts.
-- **Warte-Meldungen wieder im vertrauten Augen-Spinner:** Geht der getippte
-  Text aus, während die Analyse noch rechnet, erscheinen die Warte-Zeilen
-  („Kategorien werden berechnet …") jetzt im bekannten Auge oberhalb der
-  Karte — genau wie beim Start der Analyse. Die eigene Status-Zeile in der
-  Karte ist weg: Es gibt nur noch zwei Bilder — das arbeitende Auge und die
-  tippende KI.
-- **Abschluss-Box entfernt:** Nach der Enthüllung steht keine eigene
-  „Analyse abgeschlossen"-Box mehr unter dem Ergebnis. Der Merksatz „nichts
-  davon ist wahr …" steht ohnehin in der Zusammenfassung.
-- **Die Enthüllung scrollt sanft mit:** Jede aufpoppende Box wird
-  automatisch ins Bild geholt — du musst nicht mehr selbst hinterherscrollen.
-  Sobald du aber selbst scrollst, hört das sofort auf und du behältst die
-  Kontrolle; Töne gibt es dann nur noch für Boxen, die du auch wirklich
-  siehst. Wer im System „Bewegung reduzieren" eingestellt hat, bekommt wie
-  bisher alles sofort und ohne automatisches Scrollen.
-
 ## [3.0.1] — 2026-08-11
 
-Feinschliff nach dem Abend-Test des Live-Erlebnisses:
+Feinschliff-Sammlung nach den Live-Tests des v3.0-Starts — Dramaturgie,
+Blick-Führung und eine deutliche Datenschutz-Härtung:
 
-- **Länger sammeln, flotter tippen:** Vor dem ersten Zeichen trägt die
-  Scan-Animation jetzt rund 20 Sekunden (statt 10) — dafür tippt der Text
-  danach spürbar schneller. Das zähe Kriech-Tempo ist weg.
-- **Kein Farbwechsel mehr:** Die Live-Karte trägt von Anfang an die Farbe
-  der späteren Zusammenfassungs-Box — am Ende wechselt der Text nur noch
-  den Platz, nicht mehr das Kleid.
+**Dramaturgie nachgeschärft**
+
+- Vor dem ersten getippten Zeichen sammelt jetzt ein ~25-Sekunden-Anlauf
+  Material (die Scan-Animation trägt die Zeit) — dafür tippt der Text danach
+  spürbar flotter. Das zähe Kriech-Tempo ist weg.
+- Die Live-Karte trägt von Anfang an die Farbe der späteren
+  Zusammenfassungs-Box — kein Farbwechsel mehr am Ende.
+- Warte-Meldungen erscheinen als das vertraute Augen-Symbol oberhalb der
+  Karte statt als eigene Status-Box; die „Analyse abgeschlossen"-Box am Ende
+  ist ersatzlos entfernt. Der Score-Ring des Realitäts-Checks ist sauber
+  freigestellt (kein Glüh-Quadrat mehr dahinter).
+- Die Töne sind etwas lauter, und die Seite springt am Ende nicht mehr nach
+  oben.
+
+**Blick-Führung: der Blick ist immer dort, wo etwas passiert**
+
+- Nach der Foto-Wahl wird das Auge ins Bild geholt, beim Tipp-Start die
+  Karte, beim Tippen bleibt die letzte Zeile sichtbar, und die Enthüllung
+  zentriert jede aufpoppende Box — jeder Pop ist auch zu sehen, nicht nur zu
+  hören.
+- Dein Finger hat Vorrang: Echtes Wischen (oder Mausrad/Tasten) beendet die
+  Führung sofort und dauerhaft; bloßes Antippen — etwa des Beast-Schalters —
+  ist erlaubt. Nach einer Übernahme klingen nur noch Boxen, die wirklich im
+  Bild sind. Bei „Bewegung reduzieren" scrollt nie etwas automatisch.
+
+**Datenschutz-Härtung (nach unabhängiger Prüfung von Code, Infrastruktur
+und Mistral-Verträgen)**
+
+- **KI-Analyse vertraglich in Europa:** malziME nutzt jetzt den
+  EU-Regional-Endpunkt von Mistral — die Bildanalyse läuft laut Vertrag in
+  Rechenzentren der EU bzw. EFTA (10 % Aufpreis, und jeden Cent wert).
+- **Zero Data Retention aktiviert:** Auf unseren Antrag hat Mistral für
+  malziME Null-Datenspeicherung freigeschaltet (schriftlich bestätigt) —
+  Ein- und Ausgaben, also auch Fotos, werden dort nicht über die
+  unmittelbare Verarbeitung hinaus gespeichert oder protokolliert.
+- **Fertige Ergebnisse verschwinden am Server wenige Minuten nach der
+  Abholung** (vorher: erst nach bis zu zwei Stunden) — deckungsgleich mit
+  dem 15-Minuten-Fenster, in dem der Browser ein zugestelltes Ergebnis noch
+  einmal anzeigen darf. Nie abgeholte Ergebnisse räumt der Server spätestens
+  nach zwei Stunden ab.
+- **Datenschutzerklärung präzisiert:** Die GPS-Erklärung sagt jetzt exakt,
+  was passiert („erreichen nie unsere Server" — die Orts-Anfrage stellt dein
+  Browser direkt an OpenStreetMap), die Hosting-Beschreibung trennt sauber
+  zwischen Datenverarbeitung (ausschließlich EU-Region Belgien) und der
+  weltweiten Auslieferung der statischen Seiten, und die neuen
+  Mistral-Zusagen stehen wörtlich drin.
 
 ## [3.0.0] — 2026-08-11
 

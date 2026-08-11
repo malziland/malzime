@@ -176,6 +176,15 @@
         <a href="/stats" target="_blank" rel="noopener" class="limit-banner__stats" tabindex="0" data-i18n="limit.statsLink">Aktuelle Auslastung ansehen</a>
       </div>
 
+      <!-- KA-08 (Kurzaudit 2026-08-12): Die Einordnung „nichts davon ist wahr"
+           stand am Bildschirm bisher erst UNTER dem Upload (der Block oben ist
+           nur für den Druck). Der wichtigste pädagogische Satz gehört VOR die
+           Foto-Wahl. Gleicher i18n-Schlüssel wie unten; die .disclaimer-Klasse
+           hält ihn aus dem Druck heraus (dort übernimmt .print-disclaimer). -->
+      <div class="disclaimer disclaimer--einordnung">
+        <p data-i18n-html="disclaimer.main"><strong>malziME</strong> ist ein Lern-Tool f&uuml;r Medienkompetenz und Datenschutz-Sensibilisierung. Die KI-Profile sind erfunden und zeigen nur, was Algorithmen behaupten k&ouml;nnten &ndash; nichts davon ist wahr oder bewiesen.</p>
+      </div>
+
       <section class="upload-section">
         <label class="file-drop" for="fileInput">
           <input id="fileInput" type="file" accept="image/*" tabindex="0" />
@@ -288,8 +297,10 @@
         </div>
       </section>
 
+      <!-- KA-08: disclaimer.main steht jetzt sichtbar VOR dem Upload — hier
+           bleibt der Workshop-Hinweis, der inhaltlich zu den Demo-Fotos
+           darunter gehört. -->
       <div class="disclaimer disclaimer--flush">
-        <p data-i18n-html="disclaimer.main"><strong>malziME</strong> ist ein Lern-Tool f&uuml;r Medienkompetenz und Datenschutz-Sensibilisierung. Die KI-Profile sind erfunden und zeigen nur, was Algorithmen behaupten k&ouml;nnten &ndash; nichts davon ist wahr oder bewiesen.</p>
         <p class="disclaimer__workshop" data-i18n="disclaimer.workshop">F&uuml;r Workshops k&ouml;nnen auch die bereitgestellten KI-generierten Demo-Fotos oder &auml;ltere Bilder verwendet werden. Kein hochgeladenes Bild wird dauerhaft gespeichert oder ist nach der Analyse abrufbar.</p>
       </div>
 

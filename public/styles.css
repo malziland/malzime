@@ -2564,6 +2564,12 @@ ol.legal-list > li::before {
   margin-top: 0;
   margin-bottom: 28px;
 }
+/* KA-08: Einordnung VOR dem Upload — kompakt, ohne den grossen Abstand der
+   Basis-Klasse (die 32px oben gehoeren zur Position nach dem Ergebnis). */
+.disclaimer--einordnung {
+  margin-top: 0;
+  margin-bottom: 24px;
+}
 .disclaimer__workshop {
   margin-top: 8px;
   color: var(--muted) !important;

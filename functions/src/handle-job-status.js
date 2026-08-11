@@ -15,9 +15,10 @@
  * Ein Poll löst nur einen günstigen Firestore-Read aus.
  */
 
+const { randomUUID } = require("crypto");
 const { QUEUE_AVG_JOB_SECONDS, QUEUE_DISPATCH_CONCURRENCY } = require("./config");
 const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
-const { safeCompare } = require("./auth");
+const { safeCompare, sha256Hex } = require("./auth");
 
 /* Grobe Wartezeit-Schätzung aus der Warteschlangen-Position.
    Kalibrierung der Konstanten erfolgt in Phase 3/4 (config.js). */
@@ -108,9 +109,23 @@ async function handleJobStatus(req, res) {
        der best-effort Client-Telemetrie. Wiederholte Polls (Reload, zweiter
        Tab) loggen nicht erneut. Der Schreibvorgang läuft nebenläufig — er darf
        die Antwort an den wartenden Client nicht verzögern. */
+    const antwort = {
+      status: "done",
+      result: job.result || null,
+    };
     if (!job.deliveredAt) {
       const now = Date.now();
-      markDelivered(job.id).catch((err) =>
+      /* KA-02 (Kurzaudit 2026-08-12): Einmal-Ticket für den Realitäts-Check.
+         Es wird GENAU EINMAL ausgegeben — bei der ersten Auslieferung, hinter
+         derselben Ticket-Prüfung wie das Ergebnis selbst. Der Browser merkt
+         es sich (sessionStorage); in der Datenbank liegt nur der Hash. Der
+         Telemetrie-Endpunkt zählt eine Realitäts-Check-Stimme nur noch gegen
+         ein gültiges, unverbrauchtes Ticket — eine echte Analyse, eine
+         Stimme. Der Schreibvorgang läuft wie markDelivered nebenläufig;
+         schlägt er fehl, verfällt schlimmstenfalls diese eine Stimme. */
+      const rcTicket = randomUUID();
+      antwort.rcTicket = rcTicket;
+      markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
         console.log(JSON.stringify({ warning: "markDelivered-error", jobId: job.id, error: err.message }))
       );
       console.log(
@@ -123,10 +138,7 @@ async function handleJobStatus(req, res) {
         })
       );
     }
-    res.status(200).json({
-      status: "done",
-      result: job.result || null,
-    });
+    res.status(200).json(antwort);
     return;
   }
 

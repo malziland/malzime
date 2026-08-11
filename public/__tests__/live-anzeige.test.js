@@ -850,6 +850,41 @@ describe("Live-Anzeige (v3.0)", () => {
     }
   });
 
+  it("KA-05 Lauf-Kennung: startet binnen eines Takts ein NEUER Analyse-Lauf, stirbt die alte Nachwache-Kette sofort", async () => {
+    const spy = vi.fn();
+    elements.scanAnim.scrollIntoView = spy;
+    elements.scanAnim.classList.add("active");
+    /* Lauf 1: Auge sichtbar — die Kette tickt, scrollt aber nicht. */
+    elements.scanAnim.getBoundingClientRect = imFenster;
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      await vi.advanceTimersByTimeAsync(850);
+      expect(spy).not.toHaveBeenCalled();
+
+      /* Neues Foto mitten im Takt: zuruecksetzen() beendet Lauf 1, der
+         nächste Lauf startet seine Führung — aber (bewusst) OHNE eigenes
+         augeInsBild. Rutscht das Auge jetzt aus dem Bild, darf die ALTE
+         Kette nicht mehr scrollen. (RUECKBAUPROBE: Ohne die Lauf-Kennung
+         sieht der alte Tick die neue Führung als „aktiv" und zieht — der
+         Spy feuert, dieser Test wird rot.) */
+      liveAnzeige.zuruecksetzen();
+      liveAnzeige.fuehrungStarten();
+      elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(spy).not.toHaveBeenCalled();
+
+      /* Gegenprobe: Ein augeInsBild DES NEUEN Laufs scrollt sehr wohl —
+         die Kennung sperrt nur fremde Ketten, nicht die Funktion. */
+      liveAnzeige.augeInsBild();
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete elements.scanAnim.scrollIntoView;
+      delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
+    }
+  });
+
   it("v3.0.5 Übernahme: bloßes Antippen (touchstart) beendet die Führung NICHT — erst echtes Wischen (touchmove)", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;

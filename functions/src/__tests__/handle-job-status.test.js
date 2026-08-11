@@ -154,7 +154,9 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
     });
     const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
     await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, makeRes());
-    expect(jobs.markDelivered).toHaveBeenCalledWith("job-1");
+    /* KA-02: Mit der Erstauslieferung wird der HASH des Realitäts-Check-
+       Einmal-Tickets abgelegt (64 Hex-Zeichen = SHA-256, nie das Ticket). */
+    expect(jobs.markDelivered).toHaveBeenCalledWith("job-1", expect.stringMatching(/^[0-9a-f]{64}$/));
     const delivered = logSpy.mock.calls
       .map((c) => {
         try {
@@ -180,6 +182,49 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
       deliveredAt: 9999,
     });
     await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, makeRes());
+    expect(jobs.markDelivered).not.toHaveBeenCalled();
+  });
+});
+
+/* ── KA-02 (Kurzaudit 2026-08-12): Realitäts-Check-Einmal-Ticket ── */
+
+describe("handleJobStatus — KA-02 Realitäts-Check-Ticket", () => {
+  const doneJob = (extra = {}) => ({
+    id: "job-1",
+    status: "done",
+    result: { x: 1 },
+    resultToken: "ticket-abc",
+    createdAt: 1000,
+    finishedAt: 5000,
+    ...extra,
+  });
+
+  test("Erstauslieferung: Antwort trägt rcTicket, im Job landet exakt dessen SHA-256-Hash", async () => {
+    jobs.getJob.mockResolvedValue(doneJob());
+    const res = makeRes();
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
+    logSpy.mockRestore();
+    expect(typeof res.body.rcTicket).toBe("string");
+    expect(res.body.rcTicket.length).toBeGreaterThan(0);
+    const { sha256Hex } = require("../auth");
+    expect(jobs.markDelivered).toHaveBeenCalledWith("job-1", sha256Hex(res.body.rcTicket));
+  });
+
+  test("wiederholter Abruf (deliveredAt gesetzt): KEIN neues rcTicket — es gibt genau eins je Analyse", async () => {
+    jobs.getJob.mockResolvedValue(doneJob({ deliveredAt: 9999 }));
+    const res = makeRes();
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
+    expect(res.body.status).toBe("done");
+    expect(res.body.rcTicket).toBeUndefined();
+  });
+
+  test("falsches Abhol-Ticket: weder Ergebnis noch rcTicket — dieselbe PRIV-003-Schranke", async () => {
+    jobs.getJob.mockResolvedValue(doneJob());
+    const res = makeRes();
+    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "falsch" } }, res);
+    expect(res.body.result).toBeNull();
+    expect(res.body.rcTicket).toBeUndefined();
     expect(jobs.markDelivered).not.toHaveBeenCalled();
   });
 });

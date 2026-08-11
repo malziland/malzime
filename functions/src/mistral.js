@@ -67,8 +67,9 @@ function isRateLimitError(err) {
    was den Burst zusätzlich entzerrt.
 
    v1.10.8: modelClass ("large"/"small") wird an withMistralSlot durchgereicht,
-   damit der modell-bewusste Token-Bucket den richtigen Rate-Bucket waehlt —
-   Large darf schneller feuern (6 RPS) als Small (1.67 RPS). */
+   damit der modell-bewusste Token-Bucket den richtigen Rate-Bucket waehlt
+   (Large-Bucket taktet schneller als Small — Details und die heutige
+   Tier-Wahrheit: throttle.js-Kopf, KA-07). */
 function modelClassOf(model) {
   return /large/i.test(model || "") ? "large" : "small";
 }
@@ -130,12 +131,16 @@ const PROFILE_TEXT_SCHLUESSEL = '"profileText"';
  * Rueckgabe:
  *   - `null`, solange der Wert noch nicht begonnen hat (Schluessel fehlt oder
  *     das oeffnende `"` ist noch nicht da),
- *   - sonst `{ text, ende, abgeschlossen }`:
+ *   - sonst `{ text, schluesselIdx, ende, abgeschlossen }`:
  *       text          DEKODIERTER Klartext (JSON-Escapes wie \n, \" oder
  *                     \uXXXX sind zu echten Zeichen aufgeloest). Ein
  *                     UNVOLLSTAENDIGES Escape am Praefix-Ende (z.B. `\` oder
  *                     `\u00`) wird abgeschnitten — lieber ein Zeichen zu
  *                     wenig zeigen als kaputte Reste.
+ *       schluesselIdx Index des gefundenen `"profileText"`-Schluessels —
+ *                     der Verankerungs-Pruefpunkt (KA-11): Der Aufrufer
+ *                     stellt damit sicher, dass zwischen Modus-Schluessel
+ *                     und Fund kein ANDERER Modus-Schluessel liegt.
  *       ende          Index des schliessenden `"` (bzw. Praefix-Ende) — der
  *                     Startpunkt fuer die Suche nach dem naechsten Vorkommen.
  *       abgeschlossen true, wenn das schliessende `"` schon angekommen ist.
@@ -185,30 +190,62 @@ function findeProfileTextWert(jsonPraefix, abIdx) {
     i += 1;
   }
 
-  return { text: dekodiereJsonEscapes(jsonPraefix.slice(start, ende)), ende, abgeschlossen };
+  return { text: dekodiereJsonEscapes(jsonPraefix.slice(start, ende)), schluesselIdx, ende, abgeschlossen };
 }
+
+/* KA-11: Die Modus-Schluessel, an denen die beiden profileText-Werte verankert
+   werden. In gueltigem JSON koennen diese Zeichenfolgen INNERHALB eines
+   String-Werts nie roh auftauchen (die Anfuehrungszeichen waeren dort `\"`) —
+   dieselbe Escape-Garantie, auf der schon der profileText-Scanner beruht. */
+const STANDARD_SCHLUESSEL = '"standard"';
+const BEAST_SCHLUESSEL = '"beast"';
 
 /**
  * Extrahiert aus einem JSON-PRAEFIX (der noch mitten im Satz abbrechen kann)
  * die bereits vollstaendig angekommenen Teile BEIDER `profileText`-Werte.
- * Nach der gemessenen Schluessel-Reihenfolge der Antwort ist das erste
- * Vorkommen das Standard-Profil (`standard.profileText`), das zweite das
- * Beast-Profil (`beast.profileText`) — das Modell schreibt sequenziell,
- * Beast beginnt deshalb deutlich spaeter.
+ *
+ * KA-11 (Kurzaudit 2026-08-12): Frueher galt schlicht „erstes Vorkommen =
+ * Standard, zweites = Beast" — das hing allein am BEISPIEL-Schema im Prompt
+ * (keine Garantie durch response_format). Haette das Modell die Bloecke je
+ * vertauscht, waere der harte Beast-Text kurz als Standard-Profil erschienen.
+ * Jetzt wird jeder Wert an seinem Modus-Schluessel VERANKERT: Der
+ * Standard-Text zaehlt nur, wenn zwischen `"standard"` und dem Fund kein
+ * `"beast"` liegt (und umgekehrt). Dreht das Modell die Reihenfolge, zeigt
+ * der Live-Weg schlicht nichts Falsches — schlimmstenfalls bleibt das
+ * Warte-Auge stehen; das Endergebnis parst ohnehin das komplette JSON.
+ * Fuer die gemessene Normal-Reihenfolge ist das Ergebnis byte-identisch
+ * zum bisherigen Verhalten.
  *
  * Rueckgabe: `{ standard, beast }` — jeweils der DEKODIERTE Klartext, oder
  * `null`, solange der jeweilige Wert noch nicht begonnen hat.
  */
 function extrahiereLiveText(jsonPraefix) {
   if (typeof jsonPraefix !== "string") return { standard: null, beast: null };
-  const erster = findeProfileTextWert(jsonPraefix, 0);
-  if (!erster) return { standard: null, beast: null };
-  /* Das zweite Vorkommen kann erst NACH dem abgeschlossenen ersten Wert
-     stehen (sequenzielles Schreiben) — vorher gar nicht erst suchen. Die
-     Suche startet hinter dem schliessenden `"` des ersten Werts, damit ein
-     `"profileText"` IM Standard-Text nie als zweites Feld zaehlt. */
-  const zweiter = erster.abgeschlossen ? findeProfileTextWert(jsonPraefix, erster.ende + 1) : null;
-  return { standard: erster.text, beast: zweiter ? zweiter.text : null };
+
+  const standardIdx = jsonPraefix.indexOf(STANDARD_SCHLUESSEL);
+  const beastIdx = jsonPraefix.indexOf(BEAST_SCHLUESSEL);
+
+  /* Standard: erst ab dem eigenen Modus-Schluessel suchen — ein profileText
+     VOR `"standard"` kann nie das Standard-Profil sein. Liegt zwischen dem
+     Schluessel und dem Fund ein `"beast"`, gehoert der Fund zum Beast-Block
+     (Standard hat dann selbst noch keinen profileText geliefert). */
+  let erster = standardIdx >= 0 ? findeProfileTextWert(jsonPraefix, standardIdx) : null;
+  if (erster) {
+    const beastDazwischen = jsonPraefix.indexOf(BEAST_SCHLUESSEL, standardIdx + 1);
+    if (beastDazwischen >= 0 && beastDazwischen < erster.schluesselIdx) erster = null;
+  }
+
+  /* Beast: symmetrisch verankert. */
+  let zweiter = null;
+  if (beastIdx >= 0) {
+    const kandidat = findeProfileTextWert(jsonPraefix, beastIdx);
+    if (kandidat) {
+      const standardDazwischen = jsonPraefix.indexOf(STANDARD_SCHLUESSEL, beastIdx + 1);
+      if (!(standardDazwischen >= 0 && standardDazwischen < kandidat.schluesselIdx)) zweiter = kandidat;
+    }
+  }
+
+  return { standard: erster ? erster.text : null, beast: zweiter ? zweiter.text : null };
 }
 
 /* Loest JSON-String-Escapes zu echten Zeichen auf. Bewusst von Hand statt
@@ -442,6 +479,14 @@ async function callMistralRawUnthrottled({
 
     if (res.status === 429 && attempt < backoffs.length) {
       if (streamen) clearTimeout(timeoutId);
+      /* KA-09 (Kurzaudit 2026-08-12): Den nie gelesenen Antwortrumpf aktiv
+         verwerfen, sonst bleibt die Verbindung bis zum Speicherbereiniger
+         offen — bei Workshop-Bursts mit vielen 429ern unnötiger Ballast. */
+      try {
+        if (res.body && typeof res.body.cancel === "function") await res.body.cancel();
+      } catch (_) {
+        /* Verwerfen ist best effort — ein Fehler hier ändert nichts am Retry. */
+      }
       lastError = new Error("Mistral 429 rate limited");
       lastError.status = 429;
       await new Promise((r) => setTimeout(r, backoffs[attempt]));

@@ -27,24 +27,28 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
      - mistral-large-2512: $0.50 / $1.50  in/out  (Large 3)
      - mistral-small-2603: $0.15 / $0.60  in/out  (Small 4)
 
-   Verifizierte Limits (Account-Dashboard 2026-05-19):
-     - mistral-small-2603: 100K TPM, 1.67 RPS  (absurd niedrig — deshalb
-       Single-Large als Standard-Pfad; vor Architektur-Entscheidungen IMMER
-       das Account-Dashboard pruefen, Limits variieren je Modellversion)
-     - mistral-large-2512: 2M TPM, 6 RPS
+   RATE-LIMITS — WICHTIG, STAND 2026-08-11 (KA-07): Die frueher hier
+   notierten Modell-Limits („6 RPS" Large, „1.67 RPS" Small, Dashboard-Stand
+   2026-05-19) sind UEBERHOLT. Mistral vergibt Limits heute als
+   STUFEN-SYSTEM nach kumuliertem Umsatz (org-weit, auch am EU-Endpunkt):
+   T1 = 0,25 req/s (bis 20 $), T2 ab 20 $, T3 ab 100 $, T4 ab 500 $ —
+   kein Vorkauf moeglich. Aktuell gilt T1: 0,25 req/s = die REALE
+   Durchsatzbremse (~7,5 Analysen/min bei 2 Calls je Analyse). In der
+   Praxis haelt die Cloud-Tasks-Nebenlaeufigkeit (7 gleichzeitige Jobs,
+   ~55 s je Analyse) den Durchsatz von selbst genau unter dieser Decke —
+   wer die Nebenlaeufigkeit hochdreht, MUSS vorher die Tier-Stufe im
+   Mistral-Dashboard pruefen, nicht diesen Kommentar.
 
-   Historie: v1.10.7 (2026-05-19) wich wegen der 2603-Limits voruebergehend
-   auf mistral-small-2506 (Small 3.2, 5M TPM) aus; seit der Queue-/Single-
-   Large-Architektur ist 2603 wieder aktiv. 2506 wurde von Mistral zum
+   Historie: v1.10.7 (2026-05-19) wich wegen der damaligen 2603-Limits
+   voruebergehend auf mistral-small-2506 (Small 3.2) aus; seit der Queue-/
+   Single-Large-Architektur ist 2603 wieder aktiv. 2506 wurde von Mistral zum
    31.07.2026 ZURUECKGEZOGEN (Retirement) — als Modell-Option dauerhaft tot.
 
    API-Key kommt aus `process.env.MISTRAL_API_KEY` (Firebase Secret). */
 /* v1.10.7: Large fest auf -2512 gepinnt statt -latest-Alias. Hintergrund:
    Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
-   umlenken (z.B. ein hypothetisches Large -2603), die wie das aktuelle
-   Small-2603 mit brutalen Limits ausgestattet sein koennte. Mit dem Pin
-   kontrollieren wir Versions-Wechsel selbst.
-   Verifizierte Limits -2512 (Account-Dashboard 2026-05-19): 6 RPS, 2M TPM. */
+   umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren
+   wir Versions-Wechsel selbst. (Zu Rate-Limits: Stufen-System, s. oben.) */
 const MISTRAL_DESCRIBE_MODEL = "mistral-large-2512";
 const MISTRAL_PROFILE_MODEL = "mistral-small-2603";
 const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";

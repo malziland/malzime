@@ -228,6 +228,14 @@ const UEBERNAHME_TASTEN = new Set([
    keine Führung unterwegs (und damit auch kein automatisches Scrollen). */
 let fuehrung = null;
 
+/* KA-05 (Kurzaudit 2026-08-12): Laufende Nummer der Führung. Die
+   Auge-Nachwache ist eine setTimeout-Kette — endet ein Lauf und beginnt
+   binnen eines Takts (400 ms) der nächste, sähe der alte Tick wieder eine
+   aktive Führung und liefe als ZWEITE Kette neben der neuen weiter (im
+   Extremfall zwei Scrolls auf dasselbe Ziel). Jede Kette merkt sich deshalb
+   die Nummer ihres Laufs und stirbt beim ersten Tick mit fremder Nummer. */
+let fuehrungsLauf = 0;
+
 function fuehrungListenerEntfernen(mein) {
   if (!mein.listener) return;
   window.removeEventListener("wheel", mein.listener);
@@ -246,6 +254,7 @@ function fuehrungListenerEntfernen(mein) {
  */
 export function fuehrungStarten() {
   if (fuehrung) return;
+  fuehrungsLauf += 1; /* KA-05: neuer Lauf — alte Nachwache-Ketten verfallen */
   const mein = { aktiv: true, listener: null };
   const uebernahme = (ereignis) => {
     if (ereignis.type === "keydown" && !UEBERNAHME_TASTEN.has(ereignis.key)) return;
@@ -324,7 +333,10 @@ const AUGE_WACHE_VERSUCHE_MAX = 110;
  * die Live-Karte (Tippen), ist die Wache fertig. Desktop, Auge dauerhaft im
  * Bild: es bewegt sich weiterhin NICHTS.
  */
-export function augeInsBild(versuch = 0, zustand = { gescrollt: false }) {
+export function augeInsBild(versuch = 0, zustand = { gescrollt: false }, kennung = fuehrungsLauf) {
+  /* KA-05: Tick einer Kette aus einem FRÜHEREN Lauf — sofort sterben, sonst
+     wachen nach einem schnellen Neustart zwei Ketten nebeneinander. */
+  if (kennung !== fuehrungsLauf) return;
   if (!fuehrungAktiv()) return;
   /* Tipp-Phase erreicht: Ab hier führen Karte und Tipp-Nachscrollen. */
   if (elements.liveKarte && elements.liveKarte.classList.contains("active")) return;
@@ -345,7 +357,7 @@ export function augeInsBild(versuch = 0, zustand = { gescrollt: false }) {
     }
   }
   if (versuch < AUGE_WACHE_VERSUCHE_MAX) {
-    setTimeout(() => augeInsBild(versuch + 1, zustand), AUGE_WACHE_TAKT_MS);
+    setTimeout(() => augeInsBild(versuch + 1, zustand, kennung), AUGE_WACHE_TAKT_MS);
   }
 }
 

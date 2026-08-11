@@ -3,10 +3,18 @@
 /**
  * throttle.js — Per-Instance-Semaphore für Mistral-Bursts.
  *
- * Mistral-Scale-Tier hat 6 RPS Sustained-Limit. Wenn eine Cloud-Function-
- * Instanz mehrere Hybrid-Analysen parallel verarbeitet (Workshop-Klasse mit
- * 25 Schülern, alle laden gleichzeitig hoch), entstehen Burst-Spitzen die
- * 429-Errors triggern.
+ * RATE-LIMITS, STAND 2026-08-11 (KA-07): Mistral vergibt Limits als
+ * STUFEN-SYSTEM nach kumuliertem Umsatz (T1 = 0,25 req/s bis 20 $; T2/T3/T4
+ * darüber) — die früher hier notierten „6 RPS" stammen vom Mai-Dashboard und
+ * sind ÜBERHOLT. Die reale Durchsatzbremse ist heute die Tier-Stufe, in der
+ * Praxis gehalten durch die Cloud-Tasks-Nebenläufigkeit (7 gleichzeitige
+ * Jobs à ~55 s ≈ 0,25 req/s). Vor jeder Änderung an Nebenläufigkeit oder
+ * den Intervallen unten: Tier-Stufe im Mistral-Dashboard prüfen, nicht
+ * Kommentare zitieren.
+ *
+ * Wenn eine Cloud-Function-Instanz mehrere Analysen parallel verarbeitet
+ * (Workshop-Klasse mit 25 Schülern, alle laden gleichzeitig hoch), entstehen
+ * Burst-Spitzen, die 429-Errors triggern.
  *
  * Lösung: pro Instanz wird die Anzahl gleichzeitig in-flight Mistral-Calls
  * begrenzt. Eingehende Calls warten auf einen freien Slot statt sofort
@@ -21,11 +29,11 @@
  * Implementierung: einfache FIFO-Queue mit max-concurrent-Limit.
  */
 
-/* 6 ist konservativ und matched Mistrals 6 RPS Default-Limit auf Scale-Tier.
-   Pro Analyse machen wir 3 Mistral-Calls (1 Describe + 2 Profile parallel) —
-   damit kann eine einzelne Instanz alle 2-3 Sekunden eine vollständige
-   Analyse durchschieben. Bei Cold-Start oder Workshop-Burst greift dann
-   einfach mistral.js's Retry-Backoff. */
+/* 6 gleichzeitige Calls je Instanz — historisch am alten 6-RPS-Dashboard-Wert
+   ausgerichtet (überholt, s. Datei-Kopf), heute schlicht eine konservative
+   Parallelitäts-Decke: Die echte Raten-Grenze setzen Tier-Stufe und
+   Cloud-Tasks-Nebenläufigkeit. Bei Cold-Start oder Workshop-Burst greift
+   zusätzlich mistral.js' Retry-Backoff. */
 const DEFAULT_MAX_CONCURRENT = 6;
 
 /* v1.10.6: Queue-Timeout von 90s auf 360s (6 Minuten) hochgesetzt.
@@ -109,18 +117,15 @@ const mistralSemaphore = createSemaphore();
  * entzerrt das: jeder Caller wartet, bis seit dem letzten Start des gleichen
  * Modell-Typs genug Zeit verstrichen ist.
  *
- * v1.10.8 — getrennte Buckets pro Modell-Typ: Das Mistral-Account-Dashboard
- * zeigt SEHR unterschiedliche Limits je Modell:
- *   - mistral-large-2512 (Describe + Profile-Fallback): 6 RPS, 2M TPM
- *   - mistral-small-2603 (Profile normal/boost):        1.67 RPS, 100K TPM
- * Ein gemeinsamer Bucket muss sich am LANGSAMSTEN Modell orientieren — wir
- * haetten also auch die Large-Describe-Calls auf 1.6 RPS gedrosselt, obwohl
- * Large 6 RPS koennte. Mit getrennten Buckets laeuft Describe ~3x schneller,
- * was den Wartezeit-Tail unter Workshop-Last spuerbar kuerzt.
- *
- * Intervalle (bei maxInstances=4, siehe index.js):
- *   - Large: 800ms/Instanz → 4 × 1.25 = 5 RPS gesamt, unter dem 6-RPS-Limit
- *   - Small: 2500ms/Instanz → 4 × 0.4 = 1.6 RPS gesamt, unter dem 1.67-Limit
+ * v1.10.8 — getrennte Buckets pro Modell-Typ: Das damalige Account-Dashboard
+ * (Mai 2026) zeigte sehr unterschiedliche Limits je Modell; ein gemeinsamer
+ * Bucket haette sich am LANGSAMSTEN orientieren muessen. Die getrennten
+ * Buckets bleiben sinnvoll (Describe soll nicht hinter Profile-Calls warten),
+ * aber die Intervalle unten stammen aus der Mai-Rechnung — KA-07: Heute gilt
+ * das TIER-System (T1 = 0,25 req/s org-weit, s. config.js). Die Intervalle
+ * sind damit KEINE Garantie mehr, unter dem Limit zu bleiben; das
+ * uebernimmt real die Cloud-Tasks-Nebenlaeufigkeit (7). Wer hier schneller
+ * drehen will, prueft ZUERST die Tier-Stufe im Mistral-Dashboard.
  */
 const LARGE_TOKEN_INTERVAL_MS = 800;
 const SMALL_TOKEN_INTERVAL_MS = 2500;

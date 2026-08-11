@@ -10,6 +10,12 @@ on:
     paths: ["CHANGELOG.md"]
   workflow_dispatch: {}
 
+# KA-03: Nie zwei Release-Laeufe gleichzeitig — zwei schnelle CHANGELOG-Pushes
+# koennten sich sonst beim Loeschen/Anlegen von Tag und Release ueberholen.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -53,14 +59,36 @@ jobs:
               exit 0
             fi
             TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || echo "")"
-            if [ -n "$TAG_SHA" ] && [ "$TAG_SHA" != "$GITHUB_SHA" ]; then
-              echo "Nummer $VERSION wird wiederverwendet — Tag und Release werden auf diesen Stand umgehaengt."
-              gh release delete "$TAG" --yes
-              git push origin ":refs/tags/$TAG"
-            else
+            if [ -n "$TAG_SHA" ] && [ "$TAG_SHA" = "$GITHUB_SHA" ]; then
               echo "Release $TAG existiert bereits und zeigt auf diesen Stand — nichts zu tun."
               exit 0
             fi
+            # KA-03 (Kurzaudit 2026-08-12), zwei Haertungen:
+            #  1. Der alte Tag-Zeiger wird VOR jeder Loeschung protokolliert —
+            #     die einzige dauerhafte Spur, wohin die Nummer vorher zeigte
+            #     (Unfall- und Missbrauchs-Nachweis im Workflow-Log).
+            #  2. Reihenfolge gedreht: ERST der Tag, DANN der Release. Bricht
+            #     der Lauf dazwischen ab, bleibt "Tag weg, Release verwaist" —
+            #     dieser Zweig hier raeumt das beim naechsten Lauf von selbst
+            #     auf (TAG_SHA ist dann leer). Die alte Reihenfolge liess
+            #     stattdessen "Release weg, Tag zeigt auf alt" zurueck — und
+            #     ein Folgelauf haette den neuen Release still auf den ALTEN
+            #     Tag-Zeiger gelegt (gh ignoriert --target bei vorhandenem
+            #     Tag): exakt die OPS-002-Falle.
+            echo "Nummer $VERSION wird wiederverwendet — alter Tag-Zeiger: ${TAG_SHA:-<Tag fehlt bereits, nur verwaister Release>}"
+            if [ -n "$TAG_SHA" ]; then
+              git push origin ":refs/tags/$TAG"
+            fi
+            gh release delete "$TAG" --yes
+          fi
+          # KA-03, Wache vor dem Anlegen: Existiert der Tag auf origin noch
+          # (halber Durchlauf einer aelteren Workflow-Version, manuell
+          # angelegter Tag), wuerde `gh release create` das --target ignorieren
+          # und den Release-Text auf einen fremden Stand heften. Dann lieber
+          # laut scheitern — der Lauf ist gefahrlos wiederholbar.
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "FEHLER: Tag $TAG existiert noch auf origin, aber kein Release dazu passt zu diesem Stand — Abbruch statt Release auf falschen Zeiger. Tag pruefen/loeschen und Workflow erneut starten."
+            exit 1
           fi
           # Release-Notizen = der Abschnitt genau dieser Version
           awk -v v="## [$VERSION]" '

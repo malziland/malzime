@@ -11,6 +11,8 @@
 
 const { checkRateLimit, getClientIp } = require("./middleware");
 const { zaehleRealitaetsCheck } = require("./counter");
+const { verbraucheRcTicket } = require("./jobs");
+const { sha256Hex } = require("./auth");
 
 const STRING_FIELDS = {
   eventType: 50,
@@ -107,21 +109,45 @@ function berechneRealitaetsCheckScore(stufen) {
   return Math.round((summe / werte.length) * 100);
 }
 
+/* KA-02: Ein Ticket ist eine UUID (36 Zeichen) — die Grenze ist nur ein
+   zweites Netz gegen absurd lange Strings vor dem Hashen. */
+const RC_TICKET_MAX_LAENGE = 100;
+
 /**
  * Behandelt das realitaets-check-Ereignis: strikt validieren, EIN anonymes
  * Log-Ereignis schreiben und das Aggregat in Firestore hochzählen. Bewusst
  * KEINE weiteren Felder aus dem Body (traceId, userAgent, timings, …) —
  * dieses Ereignis bleibt unverknüpfbar. Ungültige Eingaben werden still
  * verworfen; die Antwort ist in jedem Fall 204.
+ *
+ * KA-02 (Kurzaudit 2026-08-12): Gezählt wird NUR noch gegen ein gültiges
+ * Einmal-Ticket aus einer echten Analyse (ausgegeben vom job-status-Handler
+ * bei der ersten Auslieferung, entwertet in einer Transaktion). Vorher war
+ * der Zähler von außen flutbar: Das IP-Limit lebt je Function-Instanz (bis
+ * zu 3 Instanzen), und das Aggregat kennt keinen Rückweg. Reihenfolge
+ * bewusst: erst die Stufen prüfen, DANN das Ticket entwerten — eine kaputte
+ * Eingabe verbrennt kein gültiges Ticket. Das Ticket selbst wird weder
+ * geloggt noch gespeichert; das Log-Ereignis trägt unverändert nur
+ * {stufen, score} und bleibt unverknüpfbar.
  */
 async function handleRealitaetsCheckEvent(body, res) {
   const stufen = validiereRealitaetsCheckStufen(body.stufen);
   if (stufen) {
-    const score = berechneRealitaetsCheckScore(stufen);
-    console.log(JSON.stringify({ type: "client-telemetry", eventType: "realitaets-check", stufen, score }));
-    /* zaehleRealitaetsCheck schluckt Firestore-Fehler selbst (nur Warnung) —
-       Telemetrie darf nie mit einem 5xx antworten. */
-    await zaehleRealitaetsCheck(score);
+    const ticket =
+      typeof body.ticket === "string" && body.ticket.length > 0 && body.ticket.length <= RC_TICKET_MAX_LAENGE
+        ? body.ticket
+        : null;
+    /* Ein Firestore-Schluckauf beim Entwerten darf die Antwort nie kippen —
+       dann zählt diese Stimme eben nicht (fail-closed: lieber eine echte
+       Stimme verlieren als Flutung wieder öffnen). */
+    const gueltig = ticket ? await verbraucheRcTicket(sha256Hex(ticket)).catch(() => false) : false;
+    if (gueltig) {
+      const score = berechneRealitaetsCheckScore(stufen);
+      console.log(JSON.stringify({ type: "client-telemetry", eventType: "realitaets-check", stufen, score }));
+      /* zaehleRealitaetsCheck schluckt Firestore-Fehler selbst (nur Warnung) —
+         Telemetrie darf nie mit einem 5xx antworten. */
+      await zaehleRealitaetsCheck(score);
+    }
   }
   res.status(204).end();
 }

@@ -43,8 +43,9 @@ afterAll(() => {
 /* ── 1. Extraktor: _extrahiereLiveText ───────────────────────────── */
 
 /* Seit Phase 3 liefert der Extraktor BEIDE Texte: { standard, beast } —
-   standard = 1. Vorkommen von "profileText", beast = 2. Vorkommen; jeweils
-   null, solange der Wert noch nicht begonnen hat. */
+   seit KA-11 (Kurzaudit 2026-08-12) VERANKERT am jeweiligen Modus-Schluessel
+   ("standard"/"beast") statt an der blossen Reihenfolge der Vorkommen;
+   jeweils null, solange der Wert noch nicht begonnen hat. */
 const NICHTS = { standard: null, beast: null };
 
 describe("extrahiereLiveText — Feld noch nicht begonnen", () => {
@@ -105,7 +106,7 @@ describe("extrahiereLiveText — normale Faelle", () => {
   });
 
   test("Umlaute und Emojis als rohe Zeichen bleiben erhalten", () => {
-    expect(_extrahiereLiveText('{"profileText": "Grüße aus Österreich 🎉 und weiter').standard).toBe(
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Grüße aus Österreich 🎉 und weiter').standard).toBe(
       "Grüße aus Österreich 🎉 und weiter"
     );
   });
@@ -113,37 +114,38 @@ describe("extrahiereLiveText — normale Faelle", () => {
 
 describe("extrahiereLiveText — Escapes", () => {
   test("Escapes werden zu echten Zeichen dekodiert", () => {
-    const praefix = '{"profileText": "Er sagt \\"Hallo\\" und macht\\neinen Umbruch\\tmit Tab und \\\\ Backslash';
+    const praefix =
+      '{"standard": {"profileText": "Er sagt \\"Hallo\\" und macht\\neinen Umbruch\\tmit Tab und \\\\ Backslash';
     expect(_extrahiereLiveText(praefix).standard).toBe(
       'Er sagt "Hallo" und macht\neinen Umbruch\tmit Tab und \\ Backslash'
     );
   });
 
   test("\\uXXXX-Escapes werden aufgeloest — auch Emoji-Surrogatpaare", () => {
-    const praefix = '{"profileText": "Umlaut \\u00e4, Gedankenstrich \\u2014, Emoji \\ud83d\\ude00!"';
+    const praefix = '{"standard": {"profileText": "Umlaut \\u00e4, Gedankenstrich \\u2014, Emoji \\ud83d\\ude00!"';
     expect(_extrahiereLiveText(praefix).standard).toBe("Umlaut ä, Gedankenstrich —, Emoji 😀!");
   });
 
   test('Praefix endet mitten in \\" — der nackte Backslash wird abgeschnitten', () => {
-    expect(_extrahiereLiveText('{"profileText": "Zitat: \\').standard).toBe("Zitat: ");
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Zitat: \\').standard).toBe("Zitat: ");
   });
 
   test("Praefix endet mitten in \\u00 — das halbe Escape wird abgeschnitten", () => {
-    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u00').standard).toBe("Etwa 25");
-    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u').standard).toBe("Etwa 25");
-    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u00b').standard).toBe("Etwa 25");
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Etwa 25\\u00').standard).toBe("Etwa 25");
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Etwa 25\\u').standard).toBe("Etwa 25");
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Etwa 25\\u00b').standard).toBe("Etwa 25");
   });
 
   test("ein komplettes \\uXXXX am Praefix-Ende bleibt erhalten", () => {
-    expect(_extrahiereLiveText('{"profileText": "25\\u00b0').standard).toBe("25°");
+    expect(_extrahiereLiveText('{"standard": {"profileText": "25\\u00b0').standard).toBe("25°");
   });
 
   test("einsame hohe Surrogathälfte am Ende (halbes Emoji) wird abgeschnitten", () => {
-    expect(_extrahiereLiveText('{"profileText": "Feier \\ud83d').standard).toBe("Feier ");
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Feier \\ud83d').standard).toBe("Feier ");
   });
 
   test("ein escaptes Anfuehrungszeichen beendet den Wert NICHT", () => {
-    expect(_extrahiereLiveText('{"profileText": "Er sagt \\"Servus\\" und geht').standard).toBe(
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Er sagt \\"Servus\\" und geht').standard).toBe(
       'Er sagt "Servus" und geht'
     );
   });
@@ -152,9 +154,46 @@ describe("extrahiereLiveText — Escapes", () => {
     const praefix = '{"standard": {"profileText": "Fertig."}, "beast": {"profileText": "Er sagt \\"Zack\\u2014';
     expect(_extrahiereLiveText(praefix).beast).toBe('Er sagt "Zack—');
     /* Und auch das Abschneiden halber Escapes am Praefix-Ende: */
-    expect(_extrahiereLiveText('{"profileText": "Fertig."}, "beast": {"profileText": "Etwa 25\\u00').beast).toBe(
-      "Etwa 25"
-    );
+    expect(
+      _extrahiereLiveText('{"standard": {"profileText": "Fertig."}, "beast": {"profileText": "Etwa 25\\u00').beast
+    ).toBe("Etwa 25");
+  });
+});
+
+/* ── KA-11 (Kurzaudit 2026-08-12): Verankerung am Modus-Schluessel ──
+   Die Reihenfolge „standard vor beast" haengt allein am Beispiel-Schema des
+   Prompts — keine Garantie. Jeder Wert zaehlt deshalb nur noch, wenn er
+   nachweislich zu SEINEM Modus-Block gehoert: Der harte Beast-Text darf nie
+   als Standard-Profil erscheinen, egal was das Modell anstellt. */
+describe("extrahiereLiveText — KA-11: Verankerung am Modus-Schluessel", () => {
+  test("ein profileText VOR jedem Modus-Schluessel zaehlt fuer niemanden", () => {
+    expect(_extrahiereLiveText('{"profileText": "Herrenlos und komplett."')).toEqual(NICHTS);
+  });
+
+  test("HAZARD-Fall: standard-Block OHNE profileText, beast MIT — der Beast-Text erscheint NICHT als Standard", () => {
+    const praefix = '{"standard": {"ad_targeting": ["x"]}, "beast": {"profileText": "Du bist ein zynisches Ziel';
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: null,
+      beast: "Du bist ein zynisches Ziel",
+    });
+  });
+
+  test("komplett vertauschte Reihenfolge (beast zuerst): beide Texte landen trotzdem im RICHTIGEN Feld", () => {
+    const praefix = '{"beast": {"profileText": "Boese Version."}, "standard": {"profileText": "Sachliche Vers';
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: "Sachliche Vers",
+      beast: "Boese Version.",
+    });
+  });
+
+  test("beast-Block offen ohne eigenen profileText, standard danach: nichts rutscht ins Beast-Feld", () => {
+    const praefix = '{"beast": {"ad_targeting": ["x"]}, "standard": {"profileText": "Echt."';
+    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Echt.", beast: null });
+  });
+
+  test("RUECKBAUPROBE Normalfall: gemessene Reihenfolge liefert byte-identisch dasselbe wie vor KA-11", () => {
+    const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText": "Beast-Text."}}';
+    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: "Beast-Text." });
   });
 });
 

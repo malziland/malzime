@@ -88,6 +88,16 @@ async function cleanupNonces() {
 }
 
 /**
+ * SHA-256 als Hex-String. Gebraucht fuer das Einmal-Ticket des
+ * Realitaets-Checks (KA-02): Im Job-Dokument liegt NUR der Hash, nie das
+ * Ticket selbst — wer die Datenbank liest, kann daraus kein gueltiges
+ * Ticket rekonstruieren (dieselbe Philosophie wie beim resultToken-Vergleich).
+ */
+function sha256Hex(value) {
+  return crypto.createHash("sha256").update(String(value)).digest("hex");
+}
+
+/**
  * SEC-01: Konstantzeitiger String-Vergleich fuer Secrets/Tokens.
  * Verhindert Timing-Seitenkanaele, ueber die ein Angreifer ein Secret
  * byteweise rekonstruieren koennte. Ein Laengen-Mismatch wird frueh und
@@ -109,6 +119,7 @@ module.exports = {
   consumeNonce,
   cleanupNonces,
   safeCompare,
+  sha256Hex,
   DEFAULT_TTL_MS,
   NONCE_TTL_MS,
 };

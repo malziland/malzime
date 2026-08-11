@@ -4,6 +4,54 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.2] — 2026-08-11
+
+Sanierung nach dem Kurzaudit des v3-Tags (unabhängige Prüfung von Code und
+Infrastruktur, Prüfstand 79ec393). Kein neues Feature — vier Härtungen und
+etwas Feinschliff:
+
+**Der anonyme Realitäts-Check-Zähler ist jetzt flutungssicher**
+
+- Die öffentliche Vergleichszahl („so gut lagen alle anderen") zählt eine
+  Stimme nur noch gegen ein Einmal-Ticket, das der Server bei der ersten
+  Auslieferung eines echten Ergebnisses ausgibt und beim Zählen entwertet —
+  eine echte Analyse, höchstens eine Stimme. Vorher hätte ein simples Skript
+  den Wert beliebig verstellen können. An der Anonymität ändert sich nichts:
+  Das Ticket ist ein bedeutungsloser Zufallswert, gespeichert wird weiterhin
+  ausschließlich die Selbsteinschätzung selbst; in der Datenbank liegt nur
+  ein Hash, und geloggt wird das Ticket nie.
+
+**Live-Text: Zuordnung abgesichert**
+
+- Der Live-Text-Strom verlässt sich nicht mehr auf die bloße Reihenfolge
+  der Profiltexte in der Modell-Antwort, sondern verankert jeden Text an
+  seinem Modus-Block („standard"/„beast"). Selbst wenn das Modell die Blöcke
+  je vertauschen sollte, kann der harte Beast-Text nie kurz als normales
+  Profil erscheinen.
+
+**Release-Automatik abbruchfest**
+
+- Der Release-Wächter protokolliert vor jedem Umhängen einer wiederverwendeten
+  Versionsnummer den alten Tag-Zeiger, löscht in verwechslungssicherer
+  Reihenfolge (erst Tag, dann Release), verweigert das Anlegen auf einen
+  fremden Tag-Zeiger und lässt keine zwei Läufe mehr parallel zu — ein halber
+  Durchlauf kann Tag und CHANGELOG nicht mehr auseinanderreißen.
+
+**Feinschliff**
+
+- Die Einordnung „Die KI-Profile sind erfunden … nichts davon ist wahr oder
+  bewiesen" steht am Bildschirm jetzt VOR der Foto-Wahl statt erst darunter
+  (im Druck stand sie schon immer oben).
+- Die Auge-Nachwache der Blick-Führung ist an ihren Analyse-Lauf gebunden:
+  Startet blitzschnell eine neue Analyse, kann keine alte Wache-Kette mehr
+  parallel weiterticken.
+- Bei Mistral-Überlastantworten (429) wird der ungenutzte Antwortrumpf sofort
+  verworfen statt bis zur Speicherbereinigung offen zu bleiben.
+- Veraltete „6 Anfragen/Sekunde"-Kommentare (Mai-Stand) im Code durch die
+  heutige Tier-Wahrheit ersetzt (Stufen-System, aktuell 0,25 Anfragen/s);
+  ein neues Skript legt die Analyse-Messwerte für die September-Auswertungen
+  30 Tage statt 1 Tag in den anonymen Diagnose-Speicher.
+
 ## [3.0.1] — 2026-08-11
 
 Feinschliff-Sammlung nach den Live-Tests des v3.0-Starts — Dramaturgie,

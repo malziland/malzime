@@ -22,7 +22,6 @@ export const elements = {
   srAnnounce: document.getElementById("srAnnounce"),
   /* Live-Karte (v3.0 Live-Erlebnis, js/live-anzeige.js) */
   liveKarte: document.getElementById("liveKarte"),
-  liveStatusText: document.getElementById("liveStatusText"),
   liveTextFest: document.getElementById("liveTextFest"),
   liveTextRausch: document.getElementById("liveTextRausch"),
   liveCursor: document.getElementById("liveCursor"),

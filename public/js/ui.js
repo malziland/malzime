@@ -36,11 +36,18 @@ export function getBiasMode() {
   return elements.biasSwitch.checked ? "boost" : "normal";
 }
 
-export function startScanAnim(rotateMessages = true) {
-  stopScanAnim(); /* BUG-009: alten Intervall aufräumen bevor neuer startet */
+/* `leise` nutzt die Live-Anzeige (v3.0.2): Sie holt das Auge als Warte-
+   Spinner zurück, wenn der getippte Text ausgeht — dieses Wieder-Erscheinen
+   ist KEIN neuer Analyse-Start, eine „Analyse gestartet"-Ansage wäre dort
+   schlicht falsch. */
+export function startScanAnim(rotateMessages = true, leise = false) {
+  /* BUG-009: alten Intervall aufräumen bevor neuer startet. Leise (true):
+     ein Neustart der Animation ist nie ein Abschluss — „Analyse
+     abgeschlossen" darf hier nicht angesagt werden. */
+  stopScanAnim(true);
   elements.scanAnim.classList.add("active");
   /* A11y: Screenreader-Ankuendigung */
-  if (elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srStart");
+  if (!leise && elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srStart");
   /* Queue-Modus (rotateMessages=false): nur die Animation laufen lassen, den
      scan-Text setzt der Aufrufer selbst. Die rotierenden Analyse-Meldungen
      ("Gesicht erkannt…") wären irreführend, solange der Job nur wartet. */

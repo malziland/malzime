@@ -783,40 +783,8 @@ html[data-has-result] {
   animation: fadeUp 0.35s var(--ease) both;
 }
 
-.live-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 10px;
-  color: #0e6e73;
-}
-
-[data-mode="boost"] .live-status {
-  color: #46d67c;
-}
-
-.live-status .puls-punkt {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 8px currentColor;
-  animation: livePuls 1.1s ease-in-out infinite;
-}
-
-@keyframes livePuls {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
+/* Die frühere Status-Zeile (.live-status samt Puls-Punkt) ist seit v3.0.2
+   ersatzlos weg — Warte-Meldungen trägt das Scan-Auge oberhalb der Karte. */
 
 .live-text {
   font-size: 1.02rem;
@@ -863,13 +831,6 @@ html[data-has-result] {
   margin-top: 8px;
   font-size: 0.78rem;
   color: var(--muted);
-}
-
-/* Erzähler-Betrieb während der Enthüllung: nur noch die Status-Zeile —
-   die Zusammenfassung steht dann in ihrer normalen Box (#simulation). */
-.live-karte--erzaehler .live-text,
-.live-karte--erzaehler .live-warten {
-  display: none;
 }
 
 /* ── Gestaffelte Enthüllung (v3.0) ── */
@@ -2687,10 +2648,9 @@ ol.legal-list > li::before {
     transition-delay: 0s !important;
   }
 
-  /* Live-Erlebnis (v3.0): Puls-Punkt, Cursor-Blinken und Pop explizit
-     stilllegen — die JS-Seite (live-anzeige.js) zeigt bei reduzierter
-     Bewegung ohnehin alles sofort, hier verschwindet auch der Rest-Effekt. */
-  .live-status .puls-punkt,
+  /* Live-Erlebnis (v3.0): Cursor-Blinken und Pop explizit stilllegen —
+     die JS-Seite (live-anzeige.js) zeigt bei reduzierter Bewegung ohnehin
+     alles sofort, hier verschwindet auch der Rest-Effekt. */
   .tipp-cursor,
   .pop-rein {
     animation: none !important;

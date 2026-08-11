@@ -4,6 +4,30 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.2] — 2026-08-11
+
+Dramaturgie-Feinschliff nach dem ersten Live-Tag:
+
+- **Längerer Anlauf (~25 s):** Vor dem ersten getippten Zeichen sammelt die
+  Seite jetzt rund 25 Sekunden Text (statt 20). So enden Tippen und Analyse
+  näher beieinander — vorher war die Box oft fertig, und dann passierte
+  eine ganze Weile nichts.
+- **Warte-Meldungen wieder im vertrauten Augen-Spinner:** Geht der getippte
+  Text aus, während die Analyse noch rechnet, erscheinen die Warte-Zeilen
+  („Kategorien werden berechnet …") jetzt im bekannten Auge oberhalb der
+  Karte — genau wie beim Start der Analyse. Die eigene Status-Zeile in der
+  Karte ist weg: Es gibt nur noch zwei Bilder — das arbeitende Auge und die
+  tippende KI.
+- **Abschluss-Box entfernt:** Nach der Enthüllung steht keine eigene
+  „Analyse abgeschlossen"-Box mehr unter dem Ergebnis. Der Merksatz „nichts
+  davon ist wahr …" steht ohnehin in der Zusammenfassung.
+- **Die Enthüllung scrollt sanft mit:** Jede aufpoppende Box wird
+  automatisch ins Bild geholt — du musst nicht mehr selbst hinterherscrollen.
+  Sobald du aber selbst scrollst, hört das sofort auf und du behältst die
+  Kontrolle; Töne gibt es dann nur noch für Boxen, die du auch wirklich
+  siehst. Wer im System „Bewegung reduzieren" eingestellt hat, bekommt wie
+  bisher alles sofort und ohne automatisches Scrollen.
+
 ## [3.0.1] — 2026-08-11
 
 Feinschliff nach dem Abend-Test des Live-Erlebnisses:

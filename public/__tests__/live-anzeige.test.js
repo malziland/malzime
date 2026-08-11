@@ -49,7 +49,6 @@ describe("Live-Anzeige (v3.0)", () => {
     [
       elements.liveTextFest,
       elements.liveTextRausch,
-      elements.liveStatusText,
       elements.liveWarten,
       elements.srAnnounce,
       elements.scanText,
@@ -112,6 +111,22 @@ describe("Live-Anzeige (v3.0)", () => {
     await vi.advanceTimersByTimeAsync(5300);
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
+  });
+
+  it("v3.0.2: der Standard-Anlauf beträgt 25 s — bei 24 s tippt noch nichts, kurz danach schon", async () => {
+    /* Frischer Modul-Import, damit wirklich der STANDARDWERT geprüft wird —
+       der beforeEach oben stellt den Anlauf für alle übrigen Tests auf 0. */
+    vi.resetModules();
+    const frisch = await import("../js/live-anzeige.js");
+    const { elements: el } = await import("../js/dom.js");
+    frisch.welle({ standard: "A".repeat(2000), beast: null });
+    await vi.advanceTimersByTimeAsync(24000);
+    expect(el.liveKarte.classList.contains("active")).toBe(false);
+    expect(el.liveTextFest.textContent.length).toBe(0);
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(el.liveKarte.classList.contains("active")).toBe(true);
+    expect(el.liveTextFest.textContent.length).toBeGreaterThan(0);
+    frisch.zuruecksetzen();
   });
 
   it("Adaptives Tempo: viel Puffer tippt am Deckel (~90 Z/s) — deutlich schneller als das alte Festtempo", async () => {
@@ -218,7 +233,8 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveKarte.classList.contains("active")).toBe(false);
     expect(elements.liveTextFest.textContent).toBe("");
     expect(elements.liveTextRausch.textContent).toBe("");
-    expect(elements.liveStatusText.textContent).toBe("");
+    /* Auch ein eventuell aktives Warte-Auge ist mit aufgeräumt. */
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
 
     /* Kein Wiederauferstehen durch die gestoppte Schleife. */
     await vi.advanceTimersByTimeAsync(2000);
@@ -239,8 +255,7 @@ describe("Live-Anzeige (v3.0)", () => {
     /* Das erste Zeichen ist KEIN Abschluss — die srEnd-Ansage darf hier
        nicht fallen (die kommt erst am Ende des Durchgangs). */
     expect(elements.srAnnounce.textContent).toBe("scan.srStart");
-    /* Stattdessen übernimmt die Live-Karte mit Status + Dauerhinweis. */
-    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+    /* Stattdessen übernimmt die Live-Karte mit dem Dauerhinweis. */
     expect(elements.liveWarten.textContent).toBe("live.nochNichtFertig");
   });
 
@@ -285,67 +300,71 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
   });
 
-  /* ── Warte-Rotation nach dem fertig getippten Text (FIX 2, v3.0.1) ──────
-     Seit v3.0.0 nur noch der FALLBACK für einen vorzeitig leeren Puffer —
-     den Normalfall trägt jetzt das adaptive Tippen selbst. Die kurzen Texte
-     hier (48 Zeichen, Boden-Tempo 20 Z/s ≈ 2,4 s) tippen bewusst schnell leer. */
+  /* ── Warte-Auge oberhalb der Karte (v3.0.2, ersetzt die Status-Zeile) ───
+     Läuft der aktive Puffer leer, kehrt das vertraute Scan-Auge (#scanAnim)
+     zurück und trägt die rotierenden Warte-Zeilen (`live.warten`) im
+     Spinner-Text (#scanText) — NICHT mehr in einer Zeile in der Karte. Die
+     kurzen Texte hier (48 Zeichen, Boden-Tempo 20 Z/s ≈ 2,4 s) tippen
+     bewusst schnell leer. */
 
-  it("FIX 2 (Fallback): die Warte-Rotation startet erst nach dem Tipp-Ende — nicht schon, wenn die Lieferung fertig ist", async () => {
+  it("v3.0.2: die Warte-Rotation erscheint im Auge oberhalb der Karte — erst nach dem Tipp-Ende, im Spinner-Text", async () => {
     w("A".repeat(48));
     await vi.advanceTimersByTimeAsync(1000);
-    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+    /* Solange getippt wird, ist das Auge aus: das Tippen IST die Bewegung.
+       (Diese Erwartungen werden ROT, wenn jemand den Spinner-Warte-Zustand
+       stilllegt.) */
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
 
-    /* Nächste Poll-Welle OHNE neue Zeichen → Lieferung abgeschlossen. Getippt
-       wird aber noch (~48 Zeichen / 20 pro s ≈ 2,4 s) — die Status-Zeile
-       bleibt beim Schreib-Status. */
-    w("A".repeat(48));
-    await vi.advanceTimersByTimeAsync(500);
-    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
-
-    /* Fertig getippt → jetzt rotieren die ehrlichen Warte-Zeilen. */
+    /* Fertig getippt (~2,4 s) → das Auge übernimmt mit den Warte-Zeilen. */
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    expect(elements.scanText.textContent).toBe("live.warten.0");
     await vi.advanceTimersByTimeAsync(2500);
-    expect(elements.liveStatusText.textContent).toBe("live.warten.0");
-    await vi.advanceTimersByTimeAsync(2500);
-    expect(elements.liveStatusText.textContent).toBe("live.warten.1");
+    expect(elements.scanText.textContent).toBe("live.warten.1");
     /* Der Cursor blinkt weiter: kein Rausch-Schweif, Karte bleibt aktiv. */
     expect(elements.liveTextRausch.textContent).toBe("");
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
+
+    /* Mit dem nächsten getippten Zeichen verschwindet das Auge sofort. */
+    w("A".repeat(48) + "B".repeat(120));
+    await vi.advanceTimersByTimeAsync(300);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(48);
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
   });
 
-  it("FIX 2: die Rotation stoppt bei done (Enthüllung übernimmt die Status-Zeile)", async () => {
+  it("v3.0.2: bei Enthüllungs-Beginn verschwindet das Warte-Auge endgültig", async () => {
     w("A".repeat(12));
-    await vi.advanceTimersByTimeAsync(500);
-    w("A".repeat(12)); /* Lieferung fertig */
-    await vi.advanceTimersByTimeAsync(5000); /* fertig getippt → Rotation läuft */
-    expect(elements.liveStatusText.textContent).toMatch(/^live\.warten\./);
+    await vi.advanceTimersByTimeAsync(5000); /* fertig getippt → Auge läuft */
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    expect(elements.scanText.textContent).toMatch(/^live\.warten\./);
 
     baueGerendertesErgebnis();
     liveAnzeige.starteEnthuellung();
-    /* Ab jetzt gehört die Status-Zeile der Enthüllung — keine Warte-Zeile
-       darf sie mehr überschreiben, auch nicht nach weiteren Takten. */
-    expect(elements.liveStatusText.textContent).toBe("live.statusFotoDaten");
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
+    /* Auch nach weiteren Takten schreibt keine Warte-Zeile mehr nach. */
+    const stand = elements.scanText.textContent;
     await vi.advanceTimersByTimeAsync(6000);
-    expect(elements.liveStatusText.textContent).not.toMatch(/^live\.warten\./);
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
+    expect(elements.scanText.textContent).toBe(stand);
   });
 
-  it("FIX 2: reduced-motion zeigt die rotierenden Warte-Zeilen ebenfalls — Textwechsel ist keine Bewegung", async () => {
+  it("v3.0.2: reduced-motion zeigt das Warte-Auge ebenfalls — ohne Tippen trägt es die gesamte Wartezeit", async () => {
     reduzierteBewegung();
+    /* Ohne Tippen ist der Puffer nach jeder Welle sofort „leer" — das Auge
+       mit den Warte-Zeilen übernimmt unmittelbar (Textwechsel ist keine
+       Bewegung). */
     w("A".repeat(80));
-    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
-
-    /* Welle ohne Wachstum: Text steht sofort vollständig da (kein Tippen),
-       die Lieferung ist fertig → Rotation startet unmittelbar. */
-    w("A".repeat(80));
-    expect(elements.liveStatusText.textContent).toBe("live.warten.0");
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    expect(elements.scanText.textContent).toBe("live.warten.0");
     await vi.advanceTimersByTimeAsync(2500);
-    expect(elements.liveStatusText.textContent).toBe("live.warten.1");
+    expect(elements.scanText.textContent).toBe("live.warten.1");
     await vi.advanceTimersByTimeAsync(2500);
-    expect(elements.liveStatusText.textContent).toBe("live.warten.2");
+    expect(elements.scanText.textContent).toBe("live.warten.2");
 
-    /* Kommt doch noch Text nach, endet die Rotation und es gilt wieder der
-       Schreib-Status. */
+    /* Nachschub erscheint sofort vollständig — das Auge rotiert weiter. */
     w("A".repeat(80) + "B".repeat(40));
-    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+    expect(elements.liveTextFest.textContent).toBe("A".repeat(80) + "B".repeat(40));
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
   });
 
   /* ── Zwei Puffer: der Text folgt dem gewählten Modus (Phase 3) ────────── */
@@ -378,29 +397,31 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent).toBe("S".repeat(elements.liveTextFest.textContent.length));
   });
 
-  it("Beast gewählt, Puffer noch leer: Warte-Status statt Standard-Text — und Tippstart, sobald Beast eintrifft", async () => {
+  it("Beast gewählt, Puffer noch leer: das Auge trägt den Beast-Warte-Text — und Tippstart, sobald Beast eintrifft", async () => {
     /* Seriös tippt bereits … */
     w("S".repeat(250));
     await vi.advanceTimersByTimeAsync(1000);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
 
     /* … Wechsel auf Beast, obwohl das Modell Beast noch nicht schreibt:
-       KEIN Standard-Text sichtbar, eigener Warte-Status, Cursor blinkt
-       (Schweif leer — das Blinken selbst ist CSS). */
+       KEIN Standard-Text sichtbar, das Warte-Auge oberhalb der Karte trägt
+       den Beast-Warte-Text, in der Karte blinkt der Cursor (Schweif leer —
+       das Blinken selbst ist CSS). */
     schalte(true);
     expect(elements.liveTextFest.textContent).toBe("");
-    expect(elements.liveStatusText.textContent).toBe("live.beastWartet");
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    expect(elements.scanText.textContent).toBe("live.beastWartet");
     await vi.advanceTimersByTimeAsync(2000);
     expect(elements.liveTextFest.textContent).toBe("");
     expect(elements.liveTextRausch.textContent).toBe("");
 
     /* Die nächste Welle bringt die ersten Beast-Zeichen: jetzt tippt es
-       sofort los, der Status wechselt zurück auf „schreibt". */
+       sofort los, das Auge verschwindet. */
     w("S".repeat(250), "B".repeat(230));
     await vi.advanceTimersByTimeAsync(500);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
     expect(elements.liveTextFest.textContent).toBe("B".repeat(elements.liveTextFest.textContent.length));
-    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
   });
 
   it("v3.0.0: auch ein kurzer Beast-Stand tippt nach dem Wechsel sofort — kein Anlauf-Puffer je Puffer mehr", async () => {
@@ -427,19 +448,22 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent).toBe("S".repeat(80));
   });
 
-  it("reduced-motion: Beast gewählt und noch leer → Warte-Status, kein Standard-Text", async () => {
+  it("reduced-motion: Beast gewählt und noch leer → Beast-Warte-Text im Auge, kein Standard-Text", async () => {
     reduzierteBewegung();
     w("S".repeat(80));
     expect(elements.liveTextFest.textContent).toBe("S".repeat(80));
 
     schalte(true);
     expect(elements.liveTextFest.textContent).toBe("");
-    expect(elements.liveStatusText.textContent).toBe("live.beastWartet");
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    expect(elements.scanText.textContent).toBe("live.beastWartet");
 
-    /* Sobald Beast eintrifft, steht er sofort vollständig da. */
+    /* Sobald Beast eintrifft, steht er sofort vollständig da — und das Auge
+       wechselt zurück auf die Warte-Zeilen (ohne Tippen ist der Puffer
+       sofort wieder „leer"). */
     w("S".repeat(80), "B".repeat(60));
     expect(elements.liveTextFest.textContent).toBe("B".repeat(60));
-    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+    expect(elements.scanText.textContent).toBe("live.warten.0");
   });
 
   /* ── Gestaffelte Enthüllung ──────────────────────────────────────────── */
@@ -509,9 +533,10 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(Array.from(elements.facts.children).every(sichtbar)).toBe(true);
     expect(elements.dataValue.querySelector(".dv-hero-value").textContent).toBe("0,53 €");
     expect(elements.dataValue.querySelector(".dv-bar-fill").style.width).toBe("100%");
-    /* A11y: genau EINE Ankündigung, am Ende. */
-    expect(elements.srAnnounce.textContent).toBe("live.statusFertig");
-    expect(elements.liveStatusText.textContent).toBe("live.statusFertig");
+    /* A11y: genau EINE Ankündigung, am Ende — der Abschluss-Text der
+       Scan-Phase; eine sichtbare Abschluss-Box gibt es nicht mehr (v3.0.2). */
+    expect(elements.srAnnounce.textContent).toBe("scan.srEnd");
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
   });
 
   it("v3.1: ein sichtbarer Realitäts-Check reiht sich zwischen Manipulation und Datenwert ein", async () => {
@@ -585,7 +610,7 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.exportPdf.classList.contains("export-btn--hidden")).toBe(false);
     expect(elements.dataValue.querySelector(".dv-hero-value").textContent).toBe("0,53 €");
     expect(elements.dataValue.querySelector(".dv-bar-fill").style.width).toBe("100%");
-    expect(elements.srAnnounce.textContent).toBe("live.statusFertig");
+    expect(elements.srAnnounce.textContent).toBe("scan.srEnd");
   });
 
   it("enthuellungAbkuerzen: mitten in der Enthüllung wird sofort alles sichtbar (Beast-Umschalter)", async () => {
@@ -606,13 +631,136 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.exportPdf.classList.contains("export-btn--hidden")).toBe(false);
   });
 
-  it("späte Wellen nach Beginn der Enthüllung ändern den Text nicht mehr", async () => {
+  it("späte Wellen nach Beginn der Enthüllung bringen Karte und Text nicht zurück", async () => {
     baueGerendertesErgebnis();
     reduzierteBewegung();
     w("A".repeat(80));
     expect(elements.liveTextFest.textContent).toBe("A".repeat(80));
+    /* Der Enthüllungs-Beginn räumt die Karte weg — die Zusammenfassung steht
+       ab jetzt in ihrer normalen Box (#simulation). */
     liveAnzeige.starteEnthuellung();
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.liveTextFest.textContent).toBe("");
     w("A".repeat(80) + "B".repeat(80));
-    expect(elements.liveTextFest.textContent).toBe("A".repeat(80));
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.liveTextFest.textContent).toBe("");
+  });
+
+  /* ── Abschluss ohne Status-Box + geführtes Mitscrollen (v3.0.2) ────────── */
+
+  it("v3.0.2: nach der Enthüllung steht nirgends mehr eine Abschluss-Status-Box", async () => {
+    baueGerendertesErgebnis();
+    liveAnzeige.starteEnthuellung();
+    /* Karte und Warte-Auge sind ab Enthüllungs-Beginn endgültig weg … */
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
+    await vi.advanceTimersByTimeAsync(16000);
+    /* … und auch nach dem Abschluss taucht keine Status-Box wieder auf.
+       (Diese Erwartungen werden ROT, wenn jemand die Abschluss-Box — Text
+       „Analyse abgeschlossen …", i18n-Schlüssel live.statusFertig — wieder
+       einbaut.) */
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(document.body.textContent).not.toContain("live.statusFertig");
+    /* Die EINE Screenreader-Ankündigung am Ende bleibt. */
+    expect(elements.srAnnounce.textContent).toBe("scan.srEnd");
+    expect(elements.exportPdf.classList.contains("export-btn--hidden")).toBe(false);
+  });
+
+  it("v3.0.2 Führung: jede enthüllte Box wird sanft ins Sichtfeld geholt (scrollIntoView je Box)", async () => {
+    const scrollSpy = vi.fn();
+    window.Element.prototype.scrollIntoView = scrollSpy;
+    try {
+      baueGerendertesErgebnis();
+      liveAnzeige.starteEnthuellung();
+      await vi.advanceTimersByTimeAsync(16000);
+      /* 10 Boxen: privacy, gps, 5 Kategorien-Kinder, Werbung, Manipulation,
+         Datenwert (der Realitäts-Check bleibt hier verborgen). */
+      expect(scrollSpy).toHaveBeenCalledTimes(10);
+      expect(scrollSpy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    } finally {
+      delete window.Element.prototype.scrollIntoView;
+    }
+  });
+
+  it("v3.0.2 NUTZER HAT VORRANG: das erste Rad-Ereignis beendet die Führung sofort und dauerhaft", async () => {
+    const scrollSpy = vi.fn();
+    window.Element.prototype.scrollIntoView = scrollSpy;
+    try {
+      baueGerendertesErgebnis();
+      liveAnzeige.starteEnthuellung();
+      /* privacy (~700 ms) wurde noch geführt ins Sichtfeld geholt … */
+      await vi.advanceTimersByTimeAsync(800);
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      /* … dann greift der Nutzer ein — ab jetzt scrollt NICHTS mehr
+         automatisch. (Diese Erwartung wird ROT, wenn jemand die
+         Übernahme-Wache entfernt.) */
+      window.dispatchEvent(new Event("wheel"));
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete window.Element.prototype.scrollIntoView;
+    }
+  });
+
+  it("v3.0.2 Übernahme-Tasten: Scroll-Tasten stoppen die Führung, Tab nicht", async () => {
+    const scrollSpy = vi.fn();
+    window.Element.prototype.scrollIntoView = scrollSpy;
+    try {
+      baueGerendertesErgebnis();
+      liveAnzeige.starteEnthuellung();
+      /* Tab ist Navigation, kein Scrollen — die Führung läuft weiter. */
+      window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab" }));
+      await vi.advanceTimersByTimeAsync(800);
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      /* Eine Pfeiltaste ist bewusstes Scrollen — Führung endet. */
+      window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown" }));
+      await vi.advanceTimersByTimeAsync(15000);
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete window.Element.prototype.scrollIntoView;
+    }
+  });
+
+  it("v3.0.2 Ton-Sichtfeld-Regel: nach der Übernahme klingt der Pop nur für mehrheitlich sichtbare Boxen", async () => {
+    baueGerendertesErgebnis();
+    const { popTon } = await import("../js/klang.js");
+    /* privacy liegt weit außerhalb des Fensters, gps mitten darin
+       (jsdom-Fensterhöhe: 768 px). */
+    elements.privacy.getBoundingClientRect = () => ({ top: 2000, bottom: 2120, height: 120 });
+    elements.gpsMap.getBoundingClientRect = () => ({ top: 100, bottom: 220, height: 120 });
+    liveAnzeige.starteEnthuellung();
+    /* Sofortige Übernahme, noch vor der ersten Box. */
+    window.dispatchEvent(new Event("wheel"));
+    popTon.mockClear();
+    await vi.advanceTimersByTimeAsync(750); /* privacy ist offen (~700 ms) */
+    /* Außerhalb des Sichtfelds → kein Geräusch aus dem Off. (Diese
+       Erwartung wird ROT, wenn jemand die Ton-Sichtfeld-Regel entfernt.) */
+    expect(popTon).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1150); /* gps ist offen (~1800 ms) */
+    expect(popTon).toHaveBeenCalledTimes(1);
+  });
+
+  it("v3.0.2: solange die Führung aktiv ist, klingt jeder Pop — auch außerhalb des Sichtfelds", async () => {
+    baueGerendertesErgebnis();
+    const { popTon } = await import("../js/klang.js");
+    elements.privacy.getBoundingClientRect = () => ({ top: 2000, bottom: 2120, height: 120 });
+    liveAnzeige.starteEnthuellung();
+    popTon.mockClear();
+    await vi.advanceTimersByTimeAsync(750); /* privacy ist offen (~700 ms) */
+    expect(popTon).toHaveBeenCalledTimes(1);
+  });
+
+  it("v3.0.2 reduced-motion: kein einziges automatisches Scrollen", async () => {
+    const scrollSpy = vi.fn();
+    window.Element.prototype.scrollIntoView = scrollSpy;
+    try {
+      reduzierteBewegung();
+      baueGerendertesErgebnis();
+      liveAnzeige.starteEnthuellung();
+      await vi.advanceTimersByTimeAsync(16000);
+      expect(scrollSpy).not.toHaveBeenCalled();
+    } finally {
+      delete window.Element.prototype.scrollIntoView;
+    }
   });
 });

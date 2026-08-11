@@ -233,13 +233,13 @@
       </div>
 
       <section class="results" id="resultsPanel" tabindex="-1">
-        <!-- Live-Karte (v3.0): tippt den Zusammenfassungstext während der Analyse
-             und erzählt danach die gestaffelte Enthüllung. Standardmäßig verborgen;
-             Texte setzt js/live-anzeige.js über i18n. Der wachsende Text bekommt
+        <!-- Live-Karte (v3.0): tippt den Zusammenfassungstext während der Analyse.
+             Standardmäßig verborgen; Texte setzt js/live-anzeige.js über i18n.
+             Seit v3.0.2 ohne eigene Status-Zeile: Warte-Meldungen trägt das
+             Scan-Auge (#scanAnim) oberhalb. Der wachsende Text bekommt
              bewusst KEIN aria-live (eine Ankündigung am Ende über #srAnnounce),
              Rausch-Schweif und Cursor sind rein dekorativ (aria-hidden). -->
         <div id="liveKarte" class="live-karte">
-          <div class="live-status"><span class="puls-punkt" aria-hidden="true"></span><span id="liveStatusText"></span></div>
           <div class="live-text"><span id="liveTextFest"></span><span id="liveTextRausch" class="rausch" aria-hidden="true"></span><span id="liveCursor" class="tipp-cursor" aria-hidden="true"></span></div>
           <div id="liveWarten" class="live-warten"></div>
         </div>

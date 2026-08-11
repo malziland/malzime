@@ -26,19 +26,27 @@
  *      Live-Tests). Meldet der Server „fertig", tippt schnellVorlauf() den
  *      Rest zügig aus, DANN erst startet die Enthüllung. Läuft der Puffer
  *      vorzeitig leer, verschwindet der Schweif und der Cursor blinkt.
- *   3. KEIN TOTES FENSTER (v3.0.1, FIX 2): Die Zusammenfassung ist nach
- *      ~15–25 s fertig getippt, die Analyse läuft serverseitig aber noch
- *      ~30–50 s weiter (Kategorien/Beast). Sobald der aktive Puffer fertig
- *      getippt ist UND die Lieferung dieses Modus abgeschlossen ist (eine
- *      Poll-Welle ohne neue Zeichen), rotieren in der Live-Status-Zeile
- *      ehrliche Warte-Zeilen (i18n-Liste `live.warten`, alle ~2,5 s); der
- *      Cursor blinkt weiter. Die Rotation endet bei done/Abbruch und sobald
- *      wieder getippt wird (neue Welle, Modus-Wechsel).
+ *   3. KEIN TOTES FENSTER (v3.0.1 FIX 2, umgebaut in v3.0.2): Die
+ *      Zusammenfassung ist oft fertig getippt, während die Analyse
+ *      serverseitig noch ~30–50 s weiterläuft (Kategorien/Beast). Läuft der
+ *      aktive Puffer leer (oder wartet Beast auf seine ersten Zeichen),
+ *      erscheint wieder das VERTRAUTE AUGE der Scan-Phase oberhalb der Karte
+ *      und trägt die ehrlichen Warte-Zeilen (i18n-Liste `live.warten`, alle
+ *      ~2,5 s). Es gibt damit nur noch zwei Erscheinungen: „Auge arbeitet
+ *      mit Wechseltext" und „KI tippt in der Rost-Box" — die frühere
+ *      Status-Zeile IN der Karte ist ersatzlos weg (Screenshot-Befund des
+ *      Inhabers, 11.08. abends). Mit dem nächsten getippten Zeichen
+ *      verschwindet das Auge; beim Enthüllungs-Beginn endgültig.
  *   4. Ist das Ergebnis fertig gerendert, fährt starteEnthuellung() die
  *      GESTAFFELTE ENTHÜLLUNG: alles fertige Boxen mit Pop — Foto-Daten →
  *      GPS-Karte → Kategorien (Gruppenkopf ~650 ms, Karten im ~280-ms-
  *      Stakkato) → Werbe-Box → Manipulations-Box → Datenwert-Box (nur der
  *      Euro-Betrag zählt hoch, die Balken fahren aus) → PDF-Knopf zuletzt.
+ *      Dabei scrollt die Seite GEFÜHRT mit (v3.0.2): jede Box wird sanft ins
+ *      Sichtfeld geholt. Der Nutzer hat Vorrang — beim ersten eigenen
+ *      Eingriff (Rad, Touch, Scroll-Taste) endet die Führung sofort und
+ *      dauerhaft für diesen Lauf, und der Pop-Ton klingt ab da nur noch für
+ *      Boxen, die wirklich im Sichtfeld liegen (keine Geräusche aus dem Off).
  *
  * Barrierefreiheit (Lehren aus v2.11):
  *   - prefers-reduced-motion: kein Tippen, kein Rausch — jede Welle erscheint
@@ -54,7 +62,7 @@
 import { elements } from "./dom.js";
 import { state } from "./state.js";
 import { t } from "./i18n.js";
-import { stopScanAnim } from "./ui.js";
+import { startScanAnim, stopScanAnim } from "./ui.js";
 import { tippTon, popTon } from "./klang.js";
 
 /* Zeichenvorrat des Rausch-Schweifs — exakt der des Prototyps. */
@@ -83,10 +91,12 @@ const MAX_ZEICHEN_PRO_SEKUNDE = 90;
 /* Zeit-Anlauf vor dem ersten getippten Zeichen: Der Stream liefert anfangs
    nur wenige Zeichen pro Sekunde — sofort loszutippen hieße, minutenlang an
    der Untergrenze zu kriechen. Solange trägt die Scan-Animation die Zeit.
-   20 s auf ausdrückliche Ansage des Inhabers (11.08. abends): lieber länger
-   sammeln und dann flott tippen. Meldet der Server vorher „fertig", greift
-   sofort der Schnellvorlauf. (let wegen _setzeTippAnlaufMsFuerTest.) */
-let TIPP_ANLAUF_MS = 20000;
+   25 s auf ausdrückliche Ansage des Inhabers (11.08. abends): „die Box ist
+   oft fertig und dann passiert eine Weile nichts" — also später starten,
+   damit Tippen und Analyse gemeinsamer enden. Meldet der Server vorher
+   „fertig", greift sofort der Schnellvorlauf. (let wegen
+   _setzeTippAnlaufMsFuerTest.) */
+let TIPP_ANLAUF_MS = 25000;
 /* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
    zügig, aber noch als Tippen erkennbar ausgetippt — erst danach beginnt die
    Enthüllung. So endet der Lauf ohne harten Textsprung. */
@@ -97,7 +107,8 @@ const SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE = 150;
 const SCHNELLVORLAUF_DECKEL_MS = 15000;
 /* Prüftakt, wenn der Puffer leer ist und nur der Cursor blinkt. */
 const LEERLAUF_MS = 120;
-/* Takt der ehrlichen Warte-Zeilen nach dem fertig getippten Text (FIX 2). */
+/* Takt der ehrlichen Warte-Zeilen im Warte-Auge (v3.0.2: oberhalb der
+   Karte, nicht mehr in einer Status-Zeile). */
 const ROTATION_TAKT_MS = 2500;
 
 /* Aktueller Tipp-Lauf. `stop` beendet die Schleife beim nächsten Tick.
@@ -135,16 +146,6 @@ function warte(ms, mein) {
   });
 }
 
-function statusSetzen(schluessel) {
-  if (elements.liveStatusText) elements.liveStatusText.textContent = t(schluessel);
-}
-
-/* Wie statusSetzen, aber mit fertigem Text (die Warte-Rotation zieht ihre
-   Zeilen aus einem i18n-ARRAY, nicht aus einem Einzel-Schlüssel). */
-function statusSetzenText(text) {
-  if (elements.liveStatusText) elements.liveStatusText.textContent = text;
-}
-
 /* Der Puffer-Name des gerade gewählten Modus — dieselbe Quelle wie überall
    sonst: der Beast-Schalter (#biasSwitch). */
 function aktiverModus() {
@@ -156,95 +157,102 @@ function neuerLauf() {
     stop: false,
     tippt: false,
     aktiv: aktiverModus(),
-    statusZustand: null,
+    /* v3.0.2: Zustand des Warte-Auges oberhalb der Karte — null (aus),
+       "beastWartet" (fester Text) oder "warten" (Rotation). rotationRunde
+       entwertet eine alte Rotations-Schleife, wenn eine neue startet. */
+    spinnerZustand: null,
+    rotationRunde: 0,
     /* v3.0.0: Der Server hat „fertig" gemeldet — der Rest wird im
        Schnellvorlauf ausgetippt (schnellVorlauf() setzt das). */
     schnellvorlauf: false,
     /* Vor diesem Zeitpunkt tippt die Schleife nicht (Zeit-Anlauf). */
     tippStartAb: 0,
-    /* FIX 2: Läuft gerade die Warte-Rotation? (rotationRunde entwertet eine
-       alte Rotations-Schleife, wenn eine neue startet.) */
-    rotationLaeuft: false,
-    rotationRunde: 0,
     puffer: {
-      /* `lieferungFertig`: eine Poll-Welle brachte für diesen Puffer keine
-         neuen Zeichen mehr — das Modell schreibt an diesem Feld nicht mehr. */
-      standard: { text: "", fest: 0, lieferungFertig: false },
-      beast: { text: "", fest: 0, lieferungFertig: false },
+      standard: { text: "", fest: 0 },
+      beast: { text: "", fest: 0 },
     },
   };
 }
 
-/* Hält die Status-Zeile aktuell: normalerweise „die KI schreibt gerade …",
-   beim Warten auf die ersten Beast-Zeichen der eigene Warte-Text (Beast
-   entsteht im Modell erst NACH dem Standard-Profil). Ins DOM geschrieben
-   wird nur bei einem Zustandswechsel — die Tipp-Schleife ruft das je
-   Zeichen. */
-function statusAktualisieren(mein) {
-  /* Während der Warte-Rotation (FIX 2) gehört die Status-Zeile der Rotation —
-     rotationStoppen() setzt den Zustand zurück, dann schreibt der nächste
-     Aufruf hier wieder den normalen Status. */
-  if (mein.rotationLaeuft) return;
-  const wartetAufBeast = mein.aktiv === "beast" && mein.puffer.beast.fest === 0;
-  const zustand = wartetAufBeast ? "beastWartet" : "schreibt";
-  if (zustand === mein.statusZustand) return;
-  mein.statusZustand = zustand;
-  statusSetzen(wartetAufBeast ? "live.beastWartet" : "live.statusSchreibt");
-}
-
-/* ── Warte-Rotation (FIX 2, v3.0.1) ──────────────────────────────────────
-   Nach dem fertig getippten Text wirkte die Karte eingefroren: nur blinkender
-   Cursor und der statische Dauerstatus, während der Server noch ~30–50 s an
-   Kategorien und Beast-Profil rechnet. Stattdessen rotieren jetzt ehrliche
-   Status-Zeilen (`live.warten`). Textwechsel ist keine Bewegung — die Rotation
-   läuft deshalb bewusst auch bei prefers-reduced-motion. */
+/* ── Warte-Auge oberhalb der Karte (v3.0.2, ersetzt die Status-Zeile) ─────
+   Nach dem fertig getippten Text wirkte die Karte eingefroren, und die
+   frühere Status-Zeile IN der Karte war dem Inhaber ein Dorn im Auge
+   („gefällt mir gar nicht"). Stattdessen kehrt das vertraute Auge der
+   Scan-Phase zurück und trägt die ehrlichen Warte-Zeilen (`live.warten`).
+   Textwechsel ist keine Bewegung — die Rotation läuft deshalb bewusst auch
+   bei prefers-reduced-motion. Beides über die BESTEHENDEN Bausteine aus
+   ui.js (startScanAnim/stopScanAnim), leise: Das Wieder-Erscheinen des
+   Auges ist weder ein Analyse-Start noch ein Abschluss — hier darf keine
+   Screenreader-Ansage fallen. */
 
 function rotationStarten(mein) {
-  if (mein.rotationLaeuft) return;
+  if (mein.spinnerZustand === "warten") return;
+  mein.spinnerZustand = "warten";
+  startScanAnim(false, true);
   const liste = t("live.warten");
   const texte = Array.isArray(liste) ? liste : [];
-  /* i18n-Fallback: Ohne Liste bleibt der bisherige Status einfach stehen. */
+  /* i18n-Fallback: Ohne Liste arbeitet das Auge mit dem stehenden Text. */
   if (texte.length === 0) return;
-  mein.rotationLaeuft = true;
-  mein.statusZustand = "warten";
   const meineRunde = ++mein.rotationRunde;
   (async () => {
     let i = 0;
-    while (!mein.stop && mein.rotationLaeuft && mein.rotationRunde === meineRunde) {
-      statusSetzenText(texte[i % texte.length]);
+    while (!mein.stop && mein.spinnerZustand === "warten" && mein.rotationRunde === meineRunde) {
+      if (elements.scanText) elements.scanText.textContent = texte[i % texte.length];
       i += 1;
       if (!(await warte(ROTATION_TAKT_MS, mein))) return;
     }
   })();
 }
 
-function rotationStoppen(mein) {
-  if (!mein.rotationLaeuft) return;
-  mein.rotationLaeuft = false;
-  /* Zustand zurücksetzen, damit statusAktualisieren den normalen Status
-     sofort wieder hinschreibt. */
-  mein.statusZustand = null;
+/* Beast gewählt, aber noch kein Beast-Zeichen da (das Modell schreibt Beast
+   NACH dem Standard-Profil): das Auge mit festem Warte-Text statt Rotation. */
+function beastWarteZeigen(mein) {
+  if (mein.spinnerZustand === "beastWartet") return;
+  mein.spinnerZustand = "beastWartet";
+  /* Eine eventuell laufende Rotations-Schleife entwerten. */
+  mein.rotationRunde += 1;
+  startScanAnim(false, true);
+  if (elements.scanText) elements.scanText.textContent = t("live.beastWartet");
 }
 
-/* Startet oder stoppt die Warte-Rotation je nach Lage des AKTIVEN Puffers:
-   Sie läuft genau dann, wenn er fertig getippt ist UND seine Lieferung
-   abgeschlossen ist. */
-function warteRotationAktualisieren(mein) {
+function spinnerVerstecken(mein) {
+  if (!mein.spinnerZustand) return;
+  mein.spinnerZustand = null;
+  mein.rotationRunde += 1;
+  stopScanAnim(true);
+}
+
+/* Stellt das Warte-Auge je nach Lage des AKTIVEN Puffers: Beast-Warten hat
+   Vorrang, danach gilt schlicht „Puffer leer → Auge an, es tippt → Auge
+   aus". Vor dem ersten getippten Zeichen (Karte noch zu) bleibt das Auge
+   der Anfangsphase samt seinen Scan-Texten unangetastet. Die Tipp-Schleife
+   ruft spinnerVerstecken je Zeichen — ein billiger No-Op, solange das Auge
+   ohnehin aus ist. */
+function spinnerAktualisieren(mein) {
+  if (!elements.liveKarte || !elements.liveKarte.classList.contains("active")) return;
+  /* Nach der Fertig-Meldung des Servers (Schnellvorlauf) wäre jede
+     Warte-Zeile gelogen — gleich beginnt die Enthüllung. Das Auge bleibt
+     (oder geht) aus, statt für Millisekunden aufzublitzen. */
+  if (mein.schnellvorlauf) {
+    spinnerVerstecken(mein);
+    return;
+  }
   const p = mein.puffer[mein.aktiv];
-  const fertigGetippt = p.fest > 0 && p.fest >= p.text.length;
-  if (fertigGetippt && p.lieferungFertig) rotationStarten(mein);
-  else rotationStoppen(mein);
+  /* „Beast wartet" nur, solange das Modell noch GAR NICHTS geliefert hat —
+     liegt schon Text bereit, tippt der nächste Tick sofort los, und ein
+     kurz aufblitzendes Auge wäre nur Unruhe. */
+  if (mein.aktiv === "beast" && p.text.length === 0) beastWarteZeigen(mein);
+  else if (p.fest > 0 && p.fest >= p.text.length) rotationStarten(mein);
+  else spinnerVerstecken(mein);
 }
 
 /* Blendet die Live-Karte ein und versteckt die Scan-Animation — genau beim
    ersten sichtbaren Zeichen, nicht früher. Leise (ohne Screenreader-
-   „abgeschlossen"-Ansage): das erste getippte Zeichen ist kein Abschluss.
-   Die Status-Zeile setzt statusAktualisieren (je nach Puffer-Lage). */
+   „abgeschlossen"-Ansage): das erste getippte Zeichen ist kein Abschluss. */
 function karteZeigen() {
   liveLief = true;
   const karte = elements.liveKarte;
   if (!karte || karte.classList.contains("active")) return;
-  karte.classList.remove("live-karte--erzaehler");
   karte.classList.add("active");
   /* „Noch nicht fertig"-Dauerstatus, solange getippt wird. */
   if (elements.liveWarten) elements.liveWarten.textContent = t("live.nochNichtFertig");
@@ -254,10 +262,9 @@ function karteZeigen() {
 /* Setzt die Karte vollständig zurück (unsichtbar, ohne Text). */
 function karteEntfernen() {
   const karte = elements.liveKarte;
-  if (karte) karte.classList.remove("active", "live-karte--erzaehler");
+  if (karte) karte.classList.remove("active");
   if (elements.liveTextFest) elements.liveTextFest.textContent = "";
   if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
-  if (elements.liveStatusText) elements.liveStatusText.textContent = "";
   if (elements.liveWarten) elements.liveWarten.textContent = "";
 }
 
@@ -298,9 +305,9 @@ async function tippSchleife(mein) {
          Cursor blinkt, wirkt wie ein Hänger (Befund des ersten Live-Tests). */
       karteZeigen();
       p.fest += 1;
-      /* Es wird wieder getippt → eine laufende Warte-Rotation endet (FIX 2). */
-      rotationStoppen(mein);
-      statusAktualisieren(mein);
+      /* Es wird wieder getippt → das Warte-Auge verschwindet (v3.0.2):
+         das Tippen selbst IST die sichtbare Bewegung. */
+      spinnerVerstecken(mein);
       if (elements.liveTextFest) elements.liveTextFest.textContent = p.text.slice(0, p.fest);
       /* Rausch-Schweif NUR bei Bewegung — und nie länger als der Rest. */
       const rest = Math.min(SCHWEIF_LAENGE, p.text.length - p.fest);
@@ -316,10 +323,10 @@ async function tippSchleife(mein) {
       if (!(await warte(1000 / aktuellesTempo(mein, p.text.length - p.fest), mein))) return;
     } else {
       /* Puffer leer: Schweif weg, der Cursor blinkt (CSS), wir warten auf
-         die nächste Welle. Ist der Puffer fertig getippt UND fertig
-         geliefert, rotieren die Warte-Zeilen als Fallback (FIX 2). */
+         die nächste Welle — und oberhalb der Karte übernimmt das Warte-Auge
+         mit den ehrlichen Warte-Zeilen (v3.0.2). */
       if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
-      warteRotationAktualisieren(mein);
+      spinnerAktualisieren(mein);
       if (!(await warte(LEERLAUF_MS, mein))) return;
     }
   }
@@ -338,23 +345,15 @@ export function welle(texte) {
   /* Späte Wellen nach Beginn der Enthüllung ändern nichts mehr. */
   if (enthuellungGestartet) return;
   if (!lauf) lauf = neuerLauf();
-  /* Je Puffer monoton wachsend übernehmen. Bringt eine Welle für einen Puffer
-     KEINE neuen Zeichen mehr, ist dessen Lieferung abgeschlossen (das Modell
-     schreibt weiter — nur eben nicht mehr an diesem Feld); wächst er später
-     doch wieder, hebt das die Markierung von selbst auf (FIX 2). */
+  /* Je Puffer monoton wachsend übernehmen — kürzere oder gleiche Stände sind
+     alte Antworten. Ob eine Lieferung „fertig" ist, spielt seit v3.0.2 keine
+     Rolle mehr: Das Warte-Auge richtet sich allein danach, ob gerade getippt
+     wird oder der Puffer leerläuft. */
   if (texte.standard.length > lauf.puffer.standard.text.length) {
     lauf.puffer.standard.text = texte.standard;
-    lauf.puffer.standard.lieferungFertig = false;
-  } else if (lauf.puffer.standard.text.length > 0) {
-    lauf.puffer.standard.lieferungFertig = true;
   }
-  if (typeof texte.beast === "string") {
-    if (texte.beast.length > lauf.puffer.beast.text.length) {
-      lauf.puffer.beast.text = texte.beast;
-      lauf.puffer.beast.lieferungFertig = false;
-    } else if (lauf.puffer.beast.text.length > 0) {
-      lauf.puffer.beast.lieferungFertig = true;
-    }
+  if (typeof texte.beast === "string" && texte.beast.length > lauf.puffer.beast.text.length) {
+    lauf.puffer.beast.text = texte.beast;
   }
 
   if (reduziert()) {
@@ -370,11 +369,11 @@ export function welle(texte) {
     karteZeigen();
     if (elements.liveTextFest) elements.liveTextFest.textContent = p.text;
     if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
-    /* FIX 2: Die Warte-Rotation läuft AUCH bei reduzierter Bewegung — ein
-       Textwechsel alle 2,5 s ist keine Bewegung, und ohne Tipp-Schleife gibt
-       es hier sonst niemanden, der sie startet oder stoppt. */
-    warteRotationAktualisieren(lauf);
-    statusAktualisieren(lauf);
+    /* Das Warte-Auge läuft AUCH bei reduzierter Bewegung — ein Textwechsel
+       alle 2,5 s ist keine Bewegung, und ohne Tipp-Schleife gibt es hier
+       sonst niemanden, der es stellt. Ohne Tippen ist der Puffer nach jeder
+       Welle sofort „leer" — das Auge trägt hier also die gesamte Wartezeit. */
+    spinnerAktualisieren(lauf);
     return;
   }
 
@@ -447,10 +446,9 @@ export function modusWechsel() {
   const p = lauf.puffer[neu];
   if (elements.liveTextFest) elements.liveTextFest.textContent = p.text.slice(0, p.fest);
   if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
-  /* FIX 2: Die Warte-Rotation folgt dem neuen Puffer — tippt er noch (oder
-     liefert er noch), endet sie und der normale Status kehrt zurück. */
-  warteRotationAktualisieren(lauf);
-  statusAktualisieren(lauf);
+  /* Das Warte-Auge folgt dem neuen Puffer: Beast noch leer → fester
+     Warte-Text; fertig getippt → Rotation; es tippt → Auge aus. */
+  spinnerAktualisieren(lauf);
 }
 
 /** Lief in diesem Durchgang Live-Text? (Grundlage der Enthüllungs-Entscheidung) */
@@ -460,11 +458,87 @@ export function hatLiveGelaufen() {
 
 /* ── Gestaffelte Enthüllung ──────────────────────────────────────────────── */
 
-function boxZeigen(el) {
+/* ── Geführtes Mitscrollen (v3.0.2) ──
+   Die Enthüllung wird von oben nach unten immer länger — wer nicht selbst
+   scrollt, sah vom Stakkato der unteren Boxen nur noch die Pop-Töne. Deshalb
+   holt die Führung jede Box sanft ins Sichtfeld. Der NUTZER HAT VORRANG:
+   Beim ersten eigenen Eingriff endet die Führung sofort und dauerhaft für
+   diesen Lauf — nichts ist unangenehmer als eine Seite, die gegen die eigene
+   Scroll-Richtung zieht. */
+
+/* Tasten, mit denen Menschen scrollen — nur diese gelten als Übernahme
+   (eine Tab-Taste z. B. ist Navigation, kein Scrollen). " " ist die
+   Space-Taste, "Spacebar" ihr Name in älteren Browsern. */
+const UEBERNAHME_TASTEN = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "PageUp",
+  "PageDown",
+  " ",
+  "Spacebar",
+  "Home",
+  "End",
+]);
+
+function fuehrungListenerEntfernen(mein) {
+  if (!mein.uebernahmeListener) return;
+  window.removeEventListener("wheel", mein.uebernahmeListener);
+  window.removeEventListener("touchstart", mein.uebernahmeListener);
+  window.removeEventListener("keydown", mein.uebernahmeListener);
+  mein.uebernahmeListener = null;
+}
+
+/* Wacht über den ersten Nutzereingriff. passive: die Wache liest nur mit —
+   sie darf das echte Scrollen niemals ausbremsen. */
+function fuehrungBewachen(mein) {
+  const uebernahme = (ereignis) => {
+    if (ereignis.type === "keydown" && !UEBERNAHME_TASTEN.has(ereignis.key)) return;
+    mein.fuehrungAktiv = false;
+    /* Die Wache hat ihren Dienst getan — sofort abbauen, nicht erst am
+       Enthüllungs-Ende. */
+    fuehrungListenerEntfernen(mein);
+  };
+  mein.uebernahmeListener = uebernahme;
+  window.addEventListener("wheel", uebernahme, { passive: true });
+  window.addEventListener("touchstart", uebernahme, { passive: true });
+  window.addEventListener("keydown", uebernahme);
+}
+
+/* „Mehrheitlich im Sichtfeld": mehr als die halbe Box-Höhe liegt im Fenster.
+   Degenerierte Messwerte (Höhe 0) gelten als sichtbar — im Zweifel lieber
+   ein Ton zu viel als eine stumm gewordene Enthüllung. */
+function imSichtfeld(el) {
+  try {
+    const rechteck = el.getBoundingClientRect();
+    const fensterHoehe = window.innerHeight || document.documentElement.clientHeight || 0;
+    const ueberlappung = Math.min(rechteck.bottom, fensterHoehe) - Math.max(rechteck.top, 0);
+    return ueberlappung >= rechteck.height / 2;
+  } catch (_e) {
+    return true;
+  }
+}
+
+function boxZeigen(el, mein) {
   if (!el) return;
   el.classList.remove("lv-verdeckt");
   el.classList.add("pop-rein");
-  popTon();
+  if (mein.fuehrungAktiv) {
+    /* Führung aktiv: Box sanft ins Sichtfeld holen — erst NACH dem Aufdecken,
+       eine verdeckte Box (display:none) hat keinen Ort, zu dem man scrollen
+       könnte. Der reduzierte Modus scrollt NIE automatisch; die Vorgabe wird
+       frisch gelesen, damit ein Umstellen mitten im Lauf sofort greift. */
+    if (!reduziert() && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    popTon();
+    return;
+  }
+  /* Der Nutzer hat übernommen: Der Pop klingt nur noch für Boxen, die
+     wirklich (mehrheitlich) im Sichtfeld liegen — keine Geräusche aus dem
+     Off, während er woanders liest. */
+  if (imSichtfeld(el)) popTon();
 }
 
 /* Balken des Datenwert-Diagramms auf 0 stellen (Enthüllung fährt sie aus). */
@@ -522,15 +596,20 @@ function gpsKarteNachmessen() {
   }
 }
 
-/* Schlussbild der Enthüllung: Status-Zeile, PDF-Knopf, EINE Ankündigung. */
+/* Schlussbild der Enthüllung: PDF-Knopf + EINE Screenreader-Ankündigung.
+   Eine sichtbare Abschluss-Box gibt es seit v3.0.2 nicht mehr („gefällt mir
+   gar nicht, gänzlich weglassen") — der Merksatz steht ohnehin in der
+   Ergebnis-Zusammenfassung (.verdict). Angesagt wird der bestehende
+   Abschluss-Text der Scan-Phase. */
 function abschlussAnzeigen() {
-  statusSetzen("live.statusFertig");
   if (elements.exportPdf) elements.exportPdf.classList.remove("export-btn--hidden");
   /* A11y: die EINE Ankündigung am Ende — nie pro Zeichen, nie pro Box. */
-  if (elements.srAnnounce) elements.srAnnounce.textContent = t("live.statusFertig");
+  if (elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srEnd");
 }
 
 function abschluss(mein) {
+  /* Enthüllungs-Ende: die Übernahme-Wache in jedem Fall sauber abbauen. */
+  fuehrungListenerEntfernen(mein);
   if (mein.stop) return;
   enthuellung = null;
   abschlussAnzeigen();
@@ -541,22 +620,28 @@ function abschluss(mein) {
  * Ergebnis. MUSS synchron unmittelbar nach renderCurrentMode laufen: Das
  * Verdecken passiert im selben Frame wie das Rendern, nichts blitzt auf.
  * Die Zusammenfassung steht ab jetzt in ihrer normalen Box (#simulation);
- * die Live-Karte wird zur Erzähler-Zeile der Enthüllung.
+ * Live-Karte und Warte-Auge verschwinden hier endgültig (v3.0.2) — die
+ * Enthüllung erzählt sich über die aufpoppenden Boxen selbst.
  */
 export function starteEnthuellung() {
   if (lauf) {
     lauf.stop = true;
+    /* Das Warte-Auge endgültig aus — bevor der Lauf entsorgt wird. */
+    spinnerVerstecken(lauf);
     lauf = null;
   }
-  if (enthuellung) enthuellung.stop = true;
-  const mein = { stop: false };
+  if (enthuellung) {
+    enthuellung.stop = true;
+    fuehrungListenerEntfernen(enthuellung);
+  }
+  const mein = { stop: false, fuehrungAktiv: false, uebernahmeListener: null };
   enthuellung = mein;
   enthuellungGestartet = true;
 
-  const karte = elements.liveKarte;
-  if (karte) {
-    karte.classList.add("active", "live-karte--erzaehler");
-  }
+  karteEntfernen();
+  /* Die Ankündigung von eben leeren: Nur so ist der Abschluss-Text am Ende
+     eine NEUE Mutation, die Screenreader zuverlässig wieder ansagen. */
+  if (elements.srAnnounce) elements.srAnnounce.textContent = "";
 
   /* Alles verdecken — synchron, bevor der Browser zeichnet. */
   const privacy = elements.privacy;
@@ -593,42 +678,44 @@ export function starteEnthuellung() {
     return;
   }
 
+  /* Geführtes Mitscrollen nur im bewegten Modus — bei reduzierter Bewegung
+     wird NIE automatisch gescrollt (die Enthüllung oben ist dort ohnehin
+     sofort fertig, ganz ohne Effekte). */
+  mein.fuehrungAktiv = true;
+  fuehrungBewachen(mein);
+
   (async () => {
     /* 1) Foto-Daten + Standort. */
-    statusSetzen("live.statusFotoDaten");
     if (!(await warte(700, mein))) return;
-    boxZeigen(privacy);
+    boxZeigen(privacy, mein);
     if (!(await warte(1100, mein))) return;
-    boxZeigen(gps);
+    boxZeigen(gps, mein);
     gpsKarteNachmessen();
     if (!(await warte(1400, mein))) return;
 
     /* 2) Die Kategorien: Gruppenkopf gemächlich, seine Karten im Stakkato. */
-    statusSetzen("live.statusKategorien");
     for (const kind of faktenKinder) {
       const istKopf = kind.classList.contains("cat-group-head");
       if (!(await warte(istKopf ? 650 : 280, mein))) return;
-      boxZeigen(kind);
+      boxZeigen(kind, mein);
     }
 
     /* 3) Werbung + Manipulation — nur noch ganze, fertige Boxen. */
-    statusSetzen("live.statusWerbung");
     if (!(await warte(600, mein))) return;
-    boxZeigen(adsKarte);
+    boxZeigen(adsKarte, mein);
     if (!(await warte(1200, mein))) return;
-    boxZeigen(triggerKarte);
+    boxZeigen(triggerKarte, mein);
     if (!(await warte(1200, mein))) return;
 
     /* 3b) Realitäts-Check (v3.1): direkt nach der Manipulations-Box und VOR
        dem Datenwert — mit demselben Pop wie alle anderen Boxen. */
     if (rcKarte) {
-      boxZeigen(rcKarte);
+      boxZeigen(rcKarte, mein);
       if (!(await warte(1200, mein))) return;
     }
 
     /* 4) Datenwert: Box komplett, nur der Betrag zählt hoch, Balken fahren aus. */
-    statusSetzen("live.statusDatenwert");
-    boxZeigen(dvKarte);
+    boxZeigen(dvKarte, mein);
     if (dvKarte) {
       balkenAusfahren(dvKarte, false);
       if (dvZahl && !(await betragHochzaehlen(dvZahl, 1200, mein))) return;
@@ -649,6 +736,7 @@ export function enthuellungAbkuerzen() {
   if (!enthuellung) return;
   const mein = enthuellung;
   mein.stop = true;
+  fuehrungListenerEntfernen(mein);
   enthuellung = null;
   const e = mein.einheiten || {};
   (e.boxen || []).forEach((el) => el && el.classList.remove("lv-verdeckt"));
@@ -669,10 +757,14 @@ export function enthuellungAbkuerzen() {
 export function abbrechen() {
   if (lauf) {
     lauf.stop = true;
+    /* Ein noch aktives Warte-Auge gehört mit aufgeräumt — sonst bliebe die
+       Scan-Animation neben der Fehlermeldung stehen. */
+    spinnerVerstecken(lauf);
     lauf = null;
   }
   if (enthuellung) {
     enthuellung.stop = true;
+    fuehrungListenerEntfernen(enthuellung);
     enthuellung = null;
   }
   enthuellungGestartet = false;

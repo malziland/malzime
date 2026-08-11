@@ -35,39 +35,28 @@
  * wegschneiden, um die es geht.
  */
 
-/* ── Altersgrenze mit Sicherheitsabstand ──────────────────────────────────
-   Bezieht sich auf die Schaetzung des Modells, nicht auf Wahrheit — und genau
-   das ist der Punkt.
+/* ── Altersgrenze ─────────────────────────────────────────────────────────
+   Bezieht sich auf die Schaetzung des Modells, nicht auf Wahrheit.
 
-   WARUM NICHT EINFACH 18 (geaendert 2026-08-10):
-   Aus rund 5000 begleiteten Workshop-Analysen berichtet der Inhaber ein
-   durchgaengiges Muster: Maedchen werden bis zu fuenf, sechs Jahre ZU ALT
-   geschaetzt, Jungen eher zu jung. Ursache ist, dass die Schaetzung an
-   koerperlicher Reife haengt — die bei Maedchen rund zwei Jahre frueher
-   einsetzt (siehe Merkmalsraster in den prompts.js der locales).
+   VEREINBARTE REGEL (Entscheidung des Inhabers, 2026-08-11): Stufe 2 greift,
+   wenn die UNTERGRENZE der geschaetzten Spanne 18 oder darunter ist. Nicht
+   der Punktwert zaehlt, sondern das juengste Alter, das die Angabe zulaesst —
+   wer laut Modell "17-24" sein koennte, wird geschuetzt; wer laut Modell
+   fruehestens 19 ist, nicht.
 
-   Mit einer Schwelle bei exakt 18 faellt damit ein vierzehnjaehriges Maedchen,
-   das auf neunzehn geschaetzt wird, aus dem Schutz: Gluecksspiel, Alkohol,
-   Kredit, Diaetmittel und Schoenheits-OP waeren wieder erlaubt. Im
-   Klassenzimmer, an die Wand projiziert.
+   Die beiden Beispiele aus der Entscheidung:
+     Spanne 17-24, Schaetzwert 21  →  Filter greift       (Untergrenze 17)
+     Spanne 19-21, Schaetzwert 20  →  Filter greift nicht (Untergrenze 19)
 
-   Zwei Massnahmen dagegen, beide bewusst konservativ:
-     1. Nicht der Punktwert zaehlt, sondern die UNTERGRENZE der Spanne, die
-        das Modell selbst liefert. Wer "16-22" sein koennte, wird geschuetzt.
-        Das ist keine Willkuer, sondern nutzt die vom Modell angegebene
-        Unsicherheit.
-     2. Darauf ein Sicherheitsabstand, weil auch die Untergrenze zu hoch
-        liegen kann.
-
-   PREIS, bewusst in Kauf genommen: Ein tatsaechlich Neunzehn- bis
-   Einundzwanzigjaehriger sieht keine Kredit- oder Alkoholwerbung mehr, obwohl
-   sie dort legitimer Lerninhalt waere. In Schulklassen wiegt das leichter als
-   der umgekehrte Fehler. Die Abwaegung ist asymmetrisch: Eine Vierzehnjaehrige
-   mit Gluecksspielwerbung ist ein Schaden, einem Neunzehnjaehrigen fehlt nur
-   ein Beispiel. */
+   Bis zum 2026-08-11 lag auf der Untergrenze zusaetzlich ein Abstand von
+   3 Jahren (Schutz bis unter 21). Das entsprach nicht der Vereinbarung und
+   ist entfernt. Bewusst getragene Folge: Ein real minderjaehriges Kind,
+   dessen Spanne komplett ueber 18 geschaetzt wird, faellt aus Stufe 2.
+   Stufe 1 (Pornografie, Waffen, Extremismus) bleibt davon unberuehrt und
+   gilt altersunabhaengig fuer alle. */
 const VOLLJAEHRIG_AB = 18;
-const SICHERHEITSABSTAND_JAHRE = 3;
-const SCHUTZ_BIS = VOLLJAEHRIG_AB + SICHERHEITSABSTAND_JAHRE;
+/* „Untergrenze ≤ 18" als strikter Vergleich geschrieben: untergrenze < 19. */
+const SCHUTZ_BIS = VOLLJAEHRIG_AB + 1;
 
 /* ── Zwei Stufen ──────────────────────────────────────────────────────────
    IMMER_VERBOTEN gilt unabhaengig vom geschaetzten Alter. Das ist bewusst so:

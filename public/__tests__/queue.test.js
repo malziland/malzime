@@ -488,4 +488,61 @@ describe("Queue-Modus", () => {
 
     expect(sessionStorage.getItem("malzime.queueJobId")).toBe("job-eigenes");
   });
+
+  /* ── PRIV-107 (Kurzaudit 2026-08-11): Wiederholungs-Frist ────────────────
+     Ein zugestelltes Ergebnis bleibt 15 Minuten per Reload wiederholbar —
+     gerechnet ab der ERSTEN Zustellung. Danach gilt das Gerät als
+     weitergereicht: still aufräumen, sauber starten. Die Übergabepause oben
+     greift nur über den Sichtbarkeits-Wechsel; dieser Test deckt das Gerät
+     ab, dessen Tab durchgehend sichtbar bleibt. */
+  it("PRIV-107: nach Ablauf der 15-min-Frist räumt resume still auf, ohne zu pollen", async () => {
+    const { resumeQueueJob } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-alt-zugestellt");
+    sessionStorage.setItem("malzime.queueResultToken", "tok");
+    sessionStorage.setItem("malzime.queueErgebnisZeit", String(Date.now() - 16 * 60 * 1000));
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => jsonResponse({ ok: true }));
+    await resumeQueueJob();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("malzime.queueJobId")).toBeNull();
+    expect(sessionStorage.getItem("malzime.queueResultToken")).toBeNull();
+    expect(sessionStorage.getItem("malzime.queueErgebnisZeit")).toBeNull();
+  });
+
+  it("PRIV-107: innerhalb der Frist wird das Ergebnis weiterhin wiederholt (Gegenprobe)", async () => {
+    const { resumeQueueJob } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-frisch-zugestellt");
+    sessionStorage.setItem("malzime.queueErgebnisZeit", String(Date.now() - 5 * 60 * 1000));
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    await resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(renderCurrentMode).toHaveBeenCalled();
+    expect(sessionStorage.getItem("malzime.queueJobId")).toBe("job-frisch-zugestellt");
+  });
+
+  it("PRIV-107: die erste Zustellung setzt die Uhr, ein Rerender verlängert sie nicht", async () => {
+    const { resumeQueueJob } = await import("../js/api.js");
+    sessionStorage.setItem("malzime.queueJobId", "job-uhr");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    await resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(1000);
+    const erste = sessionStorage.getItem("malzime.queueErgebnisZeit");
+    expect(erste).not.toBeNull();
+
+    /* Zweiter Resume (Reload-Wiederholung) 2 Minuten später: Uhr bleibt. */
+    vi.setSystemTime(Date.now() + 2 * 60 * 1000);
+    await resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(sessionStorage.getItem("malzime.queueErgebnisZeit")).toBe(erste);
+  });
 });

@@ -106,6 +106,16 @@ const JOB_STATUS_URL = "/api/job-status";
 const POLL_INTERVAL_MS = 2000;
 const JOB_ID_STORAGE_KEY = "malzime.queueJobId";
 const JOB_TOKEN_STORAGE_KEY = "malzime.queueResultToken"; /* PRIV-003: Abhol-Ticket */
+const JOB_DELIVERED_AT_KEY = "malzime.queueErgebnisZeit"; /* PRIV-107: erste Zustellung */
+
+/* PRIV-107 (Kurzaudit 2026-08-11): Absolute Frist, wie lange ein FERTIGES
+   Ergebnis per Reload wiederholbar bleibt — gerechnet ab der ERSTEN
+   Zustellung, nicht ab dem letzten Reload (sonst schöbe jedes Neuladen die
+   Frist vor sich her). Die 3-Minuten-Übergabepause unten greift nur über den
+   Sichtbarkeits-Wechsel des Tabs; ein Gerät, das mit durchgehend sichtbarem
+   Tab weitergereicht wird, fiel bisher durch — bis der Job serverseitig nach
+   ~2 h verfällt. Diese Frist schließt das Fenster auch für diesen Fall. */
+const ERGEBNIS_WIEDERHOLUNG_MS = 15 * 60 * 1000;
 /* Merkt, für welchen Job der „Nichts davon ist wahr"-Hinweis schon bestätigt
    wurde — überlebt den Reload, damit der Dialog nicht erneut aufpoppt. */
 const JOB_DISCLAIMER_ACK_KEY = "malzime.queueDisclaimerAcked";
@@ -161,8 +171,35 @@ function storeJobId(jobId, resultToken) {
     sessionStorage.setItem(JOB_ID_STORAGE_KEY, jobId);
     /* PRIV-003: Abhol-Ticket zusammen mit der jobId merken (überlebt Reload/Tab). */
     if (resultToken) sessionStorage.setItem(JOB_TOKEN_STORAGE_KEY, resultToken);
+    /* Neuer Auftrag → die Zustell-Uhr des vorigen Ergebnisses gilt nicht mehr. */
+    sessionStorage.removeItem(JOB_DELIVERED_AT_KEY);
   } catch (_) {
     /* sessionStorage kann im privaten Modus werfen — kein harter Fehler. */
+  }
+}
+
+/* PRIV-107: Zeitpunkt der ERSTEN Zustellung festhalten. Bewusst nur setzen,
+   wenn noch nichts gemerkt ist — ein Resume-Rerender darf die Frist nicht
+   verlängern. */
+function markiereErgebnisZustellung() {
+  try {
+    if (!sessionStorage.getItem(JOB_DELIVERED_AT_KEY)) {
+      sessionStorage.setItem(JOB_DELIVERED_AT_KEY, String(Date.now()));
+    }
+  } catch (_) {
+    /* ohne Speicher keine Frist — dann räumt weiterhin die 2-h-Job-Frist ab */
+  }
+}
+
+/* PRIV-107: true, wenn die Wiederholungs-Frist eines zugestellten Ergebnisses
+   abgelaufen ist. Ohne gemerkten Zeitpunkt (laufender Auftrag) immer false. */
+function ergebnisFristAbgelaufen() {
+  try {
+    const roh = sessionStorage.getItem(JOB_DELIVERED_AT_KEY);
+    if (!roh) return false;
+    return Date.now() - Number(roh) > ERGEBNIS_WIEDERHOLUNG_MS;
+  } catch (_) {
+    return false;
   }
 }
 
@@ -173,6 +210,7 @@ export function clearStoredJobId() {
     sessionStorage.removeItem(JOB_ID_STORAGE_KEY);
     sessionStorage.removeItem(JOB_TOKEN_STORAGE_KEY);
     sessionStorage.removeItem(JOB_DISCLAIMER_ACK_KEY);
+    sessionStorage.removeItem(JOB_DELIVERED_AT_KEY);
   } catch (_) {
     /* dito */
   }
@@ -437,6 +475,8 @@ function showPhotoDeletedNotice() {
  * übersprungen (skipDisclaimer); die jobId dient dazu, die Bestätigung zu merken.
  */
 function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) {
+  /* PRIV-107: Ab der ersten Zustellung läuft die Wiederholungs-Frist. */
+  markiereErgebnisZustellung();
   if (!data) {
     setStatus(t("error.queueFailed"), traceId);
     return;
@@ -721,6 +761,13 @@ async function analyzeImageQueued() {
 export async function resumeQueueJob({ force = false } = {}) {
   const jobId = getStoredJobId();
   if (!jobId) return;
+  /* PRIV-107: Ein bereits zugestelltes Ergebnis ist nur 15 Minuten lang per
+     Reload wiederholbar. Danach still aufräumen — das Gerät gilt als
+     weitergereicht, die nächste Person startet sauber. */
+  if (ergebnisFristAbgelaufen()) {
+    clearStoredJobId();
+    return;
+  }
   /* Normalerweise nicht dazwischenfunken, wenn gerade eine Analyse laeuft.
      force=true kommt von der Hintergrund-Wiederaufnahme: Dort ist der laufende
      Durchgang nachweislich stehengeblieben, und ein neuer Anlauf ist der Sinn

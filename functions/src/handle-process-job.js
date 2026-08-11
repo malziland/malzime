@@ -49,6 +49,51 @@ function isQuotaError(err) {
   return !!(err && (err.code === "rate_limit" || /rate_limit|quota|429/i.test(err.message || "")));
 }
 
+/* ── Kinderschutz-Bericht loggen (beide Pipelines) ────────────────────────
+   IMMER loggen, nicht nur bei einem Treffer (Audit SEC-001): Ein
+   systematischer Ausfall (englischsprachiger Durchgang, kein erkanntes
+   Alter) erzeugte sonst exakt null Spuren und waere von "alles sauber" nicht
+   zu unterscheiden. `alter: null` ist die wichtigste dieser Zeilen.
+
+   ESKALATION (Kurzaudit 2026-08-11, SEC-108): Taucht ein Begriff der HARTEN
+   Stufe (Pornografie, Waffen, Extremismus) im Fliesstext auf, ist das kein
+   Zaehlfall, sondern ein Regelbruch des Modells — dann geht zusaetzlich eine
+   ERROR-Zeile raus, die den vorhandenen E-Mail-Alarm ausloest (processJob
+   steht im Alarmfilter). Die minor-Stufe bleibt bewusst ein stiller Zaehler:
+   Sie schlaegt regelmaessig auf den Lerninhalt selbst an ("Ratenzahlung" im
+   Beast-Text, gemessen 2026-08-11). */
+function loggeMinorSafety(safety, traceId, lang) {
+  console.log(
+    JSON.stringify({
+      step: "minor-safety",
+      traceId: traceId || null,
+      lang,
+      alter: safety.alter,
+      minderjaehrig: safety.minderjaehrig,
+      entfernt: safety.entfernt.length,
+      gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
+      /* Treffer im Fliesstext: nicht entfernt, aber gemeldet — je Stufe. */
+      durchgerutscht: safety.durchgerutscht.length,
+      durchgerutschtGruende: [...new Set(safety.durchgerutscht.map((d) => d.grund))],
+    })
+  );
+
+  const harteTreffer = safety.durchgerutscht.filter((d) => d.grund === "immer");
+  if (harteTreffer.length) {
+    /* Nur Feldnamen, keine Inhalte: Der Einzelfall ist per Design nicht
+       rekonstruierbar (Foto geloescht, Job verfaellt). Die Meldung sagt
+       allein: die Prompt-Regel haelt nicht mehr — mit Demo-Fotos nachtesten. */
+    console.error(
+      JSON.stringify({
+        step: "minor-safety-durchbruch",
+        traceId: traceId || null,
+        lang,
+        felder: harteTreffer.map((d) => `${d.modus}.${d.feld}`),
+      })
+    );
+  }
+}
+
 /**
  * Führt die Mistral-Pipeline für einen Job aus.
  * @returns {Promise<{result: object, success: boolean}>}  result hat dieselbe
@@ -153,24 +198,7 @@ async function runPipeline(job) {
        zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
        Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
     const safety = applyMinorSafety(profiles, { lang, alterText: profiles.alterAnker || undefined });
-    /* IMMER loggen, nicht nur wenn etwas entfernt wurde (Audit SEC-001).
-       Vorher entstand nur bei einem Treffer eine Logzeile — ein systematischer
-       Ausfall (z.B. englischsprachiger Durchgang, oder gar kein erkanntes
-       Alter) erzeugte damit exakt null Spuren und war von "alles sauber" nicht
-       zu unterscheiden. `alter: null` ist die wichtigste dieser Zeilen. */
-    console.log(
-      JSON.stringify({
-        step: "minor-safety",
-        traceId: job.traceId || null,
-        lang,
-        alter: safety.alter,
-        minderjaehrig: safety.minderjaehrig,
-        entfernt: safety.entfernt.length,
-        gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
-        /* Treffer im Fliesstext: nicht entfernt, aber gemeldet. */
-        durchgerutscht: safety.durchgerutscht.length,
-      })
-    );
+    loggeMinorSafety(safety, job.traceId, lang);
     const n = profiles.normal || {};
     const b = profiles.boost || {};
     return {
@@ -304,24 +332,7 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
        zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
        Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
     const safety = applyMinorSafety(profiles, { lang, alterText: profiles.alterAnker || undefined });
-    /* IMMER loggen, nicht nur wenn etwas entfernt wurde (Audit SEC-001).
-       Vorher entstand nur bei einem Treffer eine Logzeile — ein systematischer
-       Ausfall (z.B. englischsprachiger Durchgang, oder gar kein erkanntes
-       Alter) erzeugte damit exakt null Spuren und war von "alles sauber" nicht
-       zu unterscheiden. `alter: null` ist die wichtigste dieser Zeilen. */
-    console.log(
-      JSON.stringify({
-        step: "minor-safety",
-        traceId: job.traceId || null,
-        lang,
-        alter: safety.alter,
-        minderjaehrig: safety.minderjaehrig,
-        entfernt: safety.entfernt.length,
-        gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
-        /* Treffer im Fliesstext: nicht entfernt, aber gemeldet. */
-        durchgerutscht: safety.durchgerutscht.length,
-      })
-    );
+    loggeMinorSafety(safety, job.traceId, lang);
     const n = profiles.normal || {};
     const b = profiles.boost || {};
     return {
@@ -528,4 +539,4 @@ async function handleProcessJob(req, res) {
   res.status(200).json({ ok: true });
 }
 
-module.exports = { handleProcessJob, runPipeline };
+module.exports = { handleProcessJob, runPipeline, _loggeMinorSafety: loggeMinorSafety };

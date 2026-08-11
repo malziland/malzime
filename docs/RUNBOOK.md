@@ -143,6 +143,26 @@ Handlungsbedarf (so geschehen 2026-07-13). Logs unter Cloud Logging mit
 5xx-Antworten oder echten Stacktraces aus eigenem Code handeln.
 Alerting-Aufbau: [ERROR-ALERTING.md](ERROR-ALERTING.md).
 
+### Verdacht auf Absturz-Schleife (Safari: „wiederholt ein Problem aufgetreten")
+
+Die Absturz-Wache (`public/js/absturz-wache.js`, seit v2.12.2) erkennt drei
+Starts binnen einer Minute, deren Vorgänger sich nicht sauber abgemeldet hat,
+meldet das EINMAL über den Diagnose-Kanal und verwirft den gemerkten Auftrag.
+**Entscheidung 2026-08-11: bewusst OHNE eigenen Alarm** — der `errors`-Dienst
+ist aus dem Alarmfilter ausgenommen (Anti-Spam), Nachschauen ist der
+vereinbarte Weg:
+
+```bash
+gcloud logging read 'resource.labels.service_name="errors" AND jsonPayload.phase="absturz-schleife"' \
+  --project=malzime --freshness=30d
+```
+
+Treffer enthalten in `errorDetail` die Anzahl der Starts, die zuletzt
+erreichte Phase (`letztePhase`) und ob ein Auftrag offen war
+(`offenerAuftrag`) — die erste echte Spur für die weiterhin ungeklärte
+Ursache. Kein Treffer nach einem Workshop heißt: Die Schleife ist dort nicht
+aufgetreten. Manuelles Neuladen zählt seit v2.12.3 nicht mehr mit.
+
 ### „Bild konnte nicht geöffnet werden" (`error.readFailed`)
 
 Datei-**Lese**fehler am Endgerät, kein Formatproblem (Workshop-Vorfall 2026-07-06).
@@ -307,85 +327,26 @@ Hosting zeigt, ohne dass jemand den Anspruch hält — eine übernehmbare Subdom
 unter der eigenen Marke. Deshalb wurde der CSP-Eintrag vorgezogen: Selbst wenn
 das passierte, dürfte die Seite den Host nicht mehr kontaktieren.
 
-## Firestore-Umzug nach Europa (Audit 2026-08-10, PRIV-001)
+## Firestore-Umzug nach Europa (Audit 2026-08-10, PRIV-001) — ABGESCHLOSSEN
 
-**Stand: vorbereitet, Schalter steht noch auf der alten Datenbank.**
+**Stand 2026-08-11: erledigt.** Aktive Datenbank ist `malzime-eu`
+(`europe-west1`), umgeschaltet mit v2.12.0 und am Zähler nachgewiesen:
+`stats/totals.allTime` stieg nach einer echten Analyse **nur** in Europa, das
+Job-Dokument lag nur dort. Die alte Datenbank `(default)` in `nam5` (USA) ist
+am 2026-08-11 **gelöscht** (Freigabe des Inhabers im Kurzaudit) — damit ist
+der Rückweg entfallen, das Kopier-Skript `scripts/firestore-umzug-sync.mjs`
+wurde ausgebaut und `firebase.json` listet nur noch `malzime-eu`. Der
+US-Bucket `malzime_cloudbuild` ist ebenfalls seit 2026-08-11 gelöscht — es
+liegt kein Speicher mehr außerhalb Europas.
 
-Die Datenschutzerklärung verspricht Europa; die ursprüngliche Datenbank liegt in
-`nam5` (USA), und ein Job-Dokument enthält bis zu zwei Stunden lang das fertige
-Profil eines oft minderjährigen Menschen. Der Standort einer Firestore-Datenbank
-ist **unveränderlich** — es gibt keinen Umzugsknopf. Der Wechsel läuft deshalb
-über eine zweite Datenbank.
+Was bleibt und weiter gilt:
 
-### Was bereits steht
-
-| | |
-|---|---|
-| Datenbank `malzime-eu` | angelegt, Standort `europe-west1` |
-| Regeln + Indizes | auf **beide** Datenbanken ausgerollt (`firebase.json` listet beide) |
-| Dauerhafte Dokumente | kopiert und als identisch nachgewiesen |
-| Code | jeder Zugriff läuft über `datenbank()` aus `functions/src/db.js` |
-| Schutz | `__tests__/db-zentral.test.js` wird rot, sobald irgendwo sonst `getFirestore` importiert wird |
-
-Nur **drei Dokumente** sind dauerhaft: `featureFlags/current`, `stats/current`,
-`stats/totals`. `jobs/*` (2 h) und `usedNonces/*` verfallen von selbst und
-werden bewusst nicht mitgenommen — ein alter Auftrag wäre ohnehin wertlos, weil
-sein Bild längst gelöscht ist.
-
-### Der Umschaltvorgang
-
-**Ruhiges Zeitfenster wählen** (kein Workshop, niemand mitten in einer Analyse).
-Es gibt keine Ausfallzeit, aber Aufträge, die genau im Moment des Deploys
-laufen, finden ihr Job-Dokument in der neuen Datenbank nicht mehr und laufen in
-den Timeout. Bei einer Handvoll Nutzern egal, im Workshop nicht.
-
-1. **Zählerstände frisch übertragen** (seit der Vorbereitung sind Analysen
-   dazugekommen):
-   ```bash
-   node scripts/firestore-umzug-sync.mjs
-   ```
-   Muss mit „alle Dokumente identisch" enden.
-
-2. **Den Schalter umlegen** — in `functions/src/config.js` die eine Zeile:
-   ```js
-   const FIRESTORE_DATABASE_ID = "malzime-eu";
-   ```
-
-3. **Erwartung im Test nachziehen.** `db-zentral.test.js` hält fest, worauf der
-   Schalter steht, und wird jetzt absichtlich rot. Den erwarteten Wert dort
-   ebenfalls auf `"malzime-eu"` setzen — das ist die eingebaute Erinnerung,
-   CHANGELOG und dieses Dokument mitzuziehen.
-
-4. **Ausrollen:** `firebase deploy --only functions` (~2 min).
-
-5. **Nachweisen, dass Schreibvorgänge wirklich in Europa landen.** Nicht raten:
-   ```bash
-   # Eine echte Analyse auf malzi.me durchlaufen lassen, dann:
-   node scripts/firestore-umzug-sync.mjs --pruefen
-   ```
-   Der Zähler `stats/totals.allTime` muss in `malzime-eu` **höher** stehen als
-   in `(default)`. Genau das ist der Beleg: Der neue Wert entsteht nur dort, wo
-   auch geschrieben wird. Steht er in der alten Datenbank höher, ist der
-   Schalter nicht überall angekommen — sofort zurück nach Punkt 7.
-
-### Rückweg (jederzeit, ~2 min)
-
-1. `node scripts/firestore-umzug-sync.mjs --zurueck` — holt die inzwischen in
-   Europa hochgelaufenen Zähler zurück. **Nicht überspringen**, sonst fällt der
-   Gesamtzähler sichtbar zurück.
-2. `FIRESTORE_DATABASE_ID` wieder auf `""`, Erwartung im Test zurück.
-3. `firebase deploy --only functions`.
-
-### Danach (erst nach ein paar ruhigen Tagen)
-
-Die alte Datenbank löschen und den Schalter samt Skript ausbauen. Vorher
-**nicht** — solange sie steht, ist der Rückweg zwei Minuten weit weg. Beim
-Löschen ebenfalls den Eintrag aus `firebase.json` nehmen.
-
-### Offen im selben Thema
-
-Der Bucket `malzime_cloudbuild` liegt in den USA. Darin stehen **keine
-Nutzerdaten** — nur Zwischenstände beim Ausrollen, und der Code ist ohnehin
-öffentlich. Ein Bucket lässt sich nicht verschieben; ein Wechsel hieße, den
-Ablagepfad der Build-Umgebung umzustellen, was den Deploy-Weg berührt. Bewusst
-zurückgestellt, bis der Datenbank-Umzug nachweislich sitzt.
+- Der Standort einer Firestore-Datenbank ist **unveränderlich** — ein
+  künftiger Wechsel läuft immer über eine zweite Datenbank.
+- Jeder Zugriff läuft über `datenbank()` aus `functions/src/db.js`, gesteuert
+  von `FIRESTORE_DATABASE_ID` in `config.js`. `__tests__/db-zentral.test.js`
+  hält beides fest und scannt seit v2.12.3 rekursiv alle Unterordner.
+- Beweisregel für jeden solchen Wechsel: eine echte Analyse durchlaufen lassen
+  und nachsehen, dass der Zähler **nur** in der neuen Datenbank steigt.
+  Zusagen über Infrastruktur werden an der Infrastruktur belegt, nicht am
+  Quelltext.

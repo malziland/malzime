@@ -43,22 +43,23 @@ describe("Untere Altersgrenze", () => {
   });
 });
 
-describe("Sicherheitsabstand über 18 hinaus", () => {
-  /* Diese Gruppe deckt genau den Fall ab, wegen dem umgestellt wurde: Eine
-     14-Jährige, die zu alt geschätzt wird, darf den Schutz nicht verlieren. */
+describe("Untergrenze der Spanne entscheidet (vereinbarte Regel, 2026-08-11)", () => {
+  /* Die Regel samt beiden Beispielen stammt wörtlich aus der Entscheidung des
+     Inhabers: Stufe 2 greift, wenn die Untergrenze 18 oder darunter ist. */
   const gluecksspiel = ["Bet365 Live-Wetten", "Nike Air Max"];
 
-  test("14-Jährige, auf 19 geschätzt — Schutz greift trotzdem", () => {
-    const p = profil("Du bist weiblich, ~19 Jahre alt.", gluecksspiel);
+  test("Spanne 17-24, Schätzwert 21 — Filter greift (Beispiel aus der Entscheidung)", () => {
+    const p = profil("weiblich, ~21 Jahre (Spanne 17-24).", gluecksspiel);
     const b = applyMinorSafety(p);
     expect(b.minderjaehrig).toBe(true);
     expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
   });
 
-  test("Spanne, die bis unter 18 reicht — Schutz greift", () => {
-    const p = profil("weiblich, ~20 Jahre (Spanne 17-23).", gluecksspiel);
-    applyMinorSafety(p);
-    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  test("Spanne 19-21, Schätzwert 20 — Filter greift nicht (Beispiel aus der Entscheidung)", () => {
+    const p = profil("weiblich, ~20 Jahre (Spanne 19-21).", gluecksspiel);
+    const b = applyMinorSafety(p);
+    expect(b.minderjaehrig).toBe(false);
+    expect(p.normal.ad_targeting).toEqual(gluecksspiel);
   });
 
   test("eindeutig erwachsen — Glücksspiel bleibt als Lerninhalt stehen", () => {
@@ -68,9 +69,10 @@ describe("Sicherheitsabstand über 18 hinaus", () => {
     expect(p.normal.ad_targeting).toEqual(gluecksspiel);
   });
 
-  test("die Schwelle liegt über der Volljährigkeit", () => {
-    /* Mutationsprobe: Fällt der Abstand weg, wird dieser Test rot. */
-    expect(_SCHUTZ_BIS).toBeGreaterThan(18);
+  test("die Schwelle ist exakt „Untergrenze ≤ 18“", () => {
+    /* Pinnt die vereinbarte Regel fest: Wer diesen Wert ändert, ändert die
+       Entscheidung vom 2026-08-11 und muss das bewusst tun. */
+    expect(_SCHUTZ_BIS).toBe(19);
   });
 });
 
@@ -134,20 +136,21 @@ describe("Stufe 2 — nur bei Minderjährigen", () => {
     expect(p.normal.ad_targeting).toEqual(heikel);
   });
 
-  test("die Schwelle liegt bei 21, nicht bei 18", () => {
-    /* GEÄNDERT 2026-08-10. Vorher schnitt der Filter bei exakt 18 — bei einer
-       Schätzung, die Mädchen laut Workshop-Erfahrung bis zu sechs Jahre zu alt
-       einordnet. Genau die Kinder, die den Schutz am nötigsten haben, fielen
-       so heraus. Begründung siehe SCHUTZ_BIS in minor-safety.js. */
-    for (const alter of [17, 18, 20]) {
+  test("die Schwelle: 18 oder darunter geschützt, ab 19 nicht mehr", () => {
+    /* GEÄNDERT 2026-08-11 auf die vereinbarte Regel (Untergrenze ≤ 18).
+       Der frühere +3-Jahre-Abstand (Schutz bis unter 21) entsprach nicht der
+       Vereinbarung. Begründung siehe SCHUTZ_BIS in minor-safety.js. */
+    for (const alter of [17, 18]) {
       const p = profil(`~${alter} Jahre alt`, ["Tipico Wetten"]);
       applyMinorSafety(p);
       expect(p.normal.ad_targeting).toEqual([]);
     }
 
-    const erwachsen = profil("~21 Jahre alt", ["Tipico Wetten"]);
-    applyMinorSafety(erwachsen);
-    expect(erwachsen.normal.ad_targeting).toEqual(["Tipico Wetten"]);
+    for (const alter of [19, 20, 21]) {
+      const erwachsen = profil(`~${alter} Jahre alt`, ["Tipico Wetten"]);
+      applyMinorSafety(erwachsen);
+      expect(erwachsen.normal.ad_targeting).toEqual(["Tipico Wetten"]);
+    }
   });
 });
 

@@ -7,6 +7,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
    ausgeschlossen — das Ereignis selbst ist unsichtbar, weil beim Auftreten
    kein eigener Code mehr läuft und deshalb auch keine Meldung ankommt.
 
+   PRÄZISIERT (Kurzaudit 2026-08-11, BUG-104): Ein Start zählt nur, wenn der
+   vorige Durchlauf UNSAUBER endete — beim normalen Neuladen meldet sich die
+   Seite über pagehide ab, ein Absturz tut das nicht. Drei schnelle manuelle
+   Neuladungen (im Workshop normal) lösen damit nichts mehr aus und verwerfen
+   vor allem keinen laufenden Auftrag mehr.
+
    Diese Prüfungen halten beide Aufgaben der Wache fest: melden UND die
    Schleife brechen. Und ebenso wichtig: dass sie im Normalbetrieb SCHWEIGT.
    Eine Wache, die bei jedem zweiten Neuladen anschlägt, wird ignoriert und
@@ -18,6 +24,12 @@ vi.mock("../js/error-logger.js", () => ({
 }));
 
 const { initAbsturzWache, merkePhase } = await import("../js/absturz-wache.js");
+
+/* Ein Absturz ist schlicht: Start ohne folgende Abmeldung. Der nächste
+   init-Aufruf sieht dann die fehlende Abmeldung des Vorgängers. */
+function sauberBeenden() {
+  window.dispatchEvent(new Event("pagehide"));
+}
 
 describe("Absturz-Wache", () => {
   let jetzt;
@@ -33,77 +45,117 @@ describe("Absturz-Wache", () => {
     vi.restoreAllMocks();
   });
 
-  it("schweigt beim ersten Start", () => {
+  it("schweigt beim allerersten Start", () => {
     expect(initAbsturzWache({})).toBe(false);
     expect(meldungen).toHaveLength(0);
   });
 
-  it("schweigt auch beim zweiten Start — einmal neu laden ist normal", () => {
-    initAbsturzWache({});
-    jetzt += 3000;
-    expect(initAbsturzWache({})).toBe(false);
+  it("drei schnelle manuelle Neuladungen lösen NICHTS aus (BUG-104)", () => {
+    /* Ungeduldiges Neuladen während der Wartezeit ist im Workshop normal —
+       jeder Durchlauf meldet sich sauber ab, also zählt keiner. */
+    const verwirfAuftrag = vi.fn();
+    for (let i = 0; i < 4; i++) {
+      expect(initAbsturzWache({ verwirfAuftrag })).toBe(false);
+      sauberBeenden();
+      jetzt += 3000;
+    }
     expect(meldungen).toHaveLength(0);
+    expect(verwirfAuftrag).not.toHaveBeenCalled();
   });
 
-  it("schlägt beim dritten Start innerhalb einer Minute an", () => {
-    initAbsturzWache({});
+  it("schlägt an, wenn drei Starts binnen einer Minute auf Abstürze folgen", () => {
+    initAbsturzWache({}); /* Start 1 — endet unsauber (kein pagehide) */
     jetzt += 3000;
-    initAbsturzWache({});
+    expect(initAbsturzWache({})).toBe(false); /* 1. Absturz-Start */
     jetzt += 3000;
-    expect(initAbsturzWache({})).toBe(true);
+    expect(initAbsturzWache({})).toBe(false); /* 2. Absturz-Start */
+    jetzt += 3000;
+    expect(initAbsturzWache({})).toBe(true); /* 3. Absturz-Start → Schleife */
     expect(meldungen).toHaveLength(1);
     expect(meldungen[0].kontext.phase).toBe("absturz-schleife");
   });
 
+  it("ein sauberes Neuladen zwischendurch zählt nicht mit", () => {
+    initAbsturzWache({});
+    jetzt += 2000;
+    initAbsturzWache({}); /* Absturz-Start 1 */
+    sauberBeenden(); /* dieser Durchlauf endet sauber */
+    jetzt += 2000;
+    initAbsturzWache({}); /* zählt NICHT — Vorgänger sauber */
+    jetzt += 2000;
+    expect(initAbsturzWache({})).toBe(false); /* erst Absturz-Start 2 */
+    expect(meldungen).toHaveLength(0);
+  });
+
   it("verwirft den gemerkten Auftrag, um die Schleife zu brechen", () => {
     const verwirfAuftrag = vi.fn();
-    initAbsturzWache({ verwirfAuftrag });
-    jetzt += 3000;
-    initAbsturzWache({ verwirfAuftrag });
-    jetzt += 3000;
-    initAbsturzWache({ verwirfAuftrag });
+    for (let i = 0; i < 4; i++) {
+      initAbsturzWache({ verwirfAuftrag });
+      jetzt += 3000;
+    }
     expect(verwirfAuftrag).toHaveBeenCalledTimes(1);
   });
 
   it("meldet die zuletzt erreichte Phase mit", () => {
     initAbsturzWache({});
     merkePhase("i18n");
-    jetzt += 2000;
-    initAbsturzWache({});
-    jetzt += 2000;
-    initAbsturzWache({});
+    for (let i = 0; i < 3; i++) {
+      jetzt += 2000;
+      initAbsturzWache({});
+    }
     expect(meldungen[0].kontext.errorDetail).toContain("letztePhase=i18n");
   });
 
   it("meldet, ob ein Auftrag offen war — die wichtigste Spur", () => {
     sessionStorage.setItem("malzime.queueJobId", "job-123");
-    initAbsturzWache({});
-    jetzt += 2000;
-    initAbsturzWache({});
-    jetzt += 2000;
-    initAbsturzWache({});
+    for (let i = 0; i < 4; i++) {
+      initAbsturzWache({});
+      jetzt += 2000;
+    }
     expect(meldungen[0].kontext.errorDetail).toContain("offenerAuftrag=true");
   });
 
   it("meldet nur EINMAL, nicht bei jedem weiteren Start", () => {
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 4; i++) {
       initAbsturzWache({});
       jetzt += 2000;
     }
     expect(meldungen).toHaveLength(1);
-    /* Der Zähler ist zurückgesetzt — der nächste Start beginnt bei null. */
+    /* Der Zähler ist zurückgesetzt — der nächste Absturz-Start beginnt bei
+       eins und bleibt still. */
     expect(initAbsturzWache({})).toBe(false);
     expect(meldungen).toHaveLength(1);
   });
 
-  it("zählt Starts nicht mit, die länger als eine Minute her sind", () => {
+  it("zählt Absturz-Starts nicht mit, die länger als eine Minute her sind", () => {
     initAbsturzWache({});
+    jetzt += 5000;
+    initAbsturzWache({}); /* Absturz-Start 1 */
     jetzt += 30_000;
-    initAbsturzWache({});
-    /* Der erste Start faellt jetzt aus dem Fenster. */
+    initAbsturzWache({}); /* Absturz-Start 2 */
+    /* Absturz-Start 1 fällt jetzt aus dem Fenster. */
     jetzt += 40_000;
     expect(initAbsturzWache({})).toBe(false);
     expect(meldungen).toHaveLength(0);
+  });
+
+  it("nach Rückkehr aus dem Rückwärtscache zählt der nächste Absturz wieder", () => {
+    /* pagehide meldet ab — kommt die Seite aber aus dem bfcache zurück, läuft
+       das Modul nicht erneut. pageshow(persisted) muss neu anmelden, sonst
+       wäre der nächste echte Absturz als „sauber beendet" getarnt. */
+    initAbsturzWache({});
+    sauberBeenden();
+    const zurueck = new Event("pageshow");
+    Object.defineProperty(zurueck, "persisted", { value: true });
+    window.dispatchEvent(zurueck);
+    /* Ab hier: Durchlauf lebt wieder, stürzt dann dreimal ab. */
+    jetzt += 2000;
+    initAbsturzWache({});
+    jetzt += 2000;
+    initAbsturzWache({});
+    jetzt += 2000;
+    expect(initAbsturzWache({})).toBe(true);
+    expect(meldungen).toHaveLength(1);
   });
 
   it("ein defekter Speicher legt den Seitenstart nicht lahm", () => {
@@ -127,10 +179,10 @@ describe("Absturz-Wache", () => {
     const verwirfAuftrag = vi.fn(() => {
       throw new Error("kaputt");
     });
-    initAbsturzWache({ verwirfAuftrag });
-    jetzt += 2000;
-    initAbsturzWache({ verwirfAuftrag });
-    jetzt += 2000;
+    for (let i = 0; i < 3; i++) {
+      initAbsturzWache({ verwirfAuftrag });
+      jetzt += 2000;
+    }
     expect(() => initAbsturzWache({ verwirfAuftrag })).not.toThrow();
     expect(meldungen).toHaveLength(1);
   });

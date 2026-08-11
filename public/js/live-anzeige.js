@@ -4,9 +4,11 @@
  * (compare-prototype-streaming.html, 2026-08-11) auf der echten Seite um:
  *
  *   1. Die bestehende Scan-Animation bleibt, bis das ERSTE Zeichen getippt
- *      wird — dann übernimmt die Live-Karte. Getippt wird ab dem ersten
- *      gelieferten Zeichen (v3.0.0: der frühere 200-Zeichen-Anlauf ist weg —
- *      er ließ die Karte je nach Timing mit leer blinkendem Cursor stehen).
+ *      wird — dann übernimmt die Live-Karte. Das Tippen beginnt erst nach
+ *      einem ZEIT-Anlauf (TIPP_ANLAUF_MS): Sofort-Start bei dünnem Puffer
+ *      kroch an der Untergrenze dahin — „wirkt sehr gequält" (Live-Test
+ *      11.08.). Die Anlauf-Zeit trägt die Scan-Animation, nie ein leerer
+ *      Cursor.
  *   2. GETIPPT (Matrix-Dekodierung: fester Text + Rausch-Schweif + Cursor)
  *      wird AUSSCHLIESSLICH der Zusammenfassungstext, gespeist aus den
  *      liveText-Wellen der 2-s-Polls (api.js → welle()). Seit Phase 3 führt
@@ -68,13 +70,22 @@ const SCHWEIF_LAENGE = 7;
    Rest ÷ ZIEL_ABTROPF_SEKUNDEN — wenig Puffer tippt langsam und lesbar,
    viel Puffer schneller, und das Tippen streckt sich über einen Großteil
    der Analyse. */
-const ZIEL_ABTROPF_SEKUNDEN = 30;
+const ZIEL_ABTROPF_SEKUNDEN = 20;
 /* Untergrenze: Darunter wirkt das Tippen wie ein Hänger statt wie Schreiben —
-   auch ein fast leerer Puffer muss sichtbar in Bewegung bleiben. */
-const MIN_ZEICHEN_PRO_SEKUNDE = 6;
+   auch ein fast leerer Puffer muss sichtbar in Bewegung bleiben. 12 statt
+   anfangs 6: Das Kriech-Tempo des ersten Livegangs wirkte „sehr gequält"
+   (Live-Test 11.08.) — der Zeit-Anlauf unten sorgt dafür, dass beim Start
+   schon genug Material für dieses Tempo im Puffer liegt. */
+const MIN_ZEICHEN_PRO_SEKUNDE = 12;
 /* Obergrenze: Darüber ist der Text nicht mehr mitlesbar — schneller darf nur
    der Schnellvorlauf nach der Fertig-Meldung des Servers sein. */
 const MAX_ZEICHEN_PRO_SEKUNDE = 90;
+/* Zeit-Anlauf vor dem ersten getippten Zeichen: Der Stream liefert anfangs
+   nur wenige Zeichen pro Sekunde — sofort loszutippen hieße, minutenlang an
+   der Untergrenze zu kriechen. Solange trägt die Scan-Animation die Zeit.
+   Meldet der Server vorher „fertig", greift sofort der Schnellvorlauf.
+   (let statt const wegen des Test-Hooks _setzeTippAnlaufMsFuerTest.) */
+let TIPP_ANLAUF_MS = 10000;
 /* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
    zügig, aber noch als Tippen erkennbar ausgetippt — erst danach beginnt die
    Enthüllung. So endet der Lauf ohne harten Textsprung. */
@@ -148,6 +159,8 @@ function neuerLauf() {
     /* v3.0.0: Der Server hat „fertig" gemeldet — der Rest wird im
        Schnellvorlauf ausgetippt (schnellVorlauf() setzt das). */
     schnellvorlauf: false,
+    /* Vor diesem Zeitpunkt tippt die Schleife nicht (Zeit-Anlauf). */
+    tippStartAb: 0,
     /* FIX 2: Läuft gerade die Warte-Rotation? (rotationRunde entwertet eine
        alte Rotations-Schleife, wenn eine neue startet.) */
     rotationLaeuft: false,
@@ -269,6 +282,12 @@ function aktuellesTempo(mein, rest) {
 async function tippSchleife(mein) {
   let naechsterTon = 3;
   while (!mein.stop) {
+    /* Zeit-Anlauf: Noch nicht tippen — draußen trägt die Scan-Animation die
+       Wartezeit. Der Schnellvorlauf (Server fertig) bricht den Anlauf ab. */
+    if (!mein.schnellvorlauf && Date.now() < mein.tippStartAb) {
+      if (!(await warte(LEERLAUF_MS, mein))) return;
+      continue;
+    }
     /* Immer der Puffer des AKTUELL gewählten Modus — modusWechsel() stellt
        `aktiv` um, der nächste Tick tippt nahtlos am anderen Stand weiter. */
     const p = mein.puffer[mein.aktiv];
@@ -358,12 +377,13 @@ export function welle(texte) {
     return;
   }
 
-  /* v3.0.0: Getippt wird ab dem ERSTEN gelieferten Zeichen — kein Anlauf-
-     Puffer mehr. Das adaptive Tempo übernimmt dessen Aufgabe: Bei wenig
-     Material tippt es langsam genug, dass der Nachschub der 2-s-Wellen
-     locker reicht, statt eine leere Karte blinken zu lassen. */
+  /* Die Tipp-Schleife startet mit der ersten Lieferung, tippt aber erst nach
+     dem Zeit-Anlauf los — bis dahin sammelt der Puffer Material und die
+     Scan-Animation trägt die Wartezeit (Nachschliff nach dem Live-Test
+     11.08.: Sofort-Start bedeutete minutenlanges Kriech-Tempo). */
   if (!lauf.tippt && (lauf.puffer.standard.text.length > 0 || lauf.puffer.beast.text.length > 0)) {
     lauf.tippt = true;
+    lauf.tippStartAb = Date.now() + TIPP_ANLAUF_MS;
     tippSchleife(lauf);
   }
 }
@@ -380,7 +400,14 @@ export function welle(texte) {
 export function schnellVorlauf() {
   return new Promise((aufloesen) => {
     const mein = lauf;
-    if (!mein || !liveLief || enthuellungGestartet) {
+    /* Zuständig, sobald ein Lauf mit geliefertem Text existiert — AUCH wenn
+       noch kein Zeichen getippt wurde (Fertig-Meldung mitten im Zeit-Anlauf):
+       Der Schnellvorlauf bricht den Anlauf ab und tippt sichtbar aus, statt
+       die Live-Dramaturgie komplett zu überspringen. Ohne gelieferten Text
+       (z. B. Wiederaufnahme nach Neuladen — die tippt bewusst nie) sofort
+       auflösen. */
+    const geliefert = mein && mein.puffer[mein.aktiv].text.length > 0;
+    if (!mein || !geliefert || enthuellungGestartet) {
       aufloesen();
       return;
     }
@@ -656,4 +683,10 @@ export function abbrechen() {
 export function zuruecksetzen() {
   abbrechen();
   liveLief = false;
+}
+
+/* Nur für Tests: verkürzt oder verlängert den Zeit-Anlauf gezielt —
+   echte 10 s wären mit Fake-Timern umständlich und ohne sie unbezahlbar. */
+export function _setzeTippAnlaufMsFuerTest(ms) {
+  TIPP_ANLAUF_MS = ms;
 }

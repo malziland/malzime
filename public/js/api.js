@@ -514,13 +514,17 @@ async function renderQueueResult(data, myId, traceId, timings) {
        (Flag aus, Tier-Profil, blocked, Resume nach Reload), räumt abbrechen()
        höchstens eine verwaiste Live-Karte weg — der heutige Pfad bleibt
        Pixel für Pixel unverändert. */
-    if (liveAnzeige.hatLiveGelaufen() && data.profiles && data.meta?.mode !== "animal") {
+    const liveEnthuellung = liveAnzeige.hatLiveGelaufen() && data.profiles && data.meta?.mode !== "animal";
+    if (liveEnthuellung) {
       liveAnzeige.starteEnthuellung();
     } else {
       liveAnzeige.abbrechen();
     }
     setStatus("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    /* Kein Sprung nach oben mitten in der Enthüllung — der Blick bleibt bei
+       der Live-Karte („das wirkt irgendwie unnatürlich", Live-Test 11.08.).
+       Ohne Live-Lauf bleibt das alte Verhalten unverändert. */
+    if (!liveEnthuellung) window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => {
       if (elements.resultsPanel) elements.resultsPanel.focus({ preventScroll: true });
     }, 300);

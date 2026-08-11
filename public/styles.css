@@ -3053,7 +3053,8 @@ html[lang="en"] .rc-zitat::after {
   stroke-linecap: round;
   stroke-dasharray: 326.7;
   stroke-dashoffset: 326.7;
-  filter: drop-shadow(0 0 8px currentColor);
+  /* Bewusst KEIN drop-shadow-Glow: Browser rastern den Filter als Rechteck —
+     hinter dem Ring stand ein sichtbares Quadrat (Live-Test 11.08.). */
   transition: stroke-dashoffset 0.08s linear;
 }
 

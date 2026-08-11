@@ -110,7 +110,7 @@ describe("Stellung des Schalters", () => {
      gemockt, und `jest.doMock` bleibt für die restliche Datei wirksam — ein
      `require("../config")` hier bekäme den Mock und prüfte ins Leere. Der
      Quelltext ist ausserdem genau das, was ein Mensch beim Umschalten ändert. */
-  test("steht derzeit auf der Standard-Datenbank", () => {
+  test("steht auf der Datenbank in Europa", () => {
     const quelle = readFileSync(join(SRC, "config.js"), "utf8");
     const treffer = quelle.match(/^const FIRESTORE_DATABASE_ID = "([^"]*)";$/m);
     /* Kein zweites expect-Argument: Jest kennt die Meldungs-Variante nicht
@@ -120,8 +120,9 @@ describe("Stellung des Schalters", () => {
     expect(treffer === null ? "Zeile `const FIRESTORE_DATABASE_ID = …` fehlt in config.js" : "gefunden").toBe(
       "gefunden"
     );
-    /* Nach dem Umzug wird diese Erwartung bewusst auf "malzime-eu" gezogen — der dann
-       fehlschlagende Test ist die Erinnerung, RUNBOOK und CHANGELOG mitzuziehen. */
-    expect(treffer[1]).toBe("");
+    /* Umgelegt am 2026-08-11 (v2.12.0). Wer zurueckschaltet, muss diese Zeile
+       ebenfalls zuruecknehmen — der dann fehlschlagende Test ist die
+       eingebaute Erinnerung, RUNBOOK und CHANGELOG mitzuziehen. */
+    expect(treffer[1]).toBe("malzime-eu");
   });
 });

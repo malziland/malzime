@@ -207,7 +207,7 @@ function localQueueConcurrency() {
    `getFirestore()`-Aufruf würde diesen Schalter umgehen und still in die
    falsche Datenbank schreiben. Genau das verhindert eine eigene Prüfung
    (`__tests__/db-zentral.test.js`). */
-const FIRESTORE_DATABASE_ID = "";
+const FIRESTORE_DATABASE_ID = "malzime-eu";
 
 /* Laufzeit-Validierung — fehlerhafte Config crasht sofort statt leise falsch zu laufen */
 if (HOURLY_LIMIT < 1) throw new Error("Config: HOURLY_LIMIT must be >= 1");

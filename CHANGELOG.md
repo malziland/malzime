@@ -4,18 +4,75 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.12.0] — 2026-08-11
+
+**Die Datenbank läuft ab jetzt in Europa.** Damit stimmt die Zusage der
+Datenschutzerklärung erstmals auch für die Datenbank — und das Projekt hat
+keinen Speicherort mehr ausserhalb der EU.
+
+### Was sich ändert
+
+Der Schalter aus 2.11.2 ist umgelegt: `FIRESTORE_DATABASE_ID = "malzime-eu"`.
+Alle Lese- und Schreibvorgänge gehen in die Datenbank in `europe-west1` — dort,
+wo auch die Programme und die Fotos liegen. Für Besucher ändert sich nichts;
+die Anwendung verhält sich identisch.
+
+Damit endet der Zustand, dass ein Job-Dokument — und darin bis zu zwei Stunden
+lang das fertige Profil eines oft minderjährigen Menschen — in den USA lag.
+Das war der letzte offene Punkt aus dem Audit vom 2026-08-10 und zugleich der
+schwerste: Die Zusage „Daten in Europa" stand drei Audits lang im Dokument,
+ohne dass sie an der Infrastruktur geprüft worden wäre.
+
+### Die alte Datenbank bleibt zunächst stehen
+
+Bewusst nicht gelöscht. Solange sie existiert, ist der Rückweg zwei Minuten
+weit weg: `scripts/firestore-umzug-sync.mjs --zurueck`, Schalter zurück,
+ausrollen. Löschen erst nach ein paar ruhigen Tagen im Betrieb.
+
+### Nachweis
+
+Nicht behauptet, sondern gemessen — Ablauf in
+[RUNBOOK](docs/RUNBOOK.md), Abschnitt „Firestore-Umzug".
+
+Backend 618 Tests grün.
+
 ## [2.11.2] — 2026-08-11
 
-Vorbereitung des Firestore-Umzugs nach Europa. **Ändert das Verhalten nicht** —
-der Schalter steht weiterhin auf der alten Datenbank.
+Vorbereitung des Umzugs **der Datenbank** nach Europa. **Ändert das Verhalten
+nicht** — der Schalter steht weiterhin auf der alten Datenbank.
 
-### Warum
+### Worum es geht — und worum ausdrücklich nicht
+
+Betroffen ist **ausschliesslich die Firestore-Datenbank**, nicht die Speicherorte
+insgesamt. Zur Klarstellung, weil das leicht verwechselt wird:
+
+| | Standort | betroffen? |
+|---|---|---|
+| **Fotos** (`malzime-queue-uploads`) | `europe-west1` | nein — lagen immer in Europa |
+| Quellstände der Functions | `europe-west1` | nein |
+| **Firestore-Datenbank** | `nam5` (USA) | **ja — darum geht es hier** |
+
+Die hochgeladenen Bilder haben Europa also zu keinem Zeitpunkt verlassen. Das
+wurde an der Infrastruktur nachgemessen, nicht aus dem Quelltext geschlossen.
+
+### Warum die Datenbank
 
 Die Datenschutzerklärung verspricht Europa; die Datenbank liegt in `nam5` (USA),
 und ein Job-Dokument enthält bis zu zwei Stunden lang das fertige Profil eines
 oft minderjährigen Menschen. Der Standort einer Firestore-Datenbank ist
 **unveränderlich** — es gibt keinen Umzugsknopf. Der Wechsel läuft deshalb über
 eine zweite Datenbank.
+
+### Was in der neuen Datenbank liegt — und was nicht
+
+**Es sind noch keine Nutzerdaten dorthin gelangt.** Kopiert wurden
+ausschliesslich drei technische Dokumente: die Schalterstellungen der
+Anwendung, der Zählerstand des Stundenlimits und die Gesamtzähler. Kein Foto,
+kein Profil, keine Auftragsdaten, nichts Personenbezogenes.
+
+Der Schalter steht unverändert auf der alten Datenbank — der laufende Betrieb
+schreibt weiterhin dorthin. Die neue Datenbank ist vorbereitet, aber noch nicht
+in Benutzung.
 
 ### Vorbereitet
 
@@ -40,6 +97,22 @@ rot, als eingebaute Erinnerung, die Dokumentation mitzuziehen.
 
 Backend 618 Tests (611 + 7 neue). Ablauf, Nachweis und Rückweg:
 [RUNBOOK](docs/RUNBOOK.md), Abschnitt „Firestore-Umzug".
+
+### Letzter US-Speicher entfernt (Infrastruktur, kein Code)
+
+`malzime_cloudbuild` lag als einziger Speicher in den USA. Inhalt geprüft, bevor
+etwas passierte: **7 Dateien, 5 Kilobyte, neueste vom 6. Juni** — die
+Bauanleitung des ntfy-Servers (Dockerfile, `entrypoint.sh`, `server.yml`).
+**Keine Nutzerdaten, keine Zugangsdaten** (die Passwörter kommen zur Laufzeit
+aus Umgebungsvariablen, der Dockerfile hält das ausdrücklich fest), kein
+ntfy-Kanalname.
+
+Der Speicher war seit zwei Monaten unbeteiligt: Die Deploys dieses Tages haben
+in den EU-Speicher `gcf-v2-sources-…-europe-west1` geschrieben, nicht dorthin.
+Die Bauanleitung existierte nirgends sonst und wurde vor dem Löschen ausserhalb
+des Repos gesichert.
+
+**Damit liegt kein einziger Speicher des Projekts mehr ausserhalb Europas.**
 
 ## [2.11.1] — 2026-08-11
 

@@ -4,6 +4,15 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.3] — 2026-08-11
+
+**Wording-Korrektur:** „Privat finanziert" heißt jetzt überall
+**„eigenfinanziert"** (Statistik-Seite, Stundenlimit-Banner, Deutsch und
+Englisch). Grund: Die Kosten trägt laut Impressum das Unternehmen
+malziland e.U. — „privat" war als Wort angreifbar, „eigenfinanziert" ist es
+nicht. An Kostenlosigkeit, Werbefreiheit und Tracking-Freiheit ändert sich
+selbstverständlich nichts.
+
 ## [3.0.2] — 2026-08-11
 
 Sanierung nach dem Kurzaudit des v3-Tags (unabhängige Prüfung von Code und

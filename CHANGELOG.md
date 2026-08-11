@@ -48,12 +48,6 @@ Zehn Prüfungen, darunter: schweigt im Normalbetrieb, meldet nur einmal, zählt
 alte Starts nicht mit, und ein defekter Speicher (privater Safari-Modus) legt
 den Seitenstart nicht lahm.
 
-### Nebenbei: Wortwahl korrigiert
-
-„Der Betreiber" ist aus CHANGELOG, Handbuch und Code-Kommentaren verschwunden.
-Das Projekt wird von einer Person entwickelt und betrieben; die Formulierung
-klang nach Auftragsarbeit für ein fremdes Unternehmen.
-
 Frontend 219 Tests, E2E 12.
 
 ## [2.12.1] — 2026-08-11

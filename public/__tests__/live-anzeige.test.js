@@ -1,9 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setupDOM } from "./setup.js";
 
-/* i18n mocken — Schlüssel statt Texte, wie in den übrigen Frontend-Tests. */
+/* i18n mocken — Schlüssel statt Texte, wie in den übrigen Frontend-Tests.
+   `live.warten` ist im Original ein ARRAY (Warte-Rotation, FIX 2) und wird
+   deshalb auch hier als Array geliefert. */
 vi.mock("../js/i18n.js", () => ({
-  t: (key) => key,
+  t: (key) => (key === "live.warten" ? ["live.warten.0", "live.warten.1", "live.warten.2"] : key),
   getLanguage: () => "de",
   initI18n: () => Promise.resolve(),
   applyTranslations: () => {},
@@ -183,6 +185,66 @@ describe("Live-Anzeige (v3.0)", () => {
 
     liveAnzeige.zuruecksetzen();
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
+  });
+
+  /* ── Warte-Rotation nach dem fertig getippten Text (FIX 2, v3.0.1) ────── */
+
+  it("FIX 2: die Warte-Rotation startet erst nach dem Tipp-Ende — nicht schon, wenn die Lieferung fertig ist", async () => {
+    w("A".repeat(250));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+
+    /* Nächste Poll-Welle OHNE neue Zeichen → Lieferung abgeschlossen. Getippt
+       wird aber noch (~250 Zeichen / 70 pro s ≈ 3,6 s) — die Status-Zeile
+       bleibt beim Schreib-Status. */
+    w("A".repeat(250));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+
+    /* Fertig getippt → jetzt rotieren die ehrlichen Warte-Zeilen. */
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(elements.liveStatusText.textContent).toBe("live.warten.0");
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(elements.liveStatusText.textContent).toBe("live.warten.1");
+    /* Der Cursor blinkt weiter: kein Rausch-Schweif, Karte bleibt aktiv. */
+    expect(elements.liveTextRausch.textContent).toBe("");
+    expect(elements.liveKarte.classList.contains("active")).toBe(true);
+  });
+
+  it("FIX 2: die Rotation stoppt bei done (Enthüllung übernimmt die Status-Zeile)", async () => {
+    w("A".repeat(250));
+    await vi.advanceTimersByTimeAsync(500);
+    w("A".repeat(250)); /* Lieferung fertig */
+    await vi.advanceTimersByTimeAsync(5000); /* fertig getippt → Rotation läuft */
+    expect(elements.liveStatusText.textContent).toMatch(/^live\.warten\./);
+
+    baueGerendertesErgebnis();
+    liveAnzeige.starteEnthuellung();
+    /* Ab jetzt gehört die Status-Zeile der Enthüllung — keine Warte-Zeile
+       darf sie mehr überschreiben, auch nicht nach weiteren Takten. */
+    expect(elements.liveStatusText.textContent).toBe("live.statusFotoDaten");
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(elements.liveStatusText.textContent).not.toMatch(/^live\.warten\./);
+  });
+
+  it("FIX 2: reduced-motion zeigt die rotierenden Warte-Zeilen ebenfalls — Textwechsel ist keine Bewegung", async () => {
+    reduzierteBewegung();
+    w("A".repeat(80));
+    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+
+    /* Welle ohne Wachstum: Text steht sofort vollständig da (kein Tippen),
+       die Lieferung ist fertig → Rotation startet unmittelbar. */
+    w("A".repeat(80));
+    expect(elements.liveStatusText.textContent).toBe("live.warten.0");
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(elements.liveStatusText.textContent).toBe("live.warten.1");
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(elements.liveStatusText.textContent).toBe("live.warten.2");
+
+    /* Kommt doch noch Text nach, endet die Rotation und es gilt wieder der
+       Schreib-Status. */
+    w("A".repeat(80) + "B".repeat(40));
+    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
   });
 
   /* ── Zwei Puffer: der Text folgt dem gewählten Modus (Phase 3) ────────── */

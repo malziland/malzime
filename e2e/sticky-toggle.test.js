@@ -96,7 +96,8 @@ async function runAnalysis(page) {
   await page.click('[data-demo="selfie"]');
   await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });
   await page.click("#disclaimerConfirm");
-  await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 5000 });
+  /* v3.0.1: Die Analyse läuft erst NACH der Bestätigung — Timeout großzügig. */
+  await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 15000 });
 
   /* Die App scrollt nach der Analyse selbst nach oben (js/api.js, weiches
      Scrollen). Erst abwarten, bis das durch ist — sonst kollidiert es mit dem
@@ -143,7 +144,8 @@ test("Sticky: Umschalter klebt erst, wenn ein Ergebnis vorliegt", async ({ page 
   await page.click('[data-demo="selfie"]');
   await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });
   await page.click("#disclaimerConfirm");
-  await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 5000 });
+  /* v3.0.1: Die Analyse läuft erst NACH der Bestätigung — Timeout großzügig. */
+  await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 15000 });
 
   await expect(page.locator("html")).toHaveAttribute("data-has-result", "1");
   const after = await page.locator("#biasToggleWrap").evaluate((el) => getComputedStyle(el).position);

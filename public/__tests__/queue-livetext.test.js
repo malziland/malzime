@@ -66,6 +66,9 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(Date.now() + 10000);
     sessionStorage.clear();
+    /* FIX 3 (v3.0.1): Hinweis gilt einmal pro Tab und ist hier schon bestätigt
+       — das Ergebnis rendert direkt, ohne Modal am Ende. */
+    sessionStorage.setItem("malzime.hinweisBestaetigt", "1");
 
     const apiMod = await import("../js/api.js");
     const stateMod = await import("../js/state.js");
@@ -146,7 +149,6 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(10000);
     await p;
-    elements.disclaimerConfirm.click();
 
     expect(renderCurrentMode).toHaveBeenCalled();
     expect(liveAnzeige.starteEnthuellung).toHaveBeenCalledTimes(1);
@@ -162,7 +164,6 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(10000);
     await p;
-    elements.disclaimerConfirm.click();
 
     expect(renderCurrentMode).toHaveBeenCalled();
     expect(liveAnzeige.starteEnthuellung).not.toHaveBeenCalled();
@@ -178,7 +179,6 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(10000);
     await p;
-    elements.disclaimerConfirm.click();
 
     expect(renderCurrentMode).toHaveBeenCalled();
     expect(liveAnzeige.starteEnthuellung).not.toHaveBeenCalled();
@@ -202,7 +202,6 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     const p = resumeQueueJob();
     await vi.advanceTimersByTimeAsync(8000);
     await p;
-    elements.disclaimerConfirm.click();
 
     expect(liveAnzeige.welle).not.toHaveBeenCalled();
     expect(liveAnzeige.starteEnthuellung).not.toHaveBeenCalled();

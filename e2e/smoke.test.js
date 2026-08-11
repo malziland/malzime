@@ -26,9 +26,10 @@ const MOCK_RESPONSE = {
 };
 
 /* Voller Durchklick über den QUEUE-Pfad (Live-Pfad seit v2.0): Demo-Foto →
-   /api/enqueue → /api/job-status (done) → Disclaimer → Profil. Die drei
-   Queue-Endpunkte werden gemockt, damit der Test ohne echtes Backend läuft. */
-test("Smoke: Demo-Foto → Queue → Disclaimer → Profil wird angezeigt", async ({ page }) => {
+   Disclaimer (seit v3.0.1 VOR der Analyse) → /api/enqueue → /api/job-status
+   (done) → Profil. Die drei Queue-Endpunkte werden gemockt, damit der Test
+   ohne echtes Backend läuft. */
+test("Smoke: Demo-Foto → Disclaimer → Queue → Profil wird angezeigt", async ({ page }) => {
   /* Feature-Flag „Queue an" + Limit-Infos */
   await page.route("**/api/stats", (route) =>
     route.fulfill({
@@ -71,15 +72,16 @@ test("Smoke: Demo-Foto → Queue → Disclaimer → Profil wird angezeigt", asyn
   /* Demo-Foto klicken → Queue-Analyse startet */
   await page.click('[data-demo="selfie"]');
 
-  /* Disclaimer-Modal erscheint nach dem ersten Status-Poll. Großzügiges
-     Timeout: Mindest-Interaktionszeit (2s) + Poll-Intervall (2s) + Bild-Prep. */
+  /* v3.0.1 (FIX 3): Das Disclaimer-Modal erscheint jetzt direkt beim
+     Analyse-START — vor dem Upload, nicht erst am fertigen Ergebnis. */
   await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });
 
-  /* Bestaetigen */
+  /* Bestaetigen — erst DANACH laeuft die Analyse (Bild-Prep, Mindest-
+     Interaktionszeit 2s, Poll-Intervall 2s), daher grosszuegiges Timeout. */
   await page.click("#disclaimerConfirm");
 
   /* Profil sollte gerendert werden */
-  await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 5000 });
+  await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
 
   /* Mindestens eine Kategorie-Karte sichtbar */
   await expect(page.locator(".cat-card").first()).toBeVisible();

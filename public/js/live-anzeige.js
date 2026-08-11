@@ -19,7 +19,15 @@
  *      dann durchgehend ~70 Zeichen/s — der Liefer- und der Anzeige-
  *      Rhythmus sind entkoppelt. Läuft der Puffer leer, verschwindet der
  *      Schweif und der Cursor blinkt.
- *   3. Ist das Ergebnis fertig gerendert, fährt starteEnthuellung() die
+ *   3. KEIN TOTES FENSTER (v3.0.1, FIX 2): Die Zusammenfassung ist nach
+ *      ~15–25 s fertig getippt, die Analyse läuft serverseitig aber noch
+ *      ~30–50 s weiter (Kategorien/Beast). Sobald der aktive Puffer fertig
+ *      getippt ist UND die Lieferung dieses Modus abgeschlossen ist (eine
+ *      Poll-Welle ohne neue Zeichen), rotieren in der Live-Status-Zeile
+ *      ehrliche Warte-Zeilen (i18n-Liste `live.warten`, alle ~2,5 s); der
+ *      Cursor blinkt weiter. Die Rotation endet bei done/Abbruch und sobald
+ *      wieder getippt wird (neue Welle, Modus-Wechsel).
+ *   4. Ist das Ergebnis fertig gerendert, fährt starteEnthuellung() die
  *      GESTAFFELTE ENTHÜLLUNG: alles fertige Boxen mit Pop — Foto-Daten →
  *      GPS-Karte → Kategorien (Gruppenkopf ~650 ms, Karten im ~280-ms-
  *      Stakkato) → Werbe-Box → Manipulations-Box → Datenwert-Box (nur der
@@ -54,6 +62,8 @@ const MIN_PUFFER = 200;
 const ZEICHEN_PRO_SEKUNDE = 70;
 /* Prüftakt, wenn der Puffer leer ist und nur der Cursor blinkt. */
 const LEERLAUF_MS = 120;
+/* Takt der ehrlichen Warte-Zeilen nach dem fertig getippten Text (FIX 2). */
+const ROTATION_TAKT_MS = 2500;
 
 /* Aktueller Tipp-Lauf. `stop` beendet die Schleife beim nächsten Tick.
    `aktiv` benennt den Puffer des gerade gewählten Modus ("standard"/"beast");
@@ -94,6 +104,12 @@ function statusSetzen(schluessel) {
   if (elements.liveStatusText) elements.liveStatusText.textContent = t(schluessel);
 }
 
+/* Wie statusSetzen, aber mit fertigem Text (die Warte-Rotation zieht ihre
+   Zeilen aus einem i18n-ARRAY, nicht aus einem Einzel-Schlüssel). */
+function statusSetzenText(text) {
+  if (elements.liveStatusText) elements.liveStatusText.textContent = text;
+}
+
 /* Der Puffer-Name des gerade gewählten Modus — dieselbe Quelle wie überall
    sonst: der Beast-Schalter (#biasSwitch). */
 function aktiverModus() {
@@ -106,9 +122,15 @@ function neuerLauf() {
     tippt: false,
     aktiv: aktiverModus(),
     statusZustand: null,
+    /* FIX 2: Läuft gerade die Warte-Rotation? (rotationRunde entwertet eine
+       alte Rotations-Schleife, wenn eine neue startet.) */
+    rotationLaeuft: false,
+    rotationRunde: 0,
     puffer: {
-      standard: { text: "", fest: 0, angelaufen: false },
-      beast: { text: "", fest: 0, angelaufen: false },
+      /* `lieferungFertig`: eine Poll-Welle brachte für diesen Puffer keine
+         neuen Zeichen mehr — das Modell schreibt an diesem Feld nicht mehr. */
+      standard: { text: "", fest: 0, angelaufen: false, lieferungFertig: false },
+      beast: { text: "", fest: 0, angelaufen: false, lieferungFertig: false },
     },
   };
 }
@@ -119,11 +141,59 @@ function neuerLauf() {
    wird nur bei einem Zustandswechsel — die Tipp-Schleife ruft das je
    Zeichen. */
 function statusAktualisieren(mein) {
+  /* Während der Warte-Rotation (FIX 2) gehört die Status-Zeile der Rotation —
+     rotationStoppen() setzt den Zustand zurück, dann schreibt der nächste
+     Aufruf hier wieder den normalen Status. */
+  if (mein.rotationLaeuft) return;
   const wartetAufBeast = mein.aktiv === "beast" && mein.puffer.beast.fest === 0;
   const zustand = wartetAufBeast ? "beastWartet" : "schreibt";
   if (zustand === mein.statusZustand) return;
   mein.statusZustand = zustand;
   statusSetzen(wartetAufBeast ? "live.beastWartet" : "live.statusSchreibt");
+}
+
+/* ── Warte-Rotation (FIX 2, v3.0.1) ──────────────────────────────────────
+   Nach dem fertig getippten Text wirkte die Karte eingefroren: nur blinkender
+   Cursor und der statische Dauerstatus, während der Server noch ~30–50 s an
+   Kategorien und Beast-Profil rechnet. Stattdessen rotieren jetzt ehrliche
+   Status-Zeilen (`live.warten`). Textwechsel ist keine Bewegung — die Rotation
+   läuft deshalb bewusst auch bei prefers-reduced-motion. */
+
+function rotationStarten(mein) {
+  if (mein.rotationLaeuft) return;
+  const liste = t("live.warten");
+  const texte = Array.isArray(liste) ? liste : [];
+  /* i18n-Fallback: Ohne Liste bleibt der bisherige Status einfach stehen. */
+  if (texte.length === 0) return;
+  mein.rotationLaeuft = true;
+  mein.statusZustand = "warten";
+  const meineRunde = ++mein.rotationRunde;
+  (async () => {
+    let i = 0;
+    while (!mein.stop && mein.rotationLaeuft && mein.rotationRunde === meineRunde) {
+      statusSetzenText(texte[i % texte.length]);
+      i += 1;
+      if (!(await warte(ROTATION_TAKT_MS, mein))) return;
+    }
+  })();
+}
+
+function rotationStoppen(mein) {
+  if (!mein.rotationLaeuft) return;
+  mein.rotationLaeuft = false;
+  /* Zustand zurücksetzen, damit statusAktualisieren den normalen Status
+     sofort wieder hinschreibt. */
+  mein.statusZustand = null;
+}
+
+/* Startet oder stoppt die Warte-Rotation je nach Lage des AKTIVEN Puffers:
+   Sie läuft genau dann, wenn er fertig getippt ist UND seine Lieferung
+   abgeschlossen ist. */
+function warteRotationAktualisieren(mein) {
+  const p = mein.puffer[mein.aktiv];
+  const fertigGetippt = p.fest > 0 && p.fest >= p.text.length;
+  if (fertigGetippt && p.lieferungFertig) rotationStarten(mein);
+  else rotationStoppen(mein);
 }
 
 /* Blendet die Live-Karte ein und versteckt die Scan-Animation — genau beim
@@ -174,6 +244,8 @@ async function tippSchleife(mein) {
     if (p.angelaufen && p.fest < p.text.length) {
       karteZeigen();
       p.fest += 1;
+      /* Es wird wieder getippt → eine laufende Warte-Rotation endet (FIX 2). */
+      rotationStoppen(mein);
       statusAktualisieren(mein);
       if (elements.liveTextFest) elements.liveTextFest.textContent = p.text.slice(0, p.fest);
       /* Rausch-Schweif NUR bei Bewegung — und nie länger als der Rest. */
@@ -190,8 +262,10 @@ async function tippSchleife(mein) {
       if (!(await warte(1000 / ZEICHEN_PRO_SEKUNDE, mein))) return;
     } else {
       /* Puffer leer (oder noch im Anlauf): Schweif weg, der Cursor blinkt
-         (CSS), wir warten auf die nächste Welle. */
+         (CSS), wir warten auf die nächste Welle. Ist der Puffer fertig
+         getippt UND fertig geliefert, rotieren die Warte-Zeilen (FIX 2). */
       if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
+      warteRotationAktualisieren(mein);
       if (!(await warte(LEERLAUF_MS, mein))) return;
     }
   }
@@ -210,10 +284,23 @@ export function welle(texte) {
   /* Späte Wellen nach Beginn der Enthüllung ändern nichts mehr. */
   if (enthuellungGestartet) return;
   if (!lauf) lauf = neuerLauf();
-  /* Je Puffer monoton wachsend übernehmen. */
-  if (texte.standard.length > lauf.puffer.standard.text.length) lauf.puffer.standard.text = texte.standard;
-  if (typeof texte.beast === "string" && texte.beast.length > lauf.puffer.beast.text.length) {
-    lauf.puffer.beast.text = texte.beast;
+  /* Je Puffer monoton wachsend übernehmen. Bringt eine Welle für einen Puffer
+     KEINE neuen Zeichen mehr, ist dessen Lieferung abgeschlossen (das Modell
+     schreibt weiter — nur eben nicht mehr an diesem Feld); wächst er später
+     doch wieder, hebt das die Markierung von selbst auf (FIX 2). */
+  if (texte.standard.length > lauf.puffer.standard.text.length) {
+    lauf.puffer.standard.text = texte.standard;
+    lauf.puffer.standard.lieferungFertig = false;
+  } else if (lauf.puffer.standard.text.length > 0) {
+    lauf.puffer.standard.lieferungFertig = true;
+  }
+  if (typeof texte.beast === "string") {
+    if (texte.beast.length > lauf.puffer.beast.text.length) {
+      lauf.puffer.beast.text = texte.beast;
+      lauf.puffer.beast.lieferungFertig = false;
+    } else if (lauf.puffer.beast.text.length > 0) {
+      lauf.puffer.beast.lieferungFertig = true;
+    }
   }
 
   if (reduziert()) {
@@ -229,6 +316,10 @@ export function welle(texte) {
     karteZeigen();
     if (elements.liveTextFest) elements.liveTextFest.textContent = p.text;
     if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
+    /* FIX 2: Die Warte-Rotation läuft AUCH bei reduzierter Bewegung — ein
+       Textwechsel alle 2,5 s ist keine Bewegung, und ohne Tipp-Schleife gibt
+       es hier sonst niemanden, der sie startet oder stoppt. */
+    warteRotationAktualisieren(lauf);
     statusAktualisieren(lauf);
     return;
   }
@@ -260,6 +351,9 @@ export function modusWechsel() {
   const p = lauf.puffer[neu];
   if (elements.liveTextFest) elements.liveTextFest.textContent = p.text.slice(0, p.fest);
   if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
+  /* FIX 2: Die Warte-Rotation folgt dem neuen Puffer — tippt er noch (oder
+     liefert er noch), endet sie und der normale Status kehrt zurück. */
+  warteRotationAktualisieren(lauf);
   statusAktualisieren(lauf);
 }
 

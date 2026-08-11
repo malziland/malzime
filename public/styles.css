@@ -760,6 +760,143 @@ html[data-has-result] {
   }
 }
 
+/* ── Live-Dekodierung (v3.0 „Live-Erlebnis", Stile aus dem abgenommenen
+   Prototyp compare-prototype-streaming.html) ── */
+
+/* Bewusst eine EIGENE Karten-Optik (Kopie der .cat-card-Fläche) statt der
+   Klasse cat-card selbst: Tests und Werkzeuge zählen über ".cat-card" die
+   KATEGORIE-Karten — die Live-Karte darf da nicht hineinfunken. */
+.live-karte {
+  display: none;
+  margin: 18px 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.live-karte.active {
+  display: block;
+  animation: fadeUp 0.35s var(--ease) both;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  color: #0e6e73;
+}
+
+[data-mode="boost"] .live-status {
+  color: #46d67c;
+}
+
+.live-status .puls-punkt {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+  animation: livePuls 1.1s ease-in-out infinite;
+}
+
+@keyframes livePuls {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.live-text {
+  font-size: 1.02rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  min-height: 3em;
+}
+
+/* Rausch-Schweif der Matrix-Dekodierung: petrolfarbener Glow, im Beast Mode
+   das Matrix-Grün. */
+.rausch {
+  opacity: 0.9;
+  font-family: "SF Mono", ui-monospace, monospace;
+  color: #0e6e73;
+  text-shadow: 0 0 6px rgba(14, 110, 115, 0.55);
+}
+
+[data-mode="boost"] .rausch {
+  color: #46d67c;
+  text-shadow: 0 0 8px rgba(70, 214, 124, 0.7);
+}
+
+/* Leuchtender Block-Cursor — blinkt, wenn der Puffer leer ist. */
+.tipp-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 1.05em;
+  vertical-align: -0.15em;
+  background: currentColor;
+  margin-left: 2px;
+  opacity: 0.9;
+  box-shadow: 0 0 8px currentColor;
+  animation: tippBlink 0.85s steps(1) infinite;
+}
+
+@keyframes tippBlink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* „Profil wird noch erstellt …" — Dauerstatus, solange getippt wird. */
+.live-warten {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* Erzähler-Betrieb während der Enthüllung: nur noch die Status-Zeile —
+   die Zusammenfassung steht dann in ihrer normalen Box (#simulation). */
+.live-karte--erzaehler .live-text,
+.live-karte--erzaehler .live-warten {
+  display: none;
+}
+
+/* ── Gestaffelte Enthüllung (v3.0) ── */
+
+.lv-verdeckt {
+  display: none !important;
+}
+
+.pop-rein {
+  animation: popRein 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+
+@keyframes popRein {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Balken des Datenwert-Diagramms fahren während der Enthüllung aus
+   (live-anzeige.js stellt sie auf 0 und setzt dann die Zielbreite). */
+.lv-balken .dv-bar-fill {
+  transition: width 0.8s ease;
+}
+
 /* ── Status (Warteschlange, Fehler, Hinweise) ── */
 
 .status {
@@ -2547,6 +2684,15 @@ ol.legal-list > li::before {
     animation-delay: 0s !important;
     transition-delay: 0s !important;
   }
+
+  /* Live-Erlebnis (v3.0): Puls-Punkt, Cursor-Blinken und Pop explizit
+     stilllegen — die JS-Seite (live-anzeige.js) zeigt bei reduzierter
+     Bewegung ohnehin alles sofort, hier verschwindet auch der Rest-Effekt. */
+  .live-status .puls-punkt,
+  .tipp-cursor,
+  .pop-rein {
+    animation: none !important;
+  }
 }
 
 /* ── Responsive ── */
@@ -2698,7 +2844,8 @@ ol.legal-list > li::before {
   .hp-field,
   #gpsMap,
   .data-value-section,
-  .limit-banner {
+  .limit-banner,
+  .live-karte {
     display: none !important;
   }
 

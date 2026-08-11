@@ -13,6 +13,7 @@ import {
   resetQueueWaiting,
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
+import * as liveAnzeige from "./live-anzeige.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
 import { logTelemetry } from "./telemetry-logger.js";
@@ -283,10 +284,14 @@ function waitForNextPoll(ms) {
 /**
  * Pollt /api/job-status bis zu einem Terminal-Status. Jeder Poll erneuert
  * serverseitig den Liveness-Herzschlag des Jobs.
+ * @param {boolean} [liveErlaubt] v3.0: Live-Text-Wellen aus processing-
+ *        Antworten an die Live-Anzeige durchreichen. Nur der frische Upload
+ *        setzt das — die Wiederaufnahme nach einem Reload bleibt bewusst beim
+ *        heutigen Verhalten (Scan-Animation bis zum fertigen Ergebnis).
  * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
  *          — oder null, wenn ein neuer Upload den Lauf abgelöst hat.
  */
-async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
+async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveErlaubt = false) {
   let failures = 0;
   let firstPoll = true;
   const pollStart = Date.now();
@@ -344,6 +349,11 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false) {
         break;
       case "processing":
         showQueueWaiting("processing");
+        /* v3.0: Liefert der Server schon Live-Text (Flag useLiveText), tippt
+           die Live-Anzeige ihn mit — sie versteckt beim ersten Zeichen selbst
+           die Scan-Animation. Ohne liveText-Feld ist das ein No-Op und alles
+           bleibt exakt wie heute. */
+        if (liveErlaubt && typeof data.liveText === "string") liveAnzeige.welle(data.liveText);
         break;
       case "done":
         return { result: data.result };
@@ -478,6 +488,8 @@ function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) 
   /* PRIV-107: Ab der ersten Zustellung läuft die Wiederholungs-Frist. */
   markiereErgebnisZustellung();
   if (!data) {
+    /* Nie halben Live-Text stehen lassen — Karte weg, normale Fehlermeldung. */
+    liveAnzeige.abbrechen();
     setStatus(t("error.queueFailed"), traceId);
     return;
   }
@@ -497,6 +509,16 @@ function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) 
     if (state.requestId !== myId) return;
     state.lastData = data;
     renderCurrentMode(data);
+    /* v3.0: Lief für diesen Job Live-Text, wird das eben Gerenderte im selben
+       Frame verdeckt und gestaffelt enthüllt (live-anzeige.js). Lief KEINER
+       (Flag aus, Tier-Profil, blocked, Resume nach Reload), räumt abbrechen()
+       höchstens eine verwaiste Live-Karte weg — der heutige Pfad bleibt
+       Pixel für Pixel unverändert. */
+    if (liveAnzeige.hatLiveGelaufen() && data.profiles && data.meta?.mode !== "animal") {
+      liveAnzeige.starteEnthuellung();
+    } else {
+      liveAnzeige.abbrechen();
+    }
     setStatus("");
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(() => {
@@ -548,6 +570,9 @@ async function analyzeImageQueued() {
   const timings = {};
 
   setStatus("");
+  /* v3.0: Reste eines vorigen Live-Erlebnisses (Karte, Verdeckungen) räumen —
+     dieser Durchgang beginnt sauber, gelaufen ist für ihn noch nichts. */
+  liveAnzeige.zuruecksetzen();
   elements.facts.innerHTML = "";
   elements.privacy.innerHTML = "";
   elements.gpsMap.innerHTML = "";
@@ -672,8 +697,10 @@ async function analyzeImageQueued() {
        die Hintergrund-Wiederaufnahme darf also wieder uebernehmen. */
     state.uploadLaeuft = false;
 
-    /* ── Auf das Ergebnis pollen (jeder Poll = Liveness-Herzschlag) ── */
-    const outcome = await pollJob(jobId, myId, resultToken);
+    /* ── Auf das Ergebnis pollen (jeder Poll = Liveness-Herzschlag) ──
+       liveErlaubt: nur hier, beim frischen Upload, darf die Live-Anzeige
+       mittippen (v3.0) — die Wiederaufnahme unten bleibt beim heutigen Bild. */
+    const outcome = await pollJob(jobId, myId, resultToken, false, true);
     if (state.requestId !== myId) return;
 
     stopScanAnim();
@@ -682,11 +709,15 @@ async function analyzeImageQueued() {
     if (!outcome) return;
 
     if (outcome.abandoned) {
+      /* v3.0: nie halben Live-Text stehen lassen — Karte samt Text weg. */
+      liveAnzeige.abbrechen();
       clearStoredJobId();
       setStatus(t("error.queueAbandoned"), traceId);
       return;
     }
     if (outcome.error) {
+      /* v3.0: dito — der Fehler gehört auf den heutigen, ungestörten Weg. */
+      liveAnzeige.abbrechen();
       /* Nur aufräumen, wenn der Job WIRKLICH weg ist (404, failed, abgelaufen).
          Bei einem Verbindungsabbruch bleibt die Nummer stehen: Sie ist der
          einzige Weg zurück zum fertigen Ergebnis — über die automatische
@@ -714,6 +745,8 @@ async function analyzeImageQueued() {
     renderQueueResult(outcome.result, myId, traceId, timings, jobId, false);
   } catch (err) {
     if (state.requestId !== myId) return;
+    /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
+    liveAnzeige.abbrechen();
     stopScanAnim();
     elements.scanText.textContent = "";
 
@@ -784,6 +817,10 @@ export async function resumeQueueJob({ force = false } = {}) {
   /* state.lastPrepared ist nach einem Reload leer — GPS kann nicht mehr
      injiziert werden (verlässt den Browser ohnehin nie). Das Profil selbst
      liegt vollständig serverseitig. */
+  /* v3.0: Die Wiederaufnahme bleibt bewusst beim heutigen Bild (Scan-Animation
+     bis zum fertigen Ergebnis). Ein eventuell mitten im Tippen eingefrorener
+     Live-Lauf wird hier restlos weggeräumt — nie halben Text stehen lassen. */
+  liveAnzeige.zuruecksetzen();
   resetQueueWaiting();
   startScanAnim(false);
   elements.scanText.textContent = "";

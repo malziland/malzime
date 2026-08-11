@@ -23,6 +23,13 @@ const ids = [
   "maintenanceReload",
   "resultsPanel",
   "srAnnounce",
+  /* Live-Karte (v3.0 Live-Erlebnis) */
+  "liveKarte",
+  "liveStatusText",
+  "liveTextFest",
+  "liveTextRausch",
+  "liveCursor",
+  "liveWarten",
 ];
 
 export function setupDOM() {

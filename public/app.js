@@ -18,6 +18,8 @@ import {
 } from "./js/ui.js";
 import { initDemo } from "./js/demo.js";
 import { initStickyToggle, renderKeepingScrollAnchor } from "./js/sticky-toggle.js";
+import { klangAktivieren } from "./js/klang.js";
+import { enthuellungAbkuerzen } from "./js/live-anzeige.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
 
@@ -92,6 +94,11 @@ function handleNewFile(file) {
      Anfrage erst tief in der asynchronen analyzeImage-Pipeline und wurde von
      iOS mit NotAllowedError abgelehnt. */
   acquireWakeLock();
+
+  /* v3.0: Den AudioContext fürs Live-Erlebnis JETZT erzeugen — die Dateiwahl
+     ist die Nutzer-Geste, ohne die Browser keinen Ton erlauben. Reiner
+     Best-Effort: ohne Web Audio läuft alles stumm weiter. */
+  klangAktivieren();
 
   /* Laufende Analyse abbrechen */
   if (state.currentAbortController) {
@@ -199,6 +206,10 @@ elements.biasSwitch.addEventListener("change", () => {
   merkeModus(elements.biasSwitch.checked);
   applyModeTheme();
   if (state.lastData) {
+    /* v3.0: Läuft gerade noch die gestaffelte Enthüllung, wird sie sofort
+       abgekürzt — der Moduswechsel rendert wie heute komplett neu, und dabei
+       darf nichts halb verdeckt zurückbleiben. KEINE erneute Enthüllung. */
+    enthuellungAbkuerzen();
     renderKeepingScrollAnchor(() => renderCurrentMode(state.lastData));
   }
 });

@@ -61,14 +61,17 @@ export function startScanAnim(rotateMessages = true) {
   }, 1800);
 }
 
-export function stopScanAnim() {
+export function stopScanAnim(leise = false) {
   elements.scanAnim.classList.remove("active");
   if (scanInterval) {
     clearInterval(scanInterval);
     scanInterval = null;
   }
-  /* A11y: Screenreader-Ankuendigung */
-  if (elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srEnd");
+  /* A11y: Screenreader-Ankuendigung. `leise` nutzt die Live-Anzeige (v3.0):
+     Sie versteckt die Scan-Animation schon beim ERSTEN getippten Zeichen —
+     dort waere „Analyse abgeschlossen" schlicht falsch. Die echte Abschluss-
+     Ansage kommt weiterhin vom normalen Aufruf am Ende des Durchgangs. */
+  if (!leise && elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srEnd");
 }
 
 /* ── Disclaimer-Modal ── */

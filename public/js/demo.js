@@ -2,6 +2,7 @@ import { elements } from "./dom.js";
 import { state } from "./state.js";
 import { analyzeImage } from "./api.js";
 import { dismissDisclaimerModal } from "./ui.js";
+import { klangAktivieren } from "./klang.js";
 import { t } from "./i18n.js";
 
 const DEMO_IMAGES = {
@@ -13,6 +14,9 @@ const DEMO_IMAGES = {
 export function initDemo() {
   document.querySelectorAll(".demo-thumb[data-demo]").forEach((btn) => {
     btn.addEventListener("click", () => {
+      /* v3.0: Klang-Aktivierung direkt in der Klick-Geste — nach dem ersten
+         `await` wäre die Nutzer-Aktivierung für den AudioContext verfallen. */
+      klangAktivieren();
       const key = btn.dataset.demo;
       if (key && DEMO_IMAGES[key]) loadDemoImage(DEMO_IMAGES[key], key);
     });

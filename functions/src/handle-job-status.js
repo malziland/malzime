@@ -66,11 +66,28 @@ async function handleJobStatus(req, res) {
   }
 
   if (job.status === "processing") {
-    res.status(200).json({
+    const antwort = {
       status: "processing",
       position: 0,
       etaSeconds: QUEUE_AVG_JOB_SECONDS,
-    });
+    };
+    /* v3.0 Phase 1: Der bereits angekommene Live-Profiltext, falls der Worker
+       ihn (Flag `useLiveText`) ins Job-Dokument gelegt hat. Er ist ein
+       Vorgriff auf das `result` und unterliegt deshalb DEMSELBEN
+       PRIV-003-Abhol-Ticket wie das fertige Ergebnis — der Client schickt
+       das Ticket ohnehin bei jedem Poll mit. Ohne Live-Text (Flag aus,
+       Analyse vor der ersten Welle) ist die Antwort byte-gleich zu heute. */
+    if (typeof job.liveText === "string" && job.resultToken && safeCompare(token, job.resultToken)) {
+      antwort.liveText = job.liveText;
+      antwort.liveTextStand = typeof job.liveTextStand === "number" ? job.liveTextStand : null;
+      /* v3.0 Phase 3: Der Beast-Text, sobald das Modell ihn schreibt —
+         BEWUSST im selben Ticket-Block: dieselbe PRIV-003-Bindung, kein
+         zweiter Pruefpfad. Solange Beast fehlt, fehlt auch das Feld. */
+      if (typeof job.liveTextBeast === "string") {
+        antwort.liveTextBeast = job.liveTextBeast;
+      }
+    }
+    res.status(200).json(antwort);
     return;
   }
 

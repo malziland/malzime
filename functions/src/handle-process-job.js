@@ -31,10 +31,15 @@ const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { applyMinorSafety } = require("./minor-safety");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { incrementTotals, releaseHourlySlot } = require("./counter");
-const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
+const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs, setLiveText } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
-const { isSingleLargeCallEnabled, isPromptCacheEnabled, isBeastAdsCallEnabled } = require("./feature-flags");
+const {
+  isSingleLargeCallEnabled,
+  isPromptCacheEnabled,
+  isBeastAdsCallEnabled,
+  isLiveTextEnabled,
+} = require("./feature-flags");
 
 /* Mistral-Provider: im Mock-Modus die kostenlose Attrappe, sonst die echte
    API. Umschaltbar über die Umgebungsvariable MISTRAL_MOCK ("1" = Mock) —
@@ -261,10 +266,33 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   /* v2.5: Prompt-Cache-Flag. Reine Kostenmassnahme, ohne Einfluss auf Modell
      oder Ergebnis — abschaltbar in Firestore ohne Deploy (~30 s Cache). */
   const usePromptCache = await isPromptCacheEnabledSafe();
+
+  /* v3.0 Phase 1 (+Phase 3): Live-Text-Strom. Mit Flag bekommt der
+     Mistral-Aufruf einen Callback, der die bereits angekommenen Profiltexte
+     ({ standard, beast }) ins Job-Dokument legt — der pollende Client sieht
+     dann schon Text, waehrend das Modell noch schreibt. OHNE Flag wird die
+     Option gar nicht erst angelegt: Die opts sind dann exakt die heutigen,
+     mistral.js setzt kein `stream: true`, nichts am Live-Verhalten aendert
+     sich. */
+  const liveTextAktiv = await isLiveTextEnabledSafe();
+  const opts = { usePromptCache };
+  if (liveTextAktiv) {
+    /* Zusaetzliche Drossel VOR dem Firestore-Schreiben: mistral.js ruft den
+       Callback zwar selbst nur ~alle 2 s, aber dieser Riegel gehoert dem
+       Schreiber — er schuetzt das Job-Dokument auch dann noch, wenn sich die
+       Aufruf-Frequenz in mistral.js einmal aendert. EIN Schreibvorgang
+       traegt beide Felder (Standard + Beast, jobs.js). setLiveText selbst
+       schluckt jeden Firestore-Fehler. */
+    let letzterSchreibMs = 0;
+    opts.onLiveText = (texte) => {
+      const jetzt = Date.now();
+      if (jetzt - letzterSchreibMs < 2000) return;
+      letzterSchreibMs = jetzt;
+      setLiveText(job.id, texte);
+    };
+  }
   try {
-    profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, {
-      usePromptCache,
-    });
+    profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts);
   } catch (err) {
     if (isQuotaError(err)) quotaError = true;
     else pipelineError = true;
@@ -418,6 +446,19 @@ async function isPromptCacheEnabledSafe() {
     return await isPromptCacheEnabled();
   } catch (err) {
     console.log(JSON.stringify({ warning: "prompt-cache-flag-read-error", error: err.message }));
+    return false;
+  }
+}
+
+/* Fail-safe wie die anderen Flags — hier heisst „sicher" AUS: Ist das Flag
+   nicht lesbar, laeuft der Aufruf ohne Stream, also exakt der heutige Pfad.
+   Der Live-Text ist reiner Komfort; ein Firestore-Wackler darf das Experiment
+   niemals von selbst einschalten. */
+async function isLiveTextEnabledSafe() {
+  try {
+    return await isLiveTextEnabled();
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "live-text-flag-read-error", error: err.message }));
     return false;
   }
 }

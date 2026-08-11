@@ -21,6 +21,7 @@ describe("getFeatureFlags", () => {
       useSingleLargeCall: false,
       usePromptCache: false,
       useBeastAdsCall: true,
+      useLiveText: false,
     });
   });
 
@@ -38,6 +39,7 @@ describe("getFeatureFlags", () => {
       useSingleLargeCall: true,
       usePromptCache: false,
       useBeastAdsCall: true,
+      useLiveText: false,
     });
   });
 
@@ -47,6 +49,7 @@ describe("getFeatureFlags", () => {
       useSingleLargeCall: false,
       usePromptCache: true,
       useBeastAdsCall: true,
+      useLiveText: false,
     });
   });
 
@@ -56,6 +59,7 @@ describe("getFeatureFlags", () => {
       useSingleLargeCall: false,
       usePromptCache: false,
       useBeastAdsCall: true,
+      useLiveText: false,
     });
   });
 
@@ -65,7 +69,46 @@ describe("getFeatureFlags", () => {
       useSingleLargeCall: false,
       usePromptCache: false,
       useBeastAdsCall: true,
+      useLiveText: false,
     });
+  });
+});
+
+/* ── v3.0 Phase 1: useLiveText ───────────────────────────────────────────
+   Das Flag schaltet den Live-Text-Strom des Workers. Entscheidend ist der
+   Default: AUS — ohne explizites `useLiveText: true` im Dokument darf sich
+   am Mistral-Aufruf nichts aendern. */
+describe("useLiveText (v3.0 Phase 1)", () => {
+  test("Default ist AUS — ein leeres Flag-Dokument aktiviert nichts", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({}) });
+    expect((await flags.getFeatureFlags()).useLiveText).toBe(false);
+  });
+
+  test("useLiveText ist true, wenn das Dokument es so setzt", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useLiveText: true }) });
+    expect((await flags.getFeatureFlags()).useLiveText).toBe(true);
+  });
+
+  test("useLiveText ist false bei nicht-true-Wert (kein versehentliches Aktivieren)", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useLiveText: "ja" }) });
+    expect((await flags.getFeatureFlags()).useLiveText).toBe(false);
+  });
+
+  test("fail-safe: bei Lesefehler bleibt der Live-Text aus", async () => {
+    mockGet.mockRejectedValue(new Error("firestore down"));
+    expect((await flags.getFeatureFlags()).useLiveText).toBe(false);
+  });
+});
+
+describe("isLiveTextEnabled", () => {
+  test("spiegelt das useLiveText-Flag", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useLiveText: true }) });
+    expect(await flags.isLiveTextEnabled()).toBe(true);
+  });
+
+  test("ist false, wenn das Flag nicht gesetzt ist", async () => {
+    mockGet.mockResolvedValue({ exists: false });
+    expect(await flags.isLiveTextEnabled()).toBe(false);
   });
 });
 

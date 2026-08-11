@@ -18,6 +18,13 @@
  *     Antwortqualitaet und die Laufzeit bleiben unveraendert (gecacht wird die
  *     Vorarbeit am statischen Text, NICHT die Antwort und NICHT das Bild).
  *     `false` = Ist-Zustand vor v2.5, jederzeit ohne Deploy erreichbar.
+ *   - `useLiveText` (v3.0 Phase 1): der Queue-Worker liest die Mistral-Antwort
+ *     als Stream mit und legt die bereits angekommenen Profiltexte ins
+ *     Job-Dokument (`liveText` = Standard, seit Phase 3 zusaetzlich
+ *     `liveTextBeast`), damit der wartende Client sie zeigen kann.
+ *     Default AUS: ohne Flag laeuft der Mistral-Aufruf exakt wie heute (kein
+ *     `stream: true`, kein zusaetzlicher Firestore-Schreibvorgang). Damit ist
+ *     der bewaehrte Pfad jederzeit ohne Deploy zurueckholbar.
  *
  * Beide Flags liegen im Firestore-Dokument `featureFlags/current`. Umlegen
  * geht OHNE Deploy (Firestore-Console, auch vom Handy aus) — damit ist der
@@ -45,7 +52,8 @@ async function getFeatureFlags() {
      Lauf dient ja gerade ihrem Test. Single-Large-Call bleibt im Lokal-Modus
      standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
      Kein Firestore-Read, kein Seeding nötig. */
-  if (isLocalQueueMode()) return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true };
+  if (isLocalQueueMode())
+    return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true, useLiveText: false };
 
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
@@ -62,6 +70,11 @@ async function getFeatureFlags() {
          er, wenn die Anfragen pro Minute knapp werden: Er verdoppelt sie, und
          bisher gab es keinen Weg, ihn ohne Deploy stillzulegen. */
       useBeastAdsCall: data.useBeastAdsCall !== false,
+      /* v3.0 Phase 1: Live-Text-Strom. Streng opt-in (`=== true`) — jeder
+         andere Wert laesst den Worker exakt wie heute laufen. Der Stream ist
+         ein Experiment am teuersten Aufruf der Pipeline; er darf sich nie
+         durch einen Tippfehler im Dokument selbst einschalten. */
+      useLiveText: data.useLiveText === true,
     };
     cache = { data: flags, expiresAt: now + CACHE_TTL_MS };
     return flags;
@@ -70,7 +83,7 @@ async function getFeatureFlags() {
     /* Fail-safe: bewaehrte Pipeline, kein Cache — der Zweitaufruf bleibt aber
        AN, denn er ist der Normalbetrieb und sein Ausfall waere ein stiller
        Qualitaetsverlust statt einer Absicherung. */
-    return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true };
+    return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true, useLiveText: false };
   }
 }
 
@@ -98,6 +111,13 @@ async function isBeastAdsCallEnabled() {
   return (await getFeatureFlags()).useBeastAdsCall;
 }
 
+/**
+ * Kurzform: Soll der Worker den Profiltext live ins Job-Dokument streamen?
+ */
+async function isLiveTextEnabled() {
+  return (await getFeatureFlags()).useLiveText;
+}
+
 /* Nur für Tests — Cache zurücksetzen. */
 function _clearCache() {
   cache = { data: null, expiresAt: 0 };
@@ -108,6 +128,7 @@ module.exports = {
   isSingleLargeCallEnabled,
   isPromptCacheEnabled,
   isBeastAdsCallEnabled,
+  isLiveTextEnabled,
   FLAGS_DOC,
   _clearCache,
 };

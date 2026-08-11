@@ -4,6 +4,44 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.0] — 2026-08-11
+
+Das Live-Erlebnis: der KI beim Schreiben zusehen.
+
+### Was sich ändert
+
+Bisher hieß Analyse: warten, dann alles auf einen Schlag. Jetzt beginnt nach
+rund zehn bis fünfzehn Sekunden das Profil, sich **Buchstabe für Buchstabe
+live aufzubauen** — mit dekodierendem Zeichen-Rauschen am Schreibrand,
+leuchtendem Cursor und einem dezenten Daten-Puls-Klang in unregelmäßigem
+Rhythmus. Der getippte Text folgt dem gewählten Modus: Wer den Beast-Schalter
+umlegt, sieht sofort den Beast-Text an dessen Stand weiterlaufen (das Modell
+schreibt sequenziell — der Beast-Teil beginnt naturgemäß etwas später, die
+Karte überbrückt das mit einem ehrlichen Wartestatus).
+
+Ist die Analyse fertig, folgt die **gestaffelte Enthüllung**: Foto-Daten und
+Standort-Karte, dann die Kategorien-Gruppen Karte für Karte, dann Werbung und
+Manipulation als ganze Boxen, zuletzt der Datenwert, dessen Betrag vor den
+Augen hochzählt, während die Balken ausfahren — und erst dann der PDF-Knopf.
+
+Der Klang ist bewusst immer an (Lautstärke regelt das Gerät); wer im System
+„Bewegung reduzieren" eingestellt hat, bekommt alles sofort und ohne Effekte;
+die Vorlese-Ansage kommt einmal am Ende, nie pro Zeichen.
+
+### Wie es funktioniert
+
+Der Analyse-Worker liest die Mistral-Antwort als Datenstrom mit und legt den
+bereits geschriebenen Profiltext (beide Modi) gedrosselt ins Auftrags-Dokument
+— geschützt durch dasselbe Abhol-Ticket wie das Ergebnis. Der Browser holt ihn
+über die vorhandene 2-Sekunden-Abfrage und tippt entkoppelt aus einem Puffer:
+keine neue Verbindungsart, kein neues Datenschutz-Thema, absturz- und
+sperrbildschirmfest. Ein Neuladen mitten im Tippen fällt bewusst auf das
+bisherige Verhalten zurück; Ausweich-Pfad, Tier-Profile, Fehlerfälle und
+Wiederaufnahme bleiben unverändert.
+
+Alles hängt am Feature-Flag `useLiveText` (Standard aus) — ohne das Flag
+verhält sich die Seite exakt wie v2.12.3. Testumfang jetzt 677 / 255 / 15.
+
 ## [2.12.3] — 2026-08-11
 
 Sanierung nach dem Kurzaudit vom selben Tag (kein Blocker, ein mittlerer und

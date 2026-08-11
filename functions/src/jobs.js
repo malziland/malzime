@@ -232,9 +232,49 @@ async function touchJob(jobId) {
  * beim Client angekommen" — unabhängig von der best-effort Client-Telemetrie.
  * Der job-status-Handler ruft das genau einmal pro Job (Guard dort: nur wenn
  * `deliveredAt` noch nicht gesetzt ist).
+ *
+ * KA-02 (Kurzaudit 2026-08-12): Mit der Auslieferung wird — im selben
+ * Schreibvorgang — der HASH des Realitäts-Check-Einmal-Tickets abgelegt.
+ * Das Ticket selbst geht nur an den Browser; die Datenbank kennt nur den
+ * Hash und kann daraus kein gültiges Ticket machen.
  */
-async function markDelivered(jobId) {
-  await jobsRef().doc(jobId).update({ deliveredAt: Date.now() });
+async function markDelivered(jobId, rcTicketHash) {
+  const patch = { deliveredAt: Date.now() };
+  if (typeof rcTicketHash === "string" && rcTicketHash.length > 0) {
+    patch.rcTicketHash = rcTicketHash;
+  }
+  await jobsRef().doc(jobId).update(patch);
+}
+
+/**
+ * KA-02: Entwertet ein Realitäts-Check-Einmal-Ticket (per Hash) und meldet,
+ * ob es gültig war. Jede echte Analyse gibt bei der ersten Auslieferung genau
+ * EIN Ticket aus — damit zählt jede Analyse höchstens eine Stimme, egal wie
+ * viele Function-Instanzen laufen (das frühere In-Memory-IP-Limit vervielfacht
+ * sich je Instanz und schützt den öffentlichen Vergleichswert nicht).
+ *
+ * Ablauf: Job per Hash-Gleichheit suchen (automatischer Einzelfeld-Index,
+ * kein zusammengesetzter nötig), dann in einer TRANSAKTION erneut lesen und
+ * den Hash auf null setzen. Zwei gleichzeitige Einreichungen desselben
+ * Tickets können so nie beide zählen: Die zweite Transaktion sieht den Hash
+ * nicht mehr. Läuft die 15-Minuten-Löschfrist (PRIV-107b) vorher ab, ist das
+ * Dokument weg und das Ticket damit von selbst wertlos.
+ */
+async function verbraucheRcTicket(rcTicketHash) {
+  if (typeof rcTicketHash !== "string" || rcTicketHash.length === 0) return false;
+  const snap = await jobsRef().where("rcTicketHash", "==", rcTicketHash).limit(1).get();
+  if (snap.empty) return false;
+  const ref = snap.docs[0].ref;
+  const db = datenbank();
+  return db.runTransaction(async (tx) => {
+    const doc = await tx.get(ref);
+    if (!doc.exists || doc.data().rcTicketHash !== rcTicketHash) return false;
+    /* null statt FieldValue.delete(): Zeitstempel/Werte sind in dieser Datei
+       bewusst plain (s. Datei-Kopf), und die Gleichheits-Suche oben findet
+       ein null-Feld nie wieder — entwertet ist entwertet. */
+    tx.update(ref, { rcTicketHash: null });
+    return true;
+  });
 }
 
 /**
@@ -403,6 +443,7 @@ module.exports = {
   markFailedIfStale,
   touchJob,
   markDelivered,
+  verbraucheRcTicket,
   setLiveText,
   abandonJob,
   isAbandoned,

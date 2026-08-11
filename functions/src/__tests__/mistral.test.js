@@ -183,6 +183,54 @@ describe("callMistralRaw 429 retry behavior", () => {
     expect(result.text).toBe("ok");
   }, 10000);
 
+  test("KA-09: der nie gelesene 429-Antwortrumpf wird aktiv verworfen (body.cancel)", async () => {
+    let attempts = 0;
+    const cancelSpy = jest.fn(async () => {});
+    setFetchForTest(async () => {
+      attempts++;
+      if (attempts === 1) {
+        return { ok: false, status: 429, text: async () => "rate limited", body: { cancel: cancelSpy } };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: {} }),
+      };
+    });
+
+    const result = await _callMistralRaw({ model: "x", messages: [], maxTokens: 1, temperature: 0 });
+    expect(result.text).toBe("ok");
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+  }, 10000);
+
+  test("KA-09: ein werfendes body.cancel aendert am Retry NICHTS (best effort)", async () => {
+    let attempts = 0;
+    setFetchForTest(async () => {
+      attempts++;
+      if (attempts === 1) {
+        return {
+          ok: false,
+          status: 429,
+          text: async () => "rate limited",
+          body: {
+            cancel: async () => {
+              throw new Error("cancel kaputt");
+            },
+          },
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }], usage: {} }),
+      };
+    });
+
+    const result = await _callMistralRaw({ model: "x", messages: [], maxTokens: 1, temperature: 0 });
+    expect(attempts).toBe(2);
+    expect(result.text).toBe("ok");
+  }, 10000);
+
   test("gives up after exhausting retries on persistent 429", async () => {
     let attempts = 0;
     setFetchForTest(async () => {

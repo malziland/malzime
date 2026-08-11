@@ -13,6 +13,7 @@ import {
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import * as liveAnzeige from "./live-anzeige.js";
+import { speichereRcTicket, loescheRcTicket } from "./rc-ticket.js";
 import * as realitaetsCheck from "./realitaets-check.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
@@ -186,6 +187,9 @@ function storeJobId(jobId, resultToken) {
   } catch (_) {
     /* sessionStorage kann im privaten Modus werfen — kein harter Fehler. */
   }
+  /* KA-02: Neuer Auftrag → das Realitäts-Check-Ticket des vorigen Ergebnisses
+     ist verbraucht oder hinfällig. */
+  loescheRcTicket();
 }
 
 /* PRIV-107: Zeitpunkt der ERSTEN Zustellung festhalten. Bewusst nur setzen,
@@ -224,6 +228,8 @@ export function clearStoredJobId() {
   } catch (_) {
     /* dito */
   }
+  /* KA-02: Zum Tab-Stand gehört auch das Realitäts-Check-Ticket. */
+  loescheRcTicket();
 }
 
 /** Gibt eine offene jobId aus einem früheren Seitenbesuch zurück (oder null). */
@@ -355,6 +361,10 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
         }
         break;
       case "done":
+        /* KA-02: Das Einmal-Ticket für den Realitäts-Check kommt genau mit
+           der ersten Auslieferung (danach nie wieder) — sofort merken, damit
+           es Reload und Tab-Wiederaufnahme im 15-Minuten-Fenster überlebt. */
+        if (typeof data.rcTicket === "string") speichereRcTicket(data.rcTicket);
         return { result: data.result };
       case "failed":
         return { error: t("error.queueFailed"), reason: data.errorReason };
@@ -592,12 +602,6 @@ async function analyzeImageQueued() {
   resetQueueWaiting();
   startScanAnim(false);
   elements.scanText.textContent = t("scan.upload");
-  /* v3.0.3 Blick-Führung: Ab jetzt gehört der Blick diesem Lauf — die
-     Übernahme-Wache startet EINMAL pro Analyse (ein eigener Scroll des
-     Nutzers stoppt alle automatischen Bewegungen dauerhaft), und das Auge
-     wird ins Bild geholt, falls es unter der Sichtkante liegt (am Handy
-     sieht man sonst nur das Foto, aber nicht, dass etwas passiert). Die
-     Wiederaufnahme nach einem Neuladen bleibt bewusst ohne Führung. */
   /* v3.0.3 Blick-Führung: Ab jetzt gehört der Blick diesem Lauf — die
      Übernahme-Wache startet EINMAL pro Analyse (ein eigener Scroll des
      Nutzers stoppt alle automatischen Bewegungen dauerhaft), und das Auge

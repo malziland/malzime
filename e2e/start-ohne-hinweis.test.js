@@ -76,6 +76,19 @@ test("Start ohne Hinweis-Pop-up: Demo-Wahl startet die Analyse direkt, kein Dial
   await expect(page.locator("#disclaimerModal")).toHaveCount(0);
   await expect(page.locator("#disclaimerConfirm")).toHaveCount(0);
 
+  /* KA-08 (Kurzaudit 2026-08-12): Der modallose Start ist nur sauber, wenn
+     die Einordnung VOR der Foto-Wahl sichtbar ist — „nichts davon ist wahr"
+     muss am Bildschirm ÜBER dem Upload stehen, nicht erst darunter. */
+  const einordnung = page.locator(".disclaimer--einordnung");
+  await expect(einordnung).toBeVisible();
+  await expect(einordnung).toContainText(/nichts davon ist wahr|none of it is true/);
+  const liegtUeberDemUpload = await page.evaluate(() => {
+    const einordnungBox = document.querySelector(".disclaimer--einordnung").getBoundingClientRect();
+    const uploadBox = document.querySelector(".upload-section").getBoundingClientRect();
+    return einordnungBox.bottom <= uploadBox.top;
+  });
+  expect(liegtUeberDemUpload).toBe(true);
+
   /* 1. Demo-Wahl → die Analyse startet SOFORT (Scan-Animation mit
      Upload-Text ab der ersten Sekunde), ohne dass irgendein Dialog
      dazwischen bestätigt werden müsste. */

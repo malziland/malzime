@@ -9,6 +9,7 @@
  */
 
 import { collectClientContext, coarseUserAgent } from "./client-context.js";
+import { leseRcTicket } from "./rc-ticket.js";
 
 const TELEMETRY_ENDPOINT = "/api/telemetry";
 
@@ -43,17 +44,28 @@ export function logTelemetry(eventType, context = {}) {
 /**
  * Realitäts-Check (v3.1): meldet die Selbsteinschätzung als anonymes
  * Ereignis. BEWUSST ein eigener, minimaler Pfad statt logTelemetry():
- * Es gehen AUSSCHLIESSLICH die Kategorie-Stufen über die Leitung — keine
- * traceId, keine jobId, kein UserAgent, keine Geräteklassen, nichts, was
- * die Eingabe mit einer Analyse oder einem Gerät verknüpfen könnte
- * (Privacy-Zusage der Spezifikation). Den Score rechnet der Server selbst.
+ * Es gehen AUSSCHLIESSLICH die Kategorie-Stufen und das Einmal-Ticket über
+ * die Leitung — keine traceId, keine jobId, kein UserAgent, keine
+ * Geräteklassen, nichts, was die Eingabe mit einer Analyse oder einem Gerät
+ * verknüpfen könnte (Privacy-Zusage der Spezifikation). Den Score rechnet
+ * der Server selbst.
+ *
+ * KA-02: Das Ticket (ein bedeutungsloser Zufallswert aus der
+ * job-status-Antwort) beweist dem Server nur „echte Analyse" und wird dort
+ * sofort entwertet — er loggt und speichert es nicht. Ohne Ticket zählt die
+ * Stimme nicht; gesendet wird trotzdem NICHT anders (der Bildschirm-Check
+ * funktioniert unabhängig davon).
  */
 export function logRealitaetsCheck(stufen) {
   try {
+    const ticket = leseRcTicket();
+    const nutzlast = ticket
+      ? { eventType: "realitaets-check", stufen, ticket }
+      : { eventType: "realitaets-check", stufen };
     fetch(TELEMETRY_ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventType: "realitaets-check", stufen }),
+      body: JSON.stringify(nutzlast),
       keepalive: true,
     }).catch(() => {});
   } catch (_) {

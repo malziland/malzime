@@ -4,6 +4,43 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.12.1] — 2026-08-11
+
+Der Beast Mode überlebt jetzt ein Neuladen.
+
+### Behoben
+
+Wer im Beast Mode die Seite neu lud, landete wieder im seriösen Modus — das
+Ergebnis wurde zwar wiederhergestellt, aber im falschen Modus, und die
+Umschaltung musste von Hand wiederholt werden.
+
+Das war ursprünglich Absicht („Beast startet immer ausgeschaltet"). Der
+Betreiber hat die Regel präzisiert, und die Präzisierung trifft den Kern:
+
+> „Beast startet immer ausgeschaltet — das stimmt, aber ein Reload ist kein
+> Start."
+
+Die Wahl liegt jetzt im `sessionStorage`: Sie überlebt Neuladen und
+Tab-Wechsel, endet aber mit dem Tab. **Der didaktische Einstieg bleibt damit
+erhalten** — im Workshop startet jede neue Person und jedes weitergereichte
+Gerät wieder im seriösen Modus und stellt den Kontrast selbst her.
+
+Datenschutz unverändert: dieselbe Ablage, die schon die Job-Nummer nutzt,
+nichts Personenbezogenes, endet mit dem Tab. Kein `localStorage` — das wird
+eigens geprüft, weil ein Wechsel dorthin die didaktische Zusage still
+aushebeln würde.
+
+### Prüfungen
+
+- Unit: sechs Fälle, darunter die Unterscheidung „nie gewählt" gegen „bewusst
+  seriös gewählt" und ein defekter Speicher (privater Safari-Modus)
+- E2E: umschalten → neu laden → weiterhin Beast; und ein **neuer Tab** startet
+  wieder seriös
+- Rückbauprobe: Fix entfernt → E2E rot mit `Received: "light"`; wieder
+  eingebaut → grün
+
+Frontend 209 Tests, E2E 12.
+
 ## [2.12.0] — 2026-08-11
 
 **Die Datenbank läuft ab jetzt in Europa.** Damit stimmt die Zusage der

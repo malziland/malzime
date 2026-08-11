@@ -100,6 +100,11 @@ export default [
         afterAll: "readonly",
         vi: "readonly",
         sessionStorage: "readonly",
+        /* Für den Test des Modus-Speichers: `localStorage` als Gegenprobe
+           (die Wahl darf dort NICHT landen), `Storage` zum Nachstellen eines
+           defekten Speichers wie im privaten Safari-Modus. */
+        localStorage: "readonly",
+        Storage: "readonly",
       },
     },
     rules: {

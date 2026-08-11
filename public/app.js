@@ -12,6 +12,7 @@ import {
 } from "./js/ui.js";
 import { initDemo } from "./js/demo.js";
 import { initStickyToggle, renderKeepingScrollAnchor } from "./js/sticky-toggle.js";
+import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 
 /* ── i18n initialisieren (vor allem anderen) ── */
 await initI18n();
@@ -148,8 +149,13 @@ document.addEventListener("drop", (e) => e.preventDefault());
 
 /* Modus-Theme-Kopplung (malziland Design System): Seriöse Analyse = heller
    Papier-Look, Beast Mode = dunkles Theme. Das Theme hängt am Modus — es
-   gibt bewusst keinen separaten Hell/Dunkel-Schalter und keine Speicherung
-   (Beast startet immer ausgeschaltet). */
+   gibt bewusst keinen separaten Hell/Dunkel-Schalter.
+
+   Zur Speicherung: Beast startet weiterhin immer ausgeschaltet — aber ein
+   Reload ist kein Start. Die Wahl liegt deshalb im sessionStorage: Sie
+   überlebt Neuladen und Tab-Wechsel, endet aber mit dem Tab. Im Workshop
+   startet damit jede neue Person und jedes weitergereichte Gerät wieder
+   seriös und erlebt den Kontrast selbst (siehe js/modus-speicher.js). */
 function applyModeTheme() {
   const boost = elements.biasSwitch.checked;
   document.documentElement.setAttribute("data-mode", boost ? "boost" : "normal");
@@ -158,6 +164,12 @@ function applyModeTheme() {
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) themeMeta.setAttribute("content", boost ? "#171d1f" : "#f9f7f4");
 }
+/* Gemerkte Wahl wiederherstellen, BEVOR das Theme angewendet wird — sonst
+   blitzt kurz der falsche Look auf. `null` heisst „nie gewählt": dann bleibt
+   der Zustand, den der Browser selbst wiederhergestellt hat, unangetastet. */
+const gemerkt = gemerkterModus();
+if (gemerkt !== null) elements.biasSwitch.checked = gemerkt;
+
 /* Beim Start anwenden — Browser können den Checkbox-Zustand nach einem
    Reload wiederherstellen, dann muss das Theme mitziehen. */
 applyModeTheme();
@@ -166,6 +178,7 @@ applyModeTheme();
 initStickyToggle();
 
 elements.biasSwitch.addEventListener("change", () => {
+  merkeModus(elements.biasSwitch.checked);
   applyModeTheme();
   if (state.lastData) {
     renderKeepingScrollAnchor(() => renderCurrentMode(state.lastData));

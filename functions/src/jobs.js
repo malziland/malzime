@@ -24,7 +24,7 @@
  */
 
 const { datenbank } = require("./db");
-const { LIVENESS_GRACE_MS, JOB_RETENTION_MS } = require("./config");
+const { LIVENESS_GRACE_MS, JOB_RETENTION_MS, ZUSTELLUNG_AUFBEWAHRUNG_MS } = require("./config");
 
 const JOBS_COLLECTION = "jobs";
 
@@ -371,6 +371,19 @@ async function findExpiredJobs(limit = 200) {
 }
 
 /**
+ * PRIV-107b: Liefert zugestellte Jobs, deren Browser-Wiederholungs-Fenster
+ * abgelaufen ist (`deliveredAt` älter als ZUSTELLUNG_AUFBEWAHRUNG_MS). Das
+ * Dokument hat ab da keinen Zweck mehr — der Browser zeigt das Ergebnis
+ * ohnehin nicht mehr an. Die Ungleichheits-Abfrage überspringt Dokumente
+ * ohne `deliveredAt` (nie zugestellt) von selbst.
+ */
+async function findZugestellteJobs(limit = 200) {
+  const cutoff = Date.now() - ZUSTELLUNG_AUFBEWAHRUNG_MS;
+  const snap = await jobsRef().where("deliveredAt", "<", cutoff).limit(limit).get();
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
  * Löscht ein Job-Dokument endgültig.
  */
 async function deleteJob(jobId) {
@@ -398,6 +411,7 @@ module.exports = {
   MAX_QUEUED_AGE_MS,
   findStaleProcessingJobs,
   findExpiredJobs,
+  findZugestellteJobs,
   deleteJob,
   countProcessingJobs,
 };

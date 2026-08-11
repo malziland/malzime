@@ -15,6 +15,11 @@
  *     (Worker abgestürzt). `markFailedIfStale` greift nur, wenn ein Client
  *     pollt; pollt keiner mehr, bliebe das Dokument ewig liegen. → `failed`.
  *
+ *  2c. PRIV-107b: Zugestellte Ergebnisse nach Ablauf des Browser-
+ *     Wiederholungs-Fensters (15 min ab Erstzustellung) — das Dokument hat
+ *     ab da keinen Zweck mehr, der Browser zeigt das Ergebnis ohnehin nicht
+ *     mehr an. Vorher deckelte nur Zweig (3) mit 2 h.
+ *
  *  3. Abgelaufene Job-Dokumente — älter als JOB_RETENTION_MS. Das Dokument
  *     wird endgültig gelöscht (Datensparsamkeit: das fertige Profil im Feld
  *     `result` soll nicht unbegrenzt liegen bleiben).
@@ -29,6 +34,7 @@ const {
   findUeberfaelligeJobs,
   findStaleProcessingJobs,
   findExpiredJobs,
+  findZugestellteJobs,
   abandonJob,
   failJob,
   deleteJob,
@@ -93,6 +99,23 @@ async function reapJobs() {
     }
   }
 
+  /* (2c) PRIV-107b: Zugestellte Ergebnisse nach dem Browser-Wiederholungs-
+     Fenster löschen — Bild zuerst (BUG-002-Regel), defensiv: normal ist es
+     nach der Analyse längst weg. */
+  const zugestellt = await findZugestellteJobs(REAP_BATCH_LIMIT);
+  let reapedZugestellt = 0;
+  for (const job of zugestellt) {
+    try {
+      if (job.imagePath) await deleteImage(job.imagePath);
+      await deleteJob(job.id);
+      reapedZugestellt += 1;
+    } catch (err) {
+      console.log(
+        JSON.stringify({ step: "reap", jobId: job.id, warning: "delete-delivered-failed", error: err.message })
+      );
+    }
+  }
+
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
   const expired = await findExpiredJobs(REAP_BATCH_LIMIT);
   let reapedExpired = 0;
@@ -125,6 +148,7 @@ async function reapJobs() {
       staleProcessing: reapedStale,
       expired: reapedExpired,
       ueberfaellig: reapedUeberfaellig,
+      zugestellt: reapedZugestellt,
     })
   );
   return {
@@ -132,6 +156,7 @@ async function reapJobs() {
     staleProcessing: reapedStale,
     expired: reapedExpired,
     ueberfaellig: reapedUeberfaellig,
+    zugestellt: reapedZugestellt,
   };
 }
 

@@ -78,7 +78,7 @@ function releaseWakeLock() {
   wakeLock = null;
 }
 
-/* v3.0.2: Das frühere Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
+/* v3.0.0: Das frühere Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
    (Entscheidung des Inhabers: „dieses Pop-Up liest sowieso keiner durch") —
    die Analyse startet direkt bei der Foto-/Demo-Wahl. Die Einordnung „nichts
    davon ist wahr" trägt weiterhin die Disclaimer-Box auf der Seite, im
@@ -475,7 +475,7 @@ function showPhotoDeletedNotice() {
 
 /**
  * Rendert das fertige Queue-Ergebnis (renderCurrentMode → Success-Telemetrie).
- * v3.0.2: Lief Live-Text, wird VOR dem Rendern der Rest-Puffer im
+ * v3.0.0: Lief Live-Text, wird VOR dem Rendern der Rest-Puffer im
  * Schnellvorlauf ausgetippt — deshalb async. Das Rendern samt Verdecken der
  * Enthüllung bleibt danach synchron im selben Frame.
  */
@@ -539,7 +539,7 @@ async function renderQueueResult(data, myId, traceId, timings) {
     });
   };
 
-  /* v3.0.2: Erst den ungetippten Rest im Schnellvorlauf zu Ende tippen (ohne
+  /* v3.0.0: Erst den ungetippten Rest im Schnellvorlauf zu Ende tippen (ohne
      Live-Lauf löst das sofort auf), DANN rendern — sonst bricht das Tippen
      mitten im Wort ab und das Ergebnis springt hart ins Bild. */
   await liveAnzeige.schnellVorlauf();
@@ -744,7 +744,7 @@ async function analyzeImageQueued() {
        resumeQueueJob beim nächsten Seitenstart still auf. */
     timings.totalMs = Date.now() - analyzeStartTime;
     /* Das Ergebnis rendert direkt in die Dramaturgie hinein — nach dem
-       Schnellvorlauf des restlichen Live-Texts (v3.0.2, daher await). */
+       Schnellvorlauf des restlichen Live-Texts (v3.0.0, daher await). */
     await renderQueueResult(outcome.result, myId, traceId, timings);
   } catch (err) {
     if (state.requestId !== myId) return;

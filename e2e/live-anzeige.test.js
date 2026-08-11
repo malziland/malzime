@@ -124,12 +124,12 @@ test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF
   test.setTimeout(90000);
   await seiteMitLiveMocks(page);
 
-  /* v3.0.2: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
+  /* v3.0.0: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
 
   /* Die Live-Karte übernimmt mit dem ERSTEN getippten Zeichen — im selben
      Moment verschwindet die Scan-Animation. Eine aktive Karte trägt dabei
-     immer schon Text: kein Leerlauf-Cursor mehr (v3.0.2). */
+     immer schon Text: kein Leerlauf-Cursor mehr (v3.0.0). */
   await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
   await expect(page.locator("#scanAnim")).not.toHaveClass(/active/);
   expect((await page.locator("#liveTextFest").textContent()).length).toBeGreaterThan(0);
@@ -164,7 +164,7 @@ test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text 
   test.setTimeout(90000);
   const steuerung = await seiteMitBeastMocks(page);
 
-  /* v3.0.2: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
+  /* v3.0.0: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
 
   /* Erst tippt der seriöse Text wie gewohnt. */
@@ -199,7 +199,7 @@ test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung oh
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seiteMitLiveMocks(page);
 
-  /* v3.0.2: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
+  /* v3.0.0: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
 
   await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });

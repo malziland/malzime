@@ -105,7 +105,7 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  /* v3.0.2: Die Analyse startet direkt bei der Demo-Wahl (kein Hinweis-
+  /* v3.0.0: Die Analyse startet direkt bei der Demo-Wahl (kein Hinweis-
      Pop-up mehr) — das Timeout deckt Bild-Prep + Mindest-Interaktionszeit. */
   await page.click('[data-demo="selfie"]');
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });

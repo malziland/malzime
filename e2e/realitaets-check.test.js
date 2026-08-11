@@ -92,7 +92,7 @@ test("Realitäts-Check: tippen → absenden → Ring mit richtiger Prozentzahl �
   test.setTimeout(90000);
   const telemetrie = await seiteMitMocks(page);
 
-  /* v3.0.2: Die Analyse startet direkt bei der Demo-Wahl — ohne Pop-up. */
+  /* v3.0.0: Die Analyse startet direkt bei der Demo-Wahl — ohne Pop-up. */
   await page.click('[data-demo="selfie"]');
 
   /* Das Ergebnis erscheint — die Check-Karte steht zwischen Manipulations-

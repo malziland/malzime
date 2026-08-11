@@ -156,7 +156,7 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     );
   });
 
-  it("v3.0.2: bei done wird ERST der Rest-Puffer schnell ausgetippt, DANN gerendert", async () => {
+  it("v3.0.0: bei done wird ERST der Rest-Puffer schnell ausgetippt, DANN gerendert", async () => {
     /* Der Schnellvorlauf muss VOR dem Rendern abgewartet werden — sonst
        stünde das fertige Ergebnis schon unverdeckt auf der Seite, während
        die Karte noch tippt (harter Sprung statt sauberem Abschluss). */

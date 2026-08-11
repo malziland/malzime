@@ -85,7 +85,7 @@ describe("Safari keyboard accessibility (index.html)", () => {
     expect(btn.getAttribute("tabindex")).toBe("0");
   });
 
-  it("v3.0.2: das Hinweis-Modal existiert nicht mehr im Markup (Analyse startet direkt)", () => {
+  it("v3.0.0: das Hinweis-Modal existiert nicht mehr im Markup (Analyse startet direkt)", () => {
     expect(document.getElementById("disclaimerModal")).toBeNull();
     expect(document.getElementById("disclaimerConfirm")).toBeNull();
   });

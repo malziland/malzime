@@ -5,7 +5,7 @@
  *
  *   1. Die bestehende Scan-Animation bleibt, bis das ERSTE Zeichen getippt
  *      wird — dann übernimmt die Live-Karte. Getippt wird ab dem ersten
- *      gelieferten Zeichen (v3.0.2: der frühere 200-Zeichen-Anlauf ist weg —
+ *      gelieferten Zeichen (v3.0.0: der frühere 200-Zeichen-Anlauf ist weg —
  *      er ließ die Karte je nach Timing mit leer blinkendem Cursor stehen).
  *   2. GETIPPT (Matrix-Dekodierung: fester Text + Rausch-Schweif + Cursor)
  *      wird AUSSCHLIESSLICH der Zusammenfassungstext, gespeist aus den
@@ -17,7 +17,7 @@
  *      Neustart von vorn. Ist der Beast-Puffer noch leer (das Modell
  *      schreibt Beast NACH dem Standard-Profil — Reihenfolge der Antwort,
  *      keine Schwäche), zeigt die Karte einen Warte-Status mit blinkendem
- *      Cursor. Tempo-Prinzip (v3.0.2, ADAPTIV statt fester 70 Zeichen/s):
+ *      Cursor. Tempo-Prinzip (v3.0.0, ADAPTIV statt fester 70 Zeichen/s):
  *      Das Tempo richtet sich bei jedem Tick nach dem ungetippten Rest —
  *      das Tippen soll die Wartezeit der Analyse TRAGEN, nicht in ~7 s
  *      durchrauschen und dann 40+ s Leere hinterlassen (Befund des ersten
@@ -59,7 +59,7 @@ import { tippTon, popTon } from "./klang.js";
 const RAUSCH_ZEICHEN = "01ｱｶｻﾀﾅﾊﾏﾔﾗ<>#/*+=~$%&";
 /* Länge des Rausch-Schweifs hinter dem zuletzt getippten Zeichen. */
 const SCHWEIF_LAENGE = 7;
-/* ── Adaptives Tipp-Tempo (v3.0.2) ──
+/* ── Adaptives Tipp-Tempo (v3.0.0) ──
    Der Puffer soll über ungefähr diese Spanne abtropfen: Eine echte Analyse
    dauert 50–80 s, der Stream liefert den Text aber schon in den ersten
    ~20–30 s — ein festes Tempo tippte deshalb in ~7 s alles leer und ließ
@@ -145,7 +145,7 @@ function neuerLauf() {
     tippt: false,
     aktiv: aktiverModus(),
     statusZustand: null,
-    /* v3.0.2: Der Server hat „fertig" gemeldet — der Rest wird im
+    /* v3.0.0: Der Server hat „fertig" gemeldet — der Rest wird im
        Schnellvorlauf ausgetippt (schnellVorlauf() setzt das). */
     schnellvorlauf: false,
     /* FIX 2: Läuft gerade die Warte-Rotation? (rotationRunde entwertet eine
@@ -358,7 +358,7 @@ export function welle(texte) {
     return;
   }
 
-  /* v3.0.2: Getippt wird ab dem ERSTEN gelieferten Zeichen — kein Anlauf-
+  /* v3.0.0: Getippt wird ab dem ERSTEN gelieferten Zeichen — kein Anlauf-
      Puffer mehr. Das adaptive Tempo übernimmt dessen Aufgabe: Bei wenig
      Material tippt es langsam genug, dass der Nachschub der 2-s-Wellen
      locker reicht, statt eine leere Karte blinken zu lassen. */

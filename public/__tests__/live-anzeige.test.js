@@ -763,4 +763,230 @@ describe("Live-Anzeige (v3.0)", () => {
       delete window.Element.prototype.scrollIntoView;
     }
   });
+
+  /* ── Blick-Führung über den gesamten Lauf (v3.0.3) ─────────────────────
+     „Der Blick ist immer dort, wo gerade etwas passiert": Auge nach der
+     Foto-Wahl, Karte beim Tipp-Start, letzte Zeile beim Tippen — und EIN
+     Übernahme-Zustand für den ganzen Lauf. Die Sichtfeld-Messungen werden
+     über getBoundingClientRect-Mocks gestellt (jsdom-Fensterhöhe: 768 px). */
+
+  const unterDerSichtkante = () => ({ top: 900, bottom: 1000, height: 100 });
+  const imFenster = () => ({ top: 100, bottom: 200, height: 100 });
+
+  it("v3.0.3 Auge ins Bild: ein Auge unterhalb der Sichtkante wird nach dem Analyse-Start sanft geholt", () => {
+    const spy = vi.fn();
+    elements.scanAnim.scrollIntoView = spy;
+    elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+    try {
+      /* Ohne gestartete Führung passiert nichts — api.js startet sie zuerst. */
+      liveAnzeige.augeInsBild();
+      expect(spy).not.toHaveBeenCalled();
+
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      /* (Diese Erwartung wird ROT, wenn jemand das Auge-Anfahren entfernt.) */
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    } finally {
+      delete elements.scanAnim.scrollIntoView;
+      delete elements.scanAnim.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 Auge ins Bild: ein schon (mehrheitlich) sichtbares Auge wird NICHT angescrollt", () => {
+    const spy = vi.fn();
+    elements.scanAnim.scrollIntoView = spy;
+    elements.scanAnim.getBoundingClientRect = imFenster;
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      /* Desktop-Fall: das Auge steht längst im Bild — NICHTS bewegt sich. */
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      delete elements.scanAnim.scrollIntoView;
+      delete elements.scanAnim.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 reduced-motion: auch das Auge wird nie automatisch angefahren", () => {
+    reduzierteBewegung();
+    const spy = vi.fn();
+    elements.scanAnim.scrollIntoView = spy;
+    elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      delete elements.scanAnim.scrollIntoView;
+      delete elements.scanAnim.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 Tipp-Start: die Karte wird beim ersten Zeichen ins Bild geholt — genau einmal", async () => {
+    const spy = vi.fn();
+    elements.liveKarte.scrollIntoView = spy;
+    elements.liveKarte.getBoundingClientRect = unterDerSichtkante;
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(300));
+      await vi.advanceTimersByTimeAsync(300);
+      expect(elements.liveKarte.classList.contains("active")).toBe(true);
+      /* (Diese Erwartung wird ROT, wenn jemand das Karten-Anfahren entfernt.) */
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+      /* Die folgenden Zeichen fahren die Karte nicht immer wieder neu an. */
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete elements.liveKarte.scrollIntoView;
+      delete elements.liveKarte.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 Tipp-Start: eine schon sichtbare Karte wird NICHT angescrollt (Desktop-Fall)", async () => {
+    const spy = vi.fn();
+    elements.liveKarte.scrollIntoView = spy;
+    elements.liveKarte.getBoundingClientRect = imFenster;
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(300));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(elements.liveKarte.classList.contains("active")).toBe(true);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      delete elements.liveKarte.scrollIntoView;
+      delete elements.liveKarte.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 Tipp-Nachscrollen: rutscht der Cursor unter die Sichtkante, scrollt es gedrosselt nach unten", async () => {
+    const echteScrollBy = window.scrollBy;
+    window.scrollBy = vi.fn();
+    elements.liveCursor.getBoundingClientRect = () => ({ top: 800, bottom: 810, height: 10 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      /* Riesiger Puffer → Tempo am Deckel (~90 Z/s) → ~90 Zeichen-Ticks in
+         der geprüften Sekunde. */
+      w("A".repeat(6000));
+      await vi.advanceTimersByTimeAsync(1000);
+      const aufrufe = window.scrollBy.mock.calls;
+      /* (Rückbauprobe: OHNE Tipp-Nachscrollen bleibt es bei 0 Aufrufen → ROT.) */
+      expect(aufrufe.length).toBeGreaterThanOrEqual(1);
+      /* Drossel: höchstens alle ~300 ms — NICHT bei jedem der ~90 Zeichen.
+         (Diese Obergrenze wird ROT, wenn jemand die Drossel entfernt.) */
+      expect(aufrufe.length).toBeLessThanOrEqual(5);
+      for (const [args] of aufrufe) {
+        expect(args.behavior).toBe("smooth");
+        /* Nur nach unten — nie gegen die Leserichtung nach oben ziehen. */
+        expect(args.top).toBeGreaterThan(0);
+      }
+    } finally {
+      window.scrollBy = echteScrollBy;
+      delete elements.liveCursor.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 Tipp-Nachscrollen: ein Cursor im Sichtfeld löst KEIN Scrollen aus", async () => {
+    const echteScrollBy = window.scrollBy;
+    window.scrollBy = vi.fn();
+    elements.liveCursor.getBoundingClientRect = () => ({ top: 100, bottom: 110, height: 10 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(6000));
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(window.scrollBy).not.toHaveBeenCalled();
+    } finally {
+      window.scrollBy = echteScrollBy;
+      delete elements.liveCursor.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 NUTZER HAT VORRANG: die Übernahme stoppt auch das Tipp-Nachscrollen sofort und dauerhaft", async () => {
+    const echteScrollBy = window.scrollBy;
+    window.scrollBy = vi.fn();
+    elements.liveCursor.getBoundingClientRect = () => ({ top: 800, bottom: 810, height: 10 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(6000));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(window.scrollBy.mock.calls.length).toBeGreaterThanOrEqual(1);
+      const standVorher = window.scrollBy.mock.calls.length;
+
+      /* Der Nutzer greift ein — ab jetzt scrollt das Tippen nie wieder.
+         (Diese Erwartung wird ROT, wenn jemand die Übernahme-
+         Verallgemeinerung entfernt.) */
+      window.dispatchEvent(new Event("wheel"));
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(window.scrollBy.mock.calls.length).toBe(standVorher);
+    } finally {
+      window.scrollBy = echteScrollBy;
+      delete elements.liveCursor.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 EIN Zustand pro Lauf: eine Übernahme WÄHREND des Tippens stoppt auch die Enthüllungs-Führung", async () => {
+    const scrollSpy = vi.fn();
+    window.Element.prototype.scrollIntoView = scrollSpy;
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(300));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(elements.liveKarte.classList.contains("active")).toBe(true);
+
+      /* Übernahme mitten im Tippen — lange VOR der Enthüllung. */
+      window.dispatchEvent(new Event("wheel"));
+
+      baueGerendertesErgebnis();
+      liveAnzeige.starteEnthuellung();
+      await vi.advanceTimersByTimeAsync(16000);
+      /* (Diese Erwartung wird ROT, wenn die Enthüllung wieder eine EIGENE
+         frische Wache startet statt den Lauf-Zustand weiterzuführen.) */
+      expect(scrollSpy).not.toHaveBeenCalled();
+      /* Die Enthüllung selbst lief trotzdem zu Ende. */
+      expect(elements.exportPdf.classList.contains("export-btn--hidden")).toBe(false);
+    } finally {
+      delete window.Element.prototype.scrollIntoView;
+    }
+  });
+
+  it("v3.0.3 reduced-motion: weder Karten-Anfahren noch Tipp-Nachscrollen", async () => {
+    reduzierteBewegung();
+    const echteScrollBy = window.scrollBy;
+    window.scrollBy = vi.fn();
+    const spy = vi.fn();
+    elements.liveKarte.scrollIntoView = spy;
+    elements.liveKarte.getBoundingClientRect = unterDerSichtkante;
+    elements.liveCursor.getBoundingClientRect = () => ({ top: 800, bottom: 810, height: 10 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(300));
+      expect(elements.liveKarte.classList.contains("active")).toBe(true);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(spy).not.toHaveBeenCalled();
+      expect(window.scrollBy).not.toHaveBeenCalled();
+    } finally {
+      window.scrollBy = echteScrollBy;
+      delete elements.liveKarte.scrollIntoView;
+      delete elements.liveKarte.getBoundingClientRect;
+      delete elements.liveCursor.getBoundingClientRect;
+    }
+  });
+
+  it("v3.0.3 Enthüllung: schon die ERSTE gepoppte Box wird aktiv zentriert — die Führung fährt ab Pop 1", async () => {
+    const scrollSpy = vi.fn();
+    window.Element.prototype.scrollIntoView = scrollSpy;
+    try {
+      baueGerendertesErgebnis();
+      liveAnzeige.starteEnthuellung();
+      /* Pop 1 (Foto-Daten, ~700 ms): sofort zentriert — nicht erst, wenn
+         „nötig". (Diese Erwartung wird ROT, wenn jemand die Zentrierung der
+         ersten Pops entfernt.) */
+      await vi.advanceTimersByTimeAsync(750);
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      expect(scrollSpy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    } finally {
+      delete window.Element.prototype.scrollIntoView;
+    }
+  });
 });

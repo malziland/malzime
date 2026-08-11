@@ -42,15 +42,27 @@
  *      GPS-Karte → Kategorien (Gruppenkopf ~650 ms, Karten im ~280-ms-
  *      Stakkato) → Werbe-Box → Manipulations-Box → Datenwert-Box (nur der
  *      Euro-Betrag zählt hoch, die Balken fahren aus) → PDF-Knopf zuletzt.
- *      Dabei scrollt die Seite GEFÜHRT mit (v3.0.2): jede Box wird sanft ins
- *      Sichtfeld geholt. Der Nutzer hat Vorrang — beim ersten eigenen
- *      Eingriff (Rad, Touch, Scroll-Taste) endet die Führung sofort und
+ *      Dabei scrollt die Seite GEFÜHRT mit (v3.0.2): jede gepoppte Box wird
+ *      aktiv zentriert — ab dem ERSTEN Pop (v3.0.3, User-Befund: die Führung
+ *      schien sonst erst spät „loszufahren").
+ *   5. BLICK-FÜHRUNG über den GESAMTEN Lauf (v3.0.3): „Der Blick ist immer
+ *      dort, wo gerade etwas passiert." Nach der Foto-/Demo-Wahl wird das
+ *      Scan-Auge sanft ins Sichtfeld geholt (am Handy zeigt der Bildschirm
+ *      sonst nur das Foto, aber nicht, dass etwas passiert), beim ersten
+ *      getippten Zeichen die Live-Karte — beides NUR, wenn das Element nicht
+ *      ohnehin mehrheitlich sichtbar ist: Auf dem Desktop bewegt sich nichts.
+ *      Während des Tippens hält ein gedrosseltes Nachscrollen die letzte
+ *      Zeile im Bild (nur nach unten, nur wenn der Cursor unter die
+ *      Sichtkante rutscht). Der Nutzer hat Vorrang: EIN Übernahme-Zustand
+ *      pro Analyse-Lauf — der erste eigene Eingriff (Rad, Touch,
+ *      Scroll-Taste) stoppt ALLE automatischen Scroll-Bewegungen sofort und
  *      dauerhaft für diesen Lauf, und der Pop-Ton klingt ab da nur noch für
  *      Boxen, die wirklich im Sichtfeld liegen (keine Geräusche aus dem Off).
  *
  * Barrierefreiheit (Lehren aus v2.11):
  *   - prefers-reduced-motion: kein Tippen, kein Rausch — jede Welle erscheint
- *     sofort vollständig; die Enthüllung läuft ohne jede Verzögerung.
+ *     sofort vollständig; die Enthüllung läuft ohne jede Verzögerung. Und es
+ *     wird NIEMALS automatisch gescrollt (auch nicht von der Blick-Führung).
  *   - Screenreader: EINE Ankündigung am Ende über #srAnnounce — nie pro
  *     Zeichen, nie pro Box. Der Rausch-Span trägt aria-hidden (index.html),
  *     der wachsende Text bewusst KEIN aria-live.
@@ -110,6 +122,15 @@ const LEERLAUF_MS = 120;
 /* Takt der ehrlichen Warte-Zeilen im Warte-Auge (v3.0.2: oberhalb der
    Karte, nicht mehr in einer Status-Zeile). */
 const ROTATION_TAKT_MS = 2500;
+/* ── Tipp-Nachscrollen (v3.0.3) ──
+   Auf kleinen Bildschirmen wächst der getippte Text unten aus dem Sichtfeld
+   („in die Nichtsichtbarkeit gerutscht", User-Befund 11.08. abends). Die
+   Drossel prüft NICHT bei jedem Zeichen — bei ~90 Z/s wären das ~90 Messungen
+   und angestoßene Smooth-Scrolls pro Sekunde, ein ruckelndes Dauerzerren. */
+const NACHSCROLL_TAKT_MS = 300;
+/* Sichtkanten-Puffer: erst wenn der Cursor DARUNTER rutscht, wird gescrollt —
+   und genau bis zurück auf diese Kante, nie weiter (nur nach unten). */
+const NACHSCROLL_PUFFER_PX = 48;
 
 /* Aktueller Tipp-Lauf. `stop` beendet die Schleife beim nächsten Tick.
    `aktiv` benennt den Puffer des gerade gewählten Modus ("standard"/"beast");
@@ -167,11 +188,156 @@ function neuerLauf() {
     schnellvorlauf: false,
     /* Vor diesem Zeitpunkt tippt die Schleife nicht (Zeit-Anlauf). */
     tippStartAb: 0,
+    /* v3.0.3: letzte Sichtkanten-Prüfung des Tipp-Nachscrollens (Drossel). */
+    nachscrollZuletzt: 0,
     puffer: {
       standard: { text: "", fest: 0 },
       beast: { text: "", fest: 0 },
     },
   };
+}
+
+/* ── Blick-Führung über den gesamten Lauf (v3.0.3) ───────────────────────
+   „Der Blick ist immer dort, wo gerade etwas passiert" — Auge nach der
+   Foto-Wahl, Karte beim Tipp-Start, letzte Zeile beim Tippen, jede Box der
+   Enthüllung. Der NUTZER HAT VORRANG: Es gibt genau EINEN Übernahme-Zustand
+   pro Analyse-Lauf; der erste eigene Eingriff (Rad, Touch, Scroll-Taste)
+   stoppt ALLE automatischen Scroll-Bewegungen sofort und dauerhaft für
+   diesen Lauf — nichts ist unangenehmer als eine Seite, die gegen die
+   eigene Scroll-Richtung zieht. Bis v3.0.2 wachte die Übernahme nur über
+   die Enthüllung — seit dem Auge- und Tipp-Scrollen muss sie ab dem
+   Analyse-Beginn gelten. */
+
+/* Tasten, mit denen Menschen scrollen — nur diese gelten als Übernahme
+   (eine Tab-Taste z. B. ist Navigation, kein Scrollen). " " ist die
+   Space-Taste, "Spacebar" ihr Name in älteren Browsern. */
+const UEBERNAHME_TASTEN = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "PageUp",
+  "PageDown",
+  " ",
+  "Spacebar",
+  "Home",
+  "End",
+]);
+
+/* Der EINE Übernahme-Zustand des laufenden Analyse-Durchgangs — null heißt:
+   keine Führung unterwegs (und damit auch kein automatisches Scrollen). */
+let fuehrung = null;
+
+function fuehrungListenerEntfernen(mein) {
+  if (!mein.listener) return;
+  window.removeEventListener("wheel", mein.listener);
+  window.removeEventListener("touchstart", mein.listener);
+  window.removeEventListener("keydown", mein.listener);
+  mein.listener = null;
+}
+
+/**
+ * Startet die Blick-Führung des Analyse-Laufs (api.js ruft das beim
+ * Analyse-Beginn). Existiert für diesen Lauf schon ein Übernahme-Zustand,
+ * bleibt er unangetastet — insbesondere eine bereits erfolgte Übernahme:
+ * Der Nutzer soll die Führung EINMAL stoppen müssen, nicht in jeder Phase
+ * aufs Neue. Die Wache liest nur mit (passive) — sie darf das echte
+ * Scrollen niemals ausbremsen.
+ */
+export function fuehrungStarten() {
+  if (fuehrung) return;
+  const mein = { aktiv: true, listener: null };
+  const uebernahme = (ereignis) => {
+    if (ereignis.type === "keydown" && !UEBERNAHME_TASTEN.has(ereignis.key)) return;
+    mein.aktiv = false;
+    /* Die Wache hat ihren Dienst getan — sofort abbauen, nicht erst am
+       Ende des Laufs. Der Zustand selbst bleibt bis zum Lauf-Ende stehen
+       (die Ton-Sichtfeld-Regel der Enthüllung braucht ihn). */
+    fuehrungListenerEntfernen(mein);
+  };
+  mein.listener = uebernahme;
+  window.addEventListener("wheel", uebernahme, { passive: true });
+  window.addEventListener("touchstart", uebernahme, { passive: true });
+  window.addEventListener("keydown", uebernahme);
+  fuehrung = mein;
+}
+
+/* Lauf-Ende (Enthüllungs-Abschluss, Fehler, Abbruch): Wache und Zustand
+   restlos weg — der nächste Durchgang beginnt mit frischer Führung. */
+function fuehrungBeenden() {
+  if (!fuehrung) return;
+  fuehrungListenerEntfernen(fuehrung);
+  fuehrung = null;
+}
+
+/* Darf gerade automatisch gescrollt werden? (Die reduzierte Bewegung prüft
+   jede Scroll-Stelle zusätzlich selbst — frisch gelesen über reduziert().) */
+function fuehrungAktiv() {
+  return !!(fuehrung && fuehrung.aktiv);
+}
+
+/* „Mehrheitlich im Sichtfeld": mehr als die halbe Box-Höhe liegt im Fenster.
+   Degenerierte Messwerte (Höhe 0) gelten als sichtbar — im Zweifel lieber
+   ein Ton zu viel als eine stumm gewordene Enthüllung. */
+function imSichtfeld(el) {
+  try {
+    const rechteck = el.getBoundingClientRect();
+    const fensterHoehe = window.innerHeight || document.documentElement.clientHeight || 0;
+    const ueberlappung = Math.min(rechteck.bottom, fensterHoehe) - Math.max(rechteck.top, 0);
+    return ueberlappung >= rechteck.height / 2;
+  } catch (_e) {
+    return true;
+  }
+}
+
+/* Sanft in die Bildmitte holen. Der reduzierte Modus scrollt NIE automatisch;
+   die Vorgabe wird frisch gelesen, damit ein Umstellen mitten im Lauf sofort
+   greift. */
+function sanftZentrieren(el) {
+  if (reduziert()) return;
+  if (el && typeof el.scrollIntoView === "function") {
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+/**
+ * Holt das Scan-Auge nach der Foto-/Demo-Wahl ins Sichtfeld (api.js ruft das
+ * beim Analyse-Beginn, direkt nach fuehrungStarten). Grund (User, 11.08.
+ * abends): „Am Handy sieht man das Foto, aber nicht, dass etwas passiert."
+ * NUR wenn das Auge nicht ohnehin mehrheitlich sichtbar ist — auf dem
+ * Desktop, wo es längst im Bild steht, darf sich NICHTS bewegen.
+ */
+export function augeInsBild() {
+  if (!fuehrungAktiv()) return;
+  const auge = elements.scanAnim;
+  if (!auge || imSichtfeld(auge)) return;
+  sanftZentrieren(auge);
+}
+
+/* Tipp-Nachscrollen (v3.0.3): hält die letzte getippte Zeile im Bild. Nur
+   nach unten, nur wenn der Cursor unter die Sichtkante (mit Puffer) gerutscht
+   ist, und gedrosselt — nicht bei jedem Zeichen (NACHSCROLL_TAKT_MS). */
+function tippNachscrollen(mein) {
+  if (!fuehrungAktiv() || reduziert()) return;
+  const jetzt = Date.now();
+  if (jetzt - mein.nachscrollZuletzt < NACHSCROLL_TAKT_MS) return;
+  mein.nachscrollZuletzt = jetzt;
+  const cursor = elements.liveCursor;
+  if (!cursor) return;
+  try {
+    const rechteck = cursor.getBoundingClientRect();
+    const fensterHoehe = window.innerHeight || document.documentElement.clientHeight || 0;
+    /* Wie weit steht der Cursor unter der Sichtkante? Negativ/null = noch im
+       Bild → nichts tun. Es wird NIE nach oben gescrollt — wer hochgeblättert
+       hat, hat übernommen und die Führung ist ohnehin beendet. */
+    const ueberhang = rechteck.bottom - (fensterHoehe - NACHSCROLL_PUFFER_PX);
+    if (ueberhang <= 0) return;
+    if (typeof window.scrollBy === "function") {
+      window.scrollBy({ top: ueberhang, behavior: "smooth" });
+    }
+  } catch (_e) {
+    /* Eine misslungene Messung darf das Tippen nie stören. */
+  }
 }
 
 /* ── Warte-Auge oberhalb der Karte (v3.0.2, ersetzt die Status-Zeile) ─────
@@ -257,6 +423,10 @@ function karteZeigen() {
   /* „Noch nicht fertig"-Dauerstatus, solange getippt wird. */
   if (elements.liveWarten) elements.liveWarten.textContent = t("live.nochNichtFertig");
   stopScanAnim(true);
+  /* v3.0.3: In dem Moment, in dem die Karte übernimmt, gehört ihr der Blick —
+     aber nur, wenn sie nicht ohnehin mehrheitlich im Bild steht (auf dem
+     Desktop bewegt sich nichts). */
+  if (fuehrungAktiv() && !imSichtfeld(karte)) sanftZentrieren(karte);
 }
 
 /* Setzt die Karte vollständig zurück (unsichtbar, ohne Text). */
@@ -314,6 +484,9 @@ async function tippSchleife(mein) {
       let rausch = "";
       for (let i = 0; i < rest; i++) rausch += zufallsZeichen();
       if (elements.liveTextRausch) elements.liveTextRausch.textContent = rausch;
+      /* v3.0.3: Die letzte Zeile bleibt im Bild — gedrosselt, nie bei jedem
+         Zeichen (Details bei tippNachscrollen). */
+      tippNachscrollen(mein);
       naechsterTon -= 1;
       if (naechsterTon <= 0) {
         naechsterTon = 3 + Math.floor(Math.random() * 12);
@@ -345,6 +518,11 @@ export function welle(texte) {
   /* Späte Wellen nach Beginn der Enthüllung ändern nichts mehr. */
   if (enthuellungGestartet) return;
   if (!lauf) lauf = neuerLauf();
+  /* Sicherheitsnetz: Normalerweise startet api.js die Blick-Führung beim
+     Analyse-Beginn — kam der Aufruf nicht (direkter Modul-Gebrauch, Tests),
+     beginnt sie spätestens mit der ersten Welle. Ein bestehender
+     Übernahme-Zustand bleibt dabei unangetastet. */
+  fuehrungStarten();
   /* Je Puffer monoton wachsend übernehmen — kürzere oder gleiche Stände sind
      alte Antworten. Ob eine Lieferung „fertig" ist, spielt seit v3.0.2 keine
      Rolle mehr: Das Warte-Auge richtet sich allein danach, ob gerade getippt
@@ -458,80 +636,15 @@ export function hatLiveGelaufen() {
 
 /* ── Gestaffelte Enthüllung ──────────────────────────────────────────────── */
 
-/* ── Geführtes Mitscrollen (v3.0.2) ──
-   Die Enthüllung wird von oben nach unten immer länger — wer nicht selbst
-   scrollt, sah vom Stakkato der unteren Boxen nur noch die Pop-Töne. Deshalb
-   holt die Führung jede Box sanft ins Sichtfeld. Der NUTZER HAT VORRANG:
-   Beim ersten eigenen Eingriff endet die Führung sofort und dauerhaft für
-   diesen Lauf — nichts ist unangenehmer als eine Seite, die gegen die eigene
-   Scroll-Richtung zieht. */
-
-/* Tasten, mit denen Menschen scrollen — nur diese gelten als Übernahme
-   (eine Tab-Taste z. B. ist Navigation, kein Scrollen). " " ist die
-   Space-Taste, "Spacebar" ihr Name in älteren Browsern. */
-const UEBERNAHME_TASTEN = new Set([
-  "ArrowUp",
-  "ArrowDown",
-  "ArrowLeft",
-  "ArrowRight",
-  "PageUp",
-  "PageDown",
-  " ",
-  "Spacebar",
-  "Home",
-  "End",
-]);
-
-function fuehrungListenerEntfernen(mein) {
-  if (!mein.uebernahmeListener) return;
-  window.removeEventListener("wheel", mein.uebernahmeListener);
-  window.removeEventListener("touchstart", mein.uebernahmeListener);
-  window.removeEventListener("keydown", mein.uebernahmeListener);
-  mein.uebernahmeListener = null;
-}
-
-/* Wacht über den ersten Nutzereingriff. passive: die Wache liest nur mit —
-   sie darf das echte Scrollen niemals ausbremsen. */
-function fuehrungBewachen(mein) {
-  const uebernahme = (ereignis) => {
-    if (ereignis.type === "keydown" && !UEBERNAHME_TASTEN.has(ereignis.key)) return;
-    mein.fuehrungAktiv = false;
-    /* Die Wache hat ihren Dienst getan — sofort abbauen, nicht erst am
-       Enthüllungs-Ende. */
-    fuehrungListenerEntfernen(mein);
-  };
-  mein.uebernahmeListener = uebernahme;
-  window.addEventListener("wheel", uebernahme, { passive: true });
-  window.addEventListener("touchstart", uebernahme, { passive: true });
-  window.addEventListener("keydown", uebernahme);
-}
-
-/* „Mehrheitlich im Sichtfeld": mehr als die halbe Box-Höhe liegt im Fenster.
-   Degenerierte Messwerte (Höhe 0) gelten als sichtbar — im Zweifel lieber
-   ein Ton zu viel als eine stumm gewordene Enthüllung. */
-function imSichtfeld(el) {
-  try {
-    const rechteck = el.getBoundingClientRect();
-    const fensterHoehe = window.innerHeight || document.documentElement.clientHeight || 0;
-    const ueberlappung = Math.min(rechteck.bottom, fensterHoehe) - Math.max(rechteck.top, 0);
-    return ueberlappung >= rechteck.height / 2;
-  } catch (_e) {
-    return true;
-  }
-}
-
-function boxZeigen(el, mein) {
+function boxZeigen(el) {
   if (!el) return;
   el.classList.remove("lv-verdeckt");
   el.classList.add("pop-rein");
-  if (mein.fuehrungAktiv) {
-    /* Führung aktiv: Box sanft ins Sichtfeld holen — erst NACH dem Aufdecken,
-       eine verdeckte Box (display:none) hat keinen Ort, zu dem man scrollen
-       könnte. Der reduzierte Modus scrollt NIE automatisch; die Vorgabe wird
-       frisch gelesen, damit ein Umstellen mitten im Lauf sofort greift. */
-    if (!reduziert() && typeof el.scrollIntoView === "function") {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }
+  if (fuehrung && fuehrung.aktiv) {
+    /* Führung aktiv: JEDE gepoppte Box wird aktiv zentriert — ab dem ERSTEN
+       Pop (v3.0.3). Erst NACH dem Aufdecken, eine verdeckte Box
+       (display:none) hat keinen Ort, zu dem man scrollen könnte. */
+    sanftZentrieren(el);
     popTon();
     return;
   }
@@ -608,8 +721,9 @@ function abschlussAnzeigen() {
 }
 
 function abschluss(mein) {
-  /* Enthüllungs-Ende: die Übernahme-Wache in jedem Fall sauber abbauen. */
-  fuehrungListenerEntfernen(mein);
+  /* Enthüllungs-Abschluss = Lauf-Ende: die Blick-Führung samt Wache in jedem
+     Fall sauber abbauen (v3.0.3: der Zustand gilt für den ganzen Lauf). */
+  fuehrungBeenden();
   if (mein.stop) return;
   enthuellung = null;
   abschlussAnzeigen();
@@ -630,13 +744,15 @@ export function starteEnthuellung() {
     spinnerVerstecken(lauf);
     lauf = null;
   }
-  if (enthuellung) {
-    enthuellung.stop = true;
-    fuehrungListenerEntfernen(enthuellung);
-  }
-  const mein = { stop: false, fuehrungAktiv: false, uebernahmeListener: null };
+  if (enthuellung) enthuellung.stop = true;
+  const mein = { stop: false };
   enthuellung = mein;
   enthuellungGestartet = true;
+  /* v3.0.3: Die Blick-Führung des Laufs läuft hier einfach WEITER — hat der
+     Nutzer schon während des Tippens übernommen, scrollt auch die Enthüllung
+     nicht mehr. Ohne laufende Führung (direkter Aufruf, Tests) startet sie
+     jetzt. */
+  fuehrungStarten();
 
   karteEntfernen();
   /* Die Ankündigung von eben leeren: Nur so ist der Abschluss-Text am Ende
@@ -678,18 +794,12 @@ export function starteEnthuellung() {
     return;
   }
 
-  /* Geführtes Mitscrollen nur im bewegten Modus — bei reduzierter Bewegung
-     wird NIE automatisch gescrollt (die Enthüllung oben ist dort ohnehin
-     sofort fertig, ganz ohne Effekte). */
-  mein.fuehrungAktiv = true;
-  fuehrungBewachen(mein);
-
   (async () => {
     /* 1) Foto-Daten + Standort. */
     if (!(await warte(700, mein))) return;
-    boxZeigen(privacy, mein);
+    boxZeigen(privacy);
     if (!(await warte(1100, mein))) return;
-    boxZeigen(gps, mein);
+    boxZeigen(gps);
     gpsKarteNachmessen();
     if (!(await warte(1400, mein))) return;
 
@@ -697,25 +807,25 @@ export function starteEnthuellung() {
     for (const kind of faktenKinder) {
       const istKopf = kind.classList.contains("cat-group-head");
       if (!(await warte(istKopf ? 650 : 280, mein))) return;
-      boxZeigen(kind, mein);
+      boxZeigen(kind);
     }
 
     /* 3) Werbung + Manipulation — nur noch ganze, fertige Boxen. */
     if (!(await warte(600, mein))) return;
-    boxZeigen(adsKarte, mein);
+    boxZeigen(adsKarte);
     if (!(await warte(1200, mein))) return;
-    boxZeigen(triggerKarte, mein);
+    boxZeigen(triggerKarte);
     if (!(await warte(1200, mein))) return;
 
     /* 3b) Realitäts-Check (v3.1): direkt nach der Manipulations-Box und VOR
        dem Datenwert — mit demselben Pop wie alle anderen Boxen. */
     if (rcKarte) {
-      boxZeigen(rcKarte, mein);
+      boxZeigen(rcKarte);
       if (!(await warte(1200, mein))) return;
     }
 
     /* 4) Datenwert: Box komplett, nur der Betrag zählt hoch, Balken fahren aus. */
-    boxZeigen(dvKarte, mein);
+    boxZeigen(dvKarte);
     if (dvKarte) {
       balkenAusfahren(dvKarte, false);
       if (dvZahl && !(await betragHochzaehlen(dvZahl, 1200, mein))) return;
@@ -736,7 +846,8 @@ export function enthuellungAbkuerzen() {
   if (!enthuellung) return;
   const mein = enthuellung;
   mein.stop = true;
-  fuehrungListenerEntfernen(mein);
+  /* Abgekürzt heißt beendet: die Blick-Führung des Laufs endet hier mit. */
+  fuehrungBeenden();
   enthuellung = null;
   const e = mein.einheiten || {};
   (e.boxen || []).forEach((el) => el && el.classList.remove("lv-verdeckt"));
@@ -764,9 +875,12 @@ export function abbrechen() {
   }
   if (enthuellung) {
     enthuellung.stop = true;
-    fuehrungListenerEntfernen(enthuellung);
     enthuellung = null;
   }
+  /* Fehler/Abbruch = Lauf-Ende: Blick-Führung samt Übernahme-Wache immer mit
+     abbauen — auch wenn weder getippt noch enthüllt wurde (v3.0.3: die
+     Führung startet schon beim Analyse-Beginn). */
+  fuehrungBeenden();
   enthuellungGestartet = false;
   karteEntfernen();
   allesAufdecken();

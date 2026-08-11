@@ -208,6 +208,93 @@ test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text 
   await expect(page.locator("#scanAnim")).not.toHaveClass(/active/);
 });
 
+/* v3.0.3 Blick-Führung: sehr langer Live-Text, damit der getippte Text am
+   Handy-Viewport sicher unter die Sichtkante wächst. `processing` hält an,
+   bis der Test fertigMachen() ruft — genug Zeit für die Scroll-Proben. */
+async function seiteMitLangemTextMocks(page) {
+  await basisRouten(page);
+  const langerText = (PROFIL_TEXT + " ").repeat(6);
+  let fertig = false;
+  let poll = 0;
+  await page.route("**/api/job-status**", (route) => {
+    poll += 1;
+    const body = fertig
+      ? { status: "done", result: MOCK_RESPONSE }
+      : {
+          status: "processing",
+          position: 0,
+          etaSeconds: 60,
+          liveText: langerText.slice(0, Math.min(langerText.length, poll * 400)),
+        };
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+
+  await page.goto("/");
+  await expect(page.locator("h1")).toBeVisible();
+  return {
+    fertigMachen() {
+      fertig = true;
+    },
+  };
+}
+
+test("v3.0.3 Blick-Führung am Handy: Auge nach der Foto-Wahl im Bild, die letzte Zeile bleibt beim Tippen sichtbar", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  /* Handy-Viewport: hier liegt das Auge nach dem Antippen eines Demo-Fotos
+     außerhalb des Sichtfelds — genau der Befund des Inhabers („man sieht das
+     Foto, aber nicht, dass etwas passiert"). */
+  await page.setViewportSize({ width: 390, height: 660 });
+  const steuerung = await seiteMitLangemTextMocks(page);
+
+  await page.click('[data-demo="selfie"]');
+
+  /* Punkt 2: Kurz nach dem Start liegt das Auge mehrheitlich im Sichtfeld —
+     die Führung hat es dorthin geholt (ohne Führung bliebe der Blick beim
+     Demo-Foto weiter unten hängen). */
+  await expect(page.locator("#scanAnim")).toHaveClass(/active/);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const r = document.getElementById("scanAnim").getBoundingClientRect();
+          const h = window.innerHeight;
+          return Math.min(r.bottom, h) - Math.max(r.top, 0) >= r.height / 2;
+        }),
+      { timeout: 10000 }
+    )
+    .toBe(true);
+
+  /* Tipp-Start (nach dem ~25-s-Anlauf): Die Karte übernimmt. */
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 45000 });
+
+  /* Punkt 4: Der Text wächst über die Sichtkante hinaus — ohne eigenes
+     Zutun scrollt die Seite nach unten mit. Erst das Anfahren der Karte
+     ausklingen lassen, damit hier wirklich das Nachscrollen gemessen wird. */
+  await page.waitForTimeout(1500);
+  const startScroll = await page.evaluate(() => window.scrollY);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY), { timeout: 40000 })
+    .toBeGreaterThan(startScroll + 40);
+
+  /* Dabei bleibt der Cursor (die letzte getippte Zeile) im Bild. */
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const r = document.getElementById("liveCursor").getBoundingClientRect();
+          return r.bottom <= window.innerHeight;
+        }),
+      { timeout: 10000 }
+    )
+    .toBe(true);
+
+  /* Punkt 5: done → die Enthüllung führt bis zum PDF-Knopf. */
+  steuerung.fertigMachen();
+  await expect(page.locator("#exportPdf")).not.toHaveClass(/export-btn--hidden/, { timeout: 60000 });
+});
+
 test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung ohne Verzögerung", async ({ page }) => {
   test.setTimeout(90000);
   await page.emulateMedia({ reducedMotion: "reduce" });

@@ -38,6 +38,9 @@ vi.mock("../js/live-anzeige.js", () => ({
   enthuellungAbkuerzen: vi.fn(),
   abbrechen: vi.fn(),
   zuruecksetzen: vi.fn(),
+  /* v3.0.3 Blick-Führung: api.js ruft beides beim Analyse-Beginn. */
+  fuehrungStarten: vi.fn(),
+  augeInsBild: vi.fn(),
 }));
 
 const DONE_RESULT = {
@@ -272,5 +275,37 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     await vi.advanceTimersByTimeAsync(8000);
     await p;
     expect(liveAnzeige.zuruecksetzen).toHaveBeenCalled();
+  });
+
+  it("v3.0.3 Blick-Führung: der Analyse-Beginn startet die Führung und holt das Auge ins Bild", async () => {
+    mockeStatusFolge([{ status: "done", result: DONE_RESULT }]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(8000);
+    await p;
+    /* (Rückbauprobe: Wird der Führungs-Start beim Analyse-Beginn entfernt —
+       die Verallgemeinerung der Übernahme-Wache auf den ganzen Lauf —,
+       werden diese Erwartungen ROT.) */
+    expect(liveAnzeige.fuehrungStarten).toHaveBeenCalledTimes(1);
+    expect(liveAnzeige.augeInsBild).toHaveBeenCalledTimes(1);
+    /* Erst die Wache, dann das Anfahren — ohne Wache darf nie gescrollt werden. */
+    expect(liveAnzeige.fuehrungStarten.mock.invocationCallOrder[0]).toBeLessThan(
+      liveAnzeige.augeInsBild.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("v3.0.3: die Wiederaufnahme nach einem Reload startet KEINE Blick-Führung", async () => {
+    /* Der Seitenstart ist keine Foto-Wahl — hier darf nichts von selbst
+       scrollen (die Wiederaufnahme bleibt beim heutigen, stillen Bild). */
+    sessionStorage.setItem("malzime.queueJobId", "job-resumed");
+    sessionStorage.setItem("malzime.queueResultToken", "tok-1");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+    const p = resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(8000);
+    await p;
+    expect(liveAnzeige.fuehrungStarten).not.toHaveBeenCalled();
+    expect(liveAnzeige.augeInsBild).not.toHaveBeenCalled();
   });
 });

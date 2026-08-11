@@ -3,7 +3,7 @@ import { test, expect } from "@playwright/test";
 /* Tastatur-Smoketest des kritischsten Nutzerflusses (Profilpflicht UI,
    docs/VERIFICATION.md): Der komplette Weg Demo-Foto → Profil muss ohne
    Maus funktionieren — nur mit Tab und Enter — und der Fokus muss dabei
-   sichtbar sein. Seit v3.0.2 startet die Analyse direkt bei der Foto-Wahl
+   sichtbar sein. Seit v3.0.0 startet die Analyse direkt bei der Foto-Wahl
    (kein Hinweis-Pop-up mehr). */
 
 const MOCK_RESPONSE = {
@@ -93,7 +93,7 @@ test("Tastatur: Demo-Foto → Profil, nur mit Tab + Enter", async ({ page }) => 
   expect(await tabToElement(page, '[data-demo="selfie"]'), "Demo-Button per Tab erreichbar").toBe(true);
   expect(await focusIsVisible(page), "Fokus auf dem Demo-Button sichtbar").toBe(true);
 
-  /* 2. Enter startet die Analyse DIREKT (v3.0.2: kein Hinweis-Dialog mehr)
+  /* 2. Enter startet die Analyse DIREKT (v3.0.0: kein Hinweis-Dialog mehr)
      und das Profil wird angezeigt */
   await page.keyboard.press("Enter");
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });

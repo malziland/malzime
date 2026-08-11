@@ -48,7 +48,7 @@ await page.waitForTimeout(2800);
 console.log("→ Foto hochladen (landet hinter den Füll-Jobs)");
 await page.setInputFiles("#fileInput", "public/img/demo/demo-selfie.jpg");
 
-/* v3.0.2: Die Analyse startet direkt bei der Foto-Wahl — es gibt kein
+/* v3.0.0: Die Analyse startet direkt bei der Foto-Wahl — es gibt kein
    Hinweis-Pop-up mehr. Gewartet wird nur noch auf Warteschlange + Ergebnis. */
 let resultSeen = false;
 let positionShot = false;

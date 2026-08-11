@@ -26,7 +26,7 @@ const MOCK_RESPONSE = {
 };
 
 /* Voller Durchklick über den QUEUE-Pfad (Live-Pfad seit v2.0): Demo-Foto →
-   /api/enqueue → /api/job-status (done) → Profil. Seit v3.0.2 startet die
+   /api/enqueue → /api/job-status (done) → Profil. Seit v3.0.0 startet die
    Analyse direkt bei der Foto-Wahl — ohne Hinweis-Pop-up. Die drei
    Queue-Endpunkte werden gemockt, damit der Test ohne echtes Backend läuft. */
 test("Smoke: Demo-Foto → Queue → Profil wird angezeigt", async ({ page }) => {
@@ -69,7 +69,7 @@ test("Smoke: Demo-Foto → Queue → Profil wird angezeigt", async ({ page }) =>
   await expect(page.locator("h1")).toBeVisible();
   await expect(page.locator('[data-demo="selfie"]')).toBeVisible();
 
-  /* Demo-Foto klicken → die Queue-Analyse startet DIREKT (v3.0.2: kein
+  /* Demo-Foto klicken → die Queue-Analyse startet DIREKT (v3.0.0: kein
      Hinweis-Pop-up mehr). Bild-Prep, Mindest-Interaktionszeit 2s und
      Poll-Intervall 2s brauchen trotzdem ein grosszuegiges Timeout. */
   await page.click('[data-demo="selfie"]');

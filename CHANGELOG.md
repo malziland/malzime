@@ -4,12 +4,9 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [3.0.2] — 2026-08-11
+## [3.0.0] — 2026-08-11
 
 v3.0 — Das Live-Erlebnis.
-
-(Warum 3.0.2? 3.0.0 und 3.0.1 waren kurzlebige Zwischenstände desselben
-Tages — und einmal vergebene Nummern werden nie wiederverwendet.)
 
 ### Was sich ändert
 

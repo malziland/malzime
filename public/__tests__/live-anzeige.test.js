@@ -91,7 +91,7 @@ describe("Live-Anzeige (v3.0)", () => {
 
   /* ── Tippen (Matrix-Dekodierung) ─────────────────────────────────────── */
 
-  it("Sofort-Start (v3.0.2): getippt wird ab dem ersten gelieferten Zeichen — kein Anlauf-Puffer mehr", async () => {
+  it("Sofort-Start (v3.0.0): getippt wird ab dem ersten gelieferten Zeichen — kein Anlauf-Puffer mehr", async () => {
     /* Vor der ersten Welle: nichts sichtbar. */
     expect(elements.liveKarte.classList.contains("active")).toBe(false);
 
@@ -224,7 +224,7 @@ describe("Live-Anzeige (v3.0)", () => {
     await vi.advanceTimersByTimeAsync(100);
     expect(elements.scanAnim.classList.contains("active")).toBe(false);
     /* Beim Wechsel steht bereits Text in der Karte — nie ein leer blinkender
-       Cursor (v3.0.2, Befund des ersten Live-Tests). */
+       Cursor (v3.0.0, Befund des ersten Live-Tests). */
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
     /* Das erste Zeichen ist KEIN Abschluss — die srEnd-Ansage darf hier
        nicht fallen (die kommt erst am Ende des Durchgangs). */
@@ -238,7 +238,7 @@ describe("Live-Anzeige (v3.0)", () => {
     /* Der einzige Fall, in dem trotz gelieferter Wellen noch nichts tippbar
        ist: Beast ist aktiv, das Modell schreibt aber erst den Standard-Teil.
        Dann bleibt die Scan-Animation — eine Karte, in der nur der Cursor
-       blinkt, darf es nicht mehr geben (v3.0.2). */
+       blinkt, darf es nicht mehr geben (v3.0.0). */
     ui.startScanAnim(false);
     elements.biasSwitch.checked = true;
     w("S".repeat(300));
@@ -276,7 +276,7 @@ describe("Live-Anzeige (v3.0)", () => {
   });
 
   /* ── Warte-Rotation nach dem fertig getippten Text (FIX 2, v3.0.1) ──────
-     Seit v3.0.2 nur noch der FALLBACK für einen vorzeitig leeren Puffer —
+     Seit v3.0.0 nur noch der FALLBACK für einen vorzeitig leeren Puffer —
      den Normalfall trägt jetzt das adaptive Tippen selbst. Die kurzen Texte
      hier (12 Zeichen, Boden-Tempo 6 Z/s ≈ 2 s) tippen bewusst schnell leer. */
 
@@ -393,7 +393,7 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
   });
 
-  it("v3.0.2: auch ein kurzer Beast-Stand tippt nach dem Wechsel sofort — kein Anlauf-Puffer je Puffer mehr", async () => {
+  it("v3.0.0: auch ein kurzer Beast-Stand tippt nach dem Wechsel sofort — kein Anlauf-Puffer je Puffer mehr", async () => {
     w("S".repeat(250), "B".repeat(50));
     await vi.advanceTimersByTimeAsync(1000);
     schalte(true);

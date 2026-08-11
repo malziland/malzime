@@ -93,7 +93,7 @@ async function mockBackend(page) {
 
 async function runAnalysis(page) {
   await page.goto("/");
-  /* v3.0.2: Die Analyse startet direkt bei der Demo-Wahl (kein Hinweis-
+  /* v3.0.0: Die Analyse startet direkt bei der Demo-Wahl (kein Hinweis-
      Pop-up mehr) — Timeout großzügig wegen Bild-Prep + Poll-Takt. */
   await page.click('[data-demo="selfie"]');
   await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 15000 });
@@ -140,7 +140,7 @@ test("Sticky: Umschalter klebt erst, wenn ein Ergebnis vorliegt", async ({ page 
   const before = await page.locator("#biasToggleWrap").evaluate((el) => getComputedStyle(el).position);
   expect(before).not.toBe("sticky");
 
-  /* v3.0.2: Die Analyse startet direkt bei der Demo-Wahl. */
+  /* v3.0.0: Die Analyse startet direkt bei der Demo-Wahl. */
   await page.click('[data-demo="selfie"]');
   await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 15000 });
 

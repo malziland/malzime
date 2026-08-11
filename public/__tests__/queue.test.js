@@ -107,7 +107,7 @@ describe("Queue-Modus", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(12000);
     await p;
-    /* Kein Modal mehr im Weg (seit v3.0.2 restlos entfernt) — direkt gerendert. */
+    /* Kein Modal mehr im Weg (seit v3.0.0 restlos entfernt) — direkt gerendert. */
     expect(renderCurrentMode).toHaveBeenCalled();
   });
 
@@ -368,7 +368,7 @@ describe("Queue-Modus", () => {
     await p;
     const urls = globalThis.fetch.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes("/api/job-status?jobId=job-resumed"))).toBe(true);
-    /* Seit v3.0.2 gibt es kein Hinweis-Modal mehr → immer direkt gerendert. */
+    /* Seit v3.0.0 gibt es kein Hinweis-Modal mehr → immer direkt gerendert. */
     expect(renderCurrentMode).toHaveBeenCalled();
   });
 
@@ -561,13 +561,13 @@ describe("Queue-Modus", () => {
     await p;
   });
 
-  /* ── v3.0.2: Das Hinweis-Pop-up ist ersatzlos entfernt ────────────────────
+  /* ── v3.0.0: Das Hinweis-Pop-up ist ersatzlos entfernt ────────────────────
      Entscheidung des Inhabers („dieses Pop-Up liest sowieso keiner durch"):
      Die Analyse startet direkt bei der Foto-/Demo-Wahl. Diese Tests belegen
      den modallosen Fluss — sie werden ROT, wenn jemand wieder einen Dialog
      zwischen Foto-Wahl und Upload schiebt. */
 
-  it("v3.0.2: die Analyse startet ohne Modal — der Upload geht direkt raus, nichts wartet auf eine Bestätigung", async () => {
+  it("v3.0.0: die Analyse startet ohne Modal — der Upload geht direkt raus, nichts wartet auf eine Bestätigung", async () => {
     renderCurrentMode.mockClear();
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-direkt" });
@@ -586,7 +586,7 @@ describe("Queue-Modus", () => {
     expect(renderCurrentMode).toHaveBeenCalled();
   });
 
-  it("v3.0.2: auch die Wiederaufnahme eines alten Auftrags rendert direkt — ohne jede gemerkte Bestätigung", async () => {
+  it("v3.0.0: auch die Wiederaufnahme eines alten Auftrags rendert direkt — ohne jede gemerkte Bestätigung", async () => {
     /* Alter Tab-Stand aus der Modal-Ära: nur die Job-Nummer liegt vor, keine
        der früheren Bestätigungs-Marken. Das Ergebnis erscheint trotzdem
        sofort — es gibt keinen Dialog mehr, der es aufhalten könnte. */

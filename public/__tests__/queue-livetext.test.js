@@ -33,6 +33,7 @@ vi.mock("../js/live-anzeige.js", () => ({
   welle: vi.fn(),
   modusWechsel: vi.fn(),
   hatLiveGelaufen: vi.fn(() => false),
+  schnellVorlauf: vi.fn(() => Promise.resolve()),
   starteEnthuellung: vi.fn(),
   enthuellungAbkuerzen: vi.fn(),
   abbrechen: vi.fn(),
@@ -66,9 +67,6 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(Date.now() + 10000);
     sessionStorage.clear();
-    /* FIX 3 (v3.0.1): Hinweis gilt einmal pro Tab und ist hier schon bestätigt
-       — das Ergebnis rendert direkt, ohne Modal am Ende. */
-    sessionStorage.setItem("malzime.hinweisBestaetigt", "1");
 
     const apiMod = await import("../js/api.js");
     const stateMod = await import("../js/state.js");
@@ -156,6 +154,38 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     expect(liveAnzeige.starteEnthuellung.mock.invocationCallOrder[0]).toBeGreaterThan(
       renderCurrentMode.mock.invocationCallOrder[0]
     );
+  });
+
+  it("v3.0.2: bei done wird ERST der Rest-Puffer schnell ausgetippt, DANN gerendert", async () => {
+    /* Der Schnellvorlauf muss VOR dem Rendern abgewartet werden — sonst
+       stünde das fertige Ergebnis schon unverdeckt auf der Seite, während
+       die Karte noch tippt (harter Sprung statt sauberem Abschluss). */
+    liveAnzeige.hatLiveGelaufen.mockReturnValue(true);
+    let vorlaufFertig = false;
+    liveAnzeige.schnellVorlauf.mockImplementationOnce(
+      () =>
+        new Promise((aufloesen) => {
+          setTimeout(() => {
+            vorlaufFertig = true;
+            aufloesen();
+          }, 500);
+        })
+    );
+    let renderNachVorlauf = null;
+    renderCurrentMode.mockImplementationOnce(() => {
+      renderNachVorlauf = vorlaufFertig;
+    });
+
+    mockeStatusFolge([
+      { status: "processing", liveText: "A".repeat(240) },
+      { status: "done", result: DONE_RESULT },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(10000);
+    await p;
+
+    expect(liveAnzeige.schnellVorlauf).toHaveBeenCalled();
+    expect(renderNachVorlauf).toBe(true);
   });
 
   it("done OHNE Live-Lauf → EXAKT der heutige Pfad, die Enthüllung läuft NICHT", async () => {

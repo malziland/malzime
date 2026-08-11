@@ -13,8 +13,6 @@ const ids = [
   "gpsMap",
   "targeting",
   "simulation",
-  "disclaimerModal",
-  "disclaimerConfirm",
   "exportPdf",
   "limitBanner",
   "limitCountdown",

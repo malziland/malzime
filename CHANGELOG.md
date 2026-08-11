@@ -4,87 +4,62 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [3.1.0] — 2026-08-11
+## [3.0.2] — 2026-08-11
 
-Der Realitäts-Check: „Wie gut hat dich die KI wirklich getroffen?"
+v3.0 — Das Live-Erlebnis.
 
-### Was sich ändert
-
-Nach jedem echten Menschen-Profil erscheint zwischen der Manipulations-Box
-und dem Datenwert eine neue Karte im umgekehrten Farb-Look: Sechs Zeilen
-zitieren, was die KI gerade behauptet hat (Alter, Geschlecht, Interessen,
-Charakter, Werbung, Manipulation), und zu jeder gibt es drei ehrliche
-Antworten — **Getroffen / Knapp / Daneben** (Geschlecht nur Getroffen/
-Daneben; die Zeile entfällt ganz, wenn die KI sich nicht festgelegt hat).
-Erst wenn jede Zeile beantwortet ist, lässt sich absenden; danach sind die
-Antworten eingefroren und ein animierter Ring zeigt die **KI-Trefferquote
-0–100 %** in den Markenfarben (Rust → Gold → Teal), dazu eine Einordnung
-je nach Ergebnis — mit eigenen Beast-Varianten und den echten Folgen
-falscher Profile für alles, was voll daneben lag. Es gibt keinen Ausgang,
-in dem das Tool „verliert": Treffer beweisen die Macht der Algorithmen,
-Fehler ihre Gefahr.
-
-Dazu kommt der **anonyme Vergleich mit allen anderen**: Beim Absenden geht
-ein einziges Ereignis mit ausschließlich den Antwort-Stufen an den Server —
-keine Auftrags-Nummer, keine Trace-ID, nichts Verknüpfbares. Der Server
-rechnet die Quote selbst nach (dem Client wird nicht vertraut), verwirft
-alles, was nicht exakt dem Schema entspricht, und zählt nur zwei Zahlen
-hoch: Anzahl und Prozentsumme. Der Vergleichsbalken („Ø andere") erscheint
-erst ab 100 Eingaben; darunter steht ein Hinweis-Satz.
-
-Im Live-Erlebnis reiht sich die Karte mit Pop und Klang in die gestaffelte
-Enthüllung ein; im PDF erscheint sie nur mit abgesendetem Ergebnis. Alle
-Texte sind zweisprachig (DE/EN, mobil einzeilige Knöpfe: „Spot on / Close /
-Way off"), die Knöpfe echte Buttons mit `aria-pressed`, die Prozentzahl
-wird Screenreadern genau einmal angesagt, und bei reduzierter Bewegung
-stehen Ring und Balken sofort. Tier-Profile, blockierte Analysen und leere
-Profile bekommen keinen Check. Testumfang jetzt 697 / 281 / 17.
-
-## [3.0.1] — 2026-08-11
-
-Drei Dramaturgie-Korrekturen aus dem ersten Live-Test des Live-Erlebnisses:
-
-- **Hinweis vor den Start:** Der „Wichtiger Hinweis"-Dialog erscheint jetzt
-  nach der Foto-Wahl und VOR dem Upload („Verstanden – Analyse starten") —
-  nicht mehr am fertigen Ergebnis, wo er mitten in die Dramaturgie platzte
-  und der live getippte Profiltext schon vor der Einordnung „nichts davon ist
-  wahr" sichtbar war. Bestätigt gilt einmal pro Tab; ein alter, noch
-  unbestätigter Auftrag zeigt den Dialog übergangsweise wie bisher vor dem
-  Ergebnis.
-- **Kein totes Fenster:** Ist die Zusammenfassung fertig getippt, während der
-  Server noch an Kategorien und Beast-Profil rechnet (~30–50 s), rotieren in
-  der Live-Karte ehrliche Status-Zeilen („Kategorien werden berechnet …")
-  statt eines eingefroren wirkenden Cursors — auch bei reduzierter Bewegung,
-  denn ein Textwechsel ist keine Bewegung.
-- **Sofort-Text beim Upload:** Ab der ersten Sekunde steht „Dein Foto ist
-  unterwegs …" unter der Scan-Animation (bei der Wiederaufnahme „Hole dein
-  Ergebnis …") — Auge und Balken stehen nie mehr sekundenlang stumm da.
-
-Testumfang jetzt 677 / 263 / 16.
-
-## [3.0.0] — 2026-08-11
-
-Das Live-Erlebnis: der KI beim Schreiben zusehen.
+(Warum 3.0.2? 3.0.0 und 3.0.1 waren kurzlebige Zwischenstände desselben
+Tages — und einmal vergebene Nummern werden nie wiederverwendet.)
 
 ### Was sich ändert
 
-Bisher hieß Analyse: warten, dann alles auf einen Schlag. Jetzt beginnt nach
-rund zehn bis fünfzehn Sekunden das Profil, sich **Buchstabe für Buchstabe
-live aufzubauen** — mit dekodierendem Zeichen-Rauschen am Schreibrand,
-leuchtendem Cursor und einem dezenten Daten-Puls-Klang in unregelmäßigem
-Rhythmus. Der getippte Text folgt dem gewählten Modus: Wer den Beast-Schalter
-umlegt, sieht sofort den Beast-Text an dessen Stand weiterlaufen (das Modell
-schreibt sequenziell — der Beast-Teil beginnt naturgemäß etwas später, die
+**Live-Streaming: der KI beim Schreiben zusehen.** Bisher hieß Analyse:
+warten, dann alles auf einen Schlag. Jetzt streamt der Server die KI-Antwort
+schon während sie entsteht, und die Seite tippt den Profiltext **Buchstabe
+für Buchstabe live mit**. Der getippte Text folgt dem gewählten Modus: Wer
+den Beast-Schalter umlegt, sieht sofort den Beast-Text an dessen eigenem
+Stand weiterlaufen (das Modell schreibt Beast naturgemäß etwas später — die
 Karte überbrückt das mit einem ehrlichen Wartestatus).
 
-Ist die Analyse fertig, folgt die **gestaffelte Enthüllung**: Foto-Daten und
-Standort-Karte, dann die Kategorien-Gruppen Karte für Karte, dann Werbung und
-Manipulation als ganze Boxen, zuletzt der Datenwert, dessen Betrag vor den
-Augen hochzählt, während die Balken ausfahren — und erst dann der PDF-Knopf.
+**Dramaturgie ohne Leerlauf** — von der Foto-Wahl bis zum PDF-Knopf ist
+immer sichtbar etwas in Bewegung:
 
-Der Klang ist bewusst immer an (Lautstärke regelt das Gerät); wer im System
-„Bewegung reduzieren" eingestellt hat, bekommt alles sofort und ohne Effekte;
-die Vorlese-Ansage kommt einmal am Ende, nie pro Zeichen.
+- Die Scan-Animation (Auge + rotierende Meldungen) bleibt, bis das **erste
+  Zeichen** wirklich getippt wird — nie eine leere Karte mit blinkendem
+  Cursor.
+- Getippt wird **im Takt der Analyse**: Das Tempo passt sich laufend an den
+  noch wartenden Text an — wenig Nachschub tippt langsam und gut lesbar,
+  viel Nachschub schneller. So trägt das Tippen die Wartezeit, statt nach
+  Sekunden fertig zu sein. Meldet der Server „fertig", tippt der Rest im
+  Schnellvorlauf aus.
+- Läuft der Text doch einmal aus, rotieren ehrliche Status-Zeilen
+  („Kategorien werden berechnet …") statt eines eingefrorenen Fensters.
+- Danach die **Enthüllung Schritt für Schritt**: Foto-Daten, Standort-Karte,
+  die Kategorien Karte für Karte, Werbung, Manipulation, Realitäts-Check,
+  zuletzt der Datenwert, dessen Betrag vor den Augen hochzählt — und erst
+  dann der PDF-Knopf.
+- Am Schreibrand dekodiert ein Zeichen-Rauschen den Text; im Beast Mode
+  leuchtet es im Matrix-Grün. Dazu dezente Sounds: ein Daten-Puls in
+  unregelmäßigem Rhythmus beim Tippen, ein leiser Pop je Enthüllung
+  (Lautstärke regelt das Gerät). Wer im System „Bewegung reduzieren"
+  eingestellt hat, bekommt alles sofort und ohne Effekte.
+
+**Realitäts-Check: „Wie gut hat dich die KI wirklich getroffen?"** Nach
+jedem echten Menschen-Profil erscheint eine Karte mit sechs Fragen: Sie
+zitiert, was die KI zu Alter, Geschlecht, Interessen, Charakter, Werbung
+und Manipulation behauptet hat, und du antwortest ehrlich mit **Getroffen /
+Knapp / Daneben**. Ein animierter Ring zeigt deine persönliche
+KI-Trefferquote samt Einordnung — Treffer beweisen die Macht der
+Algorithmen, Fehler ihre Gefahr. Dazu der **anonyme Vergleich mit allen
+anderen**: Beim Absenden gehen ausschließlich die Antwort-Stufen an den
+Server — kein Foto, kein Profil, nichts Verknüpfbares — und der
+Durchschnittsbalken erscheint erst ab 100 Eingaben. Die
+Datenschutzerklärung erklärt das jetzt in einem eigenen Satz.
+
+**Hinweis-Pop-up entfernt.** Der „Wichtiger Hinweis"-Dialog vor der Analyse
+ist ersatzlos gestrichen — die Analyse startet direkt bei der Foto- oder
+Demo-Wahl. Die Einordnung „nichts davon ist wahr" steht weiterhin gut
+sichtbar auf der Seite, im Ergebnis und im PDF.
 
 ### Wie es funktioniert
 
@@ -94,11 +69,11 @@ bereits geschriebenen Profiltext (beide Modi) gedrosselt ins Auftrags-Dokument
 über die vorhandene 2-Sekunden-Abfrage und tippt entkoppelt aus einem Puffer:
 keine neue Verbindungsart, kein neues Datenschutz-Thema, absturz- und
 sperrbildschirmfest. Ein Neuladen mitten im Tippen fällt bewusst auf das
-bisherige Verhalten zurück; Ausweich-Pfad, Tier-Profile, Fehlerfälle und
-Wiederaufnahme bleiben unverändert.
+bisherige Verhalten zurück; Tier-Profile, Fehlerfälle und Wiederaufnahme
+bleiben unverändert.
 
-Alles hängt am Feature-Flag `useLiveText` (Standard aus) — ohne das Flag
-verhält sich die Seite exakt wie v2.12.3. Testumfang jetzt 677 / 255 / 15.
+Das Streaming hängt am Serverschalter `useLiveText` — ohne ihn wartet die
+Seite wie früher bis zum fertigen Ergebnis. Testumfang jetzt 697 / 280 / 17.
 
 ## [2.12.3] — 2026-08-11
 

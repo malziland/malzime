@@ -6,7 +6,6 @@ import {
   setStatus,
   startScanAnim,
   stopScanAnim,
-  showDisclaimerModal,
   showLimitBanner,
   showMaintenanceModal,
   showQueueWaiting,
@@ -79,28 +78,12 @@ function releaseWakeLock() {
   wakeLock = null;
 }
 
+/* v3.0.2: Das frühere Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
+   (Entscheidung des Inhabers: „dieses Pop-Up liest sowieso keiner durch") —
+   die Analyse startet direkt bei der Foto-/Demo-Wahl. Die Einordnung „nichts
+   davon ist wahr" trägt weiterhin die Disclaimer-Box auf der Seite, im
+   Ergebnis und im PDF. */
 export async function analyzeImage() {
-  if (state.isAnalyzing) return;
-  /* FIX 3 (v3.0.1): Der „Wichtiger Hinweis"-Dialog steht jetzt VOR der
-     Analyse — nach der Foto-Wahl, BEVOR der Upload beginnt. Beim alten Ablauf
-     platzte er am Ende mitten in die Live-Dramaturgie, und der getippte
-     Profiltext war schon VOR der Einordnung „nichts davon ist wahr" sichtbar.
-     Bestätigt gilt EINMAL PRO TAB (sessionStorage); das zweite Foto im selben
-     Tab startet ohne erneuten Dialog. Escape bricht ab — dann startet nichts. */
-  if (!istHinweisBestaetigt()) {
-    return new Promise((aufloesen) => {
-      showDisclaimerModal(() => {
-        merkeHinweisBestaetigt();
-        aufloesen(starteAnalyse());
-      }, "modal.buttonStart");
-    });
-  }
-  return starteAnalyse();
-}
-
-/* Der eigentliche Analyse-Start — läuft erst NACH der Hinweis-Bestätigung
-   (bzw. sofort, wenn sie in diesem Tab schon vorliegt). */
-async function starteAnalyse() {
   if (state.isAnalyzing) return;
   /* Voriges Ergebnis ist ab jetzt ungueltig — der Umschalter darf waehrend der
      neuen Analyse nicht mehr oben kleben (styles.css: html[data-has-result]). */
@@ -142,16 +125,10 @@ const JOB_DELIVERED_AT_KEY = "malzime.queueErgebnisZeit"; /* PRIV-107: erste Zus
    Tab weitergereicht wird, fiel bisher durch — bis der Job serverseitig nach
    ~2 h verfällt. Diese Frist schließt das Fenster auch für diesen Fall. */
 const ERGEBNIS_WIEDERHOLUNG_MS = 15 * 60 * 1000;
-/* Merkt, für welchen Job der „Nichts davon ist wahr"-Hinweis schon bestätigt
-   wurde — überlebt den Reload, damit der Dialog nicht erneut aufpoppt.
-   Seit v3.0.1 nur noch für den Übergangsfall relevant (Resume eines Jobs, der
-   vor dem Umbau auf den Start-Dialog eingereiht wurde). */
+/* Historischer Schlüssel des entfernten Hinweis-Pop-ups (bis v3.0.1) — wird
+   beim Aufräumen weiterhin mitgelöscht, damit alte Tab-Stände keinen toten
+   Eintrag behalten. */
 const JOB_DISCLAIMER_ACK_KEY = "malzime.queueDisclaimerAcked";
-/* FIX 3 (v3.0.1): Der Hinweis-Dialog steht vor der Analyse und gilt EINMAL PRO
-   TAB. Bewusst NICHT in clearStoredJobId enthalten — die Bestätigung hängt am
-   Tab, nicht am einzelnen Auftrag. sessionStorage endet mit dem Tab: die
-   nächste Person am weitergereichten Gerät bekommt den Hinweis wieder. */
-const HINWEIS_BESTAETIGT_KEY = "malzime.hinweisBestaetigt";
 /* Aufeinanderfolgende job-status-Fehler, die der Poll-Loop toleriert, bevor
    er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
    das Ergebnis liegt serverseitig sicher. */
@@ -264,44 +241,6 @@ function getStoredResultToken() {
     return sessionStorage.getItem(JOB_TOKEN_STORAGE_KEY);
   } catch (_) {
     return null;
-  }
-}
-
-/** Merkt, dass der Hinweis-Dialog für diesen Job bestätigt wurde. */
-function setStoredDisclaimerAck(jobId) {
-  try {
-    sessionStorage.setItem(JOB_DISCLAIMER_ACK_KEY, jobId);
-  } catch (_) {
-    /* dito */
-  }
-}
-
-/** Gibt zurück, für welchen Job der Hinweis-Dialog schon bestätigt wurde. */
-function getStoredDisclaimerAck() {
-  try {
-    return sessionStorage.getItem(JOB_DISCLAIMER_ACK_KEY);
-  } catch (_) {
-    return null;
-  }
-}
-
-/** FIX 3 (v3.0.1): Wurde der Hinweis-Dialog in diesem Tab schon bestätigt? */
-function istHinweisBestaetigt() {
-  try {
-    return sessionStorage.getItem(HINWEIS_BESTAETIGT_KEY) === "1";
-  } catch (_) {
-    /* Ohne Speicher (privater Modus) erscheint der Dialog eben je Analyse —
-       bestätigt wird trotzdem immer VOR dem Upload. */
-    return false;
-  }
-}
-
-/** Merkt die Hinweis-Bestätigung für diesen Tab. */
-function merkeHinweisBestaetigt() {
-  try {
-    sessionStorage.setItem(HINWEIS_BESTAETIGT_KEY, "1");
-  } catch (_) {
-    /* dito */
   }
 }
 
@@ -456,8 +395,8 @@ const STECKENGEBLIEBEN_MS = 8000;
    stehen, damit ein Neuladen das Profil wiederholt. Im Klassenzimmer wird ein
    Tablet aber weitergereicht, ohne den Tab zu schliessen — und dann sieht das
    naechste Kind das Profil des vorigen, inklusive Altersschaetzung und
-   Manipulations-Triggern, ohne den "Nichts davon ist wahr"-Hinweis (die
-   Quittung liegt fuer diesen Job ja schon vor).
+   Manipulations-Triggern — ein fremdes Profil hat auf einem weitergereichten
+   Geraet nichts verloren.
 
    Das Sicherheitsmodell fuehrte diesen Fall als abgedeckt ("Ticket lebt im Tab
    und stirbt mit ihm") — aber der Dritte im Klassenzimmer ist derselbe Tab.
@@ -507,10 +446,6 @@ export function initHintergrundWiederaufnahme() {
   });
 }
 
-/**
- * Rendert das fertige Queue-Ergebnis — gleiche Darstellung wie im Normalfall
- * (Disclaimer-Modal → renderCurrentMode → Success-Telemetrie).
- */
 /* DATENSCHUTZ-ENTSCHEIDUNG (bewusst): Nach einem Reload zeigen wir das
    hochgeladene Foto NICHT wieder. Es wird unmittelbar nach der Analyse
    serverseitig gelöscht und absichtlich NIRGENDS — auch nicht im Browser —
@@ -540,13 +475,11 @@ function showPhotoDeletedNotice() {
 
 /**
  * Rendert das fertige Queue-Ergebnis (renderCurrentMode → Success-Telemetrie).
- * FIX 3 (v3.0.1): Der Hinweis-Dialog steht jetzt VOR der Analyse — am Ende
- * erscheint KEIN Modal mehr, gerendert wird direkt (skipDisclaimer=true).
- * Einzige Ausnahme ist der Übergangsfall: Resume eines Jobs aus einem Tab OHNE
- * Start-Bestätigung (alter Stand) — dann wie früher Modal vor der Anzeige, mit
- * dem alten Button-Text; die jobId dient dazu, die Bestätigung zu merken.
+ * v3.0.2: Lief Live-Text, wird VOR dem Rendern der Rest-Puffer im
+ * Schnellvorlauf ausgetippt — deshalb async. Das Rendern samt Verdecken der
+ * Enthüllung bleibt danach synchron im selben Frame.
  */
-function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) {
+async function renderQueueResult(data, myId, traceId, timings) {
   /* PRIV-107: Ab der ersten Zustellung läuft die Wiederholungs-Frist. */
   markiereErgebnisZustellung();
   if (!data) {
@@ -591,12 +524,6 @@ function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) 
     setTimeout(() => {
       if (elements.resultsPanel) elements.resultsPanel.focus({ preventScroll: true });
     }, 300);
-    /* Hinweis-Dialog für genau diesen Job als bestätigt merken → ein Reload
-       zeigt ihn nicht erneut (der User hat ihn ja schon weggeklickt). Ab hier
-       gilt der Hinweis auch für den Tab (FIX 3): Wer ihn im Übergangsfall vor
-       dem Ergebnis bestätigt hat, bekommt beim nächsten Foto keinen mehr. */
-    if (jobId) setStoredDisclaimerAck(jobId);
-    merkeHinweisBestaetigt();
     const meta = data.meta || {};
     logTelemetry("analyze-success", {
       traceId,
@@ -612,14 +539,12 @@ function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) 
     });
   };
 
-  /* Regelfall seit v3.0.1: direkt rendern — der Hinweis wurde beim START
-     bestätigt. Nur der Übergangsfall (alter Job ohne Start-Bestätigung) zeigt
-     den Dialog wie früher vor dem Ergebnis, mit dem alten Button-Text. */
-  if (skipDisclaimer) {
-    finishRender();
-  } else {
-    showDisclaimerModal(finishRender, "modal.button");
-  }
+  /* v3.0.2: Erst den ungetippten Rest im Schnellvorlauf zu Ende tippen (ohne
+     Live-Lauf löst das sofort auf), DANN rendern — sonst bricht das Tippen
+     mitten im Wort ab und das Ergebnis springt hart ins Bild. */
+  await liveAnzeige.schnellVorlauf();
+  if (state.requestId !== myId) return;
+  finishRender();
 }
 
 async function analyzeImageQueued() {
@@ -818,9 +743,9 @@ async function analyzeImageQueued() {
        Eintrag vom nächsten Upload; ist der Job serverseitig schon weg, räumt
        resumeQueueJob beim nächsten Seitenstart still auf. */
     timings.totalMs = Date.now() - analyzeStartTime;
-    /* FIX 3 (v3.0.1): Der Hinweis wurde beim START bestätigt — am Ende KEIN
-       Modal mehr, das Ergebnis rendert direkt in die Dramaturgie hinein. */
-    renderQueueResult(outcome.result, myId, traceId, timings, jobId, true);
+    /* Das Ergebnis rendert direkt in die Dramaturgie hinein — nach dem
+       Schnellvorlauf des restlichen Live-Texts (v3.0.2, daher await). */
+    await renderQueueResult(outcome.result, myId, traceId, timings);
   } catch (err) {
     if (state.requestId !== myId) return;
     /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
@@ -934,20 +859,7 @@ export async function resumeQueueJob({ force = false } = {}) {
        ändert das nichts, denn gespeichert wird nach wie vor nirgends etwas;
        es wird nur nicht weggeworfen, was ohnehin schon angezeigt wird. */
     if (!elements.imagePreview?.querySelector("img")) showPhotoDeletedNotice();
-    /* FIX 3 (v3.0.1): Der Hinweis gilt einmal pro Tab und wird beim START
-       bestätigt — die Bestätigung überlebt den Reload (sessionStorage), also
-       direkt rendern. Der Dialog erscheint hier nur noch im ÜBERGANGSFALL:
-       Der Job stammt aus einem Tab-Stand OHNE Start-Bestätigung (eingereiht
-       vor diesem Umbau) und wurde auch am Ergebnis nie bestätigt. */
-    const disclaimerAlreadyAcked = getStoredDisclaimerAck() === jobId || istHinweisBestaetigt();
-    renderQueueResult(
-      outcome.result,
-      myId,
-      traceId,
-      { totalMs: Date.now() - startTime },
-      jobId,
-      disclaimerAlreadyAcked
-    );
+    await renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime });
   } catch (err) {
     if (state.requestId !== myId) return;
     clearStoredJobId();

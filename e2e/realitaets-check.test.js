@@ -92,9 +92,8 @@ test("Realitäts-Check: tippen → absenden → Ring mit richtiger Prozentzahl �
   test.setTimeout(90000);
   const telemetrie = await seiteMitMocks(page);
 
+  /* v3.0.2: Die Analyse startet direkt bei der Demo-Wahl — ohne Pop-up. */
   await page.click('[data-demo="selfie"]');
-  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 10000 });
-  await page.click("#disclaimerConfirm");
 
   /* Das Ergebnis erscheint — die Check-Karte steht zwischen Manipulations-
      Box und Datenwert und zeigt 6 Zeilen (Geschlecht ist eindeutig). */

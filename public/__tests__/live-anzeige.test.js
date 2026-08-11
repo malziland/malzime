@@ -91,49 +91,104 @@ describe("Live-Anzeige (v3.0)", () => {
 
   /* ── Tippen (Matrix-Dekodierung) ─────────────────────────────────────── */
 
-  it("Anlauf: getippt wird erst, wenn ~200 Zeichen Puffer gesammelt sind", async () => {
-    w("A".repeat(150));
-    await vi.advanceTimersByTimeAsync(3000);
-    /* Unter der Anlauf-Schwelle: nichts sichtbar, Karte bleibt zu. */
-    expect(elements.liveTextFest.textContent).toBe("");
+  it("Sofort-Start (v3.0.2): getippt wird ab dem ersten gelieferten Zeichen — kein Anlauf-Puffer mehr", async () => {
+    /* Vor der ersten Welle: nichts sichtbar. */
     expect(elements.liveKarte.classList.contains("active")).toBe(false);
 
-    w("A".repeat(230));
-    await vi.advanceTimersByTimeAsync(500);
+    /* Schon eine kurze erste Welle bringt die Karte samt erstem Zeichen —
+       der frühere 200-Zeichen-Anlauf ließ hier noch den Spinner stehen. */
+    w("Hallo");
+    await vi.advanceTimersByTimeAsync(50);
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
+    expect("Hallo".startsWith(elements.liveTextFest.textContent)).toBe(true);
+  });
+
+  it("Adaptives Tempo: viel Puffer tippt am Deckel (~90 Z/s) — deutlich schneller als das alte Festtempo", async () => {
+    /* Riesiger Rest → das Tempo läuft an den Deckel MAX_ZEICHEN_PRO_SEKUNDE.
+       Diese Probe wird ROT, wenn jemand das feste 70-Z/s-Tempo zurückbaut. */
+    w("A".repeat(6000));
+    await vi.advanceTimersByTimeAsync(1000);
+    const getippt = elements.liveTextFest.textContent.length;
+    expect(getippt).toBeGreaterThanOrEqual(80);
+    expect(getippt).toBeLessThanOrEqual(100);
+  });
+
+  it("Adaptives Tempo: wenig Puffer tippt am Boden (~6 Z/s) — langsam, aber sichtbar in Bewegung", async () => {
+    /* Kleiner Rest → Untergrenze MIN_ZEICHEN_PRO_SEKUNDE. Mit festem Tempo
+       (70 Z/s) wäre der Puffer hier nach unter einer halben Sekunde leer. */
+    w("A".repeat(30));
+    await vi.advanceTimersByTimeAsync(1000);
+    const getippt = elements.liveTextFest.textContent.length;
+    expect(getippt).toBeGreaterThanOrEqual(5);
+    expect(getippt).toBeLessThanOrEqual(10);
   });
 
   it("Entkopplung: eine nachgeschobene Welle verlängert den Puffer, ohne das Tippen zu unterbrechen", async () => {
-    w("A".repeat(250));
+    w("A".repeat(600));
     await vi.advanceTimersByTimeAsync(2000);
     const mittendrin = elements.liveTextFest.textContent.length;
     expect(mittendrin).toBeGreaterThan(0);
-    expect(mittendrin).toBeLessThan(250);
+    expect(mittendrin).toBeLessThan(600);
 
-    /* Nächste 2-s-Poll-Welle: gleicher Anfang, mehr Text. */
-    w("A".repeat(250) + "B".repeat(150));
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(elements.liveTextFest.textContent.length).toBe(400);
+    /* Nächste 2-s-Poll-Welle: gleicher Anfang, mehr Text — es wird nahtlos
+       am eigenen Stand weitergetippt, kein Neustart. */
+    w("A".repeat(600) + "B".repeat(300));
+    await vi.advanceTimersByTimeAsync(2000);
+    const danach = elements.liveTextFest.textContent.length;
+    expect(danach).toBeGreaterThan(mittendrin);
+    expect(elements.liveTextFest.textContent).toBe("A".repeat(danach));
+
+    /* Die Fertig-Meldung tippt den Rest im Schnellvorlauf zu Ende —
+       inklusive der nachgeschobenen B-Zeichen. */
+    const vorlauf = liveAnzeige.schnellVorlauf();
+    await vi.advanceTimersByTimeAsync(8000);
+    await vorlauf;
+    expect(elements.liveTextFest.textContent.length).toBe(900);
     expect(elements.liveTextFest.textContent.endsWith("B")).toBe(true);
   });
 
+  it("Schnellvorlauf: nach der Fertig-Meldung tippt der Rest mit ~150 Z/s aus, erst dann löst das Versprechen auf", async () => {
+    w("A".repeat(600)); /* adaptiv: 600/30 = 20 Z/s */
+    await vi.advanceTimersByTimeAsync(1000);
+    const vorher = elements.liveTextFest.textContent.length;
+    expect(vorher).toBeLessThan(100);
+
+    let aufgeloest = false;
+    const vorlauf = liveAnzeige.schnellVorlauf().then(() => {
+      aufgeloest = true;
+    });
+    await vi.advanceTimersByTimeAsync(1000);
+    /* ~150 weitere Zeichen in einer Sekunde — klar über dem Normal-Deckel
+       von 90 Z/s. Diese Probe wird ROT, wenn der Schnellvorlauf fehlt. */
+    expect(elements.liveTextFest.textContent.length - vorher).toBeGreaterThan(100);
+    expect(aufgeloest).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(4000);
+    await vorlauf;
+    expect(aufgeloest).toBe(true);
+    expect(elements.liveTextFest.textContent.length).toBe(600);
+  });
+
   it("Rausch-Schweif nur bei Bewegung — bei leerem Puffer bleibt nur der Cursor", async () => {
-    w("A".repeat(250));
+    w("A".repeat(300));
     await vi.advanceTimersByTimeAsync(1000);
     /* Mitten im Tippen: Schweif da, nie länger als 7 Zeichen. */
     expect(elements.liveTextRausch.textContent.length).toBeGreaterThan(0);
     expect(elements.liveTextRausch.textContent.length).toBeLessThanOrEqual(7);
 
-    /* Puffer leer getippt (250 Zeichen / 70 pro s ≈ 3,6 s): Schweif weg. */
-    await vi.advanceTimersByTimeAsync(4000);
-    expect(elements.liveTextFest.textContent.length).toBe(250);
+    /* Puffer per Schnellvorlauf leeren (300 Zeichen / 150 pro s = 2 s):
+       Schweif weg, nur der Cursor blinkt. */
+    const vorlauf = liveAnzeige.schnellVorlauf();
+    await vi.advanceTimersByTimeAsync(3000);
+    await vorlauf;
+    expect(elements.liveTextFest.textContent.length).toBe(300);
     expect(elements.liveTextRausch.textContent).toBe("");
   });
 
   it("reduced-motion: jede Welle erscheint sofort vollständig — kein Tippen, kein Rausch", async () => {
     reduzierteBewegung();
-    /* Sogar unterhalb der Anlauf-Schwelle: die Welle steht sofort komplett da. */
+    /* Auch eine kurze erste Welle steht sofort komplett da. */
     w("A".repeat(80));
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
     expect(elements.liveTextFest.textContent).toBe("A".repeat(80));
@@ -145,7 +200,7 @@ describe("Live-Anzeige (v3.0)", () => {
   });
 
   it("Abbruch räumt auf: Karte samt Text verschwindet, das Tippen bleibt stehen", async () => {
-    w("A".repeat(250));
+    w("A".repeat(300));
     await vi.advanceTimersByTimeAsync(1000);
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
 
@@ -168,6 +223,9 @@ describe("Live-Anzeige (v3.0)", () => {
     w("A".repeat(250));
     await vi.advanceTimersByTimeAsync(100);
     expect(elements.scanAnim.classList.contains("active")).toBe(false);
+    /* Beim Wechsel steht bereits Text in der Karte — nie ein leer blinkender
+       Cursor (v3.0.2, Befund des ersten Live-Tests). */
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
     /* Das erste Zeichen ist KEIN Abschluss — die srEnd-Ansage darf hier
        nicht fallen (die kommt erst am Ende des Durchgangs). */
     expect(elements.srAnnounce.textContent).toBe("scan.srStart");
@@ -176,37 +234,66 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveWarten.textContent).toBe("live.nochNichtFertig");
   });
 
+  it("Spinner bleibt bis zum ersten Zeichen: Beast gewählt, aber noch ohne Beast-Text → Karte bleibt zu", async () => {
+    /* Der einzige Fall, in dem trotz gelieferter Wellen noch nichts tippbar
+       ist: Beast ist aktiv, das Modell schreibt aber erst den Standard-Teil.
+       Dann bleibt die Scan-Animation — eine Karte, in der nur der Cursor
+       blinkt, darf es nicht mehr geben (v3.0.2). */
+    ui.startScanAnim(false);
+    elements.biasSwitch.checked = true;
+    w("S".repeat(300));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.liveTextFest.textContent).toBe("");
+
+    /* Sobald das erste Beast-Zeichen tippbar ist, übernimmt die Karte —
+       mit Text, im selben Moment verschwindet der Spinner. */
+    w("S".repeat(300), "B".repeat(90));
+    await vi.advanceTimersByTimeAsync(300);
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
+    expect(elements.liveKarte.classList.contains("active")).toBe(true);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
+    expect(elements.liveTextFest.textContent).toBe("B".repeat(elements.liveTextFest.textContent.length));
+  });
+
   it("hatLiveGelaufen: erst nach dem ersten sichtbaren Zeichen, zuruecksetzen löscht es", async () => {
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
-    w("A".repeat(150));
+    /* Beast gewählt, aber nur Standard geliefert → nichts sichtbar →
+       gilt nicht als gelaufen. */
+    elements.biasSwitch.checked = true;
+    w("S".repeat(150));
     await vi.advanceTimersByTimeAsync(1000);
-    /* Nur gepuffert, nie sichtbar → gilt nicht als gelaufen. */
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
 
-    w("A".repeat(230));
-    await vi.advanceTimersByTimeAsync(200);
+    /* Das erste sichtbare Beast-Zeichen macht den Lauf zum Live-Lauf. */
+    w("S".repeat(150), "B".repeat(60));
+    await vi.advanceTimersByTimeAsync(300);
     expect(liveAnzeige.hatLiveGelaufen()).toBe(true);
 
     liveAnzeige.zuruecksetzen();
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
   });
 
-  /* ── Warte-Rotation nach dem fertig getippten Text (FIX 2, v3.0.1) ────── */
+  /* ── Warte-Rotation nach dem fertig getippten Text (FIX 2, v3.0.1) ──────
+     Seit v3.0.2 nur noch der FALLBACK für einen vorzeitig leeren Puffer —
+     den Normalfall trägt jetzt das adaptive Tippen selbst. Die kurzen Texte
+     hier (12 Zeichen, Boden-Tempo 6 Z/s ≈ 2 s) tippen bewusst schnell leer. */
 
-  it("FIX 2: die Warte-Rotation startet erst nach dem Tipp-Ende — nicht schon, wenn die Lieferung fertig ist", async () => {
-    w("A".repeat(250));
+  it("FIX 2 (Fallback): die Warte-Rotation startet erst nach dem Tipp-Ende — nicht schon, wenn die Lieferung fertig ist", async () => {
+    w("A".repeat(12));
     await vi.advanceTimersByTimeAsync(1000);
     expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
 
     /* Nächste Poll-Welle OHNE neue Zeichen → Lieferung abgeschlossen. Getippt
-       wird aber noch (~250 Zeichen / 70 pro s ≈ 3,6 s) — die Status-Zeile
+       wird aber noch (~12 Zeichen / 6 pro s ≈ 2 s) — die Status-Zeile
        bleibt beim Schreib-Status. */
-    w("A".repeat(250));
-    await vi.advanceTimersByTimeAsync(1000);
+    w("A".repeat(12));
+    await vi.advanceTimersByTimeAsync(500);
     expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
 
     /* Fertig getippt → jetzt rotieren die ehrlichen Warte-Zeilen. */
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(2500);
     expect(elements.liveStatusText.textContent).toBe("live.warten.0");
     await vi.advanceTimersByTimeAsync(2500);
     expect(elements.liveStatusText.textContent).toBe("live.warten.1");
@@ -216,9 +303,9 @@ describe("Live-Anzeige (v3.0)", () => {
   });
 
   it("FIX 2: die Rotation stoppt bei done (Enthüllung übernimmt die Status-Zeile)", async () => {
-    w("A".repeat(250));
+    w("A".repeat(12));
     await vi.advanceTimersByTimeAsync(500);
-    w("A".repeat(250)); /* Lieferung fertig */
+    w("A".repeat(12)); /* Lieferung fertig */
     await vi.advanceTimersByTimeAsync(5000); /* fertig getippt → Rotation läuft */
     expect(elements.liveStatusText.textContent).toMatch(/^live\.warten\./);
 
@@ -254,8 +341,9 @@ describe("Live-Anzeige (v3.0)", () => {
   /* ── Zwei Puffer: der Text folgt dem gewählten Modus (Phase 3) ────────── */
 
   it("Modus-Wechsel mitten im Tippen: sofort der Beast-Puffer, weitergetippt am eigenen Fortschritt", async () => {
-    /* Beide Puffer gefüllt — getippt wird nur der seriöse (Schalter aus). */
-    w("S".repeat(250), "B".repeat(250));
+    /* Beide Puffer gefüllt — getippt wird nur der seriöse (Schalter aus).
+       1500 Zeichen → adaptives Tempo ~50 Z/s, genug Bewegung für die Probe. */
+    w("S".repeat(1500), "B".repeat(1500));
     await vi.advanceTimersByTimeAsync(2000);
     const seriousStand = elements.liveTextFest.textContent.length;
     expect(seriousStand).toBeGreaterThan(50);
@@ -296,8 +384,8 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent).toBe("");
     expect(elements.liveTextRausch.textContent).toBe("");
 
-    /* Die nächste Welle bringt die ersten Beast-Zeichen (≥ Anlauf-Puffer):
-       jetzt tippt es los, der Status wechselt zurück auf „schreibt". */
+    /* Die nächste Welle bringt die ersten Beast-Zeichen: jetzt tippt es
+       sofort los, der Status wechselt zurück auf „schreibt". */
     w("S".repeat(250), "B".repeat(230));
     await vi.advanceTimersByTimeAsync(500);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
@@ -305,17 +393,13 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
   });
 
-  it("der Anlauf-Mindestpuffer gilt JE Puffer: ein kurzer Beast-Stand tippt noch nicht", async () => {
+  it("v3.0.2: auch ein kurzer Beast-Stand tippt nach dem Wechsel sofort — kein Anlauf-Puffer je Puffer mehr", async () => {
     w("S".repeat(250), "B".repeat(50));
     await vi.advanceTimersByTimeAsync(1000);
     schalte(true);
-    /* Beast liegt unter der Anlauf-Schwelle → noch kein Zeichen, Cursor
-       blinkt im Warte-Status. */
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(elements.liveTextFest.textContent).toBe("");
-
-    w("S".repeat(250), "B".repeat(210));
-    await vi.advanceTimersByTimeAsync(500);
+    /* Früher wartete der 200-Zeichen-Anlauf hier mit leerem Cursor —
+       jetzt tippt der Beast-Puffer ab dem ersten vorhandenen Zeichen. */
+    await vi.advanceTimersByTimeAsync(1000);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
     expect(elements.liveTextFest.textContent).toBe("B".repeat(elements.liveTextFest.textContent.length));
   });

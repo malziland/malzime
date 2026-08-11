@@ -135,7 +135,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call) |
 | `js/api.js` | API-Client: Einreihen, Statusabfrage, Wiederaufnahme — mit AbortController + Stale-Guard |
 | `js/render.js` | Profile-Rendering, Bias-Toggle, Privacy-Cards, Karte |
-| `js/ui.js` | Disclaimer-Modal, Maintenance-Modal, Limit-Banner, Scan-Animation |
+| `js/ui.js` | Maintenance-Modal, Limit-Banner, Scan-Animation, Warteschlangen-Anzeige |
 | `js/state.js` | Globaler State (`requestId`, `isAnalyzing`) |
 | `js/i18n.js` | i18n Micro-Modul (`initI18n`, `t`, `applyTranslations`) |
 | `js/demo.js` | Demo-Bild-Logik (KI-generierte Demo-Fotos durch die echte KI schicken — keine realen Personen, siehe `public/img/demo/LICENSE.md`) |

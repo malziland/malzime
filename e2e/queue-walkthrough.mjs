@@ -48,12 +48,14 @@ await page.waitForTimeout(2800);
 console.log("→ Foto hochladen (landet hinter den Füll-Jobs)");
 await page.setInputFiles("#fileInput", "public/img/demo/demo-selfie.jpg");
 
-let disclaimerSeen = false;
+/* v3.0.2: Die Analyse startet direkt bei der Foto-Wahl — es gibt kein
+   Hinweis-Pop-up mehr. Gewartet wird nur noch auf Warteschlange + Ergebnis. */
+let resultSeen = false;
 let positionShot = false;
 for (let i = 1; i <= 60; i++) {
   await page.waitForTimeout(2000);
-  if (await page.locator("#disclaimerModal.active").count()) {
-    disclaimerSeen = true;
+  if (await page.locator("#simulation .verdict").count()) {
+    resultSeen = true;
     break;
   }
   const scanText = await page.locator("#scanText").textContent().catch(() => "");
@@ -66,11 +68,9 @@ for (let i = 1; i <= 60; i++) {
   }
 }
 
-if (disclaimerSeen) {
-  await page.screenshot({ path: `${SHOT_DIR}/03-disclaimer.png`, fullPage: true });
-  await page.click("#disclaimerConfirm");
+if (resultSeen) {
   await page.waitForTimeout(2000);
-  await page.screenshot({ path: `${SHOT_DIR}/04-result.png`, fullPage: true });
+  await page.screenshot({ path: `${SHOT_DIR}/03-result.png`, fullPage: true });
   console.log("Ergebnis gerendert.");
 }
 

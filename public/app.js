@@ -9,13 +9,7 @@ import {
   clearStoredJobId,
 } from "./js/api.js";
 import { renderCurrentMode } from "./js/render.js";
-import {
-  dismissDisclaimerModal,
-  insertPrintNotes,
-  removePrintNotes,
-  showLimitBanner,
-  showMaintenanceModal,
-} from "./js/ui.js";
+import { insertPrintNotes, removePrintNotes, showLimitBanner, showMaintenanceModal } from "./js/ui.js";
 import { initDemo } from "./js/demo.js";
 import { initStickyToggle, renderKeepingScrollAnchor } from "./js/sticky-toggle.js";
 import { klangAktivieren } from "./js/klang.js";
@@ -110,9 +104,6 @@ function handleNewFile(file) {
     state.currentAbortController = null;
   }
   state.isAnalyzing = false;
-
-  /* Offenes Disclaimer-Modal schließen (BUG-004) */
-  dismissDisclaimerModal();
 
   /* Laufendes Geocoding abbrechen (BUG-005) */
   if (state.geocodeAbortController) {

@@ -12,8 +12,6 @@ export const elements = {
   gpsMap: document.getElementById("gpsMap"),
   targeting: document.getElementById("targeting"),
   simulation: document.getElementById("simulation"),
-  disclaimerModal: document.getElementById("disclaimerModal"),
-  disclaimerConfirm: document.getElementById("disclaimerConfirm"),
   exportPdf: document.getElementById("exportPdf"),
   limitBanner: document.getElementById("limitBanner"),
   limitCountdown: document.getElementById("limitCountdown"),

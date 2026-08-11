@@ -1,12 +1,13 @@
 import { test, expect } from "@playwright/test";
 
-/* v3.0.1 (FIX 3): Der „Wichtiger Hinweis"-Dialog steht VOR der Analyse.
+/* v3.0.2: Das Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
+ * (Entscheidung des Inhabers: „dieses Pop-Up liest sowieso keiner durch").
  *
- * ANLASS (erster Live-Test des Inhabers): Beim Live-Erlebnis platzte das Modal
- * am ENDE mitten in die Dramaturgie — und der getippte Profiltext war schon
- * VOR der Einordnung „nichts davon ist wahr" sichtbar. Jetzt erscheint der
- * Hinweis nach der Foto-Wahl und BEVOR der Upload beginnt; bestätigt gilt
- * einmal pro Tab. Am Ende erscheint KEIN Modal mehr.
+ * Dieser Test belegt den modallosen Fluss: Die Foto-/Demo-Wahl startet die
+ * Analyse DIREKT — der Upload geht ohne Zwischenklick raus, es existiert
+ * nicht einmal mehr ein Modal im Markup, und das Ergebnis erscheint ohne
+ * jeden Dialog. Er wird ROT, wenn jemand wieder ein Pop-up zwischen
+ * Foto-Wahl und Upload schiebt.
  */
 
 const MOCK_RESPONSE = {
@@ -30,10 +31,10 @@ const MOCK_RESPONSE = {
   },
   privacyRisks: [],
   exif: { make: "Apple", model: "iPhone 15 Pro" },
-  meta: { requestId: "hinweis-test-123", mode: "multimodal" },
+  meta: { requestId: "ohne-hinweis-123", mode: "multimodal" },
 };
 
-test("Hinweis vor der Analyse: Modal nach Foto-Wahl, Analyse erst nach der Bestätigung, kein zweites Modal am Ende", async ({
+test("Start ohne Hinweis-Pop-up: Demo-Wahl startet die Analyse direkt, kein Dialog bis zum fertigen Profil", async ({
   page,
 }) => {
   test.setTimeout(60000);
@@ -54,7 +55,7 @@ test("Hinweis vor der Analyse: Modal nach Foto-Wahl, Analyse erst nach der Best�
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ jobId: `hinweis-job-${enqueueAufrufe}`, resultToken: "hinweis-token-1" }),
+      body: JSON.stringify({ jobId: `ohne-hinweis-job-${enqueueAufrufe}`, resultToken: "ohne-hinweis-token" }),
     });
   });
   await page.route("**/api/job-status**", (route) =>
@@ -71,29 +72,31 @@ test("Hinweis vor der Analyse: Modal nach Foto-Wahl, Analyse erst nach der Best�
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
 
-  /* 1. Foto-Wahl → der Hinweis erscheint SOFORT, mit dem Start-Button-Text —
-     und noch ist NICHTS hochgeladen. */
+  /* Das frühere Hinweis-Modal existiert nicht einmal mehr im Markup. */
+  await expect(page.locator("#disclaimerModal")).toHaveCount(0);
+  await expect(page.locator("#disclaimerConfirm")).toHaveCount(0);
+
+  /* 1. Demo-Wahl → die Analyse startet SOFORT (Scan-Animation mit
+     Upload-Text ab der ersten Sekunde), ohne dass irgendein Dialog
+     dazwischen bestätigt werden müsste. */
   await page.click('[data-demo="selfie"]');
-  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 10000 });
-  await expect(page.locator("#disclaimerConfirm")).toHaveText(/Analyse starten|Start analysis/);
-  expect(enqueueAufrufe).toBe(0);
-
-  /* 2. Nach der Bestätigung läuft die Analyse — mit Sofort-Text statt stummem
-     Auge (FIX 1) — und der Upload geht raus. */
-  await page.click("#disclaimerConfirm");
+  await expect(page.locator("#scanAnim")).toHaveClass(/active/, { timeout: 5000 });
   await expect(page.locator("#scanText")).toHaveText(/unterwegs|on its way/, { timeout: 5000 });
+
+  /* 2. Der Upload geht ohne Zwischenklick raus und das Profil erscheint. */
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
-  expect(enqueueAufrufe).toBe(1);
-
-  /* 3. Am Ende KEIN zweites Modal — das Ergebnis steht direkt da. */
-  await expect(page.locator("#disclaimerModal")).not.toHaveClass(/active/);
   await expect(page.locator(".cat-card").first()).toBeVisible();
+  await expect.poll(() => enqueueAufrufe, { timeout: 15000 }).toBe(1);
 
-  /* 4. Zweites Foto im selben Tab: kein Modal mehr, die Analyse startet direkt
-     (bestätigt gilt einmal pro Tab). */
+  /* 3. Zu keinem Zeitpunkt ein Dialog: das einzige verbliebene Modal
+     (Wartungsmodus) ist nie aktiv geworden. */
+  await expect(page.locator("#maintenanceModal")).not.toHaveClass(/active/);
+  await expect(page.locator(".modal-overlay.active")).toHaveCount(0);
+
+  /* 4. Auch das zweite Foto startet direkt — kein Dialog, zweiter Upload. */
   await page.click('[data-demo="cafe"]');
   await expect(page.locator("#scanAnim")).toHaveClass(/active/, { timeout: 10000 });
-  await expect(page.locator("#disclaimerModal")).not.toHaveClass(/active/);
+  await expect(page.locator(".modal-overlay.active")).toHaveCount(0);
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
   await expect.poll(() => enqueueAufrufe, { timeout: 15000 }).toBe(2);
 });

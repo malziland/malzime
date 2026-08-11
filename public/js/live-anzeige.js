@@ -4,7 +4,9 @@
  * (compare-prototype-streaming.html, 2026-08-11) auf der echten Seite um:
  *
  *   1. Die bestehende Scan-Animation bleibt, bis das ERSTE Zeichen getippt
- *      wird — dann übernimmt die Live-Karte.
+ *      wird — dann übernimmt die Live-Karte. Getippt wird ab dem ersten
+ *      gelieferten Zeichen (v3.0.2: der frühere 200-Zeichen-Anlauf ist weg —
+ *      er ließ die Karte je nach Timing mit leer blinkendem Cursor stehen).
  *   2. GETIPPT (Matrix-Dekodierung: fester Text + Rausch-Schweif + Cursor)
  *      wird AUSSCHLIESSLICH der Zusammenfassungstext, gespeist aus den
  *      liveText-Wellen der 2-s-Polls (api.js → welle()). Seit Phase 3 führt
@@ -15,10 +17,13 @@
  *      Neustart von vorn. Ist der Beast-Puffer noch leer (das Modell
  *      schreibt Beast NACH dem Standard-Profil — Reihenfolge der Antwort,
  *      keine Schwäche), zeigt die Karte einen Warte-Status mit blinkendem
- *      Cursor. Puffer-Prinzip: ~200 Zeichen Anlauf sammeln (JE Puffer),
- *      dann durchgehend ~70 Zeichen/s — der Liefer- und der Anzeige-
- *      Rhythmus sind entkoppelt. Läuft der Puffer leer, verschwindet der
- *      Schweif und der Cursor blinkt.
+ *      Cursor. Tempo-Prinzip (v3.0.2, ADAPTIV statt fester 70 Zeichen/s):
+ *      Das Tempo richtet sich bei jedem Tick nach dem ungetippten Rest —
+ *      das Tippen soll die Wartezeit der Analyse TRAGEN, nicht in ~7 s
+ *      durchrauschen und dann 40+ s Leere hinterlassen (Befund des ersten
+ *      Live-Tests). Meldet der Server „fertig", tippt schnellVorlauf() den
+ *      Rest zügig aus, DANN erst startet die Enthüllung. Läuft der Puffer
+ *      vorzeitig leer, verschwindet der Schweif und der Cursor blinkt.
  *   3. KEIN TOTES FENSTER (v3.0.1, FIX 2): Die Zusammenfassung ist nach
  *      ~15–25 s fertig getippt, die Analyse läuft serverseitig aber noch
  *      ~30–50 s weiter (Kategorien/Beast). Sobald der aktive Puffer fertig
@@ -54,12 +59,30 @@ import { tippTon, popTon } from "./klang.js";
 const RAUSCH_ZEICHEN = "01ｱｶｻﾀﾅﾊﾏﾔﾗ<>#/*+=~$%&";
 /* Länge des Rausch-Schweifs hinter dem zuletzt getippten Zeichen. */
 const SCHWEIF_LAENGE = 7;
-/* Anlauf: erst tippen, wenn so viele Zeichen im Puffer liegen — sonst tippt
-   die Anzeige die erste Welle leer und stottert dann im Liefertakt.
-   Gilt JE Puffer (seriös und Beast laufen getrennt an). */
-const MIN_PUFFER = 200;
-/* Anzeige-Tempo, vom Liefertempo entkoppelt. */
-const ZEICHEN_PRO_SEKUNDE = 70;
+/* ── Adaptives Tipp-Tempo (v3.0.2) ──
+   Der Puffer soll über ungefähr diese Spanne abtropfen: Eine echte Analyse
+   dauert 50–80 s, der Stream liefert den Text aber schon in den ersten
+   ~20–30 s — ein festes Tempo tippte deshalb in ~7 s alles leer und ließ
+   danach 40+ s nur die Status-Rotation übrig („die Box fertig, und dann
+   passiert überhaupt nichts"). Bei jedem Tick wird deshalb neu gerechnet:
+   Rest ÷ ZIEL_ABTROPF_SEKUNDEN — wenig Puffer tippt langsam und lesbar,
+   viel Puffer schneller, und das Tippen streckt sich über einen Großteil
+   der Analyse. */
+const ZIEL_ABTROPF_SEKUNDEN = 30;
+/* Untergrenze: Darunter wirkt das Tippen wie ein Hänger statt wie Schreiben —
+   auch ein fast leerer Puffer muss sichtbar in Bewegung bleiben. */
+const MIN_ZEICHEN_PRO_SEKUNDE = 6;
+/* Obergrenze: Darüber ist der Text nicht mehr mitlesbar — schneller darf nur
+   der Schnellvorlauf nach der Fertig-Meldung des Servers sein. */
+const MAX_ZEICHEN_PRO_SEKUNDE = 90;
+/* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
+   zügig, aber noch als Tippen erkennbar ausgetippt — erst danach beginnt die
+   Enthüllung. So endet der Lauf ohne harten Textsprung. */
+const SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE = 150;
+/* Not-Deckel für den Schnellvorlauf: Er darf das fertige Ergebnis niemals
+   dauerhaft blockieren, falls die Tipp-Schleife aus irgendeinem Grund nicht
+   mehr vorankommt. */
+const SCHNELLVORLAUF_DECKEL_MS = 15000;
 /* Prüftakt, wenn der Puffer leer ist und nur der Cursor blinkt. */
 const LEERLAUF_MS = 120;
 /* Takt der ehrlichen Warte-Zeilen nach dem fertig getippten Text (FIX 2). */
@@ -67,8 +90,8 @@ const ROTATION_TAKT_MS = 2500;
 
 /* Aktueller Tipp-Lauf. `stop` beendet die Schleife beim nächsten Tick.
    `aktiv` benennt den Puffer des gerade gewählten Modus ("standard"/"beast");
-   jeder Puffer trägt seinen eigenen Text-Stand (`text`), Tipp-Fortschritt
-   (`fest`) und Anlauf-Zustand (`angelaufen`). */
+   jeder Puffer trägt seinen eigenen Text-Stand (`text`) und
+   Tipp-Fortschritt (`fest`). */
 let lauf = null;
 /* Laufende Enthüllung (eigener Lauf mit eigenem stop-Schalter). */
 let enthuellung = null;
@@ -122,6 +145,9 @@ function neuerLauf() {
     tippt: false,
     aktiv: aktiverModus(),
     statusZustand: null,
+    /* v3.0.2: Der Server hat „fertig" gemeldet — der Rest wird im
+       Schnellvorlauf ausgetippt (schnellVorlauf() setzt das). */
+    schnellvorlauf: false,
     /* FIX 2: Läuft gerade die Warte-Rotation? (rotationRunde entwertet eine
        alte Rotations-Schleife, wenn eine neue startet.) */
     rotationLaeuft: false,
@@ -129,8 +155,8 @@ function neuerLauf() {
     puffer: {
       /* `lieferungFertig`: eine Poll-Welle brachte für diesen Puffer keine
          neuen Zeichen mehr — das Modell schreibt an diesem Feld nicht mehr. */
-      standard: { text: "", fest: 0, angelaufen: false, lieferungFertig: false },
-      beast: { text: "", fest: 0, angelaufen: false, lieferungFertig: false },
+      standard: { text: "", fest: 0, lieferungFertig: false },
+      beast: { text: "", fest: 0, lieferungFertig: false },
     },
   };
 }
@@ -228,6 +254,14 @@ function allesAufdecken() {
   document.querySelectorAll(".lv-verdeckt").forEach((el) => el.classList.remove("lv-verdeckt"));
 }
 
+/* Das aktuelle Tipp-Tempo in Zeichen pro Sekunde — bei JEDEM Tick neu, denn
+   der Rest wächst mit jeder Welle und schrumpft mit jedem Zeichen. Nach der
+   Fertig-Meldung des Servers gilt stattdessen das Schnellvorlauf-Tempo. */
+function aktuellesTempo(mein, rest) {
+  if (mein.schnellvorlauf) return SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE;
+  return Math.min(Math.max(rest / ZIEL_ABTROPF_SEKUNDEN, MIN_ZEICHEN_PRO_SEKUNDE), MAX_ZEICHEN_PRO_SEKUNDE);
+}
+
 /* ── Tipp-Schleife (Matrix-Dekodierung) ──────────────────────────────────
    Unregelmäßiger Klang-Rhythmus wie im Film: Zufallsabstand 3–15 Zeichen,
    15 % Chance auf eine verlängerte Atempause, Anschlagstärke 0,5–1,05 —
@@ -238,10 +272,10 @@ async function tippSchleife(mein) {
     /* Immer der Puffer des AKTUELL gewählten Modus — modusWechsel() stellt
        `aktiv` um, der nächste Tick tippt nahtlos am anderen Stand weiter. */
     const p = mein.puffer[mein.aktiv];
-    /* Anlauf JE Puffer: erst tippen, wenn genug Material liegt — sonst tippt
-       die Anzeige die erste Welle leer und stottert dann im Liefertakt. */
-    if (!p.angelaufen && p.text.length >= MIN_PUFFER) p.angelaufen = true;
-    if (p.angelaufen && p.fest < p.text.length) {
+    if (p.fest < p.text.length) {
+      /* Die Scan-Animation weicht der Karte GENAU in dem Moment, in dem das
+         erste Zeichen sichtbar wird — nie früher: Eine Karte, in der nur der
+         Cursor blinkt, wirkt wie ein Hänger (Befund des ersten Live-Tests). */
       karteZeigen();
       p.fest += 1;
       /* Es wird wieder getippt → eine laufende Warte-Rotation endet (FIX 2). */
@@ -259,11 +293,11 @@ async function tippSchleife(mein) {
         if (Math.random() < 0.15) naechsterTon += 12; /* kurze Atempause */
         tippTon(0.5 + Math.random() * 0.55);
       }
-      if (!(await warte(1000 / ZEICHEN_PRO_SEKUNDE, mein))) return;
+      if (!(await warte(1000 / aktuellesTempo(mein, p.text.length - p.fest), mein))) return;
     } else {
-      /* Puffer leer (oder noch im Anlauf): Schweif weg, der Cursor blinkt
-         (CSS), wir warten auf die nächste Welle. Ist der Puffer fertig
-         getippt UND fertig geliefert, rotieren die Warte-Zeilen (FIX 2). */
+      /* Puffer leer: Schweif weg, der Cursor blinkt (CSS), wir warten auf
+         die nächste Welle. Ist der Puffer fertig getippt UND fertig
+         geliefert, rotieren die Warte-Zeilen als Fallback (FIX 2). */
       if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
       warteRotationAktualisieren(mein);
       if (!(await warte(LEERLAUF_MS, mein))) return;
@@ -324,10 +358,44 @@ export function welle(texte) {
     return;
   }
 
-  if (!lauf.tippt && (lauf.puffer.standard.text.length >= MIN_PUFFER || lauf.puffer.beast.text.length >= MIN_PUFFER)) {
+  /* v3.0.2: Getippt wird ab dem ERSTEN gelieferten Zeichen — kein Anlauf-
+     Puffer mehr. Das adaptive Tempo übernimmt dessen Aufgabe: Bei wenig
+     Material tippt es langsam genug, dass der Nachschub der 2-s-Wellen
+     locker reicht, statt eine leere Karte blinken zu lassen. */
+  if (!lauf.tippt && (lauf.puffer.standard.text.length > 0 || lauf.puffer.beast.text.length > 0)) {
     lauf.tippt = true;
     tippSchleife(lauf);
   }
+}
+
+/**
+ * Meldet, dass der Server fertig ist (api.js ruft das bei `done`, BEVOR das
+ * Ergebnis gerendert wird): Der noch ungetippte Rest des aktiven Puffers
+ * wird im Schnellvorlauf ausgetippt; das zurückgegebene Versprechen löst
+ * auf, sobald er durch ist — erst dann darf die Enthüllung starten, sonst
+ * endet das Tippen mitten im Wort mit einem harten Sprung ins Ergebnis.
+ * Ohne gelaufenen Live-Text (oder bei reduzierter Bewegung, wo der Text
+ * längst vollständig steht) löst es sofort auf.
+ */
+export function schnellVorlauf() {
+  return new Promise((aufloesen) => {
+    const mein = lauf;
+    if (!mein || !liveLief || enthuellungGestartet) {
+      aufloesen();
+      return;
+    }
+    mein.schnellvorlauf = true;
+    /* Not-Deckel: Das fertige Ergebnis darf hier nie hängen bleiben. */
+    const frist = Date.now() + SCHNELLVORLAUF_DECKEL_MS;
+    (function pruefe() {
+      const p = mein.puffer[mein.aktiv];
+      if (mein.stop || p.fest >= p.text.length || Date.now() > frist) {
+        aufloesen();
+        return;
+      }
+      setTimeout(pruefe, 50);
+    })();
+  });
 }
 
 /**

@@ -303,23 +303,32 @@ function sanftZentrieren(el) {
   }
 }
 
+/* Takt und Dauer der Auge-Nachwache: ~44 s decken jede Scan-Phase ab. */
+const AUGE_WACHE_TAKT_MS = 400;
+const AUGE_WACHE_VERSUCHE_MAX = 110;
+
 /**
- * Holt das Scan-Auge nach der Foto-/Demo-Wahl ins Sichtfeld (api.js ruft das
+ * Hält das Scan-Auge nach der Foto-/Demo-Wahl im Sichtfeld (api.js ruft das
  * beim Analyse-Beginn, direkt nach fuehrungStarten). Grund (User, 11.08.
  * abends): „Am Handy sieht man das Foto, aber nicht, dass etwas passiert."
- * NUR wenn das Auge nicht ohnehin mehrheitlich sichtbar ist — auf dem
- * Desktop, wo es längst im Bild steht, darf sich NICHTS bewegen.
+ *
+ * WICHTIG — eine Einmal-Prüfung genügt NICHT (Innenleben-Protokoll 11.08.
+ * spätabends): Beim Aufruf steht das Auge oft noch im Bild (top≈518), dann
+ * lädt die Foto-Vorschau asynchron fertig, das Layout wächst und schiebt das
+ * Auge unter die Sichtkante (top≈783+) — und niemand schaute mehr hin. Genau
+ * so blieb der Handy-Scroll dreimal aus. Deshalb WACHT diese Funktion bis
+ * zum Tipp-Start: alle AUGE_WACHE_TAKT_MS prüfen, und je „aus dem Bild
+ * gerutscht"-Episode genau EIN sanfter Scroll (kein Dauer-Ziehen — erst wenn
+ * das Auge zwischendurch wieder sichtbar war, darf erneut gescrollt werden).
+ * Nutzer-Übernahme (Wischen/Rad/Tasten) beendet die Wache sofort; übernimmt
+ * die Live-Karte (Tippen), ist die Wache fertig. Desktop, Auge dauerhaft im
+ * Bild: es bewegt sich weiterhin NICHTS.
  */
-export function augeInsBild(versuch = 0) {
+export function augeInsBild(versuch = 0, zustand = { gescrollt: false }) {
   if (!fuehrungAktiv()) return;
+  /* Tipp-Phase erreicht: Ab hier führen Karte und Tipp-Nachscrollen. */
+  if (elements.liveKarte && elements.liveKarte.classList.contains("active")) return;
   const auge = elements.scanAnim;
-  /* v3.0.5 (Handy-Befund 11.08., 18:15): Beim Analyse-Start ist das Auge oft
-     noch gar nicht aufgebaut (ohne .active, Höhe 0) — und ein Null-Höhen-
-     Element gilt der Sichtfeld-Regel als „sichtbar" (0 ≥ 0), der Scroll
-     unterblieb kommentarlos. Deshalb: erst NACHFASSEN, bis das Auge wirklich
-     steht (aktiv UND gemessene Höhe), dann genau einmal anfahren. Bricht der
-     Nutzer die Führung ab, sterben auch die Nachfass-Versuche (fuehrungAktiv
-     wird je Versuch frisch geprüft). */
   const steht = (() => {
     try {
       return !!auge && auge.classList.contains("active") && auge.getBoundingClientRect().height > 0;
@@ -327,12 +336,17 @@ export function augeInsBild(versuch = 0) {
       return false;
     }
   })();
-  if (!steht) {
-    if (versuch < 10) setTimeout(() => augeInsBild(versuch + 1), 200);
-    return;
+  if (steht) {
+    if (imSichtfeld(auge)) {
+      zustand.gescrollt = false;
+    } else if (!zustand.gescrollt) {
+      sanftZentrieren(auge);
+      zustand.gescrollt = true;
+    }
   }
-  if (imSichtfeld(auge)) return;
-  sanftZentrieren(auge);
+  if (versuch < AUGE_WACHE_VERSUCHE_MAX) {
+    setTimeout(() => augeInsBild(versuch + 1, zustand), AUGE_WACHE_TAKT_MS);
+  }
 }
 
 /* Tipp-Nachscrollen (v3.0.3): hält die letzte getippte Zeile im Bild. Nur

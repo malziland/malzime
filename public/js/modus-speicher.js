@@ -1,12 +1,12 @@
 /* ── Merken der Modus-Wahl (seriös / Beast) über ein Neuladen hinweg ──
  *
- * ANLASS (Betreiber-Meldung 2026-08-11): Wer im Beast Mode die Seite neu lädt,
+ * ANLASS (im Betrieb aufgefallen, 2026-08-11): Wer im Beast Mode die Seite neu lädt,
  * landete wieder im seriösen Modus. Im laufenden Durchgang ist das ärgerlich —
  * das Ergebnis wird nach dem Neuladen ja wiederhergestellt, aber im falschen
  * Modus, und die Umschaltung muss von Hand wiederholt werden.
  *
  * Vorher war das ausdrücklich so gewollt („Beast startet immer ausgeschaltet").
- * Der Betreiber hat die Regel präzisiert, und die Präzisierung trifft es genau:
+ * Die Regel ist präzisiert, und die Präzisierung trifft es genau:
  *
  *   „Beast startet immer ausgeschaltet — das stimmt, aber ein Reload ist
  *    kein Start."

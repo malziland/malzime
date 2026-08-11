@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { merkeModus, gemerkterModus, vergissModus } from "../js/modus-speicher.js";
 
-/* Merken der Modus-Wahl über ein Neuladen hinweg (Betreiber-Meldung 2026-08-11).
+/* Merken der Modus-Wahl über ein Neuladen hinweg (aufgefallen 2026-08-11).
 
    ANLASS: Im Beast Mode neu laden landete wieder im seriösen Modus. Die alte
-   Regel lautete „Beast startet immer ausgeschaltet". Der Betreiber hat sie
-   präzisiert — und die Präzisierung ist der ganze Kern dieser Datei:
+   Regel lautete „Beast startet immer ausgeschaltet" und ist präzisiert —
+   die Präzisierung ist der ganze Kern dieser Datei:
 
      „Beast startet immer ausgeschaltet — das stimmt, aber ein Reload ist
       kein Start."

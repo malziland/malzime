@@ -1,8 +1,8 @@
 # Runbook — Betrieb, Deploy, Rollback
 
 Dieses Dokument ist das Betriebs-Handbuch von malziME: Wie wird deployt, wie wird
-zurückgerollt, was tun bei Störungen. Zielgruppe: der Betreiber und unterstützende
-KI-Assistenten. Die Architektur selbst beschreibt [ARCHITECTURE.md](ARCHITECTURE.md),
+zurückgerollt, was tun bei Störungen. Zielgruppe: die Entwicklung des Projekts
+und unterstützende KI-Assistenten. Die Architektur selbst beschreibt [ARCHITECTURE.md](ARCHITECTURE.md),
 das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 [FLAGS.md](FLAGS.md).
 

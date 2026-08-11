@@ -21,7 +21,10 @@ describe("config", () => {
     expect(config.MISTRAL_DESCRIBE_MODEL).toBe("mistral-large-2512");
     expect(config.MISTRAL_PROFILE_MODEL).toBe("mistral-small-2603");
     expect(config.MISTRAL_FALLBACK_MODEL).toBe("mistral-large-2512");
-    expect(config.MISTRAL_ENDPOINT).toMatch(/^https:\/\/api\.mistral\.ai/);
+    /* v3.0.4: EU-Regional-Endpunkt — vertragliche EU/EFTA-Garantie. Diese
+       Probe wird ROT, wenn jemand versehentlich auf den globalen Endpunkt
+       zurueckfaellt. */
+    expect(config.MISTRAL_ENDPOINT).toMatch(/^https:\/\/api\.eu\.mistral\.ai/);
     expect(config.MISTRAL_DESCRIBE_MAX_TOKENS).toBeGreaterThan(0);
     expect(config.MISTRAL_PROFILE_MAX_TOKENS).toBeGreaterThan(5000);
     expect(config.MISTRAL_TIMEOUT_MS).toBeGreaterThan(0);

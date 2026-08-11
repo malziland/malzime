@@ -4,6 +4,22 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.4] — 2026-08-11
+
+Datenschutz-Härtung nach der großen Zusagen-Prüfung (Code, Infrastruktur
+und Mistral-Verträge wurden unabhängig gegengeprüft):
+
+- **KI-Analyse jetzt vertraglich in Europa:** Wir nutzen den
+  EU-Regional-Endpunkt von Mistral — die Bildanalyse läuft damit laut
+  Vertrag in Rechenzentren in der EU bzw. EFTA (vorher galt nur
+  „standardmäßig EU"). Kostet 10 % Aufpreis und ist es wert.
+- **Datenschutzerklärung präzisiert:** Die GPS-Erklärung sagt jetzt exakt,
+  was passiert („erreichen nie unsere Server" — die Orts-Anfrage stellt
+  dein Browser direkt an OpenStreetMap), und die Hosting-Beschreibung
+  unterscheidet sauber zwischen Datenverarbeitung (ausschließlich
+  EU-Region Belgien) und der weltweiten Auslieferung der statischen
+  Seiten.
+
 ## [3.0.3] — 2026-08-11
 
 Blick-Führung von Anfang an — dein Blick ist immer dort, wo gerade etwas

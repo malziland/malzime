@@ -48,8 +48,14 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MISTRAL_DESCRIBE_MODEL = "mistral-large-2512";
 const MISTRAL_PROFILE_MODEL = "mistral-small-2603";
 const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";
-const MISTRAL_ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
-const MISTRAL_MODELS_ENDPOINT = "https://api.mistral.ai/v1/models";
+/* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des
+   globalen — Mistral sichert damit VERTRAGLICH zu, dass die Inferenz in
+   EU-/EFTA-Rechenzentren laeuft (der globale Endpunkt verspricht nur
+   "standardmaessig EU"). Kostet 10 % Aufpreis; beide Modelle wurden am
+   11.08. mit dem echten Schluessel am EU-Endpunkt verifiziert (HTTP 200).
+   Grundlage: docs.mistral.ai/studio-api/regional-inference. */
+const MISTRAL_ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
+const MISTRAL_MODELS_ENDPOINT = "https://api.eu.mistral.ai/v1/models";
 const MISTRAL_DESCRIBE_MAX_TOKENS = 2048;
 /* v2.1 (2026-05-23 nachmittags): 12000 → 16000. Hintergrund: Beim ersten
    v2.1-Live-Test schnitt Beast mehrere Karten mit "..." mitten im Wort ab,

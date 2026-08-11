@@ -70,22 +70,23 @@ const SCHWEIF_LAENGE = 7;
    Rest ÷ ZIEL_ABTROPF_SEKUNDEN — wenig Puffer tippt langsam und lesbar,
    viel Puffer schneller, und das Tippen streckt sich über einen Großteil
    der Analyse. */
-const ZIEL_ABTROPF_SEKUNDEN = 20;
+const ZIEL_ABTROPF_SEKUNDEN = 10;
 /* Untergrenze: Darunter wirkt das Tippen wie ein Hänger statt wie Schreiben —
-   auch ein fast leerer Puffer muss sichtbar in Bewegung bleiben. 12 statt
-   anfangs 6: Das Kriech-Tempo des ersten Livegangs wirkte „sehr gequält"
-   (Live-Test 11.08.) — der Zeit-Anlauf unten sorgt dafür, dass beim Start
-   schon genug Material für dieses Tempo im Puffer liegt. */
-const MIN_ZEICHEN_PRO_SEKUNDE = 12;
+   auch ein fast leerer Puffer muss sichtbar in Bewegung bleiben. 20 nach
+   ausdrücklicher Ansage des Inhabers (Abend-Test 11.08.: 12 Z/s „wirkt
+   immer noch total zäh") — der lange Zeit-Anlauf unten sammelt vorher genug
+   Material, damit dieses Tempo durchgehalten werden kann. */
+const MIN_ZEICHEN_PRO_SEKUNDE = 20;
 /* Obergrenze: Darüber ist der Text nicht mehr mitlesbar — schneller darf nur
    der Schnellvorlauf nach der Fertig-Meldung des Servers sein. */
 const MAX_ZEICHEN_PRO_SEKUNDE = 90;
 /* Zeit-Anlauf vor dem ersten getippten Zeichen: Der Stream liefert anfangs
    nur wenige Zeichen pro Sekunde — sofort loszutippen hieße, minutenlang an
    der Untergrenze zu kriechen. Solange trägt die Scan-Animation die Zeit.
-   Meldet der Server vorher „fertig", greift sofort der Schnellvorlauf.
-   (let statt const wegen des Test-Hooks _setzeTippAnlaufMsFuerTest.) */
-let TIPP_ANLAUF_MS = 10000;
+   20 s auf ausdrückliche Ansage des Inhabers (11.08. abends): lieber länger
+   sammeln und dann flott tippen. Meldet der Server vorher „fertig", greift
+   sofort der Schnellvorlauf. (let wegen _setzeTippAnlaufMsFuerTest.) */
+let TIPP_ANLAUF_MS = 20000;
 /* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
    zügig, aber noch als Tippen erkennbar ausgetippt — erst danach beginnt die
    Enthüllung. So endet der Lauf ohne harten Textsprung. */

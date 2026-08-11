@@ -4,6 +4,17 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.1] — 2026-08-11
+
+Feinschliff nach dem Abend-Test des Live-Erlebnisses:
+
+- **Länger sammeln, flotter tippen:** Vor dem ersten Zeichen trägt die
+  Scan-Animation jetzt rund 20 Sekunden (statt 10) — dafür tippt der Text
+  danach spürbar schneller. Das zähe Kriech-Tempo ist weg.
+- **Kein Farbwechsel mehr:** Die Live-Karte trägt von Anfang an die Farbe
+  der späteren Zusammenfassungs-Box — am Ende wechselt der Text nur noch
+  den Platz, nicht mehr das Kleid.
+
 ## [3.0.0] — 2026-08-11
 
 v3.0 — Das Live-Erlebnis.

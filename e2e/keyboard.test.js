@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
 
 /* Tastatur-Smoketest des kritischsten Nutzerflusses (Profilpflicht UI,
-   docs/VERIFICATION.md): Der komplette Weg Demo-Foto → Disclaimer → Profil
-   muss ohne Maus funktionieren — nur mit Tab und Enter — und der Fokus muss
-   dabei sichtbar sein. */
+   docs/VERIFICATION.md): Der komplette Weg Demo-Foto → Profil muss ohne
+   Maus funktionieren — nur mit Tab und Enter — und der Fokus muss dabei
+   sichtbar sein. Seit v3.0.2 startet die Analyse direkt bei der Foto-Wahl
+   (kein Hinweis-Pop-up mehr). */
 
 const MOCK_RESPONSE = {
   profiles: {
@@ -54,7 +55,7 @@ async function focusIsVisible(page) {
   });
 }
 
-test("Tastatur: Demo-Foto → Disclaimer → Profil, nur mit Tab + Enter", async ({ page }) => {
+test("Tastatur: Demo-Foto → Profil, nur mit Tab + Enter", async ({ page }) => {
   await page.route("**/api/stats", (route) =>
     route.fulfill({
       status: 200,
@@ -92,19 +93,9 @@ test("Tastatur: Demo-Foto → Disclaimer → Profil, nur mit Tab + Enter", async
   expect(await tabToElement(page, '[data-demo="selfie"]'), "Demo-Button per Tab erreichbar").toBe(true);
   expect(await focusIsVisible(page), "Fokus auf dem Demo-Button sichtbar").toBe(true);
 
-  /* 2. Enter öffnet den Hinweis-Dialog (v3.0.1: er steht VOR der Analyse) */
+  /* 2. Enter startet die Analyse DIREKT (v3.0.2: kein Hinweis-Dialog mehr)
+     und das Profil wird angezeigt */
   await page.keyboard.press("Enter");
-  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });
-
-  /* 3. Per Tab zum Bestätigen-Button im Disclaimer, Enter bestätigt */
-  const alreadyOnConfirm = await page.evaluate(() => document.activeElement?.id === "disclaimerConfirm");
-  if (!alreadyOnConfirm) {
-    expect(await tabToElement(page, "#disclaimerConfirm"), "Bestätigen-Button per Tab erreichbar").toBe(true);
-  }
-  expect(await focusIsVisible(page), "Fokus auf dem Bestätigen-Button sichtbar").toBe(true);
-  await page.keyboard.press("Enter");
-
-  /* 4. Nach der Bestätigung läuft die Analyse und das Profil wird angezeigt */
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
   await expect(page.locator(".cat-card").first()).toBeVisible();
 

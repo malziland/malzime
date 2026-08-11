@@ -13,8 +13,6 @@ const ids = [
   "gpsMap",
   "targeting",
   "simulation",
-  "disclaimerModal",
-  "disclaimerConfirm",
   "exportPdf",
   "limitBanner",
   "limitCountdown",
@@ -30,6 +28,19 @@ const ids = [
   "liveTextRausch",
   "liveCursor",
   "liveWarten",
+  /* Realitäts-Check (v3.1) */
+  "realCheck",
+  "rcZeilen",
+  "rcErgebnis",
+  "rcProzent",
+  "rcRingWert",
+  "rcVergleich",
+  "rcBalkenAndere",
+  "rcMarkeDu",
+  "rcAndereWert",
+  "rcDuWert",
+  "rcWenige",
+  "rcAntwort",
 ];
 
 export function setupDOM() {
@@ -40,4 +51,13 @@ export function setupDOM() {
   input.type = "checkbox";
   input.id = "biasSwitch";
   toggle.replaceWith(input);
+  /* rcAbsenden ist im echten Markup ein <button> — .disabled muss wirken */
+  const absenden = document.createElement("button");
+  absenden.type = "button";
+  absenden.id = "rcAbsenden";
+  absenden.disabled = true;
+  document.body.appendChild(absenden);
+  /* Wie in index.html startet die Realitäts-Check-Karte verborgen — sichtbar
+     macht sie erst realitaets-check.js bei einem echten Menschen-Profil. */
+  document.getElementById("realCheck").hidden = true;
 }

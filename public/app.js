@@ -9,17 +9,12 @@ import {
   clearStoredJobId,
 } from "./js/api.js";
 import { renderCurrentMode } from "./js/render.js";
-import {
-  dismissDisclaimerModal,
-  insertPrintNotes,
-  removePrintNotes,
-  showLimitBanner,
-  showMaintenanceModal,
-} from "./js/ui.js";
+import { insertPrintNotes, removePrintNotes, showLimitBanner, showMaintenanceModal } from "./js/ui.js";
 import { initDemo } from "./js/demo.js";
 import { initStickyToggle, renderKeepingScrollAnchor } from "./js/sticky-toggle.js";
 import { klangAktivieren } from "./js/klang.js";
 import { enthuellungAbkuerzen, modusWechsel } from "./js/live-anzeige.js";
+import * as realitaetsCheck from "./js/realitaets-check.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
 
@@ -58,6 +53,9 @@ const statsTimer = setTimeout(() => statsAbort.abort(), 20000);
 state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
   .then((r) => (r.ok ? r.json() : null))
   .then((data) => {
+    /* Antwort für den Realitäts-Check aufheben (anonymer Gesamtzähler für
+       den Vergleichsbalken — erscheint erst ab 100 Eingaben). */
+    state.statsDaten = data || null;
     /* Queue-Feature-Flag übernehmen. Bleibt es aus (Flag false oder Fetch
        fehlgeschlagen), läuft der bewährte synchrone Pfad. */
     if (data?.maintenance?.enabled) {
@@ -106,9 +104,6 @@ function handleNewFile(file) {
     state.currentAbortController = null;
   }
   state.isAnalyzing = false;
-
-  /* Offenes Disclaimer-Modal schließen (BUG-004) */
-  dismissDisclaimerModal();
 
   /* Laufendes Geocoding abbrechen (BUG-005) */
   if (state.geocodeAbortController) {
@@ -202,6 +197,9 @@ applyModeTheme();
 /* Sticky-Umschalter aktivieren (Logik in js/sticky-toggle.js) */
 initStickyToggle();
 
+/* Realitäts-Check verdrahten (v3.1, js/realitaets-check.js) */
+realitaetsCheck.initRealitaetsCheck();
+
 elements.biasSwitch.addEventListener("change", () => {
   merkeModus(elements.biasSwitch.checked);
   applyModeTheme();
@@ -216,6 +214,10 @@ elements.biasSwitch.addEventListener("change", () => {
        darf nichts halb verdeckt zurückbleiben. KEINE erneute Enthüllung. */
     enthuellungAbkuerzen();
     renderKeepingScrollAnchor(() => renderCurrentMode(state.lastData));
+    /* v3.1: Vor dem Absenden folgen die Realitäts-Check-Zitate dem neuen
+       aktiven Modus (Antworten bleiben stehen); nach dem Absenden ist die
+       Karte eingefroren und der Aufruf ein No-Op. */
+    realitaetsCheck.modusGewechselt(state.lastData);
   }
 });
 

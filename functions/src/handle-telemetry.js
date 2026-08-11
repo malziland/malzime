@@ -10,6 +10,7 @@
  */
 
 const { checkRateLimit, getClientIp } = require("./middleware");
+const { zaehleRealitaetsCheck } = require("./counter");
 
 const STRING_FIELDS = {
   eventType: 50,
@@ -60,6 +61,71 @@ function sanitizeClient(raw) {
   return Object.keys(out).length > 0 ? out : null;
 }
 
+/* ── Realitäts-Check (v3.1): anonyme Selbsteinschätzung ──────────────────
+   Erlaubt sind AUSSCHLIESSLICH die Kategorie-Stufen — keine traceId, keine
+   jobId, nichts Verknüpfbares (Privacy-Zusage der Spezifikation). Alles,
+   was nicht exakt dem Schema entspricht, wird verworfen: kein Log, kein
+   Zähler-Inkrement. Geschlecht ist optional (die Zeile entfällt im
+   Frontend, wenn die KI sich nicht festgelegt hat) und binär (0|1);
+   alle anderen Stufen sind Pflicht mit den Werten 0 | 0,5 | 1. */
+
+const RC_PFLICHT_STUFEN = ["alter", "interessen", "charakter", "werbung", "manipulation"];
+const RC_OPTIONALE_STUFEN = ["geschlecht"];
+
+/**
+ * Validiert das stufen-Objekt strikt: nur die erlaubten Schlüssel, nur die
+ * erlaubten Werte, alle Pflicht-Stufen vorhanden. Liefert das bereinigte
+ * Objekt oder null (= komplette Eingabe verwerfen).
+ */
+function validiereRealitaetsCheckStufen(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const erlaubt = new Set([...RC_PFLICHT_STUFEN, ...RC_OPTIONALE_STUFEN]);
+  const keys = Object.keys(raw);
+  for (const key of keys) {
+    if (!erlaubt.has(key)) return null;
+  }
+  for (const key of RC_PFLICHT_STUFEN) {
+    if (!(key in raw)) return null;
+  }
+  const out = {};
+  for (const key of keys) {
+    const wert = raw[key];
+    const erlaubteWerte = key === "geschlecht" ? [0, 1] : [0, 0.5, 1];
+    if (!erlaubteWerte.includes(wert)) return null;
+    out[key] = wert;
+  }
+  return out;
+}
+
+/**
+ * Berechnet die Trefferquote 0–100 serverseitig aus den Stufen — dem
+ * Client wird kein fertiger Score geglaubt.
+ */
+function berechneRealitaetsCheckScore(stufen) {
+  const werte = Object.values(stufen);
+  const summe = werte.reduce((s, v) => s + v, 0);
+  return Math.round((summe / werte.length) * 100);
+}
+
+/**
+ * Behandelt das realitaets-check-Ereignis: strikt validieren, EIN anonymes
+ * Log-Ereignis schreiben und das Aggregat in Firestore hochzählen. Bewusst
+ * KEINE weiteren Felder aus dem Body (traceId, userAgent, timings, …) —
+ * dieses Ereignis bleibt unverknüpfbar. Ungültige Eingaben werden still
+ * verworfen; die Antwort ist in jedem Fall 204.
+ */
+async function handleRealitaetsCheckEvent(body, res) {
+  const stufen = validiereRealitaetsCheckStufen(body.stufen);
+  if (stufen) {
+    const score = berechneRealitaetsCheckScore(stufen);
+    console.log(JSON.stringify({ type: "client-telemetry", eventType: "realitaets-check", stufen, score }));
+    /* zaehleRealitaetsCheck schluckt Firestore-Fehler selbst (nur Warnung) —
+       Telemetrie darf nie mit einem 5xx antworten. */
+    await zaehleRealitaetsCheck(score);
+  }
+  res.status(204).end();
+}
+
 function sanitizeMeta(raw) {
   if (!raw || typeof raw !== "object") return null;
   const out = {};
@@ -96,6 +162,14 @@ async function handleTelemetry(req, res) {
     }
     if (!body || typeof body !== "object") {
       res.status(400).json({ error: "Invalid body" });
+      return;
+    }
+
+    /* Realitäts-Check (v3.1): eigener, minimaler Pfad VOR der allgemeinen
+       Feld-Übernahme — für dieses Ereignis darf ausser den Stufen nichts
+       verarbeitet oder geloggt werden (keine traceId, kein UserAgent). */
+    if (body.eventType === "realitaets-check") {
+      await handleRealitaetsCheckEvent(body, res);
       return;
     }
 

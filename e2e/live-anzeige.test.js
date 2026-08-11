@@ -124,17 +124,15 @@ test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF
   test.setTimeout(90000);
   await seiteMitLiveMocks(page);
 
+  /* v3.0.2: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
 
-  /* v3.0.1 (FIX 3): Der Hinweis-Dialog steht jetzt VOR der Analyse —
-     bestätigen, dann startet der Upload. */
-  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 10000 });
-  await page.click("#disclaimerConfirm");
-
-  /* Die Live-Karte übernimmt (erste Welle ≥ Anlauf-Puffer) und die
-     Scan-Animation verschwindet mit dem ersten getippten Zeichen. */
+  /* Die Live-Karte übernimmt mit dem ERSTEN getippten Zeichen — im selben
+     Moment verschwindet die Scan-Animation. Eine aktive Karte trägt dabei
+     immer schon Text: kein Leerlauf-Cursor mehr (v3.0.2). */
   await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
   await expect(page.locator("#scanAnim")).not.toHaveClass(/active/);
+  expect((await page.locator("#liveTextFest").textContent()).length).toBeGreaterThan(0);
 
   /* Der Text WÄCHST — erst ein Stück, später mehr (Matrix-Tippen). */
   await expect
@@ -145,10 +143,10 @@ test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF
     .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 15000 })
     .toBeGreaterThan(zwischenstand);
 
-  /* done → KEIN zweites Modal mehr (FIX 3): das Ergebnis rendert direkt und
-     die Enthüllung läuft an; die Zusammenfassung steht in ihrer normalen Box. */
+  /* done → Schnellvorlauf tippt den Rest aus, dann rendert das Ergebnis
+     direkt und die Enthüllung läuft an; die Zusammenfassung steht in ihrer
+     normalen Box. */
   await expect(page.locator("#simulation .verdict")).toBeVisible({ timeout: 30000 });
-  await expect(page.locator("#disclaimerModal")).not.toHaveClass(/active/);
   /* Während der Enthüllung ist der PDF-Knopf noch verborgen. */
   await expect(page.locator("#exportPdf")).toHaveClass(/export-btn--hidden/);
 
@@ -166,11 +164,8 @@ test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text 
   test.setTimeout(90000);
   const steuerung = await seiteMitBeastMocks(page);
 
+  /* v3.0.2: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
-
-  /* v3.0.1 (FIX 3): Hinweis vor dem Start bestätigen. */
-  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 10000 });
-  await page.click("#disclaimerConfirm");
 
   /* Erst tippt der seriöse Text wie gewohnt. */
   await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
@@ -193,11 +188,10 @@ test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text 
     .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 15000 })
     .toBeGreaterThan(beastStand);
 
-  /* done → der Abschluss rendert direkt, ohne zweites Modal (FIX 3) — auch
-     im Beast-Modus. */
+  /* done → Schnellvorlauf, dann rendert der Abschluss direkt — auch im
+     Beast-Modus. */
   steuerung.fertigMachen();
   await expect(page.locator("#simulation .verdict")).toBeVisible({ timeout: 30000 });
-  await expect(page.locator("#disclaimerModal")).not.toHaveClass(/active/);
 });
 
 test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung ohne Verzögerung", async ({ page }) => {
@@ -205,11 +199,8 @@ test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung oh
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seiteMitLiveMocks(page);
 
+  /* v3.0.2: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
-
-  /* v3.0.1 (FIX 3): Hinweis vor dem Start bestätigen. */
-  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 10000 });
-  await page.click("#disclaimerConfirm");
 
   await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
   /* Kein Tippen: kurz nach dem Erscheinen steht bereits eine KOMPLETTE Welle
@@ -220,10 +211,9 @@ test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung oh
   /* Und kein Rausch-Schweif. */
   await expect(page.locator("#liveTextRausch")).toHaveText("");
 
-  /* done → direkt gerendert (kein zweites Modal, FIX 3); die Enthüllung läuft
-     ohne Verzögerungen — alles praktisch sofort sichtbar. */
+  /* done → direkt gerendert; die Enthüllung läuft ohne Verzögerungen —
+     alles praktisch sofort sichtbar. */
   await expect(page.locator("#exportPdf")).not.toHaveClass(/export-btn--hidden/, { timeout: 30000 });
-  await expect(page.locator("#disclaimerModal")).not.toHaveClass(/active/);
   await expect(page.locator("#facts .cat-card").first()).toBeVisible();
   await expect(page.locator("#dataValue .dv-card")).toBeVisible();
 });

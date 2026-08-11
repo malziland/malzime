@@ -249,6 +249,36 @@
         <div id="gpsMap" class="gps-map"></div>
         <div id="facts" class="facts-grid"></div>
         <div id="targeting" class="targeting-grid"></div>
+        <!-- Realitäts-Check (v3.1): „Wie gut hat dich die KI wirklich getroffen?"
+             Bewusst ZWISCHEN Manipulations-Box und Datenwert (der Datenwert ist
+             statischer Lernstoff, keine KI-Leistung). Umgekehrtes Karten-Thema
+             (hell trägt die dunklen Token und umgekehrt), Logik in
+             js/realitaets-check.js. Standardmäßig verborgen; erscheint nur bei
+             echten Menschen-Profilen. Der Ring ist rein dekorativ (aria-hidden),
+             die Prozentzahl wird EINMAL über #srAnnounce angesagt. -->
+        <div id="realCheck" class="rc-karte" hidden>
+          <span class="rc-badge" data-i18n="rc.badge">REALIT&Auml;TS-CHECK</span>
+          <h3 class="rc-titel" data-i18n-html="rc.titel">Wie gut hat dich die KI <em>wirklich</em> getroffen?</h3>
+          <p class="rc-intro" data-i18n="rc.intro">Sei ehrlich &mdash; jede Antwort f&uuml;hrt zu einer unbequemen Wahrheit.</p>
+          <div id="rcZeilen"></div>
+          <button id="rcAbsenden" class="rc-absenden" type="button" tabindex="0" disabled data-i18n="rc.absenden">Absenden &amp; Ergebnis ansehen</button>
+          <div id="rcErgebnis" class="rc-ergebnis" hidden>
+            <div class="rc-ring-wrap">
+              <svg class="rc-ring" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="rc-ring-spur" cx="60" cy="60" r="52"/>
+                <circle class="rc-ring-wert" id="rcRingWert" cx="60" cy="60" r="52"/>
+              </svg>
+              <div class="rc-ring-mitte"><span id="rcProzent">0</span><small>%</small><div class="rc-ring-label" data-i18n-html="rc.ringLabel">KI-Trefferquote<br/>bei dir</div></div>
+            </div>
+            <div class="rc-vergleich" id="rcVergleich" hidden>
+              <div class="rc-vergleich-titel" data-i18n="rc.vergleichTitel">Alle bisherigen Nutzer:innen</div>
+              <div class="rc-balken"><div class="rc-balken-fuellung" id="rcBalkenAndere"></div><div class="rc-marke" id="rcMarkeDu"></div></div>
+              <div class="rc-vergleich-werte"><span id="rcAndereWert"></span><span id="rcDuWert"></span></div>
+            </div>
+            <div class="rc-vergleich-hinweis" id="rcWenige" hidden data-i18n="rc.wenigeHinweis">Der Vergleich mit allen anderen erscheint ab 100 Eingaben.</div>
+            <div id="rcAntwort" class="rc-antwort"></div>
+          </div>
+        </div>
         <div id="dataValue" class="data-value-section"></div>
         <div class="export-wrap">
           <button id="exportPdf" class="export-btn export-btn--hidden" tabindex="0">
@@ -314,20 +344,6 @@
         <a href="/stats" target="_blank" rel="noopener" tabindex="0" data-i18n="footer.stats">Stats</a>
       </div>
     </footer>
-
-    <!-- Disclaimer-Modal -->
-    <div class="modal-overlay" id="disclaimerModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
-      <div class="modal-box">
-        <div class="modal-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 9v4m0 4h.01M3.6 19.8h16.8a1.2 1.2 0 001.04-1.8L13.04 4.2a1.2 1.2 0 00-2.08 0L2.56 18a1.2 1.2 0 001.04 1.8z"/></svg>
-        </div>
-        <h2 id="modalTitle" data-i18n="modal.title">Wichtiger Hinweis</h2>
-        <p data-i18n-html="modal.text1">malziME ist ein <strong>Lern-Tool f&uuml;r Medienkompetenz und Datenschutz-Sensibilisierung</strong>.</p>
-        <p data-i18n-html="modal.text2">Die KI-Profile sind <strong>erfunden</strong> und zeigen nur, was Algorithmen behaupten k&ouml;nnten &ndash; <strong>nichts davon ist wahr oder bewiesen</strong>.</p>
-        <div class="modal-divider"></div>
-        <button class="modal-btn" id="disclaimerConfirm" tabindex="0" data-i18n="modal.button">Verstanden &ndash; Ergebnis anzeigen</button>
-      </div>
-    </div>
 
     <!-- Maintenance-Modal (blockiert Seite bei Wartungsmodus) -->
     <div class="modal-overlay" id="maintenanceModal" role="alertdialog" aria-modal="true" aria-labelledby="maintenanceTitle">

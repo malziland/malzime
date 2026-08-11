@@ -1,7 +1,6 @@
 import { elements } from "./dom.js";
 import { state } from "./state.js";
 import { analyzeImage } from "./api.js";
-import { dismissDisclaimerModal } from "./ui.js";
 import { klangAktivieren } from "./klang.js";
 import { t } from "./i18n.js";
 
@@ -29,8 +28,6 @@ async function loadDemoImage(url, name) {
     state.currentAbortController = null;
   }
   state.isAnalyzing = false;
-
-  dismissDisclaimerModal();
 
   if (state.geocodeAbortController) {
     state.geocodeAbortController.abort();

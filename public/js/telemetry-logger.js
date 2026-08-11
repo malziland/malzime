@@ -39,3 +39,24 @@ export function logTelemetry(eventType, context = {}) {
     /* niemals werfen */
   }
 }
+
+/**
+ * Realitäts-Check (v3.1): meldet die Selbsteinschätzung als anonymes
+ * Ereignis. BEWUSST ein eigener, minimaler Pfad statt logTelemetry():
+ * Es gehen AUSSCHLIESSLICH die Kategorie-Stufen über die Leitung — keine
+ * traceId, keine jobId, kein UserAgent, keine Geräteklassen, nichts, was
+ * die Eingabe mit einer Analyse oder einem Gerät verknüpfen könnte
+ * (Privacy-Zusage der Spezifikation). Den Score rechnet der Server selbst.
+ */
+export function logRealitaetsCheck(stufen) {
+  try {
+    fetch(TELEMETRY_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventType: "realitaets-check", stufen }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (_) {
+    /* niemals werfen */
+  }
+}

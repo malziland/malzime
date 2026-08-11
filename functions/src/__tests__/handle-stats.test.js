@@ -1,7 +1,7 @@
 const { handleStats } = require("../handle-stats");
 
 jest.mock("../counter");
-const { getStats, getMaintenanceStatus } = require("../counter");
+const { getStats, getMaintenanceStatus, leseRealitaetsCheck } = require("../counter");
 
 function mockReq(method = "GET") {
   return { method };
@@ -69,5 +69,27 @@ describe("handleStats", () => {
     const res = mockRes();
     await handleStats(mockReq(), res);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ useQueue: true }));
+  });
+
+  test("liefert den anonymen Realitäts-Check-Zähler mit (eingaben + mittelProzent)", async () => {
+    getStats.mockResolvedValue({ current: { count: 0 } });
+    getMaintenanceStatus.mockResolvedValue(false);
+    leseRealitaetsCheck.mockResolvedValue({ eingaben: 137, mittelProzent: 58 });
+    const res = mockRes();
+    await handleStats(mockReq(), res);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ realitaetsCheck: { eingaben: 137, mittelProzent: 58 } })
+    );
+  });
+
+  test("ohne Eingaben ist mittelProzent null — die Antwort bleibt vollständig", async () => {
+    getStats.mockResolvedValue({ current: { count: 0 } });
+    getMaintenanceStatus.mockResolvedValue(false);
+    leseRealitaetsCheck.mockResolvedValue({ eingaben: 0, mittelProzent: null });
+    const res = mockRes();
+    await handleStats(mockReq(), res);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ realitaetsCheck: { eingaben: 0, mittelProzent: null } })
+    );
   });
 });

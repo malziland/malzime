@@ -1,4 +1,4 @@
-const { getStats, getMaintenanceStatus } = require("./counter");
+const { getStats, getMaintenanceStatus, leseRealitaetsCheck } = require("./counter");
 
 async function handleStats(req, res) {
   if (req.method !== "GET") {
@@ -11,12 +11,19 @@ async function handleStats(req, res) {
      Kann ein paar Wochen nach dem Umstieg ersatzlos weg.
      Frueherer Kommentar: das Frontend holt die Antwort ohnehin
      beim Seitenstart und entscheidet damit zwischen Queue- und Sync-Pfad. */
-  const [data, maintenance] = await Promise.all([getStats(), getMaintenanceStatus()]);
+  const [data, maintenance, realitaetsCheck] = await Promise.all([
+    getStats(),
+    getMaintenanceStatus(),
+    /* Realitäts-Check (v3.1): anonymer Gesamtzähler fuer den Vergleichs-
+       balken — { eingaben, mittelProzent }; mittelProzent ist null, solange
+       es keine Eingaben gibt. */
+    leseRealitaetsCheck(),
+  ]);
   if (!data) {
     res.status(503).json({ error: "Stats unavailable" });
     return;
   }
-  res.json({ ...data, maintenance, useQueue: true });
+  res.json({ ...data, maintenance, realitaetsCheck, useQueue: true });
 }
 
 module.exports = { handleStats };

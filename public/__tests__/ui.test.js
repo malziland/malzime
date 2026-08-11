@@ -135,51 +135,6 @@ describe("getBiasMode", () => {
   });
 });
 
-describe("Disclaimer Modal", () => {
-  let showDisclaimerModal, dismissDisclaimerModal, elements;
-
-  beforeEach(async () => {
-    setupDOM();
-    const uiMod = await import("../js/ui.js");
-    const domMod = await import("../js/dom.js");
-    showDisclaimerModal = uiMod.showDisclaimerModal;
-    dismissDisclaimerModal = uiMod.dismissDisclaimerModal;
-    elements = domMod.elements;
-  });
-
-  it("adds active class on show", () => {
-    showDisclaimerModal(() => {});
-    expect(elements.disclaimerModal.classList.contains("active")).toBe(true);
-  });
-
-  it("removes active class on confirm click", () => {
-    const cb = vi.fn();
-    showDisclaimerModal(cb);
-    elements.disclaimerConfirm.click();
-    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
-    expect(cb).toHaveBeenCalledOnce();
-  });
-
-  it("dismissDisclaimerModal removes active without callback", () => {
-    const cb = vi.fn();
-    showDisclaimerModal(cb);
-    dismissDisclaimerModal();
-    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
-    /* Callback sollte NICHT aufgerufen worden sein */
-    expect(cb).not.toHaveBeenCalled();
-  });
-
-  it("BUG-002: double show does not leak listeners", () => {
-    const cb1 = vi.fn();
-    const cb2 = vi.fn();
-    showDisclaimerModal(cb1);
-    showDisclaimerModal(cb2);
-    elements.disclaimerConfirm.click();
-    expect(cb1).not.toHaveBeenCalled();
-    expect(cb2).toHaveBeenCalledOnce();
-  });
-});
-
 describe("Limit Banner", () => {
   let showLimitBanner, hideLimitBanner, elements;
 

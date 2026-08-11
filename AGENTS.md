@@ -13,7 +13,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
     geocoding.js     Nominatim Reverse Geocoding (client-seitig)
     render.js        Ergebnis-Rendering (Profile, EXIF, Karte, Datenwert)
     state.js         Globaler State (requestId, isAnalyzing)
-    ui.js            UI-Komponenten (Disclaimer-Modal, Maintenance-Modal, Scan-Animation, Bias-Toggle, Limit-Banner, Warteschlangen-Anzeige)
+    ui.js            UI-Komponenten (Maintenance-Modal, Scan-Animation, Bias-Toggle, Limit-Banner, Warteschlangen-Anzeige)
     demo.js          Demo-Foto-Initialisierung (Click-Handler fuer die KI-generierten Demo-Fotos, siehe public/img/demo/LICENSE.md)
     stats.js         Stats-Seite: Fetch /api/stats, Limit-Balken, Countdown
     i18n.js          i18n Micro-Modul (initI18n, t, getLanguage, applyTranslations)

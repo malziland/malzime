@@ -253,3 +253,71 @@ describe("handleProcessJob — Fehlerfall", () => {
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/x.jpg");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Kurzaudit 2026-08-11, SEC-108 — der Kinderschutz-Bericht braucht einen
+   Leser. Die minor-Stufe bleibt ein stiller Zaehler (sie schlaegt auf den
+   Lerninhalt selbst an, gemessen: "Ratenzahlung" im Beast-Text). Die HARTE
+   Stufe im Fliesstext ist dagegen ein Regelbruch des Modells und muss als
+   ERROR raus — nur so erreicht sie den vorhandenen E-Mail-Alarm.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("SEC-108 — Logging des Kinderschutz-Berichts", () => {
+  const { _loggeMinorSafety } = require("../handle-process-job");
+
+  const basisBericht = {
+    alter: 14,
+    minderjaehrig: true,
+    entfernt: [],
+    durchgerutscht: [],
+  };
+
+  let logSpy, errorSpy;
+  beforeEach(() => {
+    logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(() => {
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  test("minor-Treffer im Fliesstext bleiben ein stiller Zaehler (kein ERROR)", () => {
+    _loggeMinorSafety(
+      { ...basisBericht, durchgerutscht: [{ modus: "boost", feld: "profileText", grund: "minor" }] },
+      "trace-1",
+      "de"
+    );
+    expect(errorSpy).not.toHaveBeenCalled();
+    const zeile = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(zeile.durchgerutscht).toBe(1);
+    expect(zeile.durchgerutschtGruende).toEqual(["minor"]);
+  });
+
+  test("harte Stufe im Fliesstext loggt zusaetzlich als ERROR (loest den Alarm aus)", () => {
+    _loggeMinorSafety(
+      {
+        ...basisBericht,
+        durchgerutscht: [
+          { modus: "normal", feld: "profileText", grund: "immer" },
+          { modus: "boost", feld: "categories.werbeprofil", grund: "minor" },
+        ],
+      },
+      "trace-2",
+      "de"
+    );
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const fehler = JSON.parse(errorSpy.mock.calls[0][0]);
+    expect(fehler.step).toBe("minor-safety-durchbruch");
+    /* Nur Feldnamen, keine Inhalte — der Einzelfall ist per Design nicht
+       rekonstruierbar; die Meldung heisst: Prompt-Regel haelt nicht mehr. */
+    expect(fehler.felder).toEqual(["normal.profileText"]);
+    expect(JSON.stringify(fehler)).not.toContain("eintrag");
+  });
+
+  test("ohne jeden Treffer: genau eine INFO-Zeile, kein ERROR (Positivkontrolle)", () => {
+    _loggeMinorSafety(basisBericht, null, "en");
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(JSON.parse(logSpy.mock.calls[0][0]).step).toBe("minor-safety");
+  });
+});

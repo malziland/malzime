@@ -37,7 +37,24 @@ jobs:
           fi
           TAG="v$VERSION"
           if gh release view "$TAG" >/dev/null 2>&1; then
-            # Der Tag ist schon da. Zeigt er auch auf DIESEN Stand? Wenn nicht,
+            # Release existiert schon. Entscheidung 2026-08-11 (Kurzaudit
+            # OPS-103): Veroeffentlichte CHANGELOG-Abschnitte duerfen weiter
+            # bearbeitet werden (Text-Korrekturen brauchen KEINE neue Nummer).
+            # Ein solcher Push aendert die oberste Versionsnummer nicht —
+            # dann ist hier nichts zu pruefen und der Lauf bleibt gruen.
+            # Genau so ein Doku-Nachzuegler (#78) hat am 2026-08-11 den ersten
+            # Fehlalarm dieser Pruefung ausgeloest.
+            # RESTLUECKE, bewusst getragen: Wer einen BESTEHENDEN Abschnitt
+            # komplett neu befuellt (Nummer gleich, Inhalt neu), wird hier
+            # nicht erkannt — dagegen schuetzt allein die Konvention "nie
+            # eine Nummer wiederverwenden".
+            VORHER="$(git show "$GITHUB_SHA^:CHANGELOG.md" 2>/dev/null | grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' | tr -d '#[] ' || true)"
+            if [ "$VORHER" = "$VERSION" ]; then
+              echo "Release $TAG existiert; der Push aendert die oberste Version nicht (Doku-Korrektur) — nichts zu tun."
+              exit 0
+            fi
+            # Der Push hat die oberste Nummer geaendert, ihr Release existiert
+            # aber schon. Zeigt der Tag auch auf DIESEN Stand? Wenn nicht,
             # wurde eine bereits veroeffentlichte Nummer wiederverwendet — dann
             # beschreibt der CHANGELOG-Abschnitt anderen Code als der gleich-
             # namige Tag, und ein Rollback ueber den Tag landet am falschen

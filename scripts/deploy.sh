@@ -48,8 +48,11 @@ else
 fi
 echo "Cache-Busting-Version: ?v=$VERSION"
 
-# Alle HTML-Dateien mit ?v= aktualisieren
-for f in public/index.html public/datenschutz.html public/impressum.html public/nutzungsbedingungen.html public/stats.html; do
+# Alle Dateien mit ?v=-Verweisen aktualisieren: die fuenf HTML-Seiten UND
+# public/js/demo.js — dort haengen die Buster der grossen Demo-Bilder.
+# demo.js fehlte hier bis zum Kurzaudit 2026-08-11 (OPS-106): Sein Buster
+# blieb drei Deploys lang auf einem alten Stand stehen.
+for f in public/index.html public/datenschutz.html public/impressum.html public/nutzungsbedingungen.html public/stats.html public/js/demo.js; do
   if [ -f "$f" ]; then
     # BUG-009: Cross-platform sed (macOS + Linux)
     if sed --version >/dev/null 2>&1; then

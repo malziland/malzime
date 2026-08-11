@@ -4,6 +4,64 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.12.3] — 2026-08-11
+
+Sanierung nach dem Kurzaudit vom selben Tag (kein Blocker, ein mittlerer und
+acht kleine Befunde) plus zwei Entscheidungen des Inhabers.
+
+### Kinderschutz-Filter: Schutzgrenze auf die vereinbarte Regel gestellt
+
+Der altersabhängige Teil des Filters (Glücksspiel, Kredit, Alkohol,
+Schönheits-OP, Diät) greift jetzt genau dann, wenn die **Untergrenze** der
+geschätzten Altersspanne **18 oder darunter** ist: Spanne 17–24 → Filter
+greift, Spanne 19–21 → Filter greift nicht. Der bisherige zusätzliche Abstand
+von drei Jahren (Schutz bis unter 21) entsprach nicht der Vereinbarung und ist
+entfernt. Die harte Stufe (Pornografie, Waffen, Extremismus) bleibt unverändert
+**altersunabhängig** für alle.
+
+### Absturz-Wache zählt nur noch echte Abstürze
+
+Bisher zählte jeder Seitenstart — drei schnelle manuelle Neuladungen binnen
+einer Minute lösten die Wache aus und verwarfen einen laufenden Auftrag, obwohl
+nichts abgestürzt war. Jetzt meldet sich die Seite beim Verlassen sauber ab
+(`pagehide`); nur Starts **ohne** diese Abmeldung — also nach Absturz oder
+Kill — zählen. Ungeduldiges Neuladen während der Wartezeit ist damit folgenlos.
+
+### Harte Filter-Treffer im Profiltext lösen jetzt den Alarm aus
+
+Taucht ein Begriff der harten Stufe im ausgelieferten Fließtext auf, ist das
+kein Zählfall, sondern ein Regelbruch des Modells — das wird jetzt als echter
+Fehler geloggt und erreicht damit den bestehenden E-Mail-Alarm. Die milde
+Stufe bleibt ein stiller Zähler (sie schlägt regelmäßig auf den Lerninhalt
+selbst an) und wird im Log jetzt je Stufe ausgewiesen.
+
+### Weitere Härtungen
+
+- **Ergebnis-Wiederholung befristet:** Ein fertiges Profil bleibt nach der
+  ersten Zustellung 15 Minuten per Neuladen wiederholbar, danach wird still
+  aufgeräumt — schützt weitergereichte Geräte, deren Tab durchgehend sichtbar
+  bleibt (die 3-Minuten-Übergabepause griff dort nicht).
+- **Datenbank-Wächter rekursiv:** `db-zentral.test.js` scannt jetzt auch
+  Unterordner von `functions/src` — vorher lagen die Sprachdateien außerhalb
+  der Prüfung.
+- **Cache-Buster vollständig:** `deploy.sh` hebt die Versionsmarken jetzt auch
+  in `public/js/demo.js` an (dort hängen die großen Demo-Bilder); der Wert war
+  drei Deploys lang stehen geblieben.
+- **Release-Wächter präzisiert:** Text-Korrekturen an bereits veröffentlichten
+  CHANGELOG-Abschnitten sind ausdrücklich erlaubt und lassen den
+  Release-Automaten grün; scharf bleibt er nur, wenn ein Push die oberste
+  Versionsnummer ändert.
+
+### Firestore-Umzug abgeschlossen
+
+Die alte Datenbank `(default)` in `nam5` (USA) ist gelöscht — sie enthielt
+zuletzt nur eingefrorene Zählerstände, nichts Personenbezogenes. Damit liegt
+kein Speicher dieses Projekts mehr außerhalb Europas. Das Umzugs-Skript ist
+ausgebaut, `firebase.json` führt nur noch `malzime-eu`, das RUNBOOK hält den
+Abschluss samt Beweisregel fest. Neu im RUNBOOK außerdem: das Nachschau-Rezept
+für die Absturz-Wache (bewusste Entscheidung: Beobachtung per Log-Abfrage
+statt Alarm).
+
 ## [2.12.2] — 2026-08-11
 
 Eine Wache gegen einen Fehler, den bisher niemand sehen konnte.

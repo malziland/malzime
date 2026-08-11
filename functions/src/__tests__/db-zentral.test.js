@@ -1,7 +1,7 @@
 "use strict";
 
 const { readdirSync, readFileSync } = require("node:fs");
-const { join } = require("node:path");
+const { join, relative, sep } = require("node:path");
 
 /* Nur db.js darf eine Firestore-Verbindung aufbauen (Audit 2026-08-10, PRIV-001).
 
@@ -31,9 +31,15 @@ const IMPORT_DESTRUKTURIERT =
 const IMPORT_DIREKT = /require\(\s*["']firebase-admin\/firestore["']\s*\)\s*\.\s*getFirestore/;
 
 function quelldateien() {
-  return readdirSync(SRC, { withFileTypes: true })
+  /* Rekursiv (Kurzaudit 2026-08-11, TEST-105): Vorher wurde nur die oberste
+     Ebene gelesen — functions/src/locales/** lag damit komplett ausserhalb
+     des Waechters, und jeder kuenftige Unterordner ebenso. __tests__ bleibt
+     aussen vor: Testdateien zitieren die Import-Schreibweise als Text (auch
+     diese Datei hier, in der Gegenprobe unten). */
+  return readdirSync(SRC, { withFileTypes: true, recursive: true })
     .filter((e) => e.isFile() && e.name.endsWith(".js"))
-    .map((e) => e.name);
+    .map((e) => relative(SRC, join(e.parentPath, e.name)))
+    .filter((pfad) => !pfad.split(sep).includes("__tests__"));
 }
 
 describe("Firestore-Zugriff läuft ausschliesslich über db.js", () => {
@@ -42,6 +48,9 @@ describe("Firestore-Zugriff läuft ausschliesslich über db.js", () => {
   test("es wurden überhaupt Quelldateien gefunden (Positivkontrolle der Suche)", () => {
     expect(dateien.length).toBeGreaterThan(10);
     expect(dateien).toContain(ERLAUBT);
+    /* Positivkontrolle der Rekursion: Ohne sie fehlen die locales-Dateien —
+       genau die Lücke aus dem Kurzaudit 2026-08-11 (TEST-105). */
+    expect(dateien).toContain(join("locales", "de", "prompts.js"));
   });
 
   test("keine andere Datei importiert getFirestore", () => {

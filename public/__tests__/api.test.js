@@ -37,6 +37,11 @@ describe("analyzeImage", () => {
     /* Date.now() weit genug in der Zukunft für MIN_INTERACTION_MS */
     vi.setSystemTime(Date.now() + 10000);
 
+    /* FIX 3 (v3.0.1): Der Hinweis-Dialog steht VOR der Analyse und gilt einmal
+       pro Tab — hier als bestätigt vorausgesetzt (die Dialog-Fälle selbst
+       prüft queue.test.js). */
+    sessionStorage.setItem("malzime.hinweisBestaetigt", "1");
+
     const apiMod = await import("../js/api.js");
     const stateMod = await import("../js/state.js");
     const domMod = await import("../js/dom.js");
@@ -212,10 +217,9 @@ describe("analyzeImage", () => {
     await vi.advanceTimersByTimeAsync(8000);
     await lauf;
 
-    /* showDisclaimerModal wurde aufgerufen — simuliere Confirm-Click
-       elements referenziert die gecachten DOM-Nodes aus dom.js */
-    expect(elements.disclaimerModal.classList.contains("active")).toBe(true);
-    elements.disclaimerConfirm.click();
+    /* FIX 3 (v3.0.1): Der Hinweis wurde beim START bestätigt — das Ergebnis
+       rendert direkt, ohne Modal am Ende. */
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
 
     expect(renderCurrentMode).toHaveBeenCalled();
     const data = renderCurrentMode.mock.calls[0][0];
@@ -260,8 +264,7 @@ describe("analyzeImage", () => {
         }),
     });
     await analyzeImage();
-    /* Nach Disclaimer-Confirm: */
-    elements.disclaimerConfirm.click();
+    /* FIX 3: kein End-Modal mehr — der Durchgang ist direkt abgeschlossen. */
     expect(state.isAnalyzing).toBe(false);
   });
 });

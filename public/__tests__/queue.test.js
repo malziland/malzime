@@ -54,6 +54,10 @@ describe("Queue-Modus", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(Date.now() + 10000);
     sessionStorage.clear();
+    /* FIX 3 (v3.0.1): Der Hinweis-Dialog steht VOR der Analyse und gilt einmal
+       pro Tab. Für die Bestands-Tests gilt er als bestätigt — die Dialog-Fälle
+       selbst räumen das gezielt wieder weg. */
+    sessionStorage.setItem("malzime.hinweisBestaetigt", "1");
 
     const apiMod = await import("../js/api.js");
     const stateMod = await import("../js/state.js");
@@ -107,14 +111,19 @@ describe("Queue-Modus", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(12000);
     await p;
-    elements.disclaimerConfirm.click();
+    /* FIX 3: kein Modal am Ende mehr — direkt gerendert. */
     expect(renderCurrentMode).toHaveBeenCalled();
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
   });
 
   it("Tab kehrt in den Vordergrund zurück → sofortiger Poll statt das 2s-Intervall abzuwarten", async () => {
     let pollCount = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
       if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-vis" });
+      /* Nur echte Status-Polls zählen — seit FIX 3 rendert das Ergebnis direkt
+         und schickt sofort die Erfolgs-Telemetrie (früher erst nach dem
+         Modal-Klick, den dieser Test nie ausführte). */
+      if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
       pollCount += 1;
       if (pollCount === 1) return jsonResponse({ status: "queued", position: 2, etaSeconds: 120 });
       return jsonResponse({ status: "done", result: DONE_RESULT });
@@ -364,8 +373,9 @@ describe("Queue-Modus", () => {
     await p;
     const urls = globalThis.fetch.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes("/api/job-status?jobId=job-resumed"))).toBe(true);
-    elements.disclaimerConfirm.click();
+    /* Tab-Bestätigung liegt vor (Start-Dialog, FIX 3) → direkt gerendert. */
     expect(renderCurrentMode).toHaveBeenCalled();
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
   });
 
   it("resumeQueueJob schickt das gespeicherte Abhol-Ticket mit", async () => {
@@ -391,6 +401,9 @@ describe("Queue-Modus", () => {
   });
 
   it("resumeQueueJob überspringt den Hinweis-Dialog, wenn er für den Job schon bestätigt war", async () => {
+    /* Übergangsfall-Variante: KEINE Tab-Bestätigung (alter Stand), aber der
+       Dialog wurde für genau diesen Job schon am Ergebnis weggeklickt. */
+    sessionStorage.removeItem("malzime.hinweisBestaetigt");
     sessionStorage.setItem("malzime.queueJobId", "job-acked");
     sessionStorage.setItem("malzime.queueDisclaimerAcked", "job-acked");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "done", result: DONE_RESULT }));
@@ -544,5 +557,94 @@ describe("Queue-Modus", () => {
     await resumeQueueJob();
     await vi.advanceTimersByTimeAsync(1000);
     expect(sessionStorage.getItem("malzime.queueErgebnisZeit")).toBe(erste);
+  });
+
+  /* ── FIX 1 (v3.0.1): Sofort-Text beim Analyse-Start ──────────────────────
+     Beim frischen Upload standen bis zur ersten Warteschlangen-Antwort mehrere
+     Sekunden lang nur Auge+Balken OHNE Text (der Foto-Upload dauert). Jetzt
+     steht ab der ersten Sekunde ein i18n-Text im scan-Text — nie leer. */
+  it("FIX 1: beim Analyse-Start steht sofort der Upload-Hinweis im scan-Text — nie leer", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-sofort" });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+    const p = analyzeImage();
+    /* SOFORT — noch vor jedem Timer-Tick und vor jeder Antwort. */
+    expect(elements.scanText.textContent).toBe("scan.upload");
+    await vi.advanceTimersByTimeAsync(8000);
+    await p;
+  });
+
+  it("FIX 1: die Wiederaufnahme startet sofort mit dem Abhol-Hinweis im scan-Text", async () => {
+    sessionStorage.setItem("malzime.queueJobId", "job-resume-text");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "done", result: DONE_RESULT }));
+    const p = resumeQueueJob();
+    expect(elements.scanText.textContent).toBe("scan.resume");
+    await vi.advanceTimersByTimeAsync(6000);
+    await p;
+  });
+
+  /* ── FIX 3 (v3.0.1): Hinweis-Dialog VOR der Analyse ────────────────────── */
+
+  it("FIX 3: ohne Tab-Bestätigung erscheint der Hinweis VOR dem Upload — erst die Bestätigung startet die Analyse, am Ende kein zweites Modal", async () => {
+    sessionStorage.removeItem("malzime.hinweisBestaetigt");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-hinweis" });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+
+    const p = analyzeImage();
+    /* Der Dialog steht — mit dem neuen Start-Button-Text — und NICHTS ist
+       hochgeladen: kein einziger fetch vor der Bestätigung. */
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(true);
+    expect(elements.disclaimerConfirm.textContent).toBe("modal.buttonStart");
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+
+    /* Bestätigen → Upload läuft, Ergebnis rendert direkt (kein zweites Modal),
+       die Bestätigung ist für den Tab gemerkt. */
+    elements.disclaimerConfirm.click();
+    await vi.advanceTimersByTimeAsync(10000);
+    await p;
+    const urls = globalThis.fetch.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("/api/enqueue"))).toBe(true);
+    expect(renderCurrentMode).toHaveBeenCalled();
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
+    expect(sessionStorage.getItem("malzime.hinweisBestaetigt")).toBe("1");
+  });
+
+  it("FIX 3: das zweite Foto im selben Tab startet ohne Modal direkt", async () => {
+    /* Tab-Bestätigung liegt vor (beforeEach) — der Dialog darf nicht mehr
+       aufpoppen, der Upload beginnt sofort. */
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-zwei" });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+    const p = analyzeImage();
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
+    await vi.advanceTimersByTimeAsync(8000);
+    await p;
+    expect(renderCurrentMode).toHaveBeenCalled();
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(false);
+  });
+
+  it("FIX 3 Übergangsfall: Resume ohne Start-Bestätigung zeigt das Modal VOR dem Ergebnis — mit dem alten Button-Text", async () => {
+    /* Alter Tab-Stand: Job eingereiht, bevor es den Start-Dialog gab.
+       (renderCurrentMode-Zähler leeren — der Mock lebt über die Tests hinweg.) */
+    renderCurrentMode.mockClear();
+    sessionStorage.removeItem("malzime.hinweisBestaetigt");
+    sessionStorage.setItem("malzime.queueJobId", "job-alt");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "done", result: DONE_RESULT }));
+
+    const p = resumeQueueJob();
+    await vi.advanceTimersByTimeAsync(6000);
+    await p;
+    /* Wie früher: Modal vor der Anzeige, alter Button-Text, Render erst nach
+       der Bestätigung — die danach auch für den Tab gilt. */
+    expect(elements.disclaimerModal.classList.contains("active")).toBe(true);
+    expect(elements.disclaimerConfirm.textContent).toBe("modal.button");
+    expect(renderCurrentMode).not.toHaveBeenCalled();
+    elements.disclaimerConfirm.click();
+    expect(renderCurrentMode).toHaveBeenCalled();
+    expect(sessionStorage.getItem("malzime.hinweisBestaetigt")).toBe("1");
   });
 });

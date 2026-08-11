@@ -92,7 +92,7 @@ test("Tastatur: Demo-Foto → Disclaimer → Profil, nur mit Tab + Enter", async
   expect(await tabToElement(page, '[data-demo="selfie"]'), "Demo-Button per Tab erreichbar").toBe(true);
   expect(await focusIsVisible(page), "Fokus auf dem Demo-Button sichtbar").toBe(true);
 
-  /* 2. Enter startet die Analyse */
+  /* 2. Enter öffnet den Hinweis-Dialog (v3.0.1: er steht VOR der Analyse) */
   await page.keyboard.press("Enter");
   await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });
 
@@ -104,8 +104,8 @@ test("Tastatur: Demo-Foto → Disclaimer → Profil, nur mit Tab + Enter", async
   expect(await focusIsVisible(page), "Fokus auf dem Bestätigen-Button sichtbar").toBe(true);
   await page.keyboard.press("Enter");
 
-  /* 4. Profil wird angezeigt */
-  await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 5000 });
+  /* 4. Nach der Bestätigung läuft die Analyse und das Profil wird angezeigt */
+  await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
   await expect(page.locator(".cat-card").first()).toBeVisible();
 
   /* TEST-003 (Audit 2026-08-10): Der Umschalter war im Tastaturtest gar nicht

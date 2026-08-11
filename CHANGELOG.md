@@ -4,6 +4,28 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.1] — 2026-08-11
+
+Drei Dramaturgie-Korrekturen aus dem ersten Live-Test des Live-Erlebnisses:
+
+- **Hinweis vor den Start:** Der „Wichtiger Hinweis"-Dialog erscheint jetzt
+  nach der Foto-Wahl und VOR dem Upload („Verstanden – Analyse starten") —
+  nicht mehr am fertigen Ergebnis, wo er mitten in die Dramaturgie platzte
+  und der live getippte Profiltext schon vor der Einordnung „nichts davon ist
+  wahr" sichtbar war. Bestätigt gilt einmal pro Tab; ein alter, noch
+  unbestätigter Auftrag zeigt den Dialog übergangsweise wie bisher vor dem
+  Ergebnis.
+- **Kein totes Fenster:** Ist die Zusammenfassung fertig getippt, während der
+  Server noch an Kategorien und Beast-Profil rechnet (~30–50 s), rotieren in
+  der Live-Karte ehrliche Status-Zeilen („Kategorien werden berechnet …")
+  statt eines eingefroren wirkenden Cursors — auch bei reduzierter Bewegung,
+  denn ein Textwechsel ist keine Bewegung.
+- **Sofort-Text beim Upload:** Ab der ersten Sekunde steht „Dein Foto ist
+  unterwegs …" unter der Scan-Animation (bei der Wiederaufnahme „Hole dein
+  Ergebnis …") — Auge und Balken stehen nie mehr sekundenlang stumm da.
+
+Testumfang jetzt 677 / 263 / 16.
+
 ## [3.0.0] — 2026-08-11
 
 Das Live-Erlebnis: der KI beim Schreiben zusehen.

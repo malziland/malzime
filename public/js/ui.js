@@ -80,7 +80,16 @@ let currentDisclaimerHandler = null;
 let previouslyFocused = null;
 let currentKeyHandler = null;
 
-export function showDisclaimerModal(onConfirm) {
+/**
+ * Zeigt den „Wichtiger Hinweis"-Dialog.
+ * @param {Function} onConfirm  läuft nach dem Bestätigen-Klick
+ * @param {string} [buttonSchluessel]  i18n-Schlüssel des Bestätigen-Buttons.
+ *        v3.0.1 (FIX 3): Der Dialog steht jetzt VOR der Analyse („Verstanden –
+ *        Analyse starten", modal.buttonStart); nur der Übergangsfall — Resume
+ *        eines alten Jobs ohne Start-Bestätigung — zeigt ihn wie früher vor dem
+ *        Ergebnis und behält den alten Text (modal.button, Default).
+ */
+export function showDisclaimerModal(onConfirm, buttonSchluessel = "modal.button") {
   /* Alten Handler entfernen falls Modal bereits offen (BUG-002: Listener-Leak) */
   if (currentDisclaimerHandler) {
     elements.disclaimerConfirm.removeEventListener("click", currentDisclaimerHandler);
@@ -89,6 +98,7 @@ export function showDisclaimerModal(onConfirm) {
     document.removeEventListener("keydown", currentKeyHandler);
   }
 
+  elements.disclaimerConfirm.textContent = t(buttonSchluessel);
   previouslyFocused = document.activeElement;
   elements.disclaimerModal.classList.add("active");
   elements.disclaimerConfirm.focus();

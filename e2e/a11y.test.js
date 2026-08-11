@@ -108,7 +108,8 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
   await page.click('[data-demo="selfie"]');
   await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 20000 });
   await page.click("#disclaimerConfirm");
-  await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 5000 });
+  /* v3.0.1: Die Analyse läuft erst NACH der Bestätigung — Timeout großzügig. */
+  await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
   await expect(page.locator(".cat-card").first()).toBeVisible();
 
   await checkA11y(page, "Profil-Ansicht");
@@ -134,8 +135,28 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
      Fuer axe sah das aus wie unsichtbarer Text: Kontrast 1:1, 19 ernste
      Verstoesse (CI 2026-08-10). Der Fund war echt, nur nicht dort, wo er zu
      stehen schien — deshalb hier eine Pruefung auf die URSACHE statt auf das
-     Symptom. Sie haengt nicht am Zeitpunkt der Messung und kann daher nicht
-     flackern. */
+     Symptom.
+
+     v3.0.1: Die Ursache wird jetzt wirklich zeitunabhaengig geprueft — an den
+     BERECHNETEN Animationswerten (Verzoegerung 0, Dauer praktisch 0) statt an
+     einer Opacity-Momentaufnahme. Die erwischte unter Volllast (sieben
+     parallele E2E-Dateien seit v3.0.1) naemlich die eine Frame-Luecke, in der
+     `fill: both` nach dem Neu-Rendern noch den Startzustand haelt. Die
+     Sichtbarkeit selbst wird zusaetzlich geprueft, sobald alle Animationen
+     beendet sind. */
+  const kartenAnimation = await page.$$eval(".cat-card", (karten) =>
+    karten.map((k, i) => {
+      const s = getComputedStyle(k);
+      return { i, delay: parseFloat(s.animationDelay), dauer: parseFloat(s.animationDuration) };
+    })
+  );
+  for (const k of kartenAnimation) {
+    expect(k.delay, `Karte ${k.i}: animation-delay bei reduzierter Bewegung nicht zurueckgesetzt`).toBe(0);
+    expect(k.dauer, `Karte ${k.i}: animation-duration bei reduzierter Bewegung nicht zurueckgesetzt`).toBeLessThan(
+      0.05
+    );
+  }
+  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
   const unsichtbar = await page.$$eval(".cat-card", (karten) =>
     karten.map((k, i) => ({ i, opacity: Number(getComputedStyle(k).opacity) })).filter((k) => k.opacity < 1)
   );

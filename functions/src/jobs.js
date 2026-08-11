@@ -238,14 +238,22 @@ async function markDelivered(jobId) {
 }
 
 /**
- * v3.0 Phase 1: Legt den bereits angekommenen Live-Profiltext ins Job-Dokument.
+ * v3.0 Phase 1 (+Phase 3): Legt die bereits angekommenen Live-Profiltexte
+ * ins Job-Dokument.
  *
  * Der Worker ruft das waehrend eines laufenden Mistral-Streams (Flag
- * `useLiveText`), der job-status-Handler gibt die Felder bei `processing`
- * an den Client weiter. 4000 Zeichen Deckel: Der komplette Standard-
- * Profiltext liegt real bei wenigen hundert Zeichen — die Grenze schuetzt
- * das Dokument nur vor einem amoklaufenden Modell (Firestore-Dokumente sind
- * auf 1 MiB begrenzt, und `result` muss spaeter auch noch hinein).
+ * `useLiveText`) mit `{ standard, beast }`, der job-status-Handler gibt die
+ * Felder bei `processing` an den Client weiter. Die Feldnamen bleiben
+ * abwaertskompatibel: `liveText` traegt weiter den Standard-Text, der
+ * Beast-Text kommt ZUSAETZLICH als `liveTextBeast` dazu; `liveTextStand`
+ * gilt gemeinsam fuer beide. Solange Beast noch nicht begonnen hat
+ * (`beast === null`), bleibt das Feld dem Dokument bewusst fern — der
+ * Client zeigt dann seinen Warte-Status.
+ *
+ * 4000 Zeichen Deckel JE FELD: Ein kompletter Profiltext liegt real bei
+ * wenigen hundert Zeichen — die Grenze schuetzt das Dokument nur vor einem
+ * amoklaufenden Modell (Firestore-Dokumente sind auf 1 MiB begrenzt, und
+ * `result` muss spaeter auch noch hinein).
  *
  * Fehler werden STILL geschluckt: Eine verpasste Live-Welle darf nie etwas
  * kaputt machen — der naechste Schreibversuch kommt ohnehin in ~2 Sekunden,
@@ -253,14 +261,19 @@ async function markDelivered(jobId) {
  * kein console.log je Welle: Bei ~1100 Chunks pro Analyse waere selbst ein
  * sparsames Fehler-Log nur Rauschen in Cloud Logging.
  */
-async function setLiveText(jobId, text) {
+async function setLiveText(jobId, texte) {
   try {
-    await jobsRef()
-      .doc(jobId)
-      .update({
-        liveText: String(text || "").slice(0, 4000),
-        liveTextStand: Date.now(),
-      });
+    /* Abwaertskompatibel: ein nackter String (alter Aufrufstil) zaehlt als
+       Standard-Text ohne Beast. */
+    const eingabe = typeof texte === "string" ? { standard: texte } : texte || {};
+    const patch = {
+      liveText: String(eingabe.standard || "").slice(0, 4000),
+      liveTextStand: Date.now(),
+    };
+    if (typeof eingabe.beast === "string") {
+      patch.liveTextBeast = eingabe.beast.slice(0, 4000);
+    }
+    await jobsRef().doc(jobId).update(patch);
   } catch (_) {
     /* still — siehe Funktionskommentar */
   }

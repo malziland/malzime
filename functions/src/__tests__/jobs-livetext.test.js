@@ -43,10 +43,10 @@ beforeEach(() => {
 });
 
 describe("setLiveText — schreibt die Live-Felder", () => {
-  test("legt liveText und liveTextStand per update auf das Job-Dokument", async () => {
+  test("legt liveText (standard) und liveTextStand per update auf das Job-Dokument", async () => {
     mockStore.set("job-1", { status: "processing", lang: "de" });
     const vorher = Date.now();
-    await jobs.setLiveText("job-1", "Du bist neugierig");
+    await jobs.setLiveText("job-1", { standard: "Du bist neugierig", beast: null });
     const doc = mockStore.get("job-1");
     expect(doc.liveText).toBe("Du bist neugierig");
     expect(typeof doc.liveTextStand).toBe("number");
@@ -56,16 +56,39 @@ describe("setLiveText — schreibt die Live-Felder", () => {
     expect(doc.lang).toBe("de");
   });
 
-  test("deckelt den Text auf 4000 Zeichen (Schutz des Job-Dokuments)", async () => {
+  test("solange beast null ist, bleibt liveTextBeast dem Dokument fern", async () => {
     mockStore.set("job-1", { status: "processing" });
-    await jobs.setLiveText("job-1", "x".repeat(5000));
-    expect(mockStore.get("job-1").liveText).toHaveLength(4000);
+    await jobs.setLiveText("job-1", { standard: "Du bist", beast: null });
+    expect(mockStore.get("job-1")).not.toHaveProperty("liveTextBeast");
   });
 
-  test("nicht-String-Eingabe wird zum leeren String statt zu werfen", async () => {
+  test("EIN Schreibvorgang traegt beide Felder, sobald beast begonnen hat", async () => {
     mockStore.set("job-1", { status: "processing" });
-    await jobs.setLiveText("job-1", null);
+    await jobs.setLiveText("job-1", { standard: "Standard-Text.", beast: "Du bist ein zynisches" });
+    const doc = mockStore.get("job-1");
+    expect(doc.liveText).toBe("Standard-Text.");
+    expect(doc.liveTextBeast).toBe("Du bist ein zynisches");
+  });
+
+  test("deckelt BEIDE Texte auf je 4000 Zeichen (Schutz des Job-Dokuments)", async () => {
+    mockStore.set("job-1", { status: "processing" });
+    await jobs.setLiveText("job-1", { standard: "x".repeat(5000), beast: "y".repeat(5000) });
+    expect(mockStore.get("job-1").liveText).toHaveLength(4000);
+    expect(mockStore.get("job-1").liveTextBeast).toHaveLength(4000);
+  });
+
+  test("nicht-String-Eingaben werden zum leeren String bzw. weggelassen statt zu werfen", async () => {
+    mockStore.set("job-1", { status: "processing" });
+    await jobs.setLiveText("job-1", { standard: null, beast: 42 });
     expect(mockStore.get("job-1").liveText).toBe("");
+    expect(mockStore.get("job-1")).not.toHaveProperty("liveTextBeast");
+  });
+
+  test("abwaertskompatibel: ein nackter String zaehlt als Standard-Text", async () => {
+    mockStore.set("job-1", { status: "processing" });
+    await jobs.setLiveText("job-1", "Du bist neugierig");
+    expect(mockStore.get("job-1").liveText).toBe("Du bist neugierig");
+    expect(mockStore.get("job-1")).not.toHaveProperty("liveTextBeast");
   });
 });
 
@@ -73,6 +96,6 @@ describe("setLiveText — schluckt Fehler", () => {
   test("ein Firestore-Fehler (Dokument weg) laesst den Aufruf NICHT scheitern", async () => {
     /* Kein Dokument angelegt → update() wirft im Mock. Eine verpasste
        Live-Welle darf nie etwas kaputt machen. */
-    await expect(jobs.setLiveText("gibt-es-nicht", "Text")).resolves.toBeUndefined();
+    await expect(jobs.setLiveText("gibt-es-nicht", { standard: "Text", beast: null })).resolves.toBeUndefined();
   });
 });

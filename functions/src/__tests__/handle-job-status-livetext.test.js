@@ -44,6 +44,9 @@ const PROCESSING_JOB = {
   liveTextStand: 1754900000000,
 };
 
+/* Ab Phase 3 kann der Worker zusaetzlich den Beast-Text abgelegt haben. */
+const PROCESSING_JOB_MIT_BEAST = { ...PROCESSING_JOB, liveTextBeast: "Du bist ein zynisches" };
+
 beforeEach(() => {
   jest.clearAllMocks();
   jobs.markFailedIfStale.mockImplementation(async (job) => job);
@@ -62,6 +65,23 @@ describe("handleJobStatus — Live-Text bei processing", () => {
     expect(res.body.liveTextStand).toBe(1754900000000);
   });
 
+  test("mit richtigem Ticket kommt auch liveTextBeast mit, sobald der Worker es abgelegt hat", async () => {
+    jobs.getJob.mockResolvedValue(PROCESSING_JOB_MIT_BEAST);
+    const res = makeRes();
+    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    expect(res.body.status).toBe("processing");
+    expect(res.body.liveText).toBe("Du bist neugierig und");
+    expect(res.body.liveTextBeast).toBe("Du bist ein zynisches");
+  });
+
+  test("solange das Dokument keinen Beast-Text traegt, fehlt liveTextBeast in der Antwort", async () => {
+    jobs.getJob.mockResolvedValue(PROCESSING_JOB);
+    const res = makeRes();
+    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    expect(res.body.liveText).toBe("Du bist neugierig und");
+    expect(res.body).not.toHaveProperty("liveTextBeast");
+  });
+
   test("ohne Ticket KEIN liveText (PRIV-003: Vorgriff aufs Ergebnis bleibt ticket-gebunden)", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB);
     const res = makeRes();
@@ -71,12 +91,21 @@ describe("handleJobStatus — Live-Text bei processing", () => {
     expect(res.body).not.toHaveProperty("liveTextStand");
   });
 
-  test("mit falschem Ticket KEIN liveText", async () => {
-    jobs.getJob.mockResolvedValue(PROCESSING_JOB);
+  test("mit falschem Ticket KEIN liveText und KEIN liveTextBeast (gleiche Ticket-Bindung)", async () => {
+    jobs.getJob.mockResolvedValue(PROCESSING_JOB_MIT_BEAST);
     const res = makeRes();
     await handleJobStatus(reqMit("job-1", "falsch"), res);
     expect(res.body.status).toBe("processing");
     expect(res.body).not.toHaveProperty("liveText");
+    expect(res.body).not.toHaveProperty("liveTextBeast");
+  });
+
+  test("ohne Ticket KEIN liveTextBeast (dieselbe PRIV-003-Bindung wie liveText)", async () => {
+    jobs.getJob.mockResolvedValue(PROCESSING_JOB_MIT_BEAST);
+    const res = makeRes();
+    await handleJobStatus(reqMit("job-1"), res);
+    expect(res.body.status).toBe("processing");
+    expect(res.body).not.toHaveProperty("liveTextBeast");
   });
 
   test("fehlender liveTextStand wird als null mitgegeben, nicht als undefined", async () => {
@@ -106,11 +135,13 @@ describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
       resultToken: "ticket-abc",
       deliveredAt: 123 /* schon ausgeliefert → kein markDelivered-Log-Zweig */,
       liveText: "Du bist neugierig und",
+      liveTextBeast: "Du bist ein zynisches",
       liveTextStand: 1754900000000,
     });
     const res = makeRes();
     await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
     expect(res.body).toEqual({ status: "done", result: { profiles: { normal: {}, boost: {} } } });
     expect(res.body).not.toHaveProperty("liveText");
+    expect(res.body).not.toHaveProperty("liveTextBeast");
   });
 });

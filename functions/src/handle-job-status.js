@@ -80,6 +80,12 @@ async function handleJobStatus(req, res) {
     if (typeof job.liveText === "string" && job.resultToken && safeCompare(token, job.resultToken)) {
       antwort.liveText = job.liveText;
       antwort.liveTextStand = typeof job.liveTextStand === "number" ? job.liveTextStand : null;
+      /* v3.0 Phase 3: Der Beast-Text, sobald das Modell ihn schreibt —
+         BEWUSST im selben Ticket-Block: dieselbe PRIV-003-Bindung, kein
+         zweiter Pruefpfad. Solange Beast fehlt, fehlt auch das Feld. */
+      if (typeof job.liveTextBeast === "string") {
+        antwort.liveTextBeast = job.liveTextBeast;
+      }
     }
     res.status(200).json(antwort);
     return;

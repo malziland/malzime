@@ -42,52 +42,70 @@ afterAll(() => {
 
 /* ── 1. Extraktor: _extrahiereLiveText ───────────────────────────── */
 
+/* Seit Phase 3 liefert der Extraktor BEIDE Texte: { standard, beast } —
+   standard = 1. Vorkommen von "profileText", beast = 2. Vorkommen; jeweils
+   null, solange der Wert noch nicht begonnen hat. */
+const NICHTS = { standard: null, beast: null };
+
 describe("extrahiereLiveText — Feld noch nicht begonnen", () => {
-  test("liefert null, solange der Schluessel fehlt", () => {
-    expect(_extrahiereLiveText('{"subject": "PERSON", "hard_facts": {"alter')).toBeNull();
+  test("liefert beide null, solange der Schluessel fehlt", () => {
+    expect(_extrahiereLiveText('{"subject": "PERSON", "hard_facts": {"alter')).toEqual(NICHTS);
   });
 
-  test("liefert null, wenn nur der Schluessel da ist (kein Doppelpunkt, kein Wert)", () => {
-    expect(_extrahiereLiveText('{"standard": {"profileText"')).toBeNull();
+  test("liefert beide null, wenn nur der Schluessel da ist (kein Doppelpunkt, kein Wert)", () => {
+    expect(_extrahiereLiveText('{"standard": {"profileText"')).toEqual(NICHTS);
   });
 
-  test("liefert null nach Doppelpunkt ohne oeffnendes Anfuehrungszeichen", () => {
-    expect(_extrahiereLiveText('{"standard": {"profileText":')).toBeNull();
-    expect(_extrahiereLiveText('{"standard": {"profileText": ')).toBeNull();
+  test("liefert beide null nach Doppelpunkt ohne oeffnendes Anfuehrungszeichen", () => {
+    expect(_extrahiereLiveText('{"standard": {"profileText":')).toEqual(NICHTS);
+    expect(_extrahiereLiveText('{"standard": {"profileText": ')).toEqual(NICHTS);
   });
 
-  test("liefert null bei Nicht-String-Eingabe", () => {
-    expect(_extrahiereLiveText(null)).toBeNull();
-    expect(_extrahiereLiveText(undefined)).toBeNull();
-    expect(_extrahiereLiveText(42)).toBeNull();
+  test("liefert beide null bei Nicht-String-Eingabe", () => {
+    expect(_extrahiereLiveText(null)).toEqual(NICHTS);
+    expect(_extrahiereLiveText(undefined)).toEqual(NICHTS);
+    expect(_extrahiereLiveText(42)).toEqual(NICHTS);
   });
 });
 
 describe("extrahiereLiveText — normale Faelle", () => {
-  test("leerer String, sobald das oeffnende Anfuehrungszeichen da ist", () => {
-    expect(_extrahiereLiveText('{"standard": {"profileText": "')).toBe("");
+  test("leerer Standard-String, sobald das oeffnende Anfuehrungszeichen da ist", () => {
+    expect(_extrahiereLiveText('{"standard": {"profileText": "')).toEqual({ standard: "", beast: null });
   });
 
-  test("Praefix endet mitten im Wort — der bisherige Text kommt zurueck", () => {
-    expect(_extrahiereLiveText('{"standard": {"profileText": "Du bist neugier')).toBe("Du bist neugier");
+  test("nur standard begonnen: Praefix endet mitten im Wort, beast bleibt null", () => {
+    expect(_extrahiereLiveText('{"standard": {"profileText": "Du bist neugier')).toEqual({
+      standard: "Du bist neugier",
+      beast: null,
+    });
   });
 
   test("Whitespace/Zeilenumbruch zwischen Schluessel, Doppelpunkt und Wert", () => {
-    expect(_extrahiereLiveText('{"standard": {"profileText" :\n  "Du bist')).toBe("Du bist");
+    expect(_extrahiereLiveText('{"standard": {"profileText" :\n  "Du bist').standard).toBe("Du bist");
   });
 
-  test("abgeschlossener Wert (unescaptes Anfuehrungszeichen) — Text endet dort", () => {
+  test("abgeschlossener Standard-Wert (unescaptes Anfuehrungszeichen) — Text endet dort", () => {
     const praefix = '{"standard": {"profileText": "Du bist neugierig.", "categories": {"inter';
-    expect(_extrahiereLiveText(praefix)).toBe("Du bist neugierig.");
+    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Du bist neugierig.", beast: null });
   });
 
-  test("der ERSTE Treffer zaehlt — das ist das Standard-Profil", () => {
+  test("beast bleibt null, solange sein Wert nicht begonnen hat (Schluessel schon da)", () => {
+    const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText":';
+    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: null });
+  });
+
+  test("beide begonnen: Praefix endet mitten im 2. Feld — beast traegt den bisherigen Text", () => {
+    const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText": "Du bist ein zynis';
+    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: "Du bist ein zynis" });
+  });
+
+  test("beide abgeschlossen: 1. Vorkommen = standard, 2. Vorkommen = beast", () => {
     const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText": "Beast-Text."}}';
-    expect(_extrahiereLiveText(praefix)).toBe("Standard-Text.");
+    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: "Beast-Text." });
   });
 
   test("Umlaute und Emojis als rohe Zeichen bleiben erhalten", () => {
-    expect(_extrahiereLiveText('{"profileText": "Grüße aus Österreich 🎉 und weiter')).toBe(
+    expect(_extrahiereLiveText('{"profileText": "Grüße aus Österreich 🎉 und weiter').standard).toBe(
       "Grüße aus Österreich 🎉 und weiter"
     );
   });
@@ -96,34 +114,47 @@ describe("extrahiereLiveText — normale Faelle", () => {
 describe("extrahiereLiveText — Escapes", () => {
   test("Escapes werden zu echten Zeichen dekodiert", () => {
     const praefix = '{"profileText": "Er sagt \\"Hallo\\" und macht\\neinen Umbruch\\tmit Tab und \\\\ Backslash';
-    expect(_extrahiereLiveText(praefix)).toBe('Er sagt "Hallo" und macht\neinen Umbruch\tmit Tab und \\ Backslash');
+    expect(_extrahiereLiveText(praefix).standard).toBe(
+      'Er sagt "Hallo" und macht\neinen Umbruch\tmit Tab und \\ Backslash'
+    );
   });
 
   test("\\uXXXX-Escapes werden aufgeloest — auch Emoji-Surrogatpaare", () => {
     const praefix = '{"profileText": "Umlaut \\u00e4, Gedankenstrich \\u2014, Emoji \\ud83d\\ude00!"';
-    expect(_extrahiereLiveText(praefix)).toBe("Umlaut ä, Gedankenstrich —, Emoji 😀!");
+    expect(_extrahiereLiveText(praefix).standard).toBe("Umlaut ä, Gedankenstrich —, Emoji 😀!");
   });
 
   test('Praefix endet mitten in \\" — der nackte Backslash wird abgeschnitten', () => {
-    expect(_extrahiereLiveText('{"profileText": "Zitat: \\')).toBe("Zitat: ");
+    expect(_extrahiereLiveText('{"profileText": "Zitat: \\').standard).toBe("Zitat: ");
   });
 
   test("Praefix endet mitten in \\u00 — das halbe Escape wird abgeschnitten", () => {
-    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u00')).toBe("Etwa 25");
-    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u')).toBe("Etwa 25");
-    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u00b')).toBe("Etwa 25");
+    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u00').standard).toBe("Etwa 25");
+    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u').standard).toBe("Etwa 25");
+    expect(_extrahiereLiveText('{"profileText": "Etwa 25\\u00b').standard).toBe("Etwa 25");
   });
 
   test("ein komplettes \\uXXXX am Praefix-Ende bleibt erhalten", () => {
-    expect(_extrahiereLiveText('{"profileText": "25\\u00b0')).toBe("25°");
+    expect(_extrahiereLiveText('{"profileText": "25\\u00b0').standard).toBe("25°");
   });
 
   test("einsame hohe Surrogathälfte am Ende (halbes Emoji) wird abgeschnitten", () => {
-    expect(_extrahiereLiveText('{"profileText": "Feier \\ud83d')).toBe("Feier ");
+    expect(_extrahiereLiveText('{"profileText": "Feier \\ud83d').standard).toBe("Feier ");
   });
 
   test("ein escaptes Anfuehrungszeichen beendet den Wert NICHT", () => {
-    expect(_extrahiereLiveText('{"profileText": "Er sagt \\"Servus\\" und geht')).toBe('Er sagt "Servus" und geht');
+    expect(_extrahiereLiveText('{"profileText": "Er sagt \\"Servus\\" und geht').standard).toBe(
+      'Er sagt "Servus" und geht'
+    );
+  });
+
+  test("die geprüfte Escape-Behandlung gilt unveraendert auch fuer das 2. Feld (beast)", () => {
+    const praefix = '{"standard": {"profileText": "Fertig."}, "beast": {"profileText": "Er sagt \\"Zack\\u2014';
+    expect(_extrahiereLiveText(praefix).beast).toBe('Er sagt "Zack—');
+    /* Und auch das Abschneiden halber Escapes am Praefix-Ende: */
+    expect(_extrahiereLiveText('{"profileText": "Fertig."}, "beast": {"profileText": "Etwa 25\\u00').beast).toBe(
+      "Etwa 25"
+    );
   });
 });
 
@@ -238,7 +269,7 @@ describe("callMistralRaw — Stream-Modus (Mock-SSE)", () => {
     expect(mitStream.cachedTokens).toBe(3600);
   });
 
-  test("onLiveText wird mit wachsenden Praefixen gerufen und endet beim vollen Klartext", async () => {
+  test("onLiveText wird mit wachsenden { standard, beast }-Staenden gerufen und endet bei beiden Klartexten", async () => {
     setFetchForTest(async () => sseAntwort(baueSseText(fieseDeltas())));
     const wellen = [];
     await _callMistralRaw({
@@ -246,21 +277,28 @@ describe("callMistralRaw — Stream-Modus (Mock-SSE)", () => {
       messages: [],
       maxTokens: 100,
       temperature: 0,
-      onLiveText: (text) => wellen.push(text),
+      onLiveText: (texte) => wellen.push(texte),
     });
 
     expect(wellen.length).toBeGreaterThanOrEqual(2);
-    /* Jede Welle setzt die vorige fort — nie ein Ruecksprung, nie Muell. */
+    /* Jede Welle setzt die vorige fort — nie ein Ruecksprung, nie Muell.
+       Beast ist null, bis sein Feld beginnt, und waechst danach genauso. */
     for (let i = 1; i < wellen.length; i++) {
-      expect(wellen[i].startsWith(wellen[i - 1])).toBe(true);
+      expect(wellen[i].standard.startsWith(wellen[i - 1].standard)).toBe(true);
+      if (wellen[i - 1].beast !== null) {
+        expect(wellen[i].beast.startsWith(wellen[i - 1].beast)).toBe(true);
+      }
     }
-    /* Die erste Welle ist echt unvollstaendig, die letzte der volle Text. */
-    expect(wellen[0].length).toBeLessThan(PROFIL_KLARTEXT.length);
-    expect(wellen[wellen.length - 1]).toBe(PROFIL_KLARTEXT);
+    /* Die erste Welle ist echt unvollstaendig (und ohne Beast — das Modell
+       schreibt sequenziell), die letzte traegt beide vollen Texte. */
+    expect(wellen[0].standard.length).toBeLessThan(PROFIL_KLARTEXT.length);
+    expect(wellen[0].beast).toBeNull();
+    expect(wellen[wellen.length - 1].standard).toBe(PROFIL_KLARTEXT);
+    expect(wellen[wellen.length - 1].beast).toBe("Beast.");
     /* Keine Welle enthaelt rohe JSON-Escapes — alles ist dekodiert. */
     for (const w of wellen) {
-      expect(w).not.toContain('\\"');
-      expect(w).not.toContain("\\u");
+      expect(w.standard).not.toContain('\\"');
+      expect(w.standard).not.toContain("\\u");
     }
   });
 
@@ -360,7 +398,7 @@ describe("runSingleLargeCall — Live-Text-Durchreichung", () => {
     };
   }
 
-  test("opts.onLiveText schaltet den Stream ein und liefert Praefixe des Standard-profileText", async () => {
+  test("opts.onLiveText schaltet den Stream ein und liefert Staende BEIDER profileText-Felder", async () => {
     const antwortJson = JSON.stringify(vollstaendigeAntwort());
     let body = null;
     setFetchForTest(async (_url, init) => {
@@ -370,7 +408,7 @@ describe("runSingleLargeCall — Live-Text-Durchreichung", () => {
 
     const wellen = [];
     const result = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 60000, "de", {
-      onLiveText: (text) => wellen.push(text),
+      onLiveText: (texte) => wellen.push(texte),
     });
 
     expect(body.stream).toBe(true);
@@ -378,11 +416,17 @@ describe("runSingleLargeCall — Live-Text-Durchreichung", () => {
     expect(result.normal).toBeTruthy();
     expect(result.boost).toBeTruthy();
     expect(result.normal.profileText).toBe("Du bist sachlich beschrieben.");
-    /* ... und die Wellen sind Praefixe des STANDARD-Texts (erster Treffer). */
+    /* ... und die Wellen sind Praefixe des jeweiligen Texts: standard =
+       1. Vorkommen, beast = 2. Vorkommen (null vor dessen Beginn). */
     expect(wellen.length).toBeGreaterThanOrEqual(1);
     for (const w of wellen) {
-      expect("Du bist sachlich beschrieben.".startsWith(w)).toBe(true);
+      expect("Du bist sachlich beschrieben.".startsWith(w.standard)).toBe(true);
+      if (w.beast !== null) {
+        expect("Du bist zynisch beschrieben.".startsWith(w.beast)).toBe(true);
+      }
     }
+    /* Die letzte Welle traegt den kompletten Beast-Text. */
+    expect(wellen[wellen.length - 1].beast).toBe("Du bist zynisch beschrieben.");
   });
 
   test("ohne opts.onLiveText bleibt der Request bitgenau der heutige (kein stream)", async () => {

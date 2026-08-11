@@ -15,6 +15,13 @@ const PROFIL_TEXT =
 const LIVE_WELLE_1 = PROFIL_TEXT.slice(0, 230);
 const LIVE_WELLE_2 = PROFIL_TEXT;
 
+/* Beast-Text fuer den Modus-Wechsel-Fall — lang genug fuer den Anlauf-
+   Mindestpuffer (~200 Zeichen) der Live-Anzeige. */
+const BEAST_TEXT =
+  "Du willst gesehen werden, und genau das macht dich berechenbar: Jede Pose sitzt, jedes Licht ist geplant, nichts ist Zufall. " +
+  "Algorithmen lieben Profile wie deines — sie wissen vor dir, wann du schwach wirst, und verkaufen dir dann Status im Abo. " +
+  "Nichts davon ist wahr — aber genau so würde eine Maschine dich lesen.";
+
 const MOCK_RESPONSE = {
   profiles: {
     normal: {
@@ -41,7 +48,8 @@ const MOCK_RESPONSE = {
   meta: { requestId: "live-e2e-123", mode: "multimodal" },
 };
 
-async function seiteMitLiveMocks(page) {
+/* Routen, die alle Live-Faelle brauchen: stats, enqueue, kein externer Call. */
+async function basisRouten(page) {
   await page.route("**/api/stats", (route) =>
     route.fulfill({
       status: 200,
@@ -60,6 +68,14 @@ async function seiteMitLiveMocks(page) {
       body: JSON.stringify({ jobId: "live-job-1", resultToken: "live-token-1" }),
     })
   );
+  /* Kein externer Call im Test (die Demo-Bilder tragen fiktive GPS-Daten). */
+  await page.route("**/nominatim.openstreetmap.org/**", (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
+  );
+}
+
+async function seiteMitLiveMocks(page) {
+  await basisRouten(page);
   /* Die Poll-Folge: 2× processing mit wachsendem Live-Text, dann done. */
   let poll = 0;
   await page.route("**/api/job-status**", (route) => {
@@ -72,13 +88,36 @@ async function seiteMitLiveMocks(page) {
           : { status: "done", result: MOCK_RESPONSE };
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
-  /* Kein externer Call im Test (die Demo-Bilder tragen fiktive GPS-Daten). */
-  await page.route("**/nominatim.openstreetmap.org/**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
-  );
 
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
+}
+
+/* Fuer den Modus-Wechsel-Fall: erst nur Standard-Text, ab dem 2. Poll BEIDE
+   Felder (Beast beginnt im echten Stream spaeter — das bilden die Polls ab).
+   `processing` haelt an, bis der Test fertigMachen() ruft — so bleibt sicher
+   Zeit, den Schalter MITTEN im Stream umzulegen. */
+async function seiteMitBeastMocks(page) {
+  await basisRouten(page);
+  let fertig = false;
+  let poll = 0;
+  await page.route("**/api/job-status**", (route) => {
+    poll += 1;
+    const body = fertig
+      ? { status: "done", result: MOCK_RESPONSE }
+      : poll === 1
+        ? { status: "processing", position: 0, etaSeconds: 60, liveText: LIVE_WELLE_1 }
+        : { status: "processing", position: 0, etaSeconds: 60, liveText: LIVE_WELLE_2, liveTextBeast: BEAST_TEXT };
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+
+  await page.goto("/");
+  await expect(page.locator("h1")).toBeVisible();
+  return {
+    fertigMachen() {
+      fertig = true;
+    },
+  };
 }
 
 test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF-Knopf", async ({ page }) => {
@@ -116,6 +155,42 @@ test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF
   await expect(page.locator("#dataValue .dv-card")).toBeVisible({ timeout: 30000 });
   await expect(page.locator("#exportPdf")).not.toHaveClass(/export-btn--hidden/, { timeout: 30000 });
   await expect(page.locator("#liveStatusText")).toHaveText(/nichts davon ist wahr|none of this is true/i);
+});
+
+test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text und tippt dort weiter", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  const steuerung = await seiteMitBeastMocks(page);
+
+  await page.click('[data-demo="selfie"]');
+
+  /* Erst tippt der seriöse Text wie gewohnt. */
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 20000 });
+  await expect
+    .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 15000 })
+    .toBeGreaterThan(10);
+  expect(PROFIL_TEXT.startsWith(await page.locator("#liveTextFest").textContent())).toBe(true);
+
+  /* MITTEN im Stream auf Beast schalten (wie in modus-merken.test.js). */
+  await page.evaluate(() => document.getElementById("biasSwitch").click());
+
+  /* Jetzt gehört die Karte dem Beast-Text: Er beginnt am eigenen Anfang
+     (kein Rest des seriösen Texts) und tippt weiter. Bis die Beast-Welle
+     eintrifft, überbrückt die Karte mit dem Warte-Status. */
+  await expect
+    .poll(async () => (await page.locator("#liveTextFest").textContent()) || "", { timeout: 15000 })
+    .toMatch(/^Du willst gesehen werden/);
+  const beastStand = (await page.locator("#liveTextFest").textContent()).length;
+  await expect
+    .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 15000 })
+    .toBeGreaterThan(beastStand);
+
+  /* done → der gewohnte Abschluss funktioniert auch im Beast-Modus. */
+  steuerung.fertigMachen();
+  await expect(page.locator("#disclaimerModal")).toHaveClass(/active/, { timeout: 30000 });
+  await page.click("#disclaimerConfirm");
+  await expect(page.locator("#simulation .verdict")).toBeVisible({ timeout: 10000 });
 });
 
 test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung ohne Verzögerung", async ({ page }) => {

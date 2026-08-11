@@ -7,10 +7,18 @@
  *      wird — dann übernimmt die Live-Karte.
  *   2. GETIPPT (Matrix-Dekodierung: fester Text + Rausch-Schweif + Cursor)
  *      wird AUSSCHLIESSLICH der Zusammenfassungstext, gespeist aus den
- *      liveText-Wellen der 2-s-Polls (api.js → welle()). Puffer-Prinzip:
- *      ~200 Zeichen Anlauf sammeln, dann durchgehend ~70 Zeichen/s — der
- *      Liefer- und der Anzeige-Rhythmus sind entkoppelt. Läuft der Puffer
- *      leer, verschwindet der Schweif und der Cursor blinkt.
+ *      liveText-Wellen der 2-s-Polls (api.js → welle()). Seit Phase 3 führt
+ *      das Modul ZWEI Puffer (seriös/Beast) mit je eigenem Tipp-Fortschritt;
+ *      getippt wird immer der Puffer des GERADE GEWÄHLTEN Modus
+ *      (#biasSwitch). Ein Schalter-Wechsel mitten im Tippen springt sofort
+ *      auf den Stand des anderen Puffers und tippt dort weiter — kein
+ *      Neustart von vorn. Ist der Beast-Puffer noch leer (das Modell
+ *      schreibt Beast NACH dem Standard-Profil — Reihenfolge der Antwort,
+ *      keine Schwäche), zeigt die Karte einen Warte-Status mit blinkendem
+ *      Cursor. Puffer-Prinzip: ~200 Zeichen Anlauf sammeln (JE Puffer),
+ *      dann durchgehend ~70 Zeichen/s — der Liefer- und der Anzeige-
+ *      Rhythmus sind entkoppelt. Läuft der Puffer leer, verschwindet der
+ *      Schweif und der Cursor blinkt.
  *   3. Ist das Ergebnis fertig gerendert, fährt starteEnthuellung() die
  *      GESTAFFELTE ENTHÜLLUNG: alles fertige Boxen mit Pop — Foto-Daten →
  *      GPS-Karte → Kategorien (Gruppenkopf ~650 ms, Karten im ~280-ms-
@@ -39,14 +47,18 @@ const RAUSCH_ZEICHEN = "01ｱｶｻﾀﾅﾊﾏﾔﾗ<>#/*+=~$%&";
 /* Länge des Rausch-Schweifs hinter dem zuletzt getippten Zeichen. */
 const SCHWEIF_LAENGE = 7;
 /* Anlauf: erst tippen, wenn so viele Zeichen im Puffer liegen — sonst tippt
-   die Anzeige die erste Welle leer und stottert dann im Liefertakt. */
+   die Anzeige die erste Welle leer und stottert dann im Liefertakt.
+   Gilt JE Puffer (seriös und Beast laufen getrennt an). */
 const MIN_PUFFER = 200;
 /* Anzeige-Tempo, vom Liefertempo entkoppelt. */
 const ZEICHEN_PRO_SEKUNDE = 70;
 /* Prüftakt, wenn der Puffer leer ist und nur der Cursor blinkt. */
 const LEERLAUF_MS = 120;
 
-/* Aktueller Tipp-Lauf. `stop` beendet die Schleife beim nächsten Tick. */
+/* Aktueller Tipp-Lauf. `stop` beendet die Schleife beim nächsten Tick.
+   `aktiv` benennt den Puffer des gerade gewählten Modus ("standard"/"beast");
+   jeder Puffer trägt seinen eigenen Text-Stand (`text`), Tipp-Fortschritt
+   (`fest`) und Anlauf-Zustand (`angelaufen`). */
 let lauf = null;
 /* Laufende Enthüllung (eigener Lauf mit eigenem stop-Schalter). */
 let enthuellung = null;
@@ -82,16 +94,48 @@ function statusSetzen(schluessel) {
   if (elements.liveStatusText) elements.liveStatusText.textContent = t(schluessel);
 }
 
+/* Der Puffer-Name des gerade gewählten Modus — dieselbe Quelle wie überall
+   sonst: der Beast-Schalter (#biasSwitch). */
+function aktiverModus() {
+  return elements.biasSwitch && elements.biasSwitch.checked ? "beast" : "standard";
+}
+
+function neuerLauf() {
+  return {
+    stop: false,
+    tippt: false,
+    aktiv: aktiverModus(),
+    statusZustand: null,
+    puffer: {
+      standard: { text: "", fest: 0, angelaufen: false },
+      beast: { text: "", fest: 0, angelaufen: false },
+    },
+  };
+}
+
+/* Hält die Status-Zeile aktuell: normalerweise „die KI schreibt gerade …",
+   beim Warten auf die ersten Beast-Zeichen der eigene Warte-Text (Beast
+   entsteht im Modell erst NACH dem Standard-Profil). Ins DOM geschrieben
+   wird nur bei einem Zustandswechsel — die Tipp-Schleife ruft das je
+   Zeichen. */
+function statusAktualisieren(mein) {
+  const wartetAufBeast = mein.aktiv === "beast" && mein.puffer.beast.fest === 0;
+  const zustand = wartetAufBeast ? "beastWartet" : "schreibt";
+  if (zustand === mein.statusZustand) return;
+  mein.statusZustand = zustand;
+  statusSetzen(wartetAufBeast ? "live.beastWartet" : "live.statusSchreibt");
+}
+
 /* Blendet die Live-Karte ein und versteckt die Scan-Animation — genau beim
    ersten sichtbaren Zeichen, nicht früher. Leise (ohne Screenreader-
-   „abgeschlossen"-Ansage): das erste getippte Zeichen ist kein Abschluss. */
+   „abgeschlossen"-Ansage): das erste getippte Zeichen ist kein Abschluss.
+   Die Status-Zeile setzt statusAktualisieren (je nach Puffer-Lage). */
 function karteZeigen() {
   liveLief = true;
   const karte = elements.liveKarte;
   if (!karte || karte.classList.contains("active")) return;
   karte.classList.remove("live-karte--erzaehler");
   karte.classList.add("active");
-  statusSetzen("live.statusSchreibt");
   /* „Noch nicht fertig"-Dauerstatus, solange getippt wird. */
   if (elements.liveWarten) elements.liveWarten.textContent = t("live.nochNichtFertig");
   stopScanAnim(true);
@@ -121,12 +165,19 @@ function allesAufdecken() {
 async function tippSchleife(mein) {
   let naechsterTon = 3;
   while (!mein.stop) {
-    if (mein.fest < mein.puffer.length) {
-      if (mein.fest === 0) karteZeigen();
-      mein.fest += 1;
-      if (elements.liveTextFest) elements.liveTextFest.textContent = mein.puffer.slice(0, mein.fest);
+    /* Immer der Puffer des AKTUELL gewählten Modus — modusWechsel() stellt
+       `aktiv` um, der nächste Tick tippt nahtlos am anderen Stand weiter. */
+    const p = mein.puffer[mein.aktiv];
+    /* Anlauf JE Puffer: erst tippen, wenn genug Material liegt — sonst tippt
+       die Anzeige die erste Welle leer und stottert dann im Liefertakt. */
+    if (!p.angelaufen && p.text.length >= MIN_PUFFER) p.angelaufen = true;
+    if (p.angelaufen && p.fest < p.text.length) {
+      karteZeigen();
+      p.fest += 1;
+      statusAktualisieren(mein);
+      if (elements.liveTextFest) elements.liveTextFest.textContent = p.text.slice(0, p.fest);
       /* Rausch-Schweif NUR bei Bewegung — und nie länger als der Rest. */
-      const rest = Math.min(SCHWEIF_LAENGE, mein.puffer.length - mein.fest);
+      const rest = Math.min(SCHWEIF_LAENGE, p.text.length - p.fest);
       let rausch = "";
       for (let i = 0; i < rest; i++) rausch += zufallsZeichen();
       if (elements.liveTextRausch) elements.liveTextRausch.textContent = rausch;
@@ -138,8 +189,8 @@ async function tippSchleife(mein) {
       }
       if (!(await warte(1000 / ZEICHEN_PRO_SEKUNDE, mein))) return;
     } else {
-      /* Puffer leer: Schweif weg, der Cursor blinkt (CSS), wir warten auf
-         die nächste Welle. */
+      /* Puffer leer (oder noch im Anlauf): Schweif weg, der Cursor blinkt
+         (CSS), wir warten auf die nächste Welle. */
       if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
       if (!(await warte(LEERLAUF_MS, mein))) return;
     }
@@ -148,32 +199,68 @@ async function tippSchleife(mein) {
 
 /**
  * Nimmt den Live-Text-Stand einer processing-Antwort entgegen (api.js ruft
- * das bei jeder 2-s-Poll-Antwort auf). Der Server liefert den GESAMTEN bisher
- * angekommenen Text — kein Delta; kürzere oder gleiche Stände sind alte
- * Antworten und werden ignoriert.
+ * das bei jeder 2-s-Poll-Antwort auf): `{ standard, beast }` — der Server
+ * liefert je Feld den GESAMTEN bisher angekommenen Text, kein Delta;
+ * kürzere oder gleiche Stände sind alte Antworten und werden je Puffer
+ * ignoriert. `beast` ist null, solange das Modell das Beast-Profil noch
+ * nicht begonnen hat (es schreibt sequenziell: Standard zuerst).
  */
-export function welle(text) {
-  if (typeof text !== "string" || text.length === 0) return;
+export function welle(texte) {
+  if (!texte || typeof texte.standard !== "string" || texte.standard.length === 0) return;
   /* Späte Wellen nach Beginn der Enthüllung ändern nichts mehr. */
   if (enthuellungGestartet) return;
-  if (!lauf) lauf = { stop: false, puffer: "", fest: 0, tippt: false };
-  if (text.length <= lauf.puffer.length) return;
-  lauf.puffer = text;
+  if (!lauf) lauf = neuerLauf();
+  /* Je Puffer monoton wachsend übernehmen. */
+  if (texte.standard.length > lauf.puffer.standard.text.length) lauf.puffer.standard.text = texte.standard;
+  if (typeof texte.beast === "string" && texte.beast.length > lauf.puffer.beast.text.length) {
+    lauf.puffer.beast.text = texte.beast;
+  }
 
   if (reduziert()) {
-    /* Barrierefreiheit: kein Tippen, kein Rausch — die Welle erscheint
-       sofort vollständig. */
+    /* Barrierefreiheit: kein Tippen, kein Rausch — jede Welle erscheint
+       sofort vollständig, angezeigt wird der Puffer des gewählten Modus. */
+    lauf.puffer.standard.fest = lauf.puffer.standard.text.length;
+    lauf.puffer.beast.fest = lauf.puffer.beast.text.length;
+    const p = lauf.puffer[lauf.aktiv];
+    const karteAktiv = elements.liveKarte && elements.liveKarte.classList.contains("active");
+    /* Solange der gewählte Modus nichts Sichtbares hat (Beast gewählt, aber
+       noch leer) und die Karte nie erschien, bleibt die Scan-Animation. */
+    if (p.fest === 0 && !karteAktiv) return;
     karteZeigen();
-    lauf.fest = lauf.puffer.length;
-    if (elements.liveTextFest) elements.liveTextFest.textContent = lauf.puffer;
+    if (elements.liveTextFest) elements.liveTextFest.textContent = p.text;
     if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
+    statusAktualisieren(lauf);
     return;
   }
 
-  if (!lauf.tippt && lauf.puffer.length >= MIN_PUFFER) {
+  if (!lauf.tippt && (lauf.puffer.standard.text.length >= MIN_PUFFER || lauf.puffer.beast.text.length >= MIN_PUFFER)) {
     lauf.tippt = true;
     tippSchleife(lauf);
   }
+}
+
+/**
+ * Meldet einen Wechsel des Beast-Schalters (app.js ruft das im
+ * change-Listener). Mitten im Tippen springt die Anzeige SOFORT auf den
+ * Puffer des neuen Modus: dessen bereits getippter Stand erscheint, dort
+ * wird weitergetippt — kein Neustart von vorn. Ist der Beast-Puffer noch
+ * leer, zeigt die Karte den Warte-Status mit blinkendem Cursor. Ohne
+ * laufenden Live-Text oder nach Beginn der Enthüllung ein No-Op — die
+ * bestehende „keine erneute Enthüllung"-Logik bleibt unberührt.
+ */
+export function modusWechsel() {
+  if (!lauf || enthuellungGestartet) return;
+  const neu = aktiverModus();
+  if (neu === lauf.aktiv) return;
+  lauf.aktiv = neu;
+  /* Nur eine bereits sichtbare Karte sofort neu zeichnen — vor dem ersten
+     getippten Zeichen gibt es nichts umzuschalten (die Tipp-Schleife nimmt
+     den neuen Puffer von selbst beim nächsten Tick). */
+  if (!elements.liveKarte || !elements.liveKarte.classList.contains("active")) return;
+  const p = lauf.puffer[neu];
+  if (elements.liveTextFest) elements.liveTextFest.textContent = p.text.slice(0, p.fest);
+  if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
+  statusAktualisieren(lauf);
 }
 
 /** Lief in diesem Durchgang Live-Text? (Grundlage der Enthüllungs-Entscheidung) */

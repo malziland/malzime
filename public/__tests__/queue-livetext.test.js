@@ -31,6 +31,7 @@ vi.mock("../js/render.js", () => ({
 
 vi.mock("../js/live-anzeige.js", () => ({
   welle: vi.fn(),
+  modusWechsel: vi.fn(),
   hatLiveGelaufen: vi.fn(() => false),
   starteEnthuellung: vi.fn(),
   enthuellungAbkuerzen: vi.fn(),
@@ -104,7 +105,7 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     });
   }
 
-  it("processing-Antwort mit liveText → die Welle erreicht die Live-Anzeige", async () => {
+  it("processing-Antwort mit liveText → die Welle erreicht die Live-Anzeige (beast null vor dessen Beginn)", async () => {
     mockeStatusFolge([
       { status: "processing", liveText: "Erste Welle" },
       { status: "processing", liveText: "Erste Welle, zweite Welle" },
@@ -113,8 +114,19 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(12000);
     await p;
-    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(1, "Erste Welle");
-    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(2, "Erste Welle, zweite Welle");
+    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(1, { standard: "Erste Welle", beast: null });
+    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(2, { standard: "Erste Welle, zweite Welle", beast: null });
+  });
+
+  it("processing-Antwort mit liveText UND liveTextBeast → beide Felder gehen als eine Welle ans Modul", async () => {
+    mockeStatusFolge([
+      { status: "processing", liveText: "Standard-Text.", liveTextBeast: "Du bist ein" },
+      { status: "done", result: DONE_RESULT },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(12000);
+    await p;
+    expect(liveAnzeige.welle).toHaveBeenCalledWith({ standard: "Standard-Text.", beast: "Du bist ein" });
   });
 
   it("processing OHNE liveText (Flag aus) → keine einzige Welle, heutiger Pfad", async () => {

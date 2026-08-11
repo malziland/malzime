@@ -54,6 +54,9 @@ describe("Live-Anzeige (v3.0)", () => {
     ].forEach((el) => {
       el.textContent = "";
     });
+    /* Der Beast-Schalter lebt (wie alle dom.js-Referenzen) über die Tests
+       hinweg — jeder Test startet seriös. */
+    elements.biasSwitch.checked = false;
 
     echteMatchMedia = window.matchMedia;
   });
@@ -69,37 +72,48 @@ describe("Live-Anzeige (v3.0)", () => {
     window.matchMedia = () => ({ matches: true });
   }
 
+  /* Kurzform: eine Welle wie aus api.js — { standard, beast }. */
+  function w(standard, beast = null) {
+    liveAnzeige.welle({ standard, beast });
+  }
+
+  /* Beast-Schalter umlegen und den Wechsel melden, wie app.js es tut. */
+  function schalte(beast) {
+    elements.biasSwitch.checked = beast;
+    liveAnzeige.modusWechsel();
+  }
+
   /* ── Tippen (Matrix-Dekodierung) ─────────────────────────────────────── */
 
   it("Anlauf: getippt wird erst, wenn ~200 Zeichen Puffer gesammelt sind", async () => {
-    liveAnzeige.welle("A".repeat(150));
+    w("A".repeat(150));
     await vi.advanceTimersByTimeAsync(3000);
     /* Unter der Anlauf-Schwelle: nichts sichtbar, Karte bleibt zu. */
     expect(elements.liveTextFest.textContent).toBe("");
     expect(elements.liveKarte.classList.contains("active")).toBe(false);
 
-    liveAnzeige.welle("A".repeat(230));
+    w("A".repeat(230));
     await vi.advanceTimersByTimeAsync(500);
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
   });
 
   it("Entkopplung: eine nachgeschobene Welle verlängert den Puffer, ohne das Tippen zu unterbrechen", async () => {
-    liveAnzeige.welle("A".repeat(250));
+    w("A".repeat(250));
     await vi.advanceTimersByTimeAsync(2000);
     const mittendrin = elements.liveTextFest.textContent.length;
     expect(mittendrin).toBeGreaterThan(0);
     expect(mittendrin).toBeLessThan(250);
 
     /* Nächste 2-s-Poll-Welle: gleicher Anfang, mehr Text. */
-    liveAnzeige.welle("A".repeat(250) + "B".repeat(150));
+    w("A".repeat(250) + "B".repeat(150));
     await vi.advanceTimersByTimeAsync(5000);
     expect(elements.liveTextFest.textContent.length).toBe(400);
     expect(elements.liveTextFest.textContent.endsWith("B")).toBe(true);
   });
 
   it("Rausch-Schweif nur bei Bewegung — bei leerem Puffer bleibt nur der Cursor", async () => {
-    liveAnzeige.welle("A".repeat(250));
+    w("A".repeat(250));
     await vi.advanceTimersByTimeAsync(1000);
     /* Mitten im Tippen: Schweif da, nie länger als 7 Zeichen. */
     expect(elements.liveTextRausch.textContent.length).toBeGreaterThan(0);
@@ -114,18 +128,18 @@ describe("Live-Anzeige (v3.0)", () => {
   it("reduced-motion: jede Welle erscheint sofort vollständig — kein Tippen, kein Rausch", async () => {
     reduzierteBewegung();
     /* Sogar unterhalb der Anlauf-Schwelle: die Welle steht sofort komplett da. */
-    liveAnzeige.welle("A".repeat(80));
+    w("A".repeat(80));
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
     expect(elements.liveTextFest.textContent).toBe("A".repeat(80));
     expect(elements.liveTextRausch.textContent).toBe("");
 
-    liveAnzeige.welle("A".repeat(80) + "B".repeat(40));
+    w("A".repeat(80) + "B".repeat(40));
     expect(elements.liveTextFest.textContent).toBe("A".repeat(80) + "B".repeat(40));
     expect(elements.liveTextRausch.textContent).toBe("");
   });
 
   it("Abbruch räumt auf: Karte samt Text verschwindet, das Tippen bleibt stehen", async () => {
-    liveAnzeige.welle("A".repeat(250));
+    w("A".repeat(250));
     await vi.advanceTimersByTimeAsync(1000);
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
 
@@ -145,7 +159,7 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.scanAnim.classList.contains("active")).toBe(true);
     expect(elements.srAnnounce.textContent).toBe("scan.srStart");
 
-    liveAnzeige.welle("A".repeat(250));
+    w("A".repeat(250));
     await vi.advanceTimersByTimeAsync(100);
     expect(elements.scanAnim.classList.contains("active")).toBe(false);
     /* Das erste Zeichen ist KEIN Abschluss — die srEnd-Ansage darf hier
@@ -158,17 +172,114 @@ describe("Live-Anzeige (v3.0)", () => {
 
   it("hatLiveGelaufen: erst nach dem ersten sichtbaren Zeichen, zuruecksetzen löscht es", async () => {
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
-    liveAnzeige.welle("A".repeat(150));
+    w("A".repeat(150));
     await vi.advanceTimersByTimeAsync(1000);
     /* Nur gepuffert, nie sichtbar → gilt nicht als gelaufen. */
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
 
-    liveAnzeige.welle("A".repeat(230));
+    w("A".repeat(230));
     await vi.advanceTimersByTimeAsync(200);
     expect(liveAnzeige.hatLiveGelaufen()).toBe(true);
 
     liveAnzeige.zuruecksetzen();
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
+  });
+
+  /* ── Zwei Puffer: der Text folgt dem gewählten Modus (Phase 3) ────────── */
+
+  it("Modus-Wechsel mitten im Tippen: sofort der Beast-Puffer, weitergetippt am eigenen Fortschritt", async () => {
+    /* Beide Puffer gefüllt — getippt wird nur der seriöse (Schalter aus). */
+    w("S".repeat(250), "B".repeat(250));
+    await vi.advanceTimersByTimeAsync(2000);
+    const seriousStand = elements.liveTextFest.textContent.length;
+    expect(seriousStand).toBeGreaterThan(50);
+    expect(elements.liveTextFest.textContent).toBe("S".repeat(seriousStand));
+
+    /* Schalter auf Beast: die Anzeige springt SOFORT auf den Beast-Puffer —
+       dessen Fortschritt beginnt bei 0, kein Rest vom seriösen Text. */
+    schalte(true);
+    expect(elements.liveTextFest.textContent).toBe("");
+    await vi.advanceTimersByTimeAsync(1000);
+    const beastStand = elements.liveTextFest.textContent.length;
+    expect(beastStand).toBeGreaterThan(30);
+    expect(elements.liveTextFest.textContent).toBe("B".repeat(beastStand));
+
+    /* Zurück auf seriös: der alte Stand steht SOFORT wieder da (kein
+       Neustart von vorn) und dort wird weitergetippt. */
+    schalte(false);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThanOrEqual(seriousStand);
+    expect(elements.liveTextFest.textContent.startsWith("S".repeat(seriousStand))).toBe(true);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(seriousStand);
+    expect(elements.liveTextFest.textContent).toBe("S".repeat(elements.liveTextFest.textContent.length));
+  });
+
+  it("Beast gewählt, Puffer noch leer: Warte-Status statt Standard-Text — und Tippstart, sobald Beast eintrifft", async () => {
+    /* Seriös tippt bereits … */
+    w("S".repeat(250));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
+
+    /* … Wechsel auf Beast, obwohl das Modell Beast noch nicht schreibt:
+       KEIN Standard-Text sichtbar, eigener Warte-Status, Cursor blinkt
+       (Schweif leer — das Blinken selbst ist CSS). */
+    schalte(true);
+    expect(elements.liveTextFest.textContent).toBe("");
+    expect(elements.liveStatusText.textContent).toBe("live.beastWartet");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(elements.liveTextFest.textContent).toBe("");
+    expect(elements.liveTextRausch.textContent).toBe("");
+
+    /* Die nächste Welle bringt die ersten Beast-Zeichen (≥ Anlauf-Puffer):
+       jetzt tippt es los, der Status wechselt zurück auf „schreibt". */
+    w("S".repeat(250), "B".repeat(230));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
+    expect(elements.liveTextFest.textContent).toBe("B".repeat(elements.liveTextFest.textContent.length));
+    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
+  });
+
+  it("der Anlauf-Mindestpuffer gilt JE Puffer: ein kurzer Beast-Stand tippt noch nicht", async () => {
+    w("S".repeat(250), "B".repeat(50));
+    await vi.advanceTimersByTimeAsync(1000);
+    schalte(true);
+    /* Beast liegt unter der Anlauf-Schwelle → noch kein Zeichen, Cursor
+       blinkt im Warte-Status. */
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(elements.liveTextFest.textContent).toBe("");
+
+    w("S".repeat(250), "B".repeat(210));
+    await vi.advanceTimersByTimeAsync(500);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
+    expect(elements.liveTextFest.textContent).toBe("B".repeat(elements.liveTextFest.textContent.length));
+  });
+
+  it("reduced-motion: auch beim Modus-Wechsel sofort der volle Stand des Ziel-Puffers, kein Tippen", async () => {
+    reduzierteBewegung();
+    w("S".repeat(80), "B".repeat(40));
+    expect(elements.liveTextFest.textContent).toBe("S".repeat(80));
+
+    schalte(true);
+    expect(elements.liveTextFest.textContent).toBe("B".repeat(40));
+    expect(elements.liveTextRausch.textContent).toBe("");
+
+    schalte(false);
+    expect(elements.liveTextFest.textContent).toBe("S".repeat(80));
+  });
+
+  it("reduced-motion: Beast gewählt und noch leer → Warte-Status, kein Standard-Text", async () => {
+    reduzierteBewegung();
+    w("S".repeat(80));
+    expect(elements.liveTextFest.textContent).toBe("S".repeat(80));
+
+    schalte(true);
+    expect(elements.liveTextFest.textContent).toBe("");
+    expect(elements.liveStatusText.textContent).toBe("live.beastWartet");
+
+    /* Sobald Beast eintrifft, steht er sofort vollständig da. */
+    w("S".repeat(80), "B".repeat(60));
+    expect(elements.liveTextFest.textContent).toBe("B".repeat(60));
+    expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
   });
 
   /* ── Gestaffelte Enthüllung ──────────────────────────────────────────── */
@@ -298,10 +409,10 @@ describe("Live-Anzeige (v3.0)", () => {
   it("späte Wellen nach Beginn der Enthüllung ändern den Text nicht mehr", async () => {
     baueGerendertesErgebnis();
     reduzierteBewegung();
-    liveAnzeige.welle("A".repeat(80));
+    w("A".repeat(80));
     expect(elements.liveTextFest.textContent).toBe("A".repeat(80));
     liveAnzeige.starteEnthuellung();
-    liveAnzeige.welle("A".repeat(80) + "B".repeat(80));
+    w("A".repeat(80) + "B".repeat(80));
     expect(elements.liveTextFest.textContent).toBe("A".repeat(80));
   });
 });

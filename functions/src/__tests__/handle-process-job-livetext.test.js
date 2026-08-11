@@ -139,37 +139,39 @@ describe("runPipelineSingleLarge — Flag useLiveText AN", () => {
     flags.isLiveTextEnabled.mockResolvedValue(true);
   });
 
-  test("runSingleLargeCall bekommt einen onLiveText-Callback, der setLiveText mit der jobId ruft", async () => {
+  test("runSingleLargeCall bekommt einen onLiveText-Callback, der setLiveText mit jobId und BEIDEN Texten ruft", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
       expect(typeof opts.onLiveText).toBe("function");
-      opts.onLiveText("Du bist");
+      opts.onLiveText({ standard: "Du bist", beast: null });
       return PROFIL;
     });
     await handleProcessJob(postReq(), makeRes());
     expect(jobs.setLiveText).toHaveBeenCalledTimes(1);
-    expect(jobs.setLiveText).toHaveBeenCalledWith("job-1", "Du bist");
+    /* EIN Schreibvorgang traegt beide Felder — das Objekt geht 1:1 durch. */
+    expect(jobs.setLiveText).toHaveBeenCalledWith("job-1", { standard: "Du bist", beast: null });
   });
 
   test("Drossel: zwei Wellen innerhalb von 2 s ergeben nur EINEN Schreibvorgang", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-      opts.onLiveText("Du bist");
-      opts.onLiveText("Du bist sportlich"); /* unmittelbar danach → gedrosselt */
+      opts.onLiveText({ standard: "Du bist", beast: null });
+      /* unmittelbar danach → gedrosselt, auch wenn Beast inzwischen da ist */
+      opts.onLiveText({ standard: "Du bist sportlich", beast: "Du bist ein" });
       return PROFIL;
     });
     await handleProcessJob(postReq(), makeRes());
     expect(jobs.setLiveText).toHaveBeenCalledTimes(1);
-    expect(jobs.setLiveText).toHaveBeenCalledWith("job-1", "Du bist");
+    expect(jobs.setLiveText).toHaveBeenCalledWith("job-1", { standard: "Du bist", beast: null });
   });
 
-  test("nach Ablauf der 2-s-Drossel wird erneut geschrieben", async () => {
+  test("nach Ablauf der 2-s-Drossel wird erneut geschrieben — dann mit dem Beast-Stand", async () => {
     const echteNow = Date.now.bind(Date);
     let versatzMs = 0;
     const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => echteNow() + versatzMs);
     try {
       mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-        opts.onLiveText("Du bist");
+        opts.onLiveText({ standard: "Du bist", beast: null });
         versatzMs += 2500; /* die Drossel-Frist ist abgelaufen */
-        opts.onLiveText("Du bist sportlich");
+        opts.onLiveText({ standard: "Du bist sportlich", beast: "Du bist ein" });
         return PROFIL;
       });
       await handleProcessJob(postReq(), makeRes());
@@ -177,12 +179,12 @@ describe("runPipelineSingleLarge — Flag useLiveText AN", () => {
       nowSpy.mockRestore();
     }
     expect(jobs.setLiveText).toHaveBeenCalledTimes(2);
-    expect(jobs.setLiveText).toHaveBeenLastCalledWith("job-1", "Du bist sportlich");
+    expect(jobs.setLiveText).toHaveBeenLastCalledWith("job-1", { standard: "Du bist sportlich", beast: "Du bist ein" });
   });
 
   test("das Analyse-Ergebnis bleibt mit Flag identisch — completeJob bekommt das normale Profil", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-      opts.onLiveText("Du bist");
+      opts.onLiveText({ standard: "Du bist", beast: null });
       return PROFIL;
     });
     const res = makeRes();

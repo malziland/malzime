@@ -95,9 +95,9 @@ function readCachedTokens(usage) {
    zurueckgegebene `result.text` ist BYTE-IDENTISCH zu dem, was der
    Nicht-Stream-Pfad liefern wuerde — json-repair & Co. laufen unveraendert
    erst am Ende auf dem Gesamtstring. Der einzige Zusatz: Waehrend die Antwort
-   eintrifft, wird periodisch der bereits VOLLSTAENDIG angekommene Teil des
-   `profileText`-Werts extrahiert und an den Callback gegeben, damit der
-   Worker ihn ins Job-Dokument legen kann.
+   eintrifft, werden periodisch die bereits VOLLSTAENDIG angekommenen Teile
+   BEIDER `profileText`-Werte extrahiert ({ standard, beast }) und an den
+   Callback gegeben, damit der Worker sie ins Job-Dokument legen kann.
 
    Gemessen an der echten API (Phase-0-Messung 2026-08-11):
      - `stream: true` funktioniert zusammen mit `response_format` und
@@ -121,23 +121,27 @@ function _setLiveIntervalMsForTest(ms) {
 const PROFILE_TEXT_SCHLUESSEL = '"profileText"';
 
 /**
- * Extrahiert aus einem JSON-PRAEFIX (der noch mitten im Satz abbrechen kann)
- * den bereits vollstaendig angekommenen Teil des String-Werts von
- * `"profileText"`. Der ERSTE Treffer im Text ist massgeblich — nach der
- * gemessenen Schluessel-Reihenfolge der Antwort ist das das Standard-Profil
- * (`standard.profileText` kommt vor `beast.profileText`).
+ * Sucht ab `abIdx` das NAECHSTE `"profileText"`-Vorkommen im JSON-Praefix und
+ * scannt dessen String-Wert escape-bewusst bis zum letzten KOMPLETT
+ * angekommenen Zeichen. Ein Vorkommen — eine geprüfte Escape-Behandlung:
+ * extrahiereLiveText ruft diese Funktion fuer das erste UND das zweite Feld,
+ * statt den Scanner zu duplizieren.
  *
  * Rueckgabe:
  *   - `null`, solange der Wert noch nicht begonnen hat (Schluessel fehlt oder
  *     das oeffnende `"` ist noch nicht da),
- *   - sonst den DEKODIERTEN Klartext (JSON-Escapes wie \n, \" oder \uXXXX
- *     sind zu echten Zeichen aufgeloest). Ein UNVOLLSTAENDIGES Escape am
- *     Praefix-Ende (z.B. `\` oder `\u00`) wird abgeschnitten — lieber ein
- *     Zeichen zu wenig zeigen als kaputte Reste.
+ *   - sonst `{ text, ende, abgeschlossen }`:
+ *       text          DEKODIERTER Klartext (JSON-Escapes wie \n, \" oder
+ *                     \uXXXX sind zu echten Zeichen aufgeloest). Ein
+ *                     UNVOLLSTAENDIGES Escape am Praefix-Ende (z.B. `\` oder
+ *                     `\u00`) wird abgeschnitten — lieber ein Zeichen zu
+ *                     wenig zeigen als kaputte Reste.
+ *       ende          Index des schliessenden `"` (bzw. Praefix-Ende) — der
+ *                     Startpunkt fuer die Suche nach dem naechsten Vorkommen.
+ *       abgeschlossen true, wenn das schliessende `"` schon angekommen ist.
  */
-function extrahiereLiveText(jsonPraefix) {
-  if (typeof jsonPraefix !== "string") return null;
-  const schluesselIdx = jsonPraefix.indexOf(PROFILE_TEXT_SCHLUESSEL);
+function findeProfileTextWert(jsonPraefix, abIdx) {
+  const schluesselIdx = jsonPraefix.indexOf(PROFILE_TEXT_SCHLUESSEL, abIdx);
   if (schluesselIdx < 0) return null;
 
   /* Nach dem Schluessel muss `: "` folgen (beliebiger Whitespace erlaubt).
@@ -154,10 +158,12 @@ function extrahiereLiveText(jsonPraefix) {
      endet der brauchbare Teil VOR dem Backslash. */
   let i = start;
   let ende = jsonPraefix.length; /* Praefix endet mitten im Wert (Normalfall) */
+  let abgeschlossen = false;
   while (i < jsonPraefix.length) {
     const zeichen = jsonPraefix[i];
     if (zeichen === '"') {
       ende = i; /* unescaptes Ende — der Wert ist komplett angekommen */
+      abgeschlossen = true;
       break;
     }
     if (zeichen === "\\") {
@@ -179,7 +185,30 @@ function extrahiereLiveText(jsonPraefix) {
     i += 1;
   }
 
-  return dekodiereJsonEscapes(jsonPraefix.slice(start, ende));
+  return { text: dekodiereJsonEscapes(jsonPraefix.slice(start, ende)), ende, abgeschlossen };
+}
+
+/**
+ * Extrahiert aus einem JSON-PRAEFIX (der noch mitten im Satz abbrechen kann)
+ * die bereits vollstaendig angekommenen Teile BEIDER `profileText`-Werte.
+ * Nach der gemessenen Schluessel-Reihenfolge der Antwort ist das erste
+ * Vorkommen das Standard-Profil (`standard.profileText`), das zweite das
+ * Beast-Profil (`beast.profileText`) — das Modell schreibt sequenziell,
+ * Beast beginnt deshalb deutlich spaeter.
+ *
+ * Rueckgabe: `{ standard, beast }` — jeweils der DEKODIERTE Klartext, oder
+ * `null`, solange der jeweilige Wert noch nicht begonnen hat.
+ */
+function extrahiereLiveText(jsonPraefix) {
+  if (typeof jsonPraefix !== "string") return { standard: null, beast: null };
+  const erster = findeProfileTextWert(jsonPraefix, 0);
+  if (!erster) return { standard: null, beast: null };
+  /* Das zweite Vorkommen kann erst NACH dem abgeschlossenen ersten Wert
+     stehen (sequenzielles Schreiben) — vorher gar nicht erst suchen. Die
+     Suche startet hinter dem schliessenden `"` des ersten Werts, damit ein
+     `"profileText"` IM Standard-Text nie als zweites Feld zaehlt. */
+  const zweiter = erster.abgeschlossen ? findeProfileTextWert(jsonPraefix, erster.ende + 1) : null;
+  return { standard: erster.text, beast: zweiter ? zweiter.text : null };
 }
 
 /* Loest JSON-String-Escapes zu echten Zeichen auf. Bewusst von Hand statt
@@ -281,8 +310,9 @@ async function leseStreamAntwort(res, onLiveText, httpStart) {
       if (chunk.usage) usage = chunk.usage; /* kommt im letzten Chunk */
     }
 
-    /* Live-Welle: gedrosselt, still bei Fehlern. `null` heisst „profileText
-       hat noch nicht begonnen" — dann gibt es nichts zu melden. */
+    /* Live-Welle: gedrosselt, still bei Fehlern. Solange nicht einmal der
+       Standard-Text begonnen hat (standard === null), gibt es nichts zu
+       melden — Beast beginnt ohnehin erst nach dem Standard-Profil. */
     const jetzt = Date.now();
     if (jetzt - letzteWelle >= liveIntervalMs) {
       letzteWelle = jetzt;
@@ -290,7 +320,7 @@ async function leseStreamAntwort(res, onLiveText, httpStart) {
         const live = extrahiereLiveText(volltext);
         /* Callback nicht awaiten (nebenlaeufig) — aber eine Rejection MUSS
            abgefangen werden, sonst stuerzt der Prozess ab. */
-        if (live !== null) Promise.resolve(onLiveText(live)).catch(() => {});
+        if (live.standard !== null) Promise.resolve(onLiveText(live)).catch(() => {});
       } catch (_) {
         /* still: Der Live-Text ist reiner Komfort, nie Pflicht. */
       }

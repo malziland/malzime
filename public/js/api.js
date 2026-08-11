@@ -351,9 +351,17 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
         showQueueWaiting("processing");
         /* v3.0: Liefert der Server schon Live-Text (Flag useLiveText), tippt
            die Live-Anzeige ihn mit — sie versteckt beim ersten Zeichen selbst
-           die Scan-Animation. Ohne liveText-Feld ist das ein No-Op und alles
-           bleibt exakt wie heute. */
-        if (liveErlaubt && typeof data.liveText === "string") liveAnzeige.welle(data.liveText);
+           die Scan-Animation. Beide Felder gehen als EINE Welle ans Modul:
+           `standard` (liveText) und, sobald das Modell es schreibt, das
+           Beast-Profil (liveTextBeast) — angezeigt wird dort der Puffer des
+           gerade gewählten Modus. Ohne liveText-Feld ist das ein No-Op und
+           alles bleibt exakt wie heute. */
+        if (liveErlaubt && typeof data.liveText === "string") {
+          liveAnzeige.welle({
+            standard: data.liveText,
+            beast: typeof data.liveTextBeast === "string" ? data.liveTextBeast : null,
+          });
+        }
         break;
       case "done":
         return { result: data.result };

@@ -77,6 +77,7 @@
   "queue.etaUnderMin": "under 1 min left",
   "queue.etaMinutes": "about {{min}} min left",
   "live.statusSchreibt": "Live · the AI is writing about you right now …",
+  "live.beastWartet": "Live · the Beast profile is coming up next …",
   "live.statusFotoDaten": "Live · your photo data is being analyzed …",
   "live.statusKategorien": "Live · categories are being created …",
   "live.statusWerbung": "Live · your ad profile is being calculated …",

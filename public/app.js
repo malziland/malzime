@@ -19,7 +19,7 @@ import {
 import { initDemo } from "./js/demo.js";
 import { initStickyToggle, renderKeepingScrollAnchor } from "./js/sticky-toggle.js";
 import { klangAktivieren } from "./js/klang.js";
-import { enthuellungAbkuerzen } from "./js/live-anzeige.js";
+import { enthuellungAbkuerzen, modusWechsel } from "./js/live-anzeige.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
 
@@ -205,6 +205,11 @@ initStickyToggle();
 elements.biasSwitch.addEventListener("change", () => {
   merkeModus(elements.biasSwitch.checked);
   applyModeTheme();
+  /* v3.0 Phase 3: Läuft gerade das Live-Tippen, folgt es sofort dem neuen
+     Modus (eigene Puffer je Modus, live-anzeige.js). Nach Beginn der
+     Enthüllung — und damit für die „keine erneute Enthüllung"-Logik hier
+     drunter — ist der Aufruf ein No-Op. */
+  modusWechsel();
   if (state.lastData) {
     /* v3.0: Läuft gerade noch die gestaffelte Enthüllung, wird sie sofort
        abgekürzt — der Moduswechsel rendert wie heute komplett neu, und dabei

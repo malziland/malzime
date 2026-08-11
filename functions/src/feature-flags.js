@@ -19,8 +19,9 @@
  *     Vorarbeit am statischen Text, NICHT die Antwort und NICHT das Bild).
  *     `false` = Ist-Zustand vor v2.5, jederzeit ohne Deploy erreichbar.
  *   - `useLiveText` (v3.0 Phase 1): der Queue-Worker liest die Mistral-Antwort
- *     als Stream mit und legt den bereits angekommenen Standard-Profiltext ins
- *     Job-Dokument (`liveText`), damit der wartende Client ihn zeigen kann.
+ *     als Stream mit und legt die bereits angekommenen Profiltexte ins
+ *     Job-Dokument (`liveText` = Standard, seit Phase 3 zusaetzlich
+ *     `liveTextBeast`), damit der wartende Client sie zeigen kann.
  *     Default AUS: ohne Flag laeuft der Mistral-Aufruf exakt wie heute (kein
  *     `stream: true`, kein zusaetzlicher Firestore-Schreibvorgang). Damit ist
  *     der bewaehrte Pfad jederzeit ohne Deploy zurueckholbar.

@@ -16,6 +16,12 @@ Zwei Handy-Befunde aus dem Abend-Test behoben:
 - **Antippen beendet die Führung nicht mehr:** Am Handy zählt erst echtes
   Wischen als „ich übernehme" — ein bloßer Tipp (etwa auf den
   Beast-Schalter) lässt das automatische Mitscrollen weiterlaufen.
+- **Fertige Ergebnisse verschwinden am Server jetzt wenige Minuten nach der
+  Abholung** (vorher: erst nach bis zu zwei Stunden) — exakt deckungsgleich
+  mit dem 15-Minuten-Fenster, in dem dein Browser ein zugestelltes Ergebnis
+  noch einmal anzeigen darf. Nie abgeholte Ergebnisse räumt der Server
+  weiterhin spätestens nach zwei Stunden ab; die Datenschutzerklärung sagt
+  es jetzt genau so.
 
 ## [3.0.4] — 2026-08-11
 

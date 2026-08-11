@@ -172,6 +172,12 @@ const MAX_QUEUE_DEPTH = Math.floor(((30 * 60) / QUEUE_AVG_JOB_SECONDS) * QUEUE_D
    (Poll dauert Minuten, Reload-Wiederaufnahme Sekunden), reduzieren die
    Aufbewahrung der abgeleiteten Profile aber um das 12-fache. */
 const JOB_RETENTION_MS = 2 * 60 * 60 * 1000;
+/* PRIV-107b (User-Freigabe 11.08. abends): Zugestellte Ergebnisse leben am
+   Server nur noch so lange wie das Wiederholungs-Fenster im Browser
+   (ERGEBNIS_WIEDERHOLUNG_MS in public/js/api.js, 15 min ab Erstzustellung) —
+   danach hat das Dokument keinen Zweck mehr und der Reaper löscht es.
+   JOB_RETENTION_MS oben bleibt die Obergrenze für NIE abgeholte Ergebnisse. */
+const ZUSTELLUNG_AUFBEWAHRUNG_MS = 15 * 60 * 1000;
 
 /* Lokal-Modus für den Firebase-Emulator (Phase 3): Da es für Google Cloud
    Tasks keinen Emulator gibt, werden im Lokal-Modus Cloud Tasks und der
@@ -247,6 +253,7 @@ module.exports = {
   QUEUE_DISPATCH_CONCURRENCY,
   MAX_QUEUE_DEPTH,
   JOB_RETENTION_MS,
+  ZUSTELLUNG_AUFBEWAHRUNG_MS,
   LIVENESS_GRACE_MS,
   isLocalQueueMode,
   localQueueConcurrency,

@@ -5,6 +5,7 @@ jest.mock("../jobs", () => ({
   findUeberfaelligeJobs: jest.fn(),
   findStaleProcessingJobs: jest.fn(),
   findExpiredJobs: jest.fn(),
+  findZugestellteJobs: jest.fn(),
   abandonJob: jest.fn(),
   failJob: jest.fn(),
   deleteJob: jest.fn(),
@@ -27,6 +28,7 @@ beforeEach(() => {
   jobs.findUeberfaelligeJobs.mockResolvedValue([]);
   jobs.findStaleProcessingJobs.mockResolvedValue([]);
   jobs.findExpiredJobs.mockResolvedValue([]);
+  jobs.findZugestellteJobs.mockResolvedValue([]);
   jobs.abandonJob.mockResolvedValue(true);
   jobs.failJob.mockResolvedValue(true);
   jobs.deleteJob.mockResolvedValue();
@@ -37,10 +39,41 @@ beforeEach(() => {
 describe("reapJobs", () => {
   test("leerer Lauf — nichts zu tun", async () => {
     const result = await reapJobs();
-    expect(result).toEqual({ abandoned: 0, staleProcessing: 0, expired: 0, ueberfaellig: 0 });
+    expect(result).toEqual({ abandoned: 0, staleProcessing: 0, expired: 0, ueberfaellig: 0, zugestellt: 0 });
     expect(jobs.abandonJob).not.toHaveBeenCalled();
     expect(jobs.failJob).not.toHaveBeenCalled();
     expect(jobs.deleteJob).not.toHaveBeenCalled();
+  });
+
+  /* ── PRIV-107b: zugestellte Ergebnisse nach dem 15-min-Fenster ────────── */
+
+  test("PRIV-107b: zugestellte Jobs werden gelöscht — Bild zuerst, dann das Dokument", async () => {
+    jobs.findZugestellteJobs.mockResolvedValue([{ id: "z1", imagePath: "queue-uploads/z1.jpg" }, { id: "z2" }]);
+    const reihenfolge = [];
+    storage.deleteImage.mockImplementation(async () => reihenfolge.push("bild"));
+    jobs.deleteJob.mockImplementation(async () => reihenfolge.push("dokument"));
+
+    const result = await reapJobs();
+
+    /* (Diese Erwartung wird ROT, wenn jemand Zweig 2c entfernt — dann räumt
+       erst die 2-h-Grenze, und das Zustellungs-Versprechen der
+       Datenschutzerklärung wäre gebrochen.) */
+    expect(result.zugestellt).toBe(2);
+    expect(jobs.deleteJob).toHaveBeenCalledWith("z1");
+    expect(jobs.deleteJob).toHaveBeenCalledWith("z2");
+    /* BUG-002-Regel: Bild vor Dokument; ohne imagePath (z2) kein Bild-Aufruf. */
+    expect(reihenfolge).toEqual(["bild", "dokument", "dokument"]);
+    expect(storage.deleteImage).toHaveBeenCalledTimes(1);
+  });
+
+  test("PRIV-107b: ein Löschfehler wird geloggt und stoppt weder den Zweig noch den Lauf", async () => {
+    jobs.findZugestellteJobs.mockResolvedValue([{ id: "z1" }, { id: "z2" }]);
+    jobs.deleteJob.mockRejectedValueOnce(new Error("firestore weg")).mockResolvedValue();
+
+    const result = await reapJobs();
+
+    expect(result.zugestellt).toBe(1);
+    expect(jobs.deleteJob).toHaveBeenCalledTimes(2);
   });
 
   test("verlassene wartende Jobs → abandoned, Bild gelöscht", async () => {
@@ -87,7 +120,7 @@ describe("reapJobs", () => {
     jobs.findStaleProcessingJobs.mockResolvedValue([{ id: "p1", imagePath: "p" }]);
     jobs.findExpiredJobs.mockResolvedValue([{ id: "e1" }]);
     const result = await reapJobs();
-    expect(result).toEqual({ abandoned: 1, staleProcessing: 1, expired: 1, ueberfaellig: 0 });
+    expect(result).toEqual({ abandoned: 1, staleProcessing: 1, expired: 1, ueberfaellig: 0, zugestellt: 0 });
   });
 
   test("ein einzelner fehlschlagender Job stoppt den Lauf nicht", async () => {
@@ -112,6 +145,7 @@ describe("SEC-003 — Jobs, die nur durch Pollen am Leben bleiben", () => {
     jobs.findUeberfaelligeJobs.mockResolvedValue([]);
     jobs.findStaleProcessingJobs.mockResolvedValue([]);
     jobs.findExpiredJobs.mockResolvedValue([]);
+    jobs.findZugestellteJobs.mockResolvedValue([]);
     jobs.abandonJob.mockResolvedValue(true);
     jobs.failJob.mockResolvedValue(true);
     jobs.deleteJob.mockResolvedValue(true);

@@ -777,6 +777,7 @@ describe("Live-Anzeige (v3.0)", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
     elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+    elements.scanAnim.classList.add("active");
     try {
       /* Ohne gestartete Führung passiert nichts — api.js startet sie zuerst. */
       liveAnzeige.augeInsBild();
@@ -790,6 +791,55 @@ describe("Live-Anzeige (v3.0)", () => {
     } finally {
       delete elements.scanAnim.scrollIntoView;
       delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
+    }
+  });
+
+  it("v3.0.5 Auge ins Bild: ein noch nicht aufgebautes Auge (Höhe 0) wird per Nachfassen geholt, sobald es steht", async () => {
+    const spy = vi.fn();
+    elements.scanAnim.scrollIntoView = spy;
+    /* Analyse-Start: Auge existiert, ist aber noch nicht aktiv/aufgebaut —
+       genau der Handy-Befund („springt nicht hoch zum Auge"). RUECKBAUPROBE:
+       Ohne die Nachfass-Logik bleibt der Spy für immer still. */
+    elements.scanAnim.getBoundingClientRect = () => ({ top: 0, bottom: 0, height: 0 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      await vi.advanceTimersByTimeAsync(450);
+      expect(spy).not.toHaveBeenCalled();
+
+      /* Jetzt steht das Auge (aktiv + echte Höhe, unterhalb der Sichtkante). */
+      elements.scanAnim.classList.add("active");
+      elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+      await vi.advanceTimersByTimeAsync(450);
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete elements.scanAnim.scrollIntoView;
+      delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
+    }
+  });
+
+  it("v3.0.5 Übernahme: bloßes Antippen (touchstart) beendet die Führung NICHT — erst echtes Wischen (touchmove)", () => {
+    const spy = vi.fn();
+    elements.scanAnim.scrollIntoView = spy;
+    elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+    elements.scanAnim.classList.add("active");
+    try {
+      liveAnzeige.fuehrungStarten();
+      /* Antippen (z. B. Beast-Schalter) — die Führung muss weiterleben. */
+      window.dispatchEvent(new Event("touchstart"));
+      liveAnzeige.augeInsBild();
+      expect(spy).toHaveBeenCalledTimes(1);
+
+      /* Echtes Wischen — ab jetzt gehört der Bildschirm dem Nutzer. */
+      window.dispatchEvent(new Event("touchmove"));
+      liveAnzeige.augeInsBild();
+      expect(spy).toHaveBeenCalledTimes(1);
+    } finally {
+      delete elements.scanAnim.scrollIntoView;
+      delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
     }
   });
 
@@ -797,6 +847,7 @@ describe("Live-Anzeige (v3.0)", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
     elements.scanAnim.getBoundingClientRect = imFenster;
+    elements.scanAnim.classList.add("active");
     try {
       liveAnzeige.fuehrungStarten();
       liveAnzeige.augeInsBild();
@@ -805,6 +856,7 @@ describe("Live-Anzeige (v3.0)", () => {
     } finally {
       delete elements.scanAnim.scrollIntoView;
       delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
     }
   });
 
@@ -813,6 +865,7 @@ describe("Live-Anzeige (v3.0)", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
     elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
+    elements.scanAnim.classList.add("active");
     try {
       liveAnzeige.fuehrungStarten();
       liveAnzeige.augeInsBild();
@@ -820,6 +873,7 @@ describe("Live-Anzeige (v3.0)", () => {
     } finally {
       delete elements.scanAnim.scrollIntoView;
       delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
     }
   });
 

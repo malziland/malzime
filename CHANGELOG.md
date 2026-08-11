@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.5] — 2026-08-11
+
+Zwei Handy-Befunde aus dem Abend-Test behoben:
+
+- **Der Sprung zum Auge nach der Foto-Wahl kommt jetzt wirklich:** Beim
+  Analyse-Start war das Auge oft noch nicht fertig aufgebaut, und ein
+  unsichtbares Element galt der Sichtfeld-Prüfung fälschlich als „schon
+  sichtbar" — der Scroll unterblieb kommentarlos. Jetzt fasst die
+  Blick-Führung nach, bis das Auge wirklich steht, und fährt es dann an.
+- **Antippen beendet die Führung nicht mehr:** Am Handy zählt erst echtes
+  Wischen als „ich übernehme" — ein bloßer Tipp (etwa auf den
+  Beast-Schalter) lässt das automatische Mitscrollen weiterlaufen.
+
 ## [3.0.4] — 2026-08-11
 
 Datenschutz-Härtung nach der großen Zusagen-Prüfung (Code, Infrastruktur

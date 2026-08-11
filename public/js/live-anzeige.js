@@ -231,7 +231,7 @@ let fuehrung = null;
 function fuehrungListenerEntfernen(mein) {
   if (!mein.listener) return;
   window.removeEventListener("wheel", mein.listener);
-  window.removeEventListener("touchstart", mein.listener);
+  window.removeEventListener("touchmove", mein.listener);
   window.removeEventListener("keydown", mein.listener);
   mein.listener = null;
 }
@@ -257,7 +257,10 @@ export function fuehrungStarten() {
   };
   mein.listener = uebernahme;
   window.addEventListener("wheel", uebernahme, { passive: true });
-  window.addEventListener("touchstart", uebernahme, { passive: true });
+  /* v3.0.5: touchMOVE statt touchstart — am Handy ist bloßes Antippen (Beast-
+     Schalter, irgendeine Stelle) unvermeidlich und darf die Führung nicht
+     beenden; erst eine echte Wisch-Bewegung ist „ich übernehme". */
+  window.addEventListener("touchmove", uebernahme, { passive: true });
   window.addEventListener("keydown", uebernahme);
   fuehrung = mein;
 }
@@ -307,10 +310,27 @@ function sanftZentrieren(el) {
  * NUR wenn das Auge nicht ohnehin mehrheitlich sichtbar ist — auf dem
  * Desktop, wo es längst im Bild steht, darf sich NICHTS bewegen.
  */
-export function augeInsBild() {
+export function augeInsBild(versuch = 0) {
   if (!fuehrungAktiv()) return;
   const auge = elements.scanAnim;
-  if (!auge || imSichtfeld(auge)) return;
+  /* v3.0.5 (Handy-Befund 11.08., 18:15): Beim Analyse-Start ist das Auge oft
+     noch gar nicht aufgebaut (ohne .active, Höhe 0) — und ein Null-Höhen-
+     Element gilt der Sichtfeld-Regel als „sichtbar" (0 ≥ 0), der Scroll
+     unterblieb kommentarlos. Deshalb: erst NACHFASSEN, bis das Auge wirklich
+     steht (aktiv UND gemessene Höhe), dann genau einmal anfahren. Bricht der
+     Nutzer die Führung ab, sterben auch die Nachfass-Versuche (fuehrungAktiv
+     wird je Versuch frisch geprüft). */
+  let steht = false;
+  try {
+    steht = !!auge && auge.classList.contains("active") && auge.getBoundingClientRect().height > 0;
+  } catch (_e) {
+    steht = false;
+  }
+  if (!steht) {
+    if (versuch < 10) setTimeout(() => augeInsBild(versuch + 1), 200);
+    return;
+  }
+  if (imSichtfeld(auge)) return;
   sanftZentrieren(auge);
 }
 

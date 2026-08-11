@@ -23,7 +23,6 @@ const ids = [
   "srAnnounce",
   /* Live-Karte (v3.0 Live-Erlebnis) */
   "liveKarte",
-  "liveStatusText",
   "liveTextFest",
   "liveTextRausch",
   "liveCursor",

@@ -155,7 +155,12 @@ test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF
   await expect(page.locator("#targeting .target-card.warn")).toBeVisible({ timeout: 30000 });
   await expect(page.locator("#dataValue .dv-card")).toBeVisible({ timeout: 30000 });
   await expect(page.locator("#exportPdf")).not.toHaveClass(/export-btn--hidden/, { timeout: 30000 });
-  await expect(page.locator("#liveStatusText")).toHaveText(/nichts davon ist wahr|none of this is true/i);
+  /* v3.0.2: KEINE Abschluss-Status-Box mehr — Live-Karte und Scan-Auge sind
+     weg, der Merksatz steht allein in der Ergebnis-Zusammenfassung. */
+  await expect(page.locator("#liveKarte")).not.toHaveClass(/active/);
+  await expect(page.locator("#scanAnim")).not.toHaveClass(/active/);
+  await expect(page.locator("#liveStatusText")).toHaveCount(0);
+  await expect(page.locator("#simulation .verdict")).toContainText(/nichts davon ist wahr|none of this is true/i);
 });
 
 test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text und tippt dort weiter", async ({
@@ -167,8 +172,8 @@ test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text 
   /* v3.0.0: Die Demo-Wahl startet die Analyse direkt — kein Pop-up mehr. */
   await page.click('[data-demo="selfie"]');
 
-  /* Erst tippt der seriöse Text wie gewohnt. */
-  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 35000 });
+  /* Erst tippt der seriöse Text wie gewohnt (Anlauf seit v3.0.2: ~25 s). */
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 45000 });
   await expect
     .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 15000 })
     .toBeGreaterThan(10);
@@ -188,10 +193,19 @@ test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text 
     .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 15000 })
     .toBeGreaterThan(beastStand);
 
+  /* v3.0.2: Ist der Beast-Text fertig getippt und der Server noch nicht
+     fertig, kehrt das vertraute Scan-Auge OBERHALB der Karte zurück und
+     trägt die Warte-Zeilen — Karte und Auge stehen dann gemeinsam da. */
+  await expect(page.locator("#scanAnim")).toHaveClass(/active/, { timeout: 45000 });
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/);
+  await expect(page.locator("#scanText")).not.toBeEmpty();
+
   /* done → Schnellvorlauf, dann rendert der Abschluss direkt — auch im
-     Beast-Modus. */
+     Beast-Modus. Auge und Karte verschwinden mit der Enthüllung. */
   steuerung.fertigMachen();
   await expect(page.locator("#simulation .verdict")).toBeVisible({ timeout: 30000 });
+  await expect(page.locator("#liveKarte")).not.toHaveClass(/active/);
+  await expect(page.locator("#scanAnim")).not.toHaveClass(/active/);
 });
 
 test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung ohne Verzögerung", async ({ page }) => {

@@ -24,6 +24,9 @@ module.exports = [
         Promise: "readonly",
         URL: "readonly",
         TextEncoder: "readonly",
+        /* v3.0 Phase 1: Der Live-Text-Strom dekodiert SSE-Chunks mit
+           TextDecoder({stream:true}) — wie TextEncoder ein Node-Global. */
+        TextDecoder: "readonly",
         AbortController: "readonly",
         fetch: "readonly",
       },
@@ -52,6 +55,9 @@ module.exports = [
         afterAll: "readonly",
         jest: "readonly",
         fail: "readonly",
+        /* v3.0 Phase 1: Zum Nachstellen einer gestreamten Mistral-Antwort
+           (mistral-livetext.test.js) — Node-Global seit Node 18. */
+        ReadableStream: "readonly",
       },
     },
   },

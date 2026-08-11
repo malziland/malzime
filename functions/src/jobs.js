@@ -238,6 +238,35 @@ async function markDelivered(jobId) {
 }
 
 /**
+ * v3.0 Phase 1: Legt den bereits angekommenen Live-Profiltext ins Job-Dokument.
+ *
+ * Der Worker ruft das waehrend eines laufenden Mistral-Streams (Flag
+ * `useLiveText`), der job-status-Handler gibt die Felder bei `processing`
+ * an den Client weiter. 4000 Zeichen Deckel: Der komplette Standard-
+ * Profiltext liegt real bei wenigen hundert Zeichen — die Grenze schuetzt
+ * das Dokument nur vor einem amoklaufenden Modell (Firestore-Dokumente sind
+ * auf 1 MiB begrenzt, und `result` muss spaeter auch noch hinein).
+ *
+ * Fehler werden STILL geschluckt: Eine verpasste Live-Welle darf nie etwas
+ * kaputt machen — der naechste Schreibversuch kommt ohnehin in ~2 Sekunden,
+ * und das eigentliche Ergebnis liefert completeJob unabhaengig davon. Auch
+ * kein console.log je Welle: Bei ~1100 Chunks pro Analyse waere selbst ein
+ * sparsames Fehler-Log nur Rauschen in Cloud Logging.
+ */
+async function setLiveText(jobId, text) {
+  try {
+    await jobsRef()
+      .doc(jobId)
+      .update({
+        liveText: String(text || "").slice(0, 4000),
+        liveTextStand: Date.now(),
+      });
+  } catch (_) {
+    /* still — siehe Funktionskommentar */
+  }
+}
+
+/**
  * Markiert einen Job als `abandoned` — der Client hat die Seite verlassen,
  * bevor der Job verarbeitet wurde. Kein Fehler, sondern ein bewusst
  * eingesparter Lauf (kein Mistral-Call).
@@ -348,6 +377,7 @@ module.exports = {
   markFailedIfStale,
   touchJob,
   markDelivered,
+  setLiveText,
   abandonJob,
   isAbandoned,
   findAbandonedJobs,

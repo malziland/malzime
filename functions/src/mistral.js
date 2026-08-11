@@ -89,6 +89,226 @@ function readCachedTokens(usage) {
   return hit || 0;
 }
 
+/* ── v3.0 Phase 1: Live-Text-Strom ────────────────────────────────────────
+   Wird ein `onLiveText`-Callback uebergeben, laeuft der Mistral-Aufruf mit
+   `stream: true` und wir lesen die Antwort als Server-Sent-Events mit. Der
+   zurueckgegebene `result.text` ist BYTE-IDENTISCH zu dem, was der
+   Nicht-Stream-Pfad liefern wuerde — json-repair & Co. laufen unveraendert
+   erst am Ende auf dem Gesamtstring. Der einzige Zusatz: Waehrend die Antwort
+   eintrifft, wird periodisch der bereits VOLLSTAENDIG angekommene Teil des
+   `profileText`-Werts extrahiert und an den Callback gegeben, damit der
+   Worker ihn ins Job-Dokument legen kann.
+
+   Gemessen an der echten API (Phase-0-Messung 2026-08-11):
+     - `stream: true` funktioniert zusammen mit `response_format` und
+       `prompt_cache_key`; am Ende entsteht gueltiges JSON.
+     - Format: Zeilen `data: {...}`, Text in `choices[0].delta.content`,
+       Ende `data: [DONE]`, `usage` im letzten Chunk. ~1100-1200 Chunks mit
+       im Schnitt 9 Zeichen (min 1, max ~180).
+     - Chunk-Grenzen liegen mitten in Woertern, mitten in JSON-Escapes und
+       potenziell mitten in Mehrbyte-Zeichen — deshalb TextDecoder mit
+       `{stream: true}` und ein Escape-bewusster Scanner im Extraktor. */
+
+/* Hoechstens alle ~2 Sekunden extrahieren: Die Extraktion scannt den bisher
+   angekommenen Text von vorn — bei ~1150 Chunks pro Antwort waere ein Lauf pro
+   Chunk unnoetige Rechenarbeit, und schnellere Wellen braeuchte ohnehin
+   niemand (der Client pollt im 2-Sekunden-Takt). Fuer Tests umstellbar. */
+let liveIntervalMs = 2000;
+function _setLiveIntervalMsForTest(ms) {
+  liveIntervalMs = typeof ms === "number" ? ms : 2000;
+}
+
+const PROFILE_TEXT_SCHLUESSEL = '"profileText"';
+
+/**
+ * Extrahiert aus einem JSON-PRAEFIX (der noch mitten im Satz abbrechen kann)
+ * den bereits vollstaendig angekommenen Teil des String-Werts von
+ * `"profileText"`. Der ERSTE Treffer im Text ist massgeblich — nach der
+ * gemessenen Schluessel-Reihenfolge der Antwort ist das das Standard-Profil
+ * (`standard.profileText` kommt vor `beast.profileText`).
+ *
+ * Rueckgabe:
+ *   - `null`, solange der Wert noch nicht begonnen hat (Schluessel fehlt oder
+ *     das oeffnende `"` ist noch nicht da),
+ *   - sonst den DEKODIERTEN Klartext (JSON-Escapes wie \n, \" oder \uXXXX
+ *     sind zu echten Zeichen aufgeloest). Ein UNVOLLSTAENDIGES Escape am
+ *     Praefix-Ende (z.B. `\` oder `\u00`) wird abgeschnitten — lieber ein
+ *     Zeichen zu wenig zeigen als kaputte Reste.
+ */
+function extrahiereLiveText(jsonPraefix) {
+  if (typeof jsonPraefix !== "string") return null;
+  const schluesselIdx = jsonPraefix.indexOf(PROFILE_TEXT_SCHLUESSEL);
+  if (schluesselIdx < 0) return null;
+
+  /* Nach dem Schluessel muss `: "` folgen (beliebiger Whitespace erlaubt).
+     Solange das oeffnende Anfuehrungszeichen nicht da ist, hat der Wert nicht
+     begonnen — dann gibt es auch nichts zu zeigen. */
+  const nachSchluessel = jsonPraefix.slice(schluesselIdx + PROFILE_TEXT_SCHLUESSEL.length);
+  const wertBeginn = nachSchluessel.match(/^\s*:\s*"/);
+  if (!wertBeginn) return null;
+  const start = schluesselIdx + PROFILE_TEXT_SCHLUESSEL.length + wertBeginn[0].length;
+
+  /* Escape-bewusster Scan bis zum letzten KOMPLETT angekommenen Zeichen.
+     Ein rohes `"` ohne fuehrenden Backslash beendet den Wert; `\X` sind zwei
+     Zeichen, `\uXXXX` sechs. Bricht der Praefix mitten in einem Escape ab,
+     endet der brauchbare Teil VOR dem Backslash. */
+  let i = start;
+  let ende = jsonPraefix.length; /* Praefix endet mitten im Wert (Normalfall) */
+  while (i < jsonPraefix.length) {
+    const zeichen = jsonPraefix[i];
+    if (zeichen === '"') {
+      ende = i; /* unescaptes Ende — der Wert ist komplett angekommen */
+      break;
+    }
+    if (zeichen === "\\") {
+      if (i + 1 >= jsonPraefix.length) {
+        ende = i; /* nackter Backslash am Ende → unvollstaendig, abschneiden */
+        break;
+      }
+      if (jsonPraefix[i + 1] === "u") {
+        if (i + 6 > jsonPraefix.length) {
+          ende = i; /* \uXX… ohne alle vier Hex-Ziffern → abschneiden */
+          break;
+        }
+        i += 6;
+        continue;
+      }
+      i += 2; /* zweistelliges Escape wie \" \\ \n — komplett da */
+      continue;
+    }
+    i += 1;
+  }
+
+  return dekodiereJsonEscapes(jsonPraefix.slice(start, ende));
+}
+
+/* Loest JSON-String-Escapes zu echten Zeichen auf. Bewusst von Hand statt
+   JSON.parse: Der Praefix ist zwar frei von UNVOLLSTAENDIGEN Escapes (der
+   Scanner oben schneidet sie ab), aber ein Modell koennte z.B. ein rohes
+   Steuerzeichen liefern — JSON.parse wuerfe dann, und ein Fehler hier darf
+   den Live-Weg nie zum Aufruf-Fehler machen. */
+function dekodiereJsonEscapes(roh) {
+  const einfacheEscapes = { '"': '"', "\\": "\\", "/": "/", n: "\n", t: "\t", r: "\r", b: "\b", f: "\f" };
+  let klartext = "";
+  for (let i = 0; i < roh.length; i++) {
+    const zeichen = roh[i];
+    if (zeichen !== "\\") {
+      klartext += zeichen;
+      continue;
+    }
+    const naechstes = roh[i + 1];
+    if (naechstes === "u") {
+      const code = parseInt(roh.slice(i + 2, i + 6), 16);
+      if (Number.isFinite(code)) {
+        /* fromCharCode arbeitet auf UTF-16-Einheiten: zwei aufeinander
+           folgende \uXXXX-Escapes eines Emojis ergeben so automatisch das
+           richtige Surrogat-Paar. */
+        klartext += String.fromCharCode(code);
+        i += 5;
+      } else {
+        i += 1; /* kaputtes Escape — still ueberspringen statt werfen */
+      }
+      continue;
+    }
+    if (naechstes !== undefined && einfacheEscapes[naechstes] !== undefined) {
+      klartext += einfacheEscapes[naechstes];
+      i += 1;
+      continue;
+    }
+    if (naechstes !== undefined) {
+      klartext += naechstes; /* unbekanntes Escape: Zeichen woertlich uebernehmen */
+      i += 1;
+    }
+  }
+  /* Endet der Text mit einer einsamen hohen Surrogathälfte (halbes Emoji aus
+     einem \uXXXX-Paar, dessen zweite Haelfte noch unterwegs ist), schneiden
+     wir sie ab — sonst landet ein kaputtes Zeichen im Live-Text. */
+  return klartext.replace(/[\uD800-\uDBFF]$/, "");
+}
+
+/**
+ * Liest eine Mistral-Antwort im SSE-Stream-Format zu Ende und liefert
+ * dasselbe Ergebnis-Objekt wie der Nicht-Stream-Pfad. Nebenlaeufig wird
+ * hoechstens alle `liveIntervalMs` der Live-Text extrahiert und an
+ * `onLiveText` gegeben — Fehler im Callback oder in der Extraktion werden
+ * still geschluckt, sie duerfen den Aufruf NIE scheitern lassen.
+ */
+async function leseStreamAntwort(res, onLiveText, httpStart) {
+  const reader = res.body.getReader();
+  /* {stream: true}: haelt unvollstaendige Mehrbyte-Sequenzen (Umlaute,
+     Emojis) zurueck, bis die restlichen Bytes im naechsten Chunk ankommen —
+     ohne das entstuenden Ersatzzeichen mitten im Text. */
+  const decoder = new TextDecoder("utf-8");
+  let zeilenRest = ""; /* noch nicht durch \n abgeschlossene SSE-Rohdaten */
+  let volltext = ""; /* alle delta.content-Stuecke in Ankunftsreihenfolge */
+  let finishReason = "unknown";
+  let usage = {};
+  let letzteWelle = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    zeilenRest += decoder.decode(value, { stream: true });
+
+    /* Nur KOMPLETTE Zeilen verarbeiten; der Rest wartet auf den naechsten
+       Chunk. Ein \r vor dem \n (CRLF) wird mit abgeraeumt. */
+    let umbruch;
+    while ((umbruch = zeilenRest.indexOf("\n")) >= 0) {
+      const zeile = zeilenRest.slice(0, umbruch).replace(/\r$/, "");
+      zeilenRest = zeilenRest.slice(umbruch + 1);
+      if (!zeile.startsWith("data:")) continue; /* Leerzeilen, Kommentare */
+      const nutzlast = zeile.slice(5).trim();
+      if (nutzlast === "[DONE]") continue; /* Ende-Marker traegt keine Daten */
+      let chunk;
+      try {
+        chunk = JSON.parse(nutzlast);
+      } catch (_) {
+        continue; /* defensiv: eine unlesbare Zeile kippt nicht den Aufruf */
+      }
+      const choice = chunk.choices?.[0];
+      const delta = choice?.delta?.content;
+      if (typeof delta === "string") {
+        volltext += delta;
+      } else if (Array.isArray(delta)) {
+        /* Analog zum Nicht-Stream-Pfad: multimodale Antworten koennen den
+           Text als Array von {type:"text"}-Teilen liefern. */
+        volltext += delta
+          .filter((teil) => teil && teil.type === "text")
+          .map((teil) => teil.text)
+          .join("");
+      }
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+      if (chunk.usage) usage = chunk.usage; /* kommt im letzten Chunk */
+    }
+
+    /* Live-Welle: gedrosselt, still bei Fehlern. `null` heisst „profileText
+       hat noch nicht begonnen" — dann gibt es nichts zu melden. */
+    const jetzt = Date.now();
+    if (jetzt - letzteWelle >= liveIntervalMs) {
+      letzteWelle = jetzt;
+      try {
+        const live = extrahiereLiveText(volltext);
+        /* Callback nicht awaiten (nebenlaeufig) — aber eine Rejection MUSS
+           abgefangen werden, sonst stuerzt der Prozess ab. */
+        if (live !== null) Promise.resolve(onLiveText(live)).catch(() => {});
+      } catch (_) {
+        /* still: Der Live-Text ist reiner Komfort, nie Pflicht. */
+      }
+    }
+  }
+
+  /* Exakt dieselbe Ergebnisform wie der Nicht-Stream-Pfad — inklusive
+     `trim()`, damit der Gesamtstring byte-identisch ist. */
+  return {
+    text: volltext.trim(),
+    finishReason,
+    promptTokens: usage.prompt_tokens || 0,
+    outputTokens: usage.completion_tokens || 0,
+    cachedTokens: readCachedTokens(usage),
+    httpMs: Date.now() - httpStart,
+  };
+}
+
 async function callMistralRaw(options) {
   /* waitMs misst, wie lange der Call auf einen freien Semaphore-Slot UND einen
      Token-Bucket-Tick gewartet hat — der reine Drossel-Anteil an der Wartezeit.
@@ -104,8 +324,22 @@ async function callMistralRaw(options) {
   return { ...result, waitMs };
 }
 
-async function callMistralRawUnthrottled({ model, messages, maxTokens, temperature, forceJSON, timeoutMs, cacheKey }) {
+async function callMistralRawUnthrottled({
+  model,
+  messages,
+  maxTokens,
+  temperature,
+  forceJSON,
+  timeoutMs,
+  cacheKey,
+  onLiveText,
+}) {
   const apiKey = getApiKey();
+
+  /* v3.0 Phase 1: NUR mit Callback wird gestreamt. Ohne `onLiveText` ist der
+     Request-Body bitgenau der heutige — das ist die Rueckfall-Garantie des
+     Flags (Standard aus = kein `stream: true`, nirgends). */
+  const streamen = typeof onLiveText === "function";
 
   const body = {
     model,
@@ -113,6 +347,7 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
     max_tokens: maxTokens,
     temperature,
   };
+  if (streamen) body.stream = true;
   if (forceJSON) body.response_format = { type: "json_object" };
   /* v2.5: Prompt-Caching. `prompt_cache_key` erhoeht die Chance, dass Mistral
      den immer gleichen Prompt-ANFANG (unser statischer Anweisungstext, ~9.500
@@ -169,9 +404,14 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
       }
       throw err;
     }
-    clearTimeout(timeoutId);
+    /* Im Stream-Modus bleibt der Timeout SCHARF, bis der Stream zu Ende
+       gelesen ist: `fetch` liefert dort schon bei den Headern zurueck, die
+       eigentliche Antwort trudelt danach ueber Minuten ein. Ohne den aktiven
+       Waechter koennte ein haengender Stream den Worker endlos festhalten. */
+    if (!streamen) clearTimeout(timeoutId);
 
     if (res.status === 429 && attempt < backoffs.length) {
+      if (streamen) clearTimeout(timeoutId);
       lastError = new Error("Mistral 429 rate limited");
       lastError.status = 429;
       await new Promise((r) => setTimeout(r, backoffs[attempt]));
@@ -179,6 +419,7 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
     }
 
     if (!res.ok) {
+      if (streamen) clearTimeout(timeoutId);
       let bodyText = "";
       try {
         bodyText = await res.text();
@@ -188,6 +429,25 @@ async function callMistralRawUnthrottled({ model, messages, maxTokens, temperatu
       const e = new Error(`Mistral HTTP ${res.status}: ${bodyText.slice(0, 200).replace(/\s+/g, " ")}`);
       e.status = res.status;
       throw e;
+    }
+
+    if (streamen) {
+      /* Stream-Fehler sind normale Aufruf-Fehler: Ein Abbruch durch unseren
+         Timeout wirft im Reader einen AbortError (Phase-0-Messung) und wird
+         hier — wie beim Nicht-Stream-fetch — zum `timeout`-Fehler; alles
+         andere propagiert unveraendert in die bestehende Fehlerbehandlung. */
+      try {
+        return await leseStreamAntwort(res, onLiveText, httpStart);
+      } catch (err) {
+        if (err && err.name === "AbortError") {
+          const e = new Error(`Mistral request timeout after ${effectiveTimeout}ms`);
+          e.code = "timeout";
+          throw e;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
 
     const json = await res.json();
@@ -797,8 +1057,16 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
         },
       ];
 
+  /* v3.0 Phase 1: Live-Text-Callback — optional von aussen (Worker) gesetzt.
+     Er laeuft NUR im ersten Versuch mit: Ein Retry findet ausschliesslich
+     statt, wenn der erste Versuch bereits ein parsebares (nur unvollstaendiges)
+     Ergebnis geliefert hat — dessen Standard-Profiltext ist dann laengst
+     komplett angekommen. Den Retry auch noch zu streamen wuerde den bereits
+     gezeigten Live-Text nur mit einer NEUEN Modellantwort ueberschreiben. */
+  const onLiveText = typeof opts.onLiveText === "function" ? opts.onLiveText : null;
+
   /* Erster Versuch */
-  let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey);
+  let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText);
   let missing = parsed
     ? collectMissingForBothModes(parsed)
     : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };
@@ -1058,7 +1326,7 @@ function collectMissingForBothModes(parsed) {
   };
 }
 
-async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey) {
+async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText) {
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
     const result = await callMistralRaw({
@@ -1069,6 +1337,9 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       forceJSON: true,
       timeoutMs: budget,
       cacheKey,
+      /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
+         Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */
+      onLiveText: onLiveText || undefined,
     });
     const stages = [];
     const parsed = parseSafely(result.text, {
@@ -1122,4 +1393,6 @@ module.exports = {
   _callMistralRaw: callMistralRaw,
   _buildBrandBlocklistBlock: buildBrandBlocklistBlock,
   _BRAND_BLOCKLIST_SETS: BRAND_BLOCKLIST_SETS,
+  _extrahiereLiveText: extrahiereLiveText,
+  _setLiveIntervalMsForTest,
 };

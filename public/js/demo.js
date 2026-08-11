@@ -5,9 +5,9 @@ import { klangAktivieren } from "./klang.js";
 import { t } from "./i18n.js";
 
 const DEMO_IMAGES = {
-  selfie: "./img/demo/demo-selfie.jpg?v=2026081108",
-  cafe: "./img/demo/demo-cafe.jpg?v=2026081108",
-  hiker: "./img/demo/demo-hiker.jpg?v=2026081108",
+  selfie: "./img/demo/demo-selfie.jpg?v=2026081109",
+  cafe: "./img/demo/demo-cafe.jpg?v=2026081109",
+  hiker: "./img/demo/demo-hiker.jpg?v=2026081109",
 };
 
 export function initDemo() {

@@ -13,6 +13,11 @@ und Mistral-Verträge wurden unabhängig gegengeprüft):
   EU-Regional-Endpunkt von Mistral — die Bildanalyse läuft damit laut
   Vertrag in Rechenzentren in der EU bzw. EFTA (vorher galt nur
   „standardmäßig EU"). Kostet 10 % Aufpreis und ist es wert.
+- **Zero Data Retention bei Mistral aktiviert:** Auf unseren Antrag hat
+  Mistral für malziME Null-Datenspeicherung freigeschaltet (schriftlich
+  bestätigt und in der Konsole aktiv) — Ein- und Ausgaben, also auch
+  Fotos, werden dort nicht über die unmittelbare Verarbeitung hinaus
+  gespeichert oder protokolliert.
 - **Datenschutzerklärung präzisiert:** Die GPS-Erklärung sagt jetzt exakt,
   was passiert („erreichen nie unsere Server" — die Orts-Anfrage stellt
   dein Browser direkt an OpenStreetMap), und die Hosting-Beschreibung

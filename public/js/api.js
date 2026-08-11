@@ -166,7 +166,9 @@ function storeJobId(jobId, resultToken) {
   }
 }
 
-function clearStoredJobId() {
+/* Auch von der Absturz-Wache genutzt: Haengt ein Absturz an einem bestimmten
+   wiederaufgenommenen Auftrag, muss der weg, sonst wiederholt er sich endlos. */
+export function clearStoredJobId() {
   try {
     sessionStorage.removeItem(JOB_ID_STORAGE_KEY);
     sessionStorage.removeItem(JOB_TOKEN_STORAGE_KEY);

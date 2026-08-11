@@ -1,7 +1,13 @@
 import { initI18n, applyTranslations, t } from "./js/i18n.js";
 import { elements } from "./js/dom.js";
 import { state } from "./js/state.js";
-import { analyzeImage, acquireWakeLock, resumeQueueJob, initHintergrundWiederaufnahme } from "./js/api.js";
+import {
+  analyzeImage,
+  acquireWakeLock,
+  resumeQueueJob,
+  initHintergrundWiederaufnahme,
+  clearStoredJobId,
+} from "./js/api.js";
 import { renderCurrentMode } from "./js/render.js";
 import {
   dismissDisclaimerModal,
@@ -13,16 +19,28 @@ import {
 import { initDemo } from "./js/demo.js";
 import { initStickyToggle, renderKeepingScrollAnchor } from "./js/sticky-toggle.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
+import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
+
+/* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
+   Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
+   verwirft den gemerkten Auftrag — sonst wiederholt sich ein Absturz, der an
+   genau diesem Auftrag haengt, bei jedem Start endlos. Details und die Liste
+   der bereits ausgeschlossenen Ursachen: js/absturz-wache.js */
+initAbsturzWache({ verwirfAuftrag: clearStoredJobId });
+merkePhase("start");
 
 /* ── i18n initialisieren (vor allem anderen) ── */
 await initI18n();
+merkePhase("i18n");
 applyTranslations();
 
 /* ── Demo-Fotos initialisieren ── */
 initDemo();
+merkePhase("demo");
 
 /* ── Queue-Modus: offenes Ergebnis nach einem Reload weiter abholen ──
    No-Op, wenn keine jobId aus einem früheren Seitenbesuch vorliegt. */
+merkePhase("resume");
 resumeQueueJob();
 
 /* Holt das Ergebnis auch dann nach, wenn das Handy zwischendurch gesperrt war

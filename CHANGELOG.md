@@ -4,6 +4,58 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [2.12.2] — 2026-08-11
+
+Eine Wache gegen einen Fehler, den bisher niemand sehen konnte.
+
+### Der Anlass
+
+Auf einem iPhone erschien wiederholt Safaris Meldung „Auf https://malzi.me/ ist
+wiederholt ein Problem aufgetreten". **Sechs Erklärungen wurden geprüft und
+alle sechs ausgeschlossen:**
+
+| Vermutung | Ergebnis |
+|---|---|
+| 2-Stunden-Frist der Aufträge | wird sauber abgefangen, stille Aufräumung |
+| Neulade-Schleife am Stundenlimit | Limit stand bei 0 von 500 |
+| Absturz beim Laden der Sprachdatei | ist abgefangen, läuft mit Ersatztexten weiter |
+| Foto als Speicherfresser | liegt als Verweis im Fenster, nicht als Zeichenkette |
+| Abfrage-Schleife und Wartefunktion | beide sauber begrenzt und aufgeräumt |
+| DNS-Ausfall desselben Tages | zeitlich ausgeschlossen |
+
+### Warum Raten hier nicht weiterführt
+
+Wenn diese Meldung erscheint, **läuft der eigene Code nicht mehr** — deshalb
+kommt auch keine Fehlermeldung an. Das Ereignis ist unsichtbar. Statt eine
+siebte Vermutung zu prüfen, wird es jetzt messbar gemacht.
+
+### Die Wache
+
+Startet die Seite **dreimal binnen einer Minute**, ist das kein normales
+Verhalten. Dann passiert zweierlei:
+
+1. **Eine** Meldung geht über den vorhandenen Diagnose-Kanal raus — Anzahl der
+   Starts, Zeitspanne, ob ein Auftrag offen war und wie weit die Seite zuletzt
+   kam. Keine neue Datenart, kein Foto, keine Kennung.
+2. Der gemerkte Auftrag wird verworfen. **Hängt der Absturz an genau diesem
+   Auftrag, wiederholt er sich sonst bei jedem Start endlos.** Lieber ein
+   verlorenes Ergebnis als eine Seite, die sich nicht mehr öffnen lässt.
+
+Zwei Starts lösen bewusst nichts aus — einmal neu laden ist normal. Eine Wache,
+die zu früh anschlägt, wird ignoriert und ist damit wertlos.
+
+Zehn Prüfungen, darunter: schweigt im Normalbetrieb, meldet nur einmal, zählt
+alte Starts nicht mit, und ein defekter Speicher (privater Safari-Modus) legt
+den Seitenstart nicht lahm.
+
+### Nebenbei: Wortwahl korrigiert
+
+„Der Betreiber" ist aus CHANGELOG, Handbuch und Code-Kommentaren verschwunden.
+Das Projekt wird von einer Person entwickelt und betrieben; die Formulierung
+klang nach Auftragsarbeit für ein fremdes Unternehmen.
+
+Frontend 219 Tests, E2E 12.
+
 ## [2.12.1] — 2026-08-11
 
 Der Beast Mode überlebt jetzt ein Neuladen.
@@ -14,8 +66,8 @@ Wer im Beast Mode die Seite neu lud, landete wieder im seriösen Modus — das
 Ergebnis wurde zwar wiederhergestellt, aber im falschen Modus, und die
 Umschaltung musste von Hand wiederholt werden.
 
-Das war ursprünglich Absicht („Beast startet immer ausgeschaltet"). Der
-Betreiber hat die Regel präzisiert, und die Präzisierung trifft den Kern:
+Das war ursprünglich Absicht („Beast startet immer ausgeschaltet"). Die
+Regel ist präzisiert, und die Präzisierung trifft den Kern:
 
 > „Beast startet immer ausgeschaltet — das stimmt, aber ein Reload ist kein
 > Start."
@@ -154,7 +206,7 @@ des Repos gesichert.
 ## [2.11.1] — 2026-08-11
 
 Drei Fehler, die in der Browser-Konsole sichtbar waren, plus der echte Fehler
-dahinter. Ausgelöst durch eine Meldung des Betreibers aus dem laufenden Betrieb.
+dahinter. Im laufenden Betrieb aufgefallen.
 
 ### Behoben
 

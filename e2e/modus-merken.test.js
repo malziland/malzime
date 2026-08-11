@@ -2,9 +2,9 @@ import { test, expect } from "@playwright/test";
 
 /* Beast Mode überlebt ein Neuladen — aber nicht einen neuen Tab.
 
-   ANLASS (Betreiber-Meldung 2026-08-11): Im Beast Mode neu laden landete
+   ANLASS (aufgefallen 2026-08-11): Im Beast Mode neu laden landete
    wieder im seriösen Modus. Die Regel lautete „Beast startet immer
-   ausgeschaltet"; der Betreiber hat sie präzisiert:
+   ausgeschaltet"; die Regel ist präzisiert:
 
      „Beast startet immer ausgeschaltet — das stimmt, aber ein Reload ist
       kein Start."

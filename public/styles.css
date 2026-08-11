@@ -2751,6 +2751,443 @@ ol.legal-list > li::before {
 }
 
 /* ═══════════════════════════════════════════════
+   Realitäts-Check (v3.1) — der Hingucker, gebaut aus den ECHTEN
+   malziland-Bausteinen (Design-Tokens): Gold-Plakette, Teal/Gold/Rust
+   für die drei Antworten, pulsierender Glow (teal↔gold). Kein fremder
+   Farbverlauf (Veto des Inhabers). Optik 1:1 aus dem abgenommenen
+   Prototyp (compare-prototype-streaming.html, 2026-08-11).
+   ═══════════════════════════════════════════════ */
+
+.rc-karte {
+  position: relative;
+  margin: 34px 0;
+  padding: 30px 26px 26px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  animation: rcGlow 2.6s ease-in-out infinite;
+  /* UMGEKEHRTES Thema (Idee des Inhabers): Die Karte trägt im hellen
+     Modus die DUNKLEN Design-Token und umgekehrt — dadurch hebt sie sich
+     beim Scrollen sofort vom Rest ab, bleibt aber zu 100 % im
+     malziland-System. Alle inneren Regeln nutzen var(), darum genügt
+     das Vertauschen der Token hier am Karten-Wurzelelement. */
+  --surface: #1e2629;
+  --text: #eef1f0;
+  --muted: #a9b2b0;
+  --heading: #eef1f0;
+  --teal-text: #4698b9;
+  --border: rgba(255, 255, 255, 0.2);
+  --track: rgba(255, 255, 255, 0.16);
+  --hover: rgba(255, 255, 255, 0.08);
+  --tint-teal: rgba(70, 152, 185, 0.16);
+}
+
+:root[data-theme="dark"] .rc-karte {
+  --surface: #ffffff;
+  --text: #404749;
+  --muted: #6e675e;
+  --heading: #156480;
+  --teal-text: #156480;
+  --border: rgba(130, 121, 110, 0.4);
+  --track: rgba(21, 100, 128, 0.15);
+  --hover: rgba(21, 100, 128, 0.08);
+  --tint-teal: rgba(21, 100, 128, 0.07);
+}
+
+/* `hidden` schlägt die Karten-Optik — die Karte existiert im Markup dauerhaft
+   und erscheint nur bei echten Menschen-Profilen (js/realitaets-check.js). */
+.rc-karte[hidden] {
+  display: none !important;
+}
+
+@keyframes rcGlow {
+  0%,
+  100% {
+    box-shadow: 0 6px 26px rgba(21, 100, 128, 0.22);
+  }
+  50% {
+    box-shadow: 0 10px 44px rgba(191, 181, 66, 0.38);
+  }
+}
+
+.rc-badge {
+  position: absolute;
+  top: -13px;
+  left: 22px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: #bfb542;
+  color: #2c3133;
+}
+
+.rc-titel {
+  font-size: 1.35rem;
+  margin: 10px 0 2px;
+  color: var(--heading);
+}
+
+.rc-titel em {
+  font-style: normal;
+  color: var(--teal-text);
+}
+
+.rc-intro {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 2px 0 18px;
+}
+
+.rc-zeile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.rc-zeile .rc-label {
+  flex: 1 1 150px;
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+
+/* Das Zitat der echten KI-Behauptung unter dem Frage-Label — die
+   Anführungszeichen kommen sprachbewusst aus dem CSS (kein Text im JS). */
+.rc-zitat {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.rc-zitat::before {
+  content: "\201E";
+}
+
+.rc-zitat::after {
+  content: "\201C";
+}
+
+html[lang="en"] .rc-zitat::before {
+  content: "\201C";
+}
+
+html[lang="en"] .rc-zitat::after {
+  content: "\201D";
+}
+
+/* Festes 3-Spalten-Raster: jede Antwort sitzt in jeder Zeile an derselben
+   Stelle und ist gleich breit — zweistufige Zeilen lassen die Mitte leer. */
+.rc-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  flex: 0 0 min(420px, 100%);
+}
+
+.rc-seg .rc-knopf {
+  width: 100%;
+}
+
+.rc-seg .rc-knopf.spalte3 {
+  grid-column: 3;
+}
+
+@media (max-width: 480px) {
+  .rc-knopf {
+    font-size: 0.78rem;
+    padding: 8px 6px;
+  }
+  .rc-seg {
+    gap: 5px;
+  }
+}
+
+.rc-knopf {
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 8px 15px;
+  border-radius: 999px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease;
+}
+
+.rc-knopf:hover {
+  transform: scale(1.07);
+  background: var(--hover);
+}
+
+.rc-knopf.g1.gewaehlt {
+  background: var(--ml-teal);
+  border-color: var(--ml-teal);
+  color: #fff;
+}
+
+.rc-knopf.g2.gewaehlt {
+  background: var(--ml-gold);
+  border-color: var(--ml-gold);
+  color: #2c3133;
+}
+
+.rc-knopf.g3.gewaehlt {
+  background: var(--ml-rust);
+  border-color: var(--ml-rust);
+  color: #fff;
+}
+
+.rc-absenden {
+  display: block;
+  margin: 18px auto 0;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  padding: 12px 26px;
+  border-radius: 999px;
+  border: none;
+  color: #fff;
+  background: var(--ml-grad-teal);
+  box-shadow: 0 4px 18px rgba(21, 100, 128, 0.35);
+  transition:
+    transform 0.15s ease,
+    opacity 0.2s ease;
+}
+
+.rc-absenden[hidden] {
+  display: none;
+}
+
+.rc-absenden:not(:disabled):hover {
+  transform: scale(1.05);
+}
+
+.rc-absenden:not(:disabled) {
+  animation: rcBereit 1.4s ease-in-out infinite;
+}
+
+@keyframes rcBereit {
+  0%,
+  100% {
+    box-shadow: 0 4px 18px rgba(21, 100, 128, 0.35);
+  }
+  50% {
+    box-shadow: 0 6px 28px rgba(191, 181, 66, 0.55);
+  }
+}
+
+.rc-absenden:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Absenden = einfrieren: keine Klicks mehr, nur die gewählten Antworten
+   bleiben voll sichtbar (Statistik-Schutz). */
+.rc-gesperrt .rc-knopf {
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+.rc-gesperrt .rc-knopf.gewaehlt {
+  opacity: 1;
+}
+
+.rc-auswerten-blitz {
+  animation: rcBlitz 0.8s ease;
+}
+
+@keyframes rcBlitz {
+  0% {
+    filter: brightness(1);
+  }
+  35% {
+    filter: brightness(1.35) saturate(1.4);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
+.rc-ergebnis {
+  margin-top: 22px;
+}
+
+.rc-ergebnis[hidden] {
+  display: none;
+}
+
+.rc-ring-wrap {
+  position: relative;
+  width: 190px;
+  margin: 0 auto;
+}
+
+.rc-ring {
+  width: 190px;
+  height: 190px;
+  transform: rotate(-90deg);
+}
+
+.rc-ring-spur {
+  fill: none;
+  stroke: var(--track);
+  stroke-width: 11;
+}
+
+.rc-ring-wert {
+  fill: none;
+  stroke: var(--ml-teal);
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-dasharray: 326.7;
+  stroke-dashoffset: 326.7;
+  filter: drop-shadow(0 0 8px currentColor);
+  transition: stroke-dashoffset 0.08s linear;
+}
+
+.rc-ring-mitte {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.rc-ring-mitte span {
+  font-size: 2.6rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.rc-ring-mitte small {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.rc-ring-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.rc-vergleich {
+  max-width: 380px;
+  margin: 18px auto 0;
+}
+
+.rc-vergleich[hidden] {
+  display: none;
+}
+
+.rc-vergleich-titel {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.rc-balken {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--track);
+  overflow: visible;
+}
+
+.rc-balken-fuellung {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--ml-grad-teal-line);
+  transition: width 1s ease;
+}
+
+.rc-marke {
+  position: absolute;
+  top: -7px;
+  width: 4px;
+  height: 28px;
+  border-radius: 2px;
+  background: currentColor;
+  left: 0;
+  transition: left 1s ease;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.rc-vergleich-werte {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+.rc-vergleich-hinweis {
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-top: 4px;
+  text-align: center;
+}
+
+.rc-vergleich-hinweis[hidden] {
+  display: none;
+}
+
+.rc-antwort {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border-left: 4px solid var(--ml-teal);
+  background: var(--tint-teal);
+  font-size: 0.98rem;
+  line-height: 1.65;
+}
+
+/* Vor der Auswertung ist die Antwort-Box leer — dann auch keine leere
+   Farbfläche zeigen. */
+.rc-antwort:empty {
+  display: none;
+}
+
+.rc-antwort ul {
+  margin: 10px 0 0 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-karte,
+  .rc-absenden:not(:disabled),
+  .rc-auswerten-blitz {
+    animation: none;
+  }
+  .rc-knopf:hover,
+  .rc-absenden:not(:disabled):hover {
+    transform: none;
+  }
+  .rc-ring-wert,
+  .rc-balken-fuellung,
+  .rc-marke {
+    transition: none;
+  }
+}
+
+/* ═══════════════════════════════════════════════
    Print Styles — PDF-Export (heller Papier-Look der Marke)
    ═══════════════════════════════════════════════ */
 
@@ -2846,6 +3283,32 @@ ol.legal-list > li::before {
   .data-value-section,
   .limit-banner,
   .live-karte {
+    display: none !important;
+  }
+
+  /* Realitäts-Check (v3.1): Nur mit ABGESENDETEM Ergebnis drucken — eine
+     halb ausgefüllte oder leere Karte hat im PDF nichts verloren. */
+  .rc-karte:not(.rc-abgesendet) {
+    display: none !important;
+  }
+
+  /* Die gedruckte Karte ruhig und im Papier-Look: kein Glow, keine dunkle
+     Umkehrung — im Druck gelten ohnehin die hellen Token von oben. */
+  .rc-karte.rc-abgesendet {
+    animation: none;
+    box-shadow: none;
+    --surface: #ffffff;
+    --text: #404749;
+    --muted: #6e675e;
+    --heading: #156480;
+    --teal-text: #156480;
+    --border: rgba(130, 121, 110, 0.4);
+    --track: rgba(21, 100, 128, 0.15);
+    --hover: rgba(21, 100, 128, 0.08);
+    --tint-teal: rgba(21, 100, 128, 0.07);
+  }
+
+  .rc-absenden {
     display: none !important;
   }
 

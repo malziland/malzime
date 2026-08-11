@@ -468,8 +468,12 @@ export function starteEnthuellung() {
   const faktenKinder = elements.facts ? Array.from(elements.facts.children) : [];
   const adsKarte = elements.targeting ? elements.targeting.querySelector(".target-card:not(.warn)") : null;
   const triggerKarte = elements.targeting ? elements.targeting.querySelector(".target-card.warn") : null;
+  /* v3.1: Der Realitäts-Check reiht sich zwischen Manipulations- und
+     Datenwert-Box ein — aber nur, wenn er für dieses Ergebnis überhaupt
+     erscheint (realitaets-check.js hat ihn dann bereits sichtbar gemacht). */
+  const rcKarte = elements.realCheck && !elements.realCheck.hidden ? elements.realCheck : null;
   const dvKarte = elements.dataValue ? elements.dataValue.querySelector(".dv-card") : null;
-  const boxen = [privacy, gps, adsKarte, triggerKarte, dvKarte];
+  const boxen = [privacy, gps, adsKarte, triggerKarte, rcKarte, dvKarte];
   boxen.forEach((el) => el && el.classList.add("lv-verdeckt"));
   faktenKinder.forEach((el) => el.classList.add("lv-verdeckt"));
   /* Der PDF-Knopf kommt erst NACH der Enthüllung wieder. */
@@ -518,6 +522,13 @@ export function starteEnthuellung() {
     if (!(await warte(1200, mein))) return;
     boxZeigen(triggerKarte);
     if (!(await warte(1200, mein))) return;
+
+    /* 3b) Realitäts-Check (v3.1): direkt nach der Manipulations-Box und VOR
+       dem Datenwert — mit demselben Pop wie alle anderen Boxen. */
+    if (rcKarte) {
+      boxZeigen(rcKarte);
+      if (!(await warte(1200, mein))) return;
+    }
 
     /* 4) Datenwert: Box komplett, nur der Betrag zählt hoch, Balken fahren aus. */
     statusSetzen("live.statusDatenwert");

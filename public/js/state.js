@@ -12,6 +12,10 @@ export const state = {
   /* Promise des /api/stats-Aufrufs. analyzeImage wartet darauf, bevor der
      Upload startet (Wartungsmodus und Stundenlimit stehen dort drin). */
   statsReady: null,
+  /* Die geparste /api/stats-Antwort vom Seitenstart. Der Realitäts-Check
+     liest daraus den anonymen Gesamtzähler (realitaetsCheck.eingaben /
+     mittelProzent) für den Vergleichsbalken ab 100 Eingaben. */
+  statsDaten: null,
   /* Zeitpunkt der letzten erfolgreichen Statusabfrage. Die Hintergrund-
      Wiederaufnahme entscheidet daran, ob die Schleife steckengeblieben ist.
      Frueher wurde das Feld nur ad hoc in api.js gesetzt und war hier gar nicht

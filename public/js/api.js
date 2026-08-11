@@ -14,6 +14,7 @@ import {
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import * as liveAnzeige from "./live-anzeige.js";
+import * as realitaetsCheck from "./realitaets-check.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
 import { logTelemetry } from "./telemetry-logger.js";
@@ -570,6 +571,11 @@ function renderQueueResult(data, myId, traceId, timings, jobId, skipDisclaimer) 
     if (state.requestId !== myId) return;
     state.lastData = data;
     renderCurrentMode(data);
+    /* v3.1: Realitäts-Check VOR der Enthüllung aufbauen — bei einem echten
+       Menschen-Profil wird die Karte sichtbar und die Enthüllung staffelt
+       sie zwischen Manipulations- und Datenwert-Box mit ein; bei Tier-
+       Profil, blocked oder leerem Profil bleibt sie versteckt. */
+    realitaetsCheck.neuesErgebnis(data);
     /* v3.0: Lief für diesen Job Live-Text, wird das eben Gerenderte im selben
        Frame verdeckt und gestaffelt enthüllt (live-anzeige.js). Lief KEINER
        (Flag aus, Tier-Profil, blocked, Resume nach Reload), räumt abbrechen()
@@ -638,6 +644,9 @@ async function analyzeImageQueued() {
   /* v3.0: Reste eines vorigen Live-Erlebnisses (Karte, Verdeckungen) räumen —
      dieser Durchgang beginnt sauber, gelaufen ist für ihn noch nichts. */
   liveAnzeige.zuruecksetzen();
+  /* v3.1: Neues Foto = der Realitäts-Check des vorigen Ergebnisses ist
+     hinfällig — Antworten, Sperre, Ergebnis und Karte vollständig zurück. */
+  realitaetsCheck.zuruecksetzen();
   elements.facts.innerHTML = "";
   elements.privacy.innerHTML = "";
   elements.gpsMap.innerHTML = "";

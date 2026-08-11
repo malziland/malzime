@@ -5,6 +5,9 @@ const { HOURLY_LIMIT, HOURLY_WINDOW_MINUTES } = require("./config");
 const CURRENT_DOC = "stats/current";
 const TOTALS_DOC = "stats/totals";
 const MAINTENANCE_DOC = "config/maintenance";
+/* Realitäts-Check (v3.1): anonymes Aggregat der Selbsteinschätzungen —
+   nur zwei Zahlen (Anzahl + Prozentsumme), nichts Verknüpfbares. */
+const REALITAETS_CHECK_DOC = "stats/realitaetsCheck";
 
 /**
  * Filtert das recentAnalyses-Array: nur Timestamps der letzten windowMs behalten.
@@ -324,6 +327,57 @@ async function releaseHourlySlot() {
   }
 }
 
+/* ── Realitäts-Check (v3.1): anonymer Gesamtzähler ── */
+
+/**
+ * Zählt eine Realitäts-Check-Eingabe ins Aggregat: `eingaben` +1 und
+ * `summeProzent` +score — atomar über FieldValue.increment, damit parallele
+ * Workshop-Eingaben nichts verlieren. Der Score kommt bereits serverseitig
+ * validiert und berechnet aus handle-telemetry (dem Client wird nicht
+ * vertraut); hier wird er nur noch defensiv auf 0–100 geklemmt.
+ *
+ * Fehler werden still geschluckt (nur Log-Warnung) — Telemetrie darf den
+ * Antwortweg nie zum Scheitern bringen.
+ */
+async function zaehleRealitaetsCheck(score) {
+  try {
+    const s = Math.max(0, Math.min(100, Math.round(score)));
+    const db = datenbank();
+    await db.doc(REALITAETS_CHECK_DOC).set(
+      {
+        eingaben: FieldValue.increment(1),
+        summeProzent: FieldValue.increment(s),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "realitaets-check-zaehler-fehler", error: err.message }));
+  }
+}
+
+/**
+ * Liest das Realitäts-Check-Aggregat für /api/stats: Anzahl der Eingaben und
+ * gerundeter Mittelwert. Bei 0 Eingaben ist `mittelProzent` null (das
+ * Frontend zeigt den Vergleich ohnehin erst ab 100 Eingaben). Fehler liefern
+ * den leeren Stand — die Stats-Antwort bleibt funktionsfähig.
+ */
+async function leseRealitaetsCheck() {
+  try {
+    const db = datenbank();
+    const snap = await db.doc(REALITAETS_CHECK_DOC).get();
+    const data = snap.exists ? snap.data() : {};
+    const eingaben = typeof data.eingaben === "number" ? data.eingaben : 0;
+    const summe = typeof data.summeProzent === "number" ? data.summeProzent : 0;
+    return {
+      eingaben,
+      mittelProzent: eingaben > 0 ? Math.round(summe / eingaben) : null,
+    };
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "realitaets-check-lese-fehler", error: err.message }));
+    return { eingaben: 0, mittelProzent: null };
+  }
+}
+
 /* ── Maintenance-Modus (Kill-Switch) ── */
 
 let maintenanceCache = { data: null, expiresAt: 0 };
@@ -375,6 +429,8 @@ module.exports = {
   checkAndIncrement,
   incrementTotals,
   getStats,
+  zaehleRealitaetsCheck,
+  leseRealitaetsCheck,
   boostLimit,
   resetCounter,
   releaseHourlySlot,

@@ -4,6 +4,42 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.1.0] — 2026-08-11
+
+Der Realitäts-Check: „Wie gut hat dich die KI wirklich getroffen?"
+
+### Was sich ändert
+
+Nach jedem echten Menschen-Profil erscheint zwischen der Manipulations-Box
+und dem Datenwert eine neue Karte im umgekehrten Farb-Look: Sechs Zeilen
+zitieren, was die KI gerade behauptet hat (Alter, Geschlecht, Interessen,
+Charakter, Werbung, Manipulation), und zu jeder gibt es drei ehrliche
+Antworten — **Getroffen / Knapp / Daneben** (Geschlecht nur Getroffen/
+Daneben; die Zeile entfällt ganz, wenn die KI sich nicht festgelegt hat).
+Erst wenn jede Zeile beantwortet ist, lässt sich absenden; danach sind die
+Antworten eingefroren und ein animierter Ring zeigt die **KI-Trefferquote
+0–100 %** in den Markenfarben (Rust → Gold → Teal), dazu eine Einordnung
+je nach Ergebnis — mit eigenen Beast-Varianten und den echten Folgen
+falscher Profile für alles, was voll daneben lag. Es gibt keinen Ausgang,
+in dem das Tool „verliert": Treffer beweisen die Macht der Algorithmen,
+Fehler ihre Gefahr.
+
+Dazu kommt der **anonyme Vergleich mit allen anderen**: Beim Absenden geht
+ein einziges Ereignis mit ausschließlich den Antwort-Stufen an den Server —
+keine Auftrags-Nummer, keine Trace-ID, nichts Verknüpfbares. Der Server
+rechnet die Quote selbst nach (dem Client wird nicht vertraut), verwirft
+alles, was nicht exakt dem Schema entspricht, und zählt nur zwei Zahlen
+hoch: Anzahl und Prozentsumme. Der Vergleichsbalken („Ø andere") erscheint
+erst ab 100 Eingaben; darunter steht ein Hinweis-Satz.
+
+Im Live-Erlebnis reiht sich die Karte mit Pop und Klang in die gestaffelte
+Enthüllung ein; im PDF erscheint sie nur mit abgesendetem Ergebnis. Alle
+Texte sind zweisprachig (DE/EN, mobil einzeilige Knöpfe: „Spot on / Close /
+Way off"), die Knöpfe echte Buttons mit `aria-pressed`, die Prozentzahl
+wird Screenreadern genau einmal angesagt, und bei reduzierter Bewegung
+stehen Ring und Balken sofort. Tier-Profile, blockierte Analysen und leere
+Profile bekommen keinen Check. Testumfang jetzt 697 / 281 / 17.
+
 ## [3.0.1] — 2026-08-11
 
 Drei Dramaturgie-Korrekturen aus dem ersten Live-Test des Live-Erlebnisses:

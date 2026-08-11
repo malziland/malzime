@@ -59,6 +59,10 @@ describe("Live-Anzeige (v3.0)", () => {
     /* Der Beast-Schalter lebt (wie alle dom.js-Referenzen) über die Tests
        hinweg — jeder Test startet seriös. */
     elements.biasSwitch.checked = false;
+    /* v3.1: Die Realitäts-Check-Karte startet wie in index.html verborgen —
+       nur der eigene Enthüllungs-Test macht sie sichtbar. */
+    elements.realCheck.hidden = true;
+    elements.realCheck.className = "";
 
     echteMatchMedia = window.matchMedia;
   });
@@ -414,6 +418,46 @@ describe("Live-Anzeige (v3.0)", () => {
     /* A11y: genau EINE Ankündigung, am Ende. */
     expect(elements.srAnnounce.textContent).toBe("live.statusFertig");
     expect(elements.liveStatusText.textContent).toBe("live.statusFertig");
+  });
+
+  it("v3.1: ein sichtbarer Realitäts-Check reiht sich zwischen Manipulation und Datenwert ein", async () => {
+    baueGerendertesErgebnis();
+    /* realitaets-check.js hat die Karte für dieses Ergebnis sichtbar gemacht. */
+    elements.realCheck.hidden = false;
+    liveAnzeige.starteEnthuellung();
+
+    /* Synchron nach dem Start ist auch die Check-Karte verdeckt. */
+    expect(sichtbar(elements.realCheck)).toBe(false);
+
+    const warn = elements.targeting.querySelector(".target-card.warn");
+    const dv = elements.dataValue.querySelector(".dv-card");
+    const reihenfolge = [];
+    const gesehen = new Set();
+    for (let schritt = 0; schritt < 160; schritt++) {
+      await vi.advanceTimersByTimeAsync(100);
+      const stationen = [
+        ["manipulation", sichtbar(warn)],
+        ["realitaetsCheck", sichtbar(elements.realCheck)],
+        ["datenwert", sichtbar(dv)],
+      ];
+      for (const [name, ist] of stationen) {
+        if (ist && !gesehen.has(name)) {
+          gesehen.add(name);
+          reihenfolge.push(name);
+        }
+      }
+    }
+    expect(reihenfolge).toEqual(["manipulation", "realitaetsCheck", "datenwert"]);
+  });
+
+  it("v3.1: ohne sichtbaren Realitäts-Check (Tier/blocked) läuft die Staffel wie bisher", async () => {
+    baueGerendertesErgebnis();
+    /* Karte bleibt hidden (realitaets-check.js hat sie nicht freigegeben). */
+    liveAnzeige.starteEnthuellung();
+    await vi.advanceTimersByTimeAsync(16000);
+    /* Kein lv-verdeckt-Rest an der Karte, sie bleibt schlicht verborgen. */
+    expect(elements.realCheck.hidden).toBe(true);
+    expect(elements.exportPdf.classList.contains("export-btn--hidden")).toBe(false);
   });
 
   it("Datenwert: der Euro-Betrag zählt von 0 hoch, bevor er auf dem Endwert landet", async () => {

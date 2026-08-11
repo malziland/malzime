@@ -64,6 +64,10 @@ describe("Live-Anzeige (v3.0)", () => {
     elements.realCheck.hidden = true;
     elements.realCheck.className = "";
 
+    /* Zeit-Anlauf für die Tests abschalten — nur der eigene Anlauf-Test
+       stellt ihn gezielt wieder an. */
+    liveAnzeige._setzeTippAnlaufMsFuerTest(0);
+
     echteMatchMedia = window.matchMedia;
   });
 
@@ -91,17 +95,23 @@ describe("Live-Anzeige (v3.0)", () => {
 
   /* ── Tippen (Matrix-Dekodierung) ─────────────────────────────────────── */
 
-  it("Sofort-Start (v3.0.0): getippt wird ab dem ersten gelieferten Zeichen — kein Anlauf-Puffer mehr", async () => {
+  it("Zeit-Anlauf (Nachschliff 11.08.): erst trägt die Scan-Animation ~10 s, dann tippt es — kein Kriech-Start", async () => {
+    liveAnzeige._setzeTippAnlaufMsFuerTest(10000);
     /* Vor der ersten Welle: nichts sichtbar. */
     expect(elements.liveKarte.classList.contains("active")).toBe(false);
 
-    /* Schon eine kurze erste Welle bringt die Karte samt erstem Zeichen —
-       der frühere 200-Zeichen-Anlauf ließ hier noch den Spinner stehen. */
-    w("Hallo");
-    await vi.advanceTimersByTimeAsync(50);
+    /* Erste Welle: Der Puffer sammelt Material, die Karte bleibt zu — die
+       Scan-Animation trägt die Wartezeit. (Diese Erwartung wird ROT, wenn
+       jemand den Sofort-Start zurückbaut.) */
+    w("Hallo, hier entsteht gerade ein Profiltext.");
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.liveTextFest.textContent.length).toBe(0);
+
+    /* Nach Ablauf des Anlaufs übernimmt die Karte und tippt sofort los. */
+    await vi.advanceTimersByTimeAsync(5300);
     expect(elements.liveKarte.classList.contains("active")).toBe(true);
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
-    expect("Hallo".startsWith(elements.liveTextFest.textContent)).toBe(true);
   });
 
   it("Adaptives Tempo: viel Puffer tippt am Deckel (~90 Z/s) — deutlich schneller als das alte Festtempo", async () => {
@@ -114,14 +124,14 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(getippt).toBeLessThanOrEqual(100);
   });
 
-  it("Adaptives Tempo: wenig Puffer tippt am Boden (~6 Z/s) — langsam, aber sichtbar in Bewegung", async () => {
+  it("Adaptives Tempo: wenig Puffer tippt am Boden (~12 Z/s) — ruhig, aber sichtbar in Bewegung", async () => {
     /* Kleiner Rest → Untergrenze MIN_ZEICHEN_PRO_SEKUNDE. Mit festem Tempo
        (70 Z/s) wäre der Puffer hier nach unter einer halben Sekunde leer. */
     w("A".repeat(30));
     await vi.advanceTimersByTimeAsync(1000);
     const getippt = elements.liveTextFest.textContent.length;
-    expect(getippt).toBeGreaterThanOrEqual(5);
-    expect(getippt).toBeLessThanOrEqual(10);
+    expect(getippt).toBeGreaterThanOrEqual(10);
+    expect(getippt).toBeLessThanOrEqual(16);
   });
 
   it("Entkopplung: eine nachgeschobene Welle verlängert den Puffer, ohne das Tippen zu unterbrechen", async () => {
@@ -278,17 +288,17 @@ describe("Live-Anzeige (v3.0)", () => {
   /* ── Warte-Rotation nach dem fertig getippten Text (FIX 2, v3.0.1) ──────
      Seit v3.0.0 nur noch der FALLBACK für einen vorzeitig leeren Puffer —
      den Normalfall trägt jetzt das adaptive Tippen selbst. Die kurzen Texte
-     hier (12 Zeichen, Boden-Tempo 6 Z/s ≈ 2 s) tippen bewusst schnell leer. */
+     hier (24 Zeichen, Boden-Tempo 12 Z/s ≈ 2 s) tippen bewusst schnell leer. */
 
   it("FIX 2 (Fallback): die Warte-Rotation startet erst nach dem Tipp-Ende — nicht schon, wenn die Lieferung fertig ist", async () => {
-    w("A".repeat(12));
+    w("A".repeat(24));
     await vi.advanceTimersByTimeAsync(1000);
     expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
 
     /* Nächste Poll-Welle OHNE neue Zeichen → Lieferung abgeschlossen. Getippt
-       wird aber noch (~12 Zeichen / 6 pro s ≈ 2 s) — die Status-Zeile
+       wird aber noch (~24 Zeichen / 12 pro s ≈ 2 s) — die Status-Zeile
        bleibt beim Schreib-Status. */
-    w("A".repeat(12));
+    w("A".repeat(24));
     await vi.advanceTimersByTimeAsync(500);
     expect(elements.liveStatusText.textContent).toBe("live.statusSchreibt");
 

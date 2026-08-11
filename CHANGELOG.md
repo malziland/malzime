@@ -23,12 +23,14 @@ immer sichtbar etwas in Bewegung:
 
 - Die Scan-Animation (Auge + rotierende Meldungen) bleibt, bis das **erste
   Zeichen** wirklich getippt wird — nie eine leere Karte mit blinkendem
-  Cursor.
+  Cursor. Vor dem ersten Zeichen sammelt ein **~10-Sekunden-Anlauf**
+  Material, damit das Tippen danach flüssig wirkt statt zäh.
 - Getippt wird **im Takt der Analyse**: Das Tempo passt sich laufend an den
-  noch wartenden Text an — wenig Nachschub tippt langsam und gut lesbar,
+  noch wartenden Text an — wenig Nachschub tippt ruhig und gut lesbar,
   viel Nachschub schneller. So trägt das Tippen die Wartezeit, statt nach
   Sekunden fertig zu sein. Meldet der Server „fertig", tippt der Rest im
-  Schnellvorlauf aus.
+  Schnellvorlauf aus — und die Seite bleibt dabei, wo du gerade liest,
+  statt ans Seiten-Ende oder nach oben zu springen.
 - Läuft der Text doch einmal aus, rotieren ehrliche Status-Zeilen
   („Kategorien werden berechnet …") statt eines eingefrorenen Fensters.
 - Danach die **Enthüllung Schritt für Schritt**: Foto-Daten, Standort-Karte,
@@ -45,8 +47,8 @@ immer sichtbar etwas in Bewegung:
 jedem echten Menschen-Profil erscheint eine Karte mit sechs Fragen: Sie
 zitiert, was die KI zu Alter, Geschlecht, Interessen, Charakter, Werbung
 und Manipulation behauptet hat, und du antwortest ehrlich mit **Getroffen /
-Knapp / Daneben**. Ein animierter Ring zeigt deine persönliche
-KI-Trefferquote samt Einordnung — Treffer beweisen die Macht der
+Knapp / Daneben**. Ein animierter, freigestellter Ring zeigt deine
+persönliche KI-Trefferquote samt Einordnung — Treffer beweisen die Macht der
 Algorithmen, Fehler ihre Gefahr. Dazu der **anonyme Vergleich mit allen
 anderen**: Beim Absenden gehen ausschließlich die Antwort-Stufen an den
 Server — kein Foto, kein Profil, nichts Verknüpfbares — und der

@@ -23,17 +23,29 @@ echo "Prüfstand-Lauf auf Commit $COMMIT ($DATUM) — alle drei Suiten, danach S
 # ── 1. Backend (Jest) ──
 echo "— Backend-Suite läuft…"
 BACKEND_LOG=$(npm test --prefix functions 2>&1) || { echo "$BACKEND_LOG" | tail -20; echo "ABBRUCH: Backend-Suite rot — es wird nichts gestempelt."; exit 1; }
-BACKEND=$(printf "%s" "$BACKEND_LOG" | grep -Eo "Tests:\s+[0-9]+ passed, [0-9]+ total" | grep -Eo "[0-9]+" | head -1)
+# OPS-2026-08-13-32: Zwei Fehler in einer Zeile, beide erst sichtbar, als ein
+# Test bewusst uebersprungen wurde und die Ausgabe "1 skipped, 795 passed,
+# 796 total" lautete:
+#   1. Das Muster verlangte "passed" unmittelbar hinter "Tests:" und traf nicht
+#      mehr.
+#   2. Schwerer: Ohne `|| true` beendet ein leeres grep unter `set -e` und
+#      `pipefail` das ganze Skript SOFORT. Die Plausibilitaetspruefung weiter
+#      unten, die genau diesen Fall melden soll, wurde nie erreicht — der
+#      Stempler starb wortlos mit Exit 1. Ein Werkzeug, das beim Melden eines
+#      Problems selbst verstummt, ist die Ausfallform, gegen die dieses Projekt
+#      ueberall anschreibt.
+BACKEND=$(printf "%s" "$BACKEND_LOG" | grep -E "^Tests:" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | head -1 || true)
+BACKEND_GESAMT=$(printf "%s" "$BACKEND_LOG" | grep -E "^Tests:" | grep -Eo "[0-9]+ total" | grep -Eo "[0-9]+" | head -1 || true)
 
 # ── 2. Frontend (Vitest) ──
 echo "— Frontend-Suite läuft…"
 FRONTEND_LOG=$(npm run test:frontend 2>&1) || { echo "$FRONTEND_LOG" | tail -20; echo "ABBRUCH: Frontend-Suite rot — es wird nichts gestempelt."; exit 1; }
-FRONTEND=$(printf "%s" "$FRONTEND_LOG" | grep -Eo "Tests\s+[0-9]+ passed" | grep -Eo "[0-9]+" | head -1)
+FRONTEND=$(printf "%s" "$FRONTEND_LOG" | grep -Eo "Tests\s+[0-9]+ passed" | grep -Eo "[0-9]+" | head -1 || true)
 
 # ── 3. E2E (Playwright) ──
 echo "— E2E-Suite läuft (dauert am längsten)…"
 E2E_LOG=$(npm run test:e2e 2>&1) || { echo "$E2E_LOG" | tail -20; echo "ABBRUCH: E2E-Suite rot — es wird nichts gestempelt."; exit 1; }
-E2E=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | tail -1)
+E2E=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | tail -1 || true)
 
 # ── Plausibilität: alle drei Zahlen müssen da sein ──
 for WERT in "$BACKEND" "$FRONTEND" "$E2E"; do
@@ -46,7 +58,7 @@ done
 echo "Alle Suiten grün: Backend $BACKEND · Frontend $FRONTEND · E2E $E2E — Stempel wird gesetzt."
 
 # ── Stempeln: nur die Ergebnis-Zelle der drei Suiten-Zeilen ersetzen ──
-BACKEND="$BACKEND" FRONTEND="$FRONTEND" E2E="$E2E" COMMIT="$COMMIT" DATUM="$DATUM" python3 - "$MATRIX" <<'EOF'
+BACKEND="$BACKEND" BACKEND_GESAMT="$BACKEND_GESAMT" FRONTEND="$FRONTEND" E2E="$E2E" COMMIT="$COMMIT" DATUM="$DATUM" python3 - "$MATRIX" <<'EOF'
 import os, re, sys
 
 pfad = sys.argv[1]
@@ -54,8 +66,15 @@ text = open(pfad, encoding="utf-8").read()
 b, f, e = os.environ["BACKEND"], os.environ["FRONTEND"], os.environ["E2E"]
 stempel_ende = f"— `scripts/pruefstand.sh`, Commit {os.environ['COMMIT']}, {os.environ['DATUM']} |"
 
+# Ein uebersprungener Test wird AUSGEWIESEN, nicht weggerechnet: "795/795 gruen"
+# bei 796 Tests waere eine stille Schoenung genau der Art, die dieses Projekt
+# beim Audit an sich selbst gefunden hat.
+gesamt = os.environ.get("BACKEND_GESAMT") or b
+uebersprungen = int(gesamt) - int(b) if gesamt.isdigit() else 0
+b_text = f"{b}/{gesamt} grün ({uebersprungen} übersprungen)" if uebersprungen else f"{b}/{b} grün"
+
 ersetzungen = [
-    (r"(\| Backend-Unit-Tests \|[^|]+\|) [^|]+\|",  rf"\1 ✅ {b}/{b} grün {stempel_ende}"),
+    (r"(\| Backend-Unit-Tests \|[^|]+\|) [^|]+\|",  rf"\1 ✅ {b_text} {stempel_ende}"),
     (r"(\| Frontend-Unit-Tests \|[^|]+\|) [^|]+\|", rf"\1 ✅ {f}/{f} grün {stempel_ende}"),
     (r"(\| E2E kritischster Nutzerfluss[^|]*\|[^|]+\|) [^|]+\|", rf"\1 ✅ {e}/{e} grün {stempel_ende}"),
 ]

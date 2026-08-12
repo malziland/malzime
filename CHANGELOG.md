@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+**Audit-Sanierung, Welle 2 (Fortsetzung):**
+
+- **Der Prüfer blockiert jetzt wirklich** (`OPS-2026-08-12-04`, P1). Der Job `pruefungen`
+  lief zwar bei jedem Pull-Request, stand aber nicht in der Branch Protection — ein roter
+  Lauf verhinderte keinen Merge, und bei Dependabot hätte Auto-Merge ihn ohnehin nicht
+  abgewartet. In `ci.yml`, README und CHANGELOG stand trotzdem „blockierend". Er ist jetzt
+  der sechste Pflicht-Check, eingetragen erst nach fünf grünen Läufen in Folge: Wegen
+  `enforce_admins: true` blockiert ein wackliger Pflicht-Check jeden Merge, auch den
+  eigenen. Ist-Zustand und Rückweg stehen im RUNBOOK.
+
 ## [3.0.9] — 2026-08-12
 
 **Audit-Sanierung, Welle 2 — die Löschkette meldet ihr Scheitern, und die stille

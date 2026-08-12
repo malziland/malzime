@@ -4,6 +4,35 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.5] — 2026-08-12
+
+**Qualitäts-Zug „Richtung 100" (Konzept vom 2026-08-12; ohne Änderung am
+Nutzerpfad):**
+
+- **Prüfstand-Stempler:** `scripts/pruefstand.sh` lässt alle drei Test-Suiten
+  laufen und stempelt Anzahl, Commit und Datum selbst in die Verifikationsmatrix —
+  bei einer roten Suite wird nichts gestempelt. Von Hand gepflegte Testzahlen
+  sind damit abgeschafft.
+- **Live-Beweis nach jedem Deploy:** `scripts/live-smoke.sh` prüft automatisch
+  vier kostenfreie Proben gegen die Produktion (Upload-Ablehnung inkl. echter
+  Validierungs-Meldung, Honeypot, Admin-Zugriffsschutz, Stats); in `deploy.sh`
+  verankert (Notschalter `SKIP_SMOKE=1`).
+- **Doku-Drift-Wächter in der CI:** README bleibt frei von festen Testzahlen,
+  interne Doku-Links müssen existieren, die Prüfstand-Zeilen bleiben datiert.
+- **Sicherheitsmodell:** Neues `docs/SECURITY-MODEL.md` macht die bewussten
+  Abwägungen des Projekts zitierfähig (fail-open-Stundenzähler mit Alarm,
+  instanzlokales IP-Limit als Datenschutz-Entscheidung, kein Staging,
+  Bus-Faktor, externer Durchsatz-Deckel) — inklusive der verworfenen
+  Maßnahmen und ihrer Gründe.
+- **Datenschutzerklärung:** Die EU-/Zero-Data-Retention-Zusagen tragen jetzt
+  ein Prüfdatum („zuletzt am 11. August 2026 im Mistral-Dashboard überprüft")
+  samt Wiedervorlage-Versprechen — aus einem Versprechen wird ein gepflegter,
+  datierter Zustand.
+- **Zwei Drift-Korrekturen:** Die README-Beschreibung der Content Security
+  Policy nannte noch die abgebaute Subdomain `api.malzi.me` (gegen den echten
+  Live-Header korrigiert); die GPS-Formulierung war bereits in v3.0.4
+  regelkonform präzisiert worden.
+
 ## [3.0.4] — 2026-08-12
 
 **Wartungszug aus der externen Code-Review (Codex, 2026-08-12; drei Punkte im

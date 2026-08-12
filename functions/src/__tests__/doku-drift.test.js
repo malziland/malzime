@@ -89,4 +89,54 @@ describe("Doku-Drift-Wächter", () => {
 
     expect([...genannt].filter((j) => !echte.has(j))).toEqual([]);
   });
+
+  /* KURZAUDIT 2026-08-13, Rückfall von DOC-2026-08-12-07: Die Korrektur der
+     Matrix hat das audit-gate dem falschen Job zugeschrieben — und der Test
+     darüber konnte das nicht sehen, weil er nur prüft, OB ein genannter Job
+     existiert. Ein Test auf "X existiert" ersetzt keinen Test auf "X gehört
+     zu Y". Deshalb hier die Zuordnung: Jede Prüfskript-Datei, die eine
+     Matrixzelle einem CI-Job zuschreibt, muss im Block genau dieses Jobs
+     auftauchen. */
+  test("jede einem CI-Job zugeschriebene Prüfskript-Datei läuft auch in diesem Job", () => {
+    const matrix = lies("docs/VERIFICATION.md");
+    const ci = lies(".github/workflows/ci.yml");
+
+    /* ci.yml in Job-Blöcke zerlegen (Namen auf Einrückungstiefe 2 unter jobs:). */
+    const abJobs = ci.slice(ci.indexOf("\njobs:"));
+    const bloecke = {};
+    let aktuell = null;
+    for (const zeile of abJobs.split("\n")) {
+      const kopf = zeile.match(/^ {2}([a-z][a-z0-9-]*):$/);
+      if (kopf) {
+        aktuell = kopf[1];
+        bloecke[aktuell] = "";
+      } else if (aktuell) {
+        bloecke[aktuell] += zeile + "\n";
+      }
+    }
+
+    /* Tabellenzellen mit "CI-Job `name`": darin genannte Skript-Dateinamen
+       müssen im Block dieses Jobs vorkommen. Verglichen wird der Basisname —
+       die Matrix nennt den lokalen Aufruf, die CI läuft teils aus einem
+       Unterverzeichnis mit ../-Pfaden. */
+    const fehlzuordnungen = [];
+    for (const zelle of matrix.split("|")) {
+      const job = zelle.match(/CI-Job `([a-z][a-z0-9-]*)`/);
+      if (!job || !(job[1] in bloecke)) continue;
+      const skripte = zelle.match(/[\w./-]+\.(?:mjs|sh|py)\b/g) || [];
+      for (const s of skripte) {
+        const basis = s.split("/").pop();
+        if (!bloecke[job[1]].includes(basis)) {
+          fehlzuordnungen.push(`${basis} ist ${job[1]} zugeschrieben, läuft dort aber nicht`);
+        }
+      }
+    }
+
+    /* Positivkontrolle: Mindestens eine Zuordnung muss gefunden worden sein,
+       sonst prüft der Test gegen die leere Menge. */
+    const zuordnungen = (matrix.match(/CI-Job `[a-z][a-z0-9-]*`[^|]*\.(?:mjs|sh|py)\b/g) || []).length;
+    expect(zuordnungen).toBeGreaterThan(0);
+
+    expect(fehlzuordnungen).toEqual([]);
+  });
 });

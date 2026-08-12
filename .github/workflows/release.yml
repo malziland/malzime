@@ -63,7 +63,17 @@ jobs:
             #     Fehler entfaellt. Damit Tag und CHANGELOG nicht auseinander-
             #     laufen (die OPS-002-Falle vom 2026-08-10), wird der Tag samt
             #     Release hier auf DIESEN Stand umgehaengt statt zu scheitern.
-            VORHER="$(git show "$GITHUB_SHA^:CHANGELOG.md" | sh scripts/changelog-oberste-version.sh)" || true
+            # OPS-2026-08-13-35: Exit 1 ist hier normal (oberster Abschnitt ist
+            # keine Version, etwa [Unveroeffentlicht]) — Exit 2 oder eine leere
+            # Antwort heisst dagegen "Messung gescheitert". Vorher schluckte
+            # `|| true` beides, VORHER blieb leer, und der Umhaeng-Pfad lief
+            # weiter: dieselbe Tuer wie OPS-30, nur einen Schritt spaeter.
+            RC_VORHER=0
+            VORHER="$(git show "$GITHUB_SHA^:CHANGELOG.md" | sh scripts/changelog-oberste-version.sh)" || RC_VORHER=$?
+            if [ "$RC_VORHER" -eq 2 ] || [ -z "$VORHER" ]; then
+              echo "FEHLER: Elternstand des CHANGELOG nicht auswertbar — Abbruch statt Umhaengen auf Verdacht."
+              exit 1
+            fi
             if [ "$VORHER" = "$VERSION" ]; then
               echo "Release $TAG existiert; der Push aendert die oberste Version nicht (Doku-Korrektur) — nichts zu tun."
               exit 0

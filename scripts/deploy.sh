@@ -74,9 +74,21 @@ else
   ./scripts/verify-infrastructure.sh
 fi
 
+# ── Deploy-Ziel bestimmen ──
+# KURZAUDIT-Befund OPS-2026-08-13-34: Das Ziel muss VOR dem Buster-Block
+# feststehen. Vorher lief der Buster bei jedem Aufruf — ein reiner
+# Functions-Deploy veraenderte sechs Hosting-Dateien, die dann unausgeliefert
+# im Arbeitsbaum lagen. Rutscht so etwas in einen Commit, behauptet das
+# Repository einen Buster-Stand, der nie online war.
+TARGET="${1:-hosting,functions}"
+
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,
-# sonst neuer Tag mit laufender Nummer 01.
+# sonst neuer Tag mit laufender Nummer 01. NUR wenn Hosting wirklich
+# ausgeliefert wird — der Buster gehoert zur Auslieferung der Seiten, nicht
+# zum Aufruf des Skripts.
+VERSION="(kein Hosting-Deploy — Buster unveraendert)"
+if [[ ",$TARGET," == *",hosting,"* ]]; then
 TODAY=$(date +"%Y%m%d")
 CURRENT=$(grep -o 'styles\.css?v=[0-9]*' public/index.html | head -1 | grep -o '[0-9]*$' || true)
 if [ "${#CURRENT}" -eq 10 ] && [ "${CURRENT:0:8}" = "$TODAY" ]; then
@@ -107,9 +119,7 @@ for f in public/index.html public/datenschutz.html public/impressum.html public/
     echo "  $f aktualisiert"
   fi
 done
-
-# ── Deploy-Ziel bestimmen ──
-TARGET="${1:-hosting,functions}"
+fi
 
 echo ""
 echo "Deploy-Ziel: $TARGET"

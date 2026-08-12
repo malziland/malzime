@@ -25,12 +25,17 @@ gefunden hat:**
   die es nicht gibt. Jetzt vollständig.
 - **Zuschreibung in dritter Person entfernt** (`docs/ERROR-ALERTING.md`, 2 Stellen):
   Die Meldung wird jetzt sachlich beschrieben, statt sie einer Person zuzuschreiben.
-- **Neuer Job `pruefungen-bericht` (nicht blockierend):** Drei weitere Prüfungen
-  (driftende Fakten, stille Fehlschläge in Skripten, Tests ohne Zusicherung) laufen
-  mit und melden. Sie sind bewusst noch nicht blockierend: Sie finden derzeit echte
-  Kandidaten (4 blinde Tests von 924, 8 Stellen in `scripts/`), und ein dauerhaft
-  roter Job wird genauso ignoriert wie ein dauerhaft grüner. Erst aufräumen, dann
+- **Neuer Job `pruefungen-bericht` (nicht blockierend):** Zwei weitere Prüfungen
+  (stille Fehlschläge in Skripten, Tests ohne Zusicherung) laufen mit und melden.
+  Sie sind bewusst noch nicht blockierend: Sie finden derzeit echte Kandidaten
+  (8 Stellen in `scripts/`, 4 blinde Tests von 924), und ein dauerhaft roter Job
+  wird genauso ignoriert wie ein dauerhaft grüner. Erst aufräumen, dann
   `continue-on-error` entfernen.
+- **`fakten-drift` läuft bewusst nicht in der Pipeline mit.** Es meldete „Testanzahl
+  mit 27 verschiedenen Werten" und meinte damit die Zahlen alter CHANGELOG-Einträge.
+  Die Heuristik kann eine dokumentierte Historie nicht von einem Widerspruch
+  unterscheiden — ein Befund, der sich nicht beheben lässt, ohne die Historie zu
+  fälschen, gehört nicht in eine Pipeline. Von Hand bleibt die Prüfung nützlich.
 
 ## [3.0.6] — 2026-08-12
 

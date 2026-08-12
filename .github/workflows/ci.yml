@@ -145,17 +145,23 @@ jobs:
 
       - run: python3 scripts/pruefungen/checks/aussentext.py .
 
-  # ── Die uebrigen drei Pruefungen: melden, noch nicht blockieren ────────
-  # Stand 2026-08-12 haben sie im Repo echte Kandidaten gefunden (4 blinde Tests
-  # von 924, 8 stille Fehlschlaege in scripts/, 2 driftende Fakten). Sie sofort
-  # blockierend zu schalten haette jeden PR rot gemacht; ein dauerrot Job wird
-  # ignoriert wie ein dauergruener. Deshalb erst aufraeumen, dann
-  # continue-on-error entfernen — dann sind es Kontrollen statt Berichte.
+  # ── Zwei weitere Pruefungen: melden, noch nicht blockieren ─────────────
+  # Stand 2026-08-12 finden sie im Repo echte Kandidaten: 8 stille Fehlschlaege
+  # in scripts/ und 4 Tests von 924, die rechnerisch nicht rot werden koennen.
+  # Sie sofort blockierend zu schalten haette jeden PR rot gemacht; ein dauerhaft
+  # roter Job wird genauso ignoriert wie ein dauerhaft gruener. Deshalb erst
+  # aufraeumen, dann continue-on-error entfernen — dann sind es Kontrollen.
+  #
+  # fakten-drift.py laeuft hier bewusst NICHT mit: Es meldete "Testanzahl mit 27
+  # verschiedenen Werten" und meinte damit die Zahlen alter CHANGELOG-Eintraege.
+  # Die Heuristik kann eine dokumentierte Historie nicht von einem Widerspruch
+  # unterscheiden, und ein Befund, der sich nicht beheben laesst, ohne die
+  # Historie zu faelschen, gehoert nicht in eine Pipeline. Von Hand bleibt es
+  # nuetzlich: python3 scripts/pruefungen/checks/fakten-drift.py .
   pruefungen-bericht:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: python3 scripts/pruefungen/checks/fakten-drift.py .
       - run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
       - run: python3 scripts/pruefungen/checks/test-blind.py .

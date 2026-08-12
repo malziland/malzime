@@ -13,9 +13,9 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 
 | Anforderung | Nachweisweg | Letztes Ergebnis |
 |---|---|---|
-| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 726/726 grün — lokal auf `main` (v3.0.3), 2026-08-12 |
-| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 315/315 grün — lokal auf `main` (v3.0.3), 2026-08-12 |
-| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 18/18 grün (Smoke, A11y inkl. Beast Mode, Tastatur, Sticky-Toggle, Modus-Merken, Live-Anzeige, Realitäts-Check, Start-ohne-Hinweis) — lokal auf `main` (v3.0.3), 2026-08-12 |
+| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 734/734 grün — `scripts/pruefstand.sh`, Commit 626cb70, 2026-08-12 |
+| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 315/315 grün — `scripts/pruefstand.sh`, Commit 626cb70, 2026-08-12 |
+| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 18/18 grün — `scripts/pruefstand.sh`, Commit 626cb70, 2026-08-12 |
 | Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — 2026-08-10 |
 | Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29562535095, 2026-07-17 |
 | Dependency-Audit | CI-Job `test-backend`: `node scripts/audit-gate.mjs functions` (Gate, bricht Build; High/Critical blockieren, Ausnahmen nur begründet **und mit Ablaufdatum** in `.github/audit-allowlist.json`) | ✅ **0 Meldungen, Ausnahmeliste leer** — `npm audit` in beiden Projekten 0, auch inklusive Entwicklungswerkzeuge (vorher 27). Stand 2026-07-29 |
@@ -57,3 +57,10 @@ Ein Eintrag wird aktualisiert, wenn sein Nachweis durch eine Änderung ungültig
 oder ein neuer Pflicht-Nachweis entsteht (z. B. neue Profilpflicht, behobenes
 Audit-Finding). Die Rollback-Probe wird bei größeren Toolchain-Wechseln (Node-Major,
 Test-Runner) wiederholt, nicht bei jedem Release.
+
+**Die drei Suiten-Zeilen oben stempelt `scripts/pruefstand.sh` automatisch** —
+das Skript lässt alle drei Suiten laufen und trägt Anzahl, Commit und Datum
+selbst ein; bei einer roten Suite wird nichts gestempelt. Von Hand gepflegte
+Zahlen sind in diesen drei Zeilen nicht mehr vorgesehen. Der CI-Test
+`doku-drift.test.js` wacht darüber, dass das README zahlenfrei bleibt, interne
+Doku-Links existieren und die Suiten-Zeilen datiert sind.

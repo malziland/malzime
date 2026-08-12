@@ -1,0 +1,23 @@
+# Fakten, die in malziME genau EINEN Wert haben duerfen (KERN 11).
+#
+# Format:  Bezeichnung|regulaerer Ausdruck mit genau EINER Klammergruppe
+# Zeilen mit # sind Kommentare.
+#
+# Wichtig: Sobald diese Datei existiert, gelten NUR diese Muster — die
+# eingebauten sind abgeschaltet. Das ist Absicht. Generische Muster wie
+# "(\d+) Tage" halten Aufbewahrungsfrist, Karenzzeit und Pruefperiode fuer
+# denselben Fakt und melden Widersprueche, die keine sind.
+#
+# Nicht aufgenommen und warum:
+#   Testanzahl — steht bewusst nirgends fest, der CI-Lauf ist der Beleg.
+#   "N Tage"   — bezeichnet im Projekt mehrere verschiedene Fristen.
+#   Version    — steht im CHANGELOG naturgemaess vielfach; Historiendateien
+#                werden ohnehin uebersprungen.
+
+Node-Hauptversion|[Nn]ode(?:\.js)?[^0-9\n]{0,12}(\d\d)\b
+
+Stundenlimit (Analysen pro Stunde)|(\d+)\s+Analysen\s*/\s*Stunde
+
+IP-Rate-Limit (Requests pro 10 Minuten)|Rate.?Limit[^0-9\n]{0,20}(\d+)\s*Requests
+
+Aufbewahrung der Diagnose-Logs in Tagen|client-diagnostics[^0-9\n]{0,40}(\d+)\s*Tage

@@ -64,19 +64,33 @@ def einruecken(zeile):
     return len(zeile) - len(zeile.lstrip())
 
 
+def offen_danach(zeile, offen):
+    """Steht nach dieser Zeile noch ein mehrzeiliger Text offen? Gezaehlt werden
+    Backticks (JS/TS) und dreifache Anfuehrungszeichen (Python)."""
+    marken = zeile.count("`") + zeile.count('"""') + zeile.count("'''")
+    return (offen + marken) % 2
+
+
 def bloecke(zeilen):
     """Grobe Blockbildung: von einem Testbeginn bis zum naechsten oder bis die
-    Einrueckung wieder auf oder unter das Ausgangsniveau faellt."""
+    Einrueckung wieder auf oder unter das Ausgangsniveau faellt.
+
+    Innerhalb eines mehrzeiligen Textes zaehlt die Einrueckung NICHT. Ein
+    Textblock enthaelt regelmaessig Zeilen ohne jede Einrueckung; ohne diese
+    Ausnahme endete der Block dort, die Zusicherung dahinter blieb ungesehen und
+    der Test galt faelschlich als blind (Fehlalarm bis 2026-08-12)."""
     treffer = [i for i, z in enumerate(zeilen) if TESTBEGINN.search(z)]
     for pos, start in enumerate(treffer):
         ende = treffer[pos + 1] if pos + 1 < len(treffer) else len(zeilen)
         basis = einruecken(zeilen[start])
+        offen = offen_danach(zeilen[start], 0)
         for i in range(start + 1, ende):
             roh = zeilen[i]
-            if roh.strip() and einruecken(roh) <= basis and not roh.strip().startswith(
-                    ("}", ")", "]")):
+            if not offen and roh.strip() and einruecken(roh) <= basis \
+                    and not roh.strip().startswith(("}", ")", "]")):
                 ende = i
                 break
+            offen = offen_danach(roh, offen)
         yield start, ende
 
 

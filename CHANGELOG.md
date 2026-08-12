@@ -4,6 +4,31 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+**Die Prüfungen prüfen jetzt richtig — und sind deshalb alle vier verbindlich:**
+
+- **Ein Job `pruefungen` statt zwei, alles blockierend.** `continue-on-error` ist weg,
+  `fakten-drift` ist zurück in der Pipeline. Vorbedingung war, dass die Prüfungen
+  stimmen: Von 15 gemeldeten Fundstellen war **eine echt**, der Rest Fehlalarm der
+  Prüfungen selbst.
+- **Fünf Fehlalarm-Ursachen behoben**, jede mit eigener Probe in
+  `selbstpruefung.sh` (jetzt 18 statt 12): `if … >/dev/null 2>&1; then` ist kein
+  verworfener Rückgabewert · eine Zusicherung hinter einem mehrzeiligen Text wird
+  gefunden · ein Sammel-Berichter mit eigenem Fehler-Exit braucht kein `set -e` ·
+  ein geprüftes Suchergebnis gilt nicht als still gelesen (das Erfolgswort muss in
+  einer Meldung stehen, nicht in einem Suchmuster oder einem Shell-Schlüsselwort) ·
+  ein Changelog mit alten Zahlen ist Historie, kein Drift.
+- **`.pruefungen/fakten.txt` (neu):** Das Projekt legt fest, welche Zahlen genau einen
+  Wert haben dürfen. Sobald die Datei existiert, gelten nur ihre Muster — die
+  eingebauten halten „30 Tage Aufbewahrung", „7 Tage Karenz" und „183 Tage Frist" für
+  denselben Fakt und melden Widersprüche, die keine sind.
+- **Der eine echte Fund, behoben:** `cloudtasks-scripts.test.js` erzeugte ohne
+  installiertes `gcloud` einen Test mit `expect(true).toBe(true)`. Der zählte als
+  bestanden und behauptete eine Abdeckung, die es nicht gab. Jetzt wird er als
+  **übersprungen** ausgewiesen — 923 Tests, die alle scheitern können, statt 924, von
+  denen einer nicht kann.
+
 ## [3.0.7] — 2026-08-12
 
 **Formulierungs-Sperrliste als Pflicht-Check — und fünf Verstöße, die sie sofort

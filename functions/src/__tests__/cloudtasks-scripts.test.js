@@ -96,11 +96,12 @@ describe("Cloud-Tasks-Scripts", () => {
     90000
   );
 
-  if (!gcloudDa) {
-    test("Hinweis: gcloud fehlt, Parameter-Abgleich übersprungen", () => {
-      /* Kein Fehlschlag — in der CI ist gcloud nicht installiert. Der Abgleich
-         läuft dann lokal vor einem Deploy. */
-      expect(true).toBe(true);
-    });
-  }
+  // Fehlt gcloud (so in der CI), wird der Abgleich mit test.skip als übersprungen
+  // AUSGEWIESEN, statt einen immer wahren Test zu erfinden. Ein `expect(true)`
+  // stand vorher hier: Er zählte als bestanden und behauptete damit eine
+  // Abdeckung, die es nicht gab. Übersprungen ist ehrlicher als grün.
+  test.skip.each(gcloudDa ? [] : [["gcloud nicht installiert"]])(
+    "Parameter-Abgleich gegen die gcloud-Hilfe (%s)",
+    () => {}
+  );
 });

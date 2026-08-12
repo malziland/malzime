@@ -265,8 +265,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - **Secret-Scan** via gitleaks (prueft auf versehentlich committete API-Keys)
 - **Dependabot** prueft monatlich auf Updates (npm + GitHub Actions, je Bereich zu einem PR gebuendelt) und oeffnet bei gemeldeten Sicherheitsluecken sofort einen Reparatur-PR
 - **Audit-Gate** im Backend-Job (`scripts/audit-gate.mjs`): blockiert bei hohen und kritischen Schwachstellen. Laesst sich eine Luecke tief in einer fremden Abhaengigkeitskette nachweislich (noch) nicht reparieren, kann sie **begruendet und mit Ablaufdatum** in `.github/audit-allowlist.json` ausgenommen werden — danach faellt das Gate von selbst wieder auf rot
-- **Formulierungs-Sperrliste** (`aussentext`): blockiert, wenn ein Text, der nach aussen geht, eine Formulierung aus `.pruefungen/aussentext.txt` enthaelt — etwa eine Datenschutz-Zusage, die im Netzwerk-Tab widerlegbar waere. Der Job prueft zuerst die Pruefung selbst (`scripts/pruefungen/selbstpruefung.sh`)
-- **Weitere Pruefungen** (`pruefungen-bericht`): driftende Fakten, stille Fehlschlaege in Skripten, Tests ohne Zusicherung — laufen mit und melden, blockieren noch nicht
+- **Vier Pruefungen** (`pruefungen`, alle blockierend): verbotene Formulierungen in Aussentexten (`.pruefungen/aussentext.txt`), Zahlen mit mehr als einem Wert (`.pruefungen/fakten.txt`), stille Fehlschlaege in Skripten, Tests ohne Zusicherung. Der Job prueft zuerst die Pruefungen selbst — 18 Proben, je Pruefung eine gegen kaputtes und eine gegen sauberes Material, damit ein defekter Pruefer nicht gruen meldet, ohne etwas zu pruefen
 - **Branch Protection** fuer `main`: Merges erst nach gruenen Status-Checks (`test-backend`, `test-frontend`, `test-e2e`, `secret-scan`)
 - Deploy erfolgt manuell per `npx firebase deploy`
 

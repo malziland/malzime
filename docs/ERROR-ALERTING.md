@@ -3,7 +3,7 @@
 ## Was ist das?
 
 Wenn eine Cloud Function einen Fehler loggt (Absturz, Speicherfehler, API-Timeout,
-ausgefallene Kostenbremse), wird der Betreiber sofort benachrichtigt — statt es
+ausgefallene Kostenbremse), geht sofort eine Benachrichtigung raus — statt es
 erst Tage später zu merken.
 
 ## Wie es funktioniert
@@ -96,8 +96,8 @@ Der Filter wurde am 2026-07-17 (LANGAUDIT OPS-001) um die Queue-Functions
 war seit der Queue-Umstellung (v2.0) ohne Alarm. Die Functions `errors` und
 `telemetry` sind **bewusst ausgespart**: `handle-errors.js` loggt jeden
 Client-Fehlerbericht mit severity ERROR — im Filter wäre das Alarm-Spam.
-Client-Fehler erreichen den Betreiber stattdessen über den Log-Bucket
-`client-diagnostics` (30 Tage Aufbewahrung), nicht über ntfy.
+Client-Fehler landen stattdessen im Log-Bucket
+`client-diagnostics` (30 Tage Aufbewahrung), nicht bei ntfy.
 
 ## Zweiter Kanal: E-Mail (seit 2026-08-10)
 

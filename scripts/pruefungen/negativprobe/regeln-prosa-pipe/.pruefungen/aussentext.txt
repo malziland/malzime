@@ -1,0 +1,5 @@
+# Absichtlich kaputt: Die Begruendung enthaelt ein | (hier ein Firmenname).
+# ERWARTUNG: Exit 2. Ohne die Erkennung wuerde der Ausdruck stillschweigend zu
+# "verbotenes wort|Nicht verwenden. Richtig ist: Firma - learning | training" -
+# er kompiliert tadellos und trifft ab sofort jedes Vorkommen von " training".
+verbotenes wort|Nicht verwenden. Richtig ist: Firma - learning | training | consulting e.U.

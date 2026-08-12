@@ -6,7 +6,7 @@ Betreiber: malziland - learning | training | consulting e.U., Inhaber Christoph 
 
 Zielgruppe: Workshops mit Kindern, Jugendlichen und Erwachsenen zu Datenschutz, Algorithmen-Bias und Profiling (Safer Internet, Schule, Erwachsenenbildung).
 
-Datenschutz: Hochgeladene Fotos werden nur für die Dauer der Analyse verarbeitet und danach aktiv gelöscht. GPS-Daten (EXIF) verlassen nie den Browser. Keine Cookies, kein Tracking, keine Konten.
+Datenschutz: Hochgeladene Fotos werden nur für die Dauer der Analyse verarbeitet und danach aktiv gelöscht. GPS-Daten (EXIF) erreichen nie unsere Server. Keine Cookies, kein Tracking, keine Konten.
 
 Sprachen: Deutsch (Standard) und Englisch (umschaltbar auf der Seite).
 

@@ -1,0 +1,26 @@
+# Verbotene Formulierungen in Texten, die nach aussen gehen (malziME).
+#
+# Format:  regulaerer Ausdruck|Begruendung
+# Getrennt wird am LETZTEN |, der Ausdruck darf also selbst | als Oder enthalten.
+# Zeilen mit # sind Kommentare. Grosz-/Kleinschreibung wird ignoriert.
+# Eine Zeile, die sich nicht laden laesst, bricht den Lauf mit Exit 2 ab.
+#
+# Geprueft wird alles unter .md .html .htm .txt .json .yml .yaml — also README,
+# CONTRIBUTING, CHANGELOG, die Seiten unter public/ und llms.txt.
+#
+# Stand 2026-08-12: Beim Anlegen dieser Liste waren fuenf Stellen im Repo verletzt
+# (README 2x, CONTRIBUTING, CHANGELOG, public/llms.txt) — alle im selben Zug korrigiert.
+
+verl(ae|ä)sst nie den (Browser|Client)|Absolute Zusage, technisch nicht haltbar. Richtig ist: GPS erreicht nie unsere Server.
+
+verlassen nie den (Browser|Client)|Absolute Zusage, technisch nicht haltbar. Richtig ist: GPS erreicht nie unsere Server.
+
+malziland e\.U\.|Diese Kurzform der Firmierung existiert nicht. Die vollstaendige Firmierung steht im Impressum und wird unveraendert uebernommen; die reine Marke "malziland" ohne Rechtsform ist erlaubt. Der volle Name steht hier bewusst nicht, weil er selbst das Trennzeichen enthaelt.
+
+zertifiziert\w* (Saferinternet|Trainer)|Es gibt keine Zertifizierung. Korrekt ist Saferinternet-Trainer ohne Zusatz.
+
+\b(der|dem|den|des) Betreibers?\b(?!-)|Keine Zuschreibung in dritter Person, sachlich formulieren. Ausgenommen Rechtstexte und strukturierte Daten.
+
+zu ?100 ?% (sicher|anonym)|Absolute Sicherheitszusage ohne Nachweis. Abschwaechen oder Nachweis verlinken.
+
+garantiert (sicher|anonym|fehlerfrei)|Garantie ohne Nachweis.

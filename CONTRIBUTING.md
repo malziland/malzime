@@ -46,7 +46,7 @@ Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md)
 
 Diese Regeln sind nicht verhandelbar:
 
-- **GPS verlässt nie den Browser.** Keine Ausnahmen.
+- **GPS erreicht nie unsere Server.** Keine Ausnahmen. Genau so formulieren, nicht als Zusage über das Gerät: Für Karte und Ortsname ruft der Browser OpenStreetMap und Nominatim direkt auf. Die Koordinaten verlassen das Gerät also sehr wohl — nur eben nie in Richtung malziME. Jede Formulierung, die etwas anderes behauptet, ist im Netzwerk-Tab in zehn Sekunden widerlegt und steht auf der Sperrliste in `.pruefungen/aussentext.txt`.
 - **Keine externen Scripts.** Alles muss self-hosted sein.
 - **Keine Tracking-Cookies, Analytics oder Werbung.**
 - **Keine dauerhafte Speicherung von Bildern oder Profilen.** (Im Queue-Betrieb liegt das Bild kurz im Storage — es muss unmittelbar nach der Verarbeitung gelöscht werden.)

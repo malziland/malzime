@@ -27,7 +27,24 @@ UEBERSPRINGEN = {".git", "node_modules", "vendor", "dist", "build", ".venv",
 TESTBEGINN = re.compile(
     r"^\s*(?:"
     r"def\s+test\w*\s*\(|"                       # pytest / unittest
-    r"(?:it|test)\s*(?:\.\w+)?\s*\(\s*[\"'`]|"   # jest / vitest / mocha
+    # jest / vitest / mocha. TEST-2026-08-12-06, in zwei Schritten gelernt:
+    #   1. BELIEBIG VIELE Zusaetze, nicht nur einer — sonst blieb
+    #      `test.skip.each(...)` unsichtbar.
+    #   2. Und hinter der Klammer darf ALLES stehen. Die erste Fassung verlangte
+    #      dort ein Anfuehrungszeichen und uebersah damit weiterhin die
+    #      haeufigste Tabellenform ueberhaupt: `test.each(liste.map(...))`.
+    #      Zwei Anlaeufe fuer dieselbe Zeile — die zweite Fassung war am
+    #      Beispielmaterial gruen und am echten Projekt trotzdem blind.
+    # Der Name muss am Zeilenanfang stehen und genau `it`/`test` heissen;
+    # `testHelper(` faellt damit nicht darunter. Die Schablonenform
+    # (`test.each` + Rueckstrich) kommt ohne Klammer aus.
+    # Ausgenommen sind die Mitglieder, die KONFIGURIEREN statt zu deklarieren
+    # (`test.setTimeout(...)`, `test.use(...)`, `test.step(...)`). Ohne diese
+    # Ausnahme meldet die Pruefung sie als Tests ohne Zusicherung — und schneidet
+    # obendrein den echten Test darueber mitten entzwei, sodass dessen
+    # Zusicherung ungesehen bleibt. Ein Fehlalarm, der einen zweiten erzeugt.
+    r"(?:it|test)(?!\s*\.\s*(?:setTimeout|use|slow|info|step|extend|before\w+|after\w+)\b)"
+    r"\s*(?:\.\w+)*\s*(?:\(|`)|"
     r"func\s+Test\w*\s*\(|"                      # go
     r"(?:public\s+)?void\s+test\w*\s*\("         # junit
     r")", re.I)
@@ -42,6 +59,12 @@ ZUSICHERUNG = re.compile(
 UEBERSPRUNGEN = re.compile(
     r"(?:@(?:pytest\.mark\.)?skip|@Ignore|\bit\.skip|\btest\.skip|\bxit\b|\bxdescribe\b|"
     r"\bdescribe\.skip|\.todo\b|t\.Skip\(|@unittest\.skip|pytest\.skip\()", re.I)
+
+# Begruendetes Ueberspringen (KERN 12). Der Grund ist Pflicht: Ein Marker ohne
+# Text waere eine Abschaltung mit Tarnkappe. Was hier steht, taucht im Bericht
+# auf — die Abweichung bleibt sichtbar, sie wird nur nicht mehr als Mangel
+# gezaehlt.
+BEGRUENDET = re.compile(r"pruefungen:uebersprungen-weil[ \t]+(.+)")
 
 IMMER_WAHR = re.compile(
     r"(?:assert\s+True\b|assert\s+1\s*==\s*1|assertTrue\s*\(\s*True\s*\)|"
@@ -107,6 +130,7 @@ def main():
     dateien = 0
     tests = 0
     funde = []
+    begruendet = []
 
     for pfad in testdateien(wurzel):
         dateien += 1
@@ -124,9 +148,20 @@ def main():
             vorlauf = "".join(zeilen[max(0, start - 3):start])
 
             if UEBERSPRUNGEN.search(block) or UEBERSPRUNGEN.search(vorlauf):
+                # Nicht jedes Ueberspringen ist ein Versaeumnis: Ein Test, der
+                # ein Werkzeug braucht, das in dieser Umgebung fehlt, ist
+                # uebersprungen richtiger als mit einer Schein-Zusicherung
+                # gruen. Wer das behauptet, schreibt die Begruendung daneben —
+                # dann bleibt die Abweichung sichtbar, statt zu verschwinden
+                # (KERN 12). Ohne Begruendungstext gilt der Marker nicht.
+                erlaubt = BEGRUENDET.search(block) or BEGRUENDET.search(vorlauf)
+                if erlaubt and erlaubt.group(1).strip():
+                    begruendet.append((kurz, start + 1, erlaubt.group(1).strip()))
+                    continue
                 funde.append((kurz, start + 1, kopf, "uebersprungen",
                               "Ein uebersprungener Test zaehlt als Abdeckung und "
-                              "prueft nichts. Reparieren oder loeschen."))
+                              "prueft nichts. Reparieren, loeschen — oder mit "
+                              "'pruefungen:uebersprungen-weil <Grund>' begruenden."))
                 continue
             if IMMER_WAHR.search(block):
                 funde.append((kurz, start + 1, kopf, "immer wahr",
@@ -144,6 +179,15 @@ def main():
         return 2
 
     print(f"Testdateien: {dateien}, erkannte Tests: {tests}")
+
+    # Begruendet Uebersprungene werden AUSGEGEBEN, nicht verschwiegen. Eine
+    # Ausnahme, die niemand mehr sieht, ist nach zwei Monaten keine Ausnahme
+    # mehr, sondern der Normalzustand.
+    if begruendet:
+        print(f"\nBegruendet uebersprungen ({len(begruendet)}) — bleibt sichtbar, zaehlt nicht als Mangel:")
+        for kurz, nr, grund in begruendet:
+            print(f"  {kurz}:{nr}  {grund}")
+
     for kurz, nr, kopf, art, rat in funde:
         print(f"\n{kurz}:{nr}  [{art}]")
         print(f"  {kopf}")

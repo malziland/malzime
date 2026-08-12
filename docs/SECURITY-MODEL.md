@@ -90,6 +90,34 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    Warteschlangen-Ehrlichkeit (Position + ETA) abgefedert; Tier-Hebung ist eine
    Kostenentscheidung des Inhabers, kein technisches Versäumnis.
 
+7. **Der E2E-Container hängt an einem beweglichen Etikett.**
+   (`OSS-2026-08-12-24`) Die Tests laufen im offiziellen Playwright-Image
+   `mcr.microsoft.com/playwright:v<Version>-jammy`. Die Version kommt aus dem
+   Lockfile, das Etikett selbst wird von Microsoft neu bebildert — derselbe Name
+   kann morgen einen anderen Inhalt haben. *Warum kein Digest-Pin:* Das Etikett
+   wird aus dem Lockfile **abgeleitet**; ein fest verdrahteter Digest würde bei
+   jedem Playwright-Update einen Pflicht-Check brechen, bis jemand von Hand
+   nachzieht — ein Riegel, der regelmäßig aus dem falschen Grund rot ist, wird
+   ignoriert. *Warum vertretbar:* Der Job hat **kein Geheimnis, kein Token und
+   keine Schreibrechte** (`permissions: contents: read`, gemessen 2026-08-13) und
+   liefert nichts aus. Das schlimmste Ergebnis eines untergeschobenen Images ist
+   ein falsches Testergebnis — kein Zugriff auf Produktion, Daten oder Konten.
+   *Neu bewerten,* sobald der E2E-Job ein Geheimnis braucht oder etwas
+   veröffentlicht.
+8. **Nicht-personenbezogene Logs liegen weiter auf Standort `global`.**
+   (Rest von `PRIV-2026-08-12-12`) Die Standard-Log-Ablage von Google Cloud
+   (`_Default`) ist fest auf `global` und lässt sich nicht nach Europa
+   verschieben. Behoben ist der personenbezogene Teil: Cloud-Run-Request-Logs
+   sind der einzige Träger von Client-IP-Adressen und werden vollständig
+   ausgeschlossen (`exclude_run_requests_ip`, vom Deploy-Riegel bewacht, inkl.
+   Filterinhalt). *Was bleibt:* Programmausgaben der Functions und
+   Zeitplan-Läufe, ohne Personenbezug, **eine** Aufbewahrungstag lang.
+   *Verworfene Alternative:* die `_Default`-Senke auf einen EU-Speicher
+   umhängen — dann findet `gcloud logging read` ohne zusätzliche Angaben nichts
+   mehr, und jedes Störungsrezept im RUNBOOK liefert stillschweigend eine leere
+   Antwort statt eines Fehlers. Genau die Ausfallform, gegen die dieses Projekt
+   sonst überall anschreibt.
+
 ## Verworfene Maßnahmen
 
 | Maßnahme | Warum verworfen |

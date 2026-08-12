@@ -53,5 +53,10 @@ if [ "$FEHLER" -eq 0 ] && [ "$UEBERSPRUNGEN" -eq 0 ]; then
   echo "  ERGEBNIS: alle vier Pruefungen sauber."
   exit 0
 fi
+# TEST-2026-08-12-03: Eine Pruefung ohne Suchflaeche wurde bisher zwar
+# angemahnt, der Lauf ging aber trotzdem mit 0 raus — die Warnung stand in einer
+# Ausgabe, die niemand liest, solange das Ergebnis gruen ist. Jetzt entscheidet
+# der Rueckgabewert mit: 1 = echte Fundstellen, 2 = Messung gescheitert.
+# Fundstellen wiegen schwerer und gewinnen, wenn beides zutrifft.
 [ "$FEHLER" -gt 0 ] && exit 1
-exit 0
+exit 2

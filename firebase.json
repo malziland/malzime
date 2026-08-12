@@ -15,7 +15,7 @@
   },
   "hosting": {
     "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/__tests__/**", "img/demo/original/**"],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/__tests__/**", "img/demo/original/**", "lib/PRUEFSUMMEN.json"],
     "headers": [
       {
         "source": "**",

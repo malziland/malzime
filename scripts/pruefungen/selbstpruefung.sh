@@ -15,8 +15,11 @@ KAPUTT="$HIER/negativprobe/kaputt"
 SAUBER="$HIER/negativprobe/sauber"
 FEHLER=0
 
+PROBEN=0
+
 lauf() {
   # $1 = Skriptname, $2 = Verzeichnis, $3 = erwarteter Exit, $4 = Beschreibung
+  PROBEN=$((PROBEN + 1))
   python3 "$HIER/checks/$1" "$2" > /tmp/selbstpruefung.out 2>&1
   IST=$?
   if [ "$IST" -eq "$3" ]; then
@@ -71,12 +74,23 @@ lauf fakten-drift.py "$HIER/negativprobe/nur-historie" 0 \
 lauf aussentext.py "$HIER/negativprobe/ignorierte-datei" 0 \
   "eine ignorierte Datei wird nicht geprueft (lokal = CI)"
 
+echo ""
+echo "Richtung 5: keine Suchflaeche und Tabellenformen (2026-08-13)"
+lauf aussentext.py "$HIER/negativprobe/ohne-aussentexte" 2 \
+  "null gepruefte Dateien ist Exit 2, nicht 'kein Verstoss gefunden'"
+lauf test-blind.py "$HIER/negativprobe/tabellenform" 1 \
+  "test.skip.each und die Schablonenform werden ueberhaupt als Test erkannt"
+lauf test-blind.py "$HIER/negativprobe/uebersprungen-begruendet" 0 \
+  "begruendet uebersprungen zaehlt nicht als Mangel, bleibt aber sichtbar"
+
 echo "============================================================"
 if [ "$FEHLER" -eq 0 ]; then
-  echo "ERGEBNIS: alle neunzehn Proben bestanden."
+  # Die Zahl steht NUR hier und kommt aus dem Zaehler. Sie als Wort zu fuehren
+  # hiess, sie irgendwann falsch zu fuehren (DOC-2026-08-12-07).
+  echo "ERGEBNIS: alle $PROBEN Proben bestanden."
   echo "Die Pruefungen koennen rot werden und sind nicht ueberempfindlich."
   exit 0
 fi
-echo "ERGEBNIS: $FEHLER Probe(n) fehlgeschlagen."
+echo "ERGEBNIS: $FEHLER von $PROBEN Proben fehlgeschlagen."
 echo "Eine Pruefung, die hier durchfaellt, ist selbst der Befund."
 exit 1

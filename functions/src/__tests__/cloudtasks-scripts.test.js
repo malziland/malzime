@@ -100,6 +100,8 @@ describe("Cloud-Tasks-Scripts", () => {
   // AUSGEWIESEN, statt einen immer wahren Test zu erfinden. Ein `expect(true)`
   // stand vorher hier: Er zählte als bestanden und behauptete damit eine
   // Abdeckung, die es nicht gab. Übersprungen ist ehrlicher als grün.
+  //
+  // pruefungen:uebersprungen-weil der Abgleich braucht das Werkzeug gcloud, das in der CI nicht installiert ist — die Alternative waere eine Schein-Zusicherung
   test.skip.each(gcloudDa ? [] : [["gcloud nicht installiert"]])(
     "Parameter-Abgleich gegen die gcloud-Hilfe (%s)",
     () => {}

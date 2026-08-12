@@ -1,13 +1,5 @@
 # PRUEFUNGEN — vier Kontrollen statt vier Bitten
 
-> **Herkunft:** Kopie des Werkzeugkastens aus der Audit-Familie
-> (`~/.claude/skills/audit-familie/pruefungen`, Repository `malziland/audit-familie`).
-> Sie liegt hier, weil die CI nur sieht, was im Repository liegt. Aenderungen bitte an
-> BEIDEN Stellen — die Familie ist die Quelle.
->
-> Der Ordner `negativprobe/` enthaelt **absichtlich fehlerhaftes Beispielmaterial** und
-> wird von allen Pruefungen uebersprungen.
-
 Diese vier Pruefungen setzen Regeln der Familie in Programme um, die rot werden koennen.
 Der Unterschied ist der Kern der ganzen Sache: Eine Regel im Prompt wirkt vielleicht,
 eine Pruefung in der Pipeline wirkt immer.

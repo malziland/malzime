@@ -1095,14 +1095,27 @@ Erzeuge 6-8 Werbeeinträge, die an der VERLETZLICHKEIT ansetzen, nicht am Hobby.
 Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;
 
 /* Nur die wechselnden Werte — kommt als user-Nachricht NACH dem System. */
-module.exports.beastAdsUser = (p) => `═══ DAS PROFIL ═══
+/* SEC-2026-08-12-18: Derselbe Schutz wie im ersten Aufruf. Alles hier stammt
+   mittelbar aus dem hochgeladenen Bild — ein Foto mit lesbarem Text kann Sätze
+   in das Profil tragen, die im zweiten Aufruf wie Anweisungen aussehen. Drei
+   Maßnahmen, wie in buildProfilePrompt(): Warnung voran, Daten in Blöcke
+   gefasst, Inhalte maskiert (die Maskierung passiert in mistral.js, wo
+   escapeXml liegt). Die Warnung steht nur an einer Stelle und wird hier
+   verwendet, nicht kopiert. */
+module.exports.beastAdsUser = (p) => `${module.exports.injectionWarning}
 
+═══ DAS PROFIL ═══
+
+<profil_daten>
 Alter/Geschlecht: ${p.alter}
 Verletzlichkeit: ${p.verletzlichkeit}
 Gesundheit: ${p.gesundheit}
 Kaufkraft: ${p.kaufkraft}
 
 Zusammenfassung: ${p.profileText}
+</profil_daten>
 
 Diese Werbung bekommt die Person bereits im sachlichen Modus — sie zeigt den sichtbaren Lebensstil:
-${p.standardAds}`;
+<bestehende_werbung>
+${p.standardAds}
+</bestehende_werbung>`;

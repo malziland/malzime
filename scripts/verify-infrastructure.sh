@@ -170,12 +170,37 @@ esac
 
 # ── 6. Logging: Routine-Ausschlüsse + Diagnose-Sink ──
 echo "— Logging"
-EXCL=$(gcloud logging sinks describe _Default --project="$PROJECT" --format=json 2>/dev/null \
-  | python3 -c 'import json,sys; print(" ".join(e["name"] for e in json.load(sys.stdin).get("exclusions",[])))' || true)
-case " $EXCL " in
-  *" exclude_run_request_routine "*) gruen "_Default: Routine-Request-Ausschluss aktiv" ;;
-  *) rot "_Default: Ausschluss »exclude_run_request_routine« fehlt (IST: ${EXCL:-<keine>})" ;;
-esac
+# AUDIT-BEFUND PRIV-2026-08-12-12: Der _Default-Speicher liegt auf Standort
+# `global` und lässt sich nicht nach Europa verschieben. Einziger Träger von
+# Client-IP-Adressen sind die Cloud-Run-Request-Logs — sie werden deshalb
+# vollständig ausgeschlossen, nicht mehr nur unterhalb von ERROR. Geprüft wird
+# der FILTER, nicht bloß der Name: Ein Ausschluss, der wieder eine
+# Schwere-Bedingung enthält, ließe ERROR-Request-Logs samt IP durch und hieße
+# trotzdem noch so.
+#
+# Drei unterscheidbare Ausfallarten statt einer — sonst sähe eine gescheiterte
+# Messung aus wie ein fehlender Ausschluss (dieselbe Wurzel wie OPS-2026-08-12-02).
+EXCL_ROH=$(gcloud logging sinks describe _Default --project="$PROJECT" --format=json 2>/dev/null || true)
+if [ -z "$EXCL_ROH" ]; then
+  rot "_Default: Ausschlüsse NICHT MESSBAR (gcloud lieferte nichts) — kein bestandener Riegel"
+else
+  EXCL_IP=$(printf "%s" "$EXCL_ROH" | python3 -c '
+import json, sys
+daten = json.load(sys.stdin)
+for e in daten.get("exclusions", []):
+    if e["name"] == "exclude_run_requests_ip":
+        print(e.get("filter", ""))
+        break
+' || true)
+  if [ -z "$EXCL_IP" ]; then
+    VORHANDEN=$(printf "%s" "$EXCL_ROH" | python3 -c 'import json,sys; print(" ".join(e["name"] for e in json.load(sys.stdin).get("exclusions",[])))' || true)
+    rot "_Default: Ausschluss »exclude_run_requests_ip« fehlt (IST: ${VORHANDEN:-<keine>})"
+  elif printf "%s" "$EXCL_IP" | grep -qi "severity"; then
+    rot "_Default: »exclude_run_requests_ip« enthält wieder eine Schwere-Bedingung — ERROR-Request-Logs mit IP landen auf »global«: $EXCL_IP"
+  else
+    gruen "_Default: Request-Logs (einziger IP-Träger) vollständig ausgeschlossen"
+  fi
+fi
 SINKS=$(gcloud logging sinks list --project="$PROJECT" --format="value(name)" 2>/dev/null || true)
 case " $(printf "%s" "$SINKS" | tr '\n' ' ') " in
   *" client-diagnostics-sink "*) gruen "Diagnose-Sink »client-diagnostics-sink« vorhanden" ;;

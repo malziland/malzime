@@ -149,8 +149,28 @@ async function handleEnqueue(req, res, secrets) {
       res.status(400).json({ error: "Invalid file type. Allowed: JPEG, PNG, WEBP, GIF" });
       return;
     }
-    if (!detectImageType(file.buffer)) {
+    /* SEC-2026-08-12-19: Der erkannte Typ wurde bisher nur auf "ueberhaupt ein
+       Bild" geprueft und dann weggeworfen. Ein GIF mit der Behauptung
+       `image/jpeg` kam durch — die Behauptung des Aufrufers reiste danach
+       ungeprueft weiter, bis in die Daten-URL an die KI. Jetzt entscheidet der
+       Inhalt, nicht die Behauptung. Fuer das eigene Frontend aendert sich
+       nichts: Es erzeugt jedes Bild ueber den Canvas neu und schickt darum immer
+       echtes JPEG (public/js/exif.js, toDataURL("image/jpeg")). */
+    const erkannterTyp = detectImageType(file.buffer);
+    if (!erkannterTyp) {
       res.status(400).json({ error: "Invalid image data" });
+      return;
+    }
+    if (erkannterTyp !== file.mimeType) {
+      console.log(
+        JSON.stringify({
+          requestId,
+          warning: "mime-mismatch",
+          behauptet: file.mimeType,
+          erkannt: erkannterTyp,
+        })
+      );
+      res.status(400).json({ error: "Invalid file type. Allowed: JPEG, PNG, WEBP, GIF" });
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {

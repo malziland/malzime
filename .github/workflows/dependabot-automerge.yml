@@ -17,6 +17,34 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # AUDIT-BEFUND OSS-2026-08-12-20: Aendert der PR eine Workflow-Datei, laeuft
+      # fremder Code in genau den Pflicht-Checks, die den Merge freigeben — der
+      # einzige Weg, auf dem ungeprueft Fremdcode nach main gelangt. Solche PRs
+      # gehen ueber die Hand.
+      # Bewusst an den GEAENDERTEN DATEIEN gemessen, nicht am Oekosystem-Feld:
+      # Der Commit-Trailer eines Actions-PRs enthaelt gar kein
+      # `package-ecosystem` (an PR #57 nachgesehen), ein Filter darauf waere
+      # leer verglichen und haette still nie gegriffen.
+      - name: Beruehrt der PR die Auslieferkette?
+        id: flaechen
+        run: |
+          set -euo pipefail
+          DATEIEN=$(gh pr diff --name-only "$PR_URL")
+          if [ -z "$DATEIEN" ]; then
+            echo "Keine Dateiliste erhalten — im Zweifel keine Automatik." >&2
+            echo "kette=ja" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if printf '%s\n' "$DATEIEN" | grep -q '^\.github/'; then
+            echo "kette=ja" >> "$GITHUB_OUTPUT"
+          else
+            echo "kette=nein" >> "$GITHUB_OUTPUT"
+          fi
+          printf 'Geaenderte Dateien:\n%s\n' "$DATEIEN"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # Auto-Merge NUR fuer patch + minor. Major-Updates (und alles andere)
       # brauchen bewusste manuelle Freigabe — verhindert, dass ein groesserer
       # oder kompromittierter Versionssprung ungeprueft auf main landet
@@ -48,7 +76,8 @@ jobs:
         if: >
           (steps.meta.outputs.update-type == 'version-update:semver-patch' ||
            steps.meta.outputs.update-type == 'version-update:semver-minor') &&
-          !contains(steps.meta.outputs.directory, '/functions')
+          !contains(steps.meta.outputs.directory, '/functions') &&
+          steps.flaechen.outputs.kette == 'nein'
         run: gh pr merge --auto --squash "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}

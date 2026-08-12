@@ -4,9 +4,13 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [3.1.0] — 2026-08-12
+## [Unveröffentlicht]
 
 **Das TIEF-Audit und seine Sanierung.**
+
+> Dieser Eintrag bekommt die Nummer `3.1.0`, sobald alle 29 Befunde erledigt sind.
+> Solange er unveröffentlicht ist, ist die Sanierung nicht fertig — die Nummer wird
+> vergeben, wenn sie stimmt, nicht vorher.
 
 Am 12. August lief das erste vollständige TIEF-Audit dieses Projekts: sechs unabhängige
 Prüfer entlang von Prüffragen, ein eigener Widerleger für den schwersten Befund, dazu die
@@ -25,85 +29,36 @@ brachte eine Funktion zum Absturz; der Absturz löste die Störungsmeldung aus. 
 konnte damit ohne Anmeldung den einzigen Alarmkanal des Projekts unbrauchbar machen —
 beliebig oft. Behoben und live belegt.
 
-Die Sanierung lief in Wellen; `3.0.8` und `3.0.9` waren die ersten beiden. Was seither
-dazukam, steht hier. Der vollständige Bericht liegt unter `docs/audit/` (nicht im
-öffentlichen Repository).
+Vorlauf und Sanierung stehen hier vollständig an einer Stelle. `3.0.7`, `3.0.8` und
+`3.0.9` waren Zwischen-Auslieferungen derselben Arbeit — sie tragen Tags, weil sie
+tatsächlich deployt wurden, aber ihr Inhalt steht hier. Der vollständige Auditbericht mit
+allen 29 Befunden liegt unter `docs/audit/` (bewusst nicht im öffentlichen Repository).
 
-### Welle 2, Fortsetzung — die Riegel greifen wirklich
+### Vorlauf — die Sperrliste für Außentexte (ausgeliefert als `3.0.7`)
 
-- **Der Prüfer blockiert jetzt wirklich** (`OPS-2026-08-12-04`, P1). Der Job `pruefungen`
-  lief zwar bei jedem Pull-Request, stand aber nicht in der Branch Protection — ein roter
-  Lauf verhinderte keinen Merge, und bei Dependabot hätte Auto-Merge ihn ohnehin nicht
-  abgewartet. In `ci.yml`, README und CHANGELOG stand trotzdem „blockierend". Er ist jetzt
-  der sechste Pflicht-Check, eingetragen erst nach fünf grünen Läufen in Folge: Wegen
-  `enforce_admins: true` blockiert ein wackliger Pflicht-Check jeden Merge, auch den
-  eigenen. Ist-Zustand und Rückweg stehen im RUNBOOK.
+Der Anlass für das Audit. Eine Regel, die seit Monaten in `CONTRIBUTING.md` steht, war an
+fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als Prüfung.
 
-- **Der Alarmweg hatte keinen Wächter** (`OPS-2026-08-12-09`, P2). Die Richtlinie ist eine
-  Anwesenheits-Bedingung: Ihr eigener Ausfall erzeugt keine Logzeile, ein toter Alarm sieht
-  aus wie „keine Störung". Der Deploy-Riegel prüft jetzt vier Ausfallarten — Richtlinie
-  fehlt, ist aus, hat keinen Kanal, Kanal abgeschaltet. Die Grenze steht ehrlich dabei:
-  Das greift beim Deploy, nicht in der Minute des Ausfalls; der Rest ist als Restrisiko
-  in `docs/SECURITY-MODEL.md` festgehalten.
+- **Formulierungs-Sperrliste als CI-Prüfung.** Alle Texte, die nach außen gehen (README,
+  CONTRIBUTING, CHANGELOG, die Seiten unter `public/`, `llms.txt`), laufen gegen eine
+  Sperrliste in `.pruefungen/aussentext.txt`. Die Prüfung prüft zuerst sich selbst
+  (`scripts/pruefungen/selbstpruefung.sh`), damit ein defekter Prüfer nicht grün meldet,
+  ohne etwas geprüft zu haben.
+- **Fünf Verstöße korrigiert.** Die Regel „nicht behaupten, GPS verlasse das Gerät nie"
+  war verletzt in README (2x), CONTRIBUTING, CHANGELOG (Eintrag v1.0.0) und
+  `public/llms.txt`. Letzteres wiegt am schwersten: Diese Datei lesen KI-Crawler, die
+  Falschaussage wurde also aktiv weitergetragen. Überall steht jetzt „GPS erreicht nie
+  unsere Server" — sachlich richtig, weil der Browser für Karte und Ortsname
+  OpenStreetMap und Nominatim sehr wohl direkt aufruft.
+- **Firmierung korrigiert:** Ein CHANGELOG-Eintrag führte eine Kurzform der Firma, die es
+  nicht gibt. Jetzt vollständig.
+- **Zuschreibung in dritter Person entfernt** (`docs/ERROR-ALERTING.md`, 2 Stellen): Die
+  Meldung wird sachlich beschrieben, statt sie einer Person zuzuschreiben.
+- **Zwei weitere Prüfungen liefen zunächst nur mit** (stille Fehlschläge in Skripten,
+  Tests ohne Zusicherung), `fakten-drift` lief gar nicht in der Pipeline. Beides war eine
+  Notlösung — genau diese Nachgiebigkeit wurde in Welle 1 zum Befund und ist dort behoben.
 
-### Welle 3 — Außentexte
-
-**Audit-Sanierung, Welle 3 — vier Sätze, die mehr versprachen als das System hält:**
-
-- **Die Zusage über den Analyse-Zähler** (`PRIV-2026-08-12-13`, P2) war am
-  Live-Dokument widerlegbar — sie sprach von genau einem Wert je Zeitraum: Für das rollende Stundenlimit hält der Zähler die Zeitpunkte
-  der letzten 60 Minuten. Kein Personenbezug — aber es sind mehrere Werte. Der Satz zählt
-  jetzt auf, was wirklich drinsteht.
-- **Die Beschreibung der KI-Analyse** (`PRIV-2026-08-12-15`, P3) sprach von einem einzigen
-  Arbeitsschritt. Das traf nicht zu:
-  Für die Beast-Variante folgt ein zweiter Aufruf an dieselbe KI, der nach Werbe-Kategorien
-  fragt. Kein Bild geht dabei mit, wohl aber die eben erzeugten Profilangaben. Steht jetzt
-  in der Erklärung.
-- **Die Diagnose-Daten** (`PRIV-2026-08-12-14`, P3) enthalten mehr Felder als aufgezählt
-  waren — Netzwerk-Geschwindigkeit, Datensparmodus, Sprache, Prozessorkerne,
-  Arbeitsspeicher-Klasse, Pixeldichte und die aufgerufene Seite. Alle sind jetzt benannt.
-- **Das README** (`DOC-2026-08-12-16`, P3) stellte das Hosting als `europe-west1` dar;
-  gemessen antwortet ein weltweites Auslieferungsnetz. Die Datenschutzerklärung sagt es
-  richtig — jetzt sagen beide dasselbe.
-- **Zwei neue Regeln auf der Sperrliste** fangen genau diese zwei Formulierungen künftig ab.
-- **Der Formulierungs-Prüfer achtet jetzt `.gitignore`** (`TEST-2026-08-12-29`, P3). Er
-  lief über den Dateibaum und sah damit auch Auditberichte, die verbotene Formulierungen
-  zitieren, um sie zu melden — lokal dauerhaft rot, in der CI grün. Jetzt prüft er, was im
-  Repository landet: 128 Dateien statt 161, lokal und in der CI dasselbe Ergebnis.
-
-## [3.0.9] — 2026-08-12
-
-**Audit-Sanierung, Welle 2 — die Löschkette meldet ihr Scheitern, und die stille
-Erinnerung bekommt einen Wächter:**
-
-- **Bildlöschung ohne Erfolgsprüfung** (`PRIV-2026-08-12-26`, P2). `deleteImage`
-  verschluckte jeden Fehler in eine Logzeile unterhalb der Alarmschwelle und gab nichts
-  zurück; der Aufrufer löschte danach das Job-Dokument mitsamt dem einzigen Verweis auf
-  die Datei. Gemessen: 11 solcher Fehlschläge in 30 Tagen, alle unbemerkt. Jetzt meldet
-  die Funktion Erfolg oder Misserfolg, ein echter Fehler geht mit `severity: ERROR` raus,
-  und der Reaper lässt das Dokument stehen, statt den Pfad wegzuwerfen.
-- **Kein zweites Netz für die fertigen Profile** (`ARCH-2026-08-12-27`, P2). Räumte der
-  Reaper nicht, blieben Job-Dokumente unbegrenzt liegen. Neu: ein Ablauf-Feld je Job und
-  eine automatische Löschregel in der Datenbank — bewusst bei 24 Stunden statt bei 2, das
-  Netz soll den Ausfall des Reapers fangen und ihm nicht ins Handwerk pfuschen.
-  Eingerichtet, während die Sammlung leer war; keine Migration nötig.
-- **Nonce und Admin-Token waren kryptografisch dasselbe** (`SEC-2026-08-12-17`, P2). Der
-  30-Minuten-Token steht im Klartext in der Push-Mitteilung; wer ihn sah, konnte ihn im
-  Nonce-Feld einsetzen und die Bestätigungsseite überspringen. Beide tragen jetzt ihren
-  Verwendungszweck in der Signatur. Zusätzlich hat der Boost eine Obergrenze (doppeltes
-  Stundenlimit) und lehnt fail-closed ab, wenn die aktuelle Grenze nicht lesbar ist.
-- **Die Wochen-Erinnerung schwieg in jedem Fehlerfall** (`OPS-2026-08-12-11`, P2) — und
-  bis zum ersten fälligen Push im Februar 2027 wäre ihr Ausfall 180 Tage lang nicht von
-  korrektem Verhalten zu unterscheiden gewesen. Sie hinterlässt jetzt bei jedem Lauf ein
-  Lebenszeichen; der Reaper liest es jede Minute und meldet laut, wenn es älter als neun
-  Tage ist. Der Reaper eignet sich dafür, weil er in der Alarmrichtlinie steht — die
-  Erinnerung selbst bleibt bewusst leise. Dazu bekommt die CI einen wöchentlichen
-  Zeitplan: Die harte Frist-Bremse lief bisher nur bei Push und Pull-Request, damit waren
-  **beide** Schichten ereignisgesteuert und konnten gemeinsam verstummen.
-
-## [3.0.8] — 2026-08-12
-
-**Audit-Sanierung, Welle 1 — die Riegel können jetzt rot werden:**
+### Welle 1 — die Riegel, die nicht rot werden konnten
 
 - **Das Abhängigkeits-Gate meldete grün, ohne gemessen zu haben** (`OPS-2026-08-12-01`,
   P1). Bei einer Registry-Störung schrieb `npm audit` eine Fehlermeldung auf dieselbe
@@ -148,38 +103,208 @@ Erinnerung bekommt einen Wächter:**
   **übersprungen** ausgewiesen — 923 Tests, die alle scheitern können, statt 924, von
   denen einer nicht kann.
 
+### Welle 2 — Löschkette, Sicherheitsnetz, Admin-Zugang, stille Erinnerung
+
+- **Bildlöschung ohne Erfolgsprüfung** (`PRIV-2026-08-12-26`, P2). `deleteImage`
+  verschluckte jeden Fehler in eine Logzeile unterhalb der Alarmschwelle und gab nichts
+  zurück; der Aufrufer löschte danach das Job-Dokument mitsamt dem einzigen Verweis auf
+  die Datei. Gemessen: 11 solcher Fehlschläge in 30 Tagen, alle unbemerkt. Jetzt meldet
+  die Funktion Erfolg oder Misserfolg, ein echter Fehler geht mit `severity: ERROR` raus,
+  und der Reaper lässt das Dokument stehen, statt den Pfad wegzuwerfen.
+- **Kein zweites Netz für die fertigen Profile** (`ARCH-2026-08-12-27`, P2). Räumte der
+  Reaper nicht, blieben Job-Dokumente unbegrenzt liegen. Neu: ein Ablauf-Feld je Job und
+  eine automatische Löschregel in der Datenbank — bewusst bei 24 Stunden statt bei 2, das
+  Netz soll den Ausfall des Reapers fangen und ihm nicht ins Handwerk pfuschen.
+  Eingerichtet, während die Sammlung leer war; keine Migration nötig.
+- **Nonce und Admin-Token waren kryptografisch dasselbe** (`SEC-2026-08-12-17`, P2). Der
+  30-Minuten-Token steht im Klartext in der Push-Mitteilung; wer ihn sah, konnte ihn im
+  Nonce-Feld einsetzen und die Bestätigungsseite überspringen. Beide tragen jetzt ihren
+  Verwendungszweck in der Signatur. Zusätzlich hat der Boost eine Obergrenze (doppeltes
+  Stundenlimit) und lehnt fail-closed ab, wenn die aktuelle Grenze nicht lesbar ist.
+- **Die Wochen-Erinnerung schwieg in jedem Fehlerfall** (`OPS-2026-08-12-11`, P2) — und
+  bis zum ersten fälligen Push im Februar 2027 wäre ihr Ausfall 180 Tage lang nicht von
+  korrektem Verhalten zu unterscheiden gewesen. Sie hinterlässt jetzt bei jedem Lauf ein
+  Lebenszeichen; der Reaper liest es jede Minute und meldet laut, wenn es älter als neun
+  Tage ist. Der Reaper eignet sich dafür, weil er in der Alarmrichtlinie steht — die
+  Erinnerung selbst bleibt bewusst leise. Dazu bekommt die CI einen wöchentlichen
+  Zeitplan: Die harte Frist-Bremse lief bisher nur bei Push und Pull-Request, damit waren
+  **beide** Schichten ereignisgesteuert und konnten gemeinsam verstummen.
+
+- **Der Prüfer blockiert jetzt wirklich** (`OPS-2026-08-12-04`, P1). Der Job `pruefungen`
+  lief zwar bei jedem Pull-Request, stand aber nicht in der Branch Protection — ein roter
+  Lauf verhinderte keinen Merge, und bei Dependabot hätte Auto-Merge ihn ohnehin nicht
+  abgewartet. In `ci.yml`, README und CHANGELOG stand trotzdem „blockierend". Er ist jetzt
+  der sechste Pflicht-Check, eingetragen erst nach fünf grünen Läufen in Folge: Wegen
+  `enforce_admins: true` blockiert ein wackliger Pflicht-Check jeden Merge, auch den
+  eigenen. Ist-Zustand und Rückweg stehen im RUNBOOK.
+
+- **Der Alarmweg hatte keinen Wächter** (`OPS-2026-08-12-09`, P2). Die Richtlinie ist eine
+  Anwesenheits-Bedingung: Ihr eigener Ausfall erzeugt keine Logzeile, ein toter Alarm sieht
+  aus wie „keine Störung". Der Deploy-Riegel prüft jetzt vier Ausfallarten — Richtlinie
+  fehlt, ist aus, hat keinen Kanal, Kanal abgeschaltet. Die Grenze steht ehrlich dabei:
+  Das greift beim Deploy, nicht in der Minute des Ausfalls; der Rest ist als Restrisiko
+  in `docs/SECURITY-MODEL.md` festgehalten.
+
+### Welle 3 — Außentexte
+
+**Audit-Sanierung, Welle 3 — vier Sätze, die mehr versprachen als das System hält:**
+
+- **Die Zusage über den Analyse-Zähler** (`PRIV-2026-08-12-13`, P2) war am
+  Live-Dokument widerlegbar — sie sprach von genau einem Wert je Zeitraum: Für das rollende Stundenlimit hält der Zähler die Zeitpunkte
+  der letzten 60 Minuten. Kein Personenbezug — aber es sind mehrere Werte. Der Satz zählt
+  jetzt auf, was wirklich drinsteht.
+- **Die Beschreibung der KI-Analyse** (`PRIV-2026-08-12-15`, P3) sprach von einem einzigen
+  Arbeitsschritt. Das traf nicht zu:
+  Für die Beast-Variante folgt ein zweiter Aufruf an dieselbe KI, der nach Werbe-Kategorien
+  fragt. Kein Bild geht dabei mit, wohl aber die eben erzeugten Profilangaben. Steht jetzt
+  in der Erklärung.
+- **Die Diagnose-Daten** (`PRIV-2026-08-12-14`, P3) enthalten mehr Felder als aufgezählt
+  waren — Netzwerk-Geschwindigkeit, Datensparmodus, Sprache, Prozessorkerne,
+  Arbeitsspeicher-Klasse, Pixeldichte und die aufgerufene Seite. Alle sind jetzt benannt.
+- **Das README** (`DOC-2026-08-12-16`, P3) stellte das Hosting als `europe-west1` dar;
+  gemessen antwortet ein weltweites Auslieferungsnetz. Die Datenschutzerklärung sagt es
+  richtig — jetzt sagen beide dasselbe.
+- **Zwei neue Regeln auf der Sperrliste** fangen genau diese zwei Formulierungen künftig ab.
+- **Der Formulierungs-Prüfer achtet jetzt `.gitignore`** (`TEST-2026-08-12-29`, P3). Er
+  lief über den Dateibaum und sah damit auch Auditberichte, die verbotene Formulierungen
+  zitieren, um sie zu melden — lokal dauerhaft rot, in der CI grün. Jetzt prüft er, was im
+  Repository landet: 128 Dateien statt 161, lokal und in der CI dasselbe Ergebnis.
+
+### Welle 4 — die Lieferkette
+
+- **Keine Prüfsumme für die mitgelieferten Fremdbibliotheken** (`OSS-2026-08-12-22`, P2).
+  `exifr`, Leaflet und die Schriften liegen im Repository, ohne dass irgendwo stand, wie
+  sie auszusehen haben. Eine Änderung an 147 KB minifiziertem Einzeiler zeigt der
+  Pull-Request als **eine** Zeile — ausgerechnet `exifr` liest die GPS-Daten, deren
+  Nichtweitergabe die Kernzusage dieses Projekts ist. Jetzt hat jede der 19 Dateien eine
+  Prüfsumme, geprüft bei jedem Lauf. Der Vollständigkeits-Test fand beim ersten Einsatz
+  sofort drei Lücken in der frisch erstellten Liste (beide `VERSION`-Marker, die
+  Schriftlizenz `OFL.txt`).
+- **Auto-Merge griff auch für Änderungen an der Auslieferung selbst**
+  (`OSS-2026-08-12-20`, P2). Gedacht war er für harmlose Bibliotheks-Updates. Er hätte
+  aber auch eine Änderung an den Pipeline-Dateien ohne menschlichen Blick durchgewinkt.
+  Jetzt misst ein eigener Schritt die geänderten Dateien; berührt ein Pull-Request die
+  Auslieferkette, bleibt er liegen. Bei der Umsetzung stellte sich heraus, dass der
+  naheliegende Weg (Filter auf die Herkunfts-Angabe des Pakets) **nie** gegriffen hätte —
+  bei Actions-Aktualisierungen steht diese Angabe gar nicht drin. Am echten
+  Pull-Request #57 nachgesehen statt angenommen.
+- **Das Ablaufdatum der Ausnahmeliste war ein Zeichenkettenvergleich**
+  (`OSS-2026-08-12-21`, P2). Ein deutsch geschriebenes Datum („12.08.2026") wäre stumm als
+  „noch gültig" gelesen worden, eine Ausnahme also unbegrenzt in Kraft geblieben. Jetzt
+  werden Pflichtfelder und Datumsform erzwungen; was nicht passt, beendet den Lauf mit
+  „Messung gescheitert", nicht mit „in Ordnung".
+- **Der Abhängigkeitsbaum des Hauptprojekts wurde von keinem Gate geprüft**
+  (`OSS-2026-08-12-23`, P3) — nur der von `functions/`. Jetzt laufen beide.
+- **Das Auslieferungswerkzeug war an keine Version gebunden** (`OPS-2026-08-12-25`, P3).
+  Die Firebase-CLI ist global installiert; ein beiläufiges Update hätte den Deploy-Weg
+  still verändert, und nirgends stand, mit welcher Version je ausgeliefert wurde. Der
+  Deploy misst sie jetzt, schreibt sie ins Protokoll und bricht ab, wenn sie unter die
+  hinterlegte Untergrenze fällt oder gar nicht ermittelbar ist.
+- **Log-Speicher mit IP-Adressen lag auf Standort `global`** (`PRIV-2026-08-12-12`, P2).
+  Googles Standard-Log-Ablage ist fest auf `global` und lässt sich nicht nach Europa
+  verschieben. Einziger Träger von Client-IP-Adressen sind die Request-Protokolle des
+  Servers — die werden jetzt vollständig davon ausgenommen (bisher nur die unterhalb der
+  Fehlerschwelle). Live belegt an einem echten Aufruf: Request-Protokoll nicht mehr
+  gespeichert, die Programmausgaben desselben Aufrufs unverändert da, Alarmweg unberührt.
+  Der Deploy-Riegel bewacht ab jetzt nicht nur, **dass** die Ausnahme existiert, sondern
+  auch ihren Inhalt — eine wieder eingebaute Schwelle würde ihn rot machen. Was bewusst
+  bleibt, steht in `docs/SECURITY-MODEL.md`.
+- **Der E2E-Container hängt an einem beweglichen Etikett** (`OSS-2026-08-12-24`, P3) —
+  als bewusste Abwägung festgehalten statt scheinbehoben. Ein fester Digest würde bei
+  jedem Playwright-Update einen Pflicht-Check brechen; der Job hat gemessen weder
+  Geheimnis noch Token noch Schreibrechte. Begründung und Neubewertungs-Bedingung stehen
+  in `docs/SECURITY-MODEL.md`.
+
+### Welle 5 — die Prüfmittel und die Nachweise
+
+- **Die Prüfungen selbst prüfen jetzt genauer, wo sie blind waren:**
+  - **„Nichts gefunden" hieß bei einer der vier „in Ordnung"** (`TEST-2026-08-12-03`,
+    P3). Lief die Formulierungs-Prüfung über ein Verzeichnis ohne einen einzigen
+    Außentext, meldete sie „kein Verstoß gefunden" und ging grün raus. Jetzt heißt das
+    „Messung gescheitert" — wie bei den anderen drei. Auch der Sammel-Lauf mahnte eine
+    fehlende Suchfläche zwar an, gab aber trotzdem 0 zurück; die Warnung stand in einer
+    Ausgabe, die niemand liest, solange das Ergebnis grün ist.
+  - **Tabellenform-Tests waren unsichtbar** (`TEST-2026-08-12-06`, P2). Von den 982
+    Tests dieses Projekts sah die Prüfung einen erheblichen Teil gar nicht — darunter
+    ausgerechnet den Test, der am selben Tag von einer Schein-Zusicherung auf ein
+    ehrliches Überspringen umgestellt worden war. Zwei Anläufe nötig: Die erste
+    Fassung war am Beispielmaterial grün und am echten Projekt weiter blind.
+  - **Ein begründetes Überspringen kann sich jetzt erklären.** Sonst zwingt die
+    Prüfung genau zu dem Fehler, gegen den sie antritt: Wer einen Test überspringen
+    muss, weil ein Werkzeug fehlt, hätte sonst eine Schein-Zusicherung eingebaut. Die
+    Begründung ist Pflicht und wird bei jedem Lauf mit ausgegeben — eine Ausnahme, die
+    niemand mehr sieht, ist nach zwei Monaten der Normalzustand.
+  - **Und zwei Fehlalarme**, die dabei entstanden: `test.setTimeout(...)` ist
+    Konfiguration und kein Test — als Test gezählt, zerschnitt es zusätzlich den echten
+    Test darüber, dessen Zusicherung dadurch ungesehen blieb. Ein Fehlalarm, der einen
+    zweiten erzeugt.
+- **Die einkopierten Prüfungen hatten keinen Wächter — und waren bereits gedriftet**
+  (`TEST-2026-08-12-28`, P3). `scripts/pruefungen/` ist eine Kopie aus dem
+  Werkzeugkasten der Audit-Familie; die Pipeline sieht nur, was im Repository liegt.
+  Beim Kopieren waren die Punktverzeichnisse untergegangen: In einer Beispielprobe
+  fehlte dadurch die Regeldatei, und die Prüfung legte sich beim Lauf still eine Vorlage
+  an. Die Probe war grün — sie prüfte nur etwas anderes als gedacht. Jetzt hat die Kopie
+  eine Herkunftsangabe mit Prüfsummen aller 44 Dateien und einen Wächter, der beide
+  Richtungen unterscheidet: „jemand hat die Kopie bearbeitet statt der Quelle" (auch in
+  der Pipeline erkennbar) und „die Quelle ist weitergezogen" (nur lokal erkennbar — und
+  der Lauf sagt ausdrücklich dazu, wenn er das nicht sehen konnte).
+- **Der zweite KI-Aufruf hatte keinen der drei Schutzmechanismen des ersten**
+  (`SEC-2026-08-12-18`, P3). Er bekommt kein Bild — aber alles, was er bekommt, ist aus
+  dem Bild abgeleitet. Ein Foto mit lesbarem Text kann Sätze ins Profil tragen, die im
+  zweiten Aufruf wie Anweisungen aussehen. Jetzt gilt dort dasselbe wie im ersten:
+  Warnung voran, Daten in gekennzeichneten Blöcken, Inhalte maskiert.
+- **Der erkannte Bildtyp wurde nie gegen den behaupteten geprüft**
+  (`SEC-2026-08-12-19`, P3). Ein GIF mit der Behauptung „JPEG" kam durch, und die
+  Behauptung reiste ungeprüft weiter bis in die Daten an die KI. Jetzt entscheidet der
+  Inhalt. Für das eigene Frontend ändert sich nichts — es erzeugt jedes Bild über den
+  Canvas neu und schickt darum immer echtes JPEG.
+- **Die Verifikationsmatrix nannte einen CI-Job, den es nie gab**
+  (`DOC-2026-08-12-07`, P3), und eine Probenzahl von damals. Beides berichtigt — und
+  weil das maschinell entscheidbar ist, entscheidet es ab jetzt eine Maschine: Ein Test
+  vergleicht jeden dort genannten Job mit denen, die es wirklich gibt. Die Probenzahl
+  steht nur noch an einer Stelle und wird gezählt statt geschrieben.
+
+**Zwei neue Funde, die erst die Sanierung zutage gefördert hat:**
+
+- **Der Release-Wächter konnte den Tag einer bereits ausgelieferten Version umhängen**
+  (`OPS-2026-08-12-30`, P2). Er suchte die „oberste Version" mit einem Zahlenmuster.
+  Steht darüber ein Abschnitt „Unveröffentlicht" — in diesem Projekt der Normalzustand
+  zwischen zwei Deploys —, findet er die nächste Nummer weiter unten, und die ist bereits
+  ausgeliefert. Aufgefallen, als genau das passieren wollte: Die Rücknahme einer zu früh
+  vergebenen Versionsnummer hätte den Tag der vorigen Version von seinem echten
+  Deploy-Stand weggezogen. Es ist dieselbe Falle, gegen die diese Datei in vier
+  Kommentarblöcken anschreibt — sie kam nur durch eine Tür, die niemand geprüft hatte:
+  **Kein einziger Test las je eine Datei unter `.github/workflows`.** Die Auswertung liegt
+  jetzt in einem eigenen Skript und entscheidet nach der obersten Überschrift, gleich
+  welcher Art. Neun Tests, darunter ein Rückfall-Wächter und ein Lauf gegen das echte
+  CHANGELOG.
+- **Ein E2E-Test scheitert selten — und sagt beim Scheitern nicht, woran**
+  (`TEST-2026-08-13-31`, P3). Im vollen Lauf fiel „Beast Mode überlebt ein Neuladen"
+  einmal durch, in drei Einzelläufen danach nicht wieder. Die Meldung lautete, ein
+  Attribut sei leer; das heißt in Wahrheit, dass die Seite nach dem Neuladen gar nicht
+  fertig geladen hat — aber warum, stand nirgends, und die Beweisdateien waren von den
+  Folgeläufen längst überschrieben. **Die Ursache ist damit offen.** Behoben ist nur die
+  Blindheit: Der Test sammelt jetzt Browser-Meldungen, fehlgeschlagene Anfragen und
+  HTTP-Fehler ein und hängt sie an die Fehlermeldung, und er prüft zuerst, ob die Seite
+  überhaupt da ist. Beim nächsten Auftreten steht die Ursache in der Meldung, statt eine
+  Stunde zu kosten.
+
+## [3.0.9] — 2026-08-12
+
+Zwischen-Auslieferung der Audit-Sanierung (Welle 2). Der vollständige Eintrag steht im
+Abschnitt „Das TIEF-Audit und seine Sanierung" ganz oben.
+
+
+## [3.0.8] — 2026-08-12
+
+Zwischen-Auslieferung der Audit-Sanierung (Welle 1). Der vollständige Eintrag steht im
+Abschnitt „Das TIEF-Audit und seine Sanierung" ganz oben.
+
+
 ## [3.0.7] — 2026-08-12
 
-**Formulierungs-Sperrliste als Pflicht-Check — und fünf Verstöße, die sie sofort
-gefunden hat:**
-
-- **Neuer CI-Job `aussentext` (blockierend):** Prüft alle Texte, die nach außen
-  gehen (README, CONTRIBUTING, CHANGELOG, die Seiten unter `public/`, `llms.txt`)
-  gegen eine Sperrliste in `.pruefungen/aussentext.txt`. Der Job prüft zuerst die
-  Prüfung selbst (`scripts/pruefungen/selbstpruefung.sh`, zwölf Proben), damit ein
-  defekter Prüfer nicht grün meldet, ohne etwas zu prüfen.
-- **Fünf Verstöße korrigiert.** Die Regel „nicht behaupten, GPS verlasse das Gerät
-  nie" steht seit Monaten in CONTRIBUTING — und war trotzdem an fünf Stellen
-  verletzt: README (2x), CONTRIBUTING, CHANGELOG (Eintrag v1.0.0) und
-  `public/llms.txt`. Letzteres wiegt am schwersten: Diese Datei lesen KI-Crawler,
-  die Falschaussage wurde also aktiv weitergetragen. Überall steht jetzt „GPS
-  erreicht nie unsere Server" — sachlich richtig, weil der Browser für Karte und
-  Ortsname OpenStreetMap und Nominatim sehr wohl direkt aufruft.
-- **Firmierung korrigiert:** Ein CHANGELOG-Eintrag führte die Kurzform der Firma,
-  die es nicht gibt. Jetzt vollständig.
-- **Zuschreibung in dritter Person entfernt** (`docs/ERROR-ALERTING.md`, 2 Stellen):
-  Die Meldung wird jetzt sachlich beschrieben, statt sie einer Person zuzuschreiben.
-- **Neuer Job `pruefungen-bericht` (nicht blockierend):** Zwei weitere Prüfungen
-  (stille Fehlschläge in Skripten, Tests ohne Zusicherung) laufen mit und melden.
-  Sie sind bewusst noch nicht blockierend: Sie finden derzeit echte Kandidaten
-  (8 Stellen in `scripts/`, 4 blinde Tests von 924), und ein dauerhaft roter Job
-  wird genauso ignoriert wie ein dauerhaft grüner. Erst aufräumen, dann
-  `continue-on-error` entfernen.
-- **`fakten-drift` läuft bewusst nicht in der Pipeline mit.** Es meldete „Testanzahl
-  mit 27 verschiedenen Werten" und meinte damit die Zahlen alter CHANGELOG-Einträge.
-  Die Heuristik kann eine dokumentierte Historie nicht von einem Widerspruch
-  unterscheiden — ein Befund, der sich nicht beheben lässt, ohne die Historie zu
-  fälschen, gehört nicht in eine Pipeline. Von Hand bleibt die Prüfung nützlich.
+Sperrliste für Außentexte — der Vorlauf zum Audit. Der vollständige Eintrag steht im
+Abschnitt „Das TIEF-Audit und seine Sanierung" ganz oben.
 
 ## [3.0.6] — 2026-08-12
 

@@ -1,0 +1,3 @@
+# ERWARTUNG: Exit 1. Nur DIESES Muster gilt; die eingebauten sind abgeschaltet,
+# sobald ein Projekt eigene festlegt.
+Stundenlimit|Stundenlimit von (\d+)

@@ -1,13 +1,12 @@
 # PRUEFUNGEN — vier Kontrollen statt vier Bitten
 
-> **Herkunft:** Dieses Verzeichnis ist eine Kopie des Werkzeugkastens aus der
-> Audit-Familie (`~/.claude/skills/audit-familie/pruefungen`, Stand 2026-08-12,
-> Paket 1.0 plus vier Korrekturen). Es liegt hier, weil die CI nur sieht, was im
-> Repository liegt. Aenderungen bitte an BEIDEN Stellen — die Familie ist die Quelle.
+> **Herkunft:** Kopie des Werkzeugkastens aus der Audit-Familie
+> (`~/.claude/skills/audit-familie/pruefungen`, Repository `malziland/audit-familie`).
+> Sie liegt hier, weil die CI nur sieht, was im Repository liegt. Aenderungen bitte an
+> BEIDEN Stellen — die Familie ist die Quelle.
 >
-> Der Ordner `negativprobe/` enthaelt **absichtlich fehlerhaftes Beispielmaterial**
-> (Skripte mit Erfolgsluegen, Tests ohne Zusicherung, widerspruechliche Zahlen). Das
-> ist kein Code dieses Projekts und wird von allen Pruefungen uebersprungen.
+> Der Ordner `negativprobe/` enthaelt **absichtlich fehlerhaftes Beispielmaterial** und
+> wird von allen Pruefungen uebersprungen.
 
 Diese vier Pruefungen setzen Regeln der Familie in Programme um, die rot werden koennen.
 Der Unterschied ist der Kern der ganzen Sache: Eine Regel im Prompt wirkt vielleicht,

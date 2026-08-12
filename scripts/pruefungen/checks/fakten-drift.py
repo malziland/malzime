@@ -24,6 +24,14 @@ ENDUNGEN = (".md", ".markdown", ".txt", ".rst", ".adoc")
 UEBERSPRINGEN = {".git", "node_modules", "vendor", "dist", "build", ".venv",
                  "__pycache__", ".next", "target", "coverage", "negativprobe"}
 
+# Historien-Dokumente halten vergangene Staende fest. Dass dort andere Zahlen
+# stehen als heute, ist ihr Zweck und kein Widerspruch — ein Changelog mit 27
+# verschiedenen Testzahlen ist ein gutes Changelog. Sie als Drift zu melden
+# erzeugt einen Befund, der sich nur beheben laesst, indem man die Historie
+# faelscht (Fehlalarm bis 2026-08-12).
+HISTORIENDATEIEN = ("changelog", "history", "releases", "release-notes",
+                    "aenderungen", "changes")
+
 # Eingebaute Muster. Bezeichnung -> regulaerer Ausdruck mit einer Klammergruppe.
 MUSTER = {
     "Testanzahl": r"(\d[\d.']*)\s*(?:Tests?|Testfaelle|test cases?)\b",
@@ -65,8 +73,12 @@ def dateien(wurzel):
         unterordner[:] = [u for u in unterordner
                           if u not in UEBERSPRINGEN and not u.startswith(".")]
         for name in namen:
-            if name.lower().endswith(ENDUNGEN):
-                yield os.path.join(ordner, name)
+            if not name.lower().endswith(ENDUNGEN):
+                continue
+            stamm = os.path.splitext(name)[0].lower()
+            if stamm in HISTORIENDATEIEN:
+                continue
+            yield os.path.join(ordner, name)
 
 
 def main():
@@ -75,8 +87,15 @@ def main():
         print(f"FEHLER: kein Verzeichnis: {wurzel}")
         return 2
 
-    muster = dict(MUSTER)
-    muster.update(eigene_muster(wurzel))
+    # Legt das Projekt eigene Muster fest, gelten NUR diese. Die eingebauten sind
+    # ein Startpunkt fuer Projekte, die noch nicht entschieden haben, welche Zahlen
+    # bei ihnen kanonisch sind — als Dauerbetrieb taugen sie nicht: "(\d+) Tage"
+    # haelt eine Aufbewahrungsfrist, eine Karenzzeit und eine Pruefperiode fuer
+    # denselben Fakt und meldet Widersprueche, die keine sind (Fehlalarm bis
+    # 2026-08-12). Wer die Pruefung in eine Pipeline haengt, schreibt seine Muster
+    # in .pruefungen/fakten.txt.
+    eigene = eigene_muster(wurzel)
+    muster = eigene if eigene else dict(MUSTER)
 
     # bezeichnung -> wert -> Liste von Fundstellen
     funde = {name: {} for name in muster}
@@ -101,7 +120,8 @@ def main():
 
     print("FAKTEN-DRIFT")
     print(f"Geprueft: {geprueft} Textdateien unter {os.path.abspath(wurzel)}")
-    print(f"Muster: {len(muster)} ({len(muster) - len(MUSTER)} eigene)")
+    herkunft = "aus .pruefungen/fakten.txt" if eigene else "eingebaut, nicht konfiguriert"
+    print(f"Muster: {len(muster)} ({herkunft})")
     print("-" * 60)
 
     if geprueft == 0:

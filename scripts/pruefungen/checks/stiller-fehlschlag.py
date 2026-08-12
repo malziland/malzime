@@ -35,7 +35,12 @@ REGELN = [
     ),
     (
         "Ausgabe verworfen und Fehler mit",
-        re.compile(r">\s*/dev/null\s+2>&1\s*(?:;|$)", re.M),
+        # Die Umleitung muss die Zeile BEENDEN (optional mit Semikolon). Steht
+        # danach noch etwas, wird der Rueckgabewert ausgewertet und nicht
+        # verworfen — "if cmd >/dev/null 2>&1; then" ist die haeufigste Form und
+        # war bis 2026-08-12 ein Fehlalarm. Faelle wie
+        # "cmd >/dev/null 2>&1; echo fertig" faengt die erste Regel ab.
+        re.compile(r">\s*/dev/null\s+2>&1\s*;?\s*$", re.M),
         "Ohne anschliessende Pruefung des Rueckgabewerts ist nicht unterscheidbar, "
         "ob der Befehl lief oder scheiterte.",
     ),
@@ -47,15 +52,31 @@ REGELN = [
     ),
     (
         "Leeres Suchergebnis als Ergebnis gelesen",
+        # Zwischen der Suche und dem Erfolgswort darf KEINE Pruefung stehen. Vorher
+        # sprang der Ausdruck ueber beliebig viele Zeilen bis zum naechsten
+        # Erfolgswort und uebersah eine Plausibilitaetspruefung drei Zeilen
+        # darunter — der haeufigste Fehlalarm dieser Regel (bis 2026-08-12).
         re.compile(r"(?:grep|rg|ag)\b[^\n|]*\|\s*(?:wc|head|tail)\b[^\n]*\n"
-                   r"(?![^\n]*(?:if|test|\[)).*?" + ERFOLGSWORT, re.I | re.S),
+                   # Die Vorausschau muss die GANZE Zeile pruefen, nicht nur ihren
+                   # Anfang: "  if ! [[ ... ]]" beginnt mit Leerzeichen und rutschte
+                   # sonst als harmlose Zeile durch.
+                   r"(?:(?![^\n]*(?:\bif\b|\btest\b|\[\[|\bcase\b|\bexit\b))[^\n]*\n)*?"
+                   # Und das Erfolgswort muss in einer MELDUNG stehen. Ohne diese
+                   # Bedingung galten "passed" innerhalb eines Suchmusters und das
+                   # Shell-Schluesselwort "done" einer Schleife als Erfolgsmeldung.
+                   r"[^\n]*(?:echo|print|printf)[^\n]*" + ERFOLGSWORT, re.I),
         "Eine Suche, die nichts findet, und eine Suche, die scheitert, sehen gleich "
         "aus. Positivkontrolle noetig: an bekannter Fundstelle muss sie anschlagen.",
     ),
 ]
 
-# Fuer Shell-Skripte zusaetzlich: fehlendes set -e ist die Grundform des Problems.
+# Fuer Shell-Skripte zusaetzlich: fehlendes set -e ist die Grundform des Problems —
+# ABER nur bei einem Skript, das seinen Fehlschlag nicht selbst zurueckgibt.
+# Ein Sammel-Berichter zaehlt Fehler und endet mit einem eigenen "exit 1"; mit
+# set -e wuerde er beim ersten Punkt abbrechen, statt alle zu zeigen. Ihn dafuer
+# zu ruegen war ein Fehlalarm (bis 2026-08-12).
 SET_E = re.compile(r"^\s*set\s+-[a-z]*e", re.M)
+EIGENER_FEHLER_EXIT = re.compile(r"^\s*exit\s+[1-9]", re.M)
 SHELL_ENDUNGEN = (".sh", ".bash", ".zsh")
 
 
@@ -96,11 +117,15 @@ def main():
                 text = treffer.group(0).strip().splitlines()[0][:70]
                 funde.append((kurz, zeile, name, text, rat))
 
-        if pfad.lower().endswith(SHELL_ENDUNGEN) and not SET_E.search(inhalt):
+        if (pfad.lower().endswith(SHELL_ENDUNGEN)
+                and not SET_E.search(inhalt)
+                and not EIGENER_FEHLER_EXIT.search(inhalt)):
             funde.append((kurz, 1, "Kein set -e",
-                          "Skript bricht bei Fehlern nicht ab",
+                          "Skript bricht bei Fehlern nicht ab und gibt auch keinen "
+                          "eigenen Fehler-Rueckgabewert zurueck",
                           "Ohne set -e laeuft das Skript nach einem Fehlschlag weiter "
-                          "und kann am Ende Erfolg melden."))
+                          "und kann am Ende Erfolg melden. Entweder set -e setzen oder "
+                          "Fehler sammeln und mit einem eigenen exit zurueckgeben."))
 
     if geprueft == 0:
         print("Keine Skript- oder Pipeline-Dateien gefunden. Ohne Suchflaeche keine")

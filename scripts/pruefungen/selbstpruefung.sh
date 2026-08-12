@@ -54,9 +54,24 @@ lauf stiller-fehlschlag.py "$HIER/negativprobe/nur-ausgeschlossenes" 2 \
 lauf aussentext.py "$HIER/negativprobe/regeln-prosa-pipe" 2 \
   "| in der Begruendung wird erkannt, statt das Suchmuster still zu erweitern"
 
+echo ""
+echo "Richtung 4: kein Fehlalarm, sonst wird die Pruefung abgeschaltet (2026-08-12)"
+lauf stiller-fehlschlag.py "$HIER/negativprobe/echte-bedingung" 0 \
+  "if ... >/dev/null 2>&1; then gilt nicht als verworfener Fehler"
+lauf test-blind.py "$HIER/negativprobe/test-mit-textblock" 0 \
+  "Zusicherung hinter einem mehrzeiligen Text wird gefunden"
+lauf stiller-fehlschlag.py "$HIER/negativprobe/berichter-ohne-set-e" 0 \
+  "Sammel-Berichter mit eigenem Fehler-Exit braucht kein set -e"
+lauf stiller-fehlschlag.py "$HIER/negativprobe/geprueftes-suchergebnis" 0 \
+  "geprueftes Suchergebnis gilt nicht als still gelesen"
+lauf fakten-drift.py "$HIER/negativprobe/eigene-muster" 1 \
+  "eigene Muster gelten allein, die eingebauten schweigen"
+lauf fakten-drift.py "$HIER/negativprobe/nur-historie" 0 \
+  "ein Changelog mit alten Zahlen ist Historie, kein Drift"
+
 echo "============================================================"
 if [ "$FEHLER" -eq 0 ]; then
-  echo "ERGEBNIS: alle zwoelf Proben bestanden."
+  echo "ERGEBNIS: alle achtzehn Proben bestanden."
   echo "Die Pruefungen koennen rot werden und sind nicht ueberempfindlich."
   exit 0
 fi

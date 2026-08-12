@@ -105,20 +105,46 @@ async function loadImage(objectPath) {
 }
 
 /**
- * Löscht ein Bild. Ein bereits gelöschtes / nie existentes Objekt ist KEIN
- * harter Fehler — die Lifecycle-Regel räumt ohnehin nach. Der Aufrufer
- * (processJob) soll deshalb nie an einer fehlgeschlagenen Löschung scheitern.
+ * Löscht ein Bild und meldet, OB es geklappt hat.
+ *
+ * Rückgabe: true = gelöscht oder war schon weg, false = Löschung gescheitert.
+ *
+ * AUDIT-BEFUND PRIV-2026-08-12-26 / OPS-2026-08-12-10: Bisher verschluckte diese
+ * Funktion jeden Fehler in eine `console.log`-Zeile ohne severity — also unterhalb
+ * der Alarmschwelle — und gab nichts zurück. Der Aufrufer löschte danach das
+ * Job-Dokument, und mit ihm den einzigen Verweis auf die Datei: Nach einem
+ * Fehlschlag kannte niemand mehr den Pfad. Gemessen: 11 solcher Fehlschläge in
+ * 30 Tagen. Die Zusage lautet "unmittelbar gelöscht"; das 1-Tages-Netz der
+ * Lifecycle-Regel steht in keinem Außentext.
+ *
+ * Ein bereits gelöschtes Objekt (404) bleibt KEIN Fehler — das ist der Normalfall,
+ * wenn der Worker schon aufgeräumt hat. Alles andere ist einer und wird laut.
  */
 async function deleteImage(objectPath) {
-  if (!objectPath) return;
+  if (!objectPath) return true;
   try {
     if (isLocalQueueMode()) {
       await fs.promises.unlink(localPathFor(objectPath));
-      return;
+      return true;
     }
     await bucket().file(objectPath).delete();
+    return true;
   } catch (err) {
-    console.log(JSON.stringify({ warning: "queue-image-delete-failed", path: objectPath, error: err.message }));
+    /* 404 = schon weg. Kein Fehler, keine Meldung. */
+    if (err && (err.code === 404 || err.code === "ENOENT")) return true;
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "queue-image-delete-failed",
+        path: objectPath,
+        message: err && err.message,
+        hinweis:
+          "Bild konnte nicht aktiv geloescht werden. Es faellt jetzt auf die " +
+          "Lifecycle-Regel (1 Tag) zurueck — die Zusage 'unmittelbar geloescht' " +
+          "ist fuer dieses Bild nicht eingehalten.",
+      })
+    );
+    return false;
   }
 }
 

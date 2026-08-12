@@ -16,6 +16,11 @@ jest.mock("../queue-storage", () => ({
 jest.mock("../counter", () => ({
   releaseHourlySlot: jest.fn(),
 }));
+/* OPS-2026-08-12-11: Der Reaper liest das Lebenszeichen der Wochen-Erinnerung. */
+const mockLebenszeichenGet = jest.fn();
+jest.mock("../db", () => ({
+  datenbank: () => ({ doc: () => ({ get: mockLebenszeichenGet }) }),
+}));
 
 const { reapJobs } = require("../handle-reap");
 const jobs = require("../jobs");
@@ -23,6 +28,7 @@ const storage = require("../queue-storage");
 const counter = require("../counter");
 
 beforeEach(() => {
+  mockLebenszeichenGet.mockResolvedValue({ exists: true, data: () => ({ letzterLauf: Date.now() }) });
   jest.clearAllMocks();
   jobs.findAbandonedJobs.mockResolvedValue([]);
   jobs.findUeberfaelligeJobs.mockResolvedValue([]);
@@ -167,5 +173,51 @@ describe("SEC-003 — Jobs, die nur durch Pollen am Leben bleiben", () => {
     expect(storage.deleteImage).not.toHaveBeenCalled();
     expect(counter.releaseHourlySlot).not.toHaveBeenCalled();
     expect(r.ueberfaellig).toBe(0);
+  });
+});
+
+/* ── Waechter ueber die Wochen-Erinnerung (OPS-2026-08-12-11) ────────── */
+
+describe("Reaper als Waechter der Wochen-Erinnerung", () => {
+  const leer = () => {
+    jobs.findAbandonedJobs.mockResolvedValue([]);
+    jobs.findUeberfaelligeJobs.mockResolvedValue([]);
+    jobs.findStaleProcessingJobs.mockResolvedValue([]);
+    jobs.findZugestellteJobs.mockResolvedValue([]);
+    jobs.findExpiredJobs.mockResolvedValue([]);
+  };
+
+  test("frisches Lebenszeichen -> keine Meldung", async () => {
+    leer();
+    mockLebenszeichenGet.mockResolvedValue({ exists: true, data: () => ({ letzterLauf: Date.now() }) });
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    await reapJobs();
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  test("Lebenszeichen aelter als neun Tage -> laute Meldung mit severity ERROR", async () => {
+    leer();
+    const zehnTage = Date.now() - 10 * 24 * 60 * 60 * 1000;
+    mockLebenszeichenGet.mockResolvedValue({ exists: true, data: () => ({ letzterLauf: zehnTage }) });
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await reapJobs();
+
+    const zeilen = spy.mock.calls.map((c) => JSON.parse(c[0]));
+    const meldung = zeilen.find((z) => z.error === "erinnerung-lebenszeichen-veraltet");
+    expect(meldung).toBeDefined();
+    expect(meldung.severity).toBe("ERROR");
+    expect(meldung.alterTage).toBeGreaterThanOrEqual(9);
+    spy.mockRestore();
+  });
+
+  test("noch nie gelaufen -> keine Meldung (vor dem ersten Montag normal)", async () => {
+    leer();
+    mockLebenszeichenGet.mockResolvedValue({ exists: false, data: () => null });
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+    await reapJobs();
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

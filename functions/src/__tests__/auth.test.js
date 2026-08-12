@@ -202,3 +202,30 @@ describe("cleanupNonces", () => {
     expect(mockCommit).toHaveBeenCalled();
   });
 });
+
+/* SEC-2026-08-12-17: Token und Nonce trugen dieselbe Nutzlast und waren damit
+   austauschbar. Der 30-Minuten-Token steht im Klartext in der ntfy-Mitteilung;
+   wer ihn sah, konnte ihn im Nonce-Feld einsetzen und die Bestaetigungsseite
+   (SEC-001) ueberspringen. */
+describe("SEC-2026-08-12-17 — Token und Nonce sind nicht austauschbar", () => {
+  const SECRET = "geheim-fuer-den-test";
+
+  test("ein Admin-Token gilt NICHT als Nonce", () => {
+    const token = createAdminToken("boost", SECRET);
+    expect(verifyAdminToken(token, "boost", SECRET)).toBe(true);
+    expect(verifyNonce(token, "boost", SECRET)).toBe(false);
+  });
+
+  test("eine Nonce gilt NICHT als Admin-Token", () => {
+    const nonce = createNonce("boost", SECRET);
+    expect(verifyNonce(nonce, "boost", SECRET)).toBe(true);
+    expect(verifyAdminToken(nonce, "boost", SECRET)).toBe(false);
+  });
+
+  test("die Action-Bindung gilt weiterhin fuer beide", () => {
+    const token = createAdminToken("boost", SECRET);
+    const nonce = createNonce("boost", SECRET);
+    expect(verifyAdminToken(token, "reset", SECRET)).toBe(false);
+    expect(verifyNonce(nonce, "reset", SECRET)).toBe(false);
+  });
+});

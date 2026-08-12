@@ -568,13 +568,44 @@ describe("getStats", () => {
 
 describe("boostLimit", () => {
   test("increments limit by specified amount", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ limit: 500 }) });
     await boostLimit(200);
     expect(mockSet).toHaveBeenCalledWith({ limit: { __increment: 200 } }, { merge: true });
   });
 
   test("defaults to 100 when no amount given", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ limit: 500 }) });
     await boostLimit();
     expect(mockSet).toHaveBeenCalledWith({ limit: { __increment: 100 } }, { merge: true });
+  });
+
+  /* SEC-2026-08-12-17: Der Boost erhoehte ohne Obergrenze. Der Link steht im
+     Klartext in der ntfy-Mitteilung; wer ihn sah, konnte 30 Minuten lang beliebig
+     oft anheben und die einzige globale Kostenbremse praktisch abschalten. */
+  test("ueber der Obergrenze (2x Stundenlimit) wird abgelehnt und laut gemeldet", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ limit: 950 }) });
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const ergebnis = await boostLimit(100);
+
+    expect(ergebnis.abgelehnt).toBe(true);
+    expect(mockSet).not.toHaveBeenCalled();
+    const zeile = JSON.parse(fehlerSpy.mock.calls[0][0]);
+    expect(zeile.severity).toBe("ERROR");
+    expect(zeile.error).toBe("boost-obergrenze-erreicht");
+    fehlerSpy.mockRestore();
+  });
+
+  test("ist die aktuelle Grenze nicht lesbar, wird NICHT erhoeht (fail-closed)", async () => {
+    mockGet.mockRejectedValue(new Error("firestore weg"));
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    const ergebnis = await boostLimit(100);
+
+    expect(ergebnis.abgelehnt).toBe(true);
+    expect(mockSet).not.toHaveBeenCalled();
+    expect(JSON.parse(fehlerSpy.mock.calls[0][0]).error).toBe("boost-limit-nicht-lesbar");
+    fehlerSpy.mockRestore();
   });
 });
 

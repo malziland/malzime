@@ -21,10 +21,15 @@
  * und nie den Fehleralarm ausloesen (kein severity ERROR).
  */
 
+const { datenbank } = require("./db");
 const { SITE_URL } = require("./domains");
 const { leseZdrPruefdatum, bewerteFrist, formatiereDatum, FRIST_TAGE } = require("./zusagen");
 
 const MISTRAL_DATENSCHUTZ_URL = "https://admin.mistral.ai/plateforme/privacy";
+/* OPS-2026-08-12-11: Ablageort des Lebenszeichens. Bewusst neben den uebrigen
+   Betriebsdaten und nicht in `jobs` — dort greift seit ARCH-2026-08-12-27 eine
+   automatische Loeschregel. */
+const LEBENSZEICHEN_DOC = "config/erinnerung";
 const ABRUF_TIMEOUT_MS = 8000;
 
 /** Baut den Meldungstext — inklusive der drei Schritte in der richtigen Reihenfolge. */
@@ -122,7 +127,28 @@ async function pruefeZusagen({ ntfyUrl, ntfyTopic, abruf = fetch, jetzt = Date.n
   } catch (err) {
     console.log(JSON.stringify({ warning: "erinnerung-fehler", error: err.message }));
     return { gesendet: false, grund: "fehler" };
+  } finally {
+    /* AUDIT-BEFUND OPS-2026-08-12-11: Diese Funktion schweigt in JEDEM Fehlerfall
+       — bewusst, damit sie nicht den Fehleralarm ausloest (RUNBOOK). Die Folge
+       war aber, dass eine tote und eine gesunde Erinnerung 180 Tage lang
+       ununterscheidbar sind: Bis zum ersten faelligen Push ist Schweigen das
+       korrekte Verhalten. Deshalb hinterlaesst jeder Lauf ein Lebenszeichen.
+       Wer darauf schaut, ist der Reaper (handle-reap.js) — er laeuft jede Minute
+       und steht in der Alarmrichtlinie. Ein ausbleibendes Lebenszeichen wird so
+       laut, ohne dass die Erinnerung selbst laut werden muss. */
+    await schreibeLebenszeichen();
   }
 }
 
-module.exports = { pruefeZusagen, baueMeldung };
+/* Lebenszeichen: ein einziges Feld, kein Personenbezug, keine Nutzdaten. */
+async function schreibeLebenszeichen() {
+  try {
+    await datenbank().doc(LEBENSZEICHEN_DOC).set({ letzterLauf: Date.now() }, { merge: true });
+  } catch (err) {
+    /* Schlaegt selbst das fehl, ist der Lauf ohnehin gestoert — und der Reaper
+       meldet das ausbleibende Lebenszeichen wenig spaeter. */
+    console.log(JSON.stringify({ warning: "erinnerung-lebenszeichen-fehlgeschlagen", error: err.message }));
+  }
+}
+
+module.exports = { pruefeZusagen, baueMeldung, schreibeLebenszeichen, LEBENSZEICHEN_DOC };

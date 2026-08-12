@@ -106,6 +106,38 @@ Reihenfolge**:
 Das Datum **niemals** ohne echte Prüfung hochsetzen — dann behauptet die
 Webseite etwas Unbelegtes, und genau davor schützt der Wächter.
 
+## Automatische Löschregel der Datenbank (seit 2026-08-12)
+
+Soll-Zustand: `jobs/expiresAt`, Status `ACTIVE`, Datenbank `malzime-eu`.
+
+    gcloud firestore fields ttls list --database=malzime-eu --project=malzime
+
+Das ist das **Netz unter dem Reaper**, nicht die eigentliche Löschung: Der Reaper räumt
+Job-Dokumente nach 2 Stunden ab, die Regel greift erst nach 24 Stunden. Der Abstand ist
+Absicht — eine knapp gesetzte Regel würde laufende Jobs mitten im Betrieb löschen.
+
+Rückweg, falls sie je stört:
+
+    gcloud firestore fields ttls update expiresAt --collection-group=jobs \
+      --database=malzime-eu --project=malzime --disable-ttl
+
+Eingerichtet am 2026-08-12, als die Sammlung `jobs` nachweislich 0 Dokumente hatte
+(ARCH-2026-08-12-27). Eine Migration bestehender Dokumente war deshalb nicht nötig.
+
+## Lebenszeichen der Wochen-Erinnerung (seit 2026-08-12)
+
+Die Erinnerung schreibt bei jedem Lauf `config/erinnerung.letzterLauf`. Der Reaper liest
+das jede Minute und meldet mit `severity: ERROR`, wenn es älter als neun Tage ist —
+Marker `erinnerung-lebenszeichen-veraltet`. Damit fällt ein Ausfall der Erinnerung auf,
+obwohl sie selbst bewusst leise bleibt (OPS-2026-08-12-11).
+
+Prüfen von Hand:
+
+    gcloud logging read 'jsonPayload.error="erinnerung-lebenszeichen-veraltet"' \
+      --project=malzime --freshness=14d
+
+Erwartet: keine Zeile.
+
 ## Rollback-Hebel
 
 Vom schnellsten zum gründlichsten. Alle Flag-Hebel wirken **ohne Deploy** binnen

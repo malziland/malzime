@@ -11,6 +11,13 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # AUDIT-BEFUND OPS-2026-08-12-11: Die harte Frist-Bremse (zusagen-frische.test.js)
+  # haengt in `test-backend` — lief aber nur bei Push und Pull-Request. Ohne Commit
+  # kein Lauf, ohne Lauf keine Bremse. Damit waren BEIDE Schichten (Wochen-
+  # Erinnerung und CI-Waechter) ereignisgesteuert und konnten gemeinsam
+  # verstummen. Der Zeitplan gibt der Bremse eine eigene Uhr.
+  schedule:
+    - cron: "17 6 * * 1" # montags 06:17 UTC, vor der Wochen-Erinnerung um 07:00 UTC
 
 jobs:
   test-backend:

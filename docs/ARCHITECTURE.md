@@ -114,11 +114,13 @@ Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-
 
 ### Reaper
 
-`reapJobs` läuft im Minutentakt und räumt drei Sorten auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Timeout → `failed`) und abgelaufene Job-Dokumente (älter als `JOB_RETENTION_MS` = 2 h → gelöscht).
+`reapJobs` läuft im Minutentakt und räumt auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Timeout → `failed`), überfällige wartende Jobs (älter als `MAX_QUEUED_AGE_MS` = 35 min → `abandoned`, auch wenn noch gepollt wird), zugestellte Ergebnisse nach dem Browser-Wiederholungs-Fenster (15 min ab Erstzustellung → gelöscht, PRIV-107b) und abgelaufene Job-Dokumente (älter als `JOB_RETENTION_MS` = 2 h → gelöscht). Bei `abandoned` wird der Stunden-Slot zurückgegeben und das zwischengespeicherte Bild mitgelöscht.
 
 ### Einlass-Politik
 
-Der Enqueue prüft bewusst **keine Queue-Tiefe** — der Einlass ist allein durch das Stundenlimit begrenzt (500/h). Das liegt sogar knapp **unter** dem Verarbeitungs-Durchsatz (~387 Analysen/h bei Concurrency 7 × ~65 s/Job), der Durchsatz liegt damit UNTER dem Einlass. Deshalb bremst der Einlass seit dem Audit 2026-08-10 ab einer Warteschlangen-Tiefe von 155 (`MAX_QUEUE_DEPTH`) ehrlich ab, statt Auftraege anzunehmen, die den 30-Minuten-Deckel des Browsers ueberschreiten — das Stundenlimit deckelt den Einlass, bevor die Queue-Tiefe je zum Problem wird. Zusätzlich: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten; Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück (Selbstregulation). Der Client deckelt das Polling bei 30 min. Bewusste Entscheidung, bestätigt im LANGAUDIT 2026-07 (ARCH-001).
+Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (500/h, rollendes 60-Minuten-Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab 155 wartenden Jobs (`MAX_QUEUE_DEPTH`) lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. In der Praxis greift fast immer das Stundenlimit zuerst: 500/h Einlass steht einem Verarbeitungs-Durchsatz von ~387 Analysen/h gegenüber (Concurrency 7 × ~65 s/Job).
+
+Dazu kommt die Selbstregulation: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten. Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück. Wartende Jobs haben zusätzlich ein absolutes Höchstalter von 35 Minuten (`MAX_QUEUED_AGE_MS`) — fortlaufendes Pollen hält einen Job also nicht unbegrenzt am Leben.
 
 ### Lokaler Betrieb
 

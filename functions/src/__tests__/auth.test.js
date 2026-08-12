@@ -181,9 +181,9 @@ describe("consumeNonce", () => {
     expect(await consumeNonce("nonce-abc")).toBe(false);
   });
 
-  test("fails open on Firestore error", async () => {
+  test("fails closed on Firestore error (v3.0.4)", async () => {
     mockCreate.mockRejectedValue(new Error("DB down"));
-    expect(await consumeNonce("nonce-abc")).toBe(true);
+    expect(await consumeNonce("nonce-abc")).toBe(false);
   });
 });
 

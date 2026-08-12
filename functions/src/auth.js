@@ -57,7 +57,12 @@ function verifyNonce(nonce, action, secret) {
 /**
  * SEC-002: Nonce-Replay-Schutz via Firestore.
  * Speichert benutzte Nonces mit Timestamp. Gibt false zurueck wenn die Nonce
- * bereits verbraucht wurde. Fail-open bei Firestore-Fehlern.
+ * bereits verbraucht wurde. Fail-closed bei Firestore-Fehlern (seit v3.0.4):
+ * Laesst sich der Verbrauch nicht festhalten, gilt die Nonce als nicht
+ * einloesbar — Admin-Komfort ist verzichtbar, ein Replay-Fenster nicht.
+ * Der Bearer-Pfad (direktes Admin-Secret) haengt nicht an Nonces, und die
+ * Admin-Mutationen selbst schreiben ohnehin in Firestore — bei einem echten
+ * Firestore-Ausfall geht durch fail-closed also nichts verloren.
  */
 async function consumeNonce(nonce) {
   const { datenbank } = require("./db");
@@ -69,7 +74,7 @@ async function consumeNonce(nonce) {
   } catch (err) {
     if (err.code === 6) return false; // ALREADY_EXISTS
     console.log(JSON.stringify({ warning: "nonce-store-error", error: err.message }));
-    return true; // fail-open
+    return false; // fail-closed
   }
 }
 

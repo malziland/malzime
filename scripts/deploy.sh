@@ -94,5 +94,13 @@ else
   npx firebase deploy --only "$TARGET"
 fi
 
+# ── Live-Beweis: vier kostenfreie Proben gegen die frisch deployte Produktion ──
+# (endet vor KI-Aufruf und Stundenzähler; Notschalter SKIP_SMOKE=1)
+if [ "${SKIP_SMOKE:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_SMOKE=1 gesetzt — Live-Smoke wird UEBERSPRUNGEN."
+else
+  ./scripts/live-smoke.sh
+fi
+
 echo ""
 echo "Deploy abgeschlossen. Version: ?v=$VERSION"

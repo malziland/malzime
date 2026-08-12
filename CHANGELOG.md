@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.0.9] — 2026-08-12
 
 **Audit-Sanierung, Welle 2 — die Löschkette meldet ihr Scheitern, und die stille
 Erinnerung bekommt einen Wächter:**

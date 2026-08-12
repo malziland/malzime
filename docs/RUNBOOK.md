@@ -39,6 +39,10 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    relevant, reine Functions-Deploys brauchen keinen).
 5. `release.yml` legt automatisch einen GitHub-Release an, sobald die neue
    CHANGELOG-Version auf `main` landet (idempotent).
+6. Nach dem Deploy läuft automatisch `scripts/live-smoke.sh`: vier
+   kostenfreie Proben gegen die Live-API (Upload-Ablehnung 400 mit echter
+   Validierungs-Meldung, Honeypot 403, Admin-Zugriffsschutz 403, Stats 200) —
+   alle enden vor KI-Aufruf und Stundenzähler. Notschalter `SKIP_SMOKE=1`.
 
 ## Infrastruktur-Prüfung (`scripts/verify-infrastructure.sh`)
 

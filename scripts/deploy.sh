@@ -30,6 +30,16 @@ else
   npm run test:frontend
 fi
 
+# ── Infra-Riegel: Ist-Zustand der Cloud gegen den RUNBOOK-Soll-Zustand ──
+# Nur lesend (Queue, Bucket, Firestore, Worker-IAM, Regionen, Logging).
+# Notschalter fuer den Ernstfall (z. B. gcloud-Anmeldung abgelaufen und ein
+# dringender Rollback darf nicht warten): SKIP_INFRA=1
+if [ "${SKIP_INFRA:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_INFRA=1 gesetzt — Infrastruktur-Pruefung wird UEBERSPRUNGEN."
+else
+  ./scripts/verify-infrastructure.sh
+fi
+
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,
 # sonst neuer Tag mit laufender Nummer 01.

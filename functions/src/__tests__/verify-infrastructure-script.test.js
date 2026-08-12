@@ -26,6 +26,9 @@ const ERLAUBTE_LESE_MUSTER = [
   /gcloud (tasks queues|storage buckets|firestore databases|functions|run services|logging sinks) (describe|list|get-iam-policy)\b/,
   /gcloud auth list\b/,
   /command -v gcloud/,
+  /* OPS-2026-08-12-09: Waechter ueber den Alarmweg. Beides reine list-Abfragen —
+     `policies list` und `channels list` lesen nur, sie schalten nichts. */
+  /gcloud alpha monitoring (policies|channels) list\b/,
 ];
 
 function gcloudZeilen(inhalt) {

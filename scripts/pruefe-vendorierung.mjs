@@ -154,7 +154,7 @@ let soll;
 try {
   soll = JSON.parse(readFileSync(HERKUNFT, "utf8"));
 } catch (fehler) {
-  console.error(`FEHLER: HERKUNFT.json ist nicht lesbar: ${fehler.message}`);
+  console.error(`FEHLER: ${HERKUNFT} ist nicht lesbar: ${fehler.message}`);
   process.exit(2);
 }
 if (!soll.dateien || Object.keys(soll.dateien).length === 0) {
@@ -179,11 +179,33 @@ const abweichend = [];
 if (existsSync(quellePfad)) {
   quelleGeprueft = true;
   const quellDateien = new Set(dateienUnter(quellePfad));
-  /* Nur die verfolgten Dateien vergleichen: Was .gitignore ausschliesst, kann
-     im Repository gar nicht ankommen und ist keine Abweichung, sondern Absicht. */
-  for (const rel of Object.keys(ist)) {
-    if (!quellDateien.has(rel)) {
+  /* Verglichen wird ueber die VEREINIGUNG beider Seiten, nicht nur ueber die
+     Schluessel der Kopie. KURZAUDIT-Befund TEST-2026-08-13-33: Die erste
+     Fassung lief nur ueber die Kopie-Schluessel — eine in der QUELLE neu
+     angelegte Datei tauchte darin nie auf, und die erklaerte Richtung "Quelle
+     weitergezogen" war damit nur fuer geaenderte, nicht fuer neue Dateien
+     umgesetzt. Eine neue Pruefung der Familie haette die CI nie erreicht,
+     ohne dass etwas rot wird.
+
+     Was .gitignore der Kopie ausschliesst, bleibt dabei aussen vor: Es kann im
+     Repository gar nicht ankommen und ist keine Abweichung, sondern Absicht.
+     Massgeblich dafuer ist check-ignore am Zielpfad der Kopie. */
+  const alleSeiten = new Set([...Object.keys(ist), ...quellDateien]);
+  for (const rel of alleSeiten) {
+    if (rel in AUSNAHMEN) continue;
+    const inKopie = rel in ist;
+    const inQuelle = quellDateien.has(rel);
+    if (inKopie && !inQuelle) {
       abweichend.push(`${rel} (nur in der Kopie)`);
+    } else if (!inKopie && inQuelle) {
+      let ignoriert = false;
+      try {
+        execFileSync("git", ["check-ignore", "-q", join(KOPIE, rel)], { cwd: REPO });
+        ignoriert = true; // Exit 0 = ignoriert, gehoert nicht in die Kopie
+      } catch {
+        ignoriert = false;
+      }
+      if (!ignoriert) abweichend.push(`${rel} (NEU in der Quelle, fehlt in der Kopie)`);
     } else if (summe(join(KOPIE, rel)) !== summe(join(quellePfad, rel))) {
       abweichend.push(rel);
     }

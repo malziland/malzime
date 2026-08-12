@@ -106,6 +106,30 @@ Reihenfolge**:
 Das Datum **niemals** ohne echte Prüfung hochsetzen — dann behauptet die
 Webseite etwas Unbelegtes, und genau davor schützt der Wächter.
 
+## Branch Protection auf `main` (Stand 2026-08-12)
+
+Soll-Zustand, auslesbar:
+
+    gh api repos/malziland/malzime/branches/main/protection \
+      --jq '{strict:.required_status_checks.strict, checks:.required_status_checks.contexts, admins:.enforce_admins.enabled}'
+
+Erwartet: `strict: true`, `admins: true`, sechs Pflicht-Checks —
+`test-backend`, `test-frontend`, `test-e2e`, `secret-scan`, `playwright-version`,
+`pruefungen`.
+
+`pruefungen` kam am 2026-08-12 dazu (OPS-2026-08-12-04): Der Job lief zwar, stand aber
+nicht auf der Liste — die Zusage „blockierend" in `ci.yml`, README und CHANGELOG war
+damit unbelegt. Eingetragen wurde er erst, nachdem er in fünf Läufen hintereinander grün
+war; ein wackliger Pflicht-Check blockiert wegen `enforce_admins: true` **jeden** Merge,
+auch den eigenen.
+
+Rückweg, falls er je klemmt (nimmt nur `pruefungen` heraus):
+
+    gh api -X PATCH repos/malziland/malzime/branches/main/protection/required_status_checks \
+      --input - <<'JSON'
+    {"strict":true,"contexts":["test-backend","test-frontend","test-e2e","secret-scan","playwright-version"]}
+    JSON
+
 ## Automatische Löschregel der Datenbank (seit 2026-08-12)
 
 Soll-Zustand: `jobs/expiresAt`, Status `ACTIVE`, Datenbank `malzime-eu`.

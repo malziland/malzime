@@ -119,7 +119,10 @@ Einzelbefehle:
 ## Privacy-Architektur (KRITISCH)
 
 - EXIF wird client-seitig extrahiert (exifr im Browser)
-- GPS verlässt NIEMALS den Browser — Nominatim wird direkt vom Client aufgerufen
+- GPS erreicht NIE unsere Server — Nominatim und die Kartenkacheln ruft der Browser direkt
+  auf, die Koordinaten verlassen das Gerät also sehr wohl, nur nie in Richtung malziME.
+  Diese Formulierung ist verbindlich (DOC-2026-08-12-05); die frühere Fassung war im
+  Netzwerk-Tab widerlegbar und steht auf der Sperrliste in `.pruefungen/aussentext.txt`
 - Server bekommt nur: komprimiertes Bild + Kamera-Metadaten (make, model) OHNE GPS, OHNE dateTimeOriginal
 - Keine externen Scripts: Alles self-hosted (Fonts, Leaflet, exifr). Kein CDN, kein reCAPTCHA, kein Firebase SDK
 - Bot-Schutz: Rate Limiting (IP) + Honeypot + Timing-Check

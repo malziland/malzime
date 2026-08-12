@@ -45,12 +45,29 @@ function auditLesen(verzeichnis) {
     encoding: "utf8",
     maxBuffer: 64 * 1024 * 1024,
   };
+  let bericht;
   try {
-    return JSON.parse(execFileSync("npm", ["audit", "--json", "--omit=dev"], optionen));
+    bericht = JSON.parse(execFileSync("npm", ["audit", "--json", "--omit=dev"], optionen));
   } catch (fehler) {
-    if (fehler.stdout) return JSON.parse(fehler.stdout);
-    throw fehler;
+    /* Exit 1 heisst "Funde gefunden" — dann liegt der Bericht auf stdout. */
+    if (!fehler.stdout) throw fehler;
+    bericht = JSON.parse(fehler.stdout);
   }
+
+  /* AUDIT-BEFUND OPS-2026-08-12-01: Bei einer Registry-Stoerung schreibt
+     `npm audit --json` ebenfalls auf stdout — aber eine Fehlermeldung ohne den
+     Schluessel `vulnerabilities`. Der bisherige Code hat das geparst, `?? {}`
+     machte daraus null Advisories, und das Gate meldete GRUEN, ohne gemessen zu
+     haben. Ein Fehlschlag darf nie wie ein bestandener Lauf enden (KERN 5c).
+     Nachgestellt mit `npm_config_registry=http://127.0.0.1:1/`. */
+  if (!bericht || typeof bericht.vulnerabilities !== "object" || bericht.vulnerabilities === null) {
+    const grund = bericht?.error?.summary ?? bericht?.message ?? "unbekannter Fehler";
+    throw new Error(
+      `npm audit hat keinen auswertbaren Bericht geliefert (${verzeichnis}): ${grund}\n` +
+        "Das ist ein Fehlschlag, kein Freispruch — ungeprueft gilt als nicht bestanden."
+    );
+  }
+  return bericht;
 }
 
 /**
@@ -108,7 +125,16 @@ function heute() {
 
 const alleAdvisories = new Map();
 for (const verzeichnis of ziele) {
-  for (const [kennung, advisory] of advisoriesSammeln(auditLesen(verzeichnis), verzeichnis)) {
+  let bericht;
+  try {
+    bericht = auditLesen(verzeichnis);
+  } catch (fehler) {
+    /* Klartext statt Stapelabzug — und Exit 2, damit ein Messfehler von einem
+       echten Fund (Exit 1) unterscheidbar bleibt. */
+    console.error(`\nGate ROT — die Messung selbst ist gescheitert.\n${fehler.message}`);
+    process.exit(2);
+  }
+  for (const [kennung, advisory] of advisoriesSammeln(bericht, verzeichnis)) {
     const vorhanden = alleAdvisories.get(kennung);
     if (vorhanden) {
       for (const v of advisory.verzeichnisse) vorhanden.verzeichnisse.add(v);

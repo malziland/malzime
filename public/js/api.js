@@ -498,8 +498,8 @@ async function renderQueueResult(data, myId, traceId, timings) {
     setStatus(t("error.queueFailed"), traceId);
     return;
   }
-  /* Client-seitige Daten injizieren — GPS/dateTimeOriginal verlassen nie den
-     Browser. Nach einem Reload fehlt state.lastPrepared; dann bleibt GPS leer. */
+  /* Client-seitige Daten injizieren — GPS/dateTimeOriginal erreichen nie unsere
+     Server. Nach einem Reload fehlt state.lastPrepared; dann bleibt GPS leer. */
   if (!data.exif) data.exif = {};
   if (state.lastPrepared && state.lastPrepared.gps) {
     data.exif.gpsLatitude = state.lastPrepared.gps.latitude;

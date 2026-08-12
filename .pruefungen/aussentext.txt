@@ -11,9 +11,10 @@
 # Stand 2026-08-12: Beim Anlegen dieser Liste waren fuenf Stellen im Repo verletzt
 # (README 2x, CONTRIBUTING, CHANGELOG, public/llms.txt) — alle im selben Zug korrigiert.
 
-verl(ae|ä)sst nie den (Browser|Client)|Absolute Zusage, technisch nicht haltbar. Richtig ist: GPS erreicht nie unsere Server.
-
-verlassen nie den (Browser|Client)|Absolute Zusage, technisch nicht haltbar. Richtig ist: GPS erreicht nie unsere Server.
+# DOC-2026-08-12-05: Die ersten beiden Regeln trafen nur den genauen Wortlaut.
+# "NIEMALS den Browser" und "verlaesst nie dein Geraet" rutschten durch. Jetzt
+# deckt EIN Muster die Varianten ab: Verb + nie/niemals + Browser/Client/Geraet.
+(verl(ae|ä)sst|verlassen) (nie|niemals) (den|das|dein|deinen) (Browser|Client|Ger(ae|ä)t)|Absolute Zusage, technisch nicht haltbar. Richtig ist: GPS erreicht nie unsere Server.
 
 malziland e\.U\.|Diese Kurzform der Firmierung existiert nicht. Die vollstaendige Firmierung steht im Impressum und wird unveraendert uebernommen; die reine Marke "malziland" ohne Rechtsform ist erlaubt. Der volle Name steht hier bewusst nicht, weil er selbst das Trennzeichen enthaelt.
 

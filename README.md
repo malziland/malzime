@@ -204,7 +204,11 @@ zurueckkehrt, und ein Neuladen funktioniert ebenfalls.
 
 ## Sicherheit
 
-- **Content Security Policy** mit strikter Whitelist (`self` + OpenStreetMap Tiles + Nominatim + `api.malzi.me`)
+Das vollständige Sicherheitsmodell — Schutzgüter, Bedrohungsbild und vor allem
+die **bewusst getroffenen Abwägungen mit Begründung** — steht in
+[docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md). Die wichtigsten Schichten:
+
+- **Content Security Policy** mit strikter Whitelist (`self`; Bilder zusätzlich von OpenStreetMap-Kacheln, Verbindungen zusätzlich zu Nominatim)
 - **HSTS** mit Preload
 - **X-Frame-Options: DENY**
 - **X-Content-Type-Options: nosniff**

@@ -135,20 +135,38 @@ for DIENST in processjob reapjobs; do
 done
 
 # ── 5. Alle Functions in der EU-Region ──
+# AUDIT-BEFUND OPS-2026-08-12-02: Diese Prüfung meldete GRÜN, wenn ihre Messung
+# scheiterte. `gcloud … 2>/dev/null | python3 … || true` liefert bei abgelaufener
+# Anmeldung, API-Fehler oder geändertem JSON-Format eine LEERE Ausgabe — und leer
+# hieß „keine Function außerhalb europe-west1". Ausgerechnet die Prüfung, die das
+# EU-Versprechen trägt, konnte nicht rot werden. Jetzt zählt sie, was sie gesehen
+# hat: null gefundene Functions ist ein Messfehler, kein Freispruch (KERN 5c).
 echo "— Functions-Regionen"
-AUSSERHALB=$(gcloud functions list --project="$PROJECT" --format=json 2>/dev/null \
-  | python3 -c '
+FUNKTIONEN_JSON=$(gcloud functions list --project="$PROJECT" --format=json 2>&1) || FUNKTIONEN_JSON=""
+BEFUND=$(printf '%s' "$FUNKTIONEN_JSON" | python3 -c '
 import json, sys
-for f in json.load(sys.stdin):
-    teile = f["name"].split("/")           # projects/P/locations/REGION/functions/NAME
+try:
+    daten = json.load(sys.stdin)
+except Exception:
+    print("MESSFEHLER:Antwort nicht lesbar"); raise SystemExit(0)
+if not isinstance(daten, list) or len(daten) == 0:
+    print("MESSFEHLER:keine Function in der Antwort"); raise SystemExit(0)
+aussen = []
+for f in daten:
+    teile = f.get("name", "").split("/")   # projects/P/locations/REGION/functions/NAME
+    if len(teile) < 6:
+        print("MESSFEHLER:unerwartetes Namensformat"); raise SystemExit(0)
     if teile[3] != "europe-west1":
-        print(teile[3] + ":" + teile[5])
-' || true)
-if [ -z "$AUSSERHALB" ]; then
-  gruen "alle Functions in $REGION"
-else
-  rot "Functions außerhalb $REGION: $AUSSERHALB"
-fi
+        aussen.append(teile[3] + ":" + teile[5])
+print(("AUSSERHALB:" + ",".join(aussen)) if aussen else "OK:%d" % len(daten))
+' 2>/dev/null)
+
+case "$BEFUND" in
+  OK:*)         gruen "alle ${BEFUND#OK:} Functions in $REGION" ;;
+  AUSSERHALB:*) rot   "Functions außerhalb $REGION: ${BEFUND#AUSSERHALB:}" ;;
+  MESSFEHLER:*) rot   "Regionsprüfung NICHT durchgeführt (${BEFUND#MESSFEHLER:}) — ungeprüft gilt als nicht bestanden" ;;
+  *)            rot   "Regionsprüfung NICHT durchgeführt (keine auswertbare Ausgabe) — ungeprüft gilt als nicht bestanden" ;;
+esac
 
 # ── 6. Logging: Routine-Ausschlüsse + Diagnose-Sink ──
 echo "— Logging"

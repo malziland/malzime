@@ -6,6 +6,28 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+**Audit-Sanierung, Welle 1 — die Riegel können jetzt rot werden:**
+
+- **Das Abhängigkeits-Gate meldete grün, ohne gemessen zu haben** (`OPS-2026-08-12-01`,
+  P1). Bei einer Registry-Störung schrieb `npm audit` eine Fehlermeldung auf dieselbe
+  Ausgabe wie einen Bericht; das Gate las daraus „null Lücken" und ließ durch — in einem
+  Pflicht-Check. Jetzt bricht es ab und unterscheidet drei Zustände: 0 sauber, 1 echte
+  Funde, 2 Messung gescheitert.
+- **Die Regionsprüfung im Deploy-Riegel ebenso** (`OPS-2026-08-12-02`, P2). Fiel `gcloud`
+  aus, war die Ausgabe leer — und leer hieß „alle Functions in europe-west1". Sie zählt
+  jetzt, was sie gesehen hat, und meldet „nicht durchgeführt" statt grün.
+- **Jeder Fremde konnte den Störungsalarm auslösen** (`SEC-2026-08-12-08`, P1). Eine
+  Job-Nummer mit ungerader Pfadtiefe (`a/b`) erreichte ungeprüft die Datenbankschicht,
+  die dort warf; der unbehandelte Fehler erzeugte eine ERROR-Logzeile, und die
+  Alarmrichtlinie schickt bei solchen Zeilen E-Mail und Push. Unauthentifiziert,
+  beliebig wiederholbar. `/api/job-status` prüft die Job-Nummer jetzt gegen das echte
+  Firestore-Format und antwortet mit 400, **ohne** die Datenbank überhaupt zu befragen.
+- **Die Sperrliste traf nur den Wortlaut** (`DOC-2026-08-12-05`, P2). „verlässt NIEMALS
+  den Browser" rutschte durch, und `.js`-Dateien wurden gar nicht geprüft — obwohl sie
+  ausgeliefert werden. Ein Muster deckt jetzt die Varianten ab, die Suchfläche umfasst
+  `.js`, `.mjs`, `.ts`. Damit sichtbar geworden und korrigiert: **drei** weitere Stellen
+  in `AGENTS.md`, `docs/ARCHITECTURE.md` und `public/js/api.js`.
+
 **Die Prüfungen prüfen jetzt richtig — und sind deshalb alle vier verbindlich:**
 
 - **Ein Job `pruefungen` statt zwei, alles blockierend.** `continue-on-error` ist weg,

@@ -26,8 +26,11 @@ import os
 import re
 import sys
 
+# DOC-2026-08-12-05: ".js" fehlte — der Kommentar in public/js/api.js wird an
+# jeden Besucher ausgeliefert und trug monatelang eine widerlegbare Zusage, ohne
+# dass die Sperrliste ihn je gesehen haette.
 ENDUNGEN = (".md", ".html", ".htm", ".txt", ".json", ".yml", ".yaml", ".vue", ".jsx",
-            ".tsx", ".svelte")
+            ".tsx", ".svelte", ".js", ".mjs", ".ts")
 # "negativprobe" enthaelt das absichtlich kaputte Beispielmaterial dieser Pruefungen.
 # Ohne den Ausschluss meldet jeder Lauf im eigenen Verzeichnis Dauerfunde aus dem
 # eigenen Testmaterial — und ein Pruefer, der nie gruen werden kann, wird ignoriert.

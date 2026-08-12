@@ -37,7 +37,7 @@ function makeRes() {
 const reqMit = (jobId, token) => ({ method: "GET", query: token === undefined ? { jobId } : { jobId, token } });
 
 const PROCESSING_JOB = {
-  id: "job-1",
+  id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
   status: "processing",
   resultToken: "ticket-abc",
   liveText: "Du bist neugierig und",
@@ -58,7 +58,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   test("mit richtigem Ticket kommen liveText und liveTextStand mit", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB);
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     expect(res.statusCode).toBe(200);
     expect(res.body.status).toBe("processing");
     expect(res.body.liveText).toBe("Du bist neugierig und");
@@ -68,7 +68,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   test("mit richtigem Ticket kommt auch liveTextBeast mit, sobald der Worker es abgelegt hat", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB_MIT_BEAST);
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     expect(res.body.status).toBe("processing");
     expect(res.body.liveText).toBe("Du bist neugierig und");
     expect(res.body.liveTextBeast).toBe("Du bist ein zynisches");
@@ -77,7 +77,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   test("solange das Dokument keinen Beast-Text traegt, fehlt liveTextBeast in der Antwort", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB);
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     expect(res.body.liveText).toBe("Du bist neugierig und");
     expect(res.body).not.toHaveProperty("liveTextBeast");
   });
@@ -85,7 +85,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   test("ohne Ticket KEIN liveText (PRIV-003: Vorgriff aufs Ergebnis bleibt ticket-gebunden)", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB);
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.status).toBe("processing");
     expect(res.body).not.toHaveProperty("liveText");
     expect(res.body).not.toHaveProperty("liveTextStand");
@@ -94,7 +94,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   test("mit falschem Ticket KEIN liveText und KEIN liveTextBeast (gleiche Ticket-Bindung)", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB_MIT_BEAST);
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1", "falsch"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "falsch"), res);
     expect(res.body.status).toBe("processing");
     expect(res.body).not.toHaveProperty("liveText");
     expect(res.body).not.toHaveProperty("liveTextBeast");
@@ -103,7 +103,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   test("ohne Ticket KEIN liveTextBeast (dieselbe PRIV-003-Bindung wie liveText)", async () => {
     jobs.getJob.mockResolvedValue(PROCESSING_JOB_MIT_BEAST);
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.status).toBe("processing");
     expect(res.body).not.toHaveProperty("liveTextBeast");
   });
@@ -111,15 +111,15 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   test("fehlender liveTextStand wird als null mitgegeben, nicht als undefined", async () => {
     jobs.getJob.mockResolvedValue({ ...PROCESSING_JOB, liveTextStand: undefined });
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     expect(res.body.liveText).toBe("Du bist neugierig und");
     expect(res.body.liveTextStand).toBeNull();
   });
 
   test("ohne liveText im Dokument (Flag aus) ist die processing-Antwort exakt die heutige", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "processing", resultToken: "ticket-abc" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "processing", resultToken: "ticket-abc" });
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     /* toEqual mit dem VOLLEN Objekt: kein zusaetzliches Feld, nichts fehlt —
        das ist die „ohne Flag aendert sich nichts"-Garantie des Endpoints. */
     expect(res.body).toEqual({ status: "processing", position: 0, etaSeconds: QUEUE_AVG_JOB_SECONDS });
@@ -129,7 +129,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
 describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
   test("auch wenn das Dokument noch liveText-Felder traegt, liefert done nur result", async () => {
     jobs.getJob.mockResolvedValue({
-      id: "job-1",
+      id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
       status: "done",
       result: { profiles: { normal: {}, boost: {} } },
       resultToken: "ticket-abc",
@@ -139,7 +139,7 @@ describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
       liveTextStand: 1754900000000,
     });
     const res = makeRes();
-    await handleJobStatus(reqMit("job-1", "ticket-abc"), res);
+    await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     expect(res.body).toEqual({ status: "done", result: { profiles: { normal: {}, boost: {} } } });
     expect(res.body).not.toHaveProperty("liveText");
     expect(res.body).not.toHaveProperty("liveTextBeast");

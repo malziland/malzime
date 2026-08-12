@@ -20,6 +20,11 @@ const { QUEUE_AVG_JOB_SECONDS, QUEUE_DISPATCH_CONCURRENCY } = require("./config"
 const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
 const { safeCompare, sha256Hex } = require("./auth");
 
+/* Firestore-Auto-IDs: genau 20 Zeichen aus [A-Za-z0-9] (jobs.js:58 nutzt
+   `jobsRef().doc()` ohne eigenen Namen). Bewusst eng gefasst — alles, was nicht
+   so aussieht, ist keine Job-Nummer dieses Systems. */
+const JOB_ID_MUSTER = /^[A-Za-z0-9]{20}$/;
+
 /* Grobe Wartezeit-Schätzung aus der Warteschlangen-Position.
    Kalibrierung der Konstanten erfolgt in Phase 3/4 (config.js). */
 function etaForPosition(position) {
@@ -35,6 +40,20 @@ async function handleJobStatus(req, res) {
   const jobId = req.query && typeof req.query.jobId === "string" ? req.query.jobId : "";
   if (!jobId) {
     res.status(400).json({ error: "Missing jobId" });
+    return;
+  }
+  /* AUDIT-BEFUND SEC-2026-08-12-08: Ohne Formatprüfung reicht ein Aufruf mit
+     einer Job-Nummer wie "a/b" bis in `.doc()`, wo die Firestore-Bibliothek
+     wirft ("path does not contain an even number of components"). Der Handler
+     fing nichts ab, firebase-functions protokollierte "Unhandled error" mit
+     severity ERROR, und die Alarmrichtlinie feuert auf genau diesen Dienst —
+     ein beliebiger Dritter konnte so ohne Anmeldung E-Mail und Push beim
+     Inhaber auslösen, alle 5 Minuten, kostenlos.
+     Firestore-Auto-IDs sind 20 Zeichen aus [A-Za-z0-9]; alles andere kann kein
+     echter Job sein und wird als Eingabefehler beantwortet, nicht als
+     Serverabsturz. Im Zweifel verweigern (KERN: fail-closed). */
+  if (!JOB_ID_MUSTER.test(jobId)) {
+    res.status(400).json({ error: "Invalid jobId" });
     return;
   }
   /* PRIV-003: Abhol-Ticket fürs Ergebnis (vom enqueue an genau diesen Browser

@@ -254,7 +254,10 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 ## Privacy-Architektur
 
 - EXIF wird client-seitig extrahiert (exifr im Browser)
-- GPS verlaesst NIEMALS den Browser — Nominatim wird direkt vom Client aufgerufen
+- GPS erreicht NIE unsere Server — Nominatim und die Kartenkacheln ruft der Browser
+  direkt auf, die Koordinaten verlassen das Geraet also sehr wohl, nur nie in Richtung
+  malziME (Formulierung nach DOC-2026-08-12-05: die alte Fassung war im Netzwerk-Tab
+  widerlegbar)
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr)
 - CSP nur self + OpenStreetMap Tiles + Nominatim + `/api/…` (gleiche Domain)

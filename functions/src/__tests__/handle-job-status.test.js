@@ -1,4 +1,8 @@
-/* Tests für handle-job-status.js — Polling-Endpoint der Queue-Architektur. */
+/* Tests für handle-job-status.js — Polling-Endpoint der Queue-Architektur.
+   Die Job-Nummern sind bewusst echte Firestore-Auto-IDs (20 Zeichen aus
+   [A-Za-z0-9]): Seit SEC-2026-08-12-08 weist der Handler alles ab, was nicht
+   so aussieht — ein Platzhalter wie "Aa1Bb2Cc3Dd4Ee5Ff6Gg" wuerde am Formatriegel haengen
+   bleiben und die eigentliche Absicht des Tests verdecken. */
 
 jest.mock("../jobs", () => ({
   getJob: jest.fn(),
@@ -50,10 +54,31 @@ describe("handleJobStatus — Abweisungen", () => {
     expect(res.statusCode).toBe(400);
   });
 
+  /* SEC-2026-08-12-08: Eine Job-Nummer mit ungerader Pfadtiefe ("a/b") kam bis
+     in `.doc()` durch, die Firestore-Bibliothek warf, der Handler fing nichts —
+     Ergebnis war eine ERROR-Logzeile, die den Betriebsalarm des Inhabers
+     auslöste. Unauthentifiziert und beliebig wiederholbar. */
+  test.each([
+    ["a/b", "ungerade Pfadtiefe — würde in .doc() werfen"],
+    ["jobs/andere/sammlung", "Pfad statt Kennung"],
+    ["kurz", "zu kurz"],
+    ["Aa1Bb2Cc3Dd4Ee5Ff6Gg7", "ein Zeichen zu lang"],
+    ["Aa1Bb2Cc3Dd4Ee5Ff6G-", "unerlaubtes Zeichen"],
+    ["../../etc/passwd", "Traversal-Versuch"],
+  ])("ungültige jobId %p (%s) → 400, ohne Datenbankzugriff", async (jobId) => {
+    jobs.getJob.mockClear();
+    const res = makeRes();
+    await handleJobStatus(getReq(jobId), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid jobId" });
+    /* Entscheidend: Es darf gar nicht erst zur Datenbank gehen. */
+    expect(jobs.getJob).not.toHaveBeenCalled();
+  });
+
   test("nicht existierender Job → 404", async () => {
     jobs.getJob.mockResolvedValue(null);
     const res = makeRes();
-    await handleJobStatus(getReq("job-x"), res);
+    await handleJobStatus(getReq("Zz9Yy8Xx7Ww6Vv5Uu4Tt"), res);
     expect(res.statusCode).toBe(404);
   });
 });
@@ -62,61 +87,61 @@ describe("handleJobStatus — Abweisungen", () => {
 
 describe("handleJobStatus — Status-Antworten", () => {
   test("queued → Status, Position und ETA", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "queued" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "queued" });
     jobs.getQueuePosition.mockResolvedValue(6);
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.statusCode).toBe(200);
     expect(res.body.status).toBe("queued");
     expect(res.body.position).toBe(6);
     expect(res.body.etaSeconds).toBeGreaterThan(0);
     /* Der Poll ist zugleich der Liveness-Herzschlag. */
-    expect(jobs.touchJob).toHaveBeenCalledWith("job-1");
+    expect(jobs.touchJob).toHaveBeenCalledWith("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
   });
 
   test("Position 0 → ETA 0", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "queued" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "queued" });
     jobs.getQueuePosition.mockResolvedValue(0);
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.etaSeconds).toBe(0);
   });
 
   test("processing → Status processing, kein Ergebnis", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "processing" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "processing" });
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.status).toBe("processing");
     expect(res.body.etaSeconds).toBeGreaterThan(0);
   });
 
   test("done → Status done samt Ergebnis (mit Abhol-Ticket)", async () => {
     const result = { profiles: { normal: {}, boost: {} }, meta: { mode: "multimodal" } };
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "done", result, resultToken: "ticket-abc" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "done", result, resultToken: "ticket-abc" });
     const res = makeRes();
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, res);
     expect(res.body.status).toBe("done");
     expect(res.body.result).toEqual(result);
   });
 
   test("failed → Status failed samt Fehlergrund", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "failed", errorReason: "enqueue_failed" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "failed", errorReason: "enqueue_failed" });
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.status).toBe("failed");
     expect(res.body.errorReason).toBe("enqueue_failed");
   });
 
   test("abandoned → Status abandoned (Client hatte die Seite verlassen)", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "abandoned" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "abandoned" });
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.status).toBe("abandoned");
   });
 
   test("ein done-Job löst keinen Heartbeat aus — nur wartende Jobs zählen", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "done", result: {} });
-    await handleJobStatus(getReq("job-1"), makeRes());
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "done", result: {} });
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), makeRes());
     expect(jobs.touchJob).not.toHaveBeenCalled();
   });
 });
@@ -125,14 +150,14 @@ describe("handleJobStatus — Status-Antworten", () => {
 
 describe("handleJobStatus — Stale-Timeout", () => {
   test("ein hängender processing-Job wird beim Pollen auf failed gekippt", async () => {
-    jobs.getJob.mockResolvedValue({ id: "job-1", status: "processing" });
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "processing" });
     jobs.markFailedIfStale.mockResolvedValue({
-      id: "job-1",
+      id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
       status: "failed",
       errorReason: "processing_timeout",
     });
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(jobs.markFailedIfStale).toHaveBeenCalled();
     expect(res.body.status).toBe("failed");
     expect(res.body.errorReason).toBe("processing_timeout");
@@ -144,7 +169,7 @@ describe("handleJobStatus — Stale-Timeout", () => {
 describe("handleJobStatus — Auslieferungs-Messung", () => {
   test("erstes Ausliefern eines done-Jobs → markDelivered + job-delivered-Log", async () => {
     jobs.getJob.mockResolvedValue({
-      id: "job-1",
+      id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
       status: "done",
       result: {},
       resultToken: "ticket-abc",
@@ -153,10 +178,10 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
       finishedAt: 5000,
     });
     const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, makeRes());
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, makeRes());
     /* KA-02: Mit der Erstauslieferung wird der HASH des Realitäts-Check-
        Einmal-Tickets abgelegt (64 Hex-Zeichen = SHA-256, nie das Ticket). */
-    expect(jobs.markDelivered).toHaveBeenCalledWith("job-1", expect.stringMatching(/^[0-9a-f]{64}$/));
+    expect(jobs.markDelivered).toHaveBeenCalledWith("Aa1Bb2Cc3Dd4Ee5Ff6Gg", expect.stringMatching(/^[0-9a-f]{64}$/));
     const delivered = logSpy.mock.calls
       .map((c) => {
         try {
@@ -168,20 +193,20 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
       .find((o) => o && o.step === "job-delivered");
     logSpy.mockRestore();
     expect(delivered).toBeTruthy();
-    expect(delivered.jobId).toBe("job-1");
+    expect(delivered.jobId).toBe("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
     expect(typeof delivered.deliveryGapMs).toBe("number");
     expect(typeof delivered.totalMs).toBe("number");
   });
 
   test("bereits ausgelieferter Job → kein erneutes markDelivered", async () => {
     jobs.getJob.mockResolvedValue({
-      id: "job-1",
+      id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
       status: "done",
       result: {},
       resultToken: "ticket-abc",
       deliveredAt: 9999,
     });
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, makeRes());
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, makeRes());
     expect(jobs.markDelivered).not.toHaveBeenCalled();
   });
 });
@@ -190,7 +215,7 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
 
 describe("handleJobStatus — KA-02 Realitäts-Check-Ticket", () => {
   const doneJob = (extra = {}) => ({
-    id: "job-1",
+    id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
     status: "done",
     result: { x: 1 },
     resultToken: "ticket-abc",
@@ -203,18 +228,18 @@ describe("handleJobStatus — KA-02 Realitäts-Check-Ticket", () => {
     jobs.getJob.mockResolvedValue(doneJob());
     const res = makeRes();
     const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, res);
     logSpy.mockRestore();
     expect(typeof res.body.rcTicket).toBe("string");
     expect(res.body.rcTicket.length).toBeGreaterThan(0);
     const { sha256Hex } = require("../auth");
-    expect(jobs.markDelivered).toHaveBeenCalledWith("job-1", sha256Hex(res.body.rcTicket));
+    expect(jobs.markDelivered).toHaveBeenCalledWith("Aa1Bb2Cc3Dd4Ee5Ff6Gg", sha256Hex(res.body.rcTicket));
   });
 
   test("wiederholter Abruf (deliveredAt gesetzt): KEIN neues rcTicket — es gibt genau eins je Analyse", async () => {
     jobs.getJob.mockResolvedValue(doneJob({ deliveredAt: 9999 }));
     const res = makeRes();
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, res);
     expect(res.body.status).toBe("done");
     expect(res.body.rcTicket).toBeUndefined();
   });
@@ -222,7 +247,7 @@ describe("handleJobStatus — KA-02 Realitäts-Check-Ticket", () => {
   test("falsches Abhol-Ticket: weder Ergebnis noch rcTicket — dieselbe PRIV-003-Schranke", async () => {
     jobs.getJob.mockResolvedValue(doneJob());
     const res = makeRes();
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "falsch" } }, res);
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "falsch" } }, res);
     expect(res.body.result).toBeNull();
     expect(res.body.rcTicket).toBeUndefined();
     expect(jobs.markDelivered).not.toHaveBeenCalled();
@@ -233,7 +258,7 @@ describe("handleJobStatus — KA-02 Realitäts-Check-Ticket", () => {
 
 describe("handleJobStatus — PRIV-003 Abhol-Ticket", () => {
   const doneJob = (extra = {}) => ({
-    id: "job-1",
+    id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
     status: "done",
     result: { profileText: "geheim" },
     resultToken: "ticket-abc",
@@ -245,7 +270,7 @@ describe("handleJobStatus — PRIV-003 Abhol-Ticket", () => {
   test("richtiges Ticket → Ergebnis wird zurückgegeben", async () => {
     jobs.getJob.mockResolvedValue(doneJob());
     const res = makeRes();
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "ticket-abc" } }, res);
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, res);
     expect(res.body.status).toBe("done");
     expect(res.body.result).toEqual({ profileText: "geheim" });
   });
@@ -253,7 +278,7 @@ describe("handleJobStatus — PRIV-003 Abhol-Ticket", () => {
   test("falsches Ticket → KEIN Ergebnis (tokenRequired), kein markDelivered", async () => {
     jobs.getJob.mockResolvedValue(doneJob());
     const res = makeRes();
-    await handleJobStatus({ method: "GET", query: { jobId: "job-1", token: "falsch" } }, res);
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "falsch" } }, res);
     expect(res.body.status).toBe("done");
     expect(res.body.result).toBeNull();
     expect(res.body.tokenRequired).toBe(true);
@@ -263,7 +288,7 @@ describe("handleJobStatus — PRIV-003 Abhol-Ticket", () => {
   test("fehlendes Ticket → KEIN Ergebnis", async () => {
     jobs.getJob.mockResolvedValue(doneJob());
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.result).toBeNull();
     expect(res.body.tokenRequired).toBe(true);
   });
@@ -274,7 +299,7 @@ describe("handleJobStatus — PRIV-003 Abhol-Ticket", () => {
        fail-closed statt leise offen. */
     jobs.getJob.mockResolvedValue(doneJob({ resultToken: null }));
     const res = makeRes();
-    await handleJobStatus(getReq("job-1"), res);
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(res.body.result).toBeNull();
     expect(res.body.tokenRequired).toBe(true);
   });

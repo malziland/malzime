@@ -4,6 +4,33 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+**Wartungszug aus der externen Code-Review (Codex, 2026-08-12; drei Punkte im
+Konsens beider Prüfungen):**
+
+- **Sicherheit — Nonce-Verbrauch fail-closed:** Ließ sich der Verbrauch einer
+  Admin-Nonce nicht in Firestore festhalten, galt sie bisher trotzdem als
+  gültig (fail-open) — der Replay-Schutz war genau dann wirkungslos. Jetzt
+  gilt sie als nicht einlösbar: 403, keine Mutation. Kostet nichts: Der
+  Bearer-Notweg nutzt keine Nonce, und Boost/Reset schreiben selbst in
+  Firestore, wären bei einem Ausfall also ohnehin gescheitert.
+- **Betrieb — Infrastruktur-Prüfskript:** Neues, ausschließlich lesendes
+  `scripts/verify-infrastructure.sh` gleicht vor jedem Deploy den Ist-Zustand
+  der Cloud gegen den RUNBOOK-Soll-Zustand ab (Queue-Region+Concurrency,
+  Bucket-Region+Lifecycle+Soft-Delete, Firestore nur `malzime-eu`,
+  Worker nicht öffentlich, Functions-Regionen, Log-Ausschlüsse). In
+  `deploy.sh` verankert (Notschalter `SKIP_INFRA=1`); ein CI-Test erzwingt,
+  dass das Skript nie etwas verändern kann (nur Lese-Kommandos erlaubt).
+  Erstlauf gegen die echte Infrastruktur: alle Prüfungen grün.
+- **Doku — Drift bereinigt:** Feste Testzahlen aus dem README entfernt (der
+  verbindliche Stand ist der letzte CI-Lauf), `VERIFICATION.md` ausdrücklich
+  als datierter Prüfstand gerahmt und einmalig aktualisiert, der sich selbst
+  widersprechende Queue-Absatz in `ARCHITECTURE.md` neu geschrieben
+  (Stundenlimit + Tiefen-Bremse + 35-min-Höchstalter), Reaper-Absatz auf die
+  fünf realen Aufräum-Zweige gebracht, GPS-Formulierung im README
+  regelkonform präzisiert.
+
 ## [3.0.3] — 2026-08-11
 
 **Wording-Korrektur:** „Privat finanziert" heißt jetzt überall

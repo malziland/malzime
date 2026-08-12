@@ -40,6 +40,40 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 5. `release.yml` legt automatisch einen GitHub-Release an, sobald die neue
    CHANGELOG-Version auf `main` landet (idempotent).
 
+## Infrastruktur-Prüfung (`scripts/verify-infrastructure.sh`)
+
+Ein Teil der Sicherheits- und Datenschutz-Zusagen lebt **außerhalb des Repos**
+in der Cloud-Konfiguration — `firebase deploy` verwaltet sie nicht. Das
+Prüfskript gleicht den Ist-Zustand **nur lesend** gegen den Soll-Zustand ab
+und läuft automatisch in `deploy.sh` vor jedem Deploy (Notschalter
+`SKIP_INFRA=1`, z. B. wenn die gcloud-Anmeldung abgelaufen ist und ein
+dringender Rollback nicht warten darf). Es kann jederzeit auch direkt
+gestartet werden.
+
+**Was es prüft (= der Soll-Zustand):**
+
+| Bereich | Soll |
+|---|---|
+| Cloud-Tasks-Queue `analyze-queue` | existiert in `europe-west1`, Concurrency 7, RUNNING |
+| Bucket `malzime-queue-uploads` | Region `EUROPE-WEST1`, Lifecycle-Löschregel nach 1 Tag aktiv, Soft-Delete 0 |
+| Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
+| Worker-IAM | `processjob` und `reapjobs` ohne `allUsers`/`allAuthenticatedUsers` (nicht öffentlich; die `/api/*`-Functions sind bewusst öffentlich, Hosting reicht durch) |
+| Functions-Regionen | alle in `europe-west1` |
+| Logging | `_Default`-Ausschluss `exclude_run_request_routine` aktiv, Sink `client-diagnostics-sink` vorhanden |
+
+Exit-Codes: 0 = grün, 1 = Abweichung (Deploy stoppt), 2 = Voraussetzung fehlt
+(gcloud nicht da/nicht angemeldet). Der Test
+`functions/src/__tests__/verify-infrastructure-script.test.js` erzwingt in der
+CI, dass das Skript ausschließlich Lese-Kommandos enthält.
+
+**Grenze des Skripts — ZDR ist Vertrag, nicht Konfiguration:** Die
+Zero-Data-Retention-Zusage von Mistral lässt sich technisch nicht abfragen.
+Ihr Nachweis ist organisatorisch: privater Nachweisordner beim Inhaber
+(ZDR-/Trainings-Opt-out-Screenshots vom 2026-08-11, Vertrags-/DPA-Unterlagen —
+bewusst NICHT im öffentlichen Repo) plus Wiedervorlage: **vor jeder
+Presse-Welle und mindestens halbjährlich** im Mistral-Dashboard nachprüfen
+und den Screenshot-Stand erneuern.
+
 ## Rollback-Hebel
 
 Vom schnellsten zum gründlichsten. Alle Flag-Hebel wirken **ohne Deploy** binnen

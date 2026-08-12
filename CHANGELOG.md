@@ -4,13 +4,9 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.1.0] — 2026-08-13
 
 **Das TIEF-Audit und seine Sanierung.**
-
-> Dieser Eintrag bekommt die Nummer `3.1.0`, sobald alle 29 Befunde erledigt sind.
-> Solange er unveröffentlicht ist, ist die Sanierung nicht fertig — die Nummer wird
-> vergeben, wenn sie stimmt, nicht vorher.
 
 Am 12. August lief das erste vollständige TIEF-Audit dieses Projekts: sechs unabhängige
 Prüfer entlang von Prüffragen, ein eigener Widerleger für den schwersten Befund, dazu die
@@ -29,12 +25,11 @@ brachte eine Funktion zum Absturz; der Absturz löste die Störungsmeldung aus. 
 konnte damit ohne Anmeldung den einzigen Alarmkanal des Projekts unbrauchbar machen —
 beliebig oft. Behoben und live belegt.
 
-Vorlauf und Sanierung stehen hier vollständig an einer Stelle. `3.0.7`, `3.0.8` und
-`3.0.9` waren Zwischen-Auslieferungen derselben Arbeit — sie tragen Tags, weil sie
-tatsächlich deployt wurden, aber ihr Inhalt steht hier. Der vollständige Auditbericht mit
-allen 29 Befunden liegt unter `docs/audit/` (bewusst nicht im öffentlichen Repository).
+Vorlauf und Sanierung stehen hier vollständig an einer Stelle. Der vollständige
+Auditbericht mit allen 29 Befunden liegt unter `docs/audit/` (bewusst nicht im
+öffentlichen Repository).
 
-### Vorlauf — die Sperrliste für Außentexte (ausgeliefert als `3.0.7`)
+### Vorlauf — die Sperrliste für Außentexte
 
 Der Anlass für das Audit. Eine Regel, die seit Monaten in `CONTRIBUTING.md` steht, war an
 fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als Prüfung.
@@ -264,7 +259,7 @@ fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als
   vergleicht jeden dort genannten Job mit denen, die es wirklich gibt. Die Probenzahl
   steht nur noch an einer Stelle und wird gezählt statt geschrieben.
 
-**Zwei neue Funde, die erst die Sanierung zutage gefördert hat:**
+**Drei neue Funde, die erst die Sanierung zutage gefördert hat:**
 
 - **Der Release-Wächter konnte den Tag einer bereits ausgelieferten Version umhängen**
   (`OPS-2026-08-12-30`, P2). Er suchte die „oberste Version" mit einem Zahlenmuster.
@@ -278,6 +273,14 @@ fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als
   jetzt in einem eigenen Skript und entscheidet nach der obersten Überschrift, gleich
   welcher Art. Neun Tests, darunter ein Rückfall-Wächter und ein Lauf gegen das echte
   CHANGELOG.
+- **Der Prüfstand-Stempler starb wortlos** (`OPS-2026-08-13-32`, P3). Er liest die
+  Testzahlen aus der Ausgabe der Suiten. Seit ein Test bewusst übersprungen wird, lautet
+  die Zeile „1 übersprungen, 795 bestanden" — sein Muster erwartete die Zahl unmittelbar
+  hinter „Tests:" und griff nicht mehr. Seine eigene Plausibilitätsprüfung hätte genau
+  das melden sollen, wurde aber nie erreicht: Eine leere Suche beendet unter den strengen
+  Shell-Einstellungen das ganze Skript sofort. Ergebnis: Abbruch ohne ein Wort. Behoben —
+  und der übersprungene Test wird jetzt ausgewiesen statt weggerechnet („795/796 grün,
+  1 übersprungen").
 - **Ein E2E-Test scheitert selten — und sagt beim Scheitern nicht, woran**
   (`TEST-2026-08-13-31`, P3). Im vollen Lauf fiel „Beast Mode überlebt ein Neuladen"
   einmal durch, in drei Einzelläufen danach nicht wieder. Die Meldung lautete, ein
@@ -289,22 +292,8 @@ fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als
   überhaupt da ist. Beim nächsten Auftreten steht die Ursache in der Meldung, statt eine
   Stunde zu kosten.
 
-## [3.0.9] — 2026-08-12
-
-Zwischen-Auslieferung der Audit-Sanierung (Welle 2). Der vollständige Eintrag steht im
-Abschnitt „Das TIEF-Audit und seine Sanierung" ganz oben.
 
 
-## [3.0.8] — 2026-08-12
-
-Zwischen-Auslieferung der Audit-Sanierung (Welle 1). Der vollständige Eintrag steht im
-Abschnitt „Das TIEF-Audit und seine Sanierung" ganz oben.
-
-
-## [3.0.7] — 2026-08-12
-
-Sperrliste für Außentexte — der Vorlauf zum Audit. Der vollständige Eintrag steht im
-Abschnitt „Das TIEF-Audit und seine Sanierung" ganz oben.
 
 ## [3.0.6] — 2026-08-12
 

@@ -79,10 +79,22 @@ Subprozessoren-Liste — bewusst NICHT im öffentlichen Repo) plus Wiedervorlage
 **vor jeder Presse-Welle und mindestens halbjährlich** im Mistral-Dashboard
 nachprüfen und den Screenshot-Stand erneuern.
 
-**Damit die Frist nicht vergessen wird, wacht die CI darüber**
-(`functions/src/__tests__/zusagen-frische.test.js`): Ist das in
-`public/datenschutz.html` genannte Prüfdatum älter als 183 Tage, wird der Bau
-rot und nennt die nötigen Schritte. Ablauf beim roten Bau — **in dieser
+**Damit die Frist nicht vergessen wird, wachen zwei Schichten darüber** — beide
+rechnen mit derselben Frist aus `functions/src/zusagen.js`:
+
+1. **Freundliche Vorwarnung:** Die geplante Function `erinnerung`
+   (`handle-erinnerung.js`, montags 9 Uhr Wien) liest das Prüfdatum von der
+   **Live-Seite** und schickt eine Woche vor Fristablauf einen ntfy-Push aufs
+   Handy — mit der Handlungsanleitung im Text und einem Knopf direkt ins
+   Mistral-Dashboard. Überfällig meldet sie mit höherer Priorität. Sie ist
+   fail-soft: Seite nicht erreichbar, Datum unlesbar oder ntfy weg werden nur
+   als Warnung geloggt (nie `severity ERROR`, sonst löst die Erinnerung den
+   Fehleralarm aus).
+2. **Harte Bremse:** `functions/src/__tests__/zusagen-frische.test.js` macht
+   die CI rot, sobald das Prüfdatum älter als 183 Tage ist — falls die
+   Vorwarnung untergeht.
+
+Ablauf, wenn die Erinnerung kommt (oder der Bau rot wird) — **in dieser
 Reihenfolge**:
 
 1. Im Mistral-Dashboard nachsehen, ob „Null-Datenspeicherung" noch aktiv ist.

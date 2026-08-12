@@ -125,8 +125,12 @@ describe("i18n Guardian (Backend)", () => {
 
     /* Infrastructure files — no user-facing text, permanently excluded.
        mistral-mock.js is a test fixture: its bilingual canned profile data
-       simulates Mistral API output and is not localised content. */
-    const EXCLUDED = ["i18n.js", "config.js", "middleware.js", "mistral-mock.js"];
+       simulates Mistral API output and is not localised content.
+       zusagen.js parses German month names off the German privacy page, and
+       handle-erinnerung.js writes an operator-only push to the maintainer's
+       phone — neither text ever reaches a workshop participant, so neither
+       is localisation material. */
+    const EXCLUDED = ["i18n.js", "config.js", "middleware.js", "mistral-mock.js", "zusagen.js", "handle-erinnerung.js"];
 
     it("non-allowlisted backend JS files have no hardcoded German", () => {
       const violations = [];

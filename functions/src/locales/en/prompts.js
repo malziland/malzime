@@ -1053,14 +1053,22 @@ Generate 6-8 ad entries that target the VULNERABILITY, not the hobby.
 Answer ONLY with JSON: {"ad_targeting": ["...", "..."]}`;
 
 /* Nur die wechselnden Werte — kommt als user-Nachricht NACH dem System. */
-module.exports.beastAdsUser = (p) => `═══ THE PROFILE ═══
+/* SEC-2026-08-12-18: siehe die deutsche Fassung — Warnung voran, Daten in
+   Blöcke gefasst; maskiert wird in mistral.js. */
+module.exports.beastAdsUser = (p) => `${module.exports.injectionWarning}
 
+═══ THE PROFILE ═══
+
+<profil_daten>
 Age/gender: ${p.alter}
 Vulnerability: ${p.verletzlichkeit}
 Health: ${p.gesundheit}
 Purchasing power: ${p.kaufkraft}
 
 Summary: ${p.profileText}
+</profil_daten>
 
 The person already receives these ads in the factual mode — they reflect the visible lifestyle:
-${p.standardAds}`;
+<bestehende_werbung>
+${p.standardAds}
+</bestehende_werbung>`;

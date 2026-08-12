@@ -1328,14 +1328,20 @@ async function generateBeastAds(boostProfile, standardAds, lang, opts = {}) {
   const prompts = loadPrompts(lang || "de");
   if (typeof prompts.beastAdsSystem !== "string" || typeof prompts.beastAdsUser !== "function") return null;
 
+  /* SEC-2026-08-12-18: Maskieren wie im ersten Aufruf. Alle diese Werte stammen
+     mittelbar aus dem hochgeladenen Bild — ein Foto mit lesbarem Text kann
+     Saetze ins Profil tragen, die hier wie Anweisungen aussehen. Ohne escapeXml
+     koennte ein praepariertes Foto die Blockgrenze schliessen und den Rest des
+     Prompts als eigene Anweisung fortsetzen. Warnung und Blockgrenzen stehen in
+     der Prompt-Vorlage (beastAdsUser). */
   const c = boostProfile.categories;
   const nutzerteil = prompts.beastAdsUser({
-    alter: c.alter_geschlecht?.value || "",
-    verletzlichkeit: c.verletzlichkeit?.value || "",
-    gesundheit: c.gesundheit?.value || "",
-    kaufkraft: c.kaufkraft?.value || "",
-    profileText: (boostProfile.profileText || "").slice(0, 700),
-    standardAds: (Array.isArray(standardAds) ? standardAds : []).join(", "),
+    alter: escapeXml(c.alter_geschlecht?.value || ""),
+    verletzlichkeit: escapeXml(c.verletzlichkeit?.value || ""),
+    gesundheit: escapeXml(c.gesundheit?.value || ""),
+    kaufkraft: escapeXml(c.kaufkraft?.value || ""),
+    profileText: escapeXml((boostProfile.profileText || "").slice(0, 700)),
+    standardAds: escapeXml((Array.isArray(standardAds) ? standardAds : []).join(", ")),
   });
 
   try {

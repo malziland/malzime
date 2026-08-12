@@ -64,4 +64,29 @@ describe("Doku-Drift-Wächter", () => {
       expect(matrix).toMatch(muster);
     }
   });
+
+  /* DOC-2026-08-12-07: Die Matrix nannte einen CI-Job `aussentext`, den es nie
+     gab — der Job hieß von Anfang an anders. Ein Nachweis, der auf einen Job
+     zeigt, den niemand finden kann, ist kein Nachweis, sondern eine Fußnote.
+     Das ist maschinell entscheidbar, also entscheidet es ab jetzt eine
+     Maschine. */
+  test("jeder in der Verifikationsmatrix genannte CI-Job existiert auch", () => {
+    const matrix = lies("docs/VERIFICATION.md");
+    const ci = lies(".github/workflows/ci.yml");
+
+    /* Job-Namen stehen in ci.yml auf genau zwei Einrückungsebenen tief unter
+       `jobs:` — Schlüssel wie `push:` oder `schedule:` stehen unter `on:` und
+       kommen hier nicht vor, weil erst ab der Zeile `jobs:` gelesen wird. */
+    const abJobs = ci.slice(ci.indexOf("\njobs:"));
+    const echte = new Set([...abJobs.matchAll(/^ {2}([a-z][a-z0-9-]*):$/gm)].map((m) => m[1]));
+    const genannt = new Set([...matrix.matchAll(/CI-Job `([a-z][a-z0-9-]*)`/g)].map((m) => m[1]));
+
+    /* Positivkontrollen: Ohne sie wäre der Test auch grün, wenn eine der
+       beiden Suchen ins Leere liefe — dann verglichen wir zwei leere Mengen
+       und nennten das Übereinstimmung. */
+    expect(echte.size).toBeGreaterThan(3);
+    expect(genannt.size).toBeGreaterThan(3);
+
+    expect([...genannt].filter((j) => !echte.has(j))).toEqual([]);
+  });
 });

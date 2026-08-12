@@ -121,6 +121,40 @@ function heute() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/* AUDIT-BEFUND OSS-2026-08-12-21: Das Ablaufdatum wurde als Zeichenkette
+   verglichen. Ein Eintrag in deutscher Schreibweise ("31.12.2026") ist als Text
+   groesser als jedes "20xx-"-Datum — die Ausnahme waere NIE abgelaufen, und
+   genau der Ablauf ist die einzige Sicherung dagegen, dass das Ventil zur
+   stillen Muellhalde wird. Ebenso wurden die im Dateikopf als Pflicht
+   ausgewiesenen Felder nie geprueft.
+   Jetzt: Form und Gueltigkeit des Datums pruefen, Pflichtfelder erzwingen. Ein
+   fehlerhafter Eintrag ist ein Fehlschlag der Liste, kein stillschweigend
+   uebergangener Eintrag. */
+const PFLICHTFELDER = ["ghsa", "paket", "schwere", "eingetragen", "kette", "grund", "pruefen_bis"];
+
+function ausnahmenPruefen(ausnahmen) {
+  const maengel = [];
+  ausnahmen.forEach((a, i) => {
+    const name = a && a.ghsa ? a.ghsa : `Eintrag ${i + 1}`;
+    for (const feld of PFLICHTFELDER) {
+      if (!a || !a[feld]) maengel.push(`${name}: Pflichtfeld "${feld}" fehlt`);
+    }
+    if (!a || !a.pruefen_bis) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(a.pruefen_bis)) {
+      maengel.push(
+        `${name}: pruefen_bis "${a.pruefen_bis}" ist kein Datum der Form JJJJ-MM-TT. ` +
+          "Andere Schreibweisen laufen im Zeichenkettenvergleich nie ab."
+      );
+      return;
+    }
+    const wert = new Date(`${a.pruefen_bis}T00:00:00Z`);
+    if (Number.isNaN(wert.getTime())) {
+      maengel.push(`${name}: pruefen_bis "${a.pruefen_bis}" ist kein gueltiges Datum.`);
+    }
+  });
+  return maengel;
+}
+
 // --- Ausfuehrung ---------------------------------------------------------
 
 const alleAdvisories = new Map();
@@ -145,6 +179,16 @@ for (const verzeichnis of ziele) {
 }
 
 const ausnahmen = ausnahmenLesen();
+const ausnahmeMaengel = ausnahmenPruefen(ausnahmen);
+if (ausnahmeMaengel.length > 0) {
+  console.error("\nGate ROT — die Ausnahmeliste ist fehlerhaft:");
+  for (const m of ausnahmeMaengel) console.error(`  ${m}`);
+  console.error(
+    "\nEine Ausnahme ohne gueltiges Ablaufdatum laeuft nie ab. Erst die Liste\n" +
+      "reparieren, dann messen."
+  );
+  process.exit(2);
+}
 const nachKennung = new Map(ausnahmen.map((a) => [a.ghsa, a]));
 const stichtag = heute();
 

@@ -34,7 +34,10 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    Datum stempeln.
 4. Deploy über `./scripts/deploy.sh [hosting|functions]` — das Script führt
    zuerst Lint + Unit-Tests aus (Test-Guard; nur im Notfall mit `SKIP_TESTS=1`
-   überspringbar, mit Warnhinweis) und zählt dann den Cache-Buster in allen
+   überspringbar, mit Warnhinweis), prüft die Version der Firebase-CLI gegen die
+   in `deploy.sh` hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`; eine
+   nicht ermittelbare Version bricht ab, statt durchzuwinken —
+   `OPS-2026-08-12-25`) und zählt dann den Cache-Buster in allen
    fünf HTML-Seiten automatisch hoch (Konvention `?v=YYYYMMDDNN`: gleicher Tag
    → laufende Nummer +1, sonst neuer Tag mit `01`; nur bei Hosting-Deploys
    relevant, reine Functions-Deploys brauchen keinen).
@@ -64,7 +67,7 @@ gestartet werden.
 | Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
 | Worker-IAM | `processjob` und `reapjobs` ohne `allUsers`/`allAuthenticatedUsers` (nicht öffentlich; die `/api/*`-Functions sind bewusst öffentlich, Hosting reicht durch) |
 | Functions-Regionen | alle in `europe-west1` |
-| Logging | `_Default`-Ausschluss `exclude_run_request_routine` aktiv, Sink `client-diagnostics-sink` vorhanden |
+| Logging | `_Default`-Ausschluss `exclude_run_requests_ip` aktiv (Request-Logs vollständig, **ohne** Schwere-Bedingung — sie sind der einzige Träger von Client-IPs, und `_Default` liegt fest auf Standort `global`), Sink `client-diagnostics-sink` vorhanden |
 
 Exit-Codes: 0 = grün, 1 = Abweichung (Deploy stoppt), 2 = Voraussetzung fehlt
 (gcloud nicht da/nicht angemeldet). Der Test

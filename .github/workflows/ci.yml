@@ -28,7 +28,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           cache: npm
@@ -40,7 +40,11 @@ jobs:
       # `npm audit --audit-level=high`. Grund: das nackte audit blockiert bei
       # einer unreparierbaren Fremd-Luecke JEDEN PR — am 2026-07-01 sind daran
       # alle acht Dependabot-PRs gescheitert. Details: scripts/audit-gate.mjs
-      - run: node ../scripts/audit-gate.mjs functions
+      # AUDIT-BEFUND OSS-2026-08-12-23: Das Gate prueft jetzt BEIDE Baeume. Der
+      # Wurzel-Baum (Playwright, Vitest, ESLint) lief bisher durch keinen Riegel,
+      # obwohl genau dieser Code in der CI ueber dem ausgecheckten Repository
+      # laeuft. Aktuell sind beide Baeume auf 0 — der Riegel fehlte trotzdem.
+      - run: node ../scripts/audit-gate.mjs functions .
 
       - run: npm run lint
       - run: npm run format:check
@@ -63,7 +67,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           cache: npm
@@ -101,13 +105,22 @@ jobs:
     # Finalisieren haengen und blockierte als Pflicht-Check JEDEN PR.
     # Der Tag wird aus dem Lockfile abgeleitet, siehe Job playwright-version.
     # Von Hand zu pflegen bleibt nur noch der Basis-Name (-jammy).
+    #
+    # OSS-2026-08-12-24: Das Etikett ist BEWEGLICH — derselbe Name kann morgen
+    # einen anderen Inhalt tragen. Bewusst kein Digest-Pin: Der Tag wird aus dem
+    # Lockfile abgeleitet, ein fester Digest wuerde bei jedem Playwright-Update
+    # einen Pflicht-Check brechen, bis jemand von Hand nachzieht. Vertretbar,
+    # weil dieser Job weder Geheimnis noch Token noch Schreibrechte hat und
+    # nichts ausliefert — das schlimmste Ergebnis eines untergeschobenen Images
+    # ist ein falsches Testergebnis. Begruendung und Bedingung fuer eine
+    # Neubewertung: docs/SECURITY-MODEL.md, Restrisiko 7.
     container:
       image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.version }}-jammy
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
           cache: npm
@@ -153,12 +166,47 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Zuerst die Pruefungen selbst pruefen: achtzehn Proben, je Pruefung eine
-      # gegen kaputtes und eine gegen sauberes Material. Ohne diesen Schritt
-      # koennte ein defekter Pruefer gruen melden, ohne etwas zu pruefen.
+      # Node ausdruecklich einrichten statt auf die Vorinstallation des Runners
+      # zu vertrauen: Der Pruefsummen-Waechter unten laeuft mit node, und eine
+      # stillschweigende Annahme ueber die Umgebung ist genau die Sorte
+      # Voraussetzung, die irgendwann unbemerkt wegfaellt.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+
+      # Zuerst die Pruefungen selbst pruefen: je Pruefung eine Probe gegen
+      # kaputtes und eine gegen sauberes Material. Ohne diesen Schritt koennte
+      # ein defekter Pruefer gruen melden, ohne etwas geprueft zu haben.
+      # Die Anzahl der Proben steht NUR im Skript selbst — sie hier zu
+      # wiederholen hiesse, sie irgendwann falsch zu wiederholen.
       - run: sh scripts/pruefungen/selbstpruefung.sh
 
       - run: python3 scripts/pruefungen/checks/aussentext.py .
       - run: python3 scripts/pruefungen/checks/fakten-drift.py .
       - run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
       - run: python3 scripts/pruefungen/checks/test-blind.py .
+
+      # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
+      # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine
+      # Aenderung an 147 KB minifiziertem Einzeiler faellt in einem Pull-Request
+      # niemandem auf — ausgerechnet exifr liest die GPS-Daten, deren
+      # Nichtweitergabe die Kernzusage dieses Projekts ist.
+      #
+      # Wird eine Bibliothek bewusst ausgetauscht, stempelt
+      # `node scripts/pruefe-fremddateien.mjs --aktualisieren` die Liste neu.
+      # Der eigene Schalter ist Absicht: Der Austausch soll eine sichtbare
+      # Zeile im Diff sein, keine Nebenwirkung.
+      - run: node scripts/pruefe-fremddateien.mjs
+
+      # TEST-2026-08-12-28: `scripts/pruefungen/` ist eine Kopie aus der
+      # Audit-Familie. Kopien driften — diese war es bereits: Beim Kopieren
+      # gingen die Punktverzeichnisse unter, in einer Beispielprobe fehlte
+      # dadurch die Regeldatei, und die Pruefung legte sich beim Lauf still eine
+      # Vorlage an. Gruen, aber aus einem anderen Grund als gedacht.
+      #
+      # In der Pipeline schlaegt der Waechter an, wenn jemand die KOPIE
+      # bearbeitet hat statt der Quelle — der haeufigere Fehler, weil nur die
+      # Kopie im Repository liegt. Ob die Quelle weitergezogen ist, kann hier
+      # niemand sehen; der Lauf sagt das ausdruecklich dazu, statt es zu
+      # verschweigen.
+      - run: node scripts/pruefe-vendorierung.mjs

@@ -375,6 +375,40 @@ describe("TEST-002 — nachgezogene Upload-Prüfungen", () => {
     expect(res.body.error).toContain("Invalid file type");
   });
 
+  /* SEC-2026-08-12-19: Der erkannte Typ wurde nur auf "irgendein Bild" geprüft
+     und dann verworfen — die Behauptung des Aufrufers reiste ungeprüft weiter,
+     bis in die Daten-URL an die KI. */
+  test("GIF-Bytes mit der Behauptung image/jpeg → 400, nichts wird gezählt", async () => {
+    const gif = Buffer.concat([Buffer.from("GIF89a"), Buffer.alloc(20)]);
+    const req = jsonReq({ imageBase64: gif.toString("base64"), mimeType: "image/jpeg" });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain("Invalid file type");
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+    expect(storage.storeImage).not.toHaveBeenCalled();
+  });
+
+  test("PNG-Bytes mit der Behauptung image/webp → 400", async () => {
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(20)]);
+    const req = jsonReq({ imageBase64: png.toString("base64"), mimeType: "image/webp" });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain("Invalid file type");
+  });
+
+  test("Gegenprobe: passt der Typ zu den Bytes, läuft es durch", async () => {
+    /* Ohne diese Probe wäre auch eine Prüfung grün, die ALLES ablehnt — und der
+       eigene Upload-Weg wäre tot, ohne dass ein Test es bemerkt. */
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(20)]);
+    const req = jsonReq({ imageBase64: png.toString("base64"), mimeType: "image/png" });
+    const res = makeRes();
+    await handleEnqueue(req, res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(storage.storeImage).toHaveBeenCalled();
+  });
+
   test("EXIF-Werte werden auf 100 Zeichen gekappt (SEC-006 aus dem Juni-Audit)", async () => {
     const req = jsonReq({ exif: { make: "M".repeat(500), model: "X".repeat(500) } });
     const res = makeRes();

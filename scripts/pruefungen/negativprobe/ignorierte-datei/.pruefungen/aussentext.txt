@@ -1,7 +1,4 @@
-# Verbotene Formulierungen in Texten, die nach aussen gehen.
-# Format:  regulaerer Ausdruck|Begruendung
-# Diese Zeilen sind Beispiele. Passe sie an dein Projekt an.
-verlaesst nie den Browser|Absolute Zusage ueber Datenfluesse ist im Netzwerk-Tab widerlegbar. Beschreiben, was das System tut, nicht was es niemals tut.
-zu ?100 ?% sicher|Sicherheit ist keine Zusage, die man geben kann.
-garantiert (?:sicher|anonym|fehlerfrei)|Garantie ohne Nachweis. Formulierung abschwaechen oder Nachweis verlinken.
-militaerisch(?:e|er)? Verschluesselung|Marketingbegriff ohne technischen Gehalt.
+# ERWARTUNG: Exit 0. Der Verstoss steht in einer per .gitignore ausgeschlossenen
+# Datei — sie landet nie im Repository und wird deshalb nicht geprueft. Sonst ist
+# der Pruefer lokal dauerhaft rot und in der CI gruen (TEST-2026-08-12-29).
+verbotene zusage|Nicht verwenden.

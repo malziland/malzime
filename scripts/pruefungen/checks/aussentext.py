@@ -200,6 +200,17 @@ def main():
     print(f"Regeln: {len(regeln)} (Positivkontrolle bestanden)")
     print(f"Dateien: {geprueft}")
 
+    # TEST-2026-08-12-03: Null gepruefte Dateien ist kein sauberes Ergebnis,
+    # sondern eine gescheiterte Messung. Die drei anderen Pruefungen sagten das
+    # bereits; diese hier meldete "kein Verstoss gefunden" und ging mit 0 raus —
+    # dieselbe Ausfallform, gegen die sie selbst antritt (KERN 5c).
+    if geprueft == 0:
+        print("-" * 60)
+        print("Keine Aussentexte gefunden. Ohne Suchflaeche keine Aussage. Das ist")
+        print("kein bestandener Test, sondern eine gescheiterte Messung: Entweder")
+        print("gibt es die Dateien nicht, oder die Suche greift nicht.")
+        return 2
+
     for kurz, nr, text, grund in funde:
         print(f"\n{kurz}:{nr}")
         print(f"  Formulierung: {text}")

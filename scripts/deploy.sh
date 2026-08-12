@@ -30,6 +30,40 @@ else
   npm run test:frontend
 fi
 
+# ── OPS-2026-08-12-25: Riegel gegen ein unbekanntes Auslieferungswerkzeug ──
+# Die Firebase-CLI ist global installiert und war an keine Version gebunden:
+# Ein beilaeufiges `npm i -g firebase-tools` haette den Deploy-Weg still
+# veraendert, ohne dass irgendwo etwas rot wird — und nirgends stand, mit
+# welcher Version je ausgeliefert wurde.
+#
+# Bewusst NICHT nach package.json verschoben: `npx firebase` scheitert, wenn
+# firebase-tools nicht im Projekt liegt (Begruendung weiter unten), und ein
+# Werkzeug dieser Groesse im Abhaengigkeitsbaum waere der schlechtere Tausch.
+# Stattdessen: gemessen, protokolliert, mit Untergrenze.
+#
+# Untergrenze anheben, wenn ein Deploy eine neuere Version tatsaechlich
+# gebraucht hat — nicht auf Verdacht. Diese Zeile ist die einzige Quelle
+# dieser Zahl; die Doku verweist hierher.
+FIREBASE_MIN="15.1.0"
+if [ "${SKIP_CLI_CHECK:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_CLI_CHECK=1 gesetzt — Versionspruefung der CLI wird UEBERSPRUNGEN."
+else
+  FIREBASE_IST="$(firebase --version 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
+  # Fail-closed: Eine nicht ermittelbare Version ist ausdruecklich kein
+  # bestandener Riegel. Leer ist zuerst ein Verdacht gegen die Messung.
+  if [ -z "$FIREBASE_IST" ]; then
+    echo "FEHLER: Version der Firebase-CLI nicht ermittelbar (\`firebase --version\` lieferte nichts)." >&2
+    echo "        Ohne bekanntes Werkzeug kein Deploy. Notschalter: SKIP_CLI_CHECK=1" >&2
+    exit 1
+  fi
+  if [ "$(printf '%s\n%s\n' "$FIREBASE_MIN" "$FIREBASE_IST" | sort -V | head -1)" != "$FIREBASE_MIN" ]; then
+    echo "FEHLER: Firebase-CLI $FIREBASE_IST ist aelter als die Untergrenze $FIREBASE_MIN." >&2
+    echo "        Aktualisieren mit: npm i -g firebase-tools" >&2
+    exit 1
+  fi
+  echo "Firebase-CLI: $FIREBASE_IST (Untergrenze $FIREBASE_MIN)"
+fi
+
 # ── Infra-Riegel: Ist-Zustand der Cloud gegen den RUNBOOK-Soll-Zustand ──
 # Nur lesend (Queue, Bucket, Firestore, Worker-IAM, Regionen, Logging).
 # Notschalter fuer den Ernstfall (z. B. gcloud-Anmeldung abgelaufen und ein

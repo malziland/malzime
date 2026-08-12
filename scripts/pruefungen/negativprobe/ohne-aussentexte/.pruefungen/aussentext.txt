@@ -1,0 +1,3 @@
+# Gueltige Regel, damit die Probe wirklich die fehlende Suchflaeche misst
+# und nicht versehentlich die fehlende Regeldatei.
+verlaesst nie den Browser | Absolute Zusage, technisch nicht haltbar.

@@ -35,10 +35,20 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          # Oberste stabile Version (x.y.z, keine -rc) aus dem CHANGELOG holen
-          VERSION="$(grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' CHANGELOG.md | tr -d '#[] ' || true)"
-          if [ -z "$VERSION" ]; then
-            echo "Keine stabile Version oben im CHANGELOG gefunden — nichts zu tun."
+          # OPS-2026-08-12-30: Die OBERSTE Ueberschrift entscheidet, nicht die
+          # erste Zeile, die wie eine Version aussieht. Steht [Unveroeffentlicht]
+          # obenauf, ist nichts zu releasen — die naechste Nummer weiter unten
+          # ist bereits ausgeliefert und darf nicht umgehaengt werden. Die
+          # Auswertung liegt in scripts/changelog-oberste-version.sh, damit sie
+          # von Tests erreichbar ist; im YAML war sie es nie.
+          RC=0
+          VERSION="$(sh scripts/changelog-oberste-version.sh CHANGELOG.md)" || RC=$?
+          if [ "$RC" -eq 2 ]; then
+            echo "CHANGELOG nicht auswertbar — Abbruch statt stillem Durchwinken."
+            exit 1
+          fi
+          if [ "$RC" -ne 0 ]; then
+            echo "Oberster CHANGELOG-Abschnitt: '$VERSION' — keine stabile Version, nichts zu tun."
             exit 0
           fi
           TAG="v$VERSION"
@@ -53,7 +63,7 @@ jobs:
             #     Fehler entfaellt. Damit Tag und CHANGELOG nicht auseinander-
             #     laufen (die OPS-002-Falle vom 2026-08-10), wird der Tag samt
             #     Release hier auf DIESEN Stand umgehaengt statt zu scheitern.
-            VORHER="$(git show "$GITHUB_SHA^:CHANGELOG.md" 2>/dev/null | grep -m1 -oE '^## \[[0-9]+\.[0-9]+\.[0-9]+\]' | tr -d '#[] ' || true)"
+            VORHER="$(git show "$GITHUB_SHA^:CHANGELOG.md" | sh scripts/changelog-oberste-version.sh)" || true
             if [ "$VORHER" = "$VERSION" ]; then
               echo "Release $TAG existiert; der Push aendert die oberste Version nicht (Doku-Korrektur) — nichts zu tun."
               exit 0

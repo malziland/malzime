@@ -28,7 +28,7 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 - **Datenwert-Rechner**: Zeigt was ein Profil fuer Datenbroker wert ist
 - **Privacy-Check**: Erkennt ungewollt preisgegebene Informationen (Telefonnummern, Adressen, Kennzeichen)
 - **EXIF-Analyse**: Zeigt versteckte Kamera-Metadaten (client-seitig extrahiert)
-- **GPS-Karte**: Zeigt den Aufnahmeort auf einer Karte (GPS verlässt nie den Browser)
+- **GPS-Karte**: Zeigt den Aufnahmeort auf einer Karte (GPS-Daten erreichen nie unsere Server; die Karte lädt der Browser direkt bei OpenStreetMap)
 - **Easter Egg**: Tierfotos bekommen ein lustiges Spass-Profil
 - **PDF-Export**: Ergebnisse als PDF speichern (fuer Workshop-Diskussionen)
 - **Demo-Fotos**: 3 anklickbare KI-generierte Demo-Fotos (keine realen Personen, siehe `public/img/demo/LICENSE.md`) mit Fake-EXIF fuer Workshops (echte KI-Analyse, kein vorgefertigtes Ergebnis)
@@ -219,14 +219,19 @@ zurueckkehrt, und ein Neuladen funktioniert ebenfalls.
 
 ## Tests
 
+Alle Suiten laufen automatisiert in der CI bei jedem Push und Pull Request
+([GitHub Actions](https://github.com/malziland/malzime/actions)) — der
+verbindliche Stand ist immer der letzte CI-Lauf, deshalb stehen hier bewusst
+keine festen Testzahlen.
+
 ```bash
-# Backend (Jest, 611 Tests)
+# Backend (Jest)
 cd functions && npm test
 
-# Frontend (Vitest + jsdom, 193 Tests)
+# Frontend (Vitest + jsdom)
 npm run test:frontend
 
-# E2E (Playwright, 5 Tests)
+# E2E (Playwright)
 npm run test:e2e
 
 # Coverage
@@ -240,11 +245,11 @@ cd functions && npm run format:check   # Backend Prettier
 npm run format:frontend:check          # Frontend Prettier
 ```
 
-**Backend (611 Tests):** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
+**Backend:** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
 
-**Frontend (193 Tests):** DOM-Helpers, State, Scan-Animation, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
+**Frontend:** DOM-Helpers, State, Scan-Animation, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
 
-**E2E (5 Tests):** Playwright — Smoke-Tests (Demo-Flow, fehlerfreies Laden), axe-A11y-Gate (Startseite + Profil-Ansicht) und Tastatur-Durchlauf.
+**E2E:** Playwright — Smoke-Tests (Demo-Flow, fehlerfreies Laden), axe-A11y-Gate (Startseite + Profil-Ansicht) und Tastatur-Durchlauf.
 
 ## CI/CD
 

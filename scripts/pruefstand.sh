@@ -16,13 +16,35 @@ cd "$(dirname "$0")/.."
 
 DATUM=$(date +%Y-%m-%d)
 COMMIT=$(git rev-parse --short HEAD)
-MATRIX="docs/VERIFICATION.md"
+MATRIX="${PRUEFSTAND_MATRIX:-docs/VERIFICATION.md}"
+
+# ── Einspeisepunkte für Proben (OPS-2026-08-13-32, zweiter Teil) ──
+#
+# Die Plausibilitätsprüfung weiter unten lag HINTER allen drei Suiten. Sie
+# auszulösen kostete sechs Minuten und ging bei jedem Flackern der E2E-Suite
+# unterwegs verloren — genau daran ist die erste Negativprobe gestorben, ohne
+# dass es jemandem auffiel. Ein Riegel, den man nicht auslösen kann, ist ein
+# Riegel, von dem niemand weiß, ob er hält.
+#
+# Sind diese Variablen gesetzt, liest das Skript vorbereitete Suiten-Ausgaben
+# aus Dateien, statt die Suiten zu fahren. Der ganze Rest — Zahlen lesen,
+# Plausibilität, Stempeln — läuft unverändert. Im Betrieb ist nichts gesetzt.
+probe_oder_lauf() {
+  # $1 = Name der Probe-Variable, $2… = auszuführendes Kommando
+  eval "DATEI=\${$1:-}"
+  if [ -n "$DATEI" ]; then
+    cat "$DATEI"
+  else
+    shift
+    "$@" 2>&1
+  fi
+}
 
 echo "Prüfstand-Lauf auf Commit $COMMIT ($DATUM) — alle drei Suiten, danach Stempel."
 
 # ── 1. Backend (Jest) ──
 echo "— Backend-Suite läuft…"
-BACKEND_LOG=$(npm test --prefix functions 2>&1) || { echo "$BACKEND_LOG" | tail -20; echo "ABBRUCH: Backend-Suite rot — es wird nichts gestempelt."; exit 1; }
+BACKEND_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_BACKEND npm test --prefix functions) || { echo "$BACKEND_LOG" | tail -20; echo "ABBRUCH: Backend-Suite rot — es wird nichts gestempelt."; exit 1; }
 # OPS-2026-08-13-32: Zwei Fehler in einer Zeile, beide erst sichtbar, als ein
 # Test bewusst uebersprungen wurde und die Ausgabe "1 skipped, 795 passed,
 # 796 total" lautete:
@@ -39,12 +61,12 @@ BACKEND_GESAMT=$(printf "%s" "$BACKEND_LOG" | grep -E "^Tests:" | grep -Eo "[0-9
 
 # ── 2. Frontend (Vitest) ──
 echo "— Frontend-Suite läuft…"
-FRONTEND_LOG=$(npm run test:frontend 2>&1) || { echo "$FRONTEND_LOG" | tail -20; echo "ABBRUCH: Frontend-Suite rot — es wird nichts gestempelt."; exit 1; }
+FRONTEND_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_FRONTEND npm run test:frontend) || { echo "$FRONTEND_LOG" | tail -20; echo "ABBRUCH: Frontend-Suite rot — es wird nichts gestempelt."; exit 1; }
 FRONTEND=$(printf "%s" "$FRONTEND_LOG" | grep -Eo "Tests\s+[0-9]+ passed" | grep -Eo "[0-9]+" | head -1 || true)
 
 # ── 3. E2E (Playwright) ──
 echo "— E2E-Suite läuft (dauert am längsten)…"
-E2E_LOG=$(npm run test:e2e 2>&1) || { echo "$E2E_LOG" | tail -20; echo "ABBRUCH: E2E-Suite rot — es wird nichts gestempelt."; exit 1; }
+E2E_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_E2E npm run test:e2e) || { echo "$E2E_LOG" | tail -20; echo "ABBRUCH: E2E-Suite rot — es wird nichts gestempelt."; exit 1; }
 E2E=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | tail -1 || true)
 
 # ── Plausibilität: alle drei Zahlen müssen da sein ──

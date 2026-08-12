@@ -91,7 +91,13 @@ jest.mock("firebase-admin/firestore", () => {
       return fn(tx);
     },
   };
-  return { getFirestore: () => db };
+  /* ARCH-2026-08-12-27: Die Attrappe muss `Timestamp` mitliefern — createJob legt
+     seit dem 2026-08-12 ein echtes Zeitstempel-Feld `expiresAt` an, auf dem die
+     Firestore-Loeschregel als Sicherheitsnetz unter dem Reaper sitzt. */
+  const Timestamp = {
+    fromMillis: (ms) => ({ _millis: ms, toMillis: () => ms }),
+  };
+  return { getFirestore: () => db, Timestamp };
 });
 
 const jobs = require("../jobs");
@@ -118,6 +124,23 @@ describe("createJob", () => {
     expect(typeof job.createdAt).toBe("number");
     /* Liveness: bei Anlage gilt der Client als anwesend. */
     expect(job.lastSeenAt).toBe(job.createdAt);
+  });
+
+  /* ARCH-2026-08-12-27: Firestore-Loeschregel als Netz UNTER dem Reaper.
+     Entscheidend ist der Abstand: Greift die TTL frueher als der Reaper, loescht
+     sie laufende Jobs mitten im Betrieb — die Massnahme waere dann gefaehrlicher
+     als der Befund. */
+  test("legt ein Ablauf-Feld an, das DEUTLICH nach der Reaper-Frist liegt", async () => {
+    const vorher = Date.now();
+    const id = await jobs.createJob({ lang: "de" });
+    const job = await jobs.getJob(id);
+
+    expect(job.expiresAt).toBeDefined();
+    const ablauf = job.expiresAt.toMillis();
+    /* Netz spaeter als die eigentliche Loeschung … */
+    expect(ablauf - vorher).toBeGreaterThan(JOB_RETENTION_MS);
+    /* … und mit deutlichem Abstand, nicht knapp dahinter. */
+    expect(ablauf - vorher).toBeGreaterThanOrEqual(12 * 60 * 60 * 1000);
   });
 
   test("setzt Default-Sprache de wenn keine angegeben", async () => {

@@ -281,9 +281,49 @@ async function getStats() {
  * Erhöht das Limit um den angegebenen Betrag (Admin-Funktion, für ntfy-Buttons).
  * Wenn der aktuelle Count unter dem neuen Limit liegt, ist das System sofort frei.
  */
+/* AUDIT-BEFUND SEC-2026-08-12-17: `FieldValue.increment` ohne Obergrenze. Wer den
+   Boost-Link einmal sah (er steht im Klartext in der ntfy-Mitteilung), konnte 30
+   Minuten lang beliebig oft anheben und die einzige globale Kostenbremse damit
+   praktisch abschalten. Der Deckel begrenzt den Schaden auf das Doppelte des
+   regulaeren Stundenlimits — genug fuer den gedachten Zweck (eine Schulklasse
+   mehr), zu wenig fuer eine Kostenlawine. */
+const BOOST_OBERGRENZE = 2 * HOURLY_LIMIT;
+
 async function boostLimit(amount = 100) {
   const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
+  /* Fail-closed: Wer die aktuelle Grenze nicht lesen kann, darf sie nicht anheben.
+     Eine Kostenbremse, die im Zweifel oeffnet, ist keine. */
+  let snap;
+  try {
+    snap = await ref.get();
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "boost-limit-nicht-lesbar",
+        message: err && err.message,
+        hinweis: "Boost abgelehnt, weil die aktuelle Grenze nicht gelesen werden konnte.",
+      })
+    );
+    return { limit: null, abgelehnt: true };
+  }
+  const daten = snap && snap.exists ? snap.data() : null;
+  const aktuell = Number((daten && daten.limit) || HOURLY_LIMIT);
+  const gewuenscht = aktuell + amount;
+  if (gewuenscht > BOOST_OBERGRENZE) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "boost-obergrenze-erreicht",
+        aktuell,
+        angefragt: gewuenscht,
+        obergrenze: BOOST_OBERGRENZE,
+        hinweis: "Boost abgelehnt. Haeufige Ablehnungen koennen auf einen abgeflossenen Boost-Link hindeuten.",
+      })
+    );
+    return { limit: aktuell, abgelehnt: true };
+  }
   await ref.set({ limit: FieldValue.increment(amount) }, { merge: true });
 }
 

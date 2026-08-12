@@ -39,6 +39,7 @@ const {
   failJob,
   deleteJob,
 } = require("./jobs");
+const { datenbank } = require("./db");
 const { deleteImage } = require("./queue-storage");
 const { releaseHourlySlot } = require("./counter");
 
@@ -106,7 +107,12 @@ async function reapJobs() {
   let reapedZugestellt = 0;
   for (const job of zugestellt) {
     try {
-      if (job.imagePath) await deleteImage(job.imagePath);
+      /* PRIV-2026-08-12-26: Erst loeschen, dann pruefen. Scheitert die Bild-
+         loeschung, bleibt das Job-Dokument mit seinem `imagePath` stehen — sonst
+         verschwindet der einzige Verweis auf die Datei und niemand kann sie je
+         wieder finden. Der naechste Reaper-Lauf versucht es erneut; spaetestens
+         Zweig (3) raeumt das Dokument nach 2 h ab. */
+      if (job.imagePath && !(await deleteImage(job.imagePath))) continue;
       await deleteJob(job.id);
       reapedZugestellt += 1;
     } catch (err) {
@@ -131,7 +137,24 @@ async function reapJobs() {
          Loeschung — und Zweig (2) sucht nur nach `processing`, findet ihn also
          nie wieder. Deckelt die Verweildauer auf 2 h statt auf die
          Lifecycle-Regel (1 Tag). */
-      if (job.imagePath) await deleteImage(job.imagePath);
+      /* PRIV-2026-08-12-26: Auch hier erst pruefen. Anders als in Zweig (2c)
+         wird das Dokument hier trotzdem geloescht, wenn die Bildloeschung
+         dauerhaft scheitert — sonst sammelten sich abgelaufene Dokumente mit
+         Nutzerdaten unbegrenzt an, und das waere der schwerere Verstoss. Der
+         Fehlschlag ist dank deleteImage laut (severity ERROR) und faellt damit
+         in die Alarmrichtlinie. */
+      const bildWeg = job.imagePath ? await deleteImage(job.imagePath) : true;
+      if (!bildWeg) {
+        console.error(
+          JSON.stringify({
+            severity: "ERROR",
+            error: "reap-bild-blieb-liegen",
+            jobId: job.id,
+            path: job.imagePath,
+            hinweis: "Dokument wird trotzdem geraeumt; das Bild faellt auf die Lifecycle-Regel zurueck.",
+          })
+        );
+      }
       await deleteJob(job.id);
       reapedExpired += 1;
     } catch (err) {
@@ -140,6 +163,16 @@ async function reapJobs() {
       );
     }
   }
+
+  /* AUDIT-BEFUND OPS-2026-08-12-11: Waechter ueber die Wochen-Erinnerung.
+     Die Erinnerung laeuft montags und schweigt in jedem Fehlerfall — bis zum
+     ersten faelligen Push (2027-02) waere ihr Ausfall 180 Tage lang nicht von
+     korrektem Verhalten zu unterscheiden. Sie hinterlaesst deshalb bei jedem
+     Lauf ein Lebenszeichen; hier wird es gelesen. Der Reaper eignet sich dafuer,
+     weil er jede Minute laeuft und in der Alarmrichtlinie steht — anders als die
+     Erinnerung selbst, die bewusst leise bleibt.
+     Schwelle 9 Tage: ein ausgefallener Montag allein loest noch nichts aus. */
+  await pruefeErinnerungsLebenszeichen();
 
   console.log(
     JSON.stringify({
@@ -161,3 +194,33 @@ async function reapJobs() {
 }
 
 module.exports = { reapJobs };
+
+/* Liest das Lebenszeichen der Wochen-Erinnerung und meldet laut, wenn es fehlt
+   oder veraltet ist (OPS-2026-08-12-11). */
+const LEBENSZEICHEN_DOC = "config/erinnerung";
+const LEBENSZEICHEN_MAX_ALTER_MS = 9 * 24 * 60 * 60 * 1000;
+
+async function pruefeErinnerungsLebenszeichen() {
+  try {
+    const snap = await datenbank().doc(LEBENSZEICHEN_DOC).get();
+    const letzterLauf = snap.exists && snap.data() ? Number(snap.data().letzterLauf) : 0;
+    if (!letzterLauf) return; /* Noch nie gelaufen — vor dem ersten Montag normal. */
+    const alter = Date.now() - letzterLauf;
+    if (alter <= LEBENSZEICHEN_MAX_ALTER_MS) return;
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "erinnerung-lebenszeichen-veraltet",
+        letzterLauf: new Date(letzterLauf).toISOString(),
+        alterTage: Math.floor(alter / (24 * 60 * 60 * 1000)),
+        hinweis:
+          "Die Wochen-Erinnerung hat seit ueber neun Tagen nicht gelaufen. Sie meldet " +
+          "ihren eigenen Ausfall bewusst nicht — deshalb diese Meldung. Zeitplan und " +
+          "Function pruefen (RUNBOOK).",
+      })
+    );
+  } catch (err) {
+    /* Nicht lesbar ist nicht dasselbe wie veraltet — kein Fehlalarm. */
+    console.log(JSON.stringify({ warning: "lebenszeichen-nicht-lesbar", error: err.message }));
+  }
+}

@@ -4,6 +4,36 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+**Audit-Sanierung, Welle 2 — die Löschkette meldet ihr Scheitern, und die stille
+Erinnerung bekommt einen Wächter:**
+
+- **Bildlöschung ohne Erfolgsprüfung** (`PRIV-2026-08-12-26`, P2). `deleteImage`
+  verschluckte jeden Fehler in eine Logzeile unterhalb der Alarmschwelle und gab nichts
+  zurück; der Aufrufer löschte danach das Job-Dokument mitsamt dem einzigen Verweis auf
+  die Datei. Gemessen: 11 solcher Fehlschläge in 30 Tagen, alle unbemerkt. Jetzt meldet
+  die Funktion Erfolg oder Misserfolg, ein echter Fehler geht mit `severity: ERROR` raus,
+  und der Reaper lässt das Dokument stehen, statt den Pfad wegzuwerfen.
+- **Kein zweites Netz für die fertigen Profile** (`ARCH-2026-08-12-27`, P2). Räumte der
+  Reaper nicht, blieben Job-Dokumente unbegrenzt liegen. Neu: ein Ablauf-Feld je Job und
+  eine automatische Löschregel in der Datenbank — bewusst bei 24 Stunden statt bei 2, das
+  Netz soll den Ausfall des Reapers fangen und ihm nicht ins Handwerk pfuschen.
+  Eingerichtet, während die Sammlung leer war; keine Migration nötig.
+- **Nonce und Admin-Token waren kryptografisch dasselbe** (`SEC-2026-08-12-17`, P2). Der
+  30-Minuten-Token steht im Klartext in der Push-Mitteilung; wer ihn sah, konnte ihn im
+  Nonce-Feld einsetzen und die Bestätigungsseite überspringen. Beide tragen jetzt ihren
+  Verwendungszweck in der Signatur. Zusätzlich hat der Boost eine Obergrenze (doppeltes
+  Stundenlimit) und lehnt fail-closed ab, wenn die aktuelle Grenze nicht lesbar ist.
+- **Die Wochen-Erinnerung schwieg in jedem Fehlerfall** (`OPS-2026-08-12-11`, P2) — und
+  bis zum ersten fälligen Push im Februar 2027 wäre ihr Ausfall 180 Tage lang nicht von
+  korrektem Verhalten zu unterscheiden gewesen. Sie hinterlässt jetzt bei jedem Lauf ein
+  Lebenszeichen; der Reaper liest es jede Minute und meldet laut, wenn es älter als neun
+  Tage ist. Der Reaper eignet sich dafür, weil er in der Alarmrichtlinie steht — die
+  Erinnerung selbst bleibt bewusst leise. Dazu bekommt die CI einen wöchentlichen
+  Zeitplan: Die harte Frist-Bremse lief bisher nur bei Push und Pull-Request, damit waren
+  **beide** Schichten ereignisgesteuert und konnten gemeinsam verstummen.
+
 ## [3.0.8] — 2026-08-12
 
 **Audit-Sanierung, Welle 1 — die Riegel können jetzt rot werden:**

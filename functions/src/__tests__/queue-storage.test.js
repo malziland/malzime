@@ -22,7 +22,12 @@ function fakeBucket() {
           return [{ contentType: f ? f.contentType : undefined }];
         },
         async delete() {
-          if (!files.has(path)) throw new Error("object not found");
+          if (!files.has(path)) {
+            /* Wie GCS: ein nicht vorhandenes Objekt meldet 404. */
+            const err = new Error("object not found");
+            err.code = 404;
+            throw err;
+          }
           files.delete(path);
         },
       };
@@ -78,12 +83,41 @@ describe("deleteImage", () => {
     expect(bucket._files.has(path)).toBe(false);
   });
 
-  test("ein bereits gelöschtes Bild wirft keinen Fehler (Lifecycle räumt nach)", async () => {
-    await expect(storage.deleteImage("queue-uploads/nicht-da.jpg")).resolves.toBeUndefined();
+  test("ein bereits gelöschtes Bild (404) gilt als erfolgreich, ohne Meldung", async () => {
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    await expect(storage.deleteImage("queue-uploads/nicht-da.jpg")).resolves.toBe(true);
+    expect(fehlerSpy).not.toHaveBeenCalled();
+    fehlerSpy.mockRestore();
   });
 
-  test("leerer Pfad ist ein No-Op", async () => {
-    await expect(storage.deleteImage(null)).resolves.toBeUndefined();
+  test("leerer Pfad ist ein No-Op und gilt als erfolgreich", async () => {
+    await expect(storage.deleteImage(null)).resolves.toBe(true);
+  });
+
+  /* PRIV-2026-08-12-26 / OPS-2026-08-12-10: Bis zum 2026-08-12 verschluckte
+     deleteImage JEDEN Fehler in eine console.log-Zeile ohne severity — also
+     unterhalb der Alarmschwelle — und gab nichts zurück. Der Aufrufer löschte
+     danach das Job-Dokument mitsamt dem einzigen Verweis auf die Datei.
+     Gemessen: 11 solcher Fehlschläge in 30 Tagen, alle unbemerkt. */
+  test("ein echter Löschfehler gibt false zurück UND meldet mit severity ERROR", async () => {
+    const pfad = await storage.storeImage(Buffer.from("x"), "image/jpeg");
+    const echterFehler = new Error("permission denied");
+    echterFehler.code = 403;
+    jest.spyOn(bucket, "file").mockReturnValue({
+      async delete() {
+        throw echterFehler;
+      },
+    });
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    await expect(storage.deleteImage(pfad)).resolves.toBe(false);
+
+    expect(fehlerSpy).toHaveBeenCalledTimes(1);
+    const zeile = JSON.parse(fehlerSpy.mock.calls[0][0]);
+    expect(zeile.severity).toBe("ERROR");
+    expect(zeile.error).toBe("queue-image-delete-failed");
+    expect(zeile.path).toBe(pfad);
+    fehlerSpy.mockRestore();
   });
 });
 
@@ -114,7 +148,8 @@ describe("Lokal-Modus (QUEUE_LOCAL=1, Emulator)", () => {
     await expect(storage.loadImage(objectPath)).rejects.toBeDefined();
   });
 
-  test("deleteImage auf eine fehlende Datei wirft nicht", async () => {
-    await expect(storage.deleteImage("queue-uploads/gibt-es-nicht.jpg")).resolves.toBeUndefined();
+  test("deleteImage auf eine fehlende Datei wirft nicht und gilt als erfolgreich", async () => {
+    /* Im Lokal-Modus meldet fs.unlink ENOENT — wie GCS' 404 der Normalfall. */
+    await expect(storage.deleteImage("queue-uploads/gibt-es-nicht.jpg")).resolves.toBe(true);
   });
 });

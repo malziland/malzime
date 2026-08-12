@@ -23,8 +23,15 @@
  * vergleichbar, konsistent mit counter.js, kein FieldValue nötig.
  */
 
+const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
 const { LIVENESS_GRACE_MS, JOB_RETENTION_MS, ZUSTELLUNG_AUFBEWAHRUNG_MS } = require("./config");
+
+/* ARCH-2026-08-12-27: Frist des Sicherheitsnetzes (Firestore-TTL). Bewusst weit
+   ueber JOB_RETENTION_MS (2 h): Der Reaper ist die Loeschung, die TTL faengt nur
+   seinen Ausfall ab. Ein knapper Wert wuerde laufende Jobs mitten im Betrieb
+   loeschen — genau die Gefahr, die diese Massnahme nicht schaffen darf. */
+const TTL_NETZ_MS = 24 * 60 * 60 * 1000;
 
 const JOBS_COLLECTION = "jobs";
 
@@ -60,6 +67,16 @@ async function createJob({ lang, traceId, imagePath, exif, resultToken }) {
   await ref.set({
     status: "queued",
     createdAt: now,
+    /* ARCH-2026-08-12-27: Sicherheitsnetz UNTER dem Reaper. Der Reaper räumt
+       Job-Dokumente nach JOB_RETENTION_MS (2 h) ab — er ist die eigentliche
+       Löschung. Steht er still (pausierter Zeitplan, verlorene Berechtigung),
+       gab es bisher nichts darunter: Dokumente mit fertigen Profilen wären
+       unbegrenzt liegengeblieben, zugesagt sind "spätestens rund 2 Stunden".
+       Firestore löscht Dokumente automatisch, sobald dieses Zeitstempel-Feld
+       in der Vergangenheit liegt. Bewusst DEUTLICH später als der Reaper
+       (24 h statt 2 h): Das Netz soll fangen, wenn der Reaper ausfällt, und ihm
+       nicht ins Handwerk pfuschen, solange er läuft. */
+    expiresAt: Timestamp.fromMillis(now + TTL_NETZ_MS),
     lastSeenAt: now,
     startedAt: null,
     finishedAt: null,

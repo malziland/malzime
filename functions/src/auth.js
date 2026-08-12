@@ -7,18 +7,32 @@ const DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 Minuten
  * Format: {expires}.{signature}
  * Der Token ist an eine bestimmte Action gebunden (z.B. "boost", "reset").
  */
-function createAdminToken(action, secret, ttlMs = DEFAULT_TTL_MS) {
+/* AUDIT-BEFUND SEC-2026-08-12-17: Token und Nonce trugen dieselbe Nutzlast
+   (`${action}.${expires}`) und waren damit kryptografisch nicht unterscheidbar.
+   Ein 30-Minuten-Token aus der ntfy-Push-URL liess sich deshalb im Nonce-Feld
+   einsetzen und die Bestaetigungsseite (SEC-001) ueberspringen. Die Nutzlast
+   traegt jetzt den Verwendungszweck; ein Token fuer den einen Zweck ist fuer den
+   anderen ungueltig. */
+const ZWECK_TOKEN = "token";
+const ZWECK_NONCE = "nonce";
+
+function signiere(zweck, action, expires, secret) {
+  return crypto
+    .createHmac("sha256", secret)
+    .update(`${zweck}.${action}.${expires}`)
+    .digest("hex");
+}
+
+function createAdminToken(action, secret, ttlMs = DEFAULT_TTL_MS, zweck = ZWECK_TOKEN) {
   const expires = Date.now() + ttlMs;
-  const payload = `${action}.${expires}`;
-  const signature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-  return `${expires}.${signature}`;
+  return `${expires}.${signiere(zweck, action, expires, secret)}`;
 }
 
 /**
  * Validiert einen HMAC-signierten Admin-Token.
  * Prueft: Format, Ablaufzeit, Action-Bindung, Signatur (timing-safe).
  */
-function verifyAdminToken(token, action, secret) {
+function verifyAdminToken(token, action, secret, zweck = ZWECK_TOKEN) {
   if (!token || typeof token !== "string") return false;
 
   const dotIndex = token.indexOf(".");
@@ -30,8 +44,7 @@ function verifyAdminToken(token, action, secret) {
   const expires = Number(expiresStr);
   if (isNaN(expires) || Date.now() >= expires) return false;
 
-  const payload = `${action}.${expiresStr}`;
-  const expected = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  const expected = signiere(zweck, action, expiresStr, secret);
 
   if (signature.length !== expected.length) return false;
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
@@ -44,14 +57,14 @@ const NONCE_TTL_MS = 5 * 60 * 1000; // 5 Minuten
  * Format: {expires}.{signature} — wie ein Token, aber mit 5 Min TTL.
  */
 function createNonce(action, secret) {
-  return createAdminToken(action, secret, NONCE_TTL_MS);
+  return createAdminToken(action, secret, NONCE_TTL_MS, ZWECK_NONCE);
 }
 
 /**
  * Validiert eine Nonce. Wrapper um verifyAdminToken.
  */
 function verifyNonce(nonce, action, secret) {
-  return verifyAdminToken(nonce, action, secret);
+  return verifyAdminToken(nonce, action, secret, ZWECK_NONCE);
 }
 
 /**

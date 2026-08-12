@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.0.8] — 2026-08-12
 
 **Audit-Sanierung, Welle 1 — die Riegel können jetzt rot werden:**
 

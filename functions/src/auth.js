@@ -17,10 +17,7 @@ const ZWECK_TOKEN = "token";
 const ZWECK_NONCE = "nonce";
 
 function signiere(zweck, action, expires, secret) {
-  return crypto
-    .createHmac("sha256", secret)
-    .update(`${zweck}.${action}.${expires}`)
-    .digest("hex");
+  return crypto.createHmac("sha256", secret).update(`${zweck}.${action}.${expires}`).digest("hex");
 }
 
 function createAdminToken(action, secret, ttlMs = DEFAULT_TTL_MS, zweck = ZWECK_TOKEN) {

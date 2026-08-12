@@ -441,14 +441,14 @@ describe("admin handler", () => {
     expect(mockBoostLimit).not.toHaveBeenCalled();
   });
 
-  test("nonce consumption Firestore error fails open (SEC-002)", async () => {
+  test("nonce consumption Firestore error fails closed: 403, no mutation (v3.0.4)", async () => {
     mockCreate.mockRejectedValue(new Error("Firestore unavailable"));
     const nonce = createNonce("boost", TEST_SECRET);
     const req = mockReq({ path: "/boost", method: "POST", body: { nonce } });
     const res = mockRes();
     await admin(req, res);
-    expect(mockBoostLimit).toHaveBeenCalledWith(100);
-    expect(res.type).toHaveBeenCalledWith("html");
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(mockBoostLimit).not.toHaveBeenCalled();
   });
 
   /* ── Maintenance (Kill-Switch) ── */

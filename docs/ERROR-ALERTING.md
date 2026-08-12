@@ -140,11 +140,17 @@ selbst (`autoClose: 1800s`). Am 2026-08-10 so verifiziert: E-Mail kam an.
 > zugestellter Benachrichtigungsweg. Nach jeder Änderung an Kanälen oder
 > Richtlinie diesen Test fahren — er kostet nichts und ist der einzige Beleg.
 
-**Bekannter, harmloser Rest:** Der Filter nennt weiterhin den Dienst `analyze`,
-den es seit v2.10 nicht mehr gibt. Die Bedingung kann darüber nie auslösen; ein
-Aufräumen ist reine Kosmetik. Bewusst nicht angefasst, solange die Zustellung
-frisch nachgewiesen ist — an einer beweisbar funktionierenden Alarmkette ohne
-Not zu schrauben, wäre der schlechtere Handel.
+**Stand der Live-Richtlinie (nachgesehen 2026-08-12):** Der Filter deckt
+`admin`, `stats`, `enqueue`, `processjob`, `jobstatus`, `reapjobs` ab. Der
+frühere Eintrag `analyze` (Dienst seit v2.10 abgebaut) ist inzwischen
+entfernt — das oben abgedruckte Policy-Beispiel nennt ihn noch, es ist die
+Aufbau-Vorlage, nicht der Ist-Zustand.
+
+**Zustellung beider Kanäle belegt (2026-08-12):** Zwei Proben nach dem
+`gcloud logging write`-Rezept oben — die erste kam als **E-Mail** an, die
+zweite (nach der Aktualisierung des ntfy-Servers auf v2.27.0) als **Push in
+der ntfy-App**. Damit ist jeder der beiden Wege einzeln nachgewiesen, nicht
+nur eingerichtet.
 
 ## Was passiert dann?
 

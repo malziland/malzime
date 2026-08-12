@@ -27,11 +27,12 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 **Audit-Sanierung, Welle 3 — vier Sätze, die mehr versprachen als das System hält:**
 
-- **„Ausschließlich eine einzige Zahl pro Zeitraum"** (`PRIV-2026-08-12-13`, P2) war am
-  Live-Dokument widerlegbar: Für das rollende Stundenlimit hält der Zähler die Zeitpunkte
+- **Die Zusage über den Analyse-Zähler** (`PRIV-2026-08-12-13`, P2) war am
+  Live-Dokument widerlegbar — sie sprach von genau einem Wert je Zeitraum: Für das rollende Stundenlimit hält der Zähler die Zeitpunkte
   der letzten 60 Minuten. Kein Personenbezug — aber es sind mehrere Werte. Der Satz zählt
   jetzt auf, was wirklich drinsteht.
-- **„In einem Schritt zwei fiktive Profile"** (`PRIV-2026-08-12-15`, P3) traf nicht zu:
+- **Die Beschreibung der KI-Analyse** (`PRIV-2026-08-12-15`, P3) sprach von einem einzigen
+  Arbeitsschritt. Das traf nicht zu:
   Für die Beast-Variante folgt ein zweiter Aufruf an dieselbe KI, der nach Werbe-Kategorien
   fragt. Kein Bild geht dabei mit, wohl aber die eben erzeugten Profilangaben. Steht jetzt
   in der Erklärung.

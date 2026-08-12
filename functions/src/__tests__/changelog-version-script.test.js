@@ -54,7 +54,7 @@ describe("changelog-oberste-version.sh", () => {
         "",
         "- schon ausgeliefert",
         "",
-      ].join("\n"),
+      ].join("\n")
     );
     /* Das Kernversprechen: Die ausgelieferte Nummer darf nicht herauskommen.
        Käme sie heraus, würde der Workflow ihren Tag umhängen. */

@@ -109,9 +109,7 @@ describe("pruefe-fremddateien.mjs", () => {
        Auf der Website hat es aber nichts verloren: Es ist Werkzeugdaten, kein
        Seiteninhalt. Ohne diesen Test faellt eine geaenderte ignore-Liste
        niemandem auf. */
-    const hosting = JSON.parse(
-      fs.readFileSync(path.join(__dirname, "../../../firebase.json"), "utf8")
-    ).hosting;
+    const hosting = JSON.parse(fs.readFileSync(path.join(__dirname, "../../../firebase.json"), "utf8")).hosting;
     expect(hosting.ignore).toContain("lib/PRUEFSUMMEN.json");
   });
 

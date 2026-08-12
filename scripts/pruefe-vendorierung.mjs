@@ -26,22 +26,49 @@
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const KOPIE = resolve(REPO, "scripts/pruefungen");
-const HERKUNFT = resolve(KOPIE, "HERKUNFT.json");
+/* Bewusst NEBEN dem kopierten Baum, nicht darin: Ein `rsync --delete` beim
+   Neu-Einkopieren wuerde eine Datei im Baum loeschen — der Waechter haette
+   sich selbst die Sollwerte weggeraeumt. Genau das ist beim ersten Versuch
+   passiert. */
+const HERKUNFT = resolve(REPO, "scripts/pruefungen-herkunft.json");
 const AKTUALISIEREN = process.argv.includes("--aktualisieren");
 
 /* Was beim Vergleich außen vor bleibt, steht hier — sichtbar, mit Grund.
    Eine Ausnahme, die man nicht liest, ist ein Loch. */
 const AUSNAHMEN = {
   "README.md": "trägt hier zusätzlich den Herkunftshinweis; Inhalt sonst identisch",
-  "HERKUNFT.json": "beschreibt die Kopie selbst und kann sich nicht mit sich vergleichen",
 };
 const IGNORIERTE_ORDNER = new Set(["__pycache__", ".git"]);
 
+/* Verglichen wird, was das REPOSITORY enthält — nicht, was auf der Platte liegt.
+   Der erste Anlauf las den Dateibaum und stempelte damit auch eine
+   Beispieldatei, die absichtlich per .gitignore ausgeschlossen ist: lokal
+   vorhanden, in der Pipeline nie. Der Wächter war lokal grün und in der CI rot,
+   also nutzlos. Dieselbe Lehre wie bei TEST-2026-08-12-29, einen Tag später
+   noch einmal gelernt. */
+function verfolgteDateien(wurzel) {
+  const roh = execFileSync("git", ["ls-files", "-z", "--", wurzel], {
+    cwd: REPO,
+    encoding: "utf8",
+  });
+  return roh
+    .split("\0")
+    .filter(Boolean)
+    .map((p) => relative(wurzel, resolve(REPO, p)))
+    .filter((p) => !p.split("/").some((teil) => IGNORIERTE_ORDNER.has(teil)))
+    .sort();
+}
+
+/* Für die QUELLE gibt es kein git — sie liegt außerhalb des Repositorys. Dort
+   wird der Dateibaum gelesen, aber nur zum Vergleich mit den verfolgten
+   Dateien; Ungleichgewichte in dieser Richtung sind unten ausdrücklich
+   behandelt. */
 function dateienUnter(wurzel) {
   const raus = [];
   const stapel = [wurzel];
@@ -65,13 +92,38 @@ if (!existsSync(KOPIE)) {
 }
 
 const ist = {};
-for (const rel of dateienUnter(KOPIE)) {
+const nurInGit = [];
+for (const rel of verfolgteDateien(KOPIE)) {
   if (rel in AUSNAHMEN) continue;
+  /* Git kennt die Datei, die Platte nicht: gelöscht, aber nicht eingetragen.
+     Beim ersten Anlauf stürzte der Wächter hier mit einem Node-Stacktrace ab —
+     ein Werkzeug, das beim Melden eines Mangels selbst zerbricht, meldet nichts.
+     Gefunden im frischen Klon, nicht im gewachsenen Arbeitsbaum. */
+  if (!existsSync(join(KOPIE, rel))) {
+    nurInGit.push(rel);
+    continue;
+  }
   ist[rel] = summe(join(KOPIE, rel));
+}
+if (nurInGit.length > 0) {
+  for (const f of nurInGit) console.error(`IM REPOSITORY, ABER NICHT AUF DER PLATTE: ${f}`);
+  console.error("Gelöscht, aber die Löschung nicht eingetragen. Kein bestandener Lauf.");
+  process.exit(1);
 }
 
 if (AKTUALISIEREN) {
   const alt = existsSync(HERKUNFT) ? JSON.parse(readFileSync(HERKUNFT, "utf8")) : {};
+  /* Eine Herkunft ohne Versionsangabe ist keine Herkunft. Beim ersten Mal wird
+     sie von Hand eingetragen; danach bleibt sie stehen, bis jemand sie bewusst
+     hebt. Still auf "unbekannt" zu fallen hiesse, den Nachweis zu verlieren und
+     trotzdem gruen zu melden. */
+  if (!alt.familie_version || !alt.quelle) {
+    console.error(
+      `FEHLER: ${HERKUNFT} braucht 'quelle' und 'familie_version'. ` +
+        "Beides von Hand eintragen, dann erneut stempeln."
+    );
+    process.exit(2);
+  }
   writeFileSync(
     HERKUNFT,
     JSON.stringify(
@@ -81,7 +133,7 @@ if (AKTUALISIEREN) {
           "Geprüft von scripts/pruefe-vendorierung.mjs im CI-Job 'pruefungen'. " +
           "Bearbeitet wird die QUELLE, danach neu einkopieren und hier neu stempeln.",
         quelle: alt.quelle || "~/.claude/skills/audit-familie/pruefungen",
-        familie_version: alt.familie_version || "unbekannt",
+        familie_version: alt.familie_version,
         ausnahmen: AUSNAHMEN,
         dateien: ist,
       },
@@ -127,12 +179,15 @@ const abweichend = [];
 if (existsSync(quellePfad)) {
   quelleGeprueft = true;
   const quellDateien = new Set(dateienUnter(quellePfad));
-  for (const rel of quellDateien) {
-    if (rel in AUSNAHMEN) continue;
-    const hier = join(KOPIE, rel);
-    if (!existsSync(hier) || summe(hier) !== summe(join(quellePfad, rel))) abweichend.push(rel);
+  /* Nur die verfolgten Dateien vergleichen: Was .gitignore ausschliesst, kann
+     im Repository gar nicht ankommen und ist keine Abweichung, sondern Absicht. */
+  for (const rel of Object.keys(ist)) {
+    if (!quellDateien.has(rel)) {
+      abweichend.push(`${rel} (nur in der Kopie)`);
+    } else if (summe(join(KOPIE, rel)) !== summe(join(quellePfad, rel))) {
+      abweichend.push(rel);
+    }
   }
-  for (const rel of Object.keys(ist)) if (!quellDateien.has(rel)) abweichend.push(`${rel} (nur in der Kopie)`);
   for (const f of abweichend) console.error(`\nWEICHT VON DER QUELLE AB: ${f}`);
 }
 

@@ -1,10 +1,9 @@
 {
   "_hinweis": "Herkunft und Prüfsummen der einkopierten Prüfungen (TEST-2026-08-12-28). Geprüft von scripts/pruefe-vendorierung.mjs im CI-Job 'pruefungen'. Bearbeitet wird die QUELLE, danach neu einkopieren und hier neu stempeln.",
   "quelle": "~/.claude/skills/audit-familie/pruefungen",
-  "familie_version": "unbekannt",
+  "familie_version": "3.1",
   "ausnahmen": {
-    "README.md": "trägt hier zusätzlich den Herkunftshinweis; Inhalt sonst identisch",
-    "HERKUNFT.json": "beschreibt die Kopie selbst und kann sich nicht mit sich vergleichen"
+    "README.md": "trägt hier zusätzlich den Herkunftshinweis; Inhalt sonst identisch"
   },
   "dateien": {
     "checks/aussentext.py": "sha256:a863b903e9c0c487b33fe1f84775f92ac89c7a879816b3c9de99fd6e821ef9df",
@@ -21,7 +20,6 @@
     "negativprobe/ignorierte-datei/.gitignore": "sha256:5f70b6a71ce39a5f6cc4502eb1e12035e3bb7218427cda15a65bbd53079ffa68",
     "negativprobe/ignorierte-datei/.pruefungen/aussentext.txt": "sha256:ab7ca7defb561007d011fc8de23e531d2b1f40895491ff6e5fb731a62b35ce09",
     "negativprobe/ignorierte-datei/README.md": "sha256:8ed7378961009c3ec05dd21e2aa1a93de0079d1b147bceaa1e6b38c43cf344e2",
-    "negativprobe/ignorierte-datei/notizen-lokal.md": "sha256:e61a80046d2c61686ff141ccd378bce82d7a385c62f4390571fa04a89b9c164f",
     "negativprobe/kaputt/.pruefungen/aussentext.txt": "sha256:e2c29ab238eba9b86928db67d8cacd1e04c7e4ce3ad7fe4e7f2cc89ff5f18690",
     "negativprobe/kaputt/CHANGELOG.md": "sha256:da3bcc4df79f360029f65f5da23d87a43d06378454321571081768ed74c08574",
     "negativprobe/kaputt/README.md": "sha256:55fe59eb89e4686cf64125dbbd7f2e02d54f47041209cc6434ec99e3f6083aee",

@@ -4,6 +4,33 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.0.6] — 2026-08-12
+
+**Erinnerung an die ZDR-Nachprüfung — und die Ursache für ausbleibende
+Handy-Mitteilungen:**
+
+- **Wochen-Erinnerung (neu):** Eine geplante Funktion schaut montags auf die
+  Live-Seite und meldet sich eine Woche bevor die halbjährliche Nachprüfung
+  der EU-/Zero-Data-Retention-Zusage fällig wird — per Push aufs Handy, mit
+  den nötigen Schritten im Text und einem Knopf direkt ins Mistral-Dashboard.
+  Ist die Frist überschritten, meldet sie sich dringlicher. Fällt etwas aus
+  (Seite nicht erreichbar, Push-Dienst weg), passiert nichts Schlimmes: Die
+  Erinnerung ist so gebaut, dass sie den Betrieb nie stören kann.
+- **Zweites Netz:** Bleibt die Erinnerung unbeachtet, schlägt zusätzlich die
+  automatische Prüfung beim nächsten Bau an. Beide rechnen mit derselben
+  Fristdefinition — die Frist steht nur an einer Stelle im Code.
+- **Behoben: iOS-Mitteilungen kamen nie an.** Ein selbst betriebener
+  Push-Server kann iPhones nur über den Dienst ntfy.sh erreichen. Diese
+  Weiterleitung passiert erst *nach* der Antwort an den Absender — und genau
+  dann entzog die Cloud-Plattform dem Programm standardmäßig die Rechenzeit.
+  Die Weiterleitung lief still in eine Zeitüberschreitung: Die Meldung lag auf
+  dem Server, aber das Handy erfuhr nichts davon. Mit dauerhaft zugeteilter
+  Rechenzeit ist das behoben und die Zustellung bestätigt. Die frühere
+  Vermutung, das liege an der App oder an iOS, war damit widerlegt.
+- **Sicherheits-Aktualisierung des Push-Servers** auf ntfy 2.27.0 (drei
+  übersprungene Versionen mit Sicherheitskorrekturen); der Zugangsschutz —
+  senden erlaubt, anonymes Mitlesen gesperrt — ist unverändert und geprüft.
+
 ## [3.0.5] — 2026-08-12
 
 **Qualitäts-Zug „Richtung 100" (Konzept vom 2026-08-12; ohne Änderung am

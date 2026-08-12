@@ -74,10 +74,25 @@ CI, dass das Skript ausschließlich Lese-Kommandos enthält.
 **Grenze des Skripts — ZDR ist Vertrag, nicht Konfiguration:** Die
 Zero-Data-Retention-Zusage von Mistral lässt sich technisch nicht abfragen.
 Ihr Nachweis ist organisatorisch: privater Nachweisordner beim Inhaber
-(ZDR-/Trainings-Opt-out-Screenshots vom 2026-08-11, Vertrags-/DPA-Unterlagen —
-bewusst NICHT im öffentlichen Repo) plus Wiedervorlage: **vor jeder
-Presse-Welle und mindestens halbjährlich** im Mistral-Dashboard nachprüfen
-und den Screenshot-Stand erneuern.
+(ZDR-/Trainings-Opt-out-Screenshots, schriftliche Support-Bestätigung, DPA und
+Subprozessoren-Liste — bewusst NICHT im öffentlichen Repo) plus Wiedervorlage:
+**vor jeder Presse-Welle und mindestens halbjährlich** im Mistral-Dashboard
+nachprüfen und den Screenshot-Stand erneuern.
+
+**Damit die Frist nicht vergessen wird, wacht die CI darüber**
+(`functions/src/__tests__/zusagen-frische.test.js`): Ist das in
+`public/datenschutz.html` genannte Prüfdatum älter als 183 Tage, wird der Bau
+rot und nennt die nötigen Schritte. Ablauf beim roten Bau — **in dieser
+Reihenfolge**:
+
+1. Im Mistral-Dashboard nachsehen, ob „Null-Datenspeicherung" noch aktiv ist.
+2. Screenshot mit Datum in den privaten Nachweisordner legen.
+3. **Erst dann** das Datum in `public/datenschutz.html` an beiden Stellen
+   hochsetzen (Prüfdatum im Mistral-Absatz + `Stand:`-Zeile im Kopf) und
+   deployen.
+
+Das Datum **niemals** ohne echte Prüfung hochsetzen — dann behauptet die
+Webseite etwas Unbelegtes, und genau davor schützt der Wächter.
 
 ## Rollback-Hebel
 

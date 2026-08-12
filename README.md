@@ -273,7 +273,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 | Komponente | Technologie |
 |-----------|-------------|
-| Hosting | Firebase Hosting (Google Ireland, europe-west1) |
+| Hosting | Firebase Hosting — Projektregion Google Ireland (europe-west1), Auslieferung der statischen Dateien ueber ein weltweites CDN |
 | Backend | Firebase Cloud Functions (2nd Gen, Node 24, europe-west1) |
 | Queue | Google Cloud Tasks (dosierter Job-Dispatch, europe-west1) |
 | Datenbank | Cloud Firestore (Zaehler, Maintenance-Flag, Queue-Jobs, europe-west1) |

@@ -23,6 +23,31 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Das greift beim Deploy, nicht in der Minute des Ausfalls; der Rest ist als Restrisiko
   in `docs/SECURITY-MODEL.md` festgehalten.
 
+## [Unveröffentlicht]
+
+**Audit-Sanierung, Welle 3 — vier Sätze, die mehr versprachen als das System hält:**
+
+- **Die Zusage über den Analyse-Zähler** (`PRIV-2026-08-12-13`, P2) war am
+  Live-Dokument widerlegbar — sie sprach von genau einem Wert je Zeitraum: Für das rollende Stundenlimit hält der Zähler die Zeitpunkte
+  der letzten 60 Minuten. Kein Personenbezug — aber es sind mehrere Werte. Der Satz zählt
+  jetzt auf, was wirklich drinsteht.
+- **Die Beschreibung der KI-Analyse** (`PRIV-2026-08-12-15`, P3) sprach von einem einzigen
+  Arbeitsschritt. Das traf nicht zu:
+  Für die Beast-Variante folgt ein zweiter Aufruf an dieselbe KI, der nach Werbe-Kategorien
+  fragt. Kein Bild geht dabei mit, wohl aber die eben erzeugten Profilangaben. Steht jetzt
+  in der Erklärung.
+- **Die Diagnose-Daten** (`PRIV-2026-08-12-14`, P3) enthalten mehr Felder als aufgezählt
+  waren — Netzwerk-Geschwindigkeit, Datensparmodus, Sprache, Prozessorkerne,
+  Arbeitsspeicher-Klasse, Pixeldichte und die aufgerufene Seite. Alle sind jetzt benannt.
+- **Das README** (`DOC-2026-08-12-16`, P3) stellte das Hosting als `europe-west1` dar;
+  gemessen antwortet ein weltweites Auslieferungsnetz. Die Datenschutzerklärung sagt es
+  richtig — jetzt sagen beide dasselbe.
+- **Zwei neue Regeln auf der Sperrliste** fangen genau diese zwei Formulierungen künftig ab.
+- **Der Formulierungs-Prüfer achtet jetzt `.gitignore`** (`TEST-2026-08-12-29`, P3). Er
+  lief über den Dateibaum und sah damit auch Auditberichte, die verbotene Formulierungen
+  zitieren, um sie zu melden — lokal dauerhaft rot, in der CI grün. Jetzt prüft er, was im
+  Repository landet: 128 Dateien statt 161, lokal und in der CI dasselbe Ergebnis.
+
 ## [3.0.9] — 2026-08-12
 
 **Audit-Sanierung, Welle 2 — die Löschkette meldet ihr Scheitern, und die stille

@@ -24,6 +24,7 @@ weiterzuarbeiten - genau die Fehlerform, gegen die diese Pruefungen gebaut sind.
 """
 import os
 import re
+import subprocess
 import sys
 
 # DOC-2026-08-12-05: ".js" fehlte — der Kommentar in public/js/api.js wird an
@@ -103,7 +104,47 @@ def positivkontrolle(regeln):
     return True
 
 
+def git_dateien(wurzel):
+    """Alles, was im Repository landet: verfolgte Dateien PLUS noch nicht
+    hinzugefuegte, die nicht ignoriert sind. Gibt None zurueck, wenn hier kein
+    Repository liegt oder git fehlt — dann faellt die Suche auf den Dateibaum
+    zurueck.
+
+    AUDIT-BEFUND TEST-2026-08-12-29: Die Suche lief ueber den Dateibaum und sah
+    damit auch ignorierte Dateien. Auditberichte (docs/audit-*.md) zitieren die
+    verbotenen Formulierungen naturgemaess, um sie zu melden — der lokale Lauf war
+    deshalb dauerhaft rot, waehrend die CI gruen war. Ein Pruefer, der immer rot
+    ist, wird genauso ignoriert wie einer, der immer gruen ist."""
+    try:
+        roh = subprocess.run(
+            ["git", "-C", wurzel, "ls-files", "--cached", "--others",
+             "--exclude-standard", "-z"],
+            capture_output=True, timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if roh.returncode != 0:
+        return None
+    namen = [n for n in roh.stdout.decode("utf-8", "replace").split("\0") if n]
+    if not namen:
+        return None  # leeres Ergebnis ist zuerst ein Verdacht gegen das Messmittel
+    return namen
+
+
 def dateien(wurzel):
+    verfolgt = git_dateien(wurzel)
+    if verfolgt is not None:
+        for rel in verfolgt:
+            if not rel.lower().endswith(ENDUNGEN):
+                continue
+            teile = rel.split(os.sep)
+            if any(t in UEBERSPRINGEN or t.startswith(".") for t in teile[:-1]):
+                continue
+            pfad = os.path.join(wurzel, rel)
+            if os.path.isfile(pfad):
+                yield pfad
+        return
+
     for ordner, unterordner, namen in os.walk(wurzel):
         unterordner[:] = [u for u in unterordner
                           if u not in UEBERSPRINGEN and not u.startswith(".")]

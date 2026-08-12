@@ -25,3 +25,10 @@ zertifiziert\w* (Saferinternet|Trainer)|Es gibt keine Zertifizierung. Korrekt is
 zu ?100 ?% (sicher|anonym)|Absolute Sicherheitszusage ohne Nachweis. Abschwaechen oder Nachweis verlinken.
 
 garantiert (sicher|anonym|fehlerfrei)|Garantie ohne Nachweis.
+
+# PRIV-2026-08-12-13: "ausschliesslich eine einzige Zahl" war am Live-Dokument
+# widerlegbar — der Zaehler haelt fuer das rollende Stundenlimit Zeitstempel.
+ausschlie(ss|ß)lich eine einzige Zahl|Am Live-Dokument widerlegt: Der Zaehler haelt fuer das rollende Stundenlimit auch Zeitpunkte. Aufzaehlen, was wirklich gespeichert wird.
+
+# PRIV-2026-08-12-15: Es sind zwei Aufrufe an Mistral, nicht einer.
+in einem Schritt zwei fiktive Profile|Es sind zwei Aufrufe: der zweite holt die Werbe-Kategorien fuer den Beast-Modus. Beschreiben, was passiert.

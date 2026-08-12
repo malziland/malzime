@@ -68,10 +68,12 @@ lauf fakten-drift.py "$HIER/negativprobe/eigene-muster" 1 \
   "eigene Muster gelten allein, die eingebauten schweigen"
 lauf fakten-drift.py "$HIER/negativprobe/nur-historie" 0 \
   "ein Changelog mit alten Zahlen ist Historie, kein Drift"
+lauf aussentext.py "$HIER/negativprobe/ignorierte-datei" 0 \
+  "eine ignorierte Datei wird nicht geprueft (lokal = CI)"
 
 echo "============================================================"
 if [ "$FEHLER" -eq 0 ]; then
-  echo "ERGEBNIS: alle achtzehn Proben bestanden."
+  echo "ERGEBNIS: alle neunzehn Proben bestanden."
   echo "Die Pruefungen koennen rot werden und sind nicht ueberempfindlich."
   exit 0
 fi

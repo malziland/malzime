@@ -74,10 +74,37 @@ CI, dass das Skript ausschließlich Lese-Kommandos enthält.
 **Grenze des Skripts — ZDR ist Vertrag, nicht Konfiguration:** Die
 Zero-Data-Retention-Zusage von Mistral lässt sich technisch nicht abfragen.
 Ihr Nachweis ist organisatorisch: privater Nachweisordner beim Inhaber
-(ZDR-/Trainings-Opt-out-Screenshots vom 2026-08-11, Vertrags-/DPA-Unterlagen —
-bewusst NICHT im öffentlichen Repo) plus Wiedervorlage: **vor jeder
-Presse-Welle und mindestens halbjährlich** im Mistral-Dashboard nachprüfen
-und den Screenshot-Stand erneuern.
+(ZDR-/Trainings-Opt-out-Screenshots, schriftliche Support-Bestätigung, DPA und
+Subprozessoren-Liste — bewusst NICHT im öffentlichen Repo) plus Wiedervorlage:
+**vor jeder Presse-Welle und mindestens halbjährlich** im Mistral-Dashboard
+nachprüfen und den Screenshot-Stand erneuern.
+
+**Damit die Frist nicht vergessen wird, wachen zwei Schichten darüber** — beide
+rechnen mit derselben Frist aus `functions/src/zusagen.js`:
+
+1. **Freundliche Vorwarnung:** Die geplante Function `erinnerung`
+   (`handle-erinnerung.js`, montags 9 Uhr Wien) liest das Prüfdatum von der
+   **Live-Seite** und schickt eine Woche vor Fristablauf einen ntfy-Push aufs
+   Handy — mit der Handlungsanleitung im Text und einem Knopf direkt ins
+   Mistral-Dashboard. Überfällig meldet sie mit höherer Priorität. Sie ist
+   fail-soft: Seite nicht erreichbar, Datum unlesbar oder ntfy weg werden nur
+   als Warnung geloggt (nie `severity ERROR`, sonst löst die Erinnerung den
+   Fehleralarm aus).
+2. **Harte Bremse:** `functions/src/__tests__/zusagen-frische.test.js` macht
+   die CI rot, sobald das Prüfdatum älter als 183 Tage ist — falls die
+   Vorwarnung untergeht.
+
+Ablauf, wenn die Erinnerung kommt (oder der Bau rot wird) — **in dieser
+Reihenfolge**:
+
+1. Im Mistral-Dashboard nachsehen, ob „Null-Datenspeicherung" noch aktiv ist.
+2. Screenshot mit Datum in den privaten Nachweisordner legen.
+3. **Erst dann** das Datum in `public/datenschutz.html` an beiden Stellen
+   hochsetzen (Prüfdatum im Mistral-Absatz + `Stand:`-Zeile im Kopf) und
+   deployen.
+
+Das Datum **niemals** ohne echte Prüfung hochsetzen — dann behauptet die
+Webseite etwas Unbelegtes, und genau davor schützt der Wächter.
 
 ## Rollback-Hebel
 

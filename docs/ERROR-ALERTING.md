@@ -103,10 +103,29 @@ Client-Fehler erreichen den Betreiber stattdessen über den Log-Bucket
 
 Die Richtlinie schickt an **zwei** Kanäle. Grund: Am 2026-08-10 war nicht
 belegbar, dass der ntfy-Push auf dem Sperrbildschirm ankommt — die Meldung war
-in der App sichtbar, aber nur nach aktivem Öffnen. Priorität hochsetzen,
-`upstream-base-url` und Kanalzuordnung wurden geprüft und schieden als Ursache
-aus; die verbleibende Ursache liegt in der App bzw. den iOS-Einstellungen und
-damit ausserhalb dessen, was am Server reparierbar ist.
+in der App sichtbar, aber nur nach aktivem Öffnen.
+
+> **Ursache gefunden am 2026-08-12 — sie lag doch am Server.** Die frühere
+> Vermutung („liegt an der App bzw. den iOS-Einstellungen, am Server nicht
+> reparierbar") war falsch. Im ntfy-Protokoll stand:
+> `WARN Unable to publish poll request (… context deadline exceeded)`.
+>
+> Hintergrund: Ein selbst betriebener ntfy-Server kann iPhones nicht direkt
+> erreichen — nur ntfy.sh besitzt den Apple-Push-Schlüssel. Deshalb reicht der
+> eigene Server nach jeder Nachricht eine **Anstoß-Meldung** an ntfy.sh weiter
+> (`upstream-base-url`), und erst die löst den Push aus. Diese Weiterleitung
+> passiert **nach** der HTTP-Antwort an den Absender — und genau dann entzieht
+> Cloud Run dem Container standardmäßig die CPU („CPU nur während der
+> Anfrage"). Die Weiterleitung verhungerte und lief nach 10 s in die
+> Zeitüberschreitung. Ergebnis: Nachricht liegt auf dem Server, aber kein Push
+> aufs iPhone — exakt das beobachtete Verhalten.
+>
+> **Behebung:** `gcloud run services update ntfy --no-cpu-throttling
+> --memory=512Mi` (CPU dauerhaft zugeteilt; Cloud Run verlangt dafür
+> mindestens 512 MiB). Danach verschwand die Warnung. **Lehre: Hintergrund-
+> Arbeit nach der Antwort braucht auf Cloud Run dauerhaft zugeteilte CPU —
+> sonst scheitert sie lautlos, und die Fehlersuche landet fälschlich beim
+> Endgerät.**
 
 Statt weiter daran zu schrauben, kam ein davon unabhängiger Weg dazu:
 

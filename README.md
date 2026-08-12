@@ -65,6 +65,8 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   handle-process-job.js     Queue: Worker — claimt Job, ruft Mistral, schreibt Ergebnis
   handle-job-status.js      Queue: Status-Polling + Liveness-Herzschlag
   handle-reap.js            Queue: Reaper fuer verlassene / haengende / abgelaufene Jobs
+  handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung (mit Anleitung)
+  zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen (Erinnerung + CI-Waechter)
   jobs.js                   Queue: Job-Lebenszyklus (Firestore-Collection `jobs`)
   cloud-tasks.js            Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim fuer Emulator)
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket

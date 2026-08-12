@@ -11,6 +11,7 @@ const { handleEnqueue } = require("./handle-enqueue");
 const { handleProcessJob } = require("./handle-process-job");
 const { handleJobStatus } = require("./handle-job-status");
 const { reapJobs } = require("./handle-reap");
+const { pruefeZusagen } = require("./handle-erinnerung");
 const { ALLOWED_ORIGINS } = require("./domains");
 
 const adminSecret = defineSecret("ADMIN_SECRET");
@@ -139,4 +140,20 @@ exports.reapJobs = onSchedule(
     timeoutSeconds: 120,
   },
   () => reapJobs()
+);
+
+/* erinnerung — geplanter Lauf (montags 9 Uhr Wien): schickt einen ntfy-Push,
+   wenn die halbjaehrliche ZDR-Nachpruefung binnen einer Woche faellig wird.
+   Freundliche Vorwarnung VOR der harten CI-Bremse (zusagen-frische.test.js).
+   Siehe handle-erinnerung.js. */
+exports.erinnerung = onSchedule(
+  {
+    region: "europe-west1",
+    schedule: "every monday 09:00",
+    timeZone: "Europe/Vienna",
+    memory: "256MiB",
+    timeoutSeconds: 60,
+    secrets: [ntfyUrl, ntfyTopic],
+  },
+  () => pruefeZusagen({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value() })
 );

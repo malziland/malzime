@@ -4,9 +4,32 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.1.0] — 2026-08-12
 
-**Audit-Sanierung, Welle 2 (Fortsetzung):**
+**Das TIEF-Audit und seine Sanierung.**
+
+Am 12. August lief das erste vollständige TIEF-Audit dieses Projekts: sechs unabhängige
+Prüfer entlang von Prüffragen, ein eigener Widerleger für den schwersten Befund, dazu die
+Regressionsfläche des Vorberichts. Ergebnis: **29 Befunde** — 3 schwere, 14 mittlere,
+12 leichte. Zehn von elf Befunden des vorigen Audits waren belegt behoben.
+
+**Das Muster hinter fast allem:** Nicht das Projekt war kaputt, sondern seine Wächter.
+Vier Prüfungen, die als Riegel gebaut waren, meldeten „in Ordnung", wenn ihre Messung
+gescheitert war — darunter der einzige Riegel gegen Sicherheitslücken in Fremdbibliotheken
+und die Prüfung, die das EU-Versprechen trägt. Dazu kamen Zusagen, die als verbindlich
+beschrieben waren, ohne es zu sein, und eine Löschkette, die ihr eigenes Scheitern nicht
+meldete.
+
+**Der einzige von außen erreichbare Befund:** Ein Aufruf mit falsch geformter Job-Nummer
+brachte eine Funktion zum Absturz; der Absturz löste die Störungsmeldung aus. Ein Fremder
+konnte damit ohne Anmeldung den einzigen Alarmkanal des Projekts unbrauchbar machen —
+beliebig oft. Behoben und live belegt.
+
+Die Sanierung lief in Wellen; `3.0.8` und `3.0.9` waren die ersten beiden. Was seither
+dazukam, steht hier. Der vollständige Bericht liegt unter `docs/audit/` (nicht im
+öffentlichen Repository).
+
+### Welle 2, Fortsetzung — die Riegel greifen wirklich
 
 - **Der Prüfer blockiert jetzt wirklich** (`OPS-2026-08-12-04`, P1). Der Job `pruefungen`
   lief zwar bei jedem Pull-Request, stand aber nicht in der Branch Protection — ein roter
@@ -23,7 +46,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Das greift beim Deploy, nicht in der Minute des Ausfalls; der Rest ist als Restrisiko
   in `docs/SECURITY-MODEL.md` festgehalten.
 
-## [Unveröffentlicht]
+### Welle 3 — Außentexte
 
 **Audit-Sanierung, Welle 3 — vier Sätze, die mehr versprachen als das System hält:**
 

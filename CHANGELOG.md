@@ -16,6 +16,13 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   `enforce_admins: true` blockiert ein wackliger Pflicht-Check jeden Merge, auch den
   eigenen. Ist-Zustand und Rückweg stehen im RUNBOOK.
 
+- **Der Alarmweg hatte keinen Wächter** (`OPS-2026-08-12-09`, P2). Die Richtlinie ist eine
+  Anwesenheits-Bedingung: Ihr eigener Ausfall erzeugt keine Logzeile, ein toter Alarm sieht
+  aus wie „keine Störung". Der Deploy-Riegel prüft jetzt vier Ausfallarten — Richtlinie
+  fehlt, ist aus, hat keinen Kanal, Kanal abgeschaltet. Die Grenze steht ehrlich dabei:
+  Das greift beim Deploy, nicht in der Minute des Ausfalls; der Rest ist als Restrisiko
+  in `docs/SECURITY-MODEL.md` festgehalten.
+
 ## [3.0.9] — 2026-08-12
 
 **Audit-Sanierung, Welle 2 — die Löschkette meldet ihr Scheitern, und die stille

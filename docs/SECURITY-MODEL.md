@@ -103,3 +103,22 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
 Dieses Dokument wird bei jedem LANGAUDIT und vor jeder Presse-Welle
 gegengelesen. Neue bewusste Abwägungen gehören **hier** hinein — im selben
 Commit wie die Entscheidung.
+
+## Restrisiko: Der Alarmweg kann sich nicht selbst überwachen (seit 2026-08-12)
+
+**Entscheidung.** Der Fehler-Alarm (Log-Richtlinie → E-Mail + ntfy-Push) wird beim Deploy
+auf Existenz, Schärfe und zustellfähige Kanäle geprüft (`verify-infrastructure.sh`), aber
+nicht laufend.
+
+**Begründung.** Die Richtlinie ist eine Anwesenheits-Bedingung auf `severity>=ERROR`: Ihr
+eigener Ausfall erzeugt keine Logzeile, auf die sie feuern könnte. Ein laufender Wächter
+müsste außerhalb des Projekts sitzen und wäre selbst wieder unbewacht — die Kette hat kein
+Ende, nur einen Punkt, an dem man sie abschneidet.
+
+**Betrachtete Alternative.** Den ntfy-Dienst in den Alarmfilter aufnehmen. Verworfen: Der
+Alarm alarmierte dann über sich selbst, und die Störung vom 2026-08-10 (CPU-Drosselung)
+wurde von ntfy mit `severity DEFAULT` geschrieben — sie wäre selbst im Filter nie über die
+Schwelle gekommen.
+
+**Bedingung für Neubewertung.** Sobald das Projekt einen zweiten Betreuer hat (Bus-Faktor
+> 1) oder ein externer Verfügbarkeitsdienst ohnehin läuft, gehört der Alarmweg dorthin.

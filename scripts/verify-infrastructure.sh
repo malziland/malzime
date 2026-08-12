@@ -182,6 +182,70 @@ case " $(printf "%s" "$SINKS" | tr '\n' ' ') " in
   *) rot "Diagnose-Sink »client-diagnostics-sink« fehlt" ;;
 esac
 
+# ── 7. Alarmweg: existiert er noch, ist er scharf, hat er zustellfähige Kanäle? ──
+# AUDIT-BEFUND OPS-2026-08-12-09: Der Alarmweg hatte keinen Wächter. Die Richtlinie
+# ist eine Anwesenheits-Bedingung auf severity>=ERROR — ihr EIGENER Ausfall erzeugt
+# keine Logzeile. Wird sie deaktiviert, ihr Filter verstellt oder ein Kanal
+# gelöscht, sieht das exakt aus wie „keine Störung": Stille. Bei Bus-Faktor 1 ist
+# das der Unterschied zwischen „ich erfahre es" und „ich erfahre es nie".
+# Diese Prüfung ist deploy-zeitlich, nicht laufend — sie fängt den Fall beim
+# nächsten Deploy, nicht in der Minute des Ausfalls. Das ist die Grenze dieser
+# Maßnahme und steht so im RUNBOOK.
+echo "— Alarmweg"
+POLICY_JSON=$(gcloud alpha monitoring policies list --project="$PROJECT" --format=json 2>&1) || POLICY_JSON=""
+ALARM=$(printf '%s' "$POLICY_JSON" | python3 -c '
+import json, sys
+try:
+    daten = json.load(sys.stdin)
+except Exception:
+    print("MESSFEHLER:Antwort nicht lesbar"); raise SystemExit(0)
+if not isinstance(daten, list) or not daten:
+    print("MESSFEHLER:keine Richtlinie in der Antwort"); raise SystemExit(0)
+for pol in daten:
+    filter_text = " ".join(
+        (b.get("conditionMatchedLog") or {}).get("filter", "") for b in pol.get("conditions", [])
+    )
+    if "severity>=ERROR" not in filter_text.replace(" ", ""):
+        continue
+    if not pol.get("enabled", False):
+        print("AUS:" + pol.get("displayName", "?")); raise SystemExit(0)
+    kanaele = pol.get("notificationChannels", [])
+    if not kanaele:
+        print("OHNE_KANAL:" + pol.get("displayName", "?")); raise SystemExit(0)
+    print("OK:%s:%d" % (pol.get("displayName", "?"), len(kanaele))); raise SystemExit(0)
+print("FEHLT:keine Richtlinie mit severity>=ERROR")
+' 2>/dev/null)
+
+case "$ALARM" in
+  OK:*)         gruen "Fehler-Alarm scharf: »$(printf '%s' "${ALARM#OK:}" | cut -d: -f1)«, $(printf '%s' "$ALARM" | rev | cut -d: -f1 | rev) Kanal/Kanäle" ;;
+  AUS:*)        rot   "Fehler-Alarm ist DEAKTIVIERT: ${ALARM#AUS:}" ;;
+  OHNE_KANAL:*) rot   "Fehler-Alarm hat KEINEN Benachrichtigungskanal: ${ALARM#OHNE_KANAL:}" ;;
+  FEHLT:*)      rot   "Kein Fehler-Alarm gefunden — eine Stoerung wuerde niemanden erreichen" ;;
+  MESSFEHLER:*) rot   "Alarmweg NICHT geprueft (${ALARM#MESSFEHLER:}) — ungeprueft gilt als nicht bestanden" ;;
+  *)            rot   "Alarmweg NICHT geprueft (keine auswertbare Ausgabe)" ;;
+esac
+
+# Und die Kanäle selbst: ein Kanal kann verwaist oder abgeschaltet sein.
+KANAL_JSON=$(gcloud alpha monitoring channels list --project="$PROJECT" --format=json 2>&1) || KANAL_JSON=""
+KANAELE=$(printf '%s' "$KANAL_JSON" | python3 -c '
+import json, sys
+try:
+    daten = json.load(sys.stdin)
+except Exception:
+    print("MESSFEHLER"); raise SystemExit(0)
+if not isinstance(daten, list) or not daten:
+    print("MESSFEHLER"); raise SystemExit(0)
+aktiv = [k for k in daten if k.get("enabled")]
+aus = [k.get("displayName", "?") for k in daten if not k.get("enabled")]
+print(("AUS:" + ", ".join(aus)) if aus else "OK:%d" % len(aktiv))
+' 2>/dev/null)
+
+case "$KANAELE" in
+  OK:*)  gruen "Benachrichtigungskanäle aktiv: ${KANAELE#OK:}" ;;
+  AUS:*) rot   "Abgeschaltete Benachrichtigungskanäle: ${KANAELE#AUS:}" ;;
+  *)     rot   "Kanäle NICHT geprueft — ungeprueft gilt als nicht bestanden" ;;
+esac
+
 # ── Ergebnis ──
 echo ""
 echo "Hinweis: Die Zero-Data-Retention-Zusage von Mistral ist VERTRAGLICH und"

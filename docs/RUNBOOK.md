@@ -106,6 +106,20 @@ Reihenfolge**:
 Das Datum **niemals** ohne echte Prüfung hochsetzen — dann behauptet die
 Webseite etwas Unbelegtes, und genau davor schützt der Wächter.
 
+## Wächter über den Alarmweg (seit 2026-08-12)
+
+`scripts/verify-infrastructure.sh` prüft seit OPS-2026-08-12-09 vor jedem Deploy mit:
+Gibt es noch eine Richtlinie mit `severity>=ERROR`, ist sie scharf, hat sie
+Benachrichtigungskanäle, und sind die Kanäle eingeschaltet? Vier Ausfallarten führen zu
+rot: Richtlinie fehlt, Richtlinie aus, kein Kanal, Kanal abgeschaltet — dazu „nicht
+geprüft" bei einer gescheiterten Messung.
+
+**Grenze dieser Maßnahme, ausdrücklich:** Sie greift zur Deploy-Zeit, nicht in der Minute
+des Ausfalls. Zwischen zwei Deploys kann der Alarmweg tot sein, ohne dass es auffällt. Ein
+laufender Wächter müsste außerhalb dieses Projekts sitzen (der Alarm kann sich nicht
+selbst überwachen) — das bleibt ein benanntes Restrisiko. Eine Zustellprobe von Hand
+steht in `docs/ERROR-ALERTING.md`.
+
 ## Branch Protection auf `main` (Stand 2026-08-12)
 
 Soll-Zustand, auslesbar:

@@ -125,3 +125,37 @@ jobs:
             https://malzi.me/impressum
           budgetPath: .github/lighthouse-budget.json
           uploadArtifacts: true
+
+  # ── Formulierungs-Sperrliste: blockierend ──────────────────────────────
+  # Warum als Pflicht-Check und nicht als Erinnerung: Die Regel "nicht
+  # behaupten, GPS verlasse das Geraet nie" stand seit Monaten in CONTRIBUTING
+  # und wurde trotzdem an fuenf Stellen verletzt (README 2x, CONTRIBUTING,
+  # CHANGELOG, public/llms.txt) — gefunden erst durch diesen Job am 2026-08-12.
+  # Eine Wording-Regel ohne Test ist eine Bitte, kein Schutz.
+  # Sperrliste: .pruefungen/aussentext.txt
+  aussentext:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Zuerst die Pruefungen selbst pruefen: zwoelf Proben, je Pruefung eine
+      # gegen kaputtes und eine gegen sauberes Material. Ohne diesen Schritt
+      # koennte ein defekter Pruefer gruen melden, ohne etwas zu pruefen.
+      - run: sh scripts/pruefungen/selbstpruefung.sh
+
+      - run: python3 scripts/pruefungen/checks/aussentext.py .
+
+  # ── Die uebrigen drei Pruefungen: melden, noch nicht blockieren ────────
+  # Stand 2026-08-12 haben sie im Repo echte Kandidaten gefunden (4 blinde Tests
+  # von 924, 8 stille Fehlschlaege in scripts/, 2 driftende Fakten). Sie sofort
+  # blockierend zu schalten haette jeden PR rot gemacht; ein dauerrot Job wird
+  # ignoriert wie ein dauergruener. Deshalb erst aufraeumen, dann
+  # continue-on-error entfernen — dann sind es Kontrollen statt Berichte.
+  pruefungen-bericht:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: python3 scripts/pruefungen/checks/fakten-drift.py .
+      - run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
+      - run: python3 scripts/pruefungen/checks/test-blind.py .

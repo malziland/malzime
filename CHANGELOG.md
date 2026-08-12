@@ -4,6 +4,34 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+**Formulierungs-Sperrliste als Pflicht-Check — und fünf Verstöße, die sie sofort
+gefunden hat:**
+
+- **Neuer CI-Job `aussentext` (blockierend):** Prüft alle Texte, die nach außen
+  gehen (README, CONTRIBUTING, CHANGELOG, die Seiten unter `public/`, `llms.txt`)
+  gegen eine Sperrliste in `.pruefungen/aussentext.txt`. Der Job prüft zuerst die
+  Prüfung selbst (`scripts/pruefungen/selbstpruefung.sh`, zwölf Proben), damit ein
+  defekter Prüfer nicht grün meldet, ohne etwas zu prüfen.
+- **Fünf Verstöße korrigiert.** Die Regel „nicht behaupten, GPS verlasse das Gerät
+  nie" steht seit Monaten in CONTRIBUTING — und war trotzdem an fünf Stellen
+  verletzt: README (2x), CONTRIBUTING, CHANGELOG (Eintrag v1.0.0) und
+  `public/llms.txt`. Letzteres wiegt am schwersten: Diese Datei lesen KI-Crawler,
+  die Falschaussage wurde also aktiv weitergetragen. Überall steht jetzt „GPS
+  erreicht nie unsere Server" — sachlich richtig, weil der Browser für Karte und
+  Ortsname OpenStreetMap und Nominatim sehr wohl direkt aufruft.
+- **Firmierung korrigiert:** Ein CHANGELOG-Eintrag führte die Kurzform der Firma,
+  die es nicht gibt. Jetzt vollständig.
+- **Zuschreibung in dritter Person entfernt** (`docs/ERROR-ALERTING.md`, 2 Stellen):
+  Die Meldung wird jetzt sachlich beschrieben, statt sie einer Person zuzuschreiben.
+- **Neuer Job `pruefungen-bericht` (nicht blockierend):** Drei weitere Prüfungen
+  (driftende Fakten, stille Fehlschläge in Skripten, Tests ohne Zusicherung) laufen
+  mit und melden. Sie sind bewusst noch nicht blockierend: Sie finden derzeit echte
+  Kandidaten (4 blinde Tests von 924, 8 Stellen in `scripts/`), und ein dauerhaft
+  roter Job wird genauso ignoriert wie ein dauerhaft grüner. Erst aufräumen, dann
+  `continue-on-error` entfernen.
+
 ## [3.0.6] — 2026-08-12
 
 **Erinnerung an die ZDR-Nachprüfung — und die Ursache für ausbleibende
@@ -92,9 +120,9 @@ Konsens beider Prüfungen):**
 **Wording-Korrektur:** „Privat finanziert" heißt jetzt überall
 **„eigenfinanziert"** (Statistik-Seite, Stundenlimit-Banner, Deutsch und
 Englisch). Grund: Die Kosten trägt laut Impressum das Unternehmen
-malziland e.U. — „privat" war als Wort angreifbar, „eigenfinanziert" ist es
-nicht. An Kostenlosigkeit, Werbefreiheit und Tracking-Freiheit ändert sich
-selbstverständlich nichts.
+malziland - learning | training | consulting e.U. — „privat" war als Wort
+angreifbar, „eigenfinanziert" ist es nicht. An Kostenlosigkeit,
+Werbefreiheit und Tracking-Freiheit ändert sich selbstverständlich nichts.
 
 ## [3.0.2] — 2026-08-11
 
@@ -2392,7 +2420,7 @@ Erster oeffentlicher Release.
 - **Zwei Modi**: Serioese Analyse (sachlich) und Beast Mode (uebertrieben-provokant)
 - **Datenwert-Rechner**: Zeigt was ein Profil fuer Datenbroker wert ist
 - **Privacy-Check**: Erkennt ungewollt preisgegebene Informationen (Telefonnummern, Adressen, Kennzeichen)
-- **EXIF-Analyse**: Versteckte Kamera-Metadaten (client-seitig extrahiert, GPS verlässt nie den Browser)
+- **EXIF-Analyse**: Versteckte Kamera-Metadaten (client-seitig extrahiert, GPS erreicht nie unsere Server)
 - **GPS-Karte**: Aufnahmeort auf Leaflet-Karte (nur lokal im Browser)
 - **Tier-Easter-Egg**: Tierfotos bekommen ein lustiges Spass-Profil
 - **PDF-Export**: Ergebnisse als PDF speichern

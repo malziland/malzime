@@ -1,0 +1,3 @@
+# ERWARTUNG: Der Ausdruck enthaelt | als Oder. Nur beim Trennen von rechts laedt er.
+# Mit split("|", 1) bliebe "garantiert (?:sicher" uebrig - nicht kompilierbar.
+garantiert (?:sicher|anonym|fehlerfrei)|Garantie ohne Nachweis.

@@ -1,0 +1,7 @@
+# Absichtlich kaputt: eine gueltige Regel UND eine, deren Klammer nie schliesst.
+# ERWARTUNG: aussentext.py bricht mit Exit 2 ab.
+# Die gueltige Regel ist noetig, damit die Probe scharf ist: Ohne sie waere die
+# Regelliste leer und der alte Code haette schon deshalb mit 2 geendet - der
+# Rueckbau des Fixes waere unbemerkt geblieben.
+zu ?100 ?% sicher|Sicherheit ist keine Zusage, die man geben kann.
+unmatched (klammer|Diese Regel kann nicht kompilieren.

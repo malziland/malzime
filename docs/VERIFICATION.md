@@ -27,6 +27,8 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 | Reproduzierbarer Build | — entfällt: kein Build-Schritt (Vanilla-JS-Frontend wird direkt ausgeliefert, Functions deployen Quellcode) | n/a, Begründung links |
 | **Rollback-Probe** (Release-Stand aus sich heraus lauffähig) | Release-Tag in temporärem `git worktree` auschecken, `npm ci` Root + functions, beide Test-Suiten | ✅ Tag `v2.3.1` (Commit `8d39a10`): Setup ok, 435/435 + 165/165 Tests grün, Exit 0 — 2026-07-14, Node 24, macOS; Worktree danach entfernt |
 | Betriebs-Rollback ohne Deploy (Feature-Flags) | Firestore-Flag `useSingleLargeCall`, Verfahren in [RUNBOOK.md](RUNBOOK.md) | ✅ produktiv erprobt (Architektur-Umstellungen v2.0/v2.2 liefen über genau diese Schalter) |
+| Formulierungs-Sperrliste in Außentexten | CI-Job `aussentext`; lokal `python3 scripts/pruefungen/checks/aussentext.py .` — Regeln in `.pruefungen/aussentext.txt`. Ungültig, sobald eine Regel dazukommt oder ein neuer Außentext entsteht | ✅ 0 Verstöße bei 39 geprüften Dateien, 7 Regeln geladen — Zweig `feat/pruefungen-ci`, 2026-08-12. Gegenprobe: 7 absichtliche Verstöße lösen 7 Treffer aus; die 5 echten Fundstellen sind im selben Zug korrigiert |
+| Die Prüfungen selbst können rot werden | CI-Job `aussentext`, Schritt 1: `sh scripts/pruefungen/selbstpruefung.sh` — je Prüfung eine Probe gegen kaputtes und eine gegen sauberes Material | ✅ 12/12 Proben, Exit 0 — 2026-08-12. Rückbauprobe je Korrektur durchgeführt: jede Korrektur lässt genau ihre Probe fallen |
 
 ## Profilpflichten
 

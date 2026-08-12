@@ -106,7 +106,7 @@ Datenschutz ist kein Feature — es ist das Fundament:
 
 - **EU-Hosting fuer KI-Analysen**: Alle Bild-Analysen laufen ueber Mistral AI (Paris, EU-DSGVO). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO. Auf dem genutzten kostenpflichtigen API-Tier ist Training auf Eingaben/Ausgaben laut Anbieter-Zusage deaktiviert.
 - **Keine US-KI-Anbieter mehr**: Seit v1.6.0 wurden Google Vertex AI und Cloud Vision aus der Pipeline entfernt. Google bleibt nur fuer die Infrastruktur (Firebase Hosting + Cloud Functions + Firestore, alles in `europe-west1`).
-- **EXIF-Extraktion im Browser**: exifr parsed die Metadaten lokal, GPS verlässt nie den Client
+- **EXIF-Extraktion im Browser**: exifr parsed die Metadaten lokal, GPS erreicht nie unsere Server
 - **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell (ohne GPS, ohne dateTimeOriginal)
 - **Geocoding direkt vom Browser**: Nominatim wird client-seitig aufgerufen, nicht ueber den Server
 - **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
@@ -265,6 +265,8 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - **Secret-Scan** via gitleaks (prueft auf versehentlich committete API-Keys)
 - **Dependabot** prueft monatlich auf Updates (npm + GitHub Actions, je Bereich zu einem PR gebuendelt) und oeffnet bei gemeldeten Sicherheitsluecken sofort einen Reparatur-PR
 - **Audit-Gate** im Backend-Job (`scripts/audit-gate.mjs`): blockiert bei hohen und kritischen Schwachstellen. Laesst sich eine Luecke tief in einer fremden Abhaengigkeitskette nachweislich (noch) nicht reparieren, kann sie **begruendet und mit Ablaufdatum** in `.github/audit-allowlist.json` ausgenommen werden — danach faellt das Gate von selbst wieder auf rot
+- **Formulierungs-Sperrliste** (`aussentext`): blockiert, wenn ein Text, der nach aussen geht, eine Formulierung aus `.pruefungen/aussentext.txt` enthaelt — etwa eine Datenschutz-Zusage, die im Netzwerk-Tab widerlegbar waere. Der Job prueft zuerst die Pruefung selbst (`scripts/pruefungen/selbstpruefung.sh`)
+- **Weitere Pruefungen** (`pruefungen-bericht`): driftende Fakten, stille Fehlschlaege in Skripten, Tests ohne Zusicherung — laufen mit und melden, blockieren noch nicht
 - **Branch Protection** fuer `main`: Merges erst nach gruenen Status-Checks (`test-backend`, `test-frontend`, `test-e2e`, `secret-scan`)
 - Deploy erfolgt manuell per `npx firebase deploy`
 
@@ -299,7 +301,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
 - KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.
 - Infrastruktur (Hosting, Cloud Functions, Firestore) bei Google Ireland in europe-west1 — auch als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
-- GPS-Daten verlassen nie den Browser des Nutzers
+- GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser direkt bei OpenStreetMap bzw. Nominatim)
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 
 ## Lizenz

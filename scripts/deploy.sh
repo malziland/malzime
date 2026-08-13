@@ -57,8 +57,8 @@ else
       exit 1
     fi
     for CHECK in $PFLICHT; do
-      if ! printf '%s\n' "$LAGE" | grep -qx "$CHECK=success"; then
-        echo "FEHLER: Pflicht-Check »$CHECK« ist für $SHA nicht grün (Ist: $(printf '%s\n' "$LAGE" | grep "^$CHECK=" || echo "fehlt"))." >&2
+      if ! printf '%s\n' "$LAGE" | grep -qx "${CHECK}=success"; then
+        echo "FEHLER: Pflicht-Check ${CHECK} ist fuer $SHA nicht grün (Ist: $(printf '%s\n' "$LAGE" | grep "^${CHECK}=" || echo "fehlt"))." >&2
         echo "        Notschalter: SKIP_STAND=1" >&2
         exit 1
       fi

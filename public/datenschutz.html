@@ -16,7 +16,7 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./site.webmanifest" />
-    <link rel="stylesheet" href="./styles.css?v=2026081204" />
+    <link rel="stylesheet" href="./styles.css?v=2026081301" />
   </head>
   <body>
     <a href="#main" class="skip-link" tabindex="0">Zum Inhalt springen</a>
@@ -28,7 +28,7 @@
     <main id="main" class="container legal-page">
       <span class="page-eyebrow"><a href="/" class="eyebrow-home">malziME</a> &middot; Rechtliches</span>
       <h1>Datenschutz</h1>
-      <p class="legal-subtitle">Verst&auml;ndlich erkl&auml;rt &middot; Stand: 12. August 2026</p>
+      <p class="legal-subtitle">Verst&auml;ndlich erkl&auml;rt &middot; Stand: 13. August 2026</p>
       <div class="page-rule"></div>
       <div class="disclaimer disclaimer--flush">
         <p><strong>malziME</strong> ist ein Lern-Tool f&uuml;r Medienkompetenz und Datenschutz-Sensibilisierung. Die KI-Profile sind erfunden und zeigen nur, was Algorithmen behaupten k&ouml;nnten &ndash; nichts davon ist wahr oder bewiesen.</p>
@@ -62,13 +62,13 @@
             <li><strong>Kein Dateiname</strong> &ndash; ob dein Foto &bdquo;selfie_am_strand.jpg&ldquo; hei&szlig;t, erfahren wir nicht. Es wird immer als &bdquo;upload.jpg&ldquo; geschickt.</li>
             <li><strong>Keine GPS-Daten auf dem Server</strong> &ndash; GPS-Koordinaten werden im Browser ausgelesen und gehen nur an OpenStreetMap, nie an uns oder Google.</li>
             <li><strong>Kein Account</strong> &ndash; kein Login, kein Passwort, keine E-Mail-Adresse. Wir wissen nicht, wer du bist.</li>
-            <li><strong>Kein Tracking</strong> &ndash; kein Cookie, kein localStorage, keine Analyse-Tools. Einzige Ausnahme: ein anonymes <strong>Abhol-Ticket</strong> (eine Zufallsnummer im sessionStorage deines Tabs), damit dein Ergebnis ein versehentliches Neuladen der Seite &uuml;berlebt. Es enth&auml;lt keine pers&ouml;nlichen Daten, taugt nicht zum Wiedererkennen und l&ouml;scht sich von selbst, sobald du den Tab schlie&szlig;t. Danach vergisst dein Browser uns genauso schnell wie wir ihn.</li>
+            <li><strong>Kein Tracking</strong> &ndash; kein Cookie, kein localStorage, keine Analyse-Tools. Im <strong>sessionStorage deines Tabs</strong> merkt sich die Seite ein paar technische Dinge: das anonyme Abhol-Ticket (damit dein Ergebnis ein versehentliches Neuladen &uuml;berlebt), deine Modus-Wahl (seri&ouml;s/Beast), das Ticket f&uuml;r den Realit&auml;ts-Check und eine kleine Absturz-Wache. Keiner dieser Werte enth&auml;lt pers&ouml;nliche Daten, keiner taugt zum Wiedererkennen, und alle l&ouml;schen sich von selbst, sobald du den Tab schlie&szlig;t. Danach vergisst dein Browser uns genauso schnell wie wir ihn.</li>
             <li><strong>Keine IP-Adresse dauerhaft</strong> &ndash; der Missbrauchsschutz merkt sich deine IP f&uuml;r maximal 10&nbsp;Minuten im Arbeitsspeicher, dann ist sie weg.</li>
           </ul>
         </div>
-        <p>Der <a href="/stats" tabindex="0">Analyse-Z&auml;hler</a> speichert ausschlie&szlig;lich Zahlen: die Summen je Zeitraum (Tag, Woche, Monat, gesamt) und &ndash; damit das Stundenlimit rollen kann &ndash; die Zeitpunkte der Analysen der letzten 60&nbsp;Minuten. Keine IP-Adressen, keine Bildinhalte, keine Nutzerprofile. Der Z&auml;hler dient dem Kostenschutz und der transparenten Nutzungsstatistik.</p>
-        <p>Unsere Anwendungs-Logs enthalten nur eine zuf&auml;llige Anfrage-ID, den Status und technische Verarbeitungsschritte (Schritt-Name, Antwortl&auml;nge, Token-Counts) &ndash; keine Bildinhalte, keine Profile, keine IP-Adressen. Die Cloud-Functions-Infrastruktur (Google) protokolliert bei Fehlern technische Daten (IP, Zeitstempel, Statuscode) &ndash; Routine-Logs haben wir ausgeschlossen, diese Fehler-Logs werden nach 1&nbsp;Tag gel&ouml;scht. Vollst&auml;ndig anonyme Diagnose-Daten ohne Personenbezug (z.&nbsp;B. Fehler-Typ, Dauer, grobe Browser-/Betriebssystem-Klasse wie &bdquo;Safari 17 / iOS&ldquo; statt des vollen User-Agents, Bildschirm-Gr&ouml;&szlig;enklasse (klein/mittel/gro&szlig;) statt exakter Aufl&ouml;sung, Netzwerk-Klasse und -Geschwindigkeit, Datensparmodus, Spracheinstellung, Anzahl der Prozessorkerne, Arbeitsspeicher-Klasse, Pixeldichte und die aufgerufene Seite ohne Suchparameter &ndash; keine IP-Adressen, keine Bilder, keine Dateinamen) bewahren wir bis zu 30&nbsp;Tage auf, um seltene Ger&auml;tefehler &uuml;ber mehrere Workshops hinweg erkennen und beheben zu k&ouml;nnen. Eine anonymisierte Fehlerzusammenfassung ohne personenbezogene Daten (nur Fehlermeldung und H&auml;ufigkeit) bleibt zur Fehlerbehebung bestehen &ndash; eine k&uuml;rzere Aufbewahrung ist technisch nicht m&ouml;glich.</p>
-        <p>Beim freiwilligen Realit&auml;ts-Check z&auml;hlen wir ausschlie&szlig;lich anonym, wie oft die Einsch&auml;tzungen der KI als getroffen oder daneben bewertet wurden &mdash; ohne Foto, ohne Profil und ohne Verbindung zu deiner Analyse.</p>
+        <p>Der <a href="/stats" tabindex="0">Analyse-Z&auml;hler</a> speichert nur Z&auml;hlwerte: die Summen je Zeitraum (Tag, Woche, Monat, Jahr, gesamt) &ndash; jeweils mit dem zugeh&ouml;rigen Datumsschl&uuml;ssel, damit der Z&auml;hler beim Tageswechsel korrekt weiterz&auml;hlt &ndash; und, damit das Stundenlimit rollen kann, die Zeitpunkte der Analysen der letzten 60&nbsp;Minuten. Keine IP-Adressen, keine Bildinhalte, keine Nutzerprofile. Der Z&auml;hler dient dem Kostenschutz und der transparenten Nutzungsstatistik.</p>
+        <p>Unsere Anwendungs-Logs enthalten nur eine zuf&auml;llige Anfrage-ID, den Status und technische Verarbeitungsschritte (Schritt-Name, Antwortl&auml;nge, Token-Counts) &ndash; keine Bildinhalte, keine Profile, keine IP-Adressen. Die serverseitigen Anfrage-Protokolle der Infrastruktur (Google) &ndash; die einzige Stelle, an der eine IP-Adresse anfiele &ndash; sind vollst&auml;ndig ausgeschlossen und werden gar nicht erst gespeichert. Die verbleibenden Programm-Logs ohne Personenbezug l&ouml;schen sich nach 1&nbsp;Tag. Vollst&auml;ndig anonyme Diagnose-Daten ohne Personenbezug (z.&nbsp;B. Fehler-Typ, Dauer, grobe Browser-/Betriebssystem-Klasse wie &bdquo;Safari 17 / iOS&ldquo; statt des vollen User-Agents, Bildschirm-Gr&ouml;&szlig;enklasse (klein/mittel/gro&szlig;) statt exakter Aufl&ouml;sung, Netzwerk-Klasse und -Geschwindigkeit, Datensparmodus, Spracheinstellung, Anzahl der Prozessorkerne, Arbeitsspeicher-Klasse, Pixeldichte, eine grobe Motivklasse des Bildes (Mensch, Tier oder gemischt &ndash; nicht das Bild selbst) und die aufgerufene Seite ohne Suchparameter &ndash; keine IP-Adressen, keine Bilder, keine Dateinamen) bewahren wir bis zu 30&nbsp;Tage auf, um seltene Ger&auml;tefehler &uuml;ber mehrere Workshops hinweg erkennen und beheben zu k&ouml;nnen. Eine anonymisierte Fehlerzusammenfassung ohne personenbezogene Daten (nur Fehlermeldung und H&auml;ufigkeit) bleibt zur Fehlerbehebung bestehen &ndash; eine k&uuml;rzere Aufbewahrung ist technisch nicht m&ouml;glich.</p>
+        <p>Beim freiwilligen Realit&auml;ts-Check halten wir je Bewertung einen anonymen Datensatz fest (welche Einsch&auml;tzungen der KI du als getroffen oder daneben markiert hast) und z&auml;hlen daraus zusammen, wie gut die KI im Schnitt lag &mdash; ohne Foto, ohne Profil und ohne jede Verbindung zu deiner Analyse. Diese Datens&auml;tze tragen keine Kennung und bleiben bis zu 30&nbsp;Tage erhalten.</p>
       </section>
       <!-- Wer ist beteiligt? -->
       <section class="legal-section">
@@ -95,7 +95,7 @@
               </tr>
               <tr>
                 <td>Cloud Firestore</td>
-                <td>Anonymer Analyse-Z&auml;hler (nur Gesamtzahl pro Zeitraum), Maintenance-Flag und die kurzlebige Warteschlangen-Verwaltung (Status + fertiges Profil ohne Personenbezug, L&ouml;schung wenige Minuten nach der Abholung, nie abgeholte sp&auml;testens nach rund 2&nbsp;Stunden). Keine Accounts, keine IP-Adressen.</td>
+                <td>Anonymer Analyse-Z&auml;hler (Z&auml;hlwerte je Zeitraum, keine Einzelvorg&auml;nge), Maintenance-Flag und die kurzlebige Warteschlangen-Verwaltung (Status + fertiges Profil ohne Personenbezug, L&ouml;schung wenige Minuten nach der Abholung, nie abgeholte sp&auml;testens nach rund 2&nbsp;Stunden). Keine Accounts, keine IP-Adressen.</td>
                 <td>Google Ireland Ltd., EU (europe-west1)</td>
               </tr>
               <tr>

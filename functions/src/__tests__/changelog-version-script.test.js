@@ -75,6 +75,15 @@ describe("changelog-oberste-version.sh", () => {
     expect(r.aus).toBe("3.1.0-rc1");
   });
 
+  /* OPS-2026-08-13-K11: Eine Überschrift in einem Code-Zaun ist ein Beispiel,
+     keine echte oberste Version. */
+  test("Überschrift in einem Code-Zaun gewinnt NICHT gegen die echte oberste", () => {
+    const r = lauf("# Changelog\n\n```\n## [9.9.9]\n```\n\n## [3.1.0] — 2026-08-13\n\n- echt\n");
+    expect(r.aus).toBe("3.1.0");
+    expect(r.aus).not.toBe("9.9.9");
+    expect(r.code).toBe(0);
+  });
+
   test("keine auswertbare Überschrift ist ein Messfehler (2), kein 'nichts zu tun' (0)", () => {
     const r = lauf("# Changelog\n\nnur Fließtext, keine Abschnitte\n");
     expect(r.code).toBe(2);

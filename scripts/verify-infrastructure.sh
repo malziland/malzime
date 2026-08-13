@@ -296,6 +296,52 @@ case "$KANAELE" in
   *)     rot   "Kanäle NICHT geprueft — ungeprueft gilt als nicht bestanden" ;;
 esac
 
+# OPS-2026-08-13-45: Deckt der Alarmfilter alle ausgelieferten Dienste ab? Der
+# Filter ist eine Positivliste (service_name=(…)); ein neuer Dienst ist stumm,
+# bis ihn jemand von Hand eintraegt. Bewusst ausgespart sind `errors`/`telemetry`
+# (Client-Diagnose, sonst Alarm-Spam — docs/ERROR-ALERTING.md), `erinnerung`
+# (vom Reaper-Waechter abgedeckt) und `ntfy` (Zustellweg, kein malziME-Dienst).
+# Jeder ANDERE Dienst, der weder im Filter noch auf dieser Ausnahmeliste steht,
+# ist rot — das erzwingt eine bewusste Entscheidung pro neuem Dienst.
+ALARM_AUSNAHMEN="errors telemetry erinnerung ntfy"
+if [ -n "${INFRA_PROBE_POLICY:-}" ]; then
+  FILTER_DIENSTE=$(cat "$INFRA_PROBE_POLICY")
+else
+  FILTER_DIENSTE=$(printf '%s' "${POLICY_JSON:-}" | python3 -c '
+import json, re, sys
+try:
+    daten = json.load(sys.stdin)
+except Exception:
+    print(""); raise SystemExit(0)
+namen = set()
+for p in (daten if isinstance(daten, list) else []):
+    for c in p.get("conditions", []):
+        f = (c.get("conditionMatchedLog") or {}).get("filter", "")
+        namen.update(re.findall(r"\"([a-z0-9-]+)\"", f))
+print(" ".join(sorted(namen)))
+' 2>/dev/null)
+fi
+if [ -n "${INFRA_PROBE_DIENSTE:-}" ]; then
+  ALLE_DIENSTE=$(cat "$INFRA_PROBE_DIENSTE")
+else
+  ALLE_DIENSTE=$(gcloud run services list --project="$PROJECT" --region="$REGION" --format="value(metadata.name)" 2>/dev/null || true)
+fi
+if [ -z "$ALLE_DIENSTE" ]; then
+  rot "Alarm-Abdeckung NICHT geprueft (Dienstliste nicht lesbar) — ungeprueft gilt als nicht bestanden"
+else
+  UNGEDECKT=""
+  for D in $ALLE_DIENSTE; do
+    case " $FILTER_DIENSTE " in *" $D "*) continue ;; esac
+    case " $ALARM_AUSNAHMEN " in *" $D "*) continue ;; esac
+    UNGEDECKT="$UNGEDECKT $D"
+  done
+  if [ -n "$UNGEDECKT" ]; then
+    rot "Dienste ohne Alarm-Abdeckung und ohne benannte Ausnahme:$UNGEDECKT — Filter erweitern oder Ausnahme begruenden"
+  else
+    gruen "Alarm-Abdeckung: jeder Dienst ist im Filter oder benannte Ausnahme"
+  fi
+fi
+
 # ── 8. Die zwei Netze unter der Löschzusage: Firestore-TTL + Reaper-Zeitplan ──
 # OPS-2026-08-13-33: Beide sind reine Cloud-Konfiguration, die `firebase deploy`
 # NICHT verwaltet. Wer sie deaktiviert (oder eine DB neu anlegt), verliert das

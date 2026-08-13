@@ -116,6 +116,11 @@ async function ruhe(page) {
         new Promise((fertig) => setTimeout(fertig, 1000)),
       ])
   );
+  /* WebKit meldet laufende CSS-Übergänge über getAnimations() NICHT — dort
+     misst axe sonst mitten im Themenwechsel und findet Schein-Kontraste an
+     Elementen, die mit der Änderung nichts zu tun haben. Der Themenwechsel
+     dauert 200 ms; 400 ms sind der sichere Abstand. */
+  await page.waitForTimeout(400);
 }
 
 async function beastAn(page) {

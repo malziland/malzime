@@ -62,6 +62,37 @@ function sichtbar() {
   }
 }
 
+/* Wohin der Umschalter gehört, je nach Seitenaufbau:
+
+   - Startseite: in die Kopfzeile mit dem SYSTEM-AKTIV-Abzeichen (`.hero`).
+   - Unterseiten: auf dieselbe Zeile wie die Rubrik oben („malziME · Statistik",
+     „malziME · Rechtliches"). Dafür kommen Rubrik und Umschalter in eine
+     gemeinsame Zeile — vorher stand er darüber, was nach einem losen Element
+     aussah statt nach einer Kopfzeile (Nutzer-Ansage 2026-08-13).
+   - Sonst: an den Anfang des Inhalts. */
+function umschalterEinsetzen(el) {
+  /* Die Rubrik zuerst: Sie ist, wo vorhanden, die oberste Zeile — auch auf der
+     Zahlen-Seite, die zusaetzlich einen Hero-Block hat. Erst wenn es keine
+     gibt (Startseite), kommt die Kopfzeile mit dem Abzeichen. */
+  const rubrik = document.querySelector(".page-eyebrow");
+  if (rubrik && rubrik.parentNode) {
+    const zeile = document.createElement("div");
+    zeile.className = "seiten-kopfzeile";
+    rubrik.parentNode.insertBefore(zeile, rubrik);
+    zeile.append(rubrik, el);
+    return true;
+  }
+  const hero = document.querySelector(".hero");
+  if (hero) {
+    hero.insertBefore(el, hero.firstChild);
+    return true;
+  }
+  const main = document.getElementById("main");
+  if (!main) return false;
+  main.insertBefore(el, main.firstChild);
+  return true;
+}
+
 function knopf(code, aktiv) {
   const b = document.createElement("button");
   b.type = "button";
@@ -150,7 +181,6 @@ function baueHinweis() {
 function start() {
   if (!sichtbar()) return;
 
-  const ziel = document.getElementById("main") || document.querySelector("main") || document.body;
   const { grund, ok, schliessen } = baueHinweis();
   let ausloeser = null;
   /* Eigener Zustand statt `grund.hidden`: Das Verbergen passiert erst nach dem
@@ -206,7 +236,7 @@ function start() {
   }
 
   const umschalter = baueUmschalter(oeffnen);
-  ziel.insertBefore(umschalter, ziel.firstChild);
+  if (!umschalterEinsetzen(umschalter)) return;
   document.body.appendChild(grund);
 
   ok.addEventListener("click", schliessenTun);

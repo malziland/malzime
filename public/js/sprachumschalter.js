@@ -88,6 +88,37 @@ function lage() {
   return laeuftEtwas ? "laeuft" : "fertig";
 }
 
+/* Wohin der Umschalter gehört, je nach Seitenaufbau:
+
+   - Startseite: in die Kopfzeile mit dem SYSTEM-AKTIV-Abzeichen (`.hero`).
+   - Unterseiten: auf dieselbe Zeile wie die Rubrik oben („malziME · Statistik",
+     „malziME · Rechtliches"). Dafür kommen Rubrik und Umschalter in eine
+     gemeinsame Zeile — vorher stand er darüber, was nach einem losen Element
+     aussah statt nach einer Kopfzeile (Nutzer-Ansage 2026-08-13).
+   - Sonst: an den Anfang des Inhalts. */
+function umschalterEinsetzen(el) {
+  /* Die Rubrik zuerst: Sie ist, wo vorhanden, die oberste Zeile — auch auf der
+     Zahlen-Seite, die zusaetzlich einen Hero-Block hat. Erst wenn es keine
+     gibt (Startseite), kommt die Kopfzeile mit dem Abzeichen. */
+  const rubrik = document.querySelector(".page-eyebrow");
+  if (rubrik && rubrik.parentNode) {
+    const zeile = document.createElement("div");
+    zeile.className = "seiten-kopfzeile";
+    rubrik.parentNode.insertBefore(zeile, rubrik);
+    zeile.append(rubrik, el);
+    return true;
+  }
+  const hero = document.querySelector(".hero");
+  if (hero) {
+    hero.insertBefore(el, hero.firstChild);
+    return true;
+  }
+  const main = document.getElementById("main");
+  if (!main) return false;
+  main.insertBefore(el, main.firstChild);
+  return true;
+}
+
 /* ── Bausteine ──────────────────────────────────────────────────────────── */
 
 function knopf(code) {
@@ -373,17 +404,11 @@ function sageAn(text) {
 function einhaengen() {
   if (eingehaengt) return;
 
-  /* In die Kopfzeile, nicht darüber: Der Umschalter gehört auf dieselbe Höhe
-     wie das SYSTEM-AKTIV-Abzeichen, nur an den anderen Rand. `.hero` trägt
-     dafür position: relative (styles.css). Fehlt der Kopf — etwa auf einer
-     Unterseite —, bleibt es beim Anfang des Inhalts. */
-  const kopf = document.querySelector(".hero");
-  const main = document.getElementById("main");
-  const ziel = kopf || main;
-  if (!ziel) return;
-
   umschalter = baueUmschalter();
-  ziel.insertBefore(umschalter, ziel.firstChild);
+  if (!umschalterEinsetzen(umschalter)) {
+    umschalter = null;
+    return;
+  }
 
   modalFertig = modalBauen("fertig");
   modalLaeuft = modalBauen("laeuft");

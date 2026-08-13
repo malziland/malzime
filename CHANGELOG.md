@@ -30,6 +30,26 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   beim Beast-Modus startet jedes weitergereichte Gerät im Workshop wieder in
   der Gerätesprache.
 
+  **Auf jeder Seite.** `stats.html` ist übersetzt und bekommt denselben
+  Umschalter. Datenschutzerklärung, Impressum und Nutzungsbedingungen liegen
+  bisher nur auf Deutsch — dort steht der Schalter ebenfalls, zeigt aber immer
+  DE (er sagt aus, in welcher Sprache das dasteht, was man liest) und öffnet
+  beim Klick auf EN einen **zweisprachigen** Hinweis. Zweisprachig, weil wer
+  auf EN klickt kein Deutsch liest. Diese Übergangslösung
+  (`js/sprachhinweis.js`) verschwindet vollständig, sobald die Texte übersetzt
+  sind; ein Test macht ihre Ausnahme im i18n-Wächter ab diesem Tag zum Fehler
+  und nennt beim Namen, was zu entfernen ist.
+
+  Die drei Rechtsseiten laden weiterhin **keine** Sprachdatei und rufen **keine**
+  Schnittstelle auf — beides ist jetzt eine geprüfte Eigenschaft. Ob der
+  Schalter dort erscheint, entscheidet allein die Adresse oder eine Spur, die
+  die Startseite im selben Tab hinterlassen hat.
+
+  **Zwei Türen zum Erproben**, beide nur im eigenen Tab: `?sprachumschalter=1`
+  in der Adresse und `malziME.sprachumschalter()` in der Konsole. Die Adresse
+  ist der wichtigere Weg — auf iPhone und iPad gibt es keine Konsole, und genau
+  dort entscheidet sich, ob ein Daumen den Schalter trifft.
+
   Barrierefreiheit wurde nicht behauptet, sondern gemessen: Fokus-Käfig aus
   `inert` **plus** Umbruch am Listenrand (`inert` allein lässt den Fokus hinter
   dem letzten Knopf in die Browserleiste entkommen), Rücksprung auf den
@@ -37,6 +57,20 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Beast-Modus, `lang`-Attribut an jedem Knopf (sonst liest ein deutscher
   Screenreader „English" deutsch vor), Ansage des vollzogenen Wechsels.
   Geprüft über die ganze Matrix: 2 Sprachen × 2 Themen, Rückfrage offen und zu.
+
+  Zur Ziel-Größe eine Korrektur am eigenen ersten Entwurf: `min-height: 44px`
+  machte aus der schlanken Pille einen 108×52-Klotz, der mit dem abgenommenen
+  Entwurf nichts mehr zu tun hatte. Die Regel meint aber die **tastbare**
+  Fläche, nicht die sichtbare — ein unsichtbares Feld über dem Knopf bringt den
+  Daumen-Treffer, das Aussehen bleibt der Entwurf (sichtbar 50×30, tastbar 44).
+  Der Test misst seither mit `elementFromPoint`, was wirklich getroffen wird,
+  statt der Kastengröße.
+
+- **Links im Fließtext der Rechtsseiten sind unterstrichen**
+  (`A11Y-2026-08-13-01`, WCAG 1.4.1). Sie waren allein an der Farbe erkennbar —
+  8 ernste axe-Verstöße, die nie jemand gesehen hat, weil die bestehende
+  axe-Prüfung nur die Startseite abdeckt. Gefunden durch die neue Prüfung der
+  Unterseiten, nicht durch die Änderung selbst verursacht.
 
 ### Behoben
 

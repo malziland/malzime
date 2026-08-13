@@ -304,3 +304,39 @@ describe("Sprachumschalter — Barrierefreiheit", () => {
     });
   });
 });
+
+describe("Sprachumschalter — Tür über die Adresse", () => {
+  /* jsdom laesst window.location nicht ohne Weiteres umschreiben; die Adresse
+     wird deshalb ueber history.replaceState gesetzt — genau das liest
+     URLSearchParams. */
+  function adresse(suche) {
+    window.history.replaceState({}, "", suche || "/");
+  }
+
+  afterEach(() => adresse("/"));
+
+  it("?sprachumschalter=1 blendet ihn ein, ohne Merkmal und ohne Konsole", () => {
+    adresse("/?sprachumschalter=1");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).not.toBeNull();
+  });
+
+  it.each([
+    ["0", "/?sprachumschalter=0"],
+    ["false", "/?sprachumschalter=false"],
+    ["leer", "/?sprachumschalter="],
+    ["ganz ohne", "/"],
+  ])("der Wert %s blendet ihn NICHT ein", (_name, suche) => {
+    /* Streng, damit ein Tippfehler in einem herumgereichten Link kein
+         Bedienelement vor ein Workshop-Publikum stellt. */
+    adresse(suche);
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).toBeNull();
+  });
+
+  it("die Adresse verträgt sich mit ?lang=en", () => {
+    adresse("/?lang=en&sprachumschalter=1");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).not.toBeNull();
+  });
+});

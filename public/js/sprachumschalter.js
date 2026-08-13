@@ -4,14 +4,18 @@
  * ist. Ist es aus, entsteht kein einziges Element — ein sichtbarer, toter
  * Schalter wäre schlimmer als gar keiner (Nutzer-Ansage 2026-08-13).
  *
- * Zum Erproben gibt es eine Tür über die Konsole:
+ * Zum Erproben gibt es zwei Türen. Beide wirken nur im eigenen Tab und
+ * überleben kein Neuladen — damit lässt sich die fertige Bedienung auf der
+ * ECHTEN Seite durchspielen, ohne dass ein Workshop-Publikum etwas sieht.
  *
- *     malziME.sprachumschalter()        blendet ihn im eigenen Tab ein
- *     malziME.sprachumschalter(false)   nimmt ihn wieder weg
+ * 1. In der Adresse:  ?sprachumschalter=1
  *
- * Sie wirkt nur in diesem Tab und überlebt kein Neuladen. Damit lässt sich
- * die fertige Bedienung auf der ECHTEN Seite durchspielen, ohne dass ein
- * Workshop-Publikum etwas davon sieht.
+ *    Der wichtigere Weg. Auf iPhone und iPad gibt es keine Konsole, und genau
+ *    dort muss der Umschalter erprobt werden: Daumen-Größe und Rückfrage auf
+ *    kleinem Schirm sind die kritischen Punkte. Chrome sperrt am Rechner
+ *    obendrein das Einfügen in die Konsole.
+ *
+ * 2. In der Konsole:  malziME.sprachumschalter()   /   (false) zum Entfernen
  *
  * Der Wechsel selbst ist bewusst einfach gehalten: Es gibt keinen Weg, einem
  * laufenden Auftrag nachträglich eine andere Sprache zu geben. Stattdessen
@@ -30,6 +34,11 @@ import { state } from "./state.js";
    müssten die Locale-Texte einen Platzhalter bekommen. */
 const SPRACHEN = ["de", "en"];
 const SPEICHER_SCHLUESSEL = "malzime-sprache";
+/* Spur für die noch nicht übersetzten Seiten: Sie laden bewusst kein
+   /api/stats (eine Rechtsseite soll keinen Netzweg aufmachen) und erfahren so
+   im selben Tab, ob der Umschalter überhaupt gezeigt werden soll.
+   Übergangslösung — entfällt mit js/sprachhinweis.js. */
+const SPUR_SCHLUESSEL = "malzime-sprachumschalter";
 
 /* Das Schliess-Kreuz ist ein Zeichen, kein Text: Es wird nie uebersetzt und
    Screenreadern gar nicht vorgelesen — deren Beschriftung kommt aus dem
@@ -328,6 +337,11 @@ function einhaengen() {
   document.addEventListener("keydown", aufTaste);
 
   eingehaengt = true;
+  try {
+    sessionStorage.setItem(SPUR_SCHLUESSEL, "1");
+  } catch (_err) {
+    /* Privater Modus — dann zeigen die Unterseiten den Schalter eben nicht. */
+  }
   beschriften();
 }
 
@@ -335,6 +349,11 @@ function aushaengen() {
   if (!eingehaengt) return;
   modalSchliessen();
   document.removeEventListener("keydown", aufTaste);
+  try {
+    sessionStorage.removeItem(SPUR_SCHLUESSEL);
+  } catch (_err) {
+    /* siehe oben */
+  }
   [umschalter, modalFertig, modalLaeuft, ansage].forEach((el) => el && el.remove());
   umschalter = modalFertig = modalLaeuft = ansage = null;
   eingehaengt = false;
@@ -386,6 +405,16 @@ export function initSprachumschalter({ analysiere } = {}) {
     zeigeSprachumschalter(an);
     return an ? "Sprachumschalter eingeblendet (nur in diesem Tab)." : "Sprachumschalter entfernt.";
   };
+
+  /* Tür über die Adresse. Bewusst streng: nur genau "1" oeffnet. Ein
+     versehentliches ?sprachumschalter=0 oder =false darf nichts einblenden. */
+  try {
+    if (new URLSearchParams(window.location.search).get("sprachumschalter") === "1") {
+      einhaengen();
+    }
+  } catch (_err) {
+    /* Kaputte Adresse — dann eben keine Tür. */
+  }
 }
 
 /**

@@ -36,7 +36,16 @@ else
   exit 2
 fi
 
-KOPF="$(printf '%s\n' "$INHALT" | grep -m1 -oE '^## \[[^]]+\]' || true)"
+# OPS-2026-08-13-K11: Code-Zaeune (``` bzw. ~~~) ausklammern, BEVOR nach der
+# obersten Ueberschrift gesucht wird. Ein `## [x.y.z]` als Beispiel in einem
+# eingezaeunten Block wuerde sonst gegen die echte oberste Ueberschrift gewinnen
+# und Tag/Release bestimmen — dieselbe strukturblinde Denkfigur wie OPS-30, nur
+# im Parser statt im Zahlenmuster.
+OHNE_ZAEUNE="$(printf '%s\n' "$INHALT" | awk '
+  /^[[:space:]]*(```|~~~)/ { imblock = !imblock; next }
+  !imblock { print }
+')"
+KOPF="$(printf '%s\n' "$OHNE_ZAEUNE" | grep -m1 -oE '^## \[[^]]+\]' || true)"
 if [ -z "$KOPF" ]; then
   echo "FEHLER: keine Abschnitts-Ueberschrift der Form '## [...]' gefunden." >&2
   exit 2

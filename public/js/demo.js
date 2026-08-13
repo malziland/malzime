@@ -6,11 +6,25 @@ import { t } from "./i18n.js";
 import { setStatus, stopScanAnim } from "./ui.js";
 import { logClientError } from "./error-logger.js";
 
-const DEMO_IMAGES = {
-  selfie: "./img/demo/demo-selfie.jpg?v=2026081302",
-  cafe: "./img/demo/demo-cafe.jpg?v=2026081302",
-  hiker: "./img/demo/demo-hiker.jpg?v=2026081302",
-};
+/* Cache-Buster der Demo-Bilder. Steht bewusst als eigene Konstante, damit
+   scripts/deploy.sh ihn beim Hosting-Deploy mit derselben `?v=`-Ersetzung
+   hochzählt wie in den HTML-Seiten. */
+const DEMO_BUSTER = "?v=2026081302";
+
+/* 2026-08-13: Die KI-Kennzeichnung ist in die Pixel gebrannt (Pflicht seit
+   08/2026 — ein CSS-Etikett verschwindet, sobald jemand das Bild speichert).
+   Ein gebranntes Zeichen kann nicht mitübersetzen: Bei englischer Oberfläche
+   stand trotzdem „KI ERSTELLT" im Bild. Deshalb zwei Dateisätze, die Pfade
+   liegen als Übersetzungsschlüssel (`demo.full.*`) in den Locale-Dateien. */
+function demoBildPfad(key) {
+  const pfad = t(`demo.full.${key}`);
+  /* Fällt der Schlüssel aus (Locale unvollständig), lieber die deutsche Fassung
+     als gar kein Bild — die Kennzeichnung ist in beiden Sätzen vorhanden. */
+  const sicher = pfad === `demo.full.${key}` ? `./img/demo/demo-${key}.jpg` : pfad;
+  return `${sicher}${DEMO_BUSTER}`;
+}
+
+const DEMO_KEYS = ["selfie", "cafe", "hiker"];
 
 export function initDemo() {
   document.querySelectorAll(".demo-thumb[data-demo]").forEach((btn) => {
@@ -19,7 +33,9 @@ export function initDemo() {
          `await` wäre die Nutzer-Aktivierung für den AudioContext verfallen. */
       klangAktivieren();
       const key = btn.dataset.demo;
-      if (key && DEMO_IMAGES[key]) loadDemoImage(DEMO_IMAGES[key], key);
+      /* Pfad ERST beim Klick auflösen — die Sprache kann sich zwischen dem
+         Seitenaufbau und dem Klick geändert haben. */
+      if (key && DEMO_KEYS.includes(key)) loadDemoImage(demoBildPfad(key), key);
     });
   });
 }

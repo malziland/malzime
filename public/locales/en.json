@@ -223,5 +223,14 @@
   "aria.beastToggle": "Activate beast mode",
   "aria.info": "Information",
   "aria.konfidenz": "Confidence",
-  "error.queueFull": "A lot of analyses are queued right now. Please try again in a few minutes."
+  "error.queueFull": "A lot of analyses are queued right now. Please try again in a few minutes.",
+  "demo.src.selfie": "./img/demo/demo-selfie-thumb-en.jpg",
+  "demo.src.cafe": "./img/demo/demo-cafe-thumb-en.jpg",
+  "demo.src.hiker": "./img/demo/demo-hiker-thumb-en.jpg",
+  "demo.full.selfie": "./img/demo/demo-selfie-en.jpg",
+  "demo.full.cafe": "./img/demo/demo-cafe-en.jpg",
+  "demo.full.hiker": "./img/demo/demo-hiker-en.jpg",
+  "demo.alt.selfie": "AI-generated sample image: selfie at St. Stephen's Square. Does not depict a real person.",
+  "demo.alt.cafe": "AI-generated sample image: in a café in Salzburg. Does not depict a real person.",
+  "demo.alt.hiker": "AI-generated sample image: hiking near Hallstatt. Does not depict a real person."
 }

@@ -225,6 +225,9 @@ body {
 /* ── Hero ── */
 
 .hero {
+  /* relative wegen des Sprachumschalters (v3.3): Er sitzt absolut am rechten
+     Rand dieser Zeile, auf Höhe des SYSTEM-AKTIV-Abzeichens. */
+  position: relative;
   margin-bottom: 32px;
 }
 
@@ -3427,10 +3430,15 @@ html[lang="en"] .rc-zitat::after {
   --sw-fuell-text: #0e1517;
 }
 
+/* Auf derselben Zeile wie das SYSTEM-AKTIV-Abzeichen, nur am anderen Rand —
+   und in derselben Höhe. Ein erster Anlauf setzte den Umschalter darüber und
+   10 px höher; das sah nach zwei verschiedenen Dingen aus statt nach einer
+   Kopfzeile. `.hero` traegt dafuer position: relative. */
 .sprachwahl {
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 0 0.25rem;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
 }
 .sprach-pille {
   position: relative;
@@ -3439,15 +3447,15 @@ html[lang="en"] .rc-zitat::after {
   background: var(--surface);
   border: 1.5px solid var(--sw-fuell);
   border-radius: 999px;
-  padding: 3px;
+  padding: 2px;
   box-shadow: var(--shadow);
 }
 .sprach-schieber {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: calc(50% - 3px);
-  height: calc(100% - 6px);
+  top: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  height: calc(100% - 4px);
   background: var(--sw-fuell);
   border-radius: 999px;
   transition: transform 0.28s var(--ease);
@@ -3459,15 +3467,22 @@ html[lang="en"] .rc-zitat::after {
   position: relative;
   z-index: 1;
   font-family: inherit;
-  font-weight: 500;
-  font-size: 0.82rem;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  /* Auf das Mass des SYSTEM-AKTIV-Abzeichens gebracht: 28 px hohe Pille. */
+  font-size: 0.7rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
   cursor: pointer;
   border: 0;
   background: transparent;
   color: var(--sw-fuell);
   border-radius: 999px;
-  padding: 0.3rem 1rem;
+  /* Breite: 44 px je Knopf fuer den Daumen. Die Hoehe kommt ueber ::after,
+     waagrecht geht das nicht — zwei nebeneinanderliegende Knoepfe wuerden sich
+     die Flaeche streitig machen. Die Pille bleibt damit bei ~92 px und ist
+     weiterhin schmaler als das SYSTEM-AKTIV-Abzeichen (130 px). */
+  min-width: 44px;
+  padding: 0.32rem 0.5rem;
   transition: color 0.28s var(--ease);
 }
 
@@ -3665,9 +3680,11 @@ html[lang="en"] .rc-zitat::after {
 /* Zweitsprachiger Block im Hinweis der noch nicht übersetzten Seiten.
    ÜBERGANG — entfällt mit js/sprachhinweis.js, sobald die Rechtstexte auf
    Englisch vorliegen. */
-.sw-modal h2.sw-zweitsprache {
-  margin-top: 1.1rem;
-  padding-top: 1rem;
+.sw-modal .sw-zweitsprache {
+  margin-top: 0.9rem !important;
+  padding-top: 0.8rem;
   border-top: 1px solid var(--border-soft);
-  font-size: 1.1rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: var(--muted);
 }

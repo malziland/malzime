@@ -74,6 +74,18 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Behoben
 
+- **Der Umschalter stand über der Kopfzeile statt darin, und war zu hoch.**
+  Gemessen: Das SYSTEM-AKTIV-Abzeichen ist 130 × 28 px, der Umschalter war
+  108 × 38 px und saß 42 px darüber — das sah nach zwei verschiedenen Dingen
+  aus statt nach einer Kopfzeile. Jetzt 94 × 27 px auf derselben Oberkante, am
+  anderen Rand. Tastbar bleiben es 44 × 44 px.
+
+- **Der zweisprachige Hinweis hatte zwei gleichrangige Überschriften.** Deutsch
+  und Englisch standen in gleicher Größe und Fettung untereinander und stritten
+  optisch um den Rang. Die englische Zeile ist jetzt eine zurückgenommene
+  Übersetzung — und der Dialog hat wieder genau eine Überschrift, wie es sich
+  gehört.
+
 - **Safari verliert den Fokus aus dem Dialog — und findet nicht zurück**
   (`A11Y-2026-08-13-02`). Gemessen in WebKit 26.5, der Maschine hinter Safari
   auf iPhone und iPad. Safari setzt den Fokus ohne „Vollzugriff Tastatur" gar

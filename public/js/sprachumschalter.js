@@ -373,11 +373,17 @@ function sageAn(text) {
 function einhaengen() {
   if (eingehaengt) return;
 
+  /* In die Kopfzeile, nicht darüber: Der Umschalter gehört auf dieselbe Höhe
+     wie das SYSTEM-AKTIV-Abzeichen, nur an den anderen Rand. `.hero` trägt
+     dafür position: relative (styles.css). Fehlt der Kopf — etwa auf einer
+     Unterseite —, bleibt es beim Anfang des Inhalts. */
+  const kopf = document.querySelector(".hero");
   const main = document.getElementById("main");
-  if (!main) return;
+  const ziel = kopf || main;
+  if (!ziel) return;
 
   umschalter = baueUmschalter();
-  main.insertBefore(umschalter, main.firstChild);
+  ziel.insertBefore(umschalter, ziel.firstChild);
 
   modalFertig = modalBauen("fertig");
   modalLaeuft = modalBauen("laeuft");

@@ -124,7 +124,11 @@ function baueHinweis() {
   titel.textContent = TEXTE.titel_de;
   kasten.setAttribute("aria-labelledby", titel.id);
 
-  const titelEn = document.createElement("h2");
+  /* Die englische Zeile ist die Übersetzung, nicht eine zweite Überschrift.
+     Als <h2> in gleicher Grösse und Fettung sahen beide aus, als stritten sie
+     um den Rang — und ein Dialog hat genau EINE Überschrift. Jetzt ein
+     zurückgenommener Absatz darunter. */
+  const titelEn = document.createElement("p");
   titelEn.className = "sw-zweitsprache";
   titelEn.lang = "en";
   titelEn.textContent = TEXTE.titel_en;

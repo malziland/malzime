@@ -7,7 +7,21 @@ export default defineConfig({
     baseURL: "http://localhost:8081",
     headless: true,
   },
-  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  projects: [
+    { name: "chromium", use: { browserName: "chromium" } },
+    /* WebKit ist die Maschine hinter Safari auf iPhone und iPad — dort laufen
+       die Workshops. Am 2026-08-13 hat genau dieser Lauf einen Fehler gezeigt,
+       den Chromium nicht zeigte: Safari setzt den Fokus ohne „Vollzugriff
+       Tastatur" nicht auf Knoepfe; wer den Dialog per Tab verliess, kam nicht
+       mehr zurueck. Nur die Umschalter-Tests, damit die Pipeline nicht
+       unnoetig waechst — das offizielle Playwright-Abbild bringt WebKit ohne
+       Zusatzinstallation mit. */
+    {
+      name: "webkit-sprachumschalter",
+      use: { browserName: "webkit", viewport: { width: 390, height: 844 } },
+      testMatch: /sprachumschalter.*\.test\.js/,
+    },
+  ],
   webServer: {
     command: "python3 -m http.server 8081 --directory public",
     port: 8081,

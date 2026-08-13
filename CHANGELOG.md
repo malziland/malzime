@@ -74,6 +74,23 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Behoben
 
+- **Safari verliert den Fokus aus dem Dialog — und findet nicht zurück**
+  (`A11Y-2026-08-13-02`). Gemessen in WebKit 26.5, der Maschine hinter Safari
+  auf iPhone und iPad. Safari setzt den Fokus ohne „Vollzugriff Tastatur" gar
+  nicht erst auf Knöpfe; wer aus der Rückfrage heraustabbte, landete im Nichts
+  und kam nicht mehr hinein. `inert` und der Umbruch am Listenrand allein
+  reichen dafür nicht — es braucht ein Netz, das den Fokus zurückholt. In
+  Chromium war das Verhalten nicht zu sehen.
+
+  Zweiter WebKit-Fund: Ein Klick fokussiert dort den Knopf nicht, deshalb
+  landete auch der Rücksprung nach dem Schließen im Leeren. Der auslösende
+  Knopf wird jetzt ausdrücklich gemerkt statt über `document.activeElement`
+  erraten.
+
+  **WebKit läuft ab sofort in der Pipeline mit** — als eigener Lauf über die
+  Umschalter-Tests. Das offizielle Playwright-Abbild bringt die Maschine ohne
+  Zusatzinstallation mit.
+
 - **Nach einem Neuladen versprach der Wechsel eine unmögliche Analyse.** Die
   Seite holt das Ergebnis zurück, die Bilddatei überlebt aber kein Neuladen —
   ein File-Objekt lässt sich nicht speichern. Die Rückfrage sagte trotzdem „die

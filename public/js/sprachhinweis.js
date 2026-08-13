@@ -158,17 +158,32 @@ function start() {
     });
   }
 
-  function oeffnen() {
-    ausloeser = document.activeElement;
+  /* Letztes Netz, wie beim echten Umschalter: In Safari tabbt man ohne
+     „Vollzugriff Tastatur" nicht auf Knöpfe — der Fokus landet dann im Nichts
+     und kommt nicht zurück. Am 2026-08-13 im WebKit-Lauf gemessen. */
+  function fokusZurueckholen() {
+    setTimeout(() => {
+      if (grund.hidden || grund.contains(document.activeElement)) return;
+      const erster = grund.querySelector("button");
+      if (erster) erster.focus();
+    }, 0);
+  }
+
+  function oeffnen(e) {
+    /* Den auslösenden Knopf merken, nicht document.activeElement — in WebKit
+       fokussiert ein Klick den Knopf nicht. */
+    ausloeser = (e && e.currentTarget) || document.activeElement;
     grund.hidden = false;
     stillegen(true);
     const dieser = grund;
     requestAnimationFrame(() => dieser.classList.add("sichtbar"));
+    grund.addEventListener("focusout", fokusZurueckholen);
     ok.focus();
   }
 
   function schliessenTun() {
     if (grund.hidden) return;
+    grund.removeEventListener("focusout", fokusZurueckholen);
     stillegen(false);
     grund.classList.remove("sichtbar");
     setTimeout(() => {

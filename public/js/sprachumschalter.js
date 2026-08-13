@@ -117,7 +117,7 @@ function baueUmschalter() {
 
   SPRACHEN.forEach((code) => {
     const b = knopf(code);
-    b.addEventListener("click", () => geklickt(code));
+    b.addEventListener("click", () => geklickt(code, b));
     pille.appendChild(b);
   });
 
@@ -242,7 +242,7 @@ function umgebungStillegen(an) {
   });
 }
 
-function modalOeffnen(art, ziel, ohneBild) {
+function modalOeffnen(art, ziel, ohneBild, ausloeser) {
   zielSprache = ziel;
   /* Ein Satz, zwei Fälle: Mit Bild folgt eine neue Analyse, ohne Bild eine
      leere Startseite. Überschrift und Knöpfe bleiben gleich — der Nutzer
@@ -252,7 +252,11 @@ function modalOeffnen(art, ziel, ohneBild) {
     text.dataset.swKeyHtml = ohneBild ? "sprache.fertig.textOhneBild" : "sprache.fertig.text";
     text.innerHTML = t(text.dataset.swKeyHtml);
   }
-  fokusVorher = document.activeElement;
+  /* Den ausloesenden Knopf merken, NICHT document.activeElement: In WebKit
+     (Safari) bekommt ein Knopf beim Klicken keinen Fokus — der Rücksprung
+     landete dort im Leeren statt auf dem Umschalter. Am 2026-08-13 im
+     WebKit-Lauf gemessen. */
+  fokusVorher = ausloeser || document.activeElement;
   offen = art === "fertig" ? modalFertig : modalLaeuft;
   offen.hidden = false;
   umgebungStillegen(true);
@@ -262,12 +266,14 @@ function modalOeffnen(art, ziel, ohneBild) {
   requestAnimationFrame(() => dieser.classList.add("sichtbar"));
   const ruhig = offen.querySelector(".sw-knopf--bleiben");
   if (ruhig) ruhig.focus();
+  offen.addEventListener("focusout", fokusZurueckholen);
 }
 
 function modalSchliessen() {
   if (!offen) return;
   const el = offen;
   umgebungStillegen(false);
+  offen.removeEventListener("focusout", fokusZurueckholen);
   offen = null;
   zielSprache = null;
   el.classList.remove("sichtbar");
@@ -319,7 +325,7 @@ async function wechseln(ziel, neuStarten) {
   if (typeof zuruecksetzen === "function") zuruecksetzen();
 }
 
-function geklickt(ziel) {
+function geklickt(ziel, knopfEl) {
   if (ziel === getLanguage()) return;
 
   /* Steht nichts auf dem Spiel, sofort umschalten. Das ist genau der leere
@@ -346,7 +352,7 @@ function geklickt(ziel) {
      Profil wird gelöscht." stimmt in beiden Fällen. Nur der eine Satz darunter
      unterscheidet sich: einmal folgt eine neue Analyse, einmal eine leere
      Startseite. */
-  modalOeffnen(jetzt === "laeuft" ? "laeuft" : "fertig", ziel, jetzt === "ohnebild");
+  modalOeffnen(jetzt === "laeuft" ? "laeuft" : "fertig", ziel, jetzt === "ohnebild", knopfEl);
 }
 
 /* ── Ansage für Screenreader ────────────────────────────────────────────── */
@@ -396,6 +402,20 @@ function aushaengen() {
   [umschalter, modalFertig, modalLaeuft, ansage].forEach((el) => el && el.remove());
   umschalter = modalFertig = modalLaeuft = ansage = null;
   eingehaengt = false;
+}
+
+/* Letztes Netz: Verliert der Fokus die Rückfrage trotzdem (in Safari tabbt man
+   ohne „Vollzugriff Tastatur" gar nicht auf Knöpfe — der Fokus landet dann im
+   Nichts und kommt nicht zurück), wird er zurückgeholt. In WebKit 26.5
+   gemessen; Chromium zeigte das Verhalten nicht. */
+function fokusZurueckholen() {
+  /* Erst im naechsten Durchlauf pruefen: Beim Verlassen steht der neue
+     Fokus noch nicht fest. */
+  setTimeout(() => {
+    if (!offen || offen.contains(document.activeElement)) return;
+    const erster = offen.querySelector("button");
+    if (erster) erster.focus();
+  }, 0);
 }
 
 /* Fokus-Fänger. `inert` allein genügt nicht: Es verhindert, dass der Fokus in

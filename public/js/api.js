@@ -361,6 +361,15 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
         }
         break;
       case "done":
+        /* BUG-2026-08-13-FE-05: „fertig ohne Ergebnis" ist keine Zustellung.
+           Der Server schickt {status:"done", result:null, tokenRequired:true},
+           wenn ein Ergebnis existiert, aber das Abhol-Ticket fehlt (etwa wenn
+           sessionStorage beim zweiten Schreibvorgang warf). Vorher lief das als
+           Zustellung durch: startete die 15-Minuten-Frist und zeigte ein
+           Fehler-Banner statt still aufzuräumen. Jetzt wie ein Fehler behandelt. */
+        if (data.result == null) {
+          return { error: t("error.queueFailed"), reason: data.tokenRequired ? "token-fehlt" : "kein-ergebnis" };
+        }
         /* KA-02: Das Einmal-Ticket für den Realitäts-Check kommt genau mit
            der ersten Auslieferung (danach nie wieder) — sofort merken, damit
            es Reload und Tab-Wiederaufnahme im 15-Minuten-Fenster überlebt. */
@@ -687,6 +696,13 @@ async function analyzeImageQueued() {
       if (enqueueResp.status === 429 && parsed && parsed.blocked === "limit") {
         showLimitBanner(parsed.retryAfterSeconds || 600);
         setStatus(t("error.rateLimit"), traceId);
+      } else if (enqueueResp.status === 429 && parsed && parsed.blocked === "queueFull") {
+        /* UX-2026-08-13-FE-02: Die volle Warteschlange ist im Workshop-Burst der
+           ERWARTETE Fall, nicht ein Serverfehler. Vorher fiel er in den else-Zweig
+           mit "Wir haben es dreimal probiert" — auf dem enqueue-Weg wird aber
+           nichts wiederholt (ein einziger fetch). Eigener Text + die vom Server
+           mitgelieferte Wartezeit. */
+        setStatus(t("error.queueFull"), traceId);
       } else if (enqueueResp.status === 503 && parsed && parsed.maintenance) {
         showMaintenanceModal(parsed.message);
       } else if (enqueueResp.status === 413) {

@@ -113,7 +113,16 @@ describe("i18n Guardian", () => {
       const localeKeys = Object.keys(readLocale(m.default));
       const htmlFiles = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith(".html"));
 
-      const attrs = ["data-i18n", "data-i18n-alt", "data-i18n-title", "data-i18n-placeholder", "data-i18n-html"];
+      const attrs = [
+        "data-i18n",
+        "data-i18n-alt",
+        "data-i18n-title",
+        "data-i18n-placeholder",
+        "data-i18n-html",
+        // A11Y-2026-08-13-FE-03: data-i18n-aria fehlte hier — der übersetzbare
+        // aria-Mechanismus hatte deshalb 0 Nutzer, ohne dass etwas rot wurde.
+        "data-i18n-aria",
+      ];
       const missing = [];
 
       for (const file of htmlFiles) {
@@ -130,6 +139,25 @@ describe("i18n Guardian", () => {
       }
 
       expect(missing, `HTML references missing keys in ${m.default}.json`).toEqual([]);
+    });
+
+    /* A11Y-2026-08-13-FE-03: Ein hart kodiertes aria-label auf einem
+       interaktiven Element ist für englische Screenreader-Nutzer der
+       A11Y-001-Rückfall. Interaktive Beschriftungen müssen über data-i18n-aria
+       laufen. Nicht-interaktive role="img"-Labels in JS-Templates (render.js)
+       sind separat an t() gebunden. */
+    it("kein hartes aria-label auf interaktivem Element ohne data-i18n-aria (index.html)", () => {
+      const html = fs.readFileSync(path.join(PUBLIC_DIR, "index.html"), "utf8");
+      const treffer = [];
+      const regex = /<[^>]*\baria-label="([^"]+)"[^>]*>/g;
+      let m2;
+      while ((m2 = regex.exec(html))) {
+        const tag = m2[0];
+        if (!/data-i18n-aria=/.test(tag)) {
+          treffer.push(m2[1]);
+        }
+      }
+      expect(treffer, "hart kodierte aria-label in index.html").toEqual([]);
     });
 
     it("every t() call in JS references a key in default locale", () => {

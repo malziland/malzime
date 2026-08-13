@@ -3,6 +3,8 @@ import { state } from "./state.js";
 import { analyzeImage } from "./api.js";
 import { klangAktivieren } from "./klang.js";
 import { t } from "./i18n.js";
+import { setStatus, stopScanAnim } from "./ui.js";
+import { logClientError } from "./error-logger.js";
 
 const DEMO_IMAGES = {
   selfie: "./img/demo/demo-selfie.jpg?v=2026081204",
@@ -54,7 +56,13 @@ async function loadDemoImage(url, name) {
     state.lastPrepared = null;
     state.lastData = null;
     analyzeImage();
-  } catch (_err) {
-    /* Fetch fehlgeschlagen — stille Behandlung */
+  } catch (err) {
+    /* UX-2026-08-13-FE-06: Vorher völlig lautlos — der Bildschirm blieb einfach
+       stehen, wenn der Abruf scheiterte (Schul-WLAN, Offline-Moment). Die
+       Demo-Fotos sind ausgerechnet der Rückfallweg für Workshops. Jetzt Meldung,
+       Animation stoppen, Fehler protokollieren. */
+    stopScanAnim(true);
+    setStatus(t("error.networkError"));
+    logClientError(err, { phase: "demo-image-load", demo: name });
   }
 }

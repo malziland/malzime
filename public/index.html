@@ -81,9 +81,6 @@
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./site.webmanifest" />
-
-    <link rel="dns-prefetch" href="https://nominatim.openstreetmap.org" />
-    <link rel="preconnect" href="https://nominatim.openstreetmap.org" crossorigin />
     <link rel="stylesheet" href="./lib/leaflet/leaflet.css" />
     <link rel="stylesheet" href="./styles.css?v=2026081204" />
     <script type="application/ld+json">
@@ -206,21 +203,21 @@
       <div class="bias-toggle-wrap" id="biasToggleWrap">
         <div class="bias-toggle">
           <span class="bias-opt" data-mode="normal">
-            <span class="info-icon" tabindex="0" role="button" aria-label="Info">
+            <span class="info-icon" tabindex="0" role="button" aria-label="Info" data-i18n-aria="aria.info">
               <span class="info-i">i</span>
               <span class="tooltip" data-i18n="bias.normalTooltip">Sachliche Einsch&auml;tzung &mdash; so wie echte Algorithmen dich im Hintergrund kategorisieren. Direkt, konkret, ohne &Uuml;bertreibung.</span>
             </span>
             <span data-i18n="bias.normalLabel">Seri&ouml;se Analyse</span>
           </span>
           <label class="toggle-switch">
-            <input type="checkbox" id="biasSwitch" aria-label="Beast Mode aktivieren" tabindex="0" />
+            <input type="checkbox" id="biasSwitch" aria-label="Beast Mode aktivieren" data-i18n-aria="aria.beastToggle" tabindex="0" />
             <span class="toggle-track">
               <span class="toggle-thumb"></span>
             </span>
           </label>
           <span class="bias-opt boost" data-mode="boost">
             <span data-i18n="bias.boostLabel">Beast Mode</span>
-            <span class="info-icon" tabindex="0" role="button" aria-label="Info">
+            <span class="info-icon" tabindex="0" role="button" aria-label="Info" data-i18n-aria="aria.info">
               <span class="info-i">i</span>
               <span class="tooltip" data-i18n="bias.boostTooltip">Maximale &Uuml;bertreibung &mdash; zeigt wie ein skrupelloser Algorithmus dich ausnutzen w&uuml;rde. Provokant, pers&ouml;nlich, schonungslos. Nichts davon ist wahr &mdash; aber so denken Werbemaschinen.</span>
             </span>

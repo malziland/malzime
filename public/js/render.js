@@ -167,6 +167,12 @@ function renderCategories(profile) {
     return;
   }
 
+  /* A11Y-2026-08-13-FE-03: Das aria-label der Konfidenz-Punkte wird zur
+     Renderzeit übersetzt (das dynamisch erzeugte Markup läuft nicht durch den
+     data-i18n-aria-Mechanismus von i18n.js). Vorher stand es 13× pro Ergebnis
+     hart auf Deutsch — englische Screenreader lasen "Konfidenz". */
+  const ariaKonfidenz = escapeHtml(t("aria.konfidenz"));
+
   /* Pro Gruppe: Überschrift + Karten. Karten enthalten data-grp für CSS-Akzentlinie. */
   const html = CATEGORY_GROUPS.map((grp) => {
     const groupCards = grp.keys
@@ -181,7 +187,7 @@ function renderCategories(profile) {
           <div class="cat-card" data-key="${escapeHtml(key)}" data-grp="${grp.id}">
             <div class="cat-head">
               <span class="cat-label">${escapeHtml(cat.label)}</span>
-              <span class="cat-conf cat-conf--dots ${cls}" role="img" aria-label="Konfidenz">${dotsHtml}</span>
+              <span class="cat-conf cat-conf--dots ${cls}" role="img" aria-label="${ariaKonfidenz}">${dotsHtml}</span>
             </div>
             <p class="cat-value">${highlightKeyTerms(escapeHtml(cat.value))}</p>
           </div>
@@ -327,7 +333,7 @@ async function renderGpsMap(data) {
 
   try {
     /* Geocoding wurde bereits beim EXIF-Parsen gestartet (parallel zur Analyse).
-       GPS verlässt nie den Server — Nominatim wird direkt vom Browser aufgerufen. */
+       GPS erreicht nie unsere Server — Nominatim wird direkt vom Browser aufgerufen. */
     /* BUG-002: Lokale Referenz — verhindert dass ein neueres Geocoding-Promise
        ueberschrieben wird wenn zwischen await und Cleanup eine neue Analyse startet */
     const geocodePromise = state.pendingGeocode;

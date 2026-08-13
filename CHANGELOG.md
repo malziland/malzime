@@ -6,6 +6,38 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+
+- **Sprachumschalter DE/EN — vollständig vorbereitet, aber noch unsichtbar.**
+  Rechts oben auf der Startseite, im malziland-Design. Grundstellung des
+  Merkmals `useSprachumschalter` ist **aus**: Dann entsteht das Bedienelement
+  gar nicht erst im Dokument — ein sichtbarer, wirkungsloser Schalter wäre
+  schlimmer als keiner. Die englische Fassung selbst hängt nicht daran; sie ist
+  über `?lang=en` und die Gerätesprache seit jeher erreichbar.
+
+  Zum Erproben auf der echten Seite: `malziME.sprachumschalter()` in der
+  Browser-Konsole blendet ihn nur im eigenen Tab ein.
+
+  Verhalten: Auf der leeren Seite wird sofort umgeschaltet. Läuft eine Analyse
+  oder liegt ein Profil vor, kommt eine Rückfrage — in der **aktuellen**
+  Sprache, damit „Abbrechen" wirklich nichts hinterlässt. Wer bestätigt, startet
+  dieselbe Datei neu; das Bild liegt noch im Browser, es muss nichts erneut
+  ausgewählt werden. Einen Weg, einem laufenden Auftrag nachträglich eine andere
+  Sprache zu geben, gibt es bewusst nicht: Er spart Bruchteile eines Cents und
+  kostet einen Endpunkt samt Ticket-Prüfung, Transaktion und Missbrauchsdeckel.
+
+  Die Wahl überlebt ein Neuladen (`sessionStorage`), aber nicht den Tab — wie
+  beim Beast-Modus startet jedes weitergereichte Gerät im Workshop wieder in
+  der Gerätesprache.
+
+  Barrierefreiheit wurde nicht behauptet, sondern gemessen: Fokus-Käfig aus
+  `inert` **plus** Umbruch am Listenrand (`inert` allein lässt den Fokus hinter
+  dem letzten Knopf in die Browserleiste entkommen), Rücksprung auf den
+  auslösenden Schalter, Ziel-Größen 44 px, Kontrast ≥ 4,5:1 in hell **und**
+  Beast-Modus, `lang`-Attribut an jedem Knopf (sonst liest ein deutscher
+  Screenreader „English" deutsch vor), Ansage des vollzogenen Wechsels.
+  Geprüft über die ganze Matrix: 2 Sprachen × 2 Themen, Rückfrage offen und zu.
+
 ### Behoben
 
 - **Das Deploy-Skript schrieb in Fließtext hinein** (`OPS-2026-08-13-01`). Der

@@ -3400,3 +3400,236 @@ html[lang="en"] .rc-zitat::after {
     transition: none !important;
   }
 }
+
+/* ══ Sprachumschalter (DE/EN) ═════════════════════════════════════════════
+   Elemente entstehen erst zur Laufzeit (js/sprachumschalter.js) — ist das
+   Merkmal aus, greift von hier nichts. */
+
+/* Gefüllte Flächen brauchen ein eigenes Tokenpaar: --heading ist im dunklen
+   Thema fast weiss (siehe :root[data-theme="dark"]), weisse Schrift darauf
+   waere unlesbar. Am Prototyp gemessen: so bleibt der Kontrast in beiden
+   Themen ueber 4,5:1. */
+:root {
+  --sw-fuell: #156480;
+  --sw-fuell-hover: #11556d;
+  --sw-fuell-text: #ffffff;
+}
+:root[data-theme="dark"] {
+  --sw-fuell: #4698b9;
+  --sw-fuell-hover: #5aa8c7;
+  --sw-fuell-text: #0e1517;
+}
+
+.sprachwahl {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 0.25rem;
+}
+.sprach-pille {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1.5px solid var(--sw-fuell);
+  border-radius: 999px;
+  padding: 3px;
+  box-shadow: var(--shadow);
+}
+.sprach-schieber {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
+  background: var(--sw-fuell);
+  border-radius: 999px;
+  transition: transform 0.28s var(--ease);
+}
+.sprach-pille.rechts .sprach-schieber {
+  transform: translateX(100%);
+}
+.sprach-knopf {
+  position: relative;
+  z-index: 1;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: var(--sw-fuell);
+  border-radius: 999px;
+  /* WCAG 2.5.5: 44x44 als Ziel-Groesse. Am Prototyp gemessen waren es
+     49x28 — auf dem Handy zu wenig fuer einen Daumen. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 1rem;
+  transition: color 0.28s var(--ease);
+}
+.sprach-knopf.aktiv {
+  color: var(--sw-fuell-text);
+}
+.sprach-knopf:focus-visible {
+  outline: 2px solid var(--rust-text);
+  outline-offset: 3px;
+}
+
+/* ── Die Rückfrage ── */
+.sw-grund {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: var(--scrim);
+  opacity: 0;
+  transition: opacity 0.18s var(--ease);
+}
+.sw-grund.sichtbar {
+  opacity: 1;
+}
+/* `display: grid` schlaegt das HTML-Attribut `hidden`. Ohne diese Zeile liegt
+   das unsichtbare Modal als ganzflaechige Ebene ueber der Seite und schluckt
+   jeden Klick — am Prototyp passiert, von Playwright gefunden. */
+.sw-grund[hidden] {
+  display: none;
+}
+
+.sw-modal {
+  position: relative;
+  max-width: 30rem;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 1.9rem 1.75rem 1.5rem;
+  box-shadow: var(--lift);
+  transform: translateY(10px) scale(0.985);
+  transition: transform 0.22s var(--ease);
+}
+.sw-grund.sichtbar .sw-modal {
+  transform: none;
+}
+
+.sw-schliessen {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.45rem;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  font-family: inherit;
+  cursor: pointer;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    background 0.15s var(--ease),
+    color 0.15s var(--ease);
+}
+.sw-schliessen:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.sw-schliessen:focus-visible {
+  outline: 2px solid var(--rust-text);
+  outline-offset: 2px;
+}
+
+.sw-modal h2 {
+  font-size: 1.28rem;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 0 2.5rem 0.7rem 0;
+  line-height: 1.25;
+}
+.sw-modal p {
+  color: var(--text);
+  font-size: 0.95rem;
+  margin: 0;
+}
+.sw-hinweis {
+  margin-top: 0.85rem !important;
+  padding: 0.8rem 0.9rem;
+  background: var(--tint-rust);
+  border-left: 3px solid var(--rust-text);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.sw-knoepfe {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.4rem;
+  align-items: stretch;
+}
+.sw-knopf {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 0.62rem 1.1rem;
+  min-height: 44px;
+  border: 1.5px solid transparent;
+  /* Einzeilig bleiben — kein Umbruch mitten im Knopf (Nutzer-Ansage). */
+  white-space: nowrap;
+  transition:
+    background 0.15s var(--ease),
+    border-color 0.15s var(--ease),
+    color 0.15s var(--ease);
+}
+.sw-knopf:focus-visible {
+  outline: 2px solid var(--rust-text);
+  outline-offset: 2px;
+}
+/* Der ruhige Weg ist der hervorgehobene — bewusst. */
+.sw-knopf--bleiben {
+  flex: 1 1 auto;
+  background: var(--sw-fuell);
+  color: var(--sw-fuell-text);
+}
+.sw-knopf--bleiben:hover {
+  background: var(--sw-fuell-hover);
+}
+.sw-knopf--wechseln {
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--border);
+}
+.sw-knopf--wechseln:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* Sehr schmale Geraete: untereinander, jeder Knopf bleibt einzeilig. */
+@media (max-width: 26rem) {
+  .sw-knoepfe {
+    flex-direction: column;
+  }
+  .sw-knopf {
+    width: 100%;
+  }
+}
+
+/* Reduzierte Bewegung: Der Umschalter und seine Rueckfrage springen dann in
+   ihre Endlage, statt zu gleiten. Ohne diesen Block lief die Einblendung auch
+   bei ausdruecklich abgeschalteter Bewegung weiter — der Rest der Seite haelt
+   sich an die Einstellung, dieser Teil waere ausgeschert. */
+@media (prefers-reduced-motion: reduce) {
+  .sprach-schieber,
+  .sprach-knopf,
+  .sw-grund,
+  .sw-modal,
+  .sw-knopf,
+  .sw-schliessen {
+    transition: none;
+  }
+}

@@ -43,7 +43,12 @@ TESTBEGINN = re.compile(
     # Ausnahme meldet die Pruefung sie als Tests ohne Zusicherung — und schneidet
     # obendrein den echten Test darueber mitten entzwei, sodass dessen
     # Zusicherung ungesehen bleibt. Ein Fehlalarm, der einen zweiten erzeugt.
-    r"(?:it|test)(?!\s*\.\s*(?:setTimeout|use|slow|info|step|extend|before\w+|after\w+)\b)"
+    # 2026-08-13: `describe` gehoert ebenfalls dazu. `test.describe("…", () => {…})`
+    # ist eine GRUPPE, kein Test — die Zusicherungen stehen in den Tests darin.
+    # Ohne diese Ausnahme meldete die Pruefung jede Playwright-Gruppe als
+    # „Test ohne Zusicherung": derselbe Fehlalarm wie bei `test.use`, nur eine
+    # Zeile weiter.
+    r"(?:it|test)(?!\s*\.\s*(?:setTimeout|use|slow|info|step|extend|describe|before\w+|after\w+)\b)"
     r"\s*(?:\.\w+)*\s*(?:\(|`)|"
     r"func\s+Test\w*\s*\(|"                      # go
     r"(?:public\s+)?void\s+test\w*\s*\("         # junit

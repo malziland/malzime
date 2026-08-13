@@ -25,6 +25,11 @@
  *     Default AUS: ohne Flag laeuft der Mistral-Aufruf exakt wie heute (kein
  *     `stream: true`, kein zusaetzlicher Firestore-Schreibvorgang). Damit ist
  *     der bewaehrte Pfad jederzeit ohne Deploy zurueckholbar.
+ *   - `useSprachumschalter` (v3.3): zeigt den DE/EN-Umschalter auf der
+ *     Startseite. Default AUS — ist er aus, baut das Frontend das Bedienelement
+ *     gar nicht erst; ein sichtbarer, wirkungsloser Schalter waere schlimmer
+ *     als keiner. Die englische Fassung selbst haengt NICHT an diesem Flag:
+ *     Sie ist ueber ?lang=en und die Geraetesprache seit jeher erreichbar.
  *
  * Beide Flags liegen im Firestore-Dokument `featureFlags/current`. Umlegen
  * geht OHNE Deploy (Firestore-Console, auch vom Handy aus) — damit ist der
@@ -53,7 +58,13 @@ async function getFeatureFlags() {
      standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
      Kein Firestore-Read, kein Seeding nötig. */
   if (isLocalQueueMode())
-    return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true, useLiveText: false };
+    return {
+      useSingleLargeCall: false,
+      usePromptCache: false,
+      useBeastAdsCall: true,
+      useLiveText: false,
+      useSprachumschalter: false,
+    };
 
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
@@ -75,6 +86,10 @@ async function getFeatureFlags() {
          ein Experiment am teuersten Aufruf der Pipeline; er darf sich nie
          durch einen Tippfehler im Dokument selbst einschalten. */
       useLiveText: data.useLiveText === true,
+      /* v3.3: Sprachumschalter. Streng opt-in — ein Tippfehler im Dokument
+         darf ein Bedienelement nicht versehentlich vor ein Workshop-Publikum
+         stellen. */
+      useSprachumschalter: data.useSprachumschalter === true,
     };
     cache = { data: flags, expiresAt: now + CACHE_TTL_MS };
     return flags;
@@ -83,7 +98,13 @@ async function getFeatureFlags() {
     /* Fail-safe: bewaehrte Pipeline, kein Cache — der Zweitaufruf bleibt aber
        AN, denn er ist der Normalbetrieb und sein Ausfall waere ein stiller
        Qualitaetsverlust statt einer Absicherung. */
-    return { useSingleLargeCall: false, usePromptCache: false, useBeastAdsCall: true, useLiveText: false };
+    return {
+      useSingleLargeCall: false,
+      usePromptCache: false,
+      useBeastAdsCall: true,
+      useLiveText: false,
+      useSprachumschalter: false,
+    };
   }
 }
 
@@ -118,6 +139,13 @@ async function isLiveTextEnabled() {
   return (await getFeatureFlags()).useLiveText;
 }
 
+/**
+ * Kurzform: Soll die Startseite den DE/EN-Umschalter zeigen?
+ */
+async function isSprachumschalterEnabled() {
+  return (await getFeatureFlags()).useSprachumschalter;
+}
+
 /* Nur für Tests — Cache zurücksetzen. */
 function _clearCache() {
   cache = { data: null, expiresAt: 0 };
@@ -129,6 +157,7 @@ module.exports = {
   isPromptCacheEnabled,
   isBeastAdsCallEnabled,
   isLiveTextEnabled,
+  isSprachumschalterEnabled,
   FLAGS_DOC,
   _clearCache,
 };

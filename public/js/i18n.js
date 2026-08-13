@@ -14,8 +14,18 @@ export async function initI18n() {
     const manifest = await manifestRes.json();
 
     const urlLang = new URLSearchParams(window.location.search).get("lang");
+    /* v3.3: Eine im Tab getroffene Wahl überlebt das Neuladen — aber nicht den
+       Tab. Genau wie beim Beast-Modus (js/modus-speicher.js): Im Workshop
+       startet jedes weitergereichte Gerät wieder in der Gerätesprache. Eine
+       ausdrückliche Angabe in der Adresse schlägt die gemerkte Wahl. */
+    let gemerkt = null;
+    try {
+      gemerkt = sessionStorage.getItem("malzime-sprache");
+    } catch (_err) {
+      /* Privater Modus — dann gilt eben die Gerätesprache. */
+    }
     const browserLang = (navigator.language || "de").split("-")[0].toLowerCase();
-    const requested = urlLang || browserLang;
+    const requested = urlLang || gemerkt || browserLang;
     lang = manifest.languages.includes(requested) ? requested : manifest.default;
 
     const stringsRes = await fetch(`/locales/${lang}.json`);
@@ -28,6 +38,36 @@ export async function initI18n() {
   }
 
   document.documentElement.lang = lang;
+}
+
+/**
+ * Wechselt die Sprache zur Laufzeit: lädt die zweite Locale-Datei nach und
+ * zeichnet alle beschrifteten Elemente neu.
+ *
+ * Beim Start lädt die Seite bewusst nur EINE Sprachdatei (~14 kB) — die zweite
+ * holt erst dieser Aufruf, also nur, wenn wirklich jemand umschaltet. Schlägt
+ * das Laden fehl, bleibt die bisherige Sprache unverändert stehen; ein halb
+ * übersetzter Bildschirm wäre schlimmer als gar kein Wechsel.
+ *
+ * @param {string} neu Sprachcode aus dem Manifest ("de" | "en")
+ * @returns {Promise<boolean>} true, wenn wirklich gewechselt wurde
+ */
+export async function setLanguage(neu) {
+  if (!neu || neu === lang) return false;
+  let geladen;
+  try {
+    const res = await fetch(`/locales/${neu}.json`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    geladen = await res.json();
+  } catch (_err) {
+    console.warn("[i18n] Sprachdatei nicht ladbar, bleibe bei", lang);
+    return false;
+  }
+  strings = geladen;
+  lang = neu;
+  document.documentElement.lang = lang;
+  applyTranslations();
+  return true;
 }
 
 /**

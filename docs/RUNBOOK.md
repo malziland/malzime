@@ -209,6 +209,19 @@ greift.
 ehrlich „gleich zurück", statt sie auf einen Weg zu schicken, der unter Last
 auch nicht trägt.
 
+### 2a. Sprachumschalter aus (Sekunden — ein Bedienelement zurücknehmen)
+
+`featureFlags/current.useSprachumschalter = false` in der Firestore-Console,
+auch vom Handy aus. Wirkt beim nächsten Seitenaufruf (Flag-Cache 30 s).
+
+Danach entsteht der Umschalter gar nicht mehr im Dokument — nicht ausgegraut,
+sondern weg. Laufende Analysen sind nicht betroffen, und **Englisch bleibt
+erreichbar**: über `?lang=en` in der Adresse und über die Gerätesprache. Der
+Hebel nimmt nur das Bedienelement zurück, nicht die Sprache.
+
+Wann er gebraucht wird: wenn der Umschalter mitten in einem Workshop irritiert
+oder ein Fehler auffällt. Kein Deploy, kein Neustart, keine Nebenwirkung.
+
 ### 3. Single-Large-Call aus — IMMER alle drei Schritte
 
 1. `featureFlags/current.useSingleLargeCall = false` (Firestore-Console).

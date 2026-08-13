@@ -13,6 +13,7 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 |---|---|---|---|---|
 | `useSingleLargeCall` | Architektur-Schalter (Kill-Switch-Funktion) | `true` | `false` | Christoph Krieger |
 | `usePromptCache` | Kostenschalter | offen (siehe unten) | `false` | Christoph Krieger |
+| `useSprachumschalter` | Sichtbarkeit eines Bedienelements | `false` (Stand 2026-08-13) | `false` | Christoph Krieger |
 
 ### `useQueue` — ENTFERNT mit v2.10
 
@@ -118,3 +119,37 @@ gab es keinen Weg, den zweiten Aufruf ohne Deploy stillzulegen.
 - **Entfernungs-Kriterium:** sobald die Anfragerate dauerhaft unkritisch ist —
   dann Flag und Zweig entfernen.
 
+### `useSprachumschalter` (seit v3.3)
+
+Zeigt auf der Startseite den DE/EN-Umschalter (rechts oben). Grundstellung
+**aus**.
+
+**Was der Schalter NICHT steuert:** die englische Fassung selbst. Die ist seit
+jeher erreichbar — über `?lang=en` in der Adresse und über die Gerätesprache.
+Aus heißt also nur: kein Bedienelement, nicht etwa „kein Englisch".
+
+**Warum kein ausgegrautes Element:** Steht das Flag auf `false`, entsteht der
+Umschalter gar nicht erst im Dokument. Ein sichtbarer, wirkungsloser Schalter
+wäre schlimmer als keiner — man klickt darauf, und nichts passiert. Ein Test
+prüft die Elementzahl auf null, ein zweiter (Positivkontrolle) prüft, dass er
+mit Flag sehr wohl entsteht.
+
+**Erproben ohne Flag:** In der Browser-Konsole auf der echten Seite
+
+```js
+malziME.sprachumschalter();        // einblenden, nur in diesem Tab
+malziME.sprachumschalter(false);   // wieder entfernen
+```
+
+Die Tür steht unabhängig vom Flag offen und überlebt kein Neuladen. Damit lässt
+sich die fertige Bedienung live durchspielen, ohne dass ein Workshop-Publikum
+etwas davon sieht.
+
+**Verhalten beim Umschalten:** Auf der leeren Seite sofort. Läuft eine Analyse
+oder liegt ein Profil vor, kommt erst eine Rückfrage — in der aktuellen
+Sprache, damit „Abbrechen" wirklich nichts hinterlässt. Bestätigt jemand,
+startet dieselbe Datei eine neue Analyse (`state.lastFile` liegt noch im
+Browser); der alte Auftrag läuft ins Leere und wird vom Aufräumer eingesammelt.
+Es gibt bewusst **keinen** Weg, einem laufenden Auftrag nachträglich eine
+andere Sprache zu geben — das spart einen Endpunkt samt Ticket-Prüfung,
+Transaktion und Missbrauchsdeckel und kostet dafür eine verworfene Analyse.

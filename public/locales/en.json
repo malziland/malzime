@@ -232,5 +232,19 @@
   "demo.full.hiker": "./img/demo/demo-hiker-en.jpg",
   "demo.alt.selfie": "AI-generated sample image: selfie at St. Stephen's Square. Does not depict a real person.",
   "demo.alt.cafe": "AI-generated sample image: in a café in Salzburg. Does not depict a real person.",
-  "demo.alt.hiker": "AI-generated sample image: hiking near Hallstatt. Does not depict a real person."
+  "demo.alt.hiker": "AI-generated sample image: hiking near Hallstatt. Does not depict a real person.",
+  "sprache.gruppe": "Choose language",
+  "sprache.name.de": "Deutsch",
+  "sprache.name.en": "English",
+  "sprache.schliessen": "Close",
+  "sprache.gewechselt": "Language switched to English.",
+  "sprache.fertig.titel": "Switch language?",
+  "sprache.fertig.text": "Your profile was created in English. Translating would be the lazy way out. For a German profile the AI takes another look at your photo and judges from scratch.",
+  "sprache.fertig.hinweis": "<strong>And it never comes out the same.</strong> The AI guesses anew every time — the second run may describe you quite differently. That is exactly the lesson here, but your current result will be gone.",
+  "sprache.fertig.bleiben": "Keep my profile",
+  "sprache.fertig.wechseln": "Analyse again",
+  "sprache.laeuft.titel": "Switch language?",
+  "sprache.laeuft.text": "Your photo is still being processed. Switching restarts the analysis in German — your photo stays the same, you do not have to choose anything again.",
+  "sprache.laeuft.bleiben": "Stay in English",
+  "sprache.laeuft.wechseln": "Switch to German"
 }

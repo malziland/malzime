@@ -1,5 +1,14 @@
 # PRUEFUNGEN — vier Kontrollen statt vier Bitten
 
+
+> **Herkunft:** Kopie des Werkzeugkastens aus der Audit-Familie
+> (`~/.claude/skills/audit-familie/pruefungen`). **Bearbeitet wird die QUELLE, nie diese
+> Kopie** — danach neu einkopieren und mit `node scripts/pruefe-vendorierung.mjs --aktualisieren`
+> stempeln. Der Waechter `scripts/pruefe-vendorierung.mjs` meldet jede Abweichung.
+>
+> Der Ordner `negativprobe/` enthaelt **absichtlich fehlerhaftes Beispielmaterial** und
+> wird von allen Pruefungen uebersprungen.
+
 Diese vier Pruefungen setzen Regeln der Familie in Programme um, die rot werden koennen.
 Der Unterschied ist der Kern der ganzen Sache: Eine Regel im Prompt wirkt vielleicht,
 eine Pruefung in der Pipeline wirkt immer.
@@ -42,7 +51,7 @@ nichts bestanden.
     sh selbstpruefung.sh
 
 Fuehrt jede Pruefung zweimal aus: gegen absichtlich kaputtes Material, wo sie rot werden
-MUSS, und gegen sauberes Material, wo sie gruen bleiben muss. Acht Proben.
+MUSS, und gegen sauberes Material, wo sie gruen bleiben muss. Die Probenzahl steht nur im Skript und wird von selbstpruefung.sh gezaehlt.
 
 Das ist der Teil, der beim ersten Anlauf der Familie gefehlt hat. Damals wurde ein
 Pruefskript nur gegen fehlerhaftes Material getestet, wurde korrekt rot, und liess

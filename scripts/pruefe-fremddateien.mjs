@@ -18,7 +18,8 @@
  */
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { resolve, dirname } from "node:path";
+import { execFileSync } from "node:child_process";
+import { resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /* Einspeisepunkte fuer Tests. Ohne sie liesse sich nur der Gutfall pruefen —
@@ -55,6 +56,7 @@ function summe(pfad) {
 
 const abweichungen = [];
 const fehlend = [];
+const neu = [];
 const ist = {};
 
 for (const [rel, erwartet] of Object.entries(soll)) {
@@ -66,6 +68,36 @@ for (const [rel, erwartet] of Object.entries(soll)) {
   const gemessen = summe(pfad);
   ist[rel] = gemessen;
   if (gemessen !== erwartet) abweichungen.push({ rel, erwartet, gemessen });
+}
+
+/* TEST-2026-08-13-49: Die Schleife oben prüft nur, was in der Liste STEHT.
+   Eine neu hinzugefügte Datei unter public/lib/** oder public/fonts/** taucht
+   darin nie auf und würde nie geprüft — bei script-src 'self' ist sie
+   ausführbar. Genau dieselbe Liste-statt-Fläche-Lücke, die pruefe-vendorierung
+   über den Vergleich der verfolgten Dateien schließt. Hier ebenso: git fragen,
+   nicht den Dateibaum (geschützt wird, was ausgeliefert wird). Nicht anwendbar,
+   wenn über die Einspeisepunkte gegen ein Wegwerf-Verzeichnis gelaufen wird. */
+if (!process.env.PRUEFSUMMEN_BASIS) {
+  let verfolgt = [];
+  try {
+    // --cached UND --others --exclude-standard: verfolgte plus neue, aber nicht
+    // die von .gitignore ausgeschlossenen. Sonst bleibt eine frisch angelegte,
+    // noch nicht committete Fremddatei unsichtbar — genau der gefährliche Fall.
+    verfolgt = execFileSync(
+      "git",
+      ["ls-files", "--cached", "--others", "--exclude-standard", "public/lib", "public/fonts"],
+      { cwd: REPO, encoding: "utf8" }
+    )
+      .split("\n")
+      .filter(Boolean)
+      .filter((p) => !p.endsWith("PRUEFSUMMEN.json"));
+  } catch {
+    console.error("FEHLER: git ls-files nicht ausführbar — Fläche nicht bestimmbar, kein bestandener Lauf.");
+    process.exit(2);
+  }
+  for (const rel of verfolgt) {
+    if (!(rel in soll)) neu.push(rel);
+  }
 }
 
 if (AKTUALISIEREN) {
@@ -83,19 +115,22 @@ if (fehlend.length > 0) {
   console.error("\nFEHLEN im Arbeitsbaum:");
   for (const f of fehlend) console.error(`  ${f}`);
 }
+for (const f of neu) {
+  console.error(`\nNEU, nicht gestempelt: ${f} (unter public/lib/** oder public/fonts/**, aber ohne Pruefsumme)`);
+}
 for (const a of abweichungen) {
   console.error(`\nABWEICHUNG: ${a.rel}`);
   console.error(`  erwartet:  ${a.erwartet}`);
   console.error(`  gemessen:  ${a.gemessen}`);
 }
 
-if (abweichungen.length === 0 && fehlend.length === 0) {
-  console.log("ERGEBNIS: alle Fremddateien unveraendert.");
+if (abweichungen.length === 0 && fehlend.length === 0 && neu.length === 0) {
+  console.log("ERGEBNIS: alle Fremddateien unveraendert, keine neue ungestempelte Datei.");
   process.exit(0);
 }
 
 console.error(
-  `\nERGEBNIS: ${abweichungen.length} Abweichung(en), ${fehlend.length} fehlend.\n` +
+  `\nERGEBNIS: ${abweichungen.length} Abweichung(en), ${fehlend.length} fehlend, ${neu.length} neu ungestempelt.\n` +
     "Wurde eine Bibliothek bewusst ausgetauscht, dann mit\n" +
     "  node scripts/pruefe-fremddateien.mjs --aktualisieren\n" +
     "neu stempeln UND im Pull-Request begruenden. Sonst ist das ein Befund."

@@ -50,7 +50,7 @@ Diese Kontrollen existieren außerhalb des Repositories; ihr tatsächlicher Zust
 ist bei jedem Audit **extern** zu verifizieren (z. B. `gh api`), Stand hier nur
 nachrichtlich (2026-07):
 
-- Branch Protection auf `main` mit Pflicht-Checks `test-backend`, `test-frontend`, `test-e2e`, `secret-scan` (strict).
+- Branch Protection auf `main` mit sechs Pflicht-Checks (`test-backend`, `test-frontend`, `test-e2e`, `secret-scan`, `playwright-version`, `pruefungen`), `strict: true`, `enforce_admins: true`. Kanonisch: `gh api repos/malziland/malzime/branches/main/protection`.
 - Dependabot Security-Alerts **und Security-Updates** aktiviert (Letztere seit 2026-07-29 — vorher meldete Dependabot Lücken nur, ohne einen Reparatur-PR zu öffnen). Version-Updates monatlich und je Bereich gebündelt; Auto-Merge nur patch/minor.
 - GCP-Budget-Alarm und ntfy-Fehleralarm (log-basiert, siehe [ERROR-ALERTING.md](ERROR-ALERTING.md)).
 

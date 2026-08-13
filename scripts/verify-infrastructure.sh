@@ -69,11 +69,23 @@ fi
 
 # ── 2. Upload-Bucket: EU-Region, Lifecycle-Sicherheitsnetz, Soft-Delete aus ──
 echo "— Upload-Bucket ($BUCKET)"
-BUCKET_JSON=$(gcloud storage buckets describe "$BUCKET" --format=json 2>/dev/null || true)
+# OPS-2026-08-13-41: Einspeisepunkt. Ist INFRA_PROBE_BUCKET gesetzt, wird die
+# vorbereitete Antwort gelesen statt gcloud gefragt — so kann ein Test belegen,
+# dass dieser Abschnitt ueberhaupt rot werden kann (er konnte es 4 Wochen nicht).
+if [ -n "${INFRA_PROBE_BUCKET:-}" ]; then
+  BUCKET_JSON=$(cat "$INFRA_PROBE_BUCKET")
+else
+  BUCKET_JSON=$(gcloud storage buckets describe "$BUCKET" --format=json 2>/dev/null || true)
+fi
 if [ -z "$BUCKET_JSON" ]; then
   rot "Bucket nicht lesbar/nicht gefunden"
 else
-  printf "%s" "$BUCKET_JSON" | python3 -c '
+  # OPS-2026-08-13-40: Der python3-Exit wird DIREKT ausgewertet. Vorher lief
+  # `printf | python3 | sed` und geprueft wurde PIPESTATUS[0] = printf (immer 0)
+  # statt [1] = python3 — der Fehlerzweig war rechnerisch tot, drei Kernzusagen
+  # (EU-Region, Soft-Delete 0, Lifecycle) ungeschuetzt. Jetzt: python3-Ausgabe in
+  # eine Variable (deren Exit = python3, kein Pipe dazwischen), danach faerben.
+  BUCKET_AUSGABE=$(printf "%s" "$BUCKET_JSON" | python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 ok = True
@@ -101,9 +113,10 @@ if netz:
 else:
     print("  FEHLT Lifecycle: keine Delete-Regel mit age=1 gefunden"); ok = False
 sys.exit(0 if ok else 1)
-' | sed -e "s/^  OK /  \x1b[32m✓\x1b[0m /" -e "s/^  FEHLT /  \x1b[31m✗\x1b[0m /"
-  # Python-Exitcode steckt wegen der sed-Pipe in PIPESTATUS[0]
-  if [ "${PIPESTATUS[0]}" != "0" ]; then FEHLER=1; fi
+')
+  BUCKET_RC=$?
+  printf "%s\n" "$BUCKET_AUSGABE" | sed -e "s/^  OK /  \x1b[32m✓\x1b[0m /" -e "s/^  FEHLT /  \x1b[31m✗\x1b[0m /"
+  if [ "$BUCKET_RC" != "0" ]; then FEHLER=1; fi
 fi
 
 # ── 3. Firestore: genau EINE Datenbank, malzime-eu in europe-west1 ──
@@ -269,6 +282,36 @@ case "$KANAELE" in
   OK:*)  gruen "Benachrichtigungskanäle aktiv: ${KANAELE#OK:}" ;;
   AUS:*) rot   "Abgeschaltete Benachrichtigungskanäle: ${KANAELE#AUS:}" ;;
   *)     rot   "Kanäle NICHT geprueft — ungeprueft gilt als nicht bestanden" ;;
+esac
+
+# ── 8. Die zwei Netze unter der Löschzusage: Firestore-TTL + Reaper-Zeitplan ──
+# OPS-2026-08-13-33: Beide sind reine Cloud-Konfiguration, die `firebase deploy`
+# NICHT verwaltet. Wer sie deaktiviert (oder eine DB neu anlegt), verliert das
+# 24-h- bzw. 1-Minuten-Netz ohne jedes Signal — der Code schreibt expiresAt
+# weiter, der Unit-Test prueft das Feld, nicht die Regel. Analog zu Bucket-
+# Lifecycle/Soft-Delete, die hier laengst geprueft werden.
+echo "— Netze (TTL + Reaper-Zeitplan)"
+if [ -n "${INFRA_PROBE_TTL:-}" ]; then
+  TTL_STATE=$(cat "$INFRA_PROBE_TTL")
+else
+  TTL_STATE=$(gcloud firestore fields ttls list --database=malzime-eu --project="$PROJECT" \
+    --format="value(name,ttlConfig.state)" 2>/dev/null | grep "jobs/fields/expiresAt" | awk '{print $NF}' || true)
+fi
+case "$TTL_STATE" in
+  ACTIVE)  gruen "Firestore-TTL auf jobs/expiresAt: ACTIVE (24-h-Netz)" ;;
+  "")      rot   "Firestore-TTL auf jobs/expiresAt NICHT ermittelbar — ungeprueft gilt als nicht bestanden" ;;
+  *)       rot   "Firestore-TTL auf jobs/expiresAt ist »$TTL_STATE«, SOLL ACTIVE — das 24-h-Netz fehlt" ;;
+esac
+if [ -n "${INFRA_PROBE_SCHEDULER:-}" ]; then
+  SCHED_STATE=$(cat "$INFRA_PROBE_SCHEDULER")
+else
+  SCHED_STATE=$(gcloud scheduler jobs describe firebase-schedule-reapJobs-europe-west1 \
+    --location="$REGION" --project="$PROJECT" --format="value(state)" 2>/dev/null || true)
+fi
+case "$SCHED_STATE" in
+  ENABLED) gruen "Reaper-Zeitplan »firebase-schedule-reapJobs-europe-west1«: ENABLED" ;;
+  "")      rot   "Reaper-Zeitplan NICHT ermittelbar — ungeprueft gilt als nicht bestanden" ;;
+  *)       rot   "Reaper-Zeitplan ist »$SCHED_STATE«, SOLL ENABLED — der Reaper laeuft nicht" ;;
 esac
 
 # ── Ergebnis ──

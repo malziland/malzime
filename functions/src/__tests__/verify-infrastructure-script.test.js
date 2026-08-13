@@ -29,6 +29,10 @@ const ERLAUBTE_LESE_MUSTER = [
   /* OPS-2026-08-12-09: Waechter ueber den Alarmweg. Beides reine list-Abfragen —
      `policies list` und `channels list` lesen nur, sie schalten nichts. */
   /gcloud alpha monitoring (policies|channels) list\b/,
+  /* OPS-2026-08-13-33: die zwei Netze unter der Loeschzusage. `ttls list` und
+     `scheduler jobs describe` lesen nur. */
+  /gcloud firestore fields ttls list\b/,
+  /gcloud scheduler jobs describe\b/,
 ];
 
 function gcloudZeilen(inhalt) {
@@ -77,5 +81,56 @@ describe("verify-infrastructure.sh", () => {
     const deploy = fs.readFileSync(DEPLOY, "utf8");
     expect(deploy).toMatch(/SKIP_INFRA/);
     expect(deploy).toMatch(/verify-infrastructure\.sh/);
+  });
+
+  /* OPS-2026-08-13-40/41: Der Bucket-Riegel konnte vier Wochen lang nicht rot
+     werden (PIPESTATUS[0]=printf statt [1]=python3), und niemand hätte es je
+     bemerkt, weil dieser Riegel als einziger keine Negativprobe hatte. Diese
+     Tests treiben ihn über die Einspeisepunkte INFRA_PROBE_* rot und grün —
+     ohne gcloud, ohne Netz. */
+  describe("der Bucket-Riegel kann rot werden (OPS-40/41)", () => {
+    const os = require("os");
+    const { execFileSync } = require("child_process");
+    let dir;
+    const GUT_BUCKET =
+      '{"location":"EUROPE-WEST1","softDeletePolicy":{"retentionDurationSeconds":"0"},"lifecycle":{"rule":[{"action":{"type":"Delete"},"condition":{"age":1}}]}}';
+
+    beforeAll(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-infra-"));
+    });
+    afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+    function lauf(bucketJson) {
+      const bp = path.join(dir, "bucket.json");
+      fs.writeFileSync(bp, bucketJson);
+      /* Nur der Bucket-Abschnitt wird eingespeist; alle anderen Abschnitte
+         fragen echtes gcloud. Ohne Anmeldung enden sie rot — deshalb prüfen
+         wir hier NICHT den Gesamt-Exit, sondern die Bucket-Zeilen der Ausgabe. */
+      try {
+        return execFileSync("bash", [SCRIPT], {
+          encoding: "utf8",
+          env: { ...process.env, INFRA_PROBE_BUCKET: bp },
+        });
+      } catch (e) {
+        return (e.stdout || "") + (e.stderr || "");
+      }
+    }
+
+    test("kaputter Bucket (US, Soft-Delete an, kein Lifecycle) → drei ✗", () => {
+      const aus = lauf(
+        '{"location":"US-CENTRAL1","softDeletePolicy":{"retentionDurationSeconds":"604800"},"lifecycle":{"rule":[]}}'
+      );
+      expect(aus).toMatch(/Region: SOLL EUROPE-WEST1, IST US-CENTRAL1/);
+      expect(aus).toMatch(/Soft-Delete: SOLL 0, IST 604800/);
+      expect(aus).toMatch(/Lifecycle: keine Delete-Regel/);
+    });
+
+    test("guter Bucket → drei OK, keine Bucket-Abweichung", () => {
+      const aus = lauf(GUT_BUCKET);
+      expect(aus).toMatch(/Region: EUROPE-WEST1/);
+      expect(aus).toMatch(/Soft-Delete: aus/);
+      expect(aus).toMatch(/Lifecycle: Delete nach 1 Tag aktiv/);
+      expect(aus).not.toMatch(/Region: SOLL EUROPE-WEST1, IST/);
+    });
   });
 });

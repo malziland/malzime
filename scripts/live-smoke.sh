@@ -54,8 +54,29 @@ probe "Admin-Zugriffsschutz" 403 POST "/api/admin/boost" '{"nonce":"ungueltig"}'
 # 4) Lebenszeichen: öffentliche Stats MUSS 200 geben.
 probe "Stats-Endpunkt" 200 GET "/api/stats" ""
 
+# 5) OPS-2026-08-13-42/K3: Kennungs-Rückmessung. Die vier Proben oben galten
+#    schon VOR dem Deploy — ein wirkungsloser Hosting-Deploy (Teil-Upload,
+#    falsches Ziel, CDN) wäre von ihnen nicht zu unterscheiden. Wird eine
+#    erwartete Buster-Version übergeben (deploy.sh tut das nur bei Hosting im
+#    Ziel), liest diese Probe den AUSGELIEFERTEN Buster von / zurück und
+#    vergleicht. So misst der Smoke die Wirkung, nicht nur die Erreichbarkeit
+#    (KERN 10: den ausgelieferten Stand auslesen, nicht "deployt" behaupten).
+ERWARTETE_VERSION="${1:-}"
+if [ -n "$ERWARTETE_VERSION" ]; then
+  LIVE_BUSTER=$(curl -s --max-time 20 "$BASIS/" | grep -o 'styles\.css?v=[0-9]*' | head -1 | grep -o '[0-9]*$' || true)
+  if [ -z "$LIVE_BUSTER" ]; then
+    printf "  \033[31m✗\033[0m Kennung: Buster auf / nicht lesbar — kein bestandener Beweis\n"
+    FEHLER=1
+  elif [ "$LIVE_BUSTER" = "$ERWARTETE_VERSION" ]; then
+    printf "  \033[32m✓\033[0m Kennung: ausgelieferter Buster %s == erwartet\n" "$LIVE_BUSTER"
+  else
+    printf "  \033[31m✗\033[0m Kennung: ausgeliefert %s, erwartet %s — Hosting-Deploy wirkungslos?\n" "$LIVE_BUSTER" "$ERWARTETE_VERSION"
+    FEHLER=1
+  fi
+fi
+
 if [ "$FEHLER" = "0" ]; then
-  echo "ERGEBNIS: Live-Smoke grün — alle vier Proben wie erwartet."
+  echo "ERGEBNIS: Live-Smoke grün — alle Proben wie erwartet."
   exit 0
 else
   echo "ERGEBNIS: Live-Smoke ROT — Abweichung an der Produktion! Störungs-Rezepte: docs/RUNBOOK.md." >&2

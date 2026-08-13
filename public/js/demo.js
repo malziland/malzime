@@ -7,9 +7,9 @@ import { setStatus, stopScanAnim } from "./ui.js";
 import { logClientError } from "./error-logger.js";
 
 const DEMO_IMAGES = {
-  selfie: "./img/demo/demo-selfie.jpg?v=2026081204",
-  cafe: "./img/demo/demo-cafe.jpg?v=2026081204",
-  hiker: "./img/demo/demo-hiker.jpg?v=2026081204",
+  selfie: "./img/demo/demo-selfie.jpg?v=2026081301",
+  cafe: "./img/demo/demo-cafe.jpg?v=2026081301",
+  hiker: "./img/demo/demo-hiker.jpg?v=2026081301",
 };
 
 export function initDemo() {

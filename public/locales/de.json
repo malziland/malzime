@@ -181,7 +181,7 @@
   "stats.countdownSeconds": "Wieder verfügbar in {{seconds}} Sekunden",
   "stats.countdownDone": "Analyse wird wieder freigeschaltet…",
   "stats.infoCountTitle": "Was wird gezählt?",
-  "stats.infoCountText": "Nur die Anzahl der Analysen — eine einzige Zahl pro Zeitraum. Keine Bilder, keine IP-Adressen, keine Nutzerprofile.",
+  "stats.infoCountText": "Nur Zählwerte je Zeitraum — keine Einzelvorgänge. Keine Bilder, keine IP-Adressen, keine Nutzerprofile.",
   "stats.infoLimitTitle": "Warum ein Limit?",
   "stats.infoLimitText": "Jede Analyse kostet Geld (KI + Bilderkennung). Das Stundenlimit schützt das Projekt vor unerwarteten Kosten.",
   "stats.infoFundingTitle": "Eigenfinanziert — für alle kostenlos",

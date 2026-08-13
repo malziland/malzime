@@ -32,3 +32,6 @@ ausschlie(ss|ß)lich eine einzige Zahl|Am Live-Dokument widerlegt: Der Zaehler h
 
 # PRIV-2026-08-12-15: Es sind zwei Aufrufe an Mistral, nicht einer.
 in einem Schritt zwei fiktive Profile|Es sind zwei Aufrufe: der zweite holt die Werbe-Kategorien fuer den Beast-Modus. Beschreiben, was passiert.
+(eine einzige Zahl pro Zeitraum|a single number per time period)|Am Live-Dokument widerlegt: der Zaehler haelt Summen je Zeitraum UND die Zeitpunkte der letzten 60 Minuten. "Zaehlwerte je Zeitraum" statt "eine einzige Zahl".
+(verl(ae|ä)sst|verlassen) (nie|niemals) (den|die|das) Server|Sinnlos formuliert: GPS erreicht die Server nie, verlaesst sie also nicht. Richtig ist: GPS erreicht nie unsere Server.
+Einzige Ausnahme: ein anonymes Abhol-Ticket|Es sind mehrere sessionStorage-Werte (Ticket, Modus-Wahl, Realitaets-Check-Ticket, Absturz-Wache). Aufzaehlen statt "einzige".

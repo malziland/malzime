@@ -63,8 +63,9 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    bestätigt in der externen Review 2026-08-12 (der Reviewer zog seine
    fail-closed-Empfehlung nach Gegenrede zurück).
 2. **IP-Rate-Limit ist instanzlokal.** Das 500/10-min-Limit lebt im
-   Arbeitsspeicher jeder Function-Instanz (max. 5) — ein verteilter Angreifer
-   kann es umgehen. *Warum:* Es ist der Lärmfilter, nicht die Kostenbremse;
+   Arbeitsspeicher jeder Function-Instanz — bei `enqueue`/`jobstatus` bis zu 10
+   Instanzen (gemessen `maxScale`, 2026-08-13), effektiv also ein Mehrfaches der
+   genannten Zahl. Ein verteilter Angreifer kann es umgehen. *Warum:* Es ist der Lärmfilter, nicht die Kostenbremse;
    die echten Bremsen (Stundenlimit, Queue-Tiefe) sind global. Die Alternative —
    IP-Ableitungen in Firestore speichern — würde die Kern-Zusage „keine
    persistente IP" schwächen und träfe im Schul-WLAN ganze Klassen hinter einer

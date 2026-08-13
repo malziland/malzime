@@ -315,6 +315,54 @@
           </li>
         </ul>
       </section>
+      <!-- Nachpruefbarkeit -->
+      <section class="legal-section">
+        <h2>Musst du uns glauben? Nein.</h2>
+        <p>
+          Bei den meisten Websites bleibt dir nichts anderes &uuml;brig. Du liest, was der Anbieter &uuml;ber sich
+          selbst schreibt &ndash; und hast keine M&ouml;glichkeit nachzusehen, ob es stimmt.
+        </p>
+        <p><strong>Bei malziME kannst du nachsehen.</strong></p>
+        <p>
+          Der komplette Bauplan liegt offen auf
+          <a href="https://github.com/malziland/malzime" target="_blank" rel="noopener" tabindex="0">GitHub</a>: die
+          Seite, die du gerade vor dir hast, und der Teil, der die Analyse macht. Bei jeder Ver&ouml;ffentlichung legen
+          wir einen Fingerabdruck dazu &ndash; f&uuml;r jede einzelne Datei eine Zahlenfolge, die sich ver&auml;ndert,
+          sobald sich auch nur ein einziges Zeichen darin &auml;ndert.
+        </p>
+        <p>
+          <strong>Ansehen kann ihn jede und jeder:</strong>
+          <a href="/build-info.json" tabindex="0">malzi.me/build-info.json</a>. Dort stehen das Datum, die
+          ver&ouml;ffentlichte Fassung und die Zahlenfolge jeder Datei.
+        </p>
+        <p>
+          <strong>Selbst nachrechnen</strong> dauert eine Minute und braucht nur ein Terminal &ndash; kein Vorwissen,
+          keine Installation:
+        </p>
+        <pre class="legal-befehl"><code>git clone https://github.com/malziland/malzime.git
+cd malzime
+sh scripts/pruefe-live.sh</code></pre>
+        <p>
+          Das Programm l&auml;dt jede Datei von dieser Website herunter, rechnet ihre Zahlenfolge neu aus und vergleicht
+          sie mit dem Bauplan. Am Ende steht eines von drei Ergebnissen: <strong>alles deckungsgleich</strong>,
+          <strong>Abweichung gefunden</strong> &ndash; oder <strong>Messproblem</strong>, wenn die Pr&uuml;fung selbst
+          nicht sauber lief. Ein Messfehler wird nie als bestandene Pr&uuml;fung ausgegeben.
+        </p>
+        <p>
+          Damit das keine leere Geste bleibt, haben wir uns selbst die H&auml;nde gebunden: Unser
+          Ver&ouml;ffentlichungs-Programm <strong>startet gar nicht erst</strong>, wenn wir etwas ver&auml;ndert
+          h&auml;tten, das nicht offen einsehbar ist.
+        </p>
+        <div class="legal-block">
+          <p>
+            <strong>Eines k&ouml;nnen wir dir nicht beweisen, und das sagen wir lieber offen:</strong> Der letzte
+            Schritt l&auml;uft auf Rechnern von Google. Was dort im Inneren tats&auml;chlich ausgef&uuml;hrt wird, kann
+            von au&szlig;en niemand mit letzter Sicherheit nachrechnen &ndash; bei uns nicht, und bei keinem anderen
+            Anbieter der Welt. Daf&uuml;r gibt es heute schlicht kein Verfahren. Lesen kannst du auch diesen Teil, Zeile
+            f&uuml;r Zeile: Er liegt im selben offenen Bauplan.
+          </p>
+        </div>
+      </section>
       <!-- Cookies -->
       <section class="legal-section">
         <h2>Cookies</h2>

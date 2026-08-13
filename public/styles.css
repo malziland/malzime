@@ -3870,3 +3870,27 @@ html[lang="en"] .rc-zitat::after {
   font-size: 0.82rem;
   color: var(--muted);
 }
+
+/* ── Befehlsblock in Rechtstexten ─────────────────────────────────────────
+   Fuer die drei Zeilen, mit denen jemand den ausgelieferten Stand selbst
+   nachrechnet. Waagrecht rollbar statt umbrechend: Ein umgebrochener Befehl
+   laesst sich nicht mehr kopieren, und genau das Kopieren ist der Zweck. */
+.legal-befehl {
+  margin: 0.9rem 0 1.1rem;
+  padding: 14px 16px;
+  background: var(--tint-teal);
+  border-left: 2px solid var(--ml-teal);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: 0.86rem;
+  line-height: 1.7;
+  /* Der Block traegt bereits eine eigene Flaeche — die Auszeichnung im
+     Inneren darf sie nicht ein zweites Mal einfaerben. */
+}
+
+.legal-befehl code {
+  background: none;
+  padding: 0;
+  white-space: pre;
+  color: var(--text);
+}

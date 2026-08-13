@@ -95,7 +95,31 @@ describe("handleJobStatus — Status-Antworten", () => {
     expect(res.body.status).toBe("queued");
     expect(res.body.position).toBe(6);
     expect(res.body.etaSeconds).toBeGreaterThan(0);
-    /* Der Poll ist zugleich der Liveness-Herzschlag. */
+    /* Der Poll ist zugleich der Liveness-Herzschlag — beim ersten Mal
+       (kein lastSeenAt) wird geschrieben. */
+    expect(jobs.touchJob).toHaveBeenCalledWith("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
+  });
+
+  /* SEC-2026-08-13-C: Nicht jeder Poll schreibt. Ein frisch gesetzter
+     Herzschlag (lastSeenAt gerade eben) unterdrückt den Schreibvorgang. */
+  test("queued mit frischem Herzschlag → KEIN touchJob (Schreib-Drossel)", async () => {
+    jobs.getJob.mockResolvedValue({ id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", status: "queued", lastSeenAt: Date.now() });
+    jobs.getQueuePosition.mockResolvedValue(3);
+    const res = makeRes();
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
+    expect(res.statusCode).toBe(200);
+    expect(jobs.touchJob).not.toHaveBeenCalled();
+  });
+
+  test("queued mit altem Herzschlag (>30 s) → touchJob läuft wieder", async () => {
+    jobs.getJob.mockResolvedValue({
+      id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
+      status: "queued",
+      lastSeenAt: Date.now() - 60_000,
+    });
+    jobs.getQueuePosition.mockResolvedValue(3);
+    const res = makeRes();
+    await handleJobStatus(getReq("Aa1Bb2Cc3Dd4Ee5Ff6Gg"), res);
     expect(jobs.touchJob).toHaveBeenCalledWith("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
   });
 

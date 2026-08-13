@@ -76,14 +76,21 @@ async function handleEnqueue(req, res, secrets) {
       return;
     }
 
-    /* SEC-002 (Audit 2026-08-10): Groesse aus der Kopfzeile ablehnen, BEVOR
-       irgendetwas mit dem Rumpf passiert. Gemessen kostet ein 23-MB-Bild als
-       Base64 rund 170 MB Arbeitsspeicher pro gleichzeitiger Anfrage — bei
-       512 MiB Grenze reichen wenige parallele Grossuploads, um die Instanz zu
-       toeten. Die eigentliche Groessenpruefung weiter unten kommt dafuer zu
-       spaet: Die Laufzeit liest den Rumpf vorab vollstaendig ein.
-       Base64 blaeht um Faktor 4/3, dazu etwas Rahmen — deshalb wird gegen die
-       Base64-Laenge geprueft, nicht gegen die Bildgroesse. */
+    /* SEC-2026-08-13-B — EHRLICHE FASSUNG (korrigiert SEC-002 vom 2026-08-10):
+       Diese Kopfzeilen-Prüfung kann NICHT verhindern, dass der Rumpf im Speicher
+       landet. Die Cloud-Functions-Laufzeit liest ihn VORAB vollständig als
+       req.rawBody ein (siehe upload.js) — bevor dieser Handler läuft. Der frühere
+       Kommentar behauptete "ablehnen, BEVOR irgendetwas mit dem Rumpf passiert";
+       das war nachweislich falsch (24-MB-POST wird live gepuffert, dann erst 400).
+       Was hier wirklich schützt, ist gestaffelt:
+         1. Cloud Run selbst deckelt den Request-Body (~32 MiB) — ein größerer
+            Rumpf erreicht die Function gar nicht erst.
+         2. Diese Kopfzeilen-Prüfung spart den JSON-Parse bei ehrlich deklarierter
+            Übergröße (Angreifer lügt evtl. — dann greift 3).
+         3. Die Base64-Längenprüfung unten (vor Buffer.from) verhindert die ZWEITE
+            große Allokation (den dekodierten Bild-Buffer).
+       Das verbleibende Restrisiko (der rawBody selbst) ist infrastrukturseitig
+       gedeckelt und in docs/SECURITY-MODEL.md als bewusste Abwägung festgehalten. */
     const gemeldeteLaenge = Number(req.headers["content-length"] || 0);
     const MAX_BODY_BYTES = Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 64 * 1024;
     if (gemeldeteLaenge > MAX_BODY_BYTES) {

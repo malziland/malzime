@@ -48,9 +48,32 @@ const { releaseHourlySlot } = require("./counter");
    (1 min später) nimmt den Rest. */
 const REAP_BATCH_LIMIT = 200;
 
+/* OPS-2026-08-13-38: Jede Fund-Abfrage einzeln absichern. Vorher lagen die
+   fünf `await findX(...)` ausserhalb jeder Fehlerbehandlung — eine einzige
+   fehlschlagende Abfrage (fehlender Index, Berechtigungsentzug, Firestore-
+   Stoerung) hielt den GANZEN Reaper an, inklusive der beiden Loeschzweige und
+   des Erinnerungs-Waechters. Jetzt: schlaegt eine Abfrage fehl, meldet sie das
+   laut (severity ERROR → Alarm) und liefert eine leere Liste, damit die
+   uebrigen Zweige weiterlaufen. */
+async function sicherFinden(name, fn) {
+  try {
+    return await fn();
+  } catch (err) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        step: "reap",
+        error: `reap-query-fehlgeschlagen:${name}`,
+        message: err && err.message,
+      })
+    );
+    return [];
+  }
+}
+
 async function reapJobs() {
   /* (1) Verlassene wartende Jobs → abandoned. */
-  const abandoned = await findAbandonedJobs(REAP_BATCH_LIMIT);
+  const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs(REAP_BATCH_LIMIT));
   let reapedAbandoned = 0;
   for (const job of abandoned) {
     try {
@@ -68,7 +91,7 @@ async function reapJobs() {
   }
 
   /* (2) In `processing` hängende Jobs → failed. */
-  const stale = await findStaleProcessingJobs(REAP_BATCH_LIMIT);
+  const stale = await sicherFinden("stale", () => findStaleProcessingJobs(REAP_BATCH_LIMIT));
   let reapedStale = 0;
   for (const job of stale) {
     try {
@@ -86,7 +109,7 @@ async function reapJobs() {
      damit das komplette Stundenfenster dauerhaft blockieren — ohne dass je ein
      Platz zurueckkommt. Nach 35 Minuten wartet niemand mehr ernsthaft; der
      Browser gibt bereits nach 30 auf. */
-  const ueberfaellig = await findUeberfaelligeJobs(REAP_BATCH_LIMIT);
+  const ueberfaellig = await sicherFinden("ueberfaellig", () => findUeberfaelligeJobs(REAP_BATCH_LIMIT));
   let reapedUeberfaellig = 0;
   for (const job of ueberfaellig) {
     try {
@@ -103,7 +126,7 @@ async function reapJobs() {
   /* (2c) PRIV-107b: Zugestellte Ergebnisse nach dem Browser-Wiederholungs-
      Fenster löschen — Bild zuerst (BUG-002-Regel), defensiv: normal ist es
      nach der Analyse längst weg. */
-  const zugestellt = await findZugestellteJobs(REAP_BATCH_LIMIT);
+  const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs(REAP_BATCH_LIMIT));
   let reapedZugestellt = 0;
   for (const job of zugestellt) {
     try {
@@ -123,7 +146,7 @@ async function reapJobs() {
   }
 
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
-  const expired = await findExpiredJobs(REAP_BATCH_LIMIT);
+  const expired = await sicherFinden("expired", () => findExpiredJobs(REAP_BATCH_LIMIT));
   let reapedExpired = 0;
   for (const job of expired) {
     try {
@@ -199,12 +222,41 @@ module.exports = { reapJobs };
    oder veraltet ist (OPS-2026-08-12-11). */
 const LEBENSZEICHEN_DOC = "config/erinnerung";
 const LEBENSZEICHEN_MAX_ALTER_MS = 9 * 24 * 60 * 60 * 1000;
+/* OPS-2026-08-13-44: Bezugsdatum gegen die unbefristete Gnadenfrist. Vorher
+   kehrte der Wächter bei fehlendem Lebenszeichen einfach zurück — läuft die
+   Erinnerung NIE an (Zeitplan gelöscht, Function nicht deployt, Dauerfehler),
+   schwieg er für immer statt nach neun Tagen zu warnen. Ab diesem Datum + neun
+   Tagen ist ein fehlendes Lebenszeichen selbst ein ERROR. Ausgeliefert wurde
+   die Erinnerung am 2026-08-12; der erste echte Lauf ist Montag 2026-08-18. */
+const ERINNERUNG_AUSGELIEFERT_MS = Date.parse("2026-08-12T00:00:00Z");
 
 async function pruefeErinnerungsLebenszeichen() {
   try {
     const snap = await datenbank().doc(LEBENSZEICHEN_DOC).get();
-    const letzterLauf = snap.exists && snap.data() ? Number(snap.data().letzterLauf) : 0;
-    if (!letzterLauf) return; /* Noch nie gelaufen — vor dem ersten Montag normal. */
+    /* OPS-2026-08-13-44: auf letzterErfolg schauen, nicht letzterLauf — sonst
+       hält eine Erinnerung, die jeden Montag NUR läuft aber scheitert (Seite
+       nicht lesbar, Datum unlesbar), den Wächter über letzterLauf grün.
+       Rückfall auf letzterLauf für Dokumente aus der Zeit vor diesem Feld. */
+    const daten = snap.exists && snap.data() ? snap.data() : null;
+    const letzterLauf = daten ? Number(daten.letzterErfolg || daten.letzterLauf) : 0;
+    if (!letzterLauf) {
+      /* Noch nie gelaufen. Bis kurz nach der Auslieferung ist das normal —
+         danach hätte längst ein Montag stattgefunden, also ist das Ausbleiben
+         des allerersten Lebenszeichens selbst der Befund. */
+      if (Date.now() - ERINNERUNG_AUSGELIEFERT_MS > LEBENSZEICHEN_MAX_ALTER_MS) {
+        console.error(
+          JSON.stringify({
+            severity: "ERROR",
+            error: "erinnerung-nie-gelaufen",
+            ausgeliefert: new Date(ERINNERUNG_AUSGELIEFERT_MS).toISOString(),
+            hinweis:
+              "Die Wochen-Erinnerung hat seit ihrer Auslieferung KEIN einziges Lebenszeichen geschrieben — " +
+              "sie ist vermutlich nie angelaufen (Zeitplan/Function pruefen, RUNBOOK).",
+          })
+        );
+      }
+      return;
+    }
     const alter = Date.now() - letzterLauf;
     if (alter <= LEBENSZEICHEN_MAX_ALTER_MS) return;
     console.error(

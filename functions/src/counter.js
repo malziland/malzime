@@ -292,39 +292,53 @@ const BOOST_OBERGRENZE = 2 * HOURLY_LIMIT;
 async function boostLimit(amount = 100) {
   const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
-  /* Fail-closed: Wer die aktuelle Grenze nicht lesen kann, darf sie nicht anheben.
-     Eine Kostenbremse, die im Zweifel oeffnet, ist keine. */
-  let snap;
+  /* SEC-2026-08-13-A: Lesen, Obergrenze prüfen und Schreiben laufen in EINER
+     Transaktion — vorher lagen `get()` und `set(increment)` offen nebeneinander,
+     sodass N gleichzeitige Boosts die Obergrenze beliebig überschritten (der
+     Deckel aus SEC-17 ist genau für den abgeflossenen Boost-Link gebaut). Dazu
+     ein ABSOLUTER Wert statt `FieldValue.increment`: increment kann die geprüfte
+     Obergrenze bauartbedingt nicht einhalten.
+     Fail-closed bleibt (Transaktionsfehler → keine Anhebung); die Entscheidung
+     wird aus der Transaktion zurückgegeben und ERST DANACH geloggt, damit ein
+     Transaktions-Retry die Logzeile nicht vervielfacht. */
+  let ergebnis;
   try {
-    snap = await ref.get();
+    ergebnis = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const daten = snap && snap.exists ? snap.data() : null;
+      const aktuell = Number((daten && daten.limit) || HOURLY_LIMIT);
+      const gewuenscht = aktuell + amount;
+      if (gewuenscht > BOOST_OBERGRENZE) {
+        return { limit: aktuell, aktuell, gewuenscht, abgelehnt: true, grund: "obergrenze" };
+      }
+      tx.set(ref, { limit: gewuenscht }, { merge: true });
+      return { limit: gewuenscht, abgelehnt: false };
+    });
   } catch (err) {
     console.error(
       JSON.stringify({
         severity: "ERROR",
         error: "boost-limit-nicht-lesbar",
         message: err && err.message,
-        hinweis: "Boost abgelehnt, weil die aktuelle Grenze nicht gelesen werden konnte.",
+        hinweis: "Boost abgelehnt, weil die Transaktion fehlschlug (Grenze nicht lesbar/schreibbar).",
       })
     );
     return { limit: null, abgelehnt: true };
   }
-  const daten = snap && snap.exists ? snap.data() : null;
-  const aktuell = Number((daten && daten.limit) || HOURLY_LIMIT);
-  const gewuenscht = aktuell + amount;
-  if (gewuenscht > BOOST_OBERGRENZE) {
+  if (ergebnis.abgelehnt && ergebnis.grund === "obergrenze") {
     console.error(
       JSON.stringify({
         severity: "ERROR",
         error: "boost-obergrenze-erreicht",
-        aktuell,
-        angefragt: gewuenscht,
+        aktuell: ergebnis.aktuell,
+        angefragt: ergebnis.gewuenscht,
         obergrenze: BOOST_OBERGRENZE,
         hinweis: "Boost abgelehnt. Haeufige Ablehnungen koennen auf einen abgeflossenen Boost-Link hindeuten.",
       })
     );
-    return { limit: aktuell, abgelehnt: true };
+    return { limit: ergebnis.limit, abgelehnt: true };
   }
-  await ref.set({ limit: FieldValue.increment(amount) }, { merge: true });
+  return { limit: ergebnis.limit, abgelehnt: false };
 }
 
 /**

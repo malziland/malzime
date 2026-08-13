@@ -63,7 +63,9 @@ beforeEach(() => {
   delete process.env.MISTRAL_MOCK_FAIL;
   jobs.getJob.mockResolvedValue(JOB);
   jobs.claimJob.mockResolvedValue(true);
-  jobs.completeJob.mockResolvedValue();
+  /* completeJob liefert true, wenn der Job noch `processing` war und das
+     Ergebnis gespeichert wurde (BUG-2026-08-13-35). */
+  jobs.completeJob.mockResolvedValue(true);
   jobs.isAbandoned.mockReturnValue(false);
   jobs.abandonJob.mockResolvedValue(true);
   jobs.countProcessingJobs.mockResolvedValue(0);
@@ -186,6 +188,24 @@ describe("handleProcessJob — Erfolgsfall", () => {
 
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/x.jpg");
     expect(counter.incrementTotals).toHaveBeenCalledTimes(1);
+  });
+
+  /* BUG-2026-08-13-35: completeJob gibt false (Reaper war schneller). Das
+     fertige Ergebnis darf dann NICHT als "done" gezählt oder geloggt werden. */
+  test("completeJob=false → nicht gezählt, ERROR-Log, ok:false", async () => {
+    jobs.completeJob.mockResolvedValue(false);
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const res = makeRes();
+    await handleProcessJob(postReq("job-1"), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.reason).toBe("already_terminal");
+    expect(counter.incrementTotals).not.toHaveBeenCalled();
+    const zeile = fehlerSpy.mock.calls.map((c) => c[0]).find((s) => String(s).includes("ergebnis-verworfen"));
+    expect(zeile).toBeTruthy();
+    expect(JSON.parse(zeile).severity).toBe("ERROR");
+    fehlerSpy.mockRestore();
   });
 
   test("Erfolgs-Log enthält queueWaitMs (Wartezeit in der Warteschlange)", async () => {

@@ -56,6 +56,14 @@ function baueMeldung(stand) {
  * echte Uhr laufen.
  */
 async function pruefeZusagen({ ntfyUrl, ntfyTopic, abruf = fetch, jetzt = Date.now() } = {}) {
+  /* OPS-2026-08-13-44: Der Reaper-Wächter darf nicht schon dann grün bleiben,
+     wenn diese Funktion bloß GELAUFEN ist — sonst hält eine Erinnerung, die
+     jeden Montag scheitert (Seite nicht lesbar, Datum unlesbar, Absturz), den
+     Wächter über ihr `letzterLauf`-Feld ewig ruhig. Dieses Flag wird erst true,
+     wenn die Frist WIRKLICH gelesen und bewertet wurde. Das Lebenszeichen führt
+     danach `letzterErfolg` getrennt von `letzterLauf`, und der Wächter schaut
+     auf `letzterErfolg`. */
+  let checkGelang = false;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), ABRUF_TIMEOUT_MS);
@@ -81,6 +89,9 @@ async function pruefeZusagen({ ntfyUrl, ntfyTopic, abruf = fetch, jetzt = Date.n
     }
 
     const stand = { ...bewerteFrist(datum, jetzt), datumText: formatiereDatum(datum) };
+    /* Ab hier ist die Frist gelesen und bewertet — die Kernaufgabe ist erfüllt,
+       auch wenn nichts fällig ist oder der Push später scheitert. */
+    checkGelang = true;
     if (!stand.faellig) {
       console.log(JSON.stringify({ info: "erinnerung-nichts-faellig", tageBisFrist: stand.tageBisFrist }));
       return { gesendet: false, grund: "nichts-faellig", tageBisFrist: stand.tageBisFrist };
@@ -136,14 +147,18 @@ async function pruefeZusagen({ ntfyUrl, ntfyTopic, abruf = fetch, jetzt = Date.n
        Wer darauf schaut, ist der Reaper (handle-reap.js) — er laeuft jede Minute
        und steht in der Alarmrichtlinie. Ein ausbleibendes Lebenszeichen wird so
        laut, ohne dass die Erinnerung selbst laut werden muss. */
-    await schreibeLebenszeichen();
+    await schreibeLebenszeichen(checkGelang);
   }
 }
 
-/* Lebenszeichen: ein einziges Feld, kein Personenbezug, keine Nutzdaten. */
-async function schreibeLebenszeichen() {
+/* Lebenszeichen: kein Personenbezug, keine Nutzdaten. `letzterLauf` sagt „die
+   Funktion lief", `letzterErfolg` sagt „die Frist wurde wirklich bewertet". Der
+   Reaper-Wächter schaut auf letzteres (OPS-2026-08-13-44). */
+async function schreibeLebenszeichen(erfolg = false) {
   try {
-    await datenbank().doc(LEBENSZEICHEN_DOC).set({ letzterLauf: Date.now() }, { merge: true });
+    const daten = { letzterLauf: Date.now() };
+    if (erfolg) daten.letzterErfolg = Date.now();
+    await datenbank().doc(LEBENSZEICHEN_DOC).set(daten, { merge: true });
   } catch (err) {
     /* Schlaegt selbst das fehl, ist der Lauf ohnehin gestoert — und der Reaper
        meldet das ausbleibende Lebenszeichen wenig spaeter. */

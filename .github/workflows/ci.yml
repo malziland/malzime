@@ -130,8 +130,14 @@ jobs:
       - run: npm run test:e2e
 
   lighthouse:
-    # Misst die LIVE-Domain, nicht den PR-Stand — als Post-Deploy-Monitor nur
-    # auf push sinnvoll; auf PRs wäre ein grünes Ergebnis irreführend.
+    # Misst die LIVE-Domain, nicht den geprüften Stand. K12 (Audit 2026-08-13):
+    # In diesem Projekt sind Push und Deploy ENTKOPPELT — ein Push landet auf
+    # main, deployt wird erst danach von Hand. Dieser Lauf misst also den Stand,
+    # der (noch) live ist, nicht den gerade gepushten Commit. Das Ergebnis ist
+    # ein reiner Live-Monitor der Performance/Qualität und BEWUSST nicht
+    # blockierend (nicht in der Branch Protection) — es dem gepushten Commit
+    # zuzuschreiben wäre irreführend. Auf PRs liefe es gegen den falschen Stand,
+    # deshalb nur auf push.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:

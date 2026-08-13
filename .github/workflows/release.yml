@@ -52,13 +52,15 @@ jobs:
             exit 0
           fi
           TAG="v$VERSION"
+          # Extrahiert den CHANGELOG-Abschnitt genau dieser Version von stdin.
+          abschnitt() { awk -v v="## [$VERSION]" 'index($0, v)==1 {f=1; next} /^## \[/ {if (f) exit} f {print}'; }
           if gh release view "$TAG" >/dev/null 2>&1; then
             # Release existiert schon. Zwei erlaubte Faelle:
             # (a) Text-Korrektur an einem veroeffentlichten Abschnitt — die
             #     oberste Nummer aendert sich nicht, nichts zu tun
             #     (Entscheidung 2026-08-11, Kurzaudit OPS-103; Fehlalarm #78).
             # (b) Die oberste Nummer wurde auf eine schon vergebene Nummer
-            #     GEAENDERT. Entscheidung des Inhabers vom 2026-08-11: Nummern
+            #     GEAENDERT. Bewusste Entscheidung vom 2026-08-11: Nummern
             #     DUERFEN wiederverwendet werden — der fruehere Kollisions-
             #     Fehler entfaellt. Damit Tag und CHANGELOG nicht auseinander-
             #     laufen (die OPS-002-Falle vom 2026-08-10), wird der Tag samt
@@ -74,8 +76,25 @@ jobs:
               echo "FEHLER: Elternstand des CHANGELOG nicht auswertbar — Abbruch statt Umhaengen auf Verdacht."
               exit 1
             fi
-            if [ "$VORHER" = "$VERSION" ]; then
-              echo "Release $TAG existiert; der Push aendert die oberste Version nicht (Doku-Korrektur) — nichts zu tun."
+            # OPS-2026-08-13-K8: Bei manuellem Start (workflow_dispatch) ist "hat
+            # DIESER Push die Version geaendert?" die falsche Frage — main kann
+            # laengst weiter sein, dann waere VORHER==VERSION und der Lauf stiege
+            # faelschlich mit "nichts zu tun" aus, obwohl der Release woanders
+            # zeigt. Auf Dispatch die VORHER-Abkuerzung ueberspringen und direkt
+            # am Ist-Zustand messen (TAG_SHA == GITHUB_SHA unten).
+            if [ "${GITHUB_EVENT_NAME:-}" != "workflow_dispatch" ] && [ "$VORHER" = "$VERSION" ]; then
+              # OPS-2026-08-13-50: Reine Textkorrektur ODER Inhaltszuwachs? Die
+              # Nummer bleibt gleich, aber der Abschnittstext kann gewachsen sein
+              # (Nachtrag unter einer schon veroeffentlichten Version). Bei
+              # Zuwachs die Release-Notizen nachziehen statt still auszusteigen.
+              git show "$GITHUB_SHA^:CHANGELOG.md" | abschnitt > notes-alt.md || true
+              abschnitt < CHANGELOG.md > notes-neu.md
+              if cmp -s notes-alt.md notes-neu.md; then
+                echo "Release $TAG existiert; Abschnittstext unveraendert (Korrektur ausserhalb) — nichts zu tun."
+                exit 0
+              fi
+              echo "Release $TAG existiert; Abschnittstext ist gewachsen — Release-Notizen werden nachgezogen."
+              gh release edit "$TAG" --notes-file notes-neu.md
               exit 0
             fi
             TAG_SHA="$(git rev-parse --verify --quiet "refs/tags/$TAG^{commit}" || echo "")"
@@ -110,12 +129,9 @@ jobs:
             echo "FEHLER: Tag $TAG existiert noch auf origin, aber kein Release dazu passt zu diesem Stand — Abbruch statt Release auf falschen Zeiger. Tag pruefen/loeschen und Workflow erneut starten."
             exit 1
           fi
-          # Release-Notizen = der Abschnitt genau dieser Version
-          awk -v v="## [$VERSION]" '
-            index($0, v)==1 {f=1; next}
-            /^## \[/ {if (f) exit}
-            f {print}
-          ' CHANGELOG.md > notes.md
+          # Release-Notizen = der Abschnitt genau dieser Version (dieselbe
+          # Extraktion wie oben, ueber die abschnitt()-Funktion).
+          abschnitt < CHANGELOG.md > notes.md
           echo "Lege Release $TAG an ..."
           gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md
           echo "Fertig: $TAG"

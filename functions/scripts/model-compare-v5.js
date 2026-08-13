@@ -826,7 +826,7 @@ async function main() {
      ~1,9 ct/Analyse) liegt der reale Wert bei rund der HAELFTE dieser Zahl.
      Bewusst nicht "optimiert" — eine zu hohe Schaetzung ist harmlos, eine zu
      niedrige fuehrt zu ungeplanten Kosten. */
-  /* Echte Preise (Stand 08/2026, vom Inhaber bestaetigt), je Modell getrennt.
+  /* Echte Preise (Stand 08/2026, bestaetigt), je Modell getrennt.
      Gecachte Eingabe-Tokens kosten 10 % — deshalb wird der Cache-Anteil
      mitgefuehrt und beides ausgewiesen: was der Lauf gekostet hat, und was er
      ohne Cache gekostet haette. */

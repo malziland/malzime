@@ -89,7 +89,7 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
 6. **Durchsatz-Deckel liegt extern.** Mistral-Tier T1 = 0,25 req/s ≈ 7,5
    Analysen/min — die reale Bremse bei Stoßlast. *Status:* bekannt, mit
    Warteschlangen-Ehrlichkeit (Position + ETA) abgefedert; Tier-Hebung ist eine
-   Kostenentscheidung des Inhabers, kein technisches Versäumnis.
+   bewusste Kostenentscheidung, kein technisches Versäumnis.
 
 7. **Der E2E-Container hängt an einem beweglichen Etikett.**
    (`OSS-2026-08-12-24`) Die Tests laufen im offiziellen Playwright-Image

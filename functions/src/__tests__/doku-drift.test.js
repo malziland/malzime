@@ -32,6 +32,31 @@ describe("Doku-Drift-Wächter", () => {
     expect(treffer).toEqual([]);
   });
 
+  /* DOC-2026-08-13-FE-09: Die Upload-Obergrenze steht an fünf Stellen ohne
+     kanonische Quelle (config.js, api.js, beide Locales, index.html). Aktuell
+     deckungsgleich — dieser Wächter hält sie es. Kanonisch ist MAX_UPLOAD_BYTES
+     in config.js; alle nutzersichtbaren „… MB"-Angaben müssen dieselbe MB-Zahl
+     nennen. */
+  test("die Upload-Obergrenze ist an allen fünf Stellen dieselbe MB-Zahl", () => {
+    const bytes = lies("functions/src/config.js").match(/MAX_UPLOAD_BYTES\s*=\s*(\d+)\s*\*\s*1024\s*\*\s*1024/);
+    expect(bytes).not.toBeNull();
+    const mb = Number(bytes[1]);
+
+    // Frontend-Konstante (api.js): dieselbe Byte-Rechnung.
+    const apiMb = lies("public/js/api.js").match(/file\.size\s*>\s*(\d+)\s*\*\s*1024\s*\*\s*1024/);
+    expect(apiMb).not.toBeNull();
+    expect(Number(apiMb[1])).toBe(mb);
+
+    // Nutzersichtbare Texte: jede „… MB"-Angabe im Upload-Kontext nennt dieselbe Zahl.
+    const quellen = ["public/index.html", "public/locales/de.json", "public/locales/en.json"];
+    const abweichend = [];
+    for (const q of quellen) {
+      const zahlen = [...lies(q).matchAll(/(\d+)\s*MB/g)].map((m) => Number(m[1]));
+      for (const z of zahlen) if (z !== mb) abweichend.push(`${q}: ${z} MB statt ${mb}`);
+    }
+    expect(abweichend).toEqual([]);
+  });
+
   test("interne Markdown-Links in README und docs/ zeigen auf existierende Dateien", () => {
     const dateien = ["README.md"].concat(
       fs

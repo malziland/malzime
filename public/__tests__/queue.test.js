@@ -562,7 +562,7 @@ describe("Queue-Modus", () => {
   });
 
   /* ── v3.0.0: Das Hinweis-Pop-up ist ersatzlos entfernt ────────────────────
-     Entscheidung des Inhabers („dieses Pop-Up liest sowieso keiner durch"):
+     bewusste Entscheidung („dieses Pop-Up liest sowieso keiner durch"):
      Die Analyse startet direkt bei der Foto-/Demo-Wahl. Diese Tests belegen
      den modallosen Fluss — sie werden ROT, wenn jemand wieder einen Dialog
      zwischen Foto-Wahl und Upload schiebt. */

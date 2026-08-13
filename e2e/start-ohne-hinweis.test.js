@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /* v3.0.0: Das Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
- * (Entscheidung des Inhabers: „dieses Pop-Up liest sowieso keiner durch").
+ * (bewusste Entscheidung: „dieses Pop-Up liest sowieso keiner durch").
  *
  * Dieser Test belegt den modallosen Fluss: Die Foto-/Demo-Wahl startet die
  * Analyse DIREKT — der Upload geht ohne Zwischenklick raus, es existiert

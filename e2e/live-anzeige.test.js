@@ -243,7 +243,7 @@ test("v3.0.3 Blick-Führung am Handy: Auge nach der Foto-Wahl im Bild, die letzt
 }) => {
   test.setTimeout(120000);
   /* Handy-Viewport: hier liegt das Auge nach dem Antippen eines Demo-Fotos
-     außerhalb des Sichtfelds — genau der Befund des Inhabers („man sieht das
+     außerhalb des Sichtfelds — genau der gemeldete Befund („man sieht das
      Foto, aber nicht, dass etwas passiert"). */
   await page.setViewportSize({ width: 390, height: 660 });
   const steuerung = await seiteMitLangemTextMocks(page);

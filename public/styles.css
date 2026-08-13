@@ -2722,7 +2722,7 @@ ol.legal-list > li::before {
    Realitäts-Check (v3.1) — der Hingucker, gebaut aus den ECHTEN
    malziland-Bausteinen (Design-Tokens): Gold-Plakette, Teal/Gold/Rust
    für die drei Antworten, pulsierender Glow (teal↔gold). Kein fremder
-   Farbverlauf (Veto des Inhabers). Optik 1:1 aus dem abgenommenen
+   Farbverlauf (bewusst verworfen). Optik 1:1 aus dem abgenommenen
    Prototyp (compare-prototype-streaming.html, 2026-08-11).
    ═══════════════════════════════════════════════ */
 
@@ -2735,7 +2735,7 @@ ol.legal-list > li::before {
   background: var(--surface);
   color: var(--text);
   animation: rcGlow 2.6s ease-in-out infinite;
-  /* UMGEKEHRTES Thema (Idee des Inhabers): Die Karte trägt im hellen
+  /* UMGEKEHRTES Thema (bewusste Idee): Die Karte trägt im hellen
      Modus die DUNKLEN Design-Token und umgekehrt — dadurch hebt sie sich
      beim Scrollen sofort vom Rest ab, bleibt aber zu 100 % im
      malziland-System. Alle inneren Regeln nutzen var(), darum genügt

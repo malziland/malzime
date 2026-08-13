@@ -7,7 +7,7 @@
   "hero.title": "Wir sehen mehr als dein Foto.",
   "hero.lead": "Lade ein Bild hoch. Die KI erstellt in Sekunden ein komplettes Profil über dich — aus einem einzigen Foto.",
   "upload.label": "Foto auswählen oder hierhin ziehen",
-  "upload.hint": "JPEG, PNG, WEBP · max 25 MB",
+  "upload.hint": "JPEG, PNG, WEBP, GIF · max 25 MB",
   "upload.privacyHint": "Mit dem Hochladen startet die KI-Analyse. Dein Foto wird nach der Analyse sofort gelöscht — Details in der <a href=\"/datenschutz\" target=\"_blank\" rel=\"noopener\" tabindex=\"0\">Datenschutzerklärung</a>.",
   "bias.normalTooltip": "Sachliche Einschätzung — so wie echte Algorithmen dich im Hintergrund kategorisieren. Direkt, konkret, ohne Übertreibung.",
   "bias.normalLabel": "Seriöse Analyse",

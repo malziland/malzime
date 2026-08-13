@@ -238,13 +238,13 @@
   "sprache.name.en": "English",
   "sprache.schliessen": "Close",
   "sprache.gewechselt": "Language switched to English.",
-  "sprache.fertig.titel": "Your profile will be deleted.",
-  "sprache.fertig.text": "The AI looks at your photo again and writes everything from scratch — in German.",
+  "sprache.fertig.titel": "Switch to German?",
+  "sprache.fertig.text": "<strong>Your current profile will be deleted.</strong> The AI looks at your photo again and writes everything from scratch.",
   "sprache.fertig.bleiben": "Cancel",
-  "sprache.fertig.wechseln": "Analyse again",
-  "sprache.laeuft.titel": "The analysis starts over.",
-  "sprache.laeuft.text": "In German. Your photo stays, you do not have to pick it again.",
+  "sprache.fertig.wechseln": "Switch to German",
+  "sprache.laeuft.titel": "Switch to German?",
+  "sprache.laeuft.text": "The analysis starts over — your photo stays, you do not have to upload it again.",
   "sprache.laeuft.bleiben": "Cancel",
-  "sprache.laeuft.wechseln": "Restart",
-  "sprache.fertig.textOhneBild": "You will be back on the start page and can pick a new photo."
+  "sprache.laeuft.wechseln": "Switch to German",
+  "sprache.fertig.textOhneBild": "<strong>Your current profile will be deleted.</strong> For a German one you would have to upload your photo again."
 }

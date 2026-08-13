@@ -442,13 +442,13 @@ describe("Sprachumschalter — nach einem Neuladen ist das Bild weg", () => {
     langKnopf("en").click();
     const modal = sichtbaresModal();
     expect(modal.dataset.modal).toBe("fertig");
-    expect(modal.querySelector("p").dataset.swKey).toBe("sprache.fertig.textOhneBild");
+    expect(modal.querySelector("p").dataset.swKeyHtml).toBe("sprache.fertig.textOhneBild");
   });
 
   it("mit Bild steht dort der andere Satz", () => {
     state.lastFile = { name: "a.jpg" };
     langKnopf("en").click();
-    expect(sichtbaresModal().querySelector("p").dataset.swKey).toBe("sprache.fertig.text");
+    expect(sichtbaresModal().querySelector("p").dataset.swKeyHtml).toBe("sprache.fertig.text");
   });
 
   it("bestätigen setzt zurück, statt eine unmögliche Analyse zu starten", async () => {
@@ -496,5 +496,30 @@ describe("Sprachumschalter — stehende Meldungen wechseln mit", () => {
     langKnopf("en").click();
     sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
     expect(statusNeuGeschrieben).toBe(0);
+  });
+});
+
+describe("Sprachumschalter — die Rückfrage handelt vom Sprachwechsel", () => {
+  /* Ein Anlauf setzte die Löschwarnung als Überschrift. Vor jemandem, der nur
+     die Sprache wechseln wollte, stand damit eine Schreckmeldung ohne
+     Zusammenhang — und der Bestätigungsknopf hiess „Neu analysieren", obwohl
+     nach einem Neuladen gar nichts analysiert werden kann. */
+  const faelle = [
+    ["fertig, Bild da", { lastData: { profileText: "x" }, lastFile: { name: "a.jpg" } }],
+    ["fertig, Bild weg", { lastData: { profileText: "x" }, lastFile: null }],
+    ["Analyse läuft", { isAnalyzing: true, lastFile: { name: "a.jpg" } }],
+  ];
+
+  it.each(faelle)("%s: Überschrift und Knöpfe sind dieselben", (_name, zustand) => {
+    zeigeSprachumschalter(true);
+    Object.assign(state, zustand);
+    langKnopf("en").click();
+    const modal = sichtbaresModal();
+    expect(modal).not.toBeNull();
+    expect(modal.querySelector("h2").dataset.swKey).toMatch(/^sprache\.(fertig|laeuft)\.titel$/);
+    /* Immer derselbe Bestätigungstext — der Nutzer bestätigt den
+       SPRACHWECHSEL, nicht wechselnde Nebenwirkungen. */
+    expect(modal.querySelector(".sw-knopf--wechseln").dataset.swKey).toMatch(/^sprache\.(fertig|laeuft)\.wechseln$/);
+    expect(modal.querySelector(".sw-knopf--bleiben").dataset.swKey).toMatch(/^sprache\.(fertig|laeuft)\.bleiben$/);
   });
 });

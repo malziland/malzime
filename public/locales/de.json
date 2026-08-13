@@ -238,13 +238,13 @@
   "sprache.name.en": "English",
   "sprache.schliessen": "Schließen",
   "sprache.gewechselt": "Sprache auf Deutsch umgestellt.",
-  "sprache.fertig.titel": "Dein Profil wird gelöscht.",
-  "sprache.fertig.text": "Die KI schaut dein Foto noch einmal an und schreibt alles neu — auf Englisch.",
+  "sprache.fertig.titel": "Auf Englisch wechseln?",
+  "sprache.fertig.text": "<strong>Dein jetziges Profil wird gelöscht.</strong> Die KI schaut dein Foto noch einmal an und schreibt alles neu.",
   "sprache.fertig.bleiben": "Abbrechen",
-  "sprache.fertig.wechseln": "Neu analysieren",
-  "sprache.laeuft.titel": "Die Analyse beginnt von vorn.",
-  "sprache.laeuft.text": "Auf Englisch. Dein Foto bleibt, du musst nichts neu auswählen.",
+  "sprache.fertig.wechseln": "Auf Englisch wechseln",
+  "sprache.laeuft.titel": "Auf Englisch wechseln?",
+  "sprache.laeuft.text": "Die Analyse beginnt von vorn — dein Foto bleibt, du musst es nicht noch einmal hochladen.",
   "sprache.laeuft.bleiben": "Abbrechen",
-  "sprache.laeuft.wechseln": "Neu starten",
-  "sprache.fertig.textOhneBild": "Du landest wieder auf der Startseite und kannst ein neues Foto auswählen."
+  "sprache.laeuft.wechseln": "Auf Englisch wechseln",
+  "sprache.fertig.textOhneBild": "<strong>Dein jetziges Profil wird gelöscht.</strong> Für ein englisches müsstest du dein Foto noch einmal hochladen."
 }

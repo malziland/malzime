@@ -156,7 +156,8 @@ function modalBauen(art) {
   kasten.setAttribute("aria-labelledby", titel.id);
 
   const text = document.createElement("p");
-  text.dataset.swKey = `sprache.${art}.text`;
+  /* Der Folgesatz hebt die Folge hervor (<strong>), deshalb der HTML-Weg. */
+  text.dataset.swKeyHtml = `sprache.${art}.text`;
 
   kasten.append(schliessen, titel, text);
 
@@ -243,10 +244,13 @@ function umgebungStillegen(an) {
 
 function modalOeffnen(art, ziel, ohneBild) {
   zielSprache = ziel;
-  const text = art === "fertig" ? modalFertig.querySelector("[data-sw-key]:not(h2)") : null;
+  /* Ein Satz, zwei Fälle: Mit Bild folgt eine neue Analyse, ohne Bild eine
+     leere Startseite. Überschrift und Knöpfe bleiben gleich — der Nutzer
+     wollte die Sprache wechseln, nicht über eine Löschung verhandeln. */
+  const text = art === "fertig" ? modalFertig.querySelector("[data-sw-key-html]") : null;
   if (text) {
-    text.dataset.swKey = ohneBild ? "sprache.fertig.textOhneBild" : "sprache.fertig.text";
-    text.textContent = t(text.dataset.swKey);
+    text.dataset.swKeyHtml = ohneBild ? "sprache.fertig.textOhneBild" : "sprache.fertig.text";
+    text.innerHTML = t(text.dataset.swKeyHtml);
   }
   fokusVorher = document.activeElement;
   offen = art === "fertig" ? modalFertig : modalLaeuft;

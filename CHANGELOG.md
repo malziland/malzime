@@ -91,10 +91,16 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   echten Anwendung, nicht durch die drei Zustände des Entwurfs.
 
 - **Die Rückfragen waren zu lang und sahen gleich aus.** Zwei Dialoge mit
-  demselben Titel und je rund 60 Wörtern — im Workshop liest die niemand. Die
-  Überschrift nennt jetzt die **Folge** („Dein Profil wird gelöscht."), darunter
-  steht ein Satz, und die folgenschwere Variante trägt eine eigene Farbe samt
-  Warnzeichen. Ein Test hält die Länge fest, sonst wächst sie unbemerkt zurück.
+  demselben Titel und je rund 60 Wörtern — im Workshop liest die niemand. Jetzt
+  gilt: Die Überschrift nennt das Vorhaben („Auf Englisch wechseln?"), darunter
+  steht **ein** Satz mit der Folge, und der Bestätigungsknopf heißt in allen
+  Fällen gleich. Zwei Tests halten Länge und Gleichförmigkeit fest.
+
+  Ein Zwischenstand hatte die Löschwarnung als Überschrift — vor jemandem, der
+  nur die Sprache wechseln wollte, stand damit eine Schreckmeldung ohne
+  Zusammenhang, und der Knopf hieß „Neu analysieren", obwohl nach einem
+  Neuladen gar nichts analysiert werden kann. Die Hervorhebung sitzt jetzt im
+  Folgesatz, nicht im Titel.
 
 - **Das Deploy-Skript schrieb in Fließtext hinein** (`OPS-2026-08-13-01`). Der
   Cache-Buster wurde mit dem Muster `?v=` plus beliebig vielen Ziffern ersetzt —

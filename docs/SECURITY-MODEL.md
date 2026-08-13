@@ -117,6 +117,19 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    mehr, und jedes Störungsrezept im RUNBOOK liefert stillschweigend eine leere
    Antwort statt eines Fehlers. Genau die Ausfallform, gegen die dieses Projekt
    sonst überall anschreibt.
+9. **Der Upload-Rumpf landet vor jeder App-Prüfung im Speicher.**
+   (`SEC-2026-08-13-B`) Die Cloud-Functions-Laufzeit liest den Request-Body
+   vollständig als `req.rawBody` ein, bevor `handle-enqueue.js` läuft — eine
+   Kopfzeilen-Größenprüfung im Handler kann diese erste Allokation nicht
+   verhindern (der frühere Kommentar behauptete das fälschlich, jetzt richtig
+   gestellt). *Was schützt:* (1) Cloud Run deckelt den Request-Body bei ~32 MiB,
+   ein größerer erreicht die Function gar nicht; (2) die Base64-Längenprüfung vor
+   `Buffer.from` verhindert die zweite, dekodierte Allokation. *Verworfene
+   Maßnahme:* `MAX_UPLOAD_BYTES` senken — bricht die öffentliche Zusage „max
+   25 MB". *Verworfen:* `enqueue`-Concurrency auf einstellig drosseln — würde die
+   Workshop-Stoßlast (1000–2000 Analysen/Vormittag) am Einlass ausbremsen, für
+   die der Endpunkt bewusst dünn und schnell ist. *Neu bewerten,* falls je ein
+   realer Speicher-Erschöpfungs-Vorfall auftritt (bisher keiner beobachtet).
 
 ## Verworfene Maßnahmen
 

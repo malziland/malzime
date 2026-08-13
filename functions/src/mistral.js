@@ -447,7 +447,18 @@ async function callMistralRawUnthrottled({
        Einzelaufrufe. Ein einzelner haengender Mistral-Call soll nach 90s
        abbrechen, damit der Client-seitige Auto-Retry greift, statt 8 Minuten
        Spinner zu zeigen. */
-    const effectiveTimeout = Math.min(timeoutMs || MISTRAL_TIMEOUT_MS, MISTRAL_TIMEOUT_MS);
+    /* BUG-2026-08-13-37: `timeoutMs || MISTRAL_TIMEOUT_MS` verwandelte ein
+       erschöpftes Budget (exakt 0) in den vollen Timeout — der Aufruf, der laut
+       Restbudget gar nicht mehr stattfinden dürfte, bekam 90 s und konnte das
+       Function-Timeout reißen. Jetzt: nur `null`/`undefined` fällt auf den
+       Default; ein Budget ≤ 0 bricht sofort ab. */
+    const budget = timeoutMs == null ? MISTRAL_TIMEOUT_MS : timeoutMs;
+    if (budget <= 0) {
+      const err = new Error("Mistral-Budget erschoepft");
+      err.code = "timeout";
+      throw err;
+    }
+    const effectiveTimeout = Math.min(budget, MISTRAL_TIMEOUT_MS);
     const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
     const httpStart = Date.now();

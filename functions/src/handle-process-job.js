@@ -485,6 +485,30 @@ async function handleProcessJob(req, res) {
     return;
   }
 
+  /* OPS-2026-08-13-34: Ein Worker kann nach dem Claim sterben (Instanz-Kill,
+     OOM). Cloud Tasks stellt binnen 0,1 s erneut zu und trägt dabei
+     `X-CloudTasks-TaskRetryCount ≥ 1`. Trifft eine solche Wiederholung auf einen
+     Job, der noch `processing` ist, ist der vorige Versuch mit hoher
+     Wahrscheinlichkeit abgestürzt — der Nutzer wartet sonst bis zu 9 Minuten auf
+     `failed`, ohne dass ein Alarm feuert (die Request-Logs mit dem 503 sind per
+     PRIV-12 ausgeschlossen, `staleProcessing` loggt ohne severity). Eine
+     ERROR-Zeile hier löst die bestehende Alarmrichtlinie aus und ist gefahrlos:
+     der idempotente Claim unten verhindert weiterhin jede Doppelverarbeitung. */
+  const retryCount = Number(req.headers && req.headers["x-cloudtasks-taskretrycount"]);
+  if (retryCount >= 1 && job.status === "processing") {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        step: "process-job",
+        jobId,
+        error: "worker-abgestuerzt-verdacht",
+        retryCount,
+        hinweis:
+          "Task-Wiederholung traf einen noch verarbeitenden Job - der vorige Worker ist vermutlich abgestuerzt. Der Nutzer wartet sonst bis zur Stale-Grenze auf failed.",
+      })
+    );
+  }
+
   /* Liveness: Hat der Client die Seite verlassen, während der Job wartete?
      Dann gar nicht erst Mistral aufrufen — Job auf `abandoned` setzen, Bild
      löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
@@ -533,7 +557,28 @@ async function handleProcessJob(req, res) {
   const start = Date.now();
   try {
     const { result, success } = await runPipeline(job);
-    await completeJob(jobId, result);
+    /* BUG-2026-08-13-35: Rückgabewert von completeJob auswerten. Er liefert
+       `false`, wenn der Job nicht mehr `processing` ist (der Reaper hat ihn
+       zwischenzeitlich auf `failed` gekippt, und eine CPU-gedrosselt wieder
+       auflebende Fortsetzung landet hier). Vorher wurde das verworfen: das
+       fertige Ergebnis ging still verloren, `incrementTotals` zählte trotzdem
+       eine Analyse, und die Logzeile behauptete `status: "done"` — das Log log
+       aktiv, statt zu schweigen. */
+    const gespeichert = await completeJob(jobId, result);
+    if (!gespeichert) {
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          step: "process-job",
+          jobId,
+          error: "ergebnis-verworfen-job-bereits-terminal",
+          hinweis:
+            "completeJob gab false - der Job war nicht mehr processing (Reaper/markFailedIfStale war schneller). Ergebnis wird NICHT gezaehlt.",
+        })
+      );
+      res.status(200).json({ ok: false, reason: "already_terminal" });
+      return;
+    }
     if (success) {
       incrementTotals().catch((err) =>
         console.log(JSON.stringify({ warning: "incrementTotals-error", error: err.message }))

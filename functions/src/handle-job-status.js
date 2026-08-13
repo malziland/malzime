@@ -25,6 +25,12 @@ const { safeCompare, sha256Hex } = require("./auth");
    so aussieht, ist keine Job-Nummer dieses Systems. */
 const JOB_ID_MUSTER = /^[A-Za-z0-9]{20}$/;
 
+/* SEC-2026-08-13-C: Mindestabstand zwischen zwei Herzschlag-Schreibvorgängen.
+   Der Client pollt im Sekundentakt; die Karenz für "Client noch da" liegt bei
+   Minuten. 30 s nimmt den Großteil der Schreibvorgänge weg, ohne dass ein Job
+   fälschlich als verlassen gilt. */
+const TOUCH_MINDESTABSTAND_MS = 30_000;
+
 /* Grobe Wartezeit-Schätzung aus der Warteschlangen-Position.
    Kalibrierung der Konstanten erfolgt in Phase 3/4 (config.js). */
 function etaForPosition(position) {
@@ -74,8 +80,17 @@ async function handleJobStatus(req, res) {
   }
 
   if (job.status === "queued") {
-    /* Liveness-Herzschlag: Dieser Poll belegt, dass der Client noch da ist. */
-    await touchJob(jobId);
+    /* Liveness-Herzschlag: Dieser Poll belegt, dass der Client noch da ist.
+       SEC-2026-08-13-C: NICHT bei jedem Poll schreiben. Vorher war /api/job-status
+       ein unauthentifizierter Schreib-Verstärker (ein `update()` je Poll, während
+       der Kommentar "nur ein günstiger Read" behauptete). Der Herzschlag wird nur
+       aufgefrischt, wenn der letzte älter als TOUCH_MINDESTABSTAND_MS ist — das
+       kostet nichts an Liveness (die Karenz ist Minuten, nicht Sekunden) und nimmt
+       den Großteil der Schreibvorgänge weg. */
+    const zuletzt = Number(job.lastSeenAt || 0);
+    if (Date.now() - zuletzt >= TOUCH_MINDESTABSTAND_MS) {
+      await touchJob(jobId);
+    }
     const position = await getQueuePosition(job);
     res.status(200).json({
       status: "queued",

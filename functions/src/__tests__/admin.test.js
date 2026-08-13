@@ -248,6 +248,31 @@ describe("admin handler", () => {
     expect(mockBoostLimit).toHaveBeenCalledWith(100);
   });
 
+  /* SEC-2026-08-13-D: Ein abgelehnter Boost darf nicht als Erfolg gemeldet
+     werden — der Betreiber reagiert gerade auf einen Überlast-Alarm. */
+  test("abgelehnter Boost (Obergrenze) → ok:false, nicht als Erfolg gemeldet", async () => {
+    mockBoostLimit.mockResolvedValueOnce({ limit: 1000, abgelehnt: true });
+    const req = mockReq({
+      path: "/boost",
+      method: "POST",
+      headers: { authorization: `Bearer ${TEST_SECRET}` },
+    });
+    const res = mockRes();
+    await admin(req, res);
+    expect(res.body.ok).toBe(false);
+    expect(res.body.abgelehnt).toBe(true);
+  });
+
+  test("abgelehnter Boost per Nonce → HTML sagt 'abgelehnt', nicht 'hinzugefuegt'", async () => {
+    mockBoostLimit.mockResolvedValueOnce({ limit: 1000, abgelehnt: true });
+    const nonce = createNonce("boost", TEST_SECRET);
+    const req = mockReq({ path: "/boost", method: "POST", body: { nonce } });
+    const res = mockRes();
+    await admin(req, res);
+    expect(res.htmlBody).toContain("abgelehnt");
+    expect(res.htmlBody).not.toContain("hinzugefuegt");
+  });
+
   /* ── SEC-001: Nonce-based POST executes mutation ── */
 
   test("boost with valid nonce (POST) executes mutation and returns HTML", async () => {

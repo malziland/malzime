@@ -567,29 +567,48 @@ describe("getStats", () => {
 /* ── boostLimit ── */
 
 describe("boostLimit", () => {
-  test("increments limit by specified amount", async () => {
-    mockGet.mockResolvedValue({ exists: true, data: () => ({ limit: 500 }) });
-    await boostLimit(200);
-    expect(mockSet).toHaveBeenCalledWith({ limit: { __increment: 200 } }, { merge: true });
+  /* SEC-2026-08-13-A: boostLimit läuft jetzt in einer Transaktion und schreibt
+     einen ABSOLUTEN Wert. Die Attrappe reicht der Transaktionsfunktion ein tx
+     mit dem hinterlegten Startwert; txSet fängt den Schreibaufruf. */
+  function transaktionMit(startLimit, { getWirft } = {}) {
+    const txSet = jest.fn();
+    mockRunTransaction.mockImplementation(async (fn) => {
+      const tx = {
+        get: getWirft
+          ? jest.fn().mockRejectedValue(new Error("firestore weg"))
+          : jest.fn().mockResolvedValue({ exists: true, data: () => ({ limit: startLimit }) }),
+        set: txSet,
+      };
+      return fn(tx);
+    });
+    return txSet;
+  }
+
+  test("hebt das Limit auf den absoluten Zielwert (Start + amount)", async () => {
+    const txSet = transaktionMit(500);
+    const ergebnis = await boostLimit(200);
+    expect(txSet).toHaveBeenCalledWith(expect.anything(), { limit: 700 }, { merge: true });
+    expect(ergebnis).toEqual({ limit: 700, abgelehnt: false });
   });
 
   test("defaults to 100 when no amount given", async () => {
-    mockGet.mockResolvedValue({ exists: true, data: () => ({ limit: 500 }) });
-    await boostLimit();
-    expect(mockSet).toHaveBeenCalledWith({ limit: { __increment: 100 } }, { merge: true });
+    const txSet = transaktionMit(500);
+    const ergebnis = await boostLimit();
+    expect(txSet).toHaveBeenCalledWith(expect.anything(), { limit: 600 }, { merge: true });
+    expect(ergebnis.limit).toBe(600);
   });
 
-  /* SEC-2026-08-12-17: Der Boost erhoehte ohne Obergrenze. Der Link steht im
-     Klartext in der ntfy-Mitteilung; wer ihn sah, konnte 30 Minuten lang beliebig
-     oft anheben und die einzige globale Kostenbremse praktisch abschalten. */
+  /* SEC-2026-08-12-17 + SEC-2026-08-13-A: ohne Obergrenze UND ohne Atomarität
+     konnte der abgeflossene Boost-Link die einzige globale Kostenbremse
+     praktisch abschalten. Jetzt: Deckel in der Transaktion, kein Schreiben. */
   test("ueber der Obergrenze (2x Stundenlimit) wird abgelehnt und laut gemeldet", async () => {
-    mockGet.mockResolvedValue({ exists: true, data: () => ({ limit: 950 }) });
+    const txSet = transaktionMit(950);
     const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
     const ergebnis = await boostLimit(100);
 
     expect(ergebnis.abgelehnt).toBe(true);
-    expect(mockSet).not.toHaveBeenCalled();
+    expect(txSet).not.toHaveBeenCalled();
     const zeile = JSON.parse(fehlerSpy.mock.calls[0][0]);
     expect(zeile.severity).toBe("ERROR");
     expect(zeile.error).toBe("boost-obergrenze-erreicht");
@@ -597,13 +616,14 @@ describe("boostLimit", () => {
   });
 
   test("ist die aktuelle Grenze nicht lesbar, wird NICHT erhoeht (fail-closed)", async () => {
-    mockGet.mockRejectedValue(new Error("firestore weg"));
+    const txSet = transaktionMit(0, { getWirft: true });
     const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
 
     const ergebnis = await boostLimit(100);
 
     expect(ergebnis.abgelehnt).toBe(true);
-    expect(mockSet).not.toHaveBeenCalled();
+    expect(ergebnis.limit).toBeNull();
+    expect(txSet).not.toHaveBeenCalled();
     expect(JSON.parse(fehlerSpy.mock.calls[0][0]).error).toBe("boost-limit-nicht-lesbar");
     fehlerSpy.mockRestore();
   });

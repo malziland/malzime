@@ -147,12 +147,27 @@ async function handleAdmin(req, res, secrets) {
       const amount = isNonceAuth
         ? 100
         : Math.min(Math.max(Number((req.body && req.body.amount) || 100) || 100, 1), 500);
-      await boostLimit(amount);
+      /* SEC-2026-08-13-D: Rückgabewert auswerten. Vorher wurde er verworfen und
+         dem Betreiber IMMER Erfolg gemeldet — auch wenn boostLimit ablehnte
+         (Obergrenze erreicht, Grenze nicht lesbar). Genau in dem Moment reagiert
+         der Betreiber auf einen Überlast-Alarm und braucht die Wahrheit (KERN 10:
+         Vollzugsmeldung am Rückgabewert, nicht an der Reihenfolge). */
+      const boost = await boostLimit(amount);
       const data = await getStats();
-      if (isNonceAuth) {
+      if (boost && boost.abgelehnt) {
+        const grund =
+          boost.limit == null
+            ? "Die aktuelle Grenze war nicht lesbar."
+            : `Die Obergrenze (${data.current.limit}) ist erreicht.`;
+        if (isNonceAuth) {
+          res.type("html").send(adminSuccessPage("Boost abgelehnt", grund));
+        } else {
+          res.json({ ok: false, action: "boost", abgelehnt: true, grund, stats: data });
+        }
+      } else if (isNonceAuth) {
         res
           .type("html")
-          .send(adminSuccessPage("Boost", `+100 Analysen hinzugefuegt. Neues Limit: ${data.current.limit}`));
+          .send(adminSuccessPage("Boost", `+${amount} Analysen hinzugefuegt. Neues Limit: ${data.current.limit}`));
       } else {
         res.json({ ok: true, action: "boost", stats: data });
       }

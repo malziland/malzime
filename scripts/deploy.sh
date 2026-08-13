@@ -166,13 +166,19 @@ echo "Cache-Busting-Version: ?v=$VERSION"
 # public/js/demo.js — dort haengen die Buster der grossen Demo-Bilder.
 # demo.js fehlte hier bis zum Kurzaudit 2026-08-11 (OPS-106): Sein Buster
 # blieb drei Deploys lang auf einem alten Stand stehen.
+#
+# OPS-2026-08-13-01: Das Muster hiess bis 2026-08-13 [0-9]* und erlaubte damit
+# NULL Ziffern. Getroffen wurde also auch ein nacktes ?v= in gewoehnlichem
+# Fliesstext; der Kommentar ueber DEMO_BUSTER in public/js/demo.js wurde beim
+# Deploy vom 2026-08-12 stillschweigend verunstaltet. [0-9][0-9]* verlangt
+# mindestens eine Ziffer (BRE, kein + — bash 3.2 auf macOS kennt es nicht).
 for f in public/index.html public/datenschutz.html public/impressum.html public/nutzungsbedingungen.html public/stats.html public/js/demo.js; do
   if [ -f "$f" ]; then
     # BUG-009: Cross-platform sed (macOS + Linux)
     if sed --version >/dev/null 2>&1; then
-      sed -i "s/\?v=[0-9]*/\?v=$VERSION/g" "$f"
+      sed -i "s/\?v=[0-9][0-9]*/\?v=$VERSION/g" "$f"
     else
-      sed -i '' "s/\?v=[0-9]*/\?v=$VERSION/g" "$f"
+      sed -i '' "s/\?v=[0-9][0-9]*/\?v=$VERSION/g" "$f"
     fi
     echo "  $f aktualisiert"
   fi

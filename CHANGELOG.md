@@ -4,6 +4,30 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Das Deploy-Skript schrieb in Fließtext hinein** (`OPS-2026-08-13-01`). Der
+  Cache-Buster wurde mit dem Muster `?v=` plus beliebig vielen Ziffern ersetzt —
+  „beliebig viele" schloss **null** ein. Damit traf die Ersetzung auch ein nacktes
+  `?v=` in einem gewöhnlichen Satz. Beim Hosting-Deploy vom 12. August ist genau
+  das passiert: Der Kommentar über `DEMO_BUSTER` in `public/js/demo.js` wurde
+  stillschweigend verunstaltet. Sichtbar war das nur im Quelltext, nie auf der
+  Seite. Das Muster verlangt jetzt mindestens eine Ziffer.
+
+  Der neue Wächter `deploy-buster-script.test.js` liest das Muster **aus der
+  echten Skriptdatei** und wendet es mit `sed` an — eine Kopie im Test wäre grün
+  geblieben, während das Skript wegdriftet. Er prüft zusätzlich, dass beide
+  Plattform-Zweige (GNU und BSD) denselben Ausdruck tragen, und enthält eine
+  Rückbauprobe mit dem alten Muster, die den eingetretenen Fehler nachstellt.
+
+### Sonstiges
+
+- Cache-Buster `2026081303` nachgetragen. Er ging beim Deploy vom 12. August live,
+  war aber nie eingecheckt: Aus dem Repository allein ließ sich nicht ablesen, was
+  online steht.
+
 ## [3.2.0] — 2026-08-13
 
 **Der Kurzaudit und das zweite TIEF-Audit — restlos saniert.**

@@ -7,9 +7,14 @@ import { setStatus, stopScanAnim } from "./ui.js";
 import { logClientError } from "./error-logger.js";
 
 /* Cache-Buster der Demo-Bilder. Steht bewusst als eigene Konstante, damit
-   scripts/deploy.sh ihn beim Hosting-Deploy mit derselben `?v=`-Ersetzung
-   hochzählt wie in den HTML-Seiten. */
-const DEMO_BUSTER = "?v=2026081302";
+   scripts/deploy.sh ihn beim Hosting-Deploy mit derselben Ersetzung hochzählt
+   wie in den HTML-Seiten.
+
+   2026-08-13 (OPS-2026-08-13-01): Hier stand der Verweis auf das Suchmuster
+   ausgeschrieben — und wurde vom Deploy prompt selbst überschrieben, weil das
+   Muster null Ziffern erlaubte. Beides ist behoben; der Satz nennt das Muster
+   trotzdem nicht mehr wörtlich. */
+const DEMO_BUSTER = "?v=2026081303";
 
 /* 2026-08-13: Die KI-Kennzeichnung ist in die Pixel gebrannt (Pflicht seit
    08/2026 — ein CSS-Etikett verschwindet, sobald jemand das Bild speichert).

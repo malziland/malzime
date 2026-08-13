@@ -1,6 +1,7 @@
 /* ── Stats-Seite: Lädt /api/stats und befüllt die Anzeige ── */
 
 import { initI18n, t, getLanguage, applyTranslations } from "./i18n.js";
+import { initSprachumschalter, merkmalUebernehmen } from "./sprachumschalter.js";
 
 /* Projekt-Start: 5. Februar 2026 */
 const PROJECT_START = new Date("2026-02-05");
@@ -46,6 +47,10 @@ async function loadStats() {
     const res = await fetch("/api/stats");
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
+
+    /* v3.3: Merkmals-Schloss des Sprachumschalters — dieselbe Antwort, die
+       ohnehin geholt wird. Aus oder unlesbar ⇒ kein Bedienelement. */
+    merkmalUebernehmen(data.sprachumschalter === true);
 
     /* Zahlen einsetzen — hourlyTotal ist die echte Anzahl (unabhängig von Resets) */
     el.liveCount.textContent = fmt(data.current.hourlyTotal);
@@ -117,6 +122,14 @@ function startCountdown(seconds, el) {
 async function init() {
   await initI18n();
   applyTranslations();
+
+  /* v3.3: Diese Seite ist übersetzt, also bekommt sie den echten Umschalter.
+     Ohne Neuanalyse-Rückruf — hier steht nichts auf dem Spiel, ein Wechsel
+     zeichnet die Zahlen einfach neu. Gezeigt wird er nach denselben Regeln wie
+     auf der Startseite: Merkmals-Schloss aus /api/stats, dazu die beiden
+     Erprobungs-Türen (Adresse und Konsole). */
+  initSprachumschalter({});
+
   await loadStats();
 }
 

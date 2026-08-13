@@ -504,7 +504,7 @@ async function renderQueueResult(data, myId, traceId, timings) {
   if (!data) {
     /* Nie halben Live-Text stehen lassen — Karte weg, normale Fehlermeldung. */
     liveAnzeige.abbrechen();
-    setStatus(t("error.queueFailed"), traceId);
+    setStatus(t("error.queueFailed"), traceId, "error.queueFailed");
     return;
   }
   /* Client-seitige Daten injizieren — GPS/dateTimeOriginal erreichen nie unsere
@@ -623,14 +623,14 @@ async function analyzeImageQueued() {
   const file = state.lastFile || elements.fileInput.files[0];
   if (!file) {
     stopScanAnim();
-    setStatus(t("error.noFile"));
+    setStatus(t("error.noFile"), undefined, "error.noFile");
     state.isAnalyzing = false;
     state.uploadLaeuft = false;
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
     stopScanAnim();
-    setStatus(t("error.fileTooLarge"));
+    setStatus(t("error.fileTooLarge"), undefined, "error.fileTooLarge");
     state.isAnalyzing = false;
     state.uploadLaeuft = false;
     return;
@@ -695,22 +695,22 @@ async function analyzeImageQueued() {
       }
       if (enqueueResp.status === 429 && parsed && parsed.blocked === "limit") {
         showLimitBanner(parsed.retryAfterSeconds || 600);
-        setStatus(t("error.rateLimit"), traceId);
+        setStatus(t("error.rateLimit"), traceId, "error.rateLimit");
       } else if (enqueueResp.status === 429 && parsed && parsed.blocked === "queueFull") {
         /* UX-2026-08-13-FE-02: Die volle Warteschlange ist im Workshop-Burst der
            ERWARTETE Fall, nicht ein Serverfehler. Vorher fiel er in den else-Zweig
            mit "Wir haben es dreimal probiert" — auf dem enqueue-Weg wird aber
            nichts wiederholt (ein einziger fetch). Eigener Text + die vom Server
            mitgelieferte Wartezeit. */
-        setStatus(t("error.queueFull"), traceId);
+        setStatus(t("error.queueFull"), traceId, "error.queueFull");
       } else if (enqueueResp.status === 503 && parsed && parsed.maintenance) {
         showMaintenanceModal(parsed.message);
       } else if (enqueueResp.status === 413) {
-        setStatus(t("error.imageTooLarge"), traceId);
+        setStatus(t("error.imageTooLarge"), traceId, "error.imageTooLarge");
       } else if (enqueueResp.status === 400) {
-        setStatus(t("error.invalidFormat"), traceId);
+        setStatus(t("error.invalidFormat"), traceId, "error.invalidFormat");
       } else {
-        setStatus(t("error.serverBusy"), traceId);
+        setStatus(t("error.serverBusy"), traceId, "error.serverBusy");
       }
       logClientError(new Error(`enqueue HTTP ${enqueueResp.status}`), {
         phase: "queue-enqueue",
@@ -727,7 +727,7 @@ async function analyzeImageQueued() {
     const jobId = enqueueData && enqueueData.jobId;
     if (!jobId) {
       stopScanAnim();
-      setStatus(t("error.queueFailed"), traceId);
+      setStatus(t("error.queueFailed"), traceId, "error.queueFailed");
       return;
     }
     /* PRIV-003: Abhol-Ticket vom Server merken + bei jedem Poll mitschicken. */
@@ -752,7 +752,7 @@ async function analyzeImageQueued() {
       /* v3.0: nie halben Live-Text stehen lassen — Karte samt Text weg. */
       liveAnzeige.abbrechen();
       clearStoredJobId();
-      setStatus(t("error.queueAbandoned"), traceId);
+      setStatus(t("error.queueAbandoned"), traceId, "error.queueAbandoned");
       return;
     }
     if (outcome.error) {
@@ -794,16 +794,16 @@ async function analyzeImageQueued() {
     let phase;
     if (err.message === "read_failed") {
       phase = "image-read";
-      setStatus(t("error.readFailed"), traceId);
+      setStatus(t("error.readFailed"), traceId, "error.readFailed");
     } else if (err.message === "image_decode_failed") {
       phase = "image-decode";
-      setStatus(t("error.decodeFailed"), traceId);
+      setStatus(t("error.decodeFailed"), traceId, "error.decodeFailed");
     } else if (!navigator.onLine) {
       phase = "offline";
-      setStatus(t("error.offline"), traceId);
+      setStatus(t("error.offline"), traceId, "error.offline");
     } else {
       phase = "queue-network";
-      setStatus(t("error.networkError"), traceId);
+      setStatus(t("error.networkError"), traceId, "error.networkError");
     }
     logClientError(err, {
       phase,

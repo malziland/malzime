@@ -194,6 +194,31 @@ test("Positivkontrolle: mit Flag entsteht er sehr wohl", async ({ page }) => {
   await expect(page.locator(".sw-grund")).toHaveCount(2);
 });
 
+test("Adress-Tür blendet ihn auch ohne Flag ein — ohne Konsole, auch am Handy", async ({
+  page,
+}) => {
+  /* Der wichtigere der beiden Wege: Auf iPhone und iPad gibt es keine Konsole,
+     und Chrome sperrt am Rechner das Einfügen in die Konsole. */
+  await seiteVorbereiten(page, { merkmal: false });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?sprachumschalter=1");
+  await expect(page.locator(".sprach-pille")).toBeVisible();
+
+  /* Und die Daumen-Größe stimmt auch auf diesem Weg. */
+  const f = await trefferflaeche(page, '.sprach-knopf[data-lang="en"]');
+  expect(f.breite).toBeGreaterThanOrEqual(44);
+  expect(f.hoehe).toBeGreaterThanOrEqual(44);
+});
+
+test("ein Tippfehler in der Adresse blendet nichts ein", async ({ page }) => {
+  await seiteVorbereiten(page, { merkmal: false });
+  const antwort = page.waitForResponse("**/api/stats");
+  await page.goto("/?sprachumschalter=0");
+  await antwort;
+  await settle(page);
+  await expect(page.locator(".sprach-pille")).toHaveCount(0);
+});
+
 test("Konsolen-Tür blendet ihn auch ohne Flag ein", async ({ page }) => {
   await seiteVorbereiten(page, { merkmal: false });
   const antwort = page.waitForResponse("**/api/stats");
@@ -235,7 +260,7 @@ test("Profil fertig: Rückfrage in der AKTUELLEN Sprache, Abbrechen ändert nich
   await page.click('.sprach-knopf[data-lang="en"]');
   const modal = page.locator('.sw-grund[data-modal="fertig"]');
   await expect(modal).toBeVisible();
-  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Profil behalten");
+  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Abbrechen");
 
   await modal.locator(".sw-schliessen").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
@@ -244,7 +269,7 @@ test("Profil fertig: Rückfrage in der AKTUELLEN Sprache, Abbrechen ändert nich
   /* Der am Prototyp gemeldete Fehler: Der zweite Versuch kam auf Englisch,
      obwohl nie gewechselt worden war. */
   await page.click('.sprach-knopf[data-lang="en"]');
-  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Profil behalten");
+  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Abbrechen");
 });
 
 test("Analyse läuft: bestätigen startet dieselbe Datei neu", async ({ page }) => {
@@ -302,27 +327,66 @@ test("Fokus bleibt in der Rückfrage und kehrt danach zurück", async ({ page })
   expect(zurueck).toBe("en");
 });
 
-test("Ziel-Größen erreichen 44 px", async ({ page }) => {
+/** Misst, was ein Daumen WIRKLICH trifft — nicht, was man sieht.
+    Getastet wird mit elementFromPoint vom Mittelpunkt nach aussen; damit zaehlt
+    die unsichtbare Erweiterung ueber ::after mit, die genau dafuer da ist. */
+async function trefferflaeche(page, waehler) {
+  return page.evaluate((w) => {
+    const el = document.querySelector(w);
+    const r = el.getBoundingClientRect();
+    const mx = r.left + r.width / 2;
+    const my = r.top + r.height / 2;
+    const trifft = (x, y) => {
+      const t = document.elementFromPoint(x, y);
+      return !!t && (t === el || el.contains(t));
+    };
+    let oben = 0;
+    while (oben < 60 && trifft(mx, my - oben - 1)) oben++;
+    let unten = 0;
+    while (unten < 60 && trifft(mx, my + unten + 1)) unten++;
+    let links = 0;
+    while (links < 80 && trifft(mx - links - 1, my)) links++;
+    let rechts = 0;
+    while (rechts < 80 && trifft(mx + rechts + 1, my)) rechts++;
+    /* +1 fuer den Mittelpunkt selbst: Gezaehlt werden die Punkte NEBEN ihm,
+       die Flaeche umfasst ihn aber mit. Ohne das misst man 43 statt 44 und
+       verwirft eine korrekte Umsetzung. */
+    return { breite: links + rechts + 1, hoehe: oben + unten + 1 };
+  }, waehler);
+}
+
+test("Ziel-Größen erreichen 44 px — tastbar, ohne dass der Schalter aufgeblasen wird", async ({
+  page,
+}) => {
   await seiteVorbereiten(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await warteAufSchalter(page);
   await profilErzeugen(page);
 
+  /* Nach dem Erzeugen des Profils steht die Seite gescrollt; der Umschalter
+     liegt dann ausserhalb des Sichtfelds und elementFromPoint greift ins
+     Leere. Im Einzellauf fiel das nie auf, unter Last (sieben E2E-Dateien
+     gleichzeitig) schon — ein Messfehler, kein Mangel am Schalter. */
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(page.locator(".sprach-pille")).toBeInViewport();
+
   for (const waehler of ['.sprach-knopf[data-lang="de"]', '.sprach-knopf[data-lang="en"]']) {
-    const k = await page.locator(waehler).boundingBox();
-    expect(Math.round(k.width), `Breite ${waehler}`).toBeGreaterThanOrEqual(44);
-    expect(Math.round(k.height), `Höhe ${waehler}`).toBeGreaterThanOrEqual(44);
+    const f = await trefferflaeche(page, waehler);
+    expect(f.breite, `tastbare Breite ${waehler}`).toBeGreaterThanOrEqual(44);
+    expect(f.hoehe, `tastbare Höhe ${waehler}`).toBeGreaterThanOrEqual(44);
   }
 
+  /* Und die SICHTBARE Pille bleibt schlank wie der abgenommene Entwurf.
+     Der erste Anlauf blies sie auf 108×52 auf — vom Nutzer sofort bemerkt. */
+  const pille = await page.locator(".sprach-pille").boundingBox();
+  expect(Math.round(pille.height), "sichtbare Höhe der Pille").toBeLessThanOrEqual(40);
+
   await page.click('.sprach-knopf[data-lang="en"]');
-  /* Erst messen, wenn die Rückfrage ihre Endgröße hat: Bis die Klasse
-     `sichtbar` gesetzt ist, steht sie auf scale(0.985) — 44 px wären dann
-     43,3 und der Test schlüge grundlos fehl. */
   await expect(page.locator('.sw-grund[data-modal="fertig"].sichtbar')).toBeVisible();
-  const x = await page.locator('.sw-grund[data-modal="fertig"] .sw-schliessen').boundingBox();
-  expect(Math.round(x.width)).toBeGreaterThanOrEqual(44);
-  expect(Math.round(x.height)).toBeGreaterThanOrEqual(44);
+  const x = await trefferflaeche(page, '.sw-grund[data-modal="fertig"] .sw-schliessen');
+  expect(x.breite, "tastbare Breite des X").toBeGreaterThanOrEqual(44);
+  expect(x.hoehe, "tastbare Höhe des X").toBeGreaterThanOrEqual(44);
 });
 
 test("Kontrast der gefüllten Flächen reicht in hell UND dunkel", async ({ page }) => {
@@ -392,7 +456,7 @@ test.describe("Startsprache folgt dem Gerät", () => {
     await profilErzeugen(page);
     await page.click('.sprach-knopf[data-lang="de"]');
     await expect(page.locator('.sw-grund[data-modal="fertig"] .sw-knopf--bleiben')).toHaveText(
-      "Keep my profile"
+      "Cancel"
     );
   });
 });

@@ -15,6 +15,8 @@ export default [
         navigator: "readonly",
         screen: "readonly",
         sessionStorage: "readonly",
+        localStorage: "readonly",
+        MutationObserver: "readonly",
         fetch: "readonly",
         console: "readonly",
         setTimeout: "readonly",
@@ -100,10 +102,13 @@ export default [
         afterAll: "readonly",
         vi: "readonly",
         sessionStorage: "readonly",
+        localStorage: "readonly",
+        MutationObserver: "readonly",
         /* Für den Test des Modus-Speichers: `localStorage` als Gegenprobe
            (die Wahl darf dort NICHT landen), `Storage` zum Nachstellen eines
            defekten Speichers wie im privaten Safari-Modus. */
         localStorage: "readonly",
+        MutationObserver: "readonly",
         Storage: "readonly",
       },
     },

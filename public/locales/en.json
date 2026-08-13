@@ -238,13 +238,13 @@
   "sprache.name.en": "English",
   "sprache.schliessen": "Close",
   "sprache.gewechselt": "Language switched to English.",
-  "sprache.fertig.titel": "Switch language?",
-  "sprache.fertig.text": "Your profile was created in English. Translating would be the lazy way out. For a German profile the AI takes another look at your photo and judges from scratch.",
-  "sprache.fertig.hinweis": "<strong>And it never comes out the same.</strong> The AI guesses anew every time — the second run may describe you quite differently. That is exactly the lesson here, but your current result will be gone.",
-  "sprache.fertig.bleiben": "Keep my profile",
-  "sprache.fertig.wechseln": "Analyse again",
-  "sprache.laeuft.titel": "Switch language?",
-  "sprache.laeuft.text": "Your photo is still being processed. Switching restarts the analysis in German — your photo stays the same, you do not have to choose anything again.",
-  "sprache.laeuft.bleiben": "Stay in English",
-  "sprache.laeuft.wechseln": "Switch to German"
+  "sprache.fertig.titel": "Switch to German?",
+  "sprache.fertig.text": "<strong>Your current profile will be deleted.</strong> The AI looks at your photo again and writes everything from scratch.",
+  "sprache.fertig.bleiben": "Cancel",
+  "sprache.fertig.wechseln": "Switch to German",
+  "sprache.laeuft.titel": "Switch to German?",
+  "sprache.laeuft.text": "The analysis starts over — your photo stays, you do not have to upload it again.",
+  "sprache.laeuft.bleiben": "Cancel",
+  "sprache.laeuft.wechseln": "Switch to German",
+  "sprache.fertig.textOhneBild": "<strong>Your current profile will be deleted.</strong> For a German one you would have to upload your photo again."
 }

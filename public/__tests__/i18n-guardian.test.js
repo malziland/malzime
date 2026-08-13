@@ -188,7 +188,18 @@ describe("i18n Guardian", () => {
      * As phases complete, files get REMOVED from this list.
      * The guardian then ensures they stay clean forever.
      */
-    const ALLOWLIST = [];
+    const ALLOWLIST = [
+      /* ÜBERGANG (2026-08-13): js/sprachhinweis.js trägt den zweisprachigen
+         Hinweis auf den noch nicht übersetzten Rechtsseiten. Die Texte stehen
+         dort bewusst fest im Code: Diese Seiten laden KEINE Sprachdatei und
+         rufen keine Schnittstelle auf — das ist eine geprüfte Eigenschaft
+         (e2e/sprachumschalter-unterseiten.test.js). Sie dafür zu öffnen wäre
+         der schlechtere Tausch.
+
+         Der Eintrag löst sich selbst auf: Der Test direkt darunter macht ihn
+         zum Fehler, sobald die Rechtsseiten übersetzt sind. */
+      "js/sprachhinweis.js",
+    ];
 
     it("non-allowlisted JS files have no hardcoded German", () => {
       const violations = [];
@@ -201,6 +212,27 @@ describe("i18n Guardian", () => {
         }
       }
       expect(violations).toEqual([]);
+    });
+
+    it("die Übergangs-Ausnahme verschwindet, sobald die Rechtsseiten übersetzt sind", () => {
+      /* Eine Ausnahme ohne Ablaufdatum wird zur Dauerlösung. Diese hier hat
+         eines: Sobald eine der drei Rechtsseiten Übersetzungs-Marker trägt,
+         ist die Übergangslösung überflüssig — dann müssen js/sprachhinweis.js,
+         seine Einbindung im HTML und dieser Eintrag weg. */
+      /* PUBLIC_DIR zeigt bereits auf public/ — siehe oben. */
+      const rechtsseiten = ["datenschutz.html", "impressum.html", "nutzungsbedingungen.html"];
+      const uebersetzt = rechtsseiten.filter((datei) => {
+        const p = path.join(PUBLIC_DIR, datei);
+        return fs.existsSync(p) && fs.readFileSync(p, "utf8").includes("data-i18n");
+      });
+
+      if (uebersetzt.length === 0) return; // Übergang gilt noch
+
+      expect(
+        ALLOWLIST.includes("js/sprachhinweis.js"),
+        `${uebersetzt.join(", ")} ist übersetzt — die Übergangslösung js/sprachhinweis.js ` +
+          "und dieser Allowlist-Eintrag gehören jetzt entfernt"
+      ).toBe(false);
     });
 
     it("allowlist contains only files that need it (hygiene)", () => {

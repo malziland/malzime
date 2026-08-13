@@ -238,13 +238,13 @@
   "sprache.name.en": "English",
   "sprache.schliessen": "Schließen",
   "sprache.gewechselt": "Sprache auf Deutsch umgestellt.",
-  "sprache.fertig.titel": "Sprache wechseln?",
-  "sprache.fertig.text": "Dein Profil ist auf Deutsch entstanden. Übersetzen wäre die faule Lösung. Für ein englisches Profil sieht sich die KI dein Foto noch einmal an und urteilt von vorne.",
-  "sprache.fertig.hinweis": "<strong>Dabei kommt nie dasselbe Profil heraus.</strong> Die KI rät jedes Mal neu — der zweite Durchlauf kann dich ganz anders beschreiben. Genau das ist der Lerneffekt, aber dein jetziges Ergebnis ist dann weg.",
-  "sprache.fertig.bleiben": "Profil behalten",
-  "sprache.fertig.wechseln": "Neu analysieren",
-  "sprache.laeuft.titel": "Sprache wechseln?",
-  "sprache.laeuft.text": "Dein Foto ist noch in Arbeit. Beim Wechsel beginnt die Analyse auf Englisch von vorn — dein Foto bleibt dasselbe, du musst nichts noch einmal auswählen.",
-  "sprache.laeuft.bleiben": "Bei Deutsch bleiben",
-  "sprache.laeuft.wechseln": "Auf Englisch wechseln"
+  "sprache.fertig.titel": "Auf Englisch wechseln?",
+  "sprache.fertig.text": "<strong>Dein jetziges Profil wird gelöscht.</strong> Die KI schaut dein Foto noch einmal an und schreibt alles neu.",
+  "sprache.fertig.bleiben": "Abbrechen",
+  "sprache.fertig.wechseln": "Auf Englisch wechseln",
+  "sprache.laeuft.titel": "Auf Englisch wechseln?",
+  "sprache.laeuft.text": "Die Analyse beginnt von vorn — dein Foto bleibt, du musst es nicht noch einmal hochladen.",
+  "sprache.laeuft.bleiben": "Abbrechen",
+  "sprache.laeuft.wechseln": "Auf Englisch wechseln",
+  "sprache.fertig.textOhneBild": "<strong>Dein jetziges Profil wird gelöscht.</strong> Für ein englisches müsstest du dein Foto noch einmal hochladen."
 }

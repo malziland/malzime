@@ -2084,13 +2084,19 @@ html[data-has-result] {
   margin-bottom: 0;
 }
 
+/* A11Y-2026-08-13-01 (WCAG 1.4.1): Links im Fliesstext waren allein an der
+   Farbe erkennbar — axe meldete 8 ernste Verstoesse (link-in-text-block) auf
+   den Rechtsseiten. Sie waren nie gemessen worden: Die bestehende
+   axe-Pruefung deckt nur die Startseite ab. Unterstrichen ist die Loesung,
+   die ohne Farbsehen funktioniert. */
 .legal-block a {
   color: var(--teal-text);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .legal-block a:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 
 .legal-section p {
@@ -2102,11 +2108,12 @@ html[data-has-result] {
 
 .legal-section a {
   color: var(--teal-text);
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .legal-section a:hover {
-  text-decoration: underline;
+  text-decoration-thickness: 2px;
 }
 
 .legal-list {
@@ -3460,12 +3467,25 @@ html[lang="en"] .rc-zitat::after {
   background: transparent;
   color: var(--sw-fuell);
   border-radius: 999px;
-  /* WCAG 2.5.5: 44x44 als Ziel-Groesse. Am Prototyp gemessen waren es
-     49x28 — auf dem Handy zu wenig fuer einen Daumen. */
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 1rem;
+  padding: 0.3rem 1rem;
   transition: color 0.28s var(--ease);
+}
+
+/* Ziel-Groesse 44 px, ohne die Pille aufzublasen.
+   Erster Anlauf war `min-height: 44px` — das machte aus 49x28 ganze 50x44 und
+   aus der schlanken Pille einen 108x52-Klotz, der mit dem abgenommenen
+   Entwurf nichts mehr zu tun hatte. Die Regel meint aber die TASTBARE Flaeche,
+   nicht die sichtbare: Ein unsichtbares Feld ueber dem Knopf bringt den
+   Daumen-Treffer, das Aussehen bleibt der Entwurf. Nur senkrecht ausgedehnt —
+   waagrecht wuerden sich die beiden Knoepfe gegenseitig ins Gehege kommen. */
+.sprach-knopf::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 44px;
+  transform: translateY(-50%);
 }
 .sprach-knopf.aktiv {
   color: var(--sw-fuell-text);
@@ -3515,10 +3535,11 @@ html[lang="en"] .rc-zitat::after {
 
 .sw-schliessen {
   position: absolute;
-  top: 0.4rem;
-  right: 0.45rem;
-  width: 44px;
-  height: 44px;
+  top: 0.55rem;
+  right: 0.6rem;
+  /* Sichtbar 32 px wie im abgenommenen Entwurf, tastbar 44 px ueber ::after. */
+  width: 2rem;
+  height: 2rem;
   display: grid;
   place-items: center;
   font-size: 1.5rem;
@@ -3532,6 +3553,11 @@ html[lang="en"] .rc-zitat::after {
   transition:
     background 0.15s var(--ease),
     color 0.15s var(--ease);
+}
+.sw-schliessen::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
 }
 .sw-schliessen:hover {
   background: var(--hover);
@@ -3549,20 +3575,22 @@ html[lang="en"] .rc-zitat::after {
   margin: 0 2.5rem 0.7rem 0;
   line-height: 1.25;
 }
+
+/* Die zwei Rückfragen müssen auf einen Blick unterscheidbar sein — sonst liest
+   sie niemand zu Ende (Nutzer-Ansage 2026-08-13). Die Unterscheidung sitzt
+   aber im FOLGESATZ, nicht in der Überschrift: Ein erster Anlauf setzte die
+   Löschwarnung als Titel, und damit stand vor jemandem, der nur die Sprache
+   wechseln wollte, plötzlich eine Schreckmeldung ohne Zusammenhang. Die
+   Überschrift nennt jetzt wieder das Vorhaben, der hervorgehobene Halbsatz die
+   Folge. */
+.sw-modal p strong {
+  color: var(--rust-text);
+}
 .sw-modal p {
   color: var(--text);
   font-size: 0.95rem;
   margin: 0;
 }
-.sw-hinweis {
-  margin-top: 0.85rem !important;
-  padding: 0.8rem 0.9rem;
-  background: var(--tint-rust);
-  border-left: 3px solid var(--rust-text);
-  border-radius: 8px;
-  font-size: 0.9rem;
-}
-
 .sw-knoepfe {
   display: flex;
   gap: 0.6rem;
@@ -3632,4 +3660,14 @@ html[lang="en"] .rc-zitat::after {
   .sw-schliessen {
     transition: none;
   }
+}
+
+/* Zweitsprachiger Block im Hinweis der noch nicht übersetzten Seiten.
+   ÜBERGANG — entfällt mit js/sprachhinweis.js, sobald die Rechtstexte auf
+   Englisch vorliegen. */
+.sw-modal h2.sw-zweitsprache {
+  margin-top: 1.1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-soft);
+  font-size: 1.1rem;
 }

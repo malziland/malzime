@@ -83,7 +83,7 @@ async function loadDemoImage(url, name) {
        Demo-Fotos sind ausgerechnet der Rückfallweg für Workshops. Jetzt Meldung,
        Animation stoppen, Fehler protokollieren. */
     stopScanAnim(true);
-    setStatus(t("error.networkError"));
+    setStatus(t("error.networkError"), undefined, "error.networkError");
     logClientError(err, { phase: "demo-image-load", demo: name });
   }
 }

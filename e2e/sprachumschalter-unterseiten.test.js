@@ -56,13 +56,15 @@ test.describe("Nur-deutsche Seiten: Hinweis statt Wechsel", () => {
     await expect(hinweis).toBeVisible();
 
     /* Wer auf EN klickt, liest kein Deutsch — die Erklärung muss ihn erreichen. */
-    await expect(hinweis).toContainText("noch nicht auf Englisch");
-    await expect(hinweis).toContainText("not available in English yet");
+    await expect(hinweis).toContainText("nur auf Deutsch");
+    await expect(hinweis).toContainText("German only");
 
-    /* Und beide Blöcke sind als ihre Sprache ausgezeichnet, sonst spricht ein
-       Screenreader den englischen Satz deutsch aus. */
-    await expect(hinweis.locator('[lang="de"]').first()).toBeVisible();
-    await expect(hinweis.locator('[lang="en"]').first()).toBeVisible();
+    /* Beide Zeilen sind als ihre Sprache ausgezeichnet, sonst spricht ein
+       Screenreader den englischen Satz deutsch aus. Und es bleibt bei je EINER
+       Zeile — längere Hinweise liest im Workshop niemand. */
+    await expect(hinweis.locator('[lang="de"]')).toHaveCount(1);
+    await expect(hinweis.locator('[lang="en"]')).toHaveCount(1);
+    expect((await hinweis.innerText()).split("\n").filter(Boolean).length).toBeLessThanOrEqual(4);
 
     await page.click(".sw-knopf--bleiben");
     await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);

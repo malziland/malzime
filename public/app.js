@@ -17,7 +17,7 @@ import { enthuellungAbkuerzen, modusWechsel } from "./js/live-anzeige.js";
 import * as realitaetsCheck from "./js/realitaets-check.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
-import { initSprachumschalter, zeigeSprachumschalter } from "./js/sprachumschalter.js";
+import { initSprachumschalter, merkmalUebernehmen } from "./js/sprachumschalter.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
    Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
@@ -68,8 +68,9 @@ state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
     }
     /* v3.3: Sprachumschalter nur bauen, wenn das Merkmal an ist. Steht es aus
        oder war die Antwort nicht lesbar, entsteht kein Element — kein toter
-       Schalter, den jemand vergeblich anklickt. */
-    if (data?.sprachumschalter === true) zeigeSprachumschalter(true);
+       Schalter, den jemand vergeblich anklickt. Auch bei `false` aufrufen:
+       Nur so erfahren die Unterseiten, dass das Merkmal wieder aus ist. */
+    merkmalUebernehmen(data?.sprachumschalter === true);
   })
   .catch(() => {})
   .finally(() => clearTimeout(statsTimer));
@@ -77,7 +78,17 @@ state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
 /* v3.3: Sprachumschalter anmelden — bedingungslos, damit die Konsolen-Tuer
    `malziME.sprachumschalter()` auch dann offensteht, wenn /api/stats nicht
    antwortet. Gebaut wird erst auf Zuruf (Merkmals-Schloss oder Konsole). */
-initSprachumschalter({ analysiere: handleNewFile });
+initSprachumschalter({
+  analysiere: handleNewFile,
+  /* Nach einem Neuladen liegt zwar ein Ergebnis vor, die Bilddatei aber nicht
+     mehr. Wer dann die Sprache wechselt, soll nicht ein Profil in der alten
+     Sprache behalten — er landet auf einer sauberen Startseite. Den gemerkten
+     Auftrag vorher verwerfen, sonst holt ihn der nächste Seitenaufruf zurück. */
+  zuruecksetze: () => {
+    clearStoredJobId();
+    window.location.reload();
+  },
+});
 
 /* Maintenance-Modal: Seite neu laden */
 elements.maintenanceReload.addEventListener("click", () => location.reload());

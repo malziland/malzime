@@ -1,16 +1,47 @@
 import { elements } from "./dom.js";
 import { t } from "./i18n.js";
 
+/**
+ * Schreibt eine gemerkte Statusmeldung in der aktuellen Sprache neu.
+ * Ruft der Sprachumschalter nach jedem Wechsel auf.
+ */
+export function statusNeuSchreiben() {
+  const schluessel = elements.status.dataset.i18nKey;
+  if (!schluessel) return;
+  setStatus(t(schluessel), elements.status.dataset.traceId || undefined, schluessel);
+}
+
 /* ── Scan-Animation ── */
 
 let scanInterval = null;
 
-export function setStatus(text, traceId) {
+/**
+ * Setzt die Statuszeile.
+ *
+ * @param {string} text     Fertiger Text.
+ * @param {string} [traceId]
+ * @param {string} [schluessel] i18n-Schlüssel des Textes. Wird er mitgegeben,
+ *   merkt sich die Zeile ihn und kann bei einem Sprachwechsel neu geschrieben
+ *   werden (statusNeuSchreiben). Ohne ihn bleibt die Meldung stehen, wie sie
+ *   ist — genau das war der Fehler: Nach einem Wechsel auf Englisch stand die
+ *   Fehlermeldung weiter auf Deutsch (gefunden 2026-08-13 beim Durchgang durch
+ *   alle Zustände der echten Anwendung).
+ */
+export function setStatus(text, traceId, schluessel) {
   if (!text) {
     elements.status.textContent = "";
     elements.status.classList.remove("visible");
     elements.status.removeAttribute("role");
+    delete elements.status.dataset.i18nKey;
+    delete elements.status.dataset.traceId;
     return;
+  }
+  if (schluessel) {
+    elements.status.dataset.i18nKey = schluessel;
+    if (traceId) elements.status.dataset.traceId = traceId;
+  } else {
+    delete elements.status.dataset.i18nKey;
+    delete elements.status.dataset.traceId;
   }
   if (traceId) {
     /* Bei Fehlern wird die Trace-ID dezent als zweite Zeile angehaengt,

@@ -74,6 +74,28 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Behoben
 
+- **Nach einem Neuladen versprach der Wechsel eine unmögliche Analyse.** Die
+  Seite holt das Ergebnis zurück, die Bilddatei überlebt aber kein Neuladen —
+  ein File-Objekt lässt sich nicht speichern. Die Rückfrage sagte trotzdem „die
+  KI schaut dein Foto noch einmal an", und der Wechsel lief stillschweigend ins
+  Leere. Jetzt wird das Profil gelöscht und man landet auf einer sauberen
+  Startseite; der gemerkte Auftrag wird dabei verworfen, sonst holt ihn der
+  nächste Seitenaufruf zurück. Vom Betreiber gefunden, nicht von den Tests —
+  die hatten das falsche Verhalten sogar festgeschrieben.
+
+- **Stehende Meldungen wechselten die Sprache nicht mit.** Eine Fehlermeldung
+  („Die KI ist gerade überlastet…") blieb wortgleich stehen, während die Seite
+  auf Englisch umschaltete. `setStatus` merkt sich jetzt den Textschlüssel, und
+  jeder Sprachwechsel schreibt die Zeile neu — der Fehlercode bleibt erhalten.
+  Gefunden bei einem systematischen Durchgang durch **alle** Zustände der
+  echten Anwendung, nicht durch die drei Zustände des Entwurfs.
+
+- **Die Rückfragen waren zu lang und sahen gleich aus.** Zwei Dialoge mit
+  demselben Titel und je rund 60 Wörtern — im Workshop liest die niemand. Die
+  Überschrift nennt jetzt die **Folge** („Dein Profil wird gelöscht."), darunter
+  steht ein Satz, und die folgenschwere Variante trägt eine eigene Farbe samt
+  Warnzeichen. Ein Test hält die Länge fest, sonst wächst sie unbemerkt zurück.
+
 - **Das Deploy-Skript schrieb in Fließtext hinein** (`OPS-2026-08-13-01`). Der
   Cache-Buster wurde mit dem Muster `?v=` plus beliebig vielen Ziffern ersetzt —
   „beliebig viele" schloss **null** ein. Damit traf die Ersetzung auch ein nacktes

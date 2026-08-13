@@ -3575,20 +3575,25 @@ html[lang="en"] .rc-zitat::after {
   margin: 0 2.5rem 0.7rem 0;
   line-height: 1.25;
 }
+
+/* Die zwei Rückfragen müssen auf einen Blick unterscheidbar sein — sonst liest
+   sie niemand zu Ende. Die eine LÖSCHT etwas: rostrote Überschrift mit
+   Warnzeichen. Die andere kostet nur Wartezeit: ruhig wie der Rest.
+   (Nutzer-Ansage 2026-08-13: „Selbst ich habe es nicht gelesen, weil es gleich
+   ausschaut wie die anderen.") */
+.sw-modal--fertig h2 {
+  color: var(--rust-text);
+}
+.sw-modal--fertig h2::before {
+  content: "⚠";
+  margin-right: 0.45rem;
+  font-weight: 400;
+}
 .sw-modal p {
   color: var(--text);
   font-size: 0.95rem;
   margin: 0;
 }
-.sw-hinweis {
-  margin-top: 0.85rem !important;
-  padding: 0.8rem 0.9rem;
-  background: var(--tint-rust);
-  border-left: 3px solid var(--rust-text);
-  border-radius: 8px;
-  font-size: 0.9rem;
-}
-
 .sw-knoepfe {
   display: flex;
   gap: 0.6rem;

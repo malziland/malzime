@@ -27,25 +27,38 @@
  * hinterlassen hat. Kein Netzweg, kein Merkmals-Abruf auf einer Rechtsseite.
  */
 
-const SPUR = "malzime-sprachumschalter";
+const TUER = "malzime-tuer-sprachumschalter";
+const MERKMAL = "malzime-umschalter-aktiv";
 const KREUZ_ZEICHEN = "×";
 
+/* Je EIN Satz pro Sprache. Alles darüber hinaus liest im Workshop niemand
+   (Nutzer-Ansage 2026-08-13). */
 const TEXTE = {
-  titel_de: "Diese Seite gibt es noch nicht auf Englisch.",
-  titel_en: "This page is not available in English yet.",
-  text_de: "Sie wird gerade übersetzt. Die Startseite und die Analyse sind schon auf Englisch.",
-  text_en: "It is being translated. The start page and the analysis are already in English.",
+  titel_de: "Diese Seite gibt es nur auf Deutsch.",
+  titel_en: "This page is German only.",
   knopf: "OK",
   schliessen_de: "Schließen",
   schliessen_en: "Close",
 };
 
+/* Dieselbe Tür wie auf der Startseite (js/sprachumschalter.js). Sie liegt im
+   localStorage, weil diese Seiten mit target="_blank" rel="noopener" geöffnet
+   werden: Ein so geöffneter Tab bekommt einen leeren sessionStorage, eine
+   Spur von dort wäre hier nie angekommen. */
 function sichtbar() {
+  let wert = null;
   try {
-    if (new URLSearchParams(window.location.search).get("sprachumschalter") === "1") return true;
-    return sessionStorage.getItem(SPUR) === "1";
+    wert = new URLSearchParams(window.location.search).get("sprachumschalter");
   } catch (_err) {
-    return false;
+    /* kaputte Adresse */
+  }
+  try {
+    if (wert === "1") localStorage.setItem(TUER, "1");
+    if (wert === "0") localStorage.removeItem(TUER);
+    return localStorage.getItem(TUER) === "1" || localStorage.getItem(MERKMAL) === "1";
+  } catch (_err) {
+    /* Privater Modus: dann gilt nur die Angabe in der Adresse. */
+    return wert === "1";
   }
 }
 
@@ -111,18 +124,10 @@ function baueHinweis() {
   titel.textContent = TEXTE.titel_de;
   kasten.setAttribute("aria-labelledby", titel.id);
 
-  const textDe = document.createElement("p");
-  textDe.lang = "de";
-  textDe.textContent = TEXTE.text_de;
-
   const titelEn = document.createElement("h2");
   titelEn.className = "sw-zweitsprache";
   titelEn.lang = "en";
   titelEn.textContent = TEXTE.titel_en;
-
-  const textEn = document.createElement("p");
-  textEn.lang = "en";
-  textEn.textContent = TEXTE.text_en;
 
   const knoepfe = document.createElement("div");
   knoepfe.className = "sw-knoepfe";
@@ -132,7 +137,7 @@ function baueHinweis() {
   ok.textContent = TEXTE.knopf;
   knoepfe.appendChild(ok);
 
-  kasten.append(schliessen, titel, textDe, titelEn, textEn, knoepfe);
+  kasten.append(schliessen, titel, titelEn, knoepfe);
   grund.appendChild(kasten);
 
   return { grund, ok, schliessen };

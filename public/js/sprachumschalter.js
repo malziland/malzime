@@ -28,17 +28,34 @@
 
 import { t, getLanguage, setLanguage } from "./i18n.js";
 import { state } from "./state.js";
+import { statusNeuSchreiben } from "./ui.js";
 
 /* Die Texte sprechen von „der anderen Sprache", ohne sie zu benennen —
    solange es genau zwei gibt, ist das eindeutig. Käme eine dritte dazu,
    müssten die Locale-Texte einen Platzhalter bekommen. */
 const SPRACHEN = ["de", "en"];
 const SPEICHER_SCHLUESSEL = "malzime-sprache";
-/* Spur für die noch nicht übersetzten Seiten: Sie laden bewusst kein
-   /api/stats (eine Rechtsseite soll keinen Netzweg aufmachen) und erfahren so
-   im selben Tab, ob der Umschalter überhaupt gezeigt werden soll.
-   Übergangslösung — entfällt mit js/sprachhinweis.js. */
-const SPUR_SCHLUESSEL = "malzime-sprachumschalter";
+/* Spur der Erprobungs-Tür. Sie liegt im localStorage, NICHT im
+   sessionStorage: Die Rechtsseiten öffnen mit target="_blank" rel="noopener"
+   (index.html:348), und ein so geöffneter Tab bekommt einen leeren
+   sessionStorage. Die Spur wäre dort nie angekommen — genau daran ist die
+   erste Fassung gescheitert.
+
+   Bewusst geräteweit und dauerhaft: Es ist eine Tür zum Erproben, keine
+   Nutzer-Einstellung. Zu bekommen nur über ?sprachumschalter=1, wieder los
+   über ?sprachumschalter=0 oder malziME.sprachumschalter(false). Der
+   Normalbetrieb hängt weiterhin allein am Merkmals-Schloss. */
+const TUER_SCHLUESSEL = "malzime-tuer-sprachumschalter";
+
+/* Zweite Spur, die den Stand des Merkmals spiegelt. Die Rechtsseiten rufen
+   bewusst kein /api/stats auf (eine Rechtsseite soll keinen Netzweg aufmachen)
+   und erfahren nur so, dass der Umschalter im Betrieb an ist. Wird bei JEDEM
+   Aufruf der Startseite neu geschrieben oder geloescht, damit ein Abschalten
+   des Merkmals ankommt.
+
+   Getrennt von der Tuer, weil sonst das ausgeschaltete Merkmal beim naechsten
+   Seitenaufruf die Erprobung wieder zusperren wuerde. */
+const MERKMAL_SCHLUESSEL = "malzime-umschalter-aktiv";
 
 /* Das Schliess-Kreuz ist ein Zeichen, kein Text: Es wird nie uebersetzt und
    Screenreadern gar nicht vorgelesen — deren Beschriftung kommt aus dem
@@ -51,14 +68,24 @@ let modalFertig = null;
 let modalLaeuft = null;
 let ansage = null;
 let neuAnalysieren = null;
+let zuruecksetzen = null;
 
 /* ── Lage bestimmen ─────────────────────────────────────────────────────── */
 
-/** "leer" | "laeuft" | "fertig" — woran hängt gerade etwas? */
+/**
+ * "leer" | "laeuft" | "fertig" | "ohnebild"
+ *
+ * `ohnebild` ist der Fall nach einem Neuladen: Die Seite holt das Ergebnis
+ * zurück (js/api.js, resumeQueueJob), die Bilddatei aber überlebt kein
+ * Neuladen — ein File-Objekt lässt sich nicht speichern. Eine neue Analyse ist
+ * dann unmöglich, und eine Rückfrage, die sie verspricht, wäre eine Lüge: Der
+ * Wechsel liefe ins Leere und niemand wüsste warum.
+ */
 function lage() {
-  if (state.isAnalyzing || state.uploadLaeuft) return "laeuft";
-  if (state.lastData) return "fertig";
-  return "leer";
+  const laeuftEtwas = state.isAnalyzing || state.uploadLaeuft;
+  if (!laeuftEtwas && !state.lastData) return "leer";
+  if (!state.lastFile) return "ohnebild";
+  return laeuftEtwas ? "laeuft" : "fertig";
 }
 
 /* ── Bausteine ──────────────────────────────────────────────────────────── */
@@ -98,14 +125,18 @@ function baueUmschalter() {
   return huelle;
 }
 
-function modalBauen(art, mitHinweis) {
+function modalBauen(art) {
   const grund = document.createElement("div");
   grund.className = "sw-grund";
   grund.dataset.modal = art;
   grund.hidden = true;
 
   const kasten = document.createElement("div");
-  kasten.className = "sw-modal";
+  /* Die Art steht als Klasse dran, damit sich die beiden Rückfragen auf einen
+     Blick unterscheiden: Die eine löscht etwas (rostrot, Warnzeichen), die
+     andere kostet nur Wartezeit (ruhig). Vorher sahen sie gleich aus — der
+     Nutzer hat sie deshalb gar nicht erst gelesen. */
+  kasten.className = `sw-modal sw-modal--${art}`;
   kasten.setAttribute("role", "dialog");
   kasten.setAttribute("aria-modal", "true");
   kasten.id = `sw-modal-${art}`;
@@ -128,13 +159,6 @@ function modalBauen(art, mitHinweis) {
   text.dataset.swKey = `sprache.${art}.text`;
 
   kasten.append(schliessen, titel, text);
-
-  if (mitHinweis) {
-    const hinweis = document.createElement("p");
-    hinweis.className = "sw-hinweis";
-    hinweis.dataset.swKeyHtml = `sprache.${art}.hinweis`;
-    kasten.appendChild(hinweis);
-  }
 
   const knoepfe = document.createElement("div");
   knoepfe.className = "sw-knoepfe";
@@ -217,8 +241,13 @@ function umgebungStillegen(an) {
   });
 }
 
-function modalOeffnen(art, ziel) {
+function modalOeffnen(art, ziel, ohneBild) {
   zielSprache = ziel;
+  const text = art === "fertig" ? modalFertig.querySelector("[data-sw-key]:not(h2)") : null;
+  if (text) {
+    text.dataset.swKey = ohneBild ? "sprache.fertig.textOhneBild" : "sprache.fertig.text";
+    text.textContent = t(text.dataset.swKey);
+  }
   fokusVorher = document.activeElement;
   offen = art === "fertig" ? modalFertig : modalLaeuft;
   offen.hidden = false;
@@ -267,14 +296,23 @@ async function wechseln(ziel, neuStarten) {
   }
 
   beschriften();
+  /* Eine stehende Fehlermeldung gehört mitgewechselt — sonst steht sie auf
+     Deutsch unter einer englischen Seite. */
+  statusNeuSchreiben();
   sageAn(t("sprache.gewechselt"));
 
-  /* Die Analyse läuft immer in der Sprache, die beim Absenden eingestellt war
-     — Oberflächen- und Auftragssprache können deshalb nach einem Wechsel gar
-     nicht auseinanderlaufen. */
-  if (neuStarten && state.lastFile && typeof neuAnalysieren === "function") {
+  if (!neuStarten) return;
+
+  if (state.lastFile && typeof neuAnalysieren === "function") {
     neuAnalysieren(state.lastFile);
+    return;
   }
+
+  /* Kein Bild mehr da (nach einem Neuladen). Das vorliegende Profil in der
+     alten Sprache stehen zu lassen und mit einer Zeile zu entschuldigen wäre
+     der schlechtere Weg — es gehört weg, und man landet auf einer sauberen
+     Startseite. Genau das hat der Nutzer verlangt. */
+  if (typeof zuruecksetzen === "function") zuruecksetzen();
 }
 
 function geklickt(ziel) {
@@ -290,6 +328,8 @@ function geklickt(ziel) {
      nachgezogen werden — ein Test hat das nachgewiesen. Toter Code, der
      Sicherheit vortäuscht, ist schlimmer als keiner. */
   const jetzt = lage();
+
+  /* Nur auf der leeren Seite steht nichts auf dem Spiel. */
   if (jetzt === "leer") {
     wechseln(ziel, false);
     return;
@@ -298,7 +338,11 @@ function geklickt(ziel) {
   /* Sonst erst fragen. Die Oberfläche bleibt bis zur Entscheidung unverändert,
      damit „Abbrechen" wirklich nichts hinterlässt — auch die Rückfrage selbst
      erscheint deshalb in der AKTUELLEN Sprache. */
-  modalOeffnen(jetzt === "fertig" ? "fertig" : "laeuft", ziel);
+  /* "ohnebild" nutzt dieselbe Rückfrage wie "fertig" — die Überschrift „Dein
+     Profil wird gelöscht." stimmt in beiden Fällen. Nur der eine Satz darunter
+     unterscheidet sich: einmal folgt eine neue Analyse, einmal eine leere
+     Startseite. */
+  modalOeffnen(jetzt === "laeuft" ? "laeuft" : "fertig", ziel, jetzt === "ohnebild");
 }
 
 /* ── Ansage für Screenreader ────────────────────────────────────────────── */
@@ -325,8 +369,8 @@ function einhaengen() {
   umschalter = baueUmschalter();
   main.insertBefore(umschalter, main.firstChild);
 
-  modalFertig = modalBauen("fertig", true);
-  modalLaeuft = modalBauen("laeuft", false);
+  modalFertig = modalBauen("fertig");
+  modalLaeuft = modalBauen("laeuft");
   document.body.append(modalFertig, modalLaeuft);
 
   ansage = document.createElement("div");
@@ -337,11 +381,6 @@ function einhaengen() {
   document.addEventListener("keydown", aufTaste);
 
   eingehaengt = true;
-  try {
-    sessionStorage.setItem(SPUR_SCHLUESSEL, "1");
-  } catch (_err) {
-    /* Privater Modus — dann zeigen die Unterseiten den Schalter eben nicht. */
-  }
   beschriften();
 }
 
@@ -349,11 +388,7 @@ function aushaengen() {
   if (!eingehaengt) return;
   modalSchliessen();
   document.removeEventListener("keydown", aufTaste);
-  try {
-    sessionStorage.removeItem(SPUR_SCHLUESSEL);
-  } catch (_err) {
-    /* siehe oben */
-  }
+  tuer(false);
   [umschalter, modalFertig, modalLaeuft, ansage].forEach((el) => el && el.remove());
   umschalter = modalFertig = modalLaeuft = ansage = null;
   eingehaengt = false;
@@ -397,23 +432,51 @@ function aufTaste(e) {
  * @param {object} opts
  * @param {Function} opts.analysiere  Callback, der eine Datei neu analysiert.
  */
-export function initSprachumschalter({ analysiere } = {}) {
+export function initSprachumschalter({ analysiere, zuruecksetze } = {}) {
   neuAnalysieren = analysiere || null;
+  zuruecksetzen = zuruecksetze || null;
 
   window.malziME = window.malziME || {};
   window.malziME.sprachumschalter = (an = true) => {
+    tuer(an);
     zeigeSprachumschalter(an);
-    return an ? "Sprachumschalter eingeblendet (nur in diesem Tab)." : "Sprachumschalter entfernt.";
+    return an ? "Sprachumschalter eingeblendet — gilt jetzt auch auf den Unterseiten." : "Sprachumschalter entfernt.";
   };
 
-  /* Tür über die Adresse. Bewusst streng: nur genau "1" oeffnet. Ein
-     versehentliches ?sprachumschalter=0 oder =false darf nichts einblenden. */
+  /* Tür über die Adresse. Bewusst streng: nur genau "1" öffnet, nur genau "0"
+     schliesst. Alles andere lässt den Zustand, wie er ist. */
+  const wunsch = adressWunsch();
+  if (wunsch === true) tuer(true);
+  if (wunsch === false) tuer(false);
+  if (tuerOffen()) einhaengen();
+}
+
+/** "1" → true, "0" → false, sonst null (keine Angabe). */
+function adressWunsch() {
   try {
-    if (new URLSearchParams(window.location.search).get("sprachumschalter") === "1") {
-      einhaengen();
-    }
+    const wert = new URLSearchParams(window.location.search).get("sprachumschalter");
+    if (wert === "1") return true;
+    if (wert === "0") return false;
   } catch (_err) {
-    /* Kaputte Adresse — dann eben keine Tür. */
+    /* Kaputte Adresse — dann eben keine Angabe. */
+  }
+  return null;
+}
+
+function tuerOffen() {
+  try {
+    return localStorage.getItem(TUER_SCHLUESSEL) === "1";
+  } catch (_err) {
+    return false;
+  }
+}
+
+function tuer(auf) {
+  try {
+    if (auf) localStorage.setItem(TUER_SCHLUESSEL, "1");
+    else localStorage.removeItem(TUER_SCHLUESSEL);
+  } catch (_err) {
+    /* Privater Modus — dann gilt die Tür nur für diesen Seitenaufruf. */
   }
 }
 
@@ -426,6 +489,22 @@ export function initSprachumschalter({ analysiere } = {}) {
 export function zeigeSprachumschalter(an) {
   if (an) einhaengen();
   else aushaengen();
+}
+
+/**
+ * Übernimmt den Stand des Merkmals-Schlosses: baut den Umschalter und
+ * hinterlässt die Spur für die Unterseiten. Ruft app.js auf, sobald die
+ * Antwort von /api/stats da ist — mit `false` genauso wie mit `true`, damit
+ * ein Abschalten ankommt.
+ */
+export function merkmalUebernehmen(an) {
+  try {
+    if (an) localStorage.setItem(MERKMAL_SCHLUESSEL, "1");
+    else localStorage.removeItem(MERKMAL_SCHLUESSEL);
+  } catch (_err) {
+    /* Privater Modus — dann sehen die Unterseiten den Schalter nicht. */
+  }
+  if (an) einhaengen();
 }
 
 /** Nur für Tests: aktueller Einbauzustand. */

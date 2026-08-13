@@ -1,7 +1,7 @@
 /* ── Stats-Seite: Lädt /api/stats und befüllt die Anzeige ── */
 
 import { initI18n, t, getLanguage, applyTranslations } from "./i18n.js";
-import { initSprachumschalter, zeigeSprachumschalter } from "./sprachumschalter.js";
+import { initSprachumschalter, merkmalUebernehmen } from "./sprachumschalter.js";
 
 /* Projekt-Start: 5. Februar 2026 */
 const PROJECT_START = new Date("2026-02-05");
@@ -50,7 +50,7 @@ async function loadStats() {
 
     /* v3.3: Merkmals-Schloss des Sprachumschalters — dieselbe Antwort, die
        ohnehin geholt wird. Aus oder unlesbar ⇒ kein Bedienelement. */
-    if (data.sprachumschalter === true) zeigeSprachumschalter(true);
+    merkmalUebernehmen(data.sprachumschalter === true);
 
     /* Zahlen einsetzen — hourlyTotal ist die echte Anzahl (unabhängig von Resets) */
     el.liveCount.textContent = fmt(data.current.hourlyTotal);

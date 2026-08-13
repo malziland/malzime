@@ -260,7 +260,7 @@ test("Profil fertig: Rückfrage in der AKTUELLEN Sprache, Abbrechen ändert nich
   await page.click('.sprach-knopf[data-lang="en"]');
   const modal = page.locator('.sw-grund[data-modal="fertig"]');
   await expect(modal).toBeVisible();
-  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Profil behalten");
+  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Abbrechen");
 
   await modal.locator(".sw-schliessen").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "de");
@@ -269,7 +269,7 @@ test("Profil fertig: Rückfrage in der AKTUELLEN Sprache, Abbrechen ändert nich
   /* Der am Prototyp gemeldete Fehler: Der zweite Versuch kam auf Englisch,
      obwohl nie gewechselt worden war. */
   await page.click('.sprach-knopf[data-lang="en"]');
-  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Profil behalten");
+  await expect(modal.locator(".sw-knopf--bleiben")).toHaveText("Abbrechen");
 });
 
 test("Analyse läuft: bestätigen startet dieselbe Datei neu", async ({ page }) => {
@@ -456,7 +456,7 @@ test.describe("Startsprache folgt dem Gerät", () => {
     await profilErzeugen(page);
     await page.click('.sprach-knopf[data-lang="de"]');
     await expect(page.locator('.sw-grund[data-modal="fertig"] .sw-knopf--bleiben')).toHaveText(
-      "Keep my profile"
+      "Cancel"
     );
   });
 });

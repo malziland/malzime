@@ -8,6 +8,11 @@ import { setupDOM } from "./setup.js";
 let aktuelleSprache = "de";
 let ladenScheitert = false;
 
+let statusNeuGeschrieben = 0;
+vi.mock("../js/ui.js", () => ({
+  statusNeuSchreiben: () => statusNeuGeschrieben++,
+}));
+
 vi.mock("../js/i18n.js", () => ({
   t: (key) => key,
   getLanguage: () => aktuelleSprache,
@@ -116,21 +121,27 @@ describe("Sprachumschalter — wann gefragt wird", () => {
 
   it("laufende Analyse: Rückfrage statt Wechsel", () => {
     state.isAnalyzing = true;
+    state.lastFile = { name: "a.jpg" };
     langKnopf("en").click();
     expect(sichtbaresModal().dataset.modal).toBe("laeuft");
     expect(aktuelleSprache).toBe("de");
   });
 
-  it("fertiges Profil: Rückfrage mit Verlust-Hinweis", () => {
+  it("fertiges Profil: die Rückfrage ist als die folgenschwere erkennbar", () => {
     state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
     langKnopf("en").click();
     const modal = sichtbaresModal();
     expect(modal.dataset.modal).toBe("fertig");
-    expect(modal.querySelector(".sw-hinweis")).not.toBeNull();
+    /* Beide Rückfragen sahen gleich aus, deshalb las sie niemand. Die
+       löschende trägt jetzt eine eigene Markierung. */
+    expect(modal.querySelector(".sw-modal--fertig")).not.toBeNull();
+    expect(modal.querySelector(".sw-modal--laeuft")).toBeNull();
   });
 
   it("laufender Upload zählt wie eine laufende Analyse", () => {
     state.uploadLaeuft = true;
+    state.lastFile = { name: "a.jpg" };
     langKnopf("en").click();
     expect(sichtbaresModal().dataset.modal).toBe("laeuft");
   });
@@ -154,6 +165,7 @@ describe("Sprachumschalter — wann gefragt wird", () => {
 
   it("Klick auf die bereits eingestellte Sprache tut nichts", () => {
     state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
     langKnopf("de").click();
     expect(sichtbaresModal()).toBeNull();
     expect(aktuelleSprache).toBe("de");
@@ -212,12 +224,19 @@ describe("Sprachumschalter — Bestätigen", () => {
     expect(analysiert).toEqual([{ name: "foto.jpg" }]);
   });
 
-  it("ohne Bild wird nichts neu gestartet", async () => {
-    state.lastFile = null;
-    langKnopf("en").click();
-    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
-    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
-    expect(analysiert).toHaveLength(0);
+  it("Rückfragen bleiben kurz — höchstens ein Satz Text", () => {
+    /* Nutzer-Ansage 2026-08-13: „Das lässt sich niemals jemand durch." Ein
+       Grenzwert im Test hält das fest, sonst wächst der Text unbemerkt wieder. */
+    for (const art of ["fertig", "laeuft"]) {
+      state.lastFile = { name: "a.jpg" };
+      state.isAnalyzing = art === "laeuft";
+      state.lastData = art === "fertig" ? { profileText: "x" } : null;
+      langKnopf("en").click();
+      const modal = sichtbaresModal();
+      const absaetze = modal.querySelectorAll(".sw-modal p");
+      expect(absaetze.length, `${art}: Anzahl Absätze`).toBeLessThanOrEqual(1);
+      modal.querySelector(".sw-knopf--bleiben").click();
+    }
   });
 
   it("scheitert das Laden der Sprachdatei, bleibt alles beim Alten", async () => {
@@ -259,6 +278,7 @@ describe("Sprachumschalter — Barrierefreiheit", () => {
 
   it("der Dialog ist als solcher ausgewiesen und beschriftet", () => {
     state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
     langKnopf("en").click();
     const kasten = sichtbaresModal().querySelector(".sw-modal");
     expect(kasten.getAttribute("role")).toBe("dialog");
@@ -269,6 +289,7 @@ describe("Sprachumschalter — Barrierefreiheit", () => {
 
   it("während der Rückfrage ist alles andere stillgelegt", () => {
     state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
     langKnopf("en").click();
     const offen = sichtbaresModal();
     const andere = Array.from(document.body.children).filter((el) => el !== offen);
@@ -278,6 +299,7 @@ describe("Sprachumschalter — Barrierefreiheit", () => {
 
   it("nach dem Schließen ist die Stilllegung restlos zurückgenommen", () => {
     state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
     langKnopf("en").click();
     sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
     Array.from(document.body.children).forEach((el) => {
@@ -287,6 +309,7 @@ describe("Sprachumschalter — Barrierefreiheit", () => {
 
   it("der Fokus landet im Dialog und kehrt danach auf den Schalter zurück", () => {
     state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
     const ausloeser = langKnopf("en");
     ausloeser.focus();
     ausloeser.click();
@@ -313,11 +336,64 @@ describe("Sprachumschalter — Tür über die Adresse", () => {
     window.history.replaceState({}, "", suche || "/");
   }
 
-  afterEach(() => adresse("/"));
+  afterEach(() => {
+    adresse("/");
+    try {
+      localStorage.removeItem("malzime-tuer-sprachumschalter");
+    } catch {
+      /* jsdom ohne Speicher */
+    }
+  });
 
   it("?sprachumschalter=1 blendet ihn ein, ohne Merkmal und ohne Konsole", () => {
     adresse("/?sprachumschalter=1");
     initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).not.toBeNull();
+  });
+
+  it("die Tür bleibt offen — auch ohne Anhängsel und in einem neuen Tab", () => {
+    /* Der eigentliche Grund für den geräteweiten Speicher: Die Rechtsseiten
+       öffnen mit target="_blank" rel="noopener" (index.html:348), und ein so
+       geöffneter Tab bekommt einen LEEREN sessionStorage. Die erste Fassung
+       legte die Spur dort ab — sie kam nie an. */
+    adresse("/?sprachumschalter=1");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).not.toBeNull();
+
+    zeigeSprachumschalter(false);
+    baueSeite();
+    adresse("/");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).toBeNull(); // aushängen schliesst die Tür ausdrücklich
+  });
+
+  it("?sprachumschalter=0 schliesst die Tür wieder", () => {
+    adresse("/?sprachumschalter=1");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).not.toBeNull();
+
+    baueSeite();
+    adresse("/?sprachumschalter=0");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).toBeNull();
+  });
+
+  it("einmal geöffnet, gilt sie auch beim nächsten Aufruf ohne Anhängsel", async () => {
+    adresse("/?sprachumschalter=1");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).not.toBeNull();
+
+    /* Ein echter neuer Seitenaufruf: frisches Modul, frisches DOM, kein
+       Anhängsel mehr in der Adresse. Ohne vi.resetModules() glaubt das Modul,
+       es sei noch eingehängt, und der Test bewiese nichts. */
+    vi.resetModules();
+    baueSeite();
+    adresse("/datenschutz");
+    const frisch = await import("../js/sprachumschalter.js");
+    frisch.initSprachumschalter({ analysiere: () => {} });
+
+    /* Der Schalter muss da sein — sonst ist er beim ersten Klick in die
+       Fußleiste wieder weg, und genau das war der gemeldete Fehler. */
     expect(pille()).not.toBeNull();
   });
 
@@ -338,5 +414,87 @@ describe("Sprachumschalter — Tür über die Adresse", () => {
     adresse("/?lang=en&sprachumschalter=1");
     initSprachumschalter({ analysiere: () => {} });
     expect(pille()).not.toBeNull();
+  });
+});
+
+describe("Sprachumschalter — nach einem Neuladen ist das Bild weg", () => {
+  /* Vom Nutzer gefunden und dreimal nachgebessert:
+     1. Die Rückfrage versprach eine Analyse, die nicht stattfinden konnte.
+     2. Ein eigener Dialog verhandelte über etwas Unmögliches.
+     3. Ohne Dialog blieb ein Profil in der alten Sprache stehen.
+     Richtig ist: Das Profil wird gelöscht, man landet auf einer sauberen
+     Startseite — dieselbe Rückfrage wie sonst, nur ein anderer Satz. */
+  let zurueckgesetzt;
+
+  beforeEach(() => {
+    zurueckgesetzt = 0;
+    initSprachumschalter({
+      analysiere: (datei) => analysiert.push(datei),
+      zuruecksetze: () => zurueckgesetzt++,
+    });
+    zeigeSprachumschalter(true);
+    document.getElementById("facts").innerHTML = '<div class="cat-card"></div>';
+    state.lastData = { profileText: "x" };
+    state.lastFile = null;
+  });
+
+  it("es kommt die Löschen-Rückfrage, nicht die mit dem Neuanalyse-Versprechen", () => {
+    langKnopf("en").click();
+    const modal = sichtbaresModal();
+    expect(modal.dataset.modal).toBe("fertig");
+    expect(modal.querySelector("p").dataset.swKey).toBe("sprache.fertig.textOhneBild");
+  });
+
+  it("mit Bild steht dort der andere Satz", () => {
+    state.lastFile = { name: "a.jpg" };
+    langKnopf("en").click();
+    expect(sichtbaresModal().querySelector("p").dataset.swKey).toBe("sprache.fertig.text");
+  });
+
+  it("bestätigen setzt zurück, statt eine unmögliche Analyse zu starten", async () => {
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(zurueckgesetzt).toBe(1));
+    expect(analysiert).toHaveLength(0);
+  });
+
+  it("abbrechen setzt nichts zurück", () => {
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
+    expect(zurueckgesetzt).toBe(0);
+    expect(aktuelleSprache).toBe("de");
+  });
+
+  it("mit Bild wird analysiert und NICHT zurückgesetzt", async () => {
+    state.lastFile = { name: "foto.jpg" };
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(analysiert).toHaveLength(1));
+    expect(zurueckgesetzt).toBe(0);
+  });
+});
+
+describe("Sprachumschalter — stehende Meldungen wechseln mit", () => {
+  /* Gefunden beim Durchgang durch alle Zustände der echten Anwendung
+     (2026-08-13): Nach einem Fehlschlag stand die Fehlermeldung weiter auf
+     Deutsch, während die Seite auf Englisch umschaltete. Eine einmal gesetzte
+     Zeichenkette, die niemand mehr anfasst. */
+  beforeEach(() => {
+    statusNeuGeschrieben = 0;
+    zeigeSprachumschalter(true);
+  });
+
+  it("jeder Wechsel schreibt die Statuszeile neu", async () => {
+    langKnopf("en").click();
+    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
+    expect(statusNeuGeschrieben).toBe(1);
+  });
+
+  it("ein abgebrochener Wechsel schreibt nichts neu", () => {
+    state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
+    expect(statusNeuGeschrieben).toBe(0);
   });
 });

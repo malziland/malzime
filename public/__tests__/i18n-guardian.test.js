@@ -219,10 +219,10 @@ describe("i18n Guardian", () => {
          eines: Sobald eine der drei Rechtsseiten Übersetzungs-Marker trägt,
          ist die Übergangslösung überflüssig — dann müssen js/sprachhinweis.js,
          seine Einbindung im HTML und dieser Eintrag weg. */
-      const wurzel = path.join(__dirname, "../..");
+      /* PUBLIC_DIR zeigt bereits auf public/ — siehe oben. */
       const rechtsseiten = ["datenschutz.html", "impressum.html", "nutzungsbedingungen.html"];
       const uebersetzt = rechtsseiten.filter((datei) => {
-        const p = path.join(wurzel, "public", datei);
+        const p = path.join(PUBLIC_DIR, datei);
         return fs.existsSync(p) && fs.readFileSync(p, "utf8").includes("data-i18n");
       });
 

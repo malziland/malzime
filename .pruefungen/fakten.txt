@@ -21,3 +21,30 @@ Stundenlimit (Analysen pro Stunde)|(\d+)\s+Analysen\s*/\s*Stunde
 IP-Rate-Limit (Requests pro 10 Minuten)|Rate.?Limit[^0-9\n]{0,20}(\d+)\s*Requests
 
 Aufbewahrung der Diagnose-Logs in Tagen|client-diagnostics[^0-9\n]{0,40}(\d+)\s*Tage
+# 2026-08-13: Von vier auf sechzehn Fakten erweitert. Vier waren zu wenig — der
+# Waechter meldete zuverlaessig "kein Drift", und das klang wie eine Aussage
+# ueber die Doku. Es war eine ueber vier Zeilen. Aufgefallen an SECURITY.md,
+# wo ein Modellname und eine GPS-Zusage jahrelang falsch standen.
+#
+# Aufgenommen wird nur, was (a) in mehreren Dokumenten steht, (b) sich aendern
+# kann und (c) EINEN gueltigen Wert hat.
+#
+# Zwei Muster wurden nach dem ersten Lauf wieder entfernt, weil sie Historie
+# als Drift meldeten — der Waechter kann beides nicht unterscheiden:
+#   - `mistral-small-(\d{4})` traf einen historischen Vergleichsbericht ueber
+#     ein Experiment mit einem aelteren Modell.
+#   - `Concurrency (\d+)` traf die Rueckbau-Anweisungen im RUNBOOK (3, 10) und
+#     ein altes Audit (80). Alle drei Werte sind an ihrer Stelle richtig.
+# Ein Waechter, der Fehlalarm schlaegt, wird abgeschaltet. Lieber zehn
+# verlaessliche Muster als zwoelf mit zwei Luegen.
+
+Region der Cloud Functions|Cloud Functions[^.\n]{0,60}\((?:2nd Gen, )?Node \d+, (europe-west\d)\)
+Aktives KI-Modell|mistral-large-(\d{4})
+Durchschnittliche Jobdauer in Sekunden|(\d+)\s*s/Job
+Maximale Warteschlangentiefe|ab (\d+) wartenden Jobs
+Hoechstalter wartender Jobs in Minuten|(\d+)(?:-min-Job-H(?:oe|ö)chstalter|\s+Minuten \(`MAX_QUEUED_AGE_MS`\))
+Karenz vor dem Aufraeumen in Minuten|(\d+)-Minuten-Karenz
+Polling-Deckel des Browsers in Minuten|(\d+)-Minuten-Polling-Deckel
+Maximale Dateigroesse in MB|max (\d+) MB
+Verarbeitungs-Durchsatz pro Stunde|~(\d+) Analysen/h
+Firestore-Datenbank|Datenbank[^.\n]{0,12}`?(malzime-[a-z]+)`?

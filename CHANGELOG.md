@@ -4,6 +4,42 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Die Sicherheitsrichtlinie behauptete zwei Dinge, die nicht stimmten.**
+  Aufgefallen, nachdem die Doku als Ganzes in Zweifel gezogen wurde — zu Recht.
+
+  `SECURITY.md` nannte als KI-Anbieter „Large 3 + Small 4". Am Live-Log
+  nachgemessen: In den letzten 30 Tagen hat ausschließlich
+  `mistral-large-2512` Bilder gesehen; `mistral-small-2603` steckt nur im
+  Rückfallpfad hinter einem Merkmals-Schloss und lief kein einziges Mal.
+
+  Schwerer wiegt die zweite Stelle: Dort stand die englische Fassung genau
+  jener GPS-Zusage, die in den eigenen Formulierungsregeln gesperrt ist — sie
+  behauptete, die Koordinaten blieben im Browser. Sie gehen für die
+  Ortsauflösung an OpenStreetMap Nominatim: Sie erreichen unsere Server nie,
+  verlassen den Browser aber sehr wohl. Der Wortlaut steht bewusst nicht hier —
+  die Sperrliste würde ihn auch im Zitat beanstanden, und das ist richtig so.
+
+### Geändert
+
+- **Die Formulierungs-Sperrliste prüft jetzt auch Englisch.** Sie kannte nur
+  deutsche Wendungen — deshalb konnte die englische Fassung einer gesperrten
+  Zusage jahrelang unbemerkt dastehen. Vier englische Regeln ergänzt; die
+  Rückbauprobe belegt, dass sie den echten Fall fangen.
+
+- **Der Fakten-Wächter bewacht 14 statt 4 Fakten.** Vier waren zu wenig: Er
+  meldete zuverlässig „kein Drift", und das klang wie eine Aussage über die
+  Doku. Es war eine über vier Zeilen.
+
+  Beim Anlegen zeigte sich zweierlei. Zwei Muster trafen ins Leere und wären
+  stumme Wächter geblieben — repariert. Zwei weitere meldeten **Historie als
+  Drift** (ein alter Vergleichsbericht, die Rückbau-Anweisungen im RUNBOOK, wo
+  abweichende Werte richtig sind) und mussten wieder heraus. Lieber vierzehn
+  verlässliche Muster als sechzehn mit zwei Lügen.
+
 ## [3.3.0] — 2026-08-13
 
 **Der Sprachumschalter — sichtbar.**

@@ -76,7 +76,7 @@ CI, dass das Skript ausschließlich Lese-Kommandos enthält.
 
 **Grenze des Skripts — ZDR ist Vertrag, nicht Konfiguration:** Die
 Zero-Data-Retention-Zusage von Mistral lässt sich technisch nicht abfragen.
-Ihr Nachweis ist organisatorisch: privater Nachweisordner beim Inhaber
+Ihr Nachweis ist organisatorisch: privater Nachweisordner (organisatorisch)
 (ZDR-/Trainings-Opt-out-Screenshots, schriftliche Support-Bestätigung, DPA und
 Subprozessoren-Liste — bewusst NICHT im öffentlichen Repo) plus Wiedervorlage:
 **vor jeder Presse-Welle und mindestens halbjährlich** im Mistral-Dashboard
@@ -472,7 +472,7 @@ das passierte, dürfte die Seite den Host nicht mehr kontaktieren.
 (`europe-west1`), umgeschaltet mit v2.12.0 und am Zähler nachgewiesen:
 `stats/totals.allTime` stieg nach einer echten Analyse **nur** in Europa, das
 Job-Dokument lag nur dort. Die alte Datenbank `(default)` in `nam5` (USA) ist
-am 2026-08-11 **gelöscht** (Freigabe des Inhabers im Kurzaudit) — damit ist
+am 2026-08-11 **gelöscht** (freigegeben im Kurzaudit) — damit ist
 der Rückweg entfallen, das Kopier-Skript `scripts/firestore-umzug-sync.mjs`
 wurde ausgebaut und `firebase.json` listet nur noch `malzime-eu`. Der
 US-Bucket `malzime_cloudbuild` ist ebenfalls seit 2026-08-11 gelöscht — es

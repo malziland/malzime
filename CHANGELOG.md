@@ -6,7 +6,30 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [3.2.0] — 2026-08-13
 
-**Das zweite TIEF-Audit — sieben unabhängige Prüfer, ~48 Befunde, restlos saniert.**
+**Der Kurzaudit und das zweite TIEF-Audit — restlos saniert.**
+
+Am selben Tag zwei Prüfungen: zuerst ein Kurzaudit der frischen Nachtarbeit, dann
+ein vollständiges TIEF-Audit über den ganzen Bestand.
+
+### Vorlauf — der Kurzaudit (vier Befunde, sofort behoben)
+
+Ein Kurzaudit fand vier P3-Schwächen in den Werkzeugen der Nacht:
+
+- Der Vendorierungs-Wächter sah **neue** Dateien in der Quelle nicht
+  (`TEST-2026-08-13-33`) — er verglich nur die bereits gestempelten. Jetzt über die
+  Vereinigung beider Seiten.
+- `deploy.sh` zählte den Cache-Buster bei **jedem** Aufruf hoch
+  (`OPS-2026-08-13-34`) — ein reiner Functions-Deploy veränderte sechs
+  Hosting-Dateien, die dann unausgeliefert im Arbeitsbaum lagen. Der Buster läuft
+  jetzt nur noch, wenn Hosting im Deploy-Ziel steht.
+- Die Verifikationsmatrix ordnete ein Prüfgate dem falschen CI-Job zu (Rückfall
+  von `DOC-2026-08-12-07`) — und der frisch geschriebene Test konnte das nicht
+  sehen, weil er nur die **Existenz** eines Jobs prüfte, nicht die **Zuordnung**.
+  Beides behoben.
+- Der Release-Wächter schluckte einen Messfehler bei der Elternstand-Bestimmung
+  (`OPS-2026-08-13-35`) und wäre auf Verdacht weitergelaufen. Jetzt bricht er ab.
+
+### Das TIEF-Audit — sieben unabhängige Prüfer, ~48 Befunde
 
 Ein vollständiges TIEF-Audit über die Nachtarbeit des Vortags und den ganzen
 Bestand: sieben bereichs-disjunkte Prüfer (Sicherheit/Datenschutz, Korrektheit/Queue,
@@ -62,11 +85,24 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
   der Realitäts-Check, die Diagnose-Feldliste, die Fehler-Log-Beschreibung. Drei
   neue Sperrlisten-Regeln verhindern den Rückfall.
 
+### Restliste — ebenfalls erledigt
+Auch die zunächst zurückgestellten P3/P4-Punkte sind behoben:
+- **Transparenz:** Die Datenschutzerklärung benennt jetzt, dass die KI bewusst
+  sensible, dem Aussehen zugeschriebene Merkmale rät (scheinbare Herkunft, Hautton) —
+  genau das, was das Werkzeug vorführt. (Erledigt die anfangs offene Frage.)
+- **Realitäts-Check-Vergleich** erscheint auch über die API erst ab 100 Eingaben
+  (die Oberfläche sagt das zu); GIF wird als Format genannt; die IP-Grenze in den
+  Nutzungsbedingungen als Richtwert ehrlich formuliert.
+- **Werkzeuge/Tests:** Der Release-Wächter zieht Release-Notizen bei Inhaltszuwachs
+  nach und geht den manuellen Reparaturweg korrekt; die Reaper-Test-Attrappe
+  behandelt `null` jetzt wie Firestore (verhinderte eine unsichtbare Fehlerklasse);
+  ein Wächter hält die 25-MB-Obergrenze an allen fünf Stellen deckungsgleich; der
+  CHANGELOG-Parser kennt Code-Zäune.
+- **Sprachlich:** Zuschreibungen in dritter Person durchgängig neutral formuliert,
+  mit einer Sperrlisten-Regel gegen den Rückfall.
+
 Der vollständige Auditbericht mit allen Befunden liegt unter `docs/audit/`
-(bewusst nicht im öffentlichen Repository). Eine Handvoll P3/P4-Punkte niedrigster
-Priorität ist dort als Restliste geführt — keiner davon ist ein Nutzer- oder
-Datenrisiko. Eine Entscheidungsfrage bleibt bewusst offen für den Inhaber (ob die
-Hautton-Einschätzung der KI in den Außentexten benannt werden soll).
+(bewusst nicht im öffentlichen Repository).
 
 ## [3.1.0] — 2026-08-13
 
@@ -624,7 +660,7 @@ Seite wie früher bis zum fertigen Ergebnis. Testumfang jetzt 697 / 280 / 17.
 ## [2.12.3] — 2026-08-11
 
 Sanierung nach dem Kurzaudit vom selben Tag (kein Blocker, ein mittlerer und
-acht kleine Befunde) plus zwei Entscheidungen des Inhabers.
+acht kleine Befunde) plus zwei bewusste Entscheidungen.
 
 ### Kinderschutz-Filter: Schutzgrenze auf die vereinbarte Regel gestellt
 
@@ -1418,7 +1454,7 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
 
 - **Impressum-Seitentitel korrigiert:** nannte bisher eine nicht existierende Kurz-Firmierung — jetzt „Impressum — malziME by malziland". Die Firma heißt überall vollständig „malziland - learning | training | consulting e.U." (Schreibweise laut Impressum). (`public/impressum.html`)
 - **Sitemap-Änderungsdaten aktualisiert** (standen seit Februar unverändert). (`public/sitemap.xml`)
-- **README nennt den Inhaber:** Attribution am Seitenende um Christoph Krieger (LinkedIn) und den Live-Link malzi.me ergänzt. (`README.md`)
+- **README-Attribution:** am Seitenende um Christoph Krieger (LinkedIn) und den Live-Link malzi.me ergänzt. (`README.md`)
 
 ## [2.3.3] — 2026-07-14
 

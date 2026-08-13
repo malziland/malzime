@@ -35,3 +35,4 @@ in einem Schritt zwei fiktive Profile|Es sind zwei Aufrufe: der zweite holt die 
 (eine einzige Zahl pro Zeitraum|a single number per time period)|Am Live-Dokument widerlegt: der Zaehler haelt Summen je Zeitraum UND die Zeitpunkte der letzten 60 Minuten. "Zaehlwerte je Zeitraum" statt "eine einzige Zahl".
 (verl(ae|ä)sst|verlassen) (nie|niemals) (den|die|das) Server|Sinnlos formuliert: GPS erreicht die Server nie, verlaesst sie also nicht. Richtig ist: GPS erreicht nie unsere Server.
 Einzige Ausnahme: ein anonymes Abhol-Ticket|Es sind mehrere sessionStorage-Werte (Ticket, Modus-Wahl, Realitaets-Check-Ticket, Absturz-Wache). Aufzaehlen statt "einzige".
+(des|dem|den|der|vom|beim) Inhabers?\b|Keine Zuschreibung in dritter Person. "Inhaber Christoph Krieger" (Rechtstext, ohne Artikel) bleibt erlaubt; "des/dem/den Inhabers" ist Prosa und wird neutral formuliert.

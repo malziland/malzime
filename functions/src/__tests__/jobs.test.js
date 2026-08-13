@@ -10,6 +10,13 @@ jest.mock("firebase-admin/firestore", () => {
   function matchCond(data, c) {
     const v = data[c.field];
     if (c.op === "==") return v === c.value;
+    /* TEST-2026-08-13-36: Firestore-treu. Bei Ungleichheiten (<,>) schließt
+       Firestore Dokumente aus, deren Feld null/undefined ist oder fehlt — JS
+       dagegen wertet `null < Zahl` als TRUE. Die alte Attrappe hätte damit jeden
+       noch nicht zugestellten Job (`deliveredAt: null`) als „zugestellt und
+       abgelaufen" geliefert, also die Massenlöschung laufender Jobs behauptet.
+       Ein Messmittel, dessen Fehlschlag wie ein Erfolg aussieht — jetzt korrekt. */
+    if (v === null || v === undefined) return false;
     if (c.op === "<") return v < c.value;
     if (c.op === ">") return v > c.value;
     return false;
@@ -409,5 +416,25 @@ describe("deleteJob", () => {
     expect(await jobs.getJob(id)).not.toBeNull();
     await jobs.deleteJob(id);
     expect(await jobs.getJob(id)).toBeNull();
+  });
+});
+
+/* TEST-2026-08-13-36: Der gefährlichste Fall, den die alte Attrappe verdeckte.
+   findZugestellteJobs sucht `deliveredAt < cutoff`. Ein frisch angelegter Job hat
+   `deliveredAt: null` (nie zugestellt) — er darf NIEMALS als „zugestellt und
+   abgelaufen" gelten, sonst löscht der Reaper laufende Jobs. Firestore schließt
+   null bei `<` aus; die Attrappe tut das jetzt auch. */
+describe("findZugestellteJobs schließt nie-zugestellte Jobs aus (TEST-36)", () => {
+  test("ein Job mit deliveredAt: null wird NICHT geliefert", async () => {
+    await jobs.createJob({ imagePath: "queue-uploads/frisch.jpg" });
+    expect((await jobs.findZugestellteJobs(10)).length).toBe(0);
+  });
+
+  test("ein Job mit altem deliveredAt WIRD geliefert (Positivkontrolle)", async () => {
+    const id = await jobs.createJob({ imagePath: "queue-uploads/alt.jpg" });
+    /* deliveredAt künstlich auf 1970 altern — sicher unter jedem cutoff. */
+    mockStore.get(id).deliveredAt = 1;
+    const treffer = await jobs.findZugestellteJobs(10);
+    expect(treffer.length).toBe(1);
   });
 });

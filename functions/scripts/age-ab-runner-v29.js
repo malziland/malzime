@@ -9,7 +9,7 @@
  * Deploy. Schreibt nur lokale Dateien.
  *
  * WORUM ES GEHT:
- * Der Inhaber beobachtet ueber rund 5000 begleitete Workshop-Analysen ein
+ * Beobachtet wird ueber rund 5000 begleitete Workshop-Analysen ein
  * durchgaengiges Muster: Maedchen werden bis zu sechs Jahre ZU ALT geschaetzt,
  * Jungen eher zu jung. Im Prompt stand die Schulterbreite als PRIMAERE
  * Alters-Achse und eine Zusatzregel nur fuer Maedchen. Beides haengt an der
@@ -20,7 +20,7 @@
  *
  * WAS DIESER LAUF EHRLICH KANN — UND WAS NICHT:
  * Das Testset hat 14 Bilder, davon nur 6 Minderjaehrige (3 je Geschlecht).
- * Das reicht NICHT, um die Beobachtung des Inhabers zu bestaetigen oder zu
+ * Das reicht NICHT, um diese Beobachtung zu bestaetigen oder zu
  * widerlegen. Ein einzelnes Bild kippt den Mittelwert. Diese Messung liefert
  * einen ersten Eindruck und schlaegt Alarm bei grober Verschlechterung — mehr
  * nicht. Belastbare Zahlen kommen erst aus dem Erfassungsblatt im Workshop.
@@ -128,7 +128,7 @@ const GROUND_TRUTH = (() => {
    nutzersichtbaren Kartentext nach Fachbegriffen wie "Nasenruecken" gesucht —
    den verbietet der Prompt dort aber ausdruecklich ("IMMER mit Alltagsworten,
    NIEMALS mit medizinischen Fachbegriffen"). Die Metrik konnte also gar nicht
-   anschlagen. Gemessen wird deshalb, was der Inhaber tatsaechlich verlangt
+   anschlagen. Gemessen wird deshalb, was tatsaechlich verlangt wird
    hat: ein NACHVOLLZIEHBARES, sichtbares Merkmal statt eines Eindrucks.
 
    KONKRET: etwas, das man auf dem Foto zeigen kann — im Workshop vorfuehrbar.

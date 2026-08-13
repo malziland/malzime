@@ -38,7 +38,7 @@
 /* ── Altersgrenze ─────────────────────────────────────────────────────────
    Bezieht sich auf die Schaetzung des Modells, nicht auf Wahrheit.
 
-   VEREINBARTE REGEL (Entscheidung des Inhabers, 2026-08-11): Stufe 2 greift,
+   VEREINBARTE REGEL (bewusste Entscheidung, 2026-08-11): Stufe 2 greift,
    wenn die UNTERGRENZE der geschaetzten Spanne 18 oder darunter ist. Nicht
    der Punktwert zaehlt, sondern das juengste Alter, das die Angabe zulaesst —
    wer laut Modell "17-24" sein koennte, wird geschuetzt; wer laut Modell

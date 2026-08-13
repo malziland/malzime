@@ -1,7 +1,7 @@
 /* ── Realitäts-Check (v3.1) ────────────────────────────────────────────────
  *
  * „Wie gut hat dich die KI wirklich getroffen?" — der Workshop-Move des
- * Inhabers (KI-Fehler ALS Lehrmoment) als Teil des Tools. Es gibt keinen
+ * abgenommen (KI-Fehler ALS Lehrmoment) als Teil des Tools. Es gibt keinen
  * Ausgang, in dem das Tool „verliert": Treffer beweisen die Macht der
  * Algorithmen, Fehler ihre Gefahr. Abgenommener Prototyp:
  * compare-prototype-streaming.html (2026-08-11), Spezifikation in der

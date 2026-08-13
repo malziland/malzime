@@ -80,7 +80,7 @@ function releaseWakeLock() {
 }
 
 /* v3.0.0: Das frühere Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
-   (Entscheidung des Inhabers: „dieses Pop-Up liest sowieso keiner durch") —
+   (bewusste Entscheidung: „dieses Pop-Up liest sowieso keiner durch") —
    die Analyse startet direkt bei der Foto-/Demo-Wahl. Die Einordnung „nichts
    davon ist wahr" trägt weiterhin die Disclaimer-Box auf der Seite, im
    Ergebnis und im PDF. */

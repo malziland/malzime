@@ -106,7 +106,7 @@ describe("Klang (v3.0)", () => {
     expect(Mock.instanzen.length).toBe(1);
   });
 
-  it("v3.0.3: die Master-Lautstärke steht auf 0,96 — +20 % auf Ansage des Inhabers (11.08. abends)", async () => {
+  it("v3.0.3: die Master-Lautstärke steht auf 0,96 — +20 % auf ausdrueckliche Ansage (11.08. abends)", async () => {
     const Mock = baueMockAudioContext();
     Mock.instanzen = [];
     window.AudioContext = Mock;

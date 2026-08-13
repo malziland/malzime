@@ -114,6 +114,9 @@ async function handleJobStatus(req, res) {
        Analyse vor der ersten Welle) ist die Antwort byte-gleich zu heute. */
     if (typeof job.liveText === "string" && job.resultToken && safeCompare(token, job.resultToken)) {
       antwort.liveText = job.liveText;
+      /* DOC-2026-08-13-FE-08: Zeitstempel des Live-Text-Stands. Der Client wertet
+         ihn derzeit nicht aus (Teil des Live-Text-Protokolls, für Reihenfolge/
+         Debugging reserviert) — bewusst mitgegeben und getestet, kein toter Rest. */
       antwort.liveTextStand = typeof job.liveTextStand === "number" ? job.liveTextStand : null;
       /* v3.0 Phase 3: Der Beast-Text, sobald das Modell ihn schreibt —
          BEWUSST im selben Ticket-Block: dieselbe PRIV-003-Bindung, kein

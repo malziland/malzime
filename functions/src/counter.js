@@ -409,11 +409,19 @@ async function zaehleRealitaetsCheck(score) {
   }
 }
 
+/* K-2026-08-13-9: Der Vergleichswert erscheint erst ab dieser Zahl. Die
+   Oberfläche sagt „ab 100 Eingaben" zu — die Schwelle wurde vorher nur im
+   Frontend gezogen, während /api/stats den Mittelwert schon ab der ersten
+   Eingabe herausgab. Jetzt hält die API dieselbe Zusage: unter der Schwelle
+   ist `mittelProzent` null. (Ein Mittelwert aus wenigen Eingaben ist zudem
+   nicht aussagekräftig.) */
+const REALITAETS_CHECK_MINDEST_EINGABEN = 100;
+
 /**
  * Liest das Realitäts-Check-Aggregat für /api/stats: Anzahl der Eingaben und
- * gerundeter Mittelwert. Bei 0 Eingaben ist `mittelProzent` null (das
- * Frontend zeigt den Vergleich ohnehin erst ab 100 Eingaben). Fehler liefern
- * den leeren Stand — die Stats-Antwort bleibt funktionsfähig.
+ * gerundeter Mittelwert. Unter REALITAETS_CHECK_MINDEST_EINGABEN ist
+ * `mittelProzent` null — dieselbe Schwelle, die die Oberfläche zusagt. Fehler
+ * liefern den leeren Stand, die Stats-Antwort bleibt funktionsfähig.
  */
 async function leseRealitaetsCheck() {
   try {
@@ -424,7 +432,7 @@ async function leseRealitaetsCheck() {
     const summe = typeof data.summeProzent === "number" ? data.summeProzent : 0;
     return {
       eingaben,
-      mittelProzent: eingaben > 0 ? Math.round(summe / eingaben) : null,
+      mittelProzent: eingaben >= REALITAETS_CHECK_MINDEST_EINGABEN ? Math.round(summe / eingaben) : null,
     };
   } catch (err) {
     console.log(JSON.stringify({ warning: "realitaets-check-lese-fehler", error: err.message }));

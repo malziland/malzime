@@ -1,7 +1,7 @@
 /* ── Klang-Erzeugung für das Live-Erlebnis (v3.0) ──────────────────────────
  *
  * Zwei Klänge, übernommen aus dem abgenommenen Prototyp (Entscheidung des
- * Inhabers, 2026-08-11 — Variante „Daten-Puls"):
+ * abgenommen 2026-08-11 — Variante „Daten-Puls"):
  *
  *   1. tippTon()  — geformtes Bandpass-Rauschen 1500–2000 Hz (Q 4, ~38 ms)
  *                   für die Matrix-Dekodierung des Zusammenfassungstexts.
@@ -14,7 +14,7 @@
  * aus): abrupte Oszillator-Starts erzeugen das billige Klicken.
  *
  * Sound ist IMMER an, es gibt bewusst KEINEN Schalter in der Oberfläche
- * (Entscheidung des Inhabers; die Lautstärke regelt das Gerät).
+ * (bewusste Entscheidung; die Lautstärke regelt das Gerät).
  *
  * WICHTIG: Der AudioContext wird erst bei einer Nutzer-Geste erzeugt
  * (klangAktivieren() — der Analyse-Start ist eine solche Geste). Ohne diese
@@ -43,7 +43,7 @@ export function klangAktivieren() {
       for (let i = 0; i < daten.length; i++) daten[i] = Math.random() * 2 - 1;
 
       /* Gemeinsamer Bus: Master + dezentes Feedback-Echo (90 ms).
-         0,96 statt 0,8: Die Töne waren dem Inhaber im Live-Test zu leise —
+         0,96 statt 0,8: Die Töne waren im Live-Test zu leise —
          +20 % auf seine Ansage (11.08. abends, v3.0.3). */
       const master = ctx.createGain();
       master.gain.value = 0.96;

@@ -1,6 +1,6 @@
 /* ── Live-Anzeige (v3.0 „Live-Erlebnis", Phase 2) ──────────────────────────
  *
- * Setzt die vom Inhaber abgenommene Dramaturgie des Prototyps
+ * Setzt die abgenommene Dramaturgie des Prototyps
  * (compare-prototype-streaming.html, 2026-08-11) auf der echten Seite um:
  *
  *   1. Die bestehende Scan-Animation bleibt, bis das ERSTE Zeichen getippt
@@ -35,7 +35,7 @@
  *      ~2,5 s). Es gibt damit nur noch zwei Erscheinungen: „Auge arbeitet
  *      mit Wechseltext" und „KI tippt in der Rost-Box" — die frühere
  *      Status-Zeile IN der Karte ist ersatzlos weg (Screenshot-Befund des
- *      Inhabers, 11.08. abends). Mit dem nächsten getippten Zeichen
+ *      abgenommen 11.08. abends). Mit dem nächsten getippten Zeichen
  *      verschwindet das Auge; beim Enthüllungs-Beginn endgültig.
  *   4. Ist das Ergebnis fertig gerendert, fährt starteEnthuellung() die
  *      GESTAFFELTE ENTHÜLLUNG: alles fertige Boxen mit Pop — Foto-Daten →
@@ -93,7 +93,7 @@ const SCHWEIF_LAENGE = 7;
 const ZIEL_ABTROPF_SEKUNDEN = 10;
 /* Untergrenze: Darunter wirkt das Tippen wie ein Hänger statt wie Schreiben —
    auch ein fast leerer Puffer muss sichtbar in Bewegung bleiben. 20 nach
-   ausdrücklicher Ansage des Inhabers (Abend-Test 11.08.: 12 Z/s „wirkt
+   ausdrücklicher Ansage (Abend-Test 11.08.: 12 Z/s „wirkt
    immer noch total zäh") — der lange Zeit-Anlauf unten sammelt vorher genug
    Material, damit dieses Tempo durchgehalten werden kann. */
 const MIN_ZEICHEN_PRO_SEKUNDE = 20;
@@ -103,7 +103,7 @@ const MAX_ZEICHEN_PRO_SEKUNDE = 90;
 /* Zeit-Anlauf vor dem ersten getippten Zeichen: Der Stream liefert anfangs
    nur wenige Zeichen pro Sekunde — sofort loszutippen hieße, minutenlang an
    der Untergrenze zu kriechen. Solange trägt die Scan-Animation die Zeit.
-   25 s auf ausdrückliche Ansage des Inhabers (11.08. abends): „die Box ist
+   25 s auf ausdrückliche Ansage (11.08. abends): „die Box ist
    oft fertig und dann passiert eine Weile nichts" — also später starten,
    damit Tippen und Analyse gemeinsamer enden. Meldet der Server vorher
    „fertig", greift sofort der Schnellvorlauf. (let wegen
@@ -389,7 +389,7 @@ function tippNachscrollen(mein) {
 
 /* ── Warte-Auge oberhalb der Karte (v3.0.2, ersetzt die Status-Zeile) ─────
    Nach dem fertig getippten Text wirkte die Karte eingefroren, und die
-   frühere Status-Zeile IN der Karte war dem Inhaber ein Dorn im Auge
+   frühere Status-Zeile IN der Karte war ein Dorn im Auge
    („gefällt mir gar nicht"). Stattdessen kehrt das vertraute Auge der
    Scan-Phase zurück und trägt die ehrlichen Warte-Zeilen (`live.warten`).
    Textwechsel ist keine Bewegung — die Rotation läuft deshalb bewusst auch

@@ -1,7 +1,7 @@
 # Demo-Fotos — KI-generiert / Demo photos — AI-generated
 
 Die drei Demo-Fotos in diesem Ordner (`demo-selfie`, `demo-cafe`, `demo-hiker`,
-jeweils samt Thumbnail) sind **KI-generiert** (Bestätigung des Inhabers,
+jeweils samt Thumbnail) sind **KI-generiert** (bestätigt,
 2026-07-17). Sie zeigen **keine realen Personen** — Ähnlichkeiten mit lebenden
 oder verstorbenen Personen wären rein zufällig.
 

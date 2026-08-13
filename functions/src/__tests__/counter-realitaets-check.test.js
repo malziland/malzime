@@ -69,10 +69,17 @@ describe("zaehleRealitaetsCheck", () => {
 });
 
 describe("leseRealitaetsCheck", () => {
-  test("liefert eingaben und den gerundeten Mittelwert", async () => {
-    mockGet.mockResolvedValue({ exists: true, data: () => ({ eingaben: 3, summeProzent: 200 }) });
-    /* 200 / 3 = 66,67 → 67 */
-    await expect(leseRealitaetsCheck()).resolves.toEqual({ eingaben: 3, mittelProzent: 67 });
+  test("liefert eingaben und den gerundeten Mittelwert ab 100 Eingaben", async () => {
+    /* 20100 / 150 = 134 → gerundet 134; Eingaben über der Schwelle. */
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ eingaben: 150, summeProzent: 11250 }) });
+    await expect(leseRealitaetsCheck()).resolves.toEqual({ eingaben: 150, mittelProzent: 75 });
+  });
+
+  /* K-2026-08-13-9: Unter 100 Eingaben gibt die API KEINEN Mittelwert heraus —
+     dieselbe Schwelle, die die Oberfläche zusagt („ab 100 Eingaben"). */
+  test("unter 100 Eingaben ist mittelProzent null, obwohl eingaben zählt", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ eingaben: 5, summeProzent: 375 }) });
+    await expect(leseRealitaetsCheck()).resolves.toEqual({ eingaben: 5, mittelProzent: null });
   });
 
   test("bei 0 Eingaben ist mittelProzent null (keine Division durch 0)", async () => {

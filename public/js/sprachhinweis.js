@@ -149,6 +149,12 @@ function start() {
   const ziel = document.getElementById("main") || document.querySelector("main") || document.body;
   const { grund, ok, schliessen } = baueHinweis();
   let ausloeser = null;
+  /* Eigener Zustand statt `grund.hidden`: Das Verbergen passiert erst nach dem
+     Ausblenden (200 ms). In dieser Lücke feuerte ein noch offener Zeitgeber des
+     Fokus-Netzes und zog den Fokus in den schliessenden Dialog zurück — der
+     Rücksprung auf den Umschalter fiel damit aus. In der CI aufgeschlagen,
+     lokal nie. */
+  let offen = false;
 
   function stillegen(an) {
     Array.prototype.forEach.call(document.body.children, (kind) => {
@@ -163,7 +169,7 @@ function start() {
      und kommt nicht zurück. Am 2026-08-13 im WebKit-Lauf gemessen. */
   function fokusZurueckholen() {
     setTimeout(() => {
-      if (grund.hidden || grund.contains(document.activeElement)) return;
+      if (!offen || grund.contains(document.activeElement)) return;
       const erster = grund.querySelector("button");
       if (erster) erster.focus();
     }, 0);
@@ -173,6 +179,7 @@ function start() {
     /* Den auslösenden Knopf merken, nicht document.activeElement — in WebKit
        fokussiert ein Klick den Knopf nicht. */
     ausloeser = (e && e.currentTarget) || document.activeElement;
+    offen = true;
     grund.hidden = false;
     stillegen(true);
     const dieser = grund;
@@ -182,7 +189,8 @@ function start() {
   }
 
   function schliessenTun() {
-    if (grund.hidden) return;
+    if (!offen) return;
+    offen = false;
     grund.removeEventListener("focusout", fokusZurueckholen);
     stillegen(false);
     grund.classList.remove("sichtbar");
@@ -206,7 +214,7 @@ function start() {
   /* Fokus-Fänger: `inert` hält ihn aus der Umgebung heraus, aber hinter dem
      letzten Knopf verließe er das Dokument in die Browserleiste. */
   document.addEventListener("keydown", (e) => {
-    if (grund.hidden) return;
+    if (!offen) return;
     if (e.key === "Escape") {
       schliessenTun();
       return;

@@ -24,14 +24,23 @@ Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md)
 
 1. Fork das Repo und erstelle einen Feature-Branch (`git checkout -b feature/mein-feature`)
 2. Aenderungen machen
-3. Tests laufen lassen:
-   - Backend: `cd functions && npm test`
-   - Frontend: `npm run test:frontend`
-4. Lint + Format pruefen:
-   - Backend: `cd functions && npm run lint && npm run format:check`
-   - Frontend: `npm run lint:frontend && npm run format:frontend:check`
+3. **Vor dem Push:** `sh scripts/vor-dem-push.sh`
+
+   Faehrt in wenigen Sekunden genau die billigen Pruefungen der Pipeline ab —
+   Lint, Format (beide Wurzeln), Frontend-Tests und alle Waechter — und nennt
+   bei einem Mangel den CI-Job, der ohne ihn rot wuerde. Die langen Suiten
+   (Backend, E2E) fehlen dort bewusst: Sie laufen lokal so lang wie in der
+   Pipeline, dort gaebe es nichts zu gewinnen.
+
+4. Vor einem Release zusaetzlich alle drei Suiten: `sh scripts/pruefstand.sh`
 5. Cache-Buster in `index.html` hochzaehlen bei Frontend-Aenderungen
 6. Pull Request erstellen
+
+Die Einzelbefehle, falls du gezielt etwas laufen lassen willst:
+
+- Backend: `cd functions && npm test` · Lint `npm run lint` · Format `npm run format:check`
+- Frontend: `npm run test:frontend` · Lint `npm run lint:frontend` · Format `npm run format:frontend:check`
+- E2E: `npm run test:e2e`
 
 ## Code-Stil
 

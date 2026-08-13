@@ -34,7 +34,7 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **No permanent data storage**: In queue mode the image is briefly held in a dedicated EU storage bucket and deleted immediately after processing; job documents (including the result) are removed within ~2 hours. No profiles are stored permanently
 - **Queue worker not publicly reachable**: `processJob` runs with `invoker: private` — only Google Cloud Tasks can invoke it, authenticated via an OIDC service-account token
 - **No tracking**: No cookies, no analytics, no advertising
-- **GPS stays in browser**: GPS coordinates are never sent to the server
+- **GPS never reaches our servers**: Coordinates are read in the browser and used there for the map. Reverse geocoding goes directly from the browser to OpenStreetMap Nominatim — the coordinates leave the browser, but never touch malziME infrastructure
 - **Content Security Policy**: Strict whitelist (self + OpenStreetMap tiles + Nominatim)
 - **HSTS with preload**
 - **Rate limiting**: Per-IP request limits
@@ -50,9 +50,9 @@ malziME relies on external AI providers as data processors (Art. 28 GDPR). See [
 
 | Vendor | Role | Data Region |
 |--------|------|-------------|
-| Mistral AI SAS (Paris, FR) | Sole AI provider (Large 3 + Small 4) | EU by default |
+| Mistral AI SAS (Paris, FR) | Sole AI provider — `mistral-large-2512` handles every live analysis | EU by default |
 
-Mistral is the only AI provider since v1.6.0 — no Google AI in the pipeline. Mistral is contractually bound to not use uploaded images for training on the paid tier we use. See [Mistral DPA](https://legal.mistral.ai/terms/data-processing-addendum). (Google remains an infrastructure processor for Firebase Hosting / Cloud Functions / Firestore — see [datenschutz.html](public/datenschutz.html).)
+Mistral is the only AI provider since v1.6.0 — no Google AI in the pipeline. Since v2.2 a single call to `mistral-large-2512` produces both profiles; `mistral-small-2603` exists only in the fallback pipeline behind a feature flag and has not processed an image in production for over a month (checked against the live logs on 2026-08-13). Mistral is contractually bound to not use uploaded images for training on the paid tier we use. See [Mistral DPA](https://legal.mistral.ai/terms/data-processing-addendum). (Google remains an infrastructure processor for Firebase Hosting / Cloud Functions / Firestore — see [datenschutz.html](public/datenschutz.html).)
 
 ## Secrets management
 
@@ -60,5 +60,5 @@ All production secrets are stored in Google Cloud Secret Manager and bound to Cl
 
 Required secrets:
 - `ADMIN_SECRET` — Bearer token for admin endpoints (Boost, Reset, Maintenance)
-- `MISTRAL_API_KEY` — Mistral AI API key (Scale tier)
+- `MISTRAL_API_KEY` — Mistral AI API key (paid tier)
 - `NTFY_URL`, `NTFY_TOPIC` — optional, for limit-reached push notifications

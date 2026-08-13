@@ -9,7 +9,7 @@
     "checks/aussentext.py": "sha256:a863b903e9c0c487b33fe1f84775f92ac89c7a879816b3c9de99fd6e821ef9df",
     "checks/fakten-drift.py": "sha256:3cdaf1f870d78b43d7ce26b1608aa00d2eb8092adc2401dd6dd0fe0ddcb69531",
     "checks/stiller-fehlschlag.py": "sha256:3c725a18babcef51d8ab083433a27990dc97cf77d96ec81ac6962ffe76c00671",
-    "checks/test-blind.py": "sha256:08732208efd6d6bd1b79678494de3d9f713e4da1b81a24d93d5f7ef90ce0b671",
+    "checks/test-blind.py": "sha256:a518c76ee7cbd684546b0f8e44f3ce526340984d993fc23e91aa9176a255a88b",
     "negativprobe/berichter-ohne-set-e/bericht.sh": "sha256:876b3bffa5c8931569e0cd314442d72e40685a1b20d49f922dbe0756e063c8af",
     "negativprobe/echte-bedingung/pruefen.sh": "sha256:2ba30bda348d033cecb0d7876c391deff8886ed70c986aee7e0d99b34d10fa50",
     "negativprobe/eigene-muster/.pruefungen/fakten.txt": "sha256:de2b7811013128b9ff391e321bbda7627ce48a6a220a33af19f8043af924d505",
@@ -17,6 +17,7 @@
     "negativprobe/eigene-muster/README.md": "sha256:4dc9701df4d06dbe8743975190a4e98b3cc554b74c2f8c0236155ef668ee1937",
     "negativprobe/geprueftes-suchergebnis/stempel.sh": "sha256:69d04c5c3e6faf3a55eee82482e4e7f5648853d462c434338e746eddca95b3c5",
     "negativprobe/geprueftes-suchergebnis/testlauf.txt": "sha256:d08764c2619e2a5789fadb0bbcfb16fd8ba73ca5f951f301bb8eba00b70554c8",
+    "negativprobe/gruppe-mit-tests/tests/gruppe.test.js": "sha256:7de88489361306351b951c9a28cf6162f354fb3b830567e56469304123dec3c5",
     "negativprobe/ignorierte-datei/.gitignore": "sha256:5f70b6a71ce39a5f6cc4502eb1e12035e3bb7218427cda15a65bbd53079ffa68",
     "negativprobe/ignorierte-datei/.pruefungen/aussentext.txt": "sha256:ab7ca7defb561007d011fc8de23e531d2b1f40895491ff6e5fb731a62b35ce09",
     "negativprobe/ignorierte-datei/README.md": "sha256:8ed7378961009c3ec05dd21e2aa1a93de0079d1b147bceaa1e6b38c43cf344e2",
@@ -48,6 +49,6 @@
     "negativprobe/test-mit-textblock/tests/beispiel.test.js": "sha256:c0875c13905a777b421d5ecc6760980957a41a02432b9b3cd8eb2a2b64b5665a",
     "negativprobe/uebersprungen-begruendet/tests/tabelle.test.js": "sha256:29db5bcfa6d558bbbb3cf54fda56d4e110dc9c4a4dbd6737c995131df2081954",
     "pruefe-alles.sh": "sha256:a5f1434c5bc3cc90db60252668c738884d2997309ae16c0c8aeaeb9dbb413c37",
-    "selbstpruefung.sh": "sha256:52c93b608ec52afaf152002fd3a59b2c3185155ad83feda95eddcdfa1422fe3b"
+    "selbstpruefung.sh": "sha256:83d22e89eaaab803303f37d946f4094c6dc6a62de46f1fc914e3d0ff6d7e5722"
   }
 }

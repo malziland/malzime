@@ -157,16 +157,18 @@ describe("useSprachumschalter (v3.3)", () => {
     expect((await flags.getFeatureFlags()).useSprachumschalter).toBe(true);
   });
 
-  test.each([["'true'", "true"], ["1", 1], ["ja", "ja"], ["null", null]])(
-    "der Wert %s schaltet ihn NICHT ein",
-    async (_name, wert) => {
-      /* Ein Tippfehler im Firestore-Dokument darf kein Bedienelement vor ein
+  test.each([
+    ["'true'", "true"],
+    ["1", 1],
+    ["ja", "ja"],
+    ["null", null],
+  ])("der Wert %s schaltet ihn NICHT ein", async (_name, wert) => {
+    /* Ein Tippfehler im Firestore-Dokument darf kein Bedienelement vor ein
          Workshop-Publikum stellen. */
-      flags._clearCache();
-      mockGet.mockResolvedValue({ exists: true, data: () => ({ useSprachumschalter: wert }) });
-      expect((await flags.getFeatureFlags()).useSprachumschalter).toBe(false);
-    }
-  );
+    flags._clearCache();
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSprachumschalter: wert }) });
+    expect((await flags.getFeatureFlags()).useSprachumschalter).toBe(false);
+  });
 
   test("fehlendes Dokument heisst aus", async () => {
     mockGet.mockResolvedValue({ exists: false });

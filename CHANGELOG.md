@@ -6,6 +6,29 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Hinzugefügt
+
+- **`scripts/vor-dem-push.sh` — die Pipeline in wenigen Sekunden vorweggenommen.**
+  Am 13. August gingen drei Pipeline-Läufe rot; zwei davon waren reine
+  Nachlässigkeit (Format nicht gelaufen, die vendorierte Kopie statt der Quelle
+  bearbeitet). Beide hätte dieses Skript gefangen. Es fährt genau die billigen
+  Prüfungen der drei Jobs `test-frontend`, `test-backend` und `pruefungen` ab
+  und nennt bei jedem Mangel den Job, der ohne ihn rot würde.
+
+  Nachgemessen: **13 Prüfungen in 6 bis 7 Sekunden.** Ein roter Pipeline-Lauf
+  kostet dagegen Push, dreieinhalb Minuten Warten, Protokoll lesen, beheben und
+  dasselbe noch einmal.
+
+  Die langen Suiten fehlen bewusst — sie laufen lokal so lang wie in der
+  Pipeline, weil GitHub sie auf mehrere Maschinen verteilt. Dafür bleibt
+  `scripts/pruefstand.sh` der Lauf vor einem Release.
+
+  **Der Wächter dazu ist wichtiger als das Skript:** `vor-dem-push-script.test.js`
+  liest die Workflow-Datei und das Skript und meldet jeden Pipeline-Schritt, den
+  das Skript nicht kennt. Ohne ihn würde es beim ersten neuen CI-Schritt zur
+  Beruhigungspille — „alles grün" für etwas, das es nicht mehr prüft. Jede
+  bewusste Auslassung braucht eine Begründung, auch das prüft ein Test.
+
 ### Behoben
 
 - **Die Sicherheitsrichtlinie behauptete zwei Dinge, die nicht stimmten.**

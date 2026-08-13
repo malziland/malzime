@@ -148,9 +148,9 @@ async function handleAdmin(req, res, secrets) {
         ? 100
         : Math.min(Math.max(Number((req.body && req.body.amount) || 100) || 100, 1), 500);
       /* SEC-2026-08-13-D: Rückgabewert auswerten. Vorher wurde er verworfen und
-         dem Betreiber IMMER Erfolg gemeldet — auch wenn boostLimit ablehnte
-         (Obergrenze erreicht, Grenze nicht lesbar). Genau in dem Moment reagiert
-         der Betreiber auf einen Überlast-Alarm und braucht die Wahrheit (KERN 10:
+         die Antwort meldete IMMER Erfolg — auch wenn boostLimit ablehnte
+         (Obergrenze erreicht, Grenze nicht lesbar). Genau dann läuft eine Reaktion
+         auf einen Überlast-Alarm, und die Antwort muss die Wahrheit sagen (KERN 10:
          Vollzugsmeldung am Rückgabewert, nicht an der Reihenfolge). */
       const boost = await boostLimit(amount);
       const data = await getStats();

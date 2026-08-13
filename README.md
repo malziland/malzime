@@ -105,7 +105,7 @@ Seit v2.10 ist die Warteschlange der einzige Weg. Der frühere synchrone `/analy
 Datenschutz ist kein Feature — es ist das Fundament:
 
 - **EU-Hosting fuer KI-Analysen**: Alle Bild-Analysen laufen ueber Mistral AI (Paris, EU-DSGVO). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO. Auf dem genutzten kostenpflichtigen API-Tier ist Training auf Eingaben/Ausgaben laut Anbieter-Zusage deaktiviert.
-- **Keine US-KI-Anbieter mehr**: Seit v1.6.0 wurden Google Vertex AI und Cloud Vision aus der Pipeline entfernt. Google bleibt nur fuer die Infrastruktur (Firebase Hosting + Cloud Functions + Firestore, alles in `europe-west1`).
+- **Keine US-KI-Anbieter mehr**: Seit v1.6.0 wurden Google Vertex AI und Cloud Vision aus der Pipeline entfernt. Google bleibt nur fuer die Infrastruktur: Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) in `europe-west1`, statische Seiten ueber ein weltweites Auslieferungsnetz (CDN).
 - **EXIF-Extraktion im Browser**: exifr parsed die Metadaten lokal, GPS erreicht nie unsere Server
 - **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell (ohne GPS, ohne dateTimeOriginal)
 - **Geocoding direkt vom Browser**: Nominatim wird client-seitig aufgerufen, nicht ueber den Server
@@ -265,8 +265,8 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - **Secret-Scan** via gitleaks (prueft auf versehentlich committete API-Keys)
 - **Dependabot** prueft monatlich auf Updates (npm + GitHub Actions, je Bereich zu einem PR gebuendelt) und oeffnet bei gemeldeten Sicherheitsluecken sofort einen Reparatur-PR
 - **Audit-Gate** im Backend-Job (`scripts/audit-gate.mjs`): blockiert bei hohen und kritischen Schwachstellen. Laesst sich eine Luecke tief in einer fremden Abhaengigkeitskette nachweislich (noch) nicht reparieren, kann sie **begruendet und mit Ablaufdatum** in `.github/audit-allowlist.json` ausgenommen werden — danach faellt das Gate von selbst wieder auf rot
-- **Vier Pruefungen** (`pruefungen`, alle blockierend): verbotene Formulierungen in Aussentexten (`.pruefungen/aussentext.txt`), Zahlen mit mehr als einem Wert (`.pruefungen/fakten.txt`), stille Fehlschlaege in Skripten, Tests ohne Zusicherung. Der Job prueft zuerst die Pruefungen selbst — 18 Proben, je Pruefung eine gegen kaputtes und eine gegen sauberes Material, damit ein defekter Pruefer nicht gruen meldet, ohne etwas zu pruefen
-- **Branch Protection** fuer `main`: Merges erst nach gruenen Status-Checks (`test-backend`, `test-frontend`, `test-e2e`, `secret-scan`)
+- **Pruefungen** (`pruefungen`, alle blockierend): verbotene Formulierungen in Aussentexten (`.pruefungen/aussentext.txt`), Zahlen mit mehr als einem Wert (`.pruefungen/fakten.txt`), stille Fehlschlaege in Skripten, Tests ohne Zusicherung. Der Job prueft zuerst die Pruefungen selbst — je Pruefung eine Probe gegen kaputtes und eine gegen sauberes Material. Die genaue Probenzahl steht bewusst nur im Skript und wird von `selbstpruefung.sh` gezaehlt, nicht hier (sonst driftet sie)
+- **Branch Protection** fuer `main`: Merges erst nach allen gruenen Pflicht-Checks. Kanonische Quelle ist `gh api repos/malziland/malzime/branches/main/protection` (Stand 2026-08-13: sechs Checks inkl. `playwright-version` und `pruefungen`, `enforce_admins: true`)
 - Deploy erfolgt manuell per `npx firebase deploy`
 
 ## Tech-Stack
@@ -299,7 +299,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - Keine Tracking-Cookies, keine Analytics, keine Werbung
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
 - KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.
-- Infrastruktur (Hosting, Cloud Functions, Firestore) bei Google Ireland in europe-west1 — auch als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
+- Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) bei Google Ireland in europe-west1; statische Seiten ueber ein weltweites CDN. Google als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
 - GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser direkt bei OpenStreetMap bzw. Nominatim)
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 

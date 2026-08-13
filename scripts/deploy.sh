@@ -21,6 +21,54 @@ cd "$(dirname "$0")/.."
 # Pruefen:  gsutil lifecycle get gs://malzime-queue-uploads
 # (Stand 2026-06-06 verifiziert: Regel am Produktiv-Bucket aktiv.)
 
+# ── OPS-2026-08-13-43: Stand-Bindung — deployt wird nur, was die CI freigab ──
+# Der Deploy liefert den ARBEITSBAUM aus (`firebase deploy`), prüfte aber
+# nirgends, ob dieser Stand der von der CI freigegebene ist. Sein Test-Guard ist
+# zudem eine echte Teilmenge der sechs Pflicht-Checks (es fehlen e2e,
+# secret-scan, audit-gate, format:check und der ganze pruefungen-Job inkl. der
+# Fremddatei-Prüfsummen, die exifr bewachen). Statt diese Riegel lokal zu
+# doppeln, wird an die CI-Freigabe gebunden: sauberer Baum, HEAD == origin/main,
+# und für HEAD müssen alle Pflicht-Checks grün sein. Notschalter SKIP_STAND=1,
+# laut wie die anderen.
+if [ "${SKIP_STAND:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_STAND=1 gesetzt — Stand-Bindung an die CI-Freigabe wird UEBERSPRUNGEN."
+else
+  if [ -n "$(git status --porcelain)" ]; then
+    echo "FEHLER: Arbeitsbaum nicht sauber — es würde ungeprüfter Code ausgeliefert." >&2
+    echo "        Erst committen/aufräumen, dann deployen. Notschalter: SKIP_STAND=1" >&2
+    exit 1
+  fi
+  git fetch -q origin main
+  if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
+    echo "FEHLER: HEAD != origin/main — der lokale Stand ist nicht der freigegebene." >&2
+    echo "        Erst mergen/pullen, dann deployen. Notschalter: SKIP_STAND=1" >&2
+    exit 1
+  fi
+  if command -v gh >/dev/null 2>&1; then
+    SHA=$(git rev-parse HEAD)
+    # Die sechs Pflicht-Checks müssen für DIESEN Commit success sein. Fehlt ein
+    # Ergebnis (Lauf noch nicht durch), ist das kein Freibrief — dann Abbruch.
+    PFLICHT="test-backend test-frontend test-e2e secret-scan playwright-version pruefungen"
+    LAGE=$(gh api "repos/malziland/malzime/commits/$SHA/check-runs" \
+      --jq '.check_runs[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+    if [ -z "$LAGE" ]; then
+      echo "FEHLER: CI-Ergebnis für $SHA nicht abrufbar — Abbruch statt Deploy auf Verdacht." >&2
+      echo "        Notschalter: SKIP_STAND=1" >&2
+      exit 1
+    fi
+    for CHECK in $PFLICHT; do
+      if ! printf '%s\n' "$LAGE" | grep -qx "$CHECK=success"; then
+        echo "FEHLER: Pflicht-Check »$CHECK« ist für $SHA nicht grün (Ist: $(printf '%s\n' "$LAGE" | grep "^$CHECK=" || echo "fehlt"))." >&2
+        echo "        Notschalter: SKIP_STAND=1" >&2
+        exit 1
+      fi
+    done
+    echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA."
+  else
+    echo "WARNUNG: gh nicht verfügbar — CI-Freigabe nicht prüfbar, nur sauberer Baum + HEAD==origin/main geprüft."
+  fi
+fi
+
 # ── Test-Guard: Lint + Unit-Tests muessen gruen sein (Deploy-Konvention) ──
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_TESTS=1 gesetzt — Lint und Tests werden UEBERSPRUNGEN."
@@ -91,6 +139,16 @@ VERSION="(kein Hosting-Deploy — Buster unveraendert)"
 if [[ ",$TARGET," == *",hosting,"* ]]; then
 TODAY=$(date +"%Y%m%d")
 CURRENT=$(grep -o 'styles\.css?v=[0-9]*' public/index.html | head -1 | grep -o '[0-9]*$' || true)
+# OPS-2026-08-13-47: Ein leeres CURRENT (Muster nicht getroffen — Datei
+# umbenannt, Attributreihenfolge geändert, Konvention angepasst) fiel vorher
+# still in den else-Zweig und setzte ...01 — bei einem zweiten Deploy des Tages
+# eine BEREITS vergebene Nummer, Clients behalten dann alte Dateien im Cache.
+# Leer ist ein Messfehler, kein gültiger erster Deploy des Tages.
+if [ -z "$CURRENT" ]; then
+  echo "FEHLER: Cache-Buster in public/index.html nicht lesbar (Muster styles.css?v=… nicht getroffen)." >&2
+  echo "        Konvention geändert? Erst prüfen, nicht blind auf ...01 zurückfallen." >&2
+  exit 1
+fi
 if [ "${#CURRENT}" -eq 10 ] && [ "${CURRENT:0:8}" = "$TODAY" ]; then
   NEXT=$((10#${CURRENT:8:2} + 1))
   if [ "$NEXT" -gt 99 ]; then
@@ -143,8 +201,30 @@ fi
 if [ "${SKIP_SMOKE:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_SMOKE=1 gesetzt — Live-Smoke wird UEBERSPRUNGEN."
 else
-  ./scripts/live-smoke.sh
+  # OPS-2026-08-13-42: Bei Hosting im Ziel bekommt der Smoke die erwartete
+  # Buster-Version und liest sie live zurück. Bei reinem Functions-Deploy gibt
+  # es keinen neuen Buster — dann ohne Argument (nur die vier Verhaltensproben).
+  if [[ ",$TARGET," == *",hosting,"* ]]; then
+    ./scripts/live-smoke.sh "$VERSION"
+  else
+    ./scripts/live-smoke.sh
+  fi
 fi
 
+# ── OPS-2026-08-13-48: Schlussbilanz der übersprungenen Riegel ──
+# KERN 12: Ein Ausnahmeweg muss bei JEDEM Lauf mitausgegeben werden, sonst ist
+# er eine Abschaltung mit Tarnkappe. Die einzelnen WARNUNG-Zeilen scrollen hinter
+# der Deploy-Ausgabe weg; hier stehen sie gebündelt am Ende.
+UEBERSPRUNGEN=""
+[ "${SKIP_STAND:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_STAND"
+[ "${SKIP_TESTS:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_TESTS"
+[ "${SKIP_CLI_CHECK:-0}" = "1" ] && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_CLI_CHECK"
+[ "${SKIP_INFRA:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_INFRA"
+[ "${SKIP_SMOKE:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_SMOKE"
+
 echo ""
-echo "Deploy abgeschlossen. Version: ?v=$VERSION"
+if [ -n "$UEBERSPRUNGEN" ]; then
+  echo "Deploy abgeschlossen. Version: ?v=$VERSION — ⚠ ÜBERSPRUNGENE RIEGEL:$UEBERSPRUNGEN"
+else
+  echo "Deploy abgeschlossen. Version: ?v=$VERSION — alle Riegel gelaufen."
+fi

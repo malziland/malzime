@@ -63,11 +63,16 @@ BACKEND_GESAMT=$(printf "%s" "$BACKEND_LOG" | grep -E "^Tests:" | grep -Eo "[0-9
 echo "— Frontend-Suite läuft…"
 FRONTEND_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_FRONTEND npm run test:frontend) || { echo "$FRONTEND_LOG" | tail -20; echo "ABBRUCH: Frontend-Suite rot — es wird nichts gestempelt."; exit 1; }
 FRONTEND=$(printf "%s" "$FRONTEND_LOG" | grep -Eo "Tests\s+[0-9]+ passed" | grep -Eo "[0-9]+" | head -1 || true)
+# OPS-2026-08-13-46: Auch für Frontend und E2E die Übersprungenen lesen — sonst
+# stempelt der Prüfstand "n/n grün", während ein Test still aus der Suite fällt.
+# Vitest: "Tests 314 passed | 1 skipped (315)". Playwright: "1 skipped, 17 passed".
+FRONTEND_SKIP=$(printf "%s" "$FRONTEND_LOG" | grep -Eo "[0-9]+ skipped" | grep -Eo "[0-9]+" | head -1 || true)
 
 # ── 3. E2E (Playwright) ──
 echo "— E2E-Suite läuft (dauert am längsten)…"
 E2E_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_E2E npm run test:e2e) || { echo "$E2E_LOG" | tail -20; echo "ABBRUCH: E2E-Suite rot — es wird nichts gestempelt."; exit 1; }
 E2E=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | tail -1 || true)
+E2E_SKIP=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ skipped" | grep -Eo "[0-9]+" | head -1 || true)
 
 # ── Plausibilität: alle drei Zahlen müssen da sein ──
 for WERT in "$BACKEND" "$FRONTEND" "$E2E"; do
@@ -80,7 +85,7 @@ done
 echo "Alle Suiten grün: Backend $BACKEND · Frontend $FRONTEND · E2E $E2E — Stempel wird gesetzt."
 
 # ── Stempeln: nur die Ergebnis-Zelle der drei Suiten-Zeilen ersetzen ──
-BACKEND="$BACKEND" BACKEND_GESAMT="$BACKEND_GESAMT" FRONTEND="$FRONTEND" E2E="$E2E" COMMIT="$COMMIT" DATUM="$DATUM" python3 - "$MATRIX" <<'EOF'
+BACKEND="$BACKEND" BACKEND_GESAMT="$BACKEND_GESAMT" FRONTEND="$FRONTEND" FRONTEND_SKIP="$FRONTEND_SKIP" E2E="$E2E" E2E_SKIP="$E2E_SKIP" COMMIT="$COMMIT" DATUM="$DATUM" python3 - "$MATRIX" <<'EOF'
 import os, re, sys
 
 pfad = sys.argv[1]
@@ -88,17 +93,25 @@ text = open(pfad, encoding="utf-8").read()
 b, f, e = os.environ["BACKEND"], os.environ["FRONTEND"], os.environ["E2E"]
 stempel_ende = f"— `scripts/pruefstand.sh`, Commit {os.environ['COMMIT']}, {os.environ['DATUM']} |"
 
-# Ein uebersprungener Test wird AUSGEWIESEN, nicht weggerechnet: "795/795 gruen"
-# bei 796 Tests waere eine stille Schoenung genau der Art, die dieses Projekt
-# beim Audit an sich selbst gefunden hat.
-gesamt = os.environ.get("BACKEND_GESAMT") or b
-uebersprungen = int(gesamt) - int(b) if gesamt.isdigit() else 0
-b_text = f"{b}/{gesamt} grün ({uebersprungen} übersprungen)" if uebersprungen else f"{b}/{b} grün"
+# OPS-2026-08-13-32/46: Ein uebersprungener Test wird AUSGEWIESEN, nicht
+# weggerechnet — "n/n gruen" bei n+1 Tests waere eine stille Schoenung. Gilt
+# jetzt fuer alle drei Suiten, nicht nur das Backend.
+def stempel(passed, uebersprungen):
+    p = int(passed)
+    s = int(uebersprungen) if str(uebersprungen).isdigit() else 0
+    gesamt = p + s
+    return f"{p}/{gesamt} grün ({s} übersprungen)" if s else f"{p}/{p} grün"
+
+gesamt_b = os.environ.get("BACKEND_GESAMT") or b
+skip_b = (int(gesamt_b) - int(b)) if str(gesamt_b).isdigit() else 0
+b_text = stempel(b, skip_b)
+f_text = stempel(f, os.environ.get("FRONTEND_SKIP", ""))
+e_text = stempel(e, os.environ.get("E2E_SKIP", ""))
 
 ersetzungen = [
     (r"(\| Backend-Unit-Tests \|[^|]+\|) [^|]+\|",  rf"\1 ✅ {b_text} {stempel_ende}"),
-    (r"(\| Frontend-Unit-Tests \|[^|]+\|) [^|]+\|", rf"\1 ✅ {f}/{f} grün {stempel_ende}"),
-    (r"(\| E2E kritischster Nutzerfluss[^|]*\|[^|]+\|) [^|]+\|", rf"\1 ✅ {e}/{e} grün {stempel_ende}"),
+    (r"(\| Frontend-Unit-Tests \|[^|]+\|) [^|]+\|", rf"\1 ✅ {f_text} {stempel_ende}"),
+    (r"(\| E2E kritischster Nutzerfluss[^|]*\|[^|]+\|) [^|]+\|", rf"\1 ✅ {e_text} {stempel_ende}"),
 ]
 for muster, ersatz in ersetzungen:
     text, anzahl = re.subn(muster, ersatz, text, count=1)

@@ -53,10 +53,18 @@ const IGNORIERTE_ORDNER = new Set(["__pycache__", ".git"]);
    also nutzlos. Dieselbe Lehre wie bei TEST-2026-08-12-29, einen Tag später
    noch einmal gelernt. */
 function verfolgteDateien(wurzel) {
-  const roh = execFileSync("git", ["ls-files", "-z", "--", wurzel], {
-    cwd: REPO,
-    encoding: "utf8",
-  });
+  // TEST-2026-08-13-K7: Ohne Git-Repo (lokaler Lauf in einer Wegwerfkopie) warf
+  // execFileSync einen rohen Node-Stacktrace mit Exit 1 — ununterscheidbar vom
+  // echten Fund (ebenfalls 1). Wie audit-gate.mjs: Klartext + Exit 2, damit ein
+  // Messfehler nicht als Befund durchgeht (KERN 5c).
+  let roh;
+  try {
+    roh = execFileSync("git", ["ls-files", "-z", "--", wurzel], { cwd: REPO, encoding: "utf8" });
+  } catch (fehler) {
+    console.error(`FEHLER: git ls-files nicht ausführbar (kein Repo?): ${fehler.message.split("\n")[0]}`);
+    console.error("Ohne Git kann die Fläche nicht bestimmt werden — kein bestandener Lauf.");
+    process.exit(2);
+  }
   return roh
     .split("\0")
     .filter(Boolean)

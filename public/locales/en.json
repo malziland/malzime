@@ -58,7 +58,7 @@
   "error.imageTooLarge": "The image is too large. Please use a smaller photo.",
   "error.invalidFormat": "That didn't work. Is it really a photo? Try JPEG or PNG.",
   "error.serverError": "The server is having an issue right now. Wait a moment and try again.",
-  "error.serverBusy": "The AI is overloaded right now. We already tried automatically three times — please wait 2-3 minutes before trying again.",
+  "error.serverBusy": "The AI is overloaded right now. Please wait 2-3 minutes before trying again.",
   "status.serverBusyRetrying": "Lots of requests right now — the system is retrying automatically, please wait …",
   "error.missingImage": "No image detected. Please select a photo.",
   "error.timeout": "The analysis is taking too long. Try again or use a different photo.",
@@ -219,5 +219,9 @@
   "rc.folgen.interessen": "Wrong interests put you in the wrong filter bubble — you are shown a world that isn't yours at all.",
   "rc.folgen.charakter": "A misjudged character helps decide what algorithms think you are capable of — all the way to hiring filters.",
   "rc.folgen.werbung": "Even ads that don't match you follow you around for weeks — misjudgments simply keep running.",
-  "rc.folgen.manipulation": "A wrongly assumed weakness means: manipulation gets tested on you — until one sticks."
+  "rc.folgen.manipulation": "A wrongly assumed weakness means: manipulation gets tested on you — until one sticks.",
+  "aria.beastToggle": "Activate beast mode",
+  "aria.info": "Information",
+  "aria.konfidenz": "Confidence",
+  "error.queueFull": "A lot of analyses are queued right now. Please try again in a few minutes."
 }

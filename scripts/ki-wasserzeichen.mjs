@@ -47,6 +47,38 @@ const SICHERUNG = path.join(REPO, ".demo-originale");
 const TROCKEN = process.argv.includes("--dry");
 const ZIEL_DIR = TROCKEN ? "/tmp/ki-wasserzeichen" : DEMO_DIR;
 
+/* SPRACHFASSUNGEN (2026-08-13): Das Zeichen ist in die Pixel gebrannt und kann
+   deshalb nicht mituebersetzen. Bei englischer Oberflaeche stand trotzdem
+   "KI ERSTELLT" im Bild. Loesung: ein zweiter Dateisatz mit englischem Zeichen,
+   Endung `-en`. Das Frontend waehlt nach Sprache; die deutschen Dateinamen
+   bleiben unveraendert, damit nichts Bestehendes bricht.
+   Aufruf:  node scripts/ki-wasserzeichen.mjs            -> deutsche Fassung
+            node scripts/ki-wasserzeichen.mjs --lang=en  -> englische Fassung */
+const SPRACHE = (process.argv.find((a) => a.startsWith("--lang=")) || "--lang=de").split("=")[1];
+const SPRACHEN = {
+  de: {
+    endung: "",
+    kuerzel: "KI",
+    wort: "ERSTELLT",
+    beschreibung: "Mit KI erstelltes Bild. Zeigt keine reale Person.",
+    credit: "KI erstellt",
+    quelleIptc: "Generative KI",
+  },
+  en: {
+    endung: "-en",
+    kuerzel: "AI",
+    wort: "GENERATED",
+    beschreibung: "AI-generated image. Does not depict a real person.",
+    credit: "AI-generated",
+    quelleIptc: "Generative AI",
+  },
+};
+if (!SPRACHEN[SPRACHE]) {
+  console.error(`Abbruch: unbekannte Sprache "${SPRACHE}". Erlaubt: ${Object.keys(SPRACHEN).join(", ")}`);
+  process.exit(2);
+}
+const L = SPRACHEN[SPRACHE];
+
 /* anzeigeBreite = wie breit das Bild auf der Seite tatsaechlich erscheint.
    zuschnitt = das Thumbnail wird im Kachel-Format erzeugt statt im Hochformat.
 
@@ -121,7 +153,7 @@ function seite(dataUrl, breite, hoehe, anzeigeBreite, zielSchrift) {
   </style></head><body>
   <div class="rahmen">
     <img src="${dataUrl}" alt="">
-    <div class="badge"><span class="kuerzel">KI</span><span class="wort">ERSTELLT</span></div>
+    <div class="badge"><span class="kuerzel">${L.kuerzel}</span><span class="wort">${L.wort}</span></div>
   </div></body></html>`;
 }
 
@@ -162,10 +194,10 @@ function metadatenSetzen(quelle, ziel) {
        würde das Übernehmen die Kennzeichnung wieder überschreiben. */
     `-XMP-iptcExt:DigitalSourceType=${IPTC_QUELLE}`,
     "-XMP-dc:Creator=malziland - learning | training | consulting e.U.",
-    "-XMP-dc:Description=Mit KI erstelltes Bild. Zeigt keine reale Person.",
-    "-IPTC:Credit=KI erstellt",
-    "-IPTC:Source=Generative KI",
-    "-XMP-photoshop:Credit=KI erstellt",
+    `-XMP-dc:Description=${L.beschreibung}`,
+    `-IPTC:Credit=${L.credit}`,
+    `-IPTC:Source=${L.quelleIptc}`,
+    `-XMP-photoshop:Credit=${L.credit}`,
     ziel,
   ]);
 }
@@ -214,10 +246,13 @@ async function main() {
        das Original — sie laufen anschliessend durch dieselbe KI-Analyse wie
        Nutzerfotos. */
     const puffer = await page.screenshot({ type: "jpeg", quality: 92 });
-    const ziel = path.join(ZIEL_DIR, name);
+    /* Sprach-Endung im Dateinamen: demo-selfie.jpg (de) / demo-selfie-en.jpg (en).
+       Die Quelle bleibt IMMER das un-gewasserzeichnete Original. */
+    const zielName = name.replace(/\.jpg$/, `${L.endung}.jpg`);
+    const ziel = path.join(ZIEL_DIR, zielName);
     writeFileSync(ziel, puffer);
     metadatenSetzen(quelle, ziel);
-    console.log(`  ${name}  ${breite}x${hoehe}  ${(puffer.length / 1024).toFixed(0)} KB`);
+    console.log(`  ${zielName}  ${breite}x${hoehe}  ${(puffer.length / 1024).toFixed(0)} KB`);
   }
 
   await browser.close();

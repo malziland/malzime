@@ -79,6 +79,21 @@ export function applyTranslations() {
     if (text !== key) el.alt = text;
   });
 
+  /* 2026-08-13: Sprachabhängige Bildquelle. Die KI-Kennzeichnung ist in die
+     Pixel der Demo-Fotos gebrannt (Pflicht seit 08/2026 — ein CSS-Etikett
+     verschwindet, sobald jemand das Bild speichert). Ein gebranntes Zeichen kann
+     nicht mitübersetzen, deshalb gibt es zwei Dateisätze: „KI ERSTELLT" und
+     „AI GENERATED". Der Cache-Buster steht im HTML und bleibt erhalten — nur
+     der Dateiname wird getauscht. */
+  document.querySelectorAll("[data-i18n-src]").forEach((el) => {
+    const key = el.getAttribute("data-i18n-src");
+    const pfad = t(key);
+    if (pfad !== key) {
+      const buster = (el.getAttribute("src") || "").split("?")[1];
+      el.setAttribute("src", buster ? `${pfad}?${buster}` : pfad);
+    }
+  });
+
   /* A11Y-001 (Audit 2026-08-10): aria-label war nicht uebersetzbar. Der
      Hauptumschalter wurde englischsprachigen Screenreader-Nutzern als
      „Beast Mode aktivieren" vorgelesen, die Konfidenz-Punkte 13x als

@@ -85,11 +85,23 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
   der Realitäts-Check, die Diagnose-Feldliste, die Fehler-Log-Beschreibung. Drei
   neue Sperrlisten-Regeln verhindern den Rückfall.
 
-### Restliste — ebenfalls erledigt
-Auch die zunächst zurückgestellten P3/P4-Punkte sind behoben:
+### Demo-Bilder auf Englisch gekennzeichnet
+- Die KI-Kennzeichnung ist in die Bildpixel gebrannt (Pflicht seit 08/2026 — ein
+  Etikett per CSS verschwindet, sobald jemand das Bild speichert oder weitergibt).
+  Ein gebranntes Zeichen kann aber nicht mitübersetzen: Bei englischer Oberfläche
+  stand trotzdem „KI ERSTELLT" im Bild. Jetzt gibt es einen zweiten Dateisatz mit
+  „AI GENERATED", und die Seite wählt ihn nach Sprache — samt englischer
+  Bildbeschreibung für Screenreader und englischer Metadaten-Kennzeichnung
+  (`Credit`, `Source`, `Description`). Die fiktiven Kamera- und GPS-Daten, an denen
+  malziME vorführt was in Fotos steckt, bleiben in beiden Fassungen erhalten.
+- Das Werkzeug `scripts/ki-wasserzeichen.mjs` kennt dafür jetzt Sprachen
+  (`--lang=en`); der bestehende Wächter über die maschinenlesbare Kennzeichnung
+  deckt beide Sätze automatisch ab (12 statt 6 Bilder geprüft).
+
+### Weitere Korrekturen
 - **Transparenz:** Die Datenschutzerklärung benennt jetzt, dass die KI bewusst
   sensible, dem Aussehen zugeschriebene Merkmale rät (scheinbare Herkunft, Hautton) —
-  genau das, was das Werkzeug vorführt. (Erledigt die anfangs offene Frage.)
+  genau das, was das Werkzeug vorführt.
 - **Realitäts-Check-Vergleich** erscheint auch über die API erst ab 100 Eingaben
   (die Oberfläche sagt das zu); GIF wird als Format genannt; die IP-Grenze in den
   Nutzungsbedingungen als Richtwert ehrlich formuliert.

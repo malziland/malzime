@@ -223,5 +223,14 @@
   "aria.beastToggle": "Beast-Modus aktivieren",
   "aria.info": "Information",
   "aria.konfidenz": "Konfidenz",
-  "error.queueFull": "Gerade warten sehr viele Analysen. Bitte in ein paar Minuten noch einmal versuchen."
+  "error.queueFull": "Gerade warten sehr viele Analysen. Bitte in ein paar Minuten noch einmal versuchen.",
+  "demo.src.selfie": "./img/demo/demo-selfie-thumb.jpg",
+  "demo.src.cafe": "./img/demo/demo-cafe-thumb.jpg",
+  "demo.src.hiker": "./img/demo/demo-hiker-thumb.jpg",
+  "demo.full.selfie": "./img/demo/demo-selfie.jpg",
+  "demo.full.cafe": "./img/demo/demo-cafe.jpg",
+  "demo.full.hiker": "./img/demo/demo-hiker.jpg",
+  "demo.alt.selfie": "Mit KI erstelltes Beispielbild: Selfie am Stephansplatz. Zeigt keine reale Person.",
+  "demo.alt.cafe": "Mit KI erstelltes Beispielbild: Im Café in Salzburg. Zeigt keine reale Person.",
+  "demo.alt.hiker": "Mit KI erstelltes Beispielbild: Wanderung bei Hallstatt. Zeigt keine reale Person."
 }

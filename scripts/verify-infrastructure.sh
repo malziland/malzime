@@ -40,14 +40,26 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 }
 
 # ── Voraussetzungen ──
-if ! command -v gcloud >/dev/null 2>&1; then
+# OPS-2026-08-13-41: Läuft mindestens ein Abschnitt über einen Einspeisepunkt
+# (INFRA_PROBE_*), ist das ein Test-/Negativprobenlauf — dann keine gcloud-
+# Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
+# (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
+PROBEMODUS=0
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}" ]; then
+  PROBEMODUS=1
+fi
+if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
   echo "FEHLER: gcloud nicht gefunden — Prüfung nicht möglich." >&2
   exit 2
 fi
-KONTO=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1)
-if [ -z "$KONTO" ]; then
-  echo "FEHLER: Keine aktive gcloud-Anmeldung. Bitte im Terminal 'gcloud auth login' ausführen." >&2
-  exit 2
+if [ "$PROBEMODUS" = "0" ]; then
+  KONTO=$(gcloud auth list --filter=status:ACTIVE --format="value(account)" 2>/dev/null | head -1)
+  if [ -z "$KONTO" ]; then
+    echo "FEHLER: Keine aktive gcloud-Anmeldung. Bitte im Terminal 'gcloud auth login' ausführen." >&2
+    exit 2
+  fi
+else
+  KONTO="(Probemodus — Einspeisepunkt gesetzt)"
 fi
 
 echo "Infrastruktur-Prüfung malziME (Projekt $PROJECT, angemeldet: $KONTO)"

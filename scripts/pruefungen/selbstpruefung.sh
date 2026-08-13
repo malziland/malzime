@@ -63,6 +63,8 @@ lauf stiller-fehlschlag.py "$HIER/negativprobe/echte-bedingung" 0 \
   "if ... >/dev/null 2>&1; then gilt nicht als verworfener Fehler"
 lauf test-blind.py "$HIER/negativprobe/test-mit-textblock" 0 \
   "Zusicherung hinter einem mehrzeiligen Text wird gefunden"
+lauf test-blind.py "$HIER/negativprobe/gruppe-mit-tests" 0 \
+  "test.describe ist eine Gruppe, kein Test ohne Zusicherung"
 lauf stiller-fehlschlag.py "$HIER/negativprobe/berichter-ohne-set-e" 0 \
   "Sammel-Berichter mit eigenem Fehler-Exit braucht kein set -e"
 lauf stiller-fehlschlag.py "$HIER/negativprobe/geprueftes-suchergebnis" 0 \

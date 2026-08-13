@@ -232,5 +232,19 @@
   "demo.full.hiker": "./img/demo/demo-hiker.jpg",
   "demo.alt.selfie": "Mit KI erstelltes Beispielbild: Selfie am Stephansplatz. Zeigt keine reale Person.",
   "demo.alt.cafe": "Mit KI erstelltes Beispielbild: Im Café in Salzburg. Zeigt keine reale Person.",
-  "demo.alt.hiker": "Mit KI erstelltes Beispielbild: Wanderung bei Hallstatt. Zeigt keine reale Person."
+  "demo.alt.hiker": "Mit KI erstelltes Beispielbild: Wanderung bei Hallstatt. Zeigt keine reale Person.",
+  "sprache.gruppe": "Sprache wählen",
+  "sprache.name.de": "Deutsch",
+  "sprache.name.en": "English",
+  "sprache.schliessen": "Schließen",
+  "sprache.gewechselt": "Sprache auf Deutsch umgestellt.",
+  "sprache.fertig.titel": "Sprache wechseln?",
+  "sprache.fertig.text": "Dein Profil ist auf Deutsch entstanden. Übersetzen wäre die faule Lösung. Für ein englisches Profil sieht sich die KI dein Foto noch einmal an und urteilt von vorne.",
+  "sprache.fertig.hinweis": "<strong>Dabei kommt nie dasselbe Profil heraus.</strong> Die KI rät jedes Mal neu — der zweite Durchlauf kann dich ganz anders beschreiben. Genau das ist der Lerneffekt, aber dein jetziges Ergebnis ist dann weg.",
+  "sprache.fertig.bleiben": "Profil behalten",
+  "sprache.fertig.wechseln": "Neu analysieren",
+  "sprache.laeuft.titel": "Sprache wechseln?",
+  "sprache.laeuft.text": "Dein Foto ist noch in Arbeit. Beim Wechsel beginnt die Analyse auf Englisch von vorn — dein Foto bleibt dasselbe, du musst nichts noch einmal auswählen.",
+  "sprache.laeuft.bleiben": "Bei Deutsch bleiben",
+  "sprache.laeuft.wechseln": "Auf Englisch wechseln"
 }

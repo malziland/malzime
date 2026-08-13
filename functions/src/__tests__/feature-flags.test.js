@@ -22,6 +22,7 @@ describe("getFeatureFlags", () => {
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: false,
+      useSprachumschalter: false,
     });
   });
 
@@ -40,6 +41,7 @@ describe("getFeatureFlags", () => {
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: false,
+      useSprachumschalter: false,
     });
   });
 
@@ -50,6 +52,7 @@ describe("getFeatureFlags", () => {
       usePromptCache: true,
       useBeastAdsCall: true,
       useLiveText: false,
+      useSprachumschalter: false,
     });
   });
 
@@ -60,6 +63,7 @@ describe("getFeatureFlags", () => {
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: false,
+      useSprachumschalter: false,
     });
   });
 
@@ -70,6 +74,7 @@ describe("getFeatureFlags", () => {
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: false,
+      useSprachumschalter: false,
     });
   });
 });
@@ -143,5 +148,35 @@ describe("Lokal-Modus (QUEUE_LOCAL=1)", () => {
     process.env.QUEUE_LOCAL = "1";
     flags._clearCache();
     expect(mockGet).not.toHaveBeenCalled();
+  });
+});
+
+describe("useSprachumschalter (v3.3)", () => {
+  test("streng opt-in: nur der Wert true schaltet ihn ein", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSprachumschalter: true }) });
+    expect((await flags.getFeatureFlags()).useSprachumschalter).toBe(true);
+  });
+
+  test.each([
+    ["'true'", "true"],
+    ["1", 1],
+    ["ja", "ja"],
+    ["null", null],
+  ])("der Wert %s schaltet ihn NICHT ein", async (_name, wert) => {
+    /* Ein Tippfehler im Firestore-Dokument darf kein Bedienelement vor ein
+         Workshop-Publikum stellen. */
+    flags._clearCache();
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSprachumschalter: wert }) });
+    expect((await flags.getFeatureFlags()).useSprachumschalter).toBe(false);
+  });
+
+  test("fehlendes Dokument heisst aus", async () => {
+    mockGet.mockResolvedValue({ exists: false });
+    expect((await flags.getFeatureFlags()).useSprachumschalter).toBe(false);
+  });
+
+  test("Kurzform isSprachumschalterEnabled liefert dasselbe", async () => {
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSprachumschalter: true }) });
+    expect(await flags.isSprachumschalterEnabled()).toBe(true);
   });
 });

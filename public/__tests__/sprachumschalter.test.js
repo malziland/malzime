@@ -1,0 +1,306 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { setupDOM } from "./setup.js";
+
+/* i18n wird nachgebaut, damit der Wechsel ohne Netz prüfbar ist. `t` liefert
+   den Schlüssel zurück — das reicht, denn geprüft wird die Mechanik, nicht der
+   Wortlaut. setLanguage verhält sich wie das Original: Es meldet false, wenn
+   die Zielsprache schon eingestellt ist oder das Laden scheitert. */
+let aktuelleSprache = "de";
+let ladenScheitert = false;
+
+vi.mock("../js/i18n.js", () => ({
+  t: (key) => key,
+  getLanguage: () => aktuelleSprache,
+  initI18n: () => Promise.resolve(),
+  applyTranslations: () => {},
+  setLanguage: async (neu) => {
+    if (!neu || neu === aktuelleSprache) return false;
+    if (ladenScheitert) return false;
+    aktuelleSprache = neu;
+    document.documentElement.lang = neu;
+    return true;
+  },
+}));
+
+const { initSprachumschalter, zeigeSprachumschalter, istEingehaengt } = await import("../js/sprachumschalter.js");
+const { state } = await import("../js/state.js");
+
+/* Der echte Aufbau hat ein <main id="main">; setup.js kennt es nicht. */
+function baueSeite() {
+  setupDOM();
+  const main = document.createElement("main");
+  main.id = "main";
+  document.body.insertBefore(main, document.body.firstChild);
+}
+
+function pille() {
+  return document.querySelector(".sprach-pille");
+}
+function langKnopf(code) {
+  return document.querySelector(`.sprach-knopf[data-lang="${code}"]`);
+}
+function sichtbaresModal() {
+  return Array.from(document.querySelectorAll(".sw-grund")).find((el) => !el.hidden) || null;
+}
+
+let analysiert;
+
+beforeEach(() => {
+  aktuelleSprache = "de";
+  document.documentElement.lang = "de";
+  ladenScheitert = false;
+  analysiert = [];
+  baueSeite();
+  state.isAnalyzing = false;
+  state.uploadLaeuft = false;
+  state.lastData = null;
+  state.lastFile = null;
+  try {
+    sessionStorage.clear();
+  } catch {
+    /* jsdom ohne Speicher — die Tests dazu prüfen das gesondert */
+  }
+  initSprachumschalter({ analysiere: (datei) => analysiert.push(datei) });
+});
+
+afterEach(() => {
+  zeigeSprachumschalter(false);
+});
+
+describe("Sprachumschalter — Merkmals-Schloss", () => {
+  it("ohne Merkmal entsteht KEIN einziges Element", () => {
+    expect(document.querySelectorAll(".sprach-pille, .sw-grund")).toHaveLength(0);
+    expect(istEingehaengt()).toBe(false);
+  });
+
+  it("Positivkontrolle: mit Merkmal entstehen sie sehr wohl", () => {
+    /* Ohne diese Gegenprobe wäre der Test oben auch dann grün, wenn der
+       Umschalter überhaupt nicht mehr gebaut werden KANN. */
+    zeigeSprachumschalter(true);
+    expect(pille()).not.toBeNull();
+    expect(document.querySelectorAll(".sw-grund")).toHaveLength(2);
+  });
+
+  it("der Schalter ist nie sichtbar-aber-wirkungslos: kein disabled-Zustand", () => {
+    zeigeSprachumschalter(true);
+    document.querySelectorAll(".sprach-knopf").forEach((b) => {
+      expect(b.disabled).toBe(false);
+      expect(b.getAttribute("aria-disabled")).toBeNull();
+    });
+  });
+
+  it("die Konsolen-Tür steht auch ohne Merkmal offen und baut auf Zuruf", () => {
+    expect(typeof window.malziME.sprachumschalter).toBe("function");
+    window.malziME.sprachumschalter();
+    expect(pille()).not.toBeNull();
+    window.malziME.sprachumschalter(false);
+    expect(pille()).toBeNull();
+  });
+
+  it("Aushängen lässt nichts zurück", () => {
+    zeigeSprachumschalter(true);
+    zeigeSprachumschalter(false);
+    expect(document.querySelectorAll(".sprach-pille, .sw-grund, .sprachwahl")).toHaveLength(0);
+  });
+});
+
+describe("Sprachumschalter — wann gefragt wird", () => {
+  beforeEach(() => zeigeSprachumschalter(true));
+
+  it("leere Seite: sofortiger Wechsel ohne Rückfrage", async () => {
+    langKnopf("en").click();
+    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
+    expect(sichtbaresModal()).toBeNull();
+    expect(analysiert).toHaveLength(0);
+  });
+
+  it("laufende Analyse: Rückfrage statt Wechsel", () => {
+    state.isAnalyzing = true;
+    langKnopf("en").click();
+    expect(sichtbaresModal().dataset.modal).toBe("laeuft");
+    expect(aktuelleSprache).toBe("de");
+  });
+
+  it("fertiges Profil: Rückfrage mit Verlust-Hinweis", () => {
+    state.lastData = { profileText: "x" };
+    langKnopf("en").click();
+    const modal = sichtbaresModal();
+    expect(modal.dataset.modal).toBe("fertig");
+    expect(modal.querySelector(".sw-hinweis")).not.toBeNull();
+  });
+
+  it("laufender Upload zählt wie eine laufende Analyse", () => {
+    state.uploadLaeuft = true;
+    langKnopf("en").click();
+    expect(sichtbaresModal().dataset.modal).toBe("laeuft");
+  });
+
+  it("auch der Rückweg fragt, solange etwas auf dem Spiel steht", async () => {
+    /* Nach dem Wechsel läuft eine Analyse auf Englisch. Zurück auf Deutsch
+       würde sie genauso verwerfen wie der Hinweg — also wird wieder gefragt.
+       Die Rückfrage erscheint jetzt englisch, weil das die aktuelle
+       Oberflächensprache ist. */
+    state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
+
+    state.isAnalyzing = true;
+    langKnopf("de").click();
+    expect(sichtbaresModal()).not.toBeNull();
+    expect(aktuelleSprache).toBe("en");
+  });
+
+  it("Klick auf die bereits eingestellte Sprache tut nichts", () => {
+    state.lastData = { profileText: "x" };
+    langKnopf("de").click();
+    expect(sichtbaresModal()).toBeNull();
+    expect(aktuelleSprache).toBe("de");
+  });
+});
+
+describe("Sprachumschalter — Abbrechen hinterlässt nichts", () => {
+  beforeEach(() => {
+    zeigeSprachumschalter(true);
+    state.lastData = { profileText: "x" };
+    state.lastFile = { name: "a.jpg" };
+  });
+
+  it("Abbrechen ändert weder Sprache noch Schalterstellung", () => {
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
+    expect(aktuelleSprache).toBe("de");
+    expect(langKnopf("de").classList.contains("aktiv")).toBe(true);
+    expect(analysiert).toHaveLength(0);
+  });
+
+  it("das X schließt genauso", () => {
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-schliessen").click();
+    expect(aktuelleSprache).toBe("de");
+  });
+
+  it("Escape schließt genauso", () => {
+    langKnopf("en").click();
+    document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+    expect(aktuelleSprache).toBe("de");
+  });
+
+  it("der zweite Versuch fragt WIEDER in der aktuellen Sprache", () => {
+    /* Der vom Nutzer gemeldete Fehler am Prototyp: Nach einem Abbruch kam die
+       Rückfrage beim nächsten Mal auf Englisch, obwohl nie gewechselt wurde. */
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
+    langKnopf("en").click();
+    expect(aktuelleSprache).toBe("de");
+    expect(document.documentElement.lang).not.toBe("en");
+  });
+});
+
+describe("Sprachumschalter — Bestätigen", () => {
+  beforeEach(() => {
+    zeigeSprachumschalter(true);
+    state.lastData = { profileText: "x" };
+    state.lastFile = { name: "foto.jpg" };
+  });
+
+  it("wechselt die Sprache und startet dieselbe Datei neu", async () => {
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
+    expect(analysiert).toEqual([{ name: "foto.jpg" }]);
+  });
+
+  it("ohne Bild wird nichts neu gestartet", async () => {
+    state.lastFile = null;
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
+    expect(analysiert).toHaveLength(0);
+  });
+
+  it("scheitert das Laden der Sprachdatei, bleibt alles beim Alten", async () => {
+    ladenScheitert = true;
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(sichtbaresModal()).toBeNull());
+    expect(aktuelleSprache).toBe("de");
+    expect(analysiert).toHaveLength(0);
+  });
+
+  it("merkt die Wahl für das Neuladen im selben Tab", async () => {
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(sessionStorage.getItem("malzime-sprache")).toBe("en"));
+  });
+});
+
+describe("Sprachumschalter — Barrierefreiheit", () => {
+  beforeEach(() => zeigeSprachumschalter(true));
+
+  it("jeder Knopf trägt seine eigene Sprache als lang-Attribut", () => {
+    expect(langKnopf("de").getAttribute("lang")).toBe("de");
+    expect(langKnopf("en").getAttribute("lang")).toBe("en");
+  });
+
+  it("jeder Knopf hat eine Beschriftung, die nicht nur das Kürzel ist", () => {
+    document.querySelectorAll(".sprach-knopf").forEach((b) => {
+      const label = b.getAttribute("aria-label");
+      expect(label).toBeTruthy();
+      expect(label).not.toBe(b.textContent);
+    });
+  });
+
+  it("die Gruppe ist benannt", () => {
+    expect(pille().getAttribute("role")).toBe("group");
+    expect(pille().getAttribute("aria-label")).toBeTruthy();
+  });
+
+  it("der Dialog ist als solcher ausgewiesen und beschriftet", () => {
+    state.lastData = { profileText: "x" };
+    langKnopf("en").click();
+    const kasten = sichtbaresModal().querySelector(".sw-modal");
+    expect(kasten.getAttribute("role")).toBe("dialog");
+    expect(kasten.getAttribute("aria-modal")).toBe("true");
+    const beschriftetVon = kasten.getAttribute("aria-labelledby");
+    expect(document.getElementById(beschriftetVon)).not.toBeNull();
+  });
+
+  it("während der Rückfrage ist alles andere stillgelegt", () => {
+    state.lastData = { profileText: "x" };
+    langKnopf("en").click();
+    const offen = sichtbaresModal();
+    const andere = Array.from(document.body.children).filter((el) => el !== offen);
+    expect(andere.length).toBeGreaterThan(0);
+    andere.forEach((el) => expect(el.hasAttribute("inert")).toBe(true));
+  });
+
+  it("nach dem Schließen ist die Stilllegung restlos zurückgenommen", () => {
+    state.lastData = { profileText: "x" };
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
+    Array.from(document.body.children).forEach((el) => {
+      expect(el.hasAttribute("inert")).toBe(false);
+    });
+  });
+
+  it("der Fokus landet im Dialog und kehrt danach auf den Schalter zurück", () => {
+    state.lastData = { profileText: "x" };
+    const ausloeser = langKnopf("en");
+    ausloeser.focus();
+    ausloeser.click();
+    expect(sichtbaresModal().contains(document.activeElement)).toBe(true);
+    sichtbaresModal().querySelector(".sw-knopf--bleiben").click();
+    expect(document.activeElement).toBe(ausloeser);
+  });
+
+  it("der gemeldete Wechsel wird angesagt", async () => {
+    langKnopf("en").click();
+    await vi.waitFor(() => {
+      const bereich = document.querySelector('[aria-live="polite"].sr-only');
+      expect(bereich).not.toBeNull();
+      expect(bereich.textContent).toBeTruthy();
+    });
+  });
+});

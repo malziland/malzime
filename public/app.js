@@ -17,6 +17,7 @@ import { enthuellungAbkuerzen, modusWechsel } from "./js/live-anzeige.js";
 import * as realitaetsCheck from "./js/realitaets-check.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
+import { initSprachumschalter, zeigeSprachumschalter } from "./js/sprachumschalter.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
    Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
@@ -65,9 +66,18 @@ state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
     if (data?.current?.limitActive) {
       showLimitBanner(data.current.retryAfterSeconds || 600);
     }
+    /* v3.3: Sprachumschalter nur bauen, wenn das Merkmal an ist. Steht es aus
+       oder war die Antwort nicht lesbar, entsteht kein Element — kein toter
+       Schalter, den jemand vergeblich anklickt. */
+    if (data?.sprachumschalter === true) zeigeSprachumschalter(true);
   })
   .catch(() => {})
   .finally(() => clearTimeout(statsTimer));
+
+/* v3.3: Sprachumschalter anmelden — bedingungslos, damit die Konsolen-Tuer
+   `malziME.sprachumschalter()` auch dann offensteht, wenn /api/stats nicht
+   antwortet. Gebaut wird erst auf Zuruf (Merkmals-Schloss oder Konsole). */
+initSprachumschalter({ analysiere: handleNewFile });
 
 /* Maintenance-Modal: Seite neu laden */
 elements.maintenanceReload.addEventListener("click", () => location.reload());

@@ -52,7 +52,15 @@ describe("handleStats", () => {
     const res = mockRes();
     await handleStats(mockReq(), res);
     expect(res.statusCode).toBe(200);
-    expect(res.json).toHaveBeenCalledWith({ ...statsData, maintenance: false, useQueue: true });
+    expect(res.json).toHaveBeenCalledWith({
+      ...statsData,
+      maintenance: false,
+      useQueue: true,
+      realitaetsCheck: undefined,
+      /* v3.3: Merkmals-Schloss des Sprachumschalters. Ohne gesetztes Flag
+         steht es auf false — das Frontend baut den Schalter dann nicht. */
+      sprachumschalter: false,
+    });
   });
 
   test("includes maintenance: true when maintenance is active", async () => {

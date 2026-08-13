@@ -6,6 +6,11 @@
 > Kopie** — danach neu einkopieren und mit `node scripts/pruefe-vendorierung.mjs --aktualisieren`
 > stempeln. Der Waechter `scripts/pruefe-vendorierung.mjs` meldet jede Abweichung.
 >
+> **Nach jedem Einkopieren diesen Hinweis wieder einsetzen.** `rsync` loescht ihn, weil
+> die Quelle ihn nicht kennt — und der Waechter faengt das nicht ab: `README.md` ist
+> bei ihm bewusst ausgenommen (`scripts/pruefe-vendorierung.mjs:45`), gerade WEIL diese
+> Datei hier abweichen soll. Am 2026-08-13 ist der Hinweis dabei einmal verschwunden.
+>
 > Der Ordner `negativprobe/` enthaelt **absichtlich fehlerhaftes Beispielmaterial** und
 > wird von allen Pruefungen uebersprungen.
 

@@ -4,6 +4,70 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.2.0] — 2026-08-13
+
+**Das zweite TIEF-Audit — sieben unabhängige Prüfer, ~48 Befunde, restlos saniert.**
+
+Ein vollständiges TIEF-Audit über die Nachtarbeit des Vortags und den ganzen
+Bestand: sieben bereichs-disjunkte Prüfer (Sicherheit/Datenschutz, Korrektheit/Queue,
+Betrieb/Observability, Frontend/Verträge, Außenzusagen, Auslieferungskette,
+Regressionsfläche), jeder mit Positivkontrollen und Selbstwiderlegung.
+
+**Das Ergebnis in einem Satz:** Die Plattform selbst ist live gesund — jede
+Datenschutz-Kernzusage hält, an der Infrastruktur gemessen (GPS erreicht nie den
+Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
+**Wächter** darüber und die **Auslieferungskette**.
+
+### Der schwerste Fund (P0)
+- Der Deploy-Riegel, der vor jeder Auslieferung die EU-Region und „gelöscht heißt
+  gelöscht" des Bild-Buckets prüft, **konnte nicht rot werden** — ein
+  Index-Verwechsler (`PIPESTATUS[0]` = printf statt `[1]` = python3) machte den
+  Fehlerzweig rechnerisch tot. Behoben; der Riegel hat jetzt eine Negativprobe.
+
+### Die Auslieferungskette (P1)
+- **Deploy an keinen geprüften Stand gebunden:** `deploy.sh` lieferte den
+  Arbeitsbaum aus und prüfte weniger als die sechs CI-Pflicht-Checks. Jetzt an die
+  CI-Freigabe gebunden (sauberer Baum, `HEAD == origin/main`, alle sechs Checks
+  grün) — beim ersten echten Deploy sofort wirksam.
+- **Live-Smoke liest die ausgelieferte Kennung zurück:** Ein wirkungsloser
+  Hosting-Deploy fiel vorher nicht auf; jetzt wird der ausgelieferte Cache-Buster
+  gegen den erwarteten geprüft.
+- Dazu: TTL- und Reaper-Zeitplan-Riegel, Buster-Lesefehler bricht ab statt still
+  auf `01` zu fallen, Schlussbilanz übersprungener Riegel, Fremddatei-Wächter sieht
+  neue Dateien, Alarmfilter-Abdeckung, CHANGELOG-Parser kennt Code-Zäune.
+
+### Sicherheit (P2, alle live)
+- **Boost-Deckel jetzt atomar** (Transaktion statt offenem get+set) — die einzige
+  globale Kostenbremse hält unter gleichzeitigen Aufrufen.
+- **Statusabruf drosselt den Schreibzugriff** (~93 % weniger unauthentifizierte
+  Firestore-Writes).
+- **Upload-Größenbremse ehrlich beschrieben**, Restrisiko als bewusste Abwägung.
+- Worker-Tod nach dem Claim löst jetzt einen Alarm aus, statt den Nutzer 9 Minuten
+  stumm warten zu lassen; ein verworfenes Ergebnis wird nicht mehr als „fertig"
+  gezählt; der Wächter über die Wochen-Erinnerung ist nicht mehr blind.
+
+### Frontend (P2/P3, live)
+- **Barrierefreiheit:** vier Bedien-Beschriftungen (Beast-Umschalter, Info,
+  Konfidenz-Punkte) sind wieder übersetzbar — ein Rückfall, den ab jetzt ein Test
+  verhindert.
+- Die Vorverbindung zu OpenStreetMap bei jedem Seitenaufruf ist entfernt (die
+  Datenschutzerklärung sagt „nur bei GPS").
+- Eine volle Warteschlange bekommt eine ehrliche Meldung statt „wir haben es
+  dreimal probiert"; ein fehlgeschlagener Demo-Abruf scheitert nicht mehr lautlos.
+
+### Außentexte (P2/P3, live)
+- Formulierungen, die mehr versprachen als das System hält, an ihrem Belegort
+  korrigiert: der Analyse-Zähler („Zählwerte je Zeitraum" statt „eine einzige
+  Zahl"), die sessionStorage-Ausnahme („einzige" → vier Verwendungen aufgezählt),
+  der Realitäts-Check, die Diagnose-Feldliste, die Fehler-Log-Beschreibung. Drei
+  neue Sperrlisten-Regeln verhindern den Rückfall.
+
+Der vollständige Auditbericht mit allen Befunden liegt unter `docs/audit/`
+(bewusst nicht im öffentlichen Repository). Eine Handvoll P3/P4-Punkte niedrigster
+Priorität ist dort als Restliste geführt — keiner davon ist ein Nutzer- oder
+Datenrisiko. Eine Entscheidungsfrage bleibt bewusst offen für den Inhaber (ob die
+Hautton-Einschätzung der KI in den Außentexten benannt werden soll).
+
 ## [3.1.0] — 2026-08-13
 
 **Das TIEF-Audit und seine Sanierung.**

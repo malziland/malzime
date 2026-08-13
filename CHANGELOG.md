@@ -4,7 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.3.0] — 2026-08-13
+
+**Der Sprachumschalter — sichtbar.**
+
+Nach einem Tag Vorbereitung hinter einem Merkmals-Schloss und vier Runden
+Nachbesserung am gemeinsamen Durchspielen ist der DE/EN-Umschalter für alle
+Besucher da. Die englische Fassung selbst war schon vorher erreichbar
+(`?lang=en`, Gerätesprache) — gefehlt hat das Bedienelement.
+
+Zusätzlich in diesem Zug: alle Seiten auf dieselbe Inhaltsbreite (680 px), der
+Umschalter auf einer Linie mit der Kopfzeile, und acht ernste
+Barrierefreiheits-Verstöße auf den Rechtsseiten behoben, die nie jemand gesehen
+hatte.
 
 ### Hinzugefügt
 
@@ -73,6 +85,15 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Unterseiten, nicht durch die Änderung selbst verursacht.
 
 ### Behoben
+
+- **Alle Seiten haben dieselbe Inhaltsbreite.** Die Rechtsseiten standen auf
+  640 px, Start- und Zahlen-Seite auf 680 px — 40 px Unterschied ohne
+  dokumentierten Grund und zu wenig, um typografisch etwas zu bewirken. Jetzt
+  überall 680 px, ausgehend von der Startseite.
+
+- **Der Umschalter sitzt auf der Zeile der Rubrik.** Auf den Unterseiten stand
+  er über „malziME · Statistik" statt daneben und wirkte wie ein loses Element.
+  Rubrik und Umschalter teilen sich jetzt eine Kopfzeile, auf gleicher Mitte.
 
 - **Der Umschalter stand über der Kopfzeile statt darin, und war zu hoch.**
   Gemessen: Das SYSTEM-AKTIV-Abzeichen ist 130 × 28 px, der Umschalter war

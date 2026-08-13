@@ -2012,8 +2012,11 @@ html[data-has-result] {
 
 /* ── Rechtsseiten ── */
 
+/* Dieselbe Inhaltsbreite wie Start- und Zahlen-Seite. Bis 2026-08-13 standen
+   hier 640 px — 40 px schmaler als der Rest, ohne dokumentierten Grund und zu
+   wenig, um typografisch etwas zu bewirken. */
 .legal-page {
-  max-width: 640px;
+  max-width: 680px;
   padding-bottom: 40px;
 }
 
@@ -3687,4 +3690,22 @@ html[lang="en"] .rc-zitat::after {
   font-size: 0.9rem;
   font-weight: 400;
   color: var(--muted);
+}
+
+/* Kopfzeile der Unterseiten: Rubrik links, Sprachumschalter rechts, auf einer
+   Linie. Vorher stand er darüber und wirkte wie ein loses Element. */
+.seiten-kopfzeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.seiten-kopfzeile .sprachwahl {
+  position: static;
+  flex: 0 0 auto;
+}
+/* Der eigene Abstand der Rubrik wandert an die Zeile — sonst sitzt die Rubrik
+   um ihren unteren Rand versetzt neben der Pille statt auf gleicher Mitte. */
+.seiten-kopfzeile .page-eyebrow {
+  margin-bottom: 0;
 }

@@ -22,13 +22,24 @@
  *    entsteht, die später zurückgebaut werden müsste.
  *
  * Diese Seiten laden sonst KEIN JavaScript und rufen keine Schnittstelle auf.
- * Das bleibt so: Ob der Umschalter erscheint, entscheidet allein die Adresse
- * (`?sprachumschalter=1`) oder eine Spur, die die Startseite im selben Tab
- * hinterlassen hat. Kein Netzweg, kein Merkmals-Abruf auf einer Rechtsseite.
+ * Das bleibt so: kein Netzweg, kein Merkmals-Abruf auf einer Rechtsseite.
+ *
+ * v3.3.1 — die Erprobungs-Tür ist weg, und mit ihr der localStorage.
+ * Bis v3.3.0 entschied hier eine Spur im localStorage (`malzime-tuer-…`,
+ * `malzime-umschalter-aktiv`), ob der Umschalter erscheint. Sie stammte aus der
+ * Zeit vor der Freischaltung, als er sich vorführen lassen musste, ohne dass
+ * ein Workshop-Publikum ihn sieht. Zwei Gründe, warum sie jetzt fort ist:
+ *
+ *   1. Die Datenschutzerklärung sagt zu, im Browser nichts Dauerhaftes
+ *      abzulegen. Der Eintrag entstand bei JEDEM Besucher und widersprach ihr.
+ *      Der Rechtstext ist die Vorgabe, nicht der Code.
+ *   2. Der Umschalter ist seit v3.3.0 live. Eine Tür, die an einem
+ *      freigeschalteten Zimmer vorbeiführt, braucht niemand mehr.
+ *
+ * Der Umschalter erscheint hier deshalb schlicht immer — so lange, bis diese
+ * Übergangsdatei samt den Rechtstexten auf Englisch verschwindet.
  */
 
-const TUER = "malzime-tuer-sprachumschalter";
-const MERKMAL = "malzime-umschalter-aktiv";
 const KREUZ_ZEICHEN = "×";
 
 /* Je EIN Satz pro Sprache. Alles darüber hinaus liest im Workshop niemand
@@ -40,27 +51,6 @@ const TEXTE = {
   schliessen_de: "Schließen",
   schliessen_en: "Close",
 };
-
-/* Dieselbe Tür wie auf der Startseite (js/sprachumschalter.js). Sie liegt im
-   localStorage, weil diese Seiten mit target="_blank" rel="noopener" geöffnet
-   werden: Ein so geöffneter Tab bekommt einen leeren sessionStorage, eine
-   Spur von dort wäre hier nie angekommen. */
-function sichtbar() {
-  let wert = null;
-  try {
-    wert = new URLSearchParams(window.location.search).get("sprachumschalter");
-  } catch (_err) {
-    /* kaputte Adresse */
-  }
-  try {
-    if (wert === "1") localStorage.setItem(TUER, "1");
-    if (wert === "0") localStorage.removeItem(TUER);
-    return localStorage.getItem(TUER) === "1" || localStorage.getItem(MERKMAL) === "1";
-  } catch (_err) {
-    /* Privater Modus: dann gilt nur die Angabe in der Adresse. */
-    return wert === "1";
-  }
-}
 
 /* Wohin der Umschalter gehört, je nach Seitenaufbau:
 
@@ -179,8 +169,6 @@ function baueHinweis() {
 }
 
 function start() {
-  if (!sichtbar()) return;
-
   const { grund, ok, schliessen } = baueHinweis();
   let ausloeser = null;
   /* Eigener Zustand statt `grund.hidden`: Das Verbergen passiert erst nach dem

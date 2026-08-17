@@ -17,6 +17,7 @@ import { enthuellungAbkuerzen, modusWechsel } from "./js/live-anzeige.js";
 import * as realitaetsCheck from "./js/realitaets-check.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
+import { initFehlerNachsendung } from "./js/error-logger.js";
 import { initSprachumschalter, merkmalUebernehmen } from "./js/sprachumschalter.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
@@ -44,6 +45,14 @@ resumeQueueJob();
 /* Holt das Ergebnis auch dann nach, wenn das Handy zwischendurch gesperrt war
    und die Abfrage-Schleife dabei steckengeblieben ist. */
 initHintergrundWiederaufnahme();
+
+/* v3.3.1: Fehlermeldungen, die wegen einer abgerissenen Verbindung nicht
+   rausgingen, werden nachgeschickt, sobald die Verbindung zurueck ist (und ein
+   letztes Mal beim Verlassen der Seite). Ohne das bleibt ausgerechnet der
+   haeufigste Fehler unsichtbar — die Meldung darueber braucht ja dieselbe
+   Verbindung. Die Warteschlange liegt nur im Arbeitsspeicher; im Browser wird
+   dafuer nichts abgelegt. */
+initFehlerNachsendung();
 
 /* ── Limit-, Maintenance- und Feature-Flag-Check beim Seitenstart ──
    In state.statsReady abgelegt, damit analyzeImage darauf warten kann, bevor

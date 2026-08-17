@@ -29,7 +29,122 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Beruhigungspille — „alles grün" für etwas, das es nicht mehr prüft. Jede
   bewusste Auslassung braucht eine Begründung, auch das prüft ein Test.
 
+### Geändert
+
+- **Der Live-Text überlebt jetzt einen Verbindungsabbruch.** Bisher räumte ein
+  Abbruch Karte und Text weg und stellte eine Fehlermeldung hin. Aus Nutzersicht
+  sah das nach Datenverlust aus, obwohl serverseitig nichts verloren war — das
+  Ergebnis liegt rund zwei Stunden bereit. Jetzt wird pausiert statt abgeräumt:
+  Der Text bleibt gedämpft stehen, die Begründung trägt die Statuszeile.
+
+  Zwei Zusicherungen dazu stehen als Prüfung, nicht als Vorsatz: **Was schon
+  gelesen wurde, wird nie umgeschrieben** (eine Welle wird nur übernommen, wenn
+  sie mit dem bereits Getippten beginnt), und **es geht wirklich weiter** — die
+  Schleife tippt an derselben Stelle wieder los.
+
+- **„Erscheint automatisch, sobald du wieder online bist" stimmt jetzt.** Diese
+  Zusage stand seit Langem in der Fehlermeldung, war aber ungedeckt: Es lauschte
+  niemand auf „online", und die Wiederaufnahme setzte den Live-Text zurück und
+  fragte ohne ihn weiter. Nachgerüstet sind alle drei Teile — der Lauscher, die
+  Fortsetzung des Textes und ein Anker im Zustand, der den offenen Durchgang
+  überhaupt erst auffindbar macht.
+
+  Dazu: Ein zweiter Abbruch während der Wiederaufnahme wirft die Job-Nummer
+  nicht mehr weg. Sie ist der einzige Weg zurück zu einem fertigen Profil.
+
+- **Die Formulierungs-Sperrliste prüft jetzt auch Englisch.** Sie kannte nur
+  deutsche Wendungen — deshalb konnte die englische Fassung einer gesperrten
+  Zusage jahrelang unbemerkt dastehen. Vier englische Regeln ergänzt; die
+  Rückbauprobe belegt, dass sie den echten Fall fangen.
+
+- **Der Fakten-Wächter bewacht 14 statt 4 Fakten.** Vier waren zu wenig: Er
+  meldete zuverlässig „kein Drift", und das klang wie eine Aussage über die
+  Doku. Es war eine über vier Zeilen.
+
+  Beim Anlegen zeigte sich zweierlei. Zwei Muster trafen ins Leere und wären
+  stumme Wächter geblieben — repariert. Zwei weitere meldeten **Historie als
+  Drift** (ein alter Vergleichsbericht, die Rückbau-Anweisungen im RUNBOOK, wo
+  abweichende Werte richtig sind) und mussten wieder heraus. Lieber vierzehn
+  verlässliche Muster als sechzehn mit zwei Lügen.
+
 ### Behoben
+
+- **Die Analyse hatte eine Zeitgrenze, die sie gar nicht einhalten konnte.**
+  Gemeldet wurden abgebrochene Analysen und lange Wartezeiten. Am
+  30-Tage-Diagnose-Bucket nachgemessen: Der KI-Aufruf durfte **8000 Token**
+  schreiben, wurde aber nach **90 Sekunden** abgebrochen. Das Modell schreibt
+  gemessen mit 47 Token/s (langsamster Lauf 39,4) — 8000 Token brauchen also
+  rund 170 Sekunden. Die erlaubte Textmenge passte nie in die erlaubte Zeit.
+
+  Aufgefallen ist es erst jetzt, weil die Grenze bis v3.0.0 gar nicht zubiss:
+  Ohne Stream wird die Uhr schon nach den Antwortkopfzeilen abgeräumt, das
+  eigentliche Warten lief ungebremst. Der Live-Text hält sie bewusst scharf bis
+  zum letzten Zeichen — und schaltete damit eine seit Mai schlafende Grenze zum
+  ersten Mal wirksam:
+
+  | Zeitraum | Läufe | technische Fehler | Läufe über 90 s |
+  |---|---|---|---|
+  | vor v3.0.0 (19.07.–11.08.) | 121 | 0 | 8 — **alle wurden fertig** |
+  | nach v3.0.0 (11.08.–16.08.) | 28 | 2 (7,1 %) | 3 |
+
+  Jetzt hat der Single-Large-Aufruf ein eigenes, gemessenes Zeitbudget (150 s
+  statt 90 s), und die Textmenge ist auf 5000 Token gesetzt — reichlich über dem
+  längsten je gemessenen Lauf (4394 Token). Beide Werte stehen nebeneinander in
+  `config.js` und werden **gegeneinander gerechnet**: Die Startprüfung wirft, und
+  `mistral-zeitbudget.test.js` wird rot, sobald jemand einen der beiden allein
+  verschiebt. Genau diese Rechnung hatte gefehlt — einzeln sah jeder Wert
+  plausibel aus, und daran sind zwei Audits vorbeigelaufen.
+
+- **Der abgebrochene Lauf schlug keinen Alarm — der Ersatz-Werbeaufruf schon.**
+  Die gescheiterte Analyse wurde ohne Severity festgehalten und fiel damit nicht
+  unter die aktive Alarm-Richtlinie (`malziME Function Errors`, deckt
+  `processjob` ab `severity>=ERROR` ab). Zwei tote Läufe (11.08., 14.08.) haben
+  so niemanden erreicht; gefunden wurden sie, weil sich ein Nutzer beschwerte.
+  Jetzt `console.error` mit `alert: "single-large-failed"` und dem Fehler-Code,
+  der „Modell zu langsam" von „API weg" unterscheidet.
+
+- **Die Meldung über eine abgerissene Verbindung brauchte die abgerissene
+  Verbindung.** Client-Fehler gingen per `fetch` raus, und ein Fehlschlag dabei
+  wurde still verschluckt. Damit blieb ausgerechnet die häufigste Fehlerklasse
+  systematisch unsichtbar: In 30 Tagen lagen **zwei** Client-Fehler im Bucket,
+  obwohl mehrere gemeldet wurden.
+
+  Jetzt wartet eine misslungene Meldung in einer Warteschlange und wird beim
+  Ereignis „wieder online" sowie ein letztes Mal beim Verlassen der Seite
+  nachgeschickt. Ein 4xx wird nicht wiederholt (der Server will sie nicht), ein
+  5xx schon. Die Warteschlange liegt **ausschließlich im Arbeitsspeicher** — im
+  Browser wird dafür nichts abgelegt, und ein Test hält das fest. Der Preis ist
+  ehrlich benannt: Wer den Tab schließt, während das Netz weg ist, dessen
+  Meldung ist verloren.
+
+- **Die Karte „technischer Fehler" wurde nirgends als Fehler gezählt.** Ein
+  `blocked`-Ergebnis lief ausschließlich als Erfolg durch die Telemetrie. Der
+  für den Nutzer sichtbarste Fehler war damit der einzige ohne Fehlermeldung.
+  Jetzt löst er eine aus, mit dem Grund im Gepäck.
+
+- **Von der englischen Startseite landete man überall wieder auf Deutsch.** Die
+  Sprachwahl liegt im `sessionStorage` — bewusst pro Tab, damit ein
+  weitergereichtes Workshop-Gerät wieder in der Gerätesprache startet. Ein mit
+  `target="_blank"` geöffneter Tab bekommt aber einen **leeren**
+  `sessionStorage`. Gezählt über alle Seiten: **6 interne Links öffnen einen
+  neuen Tab — und alle sechs sitzen auf der Startseite**, es sind also genau
+  die, die von dort wegführen. Die 28 Links auf den Unterseiten öffnen im selben
+  Tab und waren nie betroffen.
+
+  Jetzt hängt die Übersetzungs-Routine die aktuelle Sprache an genau diese Links
+  (`/stats?lang=en`). Kein Speicher, keine Schnittstelle — die Sprache reist
+  sichtbar in der Adresse mit, und sie schlägt beim Seitenstart alles andere.
+  Die kanonischen Adressen bleiben parameterfrei, für Google ändert sich nichts.
+
+- **Bild-Metadaten für strukturierte Daten vervollständigt.** Die Google Search
+  Console meldete zwei nicht kritische Befunde: In den drei
+  `ImageObject`-Blöcken fehlten `license` und `acquireLicensePage`. Beide sind
+  ergänzt — `license` zeigt auf die MIT-Lizenz im Repository, für
+  `acquireLicensePage` verlangt Google eine Seite, auf der man erfährt, wie man
+  eine Lizenz bekommt: das Impressum mit den Kontaktdaten.
+  `strukturdaten-bilder.test.js` prüft dauerhaft, dass alle sechs Felder da
+  sind, dass es URLs sind, dass die verlinkte Seite existiert und dass sie
+  tatsächlich eine Kontaktmöglichkeit trägt.
 
 - **Die Sicherheitsrichtlinie behauptete zwei Dinge, die nicht stimmten.**
   Aufgefallen, nachdem die Doku als Ganzes in Zweifel gezogen wurde — zu Recht.
@@ -46,22 +161,36 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   verlassen den Browser aber sehr wohl. Der Wortlaut steht bewusst nicht hier —
   die Sperrliste würde ihn auch im Zitat beanstanden, und das ist richtig so.
 
-### Geändert
+### Entfernt
 
-- **Die Formulierungs-Sperrliste prüft jetzt auch Englisch.** Sie kannte nur
-  deutsche Wendungen — deshalb konnte die englische Fassung einer gesperrten
-  Zusage jahrelang unbemerkt dastehen. Vier englische Regeln ergänzt; die
-  Rückbauprobe belegt, dass sie den echten Fall fangen.
+- **Der `localStorage` — die Datenschutzerklärung sagt zu, keinen zu nutzen.**
+  Seit v3.3.0 legte der Sprachumschalter bei **jedem** Besucher den Eintrag
+  `malzime-umschalter-aktiv` an, damit die Rechtsseiten erfahren, dass der
+  DE/EN-Umschalter im Betrieb ist (sie öffnen in einem neuen Tab und bekommen
+  einen leeren `sessionStorage`). Live nachgemessen: Das Merkmal ist an, der
+  Eintrag entstand also wirklich bei allen. Inhaltlich harmlos — für alle
+  Besucher derselbe Wert, keine Kennung, nicht zum Wiedererkennen geeignet —
+  aber die Zusage war unzutreffend.
 
-- **Der Fakten-Wächter bewacht 14 statt 4 Fakten.** Vier waren zu wenig: Er
-  meldete zuverlässig „kein Drift", und das klang wie eine Aussage über die
-  Doku. Es war eine über vier Zeilen.
+  Behoben wurde der **Code**, nicht der Rechtstext. Mit entfernt sind die beiden
+  Türen, mit denen sich der Umschalter vor seiner Freischaltung vorführen ließ:
+  das Adress-Anhängsel `?sprachumschalter=1` und der Konsolen-Aufruf
+  `malziME.sprachumschalter()`. Sie stammten aus der Zeit vor v3.3.0; seit der
+  Umschalter live ist, führen sie an einem offenen Zimmer vorbei.
 
-  Beim Anlegen zeigte sich zweierlei. Zwei Muster trafen ins Leere und wären
-  stumme Wächter geblieben — repariert. Zwei weitere meldeten **Historie als
-  Drift** (ein alter Vergleichsbericht, die Rückbau-Anweisungen im RUNBOOK, wo
-  abweichende Werte richtig sind) und mussten wieder heraus. Lieber vierzehn
-  verlässliche Muster als sechzehn mit zwei Lügen.
+  Die Rechtsseiten zeigen den Umschalter jetzt schlicht immer — **ohne** dafür
+  eine Schnittstelle aufzurufen. Diese Festlegung („eine Rechtsseite macht
+  keinen Netzweg auf") bleibt unangetastet; auf Startseite und Zahlen-Seite
+  entscheidet weiterhin allein das Merkmals-Schloss.
+
+  Nachgemessen: **null `localStorage`-Zugriffe** im gesamten Frontend
+  (Positivkontrolle: dieselbe Suche findet 23 `sessionStorage`-Zugriffe). Drei
+  Prüfungen halten das fest — eine im Unit-Test, zwei im E2E-Test, die auf den
+  Rechtsseiten beide Speicher als leer nachweisen.
+
+  Nebenbei stimmte `docs/FLAGS.md` nicht mit dem Code überein: Dort stand, die
+  Erprobungs-Tür „überlebt kein Neuladen" — der `localStorage` machte daraus
+  geräteweit und dauerhaft. Mit dem Rückbau ist auch diese Abweichung weg.
 
 ## [3.3.0] — 2026-08-13
 

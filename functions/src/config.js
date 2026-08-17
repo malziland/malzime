@@ -71,6 +71,50 @@ const MISTRAL_DESCRIBE_MAX_TOKENS = 2048;
 const MISTRAL_PROFILE_MAX_TOKENS = 16000;
 const MISTRAL_TIMEOUT_MS = 90000;
 
+/* ── Eigene Zeitgrenze fuer den Single-Large-Aufruf ──
+   BUG-2026-08-17-01. Der Single-Large-Call schreibt Standard- UND Beast-Profil
+   in EINEM Zug und ist damit der mit Abstand laengste Aufruf der Pipeline. Die
+   allgemeinen 90 s passen zu den kurzen Aufrufen (describe, beast-ads), nicht
+   zu diesem.
+
+   WARUM DAS ERST SEIT v3.0.0 WEH TUT: Vor dem Live-Text lief der Aufruf ohne
+   Stream, und `mistral.js` raeumt die Uhr im Nicht-Stream-Fall schon nach den
+   Antwortkopfzeilen weg — das eigentliche Warten auf den Text lief ungebremst.
+   Die 90 s standen seit v1.6.0 (14.05.) in der Konfiguration, haben aber nie
+   zugebissen. Im Stream-Modus bleibt die Uhr bewusst scharf bis zum letzten
+   Zeichen; damit wurde eine schlafende Grenze zum ersten Mal wirksam.
+
+   WARUM 150 s: Gemessen an 35 erfolgreichen Laeufen (Log-Bucket
+   `client-diagnostics`, 11.-16.08.2026) schreibt das Modell mit 47 Token/s im
+   Median, im langsamsten Lauf mit 39,4 Token/s. MISTRAL_SINGLE_LARGE_MAX_TOKENS
+   (5000) braucht damit im schlechtesten gemessenen Fall 127 s. 150 s deckt das
+   mit Reserve ab. Damit kann die Uhr keinen Lauf mehr toeten, den das
+   Token-Budget ausdruecklich erlaubt — genau der Widerspruch, der 2 von 38
+   Laeufen gekostet hat.
+
+   Die Kopplung der beiden Werte ist keine Bitte um Sorgfalt, sondern geprueft:
+   `__tests__/mistral-zeitbudget.test.js` rechnet sie gegeneinander und wird
+   rot, sobald jemand einen der beiden Werte allein verschiebt. */
+const MISTRAL_SINGLE_LARGE_TIMEOUT_MS = 150000;
+
+/* Langsamstes gemessenes Schreibtempo (Token/s) aus dem 30-Tage-Diagnose-Bucket.
+   Kanonische Quelle fuer die Zeitbudget-Rechnung; steht hier, damit Test und
+   Konfiguration dieselbe Zahl benutzen und nicht auseinanderdriften. */
+const MISTRAL_SLOWEST_TOKENS_PER_SECOND = 39.4;
+
+/* Obergrenze der Ausgabelaenge fuer den Single-Large-Aufruf.
+   v2.1.1 (23.05.) stand hier 8000 — das war rechnerisch nie erreichbar: 8000
+   Token brauchen beim gemessenen Tempo rund 170 s und wurden nach 90 s
+   abgeschnitten. Der laengste je gemessene erfolgreiche Lauf lag bei 4394
+   Token; der Median liegt bei 2750. 5000 laesst dem Modell also reichlich
+   Luft nach oben und passt zugleich in MISTRAL_SINGLE_LARGE_TIMEOUT_MS.
+
+   Diese Konstante lag bis v3.3.1 in `mistral.js`. Sie steht jetzt neben ihrer
+   Zeitgrenze, weil die beiden nur GEMEINSAM richtig sind (Ein-Quellen-Regel):
+   getrennt aufgestellt sah jede fuer sich plausibel aus, und genau daran ist
+   der Fehler zwei Audits lang vorbeigelaufen. */
+const MISTRAL_SINGLE_LARGE_MAX_TOKENS = 5000;
+
 /* ── Globales Stundenlimit ──
    500 Analysen pro rollendem 60-Minuten-Fenster — der gewuenschte Betriebswert
    (kostenstabil beim aktuellen Budget). Mit Auto-Retries auf Client-Seite plus
@@ -230,6 +274,17 @@ if (HOURLY_LIMIT < 1) throw new Error("Config: HOURLY_LIMIT must be >= 1");
 if (RATE_LIMIT < 1) throw new Error("Config: RATE_LIMIT must be >= 1");
 if (MAX_UPLOAD_BYTES < 1) throw new Error("Config: MAX_UPLOAD_BYTES must be >= 1");
 if (MISTRAL_PROFILE_MAX_TOKENS < 1) throw new Error("Config: MISTRAL_PROFILE_MAX_TOKENS must be >= 1");
+/* BUG-2026-08-17-01: Die erlaubte Ausgabelaenge muss in die erlaubte Zeit
+   passen. Sonst toetet die Uhr Laeufe, die das Token-Budget ausdruecklich
+   zulaesst — und der Nutzer wartet zwei Minuten auf einen Fehler. Fail-fast
+   beim Start statt still im Betrieb. */
+if (MISTRAL_SINGLE_LARGE_MAX_TOKENS / MISTRAL_SLOWEST_TOKENS_PER_SECOND > MISTRAL_SINGLE_LARGE_TIMEOUT_MS / 1000) {
+  throw new Error(
+    `Config: MISTRAL_SINGLE_LARGE_MAX_TOKENS (${MISTRAL_SINGLE_LARGE_MAX_TOKENS}) braucht bei ` +
+      `${MISTRAL_SLOWEST_TOKENS_PER_SECOND} Token/s mehr als MISTRAL_SINGLE_LARGE_TIMEOUT_MS ` +
+      `(${MISTRAL_SINGLE_LARGE_TIMEOUT_MS} ms) erlaubt`
+  );
+}
 
 module.exports = {
   FIRESTORE_DATABASE_ID,
@@ -245,6 +300,9 @@ module.exports = {
   MISTRAL_DESCRIBE_MAX_TOKENS,
   MISTRAL_PROFILE_MAX_TOKENS,
   MISTRAL_TIMEOUT_MS,
+  MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
+  MISTRAL_SINGLE_LARGE_MAX_TOKENS,
+  MISTRAL_SLOWEST_TOKENS_PER_SECOND,
   REQUEST_BUDGET_MS,
   HOURLY_LIMIT,
   HOURLY_WINDOW_MINUTES,

@@ -27,4 +27,15 @@ export const state = {
      verdraengt sie den laufenden Durchgang und rendert das vorige Ergebnis
      neben dem neuen Foto (Audit UX-001). */
   uploadLaeuft: false,
+  /* v3.3.1: Ein Durchgang haengt an einer abgerissenen Verbindung. Der Job
+     laeuft serverseitig weiter, das Ergebnis liegt rund zwei Stunden bereit —
+     nur der Weg dorthin ist gerade zu.
+
+     WARUM EIN EIGENES FELD: `isAnalyzing` wird am Ende jedes Durchgangs
+     zurueckgesetzt, auch nach einem Abbruch — und das ist richtig so, sonst
+     koennte der Nutzer kein neues Foto hochladen. Die Wiederaufnahme braucht
+     aber genau dann noch einen Anker, sonst laeuft die Zusage „erscheint
+     automatisch, sobald du wieder online bist" ins Leere: Der Lauscher fiele
+     auf ein `isAnalyzing === false` und taete nichts. */
+  wartetAufVerbindung: false,
 };

@@ -164,4 +164,47 @@ export function applyTranslations() {
     const text = t(key);
     if (text !== key) el.innerHTML = text;
   });
+
+  /* ZULETZT — die Reihenfolge ist wesentlich. Der Block darüber ersetzt ganze
+     innerHTML-Bereiche, und in einem davon steckt ein Link (der Verweis auf die
+     Datenschutzerklärung im Hochlade-Hinweis). Vor dieser Zeile gesetzt, wäre
+     die Sprache dort sofort wieder überschrieben. */
+  spracheAnLinksHaengen();
+}
+
+/**
+ * Hängt die aktuelle Sprache an alle internen Links, die einen NEUEN TAB
+ * öffnen (v3.3.1).
+ *
+ * WARUM: Die Sprachwahl liegt im `sessionStorage` — bewusst pro Tab, damit ein
+ * weitergereichtes Workshop-Gerät wieder in der Gerätesprache startet. Ein mit
+ * `target="_blank"` geöffneter Tab bekommt aber einen LEEREN sessionStorage.
+ * Wer also auf der englischen Startseite die Zahlen-Seite anklickte, landete
+ * dort auf Deutsch — die Wahl blieb im alten Tab zurück.
+ *
+ * Betroffen sind genau die sechs Links der Startseite; die Unterseiten
+ * verlinken untereinander im selben Tab und brauchen nichts. Gestempelt wird
+ * trotzdem nach Merkmal statt nach Seite: Käme irgendwo ein siebenter Link mit
+ * `target="_blank"` dazu, wäre er von selbst richtig.
+ *
+ * Immer BEIDE Sprachen stempeln, nie nur Englisch: Steht das Gerät auf
+ * Englisch und jemand hat die Seite auf Deutsch gestellt, wäre ein fehlender
+ * Wert genauso falsch herum.
+ *
+ * Kein Speicher, keine Schnittstelle — die Sprache reist sichtbar in der
+ * Adresse mit. `searchParams.set` ist dabei idempotent: Mehrfaches Anwenden
+ * hängt nichts an, es überschreibt.
+ */
+function spracheAnLinksHaengen() {
+  document.querySelectorAll('a[target="_blank"][href^="/"]').forEach((a) => {
+    const roh = a.getAttribute("href");
+    if (!roh) return;
+    try {
+      const ziel = new URL(roh, window.location.origin);
+      ziel.searchParams.set("lang", lang);
+      a.setAttribute("href", ziel.pathname + ziel.search + ziel.hash);
+    } catch (_err) {
+      /* Kaputte Adresse im HTML — dann bleibt der Link, wie er ist. */
+    }
+  });
 }

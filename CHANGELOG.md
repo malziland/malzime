@@ -4,6 +4,41 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben — Screenreader
+
+Beide Fehler hat ein Nutzer beim ersten Zuhören mit VoiceOver gefunden. Keine
+automatische Prüfung hatte sie gezeigt.
+
+- **Der Wartezustand wiederholte sich alle zwei Sekunden.** Gemessen: 19 Ansagen
+  in 30 Sekunden Wartezeit, bei einer vollen Analyse rund 40 — fast immer
+  derselbe Satz. Wer zuhört, bekommt eine Minute lang Geplapper ohne Neuigkeit.
+
+  Zwei Ursachen: Der Wartetext wurde bei **jeder** Statusabfrage neu geschrieben,
+  auch wenn er unverändert war — und jede Zuweisung löst in einem Live-Bereich
+  eine neue Ansage aus. Dazu die rotierenden Zier-Meldungen („Analysiere
+  Pixel…"), die sich tatsächlich ändern und deshalb ebenfalls vorgelesen wurden.
+
+  Jetzt wird nur bei echter Änderung geschrieben, und die Rotation ist für
+  Screenreader stumm. Die Zustandswechsel kommen weiter. **Gemessen: 19 → 3.**
+
+- **Nach „Analyse abgeschlossen" folgte nichts.** Der Fokus sprang auf den
+  Ergebnisbereich — einen Abschnitt ohne Rolle und ohne Namen. Dort hat ein
+  Screenreader nichts zu sagen. Jetzt ist es ein benannter Bereich („Dein
+  Profil"), und die Ansage lautet „Analyse abgeschlossen · Dein Profil".
+
+### Hinzugefügt
+
+- **Zwei Wächter, die genau diese Fehlerklasse fangen.** Der eine zählt die
+  Ansagen während der Wartezeit und wird rot, wenn sie den Maßstab überschreiten;
+  der andere prüft, dass der Ergebnisbereich einen Namen trägt. Beide mit
+  Positivkontrolle — null Ansagen sind kein Erfolg, sondern eine kaputte Messung.
+
+- **Ein Protokoll der Vorlese-Reihenfolge** über neun Seiten und Zustände: jedes
+  Element mit Rolle, Name und Zustand, in der Reihenfolge, in der es gesprochen
+  würde. Ergebnis: kein Bedienelement ohne Namen, kein Bild ohne Alternativtext.
+
 ## [3.3.2] — 2026-08-17
 
 ### Hinzugefügt

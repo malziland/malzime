@@ -78,10 +78,27 @@ export function startScanAnim(rotateMessages = true, leise = false) {
   stopScanAnim(true);
   elements.scanAnim.classList.add("active");
   /* A11y: Screenreader-Ankuendigung */
-  if (!leise && elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srStart");
+  /* Auch hier nur bei echter Aenderung: `startScanAnim` wird pro Durchgang
+     mehrfach gerufen (Upload, dann Warteschlange), und jedes Mal stand
+     dieselbe Ansage erneut im Bereich — gemessen dreimal "Analyse gestartet"
+     in einem einzigen Lauf. */
+  if (!leise) textSetzen(elements.srAnnounce, t("scan.srStart"));
   /* Queue-Modus (rotateMessages=false): nur die Animation laufen lassen, den
      scan-Text setzt der Aufrufer selbst. Die rotierenden Analyse-Meldungen
      ("Gesicht erkannt…") wären irreführend, solange der Job nur wartet. */
+  /* v3.4: Die rotierenden Meldungen sind Zierde — „Gesicht erkannt…",
+     „Analysiere Pixel…". Sie wechseln alle paar Sekunden und wuerden deshalb
+     alle paar Sekunden VORGELESEN. Wer zuhoert, bekommt damit eine Minute lang
+     Geplapper ohne Neuigkeit. Waehrend der Rotation wird der Bereich deshalb
+     stumm geschaltet; die echten Zustandswechsel („Analyse gestartet",
+     „Analyse abgeschlossen") laufen ohnehin ueber `#srAnnounce`.
+
+     Beim Warten in der Schlange bleibt er hoerbar: Dort steht die Position,
+     und die IST eine Neuigkeit — dank textSetzen aber nur, wenn sie sich
+     wirklich aendert. */
+  if (elements.scanText) {
+    elements.scanText.setAttribute("aria-live", rotateMessages ? "off" : "polite");
+  }
   if (!rotateMessages) return;
   let idx = 0;
   const messages = t("scan.messages");
@@ -89,10 +106,10 @@ export function startScanAnim(rotateMessages = true, leise = false) {
   if (shuffled.length === 0) {
     /* BUG-104: Fallback wenn i18n-Laden fehlschlägt */
     const fallback = "\u2026";
-    elements.scanText.textContent = fallback;
+    textSetzen(elements.scanText, fallback);
     return;
   }
-  elements.scanText.textContent = shuffled[0];
+  textSetzen(elements.scanText, shuffled[0]);
   scanInterval = setInterval(() => {
     idx = (idx + 1) % shuffled.length;
     elements.scanText.textContent = shuffled[idx];
@@ -226,6 +243,27 @@ let queuePhase = null;
  * @param {number} [position]    Jobs vor diesem (0 = als Nächstes dran)
  * @param {number} [etaSeconds]  geschätzte Restwartezeit
  */
+/**
+ * Schreibt Text NUR, wenn er sich wirklich geaendert hat (v3.4).
+ *
+ * WARUM DAS NOETIG IST: `#scanText` ist ein `aria-live`-Bereich. Jede
+ * Zuweisung an `textContent` tauscht den Textknoten aus — auch wenn derselbe
+ * Satz herauskommt — und ein Screenreader liest ihn daraufhin erneut vor.
+ * `showQueueWaiting` laeuft bei JEDER Statusabfrage, also alle 2 Sekunden.
+ * Gemessen: 19 Ansagen in 30 Sekunden Wartezeit, bei einer vollen Analyse rund
+ * 40 — fast immer derselbe Satz.
+ *
+ * Gefunden hat das ein Nutzer beim Zuhoeren mit VoiceOver, nicht ein Test: Die
+ * automatische Pruefung sah, DASS angesagt wird, nicht WIE OFT. Ein
+ * Wartezustand, der sich alle zwei Sekunden selbst wiederholt, macht die Seite
+ * fuer blinde Nutzer unbenutzbar, waehrend jede Messung gruen bleibt.
+ */
+export function textSetzen(el, text) {
+  if (!el) return;
+  if (el.textContent === text) return;
+  el.textContent = text;
+}
+
 export function showQueueWaiting(status, position, etaSeconds) {
   if (status === "processing") {
     /* Verarbeitung läuft → die gewohnten rotierenden Analyse-Meldungen,
@@ -243,7 +281,7 @@ export function showQueueWaiting(status, position, etaSeconds) {
   }
   const posText = position > 0 ? t("queue.position", { n: position }) : t("queue.next");
   const etaText = formatEta(etaSeconds);
-  elements.scanText.textContent = etaText ? `${posText} · ${etaText}` : posText;
+  textSetzen(elements.scanText, etaText ? `${posText} · ${etaText}` : posText);
 }
 
 /** Setzt die Phasen-Verfolgung zurück — vor jedem neuen Queue-Lauf aufrufen. */

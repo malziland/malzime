@@ -4,6 +4,7 @@ import { prepareImage } from "./exif.js";
 import { startGeocoding } from "./geocoding.js";
 import {
   setStatus,
+  textSetzen,
   startScanAnim,
   stopScanAnim,
   showLimitBanner,
@@ -93,7 +94,7 @@ export async function analyzeImage() {
      FIX 1 (v3.0.1): mit Text — Auge+Balken standen sonst bis zur ersten
      Warteschlangen-Antwort mehrere Sekunden stumm da (der Upload dauert). */
   startScanAnim(false);
-  elements.scanText.textContent = t("scan.upload");
+  textSetzen(elements.scanText, t("scan.upload"));
   /* Kurz auf /api/stats warten: Dort stehen Wartungsmodus und Stundenlimit.
      Loest dank Timeout in app.js immer zeitnah auf. */
   if (state.statsReady) await state.statsReady;
@@ -653,7 +654,7 @@ async function analyzeImageQueued() {
      sein (der Foto-Upload dauert mehrere Sekunden). */
   resetQueueWaiting();
   startScanAnim(false);
-  elements.scanText.textContent = t("scan.upload");
+  textSetzen(elements.scanText, t("scan.upload"));
   /* v3.0.3 Blick-Führung: Ab jetzt gehört der Blick diesem Lauf — die
      Übernahme-Wache startet EINMAL pro Analyse (ein eigener Scroll des
      Nutzers stoppt alle automatischen Bewegungen dauerhaft), und das Auge
@@ -787,7 +788,7 @@ async function analyzeImageQueued() {
     if (state.requestId !== myId) return;
 
     stopScanAnim();
-    elements.scanText.textContent = "";
+    textSetzen(elements.scanText, "");
 
     if (!outcome) return;
 
@@ -840,7 +841,7 @@ async function analyzeImageQueued() {
     /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
     liveAnzeige.abbrechen();
     stopScanAnim();
-    elements.scanText.textContent = "";
+    textSetzen(elements.scanText, "");
 
     let phase;
     if (err.message === "read_failed") {
@@ -937,7 +938,7 @@ export async function resumeQueueJob({ force = false } = {}) {
     resetQueueWaiting();
     startScanAnim(false);
     /* FIX 1 (v3.0.1): Auch die Wiederaufnahme startet nie mit leerem Text. */
-    elements.scanText.textContent = t("scan.resume");
+    textSetzen(elements.scanText, t("scan.resume"));
   }
 
   try {
@@ -948,7 +949,7 @@ export async function resumeQueueJob({ force = false } = {}) {
     if (state.requestId !== myId) return;
 
     stopScanAnim();
-    elements.scanText.textContent = "";
+    textSetzen(elements.scanText, "");
 
     /* BUG-2026-08-17-03: Ein ABGERISSENER Versuch darf die Job-Nummer nicht
        wegwerfen. Sie ist der einzige Weg zurueck zu einem Ergebnis, das
@@ -992,7 +993,7 @@ export async function resumeQueueJob({ force = false } = {}) {
     if (state.requestId !== myId) return;
     clearStoredJobId();
     stopScanAnim();
-    elements.scanText.textContent = "";
+    textSetzen(elements.scanText, "");
     setStatus(""); /* stiller Fehler beim Seitenstart — kein Banner */
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });
   } finally {

@@ -26,6 +26,19 @@ export default defineConfig({
          halbe Pruefung. */
       testMatch: /(sprachumschalter|barrierefreiheit-protokoll).*\.test\.js/,
     },
+    /* Firefox — Nutzer-Ansage 2026-08-17: Die Workshops laufen NICHT nur auf
+       iPhone und Mac. Schulen und Schueler bringen mit, was sie haben; darauf
+       haben wir keinen Einfluss. Die Accessibility-Support-Baseline ist damit
+       breit, und eine Pruefung, die nur Chromium und WebKit kennt, deckt sie
+       nicht ab. Gecko ist die dritte Maschine im Feld — und Firefox mit NVDA
+       unter Windows eine der haeufigsten Kombinationen ueberhaupt.
+       Nur die Barrierefreiheits-Pruefungen, damit die Pipeline nicht unnoetig
+       waechst. */
+    {
+      name: "firefox-barrierefreiheit",
+      use: { browserName: "firefox" },
+      testMatch: /(a11y|tastatur-erreichbarkeit|barrierefreiheit-protokoll|ansagen-)/,
+    },
   ],
   webServer: {
     command: "python3 -m http.server 8081 --directory public",

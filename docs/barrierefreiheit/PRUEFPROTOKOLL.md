@@ -72,6 +72,11 @@ Nutzer in einer Minute. Geprüft wird deshalb jetzt die STRUKTUR (trägt jedes
 Bedienelement `tabindex="0"`?), nicht das Tabben. Dieser Wächter fand sofort einen
 zweiten Fall, den niemand kannte.
 
+**Eine Messung sagt, DASS etwas geschieht — nicht, wie oft.** Die Ansagen
+während der Wartezeit waren korrekt und vollständig; gemessen wurde erst nach
+einem Hinweis von außen, dass sie sich alle zwei Sekunden wiederholen. Häufigkeit
+gehört mitgemessen, sonst ist eine Seite formal richtig und praktisch unbenutzbar.
+
 **Jede Messung hat eine Positivkontrolle.** Liefert axe null geprüfte Regeln oder
 findet die Zielgrößen-Messung kein einziges Bedienelement, bricht der Lauf ab. Ohne
 das sähe ein kaputter Lauf aus wie ein perfektes Ergebnis.
@@ -179,6 +184,8 @@ Sie stehen hier, weil ein Protokoll, das nur Erfolge nennt, unglaubwürdig ist.
 | 2.4.7 Fokus sichtbar | 7 von 12 bis 20 Elementen je Rechtsseite trugen nur den Browser-Standardring. Sichtbar war er, aber sein Aussehen entscheidet jeder Browser selbst | Eigener Ring, 2 px, 5,9 : 1 gegen Papier und 11 : 1 im dunklen Thema | ja |
 | 2.1.1 Tastatur (Stufe A) | **Der Sprachumschalter war auf Safari mit der Tastatur nicht erreichbar.** Seine Knöpfe entstehen im JavaScript und trugen kein `tabindex="0"`; Safari tabbt ohne „Vollzugriff Tastatur" nicht auf Buttons. Betroffen waren 7 Knöpfe in zwei Dateien | `tabindex="0"` ergänzt | ja |
 | 2.1.1 Tastatur (Stufe A) | **Der Rücksprung zur Startseite war auf allen Unterseiten nicht erreichbar** — derselbe Grund, `.eyebrow-home` ohne `tabindex`. Vom neuen Wächter gefunden, nicht von Hand | `tabindex="0"` auf fünf Seiten ergänzt | ja |
+| 4.1.3 Statusmeldungen | **Der Wartezustand wurde alle zwei Sekunden erneut angesagt.** Gemessen: 19 Ansagen in 30 Sekunden, bei voller Analyse rund 40 — fast immer derselbe Satz. Ursache: Der Text wurde bei jeder Statusabfrage neu geschrieben, auch unverändert; jede Zuweisung löst in einem `aria-live`-Bereich eine Ansage aus. Dazu die rotierenden Zier-Meldungen, die sich tatsächlich ändern | Nur noch bei echter Änderung schreiben; Rotation stumm geschaltet. Gemessen: **19 → 3** | ja |
+| 4.1.3 Statusmeldungen | **Nach „Analyse abgeschlossen" folgte nichts.** Der Fokus sprang auf einen Abschnitt ohne Rolle und ohne Namen — dort hat ein Screenreader nichts zu sagen | `role="region"` mit übersetztem Namen („Dein Profil") | ja |
 
 **Bewusste, benannte Abweichung zu 1.4.5 (Bilder von Text):** Die drei Demo-Fotos
 tragen die KI-Kennzeichnung in die Pixel gebrannt. Das ist seit August 2026 Pflicht
@@ -187,19 +194,23 @@ Bild speichert. Die Kennzeichnung ist zusätzlich im Alternativtext und in den
 strukturierten Daten hinterlegt, ist also für Screenreader erreichbar. Die Ausnahme
 „wesentlich" des Kriteriums greift hier.
 
-## 7 Offene Handprüfungen
+## 7 Handprüfung: Stand
 
-Vier Kriterien lassen sich maschinell nicht entscheiden. Sie sind der Grund, warum
-die Erklärung bis zu ihrem Abschluss „weitgehend konform" sagt.
+Vier Kriterien galten als maschinell nicht entscheidbar. Diese Grenze war zu weit
+gezogen — der größere Teil ließ sich messen, sobald das passende Werkzeug gebaut war.
 
-| Kriterium | Was zu prüfen ist | Wie |
+| Kriterium | Wie es jetzt belegt ist | Rest |
 |---|---|---|
-| 1.1.1 Nicht-Text-Inhalt | Sind die Alternativtexte inhaltlich brauchbar — nicht nur vorhanden? | VoiceOver-Durchgang, Schritt 2 und 6 |
-| 1.3.1 Infos und Beziehungen | Erschließt sich der Aufbau auch beim Vorlesen? | VoiceOver-Durchgang, Schritt 3 |
-| 4.1.3 Statusmeldungen | Werden Wartezustand, Fehler und Ergebnis wirklich angesagt? | VoiceOver-Durchgang, Schritt 4 und 5 |
-| 2.1.1 Tastatur | Ist die Bedienung mit der Tastatur nicht nur möglich, sondern auch verständlich? | Tastatur-Durchgang, Schritt 7 |
+| 1.1.1 Nicht-Text-Inhalt | Die Vorlese-Reihenfolge aller neun Seiten und Zustände ist mitgeschrieben. Jedes Demo-Bild sagt „AI-generated sample image … Does not depict a real person." **Kein Bild ohne Alternativtext, kein Bedienelement ohne Namen** | ob die Formulierung für einen Menschen taugt |
+| 1.3.1 Infos und Beziehungen | Überschriftenstruktur je Seite ausgezählt, keine übersprungene Ebene, Reihenfolge geprüft | — |
+| 4.1.3 Statusmeldungen | Die Ansagen sind wörtlich mitgeschrieben: „Dein Foto ist unterwegs" → „Analyse gestartet" → „Warteschlange · Position" → „Analyse abgeschlossen" → „Dein Profil". Häufigkeit gemessen und begrenzt | ob Safari und VoiceOver sie aussprechen |
+| 2.1.1 Tastatur | Strukturprüfung über sechs Seiten: jedes Bedienelement trägt `tabindex="0"`. Ein Tabulator-Durchlauf im Test taugt dafür nicht — Playwrights WebKit springt auf Knöpfe unabhängig von Safaris Einstellung | — |
 
-Anleitung: [`VOICEOVER-CHECKLISTE.md`](VOICEOVER-CHECKLISTE.md)
+**Was zwingend am Gerät bleibt**, und das ist keine Formalie: ob Safari und
+VoiceOver das Ausgelesene auch tatsächlich aussprechen, und ob es sich für einen
+Menschen erträglich anhört. Beide heute gefundenen Fehler hat genau dieses
+Zuhören zutage gebracht — keine Messung hatte sie gezeigt. Der Aufwand dafür ist
+klein: einmal zuhören, Eindruck sagen. Das Protokollieren übernimmt das Werkzeug.
 
 ## 8 Nicht angestrebt: Stufe AAA
 

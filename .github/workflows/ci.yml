@@ -116,6 +116,13 @@ jobs:
     # Neubewertung: docs/SECURITY-MODEL.md, Restrisiko 7.
     container:
       image: mcr.microsoft.com/playwright:v${{ needs.playwright-version.outputs.version }}-jammy
+    # Firefox startet im Container nur mit HOME=/root — Playwright sagt es im
+    # Fehlertext selbst: "Firefox is unable to launch if the $HOME folder isn't
+    # owned by the current user." Ohne diese Zeile scheitern ALLE Firefox-Laeufe
+    # mit "Failed to launch the browser process", was wie ein Barrierefreiheits-
+    # Befund aussieht und keiner ist. Chromium und WebKit brauchen es nicht.
+    env:
+      HOME: /root
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -4,6 +4,87 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.3.2] — 2026-08-17
+
+### Hinzugefügt
+
+- **Barrierefreiheitserklärung unter `/barrierefreiheit`.** malziME ist gegen
+  WCAG 2.2 Stufe AA geprüft — messend, nicht behauptend. Von 55 Erfolgskriterien
+  sind 40 nachgewiesen erfüllt, 11 nicht anwendbar, 4 maschinell erfüllt mit
+  offener Handprüfung. Kein Kriterium ist als verletzt festgestellt.
+
+  Die Seite nennt die bekannten Einschränkungen offen: den eingebrannten
+  KI-Hinweis in den Demo-Fotos, die nicht angestrebte Stufe AAA, die fremde
+  Landkarte. Und sie sagt, was **nicht** eingesetzt wird — kein Overlay, kein
+  gekauftes Siegel.
+
+  Drei Rechtsaussagen sind an Primärquellen belegt: die Ausnahme für
+  Kleinstunternehmen nach § 6 Abs. 1 BaFG, das Schlichtungsverfahren beim
+  Sozialministeriumservice (es betrifft das Behindertengleichstellungsrecht,
+  **nicht** das BaFG-Beschwerdeverfahren — die Seite unterscheidet das) und
+  Artikel 50 der EU-KI-Verordnung, gültig seit 2. August 2026.
+
+  Nicht öffentlich, aber vorhanden: das vollständige Prüfprotokoll über alle 55
+  Kriterien mit Prüfweg und Ergebnis je Zeile.
+
+### Behoben — Bedienung mit der Tastatur
+
+- **Der Sprachumschalter war auf Safari mit der Tastatur nicht erreichbar.**
+  WCAG 2.1.1, **Stufe A** — die grundlegendste. Safari springt ohne „Vollzugriff
+  Tastatur" nicht auf Knöpfe; im Projekt gilt deshalb die Regel, dass jedes
+  Bedienelement ein ausdrückliches `tabindex="0"` braucht. Ein Test erzwingt sie
+  seit Langem, aber nur für die statische Startseite. Die Knöpfe des Umschalters
+  entstehen im JavaScript und hatten keines — sieben Stück in zwei Dateien.
+
+  **Warum die Tests das nicht fanden:** Der automatische Tastatur-Durchgang war
+  grün. Playwrights WebKit springt auf Knöpfe unabhängig von Safaris
+  Einstellung — der Test kann diesen Fehler grundsätzlich nicht zeigen. Gefunden
+  hat ihn ein Nutzer in einer Minute.
+
+  Der neue Wächter prüft deshalb die **Struktur** statt das Springen: Trägt jedes
+  sichtbare Bedienelement `tabindex="0"`, nachdem das JavaScript gelaufen ist?
+  Über sechs Seiten, den Umschalter und den geöffneten Dialog.
+
+- **Der Rücksprung zur Startseite war auf allen Unterseiten nicht erreichbar.**
+  Derselbe Grund, fünf Seiten betroffen. Diesen Fall fand der neue Wächter
+  sofort — niemand hatte ihn bemerkt.
+
+### Behoben — Anzeige und Analyse
+
+- **Kein waagrechtes Scrollen mehr bei 320 Pixel** (WCAG 1.4.10). Die
+  Nutzungsbedingungen standen bei 333 Pixel, weil die ODR-Adresse der EU 34
+  Zeichen ohne Leerstelle hat und nicht umbrechen konnte; die Profil-Seite bei
+  324, weil eine Wert-Plakette die Zeile aufschob. Dahinter lag eine dritte
+  Ursache: Die geklebte Umschalt-Leiste zog mit fest verdrahteten 20 Pixeln über
+  den Rand, während die Seitenpolsterung bei schmalen Bildschirmen auf 16 fällt.
+  Beide Werte kommen jetzt aus **einer** Quelle.
+
+- **Jedes Bedienelement hat einen eigenen Fokus-Rahmen.** Auf den Rechtsseiten
+  trugen 7 von 12 bis 20 Elementen nur den Standardrahmen des Browsers. Sichtbar
+  war er, aber sein Aussehen entscheidet jeder Browser selbst.
+
+- **Abkürzungen werden vorgelesen.** EXIF, GPS, DSGVO, KI, IP und PDF tragen nun
+  ihre Langform für Screenreader. Der sichtbare Text ist dabei byte-identisch
+  geblieben — an den Rechtstexten ändert sich optisch nichts.
+
+- **Die eigene KI-Kennzeichnung fließt nicht mehr in die Analyse.** Der Prompt
+  verlangte „jeden sichtbaren Text, auch Bildunterschriften" — die in die
+  Demo-Fotos gebrannte Pflichtkennzeichnung ist eine solche und landete damit in
+  der Profilerstellung. Jetzt zwei Riegel: eine Anweisung im Prompt (deutsch und
+  englisch) und ein Eintrag im bestehenden Wasserzeichen-Filter, der bisher nur
+  fremde Stockfoto-Wasserzeichen kannte.
+
+### Geändert
+
+- **Der Wächter für Barrierefreiheit sah einen ganzen Bildschirmteil nicht.**
+  Sein Testprofil setzte kein `subject`, dadurch erschien der Realitäts-Check
+  nie und wurde nie gemessen.
+
+- **Die Dateiliste des Auslieferungs-Skripts wird gegen die Wirklichkeit
+  geprüft.** Die neue Seite stand nicht darin — ihr Verweis auf das Stilblatt
+  wäre eingefroren, während alle anderen weiterzählen. Zwei feste Listen, die
+  niemand vergleicht, driften gemeinsam ab; jetzt fragt der Test das Dateisystem.
+
 ## [3.3.1] — 2026-08-17
 
 ### Hinzugefügt

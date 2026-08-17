@@ -172,7 +172,7 @@ echo "Cache-Busting-Version: ?v=$VERSION"
 # Fliesstext; der Kommentar ueber DEMO_BUSTER in public/js/demo.js wurde beim
 # Deploy vom 2026-08-12 stillschweigend verunstaltet. [0-9][0-9]* verlangt
 # mindestens eine Ziffer (BRE, kein + — bash 3.2 auf macOS kennt es nicht).
-for f in public/index.html public/datenschutz.html public/impressum.html public/nutzungsbedingungen.html public/stats.html public/js/demo.js; do
+for f in public/index.html public/datenschutz.html public/impressum.html public/nutzungsbedingungen.html public/barrierefreiheit.html public/stats.html public/js/demo.js; do
   if [ -f "$f" ]; then
     # BUG-009: Cross-platform sed (macOS + Linux)
     if sed --version >/dev/null 2>&1; then

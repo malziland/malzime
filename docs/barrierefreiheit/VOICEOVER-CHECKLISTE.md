@@ -23,12 +23,12 @@ hinterlegen — dann schaltet dreimaliges Drücken der Seitentaste um.
 
 **Die vier Tasten, die du am Mac brauchst:**
 
-| Taste | Was passiert |
-|---|---|
-| **Ctrl + ⌥ + →** | zum nächsten Element |
-| **Ctrl + ⌥ + Leertaste** | Element auslösen (wie klicken) |
-| **Tabulator** | zum nächsten Bedienelement springen |
-| **Ctrl** | VoiceOver zum Schweigen bringen |
+| Taste                    | Was passiert                        |
+| ------------------------ | ----------------------------------- |
+| **Ctrl + ⌥ + →**         | zum nächsten Element                |
+| **Ctrl + ⌥ + Leertaste** | Element auslösen (wie klicken)      |
+| **Tabulator**            | zum nächsten Bedienelement springen |
+| **Ctrl**                 | VoiceOver zum Schweigen bringen     |
 
 **Am iPhone:** einmal tippen = vorlesen, zweimal tippen = auslösen, mit einem Finger
 nach rechts streichen = nächstes Element.
@@ -52,7 +52,8 @@ zehnmal).
 - [ ] Wird die Überschrift „malziME" oder der Seitentitel vorgelesen?
 
 **Was du gehört hast, wenn es abweicht:**
-_____________________________________________
+
+---
 
 ### Schritt 2 — Die Demo-Fotos (Kriterium 1.1.1)
 
@@ -66,7 +67,8 @@ Das zweite ist der eigentliche Punkt: Die Kennzeichnung steht in den Pixeln des
 Bildes. Wer nicht sieht, muss sie gesagt bekommen.
 
 **Was du gehört hast:**
-_____________________________________________
+
+---
 
 ### Schritt 3 — Der Aufbau (Kriterium 1.3.1)
 
@@ -78,7 +80,8 @@ Rufe die Überschriftenliste auf: **Ctrl + ⌥ + U**, dann mit **←/→** zur K
 - [ ] Steht eine Überschrift an einer Stelle, wo keine hingehört?
 
 **Was dir aufgefallen ist:**
-_____________________________________________
+
+---
 
 ### Schritt 4 — Die Analyse ansagen (Kriterium 4.1.3)
 
@@ -95,7 +98,8 @@ Das ist der wichtigste Schritt des ganzen Durchgangs. Wer nicht sieht, erfährt 
 nicht, ob die Seite arbeitet oder hängt.
 
 **Wortlaut der Ansagen, so gut du ihn behältst:**
-_____________________________________________
+
+---
 
 ### Schritt 5 — Das Ergebnis durchgehen
 
@@ -109,7 +113,8 @@ Der letzte Punkt ist kein Formalismus: Ein Profil, das vorgelesen wird, ohne das
 Einordnung mitkommt, ist genau das, was malziME kritisiert.
 
 **Was du gehört hast:**
-_____________________________________________
+
+---
 
 ### Schritt 6 — Der Beast-Modus
 
@@ -120,7 +125,8 @@ Tabuliere zum Umschalter „Beast" und löse ihn aus.
 - [ ] Werden die neuen Inhalte vorgelesen, oder bleibt es still?
 
 **Was du gehört hast:**
-_____________________________________________
+
+---
 
 ### Schritt 7 — Nur mit der Tastatur, ohne VoiceOver (Kriterium 2.1.1)
 
@@ -139,7 +145,8 @@ Der letzte Punkt hat am 17. August einen echten Fehler zutage gebracht, der nur 
 iPhone und iPad auftrat. Deshalb steht er hier.
 
 **Wo du hängen geblieben bist:**
-_____________________________________________
+
+---
 
 ---
 
@@ -157,7 +164,8 @@ Streiche mit einem Finger von links nach rechts, bis du unten bist.
 - [ ] Wird etwas vorgelesen, das gar nicht da ist?
 
 **Was dir aufgefallen ist:**
-_____________________________________________
+
+---
 
 ### Schritt 9 — Analyse am Handy
 
@@ -172,7 +180,8 @@ greift auf iPhones nicht, dafür fängt die Warteschlange das ab. Ob das mit Voi
 auch trägt, hat noch niemand geprüft.
 
 **Was passiert ist:**
-_____________________________________________
+
+---
 
 ### Schritt 10 — Der Sprachumschalter
 
@@ -184,7 +193,8 @@ Doppeltippe auf **EN**.
       Wird der zweisprachige Hinweis vorgelesen — beide Zeilen?
 
 **Was du gehört hast:**
-_____________________________________________
+
+---
 
 ---
 
@@ -196,9 +206,9 @@ _____________________________________________
 **Gesamteindruck in einem Satz — würdest du damit arbeiten können, wenn du nichts
 sehen würdest?**
 
-_____________________________________________
+---
 
-_____________________________________________
+---
 
 ---
 

@@ -37,7 +37,7 @@ Video- oder Tonbeiträge, keine Anmeldung, keine Zeitbegrenzung und kein Formula
 personenbezogenen Daten enthält. Vier weitere Kriterien sind messtechnisch erfüllt und
 werden derzeit zusätzlich von Hand mit einem Screenreader geprüft.⟩
 
-⟨*Nach Abschluss der Handprüfung wird dieser Absatz ersetzt durch:* „Diese Seite ist
+⟨_Nach Abschluss der Handprüfung wird dieser Absatz ersetzt durch:_ „Diese Seite ist
 konform mit WCAG 2.2 Stufe AA."⟩
 
 ### Was wir geprüft haben — und wie
@@ -134,12 +134,12 @@ bei jeder Auslieferung automatisch mit.
 
 ## Belegte Grundlagen
 
-| Aussage | Beleg |
-|---|---|
-| BaFG nimmt Kleinstunternehmen bei Dienstleistungen aus (§ 6 Abs. 1); < 10 Beschäftigte und ≤ 2 Mio. € | [Sozialministeriumservice](https://www.sozialministeriumservice.gv.at/Marktueberwachung_digitale_Barrierefreiheit/Informationen_fuer_Unternehmen/Ausnahme_Kleinstunternehmen/Ausnahmen-fuer-Kleinstunternehmen.de.html), [WKO](https://www.wko.at/ce-kennzeichnung-normen/informationen-zum-barrierefreiheitsgesetz) |
-| Schlichtung: durch Schlichtungsreferent:innen des Sozialministeriumservice, kostenfrei und formlos, Dolmetschkosten getragen, vor Gericht verpflichtend. **Betrifft Diskriminierung nach Behindertengleichstellungsrecht, nicht das BaFG-Beschwerdeverfahren** | [Primärquelle Sozialministeriumservice](https://www.sozialministeriumservice.gv.at/Menschen_mit_Behinderung/Gleichstellung/Schlichtung/Schlichtung.de.html), abgerufen 17.08.2026 |
-| Artikel 50 EU-KI-Verordnung gilt ab 2. August 2026; Betreiber müssen künstlich erzeugte Bildinhalte offenlegen, auch Bilder nicht existierender Personen; keine Ausnahme für kleine Unternehmen | [Artikeltext AI Act](https://artificialintelligenceact.eu/article/50/), abgerufen 17.08.2026 |
-| `malzi.me` nimmt Mail an (MX bei IONOS) | `dig +short MX malzi.me` → `mx00.ionos.de`, `mx01.ionos.de` |
+| Aussage                                                                                                                                                                                                                                                        | Beleg                                                                                                                                                                                                                                                                                                                |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BaFG nimmt Kleinstunternehmen bei Dienstleistungen aus (§ 6 Abs. 1); < 10 Beschäftigte und ≤ 2 Mio. €                                                                                                                                                          | [Sozialministeriumservice](https://www.sozialministeriumservice.gv.at/Marktueberwachung_digitale_Barrierefreiheit/Informationen_fuer_Unternehmen/Ausnahme_Kleinstunternehmen/Ausnahmen-fuer-Kleinstunternehmen.de.html), [WKO](https://www.wko.at/ce-kennzeichnung-normen/informationen-zum-barrierefreiheitsgesetz) |
+| Schlichtung: durch Schlichtungsreferent:innen des Sozialministeriumservice, kostenfrei und formlos, Dolmetschkosten getragen, vor Gericht verpflichtend. **Betrifft Diskriminierung nach Behindertengleichstellungsrecht, nicht das BaFG-Beschwerdeverfahren** | [Primärquelle Sozialministeriumservice](https://www.sozialministeriumservice.gv.at/Menschen_mit_Behinderung/Gleichstellung/Schlichtung/Schlichtung.de.html), abgerufen 17.08.2026                                                                                                                                    |
+| Artikel 50 EU-KI-Verordnung gilt ab 2. August 2026; Betreiber müssen künstlich erzeugte Bildinhalte offenlegen, auch Bilder nicht existierender Personen; keine Ausnahme für kleine Unternehmen                                                                | [Artikeltext AI Act](https://artificialintelligenceact.eu/article/50/), abgerufen 17.08.2026                                                                                                                                                                                                                         |
+| `malzi.me` nimmt Mail an (MX bei IONOS)                                                                                                                                                                                                                        | `dig +short MX malzi.me` → `mx00.ionos.de`, `mx01.ionos.de`                                                                                                                                                                                                                                                          |
 
 ## Was vor der Veröffentlichung noch von Christoph zu entscheiden ist
 

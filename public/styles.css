@@ -554,15 +554,25 @@ html[data-has-result] {
   font-size: 0.58rem;
   font-weight: 700;
   font-style: normal;
-  color: inherit;
+  color: var(--muted);
   line-height: 1;
-  opacity: 0.55;
-  transition: opacity 0.2s var(--ease);
+  /* KEIN opacity im Ruhezustand. Vorher stand hier 0.55 — das verblasste den
+     Buchstaben UND den Kreisrand (border: currentColor) auf 2.18:1. Verlangt
+     sind 4.5:1 fuer den Buchstaben (WCAG 1.4.3) und 3:1 fuer den Rand des
+     Bedienelements (1.4.11); beides verfehlt. Dass es beim Ueberfahren mit der
+     Maus hell wird, hilft nicht: Das Kriterium gilt fuer den Zustand, in dem
+     man das Element vorfindet — und wer mit der Tastatur oder am Finger
+     arbeitet, faehrt gar nicht darueber.
+     Gefunden nicht von axe, sondern von der Bildpunkt-Messung, die axes
+     Abstention aufloest. --muted auf --bg ergibt 5.22:1 hell und 7.85:1
+     dunkel. Der Aufhell-Effekt bleibt, er laeuft jetzt ueber die Farbe. */
+  transition: color 0.2s var(--ease);
 }
 
 .info-icon:hover .info-i,
+.info-icon:focus-visible .info-i,
 .info-icon.tooltip-open .info-i {
-  opacity: 1;
+  color: var(--text);
 }
 
 .tooltip {

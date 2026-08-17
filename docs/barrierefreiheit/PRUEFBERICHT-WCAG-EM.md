@@ -12,13 +12,13 @@ Bewertung der Konformität mit den Web Content Accessibility Guidelines.
 
 ## Angaben zur Prüfung (WCAG-EM Schritt 5.1)
 
-| | |
-|---|---|
-| **Prüfer** | malziland - learning \| training \| consulting e.U., Inhaber Christoph Krieger |
-| **Auftraggeber** | Eigenprüfung |
-| **Prüfdatum** | 17. August 2026 |
-| **Geprüfter Stand** | Commit `b83121d`, ausgelieferte Kennung `2026081703` |
-| **Art der Prüfung** | Selbstbewertung, werkzeuggestützt und teilweise manuell |
+|                     |                                                                                |
+| ------------------- | ------------------------------------------------------------------------------ |
+| **Prüfer**          | malziland - learning \| training \| consulting e.U., Inhaber Christoph Krieger |
+| **Auftraggeber**    | Eigenprüfung                                                                   |
+| **Prüfdatum**       | 17. August 2026                                                                |
+| **Geprüfter Stand** | Commit `b83121d`, ausgelieferte Kennung `2026081703`                           |
+| **Art der Prüfung** | Selbstbewertung, werkzeuggestützt und teilweise manuell                        |
 
 ---
 
@@ -50,13 +50,13 @@ Betreiber hat darauf keinen Einfluss und kann keine Kombination ausschließen.
 
 Damit gelten als unterstützt:
 
-| Browser | Hilfsmittel | Betriebssystem |
-|---|---|---|
-| Chrome, Edge (Blink) | NVDA, JAWS, Narrator | Windows |
-| Firefox (Gecko) | NVDA, JAWS | Windows |
-| Safari (WebKit) | VoiceOver | macOS |
-| Safari (WebKit) | VoiceOver | iOS, iPadOS |
-| Chrome (Blink) | TalkBack | Android |
+| Browser              | Hilfsmittel          | Betriebssystem |
+| -------------------- | -------------------- | -------------- |
+| Chrome, Edge (Blink) | NVDA, JAWS, Narrator | Windows        |
+| Firefox (Gecko)      | NVDA, JAWS           | Windows        |
+| Safari (WebKit)      | VoiceOver            | macOS          |
+| Safari (WebKit)      | VoiceOver            | iOS, iPadOS    |
+| Chrome (Blink)       | TalkBack             | Android        |
 
 jeweils in den aktuellen und der jeweils vorangegangenen Hauptversion.
 
@@ -71,8 +71,7 @@ Keine über WCAG 2.2 AA hinaus. Zwei projekteigene Festlegungen wirken mit:
 - **Keine Barrierefreiheits-Overlays.** Sie verschlechtern die Bedienung mit Screenreader
   nachweislich.
 - **Die KI-Kennzeichnung der Beispielfotos bleibt in den Bildpunkten**, auch wenn das
-  „Text in Bildern" bedeutet. Grundlage: Artikel 50 der EU-KI-Verordnung, gültig seit
-  2. August 2026; eine Kennzeichnung neben dem Bild geht beim Weiterschicken verloren.
+  „Text in Bildern" bedeutet. Grundlage: Artikel 50 der EU-KI-Verordnung, gültig seit 2. August 2026; eine Kennzeichnung neben dem Bild geht beim Weiterschicken verloren.
 
 ---
 
@@ -125,16 +124,16 @@ Nutzungsstatistik.
 
 Ausgewählt nach den fünf Kategorien der Methodik:
 
-| Kategorie | Ansicht | Begründung |
-|---|---|---|
-| Gemeinsame Ansicht | Startseite `/` | Einstiegspunkt, trägt Kopf- und Fußzeile |
-| Besondere Seite | `/datenschutz` | längster Text, Tabellen, viele Links |
-| Besondere Seite | `/impressum` | kürzeste Rechtsseite, andere Struktur |
-| Besondere Seite | `/nutzungsbedingungen` | nummerierte Abschnitte, verschachtelte Listen |
-| Besondere Seite | `/barrierefreiheit` | neu, noch nie mit Nutzern erprobt |
-| Inhaltstyp-Vielfalt | `/stats` | Zahlen, Fortschrittsbalken, automatische Aktualisierung |
-| Funktionale Komponente | Sprachhinweis-Dialog | modaler Dialog mit Fokus-Käfig |
-| Funktionale Komponente | Ergebnis mit Karte | fremder eingebetteter Inhalt |
+| Kategorie              | Ansicht                | Begründung                                              |
+| ---------------------- | ---------------------- | ------------------------------------------------------- |
+| Gemeinsame Ansicht     | Startseite `/`         | Einstiegspunkt, trägt Kopf- und Fußzeile                |
+| Besondere Seite        | `/datenschutz`         | längster Text, Tabellen, viele Links                    |
+| Besondere Seite        | `/impressum`           | kürzeste Rechtsseite, andere Struktur                   |
+| Besondere Seite        | `/nutzungsbedingungen` | nummerierte Abschnitte, verschachtelte Listen           |
+| Besondere Seite        | `/barrierefreiheit`    | neu, noch nie mit Nutzern erprobt                       |
+| Inhaltstyp-Vielfalt    | `/stats`               | Zahlen, Fortschrittsbalken, automatische Aktualisierung |
+| Funktionale Komponente | Sprachhinweis-Dialog   | modaler Dialog mit Fokus-Käfig                          |
+| Funktionale Komponente | Ergebnis mit Karte     | fremder eingebetteter Inhalt                            |
 
 ### 3.2 Zufällige Auswahl
 
@@ -157,24 +156,31 @@ Ausschnitten. malziME hat einen wesentlichen Prozess:
 
 **Die Analyse eines Fotos**
 
-| Schritt | Zustand |
-|---|---|
-| 1 | Leere Startseite, Aufforderung zur Fotoauswahl |
-| 2 | Foto gewählt, Vorbereitung im Browser (Verkleinern, Metadaten lesen) |
-| 3 | Hochladen und Einreihen |
-| 4 | Warten in der Schlange, mit Position und Restzeit |
-| 5 | Verarbeitung, Live-Text während das Modell schreibt |
-| 6 | Ergebnis fertig, Enthüllung des Profils |
-| 7 | Umschalten in den Beast-Modus |
-| 8 | Realitäts-Check ausfüllen und absenden |
-| 9 | PDF-Export |
-| — | Abzweig: Fehlermeldung nach fehlgeschlagener Analyse |
-| — | Abzweig: Verbindungsabbruch mitten im Ablauf |
+| Schritt | Zustand                                                              |
+| ------- | -------------------------------------------------------------------- |
+| 1       | Leere Startseite, Aufforderung zur Fotoauswahl                       |
+| 2       | Foto gewählt, Vorbereitung im Browser (Verkleinern, Metadaten lesen) |
+| 3       | Hochladen und Einreihen                                              |
+| 4       | Warten in der Schlange, mit Position und Restzeit                    |
+| 5       | Verarbeitung, Live-Text während das Modell schreibt                  |
+| 6       | Ergebnis fertig, Enthüllung des Profils                              |
+| 7       | Umschalten in den Beast-Modus                                        |
+| 8       | Realitäts-Check ausfüllen und absenden                               |
+| 9       | PDF-Export                                                           |
+| —       | Abzweig: Fehlermeldung nach fehlgeschlagener Analyse                 |
+| —       | Abzweig: Verbindungsabbruch mitten im Ablauf                         |
 
-**Prüfstand: Die Schritte 1, 3, 4, 5, 6, 7 und beide Abzweige sind geprüft.
-Die Schritte 2, 8 und 9 sind es noch nicht** — Bildvorbereitung, Realitäts-Check und
-PDF-Export. Das ist eine offene Lücke gegenüber der Methodik und keine Kleinigkeit: Ein
-Prozess gilt erst als geprüft, wenn alle Schritte es sind.
+**Alle neun Schritte und beide Abzweige sind geprüft.**
+
+Beim Aufstellen dieser Liste fiel auf, dass die Schritte 2, 8 und 9 — Bildvorbereitung,
+Realitäts-Check und PDF-Export — nie gemessen worden waren. Sie sind seither ergänzt und
+laufen mit. Das ist der praktische Gewinn der Methodik: Die Forderung nach vollständigen
+Prozessen hat drei ungeprüfte Zustände sichtbar gemacht, die in einer selbst gewählten
+Struktur nie aufgefallen wären.
+
+Beim PDF-Export endet die Prüfung am Knopf. Die erzeugte Datei ist ein eigenes Format mit
+eigenem Regelwerk (PDF/UA) und gehört nicht in eine HTML-Prüfung; das ist eine bewusste
+Grenze, keine Lücke.
 
 ---
 
@@ -182,21 +188,34 @@ Prozess gilt erst als geprüft, wenn alle Schritte es sind.
 
 ### 4.1 Prüfmittel
 
-| Werkzeug | Herkunft | Regelwerk | Rolle |
-|---|---|---|---|
-| **axe-core 4.12.1** | Deque Systems | eigenes, auf WCAG abgebildet | Hauptwerkzeug, blockierendes Gate |
-| **pa11y 9.1.1 / HTML_CodeSniffer** | Squiz, quelloffen | **unabhängige** Umsetzung der W3C-Techniken | Zweitmeinung |
-| **Lighthouse** | Google | benutzt intern axe | Live-Prüfung, keine echte Zweitmeinung |
-| Eigene Messungen | — | direkt gegen die Kriterientexte | Zielgrößen, Umbruch, Textgröße, Textabstände, Fokus, Ansagen, Vorlese-Reihenfolge |
-| Bildpunkt-Messung | — | Kontrastformel der WCAG | entscheidet, wenn Werkzeuge sich widersprechen |
+| Werkzeug                           | Herkunft          | Regelwerk                                   | Rolle                                                                             |
+| ---------------------------------- | ----------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
+| **axe-core 4.12.1**                | Deque Systems     | eigenes, auf WCAG abgebildet                | Hauptwerkzeug, blockierendes Gate                                                 |
+| **pa11y 9.1.1 / HTML_CodeSniffer** | Squiz, quelloffen | **unabhängige** Umsetzung der W3C-Techniken | Zweitmeinung                                                                      |
+| **Lighthouse**                     | Google            | benutzt intern axe                          | Live-Prüfung, keine echte Zweitmeinung                                            |
+| Eigene Messungen                   | —                 | direkt gegen die Kriterientexte             | Zielgrößen, Umbruch, Textgröße, Textabstände, Fokus, Ansagen, Vorlese-Reihenfolge |
+| Bildpunkt-Messung                  | —                 | Kontrastformel der WCAG                     | entscheidet, wenn Werkzeuge sich widersprechen                                    |
 
 **Zwei Regeln aus der Erfahrung dieses Berichts:**
 
-**Eine Abstention ist kein Bestehen.** axe meldet auf jeder Seite 6 bis 13 Elemente als
-„unprüfbar". In der ersten Fassung dieses Berichts wurden nur die Verstöße gezählt und
-daraus „0 Verstöße" — die Abstentionen wurden abgelegt und nie aufgelöst. Der unabhängige
-Zweitprüfer meldete an genau dieser Stelle einen Fehler; die Bildpunkt-Messung entschied
-ihn. Jede Abstention wird einzeln aufgelöst.
+**Eine Abstention ist kein Bestehen.** axe meldet Elemente als „unprüfbar", wenn es den
+Hintergrund nicht bestimmen kann. In der ersten Fassung dieses Berichts wurden nur die
+Verstöße gezählt und daraus „0 Verstöße" — die Abstentionen lagen unbeantwortet daneben.
+
+Seither entscheidet eine **Bildpunkt-Messung**: Das Element wird fotografiert, das Foto
+Punkt für Punkt ausgelesen, hellster und dunkelster Punkt nach der Kontrastformel der WCAG
+verrechnet. Sie läuft bei jeder Messung automatisch mit und macht den Lauf rot, wenn sie
+einen Verstoß bestätigt.
+
+**Das hat sofort einen echten Mangel gefunden**, den axe nicht entscheiden konnte: das
+Info-Zeichen neben den beiden Profil-Modi, bei 2,18:1 statt der verlangten 4,5:1
+(Fund A-2026-08-17-09 in Anhang A). Behoben.
+
+**Stand: 55 Abstentionen je Browser, davon 0 ungeklärt.** Alle 55 sind dasselbe
+Trennzeichen in der Fußzeile — reine Zierde und damit von 1.4.3 ausdrücklich ausgenommen.
+Die Ausnahme steht als benannter Eintrag mit Begründung im Prüfcode, nicht als stille
+Regel: Wer eine hinzufügt, muss den Grund danebenschreiben, und der steht dann im
+Änderungsverlauf.
 
 **Jede Messung läuft doppelt und hat eine Positivkontrolle.** Übernommen wird nur, was beide
 Male auftritt; findet ein Werkzeug nichts zu prüfen, bricht der Lauf ab statt grün zu
@@ -209,31 +228,35 @@ Prüfweg und Ergebnis je Zeile steht in **[Anhang A](PRUEFPROTOKOLL.md#5-die-kri
 
 **Zusammenfassung:**
 
-| | Anzahl |
-|---|---|
-| erfüllt, nachgewiesen | 40 |
-| nicht anwendbar, mit Grund | 11 |
-| maschinell erfüllt, menschliche Prüfung offen | 4 |
-| **als verletzt festgestellt** | **0** |
+|                                               | Anzahl |
+| --------------------------------------------- | ------ |
+| erfüllt, nachgewiesen                         | 40     |
+| nicht anwendbar, mit Grund                    | 11     |
+| maschinell erfüllt, menschliche Prüfung offen | 4      |
+| **als verletzt festgestellt**                 | **0**  |
 
-Am Prüftag gefunden **und behoben**: acht Mängel, darunter zwei auf Stufe A. Sie stehen mit
+Am Prüftag gefunden **und behoben**: neun Mängel, darunter zwei auf Stufe A. Sie stehen mit
 Ursache, Behebung und Dauerprüfung in Anhang A. Zwei davon fand kein Werkzeug, sondern ein
-Mensch, der zum ersten Mal mit VoiceOver zuhörte.
+Mensch, der zum ersten Mal mit VoiceOver zuhörte; einen fand die Auflösung der
+Abstentionen.
+
+**Messumfang:** 46 Zustände je Browser-Maschine, drei Maschinen, also 138 Messungen — jede
+zweifach ausgeführt und nur übernommen, was beide Male auftrat.
 
 ### 4.3 Prüftiefe gegenüber der Baseline
 
 **Die wichtigste Einschränkung dieses Berichts.**
 
-| Aus der Baseline | Geprüft |
-|---|---|
-| Blink (Chrome, Edge) | ✅ automatisiert, alle Ansichten und Zustände |
-| WebKit (Safari macOS/iOS) | ✅ automatisiert, alle Ansichten und Zustände |
-| Gecko (Firefox) | ✅ automatisiert, Barrierefreiheits-Prüfungen |
-| VoiceOver (macOS) | ⚠️ **teilweise** — der Barrierefreiheits-Baum und alle Ansagen sind ausgelesen und beurteilt; **gehört** wurde einmalig von einer Person, was zwei Mängel zutage förderte |
-| VoiceOver (iOS) | ❌ **nicht geprüft** |
-| NVDA, JAWS (Windows) | ❌ **nicht geprüft** |
-| TalkBack (Android) | ❌ **nicht geprüft** |
-| Braillezeile, Schaltersteuerung | ❌ **nicht geprüft** |
+| Aus der Baseline                | Geprüft                                                                                                                                                                   |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Blink (Chrome, Edge)            | ✅ automatisiert, alle Ansichten und Zustände                                                                                                                             |
+| WebKit (Safari macOS/iOS)       | ✅ automatisiert, alle Ansichten und Zustände                                                                                                                             |
+| Gecko (Firefox)                 | ✅ automatisiert, Barrierefreiheits-Prüfungen                                                                                                                             |
+| VoiceOver (macOS)               | ⚠️ **teilweise** — der Barrierefreiheits-Baum und alle Ansagen sind ausgelesen und beurteilt; **gehört** wurde einmalig von einer Person, was zwei Mängel zutage förderte |
+| VoiceOver (iOS)                 | ❌ **nicht geprüft**                                                                                                                                                      |
+| NVDA, JAWS (Windows)            | ❌ **nicht geprüft**                                                                                                                                                      |
+| TalkBack (Android)              | ❌ **nicht geprüft**                                                                                                                                                      |
+| Braillezeile, Schaltersteuerung | ❌ **nicht geprüft**                                                                                                                                                      |
 
 Die Browser-Maschinen sind vollständig abgedeckt. **Die Hilfsmittel sind es nicht** — sie
 laufen auf Betriebssystemen, die dem Prüfer nicht zur Verfügung stehen. Deshalb ist unter
@@ -248,18 +271,21 @@ Menschen gebeten worden, die mit diesen Hilfsmitteln arbeiten.
 
 **Die Website ist weitgehend konform mit WCAG 2.2 Stufe AA.**
 
-Kein Erfolgskriterium ist als verletzt festgestellt. „Weitgehend" statt „vollständig" aus
-drei benannten Gründen:
+Kein Erfolgskriterium ist als verletzt festgestellt. Der wesentliche Prozess ist über alle
+neun Schritte geprüft, alle Abstentionen sind aufgelöst.
 
-1. **Drei Prozessschritte sind ungeprüft** (Bildvorbereitung, Realitäts-Check, PDF-Export).
-   Die Methodik verlangt vollständige Prozesse.
-2. **Die erklärte Baseline ist breiter als die Prüftiefe.** Vier Hilfsmittel-Kombinationen
-   sind nicht geprüft.
-3. **Das W3C schließt eine reine Werkzeugaussage aus:** „no tool alone can determine if a
-   site meets accessibility standards. Knowledgeable human evaluation is required."
+„Weitgehend" statt „vollständig" steht dort trotzdem, und zwar aus **zwei** benannten
+Gründen:
 
-Diese drei Punkte sind der Weg zu „vollständig konform" — nicht Ausreden, sondern eine
-Aufgabenliste.
+1. **Die erklärte Baseline ist breiter als die Prüftiefe.** Vier Hilfsmittel-Kombinationen
+   — VoiceOver auf iOS, NVDA, JAWS, TalkBack — sind nicht geprüft. Solange das so ist,
+   wäre „vollständig konform" eine Aussage über Geräte, an denen niemand gesessen hat.
+2. **Das W3C schließt eine reine Werkzeugaussage ohnehin aus:** „no tool alone can
+   determine if a site meets accessibility standards. Knowledgeable human evaluation is
+   required to determine if a site is accessible."
+
+Beide Punkte laufen auf dasselbe hinaus: Es fehlt nicht Arbeit am Code, sondern Menschen,
+die mit ihren Hilfsmitteln zuhören. Deshalb [Issue #155](https://github.com/malziland/malzime/issues/155).
 
 ### 5.2 Wiederkehrende Muster
 

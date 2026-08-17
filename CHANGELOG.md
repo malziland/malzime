@@ -28,6 +28,25 @@ automatische Prüfung hatte sie gezeigt.
   Screenreader nichts zu sagen. Jetzt ist es ein benannter Bereich („Dein
   Profil"), und die Ansage lautet „Analyse abgeschlossen · Dein Profil".
 
+### Behoben — Barrierefreiheit
+
+- **Das Info-Zeichen neben den beiden Profil-Modi war zu blass.** Es stand auf
+  55 % Deckkraft: gemessen 2,18 : 1, verlangt sind 4,5 : 1 für den Buchstaben
+  und 3 : 1 für den Kreisrand eines Bedienelements. Beim Überfahren mit der Maus
+  wurde es voll deckend — was nichts hilft, wenn man mit der Tastatur oder am
+  Finger arbeitet und gar nicht darüberfährt.
+
+  Die Deckkraft im Ruhezustand ist entfernt, der Aufhell-Effekt läuft jetzt über
+  die Farbe. Gemessen 5,22 : 1 im hellen und 7,85 : 1 im dunklen Erscheinungsbild.
+
+  Gefunden hat den Fehler kein Prüfwerkzeug: axe konnte den Fall nicht
+  entscheiden und meldete ihn als „unprüfbar". Solche Abstentionen wurden bisher
+  notiert und nie aufgelöst. Jetzt löst eine Bildpunkt-Messung jede einzelne auf
+  — das Element wird fotografiert und Punkt für Punkt nachgerechnet.
+
+- **Die Trennpunkte in der Fußzeile werden Screenreadern nicht mehr vorgelesen.**
+  Sie sind reine Zierde und stehen zwischen Links, die ohnehin getrennt sind.
+
 ### Hinzugefügt
 
 - **Zwei Wächter, die genau diese Fehlerklasse fangen.** Der eine zählt die
@@ -199,10 +218,10 @@ automatische Prüfung hatte sie gezeigt.
   zum letzten Zeichen — und schaltete damit eine seit Mai schlafende Grenze zum
   ersten Mal wirksam:
 
-  | Zeitraum | Läufe | technische Fehler | Läufe über 90 s |
-  |---|---|---|---|
-  | vor v3.0.0 (19.07.–11.08.) | 121 | 0 | 8 — **alle wurden fertig** |
-  | nach v3.0.0 (11.08.–16.08.) | 28 | 2 (7,1 %) | 3 |
+  | Zeitraum                    | Läufe | technische Fehler | Läufe über 90 s            |
+  | --------------------------- | ----- | ----------------- | -------------------------- |
+  | vor v3.0.0 (19.07.–11.08.)  | 121   | 0                 | 8 — **alle wurden fertig** |
+  | nach v3.0.0 (11.08.–16.08.) | 28    | 2 (7,1 %)         | 3                          |
 
   Jetzt hat der Single-Large-Aufruf ein eigenes, gemessenes Zeitbudget (150 s
   statt 90 s), und die Textmenge ist auf 5000 Token gesetzt — reichlich über dem
@@ -515,12 +534,14 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
 **Wächter** darüber und die **Auslieferungskette**.
 
 ### Der schwerste Fund (P0)
+
 - Der Deploy-Riegel, der vor jeder Auslieferung die EU-Region und „gelöscht heißt
   gelöscht" des Bild-Buckets prüft, **konnte nicht rot werden** — ein
   Index-Verwechsler (`PIPESTATUS[0]` = printf statt `[1]` = python3) machte den
   Fehlerzweig rechnerisch tot. Behoben; der Riegel hat jetzt eine Negativprobe.
 
 ### Die Auslieferungskette (P1)
+
 - **Deploy an keinen geprüften Stand gebunden:** `deploy.sh` lieferte den
   Arbeitsbaum aus und prüfte weniger als die sechs CI-Pflicht-Checks. Jetzt an die
   CI-Freigabe gebunden (sauberer Baum, `HEAD == origin/main`, alle sechs Checks
@@ -533,6 +554,7 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
   neue Dateien, Alarmfilter-Abdeckung, CHANGELOG-Parser kennt Code-Zäune.
 
 ### Sicherheit (P2, alle live)
+
 - **Boost-Deckel jetzt atomar** (Transaktion statt offenem get+set) — die einzige
   globale Kostenbremse hält unter gleichzeitigen Aufrufen.
 - **Statusabruf drosselt den Schreibzugriff** (~93 % weniger unauthentifizierte
@@ -543,6 +565,7 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
   gezählt; der Wächter über die Wochen-Erinnerung ist nicht mehr blind.
 
 ### Frontend (P2/P3, live)
+
 - **Barrierefreiheit:** vier Bedien-Beschriftungen (Beast-Umschalter, Info,
   Konfidenz-Punkte) sind wieder übersetzbar — ein Rückfall, den ab jetzt ein Test
   verhindert.
@@ -552,6 +575,7 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
   dreimal probiert"; ein fehlgeschlagener Demo-Abruf scheitert nicht mehr lautlos.
 
 ### Außentexte (P2/P3, live)
+
 - Formulierungen, die mehr versprachen als das System hält, an ihrem Belegort
   korrigiert: der Analyse-Zähler („Zählwerte je Zeitraum" statt „eine einzige
   Zahl"), die sessionStorage-Ausnahme („einzige" → vier Verwendungen aufgezählt),
@@ -559,6 +583,7 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
   neue Sperrlisten-Regeln verhindern den Rückfall.
 
 ### Demo-Bilder auf Englisch gekennzeichnet
+
 - Die KI-Kennzeichnung ist in die Bildpixel gebrannt (Pflicht seit 08/2026 — ein
   Etikett per CSS verschwindet, sobald jemand das Bild speichert oder weitergibt).
   Ein gebranntes Zeichen kann aber nicht mitübersetzen: Bei englischer Oberfläche
@@ -572,6 +597,7 @@ Server, keine IP-Logs, Firestore nur EU, Löschkette wirkt). Kaputt waren die
   deckt beide Sätze automatisch ab (12 statt 6 Bilder geprüft).
 
 ### Weitere Korrekturen
+
 - **Transparenz:** Die Datenschutzerklärung benennt jetzt, dass die KI bewusst
   sensible, dem Aussehen zugeschriebene Merkmale rät (scheinbare Herkunft, Hautton) —
   genau das, was das Werkzeug vorführt.
@@ -877,9 +903,6 @@ fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als
   überhaupt da ist. Beim nächsten Auftreten steht die Ursache in der Meldung, statt eine
   Stunde zu kosten.
 
-
-
-
 ## [3.0.6] — 2026-08-12
 
 **Erinnerung an die ZDR-Nachprüfung — und die Ursache für ausbleibende
@@ -897,7 +920,7 @@ Handy-Mitteilungen:**
   Fristdefinition — die Frist steht nur an einer Stelle im Code.
 - **Behoben: iOS-Mitteilungen kamen nie an.** Ein selbst betriebener
   Push-Server kann iPhones nur über den Dienst ntfy.sh erreichen. Diese
-  Weiterleitung passiert erst *nach* der Antwort an den Absender — und genau
+  Weiterleitung passiert erst _nach_ der Antwort an den Absender — und genau
   dann entzog die Cloud-Plattform dem Programm standardmäßig die Rechenzeit.
   Die Weiterleitung lief still in eine Zeitüberschreitung: Die Meldung lag auf
   dem Server, aber das Handy erfuhr nichts davon. Mit dauerhaft zugeteilter
@@ -1210,14 +1233,14 @@ Auf einem iPhone erschien wiederholt Safaris Meldung „Auf https://malzi.me/ is
 wiederholt ein Problem aufgetreten". **Sechs Erklärungen wurden geprüft und
 alle sechs ausgeschlossen:**
 
-| Vermutung | Ergebnis |
-|---|---|
-| 2-Stunden-Frist der Aufträge | wird sauber abgefangen, stille Aufräumung |
-| Neulade-Schleife am Stundenlimit | Limit stand bei 0 von 500 |
-| Absturz beim Laden der Sprachdatei | ist abgefangen, läuft mit Ersatztexten weiter |
-| Foto als Speicherfresser | liegt als Verweis im Fenster, nicht als Zeichenkette |
-| Abfrage-Schleife und Wartefunktion | beide sauber begrenzt und aufgeräumt |
-| DNS-Ausfall desselben Tages | zeitlich ausgeschlossen |
+| Vermutung                          | Ergebnis                                             |
+| ---------------------------------- | ---------------------------------------------------- |
+| 2-Stunden-Frist der Aufträge       | wird sauber abgefangen, stille Aufräumung            |
+| Neulade-Schleife am Stundenlimit   | Limit stand bei 0 von 500                            |
+| Absturz beim Laden der Sprachdatei | ist abgefangen, läuft mit Ersatztexten weiter        |
+| Foto als Speicherfresser           | liegt als Verweis im Fenster, nicht als Zeichenkette |
+| Abfrage-Schleife und Wartefunktion | beide sauber begrenzt und aufgeräumt                 |
+| DNS-Ausfall desselben Tages        | zeitlich ausgeschlossen                              |
 
 ### Warum Raten hier nicht weiterführt
 
@@ -1325,11 +1348,11 @@ nicht** — der Schalter steht weiterhin auf der alten Datenbank.
 Betroffen ist **ausschliesslich die Firestore-Datenbank**, nicht die Speicherorte
 insgesamt. Zur Klarstellung, weil das leicht verwechselt wird:
 
-| | Standort | betroffen? |
-|---|---|---|
+|                                     | Standort       | betroffen?                   |
+| ----------------------------------- | -------------- | ---------------------------- |
 | **Fotos** (`malzime-queue-uploads`) | `europe-west1` | nein — lagen immer in Europa |
-| Quellstände der Functions | `europe-west1` | nein |
-| **Firestore-Datenbank** | `nam5` (USA) | **ja — darum geht es hier** |
+| Quellstände der Functions           | `europe-west1` | nein                         |
+| **Firestore-Datenbank**             | `nam5` (USA)   | **ja — darum geht es hier**  |
 
 Die hochgeladenen Bilder haben Europa also zu keinem Zeitpunkt verlassen. Das
 wurde an der Infrastruktur nachgemessen, nicht aus dem Quelltext geschlossen.
@@ -1638,7 +1661,7 @@ Audits sind.
 
 - **Der Kinderschutz-Filter schneidet nicht mehr bei exakt 18.** Er nimmt jetzt die **Untergrenze** der Altersspanne, die das Modell selbst liefert — wer „16-22" sein könnte, gilt als schutzbedürftig — und darauf drei Jahre Sicherheitsabstand. Anlass: Aus rund 5.000 begleiteten Workshop-Analysen ist bekannt, dass Mädchen bis zu sechs Jahre zu alt geschätzt werden. Mit einer harten 18er-Grenze verlor damit ausgerechnet ein zu alt geschätztes vierzehnjähriges Mädchen den Schutz vor Glücksspiel-, Alkohol-, Kredit- und Diätwerbung — im Klassenzimmer, an die Wand projiziert. Der Preis ist bewusst in Kauf genommen: Ein tatsächlich Neunzehn- bis Einundzwanzigjähriger sieht diese Werbung nicht mehr, obwohl sie dort legitimer Lerninhalt wäre. Die Abwägung ist asymmetrisch — eine Vierzehnjährige mit Glücksspielwerbung ist ein Schaden, einem Neunzehnjährigen fehlt ein Beispiel. (`minor-safety.js`)
 
-- **Altersmerkmale für Kinder und Jugendliche, die bei beiden Geschlechtern gleich schnell laufen.** Vorher war die *primäre* Alters-Achse die **Schulterbreite**, dazu kam eine Zusatzregel, die nur für Mädchen galt („Mädchen erreichen diese Spanne oft ohne Akne und Bartflaum"). Beides hängt an der Pubertät, und die beginnt zwischen 8 und 14 Jahren, bei Mädchen im Schnitt zwei Jahre früher. Wer daran das Alter misst, schätzt Mädchen zwangsläufig zu alt und Jungen zu jung — das aus der Praxis berichtete Muster stand also wörtlich in der eigenen Anweisung. Neu sind Augenlinie im Kopf, Zahnstand, Wangenfett, Nasenrücken und Kopf-Körper-Verhältnis; Reifemerkmale sind ausdrücklich als untauglich benannt, mit Begründung. **Kein Ausgleich, keine Korrekturzahl** — nur bessere Merkmale. Bei Erwachsenen gelten fehlende Falten nicht mehr als Beleg für Jugend: Bei Mimik, Make-up oder flachem Gegenlicht entscheiden Hals, Hände und Haaransatz, und die Alters-Skala ist neu geeicht (18-30 / 30-42 / 40-52 / 50-62 / 60+).
+- **Altersmerkmale für Kinder und Jugendliche, die bei beiden Geschlechtern gleich schnell laufen.** Vorher war die _primäre_ Alters-Achse die **Schulterbreite**, dazu kam eine Zusatzregel, die nur für Mädchen galt („Mädchen erreichen diese Spanne oft ohne Akne und Bartflaum"). Beides hängt an der Pubertät, und die beginnt zwischen 8 und 14 Jahren, bei Mädchen im Schnitt zwei Jahre früher. Wer daran das Alter misst, schätzt Mädchen zwangsläufig zu alt und Jungen zu jung — das aus der Praxis berichtete Muster stand also wörtlich in der eigenen Anweisung. Neu sind Augenlinie im Kopf, Zahnstand, Wangenfett, Nasenrücken und Kopf-Körper-Verhältnis; Reifemerkmale sind ausdrücklich als untauglich benannt, mit Begründung. **Kein Ausgleich, keine Korrekturzahl** — nur bessere Merkmale. Bei Erwachsenen gelten fehlende Falten nicht mehr als Beleg für Jugend: Bei Mimik, Make-up oder flachem Gegenlicht entscheiden Hals, Hände und Haaransatz, und die Alters-Skala ist neu geeicht (18-30 / 30-42 / 40-52 / 50-62 / 60+).
 
 - **KI-Kennzeichnung auf den drei Demo-Fotos.** Sie sind KI-generiert (`public/img/demo/LICENSE.md`) und fallen unter die seit August 2026 geltende Kennzeichnungspflicht. Sichtbar in die Pixel gebrannt („KI ERSTELLT", rechts unten), maschinenlesbar über `DigitalSourceType = trainedAlgorithmicMedia` (offizieller IPTC-Wert für vollständig algorithmisch erzeugte Bilder) und für Suchmaschinen über strukturierte Daten, alt-Texte und den Hinweis „(mit KI erstellt)" in beiden Sprachen. Bewusst kein reines CSS-Overlay: Das verschwindet, sobald jemand das Bild speichert oder weitergibt. Werkzeug: `scripts/ki-wasserzeichen.mjs`.
 
@@ -1666,14 +1689,14 @@ Audits sind.
 
 84 Analysen über 14 Fotos, drei Läufe je Bild, gegen die am 2026-08-10 geprüfte und korrigierte Wahrheitsliste:
 
-| Größe | vorher | v2.9.0 |
-|---|---|---|
-| Abweichung Kinder/Jugendliche | 0,8 J | 0,8 J |
-| Abweichung Erwachsene | −7,2 J | −6,5 J |
-| Antworten mit konkretem, zeigbarem Merkmal | 95 % | **100 %** |
-| Antworten mit Leerformel | 43 % | **38 %** |
-| Geschlecht richtig | 85,7 % | 85,7 % |
-| Parse-Fehler / abgeschnittene Antworten | 0 / 0 | 0 / 0 |
+| Größe                                      | vorher | v2.9.0    |
+| ------------------------------------------ | ------ | --------- |
+| Abweichung Kinder/Jugendliche              | 0,8 J  | 0,8 J     |
+| Abweichung Erwachsene                      | −7,2 J | −6,5 J    |
+| Antworten mit konkretem, zeigbarem Merkmal | 95 %   | **100 %** |
+| Antworten mit Leerformel                   | 43 %   | **38 %**  |
+| Geschlecht richtig                         | 85,7 % | 85,7 %    |
+| Parse-Fehler / abgeschnittene Antworten    | 0 / 0  | 0 / 0     |
 
 Der belastbare Gewinn liegt bei den **Begründungen**: statt „kindliche Gesichtszüge und glatte Haut bestätigen diese Altersspanne ohne sichtbare Pubertätsmerkmale" steht dort jetzt „deine Zähne sind bleibend, aber noch etwas groß fürs Gesicht, und die Wangen sind rund ohne sichtbare Wangenknochen". „Schultern" und „Statur" kommen in keiner Antwort mehr vor (vorher in acht). Das ist im Workshop vorlesbar und am Bild zeigbar.
 
@@ -1707,16 +1730,17 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 - **Fünf Prompt-Varianten für die Verletzlichkeits-Kopplung im gemeinsamen Aufruf**, je 84 Analysen:
 
-  | Variante | Alters-Trefferquote | Trigger getrennt | Beast-Mechanik | Marken-Überlappung |
-  |---|---|---|---|---|
-  | Live v2.7.0 | Basis | nein (100 %) | ~33 % | ~6,5 % |
-  | Werbung + Trigger | −11,9 Pp | ja (6,5 %) | 54,1 % | 40,1 % |
-  | dieselbe, gestrafft | −11,9 Pp | ja (6,7 %) | 48,6 % | 25,2 % |
-  | nur Trigger | ±0 | ja (9,1 %) | 17,6 % | 15,8 % |
-  | Trigger + Feldreihenfolge | ±0 | ja (14,8 %) | 21,3 % | 11,2 % |
-  | nur Werbung | ±0 | nein | 53,4 % | 12,5 % |
+  | Variante                  | Alters-Trefferquote | Trigger getrennt | Beast-Mechanik | Marken-Überlappung |
+  | ------------------------- | ------------------- | ---------------- | -------------- | ------------------ |
+  | Live v2.7.0               | Basis               | nein (100 %)     | ~33 %          | ~6,5 %             |
+  | Werbung + Trigger         | −11,9 Pp            | ja (6,5 %)       | 54,1 %         | 40,1 %             |
+  | dieselbe, gestrafft       | −11,9 Pp            | ja (6,7 %)       | 48,6 %         | 25,2 %             |
+  | nur Trigger               | ±0                  | ja (9,1 %)       | 17,6 %         | 15,8 %             |
+  | Trigger + Feldreihenfolge | ±0                  | ja (14,8 %)      | 21,3 %         | 11,2 %             |
+  | nur Werbung               | ±0                  | nein             | 53,4 %         | 12,5 %             |
 
   Drei Befunde: (1) Die **Mindestquote hebelt die Marken-Trennung aus** — auf „mindestens 4 Einträge mit Mechanik" antwortet das Modell mit derselben Marke plus „Abo" („Decathlon Riverside 500 Abo", obwohl Decathlon schon im Standard steht). (2) **Zielkonflikt zwischen Werbung und Triggern:** Trennt man nur die Trigger, halbiert sich die Mechanik in der Werbung — das Modell erfüllt die Ausbeutungslogik dann in den Trigger-Texten. (3) Der scheinbare **Alterseinbruch war ein Messartefakt**: Die Trefferquote ist binär (±2 Jahre bei Minderjährigen), die tatsächliche Abweichung blieb mit ±8,3 Jahren unverändert. Die Feldreihenfolge im Schema (`ad_targeting` stand vor `categories`, das Modell konnte sich also gar nicht auf die Verletzlichkeit beziehen) war ebenfalls nicht der Hebel. **Lehre: Jede zusätzliche Pflichtregel im Prompt wird woanders bezahlt.**
+
 - **Prompt um 14 % kürzen** (Werbung und Trigger komplett raus): verändert weder Grundfakten noch Textqualität. Altersabweichung ±8,3 → ±8,2 Jahre, Geschlecht 64 % → 64 %. **Alter und Geschlecht sind keine Prompt-Frage** — über sechs Messungen konstant, unbeeindruckt von jeder Änderung.
 - **Modellwechsel auf Medium 3.5** (vollständiger Lauf, identischer Prompt): 4,6-fache Kosten (19,85 € statt 4,35 € je 1.000 im Workshop), Altersabweichung nur ±7,5 statt ±8,1 Jahre, Geschlecht 66,7 statt 64,3 % — und zwei Kinderschutz-Verstöße, wo Large in 42 Analysen sauber blieb. Textqualität war besser (Hedge-Wörter 2,4 statt 7,1 %), rechtfertigt den Aufpreis aber nicht.
 - **Zweiter Aufruf auf `mistral-small-2603`:** liefert Werbesprüche statt Marken („Luxus-Vitamine", „Dein Like-Count ist dein Spiegel") und ignoriert die Anzahlvorgabe (18 statt 6-8 Einträge).
@@ -1733,7 +1757,7 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 - **Beast Mode zeigt jetzt eigene Werbung.** Bisher landete EINE Werbeliste in beiden Modi (`mistral.js`, `ad_targeting: ads`) — der Beast-Text war zynisch und ausbeutend, die Werbung darunter dieselbe brave Liste wie im Standard. Das entwertete genau den Moment, auf den das Tool didaktisch hinarbeitet. Jetzt liefert das Modell **zwei getrennte Listen**: Standard zeigt, was zum sichtbaren Lebensstil passt, Beast zeigt, was die im Beast-Profil benannte Schwachstelle ausbeutet (Abo-Fallen, Ratenzahlung, Statusprodukte über Budget, bei Kindern Sammelzwang- und Quengel-Mechaniken). **Gemessen an 84 Analysen: Marken-Überlappung zwischen den Modi 100 % → 2,8 %, Produkt-Überlappung 100 % → 0,0 %.** Beispiel (14-jähriges Mädchen): Standard „Puma × Stranger Things, Converse Run Star Hike, Spotify Premium Student" — Beast „Zalando Lounge Abo, ASOS Premier Membership, Boohoo Trend-Abo, Wish Mystery Beauty Box". (`locales/de/prompts.js`, `locales/en/prompts.js`, `mistral.js`)
 - **Die immer gleichen Marken sind weg.** Ursache war kein Zufall, sondern der Prompt selbst: Er nannte neun Beispielmarken an vier Stellen, inklusive einer fertig ausgefüllten Liste im JSON-Schema. Mistral folgt Beispielen, nicht Regeln — bei einem Radsport-Foto kamen **alle acht** Marken aus der Beispielliste zurück (Garmin Edge 1040, Rapha, Specialized, Komoot, Wahoo, Red Bull, Ortlieb). Die Beispiele sind jetzt **ersatzlos entfernt** (nur noch Format-Platzhalter wie `‹Marke› ‹Modelllinie›`). **Gemessen: Anteil Werbe-Einträge aus den Prompt-Beispielen 7,5 % → 0,9 %, verschiedene Marken über alle Fotos 95 → 270, Top-3-Konzentration 11,9 % → 6,2 %.** Dasselbe Foto liefert jetzt Evoc, Schwalbe, Tubolito, Lezyne, Deuter, Vaude, Endura, Crankbrothers.
-  - **Warum das diesmal funktioniert:** Der Vielfalt-Umbau vom 29.05. (v2.3.0-Kandidat) hatte Beispielmarken durch *andere* Beispielmarken ersetzt und war durchgefallen — „nintendo switch" wurde einfach zum neuen Anker. Der Unterschied jetzt: gar kein Beispiel mehr zum Abschreiben, plus eine rotierende Sperrliste.
+  - **Warum das diesmal funktioniert:** Der Vielfalt-Umbau vom 29.05. (v2.3.0-Kandidat) hatte Beispielmarken durch _andere_ Beispielmarken ersetzt und war durchgefallen — „nintendo switch" wurde einfach zum neuen Anker. Der Unterschied jetzt: gar kein Beispiel mehr zum Abschreiben, plus eine rotierende Sperrliste.
 - **Rotierende Marken-Sperre** (`BRAND_BLOCKLIST_SETS`, 6 Sets). Sie sitzt bewusst **hinter dem Bild in der user-Message** — dort war nie Cache, die Rotation kostet damit **keinen einzigen Prompt-Cache-Treffer**. Läge sie im `system`-Teil, wechselte der statische Anfang pro Analyse und die Trefferquote fiele auf 0 (die v2.5-Messung ist im Code dokumentiert). Ein Test prüft genau das: gleicher `system`-Inhalt über verschiedene Sperrlisten hinweg. Sichtbare Marken im Foto schlagen die Sperre ausdrücklich. Gemessen: 0 Sperrlisten-Verstöße in 42 Läufen.
 
 ### Behoben
@@ -1745,7 +1769,7 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 - **Mehrverbrauch:** Eingabe +8,8 %, Ausgabe +7,1 % pro Analyse. Die Eingabe ist zwischenspeicherbar, die Ausgabe nicht — überschlägig **rund 1 bis 1,50 € mehr pro 1.000 Analysen**. Keine abgeschnittenen Antworten in 42 Läufen, `MAX_TOKENS` bleibt bei 8000.
 - **Qualität gehalten:** Konkretheit der Marken 97,6 % → 100 %, Geschlechtstreffer unverändert 64,3 %, Alterstreffer 35,7 % → 33,3 % (ein Treffer von 42 = Rauschen). 0 Parse-Fehler, 0 Transport-Fehler.
-- **Was die Messung NICHT belegt:** Ob sich bei vielen *ähnlichen* Fotos (echte Schulklasse) weniger wiederholt. Die 14 Testbilder sind maximal verschieden; dort liegt die Marken-Überlappung zwischen Fotos bei beiden Varianten unter 6 %. Genau diese Einschränkung war schon die Lehre aus dem Test vom 29.05. Belegt ist das Ende des Abschreibens aus dem Prompt und die dreifache Markenvielfalt.
+- **Was die Messung NICHT belegt:** Ob sich bei vielen _ähnlichen_ Fotos (echte Schulklasse) weniger wiederholt. Die 14 Testbilder sind maximal verschieden; dort liegt die Marken-Überlappung zwischen Fotos bei beiden Varianten unter 6 %. Genau diese Einschränkung war schon die Lehre aus dem Test vom 29.05. Belegt ist das Ende des Abschreibens aus dem Prompt und die dreifache Markenvielfalt.
 - **Der 3-Call-Fallback-Pfad** (`useSingleLargeCall = false`) liefert weiterhin eine gemeinsame Werbeliste für beide Modi. Er ist Rückfall, nicht aktiver Pfad — bewusst nicht mitgeändert.
 
 ## [2.6.0] — 2026-08-09
@@ -1788,13 +1812,14 @@ Kostensenkung im Live-Pfad: Prompt-Caching bei Mistral, gemessen statt geschätz
 - **Prompt-Caching bei Mistral, hinter dem Flag `usePromptCache` (Standard: aus).** Der statische Anweisungstext macht ~9.500 der ~11.200 Eingabe-Tokens jeder Analyse aus und wurde bisher bei jedem Upload voll bezahlt. Mit gesetztem `prompt_cache_key` berechnet Mistral ihn wieder und kostet dafür nur 10 % des Eingabepreises. **Gemessen unter Produktionsmuster** (20 Anfragen, Parallelität 10, ohne Pause, wechselnde Bilder): **76,4 % aller Eingabe-Tokens aus dem Cache**, Median pro Anfrage 99,8 %, 16 von 20 Anfragen mit klarem Treffer. Das entspricht ~8,10 € → ~4,80 € pro 1000 Analysen. (`functions/src/mistral.js`, `functions/src/feature-flags.js`, `functions/src/handle-process-job.js`)
   - **Der Nachrichten-Aufbau musste dafür umgestellt werden — das ist der eigentliche Kern der Änderung.** An der echten API gemessen, mit wechselnden Bildern:
 
-    | Aufbau | Cache-Treffer |
-    | --- | --- |
-    | `user[ text, bild ]` (Stand bis v2.4) | **0 %** |
-    | `system(text)` + `user[ bild ]` | **82–100 %** |
-    | `user[ text ]` + `user[ bild ]` | **0 %** |
+    | Aufbau                                | Cache-Treffer |
+    | ------------------------------------- | ------------- |
+    | `user[ text, bild ]` (Stand bis v2.4) | **0 %**       |
+    | `system(text)` + `user[ bild ]`       | **82–100 %**  |
+    | `user[ text ]` + `user[ bild ]`       | **0 %**       |
 
     Mistral cacht einen multimodalen `content`-Array offenbar nur als Ganzes; da das Bild pro Anfrage wechselt, fällt der komplette Präfix aus dem Cache. Blosses Auftrennen genügt nicht — der Rollenwechsel nach `system` ist die Bedingung. Der Parameter allein hätte **nichts** gebracht.
+
   - **Qualitätsgegenprobe vor der Umstellung:** drei Demo-Fotos, volle Analysen, beide Aufbauten. Identische `hard_facts` (22/28/22 Jahre, gleiche Spannen und Geschlechter), 0 fehlende Karten in beiden Modi, vergleichbare Ausgabelänge. Die Umstellung verändert die Profile nicht.
   - **Trefferquote ist anbieterseitig nicht garantiert** („erhöht die Chance, garantiert sie nicht", Mistral-Doku). Einzelaufrufe mit Pause treffen unzuverlässig (0–9 %); erst Dauerlast hält den Cache warm. Für den Workshop-Betrieb ist das der Normalfall, für vereinzelte Uploads nicht. Ein Fehlschlag kostet exakt den bisherigen Preis — die Maßnahme kann nicht teurer werden als der Ist-Zustand.
   - **Erfolgskontrolle im Protokoll:** `cachedTokens` steht jetzt in jeder `mistral-single-large`-Zeile. Nach dem ersten Workshop lässt sich die reale Ersparnis damit belegen statt schätzen.
@@ -1866,12 +1891,12 @@ Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft.
     - `test-exclude` auf `^7.0.1` übersteuert (6.0.0 → 7.0.2, dev) — 6.x hing an `minimatch@3` → `brace-expansion@1`. **Rückbau, sobald `babel-plugin-istanbul` in der installierten `jest`-Version `test-exclude` ≥ 7 anfordert.**
     - Die verbleibende Instanz unter `eslint` (`minimatch@10.2.5` → `brace-expansion@5.0.7`) brauchte keine Übersteuerung — 5.0.8 liegt in deren erlaubtem Bereich.
   - **Produktiv-Oberfläche bewusst unangetastet:** `firebase-functions` (7.2.5), `firebase-admin` (14.1.0), `express` (4.22.2), `google-gax` (5.0.7) und die `@google-cloud/*`-Pakete bleiben exakt auf dem Live-Stand. Ein vollständiger Lockfile-Neuaufbau hätte nebenbei `firebase-functions` 7.3.2 und damit **Express 4 → 5** in den Produktiv-Backend gezogen — eine Verhaltensänderung, die in einen bewusst freigegebenen eigenen Schritt gehört und nicht als Nebenwirkung hier hinein. Stattdessen minimal-invasiv: `npm install` gegen das bestehende Lockfile (ändert nur, was die Übersteuerungen erzwingen) plus gezielte Handkorrektur der drei Versionseinträge.
-  - **macOS-Lockfile-Falle erneut bestätigt und diesmal sauber umschifft:** `npm audit fix`, `npm update --package-lock-only` *und* `npm install` schneiden auf macOS die optionalen Einträge `@emnapi/core`, `@emnapi/runtime` und `@pkgjs/parseargs` aus dem Lockfile — die Linux-CI bricht daraufhin mit `npm ci`-EUSAGE ab (genau so geschehen im ersten Anlauf dieses Zweigs). Die Einträge wurden nach dem Eingriff gezielt zurückgeschrieben. **Verlässliche Vorabprüfung ist `npm ci --dry-run`** — reproduziert den CI-Fehler lokal; eine Textsuche nach „linux" im Lockfile tut das nicht (die betroffenen Pakete tragen kein „linux" im Namen). (`package.json`, `functions/package.json`, beide Lockfiles)
+  - **macOS-Lockfile-Falle erneut bestätigt und diesmal sauber umschifft:** `npm audit fix`, `npm update --package-lock-only` _und_ `npm install` schneiden auf macOS die optionalen Einträge `@emnapi/core`, `@emnapi/runtime` und `@pkgjs/parseargs` aus dem Lockfile — die Linux-CI bricht daraufhin mit `npm ci`-EUSAGE ab (genau so geschehen im ersten Anlauf dieses Zweigs). Die Einträge wurden nach dem Eingriff gezielt zurückgeschrieben. **Verlässliche Vorabprüfung ist `npm ci --dry-run`** — reproduziert den CI-Fehler lokal; eine Textsuche nach „linux" im Lockfile tut das nicht (die betroffenen Pakete tragen kein „linux" im Namen). (`package.json`, `functions/package.json`, beide Lockfiles)
 
 ### Geändert
 
 - **Audit-Gate mit begründeter, ablaufender Ausnahmeliste** (`scripts/audit-gate.mjs` + `.github/audit-allowlist.json`) ersetzt das nackte `npm audit --omit=dev --audit-level=high` im CI-Job `test-backend`. Grund: Das alte Gate war ein Alles-oder-nichts-Schalter — erschien irgendwo tief in einer fremden Abhängigkeitskette ein High-Advisory ohne verfügbare Reparatur, blockierte es **jeden** PR. Genau daran sind am 2026-07-01 alle acht Dependabot-PRs gescheitert (#30–#37, alle an `test-backend`), die deshalb von Hand weggeräumt werden mussten. Neu: High/Critical blockieren weiterhin, eine Ausnahme braucht Begründung **und** Ablaufdatum, danach fällt das Gate von selbst wieder auf rot; ein neues Advisory ist nie automatisch ausgenommen. Das Gate fasst außerdem Ketten korrekt zusammen (6 npm-Meldungen = 1 echte Lücke). Verhalten in allen vier Fällen gemessen: ungedeckt → rot, abgelaufen → rot, gedeckt → grün, verwaist → Hinweis.
-  - **Die Ausnahmeliste ist leer und soll es bleiben.** Sie ist das Ventil für den Fall, dass eine Fremd-Lücke wirklich weder reparierbar noch übersteuerbar ist — nicht der bequeme Weg. Der aktuelle Fall (`brace-expansion`) wurde bewusst *gelöst* statt eingetragen.
+  - **Die Ausnahmeliste ist leer und soll es bleiben.** Sie ist das Ventil für den Fall, dass eine Fremd-Lücke wirklich weder reparierbar noch übersteuerbar ist — nicht der bequeme Weg. Der aktuelle Fall (`brace-expansion`) wurde bewusst _gelöst_ statt eingetragen.
 - **Playwright-Container-Tag kommt jetzt aus dem Lockfile** (neuer CI-Job `playwright-version`, `test-e2e` hängt daran). Vorher stand die Version an zwei Stellen (`package.json` und Image-Tag in `ci.yml`) und musste von Hand synchron gehalten werden — jedes Dependabot-Playwright-Update musste dadurch zwangsläufig scheitern. Von Hand zu pflegen bleibt nur noch der Basis-Name `-jammy`. Ergibt heute unverändert `v1.61.1-jammy`. (`.github/workflows/ci.yml`)
 - **Dependabot bündelt Updates je Bereich zu einem PR** statt einen pro Paket (`applies-to: version-updates`, nur `minor` + `patch`). Am 2026-07-01 waren es acht einzelne PRs — gebündelt wären es drei gewesen, die mit dem bestehenden Auto-Merge ohne Zutun durchlaufen. Major-Updates bleiben bewusst einzeln, weil sie ohnehin eine manuelle Freigabe brauchen und in einem Sammel-PR untergehen würden. (`.github/dependabot.yml`)
 - **Dependabot Security-Updates aktiviert** (Repo-Einstellung, war aus). Bisher meldete Dependabot eine Lücke nur per Mail, ohne einen Reparatur-PR zu öffnen — Nörgeln statt Reparieren, jede Lücke musste von Hand gehoben werden. Security-PRs sind zusätzlich je Bereich gebündelt.
@@ -2240,7 +2265,7 @@ rund 12 %, Job-Latenz um rund 17 %.
 - **Werbemarken und Manipulations-Trigger sind in beiden Modi identisch:** Die zwei Listen werden jetzt nur einmal vom Large-Modell generiert (im selben Footer-Block) und dann modus-übergreifend übernommen. Vorher generierte jeder Profile-Call seine eigene Marken-/Trigger-Liste, was inhaltliche Widersprüche zwischen Modi erzeugte — was nicht die Realität echter Datenbroker abbildet (Algorithmen sehen dich gleich, egal mit welchem Tonfall sie es dir erklären).
 - **Beast-Profil bricht nicht mehr mitten im JSON ab:** Mistral hatte sich im Beast-Modus gelegentlich selbst entschieden, früh aufzuhören — `finishReason: "stop"` bei nur 7 von 13 gelieferten Karten und ohne Verdict-Text. Drei Maßnahmen zusammen lösen das: (1) Antwort-Budget pro Profile-Call von 8.000 auf 16.000 Tokens erhöht (Sicherheitsdeckel, kostenneutral), (2) Im JSON-Output kommt der Verdict-Text jetzt zuerst, dann die Karten — falls Mistral doch früh stoppt, ist wenigstens der Verdict da, (3) Server-seitige Vollständigkeitsprüfung: liefert Mistral weniger als 13 Karten, wird automatisch ein gezielter Retry-Call ausgelöst, der die fehlenden Felder explizit anfordert.
 - **Profil-Karte „Werbeprofil" fehlt nicht mehr im Standard-Modus:** Mistral hatte die letzte Karte gelegentlich weggelassen, vermutlich weil sie ganz am Ende des Schemas stand. Mit der Vollständigkeitsprüfung (siehe oben) und der neuen JSON-Reihenfolge gibt das System keine unvollständigen Profile mehr aus.
-- **Bei „im Bild nicht eindeutig erkennbar"-Fällen wird jetzt eine kurze Begründung mitgeliefert** statt abrupt zu enden. Vorher war „Im Bild nicht erkennbar." ein hartes Ende, das den Lesefluss zerriss; jetzt steht z. B. „Im Bild keine klaren Signale — weder Ehering noch Begleitung sichtbar." Der Workshop-Teilnehmer versteht, *warum* keine Aussage möglich ist.
+- **Bei „im Bild nicht eindeutig erkennbar"-Fällen wird jetzt eine kurze Begründung mitgeliefert** statt abrupt zu enden. Vorher war „Im Bild nicht erkennbar." ein hartes Ende, das den Lesefluss zerriss; jetzt steht z. B. „Im Bild keine klaren Signale — weder Ehering noch Begleitung sichtbar." Der Workshop-Teilnehmer versteht, _warum_ keine Aussage möglich ist.
 
 ### Geändert
 

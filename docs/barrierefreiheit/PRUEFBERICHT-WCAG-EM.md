@@ -221,6 +221,40 @@ Regel: Wer eine hinzufügt, muss den Grund danebenschreiben, und der steht dann 
 Male auftritt; findet ein Werkzeug nichts zu prüfen, bricht der Lauf ab statt grün zu
 melden.
 
+### 4.1.1 Zweitmeinung: Ergebnis vom 18. August 2026
+
+Gegen die **Live**-Seite gefahren, drei Ansichten, Regelwerk WCAG2AA:
+
+```
+npx pa11y@9 --standard WCAG2AA --reporter json https://malzi.me/
+```
+
+| Ansicht             | Meldungen | Bewertung              |
+| ------------------- | --------- | ---------------------- |
+| `/`                 | 1         | Fehlalarm, entschieden |
+| `/barrierefreiheit` | 1         | Fehlalarm, entschieden |
+| `/datenschutz`      | 1         | Fehlalarm, entschieden |
+
+**Alle drei sind dieselbe Meldung:** der aktive Knopf des Sprachumschalters, angeblich
+unter dem verlangten Kontrast. Entschieden durch Bildpunkt-Messung an der Live-Seite:
+**6,63:1** — deutlich über den verlangten 4,5:1.
+
+**Warum das Werkzeug hier irrt, und warum das keine Kleinigkeit ist:** Der Knopf hat selbst
+`background-color: rgba(0, 0, 0, 0)`, der sichtbare Grund kommt von einem umgebenden
+Element. HTML_CodeSniffer rechnet aus den Stilangaben statt aus dem Bild und liest weißen
+Text auf durchsichtigem Grund — rechnerisch 1:1. Die Bildpunkt-Messung sieht, was auf dem
+Schirm steht.
+
+Genau deshalb steht hier eine Zweitmeinung und kein zweites Gate: Ein unabhängiges
+Regelwerk findet, was das erste übersieht, aber es entscheidet nichts allein. Entschieden
+wird an den Bildpunkten.
+
+**Warum sie nicht bei jeder Auslieferung mitläuft:** Das würde pa11y als Projekt-Abhängigkeit
+bedeuten. Dieses Projekt hat eine dokumentierte Falle beim Nachziehen der Paketliste
+(plattformabhängige Einträge fallen weg, die Pipeline bricht). Der Nutzen einer
+Zweitmeinung liegt ohnehin im periodischen Abgleich, nicht in der Wiederholung bei jedem
+Deploy. Sie wird bei jeder Neuauflage dieses Berichts gefahren; der Befehl steht oben.
+
 ### 4.2 Ergebnis je Erfolgskriterium
 
 Die vollständige Tabelle aller 55 Kriterien der Stufe AA — 31 auf A, 24 auf AA — mit

@@ -30,6 +30,19 @@ automatische Prüfung hatte sie gezeigt.
 
 ### Behoben — Barrierefreiheit
 
+- **Die Beispielbilder sagten ihren Ort zweimal.** Der Name des Knopfes setzte
+  sich aus dem Alternativtext des Bildes _und_ der sichtbaren Bildunterschrift
+  zusammen — ein Screenreader las „Mit KI erstelltes Beispielbild: Selfie am
+  Stephansplatz. Zeigt keine reale Person. Selfie am Stephansplatz". Die
+  Bildunterschrift ist jetzt als Zierde ausgezeichnet; sichtbar bleibt sie
+  unverändert.
+
+  Kein Verstoß gegen ein Erfolgskriterium — kein Kriterium verbietet
+  Wiederholung. Aber es ist genau die Sorte Doppelung, die das Zuhören mühsam
+  macht. Gefunden, weil erstmals ausgelesen wurde, was ein Screenreader an
+  jeder Stelle tatsächlich vorfindet, statt nur zu prüfen, _dass_ ein Name da
+  ist.
+
 - **Das Info-Zeichen neben den beiden Profil-Modi war zu blass.** Es stand auf
   55 % Deckkraft: gemessen 2,18 : 1, verlangt sind 4,5 : 1 für den Buchstaben
   und 3 : 1 für den Kreisrand eines Bedienelements. Beim Überfahren mit der Maus

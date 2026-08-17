@@ -152,9 +152,9 @@ describe("Fehler-Nachsendung", () => {
   it("DATENSCHUTZ: die Fehlererfassung legt NICHTS im Browser ab", async () => {
     /* Die Datenschutzerklaerung zaehlt abschliessend auf, was in sessionStorage
        und localStorage liegt. Diese Funktion darf diese Liste nicht erweitern —
-       der Rechtstext ist die Vorgabe, nicht der Code. Ein erster Entwurf legte
-       misslungene Meldungen in den sessionStorage; dieser Test haelt fest, dass
-       das nicht zurueckkommt. */
+       der Rechtstext ist die Vorgabe, nicht der Code. Der naheliegende
+       „Verbesserungsvorschlag", die Warteschlange haltbar zu machen, scheitert
+       genau hier. */
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Load failed"));
 
     logClientError(new Error("darf_nirgends_landen"), { phase: "queue-network" });

@@ -88,9 +88,7 @@ async function seiteVorbereiten(page, { merkmal = true, jobHaengt = false } = {}
 /** Lässt die Seite zwei Bildschirmrahmen weiterlaufen — danach hat der
     Antwort-Empfänger von /api/stats sicher gearbeitet. */
 async function settle(page) {
-  await page.evaluate(
-    () => new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(fertig)))
-  );
+  await page.evaluate(() => new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(fertig))));
 }
 
 /** Wartet, bis der Umschalter da ist (er entsteht erst nach /api/stats). */
@@ -109,12 +107,11 @@ async function profilErzeugen(page) {
     an Elementen, die dem Umschalter gar nicht gehoeren). Mit Zeitdeckel,
     damit eine endlose Animation den Lauf nicht anhaelt. */
 async function ruhe(page) {
-  await page.evaluate(
-    () =>
-      Promise.race([
-        Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))),
-        new Promise((fertig) => setTimeout(fertig, 1000)),
-      ])
+  await page.evaluate(() =>
+    Promise.race([
+      Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))),
+      new Promise((fertig) => setTimeout(fertig, 1000)),
+    ])
   );
   /* WebKit meldet laufende CSS-Übergänge über getAnimations() NICHT — dort
      misst axe sonst mitten im Themenwechsel und findet Schein-Kontraste an
@@ -199,9 +196,7 @@ test("Positivkontrolle: mit Flag entsteht er sehr wohl", async ({ page }) => {
   await expect(page.locator(".sw-grund")).toHaveCount(2);
 });
 
-test("die Adress-Tür ist entfernt — das Anhängsel wirkt nicht mehr (v3.3.1)", async ({
-  page,
-}) => {
+test("die Adress-Tür ist entfernt — das Anhängsel wirkt nicht mehr (v3.3.1)", async ({ page }) => {
   /* Bis v3.3.0 blendete `?sprachumschalter=1` den Schalter auch ohne Flag ein
      und hinterliess dafuer eine Spur im localStorage. Der Umschalter ist seit
      v3.3.0 live, die Tuer also ueberfluessig — und ihre Spur widersprach der
@@ -267,9 +262,7 @@ test("leer: Wechsel ohne Rückfrage, Seite wird englisch", async ({ page }) => {
   await expect(page.locator('[data-demo="selfie"] img')).toHaveAttribute("src", /-en\.jpg/);
 });
 
-test("Profil fertig: Rückfrage in der AKTUELLEN Sprache, Abbrechen ändert nichts", async ({
-  page,
-}) => {
+test("Profil fertig: Rückfrage in der AKTUELLEN Sprache, Abbrechen ändert nichts", async ({ page }) => {
   await seiteVorbereiten(page);
   await page.goto("/");
   await warteAufSchalter(page);
@@ -373,9 +366,7 @@ async function trefferflaeche(page, waehler) {
   }, waehler);
 }
 
-test("Ziel-Größen erreichen 44 px — tastbar, ohne dass der Schalter aufgeblasen wird", async ({
-  page,
-}) => {
+test("Ziel-Größen erreichen 44 px — tastbar, ohne dass der Schalter aufgeblasen wird", async ({ page }) => {
   await seiteVorbereiten(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -422,18 +413,11 @@ test("Kontrast der gefüllten Flächen reicht in hell UND dunkel", async ({ page
 
   await page.click('.sprach-knopf[data-lang="en"]');
   await expect(page.locator('.sw-grund[data-modal="fertig"]')).toBeVisible();
-  const knopf = await page.evaluate(
-    kontrastImBrowser,
-    '.sw-grund[data-modal="fertig"] .sw-knopf--bleiben'
-  );
-  expect(knopf, `Kontrast Hauptknopf im Beast-Modus: ${knopf.toFixed(2)}`).toBeGreaterThanOrEqual(
-    4.5
-  );
+  const knopf = await page.evaluate(kontrastImBrowser, '.sw-grund[data-modal="fertig"] .sw-knopf--bleiben');
+  expect(knopf, `Kontrast Hauptknopf im Beast-Modus: ${knopf.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
 });
 
-test("axe über die ganze Matrix: 2 Sprachen × 2 Themen, Rückfrage offen und zu", async ({
-  page,
-}) => {
+test("axe über die ganze Matrix: 2 Sprachen × 2 Themen, Rückfrage offen und zu", async ({ page }) => {
   await seiteVorbereiten(page);
   await page.goto("/");
   await warteAufSchalter(page);
@@ -473,8 +457,32 @@ test.describe("Startsprache folgt dem Gerät", () => {
     /* Und die Rückfrage erscheint dann folgerichtig auf Englisch. */
     await profilErzeugen(page);
     await page.click('.sprach-knopf[data-lang="de"]');
-    await expect(page.locator('.sw-grund[data-modal="fertig"] .sw-knopf--bleiben')).toHaveText(
-      "Cancel"
-    );
+    await expect(page.locator('.sw-grund[data-modal="fertig"] .sw-knopf--bleiben')).toHaveText("Cancel");
   });
+});
+
+test("die Sprache reist in einen neuen Tab mit (v3.3.1)", async ({ page }) => {
+  /* Die Wahl liegt im sessionStorage — bewusst pro Tab. Ein mit
+     target="_blank" geoeffneter Tab bekommt einen LEEREN sessionStorage, und
+     alle sechs Links der Startseite oeffnen einen neuen Tab. Ohne Anhaengsel
+     landete man von der englischen Startseite ueberall wieder auf Deutsch. */
+  await seiteVorbereiten(page, { merkmal: true });
+  await page.goto("/");
+  await warteAufSchalter(page);
+
+  /* Vorher: deutsch, also traegt der Link auch deutsch. */
+  await expect(page.locator('a[href^="/stats"]').first()).toHaveAttribute("href", /lang=de/);
+
+  await page.click('.sprach-knopf[data-lang="en"]');
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+  /* Nachher: englisch — und zwar an ALLEN Links in einen neuen Tab. */
+  const ziele = await page.$$eval('a[target="_blank"][href^="/"]', (as) => as.map((a) => a.getAttribute("href")));
+  expect(ziele.length).toBeGreaterThan(0);
+  for (const z of ziele) expect(z).toContain("lang=en");
+
+  /* Und die Probe aufs Exempel: Der neue Tab startet wirklich englisch. */
+  const stats = ziele.find((z) => z.startsWith("/stats"));
+  await page.goto(stats.replace("/stats", "/stats.html"));
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });

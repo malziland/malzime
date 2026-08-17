@@ -22,13 +22,14 @@
  *
  * ── Warum die Warteschlange NUR im Arbeitsspeicher liegt ──
  *
- * Eine erste Fassung legte misslungene Meldungen in den `sessionStorage`. Das
- * war der falsche Weg: Die Datenschutzerklaerung zaehlt abschliessend auf, was
- * dort liegt — ein sechster Eintrag haette bedeutet, den Rechtstext an eine
- * Funktion anzupassen. Die Reihenfolge ist umgekehrt: Der Rechtstext ist die
- * Vorgabe, der Code richtet sich danach.
+ * NICHT im `sessionStorage` und nicht im `localStorage`. Die
+ * Datenschutzerklaerung zaehlt abschliessend auf, was im Browser abgelegt wird;
+ * ein weiterer Eintrag hiesse, den Rechtstext an eine Funktion anzupassen. Die
+ * Reihenfolge ist umgekehrt — der Rechtstext ist die Vorgabe, der Code richtet
+ * sich danach. Wer diese Warteschlange „haltbarer" machen will, aendert also
+ * zuerst nichts hier.
  *
- * Deshalb lebt die Warteschlange als einfaches Array im Modul. Sie hinterlaesst
+ * Sie lebt deshalb als einfaches Array im Modul. Sie hinterlaesst
  * NICHTS im Browser, ueberdauert kein Neuladen und braucht keine Zeile in der
  * Datenschutzerklaerung — der Seite steht ohnehin frei, waehrend ihrer Laufzeit
  * Daten im Arbeitsspeicher zu halten (das Profil selbst liegt genauso dort).

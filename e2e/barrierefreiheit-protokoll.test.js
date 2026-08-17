@@ -122,6 +122,140 @@ async function endpunkteStellen(page, { jobStatus = { status: "done", result: PR
   await page.route("**/tile.openstreetmap.org/**", (r) => r.fulfill({ status: 200, body: "" }));
 }
 
+/* ── Abstentionen aufloesen ────────────────────────────────────────────────
+   axe meldet Kontrast als "unpruefbar", wenn es den Hintergrund nicht
+   bestimmen kann — Verlauf, Bild, ueberlappende Schichten, Halbtransparenz.
+   Das ist KEIN Bestehen. In der ersten Fassung des Protokolls wurden nur die
+   Verstoesse gezaehlt und daraus "0 Verstoesse" gemacht, waehrend 6 bis 13
+   Abstentionen je Seite unbeantwortet liegen blieben. Der unabhaengige
+   Zweitpruefer meldete genau dort einen Fehler.
+
+   Hier entscheidet die Messung statt der Vermutung: Das Element wird
+   fotografiert, das Foto in eine Leinwand gelegt und Bildpunkt fuer Bildpunkt
+   ausgelesen. Hellster und dunkelster Punkt sind Hintergrund und Schrift; ihr
+   Verhaeltnis ist der Kontrast nach der Formel der WCAG. Antialiasing erzeugt
+   Zwischentoene, die zwischen beiden liegen und das Ergebnis nicht verfaelschen
+   koennen. */
+function leuchtdichte(r, g, b) {
+  const k = [r, g, b].map((v) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * k[0] + 0.7152 * k[1] + 0.0722 * k[2];
+}
+
+async function kontrastAusBildpunkten(page, waehler) {
+  const el = page.locator(waehler).first();
+  if (!(await el.count())) return null;
+  if (!(await el.isVisible().catch(() => false))) return null;
+
+  let png;
+  try {
+    png = await el.screenshot({ timeout: 5000 });
+  } catch {
+    return null; /* Element nicht fotografierbar (0 Pixel, ausserhalb) */
+  }
+
+  /* Das Foto zurueck in die Seite geben und dort auslesen — so braucht die
+     Messung keine zusaetzliche Bibliothek zum Entpacken von PNG. */
+  const punkte = await page.evaluate(async (b64) => {
+    const bild = new Image();
+    bild.src = "data:image/png;base64," + b64;
+    await bild.decode();
+    const c = document.createElement("canvas");
+    c.width = bild.naturalWidth;
+    c.height = bild.naturalHeight;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(bild, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height).data;
+    const raus = [];
+    for (let i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 250) continue; /* halbtransparente Punkte taugen nicht */
+      raus.push([d[i], d[i + 1], d[i + 2]]);
+    }
+    return raus;
+  }, png.toString("base64"));
+
+  if (punkte.length < 4) return null;
+
+  let hell = -1;
+  let dunkel = 2;
+  for (const [r, g, b] of punkte) {
+    const l = leuchtdichte(r, g, b);
+    if (l > hell) hell = l;
+    if (l < dunkel) dunkel = l;
+  }
+  return Number(((hell + 0.05) / (dunkel + 0.05)).toFixed(2));
+}
+
+/* Schriftgroesse und -staerke entscheiden, welche Schwelle gilt: 3:1 fuer
+   grossen Text (ab 24 px, oder ab 18.66 px fett), sonst 4.5:1. */
+async function schwelleFuer(page, waehler) {
+  return page
+    .locator(waehler)
+    .first()
+    .evaluate((n) => {
+      const s = getComputedStyle(n);
+      const px = parseFloat(s.fontSize);
+      const fett = parseInt(s.fontWeight, 10) >= 700;
+      return (fett && px >= 18.66) || px >= 24 ? 3 : 4.5;
+    })
+    .catch(() => 4.5);
+}
+
+/* Benannte Ausnahmen — jede mit Grund, jede einzeln. Bewusst eine Liste im
+   Quelltext und keine stille Regel wie "alles mit aria-hidden ueberspringen":
+   Wer hier etwas eintraegt, muss eine Begruendung danebenschreiben, und die
+   steht dann im Diff. Eine unsichtbare Sammelausnahme waere genau der
+   Mechanismus, mit dem ein Protokoll unbemerkt wertlos wird. */
+const KONTRAST_AUSNAHMEN = [
+  {
+    passt: (waehler) => waehler.includes(".footer-sep"),
+    grund:
+      "Der Mittelpunkt zwischen den Fusszeilen-Links ist reine Zierde: Er traegt keine " +
+      "Information — die Links sind eigene Elemente und ohne ihn genauso getrennt — und " +
+      "hat keine Funktion. WCAG 1.4.3 nimmt reine Zierde ausdruecklich aus. Im Markup " +
+      'als aria-hidden="true" ausgewiesen, damit die Ausnahme dort steht, wo sie gilt, ' +
+      "und damit Screenreader nicht zwischen jedem Link einen Punkt vorlesen.",
+  },
+];
+
+async function abstentionenAufloesen(page, incomplete) {
+  const offen = [];
+  for (const regel of incomplete) {
+    if (regel.id !== "color-contrast") {
+      /* Andere Abstentionen sind selten und brauchen ein Augenpaar — sie
+         werden benannt, nicht weggerechnet. */
+      offen.push({ regel: regel.id, elemente: regel.nodes.length, aufloesung: "Handpruefung noetig" });
+      continue;
+    }
+    for (const knoten of regel.nodes) {
+      const waehler = knoten.target.join(" ");
+      const ausnahme = KONTRAST_AUSNAHMEN.find((a) => a.passt(waehler));
+      if (ausnahme) {
+        offen.push({ regel: regel.id, element: waehler, aufloesung: "Ausnahme: " + ausnahme.grund });
+        continue;
+      }
+      const gemessen = await kontrastAusBildpunkten(page, waehler);
+      if (gemessen == null) {
+        offen.push({ regel: regel.id, element: waehler, aufloesung: "nicht messbar" });
+        continue;
+      }
+      const schwelle = await schwelleFuer(page, waehler);
+      if (gemessen + 0.01 < schwelle) {
+        offen.push({
+          regel: regel.id,
+          element: waehler,
+          gemessen,
+          verlangt: schwelle,
+          aufloesung: "VERSTOSS, durch Bildpunkt-Messung bestaetigt",
+        });
+      }
+    }
+  }
+  return offen;
+}
+
 /**
  * Misst EINEN Zustand und legt das Ergebnis ab.
  *
@@ -160,6 +294,8 @@ async function messen(page, bildschirm, zustand) {
     zustand,
     geprueft: lauf1.passes.length,
     unpruefbar: lauf1.incomplete.map((v) => ({ regel: v.id, elemente: v.nodes.length })),
+    /* Jede Abstention einzeln aufgeloest — leer heisst: alle geklaert. */
+    abstentionOffen: await abstentionenAufloesen(page, lauf1.incomplete),
     wackelig: wackelig.map((v) => ({ regel: v.id, anzahl: v.nodes.length })),
     verstoesse: stabil.map((v) => ({
       regel: v.id,
@@ -175,6 +311,10 @@ async function messen(page, bildschirm, zustand) {
      "keine Verstoesse". Ohne diese Zeile waere ein kaputter Lauf ein
      Musterprotokoll. */
   expect(eintrag.geprueft, `axe hat auf ${bildschirm}/${zustand} nichts geprueft`).toBeGreaterThan(0);
+  /* Eine Abstention, die sich als Verstoss herausstellt, ist ein Verstoss —
+     und muss den Lauf rot machen, sonst haette der Auflöser keine Wirkung. */
+  const bestaetigt = eintrag.abstentionOffen.filter((a) => a.aufloesung.startsWith("VERSTOSS"));
+  expect(bestaetigt, `Kontrast zu schwach auf ${bildschirm}/${zustand}: ${JSON.stringify(bestaetigt)}`).toEqual([]);
   befunde.push(eintrag);
   return eintrag;
 }
@@ -608,6 +748,90 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
     await messen(page, "Profil", "Beast, Umschalter geklebt");
 
     await umbruchMessen(page, "Profil");
+  });
+
+  /* WCAG-EM Schritt 3.3 verlangt VOLLSTAENDIGE Prozesse, nicht Einzelzustaende.
+     Diese drei Schritte der Analyse fehlten: Bildvorbereitung, Realitaets-Check
+     und PDF-Export. Ein Prozess gilt erst als geprueft, wenn alle Schritte es
+     sind. */
+  /* RUECKBAUPROBE fuer den Auflöser selbst. Ein Pruefmittel, das nicht rot
+     werden kann, belegt nichts. Hier wird absichtlich zu schwacher Kontrast
+     erzeugt und gemessen — findet die Bildpunkt-Messung ihn nicht, ist sie
+     kaputt, nicht die Seite. */
+  test("Rueckbauprobe: die Bildpunkt-Messung erkennt zu schwachen Kontrast", async ({ page }) => {
+    await endpunkteStellen(page);
+    await page.goto("/");
+    await page.evaluate(() => {
+      const d = document.createElement("p");
+      d.id = "kontrast-probe";
+      d.textContent = "Absichtlich zu blass";
+      /* 4.06:1 auf Weiss — deutlich unter den verlangten 4.5:1, aber nah genug,
+         dass nur eine echte Messung den Unterschied sieht. */
+      d.style.cssText = "color:#8a8a8a;background:#ffffff;font-size:16px;padding:8px;position:relative;z-index:9999";
+      document.body.prepend(d);
+    });
+    const gemessen = await kontrastAusBildpunkten(page, "#kontrast-probe");
+    expect(gemessen).not.toBeNull();
+    expect(gemessen).toBeLessThan(4.5);
+
+    /* Gegenprobe in dieselbe Richtung: Reicht der Kontrast, darf die Messung
+       NICHT anschlagen. Sonst wuerde sie alles rot faerben und waere ebenso
+       wertlos wie eine, die nie anschlaegt. */
+    await page.evaluate(() => {
+      document.getElementById("kontrast-probe").style.color = "#1a1a1a";
+    });
+    const gut = await kontrastAusBildpunkten(page, "#kontrast-probe");
+    expect(gut).toBeGreaterThan(4.5);
+  });
+
+  test("Prozess-Schritt: Foto gewaehlt, Vorbereitung laeuft", async ({ page }) => {
+    await endpunkteStellen(page, { jobStatus: { status: "queued", position: 1, etaSeconds: 20 } });
+    await page.goto("/");
+    /* Der Zustand zwischen Klick und Einreihung: Der Browser verkleinert das
+       Bild und liest die Metadaten. Kurz, aber sichtbar — und fuer jemanden mit
+       Screenreader der Moment, in dem etwas passieren muss. */
+    await page.click('[data-demo="selfie"]');
+    await page.waitForTimeout(1200);
+    await messen(page, "Analyse-Prozess", "Schritt 2: Bildvorbereitung");
+
+    /* Die eigentliche Zusicherung dieses Schritts, und der Grund, warum er in
+       der Prozessliste steht: Zwischen Klick und Warteschlange vergeht Zeit, in
+       der auf dem Bildschirm etwas passiert. Wer nicht sieht, erfaehrt davon
+       nur ueber einen Live-Bereich. Bleibt der leer, sitzt jemand vor einer
+       Seite, die scheinbar nichts tut — formal fehlerfrei, praktisch kaputt.
+       (WCAG 4.1.3 Statusmeldungen, Stufe AA) */
+    const lebend = page.locator('[aria-live="polite"], [aria-live="assertive"], [role="status"]');
+    await expect(lebend.first()).toHaveCount(1);
+    const gesagt = (await lebend.allTextContents()).join(" ").trim();
+    expect(gesagt.length, "Bildvorbereitung laeuft, aber kein Live-Bereich sagt etwas").toBeGreaterThan(0);
+  });
+
+  test("Prozess-Schritt: Realitaets-Check ausfuellen", async ({ page }) => {
+    await endpunkteStellen(page);
+    await page.goto("/");
+    await page.click('[data-demo="selfie"]');
+    await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 20000 });
+    const rc = page.locator(".rc-knopf").first();
+    if (await rc.count()) {
+      await rc.click();
+      await page.waitForTimeout(400);
+    }
+    await messen(page, "Analyse-Prozess", "Schritt 8: Realitaets-Check");
+    await zielgroessenMessen(page, "Realitaets-Check");
+  });
+
+  test("Prozess-Schritt: PDF-Export", async ({ page }) => {
+    await endpunkteStellen(page);
+    await page.goto("/");
+    await page.click('[data-demo="selfie"]');
+    await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 20000 });
+    /* Nur den Knopf pruefen, nicht die erzeugte Datei: Ein PDF ist ein eigenes
+       Format mit eigenen Barrierefreiheits-Regeln (PDF/UA) und gehoert nicht in
+       eine HTML-Pruefung. Was hier zaehlt: Ist der Weg dorthin bedienbar und
+       benannt? */
+    const knopf = page.locator("#exportPdf, [id*=export]").first();
+    await expect(knopf).toHaveCount(1);
+    await messen(page, "Analyse-Prozess", "Schritt 9: PDF-Export erreichbar");
   });
 
   test("Fehlermeldungen", async ({ page }) => {

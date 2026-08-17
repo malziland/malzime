@@ -6,68 +6,66 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
-### Behoben — Screenreader
+### Behoben — Barrierefreiheit
 
-Beide Fehler hat ein Nutzer beim ersten Zuhören mit VoiceOver gefunden. Keine
-automatische Prüfung hatte sie gezeigt.
+Sechs Mängel. Zwei fand ein Mensch beim ersten Zuhören mit VoiceOver, zwei fand
+ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an.
 
 - **Der Wartezustand wiederholte sich alle zwei Sekunden.** Gemessen: 19 Ansagen
-  in 30 Sekunden Wartezeit, bei einer vollen Analyse rund 40 — fast immer
-  derselbe Satz. Wer zuhört, bekommt eine Minute lang Geplapper ohne Neuigkeit.
+  in 30 Sekunden, bei einer vollen Analyse rund 40 — fast immer derselbe Satz.
+  Ursache: Der Wartetext wurde bei **jeder** Statusabfrage neu geschrieben, auch
+  unverändert, und jede Zuweisung löst in einem Live-Bereich eine neue Ansage
+  aus. Dazu die rotierenden Zier-Meldungen, die sich tatsächlich ändern.
 
-  Zwei Ursachen: Der Wartetext wurde bei **jeder** Statusabfrage neu geschrieben,
-  auch wenn er unverändert war — und jede Zuweisung löst in einem Live-Bereich
-  eine neue Ansage aus. Dazu die rotierenden Zier-Meldungen („Analysiere
-  Pixel…"), die sich tatsächlich ändern und deshalb ebenfalls vorgelesen wurden.
-
-  Jetzt wird nur bei echter Änderung geschrieben, und die Rotation ist für
-  Screenreader stumm. Die Zustandswechsel kommen weiter. **Gemessen: 19 → 3.**
+  Jetzt wird nur bei echter Änderung geschrieben, die Rotation ist stumm.
+  Gemessen: **19 → 3**.
 
 - **Nach „Analyse abgeschlossen" folgte nichts.** Der Fokus sprang auf den
   Ergebnisbereich — einen Abschnitt ohne Rolle und ohne Namen. Dort hat ein
-  Screenreader nichts zu sagen. Jetzt ist es ein benannter Bereich („Dein
-  Profil"), und die Ansage lautet „Analyse abgeschlossen · Dein Profil".
-
-### Behoben — Barrierefreiheit
+  Screenreader nichts zu sagen. Jetzt ein benannter Bereich; die Ansage lautet
+  „Analyse abgeschlossen · Dein Profil".
 
 - **Die Beispielbilder sagten ihren Ort zweimal.** Der Name des Knopfes setzte
   sich aus dem Alternativtext des Bildes _und_ der sichtbaren Bildunterschrift
-  zusammen — ein Screenreader las „Mit KI erstelltes Beispielbild: Selfie am
-  Stephansplatz. Zeigt keine reale Person. Selfie am Stephansplatz". Die
-  Bildunterschrift ist jetzt als Zierde ausgezeichnet; sichtbar bleibt sie
-  unverändert.
+  zusammen: „Mit KI erstelltes Beispielbild: Selfie am Stephansplatz. Zeigt keine
+  reale Person. Selfie am Stephansplatz." Die Bildunterschrift ist jetzt als
+  Zierde ausgezeichnet; sichtbar bleibt sie unverändert.
 
-  Kein Verstoß gegen ein Erfolgskriterium — kein Kriterium verbietet
-  Wiederholung. Aber es ist genau die Sorte Doppelung, die das Zuhören mühsam
-  macht. Gefunden, weil erstmals ausgelesen wurde, was ein Screenreader an
-  jeder Stelle tatsächlich vorfindet, statt nur zu prüfen, _dass_ ein Name da
-  ist.
-
-- **Das Info-Zeichen neben den beiden Profil-Modi war zu blass.** Es stand auf
-  55 % Deckkraft: gemessen 2,18 : 1, verlangt sind 4,5 : 1 für den Buchstaben
-  und 3 : 1 für den Kreisrand eines Bedienelements. Beim Überfahren mit der Maus
-  wurde es voll deckend — was nichts hilft, wenn man mit der Tastatur oder am
-  Finger arbeitet und gar nicht darüberfährt.
-
-  Die Deckkraft im Ruhezustand ist entfernt, der Aufhell-Effekt läuft jetzt über
-  die Farbe. Gemessen 5,22 : 1 im hellen und 7,85 : 1 im dunklen Erscheinungsbild.
-
-  Gefunden hat den Fehler kein Prüfwerkzeug: axe konnte den Fall nicht
-  entscheiden und meldete ihn als „unprüfbar". Solche Abstentionen wurden bisher
-  notiert und nie aufgelöst. Jetzt löst eine Bildpunkt-Messung jede einzelne auf
-  — das Element wird fotografiert und Punkt für Punkt nachgerechnet.
+- **Das Info-Zeichen neben den beiden Profil-Modi war zu blass.** 55 % Deckkraft
+  ergaben 2,18 : 1; verlangt sind 4,5 : 1 für den Buchstaben und 3 : 1 für den
+  Kreisrand eines Bedienelements. Dass es beim Überfahren mit der Maus voll
+  deckend wurde, hilft an Tastatur und Finger nicht. Deckkraft entfernt, die
+  Aufhellung läuft über die Farbe: **5,22 : 1** hell, **7,85 : 1** dunkel.
 
 - **Die Trennpunkte in der Fußzeile werden Screenreadern nicht mehr vorgelesen.**
   Sie sind reine Zierde und stehen zwischen Links, die ohnehin getrennt sind.
 
+- **Drei Schritte der Analyse waren nie auf Barrierefreiheit gemessen** —
+  Bildvorbereitung, Realitäts-Check und PDF-Ausgabe. Sie laufen jetzt mit.
+
 ### Hinzugefügt
 
-- **Zwei Wächter, die genau diese Fehlerklasse fangen.** Der eine zählt die
-  Ansagen während der Wartezeit und wird rot, wenn sie den Maßstab überschreiten;
-  der andere prüft, dass der Ergebnisbereich einen Namen trägt. Beide mit
-  Positivkontrolle — null Ansagen sind kein Erfolg, sondern eine kaputte Messung.
+- **Prüfbericht nach WCAG-EM 2.0**, der Prüfmethodik des W3C. Sie schreibt vor,
+  was ein Bericht enthalten muss: Geltungsbereich, unterstützte Geräte,
+  eingesetzte Technologien, begründete Stichprobe und **vollständige Prozesse**
+  statt einzelner Zustände. Genau diese Forderung brachte die drei ungeprüften
+  Schritte oben ans Licht.
 
-- **Ein Protokoll der Vorlese-Reihenfolge** über neun Seiten und Zustände: jedes
+  Die Erklärung auf `/barrierefreiheit` nennt jetzt offen, welche Hilfsmittel
+  ungeprüft sind und warum daraus „weitgehend konform" folgt.
+
+- **Wo das Prüfwerkzeug sich enthält, wird nachgemessen.** axe kann manche
+  Kontraste nicht beurteilen und meldet sie als „unprüfbar" — das ist kein
+  Bestehen. Solche Fälle werden jetzt fotografiert und Bildpunkt für Bildpunkt
+  nachgerechnet. Das fand auf Anhieb das zu blasse Info-Zeichen.
+
+- **Vier Wächter gegen genau diese Fehlerklassen:** Häufigkeit der Ansagen,
+  Name des Ergebnisbereichs, Kontrast bei Werkzeug-Enthaltung, und Ansagen, die
+  sich in sich selbst wiederholen. Jeder mit Positivkontrolle und Rückbauprobe —
+  ein Prüfmittel, das nie anschlägt, und eines, das immer anschlägt, sind gleich
+  wertlos.
+
+- **Ein Protokoll der Vorlese-Reihenfolge** über alle Seiten und Zustände: jedes
   Element mit Rolle, Name und Zustand, in der Reihenfolge, in der es gesprochen
   würde. Ergebnis: kein Bedienelement ohne Namen, kein Bild ohne Alternativtext.
 

@@ -786,6 +786,24 @@ html[data-has-result] {
   animation: fadeUp 0.35s var(--ease) both;
 }
 
+/* v3.3.1 — Verbindungsabbruch mitten im Schreiben: Die Karte BLEIBT samt
+   Text stehen, sie tritt nur zurück. Vorher verschwand hier alles, was schon
+   geschrieben war; das sah nach Datenverlust aus, obwohl serverseitig nichts
+   verloren war. Gedämpft statt weg — die Begründung trägt die Statuszeile.
+   Bewusst nur Deckkraft und Rahmenfarbe: kein Layout-Sprung, keine Bewegung,
+   damit die Pause auch bei reduzierter Bewegung ruhig wirkt. */
+.live-karte--pausiert {
+  opacity: 0.62;
+  border-left-color: var(--ml-warmgray);
+}
+
+/* Der blinkende Cursor gehört zum Schreiben — steht das Schreiben still,
+   steht auch er still, sonst verspricht er Fortschritt, den es nicht gibt. */
+.live-karte--pausiert .tipp-cursor {
+  animation: none;
+  opacity: 0.35;
+}
+
 /* Die frühere Status-Zeile (.live-status samt Puls-Punkt) ist seit v3.0.2
    ersatzlos weg — Warte-Meldungen trägt das Scan-Auge oberhalb der Karte. */
 

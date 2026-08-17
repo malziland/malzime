@@ -134,16 +134,25 @@ wäre schlimmer als keiner — man klickt darauf, und nichts passiert. Ein Test
 prüft die Elementzahl auf null, ein zweiter (Positivkontrolle) prüft, dass er
 mit Flag sehr wohl entsteht.
 
-**Erproben ohne Flag:** In der Browser-Konsole auf der echten Seite
+**Erproben ohne Flag: entfallen mit v3.3.1.** Es gab zwei Türen — das Anhängsel
+`?sprachumschalter=1` in der Adresse und den Konsolen-Aufruf
+`malziME.sprachumschalter()`. Beide sind ersatzlos entfernt. Zwei Gründe:
 
-```js
-malziME.sprachumschalter();        // einblenden, nur in diesem Tab
-malziME.sprachumschalter(false);   // wieder entfernen
-```
+1. **Sie legten eine Spur im `localStorage` ab** (`malzime-tuer-sprachumschalter`
+   und `malzime-umschalter-aktiv`) — Letzteres bei *jedem* Besucher, weil es den
+   Merkmals-Stand an die Unterseiten weiterreichte. Die Datenschutzerklärung
+   sagt zu, im Browser nichts Dauerhaftes abzulegen. Der Rechtstext ist die
+   Vorgabe, nicht der Code.
+2. **Sie waren für die Zeit vor der Freischaltung gedacht.** Seit v3.3.0 ist der
+   Umschalter live; eine Tür an einem offenen Zimmer braucht niemand.
 
-Die Tür steht unabhängig vom Flag offen und überlebt kein Neuladen. Damit lässt
-sich die fertige Bedienung live durchspielen, ohne dass ein Workshop-Publikum
-etwas davon sieht.
+Nebenbei stimmte die Beschreibung hier nicht mehr mit dem Code überein: Sie sagte,
+die Tür überlebe kein Neuladen — der `localStorage` machte daraus geräteweit und
+dauerhaft. Mit dem Rückbau ist auch diese Abweichung weg.
+
+Die Unterseiten mit den Rechtstexten zeigen den Umschalter jetzt unabhängig vom
+Flag (sie rufen bewusst keine Schnittstelle auf — diese Festlegung bleibt). Auf
+Startseite und Zahlen-Seite entscheidet allein das Flag.
 
 **Verhalten beim Umschalten:** Auf der leeren Seite sofort. Läuft eine Analyse
 oder liegt ein Profil vor, kommt erst eine Rückfrage — in der aktuellen

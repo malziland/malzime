@@ -455,12 +455,35 @@ export function initHintergrundWiederaufnahme() {
        UX-002: Auch nach einer FERTIGEN Analyse nichts tun. Die Job-Nummer
        bleibt dann bewusst stehen (Reload soll das Ergebnis wiederholen), aber
        `isAnalyzing` ist false — ohne diese Bedingung loeste jeder Tab-Wechsel
-       eine volle Wiederaufnahme samt Sprung an den Seitenanfang aus. */
-    if (!state.isAnalyzing) return;
+       eine volle Wiederaufnahme samt Sprung an den Seitenanfang aus.
+       v3.3.1: Ein wegen Verbindungsabbruch pausierter Durchgang zaehlt hier
+       mit — dort ist `isAnalyzing` bereits false, das Ergebnis aber offen. */
+    if (!state.isAnalyzing && !state.wartetAufVerbindung) return;
 
     const stillSeit = Date.now() - (state.lastPollOk || 0);
     if (stillSeit < STECKENGEBLIEBEN_MS) return;
 
+    resumeQueueJob({ force: true });
+  });
+
+  /* ── „Wieder online" (v3.3.1) ──────────────────────────────────────────
+     BUG-2026-08-17-02. Bei Verbindungsabbruch sagt die Meldung zu, die
+     Analyse erscheine automatisch, sobald man wieder online ist. Diese Zusage
+     war bis v3.3.0 ungedeckt: Die Wiederaufnahme hing allein am Tab-Wechsel
+     und am Neuladen. Wer einfach sitzen blieb, bis das Netz zurueckkam,
+     wartete vergeblich — die Seite tat nichts.
+
+     Kein STECKENGEBLIEBEN_MS-Vorlauf wie oben: Dort ist offen, ob die
+     Schleife noch lebt; hier ist der Ausloeser eindeutig, und jede Sekunde
+     Zoegern ist eine Sekunde vor einer toten Seite. */
+  window.addEventListener("online", () => {
+    if (state.uploadLaeuft) return;
+    if (!getStoredJobId()) return;
+    /* `wartetAufVerbindung` ist hier der eigentliche Fall: Der Durchgang hat
+       aufgegeben, `isAnalyzing` steht deshalb schon auf false. Ohne dieses
+       Feld wuerde der Lauscher genau in der Lage nichts tun, fuer die er
+       gebaut ist (siehe state.js). */
+    if (!state.isAnalyzing && !state.wartetAufVerbindung) return;
     resumeQueueJob({ force: true });
   });
 }
@@ -548,6 +571,22 @@ async function renderQueueResult(data, myId, traceId, timings) {
       if (elements.resultsPanel) elements.resultsPanel.focus({ preventScroll: true });
     }, 300);
     const meta = data.meta || {};
+    /* BUG-2026-08-17-05: Ein `blocked`-Ergebnis IST ein Fehler — der Nutzer
+       sieht die Karte „technischer Fehler", nicht sein Profil. Bis v3.3.0 lief
+       genau dieser Fall ausschliesslich als `analyze-success` durch die
+       Telemetrie und loeste keine einzige Fehlermeldung aus. Die
+       Fehlererfassung sah dadurch sauberer aus, als die Anwendung war: Der
+       sichtbarste Fehler war der einzige, der nirgends als Fehler gezaehlt
+       wurde. Der Grund steht in `blockedReason` und wird mitgeschickt. */
+    if (meta.mode === "blocked") {
+      logClientError(new Error(data.blockedReason || "blocked.generic"), {
+        phase: "analyse-blockiert",
+        durationMs: timings.totalMs,
+        requestId: String(myId),
+        traceId,
+        wakeLock: wakeLockStatus,
+      });
+    }
     logTelemetry("analyze-success", {
       traceId,
       durationMs: timings.totalMs,
@@ -572,6 +611,10 @@ async function renderQueueResult(data, myId, traceId, timings) {
 
 async function analyzeImageQueued() {
   state.isAnalyzing = true;
+  /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
+     erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
+     der Anker immer die Lage von JETZT und nicht die von vorhin. */
+  state.wartetAufVerbindung = false;
   /* UX-001 (Audit 2026-08-10): Ab hier gehoert der Bildschirm dem NEUEN Foto.
      Die Job-Nummer des vorigen Durchgangs bleibt nach einem Erfolg bewusst
      stehen (damit ein Reload das Ergebnis wiederholen kann) — sie darf aber
@@ -756,8 +799,16 @@ async function analyzeImageQueued() {
       return;
     }
     if (outcome.error) {
-      /* v3.0: dito — der Fehler gehört auf den heutigen, ungestörten Weg. */
-      liveAnzeige.abbrechen();
+      /* v3.3.1: Beim VERBINDUNGSABBRUCH bleibt der bereits geschriebene Text
+         stehen (pausieren statt abbrechen). Er ist echt, er stammt vom Modell,
+         und der Job läuft serverseitig weiter — ihn wegzuräumen sah nach
+         Datenverlust aus, obwohl nichts verloren war. Bei jedem anderen Fehler
+         (Job weg, fehlgeschlagen, 404) ist der Text gegenstandslos und wird
+         wie bisher restlos abgeräumt. */
+      if (outcome.transient) liveAnzeige.pausieren();
+      else liveAnzeige.abbrechen();
+      /* Anker fuer die Wiederaufnahme — siehe state.js. */
+      state.wartetAufVerbindung = Boolean(outcome.transient);
       /* Nur aufräumen, wenn der Job WIRKLICH weg ist (404, failed, abgelaufen).
          Bei einem Verbindungsabbruch bleibt die Nummer stehen: Sie ist der
          einzige Weg zurück zum fertigen Ergebnis — über die automatische
@@ -851,6 +902,10 @@ export async function resumeQueueJob({ force = false } = {}) {
   const resultToken = getStoredResultToken();
 
   state.isAnalyzing = true;
+  /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
+     erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
+     der Anker immer die Lage von JETZT und nicht die von vorhin. */
+  state.wartetAufVerbindung = false;
   const myId = ++state.requestId;
   const traceId = generateTraceId();
   const startTime = Date.now();
@@ -858,28 +913,63 @@ export async function resumeQueueJob({ force = false } = {}) {
   /* state.lastPrepared ist nach einem Reload leer — GPS kann nicht mehr
      injiziert werden (verlässt den Browser ohnehin nie). Das Profil selbst
      liegt vollständig serverseitig. */
-  /* v3.0: Die Wiederaufnahme bleibt bewusst beim heutigen Bild (Scan-Animation
-     bis zum fertigen Ergebnis). Ein eventuell mitten im Tippen eingefrorener
-     Live-Lauf wird hier restlos weggeräumt — nie halben Text stehen lassen. */
-  liveAnzeige.zuruecksetzen();
-  resetQueueWaiting();
-  startScanAnim(false);
-  /* FIX 1 (v3.0.1): Auch die Wiederaufnahme startet nie mit leerem Text. */
-  elements.scanText.textContent = t("scan.resume");
+  /* v3.3.1: ZWEI Wiederaufnahmen, die sich grundlegend unterscheiden.
+
+     (a) Ein pausierter Live-Lauf steht noch im Fenster — der Verbindungs-
+         abbruch hat ihn angehalten, nicht zerstoert. Puffer und Tipp-Stand
+         sind unberuehrt. Hier wird NICHTS zurueckgesetzt: Der Text bleibt
+         genau stehen, wie der Nutzer ihn zuletzt gesehen hat, und die Schleife
+         tippt an derselben Stelle weiter. Genau das ist die Zusage hinter
+         „erscheint automatisch, sobald du wieder online bist" — sie war bis
+         v3.3.0 nicht gedeckt, weil hier zurueckgesetzt und ohne Live-Text
+         weitergefragt wurde.
+
+     (b) Nach einem Neuladen ist der Lauf weg (der Speicher ist leer). Dann
+         bleibt es beim bisherigen Verhalten: Scan-Animation bis zum fertigen
+         Ergebnis. Halben Text aus dem Nichts nachzubauen waere Theater. */
+  const setztLiveTextFort = liveAnzeige.istPausiert();
+
+  if (setztLiveTextFort) {
+    liveAnzeige.fortsetzen();
+    setStatus("");
+  } else {
+    liveAnzeige.zuruecksetzen();
+    resetQueueWaiting();
+    startScanAnim(false);
+    /* FIX 1 (v3.0.1): Auch die Wiederaufnahme startet nie mit leerem Text. */
+    elements.scanText.textContent = t("scan.resume");
+  }
 
   try {
-    /* pollImmediately=true: das fertige Ergebnis sofort holen, ohne 2s-Vorlauf. */
-    const outcome = await pollJob(jobId, myId, resultToken, true);
+    /* pollImmediately=true: das fertige Ergebnis sofort holen, ohne 2s-Vorlauf.
+       liveErlaubt nur im Fall (a): Nur dort gibt es einen Puffer, an den die
+       naechste Welle anschliessen kann. */
+    const outcome = await pollJob(jobId, myId, resultToken, true, setztLiveTextFort);
     if (state.requestId !== myId) return;
 
     stopScanAnim();
     elements.scanText.textContent = "";
+
+    /* BUG-2026-08-17-03: Ein ABGERISSENER Versuch darf die Job-Nummer nicht
+       wegwerfen. Sie ist der einzige Weg zurueck zu einem Ergebnis, das
+       serverseitig rund zwei Stunden bereitliegt. Bis v3.3.0 raeumte die
+       Wiederaufnahme bei JEDEM Fehler auf — solange sie nur beim Seitenstart
+       lief, blieb das folgenlos. Seit sie auch bei „wieder online" mitten im
+       Lauf greift, wuerde ein zweiter Abbruch das fertige Profil endgueltig
+       unerreichbar machen. Also: erneut pausieren, Nummer behalten. */
+    if (outcome && outcome.error && outcome.transient) {
+      if (!liveAnzeige.pausieren()) startScanAnim(false);
+      state.wartetAufVerbindung = true;
+      setStatus(outcome.error, traceId, "error.connectionLost");
+      return;
+    }
 
     /* Resume ist eine stille Hintergrund-Wiederherstellung beim Seitenstart.
        Ist der Job weg oder fehlgeschlagen (abgelaufen / abgebrochen / nach 2 h
        serverseitig gelöscht → 404), den User NICHT mit einer Fehlermeldung
        erschrecken: still aufräumen und die normale Startseite zeigen. */
     if (!outcome || outcome.abandoned || outcome.error) {
+      liveAnzeige.abbrechen();
       clearStoredJobId();
       setStatus("");
       return;

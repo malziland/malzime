@@ -22,6 +22,8 @@ const {
   MISTRAL_DESCRIBE_MAX_TOKENS,
   MISTRAL_PROFILE_MAX_TOKENS,
   MISTRAL_TIMEOUT_MS,
+  MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
+  MISTRAL_SINGLE_LARGE_MAX_TOKENS,
 } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely } = require("./json-repair");
@@ -398,6 +400,7 @@ async function callMistralRawUnthrottled({
   temperature,
   forceJSON,
   timeoutMs,
+  timeoutCapMs,
   cacheKey,
   onLiveText,
 }) {
@@ -452,13 +455,19 @@ async function callMistralRawUnthrottled({
        Restbudget gar nicht mehr stattfinden dürfte, bekam 90 s und konnte das
        Function-Timeout reißen. Jetzt: nur `null`/`undefined` fällt auf den
        Default; ein Budget ≤ 0 bricht sofort ab. */
-    const budget = timeoutMs == null ? MISTRAL_TIMEOUT_MS : timeoutMs;
+    /* BUG-2026-08-17-01: Die Obergrenze ist jetzt pro Aufruf setzbar. Die
+       allgemeinen 90 s passen zu den kurzen Aufrufen (describe, beast-ads);
+       der Single-Large-Call schreibt zwei vollstaendige Profile in EINEM Zug
+       und bekommt deshalb sein eigenes, gemessenes Budget mit. Ohne
+       `timeoutCapMs` bleibt alles exakt wie vorher. */
+    const cap = timeoutCapMs == null ? MISTRAL_TIMEOUT_MS : timeoutCapMs;
+    const budget = timeoutMs == null ? cap : timeoutMs;
     if (budget <= 0) {
       const err = new Error("Mistral-Budget erschoepft");
       err.code = "timeout";
       throw err;
     }
-    const effectiveTimeout = Math.min(budget, MISTRAL_TIMEOUT_MS);
+    const effectiveTimeout = Math.min(budget, cap);
     const timeoutId = setTimeout(() => controller.abort(), effectiveTimeout);
 
     const httpStart = Date.now();
@@ -1040,7 +1049,9 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
    Kosten-Hinweis: alle Tokens landen im teureren Large 2512 statt im billigen
    Small 2603 — Mehrkosten ~+6% gegenüber heutiger Pipeline (siehe CHANGELOG). */
 
-const MISTRAL_SINGLE_LARGE_MAX_TOKENS = 8000;
+/* MISTRAL_SINGLE_LARGE_MAX_TOKENS steht seit v3.3.1 in `config.js`, direkt
+   neben MISTRAL_SINGLE_LARGE_TIMEOUT_MS: Die beiden Werte sind nur gemeinsam
+   richtig, und getrennt aufgestellt sah jeder fuer sich plausibel aus. */
 
 /* ── Marken-Sperre (v2.7) ─────────────────────────────────────────────────
    Mistral folgt Beispielen, nicht Regeln. Solange konkrete Marken im Prompt
@@ -1428,6 +1439,9 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
       forceJSON: true,
       timeoutMs: budget,
+      /* BUG-2026-08-17-01: eigenes Zeitbudget statt der allgemeinen 90 s —
+         siehe Herleitung an der Konstante in config.js. */
+      timeoutCapMs: MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
       cacheKey,
       /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
          Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */
@@ -1457,12 +1471,28 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     );
     return parsed;
   } catch (err) {
-    console.log(
+    /* BUG-2026-08-17-06: console.error statt console.log — das ergibt severity
+       ERROR in Cloud Logging und faellt damit unter die bestehende
+       Alarm-Policy (dieselbe Begruendung wie OPS-004 beim Werbe-Ersatzaufruf).
+
+       Vorher war die Lage absurd herum: Der NEBENSAECHLICHE Ersatzaufruf fuer
+       die Werbeliste schlug Alarm, waehrend die Analyse selbst still starb.
+       Zwei abgebrochene Laeufe (11.08. und 14.08.2026) haben so niemanden
+       erreicht — gefunden wurden sie erst, weil ein Nutzer sich beschwerte.
+       Genau das ist die Frage aus KERN 4: Wer wuerde es merken, wenn das hier
+       falsch waere? Bis hierher: niemand. */
+    console.error(
       JSON.stringify({
+        severity: "ERROR",
+        alert: "single-large-failed",
         step: "mistral-single-large",
         attempt: attemptLabel,
         status: "error",
         error: err.message,
+        /* `timeout` trennt „das Modell war zu langsam" von „die API war weg" —
+           ohne diese Unterscheidung ist am Alarm nicht zu erkennen, ob eine
+           Zeitgrenze zu knapp sitzt oder Mistral eine Stoerung hat. */
+        errorCode: err.code || null,
       })
     );
     if (isRateLimitError(err)) {

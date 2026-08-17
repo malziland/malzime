@@ -125,9 +125,10 @@ async function init() {
 
   /* v3.3: Diese Seite ist übersetzt, also bekommt sie den echten Umschalter.
      Ohne Neuanalyse-Rückruf — hier steht nichts auf dem Spiel, ein Wechsel
-     zeichnet die Zahlen einfach neu. Gezeigt wird er nach denselben Regeln wie
-     auf der Startseite: Merkmals-Schloss aus /api/stats, dazu die beiden
-     Erprobungs-Türen (Adresse und Konsole). */
+     zeichnet die Zahlen einfach neu. Gezeigt wird er nach derselben Regel wie
+     auf der Startseite: allein das Merkmals-Schloss aus /api/stats, das oben
+     bereits gelesen wurde. Die beiden Erprobungs-Türen (Adresse und Konsole)
+     sind mit v3.3.1 entfallen. */
   initSprachumschalter({});
 
   await loadStats();

@@ -8,14 +8,11 @@
  * überleben kein Neuladen — damit lässt sich die fertige Bedienung auf der
  * ECHTEN Seite durchspielen, ohne dass ein Workshop-Publikum etwas sieht.
  *
- * 1. In der Adresse:  ?sprachumschalter=1
- *
- *    Der wichtigere Weg. Auf iPhone und iPad gibt es keine Konsole, und genau
- *    dort muss der Umschalter erprobt werden: Daumen-Größe und Rückfrage auf
- *    kleinem Schirm sind die kritischen Punkte. Chrome sperrt am Rechner
- *    obendrein das Einfügen in die Konsole.
- *
- * 2. In der Konsole:  malziME.sprachumschalter()   /   (false) zum Entfernen
+ * Ob er entsteht, entscheidet allein das Merkmals-Schloss `useSprachumschalter`
+ * (Firestore, ohne Deploy umlegbar). Die frühere Erprobungs-Tür — Adress-
+ * Anhängsel und Konsolen-Aufruf — ist mit v3.3.1 entfallen: Sie war für die
+ * Zeit vor der Freischaltung gedacht, und ihre Spur im localStorage
+ * widersprach der Datenschutzerklärung. Näheres weiter unten.
  *
  * Der Wechsel selbst ist bewusst einfach gehalten: Es gibt keinen Weg, einem
  * laufenden Auftrag nachträglich eine andere Sprache zu geben. Stattdessen
@@ -35,27 +32,21 @@ import { statusNeuSchreiben } from "./ui.js";
    müssten die Locale-Texte einen Platzhalter bekommen. */
 const SPRACHEN = ["de", "en"];
 const SPEICHER_SCHLUESSEL = "malzime-sprache";
-/* Spur der Erprobungs-Tür. Sie liegt im localStorage, NICHT im
-   sessionStorage: Die Rechtsseiten öffnen mit target="_blank" rel="noopener"
-   (index.html:348), und ein so geöffneter Tab bekommt einen leeren
-   sessionStorage. Die Spur wäre dort nie angekommen — genau daran ist die
-   erste Fassung gescheitert.
+/* v3.3.1 — die Erprobungs-Tür ist ersatzlos entfernt, samt ihrer beiden
+   localStorage-Schlüssel `malzime-tuer-sprachumschalter` und
+   `malzime-umschalter-aktiv`.
 
-   Bewusst geräteweit und dauerhaft: Es ist eine Tür zum Erproben, keine
-   Nutzer-Einstellung. Zu bekommen nur über ?sprachumschalter=1, wieder los
-   über ?sprachumschalter=0 oder malziME.sprachumschalter(false). Der
-   Normalbetrieb hängt weiterhin allein am Merkmals-Schloss. */
-const TUER_SCHLUESSEL = "malzime-tuer-sprachumschalter";
+   Sie stammte aus der Zeit vor der Freischaltung: Der fertige Umschalter
+   sollte sich live vorführen lassen, ohne dass ein Workshop-Publikum ihn
+   sieht. Seit v3.3.0 ist er freigeschaltet — die Tür führt an einem offenen
+   Zimmer vorbei.
 
-/* Zweite Spur, die den Stand des Merkmals spiegelt. Die Rechtsseiten rufen
-   bewusst kein /api/stats auf (eine Rechtsseite soll keinen Netzweg aufmachen)
-   und erfahren nur so, dass der Umschalter im Betrieb an ist. Wird bei JEDEM
-   Aufruf der Startseite neu geschrieben oder geloescht, damit ein Abschalten
-   des Merkmals ankommt.
-
-   Getrennt von der Tuer, weil sonst das ausgeschaltete Merkmal beim naechsten
-   Seitenaufruf die Erprobung wieder zusperren wuerde. */
-const MERKMAL_SCHLUESSEL = "malzime-umschalter-aktiv";
+   Der eigentliche Grund für den Rückbau ist aber ein anderer: Der Schlüssel
+   `malzime-umschalter-aktiv` wurde bei JEDEM Besucher gesetzt, während die
+   Datenschutzerklärung zusagt, im Browser nichts Dauerhaftes abzulegen. Der
+   Rechtstext ist die Vorgabe, nicht der Code. Nebenbei stand in docs/FLAGS.md
+   ohnehin, die Tür „überlebt kein Neuladen" — der localStorage machte daraus
+   geräteweit und dauerhaft. Auch diese Abweichung ist damit weg. */
 
 /* Das Schliess-Kreuz ist ein Zeichen, kein Text: Es wird nie uebersetzt und
    Screenreadern gar nicht vorgelesen — deren Beschriftung kommt aus dem
@@ -429,7 +420,6 @@ function aushaengen() {
   if (!eingehaengt) return;
   modalSchliessen();
   document.removeEventListener("keydown", aufTaste);
-  tuer(false);
   [umschalter, modalFertig, modalLaeuft, ansage].forEach((el) => el && el.remove());
   umschalter = modalFertig = modalLaeuft = ansage = null;
   eingehaengt = false;
@@ -491,48 +481,10 @@ export function initSprachumschalter({ analysiere, zuruecksetze } = {}) {
   neuAnalysieren = analysiere || null;
   zuruecksetzen = zuruecksetze || null;
 
-  window.malziME = window.malziME || {};
-  window.malziME.sprachumschalter = (an = true) => {
-    tuer(an);
-    zeigeSprachumschalter(an);
-    return an ? "Sprachumschalter eingeblendet — gilt jetzt auch auf den Unterseiten." : "Sprachumschalter entfernt.";
-  };
-
-  /* Tür über die Adresse. Bewusst streng: nur genau "1" öffnet, nur genau "0"
-     schliesst. Alles andere lässt den Zustand, wie er ist. */
-  const wunsch = adressWunsch();
-  if (wunsch === true) tuer(true);
-  if (wunsch === false) tuer(false);
-  if (tuerOffen()) einhaengen();
-}
-
-/** "1" → true, "0" → false, sonst null (keine Angabe). */
-function adressWunsch() {
-  try {
-    const wert = new URLSearchParams(window.location.search).get("sprachumschalter");
-    if (wert === "1") return true;
-    if (wert === "0") return false;
-  } catch (_err) {
-    /* Kaputte Adresse — dann eben keine Angabe. */
-  }
-  return null;
-}
-
-function tuerOffen() {
-  try {
-    return localStorage.getItem(TUER_SCHLUESSEL) === "1";
-  } catch (_err) {
-    return false;
-  }
-}
-
-function tuer(auf) {
-  try {
-    if (auf) localStorage.setItem(TUER_SCHLUESSEL, "1");
-    else localStorage.removeItem(TUER_SCHLUESSEL);
-  } catch (_err) {
-    /* Privater Modus — dann gilt die Tür nur für diesen Seitenaufruf. */
-  }
+  /* Ab hier entscheidet allein das Merkmals-Schloss, ob der Umschalter
+     entsteht — app.js ruft merkmalUebernehmen(), sobald /api/stats geantwortet
+     hat. Die frühere Erprobungs-Tür (Adress-Anhängsel und Konsolen-Aufruf) ist
+     mit v3.3.1 entfallen; siehe die Begründung am Kopf der Datei. */
 }
 
 /**
@@ -553,12 +505,16 @@ export function zeigeSprachumschalter(an) {
  * ein Abschalten ankommt.
  */
 export function merkmalUebernehmen(an) {
-  try {
-    if (an) localStorage.setItem(MERKMAL_SCHLUESSEL, "1");
-    else localStorage.removeItem(MERKMAL_SCHLUESSEL);
-  } catch (_err) {
-    /* Privater Modus — dann sehen die Unterseiten den Schalter nicht. */
-  }
+  /* v3.3.1: KEIN localStorage mehr. Der Stand wurde hier hinterlegt, damit die
+     Unterseiten ihn sehen (sie öffnen mit target="_blank" und bekommen einen
+     leeren sessionStorage). Das legte bei JEDEM Besucher einen dauerhaften
+     Eintrag an und widersprach der Datenschutzerklärung.
+
+     Die Unterseiten holen den Stand jetzt selbst bei /api/stats — dieselbe
+     Quelle, aus der auch dieser Aufruf gespeist wird (app.js). Das ist nicht
+     nur datenschutzkonform, sondern auch richtiger: Der hinterlegte Wert
+     veraltete: Wurde das Merkmal abgeschaltet, trug ein Gerät den alten Stand
+     so lange weiter, bis jemand die Startseite erneut aufrief. */
   if (an) einhaengen();
 }
 

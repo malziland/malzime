@@ -145,6 +145,11 @@ let enthuellungGestartet = false;
 /* Wurde in diesem Durchgang Live-Text angezeigt? Entscheidet in api.js,
    ob nach dem Rendern die gestaffelte Enthüllung fährt. */
 let liveLief = false;
+/* v3.3.1: Haelt der Lauf gerade wegen eines Verbindungsabbruchs an? Karte und
+   Text bleiben dabei stehen — siehe pausieren(). Getrennt von `lauf.stop`,
+   weil `stop` auch das endgueltige Ende bedeutet und beides sonst nicht
+   unterscheidbar waere. */
+let pausiert = false;
 
 /* Bewegungs-Vorgabe des Systems — bewusst bei jedem Zugriff frisch lesen,
    damit ein Umstellen während der Analyse sofort greift. */
@@ -560,6 +565,31 @@ async function tippSchleife(mein) {
  * ignoriert. `beast` ist null, solange das Modell das Beast-Profil noch
  * nicht begonnen hat (es schreibt sequenziell: Standard zuerst).
  */
+/**
+ * Uebernimmt einen neuen Stand in einen Puffer — oder eben nicht.
+ *
+ * ZWEI BEDINGUNGEN, und die zweite ist eine Zusicherung an den Nutzer
+ * (v3.3.1): Der Text, den er BEREITS GELESEN hat, wird nie wieder angetastet.
+ *
+ *   1. Nur laengere Staende zaehlen. Kuerzere oder gleiche sind alte
+ *      Antworten, die verspaetet eintrudeln.
+ *   2. Der neue Stand muss mit dem bereits GETIPPTEN Teil beginnen. Taete er
+ *      das nicht, wuerde sich Sichtbares vor den Augen des Nutzers aendern —
+ *      genau das, was beim Verbindungsabbruch niemand erleben soll.
+ *
+ * Geprueft wird gegen `fest` (das Getippte), nicht gegen den ganzen Puffer:
+ * Der noch ungetippte Rest ist unsichtbar und darf sich korrigieren, etwa
+ * wenn der Server-Extraktor eine halb angekommene Escape-Sequenz spaeter
+ * sauber aufloest. Gegen den ganzen Puffer geprueft koennte genau so ein
+ * Zwischenstand die Anzeige dauerhaft einfrieren.
+ */
+function uebernehmen(puffer, neu) {
+  if (typeof neu !== "string") return;
+  if (neu.length <= puffer.text.length) return;
+  if (!neu.startsWith(puffer.text.slice(0, puffer.fest))) return;
+  puffer.text = neu;
+}
+
 export function welle(texte) {
   if (!texte || typeof texte.standard !== "string" || texte.standard.length === 0) return;
   /* Späte Wellen nach Beginn der Enthüllung ändern nichts mehr. */
@@ -574,12 +604,8 @@ export function welle(texte) {
      alte Antworten. Ob eine Lieferung „fertig" ist, spielt seit v3.0.2 keine
      Rolle mehr: Das Warte-Auge richtet sich allein danach, ob gerade getippt
      wird oder der Puffer leerläuft. */
-  if (texte.standard.length > lauf.puffer.standard.text.length) {
-    lauf.puffer.standard.text = texte.standard;
-  }
-  if (typeof texte.beast === "string" && texte.beast.length > lauf.puffer.beast.text.length) {
-    lauf.puffer.beast.text = texte.beast;
-  }
+  uebernehmen(lauf.puffer.standard, texte.standard);
+  uebernehmen(lauf.puffer.beast, texte.beast);
 
   if (reduziert()) {
     /* Barrierefreiheit: kein Tippen, kein Rausch — jede Welle erscheint
@@ -912,7 +938,65 @@ export function enthuellungAbkuerzen() {
  * Schleifen gestoppt, Verdecktes wieder sichtbar. Für Fehler/Abbruch mitten
  * im Live-Text und als No-Op-Aufräumer, wenn nie Live-Text lief.
  */
+/**
+ * Haelt das Live-Erlebnis an, OHNE etwas wegzuraeumen (v3.3.1).
+ *
+ * Fuer den Verbindungsabbruch mitten im Schreiben. Bis v3.3.0 rief api.js
+ * hier `abbrechen()` — Karte und Text verschwanden, uebrig blieb eine
+ * Fehlermeldung. Aus Nutzersicht sah das aus, als haette die Seite alles
+ * verloren, obwohl serverseitig nichts verloren war.
+ *
+ * Jetzt bleibt stehen, was schon dasteht: Die Tipp-Schleife haelt an, der
+ * Rausch-Schweif verschwindet (er waere Bewegung ohne Fortschritt), die Karte
+ * wird ueber eine CSS-Klasse gedaempft. Die Begruendung traegt die
+ * Statuszeile, die api.js ohnehin setzt.
+ *
+ * @returns {boolean} true, wenn tatsaechlich ein Lauf angehalten wurde.
+ */
+export function pausieren() {
+  if (!lauf || pausiert) return false;
+  pausiert = true;
+  /* stop beendet die laufende Tipp-Schleife; `lauf` selbst bleibt samt
+     Puffern und `fest`-Staenden erhalten — daran knuepft fortsetzen() an. */
+  lauf.stop = true;
+  lauf.tippt = false;
+  spinnerVerstecken(lauf);
+  if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
+  if (elements.liveKarte) elements.liveKarte.classList.add("live-karte--pausiert");
+  return true;
+}
+
+/**
+ * Nimmt ein pausiertes Live-Erlebnis wieder auf (v3.3.1).
+ *
+ * Der Puffer und der Stand des bereits Getippten (`fest`) sind unberuehrt
+ * geblieben — die Schleife tippt also exakt dort weiter, wo sie angehalten
+ * hat. Ohne Zeit-Anlauf: Der Nutzer hat gerade eine Pause erlebt, eine zweite
+ * waere Hohn.
+ *
+ * @returns {boolean} true, wenn tatsaechlich fortgesetzt wurde.
+ */
+export function fortsetzen() {
+  if (!lauf || !pausiert) return false;
+  pausiert = false;
+  if (elements.liveKarte) elements.liveKarte.classList.remove("live-karte--pausiert");
+  lauf.stop = false;
+  if (!lauf.tippt) {
+    lauf.tippt = true;
+    lauf.tippStartAb = 0;
+    tippSchleife(lauf);
+  }
+  return true;
+}
+
+/** Laeuft gerade ein pausierter Live-Text? Fuer api.js und die Tests. */
+export function istPausiert() {
+  return pausiert;
+}
+
 export function abbrechen() {
+  pausiert = false;
+  if (elements.liveKarte) elements.liveKarte.classList.remove("live-karte--pausiert");
   if (lauf) {
     lauf.stop = true;
     /* Ein noch aktives Warte-Auge gehört mit aufgeräumt — sonst bliebe die

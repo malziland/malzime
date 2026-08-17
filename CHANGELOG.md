@@ -6,6 +6,139 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Behoben — Abbrüche und verschluckte Fehler
+
+- **Die Analyse hatte eine Zeitgrenze, die sie gar nicht einhalten konnte.**
+  Ein Nutzer meldete abgebrochene Analysen und lange Wartezeiten. Am
+  30-Tage-Diagnose-Bucket nachgemessen: Der KI-Aufruf darf **8000 Token**
+  schreiben, wird aber nach **90 Sekunden** abgebrochen. Das Modell schreibt
+  gemessen mit 47 Token/s (langsamster Lauf 39,4) — 8000 Token brauchen also
+  rund 170 Sekunden. Die erlaubte Textmenge passte nie in die erlaubte Zeit.
+
+  Aufgefallen ist es erst jetzt, weil die Grenze bis v3.0.0 gar nicht zubiss:
+  Ohne Stream räumt `mistral.js` die Uhr schon nach den Antwortkopfzeilen weg,
+  das eigentliche Warten lief ungebremst. Der Live-Text (11.08.) hält die Uhr
+  bewusst scharf bis zum letzten Zeichen — und schaltete damit eine seit Mai
+  schlafende Grenze zum ersten Mal wirksam. Die Zahlen dazu:
+
+  | Zeitraum | Läufe | technische Fehler | Läufe über 90 s |
+  |---|---|---|---|
+  | vor v3.0.0 (19.07.–11.08.) | 121 | 0 | 8 — **alle wurden fertig** |
+  | nach v3.0.0 (11.08.–16.08.) | 28 | 2 (7,1 %) | 3 |
+
+  Jetzt hat der Single-Large-Aufruf ein eigenes, gemessenes Zeitbudget
+  (150 s statt 90 s), und die Textmenge ist auf 5000 Token gesetzt — reichlich
+  über dem längsten je gemessenen Lauf (4394 Token). Beide Werte stehen
+  nebeneinander in `config.js` und werden **gegeneinander gerechnet**: Die
+  Startprüfung wirft, und `mistral-zeitbudget.test.js` wird rot, sobald jemand
+  einen der beiden allein verschiebt. Genau diese Rechnung hatte gefehlt —
+  einzeln sah jeder Wert plausibel aus, und daran sind zwei Audits
+  vorbeigelaufen.
+
+- **Der abgebrochene Lauf schlug keinen Alarm — der Ersatz-Werbeaufruf schon.**
+  Die gescheiterte Analyse wurde mit `console.log` festgehalten, also ohne
+  Severity, und fiel damit nicht unter die aktive Alarm-Richtlinie
+  (`malziME Function Errors`, deckt `processjob` ab `severity>=ERROR` ab).
+  Zwei tote Läufe (11.08., 14.08.) haben so niemanden erreicht; gefunden wurden
+  sie, weil sich ein Nutzer beschwerte. Jetzt `console.error` mit
+  `alert: "single-large-failed"` und dem Fehler-Code, der „Modell zu langsam"
+  von „API weg" unterscheidet.
+
+- **Die Meldung über eine abgerissene Verbindung brauchte die abgerissene
+  Verbindung.** `error-logger.js` schickte jeden Fehler per `fetch` und
+  verschluckte einen Fehlschlag dabei still. Damit blieb ausgerechnet die
+  häufigste Fehlerklasse systematisch unsichtbar: In 30 Tagen lagen **zwei**
+  Client-Fehler im Bucket, obwohl mehrere gemeldet wurden. Jetzt wartet eine
+  misslungene Meldung **im Arbeitsspeicher** und wird beim Ereignis „wieder
+  online" sowie ein letztes Mal beim Verlassen der Seite nachgeschickt. Ein 4xx
+  wird nicht wiederholt (der Server will sie nicht), ein 5xx schon.
+
+  **Bewusst ohne Browser-Speicher.** Ein erster Entwurf legte die Meldungen in
+  den `sessionStorage`. Das war der falsche Weg: Die Datenschutzerklärung zählt
+  abschließend auf, was dort liegt — ein sechster Eintrag hätte bedeutet, den
+  Rechtstext an eine Funktion anzupassen. Die Reihenfolge ist umgekehrt. Der
+  Preis ist ehrlich benannt: Wer den Tab schließt, während das Netz weg ist,
+  dessen Meldung ist verloren. Abgedeckt ist der Fall, der in den Logs
+  tatsächlich auftrat. `error-logger-puffer.test.js` prüft, dass in
+  `sessionStorage` und `localStorage` nichts landet.
+
+- **Die Karte „technischer Fehler" wurde nirgends als Fehler gezählt.**
+  Ein `blocked`-Ergebnis lief ausschließlich als `analyze-success` durch die
+  Telemetrie. Der für den Nutzer sichtbarste Fehler war damit der einzige ohne
+  Fehlermeldung. Jetzt löst er `logClientError` mit dem `blockedReason` aus.
+
+### Geändert — der Live-Text überlebt einen Verbindungsabbruch
+
+- **Der geschriebene Text bleibt jetzt stehen.** Bis v3.3.0 räumte ein
+  Verbindungsabbruch Karte und Text weg und stellte eine Fehlermeldung hin.
+  Aus Nutzersicht sah das nach Datenverlust aus, obwohl serverseitig nichts
+  verloren war — das Ergebnis liegt rund zwei Stunden bereit. Jetzt wird
+  pausiert statt abgeräumt: Der Text bleibt gedämpft stehen, die Begründung
+  trägt die Statuszeile.
+
+  Zwei Zusicherungen dazu stehen als Prüfung, nicht als Vorsatz:
+  **Was schon gelesen wurde, wird nie umgeschrieben** (eine Welle wird nur
+  übernommen, wenn sie mit dem bereits Getippten beginnt), und **es geht
+  wirklich weiter** — die Schleife tippt an derselben Stelle weiter.
+
+- **„Erscheint automatisch, sobald du wieder online bist" stimmt jetzt.**
+  Diese Zusage stand seit Langem in der Fehlermeldung, war aber ungedeckt: Es
+  lauschte niemand auf „online", die Wiederaufnahme setzte den Live-Text zurück
+  und fragte ohne ihn weiter. Nachgerüstet sind alle drei Teile — der Lauscher,
+  die Fortsetzung des Textes und ein Anker (`state.wartetAufVerbindung`), der
+  den offenen Durchgang überhaupt erst auffindbar macht.
+
+- **Ein zweiter Abbruch wirft die Job-Nummer nicht mehr weg.** Die
+  Wiederaufnahme räumte bei jedem Fehler auf. Solange sie nur beim Seitenstart
+  lief, war das folgenlos; seit sie auch mitten im Lauf greift, hätte sie ein
+  fertiges Profil endgültig unerreichbar gemacht.
+
+### Entfernt — der `localStorage` und die Erprobungs-Türen
+
+- **Die Datenschutzerklärung sagt „kein localStorage" zu — seit v3.3.0 stimmte
+  das nicht mehr.** `sprachumschalter.js` legte bei **jedem** Besucher den
+  Eintrag `malzime-umschalter-aktiv` an, damit die Rechtsseiten erfahren, dass
+  der DE/EN-Umschalter im Betrieb ist (sie öffnen mit `target="_blank"` und
+  bekommen einen leeren `sessionStorage`). Live nachgemessen am 17.08.:
+  `/api/stats` liefert `sprachumschalter: true`, der Eintrag entstand also
+  wirklich bei allen. Inhaltlich harmlos — für alle Besucher derselbe Wert `1`,
+  keine Kennung, nicht zum Wiedererkennen geeignet — aber die Zusage war
+  unzutreffend.
+
+  **Behoben wurde der Code, nicht der Rechtstext.** Beide Türen, mit denen sich
+  der Umschalter vor seiner Freischaltung vorführen ließ, sind ersatzlos weg:
+  das Adress-Anhängsel `?sprachumschalter=1` und der Konsolen-Aufruf
+  `malziME.sprachumschalter()`. Mit ihnen die beiden `localStorage`-Schlüssel.
+  Sie stammten aus der Zeit vor v3.3.0; seit der Umschalter live ist, führen sie
+  an einem offenen Zimmer vorbei.
+
+  Die Rechtsseiten zeigen den Umschalter jetzt schlicht immer — **ohne** dafür
+  eine Schnittstelle aufzurufen. Diese Festlegung („eine Rechtsseite macht
+  keinen Netzweg auf") bleibt unangetastet; auf Startseite und Zahlen-Seite
+  entscheidet weiterhin allein das Merkmals-Schloss.
+
+  Nachgemessen: **null `localStorage`-Zugriffe** im gesamten Frontend
+  (Positivkontrolle: dieselbe Suche findet 23 `sessionStorage`-Zugriffe). Zwei
+  Prüfungen halten das fest — eine im Unit-Test, eine im E2E-Test, die auf den
+  Rechtsseiten beide Speicher als leer nachweist.
+
+- **Nebenbei stimmte `docs/FLAGS.md` nicht mit dem Code überein.** Dort stand,
+  die Erprobungs-Tür „überlebt kein Neuladen" — der `localStorage` machte daraus
+  geräteweit und dauerhaft. Mit dem Rückbau ist auch diese Abweichung weg.
+
+### Behoben — Google Search Console
+
+- **Bild-Metadaten für strukturierte Daten vervollständigt.** Die Search
+  Console meldete am 17.08. zwei nicht kritische Befunde: In den drei
+  `ImageObject`-Blöcken fehlten `license` und `acquireLicensePage`. Beide sind
+  ergänzt: `license` zeigt auf die MIT-Lizenz im Repository, für
+  `acquireLicensePage` verlangt Google eine Seite, auf der man erfährt, wie man
+  eine Lizenz bekommt — dafür das Impressum mit den Kontaktdaten. **Kein
+  Rechtstext wurde dafür geändert.** `strukturdaten-bilder.test.js` prüft
+  dauerhaft, dass alle sechs Felder da sind, dass es URLs sind, dass die
+  verlinkte Seite existiert und dass sie tatsächlich eine Kontaktmöglichkeit
+  trägt.
+
 ### Hinzugefügt
 
 - **`scripts/vor-dem-push.sh` — die Pipeline in wenigen Sekunden vorweggenommen.**

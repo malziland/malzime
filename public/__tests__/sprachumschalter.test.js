@@ -94,12 +94,11 @@ describe("Sprachumschalter — Merkmals-Schloss", () => {
     });
   });
 
-  it("die Konsolen-Tür steht auch ohne Merkmal offen und baut auf Zuruf", () => {
-    expect(typeof window.malziME.sprachumschalter).toBe("function");
-    window.malziME.sprachumschalter();
-    expect(pille()).not.toBeNull();
-    window.malziME.sprachumschalter(false);
-    expect(pille()).toBeNull();
+  it("es gibt keine Konsolen-Tür mehr (v3.3.1)", () => {
+    /* Sie war fuer die Zeit vor der Freischaltung gedacht. Seit der Umschalter
+       live ist, fuehrt sie an einem offenen Zimmer vorbei — und ihre Spur lag
+       im localStorage, was der Datenschutzerklaerung widersprach. */
+    expect(window.malziME && window.malziME.sprachumschalter).toBeUndefined();
   });
 
   it("Aushängen lässt nichts zurück", () => {
@@ -328,9 +327,9 @@ describe("Sprachumschalter — Barrierefreiheit", () => {
   });
 });
 
-describe("Sprachumschalter — Tür über die Adresse", () => {
+describe("Sprachumschalter — die Erprobungs-Tür ist entfernt (v3.3.1)", () => {
   /* jsdom laesst window.location nicht ohne Weiteres umschreiben; die Adresse
-     wird deshalb ueber history.replaceState gesetzt — genau das liest
+     wird deshalb ueber history.replaceState gesetzt — genau das las frueher
      URLSearchParams. */
   function adresse(suche) {
     window.history.replaceState({}, "", suche || "/");
@@ -338,81 +337,42 @@ describe("Sprachumschalter — Tür über die Adresse", () => {
 
   afterEach(() => {
     adresse("/");
-    try {
-      localStorage.removeItem("malzime-tuer-sprachumschalter");
-    } catch {
-      /* jsdom ohne Speicher */
-    }
-  });
-
-  it("?sprachumschalter=1 blendet ihn ein, ohne Merkmal und ohne Konsole", () => {
-    adresse("/?sprachumschalter=1");
-    initSprachumschalter({ analysiere: () => {} });
-    expect(pille()).not.toBeNull();
-  });
-
-  it("die Tür bleibt offen — auch ohne Anhängsel und in einem neuen Tab", () => {
-    /* Der eigentliche Grund für den geräteweiten Speicher: Die Rechtsseiten
-       öffnen mit target="_blank" rel="noopener" (index.html:348), und ein so
-       geöffneter Tab bekommt einen LEEREN sessionStorage. Die erste Fassung
-       legte die Spur dort ab — sie kam nie an. */
-    adresse("/?sprachumschalter=1");
-    initSprachumschalter({ analysiere: () => {} });
-    expect(pille()).not.toBeNull();
-
-    zeigeSprachumschalter(false);
-    baueSeite();
-    adresse("/");
-    initSprachumschalter({ analysiere: () => {} });
-    expect(pille()).toBeNull(); // aushängen schliesst die Tür ausdrücklich
-  });
-
-  it("?sprachumschalter=0 schliesst die Tür wieder", () => {
-    adresse("/?sprachumschalter=1");
-    initSprachumschalter({ analysiere: () => {} });
-    expect(pille()).not.toBeNull();
-
-    baueSeite();
-    adresse("/?sprachumschalter=0");
-    initSprachumschalter({ analysiere: () => {} });
-    expect(pille()).toBeNull();
-  });
-
-  it("einmal geöffnet, gilt sie auch beim nächsten Aufruf ohne Anhängsel", async () => {
-    adresse("/?sprachumschalter=1");
-    initSprachumschalter({ analysiere: () => {} });
-    expect(pille()).not.toBeNull();
-
-    /* Ein echter neuer Seitenaufruf: frisches Modul, frisches DOM, kein
-       Anhängsel mehr in der Adresse. Ohne vi.resetModules() glaubt das Modul,
-       es sei noch eingehängt, und der Test bewiese nichts. */
-    vi.resetModules();
-    baueSeite();
-    adresse("/datenschutz");
-    const frisch = await import("../js/sprachumschalter.js");
-    frisch.initSprachumschalter({ analysiere: () => {} });
-
-    /* Der Schalter muss da sein — sonst ist er beim ersten Klick in die
-       Fußleiste wieder weg, und genau das war der gemeldete Fehler. */
-    expect(pille()).not.toBeNull();
   });
 
   it.each([
+    ["1", "/?sprachumschalter=1"],
     ["0", "/?sprachumschalter=0"],
-    ["false", "/?sprachumschalter=false"],
-    ["leer", "/?sprachumschalter="],
-    ["ganz ohne", "/"],
-  ])("der Wert %s blendet ihn NICHT ein", (_name, suche) => {
-    /* Streng, damit ein Tippfehler in einem herumgereichten Link kein
-         Bedienelement vor ein Workshop-Publikum stellt. */
+    ["mit lang=en", "/?lang=en&sprachumschalter=1"],
+  ])("das Anhängsel %s hat keine Wirkung mehr", (_name, suche) => {
     adresse(suche);
     initSprachumschalter({ analysiere: () => {} });
+    /* Ob der Umschalter entsteht, entscheidet jetzt allein das
+       Merkmals-Schloss ueber merkmalUebernehmen(). */
     expect(pille()).toBeNull();
   });
 
-  it("die Adresse verträgt sich mit ?lang=en", () => {
-    adresse("/?lang=en&sprachumschalter=1");
+  it("DATENSCHUTZ: der Umschalter legt NICHTS dauerhaft im Browser ab", () => {
+    /* Der Kern des Rueckbaus. Bis v3.3.0 schrieb merkmalUebernehmen() den
+       Schluessel `malzime-umschalter-aktiv` in den localStorage — bei JEDEM
+       Besucher, waehrend die Datenschutzerklaerung zusagt, dort nichts
+       abzulegen. Dieser Test wird rot, wenn das zurueckkommt. */
+    localStorage.clear();
+
+    adresse("/?sprachumschalter=1");
     initSprachumschalter({ analysiere: () => {} });
+    zeigeSprachumschalter(true);
+    expect(pille()).not.toBeNull();
+    zeigeSprachumschalter(false);
+
+    expect(localStorage.length).toBe(0);
+  });
+
+  it("Positivkontrolle: ueber das Merkmals-Schloss entsteht er sehr wohl", () => {
+    adresse("/");
+    initSprachumschalter({ analysiere: () => {} });
+    expect(pille()).toBeNull();
+
+    zeigeSprachumschalter(true);
     expect(pille()).not.toBeNull();
   });
 });

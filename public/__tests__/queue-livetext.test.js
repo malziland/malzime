@@ -38,6 +38,10 @@ vi.mock("../js/live-anzeige.js", () => ({
   enthuellungAbkuerzen: vi.fn(),
   abbrechen: vi.fn(),
   zuruecksetzen: vi.fn(),
+  /* v3.3.1: Pause statt Wegräumen beim Verbindungsabbruch. */
+  pausieren: vi.fn(() => true),
+  fortsetzen: vi.fn(() => true),
+  istPausiert: vi.fn(() => false),
   /* v3.0.3 Blick-Führung: api.js ruft beides beim Analyse-Beginn. */
   fuehrungStarten: vi.fn(),
   augeInsBild: vi.fn(),

@@ -341,7 +341,16 @@ test("Fokus bleibt in der Rückfrage und kehrt danach zurück", async ({ page })
      `document.activeElement` traf diese Luecke unter CI-Last auf WebKit —
      lokal nie, in der Pipeline einmal. Die Zusicherung bleibt exakt dieselbe
      (der EN-Knopf hat den Fokus), sie darf nur darauf warten. */
-  await expect(ausloeser).toBeFocused();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const a = document.activeElement;
+          return a ? `${a.tagName.toLowerCase()} data-lang="${a.dataset.lang || ""}"` : "gar nichts";
+        }),
+      { message: "Fokus kehrt nach Escape auf den EN-Knopf zurueck" }
+    )
+    .toBe('button data-lang="en"');
 });
 
 /** Misst, was ein Daumen WIRKLICH trifft — nicht, was man sieht.

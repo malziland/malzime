@@ -303,7 +303,36 @@ function modalSchliessen() {
   setTimeout(() => {
     el.hidden = true;
   }, 200);
-  if (fokusVorher && typeof fokusVorher.focus === "function") fokusVorher.focus();
+  /* Fokus erst im NÄCHSTEN Bildschirmrahmen zurückgeben, nicht sofort.
+     Grund: Der Auslöser liegt ausserhalb des Dialogs und war deshalb bis eine
+     Zeile vorher `inert` — der Browser hat ihn also gerade eben erst wieder
+     fokussierbar gemacht. Setzt man den Fokus im selben Durchlauf, hat die
+     Fokus-Verwaltung mancher Engine den Zustandswechsel noch nicht verarbeitet
+     und verwirft den Aufruf stillschweigend. Beobachtet auf WebKit/Linux in der
+     Pipeline (der Knopf blieb unfokussiert, kein Fehler), auf macOS nie.
+     Ein direkter `focus()` ist hier also keine Zusicherung, sondern ein
+     Wunsch — und ein Fokus, der ins Leere fällt, trifft genau die Menschen,
+     die auf die Tastatur angewiesen sind.
+
+     Der Wächter davor: Wurde inzwischen ein neuer Dialog geöffnet, gehört ihm
+     der Fokus, nicht dem alten Auslöser. */
+  const ziel = fokusVorher;
+  if (ziel && typeof ziel.focus === "function") {
+    const zurueckgeben = () => {
+      /* Ist inzwischen ein neuer Dialog offen, gehört ihm der Fokus. Und ein
+         Element, das nicht mehr im Dokument hängt, kann keinen annehmen. */
+      if (offen || !ziel.isConnected) return;
+      if (document.activeElement === ziel) return;
+      ziel.focus();
+    };
+    /* ZWEIMAL, und das ist Absicht — der zweite Versuch ist der Riegel, nicht
+       der erste. Sofort deckt den Normalfall; der Rahmen danach fängt die
+       Engines, die den `inert`-Wechsel eine Zeile vorher noch nicht verarbeitet
+       haben und den Aufruf stillschweigend verwerfen. Der Wächter oben macht
+       den zweiten Versuch folgenlos, wenn der erste gegriffen hat. */
+    zurueckgeben();
+    requestAnimationFrame(zurueckgeben);
+  }
   fokusVorher = null;
 }
 

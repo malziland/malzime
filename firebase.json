@@ -1,21 +1,44 @@
 {
   "_kommentar_firestore": "Einzige Datenbank: malzime-eu in europe-west1, ausgewaehlt ueber FIRESTORE_DATABASE_ID in functions/src/config.js. Die alte (default)-Datenbank (nam5, USA) wurde am 2026-08-11 geloescht — Ablauf und Beweisregel in docs/RUNBOOK.md, Abschnitt Firestore-Umzug.",
-  "firestore": [{ "database": "malzime-eu", "rules": "firestore.rules", "indexes": "firestore.indexes.json" }],
+  "firestore": [
+    {
+      "database": "malzime-eu",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
+    }
+  ],
   "functions": {
     "source": "functions",
     "runtime": "nodejs24"
   },
   "emulators": {
-    "functions": { "port": 5001 },
-    "firestore": { "port": 8080 },
-    "hosting": { "port": 5050 },
-    "pubsub": { "port": 8085 },
-    "ui": { "enabled": true },
+    "functions": {
+      "port": 5001
+    },
+    "firestore": {
+      "port": 8080
+    },
+    "hosting": {
+      "port": 5050
+    },
+    "pubsub": {
+      "port": 8085
+    },
+    "ui": {
+      "enabled": true
+    },
     "singleProjectMode": true
   },
   "hosting": {
     "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "**/__tests__/**", "img/demo/original/**", "lib/PRUEFSUMMEN.json"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "**/__tests__/**",
+      "img/demo/original/**",
+      "lib/PRUEFSUMMEN.json"
+    ],
     "headers": [
       {
         "source": "**",
@@ -81,27 +104,45 @@
     "rewrites": [
       {
         "source": "/api/stats",
-        "function": { "functionId": "stats", "region": "europe-west1" }
+        "function": {
+          "functionId": "stats",
+          "region": "europe-west1"
+        }
       },
       {
         "source": "/api/errors",
-        "function": { "functionId": "errors", "region": "europe-west1" }
+        "function": {
+          "functionId": "errors",
+          "region": "europe-west1"
+        }
       },
       {
         "source": "/api/telemetry",
-        "function": { "functionId": "telemetry", "region": "europe-west1" }
+        "function": {
+          "functionId": "telemetry",
+          "region": "europe-west1"
+        }
       },
       {
         "source": "/api/enqueue",
-        "function": { "functionId": "enqueue", "region": "europe-west1" }
+        "function": {
+          "functionId": "enqueue",
+          "region": "europe-west1"
+        }
       },
       {
         "source": "/api/job-status",
-        "function": { "functionId": "jobStatus", "region": "europe-west1" }
+        "function": {
+          "functionId": "jobStatus",
+          "region": "europe-west1"
+        }
       },
       {
         "source": "/api/admin/**",
-        "function": { "functionId": "admin", "region": "europe-west1" }
+        "function": {
+          "functionId": "admin",
+          "region": "europe-west1"
+        }
       },
       {
         "source": "/stats",
@@ -118,6 +159,10 @@
       {
         "source": "/nutzungsbedingungen",
         "destination": "/nutzungsbedingungen.html"
+      },
+      {
+        "source": "/barrierefreiheit",
+        "destination": "/barrierefreiheit.html"
       },
       {
         "source": "**",

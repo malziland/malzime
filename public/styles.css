@@ -77,6 +77,20 @@
 /* ── Design-Token (Hell = Standard: Seriöse Analyse, Papier-Look) ── */
 
 :root {
+  /* Seitenpolsterung links/rechts. EINE Quelle, weil sich mehr als der
+     Container danach richtet: Die geklebte Umschalt-Leiste zieht sich mit
+     negativem Rand genau um diesen Betrag hinaus, damit beim Scrollen kein
+     Text seitlich vorbeiblitzt. Standen beide Werte getrennt da, drifteten sie
+     auseinander — bei 640 px fiel der Container auf 16 px, die Leiste zog
+     weiter mit 20 px und ragte 4 px ueber das Fenster hinaus. Ergebnis:
+     waagrechtes Scrollen bei 320 px Breite, ein echter Verstoss gegen
+     WCAG 1.4.10 (Reflow, Stufe AA). */
+  --container-pad-x: 20px;
+
+  /* Fokus-Ring. Petrol traegt gegen Papier (#f9f7f4) rund 5,9:1 und damit
+     deutlich mehr als die von WCAG 2.4.11 geforderten 3:1. */
+  --fokus-ring: #156480;
+
   /* Markenfarben (Vollton) */
   --ml-teal: #156480;
   --ml-rust: #9c4e36;
@@ -133,6 +147,12 @@
    hellere Stufe im identischen Farbton; Überschriften bleiben hell. ── */
 
 :root[data-theme="dark"] {
+  /* Im dunklen Thema traegt Petrol zu wenig — hier ein heller Ring. Der Wert ist
+     GERECHNET (rund 11:1 gegen #171d1f), nicht am Bildschirm nachgemessen: Das
+     dunkle Thema entsteht nur ueber den Beast-Schalter, also allein auf der
+     Startseite mit Ergebnis. `prefers-color-scheme` gibt es hier nicht. */
+  --fokus-ring: #7fd3e8;
+
   --bg: #171d1f;
   --surface: #1e2629;
   --border: rgba(255, 255, 255, 0.18);
@@ -219,7 +239,7 @@ body {
   z-index: 1;
   max-width: 680px;
   margin: 0 auto;
-  padding: 40px 20px 60px;
+  padding: 40px var(--container-pad-x) 60px;
 }
 
 /* ── Hero ── */
@@ -434,9 +454,9 @@ html[data-has-result] .bias-toggle-wrap {
   z-index: 20;
   /* Negativer Rand + Innenabstand: die Leiste deckt beim Kleben die volle
      Containerbreite ab, damit durchlaufender Text nicht seitlich vorbeiblitzt. */
-  margin-left: -20px;
-  margin-right: -20px;
-  padding: 10px 20px;
+  margin-left: calc(-1 * var(--container-pad-x));
+  margin-right: calc(-1 * var(--container-pad-x));
+  padding: 10px var(--container-pad-x);
 }
 
 /* Ruhezustand: unsichtbarer Untergrund, damit die Leiste im Seitenfluss
@@ -2301,11 +2321,25 @@ ol.legal-list > li::before {
   border-radius: var(--radius-md);
 }
 
+/* Umbrechen statt ueberstehen. Bei 320 px Fensterbreite bleiben nach den
+   Polsterungen von Container und Kasten rund 256 px; die Wert-Plakette ist
+   allein 163 px breit und traegt `white-space: nowrap` (Zahlen sollen nicht
+   mitten im Wert brechen — das bleibt richtig). Ohne Umbruch schob die Zeile
+   das ganze Dokument auf 324 px und erzeugte waagrechtes Scrollen, ein
+   Verstoss gegen WCAG 1.4.10 (Reflow, Stufe AA). Jetzt rutscht die Plakette
+   auf die naechste Zeile, statt die Seite breiter zu machen.
+   `min-width: 0` beim Text, weil Flex-Elemente sonst nicht unter ihre
+   Inhaltsbreite schrumpfen duerfen und der Umbruch wirkungslos bliebe. */
 .dv-scale-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+
+.dv-scale-label {
+  min-width: 0;
 }
 
 .dv-scale-label {
@@ -2566,7 +2600,11 @@ ol.legal-list > li::before {
   position: absolute;
   top: -100%;
   left: 0;
-  padding: 8px 16px;
+  /* 10px statt 8px: Damit erreicht die Marke 45 px Hoehe und erfuellt
+     WCAG 2.5.5 (Zielgroesse erweitert, AAA, 44 x 44). Gemessen waren es 41 px —
+     es fehlten drei. Sichtbar ist sie ohnehin nur bei Tastaturnutzung, die
+     zwei Pixel sieht im Normalbetrieb niemand. */
+  padding: 10px 16px;
   background: var(--ml-teal);
   color: #ffffff;
   z-index: 1000;
@@ -2575,6 +2613,39 @@ ol.legal-list > li::before {
 }
 .skip-link:focus {
   top: 0;
+}
+
+/* Abkuerzungen (WCAG 3.1.4, Stufe AAA): Die Langform steht im `title`, damit
+   Screenreader und Maus sie erreichen. BEWUSST ohne die uebliche gepunktete
+   Unterstreichung — an den Rechtstexten darf sich optisch nichts aendern, und
+   eine neue Linie unter "KI" waere genau das. Der Nutzen liegt in der
+   Vorlesbarkeit, nicht in einer Verzierung. */
+abbr[title] {
+  text-decoration: none;
+  border-bottom: 0;
+  cursor: help;
+}
+
+/* ── Fokus-Ring ────────────────────────────────────────────────────────────
+   Gemessen wurde: Auf den Rechtsseiten und in der Fusszeile trugen 7 von 12
+   bis 20 fokussierbaren Elementen nur den BROWSER-Standardring
+   (`outline: auto 1px`). Sichtbar ist der — WCAG 2.4.7 (Stufe AA) ist damit
+   erfuellt. Fuer 2.4.13 (Fokus-Erscheinung, Stufe AAA) reicht er nicht: Der
+   verlangt mindestens 2 px Staerke und einen bestimmten Kontrast, und wie der
+   Standardring aussieht, entscheidet jeder Browser selbst — auf iOS anders als
+   auf Windows.
+
+   Deshalb ein eigener Ring, der ueberall gleich aussieht. Bewusst NUR fuer
+   `:focus-visible`: Wer mit der Maus klickt, sieht ihn nicht, wer mit der
+   Tastatur navigiert, sehr wohl. Elemente mit eigenem Fokus-Stil (Sprachknopf,
+   Demo-Bild, Dialog-Knoepfe) stehen weiter unten und gewinnen. */
+a:focus-visible,
+button:focus-visible,
+[tabindex="0"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--fokus-ring);
+  outline-offset: 2px;
+  border-radius: 3px;
 }
 
 /* A11y: Nur fuer Screenreader sichtbar (opacity statt clip fuer Safari/VoiceOver) */
@@ -2694,11 +2765,25 @@ ol.legal-list > li::before {
   }
 }
 
+/* Lange Adressen ohne Leerstelle (etwa die ODR-Plattform der EU) sprengen
+   sonst schmale Bildschirme: 34 Zeichen am Stueck passen bei 320 px nicht in
+   eine Zeile, und ohne Umbruchpunkt schiebt der Link das ganze Dokument
+   breiter. Gemessen: 333 statt 320 px auf den Nutzungsbedingungen — waagrechtes
+   Scrollen, WCAG 1.4.10 (Reflow, Stufe AA). `anywhere` statt `break-word`,
+   weil nur das auch die Mindestbreite des Elements mit einrechnet. */
+.legal-page a,
+.legal-list a {
+  overflow-wrap: anywhere;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 640px) {
+  :root {
+    --container-pad-x: 16px;
+  }
   .container {
-    padding: 24px 16px 48px;
+    padding: 24px var(--container-pad-x) 48px;
   }
   h1 {
     font-size: 1.4rem;

@@ -5,13 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#f9f7f4" />
     <title>Stats &mdash; malziME | Nutzungsstatistik</title>
-    <meta name="description" content="Anonyme Nutzungsstatistik von malziME. Keine personenbezogenen Daten, keine Cookies, kein Tracking. Nur die Anzahl der Analysen." />
+    <meta
+      name="description"
+      content="Anonyme Nutzungsstatistik von malziME. Keine personenbezogenen Daten, keine Cookies, kein Tracking. Nur die Anzahl der Analysen."
+    />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://malzi.me/stats" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Stats &mdash; malziME" />
-    <meta property="og:description" content="Anonyme Nutzungsstatistik von malziME &mdash; transparent und ohne Tracking." />
+    <meta
+      property="og:description"
+      content="Anonyme Nutzungsstatistik von malziME &mdash; transparent und ohne Tracking."
+    />
     <meta property="og:url" content="https://malzi.me/stats" />
 
     <link rel="icon" href="./favicon.ico" sizes="48x48" />
@@ -23,14 +29,17 @@
   </head>
   <body>
     <a href="#main" class="skip-link" tabindex="0">Zum Inhalt springen</a>
-        <!-- m-Wasserzeichen (Leitfaden Kap. 07): 1x pro Flaeche, randbeschnitten -->
+    <!-- m-Wasserzeichen (Leitfaden Kap. 07): 1x pro Flaeche, randbeschnitten -->
     <div class="brand-watermark" aria-hidden="true">
       <img class="wm-light" src="./img/brand/malziland-m-petrol.png" alt="" />
       <img class="wm-dark" src="./img/brand/malziland-m-white.png" alt="" />
     </div>
 
     <main id="main" class="container">
-      <span class="page-eyebrow"><a href="/" class="eyebrow-home">malziME</a> &middot; <span data-i18n="stats.eyebrow">Statistik</span></span>
+      <span class="page-eyebrow"
+        ><a href="/" class="eyebrow-home" tabindex="0">malziME</a> &middot;
+        <span data-i18n="stats.eyebrow">Statistik</span></span
+      >
 
       <!-- Error (hidden by default) -->
       <div class="stats-error" id="statsError">
@@ -44,13 +53,18 @@
           <span class="badge-text" data-i18n="stats.heroBadge">SYSTEM AKTIV</span>
         </div>
         <h1 class="stats-hero__title" data-i18n="stats.heroTitle">malziME in Zahlen</h1>
-        <p class="stats-hero__sub" data-i18n="stats.heroSub">Anonyme Nutzungsstatistik &mdash; keine personenbezogenen Daten, keine Cookies, kein Tracking.</p>
+        <p class="stats-hero__sub" data-i18n="stats.heroSub">
+          Anonyme Nutzungsstatistik &mdash; keine personenbezogenen Daten, keine Cookies, kein Tracking.
+        </p>
       </div>
 
       <!-- Live Status -->
       <div class="stats-live">
         <span class="stats-live__dot"></span>
-        <span class="stats-live__text"><span class="stats-live__num" id="liveCount">&ndash;</span> <span data-i18n="stats.liveText">Analysen in der letzten Stunde</span></span>
+        <span class="stats-live__text"
+          ><span class="stats-live__num" id="liveCount">&ndash;</span>
+          <span data-i18n="stats.liveText">Analysen in der letzten Stunde</span></span
+        >
       </div>
 
       <!-- Total Counter -->
@@ -98,31 +112,90 @@
       <!-- Info Boxes -->
       <div class="stats-info-grid">
         <div class="stats-info">
-          <svg class="stats-info__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M12 15v-3m0-3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <svg
+            class="stats-info__icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <path d="M12 15v-3m0-3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
           <h2 class="stats-info__title" data-i18n="stats.infoCountTitle">Was wird gez&auml;hlt?</h2>
-          <p class="stats-info__text" data-i18n="stats.infoCountText">Nur Z&auml;hlwerte je Zeitraum &mdash; keine Einzelvorg&auml;nge. Keine Bilder, keine IP-Adressen, keine Nutzerprofile.</p>
+          <p class="stats-info__text" data-i18n="stats.infoCountText">
+            Nur Z&auml;hlwerte je Zeitraum &mdash; keine Einzelvorg&auml;nge. Keine Bilder, keine
+            <abbr title="Internet Protocol">IP</abbr>-Adressen, keine Nutzerprofile.
+          </p>
         </div>
 
         <div class="stats-info">
-          <svg class="stats-info__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <svg
+            class="stats-info__icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 6v6l4 2" />
+          </svg>
           <h2 class="stats-info__title" data-i18n="stats.infoLimitTitle">Warum ein Limit?</h2>
-          <p class="stats-info__text" data-i18n="stats.infoLimitText">Jede Analyse kostet Geld (KI&nbsp;+&nbsp;Bilderkennung). Das Stundenlimit sch&uuml;tzt das Projekt vor unerwarteten Kosten.</p>
+          <p class="stats-info__text" data-i18n="stats.infoLimitText">
+            Jede Analyse kostet Geld (<abbr title="K&uuml;nstliche Intelligenz">KI</abbr>&nbsp;+&nbsp;Bilderkennung).
+            Das Stundenlimit sch&uuml;tzt das Projekt vor unerwarteten Kosten.
+          </p>
         </div>
 
         <div class="stats-info stats-info--full">
-          <svg class="stats-info__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
-          <h2 class="stats-info__title" data-i18n="stats.infoFundingTitle">Eigenfinanziert &mdash; f&uuml;r alle kostenlos</h2>
-          <p class="stats-info__text" data-i18n="stats.infoFundingText">malziME ist werbefrei, ohne Tracking und ohne Paywall. Mit einer Spende hilfst du, die Limits zu erh&ouml;hen und das Projekt am Laufen zu halten.</p>
+          <svg
+            class="stats-info__icon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            aria-hidden="true"
+          >
+            <path
+              d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+            />
+          </svg>
+          <h2 class="stats-info__title" data-i18n="stats.infoFundingTitle">
+            Eigenfinanziert &mdash; f&uuml;r alle kostenlos
+          </h2>
+          <p class="stats-info__text" data-i18n="stats.infoFundingText">
+            malziME ist werbefrei, ohne Tracking und ohne Paywall. Mit einer Spende hilfst du, die Limits zu
+            erh&ouml;hen und das Projekt am Laufen zu halten.
+          </p>
           <div class="stats-info__cta">
-            <a href="https://buymeacoffee.com/malzime" target="_blank" rel="noopener" class="support-btn" tabindex="0" data-i18n="stats.infoFundingButton">Projekt unterst&uuml;tzen</a>
+            <a
+              href="https://buymeacoffee.com/malzime"
+              target="_blank"
+              rel="noopener"
+              class="support-btn"
+              tabindex="0"
+              data-i18n="stats.infoFundingButton"
+              >Projekt unterst&uuml;tzen</a
+            >
           </div>
         </div>
       </div>
     </main>
 
     <div class="opensource-box">
-      <a href="https://github.com/malziland/malzime" target="_blank" rel="noopener" class="opensource-link" tabindex="0">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+      <a
+        href="https://github.com/malziland/malzime"
+        target="_blank"
+        rel="noopener"
+        class="opensource-link"
+        tabindex="0"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path
+            d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"
+          />
+        </svg>
         <span data-i18n="opensource.link">Open Source auf GitHub</span>
       </a>
     </div>
@@ -130,7 +203,15 @@
     <div class="support-box">
       <p class="support-headline" data-i18n="support.headline">Keine Paywall. Kein Bullshit.</p>
       <p class="support-text" data-i18n="support.text">Und du h&auml;ltst es am Laufen.</p>
-      <a href="https://buymeacoffee.com/malzime" target="_blank" rel="noopener" class="support-btn" tabindex="0" data-i18n="support.button">Jetzt Projekt unterst&uuml;tzen</a>
+      <a
+        href="https://buymeacoffee.com/malzime"
+        target="_blank"
+        rel="noopener"
+        class="support-btn"
+        tabindex="0"
+        data-i18n="support.button"
+        >Jetzt Projekt unterst&uuml;tzen</a
+      >
     </div>
 
     <footer class="site-footer">
@@ -144,6 +225,8 @@
         <a href="/datenschutz" tabindex="0" data-i18n="footer.datenschutz">Datenschutz</a>
         <span class="footer-sep">&middot;</span>
         <a href="/nutzungsbedingungen" tabindex="0" data-i18n="footer.nutzungsbedingungen">Nutzungsbedingungen</a>
+        <span class="footer-sep">&middot;</span>
+        <a href="/barrierefreiheit" tabindex="0" data-i18n="footer.barrierefreiheit">Barrierefreiheit</a>
         <span class="footer-sep">&middot;</span>
         <a href="/stats" tabindex="0" data-i18n="footer.stats">Stats</a>
       </div>

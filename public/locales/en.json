@@ -157,6 +157,7 @@
   "limit.statsLink": "View current utilization",
   "footer.startseite": "Home",
   "footer.nutzungsbedingungen": "Terms of Use",
+  "footer.barrierefreiheit": "Accessibility",
   "footer.stats": "Stats",
   "stats.backLink": "← Back to homepage",
   "stats.errorText": "Stats could not be loaded. Please try again later.",

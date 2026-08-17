@@ -462,6 +462,11 @@ ADDITIONAL TASK — visible text:
 At the end of the image description, list every text visible on the image —
 verbatim where possible (signs, street names, brand logos, tattoos,
 T-shirt/jersey imprints, captions, display readouts).
+DO NOT LIST: markings that identify the image as AI-generated — such as
+"KI ERSTELLT", "AI GENERATED", "AI-generated". This is our own mandatory
+labelling under Article 50 of the EU AI Act, not part of the subject. It belongs
+neither in the visible text nor in the description and must not influence the
+profile.
 Format: "Visible text: <text 1>; <text 2>; ..." — leave empty if no text.`,
 
   /* ── Blocked image hint (used in index.js) ── */

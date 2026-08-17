@@ -34,10 +34,26 @@ const MOCK_RESPONSE = {
   },
   privacyRisks: [],
   exif: { make: "Apple", model: "iPhone 15 Pro" },
-  meta: { requestId: "a11y-test-123", mode: "multimodal" },
+  /* `subject` war hier nie gesetzt — deshalb blieb der Realitaets-Check
+     unsichtbar und dieser Waechter hat ihn NIE gemessen. Aufgefallen erst beim
+     Aufbau des Barrierefreiheits-Protokolls (2026-08-17), das mit vollem
+     Profil misst. Ein Waechter, der einen ganzen Bildschirmteil nicht sieht,
+     meldet "gruen" fuer etwas, das er nicht geprueft hat. */
+  meta: { requestId: "a11y-test-123", mode: "multimodal", subject: "HUMAN" },
 };
 
 async function checkA11y(page, kontext) {
+  /* Erst zur Ruhe kommen lassen, dann messen. `document.getAnimations()` allein
+     genuegt nicht: Eine Animation, die erst im naechsten Bildschirmrahmen
+     beginnt — etwa der Farbuebergang beim Wechsel ins dunkle Thema — steht dort
+     noch nicht drin. axe erwischt dann Elemente mitten im Uebergang und meldet
+     Kontrastwerte, die es im Endzustand nicht gibt. Genau das ist am
+     2026-08-17 passiert: 19 „ernste" Verstoesse, die in einer ruhigen Messung
+     und in der Nachrechnung von Hand alle bestanden. */
+  for (let i = 0; i < 2; i++) {
+    await page.evaluate(() => new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f))));
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+  }
   const results = await new AxeBuilder({ page }).analyze();
   const alle = results.violations;
   if (alle.length > 0) {
@@ -168,4 +184,55 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
   await page.evaluate(() => window.scrollTo(0, 1200));
   await page.waitForTimeout(300);
   await checkA11y(page, "Beast Mode, Umschalter geklebt");
+});
+
+/* ── Zwei Riegel fuer die Behebungen vom 2026-08-17 ───────────────────────── */
+
+test("A11y: kein waagrechtes Scrollen bei 320 px (WCAG 1.4.10 AA)", async ({ page }) => {
+  /* Gemessen und behoben am 2026-08-17: Die Nutzungsbedingungen standen bei
+     333 px, die Profil-Seite bei 324. Ursachen waren eine nicht umbrechbare
+     EU-Adresse und eine Wert-Plakette, die die Zeile aufschob — dazu eine
+     geklebte Leiste, deren negativer Rand nicht zur Container-Polsterung
+     passte. Ohne diesen Riegel faellt das still zurueck. */
+  await page.setViewportSize({ width: 320, height: 800 });
+  for (const pfad of [
+    "/",
+    "/datenschutz.html",
+    "/impressum.html",
+    "/nutzungsbedingungen.html",
+    "/barrierefreiheit.html",
+    "/stats.html",
+  ]) {
+    await page.goto(pfad);
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+    const mass = await page.evaluate(() => ({
+      doc: document.documentElement.scrollWidth,
+      fenster: window.innerWidth,
+    }));
+    expect(mass.doc, `${pfad} scrollt waagrecht bei 320 px`).toBeLessThanOrEqual(mass.fenster + 1);
+  }
+});
+
+test("A11y: jedes fokussierbare Element hat einen eigenen Fokus-Ring", async ({ page }) => {
+  /* Gemessen am 2026-08-17: 7 von 12 bis 20 Elementen trugen nur den
+     Browser-Standardring. Sichtbar ist der (WCAG 2.4.7 AA erfuellt), aber sein
+     Aussehen entscheidet jeder Browser selbst. Seit dem eigenen Ring sind es 0
+     — dieser Riegel haelt das fest. */
+  for (const pfad of ["/impressum.html", "/datenschutz.html", "/nutzungsbedingungen.html", "/barrierefreiheit.html"]) {
+    await page.goto(pfad);
+    const schwach = await page.evaluate(() => {
+      const raus = [];
+      document.querySelectorAll("a, button, [tabindex='0']").forEach((el) => {
+        if (!el.getClientRects().length) return;
+        el.focus();
+        const s = getComputedStyle(el);
+        const staerke = parseFloat(s.outlineWidth) || 0;
+        if (staerke < 2 || s.outlineStyle === "none") {
+          raus.push((el.id ? "#" + el.id : String(el.className || el.tagName).slice(0, 30)) + " " + staerke + "px");
+        }
+      });
+      return raus;
+    });
+    expect(schwach, `${pfad}: Elemente ohne eigenen Fokus-Ring`).toEqual([]);
+  }
 });

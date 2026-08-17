@@ -499,6 +499,11 @@ ZUSATZAUFGABE — sichtbarer Text:
 Liste am Ende der Bildbeschreibung jeden auf dem Bild sichtbaren Text auf —
 wortgenau wenn möglich (Schilder, Straßennamen, Marken-Logos, Tattoos,
 T-Shirt-/Trikot-Aufdrucke, Bildunterschriften, Display-Anzeigen).
+NICHT AUFLISTEN: Kennzeichnungen, die das Bild als KI-erzeugt ausweisen —
+etwa "KI ERSTELLT", "AI GENERATED", "KI-generiert". Das ist unsere eigene
+Pflichtkennzeichnung nach Artikel 50 der EU-KI-Verordnung, kein Inhalt des
+Motivs. Sie gehört weder in den sichtbaren Text noch in die Beschreibung und
+darf das Profil nicht beeinflussen.
 Format: "Sichtbarer Text: <Text 1>; <Text 2>; ..." — leer lassen wenn kein Text.`,
 
   /* ── Blocked-Image-Hinweis (verwendet in index.js) ── */

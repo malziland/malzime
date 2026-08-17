@@ -19,7 +19,12 @@ export default defineConfig({
     {
       name: "webkit-sprachumschalter",
       use: { browserName: "webkit", viewport: { width: 390, height: 844 } },
-      testMatch: /sprachumschalter.*\.test\.js/,
+      /* Auch das Barrierefreiheits-Protokoll laeuft hier: Die Workshops finden
+         auf iPhones statt, also auf WebKit. Am 2026-08-17 hat genau dieser
+         Unterschied einen echten Fehler gezeigt, den Chromium nicht zeigte —
+         nur in einem Browser zu messen und "geprueft" zu sagen, waere eine
+         halbe Pruefung. */
+      testMatch: /(sprachumschalter|barrierefreiheit-protokoll).*\.test\.js/,
     },
   ],
   webServer: {

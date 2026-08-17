@@ -50,8 +50,14 @@ function buildPrivacyRisks({ visibleText, fullDescription }) {
       risks.push("privacy.address");
     }
 
-    /* Watermark-Filter: Stockfoto-Anbieter sollen NICHT als Telefon-Risiko gelten */
-    const isWatermark = /shutterstock|getty|istock|depositphotos|alamy/i.test(text);
+    /* Watermark-Filter: Stockfoto-Anbieter sollen NICHT als Telefon-Risiko gelten.
+       Seit 2026-08-17 auch die EIGENE KI-Kennzeichnung: Sie ist in die Demo-Fotos
+       gebrannt (Pflicht nach Art. 50 EU-KI-Verordnung) und damit fuer das Modell
+       sichtbarer Text wie jeder andere. Der Prompt weist sie bereits ab; dies ist
+       der zweite Riegel, falls das Modell sie doch meldet. */
+    const isWatermark = /shutterstock|getty|istock|depositphotos|alamy|ki erstellt|ai generated|ki-generiert/i.test(
+      text
+    );
     if (!isWatermark && (/\b\d{2,3}[\s/-]?\d{6,8}\b/.test(text) || /\b0\d{2,4}[\s/-]?\d{5,8}\b/.test(text))) {
       risks.push("privacy.phone");
     }

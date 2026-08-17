@@ -14,7 +14,7 @@ import { logClientError } from "./error-logger.js";
    ausgeschrieben — und wurde vom Deploy prompt selbst überschrieben, weil das
    Muster null Ziffern erlaubte. Beides ist behoben; der Satz nennt das Muster
    trotzdem nicht mehr wörtlich. */
-const DEMO_BUSTER = "?v=2026081306";
+const DEMO_BUSTER = "?v=2026081701";
 
 /* 2026-08-13: Die KI-Kennzeichnung ist in die Pixel gebrannt (Pflicht seit
    08/2026 — ein CSS-Etikett verschwindet, sobald jemand das Bild speichert).

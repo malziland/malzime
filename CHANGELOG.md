@@ -53,9 +53,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   nicht mehr weg. Sie ist der einzige Weg zurück zu einem fertigen Profil.
 
 - **Die Formulierungs-Sperrliste prüft jetzt auch Englisch.** Sie kannte nur
-  deutsche Wendungen — deshalb konnte die englische Fassung einer gesperrten
-  Zusage jahrelang unbemerkt dastehen. Vier englische Regeln ergänzt; die
-  Rückbauprobe belegt, dass sie den echten Fall fangen.
+  deutsche Wendungen — deshalb stand die englische Fassung einer gesperrten
+  Zusage seit dem ersten Release unbemerkt da, ein halbes Jahr lang. Vier
+  englische Regeln ergänzt; die Rückbauprobe belegt, dass sie den echten Fall
+  fangen.
 
 - **Der Fakten-Wächter bewacht 14 statt 4 Fakten.** Vier waren zu wenig: Er
   meldete zuverlässig „kein Drift", und das klang wie eine Aussage über die

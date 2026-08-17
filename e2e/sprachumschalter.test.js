@@ -334,8 +334,14 @@ test("Fokus bleibt in der Rückfrage und kehrt danach zurück", async ({ page })
 
   await page.keyboard.press("Escape");
   await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
-  const zurueck = await page.evaluate(() => document.activeElement.dataset.lang);
-  expect(zurueck).toBe("en");
+  /* Wartend statt einmalig lesen — und zwar aus einem konkreten Grund:
+     `modalSchliessen()` nimmt die Klasse `sichtbar` WEG, BEVOR es den Fokus
+     zurueckholt (sprachumschalter.js). Die Zeile darueber ist also schon
+     erfuellt, waehrend der Fokus noch unterwegs sein kann. Ein einmaliges
+     `document.activeElement` traf diese Luecke unter CI-Last auf WebKit —
+     lokal nie, in der Pipeline einmal. Die Zusicherung bleibt exakt dieselbe
+     (der EN-Knopf hat den Fokus), sie darf nur darauf warten. */
+  await expect(ausloeser).toBeFocused();
 });
 
 /** Misst, was ein Daumen WIRKLICH trifft — nicht, was man sieht.

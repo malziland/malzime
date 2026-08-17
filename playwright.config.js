@@ -37,7 +37,7 @@ export default defineConfig({
     {
       name: "firefox-barrierefreiheit",
       use: { browserName: "firefox" },
-      testMatch: /(a11y|tastatur-erreichbarkeit|barrierefreiheit-protokoll|ansagen-)/,
+      testMatch: /(a11y|tastatur-erreichbarkeit|barrierefreiheit-protokoll|ansagen)/,
     },
   ],
   webServer: {

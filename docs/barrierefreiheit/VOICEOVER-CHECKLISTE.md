@@ -1,12 +1,17 @@
-# VoiceOver-Durchgang — Anleitung zum Abhaken
+# VoiceOver am Mac — Durchgang zum Abhaken
 
 **Für:** Christoph
-**Dauer:** rund 45 Minuten, davon 25 am Mac und 20 am iPhone
-**Zweck:** Vier Kriterien lassen sich maschinell nicht prüfen. Erst mit diesem
-Durchgang darf die Barrierefreiheitserklärung „konform" sagen statt „weitgehend
-konform".
+**Dauer:** rund 25 Minuten
+**Zweck:** Ergänzung zum iPhone-Durchgang, für den Fall, dass du auch am Rechner
+zuhören willst.
 
-Du musst nichts wissen und nichts vorbereiten. Alles, was du brauchst, steht hier.
+> **Fang mit dem iPhone an, nicht hier.**
+> **[IPHONE-DURCHGANG.md](IPHONE-DURCHGANG.md)** ist die empfohlene Anleitung: Sie stellt
+> dir bei jedem Schritt den **erwarteten Wortlaut** daneben, sodass du nur vergleichen
+> musst statt zu beurteilen — und sie allein reicht aus, um die vier offenen Kriterien zu
+> schließen. Diese Datei hier ist der ältere, offenere Durchgang am Mac; sie fragt „was
+> hast du gehört" und verlangt damit mehr Einschätzung von dir.
+
 **Trage bei jedem Schritt nur ein, was du gehört hast** — auch wenn es dir falsch
 vorkommt. Genau das ist das Ergebnis.
 
@@ -17,10 +22,6 @@ vorkommt. Genau das ist das Ergebnis.
 **Am Mac:** VoiceOver einschalten mit **⌘ + F5** (bei Tastaturen mit Fn-Taste:
 **Fn + ⌘ + F5**). Ausschalten mit derselben Tastenkombination.
 
-**Am iPhone:** Einstellungen → Bedienungshilfen → VoiceOver → einschalten. Praktisch
-ist es, vorher unter Bedienungshilfen → Bedienungshilfen-Kurzbefehl VoiceOver zu
-hinterlegen — dann schaltet dreimaliges Drücken der Seitentaste um.
-
 **Die vier Tasten, die du am Mac brauchst:**
 
 | Taste                    | Was passiert                        |
@@ -30,15 +31,12 @@ hinterlegen — dann schaltet dreimaliges Drücken der Seitentaste um.
 | **Tabulator**            | zum nächsten Bedienelement springen |
 | **Ctrl**                 | VoiceOver zum Schweigen bringen     |
 
-**Am iPhone:** einmal tippen = vorlesen, zweimal tippen = auslösen, mit einem Finger
-nach rechts streichen = nächstes Element.
-
 **Wenn etwas schiefgeht:** VoiceOver aus, Seite neu laden, VoiceOver an. Nichts kann
 kaputtgehen.
 
 ---
 
-## Teil 1 — Am Mac (rund 25 Minuten)
+## Der Durchgang
 
 Öffne **https://malzi.me** in Safari. VoiceOver einschalten.
 
@@ -150,58 +148,16 @@ iPhone und iPad auftrat. Deshalb steht er hier.
 
 ---
 
-## Teil 2 — Am iPhone (rund 20 Minuten)
+## Der iPhone-Teil steht woanders
 
-Hier finden die Workshops statt, deshalb zählt dieser Teil doppelt. Öffne
-**https://malzi.me** in Safari, VoiceOver einschalten.
-
-### Schritt 8 — Wischen durch die Seite
-
-Streiche mit einem Finger von links nach rechts, bis du unten bist.
-
-- [ ] Werden alle Elemente in einer sinnvollen Reihenfolge vorgelesen?
-- [ ] Wird etwas übersprungen, das du auf dem Bildschirm siehst?
-- [ ] Wird etwas vorgelesen, das gar nicht da ist?
-
-**Was dir aufgefallen ist:**
-
----
-
-### Schritt 9 — Analyse am Handy
-
-Doppeltippe ein Demo-Bild. **Lege das Telefon hin und warte**, ohne es zu berühren.
-
-- [ ] Kommen die Ansagen wie am Mac?
-- [ ] Passiert etwas Ungutes, wenn der Bildschirm dunkel wird und du ihn wieder
-      aufweckst?
-
-Der zweite Punkt ist bei uns ein bekannter Wackelkandidat: Der Bildschirm-Wachhalter
-greift auf iPhones nicht, dafür fängt die Warteschlange das ab. Ob das mit VoiceOver
-auch trägt, hat noch niemand geprüft.
-
-**Was passiert ist:**
-
----
-
-### Schritt 10 — Der Sprachumschalter
-
-Doppeltippe auf **EN**.
-
-- [ ] Wird angesagt, dass die Sprache gewechselt hat?
-- [ ] Wird die Seite danach auf **Englisch** vorgelesen?
-- [ ] Öffne aus der Fußzeile die Datenschutzerklärung und tippe dort auf **EN**:
-      Wird der zweisprachige Hinweis vorgelesen — beide Zeilen?
-
-**Was du gehört hast:**
-
----
-
----
+Die Schritte am iPhone standen früher hier und sind nach
+**[IPHONE-DURCHGANG.md](IPHONE-DURCHGANG.md)** umgezogen — dort mit erwartetem Wortlaut
+statt offener Frage. Zwei Anleitungen für dieselbe Sache driften auseinander; deshalb hat
+jede jetzt genau ein Gerät.
 
 ## Zum Schluss
 
-- [ ] VoiceOver am Mac ausgeschaltet
-- [ ] VoiceOver am iPhone ausgeschaltet
+- [ ] VoiceOver ausgeschaltet
 
 **Gesamteindruck in einem Satz — würdest du damit arbeiten können, wenn du nichts
 sehen würdest?**
@@ -217,7 +173,7 @@ sehen würdest?**
 Gib mir diese Liste zurück, so ausgefüllt wie sie ist. Auch „weiß nicht mehr genau"
 ist eine brauchbare Antwort.
 
-Ich trage die Ergebnisse in Abschnitt 7 des Prüfprotokolls ein. Findet sich nichts,
+Ich trage die Ergebnisse in Abschnitt 7 von Anhang A ein. Findet sich nichts,
 wird aus „weitgehend konform" ein belegtes „konform". Findet sich etwas, behebe ich
 es und der Punkt steht als Fund im Protokoll — was der Erklärung nicht schadet,
 sondern sie glaubwürdig macht.

@@ -20,6 +20,25 @@ import { join } from "node:path";
  * Restrisiko, das Zweite eine Beurteilung — beides gehoert ehrlich benannt und
  * nicht als "geprueft" ausgegeben.
  */
+/**
+ * ansagen.test.js — ALLES, was ein Screenreader sagen wuerde.
+ *
+ * Zusammengelegt am 2026-08-18 aus drei Dateien (ansagen-protokoll,
+ * ansagen-haeufigkeit, ansagen-doppelung), die getrennt gewachsen waren und
+ * dieselbe Frage aus drei Richtungen stellten. Jede hatte ihre eigene Kopie der
+ * Testdaten und ihres Endpunkt-Aufbaus — zwei Kopien, die niemand gegen die
+ * dritte haelt, driften gemeinsam ab.
+ *
+ * Drei Fragen, eine Datei:
+ *   1. WAS wird gesagt        — Baum und Live-Bereiche mitschreiben
+ *   2. WIE OFT wird es gesagt — Haeufigkeit waehrend der Wartezeit
+ *   3. Sagt es sich DOPPELT   — Wortgruppen, die sich im Namen wiederholen
+ *
+ * Zustaendigkeiten der uebrigen Barrierefreiheits-Dateien:
+ *   a11y.test.js                     blockierendes Gate, schnell, wenige Seiten
+ *   barrierefreiheit-protokoll.js    breite Messung, schreibt Befunde weg
+ *   tastatur-erreichbarkeit.test.js  Struktur der Tastaturbedienung
+ */
 
 const AUSGABE = join(process.cwd(), "e2e", ".protokoll");
 const mitschrift = { baum: {}, ansagen: [] };
@@ -265,5 +284,183 @@ test.describe("Ansage-Protokoll", () => {
     mkdirSync(AUSGABE, { recursive: true });
     writeFileSync(join(AUSGABE, "ansagen.json"), JSON.stringify(mitschrift, null, 2), "utf8");
     expect(Object.keys(mitschrift.baum).length).toBeGreaterThan(0);
+  });
+});
+
+/* ── 2. WIE OFT wird gesprochen ────────────────────────────────────────────
+Wie oft ein Screenreader waehrend der Wartezeit spricht — und dass das Ergebnis
+ * einen Namen hat.
+ *
+ * ANLASS: Ein Nutzer hat mit VoiceOver zugehoert und gesagt, es sei „total
+ * nervig, der wiederholt andauernd". Nachgemessen: 19 Ansagen in 30 Sekunden
+ * Wartezeit, bei einer vollen Analyse rund 40 — fast immer derselbe Satz.
+ * Ursache: `showQueueWaiting` schrieb den Text bei JEDER Statusabfrage neu, also
+ * alle 2 Sekunden, auch wenn er sich nicht geaendert hatte. Jede Zuweisung an
+ * `textContent` loest in einem `aria-live`-Bereich eine neue Ansage aus.
+ *
+ * Dazu kamen die rotierenden Zier-Meldungen („Analysiere Pixel…"), die sich
+ * tatsaechlich aendern und deshalb ebenfalls vorgelesen wurden.
+ *
+ * WARUM KEIN TEST DAS FAND: Die Pruefungen sahen, DASS angesagt wird — nicht WIE
+ * OFT. Eine Seite, die sich alle zwei Sekunden selbst wiederholt, ist fuer blinde
+ * Nutzer unbenutzbar, waehrend jede Messung gruen bleibt.
+ *
+ * MASSSTAB: Waehrend einer Wartezeit gehoeren die Zustandswechsel angesagt —
+ * „Foto unterwegs", „Analyse gestartet", die Warteschlangen-Position — und sonst
+ * nichts. Drei bis vier pro Minute. Die Grenze hier ist bewusst grosszuegig
+ * gesetzt (5 in 30 Sekunden), damit sie echte Rueckfaelle faengt und nicht bei
+ * jeder Textaenderung anschlaegt.
+*/
+
+test("Wartezeit: hoechstens fuenf Ansagen in 30 Sekunden", async ({ page }) => {
+  test.setTimeout(90000);
+  const ansagen = [];
+  await page.exposeFunction("__ansage", (t) => ansagen.push((t || "").trim()));
+  await page.addInitScript(() => {
+    window.addEventListener("DOMContentLoaded", () => {
+      document.querySelectorAll("[aria-live]:not([aria-live='off']), [role='status'], [role='alert']").forEach((el) => {
+        new MutationObserver(() => window.__ansage(el.textContent)).observe(el, {
+          childList: true,
+          subtree: true,
+          characterData: true,
+        });
+      });
+    });
+  });
+
+  await endpunkte(page, { status: "queued", position: 3, etaSeconds: 45 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.waitForTimeout(500);
+  const vorher = ansagen.length;
+  await page.click('[data-demo="selfie"]');
+  await page.waitForTimeout(30000);
+  const waehrend = ansagen.slice(vorher).filter(Boolean);
+
+  /* POSITIVKONTROLLE: Null Ansagen waeren kein Erfolg, sondern eine kaputte
+     Messung — oder eine Seite, die blinden Nutzern gar nichts sagt. */
+  expect(waehrend.length).toBeGreaterThan(0);
+  expect(waehrend.length).toBeLessThanOrEqual(5);
+});
+
+test("Nach der Analyse traegt der Ergebnisbereich einen Namen", async ({ page }) => {
+  /* Der zweite Fund desselben Nutzers: „Analyse beendet" kam, danach nichts.
+     Der Fokus sprang auf einen <section> ohne Rolle und ohne Namen — VoiceOver
+     landet dort und hat nichts zu sagen. */
+  await endpunkte(page, { status: "done", result: PROFIL });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await page.click('[data-demo="selfie"]');
+  await page.waitForSelector(".cat-card", { timeout: 20000 });
+  await page.waitForTimeout(1200);
+
+  const fokus = await page.evaluate(() => {
+    const a = document.activeElement;
+    return { id: a?.id, rolle: a?.getAttribute("role"), name: a?.getAttribute("aria-label") };
+  });
+  expect(fokus.id).toBe("resultsPanel");
+  expect(fokus.rolle).toBe("region");
+  expect(fokus.name).toBeTruthy();
+});
+
+/* ── 3. Sagt sich eine Ansage DOPPELT ──────────────────────────────────────
+ * ansagen-doppelung.test.js — Wächter gegen doppelte Wörter in einer Ansage.
+ *
+ * Anlass 2026-08-18: Die Knöpfe der Beispielbilder trugen ihren Namen
+ * zweimal — einmal aus dem Alternativtext des Bildes, einmal aus der
+ * sichtbaren Bildunterschrift darunter. Beides landet im zugänglichen Namen
+ * des Knopfes, also sagte VoiceOver „Selfie am Stephansplatz. Zeigt keine
+ * reale Person. Selfie am Stephansplatz".
+ *
+ * Kein Verstoß gegen ein Erfolgskriterium — kein Kriterium verbietet
+ * Wiederholung. Aber genau diese Sorte Doppelung war die Beschwerde beim
+ * ersten Zuhören: „er wiederholt andauernd". Formal richtig und trotzdem
+ * mühsam ist der Zustand, den Messungen am leichtesten übersehen.
+ *
+ * Gefunden wurde es nicht durch Messen, sondern durch AUSLESEN, was ein
+ * Screenreader an dieser Stelle vorfindet. Das ist der Grund für diese Datei:
+ * Der Name jedes Bedienelements wird gelesen, nicht nur auf Vorhandensein
+ * geprüft.
+ */
+
+/* Zerlegt einen Namen in Wortgruppen und sucht Gruppen, die sich wortwörtlich
+   wiederholen. Einzelne Wörter zählen nicht — „der" darf mehrfach vorkommen. */
+function doppelteGruppen(name) {
+  const woerter = name
+    .toLowerCase()
+    .replace(/[.,:;!?]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const treffer = [];
+  for (let laenge = 3; laenge <= Math.floor(woerter.length / 2); laenge++) {
+    for (let i = 0; i + laenge * 2 <= woerter.length + laenge; i++) {
+      const gruppe = woerter.slice(i, i + laenge).join(" ");
+      const rest = woerter.slice(i + laenge).join(" ");
+      if (rest.includes(gruppe)) treffer.push(gruppe);
+    }
+  }
+  return [...new Set(treffer)];
+}
+
+test.describe("Ansagen wiederholen sich nicht in sich selbst", () => {
+  test("Rückbauprobe: die Suche findet eine Doppelung, wenn es eine gibt", () => {
+    /* Ohne diese Zeile wäre ein kaputter Vergleich still grün. */
+    expect(doppelteGruppen("Selfie am Stephansplatz zeigt niemanden Selfie am Stephansplatz").length).toBeGreaterThan(
+      0
+    );
+    expect(doppelteGruppen("Foto auswählen oder hierhin ziehen")).toEqual([]);
+  });
+
+  test("kein Bedienelement sagt seinen Namen zweimal", async ({ page }) => {
+    await page.route("**/api/stats", (r) =>
+      r.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          current: { count: 1, limit: 500, limitActive: false, retryAfterSeconds: 0 },
+          totals: { today: 1, week: 1, month: 1, total: 1 },
+          useQueue: true,
+          sprachumschalter: true,
+        }),
+      })
+    );
+    await page.goto("/");
+
+    const bedienbar = page.locator("button, a[href], [role='button'], input, select");
+    const anzahl = await bedienbar.count();
+    /* POSITIVKONTROLLE: Findet die Suche keine Bedienelemente, ist der Test
+       blind und nicht die Seite sauber. */
+    expect(anzahl).toBeGreaterThan(8);
+
+    const gefunden = [];
+    for (let i = 0; i < anzahl; i++) {
+      const el = bedienbar.nth(i);
+      if (!(await el.isVisible().catch(() => false))) continue;
+      const name = (
+        await el.evaluate((n) => (n.textContent || "") + " " + (n.getAttribute("aria-label") || ""))
+      ).trim();
+      const voll = await el.evaluate((n) => {
+        /* So, wie ein Screenreader den Namen zusammensetzt: aria-label
+           schlägt alles, sonst Inhalt inklusive Alternativtexten. */
+        const label = n.getAttribute("aria-label");
+        if (label) return label;
+        const teile = [];
+        n.querySelectorAll("img[alt]").forEach((b) => {
+          if (b.getAttribute("aria-hidden") !== "true") teile.push(b.alt);
+        });
+        n.childNodes.forEach((k) => {
+          if (k.nodeType === 3) teile.push(k.textContent);
+          else if (k.nodeType === 1 && k.getAttribute("aria-hidden") !== "true" && k.tagName !== "IMG")
+            teile.push(k.textContent);
+        });
+        return teile.join(" ").replace(/\s+/g, " ").trim();
+      });
+      if (!voll || voll.length < 12) continue;
+      const doppel = doppelteGruppen(voll);
+      if (doppel.length) gefunden.push({ name: voll.slice(0, 90), doppelt: doppel[0] });
+      void name;
+    }
+
+    expect(gefunden, `Diese Ansagen enthalten sich selbst doppelt: ${JSON.stringify(gefunden, null, 1)}`).toEqual([]);
   });
 });

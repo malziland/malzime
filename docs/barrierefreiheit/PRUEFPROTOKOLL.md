@@ -64,6 +64,14 @@ Ein erster Aufbau meldete 17 Kontrastverstöße, die in einem sauberen Einzellau
 reproduzierbar waren — axe hatte Elemente in einem Übergangszustand erwischt. Ein
 Protokoll mit Scheinbefunden ist schlechter als keines.
 
+**Ein grüner Test ist nur so viel wert wie die Frage, die er stellen kann.**
+Der Tastatur-Durchgang dieses Protokolls war grün, während der Sprachumschalter auf
+Safari mit der Tastatur unerreichbar war — Playwrights WebKit tabbt auf Buttons
+unabhängig von Safaris Einstellung „Vollzugriff Tastatur". Gefunden hat den Fehler ein
+Nutzer in einer Minute. Geprüft wird deshalb jetzt die STRUKTUR (trägt jedes
+Bedienelement `tabindex="0"`?), nicht das Tabben. Dieser Wächter fand sofort einen
+zweiten Fall, den niemand kannte.
+
 **Jede Messung hat eine Positivkontrolle.** Liefert axe null geprüfte Regeln oder
 findet die Zielgrößen-Messung kein einziges Bedienelement, bricht der Lauf ab. Ohne
 das sähe ein kaputter Lauf aus wie ein perfektes Ergebnis.
@@ -104,7 +112,7 @@ Legende: **erfüllt** = nachgewiesen · **n. a.** = nicht anwendbar, mit Grund �
 | 1.3.3 Sensorische Eigenschaften | Sichtprüfung: keine Anweisung verweist allein auf Form, Größe oder Position | **erfüllt** |
 | 1.4.1 Benutzung von Farbe | Sichtprüfung: Konfidenz-Punkte tragen zusätzlich Zahlwerte, Fehlermeldungen zusätzlich Text | **erfüllt** |
 | 1.4.2 Audio-Steuerelement | Die Tipp-Geräusche sind kürzer als 3 s, spielen nur auf Nutzeraktion und lassen sich abschalten | **n. a.** |
-| 2.1.1 Tastatur | E2E-Durchgang: jedes Bedienelement per Tabulator erreichbar und auslösbar | **maschinell erfüllt**, Handprüfung offen |
+| 2.1.1 Tastatur | **Struktur**-Prüfung: jedes Bedienelement trägt `tabindex="0"` — auch die von JavaScript erzeugten (`tastatur-erreichbarkeit.test.js`, 6 Seiten plus Umschalter und Dialog). Ein Tabulator-Durchlauf im Test taugt dafür NICHT: Playwrights WebKit tabbt auf Buttons unabhängig von Safaris Einstellung „Vollzugriff Tastatur" und ist grün, während die echte Bedienung scheitert | **erfüllt**, Handprüfung offen |
 | 2.1.2 Keine Tastaturfalle | E2E: 10 Tabulatorschritte im Dialog, Fokus verlässt ihn nie und kehrt bei Escape zurück | **erfüllt** |
 | 2.1.4 Zeichentasten-Kurzbefehle | Bestandsprüfung: keine Einzelzeichen-Kurzbefehle vorhanden | **n. a.** |
 | 2.2.1 Zeiteinteilung anpassbar | Die Analyse hat keine Frist für den Nutzer; das Abholfenster von 15 Minuten betrifft nur die Wiederholung eines fertigen Ergebnisses und verliert keine Eingabe | **erfüllt** |
@@ -169,6 +177,8 @@ Sie stehen hier, weil ein Protokoll, das nur Erfolge nennt, unglaubwürdig ist.
 | 1.4.10 Reflow | Profil-Seite 324 statt 320 px — die Wert-Plakette der Datenwert-Skala schob die Zeile auf | Zeile bricht um statt die Seite zu verbreitern | ja |
 | 1.4.10 Reflow (Ursache) | Die geklebte Umschalt-Leiste zog mit fest verdrahteten 20 px über den Rand, während die Seitenpolsterung bei schmalen Bildschirmen auf 16 px zurückgeht | Beide Werte kommen jetzt aus einer Quelle und können nicht auseinanderdriften | ja |
 | 2.4.7 Fokus sichtbar | 7 von 12 bis 20 Elementen je Rechtsseite trugen nur den Browser-Standardring. Sichtbar war er, aber sein Aussehen entscheidet jeder Browser selbst | Eigener Ring, 2 px, 5,9 : 1 gegen Papier und 11 : 1 im dunklen Thema | ja |
+| 2.1.1 Tastatur (Stufe A) | **Der Sprachumschalter war auf Safari mit der Tastatur nicht erreichbar.** Seine Knöpfe entstehen im JavaScript und trugen kein `tabindex="0"`; Safari tabbt ohne „Vollzugriff Tastatur" nicht auf Buttons. Betroffen waren 7 Knöpfe in zwei Dateien | `tabindex="0"` ergänzt | ja |
+| 2.1.1 Tastatur (Stufe A) | **Der Rücksprung zur Startseite war auf allen Unterseiten nicht erreichbar** — derselbe Grund, `.eyebrow-home` ohne `tabindex`. Vom neuen Wächter gefunden, nicht von Hand | `tabindex="0"` auf fünf Seiten ergänzt | ja |
 
 **Bewusste, benannte Abweichung zu 1.4.5 (Bilder von Text):** Die drei Demo-Fotos
 tragen die KI-Kennzeichnung in die Pixel gebrannt. Das ist seit August 2026 Pflicht

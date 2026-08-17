@@ -86,6 +86,14 @@ function umschalterEinsetzen(el) {
 function knopf(code, aktiv) {
   const b = document.createElement("button");
   b.type = "button";
+  /* SAFARI-REGEL (BUG-2026-08-17-08): Safari tabbt ohne „Vollzugriff Tastatur"
+     NICHT zu Buttons — jedes Bedienelement braucht ein ausdrueckliches
+     tabindex="0". Fuer die statische index.html erzwingt das ein Unit-Test seit
+     Langem; die HIER im JavaScript erzeugten Knoepfe hat er nie gesehen. Folge:
+     Der Sprachumschalter war auf Safari mit der Tastatur nicht erreichbar —
+     WCAG 2.1.1, Stufe A. Gefunden von einem Nutzer auf der Live-Seite, nicht
+     von einem Test. */
+  b.setAttribute("tabindex", "0");
   b.className = "sprach-knopf" + (aktiv ? " aktiv" : "");
   b.dataset.lang = code;
   b.textContent = code.toUpperCase();
@@ -132,6 +140,7 @@ function baueHinweis() {
 
   const schliessen = document.createElement("button");
   schliessen.type = "button";
+  schliessen.setAttribute("tabindex", "0");
   schliessen.className = "sw-schliessen";
   schliessen.setAttribute("aria-label", `${TEXTE.schliessen_de} / ${TEXTE.schliessen_en}`);
   const kreuz = document.createElement("span");
@@ -158,6 +167,7 @@ function baueHinweis() {
   knoepfe.className = "sw-knoepfe";
   const ok = document.createElement("button");
   ok.type = "button";
+  ok.setAttribute("tabindex", "0");
   ok.className = "sw-knopf sw-knopf--bleiben";
   ok.textContent = TEXTE.knopf;
   knoepfe.appendChild(ok);

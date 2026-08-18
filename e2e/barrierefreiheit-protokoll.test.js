@@ -18,7 +18,7 @@
 
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 /* Bewusst über das Arbeitsverzeichnis statt über `import.meta.url`: Playwright
@@ -913,7 +913,47 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
        Protokoll, das seine eigene Quelle nicht nennen kann, ist kein Protokoll. */
     const browser = test.info().project.name || "unbekannt";
     writeFileSync(join(AUSGABE, `befunde-${browser}.json`), JSON.stringify(befunde, null, 2), "utf8");
-    /* Bewusst kein `expect` hier: Diese Datei misst, sie richtet nicht. */
     console.log(`[protokoll] ${befunde.length} Messungen (${browser}) abgelegt in ${AUSGABE}`);
+
+    /* ── Wächter gegen Doku-Drift ──────────────────────────────────────────
+       Anlass 2026-08-18: Im Prüfprotokoll stand in einer Tabellenzelle noch
+       "15 Zustände, beide Browser", während längst 46 in DREI Browsern
+       gemessen wurden. Die Messung war aktuell, der Satz daneben nicht.
+
+       Der Nutzer zog daraus den naheliegenden Schluss: "Dann kannst du es ja
+       nicht geprüft haben." Genau das ist der Schaden — eine veraltete Zahl
+       entwertet den ganzen Bericht, auch wenn die Messung dahinter stimmt. Wer
+       eine falsche Zahl findet, glaubt keiner der übrigen.
+
+       Der Wächter sitzt HIER und nicht in der Unit-Suite: Die Rohdaten unter
+       e2e/.protokoll/ sind bewusst nicht versioniert, ein Test anderswo hätte
+       sie in der CI nie gesehen und sich still übersprungen. An dieser Stelle
+       ist die Zahl gerade entstanden.
+
+       Diese Datei richtet sonst nicht, sie misst — hier aber schon: Eine
+       falsche Zahl in einem Prüfbericht ist kein Messergebnis, sondern ein
+       Fehler in der Unterlage. */
+    const UNTERLAGEN = [
+      "docs/barrierefreiheit/PRUEFBERICHT-WCAG-EM.md",
+      "docs/barrierefreiheit/PRUEFPROTOKOLL.md",
+      "public/barrierefreiheit.html",
+    ];
+    const falsch = [];
+    let gelesen = 0;
+    for (const rel of UNTERLAGEN) {
+      const pfad = join(process.cwd(), rel);
+      if (!existsSync(pfad)) continue;
+      const text = readFileSync(pfad, "utf8");
+      gelesen++;
+      for (const m of text.matchAll(/(\d+)\s*Zust(?:ä|&auml;|ae)nde/g)) {
+        if (Number(m[1]) !== befunde.length) {
+          falsch.push({ datei: rel, genannt: Number(m[1]), gemessen: befunde.length });
+        }
+      }
+    }
+    /* POSITIVKONTROLLE: Wurde keine Unterlage gelesen, prüft der Wächter
+       nichts und wäre still grün. */
+    expect(gelesen, "keine Unterlage gefunden — der Drift-Wächter ist blind").toBeGreaterThan(0);
+    expect(falsch, `Doku nennt eine andere Zahl von Zuständen als gemessen: ${JSON.stringify(falsch)}`).toEqual([]);
   });
 });

@@ -4,6 +4,21 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Eine veraltete Zahl im Prüfprotokoll.** In einer Tabellenzelle stand noch
+  „15 Zustände, beide Browser", während längst 46 Zustände in drei Browsern
+  gemessen wurden. Die Messung war aktuell — der Satz daneben nicht.
+
+  Der Schaden ist größer als die Zahl: Wer in einem Prüfbericht eine falsche
+  Angabe findet, glaubt keiner der übrigen. Deshalb prüft jetzt ein Wächter bei
+  jedem Testlauf, ob die Zahlen in Bericht, Protokoll und auf der Website mit
+  dem übereinstimmen, was tatsächlich gemessen wurde. Er sitzt an der Stelle,
+  an der die Zahl entsteht — anderswo hätte er die Rohdaten in der CI nie
+  gesehen.
+
 ## [3.4.1] — 2026-08-18
 
 ### Geändert

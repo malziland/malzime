@@ -4,7 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.4.0] — 2026-08-18
+
+Barrierefreiheit: geprüft nach der Methodik des W3C, sechs Mängel behoben.
+
+Der Prüfbericht folgt jetzt **WCAG-EM 2.0** statt einer selbst gewählten Form.
+Das ist kein Formalismus — die Methodik verlangt Angaben, die vorher fehlten,
+und genau diese Fragen brachten drei ungeprüfte Schritte und einen echten
+Kontrastmangel ans Licht.
+
+Die Konformitätsaussage lautet bewusst „weitgehend konform" und nicht
+„konform": Alle drei Browser-Maschinen sind geprüft, vier
+Hilfsmittel-Kombinationen nicht.
 
 ### Behoben — Barrierefreiheit
 

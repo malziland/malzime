@@ -76,6 +76,13 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   ein Prüfmittel, das nie anschlägt, und eines, das immer anschlägt, sind gleich
   wertlos.
 
+- **Zwei wackelige Prüfungen entwackelt.** Eine Zusicherung wählte über einen
+  Komma-Wähler „das erste Element im Dokument" statt „das mit Inhalt" und wurde
+  auf Firefox rot, obwohl die Seite in Ordnung war; eine zweite konnte praktisch
+  nicht fehlschlagen. Ein wackeliger Riegel ist schlimmer als keiner — er wird
+  irgendwann übergangen, und dann fängt er auch die echten Fälle nicht mehr.
+  Gewartet wird jetzt auf die Bedingung statt auf die Uhr.
+
 - **Ein Protokoll der Vorlese-Reihenfolge** über alle Seiten und Zustände: jedes
   Element mit Rolle, Name und Zustand, in der Reihenfolge, in der es gesprochen
   würde. Ergebnis: kein Bedienelement ohne Namen, kein Bild ohne Alternativtext.

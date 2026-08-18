@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.6.1] — 2026-08-18
 
 ### Geändert
 

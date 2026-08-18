@@ -708,11 +708,13 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
     });
     await page.goto("/");
     await page.click('[data-demo="selfie"]');
-    await page.waitForTimeout(4000);
     /* POSITIVKONTROLLE: Ohne sie koennte dieser Test eine leere Seite messen
        und "keine Verstoesse" melden — der Wartezustand muss nachweislich da
-       sein, sonst ist das Protokoll an dieser Stelle wertlos. */
-    await expect(page.locator("#scanText")).not.toBeEmpty();
+       sein, sonst ist das Protokoll an dieser Stelle wertlos.
+       Gewartet wird auf die Bedingung, nicht auf die Uhr: Eine feste Frist ist
+       auf einem langsamen Laufer zu kurz und auf einem schnellen verschenkte
+       Zeit. */
+    await expect(page.locator("#scanText")).not.toBeEmpty({ timeout: 20000 });
     await messen(page, "Warteschlange", "wartend mit Position und Restzeit");
 
     await page.unroute("**/api/job-status**");
@@ -723,8 +725,22 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
         body: JSON.stringify({ status: "processing", liveText: "Du bist vermutlich Mitte zwanzig und " }),
       })
     );
-    await page.waitForTimeout(4000);
-    await expect(page.locator("#liveTextFest, #scanText").first()).not.toBeEmpty();
+    /* NICHT `locator("#a, #b").first()` — das waehlt nach Reihenfolge im
+       Dokument, nicht nach "das mit Inhalt". Sobald die Verarbeitung beginnt,
+       wird #scanText geleert und der Text steht in #liveTextFest; .first()
+       prueft dann das leere Element. Auf Firefox trat genau diese Reihenfolge
+       ein — der Riegel war dort rot, obwohl die Seite in Ordnung war.
+       Ein wackeliger Riegel ist schlimmer als keiner: Er wird irgendwann
+       uebergangen, und dann faengt er auch die echten Faelle nicht mehr.
+       Geprueft wird deshalb, ob IRGENDWO Live-Text steht, und mit Warten auf
+       die Bedingung statt auf die Uhr. */
+    await expect
+      .poll(
+        async () =>
+          (await page.locator("#liveTextFest, #scanText").allTextContents()).join("").replace(/\s+/g, "").length,
+        { timeout: 20000, message: "Weder #liveTextFest noch #scanText tragen Live-Text" }
+      )
+      .toBeGreaterThan(0);
     await messen(page, "Live-Text", "Modell schreibt mit");
   });
 
@@ -829,8 +845,16 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
        Format mit eigenen Barrierefreiheits-Regeln (PDF/UA) und gehoert nicht in
        eine HTML-Pruefung. Was hier zaehlt: Ist der Weg dorthin bedienbar und
        benannt? */
-    const knopf = page.locator("#exportPdf, [id*=export]").first();
-    await expect(knopf).toHaveCount(1);
+    /* `toHaveCount(1)` auf einem .first()-Waehler ist fast immer wahr und
+       belegt nichts — es genuegt IRGENDEIN Treffer, auch der falsche.
+       Geprueft wird deshalb, was der Schritt wirklich braucht: Der Knopf ist
+       sichtbar, mit der Tastatur erreichbar und traegt einen Namen. Ein
+       Bedienelement ohne Namen ist fuer einen Screenreader nicht vorhanden. */
+    const knopf = page.getByRole("button", { name: /pdf|export|herunterladen|speichern/i }).first();
+    await expect(knopf).toBeVisible({ timeout: 20000 });
+    const name = (await knopf.evaluate((n) => n.getAttribute("aria-label") || n.textContent || "")).trim();
+    expect(name.length, "Der PDF-Knopf traegt keinen Namen").toBeGreaterThan(2);
+    await expect(knopf).toHaveAttribute("tabindex", "0");
     await messen(page, "Analyse-Prozess", "Schritt 9: PDF-Export erreichbar");
   });
 

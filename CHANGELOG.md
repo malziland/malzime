@@ -4,7 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.4.0] — 2026-08-18
+
+Barrierefreiheit: geprüft nach der Methodik des W3C, sechs Mängel behoben.
+
+Der Prüfbericht folgt jetzt **WCAG-EM 2.0** statt einer selbst gewählten Form.
+Das ist kein Formalismus — die Methodik verlangt Angaben, die vorher fehlten,
+und genau diese Fragen brachten drei ungeprüfte Schritte und einen echten
+Kontrastmangel ans Licht.
+
+Die Konformitätsaussage lautet bewusst „weitgehend konform" und nicht
+„konform": Alle drei Browser-Maschinen sind geprüft, vier
+Hilfsmittel-Kombinationen nicht.
 
 ### Behoben — Barrierefreiheit
 
@@ -64,6 +75,13 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   sich in sich selbst wiederholen. Jeder mit Positivkontrolle und Rückbauprobe —
   ein Prüfmittel, das nie anschlägt, und eines, das immer anschlägt, sind gleich
   wertlos.
+
+- **Zwei wackelige Prüfungen entwackelt.** Eine Zusicherung wählte über einen
+  Komma-Wähler „das erste Element im Dokument" statt „das mit Inhalt" und wurde
+  auf Firefox rot, obwohl die Seite in Ordnung war; eine zweite konnte praktisch
+  nicht fehlschlagen. Ein wackeliger Riegel ist schlimmer als keiner — er wird
+  irgendwann übergangen, und dann fängt er auch die echten Fälle nicht mehr.
+  Gewartet wird jetzt auf die Bedingung statt auf die Uhr.
 
 - **Ein Protokoll der Vorlese-Reihenfolge** über alle Seiten und Zustände: jedes
   Element mit Rolle, Name und Zustand, in der Reihenfolge, in der es gesprochen

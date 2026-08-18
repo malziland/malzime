@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+
+- **Ein gemeldeter Fehler wird messbar, statt geraten.** Nutzer-Fund: Profil
+  laden, Beast-Modus, „PDF speichern", dann im Druckdialog abbrechen — die
+  Seite war danach schwarz und leer, erst ein Neuladen half.
+
+  **Der Fehler ließ sich nicht nachstellen** — weder in Chromium noch in
+  WebKit, weder über das Druck-Stylesheet noch über den Aufräumweg. Die
+  üblichen Verdächtigen scheiden aus: keine hängende Überlagerung, kein
+  `backdrop-filter`, keine 3D-Ebene, die klebende Leiste ist unbeteiligt.
+
+  Statt eine Vermutung als Behebung auszuliefern, prüft die Seite nach jedem
+  Druckdialog selbst nach, ob der Ergebnisbereich noch sichtbar ist — und
+  meldet den Fall mit allen nötigen Angaben, wenn nicht. Beim nächsten
+  Auftreten liegt damit ein Befund vor statt einer Beschreibung.
+
+  Dazu ein Wächter, der festhält, was nach dem Abbrechen gelten muss.
+
 ## [3.6.0] — 2026-08-18
 
 ### Hinzugefügt

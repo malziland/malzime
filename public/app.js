@@ -17,7 +17,7 @@ import { enthuellungAbkuerzen, modusWechsel } from "./js/live-anzeige.js";
 import * as realitaetsCheck from "./js/realitaets-check.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
-import { initFehlerNachsendung } from "./js/error-logger.js";
+import { initFehlerNachsendung, logClientError } from "./js/error-logger.js";
 import { initSprachumschalter, merkmalUebernehmen } from "./js/sprachumschalter.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
@@ -314,4 +314,36 @@ elements.exportPdf.addEventListener("click", () => {
   setTimeout(removePrintNotes, 1000);
 });
 
-window.addEventListener("afterprint", removePrintNotes);
+window.addEventListener("afterprint", () => {
+  removePrintNotes();
+
+  /* NUTZER-FUND 2026-08-18: Nach „PDF speichern" → Abbrechen war die Seite im
+     Beast-Modus schwarz und leer; erst ein Neuladen brachte sie zurueck.
+     Headless ist das nicht reproduzierbar — weder ueber das Druck-Stylesheet
+     noch in Chromium oder WebKit. Statt eine Vermutung als Behebung
+     auszuliefern, wird der Fall hier MESSBAR gemacht: Bleibt der
+     Ergebnisbereich nach dem Druckdialog unsichtbar, geht das mit den
+     noetigen Angaben in die Fehlererfassung. Beim naechsten Auftreten liegt
+     dann ein Befund vor statt einer Beschreibung.
+     Zwei Bildschirmrahmen Abstand, damit der Browser fertig gezeichnet hat. */
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      const panel = document.getElementById("resultsPanel");
+      if (!panel) return;
+      const kasten = panel.getBoundingClientRect();
+      const stil = window.getComputedStyle(panel);
+      const unsichtbar = kasten.height < 50 || stil.display === "none" || stil.visibility === "hidden";
+      if (!unsichtbar) return;
+      logClientError("druck-abbruch-seite-leer", {
+        hoehe: Math.round(kasten.height),
+        display: stil.display,
+        sichtbarkeit: stil.visibility,
+        deckkraft: stil.opacity,
+        modus: document.documentElement.getAttribute("data-mode"),
+        thema: document.documentElement.getAttribute("data-theme"),
+        bodyHoehe: document.body.scrollHeight,
+        druckhinweise: document.querySelectorAll(".print-note").length,
+      });
+    })
+  );
+});

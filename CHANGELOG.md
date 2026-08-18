@@ -4,6 +4,20 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Die Barrierefreiheitserklärung lädt jetzt ein, statt sich zu entschuldigen.**
+  Bisher stand dort, die fehlenden Hilfsmittel-Durchgänge lägen daran, dass uns
+  „diese Geräte nicht zur Verfügung stehen" — was für das iPhone schlicht nicht
+  stimmte. Jetzt steht dieselbe Tatsache mit einem Weg daneben: Was offen ist,
+  liegt öffentlich auf GitHub, und wer mit einem Screenreader arbeitet, kann es
+  in fünf Minuten beantworten. Ohne GitHub-Konto genügt eine E-Mail.
+
+- **`/barrierefreiheit` trägt jetzt dieselben Kästen wie alle anderen Seiten**
+  (Open Source, Projektunterstützung). Sie war die einzige Seite ohne.
+
 ## [3.4.0] — 2026-08-18
 
 Barrierefreiheit: geprüft nach der Methodik des W3C, sechs Mängel behoben.

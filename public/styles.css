@@ -3822,3 +3822,51 @@ html[lang="en"] .rc-zitat::after {
 .seiten-kopfzeile .page-eyebrow {
   margin-bottom: 0;
 }
+
+/* ── Aufruf zum Mitmachen, eingebettet in einen Textabschnitt ──────────────
+   Anlass 2026-08-18: Die Barrierefreiheitserklaerung benannte die ungepruefen
+   Hilfsmittel als Entschuldigung ("stehen uns nicht zur Verfuegung"). Aus der
+   Luecke wird eine Einladung — dieselbe Tatsache, aber mit einem Weg daneben.
+
+   Baut auf .support-box auf, das ausserhalb von <main> am Seitenende steht.
+   Diese Abwandlung sitzt MITTEN im Text und braucht deshalb einen eigenen
+   Rahmen, damit sie sich vom Fliesstext absetzt, ohne wie eine Werbeflaeche zu
+   wirken. */
+.support-box--inline {
+  max-width: none;
+  padding: 20px 18px;
+  margin: 18px 0;
+  background: var(--tint-teal);
+  border-left: 2px solid var(--ml-teal);
+  border-radius: var(--radius-md);
+}
+
+.support-box--inline .support-headline {
+  margin: 0 0 6px;
+}
+
+.support-box--inline .support-text {
+  margin: 0 0 14px;
+}
+
+/* KASKADEN-KOLLISION, beim Ansehen gefunden und fast ausgeliefert:
+   `.legal-section a` (Spezifitaet 0,1,1) schlaegt `.support-btn` (0,1,0) und
+   faerbte den Knopftext tuerkis MIT Unterstreichung — tuerkis auf tuerkisem
+   Verlauf, praktisch unlesbar. Kein Messwerkzeug haette das gemeldet: Der
+   Knopf war vorhanden, benannt und anklickbar. Nur Hinsehen zeigt es.
+   Deshalb hier gezielt zurueckgeholt, nicht mit !important erschlagen. */
+.legal-section .support-box--inline .support-btn,
+.legal-section .support-box--inline .support-btn:hover {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+/* Der Nachsatz nimmt die Huerde weg: Ein GitHub-Konto ist keine Bedingung.
+   Bewusst kleiner, aber NICHT blasser — 0.82rem auf --muted haelt die
+   verlangten 4.5:1 (WCAG 1.4.3). Eine graue Fussnote waere genau der Fehler,
+   den diese Seite anprangert. */
+.support-box--inline .support-fein {
+  margin: 12px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}

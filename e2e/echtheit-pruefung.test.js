@@ -9,22 +9,35 @@
 
 import { test, expect } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 
 const FINGERABDRUCK = join(process.cwd(), "public", "build-info.json");
+const OEFFENTLICH = join(process.cwd(), "public");
 
 /* Der im Repository liegende Fingerabdruck ist gegenueber dem Arbeitsstand
    IMMER veraltet — er entsteht erst beim Ausliefern neu. Ein Test, der gegen
    ihn prueft, waere je nach letzter Aenderung mal gruen und mal rot; genau das
-   ist in der CI passiert (2 von 80 Dateien weichen ab).
-   Der Test stellt sich seinen Pruefstand deshalb selbst her und raeumt danach
-   auf. Damit misst er die Mechanik, nicht den Zufall. */
+   ist in der CI passiert ("2 von 80 Dateien weichen ab").
+
+   Der Test rechnet die Pruefsummen deshalb selbst nach und schreibt sie in den
+   Fingerabdruck, bevor er misst. Bewusst OHNE scripts/build-info.mjs: Das
+   Skript braucht git, und im CI-Container gibt es kein Repository — der erste
+   Anlauf scheiterte genau daran. Die Metadaten (Commit, Zeitpunkt) bleiben
+   unangetastet; geprueft wird die Mechanik, nicht die Herkunft. */
 let urzustand;
 
 test.beforeAll(() => {
   urzustand = readFileSync(FINGERABDRUCK, "utf8");
-  execFileSync("node", ["scripts/build-info.mjs", "2099010101"], { cwd: process.cwd() });
+  const daten = JSON.parse(urzustand);
+  for (const pfad of Object.keys(daten.dateien)) {
+    daten.dateien[pfad] =
+      "sha256:" +
+      createHash("sha256")
+        .update(readFileSync(join(OEFFENTLICH, pfad)))
+        .digest("hex");
+  }
+  writeFileSync(FINGERABDRUCK, JSON.stringify(daten, null, 2) + "\n", "utf8");
 });
 
 test.afterAll(() => {

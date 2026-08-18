@@ -153,8 +153,37 @@ function kontrastImBrowser(waehler) {
 }
 
 async function axePruefen(page, kontext) {
+  /* ZWEIMAL messen und nur uebernehmen, was BEIDE Male auftritt.
+     Anlass 2026-08-18: Dieser Test wurde im Pruefstand rot mit 18 Kontrast-
+     Funden im Zustand "Profil fertig, Beast" — im Wiederholungslauf gruen.
+     Ursache ist die Zeitdeckelung in ruhe(): Nach einer Sekunde misst sie
+     weiter, auch wenn der Themenwechsel plus Ergebnis-Einblendung auf einer
+     ausgelasteten Maschine laenger braucht. axe erwischt dann halbtransparente
+     Elemente im Uebergang.
+     Ein wackeliger Riegel ist schlimmer als keiner: Er wird irgendwann
+     uebergangen, und dann faengt er auch die echten Faelle nicht mehr.
+     Ein Uebergangs-Artefakt tritt in zwei getrennten Messungen nicht zweimal
+     an derselben Stelle auf, ein echter Verstoss immer. */
   await ruhe(page);
-  const funde = (await new AxeBuilder({ page }).analyze()).violations;
+  const lauf1 = (await new AxeBuilder({ page }).analyze()).violations;
+  await ruhe(page);
+  const lauf2 = (await new AxeBuilder({ page }).analyze()).violations;
+
+  const schluessel = (v) =>
+    v.id +
+    "|" +
+    v.nodes
+      .map((n) => n.target.join(" "))
+      .sort()
+      .join(";");
+  const imZweiten = new Set(lauf2.map(schluessel));
+  const funde = lauf1.filter((v) => imZweiten.has(schluessel(v)));
+
+  const wackelig = lauf1.filter((v) => !imZweiten.has(schluessel(v)));
+  if (wackelig.length) {
+    console.log(`[a11y] ${kontext}: ${wackelig.length} Fund(e) nur im ersten Lauf — als Uebergangs-Artefakt verworfen`);
+  }
+
   if (funde.length) {
     console.log(
       `[a11y] ${kontext}: ${funde.length} Fund(e):`,

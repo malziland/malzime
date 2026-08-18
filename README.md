@@ -303,6 +303,30 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser direkt bei OpenStreetMap bzw. Nominatim)
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 
+## Laeuft wirklich, was hier offen liegt?
+
+Offener Quelltext sagt, was laufen KOENNTE — nicht, was laeuft. Fuer das
+Frontend, auf dem die Datenschutz-Zusagen dieses Projekts beruhen, ist die
+Luecke geschlossen:
+
+Bei jedem Ausliefern entsteht [`/build-info.json`](https://malzi.me/build-info.json)
+mit dem Commit, dem Zeitpunkt und einer SHA-256-Pruefsumme **jeder** ausgelieferten
+Datei. Wer nachrechnen will, braucht einen Befehl:
+
+```
+sh scripts/pruefe-live.sh
+```
+
+Das Skript holt den Fingerabdruck von malzi.me, prueft ob der genannte Commit in
+diesem Repository existiert, laedt jede gelistete Datei vom Server und vergleicht
+die Pruefsummen. Rueckgabewerte sind bewusst getrennt: `0` deckungsgleich,
+`1` Abweichung gefunden, `2` Messproblem (kein Netz, Werkzeug fehlt) — ein
+Messfehler darf nie als Befund durchgehen.
+
+Was das NICHT beweist: was auf dem Server passiert. Die Cloud Functions baut
+Google aus dem Quelltext; eine nachrechenbare Bestaetigung dafuer gibt es nicht.
+Der Teil, der beweisbar ist, ist beweisbar gemacht.
+
 ## Lizenz
 
 Der Quellcode steht unter MIT — siehe [LICENSE](LICENSE).

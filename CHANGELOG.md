@@ -6,6 +6,46 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Behoben
+
+- **Ein wackeliger Prüfriegel.** Der Sprachumschalter-Test wurde im Prüfstand
+  rot mit 18 Kontrast-Funden im dunklen Modus — im Wiederholungslauf grün.
+  Ursache: Die Warteroutine bricht nach einer Sekunde ab, auch wenn der
+  Themenwechsel plus Ergebnis-Einblendung länger braucht; gemessen wurde dann
+  mitten im Übergang. Jetzt läuft die Messung doppelt, und nur was beide Male
+  auftritt, zählt als Fund. Ein Übergangs-Artefakt schafft das nicht, ein
+  echter Verstoß immer.
+
+### Hinzugefügt
+
+- **Die Datenschutzerklärung sagt jetzt, wie man uns überprüft.** Neuer
+  Abschnitt „Musst du uns glauben? Nein." — mit dem Link auf den Fingerabdruck
+  für alle und den drei Befehlen zum Selbst-Nachrechnen für die, die ein
+  Terminal öffnen wollen. Kein Vorwissen, keine Installation.
+
+  Die Grenze steht als eigener, hervorgehobener Absatz und nicht im
+  Kleingedruckten: Der letzte Schritt läuft auf Rechnern von Google, und was
+  dort im Inneren ausgeführt wird, kann von außen niemand nachrechnen — bei
+  keinem Anbieter. Dafür gibt es heute kein Verfahren. Lesbar ist auch dieser
+  Teil, er liegt im selben offenen Bauplan.
+
+- **Nachrechenbar, dass live genau das läuft, was offen im Quelltext steht.**
+  Bei jeder Auslieferung entsteht `malzi.me/build-info.json`: der Commit, der
+  Zeitpunkt und eine Prüfsumme jeder einzelnen Datei, die diese Website
+  ausliefert. Welche Dateien das sind, entscheidet nicht das Skript, sondern
+  die Ausschlussliste in `firebase.json` — es bricht ab, wenn sie fehlt.
+
+  Nachrechnen geht mit einem Befehl: `sh scripts/pruefe-live.sh` holt den
+  Fingerabdruck, prüft ob der genannte Commit im Repository existiert, lädt
+  jede gelistete Datei vom Server und vergleicht. Die Rückgabewerte sind
+  bewusst getrennt: **0** deckungsgleich, **1** Abweichung gefunden,
+  **2** Messproblem. Ein Messfehler darf nie als bestandener Test durchgehen.
+
+  **Was das belegt:** die Seite, die im Browser ankommt. **Was es nicht
+  belegt:** was auf den Servern geschieht — deren Software bauen und betreiben
+  wir nicht. Das steht so auch in der README, statt einen Beweis zu
+  suggerieren, den es nicht gibt.
+
 ### Aufgeräumt
 
 - **`queue-prod-test.js` liegt jetzt dort, wo sein eigener Kopf es beschreibt.**
@@ -211,6 +251,35 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
 ## [3.3.1] — 2026-08-17
 
 ### Hinzugefügt
+
+- **Der Beweis, dass live läuft, was offen liegt.** Offener Quelltext sagt, was
+  laufen _könnte_ — nicht, was läuft. Für das Frontend, auf dem die
+  Datenschutz-Zusagen beruhen, ist die Lücke jetzt geschlossen.
+
+  Bei jedem Ausliefern entsteht `/build-info.json` mit Commit, Zeitpunkt,
+  Cache-Buster und einer SHA-256-Prüfsumme **jeder** ausgelieferten Datei
+  (aktuell 79 Dateien, 11 KB). Wer nachrechnen will, braucht einen Befehl:
+  `sh scripts/pruefe-live.sh`.
+
+  Drei Dinge waren dabei wichtiger als die Erzeugung selbst:
+
+  Die **Reihenfolge im Deploy** — der Fingerabdruck entsteht NACH der
+  Cache-Buster-Ersetzung. Andersherum stünden dort die Prüfsummen des Zustands
+  davor, und jede Nachprüfung meldete Abweichungen, wo keine sind. Ein Beweis,
+  der falsch Alarm schlägt, wird nach kurzer Zeit ignoriert.
+
+  Die **Ausschlussliste** wird aus `firebase.json` **gelesen**, nicht
+  abgeschrieben. Sonst behauptete der Fingerabdruck etwas über Dateien, die
+  Firebase gar nicht ausliefert — Tests, versteckte Dateien, Demo-Originale.
+
+  Die **Trennung von Befund und Messproblem**: `0` deckungsgleich, `1`
+  Abweichung, `2` kein Netz. Belegt an einem lokalen Server, alle drei Fälle
+  einzeln nachgemessen. Ein Messfehler darf nie als Befund durchgehen.
+
+  Was das nicht beweist, steht ausdrücklich in der README: was auf dem **Server**
+  passiert. Die Cloud Functions baut Google; eine nachrechenbare Bestätigung
+  dafür gibt es nicht. Der beweisbare Teil ist beweisbar gemacht, der Rest wird
+  benannt statt behauptet.
 
 - **`scripts/vor-dem-push.sh` — die Pipeline in wenigen Sekunden vorweggenommen.**
   Am 13. August gingen drei Pipeline-Läufe rot; zwei davon waren reine

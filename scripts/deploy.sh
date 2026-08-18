@@ -183,6 +183,14 @@ for f in public/index.html public/datenschutz.html public/impressum.html public/
     echo "  $f aktualisiert"
   fi
 done
+
+# Fingerabdruck des Ausgelieferten. MUSS nach der Buster-Ersetzung laufen —
+# sonst stehen dort die Pruefsummen des Zustands DAVOR, und jede Nachpruefung
+# meldet Abweichungen, wo keine sind.
+if ! node scripts/build-info.mjs "$VERSION"; then
+  echo "FEHLER: build-info.json konnte nicht erzeugt werden." >&2
+  exit 1
+fi
 fi
 
 echo ""

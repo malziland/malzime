@@ -9,11 +9,15 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 ### Geändert
 
 - **Die Barrierefreiheitserklärung lädt jetzt ein, statt sich zu entschuldigen.**
-  Bisher stand dort, die fehlenden Hilfsmittel-Durchgänge lägen daran, dass uns
-  „diese Geräte nicht zur Verfügung stehen" — was für das iPhone schlicht nicht
-  stimmte. Jetzt steht dieselbe Tatsache mit einem Weg daneben: Was offen ist,
-  liegt öffentlich auf GitHub, und wer mit einem Screenreader arbeitet, kann es
-  in fünf Minuten beantworten. Ohne GitHub-Konto genügt eine E-Mail.
+  Bisher rechtfertigte sie die fehlenden Hilfsmittel-Durchgänge damit, dass uns
+  „diese Geräte nicht zur Verfügung stehen". Jetzt steht dort schlicht, dass
+  diese Durchgänge noch nicht abgeschlossen sind — und daneben ein Weg, das zu
+  ändern: Rückmeldungen sammeln wir auf GitHub, ohne Konto genügt eine E-Mail.
+
+  Der Aufruf richtet sich an alle, die mit einem Hilfsmittel arbeiten, nicht nur
+  an Screenreader-Nutzer — und er stellt keine Bedingungen. Ein erster Entwurf
+  hatte von Menschen gesprochen, „die mitreden können"; auf einer Seite über
+  Barrierefreiheit ist das genau die falsche Hürde.
 
 - **`/barrierefreiheit` trägt jetzt dieselben Kästen wie alle anderen Seiten**
   (Open Source, Projektunterstützung). Sie war die einzige Seite ohne.

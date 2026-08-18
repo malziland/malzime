@@ -246,7 +246,11 @@ test.describe("Ansage-Protokoll", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await page.click('[data-demo="selfie"]');
-    await page.waitForSelector(".cat-card", { timeout: 20000 });
+    /* 45 s statt 20: Auf dem Firefox-Laeufer der CI reichten 20 s nicht, der
+     Test wurde dort zeitweise rot, obwohl die Seite in Ordnung ist. Die
+     Zusicherung darunter bleibt unveraendert — verlaengert wird nur die
+     Geduld, nicht die Toleranz. */
+    await page.waitForSelector(".cat-card", { timeout: 45000 });
     await page.evaluate(() => document.getElementById("biasSwitch").click());
     await page.waitForTimeout(1200);
     const zeilen = await baumLesen(page, "Beast an");
@@ -351,7 +355,11 @@ test("Nach der Analyse traegt der Ergebnisbereich einen Namen", async ({ page })
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await page.click('[data-demo="selfie"]');
-  await page.waitForSelector(".cat-card", { timeout: 20000 });
+  /* 45 s statt 20: Auf dem Firefox-Laeufer der CI reichten 20 s nicht, der
+     Test wurde dort zeitweise rot, obwohl die Seite in Ordnung ist. Die
+     Zusicherung darunter bleibt unveraendert — verlaengert wird nur die
+     Geduld, nicht die Toleranz. */
+  await page.waitForSelector(".cat-card", { timeout: 45000 });
   await page.waitForTimeout(1200);
 
   const fokus = await page.evaluate(() => {

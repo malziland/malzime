@@ -6,6 +6,18 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- **Der Absatz über die Grenze der Nachprüfbarkeit war zu bescheiden geworden.**
+  Er stammte aus der Zeit, als nur die Website mit Prüfsummen belegt war, und
+  las sich wie „am Server wissen wir auch nichts". Seit der Server-Code
+  ebenfalls Datei für Datei im Fingerabdruck steht, stimmt das nicht mehr.
+
+  Jetzt in drei kurzen Absätzen: Wo wir keinen Zugriff haben. Was wir trotzdem
+  zeigen können — nämlich welcher Code dorthin gegeben wurde. Und was niemand
+  zeigen kann: dass Googles Rechner genau diesen Code ausführen. Das steht
+  ausdrücklich als Stand der Technik da, nicht als übersehene Lücke.
+
 ### Hinzugefügt
 
 - **Ein gemeldeter Fehler wird messbar, statt geraten.** Nutzer-Fund: Profil

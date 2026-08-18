@@ -16,8 +16,8 @@ Bewertung der Konformität mit den Web Content Accessibility Guidelines.
 | ------------------- | ------------------------------------------------------------------------------ |
 | **Prüfer**          | malziland - learning \| training \| consulting e.U., Inhaber Christoph Krieger |
 | **Auftraggeber**    | Eigenprüfung                                                                   |
-| **Prüfdatum**       | 17. August 2026                                                                |
-| **Geprüfter Stand** | Commit `b83121d`, ausgelieferte Kennung `2026081703`                           |
+| **Prüfdatum**       | 17.–18. August 2026                                                            |
+| **Geprüfter Stand** | Commit `05e2a71` (v3.4.0), ausgelieferte Kennung `2026081802`                  |
 | **Art der Prüfung** | Selbstbewertung, werkzeuggestützt und teilweise manuell                        |
 
 ---

@@ -6,6 +6,13 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Aufgeräumt
+
+- **`queue-prod-test.js` liegt jetzt dort, wo sein eigener Kopf es beschreibt.**
+  Das Werkzeug lag in einem eigenen Ordner neben dem Repo, obwohl es seit jeher
+  den Aufruf aus dem Repo-Wurzelverzeichnis dokumentierte. Ein Werkzeug, das
+  seinen eigenen Ablageort widerlegt, findet niemand wieder.
+
 ### Behoben
 
 - **Eine veraltete Zahl im Prüfprotokoll.** In einer Tabellenzelle stand noch

@@ -234,3 +234,38 @@ if [ -n "$UEBERSPRUNGEN" ]; then
 else
   echo "Deploy abgeschlossen. Version: ?v=$VERSION — alle Riegel gelaufen."
 fi
+
+# ── OPS-2026-08-18-01: Der Versionsschnitt darf nicht vergessen werden ──
+# Dreimal an einem Tag ausgeliefert, dreimal die Nummer nicht gesetzt: GitHub
+# meldete v3.3.2 beziehungsweise v3.4.0, waehrend live schon mehr stand. Das
+# Repository behauptet dann WENIGER, als ausgeliefert ist — wer den Stand
+# nachlesen will, wird in die Irre gefuehrt.
+#
+# Warum als Schlusshinweis und nicht als Riegel VOR dem Deploy: Steht die Nummer
+# schon vor dem Merge im CHANGELOG, legt release.yml den Release an, sobald der
+# Merge auf main landet — also rund acht Minuten VOR der Auslieferung. Die
+# Reihenfolge muss bleiben: erst ausliefern, dann die Nummer setzen. Der
+# richtige Ort dafuer ist der Cache-Buster-PR, der ohnehin nach jedem Deploy
+# faellig ist.
+OBERSTE="$(sh scripts/changelog-oberste-version.sh CHANGELOG.md 2>/dev/null || true)"
+case "$OBERSTE" in
+  ""|*nver*)
+    echo ""
+    echo "════════════════════════════════════════════════════════════════"
+    echo " OFFEN: Der CHANGELOG steht auf [Unveröffentlicht]."
+    echo ""
+    echo " Ausgeliefert ist ?v=$VERSION — im Repository steht diese"
+    echo " Auslieferung aber unter keiner Versionsnummer. Damit meldet"
+    echo " GitHub einen aelteren Stand, als tatsaechlich live ist."
+    echo ""
+    echo " ZU TUN, zusammen mit dem Cache-Buster-PR:"
+    echo "   1. In CHANGELOG.md '## [Unveröffentlicht]' durch die neue"
+    echo "      Nummer und das heutige Datum ersetzen."
+    echo "   2. Pruefen:  sh scripts/changelog-oberste-version.sh CHANGELOG.md"
+    echo "   3. Mitcommitten — release.yml legt Tag und Release dann selbst an."
+    echo "════════════════════════════════════════════════════════════════"
+    ;;
+  *)
+    echo "CHANGELOG: oberste Version ist $OBERSTE — Versionsschnitt gesetzt."
+    ;;
+esac

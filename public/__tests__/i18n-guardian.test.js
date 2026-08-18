@@ -199,6 +199,15 @@ describe("i18n Guardian", () => {
          Der Eintrag löst sich selbst auf: Der Test direkt darunter macht ihn
          zum Fehler, sobald die Rechtsseiten übersetzt sind. */
       "js/sprachhinweis.js",
+
+      /* ÜBERGANG (2026-08-18), gleiche Begründung: js/echtheit-pruefen.js
+         rechnet auf der Datenschutzseite nach, ob der ausgelieferte Stand dem
+         offenen Quelltext entspricht. Auch diese Seite lädt keine Sprachdatei
+         — die Texte müssen deshalb im Code stehen.
+
+         Er löst sich mit demselben Test auf: Sobald die Rechtsseiten übersetzt
+         sind, gehört dieser Eintrag entfernt und die Texte in die Locales. */
+      "js/echtheit-pruefen.js",
     ];
 
     it("non-allowlisted JS files have no hardcoded German", () => {
@@ -229,9 +238,9 @@ describe("i18n Guardian", () => {
       if (uebersetzt.length === 0) return; // Übergang gilt noch
 
       expect(
-        ALLOWLIST.includes("js/sprachhinweis.js"),
-        `${uebersetzt.join(", ")} ist übersetzt — die Übergangslösung js/sprachhinweis.js ` +
-          "und dieser Allowlist-Eintrag gehören jetzt entfernt"
+        ALLOWLIST.includes("js/sprachhinweis.js") || ALLOWLIST.includes("js/echtheit-pruefen.js"),
+        `${uebersetzt.join(", ")} ist übersetzt — die Übergangslösungen js/sprachhinweis.js ` +
+          "und js/echtheit-pruefen.js und ihre Allowlist-Einträge gehören jetzt entfernt"
       ).toBe(false);
     });
 

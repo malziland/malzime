@@ -124,17 +124,54 @@ done < "$ARBEIT/soll.txt"
 
 echo "-----------------------------------------------------------"
 
+# ── Server-Code gegen dieses Repository ───────────────────────────────────
+# Seit 2026-08-18 nennt der Fingerabdruck auch Pruefsummen fuer functions/src/.
+# Die kann man nicht vom Webserver holen — der Server-Code wird nicht
+# ausgeliefert, er laeuft. Nachrechenbar ist er trotzdem: gegen die Dateien in
+# genau diesem Repository. Das beantwortet die Frage "ist der Code, den ich
+# hier lese, wirklich der, aus dem ausgeliefert wurde?"
+SERVER_ABWEICHUNG=0
+SERVER_GEPRUEFT=0
+if python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+for pfad, summe in sorted(d.get('serverDateien', {}).items()):
+    print(pfad + '\t' + summe)
+" "$ARBEIT/build-info.json" > "$ARBEIT/server-soll.txt" 2>/dev/null && [ -s "$ARBEIT/server-soll.txt" ]; then
+  while IFS="$(printf '\t')" read -r PFAD SOLL; do
+    [ -z "$PFAD" ] && continue
+    QUELLE="functions/src/$PFAD"
+    if [ ! -f "$QUELLE" ]; then
+      echo "  FEHLT im Repository: $QUELLE"
+      SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+      continue
+    fi
+    IST="sha256:$($SUMME "$QUELLE" | cut -d' ' -f1)"
+    SERVER_GEPRUEFT=$((SERVER_GEPRUEFT + 1))
+    if [ "$IST" != "$SOLL" ]; then
+      echo "  ABWEICHUNG im Server-Code: $QUELLE"
+      SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+    fi
+  done < "$ARBEIT/server-soll.txt"
+  echo "  Server-Code: $SERVER_GEPRUEFT Datei(en) gegen dieses Repository geprueft."
+  echo "-----------------------------------------------------------"
+fi
+
 if [ "$GEPRUEFT" -eq 0 ]; then
   echo "MESSPROBLEM: keine einzige Datei geladen — vermutlich kein Netz." >&2
   exit 2
 fi
 
-if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ]; then
-  echo "ERGEBNIS: $GEPRUEFT von $ANZAHL Dateien geprueft, alle deckungsgleich."
+if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ] && [ "$SERVER_ABWEICHUNG" -eq 0 ]; then
+  echo "ERGEBNIS: $GEPRUEFT von $ANZAHL Website-Dateien geprueft, alle deckungsgleich."
+  if [ "$SERVER_GEPRUEFT" -gt 0 ]; then
+    echo "          $SERVER_GEPRUEFT Server-Dateien in diesem Repository ebenfalls deckungsgleich."
+  fi
   echo "Der ausgelieferte Stand entspricht Commit $COMMIT."
   exit 0
 fi
 
 echo "ERGEBNIS: $ABWEICHUNG Abweichung(en), $FEHLEND fehlend, bei $GEPRUEFT geprueften Dateien."
+[ "$SERVER_ABWEICHUNG" -gt 0 ] && echo "          Dazu $SERVER_ABWEICHUNG Abweichung(en) im Server-Code."
 echo "Der ausgelieferte Stand entspricht NICHT dem genannten Commit."
 exit 1

@@ -67,7 +67,6 @@ function passtAufMuster(rel, muster) {
   return false;
 }
 
-
 function fehler(text) {
   console.error(`FEHLER: ${text}`);
   process.exit(2);
@@ -126,18 +125,74 @@ for (const rel of dateien) {
   summen[rel] = pruefsumme(voll);
 }
 
+/* ── Server-Code ───────────────────────────────────────────────────────────
+   Bis 2026-08-18 nannte der Fingerabdruck den Server-Teil nur ueber den
+   Commit. Das genuegt, solange die Auslieferung sauber an einen
+   veroeffentlichten Stand gebunden ist — genau diese Bindung laesst sich aber
+   mit SKIP_STAND=1 umgehen. Dann waere die Commit-Angabe irrefuehrend, ohne
+   dass es jemand sehen koennte.
+   Mit Pruefsummen ueber functions/src/ ist auch der Server-Teil Datei fuer
+   Datei festgenagelt: Wer das Repository hat, rechnet nach, ob der Code darin
+   byte-genau der ist, aus dem ausgeliefert wurde.
+   Was das WEITERHIN nicht beweist: dass Google genau diesen Code ausfuehrt.
+   Diese Grenze bleibt und wird auch so benannt. */
+const SERVER = join(WURZEL, "functions", "src");
+function serverDateienSammeln(ordner, gesammelt = []) {
+  for (const e of readdirSync(ordner, { withFileTypes: true })) {
+    const voll = join(ordner, e.name);
+    /* Tests und Testdaten laufen nicht im Betrieb — sie gehoeren nicht in
+       eine Aussage darueber, was ausgeliefert wurde. */
+    if (e.isDirectory()) {
+      if (e.name === "__tests__" || e.name === "node_modules") continue;
+      serverDateienSammeln(voll, gesammelt);
+      continue;
+    }
+    if (!e.name.endsWith(".js")) continue;
+    gesammelt.push(relative(SERVER, voll));
+  }
+  return gesammelt.sort();
+}
+
+const serverDateien = serverDateienSammeln(SERVER);
+if (serverDateien.length === 0) {
+  fehler("Keine Dateien unter functions/src/ gefunden — das kann nicht stimmen.");
+}
+const serverSummen = {};
+for (const rel of serverDateien) {
+  serverSummen[rel] = pruefsumme(join(SERVER, rel));
+}
+
+const jetzt = new Date();
+const commitKurz = git("rev-parse", "--short", "HEAD");
+const wann = jetzt.toLocaleString("de-AT", { timeZone: "Europe/Vienna", dateStyle: "long", timeStyle: "short" });
+
 const inhalt = {
-  hinweis:
-    "Fingerabdruck des ausgelieferten Standes. Nachrechnen: scripts/pruefe-live.sh im Repository github.com/malziland/malzime",
+  /* Wer hier draufklickt, sieht sonst rohes JSON und weiss nicht, was er vor
+     sich hat. Die ersten drei Felder sind deshalb Klartext — sie erklaeren
+     die Datei, bevor die Zahlenkolonnen kommen. */
+  _1_wasIstDas:
+    `Diese Website wurde am ${wann} (Wien) aus dem oeffentlichen Quelltext veroeffentlicht, ` +
+    `Fassung ${commitKurz}. Darunter steht fuer jede einzelne Datei eine Pruefsumme: eine ` +
+    `Zahlenfolge, die sich aendert, sobald sich auch nur ein Zeichen in der Datei aendert.`,
+  _2_wozu:
+    "Damit kann jeder nachrechnen, ob das, was hier ausgeliefert wird, wirklich dem offenen " +
+    "Quelltext entspricht — ohne uns glauben zu muessen.",
+  _3_soGehtsSelbst: "git clone https://github.com/malziland/malzime.git && cd malzime && sh scripts/pruefe-live.sh",
+  _4_grenze:
+    "Belegt wird die Website, die im Browser ankommt, und der Server-Code in diesem Repository. " +
+    "Was auf den Rechnern von Google im Inneren ausgefuehrt wird, kann von aussen niemand " +
+    "nachrechnen — bei keinem Anbieter. Dafuer gibt es heute kein Verfahren.",
   commit: git("rev-parse", "HEAD"),
-  commitKurz: git("rev-parse", "--short", "HEAD"),
+  commitKurz,
   zweig: git("rev-parse", "--abbrev-ref", "HEAD"),
   cacheBuster: version,
-  ausgeliefertAm: new Date().toISOString(),
+  ausgeliefertAm: jetzt.toISOString(),
   dateien: summen,
+  serverDateien: serverSummen,
 };
 
 writeFileSync(ZIEL, JSON.stringify(inhalt, null, 2) + "\n", "utf8");
 console.log(
-  `  build-info.json geschrieben: ${Object.keys(summen).length} Dateien, Commit ${inhalt.commitKurz}`
+  `  build-info.json geschrieben: ${Object.keys(summen).length} Website-Dateien + ` +
+    `${Object.keys(serverSummen).length} Server-Dateien, Commit ${inhalt.commitKurz}`
 );

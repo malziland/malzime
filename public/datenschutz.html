@@ -52,6 +52,33 @@
           verwendet werden. Kein hochgeladenes Bild wird dauerhaft gespeichert oder ist nach der Analyse abrufbar.
         </p>
       </div>
+      <!-- Kurzfassung -->
+      <section class="legal-section">
+        <h2>Das Wichtigste in vier S&auml;tzen</h2>
+        <div class="legal-block legal-block--highlight">
+          <ul class="legal-list legal-list--kurz">
+            <li>
+              <strong>Dein Foto</strong> wird unmittelbar nach der Analyse automatisch gel&ouml;scht &ndash; meist nach
+              Sekunden.
+            </li>
+            <li>
+              <strong>Ortsdaten und Aufnahmedatum</strong> erreichen unsere Server nie &ndash; dein Browser liest sie
+              aus und schickt sie nicht mit.
+            </li>
+            <li>
+              <strong>Wir speichern nichts &uuml;ber dich:</strong> kein Konto, keine Cookies zur Verfolgung, keine
+              dauerhafte <abbr title="Internet Protocol">IP</abbr>-Adresse, keine Werbung, kein Datenverkauf.
+            </li>
+            <li>
+              <strong>Du musst uns nicht glauben.</strong> Der gesamte Quelltext ist offen, und du kannst mit einem
+              Klick nachrechnen, dass hier genau das l&auml;uft.
+            </li>
+          </ul>
+          <p class="legal-kurz-fuss">
+            Alles Weitere steht darunter im Detail &ndash; ohne Verstecken, ohne Kleingedrucktes.
+          </p>
+        </div>
+      </section>
       <!-- Verantwortlicher -->
       <section class="legal-section">
         <h2>Verantwortlicher</h2>
@@ -349,6 +376,34 @@ sh scripts/pruefe-live.sh</code></pre>
           nicht sauber lief. Ein Messfehler wird nie als bestandene Pr&uuml;fung ausgegeben.
         </p>
         <p>
+          <strong>Warum beide Wege?</strong> Der Knopf oben ist bequem, aber er l&auml;uft auf dieser Seite. Wer diese
+          Website vollst&auml;ndig unter Kontrolle h&auml;tte, k&ouml;nnte auch ein l&uuml;gendes Pr&uuml;fprogramm
+          ausliefern. Der Weg &uuml;ber die Kommandozeile startet dagegen aus einer frischen Kopie des Quelltextes und
+          ist von dieser Seite unabh&auml;ngig. Das Pr&uuml;fprogramm des Knopfes liegt &uuml;brigens selbst im offenen
+          Quelltext und steht selbst im Fingerabdruck &ndash; es pr&uuml;ft sich mit.
+        </p>
+        <div class="echtheit">
+          <button
+            type="button"
+            id="echtheitKnopf"
+            class="echtheit-knopf"
+            tabindex="0"
+            aria-controls="echtheitKonsole"
+            aria-expanded="false"
+          >
+            Jetzt hier pr&uuml;fen
+          </button>
+          <p class="echtheit-hinweis">
+            Rechnet direkt in deinem Browser nach &ndash; ohne Terminal, ohne Installation. Dabei wird nichts an uns
+            &uuml;bertragen: Dein Browser l&auml;dt die Dateien und rechnet selbst.
+          </p>
+          <div class="echtheit-konsole" id="echtheitKonsole" hidden>
+            <div class="echtheit-zeilen" id="echtheitZeilen" role="log" aria-live="off"></div>
+          </div>
+          <p class="echtheit-ergebnis" id="echtheitErgebnis" role="status" aria-live="polite"></p>
+        </div>
+
+        <p>
           Damit das keine leere Geste bleibt, haben wir uns selbst die H&auml;nde gebunden: Unser
           Ver&ouml;ffentlichungs-Programm <strong>startet gar nicht erst</strong>, wenn wir etwas ver&auml;ndert
           h&auml;tten, das nicht offen einsehbar ist.
@@ -438,6 +493,7 @@ sh scripts/pruefe-live.sh</code></pre>
     <!-- ÜBERGANG: Sprachumschalter mit zweisprachigem Hinweis, solange diese
          Seite nur auf Deutsch vorliegt. Verschwindet samt js/sprachhinweis.js,
          sobald sie übersetzt ist. -->
+    <script type="module" src="./js/echtheit-pruefen.js?v=2026081805"></script>
     <script type="module" src="./js/sprachhinweis.js?v=2026081805"></script>
   </body>
 </html>

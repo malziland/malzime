@@ -3894,3 +3894,125 @@ html[lang="en"] .rc-zitat::after {
   white-space: pre;
   color: var(--text);
 }
+
+/* ── Echtheits-Prüfung direkt in der Seite ────────────────────────────────
+   Ein kleines Terminal, das im Browser nachrechnet, ob der ausgelieferte
+   Stand dem offenen Quelltext entspricht. Kein Fenster, kein Overlay: Es
+   klappt an Ort und Stelle auf, damit der Zusammenhang zum Text erhalten
+   bleibt. */
+.echtheit {
+  margin: 1.2rem 0 1.4rem;
+}
+
+.echtheit-knopf {
+  display: inline-block;
+  padding: 12px 26px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--ml-grad-teal);
+  cursor: pointer;
+  transition:
+    filter 0.2s var(--ease),
+    transform 0.2s var(--ease);
+}
+
+.echtheit-knopf:hover:not(:disabled) {
+  filter: brightness(0.92);
+  transform: translateY(-1px);
+}
+
+.echtheit-knopf:disabled {
+  cursor: progress;
+  filter: saturate(0.7);
+}
+
+.echtheit-hinweis {
+  margin: 0.7rem 0 0;
+  font-size: 0.84rem;
+  color: var(--muted);
+}
+
+/* Feste Hoehe statt mitwachsend: Ein Kasten, der waehrend des Laufs um
+   achtzig Zeilen waechst, schiebt den ganzen Text unter dem Daumen weg. */
+.echtheit-konsole {
+  margin-top: 0.9rem;
+  max-height: 15rem;
+  overflow: auto;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: #10181b;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.echtheit-zeile {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  /* Heller Text auf #10181b: gemessen deutlich über den verlangten 4.5:1.
+     Das Terminal ist bewusst immer dunkel — es ist ein Terminal. */
+  color: #cfe3e8;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.echtheit-zeile--gut {
+  color: #8fe0b0;
+}
+
+.echtheit-zeile--problem {
+  color: #ffb4a2;
+}
+
+.echtheit-ergebnis {
+  margin: 0.9rem 0 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.echtheit-ergebnis:empty {
+  display: none;
+}
+
+.echtheit-ergebnis--gut {
+  color: var(--teal-text);
+}
+
+.echtheit-ergebnis--abweichung,
+.echtheit-ergebnis--messproblem {
+  color: #9a3412;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .echtheit-knopf {
+    transition: none;
+  }
+  .echtheit-knopf:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Kurzfassung ganz oben in der Datenschutzerklärung: vier Sätze für alle, die
+   eine schnelle Antwort brauchen. Etwas grösserer Zeilenabstand als die
+   übrigen Listen — dieser Block wird gelesen, nicht überflogen. */
+.legal-list--kurz {
+  margin: 0;
+}
+
+.legal-list--kurz li {
+  margin-bottom: 0.6rem;
+  line-height: 1.65;
+}
+
+.legal-list--kurz li:last-child {
+  margin-bottom: 0;
+}
+
+.legal-kurz-fuss {
+  margin: 0.9rem 0 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+}

@@ -4,6 +4,40 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+
+- **Die Echtheits-Prüfung läuft jetzt direkt in der Seite.** Ein Klick auf
+  „Jetzt hier prüfen" in der Datenschutzerklärung, und der Browser lädt jede
+  ausgelieferte Datei, rechnet ihre Prüfsumme neu aus und zeigt das Ergebnis
+  Zeile für Zeile in einem kleinen Terminal. Kein Fenster, kein Pop-up, keine
+  Installation — und nichts davon wird an uns übertragen. Gemessen: gut eine
+  Sekunde für 81 Dateien.
+
+  Das Prüfprogramm liegt selbst im offenen Quelltext und steht selbst im
+  Fingerabdruck — es prüft sich mit. Daneben steht offen, warum es den Weg
+  über die Kommandozeile trotzdem weiter gibt: Wer diese Website vollständig
+  unter Kontrolle hätte, könnte auch ein lügendes Prüfprogramm ausliefern. Der
+  Weg aus einer frischen Kopie des Quelltextes ist von dieser Seite unabhängig.
+
+- **Der Fingerabdruck deckt jetzt auch den Server-Code ab.** 80 Website-Dateien
+  plus 35 Dateien aus `functions/src/`. Bisher war der Server-Teil nur über den
+  Commit benannt — das genügt, solange die Auslieferung an einen
+  veröffentlichten Stand gebunden ist, und genau diese Bindung lässt sich mit
+  einem Notschalter umgehen. Jetzt ist auch dieser Teil Datei für Datei
+  festgenagelt.
+
+- **`build-info.json` erklärt sich selbst.** Wer draufklickt, sah bisher rohe
+  Zahlenkolonnen. Jetzt stehen vier Klartext-Felder obenan: was die Datei ist,
+  wozu sie dient, wie man selbst nachrechnet, und wo die Grenze liegt.
+
+- **Die Datenschutzerklärung beginnt mit vier Sätzen.** „Das Wichtigste in vier
+  Sätzen" — für alle, die schnell eine Antwort brauchen, ohne zehn Abschnitte
+  zu lesen. Jede der vier Zusagen ist gegen den Detailteil abgeglichen; eine
+  Formulierung war dabei zu vage und wurde nach der strengeren Fassung im
+  Detailteil korrigiert.
+
 ## [3.5.0] — 2026-08-18
 
 ### Behoben

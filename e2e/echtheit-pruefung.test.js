@@ -9,9 +9,27 @@
 
 import { test, expect } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
 const FINGERABDRUCK = join(process.cwd(), "public", "build-info.json");
+
+/* Der im Repository liegende Fingerabdruck ist gegenueber dem Arbeitsstand
+   IMMER veraltet — er entsteht erst beim Ausliefern neu. Ein Test, der gegen
+   ihn prueft, waere je nach letzter Aenderung mal gruen und mal rot; genau das
+   ist in der CI passiert (2 von 80 Dateien weichen ab).
+   Der Test stellt sich seinen Pruefstand deshalb selbst her und raeumt danach
+   auf. Damit misst er die Mechanik, nicht den Zufall. */
+let urzustand;
+
+test.beforeAll(() => {
+  urzustand = readFileSync(FINGERABDRUCK, "utf8");
+  execFileSync("node", ["scripts/build-info.mjs", "2099010101"], { cwd: process.cwd() });
+});
+
+test.afterAll(() => {
+  if (urzustand) writeFileSync(FINGERABDRUCK, urzustand, "utf8");
+});
 
 async function laufen(page) {
   await page.click("#echtheitKnopf");

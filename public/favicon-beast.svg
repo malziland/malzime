@@ -1,12 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-label="malziME">
   <title>malziME</title>
   <style>
-    /* FESTE Farben, keine Medienabfrage: Diese Fassung gehoert zum
-       Beast-Modus der Seite, nicht zum Systemthema. Welche Datei angezeigt
-       wird, entscheidet js/app.js beim Umschalten — siehe dort. Die Geometrie
-       ist Zeichen fuer Zeichen dieselbe wie in favicon.svg. */
-    .kasten { fill: #e6e9e9 }
-    .zeichen { fill: #171d1f }
+    /* Beast-Modus der SEITE, nicht Systemthema — deshalb feste Farben und
+       keine Medienabfrage.
+
+       DUNKLER Kasten, helles ME. Die erste Fassung hatte es umgekehrt (heller
+       Kasten, dunkles ME) — das ist die Fassung der Vorlage fuer eine DUNKLE
+       Tab-Leiste. Auf einer hellen Leiste, wie sie ein Mac im hellen
+       Systemthema hat, war sie praktisch unsichtbar: "Der Tab bleibt immer
+       noch hell" (Nutzer, 2026-08-19). Er hatte recht — ich hatte ein helles
+       Zeichen ausgeliefert und behauptet, es sei ein Moduswechsel.
+
+       Diese Fassung traegt die Beast-Farben der Seite (#171d1f Grund,
+       #eef1f0 Schrift) und hebt sich damit auf JEDER Leiste vom Petrol ab. */
+    .kasten { fill: #171d1f }
+    .zeichen { fill: #eef1f0 }
   </style>
   <rect class="kasten" width="1000" height="1000" rx="181.8" ry="181.8"/>
   <path class="zeichen" d="M593.5858977978543 319.3181818181818V669.8722473178995H508.1945228684359V459.63968097120267L429.79425465838506 669.8722473178995H360.88191699604744L281.9822840203275 459.14031620553357V669.8722473178995H196.5909090909091V319.3181818181818H297.46259175607L395.8374505928854 562.009457933371L493.21357989836247 319.3181818181818ZM710.4372529644269 387.73115471485033V458.64095143986447H824.7917843026538V524.5571005081874H710.4372529644269V601.4592744212309H839.7727272727273V669.8722473178995H625.0458780350085V319.3181818181818H839.7727272727273V387.73115471485033Z"/>

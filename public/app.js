@@ -230,8 +230,18 @@ function applyModeTheme() {
 
      Es entsteht dabei KEIN neuer Tab und kein Neuladen — getauscht wird nur
      das `href` des vorhandenen Elements. */
-  const tabZeichen = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
-  if (tabZeichen) tabZeichen.href = boost ? "/favicon-beast.svg" : "/favicon.svg";
+  const alt = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+  const ziel = boost ? "/favicon-beast.svg" : "/favicon.svg";
+  if (alt && !alt.href.endsWith(ziel)) {
+    /* ERSETZEN, nicht nur `href` setzen. Browser halten Favicons zaeh fest;
+       ein geaendertes Attribut allein loest das Neuzeichnen nicht zuverlaessig
+       aus. Ein frisches Element mit derselben Rolle tut es. */
+    const neu = document.createElement("link");
+    neu.rel = "icon";
+    neu.type = "image/svg+xml";
+    neu.href = ziel;
+    alt.replaceWith(neu);
+  }
 }
 /* Gemerkte Wahl wiederherstellen, BEVOR das Theme angewendet wird — sonst
    blitzt kurz der falsche Look auf. `null` heisst „nie gewählt": dann bleibt

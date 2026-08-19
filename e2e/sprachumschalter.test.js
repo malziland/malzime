@@ -285,7 +285,25 @@ test("leer: Wechsel ohne Rückfrage, Seite wird englisch", async ({ page }) => {
 
   await page.click('.sprach-knopf[data-lang="en"]');
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
-  await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
+  /* WARTEND lesen (`expect.poll`), nicht einmalig.
+     ZWEITER FEHLER, 2026-08-19: Die erste Diagnose-Fassung nutzte
+     `expect(await ...evaluateAll(...))`. Das liest GENAU EINMAL — anders als
+     `toHaveCount`, das von sich aus wiederholt. Ich hatte die Wiederholung
+     entfernt und den Test dadurch WACKLIGER gemacht als vorher. `expect.poll`
+     bringt sie zurueck und behaelt die Diagnose.
+
+     Zusicherung unveraendert streng — aber mit Diagnose.
+     ANLASS 2026-08-19: Dieser Test fiel in der Pipeline (WebKit, unter Last)
+     mit "Received: 1" um und war beim zweiten Lauf DESSELBEN Commits gruen;
+     lokal 6 von 6 gruen. `.sw-grund.sichtbar` zaehlt ueber ALLE Dialoge — es
+     gibt zwei (`fertig` und `laeuft`). Aus "Received: 1" ist nicht zu erkennen,
+     WELCHER haengengeblieben ist, und ohne das laesst sich die Ursache nicht
+     suchen. Jetzt nennt die Meldung ihn. */
+  await expect
+    .poll(() => page.locator(".sw-grund.sichtbar").evaluateAll((els) => els.map((el) => el.dataset.modal || "?")), {
+      message: "Dialoge, die noch sichtbar sind",
+    })
+    .toEqual([]);
   await expect(page.locator("h1")).toContainText("We see more");
   /* Das englische Demo-Bildpaket muss mitziehen. */
   await expect(page.locator('[data-demo="selfie"] img')).toHaveAttribute("src", /-en\.jpg/);
@@ -362,7 +380,18 @@ test("Fokus bleibt in der Rückfrage und kehrt danach zurück", async ({ page })
   }
 
   await page.keyboard.press("Escape");
-  await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
+  /* Zusicherung unveraendert streng — aber mit Diagnose.
+     ANLASS 2026-08-19: Dieser Test fiel in der Pipeline (WebKit, unter Last)
+     mit "Received: 1" um und war beim zweiten Lauf DESSELBEN Commits gruen;
+     lokal 6 von 6 gruen. `.sw-grund.sichtbar` zaehlt ueber ALLE Dialoge — es
+     gibt zwei (`fertig` und `laeuft`). Aus "Received: 1" ist nicht zu erkennen,
+     WELCHER haengengeblieben ist, und ohne das laesst sich die Ursache nicht
+     suchen. Jetzt nennt die Meldung ihn. */
+  await expect
+    .poll(() => page.locator(".sw-grund.sichtbar").evaluateAll((els) => els.map((el) => el.dataset.modal || "?")), {
+      message: "Dialoge, die noch sichtbar sind",
+    })
+    .toEqual([]);
   /* Wartend statt einmalig lesen — und zwar aus einem konkreten Grund:
      `modalSchliessen()` nimmt die Klasse `sichtbar` WEG, BEVOR es den Fokus
      zurueckholt (sprachumschalter.js). Die Zeile darueber ist also schon
@@ -479,7 +508,18 @@ test("axe über die ganze Matrix: 2 Sprachen × 2 Themen, Rückfrage offen und z
   await expect(page.locator('.sw-grund[data-modal="fertig"]')).toBeVisible();
   await axePruefen(page, "Rückfrage offen, hell");
   await page.keyboard.press("Escape");
-  await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
+  /* Zusicherung unveraendert streng — aber mit Diagnose.
+     ANLASS 2026-08-19: Dieser Test fiel in der Pipeline (WebKit, unter Last)
+     mit "Received: 1" um und war beim zweiten Lauf DESSELBEN Commits gruen;
+     lokal 6 von 6 gruen. `.sw-grund.sichtbar` zaehlt ueber ALLE Dialoge — es
+     gibt zwei (`fertig` und `laeuft`). Aus "Received: 1" ist nicht zu erkennen,
+     WELCHER haengengeblieben ist, und ohne das laesst sich die Ursache nicht
+     suchen. Jetzt nennt die Meldung ihn. */
+  await expect
+    .poll(() => page.locator(".sw-grund.sichtbar").evaluateAll((els) => els.map((el) => el.dataset.modal || "?")), {
+      message: "Dialoge, die noch sichtbar sind",
+    })
+    .toEqual([]);
 
   await beastAn(page);
   await axePruefen(page, "Profil fertig, Beast");

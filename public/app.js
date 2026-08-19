@@ -231,8 +231,15 @@ function applyModeTheme() {
      Es entsteht dabei KEIN neuer Tab und kein Neuladen — getauscht wird nur
      das `href` des vorhandenen Elements. */
   const alt = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
-  const ziel = boost ? "/favicon-beast.svg" : "/favicon.svg";
-  if (alt && !alt.href.endsWith(ziel)) {
+  /* Die Kennung des ausgelieferten Standes mitnehmen. Ohne sie behaelt der
+     Browser das alte Zeichen — Favicons speichert er besonders hartnaeckig
+     zwischen, weit ueber das hinaus, was die Kopfzeilen verlangen. Genau das
+     ist am 2026-08-19 passiert: "Ich sehe immer noch das alte Favicon."
+     Die Kennung steht bereits im vorhandenen Verweis; sie wird nicht geraten,
+     sondern uebernommen. */
+  const kennung = alt ? new URL(alt.href, location.href).search : "";
+  const ziel = (boost ? "/favicon-beast.svg" : "/favicon.svg") + kennung;
+  if (alt && new URL(alt.href, location.href).pathname !== ziel.split("?")[0]) {
     /* ERSETZEN, nicht nur `href` setzen. Browser halten Favicons zaeh fest;
        ein geaendertes Attribut allein loest das Neuzeichnen nicht zuverlaessig
        aus. Ein frisches Element mit derselben Rolle tut es. */

@@ -1848,6 +1848,15 @@ html[data-has-result] {
 .stats-hero {
   text-align: center;
   margin-bottom: 32px;
+  /* Damit die Ueberschrift auf DERSELBEN Hoehe steht wie auf allen anderen
+     Seiten. Gefunden von e2e/kopfbereich.test.js: neun Seiten bei 115 px, die
+     Zahlen-Seite bei 94 — sie hat einen eigenen Kopfbereich, den die Regel fuer
+     .hero nicht erreicht.
+
+     INNENabstand, nicht Rand: Ein Rand an der Ueberschrift faellt mit dem des
+     Elternelements zusammen (Margin-Collapsing) und wirkte nur zur Haelfte —
+     gemessen 105 statt 115. Innenabstand faellt nicht zusammen. */
+  padding-top: 21px;
 }
 
 .stats-hero__title {

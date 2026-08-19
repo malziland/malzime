@@ -244,6 +244,26 @@ body {
 
 /* ── Hero ── */
 
+/* Der Abstand zwischen Wortmarke und Ueberschrift.
+   FEHLER 2026-08-19, vom Nutzer gefunden: Er lag zuerst an `.seiten-kopfzeile`.
+   Die entsteht auf der Startseite aber erst durch JavaScript — der
+   Sprachumschalter baut sie um die Wortmarke herum. Laeuft das Skript nicht,
+   nicht rechtzeitig, oder liegt eine aeltere Fassung im Zwischenspeicher, gibt
+   es die Kopfzeile nicht, der Abstand faellt weg und die Ueberschrift rueckt an
+   die Marke heran. Genau das hat der Nutzer gesehen, waehrend meine Messung
+   66 px meldete — ich hatte einen Browser gemessen, in dem das Skript gelaufen
+   war.
+
+   Ein Abstand darf nicht davon abhaengen, ob ein Skript durchlaeuft. Er liegt
+   deshalb an der Ueberschrift: Die ist immer da, im HTML, ohne Zutun.
+
+   66 px, weil vorher das SYSTEM-AKTIV-Abzeichen genau so viel Platz einnahm
+   (20 darueber + 28 hoch + 18 darunter). Es hat den Abstand nie besessen, nur
+   gefuellt. */
+.hero h1 {
+  margin-top: 66px;
+}
+
 .hero {
   /* relative wegen des Sprachumschalters (v3.3): Er sitzt absolut am rechten
      Rand dieser Zeile, auf Höhe des SYSTEM-AKTIV-Abzeichens. */
@@ -3873,18 +3893,6 @@ a.sprach-knopf:hover {
 
 /* Kopfzeile der Unterseiten: Rubrik links, Sprachumschalter rechts, auf einer
    Linie. Vorher stand er darüber und wirkte wie ein loses Element. */
-/* Auf der Startseite trug das entfernte SYSTEM-AKTIV-Abzeichen den Abstand
-   zwischen Marke und Ueberschrift: 20 px darueber, 28 px hoch, 18 px darunter
-   — zusammen 66 px. Mit dem Abzeichen fiel dieser Abstand weg, und die
-   Ueberschrift rutschte an die Marke heran (gemessen 20 statt 66 px). Der
-   Abstand gehoerte nie dem Abzeichen, es hat ihn nur zufaellig gefuellt.
-   Deshalb liegt er jetzt an der Kopfzeile selbst.
-
-   Nur im Hero: Auf den Unterseiten folgt die Rubrik, die naeher stehen soll. */
-.hero .seiten-kopfzeile {
-  margin-bottom: 66px;
-}
-
 .seiten-kopfzeile {
   display: flex;
   align-items: center;

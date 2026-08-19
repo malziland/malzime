@@ -105,6 +105,51 @@ async function checkA11y(page, kontext) {
     await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
   }
   const results = await new AxeBuilder({ page }).analyze();
+
+  /* POSITIVKONTROLLE: HAT axe die tragenden Bereiche ueberhaupt angefasst?
+   *
+   * ANLASS 2026-08-19, vom Nutzer angestossen: "Aber eigentlich haettest du die
+   * gesamte Seite ja schon ueberpruefen muessen auf Barrierefreiheit." Er hatte
+   * recht. Im Beast-Modus lieferte axe fuer die acht Werte der Datenwert-Skala
+   * und fuer die Werbe-Schlagworte NICHTS — weder Verstoss noch "unklar" noch
+   * "in Ordnung". Sie waren im Dokument, sichtbar, mit Text. Gemessen wurden
+   * sie nicht. Der Waechter meldete trotzdem gruen, und das Pruefprotokoll
+   * schrieb "0 Verstoesse" fuer einen Bereich, den niemand geprueft hatte.
+   * Tatsaechlich lagen dort drei echte Kontrastfehler (4.01, 4.40, 4.41 statt
+   * 4.5) — gefunden erst, als eine neue Zeile in der Karte axe dazu brachte,
+   * den Bereich doch anzusehen.
+   *
+   * URSACHE, nachgewiesen: die Sprechblase der GPS-Karte, die sich von selbst
+   * oeffnete. Nimmt man am alten Stand NUR das `openPopup()` weg und aendert
+   * sonst nichts, misst axe den Profilinhalt sofort — und meldet die drei
+   * Verstoesse. Eine ueberdeckende Flaeche bringt die Kontrastregel dazu, den
+   * dahinterliegenden Bereich zu ueberspringen. Die Sprechblase hat damit
+   * jahrelang genau die Fehler verdeckt, die sie sichtbar gemacht haette.
+   *
+   * Ein Waechter, der schweigt, ist von einem Waechter, der Entwarnung gibt,
+   * nicht zu unterscheiden — es sei denn, man fragt ihn, was er gesehen hat.
+   * Genau das passiert hier. */
+  const angefasst = new Set();
+  for (const liste of [results.violations, results.incomplete, results.passes]) {
+    for (const v of liste) {
+      if (v.id !== "color-contrast") continue;
+      for (const n of v.nodes) angefasst.add(n.target.join(" "));
+    }
+  }
+  const gesehen = (auswahl) => [...angefasst].some((z) => z.includes(auswahl));
+  const erwartet = await page.evaluate(() =>
+    /* Nur Elemente, die selbst TEXT tragen — fuer Behaelter ohne eigenen Text
+       ist die Kontrastregel gar nicht zustaendig. `.cat-card` stand hier zuerst
+       und war deshalb ein Fehlalarm der Kontrolle selbst. */
+    [".dv-scale-value", ".tag", ".cat-label", ".cat-value", ".gps-address"].filter(
+      (auswahl) => document.querySelectorAll(auswahl).length > 0
+    )
+  );
+  const uebersehen = erwartet.filter((auswahl) => !gesehen(auswahl));
+  expect(
+    uebersehen,
+    `axe hat diese sichtbaren Bereiche auf ${kontext} gar nicht gemessen — "keine Verstoesse" heisst hier "nicht geprueft"`
+  ).toEqual([]);
   const alle = results.violations;
   if (alle.length > 0) {
     /* Alles loggen (auch minor/moderate), damit Funde im CI-Log sichtbar sind */

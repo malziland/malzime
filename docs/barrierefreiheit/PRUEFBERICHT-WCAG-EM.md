@@ -352,6 +352,26 @@ Die maschinellen Messungen laufen bei jeder Auslieferung automatisch mit.
 
 ---
 
+## Nachtrag 19. August 2026 — die Messung zu 1.4.3 war unvollständig
+
+Beim Umbau der GPS-Karte zeigte sich, dass axe auf der Profil-Seite den gesamten
+Profilinhalt nie erfasst hatte: Kategorie-Beschriftungen und -Werte, Werbe-Schlagworte
+und die acht Werte der Datenwert-Skala erschienen in keinem Ergebnis — weder als
+Verstoß noch als Abstention. Ursache war die Sprechblase der Karte, die sich von
+selbst öffnete; eine überdeckende Fläche bringt die Kontrastregel dazu, den
+dahinterliegenden Bereich zu überspringen. Nachgewiesen dadurch, dass das Entfernen
+allein dieses einen Aufrufs am Stand vom 17. August die Messung sofort liefert.
+
+Dort lagen **drei echte Verstöße gegen 1.4.3** im Beast-Modus (4,40 · 4,01 · 4,41
+statt 4,5 : 1). Alle drei sind am 19. August behoben; nachgemessen 4,56 · 4,57 ·
+4,59 : 1. Das Ergebnis „erfüllt" für 1.4.3 gilt damit ab dem 19. August, nicht ab
+dem 17. Einzelheiten in `PRUEFPROTOKOLL.md`, Abschnitt 6.
+
+Die Dauerprüfung fragt seither zuerst, **was** sie gemessen hat: Sie nennt die
+sichtbaren, textführenden Bereiche und wird rot, wenn axe einen davon nicht
+angefasst hat. Gegen den Stand vom 17. August meldet sie alle vier übersehenen
+Bereiche.
+
 ## Anhänge
 
 - **[Anhang A](PRUEFPROTOKOLL.md)** — alle 55 Kriterien einzeln, mit Prüfweg und Ergebnis;

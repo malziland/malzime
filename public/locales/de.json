@@ -92,6 +92,8 @@
   "privacy.sectionTitle": "Das hast du ungewollt verraten",
   "gps.sectionTitle": "Hier wurdest du geortet",
   "gps.popup": "Dein Standort",
+  "gps.zoomHint": "Zum Zoomen die Tasten + und − benutzen — am Handy mit zwei Fingern bewegen und zoomen.",
+  "gps.osmCredit": "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>-Mitwirkende",
   "verdict.title": "So denkt die KI über dich",
   "blocked.overloaded": "Gerade nutzen sehr viele Menschen malziME gleichzeitig. Bitte warte einen Moment und versuche es dann nochmal.",
   "blocked.safetyFilter": "Die KI hat das Bild nicht analysiert, weil der Inhalt als sensibel eingestuft wurde — z. B. weil Kinder oder Jugendliche erkannt wurden, oder weil das Bild als geschützt gilt. Die Sicherheitsfilter der KI-Anbieter blockieren die Auswertung in solchen Fällen automatisch.",

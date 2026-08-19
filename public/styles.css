@@ -160,8 +160,13 @@
   --text: #eef1f0;
   --muted: #a9b2b0;
   --heading: #eef1f0;
-  --teal-text: #4698b9;
-  --rust-text: #c17d67;
+  /* 2026-08-19 aufgehellt: axe mass 4.02:1 auf dem Schlagwort-Grund und
+     4.42:1 im fetten Hinweistext — beides unter den geforderten 4.5:1
+     (WCAG 1.4.3). Aufgefallen, als die neue Adresszeile der Karte den
+     Waechter ueber diese Stellen laufen liess. */
+  --teal-text: #57a2c0;
+  /* 2026-08-19 aufgehellt: 4.18:1 auf dem Rost-Grund der Adresszeile. */
+  --rust-text: #c58571;
   --tint-teal: rgba(21, 100, 128, 0.22);
   --tint-teal-strong: rgba(21, 100, 128, 0.38);
   --tint-rust: rgba(156, 78, 54, 0.16);
@@ -172,7 +177,8 @@
   --lift: 0 10px 24px rgba(0, 0, 0, 0.45);
   --scrim: rgba(0, 0, 0, 0.55);
   --num-chip-bg: rgba(191, 181, 66, 0.18);
-  --num-chip-text: #bfb542;
+  /* 2026-08-19 aufgehellt: 4.41:1 auf dem Gruen-Grund der Datenwert-Skala. */
+  --num-chip-text: #c2b84a;
 }
 
 *,
@@ -784,6 +790,95 @@ html[data-has-result] {
   background: var(--ml-rust);
 }
 
+/* ── Beast-Lockruf ─────────────────────────────────────────────────────────
+   Zeigt EINMAL auf den Umschalter, wenn das Profil fertig dasteht. Wann und
+   warum: js/beast-lockruf.js — dort steht die Begruendung, hier nur die Form.
+
+   Zwei Bewegungen in EINEM Takt, damit es als eine gelesen wird und nicht als
+   zwei nebeneinander: Die Pille loest sich vom Papier und wirft einen
+   Schatten, waehrend die Rille des Schalters von links dunkel volllaeuft.
+   Beide kehren gemeinsam zurueck. Zwei Durchlaeufe, dann ist Ruhe.
+
+   Die Fuellfarbe ist fest verdrahtet, nicht aus einer Farbmarke: Sie zeigt den
+   BEAST-MODUS an, nicht das aktuelle Thema der Seite. Der Lockruf laeuft immer
+   im hellen, sachlichen Modus — im Beast-Modus ist er ueberfluessig. */
+
+.bias-lockruf-fuellung {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: #171d1f;
+  transform-origin: left center;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+
+/* Nur waehrend des Lockrufs beschneiden — sonst wuerde der Umschalter dauerhaft
+   anders clippen als bisher. */
+.bias-toggle.bias-lockruf .toggle-track {
+  overflow: hidden;
+}
+
+@keyframes biasLockrufHeben {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+    box-shadow: var(--shadow);
+  }
+  42%,
+  58% {
+    transform: translateY(-5px) scale(1.035);
+    box-shadow: 0 12px 26px rgba(23, 29, 31, 0.22);
+  }
+}
+
+@keyframes biasLockrufFuellen {
+  0% {
+    transform: scaleX(0);
+  }
+  42%,
+  58% {
+    transform: scaleX(1);
+  }
+  100% {
+    transform: scaleX(0);
+  }
+}
+
+.bias-toggle.bias-lockruf {
+  animation: biasLockrufHeben 2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s 2;
+}
+
+.bias-toggle.bias-lockruf .bias-lockruf-fuellung {
+  animation: biasLockrufFuellen 2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s 2;
+}
+
+/* Reduzierte Bewegung: kein Heben, kein Wachsen — die Fuellung ist sofort in
+   voller Breite da und blendet nur auf und ab. Der Hinweis bleibt also
+   erhalten, die Bewegung faellt weg. */
+@keyframes biasLockrufBlenden {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  42%,
+  58% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bias-toggle.bias-lockruf {
+    animation: none;
+  }
+
+  .bias-toggle.bias-lockruf .bias-lockruf-fuellung {
+    transform: scaleX(1);
+    opacity: 0;
+    animation: biasLockrufBlenden 2s ease 0.4s 2;
+  }
+}
+
 /* ── Scan-Animation (funktionaler Fortschritt — bewegt nur während der Analyse) ── */
 
 .scan-anim {
@@ -1346,6 +1441,39 @@ html[data-has-result] {
   height: 240px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
+  /* EIGENER STAPEL-KONTEXT. Leaflets BEDIENELEMENTE — Zoomtasten oben links,
+     Quellenangabe unten rechts — liegen auf Ebene 800. Die Kachel- und
+     Zeigerflaechen sind unkritisch: Sie stecken in `.leaflet-map-pane`, das
+     Leaflet verschiebt, und eine Verschiebung macht schon von sich aus einen
+     eigenen Stapel. Die Bedienelemente stecken NICHT darin und zaehlen ohne
+     diese Zeilen im Stapel der ganzen Seite mit — also gegen die geklebte
+     Umschalt-Leiste auf Ebene 20, die sie damit ueberzeichnen.
+
+     Gefunden am 2026-08-19 auf einem Foto des geklebten Zustands; die erste
+     Erklaerung (die Kacheln seien schuld) war falsch und liess sich nicht
+     nachstellen. Nachgemessen wird jetzt dort, wo es wirklich auftritt:
+     wenn der UNTERE Kartenrand hinter der Leiste steht (e2e/karte.test.js). */
+  position: relative;
+  z-index: 0;
+}
+
+/* Eigener Ortszeiger statt Leaflets Standard-Blau. Das divIcon bringt von Haus
+   aus weissen Grund und Rand mit — beides weg, es soll nur die Form wirken. */
+.gps-zeiger {
+  background: none;
+  border: 0;
+}
+
+.gps-zeiger svg {
+  display: block;
+  filter: drop-shadow(0 2px 3px rgba(23, 29, 31, 0.35));
+}
+
+.gps-hinweis {
+  margin-top: 10px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 /* ── Targeting (einspaltig) ── */
@@ -2954,7 +3082,7 @@ summary:focus-visible {
   --text: #eef1f0;
   --muted: #a9b2b0;
   --heading: #eef1f0;
-  --teal-text: #4698b9;
+  --teal-text: #57a2c0;
   --border: rgba(255, 255, 255, 0.2);
   --track: rgba(255, 255, 255, 0.16);
   --hover: rgba(255, 255, 255, 0.08);

@@ -92,6 +92,8 @@
   "privacy.sectionTitle": "What you unintentionally revealed",
   "gps.sectionTitle": "Where you were located",
   "gps.popup": "Your location",
+  "gps.zoomHint": "Use the + and − buttons to zoom — on a phone, pan and zoom with two fingers.",
+  "gps.osmCredit": "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors",
   "verdict.title": "This is what the AI thinks about you",
   "blocked.overloaded": "A lot of people are using malziME at the same time right now. Please wait a moment and try again.",
   "blocked.safetyFilter": "The AI did not analyze the image because the content was classified as sensitive — e.g. because children or minors were detected, or because the image is considered protected. The AI provider's safety filters automatically block evaluation in such cases.",

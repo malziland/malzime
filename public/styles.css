@@ -3906,8 +3906,12 @@ a.sprach-knopf:hover {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  /* Der Abstand nach unten liegt hier, nicht an der Wortmarke — siehe dort. */
-  margin-bottom: 14px;
+  /* Der Abstand nach unten liegt hier, nicht an der Wortmarke — siehe dort.
+     20 px statt 14: Gemessen sass das SYSTEM-AKTIV-Abzeichen 14 px unter dem
+     Logo, aber 18 px ueber der Ueberschrift — es klebte damit an der Marke
+     statt bei dem zu stehen, wozu es gehoert. Der Nutzer hat es so beschrieben,
+     die Messung hat es bestaetigt. */
+  margin-bottom: 20px;
 }
 .seiten-kopfzeile .sprachwahl {
   position: static;

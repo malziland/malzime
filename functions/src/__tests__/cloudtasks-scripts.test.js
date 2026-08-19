@@ -96,14 +96,24 @@ describe("Cloud-Tasks-Scripts", () => {
     90000
   );
 
-  // Fehlt gcloud (so in der CI), wird der Abgleich mit test.skip als übersprungen
-  // AUSGEWIESEN, statt einen immer wahren Test zu erfinden. Ein `expect(true)`
-  // stand vorher hier: Er zählte als bestanden und behauptete damit eine
-  // Abdeckung, die es nicht gab. Übersprungen ist ehrlicher als grün.
-  //
-  // pruefungen:uebersprungen-weil der Abgleich braucht das Werkzeug gcloud, das in der CI nicht installiert ist — die Alternative waere eine Schein-Zusicherung
-  test.skip.each(gcloudDa ? [] : [["gcloud nicht installiert"]])(
-    "Parameter-Abgleich gegen die gcloud-Hilfe (%s)",
-    () => {}
-  );
+  /* Fehlt gcloud, wird der Abgleich als uebersprungen AUSGEWIESEN statt einen
+     immer wahren Test zu erfinden. Ein `expect(true)` stand hier einmal: Er
+     zaehlte als bestanden und behauptete eine Abdeckung, die es nicht gab.
+     Uebersprungen ist ehrlicher als gruen.
+
+     KORREKTUR 2026-08-19: Hier stand `test.skip.each(gcloudDa ? [] : [...])`.
+     Jest registriert aus einer LEEREN Liste trotzdem einen wartenden Eintrag —
+     erkennbar am unaufgeloesten `%s` im Namen. Folge: Jeder Lauf meldete
+     "1 skipped", auch wenn gcloud da war und der Abgleich lief. Eine Zahl, die
+     immer eine fehlende Abdeckung behauptet, wo keine fehlt, ist genau so
+     wertlos wie eine, die immer Abdeckung behauptet, wo keine ist.
+
+     Ausserdem war die Begruendung falsch: Der Ubuntu-Laeufer von GitHub
+     enthaelt die Google Cloud CLI. Der Abgleich lief die ganze Zeit auch in der
+     CI — belegt mit `jest --json` und im CI-Protokoll. Der Platzhalter greift
+     jetzt nur noch dort, wo gcloud wirklich fehlt. */
+  if (!gcloudDa) {
+    // pruefungen:uebersprungen-weil der Abgleich braucht das Werkzeug gcloud, das in dieser Umgebung fehlt — die Alternative waere eine Schein-Zusicherung
+    test.skip("Parameter-Abgleich gegen die gcloud-Hilfe (gcloud nicht installiert)", () => {});
+  }
 });

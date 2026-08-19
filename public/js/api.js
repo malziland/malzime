@@ -718,8 +718,12 @@ async function analyzeImageQueued() {
         body: JSON.stringify({
           imageBase64: state.lastPrepared.imageBase64,
           exif: state.lastPrepared.exif,
-          mimeType: "image/jpeg",
-          filename: "upload.jpg",
+          /* BUG-2026-08-19-01: Hier standen feste Werte. Der Canvas liefert
+             nicht immer JPEG (siehe public/js/exif.js) — die feste Behauptung
+             brachte am 19.08. zwei Uploads mit HTTP 400 zu Fall. Gemeldet wird
+             jetzt, was tatsaechlich herauskam. */
+          mimeType: state.lastPrepared.mimeType || "image/jpeg",
+          filename: state.lastPrepared.dateiname || "upload.jpg",
           lang: getLanguage(),
           traceId,
         }),

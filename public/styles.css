@@ -4032,3 +4032,18 @@ a.sprach-knopf:hover {
   font-size: 0.86rem;
   color: var(--muted);
 }
+
+/* Beiliegende Angabe, die zur Zeile darueber gehoert — der amtlich
+   eingetragene Wortlaut unter seiner englischen Wiedergabe, und die einmalige
+   Erklaerung der Registerkuerzel am Ende des Blocks.
+
+   Warum eigene Klasse statt .legal-kurz-fuss: Die hat oben 0,9 rem Abstand,
+   weil sie eine abgesetzte Schlussbemerkung ist. Hier gehoert die Zeile
+   ENG an die darueber, sonst zerfaellt der Block optisch. */
+.legal-block p.legal-fein,
+.legal-fein {
+  margin: 0.15rem 0 0.55rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--muted);
+}

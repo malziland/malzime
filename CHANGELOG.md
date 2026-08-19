@@ -4,6 +4,25 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.6.2] — 2026-08-19
+
+### Behoben
+
+- **Auf iPhones scheiterte das Hochladen ab dem zweiten Bild.** Das erste Foto
+  lief durch, das zweite brach mit einer Fehlermeldung ab — für die Person
+  davor sah das aus, als sei die Seite kaputt. Gemeldet aus einem Workshop und
+  im Protokoll am 19.08. um 07:42 und 07:43 Uhr wiedergefunden.
+
+  Zwei Ursachen, beide behoben. Erstens gab die Seite den Bildtyp fest als JPEG
+  an, obwohl der Browser beim zweiten Bild PNG lieferte; die Server-Prüfung,
+  die seit August den Inhalt statt der Behauptung bewertet, wies das zu Recht
+  ab. Die Seite meldet jetzt den Typ, der tatsächlich entstanden ist,
+  Dateiname eingeschlossen. Zweitens wurde der Zeichenbereich nach der
+  Umrechnung nicht freigegeben — genau deshalb traf es das zweite Bild und
+  nicht das erste. Er wird jetzt sofort geleert.
+
+  Drei Tests halten den Fall fest; ohne die Behebung sind sie rot.
+
 ## [3.6.1] — 2026-08-18
 
 ### Geändert

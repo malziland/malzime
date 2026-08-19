@@ -261,7 +261,12 @@ body {
    (20 darueber + 28 hoch + 18 darunter). Es hat den Abstand nie besessen, nur
    gefuellt. */
 .hero h1 {
-  margin-top: 66px;
+  /* 48 px, damit die Ueberschrift auf der Startseite auf DERSELBEN Hoehe sitzt
+     wie "Datenschutz", "Impressum" oder "Zahlen" auf den Unterseiten.
+     Gemessen: dort steht die Oberkante bei 115 px, hier vorher bei 133.
+     Die 66 px stammten aus dem entfernten Abzeichen; die Unterseiten sind der
+     verbindliche Bezug, nicht ein weggefallenes Element. */
+  margin-top: 48px;
 }
 
 .hero {

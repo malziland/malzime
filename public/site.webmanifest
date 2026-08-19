@@ -1,6 +1,8 @@
 {
   "name": "malziME",
   "short_name": "malziME",
+  "start_url": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "./favicon-192x192.png",

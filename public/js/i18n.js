@@ -167,9 +167,75 @@ export function applyTranslations() {
 
   /* ZULETZT — die Reihenfolge ist wesentlich. Der Block darüber ersetzt ganze
      innerHTML-Bereiche, und in einem davon steckt ein Link (der Verweis auf die
-     Datenschutzerklärung im Hochlade-Hinweis). Vor dieser Zeile gesetzt, wäre
-     die Sprache dort sofort wieder überschrieben. */
+     Datenschutzerklärung im Hochlade-Hinweis). Vor diesen beiden Zeilen
+     gesetzt, wären Ziel und Sprache dort sofort wieder überschrieben.
+
+     Erst das Ziel, dann das Anhängsel. Der Tausch erhält den Suchteil, beide
+     Reihenfolgen kämen also auf dasselbe heraus; so gelesen entsteht die
+     Adresse aber in derselben Folge, in der sie am Ende dasteht. */
+  rechtsseitenAufSpracheStellen();
   spracheAnLinksHaengen();
+}
+
+/* ── Die vier Rechtsseiten und ihre englischen Zwillinge ──────────────────
+ *
+ * Seit 2026-08-18 gibt es jede Rechtsseite zweimal. Die Fußzeile übersetzte
+ * bis dahin nur ihre BESCHRIFTUNG: Auf Englisch stand dort „Privacy Policy",
+ * der Klick landete trotzdem auf der deutschen Seite. Eine übersetzte
+ * Beschriftung mit unübersetztem Ziel ist schlimmer als eine unübersetzte —
+ * sie verspricht etwas, das der Klick nicht hält.
+ *
+ * Diese Tabelle ist die EINZIGE Zuordnung im Frontend, und sie ist
+ * ausdrücklich nach außen gegeben (`export`), damit die Wächter sie LESEN
+ * statt sie abzuschreiben: i18n-guardian.test.js hält sie gegen die kanonische Paarliste
+ * RECHTS_PAARE, gegen die Dateien unter public/en/ und gegen die Rewrites in
+ * firebase.json. Eine stumme zweite Liste driftet, eine geprüfte nicht.
+ *
+ * Der Rückweg wird abgeleitet und nicht ein zweites Mal geschrieben — sonst
+ * säße genau hier die nächste Drift.
+ *
+ * /stats fehlt bewusst: Die Zahlen-Seite ist DIESELBE Datei in beiden Sprachen
+ * (`?lang=`). Sie hat kein Gegenstück und braucht keins.
+ */
+export const RECHTSSEITEN = Object.freeze({
+  "/impressum": "/en/imprint",
+  "/datenschutz": "/en/privacy",
+  "/nutzungsbedingungen": "/en/terms",
+  "/barrierefreiheit": "/en/accessibility",
+});
+
+const ZURUECK_AUF_DEUTSCH = Object.freeze(Object.fromEntries(Object.entries(RECHTSSEITEN).map(([de, en]) => [en, de])));
+
+/**
+ * Stellt die Ziele der Rechts-Links auf die eingestellte Sprache um.
+ *
+ * Anders als beim Sprach-Anhängsel darunter zählt hier NICHT nur
+ * `target="_blank"`: Die Zahlen-Seite verlinkt die Rechtsseiten im selben Tab.
+ * Gesucht wird deshalb über jeden internen Link.
+ *
+ * Getauscht wird nur der Pfad. Ein vorhandener Suchteil bleibt stehen, damit
+ * das Sprach-Anhängsel und alles andere in der Adresse den Tausch überlebt.
+ *
+ * Deutsch ist die Rückfallsprache: Ist etwas anderes als Englisch
+ * eingestellt — heute unmöglich, morgen vielleicht nicht —, führen die Links
+ * auf die deutschen Seiten. Das ist der einzige vollständige Satz; ein Verweis auf
+ * eine Seite, die es nicht gibt, wäre die schlechtere Antwort.
+ */
+function rechtsseitenAufSpracheStellen() {
+  const tabelle = lang === "en" ? RECHTSSEITEN : ZURUECK_AUF_DEUTSCH;
+  document.querySelectorAll('a[href^="/"]').forEach((a) => {
+    const roh = a.getAttribute("href");
+    if (!roh) return;
+    try {
+      const ziel = new URL(roh, window.location.origin);
+      const neu = tabelle[ziel.pathname];
+      if (!neu) return;
+      ziel.pathname = neu;
+      a.setAttribute("href", ziel.pathname + ziel.search + ziel.hash);
+    } catch (_err) {
+      /* Kaputte Adresse im HTML — dann bleibt der Link, wie er ist. */
+    }
+  });
 }
 
 /**

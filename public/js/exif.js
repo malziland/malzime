@@ -91,7 +91,7 @@ export async function prepareImage(file) {
 
   /* Bild via Canvas komprimieren — aus der In-Memory-Kopie, nicht aus der
      Datei-Referenz (siehe readFileBytes). */
-  const imageBase64 = await new Promise((resolve, reject) => {
+  const bild = await new Promise((resolve, reject) => {
     const blob = new Blob([bytes], { type: file.type || "image/jpeg" });
     const url = URL.createObjectURL(blob);
     const img = new Image();
@@ -126,10 +126,52 @@ export async function prepareImage(file) {
          Altersschaetzung braucht. */
       ctx.imageSmoothingQuality = "high";
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", 0.82).split(",")[1] || "");
+
+      /* BUG-2026-08-19-01, Teil 1 von 2: Wir nehmen, was herauskam.
+         Bis hierher wurde das Ergebnis als JPEG AUSGEGEBEN und in api.js auch
+         so ANGEKUENDIGT. Am 19.08. lieferte ein iPhone beim zweiten Bild
+         derselben Sitzung PNG — die Ankuendigung war damit gelogen, und die
+         inhaltliche Pruefung des Servers (SEC-2026-08-12-19) wies zu Recht mit
+         400 ab. Fuer den Menschen davor: "die Seite funktioniert nicht".
+
+         `toDataURL` darf laut Norm auf PNG zurueckfallen, wenn der gewuenschte
+         Typ nicht geliefert werden kann. Statt zu raten, WARUM ein fremder
+         Browser das tut, lesen wir den Typ aus dem Ergebnis ab. Der Server
+         erlaubt PNG ohnehin (ALLOWED_MIME) und prueft weiterhin den Inhalt —
+         diese Aenderung schwaecht also nichts ab, sie hoert nur auf zu
+         behaupten. */
+      const datenUrl = canvas.toDataURL("image/jpeg", 0.82);
+      const typ = /^data:([^;,]+)/.exec(datenUrl);
+
+      /* BUG-2026-08-19-01, Teil 2 von 2: den Canvas freigeben.
+         Der Fehler trat beim ZWEITEN Bild derselben Sitzung auf, nicht beim
+         ersten. iOS Safari raeumt Canvas-Speicher nicht sofort ab; ist die
+         Obergrenze erreicht, misslingt die JPEG-Kodierung und der Browser
+         faellt zurueck. Ein Canvas auf 0x0 zu setzen ist der uebliche Weg, den
+         Speicher sofort freizugeben — er kostet nichts und nimmt der Ursache
+         die Grundlage, unabhaengig davon, ob sie genau so aussieht. */
+      canvas.width = 0;
+      canvas.height = 0;
+
+      resolve({
+        base64: datenUrl.split(",")[1] || "",
+        mimeType: typ ? typ[1] : "image/jpeg",
+      });
     };
     img.src = url;
   });
 
-  return { imageBase64, exif, dateTimeOriginal, gps };
+  /* Der Dateiname folgt dem Typ. Ein PNG "upload.jpg" zu nennen waere dieselbe
+     Unwahrheit eine Ebene tiefer — sie faellt nur nicht auf, weil der Server
+     den Namen nicht prueft. Kein Grund, ihn falsch zu setzen. */
+  const endung = { "image/png": "png", "image/webp": "webp", "image/gif": "gif" }[bild.mimeType] || "jpg";
+
+  return {
+    imageBase64: bild.base64,
+    mimeType: bild.mimeType,
+    dateiname: `upload.${endung}`,
+    exif,
+    dateTimeOriginal,
+    gps,
+  };
 }

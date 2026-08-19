@@ -1,5 +1,51 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+/* ── Welche Seiten geprueft werden ─────────────────────────────────────────
+   OPS-2026-08-18-03: Hier standen zwei feste Listen mit denselben vier
+   deutschen Rechtsseiten. Am 2026-08-18 kamen vier englische Seiten unter
+   public/en/ dazu — beide Listen haetten sie nicht gesehen, und der
+   Pruefbericht haette weiter behauptet, die Stichprobe umfasse die Website
+   "vollstaendig". Eine Konformitaetsaussage, die auf einer veralteten Liste
+   steht, ist keine.
+
+   Deshalb wird jetzt das Dateisystem gefragt. Jede neue Seite ist damit ab
+   ihrer Entstehung in der Pruefung — ohne dass jemand daran denken muss. */
+const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../public");
+
+function alleSeiten(unter = "") {
+  const treffer = [];
+  for (const e of fs.readdirSync(path.join(PUBLIC, unter), { withFileTypes: true })) {
+    const rel = unter ? `${unter}/${e.name}` : e.name;
+    if (e.isDirectory()) {
+      if (["__tests__", "node_modules", "fonts", "img", "js", "locales"].includes(e.name)) continue;
+      treffer.push(...alleSeiten(rel));
+    } else if (e.name.endsWith(".html")) {
+      treffer.push("/" + rel);
+    }
+  }
+  return treffer.sort();
+}
+
+const ALLE_SEITEN = alleSeiten();
+
+/* Die Rechtsseiten: alles ausser Startseite und Zahlen-Seite. Deutsch UND
+   englisch — /en/privacy.html traegt dieselbe Verantwortung wie
+   /datenschutz.html. */
+const RECHTSSEITEN = ALLE_SEITEN.filter((p) => !/^\/(index|stats)\.html$/.test(p));
+
+/* Positivkontrolle fuer die Suche selbst: Faende sie nichts oder zu wenig,
+   liefen die Schleifen unten still leer und der Test waere gruen ohne
+   gemessen zu haben. Stand 2026-08-18: 10 Seiten, davon 8 Rechtsseiten. */
+test("Messmittel: die Seitensuche findet die ausgelieferten Seiten", () => {
+  expect(ALLE_SEITEN.length, `gefunden: ${ALLE_SEITEN.join(", ")}`).toBeGreaterThanOrEqual(10);
+  expect(RECHTSSEITEN.length).toBeGreaterThanOrEqual(8);
+  expect(ALLE_SEITEN).toContain("/en/privacy.html");
+  expect(ALLE_SEITEN).toContain("/datenschutz.html");
+});
 
 /* Automatisierter Accessibility-Check (axe-core) des kritischsten Nutzerflusses:
    Startseite und fertige Profil-Ansicht. Gate: Verstöße mit Impact "serious"
@@ -195,14 +241,7 @@ test("A11y: kein waagrechtes Scrollen bei 320 px (WCAG 1.4.10 AA)", async ({ pag
      geklebte Leiste, deren negativer Rand nicht zur Container-Polsterung
      passte. Ohne diesen Riegel faellt das still zurueck. */
   await page.setViewportSize({ width: 320, height: 800 });
-  for (const pfad of [
-    "/",
-    "/datenschutz.html",
-    "/impressum.html",
-    "/nutzungsbedingungen.html",
-    "/barrierefreiheit.html",
-    "/stats.html",
-  ]) {
+  for (const pfad of ALLE_SEITEN) {
     await page.goto(pfad);
     await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
     const mass = await page.evaluate(() => ({
@@ -218,7 +257,7 @@ test("A11y: jedes fokussierbare Element hat einen eigenen Fokus-Ring", async ({ 
      Browser-Standardring. Sichtbar ist der (WCAG 2.4.7 AA erfuellt), aber sein
      Aussehen entscheidet jeder Browser selbst. Seit dem eigenen Ring sind es 0
      — dieser Riegel haelt das fest. */
-  for (const pfad of ["/impressum.html", "/datenschutz.html", "/nutzungsbedingungen.html", "/barrierefreiheit.html"]) {
+  for (const pfad of RECHTSSEITEN) {
     await page.goto(pfad);
     const schwach = await page.evaluate(() => {
       const raus = [];

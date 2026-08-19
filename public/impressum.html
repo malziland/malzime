@@ -11,6 +11,9 @@
     />
     <meta name="robots" content="index, follow" />
     <link rel="canonical" href="https://malzi.me/impressum" />
+    <link rel="alternate" hreflang="de" href="https://malzi.me/impressum" />
+    <link rel="alternate" hreflang="en" href="https://malzi.me/en/imprint" />
+    <link rel="alternate" hreflang="x-default" href="https://malzi.me/impressum" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Impressum &mdash; malziME" />
@@ -42,7 +45,7 @@
       }
     </script>
 
-    <link rel="icon" href="./favicon.ico" sizes="48x48" />
+    <link rel="icon" href="./favicon.ico" sizes="32x32 16x16" />
     <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="manifest" href="./site.webmanifest" />
@@ -58,7 +61,25 @@
     </div>
 
     <main id="main" class="container legal-page">
-      <span class="page-eyebrow"><a href="/" class="eyebrow-home" tabindex="0">malziME</a> &middot; Rechtliches</span>
+      <div class="seiten-kopfzeile">
+        <span class="page-eyebrow"><a href="/" class="eyebrow-home" tabindex="0">malziME</a> &middot; Rechtliches</span>
+        <div class="sprachwahl">
+          <div class="sprach-pille" role="group" aria-label="Sprache w&auml;hlen / Choose language">
+            <span class="sprach-schieber" aria-hidden="true"></span>
+            <span class="sprach-knopf aktiv" data-lang="de" lang="de" aria-current="page">DE</span>
+            <a
+              class="sprach-knopf"
+              data-lang="en"
+              lang="en"
+              hreflang="en"
+              href="/en/imprint"
+              tabindex="0"
+              aria-label="English"
+              >EN</a
+            >
+          </div>
+        </div>
+      </div>
       <h1>Impressum</h1>
       <p class="legal-subtitle">Impressum &ndash; malziME by malziland</p>
       <div class="page-rule"></div>
@@ -142,9 +163,5 @@
         <a href="/stats" tabindex="0">Stats</a>
       </div>
     </footer>
-    <!-- ÜBERGANG: Sprachumschalter mit zweisprachigem Hinweis, solange diese
-         Seite nur auf Deutsch vorliegt. Verschwindet samt js/sprachhinweis.js,
-         sobald sie übersetzt ist. -->
-    <script type="module" src="./js/sprachhinweis.js?v=2026081807"></script>
   </body>
 </html>

@@ -406,7 +406,15 @@ test("Fokus bleibt in der Rückfrage und kehrt danach zurück", async ({ page })
           const a = document.activeElement;
           return a ? `${a.tagName.toLowerCase()} data-lang="${a.dataset.lang || ""}"` : "gar nichts";
         }),
-      { message: "Fokus kehrt nach Escape auf den EN-Knopf zurueck" }
+      {
+        /* Standard sind 5 s. Das reichte lokal immer und in der Pipeline fast
+           immer — am 2026-08-19 zum zweiten Mal nicht, unter WebKit und CI-Last
+           (lokal danach 3 von 3 gruen). Die Zusicherung bleibt wortgleich, sie
+           bekommt nur mehr Zeit; ein Fokus, der nach 15 s nicht dort ist, waere
+           ein echter Fehler und kein Flackern. */
+        timeout: 15000,
+        message: "Fokus kehrt nach Escape auf den EN-Knopf zurueck",
+      }
     )
     .toBe('button data-lang="en"');
 });

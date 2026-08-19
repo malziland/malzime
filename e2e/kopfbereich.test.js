@@ -125,15 +125,23 @@ test.describe("Kopfbereich", () => {
     await merkmalStellen(page);
     await page.goto("/index.html");
     await page.evaluate(() => document.fonts.ready);
+    /* WARTEN, nicht sofort zaehlen: Die Kopfzeile entsteht erst, nachdem
+       js/sprachumschalter.js das Merkmal von /api/stats gelesen hat. Ein
+       sofortiges `count()` traf die Luecke — lokal nie, in der Pipeline sofort.
+       (Genau derselbe Fehlertyp, den dieser Test eigentlich pruefen soll: eine
+       Aussage ueber etwas, das noch gar nicht da ist.) */
+    await expect(page.locator(".seiten-kopfzeile"), "ohne Kopfzeile prüft der Vergleich nichts").toHaveCount(1);
     const mit = await page.evaluate(() => Math.round(document.querySelector("h1").getBoundingClientRect().top));
-    expect(await page.locator(".seiten-kopfzeile").count(), "ohne Kopfzeile prüft der Vergleich nichts").toBe(1);
 
     const ohne = await page.context().newPage();
     await ohne.route("**/js/sprachumschalter.js*", (r) => r.abort());
     await ohne.goto("/index.html");
     await ohne.evaluate(() => document.fonts.ready);
+    /* Hier ist die Abwesenheit die Aussage — kurz warten, damit ein verspaetetes
+       Skript den Test nicht faelschlich bestehen laesst. */
+    await ohne.waitForTimeout(600);
+    await expect(ohne.locator(".seiten-kopfzeile"), "Kopfzeile trotz blockiertem Skript da?").toHaveCount(0);
     const ohneWert = await ohne.evaluate(() => Math.round(document.querySelector("h1").getBoundingClientRect().top));
-    expect(await ohne.locator(".seiten-kopfzeile").count(), "Kopfzeile trotz blockiertem Skript da?").toBe(0);
     await ohne.close();
 
     expect(ohneWert, `mit Skript ${mit} px, ohne ${ohneWert} px — der Abstand hängt am Skript`).toBe(mit);

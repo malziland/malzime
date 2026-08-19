@@ -18,12 +18,75 @@
 
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 /* Bewusst über das Arbeitsverzeichnis statt über `import.meta.url`: Playwright
    lädt die Testdateien nicht als echte ES-Module, `import.meta` wirft dort. */
 const AUSGABE = join(process.cwd(), "e2e", ".protokoll");
+
+/* ── Welche Seiten im Messumfang liegen ───────────────────────────────────
+   OPS-2026-08-18: Hier stand weiter unten eine feste Liste mit genau den vier
+   DEUTSCHEN Rechtsseiten. Am 18.08.2026 kamen vier englische Fassungen unter
+   `public/en/` dazu — die Liste kannte sie nicht. Das Protokoll hätte weiter
+   behauptet, es messe die Website vollständig, und hätte dabei vier
+   ausgelieferte Seiten nie angesehen. Eine Konformitätsaussage, die auf einer
+   veralteten Liste steht, ist keine Konformitätsaussage.
+
+   Deshalb wird jetzt das Dateisystem gefragt — dieselbe Ableitung wie in
+   `e2e/a11y.test.js`. Jede neue Seite liegt damit ab ihrer Entstehung im
+   Messumfang, ohne dass jemand daran denken muss.
+
+   Warum die Ableitung doppelt dasteht statt in einem gemeinsamen Modul: Ein
+   Hilfsmodul wäre eine dritte Datei, und die Kopplung zweier Prüfmittel über
+   eine gemeinsame Quelle kostet mehr, als die zehn Zeilen wert sind. Was
+   beide Dateien teilen müssen, ist das VERFAHREN (frag das Dateisystem), nicht
+   der Code.
+
+   Basis ist das Arbeitsverzeichnis, nicht `import.meta.url` — Begründung
+   direkt oben bei AUSGABE. */
+const PUBLIC = join(process.cwd(), "public");
+
+function alleSeiten(unter = "") {
+  const treffer = [];
+  for (const e of readdirSync(join(PUBLIC, unter), { withFileTypes: true })) {
+    const rel = unter ? `${unter}/${e.name}` : e.name;
+    if (e.isDirectory()) {
+      if (["__tests__", "node_modules", "fonts", "img", "js", "locales"].includes(e.name)) continue;
+      treffer.push(...alleSeiten(rel));
+    } else if (e.name.endsWith(".html")) {
+      treffer.push("/" + rel);
+    }
+  }
+  return treffer.sort();
+}
+
+const ALLE_SEITEN = alleSeiten();
+
+/* Die Rechtsseiten: alles außer Startseite und Zahlen-Seite — die beiden haben
+   eigene Tests weiter unten, weil sie eine Schnittstelle brauchen. Deutsch UND
+   englisch: `/en/privacy.html` trägt dieselbe Verantwortung wie
+   `/datenschutz.html` und wird deshalb genauso gemessen. */
+const RECHTSSEITEN = ALLE_SEITEN.filter((p) => !/^\/(index|stats)\.html$/.test(p));
+
+/* Adresse ohne Endung -> ausgelieferte Datei, abgeleitet aus derselben Suche.
+   Gebraucht von der Rewrite-Attrappe weiter unten; bewusst KEINE zweite feste
+   Liste der acht Hosting-Regeln. */
+const REWRITES = new Map(ALLE_SEITEN.map((p) => [p.replace(/\.html$/, ""), p]));
+
+/* Ein sprechender Name je Seite fürs Protokoll, ebenfalls abgeleitet:
+   "/datenschutz.html" -> "DE Datenschutz", "/en/privacy.html" -> "EN Privacy".
+   Die Sprache steht bewusst vorne — im Befundbericht muss auf einen Blick zu
+   sehen sein, dass beide Fassungen gemessen wurden. */
+function seitenName(pfad) {
+  const teile = pfad
+    .replace(/^\//, "")
+    .replace(/\.html$/, "")
+    .split("/");
+  const blatt = teile.pop();
+  const sprache = (teile.join("/") || "de").toUpperCase();
+  return `${sprache} ${blatt.charAt(0).toUpperCase()}${blatt.slice(1)}`;
+}
 
 /* Genau die Stufe, die wir zusagen — nicht mehr und nicht weniger. Ohne diese
    Marken misst axe auch „best-practice"-Regeln, die zu KEINEM Standard
@@ -120,6 +183,31 @@ async function endpunkteStellen(page, { jobStatus = { status: "done", result: PR
     r.fulfill({ status: 200, contentType: "application/json", body: "[]" })
   );
   await page.route("**/tile.openstreetmap.org/**", (r) => r.fulfill({ status: 200, body: "" }));
+}
+
+/**
+ * Stellt die Rewrites von Firebase Hosting nach.
+ *
+ * WARUM: Der Sprachumschalter verweist auf die sauberen Adressen ohne Endung
+ * (`/en/privacy`), weil Hosting sie auf die HTML-Datei umschreibt. Der
+ * Testserver ist ein nackter Dateiserver und kennt diese Regel nicht — ein
+ * Klick liefe dort in einen 404, und das Protokoll würde den Testserver messen
+ * statt den Umschalter. Gleiches Vorgehen wie in
+ * `e2e/sprachumschalter-unterseiten.test.js`, nur wird die Zuordnung hier aus
+ * der Seitensuche abgeleitet statt noch einmal aufgeschrieben.
+ *
+ * Die Antwort holt die Attrappe vom Testserver, nicht von der Festplatte —
+ * gemessen bleibt damit, was auch ausgeliefert wird.
+ */
+async function hostingAdressenNachstellen(page) {
+  await page.route(
+    (url) => REWRITES.has(url.pathname),
+    async (route) => {
+      const adresse = new URL(route.request().url());
+      const antwort = await route.fetch({ url: adresse.origin + REWRITES.get(adresse.pathname) });
+      await route.fulfill({ response: antwort });
+    }
+  );
 }
 
 /* ── Abstentionen aufloesen ────────────────────────────────────────────────
@@ -676,6 +764,155 @@ async function textAnpassungMessen(page, bildschirm) {
   return ergebnisse;
 }
 
+/**
+ * Der Sprachumschalter auf einer Rechtsseite — WCAG 2.1.1 Tastatur (A),
+ * 2.4.7 Fokus sichtbar (AA), 2.5.8 Zielgroesse (AA), 4.1.2 Name/Rolle/Wert (A)
+ * und 3.2.3 Konsistente Navigation (AA).
+ *
+ * OPS-2026-08-18, WAS HIER FRUEHER STAND: eine Messung namens "Sprachhinweis
+ * offen". Bis zum 18.08.2026 loeste der EN-Knopf auf den Rechtsseiten keinen
+ * Wechsel aus, sondern eine Rueckfrage — `public/js/sprachhinweis.js` oeffnete
+ * einen zweisprachigen Dialog ("Diese Seite gibt es nur auf Deutsch"). Der Test
+ * klickte darauf und erwartete `.sw-grund[data-modal="unuebersetzt"]`.
+ *
+ * Diese Uebergangsloesung ist ersatzlos weg: Es gibt vier englische Fassungen,
+ * die Skriptdatei ist geloescht, der Umschalter ist ein reiner Link. Der
+ * Klick NAVIGIERT jetzt — der alte Zustand ist also nicht "noch gruen", er
+ * existiert nicht mehr. Die alte Erwartung stehenzulassen haette den Lauf rot
+ * gemacht; sie einfach zu streichen haette das einzige Bedienelement dieser
+ * Seiten aus dem Protokoll fallen lassen. Beides waere falsch.
+ *
+ * WARUM HIER KEIN ZWEITER axe-DURCHLAUF LAEUFT: Ein fokussierter Link sieht
+ * fuer axe genauso aus wie ein nicht fokussierter — axe prueft keine
+ * Fokusringe. Ein `messen()`-Aufruf haette denselben Zustand ein zweites Mal
+ * gezaehlt und im Protokoll einen Zustand behauptet, den es nicht gibt. Genau
+ * dieser Fehler steckte in der frueheren Messung "Startseite, leer, dunkel"
+ * (Begruendung im Test unten). Gemessen wird deshalb, was den Umschalter
+ * ausmacht und was axe NICHT sieht: seine Rollen, seine tastbare Flaeche und
+ * sein Fokusring.
+ *
+ * Gegatet wird nur, was der geloeschte Dialog auch gatete — dass das
+ * Bedienelement da ist und tut, was es soll. Die Groessen wandern als Messwert
+ * ins Protokoll, nicht in eine Zusicherung: Diese Datei misst, sie richtet
+ * nicht (Kopf der Datei).
+ */
+async function sprachumschalterMessen(page, bildschirm) {
+  await beruhigen(page);
+
+  const mess = await page.evaluate((tf) => {
+    eval(tf);
+    const pille = document.querySelector(".sprach-pille");
+    if (!pille) return { pillen: 0 };
+    const knoepfe = Array.from(pille.querySelectorAll(".sprach-knopf")).map((el) => {
+      /* eslint-disable no-undef */
+      const flaeche = trefferflaeche(el);
+      /* eslint-enable no-undef */
+      const kasten = el.getBoundingClientRect();
+      return {
+        sprache: el.getAttribute("data-lang"),
+        element: el.tagName,
+        aktiv: el.classList.contains("aktiv"),
+        ariaCurrent: el.getAttribute("aria-current"),
+        lang: el.getAttribute("lang"),
+        ziel: el.getAttribute("href"),
+        tabindex: el.getAttribute("tabindex"),
+        name: (el.getAttribute("aria-label") || el.textContent || "").trim(),
+        gemalt: { breite: Math.round(kasten.width), hoehe: Math.round(kasten.height) },
+        tastbar: flaeche,
+      };
+    });
+
+    /* Der Fokusring entsteht erst, wenn der Fokus wirklich sitzt:
+       `:focus-visible` greift nicht ueber berechnete Stile allein. */
+    const verweis = pille.querySelector("a.sprach-knopf[href]");
+    let fokus = null;
+    if (verweis) {
+      verweis.focus();
+      const s = getComputedStyle(verweis);
+      fokus = {
+        angekommen: document.activeElement === verweis,
+        umriss: parseFloat(s.outlineWidth) || 0,
+        umrissArt: s.outlineStyle,
+        schatten: !!(s.boxShadow && s.boxShadow !== "none"),
+      };
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    }
+
+    return {
+      pillen: document.querySelectorAll(".sprach-pille").length,
+      knoepfe,
+      fokus,
+      /* Reste der Uebergangsloesung. Muss 0 sein — sonst liegt totes Markup
+         herum, das ein Screenreader trotzdem vorliest. */
+      dialogReste: document.querySelectorAll('.sw-grund, .sw-modal, [data-modal="unuebersetzt"]').length,
+    };
+  }, TREFFERFLAECHE_JS);
+
+  /* POSITIVKONTROLLE: Ohne Pille misst diese Funktion nichts und waere still
+     gruen — genau die Falle, in die eine Messung ohne Gegenprobe laeuft. */
+  expect(mess.pillen, `keine Umschalter-Pille auf ${bildschirm} gefunden`).toBe(1);
+  expect(mess.knoepfe.length, `die Pille auf ${bildschirm} traegt nicht genau zwei Sprachen`).toBe(2);
+
+  const aktiv = mess.knoepfe.filter((k) => k.aktiv);
+  const verweise = mess.knoepfe.filter((k) => !k.aktiv);
+  expect(aktiv.length, `${bildschirm}: genau eine Sprache muss als aktiv ausgewiesen sein`).toBe(1);
+  expect(verweise.length, `${bildschirm}: genau eine Sprache muss verlinkt sein`).toBe(1);
+
+  /* Die Sprache, in der die Seite dasteht, ist kein Bedienelement: Man kann
+     sie nicht anklicken, weil man dort schon ist. Als <span> mit
+     aria-current="page" sagt ein Screenreader "aktuelle Seite", statt einen
+     Link anzubieten, der nirgendwohin fuehrt (WCAG 4.1.2). */
+  expect(aktiv[0].element, `${bildschirm}: die aktive Sprache muss ein <span> sein, kein Link`).toBe("SPAN");
+  expect(aktiv[0].ariaCurrent, `${bildschirm}: der aktiven Sprache fehlt aria-current="page"`).toBe("page");
+  expect(aktiv[0].lang, `${bildschirm}: der aktiven Sprache fehlt das lang-Merkmal`).toBeTruthy();
+
+  /* Die andere Sprache ist ein echter Link. Ohne `lang` spricht ein
+     Screenreader "EN" deutsch aus; ohne ausdrueckliches tabindex="0" erreicht
+     Safari ihn ohne "Vollzugriff Tastatur" gar nicht (BUG-2026-08-17-08,
+     gefunden von einem Nutzer auf der Live-Seite). */
+  expect(verweise[0].element, `${bildschirm}: die andere Sprache muss ein echter Link sein`).toBe("A");
+  expect(verweise[0].lang, `${bildschirm}: dem Sprachverweis fehlt das lang-Merkmal`).toBeTruthy();
+  expect(verweise[0].tabindex, `${bildschirm}: ohne tabindex="0" erreicht Safari den Sprachverweis nicht`).toBe("0");
+  expect(verweise[0].name.length, `${bildschirm}: der Sprachverweis traegt keinen Namen`).toBeGreaterThan(1);
+  expect(verweise[0].ariaCurrent, `${bildschirm}: nur die Seite, auf der man steht, darf aria-current tragen`).toBe(
+    null
+  );
+
+  /* Das Ziel muss eine Seite sein, die es wirklich gibt — geprueft an der
+     Seitensuche, nicht an einer Liste im Test. Ein Sprachverweis ins Leere
+     waere fuer jemanden mit Screenreader nicht als Sackgasse erkennbar. */
+  expect(REWRITES.has(verweise[0].ziel), `${bildschirm}: der Sprachverweis ${verweise[0].ziel} fuehrt ins Leere`).toBe(
+    true
+  );
+
+  expect(mess.dialogReste, `${bildschirm}: Reste des geloeschten Sprachhinweis-Dialogs im Markup`).toBe(0);
+
+  /* WCAG 2.4.7: Der Fokus muss sichtbar sein. "Sichtbar" heisst in diesem
+     Projekt: eigener Umriss ab 2 px oder ein Schlagschatten — dieselbe
+     Definition wie in `aaaMessen` weiter oben, damit nicht zwei Messungen
+     dasselbe verschieden nennen. */
+  expect(mess.fokus, `${bildschirm}: der Sprachverweis liess sich nicht fokussieren`).not.toBeNull();
+  expect(mess.fokus.angekommen, `${bildschirm}: der Fokus kam am Sprachverweis nicht an`).toBe(true);
+  expect(
+    mess.fokus.umriss >= 2 || mess.fokus.schatten,
+    `${bildschirm}: der Sprachverweis hat mit Tastaturfokus keinen sichtbaren Ring (${JSON.stringify(mess.fokus)})`
+  ).toBe(true);
+
+  befunde.push({
+    bildschirm,
+    zustand: "Sprachumschalter als Link (WCAG 2.1.1 A · 2.4.7 AA · 2.5.8 AA · 4.1.2 A)",
+    ...mess,
+    /* Nachrichtlich, wie ueberall in dieser Datei: 24 x 24 ist AA, 44 x 44 ist
+       AAA und ausdruecklich nicht unser Ziel. Gemessen wird die TASTBARE
+       Flaeche — die Sprachknoepfe sind sichtbar flacher als ihre Trefferzone,
+       eine Messung an `getBoundingClientRect()` haette sie faelschlich als
+       Mangel gemeldet (Begruendung bei TREFFERFLAECHE_JS oben). */
+    unter24: mess.knoepfe.filter((k) => k.tastbar.breite < 24 || k.tastbar.hoehe < 24),
+    unter44: mess.knoepfe.filter((k) => k.tastbar.breite < 44 || k.tastbar.hoehe < 44),
+  });
+  return mess;
+}
+
 test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
   test.use({ viewport: { width: 1280, height: 900 } });
 
@@ -878,13 +1115,18 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
     await umbruchMessen(page, "Zahlen-Seite");
   });
 
-  for (const [name, pfad] of [
-    ["Datenschutz", "/datenschutz.html"],
-    ["Impressum", "/impressum.html"],
-    ["Nutzungsbedingungen", "/nutzungsbedingungen.html"],
-    ["Barrierefreiheit", "/barrierefreiheit.html"],
-  ]) {
+  /* Alle Rechtsseiten, deutsch UND englisch, aus dem Dateisystem abgeleitet
+     (RECHTSSEITEN oben). Hier stand bis 2026-08-19 eine feste Liste mit den vier
+     deutschen Seiten. Sie war beim Zuwachs von public/en/ sofort veraltet — und
+     der Pruefbericht haette weiter behauptet, die Stichprobe umfasse die Website
+     "vollstaendig". Eine Konformitaetsaussage auf einer veralteten Liste ist keine. */
+  for (const pfad of RECHTSSEITEN) {
+    const name = seitenName(pfad);
     test(`Rechtsseite: ${name}`, async ({ page }) => {
+      /* Der Umschalter verweist auf saubere Adressen (/en/privacy); Firebase
+         Hosting schreibt sie auf die HTML-Datei um, der Testserver kann das
+         nicht. Die Attrappe bildet genau diese Regeln nach. */
+      await hostingAdressenNachstellen(page);
       await page.goto(pfad);
       await expect(page.locator("h1")).toBeVisible();
       await messen(page, name, "hell");
@@ -892,14 +1134,14 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
       await aaaMessen(page, name);
       await textAnpassungMessen(page, name);
 
-      /* Der Sprachhinweis ist ein Dialog — offene Dialoge werden eigens
-         gemessen, weil sie den Fokus fangen und die Umgebung stilllegen. */
-      const en = page.locator('.sprach-knopf[data-lang="en"]');
-      if (await en.count()) {
-        await en.click();
-        await expect(page.locator('.sw-grund[data-modal="unuebersetzt"]')).toBeVisible();
-        await messen(page, name, "Sprachhinweis offen");
-      }
+      /* Der Sprachumschalter war bis v3.6.1 ein Dialog und wurde als solcher
+         gemessen — Fokus-Kaefig, stillgelegte Umgebung, Escape. Seit es die
+         englischen Seiten gibt, ist er ein LINK: keine Rueckfrage, kein Dialog,
+         kein JavaScript. Gemessen wird jetzt der Link samt Fokusring,
+         Trefferflaeche, Beschriftung — und ausdruecklich, dass vom Dialog
+         nichts uebrig ist. */
+      await sprachumschalterMessen(page, name);
+
       await umbruchMessen(page, name);
     });
   }

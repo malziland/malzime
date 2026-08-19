@@ -257,13 +257,30 @@ test.describe("Ansage-Protokoll", () => {
     expect(zeilen.length).toBeGreaterThan(5);
   });
 
-  test("Rechtsseite: Sprachhinweis-Dialog", async ({ page }) => {
-    await ansagenMitschreiben(page, "Sprachhinweis");
+  test("Rechtsseite: der Sprachumschalter als Link", async ({ page }) => {
+    /* Bis v3.6.1 oeffnete der EN-Knopf hier eine Rueckfrage ("Diese Seite gibt
+       es nur auf Deutsch"), und dieser Test schrieb mit, was ein Screenreader
+       in diesem Dialog vorliest. Seit die englischen Seiten existieren, ist der
+       Umschalter ein Link — es gibt nichts mehr zu oeffnen.
+
+       Geprueft wird jetzt, dass der Screenreader die aktive Sprache und das
+       Ziel unterscheiden kann: Die aktive Sprache ist kein Link (man steht
+       darauf), die andere schon, und beide tragen ihre eigene Sprache als
+       Auszeichnung — sonst spricht die Stimme "EN" deutsch aus. */
+    await ansagenMitschreiben(page, "Sprachumschalter");
     await page.goto("/datenschutz.html");
-    await page.waitForTimeout(700);
-    await page.click('.sprach-knopf[data-lang="en"]');
-    await page.waitForTimeout(600);
-    const zeilen = await baumLesen(page, "Sprachhinweis offen");
+
+    const aktiv = page.locator("span.sprach-knopf.aktiv");
+    const verweis = page.locator("a.sprach-knopf");
+    await expect(aktiv, "kein aktiver Sprachknopf — Test wuerde nichts pruefen").toHaveCount(1);
+    await expect(verweis, "kein Sprachverweis — Test wuerde nichts pruefen").toHaveCount(1);
+
+    await expect(aktiv).toHaveAttribute("aria-current", "page");
+    await expect(aktiv).toHaveAttribute("lang", "de");
+    await expect(verweis).toHaveAttribute("lang", "en");
+    await expect(verweis).toHaveAttribute("aria-label", "English");
+
+    const zeilen = await baumLesen(page, "Sprachumschalter");
     expect(zeilen.length).toBeGreaterThan(3);
   });
 

@@ -162,8 +162,22 @@ else
 fi
 echo "Cache-Busting-Version: ?v=$VERSION"
 
-# Alle Dateien mit ?v=-Verweisen aktualisieren: die fuenf HTML-Seiten UND
-# public/js/demo.js — dort haengen die Buster der grossen Demo-Bilder.
+# Alle Dateien mit ?v=-Verweisen aktualisieren: JEDE HTML-Seite unter public/
+# — auch in Unterordnern wie public/en/ — UND public/js/demo.js, dort haengen
+# die Buster der grossen Demo-Bilder.
+#
+# OPS-2026-08-18-02: Hier stand eine feste Liste von sechs Pfaden. Sie war beim
+# Zuwachs der Seite /barrierefreiheit schon einmal veraltet (OPS-2026-08-17)
+# und wurde damals nur ergaenzt. Mit den englischen Seiten unter public/en/ waere
+# derselbe Fehler zum zweiten Mal passiert: Ihre Stilblatt-Verweise waeren auf
+# der Kennung ihres Entstehungstages eingefroren, waehrend alle anderen Seiten
+# weiterzaehlen — nach der naechsten CSS-Aenderung haetten sie ein altes
+# Stilblatt aus dem Zwischenspeicher gezogen. Auch der Waechter haette es nicht
+# gesehen, er durchsuchte nur die oberste Ebene von public/.
+#
+# Jetzt gibt es keine Liste mehr, die veralten kann: gefragt wird das
+# Dateisystem. Der Waechter fuehrt genau die Zeile unten aus und vergleicht ihr
+# Ergebnis mit allem, was tatsaechlich einen Buster traegt.
 # demo.js fehlte hier bis zum Kurzaudit 2026-08-11 (OPS-106): Sein Buster
 # blieb drei Deploys lang auf einem alten Stand stehen.
 #
@@ -172,7 +186,10 @@ echo "Cache-Busting-Version: ?v=$VERSION"
 # Fliesstext; der Kommentar ueber DEMO_BUSTER in public/js/demo.js wurde beim
 # Deploy vom 2026-08-12 stillschweigend verunstaltet. [0-9][0-9]* verlangt
 # mindestens eine Ziffer (BRE, kein + — bash 3.2 auf macOS kennt es nicht).
-for f in public/index.html public/datenschutz.html public/impressum.html public/nutzungsbedingungen.html public/barrierefreiheit.html public/stats.html public/js/demo.js; do
+# BUSTER-DATEIEN: Diese Zeile fuehrt functions/src/__tests__/deploy-buster-script.test.js
+# unveraendert aus. Ihre Form nicht ohne Blick dorthin aendern.
+BUSTER_DATEIEN=$(find public -name '*.html' | sort; echo public/js/demo.js)
+for f in $BUSTER_DATEIEN; do
   if [ -f "$f" ]; then
     # BUG-009: Cross-platform sed (macOS + Linux)
     if sed --version >/dev/null 2>&1; then

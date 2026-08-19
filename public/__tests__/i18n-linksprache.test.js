@@ -90,13 +90,27 @@ describe("Sprache als Übergabewert in der Adresse", () => {
     i18n.applyTranslations();
     await i18n.setLanguage("en");
 
+    /* Die Zahlen-Seite ist in beiden Sprachen dieselbe Datei — hier bleibt nur
+       das Anhängsel übrig, um das es diesem Test geht. */
     expect(href("stats")).toBe("/stats?lang=en");
-    expect(href("impressum")).toBe("/impressum?lang=en");
+    /* Seit 2026-08-18 wandert beim Impressum ZUSÄTZLICH das Ziel mit: Es gibt
+       eine englische Fassung, und eine Fußzeile, die nur ihre Beschriftung
+       übersetzt, verspricht etwas, das der Klick nicht hält. Die Umstellung
+       selbst prüft i18n-rechtslinks.test.js; hier steht sie, weil das
+       Anhängsel den Tausch überleben muss — beides zusammen ergibt die
+       Adresse, die am Ende in der Leiste steht. */
+    expect(href("impressum")).toBe("/en/legal-notice?lang=en");
   });
 
-  it("Links im SELBEN Tab bleiben unangetastet", () => {
+  it("Links im SELBEN Tab bekommen kein Anhängsel", () => {
     /* Dort trägt der sessionStorage die Wahl bereits — ein Anhängsel wäre
-       Ballast in der Adressleiste ohne jeden Nutzen. */
+       Ballast in der Adressleiste ohne jeden Nutzen.
+
+       „Unangetastet" hiess das hier bis 2026-08-18. Das stimmt seither nur
+       noch für das Anhängsel: Das ZIEL wird auch im selben Tab umgestellt,
+       sonst wäre die Fußzeile der Zahlen-Seite die einzige, die auf Englisch
+       weiter nach Deutschland zeigt. Deutsch bleibt die Ausgangslage dieses
+       Tests, deshalb ändert sich an der Adresse hier nichts. */
     i18n.applyTranslations();
     expect(href("gleicherTab")).toBe("/datenschutz");
   });
@@ -116,7 +130,11 @@ describe("Sprache als Übergabewert in der Adresse", () => {
 
     const drin = document.querySelector("#hinweis a");
     expect(drin).not.toBeNull();
-    expect(drin.getAttribute("href")).toBe("/datenschutz?lang=en");
+    /* Seit 2026-08-18 auch hier: erst das englische Ziel, dann das Anhängsel.
+       Die Sprachdatei verweist bewusst weiter auf die deutsche Adresse — die
+       Zuordnung steht an genau einer Stelle (js/i18n.js), nicht in zwei
+       JSON-Dateien. */
+    expect(drin.getAttribute("href")).toBe("/en/privacy?lang=en");
   });
 
   it("mehrfaches Anwenden hängt nichts an", async () => {

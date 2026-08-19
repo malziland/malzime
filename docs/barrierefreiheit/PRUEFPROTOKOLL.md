@@ -40,7 +40,7 @@ Handprüfung nötig ist, steht das als offener Punkt — nicht als Häkchen.
 **Geprüfte Zustände:** Startseite leer, Warteschlange mit Position und Restzeit,
 Live-Text während die KI schreibt, fertiges Profil (seriöser Modus, Beast-Modus,
 Umschalter im geklebten Zustand), Fehlermeldung nach fehlgeschlagener Analyse,
-Sprachhinweis-Dialog geöffnet.
+Sprachumschalter als Link geprüft (Fokusring, Trefferfläche, Beschriftung).
 
 **Zum dunklen Erscheinungsbild, damit hier nichts Falsches steht:** malziME richtet
 sich NICHT nach der Systemeinstellung „dunkel" — `prefers-color-scheme` kommt im
@@ -64,7 +64,7 @@ Zielgrößen, Reflow, Textvergrößerung, Textabstände und Fokus-Erscheinung.
 **Reproduzierbar:** `npx playwright test e2e/barrierefreiheit-protokoll.test.js`
 Rohdaten: `e2e/.protokoll/befunde-chromium.json`,
 `e2e/.protokoll/befunde-webkit-sprachumschalter.json`,
-`e2e/.protokoll/befunde-firefox-barrierefreiheit.json` — 46 Zustände je Maschine.
+`e2e/.protokoll/befunde-firefox-barrierefreiheit.json` — 70 Zustände je Maschine.
 
 ## 3 Fünf Vorsichtsmaßnahmen, die das Ergebnis erst belastbar machen
 
@@ -171,7 +171,7 @@ Legende: **erfüllt** = nachgewiesen · **n. a.** = nicht anwendbar, mit Grund �
 | 1.2.5 Audiodeskription (aufgezeichnet)                | keine Videobeiträge                                                                                                                                                                                      | **n. a.**                                 |
 | 1.3.4 Ausrichtung                                     | Sichtprüfung: keine Einschränkung auf Hoch- oder Querformat                                                                                                                                              | **erfüllt**                               |
 | 1.3.5 Eingabezweck bestimmen                          | Es gibt kein Formularfeld, das personenbezogene Daten erhebt                                                                                                                                             | **n. a.**                                 |
-| 1.4.3 Kontrast (Minimum)                              | axe (`color-contrast`), 46 Zustände je Browser, doppelt gemessen, drei Browser: **0 Verstöße**. Jede Abstention des Werkzeugs einzeln an den Bildpunkten aufgelöst                                                                                 | **erfüllt**                               |
+| 1.4.3 Kontrast (Minimum)                              | axe (`color-contrast`), 70 Zustände je Browser, doppelt gemessen, drei Browser: **0 Verstöße**. Jede Abstention des Werkzeugs einzeln an den Bildpunkten aufgelöst                                                                                 | **erfüllt**                               |
 | 1.4.4 Textgröße ändern                                | Eigene Messung: Wurzelschrift auf 200 % (16 → 32 px), alle fünf Seiten ohne waagrechtes Scrollen und ohne abgeschnittenen Inhalt                                                                         | **erfüllt**                               |
 | 1.4.5 Bilder von Text                                 | Kein Text als Bild, mit einer benannten Ausnahme: die KI-Kennzeichnung in den Demo-Fotos (siehe Abschnitt 6)                                                                                             | **erfüllt**                               |
 | 1.4.10 Reflow                                         | Eigene Messung bei 320 px: alle fünf Seiten genau 320 px, kein waagrechtes Scrollen. Zwei Mängel am Prüftag gefunden und behoben (siehe Abschnitt 6)                                                     | **erfüllt**                               |
@@ -228,7 +228,7 @@ gezogen — der größere Teil ließ sich messen, sobald das passende Werkzeug g
 | 1.1.1 Nicht-Text-Inhalt     | Die Vorlese-Reihenfolge aller neun Seiten und Zustände ist mitgeschrieben. Jedes Demo-Bild sagt „AI-generated sample image … Does not depict a real person." **Kein Bild ohne Alternativtext, kein Bedienelement ohne Namen** | ob die Formulierung für einen Menschen taugt |
 | 1.3.1 Infos und Beziehungen | Überschriftenstruktur je Seite ausgezählt, keine übersprungene Ebene, Reihenfolge geprüft                                                                                                                                     | —                                            |
 | 4.1.3 Statusmeldungen       | Die Ansagen sind wörtlich mitgeschrieben: „Dein Foto ist unterwegs" → „Analyse gestartet" → „Warteschlange · Position" → „Analyse abgeschlossen" → „Dein Profil". Häufigkeit gemessen und begrenzt                            | ob Safari und VoiceOver sie aussprechen      |
-| 2.1.1 Tastatur              | Strukturprüfung über sechs Seiten: jedes Bedienelement trägt `tabindex="0"`. Ein Tabulator-Durchlauf im Test taugt dafür nicht — Playwrights WebKit springt auf Knöpfe unabhängig von Safaris Einstellung                     | —                                            |
+| 2.1.1 Tastatur              | Strukturprüfung über alle zehn Seiten: jedes Bedienelement trägt `tabindex="0"`. Ein Tabulator-Durchlauf im Test taugt dafür nicht — Playwrights WebKit springt auf Knöpfe unabhängig von Safaris Einstellung                     | —                                            |
 
 **Was zwingend am Gerät bleibt**, und das ist keine Formalie: ob Safari und
 VoiceOver das Ausgelesene auch tatsächlich aussprechen, und ob es sich für einen

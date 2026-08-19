@@ -3626,6 +3626,34 @@ html[lang="en"] .rc-zitat::after {
   outline-offset: 3px;
 }
 
+/* ── Der Umschalter OHNE JavaScript (Rechtsseiten, seit v3.7.0) ────────────
+   Auf den Rechtsseiten ist der Umschalter kein Bedienelement, das etwas
+   umrechnet, sondern schlicht ein Link auf die Schwesterseite: /datenschutz
+   und /en/privacy sind zwei Dateien. Dadurch laden diese Seiten gar kein
+   Skript mehr — bis v3.6.1 lag dort js/sprachhinweis.js, nur um zu sagen
+   "gibt es nur auf Deutsch".
+
+   Zwei Elementarten in derselben Pille: die aktive Sprache ist ein <span>
+   (kein Link auf die Seite, auf der man steht), die andere ein <a>. Beide
+   müssen deshalb aussehen und messen wie der frühere <button>. */
+a.sprach-knopf,
+span.sprach-knopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  /* Die Knopf-Höhe kam von der Zeilenhöhe des <button>; <span> und <a> sind
+     inline und würden ohne das eine Spur flacher ausfallen. */
+  min-height: 1.7em;
+  text-decoration: none;
+  /* Kein Hover-Farbwechsel: --sw-fuell-text ist die Farbe AUF dem Schieber,
+     auf dem hellen Grund daneben wäre sie unsichtbar. */
+  user-select: none;
+}
+a.sprach-knopf:hover {
+  text-decoration: none;
+}
+
 /* ── Die Rückfrage ── */
 .sw-grund {
   position: fixed;
@@ -3791,18 +3819,6 @@ html[lang="en"] .rc-zitat::after {
   .sw-schliessen {
     transition: none;
   }
-}
-
-/* Zweitsprachiger Block im Hinweis der noch nicht übersetzten Seiten.
-   ÜBERGANG — entfällt mit js/sprachhinweis.js, sobald die Rechtstexte auf
-   Englisch vorliegen. */
-.sw-modal .sw-zweitsprache {
-  margin-top: 0.9rem !important;
-  padding-top: 0.8rem;
-  border-top: 1px solid var(--border-soft);
-  font-size: 0.9rem;
-  font-weight: 400;
-  color: var(--muted);
 }
 
 /* Kopfzeile der Unterseiten: Rubrik links, Sprachumschalter rechts, auf einer
@@ -4014,5 +4030,20 @@ html[lang="en"] .rc-zitat::after {
 .legal-kurz-fuss {
   margin: 0.9rem 0 0;
   font-size: 0.86rem;
+  color: var(--muted);
+}
+
+/* Beiliegende Angabe, die zur Zeile darueber gehoert — der amtlich
+   eingetragene Wortlaut unter seiner englischen Wiedergabe, und die einmalige
+   Erklaerung der Registerkuerzel am Ende des Blocks.
+
+   Warum eigene Klasse statt .legal-kurz-fuss: Die hat oben 0,9 rem Abstand,
+   weil sie eine abgesetzte Schlussbemerkung ist. Hier gehoert die Zeile
+   ENG an die darueber, sonst zerfaellt der Block optisch. */
+.legal-block p.legal-fein,
+.legal-fein {
+  margin: 0.15rem 0 0.55rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
   color: var(--muted);
 }

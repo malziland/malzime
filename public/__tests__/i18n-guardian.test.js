@@ -1,9 +1,43 @@
 import { describe, it, expect } from "vitest";
+/* Die Zuordnung wird aus dem Frontend GELESEN, nicht hier abgeschrieben.
+   Eine zweite Liste waere eine, die driftet. */
+import { RECHTSSEITEN } from "../js/i18n.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/* Jede HTML-Seite unter public/, relativ zu PUBLIC_DIR — auch in
+   Unterordnern. Bis 2026-08-18 wurde nur die oberste Ebene durchsucht; die
+   englischen Rechtsseiten in public/en/ waeren damit unbeachtet geblieben. */
+function alleHtmlSeiten(unter = "") {
+  const treffer = [];
+  for (const e of fs.readdirSync(path.join(PUBLIC_DIR, unter), { withFileTypes: true })) {
+    const rel = unter ? `${unter}/${e.name}` : e.name;
+    if (e.isDirectory()) {
+      if (e.name === "__tests__" || e.name === "node_modules" || e.name === "fonts") continue;
+      treffer.push(...alleHtmlSeiten(rel));
+    } else if (e.name.endsWith(".html")) {
+      treffer.push(rel);
+    }
+  }
+  return treffer;
+}
+
+/* Die vier Rechtsseiten und ihre englischen Zwillinge. Kanonische Quelle fuer
+   die Paarung; firebase.json und die Umschalter-Links muessen dazu passen. */
+const RECHTS_PAARE = [
+  { de: "impressum.html", en: "en/legal-notice.html", dePfad: "/impressum", enPfad: "/en/legal-notice" },
+  { de: "datenschutz.html", en: "en/privacy.html", dePfad: "/datenschutz", enPfad: "/en/privacy" },
+  { de: "nutzungsbedingungen.html", en: "en/terms.html", dePfad: "/nutzungsbedingungen", enPfad: "/en/terms" },
+  {
+    de: "barrierefreiheit.html",
+    en: "en/accessibility.html",
+    dePfad: "/barrierefreiheit",
+    enPfad: "/en/accessibility",
+  },
+];
 const LOCALES_DIR = path.join(PUBLIC_DIR, "locales");
 
 /* ── Helpers ── */
@@ -111,7 +145,9 @@ describe("i18n Guardian", () => {
     it("every data-i18n attribute in all HTML files has a key in default locale", () => {
       const m = readManifest();
       const localeKeys = Object.keys(readLocale(m.default));
-      const htmlFiles = fs.readdirSync(PUBLIC_DIR).filter((f) => f.endsWith(".html"));
+      /* Rekursiv seit 2026-08-18: Die englischen Seiten liegen in public/en/.
+         Eine Suche nur auf der obersten Ebene haette sie nie gesehen. */
+      const htmlFiles = alleHtmlSeiten();
 
       const attrs = [
         "data-i18n",
@@ -189,24 +225,23 @@ describe("i18n Guardian", () => {
      * The guardian then ensures they stay clean forever.
      */
     const ALLOWLIST = [
-      /* ÜBERGANG (2026-08-13): js/sprachhinweis.js trägt den zweisprachigen
-         Hinweis auf den noch nicht übersetzten Rechtsseiten. Die Texte stehen
-         dort bewusst fest im Code: Diese Seiten laden KEINE Sprachdatei und
-         rufen keine Schnittstelle auf — das ist eine geprüfte Eigenschaft
-         (e2e/sprachumschalter-unterseiten.test.js). Sie dafür zu öffnen wäre
-         der schlechtere Tausch.
+      /* BEWUSSTE AUSNAHME, kein Übergang mehr (Stand 2026-08-18):
+         js/echtheit-pruefen.js rechnet auf der Datenschutzseite nach, ob der
+         ausgelieferte Stand dem offenen Quelltext entspricht.
 
-         Der Eintrag löst sich selbst auf: Der Test direkt darunter macht ihn
-         zum Fehler, sobald die Rechtsseiten übersetzt sind. */
-      "js/sprachhinweis.js",
+         Warum die Texte hier im Code stehen und nicht in den Sprachdateien:
+         Diese Seite lädt KEINE Sprachdatei und ruft keine Schnittstelle auf —
+         eine geprüfte Eigenschaft (e2e/sprachumschalter-unterseiten.test.js).
+         Sie dafür zu öffnen wäre der schlechtere Tausch: ein Netzweg auf einer
+         Rechtsseite, damit ein Wächter zufrieden ist.
 
-      /* ÜBERGANG (2026-08-18), gleiche Begründung: js/echtheit-pruefen.js
-         rechnet auf der Datenschutzseite nach, ob der ausgelieferte Stand dem
-         offenen Quelltext entspricht. Auch diese Seite lädt keine Sprachdatei
-         — die Texte müssen deshalb im Code stehen.
+         Die Ausnahme ist deshalb nicht folgenlos: Der Test direkt darunter
+         verlangt, dass jeder Text HIER in beiden Sprachen vorliegt. Eine
+         Ausnahme von der Übersetzung ist es also nicht — nur eine vom Ort.
 
-         Er löst sich mit demselben Test auf: Sobald die Rechtsseiten übersetzt
-         sind, gehört dieser Eintrag entfernt und die Texte in die Locales. */
+         js/sprachhinweis.js stand hier bis 2026-08-18. Diese Übergangslösung
+         hat ihr Ablaufdatum erreicht und ist gelöscht; der Test darunter hält
+         das fest. */
       "js/echtheit-pruefen.js",
     ];
 
@@ -223,25 +258,61 @@ describe("i18n Guardian", () => {
       expect(violations).toEqual([]);
     });
 
-    it("die Übergangs-Ausnahme verschwindet, sobald die Rechtsseiten übersetzt sind", () => {
-      /* Eine Ausnahme ohne Ablaufdatum wird zur Dauerlösung. Diese hier hat
-         eines: Sobald eine der drei Rechtsseiten Übersetzungs-Marker trägt,
-         ist die Übergangslösung überflüssig — dann müssen js/sprachhinweis.js,
-         seine Einbindung im HTML und dieser Eintrag weg. */
-      /* PUBLIC_DIR zeigt bereits auf public/ — siehe oben. */
-      const rechtsseiten = ["datenschutz.html", "impressum.html", "nutzungsbedingungen.html"];
-      const uebersetzt = rechtsseiten.filter((datei) => {
-        const p = path.join(PUBLIC_DIR, datei);
-        return fs.existsSync(p) && fs.readFileSync(p, "utf8").includes("data-i18n");
-      });
+    it("die Übergangslösung js/sprachhinweis.js ist fort, samt jeder Einbindung", () => {
+      /* Sie trug auf den Rechtsseiten den Hinweis "gibt es nur auf Deutsch".
+         Seit die vier englischen Seiten existieren, ist das eine Falschaussage
+         — die Datei ist gelöscht und der Umschalter dort ein Link. Dieser Test
+         verhindert, dass sie über einen Rückbau wieder hereinkommt. */
+      expect(fs.existsSync(path.join(PUBLIC_DIR, "js/sprachhinweis.js"))).toBe(false);
+      const einbindungen = alleHtmlSeiten().filter((f) =>
+        fs.readFileSync(path.join(PUBLIC_DIR, f), "utf8").includes("sprachhinweis")
+      );
+      expect(einbindungen).toEqual([]);
+    });
 
-      if (uebersetzt.length === 0) return; // Übergang gilt noch
+    it("die Ausnahme übersetzt trotzdem: jeder Text in echtheit-pruefen.js liegt in DE und EN vor", () => {
+      /* Eine Ausnahme von der Sprachdatei ist keine Ausnahme von der
+         Übersetzung. Geprüft wird die TEXTE-Tabelle Schlüssel für Schlüssel:
+         Was auf Deutsch existiert, muss auf Englisch existieren — und
+         umgekehrt. Sonst fällt ein englischer Leser mitten im Ablauf auf
+         Deutsch zurück, und niemand merkt es. */
+      const code = fs.readFileSync(path.join(PUBLIC_DIR, "js/echtheit-pruefen.js"), "utf8");
+
+      /* Klammern zählen statt Regex über den ganzen Block: Die Werte enthalten
+         selbst geschweifte Klammern (Pfeilfunktionen). */
+      function block(sprache) {
+        const start = code.indexOf(`${sprache}: {`);
+        /* Positivkontrolle: Fehlt der Block, ist die Messung blind — dann soll
+           der Test scheitern, nicht eine leere Menge vergleichen. */
+        expect(start, `Block "${sprache}:" in echtheit-pruefen.js nicht gefunden`).toBeGreaterThan(-1);
+        let tiefe = 0;
+        let i = code.indexOf("{", start);
+        const von = i;
+        for (; i < code.length; i++) {
+          if (code[i] === "{") tiefe++;
+          else if (code[i] === "}" && --tiefe === 0) break;
+        }
+        return code.slice(von + 1, i);
+      }
+
+      function schluessel(text) {
+        return [...text.matchAll(/^\s{4}([A-Za-z][\w]*):/gm)].map((m) => m[1]).sort();
+      }
+
+      const de = schluessel(block("de"));
+      const en = schluessel(block("en"));
+
+      /* Positivkontrolle für die Schlüssel-Erkennung selbst. */
+      expect(de.length).toBeGreaterThan(10);
 
       expect(
-        ALLOWLIST.includes("js/sprachhinweis.js") || ALLOWLIST.includes("js/echtheit-pruefen.js"),
-        `${uebersetzt.join(", ")} ist übersetzt — die Übergangslösungen js/sprachhinweis.js ` +
-          "und js/echtheit-pruefen.js und ihre Allowlist-Einträge gehören jetzt entfernt"
-      ).toBe(false);
+        de.filter((k) => !en.includes(k)),
+        "nur auf Deutsch vorhanden"
+      ).toEqual([]);
+      expect(
+        en.filter((k) => !de.includes(k)),
+        "nur auf Englisch vorhanden"
+      ).toEqual([]);
     });
 
     it("allowlist contains only files that need it (hygiene)", () => {
@@ -255,6 +326,105 @@ describe("i18n Guardian", () => {
         }
       }
       expect(stale).toEqual([]);
+    });
+  });
+
+  /* ── 5. Rechts-Links: Beschriftung UND Ziel ── */
+  describe("Rechts-Links folgen der Sprache", () => {
+    /* ANLASS 2026-08-18: Die Fußzeile übersetzte ihre Beschriftung, nicht ihr
+       Ziel — auf Englisch stand dort „Privacy Policy" und der Klick landete auf
+       der deutschen Seite. Seit es die vier englischen Rechtsseiten gibt, ist
+       das kein Schönheitsfehler mehr, sondern ein falscher Verweis.
+
+       Die Mechanik (schaltet der Wechsel wirklich um, in beide Richtungen,
+       schon beim ersten Laden) prüft i18n-rechtslinks.test.js. Hier steht die
+       andere Hälfte: dass die Zuordnung im Frontend die RICHTIGE ist. */
+
+    /* Bewusst ohne englisches Gegenstück, mit Grund:
+       „/"      — die Startseite ist zweisprachig (dieselbe Datei).
+       „/stats" — die Zahlen-Seite ebenso, die Sprache reist per `?lang=`.
+       Eine Ausnahme mit Begründung ist zulässig, eine stille Lücke nicht. */
+    const OHNE_GEGENSTUECK = ["/", "/stats"];
+
+    /* Die Seiten, deren Links zur Laufzeit umgestellt werden — und die
+       Sprachdateien, weil in `upload.privacyHint` ebenfalls ein Rechts-Link
+       steckt. Rechtsseiten stehen bewusst NICHT in dieser Liste: Sie laden
+       keine Sprachdatei und verlinken ihre Gegenstücke fest im HTML. */
+    const QUELLEN = ["index.html", "stats.html", "locales/de.json", "locales/en.json"];
+
+    /* Findet `href="/…"` im HTML und `href=\"/…\"` im JSON. Das Fragezeichen
+       hinter dem Rückstrich ist der ganze Unterschied zwischen beiden Formen. */
+    function interneZiele(text) {
+      return [...text.matchAll(/href=\\?"(\/[^"\\?#]*)/g)].map((m) => m[1]);
+    }
+
+    it("die Zuordnung im Frontend deckt sich mit der kanonischen Paarliste", () => {
+      /* Positivkontrolle: Wären beide Listen leer, vergliche der Test nichts
+         mit nichts und bliebe still grün. */
+      expect(RECHTS_PAARE.length, "kanonische Paarliste ist leer").toBeGreaterThan(0);
+
+      const ausCode = Object.entries(RECHTSSEITEN)
+        .map(([de, en]) => `${de} → ${en}`)
+        .sort();
+      const kanonisch = RECHTS_PAARE.map((p) => `${p.dePfad} → ${p.enPfad}`).sort();
+
+      expect(ausCode, "js/i18n.js RECHTSSEITEN gegen RECHTS_PAARE").toEqual(kanonisch);
+    });
+
+    it("jede verlinkte deutsche Unterseite hat ein Gegenstück in der Zuordnung", () => {
+      const fehlen = [];
+      const hartEnglisch = [];
+      const treffer = {};
+
+      for (const quelle of QUELLEN) {
+        const ziele = interneZiele(fs.readFileSync(path.join(PUBLIC_DIR, quelle), "utf8"));
+        treffer[quelle] = ziele.length;
+
+        for (const ziel of ziele) {
+          if (ziel.startsWith("/en/")) {
+            /* Englische Adressen gehören zur Laufzeit gesetzt, nicht fest ins
+               HTML: Fest verdrahtet zeigten sie auch dem deutschen Leser die
+               englische Seite. */
+            hartEnglisch.push(`${quelle}: ${ziel}`);
+            continue;
+          }
+          if (OHNE_GEGENSTUECK.includes(ziel)) continue;
+          /* Was eine eigene Seite ist, entscheidet das Dateisystem, keine
+             zweite Liste: /impressum → public/impressum.html. Verweise auf
+             styles.css, Symbole oder das Manifest fallen damit von selbst raus. */
+          if (!fs.existsSync(path.join(PUBLIC_DIR, `${ziel.slice(1)}.html`))) continue;
+          if (!(ziel in RECHTSSEITEN)) fehlen.push(`${quelle}: ${ziel}`);
+        }
+      }
+
+      /* Positivkontrolle je Quelle: Findet die Suche in einer Datei gar nichts,
+         ist das Messmittel kaputt — im JSON etwa, wenn die Anführungszeichen
+         anders entwertet werden. Ein leeres Ergebnis wäre sonst grün. */
+      for (const quelle of QUELLEN) {
+        expect(treffer[quelle], `keine internen Links in ${quelle} gefunden`).toBeGreaterThan(0);
+      }
+
+      expect(fehlen, "deutsche Unterseite ohne Eintrag in RECHTSSEITEN").toEqual([]);
+      expect(hartEnglisch, "englische Adresse fest verdrahtet").toEqual([]);
+    });
+
+    it("zu jedem englischen Ziel gibt es eine Datei unter public/en/ und einen Rewrite", () => {
+      const ziele = Object.values(RECHTSSEITEN);
+      /* Positivkontrolle: Eine leere Zuordnung durchliefe die Schleife unten
+         ohne eine einzige Prüfung. */
+      expect(ziele.length, "RECHTSSEITEN ist leer").toBeGreaterThan(0);
+
+      const firebase = fs.readFileSync(path.join(PUBLIC_DIR, "..", "firebase.json"), "utf8");
+      /* Positivkontrolle für die zweite Messung: Ohne diese Zeile wäre eine
+         leere oder falsch gelesene firebase.json nicht von einem fehlenden
+         Rewrite zu unterscheiden. */
+      expect(firebase, "firebase.json ohne Hosting-Rewrites gelesen").toContain('"rewrites"');
+
+      for (const enPfad of ziele) {
+        const datei = `${enPfad.slice(1)}.html`;
+        expect(fs.existsSync(path.join(PUBLIC_DIR, datei)), `fehlt: public/${datei}`).toBe(true);
+        expect(firebase.includes(`"${enPfad}"`), `kein Rewrite für ${enPfad} in firebase.json`).toBe(true);
+      }
     });
   });
 });

@@ -1,8 +1,7 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 
 /* ── Welche Seiten geprueft werden ─────────────────────────────────────────
    OPS-2026-08-18-03: Hier standen zwei feste Listen mit denselben vier
@@ -14,11 +13,16 @@ import { fileURLToPath } from "node:url";
 
    Deshalb wird jetzt das Dateisystem gefragt. Jede neue Seite ist damit ab
    ihrer Entstehung in der Pruefung — ohne dass jemand daran denken muss. */
-const PUBLIC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../public");
+/* Basis ist das ARBEITSVERZEICHNIS, nicht `import.meta.url`: Playwright laedt
+   Testdateien nicht als echte ES-Module, `import.meta` wirft dort. Dieselbe
+   Begruendung steht seit Langem in e2e/barrierefreiheit-protokoll.test.js — ich
+   habe sie beim Umbau uebersehen UND die Datei danach nicht laufen lassen. Der
+   Fehler blieb dadurch einen Tag unbemerkt. */
+const PUBLIC = join(process.cwd(), "public");
 
 function alleSeiten(unter = "") {
   const treffer = [];
-  for (const e of fs.readdirSync(path.join(PUBLIC, unter), { withFileTypes: true })) {
+  for (const e of readdirSync(join(PUBLIC, unter), { withFileTypes: true })) {
     const rel = unter ? `${unter}/${e.name}` : e.name;
     if (e.isDirectory()) {
       if (["__tests__", "node_modules", "fonts", "img", "js", "locales"].includes(e.name)) continue;

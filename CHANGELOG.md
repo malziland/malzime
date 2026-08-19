@@ -4,6 +4,48 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+
+- **Impressum, Datenschutz, Nutzungsbedingungen und Barrierefreiheit gibt es
+  jetzt auf Englisch.** Erreichbar unter `/en/legal-notice`, `/en/privacy`,
+  `/en/terms` und `/en/accessibility`; der Umschalter oben auf jeder Seite
+  wechselt zwischen den Fassungen, und die Fußzeilen-Links führen auf Englisch
+  auf die englische Seite statt auf die deutsche.
+
+  Verbindlich bleibt die deutsche Fassung — das steht auf jeder Seite, bei den
+  Nutzungsbedingungen als eigene Klausel unter den Schlussbestimmungen. Namen
+  von Gerichten, Behörden und Registern stehen im Original: Ein übersetzter
+  Eigenname lässt sich nirgends nachschlagen. Gesetze tragen zusätzlich ihr
+  deutsches Kürzel, weil man damit zitiert.
+
+- **Der Sprachumschalter auf den Rechtsseiten kommt ohne JavaScript aus.**
+  Er ist jetzt ein Link auf die Schwesterseite. Sechs der acht Rechtsseiten
+  laden dadurch **überhaupt kein Skript** mehr; nur die beiden
+  Datenschutzseiten laden eines, nämlich die Echtheits-Prüfung. Bis hierher
+  stand dort ein Hinweis „Diese Seite gibt es nur auf Deutsch" — seit es die
+  Übersetzung gibt, war das eine Falschaussage.
+
+### Geändert
+
+- **Die Barrierefreiheits-Prüfung umfasst jetzt zehn Seiten statt sechs.**
+  Gemessen: 70 Zustände je Browser-Maschine, drei Maschinen, 210 Messungen,
+  **0 Verstöße**. Prüfbericht, Prüfprotokoll und beide öffentlichen
+  Erklärungen tragen diese Zahlen; ein Wächter im Testlauf vergleicht sie bei
+  jeder Änderung mit der Messung und schlägt bei Abweichung an.
+
+### Behoben
+
+- **Zwei waagrecht rollbare Kästen in der Datenschutzerklärung waren mit der
+  Tastatur nicht erreichbar** (WCAG 2.1.1, Stufe A). Wer nicht mit der Maus
+  wischt, konnte die Dienste-Tabelle und den Befehl zum Selbst-Nachrechnen
+  nicht zu Ende lesen. Betraf iPhone-Breite.
+
+- **Wer die Seite von einer Unterseite aus zum Startbildschirm hinzufügte,
+  bekam eine App, die auf dieser Unterseite startet.** Dem Web-Manifest fehlte
+  die Startadresse.
+
 ## [3.6.2] — 2026-08-19
 
 ### Behoben

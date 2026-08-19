@@ -161,7 +161,7 @@ describe("Cache-Buster: die Entdeckung laesst nichts liegen", () => {
        soll dieser Test es sagen und nicht stillschweigend leer laufen. */
     const gefunden = busterDateienLautSkript();
     for (const seite of [
-      "public/en/imprint.html",
+      "public/en/legal-notice.html",
       "public/en/privacy.html",
       "public/en/terms.html",
       "public/en/accessibility.html",

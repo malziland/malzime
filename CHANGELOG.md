@@ -46,8 +46,14 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   unter dem geforderten Kontrast (4,40 · 4,01 · 4,41 statt 4,5 : 1). Jetzt
   4,56 · 4,57 · 4,59 : 1.
 
-  Aufgefallen sind sie erst jetzt, weil die automatische Prüfung diesen Bereich
-  **nie gemessen** hatte: Die Sprechblase der Karte überdeckte etwas, woraufhin
+  Die öffentliche Barrierefreiheitserklärung nennt den Fund und trägt das neue
+  Prüfdatum — in beiden Sprachen. Dass sie beim ersten Anlauf vergessen wurde,
+  kann sich nicht wiederholen: Eine neue Prüfung vergleicht das Prüfdatum in der
+  deutschen Erklärung, der englischen und dem Prüfbericht und schlägt Alarm,
+  sobald eines davon abweicht.
+
+  Aufgefallen sind die drei Farben erst jetzt, weil die automatische Prüfung
+  diesen Bereich **nie gemessen** hatte: Die Sprechblase der Karte überdeckte etwas, woraufhin
   das Prüfwerkzeug den ganzen Profilinhalt übersprang — und „keine Verstöße"
   meldete, ohne hingesehen zu haben. Die Prüfung nennt jetzt zuerst, was sie
   angesehen hat, und schlägt Alarm, wenn ein sichtbarer Bereich fehlt. Das

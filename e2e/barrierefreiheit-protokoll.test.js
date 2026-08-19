@@ -1213,5 +1213,48 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
        nichts und wäre still grün. */
     expect(gelesen, "keine Unterlage gefunden — der Drift-Wächter ist blind").toBeGreaterThan(0);
     expect(falsch, `Doku nennt eine andere Zahl von Zuständen als gemessen: ${JSON.stringify(falsch)}`).toEqual([]);
+
+    /* ── Und dasselbe für das Prüfdatum ────────────────────────────────────
+       ANLASS 2026-08-19, vom Nutzer gefunden: Nach drei behobenen
+       Kontrastfehlern hatte ich die beiden Unterlagen in docs/ nachgezogen,
+       die ÖFFENTLICHE Erklärung aber nicht — ausgerechnet die, auf die sich
+       ein Dritter beruft. Sie stand danach mit einem Datum da, an dem der
+       Befund noch gar nicht bekannt war. Der Nutzer musste daran denken; das
+       ist die falsche Person dafür.
+
+       Warum hier und nicht im Fakten-Drift-Wächter: Der liest ausschließlich
+       Markdown und Text. Ein Muster für HTML wäre dort still nie angesprungen
+       und hätte Sicherheit vorgetäuscht — nachgemessen, nicht vermutet. */
+    const DATUM_STELLEN = [
+      ["public/barrierefreiheit.html", /zuletzt gepr&uuml;ft am (\d{1,2})\.&nbsp;\w+&nbsp;(\d{4})/],
+      ["public/barrierefreiheit.html", /nicht behauptet &middot; Stand: (\d{1,2})\. \w+ (\d{4})/],
+      ["public/en/accessibility.html", /last reviewed on (\d{1,2})&nbsp;\w+&nbsp;(\d{4})/],
+      [
+        "docs/barrierefreiheit/PRUEFBERICHT-WCAG-EM.md",
+        /\*\*Prüfdatum\*\*\s*\|\s*\d{1,2}\.–(\d{1,2})\.\s*\w+\s*(\d{4})/,
+      ],
+    ];
+    const daten = [];
+    for (const [rel, muster] of DATUM_STELLEN) {
+      const pfad = join(process.cwd(), rel);
+      if (!existsSync(pfad)) continue;
+      const treffer = readFileSync(pfad, "utf8").match(muster);
+      daten.push({ datei: rel, datum: treffer ? `${treffer[1]}.${treffer[2]}` : null });
+    }
+
+    /* POSITIVKONTROLLE: Jede Stelle MUSS treffen. Ein Muster, das ins Leere
+       läuft, meldet „kein Widerspruch" und ist damit von einem gesunden
+       Ergebnis nicht zu unterscheiden. */
+    expect(
+      daten.filter((d) => d.datum === null).map((d) => d.datei),
+      "Prüfdatum an dieser Stelle nicht gefunden — der Wächter ist dort blind"
+    ).toEqual([]);
+    expect(daten.length, "keine Unterlage mit Prüfdatum gefunden").toBeGreaterThan(2);
+
+    const verschieden = [...new Set(daten.map((d) => d.datum))];
+    expect(
+      verschieden.length,
+      `Das Datum der letzten Barrierefreiheits-Prüfung steht unterschiedlich da: ${JSON.stringify(daten)}`
+    ).toBe(1);
   });
 });

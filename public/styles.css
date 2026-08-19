@@ -244,6 +244,31 @@ body {
 
 /* ── Hero ── */
 
+/* Der Abstand zwischen Wortmarke und Ueberschrift.
+   FEHLER 2026-08-19, vom Nutzer gefunden: Er lag zuerst an `.seiten-kopfzeile`.
+   Die entsteht auf der Startseite aber erst durch JavaScript — der
+   Sprachumschalter baut sie um die Wortmarke herum. Laeuft das Skript nicht,
+   nicht rechtzeitig, oder liegt eine aeltere Fassung im Zwischenspeicher, gibt
+   es die Kopfzeile nicht, der Abstand faellt weg und die Ueberschrift rueckt an
+   die Marke heran. Genau das hat der Nutzer gesehen, waehrend meine Messung
+   66 px meldete — ich hatte einen Browser gemessen, in dem das Skript gelaufen
+   war.
+
+   Ein Abstand darf nicht davon abhaengen, ob ein Skript durchlaeuft. Er liegt
+   deshalb an der Ueberschrift: Die ist immer da, im HTML, ohne Zutun.
+
+   66 px, weil vorher das SYSTEM-AKTIV-Abzeichen genau so viel Platz einnahm
+   (20 darueber + 28 hoch + 18 darunter). Es hat den Abstand nie besessen, nur
+   gefuellt. */
+.hero h1 {
+  /* 48 px, damit die Ueberschrift auf der Startseite auf DERSELBEN Hoehe sitzt
+     wie "Datenschutz", "Impressum" oder "Zahlen" auf den Unterseiten.
+     Gemessen: dort steht die Oberkante bei 115 px, hier vorher bei 133.
+     Die 66 px stammten aus dem entfernten Abzeichen; die Unterseiten sind der
+     verbindliche Bezug, nicht ein weggefallenes Element. */
+  margin-top: 48px;
+}
+
 .hero {
   /* relative wegen des Sprachumschalters (v3.3): Er sitzt absolut am rechten
      Rand dieser Zeile, auf Höhe des SYSTEM-AKTIV-Abzeichens. */
@@ -251,35 +276,85 @@ body {
   margin-bottom: 32px;
 }
 
-.hero-badge {
+/* ── Wortmarke (Startseite und Unterseiten) ───────────────────────────────────────────────
+   Werte woertlich aus der Vorlage (Claude Design, "malziME Wortmarke"):
+   Poppins 400 fuer `malzi`, 700 fuer `ME`, Schriftgrad 22 px, Laufweite
+   -0,028 em, Abstand zum Kasten 5 px, Kasten-Innenabstand 2/5/3 px, Radius
+   4 px. Nichts davon ist geschaetzt oder gerundet.
+
+   Die Farben stehen als eigene Werte statt als Marken-Token, weil die Vorlage
+   fuer den dunklen Grund ausdruecklich andere nennt (#e6e9e9 statt der
+   Textfarbe des dunklen Themas). Wer sie spaeter angleicht, weicht von der
+   Vorlage ab — deshalb hier sichtbar und nicht versteckt. */
+.wortmarke {
+  --wm-schrift: var(--ml-teal);
+  --wm-kasten: var(--ml-teal);
+  --wm-kasten-schrift: #f9f7f4;
+
+  /* BLOCKBILDEND, nicht inline-flex: Das SYSTEM-AKTIV-Abzeichen darunter ist
+     selbst inline-flex — beide landeten sonst auf derselben Zeile, und der
+     untere Abstand wirkte nicht (an einem inline-Element tut er das nicht).
+     Gemessen: -24 px statt 14. `width: max-content` haelt die Breite trotzdem
+     am Inhalt, damit der Kasten nicht ueber die Zeile zieht. */
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  /* Eine Marke bricht nicht um. Ohne das zerfiel sie bei 320 px in "ma/lzi"
+     und "M/E" — gemessen, nicht befuerchtet. */
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  align-items: center;
+  gap: 5px;
+  /* KEIN eigener unterer Abstand: Die Marke steht in einer mittig
+     ausgerichteten Zeile (.seiten-kopfzeile). Ein Rand wird dort MITGEMITTELT
+     und schob sie um die halbe Randhoehe nach oben — gemessen 7 px Versatz
+     gegenueber dem Sprachumschalter, genau die Haelfte der frueheren 14 px.
+     Der Abstand nach unten gehoert der Zeile. */
+  font-family: "Poppins", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.028em;
+  color: var(--wm-schrift);
+}
+
+/* Auf den Unterseiten ist sie der Weg zurueck zur Startseite. Als Link darf
+   sie weder unterstrichen sein noch die Linkfarbe erben — sie ist eine Marke,
+   kein Fliesstext. Der Fokusring bleibt, sonst waere sie mit der Tastatur
+   unsichtbar erreichbar. */
+a.wortmarke {
+  text-decoration: none;
+  color: var(--wm-schrift);
+}
+a.wortmarke:hover .wortmarke-me {
+  opacity: 0.88;
+}
+a.wortmarke:focus-visible {
+  outline: 2px solid var(--fokus-ring, var(--ml-teal));
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.wortmarke-me {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 14px 5px 10px;
-  background: var(--tint-teal);
-  border: 1px solid rgba(21, 100, 128, 0.3);
-  border-radius: var(--radius-pill);
-  margin-bottom: 18px;
+  justify-content: center;
+  padding: 2px 5px 3px;
+  border-radius: 4px;
+  background: var(--wm-kasten);
+  color: var(--wm-kasten-schrift);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+/* Beast Mode: die Vorlage kehrt um — heller Kasten, dunkles ME. */
+:root[data-theme="dark"] .wortmarke {
+  --wm-schrift: #e6e9e9;
+  --wm-kasten: #e6e9e9;
+  --wm-kasten-schrift: #171d1f;
 }
 
 /* Statuspunkt statisch — das Design-System verzichtet auf Endlos-Animationen */
-.pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ml-teal);
-}
-:root[data-theme="dark"] .pulse {
-  background: var(--teal-text);
-}
-
-.badge-text {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--teal-text);
-}
 
 h1 {
   font-size: clamp(1.6rem, 4.5vw, 2.4rem);
@@ -3828,6 +3903,12 @@ a.sprach-knopf:hover {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  /* Der Abstand nach unten liegt hier, nicht an der Wortmarke — siehe dort.
+     20 px statt 14: Gemessen sass das SYSTEM-AKTIV-Abzeichen 14 px unter dem
+     Logo, aber 18 px ueber der Ueberschrift — es klebte damit an der Marke
+     statt bei dem zu stehen, wozu es gehoert. Der Nutzer hat es so beschrieben,
+     die Messung hat es bestaetigt. */
+  margin-bottom: 20px;
 }
 .seiten-kopfzeile .sprachwahl {
   position: static;

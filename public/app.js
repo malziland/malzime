@@ -213,6 +213,35 @@ function applyModeTheme() {
   /* Browser-Farbleiste (mobile Adressleiste) folgt dem Modus */
   const themeMeta = document.querySelector('meta[name="theme-color"]');
   if (themeMeta) themeMeta.setAttribute("content", boost ? "#171d1f" : "#f9f7f4");
+
+  /* Und das Tab-Zeichen. Die Vorlage (Claude Design, "malziME Wortmarke")
+     trennt hier zwei Dinge, die leicht verwechselt werden:
+
+       favicon.svg        folgt dem SYSTEMTHEMA, ganz ohne unser Zutun — beide
+                          Farbfassungen liegen in der Datei, eine Medienabfrage
+                          schaltet. Das gilt auf allen Seiten.
+       favicon-beast.svg  folgt dem MODUS DIESER SEITE. Davon weiss der Browser
+                          nichts; die Adresse muss getauscht werden.
+
+     Die Vorlage nennt das einen starken Effekt und empfiehlt, ihn bewusst zu
+     entscheiden statt mitzunehmen. Der Nutzer hat ihn am 2026-08-19 ausdruecklich
+     gewuenscht: Der Beast-Modus soll sichtbar sein, und der Tab ist das
+     staerkste Signal, das eine Website dafuer hat.
+
+     Es entsteht dabei KEIN neuer Tab und kein Neuladen — getauscht wird nur
+     das `href` des vorhandenen Elements. */
+  const alt = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+  const ziel = boost ? "/favicon-beast.svg" : "/favicon.svg";
+  if (alt && !alt.href.endsWith(ziel)) {
+    /* ERSETZEN, nicht nur `href` setzen. Browser halten Favicons zaeh fest;
+       ein geaendertes Attribut allein loest das Neuzeichnen nicht zuverlaessig
+       aus. Ein frisches Element mit derselben Rolle tut es. */
+    const neu = document.createElement("link");
+    neu.rel = "icon";
+    neu.type = "image/svg+xml";
+    neu.href = ziel;
+    alt.replaceWith(neu);
+  }
 }
 /* Gemerkte Wahl wiederherstellen, BEVOR das Theme angewendet wird — sonst
    blitzt kurz der falsche Look auf. `null` heisst „nie gewählt": dann bleibt

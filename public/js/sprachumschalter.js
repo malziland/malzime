@@ -88,9 +88,31 @@ function lage() {
      aussah statt nach einer Kopfzeile (Nutzer-Ansage 2026-08-13).
    - Sonst: an den Anfang des Inhalts. */
 function umschalterEinsetzen(el) {
-  /* Die Rubrik zuerst: Sie ist, wo vorhanden, die oberste Zeile — auch auf der
-     Zahlen-Seite, die zusaetzlich einen Hero-Block hat. Erst wenn es keine
-     gibt (Startseite), kommt die Kopfzeile mit dem Abzeichen. */
+  /* Die WORTMARKE zuerst — sie ist die oberste Zeile jeder Seite.
+     Bis 2026-08-19 haengte sich der Umschalter an die Rubrik. Seit die
+     Wortmarke darueber steht, sass er dadurch eine Zeile tiefer als auf der
+     Startseite, wo er auf Logo-Hoehe liegt. Der Nutzer hat das gefunden:
+     "Auf der Startseite hast du den Sprachumschalter auf Hoehe des Logos, auf
+     den Unterseiten allerdings nicht."
+
+     Steckt die Wortmarke bereits in einer Kopfzeile (die statischen
+     Rechtsseiten bringen sie fertig mit), wird nur noch der Umschalter
+     hineingehaengt — sonst entstuende eine zweite Zeile um die erste herum. */
+  const marke = document.querySelector(".wortmarke");
+  if (marke && marke.parentNode) {
+    const vorhanden = marke.closest(".seiten-kopfzeile");
+    if (vorhanden) {
+      vorhanden.append(el);
+      return true;
+    }
+    const zeile = document.createElement("div");
+    zeile.className = "seiten-kopfzeile";
+    marke.parentNode.insertBefore(zeile, marke);
+    zeile.append(marke, el);
+    return true;
+  }
+
+  /* Ohne Wortmarke: die Rubrik, wie bisher. */
   const rubrik = document.querySelector(".page-eyebrow");
   if (rubrik && rubrik.parentNode) {
     const zeile = document.createElement("div");

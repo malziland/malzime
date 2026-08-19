@@ -14,7 +14,6 @@ describe("stats page", () => {
     const requiredKeys = [
       "stats.backLink",
       "stats.errorText",
-      "stats.heroBadge",
       "stats.heroTitle",
       "stats.heroSub",
       "stats.liveText",
@@ -55,10 +54,6 @@ describe("stats page", () => {
 
   describe("stats.html has data-i18n attributes", () => {
     const html = readFileSync(resolve(__dirname, "../stats.html"), "utf-8");
-
-    it("has data-i18n for hero badge", () => {
-      expect(html).toContain('data-i18n="stats.heroBadge"');
-    });
 
     it("has data-i18n for hero title", () => {
       expect(html).toContain('data-i18n="stats.heroTitle"');

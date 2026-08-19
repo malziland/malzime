@@ -14,6 +14,20 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   nur eines davon: meist genau das, das er gar nicht anzeigte. Jetzt bleibt im
   Beast-Modus ein einziges übrig, danach ist der ursprüngliche Satz zurück.
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Im Beast-Modus wurde das Zeichen im Browser-Tab doch nicht schwarz.** Die
+  Seite bietet dem Browser drei Zeichen an; er sucht sich eines aus, und wir
+  tauschten nur eines davon — meist genau das, das er gar nicht anzeigte. Jetzt
+  bleibt im Beast-Modus ein einziges übrig.
+
+- **Die Sprachwahl-Rückfrage konnte sich in seltenen Fällen nicht mehr
+  schließen.** Wurde sie im selben Sekundenbruchteil geöffnet und wieder
+  geschlossen, blieb sie sichtbar stehen und reagierte danach auf keine Taste
+  mehr. Trat unter Last auf und hat die Auslieferung dreimal blockiert.
+
 ## [3.8.1] — 2026-08-19
 
 ### Behoben

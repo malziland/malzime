@@ -914,6 +914,22 @@ async function sprachumschalterMessen(page, bildschirm) {
 }
 
 test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
+  /* ZEITGRENZE. Diese Prüfungen fotografieren jedes gemessene Element einzeln
+     und rechnen den Kontrast Bildpunkt für Bildpunkt nach — das ist langsam und
+     soll es sein.
+
+     Am 2026-08-19 lief "Profil, beide Modi, beide Themen" in der Pipeline in
+     die Standardgrenze von 30 s. Nachgemessen statt vermutet: Auf dem
+     Entwicklungsrechner braucht dieselbe Prüfung 13,7 s, die ganze Datei
+     59 s — und zwar vor wie nach der Änderung, die den Ausfall ausgelöst hat.
+     Die Arbeitsmenge ist also NICHT gewachsen; der CI-Läufer ist schlicht rund
+     dreimal langsamer, und 30 s waren für eine Prüfung, die dutzende Elemente
+     einzeln fotografiert, von Anfang an zu knapp bemessen.
+
+     (Meine erste Erklärung lautete "sie misst jetzt mehr". Die Messung hat sie
+     widerlegt — deshalb steht hier die Zahl und nicht die Vermutung.) */
+  test.setTimeout(180000);
+
   test.use({ viewport: { width: 1280, height: 900 } });
 
   test.beforeEach(async ({ page }) => {

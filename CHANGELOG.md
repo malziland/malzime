@@ -4,6 +4,36 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+
+- **Die Wortmarke steht jetzt auf jeder Seite.** Oben links, daneben rechts der
+  Sprachumschalter — auf der Startseite und auf allen Unterseiten gleich. Auf
+  den Unterseiten führt sie zugleich zurück zur Startseite. Gebaut aus
+  derselben Schrift, die die Seite ohnehin lädt, mit den Maßen aus der Vorlage.
+
+- **Im Beast-Modus wird auch das Zeichen im Browser-Tab schwarz.** Bisher zeigte
+  es dort dasselbe Petrol wie im seriösen Modus.
+
+  Was dabei nicht geht und immer wieder vermutet wird: Die Tab-_Leiste_ kann
+  eine Website nicht einfärben — der Streifen gehört dem Browser. Nur Safari
+  auf dem Mac folgt der Seitenfarbe.
+
+### Geändert
+
+- **Das Abzeichen „SYSTEM AKTIV" ist entfallen.** Es war reine Zier: Kein
+  Programmteil hat es je verändert, es stand immer auf „aktiv" — auch wenn
+  nichts lief. Der Abstand, den es einnahm, bleibt erhalten.
+
+- **Alle Überschriften stehen auf derselben Höhe**, Startseite wie Unterseiten.
+
+### Behoben
+
+- **Der Abstand unter der Wortmarke hing an einem Element, das erst JavaScript
+  erzeugt.** Lief das Skript nicht oder zu spät, rutschte die Überschrift nach
+  oben. Er liegt jetzt an der Überschrift selbst, die immer vorhanden ist.
+
 ## [3.7.0] — 2026-08-19
 
 ### Hinzugefügt

@@ -315,10 +315,22 @@ function modalOeffnen(art, ziel, ohneBild, ausloeser) {
   offen = art === "fertig" ? modalFertig : modalLaeuft;
   offen.hidden = false;
   umgebungStillegen(true);
-  /* Element festhalten, nicht `offen` lesen: Wird die Rückfrage vor dem
-     nächsten Bildschirmrahmen geschlossen, ist `offen` dann null. */
+  /* Element festhalten UND vor dem Setzen prüfen, ob es noch das offene ist.
+     BUG-2026-08-19-02: Bis hierher wurde nur festgehalten. Das war schlimmer
+     als `offen` zu lesen — wird die Rückfrage vor dem nächsten Bildschirmrahmen
+     geschlossen, gab der Rahmen die Klasse `sichtbar` an einen BEREITS
+     GESCHLOSSENEN Dialog zurück. Danach war `sichtbar` gesetzt, `offen` aber
+     null, und weil `aufTaste()` mit `if (!offen) return;` beginnt, tat Escape
+     nichts mehr: Der Dialog blieb dauerhaft offen.
+
+     Aufgefallen in der Pipeline (WebKit unter Last), dreimal, zuletzt auch
+     dann noch, als die Zusicherung bereits wartend las — sie konnte also nicht
+     zu früh gemessen haben. Genau diese Signatur: `.sw-grund.sichtbar` bleibt
+     stehen und lässt sich nicht mehr schliessen. */
   const dieser = offen;
-  requestAnimationFrame(() => dieser.classList.add("sichtbar"));
+  requestAnimationFrame(() => {
+    if (offen === dieser) dieser.classList.add("sichtbar");
+  });
   const ruhig = offen.querySelector(".sw-knopf--bleiben");
   if (ruhig) ruhig.focus();
   offen.addEventListener("focusout", fokusZurueckholen);

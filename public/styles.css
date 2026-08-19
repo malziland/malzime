@@ -329,35 +329,7 @@ a.wortmarke:focus-visible {
   --wm-kasten-schrift: #171d1f;
 }
 
-.hero-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 14px 5px 10px;
-  background: var(--tint-teal);
-  border: 1px solid rgba(21, 100, 128, 0.3);
-  border-radius: var(--radius-pill);
-  margin-bottom: 18px;
-}
-
 /* Statuspunkt statisch — das Design-System verzichtet auf Endlos-Animationen */
-.pulse {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--ml-teal);
-}
-:root[data-theme="dark"] .pulse {
-  background: var(--teal-text);
-}
-
-.badge-text {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--teal-text);
-}
 
 h1 {
   font-size: clamp(1.6rem, 4.5vw, 2.4rem);
@@ -3901,6 +3873,18 @@ a.sprach-knopf:hover {
 
 /* Kopfzeile der Unterseiten: Rubrik links, Sprachumschalter rechts, auf einer
    Linie. Vorher stand er darüber und wirkte wie ein loses Element. */
+/* Auf der Startseite trug das entfernte SYSTEM-AKTIV-Abzeichen den Abstand
+   zwischen Marke und Ueberschrift: 20 px darueber, 28 px hoch, 18 px darunter
+   — zusammen 66 px. Mit dem Abzeichen fiel dieser Abstand weg, und die
+   Ueberschrift rutschte an die Marke heran (gemessen 20 statt 66 px). Der
+   Abstand gehoerte nie dem Abzeichen, es hat ihn nur zufaellig gefuellt.
+   Deshalb liegt er jetzt an der Kopfzeile selbst.
+
+   Nur im Hero: Auf den Unterseiten folgt die Rubrik, die naeher stehen soll. */
+.hero .seiten-kopfzeile {
+  margin-bottom: 66px;
+}
+
 .seiten-kopfzeile {
   display: flex;
   align-items: center;

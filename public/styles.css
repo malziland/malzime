@@ -251,6 +251,59 @@ body {
   margin-bottom: 32px;
 }
 
+/* ── Wortmarke im Seitenkopf ───────────────────────────────────────────────
+   Werte woertlich aus der Vorlage (Claude Design, "malziME Wortmarke"):
+   Poppins 400 fuer `malzi`, 700 fuer `ME`, Schriftgrad 22 px, Laufweite
+   -0,028 em, Abstand zum Kasten 5 px, Kasten-Innenabstand 2/5/3 px, Radius
+   4 px. Nichts davon ist geschaetzt oder gerundet.
+
+   Die Farben stehen als eigene Werte statt als Marken-Token, weil die Vorlage
+   fuer den dunklen Grund ausdruecklich andere nennt (#e6e9e9 statt der
+   Textfarbe des dunklen Themas). Wer sie spaeter angleicht, weicht von der
+   Vorlage ab — deshalb hier sichtbar und nicht versteckt. */
+.hero-wortmarke {
+  --wm-schrift: var(--ml-teal);
+  --wm-kasten: var(--ml-teal);
+  --wm-kasten-schrift: #f9f7f4;
+
+  /* BLOCKBILDEND, nicht inline-flex: Das SYSTEM-AKTIV-Abzeichen darunter ist
+     selbst inline-flex — beide landeten sonst auf derselben Zeile, und der
+     untere Abstand wirkte nicht (an einem inline-Element tut er das nicht).
+     Gemessen: -24 px statt 14. `width: max-content` haelt die Breite trotzdem
+     am Inhalt, damit der Kasten nicht ueber die Zeile zieht. */
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 14px;
+  font-family: "Poppins", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: -0.028em;
+  color: var(--wm-schrift);
+}
+
+.hero-wortmarke-me {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 5px 3px;
+  border-radius: 4px;
+  background: var(--wm-kasten);
+  color: var(--wm-kasten-schrift);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+/* Beast Mode: die Vorlage kehrt um — heller Kasten, dunkles ME. */
+:root[data-theme="dark"] .hero-wortmarke {
+  --wm-schrift: #e6e9e9;
+  --wm-kasten: #e6e9e9;
+  --wm-kasten-schrift: #171d1f;
+}
+
 .hero-badge {
   display: inline-flex;
   align-items: center;

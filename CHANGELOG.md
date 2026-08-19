@@ -4,6 +4,16 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Im Beast-Modus wurde das Zeichen im Browser-Tab doch nicht schwarz.** Die
+  Seite bietet dem Browser drei Zeichen an — für ältere Browser, für moderne
+  und für Suchmaschinen. Der Browser sucht sich eines aus, und wir tauschten
+  nur eines davon: meist genau das, das er gar nicht anzeigte. Jetzt bleibt im
+  Beast-Modus ein einziges übrig, danach ist der ursprüngliche Satz zurück.
+
 ## [3.8.1] — 2026-08-19
 
 ### Behoben

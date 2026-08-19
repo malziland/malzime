@@ -206,6 +206,57 @@ document.addEventListener("drop", (e) => e.preventDefault());
    überlebt Neuladen und Tab-Wechsel, endet aber mit dem Tab. Im Workshop
    startet damit jede neue Person und jedes weitergereichte Gerät wieder
    seriös und erlebt den Kontrast selbst (siehe js/modus-speicher.js). */
+/* Das Tab-Zeichen dem Modus folgen lassen.
+ *
+ * WARUM ALLE VERWEISE UND NICHT NUR DER SVG-VERWEIS (Befund 2026-08-19):
+ * Die Seite nennt DREI Zeichen — favicon.ico (Rueckfall fuer alte Browser),
+ * favicon.svg (skalierbar) und favicon-192x192.png (fuer Suchmaschinen). Der
+ * Browser sucht sich EINES davon aus, und viele bevorzugen das .ico oder das
+ * grosse PNG. Wer nur den SVG-Verweis tauscht, tauscht dann etwas, das gar
+ * nicht angezeigt wird — beim Nutzer blieb der Tab unveraendert, in Safari wie
+ * in Brave.
+ *
+ * Im Beast-Modus bleibt deshalb GENAU EIN Verweis uebrig, damit es nichts
+ * auszuwaehlen gibt. Beim Zurueckschalten wird der urspruengliche Satz
+ * wiederhergestellt — er wird beim ersten Aufruf gemerkt, nicht nachgebaut.
+ *
+ * WAS SICH NICHT PRUEFEN LAESST: Ob der Browser das Zeichen daraufhin neu
+ * zeichnet. Die Tab-Leiste ist Browser-Oberflaeche; Playwright fotografiert sie
+ * nicht, und headless-Browser fordern Favicons gar nicht erst an. Automatisch
+ * belegbar ist allein, WELCHE Verweise im Dokument stehen. */
+let zeichenUrsprung = null;
+
+function tabZeichenSetzen(boost) {
+  const kopf = document.head;
+  if (!kopf) return;
+
+  if (zeichenUrsprung === null) {
+    zeichenUrsprung = Array.from(kopf.querySelectorAll('link[rel="icon"]')).map((el) => el.outerHTML);
+  }
+  /* Ohne gemerkten Satz gibt es nichts zu tauschen — dann lieber nichts tun,
+     als einen erfundenen Satz zu schreiben. */
+  if (!zeichenUrsprung.length) return;
+
+  const vorhanden = Array.from(kopf.querySelectorAll('link[rel="icon"]'));
+  const kennung = vorhanden.length ? new URL(vorhanden[0].href, location.href).search : "";
+  const istBeast = vorhanden.length === 1 && vorhanden[0].getAttribute("href")?.includes("favicon-beast");
+  if (boost === istBeast) return;
+
+  vorhanden.forEach((el) => el.remove());
+
+  if (boost) {
+    const neu = document.createElement("link");
+    neu.rel = "icon";
+    neu.type = "image/svg+xml";
+    neu.href = "/favicon-beast.svg" + kennung;
+    kopf.appendChild(neu);
+  } else {
+    for (const html of zeichenUrsprung) {
+      kopf.insertAdjacentHTML("beforeend", html);
+    }
+  }
+}
+
 function applyModeTheme() {
   const boost = elements.biasSwitch.checked;
   document.documentElement.setAttribute("data-mode", boost ? "boost" : "normal");
@@ -230,25 +281,7 @@ function applyModeTheme() {
 
      Es entsteht dabei KEIN neuer Tab und kein Neuladen — getauscht wird nur
      das `href` des vorhandenen Elements. */
-  const alt = document.querySelector('link[rel="icon"][type="image/svg+xml"]');
-  /* Die Kennung des ausgelieferten Standes mitnehmen. Ohne sie behaelt der
-     Browser das alte Zeichen — Favicons speichert er besonders hartnaeckig
-     zwischen, weit ueber das hinaus, was die Kopfzeilen verlangen. Genau das
-     ist am 2026-08-19 passiert: "Ich sehe immer noch das alte Favicon."
-     Die Kennung steht bereits im vorhandenen Verweis; sie wird nicht geraten,
-     sondern uebernommen. */
-  const kennung = alt ? new URL(alt.href, location.href).search : "";
-  const ziel = (boost ? "/favicon-beast.svg" : "/favicon.svg") + kennung;
-  if (alt && new URL(alt.href, location.href).pathname !== ziel.split("?")[0]) {
-    /* ERSETZEN, nicht nur `href` setzen. Browser halten Favicons zaeh fest;
-       ein geaendertes Attribut allein loest das Neuzeichnen nicht zuverlaessig
-       aus. Ein frisches Element mit derselben Rolle tut es. */
-    const neu = document.createElement("link");
-    neu.rel = "icon";
-    neu.type = "image/svg+xml";
-    neu.href = ziel;
-    alt.replaceWith(neu);
-  }
+  tabZeichenSetzen(boost);
 }
 /* Gemerkte Wahl wiederherstellen, BEVOR das Theme angewendet wird — sonst
    blitzt kurz der falsche Look auf. `null` heisst „nie gewählt": dann bleibt

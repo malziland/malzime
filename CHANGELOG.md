@@ -4,6 +4,25 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Das Logo aktualisierte sich im Browser nicht.** Die Verweise auf Favicon,
+  App-Kachel und Manifest trugen keine Versionskennung — anders als das
+  Stilblatt. Der Browser behielt deshalb das alte Zeichen, unter Umständen
+  wochenlang. Das betraf jede bisherige Änderung am Logo.
+
+- **Suchmaschinen fanden kein Logo.** In den strukturierten Daten fehlte die
+  Angabe, welches Bild das Logo ist. Ohne sie zeigt Google keines — die
+  Bilddateien lagen längst bereit, waren aber nirgends als Logo benannt.
+  Zusätzlich ist jetzt ein großes Favicon verlinkt; Google empfiehlt über
+  48 Bildpunkte.
+
+- **Die Überschrift auf der Zahlen-Seite stand 21 Bildpunkte höher als auf
+  allen anderen Seiten.** Aufgefallen ist das keinem Menschen, sondern einer
+  neuen Prüfung — man sieht die Seiten selten nebeneinander.
+
 ## [3.8.0] — 2026-08-19
 
 ### Hinzugefügt

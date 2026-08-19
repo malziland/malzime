@@ -124,24 +124,29 @@ Nutzungsstatistik.
 
 Ausgewählt nach den fünf Kategorien der Methodik:
 
-| Kategorie              | Ansicht                | Begründung                                              |
-| ---------------------- | ---------------------- | ------------------------------------------------------- |
-| Gemeinsame Ansicht     | Startseite `/`         | Einstiegspunkt, trägt Kopf- und Fußzeile                |
-| Besondere Seite        | `/datenschutz`         | längster Text, Tabellen, viele Links                    |
-| Besondere Seite        | `/impressum`           | kürzeste Rechtsseite, andere Struktur                   |
-| Besondere Seite        | `/nutzungsbedingungen` | nummerierte Abschnitte, verschachtelte Listen           |
-| Besondere Seite        | `/barrierefreiheit`    | neu, noch nie mit Nutzern erprobt                       |
-| Inhaltstyp-Vielfalt    | `/stats`               | Zahlen, Fortschrittsbalken, automatische Aktualisierung |
-| Funktionale Komponente | Sprachhinweis-Dialog   | modaler Dialog mit Fokus-Käfig                          |
-| Funktionale Komponente | Ergebnis mit Karte     | fremder eingebetteter Inhalt                            |
+| Kategorie              | Ansicht                 | Begründung                                              |
+| ---------------------- | ----------------------- | ------------------------------------------------------- |
+| Gemeinsame Ansicht     | Startseite `/`          | Einstiegspunkt, trägt Kopf- und Fußzeile                |
+| Besondere Seite        | `/datenschutz`          | längster Text, Tabellen, viele Links                    |
+| Besondere Seite        | `/impressum`            | kürzeste Rechtsseite, andere Struktur                   |
+| Besondere Seite        | `/nutzungsbedingungen`  | nummerierte Abschnitte, verschachtelte Listen           |
+| Besondere Seite        | `/barrierefreiheit`     | diese Erklärung                                         |
+| Besondere Seite        | `/en/privacy`           | englische Fassung, längster Text                        |
+| Besondere Seite        | `/en/legal-notice`      | englische Fassung, kürzeste Rechtsseite                 |
+| Besondere Seite        | `/en/terms`             | englische Fassung, nummerierte Abschnitte               |
+| Besondere Seite        | `/en/accessibility`     | englische Fassung dieser Erklärung                      |
+| Inhaltstyp-Vielfalt    | `/stats`                | Zahlen, Fortschrittsbalken, automatische Aktualisierung |
+| Funktionale Komponente | Sprachumschalter (Link) | Sprachwechsel ohne JavaScript, Fokus und Trefferfläche  |
+| Funktionale Komponente | Ergebnis mit Karte      | fremder eingebetteter Inhalt                            |
 
 ### 3.2 Zufällige Auswahl
 
 Die Methodik verlangt zusätzlich rund 10 % zufällig gewählter Ansichten als
 Qualitätskontrolle der strukturierten Auswahl.
 
-**Hier nicht anwendbar, mit Begründung:** Die Website hat sechs Seiten. Die strukturierte
-Auswahl umfasst sie **vollständig**; eine Zufallsauswahl könnte nichts finden, was nicht
+**Hier nicht anwendbar, mit Begründung:** Die Website hat zehn Seiten — sechs deutsche und
+vier englische, seit dem 19. August 2026. Die strukturierte Auswahl umfasst sie
+**vollständig**; eine Zufallsauswahl könnte nichts finden, was nicht
 ohnehin geprüft ist. Die Zufallsauswahl dient bei großen Websites dazu, die Repräsentativität
 der Stichprobe zu prüfen — bei einer Vollerhebung entfällt ihr Zweck.
 
@@ -274,8 +279,13 @@ Ursache, Behebung und Dauerprüfung in Anhang A. Zwei davon fand kein Werkzeug, 
 Mensch, der zum ersten Mal mit VoiceOver zuhörte; einen fand die Auflösung der
 Abstentionen.
 
-**Messumfang:** 46 Zustände je Browser-Maschine, drei Maschinen, also 138 Messungen — jede
+**Messumfang:** 70 Zustände je Browser-Maschine, drei Maschinen, also 210 Messungen — jede
 zweifach ausgeführt und nur übernommen, was beide Male auftrat.
+
+Die Zahl stammt nicht aus diesem Text: `e2e/barrierefreiheit-protokoll.test.js` zählt die
+Zustände beim Messen und vergleicht sie am Ende mit jeder Zahl, die in den Unterlagen steht.
+Weichen sie ab, wird der Lauf rot. Genau das ist am 19. August passiert, als die vier
+englischen Seiten dazukamen und hier noch 46 stand.
 
 ### 4.3 Prüftiefe gegenüber der Baseline
 

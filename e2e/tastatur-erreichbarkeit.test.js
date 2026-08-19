@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 
 /* Jedes Bedienelement muss tabindex="0" tragen — auch die, die JavaScript baut.
  *
@@ -20,14 +22,46 @@ import { test, expect } from "@playwright/test";
  * Antwort darauf, dass das nie wieder von Handarbeit abhaengen soll.
  */
 
-const SEITEN = [
-  "/",
-  "/stats.html",
-  "/datenschutz.html",
-  "/impressum.html",
-  "/nutzungsbedingungen.html",
-  "/barrierefreiheit.html",
-];
+/* ── Welche Seiten geprueft werden ────────────────────────────────────────
+   OPS-2026-08-19: Hier stand eine feste Liste mit sechs Pfaden. Am 2026-08-18
+   kamen vier englische Seiten unter public/en/ dazu; die Liste kannte sie
+   nicht. Ein Bedienelement ohne `tabindex="0"` waere dort unbemerkt geblieben —
+   und genau dieser Fehler (BUG-2026-08-17-08) wurde seinerzeit von einem
+   Nutzer auf der Live-Seite gefunden, nicht von einem Test.
+
+   Deshalb wird jetzt das Dateisystem gefragt, wie in e2e/a11y.test.js und
+   e2e/barrierefreiheit-protokoll.test.js. Jede neue Seite ist ab ihrer
+   Entstehung dabei, ohne dass jemand daran denken muss. */
+/* Basis ist das ARBEITSVERZEICHNIS, nicht `import.meta.url`: Playwright laedt
+   Testdateien nicht als echte ES-Module, `import.meta` wirft dort. Dieselbe
+   Begruendung steht in e2e/barrierefreiheit-protokoll.test.js — ich bin genau
+   in diese Falle getreten, obwohl der Kommentar zwei Dateien weiter stand. */
+const PUBLIC = join(process.cwd(), "public");
+
+function alleSeiten(unter = "") {
+  const treffer = [];
+  for (const e of readdirSync(join(PUBLIC, unter), { withFileTypes: true })) {
+    const rel = unter ? `${unter}/${e.name}` : e.name;
+    if (e.isDirectory()) {
+      if (["__tests__", "node_modules", "fonts", "img", "js", "locales", "lib"].includes(e.name)) continue;
+      treffer.push(...alleSeiten(rel));
+    } else if (e.name.endsWith(".html")) {
+      treffer.push("/" + rel);
+    }
+  }
+  return treffer.sort();
+}
+
+const SEITEN = alleSeiten();
+
+/* Positivkontrolle fuer die Suche selbst: Faende sie nichts oder zu wenig,
+   liefe die Schleife unten still leer und der Test waere gruen, ohne gemessen
+   zu haben. Stand 2026-08-19: zehn Seiten. */
+test("Messmittel: die Seitensuche findet die ausgelieferten Seiten", () => {
+  expect(SEITEN.length, `gefunden: ${SEITEN.join(", ")}`).toBeGreaterThanOrEqual(10);
+  expect(SEITEN).toContain("/en/privacy.html");
+  expect(SEITEN).toContain("/index.html");
+});
 
 /** Bewusst ausgenommen, mit Grund. */
 const AUSNAHMEN = [{ auswahl: "#website", grund: "Honeypot — darf fuer Menschen NICHT erreichbar sein (tabindex=-1)" }];
@@ -94,10 +128,18 @@ for (const pfad of SEITEN) {
   });
 }
 
-test("Tastatur: auch der Sprachumschalter und seine Rueckfrage", async ({ page }) => {
-  /* Der konkrete Fall aus dem Fehlerbericht: Der Umschalter entsteht erst durch
-     JavaScript, seine Rueckfrage sogar erst auf Klick. Beide werden hier
-     ausdruecklich geoeffnet und geprueft. */
+test("Tastatur: der Sprachumschalter auf der Startseite und auf einer Rechtsseite", async ({ page }) => {
+  /* Der konkrete Fall aus dem Fehlerbericht (BUG-2026-08-17-08): Auf der
+     Startseite entsteht der Umschalter erst durch JavaScript — ein Test, der
+     nur das statische HTML prueft, haette ihn nie gesehen. Er wird deshalb
+     ausdruecklich abgewartet und geprueft.
+
+     Auf den RECHTSSEITEN war er bis v3.6.1 ebenfalls JavaScript und oeffnete
+     eine Rueckfrage ("Diese Seite gibt es nur auf Deutsch"), deren Knoepfe hier
+     mitgeprueft wurden. Seit die englischen Seiten existieren, ist er dort ein
+     LINK — kein Dialog, kein Skript. Geprueft wird jetzt der Link: Er muss
+     `tabindex="0"` tragen, sonst springt Safari ohne "Vollzugriff Tastatur"
+     nicht auf ihn, und der Sprachwechsel waere per Tastatur unerreichbar. */
   await endpunkteStellen(page);
   await page.goto("/");
   await page.waitForTimeout(800);
@@ -106,10 +148,14 @@ test("Tastatur: auch der Sprachumschalter und seine Rueckfrage", async ({ page }
   await expect(pille, "Umschalter nicht entstanden — Test wuerde nichts pruefen").toHaveCount(1);
   expect(await fehlendeErfassen(page), "Umschalter-Knoepfe ohne tabindex=0").toEqual([]);
 
-  /* Und der zweisprachige Hinweis auf einer Rechtsseite. */
+  /* Und auf einer Rechtsseite, wo er ein reiner Link ist. */
   await page.goto("/datenschutz.html");
-  await page.waitForTimeout(600);
-  await page.click('.sprach-knopf[data-lang="en"]');
-  await expect(page.locator('.sw-grund[data-modal="unuebersetzt"]')).toBeVisible();
-  expect(await fehlendeErfassen(page), "Dialog-Knoepfe ohne tabindex=0").toEqual([]);
+  const verweis = page.locator("a.sprach-knopf");
+  await expect(verweis, "kein Sprachverweis auf der Rechtsseite — Test wuerde nichts pruefen").toHaveCount(1);
+  await expect(verweis).toHaveAttribute("tabindex", "0");
+  await expect(verweis).toHaveAttribute("href", "/en/privacy");
+  expect(await fehlendeErfassen(page), "Sprachverweis ohne tabindex=0").toEqual([]);
+
+  /* Die Rueckfrage ist fort — und darf nicht zurueckkommen. */
+  await expect(page.locator(".sw-grund, .sw-modal")).toHaveCount(0);
 });

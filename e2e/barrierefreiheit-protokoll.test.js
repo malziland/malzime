@@ -1115,13 +1115,18 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
     await umbruchMessen(page, "Zahlen-Seite");
   });
 
-  for (const [name, pfad] of [
-    ["Datenschutz", "/datenschutz.html"],
-    ["Impressum", "/impressum.html"],
-    ["Nutzungsbedingungen", "/nutzungsbedingungen.html"],
-    ["Barrierefreiheit", "/barrierefreiheit.html"],
-  ]) {
+  /* Alle Rechtsseiten, deutsch UND englisch, aus dem Dateisystem abgeleitet
+     (RECHTSSEITEN oben). Hier stand bis 2026-08-19 eine feste Liste mit den vier
+     deutschen Seiten. Sie war beim Zuwachs von public/en/ sofort veraltet — und
+     der Pruefbericht haette weiter behauptet, die Stichprobe umfasse die Website
+     "vollstaendig". Eine Konformitaetsaussage auf einer veralteten Liste ist keine. */
+  for (const pfad of RECHTSSEITEN) {
+    const name = seitenName(pfad);
     test(`Rechtsseite: ${name}`, async ({ page }) => {
+      /* Der Umschalter verweist auf saubere Adressen (/en/privacy); Firebase
+         Hosting schreibt sie auf die HTML-Datei um, der Testserver kann das
+         nicht. Die Attrappe bildet genau diese Regeln nach. */
+      await hostingAdressenNachstellen(page);
       await page.goto(pfad);
       await expect(page.locator("h1")).toBeVisible();
       await messen(page, name, "hell");
@@ -1129,14 +1134,14 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
       await aaaMessen(page, name);
       await textAnpassungMessen(page, name);
 
-      /* Der Sprachhinweis ist ein Dialog — offene Dialoge werden eigens
-         gemessen, weil sie den Fokus fangen und die Umgebung stilllegen. */
-      const en = page.locator('.sprach-knopf[data-lang="en"]');
-      if (await en.count()) {
-        await en.click();
-        await expect(page.locator('.sw-grund[data-modal="unuebersetzt"]')).toBeVisible();
-        await messen(page, name, "Sprachhinweis offen");
-      }
+      /* Der Sprachumschalter war bis v3.6.1 ein Dialog und wurde als solcher
+         gemessen — Fokus-Kaefig, stillgelegte Umgebung, Escape. Seit es die
+         englischen Seiten gibt, ist er ein LINK: keine Rueckfrage, kein Dialog,
+         kein JavaScript. Gemessen wird jetzt der Link samt Fokusring,
+         Trefferflaeche, Beschriftung — und ausdruecklich, dass vom Dialog
+         nichts uebrig ist. */
+      await sprachumschalterMessen(page, name);
+
       await umbruchMessen(page, name);
     });
   }

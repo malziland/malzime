@@ -13,8 +13,19 @@
  *
  * Aufruf:  node scripts/vorschau.mjs [port]     (Vorgabe: 8099)
  *
- * Bewusst NICHT enthalten: die Weiterleitung von /api/* auf die Functions.
- * Wer Schnittstellen braucht, nimmt den Emulator — hier geht es ums Aussehen.
+ * /api/stats wird beantwortet, /api/* sonst nicht. Grund: Ohne diese eine
+ * Antwort entsteht der SPRACHUMSCHALTER nicht — app.js liest das Merkmal von
+ * dort. In der ersten Fassung fiel /api/stats in die Auffang-Regel und lieferte
+ * HTML; der Browser konnte es nicht lesen, und der Umschalter fehlte lautlos.
+ * Der Nutzer hat das gefunden, nicht ich: "der Sprachumschalter ist gar nicht
+ * da ... irgendwas stimmt mit deinen Angaben nicht."
+ *
+ * Genau das ist der Sinn einer Vorschau — sie muss zeigen, was live steht.
+ * Verschluckt sie ein sichtbares Element, ist sie schlechter als gar keine.
+ *
+ * Alles andere unter /api/ bleibt draussen und antwortet ausdruecklich mit 501,
+ * damit niemand hier eine Analyse zu starten versucht und sich wundert. Wer
+ * Schnittstellen braucht, nimmt den Emulator.
  */
 import { createServer } from "node:http";
 import { readFileSync, existsSync, statSync } from "node:fs";
@@ -65,8 +76,31 @@ function zielFuer(pfad) {
   return null;
 }
 
+/* Eine plausible Antwort, ausdruecklich als Vorschau gekennzeichnet. Die Werte
+   sind erfunden — es geht um das Aussehen, nicht um Zahlen. */
+const STATS_VORSCHAU = {
+  current: { count: 6, limit: 500, limitActive: false, retryAfterSeconds: 0, hourlyTotal: 6 },
+  totals: { today: 19, week: 26, month: 172, year: 5129, allTime: 5129 },
+  maintenance: { enabled: false, message: "" },
+  realitaetsCheck: { eingaben: 8, mittelProzent: null },
+  useQueue: true,
+  sprachumschalter: true,
+  vorschau: true,
+};
+
 createServer((req, res) => {
   const pfad = decodeURIComponent(req.url.split("?")[0]);
+
+  if (pfad === "/api/stats") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(JSON.stringify(STATS_VORSCHAU));
+    return;
+  }
+  if (pfad.startsWith("/api/")) {
+    res.writeHead(501, { "content-type": "text/plain; charset=utf-8" });
+    res.end(`501 — ${pfad} gibt es in der Vorschau nicht. Fuer Schnittstellen den Emulator nehmen.`);
+    return;
+  }
 
   /* 1. Gibt es die Datei wirklich? Dann direkt ausliefern. */
   let datei = join(WURZEL, pfad);

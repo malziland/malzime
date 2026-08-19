@@ -251,7 +251,7 @@ body {
   margin-bottom: 32px;
 }
 
-/* ── Wortmarke im Seitenkopf ───────────────────────────────────────────────
+/* ── Wortmarke (Startseite und Unterseiten) ───────────────────────────────────────────────
    Werte woertlich aus der Vorlage (Claude Design, "malziME Wortmarke"):
    Poppins 400 fuer `malzi`, 700 fuer `ME`, Schriftgrad 22 px, Laufweite
    -0,028 em, Abstand zum Kasten 5 px, Kasten-Innenabstand 2/5/3 px, Radius
@@ -261,7 +261,7 @@ body {
    fuer den dunklen Grund ausdruecklich andere nennt (#e6e9e9 statt der
    Textfarbe des dunklen Themas). Wer sie spaeter angleicht, weicht von der
    Vorlage ab — deshalb hier sichtbar und nicht versteckt. */
-.hero-wortmarke {
+.wortmarke {
   --wm-schrift: var(--ml-teal);
   --wm-kasten: var(--ml-teal);
   --wm-kasten-schrift: #f9f7f4;
@@ -274,9 +274,17 @@ body {
   display: flex;
   width: max-content;
   max-width: 100%;
+  /* Eine Marke bricht nicht um. Ohne das zerfiel sie bei 320 px in "ma/lzi"
+     und "M/E" — gemessen, nicht befuerchtet. */
+  flex-wrap: nowrap;
+  white-space: nowrap;
   align-items: center;
   gap: 5px;
-  margin-bottom: 14px;
+  /* KEIN eigener unterer Abstand: Die Marke steht in einer mittig
+     ausgerichteten Zeile (.seiten-kopfzeile). Ein Rand wird dort MITGEMITTELT
+     und schob sie um die halbe Randhoehe nach oben — gemessen 7 px Versatz
+     gegenueber dem Sprachumschalter, genau die Haelfte der frueheren 14 px.
+     Der Abstand nach unten gehoert der Zeile. */
   font-family: "Poppins", system-ui, sans-serif;
   font-weight: 400;
   font-size: 22px;
@@ -285,7 +293,24 @@ body {
   color: var(--wm-schrift);
 }
 
-.hero-wortmarke-me {
+/* Auf den Unterseiten ist sie der Weg zurueck zur Startseite. Als Link darf
+   sie weder unterstrichen sein noch die Linkfarbe erben — sie ist eine Marke,
+   kein Fliesstext. Der Fokusring bleibt, sonst waere sie mit der Tastatur
+   unsichtbar erreichbar. */
+a.wortmarke {
+  text-decoration: none;
+  color: var(--wm-schrift);
+}
+a.wortmarke:hover .wortmarke-me {
+  opacity: 0.88;
+}
+a.wortmarke:focus-visible {
+  outline: 2px solid var(--fokus-ring, var(--ml-teal));
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.wortmarke-me {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -298,7 +323,7 @@ body {
 }
 
 /* Beast Mode: die Vorlage kehrt um — heller Kasten, dunkles ME. */
-:root[data-theme="dark"] .hero-wortmarke {
+:root[data-theme="dark"] .wortmarke {
   --wm-schrift: #e6e9e9;
   --wm-kasten: #e6e9e9;
   --wm-kasten-schrift: #171d1f;
@@ -3881,6 +3906,8 @@ a.sprach-knopf:hover {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  /* Der Abstand nach unten liegt hier, nicht an der Wortmarke — siehe dort. */
+  margin-bottom: 14px;
 }
 .seiten-kopfzeile .sprachwahl {
   position: static;

@@ -373,7 +373,14 @@ async function renderGpsMap(data) {
     /* Quellenangabe: Die OSM-Lizenz verlangt eine Nennung MIT Verweis auf die
        Lizenzseite. Bis v3.8.1 stand dort nur der unverlinkte Text
        "© OpenStreetMap" — Nennung ja, Verweis nein. */
-    karte.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
+    /* Beide Verweise in einen NEUEN Tab. Sonst ersetzt ein Klick auf die
+       Quellenangabe die laufende Analyse durch die OpenStreetMap-Seite — das
+       Ergebnis ist dann weg. Gefunden vom Nutzer am 2026-08-19: "Ich kann nicht
+       meine eigene Seite ueberschreiben." `rel` verhindert, dass die neue Seite
+       auf das oeffnende Fenster zugreifen kann. */
+    karte.attributionControl.setPrefix(
+      '<a href="https://leafletjs.com" target="_blank" rel="noopener noreferrer">Leaflet</a>'
+    );
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: t("gps.osmCredit"),
       referrerPolicy: "origin",

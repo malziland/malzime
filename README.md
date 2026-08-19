@@ -159,16 +159,16 @@ Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
   "mimeType": "image/jpeg",
   "filename": "upload.jpg",
   "exif": { "make": "Apple", "model": "iPhone 15 Pro" },
-  "lang": "de",
+  "lang": "de"
 }
 ```
 
-| Feld | Typ | Beschreibung |
-|------|-----|--------------|
-| `imageBase64` | string | Base64-kodiertes Bild (client-seitig komprimiert) |
-| `mimeType` | string | `image/jpeg`, `image/png`, `image/webp`, `image/gif` |
-| `exif` | object | Kamera-Metadaten vom Client (ohne GPS!) |
-| `lang` | string | Sprachcode (`de`, `en`, ...). Default: `de` |
+| Feld          | Typ    | Beschreibung                                         |
+| ------------- | ------ | ---------------------------------------------------- |
+| `imageBase64` | string | Base64-kodiertes Bild (client-seitig komprimiert)    |
+| `mimeType`    | string | `image/jpeg`, `image/png`, `image/webp`, `image/gif` |
+| `exif`        | object | Kamera-Metadaten vom Client (ohne GPS!)              |
+| `lang`        | string | Sprachcode (`de`, `en`, ...). Default: `de`          |
 
 ### Response
 
@@ -271,20 +271,20 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 ## Tech-Stack
 
-| Komponente | Technologie |
-|-----------|-------------|
-| Hosting | Firebase Hosting — Projektregion Google Ireland (europe-west1), Auslieferung der statischen Dateien ueber ein weltweites CDN |
-| Backend | Firebase Cloud Functions (2nd Gen, Node 24, europe-west1) |
-| Queue | Google Cloud Tasks (dosierter Job-Dispatch, europe-west1) |
-| Datenbank | Cloud Firestore (Zaehler, Maintenance-Flag, Queue-Jobs, europe-west1) |
-| KI-Analyse (aktiv) | Mistral Large (multimodal, Paris/EU) — ein Single-Call erstellt Bildbeschreibung + beide Profile |
-| KI-Fallback | Klassische 3-Call-Pipeline (Large beschreibt, Small profiliert), per Feature-Flag umschaltbar |
-| Karten | Leaflet + OpenStreetMap (self-hosted Lib + OSM-Tiles) |
-| Geocoding | Nominatim (client-seitig, OpenStreetMap Foundation) |
-| EXIF-Parsing | exifr (client-seitig im Browser) |
-| Fonts | Poppins (self-hosted, woff2, OFL) |
-| i18n | Eigenes Micro-Modul (Frontend JSON + Backend CommonJS Locales) |
-| Frontend | Vanilla JS, kein Framework, kein Build-Schritt |
+| Komponente         | Technologie                                                                                                                  |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| Hosting            | Firebase Hosting — Projektregion Google Ireland (europe-west1), Auslieferung der statischen Dateien ueber ein weltweites CDN |
+| Backend            | Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)                                                                    |
+| Queue              | Google Cloud Tasks (dosierter Job-Dispatch, europe-west1)                                                                    |
+| Datenbank          | Cloud Firestore (Zaehler, Maintenance-Flag, Queue-Jobs, europe-west1)                                                        |
+| KI-Analyse (aktiv) | Mistral Large (multimodal, Paris/EU) — ein Single-Call erstellt Bildbeschreibung + beide Profile                             |
+| KI-Fallback        | Klassische 3-Call-Pipeline (Large beschreibt, Small profiliert), per Feature-Flag umschaltbar                                |
+| Karten             | Leaflet + OpenStreetMap (self-hosted Lib + OSM-Tiles)                                                                        |
+| Geocoding          | Nominatim (client-seitig, OpenStreetMap Foundation)                                                                          |
+| EXIF-Parsing       | exifr (client-seitig im Browser)                                                                                             |
+| Fonts              | Poppins (self-hosted, woff2, OFL)                                                                                            |
+| i18n               | Eigenes Micro-Modul (Frontend JSON + Backend CommonJS Locales)                                                               |
+| Frontend           | Vanilla JS, kein Framework, kein Build-Schritt                                                                               |
 
 ## Einschraenkungen
 
@@ -336,8 +336,16 @@ Der Quellcode steht unter MIT — siehe [LICENSE](LICENSE).
 Nutzung ausserhalb dieses Projekts nur mit schriftlicher Zustimmung von
 malziland - learning | training | consulting e.U. Details: [TRADEMARKS.md](TRADEMARKS.md).
 
-**Schriften:** Poppins ist unter der SIL Open Font License 1.1 lizenziert
-(OFL-Text liegt im Ordner `public/fonts/poppins/`).
+**Fremde Bestandteile:** Leaflet (BSD 2-Clause), exifr (MIT) und die Schrift
+Poppins (SIL Open Font License 1.1) liegen selbst gehostet im Repository und sind
+**nicht** von der MIT-Lizenz dieses Projekts umfasst. Jeder Bestandteil bringt
+seinen eigenen Lizenztext mit; die Uebersicht steht in
+[THIRD-PARTY.md](THIRD-PARTY.md).
+
+**OpenStreetMap:** Kartenkacheln und Adressaufloesung kommen zur Laufzeit direkt
+vom Browser der Besucher — im Repository liegt kein OSM-Material, und die
+MIT-Lizenz bleibt davon unberuehrt. Die Namensnennung mit Verweis auf die
+Lizenzseite steht in der Karte selbst.
 
 ---
 

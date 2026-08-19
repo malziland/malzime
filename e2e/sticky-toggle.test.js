@@ -70,24 +70,24 @@ async function mockBackend(page) {
         totals: { today: 10, week: 50, month: 200, total: 1000 },
         useQueue: true,
       }),
-    }),
+    })
   );
   await page.route("**/api/enqueue", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ jobId: "sticky-job-1", resultToken: "sticky-token-1" }),
-    }),
+    })
   );
   await page.route("**/api/job-status**", (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ status: "done", result: MOCK_RESPONSE }),
-    }),
+    })
   );
   await page.route("**/nominatim.openstreetmap.org/**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" }),
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
   );
 }
 
@@ -116,7 +116,7 @@ async function runAnalysis(page) {
         requestAnimationFrame(tick);
       }),
     null,
-    { timeout: 5000 },
+    { timeout: 5000 }
   );
 }
 
@@ -130,23 +130,39 @@ async function scrollCardIntoView(page, index) {
   await page.waitForTimeout(150);
 }
 
-test("Sticky: Umschalter klebt erst, wenn ein Ergebnis vorliegt", async ({ page }) => {
+test("Sticky: Umschalter klebt von Anfang an, auch ohne Ergebnis", async ({ page }) => {
+  /* GEAENDERT in v3.9.0. Bis dahin hing das Kleben an `data-has-result`, begann
+     also erst mit dem fertigen Profil. Auf dem Handy wirkte das wie ein Fehler:
+     Man scrollt waehrend der Analyse, die Leiste laeuft nach oben weg und kommt
+     spaeter unvermittelt zurueck. Nutzerwunsch am 2026-08-19: "Wenn man einfach
+     scrollt, dann ist das sticky fertig."
+
+     Diese Pruefung misst die WIRKUNG (klebt die Leiste beim Scrollen wirklich
+     oben?), nicht die Einstellung im Stilblatt. */
   await mockBackend(page);
   await page.goto("/");
+  await expect(page.locator("h1")).toBeVisible();
 
-  /* Ohne Ergebnis: kein Kleben — der Umschalter soll auf der Startseite
-     keinen Platz kosten. */
+  /* Ohne jedes Ergebnis — und trotzdem klebefaehig. */
   await expect(page.locator("html")).not.toHaveAttribute("data-has-result", /.*/);
-  const before = await page.locator("#biasToggleWrap").evaluate((el) => getComputedStyle(el).position);
-  expect(before).not.toBe("sticky");
+  const vorher = await page.locator("#biasToggleWrap").evaluate((el) => getComputedStyle(el).position);
+  expect(vorher, "der Umschalter ist ohne Ergebnis gar nicht klebefaehig").toBe("sticky");
 
-  /* v3.0.0: Die Analyse startet direkt bei der Demo-Wahl. */
+  /* Weit genug scrollen, dass die Leiste den oberen Rand erreicht. */
+  const oben = await page.locator("#biasToggleWrap").evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+  await page.evaluate((y) => window.scrollTo({ top: y + 400, behavior: "instant" }), oben);
+  await page.waitForTimeout(400);
+
+  await expect(page.locator("#biasToggleWrap"), "die Leiste klebt ohne Ergebnis nicht").toHaveClass(/is-stuck/);
+  const kastenOben = await page.locator("#biasToggleWrap").evaluate((el) => Math.round(el.getBoundingClientRect().top));
+  expect(kastenOben, `die Leiste steht bei ${kastenOben} statt oben`).toBeLessThanOrEqual(1);
+
+  /* Und mit Ergebnis klebt sie natuerlich weiter. */
   await page.click('[data-demo="selfie"]');
-  await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 15000 });
-
+  await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 20000 });
   await expect(page.locator("html")).toHaveAttribute("data-has-result", "1");
-  const after = await page.locator("#biasToggleWrap").evaluate((el) => getComputedStyle(el).position);
-  expect(after).toBe("sticky");
+  const nachher = await page.locator("#biasToggleWrap").evaluate((el) => getComputedStyle(el).position);
+  expect(nachher).toBe("sticky");
 });
 
 test("Sticky: Umschalter bleibt beim Scrollen sichtbar und erreichbar", async ({ page }) => {
@@ -181,7 +197,7 @@ test("Sticky: Umschalten mitten in der Seite haelt die Leseposition", async ({ p
   const readBefore = await page.evaluate(() => {
     const bar = document.getElementById("biasToggleWrap").getBoundingClientRect().bottom;
     const card = Array.from(document.querySelectorAll("#facts .cat-card")).find(
-      (c) => c.getBoundingClientRect().bottom > bar + 4,
+      (c) => c.getBoundingClientRect().bottom > bar + 4
     );
     return card ? { key: card.dataset.key, top: card.getBoundingClientRect().top } : null;
   });
@@ -195,9 +211,7 @@ test("Sticky: Umschalten mitten in der Seite haelt die Leseposition", async ({ p
   await page.waitForTimeout(300);
 
   const readAfter = await page.evaluate((key) => {
-    const card = Array.from(document.querySelectorAll("#facts .cat-card")).find(
-      (c) => c.dataset.key === key,
-    );
+    const card = Array.from(document.querySelectorAll("#facts .cat-card")).find((c) => c.dataset.key === key);
     return card ? card.getBoundingClientRect().top : null;
   }, readBefore.key);
 
@@ -245,4 +259,3 @@ test("Sticky: Umschalten ganz oben laesst die Ueberschrift stehen", async ({ pag
   const scrollY = await page.evaluate(() => window.scrollY);
   expect(scrollY).toBeLessThan(50);
 });
-

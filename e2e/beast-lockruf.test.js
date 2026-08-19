@@ -149,6 +149,14 @@ test.describe("Beast-Lockruf", () => {
 
   test("kommt nach dem fertigen Profil und bewegt sich wirklich", async ({ page }) => {
     await analyseLaufen(page);
+    await expect(page.locator("html")).toHaveAttribute("data-has-result", "1", { timeout: 40000 });
+    /* Nach einem Lauf OHNE Live-Text springt die Seite zurueck nach oben
+     (api.js: window.scrollTo top 0). Die Pille steht dann unterhalb des
+     Bildrands, und der Lockruf wartet zu Recht — ein Hinweis, den niemand
+     sieht, ist keiner. Fuer die folgenden Messungen wird sie deshalb ins Bild
+     geholt; das entspricht dem, was ein Mensch tut, sobald er das Profil lesen
+     will. */
+    await page.locator(".bias-toggle").scrollIntoViewIfNeeded();
 
     const pille = page.locator(".bias-toggle");
 
@@ -210,6 +218,67 @@ test.describe("Beast-Lockruf", () => {
     expect(verdeckt, "der Lockruf kam mitten in die laufende Enthuellung").toBe(0);
   });
 
+  test("laeuft drei Durchlaeufe, nicht zwei", async ({ page }) => {
+    /* Nutzerwunsch 2026-08-19: "Die Bewegung soll 3 Durchlaeufe sein, mit
+       2 Sekunden jeweils." Gemessen wird, was der Browser rechnet. */
+    await analyseLaufen(page);
+    await expect(page.locator("html")).toHaveAttribute("data-has-result", "1", { timeout: 40000 });
+    /* Nach einem Lauf OHNE Live-Text springt die Seite zurueck nach oben
+     (api.js: window.scrollTo top 0). Die Pille steht dann unterhalb des
+     Bildrands, und der Lockruf wartet zu Recht — ein Hinweis, den niemand
+     sieht, ist keiner. Fuer die folgenden Messungen wird sie deshalb ins Bild
+     geholt; das entspricht dem, was ein Mensch tut, sobald er das Profil lesen
+     will. */
+    await page.locator(".bias-toggle").scrollIntoViewIfNeeded();
+
+    const pille = page.locator(".bias-toggle");
+    await expect
+      .poll(async () => pille.evaluate((el) => el.classList.contains("bias-lockruf")), { timeout: 40000 })
+      .toBe(true);
+
+    const takt = await pille.evaluate((el) => {
+      const st = getComputedStyle(el);
+      return { durchlaeufe: st.animationIterationCount, dauer: st.animationDuration, vorlauf: st.animationDelay };
+    });
+    expect(takt.durchlaeufe).toBe("3");
+    expect(takt.dauer).toBe("2s");
+    expect(takt.vorlauf).toBe("0.4s");
+  });
+
+  test("wartet, bis die Pille im Bild ist, und geht dann los", async ({ page }) => {
+    /* ANLASS 2026-08-19, Nutzerbefund: "Zumindest konnte ich das nicht sehen."
+       Der Hinweis lief stur drei Sekunden nach dem Profil los — war die Pille
+       zu dem Zeitpunkt weggescrollt, sah ihn niemand, und er kam nie wieder.
+       Hier wird das Fenster klein gemacht und ganz nach oben gescrollt, sodass
+       die Pille unterhalb des Bildrands liegt. */
+    await page.setViewportSize({ width: 390, height: 500 });
+    await analyseLaufen(page);
+    const pille = page.locator(".bias-toggle");
+
+    /* Warten, bis das Profil fertig ist — dann sofort ganz nach oben. */
+    await expect(page.locator("html")).toHaveAttribute("data-has-result", "1", { timeout: 40000 });
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await page.waitForTimeout(200);
+
+    /* POSITIVKONTROLLE: Liegt die Pille wirklich ausserhalb des Bildes? Sonst
+       prueft der Rest nichts. */
+    const drausssen = await pille.evaluate((el) => el.getBoundingClientRect().top > window.innerHeight);
+    expect(drausssen, "die Pille ist doch im Bild — der Fall wird nicht geprueft").toBe(true);
+
+    /* Deutlich laenger warten als die drei Sekunden Vorlauf. */
+    await page.waitForTimeout(7000);
+    await expect(pille, "der Hinweis lief los, obwohl ihn niemand sehen konnte").not.toHaveClass(/bias-lockruf/);
+
+    /* Jetzt ins Bild holen — nun muss er kommen. */
+    await pille.scrollIntoViewIfNeeded();
+    await expect
+      .poll(async () => pille.evaluate((el) => el.classList.contains("bias-lockruf")), {
+        timeout: 15000,
+        message: "der Hinweis kommt auch dann nicht, wenn die Pille sichtbar wird",
+      })
+      .toBe(true);
+  });
+
   test("bleibt aus, wer den Schalter schon selbst gefunden hat", async ({ page }) => {
     await analyseLaufen(page);
 
@@ -224,6 +293,15 @@ test.describe("Beast-Lockruf", () => {
 
   test("raeumt sich restlos ab und laesst den Umschalter unveraendert zurueck", async ({ page }) => {
     await analyseLaufen(page);
+    await expect(page.locator("html")).toHaveAttribute("data-has-result", "1", { timeout: 40000 });
+    /* Nach einem Lauf OHNE Live-Text springt die Seite zurueck nach oben
+     (api.js: window.scrollTo top 0). Die Pille steht dann unterhalb des
+     Bildrands, und der Lockruf wartet zu Recht — ein Hinweis, den niemand
+     sieht, ist keiner. Fuer die folgenden Messungen wird sie deshalb ins Bild
+     geholt; das entspricht dem, was ein Mensch tut, sobald er das Profil lesen
+     will. */
+    await page.locator(".bias-toggle").scrollIntoViewIfNeeded();
+
     const pille = page.locator(".bias-toggle");
 
     await expect

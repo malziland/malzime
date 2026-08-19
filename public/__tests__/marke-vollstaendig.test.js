@@ -109,6 +109,51 @@ describe("Die Marke kommt überall an", () => {
     expect(m.start_url, "ohne start_url startet die App auf der Seite, von der aus sie hinzugefügt wurde").toBe("/");
   });
 
+  it("jede Seite verweist in der Fußzeile auf malziland.at", () => {
+    /* ANLASS 2026-08-19: Der Verweis war seit dem 16. Juli bewusst ausgesetzt —
+       die Seite malziland.at lag im Relaunch, und ein Link auf eine Baustelle
+       schadet mehr, als er nutzt (dokumentiert im CHANGELOG zu v2.3.4). Die
+       neue Seite ist seit dem 19. August erreichbar; der Verweis ist wieder da.
+       Dieser Wächter hält fest, dass er auf ALLEN Seiten steht und nicht bei
+       der nächsten Fußzeilen-Änderung auf einer davon verlorengeht.
+
+       Der neue Tab ist Pflicht: Ohne ihn ersetzt ein Klick die laufende
+       Analyse. `tabindex="0"` ebenso — Safari springt ohne „Vollzugriff
+       Tastatur" sonst nicht darauf (Befund aus dem Barrierefreiheits-Audit). */
+    /* Deutsche UND englische Seiten — `seiten()` oben liest nur die oberste
+       Ebene, die Rechtsseiten auf Englisch liegen in public/en/. */
+    const alle = [
+      ...seiten(),
+      ...fs
+        .readdirSync(path.join(PUBLIC, "en"))
+        .filter((f) => f.endsWith(".html"))
+        .map((f) => `en/${f}`),
+    ];
+    expect(alle.length, "keine Seite gefunden — der Wächter prüft nichts").toBeGreaterThan(5);
+
+    const fehlen = [];
+    let mitFusszeile = 0;
+    for (const rel of alle) {
+      const html = fs.readFileSync(path.join(PUBLIC, rel), "utf8");
+      if (!html.includes("footer-copy")) continue; // Seiten ohne Fußzeile
+      mitFusszeile++;
+      const treffer = html.match(/<a[^>]*class="footer-marke"[^>]*>/);
+      if (!treffer) {
+        fehlen.push(`${rel}: kein Verweis`);
+        continue;
+      }
+      const tag = treffer[0];
+      if (!tag.includes('href="https://malziland.at"')) fehlen.push(`${rel}: falsches Ziel`);
+      if (!tag.includes('target="_blank"')) fehlen.push(`${rel}: öffnet im selben Tab`);
+      if (!tag.includes("noopener")) fehlen.push(`${rel}: ohne noopener`);
+      if (!tag.includes('tabindex="0"')) fehlen.push(`${rel}: ohne tabindex`);
+    }
+    /* POSITIVKONTROLLE: Ohne Seite mit Fußzeile prüft die Schleife nichts und
+       wäre still grün. */
+    expect(mitFusszeile, "keine einzige Seite mit Fußzeile geprüft").toBeGreaterThan(5);
+    expect(fehlen).toEqual([]);
+  });
+
   it("beide Tab-Zeichen tragen dieselbe Form", () => {
     /* Sonst wäre es nicht dasselbe Logo, sondern ein zweites. */
     const pfad = (d) => /<path class="zeichen" d="([^"]+)"/.exec(lies(d))[1];

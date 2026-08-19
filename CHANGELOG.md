@@ -4,6 +4,57 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [3.9.1] — 2026-08-19
+
+### Hinzugefügt
+
+- **Die Fußzeile verweist wieder auf malziland.at.** Der Verweis war seit dem
+  16. Juli ausgesetzt, weil die Seite im Umbau war — ein Link auf eine
+  Baustelle schadet mehr, als er nutzt. Sie ist wieder erreichbar, also ist er
+  wieder da: auf allen zehn Seiten, in einem neuen Tab, mit der Tastatur
+  erreichbar.
+
+### Geändert
+
+- **Der Umschalter klebt jetzt von Anfang an oben, nicht erst mit einem
+  Ergebnis.** Bisher lief er beim Scrollen während der Analyse nach oben weg
+  und kam später unvermittelt zurück. Wer scrollt, hat ihn ab sofort immer
+  greifbar.
+
+- **Der Hinweis auf den Beast-Modus läuft drei Mal statt zwei** — rund sechs
+  statt vier Sekunden Bewegung.
+
+### Behoben
+
+- **Der Hinweis auf den Beast-Modus lief manchmal ins Leere.** Er startete
+  starr drei Sekunden nach dem fertigen Profil. Stand der Umschalter zu dem
+  Zeitpunkt außerhalb des Bildes — nach einer Analyse ohne Live-Text springt
+  die Seite nach oben, und auf kleinen Bildschirmen liegt er dann darunter —,
+  sah ihn niemand, und er kam kein zweites Mal. Jetzt wartet er, bis der
+  Umschalter tatsächlich zu sehen ist, und geht erst dann los. Ob er dabei oben
+  klebt oder mitten in der Seite steht, spielt keine Rolle.
+
+- **Die mitgelieferten fremden Bausteine hatten ihren Lizenztext nicht dabei.**
+  Leaflet lag nur mit einer Copyright-Zeile da, exifr mit gar nichts — beide
+  Lizenzen verlangen aber ausdrücklich, dass ihr Text bei der Weitergabe
+  mitgeliefert wird. Beide Originaltexte liegen jetzt wörtlich bei den
+  Dateien, sind gegen Veränderung mit einer Prüfsumme gesichert und in einer
+  neuen Übersicht `THIRD-PARTY.md` aufgeführt. Eine Prüfung erzwingt das beim
+  nächsten Einbau: ohne vollständigen Lizenztext wird der Bau rot.
+
+  Klarstellung dazu: OpenStreetMap berührt die Lizenz dieses Projekts nicht.
+  Karten und Adressen kommen zur Laufzeit direkt zum Browser der Besucher; im
+  Projekt liegt kein Material davon.
+
+- **Die Verweise in der Karte öffneten sich im selben Tab.** Ein Klick auf die
+  Quellenangabe oder den Leaflet-Hinweis ersetzte damit die laufende Seite —
+  das fertige Profil war weg. Beide öffnen jetzt einen neuen Tab.
+
+- **Die Auslieferung konnte im Hintergrund stumm hängenbleiben.** Das
+  Deploy-Skript stellte eine Rückfrage und wartete ohne Zeitablauf auf eine
+  Taste — ohne Terminal wartete es ewig, und von außen sah das aus wie „läuft
+  noch". Jetzt fragt es nur noch, wenn wirklich jemand davorsitzt.
+
 ## [3.9.0] — 2026-08-19
 
 ### Hinzugefügt

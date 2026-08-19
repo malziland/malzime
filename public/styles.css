@@ -519,17 +519,24 @@ h1 {
 }
 
 /* ── Sticky-Umschalter ──────────────────────────────────────────────────────
-   Sobald ein Ergebnis vorliegt, bleibt der Umschalter beim Scrollen oben
-   stehen. Grund: Der Vergleich derselben Karte in beiden Modi ist der
-   didaktische Kern — ohne Sticky muss man hoch, umschalten, wieder runter
-   und die Karte neu suchen.
+   Der Umschalter bleibt beim Scrollen oben stehen — IMMER, nicht erst mit
+   einem Ergebnis. Grund: Der Vergleich derselben Karte in beiden Modi ist der
+   didaktische Kern; ohne Kleben muss man hoch, umschalten, wieder runter und
+   die Karte neu suchen.
+
+   Bis v3.9.0 hing das an `html[data-has-result]`, das Kleben begann also erst
+   mit dem fertigen Profil. Auf dem Handy wirkte das wie ein Fehler: Man
+   scrollt waehrend der Analyse, die Leiste laeuft mit nach oben weg und kommt
+   spaeter unvermittelt zurueck. Nutzerwunsch am 2026-08-19: "In der mobilen
+   Ansicht oder generell soll die Beastmode-Pille von Anfang an schon sticky
+   sein koennen. Wenn man einfach scrollt, dann ist das sticky fertig."
 
    Bewusst KEIN zweites Bedienelement: derselbe Schalter wechselt nur seine
    Position. Ein Duplikat unten wuerde einen zweiten Tab-Stopp erzeugen (der
    Tastatur-E2E-Test ist CI-Pflicht) und die fixed positionierten Tooltips
    ein zweites Mal ausrichten muessen. */
 
-html[data-has-result] .bias-toggle-wrap {
+.bias-toggle-wrap {
   position: sticky;
   top: 0;
   z-index: 20;
@@ -542,7 +549,7 @@ html[data-has-result] .bias-toggle-wrap {
 
 /* Ruhezustand: unsichtbarer Untergrund, damit die Leiste im Seitenfluss
    nicht wie ein Kasten wirkt. */
-html[data-has-result] .bias-toggle-wrap::before {
+.bias-toggle-wrap::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -554,19 +561,19 @@ html[data-has-result] .bias-toggle-wrap::before {
 
 /* Geklebt: Untergrund einblenden + feine Trennkante, damit der Inhalt
    darunter nicht durchscheint. */
-html[data-has-result] .bias-toggle-wrap.is-stuck::before {
+.bias-toggle-wrap.is-stuck::before {
   opacity: 0.97;
   box-shadow: 0 1px 0 var(--border-soft);
 }
 
-html[data-has-result] .bias-toggle-wrap > .bias-toggle {
+.bias-toggle-wrap > .bias-toggle {
   position: relative;
   z-index: 1;
 }
 
 /* Geklebt kompakter — der Inhalt darunter soll so wenig wie moeglich
    verdeckt werden. */
-html[data-has-result] .bias-toggle-wrap.is-stuck > .bias-toggle {
+.bias-toggle-wrap.is-stuck > .bias-toggle {
   padding: 5px 16px;
   gap: 10px;
   transition:
@@ -585,7 +592,7 @@ html[data-has-result] .bias-toggle-wrap.is-stuck > .bias-toggle {
 
 /* Tastatur-Navigation: Ohne diesen Abstand springt der Fokus hinter die
    geklebte Leiste, wenn man sich durch die Ergebniskarten tabbt. */
-html[data-has-result] {
+html {
   scroll-padding-top: 72px;
 }
 
@@ -846,11 +853,11 @@ html[data-has-result] {
 }
 
 .bias-toggle.bias-lockruf {
-  animation: biasLockrufHeben 2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s 2;
+  animation: biasLockrufHeben 2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s 3;
 }
 
 .bias-toggle.bias-lockruf .bias-lockruf-fuellung {
-  animation: biasLockrufFuellen 2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s 2;
+  animation: biasLockrufFuellen 2s cubic-bezier(0.65, 0, 0.35, 1) 0.4s 3;
 }
 
 /* Reduzierte Bewegung: kein Heben, kein Wachsen — die Fuellung ist sofort in
@@ -875,7 +882,7 @@ html[data-has-result] {
   .bias-toggle.bias-lockruf .bias-lockruf-fuellung {
     transform: scaleX(1);
     opacity: 0;
-    animation: biasLockrufBlenden 2s ease 0.4s 2;
+    animation: biasLockrufBlenden 2s ease 0.4s 3;
   }
 }
 
@@ -1768,6 +1775,20 @@ html[data-has-result] {
 .footer-sep {
   color: var(--border);
   user-select: none;
+}
+
+/* Der Marken-Verweis gehoert zum Satz davor („powered by malziland") und darf
+   nicht so weit weg stehen wie die Trennzeichen. Die Fusszeile ist eine
+   Flex-Zeile mit 8 px zwischen ALLEN Teilen; das ist als Wortabstand zu viel.
+   Der negative Rand bringt ihn auf rund 4 px — so weit wie eine Leerstelle.
+
+   Warum der Verweis nicht einfach IM Text-Element steht, wo er hingehoerte:
+   Auf Startseite und Zahlen-Seite traegt dieses Element `data-i18n`, und die
+   Uebersetzung schreibt seinen Textinhalt neu — ein verschachtelter Verweis
+   waere dabei weg. Gleiche Schreibweise auf allen zehn Seiten war die Vorgabe,
+   also steht er ueberall daneben. */
+.footer-marke {
+  margin-left: -4px;
 }
 
 .site-footer a {
@@ -3024,14 +3045,14 @@ summary:focus-visible {
      moeglich bleiben. Bewusst wird NICHTS ausgeblendet: die Info-Icons haben
      tabindex="0", ein Ein-/Ausblenden beim Scrollen wuerde die Tab-Reihenfolge
      waehrend der Bedienung veraendern. */
-  html[data-has-result] .bias-toggle-wrap {
+  .bias-toggle-wrap {
     padding: 6px 20px;
   }
-  html[data-has-result] .bias-toggle-wrap.is-stuck > .bias-toggle {
+  .bias-toggle-wrap.is-stuck > .bias-toggle {
     padding: 4px 12px;
     gap: 8px;
   }
-  html[data-has-result] {
+  html {
     scroll-padding-top: 60px;
   }
   .demo-grid {
@@ -3526,13 +3547,13 @@ html[lang="en"] .rc-zitat::after {
 
   /* Im PDF nichts kleben lassen — sonst wandert die Leiste auf jede Seite
      bzw. ueberdeckt den Seitenanfang. */
-  html[data-has-result] .bias-toggle-wrap {
+  .bias-toggle-wrap {
     position: static;
     margin-left: 0;
     margin-right: 0;
     padding: 0;
   }
-  html[data-has-result] .bias-toggle-wrap::before {
+  .bias-toggle-wrap::before {
     display: none;
   }
 

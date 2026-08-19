@@ -11,7 +11,7 @@ import AxeBuilder from "@axe-core/playwright";
  * Übergangslösung ist weg — die Datei ist gelöscht. Es gibt jetzt vier
  * englische Fassungen, und der Umschalter ist ein reiner Link OHNE JavaScript:
  *
- *   /impressum.html            <->  /en/imprint.html
+ *   /impressum.html            <->  /en/legal-notice.html
  *   /datenschutz.html          <->  /en/privacy.html
  *   /nutzungsbedingungen.html  <->  /en/terms.html
  *   /barrierefreiheit.html     <->  /en/accessibility.html
@@ -49,7 +49,7 @@ const SEITENPAARE = [
   {
     name: "Impressum",
     de: { datei: "/impressum.html", klar: "/impressum" },
-    en: { datei: "/en/imprint.html", klar: "/en/imprint" },
+    en: { datei: "/en/legal-notice.html", klar: "/en/legal-notice" },
   },
   {
     name: "Datenschutz",

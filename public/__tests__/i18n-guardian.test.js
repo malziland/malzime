@@ -28,7 +28,7 @@ function alleHtmlSeiten(unter = "") {
 /* Die vier Rechtsseiten und ihre englischen Zwillinge. Kanonische Quelle fuer
    die Paarung; firebase.json und die Umschalter-Links muessen dazu passen. */
 const RECHTS_PAARE = [
-  { de: "impressum.html", en: "en/imprint.html", dePfad: "/impressum", enPfad: "/en/imprint" },
+  { de: "impressum.html", en: "en/legal-notice.html", dePfad: "/impressum", enPfad: "/en/legal-notice" },
   { de: "datenschutz.html", en: "en/privacy.html", dePfad: "/datenschutz", enPfad: "/en/privacy" },
   { de: "nutzungsbedingungen.html", en: "en/terms.html", dePfad: "/nutzungsbedingungen", enPfad: "/en/terms" },
   {

@@ -99,7 +99,7 @@ describe("Sprache als Übergabewert in der Adresse", () => {
        selbst prüft i18n-rechtslinks.test.js; hier steht sie, weil das
        Anhängsel den Tausch überleben muss — beides zusammen ergibt die
        Adresse, die am Ende in der Leiste steht. */
-    expect(href("impressum")).toBe("/en/imprint?lang=en");
+    expect(href("impressum")).toBe("/en/legal-notice?lang=en");
   });
 
   it("Links im SELBEN Tab bekommen kein Anhängsel", () => {

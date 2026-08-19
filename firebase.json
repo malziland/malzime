@@ -165,8 +165,8 @@
         "destination": "/barrierefreiheit.html"
       },
       {
-        "source": "/en/imprint",
-        "destination": "/en/imprint.html"
+        "source": "/en/legal-notice",
+        "destination": "/en/legal-notice.html"
       },
       {
         "source": "/en/privacy",

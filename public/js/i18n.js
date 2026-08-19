@@ -198,7 +198,7 @@ export function applyTranslations() {
  * (`?lang=`). Sie hat kein Gegenstück und braucht keins.
  */
 export const RECHTSSEITEN = Object.freeze({
-  "/impressum": "/en/imprint",
+  "/impressum": "/en/legal-notice",
   "/datenschutz": "/en/privacy",
   "/nutzungsbedingungen": "/en/terms",
   "/barrierefreiheit": "/en/accessibility",

@@ -6,7 +6,7 @@
  * ihre BESCHRIFTUNG, nicht ihr ZIEL. Auf Englisch stand dort „Privacy Policy",
  * der Klick landete trotzdem auf der deutschen Seite. Solange es die englischen
  * Rechtsseiten nicht gab, war das nur unschön; seit sie existieren
- * (/en/imprint, /en/privacy, /en/terms, /en/accessibility), ist es ein
+ * (/en/legal-notice, /en/privacy, /en/terms, /en/accessibility), ist es ein
  * falscher Verweis: Die Beschriftung verspricht etwas, das der Klick nicht
  * hält.
  *

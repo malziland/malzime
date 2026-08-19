@@ -19,6 +19,7 @@ import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
 import { initFehlerNachsendung, logClientError } from "./js/error-logger.js";
 import { initSprachumschalter, merkmalUebernehmen } from "./js/sprachumschalter.js";
+import { initBeastLockruf } from "./js/beast-lockruf.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
    Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
@@ -223,7 +224,15 @@ document.addEventListener("drop", (e) => e.preventDefault());
  * WAS SICH NICHT PRUEFEN LAESST: Ob der Browser das Zeichen daraufhin neu
  * zeichnet. Die Tab-Leiste ist Browser-Oberflaeche; Playwright fotografiert sie
  * nicht, und headless-Browser fordern Favicons gar nicht erst an. Automatisch
- * belegbar ist allein, WELCHE Verweise im Dokument stehen. */
+ * belegbar ist allein, WELCHE Verweise im Dokument stehen.
+ *
+ * SAFARI KANN DAS NICHT, und das ist keine Nachlaessigkeit, sondern eine Grenze
+ * des Browsers: Safari merkt sich das Zeichen pro Adresse und sieht die
+ * Verweise nach dem Laden kein zweites Mal an. Weder das Austauschen des
+ * Verweises noch eine Kennung am Ende der Adresse bewegt ihn dazu — beides ist
+ * hier gebaut, beides wirkt nur in Chromium und Firefox. Am 2026-08-19 vom
+ * Nutzer in Safari, Chrome und Brave gegengeprueft: Chrome und Brave tauschen,
+ * Safari nicht. NICHT erneut als Fehler aufnehmen. */
 let zeichenUrsprung = null;
 
 function tabZeichenSetzen(boost) {
@@ -295,6 +304,11 @@ applyModeTheme();
 
 /* Sticky-Umschalter aktivieren (Logik in js/sticky-toggle.js) */
 initStickyToggle();
+
+/* Beast-Lockruf anmelden — NACH dem Wiederherstellen der gemerkten Wahl,
+   sonst liest er einen Schalterzustand, den die Seite gleich noch aendert
+   (js/beast-lockruf.js). */
+initBeastLockruf();
 
 /* Realitäts-Check verdrahten (v3.1, js/realitaets-check.js) */
 realitaetsCheck.initRealitaetsCheck();

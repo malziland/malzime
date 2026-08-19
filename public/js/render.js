@@ -340,23 +340,59 @@ async function renderGpsMap(data) {
     const address = geocodePromise ? await geocodePromise : null;
     if (state.pendingGeocode === geocodePromise) state.pendingGeocode = null;
 
+    /* Der Ort steht als Zeile UEBER der Karte, nicht in einer Sprechblase.
+       Bis v3.8.1 oeffnete sich eine Leaflet-Sprechblase von selbst und verdeckte
+       die halbe Karte — auf dem Handy lief sie ueber den Rand hinaus und die
+       Zoom-Tasten schnitten den Text ab ("ur location" statt "Your location").
+       Schloss man sie, war die Adresse ganz weg. Als Zeile ist sie immer da,
+       kopierbar, im Ausdruck enthalten und fuer Screenreader normaler Text. */
+    const ortText = address ? escapeHtml(address) : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     elements.gpsMap.innerHTML = `
       <div class="map-wrapper">
         <h3>${t("gps.sectionTitle")}</h3>
+        <p class="gps-address">${ortText}</p>
         <div id="gpsMapLeaflet"></div>
+        <p class="gps-hinweis">${t("gps.zoomHint")}</p>
       </div>
     `;
 
-    state.gpsMapInstance = L.map("gpsMapLeaflet").setView([lat, lng], 15);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "&copy; OpenStreetMap",
-      referrerPolicy: "origin",
-    }).addTo(state.gpsMapInstance);
+    /* Die Karte darf das Scrollen der Seite nicht kapern.
+         Mausrad:  aus. Sonst zoomt die Karte, sobald der Zeiger beim Scrollen
+                   ueber sie faehrt — die Seite bleibt stehen.
+         Ziehen:   am Finger aus. Sonst faengt die 240 Bildpunkte hohe Karte
+                   den Finger, und die Seite scrollt nicht weiter. Zwei Finger
+                   bewegen und zoomen weiterhin (touchZoom bleibt an), die
+                   Tasten + und - ebenfalls. */
+    const amFinger = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    const karte = L.map("gpsMapLeaflet", {
+      scrollWheelZoom: false,
+      dragging: !amFinger,
+    }).setView([lat, lng], 15);
+    state.gpsMapInstance = karte;
 
-    const popupText = address
-      ? `<strong>${t("gps.popup")}</strong><br>${escapeHtml(address)}`
-      : `<strong>${t("gps.popup")}</strong><br>${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    L.marker([lat, lng]).addTo(state.gpsMapInstance).bindPopup(popupText).openPopup();
+    /* Quellenangabe: Die OSM-Lizenz verlangt eine Nennung MIT Verweis auf die
+       Lizenzseite. Bis v3.8.1 stand dort nur der unverlinkte Text
+       "© OpenStreetMap" — Nennung ja, Verweis nein. */
+    karte.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: t("gps.osmCredit"),
+      referrerPolicy: "origin",
+    }).addTo(karte);
+
+    /* Eigener Zeiger in Rost statt Leaflets Standard-Blau — das Blau gehoert
+       zu keiner Farbe dieser Seite. Als divIcon, damit keine weitere Bilddatei
+       geladen werden muss. */
+    const zeiger = L.divIcon({
+      className: "gps-zeiger",
+      html:
+        '<svg viewBox="0 0 24 32" width="28" height="37" aria-hidden="true">' +
+        '<path fill="#9c4e36" stroke="#fff" stroke-width="1.6" ' +
+        'd="M12 1.4c-4.9 0-8.9 3.9-8.9 8.7 0 6.3 7.9 20 8.3 20.6a.7.7 0 0 0 1.2 0c.4-.6 8.3-14.3 8.3-20.6 0-4.8-4-8.7-8.9-8.7Z"/>' +
+        '<circle cx="12" cy="10.1" r="3.3" fill="#fff"/></svg>',
+      iconSize: [28, 37],
+      iconAnchor: [14, 37],
+    });
+    L.marker([lat, lng], { icon: zeiger, title: t("gps.popup") }).addTo(karte);
   } catch (_err) {
     /* BUG-015: Leaflet-Fehler abfangen statt Unhandled Promise Rejection */
     elements.gpsMap.innerHTML = "";

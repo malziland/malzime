@@ -171,7 +171,7 @@ Legende: **erfüllt** = nachgewiesen · **n. a.** = nicht anwendbar, mit Grund �
 | 1.2.5 Audiodeskription (aufgezeichnet)                | keine Videobeiträge                                                                                                                                                                                      | **n. a.**                                 |
 | 1.3.4 Ausrichtung                                     | Sichtprüfung: keine Einschränkung auf Hoch- oder Querformat                                                                                                                                              | **erfüllt**                               |
 | 1.3.5 Eingabezweck bestimmen                          | Es gibt kein Formularfeld, das personenbezogene Daten erhebt                                                                                                                                             | **n. a.**                                 |
-| 1.4.3 Kontrast (Minimum)                              | axe (`color-contrast`), 70 Zustände je Browser, doppelt gemessen, drei Browser: **0 Verstöße**. Jede Abstention des Werkzeugs einzeln an den Bildpunkten aufgelöst                                                                                 | **erfüllt**                               |
+| 1.4.3 Kontrast (Minimum)                              | axe (`color-contrast`), 70 Zustände je Browser, doppelt gemessen, drei Browser. Jede Abstention des Werkzeugs einzeln an den Bildpunkten aufgelöst. **Nachgemessen am 19. August 2026, weil die Messung vom 17. den Profilinhalt gar nicht erfasst hatte: drei Verstöße gefunden und behoben (siehe Nachtrag in Abschnitt 6).** Seither erfüllt, mit einer Kontrolle, die eine stumme Messung rot meldet                                                                                 | **erfüllt**                               |
 | 1.4.4 Textgröße ändern                                | Eigene Messung: Wurzelschrift auf 200 % (16 → 32 px), alle fünf Seiten ohne waagrechtes Scrollen und ohne abgeschnittenen Inhalt                                                                         | **erfüllt**                               |
 | 1.4.5 Bilder von Text                                 | Kein Text als Bild, mit einer benannten Ausnahme: die KI-Kennzeichnung in den Demo-Fotos (siehe Abschnitt 6)                                                                                             | **erfüllt**                               |
 | 1.4.10 Reflow                                         | Eigene Messung bei 320 px: alle fünf Seiten genau 320 px, kein waagrechtes Scrollen. Zwei Mängel am Prüftag gefunden und behoben (siehe Abschnitt 6)                                                     | **erfüllt**                               |
@@ -210,6 +210,39 @@ Sie stehen hier, weil ein Protokoll, das nur Erfolge nennt, unglaubwürdig ist.
 | 4.1.3 Statusmeldungen                       | **Der Wartezustand wurde alle zwei Sekunden erneut angesagt.** Gemessen: 19 Ansagen in 30 Sekunden, bei voller Analyse rund 40 — fast immer derselbe Satz. Ursache: Der Text wurde bei jeder Statusabfrage neu geschrieben, auch unverändert; jede Zuweisung löst in einem `aria-live`-Bereich eine Ansage aus. Dazu die rotierenden Zier-Meldungen, die sich tatsächlich ändern                                                                                                                                                                                                                                  | Nur noch bei echter Änderung schreiben; Rotation stumm geschaltet. Gemessen: **19 → 3**                                  | ja           |
 | 1.4.3 Kontrast / 1.4.11 Nicht-Text-Kontrast | **Das Info-Zeichen neben den beiden Profil-Modi war auf 55 % Deckkraft gesetzt: 2,18:1 statt 4,5:1 für den Buchstaben und 3:1 für den Kreisrand.** Es ist ein Bedienelement (`role="button"`, mit der Tastatur erreichbar), keine Zierde. Beim Überfahren mit der Maus wurde es voll deckend — das zählt nicht: Das Kriterium gilt für den Zustand, in dem man das Element vorfindet, und wer mit Tastatur oder Finger arbeitet, fährt gar nicht darüber. **axe konnte den Fall nicht entscheiden und meldete ihn als „unprüfbar"** — gefunden hat ihn erst die Bildpunkt-Messung, die diese Abstentionen auflöst | Deckkraft im Ruhezustand entfernt, der Aufhell-Effekt läuft jetzt über die Farbe. Gemessen 5,22:1 hell und 7,85:1 dunkel | ja           |
 | 4.1.3 Statusmeldungen                       | **Nach „Analyse abgeschlossen" folgte nichts.** Der Fokus sprang auf einen Abschnitt ohne Rolle und ohne Namen — dort hat ein Screenreader nichts zu sagen                                                                                                                                                                                                                                                                                                                                                                                                                                                        | `role="region"` mit übersetztem Namen („Dein Profil")                                                                    | ja           |
+
+### Nachtrag 19. August 2026: Die Messung selbst war blind
+
+Am 19. August fiel beim Umbau der GPS-Karte auf, dass axe auf der Profil-Seite
+**den gesamten Profilinhalt nie gemessen hatte** — nicht als Verstoß, nicht als
+Abstention, sondern überhaupt nicht. Betroffen waren die Kategorie-Beschriftungen
+und -Werte, die Werbe-Schlagworte und die acht Werte der Datenwert-Skala.
+
+**Ursache, nachgewiesen:** Die Sprechblase der Karte öffnete sich von selbst.
+Nimmt man am Stand vom 17. August nur diesen einen Aufruf weg und ändert sonst
+nichts, misst axe den Bereich sofort und meldet die Verstöße. Eine überdeckende
+Fläche bringt die Kontrastregel dazu, den dahinterliegenden Bereich zu
+überspringen. Die Sprechblase hat damit genau die Fehler verdeckt, die sie hätte
+sichtbar machen sollen — und der Wächter meldete „grün", weil er nichts gesehen
+hatte.
+
+**Damit ist die Aussage „0 Verstöße" vom 17. August für 1.4.3 hinfällig.** Sie
+beruhte auf einer unvollständigen Messung. Was tatsächlich dort lag:
+
+| Kriterium                | Befund                                                                                     | Behebung                            | Dauerprüfung |
+| ------------------------ | ------------------------------------------------------------------------------------------ | ----------------------------------- | ------------ |
+| 1.4.3 Kontrast (Minimum) | Werte der Datenwert-Skala im Beast-Modus: **4,40 : 1** statt 4,5 : 1 (`#bfb542` auf `#394b3d`) | Schriftfarbe auf `#c2b84a`, 4,56 : 1 | ja           |
+| 1.4.3 Kontrast (Minimum) | Werbe-Schlagworte im Beast-Modus: **4,01 : 1** statt 4,5 : 1 (`#4698b9` auf `#1c343c`)         | Schriftfarbe auf `#57a2c0`, 4,57 : 1 | ja           |
+| 1.4.3 Kontrast (Minimum) | Fetter Hinweistext im Beast-Modus: **4,41 : 1** statt 4,5 : 1 (`#4698b9` auf `#172d34`)        | dieselbe Farbmarke, 4,59 : 1        | ja           |
+
+**Was daraus dauerhaft folgt:** Der Wächter fragt jetzt nicht mehr nur „gibt es
+Verstöße?", sondern zuerst „was hast du überhaupt angesehen?". Er nennt die
+Bereiche, die im Dokument stehen, sichtbar sind und Text tragen, und wird rot,
+wenn axe einen davon nicht angefasst hat. Gegenprobe erbracht: Gegen den Stand
+vom 17. August meldet er alle vier übersehenen Bereiche.
+
+Ein schweigender Wächter ist von einem, der Entwarnung gibt, nicht zu
+unterscheiden — es sei denn, man fragt ihn, was er gesehen hat.
 
 **Bewusste, benannte Abweichung zu 1.4.5 (Bilder von Text):** Die drei Demo-Fotos
 tragen die KI-Kennzeichnung in die Pixel gebrannt. Das ist seit August 2026 Pflicht

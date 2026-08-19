@@ -19,6 +19,7 @@ import * as realitaetsCheck from "./realitaets-check.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
 import { logTelemetry } from "./telemetry-logger.js";
+import { PROFIL_FERTIG } from "./beast-lockruf.js";
 import { generateTraceId } from "./client-context.js";
 
 const PAGE_LOADED_AT = Date.now();
@@ -562,6 +563,13 @@ async function renderQueueResult(data, myId, traceId, timings) {
       liveAnzeige.starteEnthuellung();
     } else {
       liveAnzeige.abbrechen();
+      /* OHNE Enthuellung steht das Profil hier schon vollstaendig da — dann
+         meldet es niemand sonst. Der Beast-Lockruf haengt sonst nur am Ende
+         der Enthuellung und bliebe in genau diesen Faellen stumm: Tier-Profil,
+         Merkmal aus, und vor allem die Wiederaufnahme nach einem Neuladen.
+         Die Wache gegen Fehlerfaelle sitzt im Empfaenger, der auf
+         `data-has-result` prueft (js/beast-lockruf.js). */
+      document.dispatchEvent(new CustomEvent(PROFIL_FERTIG));
     }
     setStatus("");
     /* Kein Sprung nach oben mitten in der Enthüllung — der Blick bleibt bei

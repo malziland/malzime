@@ -76,6 +76,7 @@ import { state } from "./state.js";
 import { t } from "./i18n.js";
 import { startScanAnim, stopScanAnim } from "./ui.js";
 import { tippTon, popTon } from "./klang.js";
+import { PROFIL_FERTIG } from "./beast-lockruf.js";
 
 /* Zeichenvorrat des Rausch-Schweifs — exakt der des Prototyps. */
 const RAUSCH_ZEICHEN = "01ｱｶｻﾀﾅﾊﾏﾔﾗ<>#/*+=~$%&";
@@ -791,6 +792,12 @@ function abschlussAnzeigen() {
   if (elements.exportPdf) elements.exportPdf.classList.remove("export-btn--hidden");
   /* A11y: die EINE Ankündigung am Ende — nie pro Zeichen, nie pro Box. */
   if (elements.srAnnounce) elements.srAnnounce.textContent = t("scan.srEnd");
+  /* „Es steht ein fertiges Profil da." Diese Funktion laeuft an genau zwei
+     Stellen — normales Enthuellungs-Ende und Abkuerzen —, im Fehler- und
+     Abbruchpfad NIE. Genau deshalb haengt der Beast-Lockruf hier und nicht an
+     fuehrungBeenden(), das auch bei Fehlern feuert. Den Fall OHNE Enthuellung
+     meldet js/api.js (js/beast-lockruf.js). */
+  document.dispatchEvent(new CustomEvent(PROFIL_FERTIG));
 }
 
 function abschluss(mein) {

@@ -4,24 +4,73 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [3.9.0] — 2026-08-19
+
+### Hinzugefügt
+
+- **Der Umschalter meldet sich einmal, wenn das Profil fertig ist.** Die Pille
+  hebt sich kurz an, während die Rille des Schalters von links dunkel volläuft
+  — zweimal, dann ist Ruhe. Wer die Seite ohne Begleitung ansieht, übersieht
+  den Beast-Modus sonst leicht; im Workshop sagt es die Trainerin oder der
+  Trainer, beim Weiterleiten sagt es niemand.
+
+  Der Hinweis kommt drei Sekunden nach dem fertigen Profil, nie während des
+  Aufbaus — der Vergleich beider Fassungen ist der didaktische Kern und
+  verträgt keine Ablenkung. Er kommt genau einmal, nie nach einem Fehler oder
+  Abbruch, und gar nicht, wenn der Schalter schon bedient wurde. Wer am Gerät
+  Animationen abgeschaltet hat, sieht statt der Bewegung ein ruhiges Auf- und
+  Abblenden. Nichts davon wird gespeichert.
+
+### Geändert
+
+- **Die Karte zeigt den Ort jetzt als Zeile über dem Kartenbild.** Bisher stand
+  er in einer Sprechblase, die sich von selbst öffnete und die halbe Karte
+  verdeckte — auf dem Handy lief sie über den Rand hinaus, und die Zoom-Tasten
+  schnitten ihren eigenen Text ab. Schloss man sie, war die Adresse ganz weg.
+  Als Zeile ist sie immer da, lässt sich markieren und kommt in den Ausdruck
+  mit.
+
+- **Die Karte kapert das Scrollen nicht mehr.** Am Rechner zoomte sie, sobald
+  der Mauszeiger beim Scrollen über sie fuhr — die Seite blieb stehen. Am Handy
+  fing sie den Finger, und man kam nicht weiter. Jetzt scrollt die Seite in
+  beiden Fällen normal weiter; gezoomt wird mit den Tasten + und −, am Handy
+  mit zwei Fingern. Ein Hinweis unter der Karte sagt das.
+
+- **Der Ortszeiger trägt die Farben der Seite.** Vorher war es Leaflets
+  Standard-Blau, das auf dieser Seite sonst nirgends vorkommt.
 
 ### Behoben
+
+- **Drei Textfarben im Beast-Modus waren zu blass.** Die Werte der
+  Datenwert-Skala, die Werbe-Schlagworte und der fette Hinweistext lagen knapp
+  unter dem geforderten Kontrast (4,40 · 4,01 · 4,41 statt 4,5 : 1). Jetzt
+  4,56 · 4,57 · 4,59 : 1.
+
+  Aufgefallen sind sie erst jetzt, weil die automatische Prüfung diesen Bereich
+  **nie gemessen** hatte: Die Sprechblase der Karte überdeckte etwas, woraufhin
+  das Prüfwerkzeug den ganzen Profilinhalt übersprang — und „keine Verstöße"
+  meldete, ohne hingesehen zu haben. Die Prüfung nennt jetzt zuerst, was sie
+  angesehen hat, und schlägt Alarm, wenn ein sichtbarer Bereich fehlt. Das
+  Prüfprotokoll ist entsprechend richtiggestellt.
+
+- **Die Quellenangabe der Karte verweist jetzt auf die Lizenzseite.** Dort
+  stand „© OpenStreetMap" als reiner Text. Die Lizenz verlangt die Nennung
+  **mit** Verweis; genannt war sie, verwiesen wurde nicht.
+
+- **Die Karte zeichnete über die oben klebende Umschalt-Leiste.** Betroffen
+  waren Leaflets eigene Bedienelemente — Zoomtasten und Quellenangabe —, die
+  aus dem Kartenrahmen ausbrachen und sich über die Leiste legten.
 
 - **Im Beast-Modus wurde das Zeichen im Browser-Tab doch nicht schwarz.** Die
   Seite bietet dem Browser drei Zeichen an — für ältere Browser, für moderne
-  und für Suchmaschinen. Der Browser sucht sich eines aus, und wir tauschten
-  nur eines davon: meist genau das, das er gar nicht anzeigte. Jetzt bleibt im
+  und für Suchmaschinen. Er sucht sich eines aus, und wir tauschten nur eines
+  davon: meist genau das, das er gar nicht anzeigte. Jetzt bleibt im
   Beast-Modus ein einziges übrig, danach ist der ursprüngliche Satz zurück.
 
-## [Unveröffentlicht]
-
-### Behoben
-
-- **Im Beast-Modus wurde das Zeichen im Browser-Tab doch nicht schwarz.** Die
-  Seite bietet dem Browser drei Zeichen an; er sucht sich eines aus, und wir
-  tauschten nur eines davon — meist genau das, das er gar nicht anzeigte. Jetzt
-  bleibt im Beast-Modus ein einziges übrig.
+  In **Safari** bleibt das Zeichen petrol, und daran lässt sich nichts ändern:
+  Safari merkt sich das Zeichen pro Adresse und sieht die Verweise nach dem
+  Laden kein zweites Mal an. Chrome, Brave, Edge und Firefox tauschen wie
+  gewünscht; in Safari bleibt der Beast-Modus auf der Seite selbst sichtbar.
 
 - **Die Sprachwahl-Rückfrage konnte sich in seltenen Fällen nicht mehr
   schließen.** Wurde sie im selben Sekundenbruchteil geöffnet und wieder

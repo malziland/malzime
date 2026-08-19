@@ -212,8 +212,28 @@ fi
 
 echo ""
 echo "Deploy-Ziel: $TARGET"
-echo "Weiter? (Enter = ja, Ctrl+C = abbrechen)"
-read -r
+
+# Rueckfrage NUR, wenn wirklich jemand davorsitzt.
+#
+# ANLASS 2026-08-19: Diese Zeile war ein blankes `read -r`. Bei einem Deploy im
+# Hintergrund (kein Terminal an der Eingabe) wartete das Skript darauf ewig —
+# stumm, ohne Fehler, ohne Zeitablauf. Von aussen war das nicht von "laeuft noch"
+# zu unterscheiden; die Auslieferung stand eine Dreiviertelstunde still, waehrend
+# das Protokoll lauter gruene Haken zeigte.
+#
+# Frueher fiel es nicht auf, weil die Rueckfrage erst ab dem Ziel
+# "hosting,functions" kommt — bei reinen Hosting-Deploys nie.
+#
+# `[ -t 0 ]` ist wahr, wenn die Standardeingabe an einem Terminal haengt. Damit
+# fragt das Skript einen Menschen weiterhin, kann aber im Hintergrund und in der
+# CI nicht mehr haengenbleiben. DEPLOY_JA=1 uebergeht die Rueckfrage auch am
+# Terminal.
+if [ -t 0 ] && [ -z "${DEPLOY_JA:-}" ]; then
+  echo "Weiter? (Enter = ja, Ctrl+C = abbrechen)"
+  read -r
+else
+  echo "Ohne Rueckfrage (kein Terminal an der Eingabe oder DEPLOY_JA gesetzt)."
+fi
 
 # Global installierte CLI bevorzugen. `npx firebase` scheitert, wenn firebase-tools
 # nicht im Projekt liegt: npm versucht dann einen Registry-Abruf und bricht mit

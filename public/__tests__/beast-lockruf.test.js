@@ -15,7 +15,7 @@ import { initBeastLockruf, _zuruecksetzen, PROFIL_FERTIG } from "../js/beast-loc
  */
 
 const WARTE_MS = 3000;
-const DAUER_MS = 4600;
+const DAUER_MS = 6600;
 
 function seiteBauen({ beastAn = false, ergebnis = true } = {}) {
   /* `data-has-result` setzt render.js, wenn das Profil vollstaendig steht —
@@ -143,6 +143,50 @@ describe("Beast-Lockruf", () => {
     vi.advanceTimersByTime(WARTE_MS);
     expect(laeuft()).toBe(false);
     expect(fuellung()).toBeNull();
+  });
+
+  it("wartet, bis die Pille im Bild ist — und geht dann los", () => {
+    /* ANLASS 2026-08-19: Der Hinweis lief stur drei Sekunden nach dem Profil
+       los, auch wenn die Pille weggescrollt war. Dann sah ihn niemand, und er
+       kam kein zweites Mal ("Zumindest konnte ich das nicht sehen").
+       jsdom kennt keinen IntersectionObserver — hier wird einer untergeschoben,
+       damit die Wache selbst geprueft wird und nicht der Notfall-Pfad. */
+    const beobachtet = [];
+    let melden;
+    globalThis.IntersectionObserver = class {
+      constructor(rueckruf) {
+        melden = rueckruf;
+      }
+      observe(el) {
+        beobachtet.push(el);
+      }
+      disconnect() {}
+    };
+    try {
+      initBeastLockruf();
+      fertigMelden();
+      vi.advanceTimersByTime(WARTE_MS);
+
+      /* Noch nichts — die Pille ist (aus Sicht der Wache) nicht im Bild. */
+      expect(laeuft()).toBe(false);
+      expect(beobachtet).toEqual([pille()]);
+
+      melden([{ isIntersecting: true }]);
+      expect(laeuft()).toBe(true);
+    } finally {
+      delete globalThis.IntersectionObserver;
+    }
+  });
+
+  it("ohne IntersectionObserver geht der Hinweis trotzdem los", () => {
+    /* Lieber sofort zeigen als gar nicht: Ein sehr alter Browser soll den
+       Hinweis bekommen, auch wenn wir die Sichtbarkeit dort nicht messen
+       koennen. */
+    expect(globalThis.IntersectionObserver).toBeUndefined();
+    initBeastLockruf();
+    fertigMelden();
+    vi.advanceTimersByTime(WARTE_MS);
+    expect(laeuft()).toBe(true);
   });
 
   it("mehrfaches Anmelden bleibt folgenlos", () => {

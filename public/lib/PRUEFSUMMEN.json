@@ -2,8 +2,8 @@
   "_hinweis": "Pruefsummen der selbst gehosteten Fremddateien (AUDIT-BEFUND OSS-2026-08-12-22). Ohne sie faellt eine Aenderung an minifiziertem Fremdcode niemandem auf — ausgerechnet exifr liest die GPS-Daten, deren Nichtweitergabe die Kernzusage ist. Geprueft von scripts/pruefe-fremddateien.mjs, im CI-Job 'pruefungen'.",
   "_erstellt": "2026-08-12",
   "_herkunft": {
-    "public/lib/leaflet": "npm leaflet@1.9.4, dist/ — leaflet.js ohne die sourceMappingURL-Zeile (siehe VERSION)",
-    "public/lib/exifr": "npm exifr@7.1.x, dist/lite.esm.mjs — per Pruefsumme auf 7.1.0-7.1.3 eingegrenzt",
+    "public/lib/leaflet": "npm leaflet@1.9.4, dist/ — leaflet.js ohne die sourceMappingURL-Zeile (siehe VERSION); LICENSE woertlich aus dem Leaflet-Repository (2026-08-19)",
+    "public/lib/exifr": "npm exifr@7.1.x, dist/lite.esm.mjs — per Pruefsumme auf 7.1.0-7.1.3 eingegrenzt; LICENSE woertlich aus dem exifr-Repository (2026-08-19)",
     "public/fonts/poppins": "Google-Fonts-Subset, kein kanonischer Veroeffentlichungspunkt mit stabiler Pruefsumme"
   },
   "dateien": {
@@ -16,8 +16,10 @@
     "public/fonts/poppins/poppins-500-latin.woff2": "sha256:289e0afc8be731a86822349e54557296f145926496bd2138db1bac0db77f77a2",
     "public/fonts/poppins/poppins-700-latin-ext.woff2": "sha256:2477683a4b1200680780a759cc1b93b816410362dc5f4c74ebfeafa212bcb74d",
     "public/fonts/poppins/poppins-700-latin.woff2": "sha256:197a3cbd7290c242c5c765268cdd69a9a39867fdc80cd13071f243a81c56fb76",
+    "public/lib/exifr/LICENSE": "sha256:e32a745bc4816c774d8e26bb9f04acde451b54669079e8b728d22fe9805c1225",
     "public/lib/exifr/VERSION": "sha256:dac806d27e1ea482e57e6968a3706161a1811181920373f60c5aba14ef3f37de",
     "public/lib/exifr/lite.esm.mjs": "sha256:9c18a09ddc50bb7f4171fa292e5593d6bf4b96857783b6e8e20cc6c0a53c73c1",
+    "public/lib/leaflet/LICENSE": "sha256:6cca66c5533df4495348243ab440b889831e1fd4bfc002a2845dd74da12c0b29",
     "public/lib/leaflet/VERSION": "sha256:28f44dc6460663419440ba8a52cf03a443a1876a58f8af8b379ec42f59f89f61",
     "public/lib/leaflet/images/layers-2x.png": "sha256:066daca850d8ffbef007af00b06eac0015728dee279c51f3cb6c716df7c42edf",
     "public/lib/leaflet/images/layers.png": "sha256:1dbbe9d028e292f36fcba8f8b3a28d5e8932754fc2215b9ac69e4cdecf5107c6",

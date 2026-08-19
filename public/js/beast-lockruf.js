@@ -29,6 +29,14 @@
  * Abbruch ausdruecklich wieder weg. Damit kann der Lockruf niemals auf ein
  * Ergebnis zeigen, das es nicht gibt.
  *
+ * WO. Erst, wenn die Pille tatsaechlich IM BILD ist — geklebt oder im
+ * Seitenfluss, das ist gleichgueltig. Bis v3.9.0 lief der Hinweis stur drei
+ * Sekunden nach dem Profil los, auch wenn die Pille zu dem Zeitpunkt
+ * weggescrollt war; er lief dann ins Leere und kam nie wieder. Der Nutzer am
+ * 2026-08-19: "Zumindest konnte ich das nicht sehen." Jetzt wartet der Lockruf
+ * mit einem IntersectionObserver, bis die Pille sichtbar wird, und geht dann
+ * los. Steht sie schon im Bild, faellt das Warten weg.
+ *
  * WANN NICHT. Wenn der Schalter in dieser Sitzung schon bedient wurde oder
  * beim Laden bereits auf Beast stand (gemerkte Wahl): Dann kennt die Person
  * ihn und braucht keinen Hinweis. Und nie zweimal.
@@ -44,14 +52,23 @@ export const PROFIL_FERTIG = "malzime:profil-fertig";
 /* Ruhe nach dem Aufbau, bevor der Lockruf kommt. */
 const VERZOEGERUNG_MS = 3000;
 
-/* 0,4 s Vorlauf + zwei Durchlaeufe a 2 s + Puffer. Muss zu den Werten in
-   styles.css passen (Abschnitt „Beast-Lockruf") — dort steht die Quelle. */
-const DAUER_MS = 4600;
+/* 0,4 s Vorlauf + DREI Durchlaeufe a 2 s + Puffer. Muss zu den Werten in
+   styles.css passen (Abschnitt „Beast-Lockruf") — dort steht die Quelle.
+   Zwei Durchlaeufe waren dem Nutzer zu wenig (2026-08-19). */
+const DAUER_MS = 6600;
 
 let zustand = null;
 
+function wacheAbbauen() {
+  if (zustand?.wache) {
+    zustand.wache.disconnect();
+    zustand.wache = null;
+  }
+}
+
 function abraeumen() {
   if (!zustand) return;
+  wacheAbbauen();
   clearTimeout(zustand.startUhr);
   clearTimeout(zustand.endUhr);
   zustand.startUhr = null;
@@ -84,6 +101,32 @@ function zeigen() {
 }
 
 /**
+ * Nach der Wartezeit: NICHT sofort losgehen, sondern warten, bis die Pille im
+ * Bild ist. Ein Hinweis, den niemand sieht, ist keiner — und er kommt kein
+ * zweites Mal.
+ */
+function scharfstellen() {
+  if (!zustand || zustand.gelaufen || zustand.benutzt) return;
+  /* Ohne IntersectionObserver (sehr alte Browser) lieber sofort zeigen als
+     gar nicht. */
+  if (typeof IntersectionObserver !== "function") {
+    zeigen();
+    return;
+  }
+  zustand.wache = new IntersectionObserver(
+    (eintraege) => {
+      if (!eintraege.some((e) => e.isIntersecting)) return;
+      wacheAbbauen();
+      zeigen();
+    },
+    /* Gut zur Haelfte sichtbar. Klebt die Pille oben, ist sie ganz im Bild und
+       der Beobachter meldet sofort. */
+    { threshold: 0.55 }
+  );
+  zustand.wache.observe(zustand.pille);
+}
+
+/**
  * Meldet den Lockruf an. Mehrfachaufruf ist ein No-Op.
  * Muss NACH dem Wiederherstellen der gemerkten Wahl laufen — sonst liest er
  * einen Schalterzustand, den die Seite gleich noch aendert.
@@ -105,6 +148,7 @@ export function initBeastLockruf() {
     startUhr: null,
     endUhr: null,
     fuellung: null,
+    wache: null,
   };
 
   schalter.addEventListener("change", () => {
@@ -119,7 +163,7 @@ export function initBeastLockruf() {
     if (!document.documentElement.hasAttribute("data-has-result")) return;
     zustand.startUhr = setTimeout(() => {
       if (zustand) zustand.startUhr = null;
-      zeigen();
+      scharfstellen();
     }, VERZOEGERUNG_MS);
   });
 }

@@ -88,8 +88,11 @@ function releaseWakeLock() {
    Ergebnis und im PDF. */
 export async function analyzeImage() {
   if (state.isAnalyzing) return;
-  /* Voriges Ergebnis ist ab jetzt ungueltig — der Umschalter darf waehrend der
-     neuen Analyse nicht mehr oben kleben (styles.css: html[data-has-result]). */
+  /* Voriges Ergebnis ist ab jetzt ungueltig. Das Kleben des Umschalters haengt
+     seit v3.9.0 NICHT mehr daran — er klebt immer. Das Merkmal sagt jetzt nur
+     noch, ob ein fertiges Profil dasteht: Daran haengt der Beast-Lockruf
+     (js/beast-lockruf.js), der nach einem Fehler nicht auf ein Ergebnis zeigen
+     darf, das es nicht gibt. */
   document.documentElement.removeAttribute("data-has-result");
   /* Sofort sichtbares Feedback, bevor irgendetwas ueber die Leitung geht.
      FIX 1 (v3.0.1): mit Text — Auge+Balken standen sonst bis zur ersten

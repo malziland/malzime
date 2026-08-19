@@ -69,13 +69,13 @@
       <div class="disclaimer disclaimer--flush">
         <p>
           <strong>malziME</strong> is a learning tool for media literacy and data protection awareness. The
-          <abbr title="Artificial Intelligence">AI</abbr> profiles are invented. They only show what algorithms might
+          <abbr title="Artificial Intelligence">AI</abbr> profiles are guesses. They only show what algorithms might
           claim &ndash; none of it is true, and none of it is proven.
         </p>
         <p>
           The AI deliberately also guesses sensitive attributes that it infers from appearance &ndash; apparent origin
           or skin tone, for example. That is exactly what malziME demonstrates: that algorithms make such assumptions at
-          all. These assessments are invented, frequently wrong, and are not stored.
+          all. These assessments are guesses, frequently wrong, and are not stored.
         </p>
         <p class="disclaimer__workshop">
           For workshops you can also use the AI-generated example photos provided, or older pictures. No uploaded image
@@ -145,24 +145,23 @@
           <li>
             <strong>Mistral AI analyses the photo.</strong> Our server sends the compressed image and the camera
             metadata to the French AI provider <strong>Mistral AI</strong> (registered office: Paris, EU). Mistral
-            analyses the image and creates two fictional profiles from it in a single call (modes &bdquo;normal&ldquo;
-            and &bdquo;Beast&ldquo;). For the exaggerated Beast variant a second call to the same AI follows, asking for
+            analyses the image and creates two guessed profiles from it in a single call (modes &bdquo;normal&ldquo; and
+            &bdquo;Beast&ldquo;). For the exaggerated Beast variant a second call to the same AI follows, asking for
             matching advertising categories &ndash; <strong>no image</strong> is sent with it, only the freshly
-            generated, entirely invented profile details &ndash; and for that we use the capable
-            <em>Mistral Large</em> model. We use Mistral's EU regional endpoint: under the contract, the image analysis
-            therefore runs in data centres in the EU or EFTA. For ancillary services Mistral may use temporary
-            sub-processors outside the EU, in which case with
-            <abbr title="General Data Protection Regulation">GDPR</abbr> safeguards under Art.&nbsp;46 (standard
-            contractual clauses). On the paid API tier we use, inputs and outputs are, according to the provider's
-            commitment, <strong>not used for training</strong>. In addition, <strong>Zero Data Retention</strong> is
-            activated for our organisation (confirmed by Mistral in writing on 11&nbsp;August&nbsp;2026): inputs and
-            outputs are not stored or logged for longer than generating the response technically requires. Mistral still
-            screens requests automatically for illegal content such as child abuse or violence. Mistral only knows the
-            data from the specific request &ndash; not your <abbr title="Internet Protocol">IP</abbr> address, and no
-            other user data. Facial recognition is not enabled. We last verified and documented these commitments
-            &ndash; EU endpoint, Zero Data Retention, no training &ndash; directly in the Mistral dashboard on
-            11&nbsp;August&nbsp;2026; we re-check them regularly, at least every six months and before major releases.
-            Further details on request.
+            generated, guessed profile details &ndash; and for that we use the capable <em>Mistral Large</em> model. We
+            use Mistral's EU regional endpoint: under the contract, the image analysis therefore runs in data centres in
+            the EU or EFTA. For ancillary services Mistral may use temporary sub-processors outside the EU, in which
+            case with <abbr title="General Data Protection Regulation">GDPR</abbr> safeguards under Art.&nbsp;46
+            (standard contractual clauses). On the paid API tier we use, inputs and outputs are, according to the
+            provider's commitment, <strong>not used for training</strong>. In addition,
+            <strong>Zero Data Retention</strong> is activated for our organisation (confirmed by Mistral in writing on
+            11&nbsp;August&nbsp;2026): inputs and outputs are not stored or logged for longer than generating the
+            response technically requires. Mistral still screens requests automatically for illegal content such as
+            child abuse or violence. Mistral only knows the data from the specific request &ndash; not your
+            <abbr title="Internet Protocol">IP</abbr> address, and no other user data. Facial recognition is not
+            enabled. We last verified and documented these commitments &ndash; EU endpoint, Zero Data Retention, no
+            training &ndash; directly in the Mistral dashboard on 11&nbsp;August&nbsp;2026; we re-check them regularly,
+            at least every six months and before major releases. Further details on request.
           </li>
           <li>
             <strong>After that, it is over.</strong> The finished profile arrives in your browser. So that your browser
@@ -538,7 +537,10 @@ sh scripts/pruefe-live.sh</code></pre>
 
     <footer class="site-footer">
       <div class="footer-inner">
-        <span class="footer-copy">&copy; 2026 malziME &bull; powered by malziland</span>
+        <span class="footer-copy">&copy; 2026 malziME &bull; powered by</span>
+        <a class="footer-marke" href="https://malziland.at" target="_blank" rel="noopener noreferrer" tabindex="0"
+          >malziland</a
+        >
         <span class="footer-sep" aria-hidden="true">&middot;</span>
         <a href="/?lang=en" tabindex="0">Home</a>
         <span class="footer-sep" aria-hidden="true">&middot;</span>

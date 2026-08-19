@@ -92,6 +92,31 @@ test.describe("GPS-Karte", () => {
     await expect(verweis).toHaveText(/OpenStreetMap/);
   });
 
+  test("beide Verweise in der Karte oeffnen einen neuen Tab", async ({ page }) => {
+    /* ANLASS 2026-08-19, vom Nutzer gefunden: "Der Link auf die
+       OpenStreetMap-Verlinkung oeffnet sich im selben Tab. Das muss ein neuer
+       Tab sein. Ich kann nicht meine eigene Seite ueberschreiben." Er hat
+       recht — ein Klick daneben haette das fertige Profil weggeworfen.
+       Betrifft BEIDE Verweise: die Quellenangabe und den Leaflet-Hinweis. */
+    await seiteMitKarte(page);
+
+    const verweise = page.locator(".leaflet-control-attribution a");
+    /* POSITIVKONTROLLE: Ohne Verweise waere jede Aussage darueber wertlos. */
+    await expect(verweise).toHaveCount(2);
+
+    const befund = await verweise.evaluateAll((els) =>
+      els.map((el) => ({
+        ziel: el.getAttribute("href"),
+        tab: el.getAttribute("target"),
+        schutz: el.getAttribute("rel"),
+      }))
+    );
+    for (const v of befund) {
+      expect(v.tab, `${v.ziel} oeffnet im selben Tab`).toBe("_blank");
+      expect(v.schutz || "", `${v.ziel} ohne noopener`).toContain("noopener");
+    }
+  });
+
   test("der Ortszeiger ist unserer, nicht Leaflets Standard-Blau", async ({ page }) => {
     await seiteMitKarte(page);
     await expect(page.locator(".gps-zeiger svg")).toHaveCount(1);

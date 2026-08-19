@@ -170,6 +170,18 @@ test.describe("Kopfbereich", () => {
     const beast = await zeichen();
     expect(beast.adresse, "das Tab-Zeichen wechselt im Beast-Modus nicht").toBe("/favicon-beast.svg");
 
+    /* UND es darf kein zweites geben. BEFUND 2026-08-19: Die Seite nennt DREI
+       Zeichen (ico, svg, 192-px-png). Der Browser sucht sich EINES aus und
+       bevorzugt oft das .ico. Solange nur der SVG-Verweis getauscht wurde,
+       tauschten wir etwas, das gar nicht angezeigt wird — beim Nutzer blieb der
+       Tab unveraendert, in Safari wie in Brave. Im echten Chrome nachgemessen:
+       Erst als genau ein Verweis uebrig blieb, holte der Browser
+       favicon-beast.svg tatsaechlich (HTTP 200 im Netzwerk-Mitschnitt). */
+    const alleImBeast = await page
+      .locator("link[rel='icon']")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+    expect(alleImBeast, "im Beast-Modus darf nur EIN Zeichen angeboten werden").toHaveLength(1);
+
     /* Und es muss WIRKLICH dunkel sein — nicht nur eine andere Datei. Die erste
        Fassung war ein HELLER Kasten (die Vorlagen-Fassung für dunkle
        Tab-Leisten); auf einer hellen Leiste blieb der Tab dadurch hell, und der
@@ -184,6 +196,10 @@ test.describe("Kopfbereich", () => {
 
     await page.locator("#biasSwitch").click({ force: true });
     expect((await zeichen()).adresse, "kehrt nach dem Zurückschalten nicht zurück").toBe("/favicon.svg");
+    const alleZurueck = await page
+      .locator("link[rel='icon']")
+      .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+    expect(alleZurueck.length, "der urspruengliche Satz wird nicht wiederhergestellt").toBeGreaterThan(1);
   });
 
   test("beide Zeichen haben dieselbe Form — nur andere Farben", () => {

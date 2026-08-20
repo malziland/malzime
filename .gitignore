@@ -73,3 +73,7 @@ docs/audit/
 
 # Messdaten des Barrierefreiheits-Protokolls (werden bei jedem Lauf neu erzeugt)
 e2e/.protokoll/
+
+# Python-Bytecode der Pruefungen (entsteht bei jedem Lauf)
+__pycache__/
+*.pyc

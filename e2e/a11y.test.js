@@ -136,16 +136,79 @@ async function checkA11y(page, kontext) {
       for (const n of v.nodes) angefasst.add(n.target.join(" "));
     }
   }
-  const gesehen = (auswahl) => [...angefasst].some((z) => z.includes(auswahl));
-  const erwartet = await page.evaluate(() =>
-    /* Nur Elemente, die selbst TEXT tragen — fuer Behaelter ohne eigenen Text
-       ist die Kontrastregel gar nicht zustaendig. `.cat-card` stand hier zuerst
-       und war deshalb ein Fehlalarm der Kontrolle selbst. */
-    [".dv-scale-value", ".tag", ".cat-label", ".cat-value", ".gps-address"].filter(
-      (auswahl) => document.querySelectorAll(auswahl).length > 0
-    )
+  /* TEST-2026-08-20-13: Hier stand eine feste Liste von fuenf Klassen — der
+     Stand vom 19.08., nicht die Seite. Ein umbenannter oder neu hinzugekommener
+     Bereich waere davon nie erfasst worden, und der blinde Fleck von damals
+     ("gruen gemeldet, ohne hingesehen zu haben", drei echte Kontrastfehler
+     dahinter) haette in identischer Form zurueckkehren koennen.
+     Jetzt bestimmt der Waechter seine Sollmenge aus der FLAECHE: jedes sichtbare
+     Element mit eigenem Text. Verglichen wird ueber die Elemente selbst, nicht
+     ueber Klassennamen — axe rechnet den Text eines Kindes haeufig dem
+     Elternknoten zu, und ein Namensvergleich meldete dann Bereiche als
+     uebersehen, die sehr wohl gemessen wurden (vier Fehlalarme auf der
+     Startseite). Ein Element gilt als gemessen, wenn axe es selbst oder einen
+     seiner Vorfahren angefasst hat.
+     Nur Elemente, die selbst TEXT tragen — fuer Behaelter ohne eigenen Text ist
+     die Kontrastregel gar nicht zustaendig (`.cat-card` stand frueher in der
+     Liste und war deshalb ein Fehlalarm der Kontrolle selbst). */
+  const erwartet = await page.evaluate(
+    (axeZiele) => {
+      const gemessen = axeZiele
+        .map((ziel) => {
+          try {
+            return document.querySelector(ziel);
+          } catch (_fehler) {
+            return null;
+          }
+        })
+        .filter(Boolean);
+      const wurdeGemessen = (el) => gemessen.some((g) => g === el || g.contains(el));
+      const kennung = (el) =>
+        el.classList.length ? "." + [...el.classList].join(".") : el.tagName.toLowerCase() + (el.id ? "#" + el.id : "");
+
+      const sammle = (wurzel) => {
+        const uebersehen = new Set();
+        let betrachtet = 0;
+        for (const el of wurzel.querySelectorAll("*")) {
+          /* Dekoratives ist fuer Screenreader und Kontrastregel unsichtbar. */
+          if (el.closest('[aria-hidden="true"]')) continue;
+          /* WCAG 1.4.3 nimmt deaktivierte Bedienelemente ausdruecklich von der
+           Kontrastanforderung aus ("inactive user interface components"), und axe
+           misst sie deshalb zu Recht nicht. Ohne diese Ausnahme meldete die
+           Kontrolle den deaktivierten Absende-Knopf des Realitaets-Checks als
+           uebersehenen Bereich — ein Fehlalarm der Kontrolle selbst. */
+          if (el.disabled || el.closest("[disabled]") || el.closest('[aria-disabled="true"]')) continue;
+          const eigenerText = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 0);
+          if (!eigenerText) continue;
+          const kasten = el.getBoundingClientRect();
+          if (kasten.width < 1 || kasten.height < 1) continue;
+          const stil = getComputedStyle(el);
+          if (stil.display === "none" || stil.visibility === "hidden" || Number(stil.opacity) === 0) continue;
+          /* Der Sprunglink liegt bis zum Fokus ausserhalb des Bildes; axe misst
+           ihn dort zu Recht nicht. */
+          if (kasten.bottom < 0 || kasten.right < 0) continue;
+          betrachtet += 1;
+          if (!wurdeGemessen(el)) uebersehen.add(kennung(el));
+        }
+        return { uebersehen: [...uebersehen], betrachtet };
+      };
+      /* Vor der ersten Analyse ist der Ergebnisbereich leer — dann gilt die ganze
+       Seite als Flaeche. So deckt die Kontrolle auch die Startseite ab, statt
+       dort mangels Inhalt stillschweigend nichts zu pruefen. */
+      const panel = document.getElementById("resultsPanel");
+      const ausPanel = panel ? sammle(panel) : { uebersehen: [], betrachtet: 0 };
+      return ausPanel.betrachtet > 0 ? ausPanel : sammle(document.body);
+    },
+    [...angefasst]
   );
-  const uebersehen = erwartet.filter((auswahl) => !gesehen(auswahl));
+  /* Positivkontrolle gegen die eigene Messung: Findet der Waechter ueberhaupt
+     keinen sichtbaren Text, misst er nichts — und "keine Uebersehenen" waere
+     dann keine Entwarnung, sondern ein leeres Blatt. */
+  expect(
+    erwartet.betrachtet,
+    `auf ${kontext} wurde kein sichtbarer Text gefunden — die Abdeckungskontrolle haette nichts zu pruefen`
+  ).toBeGreaterThan(0);
+  const uebersehen = erwartet.uebersehen;
   expect(
     uebersehen,
     `axe hat diese sichtbaren Bereiche auf ${kontext} gar nicht gemessen — "keine Verstoesse" heisst hier "nicht geprueft"`

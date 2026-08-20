@@ -212,12 +212,52 @@ describe("Reaper als Waechter der Wochen-Erinnerung", () => {
     spy.mockRestore();
   });
 
-  test("noch nie gelaufen -> keine Meldung (vor dem ersten Montag normal)", async () => {
+  /* TEST-2026-08-20-01: Die beiden folgenden Tests stellen die Uhr selbst, statt sich
+     auf die echte zu verlassen. Vorher prüfte nur der Schweige-Fall, und zwar mit
+     `Date.now()` gegen das feste Auslieferungsdatum im Produktivcode — ab dem
+     Stichtag (Auslieferung + neun Tage) wäre er bei JEDEM Lauf rot geworden und
+     hätte die ganze Prüfkette blockiert. Die Regel dazu steht in
+     handle-erinnerung.test.js: Tests dürfen nicht von der Uhr abhängen. */
+  const mitUhr = async (zeitpunkt, pruefung) => {
+    jest.useFakeTimers({ doNotFake: ["nextTick"] });
+    jest.setSystemTime(new Date(zeitpunkt));
+    try {
+      await pruefung();
+    } finally {
+      jest.useRealTimers();
+    }
+  };
+
+  test("noch nie gelaufen, innerhalb der Gnadenfrist -> keine Meldung", async () => {
     leer();
     mockLebenszeichenGet.mockResolvedValue({ exists: false, data: () => null });
     const spy = jest.spyOn(console, "error").mockImplementation(() => {});
-    await reapJobs();
-    expect(spy).not.toHaveBeenCalled();
+
+    /* Zwei Tage nach der Auslieferung: der erste Montag stand noch aus. */
+    await mitUhr("2026-08-14T00:00:00Z", async () => {
+      await reapJobs();
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    spy.mockRestore();
+  });
+
+  test("noch nie gelaufen, Gnadenfrist abgelaufen -> laute Meldung erinnerung-nie-gelaufen", async () => {
+    leer();
+    mockLebenszeichenGet.mockResolvedValue({ exists: false, data: () => null });
+    const spy = jest.spyOn(console, "error").mockImplementation(() => {});
+
+    /* Zwei Wochen nach der Auslieferung: zwei Montage sind verstrichen, das
+       Ausbleiben des allerersten Lebenszeichens ist selbst der Befund. */
+    await mitUhr("2026-08-26T00:00:00Z", async () => {
+      await reapJobs();
+      const zeilen = spy.mock.calls.map((c) => JSON.parse(c[0]));
+      const meldung = zeilen.find((z) => z.error === "erinnerung-nie-gelaufen");
+      expect(meldung).toBeDefined();
+      expect(meldung.severity).toBe("ERROR");
+      expect(meldung.ausgeliefert).toBe("2026-08-12T00:00:00.000Z");
+    });
+
     spy.mockRestore();
   });
 });

@@ -1191,19 +1191,27 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
        Diese Datei richtet sonst nicht, sie misst — hier aber schon: Eine
        falsche Zahl in einem Prüfbericht ist kein Messergebnis, sondern ein
        Fehler in der Unterlage. */
+    /* TEST-2026-08-20-11: Die englische Erklärung fehlte hier — ausgerechnet die
+       Fassung, auf die sich Dritte berufen. Sie nennt dieselbe Zahl in eigener
+       Formulierung ("70 states"), war aber von keinem Wächter gedeckt. */
     const UNTERLAGEN = [
       "docs/barrierefreiheit/PRUEFBERICHT-WCAG-EM.md",
       "docs/barrierefreiheit/PRUEFPROTOKOLL.md",
       "public/barrierefreiheit.html",
+      "public/en/accessibility.html",
     ];
+    /* Beide Sprachen. Der Wächter zählt seine Treffer, siehe Positivkontrolle. */
+    const ZAHLWORT = /(\d+)\s*(?:Zust(?:ä|&auml;|ae)nde|states)\b/g;
     const falsch = [];
     let gelesen = 0;
+    let treffer = 0;
     for (const rel of UNTERLAGEN) {
       const pfad = join(process.cwd(), rel);
       if (!existsSync(pfad)) continue;
       const text = readFileSync(pfad, "utf8");
       gelesen++;
-      for (const m of text.matchAll(/(\d+)\s*Zust(?:ä|&auml;|ae)nde/g)) {
+      for (const m of text.matchAll(ZAHLWORT)) {
+        treffer++;
         if (Number(m[1]) !== befunde.length) {
           falsch.push({ datei: rel, genannt: Number(m[1]), gemessen: befunde.length });
         }
@@ -1212,6 +1220,16 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
     /* POSITIVKONTROLLE: Wurde keine Unterlage gelesen, prüft der Wächter
        nichts und wäre still grün. */
     expect(gelesen, "keine Unterlage gefunden — der Drift-Wächter ist blind").toBeGreaterThan(0);
+    /* TEST-2026-08-20-11, zweite Positivkontrolle: Bisher genügte es, dass die
+       DATEIEN da waren. Ändert jemand die Formulierung ("70 geprüfte Zustände"
+       → "70 Prüfschritte"), findet das Muster nichts mehr — und ein Wächter
+       ohne Treffer meldet grün, ohne verglichen zu haben. Genau diese
+       Fehlerklasse (öffentliche Zahl driftet unbemerkt) war der Anlass, ihn zu
+       bauen. Erwartet wird mindestens ein Treffer je Unterlage. */
+    expect(
+      treffer,
+      `der Zahlen-Wächter fand in ${gelesen} Unterlagen keine einzige Zustandszahl — Muster oder Formulierung stimmen nicht mehr überein`
+    ).toBeGreaterThanOrEqual(gelesen);
     expect(falsch, `Doku nennt eine andere Zahl von Zuständen als gemessen: ${JSON.stringify(falsch)}`).toEqual([]);
 
     /* ── Und dasselbe für das Prüfdatum ────────────────────────────────────
@@ -1225,22 +1243,67 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
        Warum hier und nicht im Fakten-Drift-Wächter: Der liest ausschließlich
        Markdown und Text. Ein Muster für HTML wäre dort still nie angesprungen
        und hätte Sicherheit vorgetäuscht — nachgemessen, nicht vermutet. */
+    /* TEST-2026-08-20-12: Die Muster fingen Tag und Jahr, den Monat liessen sie
+       unkapturiert (`\w+`). Bei Tag-Gleichheit in verschiedenen Monaten — also
+       bei jeder Aktualisierung am selben Kalendertag — haette der Waechter genau
+       den Fehler wieder durchgelassen, gegen den er gebaut wurde. Ausserdem
+       fehlten zwei englische Datumsstellen (Fusszeile "English version" /
+       "German original"). */
     const DATUM_STELLEN = [
-      ["public/barrierefreiheit.html", /zuletzt gepr&uuml;ft am (\d{1,2})\.&nbsp;\w+&nbsp;(\d{4})/],
-      ["public/barrierefreiheit.html", /nicht behauptet &middot; Stand: (\d{1,2})\. \w+ (\d{4})/],
-      ["public/en/accessibility.html", /last reviewed on (\d{1,2})&nbsp;\w+&nbsp;(\d{4})/],
+      ["public/barrierefreiheit.html", /zuletzt gepr&uuml;ft am (\d{1,2})\.&nbsp;(\w+)&nbsp;(\d{4})/],
+      ["public/barrierefreiheit.html", /nicht behauptet &middot; Stand: (\d{1,2})\. (\w+) (\d{4})/],
+      ["public/en/accessibility.html", /last reviewed on (\d{1,2})&nbsp;(\w+)&nbsp;(\d{4})/],
+      ["public/en/accessibility.html", /English version: (\d{1,2}) (\w+) (\d{4})/],
+      ["public/en/accessibility.html", /German original: (\d{1,2}) (\w+) (\d{4})/],
       [
         "docs/barrierefreiheit/PRUEFBERICHT-WCAG-EM.md",
-        /\*\*Prüfdatum\*\*\s*\|\s*\d{1,2}\.–(\d{1,2})\.\s*\w+\s*(\d{4})/,
+        /\*\*Prüfdatum\*\*\s*\|\s*\d{1,2}\.–(\d{1,2})\.\s*(\w+)\s*(\d{4})/,
       ],
     ];
+    /* Deutsche und englische Monatsnamen bezeichnen denselben Monat verschieden
+       ("Dezember"/"December"). Ohne Normalisierung meldete der Waechter zwischen
+       den Sprachfassungen einen Widerspruch, den es nicht gibt. */
+    const MONATE = {
+      januar: 1,
+      january: 1,
+      februar: 2,
+      february: 2,
+      märz: 3,
+      maerz: 3,
+      march: 3,
+      april: 4,
+      mai: 5,
+      may: 5,
+      juni: 6,
+      june: 6,
+      juli: 7,
+      july: 7,
+      august: 8,
+      september: 9,
+      oktober: 10,
+      october: 10,
+      november: 11,
+      dezember: 12,
+      december: 12,
+    };
+    const monatsNummer = (name) => MONATE[String(name).toLowerCase()] ?? null;
     const daten = [];
     for (const [rel, muster] of DATUM_STELLEN) {
       const pfad = join(process.cwd(), rel);
       if (!existsSync(pfad)) continue;
       const treffer = readFileSync(pfad, "utf8").match(muster);
-      daten.push({ datei: rel, datum: treffer ? `${treffer[1]}.${treffer[2]}` : null });
+      const monat = treffer ? monatsNummer(treffer[2]) : null;
+      daten.push({
+        datei: rel,
+        datum: treffer && monat ? `${treffer[1]}.${monat}.${treffer[3]}` : null,
+        monatsname: treffer ? treffer[2] : null,
+      });
     }
+    /* Ein unbekannter Monatsname ist ein Messproblem, kein Gleichstand. */
+    expect(
+      daten.filter((d) => d.monatsname && d.datum === null).map((d) => `${d.datei}: ${d.monatsname}`),
+      "Monatsname nicht erkannt — die Tabelle in diesem Wächter ist unvollständig"
+    ).toEqual([]);
 
     /* POSITIVKONTROLLE: Jede Stelle MUSS treffen. Ein Muster, das ins Leere
        läuft, meldet „kein Widerspruch" und ist damit von einem gesunden

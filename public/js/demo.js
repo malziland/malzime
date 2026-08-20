@@ -84,6 +84,9 @@ async function loadDemoImage(url, name) {
        Animation stoppen, Fehler protokollieren. */
     stopScanAnim(true);
     setStatus(t("error.networkError"), undefined, "error.networkError");
-    logClientError(err, { phase: "demo-image-load", demo: name });
+    /* BUG-2026-08-20-02 (Nachlauf): `demo` steht nicht auf der Feldliste des
+       Loggers und waere stillschweigend verlorengegangen — welches Beispielbild
+       es traf, gehoert aber genau zur Diagnose. Darum in `errorDetail`. */
+    logClientError(err, { phase: "demo-image-load", errorDetail: `demo=${name}`.slice(0, 60) });
   }
 }

@@ -63,6 +63,7 @@ lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/ch
 lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/pruefungen/checks/test-blind.py .
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
+lauf "Pruefungen: Zeitzuender" "pruefungen" sh scripts/pruefe-zeitzuender.sh .
 
 DAUER=$(($(date +%s) - START))
 echo "-----------------------------------------------------------"

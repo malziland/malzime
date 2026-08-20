@@ -223,3 +223,17 @@ jobs:
       # niemand sehen; der Lauf sagt das ausdruecklich dazu, statt es zu
       # verschweigen.
       - run: node scripts/pruefe-vendorierung.mjs
+
+      # TEST-2026-08-20-01: Ein Test verglich die ECHTE Uhr mit einem festen Datum
+      # im Produktivcode. Er war gruen — bis zu einem berechenbaren Tag, ab dem er
+      # bei jedem Lauf rot geworden waere und als Pflicht-Check jede Auslieferung
+      # blockiert haette, ohne dass jemand etwas geaendert hat.
+      #
+      # Die Pruefung misst die WIRKUNG statt der Struktur: Sie sucht Tests zu Code
+      # mit festem Zeitpunkt und laesst genau diese mit vorgestellter Uhr laufen.
+      # Eine rein strukturelle Fassung hatte sofort einen Fehlalarm erzeugt (ein
+      # Test, der die zeitabhaengige Funktion gar nicht aufruft) — und ein Riegel,
+      # der aus dem falschen Grund rot ist, wird nach zwei Wochen ignoriert.
+      # Vor jeder Messung beweist sie an eigenem Beispielmaterial, dass sie rot
+      # werden kann. Exit 2 (Messproblem) gilt nie als bestanden.
+      - run: sh scripts/pruefe-zeitzuender.sh .

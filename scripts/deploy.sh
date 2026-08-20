@@ -44,13 +44,29 @@ else
     echo "        Erst mergen/pullen, dann deployen. Notschalter: SKIP_STAND=1" >&2
     exit 1
   fi
-  if command -v gh >/dev/null 2>&1; then
+  if ! command -v gh >/dev/null 2>&1; then
+    # OPS-2026-08-20-12: Hier stand eine WARNUNG, und der Deploy lief weiter — der
+    # CI-Freigabe-Riegel fiel damit still aus, genau wenn das Werkzeug fehlt.
+    # Ungeprüft gilt als nicht bestanden.
+    echo "FEHLER: gh nicht verfügbar — die CI-Freigabe ist nicht prüfbar." >&2
+    echo "        Installieren (brew install gh) oder bewusst überspringen: SKIP_STAND=1" >&2
+    exit 1
+  fi
+  if true; then
     SHA=$(git rev-parse HEAD)
     # Die sechs Pflicht-Checks müssen für DIESEN Commit success sein. Fehlt ein
     # Ergebnis (Lauf noch nicht durch), ist das kein Freibrief — dann Abbruch.
     PFLICHT="test-backend test-frontend test-e2e secret-scan playwright-version pruefungen"
+    # OPS-2026-08-20-03: Je Check-Namen zählt NUR der jüngste Lauf. Vorher wurde die
+    # gesamte Liste durchsucht, und ein einziges altes "success" genügte. Derselbe
+    # Commit trägt aber mehrere Läufe, sobald der wöchentliche Zeitplan ihn erneut
+    # prüft (am 2026-08-17 real geschehen: b3908c3 trug jeden Pflicht-Check doppelt).
+    # Wird der Zeitplan-Lauf rot — etwa weil eine Ausnahme im Abhängigkeits-Gate
+    # abläuft oder eine neue Lücke gemeldet wird, beides ohne jede Code-Änderung —,
+    # meldete die Bindung weiterhin "alle sechs grün".
     LAGE=$(gh api "repos/malziland/malzime/commits/$SHA/check-runs" \
-      --jq '.check_runs[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+      --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
+            | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
     if [ -z "$LAGE" ]; then
       echo "FEHLER: CI-Ergebnis für $SHA nicht abrufbar — Abbruch statt Deploy auf Verdacht." >&2
       echo "        Notschalter: SKIP_STAND=1" >&2
@@ -63,9 +79,7 @@ else
         exit 1
       fi
     done
-    echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA."
-  else
-    echo "WARNUNG: gh nicht verfügbar — CI-Freigabe nicht prüfbar, nur sauberer Baum + HEAD==origin/main geprüft."
+    echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA (jüngster Lauf je Check)."
   fi
 fi
 

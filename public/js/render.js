@@ -337,8 +337,20 @@ async function renderGpsMap(data) {
     /* BUG-002: Lokale Referenz — verhindert dass ein neueres Geocoding-Promise
        ueberschrieben wird wenn zwischen await und Cleanup eine neue Analyse startet */
     const geocodePromise = state.pendingGeocode;
-    const address = geocodePromise ? await geocodePromise : null;
+    let address = geocodePromise ? await geocodePromise : null;
     if (state.pendingGeocode === geocodePromise) state.pendingGeocode = null;
+
+    /* BUG-2026-08-20-06: Beim zweiten Aufbau derselben Analyse (Moduswechsel,
+       Ausdruck) ist `pendingGeocode` bereits verbraucht. Ohne Gedaechtnis stuenden
+       dort ab dann nur noch Koordinaten — die Adresse war weg, auch im Ausdruck.
+       Der Cache haengt an den Koordinaten: Er greift nur, wenn es dieselbe
+       Aufnahme ist. */
+    const passtZuCache = state.geocodeCache && state.geocodeCache.lat === lat && state.geocodeCache.lng === lng;
+    if (address) {
+      state.geocodeCache = { lat, lng, address };
+    } else if (passtZuCache) {
+      address = state.geocodeCache.address;
+    }
 
     /* Der Ort steht als Zeile UEBER der Karte, nicht in einer Sprechblase.
        Bis v3.8.1 oeffnete sich eine Leaflet-Sprechblase von selbst und verdeckte

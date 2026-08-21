@@ -3,6 +3,14 @@ export const state = {
   isAnalyzing: false,
   currentAbortController: null,
   pendingGeocode: null,
+  /* BUG-2026-08-20-06: Die aufgeloeste Adresse wird hier behalten, damit die
+     Ortszeile der Karte einen zweiten Aufbau ueberlebt (Moduswechsel, Ausdruck).
+     Vorher konsumierte der erste Aufbau `pendingGeocode` und setzte es auf null —
+     ab dem ersten Umschalten standen nur noch Koordinaten da.
+     An die Koordinaten GEBUNDEN, nicht frei stehend: So kann die Adresse des
+     vorigen Fotos nicht am naechsten kleben, auch wenn irgendwo das
+     Zuruecksetzen vergessen wird. */
+  geocodeCache: null, // { lat, lng, address }
   geocodeAbortController: null,
   lastPrepared: null,
   lastFile: null,

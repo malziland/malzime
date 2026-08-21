@@ -13,9 +13,9 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 
 | Anforderung | Nachweisweg | Letztes Ergebnis |
 |---|---|---|
-| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 857/857 grün — `scripts/pruefstand.sh`, Commit d0e245f, 2026-08-19 |
-| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 461/461 grün — `scripts/pruefstand.sh`, Commit d0e245f, 2026-08-19 |
-| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 261/261 grün — `scripts/pruefstand.sh`, Commit d0e245f, 2026-08-19 |
+| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 879/879 grün — `scripts/pruefstand.sh`, Commit bedb08e, 2026-08-21 |
+| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 472/472 grün — `scripts/pruefstand.sh`, Commit bedb08e, 2026-08-21 |
+| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 279/279 grün — `scripts/pruefstand.sh`, Commit bedb08e, 2026-08-21 |
 | Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — 2026-08-10 |
 | Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29562535095, 2026-07-17 |
 | Dependency-Audit | CI-Job `test-backend`: `node ../scripts/audit-gate.mjs functions .` (aus `functions/` heraus) — **beide** Abhängigkeitsbäume (Gate, bricht Build; High/Critical blockieren, Ausnahmen nur begründet **und mit Ablaufdatum** in `.github/audit-allowlist.json`) | ✅ **0 Meldungen, Ausnahmeliste leer** — `npm audit` in beiden Projekten 0, auch inklusive Entwicklungswerkzeuge (vorher 27). Stand 2026-07-29 |

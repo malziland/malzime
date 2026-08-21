@@ -39,17 +39,24 @@
       <a class="wortmarke seiten-wortmarke" href="/" tabindex="0">malzi<span class="wortmarke-me">ME</span></a>
       <span class="page-eyebrow"><span data-i18n="stats.eyebrow">Statistik</span></span>
 
-      <!-- Error (hidden by default) -->
-      <div class="stats-error" id="statsError">
-        <p data-i18n="stats.errorText">Stats konnten nicht geladen werden. Bitte sp&auml;ter nochmal versuchen.</p>
-      </div>
-
       <!-- Hero -->
       <div class="stats-hero">
         <h1 class="stats-hero__title" data-i18n="stats.heroTitle">malziME in Zahlen</h1>
         <p class="stats-hero__sub" data-i18n="stats.heroSub">
           Anonyme Nutzungsstatistik &mdash; keine personenbezogenen Daten, keine Cookies, kein Tracking.
         </p>
+      </div>
+
+      <!-- BUG-2026-08-21-03: Der Fehlerhinweis stand ZWISCHEN Augenbraue und
+           Ueberschrift und war nur mit `display: none` versteckt. Sobald er
+           erschien — also genau dann, wenn die Zahlen nicht luden —, schob er die
+           Ueberschrift um 21 Bildpunkte nach unten: derselbe Sprung, den v3.8.1
+           schon einmal behoben hat, nur diesmal an einen Fehlerfall gekoppelt.
+           Wer die Seite bei einer Stoerung oeffnete, sah den Kopfbereich
+           springen. Jetzt steht der Hinweis UNTER der Ueberschrift, wo er nichts
+           verschiebt. -->
+      <div class="stats-error" id="statsError">
+        <p data-i18n="stats.errorText">Stats konnten nicht geladen werden. Bitte sp&auml;ter nochmal versuchen.</p>
       </div>
 
       <!-- Live Status -->

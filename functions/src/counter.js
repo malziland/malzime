@@ -56,13 +56,18 @@ async function checkAndIncrement() {
         const snap = await tx.get(ref);
         const data = snap.exists ? snap.data() : {};
 
-        const limit = data.limit || HOURLY_LIMIT;
         const wm = data.windowMinutes || HOURLY_WINDOW_MINUTES;
         const windowMs = wm * 60 * 1000;
         const now = Date.now();
 
         /* Rollendes Fenster: nur Analysen der letzten Stunde */
         const recent = filterRecent(data.recentAnalyses, now, windowMs);
+
+        /* BIZ-2026-08-20-28: Ein abgelaufener Boost faellt hier zurueck — aber nur,
+           wenn er gerade nicht gebraucht wird (siehe wirksamesLimit). Der
+           Rueckfall wird gleich mitgeschrieben, damit /stats und der naechste
+           Aufruf dasselbe sehen. */
+        const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length);
 
         /* Limit erreicht → blockieren */
         if (recent.length >= limit) {
@@ -81,7 +86,24 @@ async function checkAndIncrement() {
         const justReached = recent.length === limit;
 
         if (snap.exists) {
-          tx.update(ref, { recentAnalyses: recent });
+          /* BIZ-2026-08-20-28: Ist der Boost verfallen, wird der Deckel in
+             derselben Transaktion zurueckgeschrieben — sonst wuerde er bei jedem
+             Aufruf neu "verfallen", ohne je im Dokument anzukommen, und /stats
+             zeigte weiter den erhoehten Wert. */
+          const aenderung = boostVerfallen
+            ? { recentAnalyses: recent, limit: HOURLY_LIMIT, limitBis: null }
+            : { recentAnalyses: recent };
+          if (boostVerfallen) {
+            console.log(
+              JSON.stringify({
+                step: "boost-verfallen",
+                zurueckAuf: HOURLY_LIMIT,
+                imFenster: recent.length,
+                hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
+              })
+            );
+          }
+          tx.update(ref, aenderung);
         } else {
           tx.set(ref, {
             recentAnalyses: recent,
@@ -247,12 +269,14 @@ async function getStats() {
       : { limit: HOURLY_LIMIT, windowMinutes: HOURLY_WINDOW_MINUTES };
     const totals = totalsSnap.exists ? totalsSnap.data() : { today: 0, week: 0, month: 0, year: 0, allTime: 0 };
 
-    const currentLimit = current.limit || HOURLY_LIMIT;
     const wm = current.windowMinutes || HOURLY_WINDOW_MINUTES;
     const windowMs = wm * 60 * 1000;
     const now = Date.now();
 
     const recent = filterRecent(current.recentAnalyses, now, windowMs);
+    /* BIZ-2026-08-20-28: Dieselbe Quelle wie der Einlass — sonst zeigte /stats
+       einen Deckel an, den der naechste Upload gar nicht mehr bekommt. */
+    const { limit: currentLimit } = wirksamesLimit(current, recent.length);
     const recentCount = recent.length;
     const limitActive = recentCount >= currentLimit;
     const retryAfterSeconds = limitActive ? calcRetrySeconds(recent, currentLimit, now, windowMs) : 0;
@@ -297,6 +321,45 @@ async function getStats() {
    mehr), zu wenig fuer eine Kostenlawine. */
 const BOOST_OBERGRENZE = 2 * HOURLY_LIMIT;
 
+/* BIZ-2026-08-20-28 (Entscheidung E2 aus dem Audit, 2026-08-21): Ein Boost hob den
+   Deckel DAUERHAFT an. Es gab keinen Rückfall auf das reguläre Stundenlimit, keinen
+   Zeitplan, der ihn zurücksetzt, und keinen Alarm, wenn er wochenlang stehen blieb —
+   die dokumentierte zentrale Kostenbremse ("Stundenlimit 500/h") war nach einem
+   einzigen Klick still verdoppelt. Zurück ging es nur über einen manuellen Reset,
+   an den sich jemand erinnern musste.
+
+   BEWUSST SANFT gebaut, weil hier der Workshop-Betrieb hängt: Der Boost verfällt
+   NICHT hart nach Ablauf der Frist. Er verfällt, sobald er nicht mehr gebraucht
+   wird — also erst, wenn die Frist um ist UND der rollende Zähler wieder unter dem
+   regulären Limit liegt. So kann niemand mitten in einer laufenden Klasse
+   ausgesperrt werden; der Deckel normalisiert sich von selbst in der ersten
+   ruhigen Minute danach. */
+const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;
+
+/**
+ * Das heute gültige Stundenlimit. EINE Quelle für alle Lesestellen — vorher
+ * stand `data.limit || HOURLY_LIMIT` an drei Stellen, die getrennt hätten
+ * abdriften können.
+ *
+ * @param {object|null} daten Dokument `stats/current`.
+ * @param {number} anzahlImFenster Analysen im rollenden Fenster.
+ * @returns {{limit:number, verfallen:boolean}} verfallen=true → der Boost ist
+ *   abgelaufen und darf zurückgeschrieben werden.
+ */
+function wirksamesLimit(daten, anzahlImFenster = 0) {
+  const gesetzt = Number((daten && daten.limit) || HOURLY_LIMIT);
+  if (gesetzt <= HOURLY_LIMIT) return { limit: HOURLY_LIMIT, verfallen: false };
+  const bis = Number((daten && daten.limitBis) || 0);
+  /* Ohne Ablaufdatum stammt der Boost aus der Zeit vor diesem Fix — dann gilt er
+     weiter, bis ihn ein neuer Boost oder ein Reset ablöst. Bestehendes still zu
+     entwerten wäre die schlechtere Überraschung. */
+  if (!bis) return { limit: gesetzt, verfallen: false };
+  const abgelaufen = Date.now() > bis;
+  const wirdNichtGebraucht = anzahlImFenster < HOURLY_LIMIT;
+  if (abgelaufen && wirdNichtGebraucht) return { limit: HOURLY_LIMIT, verfallen: true };
+  return { limit: gesetzt, verfallen: false };
+}
+
 async function boostLimit(amount = 100) {
   const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
@@ -319,8 +382,9 @@ async function boostLimit(amount = 100) {
       if (gewuenscht > BOOST_OBERGRENZE) {
         return { limit: aktuell, aktuell, gewuenscht, abgelehnt: true, grund: "obergrenze" };
       }
-      tx.set(ref, { limit: gewuenscht }, { merge: true });
-      return { limit: gewuenscht, abgelehnt: false };
+      /* BIZ-2026-08-20-28: mit Ablaufdatum statt fuer immer. */
+      tx.set(ref, { limit: gewuenscht, limitBis: Date.now() + BOOST_FRIST_MS }, { merge: true });
+      return { limit: gewuenscht, abgelehnt: false, gueltigBis: Date.now() + BOOST_FRIST_MS };
     });
   } catch (err) {
     console.error(
@@ -356,7 +420,7 @@ async function boostLimit(amount = 100) {
 async function resetCounter() {
   const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
-  await ref.set({ recentAnalyses: [], limit: HOURLY_LIMIT }, { merge: true });
+  await ref.set({ recentAnalyses: [], limit: HOURLY_LIMIT, limitBis: null }, { merge: true });
 }
 
 /**

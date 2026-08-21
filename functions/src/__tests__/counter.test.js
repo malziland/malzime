@@ -616,14 +616,24 @@ describe("boostLimit", () => {
   test("hebt das Limit auf den absoluten Zielwert (Start + amount)", async () => {
     const txSet = transaktionMit(500);
     const ergebnis = await boostLimit(200);
-    expect(txSet).toHaveBeenCalledWith(expect.anything(), { limit: 700 }, { merge: true });
+    /* BIZ-2026-08-20-28: Der Boost traegt jetzt ein Ablaufdatum — er hebt den
+       Deckel nicht mehr fuer immer an. */
+    expect(txSet).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ limit: 700, limitBis: expect.any(Number) }),
+      { merge: true }
+    );
     expect(ergebnis).toEqual({ limit: 700, abgelehnt: false });
   });
 
   test("defaults to 100 when no amount given", async () => {
     const txSet = transaktionMit(500);
     const ergebnis = await boostLimit();
-    expect(txSet).toHaveBeenCalledWith(expect.anything(), { limit: 600 }, { merge: true });
+    expect(txSet).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ limit: 600, limitBis: expect.any(Number) }),
+      { merge: true }
+    );
     expect(ergebnis.limit).toBe(600);
   });
 
@@ -663,7 +673,8 @@ describe("boostLimit", () => {
 describe("resetCounter", () => {
   test("clears recentAnalyses and resets limit", async () => {
     await resetCounter();
-    expect(mockSet).toHaveBeenCalledWith({ recentAnalyses: [], limit: 500 }, { merge: true });
+    /* Der Reset raeumt auch die Boost-Frist ab. */
+    expect(mockSet).toHaveBeenCalledWith({ recentAnalyses: [], limit: 500, limitBis: null }, { merge: true });
   });
 });
 

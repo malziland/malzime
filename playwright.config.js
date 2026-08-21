@@ -8,10 +8,14 @@ export default defineConfig({
      nacheinander — rund zehn Minuten je Lauf, und die Kette faehrt zweimal je
      Auslieferung. Am 2026-08-21 hat das an einem Tag ueber eine Stunde reine
      Wartezeit gekostet.
-     Vier Arbeiter, nicht mehr: Der Test-Webserver liefert die Seiten aus, und
-     die Laeufe teilen sich einen Port. Mehr Gleichzeitigkeit macht ihn zum
-     Engpass — genau daher kamen die "Broken pipe"-Aussetzer im Protokoll. */
-  workers: process.env.CI ? 4 : undefined,
+     ZWEI Arbeiter, nicht mehr. Vier waren am 21.08. ausprobiert und gemessen:
+     Der Lauf war zwar schnell (6,0 statt 10,5 Minuten), aber der schwerste Test
+     (axe ueber vier Sprach-/Themen-Kombinationen in WebKit) riss dabei die
+     30-Sekunden-Grenze. Der Pipeline-Rechner hat vier Kerne; vier gleichzeitige
+     Browser lassen dem einzelnen Test zu wenig davon uebrig. Ein Pruefstand, der
+     unter eigener Last kippt, ist wertlos — lieber etwas langsamer und
+     verlaesslich. */
+  workers: process.env.CI ? 2 : undefined,
   use: {
     baseURL: "http://localhost:8081",
     headless: true,

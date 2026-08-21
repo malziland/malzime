@@ -4,19 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
-
-> **Was hiervon live ist, Stand 2026-08-21:** Die Rechtstexte und die
-> Doku-Korrekturen sind ausgeliefert (Hosting-Deploy, Cache-Kennung
-> `2026082101`). Die Code-Fixes darunter — Karte, Sprachwahl, Boost,
-> Wochenzähler, Fehlerpfade — sind gebaut und geprüft, aber **noch nicht
-> ausgeliefert**; sie gehen mit dem nächsten Deploy live.
->
-> Alles steht bewusst weiter unter „Unveröffentlicht": Die Sanierung des TIEF-Audits vom 20.08. wird als
-> **Version 4.0.0** ausgeliefert, und die Nummer wird erst vergeben, wenn alle
-> Befunde behoben und ausdrücklich freigegeben sind. Bis dahin darf hier keine
-> Versionsnummer stehen — `release.yml` legte sonst sofort einen GitHub-Release
-> an. Nicht „korrigieren".
+## [4.0.0] — 2026-08-21
 
 Ein Lang-Audit hat das Projekt in der Nacht auf den 21. August durchleuchtet:
 14 Prüfer entlang getrennter Fragen, jeder Verdacht danach von einem eigenen
@@ -43,6 +31,17 @@ Aussagen, die nicht mehr zum Code passten.
   Verkleinern wurde der Zeichenspeicher nicht freigegeben — dieselbe Ursache,
   die im August schon einmal das zweite Bild scheitern ließ, nur in einem
   selteneren Zweig.
+
+- **Die Überschrift der Zahlen-Seite sprang, wenn die Zahlen nicht luden.** Der
+  Fehlerhinweis stand über der Überschrift und schob sie nach unten, sobald er
+  erschien — ausgerechnet bei einer Störung wackelte also der Seitenkopf. Er
+  steht jetzt darunter, wo er nichts verschiebt.
+
+- **Die Tastatur fand nach der Sprachwahl-Rückfrage nicht immer zurück.** Wer
+  die Rückfrage mit der Tastatur schloss, sollte auf dem auslösenden Knopf
+  landen. Auf langsamen Geräten kam die Markierung dort manchmal nicht an und
+  die Bedienung begann wieder von vorn. Sie wird jetzt so lange nachgeführt,
+  bis sie sitzt.
 
 ### Behoben — was in den Rechtstexten stand
 

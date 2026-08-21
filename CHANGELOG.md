@@ -8,6 +8,14 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Behoben
 
+- **Die Tastatur-Rückgabe nach der Sprachwahl griff zu kurz.** Der Fix vom
+  20. August fasste achtmal nach, gemessen in Bildschirmrahmen — das sind rund
+  130 Millisekunden. Auf langsamen Geräten reicht das nicht, und die Markierung
+  blieb liegen. Jetzt zählt eine Frist statt Bildrahmen: bis zu zwei Sekunden,
+  und sofort Schluss, sobald sie sitzt.
+
+### Behoben
+
 - **Der Hinweis „Kurze Pause" zeigte eine veraltete Fassung.** Erscheint das
   Stundenlimit, stand dort noch der alte, härtere Text („Stundenlimit erreicht.
   Zu viele Analysen in kurzer Zeit") statt der überarbeiteten Fassung, die

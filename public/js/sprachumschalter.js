@@ -403,13 +403,23 @@ function modalSchliessen() {
        der aus dem falschen Grund rot wird, wird irgendwann ignoriert — und ein
        Fokus, der ins Leere fällt, trifft genau die Menschen, die auf die
        Tastatur angewiesen sind. Beides spricht für dieselbe Abhilfe: nicht
-       einmal wünschen, sondern nachsehen und wiederholen, bis es sitzt. */
-    const VERSUCHE = 8;
-    let versuch = 0;
+       einmal wünschen, sondern nachsehen und wiederholen, bis es sitzt.
+
+       TEST-2026-08-21-09: Der erste Anlauf zählte ACHT Bildrahmen — das sind bei
+       60 Hz rund 130 Millisekunden, danach gab er auf. Genau daran ist er am
+       21.08. erneut gescheitert: WebKit brauchte unter Last länger, der Fokus kam
+       nie an, und die Prüfung wartete zu Recht vergeblich. Eine Zahl von Rahmen
+       ist das falsche Maß, weil sie nichts darüber sagt, wie viel ZEIT vergeht.
+       Jetzt begrenzt eine Frist: bis zu zwei Sekunden lang nachfassen. Das ist
+       für einen Menschen nicht wahrnehmbar und für die langsamste Engine
+       reichlich. Sobald der Fokus sitzt, hört es sofort auf — es kostet also
+       nichts, wenn es wie üblich beim ersten Versuch klappt. */
+    const FRIST_MS = 2000;
+    const beginn = Date.now();
     const nachfassen = () => {
-      versuch += 1;
       zurueckgeben();
-      if (versuch < VERSUCHE && !offen && ziel.isConnected && document.activeElement !== ziel) {
+      const nochNichtDa = !offen && ziel.isConnected && document.activeElement !== ziel;
+      if (nochNichtDa && Date.now() - beginn < FRIST_MS) {
         requestAnimationFrame(nachfassen);
       }
     };

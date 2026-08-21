@@ -36,7 +36,8 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **No tracking**: No cookies, no analytics, no advertising
 - **GPS never reaches our servers**: Coordinates are read in the browser and used there for the map. Reverse geocoding goes directly from the browser to OpenStreetMap Nominatim — the coordinates leave the browser, but never touch malziME infrastructure
 - **Content Security Policy**: Strict whitelist (self + OpenStreetMap tiles + Nominatim)
-- **HSTS with preload**
+- **HSTS** — enforced for two years including subdomains; the `preload` directive is sent,
+  but the site is deliberately **not** on the browser preload list (see `docs/SECURITY-MODEL.md`)
 - **Rate limiting**: Per-IP request limits
 - **Prompt injection protection**: user data isolated in XML tags (3-call path); the active single-large prompt states explicitly that text visible in the image is content, never an instruction
 - **Input validation**: File type, size, and format checks

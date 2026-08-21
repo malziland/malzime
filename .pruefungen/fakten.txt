@@ -9,7 +9,10 @@
 # denselben Fakt und melden Widersprueche, die keine sind.
 #
 # Nicht aufgenommen und warum:
-#   Testanzahl — steht bewusst nirgends fest, der CI-Lauf ist der Beleg.
+#   Testanzahl — kanonisch ist docs/VERIFICATION.md, dort stempelt sie
+#   scripts/pruefstand.sh. Andere Dateien verweisen darauf, statt sie zu nennen;
+#   AGENTS.md und docs/SETUP.md trugen bis 2026-08-21 veraltete Werte
+#   (DOC-2026-08-20-10).
 #   "N Tage"   — bezeichnet im Projekt mehrere verschiedene Fristen.
 #   Version    — steht im CHANGELOG naturgemaess vielfach; Historiendateien
 #                werden ohnehin uebersprungen.

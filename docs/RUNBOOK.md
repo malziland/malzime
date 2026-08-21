@@ -27,8 +27,10 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    `cd functions && npm test && npm run lint && npm run format:check` sowie
    `npm run test:frontend && npm run lint:frontend && npm run format:frontend:check`
    (E2E: `npm run test:e2e`).
-2. Änderung per Branch + PR auf `main`; die CI-Pflicht-Checks (test-backend,
-   test-frontend, test-e2e, secret-scan) sind Merge-Voraussetzung.
+2. Änderung per Branch + PR auf `main`; die **sechs** CI-Pflicht-Checks
+   (test-backend, test-frontend, test-e2e, secret-scan, playwright-version,
+   pruefungen) sind Merge-Voraussetzung. Kanonisch ist die Branch Protection,
+   siehe Abschnitt weiter unten (DOC-2026-08-20-13: hier standen vier).
 3. CHANGELOG: Sobald deployt wird, ist das ein Release — den
    `[Unveröffentlicht]`-Abschnitt im selben Schritt auf neue Versionsnummer und
    Datum stempeln.
@@ -38,7 +40,10 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    in `deploy.sh` hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`; eine
    nicht ermittelbare Version bricht ab, statt durchzuwinken —
    `OPS-2026-08-12-25`) und zählt dann den Cache-Buster in allen
-   fünf HTML-Seiten automatisch hoch (Konvention `?v=YYYYMMDDNN`: gleicher Tag
+   ausgelieferten Seiten automatisch hoch — welche das sind, fragt das Skript
+   beim Dateisystem ab, es führt keine eigene Liste (DOC-2026-08-20-13: hier
+   stand „fünf HTML-Seiten", real sind es seit den englischen Rechtsseiten zehn
+   plus `js/demo.js`) (Konvention `?v=YYYYMMDDNN`: gleicher Tag
    → laufende Nummer +1, sonst neuer Tag mit `01`; nur bei Hosting-Deploys
    relevant, reine Functions-Deploys brauchen keinen).
 5. `release.yml` legt automatisch einen GitHub-Release an, sobald die neue
@@ -411,9 +416,16 @@ existierte bis 2026-08-10 nicht — siehe den Vorfall weiter unten.
 | A | `@` | `199.36.158.100` | Firebase Hosting (malzi.me). **Ohne diesen Eintrag ist die Seite offline.** |
 | MX | `@` | `mx00.ionos.de`, `mx01.ionos.de` (Prio 10) | E-Mail-Empfang |
 | TXT | `@` | `v=spf1 include:_spf-eu.ionos.com ~all` | SPF, sonst landen ausgehende Mails im Spam |
+| CNAME | `www` | `malzime.web.app.` | leitet www.malzi.me auf malzi.me um (301) |
 
 Weitere Einträge gibt es nicht und soll es nicht geben. Insbesondere **kein
 `api`** mehr (siehe unten).
+
+> **DOC-2026-08-20-18:** Der `www`-Eintrag fehlte dieser Tabelle, obwohl sie sich
+> ausdrücklich als „einzige schriftliche Quelle" bezeichnet — genau das
+> Wiederherstellungs-Szenario vom 2026-08-10 hätte ihn mit verloren. Gemessen am
+> 2026-08-21: `dig +short www.malzi.me CNAME @ns1091.ui-dns.de` → `malzime.web.app.`,
+> und Firebase führt `www.malzi.me` als eigene Domain (HOST_ACTIVE, CERT_ACTIVE).
 
 Prüfbefehl (fragt IONOS direkt, umgeht alle Zwischenspeicher):
 
@@ -463,15 +475,10 @@ ausschließlich der Wegweiser bei IONOS.
 Der CSP-Eintrag ist seit v2.11.0 draußen, eine echte Analyse auf malzi.me lief
 danach normal durch — damit ist belegt, dass nichts mehr daran hing.
 
-**Rest:** In Cloud Run steht die Zuordnung `api.malzi.me → analyze` noch (der
-Dienst `analyze` existiert seit v2.10 nicht mehr). Ohne DNS zeigt nichts mehr
-darauf; das ist eine Karteileiche, kein Risiko. Aufräumen:
-
-```bash
-curl -X DELETE -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-     -H "x-goog-user-project: malzime" \
-  "https://europe-west1-run.googleapis.com/apis/domains.cloudrun.com/v1/namespaces/malzime/domainmappings/api.malzi.me"
-```
+**Rest: erledigt.** Die Cloud-Run-Zuordnung `api.malzi.me → analyze` ist inzwischen
+geräumt — gemessen am 2026-08-21 über die Domain-Mappings-Schnittstelle: keine
+Einträge mehr (DOC-2026-08-20-35; hier stand sie noch als vorhanden, samt
+Aufräum-Befehl).
 
 **Reihenfolge war und bleibt wichtig: erst DNS, dann die Zuordnung.**
 Andersherum entstünde ein Zeitfenster, in dem der DNS-Eintrag auf Googles

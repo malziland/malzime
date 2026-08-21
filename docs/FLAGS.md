@@ -12,8 +12,19 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 | Flag | Typ | Soll live | Fail-safe | Owner |
 |---|---|---|---|---|
 | `useSingleLargeCall` | Architektur-Schalter (Kill-Switch-Funktion) | `true` | `false` | Christoph Krieger |
-| `usePromptCache` | Kostenschalter | offen (siehe unten) | `false` | Christoph Krieger |
-| `useSprachumschalter` | Sichtbarkeit eines Bedienelements | `false` (Stand 2026-08-13) | `false` | Christoph Krieger |
+| `usePromptCache` | Kostenschalter | `true` | `false` | Christoph Krieger |
+| `useLiveText` | Anzeige-Schalter (Live-Text waehrend der Analyse) | `true` | `false` | Christoph Krieger |
+| `useBeastAdsCall` | Zweiter, kleiner Mistral-Aufruf fuer die Beast-Werbung | `true` | `true` | Christoph Krieger |
+| `useSprachumschalter` | Sichtbarkeit eines Bedienelements | `true` (seit v3.3.0 live) | `false` | Christoph Krieger |
+
+> **Stand 2026-08-21 (DOC-2026-08-20-09).** Die Spalte „Soll live" trug zuvor fuer
+> `useSprachumschalter` noch `false` — den Stand von der Vorbereitung am 13.08., obwohl
+> derselbe Text weiter unten den Umschalter seit v3.3.0 als live beschreibt. `useLiveText`
+> und `useBeastAdsCall` fehlten ganz, obwohl `feature-flags.js` sie liest. Ein Register,
+> das den Live-Zustand falsch angibt, ist als Wiederherstellungs-Quelle unbrauchbar: Wer
+> nach einem Zwischenfall „auf Soll" zuruecksetzt, schaltet damit Funktionen ab.
+> Der Live-Zustand ist an der Quelle gemessen (Firestore `featureFlags/current`), nicht
+> aus dem Code geschlossen.
 
 ### `useQueue` — ENTFERNT mit v2.10
 

@@ -21,11 +21,11 @@
       content="malziME speichert keine Profile und keine Nutzerdaten dauerhaft. Hochgeladene Fotos werden nur kurz verarbeitet und sofort wieder gel&ouml;scht."
     />
     <meta property="og:url" content="https://malzi.me/datenschutz" />
-    <link rel="icon" href="./favicon.ico?v=2026082001" sizes="32x32 16x16" />
-    <link rel="icon" href="./favicon.svg?v=2026082001" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=2026082001" />
-    <link rel="manifest" href="./site.webmanifest?v=2026082001" />
-    <link rel="stylesheet" href="./styles.css?v=2026082001" />
+    <link rel="icon" href="./favicon.ico?v=2026082101" sizes="32x32 16x16" />
+    <link rel="icon" href="./favicon.svg?v=2026082101" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=2026082101" />
+    <link rel="manifest" href="./site.webmanifest?v=2026082101" />
+    <link rel="stylesheet" href="./styles.css?v=2026082101" />
   </head>
   <body>
     <a href="#main" class="skip-link" tabindex="0">Zum Inhalt springen</a>
@@ -56,7 +56,7 @@
       </div>
       <span class="page-eyebrow">Rechtliches</span>
       <h1>Datenschutz</h1>
-      <p class="legal-subtitle">Verst&auml;ndlich erkl&auml;rt &middot; Stand: 13. August 2026</p>
+      <p class="legal-subtitle">Verst&auml;ndlich erkl&auml;rt &middot; Stand: 21. August 2026</p>
       <div class="page-rule"></div>
       <div class="disclaimer disclaimer--flush">
         <p>
@@ -116,12 +116,12 @@
         <ol class="legal-list">
           <li>
             <strong>Dein Browser macht den ersten Schritt.</strong> Noch bevor irgendetwas an einen Server geht,
-            verkleinert dein Browser das Foto auf max.&nbsp;1280&nbsp;Pixel und komprimiert es als JPEG. Der Dateiname?
-            Wird nicht &uuml;bermittelt. <abbr title="Global Positioning System">GPS</abbr>-Koordinaten und
-            Aufnahmedatum? Erreichen nie unsere Server &ndash; dein Browser liest sie aus, und mit dem neu komprimierten
-            Foto werden sie gar nicht erst mitgeschickt. Falls GPS vorhanden ist, fragt dein Browser direkt bei
-            OpenStreetMap nach der Adresse und Karte &ndash; ohne Umweg &uuml;ber uns. Unser Server bekommt davon nichts
-            mit.
+            verkleinert dein Browser das Foto auf max.&nbsp;1280&nbsp;Pixel und komprimiert es &ndash; in aller Regel
+            als JPEG, auf manchen Ger&auml;ten als PNG. Der Dateiname? Wird nicht &uuml;bermittelt.
+            <abbr title="Global Positioning System">GPS</abbr>-Koordinaten und Aufnahmedatum? Erreichen nie unsere
+            Server &ndash; dein Browser liest sie aus, und mit dem neu komprimierten Foto werden sie gar nicht erst
+            mitgeschickt. Falls GPS vorhanden ist, fragt dein Browser direkt bei OpenStreetMap nach der Adresse und
+            Karte &ndash; ohne Umweg &uuml;ber uns. Unser Server bekommt davon nichts mit.
           </li>
           <li>
             <strong>An unseren Server geht wenig.</strong> Nur das komprimierte Bild und zwei Kamera-Infos: Hersteller
@@ -183,12 +183,13 @@
               verkn&uuml;pft.
             </li>
             <li>
-              <strong>Kein Originalfoto</strong> &ndash; der Server bekommt nur eine verkleinerte JPEG-Version
-              (max.&nbsp;1280&nbsp;px). Dein hochaufl&ouml;sendes Original bleibt bei dir.
+              <strong>Kein Originalfoto</strong> &ndash; der Server bekommt nur eine verkleinerte, neu berechnete
+              Fassung (max.&nbsp;1280&nbsp;px). Dein hochaufl&ouml;sendes Original bleibt bei dir.
             </li>
             <li>
               <strong>Kein Dateiname</strong> &ndash; ob dein Foto &bdquo;selfie_am_strand.jpg&ldquo; hei&szlig;t,
-              erfahren wir nicht. Es wird immer als &bdquo;upload.jpg&ldquo; geschickt.
+              erfahren wir nicht. Mitgeschickt wird ein neu vergebener Name ohne Bezug zu deiner Datei
+              (&bdquo;upload.jpg&ldquo;, je nach Format auch &bdquo;upload.png&ldquo;).
             </li>
             <li>
               <strong>Keine GPS-Daten auf dem Server</strong> &ndash; GPS-Koordinaten werden im Browser ausgelesen und
@@ -531,6 +532,6 @@ sh scripts/pruefe-live.sh</code></pre>
         <a href="/stats" tabindex="0">Stats</a>
       </div>
     </footer>
-    <script type="module" src="./js/echtheit-pruefen.js?v=2026082001"></script>
+    <script type="module" src="./js/echtheit-pruefen.js?v=2026082101"></script>
   </body>
 </html>

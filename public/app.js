@@ -86,9 +86,11 @@ state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
   .catch(() => {})
   .finally(() => clearTimeout(statsTimer));
 
-/* v3.3: Sprachumschalter anmelden — bedingungslos, damit die Konsolen-Tuer
-   `malziME.sprachumschalter()` auch dann offensteht, wenn /api/stats nicht
-   antwortet. Gebaut wird erst auf Zuruf (Merkmals-Schloss oder Konsole). */
+/* v3.3: Sprachumschalter anmelden — bedingungslos, damit er auch dann entsteht,
+   wenn /api/stats nicht antwortet. Die Erprobungs-Tueren (Konsole,
+   Merkmals-Schloss) sind seit v3.3.1 ersatzlos gestrichen; sichtbar ist der
+   Umschalter ueber das Firestore-Flag `useSprachumschalter`
+   (DOC-2026-08-20-46). */
 initSprachumschalter({
   analysiere: handleNewFile,
   /* Nach einem Neuladen liegt zwar ein Ergebnis vor, die Bilddatei aber nicht

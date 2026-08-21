@@ -32,7 +32,9 @@ cd malzime
 malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
 
 1. Account erstellen auf [console.mistral.ai](https://console.mistral.ai/)
-2. Stripe-Karte hinterlegen, **Scale Tier** aktivieren — Free Tier reicht nicht fuer Image-Calls
+2. Zahlungsmittel hinterlegen und einen kostenpflichtigen Tarif aktivieren — der kostenlose
+   Tarif reicht fuer Bild-Aufrufe nicht. Die Tarifnamen bei Mistral aendern sich; massgeblich
+   ist das Dashboard, nicht diese Anleitung (DOC-2026-08-20-52).
 3. API-Key generieren unter https://console.mistral.ai/api-keys/
 4. Key sofort sichern (wird nur einmal angezeigt) — wird in Schritt 5g als Firebase Secret hinterlegt
 

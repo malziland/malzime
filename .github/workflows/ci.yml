@@ -229,6 +229,14 @@ jobs:
       # bei Andrang erscheint — also ausgerechnet im Workshop.
       - run: python3 scripts/pruefe-i18n-fallbacks.py
 
+      # OPS-2026-08-21-08: Eine Wartezeit ueber dem Zeitlimit des Tests ist
+      # wirkungslos — der Test stirbt vorher. In vier Tests standen solche
+      # Werte, teils mit Kommentaren, die eine frueher behobene Flakiness
+      # beschrieben. Behoben war nichts; am 21.08. hat einer davon die
+      # Auslieferung blockiert. Die Pruefung blendet Kommentare aus, sonst
+      # tarnt ein auskommentiertes test.slow() den Befund.
+      - run: python3 scripts/pruefe-tote-geduld.py
+
       # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
       # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine
       # Aenderung an 147 KB minifiziertem Einzeiler faellt in einem Pull-Request

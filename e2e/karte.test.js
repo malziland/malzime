@@ -84,6 +84,11 @@ test.describe("GPS-Karte", () => {
   });
 
   test("BUG-2026-08-20-06: die Adresse ueberlebt den Moduswechsel", async ({ page }) => {
+    /* OPS-2026-08-21-08: Der Wartewert von 40 s weiter unten war wirkungslos —
+       das Zeitlimit des Tests liegt bei 30 s und greift vorher. Die Karte baut
+       sich nach dem Moduswechsel neu auf, das dauert unter Last. `test.slow()`
+       verdreifacht das Limit; geprueft wird unveraendert dasselbe. */
+    test.slow();
     /* Der erste Aufbau verbrauchte das Geocoding-Versprechen und setzte es auf
        null. Beim zweiten Aufbau — jedem Moduswechsel und jedem Ausdruck — stand
        deshalb nur noch das Koordinatenpaar da. Der Ort, den die Karte zeigen

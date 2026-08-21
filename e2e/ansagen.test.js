@@ -241,6 +241,12 @@ test.describe("Ansage-Protokoll", () => {
   });
 
   test("Beast-Umschalter: Zustand und Ansage", async ({ page }) => {
+    /* OPS-2026-08-21-08: Der Wartewert von 45 s darunter war wirkungslos — das
+       Zeitlimit des Tests liegt bei 30 s und greift vorher. Am 21.08. hat genau
+       das die Auslieferung blockiert. `test.slow()` verdreifacht das Limit auf
+       90 s; erst damit wirkt die Geduld, die hier seit einer frueheren
+       Sanierung beabsichtigt war. Geprueft wird unveraendert dasselbe. */
+    test.slow();
     await ansagenMitschreiben(page, "Beast");
     await endpunkte(page, { status: "done", result: PROFIL });
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -368,14 +374,13 @@ test("Nach der Analyse traegt der Ergebnisbereich einen Namen", async ({ page })
   /* Der zweite Fund desselben Nutzers: „Analyse beendet" kam, danach nichts.
      Der Fokus sprang auf einen <section> ohne Rolle und ohne Namen — VoiceOver
      landet dort und hat nichts zu sagen. */
+  /* OPS-2026-08-21-08: siehe oben — ohne test.slow() war der Wartewert von
+     45 s wirkungslos, weil das Zeitlimit des Tests bei 30 s liegt. */
+  test.slow();
   await endpunkte(page, { status: "done", result: PROFIL });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await page.click('[data-demo="selfie"]');
-  /* 45 s statt 20: Auf dem Firefox-Laeufer der CI reichten 20 s nicht, der
-     Test wurde dort zeitweise rot, obwohl die Seite in Ordnung ist. Die
-     Zusicherung darunter bleibt unveraendert — verlaengert wird nur die
-     Geduld, nicht die Toleranz. */
   await page.waitForSelector(".cat-card", { timeout: 45000 });
   await page.waitForTimeout(1200);
 

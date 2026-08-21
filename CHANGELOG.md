@@ -26,6 +26,14 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Jetzt ist er für alle gleichzeitig abgeschaltet, und die Tastatur landet auf
   dem Hinweis statt im Nichts.
 
+- **Vier Prüfungen waren geduldiger gebaut, als sie sein konnten.** Sie warteten
+  bis zu 45 Sekunden auf ein Element, während ihr eigenes Zeitlimit bei 30
+  Sekunden lag — die längere Geduld war wirkungslos, obwohl im Quelltext
+  ausdrücklich stand, damit sei eine frühere Unzuverlässigkeit behoben. Genau
+  eine dieser Stellen hat am 21. August eine Auslieferung blockiert. Eine neue
+  Prüfung findet diese Bauart künftig selbst; sie blendet dabei Kommentare aus,
+  weil sonst eine auskommentierte Zeile den Befund tarnt.
+
 - **Sechs Fehlerbilder werden jetzt wirklich angesehen.** Neue Prüfungen
   versetzen die Seite in die Zustände „Stundenlimit", „Warteschlange voll",
   „Wartungsmodus", „Bild zu groß", „Format nicht lesbar" und „Server

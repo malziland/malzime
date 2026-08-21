@@ -4,6 +4,67 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Die Prüfkette wäre heute Nacht von selbst rot geworden.** Ein Test rechnete
+  mit der echten Uhr gegen ein fest eingebautes Datum und wäre ab dem
+  21. August bei jedem Lauf durchgefallen — ohne dass jemand etwas geändert
+  hätte. Da er zu den Pflicht-Prüfungen gehört, hätte das jede Änderung und
+  jede Auslieferung blockiert. Die Website selbst war nie betroffen.
+
+  Eine neue Prüfung findet diese Fehlerform künftig selbst: Sie sucht Tests zu
+  Programmteilen mit festem Datum und lässt genau die mit einer um 400 Tage
+  vorgestellten Uhr laufen. Was dabei umkippt, ist ein solcher Zeitzünder.
+
+- **Der Melder für den gemeldeten Druck-Abbruch-Fehler lieferte nichts.** Er
+  wurde am 18. August gebaut, um den Fehler beim nächsten Auftreten messbar zu
+  machen — schickte seine Messwerte aber in einer Form los, die unterwegs
+  verworfen wurde. Angekommen wäre eine leere Meldung. Jetzt kommen alle
+  Angaben an, und eine Prüfung hält den Meldeweg für jede künftige Meldestelle
+  fest. Dabei fiel eine zweite Stelle auf, die aus demselben Grund verlor,
+  welches Beispielbild einen Fehler ausgelöst hatte.
+
+- **Ein roter Prüflauf konnte an der Auslieferung vorbeirutschen.** Wird ein
+  Stand später erneut geprüft — das passiert wöchentlich automatisch — und
+  fällt dabei durch, meldete die Auslieferungssperre trotzdem „alles grün": Sie
+  sah den älteren, grünen Lauf. Jetzt zählt nur noch der jüngste. Fehlt das
+  Werkzeug, mit dem sie die Prüfergebnisse abfragt, bricht sie ab, statt die
+  Freigabe stillschweigend zu überspringen.
+
+- **Die Echtheits-Prüfung belegte nicht, was sie behauptete.** Sie verglich die
+  ausgelieferten Dateien mit einer Liste, die vom selben Server stammte — wer
+  die Auslieferung kontrolliert, kontrolliert beides. Jetzt rechnet sie jede
+  Datei zusätzlich gegen den genannten Stand im Quelltext-Archiv nach. Die
+  Cache-Kennung weicht dabei erwartbar ab; das steht jetzt ausdrücklich im
+  Ergebnis, statt verschwiegen zu werden. Ein Netzabbruch gilt außerdem nicht
+  mehr als „Datei fehlt", sondern als Messproblem.
+
+- **Vier Wächter der Barrierefreiheit prüften eine Liste statt der Seite.** Der
+  Abdeckungs-Wächter — gebaut, nachdem das Prüfwerkzeug den ganzen Profilinhalt
+  übersehen hatte — bewachte fünf feste Namen; ein umbenannter oder neuer
+  Bereich wäre nie aufgefallen. Der Zahlen-Wächter kannte die englische
+  Erklärung nicht und hätte grün gemeldet, sobald er gar nichts mehr findet.
+  Der Datums-Wächter verglich Tag und Jahr, aber nicht den Monat. Und geprüft
+  wurden nur zwei der acht Rechtsseiten, während die Zusage „keine Verstöße"
+  für alle gilt. Alle vier messen jetzt die tatsächliche Fläche; die sechs
+  bisher ungeprüften Seiten sind auf Anhieb ohne Beanstandung.
+
+- **Weitere Wächter-Lücken geschlossen:** Der Lizenz-Wächter sah nur Ordner —
+  eine einzeln abgelegte fremde Datei wäre ohne Lizenztext durchgegangen. Der
+  Doku-Wächter las nur die oberste Ebene und übersah damit ausgerechnet die
+  Unterlagen, die öffentlich zitiert werden; er prüft jetzt auch Verweise auf
+  Seiten der Website. Und die Liste der Rechtsseiten hat eine Kontrolle
+  bekommen, die bemerkt, wenn eine neue Seite dazukommt.
+
+### Aufgeräumt
+
+- Zwei Beispielgrafiken, die seit dem ersten Tag niemand benutzte, wurden bei
+  jeder Auslieferung mitgeschickt — jetzt entfernt. Dazu ein einmaliges
+  Testskript aus dem Hauptverzeichnis und eine Ignorier-Regel für die
+  Zwischendateien der Prüfungen.
+
 ## [3.9.1] — 2026-08-19
 
 ### Hinzugefügt

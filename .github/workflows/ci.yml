@@ -220,6 +220,15 @@ jobs:
       - run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
       - run: python3 scripts/pruefungen/checks/test-blind.py .
 
+      # UX-2026-08-21-06: Jedes uebersetzbare Element traegt einen Text fest im
+      # HTML. Der ist kein Platzhalter — Besucher sehen ihn, solange die
+      # Sprachdatei nicht geladen ist, und dauerhaft, wenn sie gar nicht laedt.
+      # Am 21.08. war der Limit-Hinweis der Startseite dort in einer alten
+      # Fassung stehen geblieben, waehrend die Sprachdatei laengst die
+      # ueberarbeitete trug: vier Absaetze, unbemerkt, weil dieser Hinweis nur
+      # bei Andrang erscheint — also ausgerechnet im Workshop.
+      - run: python3 scripts/pruefe-i18n-fallbacks.py
+
       # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
       # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine
       # Aenderung an 147 KB minifiziertem Einzeiler faellt in einem Pull-Request

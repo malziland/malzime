@@ -206,16 +206,26 @@
             <path d="M12 6v6l4 2" />
           </svg>
         </div>
-        <p class="limit-banner__title" data-i18n="limit.title">Stundenlimit erreicht</p>
+        <!-- UX-2026-08-21-06: Diese vier Texte standen noch in einer alten Fassung,
+             waehrend die Sprachdatei laengst die ueberarbeitete trug. Was hier steht,
+             ist kein Platzhalter: Es ist das, was Besucher sehen, solange die
+             Sprachdatei nicht geladen ist — und dauerhaft, wenn sie gar nicht laedt.
+             Ausgerechnet dieser Hinweis erscheint nur bei Andrang, also im Workshop.
+             `scripts/pruefe-i18n-fallbacks.py` haelt beide Fassungen ab jetzt gleich. -->
+        <p class="limit-banner__title" data-i18n="limit.title">Kurze Pause.</p>
         <p class="limit-banner__text" data-i18n="limit.text">
-          Zu viele Analysen in kurzer Zeit. Bitte warte, bis das Limit zur&uuml;ckgesetzt wird.
+          malziME wurde in dieser Stunde schon sehr oft genutzt und hat das Limit erreicht. Die Analyse ist
+          vor&uuml;bergehend deaktiviert, damit die Kosten nicht explodieren.
         </p>
         <p class="limit-banner__countdown" id="limitCountdown" aria-live="off"></p>
         <p class="limit-banner__muted" data-i18n="limit.textMuted">
-          Das Limit sch&uuml;tzt das Projekt vor unerwarteten Kosten.
+          malziME ist ein eigenfinanziertes Projekt &mdash; kostenlos, werbefrei und ohne Tracking. Dieses Limit
+          sch&uuml;tzt das Projekt vor unerwarteten Serverkosten.
         </p>
         <div class="limit-banner__cta">
-          <span data-i18n="limit.supportText">Du willst das Limit erh&ouml;hen?</span>
+          <span data-i18n="limit.supportText"
+            >Mit einer Spende hilfst du, die Limits zu erh&ouml;hen und malziME am Laufen zu halten.</span
+          >
           <a
             href="https://buymeacoffee.com/malzime"
             target="_blank"

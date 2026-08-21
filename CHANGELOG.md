@@ -4,6 +4,22 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Der Hinweis „Kurze Pause" zeigte eine veraltete Fassung.** Erscheint das
+  Stundenlimit, stand dort noch der alte, härtere Text („Stundenlimit erreicht.
+  Zu viele Analysen in kurzer Zeit") statt der überarbeiteten Fassung, die
+  erklärt, warum es das Limit gibt. Vier Absätze waren betroffen. Sichtbar wurde
+  das immer dann, wenn die Übersetzungsdatei noch nicht geladen war — und
+  dauerhaft, wenn sie gar nicht lädt. Ausgerechnet dieser Hinweis erscheint nur
+  bei Andrang, also im Workshop.
+
+- **Eine neue Prüfung hält beide Fassungen künftig gleich.** Sie vergleicht für
+  jeden übersetzbaren Text auf allen zehn Seiten, was im Seitenquelltext steht,
+  mit dem, was in der Sprachdatei steht. 68 Texte, deutsch wie englisch.
+
 ## [4.0.0] — 2026-08-21
 
 Ein Lang-Audit hat das Projekt in der Nacht auf den 21. August durchleuchtet:

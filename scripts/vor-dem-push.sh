@@ -61,6 +61,7 @@ lauf "Pruefungen: Aussentext-Sperrliste" "pruefungen" python3 scripts/pruefungen
 lauf "Pruefungen: Fakten-Drift" "pruefungen" python3 scripts/pruefungen/checks/fakten-drift.py .
 lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
 lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/pruefungen/checks/test-blind.py .
+lauf "Pruefungen: Sichtbare Texte" "pruefungen" python3 scripts/pruefe-i18n-fallbacks.py
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend

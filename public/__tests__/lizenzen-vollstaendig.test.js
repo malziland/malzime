@@ -28,6 +28,13 @@ const LIZENZDATEIEN = ["LICENSE", "LICENSE.txt", "LICENSE.md", "LICENCE", "COPYI
 /* Ordner, in denen fremde Bestandteile liegen. */
 const BEREICHE = ["public/lib", "public/fonts"];
 
+/* Eigene Erzeugnisse in den Fremd-Ordnern, die keinen fremden Lizenztext
+   brauchen. Jede Ausnahme trägt ihren Grund — eine Ausnahme ohne Begründung
+   wird sonst zur Hintertür (OSS-2026-08-20-14). */
+const EIGENE_DATEIEN = {
+  "public/lib/PRUEFSUMMEN.json": "von scripts/pruefe-fremddateien.mjs erzeugt, kein Fremdcode",
+};
+
 function bestandteile() {
   const raus = [];
   for (const bereich of BEREICHE) {
@@ -35,8 +42,23 @@ function bestandteile() {
     if (!fs.existsSync(wurzel)) continue;
     for (const name of fs.readdirSync(wurzel)) {
       const voll = path.join(wurzel, name);
-      if (!fs.statSync(voll).isDirectory()) continue;
-      raus.push({ name, rel: `${bereich}/${name}`, pfad: voll });
+      const rel = `${bereich}/${name}`;
+      if (fs.statSync(voll).isDirectory()) {
+        raus.push({ name, rel, pfad: voll });
+        continue;
+      }
+      /* OSS-2026-08-20-14: Der Wächter sah nur Unterordner. Eine als
+         EINZELDATEI vendorierte Bibliothek (public/lib/irgendwas.min.js) wäre
+         nie geprüft worden — genau der Zustand, den der Nutzer am 19.08.
+         beanstandete ("Leaflet lag mit einer Copyright-Zeile da, sonst
+         nichts"), nur diesmal unbemerkt. MIT und BSD verlangen die
+         Mitlieferung des Lizenztextes. */
+      if (EIGENE_DATEIEN[rel]) continue;
+      /* Punktdateien (.DS_Store & Co.) sind Betriebssystem-Beiwerk, kein
+         Bestandteil: firebase.json schliesst alle Punktdateien von der
+         Auslieferung aus, sie erreichen also nie einen Nutzer. */
+      if (name.startsWith(".")) continue;
+      raus.push({ name, rel, pfad: voll, einzeldatei: true });
     }
   }
   return raus;
@@ -52,17 +74,29 @@ describe("Fremde Bestandteile: Lizenzen", () => {
     expect(ALLE.map((b) => b.rel).sort()).toEqual(["public/fonts/poppins", "public/lib/exifr", "public/lib/leaflet"]);
   });
 
-  it.each(ALLE)("$rel bringt eine Lizenzdatei mit", ({ pfad, rel }) => {
-    const gefunden = LIZENZDATEIEN.filter((n) => fs.existsSync(path.join(pfad, n)));
+  /* Wo der Lizenztext eines Bestandteils liegt: im Ordner als eigene Datei,
+     bei einer Einzeldatei als `<dateiname>.LICENSE` daneben. */
+  const lizenzPfad = ({ pfad, einzeldatei }) =>
+    einzeldatei
+      ? [`${pfad}.LICENSE`, `${pfad}.LICENSE.txt`].find((p) => fs.existsSync(p))
+      : LIZENZDATEIEN.map((n) => path.join(pfad, n)).find((p) => fs.existsSync(p));
+
+  it.each(ALLE)("$rel bringt eine Lizenzdatei mit", (bestandteil) => {
+    const { rel, einzeldatei } = bestandteil;
     expect(
-      gefunden,
-      `${rel} hat keine Lizenzdatei. Erlaubt: ${LIZENZDATEIEN.join(", ")}. ` +
-        `Der Name allein genügt nicht — der Originaltext muss mitgeliefert werden.`
-    ).not.toHaveLength(0);
+      lizenzPfad(bestandteil),
+      einzeldatei
+        ? `${rel} ist eine einzeln vendorierte Fremddatei ohne Lizenztext. Erwartet: ${rel}.LICENSE daneben. ` +
+            `MIT und BSD verlangen die Mitlieferung des Textes — eine Copyright-Zeile im Dateikopf genügt nicht.`
+        : `${rel} hat keine Lizenzdatei. Erlaubt: ${LIZENZDATEIEN.join(", ")}. ` +
+            `Der Name allein genügt nicht — der Originaltext muss mitgeliefert werden.`
+    ).toBeDefined();
   });
 
-  it.each(ALLE)("$rel: der Lizenztext ist vollständig, nicht nur eine Zeile", ({ pfad, rel }) => {
-    const datei = LIZENZDATEIEN.map((n) => path.join(pfad, n)).find((p) => fs.existsSync(p));
+  it.each(ALLE)("$rel: der Lizenztext ist vollständig, nicht nur eine Zeile", (bestandteil) => {
+    const { rel } = bestandteil;
+    const datei = lizenzPfad(bestandteil);
+    expect(datei, `${rel}: kein Lizenztext gefunden — siehe vorige Prüfung`).toBeDefined();
     const text = fs.readFileSync(datei, "utf8");
 
     /* Jede hier vorkommende Lizenz (MIT, BSD, OFL) schliesst die Gewährleistung

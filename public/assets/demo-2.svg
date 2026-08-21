@@ -1,9 +1,0 @@
-<svg width="640" height="420" viewBox="0 0 640 420" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="640" height="420" rx="28" fill="#101015" />
-  <rect x="0" y="250" width="640" height="170" fill="#1b1b24" />
-  <rect x="60" y="180" width="200" height="120" rx="12" fill="#2b2b38" />
-  <rect x="320" y="160" width="260" height="140" rx="12" fill="#232331" />
-  <rect x="110" y="210" width="90" height="30" rx="6" fill="#ff6a3d" />
-  <rect x="380" y="200" width="120" height="40" rx="6" fill="#ffd166" />
-  <text x="32" y="60" fill="#f5f5f7" font-family="Space Grotesk, sans-serif" font-size="20">Demo: Straße</text>
-</svg>

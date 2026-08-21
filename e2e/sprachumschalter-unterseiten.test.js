@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * sprachumschalter-unterseiten.test.js — der Sprachwechsel auf den Rechtsseiten.
@@ -179,6 +181,47 @@ function aufrufeMitschneiden(page) {
   return alle;
 }
 
+/* TEST-2026-08-20-17: Alle Riegel dieser Datei hingen an der festen Liste
+   SEITENPAARE — dem Stand vom 19.08., nicht dem Repository. Eine neue Rechtsseite
+   koennte unbemerkt Skripte laden oder einen per Tastatur unerreichbaren
+   Umschalter tragen, ohne dass irgendeine Pruefung anspringt: Sie stuende
+   schlicht nicht auf der Liste. Diese Kontrolle haelt das Dateisystem gegen die
+   Liste, damit die Luecke nicht still entsteht. */
+test.describe("Rechtsseiten: die Liste deckt die Flaeche", () => {
+  /* index und stats sind keine Rechtsseiten: die Startseite traegt die Analyse,
+     die Zahlen-Seite ist dynamisch zweisprachig und in eigenen Tests abgedeckt. */
+  const KEINE_RECHTSSEITEN = new Set(["index.html", "stats.html"]);
+
+  test("jede HTML-Seite in public/ und public/en/ steht in SEITENPAARE", () => {
+    const wurzel = join(process.cwd(), "public");
+    const gefunden = [
+      ...readdirSync(wurzel)
+        .filter((n) => n.endsWith(".html") && !KEINE_RECHTSSEITEN.has(n))
+        .map((n) => `/${n}`),
+      ...readdirSync(join(wurzel, "en"))
+        .filter((n) => n.endsWith(".html"))
+        .map((n) => `/en/${n}`),
+    ].sort();
+
+    /* Positivkontrolle gegen die eigene Messung: Findet die Suche gar nichts,
+       waere "keine fehlende Seite" kein Ergebnis, sondern ein leeres Blatt. */
+    expect(gefunden.length, "keine einzige Rechtsseite gefunden — die Suche greift nicht").toBeGreaterThan(4);
+
+    const fehlend = gefunden.filter((datei) => !ALLE_RECHTSSEITEN.includes(datei));
+    expect(
+      fehlend,
+      `Diese Seiten werden ausgeliefert, stehen aber in keiner Pruefung dieser Datei: ${fehlend.join(", ")}`
+    ).toEqual([]);
+
+    /* Und umgekehrt: Eine Seite auf der Liste, die es nicht mehr gibt, bedeutet
+       Pruefungen, die ins Leere laufen. */
+    const verwaist = ALLE_RECHTSSEITEN.filter((datei) => !gefunden.includes(datei));
+    expect(verwaist, `Diese Seiten stehen auf der Liste, existieren aber nicht mehr: ${verwaist.join(", ")}`).toEqual(
+      []
+    );
+  });
+});
+
 test.describe("Rechtsseiten: der Umschalter ist ein Link, kein Skript", () => {
   /* Bewusst mit englischem Browser gemessen: Diese Seiten sind statisch und
      dürfen sich von der Browsersprache NICHT umstimmen lassen. Eine deutsche
@@ -336,11 +379,24 @@ test.describe("Rechtsseiten: der Umschalter ist ein Link, kein Skript", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
   });
 
-  for (const seite of ["/datenschutz.html", "/en/privacy.html"]) {
+  /* TEST-2026-08-20-14/46: Hier standen zwei Seiten, mit der Begründung, was dort
+     durchgehe, gelte auch für die übrigen sechs, "die weniger enthalten". Das war
+     eine Annahme, keine Messung — die öffentliche Zusage "0 Verstöße" in
+     Prüfbericht und Erklärung gilt für ALLE acht Rechtsseiten, und sie konnte für
+     sechs davon still falsch werden, ohne dass ein Riegel rot wird. Jede Seite
+     bringt eigene Inhalte mit (Tabellen, rollbare Kästen, Fußnoten), und der
+     Kontrast hängt am Inhalt, nicht am Gerüst. */
+  for (const seite of [
+    "/datenschutz.html",
+    "/impressum.html",
+    "/nutzungsbedingungen.html",
+    "/barrierefreiheit.html",
+    "/en/privacy.html",
+    "/en/legal-notice.html",
+    "/en/terms.html",
+    "/en/accessibility.html",
+  ]) {
     test(`axe: ${seite} ohne ernste Verstöße`, async ({ page }) => {
-      /* Je eine deutsche und eine englische Seite. Beide tragen dieselbe Pille
-         und dasselbe Skript — was hier durchgeht, gilt auch für die übrigen
-         sechs, die weniger enthalten. */
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(seite);
       await expect(page.locator(".sprach-pille"), "Seite nicht geladen — axe prüfte eine Fehlerseite").toHaveCount(1);

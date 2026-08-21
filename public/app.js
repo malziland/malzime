@@ -20,6 +20,7 @@ import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
 import { initFehlerNachsendung, logClientError } from "./js/error-logger.js";
 import { initSprachumschalter, merkmalUebernehmen } from "./js/sprachumschalter.js";
 import { initBeastLockruf } from "./js/beast-lockruf.js";
+import { pruefeSeiteNachDruck } from "./js/druck-wache.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
    Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
@@ -400,33 +401,10 @@ elements.exportPdf.addEventListener("click", () => {
 window.addEventListener("afterprint", () => {
   removePrintNotes();
 
-  /* NUTZER-FUND 2026-08-18: Nach „PDF speichern" → Abbrechen war die Seite im
-     Beast-Modus schwarz und leer; erst ein Neuladen brachte sie zurueck.
-     Headless ist das nicht reproduzierbar — weder ueber das Druck-Stylesheet
-     noch in Chromium oder WebKit. Statt eine Vermutung als Behebung
-     auszuliefern, wird der Fall hier MESSBAR gemacht: Bleibt der
-     Ergebnisbereich nach dem Druckdialog unsichtbar, geht das mit den
-     noetigen Angaben in die Fehlererfassung. Beim naechsten Auftreten liegt
-     dann ein Befund vor statt einer Beschreibung.
+  /* Bleibt der Ergebnisbereich nach dem Druckdialog unsichtbar (Nutzer-Fund
+     2026-08-18), meldet die Druck-Wache das mit allen Messwerten. Die Logik
+     liegt in js/druck-wache.js, weil sie dort pruefbar ist — die erste Fassung
+     stand hier und verlor jede Angabe unbemerkt (BUG-2026-08-20-02).
      Zwei Bildschirmrahmen Abstand, damit der Browser fertig gezeichnet hat. */
-  requestAnimationFrame(() =>
-    requestAnimationFrame(() => {
-      const panel = document.getElementById("resultsPanel");
-      if (!panel) return;
-      const kasten = panel.getBoundingClientRect();
-      const stil = window.getComputedStyle(panel);
-      const unsichtbar = kasten.height < 50 || stil.display === "none" || stil.visibility === "hidden";
-      if (!unsichtbar) return;
-      logClientError("druck-abbruch-seite-leer", {
-        hoehe: Math.round(kasten.height),
-        display: stil.display,
-        sichtbarkeit: stil.visibility,
-        deckkraft: stil.opacity,
-        modus: document.documentElement.getAttribute("data-mode"),
-        thema: document.documentElement.getAttribute("data-theme"),
-        bodyHoehe: document.body.scrollHeight,
-        druckhinweise: document.querySelectorAll(".print-note").length,
-      });
-    })
-  );
+  requestAnimationFrame(() => requestAnimationFrame(() => pruefeSeiteNachDruck(logClientError)));
 });

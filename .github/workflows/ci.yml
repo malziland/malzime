@@ -50,6 +50,17 @@ jobs:
       - run: npm run format:check
       - run: npm test
 
+      # TEST-2026-08-20-01: Ein Test verglich die ECHTE Uhr mit einem festen Datum im
+      # Produktivcode. Er war gruen — bis zu einem berechenbaren Tag, ab dem er bei
+      # jedem Lauf rot geworden waere und als Pflicht-Check jede Auslieferung blockiert
+      # haette, ohne dass jemand etwas geaendert hat. Die Pruefung misst die WIRKUNG:
+      # Sie sucht Tests zu Code mit festem Zeitpunkt und laesst genau die mit
+      # vorgestellter Uhr laufen. Sie haengt an den Test-Jobs, weil sie den jeweiligen
+      # Runner braucht — der schlanke Job `pruefungen` hat bewusst keine Pakete.
+      # Exit 2 (Messproblem) gilt nie als bestanden.
+      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend
+        working-directory: .
+
   secret-scan:
     runs-on: ubuntu-latest
     steps:
@@ -77,6 +88,16 @@ jobs:
       - run: npm run lint:frontend
       - run: npm run format:frontend:check
       - run: npm run test:frontend
+
+      # TEST-2026-08-20-01: Ein Test verglich die ECHTE Uhr mit einem festen Datum im
+      # Produktivcode. Er war gruen — bis zu einem berechenbaren Tag, ab dem er bei
+      # jedem Lauf rot geworden waere und als Pflicht-Check jede Auslieferung blockiert
+      # haette, ohne dass jemand etwas geaendert hat. Die Pruefung misst die WIRKUNG:
+      # Sie sucht Tests zu Code mit festem Zeitpunkt und laesst genau die mit
+      # vorgestellter Uhr laufen. Sie haengt an den Test-Jobs, weil sie den jeweiligen
+      # Runner braucht — der schlanke Job `pruefungen` hat bewusst keine Pakete.
+      # Exit 2 (Messproblem) gilt nie als bestanden.
+      - run: sh scripts/pruefe-zeitzuender.sh . --nur frontend
 
   # Liest die Playwright-Version aus dem Lockfile und reicht sie an test-e2e
   # weiter. Frueher stand die Version an zwei Stellen (package.json UND
@@ -223,3 +244,4 @@ jobs:
       # niemand sehen; der Lauf sagt das ausdruecklich dazu, statt es zu
       # verschweigen.
       - run: node scripts/pruefe-vendorierung.mjs
+

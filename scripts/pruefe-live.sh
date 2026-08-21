@@ -79,9 +79,14 @@ echo "  Commit:        $COMMIT"
 echo "  Dateien:       $ANZAHL"
 
 # ── 2. Kennt das lokale Repository diesen Commit? ───────────────────────────
+COMMIT_DA=nein
+REPO_GEPRUEFT=0
+REPO_ABWEICHUNG=0
+NUR_KENNUNG=0
 if git rev-parse --git-dir >/dev/null 2>&1; then
   if git cat-file -e "${COMMIT}^{commit}" 2>/dev/null; then
     echo "  Commit im Repository: ja"
+    COMMIT_DA=ja
   else
     echo "  Commit im Repository: NEIN — 'git fetch' ausfuehren, dann erneut pruefen."
   fi
@@ -105,11 +110,27 @@ ABWEICHUNG=0
 FEHLEND=0
 GEPRUEFT=0
 
+TRANSPORT=0
+
 while IFS="$(printf '\t')" read -r PFAD SOLL; do
   [ -z "$PFAD" ] && continue
-  if ! curl -fsS "$BASIS/$PFAD" -o "$ARBEIT/datei" 2>/dev/null; then
-    echo "  FEHLT auf dem Server: $PFAD"
-    FEHLEND=$((FEHLEND + 1))
+  # BUG-2026-08-20-08: Vorher galt JEDER gescheiterte Abruf als "FEHLT auf dem
+  # Server" und damit als Befund (Exit 1). Ein abgebrochenes Netz, ein Zeitablauf
+  # oder ein 5xx sahen damit aus wie eine manipulierte Auslieferung. curl
+  # unterscheidet das: Rueckgabewert 22 ist eine echte HTTP-Fehlerantwort
+  # (404 -> die Datei fehlt wirklich), alles andere ist ein Transportproblem und
+  # damit ein MESSproblem.
+  CURL_FEHLER=$(curl -fsS "$BASIS/$PFAD" -o "$ARBEIT/datei" 2>&1) || CURL_RC=$?
+  CURL_RC=${CURL_RC:-0}
+  if [ "$CURL_RC" -ne 0 ]; then
+    if [ "$CURL_RC" -eq 22 ]; then
+      echo "  FEHLT auf dem Server: $PFAD"
+      FEHLEND=$((FEHLEND + 1))
+    else
+      echo "  NICHT MESSBAR: $PFAD (curl-Rueckgabewert $CURL_RC: ${CURL_FEHLER:-Transportfehler})"
+      TRANSPORT=$((TRANSPORT + 1))
+    fi
+    CURL_RC=0
     continue
   fi
   IST="sha256:$($SUMME "$ARBEIT/datei" | cut -d' ' -f1)"
@@ -119,6 +140,35 @@ while IFS="$(printf '\t')" read -r PFAD SOLL; do
     echo "      erwartet: $SOLL"
     echo "      gefunden: $IST"
     ABWEICHUNG=$((ABWEICHUNG + 1))
+    continue
+  fi
+  # ARCH-2026-08-20-04: Bis hierher hat nur der Server gegen sich selbst gerechnet
+  # — Sollwerte und Dateien kommen beide von malzi.me. Wer die Auslieferung
+  # kontrolliert, kontrolliert beides. Erst der Vergleich gegen den GENANNTEN
+  # COMMIT im lokalen Repository macht die Schlussaussage belegbar.
+  if [ "$COMMIT_DA" = "ja" ]; then
+    REPOPFAD="public/$PFAD"
+    if git cat-file -e "${COMMIT}:${REPOPFAD}" 2>/dev/null; then
+      REPO_GEPRUEFT=$((REPO_GEPRUEFT + 1))
+      git show "${COMMIT}:${REPOPFAD}" > "$ARBEIT/repo-datei" 2>/dev/null
+      if [ "sha256:$($SUMME "$ARBEIT/repo-datei" | cut -d' ' -f1)" != "$IST" ]; then
+        # Die Cache-Kennung (?v=JJJJMMTTNN) schreibt das Deploy-Skript VOR der
+        # Auslieferung in die Seiten; committet wird sie erst danach. Genau diese
+        # Differenz ist erwartbar und kein Hinweis auf fremden Code — sie wird
+        # benannt statt verschwiegen. Alles andere ist eine echte Abweichung.
+        OHNE_LIVE=$(sed 's/?v=[0-9]\{10\}/?v=KENNUNG/g' "$ARBEIT/datei" | $SUMME | cut -d' ' -f1)
+        OHNE_REPO=$(sed 's/?v=[0-9]\{10\}/?v=KENNUNG/g' "$ARBEIT/repo-datei" | $SUMME | cut -d' ' -f1)
+        if [ "$OHNE_LIVE" = "$OHNE_REPO" ]; then
+          NUR_KENNUNG=$((NUR_KENNUNG + 1))
+        else
+          echo "  ABWEICHUNG zum Commit: $PFAD (Inhalt, nicht nur die Cache-Kennung)"
+          REPO_ABWEICHUNG=$((REPO_ABWEICHUNG + 1))
+        fi
+      fi
+    else
+      echo "  NICHT IM COMMIT: $PFAD — die Datei wird ausgeliefert, steht aber nicht in $COMMIT."
+      REPO_ABWEICHUNG=$((REPO_ABWEICHUNG + 1))
+    fi
   fi
 done < "$ARBEIT/soll.txt"
 
@@ -161,17 +211,39 @@ if [ "$GEPRUEFT" -eq 0 ]; then
   echo "MESSPROBLEM: keine einzige Datei geladen — vermutlich kein Netz." >&2
   exit 2
 fi
+if [ "$TRANSPORT" -gt 0 ]; then
+  echo "MESSPROBLEM: $TRANSPORT Datei(en) waren nicht abrufbar (Netz/Server, kein HTTP 404)." >&2
+  echo "             Ein unvollstaendiger Lauf ist kein bestandener Lauf — erneut versuchen." >&2
+  exit 2
+fi
 
-if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ] && [ "$SERVER_ABWEICHUNG" -eq 0 ]; then
-  echo "ERGEBNIS: $GEPRUEFT von $ANZAHL Website-Dateien geprueft, alle deckungsgleich."
+if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ] && [ "$SERVER_ABWEICHUNG" -eq 0 ] && [ "$REPO_ABWEICHUNG" -eq 0 ]; then
+  echo "ERGEBNIS: $GEPRUEFT von $ANZAHL Website-Dateien geprueft, alle deckungsgleich"
+  echo "          mit dem Fingerabdruck der Auslieferung."
   if [ "$SERVER_GEPRUEFT" -gt 0 ]; then
     echo "          $SERVER_GEPRUEFT Server-Dateien in diesem Repository ebenfalls deckungsgleich."
   fi
-  echo "Der ausgelieferte Stand entspricht Commit $COMMIT."
+  # ARCH-2026-08-20-04: Die Schlusszeile sagt jetzt genau so viel, wie gemessen
+  # wurde. Ohne lokales Repository ist der Commit nur BENANNT, nicht geprueft —
+  # vorher stand dort trotzdem "entspricht Commit X".
+  if [ "$COMMIT_DA" = "ja" ] && [ "$REPO_GEPRUEFT" -gt 0 ]; then
+    echo "          $REPO_GEPRUEFT Datei(en) zusaetzlich gegen den Inhalt von $COMMIT nachgerechnet."
+    if [ "$NUR_KENNUNG" -gt 0 ]; then
+      echo "          Davon $NUR_KENNUNG nur in der Cache-Kennung abweichend (?v=…): Die schreibt"
+      echo "          das Deploy-Skript vor der Auslieferung, committet wird sie unmittelbar danach."
+    fi
+    echo "Der ausgelieferte Stand entspricht Commit $COMMIT."
+    exit 0
+  fi
+  echo "Der ausgelieferte Stand ist in sich schluessig; er nennt Commit $COMMIT."
+  echo "ACHTUNG: Dieser Commit wurde NICHT gegengerechnet — Sollwerte und Dateien"
+  echo "         stammen beide vom Server. Fuer den vollen Nachweis in einer Kopie"
+  echo "         des Repositories laufen lassen (git clone, dann erneut)."
   exit 0
 fi
 
 echo "ERGEBNIS: $ABWEICHUNG Abweichung(en), $FEHLEND fehlend, bei $GEPRUEFT geprueften Dateien."
 [ "$SERVER_ABWEICHUNG" -gt 0 ] && echo "          Dazu $SERVER_ABWEICHUNG Abweichung(en) im Server-Code."
+[ "$REPO_ABWEICHUNG" -gt 0 ] && echo "          Dazu $REPO_ABWEICHUNG Abweichung(en) gegenueber dem Inhalt von $COMMIT."
 echo "Der ausgelieferte Stand entspricht NICHT dem genannten Commit."
 exit 1

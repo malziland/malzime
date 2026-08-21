@@ -390,13 +390,30 @@ function modalSchliessen() {
       if (document.activeElement === ziel) return;
       ziel.focus();
     };
-    /* ZWEIMAL, und das ist Absicht — der zweite Versuch ist der Riegel, nicht
-       der erste. Sofort deckt den Normalfall; der Rahmen danach fängt die
-       Engines, die den `inert`-Wechsel eine Zeile vorher noch nicht verarbeitet
-       haben und den Aufruf stillschweigend verwerfen. Der Wächter oben macht
-       den zweiten Versuch folgenlos, wenn der erste gegriffen hat. */
-    zurueckgeben();
-    requestAnimationFrame(zurueckgeben);
+    /* MEHRFACH über mehrere Bildschirmrahmen, und das ist Absicht. Sofort deckt
+       den Normalfall; die Rahmen danach fangen die Engines, die den
+       `inert`-Wechsel eine Zeile vorher noch nicht verarbeitet haben und den
+       Aufruf stillschweigend verwerfen. Der Wächter oben macht jeden weiteren
+       Versuch folgenlos, sobald einer gegriffen hat.
+
+       TEST-2026-08-21-02: Vorher waren es genau zwei Versuche. Das reichte auf
+       macOS immer und in der Pipeline fast immer — dreimal aber nicht (WebKit
+       unter Last, 19.08. zweimal, 21.08. einmal). Jedes Mal blieb der Fokus
+       liegen und die Auslieferung stand, obwohl nichts kaputt war. Ein Riegel,
+       der aus dem falschen Grund rot wird, wird irgendwann ignoriert — und ein
+       Fokus, der ins Leere fällt, trifft genau die Menschen, die auf die
+       Tastatur angewiesen sind. Beides spricht für dieselbe Abhilfe: nicht
+       einmal wünschen, sondern nachsehen und wiederholen, bis es sitzt. */
+    const VERSUCHE = 8;
+    let versuch = 0;
+    const nachfassen = () => {
+      versuch += 1;
+      zurueckgeben();
+      if (versuch < VERSUCHE && !offen && ziel.isConnected && document.activeElement !== ziel) {
+        requestAnimationFrame(nachfassen);
+      }
+    };
+    nachfassen();
   }
   fokusVorher = null;
 }

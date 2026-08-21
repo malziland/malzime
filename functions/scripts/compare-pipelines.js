@@ -53,7 +53,7 @@ const MODELS = {
   SMALL_2506: "mistral-small-2506", // RETIRED 31.07.2026 — Pipeline B nicht mehr lauffaehig
 };
 
-const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
+const ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
 const TIMEOUT_MS = 120000;
 
 const CATEGORY_ORDER = [

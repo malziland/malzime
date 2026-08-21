@@ -62,7 +62,7 @@ const INPUT_DIR = path.join(REPO_ROOT, "compare-input");
 const OUTPUT_JSON = path.join(REPO_ROOT, "model-compare-results.json");
 const OUTPUT_REPORT = path.join(REPO_ROOT, "model-compare-report.md");
 
-const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
+const ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
 
 const MAX_TOKENS = 8000;
 const TEMPERATURE = 0.5;

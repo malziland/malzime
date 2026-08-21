@@ -183,6 +183,20 @@ async function axePruefen(page, kontext) {
   if (wackelig.length) {
     console.log(`[a11y] ${kontext}: ${wackelig.length} Fund(e) nur im ersten Lauf — als Uebergangs-Artefakt verworfen`);
   }
+  /* TEST-2026-08-20-25: Das Verwerfen hinterliess nur diese Zeile im Protokoll,
+     die kein Gate liest und niemand ansieht. Ein realer, an einen kurzlebigen
+     Zustand gebundener Verstoss (aufblitzende Ansage, Lockruf-Scheitel,
+     Ladezustand) waere damit fuer immer unsichtbar geblieben — verworfen heisst
+     hier "nicht reproduzierbar", nicht "existiert nicht".
+     Ein ERNSTER Fund, der nur in einem der beiden Laeufe auftritt, macht deshalb
+     jetzt rot. Er ist entweder echt und selten — dann gehoert er behoben — oder
+     die Messung ist wacklig, dann gehoert das gesehen. Leichtere Funde
+     (minor/moderate) bleiben eine Protokollzeile, wie bisher. */
+  const wackeligErnst = wackelig.filter((v) => v.impact === "serious" || v.impact === "critical");
+  expect(
+    wackeligErnst.map((v) => ({ regel: v.id, wirkung: v.impact, elemente: v.nodes.map((n) => n.target.join(" ")) })),
+    `Ernster A11y-Verstoss nur im ERSTEN von zwei Laeufen (${kontext}) — entweder ein seltener echter Fehler oder eine wacklige Messung; beides gehoert angesehen, nicht verworfen`
+  ).toEqual([]);
 
   if (funde.length) {
     console.log(

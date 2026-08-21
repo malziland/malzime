@@ -142,7 +142,13 @@ fi
 # Functions-Deploy veraenderte sechs Hosting-Dateien, die dann unausgeliefert
 # im Arbeitsbaum lagen. Rutscht so etwas in einen Commit, behauptet das
 # Repository einen Buster-Stand, der nie online war.
-TARGET="${1:-hosting,functions}"
+# OPS-2026-08-20-49: `firestore:rules` gehoerte nicht zu den Zielen — die Regeln
+# im Repository wurden also nie ausgerollt. Sie sind heute deckungsgleich mit den
+# aktiven (gemessen 2026-08-21 ueber die Firebase-Regel-Schnittstelle: beide
+# "allow read, write: if false"), der Schritt aendert also nichts und macht ihn
+# ab jetzt wiederholbar. Wer die Regeln aendert, muss sie sonst von Hand
+# ausrollen — und genau das faellt irgendwann aus.
+TARGET="${1:-hosting,functions,firestore:rules}"
 
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,

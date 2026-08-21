@@ -45,7 +45,7 @@ const BILD = process.env.BILD || "";
 const ECHTES_ALTER = Number(process.env.ECHTES_ALTER || 0);
 const RUNS = Number(process.env.RUNS || 3);
 
-const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
+const ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
 const MODEL = "mistral-large-2512";
 
 const NEU = require("../src/locales/de/prompts").singleLargePrompt;

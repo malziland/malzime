@@ -62,7 +62,7 @@
       <span class="page-eyebrow">Legal</span>
       <h1>Privacy</h1>
       <p class="legal-subtitle">
-        Explained plainly &middot; English version: 19 August 2026 &middot; German original: 13 August 2026
+        Explained plainly &middot; English version: 21 August 2026 &middot; German original: 21 August 2026
       </p>
       <div class="page-rule"></div>
 
@@ -125,7 +125,8 @@
         <ol class="legal-list">
           <li>
             <strong>Your browser takes the first step.</strong> Before anything reaches a server, your browser scales
-            the photo down to a maximum of 1280&nbsp;pixels and compresses it as a JPEG. The file name? Not transmitted.
+            the photo down to a maximum of 1280&nbsp;pixels and compresses it &ndash; normally as a JPEG, on some
+            devices as a PNG. The file name? Not transmitted.
             <abbr title="Global Positioning System">GPS</abbr> coordinates and the capture date? They never reach our
             servers &ndash; your browser reads them, and they are not included with the newly compressed photo. If GPS
             data is present, your browser asks OpenStreetMap directly for the address and the map &ndash; without any
@@ -189,12 +190,13 @@
               (never-collected ones after roughly 2&nbsp;hours at the latest). It is not linked to any person.
             </li>
             <li>
-              <strong>No original photo</strong> &ndash; the server only receives a scaled-down JPEG version (max.
-              1280&nbsp;px). Your high-resolution original stays with you.
+              <strong>No original photo</strong> &ndash; the server only receives a scaled-down, re-encoded version
+              (max. 1280&nbsp;px). Your high-resolution original stays with you.
             </li>
             <li>
               <strong>No file name</strong> &ndash; whether your photo is called &bdquo;selfie_at_the_beach.jpg&ldquo;
-              is something we never learn. It is always sent as &bdquo;upload.jpg&ldquo;.
+              is something we never learn. What travels along is a newly assigned name unrelated to your file
+              (&bdquo;upload.jpg&ldquo;, or &bdquo;upload.png&ldquo; depending on the format).
             </li>
             <li>
               <strong>No GPS data on the server</strong> &ndash; GPS coordinates are read in the browser and go only to
@@ -470,7 +472,7 @@ sh scripts/pruefe-live.sh</code></pre>
       <section class="legal-section">
         <h2>Workshops</h2>
         <p>
-          The AI profiles are <strong>invented</strong>. Algorithms assert &ndash; they prove nothing. This is not
+          The AI profiles are <strong>guesses</strong>. Algorithms assert &ndash; they prove nothing. This is not
           automated decision-making within the meaning of Art.&nbsp;22 GDPR.
         </p>
       </section>

@@ -27,9 +27,26 @@ function lies(datei) {
 }
 
 describe("Doku-Drift-Wächter", () => {
-  test("README behauptet keine festen Testzahlen", () => {
-    const treffer = lies("README.md").match(/\b\d+\s+Tests?\b/g) || [];
+  /* DOC-2026-08-20-10: Der Waechter las nur die README. AGENTS.md und
+     docs/SETUP.md trugen deshalb ueber die gesamte v3-Reihe die Zahlen 611/193/5,
+     waehrend die kanonische Quelle (docs/VERIFICATION.md, gestempelt von
+     scripts/pruefstand.sh) laengst bei ganz anderen Werten stand. Gerade AGENTS.md
+     liest die naechste Sitzung zuerst. Gesucht wird jetzt ueber die FLAECHE der
+     Dokumente, in denen eine Testzahl ueberhaupt Sinn ergaebe. */
+  const ZAHLENFREIE_DOKU = ["README.md", "AGENTS.md", "docs/SETUP.md", "CONTRIBUTING.md"];
+
+  test.each(ZAHLENFREIE_DOKU)("%s behauptet keine festen Testzahlen", (datei) => {
+    const treffer = lies(datei).match(/\b\d+\s+Tests?\b/gi) || [];
+    /* Kanonisch ist docs/VERIFICATION.md — dort stempelt pruefstand.sh die Zahlen
+       samt Commit und Datum. Ueberall sonst wird darauf verwiesen. */
     expect(treffer).toEqual([]);
+  });
+
+  test("die kanonische Quelle nennt die Zahlen tatsaechlich (Positivkontrolle)", () => {
+    /* Ohne diese Kontrolle waere der Waechter gruen, wenn die Zahlen NIRGENDS
+       mehr stuenden — auch dort nicht, wo sie hingehoeren. */
+    const treffer = lies("docs/VERIFICATION.md").match(/\b\d+\/\d+\b/g) || [];
+    expect(treffer.length).toBeGreaterThanOrEqual(3);
   });
 
   /* DOC-2026-08-13-FE-09: Die Upload-Obergrenze steht an fünf Stellen ohne

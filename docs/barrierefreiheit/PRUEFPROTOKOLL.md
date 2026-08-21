@@ -8,7 +8,8 @@
 
 **Prüfgegenstand:** https://malzi.me
 **Angestrebte Stufe:** WCAG 2.2, Konformitätsstufe AA
-**Prüfdatum:** 17. August 2026
+**Prüfdatum:** 17. August 2026 (Erstprüfung, fünf Seiten) · 19. August 2026
+(Ausweitung auf zehn Seiten und Neumessung; seither gilt dieser Umfang)
 **Prüfer:** Eigenprüfung (malziland - learning | training | consulting e.U.)
 
 Der geprüfte Stand steht im Bericht — bewusst nur dort, damit die Commit-Nummer eine
@@ -33,9 +34,17 @@ Handprüfung nötig ist, steht das als offener Punkt — nicht als Häkchen.
 
 ## 2 Prüfumfang
 
-**Geprüfte Seiten:** Startseite (`/`), Zahlen (`/stats`), Datenschutz
-(`/datenschutz`), Impressum (`/impressum`), Nutzungsbedingungen
-(`/nutzungsbedingungen`).
+**Geprüfte Seiten (Stand 2026-08-21, zehn):** Startseite (`/`), Zahlen (`/stats`),
+Datenschutz (`/datenschutz`), Impressum (`/impressum`), Nutzungsbedingungen
+(`/nutzungsbedingungen`), Barrierefreiheit (`/barrierefreiheit`) sowie die vier
+englischen Fassungen (`/en/privacy`, `/en/legal-notice`, `/en/terms`,
+`/en/accessibility`).
+
+> **DOC-2026-08-20-31:** Hier standen fünf Seiten — der Umfang der Erstprüfung vom
+> 17.08. —, während weiter unten im selben Dokument bereits von „allen zehn Seiten"
+> die Rede war. Ein extern angebotener Anhang mit zwei Prüfumfängen ist nicht
+> zitierfähig. Der Umfang ist jetzt einheitlich der heutige; die Erstprüfung vom
+> 17.08. ist im Verlauf des Dokuments als solche benannt.
 
 **Geprüfte Zustände:** Startseite leer, Warteschlange mit Position und Restzeit,
 Live-Text während die KI schreibt, fertiges Profil (seriöser Modus, Beast-Modus,

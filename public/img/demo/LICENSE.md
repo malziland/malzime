@@ -5,6 +5,11 @@ jeweils samt Thumbnail) sind **KI-generiert** (bestätigt,
 2026-07-17). Sie zeigen **keine realen Personen** — Ähnlichkeiten mit lebenden
 oder verstorbenen Personen wären rein zufällig.
 
+<!-- ABGRENZUNG zur Formulierungsregel vom 19.08.2026: Das Wort "fiktiv" ist hier
+     richtig und bleibt. Die Regel verbietet es fuer die KI-PROFILE (die erfindet
+     niemand — eine echte KI raet sie wirklich). Die EXIF-Daten dieser Demo-Bilder
+     dagegen sind tatsaechlich gesetzt: Es gibt keinen echten Aufnahmeort. -->
+
 Die EXIF-Daten der Bilder (Kamera, Aufnahmeort, Datum) sind **bewusst fiktiv**
 gesetzt — sie dienen dem Demo-Zweck von malziME, versteckte Foto-Metadaten
 sichtbar zu machen.

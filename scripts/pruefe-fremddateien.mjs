@@ -101,6 +101,17 @@ if (!process.env.PRUEFSUMMEN_BASIS) {
 }
 
 if (AKTUALISIEREN) {
+  /* OSS-2026-08-21-01 (Fund bei der Behebung von OSS-2026-08-20-41): `ist` enthaelt
+     nur, was in der Liste STAND — neue Dateien landeten also nie in der Stempelung.
+     Der Schalter, den das Skript selbst als Loesung nennt, half damit ausgerechnet
+     im Fall "NEU, nicht gestempelt" nicht weiter: Man haette ihn beliebig oft
+     aufrufen koennen, der Lauf blieb rot. Jetzt werden die neu gefundenen Dateien
+     mitgestempelt — dieselbe Liste-statt-Flaeche-Luecke wie in TEST-2026-08-13-49,
+     nur eine Ebene weiter. */
+  for (const rel of neu) {
+    const pfad = resolve(REPO, rel);
+    if (existsSync(pfad)) ist[rel] = summe(pfad);
+  }
   liste.dateien = ist;
   liste._erstellt = new Date().toISOString().slice(0, 10);
   writeFileSync(LISTE, JSON.stringify(liste, null, 2) + "\n");

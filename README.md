@@ -4,7 +4,7 @@
 [![Firebase Hosting](https://img.shields.io/badge/Firebase-Hosting-FFCA28?logo=firebase&logoColor=black)](https://malzi.me)
 ![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 [![CI](https://github.com/malziland/malzime/actions/workflows/ci.yml/badge.svg)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
-[![Lighthouse Performance](https://img.shields.io/badge/Performance-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
+[![Lighthouse Performance](https://img.shields.io/badge/Performance-%E2%89%A590-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse Accessibility](https://img.shields.io/badge/Accessibility-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse Best Practices](https://img.shields.io/badge/Best_Practices-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse SEO](https://img.shields.io/badge/SEO-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
@@ -13,7 +13,7 @@
 
 Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teilnehmer:innen, was KI-Algorithmen aus einem einzigen Foto ableiten koennten — inklusive Persoenlichkeitsprofil, Werbe-Targeting und Manipulationstrigger.
 
-**Alles erfunden. Nichts davon ist wahr oder bewiesen.**
+**Alles geraten. Nichts davon ist wahr oder bewiesen.**
 
 <p align="center">
   <img src="docs/screenshots/01-startseite.png" alt="malziME Startseite" width="720" />
@@ -211,7 +211,9 @@ die **bewusst getroffenen Abwägungen mit Begründung** — steht in
 [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md). Die wichtigsten Schichten:
 
 - **Content Security Policy** mit strikter Whitelist (`self`; Bilder zusätzlich von OpenStreetMap-Kacheln, Verbindungen zusätzlich zu Nominatim)
-- **HSTS** mit Preload
+- **HSTS** — Transportverschlüsselung erzwungen, zwei Jahre, inklusive Unterdomains; die
+  `preload`-Angabe wird mitgeliefert, ein Eintrag in der Browser-Liste ist bewusst nicht
+  erfolgt (Begründung: `docs/SECURITY-MODEL.md`)
 - **X-Frame-Options: DENY**
 - **X-Content-Type-Options: nosniff**
 - **Magic-Byte-Validierung**: Server prueft JPEG/PNG/WebP/GIF-Header

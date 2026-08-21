@@ -164,3 +164,30 @@ Schwelle gekommen.
 
 **Bedingung für Neubewertung.** Sobald das Projekt einen zweiten Betreuer hat (Bus-Faktor
 > 1) oder ein externer Verfügbarkeitsdienst ohnehin läuft, gehört der Alarmweg dorthin.
+
+## Restrisiko: Kein Eintrag in der HSTS-Preload-Liste (seit 2026-08-21)
+
+**Entscheidung.** Die Seite sendet den HSTS-Kopf inklusive `preload`-Angabe, ist aber
+bewusst **nicht** in die fest in Browser eingebaute Preload-Liste eingetragen
+(`OPS-2026-08-20-36`; README und SECURITY.md behaupteten das zuvor).
+
+**Begründung.** Der Gewinn ist der allererste Aufruf einer von Hand getippten Adresse ohne
+`https://` in einem Browser, der die Domain noch nie gesehen hat — danach greift der
+gesendete Kopf ohnehin. Der Preis ist eine praktisch unumkehrbare Bindung: Ein Eintrag wird
+mit der Browser-Software ausgeliefert und wirkt über alte Versionen jahrelang nach, für die
+gesamte Domain samt aller künftigen Unterdomains. An `malzi.me` hängt auch die E-Mail des
+Betriebs; eine Unterdomain, deren Zertifikat einmal klemmt, wäre ohne Ausweg blockiert
+(keine Warnseite zum Durchklicken, sondern harte Verweigerung).
+
+**Betrachtete Alternative.** Eintragen. Verworfen für ein Ein-Personen-Projekt mit einer
+Domain: dauerhafte Bindung gegen einen Gewinn, den das Publikum dieses Werkzeugs
+(Workshop-Teilnehmende mit geteiltem Link, QR-Code oder Lesezeichen) praktisch nie erlebt.
+
+**Marktvergleich, gemessen 2026-08-21** über `hstspreload.org/api/v2/status`:
+`github.com` = preloaded; `orf.at`, `saferinternet.at`, `bmbwf.gv.at`, `wien.gv.at` = nicht
+gelistet. Bei großen Plattformen üblich, bei österreichischen Medien-, Bildungs- und
+Verwaltungsseiten die Ausnahme.
+
+**Bedingung für Neubewertung.** Sobald feststeht, dass keine Unterdomain ohne sichere
+Verbindung mehr geplant ist — etwa nach dem Presse-Zug und der 4.0-Auslieferung. Der
+Eintrag bleibt jederzeit möglich; der Kopf ist bereits preload-fähig.

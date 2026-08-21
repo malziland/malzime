@@ -1,0 +1,15 @@
+Poppins (v21, latin subset)
+Source: https://fonts.google.com/specimen/Poppins
+License: SIL Open Font License 1.1 (siehe OFL.txt in diesem Ordner)
+Designer: Indian Type Foundry, Jonny Pinhorn
+
+Abweichung vom Original: nur die WOFF2-Dateien des latin-Subsets werden
+mitgeliefert: Schnitte 300/400/500/700, je latin und latin-ext. Die Schriftdateien
+selbst sind unveraendert; nichts wurde umbenannt, neu gerendert oder editiert.
+
+Selbst gehostet, weil die Seite keine externen Skripte oder Schriften laedt —
+ein Google-Fonts-Aufruf wuerde die IP-Adresse der Besucher an einen Dritten
+uebertragen (siehe docs/SECURITY-MODEL.md und die Datenschutzerklaerung).
+
+Nachgetragen am 2026-08-21 (OSS-2026-08-20-41): THIRD-PARTY.md verspricht eine
+VERSION-Datei je Fremd-Ordner; fuer die Schriften fehlte sie als einzige.

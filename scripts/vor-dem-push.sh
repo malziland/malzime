@@ -63,7 +63,8 @@ lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/ch
 lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/pruefungen/checks/test-blind.py .
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
-lauf "Pruefungen: Zeitzuender" "test-backend/test-frontend" sh scripts/pruefe-zeitzuender.sh .
+lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend
+lauf "Zeitzuender (Frontend)" "test-frontend" sh scripts/pruefe-zeitzuender.sh . --nur frontend
 
 DAUER=$(($(date +%s) - START))
 echo "-----------------------------------------------------------"

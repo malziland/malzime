@@ -58,7 +58,8 @@ jobs:
       # vorgestellter Uhr laufen. Sie haengt an den Test-Jobs, weil sie den jeweiligen
       # Runner braucht — der schlanke Job `pruefungen` hat bewusst keine Pakete.
       # Exit 2 (Messproblem) gilt nie als bestanden.
-      - run: sh ../scripts/pruefe-zeitzuender.sh .. --nur backend
+      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend
+        working-directory: .
 
   secret-scan:
     runs-on: ubuntu-latest

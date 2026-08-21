@@ -115,6 +115,32 @@ test.describe("Kopfbereich", () => {
     expect(werte, `Überschriften auf verschiedenen Höhen: ${JSON.stringify(hoehen)}`).toHaveLength(1);
   });
 
+  test("BUG-2026-08-21-03: die Überschrift bleibt an Ort und Stelle, auch wenn die Zahlen nicht laden", async ({
+    page,
+  }) => {
+    /* Der Fehlerhinweis der Zahlen-Seite stand ZWISCHEN Augenbraue und
+       Überschrift und war nur mit `display: none` versteckt. Sobald er erschien
+       — also genau dann, wenn die Zahlen nicht luden —, schob er die Überschrift
+       um 21 Bildpunkte nach unten: derselbe Sprung, den v3.8.1 schon einmal
+       behoben hat, nur diesmal an einen Fehlerfall gekoppelt. In der Pipeline
+       fiel er auf, weil dort kein Backend antwortet; wer die Seite bei einer
+       Störung öffnet, sah ihn ebenso. */
+    await merkmalStellen(page);
+
+    await page.route("**/api/stats", (r) => r.fulfill({ status: 500, body: "kaputt" }));
+    await page.goto("/stats.html");
+    await page.evaluate(() => document.fonts.ready);
+    await expect(page.locator("#statsError")).toBeVisible();
+    const mitFehler = await page.evaluate(() => Math.round(document.querySelector("h1").getBoundingClientRect().top));
+
+    await page.unroute("**/api/stats");
+    await page.goto("/index.html");
+    await page.evaluate(() => document.fonts.ready);
+    const referenz = await page.evaluate(() => Math.round(document.querySelector("h1").getBoundingClientRect().top));
+
+    expect(mitFehler, `Überschrift springt bei Fehler: ${mitFehler} statt ${referenz}`).toBe(referenz);
+  });
+
   test("der Abstand hält auch OHNE das Umschalter-Skript", async ({ page }) => {
     /* DER FEHLER VOM 2026-08-19. Der Abstand hing an `.seiten-kopfzeile`, die
        auf der Startseite erst js/sprachumschalter.js erzeugt. Lief das Skript

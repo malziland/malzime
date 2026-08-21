@@ -153,17 +153,25 @@ function getDateKeys(now = new Date()) {
   const monthKey = `${y}-${m}`;
   const yearKey = y;
 
-  /* Wochenstart (Montag) in Wiener Zeit berechnen */
+  /* Wochenstart (Montag) in Wiener Zeit berechnen.
+     BUG-2026-08-20-48: Die Rechnung zog `diff` mal 86.400.000 ms ab — also feste
+     24-Stunden-Tage. An den beiden Umstellungssonntagen hat der Tag in Wien aber
+     23 bzw. 25 Stunden. Am Winterzeit-Sonntag (naechstes Mal 25.10.2026) landete
+     der Rueckschritt um sechs "Tage" deshalb im Sonntag der VORwoche, ab 23:00
+     Ortszeit sogar im falschen Kalendertag — die Wochenzahl der /stats-Seite
+     sprang dann fuer bis zu eine Stunde auf einen falschen Wochenschluessel, und
+     Analysen dieser Stunde wurden einer anderen Woche gutgeschrieben.
+     Jetzt wird in Wiener KALENDERtagen gerechnet statt in Millisekunden: Der
+     Tagesschluessel wird zerlegt und ueber UTC-Mitternacht zurueckgezaehlt, wo
+     ein Tag immer 24 Stunden hat. */
   const viennaDay = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Vienna", weekday: "short" }).format(now);
   const dayMap = { Sun: 6, Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5 };
   const diff = dayMap[viennaDay] || 0;
-  const mondayMs = now.getTime() - diff * 86400000;
-  const weekStart = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Europe/Vienna",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date(mondayMs));
+  const [jahr, monat, tag] = todayDate.split("-").map(Number);
+  const montagUtc = new Date(Date.UTC(jahr, monat - 1, tag) - diff * 86400000);
+  const weekStart = `${montagUtc.getUTCFullYear()}-${String(montagUtc.getUTCMonth() + 1).padStart(2, "0")}-${String(
+    montagUtc.getUTCDate()
+  ).padStart(2, "0")}`;
 
   return { todayDate, weekStart, monthKey, yearKey };
 }

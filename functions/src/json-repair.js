@@ -543,6 +543,10 @@ function parseSafely(text, options = {}) {
 module.exports = {
   parseSafely,
   applyBounds,
+  /* Kanonische Laengengrenze eines Kartenwerts. Wird auch in mistral.js
+     gebraucht (Anker-Voranstellung, BUG-2026-08-20-26) — dort NICHT wiederholen,
+     sonst driften zwei Zahlen auseinander. */
+  STRING_BOUND_CATEGORY,
   cleanHeuristic,
   /* Für gezielte Tests einzelner Stufen */
   _tryParseDirect: tryParseDirect,

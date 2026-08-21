@@ -72,6 +72,35 @@ describe("getDateKeys", () => {
     expect(date.getDay()).toBe(1); /* 1 = Monday */
   });
 
+  test("BUG-2026-08-20-48: der Wochenstart haelt auch am Zeitumstellungs-Sonntag", () => {
+    /* Die Rechnung zog feste 24-Stunden-Tage ab. An den Umstellungssonntagen hat
+       der Tag in Wien aber 23 bzw. 25 Stunden — am Winterzeit-Sonntag landete der
+       Rueckschritt deshalb im falschen Kalendertag, und Analysen dieser Stunde
+       zaehlten in eine andere Woche. Naechstes Eintreten: 25.10.2026. */
+    const faelle = [
+      ["2026-10-25T22:30:00Z", "Winterzeit-Sonntag, 23:30 Wien (nach der Umstellung)", "2026-10-19"],
+      ["2026-10-25T21:30:00Z", "Winterzeit-Sonntag, 23:30 Wien (vor der Umstellung)", "2026-10-19"],
+      ["2026-10-26T00:30:00Z", "Montag danach, 01:30 Wien", "2026-10-26"],
+      ["2026-03-29T00:30:00Z", "Sommerzeit-Sonntag, 01:30 Wien", "2026-03-23"],
+      /* 22:00 UTC ist in Wien schon Montag, der 30. — der Wochenstart ist dann
+         dieser Montag selbst. (Der erste Anlauf dieses Tests hatte hier die
+         falsche Erwartung; der Code war richtig.) */
+      ["2026-03-29T22:00:00Z", "Montag 00:00 Wien", "2026-03-30"],
+    ];
+    /* Jest kennt keine Zusatz-Meldung an expect() — der Fall steht deshalb IM
+       verglichenen Wert, damit er im Fehlschlag sichtbar ist. */
+    const ist = faelle.map(([iso, was]) => {
+      const keys = getDateKeys(new Date(iso));
+      const [y, m, d] = keys.weekStart.split("-").map(Number);
+      /* Date.UTC, nicht new Date(y, m-1, d): Letzteres nimmt die Zeitzone des
+         Laeufers und machte den Test selbst zeitzonenabhaengig. */
+      const wochentag = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+      return { was, weekStart: keys.weekStart, istMontag: wochentag === 1 };
+    });
+    const soll = faelle.map(([, was, erwartet]) => ({ was, weekStart: erwartet, istMontag: true }));
+    expect(ist).toEqual(soll);
+  });
+
   test("uses Vienna timezone (not UTC)", () => {
     /* At 00:30 UTC on Jan 1, Vienna is already Jan 1 (UTC+1) — same day.
        At 23:30 UTC on Dec 31, Vienna is already Jan 1 (UTC+1) — different day. */

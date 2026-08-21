@@ -58,6 +58,46 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Seiten der Website. Und die Liste der Rechtsseiten hat eine Kontrolle
   bekommen, die bemerkt, wenn eine neue Seite dazukommt.
 
+### Behoben (Welle 3 — was im Betrieb wirkt)
+
+- **Die Adresse auf der GPS-Karte verschwand beim Umschalten.** Wer nach der
+  Analyse zwischen seriösem und Beast-Modus wechselte, sah ab dann nur noch
+  Zahlenkoordinaten statt des Ortsnamens — auch im Ausdruck. Der Ort wird jetzt
+  behalten, gebunden an die Aufnahme, damit er nicht am nächsten Foto klebt.
+
+- **Vier Fehler, die niemand je erfahren hätte.** Fiel die Karte aus, verschwand
+  einfach ein Abschnitt der Seite, ohne dass eine Meldung ankam. Fehlermeldungen
+  gingen bei Andrang verloren — ausgerechnet dann, wenn viele Geräte gleichzeitig
+  melden. Der Hinweis zum Beast-Modus konnte nach einem Abbruch losgehen. Und die
+  Echtheits-Prüfung sagte in sehr alten Browsern nicht ehrlich, dass sie dort
+  nicht läuft, sondern hinterließ einen toten Knopf.
+
+- **Die Sprachwahl-Rückfrage konnte weiterhin hängenbleiben.** Wer sie schloss
+  und im selben Moment erneut öffnete, bekam ein unsichtbares, aber offenes
+  Fenster — die Seite reagierte danach auf keine Taste mehr.
+
+- **Der Workshop-Boost hob das Stundenlimit dauerhaft an.** Ein Klick auf
+  „+100 Analysen" verdoppelte die Kostenbremse für immer; zurück ging es nur von
+  Hand. Der Boost läuft jetzt nach zwei Stunden aus — aber schonend: erst, wenn
+  die Auslastung wieder unter dem normalen Limit liegt. Eine laufende Schulklasse
+  wird dadurch nie mitten im Betrieb ausgesperrt.
+
+- **Ein Textfeld der KI konnte die Längenbegrenzung umgehen.** Ein präpariertes
+  Foto hätte einen überlangen Wert auf eine Profilkarte bringen können. Normale
+  Profiltexte bleiben unverändert — das ist eigens abgesichert.
+
+- **Der Wochenzähler wäre am 25. Oktober umgekippt.** Am Tag der Zeitumstellung
+  hat der Sonntag 25 Stunden; die Rechnung ging von festen 24 aus und hätte
+  Analysen dieser Stunde einer falschen Woche zugeschrieben.
+
+- **Die Mess-Werkzeuge im Projekt riefen den falschen Mistral-Eingang auf.** Der
+  ausgelieferte Code war längst auf den EU-Endpunkt festgelegt, die zehn
+  Vergleichs-Werkzeuge nicht. Eine Prüfung deckt jetzt das gesamte Projekt ab.
+
+- **Die Zugriffsregeln der Datenbank wurden nie mit ausgeliefert.** Sie stimmen
+  heute mit den aktiven überein (nachgemessen); ab jetzt gehören sie zur
+  Auslieferung, damit eine künftige Änderung nicht von Hand nachgezogen werden muss.
+
 ### Aufgeräumt
 
 - Zwei Beispielgrafiken, die seit dem ersten Tag niemand benutzte, wurden bei

@@ -3,6 +3,19 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30000,
+  /* OPS-2026-08-21-04: Ohne diese Angabe schaltet Playwright in der Pipeline auf
+     EINEN Arbeiter herunter (CI-Erkennung). Die 279 Tests liefen deshalb streng
+     nacheinander — rund zehn Minuten je Lauf, und die Kette faehrt zweimal je
+     Auslieferung. Am 2026-08-21 hat das an einem Tag ueber eine Stunde reine
+     Wartezeit gekostet.
+     ZWEI Arbeiter, nicht mehr. Vier waren am 21.08. ausprobiert und gemessen:
+     Der Lauf war zwar schnell (6,0 statt 10,5 Minuten), aber der schwerste Test
+     (axe ueber vier Sprach-/Themen-Kombinationen in WebKit) riss dabei die
+     30-Sekunden-Grenze. Der Pipeline-Rechner hat vier Kerne; vier gleichzeitige
+     Browser lassen dem einzelnen Test zu wenig davon uebrig. Ein Pruefstand, der
+     unter eigener Last kippt, ist wertlos — lieber etwas langsamer und
+     verlaesslich. */
+  workers: process.env.CI ? 2 : undefined,
   use: {
     baseURL: "http://localhost:8081",
     headless: true,
@@ -41,7 +54,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "python3 -m http.server 8081 --directory public",
+    /* OPS-2026-08-21-04: `python3 -m http.server` bedient GENAU EINE Anfrage zur
+       Zeit. Bei mehreren Arbeitern (und schon bei einem, wenn eine Seite viele
+       Dateien nachlaedt) reisst er Verbindungen ab: "BrokenPipeError" und
+       "ConnectionResetError" standen wiederholt im Pipeline-Protokoll, einmal
+       hat ein solcher Aussetzer einen Testlauf rot gemacht. Die mehrspurige
+       Variante steht in derselben Standardbibliothek und kostet nichts. */
+    command:
+      "python3 -c \"from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler;import functools,os;os.chdir('public');ThreadingHTTPServer(('',8081),SimpleHTTPRequestHandler).serve_forever()\"",
     port: 8081,
     // TEST-2026-08-13-K6: Standardmäßig NICHT wiederverwenden. Vorher teilten
     // sich zwei gleichzeitige Läufe Port 8081 — der zweite bekam einen fremden

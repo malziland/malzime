@@ -513,6 +513,13 @@ test("Kontrast der gefüllten Flächen reicht in hell UND dunkel", async ({ page
 });
 
 test("axe über die ganze Matrix: 2 Sprachen × 2 Themen, Rückfrage offen und zu", async ({ page }) => {
+  // Der mit Abstand teuerste Test der Suite: axe läuft sechs Mal, in WebKit.
+  // Allein braucht er rund 13 Sekunden; laufen daneben weitere Browser, wird er
+  // langsamer, ohne dass etwas kaputt wäre. Am 21.08. hat er deshalb bei vier
+  // gleichzeitigen Arbeitern die 30-Sekunden-Grenze gerissen und die Kette rot
+  // gemacht — ein Messfehler, kein Befund. `test.slow()` verdreifacht seine
+  // Zeitgrenze; geprüft wird unverändert dasselbe.
+  test.slow();
   await seiteVorbereiten(page);
   await page.goto("/");
   await warteAufSchalter(page);

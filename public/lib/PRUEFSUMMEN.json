@@ -1,6 +1,6 @@
 {
   "_hinweis": "Pruefsummen der selbst gehosteten Fremddateien (AUDIT-BEFUND OSS-2026-08-12-22). Ohne sie faellt eine Aenderung an minifiziertem Fremdcode niemandem auf — ausgerechnet exifr liest die GPS-Daten, deren Nichtweitergabe die Kernzusage ist. Geprueft von scripts/pruefe-fremddateien.mjs, im CI-Job 'pruefungen'.",
-  "_erstellt": "2026-08-12",
+  "_erstellt": "2026-08-21",
   "_herkunft": {
     "public/lib/leaflet": "npm leaflet@1.9.4, dist/ — leaflet.js ohne die sourceMappingURL-Zeile (siehe VERSION); LICENSE woertlich aus dem Leaflet-Repository (2026-08-19)",
     "public/lib/exifr": "npm exifr@7.1.x, dist/lite.esm.mjs — per Pruefsumme auf 7.1.0-7.1.3 eingegrenzt; LICENSE woertlich aus dem exifr-Repository (2026-08-19)",
@@ -27,6 +27,7 @@
     "public/lib/leaflet/images/marker-icon.png": "sha256:574c3a5cca85f4114085b6841596d62f00d7c892c7b03f28cbfa301deb1dc437",
     "public/lib/leaflet/images/marker-shadow.png": "sha256:264f5c640339f042dd729062cfc04c17f8ea0f29882b538e3848ed8f10edb4da",
     "public/lib/leaflet/leaflet.css": "sha256:a7837102824184820dfa198d1ebcd109ff6d0ff9a2672a074b9a1b4d147d04c6",
-    "public/lib/leaflet/leaflet.js": "sha256:dc71f8a6880bc3ca1bd9fa8dc5f1af48c702dc510b0a78240a07c5feed7ce935"
+    "public/lib/leaflet/leaflet.js": "sha256:dc71f8a6880bc3ca1bd9fa8dc5f1af48c702dc510b0a78240a07c5feed7ce935",
+    "public/fonts/poppins/VERSION": "sha256:8799ca17fd5928e88739429f2fc1d7d8c5241e6ff58d46d81b4996de1d5609cc"
   }
 }

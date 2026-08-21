@@ -184,7 +184,7 @@
   "stats.infoCountTitle": "Was wird gezählt?",
   "stats.infoCountText": "Nur Zählwerte je Zeitraum — keine Einzelvorgänge. Keine Bilder, keine IP-Adressen, keine Nutzerprofile.",
   "stats.infoLimitTitle": "Warum ein Limit?",
-  "stats.infoLimitText": "Jede Analyse kostet Geld (KI + Bilderkennung). Das Stundenlimit schützt das Projekt vor unerwarteten Kosten.",
+  "stats.infoLimitText": "Jede KI-Analyse kostet Geld. Das Stundenlimit schützt das Projekt vor unerwarteten Kosten.",
   "stats.infoFundingTitle": "Eigenfinanziert — für alle kostenlos",
   "stats.infoFundingText": "malziME ist werbefrei, ohne Tracking und ohne Paywall. Mit einer Spende hilfst du, die Limits zu erhöhen und das Projekt am Laufen zu halten.",
   "stats.infoFundingButton": "Projekt unterstützen",

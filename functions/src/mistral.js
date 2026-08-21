@@ -26,7 +26,7 @@ const {
   MISTRAL_SINGLE_LARGE_MAX_TOKENS,
 } = require("./config");
 const { loadPrompts } = require("./i18n");
-const { parseSafely } = require("./json-repair");
+const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 const { withMistralSlot } = require("./throttle");
 
 /* Wird beim Modul-Load via env-Variable gelesen. NICHT hartcodiert. */
@@ -1261,6 +1261,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      erhoben, nicht am ausgelieferten Ergebnis — auf der Karte kam sie nie an.
      Nebeneffekt vorher: Standard- und Beast-Modus zeigten an dieser Karte
      denselben nackten Anker. */
+  const ANKER_MAX = 120;
   function mitAnkerVoran(anker, modellwert) {
     const a = String(anker || "")
       .trim()
@@ -1273,7 +1274,17 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        doppelt zu schreiben. */
     const m = String(modellwert || "").match(/^[^.!?]*[.!?]\s*(.+)$/s);
     const rest = m ? m[1].trim() : "";
-    return rest ? `${a}. ${rest}` : a;
+    /* BUG-2026-08-20-26: Der Anker wird NACH applyBounds vorangestellt und umging
+       damit die Laengengrenze der Karte. Ein praepariertes Foto (Prompt-Injection
+       ueber Bildinhalt) oder ein durchdrehendes Modell konnte so einen bis zu
+       fuenfstellig langen Wert auf die Karte bringen — nachgemessen: 5000 Zeichen
+       statt der zugesagten 800. Kein XSS (das Frontend maskiert), aber eine
+       Anzeige, die die Seite sprengt, und eine Zusage, die nicht mehr stimmt.
+       Der Anker selbst ist von Natur aus kurz ("34, weiblich"); 120 Zeichen sind
+       grosszuegig. Danach gilt dieselbe Grenze wie fuer jeden Kartenwert. */
+    const ankerKurz = a.slice(0, ANKER_MAX);
+    const zusammen = rest ? `${ankerKurz}. ${rest}` : ankerKurz;
+    return zusammen.slice(0, STRING_BOUND_CATEGORY);
   }
 
   function buildProfile(modeKey) {

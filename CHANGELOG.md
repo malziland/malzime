@@ -6,65 +6,157 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
-> **Diese Einträge sind teilweise schon LIVE** (Hosting-Deploy 2026-08-21,
-> Cache-Kennung `2026082101`) und stehen bewusst weiter unter
-> „Unveröffentlicht": Die Sanierung des TIEF-Audits vom 20.08. wird als
-> **Version 4.0.0** ausgeliefert, und die Nummer wird erst vergeben,
-> wenn alle Befunde behoben und ausdruecklich freigegeben sind. Bis dahin darf hier
-> keine Versionsnummer stehen — `release.yml` legte sonst sofort einen
-> GitHub-Release an. Nicht „korrigieren".
+> **Was hiervon live ist, Stand 2026-08-21:** Die Rechtstexte und die
+> Doku-Korrekturen sind ausgeliefert (Hosting-Deploy, Cache-Kennung
+> `2026082101`). Die Code-Fixes darunter — Karte, Sprachwahl, Boost,
+> Wochenzähler, Fehlerpfade — sind gebaut und geprüft, aber **noch nicht
+> ausgeliefert**; sie gehen mit dem nächsten Deploy live.
+>
+> Alles steht bewusst weiter unter „Unveröffentlicht": Die Sanierung des TIEF-Audits vom 20.08. wird als
+> **Version 4.0.0** ausgeliefert, und die Nummer wird erst vergeben, wenn alle
+> Befunde behoben und ausdrücklich freigegeben sind. Bis dahin darf hier keine
+> Versionsnummer stehen — `release.yml` legte sonst sofort einen GitHub-Release
+> an. Nicht „korrigieren".
 
-### Behoben
+Ein Lang-Audit hat das Projekt in der Nacht auf den 21. August durchleuchtet:
+14 Prüfer entlang getrennter Fragen, jeder Verdacht danach von einem eigenen
+Prüfer angegriffen. Ergebnis: **52 Befunde, alle behoben.** Kein Datenabfluss,
+keine Kostenlücke, nichts von außen Ausnutzbares — die Plattform selbst war
+gesund. Kaputt waren die Wächter darüber, die Messinstrumente und einige
+Aussagen, die nicht mehr zum Code passten.
 
-- **Die Prüfkette wäre heute Nacht von selbst rot geworden.** Ein Test rechnete
-  mit der echten Uhr gegen ein fest eingebautes Datum und wäre ab dem
-  21. August bei jedem Lauf durchgefallen — ohne dass jemand etwas geändert
-  hätte. Da er zu den Pflicht-Prüfungen gehört, hätte das jede Änderung und
-  jede Auslieferung blockiert. Die Website selbst war nie betroffen.
+### Behoben — was Besucher merken
 
-  Eine neue Prüfung findet diese Fehlerform künftig selbst: Sie sucht Tests zu
-  Programmteilen mit festem Datum und lässt genau die mit einer um 400 Tage
-  vorgestellten Uhr laufen. Was dabei umkippt, ist ein solcher Zeitzünder.
+- **Die Adresse auf der GPS-Karte verschwand beim Umschalten.** Wer nach der
+  Analyse zwischen seriösem Modus und Beast-Modus wechselte, sah ab dann nur
+  noch Zahlenkoordinaten statt des Ortsnamens — auch im Ausdruck. Der Ort wird
+  jetzt behalten, gebunden an die Aufnahme, damit er nicht am nächsten Foto klebt.
+
+- **Die Sprachwahl-Rückfrage konnte hängenbleiben.** Wer sie schloss und im
+  selben Moment erneut öffnete, bekam ein unsichtbares, aber offenes Fenster —
+  die Seite reagierte danach auf keine Taste mehr.
+
+- **Die Echtheits-Prüfung ließ ältere Browser im Unklaren.** Statt ehrlich zu
+  sagen, dass sie dort nicht läuft, blieb ein toter Knopf zurück.
+
+- **Auf iPhones konnte das nächste Foto scheitern.** Nach einem Fehler beim
+  Verkleinern wurde der Zeichenspeicher nicht freigegeben — dieselbe Ursache,
+  die im August schon einmal das zweite Bild scheitern ließ, nur in einem
+  selteneren Zweig.
+
+### Behoben — was in den Rechtstexten stand
+
+- **„Immer JPEG, immer upload.jpg" stimmte nicht mehr.** Seit dem
+  iPhone-Fix vom 19. August kann der Browser das Foto als PNG schicken. Die
+  Datenschutzerklärung sagt jetzt in beiden Sprachen, was wirklich passiert —
+  ohne die Zusage abzuschwächen: kein Originalname, keine Metadaten, kein
+  Originalfoto.
+
+- **Die Aufzählung dessen, was an den Server geht, war unvollständig.** Vier
+  technische Angaben reisen mit, die nichts über die Person sagen: Bildformat,
+  der neu vergebene Dateiname, die Seitensprache und eine zufällige
+  Anfrage-Nummer. Sie sind jetzt benannt und erklärt.
+
+- **Die Nutzungsbedingungen verwiesen auf eine Schlichtungsstelle, die es nicht
+  mehr gibt.** Die EU-Plattform wurde im Juli 2025 eingestellt; an ihrer Stelle
+  stehen jetzt die österreichischen Schlichtungsstellen.
+
+- **Die Klausel, welche Sprachfassung rechtlich gilt, stand nur auf Englisch.**
+  Jetzt in beiden Fassungen.
+
+- **Die Wortregel „geraten statt erfunden" galt noch nicht überall.** Sie fehlte
+  in den englischen Texten, im README — und in der Datei, die KI-Suchmaschinen
+  sagt, wie sie malziME zitieren sollen. Dort stand ausdrücklich, die Profile
+  seien „fiktiv".
+
+- **Die Stand-Daten der Rechtsseiten waren älter als ihr Inhalt.** Bei
+  Rechtstexten ist das Datum die einzige Änderungsanzeige.
+
+- **Der Hinweis auf der Zahlen-Seite nannte einen Dienst, den es nicht mehr
+  gibt** („KI + Bilderkennung" — seit v1.6 läuft alles über eine einzige KI).
+
+### Behoben — Prüfungen, die nicht mehr prüften
+
+- **Die Prüfkette wäre in der Nacht von selbst rot geworden.** Ein Test rechnete
+  mit der echten Uhr gegen ein fest eingebautes Datum und wäre ab dem 21. August
+  bei jedem Lauf durchgefallen — ohne dass jemand etwas geändert hätte. Da er zu
+  den Pflicht-Prüfungen gehört, hätte das jede Änderung und jede Auslieferung
+  blockiert. Die Website war nie betroffen. Eine neue Prüfung findet diese
+  Fehlerform künftig selbst.
 
 - **Der Melder für den gemeldeten Druck-Abbruch-Fehler lieferte nichts.** Er
   wurde am 18. August gebaut, um den Fehler beim nächsten Auftreten messbar zu
   machen — schickte seine Messwerte aber in einer Form los, die unterwegs
-  verworfen wurde. Angekommen wäre eine leere Meldung. Jetzt kommen alle
-  Angaben an, und eine Prüfung hält den Meldeweg für jede künftige Meldestelle
-  fest. Dabei fiel eine zweite Stelle auf, die aus demselben Grund verlor,
-  welches Beispielbild einen Fehler ausgelöst hatte.
-
-- **Ein roter Prüflauf konnte an der Auslieferung vorbeirutschen.** Wird ein
-  Stand später erneut geprüft — das passiert wöchentlich automatisch — und
-  fällt dabei durch, meldete die Auslieferungssperre trotzdem „alles grün": Sie
-  sah den älteren, grünen Lauf. Jetzt zählt nur noch der jüngste. Fehlt das
-  Werkzeug, mit dem sie die Prüfergebnisse abfragt, bricht sie ab, statt die
-  Freigabe stillschweigend zu überspringen.
-
-- **Die Echtheits-Prüfung belegte nicht, was sie behauptete.** Sie verglich die
-  ausgelieferten Dateien mit einer Liste, die vom selben Server stammte — wer
-  die Auslieferung kontrolliert, kontrolliert beides. Jetzt rechnet sie jede
-  Datei zusätzlich gegen den genannten Stand im Quelltext-Archiv nach. Die
-  Cache-Kennung weicht dabei erwartbar ab; das steht jetzt ausdrücklich im
-  Ergebnis, statt verschwiegen zu werden. Ein Netzabbruch gilt außerdem nicht
-  mehr als „Datei fehlt", sondern als Messproblem.
+  verworfen wurde. Jetzt kommen alle Angaben an.
 
 - **Vier Wächter der Barrierefreiheit prüften eine Liste statt der Seite.** Der
   Abdeckungs-Wächter — gebaut, nachdem das Prüfwerkzeug den ganzen Profilinhalt
-  übersehen hatte — bewachte fünf feste Namen; ein umbenannter oder neuer
-  Bereich wäre nie aufgefallen. Der Zahlen-Wächter kannte die englische
-  Erklärung nicht und hätte grün gemeldet, sobald er gar nichts mehr findet.
-  Der Datums-Wächter verglich Tag und Jahr, aber nicht den Monat. Und geprüft
-  wurden nur zwei der acht Rechtsseiten, während die Zusage „keine Verstöße"
-  für alle gilt. Alle vier messen jetzt die tatsächliche Fläche; die sechs
-  bisher ungeprüften Seiten sind auf Anhieb ohne Beanstandung.
+  übersehen hatte — bewachte fünf feste Namen. Der Zahlen-Wächter kannte die
+  englische Erklärung nicht. Der Datums-Wächter verglich den Monat nicht. Und
+  geprüft wurden nur zwei der acht Rechtsseiten, während die Zusage „keine
+  Verstöße" für alle gilt. Die sechs bisher ungeprüften Seiten sind auf Anhieb
+  ohne Beanstandung.
 
-- **Weitere Wächter-Lücken geschlossen:** Der Lizenz-Wächter sah nur Ordner —
-  eine einzeln abgelegte fremde Datei wäre ohne Lizenztext durchgegangen. Der
-  Doku-Wächter las nur die oberste Ebene und übersah damit ausgerechnet die
-  Unterlagen, die öffentlich zitiert werden; er prüft jetzt auch Verweise auf
-  Seiten der Website. Und die Liste der Rechtsseiten hat eine Kontrolle
-  bekommen, die bemerkt, wenn eine neue Seite dazukommt.
+- **Sporadische Barrierefreiheits-Fehler wurden stillschweigend verworfen.** Was
+  nur in einem von zwei Messläufen auftrat, landete in einer Protokollzeile, die
+  niemand liest. Ernste Funde machen jetzt rot.
+
+- **Weitere Lücken:** Der Lizenz-Wächter sah nur Ordner — eine einzeln abgelegte
+  fremde Datei wäre ohne Lizenztext durchgegangen. Der Doku-Wächter las nur die
+  oberste Ebene und übersah die Unterlagen, die öffentlich zitiert werden. Und
+  ein Wächter meldete eine neue Fremddatei, konnte sie aber mit seinem eigenen
+  Werkzeug nicht abhaken — der Lauf blieb rot, egal wie oft man es versuchte.
+
+### Behoben — Auslieferung und Betrieb
+
+- **Ein roter Prüflauf konnte an der Auslieferung vorbeirutschen.** Wird ein
+  Stand später erneut geprüft — das passiert wöchentlich automatisch — und fällt
+  dabei durch, meldete die Sperre trotzdem „alles grün": Sie sah den älteren,
+  grünen Lauf. Jetzt zählt nur der jüngste. Fehlt das Werkzeug zum Abfragen,
+  bricht sie ab, statt die Freigabe stillschweigend zu überspringen.
+
+- **Die Echtheits-Prüfung belegte nicht, was sie behauptete.** Sie verglich die
+  ausgelieferten Dateien mit einer Liste, die vom selben Server stammte. Jetzt
+  rechnet sie jede Datei zusätzlich gegen den Quelltext-Stand nach.
+
+- **Der Workshop-Boost hob das Stundenlimit dauerhaft an.** Ein Klick auf
+  „+100 Analysen" verdoppelte die Kostenbremse für immer; zurück ging es nur von
+  Hand. Der Boost läuft jetzt nach zwei Stunden aus — aber schonend: erst, wenn
+  die Auslastung wieder unter dem normalen Limit liegt. Eine laufende
+  Schulklasse wird nie mitten im Betrieb ausgesperrt.
+
+- **Vier Fehler, von denen niemand je erfahren hätte.** Fiel die Karte aus,
+  verschwand ein Abschnitt der Seite ohne jede Meldung. Fehlermeldungen gingen
+  bei Andrang verloren — ausgerechnet dann, wenn viele Geräte gleichzeitig
+  melden. Der Hinweis auf den Beast-Modus konnte nach einem Abbruch losgehen.
+
+- **Ein Textfeld der KI konnte die Längenbegrenzung umgehen.** Ein präpariertes
+  Foto hätte einen überlangen Wert auf eine Profilkarte bringen können. Normale
+  Profiltexte bleiben unverändert — das ist eigens abgesichert.
+
+- **Der Wochenzähler wäre am 25. Oktober umgekippt.** Am Tag der Zeitumstellung
+  hat der Sonntag 25 Stunden; die Rechnung ging von festen 24 aus.
+
+- **Die Mess-Werkzeuge im Projekt riefen den falschen Mistral-Eingang auf.** Der
+  ausgelieferte Code war längst auf den EU-Endpunkt festgelegt, die zehn
+  Vergleichs-Werkzeuge nicht.
+
+- **Die Zugriffsregeln der Datenbank wurden nie mit ausgeliefert.** Sie stimmen
+  heute mit den aktiven überein (nachgemessen); ab jetzt gehören sie zur
+  Auslieferung.
+
+### Geändert
+
+- **Die Beschreibung des Schutzes „HSTS" ist ehrlicher.** Die Seite erzwingt
+  verschlüsselte Verbindungen, ist aber bewusst nicht in die fest in Browser
+  eingebaute Liste eingetragen — der Eintrag wäre praktisch unumkehrbar und
+  bindet die gesamte Domain samt aller künftigen Unteradressen. Die Abwägung
+  steht offen im Sicherheitsmodell, statt dass der Satz stillschweigend
+  verschwindet.
+
+- **Betriebsunterlagen gegen die Wirklichkeit gemessen:** Architektur-Diagramm,
+  Feature-Schalter-Register, Betriebshandbuch, DNS-Tabelle, Prüfprotokoll,
+  Sitemap und mehrere veraltete Angaben in README, AGENTS und SETUP.
 
 ### Aufgeräumt
 

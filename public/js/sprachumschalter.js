@@ -284,6 +284,10 @@ function beschriften() {
 
 let offen = null;
 let zielSprache = null;
+/* BUG-2026-08-20-19: Haelt den Ausblend-Zeitgeber fest, damit ein Wiederoeffnen
+   ihn abraeumen kann. Ohne das versteckte der alte Zeitgeber den frisch
+   geoeffneten Dialog — sichtbar weg, in Wahrheit offen, Seite blockiert. */
+let versteckZeitgeber = null;
 let fokusVorher = null;
 
 /* Alles ausser dem Dialog stillegen. `inert` nimmt Maus, Tastatur UND
@@ -298,6 +302,13 @@ function umgebungStillegen(an) {
 }
 
 function modalOeffnen(art, ziel, ohneBild, ausloeser) {
+  /* BUG-2026-08-20-19: Einen noch laufenden Ausblend-Zeitgeber des vorigen
+     Schliessens abraeumen — sonst versteckt er gleich den Dialog, den wir
+     gerade oeffnen, und laesst die Seite stillgelegt zurueck. */
+  if (versteckZeitgeber) {
+    clearTimeout(versteckZeitgeber);
+    versteckZeitgeber = null;
+  }
   zielSprache = ziel;
   /* Ein Satz, zwei Fälle: Mit Bild folgt eine neue Analyse, ohne Bild eine
      leere Startseite. Überschrift und Knöpfe bleiben gleich — der Nutzer
@@ -344,8 +355,17 @@ function modalSchliessen() {
   offen = null;
   zielSprache = null;
   el.classList.remove("sichtbar");
-  /* Erst nach dem Ausblenden verbergen, sonst springt es weg statt zu gehen. */
-  setTimeout(() => {
+  /* Erst nach dem Ausblenden verbergen, sonst springt es weg statt zu gehen.
+     BUG-2026-08-20-19: Der Zeitgeber wurde bisher nicht festgehalten. Wer den
+     Dialog schloss und binnen 200 ms denselben Sprachknopf erneut drueckte, sah
+     ihn kurz aufgehen — und dann setzte der ALTE Zeitgeber `hidden = true`. Der
+     Dialog war danach unsichtbar, aber offen: Die Seite blieb stillgelegt und
+     reagierte auf keine Taste mehr. Der v3.9.1-Fix deckte nur das gleichzeitige
+     Oeffnen und Schliessen ab, nicht das Wiederoeffnen.
+     Jetzt wird ein laufender Zeitgeber beim naechsten Oeffnen abgeraeumt. */
+  if (versteckZeitgeber) clearTimeout(versteckZeitgeber);
+  versteckZeitgeber = setTimeout(() => {
+    versteckZeitgeber = null;
     el.hidden = true;
   }, 200);
   /* Fokus erst im NÄCHSTEN Bildschirmrahmen zurückgeben, nicht sofort.

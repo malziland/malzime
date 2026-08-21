@@ -67,7 +67,7 @@ const INPUT_DIR = path.join(REPO_ROOT, "compare-input");
 const OUTPUT_JSON = path.join(REPO_ROOT, "age-ab-v29-results.json");
 const OUTPUT_REPORT = path.join(REPO_ROOT, "age-ab-v29-report.md");
 
-const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
+const ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
 const MODEL = "mistral-large-2512";
 const MAX_TOKENS = 8000;
 const TEMPERATURE = 0.5;

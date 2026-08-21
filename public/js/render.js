@@ -1,4 +1,5 @@
 import { elements, escapeHtml } from "./dom.js";
+import { logClientError } from "./error-logger.js";
 import { state } from "./state.js";
 import { getBiasMode } from "./ui.js";
 import { t, getLanguage } from "./i18n.js";
@@ -337,8 +338,20 @@ async function renderGpsMap(data) {
     /* BUG-002: Lokale Referenz — verhindert dass ein neueres Geocoding-Promise
        ueberschrieben wird wenn zwischen await und Cleanup eine neue Analyse startet */
     const geocodePromise = state.pendingGeocode;
-    const address = geocodePromise ? await geocodePromise : null;
+    let address = geocodePromise ? await geocodePromise : null;
     if (state.pendingGeocode === geocodePromise) state.pendingGeocode = null;
+
+    /* BUG-2026-08-20-06: Beim zweiten Aufbau derselben Analyse (Moduswechsel,
+       Ausdruck) ist `pendingGeocode` bereits verbraucht. Ohne Gedaechtnis stuenden
+       dort ab dann nur noch Koordinaten — die Adresse war weg, auch im Ausdruck.
+       Der Cache haengt an den Koordinaten: Er greift nur, wenn es dieselbe
+       Aufnahme ist. */
+    const passtZuCache = state.geocodeCache && state.geocodeCache.lat === lat && state.geocodeCache.lng === lng;
+    if (address) {
+      state.geocodeCache = { lat, lng, address };
+    } else if (passtZuCache) {
+      address = state.geocodeCache.address;
+    }
 
     /* Der Ort steht als Zeile UEBER der Karte, nicht in einer Sprechblase.
        Bis v3.8.1 oeffnete sich eine Leaflet-Sprechblase von selbst und verdeckte
@@ -400,9 +413,24 @@ async function renderGpsMap(data) {
       iconAnchor: [14, 37],
     });
     L.marker([lat, lng], { icon: zeiger, title: t("gps.popup") }).addTo(karte);
-  } catch (_err) {
-    /* BUG-015: Leaflet-Fehler abfangen statt Unhandled Promise Rejection */
+  } catch (fehler) {
+    /* BUG-015: Leaflet-Fehler abfangen statt Unhandled Promise Rejection.
+       BUG-2026-08-20-17: Der Bereich wurde dabei stumm geleert. Faellt die Karte
+       fuer alle Nutzer aus — kaputtes Leaflet, blockierte Kacheln, Fehler im
+       Kartenaufbau —, verschwindet einfach ein Abschnitt der Seite, und niemand
+       erfaehrt davon: Nutzer melden ein FEHLENDES Stueck erfahrungsgemaess nicht.
+       Genau die sieben Karten-Befunde vom 19.08. sind so lange unentdeckt
+       geblieben. Jetzt geht der Ausfall in die Fehlererfassung (anonym, ohne
+       Koordinaten — die verlassen den Browser nicht). */
     elements.gpsMap.innerHTML = "";
+    try {
+      logClientError(fehler instanceof Error ? fehler : new Error(String(fehler)), {
+        phase: "gps-karte-aufbau",
+        errorDetail: `leaflet=${typeof L === "undefined" ? "fehlt" : "da"}`.slice(0, 60),
+      });
+    } catch (_still) {
+      /* Die Meldung darf die Anzeige nie mit herunterreissen. */
+    }
   }
 }
 

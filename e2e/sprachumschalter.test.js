@@ -183,6 +183,20 @@ async function axePruefen(page, kontext) {
   if (wackelig.length) {
     console.log(`[a11y] ${kontext}: ${wackelig.length} Fund(e) nur im ersten Lauf — als Uebergangs-Artefakt verworfen`);
   }
+  /* TEST-2026-08-20-25: Das Verwerfen hinterliess nur diese Zeile im Protokoll,
+     die kein Gate liest und niemand ansieht. Ein realer, an einen kurzlebigen
+     Zustand gebundener Verstoss (aufblitzende Ansage, Lockruf-Scheitel,
+     Ladezustand) waere damit fuer immer unsichtbar geblieben — verworfen heisst
+     hier "nicht reproduzierbar", nicht "existiert nicht".
+     Ein ERNSTER Fund, der nur in einem der beiden Laeufe auftritt, macht deshalb
+     jetzt rot. Er ist entweder echt und selten — dann gehoert er behoben — oder
+     die Messung ist wacklig, dann gehoert das gesehen. Leichtere Funde
+     (minor/moderate) bleiben eine Protokollzeile, wie bisher. */
+  const wackeligErnst = wackelig.filter((v) => v.impact === "serious" || v.impact === "critical");
+  expect(
+    wackeligErnst.map((v) => ({ regel: v.id, wirkung: v.impact, elemente: v.nodes.map((n) => n.target.join(" ")) })),
+    `Ernster A11y-Verstoss nur im ERSTEN von zwei Laeufen (${kontext}) — entweder ein seltener echter Fehler oder eine wacklige Messung; beides gehoert angesehen, nicht verworfen`
+  ).toEqual([]);
 
   if (funde.length) {
     console.log(
@@ -535,6 +549,41 @@ test("axe über die ganze Matrix: 2 Sprachen × 2 Themen, Rückfrage offen und z
   await page.click('.sprach-knopf[data-lang="en"]');
   await expect(page.locator('.sw-grund[data-modal="fertig"]')).toBeVisible();
   await axePruefen(page, "Rückfrage offen, Beast");
+});
+
+test("BUG-2026-08-20-19: Wiederoeffnen binnen der Ausblendzeit laesst den Dialog bedienbar", async ({ page }) => {
+  /* Schliessen startet einen 200-ms-Zeitgeber, der den Dialog danach `hidden`
+     setzt. Wurde binnen dieser Zeit erneut geoeffnet, versteckte der ALTE
+     Zeitgeber den frisch geoeffneten Dialog: unsichtbar, aber offen — die Seite
+     blieb stillgelegt und reagierte auf keine Taste mehr. Der Fix von v3.9.1
+     deckte nur das gleichzeitige Oeffnen und Schliessen ab, nicht diesen Fall. */
+  await seiteVorbereiten(page);
+  await page.goto("/");
+  await warteAufSchalter(page);
+  await profilErzeugen(page);
+
+  await page.click('.sprach-knopf[data-lang="en"]');
+  const modal = page.locator('.sw-grund[data-modal="fertig"]');
+  await expect(modal).toBeVisible();
+
+  /* Schliessen und SOFORT wieder oeffnen — beides im SELBEN Durchlauf, sonst
+     liegen zwischen zwei Playwright-Klicks laenger als die 200 ms und der
+     Zeitgeber ist bereits abgelaufen. (Der erste Anlauf dieses Tests hatte genau
+     diesen Fehler: Er blieb auch ohne den Fix gruen — die Rueckbauprobe hat es
+     gezeigt, nicht die Vermutung.) */
+  await page.evaluate(() => {
+    document.querySelector('.sw-grund[data-modal="fertig"] .sw-schliessen').click();
+    document.querySelector('.sprach-knopf[data-lang="en"]').click();
+  });
+
+  /* Nach Ablauf des alten Zeitgebers muss der Dialog immer noch dastehen. */
+  await page.waitForTimeout(400);
+  await expect(modal, "der alte Zeitgeber hat den frisch geoeffneten Dialog versteckt").toBeVisible();
+
+  /* Und er laesst sich normal schliessen — die Seite ist danach bedienbar. */
+  await modal.locator(".sw-knopf--bleiben").click();
+  await page.waitForTimeout(400);
+  await expect(modal).toBeHidden();
 });
 
 test.describe("Startsprache folgt dem Gerät", () => {

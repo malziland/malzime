@@ -83,6 +83,28 @@ test.describe("GPS-Karte", () => {
     await expect(page.locator(".leaflet-popup")).toHaveCount(0);
   });
 
+  test("BUG-2026-08-20-06: die Adresse ueberlebt den Moduswechsel", async ({ page }) => {
+    /* Der erste Aufbau verbrauchte das Geocoding-Versprechen und setzte es auf
+       null. Beim zweiten Aufbau — jedem Moduswechsel und jedem Ausdruck — stand
+       deshalb nur noch das Koordinatenpaar da. Der Ort, den die Karte zeigen
+       soll, war genau ab dem ersten Umschalten weg. */
+    await seiteMitKarte(page);
+    await expect(page.locator(".gps-address")).toHaveText(ADRESSE);
+
+    await page.evaluate(() => document.getElementById("biasSwitch").click());
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "boost");
+    await expect(page.locator("#gpsMapLeaflet")).toBeVisible({ timeout: 40000 });
+    await expect(
+      page.locator(".gps-address"),
+      "nach dem Moduswechsel steht dort das Koordinatenpaar statt der Adresse"
+    ).toHaveText(ADRESSE);
+
+    /* Und zurueck: auch der dritte Aufbau muss die Adresse behalten. */
+    await page.evaluate(() => document.getElementById("biasSwitch").click());
+    await expect(page.locator("html")).toHaveAttribute("data-mode", "normal");
+    await expect(page.locator(".gps-address")).toHaveText(ADRESSE);
+  });
+
   test("die Quellenangabe verweist auf die Lizenzseite", async ({ page }) => {
     /* Die OSM-Lizenz verlangt eine Nennung MIT Verweis. Bis v3.8.1 stand dort
        nur unverlinkter Text. */

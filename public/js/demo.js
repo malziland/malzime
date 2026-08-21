@@ -57,6 +57,7 @@ async function loadDemoImage(url, name) {
     state.geocodeAbortController = null;
   }
   state.pendingGeocode = null;
+  state.geocodeCache = null; /* BUG-2026-08-20-06: neue Analyse, neue Aufnahme */
 
   const prev = elements.imagePreview.querySelector("img");
   if (prev) URL.revokeObjectURL(prev.src);

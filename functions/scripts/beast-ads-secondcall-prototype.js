@@ -36,7 +36,7 @@ const REPO_ROOT = path.resolve(__dirname, "../..");
 const INPUT = path.join(REPO_ROOT, "ab-test-v4-vuln-results.json");
 const OUTPUT = path.join(REPO_ROOT, "secondcall-prototype-report.md");
 
-const ENDPOINT = "https://api.mistral.ai/v1/chat/completions";
+const ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
 const MODEL = process.env.MODEL || "mistral-large-2512";
 const TIMEOUT_MS = 60_000;
 

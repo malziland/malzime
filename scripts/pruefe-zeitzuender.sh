@@ -9,11 +9,25 @@
 # ist ein Zeitzuender. Ein Test, der die zeitabhaengige Funktion gar nicht aufruft, kann
 # hier nicht faelschlich anschlagen.
 #
-# Aufruf: sh scripts/pruefe-zeitzuender.sh [verzeichnis]
+# Aufruf: sh scripts/pruefe-zeitzuender.sh [verzeichnis] [--nur backend|frontend]
+#
+# Der Lauf braucht den jeweiligen Test-Runner. In der Pipeline liegen die Pakete nicht
+# in einem gemeinsamen Job: `test-backend` hat jest (npm ci --prefix functions),
+# `test-frontend` hat vitest (npm ci im Wurzelverzeichnis), und der schlanke Job
+# `pruefungen` hat bewusst gar keine. Deshalb der Filter — jeder Job prueft die
+# Kandidaten, die er auch ausfuehren KANN. Ohne Filter (lokal, vor-dem-push) laeuft alles.
+#
 # Exit 0 = kein Zeitzuender, 1 = Fundstelle, 2 = Messproblem (NIE als bestanden werten).
 
 set -u
-WURZEL=${1:-.}
+WURZEL=.
+NUR=alle
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --nur) NUR=${2:-alle}; shift 2 ;;
+    *) WURZEL=$1; shift ;;
+  esac
+done
 HIER=$(cd "$(dirname "$0")" && pwd)
 VORSPRUNG_TAGE=400
 
@@ -82,15 +96,19 @@ trap 'rm -f "$UHR" "$VCONF"' EXIT
 
 echo "Zeitzuender-Probe: Uhr um ${VORSPRUNG_TAGE} Tage vorgestellt."
 FEHLER=0
+GEMESSEN=0
 for TEST in $KANDIDATEN; do
   REL=${TEST#"$WURZEL"/}
   case "$REL" in
     functions/*)
+      [ "$NUR" = "frontend" ] && { echo "  --      $REL (uebersprungen: --nur frontend)"; continue; }
       AUSGABE=$(cd "$WURZEL/functions" && npx jest "${REL#functions/}" --setupFiles="$UHR" 2>&1) ;;
     *)
+      [ "$NUR" = "backend" ] && { echo "  --      $REL (uebersprungen: --nur backend)"; continue; }
       AUSGABE=$(cd "$WURZEL" && npx vitest run "$REL" --config .zeitzuender-vitest.config.js 2>&1) ;;
   esac
   LAUF=$?
+  GEMESSEN=$((GEMESSEN + 1))
   # KERN 5c: Ein gescheiterter Aufruf sieht aus wie ein Befund. Diese Formen sind
   # Messprobleme und enden mit Exit 2, niemals als "Zeitzuender gefunden".
   if echo "$AUSGABE" | grep -qE "Cannot find module|No tests found|command not found|Unknown option|CACError|Failed to load config|Validation Error"; then
@@ -113,5 +131,9 @@ if [ "$FEHLER" -gt 0 ]; then
   echo "useFakeTimers) oder den Zeitpunkt als Parameter injizieren."
   exit 1
 fi
-echo "Kein Zeitzuender: alle Kandidaten bleiben auch in der Zukunft gruen."
+if [ "$GEMESSEN" -eq 0 ]; then
+  echo "Kein Kandidat fuer diesen Lauf (--nur $NUR) — nichts gemessen."
+  exit 0
+fi
+echo "Kein Zeitzuender: alle $GEMESSEN gemessenen Kandidaten bleiben auch in der Zukunft gruen."
 exit 0

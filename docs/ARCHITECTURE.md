@@ -36,46 +36,48 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 ┌──────────────────────────────────────────────────────────────────┐
 │  Cloud Function "enqueue" (europe-west1, Node 24, 512 MiB)         │
 │                                                                    │
-│  1. Validation in handle-enqueue.js                                │
+│  Validation in handle-enqueue.js                                   │
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
 │     ├─ Rate-Limit (IP-basiert, 500/10min, In-Memory pro Instanz)  │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
-│     └─ Hourly-Limit-Check (Firestore, 500/Std. rollendes Fenster)  │
+│     ├─ Hourly-Limit-Check (Firestore, 500/Std. rollendes Fenster)  │
+│     └─ Queue-Tiefen-Bremse (MAX_QUEUE_DEPTH)                       │
 │                                                                    │
-│  2. Mistral Large 3 — Beschreibung                                 │
-│     ├─ mistral.js → POST api.mistral.ai/v1/chat/completions        │
-│     │   (Bearer MISTRAL_API_KEY, image_url base64, max 2048 tok)   │
-│     └─ Antwort enthaelt:                                            │
-│         ├─ Erste Zeile: "SUBJECT: ANIMAL_ONLY|HUMAN|MIXED|OTHER"   │
-│         ├─ Bildbeschreibung als Fliesstext                          │
-│         └─ Letzte Zeile: "Sichtbarer Text: ..."                     │
+│  Bild → GCS-Bucket, Job-Dokument → Firestore, Task → Cloud Tasks   │
+│  Antwort an den Browser: { jobId } — KEINE Analyse in dieser       │
+│  Function (der synchrone Pfad ist seit v2.10 entfernt).            │
+└────────────────────────────────────┬───────────────────────────────┘
+                                     │ dosiert durch Cloud Tasks
+                                     ↓
+┌──────────────────────────────────────────────────────────────────┐
+│  Cloud Function "processJob" (OIDC-geschuetzt, nicht oeffentlich)  │
+│                                                                    │
+│  1. claimJob: queued → processing (idempotente Transaktion)        │
+│                                                                    │
+│  2. AKTIV: Single-Large-Call (Feature-Flag useSingleLargeCall)     │
+│     └─ EIN Aufruf an mistral-large-2512 liefert Beschreibung       │
+│        UND beide Profile; ein zweiter, kleiner Aufruf ohne Bild    │
+│        erzeugt die Beast-Werbung (seit v2.8)                       │
 │                                                                    │
 │  3. SUBJECT-Klassifikation in animal.js                            │
 │     ├─ classifyDescription() parst die SUBJECT-Zeile                │
 │     ├─ Bei ANIMAL_ONLY: detectAnimalType() matcht Tier-Keywords     │
-│     │   im Text (Hund/Katze/Vogel/Fisch/Pferd/Kaninchen/generic)    │
 │     └─ Default bei fehlender Zeile: HUMAN (restriktivste Annahme)   │
 │                                                                    │
 │  4. Privacy-Risiken in privacy.js                                  │
 │     ├─ extractVisibleText() parst "Sichtbarer Text:"-Zeile         │
 │     └─ buildPrivacyRisks() matcht Telefon/Adress/Kfz-Patterns       │
 │                                                                    │
-│  5. Profil-Stage                                                   │
-│     ├─ ANIMAL_ONLY-Pfad: buildAnimalProfiles(animalType)           │
-│     │   → Easter-Egg aus locales/de/animals.js                     │
-│     └─ HUMAN/MIXED/OTHER-Pfad:                                     │
-│         ├─ mistral.generateBothProfiles() parallel                  │
-│         │   ├─ Normal-Profil via Small 4                            │
-│         │   ├─ Boost-Profil via Small 4                             │
-│         │   └─ Bei Small-4-JSON-Fail: Large 3 als Mistral-Backup    │
-│         └─ json-repair.js cleant LLM-Outputs (4-Stufen-Repair)      │
+│  5. FALLBACK (Flag aus): 3-Call-Pipeline                           │
+│     ├─ Describe via Large, Profile via mistral-small-2603          │
+│     └─ Bei Small-JSON-Fail: Large als Mistral-internes Backup      │
 │                                                                    │
-│  6. Response-Aufbau                                                │
+│  6. Ergebnis-Aufbau                                                │
 │     ├─ Profile JSON in Output-Bounds geclampt (SEC-004)            │
-│     └─ JSON-Antwort an den Browser                                 │
+│     └─ Ergebnis ins Job-Dokument, Bild sofort geloescht            │
 └────────────────────────────────────┬───────────────────────────────┘
                                      │
-                                     ↓ JSON
+                                     ↓ GET /api/job-status (Polling, 2 s)
 ┌──────────────────────────────────────────────────────────────────┐
 │  Browser                                                           │
 │                                                                    │

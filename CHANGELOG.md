@@ -4,7 +4,15 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [4.0.1] — 2026-08-21
+
+### Behoben
+
+- **Die Tastatur-Rückgabe nach der Sprachwahl griff zu kurz.** Der Fix vom
+  20. August fasste achtmal nach, gemessen in Bildschirmrahmen — das sind rund
+  130 Millisekunden. Auf langsamen Geräten reicht das nicht, und die Markierung
+  blieb liegen. Jetzt zählt eine Frist statt Bildrahmen: bis zu zwei Sekunden,
+  und sofort Schluss, sobald sie sitzt.
 
 ### Behoben
 

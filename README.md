@@ -211,7 +211,9 @@ die **bewusst getroffenen Abwägungen mit Begründung** — steht in
 [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md). Die wichtigsten Schichten:
 
 - **Content Security Policy** mit strikter Whitelist (`self`; Bilder zusätzlich von OpenStreetMap-Kacheln, Verbindungen zusätzlich zu Nominatim)
-- **HSTS** mit Preload
+- **HSTS** — Transportverschlüsselung erzwungen, zwei Jahre, inklusive Unterdomains; die
+  `preload`-Angabe wird mitgeliefert, ein Eintrag in der Browser-Liste ist bewusst nicht
+  erfolgt (Begründung: `docs/SECURITY-MODEL.md`)
 - **X-Frame-Options: DENY**
 - **X-Content-Type-Options: nosniff**
 - **Magic-Byte-Validierung**: Server prueft JPEG/PNG/WebP/GIF-Header

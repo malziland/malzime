@@ -8,14 +8,17 @@ export default defineConfig({
      nacheinander — rund zehn Minuten je Lauf, und die Kette faehrt zweimal je
      Auslieferung. Am 2026-08-21 hat das an einem Tag ueber eine Stunde reine
      Wartezeit gekostet.
-     ZWEI Arbeiter, nicht mehr. Vier waren am 21.08. ausprobiert und gemessen:
-     Der Lauf war zwar schnell (6,0 statt 10,5 Minuten), aber der schwerste Test
-     (axe ueber vier Sprach-/Themen-Kombinationen in WebKit) riss dabei die
-     30-Sekunden-Grenze. Der Pipeline-Rechner hat vier Kerne; vier gleichzeitige
-     Browser lassen dem einzelnen Test zu wenig davon uebrig. Ein Pruefstand, der
-     unter eigener Last kippt, ist wertlos — lieber etwas langsamer und
-     verlaesslich. */
-  workers: process.env.CI ? 2 : undefined,
+     VIER Arbeiter. Der Weg dorthin ist es wert, festgehalten zu werden, weil
+     die naheliegende Erklaerung zweimal falsch war:
+     - Vier Arbeiter allein: 6:40 statt 10:29 — aber rot, weil der teuerste Test
+       (axe ueber vier Sprach-/Themen-Kombinationen in WebKit) unter der Last die
+       30-Sekunden-Grenze riss. Kein Befund, ein Messfehler.
+     - Daraufhin auf zwei zurueckgenommen: 10:39, also kein Gewinn. Erst da war
+       klar, dass die Arbeiterzahl wirkt und die Reissleine das Problem war.
+     Jetzt beides zusammen: vier Arbeiter UND `test.slow()` fuer den teuren Test
+     (siehe e2e/sprachumschalter.test.js). Diese Kombination gab es vorher nie.
+     Mehr als vier bringt nichts: Der Pipeline-Rechner hat vier Kerne. */
+  workers: process.env.CI ? 4 : undefined,
   use: {
     baseURL: "http://localhost:8081",
     headless: true,

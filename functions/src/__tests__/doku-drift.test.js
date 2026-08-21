@@ -58,12 +58,22 @@ describe("Doku-Drift-Wächter", () => {
   });
 
   test("interne Markdown-Links in README und docs/ zeigen auf existierende Dateien", () => {
-    const dateien = ["README.md"].concat(
-      fs
-        .readdirSync(path.join(WURZEL, "docs"))
-        .filter((name) => name.endsWith(".md"))
-        .map((name) => path.join("docs", name))
-    );
+    /* DOC-2026-08-20-34: Geprüft wurde nur die oberste Ebene von docs/. Gerade
+       die Unterordner sind aber das, was nach außen zitiert wird —
+       docs/barrierefreiheit/ ist Anhang A der öffentlichen Erklärung, docs/adr/
+       hält die Architekturentscheidungen. Tote Verweise blieben dort grün,
+       also genau dort, wo "die Drift, die ein öffentliches Repo unglaubwürdig
+       macht" (Kommentar dieses Tests) am teuersten ist. */
+    const markdownUnter = (rel) => {
+      const voll = path.join(WURZEL, rel);
+      if (!fs.existsSync(voll)) return [];
+      return fs.readdirSync(voll, { withFileTypes: true }).flatMap((eintrag) => {
+        const kind = path.join(rel, eintrag.name);
+        if (eintrag.isDirectory()) return markdownUnter(kind);
+        return eintrag.name.endsWith(".md") ? [kind] : [];
+      });
+    };
+    const dateien = ["README.md"].concat(markdownUnter("docs"));
 
     const tote = [];
     for (const datei of dateien) {
@@ -75,6 +85,21 @@ describe("Doku-Drift-Wächter", () => {
         if (/^(https?:|mailto:|#)/.test(ziel)) continue;
         const ohneAnker = ziel.split("#")[0];
         if (!ohneAnker) continue;
+        /* DOC-2026-08-20-34: Ein Ziel wie `/impressum` ist kein Dateipfad,
+           sondern eine Adresse der ausgelieferten Website — als Dateipfad
+           aufgelöst wäre es immer tot (Fehlalarm), stillschweigend übersprungen
+           dagegen ungeprüft. Deshalb wird dort die zugehörige Seite in public/
+           gesucht: So fällt auch ein Tippfehler in einem Website-Verweis auf. */
+        if (ohneAnker.startsWith("/")) {
+          const rumpf = ohneAnker.replace(/\/$/, "") || "/index";
+          const kandidaten = [
+            path.join(WURZEL, "public", `${rumpf}.html`),
+            path.join(WURZEL, "public", rumpf, "index.html"),
+            path.join(WURZEL, "public", rumpf),
+          ];
+          if (!kandidaten.some((p) => fs.existsSync(p))) tote.push(`${datei} → ${ziel} (keine Seite in public/)`);
+          continue;
+        }
         const aufgeloest = path.resolve(WURZEL, path.dirname(datei), ohneAnker);
         if (!fs.existsSync(aufgeloest)) tote.push(`${datei} → ${ziel}`);
       }

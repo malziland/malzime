@@ -336,11 +336,24 @@ test.describe("Rechtsseiten: der Umschalter ist ein Link, kein Skript", () => {
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
   });
 
-  for (const seite of ["/datenschutz.html", "/en/privacy.html"]) {
+  /* TEST-2026-08-20-14/46: Hier standen zwei Seiten, mit der Begründung, was dort
+     durchgehe, gelte auch für die übrigen sechs, "die weniger enthalten". Das war
+     eine Annahme, keine Messung — die öffentliche Zusage "0 Verstöße" in
+     Prüfbericht und Erklärung gilt für ALLE acht Rechtsseiten, und sie konnte für
+     sechs davon still falsch werden, ohne dass ein Riegel rot wird. Jede Seite
+     bringt eigene Inhalte mit (Tabellen, rollbare Kästen, Fußnoten), und der
+     Kontrast hängt am Inhalt, nicht am Gerüst. */
+  for (const seite of [
+    "/datenschutz.html",
+    "/impressum.html",
+    "/nutzungsbedingungen.html",
+    "/barrierefreiheit.html",
+    "/en/privacy.html",
+    "/en/legal-notice.html",
+    "/en/terms.html",
+    "/en/accessibility.html",
+  ]) {
     test(`axe: ${seite} ohne ernste Verstöße`, async ({ page }) => {
-      /* Je eine deutsche und eine englische Seite. Beide tragen dieselbe Pille
-         und dasselbe Skript — was hier durchgeht, gilt auch für die übrigen
-         sechs, die weniger enthalten. */
       await page.emulateMedia({ reducedMotion: "reduce" });
       await page.goto(seite);
       await expect(page.locator(".sprach-pille"), "Seite nicht geladen — axe prüfte eine Fehlerseite").toHaveCount(1);

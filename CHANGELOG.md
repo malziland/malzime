@@ -20,6 +20,19 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   jeden übersetzbaren Text auf allen zehn Seiten, was im Seitenquelltext steht,
   mit dem, was in der Sprachdatei steht. 68 Texte, deutsch wie englisch.
 
+- **Bei erreichtem Stundenlimit war der Upload nur für Sehende abgeschaltet.**
+  Wer mit einem Screenreader unterwegs war, bekam den toten Bereich weiter
+  vorgelesen — samt Aufforderung, ein Foto zu wählen, die ins Leere führte.
+  Jetzt ist er für alle gleichzeitig abgeschaltet, und die Tastatur landet auf
+  dem Hinweis statt im Nichts.
+
+- **Sechs Fehlerbilder werden jetzt wirklich angesehen.** Neue Prüfungen
+  versetzen die Seite in die Zustände „Stundenlimit", „Warteschlange voll",
+  „Wartungsmodus", „Bild zu groß", „Format nicht lesbar" und „Server
+  überlastet" und sehen nach: Erscheint der Hinweis, springt der Seitenkopf,
+  läuft Text aus seinem Kasten, ist er barrierefrei? Zuvor kamen 26 der 45
+  Fehlermeldungen in keiner einzigen Prüfung vor.
+
 ## [4.0.0] — 2026-08-21
 
 Ein Lang-Audit hat das Projekt in der Nacht auf den 21. August durchleuchtet:

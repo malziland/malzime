@@ -133,14 +133,49 @@ export function stopScanAnim(leise = false) {
 
 let countdownInterval = null;
 
+/* UX-2026-08-21-07: Der abgeschaltete Bereich war nur fuer Sehende und
+   Maus-Nutzer abgeschaltet.
+
+   Gemessen am 21.08. bei aktivem Limit: `pointer-events: none` griff, der
+   Datenschutz-Link war nicht mehr anklickbar — aber `.drop-label`, der
+   Datenschutz-Hinweis und der Rest waren fuer Screenreader unveraendert
+   vorhanden und wurden vorgelesen, ohne dass irgendetwas den abgeschalteten
+   Zustand vermittelt haette. Wer sieht, erkennt den toten Bereich sofort; wer
+   hoert, liest eine Aufforderung zum Hochladen vor, die ins Leere fuehrt.
+
+   `inert` schaltet den Bereich fuer ALLE gleichzeitig ab: Maus, Tastatur,
+   Screenreader. Damit deckt sich der angesagte Zustand mit dem sichtbaren, und
+   die sieben Kontrastmeldungen von axe entfallen als Nebenwirkung — abgeschaltete
+   Bereiche sind von WCAG 1.4.3 ausgenommen, aber nur, wenn sie es wirklich sind.
+
+   `inert` ist in diesem Projekt erprobt (Fokus-Kaefig der Sprachwahl-Rueckfrage). */
+function bereicheSchalten(abgeschaltet) {
+  for (const wahl of [".upload-section", ".demo-section"]) {
+    const bereich = document.querySelector(wahl);
+    if (!bereich) continue;
+    bereich.classList.toggle("upload-section--limited", abgeschaltet);
+    bereich.inert = abgeschaltet;
+  }
+}
+
 export function showLimitBanner(retryAfterSeconds) {
   if (!elements.limitBanner) return;
   elements.limitBanner.classList.add("active");
 
-  const uploadSection = document.querySelector(".upload-section");
-  const demoSection = document.querySelector(".demo-section");
-  if (uploadSection) uploadSection.classList.add("upload-section--limited");
-  if (demoSection) demoSection.classList.add("upload-section--limited");
+  /* Reihenfolge ist wichtig: Steht der Fokus noch im Bereich, wenn er inert
+     wird, faellt er ersatzlos auf <body> — der naechste Tastendruck beginnt
+     dann wieder ganz oben. Deshalb zuerst pruefen, dann schalten, dann den
+     Fokus auf den Hinweis lenken, der ohnehin `role="alert"` traegt. */
+  const fokusWarDrin = document.activeElement
+    ? Boolean(document.activeElement.closest(".upload-section, .demo-section"))
+    : false;
+
+  bereicheSchalten(true);
+
+  if (fokusWarDrin) {
+    elements.limitBanner.setAttribute("tabindex", "-1");
+    elements.limitBanner.focus({ preventScroll: true });
+  }
 
   startLimitCountdown(retryAfterSeconds);
 }
@@ -149,10 +184,7 @@ export function hideLimitBanner() {
   if (!elements.limitBanner) return;
   elements.limitBanner.classList.remove("active");
 
-  const uploadSection = document.querySelector(".upload-section");
-  const demoSection = document.querySelector(".demo-section");
-  if (uploadSection) uploadSection.classList.remove("upload-section--limited");
-  if (demoSection) demoSection.classList.remove("upload-section--limited");
+  bereicheSchalten(false);
 
   if (countdownInterval) {
     clearInterval(countdownInterval);

@@ -91,6 +91,37 @@ gcloud alpha monitoring policies create \
 
 Der `notificationRateLimit` (300s) verhindert Push-Spam bei einem Fehler-Sturm.
 
+## Zweite Richtlinie: Haeufung von Client-Fehlern (seit 2026-08-21)
+
+**Name:** `malziME Client-Fehler-Haeufung` · **Schwelle:** mehr als **20** Berichte
+je Stunde · **Kanaele:** ntfy-Push und E-Mail · **Metrik:**
+`logging.googleapis.com/user/client_fehler_rate`
+
+**Warum es sie gibt.** Die Richtlinie darunter alarmiert nur SERVER-Fehler. Was im
+Browser der Besucher schiefgeht — Layout, Speicher, Safari-Eigenheiten — war
+bewusst stumm (siehe unten: jeder einzelne Bericht waere ein Alarm gewesen). Genau
+diese Fehlerklasse hat aber am 2026-08-21 gleich dreimal zugeschlagen, und zur
+Presse-Aussendung schauen Fremde auf die Seite.
+
+**Warum eine Schwelle und nicht der alte Filter.** Gemessen am 2026-08-21:
+**fuenf** Berichte in sieben Tagen. Eine Schwelle von 20 je Stunde feuert im
+Normalbetrieb nie, faengt aber einen Einbruch. Die Spam-Gefahr von damals kommt
+damit nicht zurueck.
+
+**Wenn der Alarm kommt:** nachsehen, welche Phase sich haeuft.
+
+```bash
+gcloud logging read 'resource.labels.service_name="errors"' \
+  --project=malzime --freshness=2h \
+  --format='value(jsonPayload.phase,jsonPayload.errorDetail)'
+```
+
+Haeufen sich Meldungen EINER Phase, ist dort etwas kaputt. Gleichverteiltes
+Rauschen bei hoher Last ist dagegen normal — dann ist die Schwelle zu niedrig
+und darf steigen.
+
+---
+
 Der Filter wurde am 2026-07-17 (LANGAUDIT OPS-001) um die Queue-Functions
 `enqueue`, `processjob`, `jobstatus` und `reapjobs` erweitert — der Live-Analysepfad
 war seit der Queue-Umstellung (v2.0) ohne Alarm. Die Functions `errors` und

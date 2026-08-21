@@ -72,6 +72,9 @@ async function endpunkte(page, jobStatus) {
 }
 
 test("Nach Abbrechen des Druckdialogs ist die Seite im Beast-Modus wieder da", async ({ page }) => {
+  /* OPS-2026-08-21-08: Der Wartewert von 45 s unten war wirkungslos — das
+     Zeitlimit des Tests liegt bei 30 s. `test.slow()` verdreifacht es. */
+  test.slow();
   await endpunkte(page, { status: "done", result: PROFIL });
   await page.goto("/");
   await page.click('[data-demo="selfie"]');

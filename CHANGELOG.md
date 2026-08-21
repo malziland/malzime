@@ -4,6 +4,43 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Der Hinweis „Kurze Pause" zeigte eine veraltete Fassung.** Erscheint das
+  Stundenlimit, stand dort noch der alte, härtere Text („Stundenlimit erreicht.
+  Zu viele Analysen in kurzer Zeit") statt der überarbeiteten Fassung, die
+  erklärt, warum es das Limit gibt. Vier Absätze waren betroffen. Sichtbar wurde
+  das immer dann, wenn die Übersetzungsdatei noch nicht geladen war — und
+  dauerhaft, wenn sie gar nicht lädt. Ausgerechnet dieser Hinweis erscheint nur
+  bei Andrang, also im Workshop.
+
+- **Eine neue Prüfung hält beide Fassungen künftig gleich.** Sie vergleicht für
+  jeden übersetzbaren Text auf allen zehn Seiten, was im Seitenquelltext steht,
+  mit dem, was in der Sprachdatei steht. 68 Texte, deutsch wie englisch.
+
+- **Bei erreichtem Stundenlimit war der Upload nur für Sehende abgeschaltet.**
+  Wer mit einem Screenreader unterwegs war, bekam den toten Bereich weiter
+  vorgelesen — samt Aufforderung, ein Foto zu wählen, die ins Leere führte.
+  Jetzt ist er für alle gleichzeitig abgeschaltet, und die Tastatur landet auf
+  dem Hinweis statt im Nichts.
+
+- **Vier Prüfungen waren geduldiger gebaut, als sie sein konnten.** Sie warteten
+  bis zu 45 Sekunden auf ein Element, während ihr eigenes Zeitlimit bei 30
+  Sekunden lag — die längere Geduld war wirkungslos, obwohl im Quelltext
+  ausdrücklich stand, damit sei eine frühere Unzuverlässigkeit behoben. Genau
+  eine dieser Stellen hat am 21. August eine Auslieferung blockiert. Eine neue
+  Prüfung findet diese Bauart künftig selbst; sie blendet dabei Kommentare aus,
+  weil sonst eine auskommentierte Zeile den Befund tarnt.
+
+- **Sechs Fehlerbilder werden jetzt wirklich angesehen.** Neue Prüfungen
+  versetzen die Seite in die Zustände „Stundenlimit", „Warteschlange voll",
+  „Wartungsmodus", „Bild zu groß", „Format nicht lesbar" und „Server
+  überlastet" und sehen nach: Erscheint der Hinweis, springt der Seitenkopf,
+  läuft Text aus seinem Kasten, ist er barrierefrei? Zuvor kamen 26 der 45
+  Fehlermeldungen in keiner einzigen Prüfung vor.
+
 ## [4.0.0] — 2026-08-21
 
 Ein Lang-Audit hat das Projekt in der Nacht auf den 21. August durchleuchtet:

@@ -156,6 +156,18 @@ export function initBeastLockruf() {
     abraeumen();
   });
 
+  /* BUG-2026-08-20-20: Ein scharfgestellter Lockruf ueberlebte den Beginn der
+     naechsten Analyse und jeden Fehler. Er konnte dadurch waehrend des Aufbaus
+     animieren oder nach einem Abbruch losgehen — beides schliesst der CHANGELOG
+     zu v3.9.0 ausdruecklich aus ("nie waehrend des Aufbaus, nie nach
+     Fehler/Abbruch"), und der Modulkopf sagt dasselbe. Verschwindet das fertige
+     Ergebnis, verschwindet auch der Lockruf: Das Merkmal `data-has-result` ist
+     dieselbe Quelle, die der Ausloeser oben als Wache benutzt. */
+  const ergebnisWache = new MutationObserver(() => {
+    if (!document.documentElement.hasAttribute("data-has-result")) abraeumen();
+  });
+  ergebnisWache.observe(document.documentElement, { attributes: true, attributeFilter: ["data-has-result"] });
+
   document.addEventListener(PROFIL_FERTIG, () => {
     if (!zustand || zustand.gelaufen || zustand.benutzt || zustand.startUhr) return;
     /* Wache: ohne fertiges Ergebnis kein Lockruf. Beide Sender rufen nur im

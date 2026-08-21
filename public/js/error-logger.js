@@ -83,8 +83,17 @@ function senden(payload) {
     .then((resp) => {
       /* 4xx bedeutet: Der Server WILL diese Meldung nicht (Whitelist, Format).
          Sie erneut zu schicken, wuerde nur die Warteschlange verstopfen. 5xx
-         dagegen ist ein voruebergehendes Serverproblem — die heben wir auf. */
-      if (resp && !resp.ok && resp.status >= 500) throw new Error(`HTTP ${resp.status}`);
+         dagegen ist ein voruebergehendes Serverproblem — die heben wir auf.
+         BUG-2026-08-20-16: 429 gehoert zur zweiten Gruppe, nicht zur ersten. Die
+         Antwort heisst "gerade zu viele", nicht "will ich nicht" — und sie kommt
+         ausgerechnet dann, wenn viele Geraete gleichzeitig Fehler melden, also im
+         Massenfehler-Fall, fuer den die Erfassung ueberhaupt gebaut wurde. Vorher
+         verschwanden genau diese Meldungen lautlos; die 429-Ablehnung selbst wird
+         serverseitig nicht protokolliert (Routine-Request-Logs sind bewusst
+         ausgeschlossen), es blieb also gar keine Spur. */
+      if (resp && !resp.ok && (resp.status >= 500 || resp.status === 429)) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
       return true;
     })
     .catch(() => {

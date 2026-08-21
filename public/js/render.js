@@ -1,4 +1,5 @@
 import { elements, escapeHtml } from "./dom.js";
+import { logClientError } from "./error-logger.js";
 import { state } from "./state.js";
 import { getBiasMode } from "./ui.js";
 import { t, getLanguage } from "./i18n.js";
@@ -412,9 +413,24 @@ async function renderGpsMap(data) {
       iconAnchor: [14, 37],
     });
     L.marker([lat, lng], { icon: zeiger, title: t("gps.popup") }).addTo(karte);
-  } catch (_err) {
-    /* BUG-015: Leaflet-Fehler abfangen statt Unhandled Promise Rejection */
+  } catch (fehler) {
+    /* BUG-015: Leaflet-Fehler abfangen statt Unhandled Promise Rejection.
+       BUG-2026-08-20-17: Der Bereich wurde dabei stumm geleert. Faellt die Karte
+       fuer alle Nutzer aus — kaputtes Leaflet, blockierte Kacheln, Fehler im
+       Kartenaufbau —, verschwindet einfach ein Abschnitt der Seite, und niemand
+       erfaehrt davon: Nutzer melden ein FEHLENDES Stueck erfahrungsgemaess nicht.
+       Genau die sieben Karten-Befunde vom 19.08. sind so lange unentdeckt
+       geblieben. Jetzt geht der Ausfall in die Fehlererfassung (anonym, ohne
+       Koordinaten — die verlassen den Browser nicht). */
     elements.gpsMap.innerHTML = "";
+    try {
+      logClientError(fehler instanceof Error ? fehler : new Error(String(fehler)), {
+        phase: "gps-karte-aufbau",
+        errorDetail: `leaflet=${typeof L === "undefined" ? "fehlt" : "da"}`.slice(0, 60),
+      });
+    } catch (_still) {
+      /* Die Meldung darf die Anzeige nie mit herunterreissen. */
+    }
   }
 }
 

@@ -97,14 +97,19 @@ export function initEchtheitspruefung() {
   const ergebnis = document.getElementById("echtheitErgebnis");
   if (!knopf || !konsole || !zeilen || !ergebnis) return;
 
-  /* Ohne SubtleCrypto geht es nicht — das ehrlich sagen statt still scheitern. */
+  const T = texte();
+
+  /* Ohne SubtleCrypto geht es nicht — das ehrlich sagen statt still scheitern.
+     BUG-2026-08-20-21: `T` stand hier VOR seiner Deklaration. Der Zweig, der die
+     ehrliche Meldung setzen sollte, warf stattdessen einen ReferenceError — der
+     Knopf blieb mit unveraendertem Text zurueck und wirkte kaputt statt erklaert.
+     Betroffen sind Browser ohne SubtleCrypto (sehr alte, und jede Auslieferung
+     ueber http:// statt https://). */
   if (!window.crypto || !window.crypto.subtle) {
     knopf.disabled = true;
     knopf.textContent = T.unmoeglich;
     return;
   }
-
-  const T = texte();
   const ruhig = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let laeuft = false;
 

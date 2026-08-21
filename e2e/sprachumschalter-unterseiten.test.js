@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * sprachumschalter-unterseiten.test.js — der Sprachwechsel auf den Rechtsseiten.
@@ -178,6 +180,47 @@ function aufrufeMitschneiden(page) {
   page.on("request", (r) => alle.push(new URL(r.url()).pathname));
   return alle;
 }
+
+/* TEST-2026-08-20-17: Alle Riegel dieser Datei hingen an der festen Liste
+   SEITENPAARE — dem Stand vom 19.08., nicht dem Repository. Eine neue Rechtsseite
+   koennte unbemerkt Skripte laden oder einen per Tastatur unerreichbaren
+   Umschalter tragen, ohne dass irgendeine Pruefung anspringt: Sie stuende
+   schlicht nicht auf der Liste. Diese Kontrolle haelt das Dateisystem gegen die
+   Liste, damit die Luecke nicht still entsteht. */
+test.describe("Rechtsseiten: die Liste deckt die Flaeche", () => {
+  /* index und stats sind keine Rechtsseiten: die Startseite traegt die Analyse,
+     die Zahlen-Seite ist dynamisch zweisprachig und in eigenen Tests abgedeckt. */
+  const KEINE_RECHTSSEITEN = new Set(["index.html", "stats.html"]);
+
+  test("jede HTML-Seite in public/ und public/en/ steht in SEITENPAARE", () => {
+    const wurzel = join(process.cwd(), "public");
+    const gefunden = [
+      ...readdirSync(wurzel)
+        .filter((n) => n.endsWith(".html") && !KEINE_RECHTSSEITEN.has(n))
+        .map((n) => `/${n}`),
+      ...readdirSync(join(wurzel, "en"))
+        .filter((n) => n.endsWith(".html"))
+        .map((n) => `/en/${n}`),
+    ].sort();
+
+    /* Positivkontrolle gegen die eigene Messung: Findet die Suche gar nichts,
+       waere "keine fehlende Seite" kein Ergebnis, sondern ein leeres Blatt. */
+    expect(gefunden.length, "keine einzige Rechtsseite gefunden — die Suche greift nicht").toBeGreaterThan(4);
+
+    const fehlend = gefunden.filter((datei) => !ALLE_RECHTSSEITEN.includes(datei));
+    expect(
+      fehlend,
+      `Diese Seiten werden ausgeliefert, stehen aber in keiner Pruefung dieser Datei: ${fehlend.join(", ")}`
+    ).toEqual([]);
+
+    /* Und umgekehrt: Eine Seite auf der Liste, die es nicht mehr gibt, bedeutet
+       Pruefungen, die ins Leere laufen. */
+    const verwaist = ALLE_RECHTSSEITEN.filter((datei) => !gefunden.includes(datei));
+    expect(verwaist, `Diese Seiten stehen auf der Liste, existieren aber nicht mehr: ${verwaist.join(", ")}`).toEqual(
+      []
+    );
+  });
+});
 
 test.describe("Rechtsseiten: der Umschalter ist ein Link, kein Skript", () => {
   /* Bewusst mit englischem Browser gemessen: Diese Seiten sind statisch und

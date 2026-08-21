@@ -3,6 +3,15 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./e2e",
   timeout: 30000,
+  /* OPS-2026-08-21-04: Ohne diese Angabe schaltet Playwright in der Pipeline auf
+     EINEN Arbeiter herunter (CI-Erkennung). Die 279 Tests liefen deshalb streng
+     nacheinander — rund zehn Minuten je Lauf, und die Kette faehrt zweimal je
+     Auslieferung. Am 2026-08-21 hat das an einem Tag ueber eine Stunde reine
+     Wartezeit gekostet.
+     Vier Arbeiter, nicht mehr: Der Test-Webserver liefert die Seiten aus, und
+     die Laeufe teilen sich einen Port. Mehr Gleichzeitigkeit macht ihn zum
+     Engpass — genau daher kamen die "Broken pipe"-Aussetzer im Protokoll. */
+  workers: process.env.CI ? 4 : undefined,
   use: {
     baseURL: "http://localhost:8081",
     headless: true,
@@ -41,7 +50,14 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "python3 -m http.server 8081 --directory public",
+    /* OPS-2026-08-21-04: `python3 -m http.server` bedient GENAU EINE Anfrage zur
+       Zeit. Bei mehreren Arbeitern (und schon bei einem, wenn eine Seite viele
+       Dateien nachlaedt) reisst er Verbindungen ab: "BrokenPipeError" und
+       "ConnectionResetError" standen wiederholt im Pipeline-Protokoll, einmal
+       hat ein solcher Aussetzer einen Testlauf rot gemacht. Die mehrspurige
+       Variante steht in derselben Standardbibliothek und kostet nichts. */
+    command:
+      "python3 -c \"from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler;import functools,os;os.chdir('public');ThreadingHTTPServer(('',8081),SimpleHTTPRequestHandler).serve_forever()\"",
     port: 8081,
     // TEST-2026-08-13-K6: Standardmäßig NICHT wiederverwenden. Vorher teilten
     // sich zwei gleichzeitige Läufe Port 8081 — der zweite bekam einen fremden

@@ -6,6 +6,14 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+> **Diese Einträge sind teilweise schon LIVE** (Hosting-Deploy 2026-08-21,
+> Cache-Kennung `2026082101`) und stehen bewusst weiter unter
+> „Unveröffentlicht": Die Sanierung des TIEF-Audits vom 20.08. wird als
+> **Version 4.0.0** ausgeliefert, und die Nummer vergibt der Betreiber erst,
+> wenn alle Befunde behoben und von ihm freigegeben sind. Bis dahin darf hier
+> keine Versionsnummer stehen — `release.yml` legte sonst sofort einen
+> GitHub-Release an. Nicht „korrigieren".
+
 ### Behoben
 
 - **Die Prüfkette wäre heute Nacht von selbst rot geworden.** Ein Test rechnete

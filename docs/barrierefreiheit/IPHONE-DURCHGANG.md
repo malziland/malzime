@@ -120,7 +120,7 @@ Streiche weiter nach rechts durch das fertige Profil.
 | 20  | „Dein Profil, `Bereich`"                                                   | ☐      | ☐            |
 | 21  | zu jeder Karte: erst die Bezeichnung („Alter & Geschlecht"), dann der Wert | ☐      | ☐            |
 | 22  | bei den Balken: „Konfidenz" mit einer Zahl oder einem Prozentwert          | ☐      | ☐            |
-| 23  | irgendwo wird vorgelesen, dass die Angaben **erfunden** sind               | ☐      | ☐            |
+| 23  | irgendwo wird vorgelesen, dass die Angaben **geraten** sind                | ☐      | ☐            |
 
 **Nummer 23 ist kein Formalismus.** Ein Profil, das vorgelesen wird, ohne dass die
 Einordnung mitkommt, ist genau das, wovor malziME warnt.

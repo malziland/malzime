@@ -105,7 +105,7 @@ Gehe mit **Ctrl + ⌥ + →** durch das fertige Profil.
 
 - [ ] Wird zu jeder Karte die **Überschrift und der Inhalt** vorgelesen?
 - [ ] Werden die Konfidenz-Punkte als **Zahl oder Wort** angesagt — oder gar nicht?
-- [ ] Ist verständlich, dass alles **erfunden** ist? Wird der Hinweis vorgelesen?
+- [ ] Ist verständlich, dass alles **geraten** ist? Wird der Hinweis vorgelesen?
 
 Der letzte Punkt ist kein Formalismus: Ein Profil, das vorgelesen wird, ohne dass die
 Einordnung mitkommt, ist genau das, was malziME kritisiert.

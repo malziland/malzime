@@ -13,7 +13,7 @@
 
 Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teilnehmer:innen, was KI-Algorithmen aus einem einzigen Foto ableiten koennten — inklusive Persoenlichkeitsprofil, Werbe-Targeting und Manipulationstrigger.
 
-**Alles erfunden. Nichts davon ist wahr oder bewiesen.**
+**Alles geraten. Nichts davon ist wahr oder bewiesen.**
 
 <p align="center">
   <img src="docs/screenshots/01-startseite.png" alt="malziME Startseite" width="720" />

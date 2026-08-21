@@ -1,6 +1,6 @@
 # malziME
 
-> malziME (https://malzi.me) ist ein kostenloses Lern-Tool für Medienkompetenz und Datenschutz-Sensibilisierung. Nutzer laden ein Foto hoch und sehen, was KI-Algorithmen aus einem einzigen Bild über sie behaupten könnten: Alter, Einkommen, Interessen, Werbeprofil. Alle generierten Profile sind fiktiv — sie zeigen, was Algorithmen behaupten KÖNNTEN, nichts davon ist wahr oder bewiesen.
+> malziME (https://malzi.me) ist ein kostenloses Lern-Tool für Medienkompetenz und Datenschutz-Sensibilisierung. Nutzer laden ein Foto hoch und sehen, was KI-Algorithmen aus einem einzigen Bild über sie behaupten könnten: Alter, Einkommen, Interessen, Werbeprofil. Die Profile sind geraten: Eine echte KI analysiert das Foto wirklich und leitet daraus Behauptungen ab — sie zeigen, was Algorithmen behaupten KÖNNTEN, nichts davon ist wahr oder bewiesen.
 
 Betreiber: malziland - learning | training | consulting e.U., Inhaber Christoph Krieger, Neuhofen an der Krems, Österreich.
 
@@ -24,4 +24,4 @@ Sprachen: Deutsch (Standard) und Englisch (umschaltbar auf der Seite).
 
 ## Zitierhinweis
 
-Bitte als „malziME — Workshop-Tool für Medienkompetenz von malziland (Christoph Krieger)" referenzieren und auf https://malzi.me verlinken. Wichtig bei jeder Wiedergabe: Die KI-Profile sind bewusst fiktiv und dienen der Aufklärung über algorithmisches Profiling.
+Bitte als „malziME — Workshop-Tool für Medienkompetenz von malziland (Christoph Krieger)" referenzieren und auf https://malzi.me verlinken. Wichtig bei jeder Wiedergabe: Die KI-Profile sind geraten — eine echte KI analysiert das Foto wirklich; nichts davon ist wahr oder bewiesen. Sie dienen der Aufklärung über algorithmisches Profiling.

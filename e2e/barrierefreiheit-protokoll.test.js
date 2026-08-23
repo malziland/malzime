@@ -472,6 +472,51 @@ async function beruhigen(page) {
     await page.evaluate(() => new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f))));
     await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
   }
+  /* ANLASS 2026-08-23: Ein CI-Lauf meldete im Zustand "Live-Text/Modell
+     schreibt mit" Kontrast 1,08 an einem Fusszeilen-Link, dessen Farbe
+     nachweislich 5,58 misst. Weder lokal noch im Wiederholungslauf trat der
+     Fund wieder auf, auch nicht bei acht Wiederholungen unter Last.
+
+     Die Luecke: `document.getAnimations()` erfasst CSS-Animationen und
+     -Uebergaenge, aber KEINE Aenderungen, die JavaScript am DOM vornimmt.
+     Genau das passiert in diesem Zustand — sobald Live-Text eintrifft, wird
+     #scanText geleert und der Text nach #liveTextFest umgehaengt. Das
+     verschiebt das Layout, und alles darunter wandert mit. Der Test misst
+     unmittelbar nach `expect.poll`, also mitten hinein. Auf der langsameren
+     CI-Maschine ist dieses Fenster groesser als hier.
+
+     Deshalb wird zusaetzlich auf LAYOUT-Ruhe gewartet: Die Seitenhoehe und die
+     Lage der Fusszeile muessen ueber zwei aufeinanderfolgende Bilder gleich
+     bleiben. Das faengt jede Bewegung ab, gleich wodurch sie ausgeloest wird. */
+  /* Layout-Ruhe abwarten — von aussen gemessen, nicht mit waitForFunction.
+     Zwei Anlaeufe scheiterten daran: Bei polling "raf" wartet Playwright nicht
+     auf ein zurueckgegebenes Promise (es wertet das Objekt als "wahr" und
+     loest sofort auf), und auch die synchrone Fassung meldete eine dauerhaft
+     wachsende Seite als ruhig. Beide Male fiel es nur auf, weil eine
+     Gegenprobe danebenstand — eine Zusicherung, die nie scheitern kann, ist
+     schlimmer als keine.
+
+     ANLASS 2026-08-23: Ein CI-Lauf meldete im Zustand "Live-Text/Modell
+     schreibt mit" Kontrast 1,08 an einem Fusszeilen-Link, dessen Farbe
+     nachweislich 5,58 misst. `document.getAnimations()` deckt CSS-Animationen
+     und -Uebergaenge ab, aber KEINE Aenderungen, die JavaScript am DOM
+     vornimmt — und genau das passiert dort: #scanText wird geleert, der Text
+     wandert nach #liveTextFest, alles darunter verschiebt sich. */
+  let vorher = null;
+  let gleich = 0;
+  for (let i = 0; i < 50 && gleich < 3; i++) {
+    const jetzt = await page.evaluate(() => {
+      const f = document.querySelector(".site-footer");
+      return document.documentElement.scrollHeight + "|" + (f ? Math.round(f.getBoundingClientRect().top) : "-");
+    });
+    gleich = jetzt === vorher ? gleich + 1 : 0;
+    vorher = jetzt;
+    if (gleich < 3) await page.waitForTimeout(30);
+  }
+  /* Bleibt die Seite laenger in Bewegung, wird trotzdem gemessen — die
+     Diagnose am Verstoss haelt Lage und Ueberdeckung fest, sodass ein Fund aus
+     dieser Ursache erkennbar bleibt. Ein Riegel, der hier abbricht, wuerde
+     echte Pruefungen verhindern. */
 }
 
 /**

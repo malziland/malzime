@@ -488,35 +488,52 @@ async function beruhigen(page) {
      Deshalb wird zusaetzlich auf LAYOUT-Ruhe gewartet: Die Seitenhoehe und die
      Lage der Fusszeile muessen ueber zwei aufeinanderfolgende Bilder gleich
      bleiben. Das faengt jede Bewegung ab, gleich wodurch sie ausgeloest wird. */
-  /* Layout-Ruhe abwarten — von aussen gemessen, nicht mit waitForFunction.
-     Zwei Anlaeufe scheiterten daran: Bei polling "raf" wartet Playwright nicht
-     auf ein zurueckgegebenes Promise (es wertet das Objekt als "wahr" und
-     loest sofort auf), und auch die synchrone Fassung meldete eine dauerhaft
-     wachsende Seite als ruhig. Beide Male fiel es nur auf, weil eine
-     Gegenprobe danebenstand — eine Zusicherung, die nie scheitern kann, ist
-     schlimmer als keine.
-
+  /* Layout-Ruhe abwarten.
      ANLASS 2026-08-23: Ein CI-Lauf meldete im Zustand "Live-Text/Modell
      schreibt mit" Kontrast 1,08 an einem Fusszeilen-Link, dessen Farbe
      nachweislich 5,58 misst. `document.getAnimations()` deckt CSS-Animationen
      und -Uebergaenge ab, aber KEINE Aenderungen, die JavaScript am DOM
      vornimmt — und genau das passiert dort: #scanText wird geleert, der Text
-     wandert nach #liveTextFest, alles darunter verschiebt sich. */
-  let vorher = null;
-  let gleich = 0;
-  for (let i = 0; i < 50 && gleich < 3; i++) {
-    const jetzt = await page.evaluate(() => {
-      const f = document.querySelector(".site-footer");
-      return document.documentElement.scrollHeight + "|" + (f ? Math.round(f.getBoundingClientRect().top) : "-");
-    });
-    gleich = jetzt === vorher ? gleich + 1 : 0;
-    vorher = jetzt;
-    if (gleich < 3) await page.waitForTimeout(30);
+     wandert nach #liveTextFest, alles darunter verschiebt sich.
+
+     EIN Roundtrip, nicht mehrere: Eine erste Fassung mass in einer Schleife
+     von aussen und rief page.evaluate bis zu 50-mal je Messung auf. Bei 82
+     Zustaenden mal drei Browsern summierte sich das so weit, dass unter Last
+     ANDERE Testdateien in ihre Zeitgrenzen liefen — ein Riegel darf die Suite
+     nicht kippen, die er schuetzen soll. page.evaluate wartet auf ein
+     zurueckgegebenes Promise (anders als waitForFunction mit polling "raf",
+     das eine fruehere Fassung wirkungslos machte), also wird innerhalb EINES
+     Aufrufs ueber mehrere Bilder gemessen. */
+  for (let versuch = 0; versuch < 3; versuch++) {
+    const ruhig = await page.evaluate(
+      () =>
+        new Promise((fertig) => {
+          const messen = () => {
+            const f = document.querySelector(".site-footer");
+            return (
+              document.documentElement.scrollHeight + "|" + (f ? Math.round(f.getBoundingClientRect().top) : "-")
+            );
+          };
+          /* Abstand zwischen den Messungen, nicht Bild an Bild: Vier direkt
+             aufeinanderfolgende Bilder laufen so schnell durch, dass eine
+             langsamere Bewegung dazwischen gar nicht stattfindet — die
+             Gegenprobe mit einer wachsenden Seite ging so durch. 50 ms decken
+             ein Bild bei 20 Hz ab und kosten je Messung 150 ms. */
+          const werte = [];
+          const naechstes = () => {
+            werte.push(messen());
+            if (werte.length < 4) setTimeout(() => requestAnimationFrame(naechstes), 50);
+            else fertig(werte.every((w) => w === werte[0]));
+          };
+          requestAnimationFrame(naechstes);
+        })
+    );
+    if (ruhig) break;
+    /* Bleibt die Seite auch nach drei Anlaeufen in Bewegung, wird trotzdem
+       gemessen — die Diagnose am Verstoss haelt Lage und Ueberdeckung fest,
+       sodass ein Fund aus dieser Ursache erkennbar bleibt. Ein Riegel, der
+       hier abbricht, wuerde echte Pruefungen verhindern. */
   }
-  /* Bleibt die Seite laenger in Bewegung, wird trotzdem gemessen — die
-     Diagnose am Verstoss haelt Lage und Ueberdeckung fest, sodass ein Fund aus
-     dieser Ursache erkennbar bleibt. Ein Riegel, der hier abbricht, wuerde
-     echte Pruefungen verhindern. */
 }
 
 /**

@@ -181,6 +181,14 @@
         "destination": "/en/accessibility.html"
       },
       {
+        "source": "/kurzvorstellung",
+        "destination": "/kurzvorstellung.html"
+      },
+      {
+        "source": "/en/introduction",
+        "destination": "/en/introduction.html"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

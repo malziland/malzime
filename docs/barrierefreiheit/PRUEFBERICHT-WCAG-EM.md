@@ -16,7 +16,7 @@ Bewertung der Konformität mit den Web Content Accessibility Guidelines.
 | ------------------- | ------------------------------------------------------------------------------ |
 | **Prüfer**          | malziland - learning \| training \| consulting e.U., Inhaber Christoph Krieger |
 | **Auftraggeber**    | Eigenprüfung                                                                   |
-| **Prüfdatum**       | 17.–19. August 2026                                                            |
+| **Prüfdatum**       | 17.–23. August 2026                                                            |
 | **Geprüfter Stand** | Commit `05e2a71` (v3.4.0), ausgelieferte Kennung `2026081802`                  |
 | **Art der Prüfung** | Selbstbewertung, werkzeuggestützt und teilweise manuell                        |
 
@@ -279,7 +279,7 @@ Ursache, Behebung und Dauerprüfung in Anhang A. Zwei davon fand kein Werkzeug, 
 Mensch, der zum ersten Mal mit VoiceOver zuhörte; einen fand die Auflösung der
 Abstentionen.
 
-**Messumfang:** 70 Zustände je Browser-Maschine, drei Maschinen, also 210 Messungen — jede
+**Messumfang:** 82 Zustände je Browser-Maschine, drei Maschinen, also 210 Messungen — jede
 zweifach ausgeführt und nur übernommen, was beide Male auftrat.
 
 Die Zahl stammt nicht aus diesem Text: `e2e/barrierefreiheit-protokoll.test.js` zählt die

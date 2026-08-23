@@ -25,8 +25,9 @@ function alleHtmlSeiten(unter = "") {
   return treffer;
 }
 
-/* Die vier Rechtsseiten und ihre englischen Zwillinge. Kanonische Quelle fuer
-   die Paarung; firebase.json und die Umschalter-Links muessen dazu passen. */
+/* Die zweisprachigen Unterseiten und ihre englischen Zwillinge — die vier
+   Rechtsseiten plus die Kurzvorstellung. Kanonische Quelle fuer die Paarung;
+   firebase.json und die Umschalter-Links muessen dazu passen. */
 const RECHTS_PAARE = [
   { de: "impressum.html", en: "en/legal-notice.html", dePfad: "/impressum", enPfad: "/en/legal-notice" },
   { de: "datenschutz.html", en: "en/privacy.html", dePfad: "/datenschutz", enPfad: "/en/privacy" },
@@ -36,6 +37,12 @@ const RECHTS_PAARE = [
     en: "en/accessibility.html",
     dePfad: "/barrierefreiheit",
     enPfad: "/en/accessibility",
+  },
+  {
+    de: "kurzvorstellung.html",
+    en: "en/introduction.html",
+    dePfad: "/kurzvorstellung",
+    enPfad: "/en/introduction",
   },
 ];
 const LOCALES_DIR = path.join(PUBLIC_DIR, "locales");

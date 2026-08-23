@@ -308,6 +308,50 @@ const KONTRAST_AUSNAHMEN = [
   },
 ];
 
+/**
+ * Sammelt zu einem gemeldeten Kontrast-Verstoss alles, was ihn spaeter
+ * auswertbar macht.
+ *
+ * ANLASS 2026-08-23: Ein Lauf meldete an einem Fusszeilen-Link Kontrast 1,08
+ * statt der gemessenen 5,58 — "durch Bildpunkt-Messung bestaetigt". Weder
+ * lokal noch im Wiederholungslauf trat er wieder auf; zwei Erklaerungen
+ * (laufender Farbuebergang, andere Browsersprache) liessen sich durch
+ * erzwungene Gegenversuche WIDERLEGEN. Der Fund blieb unerklaert.
+ *
+ * Der Grund dafuer war das Messmittel selbst: Es meldete nur die Zahl. Ob das
+ * Element ueberdeckt war, welche Farben tatsaechlich anlagen, ob gerade eine
+ * Animation lief — nichts davon stand im Bericht, und ohne das ist ein
+ * einmaliger Fund nicht aufloesbar. Ein Pruefmittel, dessen Funde niemand
+ * nachvollziehen kann, verliert genau das Vertrauen, das es herstellen soll.
+ */
+async function verstossDiagnose(page, waehler) {
+  return page.evaluate((w) => {
+    const el = document.querySelector(w);
+    if (!el) return { hinweis: "Element beim Nachsehen nicht mehr da" };
+    const cs = getComputedStyle(el);
+    const r = el.getBoundingClientRect();
+    /* Hintergrund: die erste Elternflaeche, die nicht durchsichtig ist */
+    let hinter = null;
+    for (let k = el; k; k = k.parentElement) {
+      const bg = getComputedStyle(k).backgroundColor;
+      if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") { hinter = bg; break; }
+    }
+    const mitte = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return {
+      textfarbe: cs.color,
+      hintergrund: hinter,
+      deckkraft: cs.opacity,
+      schriftgroesse: cs.fontSize,
+      sichtbar: cs.visibility + "/" + cs.display,
+      ueberdecktVon: mitte === el || el.contains(mitte) ? null : (mitte ? mitte.tagName + "." + mitte.className : "nichts"),
+      imBild: r.top >= 0 && r.bottom <= innerHeight,
+      masse: Math.round(r.width) + "x" + Math.round(r.height) + " bei " + Math.round(r.top),
+      laufendeAnimationen: document.getAnimations().length,
+      sprache: document.documentElement.lang + " / " + navigator.language,
+    };
+  }, waehler);
+}
+
 async function abstentionenAufloesen(page, incomplete) {
   const offen = [];
   for (const regel of incomplete) {
@@ -337,6 +381,9 @@ async function abstentionenAufloesen(page, incomplete) {
           gemessen,
           verlangt: schwelle,
           aufloesung: "VERSTOSS, durch Bildpunkt-Messung bestaetigt",
+          /* Ohne diese Angaben ist ein einmaliger Fund nicht aufloesbar —
+             siehe Begruendung bei verstossDiagnose. */
+          diagnose: await verstossDiagnose(page, waehler),
         });
       }
     }
@@ -385,14 +432,20 @@ async function messen(page, bildschirm, zustand) {
     /* Jede Abstention einzeln aufgeloest — leer heisst: alle geklaert. */
     abstentionOffen: await abstentionenAufloesen(page, lauf1.incomplete),
     wackelig: wackelig.map((v) => ({ regel: v.id, anzahl: v.nodes.length })),
-    verstoesse: stabil.map((v) => ({
-      regel: v.id,
-      impact: v.impact,
-      beschreibung: v.help,
-      kriterium: v.tags.filter((t) => t.startsWith("wcag")).join(" "),
-      elemente: v.nodes.map((n) => n.target.join(" ")).slice(0, 8),
-      anzahl: v.nodes.length,
-    })),
+    verstoesse: await Promise.all(
+      stabil.map(async (v) => ({
+        regel: v.id,
+        impact: v.impact,
+        beschreibung: v.help,
+        kriterium: v.tags.filter((t) => t.startsWith("wcag")).join(" "),
+        elemente: v.nodes.map((n) => n.target.join(" ")).slice(0, 8),
+        anzahl: v.nodes.length,
+        /* Bei Farbkontrast zusaetzlich, was den Fund aufloesbar macht: welche
+           Farben tatsaechlich anlagen, ob das Element ueberdeckt war, ob
+           Animationen liefen. Siehe Begruendung bei verstossDiagnose. */
+        ...(v.id === "color-contrast" ? { diagnose: await verstossDiagnose(page, v.nodes[0].target.join(" ")) } : {}),
+      }))
+    ),
   };
   /* POSITIVKONTROLLE, kein Formalismus: Liefert axe null geprueffte Regeln,
      ist die Messung gescheitert — und ein leeres Ergebnis sieht genau aus wie

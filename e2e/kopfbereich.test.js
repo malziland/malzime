@@ -101,10 +101,21 @@ test.describe("Kopfbereich", () => {
     expect(versatz, "Umschalter nicht auf Logo-Höhe").toEqual([]);
   });
 
+  /* AUSNAHME, bewusst und sichtbar (KERN 12): Die Kurzvorstellung ist eine
+     Landeseite mit Verlaufs-Kopf — dort sitzt die Überschrift IM Farbkasten,
+     nicht auf der Textkante. Sie kann die gemeinsame Höhe nicht einhalten,
+     ohne den Kopf aufzugeben. Die Regel schützt vor Sprüngen beim Wechsel
+     zwischen den gleichartigen Text- und Rechtsseiten; eine bewusst anders
+     gebaute Landeseite ist kein solcher Fall.
+     Die Ausnahme wird bei JEDEM Lauf ausgegeben — eine Ausnahme, die niemand
+     mehr sieht, ist nach zwei Monaten der Normalzustand. */
+  const HOEHEN_AUSNAHMEN = ["/kurzvorstellung.html", "/en/introduction.html"];
+
   test("alle Überschriften stehen auf derselben Höhe", async ({ page }) => {
     await merkmalStellen(page);
+    console.log(`[kopfbereich] Höhenregel ausgenommen: ${HOEHEN_AUSNAHMEN.join(", ")} (Landeseiten mit Verlaufs-Kopf)`);
     const hoehen = {};
-    for (const pfad of SEITEN) {
+    for (const pfad of SEITEN.filter((p) => !HOEHEN_AUSNAHMEN.includes(p))) {
       await page.goto(pfad);
       await page.evaluate(() => document.fonts.ready);
       hoehen[pfad] = await page.evaluate(() => Math.round(document.querySelector("h1").getBoundingClientRect().top));
@@ -112,6 +123,14 @@ test.describe("Kopfbereich", () => {
     const werte = [...new Set(Object.values(hoehen))];
     /* Positivkontrolle: Wären alle 0, hätte nichts gemessen. */
     expect(werte[0]).toBeGreaterThan(50);
+    /* Zweite Positivkontrolle: Eine Ausnahme, die auf eine nicht mehr
+       vorhandene Seite zeigt, nimmt still nichts mehr aus — und niemand
+       merkt, dass die Liste veraltet ist. */
+    for (const a of HOEHEN_AUSNAHMEN) {
+      expect(SEITEN, `Ausnahme ${a} zeigt ins Leere — Seite gibt es nicht mehr`).toContain(a);
+    }
+    /* Und sie darf nicht alles ausnehmen. */
+    expect(Object.keys(hoehen).length, "alle Seiten ausgenommen — der Test misst nichts").toBeGreaterThanOrEqual(8);
     expect(werte, `Überschriften auf verschiedenen Höhen: ${JSON.stringify(hoehen)}`).toHaveLength(1);
   });
 

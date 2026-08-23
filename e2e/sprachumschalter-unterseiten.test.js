@@ -23,7 +23,7 @@ import { join } from "node:path";
  * eine englische Zeile. Es gibt keinen Dialog mehr, den man prüfen könnte.
  * Ebenfalls gestrichen ist die „Spur aus dem Tab": Ob die Pille erscheint,
  * entschied früher ein Merkmal, das die Startseite im Tab hinterließ — heute
- * steht sie fest im Markup jeder der acht Seiten.
+ * steht sie fest im Markup jeder dieser Seiten.
  *
  * GEBLIEBEN, und wichtiger als vorher, sind die drei Zusicherungen, die diese
  * Seiten still halten. Sie stehen so in der Datenschutzerklärung, sind also
@@ -31,7 +31,7 @@ import { join } from "node:path";
  *   - Sie legen nichts im Browser ab (weder localStorage noch sessionStorage).
  *   - Sie rufen keine Schnittstelle auf. Eine Rechtsseite, die nach Hause
  *     funkt, wäre genau das, was ihr eigener Text ausschließt.
- *   - NEU: Sechs der acht Seiten laden überhaupt kein JavaScript; nur die
+ *   - NEU: Bis auf die Datenschutzseiten laden diese Seiten überhaupt kein JavaScript; nur die
  *     beiden Datenschutzseiten laden genau ein Skript, `js/echtheit-pruefen.js`.
  *     Früher hing diese Zusage am bloßen Fehlen eines Umschalter-Skripts,
  *     jetzt wird sie ausdrücklich gemessen — und zwar an dem, was der Browser
@@ -44,7 +44,7 @@ import { join } from "node:path";
  * die Maschine hinter Safari auf den iPhones, auf denen die Workshops laufen.
  */
 
-/* Die vier Paare. `klar` ist jeweils die Adresse OHNE Endung — genau die, die
+/* Die Paare. `klar` ist jeweils die Adresse OHNE Endung — genau die, die
    im href des Umschalters steht und die Firebase Hosting per Rewrite auf die
    HTML-Datei abbildet (firebase.json). */
 const SEITENPAARE = [
@@ -68,21 +68,26 @@ const SEITENPAARE = [
     de: { datei: "/barrierefreiheit.html", klar: "/barrierefreiheit" },
     en: { datei: "/en/accessibility.html", klar: "/en/accessibility" },
   },
+  {
+    name: "Kurzvorstellung",
+    de: { datei: "/kurzvorstellung.html", klar: "/kurzvorstellung" },
+    en: { datei: "/en/introduction.html", klar: "/en/introduction" },
+  },
 ];
 
 /* Welche Skripte eine Seite laden DARF — vollständig, nicht „mindestens".
    Die Datenschutzseiten tragen den Echtheits-Nachweis (nachrechnen der
    ausgelieferten Prüfsummen im Browser); der braucht ein Skript und ist im
-   Text angekündigt. Alle übrigen sechs Seiten sind reines HTML. */
+   Text angekündigt. Alle übrigen Seiten sind reines HTML. */
 const ERLAUBTE_SKRIPTE = new Map([
   ["/datenschutz.html", ["/js/echtheit-pruefen.js"]],
   ["/en/privacy.html", ["/js/echtheit-pruefen.js"]],
 ]);
 
-/* Alle acht Seiten flach, für die Prüfungen, die je Seite laufen. */
+/* Alle Seiten flach, für die Prüfungen, die je Seite laufen. */
 const ALLE_RECHTSSEITEN = SEITENPAARE.flatMap((p) => [p.de.datei, p.en.datei]);
 
-/* Adresse ohne Endung -> Datei mit Endung, exakt die acht Rewrites aus
+/* Adresse ohne Endung -> Datei mit Endung, exakt die Seiten-Rewrites aus
    firebase.json. Gebraucht von der Attrappe weiter unten. */
 const REWRITES = new Map(
   SEITENPAARE.flatMap((p) => [

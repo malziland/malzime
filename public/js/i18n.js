@@ -202,6 +202,7 @@ export const RECHTSSEITEN = Object.freeze({
   "/datenschutz": "/en/privacy",
   "/nutzungsbedingungen": "/en/terms",
   "/barrierefreiheit": "/en/accessibility",
+  "/kurzvorstellung": "/en/introduction",
 });
 
 const ZURUECK_AUF_DEUTSCH = Object.freeze(Object.fromEntries(Object.entries(RECHTSSEITEN).map(([de, en]) => [en, de])));

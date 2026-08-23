@@ -4,6 +4,31 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Neu
+
+- **Eine Kurzvorstellung erklärt malziME auf einer eigenen Seite.** Deutsch unter
+  `/kurzvorstellung`, englisch unter `/en/introduction`: was das Werkzeug ist,
+  warum es im Workshop wirkt, wie es in drei Schritten abläuft, was mit den
+  hochgeladenen Fotos passiert. Gedacht als Anhang zur Presse- und
+  Schulaussendung und zum Verlinken auf der Website.
+
+- **Beide Seiten sind für Suchmaschinen und Antwortmaschinen auswertbar.**
+  Strukturierte Daten mit sechs häufig gestellten Fragen, vollständige
+  Vorschaubild-Angaben, Einträge in der Sitemap und saubere Adressen ohne
+  Dateiendung.
+
+- **Die Fußzeile führt die Kurzvorstellung auf allen zwölf Seiten** — zusammen
+  mit der Wortmarke in der Markenfarbe, damit die beiden inhaltlichen Einträge
+  zwischen den Rechtsseiten auffallen.
+
+### Geändert
+
+- **Die Barrierefreiheitserklärung nennt 82 statt 70 geprüfte Zustände.** Die
+  beiden neuen Seiten durchlaufen dieselbe Prüfung wie alle anderen; Prüfdatum
+  in Erklärung, Prüfbericht und Prüfprotokoll auf den 23. August 2026 gezogen.
+
 ## [4.0.1] — 2026-08-21
 
 ### Behoben

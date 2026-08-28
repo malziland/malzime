@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.1.2] — 2026-08-28
+
+### Behoben
+
+- **Bricht eine Analyse an der Zeitgrenze ab, geht das bereits Geschriebene
+  nicht mehr verloren.** Bisher wurde ein Lauf, dessen Uhr ablief, vollständig
+  verworfen — auch dann, wenn beide Profile längst fertig dastanden und im
+  Live-Text schon zu lesen waren. Der Nutzer sah statt seines Ergebnisses die
+  Meldung „technischer Fehler". Jetzt wird der bereits empfangene Text durch
+  die vorhandene Reparatur für unvollständige Antworten geschickt; trägt er
+  mindestens ein Profil, wird er ausgeliefert. Greift die Rettung nicht, bleibt
+  alles wie bisher.
+
 ## [4.1.1] — 2026-08-28
 
 ### Behoben

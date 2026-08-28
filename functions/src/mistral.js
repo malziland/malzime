@@ -301,7 +301,7 @@ function dekodiereJsonEscapes(roh) {
  * `onLiveText` gegeben — Fehler im Callback oder in der Extraktion werden
  * still geschluckt, sie duerfen den Aufruf NIE scheitern lassen.
  */
-async function leseStreamAntwort(res, onLiveText, httpStart) {
+async function leseStreamAntwort(res, onLiveText, httpStart, spur) {
   const reader = res.body.getReader();
   /* {stream: true}: haelt unvollstaendige Mehrbyte-Sequenzen (Umlaute,
      Emojis) zurueck, bis die restlichen Bytes im naechsten Chunk ankommen —
@@ -348,6 +348,12 @@ async function leseStreamAntwort(res, onLiveText, httpStart) {
       if (choice?.finish_reason) finishReason = choice.finish_reason;
       if (chunk.usage) usage = chunk.usage; /* kommt im letzten Chunk */
     }
+
+    /* BUG-2026-08-28-02: Der bereits gelesene Text wird nach aussen
+       mitgefuehrt. Reisst die Uhr mitten im Strom, wirft der Reader einen
+       AbortError und `volltext` waere sonst mit dem Stack-Frame verloren —
+       obwohl darin ein fast vollstaendiges Ergebnis steht. */
+    if (spur) spur.text = volltext;
 
     /* Live-Welle: gedrosselt, still bei Fehlern. Solange nicht einmal der
        Standard-Text begonnen hat (standard === null), gibt es nichts zu
@@ -531,12 +537,15 @@ async function callMistralRawUnthrottled({
          Timeout wirft im Reader einen AbortError (Phase-0-Messung) und wird
          hier — wie beim Nicht-Stream-fetch — zum `timeout`-Fehler; alles
          andere propagiert unveraendert in die bestehende Fehlerbehandlung. */
+      const spur = {};
       try {
-        return await leseStreamAntwort(res, onLiveText, httpStart);
+        return await leseStreamAntwort(res, onLiveText, httpStart, spur);
       } catch (err) {
         if (err && err.name === "AbortError") {
           const e = new Error(`Mistral request timeout after ${effectiveTimeout}ms`);
           e.code = "timeout";
+          /* BUG-2026-08-28-02: Was bis zum Abbruch ankam, faehrt mit. */
+          e.teiltext = spur.text || "";
           throw e;
         }
         throw err;
@@ -1440,6 +1449,12 @@ function collectMissingForBothModes(parsed) {
   };
 }
 
+/* BUG-2026-08-28-02: Traegt ein geretteter Profilblock ueberhaupt Text? Reine
+   Formpruefung — ohne sie wuerde ein leeres Geruest als Rettung durchgehen. */
+function hatProfilText(block) {
+  return Boolean(block && typeof block.profileText === "string" && block.profileText.trim().length > 0);
+}
+
 async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText) {
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
@@ -1482,6 +1497,32 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     );
     return parsed;
   } catch (err) {
+    /* BUG-2026-08-28-02: Rettung vor dem Fehlerpfad. Reisst die Uhr, steht im
+       Strom oft ein fast vollstaendiges Ergebnis — am 28.08. lagen bei jedem
+       gescheiterten Lauf beide Profiltexte fertig in Firestore und wurden
+       trotzdem verworfen. `parseSafely` bringt die Reparatur fuer
+       abgeschnittenes JSON bereits mit (Stufe truncation-recovery); sie war
+       hier nur nie erreichbar, weil der Teiltext mit dem Stack-Frame starb.
+       Greift die Rettung nicht, laeuft alles exakt wie bisher weiter. */
+    if (err && err.code === "timeout" && typeof err.teiltext === "string" && err.teiltext.length > 0) {
+      const rettungsStufen = [];
+      const gerettet = parseSafely(err.teiltext, {
+        requireSchema: false,
+        onRepair: (stufe, e) => rettungsStufen.push(stufe + (e ? `:${e.name || "Error"}` : "")),
+      });
+      const brauchbar = gerettet && (hatProfilText(gerettet.standard) || hatProfilText(gerettet.beast));
+      console.log(
+        JSON.stringify({
+          step: "single-large-rettung",
+          attempt: attemptLabel,
+          status: brauchbar ? "gerettet" : "nicht-rettbar",
+          teiltextZeichen: err.teiltext.length,
+          repairStages: rettungsStufen,
+        })
+      );
+      if (brauchbar) return gerettet;
+    }
+
     /* BUG-2026-08-17-06: console.error statt console.log — das ergibt severity
        ERROR in Cloud Logging und faellt damit unter die bestehende
        Alarm-Policy (dieselbe Begruendung wie OPS-004 beim Werbe-Ersatzaufruf).

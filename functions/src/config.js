@@ -84,18 +84,26 @@ const MISTRAL_TIMEOUT_MS = 90000;
    zugebissen. Im Stream-Modus bleibt die Uhr bewusst scharf bis zum letzten
    Zeichen; damit wurde eine schlafende Grenze zum ersten Mal wirksam.
 
-   WARUM 150 s: Gemessen an 35 erfolgreichen Laeufen (Log-Bucket
-   `client-diagnostics`, 11.-16.08.2026) schreibt das Modell mit 47 Token/s im
-   Median, im langsamsten Lauf mit 39,4 Token/s. MISTRAL_SINGLE_LARGE_MAX_TOKENS
-   (5000) braucht damit im schlechtesten gemessenen Fall 127 s. 150 s deckt das
-   mit Reserve ab. Damit kann die Uhr keinen Lauf mehr toeten, den das
-   Token-Budget ausdruecklich erlaubt — genau der Widerspruch, der 2 von 38
-   Laeufen gekostet hat.
+   WARUM 300 s (BUG-2026-08-28-01, vorher 150 s): Die 150 s stammten aus einer
+   Messung vom 11.-16.08.2026 (47 Token/s im Median, 39,4 im langsamsten Lauf).
+   Diese Momentaufnahme stand danach als feste Zahl im Code und wurde nie wieder
+   an der Wirklichkeit geprueft. Am 28.08. lag die reale Laufzeit des Aufrufs bei
+   135-155 s und damit MITTEN auf der Grenze: Gemessen wurden vier Laeufe
+   innerhalb einer halben Stunde, zwei davon (150,3 s und 152,2 s) starben an der
+   Uhr, zwei kamen durch (135,8 s und 156,7 s Gesamtdauer). Das ergab fuer die
+   Nutzer eine Ausfallquote um 50 % — bei fertig geschriebenen Profilen, die
+   verworfen wurden.
+
+   Die Zahl selbst ist damit nicht das Problem, sondern dass sie eine gemessene
+   Eigenschaft der Aussenwelt einfriert. 300 s ist bewusst grosszuegig gewaehlt
+   (Function-Limit 540 s, REQUEST_BUDGET_MS 480 s) und behebt den Ausfall; sie
+   macht die Verlangsamung selbst nicht rueckgaengig und ersetzt keinen Waechter,
+   der anschlaegt, wenn die Laufzeit erneut an die Grenze wandert.
 
    Die Kopplung der beiden Werte ist keine Bitte um Sorgfalt, sondern geprueft:
    `__tests__/mistral-zeitbudget.test.js` rechnet sie gegeneinander und wird
    rot, sobald jemand einen der beiden Werte allein verschiebt. */
-const MISTRAL_SINGLE_LARGE_TIMEOUT_MS = 150000;
+const MISTRAL_SINGLE_LARGE_TIMEOUT_MS = 300000;
 
 /* Langsamstes gemessenes Schreibtempo (Token/s) aus dem 30-Tage-Diagnose-Bucket.
    Kanonische Quelle fuer die Zeitbudget-Rechnung; steht hier, damit Test und

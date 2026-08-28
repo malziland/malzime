@@ -4,6 +4,23 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.1.1] — 2026-08-28
+
+### Behoben
+
+- **Analysen brachen ab, obwohl das Profil fertig geschrieben war.** Die
+  Zeitgrenze für den großen KI-Aufruf lag bei 150 Sekunden, während ein
+  Durchgang zuletzt 135 bis 155 Sekunden brauchte — die Grenze lag damit mitten
+  in der normalen Laufzeit. Wer ein paar Sekunden darüber lag, bekam die
+  Meldung „technischer Fehler", obwohl beide Profile bereits vollständig
+  vorlagen. Vier Läufe innerhalb einer halben Stunde am 28.08. zeigten das
+  Bild: zwei durchgekommen, zwei an der Uhr gestorben. Die Grenze liegt jetzt
+  bei 300 Sekunden und damit wieder klar über der realen Laufzeit.
+
+  Die Ursache der Verlangsamung selbst — ein Durchgang dauerte im Juli rund 65,
+  Ende August rund 150 Sekunden — liegt außerhalb des Projekts und ist mit
+  dieser Änderung nicht behoben, sondern nur entschärft.
+
 ## [4.1.0] — 2026-08-23
 
 ### Neu

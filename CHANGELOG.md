@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Wer während der Wartezeit scrollt, bekommt den mitlaufenden Text trotzdem
+  zu sehen.** Bisher gab die Seite die Führung beim ersten Wischen endgültig
+  ab — auch wenn es lange vor dem Tippen geschah, aus bloßer Neugier, während
+  nur das Scan-Auge lief. Danach war alles abgeschaltet: das Ausrichten des
+  Profiltexts und das Nachrücken der Zeile. Wer sich beim Warten umgesehen
+  hatte, sah den Text anschließend am unteren Bildrand vorbeilaufen.
+
+  Zum Tippbeginn wird die Führung jetzt genau einmal neu scharf gestellt. Ab
+  da gilt der Vorrang des Lesers wieder wie zuvor: Wer während des Tippens
+  scrollt, übernimmt endgültig.
+
+- **Das Scan-Auge wird erst dann als sichtbar gewertet, wenn es ganz ins Bild
+  passt.** Die bisherige Regel ließ die halbe Höhe genügen — ein zur Hälfte
+  angeschnittenes Auge galt damit als sichtbar und wurde nie nachgezogen. Auf
+  kleinen Bildschirmen stand deshalb oft nur ein halber Kreis am Rand.
+
 ## [4.2.1] — 2026-08-29
 
 ### Geändert

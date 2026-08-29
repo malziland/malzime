@@ -118,7 +118,36 @@ test.describe("Kopfbereich", () => {
     for (const pfad of SEITEN.filter((p) => !HOEHEN_AUSNAHMEN.includes(p))) {
       await page.goto(pfad);
       await page.evaluate(() => document.fonts.ready);
-      hoehen[pfad] = await page.evaluate(() => Math.round(document.querySelector("h1").getBoundingClientRect().top));
+      /* ANLASS 30.08.2026, durch das erste Fehlerbild der CI geklaert: Die
+         Zahlen-Seite fiel wiederholt mit 136 statt 115 auf. Das Bild zeigte
+         sie auf ENGLISCH und halb aufgebaut ("NaN Analyses in the last hour").
+
+         Grund: /stats.html ist die EINZIGE Seite, die in beiden Sprachen
+         dieselbe Datei ist — sie wird erst nach dem Laden uebersetzt. Alle
+         anderen existieren getrennt und stehen sofort richtig. Playwright
+         meldet dem Browser Englisch, die Uebersetzung laeuft also immer, und
+         sie verschiebt das Layout. `document.fonts.ready` sagt darueber
+         nichts.
+
+         Gewartet wird deshalb auf LAYOUT-RUHE: Die Lage der Ueberschrift muss
+         ueber zwei aufeinanderfolgende Bilder gleich bleiben. Das faengt jede
+         Bewegung ab, gleich wodurch sie ausgeloest wird — und macht den Test
+         unabhaengig davon, wie schnell der Laeufer gerade ist.
+
+         Die Zusicherung darunter bleibt unveraendert; korrigiert wird nur der
+         Zeitpunkt der Messung. */
+      hoehen[pfad] = await page.evaluate(async () => {
+        const messen = () => Math.round(document.querySelector("h1").getBoundingClientRect().top);
+        const bild = () => new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f)));
+        let vorher = messen();
+        for (let i = 0; i < 40; i += 1) {
+          await bild();
+          const jetzt = messen();
+          if (jetzt === vorher) return jetzt;
+          vorher = jetzt;
+        }
+        return vorher;
+      });
     }
     const werte = [...new Set(Object.values(hoehen))];
     /* Positivkontrolle: Wären alle 0, hätte nichts gemessen. */

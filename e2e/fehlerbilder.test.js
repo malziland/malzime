@@ -169,7 +169,25 @@ for (const bild of FEHLERBILDER) {
       ueberlauf ? `Text läuft aus dem Kasten: „${ueberlauf.text}" (${ueberlauf.innen} px > ${ueberlauf.aussen} px)` : ""
     ).toBeNull();
 
-    /* ── 4. Barrierefrei ── */
+    /* ── 4. Barrierefrei ──
+
+       ZUERST die Einblendung abwarten. Die Fehlerbilder erscheinen mit
+       `animation: fadeUp 0.4s` — `toBeVisible()` wartet aber nur darauf, dass
+       das Element ANGEZEIGT wird, nicht darauf, dass die Animation durch ist.
+
+       Wer mittendrin misst, misst die Zwischenfarben des Übergangs. Genau das
+       ist am 29.08.2026 passiert: Der Lauf meldete sechs Kontrastverstöße im
+       Fehlerbild „Stundenlimit erreicht" (`.limit-banner__title` mit 1,51 statt
+       4,5), reproduzierbar NUR im vollen Lauf — bei ausgelasteter Maschine
+       kommt der Test früher an als die Animation. Allein lief dieselbe Datei
+       grün. Nachgemessen: eine laufende Animation zum Messzeitpunkt,
+       Vordergrundfarbe `#ddc4ba` statt des echten Werts.
+
+       Das ist keine Lockerung der Prüfung, sondern ihre Bedingung: Geprüft
+       gehört der Zustand, den ein Mensch sieht — und der steht erst nach der
+       Einblendung. */
+    await ziel.evaluate((el) => Promise.all(el.getAnimations({ subtree: true }).map((a) => a.finished)));
+
     const ergebnis = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
     const verstoesse = ergebnis.violations.map((v) => `${v.id} (${v.nodes.length}×): ${v.help}`);
     expect(verstoesse, `axe-Verstöße im Fehlerbild „${bild.name}"`).toEqual([]);

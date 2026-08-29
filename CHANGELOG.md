@@ -42,7 +42,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   untersuchbar; man konnte den Lauf nur wiederholen. Jetzt liegen Screenshot,
   Aufzeichnung und Fehlerkontext bei. Im grünen Fall entsteht nichts.
 
-## [4.2.1] — 2026-08-29
+## [4.2.2] — 2026-08-30
 
 ### Behoben
 

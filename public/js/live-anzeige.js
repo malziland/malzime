@@ -482,6 +482,47 @@ function karteZeigen() {
   if (fuehrungAktiv() && !imSichtfeld(karte)) sanftZentrieren(karte);
 }
 
+/* FEATURE-2026-08-29-01: Merkmale, die das Modell bereits geschrieben hat.
+   Je Modus getrennt, weil Standard- und Beast-Profil eigene Karten haben. */
+let merkmale = { standard: [], beast: [] };
+let merkmaleModus = null;
+
+/**
+ * Zeigt die fertigen Merkmale des gewählten Modus.
+ *
+ * WARUM ES DAS GIBT: Zwischen dem fertigen Profiltext und dem Beast-Text lagen
+ * am 28.08. rund 50 Sekunden, in denen sichtbar nichts geschah — dort entstehen
+ * die 13 Kategorie-Karten, die bis dahin erst ganz am Ende auf einmal
+ * erschienen. Der Lauf sah beendet aus, obwohl die Hälfte noch fehlte.
+ *
+ * Die Liste wächst nur an und wird nie neu aufgebaut: Ein Neuaufbau bei jeder
+ * 2-Sekunden-Welle ließe bereits gelesene Zeilen springen.
+ */
+function merkmaleZeigen(modus) {
+  const ziel = elements.liveMerkmale;
+  if (!ziel) return;
+  const liste = merkmale[modus] || [];
+  /* Moduswechsel: andere Karten, also einmal leeren und neu füllen. */
+  if (merkmaleModus !== modus) {
+    ziel.replaceChildren();
+    merkmaleModus = modus;
+  }
+  for (let i = ziel.childElementCount; i < liste.length; i += 1) {
+    const eintrag = liste[i];
+    if (!eintrag) continue;
+    const zeile = document.createElement("li");
+    zeile.className = "live-merkmal";
+    const name = document.createElement("span");
+    name.className = "live-merkmal-name";
+    name.textContent = String(eintrag.bezeichnung || "");
+    const wert = document.createElement("span");
+    wert.className = "live-merkmal-wert";
+    wert.textContent = String(eintrag.wert || "");
+    zeile.append(name, wert);
+    ziel.appendChild(zeile);
+  }
+}
+
 /* Setzt die Karte vollständig zurück (unsichtbar, ohne Text). */
 function karteEntfernen() {
   const karte = elements.liveKarte;
@@ -489,6 +530,10 @@ function karteEntfernen() {
   if (elements.liveTextFest) elements.liveTextFest.textContent = "";
   if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
   if (elements.liveWarten) elements.liveWarten.textContent = "";
+  /* FEATURE-2026-08-29-01: Merkmale gehören zum Lauf, nicht zur Seite. */
+  if (elements.liveMerkmale) elements.liveMerkmale.replaceChildren();
+  merkmale = { standard: [], beast: [] };
+  merkmaleModus = null;
 }
 
 /* Nimmt alle Verdeckungen einer (abgebrochenen) Enthüllung zurück. Muss vor
@@ -607,6 +652,16 @@ export function welle(texte) {
      wird oder der Puffer leerläuft. */
   uebernehmen(lauf.puffer.standard, texte.standard);
   uebernehmen(lauf.puffer.beast, texte.beast);
+  /* FEATURE-2026-08-29-01: Merkmale derselben Welle. Nur wachsende Listen
+     übernehmen — eine kürzere Lieferung ist eine überholte Antwort, genau wie
+     beim Text. Fehlt das Feld (alter Server), bleibt der bisherige Stand. */
+  for (const [modus, neue] of [
+    ["standard", texte.kartenStandard],
+    ["beast", texte.kartenBeast],
+  ]) {
+    if (Array.isArray(neue) && neue.length > merkmale[modus].length) merkmale[modus] = neue;
+  }
+  merkmaleZeigen(lauf.aktiv);
 
   if (reduziert()) {
     /* Barrierefreiheit: kein Tippen, kein Rausch — jede Welle erscheint
@@ -691,6 +746,8 @@ export function modusWechsel() {
   const neu = aktiverModus();
   if (neu === lauf.aktiv) return;
   lauf.aktiv = neu;
+  /* FEATURE-2026-08-29-01: Der andere Modus hat eigene Merkmale. */
+  merkmaleZeigen(neu);
   /* Nur eine bereits sichtbare Karte sofort neu zeichnen — vor dem ersten
      getippten Zeichen gibt es nichts umzuschalten (die Tipp-Schleife nimmt
      den neuen Puffer von selbst beim nächsten Tick). */

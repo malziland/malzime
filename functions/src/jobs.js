@@ -330,6 +330,22 @@ async function setLiveText(jobId, texte) {
     if (typeof eingabe.beast === "string") {
       patch.liveTextBeast = eingabe.beast.slice(0, 4000);
     }
+    /* FEATURE-2026-08-29-01: Fertige Kategorie-Karten mitschreiben, damit der
+       Bildschirm nicht stillsteht, waehrend sie entstehen. Beide Grenzen sind
+       Absicherung gegen ein aufgeblaehtes Job-Dokument, nicht Sparsamkeit:
+       13 Karten sind das Maximum laut Schema, 400 Zeichen decken die im Prompt
+       verlangten 20-30 Woerter mit Reserve. */
+    for (const [feld, quelle] of [
+      ["liveKartenStandard", eingabe.kartenStandard],
+      ["liveKartenBeast", eingabe.kartenBeast],
+    ]) {
+      if (!Array.isArray(quelle)) continue;
+      patch[feld] = quelle.slice(0, 13).map((k) => ({
+        schluessel: String(k.schluessel || "").slice(0, 40),
+        bezeichnung: String(k.bezeichnung || "").slice(0, 80),
+        wert: String(k.wert || "").slice(0, 400),
+      }));
+    }
     await jobsRef().doc(jobId).update(patch);
   } catch (_) {
     /* still — siehe Funktionskommentar */

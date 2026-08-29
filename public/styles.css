@@ -1061,6 +1061,70 @@ html {
   color: var(--muted);
 }
 
+/* ── Merkmale während des Laufs (FEATURE-2026-08-29-01) ──
+   Sie erscheinen einzeln, sobald das Modell sie geschrieben hat. Vorher stand
+   der Bildschirm rund 50 s still, während genau diese Karten unsichtbar
+   entstanden — der Lauf sah beendet aus. Bewusst schlicht gehalten: Das
+   ausführliche Karten-Layout kommt am Ende, hier zählt nur das Lebenszeichen. */
+.live-merkmale {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.live-merkmal {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  animation: merkmalRein 0.28s ease-out;
+}
+
+.live-merkmal-name {
+  flex: 0 0 auto;
+  min-width: 8.5em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.live-merkmal-wert {
+  flex: 1;
+  min-width: 0;
+}
+
+@keyframes merkmalRein {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Bei reduzierter Bewegung erscheint die Zeile ohne Anflug — sichtbar bleibt
+   sie trotzdem, das Lebenszeichen ist der Zweck. */
+@media (prefers-reduced-motion: reduce) {
+  .live-merkmal {
+    animation: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .live-merkmal {
+    flex-direction: column;
+    gap: 1px;
+  }
+  .live-merkmal-name {
+    min-width: 0;
+  }
+}
+
 /* ── Gestaffelte Enthüllung (v3.0) ── */
 
 .lv-verdeckt {

@@ -361,6 +361,13 @@
             <span id="liveTextFest"></span><span id="liveTextRausch" class="rausch" aria-hidden="true"></span
             ><span id="liveCursor" class="tipp-cursor" aria-hidden="true"></span>
           </div>
+          <!-- FEATURE-2026-08-29-01: Die Merkmale erscheinen einzeln, sobald das
+               Modell sie geschrieben hat. Vorher stand der Bildschirm ~50 s still,
+               waehrend genau diese 13 Karten unsichtbar entstanden — der Lauf sah
+               beendet aus, obwohl die Haelfte noch fehlte. Bewusst ohne aria-live:
+               Der Screenreader bekommt die Ankuendigung am Ende ueber #srAnnounce,
+               ein Vorlesen jeder einzelnen Karte waere Dauerfeuer. -->
+          <ul id="liveMerkmale" class="live-merkmale" aria-hidden="true"></ul>
           <div id="liveWarten" class="live-warten"></div>
         </div>
         <div id="status" class="status" aria-live="polite" aria-atomic="true"></div>
@@ -520,7 +527,13 @@
           >malziland</a
         >
         <span class="footer-sep" aria-hidden="true">&middot;</span>
-        <a class="footer-hervor" href="/kurzvorstellung" target="_blank" rel="noopener" tabindex="0" data-i18n="footer.kurzvorstellung"
+        <a
+          class="footer-hervor"
+          href="/kurzvorstellung"
+          target="_blank"
+          rel="noopener"
+          tabindex="0"
+          data-i18n="footer.kurzvorstellung"
           >Kurzvorstellung</a
         >
         <span class="footer-sep" aria-hidden="true">&middot;</span>

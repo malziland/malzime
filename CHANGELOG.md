@@ -4,6 +4,38 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.2.0] — 2026-08-29
+
+### Neu
+
+- **Die Merkmale erscheinen jetzt einzeln, während sie entstehen.** Bisher stand
+  der Bildschirm nach dem ersten Profiltext rund fünfzig Sekunden still — dort
+  schreibt die KI die dreizehn Kategorie-Karten, die vorher gesammelt und erst
+  ganz am Ende auf einmal gezeigt wurden. Für Wartende sah der Lauf beendet aus,
+  obwohl die Hälfte der Arbeit noch bevorstand. Jede Karte erscheint nun, sobald
+  sie fertig geschrieben ist.
+
+- **Eine tägliche Prüfung meldet, wenn Analysen langsamer werden.** Sie
+  vergleicht die letzten drei Tage mit den vierzehn davor und schlägt an, wenn
+  ein spürbarer Anteil der Läufe der Zeitgrenze nahekommt. Bewusst mit
+  Vergleichswerten statt fester Schwellen: Eine einmal gemessene Zahl veraltet,
+  ein Vergleich des Systems mit sich selbst nicht. Damit fällt eine schleichende
+  Verschlechterung auf, bevor Rückmeldungen kommen.
+
+### Geändert
+
+- **Die Wartezeit-Ansage rechnet mit der tatsächlichen Dauer der letzten
+  Analysen** statt mit einem festen Schätzwert von 65 Sekunden, der aus einem
+  Lasttest im Mai stammte. Liegen zu wenige oder zu alte Messwerte vor, zeigt
+  die Seite nur noch die Position in der Warteschlange — eine Zeitangabe, die
+  nicht stimmt, ist schlechter als keine.
+
+- **Die Einlassgrenze der Warteschlange folgt derselben Messung.** Sie wurde
+  bisher aus dem Schätzwert berechnet und ließ dadurch mehr Wartende zu, als in
+  der Zeit zu schaffen waren; die hinteren warteten umsonst und sahen am Ende
+  einen Fehler. Bei Andrang lässt die Seite jetzt so viele ein, wie sie beim
+  aktuell gemessenen Tempo wirklich bedienen kann.
+
 ## [4.1.2] — 2026-08-28
 
 ### Behoben

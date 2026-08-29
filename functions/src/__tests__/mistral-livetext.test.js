@@ -46,7 +46,11 @@ afterAll(() => {
    seit KA-11 (Kurzaudit 2026-08-12) VERANKERT am jeweiligen Modus-Schluessel
    ("standard"/"beast") statt an der blossen Reihenfolge der Vorkommen;
    jeweils null, solange der Wert noch nicht begonnen hat. */
-const NICHTS = { standard: null, beast: null };
+/* FEATURE-2026-08-29-01: Die Rueckgabe traegt seit den Live-Karten zwei Felder
+   mehr. Bewusst weiter mit `toEqual` auf die VOLLE Struktur geprueft statt auf
+   einzelne Felder — sonst faellt kuenftig nicht mehr auf, wenn ein Feld
+   unbemerkt dazukommt oder verschwindet. */
+const NICHTS = { standard: null, beast: null, kartenStandard: [], kartenBeast: [] };
 
 describe("extrahiereLiveText — Feld noch nicht begonnen", () => {
   test("liefert beide null, solange der Schluessel fehlt", () => {
@@ -71,13 +75,20 @@ describe("extrahiereLiveText — Feld noch nicht begonnen", () => {
 
 describe("extrahiereLiveText — normale Faelle", () => {
   test("leerer Standard-String, sobald das oeffnende Anfuehrungszeichen da ist", () => {
-    expect(_extrahiereLiveText('{"standard": {"profileText": "')).toEqual({ standard: "", beast: null });
+    expect(_extrahiereLiveText('{"standard": {"profileText": "')).toEqual({
+      standard: "",
+      beast: null,
+      kartenStandard: [],
+      kartenBeast: [],
+    });
   });
 
   test("nur standard begonnen: Praefix endet mitten im Wort, beast bleibt null", () => {
     expect(_extrahiereLiveText('{"standard": {"profileText": "Du bist neugier')).toEqual({
       standard: "Du bist neugier",
       beast: null,
+      kartenStandard: [],
+      kartenBeast: [],
     });
   });
 
@@ -87,22 +98,42 @@ describe("extrahiereLiveText — normale Faelle", () => {
 
   test("abgeschlossener Standard-Wert (unescaptes Anfuehrungszeichen) — Text endet dort", () => {
     const praefix = '{"standard": {"profileText": "Du bist neugierig.", "categories": {"inter';
-    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Du bist neugierig.", beast: null });
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: "Du bist neugierig.",
+      beast: null,
+      kartenStandard: [],
+      kartenBeast: [],
+    });
   });
 
   test("beast bleibt null, solange sein Wert nicht begonnen hat (Schluessel schon da)", () => {
     const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText":';
-    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: null });
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: "Standard-Text.",
+      beast: null,
+      kartenStandard: [],
+      kartenBeast: [],
+    });
   });
 
   test("beide begonnen: Praefix endet mitten im 2. Feld — beast traegt den bisherigen Text", () => {
     const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText": "Du bist ein zynis';
-    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: "Du bist ein zynis" });
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: "Standard-Text.",
+      beast: "Du bist ein zynis",
+      kartenStandard: [],
+      kartenBeast: [],
+    });
   });
 
   test("beide abgeschlossen: 1. Vorkommen = standard, 2. Vorkommen = beast", () => {
     const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText": "Beast-Text."}}';
-    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: "Beast-Text." });
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: "Standard-Text.",
+      beast: "Beast-Text.",
+      kartenStandard: [],
+      kartenBeast: [],
+    });
   });
 
   test("Umlaute und Emojis als rohe Zeichen bleiben erhalten", () => {
@@ -175,6 +206,8 @@ describe("extrahiereLiveText — KA-11: Verankerung am Modus-Schluessel", () => 
     expect(_extrahiereLiveText(praefix)).toEqual({
       standard: null,
       beast: "Du bist ein zynisches Ziel",
+      kartenStandard: [],
+      kartenBeast: [],
     });
   });
 
@@ -183,17 +216,29 @@ describe("extrahiereLiveText — KA-11: Verankerung am Modus-Schluessel", () => 
     expect(_extrahiereLiveText(praefix)).toEqual({
       standard: "Sachliche Vers",
       beast: "Boese Version.",
+      kartenStandard: [],
+      kartenBeast: [],
     });
   });
 
   test("beast-Block offen ohne eigenen profileText, standard danach: nichts rutscht ins Beast-Feld", () => {
     const praefix = '{"beast": {"ad_targeting": ["x"]}, "standard": {"profileText": "Echt."';
-    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Echt.", beast: null });
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: "Echt.",
+      beast: null,
+      kartenStandard: [],
+      kartenBeast: [],
+    });
   });
 
   test("RUECKBAUPROBE Normalfall: gemessene Reihenfolge liefert byte-identisch dasselbe wie vor KA-11", () => {
     const praefix = '{"standard": {"profileText": "Standard-Text."}, "beast": {"profileText": "Beast-Text."}}';
-    expect(_extrahiereLiveText(praefix)).toEqual({ standard: "Standard-Text.", beast: "Beast-Text." });
+    expect(_extrahiereLiveText(praefix)).toEqual({
+      standard: "Standard-Text.",
+      beast: "Beast-Text.",
+      kartenStandard: [],
+      kartenBeast: [],
+    });
   });
 });
 

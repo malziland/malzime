@@ -64,6 +64,7 @@ async function getFeatureFlags() {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      useGemesseneDauer: false,
     };
 
   const now = Date.now();
@@ -90,6 +91,12 @@ async function getFeatureFlags() {
          darf ein Bedienelement nicht versehentlich vor ein Workshop-Publikum
          stellen. */
       useSprachumschalter: data.useSprachumschalter === true,
+      /* FEATURE-2026-08-29-02: Wartezeit und Einlassgrenze aus der gemessenen
+         Dauer statt aus QUEUE_AVG_JOB_SECONDS. Fehlt das Feld, ist die Messung
+         AN — sie ist die richtigere Rechnung, und ihr schlechtester Fall ist
+         der bisherige Code-Wert. Ausschalten ist der Notweg, nicht der
+         Normalfall. */
+      useGemesseneDauer: data.useGemesseneDauer !== false,
     };
     cache = { data: flags, expiresAt: now + CACHE_TTL_MS };
     return flags;
@@ -104,6 +111,7 @@ async function getFeatureFlags() {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      useGemesseneDauer: false,
     };
   }
 }

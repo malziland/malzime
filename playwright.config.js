@@ -22,6 +22,18 @@ export default defineConfig({
   use: {
     baseURL: "http://localhost:8081",
     headless: true,
+    /* BEWEISE BEI FEHLSCHLAG (30.08.2026). Vorher zeichnete der Lauf nichts
+       auf: Ein Test, der nur in der Pipeline umfaellt — andere Schriften,
+       andere Parallelitaet, anderes Timing — war damit nicht untersuchbar.
+       Man konnte nur wiederholen und hoffen. In einer einzigen Nacht hat das
+       vier verschiedene Tests betroffen und die Auslieferung fuenfmal
+       blockiert, ohne dass je eine Ursache sichtbar wurde.
+
+       Im gruenen Normalfall entsteht nichts, die Laufzeit bleibt gleich. Erst
+       der Fehlschlag hinterlaesst Bild und Ablaufprotokoll; die CI laedt sie
+       als Artefakt hoch (siehe .github/workflows/ci.yml). */
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
   },
   projects: [
     { name: "chromium", use: { browserName: "chromium" } },

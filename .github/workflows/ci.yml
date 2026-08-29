@@ -157,6 +157,20 @@ jobs:
       - run: npm ci
       - run: npm run test:e2e
 
+      # Ohne diesen Schritt hinterlaesst ein roter Browser-Test NICHTS — kein
+      # Bild, kein Ablaufprotokoll. Ein Fehler, der sich lokal nicht
+      # nachstellen laesst, bleibt damit grundsaetzlich unaufklaerbar.
+      - name: Fehlerbilder und Aufzeichnungen sichern
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-fehler
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore
+
   lighthouse:
     # Misst die LIVE-Domain, nicht den geprüften Stand. K12 (Audit 2026-08-13):
     # In diesem Projekt sind Push und Deploy ENTKOPPELT — ein Push landet auf

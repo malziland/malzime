@@ -666,58 +666,78 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.exportPdf.classList.contains("export-btn--hidden")).toBe(false);
   });
 
-  it("v3.0.2 Führung: jede enthüllte Box wird sanft ins Sichtfeld geholt (scrollIntoView je Box)", async () => {
+  it("29.08.: die Enthüllung scrollt KEINE einzige Box mehr an", async () => {
+    /* Vorgabe des Nutzers (29.08.2026): Automatisch gescrollt wird nur bis zu
+       dem Punkt, an dem der Profiltext lesbar ist. Danach übernimmt der Leser
+       selbst — „dann muss man eben manuell weiter scrollen".
+
+       Vorher holte die Führung JEDE der zehn Boxen einzeln in die Bildmitte.
+       Genau das machte das Verhalten zwischen den Modi ungleich: Beast- und
+       seriöser Text sind unterschiedlich lang, also fuhr die Seite
+       unterschiedlich weit mit.
+
+       (Rückbauprobe: Mit dem alten sanftZentrieren(el) in boxZeigen() zählt
+       der Spion 10 Aufrufe → ROT.) */
     const scrollSpy = vi.fn();
+    const scrollToSpy = vi.fn();
     window.Element.prototype.scrollIntoView = scrollSpy;
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = scrollToSpy;
     try {
       baueGerendertesErgebnis();
       liveAnzeige.starteEnthuellung();
       await vi.advanceTimersByTimeAsync(16000);
-      /* 10 Boxen: privacy, gps, 5 Kategorien-Kinder, Werbung, Manipulation,
-         Datenwert (der Realitäts-Check bleibt hier verborgen). */
-      expect(scrollSpy).toHaveBeenCalledTimes(10);
-      expect(scrollSpy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+      expect(scrollSpy).not.toHaveBeenCalled();
+      expect(scrollToSpy).not.toHaveBeenCalled();
     } finally {
       delete window.Element.prototype.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
     }
   });
 
   it("v3.0.2 NUTZER HAT VORRANG: das erste Rad-Ereignis beendet die Führung sofort und dauerhaft", async () => {
-    const scrollSpy = vi.fn();
-    window.Element.prototype.scrollIntoView = scrollSpy;
+    /* Die Übernahme-Wache bleibt — sie wirkt seit 29.08.2026 nur noch dort,
+       wo überhaupt noch automatisch gescrollt wird: beim Ausrichten des
+       Profiltext-Blocks zum Tipp-Start. Wer vorher selbst gescrollt hat, dem
+       wird die Seite nicht mehr unter den Augen weggezogen. */
+    const scrollToSpy = vi.fn();
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = scrollToSpy;
     try {
-      baueGerendertesErgebnis();
-      liveAnzeige.starteEnthuellung();
-      /* privacy (~700 ms) wurde noch geführt ins Sichtfeld geholt … */
-      await vi.advanceTimersByTimeAsync(800);
-      expect(scrollSpy).toHaveBeenCalledTimes(1);
-      /* … dann greift der Nutzer ein — ab jetzt scrollt NICHTS mehr
-         automatisch. (Diese Erwartung wird ROT, wenn jemand die
-         Übernahme-Wache entfernt.) */
+      liveAnzeige.fuehrungStarten();
       window.dispatchEvent(new Event("wheel"));
-      await vi.advanceTimersByTimeAsync(15000);
-      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      w("Ein Text, der ohne Übernahme angefahren worden wäre.".repeat(4));
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(scrollToSpy).not.toHaveBeenCalled();
     } finally {
-      delete window.Element.prototype.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
     }
   });
 
   it("v3.0.2 Übernahme-Tasten: Scroll-Tasten stoppen die Führung, Tab nicht", async () => {
-    const scrollSpy = vi.fn();
-    window.Element.prototype.scrollIntoView = scrollSpy;
+    const echtesScrollTo = window.scrollTo;
     try {
-      baueGerendertesErgebnis();
-      liveAnzeige.starteEnthuellung();
-      /* Tab ist Navigation, kein Scrollen — die Führung läuft weiter. */
+      /* Tab ist Navigation, kein Scrollen — die Führung läuft weiter und der
+         Block wird ausgerichtet. */
+      const mitTab = vi.fn();
+      window.scrollTo = mitTab;
+      liveAnzeige.fuehrungStarten();
       window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Tab" }));
-      await vi.advanceTimersByTimeAsync(800);
-      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      w("A".repeat(300));
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(mitTab).toHaveBeenCalledTimes(1);
+
       /* Eine Pfeiltaste ist bewusstes Scrollen — Führung endet. */
+      liveAnzeige.zuruecksetzen();
+      const mitPfeil = vi.fn();
+      window.scrollTo = mitPfeil;
+      liveAnzeige.fuehrungStarten();
       window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown" }));
-      await vi.advanceTimersByTimeAsync(15000);
-      expect(scrollSpy).toHaveBeenCalledTimes(1);
+      w("B".repeat(300));
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(mitPfeil).not.toHaveBeenCalled();
     } finally {
-      delete window.Element.prototype.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
     }
   });
 
@@ -740,14 +760,22 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(popTon).toHaveBeenCalledTimes(1);
   });
 
-  it("v3.0.2: solange die Führung aktiv ist, klingt jeder Pop — auch außerhalb des Sichtfelds", async () => {
+  it("29.08.: eine Box weit außerhalb des Bildes klingt NICHT — auch bei aktiver Führung", async () => {
+    /* Früher klang jeder Pop, solange die Führung lief, weil die Führung die
+       Box ohnehin ins Bild holte — der Ton hatte also immer einen sichtbaren
+       Anlass. Seit die Enthüllung nicht mehr scrollt (Vorgabe 29.08.2026),
+       wäre das ein Geräusch aus dem Off: Es ploppt irgendwo unterhalb,
+       während der Leser oben noch den Profiltext liest.
+
+       Deshalb gilt die Sichtfeld-Regel jetzt IMMER, statt nur nach einer
+       Übernahme — dieselbe Regel in jedem Szenario. */
     baueGerendertesErgebnis();
     const { popTon } = await import("../js/klang.js");
     elements.privacy.getBoundingClientRect = () => ({ top: 2000, bottom: 2120, height: 120 });
     liveAnzeige.starteEnthuellung();
     popTon.mockClear();
     await vi.advanceTimersByTimeAsync(750); /* privacy ist offen (~700 ms) */
-    expect(popTon).toHaveBeenCalledTimes(1);
+    expect(popTon).not.toHaveBeenCalled();
   });
 
   it("v3.0.2 reduced-motion: kein einziges automatisches Scrollen", async () => {
@@ -942,39 +970,53 @@ describe("Live-Anzeige (v3.0)", () => {
     }
   });
 
-  it("v3.0.3 Tipp-Start: die Karte wird beim ersten Zeichen ins Bild geholt — genau einmal", async () => {
+  it("29.08. Tipp-Start: der Block wird oben ausgerichtet — genau einmal", async () => {
+    /* Die eine Stelle, an der nach Vorgabe des Nutzers (29.08.2026) noch
+       automatisch gescrollt wird: Beim ersten getippten Zeichen kommt der
+       Profiltext-Block so ins Bild, dass möglichst viel davon lesbar ist —
+       Oberkante knapp unter die Sichtkante, damit der Text nach unten ins
+       Fenster hineinwachsen kann.
+
+       (Rückbauprobe: Ohne blockLesbarMachen() in karteZeigen() bleibt der
+       Spion bei 0 Aufrufen → ROT.) */
     const spy = vi.fn();
-    elements.liveKarte.scrollIntoView = spy;
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.liveKarte.getBoundingClientRect = unterDerSichtkante;
     try {
       liveAnzeige.fuehrungStarten();
       w("A".repeat(300));
       await vi.advanceTimersByTimeAsync(300);
       expect(elements.liveKarte.classList.contains("active")).toBe(true);
-      /* (Diese Erwartung wird ROT, wenn jemand das Karten-Anfahren entfernt.) */
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
-      /* Die folgenden Zeichen fahren die Karte nicht immer wieder neu an. */
+      expect(spy.mock.calls[0][0].behavior).toBe("smooth");
+      /* Die folgenden Zeichen scrollen NICHT nach — das ist der Kern der
+         Vorgabe: „Während dem Schreiben danach sollte Schluss sein." */
       await vi.advanceTimersByTimeAsync(1000);
       expect(spy).toHaveBeenCalledTimes(1);
     } finally {
-      delete elements.liveKarte.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.liveKarte.getBoundingClientRect;
     }
   });
 
-  it("v3.0.3 Tipp-Start: eine schon sichtbare Karte wird NICHT angescrollt (Desktop-Fall)", async () => {
+  it("29.08. EINHEITLICH: auch eine schon sichtbare Karte fährt dieselbe Zielposition an", async () => {
+    /* Vorher wurde auf dem Desktop gar nicht gescrollt, am Handy schon —
+       genau die Ungleichheit, die der Nutzer gemeldet hat. Jetzt wird immer
+       dieselbe Zielposition angefahren. Steht der Block schon dort, ist die
+       Bewegung null; die REGEL ist in jedem Szenario dieselbe. */
     const spy = vi.fn();
-    elements.liveKarte.scrollIntoView = spy;
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.liveKarte.getBoundingClientRect = imFenster;
     try {
       liveAnzeige.fuehrungStarten();
       w("A".repeat(300));
       await vi.advanceTimersByTimeAsync(500);
       expect(elements.liveKarte.classList.contains("active")).toBe(true);
-      expect(spy).not.toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledTimes(1);
     } finally {
-      delete elements.liveKarte.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.liveKarte.getBoundingClientRect;
     }
   });
@@ -1044,6 +1086,36 @@ describe("Live-Anzeige (v3.0)", () => {
     }
   });
 
+  it("29.08. EINHEITLICH über die Modi: nach dem Moduswechsel bleibt die unterste Zeile im Bild", async () => {
+    /* Der gemeldete Fall: Im Beast-Modus verhielt sich das Scrollen anders als
+       in der seriösen Analyse. Das Mitscrollen folgt dem Schreibcursor und ist
+       damit von der Textlänge unabhängig — es muss also auch nach einem
+       Wechsel mitten im Tippen weiterlaufen.
+
+       (Rückbauprobe: Ohne tippNachscrollen in der Tippschleife bleibt scrollBy
+       nach dem Wechsel bei 0 Aufrufen → ROT.) */
+    const echteScrollBy = window.scrollBy;
+    window.scrollBy = vi.fn();
+    elements.liveCursor.getBoundingClientRect = () => ({ top: 800, bottom: 810, height: 10 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(3000), "B".repeat(3000));
+      await vi.advanceTimersByTimeAsync(1500);
+
+      schalte(true);
+      window.scrollBy.mockClear();
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(window.scrollBy.mock.calls.length).toBeGreaterThanOrEqual(1);
+      for (const [args] of window.scrollBy.mock.calls) {
+        expect(args.behavior).toBe("smooth");
+        expect(args.top).toBeGreaterThan(0); /* nur nach unten */
+      }
+    } finally {
+      window.scrollBy = echteScrollBy;
+      delete elements.liveCursor.getBoundingClientRect;
+    }
+  });
+
   it("v3.0.3 EIN Zustand pro Lauf: eine Übernahme WÄHREND des Tippens stoppt auch die Enthüllungs-Führung", async () => {
     const scrollSpy = vi.fn();
     window.Element.prototype.scrollIntoView = scrollSpy;
@@ -1092,20 +1164,24 @@ describe("Live-Anzeige (v3.0)", () => {
     }
   });
 
-  it("v3.0.3 Enthüllung: schon die ERSTE gepoppte Box wird aktiv zentriert — die Führung fährt ab Pop 1", async () => {
+  it("29.08. Enthüllung: auch der ERSTE Pop wird nicht mehr angefahren", async () => {
+    /* Gegenstück zum Test weiter oben, hier für den frühesten Zeitpunkt: Nach
+       dem Profiltext fährt gar nichts mehr von selbst — weder Pop 1 noch ein
+       späterer. Der Leser scrollt ab hier selbst weiter. */
     const scrollSpy = vi.fn();
+    const scrollToSpy = vi.fn();
     window.Element.prototype.scrollIntoView = scrollSpy;
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = scrollToSpy;
     try {
       baueGerendertesErgebnis();
       liveAnzeige.starteEnthuellung();
-      /* Pop 1 (Foto-Daten, ~700 ms): sofort zentriert — nicht erst, wenn
-         „nötig". (Diese Erwartung wird ROT, wenn jemand die Zentrierung der
-         ersten Pops entfernt.) */
       await vi.advanceTimersByTimeAsync(750);
-      expect(scrollSpy).toHaveBeenCalledTimes(1);
-      expect(scrollSpy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+      expect(scrollSpy).not.toHaveBeenCalled();
+      expect(scrollToSpy).not.toHaveBeenCalled();
     } finally {
       delete window.Element.prototype.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
     }
   });
 });

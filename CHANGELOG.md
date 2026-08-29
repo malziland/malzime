@@ -4,6 +4,27 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Das automatische Mitscrollen verhält sich in allen Modi gleich.** Bisher
+  fuhr die Seite im Beast Mode anders mit als in der seriösen Analyse, und auf
+  dem Desktop anders als am Handy. Zwei Ursachen: Der Profiltext wurde nur
+  angefahren, wenn er nicht ohnehin halb im Bild stand, und jede der später
+  aufpoppenden Boxen wurde einzeln in die Bildmitte gezogen — bei
+  unterschiedlich langen Texten also unterschiedlich weit.
+
+  Jetzt gilt überall dieselbe Regel: Zum Beginn des Tippens wird der
+  Profiltext-Block oben ausgerichtet, während des Tippens bleibt die zuletzt
+  geschriebene Zeile im Bild, und danach scrollt nichts mehr von selbst. Wer
+  die Merkmale sehen will, scrollt dorthin — die Seite entscheidet das nicht
+  mehr für ihn.
+
+  Der Ton beim Erscheinen einer Box klingt entsprechend nur noch für Boxen, die
+  wirklich im Bild sind: Ohne das begleitende Scrollen wäre er ein Geräusch aus
+  dem Off.
+
 ## [4.2.0] — 2026-08-29
 
 ### Neu

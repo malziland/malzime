@@ -129,7 +129,8 @@ const LEERLAUF_MS = 120;
 /* Takt der ehrlichen Warte-Zeilen im Warte-Auge (v3.0.2: oberhalb der
    Karte, nicht mehr in einer Status-Zeile). */
 const ROTATION_TAKT_MS = 2500;
-/* ── Tipp-Nachscrollen (v3.0.3) ──
+
+/* ── Tipp-Nachscrollen ──
    Auf kleinen Bildschirmen wächst der getippte Text unten aus dem Sichtfeld
    („in die Nichtsichtbarkeit gerutscht", User-Befund 11.08. abends). Die
    Drossel prüft NICHT bei jedem Zeichen — bei ~90 Z/s wären das ~90 Messungen
@@ -204,7 +205,7 @@ function neuerLauf() {
     schnellvorlauf: false,
     /* Vor diesem Zeitpunkt tippt die Schleife nicht (Zeit-Anlauf). */
     tippStartAb: 0,
-    /* v3.0.3: letzte Sichtkanten-Prüfung des Tipp-Nachscrollens (Drossel). */
+    /* Letzte Sichtkanten-Prüfung des Tipp-Nachscrollens (Drossel). */
     nachscrollZuletzt: 0,
     puffer: {
       standard: { text: "", fest: 0 },
@@ -320,11 +321,39 @@ function imSichtfeld(el) {
 
 /* Sanft in die Bildmitte holen. Der reduzierte Modus scrollt NIE automatisch;
    die Vorgabe wird frisch gelesen, damit ein Umstellen mitten im Lauf sofort
-   greift. */
+   greift. Nur noch fuer das Scan-Auge VOR dem Tippen. */
 function sanftZentrieren(el) {
   if (reduziert()) return;
   if (el && typeof el.scrollIntoView === "function") {
     el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+}
+
+/* Abstand der Blockoberkante zur Sichtkante, damit nichts angeschnitten wirkt. */
+const LESBAR_RAND_PX = 24;
+
+/**
+ * Holt den Profiltext-Block so ins Bild, dass moeglichst viel davon lesbar
+ * ist: Oberkante knapp unter die Sichtkante, der Text waechst dann nach unten
+ * ins Fenster hinein.
+ *
+ * WARUM ABSOLUT UND UNBEDINGT (User, 29.08.2026): Vorher wurde nur gescrollt,
+ * wenn der Block NICHT mehrheitlich im Bild stand — dadurch verhielt sich die
+ * Seite auf dem Desktop anders als am Handy und im Beast-Modus anders als in
+ * der serioesen Analyse. Jetzt wird immer dieselbe Zielposition angefahren.
+ * Steht der Block schon dort, bewegt sich nichts: gleiche Regel, kein Ruckeln.
+ */
+function blockLesbarMachen(el) {
+  if (reduziert() || !el) return;
+  try {
+    const rechteck = el.getBoundingClientRect();
+    const obenJetzt = window.scrollY || window.pageYOffset || 0;
+    const ziel = Math.max(0, obenJetzt + rechteck.top - LESBAR_RAND_PX);
+    if (typeof window.scrollTo === "function") {
+      window.scrollTo({ top: ziel, behavior: "smooth" });
+    }
+  } catch (_e) {
+    /* Eine misslungene Messung darf den Lauf nie stoeren. */
   }
 }
 
@@ -486,10 +515,11 @@ function karteZeigen() {
   /* „Noch nicht fertig"-Dauerstatus, solange getippt wird. */
   if (elements.liveWarten) elements.liveWarten.textContent = t("live.nochNichtFertig");
   stopScanAnim(true);
-  /* v3.0.3: In dem Moment, in dem die Karte übernimmt, gehört ihr der Blick —
-     aber nur, wenn sie nicht ohnehin mehrheitlich im Bild steht (auf dem
-     Desktop bewegt sich nichts). */
-  if (fuehrungAktiv() && !imSichtfeld(karte)) sanftZentrieren(karte);
+  /* In dem Moment, in dem die Karte uebernimmt, gehoert ihr der Blick. Immer
+     dieselbe Zielposition (User, 29.08.2026) — steht der Block schon dort,
+     bewegt sich nichts. Danach wird bis zum Ende des Laufs NICHT mehr
+     automatisch gescrollt. */
+  if (fuehrungAktiv()) blockLesbarMachen(karte);
 }
 
 /* FEATURE-2026-08-29-01: Kategorie-Karten, die das Modell bereits geschrieben
@@ -624,8 +654,9 @@ async function tippSchleife(mein) {
       let rausch = "";
       for (let i = 0; i < rest; i++) rausch += zufallsZeichen();
       if (elements.liveTextRausch) elements.liveTextRausch.textContent = rausch;
-      /* v3.0.3: Die letzte Zeile bleibt im Bild — gedrosselt, nie bei jedem
-         Zeichen (Details bei tippNachscrollen). */
+      /* Die zuletzt getippte Zeile bleibt im Bild (User, 29.08.2026:
+         „gescrollt wird, während man immer die unterste Linie auch sieht") —
+         gedrosselt, nie bei jedem Zeichen (Details bei tippNachscrollen). */
       tippNachscrollen(mein);
       naechsterTon -= 1;
       if (naechsterTon <= 0) {
@@ -814,17 +845,12 @@ function boxZeigen(el) {
   if (!el) return;
   el.classList.remove("lv-verdeckt");
   el.classList.add("pop-rein");
-  if (fuehrung && fuehrung.aktiv) {
-    /* Führung aktiv: JEDE gepoppte Box wird aktiv zentriert — ab dem ERSTEN
-       Pop (v3.0.3). Erst NACH dem Aufdecken, eine verdeckte Box
-       (display:none) hat keinen Ort, zu dem man scrollen könnte. */
-    sanftZentrieren(el);
-    popTon();
-    return;
-  }
-  /* Der Nutzer hat übernommen: Der Pop klingt nur noch für Boxen, die
-     wirklich (mehrheitlich) im Sichtfeld liegen — keine Geräusche aus dem
-     Off, während er woanders liest. */
+  /* Nach dem Profiltext wird nicht mehr automatisch gescrollt (User,
+     29.08.2026) — auch nicht fuer die aufpoppenden Boxen. Der Ton klingt
+     deshalb nur noch fuer Boxen, die wirklich (mehrheitlich) im Sichtfeld
+     liegen: keine Geraeusche aus dem Off, waehrend woanders gelesen wird.
+     Das gilt jetzt unabhaengig davon, ob der Nutzer schon uebernommen hat —
+     dieselbe Regel in jedem Szenario. */
   if (imSichtfeld(el)) popTon();
 }
 

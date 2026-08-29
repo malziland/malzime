@@ -1036,6 +1036,51 @@ describe("Live-Anzeige (v3.0)", () => {
     }
   });
 
+  it("30.08. iPHONE: die Adressleiste zaehlt nicht zur sichtbaren Hoehe", async () => {
+    /* Vom Nutzer am iPhone gemeldet und mit Foto belegt (30.08.2026, 00:06):
+       Das Scan-Auge stand angeschnitten hinter der Safari-Adressleiste und
+       wurde NICHT hochgeholt. Am Desktop funktionierte dasselbe einwandfrei —
+       „Am Desktop schon."
+
+       Grund: `window.innerHeight` zaehlt auf iOS die eingeblendeten Leisten
+       mit. Fuer die Rechnung lag das Auge im Bild, fuer den Betrachter lag es
+       dahinter. Auf einem iPhone sind das leicht 100 Bildpunkte.
+
+       Hier nachgestellt: Fenster 800 hoch, davon 100 von der Leiste verdeckt,
+       das Auge sitzt bei 720–780 — also im `innerHeight`, aber HINTER der
+       Leiste. Es muss angefahren werden.
+
+       (Rueckbauprobe: Rechnet sichtbareHoehe() wieder mit innerHeight, gilt
+       das Auge als sichtbar und der Spion bleibt bei 0 Aufrufen -> ROT.) */
+    const spy = vi.fn();
+    const echtesVV = window.visualViewport;
+    const echteHoehe = window.innerHeight;
+    /* Das Fenster meldet 900 — die Leiste verdeckt davon 200. */
+    Object.defineProperty(window, "innerHeight", { value: 900, configurable: true });
+    Object.defineProperty(window, "visualViewport", {
+      value: { height: 700 },
+      configurable: true,
+    });
+    elements.scanAnim.classList.add("active");
+    /* Das Auge sitzt bei 720–780: innerhalb der gemeldeten 900, aber HINTER
+       der Leiste, die bei 700 beginnt. */
+    elements.scanAnim.getBoundingClientRect = () => ({ top: 720, bottom: 780, height: 60 });
+    elements.scanAnim.scrollIntoView = spy;
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      await vi.advanceTimersByTimeAsync(600);
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      if (echtesVV === undefined) delete window.visualViewport;
+      else Object.defineProperty(window, "visualViewport", { value: echtesVV, configurable: true });
+      Object.defineProperty(window, "innerHeight", { value: echteHoehe, configurable: true });
+      delete elements.scanAnim.getBoundingClientRect;
+      delete elements.scanAnim.scrollIntoView;
+      elements.scanAnim.classList.remove("active");
+    }
+  });
+
   it("29.08. Tipp-Start: der Block wird oben ausgerichtet — genau einmal", async () => {
     /* Die eine Stelle, an der nach Vorgabe des Nutzers (29.08.2026) noch
        automatisch gescrollt wird: Beim ersten getippten Zeichen kommt der

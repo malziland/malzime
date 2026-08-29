@@ -320,10 +320,37 @@ function fuehrungAktiv() {
 /* „Mehrheitlich im Sichtfeld": mehr als die halbe Box-Höhe liegt im Fenster.
    Degenerierte Messwerte (Höhe 0) gelten als sichtbar — im Zweifel lieber
    ein Ton zu viel als eine stumm gewordene Enthüllung. */
+/**
+ * Die WIRKLICH sichtbare Hoehe des Fensters.
+ *
+ * ANLASS (User-Befund am iPhone, 30.08.2026, mit Foto belegt): Das Scan-Auge
+ * stand angeschnitten hinter der Safari-Adressleiste und wurde nicht
+ * hochgeholt — am Desktop funktionierte dasselbe einwandfrei.
+ *
+ * Grund: `window.innerHeight` zaehlt auf iOS die eingeblendete Adress- und
+ * Werkzeugleiste MIT. Fuer die Rechnung lag das Auge damit im Bild, fuer das
+ * Auge des Nutzers lag es dahinter. Der Unterschied betraegt auf einem iPhone
+ * leicht 100 Bildpunkte — genug, um ein Element vollstaendig zu verdecken.
+ *
+ * `visualViewport.height` meldet die Flaeche, die tatsaechlich zu sehen ist,
+ * und aendert sich mit, wenn die Leisten ein- oder ausfahren. Wo es das nicht
+ * gibt (aeltere Browser), bleibt es beim bisherigen Wert — dort war die
+ * Rechnung ohnehin richtig.
+ */
+function sichtbareHoehe() {
+  try {
+    const vv = window.visualViewport;
+    if (vv && typeof vv.height === "number" && vv.height > 0) return vv.height;
+  } catch (_e) {
+    /* Kein visualViewport — der Rueckfall unten gilt. */
+  }
+  return window.innerHeight || document.documentElement.clientHeight || 0;
+}
+
 function imSichtfeld(el) {
   try {
     const rechteck = el.getBoundingClientRect();
-    const fensterHoehe = window.innerHeight || document.documentElement.clientHeight || 0;
+    const fensterHoehe = sichtbareHoehe();
     const ueberlappung = Math.min(rechteck.bottom, fensterHoehe) - Math.max(rechteck.top, 0);
     return ueberlappung >= rechteck.height / 2;
   } catch (_e) {
@@ -376,7 +403,7 @@ const VOLL_SICHTBAR_TOLERANZ_PX = 8;
 function vollSichtbar(el) {
   try {
     const r = el.getBoundingClientRect();
-    const h = window.innerHeight || document.documentElement.clientHeight || 0;
+    const h = sichtbareHoehe();
     return r.top >= -VOLL_SICHTBAR_TOLERANZ_PX && r.bottom <= h + VOLL_SICHTBAR_TOLERANZ_PX;
   } catch (_e) {
     return true; /* Im Zweifel nicht scrollen. */
@@ -449,7 +476,7 @@ function tippNachscrollen(mein) {
   if (!cursor) return;
   try {
     const rechteck = cursor.getBoundingClientRect();
-    const fensterHoehe = window.innerHeight || document.documentElement.clientHeight || 0;
+    const fensterHoehe = sichtbareHoehe();
     /* Wie weit steht der Cursor unter der Sichtkante? Negativ/null = noch im
        Bild → nichts tun. Es wird NIE nach oben gescrollt — wer hochgeblättert
        hat, hat übernommen und die Führung ist ohnehin beendet. */

@@ -470,7 +470,7 @@ async function messen(page, bildschirm, zustand) {
 async function beruhigen(page) {
   for (let i = 0; i < 2; i++) {
     await page.evaluate(() => new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f))));
-    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+    await animationsRuhe(page);
   }
   /* ANLASS 2026-08-23: Ein CI-Lauf meldete im Zustand "Live-Text/Modell
      schreibt mit" Kontrast 1,08 an einem Fusszeilen-Link, dessen Farbe
@@ -657,6 +657,45 @@ async function umbruchMessen(page, bildschirm) {
    dokumentiert statt verschwiegen. */
 const WCAG_AAA = ["wcag2aaa", "wcag21aaa", "wcag22aaa"];
 
+
+/* Auf Animations-Ruhe warten — ABER nur auf Animationen, die ueberhaupt
+   enden koennen.
+
+   ANLASS 2026-08-29: Seit die Kategorie-Karten von Beginn an als unscharfes
+   Geruest stehen, laufen waehrend der Analyse 39 Endlos-Animationen
+   gleichzeitig (13 Karten * 3 Konfidenz-Punkte, `animation: ... infinite`).
+   `a.finished` loest bei einer Endlos-Animation NIE auf. Das Warten auf
+   `Promise.all(alle)` blockierte damit bis zum Zeitrahmen des Tests — gemessen
+   wurde danach in eine Seite hinein, die noch in Bewegung war.
+
+   Die Folge waren IRREFUEHRENDE Befunde: axe meldete "Kontrast 1 statt 4,5"
+   (weiss auf weiss) an einem Knopf, der gerade eingeblendet wurde, und der
+   Zustands-Abgleich meldete "82 erwartet, 6 gemessen", weil der Lauf vorher
+   abbrach. Beides sah nach Barrierefreiheits-Fehlern aus und war keiner.
+
+   Nachgemessen am 29.08.: 52 Animationen, davon 39 endlos. Warten auf alle =
+   nach 5 s noch nicht fertig. Warten auf die endlichen = fertig in 1 ms.
+
+   Endlos-Animationen sind fuer die Messung unproblematisch: Sie veraendern
+   Deckkraft oder Position zyklisch, aber das Layout steht. Worauf es ankommt —
+   Einblendungen, Uebergaenge, Verschiebungen — sind endliche Animationen, und
+   auf die wird unveraendert gewartet. */
+async function animationsRuhe(page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => {
+          try {
+            return a.effect?.getComputedTiming?.().iterations !== Infinity;
+          } catch (_e) {
+            return true; /* im Zweifel warten */
+          }
+        })
+        .map((a) => a.finished.catch(() => {}))
+    )
+  );
+}
 async function aaaMessen(page, bildschirm) {
   await beruhigen(page);
   const axeAaa = await new AxeBuilder({ page }).withTags(WCAG_AAA).analyze();

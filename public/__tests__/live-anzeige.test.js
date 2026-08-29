@@ -705,9 +705,14 @@ describe("Live-Anzeige (v3.0)", () => {
     window.scrollTo = scrollToSpy;
     try {
       liveAnzeige.fuehrungStarten();
-      window.dispatchEvent(new Event("wheel"));
+      /* Die Übernahme muss WÄHREND des Tippens kommen: Ein Rad-Ereignis in der
+         Wartephase gibt die Führung seit 29.08. nur bis zum Tippbeginn ab
+         (siehe „GEMELDET"-Test weiter unten). */
       w("Ein Text, der ohne Übernahme angefahren worden wäre.".repeat(4));
-      await vi.advanceTimersByTimeAsync(1500);
+      await vi.advanceTimersByTimeAsync(400);
+      scrollToSpy.mockClear();
+      window.dispatchEvent(new Event("wheel"));
+      await vi.advanceTimersByTimeAsync(2000);
       expect(scrollToSpy).not.toHaveBeenCalled();
     } finally {
       window.scrollTo = echtesScrollTo;
@@ -719,6 +724,7 @@ describe("Live-Anzeige (v3.0)", () => {
     try {
       /* Tab ist Navigation, kein Scrollen — die Führung läuft weiter und der
          Block wird ausgerichtet. */
+      /* Tab ist Navigation, kein Scrollen — die Führung läuft weiter. */
       const mitTab = vi.fn();
       window.scrollTo = mitTab;
       liveAnzeige.fuehrungStarten();
@@ -727,14 +733,18 @@ describe("Live-Anzeige (v3.0)", () => {
       await vi.advanceTimersByTimeAsync(1500);
       expect(mitTab).toHaveBeenCalledTimes(1);
 
-      /* Eine Pfeiltaste ist bewusstes Scrollen — Führung endet. */
+      /* Eine Pfeiltaste WÄHREND des Tippens ist bewusstes Scrollen — die
+         Führung endet und der Block wird nicht mehr angefahren. Geprüft am
+         Moduswechsel, der sonst neu ausrichten würde. */
       liveAnzeige.zuruecksetzen();
       const mitPfeil = vi.fn();
       window.scrollTo = mitPfeil;
       liveAnzeige.fuehrungStarten();
+      w("B".repeat(4000));
+      await vi.advanceTimersByTimeAsync(400);
+      mitPfeil.mockClear();
       window.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown" }));
-      w("B".repeat(300));
-      await vi.advanceTimersByTimeAsync(1500);
+      await vi.advanceTimersByTimeAsync(2000);
       expect(mitPfeil).not.toHaveBeenCalled();
     } finally {
       window.scrollTo = echtesScrollTo;
@@ -967,6 +977,62 @@ describe("Live-Anzeige (v3.0)", () => {
       delete elements.scanAnim.scrollIntoView;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
+    }
+  });
+
+  it("29.08. GEMELDET: Scrollen in der WARTEPHASE darf das Nachrücken beim Tippen nicht töten", async () => {
+    /* Vom Nutzer am 29.08. abends gemeldet und exakt beschrieben:
+         „Ich lade das Bild hoch, scrolle etwas nach oben, während noch das Auge
+          angezeigt wird. Dann fängt die KI an zu tippen, aber es wird nicht
+          nachgescrollt."
+
+       Ursache: Die Übernahme-Wache (v3.0.2) beendete die Führung beim ERSTEN
+       Rad-Ereignis — auch wenn es lange vor dem Tippen kam, aus blosser
+       Neugier während der Wartezeit. Danach war alles tot: die Ausrichtung
+       des Blocks UND das Nachrücken der Zeile.
+
+       Neue Regel: Zum Tippbeginn wird die Führung genau einmal neu scharf
+       gestellt. Der Nutzer-Vorrang gilt ab da erneut — wer WÄHREND des
+       Tippens scrollt, übernimmt weiterhin endgültig (Test darunter).
+
+       (Rückbauprobe: Ohne die Reaktivierung in karteZeigen() bleibt scrollBy
+       bei 0 Aufrufen → ROT.) */
+    const echteScrollBy = window.scrollBy;
+    window.scrollBy = vi.fn();
+    elements.liveCursor.getBoundingClientRect = () => ({ top: 800, bottom: 810, height: 10 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      /* Der Nutzer scrollt, während nur das Auge läuft — noch kein Zeichen. */
+      window.dispatchEvent(new Event("wheel"));
+      /* Jetzt beginnt das Tippen. */
+      w("A".repeat(4000));
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(window.scrollBy.mock.calls.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      window.scrollBy = echteScrollBy;
+      delete elements.liveCursor.getBoundingClientRect;
+    }
+  });
+
+  it("29.08. Der Vorrang gilt ab dem Tippen weiter: Scrollen WÄHREND des Tippens stoppt endgültig", async () => {
+    /* Gegenstück zum Test darüber — die Reaktivierung darf den Nutzer-Vorrang
+       nicht aushebeln, sondern ihn nur auf den richtigen Zeitpunkt legen. */
+    const echteScrollBy = window.scrollBy;
+    window.scrollBy = vi.fn();
+    elements.liveCursor.getBoundingClientRect = () => ({ top: 800, bottom: 810, height: 10 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      w("A".repeat(6000));
+      await vi.advanceTimersByTimeAsync(800);
+      expect(window.scrollBy.mock.calls.length).toBeGreaterThanOrEqual(1);
+      const stand = window.scrollBy.mock.calls.length;
+
+      window.dispatchEvent(new Event("wheel"));
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(window.scrollBy.mock.calls.length).toBe(stand);
+    } finally {
+      window.scrollBy = echteScrollBy;
+      delete elements.liveCursor.getBoundingClientRect;
     }
   });
 

@@ -291,6 +291,18 @@ export function fuehrungStarten() {
   fuehrung = mein;
 }
 
+/* Einmal je Lauf beim ersten getippten Zeichen: Eine in der Wartephase
+   abgegebene Fuehrung wird zurueckgeholt (Details bei karteZeigen). Ein
+   zweites Mal passiert das nicht — `tippPhase` merkt sich das. */
+function fuehrungZumTippenNeuScharf() {
+  if (!fuehrung || fuehrung.tippPhase) return;
+  fuehrung.tippPhase = true;
+  if (fuehrung.aktiv) return; /* nie abgegeben — nichts zu tun */
+  fuehrungBeenden();
+  fuehrungStarten();
+  if (fuehrung) fuehrung.tippPhase = true;
+}
+
 /* Lauf-Ende (Enthüllungs-Abschluss, Fehler, Abbruch): Wache und Zustand
    restlos weg — der nächste Durchgang beginnt mit frischer Führung. */
 function fuehrungBeenden() {
@@ -357,6 +369,20 @@ function blockLesbarMachen(el) {
   }
 }
 
+/* Liegt das Element mit seiner GANZEN Hoehe im Fenster? Strenger als
+   imSichtfeld(), das die halbe Hoehe genuegen laesst. Ein kleiner Rand bleibt
+   zugestanden, damit ein einzelnes Pixel keine Dauerkorrektur ausloest. */
+const VOLL_SICHTBAR_TOLERANZ_PX = 8;
+function vollSichtbar(el) {
+  try {
+    const r = el.getBoundingClientRect();
+    const h = window.innerHeight || document.documentElement.clientHeight || 0;
+    return r.top >= -VOLL_SICHTBAR_TOLERANZ_PX && r.bottom <= h + VOLL_SICHTBAR_TOLERANZ_PX;
+  } catch (_e) {
+    return true; /* Im Zweifel nicht scrollen. */
+  }
+}
+
 /* Takt und Dauer der Auge-Nachwache: ~44 s decken jede Scan-Phase ab. */
 const AUGE_WACHE_TAKT_MS = 400;
 const AUGE_WACHE_VERSUCHE_MAX = 110;
@@ -394,7 +420,12 @@ export function augeInsBild(versuch = 0, zustand = { gescrollt: false }, kennung
     }
   })();
   if (steht) {
-    if (imSichtfeld(auge)) {
+    /* GANZ sichtbar, nicht nur mehrheitlich (User, 29.08.2026: „Das Auge wird
+       nicht im Bild gehalten, das ist abgeschnitten."). Die halbe-Hoehe-Regel
+       von imSichtfeld() genuegt hier nicht: Ein zur Haelfte angeschnittenes
+       Auge gilt danach als sichtbar und wurde nie nachgezogen — sichtbar war
+       dann ein halber Kreis am Bildrand. */
+    if (vollSichtbar(auge)) {
       zustand.gescrollt = false;
     } else if (!zustand.gescrollt) {
       sanftZentrieren(auge);
@@ -515,10 +546,21 @@ function karteZeigen() {
   /* „Noch nicht fertig"-Dauerstatus, solange getippt wird. */
   if (elements.liveWarten) elements.liveWarten.textContent = t("live.nochNichtFertig");
   stopScanAnim(true);
-  /* In dem Moment, in dem die Karte uebernimmt, gehoert ihr der Blick. Immer
-     dieselbe Zielposition (User, 29.08.2026) — steht der Block schon dort,
-     bewegt sich nichts. Danach wird bis zum Ende des Laufs NICHT mehr
-     automatisch gescrollt. */
+  /* Der Tippbeginn stellt die Fuehrung genau einmal neu scharf.
+
+     GRUND (User, 29.08.2026, wortwoertlich): „Ich lade das Bild hoch, scrolle
+     etwas nach oben, waehrend noch das Auge angezeigt wird. Dann faengt die KI
+     an zu tippen, aber es wird nicht nachgescrollt."
+
+     Die Uebernahme-Wache beendete die Fuehrung beim ersten Rad-Ereignis —
+     auch wenn es lange vor dem Tippen kam, aus blosser Neugier waehrend der
+     Wartezeit. Danach war alles tot: die Ausrichtung des Blocks UND das
+     Nachruecken der Zeile. Wer waehrend des Wartens scrollt, sagt aber nur
+     „ich schaue mich um", nicht „ich uebernehme fuer den Rest des Laufs".
+
+     Ab hier gilt der Vorrang neu und dann bis zum Ende: Wer WAEHREND des
+     Tippens scrollt, uebernimmt endgueltig. */
+  fuehrungZumTippenNeuScharf();
   if (fuehrungAktiv()) blockLesbarMachen(karte);
 }
 

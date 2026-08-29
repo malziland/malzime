@@ -72,6 +72,12 @@
  */
 
 import { elements } from "./dom.js";
+import {
+  zeigeLiveKarten,
+  liveKartenZuruecksetzen,
+  liveKartenModusWechsel,
+  zeigeVersteckteDatenUndKarte,
+} from "./render.js";
 import { state } from "./state.js";
 import { t } from "./i18n.js";
 import { startScanAnim, stopScanAnim } from "./ui.js";
@@ -180,6 +186,10 @@ function aktiverModus() {
 }
 
 function neuerLauf() {
+  /* Ein neuer Lauf beginnt ohne Vorgeschichte — hier gehört das Zurücksetzen
+     hin, nicht in karteEntfernen(): Das läuft auch mitten in der Enthüllung,
+     die den Stand dann noch braucht. */
+  fruehGezeigt = { daten: false, fakten: false };
   return {
     stop: false,
     tippt: false,
@@ -482,6 +492,69 @@ function karteZeigen() {
   if (fuehrungAktiv() && !imSichtfeld(karte)) sanftZentrieren(karte);
 }
 
+/* FEATURE-2026-08-29-01: Kategorie-Karten, die das Modell bereits geschrieben
+   hat. Sie erscheinen NICHT hier im Live-Bereich, sondern in ihrem normalen
+   Layout weiter unten — und erst, wenn der Profiltext fertig getippt ist. */
+let liveKarten = { standard: [], beast: [] };
+
+/**
+ * Zeigt die angekommenen Karten, sobald der Profiltext ausgetippt ist.
+ *
+ * DIE REIHENFOLGE IST DIE ANFORDERUNG: erst der Text „So denkt die KI über
+ * dich", dann die Karten. Am 29.08. im Emulator gesehen, was sonst passiert:
+ * Karten standen da, während der Text noch tippte — als wären sie Teil
+ * desselben Absatzes. Der Tippeffekt hat bewusst 25 s Anlauf, die Karten
+ * überholten ihn dadurch um genau diese Zeitspanne.
+ *
+ * `fest >= text.length` heißt: Der Tippeffekt hat den gelieferten Text
+ * eingeholt. Im Betrieb ist der Profiltext lange vor den Karten fertig — das
+ * Modell schreibt ihn zuerst —, die Bedingung greift also rechtzeitig.
+ */
+let zuletztGezeigt = { standard: 0, beast: 0 };
+/* Schritt 2 der Reihenfolge passiert genau einmal je Lauf; der Wert ist der
+   Zeitpunkt, damit das Kartengerüst danach mit Abstand folgt. */
+let datenUndKarteGezeigt = 0;
+/* Was während des Laufs bereits sichtbar war, darf die Enthüllung am Ende
+   NICHT noch einmal verstecken. Genau das erzeugte das Aufblitzen: Alles war
+   schon da, verschwand kurz und wurde im alten Takt neu aufgedeckt. */
+let fruehGezeigt = { daten: false, fakten: false };
+/* Abstand wie zwischen zwei Boxen der Enthüllung. */
+const DATEN_VOR_KARTEN_MS = 1200;
+
+function kartenPruefen() {
+  if (!lauf) return;
+  const modus = lauf.aktiv;
+  const p = lauf.puffer[modus];
+  if (!p || p.text.length === 0 || p.fest < p.text.length) return;
+  /* REIHENFOLGE (Anforderung des Nutzers, 29.08.):
+       1. Profiltext „So denkt die KI über dich"
+       2. Die versteckten Daten im Foto und die Landkarte
+       3. Die Kategorie-Boxen, nach und nach
+     Schritt 2 einmal je Lauf, bevor die erste Karte erscheint. Beide brauchen
+     den Server nicht — der Browser hat EXIF und GPS längst. */
+  if (!datenUndKarteGezeigt) {
+    if (zeigeVersteckteDatenUndKarte()) fruehGezeigt.daten = true;
+    datenUndKarteGezeigt = Date.now();
+    return; /* Das Kartengerüst kommt erst danach, nicht im selben Moment. */
+  }
+  /* Dieselbe Pause wie in der Enthüllung zwischen zwei Boxen — die versteckten
+     Daten und die Karte sollen erst ankommen, bevor das Kartengerüst erscheint.
+     Ohne diesen Abstand erschien beides gleichzeitig und die Reihenfolge war
+     nicht mehr zu erkennen. */
+  if (Date.now() - datenUndKarteGezeigt < DATEN_VOR_KARTEN_MS) return;
+
+  const liste = liveKarten[modus] || [];
+  /* NUR rendern, wenn wirklich eine Karte dazugekommen ist.
+     Diese Prüfung wird aus der Tipp-Schleife aufgerufen, also bei jedem
+     Buchstaben. Ohne die Sperre baute sich das Kartenfeld vielmals pro Sekunde
+     neu auf, die Einblendung begann jedes Mal von vorn — sichtbar blieben nur
+     die Gruppen-Überschriften über leerem Raum (am 29.08. so beobachtet). */
+  if (liste.length === 0 || liste.length === zuletztGezeigt[modus]) return;
+  zuletztGezeigt[modus] = liste.length;
+  zeigeLiveKarten(liste);
+  fruehGezeigt.fakten = true;
+}
+
 /* Setzt die Karte vollständig zurück (unsichtbar, ohne Text). */
 function karteEntfernen() {
   const karte = elements.liveKarte;
@@ -489,6 +562,17 @@ function karteEntfernen() {
   if (elements.liveTextFest) elements.liveTextFest.textContent = "";
   if (elements.liveTextRausch) elements.liveTextRausch.textContent = "";
   if (elements.liveWarten) elements.liveWarten.textContent = "";
+  /* FEATURE-2026-08-29-01: Karten gehören zum Lauf, nicht zur Seite.
+
+     `fruehGezeigt` wird hier BEWUSST NICHT zurückgesetzt: `karteEntfernen()`
+     läuft auch zu Beginn der Enthüllung, und die muss noch wissen, was während
+     des Laufs bereits sichtbar war. Sonst versteckt sie alles erneut und deckt
+     es im alten Takt wieder auf — das Aufblitzen. Zurückgesetzt wird beim
+     Start des nächsten Laufs (neuerLauf). */
+  liveKarten = { standard: [], beast: [] };
+  zuletztGezeigt = { standard: 0, beast: 0 };
+  datenUndKarteGezeigt = 0;
+  liveKartenZuruecksetzen();
 }
 
 /* Nimmt alle Verdeckungen einer (abgebrochenen) Enthüllung zurück. Muss vor
@@ -522,6 +606,9 @@ async function tippSchleife(mein) {
     /* Immer der Puffer des AKTUELL gewählten Modus — modusWechsel() stellt
        `aktiv` um, der nächste Tick tippt nahtlos am anderen Stand weiter. */
     const p = mein.puffer[mein.aktiv];
+    /* Sobald der Text eingeholt ist, dürfen die Karten erscheinen. Ohne diesen
+       Aufruf warteten sie auf die nächste Welle (bis zu 2 s). */
+    kartenPruefen();
     if (p.fest < p.text.length) {
       /* Die Scan-Animation weicht der Karte GENAU in dem Moment, in dem das
          erste Zeichen sichtbar wird — nie früher: Eine Karte, in der nur der
@@ -607,6 +694,16 @@ export function welle(texte) {
      wird oder der Puffer leerläuft. */
   uebernehmen(lauf.puffer.standard, texte.standard);
   uebernehmen(lauf.puffer.beast, texte.beast);
+  /* FEATURE-2026-08-29-01: Karten derselben Welle mitnehmen. Nur wachsende
+     Listen übernehmen — eine kürzere Lieferung ist eine überholte Antwort,
+     genau wie beim Text. Gezeigt werden sie erst, wenn der Text steht. */
+  for (const [modus, neue] of [
+    ["standard", texte.kartenStandard],
+    ["beast", texte.kartenBeast],
+  ]) {
+    if (Array.isArray(neue) && neue.length > liveKarten[modus].length) liveKarten[modus] = neue;
+  }
+  kartenPruefen();
 
   if (reduziert()) {
     /* Barrierefreiheit: kein Tippen, kein Rausch — jede Welle erscheint
@@ -691,6 +788,9 @@ export function modusWechsel() {
   const neu = aktiverModus();
   if (neu === lauf.aktiv) return;
   lauf.aktiv = neu;
+  /* Der andere Modus hat eigene Karten: Inhalte neu setzen, Gerüst behalten. */
+  zuletztGezeigt[neu] = 0;
+  liveKartenModusWechsel();
   /* Nur eine bereits sichtbare Karte sofort neu zeichnen — vor dem ersten
      getippten Zeichen gibt es nichts umzuschalten (die Tipp-Schleife nimmt
      den neuen Puffer von selbst beim nächsten Tick). */
@@ -851,8 +951,22 @@ export function starteEnthuellung() {
   const rcKarte = elements.realCheck && !elements.realCheck.hidden ? elements.realCheck : null;
   const dvKarte = elements.dataValue ? elements.dataValue.querySelector(".dv-card") : null;
   const boxen = [privacy, gps, adsKarte, triggerKarte, rcKarte, dvKarte];
-  boxen.forEach((el) => el && el.classList.add("lv-verdeckt"));
-  faktenKinder.forEach((el) => el.classList.add("lv-verdeckt"));
+  /* Was während des Laufs schon sichtbar war, bleibt sichtbar. Sonst
+     verschwindet es kurz und wird im alten Takt neu aufgedeckt — das Aufblitzen,
+     das der Nutzer am 29.08. beschrieben hat. Die Enthüllung deckt dann nur
+     noch auf, was wirklich neu ist. */
+  /* Hat der Lauf schon Boxen gezeigt, ist die gestaffelte Enthuellung vorbei
+     — sie wuerde Fertiges verstecken und im alten Takt neu aufdecken. Genau
+     das sah aus wie ein Neuladen der Seite, und Quiz und Werbewert warteten
+     dabei auf Pausen fuer Boxen, die laengst standen. Dann wird nur noch
+     gezeigt, was wirklich neu ist: Werbung, Manipulation, Quiz, Werbewert. */
+  const nurNeueBoxen = fruehGezeigt.fakten || fruehGezeigt.daten;
+  if (nurNeueBoxen) {
+    [adsKarte, triggerKarte, rcKarte, dvKarte].forEach((el) => el && el.classList.add("lv-verdeckt"));
+  } else {
+    boxen.forEach((el) => el && el.classList.add("lv-verdeckt"));
+    faktenKinder.forEach((el) => el.classList.add("lv-verdeckt"));
+  }
   /* Der PDF-Knopf kommt erst NACH der Enthüllung wieder. */
   if (elements.exportPdf) elements.exportPdf.classList.add("export-btn--hidden");
   const dvZahl = dvKarte ? dvKarte.querySelector(".dv-hero-value") : null;
@@ -875,33 +989,48 @@ export function starteEnthuellung() {
   }
 
   (async () => {
-    /* 1) Foto-Daten + Standort. */
-    if (!(await warte(700, mein))) return;
-    boxZeigen(privacy);
-    if (!(await warte(1100, mein))) return;
-    boxZeigen(gps);
-    gpsKarteNachmessen();
-    if (!(await warte(1400, mein))) return;
-
-    /* 2) Die Kategorien: Gruppenkopf gemächlich, seine Karten im Stakkato. */
-    for (const kind of faktenKinder) {
-      const istKopf = kind.classList.contains("cat-group-head");
-      if (!(await warte(istKopf ? 650 : 280, mein))) return;
-      boxZeigen(kind);
+    /* 1) Foto-Daten + Standort — nur, wenn sie nicht längst stehen. Für bereits
+       Sichtbares entfällt auch die Pause: Sonst wartet der Bildschirm auf ein
+       Erscheinen, das gar nicht mehr kommt. */
+    if (!nurNeueBoxen) {
+      if (!(await warte(700, mein))) return;
+      boxZeigen(privacy);
+      if (!(await warte(1100, mein))) return;
+      boxZeigen(gps);
+      gpsKarteNachmessen();
+      if (!(await warte(1400, mein))) return;
+    } else {
+      gpsKarteNachmessen();
     }
 
-    /* 3) Werbung + Manipulation — nur noch ganze, fertige Boxen. */
-    if (!(await warte(600, mein))) return;
+    /* 2) Die Kategorien: Gruppenkopf gemächlich, seine Karten im Stakkato.
+       Standen sie schon während der Analyse da, gibt es hier nichts mehr
+       aufzudecken. */
+    if (!nurNeueBoxen) {
+      for (const kind of faktenKinder) {
+        const istKopf = kind.classList.contains("cat-group-head");
+        if (!(await warte(istKopf ? 650 : 280, mein))) return;
+        boxZeigen(kind);
+      }
+    }
+
+    /* 3) Werbung + Manipulation — nur noch ganze, fertige Boxen.
+
+       Standen die Kategorien schon waehrend der Analyse da, wird der Takt
+       gestrafft: Der Blick hat den Bildschirm dann laengst erfasst, und die
+       vollen Pausen wirken wie Warten ohne Grund. */
+    const takt = (voll) => (nurNeueBoxen ? Math.round(voll * 0.45) : voll);
+    if (!(await warte(takt(600), mein))) return;
     boxZeigen(adsKarte);
-    if (!(await warte(1200, mein))) return;
+    if (!(await warte(takt(1200), mein))) return;
     boxZeigen(triggerKarte);
-    if (!(await warte(1200, mein))) return;
+    if (!(await warte(takt(1200), mein))) return;
 
     /* 3b) Realitäts-Check (v3.1): direkt nach der Manipulations-Box und VOR
        dem Datenwert — mit demselben Pop wie alle anderen Boxen. */
     if (rcKarte) {
       boxZeigen(rcKarte);
-      if (!(await warte(1200, mein))) return;
+      if (!(await warte(takt(1200), mein))) return;
     }
 
     /* 4) Datenwert: Box komplett, nur der Betrag zählt hoch, Balken fahren aus. */

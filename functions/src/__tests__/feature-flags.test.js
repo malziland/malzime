@@ -23,6 +23,11 @@ describe("getFeatureFlags", () => {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      /* Ist Firestore nicht lesbar, kann auch die Durchsatz-Messung nichts
+         lesen — die Rechnung faellt ohnehin auf den Code-Wert zurueck. Hier
+         `false`, damit der Fehlerfall keine Messung behauptet, die es nicht
+         gibt. */
+      useGemesseneDauer: false,
     });
   });
 
@@ -42,6 +47,7 @@ describe("getFeatureFlags", () => {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      useGemesseneDauer: true,
     });
   });
 
@@ -53,6 +59,7 @@ describe("getFeatureFlags", () => {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      useGemesseneDauer: true,
     });
   });
 
@@ -64,6 +71,7 @@ describe("getFeatureFlags", () => {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      useGemesseneDauer: true,
     });
   });
 
@@ -75,6 +83,7 @@ describe("getFeatureFlags", () => {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      useGemesseneDauer: true,
     });
   });
 });

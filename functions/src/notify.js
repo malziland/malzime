@@ -57,4 +57,46 @@ async function notifyLimitReached({ ntfyUrl, ntfyTopic, adminSecret, count, limi
   }
 }
 
-module.exports = { notifyLimitReached };
+/**
+ * Sendet eine schlichte Meldung über ntfy — ohne Schaltflächen, ohne Token.
+ *
+ * FEATURE-2026-08-29-03: Gebraucht von der Laufzeit-Wache. Bewusst getrennt von
+ * `notifyLimitReached`: Die trägt Admin-Aktionen und damit signierte Token im
+ * Text; für eine reine Beobachtung wäre das unnötige Angriffsfläche.
+ *
+ * Wie oben mit Zeitgrenze — ein hängender ntfy-Server darf keine Function
+ * blockieren — und still bei Fehlern: Eine Meldung, die nicht ankommt, ist
+ * ärgerlich, aber kein Grund, den geplanten Lauf scheitern zu lassen.
+ */
+async function sendeNtfy({ ntfyUrl, ntfyTopic, text, titel = "malziME", prioritaet = 4 }) {
+  if (!ntfyUrl || !ntfyTopic || !text) return false;
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(ntfyUrl, {
+      signal: controller.signal,
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        topic: ntfyTopic,
+        title: titel,
+        message: text,
+        priority: prioritaet,
+        tags: ["hourglass"],
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.log(JSON.stringify({ warning: "ntfy-failed", status: res.status, body }));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.log(JSON.stringify({ warning: "ntfy-error", error: err.message }));
+    return false;
+  } finally {
+    clearTimeout(fetchTimeout);
+  }
+}
+
+module.exports = { notifyLimitReached, sendeNtfy };

@@ -170,6 +170,37 @@ Rückweg, falls sie je stört:
 Eingerichtet am 2026-08-12, als die Sammlung `jobs` nachweislich 0 Dokumente hatte
 (ARCH-2026-08-12-27). Eine Migration bestehender Dokumente war deshalb nicht nötig.
 
+## Laufzeit-Wache (seit 2026-08-29, v4.2.0)
+
+**Was sie tut.** Die geplante Function `laufzeitWache` (`laufzeit-wache.js`,
+täglich 7:20 Wien) vergleicht die Dauer der letzten drei Tage mit den vierzehn
+davor und meldet per ntfy, wenn Analysen spürbar langsamer werden oder ein
+relevanter Anteil der Zeitgrenze nahekommt.
+
+**Warum es sie gibt.** Der Einbruch vom 26.08.2026 fiel erst am 28.08. durch
+Rückmeldungen auf — zwei Tage später, mitten in einer laufenden Aussendung.
+`mistral-zeitbudget.test.js` sollte das abdecken, kann es aber per Konstruktion
+nicht: Er rechnet zwei Konstanten gegeneinander und bleibt grün, wenn der
+Anbieter langsamer wird.
+
+**Wann sie schweigt — und warum das kein Ausfall ist.** Unter zehn Analysen im
+Zeitraum trifft sie keine Aussage (malziME hat Tage mit zwei Läufen), und eine
+Auffälligkeit muss zwei Tage anhalten. Am 28.08. lagen zwischen 19 und 66 Token
+pro Sekunde nur drei Stunden — eine Wache, die auf einzelne Ausschläge
+anspringt, wird nach zwei Wochen ignoriert.
+
+**Nachsehen, ob sie läuft.** Sie protokolliert JEDEN Lauf, auch den
+unauffälligen — sonst wäre nicht zu unterscheiden, ob sie „in Ordnung" meldet
+oder gar nicht lief:
+
+    gcloud logging read 'jsonPayload.step="laufzeit-wache"' \
+      --project=malzime --limit=5 --format=json
+
+**Beim nächsten Deploy zu beachten.** `laufzeitWache` ist eine NEUE Function.
+Sie braucht die ntfy-Secrets (sind in `index.js` deklariert) und sollte in den
+Filter der Alarm-Policy „malziME Function Errors" aufgenommen werden — sonst
+stirbt sie still.
+
 ## Lebenszeichen der Wochen-Erinnerung (seit 2026-08-12)
 
 Die Erinnerung schreibt bei jedem Lauf `config/erinnerung.letzterLauf`. Der Reaper liest

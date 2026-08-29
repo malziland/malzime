@@ -34,6 +34,8 @@ const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs, setLiveText } = require("./jobs");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
+/* FEATURE-2026-08-29-02: Jede erfolgreiche Analyse meldet ihre Dauer. */
+const { merkeDauer } = require("./durchsatz");
 const {
   isSingleLargeCallEnabled,
   isPromptCacheEnabled,
@@ -597,6 +599,14 @@ async function handleProcessJob(req, res) {
         totalMs: Date.now() - start,
       })
     );
+    /* FEATURE-2026-08-29-02: Die Dauer dieses Laufs fuettert die Wartezeit-
+       Ansage der naechsten Besucher. NUR bei Erfolg — ein blockierter oder an
+       der Uhr gestorbener Lauf sagt nichts darueber, wie lange eine Analyse
+       braucht, und wuerde die Ansage verfaelschen. Bewusst ohne await: Das
+       Ergebnis steht bereits, niemand soll darauf warten. */
+    if (success) {
+      merkeDauer((Date.now() - start) / 1000).catch(() => {});
+    }
   } catch (err) {
     /* Unerwarteter Fehler → trotzdem ein sauberes, renderbares blocked-
        Ergebnis liefern (wie der synchrone Pfad). */

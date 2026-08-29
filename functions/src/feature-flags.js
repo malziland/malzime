@@ -57,14 +57,24 @@ async function getFeatureFlags() {
      Lauf dient ja gerade ihrem Test. Single-Large-Call bleibt im Lokal-Modus
      standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
      Kein Firestore-Read, kein Seeding nötig. */
-  if (isLocalQueueMode())
+  if (isLocalQueueMode()) {
+    /* Der Live-Weg (Single-Large + Live-Text) ist im Emulator standardmaessig
+       AUS, damit der gewoehnliche Durchklick die bewaehrte Pipeline trifft.
+       Seit 2026-08-29 laesst er sich per `QUEUE_LOCAL_LIVE=1` in
+       `functions/.env.local` einschalten — die Attrappe stellt seitdem auch
+       den Datenstrom nach. Ohne diesen Schalter waere die Live-Anzeige lokal
+       ueberhaupt nicht zu sehen, und jede Pruefung an ihr braeuchte echte
+       Mistral-Aufrufe. */
+    const live = process.env.QUEUE_LOCAL_LIVE === "1";
     return {
-      useSingleLargeCall: false,
+      useSingleLargeCall: live,
       usePromptCache: false,
       useBeastAdsCall: true,
-      useLiveText: false,
+      useLiveText: live,
       useSprachumschalter: false,
+      useGemesseneDauer: false,
     };
+  }
 
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;
@@ -90,6 +100,12 @@ async function getFeatureFlags() {
          darf ein Bedienelement nicht versehentlich vor ein Workshop-Publikum
          stellen. */
       useSprachumschalter: data.useSprachumschalter === true,
+      /* FEATURE-2026-08-29-02: Wartezeit und Einlassgrenze aus der gemessenen
+         Dauer statt aus QUEUE_AVG_JOB_SECONDS. Fehlt das Feld, ist die Messung
+         AN — sie ist die richtigere Rechnung, und ihr schlechtester Fall ist
+         der bisherige Code-Wert. Ausschalten ist der Notweg, nicht der
+         Normalfall. */
+      useGemesseneDauer: data.useGemesseneDauer !== false,
     };
     cache = { data: flags, expiresAt: now + CACHE_TTL_MS };
     return flags;
@@ -104,6 +120,7 @@ async function getFeatureFlags() {
       useBeastAdsCall: true,
       useLiveText: false,
       useSprachumschalter: false,
+      useGemesseneDauer: false,
     };
   }
 }

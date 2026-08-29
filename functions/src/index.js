@@ -12,6 +12,8 @@ const { handleProcessJob } = require("./handle-process-job");
 const { handleJobStatus } = require("./handle-job-status");
 const { reapJobs } = require("./handle-reap");
 const { pruefeZusagen } = require("./handle-erinnerung");
+const { pruefeLaufzeit } = require("./laufzeit-wache");
+const { sendeNtfy } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 
 const adminSecret = defineSecret("ADMIN_SECRET");
@@ -156,4 +158,34 @@ exports.erinnerung = onSchedule(
     secrets: [ntfyUrl, ntfyTopic],
   },
   () => pruefeZusagen({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value() })
+);
+
+/* FEATURE-2026-08-29-03: Laufzeit-Wache.
+
+   BEWUSST EIGENER ZEITPLAN, nicht an `erinnerung` angehaengt: Die laeuft nur
+   montags. Eine Verlangsamung, die am Dienstag beginnt, waere sechs Tage lang
+   unsichtbar — genau der Fehler, den diese Wache verhindern soll. Der Einbruch
+   vom 26.08. wurde zwei Tage lang nicht bemerkt und traf dann eine laufende
+   Presse-Aussendung.
+
+   07:20, damit ein Befund vor dem Schulvormittag auf dem Telefon liegt. Nicht
+   zur vollen oder halben Stunde — dort draengen sich alle Zeitplaene. */
+exports.laufzeitWache = onSchedule(
+  {
+    region: "europe-west1",
+    schedule: "every day 07:20",
+    timeZone: "Europe/Vienna",
+    memory: "256MiB",
+    timeoutSeconds: 60,
+    secrets: [ntfyUrl, ntfyTopic],
+  },
+  async () => {
+    const ergebnis = await pruefeLaufzeit({
+      melder: (text) => sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text }),
+    });
+    /* Auch der unauffaellige Lauf wird protokolliert — sonst laesst sich nicht
+       unterscheiden, ob die Wache "in Ordnung" meldet oder gar nicht lief
+       (KERN 4: ein stiller Ausfall darf nie wie ein Bestehen aussehen). */
+    console.log(JSON.stringify({ step: "laufzeit-wache", ...ergebnis }));
+  }
 );

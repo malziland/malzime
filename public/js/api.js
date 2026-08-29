@@ -362,6 +362,10 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
           liveAnzeige.welle({
             standard: data.liveText,
             beast: typeof data.liveTextBeast === "string" ? data.liveTextBeast : null,
+            /* FEATURE-2026-08-29-01: Fertige Merkmale derselben Welle. Fehlen
+               sie (alter Server, Flag aus), bleibt es beim reinen Text. */
+            kartenStandard: Array.isArray(data.liveKartenStandard) ? data.liveKartenStandard : null,
+            kartenBeast: Array.isArray(data.liveKartenBeast) ? data.liveKartenBeast : null,
           });
         }
         break;

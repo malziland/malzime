@@ -122,6 +122,9 @@ function _setLiveIntervalMsForTest(ms) {
 }
 
 const PROFILE_TEXT_SCHLUESSEL = '"profileText"';
+/* FEATURE-2026-08-29-01: Unter jedem Kartenschluessel steht der Text in `value`. */
+const KARTEN_WERT_SCHLUESSEL = '"value"';
+const KARTEN_LABEL_SCHLUESSEL = '"label"';
 
 /**
  * Sucht ab `abIdx` das NAECHSTE `"profileText"`-Vorkommen im JSON-Praefix und
@@ -147,17 +150,17 @@ const PROFILE_TEXT_SCHLUESSEL = '"profileText"';
  *                     Startpunkt fuer die Suche nach dem naechsten Vorkommen.
  *       abgeschlossen true, wenn das schliessende `"` schon angekommen ist.
  */
-function findeProfileTextWert(jsonPraefix, abIdx) {
-  const schluesselIdx = jsonPraefix.indexOf(PROFILE_TEXT_SCHLUESSEL, abIdx);
+function findeProfileTextWert(jsonPraefix, abIdx, schluessel = PROFILE_TEXT_SCHLUESSEL) {
+  const schluesselIdx = jsonPraefix.indexOf(schluessel, abIdx);
   if (schluesselIdx < 0) return null;
 
   /* Nach dem Schluessel muss `: "` folgen (beliebiger Whitespace erlaubt).
      Solange das oeffnende Anfuehrungszeichen nicht da ist, hat der Wert nicht
      begonnen — dann gibt es auch nichts zu zeigen. */
-  const nachSchluessel = jsonPraefix.slice(schluesselIdx + PROFILE_TEXT_SCHLUESSEL.length);
+  const nachSchluessel = jsonPraefix.slice(schluesselIdx + schluessel.length);
   const wertBeginn = nachSchluessel.match(/^\s*:\s*"/);
   if (!wertBeginn) return null;
-  const start = schluesselIdx + PROFILE_TEXT_SCHLUESSEL.length + wertBeginn[0].length;
+  const start = schluesselIdx + schluessel.length + wertBeginn[0].length;
 
   /* Escape-bewusster Scan bis zum letzten KOMPLETT angekommenen Zeichen.
      Ein rohes `"` ohne fuehrenden Backslash beendet den Wert; `\X` sind zwei
@@ -221,8 +224,47 @@ const BEAST_SCHLUESSEL = '"beast"';
  * Rueckgabe: `{ standard, beast }` — jeweils der DEKODIERTE Klartext, oder
  * `null`, solange der jeweilige Wert noch nicht begonnen hat.
  */
+/* FEATURE-2026-08-29-01: Fertige Kategorie-Karten aus dem laufenden Strom lesen.
+
+   WARUM: Ein Profil besteht aus `profileText` UND 13 Karten, und der Prompt
+   verlangt den Text ZUERST. Bis hierher wanderte nur der Text in die Live-
+   Anzeige — die Karten entstanden unsichtbar. Gemessen am 28.08.: Standard-Text
+   nach 34,6 s fertig, Beast-Text ab ~85 s. Dazwischen 50 Sekunden, in denen der
+   Bildschirm stillsteht, obwohl die Hälfte der Arbeit genau dort passiert. Der
+   Nutzer haelt das fuer das Ende ("es wirkt fertig, das liest ja keiner mehr").
+
+   Zurueckgegeben werden NUR abgeschlossene Werte. Eine halb angekommene Karte
+   zu zeigen waere schlechter als keine — sie wuerde sich beim naechsten Poll
+   veraendern und wirkte wie ein Fehler. */
+function extrahiereKarten(jsonPraefix, vonIdx, bisIdx) {
+  if (typeof jsonPraefix !== "string" || vonIdx < 0) return [];
+  const bereich = bisIdx > vonIdx ? jsonPraefix.slice(0, bisIdx) : jsonPraefix;
+  const fertige = [];
+  for (const schluessel of REQUIRED_CARDS) {
+    const marke = `"${schluessel}"`;
+    const idx = bereich.indexOf(marke, vonIdx);
+    if (idx < 0) continue;
+    /* Das Schema legt `label` VOR `value` — beide muessen komplett sein, sonst
+       stuende eine Karte ohne Beschriftung oder mit halbem Satz da. */
+    const bezeichnung = findeProfileTextWert(bereich, idx, KARTEN_LABEL_SCHLUESSEL);
+    if (!bezeichnung || !bezeichnung.abgeschlossen || !bezeichnung.text) continue;
+    const wert = findeProfileTextWert(bereich, idx, KARTEN_WERT_SCHLUESSEL);
+    if (!wert || !wert.abgeschlossen || !wert.text) continue;
+    /* Liegt zwischen dem Kartenschluessel und dem gefundenen `"value"` ein
+       ANDERER Kartenschluessel, gehoert der Wert zur naechsten Karte — diese
+       hier hat dann selbst noch keinen. Dieselbe Verankerung wie bei
+       standard/beast, nur eine Ebene tiefer. */
+    const dazwischen = bereich.slice(idx + marke.length, wert.schluesselIdx);
+    if (REQUIRED_CARDS.some((k) => k !== schluessel && dazwischen.includes(`"${k}"`))) continue;
+    fertige.push({ schluessel, bezeichnung: bezeichnung.text, wert: wert.text });
+  }
+  return fertige;
+}
+
 function extrahiereLiveText(jsonPraefix) {
-  if (typeof jsonPraefix !== "string") return { standard: null, beast: null };
+  /* Dieselbe Form wie im Normalfall — ein Aufrufer, der `kartenStandard.length`
+     liest, darf hier nicht ueber `undefined` stolpern. */
+  if (typeof jsonPraefix !== "string") return { standard: null, beast: null, kartenStandard: [], kartenBeast: [] };
 
   const standardIdx = jsonPraefix.indexOf(STANDARD_SCHLUESSEL);
   const beastIdx = jsonPraefix.indexOf(BEAST_SCHLUESSEL);
@@ -247,7 +289,15 @@ function extrahiereLiveText(jsonPraefix) {
     }
   }
 
-  return { standard: erster ? erster.text : null, beast: zweiter ? zweiter.text : null };
+  /* FEATURE-2026-08-29-01: Karten additiv dazu. `standard` und `beast` bleiben
+     unveraendert — alte Aufrufer merken nichts. */
+  const standardBis = beastIdx > standardIdx ? beastIdx : -1;
+  return {
+    standard: erster ? erster.text : null,
+    beast: zweiter ? zweiter.text : null,
+    kartenStandard: extrahiereKarten(jsonPraefix, standardIdx, standardBis),
+    kartenBeast: extrahiereKarten(jsonPraefix, beastIdx, -1),
+  };
 }
 
 /* Loest JSON-String-Escapes zu echten Zeichen auf. Bewusst von Hand statt

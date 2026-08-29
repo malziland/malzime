@@ -27,6 +27,11 @@ vi.mock("../js/geocoding.js", () => ({
 
 vi.mock("../js/render.js", () => ({
   renderCurrentMode: vi.fn(),
+  /* FEATURE-2026-08-29-01: Karten waehrend der Analyse. */
+  zeigeLiveKarten: vi.fn(),
+  liveKartenZuruecksetzen: vi.fn(),
+  liveKartenModusWechsel: vi.fn(),
+  zeigeVersteckteDatenUndKarte: vi.fn(),
 }));
 
 vi.mock("../js/live-anzeige.js", () => ({
@@ -122,8 +127,18 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(12000);
     await p;
-    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(1, { standard: "Erste Welle", beast: null });
-    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(2, { standard: "Erste Welle, zweite Welle", beast: null });
+    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(1, {
+      standard: "Erste Welle",
+      beast: null,
+      kartenStandard: null,
+      kartenBeast: null,
+    });
+    expect(liveAnzeige.welle).toHaveBeenNthCalledWith(2, {
+      standard: "Erste Welle, zweite Welle",
+      beast: null,
+      kartenStandard: null,
+      kartenBeast: null,
+    });
   });
 
   it("processing-Antwort mit liveText UND liveTextBeast → beide Felder gehen als eine Welle ans Modul", async () => {
@@ -134,7 +149,12 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(12000);
     await p;
-    expect(liveAnzeige.welle).toHaveBeenCalledWith({ standard: "Standard-Text.", beast: "Du bist ein" });
+    expect(liveAnzeige.welle).toHaveBeenCalledWith({
+      standard: "Standard-Text.",
+      beast: "Du bist ein",
+      kartenStandard: null,
+      kartenBeast: null,
+    });
   });
 
   it("processing OHNE liveText (Flag aus) → keine einzige Welle, heutiger Pfad", async () => {

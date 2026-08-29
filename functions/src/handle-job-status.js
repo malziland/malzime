@@ -16,7 +16,9 @@
  */
 
 const { randomUUID } = require("crypto");
-const { QUEUE_AVG_JOB_SECONDS, QUEUE_DISPATCH_CONCURRENCY } = require("./config");
+const { QUEUE_DISPATCH_CONCURRENCY } = require("./config");
+const { dauerJeAnalyse } = require("./durchsatz");
+const { getFeatureFlags } = require("./feature-flags");
 const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
 const { safeCompare, sha256Hex } = require("./auth");
 
@@ -31,10 +33,30 @@ const JOB_ID_MUSTER = /^[A-Za-z0-9]{20}$/;
    fälschlich als verlassen gilt. */
 const TOUCH_MINDESTABSTAND_MS = 30_000;
 
-/* Grobe Wartezeit-Schätzung aus der Warteschlangen-Position.
-   Kalibrierung der Konstanten erfolgt in Phase 3/4 (config.js). */
-function etaForPosition(position) {
-  return Math.ceil(position / QUEUE_DISPATCH_CONCURRENCY) * QUEUE_AVG_JOB_SECONDS;
+/* Wartezeit-Schätzung aus der Warteschlangen-Position.
+
+   FEATURE-2026-08-29-02: Rechnet mit der GEMESSENEN Dauer der letzten Läufe
+   statt mit `QUEUE_AVG_JOB_SECONDS`. Die feste Zahl stammte vom 23.05. und war
+   am 28.08. um mehr als die Hälfte zu optimistisch — eine Ansage, die nicht
+   stimmt, ist schlechter als keine.
+
+   `null` heißt ausdrücklich „keine belastbare Zeitangabe" (zu wenige oder zu
+   alte Messwerte). Der Client zeigt dann die Position, die immer stimmt. */
+async function etaForPosition(position) {
+  const { sekunden, frisch, gemessen } = await dauerJeAnalyse(await isGemesseneDauerAn());
+  if (gemessen && !frisch) return null;
+  return Math.ceil(position / QUEUE_DISPATCH_CONCURRENCY) * sekunden;
+}
+
+/* Flag-Abfrage, die niemals wirft: Ist Firestore nicht erreichbar, gilt der
+   Code-Wert — dieselbe Rückfallebene wie im Rest des Moduls. */
+async function isGemesseneDauerAn() {
+  try {
+    const flags = await getFeatureFlags();
+    return flags.useGemesseneDauer === true;
+  } catch (_) {
+    return false;
+  }
 }
 
 async function handleJobStatus(req, res) {
@@ -95,16 +117,18 @@ async function handleJobStatus(req, res) {
     res.status(200).json({
       status: "queued",
       position,
-      etaSeconds: etaForPosition(position),
+      etaSeconds: await etaForPosition(position),
     });
     return;
   }
 
   if (job.status === "processing") {
+    /* Der Job läuft bereits — die Restzeit ist die Dauer einer Analyse. */
+    const laufend = await dauerJeAnalyse(await isGemesseneDauerAn());
     const antwort = {
       status: "processing",
       position: 0,
-      etaSeconds: QUEUE_AVG_JOB_SECONDS,
+      etaSeconds: laufend.gemessen && !laufend.frisch ? null : laufend.sekunden,
     };
     /* v3.0 Phase 1: Der bereits angekommene Live-Profiltext, falls der Worker
        ihn (Flag `useLiveText`) ins Job-Dokument gelegt hat. Er ist ein
@@ -123,6 +147,13 @@ async function handleJobStatus(req, res) {
          zweiter Pruefpfad. Solange Beast fehlt, fehlt auch das Feld. */
       if (typeof job.liveTextBeast === "string") {
         antwort.liveTextBeast = job.liveTextBeast;
+      }
+      /* FEATURE-2026-08-29-01: Fertige Kategorie-Karten — BEWUSST im selben
+         Ticket-Block wie die Texte. Sie sind derselbe Vorgriff auf `result`
+         und unterliegen damit derselben PRIV-003-Bindung; ein zweiter
+         Pruefpfad waere eine zweite Stelle, an der man ihn vergessen kann. */
+      for (const feld of ["liveKartenStandard", "liveKartenBeast"]) {
+        if (Array.isArray(job[feld])) antwort[feld] = job[feld];
       }
     }
     res.status(200).json(antwort);

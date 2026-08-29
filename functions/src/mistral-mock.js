@@ -84,17 +84,23 @@ function profileDe(isBoost) {
     categories: {
       alter_geschlecht: {
         label: "Alter & Geschlecht",
-        value: "Du bist vermutlich männlich, ca. 30 Jahre alt.",
+        value: isBoost
+          ? "Männlich, ~30 — die Kieferlinie verrät dich."
+          : "Du bist vermutlich männlich, ca. 30 Jahre alt.",
         confidence: 0.78,
       },
       interessen: {
         label: "Interessen & Hobbys",
-        value: "Die Analyse leitet ab, dass du dich für Stadtleben, Mode und Fotografie interessierst.",
+        value: isBoost
+          ? "Stadtleben, Mode, Fotografie. Vorhersehbar."
+          : "Die Analyse leitet ab, dass du dich für Stadtleben, Mode und Fotografie interessierst.",
         confidence: 0.61,
       },
       persoenlichkeit: {
         label: "Persönlichkeitstyp",
-        value: "Offen und kontaktfreudig, mit einem Hang zur Selbstdarstellung. Wirkt organisiert und zielstrebig.",
+        value: isBoost
+          ? "Selbstdarsteller mit Ordnungsdrang. Leicht zu lesen."
+          : "Offen und kontaktfreudig, mit einem Hang zur Selbstdarstellung. Wirkt organisiert und zielstrebig.",
         confidence: 0.55,
       },
       kaufkraft: {
@@ -106,7 +112,62 @@ function profileDe(isBoost) {
       },
       charakterzuege: {
         label: "Charaktereigenschaften",
-        value: "Aufgeschlossen, gepflegt, sozial orientiert und stilbewusst.",
+        value: isBoost
+          ? "Will gefallen. Genau das nutzen wir."
+          : "Aufgeschlossen, gepflegt, sozial orientiert und stilbewusst.",
+        confidence: 0.5,
+      },
+
+      herkunft: {
+        label: "Herkunft",
+        value: isBoost
+          ? "Mitteleuropa — dein Umfeld verrät dich sofort."
+          : "Mitteleuropäischer Raum, städtisches Umfeld.",
+        confidence: 0.5,
+      },
+      einkommen: {
+        label: "Einkommen",
+        value: isBoost
+          ? "Mittelschicht mit Anspruch. Wir kennen dein Budget."
+          : "Mittleres Einkommen, geregelte Beschäftigung.",
+        confidence: 0.5,
+      },
+      bildung: {
+        label: "Bildung",
+        value: isBoost
+          ? "Genug Bildung, um dich für unbeeinflussbar zu halten."
+          : "Weiterführender Abschluss wahrscheinlich.",
+        confidence: 0.5,
+      },
+      beziehungsstatus: {
+        label: "Beziehungsstatus",
+        value: isBoost ? "Verrätst du nicht — wir raten trotzdem." : "Keine belastbaren Hinweise im Bild.",
+        confidence: 0.5,
+      },
+      politisch: {
+        label: "Politische Neigung",
+        value: isBoost
+          ? "Sagst du nicht. Dein Konsum sagt es für dich."
+          : "Keine Anhaltspunkte — bewusst offen gelassen.",
+        confidence: 0.5,
+      },
+      gesundheit: {
+        label: "Gesundheit",
+        value: isBoost ? "Nichts Auffälliges. Noch nicht." : "Keine Auffälligkeiten erkennbar.",
+        confidence: 0.5,
+      },
+      verletzlichkeit: {
+        label: "Angriffsflächen",
+        value: isBoost
+          ? "Du willst dazugehören. Genau da holen wir dich ab."
+          : "Wirkt offen für Empfehlungen und soziale Bestätigung.",
+        confidence: 0.5,
+      },
+      werbeprofil: {
+        label: "Werbeprofil",
+        value: isBoost
+          ? "Ein Datensatz mit klaren Schwächen — leicht zu bespielen."
+          : "Gut adressierbar über Lifestyle- und Modekanäle.",
         confidence: 0.5,
       },
     },
@@ -143,17 +204,23 @@ function profileEn(isBoost) {
     categories: {
       alter_geschlecht: {
         label: "Age & Gender",
-        value: "You are likely male, approximately 30 years old.",
+        value: isBoost
+          ? "Male, ~30 — your jawline gives you away."
+          : "You are likely male, approximately 30 years old.",
         confidence: 0.78,
       },
       interessen: {
         label: "Interests & Hobbies",
-        value: "The analysis infers that you are interested in city life, fashion and photography.",
+        value: isBoost
+          ? "City life, fashion, photography. Predictable."
+          : "The analysis infers that you are interested in city life, fashion and photography.",
         confidence: 0.61,
       },
       persoenlichkeit: {
         label: "Personality Type",
-        value: "Open and sociable, with a tendency toward self-presentation. Appears organised and driven.",
+        value: isBoost
+          ? "Self-presenter with a need for order. Easy to read."
+          : "Open and sociable, with a tendency toward self-presentation. Appears organised and driven.",
         confidence: 0.55,
       },
       kaufkraft: {
@@ -165,7 +232,54 @@ function profileEn(isBoost) {
       },
       charakterzuege: {
         label: "Character Traits",
-        value: "Open-minded, well-groomed, socially oriented and style-conscious.",
+        value: isBoost
+          ? "Wants to be liked. That is what we use."
+          : "Open-minded, well-groomed, socially oriented and style-conscious.",
+        confidence: 0.5,
+      },
+
+      herkunft: {
+        label: "Origin",
+        value: isBoost ? "Central Europe — your surroundings give you away." : "Central European, urban environment.",
+        confidence: 0.5,
+      },
+      einkommen: {
+        label: "Income",
+        value: isBoost ? "Middle class with aspirations. We know your budget." : "Middle income, steady employment.",
+        confidence: 0.5,
+      },
+      bildung: {
+        label: "Education",
+        value: isBoost ? "Educated enough to think you are immune." : "Higher education likely.",
+        confidence: 0.5,
+      },
+      beziehungsstatus: {
+        label: "Relationship status",
+        value: isBoost ? "You will not say. We guess anyway." : "No reliable indicators in the image.",
+        confidence: 0.5,
+      },
+      politisch: {
+        label: "Political leaning",
+        value: isBoost ? "You stay quiet. Your shopping speaks." : "No indicators — deliberately left open.",
+        confidence: 0.5,
+      },
+      gesundheit: {
+        label: "Health",
+        value: isBoost ? "Nothing remarkable. Not yet." : "No abnormalities detectable.",
+        confidence: 0.5,
+      },
+      verletzlichkeit: {
+        label: "Vulnerabilities",
+        value: isBoost
+          ? "You want to belong. That is where we reach you."
+          : "Appears open to recommendations and social approval.",
+        confidence: 0.5,
+      },
+      werbeprofil: {
+        label: "Ad profile",
+        value: isBoost
+          ? "A record with clear weak spots — easy to play."
+          : "Easily addressable via lifestyle and fashion channels.",
         confidence: 0.5,
       },
     },
@@ -247,8 +361,79 @@ async function generateBothProfiles(_imageDescription, _exifData, _remainingBudg
   };
 }
 
+/**
+ * Attrappe des Single-Large-Aufrufs — MIT simuliertem Datenstrom.
+ *
+ * WARUM ES DAS BRAUCHT (2026-08-29): Die Attrappe kannte diesen Aufruf bisher
+ * nicht, deshalb steht `useSingleLargeCall` im Lokal-Modus auf `false`. Der
+ * Live-Weg war damit im Emulator nicht nur abgeschaltet, sondern gar nicht
+ * vorhanden — und die Live-Anzeige ohne echte Mistral-Kosten nicht zu sehen.
+ *
+ * Der Strom wird in derselben Reihenfolge nachgestellt, in der das Modell
+ * schreibt: erst der Profiltext, dann die Karten einzeln. Genau diese
+ * Reihenfolge erzeugt im Betrieb die Wartezeit, in der der Bildschirm bisher
+ * stillstand.
+ */
+async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, opts = {}) {
+  const resolved = lang === "en" ? "en" : "de";
+  const normal = mockProfile("normal", resolved);
+  const boost = mockProfile("boost", resolved);
+  const onLiveText = typeof opts.onLiveText === "function" ? opts.onLiveText : null;
+
+  /* Ohne Callback verhaelt sich die Attrappe wie der Nicht-Stream-Pfad. */
+  if (!onLiveText) {
+    await sleep(mockDelayMs());
+    return { normal, boost, subject: "HUMAN", visibleText: "" };
+  }
+
+  /* Zeitverhaeltnis wie im Betrieb: Der Profiltext ist FRUEH fertig, die Karten
+     brauchen danach das Vielfache. Am 28.08. gemessen: Text nach 34,6 s
+     komplett, Karten bis ~85 s. Eine Attrappe, die den Text ueber die ganze
+     Laufzeit streckt, stellt genau die Reihenfolge nicht her, um die es geht. */
+  /* MISTRAL_MOCK_DELAY_MS ist die Dauer je PROFIL, nicht je Schritt — sonst
+     verlaengert jede zusaetzliche Karte den Durchlauf still. Der Text bekommt
+     ein Zehntel davon (er ist im Betrieb frueh fertig), die Karten teilen sich
+     den Rest. */
+  const gesamt = mockDelayMs();
+  const textSchritt = Math.max(80, Math.round(gesamt / 30));
+  const kartenAnzahl = Math.max(1, Object.keys(normal.categories || {}).length);
+  const kartenSchritt = Math.max(150, Math.round((gesamt * 0.9) / kartenAnzahl));
+  const karten = (profil) =>
+    Object.entries(profil.categories || {}).map(([schluessel, k]) => ({
+      schluessel,
+      bezeichnung: k.label,
+      wert: k.value,
+    }));
+  const alleStandard = karten(normal);
+  const alleBeast = karten(boost);
+  const stand = { standard: "", beast: "", kartenStandard: [], kartenBeast: [] };
+
+  /* 1. Profiltext waechst zeichenweise (wie der echte Strom). */
+  for (const [feld, text] of [
+    ["standard", normal.profileText || ""],
+    ["beast", boost.profileText || ""],
+  ]) {
+    for (let i = 1; i <= 3; i += 1) {
+      stand[feld] = text.slice(0, Math.ceil((text.length * i) / 3));
+      await sleep(textSchritt);
+      onLiveText({ ...stand });
+    }
+    /* 2. Danach die Karten — einzeln, genau wie im Betrieb. */
+    const ziel = feld === "standard" ? "kartenStandard" : "kartenBeast";
+    const quelle = feld === "standard" ? alleStandard : alleBeast;
+    for (let i = 1; i <= quelle.length; i += 1) {
+      stand[ziel] = quelle.slice(0, i);
+      await sleep(kartenSchritt);
+      onLiveText({ ...stand });
+    }
+  }
+
+  return { normal, boost, subject: "HUMAN", visibleText: "" };
+}
+
 module.exports = {
   describeImage,
   generateBothProfiles,
+  runSingleLargeCall,
   isRateLimitError,
 };

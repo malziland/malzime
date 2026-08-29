@@ -16,6 +16,14 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 | `useLiveText` | Anzeige-Schalter (Live-Text waehrend der Analyse) | `true` | `false` | Christoph Krieger |
 | `useBeastAdsCall` | Zweiter, kleiner Mistral-Aufruf fuer die Beast-Werbung | `true` | `true` | Christoph Krieger |
 | `useSprachumschalter` | Sichtbarkeit eines Bedienelements | `true` (seit v3.3.0 live) | `false` | Christoph Krieger |
+| `useGemesseneDauer` | Wartezeit und Einlassgrenze aus der gemessenen statt der angenommenen Analysedauer (seit v4.2.0) | `true` | `true` | Christoph Krieger |
+
+> **`useGemesseneDauer` ist fail-safe `true`** — anders als die uebrigen Flags. Grund:
+> Der Schalter waehlt nicht zwischen "Funktion an" und "Funktion aus", sondern zwischen
+> zwei Rechenwegen. Der gemessene ist der richtigere, und sein schlechtester Fall ist
+> ohnehin der Code-Wert `QUEUE_AVG_JOB_SECONDS` — bei zu wenigen, unplausiblen oder
+> unlesbaren Messwerten faellt er von selbst dorthin zurueck. Ausschalten ist der
+> Notweg, nicht der Normalzustand.
 
 > **Stand 2026-08-21 (DOC-2026-08-20-09).** Die Spalte „Soll live" trug zuvor fuer
 > `useSprachumschalter` noch `false` — den Stand von der Vorbereitung am 13.08., obwohl

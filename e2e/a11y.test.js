@@ -41,6 +41,45 @@ const ALLE_SEITEN = alleSeiten();
    /datenschutz.html. */
 const RECHTSSEITEN = ALLE_SEITEN.filter((p) => !/^\/(index|stats)\.html$/.test(p));
 
+
+/* Auf Animations-Ruhe warten — ABER nur auf Animationen, die ueberhaupt
+   enden koennen.
+
+   ANLASS 2026-08-29: Seit die Kategorie-Karten von Beginn an als unscharfes
+   Geruest stehen, laufen waehrend der Analyse 39 Endlos-Animationen
+   gleichzeitig (13 Karten * 3 Konfidenz-Punkte, `animation: ... infinite`).
+   `a.finished` loest bei einer Endlos-Animation NIE auf. Das Warten auf
+   `Promise.all(alle)` blockierte damit bis zum Zeitrahmen des Tests — gemessen
+   wurde danach in eine Seite hinein, die noch in Bewegung war.
+
+   Die Folge waren IRREFUEHRENDE Befunde: axe meldete "Kontrast 1 statt 4,5"
+   (weiss auf weiss) an einem Knopf, der gerade eingeblendet wurde, und der
+   Zustands-Abgleich meldete "82 erwartet, 6 gemessen", weil der Lauf vorher
+   abbrach. Beides sah nach Barrierefreiheits-Fehlern aus und war keiner.
+
+   Nachgemessen am 29.08.: 52 Animationen, davon 39 endlos. Warten auf alle =
+   nach 5 s noch nicht fertig. Warten auf die endlichen = fertig in 1 ms.
+
+   Endlos-Animationen sind fuer die Messung unproblematisch: Sie veraendern
+   Deckkraft oder Position zyklisch, aber das Layout steht. Worauf es ankommt —
+   Einblendungen, Uebergaenge, Verschiebungen — sind endliche Animationen, und
+   auf die wird unveraendert gewartet. */
+async function animationsRuhe(page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => {
+          try {
+            return a.effect?.getComputedTiming?.().iterations !== Infinity;
+          } catch (_e) {
+            return true; /* im Zweifel warten */
+          }
+        })
+        .map((a) => a.finished.catch(() => {}))
+    )
+  );
+}
 /* Positivkontrolle fuer die Suche selbst: Faende sie nichts oder zu wenig,
    liefen die Schleifen unten still leer und der Test waere gruen ohne
    gemessen zu haben. Stand 2026-08-18: 10 Seiten, davon 8 Rechtsseiten. */
@@ -102,7 +141,7 @@ async function checkA11y(page, kontext) {
      und in der Nachrechnung von Hand alle bestanden. */
   for (let i = 0; i < 2; i++) {
     await page.evaluate(() => new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f))));
-    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+    await animationsRuhe(page);
   }
   const results = await new AxeBuilder({ page }).analyze();
 
@@ -329,7 +368,7 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
       0.05
     );
   }
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+  await animationsRuhe(page);
   const unsichtbar = await page.$$eval(".cat-card", (karten) =>
     karten.map((k, i) => ({ i, opacity: Number(getComputedStyle(k).opacity) })).filter((k) => k.opacity < 1)
   );
@@ -355,7 +394,7 @@ test("A11y: kein waagrechtes Scrollen bei 320 px (WCAG 1.4.10 AA)", async ({ pag
   await page.setViewportSize({ width: 320, height: 800 });
   for (const pfad of ALLE_SEITEN) {
     await page.goto(pfad);
-    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => {}))));
+    await animationsRuhe(page);
     const mass = await page.evaluate(() => ({
       doc: document.documentElement.scrollWidth,
       fenster: window.innerWidth,

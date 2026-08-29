@@ -4,6 +4,44 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Wer während der Wartezeit scrollt, bekommt den mitlaufenden Text trotzdem
+  zu sehen.** Bisher gab die Seite die Führung beim ersten Wischen endgültig
+  ab — auch wenn es lange vor dem Tippen geschah, aus bloßer Neugier, während
+  nur das Scan-Auge lief. Danach war alles abgeschaltet: das Ausrichten des
+  Profiltexts und das Nachrücken der Zeile. Wer sich beim Warten umgesehen
+  hatte, sah den Text anschließend am unteren Bildrand vorbeilaufen.
+
+  Zum Tippbeginn wird die Führung jetzt genau einmal neu scharf gestellt. Ab
+  da gilt der Vorrang des Lesers wieder wie zuvor: Wer während des Tippens
+  scrollt, übernimmt endgültig.
+
+- **Das Scan-Auge wird erst dann als sichtbar gewertet, wenn es ganz ins Bild
+  passt.** Die bisherige Regel ließ die halbe Höhe genügen — ein zur Hälfte
+  angeschnittenes Auge galt damit als sichtbar und wurde nie nachgezogen. Auf
+  kleinen Bildschirmen stand deshalb oft nur ein halber Kreis am Rand.
+
+### Prüfkette
+
+- **Die Barrierefreiheits-Messung wartet nicht mehr auf Animationen, die nie
+  enden.** Seit die Merkmal-Karten von Beginn an als unscharfes Gerüst stehen,
+  laufen während einer Analyse 39 Dauer-Animationen gleichzeitig (dreizehn
+  Karten mit je drei Punkten). Die Messung wartete darauf, dass alle
+  Animationen fertig werden — was bei Dauer-Animationen nie eintritt. Sie maß
+  deshalb in eine Seite hinein, die noch in Bewegung war, und meldete
+  Kontrastfehler an Elementen, die gerade eingeblendet wurden. Nachgemessen:
+  Warten auf alle Animationen war nach fünf Sekunden nicht fertig, Warten auf
+  die endlichen nach einer Millisekunde.
+
+- **Ein fehlgeschlagener Browser-Test hinterlässt jetzt Beweise.** Bisher
+  zeichnete die Prüfkette bei einem Fehlschlag nichts auf — kein Bild, kein
+  Ablaufprotokoll. Ein Fehler, der sich nur dort zeigt, war damit nicht
+  untersuchbar; man konnte den Lauf nur wiederholen. Jetzt liegen Screenshot,
+  Aufzeichnung und Fehlerkontext bei. Im grünen Fall entsteht nichts.
+
 ## [4.2.1] — 2026-08-29
 
 ### Behoben

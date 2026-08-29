@@ -8,12 +8,23 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Neu
 
-- **Die Merkmale erscheinen jetzt einzeln, während sie entstehen.** Bisher stand
-  der Bildschirm nach dem ersten Profiltext rund fünfzig Sekunden still — dort
-  schreibt die KI die dreizehn Kategorie-Karten, die vorher gesammelt und erst
-  ganz am Ende auf einmal gezeigt wurden. Für Wartende sah der Lauf beendet aus,
-  obwohl die Hälfte der Arbeit noch bevorstand. Jede Karte erscheint nun, sobald
-  sie fertig geschrieben ist.
+- **Die Merkmale bauen sich jetzt auf, während die KI sie schreibt.** Bisher
+  stand der Bildschirm nach dem Profiltext rund fünfzig Sekunden still — dort
+  entstehen die dreizehn Kategorie-Karten, die vorher gesammelt und erst ganz am
+  Ende auf einmal gezeigt wurden. Für Wartende sah der Lauf beendet aus, obwohl
+  die Hälfte der Arbeit noch bevorstand.
+
+  Der Ablauf folgt jetzt der gewohnten Reihenfolge: erst der Profiltext, dann
+  die versteckten Daten im Foto und die Landkarte, dann die Merkmale. Alle
+  dreizehn Karten stehen dabei von Anfang an da — unscharf, als wäre das Bild
+  noch nicht fokussiert — und stellen sich einzeln scharf, sobald die KI das
+  Merkmal geschrieben hat. Die Sicherheits-Punkte an der Seite laufen, solange
+  eine Karte noch leer ist. So ist jederzeit zu sehen, wie viel noch kommt;
+  vorher wirkte jede Pause wie das Ende.
+
+  Realitäts-Check und Datenwert bleiben unverändert am Schluss. Beim Umschalten
+  zwischen seriöser Analyse und Beast Mode werden die Merkmale neu geschrieben,
+  ohne dass die Seite neu aufgebaut wird.
 
 - **Eine tägliche Prüfung meldet, wenn Analysen langsamer werden.** Sie
   vergleicht die letzten drei Tage mit den vierzehn davor und schlägt an, wenn

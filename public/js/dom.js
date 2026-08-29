@@ -26,8 +26,6 @@ export const elements = {
   liveTextRausch: document.getElementById("liveTextRausch"),
   liveCursor: document.getElementById("liveCursor"),
   liveWarten: document.getElementById("liveWarten"),
-  /* FEATURE-2026-08-29-01: Liste der bereits geschriebenen Merkmale. */
-  liveMerkmale: document.getElementById("liveMerkmale"),
   /* Realitäts-Check (v3.1, js/realitaets-check.js) */
   realCheck: document.getElementById("realCheck"),
   rcZeilen: document.getElementById("rcZeilen"),

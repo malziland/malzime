@@ -210,6 +210,152 @@ function renderCategories(profile) {
   elements.facts.innerHTML = html;
 }
 
+/**
+ * Zeigt die versteckten Daten und die Landkarte, sobald der Profiltext steht.
+ *
+ * FEATURE-2026-08-29-01: Beide brauchen den Server NICHT. EXIF liest der
+ * Browser selbst aus dem Foto, die Ortsaufloesung laeuft direkt zu Nominatim,
+ * die Kartenkacheln kommen von OpenStreetMap — genau die Datenschutz-
+ * Architektur, wegen der GPS unsere Server nie erreicht. Die Daten liegen
+ * also fertig vor, sobald das Bild vorbereitet ist.
+ *
+ * Sie gehoeren VOR die Kategorie-Boxen: erst der Profiltext, dann die
+ * versteckten Daten und die Karte, dann die Boxen nach und nach. Ohne diesen
+ * Schritt sprangen die Kategorie-Karten direkt hinter den Text und die Karte
+ * erschien erst ganz am Ende — die Reihenfolge war zerrissen.
+ */
+export function zeigeVersteckteDatenUndKarte() {
+  const vorbereitet = state.lastPrepared;
+  if (!vorbereitet) return false;
+  const exif = { ...(vorbereitet.exif || {}) };
+  if (vorbereitet.gps) {
+    exif.gpsLatitude = vorbereitet.gps.latitude;
+    exif.gpsLongitude = vorbereitet.gps.longitude;
+  }
+  if (vorbereitet.dateTimeOriginal) exif.dateTimeOriginal = vorbereitet.dateTimeOriginal;
+  if (Object.keys(exif).length === 0) return false;
+
+  /* `privacyRisks` kommt erst mit dem Ergebnis — die Box zeigt ohne sie die
+     Kameradaten, und genau die sind hier gemeint. */
+  renderPrivacyRisks({ exif, privacyRisks: [] });
+  renderGpsMap({ exif });
+  return true;
+}
+
+/**
+ * Zeigt die bereits geschriebenen Kategorie-Karten WAEHREND der Analyse.
+ *
+ * FEATURE-2026-08-29-01: Bisher entstanden die 13 Karten unsichtbar — der
+ * Prompt verlangt den Profiltext zuerst, danach schreibt das Modell rund 50
+ * Sekunden lang Karten, ohne dass sich am Bildschirm etwas tut. Der Lauf sah
+ * beendet aus.
+ *
+ * Sie erscheinen in DEMSELBEN Layout wie am Ende, in ihren Themengruppen —
+ * nicht in einer Ersatzliste und nicht im Profiltext-Feld. Dort haben sie
+ * nichts zu suchen: Der Text ist eine Erzaehlung, die Karten sind Einzelbefunde.
+ *
+ * Nur neue Karten bekommen die Einblendung; bereits sichtbare bleiben ruhig
+ * stehen. Ein Neuaufbau bei jeder Welle liesse sonst alle zwei Sekunden das
+ * ganze Feld flackern.
+ */
+const bereitsGezeigt = new Set();
+/* Reihenfolge der Karten im Geruest — dieselbe wie im fertigen Ergebnis. */
+const ALLE_KARTEN = CATEGORY_GROUPS.flatMap((g) => g.keys);
+/* Fuellwort fuer noch leere Karten. Es wird unscharf gezeichnet und ist
+   deshalb nie lesbar; es traegt nur die Hoehe der Zeile. */
+const PLATZHALTER_TEXT = "Wird gerade ausgewertet und gleich hier stehen.";
+/* Auch die Beschriftung ist zunaechst unscharf — sie kommt vom Modell. */
+const PLATZHALTER_LABEL = "Wird ausgewertet";
+let geruestSteht = false;
+/* Abstand zwischen zwei scharfgestellten Karten. */
+const SCHARFSTELL_TAKT_MS = 400;
+
+export function zeigeLiveKarten(liveKarten) {
+  if (!elements.facts || !Array.isArray(liveKarten)) return;
+
+  /* Beim ersten Aufruf das vollstaendige Geruest bauen: ALLE Karten stehen da,
+     die noch leeren unscharf. So sieht man von Anfang an, wie viele Merkmale
+     kommen — und keine Pause wirkt mehr wie das Ende. */
+  const fertige = new Map();
+  for (const k of liveKarten) {
+    if (k && k.schluessel) fertige.set(k.schluessel, { label: k.bezeichnung, value: k.wert });
+  }
+
+  /* Das Gerüst wird GENAU EINMAL gebaut. Jeder weitere Aufruf ändert nur die
+     Karte, die dazugekommen ist.
+
+     Vorher wurde bei jeder neuen Karte das ganze Feld neu erzeugt — bei
+     dreizehn Karten also dreizehn Komplettaufbauten. Jeder davon liess das
+     gesamte Ergebnis kurz aufblitzen und sah aus wie ein Neuladen der Seite
+     (vom Nutzer am 29.08. mehrfach gemeldet). */
+  if (!geruestSteht) {
+    const categories = {};
+    for (const key of ALLE_KARTEN) {
+      categories[key] = { label: PLATZHALTER_LABEL, value: PLATZHALTER_TEXT };
+    }
+    renderCategories({ categories });
+    for (const karte of elements.facts.querySelectorAll(".cat-card")) {
+      karte.classList.add("cat-card--unscharf");
+    }
+    geruestSteht = true;
+  }
+
+  /* Gestaffelt scharfstellen. Beim ersten Aufruf liegen oft schon viele Karten
+     vor — der Tippeffekt braucht laenger als die KI zum Schreiben. Wuerden alle
+     gleichzeitig scharf, waere vom Effekt nichts zu sehen und die Boxen
+     erschienen schlagartig fertig (am 29.08. gemessen: 13 von 13 in derselben
+     Sekunde). Ein Takt von 400 ms macht daraus ein sichtbares Nacheinander. */
+  const offene = [...fertige].filter(([k]) => !bereitsGezeigt.has(k));
+  offene.forEach(([schluessel, inhalt], i) => {
+    bereitsGezeigt.add(schluessel);
+    const setzen = () => {
+      const karte = elements.facts.querySelector(`.cat-card[data-key="${schluessel}"]`);
+      if (!karte) return;
+      const label = karte.querySelector(".cat-label");
+      const wert = karte.querySelector(".cat-value");
+      if (label) label.textContent = inhalt.label || "";
+      if (wert) wert.innerHTML = highlightKeyTerms(escapeHtml(inhalt.value || ""));
+      karte.classList.remove("cat-card--unscharf");
+      karte.classList.add("cat-card--scharfstellen");
+    };
+    if (i === 0) setzen();
+    else setTimeout(setzen, i * SCHARFSTELL_TAKT_MS);
+  });
+}
+
+/** Vor jedem neuen Lauf: Die Merkliste der gezeigten Karten leeren. */
+export function liveKartenZuruecksetzen() {
+  bereitsGezeigt.clear();
+  geruestSteht = false;
+}
+
+/**
+ * Moduswechsel mitten im Lauf: Die Inhalte gehören dem anderen Profil, das
+ * Gerüst bleibt aber stehen.
+ *
+ * Ohne dieses Leeren würden die bereits gesetzten Karten übersprungen — im
+ * Beast-Modus stand dann weiter der seriöse Text (am 29.08. so gemessen).
+ * `geruestSteht` bleibt bewusst true: Ein Neuaufbau ließe das ganze Feld
+ * aufblitzen, genau das soll nicht passieren.
+ */
+export function liveKartenModusWechsel() {
+  bereitsGezeigt.clear();
+  /* Die stehenden Inhalte gehören dem anderen Profil — sie dürfen nicht
+     stehenbleiben, bis die neuen eintreffen. Am 29.08. gemessen: Nach dem
+     Umschalten auf Beast stand zwölf Sekunden lang weiter der seriöse Text,
+     bis das Endergebnis kam. Zurück auf unscharf heißt: Das Gerüst bleibt,
+     der Inhalt wird neu geschrieben — genau wie beim ersten Mal. */
+  if (!elements.facts) return;
+  for (const karte of elements.facts.querySelectorAll(".cat-card")) {
+    const label = karte.querySelector(".cat-label");
+    const wert = karte.querySelector(".cat-value");
+    if (label) label.textContent = PLATZHALTER_LABEL;
+    if (wert) wert.textContent = PLATZHALTER_TEXT;
+    karte.classList.remove("cat-card--scharfstellen");
+    karte.classList.add("cat-card--unscharf");
+  }
+}
+
 /* ── Rendering: Werbung + Manipulation ── */
 
 function renderAdTargeting(profile) {

@@ -1061,67 +1061,96 @@ html {
   color: var(--muted);
 }
 
-/* ── Merkmale während des Laufs (FEATURE-2026-08-29-01) ──
-   Sie erscheinen einzeln, sobald das Modell sie geschrieben hat. Vorher stand
-   der Bildschirm rund 50 s still, während genau diese Karten unsichtbar
-   entstanden — der Lauf sah beendet aus. Bewusst schlicht gehalten: Das
-   ausführliche Karten-Layout kommt am Ende, hier zählt nur das Lebenszeichen. */
-.live-merkmale {
-  list-style: none;
-  margin: 12px 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* ── Karten, die sich scharfstellen (FEATURE-2026-08-29-01) ──
+
+   Alle Karten stehen von Beginn an da; die noch leeren sind unscharf, als
+   waere das Bild noch nicht fokussiert. Sobald die KI ein Merkmal geschrieben
+   hat, stellt sich genau diese Karte scharf.
+
+   Warum so: Erscheinen die Karten einzeln aus dem Nichts, wirkt jede Pause wie
+   das Ende — man weiss nie, ob noch etwas kommt. Mit dem vollstaendigen
+   Geruest sieht man von Anfang an, wie viel die KI noch herausfinden wird.
+   Das passt zur Scan-Sprache der Seite und traegt die Botschaft, statt nur ein
+   Ladezustand zu sein. */
+.cat-card--unscharf .cat-value,
+.cat-card--unscharf .cat-label {
+  filter: blur(4px);
+  opacity: 0.45;
+  user-select: none;
 }
 
-.live-merkmal {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  font-size: 0.82rem;
-  line-height: 1.45;
-  animation: merkmalRein 0.28s ease-out;
+/* Die Sicherheits-Punkte laufen, solange die Karte noch unscharf ist — ein
+   Lebenszeichen genau dort, wo spaeter die Sicherheit steht. Sie zeigen dann
+   keinen Wert an, sondern dass die KI noch arbeitet. */
+.cat-card--unscharf .cat-conf {
+  opacity: 0.55;
 }
 
-.live-merkmal-name {
-  flex: 0 0 auto;
-  min-width: 8.5em;
-  color: var(--muted);
-  font-weight: 600;
+.cat-card--unscharf .conf-dot {
+  animation: punktLauf 1.2s ease-in-out infinite;
+  background: currentColor;
+  opacity: 0.25;
 }
 
-.live-merkmal-wert {
-  flex: 1;
-  min-width: 0;
+.cat-card--unscharf .conf-dot:nth-child(2) {
+  animation-delay: 0.2s;
 }
 
-@keyframes merkmalRein {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
+.cat-card--unscharf .conf-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes punktLauf {
+  0%,
+  70%,
+  100% {
+    opacity: 0.25;
   }
-  to {
+  35% {
     opacity: 1;
-    transform: none;
   }
 }
 
-/* Bei reduzierter Bewegung erscheint die Zeile ohne Anflug — sichtbar bleibt
-   sie trotzdem, das Lebenszeichen ist der Zweck. */
+/* Ohne Bewegung stehen die Punkte still — ein Dauerlauf waere hier genau die
+   Reizquelle, die reduzierte Bewegung vermeiden soll. */
 @media (prefers-reduced-motion: reduce) {
-  .live-merkmal {
+  .cat-card--unscharf .conf-dot {
     animation: none;
   }
 }
 
-@media (max-width: 480px) {
-  .live-merkmal {
-    flex-direction: column;
-    gap: 1px;
+.cat-card--unscharf {
+  border-color: var(--linie, rgba(0, 0, 0, 0.08));
+}
+
+/* Der Moment des Scharfstellens — einmal je Karte. */
+.cat-card--scharfstellen .cat-value,
+.cat-card--scharfstellen .cat-label {
+  animation: scharfstellen 0.5s ease-out;
+}
+
+@keyframes scharfstellen {
+  from {
+    filter: blur(4px);
+    opacity: 0.45;
   }
-  .live-merkmal-name {
-    min-width: 0;
+  to {
+    filter: blur(0);
+    opacity: 1;
+  }
+}
+
+/* Ohne Bewegung: kein Weichzeichner-Uebergang, aber die Unterscheidung
+   zwischen leer und gefuellt bleibt — sonst waere der Fortschritt unsichtbar. */
+@media (prefers-reduced-motion: reduce) {
+  .cat-card--scharfstellen .cat-value,
+  .cat-card--scharfstellen .cat-label {
+    animation: none;
+  }
+  .cat-card--unscharf .cat-value,
+  .cat-card--unscharf .cat-label {
+    filter: none;
+    opacity: 0.35;
   }
 }
 

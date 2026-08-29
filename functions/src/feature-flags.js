@@ -57,15 +57,24 @@ async function getFeatureFlags() {
      Lauf dient ja gerade ihrem Test. Single-Large-Call bleibt im Lokal-Modus
      standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
      Kein Firestore-Read, kein Seeding nötig. */
-  if (isLocalQueueMode())
+  if (isLocalQueueMode()) {
+    /* Der Live-Weg (Single-Large + Live-Text) ist im Emulator standardmaessig
+       AUS, damit der gewoehnliche Durchklick die bewaehrte Pipeline trifft.
+       Seit 2026-08-29 laesst er sich per `QUEUE_LOCAL_LIVE=1` in
+       `functions/.env.local` einschalten — die Attrappe stellt seitdem auch
+       den Datenstrom nach. Ohne diesen Schalter waere die Live-Anzeige lokal
+       ueberhaupt nicht zu sehen, und jede Pruefung an ihr braeuchte echte
+       Mistral-Aufrufe. */
+    const live = process.env.QUEUE_LOCAL_LIVE === "1";
     return {
-      useSingleLargeCall: false,
+      useSingleLargeCall: live,
       usePromptCache: false,
       useBeastAdsCall: true,
-      useLiveText: false,
+      useLiveText: live,
       useSprachumschalter: false,
       useGemesseneDauer: false,
     };
+  }
 
   const now = Date.now();
   if (cache.data && now < cache.expiresAt) return cache.data;

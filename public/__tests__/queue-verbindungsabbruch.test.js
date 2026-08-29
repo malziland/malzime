@@ -39,6 +39,11 @@ vi.mock("../js/geocoding.js", () => ({
 
 vi.mock("../js/render.js", () => ({
   renderCurrentMode: vi.fn(),
+  /* FEATURE-2026-08-29-01: Karten waehrend der Analyse. */
+  zeigeLiveKarten: vi.fn(),
+  liveKartenZuruecksetzen: vi.fn(),
+  liveKartenModusWechsel: vi.fn(),
+  zeigeVersteckteDatenUndKarte: vi.fn(),
 }));
 
 vi.mock("../js/live-anzeige.js", () => ({

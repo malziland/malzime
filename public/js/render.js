@@ -296,6 +296,12 @@ export function zeigeLiveKarten(liveKarten) {
     renderCategories({ categories });
     for (const karte of elements.facts.querySelectorAll(".cat-card")) {
       karte.classList.add("cat-card--unscharf");
+      /* Fuer Screenreader existiert eine leere Karte nicht: Dreizehnmal "Wird
+         ausgewertet" waere Laerm, und die Konfidenz-Punkte kuendigen eine
+         Sicherheit an, die es noch gar nicht gibt. Sie werden hoerbar, sobald
+         sie Inhalt haben. Die Ankuendigung des fertigen Profils laeuft
+         unveraendert ueber #srAnnounce am Ende. */
+      karte.setAttribute("aria-hidden", "true");
     }
     geruestSteht = true;
   }
@@ -317,6 +323,7 @@ export function zeigeLiveKarten(liveKarten) {
       if (wert) wert.innerHTML = highlightKeyTerms(escapeHtml(inhalt.value || ""));
       karte.classList.remove("cat-card--unscharf");
       karte.classList.add("cat-card--scharfstellen");
+      karte.removeAttribute("aria-hidden");
     };
     if (i === 0) setzen();
     else setTimeout(setzen, i * SCHARFSTELL_TAKT_MS);
@@ -353,6 +360,7 @@ export function liveKartenModusWechsel() {
     if (wert) wert.textContent = PLATZHALTER_TEXT;
     karte.classList.remove("cat-card--scharfstellen");
     karte.classList.add("cat-card--unscharf");
+    karte.setAttribute("aria-hidden", "true");
   }
 }
 

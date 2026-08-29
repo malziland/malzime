@@ -4,7 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [4.2.3] — 2026-08-30
+
+### Behoben
+
+- **Am iPhone wird das Scan-Auge nicht mehr von der Adressleiste verdeckt.**
+  Die Seite prüfte, ob das Auge im Fenster liegt — und rechnete dabei mit einer
+  Fensterhöhe, die auf dem iPhone die eingeblendete Adress- und Werkzeugleiste
+  mitzählt. Für die Rechnung lag das Auge damit im Bild, für den Betrachter
+  hinter der Leiste; nachgeholt wurde es deshalb nie. Auf dem Desktop
+  funktionierte dasselbe einwandfrei, weil dort keine Leisten ein- und
+  ausfahren. Gemessen wird jetzt die tatsächlich sichtbare Fläche, die sich
+  mitverändert, wenn die Leisten erscheinen oder verschwinden.
+
 
 ### Behoben
 
@@ -42,7 +54,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   untersuchbar; man konnte den Lauf nur wiederholen. Jetzt liegen Screenshot,
   Aufzeichnung und Fehlerkontext bei. Im grünen Fall entsteht nichts.
 
-## [4.2.1] — 2026-08-29
+## [4.2.2] — 2026-08-30
 
 ### Behoben
 

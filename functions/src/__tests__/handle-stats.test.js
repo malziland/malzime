@@ -57,6 +57,11 @@ describe("handleStats", () => {
       maintenance: false,
       useQueue: true,
       realitaetsCheck: undefined,
+      /* Betriebswerte (29.08.2026): Ohne Firestore-Profil steht hier die
+         Herkunft "code" und kein Profilname — genau der heutige Zustand.
+         Die Zeitgrenze geht mit, damit der Browser weiss, wie lange er
+         mindestens durchhalten muss. */
+      betrieb: { profil: null, quelle: "code", analyseZeitgrenzeMs: 300000 },
       /* v3.3: Merkmals-Schloss des Sprachumschalters. Ohne gesetztes Flag
          steht es auf false — das Frontend baut den Schalter dann nicht. */
       sprachumschalter: false,

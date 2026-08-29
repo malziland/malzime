@@ -25,6 +25,8 @@ const {
   MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
   MISTRAL_SINGLE_LARGE_MAX_TOKENS,
 } = require("./config");
+/* Betriebsprofil: liefert die geltenden Werte (Firestore-Profil oder Code). */
+const { geltendeWerte } = require("./betriebsprofil");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 const { withMistralSlot } = require("./throttle");
@@ -1508,16 +1510,27 @@ function hatProfilText(block) {
 async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText) {
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
+    /* Betriebsprofil (30.08.2026): Zeitgrenze und Textmenge kommen aus dem
+       aktiven Profil, wenn eines hinterlegt und gueltig ist — sonst aus dem
+       Code. `geltendeWerte()` liefert IMMER einen brauchbaren Satz: Fehlt das
+       Dokument, ist es unlesbar oder besteht das Profil die Kopplungspruefung
+       nicht, sind es die Code-Werte. Der schlechteste Fall ist damit der
+       Zustand von vorher, nie ein schlechterer.
+
+       Die beiden Werte gehoeren zusammen und werden deshalb GEMEINSAM
+       gelesen — genau daran waere ein einzelner Firestore-Schalter
+       gescheitert (BUG-2026-08-17-01). */
+    const { werte: betriebswerte } = await geltendeWerte();
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — multimodal, 2M TPM */,
       messages,
-      maxTokens: MISTRAL_SINGLE_LARGE_MAX_TOKENS,
+      maxTokens: betriebswerte.singleLargeMaxTokens,
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
       forceJSON: true,
       timeoutMs: budget,
       /* BUG-2026-08-17-01: eigenes Zeitbudget statt der allgemeinen 90 s —
          siehe Herleitung an der Konstante in config.js. */
-      timeoutCapMs: MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
+      timeoutCapMs: betriebswerte.singleLargeTimeoutMs,
       cacheKey,
       /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
          Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */

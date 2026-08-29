@@ -13,6 +13,7 @@ const { handleJobStatus } = require("./handle-job-status");
 const { reapJobs } = require("./handle-reap");
 const { pruefeZusagen } = require("./handle-erinnerung");
 const { pruefeLaufzeit } = require("./laufzeit-wache");
+const { pruefeKapazitaet } = require("./kapazitaets-wache");
 const { sendeNtfy } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 
@@ -187,5 +188,26 @@ exports.laufzeitWache = onSchedule(
        unterscheiden, ob die Wache "in Ordnung" meldet oder gar nicht lief
        (KERN 4: ein stiller Ausfall darf nie wie ein Bestehen aussehen). */
     console.log(JSON.stringify({ step: "laufzeit-wache", ...ergebnis }));
+
+    /* Zweite Pruefung im selben taeglichen Lauf: Stimmen Code und echte
+       Warteschlange noch ueberein?
+
+       BEWUSST KEINE EIGENE FUNCTION. Am 29.08. hat der Infrastruktur-Waechter
+       eine Auslieferung gestoppt, weil die neu angelegte `laufzeitWache` nicht
+       im Filter der Fehler-Alarmierung stand — jede neue Function zieht diese
+       Nacharbeit nach sich. Zwei fachlich verwandte Tagespruefungen in einer
+       Function ersparen sie, und der Zeitpunkt ist ohnehin derselbe.
+
+       Ein Fehler hier darf die Laufzeit-Pruefung nicht nachtraeglich
+       entwerten — sie ist oben bereits gelaufen und protokolliert. */
+    try {
+      const kapazitaet = await pruefeKapazitaet();
+      if (kapazitaet.auffaellig && kapazitaet.meldung) {
+        await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text: kapazitaet.meldung });
+      }
+      console.log(JSON.stringify({ step: "kapazitaets-wache", ...kapazitaet }));
+    } catch (fehler) {
+      console.error(JSON.stringify({ step: "kapazitaets-wache", status: "fehler", grund: String(fehler.message) }));
+    }
   }
 );

@@ -6,6 +6,43 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Betriebswerte lassen sich als benannte Sätze umstellen, ohne Auslieferung.**
+  Zeitgrenzen und Kapazität standen bisher fest im Code. Eine Änderung — etwa
+  beim Wechsel auf einen größeren Tarif oder wenn der KI-Anbieter langsamer
+  wird — bedeutete mehrere Stellen von Hand und eine vollständige Auslieferung.
+  Am 28. August kostete das Hochsetzen einer einzigen Zahl fünfundzwanzig
+  Minuten, mitten im Vorfall.
+
+  Jetzt liegt in der Datenbank ein Dokument mit vollständigen Sätzen. Umgestellt
+  wird ein einziges Feld; alle zugehörigen Werte ziehen mit, ohne Deploy.
+
+  **Bewusst keine einzelnen Schalter.** Genau daran war der frühere Vorschlag
+  gescheitert: Er hätte die Kopplung zwischen Zeitgrenze und erlaubter
+  Textmenge aufgehoben — die Sicherung, die im August einen Ausfall verhindert
+  hat. Diese Rechnung läuft jetzt beim Laden. Ein Satz, der sie nicht besteht,
+  wird abgelehnt; es gelten die bisherigen Werte weiter. Damit ist die
+  Umstellung sicherer als vorher: Statt beim Start abzustürzen, verwirft das
+  System den falschen Wert und arbeitet mit den bewährten weiter.
+
+  Nicht umstellbar bleiben Upload-Grenze, Feldlängen der Fehlererfassung sowie
+  Modell und Serverstandort — das sind Sicherheits- und Datenschutzzusagen.
+  Einzelheiten in `docs/BETRIEBSPROFILE.md`.
+
+- **Eine tägliche Prüfung meldet, wenn Code und Warteschlange auseinanderlaufen.**
+  Die Zahl, wie viele Analysen gleichzeitig laufen dürfen, existiert an zwei
+  Stellen: im Code und in der Warteschlange bei Google. Der Code rechnet damit
+  die Wartezeit aus, Google entscheidet, was tatsächlich passiert. Standen die
+  beiden auseinander, rechnete die Seite still falsch — entweder wurden mehr
+  Leute eingelassen als bedient werden konnten, oder Kapazität blieb ungenutzt.
+
+  Die Prüfung meldet Abweichungen mit beiden Zahlen und dem Weg zur Abhilfe.
+  Sie stellt bewusst nichts selbst um: Die Warteschlange ist ein fremdes
+  System, eine Änderung dort gehört durch die Prüfkette.
+
+## [Unveröffentlicht]
+
 ### Behoben
 
 - **Wer während der Wartezeit scrollt, bekommt den mitlaufenden Text trotzdem
@@ -41,6 +78,45 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Ablaufprotokoll. Ein Fehler, der sich nur dort zeigt, war damit nicht
   untersuchbar; man konnte den Lauf nur wiederholen. Jetzt liegen Screenshot,
   Aufzeichnung und Fehlerkontext bei. Im grünen Fall entsteht nichts.
+
+## [Unveröffentlicht]
+
+### Neu
+
+- **Betriebswerte lassen sich als benannte Sätze umstellen, ohne Auslieferung.**
+  Bisher standen Zeitgrenzen, Parallelität und Einlassgrenzen fest im Code. Eine
+  Änderung — etwa beim Wechsel auf einen größeren Mistral-Tarif — bedeutete
+  fünf Stellen von Hand, ein Skript für Googles Warteschlange und eine
+  vollständige Auslieferung, mit der Hoffnung, nichts vergessen zu haben.
+
+  Jetzt liegt in der Datenbank ein Dokument mit vollständigen Sätzen, etwa
+  `t1-normal` oder `t2-normal`. Umgestellt wird ein einziges Feld: der Name des
+  aktiven Satzes. Alle zugehörigen Werte ziehen mit.
+
+  **Bewusst keine einzelnen Schalter.** Genau daran war der frühere Vorschlag
+  gescheitert: Er hätte die Kopplung zwischen Zeitgrenze und erlaubter
+  Textmenge aufgehoben — die Sicherung, die im August einen Ausfall verhindert
+  hat. Diese Rechnung läuft jetzt beim Laden. Ein Satz, der sie nicht besteht,
+  wird abgelehnt; es gelten die bisherigen Werte weiter. Damit ist die
+  Umstellung sicherer als der alte Zustand: Statt beim Start abzustürzen,
+  verwirft das System den falschen Wert und arbeitet mit den bewährten weiter.
+
+  Nicht umstellbar bleiben Upload-Grenze, Feldlängen der Fehlererfassung sowie
+  Modell und Serverstandort. Das sind Sicherheits- und Datenschutzzusagen —
+  zur Laufzeit umschaltbar wären sie Wege, eine Zusage unbemerkt zu brechen.
+
+- **Eine tägliche Prüfung meldet, wenn Code und Warteschlange auseinanderlaufen.**
+  Die Zahl, wie viele Analysen gleichzeitig laufen dürfen, existiert an zwei
+  Stellen: im Code und in Googles Warteschlange. Der Code rechnet damit die
+  Wartezeit aus, Google entscheidet, was tatsächlich passiert. Standen die
+  beiden auseinander, rechnete die Seite still falsch — entweder wurden mehr
+  Leute eingelassen als bedient werden konnten, oder es blieb Kapazität
+  ungenutzt.
+
+  Die Prüfung liest den echten Wert und meldet Abweichungen mit beiden Zahlen
+  und dem Weg zur Abhilfe. Sie stellt bewusst nichts selbst um: Googles
+  Warteschlange ist ein fremdes System, eine Änderung dort gehört durch die
+  Prüfkette, nicht in eine nächtliche Automatik.
 
 ## [4.2.1] — 2026-08-29
 

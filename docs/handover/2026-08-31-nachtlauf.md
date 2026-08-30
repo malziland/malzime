@@ -103,6 +103,33 @@ schauen, ob der Fokus zurückspringt.
 
 ---
 
+## Die sechs Prüfrunden
+
+Wie besprochen, jede mit einer anderen Frage — und danach von vorn.
+
+| Runde | Frage | Ergebnis |
+|---|---|---|
+| 1 | Was ist objektiv falsch? | kein Befund. Die Schnittstelle von `mistral.js` ist bitgenau dieselbe (12 Exporte vorher wie nachher), die Reihenfolge im Deploy-Skript stimmt |
+| 2 | Tut es, was es behauptet? | belegt. Ein Messfehler lag bei **mir**: Ich prüfte den Wächter aus dem falschen Verzeichnis |
+| 3 | Merkt die Testkette den Rückbau? | **ECHTER BEFUND**, siehe unten |
+| 4 | Was passiert bei Andrang? | sieben Workshop-Lagen gegen den Emulator |
+| 5 | Bricht es eine Zusage? | kein Befund. Alle vier Datenschutz-Obergrenzen sind im Test, jede mit dem Wortlaut der Datenschutzerklärung daneben |
+| 6 | Fremder Blick | ein Prüfer ohne Vorwissen, mit dem Auftrag, Probleme zu finden statt die Arbeit zu bestätigen |
+
+### Der Befund aus Runde 3
+
+**`scripts/deploy.sh` war von KEINEM Test abgedeckt.** Trockenlauf,
+Aufräumfalle, Stand-Bindung, Notschalter-Bilanz und die neue Concurrency-Regel
+ließen sich alle entfernen, ohne dass irgendetwas rot wurde.
+
+Ausgerechnet dort stehen die Riegel, die ungeprüften Code von der Produktion
+fernhalten. Wären sie weg, fiele es erst auf, wenn es zu spät ist.
+
+**Behoben** mit `scripts/pruefe-deploy-riegel.py`: Er prüft acht Riegel samt
+Reihenfolge (der Trockenlauf MUSS vor dem Cache-Buster stehen, die Aufräumfalle
+danach), alle sieben Notschalter auf ihren Eintrag in der Schlussbilanz, und
+die Concurrency-Regel samt Ausnahme für `main`. Belegt mit vier Rückbauproben.
+
 ## Abnahme
 
 | Kriterium | Ergebnis |

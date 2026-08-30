@@ -75,7 +75,39 @@ if [ -z "$QUEUE_INFO" ]; then
   rot "Queue »${QUEUE}« in $REGION nicht gefunden (falsche Region oder gelöscht?)"
 else
   gruen "Queue »${QUEUE}« existiert in $REGION"
-  pruef "Concurrency (RUNBOOK: 7 seit v2.8)" "7" "$QUEUE_CONC"
+
+  # ── BEFUND 30.08.2026: Hier stand die feste Zahl 7 aus dem RUNBOOK ──
+  # Genau die Doppelquelle, die der Firestore-Umbau abschaffen sollte: Der
+  # Sollwert stand im Handbuch, der Istwert in der Queue, und der laufende
+  # Betrieb richtete sich nach einem dritten Ort (dem Einstellungssatz). Als
+  # die Parallelität am 30.08. von 7 auf 4 gesenkt wurde, meldete der Wächter
+  # eine Abweichung — und hatte formal recht, obwohl nichts falsch war.
+  #
+  # Der Sollwert kommt jetzt aus dem Einstellungssatz, also von dort, wo er
+  # ohnehin gilt. Damit prüft dieser Riegel, was er prüfen soll: Stimmen
+  # Einstellung und echte Warteschlange überein?
+  #
+  # FAIL-CLOSED: Ist der Satz nicht lesbar, gilt das als nicht bestanden.
+  # Ungeprüft ist kein Freibrief (KERN 4).
+  SOLL_CONC=$(cd "$(dirname "$0")/../functions" && node -e '
+    const { Firestore } = require("@google-cloud/firestore");
+    new Firestore({ projectId: "malzime", databaseId: "malzime-eu" })
+      .doc("config/betriebsprofil").get()
+      .then((s) => {
+        const d = s.data();
+        const p = d && d.profile && d.profile[d.aktiv];
+        console.log(p && p.parallelitaet !== undefined ? p.parallelitaet : "");
+        process.exit(0);
+      })
+      .catch(() => { console.log(""); process.exit(0); });
+  ' 2>/dev/null)
+
+  if [ -z "$SOLL_CONC" ]; then
+    rot "Parallelität: Sollwert nicht aus dem Einstellungssatz lesbar — ungeprüft gilt als nicht bestanden"
+  else
+    pruef "Parallelität (Einstellungssatz)" "$SOLL_CONC" "$QUEUE_CONC"
+  fi
+
   pruef "Queue-Status" "RUNNING" "$QUEUE_STATE"
 fi
 

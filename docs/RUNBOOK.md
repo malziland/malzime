@@ -10,8 +10,11 @@ das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 ## Normalbetrieb (Soll-Zustand)
 
 - **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call
-  (`featureFlags/current`: `useSingleLargeCall = true`),
-  Cloud-Tasks-Concurrency **7** (seit v2.8 — zwei Mistral-Aufrufe je Analyse).
+  (`featureFlags/current`: `useSingleLargeCall = true`).
+- **Warteschlangen-Dosierung:** steht im Einstellungssatz
+  (`parallelitaet` und `queueRatePerSekunde`) und wird von der `satzWache`
+  automatisch in die Cloud-Tasks-Queue übertragen — hier bewusst ohne Zahl.
+  Nachsehen: `./scripts/warteschlange-pruefen.sh`.
 - **Limits:** Stundenlimit und IP-Rate-Limit stehen im Einstellungssatz
   (`config/betriebsprofil`, siehe [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md)) —
   hier bewusst ohne Zahl, damit sie nach einer Umstellung nicht falsch ist
@@ -69,7 +72,7 @@ gestartet werden.
 
 | Bereich | Soll |
 |---|---|
-| Cloud-Tasks-Queue `analyze-queue` | existiert in `europe-west1`, Concurrency 7, RUNNING |
+| Cloud-Tasks-Queue `analyze-queue` | existiert in `europe-west1`, RUNNING, Dosierung == Einstellungssatz |
 | Bucket `malzime-queue-uploads` | Region `EUROPE-WEST1`, Lifecycle-Löschregel nach 1 Tag aktiv, Soft-Delete 0 |
 | Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
 | Worker-IAM | `processjob` und `reapjobs` ohne `allUsers`/`allAuthenticatedUsers` (nicht öffentlich; die `/api/*`-Functions sind bewusst öffentlich, Hosting reicht durch) |
@@ -289,10 +292,19 @@ Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback):
 `parallelitaet` im Einstellungssatz auf 10 zurücksetzen (kein Deploy) — sonst läuft
 die Queue unnötig langsam.
 
-**Warum Concurrency 7:** `mistral-large-2512` erlaubt **15 Anfragen pro Minute**
-(am 2026-08-10 direkt an der API gemessen — die frühere Annahme von 6 Anfragen
-pro *Sekunde* ist überholt). Bei 65 s je Analyse (live gemessen 2026-08-10) erzeugt Concurrency 7 rund
-15 Anfragen/min, Concurrency 10 dagegen 22 und damit 429-Fehler.
+**Warum die Dosierung so steht, wie sie steht (Stand 30.08.2026):** Mistral
+begrenzt auf der Stufe T1 **0,25 Anfragen pro Sekunde**. Jede Analyse macht
+zwei Aufrufe (Analyse + Beast-Werbung), also darf die Queue höchstens **0,125
+Analysen pro Sekunde** losschicken — eine alle acht Sekunden. Bei rund 40 s je
+Analyse (gemessen 30.08.2026) passt dazu eine Parallelität von **4**.
+
+Die frühere Rechnung ging von 15 Anfragen pro Minute und 65 s je Analyse aus
+und kam auf Concurrency 7. Beide Zahlen waren überholt; wir fuhren damit über
+dem Limit, was im Alltag nicht auffiel und bei Andrang 429-Fehler erzeugte.
+
+**Beide Werte stehen im Einstellungssatz und werden automatisch übertragen.**
+Wer sie ändert, ändert die laufende Queue — kein Deploy, kein gcloud-Befehl.
+Vorher ins Mistral-Dashboard sehen, nicht nach Gefühl entscheiden.
 
 ### 3b. Prompt-Caching aus (~30 s, kein Deploy, keine Begleitschritte)
 

@@ -6,6 +6,28 @@ name: CI
 permissions:
   contents: read
 
+# ── Nur der neueste Lauf je Zweig zaehlt ──
+#
+# BEFUND 31.08.2026: In der Nacht wurde zehnmal in einer halben Stunde auf
+# denselben Zweig gepusht. Jeder Push startete einen vollstaendigen Prueflauf,
+# und keiner brach den vorigen ab — bis zu fuenf E2E-Laeufe liefen gleichzeitig,
+# jeder rund neun Minuten mit vier Browsern.
+#
+# Drei Folgen, alle unerwuenscht:
+#   · Fehlschlagsmeldungen fuer Staende, die laengst ueberholt sind
+#   · Zeitprobleme in den Browser-Tests durch Konkurrenz um dieselbe Maschine
+#     (genau die Klasse Fehler, die keyboard.test.js flackern liess)
+#   · Rechenzeit fuer Ergebnisse, die niemand mehr braucht
+#
+# Ein Ergebnis zu einem ueberholten Stand ist wertlos. Also wird er abgebrochen.
+#
+# AUSNAHME `main`: Dort wird NICHT abgebrochen. Die Stand-Bindung im Deploy
+# verlangt gruene Pflicht-Checks fuer genau diesen Commit — ein abgebrochener
+# Lauf wuerde eine spaetere Auslieferung dieses Standes blockieren.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 on:
   push:
     branches: [main]

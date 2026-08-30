@@ -4,11 +4,17 @@
  * cloud-tasks.js — dünner Wrapper um Google Cloud Tasks.
  *
  * Reiht Analyse-Jobs in die Queue `analyze-queue` ein. Cloud Tasks dispatcht
- * sie anschließend dosiert an die `processJob`-Function. Die Dosier-Parameter
- * (`maxConcurrentDispatches`, `maxDispatchesPerSecond`) stehen in der
- * Queue-Definition selbst — sie werden bei der Queue-Erstellung gesetzt,
- * NICHT hier im Code. Genau diese Drossel verhindert die 429er strukturell:
- * Mistral sieht nie mehr als N parallele Calls.
+ * sie anschließend dosiert an die `processJob`-Function. Genau diese Drossel
+ * verhindert die 429er strukturell: Mistral sieht nie mehr als N parallele
+ * Calls, und sie wirkt GLOBAL — anders als `throttle.js`, das nur im
+ * Arbeitsspeicher einer einzelnen Instanz zählt.
+ *
+ * SEIT 30.08.2026 kommen die Dosier-Parameter aus dem Einstellungssatz:
+ * `parallelitaet` -> maxConcurrentDispatches, `queueRatePerSekunde` ->
+ * maxDispatchesPerSecond. `warteschlangeNachziehen()` überträgt sie; die
+ * `satzWache` ruft das bei jeder Änderung auf. Vorher standen sie nur in der
+ * Queue-Definition und waren ausschließlich per gcloud-Befehl änderbar —
+ * also nicht im laufenden Betrieb.
  *
  * Authentifizierung: Jeder Task trägt ein OIDC-Token eines Service-Accounts.
  * `processJob` akzeptiert nur Aufrufe mit gültigem Token — damit ist der
@@ -129,6 +135,62 @@ function redispatchJobLocal(jobId) {
   setTimeout(() => dispatchLocal(jobId), LOCAL_REDISPATCH_MS);
 }
 
+/**
+ * Überträgt die Dosierung aus dem Einstellungssatz in die echte Queue.
+ *
+ * Wird von der `satzWache` bei jeder Änderung an `config/betriebsprofil`
+ * aufgerufen. Damit ist der Firestore-Wert die einzige Quelle: Wer ihn ändert,
+ * ändert die laufende Drossel — ohne Deploy, ohne gcloud, ohne mich.
+ *
+ * Rückgabe beschreibt, was passiert ist; die Wache meldet es weiter.
+ * Wirft nie — ein Fehler hier darf den Einstellungssatz nicht blockieren.
+ */
+async function warteschlangeNachziehen({ parallelitaet, queueRatePerSekunde }) {
+  try {
+    const projekt = projectId();
+    if (!projekt) return { ok: false, grund: "kein Projekt bekannt" };
+
+    const c = getClient();
+    const name = c.queuePath(projekt, QUEUE_REGION, QUEUE_NAME);
+
+    /* Erst lesen: Steht der Wert schon richtig, wird nicht geschrieben. Das
+       spart Schreibvorgaenge und macht die Meldung ehrlich ("unveraendert"). */
+    const [vorher] = await c.getQueue({ name });
+    const istRate = Number(vorher.rateLimits?.maxDispatchesPerSecond);
+    const istParallel = Number(vorher.rateLimits?.maxConcurrentDispatches);
+
+    if (istRate === queueRatePerSekunde && istParallel === parallelitaet) {
+      return { ok: true, geaendert: false, rate: istRate, parallel: istParallel };
+    }
+
+    const [nachher] = await c.updateQueue({
+      queue: {
+        name,
+        rateLimits: {
+          maxDispatchesPerSecond: queueRatePerSekunde,
+          maxConcurrentDispatches: parallelitaet,
+        },
+      },
+      updateMask: {
+        paths: ["rate_limits.max_dispatches_per_second", "rate_limits.max_concurrent_dispatches"],
+      },
+    });
+
+    /* NACHMESSEN statt annehmen: Google meldet den tatsaechlich gesetzten
+       Stand zurueck. Weicht er ab, steht das in der Meldung. */
+    return {
+      ok: true,
+      geaendert: true,
+      vorherRate: istRate,
+      vorherParallel: istParallel,
+      rate: Number(nachher.rateLimits?.maxDispatchesPerSecond),
+      parallel: Number(nachher.rateLimits?.maxConcurrentDispatches),
+    };
+  } catch (err) {
+    return { ok: false, grund: err?.message || String(err) };
+  }
+}
+
 /* Nur für Tests — ersetzt den CloudTasksClient durch eine Attrappe. */
 function setClientForTest(impl) {
   clientOverride = impl;
@@ -140,4 +202,5 @@ module.exports = {
   processJobUrl,
   invokerServiceAccount,
   setClientForTest,
+  warteschlangeNachziehen,
 };

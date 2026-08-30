@@ -263,6 +263,38 @@ describe("Gruppe 2 — Andrang und Einlass", () => {
     expect(bei14).toBe(600); /* ceil(140/14)=10 × 60 s */
   });
 
+  test("queueRatePerSekunde wirkt: die Queue bekommt genau diesen Wert", async () => {
+    /* Dieser Wert wirkt anders als alle anderen: Er wird nicht gelesen,
+       sondern in ein fremdes System GESCHRIEBEN. Geprüft wird deshalb, was
+       bei Google ankommt — nicht, was im Satz steht. */
+    const { setClientForTest, warteschlangeNachziehen } = require("../cloud-tasks");
+    const altesProjekt = process.env.GCLOUD_PROJECT;
+    process.env.GCLOUD_PROJECT = "malzime-test";
+
+    let gesetzt = null;
+    setClientForTest({
+      queuePath: (p, r, q) => `${p}/${r}/${q}`,
+      getQueue: async () => [{ rateLimits: { maxDispatchesPerSecond: 99, maxConcurrentDispatches: 99 } }],
+      updateQueue: async (req) => {
+        gesetzt = req.queue.rateLimits;
+        return [{ rateLimits: req.queue.rateLimits }];
+      },
+    });
+
+    await warteschlangeNachziehen({ parallelitaet: 4, queueRatePerSekunde: 0.125 });
+    expect(gesetzt.maxDispatchesPerSecond).toBe(0.125);
+
+    /* Anderer Wert, anderes Ergebnis — sonst wäre die Prüfung blind gegen
+       eine fest verdrahtete Zahl. */
+    await warteschlangeNachziehen({ parallelitaet: 9, queueRatePerSekunde: 0.5 });
+    expect(gesetzt.maxDispatchesPerSecond).toBe(0.5);
+    expect(gesetzt.maxConcurrentDispatches).toBe(9);
+
+    setClientForTest(null);
+    if (altesProjekt === undefined) delete process.env.GCLOUD_PROJECT;
+    else process.env.GCLOUD_PROJECT = altesProjekt;
+  });
+
   test("warteschlangeTiefe wirkt: die Einlassgrenze folgt dem Satz", async () => {
     async function grenze(tiefe) {
       const m = modulMitSatz("../handle-enqueue", mit("warteschlangeTiefe", tiefe), {

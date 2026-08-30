@@ -62,9 +62,10 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `parallelitaet` | 7 | Wie viele Analysen gleichzeitig laufen |
+| `parallelitaet` | 4 | Wie viele Analysen gleichzeitig laufen |
+| `queueRatePerSekunde` | 0.125 | Wie schnell die Warteschlange Aufträge losschickt |
 | `warteschlangeTiefe` | 155 | Ab wie vielen Wartenden abgelehnt wird |
-| `durchschnittsdauerSekunden` | 65 | Ausgangswert der Wartezeit-Ansage |
+| `durchschnittsdauerSekunden` | 40 | Ausgangswert der Wartezeit-Ansage |
 | `stundenlimit` | 500 | Analysen pro Zeitfenster |
 | `stundenfensterMinuten` | 60 | Größe dieses Fensters |
 | `adressLimit` | 500 | Anfragen je Internetanschluss |
@@ -81,10 +82,10 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `drosselMaxParallel` | 6 | Gleichzeitige Aufrufe an Mistral |
+| `drosselMaxParallel` | 4 | Gleichzeitige Aufrufe an Mistral |
 | `drosselWartelimitMs` | 360000 | Wie lange ein Aufruf auf seinen Platz wartet |
-| `tokenAbstandGrossMs` | 800 | Mindestabstand zwischen großen Aufrufen |
-| `tokenAbstandKleinMs` | 2500 | Mindestabstand zwischen kleinen Aufrufen |
+| `tokenAbstandGrossMs` | 4000 | Mindestabstand zwischen großen Aufrufen |
+| `tokenAbstandKleinMs` | 4000 | Mindestabstand zwischen kleinen Aufrufen |
 
 ### 5 · Fristen und Aufräumen
 

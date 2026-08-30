@@ -136,6 +136,22 @@ const FELDER = {
 
   /* --- 2. Andrang: wie viele wir gleichzeitig und pro Stunde einlassen --- */
   parallelitaet: { min: 1, max: 100 },
+  /* Die Rate, mit der die Warteschlange Auftraege LOSSCHICKT (Auftraege pro
+     Sekunde). Sie steht hier, weil sie die eigentliche Bremse gegen das
+     Mistral-Limit ist — und weil sie sonst nur per gcloud-Befehl aenderbar
+     waere, also nicht im laufenden Betrieb.
+
+     Der Wert wird von der `satzWache` in die echte Cloud-Tasks-Queue
+     uebertragen; er beschreibt also nicht bloss, er STELLT.
+
+     Rechnung: Mistral-Limit (Aufrufe/s) geteilt durch 2, weil jede Analyse
+     zwei Aufrufe macht (Analyse + Beast-Werbung). Bei Stufe T1 mit 0,25/s
+     ergibt das 0,125.
+
+     OBERGRENZE 5: Darueber liegt keine Mistral-Stufe, die wir haben koennten;
+     ein Tippfehler wuerde sonst Kosten und Fehler erzeugen, bevor jemand
+     hinsieht. */
+  queueRatePerSekunde: { min: 0.01, max: 5 },
   warteschlangeTiefe: { min: 1, max: 10000 },
   durchschnittsdauerSekunden: { min: 1, max: 3600 },
   stundenlimit: { min: 1, max: 100000 },

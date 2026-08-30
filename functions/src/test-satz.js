@@ -20,6 +20,11 @@ const SATZ = {
   requestBudgetMs: 480000,
   /* Andrang und Einlass */
   parallelitaet: 7,
+  /* Die Bremse, die in die echte Cloud-Tasks-Queue uebertragen wird. Im Test
+     bewusst ein anderer Wert als in der Produktion (0,125): Ein Test, der
+     zufaellig denselben Wert traegt, wuerde nicht auffallen, wenn der Code
+     statt des Satzwertes eine Konstante liest. */
+  queueRatePerSekunde: 0.5,
   warteschlangeTiefe: 155,
   durchschnittsdauerSekunden: 65,
   stundenlimit: 500,

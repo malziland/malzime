@@ -251,3 +251,93 @@ describe("Riegel 9: Die Wache holt die Grenze aus dem Satz, nicht aus dem Code",
     expect(weit.ergebnis.gemeldet).toBe(false);
   });
 });
+
+describe("Riegel 10: Der Store kann keine Zusage umlenken", () => {
+  /* DIE WICHTIGSTE SICHERHEITSAUSSAGE DES GANZEN UMBAUS.
+   *
+   * Der Einstellungssatz liegt in einer Datenbank und ist in Sekunden
+   * änderbar — ohne Commit, ohne Review, ohne Spur im offenen Quelltext. Das
+   * ist für Zeitgrenzen genau richtig und für Zusagen fatal:
+   *
+   * Stünde der KI-Endpunkt im Satz, könnte ein einziger Schreibzugriff die
+   * Bildanalyse auf einen Server außerhalb der EU umlenken — während die
+   * Website weiter dasselbe verspricht, der Quelltext auf GitHub unverändert
+   * bleibt und die Prüfsummen unter malzi.me/build-info.json weiter stimmen.
+   * Der Bruch wäre von außen nicht nachweisbar.
+   *
+   * Der Schutz besteht darin, dass `felderLesen` NUR die bekannten
+   * Zahlenfelder übernimmt. Er war bis zum 30.08.2026 nur durch Lesen des
+   * Codes belegt — hier wird er geprüft. */
+  /* requireActual: Weiter oben in dieser Datei steht ein jest.mock auf
+     ../betriebsprofil (fuer Riegel 5). Ohne requireActual bekaeme man hier
+     den Mock und pruefte nichts. */
+  const { _felderLesen, _pruefe, PFLICHTFELDER } = jest.requireActual("../betriebsprofil");
+
+  const ZUSAGEN_FELDER = [
+    ["mistralEndpoint", "https://api.us-east.example/v1/chat"],
+    ["MISTRAL_ENDPOINT", "https://api.us-east.example/v1/chat"],
+    ["firestoreDatabaseId", "malzime-usa"],
+    ["FIRESTORE_DATABASE_ID", "(default)"],
+    ["mistralDescribeModel", "irgendein-anderes-modell"],
+    ["maxUploadBytes", 500 * 1024 * 1024],
+    ["allowedMime", "text/html"],
+    ["MISTRAL_SLOWEST_TOKENS_PER_SECOND", 1],
+  ];
+
+  test.each(ZUSAGEN_FELDER)("»%s« im Dokument wird NICHT übernommen", (feld, wert) => {
+    const gelesen = _felderLesen({ ...SATZ, [feld]: wert });
+    expect(gelesen).not.toHaveProperty(feld);
+  });
+
+  test("ein Dokument voller Zusagen-Felder ergibt trotzdem nur die 26 bekannten", () => {
+    const angriff = { ...SATZ };
+    for (const [feld, wert] of ZUSAGEN_FELDER) angriff[feld] = wert;
+    const gelesen = _felderLesen(angriff);
+    expect(Object.keys(gelesen).sort()).toEqual([...PFLICHTFELDER].sort());
+    /* Und er gilt weiterhin — die Fremdfelder machen ihn nicht ungültig,
+       sie sind schlicht wirkungslos. */
+    expect(_pruefe(gelesen)).toBeNull();
+  });
+
+  test("die Liste der übernehmbaren Felder enthält nichts mit Zusagen-Bezug", () => {
+    /* Wächter gegen die Zukunft: Wer versehentlich `mistralEndpoint` in die
+       Feldliste aufnimmt, wird hier rot — nicht erst, wenn jemand den Store
+       ändert. */
+    const verdaechtig = PFLICHTFELDER.filter((f) =>
+      /endpoint|url|model|modell|database|datenbank|mime|host|region|key|secret/i.test(f)
+    );
+    expect(verdaechtig).toEqual([]);
+  });
+});
+
+describe("Riegel 11: Realistische Fehleingaben aus der Konsole", () => {
+  /* Wer den Satz von Hand in der Firebase-Konsole ändert, macht andere Fehler
+     als ein Zufallsgenerator: Er leert ein Feld, tippt eine Zahl als Text,
+     oder setzt ein Komma statt eines Punktes. Die Chaos-Suite prüft
+     Zufallswerte — hier stehen die Fehler, die ein Mensch wirklich macht. */
+  const { _felderLesen, _pruefe } = jest.requireActual("../betriebsprofil");
+
+  const ohne = (feld) => {
+    const k = { ...SATZ };
+    delete k[feld];
+    return k;
+  };
+
+  test.each([
+    ["Feld auf null geleert", { ...SATZ, singleLargeTimeoutMs: null }],
+    ["Zahl als Text getippt", { ...SATZ, singleLargeTimeoutMs: "300000" }],
+    ["Feld ganz entfernt", ohne("parallelitaet")],
+    ["Komma statt Punkt (wird NaN)", { ...SATZ, singleLargeTimeoutMs: NaN }],
+    ["negative Zahl", { ...SATZ, parallelitaet: -7 }],
+    ["Null als Parallelität", { ...SATZ, parallelitaet: 0 }],
+    ["Unendlich", { ...SATZ, requestBudgetMs: Infinity }],
+    ["leerer Satz", {}],
+    ["Feld als Objekt", { ...SATZ, stundenlimit: { wert: 500 } }],
+    ["Feld als Array", { ...SATZ, stundenlimit: [500] }],
+  ])("%s wird abgelehnt, mit Grund im Klartext", (_name, satz) => {
+    const grund = _pruefe(_felderLesen(satz));
+    expect(grund).toBeTruthy();
+    expect(typeof grund).toBe("string");
+    expect(grund.length).toBeGreaterThan(10);
+  });
+});

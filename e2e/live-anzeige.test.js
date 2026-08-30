@@ -274,9 +274,7 @@ test("v3.0.3 Blick-Führung am Handy: Auge nach der Foto-Wahl im Bild, die letzt
      ausklingen lassen, damit hier wirklich das Nachscrollen gemessen wird. */
   await page.waitForTimeout(1500);
   const startScroll = await page.evaluate(() => window.scrollY);
-  await expect
-    .poll(() => page.evaluate(() => window.scrollY), { timeout: 40000 })
-    .toBeGreaterThan(startScroll + 40);
+  await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 40000 }).toBeGreaterThan(startScroll + 40);
 
   /* Dabei bleibt der Cursor (die letzte getippte Zeile) im Bild. */
   await expect

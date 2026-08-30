@@ -64,6 +64,38 @@ const FEHLERBILDER = [
     antwort: { status: 500, body: {} },
     sichtbar: "#status",
   },
+  {
+    /* NEU 30.08.2026: Seit dem Firestore-Umbau kann eine Analyse daran
+       scheitern, dass der Einstellungssatz fehlt oder abgelehnt wurde. Der
+       Fall lief bis hierher durch KEINE Prüfung am Bildschirm — der Schlüssel
+       stand in beiden Sprachdateien, das Backend sendete ihn, und ob der Satz
+       je bei einem Menschen ankommt, hatte niemand gemessen.
+
+       Er läuft anders als die sechs darüber: nicht als HTTP-Fehler beim
+       Einlass, sondern als Ergebnis eines FERTIGEN Auftrags. Der Weg über den
+       Statusabruf ist deshalb eigens nachgebildet. */
+    name: "Einstellungssatz fehlt",
+    antwort: { status: 200, body: { jobId: "probe-config", resultToken: "tok-config" } },
+    /* Die Form ist NICHT geraten, sondern an handle-job-status.js und
+       render.js abgelesen: Der Statusabruf liefert { status, result }, und
+       `result` ist genau das Objekt, das renderCurrentMode() bekommt. Fehlt
+       darin `profiles`, zeigt render.js den uebersetzten `blockedReason` in
+       #simulation. Ein geratener Mock (result.mode statt result.meta.mode)
+       liess den Test zuerst rot laufen — er haette dann nie geprueft, was er
+       soll. */
+    jobStatus: {
+      status: "done",
+      result: {
+        meta: { mode: "blocked" },
+        blockedReason: "blocked.configMissing",
+        profiles: null,
+      },
+    },
+    sichtbar: "#simulation",
+    /* Der Text muss dem Teilnehmer sagen, dass es NICHT an ihm liegt —
+       in BEIDEN Sprachen. Getrennt geprueft, siehe unten. */
+    erwarteterText: { de: /liegt nicht an dir/i, en: /not your fault/i },
+  },
 ];
 
 /* Ein winziges, gültiges JPEG — der Upload-Weg soll echt durchlaufen werden,
@@ -75,7 +107,7 @@ const MINI_JPEG = Buffer.from(
   "base64"
 );
 
-async function seiteVorbereiten(page, antwort) {
+async function seiteVorbereiten(page, antwort, jobStatus) {
   await page.route("**/api/stats", (r) =>
     r.fulfill({
       status: 200,
@@ -96,6 +128,17 @@ async function seiteVorbereiten(page, antwort) {
   /* Fehlerberichte ins Leere laufen lassen: Sie gehören nicht zum Prüfgegenstand
      und würden den Lauf nur verlangsamen. */
   await page.route("**/api/errors**", (r) => r.fulfill({ status: 204, body: "" }));
+  /* Nur für Fehlerbilder, die über den Statusabruf kommen (siehe
+     "Einstellungssatz fehlt"). Ohne diese Route pollt der Client ins Leere,
+     der Test liefe in einen Zeitablauf und sagte nichts über den Text. */
+  if (jobStatus) {
+    await page.route("**/api/job-status**", (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jobStatus) })
+    );
+    await page.route("**/api/jobStatus**", (r) =>
+      r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jobStatus) })
+    );
+  }
 }
 
 async function kopfHoehe(page) {
@@ -124,11 +167,41 @@ async function fehlerAusloesen(page) {
   }
 }
 
+/* DIE SPRACHE WIRD AUSDRUECKLICH GESETZT (30.08.2026).
+   Vorher erbte die Suite die Sprache des Browsers. Gemessen wurde damit, was
+   die Umgebung zufaellig vorgab — lokal und im CI moeglicherweise
+   Verschiedenes. Der deutsche Fehlertext, den die Workshop-Teilnehmer sehen,
+   war dadurch von KEINEM E2E-Test je geprueft.
+
+   Die sechs Standard-Fehlerbilder laufen auf Deutsch (die Sprache der
+   Workshops). Der Fall mit ausformuliertem Erwartungstext laeuft zusaetzlich
+   auf Englisch — dort haengt die Aussage am Wortlaut, nicht nur am Kasten. */
+const SPRACHEN = ["de", "en"];
+
 for (const bild of FEHLERBILDER) {
-  test(`Fehlerbild „${bild.name}": erscheint, verschiebt den Kopf nicht, ist barrierefrei`, async ({ page }) => {
+  for (const sprache of SPRACHEN) {
+    if (sprache === "en" && !bild.erwarteterText) continue;
+    testFuerSprache(bild, sprache);
+  }
+}
+
+function testFuerSprache(bild, sprache) {
+  const zusatz = bild.erwarteterText ? ` [${sprache}]` : "";
+  test(`Fehlerbild „${bild.name}"${zusatz}: erscheint, verschiebt den Kopf nicht, ist barrierefrei`, async ({
+    page,
+  }) => {
     await page.setViewportSize(HANDY);
-    await seiteVorbereiten(page, bild.antwort);
-    await page.goto("/");
+    await page.addInitScript((s) => {
+      /* Die Anwendung liest die Sprache aus ?lang= oder dem Browser. Hier
+         wird sie fest vorgegeben, damit der Lauf nicht von der Umgebung
+         abhaengt. */
+      Object.defineProperty(navigator, "language", { get: () => (s === "de" ? "de-AT" : "en-US") });
+      Object.defineProperty(navigator, "languages", {
+        get: () => (s === "de" ? ["de-AT", "de"] : ["en-US", "en"]),
+      });
+    }, sprache);
+    await seiteVorbereiten(page, bild.antwort, bild.jobStatus);
+    await page.goto(`/?lang=${sprache}`);
     await page.waitForLoadState("networkidle");
 
     const kopfVorher = await kopfHoehe(page);
@@ -141,6 +214,20 @@ for (const bild of FEHLERBILDER) {
     await expect(ziel, `„${bild.name}" muss sichtbar werden — sonst prüft der Rest nichts`).toBeVisible({
       timeout: 15000,
     });
+
+    /* ── 1b. Der Text sagt das Richtige ── */
+    if (bild.erwarteterText) {
+      const muster = bild.erwarteterText[sprache] || bild.erwarteterText;
+      /* Ein sichtbarer Kasten allein genuegt nicht: Beim Fehlerbild
+         "Einstellungssatz fehlt" kommt es genau darauf an, dass der
+         Teilnehmer liest, dass es NICHT an ihm liegt. Ein leerer oder
+         generischer Kasten waere schlimmer als keiner. */
+      await expect(
+        ziel,
+        `„${bild.name}" zeigt einen Kasten, aber nicht den erwarteten Text. ` +
+          `Der Teilnehmer muss erfahren, woran es liegt.`
+      ).toHaveText(muster, { timeout: 15000 });
+    }
 
     /* ── 2. Der Seitenkopf springt nicht (BUG-2026-08-21-03) ── */
     const kopfNachher = await kopfHoehe(page);
@@ -159,7 +246,11 @@ for (const bild of FEHLERBILDER) {
         const innen = kind.getBoundingClientRect();
         if (innen.width === 0) continue;
         if (innen.right > aussen.right + 2 || innen.left < aussen.left - 2) {
-          return { text: (kind.textContent || "").trim().slice(0, 60), innen: Math.round(innen.right), aussen: Math.round(aussen.right) };
+          return {
+            text: (kind.textContent || "").trim().slice(0, 60),
+            innen: Math.round(innen.right),
+            aussen: Math.round(aussen.right),
+          };
         }
       }
       return null;

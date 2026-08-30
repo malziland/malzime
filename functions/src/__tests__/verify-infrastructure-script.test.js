@@ -33,6 +33,13 @@ const ERLAUBTE_LESE_MUSTER = [
      `scheduler jobs describe` lesen nur. */
   /gcloud firestore fields ttls list\b/,
   /gcloud scheduler jobs describe\b/,
+  /* SEC-2026-08-30-13: Waechter ueber die Firestore-Sicherheitsregeln. Der
+     gesamte Firestore-Umbau setzt voraus, dass niemand von aussen an
+     `config/betriebsprofil` kommt — diese Voraussetzung war ungeprueft.
+     `auth print-access-token` gibt nur ein Lese-Token aus und aendert nichts;
+     die Regeln selbst werden ueber die REST-Schnittstelle GELESEN (curl ohne
+     -X, also GET). */
+  /gcloud auth print-access-token\b/,
 ];
 
 function gcloudZeilen(inhalt) {

@@ -41,7 +41,6 @@ const ALLE_SEITEN = alleSeiten();
    /datenschutz.html. */
 const RECHTSSEITEN = ALLE_SEITEN.filter((p) => !/^\/(index|stats)\.html$/.test(p));
 
-
 /* Auf Animations-Ruhe warten — ABER nur auf Animationen, die ueberhaupt
    enden koennen.
 

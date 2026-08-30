@@ -309,10 +309,22 @@ async function geltendeWerte() {
 
 async function leseFrisch(jetzt) {
   let ergebnis = { werte: null, quelle: "fehlt", grund: null, profil: null };
+  /* Der Zeitlimit-Timer wird nach dem Wettlauf AUFGERAEUMT.
+     BEFUND (Pruefstand 30.08.2026): Ohne das lief nach jedem erfolgreichen
+     Lesevorgang noch zwei Sekunden ein Timer weiter und feuerte anschliessend
+     ins Leere. In der Function ist das ein kleines, aber stetiges Leck — bei
+     einem Workshop mit tausend Analysen entsprechend viele offene Timer, die
+     die Instanz am Herunterfahren hindern. Im Test brach es die Suite ab,
+     weil die Ablehnung nach dem Testende ankam. */
+  let zeitgeber = null;
   try {
     const snap = await Promise.race([
       datenbank().doc(DOKUMENT).get(),
-      new Promise((_, ab) => setTimeout(() => ab(new Error(`Zeitlimit ${LESE_ZEITLIMIT_MS} ms`)), LESE_ZEITLIMIT_MS)),
+      new Promise((_, ab) => {
+        zeitgeber = setTimeout(() => ab(new Error(`Zeitlimit ${LESE_ZEITLIMIT_MS} ms`)), LESE_ZEITLIMIT_MS);
+        /* unref: Ein wartender Timer darf den Prozess nicht am Ende hindern. */
+        if (typeof zeitgeber.unref === "function") zeitgeber.unref();
+      }),
     ]);
     if (snap.exists) {
       const daten = snap.data() || {};
@@ -336,6 +348,8 @@ async function leseFrisch(jetzt) {
     }
   } catch (fehler) {
     ergebnis.grund = `nicht lesbar: ${String(fehler.message)}`;
+  } finally {
+    if (zeitgeber) clearTimeout(zeitgeber);
   }
 
   /* PROTOKOLL — nur bei ZUSTANDSWECHSEL.

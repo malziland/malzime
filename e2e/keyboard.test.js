@@ -34,10 +34,7 @@ const MOCK_RESPONSE = {
 async function tabToElement(page, selector, maxTabs = 40) {
   for (let i = 0; i < maxTabs; i++) {
     await page.keyboard.press("Tab");
-    const focused = await page.evaluate(
-      (sel) => document.activeElement?.matches(sel) === true,
-      selector
-    );
+    const focused = await page.evaluate((sel) => document.activeElement?.matches(sel) === true, selector);
     if (focused) return true;
   }
   return false;

@@ -136,6 +136,36 @@ else
   ./scripts/verify-infrastructure.sh
 fi
 
+# ── Riegel: Liegt der Einstellungssatz? (seit v4.4, 30.08.2026) ──
+# Seit dem Firestore-Umbau kommen ALLE Betriebswerte aus config/betriebsprofil.
+# Fehlt das Dokument, laeuft die Seite, nimmt Fotos an — und JEDE Analyse
+# scheitert. Der Deploy und das Anlegen des Satzes sind zwei getrennte
+# Schritte; ohne diesen Riegel haenge die Reihenfolge an der Sorgfalt des
+# Menschen, der ihn ausfuehrt.
+#
+# Die Pruefung ist rein lesend und kostet nichts. Notschalter: SKIP_SATZ=1
+# (etwa fuer einen Rollback auf v4.2.3, die den Satz gar nicht braucht).
+if [ "${SKIP_SATZ:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_SATZ=1 gesetzt — Einstellungssatz wird NICHT geprueft."
+else
+  echo "— Einstellungssatz"
+  SATZ_ANTWORT=$(curl -s --max-time 20 "https://malzi.me/api/stats" 2>/dev/null || true)
+  SATZ_LIMIT=$(printf '%s' "$SATZ_ANTWORT" | grep -o '"limit":[0-9]*' | head -1 | grep -o '[0-9]*$' || true)
+  if [ -z "$SATZ_LIMIT" ] || [ "$SATZ_LIMIT" -lt 1 ] 2>/dev/null; then
+    echo "ABBRUCH: In der Produktion ist kein gueltiger Einstellungssatz erkennbar."
+    echo "         Ohne ihn scheitert nach dem Deploy JEDE Analyse."
+    echo
+    echo "         Zuerst:  node scripts/betriebsprofil-anlegen.js --ausfuehren"
+    echo "         Danach:  sh scripts/deploy.sh"
+    echo
+    echo "         (Beim allerersten Deploy von v4.4 ist das erwartet: Die alte"
+    echo "          Fassung liest den Satz nicht, meldet aber ihr eigenes Limit."
+    echo "          Notschalter SKIP_SATZ=1, wenn der Satz nachweislich liegt.)"
+    exit 1
+  fi
+  echo "  ok    Einstellungssatz erkennbar (Stundenlimit $SATZ_LIMIT)"
+fi
+
 # ── Deploy-Ziel bestimmen ──
 # KURZAUDIT-Befund OPS-2026-08-13-34: Das Ziel muss VOR dem Buster-Block
 # feststehen. Vorher lief der Buster bei jedem Aufruf — ein reiner

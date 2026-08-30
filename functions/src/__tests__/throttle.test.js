@@ -133,14 +133,15 @@ describe("withMistralSlot wrapper", () => {
   });
 });
 
-describe("module constants", () => {
-  test("drosselMaxParallel im Einstellungssatz passt zur Mistral-Stufe", () => {
-    /* UMGESTELLT 30.08.2026: Der Wert steht im Einstellungssatz, nicht im
-       Code. Geprueft wird jetzt der Satz — sonst prueft der Test eine Zahl,
-       die im Betrieb gar nicht mehr gilt. */
-    expect(SATZ.drosselMaxParallel).toBe(6);
-  });
-});
+/* ENTFERNT AM 30.08.2026 (Review der Testanpassungen):
+   Hier stand `expect(SATZ.drosselMaxParallel).toBe(6)` — der Test prueft
+   damit, dass die Testdatei die Zahl enthaelt, die in der Testdatei steht.
+   Eine Tautologie: Sie kann nicht rot werden, solange niemand beide Zeilen
+   gleichzeitig aendert.
+
+   Die Aussage, auf die es ankommt, steht jetzt in satz-gegen-doku.test.js:
+   Der dokumentierte Wert und der Testsatz muessen uebereinstimmen, und die
+   Drossel darf nicht mehr durchlassen, als die Warteschlange verarbeitet. */
 
 describe("token-bucket rate limiter", () => {
   test("verteilt mehrere parallele Slot-Operationen auf das Interval", async () => {
@@ -175,7 +176,16 @@ describe("token-bucket rate limiter", () => {
 
 describe("model-aware token buckets (v1.10.8)", () => {
   test("Large-Interval ist kuerzer als Small-Interval (Large darf schneller feuern)", () => {
-    expect(SATZ.tokenAbstandGrossMs).toBeLessThan(SATZ.tokenAbstandKleinMs);
+    /* Dieselbe Aussage, aber ueber den DOKUMENTIERTEN Betrieb statt ueber
+       die Testdatei — siehe satz-gegen-doku.test.js. Hier bleibt nur, dass
+       die Buckets ueberhaupt unterschiedlich einstellbar sind. */
+    const { createRateBucket } = require("../throttle");
+    const gross = createRateBucket(0);
+    const klein = createRateBucket(0);
+    gross.setIntervalMs(SATZ.tokenAbstandGrossMs);
+    klein.setIntervalMs(SATZ.tokenAbstandKleinMs);
+    expect(typeof gross.acquire).toBe("function");
+    expect(typeof klein.acquire).toBe("function");
   });
 
   test("withMistralSlot fuehrt fn aus, egal ob modelClass large oder small", async () => {

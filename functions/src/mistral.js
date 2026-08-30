@@ -1679,6 +1679,11 @@ module.exports = {
   /* Für Tests */
   setFetchForTest,
   _callMistralRaw: callMistralRaw,
+  /* Fuer die Rueckfall-Pruefung exportiert (30.08.2026): callMistralRaw setzt
+     die Zeitgrenze aus dem Einstellungssatz, bevor es hierher durchreicht —
+     ein Rueckfall auf eine feste Zahl WEITER INNEN waere von aussen deshalb
+     nicht sichtbar. Die Rueckbauprobe blieb genau daran gruen. */
+  _callMistralRawUnthrottled: callMistralRawUnthrottled,
   _buildBrandBlocklistBlock: buildBrandBlocklistBlock,
   _BRAND_BLOCKLIST_SETS: BRAND_BLOCKLIST_SETS,
   _extrahiereLiveText: extrahiereLiveText,

@@ -298,6 +298,13 @@ jobs:
       - run: python3 scripts/pruefe-mitzieher.py
       - run: python3 scripts/pruefe-kopplung.py
 
+      # 31.08.2026: Die Rueckbauprobe hat gezeigt, dass scripts/deploy.sh von
+      # KEINEM Test abgedeckt war — Trockenlauf, Aufraeumfalle, Stand-Bindung
+      # und Notschalter-Bilanz liessen sich entfernen, ohne dass etwas rot
+      # wurde. Ausgerechnet dort stehen die Riegel, die ungeprueften Code von
+      # der Produktion fernhalten.
+      - run: python3 scripts/pruefe-deploy-riegel.py
+
       # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
       # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine
       # Aenderung an 147 KB minifiziertem Einzeiler faellt in einem Pull-Request

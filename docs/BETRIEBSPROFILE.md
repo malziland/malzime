@@ -48,6 +48,22 @@ das System den falschen Wert und läuft mit den bewährten weiter.
 Satz nicht hinterlegt, Prüfung nicht bestanden, Datenbank nicht lesbar. Der
 schlechteste Fall ist damit der Zustand von vorher.
 
+## Wirksame Werte und Sollwerte — ein wichtiger Unterschied
+
+| Wert | Wirkung |
+|------|---------|
+| `singleLargeTimeoutMs`, `singleLargeMaxTokens`, `mistralTimeoutMs`, `requestBudgetMs` | **Wirken sofort** — gehen direkt in den Analyse-Aufruf |
+| `parallelitaet`, `stundenlimit`, `adressLimit` | **Sollwerte** — ändern von sich aus nichts |
+
+Die Parallelität wird von der Warteschlange bei Google bestimmt; Stunden- und
+Adress-Limit steuert der Boost-Mechanismus. Im Profil stehen sie als das, was
+gelten **soll** — die tägliche Prüfung vergleicht sie mit der Wirklichkeit und
+meldet Abweichungen.
+
+Das ist bewusst so: Ein Profil `t2-normal` muss ablesbar machen, dass dort
+vierzehn Analysen parallel laufen sollen. Wer den Wert ändert, ändert die
+Erwartung; die Prüfung sagt dann, ob die Anlage noch dazu passt.
+
 ## Was drin steht — und was nicht
 
 Im Profil: Zeitgrenzen und Textmenge der KI-Aufrufe, Parallelität,

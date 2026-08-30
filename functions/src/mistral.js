@@ -1508,6 +1508,10 @@ function hatProfilText(block) {
 }
 
 async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText) {
+  /* VOR dem try: Der Fehlerpfad protokolliert das Profil ebenfalls, und eine
+     im try angelegte Variable gibt es im catch nicht. Genau daran sind beim
+     ersten Anlauf zwei Pruefungen umgefallen. */
+  let aktivesProfil = null;
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
     /* Betriebsprofil (30.08.2026): Zeitgrenze und Textmenge kommen aus dem
@@ -1520,7 +1524,8 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        Die beiden Werte gehoeren zusammen und werden deshalb GEMEINSAM
        gelesen — genau daran waere ein einzelner Firestore-Schalter
        gescheitert (BUG-2026-08-17-01). */
-    const { werte: betriebswerte } = await geltendeWerte();
+    const { werte: betriebswerte, profil } = await geltendeWerte();
+    aktivesProfil = profil || null;
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — multimodal, 2M TPM */,
       messages,
@@ -1544,6 +1549,11 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     console.log(
       JSON.stringify({
         step: "mistral-single-large",
+        /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
+           Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
+           bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,
+           es galten die Code-Werte. */
+        profil: aktivesProfil || null,
         model: MISTRAL_DESCRIBE_MODEL,
         attempt: attemptLabel,
         status: parsed ? "ok" : "parse-failed",
@@ -1601,6 +1611,11 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
         severity: "ERROR",
         alert: "single-large-failed",
         step: "mistral-single-large",
+        /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
+           Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
+           bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,
+           es galten die Code-Werte. */
+        profil: aktivesProfil || null,
         attempt: attemptLabel,
         status: "error",
         error: err.message,

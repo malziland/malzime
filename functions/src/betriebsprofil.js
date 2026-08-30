@@ -59,19 +59,58 @@ const {
 } = require("./config");
 
 const DOKUMENT = "config/betriebsprofil";
+/* Zeitlimit fuer das Lesen. OHNE DAS waere die Rueckfallebene wertlos: Diese
+   Funktion sitzt im Analyse-Pfad, und ein haengender Firestore-Aufruf haette
+   den Start JEDER Analyse blockiert — statt still auf die Code-Werte
+   zurueckzufallen, waere die Anwendung stehengeblieben. Zwei Sekunden sind
+   grosszuegig fuer das Lesen EINES kleinen Dokuments und kurz genug, dass
+   niemand es merkt. */
+const LESE_ZEITLIMIT_MS = 2000;
 /* Wie die Feature-Flags: kurz genug, dass eine Umstellung in Sekunden wirkt,
    lang genug, dass nicht jeder Aufruf Firestore liest. */
 const CACHE_MS = 30 * 1000;
 /* Obergrenze, die Google der Function gibt. Kein Profil darf darueber. */
 const FUNCTION_LIMIT_MS = 540 * 1000;
 
+/* Plausibilitaetsgrenzen. GRUND (Review 30.08.2026): Ohne sie liess sich
+   `parallelitaet: 99999` setzen. Alle anderen Unsinnswerte fing die
+   Kopplungsrechnung ab, dieser nicht — er waere durchgegangen und haette die
+   Wartezeit-Ansage und die Einlassgrenze absurd gemacht: Es waeren weit mehr
+   Leute eingelassen worden, als je bedient werden koennen.
+
+   Die Obergrenzen sind bewusst weit ueber jedem realistischen Bedarf gewaehlt
+   (heute: 7 parallel, 500 pro Stunde). Sie sollen keinen sinnvollen Ausbau
+   verhindern, sondern nur Tippfehler und Unfug abfangen. */
+const GRENZEN = {
+  parallelitaet: { min: 1, max: 100 },
+  stundenlimit: { min: 1, max: 100000 },
+  adressLimit: { min: 1, max: 100000 },
+  singleLargeMaxTokens: { min: 100, max: 100000 },
+};
+
 /* Die Werte, die ein Profil tragen darf — und ihre Herkunft im Code, die als
    Rueckfallebene gilt. Was hier nicht steht, ist nicht umstellbar. */
 const ERLAUBT = {
+  /* WIRKSAM: gehen direkt in den Analyse-Aufruf. */
   mistralTimeoutMs: MISTRAL_TIMEOUT_MS,
   singleLargeTimeoutMs: MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
   singleLargeMaxTokens: MISTRAL_SINGLE_LARGE_MAX_TOKENS,
   requestBudgetMs: REQUEST_BUDGET_MS,
+
+  /* SOLLWERTE, KEINE SCHALTER (Befund aus dem zweiten Review, 30.08.2026):
+     Diese drei aendern von sich aus NICHTS. Sie stehen hier als das, was
+     gelten SOLL — die kapazitaets-wache vergleicht sie taeglich mit der
+     Wirklichkeit und meldet Abweichungen.
+
+     `parallelitaet` wird von der Cloud-Tasks-Warteschlange bei Google
+     bestimmt; ein fremdes System wird nicht aus Firestore umgestellt.
+     `stundenlimit` und `adressLimit` steuert weiterhin der Boost-Mechanismus
+     in counter.js.
+
+     WARUM SIE TROTZDEM HIER STEHEN: Ohne sie waere ein Profil unvollstaendig
+     — `t2-normal` waere nicht ablesbar als "vierzehn parallel", und der
+     Abgleich haette keinen Sollwert. Wer sie aendert, aendert damit die
+     ERWARTUNG; die Wache sagt dann, ob die Wirklichkeit noch dazu passt. */
   parallelitaet: QUEUE_DISPATCH_CONCURRENCY,
   stundenlimit: HOURLY_LIMIT,
   adressLimit: RATE_LIMIT,
@@ -94,6 +133,12 @@ function pruefe(werte) {
   for (const [name, wert] of Object.entries(werte)) {
     if (typeof wert !== "number" || !Number.isFinite(wert) || wert <= 0) {
       return `${name} ist keine positive Zahl (${JSON.stringify(wert)})`;
+    }
+  }
+  /* Plausibilitaetsgrenzen — fangen Tippfehler und Unfug ab. */
+  for (const [name, g] of Object.entries(GRENZEN)) {
+    if (werte[name] < g.min || werte[name] > g.max) {
+      return `${name} (${werte[name]}) liegt ausserhalb des plausiblen Bereichs ${g.min}–${g.max}`;
     }
   }
   /* Die Sicherung aus config.js: Die erlaubte Ausgabelaenge muss in die
@@ -149,7 +194,10 @@ async function geltendeWerte() {
 
   let ergebnis = { werte: codeWerte(), quelle: "code", grund: null, profil: null };
   try {
-    const snap = await datenbank().doc(DOKUMENT).get();
+    const snap = await Promise.race([
+      datenbank().doc(DOKUMENT).get(),
+      new Promise((_, ab) => setTimeout(() => ab(new Error(`Zeitlimit ${LESE_ZEITLIMIT_MS} ms`)), LESE_ZEITLIMIT_MS)),
+    ]);
     if (snap.exists) {
       const daten = snap.data() || {};
       const aktiv = typeof daten.aktiv === "string" ? daten.aktiv : null;

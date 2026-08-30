@@ -13,10 +13,14 @@
 
 const mockDoc = { daten: undefined, fehler: null };
 
+let leseZaehler = 0;
+
 jest.mock("../db", () => ({
   datenbank: () => ({
     doc: () => ({
       async get() {
+        leseZaehler += 1;
+        if (mockDoc.verzoegerung) await new Promise((f) => setTimeout(f, mockDoc.verzoegerung));
         if (mockDoc.fehler) throw new Error(mockDoc.fehler);
         return { exists: mockDoc.daten !== undefined, data: () => mockDoc.daten };
       },
@@ -26,9 +30,11 @@ jest.mock("../db", () => ({
 
 const { geltendeWerte, codeWerte, _pruefe, _cacheLeeren } = require("../betriebsprofil");
 
-function setze(daten, fehler = null) {
+function setze(daten, fehler = null, verzoegerung = 0) {
   mockDoc.daten = daten;
   mockDoc.fehler = fehler;
+  mockDoc.verzoegerung = verzoegerung;
+  leseZaehler = 0;
   _cacheLeeren();
 }
 
@@ -151,5 +157,64 @@ describe("Ein gueltiges Profil greift", () => {
     expect(e.werte.parallelitaet).toBe(5);
     expect(e.werte.uploadGrenze).toBeUndefined();
     expect(e.werte.modell).toBeUndefined();
+  });
+});
+
+describe("Review-Befunde vom 30.08.", () => {
+  test("BEFUND 1: eine haengende Datenbank blockiert die Analyse NICHT", async () => {
+    /* Diese Funktion sitzt im Analyse-Pfad. Ohne Zeitlimit haette ein
+       haengender Firestore-Aufruf den Start JEDER Analyse blockiert — statt
+       still auf die Code-Werte zurueckzufallen, waere die Anwendung
+       stehengeblieben. Damit waere die ganze Rueckfallebene wertlos gewesen.
+
+       Hier: Die Datenbank braucht 5 s, das Zeitlimit liegt bei 2 s.
+
+       (Rueckbauprobe: Ohne Promise.race dauert der Aufruf ueber 5 s und der
+       Zeitvergleich unten wird ROT.) */
+    setze({ aktiv: "egal", profile: { egal: { parallelitaet: 9 } } }, null, 5000);
+    const start = Date.now();
+    const e = await geltendeWerte();
+    const gedauert = Date.now() - start;
+
+    expect(gedauert).toBeLessThan(4000);
+    expect(e.quelle).toBe("code");
+    expect(e.grund).toContain("nicht lesbar");
+    expect(e.werte).toEqual(codeWerte());
+  }, 10000);
+
+  test("BEFUND 3: unsinnige Kapazitaeten werden abgelehnt, sinnvolle nicht", async () => {
+    /* Im Review aufgefallen: `parallelitaet: 99999` ging durch. Alle anderen
+       Unsinnswerte fing die Kopplungsrechnung ab, dieser nicht — er haette die
+       Wartezeit-Ansage und die Einlassgrenze absurd gemacht.
+
+       Die Grenzen sind bewusst weit: Ein Tarifwechsel auf 14 parallele
+       Analysen muss durchgehen, ein Tippfehler nicht.
+
+       (Rueckbauprobe: Ohne die GRENZEN-Pruefung wird 99999 uebernommen -> ROT.) */
+    setze({ aktiv: "unfug", profile: { unfug: { parallelitaet: 99999 } } });
+    const abgelehnt = await geltendeWerte();
+    expect(abgelehnt.quelle).toBe("code");
+    expect(abgelehnt.grund).toContain("plausiblen Bereichs");
+
+    setze({ aktiv: "t2", profile: { t2: { parallelitaet: 14, stundenlimit: 1000 } } });
+    const angenommen = await geltendeWerte();
+    expect(angenommen.quelle).toBe("firestore");
+    expect(angenommen.werte.parallelitaet).toBe(14);
+  });
+
+  test("BEFUND 2: der Zwischenspeicher greift — nicht jeder Aufruf liest die Datenbank", async () => {
+    /* Ohne Zwischenspeicher laege bei jedem Analyse-Start ein zusaetzlicher
+       Firestore-Aufruf an. Bei einem Workshop mit 1000 Analysen am Vormittag
+       waeren das 1000 vermeidbare Lesevorgaenge — Kosten und Latenz ohne
+       Gegenwert, weil sich Profile im Minutentakt nicht aendern. */
+    setze({ aktiv: "t2", profile: { t2: { parallelitaet: 14 } } });
+    const a = await geltendeWerte();
+    const b = await geltendeWerte();
+    const c = await geltendeWerte();
+
+    expect(a.werte.parallelitaet).toBe(14);
+    expect(b.werte.parallelitaet).toBe(14);
+    expect(c.werte.parallelitaet).toBe(14);
+    expect(leseZaehler).toBe(1);
   });
 });

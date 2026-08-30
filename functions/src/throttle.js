@@ -34,7 +34,6 @@
    Parallelitäts-Decke: Die echte Raten-Grenze setzen Tier-Stufe und
    Cloud-Tasks-Nebenläufigkeit. Bei Cold-Start oder Workshop-Burst greift
    zusätzlich mistral.js' Retry-Backoff. */
-const DEFAULT_MAX_CONCURRENT = 6;
 
 /* v1.10.6: Queue-Timeout von 90s auf 360s (6 Minuten) hochgesetzt.
    Hintergrund: Mistral braucht 60-90s pro Call, ein Slot wird also nur
@@ -43,15 +42,17 @@ const DEFAULT_MAX_CONCURRENT = 6;
    Mit 360s reicht es, dass der spaeteste Wartende immer noch durchkommt
    (~24 Plaetze × 15s = 360s). Cloud-Function-Timeout ist 540s, also
    bleibt nach dem Anstehen genug Zeit fuer den eigentlichen Mistral-Call. */
-const DEFAULT_QUEUE_TIMEOUT_MS = 360000;
 
 /**
  * Erzeugt einen neuen Semaphore.
  * Für Tests: man kann mehrere unabhängige Semaphoren erstellen.
  */
 function createSemaphore(options = {}) {
-  const maxConcurrent = options.maxConcurrent || DEFAULT_MAX_CONCURRENT;
-  const queueTimeoutMs = options.queueTimeoutMs || DEFAULT_QUEUE_TIMEOUT_MS;
+  /* Startwerte nur fuer den Moment zwischen Modulladen und erstem Aufruf —
+     danach setzt drosselEinstellen() die Werte aus dem Einstellungssatz.
+     Sie sind bewusst eng: Wer nie eingestellt wird, drosselt lieber zu viel. */
+  let maxConcurrent = options.maxConcurrent || 1;
+  let queueTimeoutMs = options.queueTimeoutMs || 60000;
 
   let inFlight = 0;
   const waiters = [];
@@ -102,7 +103,17 @@ function createSemaphore(options = {}) {
     return { inFlight, queued: waiters.length, maxConcurrent };
   }
 
-  return { acquire, stats };
+  /* Setter, damit die Werte aus dem Einstellungssatz greifen koennen. Ein
+     Semaphore lebt so lange wie die Instanz — ohne sie waere eine Umstellung
+     erst nach einem Neustart wirksam geworden. */
+  function setMaxConcurrent(n) {
+    if (typeof n === "number" && n > 0) maxConcurrent = n;
+  }
+  function setQueueTimeoutMs(ms) {
+    if (typeof ms === "number" && ms > 0) queueTimeoutMs = ms;
+  }
+
+  return { acquire, stats, setMaxConcurrent, setQueueTimeoutMs };
 }
 
 /* Modul-globale Semaphore für die Mistral-Calls aus mistral.js / Hybrid-Pfad. */
@@ -127,8 +138,6 @@ const mistralSemaphore = createSemaphore();
  * uebernimmt real die Cloud-Tasks-Nebenlaeufigkeit (7). Wer hier schneller
  * drehen will, prueft ZUERST die Tier-Stufe im Mistral-Dashboard.
  */
-const LARGE_TOKEN_INTERVAL_MS = 800;
-const SMALL_TOKEN_INTERVAL_MS = 2500;
 /* Initial-Jitter beim allerersten Token-Acquire pro Instanz. Verhindert, dass
    mehrere frisch gestartete Cloud-Run-Instanzen ihren ersten Call in derselben
    Millisekunde feuern. */
@@ -187,8 +196,10 @@ function createRateBucket(defaultIntervalMs) {
   };
 }
 
-const largeBucket = createRateBucket(LARGE_TOKEN_INTERVAL_MS);
-const smallBucket = createRateBucket(SMALL_TOKEN_INTERVAL_MS);
+/* Startwert 0 = keine Drosselung, bis der Einstellungssatz sie setzt. Der
+   Semaphore davor laesst in diesem Moment ohnehin nur einen Aufruf durch. */
+const largeBucket = createRateBucket(0);
+const smallBucket = createRateBucket(0);
 
 function bucketFor(modelClass) {
   return modelClass === "large" ? largeBucket : smallBucket;
@@ -202,7 +213,19 @@ function bucketFor(modelClass) {
  * @param {Function} fn         auszufuehrende Mistral-Operation
  * @param {string}   modelClass "large" oder "small" — bestimmt den Token-Bucket
  */
-async function withMistralSlot(fn, modelClass) {
+/* Uebernimmt die Drosselwerte aus dem Einstellungssatz. Wird vor jedem
+   Mistral-Aufruf gerufen; die Setter gab es schon, sie wurden bisher nur von
+   Tests benutzt. So gibt es die Zahlen nur EINMAL — im Satz. */
+function drosselEinstellen(werte) {
+  if (!werte) return;
+  mistralSemaphore.setMaxConcurrent(werte.drosselMaxParallel);
+  mistralSemaphore.setQueueTimeoutMs(werte.drosselWartelimitMs);
+  largeBucket.setIntervalMs(werte.tokenAbstandGrossMs);
+  smallBucket.setIntervalMs(werte.tokenAbstandKleinMs);
+}
+
+async function withMistralSlot(fn, modelClass, werte) {
+  drosselEinstellen(werte);
   const release = await mistralSemaphore.acquire();
   try {
     await bucketFor(modelClass).acquire();
@@ -238,10 +261,6 @@ module.exports = {
   createRateBucket,
   withMistralSlot,
   getMistralStats,
-  DEFAULT_MAX_CONCURRENT,
-  DEFAULT_QUEUE_TIMEOUT_MS,
-  LARGE_TOKEN_INTERVAL_MS,
-  SMALL_TOKEN_INTERVAL_MS,
   INITIAL_JITTER_MAX_MS,
   _resetRateBucket,
   _setRateIntervalMs,

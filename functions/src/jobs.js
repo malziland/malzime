@@ -25,8 +25,20 @@
 
 const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
-const { LIVENESS_GRACE_MS, JOB_RETENTION_MS, ZUSTELLUNG_AUFBEWAHRUNG_MS } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
+
+/* Holt die Betriebswerte oder bricht ab. Es gibt keine Ersatzzahlen mehr:
+   Liegt kein gueltiger Einstellungssatz vor, laeuft auch keine Analyse — dann
+   entstehen keine neuen Jobs, und die Firestore-TTL raeumt die alten. */
+async function betriebswerteOderAbbruch() {
+  const { werte, grund } = await geltendeWerte();
+  if (!werte) {
+    const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
+    fehler.code = "config_missing";
+    throw fehler;
+  }
+  return werte;
+}
 
 /* ARCH-2026-08-12-27: Frist des Sicherheitsnetzes (Firestore-TTL). Bewusst weit
    ueber JOB_RETENTION_MS (2 h): Der Reaper ist die Loeschung, die TTL faengt nur
@@ -46,7 +58,6 @@ const JOBS_COLLECTION = "jobs";
    Pipeline-Budget (REQUEST_BUDGET_MS=480s) liegt darunter, daher werden echte
    Jobs (≈480s + Overhead) NICHT fälschlich gescheitert — und die jetzt
    bedingten Statusübergänge (s. completeJob/failJob) verhindern jede Race. */
-const PROCESSING_TIMEOUT_MS = 9 * 60 * 1000;
 
 function jobsRef() {
   return datenbank().collection(JOBS_COLLECTION);
@@ -224,7 +235,8 @@ async function countQueuedJobs() {
 async function markFailedIfStale(job) {
   if (!job || job.status !== "processing") return job;
   const startedAt = job.startedAt || job.createdAt || 0;
-  if (Date.now() - startedAt < PROCESSING_TIMEOUT_MS) return job;
+  const werte = await betriebswerteOderAbbruch();
+  if (Date.now() - startedAt < werte.verarbeitungsZeitlimitMs) return job;
   const failed = await failJob(job.id, "processing_timeout");
   if (failed) return { ...job, status: "failed", errorReason: "processing_timeout" };
   /* BUG-001: failJob hat NICHT gegriffen — der Job ist inzwischen terminal
@@ -380,7 +392,13 @@ async function abandonJob(jobId) {
    viele Jobs laeuft. Fehlt der Wert, gilt die Konstante: Eine Aufraeum-Frist
    darf nie fehlen, sonst blieben verwaiste Jobs ewig liegen. */
 function isAbandoned(job, gnadenfristMs) {
-  const frist = typeof gnadenfristMs === "number" && gnadenfristMs > 0 ? gnadenfristMs : LIVENESS_GRACE_MS;
+  /* Die Frist ist Pflicht. Frueher stand hier ein Rueckfall auf eine Konstante
+     — damit gab es dieselbe Zahl an zwei Orten, und welche galt, hing vom
+     Aufrufweg ab. */
+  if (typeof gnadenfristMs !== "number" || !(gnadenfristMs > 0)) {
+    throw new Error("isAbandoned: livenessGnadenfristMs fehlt");
+  }
+  const frist = gnadenfristMs;
   if (!job || job.status !== "queued") return false;
   return Date.now() - (job.lastSeenAt || job.createdAt || 0) > frist;
 }
@@ -399,10 +417,10 @@ async function countProcessingJobs() {
  * ist — die Arbeitsliste des Reapers. `limit` deckelt die Batch-Größe pro
  * Lauf. Benötigt den zusammengesetzten Index (status, lastSeenAt).
  */
-async function findAbandonedJobs(limit = 200) {
-  const { werte: lw } = await geltendeWerte().catch(() => ({ werte: null }));
-  const gnadenfrist = lw && lw.livenessGnadenfristMs ? lw.livenessGnadenfristMs : LIVENESS_GRACE_MS;
-  const cutoff = Date.now() - gnadenfrist;
+async function findAbandonedJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.livenessGnadenfristMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("status", "==", "queued").where("lastSeenAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -418,10 +436,11 @@ async function findAbandonedJobs(limit = 200) {
 
    Eine ehrliche Wartezeit liegt bei wenigen Minuten; der Browser gibt nach
    30 Minuten ohnehin auf. Alles darueber ist kein wartender Nutzer mehr. */
-const MAX_QUEUED_AGE_MS = 35 * 60 * 1000;
 
-async function findUeberfaelligeJobs(limit = 200) {
-  const cutoff = Date.now() - MAX_QUEUED_AGE_MS;
+async function findUeberfaelligeJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.wartendesHoechstalterMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("status", "==", "queued").where("createdAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -432,8 +451,10 @@ async function findUeberfaelligeJobs(limit = 200) {
  * Arbeitsliste des Reapers, damit solche Dokumente nicht ewig liegen bleiben.
  * Benötigt den zusammengesetzten Index (status, startedAt).
  */
-async function findStaleProcessingJobs(limit = 200) {
-  const cutoff = Date.now() - PROCESSING_TIMEOUT_MS;
+async function findStaleProcessingJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.verarbeitungsZeitlimitMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("status", "==", "processing").where("startedAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -445,10 +466,10 @@ async function findStaleProcessingJobs(limit = 200) {
  * Sekunden bis Minuten). Einfache Ungleichheit auf `createdAt`, daher vom
  * automatischen Einzelfeld-Index abgedeckt — kein zusammengesetzter Index.
  */
-async function findExpiredJobs(limit = 200) {
-  const { werte } = await geltendeWerte().catch(() => ({ werte: null }));
-  const aufbewahrung = werte && werte.jobAufbewahrungMs ? werte.jobAufbewahrungMs : JOB_RETENTION_MS;
-  const cutoff = Date.now() - aufbewahrung;
+async function findExpiredJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.jobAufbewahrungMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("createdAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -460,10 +481,10 @@ async function findExpiredJobs(limit = 200) {
  * ohnehin nicht mehr an. Die Ungleichheits-Abfrage überspringt Dokumente
  * ohne `deliveredAt` (nie zugestellt) von selbst.
  */
-async function findZugestellteJobs(limit = 200) {
-  const { werte: zw } = await geltendeWerte().catch(() => ({ werte: null }));
-  const zustellfenster = zw && zw.zustellfensterMs ? zw.zustellfensterMs : ZUSTELLUNG_AUFBEWAHRUNG_MS;
-  const cutoff = Date.now() - zustellfenster;
+async function findZugestellteJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.zustellfensterMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("deliveredAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -477,7 +498,6 @@ async function deleteJob(jobId) {
 
 module.exports = {
   JOBS_COLLECTION,
-  PROCESSING_TIMEOUT_MS,
   createJob,
   getJob,
   claimJob,
@@ -494,7 +514,6 @@ module.exports = {
   isAbandoned,
   findAbandonedJobs,
   findUeberfaelligeJobs,
-  MAX_QUEUED_AGE_MS,
   findStaleProcessingJobs,
   findExpiredJobs,
   findZugestellteJobs,

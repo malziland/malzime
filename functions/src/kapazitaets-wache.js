@@ -27,7 +27,8 @@
  * und meldet — gehandelt wird von Hand, mit den vorhandenen Skripten.
  */
 
-const { QUEUE_NAME, QUEUE_REGION, QUEUE_DISPATCH_CONCURRENCY, isLocalQueueMode } = require("./config");
+const { QUEUE_NAME, QUEUE_REGION, isLocalQueueMode } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
 
 let clientOverride = null;
 
@@ -91,14 +92,14 @@ function baueMeldung(befund) {
       `Kapazitaet laeuft auseinander: Der Code rechnet mit ${imCode} gleichzeitigen ` +
       `Analysen, die Warteschlange laesst aber nur ${inDerQueue} zu. Wartezeit-Ansage und ` +
       `Einlassgrenze sind damit zu optimistisch — wer hinten einreiht, wartet umsonst. ` +
-      `Abhilfe: scripts/cloudtasks-concurrency-${imCode}.sh, oder QUEUE_DISPATCH_CONCURRENCY ` +
+      `Abhilfe: scripts/cloudtasks-concurrency-${imCode}.sh, oder parallelitaet im Einstellungssatz ` +
       `auf ${inDerQueue} senken.`
     );
   }
   return (
     `Kapazitaet wird verschenkt: Die Warteschlange erlaubt ${inDerQueue} gleichzeitige ` +
     `Analysen, der Code rechnet nur mit ${imCode}. Es koennten mehr Leute gleichzeitig ` +
-    `arbeiten, als wir einlassen. Abhilfe: QUEUE_DISPATCH_CONCURRENCY auf ${inDerQueue} heben.`
+    `arbeiten, als wir einlassen. Abhilfe: parallelitaet im Einstellungssatz auf ${inDerQueue} heben.`
   );
 }
 
@@ -110,7 +111,16 @@ function baueMeldung(befund) {
  */
 async function pruefeKapazitaet() {
   const inDerQueue = await echteParallelitaet();
-  const befund = bewerte(QUEUE_DISPATCH_CONCURRENCY, inDerQueue);
+  /* Der Sollwert kommt aus dem Einstellungssatz — die Wache soll gegen das
+     pruefen, was heute gilt, nicht gegen eine Zahl im Quelltext. */
+  const { werte } = await geltendeWerte();
+  if (!werte) {
+    console.error(
+      JSON.stringify({ step: "kapazitaets-wache", grund: "kein Einstellungssatz — kein Abgleich moeglich" })
+    );
+    return { gemeldet: false, grund: "kein-einstellungssatz" };
+  }
+  const befund = bewerte(werte.parallelitaet, inDerQueue);
   return { ...befund, meldung: befund.auffaellig ? baueMeldung(befund) : null };
 }
 

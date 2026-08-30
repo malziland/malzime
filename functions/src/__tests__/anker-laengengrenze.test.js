@@ -13,25 +13,11 @@
    sonst bricht jeder Aufruf mit "Betriebswerte fehlen" ab, was diese Tests
    nicht pruefen wollen. Wer das Verhalten OHNE Satz prueft, tut das in
    betriebsprofil*.test.js. */
-jest.mock("../betriebsprofil", () => ({
-  geltendeWerte: async () => ({
-    werte: {
-      mistralTimeoutMs: 90000,
-      singleLargeTimeoutMs: 300000,
-      singleLargeMaxTokens: 5000,
-      requestBudgetMs: 480000,
-      describeMaxTokens: 2048,
-      profileMaxTokens: 16000,
-      parallelitaet: 7,
-      stundenlimit: 500,
-      adressLimit: 500,
-    },
-    quelle: "firestore",
-    profil: "test",
-    grund: null,
-  }),
-  PFLICHTFELDER: ["mistralTimeoutMs", "singleLargeTimeoutMs", "singleLargeMaxTokens", "requestBudgetMs"],
-}));
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
 const mistral = require("../mistral");
 const { setFetchForTest, runSingleLargeCall } = mistral;

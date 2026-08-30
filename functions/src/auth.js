@@ -1,6 +1,9 @@
 const crypto = require("crypto");
 
-const DEFAULT_TTL_MS = 30 * 60 * 1000; // 30 Minuten
+/* Die Gueltigkeitsdauer kommt aus dem Einstellungssatz (ticketGueltigkeitMs)
+   und wird vom Aufrufer uebergeben. Kein Rueckfallwert: Ein Token, das
+   laenger gilt als gedacht, ist ein Sicherheitsproblem — und welche Dauer
+   gaelte, haenge sonst davon ab, welcher Aufrufweg genommen wurde. */
 
 /**
  * Erstellt einen HMAC-signierten Admin-Token.
@@ -20,7 +23,10 @@ function signiere(zweck, action, expires, secret) {
   return crypto.createHmac("sha256", secret).update(`${zweck}.${action}.${expires}`).digest("hex");
 }
 
-function createAdminToken(action, secret, ttlMs = DEFAULT_TTL_MS, zweck = ZWECK_TOKEN) {
+function createAdminToken(action, secret, ttlMs, zweck = ZWECK_TOKEN) {
+  if (typeof ttlMs !== "number" || !(ttlMs > 0)) {
+    throw new Error("createAdminToken: ticketGueltigkeitMs fehlt");
+  }
   const expires = Date.now() + ttlMs;
   return `${expires}.${signiere(zweck, action, expires, secret)}`;
 }
@@ -135,6 +141,5 @@ module.exports = {
   cleanupNonces,
   safeCompare,
   sha256Hex,
-  DEFAULT_TTL_MS,
   NONCE_TTL_MS,
 };

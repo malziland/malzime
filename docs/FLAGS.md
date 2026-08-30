@@ -21,7 +21,7 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 > **`useGemesseneDauer` ist fail-safe `true`** — anders als die uebrigen Flags. Grund:
 > Der Schalter waehlt nicht zwischen "Funktion an" und "Funktion aus", sondern zwischen
 > zwei Rechenwegen. Der gemessene ist der richtigere, und sein schlechtester Fall ist
-> ohnehin der Code-Wert `QUEUE_AVG_JOB_SECONDS` — bei zu wenigen, unplausiblen oder
+> ohnehin `durchschnittsdauerSekunden` aus dem Einstellungssatz — bei zu wenigen, unplausiblen oder
 > unlesbaren Messwerten faellt er von selbst dorthin zurueck. Ausschalten ist der
 > Notweg, nicht der Normalzustand.
 

@@ -33,17 +33,9 @@ jest.mock("../db", () => ({
 const { geltendeWerte, _pruefe, _cacheLeeren, PFLICHTFELDER } = require("../betriebsprofil");
 
 /* Ein gueltiger Satz mit den Werten, die heute im Code stehen. */
-const GUELTIG = {
-  mistralTimeoutMs: 90000,
-  singleLargeTimeoutMs: 300000,
-  singleLargeMaxTokens: 5000,
-  requestBudgetMs: 480000,
-  describeMaxTokens: 2048,
-  profileMaxTokens: 16000,
-  parallelitaet: 7,
-  stundenlimit: 500,
-  adressLimit: 500,
-};
+/* Der Satz kommt zentral aus ../test-satz — sonst muss jedes neue
+   Pflichtfeld in jeder Testdatei nachgetragen werden (Ein-Quellen-Regel). */
+const GUELTIG = require("../test-satz").SATZ;
 
 function setze(daten, fehler = null, verzoegerung = 0) {
   mockDoc.daten = daten;

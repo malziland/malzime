@@ -9,6 +9,11 @@
    Einmal-Ticket aus einer echten Analyse — der Zähler war vorher von außen
    flutbar (In-Memory-IP-Limit je Function-Instanz, Aggregat ohne Rückweg). */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 jest.mock("../counter");
 jest.mock("../jobs");
 const { zaehleRealitaetsCheck } = require("../counter");

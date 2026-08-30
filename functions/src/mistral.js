@@ -444,10 +444,24 @@ async function callMistralRaw(options) {
      beantworten: bremst Mistral oder bremsen wir? */
   const t0 = Date.now();
   let waitMs = 0;
-  const result = await withMistralSlot(() => {
-    waitMs = Date.now() - t0;
-    return callMistralRawUnthrottled(options);
-  }, modelClassOf(options.model));
+  /* Die Drosselwerte kommen aus dem Einstellungssatz und werden hier
+     durchgereicht — an EINER Stelle, statt in jedem einzelnen Aufrufer. Der
+     Satz liegt im Zwischenspeicher, der Aufruf kostet nichts. */
+  const { werte } = await betriebswerteOderAbbruch();
+  /* Die Zeitgrenze des Einzelaufrufs kommt aus dem Einstellungssatz. Ein
+     Aufrufer darf sie ueberschreiben — der Single-Large-Pfad tut das, weil er
+     eine eigene, laengere Grenze hat (singleLargeTimeoutMs). Wer nichts sagt,
+     bekommt mistralTimeoutMs. Das ist KEIN Rueckfall auf einen Code-Wert:
+     Beide Zahlen stehen im selben Satz, es gibt sie nur einmal. */
+  const mitGrenze = options.timeoutCapMs == null ? { ...options, timeoutCapMs: werte.mistralTimeoutMs } : options;
+  const result = await withMistralSlot(
+    () => {
+      waitMs = Date.now() - t0;
+      return callMistralRawUnthrottled(mitGrenze);
+    },
+    modelClassOf(options.model),
+    werte
+  );
   return { ...result, waitMs };
 }
 
@@ -518,7 +532,11 @@ async function callMistralRawUnthrottled({
        der Single-Large-Call schreibt zwei vollstaendige Profile in EINEM Zug
        und bekommt deshalb sein eigenes, gemessenes Budget mit. Ohne
        `timeoutCapMs` bleibt alles exakt wie vorher. */
-    const cap = timeoutCapMs == null ? MISTRAL_TIMEOUT_MS : timeoutCapMs;
+    /* Die Obergrenze ist Pflicht — sie kommt aus dem Einstellungssatz. */
+    if (typeof timeoutCapMs !== "number" || !(timeoutCapMs > 0)) {
+      throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
+    }
+    const cap = timeoutCapMs;
     const budget = timeoutMs == null ? cap : timeoutMs;
     if (budget <= 0) {
       const err = new Error("Mistral-Budget erschoepft");

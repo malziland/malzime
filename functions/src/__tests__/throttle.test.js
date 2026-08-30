@@ -3,12 +3,10 @@ const {
   createRateBucket,
   withMistralSlot,
   getMistralStats,
-  DEFAULT_MAX_CONCURRENT,
-  LARGE_TOKEN_INTERVAL_MS,
-  SMALL_TOKEN_INTERVAL_MS,
   _setRateIntervalMs,
   _resetRateBucket,
 } = require("../throttle");
+const { SATZ } = require("../test-satz");
 
 /* v1.10.6: Token-Bucket fuer Tests deaktivieren — der modul-globale Rate-Limiter
    (1 RPS in Production) wuerde alle Mehrfach-Operation-Tests auf je >=1s
@@ -103,7 +101,7 @@ describe("createSemaphore — basic acquire/release", () => {
 describe("withMistralSlot wrapper", () => {
   test("releases the slot after successful operation", async () => {
     const before = getMistralStats().inFlight;
-    const result = await withMistralSlot(async () => "ok");
+    const result = await withMistralSlot(async () => "ok", "large", SATZ);
     expect(result).toBe("ok");
     expect(getMistralStats().inFlight).toBe(before);
   });
@@ -130,14 +128,17 @@ describe("withMistralSlot wrapper", () => {
     /* Mindestens 2 parallel sollten gesehen worden sein */
     expect(maxObservedInFlight).toBeGreaterThanOrEqual(2);
     /* Aber nie über das Default-Limit */
-    expect(maxObservedInFlight).toBeLessThanOrEqual(DEFAULT_MAX_CONCURRENT);
+    expect(maxObservedInFlight).toBeLessThanOrEqual(SATZ.drosselMaxParallel);
     expect(getMistralStats().inFlight).toBe(0);
   });
 });
 
 describe("module constants", () => {
-  test("DEFAULT_MAX_CONCURRENT matches Mistral Scale-Tier RPS limit", () => {
-    expect(DEFAULT_MAX_CONCURRENT).toBe(6);
+  test("drosselMaxParallel im Einstellungssatz passt zur Mistral-Stufe", () => {
+    /* UMGESTELLT 30.08.2026: Der Wert steht im Einstellungssatz, nicht im
+       Code. Geprueft wird jetzt der Satz — sonst prueft der Test eine Zahl,
+       die im Betrieb gar nicht mehr gilt. */
+    expect(SATZ.drosselMaxParallel).toBe(6);
   });
 });
 
@@ -174,14 +175,14 @@ describe("token-bucket rate limiter", () => {
 
 describe("model-aware token buckets (v1.10.8)", () => {
   test("Large-Interval ist kuerzer als Small-Interval (Large darf schneller feuern)", () => {
-    expect(LARGE_TOKEN_INTERVAL_MS).toBeLessThan(SMALL_TOKEN_INTERVAL_MS);
+    expect(SATZ.tokenAbstandGrossMs).toBeLessThan(SATZ.tokenAbstandKleinMs);
   });
 
   test("withMistralSlot fuehrt fn aus, egal ob modelClass large oder small", async () => {
     _setRateIntervalMs(0);
     _resetRateBucket();
-    const large = await withMistralSlot(async () => "L", "large");
-    const small = await withMistralSlot(async () => "S", "small");
+    const large = await withMistralSlot(async () => "L", "large", SATZ);
+    const small = await withMistralSlot(async () => "S", "small", SATZ);
     expect(large).toBe("L");
     expect(small).toBe("S");
   });

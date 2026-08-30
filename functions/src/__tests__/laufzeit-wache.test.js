@@ -9,6 +9,8 @@
  * Reine Rechnung auf Zahlenreihen — kein Netzwerk, keine Cloud.
  */
 
+const { SATZ } = require("../test-satz");
+
 const { _bewerte, _MIN_ANALYSEN } = require("../laufzeit-wache");
 
 /** Baut einen Tag mit n Analysen der angegebenen Dauer. */
@@ -21,7 +23,7 @@ describe("Bewertung der Laufzeit", () => {
     const tage = [];
     for (let i = 1; i <= 17; i += 1) tage.push(tag(`2026-08-${String(i).padStart(2, "0")}`, 65));
 
-    const befund = _bewerte(tage);
+    const befund = _bewerte(tage, SATZ.singleLargeTimeoutMs);
     expect(befund.auffaellig).toBe(false);
     expect(befund.grund).toBe("im-rahmen");
   });
@@ -33,7 +35,7 @@ describe("Bewertung der Laufzeit", () => {
     for (let i = 11; i <= 25; i += 1) tage.push(tag(`2026-08-${i}`, 65));
     tage.push(tag("2026-08-26", 110), tag("2026-08-27", 95), tag("2026-08-28", 150));
 
-    const befund = _bewerte(tage);
+    const befund = _bewerte(tage, SATZ.singleLargeTimeoutMs);
     expect(befund.auffaellig).toBe(true);
   });
 
@@ -44,7 +46,7 @@ describe("Bewertung der Laufzeit", () => {
     for (let i = 11; i <= 26; i += 1) tage.push(tag(`2026-08-${i}`, 65));
     tage.push(tag("2026-08-27", 65), { d: "2026-08-28", w: [65, 65, 300, 65, 65, 65] });
 
-    expect(_bewerte(tage).auffaellig).toBe(false);
+    expect(_bewerte(tage, SATZ.singleLargeTimeoutMs).auffaellig).toBe(false);
   });
 
   test("zu wenige Analysen ergeben keine Aussage", () => {
@@ -52,7 +54,7 @@ describe("Bewertung der Laufzeit", () => {
        werden, weder gut noch schlecht. */
     const tage = [tag("2026-08-27", 200, 2), tag("2026-08-28", 200, 3)];
 
-    const befund = _bewerte(tage);
+    const befund = _bewerte(tage, SATZ.singleLargeTimeoutMs);
     expect(befund.auffaellig).toBe(false);
     expect(befund.grund).toBe("zu-wenige-analysen");
     expect(befund.zahlen.juengst).toBeLessThan(_MIN_ANALYSEN);
@@ -64,14 +66,14 @@ describe("Bewertung der Laufzeit", () => {
        der 300-Sekunden-Grenze. */
     const tage = [tag("2026-08-27", 250, 6), tag("2026-08-28", 250, 6)];
 
-    const befund = _bewerte(tage);
+    const befund = _bewerte(tage, SATZ.singleLargeTimeoutMs);
     expect(befund.auffaellig).toBe(true);
     expect(befund.grund).toBe("nah-an-der-zeitgrenze");
     expect(befund.zahlen.anteilProzent).toBe(100);
   });
 
   test("eine leere Historie behauptet nichts", () => {
-    const befund = _bewerte([]);
+    const befund = _bewerte([], SATZ.singleLargeTimeoutMs);
     expect(befund.auffaellig).toBe(false);
     expect(befund.grund).toBe("zu-wenige-analysen");
   });

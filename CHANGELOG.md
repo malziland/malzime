@@ -29,6 +29,33 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   ein widersprüchlicher Satz wird abgelehnt, statt Analysen abbrechen zu
   lassen. Genau der Ausfall vom 17. August kann so nicht mehr entstehen.
 
+- **Was eine Zusage trägt, bleibt bewusst außerhalb der Datenbank.**
+  Nicht jede Zahl darf sich im Betrieb ändern lassen. Der EU-Endpunkt, die
+  EU-Datenbank, das benannte KI-Modell, die Obergrenze für Dateigrößen und die
+  gekürzten Feldlängen der Fehlerprotokolle stehen weiterhin fest im
+  Programmcode — und das ist kein Rest, sondern eine Sicherheitsgrenze.
+
+  Ein Wert in der Datenbank lässt sich in Sekunden ändern: ohne Auslieferung,
+  ohne Prüfung, ohne Spur im offenen Quelltext. Für eine Zeitgrenze ist das
+  genau richtig. Stünde dort der Endpunkt, könnte ein einziger Schreibzugriff
+  die Analyse still auf einen Server außerhalb der EU umlenken — während die
+  Website weiter dasselbe verspricht, der Quelltext auf GitHub unverändert
+  bleibt und die Prüfsummen unter `malzi.me/build-info.json` weiter stimmen.
+  Der Bruch wäre von außen nicht nachweisbar.
+
+  Deshalb: Alles, was eine Zusage an die Teilnehmenden trägt, muss den Weg
+  über Commit, Prüfkette und Veröffentlichung nehmen. Die Datenbank kann diese
+  Werte auch nicht versehentlich übernehmen — gelesen werden ausschließlich
+  die bekannten Zahlenfelder, alles andere im Dokument wird ignoriert.
+
+- **Eine neue Prüfung verhindert, dass Werte wieder doppelt entstehen.**
+  Sie geht vom Programmcode aus, nicht von der Liste der Einstellungen, und
+  verlangt für jede Zahl eine von zwei Antworten: Sie steht in der Datenbank —
+  dann darf sie im Code nicht noch einmal stehen. Oder sie trägt eine
+  ausgeschriebene Begründung, warum sie dort bleibt. Alles andere ist ein
+  Fund und hält die Auslieferung an. Die Prüfung läuft in der Pipeline und vor
+  jedem Push.
+
 - **Eine tägliche Prüfung meldet, wenn Einstellung und Wirklichkeit
   auseinanderlaufen.** Die Zahl, wie viele Analysen gleichzeitig laufen
   dürfen, steht auch in der Warteschlange bei Google. Stimmen beide nicht

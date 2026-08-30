@@ -1,5 +1,3 @@
-const { RATE_LIMIT, RATE_WINDOW_MS } = require("./config");
-
 const rateState = new Map();
 let lastCleanup = Date.now();
 const CLEANUP_INTERVAL_MS = 60 * 1000;
@@ -35,8 +33,13 @@ function cleanupExpired() {
  * Schutzgrenze — ohne sie waere der Eingang offen.
  */
 function checkRateLimit(key, grenze, fensterMs) {
-  const limit = typeof grenze === "number" && grenze > 0 ? grenze : RATE_LIMIT;
-  const fenster = typeof fensterMs === "number" && fensterMs > 0 ? fensterMs : RATE_WINDOW_MS;
+  /* Grenze und Fenster sind Pflicht — sie kommen aus dem Einstellungssatz.
+     Ein Rueckfall auf eine Konstante waere eine zweite Definition derselben
+     Zahl gewesen. */
+  if (typeof grenze !== "number" || !(grenze > 0)) throw new Error("checkRateLimit: adressLimit fehlt");
+  if (typeof fensterMs !== "number" || !(fensterMs > 0)) throw new Error("checkRateLimit: adressfensterMs fehlt");
+  const limit = grenze;
+  const fenster = fensterMs;
   cleanupExpired();
   const current = Date.now();
   const entry = rateState.get(key);

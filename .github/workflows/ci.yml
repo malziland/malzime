@@ -250,6 +250,7 @@ jobs:
       # Auslieferung blockiert. Die Pruefung blendet Kommentare aus, sonst
       # tarnt ein auskommentiertes test.slow() den Befund.
       - run: python3 scripts/pruefe-tote-geduld.py
+      - run: python3 scripts/pruefe-doppelte-werte.py
 
       # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
       # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine

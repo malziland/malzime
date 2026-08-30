@@ -1,6 +1,5 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
-const { HOURLY_LIMIT, HOURLY_WINDOW_MINUTES } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
 
 const CURRENT_DOC = "stats/current";
@@ -333,7 +332,9 @@ async function getStats() {
    praktisch abschalten. Der Deckel begrenzt den Schaden auf das Doppelte des
    regulaeren Stundenlimits — genug fuer den gedachten Zweck (eine Schulklasse
    mehr), zu wenig fuer eine Kostenlawine. */
-const BOOST_OBERGRENZE = 2 * HOURLY_LIMIT;
+/* Der Deckel und die Frist kommen aus dem Einstellungssatz (boostFaktor,
+   boostFristMs) — frueher standen sie im Code und waren damit eine zweite
+   Definition neben dem Stundenlimit. */
 
 /* BIZ-2026-08-20-28 (Entscheidung E2 aus dem Audit, 2026-08-21): Ein Boost hob den
    Deckel DAUERHAFT an. Es gab keinen Rückfall auf das reguläre Stundenlimit, keinen
@@ -348,7 +349,6 @@ const BOOST_OBERGRENZE = 2 * HOURLY_LIMIT;
    regulären Limit liegt. So kann niemand mitten in einer laufenden Klasse
    ausgesperrt werden; der Deckel normalisiert sich von selbst in der ersten
    ruhigen Minute danach. */
-const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;
 
 /**
  * Das heute gültige Stundenlimit. EINE Quelle für alle Lesestellen — vorher
@@ -404,19 +404,33 @@ async function boostLimit(amount = 100) {
   let ergebnis;
   /* Grundwert VOR der Transaktion holen — innerhalb einer Firestore-Transaktion
      darf kein weiterer Lesevorgang laufen. */
-  const { werte: satzwerte } = await geltendeWerte();
+  const { werte: satzwerte, grund: satzgrund } = await geltendeWerte();
+  if (!satzwerte) {
+    /* Fail-closed: Ohne Einstellungssatz kein Boost. */
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "boost-ohne-einstellungssatz",
+        grund: satzgrund || null,
+        hinweis: "Boost abgelehnt, weil kein gueltiger Einstellungssatz vorliegt.",
+      })
+    );
+    return { limit: null, abgelehnt: true };
+  }
+  const obergrenze = satzwerte.stundenlimit * satzwerte.boostFaktor;
+  const fristMs = satzwerte.boostFristMs;
   try {
     ergebnis = await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const daten = snap && snap.exists ? snap.data() : null;
       const aktuell = Number((daten && daten.limit) || satzwerte.stundenlimit);
       const gewuenscht = aktuell + amount;
-      if (gewuenscht > BOOST_OBERGRENZE) {
+      if (gewuenscht > obergrenze) {
         return { limit: aktuell, aktuell, gewuenscht, abgelehnt: true, grund: "obergrenze" };
       }
       /* BIZ-2026-08-20-28: mit Ablaufdatum statt fuer immer. */
-      tx.set(ref, { limit: gewuenscht, limitBis: Date.now() + BOOST_FRIST_MS }, { merge: true });
-      return { limit: gewuenscht, abgelehnt: false, gueltigBis: Date.now() + BOOST_FRIST_MS };
+      tx.set(ref, { limit: gewuenscht, limitBis: Date.now() + fristMs }, { merge: true });
+      return { limit: gewuenscht, abgelehnt: false, gueltigBis: Date.now() + fristMs };
     });
   } catch (err) {
     console.error(
@@ -436,7 +450,7 @@ async function boostLimit(amount = 100) {
         error: "boost-obergrenze-erreicht",
         aktuell: ergebnis.aktuell,
         angefragt: ergebnis.gewuenscht,
-        obergrenze: BOOST_OBERGRENZE,
+        obergrenze,
         hinweis: "Boost abgelehnt. Haeufige Ablehnungen koennen auf einen abgeflossenen Boost-Link hindeuten.",
       })
     );

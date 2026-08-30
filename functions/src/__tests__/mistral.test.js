@@ -3,25 +3,12 @@
    sonst bricht jeder Aufruf mit "Betriebswerte fehlen" ab, was diese Tests
    nicht pruefen wollen. Wer das Verhalten OHNE Satz prueft, tut das in
    betriebsprofil*.test.js. */
-jest.mock("../betriebsprofil", () => ({
-  geltendeWerte: async () => ({
-    werte: {
-      mistralTimeoutMs: 90000,
-      singleLargeTimeoutMs: 300000,
-      singleLargeMaxTokens: 5000,
-      requestBudgetMs: 480000,
-      describeMaxTokens: 2048,
-      profileMaxTokens: 16000,
-      parallelitaet: 7,
-      stundenlimit: 500,
-      adressLimit: 500,
-    },
-    quelle: "firestore",
-    profil: "test",
-    grund: null,
-  }),
-  PFLICHTFELDER: ["mistralTimeoutMs", "singleLargeTimeoutMs", "singleLargeMaxTokens", "requestBudgetMs"],
-}));
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
+const { SATZ } = require("../test-satz");
 
 const mistral = require("../mistral");
 const { isRateLimitError, setFetchForTest, _callMistralRaw } = mistral;
@@ -270,12 +257,11 @@ describe("callMistralRaw 429 retry behavior", () => {
     expect(attempts).toBe(2);
   }, 15000);
 
-  test("v1.10.6: Einzel-Call-Timeout cappt bei MISTRAL_TIMEOUT_MS auch wenn budget groesser ist", async () => {
+  test("v1.10.6: Einzel-Call-Timeout cappt bei mistralTimeoutMs aus dem Einstellungssatz auch wenn budget groesser ist", async () => {
     /* Wenn das REQUEST_BUDGET_MS gross ist (z.B. 480s), darf der einzelne
        Mistral-Call trotzdem nicht laenger als MISTRAL_TIMEOUT_MS laufen.
        Simuliert wird via Mock-Fetch, der nie returnt — dann sollte
        AbortController nach MISTRAL_TIMEOUT_MS feuern, nicht nach 480s. */
-    const { MISTRAL_TIMEOUT_MS } = require("../config");
     let abortedAt = null;
     const start = Date.now();
     setFetchForTest(async (_url, opts) => {
@@ -295,7 +281,7 @@ describe("callMistralRaw 429 retry behavior", () => {
     /* AbortController muss bei ~MISTRAL_TIMEOUT_MS (90s) feuern, nicht bei 480s.
        Wir geben grosszuegig Toleranz, weil Fake-Timing im Jest-Setup nicht
        exakt arbeitet — wichtig ist: deutlich < 480s. */
-    expect(abortedAt).toBeLessThan(MISTRAL_TIMEOUT_MS + 5000);
+    expect(abortedAt).toBeLessThan(SATZ.mistralTimeoutMs + 5000);
   }, 100000);
 });
 
@@ -317,13 +303,13 @@ describe("callMistralRaw throttle integration (REL-01)", () => {
     });
 
     /* Mehr gleichzeitige Calls losschicken als das Limit erlaubt */
-    const calls = Array.from({ length: DEFAULT_MAX_CONCURRENT + 6 }, () =>
+    const calls = Array.from({ length: SATZ.drosselMaxParallel + 6 }, () =>
       _callMistralRaw({ model: "x", messages: [], maxTokens: 1, temperature: 0 })
     );
     await Promise.all(calls);
 
     expect(maxObserved).toBeGreaterThan(1); /* echte Parallelität fand statt */
-    expect(maxObserved).toBeLessThanOrEqual(DEFAULT_MAX_CONCURRENT); /* aber gedeckelt durch die Semaphore */
+    expect(maxObserved).toBeLessThanOrEqual(SATZ.drosselMaxParallel); /* aber gedeckelt durch die Semaphore */
     expect(getMistralStats().inFlight).toBe(0); /* alle Slots wieder freigegeben */
   }, 10000);
 });

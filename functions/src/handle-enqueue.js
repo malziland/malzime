@@ -16,7 +16,7 @@
  */
 
 const crypto = require("crypto");
-const { ALLOWED_MIME, MAX_UPLOAD_BYTES, MAX_QUEUE_DEPTH } = require("./config");
+const { ALLOWED_MIME, MAX_UPLOAD_BYTES } = require("./config");
 const { dauerJeAnalyse } = require("./durchsatz");
 const { geltendeWerte } = require("./betriebsprofil");
 const { getFeatureFlags } = require("./feature-flags");
@@ -37,16 +37,19 @@ const { getFeatureFlags } = require("./feature-flags");
    config.js: Die Einlassgrenze ist eine Schutzgrenze, keine Einstellung — sie
    darf nie fehlen, sonst liesse die Seite unbegrenzt Leute herein. */
 async function aktuelleEinlassgrenze() {
+  const { werte } = await geltendeWerte();
+  /* Ohne Einstellungssatz laeuft ohnehin keine Analyse — dann ist die
+     ehrliche Einlassgrenze null, nicht eine Ersatzzahl aus dem Code. */
+  if (!werte) return 0;
   try {
     const flags = await getFeatureFlags();
     const { sekunden, gemessen } = await dauerJeAnalyse(flags.useGemesseneDauer === true);
-    if (!gemessen) return MAX_QUEUE_DEPTH;
-    const { werte } = await geltendeWerte();
-    const parallel = werte && typeof werte.parallelitaet === "number" ? werte.parallelitaet : null;
-    if (!parallel) return MAX_QUEUE_DEPTH;
-    return Math.max(1, Math.floor(((30 * 60) / sekunden) * parallel * 0.8));
+    /* Gemessene Dauer verfuegbar: Grenze daraus rechnen, sonst die Zahl aus
+       dem Einstellungssatz nehmen. */
+    if (!gemessen || !sekunden) return werte.warteschlangeTiefe;
+    return Math.max(1, Math.floor(((30 * 60) / sekunden) * werte.parallelitaet * 0.8));
   } catch (_) {
-    return MAX_QUEUE_DEPTH;
+    return werte.warteschlangeTiefe;
   }
 }
 const { getClientIp, checkRateLimit } = require("./middleware");

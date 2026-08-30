@@ -37,7 +37,7 @@
  */
 
 const { datenbank } = require("./db");
-const { QUEUE_AVG_JOB_SECONDS } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
 
 const DOKUMENT = "stats/durchsatz";
 /* FEATURE-2026-08-29-03: Tageshistorie fuer die Laufzeit-Wache. Getrennt vom
@@ -180,9 +180,14 @@ async function gemesseneDauer() {
  * Sekundenangabe an den Nutzer ist.
  */
 async function dauerJeAnalyse(flagAn) {
-  if (!flagAn) return { sekunden: QUEUE_AVG_JOB_SECONDS, gemessen: false, frisch: false };
+  /* Die Ausgangsdauer kommt aus dem Einstellungssatz, nicht aus dem Code —
+     sonst gaebe es dieselbe Zahl zweimal, und die Wartezeit-Ansage haette sich
+     an der falschen orientiert. */
+  const { werte } = await geltendeWerte();
+  const ausSatz = werte ? werte.durchschnittsdauerSekunden : null;
+  if (!flagAn) return { sekunden: ausSatz, gemessen: false, frisch: false };
   const gemessen = await gemesseneDauer();
-  if (!gemessen) return { sekunden: QUEUE_AVG_JOB_SECONDS, gemessen: false, frisch: false };
+  if (!gemessen) return { sekunden: ausSatz, gemessen: false, frisch: false };
   return { sekunden: gemessen.sekunden, gemessen: true, frisch: gemessen.frisch };
 }
 

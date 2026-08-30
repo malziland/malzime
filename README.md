@@ -218,12 +218,48 @@ die **bewusst getroffenen Abwägungen mit Begründung** — steht in
 - **X-Content-Type-Options: nosniff**
 - **Magic-Byte-Validierung**: Server prueft JPEG/PNG/WebP/GIF-Header
 - **Honeypot-Feld** gegen Bots
-- **Rate Limiting**: 500 Requests / 10 Minuten pro IP
+- **Rate Limiting** pro IP, **Stundenlimit** ueber ein rollendes Fenster (anonyme
+  Timestamps in Firestore), **HMAC-Admin-Tokens** mit kurzer Gueltigkeit und
+  **befristete Aufbewahrung** von Job-Daten. Die Zahlenwerte dieser vier Grenzen
+  stehen im Einstellungssatz und sind hier bewusst nicht wiederholt — sie waeren
+  sonst nach der ersten Umstellung falsch. Der geltende Stand steht in
+  [docs/BETRIEBSPROFILE.md](docs/BETRIEBSPROFILE.md).
 - **Timing-Check**: Requests innerhalb von 2s nach Seitenaufruf werden verzoegert
 - **Prompt-Injection-Schutz**: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
-- **HMAC-Admin-Tokens**: Kurzlebige signierte Tokens (30 Min) + Nonces (5 Min) fuer Admin-Aktionen
-- **Stundenlimit**: Rollendes 60-Minuten-Fenster (500 Analysen/Stunde, anonyme Timestamps in Firestore)
-- **Keine dauerhafte Datenspeicherung**: Bilder nur kurz zur Verarbeitung gehalten, Job-Daten spaetestens nach 2 h geloescht, kein Logging von Bilddaten
+- **Keine dauerhafte Speicherung von Bilddaten**: Bilder werden nur zur Verarbeitung
+  gehalten und danach geloescht, Bildinhalte nie protokolliert
+
+### Was sich zur Laufzeit aendern laesst — und was ausdruecklich nicht
+
+Die Betriebswerte (Zeitgrenzen, Limits, Kapazitaet, Fristen) liegen in Firestore
+und lassen sich im laufenden Betrieb umstellen. Das ist gewollt: Ein KI-Anbieter
+wird langsamer, ein Workshop ist groesser als geplant — dann muss eine Zahl
+nachziehen koennen, ohne eine Auslieferung von fuenfundzwanzig Minuten.
+
+**Genau deshalb duerfen bestimmte Werte dort nicht stehen.** Ein Eintrag in der
+Datenbank laesst sich in Sekunden aendern: ohne Commit, ohne Review, ohne Spur im
+offenen Quelltext. Stuende dort der KI-Endpunkt, koennte ein einziger
+Schreibzugriff die Bildanalyse still auf einen Server ausserhalb der EU umlenken —
+waehrend die Website weiter dasselbe verspricht, der Quelltext hier unveraendert
+bleibt und die Pruefsummen unter `malzi.me/build-info.json` weiter stimmen. Der
+Bruch waere von aussen nicht nachweisbar.
+
+Im Code bleiben deshalb: **EU-Endpunkt**, **EU-Datenbank** (`malzime-eu`), die
+**benannten KI-Modelle**, die **Upload-Obergrenze**, die **erlaubten Dateiformate**
+und die **gekuerzten Feldlaengen der Fehlerprotokolle**. Alles davon traegt eine
+Zusage an die Teilnehmenden und muss den Weg ueber Commit, Pruefkette und
+Veroeffentlichung nehmen.
+
+Zwei Mechanismen halten die Trennung aufrecht:
+
+1. Der Einstellungssatz kann diese Werte **nicht versehentlich uebernehmen** —
+   gelesen werden ausschliesslich die bekannten Zahlenfelder, alles andere im
+   Dokument wird ignoriert.
+2. `scripts/pruefe-doppelte-werte.py` geht **vom Code aus** und verlangt fuer jede
+   Zahlenkonstante eine von zwei Antworten: Sie steht in der Datenbank (dann darf
+   sie im Code nicht noch einmal stehen), oder sie traegt eine ausgeschriebene
+   Begruendung `BLEIBT IM CODE — <Grund>`. Alles andere haelt die Auslieferung an.
+   Die Pruefung laeuft in der Pipeline und vor jedem Push.
 
 ## Tests
 

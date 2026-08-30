@@ -1,19 +1,66 @@
 "use strict";
 
 /**
- * config.js — Konstanten für die Mistral-only Pipeline (seit v1.6.0).
+ * config.js — was NICHT einstellbar ist, und warum.
  *
- * Vor v1.6.0 standen hier auch Gemini-Modelle (DESCRIBE_MODELS, PROFILE_MODELS)
- * und Vision-API-Konfiguration. Beides wurde mit dem Vision/Gemini-Cleanup
- * entfernt. Die heute aktive Pipeline nutzt ausschließlich Mistral AI.
+ * ═══════════════════════════════════════════════════════════════════════════
+ * SEIT 30.08.2026 STEHEN HIER KEINE BETRIEBSWERTE MEHR.
+ *
+ * Zeitgrenzen, Textmengen, Limits, Parallelitaet und Fristen kommen
+ * ausschliesslich aus dem Einstellungssatz in Firestore
+ * (`config/betriebsprofil`, siehe betriebsprofil.js). Jede dieser Zahlen
+ * existiert genau einmal. Es gibt keine Rueckfallwerte im Code: Zwei Orte
+ * fuer dieselbe Zahl laufen frueher oder spaeter auseinander, und dann haengt
+ * es vom Aufrufweg ab, welche gilt — ein Fehler, den niemand sieht.
+ *
+ * ── WARUM HIER TROTZDEM ZAHLEN STEHEN ─────────────────────────────────────
+ *
+ * Was in dieser Datei geblieben ist, ist bewusst NICHT einstellbar. Der
+ * Unterschied ist keine Bequemlichkeit, sondern eine Sicherheitsgrenze:
+ *
+ * Ein Wert im Firestore laesst sich zur Laufzeit aendern — von jedem, der
+ * Schreibrechte auf die Datenbank hat, in Sekunden, ohne Commit, ohne
+ * Code-Review, ohne Spur im oeffentlichen Quelltext. Fuer eine Zeitgrenze ist
+ * das genau richtig: Sie soll sich im Betrieb drehen lassen.
+ *
+ * Fuer eine ZUSAGE waere es fatal. malziME verspricht oeffentlich:
+ *   · Die Bilder gehen an einen EU-Endpunkt (api.eu.mistral.ai).
+ *   · Die Daten liegen in der EU-Datenbank (malzime-eu).
+ *   · Es rechnet ein benanntes Modell, kein beliebiges anderes.
+ *   · Fehlerprotokolle sind auf harmlose Feldlaengen beschnitten.
+ *
+ * Stuende der Endpunkt im Store, koennte ein einziger Schreibzugriff die
+ * Analyse still auf einen Nicht-EU-Server umlenken — die Website wuerde
+ * weiter dasselbe versprechen, der Quelltext auf GitHub waere unveraendert,
+ * und die Pruefsummen unter malzi.me/build-info.json wuerden weiter stimmen.
+ * Der Bruch waere von aussen nicht nachweisbar.
+ *
+ * Deshalb: Alles, was eine Zusage an die Nutzer traegt, bleibt im Code, wo es
+ * durch Commit, Review, Pruefkette und Veroeffentlichung muss. Der
+ * Einstellungssatz kann diese Werte auch nicht versehentlich uebernehmen —
+ * betriebsprofil.js liest ausschliesslich die ihm bekannten Zahlenfelder;
+ * alles andere im Dokument wird ignoriert (Test: betriebsprofil-chaos).
+ *
+ * ── DIE TRENNLINIE IN EINEM SATZ ──────────────────────────────────────────
+ *   Zahlen, die man im Betrieb dreht          → Einstellungssatz (Firestore)
+ *   Zusagen, Adressen, Sicherheitsgrenzen,
+ *   Messergebnisse                            → hier, im Code
+ *
+ * Vor v1.6.0 standen hier auch Gemini-Modelle und Vision-API-Konfiguration.
+ * Beides wurde mit dem Vision/Gemini-Cleanup entfernt; die heute aktive
+ * Pipeline nutzt ausschliesslich Mistral AI.
  */
 
+/* BLEIBT IM CODE — Sicherheitsgrenze.
+   Die groesste Datei, die der Server ueberhaupt annimmt. Waere sie im Store,
+   liesse sich der Schutz gegen ueberlange Uploads zur Laufzeit stilllegen:
+   ein Schreibzugriff, und der Server nimmt 500-MB-Dateien entgegen. Eine
+   Schutzgrenze, die sich ohne Code-Aenderung aufheben laesst, ist keine. */
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
-/* v1.10.6: RATE_LIMIT 200 → 500. Schul-WLAN teilt sich eine IP. Bei einem
-   25er-Workshop mit Auto-Retries kann eine Schul-IP locker 200/10min
-   ueberschreiten und alle blockieren. 500 gibt grosszuegigen Puffer. */
-const RATE_LIMIT = 500;
-const RATE_WINDOW_MS = 10 * 60 * 1000;
+
+/* BLEIBT IM CODE — Sicherheitsliste.
+   Welche Dateiformate ueberhaupt durchgelassen werden. Dasselbe Argument:
+   Ein Store-Eintrag koennte hier stillschweigend SVG oder HTML ergaenzen. */
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /* ── Mistral-Modelle ──
@@ -49,6 +96,10 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
    umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren
    wir Versions-Wechsel selbst. (Zu Rate-Limits: Stufen-System, s. oben.) */
+/* BLEIBT IM CODE — Zusage an die Nutzer.
+   WELCHES Modell rechnet, steht auf der Website und in den Rechtstexten.
+   Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein anderes
+   Modell, waehrend die Seite weiter das alte nennt. */
 const MISTRAL_DESCRIBE_MODEL = "mistral-large-2512";
 const MISTRAL_PROFILE_MODEL = "mistral-small-2603";
 const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";
@@ -58,9 +109,13 @@ const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";
    "standardmaessig EU"). Kostet 10 % Aufpreis; beide Modelle wurden am
    11.08. mit dem echten Schluessel am EU-Endpunkt verifiziert (HTTP 200).
    Grundlage: docs.mistral.ai/studio-api/regional-inference. */
+/* BLEIBT IM CODE — Datenschutzzusage, der wichtigste Fall.
+   Der EU-Endpunkt ist der Grund, warum die Bilder die EU nicht verlassen.
+   Stuende er im Store, koennte EIN Schreibzugriff die Analyse auf einen
+   Nicht-EU-Server umlenken: Website, Quelltext und Pruefsummen blieben
+   unveraendert, der Bruch waere von aussen nicht nachweisbar. */
 const MISTRAL_ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
 const MISTRAL_MODELS_ENDPOINT = "https://api.eu.mistral.ai/v1/models";
-const MISTRAL_DESCRIBE_MAX_TOKENS = 2048;
 /* v2.1 (2026-05-23 nachmittags): 12000 → 16000. Hintergrund: Beim ersten
    v2.1-Live-Test schnitt Beast mehrere Karten mit "..." mitten im Wort ab,
    weil Mistral trotz Variante-B-Längenvorgabe ausführlich schrieb. 16000
@@ -68,8 +123,6 @@ const MISTRAL_DESCRIBE_MAX_TOKENS = 2048;
    (siehe jsonSchemaBoost) bei trotzdem disziplinierterem Modell-Verhalten
    (Temperatur Beast wurde von 1.0 → 0.8 in mistral.js). Kostenneutral,
    da Mistral nur tatsächlich generierte Tokens berechnet. */
-const MISTRAL_PROFILE_MAX_TOKENS = 16000;
-const MISTRAL_TIMEOUT_MS = 90000;
 
 /* ── Eigene Zeitgrenze fuer den Single-Large-Aufruf ──
    BUG-2026-08-17-01. Der Single-Large-Call schreibt Standard- UND Beast-Profil
@@ -103,11 +156,18 @@ const MISTRAL_TIMEOUT_MS = 90000;
    Die Kopplung der beiden Werte ist keine Bitte um Sorgfalt, sondern geprueft:
    `__tests__/mistral-zeitbudget.test.js` rechnet sie gegeneinander und wird
    rot, sobald jemand einen der beiden Werte allein verschiebt. */
-const MISTRAL_SINGLE_LARGE_TIMEOUT_MS = 300000;
 
 /* Langsamstes gemessenes Schreibtempo (Token/s) aus dem 30-Tage-Diagnose-Bucket.
    Kanonische Quelle fuer die Zeitbudget-Rechnung; steht hier, damit Test und
    Konfiguration dieselbe Zahl benutzen und nicht auseinanderdriften. */
+/* BLEIBT IM CODE — Messergebnis, kein Sollwert.
+   Die langsamste je gemessene Ausgabegeschwindigkeit von Mistral. Man STELLT
+   sie nicht ein: Wird Mistral langsamer, misst man neu und traegt den neuen
+   Messwert ein — mit Commit und Beleg. Im Einstellungssatz waere sie eine
+   Zahl, an der man drehen koennte, bis die Kopplungspruefung "passt" — und
+   genau die Pruefung soll ja verhindern, dass Token-Budget und Zeitgrenze
+   auseinanderlaufen (BUG-2026-08-17-01). Ein Pruefmass, das der Prueflling
+   selbst verstellen kann, prueft nichts. */
 const MISTRAL_SLOWEST_TOKENS_PER_SECOND = 39.4;
 
 /* Obergrenze der Ausgabelaenge fuer den Single-Large-Aufruf.
@@ -121,7 +181,6 @@ const MISTRAL_SLOWEST_TOKENS_PER_SECOND = 39.4;
    Zeitgrenze, weil die beiden nur GEMEINSAM richtig sind (Ein-Quellen-Regel):
    getrennt aufgestellt sah jede fuer sich plausibel aus, und genau daran ist
    der Fehler zwei Audits lang vorbeigelaufen. */
-const MISTRAL_SINGLE_LARGE_MAX_TOKENS = 5000;
 
 /* ── Globales Stundenlimit ──
    500 Analysen pro rollendem 60-Minuten-Fenster — der gewuenschte Betriebswert
@@ -134,15 +193,12 @@ const MISTRAL_SINGLE_LARGE_MAX_TOKENS = 5000;
    fehlendem Feld und (b) der Wert, auf den `resetHourly` das Dokument setzt.
    Beide muessen zum Live-Wert passen — sonst kippt ein Admin-Reset das Limit
    ungewollt. Bei Aenderung IMMER auch `stats/current.limit` mitziehen. */
-const HOURLY_LIMIT = 500;
-const HOURLY_WINDOW_MINUTES = 60;
 
 /* BUG-003: Globales Budget pro Request — verhindert dass die Summe aller
    internen Timeouts das Cloud-Function-Limit übersteigt.
    v1.10.6: Function-Timeout ist jetzt 540s (Maximum). Budget auf 480s
    gehoben — Mistral bekommt damit auch nach langer Throttle-Queue-Wartezeit
    noch seine vollen 90s, statt nach 119s schon kein Budget mehr zu haben. */
-const REQUEST_BUDGET_MS = 480000;
 
 /* ── Queue-Architektur (v2.0) ──
    Konstanten für den Cloud-Tasks-Queue-Pfad. Seit v2.10 ist die Queue der
@@ -173,7 +229,6 @@ const QUEUE_UPLOAD_PREFIX = "queue-uploads/";
    war. 8 Min deckt realistische Abwesenheiten ab. Kostenneutral — ein
    abandoned Job macht ohnehin keinen Mistral-Call; es wird nur der Bild-
    Zwischenspeicher + der Warteschlangen-Platz etwas länger gehalten. */
-const LIVENESS_GRACE_MS = 8 * 60 * 1000;
 
 /* Schätzwerte für die Warteschlangen-ETA im job-status-Endpoint:
    durchschnittliche Verarbeitungsdauer pro Job und Anzahl parallel
@@ -198,8 +253,6 @@ const LIVENESS_GRACE_MS = 8 * 60 * 1000;
    Die Queue muss per `scripts/cloudtasks-concurrency-7.sh` mitgezogen werden.
    QUEUE_AVG_JOB_SECONDS bleibt bewusst bei 65, obwohl real 56 gemessen —
    die ETA soll ueberschaetzen, und der zweite Aufruf kostet 1-2 Sekunden. */
-const QUEUE_AVG_JOB_SECONDS = 65;
-const QUEUE_DISPATCH_CONCURRENCY = 7;
 
 /* ARCH-001 (Audit 2026-08-10): Obergrenze der Warteschlangen-Tiefe beim Einlass.
    Der Browser gibt nach 30 Minuten auf (MAX_POLL_DURATION_MS in api.js). Bei
@@ -213,7 +266,6 @@ const QUEUE_DISPATCH_CONCURRENCY = 7;
    Hahn zudrehen. Die Tiefenpruefung bremst nur dann, wenn es ohnehin nicht mehr
    aufgeht — und sie loest sich von selbst wieder auf.
    Mit 20 % Sicherheitsabstand unter der rechnerischen Grenze. */
-const MAX_QUEUE_DEPTH = Math.floor(((30 * 60) / QUEUE_AVG_JOB_SECONDS) * QUEUE_DISPATCH_CONCURRENCY * 0.8);
 
 /* Aufbewahrungsfenster der Job-Dokumente. Ein Job-Dokument enthält bis zum
    Abschluss das fertige Profil im Feld `result`; danach wird es nicht mehr
@@ -227,13 +279,11 @@ const MAX_QUEUE_DEPTH = Math.floor(((30 * 60) / QUEUE_AVG_JOB_SECONDS) * QUEUE_D
    bis Minuten; 2 h decken jedes realistische Reload-/Abhol-Fenster großzügig ab
    (Poll dauert Minuten, Reload-Wiederaufnahme Sekunden), reduzieren die
    Aufbewahrung der abgeleiteten Profile aber um das 12-fache. */
-const JOB_RETENTION_MS = 2 * 60 * 60 * 1000;
 /* PRIV-107b (User-Freigabe 11.08. abends): Zugestellte Ergebnisse leben am
    Server nur noch so lange wie das Wiederholungs-Fenster im Browser
    (ERGEBNIS_WIEDERHOLUNG_MS in public/js/api.js, 15 min ab Erstzustellung) —
    danach hat das Dokument keinen Zweck mehr und der Reaper löscht es.
    JOB_RETENTION_MS oben bleibt die Obergrenze für NIE abgeholte Ergebnisse. */
-const ZUSTELLUNG_AUFBEWAHRUNG_MS = 15 * 60 * 1000;
 
 /* Lokal-Modus für den Firebase-Emulator (Phase 3): Da es für Google Cloud
    Tasks keinen Emulator gibt, werden im Lokal-Modus Cloud Tasks und der
@@ -275,56 +325,35 @@ function localQueueConcurrency() {
    `getFirestore()`-Aufruf würde diesen Schalter umgehen und still in die
    falsche Datenbank schreiben. Genau das verhindert eine eigene Prüfung
    (`__tests__/db-zentral.test.js`). */
+/* BLEIBT IM CODE — dieselbe Datenschutzzusage wie beim Endpunkt.
+   Welche Datenbank die Daten haelt, und damit in welchem Rechtsraum sie
+   liegen. Zusaetzlich pruefbar von aussen: scripts/verify-infrastructure.sh
+   misst das vor jedem Deploy an der echten Infrastruktur. */
 const FIRESTORE_DATABASE_ID = "malzime-eu";
 
 /* Laufzeit-Validierung — fehlerhafte Config crasht sofort statt leise falsch zu laufen */
-if (HOURLY_LIMIT < 1) throw new Error("Config: HOURLY_LIMIT must be >= 1");
-if (RATE_LIMIT < 1) throw new Error("Config: RATE_LIMIT must be >= 1");
 if (MAX_UPLOAD_BYTES < 1) throw new Error("Config: MAX_UPLOAD_BYTES must be >= 1");
-if (MISTRAL_PROFILE_MAX_TOKENS < 1) throw new Error("Config: MISTRAL_PROFILE_MAX_TOKENS must be >= 1");
-/* BUG-2026-08-17-01: Die erlaubte Ausgabelaenge muss in die erlaubte Zeit
-   passen. Sonst toetet die Uhr Laeufe, die das Token-Budget ausdruecklich
-   zulaesst — und der Nutzer wartet zwei Minuten auf einen Fehler. Fail-fast
-   beim Start statt still im Betrieb. */
-if (MISTRAL_SINGLE_LARGE_MAX_TOKENS / MISTRAL_SLOWEST_TOKENS_PER_SECOND > MISTRAL_SINGLE_LARGE_TIMEOUT_MS / 1000) {
-  throw new Error(
-    `Config: MISTRAL_SINGLE_LARGE_MAX_TOKENS (${MISTRAL_SINGLE_LARGE_MAX_TOKENS}) braucht bei ` +
-      `${MISTRAL_SLOWEST_TOKENS_PER_SECOND} Token/s mehr als MISTRAL_SINGLE_LARGE_TIMEOUT_MS ` +
-      `(${MISTRAL_SINGLE_LARGE_TIMEOUT_MS} ms) erlaubt`
-  );
-}
+/* Die Kopplungspruefung "Ausgabelaenge muss in die Zeitgrenze passen"
+   (BUG-2026-08-17-01) ist mit den Werten in den Einstellungssatz gewandert.
+   Sie steht jetzt in betriebsprofil.js und prueft JEDEN neuen Satz, bevor er
+   gilt — also auch die, die erst im Betrieb entstehen. Frueher lief sie nur
+   beim Start der Function. */
 
 module.exports = {
   FIRESTORE_DATABASE_ID,
   MAX_UPLOAD_BYTES,
-  RATE_LIMIT,
-  RATE_WINDOW_MS,
   ALLOWED_MIME,
   MISTRAL_DESCRIBE_MODEL,
   MISTRAL_PROFILE_MODEL,
   MISTRAL_FALLBACK_MODEL,
   MISTRAL_ENDPOINT,
   MISTRAL_MODELS_ENDPOINT,
-  MISTRAL_DESCRIBE_MAX_TOKENS,
-  MISTRAL_PROFILE_MAX_TOKENS,
-  MISTRAL_TIMEOUT_MS,
-  MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
-  MISTRAL_SINGLE_LARGE_MAX_TOKENS,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,
-  REQUEST_BUDGET_MS,
-  HOURLY_LIMIT,
-  HOURLY_WINDOW_MINUTES,
   QUEUE_NAME,
   QUEUE_REGION,
   PROCESS_JOB_FUNCTION,
   QUEUE_BUCKET,
   QUEUE_UPLOAD_PREFIX,
-  QUEUE_AVG_JOB_SECONDS,
-  QUEUE_DISPATCH_CONCURRENCY,
-  MAX_QUEUE_DEPTH,
-  JOB_RETENTION_MS,
-  ZUSTELLUNG_AUFBEWAHRUNG_MS,
-  LIVENESS_GRACE_MS,
   isLocalQueueMode,
   localQueueConcurrency,
 };

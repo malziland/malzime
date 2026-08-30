@@ -19,19 +19,9 @@ jest.mock("../feature-flags", () => ({ getFeatureFlags: async () => zustand.flag
 jest.mock("../betriebsprofil", () => ({ geltendeWerte: async () => ({ werte: zustand.werte }) }));
 
 const { _aktuelleEinlassgrenze } = require("../handle-enqueue");
-const { MAX_QUEUE_DEPTH } = require("../config");
 
-const SATZ = (parallel) => ({
-  mistralTimeoutMs: 90000,
-  singleLargeTimeoutMs: 300000,
-  singleLargeMaxTokens: 5000,
-  requestBudgetMs: 480000,
-  describeMaxTokens: 2048,
-  profileMaxTokens: 16000,
-  parallelitaet: parallel,
-  stundenlimit: 500,
-  adressLimit: 500,
-});
+/* Zentral aus ../test-satz, mit der jeweils zu pruefenden Parallelitaet. */
+const SATZ = (parallel) => ({ ...require("../test-satz").SATZ, parallelitaet: parallel });
 
 describe("Einlassgrenze folgt dem Einstellungssatz", () => {
   test("groessere Parallelitaet laesst mehr Wartende ein", async () => {
@@ -53,25 +43,38 @@ describe("Einlassgrenze folgt dem Einstellungssatz", () => {
     expect(await _aktuelleEinlassgrenze()).toBe(168);
   });
 
-  test("SCHUTZGRENZE: ohne Einstellungssatz gilt die Konstante, nicht unbegrenzt", async () => {
-    /* Die Einlassgrenze darf NIE fehlen — sonst liesse die Seite beliebig
-       viele Leute herein. Anders als bei den Zeitgrenzen ist der Rueckfall
-       hier richtig. */
+  /* UMGESCHRIEBEN AM 30.08.2026 — das Verhalten hat sich geaendert, und zwar
+     zum Strengeren.
+
+     FRUEHER: Ohne Einstellungssatz griff die Konstante MAX_QUEUE_DEPTH (155).
+     Die Begruendung dafuer klang plausibel ("eine Schutzgrenze darf nie
+     fehlen") und war trotzdem falsch: Sie liess 155 Leute herein, deren
+     Auftraege anschliessend ALLE scheitern — weil ohne Satz gar keine Analyse
+     laufen kann. Das ist die unfreundlichste Variante: erst warten lassen,
+     dann fehlschlagen.
+
+     HEUTE: Ohne Satz ist die ehrliche Einlassgrenze null. Wer kommt, bekommt
+     sofort eine klare Absage statt eines Platzes in einer Schlange, die nie
+     abgearbeitet wird. */
+  test("ohne Einstellungssatz wird niemand eingelassen — sofortige Absage", async () => {
     zustand.werte = null;
-    expect(await _aktuelleEinlassgrenze()).toBe(MAX_QUEUE_DEPTH);
+    expect(await _aktuelleEinlassgrenze()).toBe(0);
   });
 
-  test("ohne gemessene Dauer gilt ebenfalls die Konstante", async () => {
+  test("ohne gemessene Dauer gilt die Tiefe aus dem Einstellungssatz", async () => {
     zustand.werte = SATZ(7);
     zustand.dauer = { sekunden: 65, gemessen: false };
-    expect(await _aktuelleEinlassgrenze()).toBe(MAX_QUEUE_DEPTH);
+    /* Nicht mehr die Code-Konstante, sondern der Wert aus dem Satz — sonst
+       waere die Einlassgrenze das einzige, was eine Umstellung ignoriert. */
+    expect(await _aktuelleEinlassgrenze()).toBe(SATZ(7).warteschlangeTiefe);
     zustand.dauer = { sekunden: 60, gemessen: true };
   });
 
-  test("unsinnige Parallelitaet im Satz fuehrt nicht zu unsinniger Grenze", async () => {
-    /* Ein Satz mit 99999 wird zwar schon beim Laden abgelehnt — hier der
-       zweite Riegel, falls er es doch bis hierher schafft. */
+  test("unsinnige Parallelitaet fuehrt nicht zu unsinniger Grenze", async () => {
+    /* Ein solcher Satz wird schon beim Laden abgelehnt (parallelitaet min 1) —
+       hier der zweite Riegel, falls er es doch bis hierher schafft. Erwartet
+       wird die kleinstmoegliche Grenze, nicht eine erfundene Zahl. */
     zustand.werte = { ...SATZ(7), parallelitaet: 0 };
-    expect(await _aktuelleEinlassgrenze()).toBe(MAX_QUEUE_DEPTH);
+    expect(await _aktuelleEinlassgrenze()).toBe(1);
   });
 });

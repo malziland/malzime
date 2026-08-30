@@ -23,17 +23,9 @@ jest.mock("../db", () => ({
 
 const { geltendeWerte, _pruefe, _cacheLeeren } = require("../betriebsprofil");
 
-const T1 = {
-  mistralTimeoutMs: 90000,
-  singleLargeTimeoutMs: 300000,
-  singleLargeMaxTokens: 5000,
-  requestBudgetMs: 480000,
-  describeMaxTokens: 2048,
-  profileMaxTokens: 16000,
-  parallelitaet: 7,
-  stundenlimit: 500,
-  adressLimit: 500,
-};
+/* Zentral aus ../test-satz — sonst muss jedes neue Pflichtfeld in
+   jeder Testdatei nachgetragen werden (Ein-Quellen-Regel). */
+const T1 = require("../test-satz").SATZ;
 const setze = (d, f = null) => {
   mockDoc.daten = d;
   mockDoc.fehler = f;

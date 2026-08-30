@@ -34,7 +34,7 @@
  */
 
 const { datenbank } = require("./db");
-const { MISTRAL_SINGLE_LARGE_TIMEOUT_MS } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
 const { tagesHistorie } = require("./durchsatz");
 
 const ZUSTAND_DOKUMENT = "stats/laufzeit-wache";
@@ -46,7 +46,11 @@ const MIN_ANALYSEN = 10;
 const FAKTOR_SCHWELLE = 1.5;
 /* Anteil der Laeufe nahe an der Zeitgrenze, ab dem gemeldet wird. */
 const NAH_AN_GRENZE_ANTEIL = 0.2;
-const NAH_AN_GRENZE_MS = MISTRAL_SINGLE_LARGE_TIMEOUT_MS * 0.8;
+/* Anteil der Zeitgrenze, ab dem ein Lauf als "nah an der Grenze" gilt. Die
+   Grenze selbst kommt aus dem Einstellungssatz — frueher stand hier der
+   Code-Wert, und nach einer Umstellung haette die Wache gegen die alte Grenze
+   gemessen und die Gefahr uebersehen. */
+const NAH_AN_GRENZE_FAKTOR = 0.8;
 /* Erst wenn es so viele Tage in Folge auffaellig ist, geht eine Meldung raus. */
 const ANHALTEND_TAGE = 2;
 
@@ -64,7 +68,8 @@ function median(zahlen) {
  * ausdruecklich "geprueft und in Ordnung", nicht "nicht geprueft". Fehlt die
  * Datengrundlage, steht das als Grund drin.
  */
-function bewerte(tage) {
+function bewerte(tage, zeitgrenzeMs) {
+  const nahAnGrenzeMs = zeitgrenzeMs * NAH_AN_GRENZE_FAKTOR;
   const sortiert = tage.slice().sort((a, b) => (a.d < b.d ? -1 : 1));
   const juengste = sortiert.slice(-JUENGSTE_TAGE);
   const davor = sortiert.slice(-(JUENGSTE_TAGE + VERGLEICH_TAGE), -JUENGSTE_TAGE);
@@ -78,7 +83,7 @@ function bewerte(tage) {
 
   /* Indikator 1: Naehe zur Zeitgrenze. Braucht keinen Vergleichszeitraum und
      ist deshalb auch dann aussagekraeftig, wenn das Werkzeug lange ruhte. */
-  const nahDran = werteJuengst.filter((s) => s * 1000 >= NAH_AN_GRENZE_MS).length;
+  const nahDran = werteJuengst.filter((s) => s * 1000 >= nahAnGrenzeMs).length;
   const anteilNah = nahDran / werteJuengst.length;
   if (anteilNah >= NAH_AN_GRENZE_ANTEIL) {
     return {
@@ -86,7 +91,7 @@ function bewerte(tage) {
       grund: "nah-an-der-zeitgrenze",
       zahlen: {
         anteilProzent: Math.round(anteilNah * 100),
-        grenzeSekunden: Math.round(NAH_AN_GRENZE_MS / 1000),
+        grenzeSekunden: Math.round(nahAnGrenzeMs / 1000),
         analysen: werteJuengst.length,
       },
     };
@@ -132,7 +137,15 @@ function baueMeldung(befund) {
  */
 async function pruefeLaufzeit({ melder, jetzt = Date.now() } = {}) {
   const tage = await tagesHistorie();
-  const befund = bewerte(tage);
+  /* Die Zeitgrenze kommt aus dem Einstellungssatz. Ohne Satz kann die Wache
+     nicht bewerten — sie meldet das, statt gegen eine erfundene Grenze zu
+     messen. */
+  const { werte } = await geltendeWerte();
+  if (!werte) {
+    console.error(JSON.stringify({ step: "laufzeit-wache", grund: "kein Einstellungssatz — nicht bewertbar" }));
+    return { gemeldet: false, grund: "kein-einstellungssatz" };
+  }
+  const befund = bewerte(tage, werte.singleLargeTimeoutMs);
   const heute = new Date(jetzt).toISOString().slice(0, 10);
 
   let zustand = {};

@@ -1,4 +1,5 @@
 const { createAdminToken } = require("./auth");
+const { geltendeWerte } = require("./betriebsprofil");
 const { SITE_URL } = require("./domains");
 
 /**
@@ -14,8 +15,15 @@ async function notifyLimitReached({ ntfyUrl, ntfyTopic, adminSecret, count, limi
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const boostToken = createAdminToken("boost", adminSecret);
-    const resetToken = createAdminToken("reset", adminSecret);
+    /* Wie lange die Knoepfe in dieser Mitteilung gueltig sind — aus dem
+       Einstellungssatz, damit die Dauer nur an einer Stelle steht. */
+    const { werte } = await geltendeWerte();
+    if (!werte) {
+      console.error(JSON.stringify({ step: "notify", grund: "kein Einstellungssatz — keine Aktions-Knoepfe" }));
+      return;
+    }
+    const boostToken = createAdminToken("boost", adminSecret, werte.ticketGueltigkeitMs);
+    const resetToken = createAdminToken("reset", adminSecret, werte.ticketGueltigkeitMs);
 
     const res = await fetch(ntfyUrl, {
       signal: controller.signal,

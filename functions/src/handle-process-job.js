@@ -26,7 +26,7 @@
  * Stale-Timeout in jobs.js aufgefangen.
  */
 
-const { REQUEST_BUDGET_MS, isLocalQueueMode, localQueueConcurrency } = require("./config");
+const { isLocalQueueMode, localQueueConcurrency } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { applyMinorSafety } = require("./minor-safety");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
@@ -111,7 +111,17 @@ function loggeMinorSafety(safety, traceId, lang) {
 async function runPipeline(job) {
   const mistral = getMistral();
   const start = Date.now();
-  const remainingBudget = () => Math.max(0, REQUEST_BUDGET_MS - (Date.now() - start));
+  const { werte, grund } = await geltendeWerte();
+  if (!werte) {
+    const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
+    fehler.code = "config_missing";
+    throw fehler;
+  }
+  const budgetMs = werte.requestBudgetMs;
+  /* Das Zeitbudget kommt aus dem Einstellungssatz. Frueher stand hier der
+     Code-Wert — wer das Budget umstellte, aenderte damit NICHT, wie lange
+     dieser Lauf sich tatsaechlich Zeit liess. */
+  const remainingBudget = () => Math.max(0, budgetMs - (Date.now() - start));
   const lang = job.lang || "de";
   const exif = job.exif || {};
 
@@ -534,8 +544,18 @@ async function handleProcessJob(req, res) {
   /* Liveness: Hat der Client die Seite verlassen, während der Job wartete?
      Dann gar nicht erst Mistral aufrufen — Job auf `abandoned` setzen, Bild
      löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
-  const { werte: betriebsW } = await geltendeWerte().catch(() => ({ werte: null }));
-  if (isAbandoned(job, betriebsW?.livenessGnadenfristMs)) {
+  const { werte: betriebsW, grund: betriebsGrund } = await geltendeWerte();
+  if (!betriebsW) {
+    /* Ohne Einstellungssatz laeuft keine Analyse. Der Job bleibt liegen und
+       wird nach der Wiederholung ehrlich als Fehler gemeldet, statt mit
+       erfundenen Werten zu rechnen. */
+    console.error(
+      JSON.stringify({ step: "process-job", jobId, status: "kein-einstellungssatz", grund: betriebsGrund })
+    );
+    res.status(503).json({ ok: false, reason: "config_missing" });
+    return;
+  }
+  if (isAbandoned(job, betriebsW.livenessGnadenfristMs)) {
     const didAbandon = await abandonJob(jobId);
     if (!didAbandon) {
       /* Übergang verloren: Entweder hat der Reaper parallel abgeräumt (Bild

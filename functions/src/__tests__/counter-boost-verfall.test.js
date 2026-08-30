@@ -10,29 +10,11 @@
    Firestore, ohne Rueckfallwerte im Code. Ohne diesen Satz laeuft die
    Einlasskontrolle nicht — das ist Absicht und wird in
    betriebsprofil*.test.js geprueft, nicht hier. */
-jest.mock("../betriebsprofil", () => ({
-  geltendeWerte: async () => ({
-    werte: {
-      mistralTimeoutMs: 90000,
-      singleLargeTimeoutMs: 300000,
-      singleLargeMaxTokens: 5000,
-      requestBudgetMs: 480000,
-      describeMaxTokens: 2048,
-      profileMaxTokens: 16000,
-      parallelitaet: 7,
-      stundenlimit: 500,
-      adressLimit: 500,
-      stundenfensterMinuten: 60,
-      adressfensterMs: 600000,
-      jobAufbewahrungMs: 7200000,
-      zustellfensterMs: 900000,
-      livenessGnadenfristMs: 480000,
-    },
-    quelle: "firestore",
-    profil: "test",
-    grund: null,
-  }),
-}));
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
 const HOURLY_LIMIT = 500;
 const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;

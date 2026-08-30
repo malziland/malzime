@@ -27,7 +27,7 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 | Bedrohung | Realistisch? | Hauptgegenmittel |
 |---|---|---|
 | Neugierige Dritte / Datenabfluss | Kernrisiko | Löschketten, EU-Only, ZDR, keine PII in Logs |
-| Kostenangriff (massenhafte Analysen) | möglich | Stundenlimit 500/h (global, Firestore), Queue-Tiefe 155, 35-min-Job-Höchstalter |
+| Kostenangriff (massenhafte Analysen) | möglich | Stundenlimit (global, Firestore), Queue-Tiefen-Bremse, Job-Höchstalter — alle drei im Einstellungssatz, siehe [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md) |
 | Störangriff auf einen Workshop | möglich, bisher nie beobachtet | dieselben Limits + Boost/Reset-Hebel; Restrisiko akzeptiert (s. u.) |
 | Bots / Scanner-Rauschen | täglich | Honeypot, Timing-Check, IP-Rate-Limit, Magic-Byte-Validierung |
 | Prompt Injection über Bildinhalte | strukturell | XML-Isolation, escapeXml, Output-Clamps; LLM-Ausgaben steuern keine Tools |

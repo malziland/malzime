@@ -3,6 +3,11 @@
    über den echten mistral-mock (MISTRAL_MOCK=1) — privacy.js und animal.js
    sind real, der Worker wird also als echte Integration getestet. */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 jest.mock("../jobs", () => ({
   getJob: jest.fn(),
   claimJob: jest.fn(),

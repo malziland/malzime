@@ -1,5 +1,7 @@
 /* Tests for admin handler in index.js */
 
+const { SATZ } = require("../test-satz");
+
 jest.mock("firebase-admin/app", () => ({
   initializeApp: jest.fn(),
 }));
@@ -151,7 +153,14 @@ describe("admin handler", () => {
   });
 
   test("returns 403 with expired HMAC token", async () => {
-    const expired = createAdminToken("boost", TEST_SECRET, -1000);
+    /* Ein abgelaufenes Token entsteht jetzt durch Zeitablauf, nicht durch eine
+       negative Gueltigkeitsdauer — die verbietet createAdminToken, seit die
+       Dauer ein Pflichtwert aus dem Einstellungssatz ist. Die Zusicherung
+       bleibt: abgelaufen = 403. */
+    const echteZeit = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(echteZeit - 2 * SATZ.ticketGueltigkeitMs);
+    const expired = createAdminToken("boost", TEST_SECRET, SATZ.ticketGueltigkeitMs);
+    Date.now.mockRestore();
     const req = mockReq({ path: "/boost", query: { hmac: expired } });
     const res = mockRes();
     await admin(req, res);
@@ -159,7 +168,7 @@ describe("admin handler", () => {
   });
 
   test("returns 403 with HMAC for wrong action", async () => {
-    const token = createAdminToken("reset", TEST_SECRET);
+    const token = createAdminToken("reset", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/boost", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);
@@ -183,7 +192,7 @@ describe("admin handler", () => {
   });
 
   test("boost with valid HMAC (GET) returns confirmation page, no mutation (SEC-001)", async () => {
-    const token = createAdminToken("boost", TEST_SECRET);
+    const token = createAdminToken("boost", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/boost", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);
@@ -212,7 +221,7 @@ describe("admin handler", () => {
   });
 
   test("reset with valid HMAC (GET) returns confirmation page, no mutation (SEC-001)", async () => {
-    const token = createAdminToken("reset", TEST_SECRET);
+    const token = createAdminToken("reset", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/reset", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);
@@ -328,7 +337,7 @@ describe("admin handler", () => {
   /* ── SEC-001: HMAC+POST must be rejected ── */
 
   test("HMAC+POST without nonce returns 403, no mutation (SEC-001)", async () => {
-    const token = createAdminToken("boost", TEST_SECRET);
+    const token = createAdminToken("boost", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/api/admin/boost", method: "POST", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);
@@ -337,7 +346,7 @@ describe("admin handler", () => {
   });
 
   test("HMAC+POST reset without nonce returns 403 (SEC-001)", async () => {
-    const token = createAdminToken("reset", TEST_SECRET);
+    const token = createAdminToken("reset", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/api/admin/reset", method: "POST", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);
@@ -348,7 +357,7 @@ describe("admin handler", () => {
   /* ── BUG-001: Confirm page form action must use /api/admin/ prefix ── */
 
   test("confirm page form action contains /api/admin/ prefix (BUG-001)", async () => {
-    const token = createAdminToken("boost", TEST_SECRET);
+    const token = createAdminToken("boost", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/api/admin/boost", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);
@@ -356,7 +365,7 @@ describe("admin handler", () => {
   });
 
   test("reset confirm page form action contains /api/admin/ prefix (BUG-001)", async () => {
-    const token = createAdminToken("reset", TEST_SECRET);
+    const token = createAdminToken("reset", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/api/admin/reset", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);
@@ -509,7 +518,7 @@ describe("admin handler", () => {
   });
 
   test("maintenance rejects HMAC auth (Bearer only)", async () => {
-    const token = createAdminToken("maintenance", TEST_SECRET);
+    const token = createAdminToken("maintenance", TEST_SECRET, SATZ.ticketGueltigkeitMs);
     const req = mockReq({ path: "/api/admin/maintenance", query: { hmac: token } });
     const res = mockRes();
     await admin(req, res);

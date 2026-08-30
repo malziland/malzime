@@ -2,6 +2,13 @@
    Die externen Module (Counter, Storage, Cloud Tasks, Jobs) sind gemockt;
    getestet wird die Validierungs-Logik und der Annahme-Ablauf des Handlers. */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
+const { SATZ } = require("../test-satz");
+
 jest.mock("../counter", () => ({
   getMaintenanceStatus: jest.fn(),
   checkAndIncrement: jest.fn(),
@@ -33,7 +40,6 @@ const middleware = require("../middleware");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const tasks = require("../cloud-tasks");
-const { MAX_QUEUE_DEPTH } = require("../config");
 
 const VALID_JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(20)]);
 
@@ -296,7 +302,7 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
     /* Ohne diese Bremse nimmt der Einlass Aufträge an, die den 30-Minuten-
        Deckel des Browsers garantiert überschreiten: Der Teilnehmer sieht einen
        Timeout, der Job läuft trotzdem und kostet Geld. */
-    jobs.countQueuedJobs.mockResolvedValue(MAX_QUEUE_DEPTH);
+    jobs.countQueuedJobs.mockResolvedValue(SATZ.warteschlangeTiefe);
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
 
@@ -307,7 +313,7 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
   });
 
   test("knapp unter der Grenze geht durch (Positivkontrolle)", async () => {
-    jobs.countQueuedJobs.mockResolvedValue(MAX_QUEUE_DEPTH - 1);
+    jobs.countQueuedJobs.mockResolvedValue(SATZ.warteschlangeTiefe - 1);
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
 

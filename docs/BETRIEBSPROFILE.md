@@ -1,91 +1,211 @@
-# Betriebsprofile
+# Betriebswerte
 
-Betriebswerte lassen sich als benannte Sätze umstellen, ohne Auslieferung.
+**Alle einstellbaren Zahlen von malziME stehen in Firestore, in genau einem
+Dokument.** Im Programmcode steht keine davon ein zweites Mal.
 
-## Wie es funktioniert
+Umgestellt wird ohne Auslieferung: ein Feld ändern, dreißig Sekunden warten.
 
-In Firestore liegt das Dokument `config/betriebsprofil`:
+---
+
+## Die eine Regel
+
+> Jeder einstellbare Wert existiert **genau einmal** — im Einstellungssatz.
+> Es gibt keine Rückfallwerte im Code.
+
+Der Grund ist Erfahrung, nicht Ästhetik. Zwei Orte für dieselbe Zahl laufen
+früher oder später auseinander, und dann hängt es vom Aufrufweg ab, welche
+gilt. Dieser Fehler zeigt sich nicht beim Testen — er zeigt sich, wenn jemand
+eine Einstellung ändert und nichts passiert.
+
+**Ohne gültigen Satz läuft keine Analyse.** Das ist Absicht: Ein
+Konfigurationsfehler soll auffallen, nicht monatelang unbemerkt bleiben.
+
+---
+
+## Das Dokument
+
+Firestore-Datenbank `malzime-eu`, Dokument **`config/betriebsprofil`**:
 
 ```json
 {
   "aktiv": "t1-normal",
   "profile": {
-    "t1-normal": {
-      "singleLargeTimeoutMs": 300000,
-      "singleLargeMaxTokens": 5000,
-      "parallelitaet": 7
-    },
-    "t1-langsam": {
-      "singleLargeTimeoutMs": 450000,
-      "singleLargeMaxTokens": 5000,
-      "parallelitaet": 7
-    },
-    "t2-normal": {
-      "singleLargeTimeoutMs": 300000,
-      "singleLargeMaxTokens": 5000,
-      "parallelitaet": 14,
-      "stundenlimit": 1000
-    }
+    "t1-normal": { … alle 26 Werte … },
+    "t1-langsam": { … },
+    "t2-schnell": { … }
   }
 }
 ```
 
-**Umstellen heißt: das Feld `aktiv` ändern.** Alle Werte des Satzes ziehen mit,
-sofort und ohne Deploy. Der Wert wird 30 Sekunden zwischengespeichert.
+**Umstellen heißt: das Feld `aktiv` ändern.** Alle Werte des Satzes ziehen
+mit.
+
+Ein Satz muss **vollständig** sein. Fehlt ein Feld, wird der ganze Satz
+abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
+
+---
+
+## Die 26 Werte
+
+### 1 · Die KI-Aufrufe
+
+| Feld | heute | Bedeutung |
+|---|---|---|
+| `singleLargeTimeoutMs` | 300000 | Wie lange ein Analyse-Aufruf dauern darf |
+| `singleLargeMaxTokens` | 5000 | Wie viel Text die KI ausgeben darf |
+| `mistralTimeoutMs` | 90000 | Zeitgrenze der übrigen Aufrufe |
+| `describeMaxTokens` | 2048 | Textmenge der Bildbeschreibung |
+| `profileMaxTokens` | 16000 | Textmenge der Profilerstellung |
+| `requestBudgetMs` | 480000 | Gesamtbudget eines Durchlaufs |
+
+### 2 · Andrang und Einlass
+
+| Feld | heute | Bedeutung |
+|---|---|---|
+| `parallelitaet` | 7 | Wie viele Analysen gleichzeitig laufen |
+| `warteschlangeTiefe` | 155 | Ab wie vielen Wartenden abgelehnt wird |
+| `durchschnittsdauerSekunden` | 65 | Ausgangswert der Wartezeit-Ansage |
+| `stundenlimit` | 500 | Analysen pro Zeitfenster |
+| `stundenfensterMinuten` | 60 | Größe dieses Fensters |
+| `adressLimit` | 500 | Anfragen je Internetanschluss |
+| `adressfensterMs` | 600000 | Größe dieses Fensters |
+
+### 3 · Der Notaufschlag
+
+| Feld | heute | Bedeutung |
+|---|---|---|
+| `boostFaktor` | 2 | Höchstens das Doppelte des Stundenlimits |
+| `boostFristMs` | 7200000 | Wie lange ein Aufschlag gilt |
+
+### 4 · Rücksicht auf den KI-Anbieter
+
+| Feld | heute | Bedeutung |
+|---|---|---|
+| `drosselMaxParallel` | 6 | Gleichzeitige Aufrufe an Mistral |
+| `drosselWartelimitMs` | 360000 | Wie lange ein Aufruf auf seinen Platz wartet |
+| `tokenAbstandGrossMs` | 800 | Mindestabstand zwischen großen Aufrufen |
+| `tokenAbstandKleinMs` | 2500 | Mindestabstand zwischen kleinen Aufrufen |
+
+### 5 · Fristen und Aufräumen
+
+| Feld | heute | Bedeutung |
+|---|---|---|
+| `jobAufbewahrungMs` | 7200000 | Wie lange ein Auftrag höchstens liegt |
+| `zustellfensterMs` | 900000 | Abholfenster für das Ergebnis |
+| `livenessGnadenfristMs` | 480000 | Karenz, bevor ein Wartender als weg gilt |
+| `verarbeitungsZeitlimitMs` | 540000 | Ab wann ein laufender Auftrag als hängend gilt |
+| `wartendesHoechstalterMs` | 2100000 | Absolutes Höchstalter eines Wartenden |
+| `aufraeumStapel` | 200 | Wie viele Aufträge je Aufräumlauf |
+| `ticketGueltigkeitMs` | 1800000 | Gültigkeit der Verwaltungs-Knöpfe |
+
+---
+
+## Vier Obergrenzen sind Zusagen
+
+Bei vier Feldern ist die zulässige Obergrenze **nicht** großzügig gewählt,
+sondern exakt das, was die Datenschutzerklärung öffentlich verspricht:
+
+```
+jobAufbewahrungMs      max 2 h      "nie abgeholte spätestens nach rund 2 Stunden"
+zustellfensterMs       max 15 min   "wenige Minuten nach der Abholung gelöscht"
+adressfensterMs        max 10 min   "merkt sich deine IP für maximal 10 Minuten"
+stundenfensterMinuten  max 60       "die Zeitpunkte der Analysen der letzten 60 Minuten"
+```
+
+Der Einstellungssatz kann diese Fristen nur **verkürzen**. Wäre es anders,
+ließe sich eine öffentliche Zusage mit einem Datenbankeintrag brechen —
+während die Erklärung auf der Website weiter dasselbe sagt.
+
+**Wer eine dieser Grenzen anheben will, ändert zuerst die
+Datenschutzerklärung.**
+
+---
+
+## Was ausdrücklich nicht einstellbar ist
+
+Nicht jede Zahl darf sich im Betrieb ändern lassen. Ein Eintrag in der
+Datenbank ist in Sekunden geändert: ohne Commit, ohne Review, ohne Spur im
+offenen Quelltext.
+
+Für eine Zeitgrenze ist das genau richtig. Für eine Zusage wäre es fatal.
+Stünde dort der KI-Endpunkt, könnte ein einziger Schreibzugriff die Analyse
+still auf einen Server außerhalb der EU umlenken — während die Website weiter
+dasselbe verspricht, der Quelltext auf GitHub unverändert bleibt und die
+Prüfsummen unter `malzi.me/build-info.json` weiter stimmen. Der Bruch wäre von
+außen nicht nachweisbar.
+
+Im Code bleiben deshalb, jeweils mit ausgeschriebener Begründung an Ort und
+Stelle:
+
+| bleibt im Code | Grund |
+|---|---|
+| EU-Endpunkt `api.eu.mistral.ai` | Datenschutzzusage |
+| EU-Datenbank `malzime-eu` | Datenschutzzusage |
+| Die benannten KI-Modelle | Zusage, welches Modell rechnet |
+| Upload-Obergrenze 25 MB | Sicherheitsgrenze |
+| Erlaubte Dateiformate | Sicherheitsliste |
+| Gekürzte Feldlängen der Fehlerprotokolle | Datenschutz in Zahlenform |
+| Langsamste gemessene KI-Geschwindigkeit | Messergebnis, kein Sollwert |
+
+Zwei Mechanismen halten die Trennung aufrecht:
+
+1. **Der Satz kann diese Werte nicht übernehmen.** Gelesen werden
+   ausschließlich die 26 bekannten Zahlenfelder; alles andere im Dokument wird
+   ignoriert.
+2. **`scripts/pruefe-doppelte-werte.py` geht vom Code aus** — nicht von dieser
+   Liste — und verlangt für jede Zahlenkonstante eine von zwei Antworten: Sie
+   steht im Satz (dann darf sie im Code nicht noch einmal stehen), oder sie
+   trägt einen Kommentar `BLEIBT IM CODE — <Grund>`. Alles andere hält die
+   Auslieferung an. Läuft in der Pipeline und vor jedem Push.
+
+---
 
 ## Die Riegel
 
-**Ein Satz wird geprüft, bevor er gilt.** Passt die erlaubte Textmenge nicht in
-die erlaubte Zeit, liegt eine Einzelgrenze über dem Gesamtbudget oder das
-Budget über dem, was Google der Funktion gibt — dann wird der Satz **abgelehnt**
-und die Werte aus dem Code gelten weiter.
+**Ein Satz wird geprüft, bevor er gilt.** Abgelehnt wird er, wenn:
 
-Das ist die Sicherung, an der die Idee einzelner Schalter im August gescheitert
-ist. Sie ist hier strenger als vorher: Statt beim Start abzustürzen, verwirft
-das System den falschen Wert und läuft mit den bewährten weiter.
+- ein Pflichtfeld fehlt
+- ein Wert keine positive Zahl ist
+- ein Wert außerhalb seines zulässigen Bereichs liegt
+- die erlaubte Textmenge nicht in die erlaubte Zeit passt
+- eine Einzelgrenze über dem Gesamtbudget liegt
+- das Budget über dem liegt, was Google der Funktion gibt
+- das Zustellfenster über der Aufbewahrung liegt
 
-**Jeder Rückfall führt zu den Code-Werten:** kein Dokument, kein aktiver Satz,
-Satz nicht hinterlegt, Prüfung nicht bestanden, Datenbank nicht lesbar. Der
-schlechteste Fall ist damit der Zustand von vorher.
+Die Kopplungsprüfung „Textmenge muss in die Zeit passen" ist der Riegel gegen
+den Ausfall vom 17. August 2026. Sie lief früher nur beim Start der Funktion;
+jetzt prüft sie **jeden** Satz, auch die, die erst im Betrieb entstehen.
 
-## Wirksame Werte und Sollwerte — ein wichtiger Unterschied
+**Ein abgelehnter Satz meldet sich sofort.** Ein Firestore-Auslöser (`satzWache`)
+feuert im Moment der Änderung und schickt eine Nachricht auf beide Kanäle: bei
+einem gültigen Satz die übernommenen Werte, bei einem abgelehnten den Grund im
+Klartext plus einen Fehlereintrag, der die Alarmierung auslöst.
 
-| Wert | Wirkung |
-|------|---------|
-| `singleLargeTimeoutMs`, `singleLargeMaxTokens`, `mistralTimeoutMs`, `requestBudgetMs` | **Wirken sofort** — gehen direkt in den Analyse-Aufruf |
-| `parallelitaet`, `stundenlimit`, `adressLimit` | **Sollwerte** — ändern von sich aus nichts |
+Ohne diesen Auslöser hätte sich ein kaputter Satz erst gemeldet, wenn jemand
+eine Analyse versucht — nachts also gar nicht.
 
-Die Parallelität wird von der Warteschlange bei Google bestimmt; Stunden- und
-Adress-Limit steuert der Boost-Mechanismus. Im Profil stehen sie als das, was
-gelten **soll** — die tägliche Prüfung vergleicht sie mit der Wirklichkeit und
-meldet Abweichungen.
+---
 
-Das ist bewusst so: Ein Profil `t2-normal` muss ablesbar machen, dass dort
-vierzehn Analysen parallel laufen sollen. Wer den Wert ändert, ändert die
-Erwartung; die Prüfung sagt dann, ob die Anlage noch dazu passt.
+## Beim Ausliefern: die Reihenfolge zählt
 
-## Was drin steht — und was nicht
+> **Erst den Einstellungssatz anlegen, dann ausliefern.**
 
-Im Profil: Zeitgrenzen und Textmenge der KI-Aufrufe, Parallelität,
-Stundenlimit, Adress-Limit.
+Umgekehrt stünde zwischen Auslieferung und Anlegen ein Zeitraum, in dem keine
+Analyse läuft. Der Satz kann gefahrlos vorher angelegt werden — die alte
+Fassung liest ihn nicht.
 
-**Bewusst im Code:**
+```bash
+# 1. Satz anlegen und nachmessen
+node scripts/betriebsprofil-anlegen.js
+# 2. erst danach
+sh scripts/deploy.sh
+```
 
-| Wert | Grund |
-|------|-------|
-| Upload-Grenze | Sicherheitsgrenze — zur Laufzeit erhöht eine offene Tür für Überlastung |
-| Feldlängen der Fehlererfassung | Datenschutzzusage in Zahlenform |
-| Modellname, EU-Endpunkt | Zusage an die Nutzer; umschaltbar hieße, sie unbemerkt brechen zu können |
-| Stundenlimit (praktisch) | Bereits über den Boost steuerbar — zweimal steuerbar wäre schlechter als einmal |
+## Zurück auf den Stand davor
 
-## Was das Profil NICHT kann
+Der Rückweg führt auf **v4.2.3**. Der Einstellungssatz kann liegen bleiben —
+die alte Fassung ignoriert ihn.
 
-Die Warteschlange bei Google zieht **nicht** automatisch mit. Sie ist ein
-fremdes System; eine Änderung dort gehört durch die Prüfkette, nicht in eine
-nächtliche Automatik. Stattdessen vergleicht eine tägliche Prüfung beide Seiten
-und meldet Abweichungen mit beiden Zahlen und dem Weg zur Abhilfe.
-
-## Nachsehen, was gerade gilt
-
-`https://malzi.me/api/stats` nennt unter `betrieb` den aktiven Satz, die
-Herkunft (`firestore` oder `code`) und die geltende Zeitgrenze.
+```bash
+git checkout v4.2.3 && sh scripts/deploy.sh
+```

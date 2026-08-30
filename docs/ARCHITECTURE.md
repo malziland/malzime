@@ -38,10 +38,10 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │                                                                    │
 │  Validation in handle-enqueue.js                                   │
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
-│     ├─ Rate-Limit (IP-basiert, 500/10min, In-Memory pro Instanz)  │
+│     ├─ Rate-Limit (IP-basiert, Wert im Einstellungssatz)          │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
-│     ├─ Hourly-Limit-Check (Firestore, 500/Std. rollendes Fenster)  │
-│     └─ Queue-Tiefen-Bremse (MAX_QUEUE_DEPTH)                       │
+│     ├─ Hourly-Limit-Check (Firestore, rollendes Fenster)           │
+│     └─ Queue-Tiefen-Bremse (warteschlangeTiefe)                    │
 │                                                                    │
 │  Bild → GCS-Bucket, Job-Dokument → Firestore, Task → Cloud Tasks   │
 │  Antwort an den Browser: { jobId } — KEINE Analyse in dieser       │
@@ -112,17 +112,17 @@ Browser ◄──GET /api/job-status?jobId=──  Polling alle 2 s (= Liveness-
 
 ### Client-Liveness
 
-Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-Poll schreibt `lastSeenAt`. Bleibt das Lebenszeichen länger als `LIVENESS_GRACE_MS` (8 min) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
+Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-Poll schreibt `lastSeenAt`. Bleibt das Lebenszeichen länger als `livenessGnadenfristMs` (Einstellungssatz) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
 
 ### Reaper
 
-`reapJobs` läuft im Minutentakt und räumt auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Timeout → `failed`), überfällige wartende Jobs (älter als `MAX_QUEUED_AGE_MS` = 35 min → `abandoned`, auch wenn noch gepollt wird), zugestellte Ergebnisse nach dem Browser-Wiederholungs-Fenster (15 min ab Erstzustellung → gelöscht, PRIV-107b) und abgelaufene Job-Dokumente (älter als `JOB_RETENTION_MS` = 2 h → gelöscht). Bei `abandoned` wird der Stunden-Slot zurückgegeben und das zwischengespeicherte Bild mitgelöscht.
+`reapJobs` läuft im Minutentakt und räumt auf: verlassene wartende Jobs (`queued` ohne Herzschlag → `abandoned`), hängende Jobs (`processing` über dem Zeitlimit → `failed`), überfällige wartende Jobs (älter als `wartendesHoechstalterMs` → `abandoned`, auch wenn noch gepollt wird), zugestellte Ergebnisse nach dem Browser-Wiederholungs-Fenster (`zustellfensterMs` ab Erstzustellung → gelöscht, PRIV-107b) und abgelaufene Job-Dokumente (älter als `jobAufbewahrungMs` → gelöscht). Alle vier Fristen stehen im Einstellungssatz ([BETRIEBSPROFILE.md](BETRIEBSPROFILE.md)); zwei davon sind nach oben durch Datenschutzzusagen begrenzt. Bei `abandoned` wird der Stunden-Slot zurückgegeben und das zwischengespeicherte Bild mitgelöscht.
 
 ### Einlass-Politik
 
-Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (500/h, rollendes 60-Minuten-Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab 155 wartenden Jobs (`MAX_QUEUE_DEPTH`) lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. In der Praxis greift fast immer das Stundenlimit zuerst: 500/h Einlass steht einem Verarbeitungs-Durchsatz von ~387 Analysen/h gegenüber (Concurrency 7 × ~65 s/Job).
+Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab `warteschlangeTiefe` wartenden Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt (`parallelitaet` × gemessene Dauer je Analyse). Beide Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
 
-Dazu kommt die Selbstregulation: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten. Abbrecher werden nach der 8-Minuten-Karenz gereapt und geben ihren Stunden-Slot zurück. Wartende Jobs haben zusätzlich ein absolutes Höchstalter von 35 Minuten (`MAX_QUEUED_AGE_MS`) — fortlaufendes Pollen hält einen Job also nicht unbegrenzt am Leben.
+Dazu kommt die Selbstregulation: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten. Abbrecher werden nach der Karenz (`livenessGnadenfristMs`) gereapt und geben ihren Stunden-Slot zurück. Wartende Jobs haben zusätzlich ein absolutes Höchstalter (`wartendesHoechstalterMs`) — fortlaufendes Pollen hält einen Job also nicht unbegrenzt am Leben.
 
 ### Lokaler Betrieb
 

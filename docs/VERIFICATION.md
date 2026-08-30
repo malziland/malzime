@@ -42,7 +42,7 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 | SERVICE_API | Autorisierung fail-closed | ✅ Admin nur mit HMAC-Token + Nonce (`auth.js`, Tests); Nonce-Verbrauch seit v3.0.4 auch bei Firestore-Fehlern fail-closed (vorher fail-open); `processJob` nur via OIDC (Cloud Tasks) |
 | DATA_ML_GENAI | LLM-Ausgaben schema-validiert, kein ungeprüftes Freitext-Parsing für Logik | ✅ JSON-Schema in Prompts + `json-repair.js` + Output-Clamps; LLM-Ausgaben steuern keine Tools/Folgeprozesse |
 | DATA_ML_GENAI | Untrusted-Input-Annahme (Prompt Injection) | ✅ XML-Isolation + `escapeXml()` (SEC-003), Bounds (SEC-004) |
-| DATA_ML_GENAI | Kosten-Grenzen | ✅ Stundenlimit 500 (Code-Gate) + GCP-Budget-Alarm (extern, siehe unten) |
+| DATA_ML_GENAI | Kosten-Grenzen | ✅ Stundenlimit (Einstellungssatz in Firestore) + GCP-Budget-Alarm (extern, siehe unten) |
 
 ## Externe Kontrollen (nicht aus dem Repo verifizierbar)
 

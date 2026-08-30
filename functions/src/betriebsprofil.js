@@ -62,6 +62,31 @@
  * kapazitaets-wache.js). Der Profilwert dient der Wartezeit-Rechnung; die
  * Wache meldet, wenn beide Seiten auseinanderlaufen.
  *
+ * ── VIER OBERGRENZEN SIND ZUSAGEN, KEINE PLAUSIBILITAETSGRENZEN ───────────
+ *
+ * Bei vier Feldern ist die Obergrenze in FELDER nicht willkuerlich weit
+ * gewaehlt, sondern exakt das, was die Datenschutzerklaerung oeffentlich
+ * verspricht:
+ *
+ *   jobAufbewahrungMs   max 2 h    "nie abgeholte spaetestens nach rund
+ *                                   2 Stunden"
+ *   zustellfensterMs    max 15 min "wenige Minuten nach der Abholung
+ *                                   automatisch geloescht"
+ *   adressfensterMs     max 10 min "merkt sich deine IP fuer maximal
+ *                                   10 Minuten"
+ *   stundenfensterMin.  max 60     "die Zeitpunkte der Analysen der letzten
+ *                                   60 Minuten"
+ *
+ * Der Einstellungssatz kann diese Fristen nur VERKUERZEN. Waeren sie weiter
+ * einstellbar, liesse sich eine oeffentliche Datenschutzzusage mit einem
+ * Datenbankeintrag brechen — ohne Commit, ohne Review, ohne Spur im
+ * Quelltext, waehrend die Erklaerung auf der Website weiter dasselbe sagt.
+ *
+ * WER EINE DIESER GRENZEN ANHEBEN WILL, AENDERT ZUERST DIE
+ * DATENSCHUTZERKLAERUNG — nicht diese Datei. (Befund aus dem eigenen Review
+ * am 30.08.2026: drei der vier Fristen waren zunaechst weit darueber hinaus
+ * einstellbar.)
+ *
  * WAS BEWUSST NICHT HIER STEHT: Upload-Grenze (Sicherheitsgrenze),
  * Feldlaengen der Fehlererfassung (Datenschutzzusage in Zahlenform),
  * Modellname und EU-Endpunkt (Zusage an die Nutzer). Zur Laufzeit umschaltbar
@@ -95,63 +120,76 @@ const CACHE_MS = 30 * 1000;
 /* Obergrenze, die Google der Function gibt. Kein Profil darf darueber. */
 const FUNCTION_LIMIT_MS = 540 * 1000;
 
-/* Plausibilitaetsgrenzen. GRUND (Review 30.08.2026): Ohne sie liess sich
-   `parallelitaet: 99999` setzen. Alle anderen Unsinnswerte fing die
-   Kopplungsrechnung ab, dieser nicht — er waere durchgegangen und haette die
-   Wartezeit-Ansage und die Einlassgrenze absurd gemacht: Es waeren weit mehr
-   Leute eingelassen worden, als je bedient werden koennen.
+/* WELCHE WERTE EIN EINSTELLUNGSSATZ TRAEGT.
+   Alle sind PFLICHT. Es gibt keine Kann-Felder und keine Rueckfallwerte mehr:
+   Ein halber Satz ist ein kaputter Satz, und ein Wert, der an zwei Orten
+   steht, laeuft frueher oder spaeter auseinander.
 
-   Die Obergrenzen sind bewusst weit ueber jedem realistischen Bedarf gewaehlt
-   (heute: 7 parallel, 500 pro Stunde). Sie sollen keinen sinnvollen Ausbau
-   verhindern, sondern nur Tippfehler und Unfug abfangen. */
-const GRENZEN = {
-  parallelitaet: { min: 1, max: 100 },
+   Vorgabe des Nutzers (30.08.2026): "Jeder Wert darf nur einmal vorkommen,
+   und dieser muss aus dem Store geliefert werden. Weitere Konstanten oder
+   Uebergabewerte darf es so nicht geben."
+
+   Was hier NICHT steht, ist bewusst keine Einstellung — siehe Kopf der Datei. */
+const FELDER = {
+  /* --- 1. Die KI-Aufrufe: wie lange, wie viel Text --- */
+  mistralTimeoutMs: { min: 5000, max: 540000 },
+  singleLargeTimeoutMs: { min: 5000, max: 540000 },
+  singleLargeMaxTokens: { min: 100, max: 100000 },
   describeMaxTokens: { min: 100, max: 100000 },
   profileMaxTokens: { min: 100, max: 100000 },
-  stundenfensterMinuten: { min: 1, max: 1440 },
-  adressfensterMs: { min: 1000, max: 24 * 60 * 60 * 1000 },
-  jobAufbewahrungMs: { min: 60 * 1000, max: 7 * 24 * 60 * 60 * 1000 },
-  zustellfensterMs: { min: 60 * 1000, max: 24 * 60 * 60 * 1000 },
-  livenessGnadenfristMs: { min: 30 * 1000, max: 60 * 60 * 1000 },
+  requestBudgetMs: { min: 5000, max: 540000 },
+
+  /* --- 2. Andrang: wie viele wir gleichzeitig und pro Stunde einlassen --- */
+  parallelitaet: { min: 1, max: 100 },
+  warteschlangeTiefe: { min: 1, max: 10000 },
+  durchschnittsdauerSekunden: { min: 1, max: 3600 },
   stundenlimit: { min: 1, max: 100000 },
+  /* OBERGRENZE = ZUSAGE: "die Zeitpunkte der Analysen der letzten 60 Minuten"
+     steht so in der Datenschutzerklaerung. Ein groesseres Fenster hiesse:
+     laenger aufbewahrte Zeitstempel, als zugesagt. */
+  stundenfensterMinuten: { min: 1, max: 60 },
   adressLimit: { min: 1, max: 100000 },
-  singleLargeMaxTokens: { min: 100, max: 100000 },
+  /* OBERGRENZE = ZUSAGE: Die Datenschutzerklaerung sagt "merkt sich deine IP
+     fuer maximal 10 Minuten im Arbeitsspeicher, dann ist sie weg". Ein
+     laengeres Fenster waere eine laengere Speicherung — der Satz kann das
+     Fenster nur verkuerzen. */
+  adressfensterMs: { min: 1000, max: 10 * 60 * 1000 },
+
+  /* --- 3. Der Notaufschlag fuer einen ueberfuellten Workshop --- */
+  boostFaktor: { min: 1, max: 20 },
+  boostFristMs: { min: 60 * 1000, max: 24 * 60 * 60 * 1000 },
+
+  /* --- 4. Ruecksicht auf Mistral: nicht mehr schicken, als die dort erlauben --- */
+  drosselMaxParallel: { min: 1, max: 100 },
+  drosselWartelimitMs: { min: 1000, max: 30 * 60 * 1000 },
+  tokenAbstandGrossMs: { min: 0, max: 60 * 1000 },
+  tokenAbstandKleinMs: { min: 0, max: 60 * 1000 },
+
+  /* --- 5. Fristen: wie lange etwas liegen bleibt, bis aufgeraeumt wird ---
+
+     ACHTUNG, HIER IST DIE OBERGRENZE SELBST EINE ZUSAGE:
+     Die Datenschutzerklaerung verspricht an vier Stellen, dass Job-Daten
+     "spaetestens nach rund 2 Stunden" geloescht werden. Waere hier eine
+     hoehere Grenze erlaubt, liesse sich diese Zusage mit einem einzigen
+     Datenbankeintrag brechen — ohne Commit, ohne Spur im Quelltext.
+
+     Die Grenze ist deshalb die Zusage: Der Einstellungssatz kann die Frist
+     nur VERKUERZEN, nie verlaengern. (Befund aus dem eigenen Review,
+     30.08.2026 — die Frist war zuvor bis 7 Tage einstellbar.) */
+  jobAufbewahrungMs: { min: 60 * 1000, max: 2 * 60 * 60 * 1000 },
+  /* OBERGRENZE = ZUSAGE: "wird wenige Minuten nach der Abholung automatisch
+     geloescht". Fuenfzehn Minuten sind der heutige Wert und die aeusserste
+     Lesart von "wenige Minuten". Wer mehr braucht, aendert ZUERST die
+     Datenschutzerklaerung — nicht diesen Wert. */
+  zustellfensterMs: { min: 60 * 1000, max: 15 * 60 * 1000 },
+  livenessGnadenfristMs: { min: 30 * 1000, max: 60 * 60 * 1000 },
+  verarbeitungsZeitlimitMs: { min: 60 * 1000, max: 60 * 60 * 1000 },
+  wartendesHoechstalterMs: { min: 60 * 1000, max: 24 * 60 * 60 * 1000 },
+  aufraeumStapel: { min: 1, max: 5000 },
+  ticketGueltigkeitMs: { min: 60 * 1000, max: 24 * 60 * 60 * 1000 },
 };
 
-/* Die Werte, die ein Profil tragen darf — und ihre Herkunft im Code, die als
-   Rueckfallebene gilt. Was hier nicht steht, ist nicht umstellbar. */
-/* Welche Felder ein Einstellungssatz tragen darf. Die Werte selbst stehen
-   NICHT mehr im Code — sie kommen ausschliesslich aus Firestore.
-
-   PFLICHT: ohne diese Felder ist ein Satz unvollstaendig und wird abgelehnt. */
-const PFLICHTFELDER = [
-  "mistralTimeoutMs",
-  "singleLargeTimeoutMs",
-  "singleLargeMaxTokens",
-  "requestBudgetMs",
-  /* Textmengen der uebrigen KI-Aufrufe — Nachtrag 30.08.2026: Sie fehlten
-     zunaechst, obwohl sie genauso anpassbar sind wie die Hauptgrenze. */
-  "describeMaxTokens",
-  "profileMaxTokens",
-];
-
-/* KANN-FELDER: Sollwerte fuer den taeglichen Abgleich (kapazitaets-wache).
-   Sie steuern nichts unmittelbar — die Warteschlange bei Google und der
-   Boost-Mechanismus tun das —, benennen aber, was gelten SOLL. */
-const KANNFELDER = [
-  "parallelitaet",
-  "stundenlimit",
-  "adressLimit",
-  /* ZEITFENSTER — Nachtrag 30.08.2026. Ohne sie waren die Limits nur halb
-     einstellbar: "500 Analysen" liess sich aendern, "pro Stunde" nicht. Eine
-     Zahl ohne ihren Bezugsraum ist keine Einstellung. */
-  "stundenfensterMinuten",
-  "adressfensterMs",
-  /* Betriebsfristen — anpassbar, aber nicht analysekritisch. */
-  "jobAufbewahrungMs",
-  "zustellfensterMs",
-  "livenessGnadenfristMs",
-];
+const PFLICHTFELDER = Object.keys(FELDER);
 
 let cache = { zeit: 0, werte: null, quelle: "code" };
 /* Laeuft gerade ein Lesevorgang? Dann warten alle weiteren darauf, statt
@@ -182,7 +220,7 @@ function pruefe(werte) {
     }
   }
   /* Plausibilitaetsgrenzen — fangen Tippfehler und Unfug ab. */
-  for (const [name, g] of Object.entries(GRENZEN)) {
+  for (const [name, g] of Object.entries(FELDER)) {
     if (werte[name] === undefined) continue;
     if (werte[name] < g.min || werte[name] > g.max) {
       return `${name} (${werte[name]}) liegt ausserhalb des plausiblen Bereichs ${g.min}–${g.max}`;
@@ -205,6 +243,15 @@ function pruefe(werte) {
       return `${name} (${werte[name]} ms) liegt ueber requestBudgetMs (${werte.requestBudgetMs} ms)`;
     }
   }
+  /* Das Zustellfenster darf die Aufbewahrung nicht ueberschreiten — sonst
+     wartet der Reaper auf ein Fenster, das nach der Loeschung endet. */
+  if (werte.zustellfensterMs > werte.jobAufbewahrungMs) {
+    return (
+      `zustellfensterMs (${werte.zustellfensterMs} ms) liegt ueber ` +
+      `jobAufbewahrungMs (${werte.jobAufbewahrungMs} ms) — das Ergebnis waere ` +
+      `geloescht, bevor das Wiederholungsfenster endet`
+    );
+  }
   /* Das Gesamtbudget unter dem, was Google der Function gibt. */
   if (werte.requestBudgetMs > FUNCTION_LIMIT_MS) {
     return `requestBudgetMs (${werte.requestBudgetMs} ms) liegt ueber dem Function-Limit (${FUNCTION_LIMIT_MS} ms)`;
@@ -223,7 +270,7 @@ function pruefe(werte) {
 function felderLesen(satz) {
   const werte = {};
   if (!satz || typeof satz !== "object") return werte;
-  for (const name of [...PFLICHTFELDER, ...KANNFELDER]) {
+  for (const name of PFLICHTFELDER) {
     if (typeof satz[name] === "number") werte[name] = satz[name];
   }
   return werte;
@@ -340,5 +387,5 @@ module.exports = {
   _felderLesen: felderLesen,
   _cacheLeeren,
   _DOKUMENT: DOKUMENT,
-  _KANNFELDER: KANNFELDER,
+  _FELDER: FELDER,
 };

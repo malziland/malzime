@@ -33,11 +33,17 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   index.js           Cloud-Function-Exports (stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
   handle-stats.js    Stats-Handler (GET-only)
   handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
-  config.js          Konstanten + Mistral-Modell-IDs + Limits + HOURLY_LIMIT (500)
+  config.js          NUR NOCH, was bewusst NICHT einstellbar ist: Modell-IDs,
+                     EU-Endpunkt, EU-Datenbank, Upload-Grenze, erlaubte
+                     Dateiformate. Jede Zeile mit Begruendung 'BLEIBT IM CODE'.
+                     Betriebswerte stehen seit 30.08.2026 AUSSCHLIESSLICH im
+                     Firestore-Einstellungssatz -> docs/BETRIEBSPROFILE.md
+  betriebsprofil.js  Die 26 einstellbaren Werte, ihre Grenzen und die Pruefung
+                     jedes Satzes. Vier Obergrenzen SIND Datenschutzzusagen.
   counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance-Mode
   notify.js          ntfy Push-Benachrichtigungen bei Limit-Erreichung
   animal.js          SUBJECT-Klassifikation aus Mistral-Beschreibungstext + Easter-Egg-Profile (Hund/Katze/Vogel/...)
-  middleware.js      Rate Limiting (IP-basiert, 500/10min), IP-Extraktion
+  middleware.js      Rate Limiting (IP-basiert, Grenze+Fenster aus dem Einstellungssatz), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
   mistral.js         Mistral AI: AKTIV runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call); Fallback 3-Call-Hybrid Large (Describe) + Small (Profile) hinter Feature-Flag useSingleLargeCall

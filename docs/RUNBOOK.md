@@ -39,9 +39,30 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 3. CHANGELOG: Sobald deployt wird, ist das ein Release — den
    `[Unveröffentlicht]`-Abschnitt im selben Schritt auf neue Versionsnummer und
    Datum stempeln.
-4. Deploy über `./scripts/deploy.sh [hosting|functions]` — das Script führt
-   zuerst Lint + Unit-Tests aus (Test-Guard; nur im Notfall mit `SKIP_TESTS=1`
-   überspringbar, mit Warnhinweis), prüft die Version der Firebase-CLI gegen die
+4. Deploy über `./scripts/deploy.sh [hosting|functions]`.
+
+   **Seit 31.08.2026 läuft zuerst ein Trockenlauf** (`firebase deploy
+   --dry-run`, rund 28 Sekunden), in derselben Reihenfolge und mit denselben
+   Zielen wie der echte Deploy. Anlass waren sechs gescheiterte Auslieferungen
+   an einem Tag — jede davon wäre hier sichtbar geworden, zusammen rund
+   zweieinhalb Stunden. Bricht er ab, passiert nichts weiter (Notschalter
+   `SKIP_DRYRUN=1`). Scheitert der Deploy später doch, nimmt das Skript die
+   hochgezählte Cache-Kennung selbst zurück — sonst blockiert ein
+   gescheiterter Versuch den nächsten am Sauberkeits-Riegel.
+
+   **Lint und Unit-Tests laufen nur noch, wenn die Stand-Bindung NICHT
+   gegriffen hat.** Sie verlangt ohnehin einen sauberen Arbeitsbaum,
+   `HEAD == origin/main` und sechs grüne Pflicht-Checks — damit sind dieselben
+   Suiten über bitgenau denselben Code bereits belegt. Fällt sie aus
+   (`SKIP_STAND=1`), laufen sie vollständig.
+
+   **Wartet der main-Lauf noch, zählen die Ergebnisse des Pull Requests** —
+   aber nur, wenn dessen Baum-Kennung identisch ist. Dann ist jede Datei
+   bitgenau gleich, und eine Prüfung kann nichts anderes finden. Zusammen mit
+   dem vorigen Punkt spart das rund elf Minuten je Auslieferung, ohne einen
+   Riegel aufzugeben.
+
+   Das Skript prüft weiter die Version der Firebase-CLI gegen die
    in `deploy.sh` hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`; eine
    nicht ermittelbare Version bricht ab, statt durchzuwinken —
    `OPS-2026-08-12-25`) und zählt dann den Cache-Buster in allen

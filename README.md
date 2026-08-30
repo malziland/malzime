@@ -261,6 +261,27 @@ Zwei Mechanismen halten die Trennung aufrecht:
    Begruendung `BLEIBT IM CODE — <Grund>`. Alles andere haelt die Auslieferung an.
    Die Pruefung laeuft in der Pipeline und vor jedem Push.
 
+### Zwei Waechter gegen teure Umbauten
+
+Ein Umbau des Einstellungssatzes am 30.08.2026 erzeugte 39 Fundstellen. Nicht
+weil der Code schlecht waere, sondern weil eine Aenderung dieser Art weit
+ausstrahlt — und weil nirgends stand, was zusammengehoert. Zwei Waechter halten
+das jetzt fest:
+
+`scripts/pruefe-mitzieher.py` beantwortet die Frage **"wenn du X aenderst,
+gehoert Y mitgezogen"**. Ein neues Pflichtfeld im Einstellungssatz braucht vier
+weitere Stellen; eine neue Cloud Function einen Eintrag im Alarm-Filter; eine
+neue Seite unter `public/` die Cache-Kennung. Jede Regel nennt, was passiert,
+wenn man sie vergisst — eine Meldung ohne Grund wird irgendwann weggeklickt.
+
+`scripts/pruefe-kopplung.py` meldet, wenn Dateien **wieder zusammenwachsen**.
+Die Grenzen sind der gemessene Stand, aufgerundet: eine Sperrklinke, von hier
+aus nur noch abwaerts. Sie verbieten nichts, sie verlangen eine Entscheidung —
+teilen oder die Grenze bewusst anheben und danebenschreiben, warum.
+
+Beide laufen in der Pipeline und vor jedem Push. Beide melden **"nicht
+messbar"** statt stillschweigend gruen, wenn ihre Grundlage fehlt.
+
 ## Tests
 
 Alle Suiten laufen automatisiert in der CI bei jedem Push und Pull Request

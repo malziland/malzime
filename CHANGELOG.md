@@ -4,6 +4,40 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Neu
+
+- **Vor jeder Auslieferung läuft eine Probe.** Sie prüft in einer halben
+  Minute, ob die Auslieferung durchgehen würde — ohne etwas zu verändern.
+  Anlass waren sechs abgebrochene Auslieferungen an einem einzigen Tag; jede
+  einzelne wäre in dieser Probe sichtbar gewesen. Bricht eine Auslieferung
+  trotzdem ab, räumt sie jetzt hinter sich auf, statt den nächsten Versuch zu
+  blockieren.
+
+- **Zwei neue Wächter gegen teure Umbauten.** Der eine merkt sich, was
+  zusammengehört: Wer eine Einstellung hinzufügt, wird an die vier weiteren
+  Stellen erinnert, die mitziehen müssen. Der andere meldet, wenn Dateien
+  wieder zusammenwachsen, die getrennt gehören. Beide melden ausdrücklich
+  „nicht messbar", wenn ihre Grundlage fehlt, statt stillschweigend grün zu
+  sein.
+
+### Geändert
+
+- **Eine Auslieferung dauert rund elf Minuten weniger.** Die sechs Prüfungen
+  liefen zweimal über bitgenau denselben Code, und danach wiederholte das
+  Auslieferungs-Skript noch einmal Tests, die längst bestanden waren. Beide
+  Doppelungen sind weg; kein einziger Riegel wurde dafür entfernt.
+
+- **Die Antwort-Auswertung der KI liegt in einer eigenen Datei.** Die
+  Hauptdatei war auf 1691 Zeilen gewachsen und vermischte vier Aufgaben.
+
+### Behoben
+
+- **Ein Test in der Prüfkette schlug gelegentlich grundlos fehl** und hielt
+  damit Auslieferungen auf, obwohl nichts kaputt war. Er trennte zwei
+  Handgriffe, zwischen denen unter Last etwas dazwischenkommen konnte.
+
 ## [4.5.0] — 2026-08-30
 
 ### Neu

@@ -117,7 +117,7 @@ describe("CHAOS — Zufallswerte", () => {
       const grund = _pruefe(satz);
       if (grund === null) {
         /* Durchgelassen? Dann muss jeder Wert eine sinnvolle Zahl sein. */
-        for (const [name, v] of Object.entries(satz)) {
+        for (const [, v] of Object.entries(satz)) {
           expect(typeof v).toBe("number");
           expect(Number.isFinite(v)).toBe(true);
           expect(v).toBeGreaterThan(0);

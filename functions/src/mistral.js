@@ -14,17 +14,7 @@
  * API-Key kommt aus process.env.MISTRAL_API_KEY (Firebase Secret).
  */
 
-const {
-  MISTRAL_DESCRIBE_MODEL,
-  MISTRAL_PROFILE_MODEL,
-  MISTRAL_FALLBACK_MODEL,
-  MISTRAL_ENDPOINT,
-  MISTRAL_DESCRIBE_MAX_TOKENS,
-  MISTRAL_PROFILE_MAX_TOKENS,
-  MISTRAL_TIMEOUT_MS,
-  MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
-  MISTRAL_SINGLE_LARGE_MAX_TOKENS,
-} = require("./config");
+const { MISTRAL_DESCRIBE_MODEL, MISTRAL_PROFILE_MODEL, MISTRAL_FALLBACK_MODEL, MISTRAL_ENDPOINT } = require("./config");
 /* Betriebsprofil: liefert die geltenden Werte (Firestore-Profil oder Code). */
 const { geltendeWerte } = require("./betriebsprofil");
 const { loadPrompts } = require("./i18n");

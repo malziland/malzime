@@ -178,7 +178,23 @@ fi
 # "allow read, write: if false"), der Schritt aendert also nichts und macht ihn
 # ab jetzt wiederholbar. Wer die Regeln aendert, muss sie sonst von Hand
 # ausrollen — und genau das faellt irgendwann aus.
-TARGET="${1:-hosting,functions,firestore:rules}"
+#
+# BEFUND 30.08.2026: Das Ziel hiess `firestore:rules` — und genau daran ist der
+# erste v4.4-Deploy gescheitert:
+#
+#   Error: Request to .../databases/(default) had HTTP Error: 404,
+#   Project 'malzime' or database '(default)' does not exist.
+#
+# `firestore:rules` sucht die STANDARD-Datenbank. Die gibt es hier nicht: Seit
+# dem Umzug nach Europa (PRIV-001) heisst sie `malzime-eu`. Die richtige
+# Schreibweise nennt die Datenbank statt der Regeln — mit Trockenlauf belegt:
+#   firebase deploy --only firestore:malzime-eu --dry-run  ->  compiled successfully
+#
+# Der Fehler war bis heute unsichtbar, weil der Schritt nie etwas aenderte.
+# Er scheiterte trotzdem — und riss den GANZEN Deploy mit, bevor Functions und
+# Hosting hochgeladen waren. Die Produktion blieb dabei unversehrt; das ist
+# Glueck, kein Entwurf.
+TARGET="${1:-hosting,functions,firestore:malzime-eu}"
 
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,

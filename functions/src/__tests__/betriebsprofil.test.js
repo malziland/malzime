@@ -15,13 +15,13 @@
  */
 
 const mockDoc = { daten: undefined, fehler: null, verzoegerung: 0 };
-let lesevorgaenge = 0;
+let _lesevorgaenge = 0; /* Zaehler bleibt fuer die Fehlersuche, wird aber nicht geprueft */
 
 jest.mock("../db", () => ({
   datenbank: () => ({
     doc: () => ({
       async get() {
-        lesevorgaenge += 1;
+        _lesevorgaenge += 1;
         if (mockDoc.verzoegerung) await new Promise((f) => setTimeout(f, mockDoc.verzoegerung));
         if (mockDoc.fehler) throw new Error(mockDoc.fehler);
         return { exists: mockDoc.daten !== undefined, data: () => mockDoc.daten };
@@ -41,7 +41,7 @@ function setze(daten, fehler = null, verzoegerung = 0) {
   mockDoc.daten = daten;
   mockDoc.fehler = fehler;
   mockDoc.verzoegerung = verzoegerung;
-  lesevorgaenge = 0;
+  _lesevorgaenge = 0;
   _cacheLeeren();
 }
 const satz = (werte, name = "t1-normal") => ({ aktiv: name, profile: { [name]: werte } });

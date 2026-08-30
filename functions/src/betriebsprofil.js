@@ -95,16 +95,11 @@
  */
 
 const { datenbank } = require("./db");
-const {
-  MISTRAL_TIMEOUT_MS,
-  MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
-  MISTRAL_SINGLE_LARGE_MAX_TOKENS,
-  MISTRAL_SLOWEST_TOKENS_PER_SECOND,
-  REQUEST_BUDGET_MS,
-  QUEUE_DISPATCH_CONCURRENCY,
-  HOURLY_LIMIT,
-  RATE_LIMIT,
-} = require("./config");
+/* Nur noch das gemessene Schreibtempo — die uebrigen Konstanten sind mit dem
+   Umbau in den Einstellungssatz gewandert und existieren in config.js nicht
+   mehr. Die Importe liefen ins Leere (undefined) und waren nur noch
+   Verwirrung fuer den naechsten Leser. */
+const { MISTRAL_SLOWEST_TOKENS_PER_SECOND } = require("./config");
 
 const DOKUMENT = "config/betriebsprofil";
 /* Zeitlimit fuer das Lesen. OHNE DAS waere die Rueckfallebene wertlos: Diese

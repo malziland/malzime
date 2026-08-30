@@ -92,6 +92,11 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Behoben
 
+- **Am iPhone bleibt die Scan-Anzeige vollständig sichtbar.** Auge, Text und
+  Fortschrittsbalken verschwanden auf dem Handy hinter der Adressleiste — man
+  sah sein Foto, aber nicht, dass die Analyse läuft. Auf dem Desktop trat das
+  nie auf, weil dort keine Leisten ein- und ausfahren.
+
 - **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
   Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
   an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
@@ -107,6 +112,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
   **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
   bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+## [4.2.3] — 2026-08-30
 
 - **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
   Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
@@ -136,11 +142,16 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   statt dass stillschweigend keine Analyse mehr läuft. Protokolliert werden
   ausschließlich Zahlen und der selbstgewählte Name des Satzes.
 
-## [Unveröffentlicht]
 
 
-
-### Behoben
+  Zwei Ursachen, beide behoben: Die Prüfung, ob die Anzeige im Bild liegt,
+  rechnete mit der Fensterhöhe — und die zählt auf dem iPhone die Leisten mit.
+  Und das Zurückholen benutzte die eingebaute Browser-Funktion, die ebenfalls
+  im Fenster zentriert; der Browser scrollte also, hielt es für erledigt, und
+  die Anzeige blieb dahinter. Beides rechnet jetzt mit der tatsächlich
+  sichtbaren Fläche, und die Anzeige wird ins obere Drittel geholt statt in die
+  Mitte — so bleibt sie auch dann vollständig sichtbar, wenn der Browser die
+  Höhe zu großzügig meldet.
 
 - **Wer während der Wartezeit scrollt, bekommt den mitlaufenden Text trotzdem
   zu sehen.** Bisher gab die Seite die Führung beim ersten Wischen endgültig
@@ -152,11 +163,6 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Zum Tippbeginn wird die Führung jetzt genau einmal neu scharf gestellt. Ab
   da gilt der Vorrang des Lesers wieder wie zuvor: Wer während des Tippens
   scrollt, übernimmt endgültig.
-
-- **Das Scan-Auge wird erst dann als sichtbar gewertet, wenn es ganz ins Bild
-  passt.** Die bisherige Regel ließ die halbe Höhe genügen — ein zur Hälfte
-  angeschnittenes Auge galt damit als sichtbar und wurde nie nachgezogen. Auf
-  kleinen Bildschirmen stand deshalb oft nur ein halber Kreis am Rand.
 
 ### Prüfkette
 

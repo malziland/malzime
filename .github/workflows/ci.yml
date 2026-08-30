@@ -212,7 +212,14 @@ jobs:
   pruefungen:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth: 0 holt die volle Historie. Sie wird von
+      # pruefe-mitzieher.py gebraucht: Der Waechter vergleicht gegen den
+      # Zielzweig, um zu sehen, WAS geaendert wurde. Mit dem Standard (nur der
+      # letzte Commit) faende er gar nichts und waere stillschweigend gruen —
+      # also genau das, wovor er schuetzen soll.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       # Node ausdruecklich einrichten statt auf die Vorinstallation des Runners
       # zu vertrauen: Der Pruefsummen-Waechter unten laeuft mit node, und eine
@@ -251,6 +258,23 @@ jobs:
       # tarnt ein auskommentiertes test.slow() den Befund.
       - run: python3 scripts/pruefe-tote-geduld.py
       - run: python3 scripts/pruefe-doppelte-werte.py
+
+      # 31.08.2026: Zwei Waechter gegen die Fehlerklasse, die den Umbau vom
+      # 30.08. so teuer gemacht hat.
+      #
+      # Der erste prueft, ob eine Aenderung ihre Begleiter mitgebracht hat: Ein
+      # neues Pflichtfeld im Einstellungssatz muss an vier weiteren Stellen
+      # nachgezogen werden. Am 30.08. wurden zwei davon vergessen und erst vom
+      # Testlauf gefunden.
+      #
+      # Der zweite meldet, wenn Dateien wieder zusammenwachsen. mistral.js war
+      # auf 1691 Zeilen; an betriebsprofil.js haengen 14 Module. Aufteilen
+      # allein haelt nicht, wenn niemand hinsieht.
+      #
+      # BEIDE brauchen die Vergleichsbasis, deshalb steht fetch-depth: 0 im
+      # Checkout dieses Jobs.
+      - run: python3 scripts/pruefe-mitzieher.py
+      - run: python3 scripts/pruefe-kopplung.py
 
       # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
       # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine

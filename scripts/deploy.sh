@@ -210,6 +210,53 @@ fi
 # Glueck, kein Entwurf.
 TARGET="${1:-hosting,functions}"
 
+# ── TROCKENLAUF: würde diese Auslieferung überhaupt durchgehen? ──
+#
+# ANLASS, 30.08.2026: SECHS gescheiterte Auslieferungen an einem einzigen Tag —
+# falsches Firestore-Ziel, Firestore im Paket statt allein, die satzWache ohne
+# Datenbank-Angabe, der Infrastruktur-Wächter gegen eine feste RUNBOOK-Zahl,
+# ein verbotener Formwechsel der satzWache, und zuletzt ein unsauberer
+# Arbeitsbaum als Folge des vorigen Abbruchs.
+#
+# Jeder dieser Fehler wäre HIER sichtbar geworden. Zusammen kosteten sie rund
+# zweieinhalb Stunden. Der Trockenlauf kostet 28 Sekunden (gemessen 30.08.:
+# 3 s für Firestore, 25 s für hosting/functions).
+#
+# Er läuft in DERSELBEN Reihenfolge und mit denselben Zielen wie der echte
+# Deploy weiter unten — sonst prüft er etwas anderes, als später passiert.
+#
+# BEWUSST VOR DEM CACHE-BUSTER: Bricht der Trockenlauf ab, ist der Arbeitsbaum
+# noch unberührt. Sonst bliebe die hochgezählte Kennung ungespeichert liegen
+# und würde den nächsten Versuch am Sauberkeits-Riegel blockieren — genau das
+# ist am 30.08. passiert.
+#
+# Notschalter SKIP_DRYRUN=1, laut wie die anderen.
+if [ "${SKIP_DRYRUN:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_DRYRUN=1 gesetzt — der Trockenlauf wird UEBERSPRUNGEN."
+else
+  echo "— Trockenlauf (prueft, ohne etwas zu aendern)"
+  DRY_START=$(date +%s)
+
+  if [ "${SKIP_FIRESTORE:-0}" != "1" ]; then
+    if ! firebase deploy --only firestore:malzime-eu --dry-run >/tmp/malzime-dry-firestore.log 2>&1; then
+      echo "FEHLER: Der Trockenlauf fuer Firestore ist gescheitert — nichts wurde ausgeliefert." >&2
+      tail -15 /tmp/malzime-dry-firestore.log | sed 's/^/    /' >&2
+      echo "        Notschalter: SKIP_DRYRUN=1" >&2
+      exit 1
+    fi
+    echo "  ok    Firestore-Regeln und Indizes"
+  fi
+
+  if ! firebase deploy --only "$TARGET" --dry-run >/tmp/malzime-dry-rest.log 2>&1; then
+    echo "FEHLER: Der Trockenlauf fuer $TARGET ist gescheitert — nichts wurde ausgeliefert." >&2
+    tail -15 /tmp/malzime-dry-rest.log | sed 's/^/    /' >&2
+    echo "        Notschalter: SKIP_DRYRUN=1" >&2
+    exit 1
+  fi
+  echo "  ok    $TARGET"
+  echo "Trockenlauf gruen in $(( $(date +%s) - DRY_START )) s — die Auslieferung sollte durchgehen."
+fi
+
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,
 # sonst neuer Tag mit laufender Nummer 01. NUR wenn Hosting wirklich
@@ -241,6 +288,31 @@ else
   VERSION="${TODAY}01"
 fi
 echo "Cache-Busting-Version: ?v=$VERSION"
+
+# ── AUFRAEUMEN BEI ABBRUCH ──
+#
+# BEFUND 30.08.2026: Ein gescheiterter Deploy blockierte den naechsten. Die
+# Kennung wird HIER hochgezaehlt und in vierzehn Dateien geschrieben; bricht
+# der Deploy danach ab, bleiben diese Aenderungen ungespeichert liegen. Der
+# Stand-Riegel ganz oben verlangt aber einen sauberen Arbeitsbaum — der
+# naechste Versuch scheitert also, ohne dass etwas Neues kaputt waere.
+#
+# An diesem Tag hat das einen ganzen Durchlauf gekostet, mitten in der Nacht,
+# und sah aus wie ein zweiter, unabhaengiger Fehler.
+#
+# Die Falle raeumt nur auf, was DIESES Skript geschrieben hat: die
+# Buster-Dateien unter public/. Fremde Aenderungen bleiben unberuehrt — der
+# Stand-Riegel oben hat ohnehin schon sichergestellt, dass es keine gibt.
+aufraeumen_bei_abbruch() {
+  CODE=$?
+  if [ "$CODE" -ne 0 ] && [ -n "$(git status --porcelain -- public/ 2>/dev/null)" ]; then
+    echo ""
+    echo "Deploy abgebrochen (Code $CODE) — nehme die Cache-Kennung zurueck,"
+    echo "damit der naechste Versuch nicht am Sauberkeits-Riegel scheitert."
+    git checkout -- public/ 2>/dev/null && echo "  zurueckgesetzt."
+  fi
+}
+trap aufraeumen_bei_abbruch EXIT
 
 # Alle Dateien mit ?v=-Verweisen aktualisieren: JEDE HTML-Seite unter public/
 # — auch in Unterordnern wie public/en/ — UND public/js/demo.js, dort haengen
@@ -368,6 +440,7 @@ UEBERSPRUNGEN=""
 [ "${SKIP_INFRA:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_INFRA"
 [ "${SKIP_SMOKE:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_SMOKE"
 [ "${SKIP_FIRESTORE:-0}" = "1" ] && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_FIRESTORE"
+[ "${SKIP_DRYRUN:-0}" = "1" ]    && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_DRYRUN"
 
 echo ""
 if [ -n "$UEBERSPRUNGEN" ]; then

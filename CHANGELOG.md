@@ -6,42 +6,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
-### Neu
 
-- **Betriebswerte lassen sich als benannte Sätze umstellen, ohne Auslieferung.**
-  Zeitgrenzen und Kapazität standen bisher fest im Code. Eine Änderung — etwa
-  beim Wechsel auf einen größeren Tarif oder wenn der KI-Anbieter langsamer
-  wird — bedeutete mehrere Stellen von Hand und eine vollständige Auslieferung.
-  Am 28. August kostete das Hochsetzen einer einzigen Zahl fünfundzwanzig
-  Minuten, mitten im Vorfall.
-
-  Jetzt liegt in der Datenbank ein Dokument mit vollständigen Sätzen. Umgestellt
-  wird ein einziges Feld; alle zugehörigen Werte ziehen mit, ohne Deploy.
-
-  **Bewusst keine einzelnen Schalter.** Genau daran war der frühere Vorschlag
-  gescheitert: Er hätte die Kopplung zwischen Zeitgrenze und erlaubter
-  Textmenge aufgehoben — die Sicherung, die im August einen Ausfall verhindert
-  hat. Diese Rechnung läuft jetzt beim Laden. Ein Satz, der sie nicht besteht,
-  wird abgelehnt; es gelten die bisherigen Werte weiter. Damit ist die
-  Umstellung sicherer als vorher: Statt beim Start abzustürzen, verwirft das
-  System den falschen Wert und arbeitet mit den bewährten weiter.
-
-  Nicht umstellbar bleiben Upload-Grenze, Feldlängen der Fehlererfassung sowie
-  Modell und Serverstandort — das sind Sicherheits- und Datenschutzzusagen.
-  Einzelheiten in `docs/BETRIEBSPROFILE.md`.
-
-- **Eine tägliche Prüfung meldet, wenn Code und Warteschlange auseinanderlaufen.**
-  Die Zahl, wie viele Analysen gleichzeitig laufen dürfen, existiert an zwei
-  Stellen: im Code und in der Warteschlange bei Google. Der Code rechnet damit
-  die Wartezeit aus, Google entscheidet, was tatsächlich passiert. Standen die
-  beiden auseinander, rechnete die Seite still falsch — entweder wurden mehr
-  Leute eingelassen als bedient werden konnten, oder Kapazität blieb ungenutzt.
-
-  Die Prüfung meldet Abweichungen mit beiden Zahlen und dem Weg zur Abhilfe.
-  Sie stellt bewusst nichts selbst um: Die Warteschlange ist ein fremdes
-  System, eine Änderung dort gehört durch die Prüfkette.
-
-## [Unveröffentlicht]
 
 ### Behoben
 
@@ -79,7 +44,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   untersuchbar; man konnte den Lauf nur wiederholen. Jetzt liegen Screenshot,
   Aufzeichnung und Fehlerkontext bei. Im grünen Fall entsteht nichts.
 
-## [Unveröffentlicht]
+
 
 ### Neu
 
@@ -118,7 +83,78 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Warteschlange ist ein fremdes System, eine Änderung dort gehört durch die
   Prüfkette, nicht in eine nächtliche Automatik.
 
-## [4.2.1] — 2026-08-29
+## [4.2.4] — 2026-08-30
+
+
+
+### Behoben
+
+- **Das Scan-Auge wird auf dem iPhone jetzt wirklich ins Bild geholt.** Die
+  Korrektur davor erkannte zwar richtig, dass die Adressleiste es verdeckt —
+  das Zurückholen selbst benutzte aber die eingebaute Browser-Funktion, und die
+  zentriert im Fenster einschließlich der Leiste. Der Browser scrollte also,
+  hielt es für erledigt, und das Auge blieb dahinter; danach unternahm die
+  Wache nichts mehr, weil sie ihren Versuch als abgeschlossen verbucht hatte.
+
+  Die Zielposition wird jetzt selbst gerechnet, bezogen auf die tatsächlich
+  sichtbare Fläche. Nachgestellt mit echtem Upload bei Handy-Maßen: vorher
+  fünfundfünfzig Bildpunkte verdeckt und keine Bewegung, nachher vollständig
+  im Bild.
+
+## [4.2.3] — 2026-08-30
+
+
+
+### Behoben
+
+- **Am iPhone wird das Scan-Auge nicht mehr von der Adressleiste verdeckt.**
+  Die Seite prüfte, ob das Auge im Fenster liegt — und rechnete dabei mit einer
+  Fensterhöhe, die auf dem iPhone die eingeblendete Adress- und Werkzeugleiste
+  mitzählt. Für die Rechnung lag das Auge damit im Bild, für den Betrachter
+  hinter der Leiste; nachgeholt wurde es deshalb nie. Auf dem Desktop
+  funktionierte dasselbe einwandfrei, weil dort keine Leisten ein- und
+  ausfahren. Gemessen wird jetzt die tatsächlich sichtbare Fläche, die sich
+  mitverändert, wenn die Leisten erscheinen oder verschwinden.
+
+
+### Neu
+
+- **Betriebswerte lassen sich als benannte Sätze umstellen, ohne Auslieferung.**
+  Zeitgrenzen und Kapazität standen bisher fest im Code. Eine Änderung — etwa
+  beim Wechsel auf einen größeren Tarif oder wenn der KI-Anbieter langsamer
+  wird — bedeutete mehrere Stellen von Hand und eine vollständige Auslieferung.
+  Am 28. August kostete das Hochsetzen einer einzigen Zahl fünfundzwanzig
+  Minuten, mitten im Vorfall.
+
+  Jetzt liegt in der Datenbank ein Dokument mit vollständigen Sätzen. Umgestellt
+  wird ein einziges Feld; alle zugehörigen Werte ziehen mit, ohne Deploy.
+
+  **Bewusst keine einzelnen Schalter.** Genau daran war der frühere Vorschlag
+  gescheitert: Er hätte die Kopplung zwischen Zeitgrenze und erlaubter
+  Textmenge aufgehoben — die Sicherung, die im August einen Ausfall verhindert
+  hat. Diese Rechnung läuft jetzt beim Laden. Ein Satz, der sie nicht besteht,
+  wird abgelehnt; es gelten die bisherigen Werte weiter. Damit ist die
+  Umstellung sicherer als vorher: Statt beim Start abzustürzen, verwirft das
+  System den falschen Wert und arbeitet mit den bewährten weiter.
+
+  Nicht umstellbar bleiben Upload-Grenze, Feldlängen der Fehlererfassung sowie
+  Modell und Serverstandort — das sind Sicherheits- und Datenschutzzusagen.
+  Einzelheiten in `docs/BETRIEBSPROFILE.md`.
+
+- **Eine tägliche Prüfung meldet, wenn Code und Warteschlange auseinanderlaufen.**
+  Die Zahl, wie viele Analysen gleichzeitig laufen dürfen, existiert an zwei
+  Stellen: im Code und in der Warteschlange bei Google. Der Code rechnet damit
+  die Wartezeit aus, Google entscheidet, was tatsächlich passiert. Standen die
+  beiden auseinander, rechnete die Seite still falsch — entweder wurden mehr
+  Leute eingelassen als bedient werden konnten, oder Kapazität blieb ungenutzt.
+
+  Die Prüfung meldet Abweichungen mit beiden Zahlen und dem Weg zur Abhilfe.
+  Sie stellt bewusst nichts selbst um: Die Warteschlange ist ein fremdes
+  System, eine Änderung dort gehört durch die Prüfkette.
+
+## [4.2.2] — 2026-08-30
+
+
 
 ### Behoben
 
@@ -140,6 +176,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [4.2.1] — 2026-08-29
 
+
+
 ### Geändert
 
 - **Das automatische Mitscrollen verhält sich in allen Modi gleich.** Bisher
@@ -160,6 +198,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   dem Off.
 
 ## [4.2.0] — 2026-08-29
+
+
 
 ### Neu
 
@@ -204,6 +244,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [4.1.2] — 2026-08-28
 
+
+
 ### Behoben
 
 - **Bricht eine Analyse an der Zeitgrenze ab, geht das bereits Geschriebene
@@ -216,6 +258,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   alles wie bisher.
 
 ## [4.1.1] — 2026-08-28
+
+
 
 ### Behoben
 
@@ -233,6 +277,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   dieser Änderung nicht behoben, sondern nur entschärft.
 
 ## [4.1.0] — 2026-08-23
+
+
 
 ### Neu
 
@@ -258,6 +304,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   in Erklärung, Prüfbericht und Prüfprotokoll auf den 23. August 2026 gezogen.
 
 ## [4.0.1] — 2026-08-21
+
+
 
 ### Behoben
 
@@ -303,6 +351,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Fehlermeldungen in keiner einzigen Prüfung vor.
 
 ## [4.0.0] — 2026-08-21
+
+
 
 Ein Lang-Audit hat das Projekt in der Nacht auf den 21. August durchleuchtet:
 14 Prüfer entlang getrennter Fragen, jeder Verdacht danach von einem eigenen
@@ -464,6 +514,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.9.1] — 2026-08-19
 
+
+
 ### Hinzugefügt
 
 - **Die Fußzeile verweist wieder auf malziland.at.** Der Verweis war seit dem
@@ -514,6 +566,8 @@ Aussagen, die nicht mehr zum Code passten.
   noch". Jetzt fragt es nur noch, wenn wirklich jemand davorsitzt.
 
 ## [3.9.0] — 2026-08-19
+
+
 
 ### Hinzugefügt
 
@@ -594,6 +648,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.8.1] — 2026-08-19
 
+
+
 ### Behoben
 
 - **Das Logo aktualisierte sich im Browser nicht.** Die Verweise auf Favicon,
@@ -612,6 +668,8 @@ Aussagen, die nicht mehr zum Code passten.
   neuen Prüfung — man sieht die Seiten selten nebeneinander.
 
 ## [3.8.0] — 2026-08-19
+
+
 
 ### Hinzugefügt
 
@@ -642,6 +700,8 @@ Aussagen, die nicht mehr zum Code passten.
   oben. Er liegt jetzt an der Überschrift selbst, die immer vorhanden ist.
 
 ## [3.7.0] — 2026-08-19
+
+
 
 ### Hinzugefügt
 
@@ -685,6 +745,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.6.2] — 2026-08-19
 
+
+
 ### Behoben
 
 - **Auf iPhones scheiterte das Hochladen ab dem zweiten Bild.** Das erste Foto
@@ -703,6 +765,8 @@ Aussagen, die nicht mehr zum Code passten.
   Drei Tests halten den Fall fest; ohne die Behebung sind sie rot.
 
 ## [3.6.1] — 2026-08-18
+
+
 
 ### Geändert
 
@@ -735,6 +799,8 @@ Aussagen, die nicht mehr zum Code passten.
   Dazu ein Wächter, der festhält, was nach dem Abbrechen gelten muss.
 
 ## [3.6.0] — 2026-08-18
+
+
 
 ### Hinzugefügt
 
@@ -769,6 +835,8 @@ Aussagen, die nicht mehr zum Code passten.
   Detailteil korrigiert.
 
 ## [3.5.0] — 2026-08-18
+
+
 
 ### Behoben
 
@@ -832,6 +900,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.4.1] — 2026-08-18
 
+
+
 ### Geändert
 
 - **Die Barrierefreiheitserklärung lädt jetzt ein, statt sich zu entschuldigen.**
@@ -849,6 +919,8 @@ Aussagen, die nicht mehr zum Code passten.
   (Open Source, Projektunterstützung). Sie war die einzige Seite ohne.
 
 ## [3.4.0] — 2026-08-18
+
+
 
 Barrierefreiheit: geprüft nach der Methodik des W3C, sechs Mängel behoben.
 
@@ -933,6 +1005,8 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
 
 ## [3.3.2] — 2026-08-17
 
+
+
 ### Hinzugefügt
 
 - **Barrierefreiheitserklärung unter `/barrierefreiheit`.** malziME ist gegen
@@ -1013,6 +1087,8 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   niemand vergleicht, driften gemeinsam ab; jetzt fragt der Test das Dateisystem.
 
 ## [3.3.1] — 2026-08-17
+
+
 
 ### Hinzugefügt
 
@@ -1232,6 +1308,8 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
 
 ## [3.3.0] — 2026-08-13
 
+
+
 **Der Sprachumschalter — sichtbar.**
 
 Nach einem Tag Vorbereitung hinter einem Merkmals-Schloss und vier Runden
@@ -1400,6 +1478,8 @@ hatte.
 
 ## [3.2.0] — 2026-08-13
 
+
+
 **Der Kurzaudit und das zweite TIEF-Audit — restlos saniert.**
 
 Am selben Tag zwei Prüfungen: zuerst ein Kurzaudit der frischen Nachtarbeit, dann
@@ -1518,6 +1598,8 @@ Der vollständige Auditbericht mit allen Befunden liegt unter `docs/audit/`
 (bewusst nicht im öffentlichen Repository).
 
 ## [3.1.0] — 2026-08-13
+
+
 
 **Das TIEF-Audit und seine Sanierung.**
 
@@ -1807,6 +1889,8 @@ fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als
 
 ## [3.0.6] — 2026-08-12
 
+
+
 **Erinnerung an die ZDR-Nachprüfung — und die Ursache für ausbleibende
 Handy-Mitteilungen:**
 
@@ -1833,6 +1917,8 @@ Handy-Mitteilungen:**
   senden erlaubt, anonymes Mitlesen gesperrt — ist unverändert und geprüft.
 
 ## [3.0.5] — 2026-08-12
+
+
 
 **Qualitäts-Zug „Richtung 100" (Konzept vom 2026-08-12; ohne Änderung am
 Nutzerpfad):**
@@ -1863,6 +1949,8 @@ Nutzerpfad):**
 
 ## [3.0.4] — 2026-08-12
 
+
+
 **Wartungszug aus der externen Code-Review (Codex, 2026-08-12; drei Punkte im
 Konsens beider Prüfungen):**
 
@@ -1890,6 +1978,8 @@ Konsens beider Prüfungen):**
 
 ## [3.0.3] — 2026-08-11
 
+
+
 **Wording-Korrektur:** „Privat finanziert" heißt jetzt überall
 **„eigenfinanziert"** (Statistik-Seite, Stundenlimit-Banner, Deutsch und
 Englisch). Grund: Die Kosten trägt laut Impressum das Unternehmen
@@ -1898,6 +1988,8 @@ angreifbar, „eigenfinanziert" ist es nicht. An Kostenlosigkeit,
 Werbefreiheit und Tracking-Freiheit ändert sich selbstverständlich nichts.
 
 ## [3.0.2] — 2026-08-11
+
+
 
 Sanierung nach dem Kurzaudit des v3-Tags (unabhängige Prüfung von Code und
 Infrastruktur, Prüfstand 79ec393). Kein neues Feature — vier Härtungen und
@@ -1946,6 +2038,8 @@ etwas Feinschliff:
   30 Tage statt 1 Tag in den anonymen Diagnose-Speicher.
 
 ## [3.0.1] — 2026-08-11
+
+
 
 Feinschliff-Sammlung nach den Live-Tests des v3.0-Starts — Dramaturgie,
 Blick-Führung und eine deutliche Datenschutz-Härtung:
@@ -1998,6 +2092,8 @@ und Mistral-Verträgen)**
   Mistral-Zusagen stehen wörtlich drin.
 
 ## [3.0.0] — 2026-08-11
+
+
 
 v3.0 — Das Live-Erlebnis.
 
@@ -2069,6 +2165,8 @@ Seite wie früher bis zum fertigen Ergebnis. Testumfang jetzt 697 / 280 / 17.
 
 ## [2.12.3] — 2026-08-11
 
+
+
 Sanierung nach dem Kurzaudit vom selben Tag (kein Blocker, ein mittlerer und
 acht kleine Befunde) plus zwei bewusste Entscheidungen.
 
@@ -2127,6 +2225,8 @@ statt Alarm).
 
 ## [2.12.2] — 2026-08-11
 
+
+
 Eine Wache gegen einen Fehler, den bisher niemand sehen konnte.
 
 ### Der Anlass
@@ -2173,6 +2273,8 @@ Frontend 219 Tests, E2E 12.
 
 ## [2.12.1] — 2026-08-11
 
+
+
 Der Beast Mode überlebt jetzt ein Neuladen.
 
 ### Behoben
@@ -2210,6 +2312,8 @@ Frontend 209 Tests, E2E 12.
 
 ## [2.12.0] — 2026-08-11
 
+
+
 **Die Datenbank läuft ab jetzt in Europa.** Damit stimmt die Zusage der
 Datenschutzerklärung erstmals auch für die Datenbank — und das Projekt hat
 keinen Speicherort mehr ausserhalb der EU.
@@ -2241,6 +2345,8 @@ Nicht behauptet, sondern gemessen — Ablauf in
 Backend 618 Tests grün.
 
 ## [2.11.2] — 2026-08-11
+
+
 
 Vorbereitung des Umzugs **der Datenbank** nach Europa. **Ändert das Verhalten
 nicht** — der Schalter steht weiterhin auf der alten Datenbank.
@@ -2320,6 +2426,8 @@ des Repos gesichert.
 
 ## [2.11.1] — 2026-08-11
 
+
+
 Drei Fehler, die in der Browser-Konsole sichtbar waren, plus der echte Fehler
 dahinter. Im laufenden Betrieb aufgefallen.
 
@@ -2374,6 +2482,8 @@ schien.
 - `api.malzi.me` ist vollständig abgebaut (DNS und Cloud-Run-Zuordnung).
 
 ## [2.11.0] — 2026-08-11
+
+
 
 Sanierung des LANGAUDIT vom 2026-08-10 (Bericht wird nicht veröffentlicht).
 **36 der 38 Befunde geschlossen**, jeder mit einer Prüfung dahinter und einer
@@ -2523,6 +2633,8 @@ Audits sind.
 
 ## [2.10.0] — 2026-08-10
 
+
+
 ### Entfernt
 
 - **Der synchrone `/analyze`-Pfad ist abgebaut.** Der alte Weg vor der Warteschlange: Browser schickt das Bild, hält die Verbindung 30 bis 60 Sekunden offen, wartet auf die Antwort. Seit Mai 2026 trägt die Warteschlange jeden Upload; der synchrone Weg war nur noch Rückfall über ein Feature-Flag.
@@ -2541,6 +2653,8 @@ Audits sind.
 
 ## [2.9.2] — 2026-08-10
 
+
+
 ### Geändert
 
 - **Fünf von sieben Abhängigkeits-Ausnahmen entfernt.** Diese `overrides` zwingen ein Paket, eine bestimmte Version einer tief liegenden Abhängigkeit zu nutzen — nötig, solange dort eine Sicherheitslücke steckt, die der Hersteller noch nicht selbst geschlossen hat. Nachgemessen mit entfernten Ausnahmen in einer Arbeitskopie: `glob`, `test-exclude`, `rimraf` und `brace-expansion` (Root **und** functions) melden inzwischen **keine Schwachstelle mehr** — die Pakete haben nachgezogen, die Ausnahmen hielten nur noch Versionen fest, die ohnehin kämen.
@@ -2551,6 +2665,8 @@ Audits sind.
 
 ## [2.9.1] — 2026-08-10
 
+
+
 ### Behoben
 
 - **Das Foto verschwand, wenn die Analyse aus dem Hintergrund zurückkam.** An seiner Stelle stand der Hinweis „Foto gelöscht" — obwohl gar kein Neuladen stattgefunden hatte. Die Wiederaufnahme war ursprünglich nur für den Reload-Fall gebaut, wo das Foto tatsächlich weg ist, und setzte den Hinweis unbesehen. Kommt die Seite dagegen aus dem Hintergrund zurück, lief sie durchgehend und das Bild steht noch im Fenster. Der Hinweis erscheint jetzt nur noch, wenn wirklich kein Foto mehr da ist.
@@ -2558,6 +2674,8 @@ Audits sind.
   Datenschutzrechtlich ändert das nichts: Gespeichert wird nach wie vor nirgends etwas, weder im Browser noch serverseitig. Es wird lediglich nicht weggeworfen, was ohnehin schon angezeigt wird. (+2 Tests, Mutationsprobe bestanden)
 
 ## [2.9.0] — 2026-08-10
+
+
 
 ### Hinzugefügt
 
@@ -2612,11 +2730,15 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.8.1] — 2026-08-10
 
+
+
 ### Behoben
 
 - **Umschalten ganz oben auf der Seite sprang zur Ergebnisliste.** Stand man bei der Überschrift und wechselte den Modus, scrollte die Seite nach unten und die Überschrift verschwand — der Einstieg begann plötzlich bei der Foto-Auswahl. Ursache war der Scroll-Anker aus v2.6.0: Er suchte die erste Karte, die unter der geklebten Leiste hervorschaut, und fand dabei auch Karten, die noch gar nicht im Bild waren. Beim Umschalten wurde dann dorthin gescrollt. Jetzt muss die Ankerkarte zusätzlich **innerhalb des Bildschirms beginnen** — steht keine Karte im Bild, ist man nicht in der Liste und es gibt nichts zu verankern. (`public/js/sticky-toggle.js`, +2 Unit-Tests, +1 E2E-Test, Mutationsprobe bestanden)
 
 ## [2.8.0] — 2026-08-10
+
+
 
 ### Hinzugefügt
 
@@ -2655,6 +2777,8 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.7.0] — 2026-08-09
 
+
+
 ### Geändert
 
 - **Beast Mode zeigt jetzt eigene Werbung.** Bisher landete EINE Werbeliste in beiden Modi (`mistral.js`, `ad_targeting: ads`) — der Beast-Text war zynisch und ausbeutend, die Werbung darunter dieselbe brave Liste wie im Standard. Das entwertete genau den Moment, auf den das Tool didaktisch hinarbeitet. Jetzt liefert das Modell **zwei getrennte Listen**: Standard zeigt, was zum sichtbaren Lebensstil passt, Beast zeigt, was die im Beast-Profil benannte Schwachstelle ausbeutet (Abo-Fallen, Ratenzahlung, Statusprodukte über Budget, bei Kindern Sammelzwang- und Quengel-Mechaniken). **Gemessen an 84 Analysen: Marken-Überlappung zwischen den Modi 100 % → 2,8 %, Produkt-Überlappung 100 % → 0,0 %.** Beispiel (14-jähriges Mädchen): Standard „Puma × Stranger Things, Converse Run Star Hike, Spotify Premium Student" — Beast „Zalando Lounge Abo, ASOS Premier Membership, Boohoo Trend-Abo, Wish Mystery Beauty Box". (`locales/de/prompts.js`, `locales/en/prompts.js`, `mistral.js`)
@@ -2676,6 +2800,8 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.6.0] — 2026-08-09
 
+
+
 ### Hinzugefügt
 
 - **Sticky-Umschalter zwischen „Seriöse Analyse" und „Beast Mode".** Sobald ein Ergebnis vorliegt, bleibt der Umschalter beim Scrollen oben stehen. Grund ist didaktisch, nicht bequemlichkeitshalber: Der Vergleich derselben Karte in beiden Modi ist der Kern des Tools, bisher musste man dafür hoch, umschalten, wieder runter und die Karte neu suchen. Umgesetzt als **Positionswechsel des bestehenden Schalters** (`position: sticky`), bewusst NICHT als zweite Leiste — ein Duplikat hätte einen zweiten Tab-Stopp erzeugt (der Tastatur-E2E-Test ist CI-Pflicht) und die `position: fixed`-Tooltips ein zweites Mal ausrichten müssen. Auf der Startseite klebt nichts: gesteuert über `html[data-has-result]`, das `renderCurrentMode` nur bei vollständigem Ergebnis setzt. (`public/js/sticky-toggle.js` neu, `public/styles.css`, `public/app.js`, `public/js/render.js`, `public/js/api.js`)
@@ -2694,6 +2820,8 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.5.2] — 2026-08-08
 
+
+
 ### Behoben
 
 - **`npm audit` wieder 0/0 in beiden Projekten** (Stand seit v2.4.2, war durch neue Advisories gekippt). Im Root fehlte noch dieselbe `brace-expansion`-Lücke wie in `functions/` — ebenfalls reine Entwicklungskette (`eslint → minimatch`), Root hat gar keine Produktiv-Abhängigkeiten. Behoben mit `overrides.brace-expansion: ^5.0.9` in der Wurzel (dort bisher keine overrides; **Rückbau-Bedingung identisch:** entfällt, sobald `eslint`/`minimatch` von sich aus ≥ 5.0.9 ziehen). Frontend-Tests 165 grün. (`package.json`, `package-lock.json`)
@@ -2701,11 +2829,15 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.5.1] — 2026-08-08
 
+
+
 ### Behoben
 
 - **Audit-Gate wieder grün** (`main` war nach dem v2.5.0-Push rot). Ursache war kein Fehler in v2.5.0, sondern ein neu veröffentlichtes Advisory: `brace-expansion` < 5.0.9 (GHSA-rgw5-rvv9-x895, high, DoS). Das Paket kommt rein über die Entwicklungskette `eslint → minimatch → brace-expansion` und läuft **nie** in Produktion — `npm audit --omit=dev` filtert transitive Dev-Abhängigkeiten aber nicht zuverlässig heraus, deshalb schlug das Gate an. Behoben mit `overrides.brace-expansion: ^5.0.9` (der zulässige Bereich von `minimatch@10.2.5` ist `^5.0.5`, `npm update` hob es nur nicht von selbst). Keine Allowlist-Ausnahme, weil eine reparierte Version existiert. **Rückbau-Bedingung:** entfällt, sobald `eslint`/`minimatch` von sich aus ≥ 5.0.9 ziehen — damit jetzt 6 overrides in `functions/package.json`. Lockfile-Falle geprüft: `npm ci --dry-run` in Root und `functions/` je exit 0, optionale Einträge (`@emnapi/*`) unverändert. (`functions/package.json`, `functions/package-lock.json`)
 
 ## [2.5.0] — 2026-08-08
+
+
 
 Kostensenkung im Live-Pfad: Prompt-Caching bei Mistral, gemessen statt geschätzt.
 
@@ -2730,6 +2862,8 @@ Kostensenkung im Live-Pfad: Prompt-Caching bei Mistral, gemessen statt geschätz
 
 ## [2.4.4] — 2026-07-29
 
+
+
 Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu lassen.
 
 ### Behoben
@@ -2751,6 +2885,8 @@ Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu l
 - Vier veraltete lokale Zweige entfernt (PRs #50–#53, alle per Squash gemergt), Remote-Referenzen bereinigt.
 
 ## [2.4.3] — 2026-07-29
+
+
 
 Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst erzeugt hat — gebündelt statt einzeln, und einer davon vollständig ohne Zutun durchgelaufen. Der Backend-Anteil enthält einen Major-Sprung im Innenleben (Express 4 → 5), der bewusst geprüft statt automatisch durchgewunken wurde.
 
@@ -2779,6 +2915,8 @@ Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst er
 - **Die Backend-Unit-Tests decken die Express-Schicht nicht ab** — sie ersetzen `onRequest` durch eine Attrappe und treffen die Handler direkt. Die 439 grünen Tests sagen über Multipart-Streaming, Query-Parsing und Body-Handling nichts aus. Für diese Schicht gibt es derzeit **keinen dauerhaften Test**; die Prüfung oben lief über einen eigens gebauten Prüfstand. → offener Punkt.
 
 ## [2.4.2] — 2026-07-29
+
+
 
 Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft. Ausgangspunkt war die Beobachtung, dass laufend Dependabot-Mails eintrudeln: Ursache war nicht Dependabot selbst, sondern zwei dauerhaft rote CI-Tore, an denen jeder Update-PR hängenblieb — die Auto-Merge-Automatik funktionierte, kam aber nie zum Zug.
 
@@ -2810,6 +2948,8 @@ Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft.
 
 ## [2.4.1] — 2026-07-17
 
+
+
 Visueller Feinschliff: Der Datenschutz-Link im neuen Upload-Hinweis (2.4.0) erschien im Browser-Standardblau statt in der Markenfarbe.
 
 ### Behoben
@@ -2817,6 +2957,8 @@ Visueller Feinschliff: Der Datenschutz-Link im neuen Upload-Hinweis (2.4.0) ersc
 - **Datenschutz-Link im Upload-Hinweis in CI-Petrol** (`var(--teal-text)`) statt Browser-Blau — konsistent mit den übrigen Inline-Links (Rechtstexte, Footer). Umgesetzt über den Kontext-Selektor `.disclaimer__workshop a` (`public/styles.css`); HTML und Sprachdateien unverändert. Cache-Buster 2026071703.
 
 ## [2.4.0] — 2026-07-17
+
+
 
 Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter anonymisiert, eine latente Secret-Falle entschärft, die CI gehärtet und die gesamte Doku auf den tatsächlichen Live-Stand gebracht. Keine Verhaltensänderung im Normalpfad — der Live-Betrieb (u. a. das globale Stundenlimit von 500/h) lief durchgehend stabil weiter.
 
@@ -2853,6 +2995,8 @@ Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v
 
 ## [2.3.4] — 2026-07-16
 
+
+
 Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar mit malziland und Christoph Krieger verknüpft — an der sichtbaren Seite ändert sich nichts. Bewusst KEIN Link auf malziland.at (Seite im Relaunch, Stand 2026-07-16). Nur-Hosting-Deploy, keine Funktionsänderung.
 
 ### Hinzugefügt
@@ -2870,6 +3014,8 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
 
 ## [2.3.3] — 2026-07-14
 
+
+
 Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten) axe-Hinweise behoben und der Tastatur-Durchlauf als dauerhafter Test verankert — der Wächter meldet jetzt **null Funde über alle Schweregrade**. Nur-Hosting-Deploy. 165 Frontend- + 435 Backend-Tests, 5 E2E, Lint und Format grün.
 
 ### Geändert
@@ -2882,6 +3028,8 @@ Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten
 - **Tastatur-Smoketest als dauerhafter E2E-Test** (`e2e/keyboard.test.js`, CI-Pflicht-Check): kompletter Weg Demo-Foto → Disclaimer → Profil nur mit Tab + Enter, inklusive Prüfung, dass die Fokus-Markierung sichtbar ist. Damit ist der letzte offene Punkt der Verifikationsmatrix geschlossen — statt eines einmaligen manuellen Durchklicks wird die Tastatur-Bedienbarkeit jetzt bei jedem PR bewiesen. (`e2e/keyboard.test.js`, `docs/VERIFICATION.md`)
 
 ## [2.3.2] — 2026-07-14
+
+
 
 Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus Governance-Nachrüstung (Phasen 1–3: Betriebs-Doku, Verifikationsmatrix, A11y-Gate, Sammel-Scripts). Nur-Hosting-Deploy — Functions unberührt. 165 Frontend- + 435 Backend-Tests, 4 E2E (A11y-Gate ohne Ausnahmen), Lint und Format grün.
 
@@ -2902,6 +3050,8 @@ Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus 
 
 ## [2.3.1] — 2026-07-13
 
+
+
 Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teilen-Bild, README-Screenshots) plus ein Sicherheitsupdate im Backend. Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
 
 ### Geändert
@@ -2913,6 +3063,8 @@ Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teile
 - **`uuid` 9.0.1 → 11.1.1 im Backend** (Dependabot-Meldung „medium": fehlende Puffer-Grenzenprüfung in v3/v5/v6 bei übergebenem `buf`). uuid kommt transitiv über `firebase-admin` → `@google-cloud/storage`, deren Versionsbereiche noch auf 9.x zeigen — daher per `overrides`-Eintrag in `functions/package.json` angehoben (gleiches Muster wie der bestehende firebase-admin-Override; zurückbauen, sobald die Google-Pakete uuid ≥ 11 selbst anfordern). Lockfile sauber neu aufgebaut, `npm audit`: 0 Meldungen, alle 435 Backend-Tests grün. (`functions/package.json`, `functions/package-lock.json`)
 
 ## [2.3.0] — 2026-07-13
+
+
 
 Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
 
@@ -2936,6 +3088,8 @@ Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleit
 
 ## [2.2.8] — 2026-07-06
 
+
+
 Reaktion auf den Workshop-Vorfall vom selben Vormittag: Foto-Einlesen abgehärtet, irreführende Fehlermeldung ersetzt, Fehler-Diagnose erweitert und anonyme Diagnose-Logs 30 Tage aufbewahrt (bisher war jede Häufigkeits-Analyse nach 1 Tag blind). Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests grün.
 
 ### Behoben
@@ -2947,6 +3101,8 @@ Reaktion auf den Workshop-Vorfall vom selben Vormittag: Foto-Einlesen abgehärte
 - **Anonyme Diagnose-Daten werden jetzt 30 Tage aufbewahrt (bisher 1 Tag) — personenbezogene Infrastruktur-Logs weiterhin nur 1 Tag.** Hintergrund: Die gesamte Log-Aufbewahrung stand auf 1 Tag; damit war keinerlei Aussage möglich, wie oft ein Fehler über mehrere Workshops hinweg auftritt. Umsetzung datenschutzkonform über einen separaten Log-Speicher (`client-diagnostics`, EU-Region `europe-west1`, 30 Tage), in den ausschließlich die vollständig anonymen Client-Diagnose-Einträge (`client-error`/`client-telemetry` — Fehler-Typ, Geräteklasse, Dauer; keine IP-Adressen, keine Bilder, keine Dateinamen) gespiegelt werden. Der Standard-Log-Speicher mit Googles Infrastruktur-Fehlerlogs (enthalten IPs) bleibt unverändert bei 1 Tag — das Versprechen der Datenschutzerklärung gilt weiter. Die Datenschutzerklärung wurde um die 30-Tage-Aufbewahrung der anonymen Diagnose-Daten ergänzt (Stand-Datum aktualisiert). (Cloud-Logging-Konfiguration, `public/datenschutz.html`)
 
 ## [2.2.7] — 2026-07-05
+
+
 
 Wartungs- und Sicherheits-Release: Backend-Grundbibliothek `firebase-admin` auf Version 14 (schließt alle 3 hohen bekannten Sicherheitslücken), gesammelte Werkzeug- und CI-Updates, Mistral-2506-Aufräumen. Reiner Functions-Deploy, keine Frontend-Änderung. 432 Backend- + 157 Frontend-Tests grün, E2E in der CI grün.
 
@@ -2962,6 +3118,8 @@ Wartungs- und Sicherheits-Release: Backend-Grundbibliothek `firebase-admin` auf 
 
 ## [2.2.6] — 2026-06-07
 
+
+
 Weiterer Feinschliff der Reload-Erfahrung (zwei Punkte aus dem Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 157 Frontend-Tests grün.
 
 ### Behoben
@@ -2973,6 +3131,8 @@ Weiterer Feinschliff der Reload-Erfahrung (zwei Punkte aus dem Live-Test auf dem
 - **Das hochgeladene Foto wird nach einem Reload bewusst NICHT wiederhergestellt — und das wird zum sichtbaren Datenschutz-Lerneffekt.** Das Foto wird unmittelbar nach der Analyse gelöscht und absichtlich nirgends — auch nicht im Browser — zwischengespeichert. An die Stelle, wo das Foto war, tritt nach dem Reload ein kurzer, positiver Hinweis: „Dein Foto ist schon gelöscht — gut für deine Privatsphäre." Zweisprachig (DE/EN), als Klasse `photo-deleted-note`. Das passt zur Bildungs-Mission des Tools: Datensparsamkeit sichtbar machen statt verstecken. (`public/js/api.js`, `public/styles.css`, `public/locales/de.json`, `public/locales/en.json`)
 
 ## [2.2.5] — 2026-06-07
+
+
 
 Feinschliff der Reload-Wiederherstellung aus v2.2.4 (zwei UX-Reparaturen nach Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.
 
@@ -2986,6 +3146,8 @@ Feinschliff der Reload-Wiederherstellung aus v2.2.4 (zwei UX-Reparaturen nach Li
 - Das hochgeladene Foto erscheint nach einem Reload bewusst NICHT wieder: Es wird aus Datenschutzgründen sofort gelöscht und nirgends zwischengespeichert. Das Ergebnis-Profil (serverseitig bis 2 h, ticket-geschützt) kommt zurück, das Foto nicht; das leere Vorschau-Feld kollabiert sauber.
 
 ## [2.2.4] — 2026-06-07
+
+
 
 Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte und der Doku mit dem aktuellen Stand (Single-Large-Pipeline, 2-h-Aufbewahrung aus v2.2.3). Reiner Hosting-/Doku-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.
 
@@ -3003,6 +3165,8 @@ Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte un
 - **Test-Zahlen aktualisiert** auf real 432 Backend / 155 Frontend; alle verbliebenen „24 h"-Aufbewahrungsangaben in der Doku auf 2 h korrigiert.
 
 ## [2.2.3] — 2026-06-07
+
+
 
 Fünf kleinere Reparaturen aus dem Audit (alle P3) an der Queue-/Reliability-Schicht. Vorab gegen den Firestore-Emulator end-to-end getestet (Abhol-Ticket-Flow + voller Job-Lebenszyklus); 432 Backend- + 153 Frontend-Tests grün.
 
@@ -3023,6 +3187,8 @@ Fünf kleinere Reparaturen aus dem Audit (alle P3) an der Queue-/Reliability-Sch
 - e2e-CI-Check repariert (Playwright-Install-Hänger + hartes Job-Timeout). Der veraltete Disclaimer-Smoke-Test ist als `test.fixme` markiert — er testet den abgelösten synchronen Pfad; Rewrite auf den Queue-Pfad bleibt offen.
 
 ## [2.2.2] — 2026-06-06
+
+
 
 Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverlässigkeit, Architektur, OSS, Lieferkette) mit Multi-Agent-Prüfung, adversarialer Gegenprüfung und Live-Verifikation gegen die echten Cloud-Dienste. **Keine ausnutzbare Sicherheitslücke (0× P0).** Die Codebasis ist solide; dieser Release bündelt eine funktionale Reparatur (PRIV-002, deployt) und mehrere Härtungen in Repository, CI/CD und Doku.
 
@@ -3053,6 +3219,8 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
 
 ## [2.2.1] — 2026-05-29
 
+
+
 Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Sicherheits-Ergänzung im Minderjährigen-Abschnitt — keine Struktur-/Schema-Änderung, kostenneutral.
 
 ### Geändert
@@ -3065,6 +3233,8 @@ Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Si
 
 ## [2.2.0] — 2026-05-28
 
+
+
 Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) ist damit abgeschlossen — die seit rc3 live laufende Architektur (Single-Large hinter Feature-Flag, Cloud-Tasks-Concurrency 10) wird unverändert zur stabilen Version erklärt. Zusätzlich zwei kleine Verbesserungen aus dem Betrieb: lesbarere Altersbeschreibungen und gehärtete Diagnose-Endpunkte.
 
 ### Geändert
@@ -3076,82 +3246,9 @@ Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) 
 
 - **Erster Werktag-Vormittag unter rc3** (2026-05-28, Do): 27 Jobs, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Job-Median ~50 s (P95 67 s). Echte Gleichzeitigkeit im Burst 08:02–08:14 CEST (~24 Uploads in ~12 Min) ohne Überlast. Damit ist das zuvor offene Werktags-Verhalten der Single-Large-Pipeline bestätigt.
 
-## [2.2.0-rc3] — 2026-05-27
-
-Konsolidierter Single-Large-Prompt mit Sicherheits- und Qualitäts-Härtungen. Verhalten der Live-Pipeline (Single-Large hinter Feature-Flag) bleibt strukturell gleich; Prompt wurde gegen den RC2-Stand A/B-getestet (15 Bilder × 3 Läufe = 90 Mistral-Calls) und an den zwei messbaren Schwachpunkten nachgeschärft.
-
-### Geändert
-
-- **`singleLargePrompt` in beiden Locales (`functions/src/locales/de/prompts.js` UND `functions/src/locales/en/prompts.js`) konsolidiert.** Bisher ein Template-Literal aus den 3-Call-Bausteinen (`systemNormal`/`systemBoost`/`AGE_ANCHOR`/`GENDER_ANCHOR`); jetzt ein eigenständiger Prompt mit gemeinsamen Regeln (GEMEINSAME REGELN-Block für beide Modi), geteilten Charakter-Pools (8 Bereiche mit STANDARD-Stärken, STANDARD-Schwächen und BEAST-Schwächen pro Bereich) und konsistenter „keine klaren Bildsignale"-Phrase als einheitlichem Ausweg für nicht-beurteilbare Felder. Die 3-Call-Pipeline-Bausteine bleiben in beiden Locales unverändert; nur Single-Large hat ab rc3 einen getrennten Prompt-Text (Pflege-Notiz im Header beider Dateien — DE und EN sind ab jetzt parallel zu pflegen).
-- **Sicherheits-Klausel ergänzt:** Explizites Verbot sexualisierter Zuschreibungen bei Minderjährigen (war im Live-Prompt zuvor nicht codifiziert, sondern nur durch Mistrals Eigenvorsicht abgedeckt). Zentrale Schutzregel für Workshop-Tool mit Schüler:innen.
-- **Anti-Halluzinations-Härtungen:** „Erfinde KEINE Markennamen — nur real existierende Marken aus dem mitteleuropäischen Markt" in AD_TARGETING; expliziter Anti-Leakage-Block vor dem JSON-Schema („Übernimm NIEMALS die konkreten Beispiel-Inhalte wie Bikepacking oder Garmin Edge 1040, wenn das Foto sie nicht hergibt").
-- **Konsistenz-Pflicht zwischen Modi geschärft:** `hard_facts.alter_geschlecht` und `hard_facts.herkunft` müssen jetzt wortgenau in die jeweiligen Karten-Values übernommen werden (Satzanfang). A/B-Test zeigte: Substring-strikte Konsistenz 0 % → 100 %.
-- **Confidence-Differenzierung explizit gefordert:** Bei klarem Bildbeleg 0,75–0,95, bei „keine klaren Bildsignale" deutlich niedriger (typisch unter 0,60). A/B-Test zeigte: Confidence-Streuung 0,104 → 0,143 (ehrlicher differenziert).
-- **Karten-Wort-Untergrenze hart:** „MINDESTENS 15 Wörter pro Karte, MAXIMAL 25, 2 vollständige Sätze. Karten unter 15 Wörtern sind unvollständig und gelten als Fehler." Exemplar-Test mit den zwei A/B-Worst-Performern reduzierte zu-kurze Karten von ~26 % auf ~8 %.
-- **Anti-Stichwort-Listen-Regel mit Negativ-Beispiel** in GEMEINSAME REGELN hochgezogen: „FALSCH: 'unsicher, ängstlich, perfektionistisch.' RICHTIG: 'Du bist unsicher und perfektionistisch. Die hochgezogenen Schultern und der angespannte Kiefer verraten Anpassungsdruck.'" Exemplar-Test eliminierte Stichwort-Listen vollständig (vorher 6 in 3 Läufen, nachher 0).
-- **Beast-Variations-Pool** für korporative Stimme: Liste mit zehn Wir-Formulierungen („Wir wissen", „Wir verkaufen dir", „Wir kalkulieren", „Algorithmen sehen dich als", „Versicherer rechnen dich als", …), Empfehlung zur Variation gegen monotone Wiederholungen.
-- **Multi-Person-Regel:** Falls das Bild mehrere Personen zeigt, wird die Person im Vordergrund/in der Bildmitte analysiert.
-- **Marken-Spezifik gefördert:** „möglichst mit Modellnummer/Linie" in AD_TARGETING. Test zeigte spezifischere Werbe-Vorschläge wie „L'Oréal Paris True Match Foundation", „Nike Phantom GX 2 Elite", „L.O.L. Surprise! O.M.G. Fashion Dolls" (statt nur „L'Oréal", „Nike", „L.O.L. Surprise!").
-
-### Hinzugefügt (Test-Infrastruktur)
-
-- **`functions/scripts/single-large-ab-runner.js`** — generischer A/B-Test-Runner: fährt alle Bilder aus `compare-input/` mehrfach gegen Live- und Kandidat-Prompt, bewertet 7 automatische Metriken (Karten-Wort-Bereich, Stichwort-Listen, Confidence-Streuung, Leakage-Hits, Hard-Facts-Konsistenz, Beast-Opener-Wiederholungen, ad_targeting-Plausibilität), schreibt Markdown-Report. Wiederverwendbar für künftige Prompt-Iterationen.
-- **`functions/scripts/prompts-v2.2.1-rc1.js`** — Snapshot des in rc3 deployten Prompts, separat als Test-Referenz für spätere A/B-Läufe gegen die dann-aktuelle Live-Version.
-- **`PROMPT_VARIANT=rc1` ENV-Schalter in `functions/scripts/single-large-call-test.js`** — erlaubt schnellen Vergleich zwischen Live-Locale und Kandidat-Datei ohne Anpassung am Test-Skript.
-
-### Validiert
-
-- **A/B-Test 15 Bilder × 3 Läufe × 2 Varianten = 90 Calls** (kostete 2,69 EUR, dauerte 16,5 Min). Korrigierte Befunde nach Bereinigung um Mess-Artefakte (HTTP-Timeouts bei 2 Bildern und defekte „inventedBrands"-Heuristik): 6–7 echte Verbesserungen, 2 marginale Verschlechterungen im statistischen Rauschen. Wichtigste Verbesserungen: Hard-Facts-Konsistenz 0 % → 100 %, Confidence-Streuung 0,104 → 0,143, Marken spezifischer mit Modellbezeichnung, Karten näher am 15–25-Wort-Korridor.
-- **Exemplar-Stresstest** an den zwei A/B-Worst-Performern (`IMG_0378.jpg`, `IMG_0584.jpg`) mit den zwei Polituren (harte Wort-Untergrenze + Anti-Stichwort-Liste in GEMEINSAME REGELN): zu-kurze Karten von ~26 % auf ~8 % gefallen, Stichwort-Listen vollständig eliminiert.
-- **Tagesbilanz Live-Workshop 2026-05-27 vor Deploy:** 56 Jobs auf Single-Large-Pipeline, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Server-Median ~57 s, Client-End-to-End ~59 s. Zwei stille Verluste (deliveredAt=null) — bekannter offener Punkt zum Auslieferungs-Loch, unverändert; Datenschutz-Entscheidung bleibt: kein `localStorage` (geteilte Schul-Geräte).
-
-### Nicht geändert
-
-- **3-Call-Pipeline-Bausteine** (`systemNormal`, `systemBoost`, `AGE_ANCHOR`, `GENDER_ANCHOR`) in beiden Locales unverändert — Fallback bei Rückschalten des Feature-Flags `useSingleLargeCall` auf `false` verhält sich identisch zu rc2.
-
-### Hinweis zur EN-Variante
-
-EN-Locale wurde strukturell parallel zur DE-Variante übersetzt (nicht separat A/B-getestet, da Live-Traffic >95 % de-DE/de-AT). Sollte EN-Traffic in Zukunft wachsen, wäre ein eigenständiger EN-A/B-Test gegen einen englischsprachigen Bilder-Pool sinnvoll. Beide Locales sind ab jetzt parallel zu pflegen.
-
-## [2.2.0-rc2] — 2026-05-24
-
-Kleinere Anpassungen am RC, bleibt prerelease. Single-Large-Pipeline weiterhin live aktiv hinter Feature-Flag.
-
-### Geändert
-
-- **Firmenname aktualisiert** auf „malziland - learning | training | consulting e.U." (vorher „malziland – digitale Wissensgestaltung e.U.") in Impressum, Datenschutz, Nutzungsbedingungen, JSON-LD schema.org und Meta-Tags. Inhaber-Name, Adresse, GISA, UID, FN unverändert.
-- **`QUEUE_DISPATCH_CONCURRENCY` 3 → 10** und **`QUEUE_AVG_JOB_SECONDS` 100 → 65** in `functions/src/config.js` an die Realwerte aus dem Single-Large-Lasttest angepasst. Frontend-ETA zeigt jetzt realistische Wartezeit-Schätzungen für User — vorher rechnete sie noch mit den Werten der alten 3-Call-Pipeline und überschätzte die Wartezeit ~3×.
-- **Cache-Buster aller HTML-Dateien** auf `v=2026052401` angehoben. `impressum.html` war noch auf `v=2026022106` (Februar) — überfällig.
-
-### Validiert
-
-- Zweiter Lasttest gegen Produktion (35 Jobs gegen Single-Large, Cloud-Tasks-Concurrency 10): 35/35 done, 0 Fehler, 0 × 429, 0 Retries. Mistral-Latenz Median 60 s, P95 69 s. Interner Throttle-Wait Median 0 ms. Bestätigt die Stabilität aus dem ersten Lasttest am 23.05. abends.
-- Sonntag-Vormittag (24.05. seit 00:00): 5 echte User-Jobs, alle 5 done über Single-Large-Pipeline, 0 Fehler. Median 51 s pro Job, Median 13.130 Tokens.
-
-## [2.2.0-rc1] — 2026-05-23
-
-**Architektur-Experiment „Single-Large-Call" eingebaut, dormant hinter Feature-Flag.** Live-Pipeline läuft weiterhin auf der bewährten 3-Call-Architektur (Describe Large + 2× Profile Small 2603). Erst wenn `featureFlags/current.useSingleLargeCall` in Firestore manuell auf `true` gesetzt wird, schaltet die Queue-Pipeline für jeden neuen Job auf einen einzigen `mistral-large-2512`-Aufruf um, der Bild-Beschreibung, Standard-Profil und Beast-Profil in einer Antwort liefert. **Release Candidate** — Workshop-Validierung steht aus, daher RC-Status. Diese Release ändert für Endnutzer mit deaktiviertem Flag NICHTS.
-
-### Hinzugefügt
-
-- **Feature-Flag `useSingleLargeCall` in Firestore (`featureFlags/current.useSingleLargeCall`)** — schaltet ohne Deploy zwischen den zwei Pipelines. Default `false`; im Lokal-Modus (`QUEUE_LOCAL=1`) immer `false`, damit Emulator-Klicks die bewährte Pipeline treffen. Cache-TTL 30 s wie beim bestehenden `useQueue`-Flag. Fail-safe: jeder Firestore-Lesefehler → 3-Call-Pipeline.
-- **Neue Funktion `runSingleLargeCall(buffer, mimeType, remainingBudget, lang)` in `functions/src/mistral.js`** — einziger `mistral-large-2512`-Call mit Bild + zusammengeführtem Prompt + großem JSON-Schema. Liefert dasselbe `{ normal, boost }`-Shape wie `generateBothProfiles`, damit `handle-process-job.js` nichts anderes anpassen muss als den Pipeline-Branch. Inklusive: Vollständigkeits-Check (alle 13 Karten pro Modus), gezielter Retry mit Hinweis auf fehlende Karten, Hard-Facts-Konsistenz server-seitig (`alter_geschlecht` + `herkunft` werden wortgenau in beide Modi überschrieben), zentrale Übernahme von `ad_targeting` + `manipulation_triggers` in beide Modi — analog zum v2.1-Konsistenz-Anker, nur in einer Antwort statt aus dem Describe-Footer.
-- **Single-Large-Pipeline in `handle-process-job.js` (`runPipelineSingleLarge`)** — kompletter Branch der Queue-Pipeline. Tier-Easter-Egg (reine Tier-Bilder bekommen vordefinierte Profile) und Privacy-Risks bleiben funktionsfähig: weil der Single-Call kein separates Description-Feld liefert, baut die Funktion eine Pseudo-Beschreibung aus `profileText` + allen Karten-Werten zusammen — reicht für die Schlüsselwort-Heuristiken (Hund, Katze, sichtbarer Text). Tracking-Meta-Feld `meta.pipeline = "single-large"` zur späteren Log-Auswertung.
-- **Wechsel-Scripts `scripts/cloudtasks-concurrency-3.sh` und `scripts/cloudtasks-concurrency-10.sh`** — passen die Cloud-Tasks-Queue-Drossel an die jeweilige Pipeline an. 3 für die bewährte 3-Call-Pipeline (Small-2603-TPM-Decke), 10 für Single-Large (Large-2M-TPM-Decke entlastet komplett). Cloud-Tasks-Konfiguration ist nicht runtime-toggle-bar, daher zwei separate gcloud-Befehle. Workflow im Script-Header dokumentiert: erst Flag in Firestore umlegen, dann Concurrency-Script ausführen.
-- **Forschungs-Tool `functions/scripts/single-large-call-test.js`** — eigenständiger Test gegen die Mistral-Produktion (kein Live-Deploy, kein Firestore-Schreibzugriff). Wählt 3 zufällige Bilder aus `compare-input/` (oder feste über `TEST_IMAGES=...`), misst Tokens + Latenz + Vollständigkeit, generiert HTML-Vergleich + JSON-Rohdaten. Lädt jetzt den Live-`singleLargePrompt` direkt — Drift zwischen Test und Production kann strukturell nicht passieren.
-- **Locale-Schlüssel `singleLargePrompt` in `functions/src/locales/de/prompts.js` und `en/prompts.js`** — als Template-Literal nach `module.exports` aus den bestehenden Live-Bausteinen (`systemNormal` + `systemBoost` + `AGE_ANCHOR` + `GENDER_ANCHOR`) zusammengesetzt. Single-Source-of-Truth: Verbesserungen an einem Live-Baustein wirken automatisch auf BEIDE Pipelines (3-Call + Single-Large). Damit gelten die vollen Live-Standards: kein „wahrscheinlich"/„könnte" im Standard, 8-Kategorien-Charakter-Katalog, FORCED-MAPPING-Altersregel (Nasolabialfalten → MINIMUM 38 Jahre), Gender-First-Aus-Gesichtsmerkmalen-Regel, Manipulation-Trigger-Pool mit 20+ Optionen, KEINE-Preisangaben-Verbot in `ad_targeting`/`werbeprofil`/`kaufkraft`. Single-Call-spezifisch sind nur die Einleitung (Modell sieht das Bild SELBST, beide Profile in einer Antwort), das JSON-Schema mit `standard`/`beast`-Sub-Objekten, sowie 13 konkrete „Aussage + Beleg"-Beispiele pro Modus (15-25 Wörter, „Du bist X. Bildbeleg Y."), die Mistral Karte für Karte imitiert. EN-Lokalisierung ist eine vollständige Übersetzung.
-
-### Geändert
-
-- **`feature-flags.js` liefert jetzt zwei Flags statt einem** — `{ useQueue, useSingleLargeCall }`. Bestehender Aufruf-Code (`isQueueEnabled`) unverändert, neue Funktion `isSingleLargeCallEnabled` analog. Caller in `handle-process-job.js` nutzt den Safe-Wrapper `isSingleLargeCallEnabledSafe`, damit ein Firestore-Fehler die Pipeline nicht blockiert.
-- **Reale Token- und Latenz-Werte des Single-Large-Pfads (1 Bild, Live-API-Messung vor Deploy):** 13.180 Tokens pro Analyse, 60,6 s Latenz. Vergleich zur heutigen 3-Call-Pipeline: **-38 % Tokens**, aber **+60 % langsamere Einzel-Latenz** (60 s vs 38 s). Hard-Facts identisch in beiden Modi, Beast-Profil substanziell (10-12 Sätze, ~150 Wörter, schockierend mit Bildbeleg), konkrete Marken (Garmin Edge 1040, GOREWEAR, Specialized) statt generischer Branchen, vielfältige Trigger, Karten im „Du bist X. Bildbeleg Y."-Format (16-23 Wörter).
-- **Architektur-Wert ehrlich:** der primäre Gewinn der Single-Large-Architektur ist NICHT die Einzelanalyse-Latenz, sondern die **vollständige Befreiung vom 2603-TPM-Bottleneck**. Alle Tokens landen im Large 2512 (2M TPM statt 100K) — Workshop-Concurrency kann auf 10+ ohne 429-Risiko. Bei einem 40er-Workshop bedeutet das rechnerisch: ~6 min Total-Zeit (Single-Large + Concurrency 10) statt ~13 min (heute Concurrency 3). Kostenseitig: ~3,2 ct pro Analyse statt 1,7 ct heute (+88 %). Lasttest steht aus.
-
-### Geprüft (aber nicht umgesetzt)
-
-- **Concurrency-Erhöhung der bestehenden 3-Call-Pipeline von 3 auf 4:** Mit den exakten Token-Werten aus den Live-Logs neu gerechnet — heutige Pipeline liegt mit Concurrency 3 bei ~95 % der 2603-TPM-Decke. Concurrency 4 würde uns rechnerisch ~27 % über die Decke heben. Verworfen. Sauberere Lösung ist der Single-Large-Call-Branch oben, der das 2603-Konto komplett entlastet.
-
 ## [2.1.0] — 2026-05-23
+
+
 
 Großer Konsistenz- und UX-Sprung. Standard- und Beast-Modus zeigen jetzt
 identische Grundfakten (Alter, Geschlecht, Herkunft) und identische Marken-
@@ -3186,6 +3283,8 @@ rund 12 %, Job-Latenz um rund 17 %.
 
 ## [2.0.3] — 2026-05-23
 
+
+
 Konsistenz im UI und Messbarkeit auf der Mistral-Seite: Die Profil-Karten erscheinen jetzt in beiden Modi in derselben festen Reihenfolge, und jeder Mistral-Call protokolliert Token-Verbrauch und Wartezeit getrennt.
 
 ### Behoben
@@ -3197,6 +3296,8 @@ Konsistenz im UI und Messbarkeit auf der Mistral-Seite: Die Profil-Karten ersche
 - **Pro-Call-Forensik für Mistral:** Jede `mistral-describe`- und `mistral-profile-*`-Log-Zeile trägt jetzt `promptTokens`, `outputTokens`, `httpMs` (reiner Mistral-Roundtrip) und `waitMs` (Wartezeit auf Semaphore-Slot + Token-Bucket). Beantwortet nach dem nächsten Workshop die Frage, ob die Mistral-TPM-Decke, die RPS-Decke oder die eigene Drossel die Wartezeit erzeugt — die Werte kamen schon vorher in jeder Mistral-Antwort, wurden aber verworfen.
 
 ## [2.0.2] — 2026-05-22
+
+
 
 Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zurückkehrende Nutzer schneller, und die vier Phasen einer Analyse — Upload → Warteschlange → Verarbeitung → Auslieferung — sind ab jetzt einzeln im Log messbar.
 
@@ -3212,6 +3313,8 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
 
 ## [2.0.1] — 2026-05-21
 
+
+
 ### Behoben
 
 - Speicher der Warteschlangen-Statusabfrage (`jobStatus`) von 128 auf 256 MB angehoben. 128 MB hatte keinen Puffer über dem firebase-admin-Grundbedarf und lief beim Workshop am 21.05. unter Poll-Last in einen Speicherüberlauf.
@@ -3225,6 +3328,8 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
 - Diagnose-Logging: Scheitert das Öffnen eines Bildes im Browser, wird die Formatklasse der Datei (an den ersten Bytes erkannt, etwa `heic` oder `tiff`) anonym mitgeloggt — kein Dateiname, kein Bildinhalt, nur die Format-Art.
 
 ## [2.0.0] — 2026-05-20
+
+
 
 **Release: Queue-Architektur.** Jeder Upload läuft jetzt über eine Google-Cloud-Tasks-Warteschlange statt über eine lange offene Verbindung. Das fängt Workshop-Lastspitzen strukturell ab: Statt unter Stoßlast in eine 429-Fehlerkaskade zu laufen, werden Uploads dosiert und in fairer Reihenfolge abgearbeitet — kein verlorener Job, keine harten Fehler. Gesteuert über das Firestore-Feature-Flag `useQueue`; der synchrone `/analyze`-Pfad bleibt als sofortiger Rückfall erhalten (Flag umlegen, kein Deploy).
 
@@ -3259,6 +3364,8 @@ Diese Version fasst die fünf Entwicklungsphasen rc1–rc5 zusammen.
 
 ## [1.10.9] — 2026-05-20
 
+
+
 ### Behoben — Wake-Lock wird wieder im User-Gesture-Kontext angefordert
 
 Die v1.10.8-Wake-Lock-Telemetrie lieferte sofort ein klares Ergebnis: Auf einem iPhone (voller Akku, KEIN Stromsparmodus) kam `wakeLock: "denied:NotAllowedError"`, auf einem Mac `"acquired"`.
@@ -3281,6 +3388,8 @@ Erwartung: Auf iPhones sollte aus `denied:NotAllowedError` künftig `acquired` w
 - Cache-Buster auf `?v=2026052002`.
 
 ## [1.10.8] — 2026-05-20
+
+
 
 ### Behoben — modell-bewusster Token-Bucket + Wake-Lock-Diagnose
 
@@ -3306,6 +3415,8 @@ Nach Auswertung des Workshop-Vormittags (2026-05-20): Der Server lief stabil (ke
 - Cache-Buster auf `?v=2026052001`.
 
 ## [1.10.7] — 2026-05-19 (Abend)
+
+
 
 ### Behoben — Modell-Limits korrekt erfasst, Token-Bucket entsprechend kalibriert
 
@@ -3344,6 +3455,8 @@ Lesson learned: Versions-Sprung Small 3.2 → Small 4 ist bei spezifischen Fähi
 - Frontend 143/143 gruen (unveraendert).
 
 ## [1.10.6] — 2026-05-19
+
+
 
 ### Behoben — Workshop-Tauglichkeit fuer 25-50 gleichzeitige Teilnehmer
 
@@ -3394,6 +3507,8 @@ Heutiger 13:00-15:00-Workshop hat die Pipeline gerissen: ab ~15 Geraeten gleichz
 
 ## [1.10.5] — 2026-05-15
 
+
+
 ### Behoben — Spinner verschwand mid-Pipeline mit Heartbeat
 
 Direkt nach v1.10.4-Deploy gemeldet: Spinner verschwand nach wenigen Sekunden, dann ~1 Minute leere UI, dann ploetzlich das Ergebnis. Ursache: `await fetch(...)` returnt bei chunked transfer **sofort sobald Headers da sind** (statt erst beim kompletten Body wie bei `Content-Length`-Response). `stopScanAnim()` lief deshalb mid-Pipeline statt erst beim fertigen JSON.
@@ -3409,6 +3524,8 @@ Direkt nach v1.10.4-Deploy gemeldet: Spinner verschwand nach wenigen Sekunden, d
 - Cache-Buster auf `?v=2026051509`.
 
 ## [1.10.4] — 2026-05-15
+
+
 
 ### Behoben — Safari/WebKit kappt fetch nach ~47 s ("Load failed")
 
@@ -3433,6 +3550,8 @@ Akutes Problem: Im Workshop-Setup auf macOS + iOS Safari brach jede Analyse mit 
 
 ## [1.10.3] — 2026-05-15
 
+
+
 ### Geaendert — Hosting-Fallback-Pfade entfernt
 
 Nach erfolgreicher Verifikation von `api.malzi.me` (v1.10.2) jetzt die beiden Fallbacks aufgeraeumt, die als Sicherheitsnetz waehrend des Uebergangs drin waren:
@@ -3452,6 +3571,8 @@ Cloud-Run-Services bleiben unveraendert; nur Frontend-Hosting-Konfig.
 
 ## [1.10.2] — 2026-05-15
 
+
+
 ### Geaendert — Analyze-Endpoint nutzt jetzt `api.malzi.me`
 
 Custom Domain `api.malzi.me` ist via Cloud Run Domain Mapping eingerichtet (CNAME → `ghs.googlehosted.com`, SSL automatisch ueber Lets Encrypt). Damit weg von der unschoenen `.run.app`-URL und in DevTools/Network-Tab sauber unter eigener Domain sichtbar. Funktional identisch zur direkten Cloud-Run-URL — Edge-Timeout-Falle bleibt umgangen.
@@ -3469,6 +3590,8 @@ Custom Domain `api.malzi.me` ist via Cloud Run Domain Mapping eingerichtet (CNAM
 - Cache-Buster auf `?v=2026051506`.
 
 ## [1.10.1] — 2026-05-15
+
+
 
 ### Geaendert — Trace-ID standardmaessig in Fehlermeldungen
 
@@ -3489,6 +3612,8 @@ Custom Domain `api.malzi.me` ist via Cloud Run Domain Mapping eingerichtet (CNAM
 - Cache-Buster auf `?v=2026051505`.
 
 ## [1.10.0] — 2026-05-15
+
+
 
 ### Neu — State-of-the-Art Logging-Pipeline (anonym, DSGVO-konform)
 
@@ -3518,6 +3643,8 @@ Geloggt: Fehler-Typ + -Message (gekuerzt), Phase, Dauer, gekuerzter User-Agent, 
 
 ## [1.9.1] — 2026-05-15
 
+
+
 ### Geaendert — Upload-Limit von 6 MB auf 25 MB hochgesetzt
 
 Frontend verkleinert das Bild ohnehin per Canvas-Resize (`exif.js`), bevor es an die API gesendet wird. Das alte 6-MB-Hardlimit blockierte aber bereits die Rohdatei — typische Handy-Originale (iPhone, iPad, Pixel) liegen oft bei 4–10 MB und scheiterten daran ohne Grund. Neues 25-MB-Limit laesst alle ueblichen Handy-Fotos durch, schuetzt aber weiterhin vor versehentlich hochgeladenen RAW-Dateien oder Videos.
@@ -3537,6 +3664,8 @@ Frontend verkleinert das Bild ohnehin per Canvas-Resize (`exif.js`), bevor es an
 - Cache-Buster auf `?v=2026051503`.
 
 ## [1.9.0] — 2026-05-15
+
+
 
 ### Neu — Anonymes Client-Error-Logging (DSGVO-konform)
 
@@ -3565,6 +3694,8 @@ Was NICHT geloggt wird: IPs persistent, Cookies, Bilder, EXIF, GPS, beliebige He
 
 ## [1.8.0] — 2026-05-15
 
+
+
 ### Behoben — Hosting-Edge-Timeout umgangen
 
 Beobachtet: Bei langsameren Mistral-Antworten (z.B. heute Vormittag um ~30 % erhoehte Latenz) reisst die komplette Pipeline (describe + 2x profile) die 60-Sekunden-Grenze des Firebase-Hosting-Rewrite-Edges. Symptom im Browser: „Server-Fehler" nach ~60–70 s, obwohl die Cloud Function selber sauber mit `status:"ok"` antwortet — der Hosting-Proxy davor kappt die Antwort.
@@ -3586,6 +3717,8 @@ Der bisherige `/analyze`-Rewrite in `firebase.json` bleibt als sanfter Fallback 
 
 ## [1.7.2] — 2026-05-14
 
+
+
 ### Aufgeraeumt — Gemini-Aera-Reste entfernt
 
 Nach der Pure-Mistral-Umstellung (v1.6.0) waren in Doku und Kommentaren noch veraltete Verweise auf Google Gemini / Vertex AI / Cloud Vision uebrig — teils schlicht falsch (z.B. „faellt automatisch auf Gemini-Fallback zurueck", obwohl es seit v1.6.0 keinen Fallback-Anbieter mehr gibt). Bereinigt:
@@ -3604,6 +3737,8 @@ Nach der Pure-Mistral-Umstellung (v1.6.0) waren in Doku und Kommentaren noch ver
 
 ## [1.7.1] — 2026-05-14
 
+
+
 ### Behoben / Verbessert
 
 - **Wake-Lock gegen Analyse-Abbruch** (`public/js/api.js` + Locales): Eine Analyse kann bis ~3 min dauern. Ging das Geraet in der Zeit in Standby, fror der Browser die Seite ein und die laufende fetch-Anfrage starb — der User sah beim Aufwachen einen Fehler, obwohl der Server fertig gerechnet hatte. Jetzt fordert der Browser waehrend der Analyse einen Screen-Wake-Lock an (Bildschirm bleibt an) und gibt ihn danach wieder frei. Best-Effort: nicht jedes Geraet unterstuetzt die API, und ein manueller Power-Knopf-Druck sperrt weiterhin.
@@ -3618,6 +3753,8 @@ Nach der Pure-Mistral-Umstellung (v1.6.0) waren in Doku und Kommentaren noch ver
 - Cache-Buster auf `?v=2026051404`.
 
 ## [1.7.0] — 2026-05-14
+
+
 
 ### Sicherheit & Stabilitaet — Audit-Massnahmen
 
@@ -3640,17 +3777,15 @@ Nicht-Code-Befunde des Audits: Das Mistral-Ausgabenlimit (100 EUR/Monat, harte N
 
 ## [1.6.2] — 2026-05-14
 
+
+
 ### Behoben
 
 - **Alter inkonsistent zwischen Normal- und Beast-Modus** (Prompts de + en): Bisher nannte die Bildbeschreibung absichtlich kein Alter — sie beschrieb nur die Merkmale, und beide Profil-Anfragen legten das Alter danach jeweils selbst fest. Dadurch kamen sie auf unterschiedliche Werte. Jetzt legt die bildsehende Stufe (Mistral Large 3) die Altersspanne EINMAL fest, beide Profile (Normal + Beast) uebernehmen sie unveraendert. Umgesetzt ueber `describePrompt` + `describeFallback` (Alter wird jetzt explizit geschaetzt) plus neue `ALTER`-Regel in `SCHEMA_RULES`. `AGE_ANCHOR`-Kalibrierung unveraendert. Reiner Prompt-Eingriff, keine zusaetzliche API-Anfrage.
 
-## [1.6.1.1] — 2026-05-14
-
-### Behoben
-
-- **Geschlecht inkonsistent zwischen Normal- und Beast-Modus** (`SCHEMA_RULES` in de + en `prompts.js`): Beide Profile bekommen dieselbe Bildbeschreibung von Large 3 — aber der Beast-Modus (hoehere Temperatur + konfrontativer System-Prompt) interpretierte das Geschlecht teils neu, statt es zu uebernehmen. Neue Regel in `SCHEMA_RULES`: Das Geschlecht steht in der Bildbeschreibung und wird exakt uebernommen — keine Neuinterpretation, keine Aenderung zur dramatischen Wirkung. Greift fuer Normal + Beast. Reiner Prompt-Eingriff, keine zusaetzliche API-Anfrage.
-
 ## [1.6.1] — 2026-05-14
+
+
 
 ### Behoben / Verbessert
 
@@ -3671,6 +3806,8 @@ Das sind Feinschliff-Massnahmen, kein Allheilmittel — Mistrals Grundgenauigkei
 - 283 Backend-Tests + 139 Frontend-Tests gruen.
 
 ## [1.6.0] — 2026-05-14
+
+
 
 ### Architektur-Wechsel: Pure-Mistral-only (Vision + Gemini entfernt)
 
@@ -3758,6 +3895,8 @@ Kaskade ist jetzt: Mistral-Call (90s) < Backend-Budget (120s) < Cloud-Function-H
 
 ## [1.5.3] — 2026-05-12
 
+
+
 ### Phase 4 der Mistral-Migration — Auto-Ramp (in v1.6.0 wieder entfernt)
 
 v1.5.3 brachte einen hartcodierten 8-Tage-Auto-Ramp, der den Mistral-Anteil
@@ -3773,6 +3912,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 `feature-flags.js`) wurde in v1.6.0 ersatzlos entfernt.
 
 ## [1.5.2] — 2026-05-12
+
+
 
 ### Verbesserungen (Phase 3 der Mistral-Migration — Feature-Flag + Multi-Provider-Fallback-Chain)
 
@@ -3794,6 +3935,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.5.1] — 2026-05-12
 
+
+
 ### Verbesserungen (Phase 2 der Mistral-Migration — dormanter Schatten-Code)
 
 - **`functions/src/json-repair.js`** neu (~310 Zeilen): provider-agnostische 4-stufige JSON-Reparatur-Schicht.
@@ -3814,6 +3957,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **Live-System unverändert**: weder `handle-analyze.js` noch `gemini.js` importieren die neuen Module. Der Code ist dormant und wird erst in Phase 3 (Feature-Flag + Multi-Provider-Fallback) aktiviert. Deploy ist daher rein additiv ohne Verhaltens-Aenderung in Produktion.
 
 ## [1.5.0] — 2026-05-12
+
+
 
 ### Verbesserungen (Phase 1 der Mistral-Migration)
 
@@ -3844,6 +3989,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.4.0] — 2026-05-11
 
+
+
 ### Wartung (zukunftssichernd)
 
 - **SDK-Migration auf `@google/genai` 2.0.1**: Die alte `@google-cloud/vertexai` SDK (1.12.0) wird am 24.06.2026 von Google entfernt. Komplettes Refactor von `functions/src/gemini.js` auf die neue, einheitliche Gen-AI-SDK:
@@ -3857,6 +4004,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **gitleaks-action auf Node.js 24 vorgezogen**: ENV-Variable `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` im `secret-scan`-Job. GitHub forced ab 02.06.2026 ohnehin Node 24; mit dem Override verschwindet die Deprecation-Warnung schon jetzt aus den CI-Logs. Action-Version auf `v2.3.9` gepinnt (Latest).
 
 ## [1.3.2] — 2026-05-11
+
+
 
 ### Verbesserungen
 
@@ -3879,6 +4028,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.3.1] — 2026-04-19
 
+
+
 ### Sicherheit
 
 - **protobufjs RCE gefixt (CRITICAL)**: `protobufjs` auf 7.5.5 aktualisiert — schliesst Arbitrary-Code-Execution-Luecke (GHSA-xq3m-2v4x-88gg), die transitiv ueber `@google-cloud/firestore` + `@google-cloud/vision` + `firebase-admin` in die Cloud Functions gelangte.
@@ -3896,11 +4047,15 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.3.0] — 2026-03-07
 
+
+
 ### Neu
 
 - **Englische Uebersetzung**: Komplette i18n-Unterstuetzung fuer Englisch — UI-Texte, Gemini-Prompts, Tier-Profile und Schemas. Sprache wird automatisch ueber Browser-Sprache oder `?lang=en` URL-Parameter gewaehlt. Beitrag von [@MechanikGamer](https://github.com/MechanikGamer) (PR #11, Issue #4).
 
 ## [1.2.10] — 2026-02-27
+
+
 
 ### Verbesserungen
 
@@ -3917,6 +4072,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.2.9] — 2026-02-27
 
+
+
 ### Bugfixes
 
 - **Altersschaetzung bei Erwachsenen 25+ (umfassende Ueberarbeitung)**: Personen ueber 25 wurden systematisch zu jung geschaetzt — oft 10 Jahre daneben. Drei Ursachen identifiziert und behoben:
@@ -3927,6 +4084,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.2.8] — 2026-02-24
 
+
+
 ### Verbesserungen
 
 - **Altersangepasste Sprache**: Profile passen Wortwahl und Ton automatisch an das geschaetzte Alter an. Jüngere Personen bekommen einfachere Sprache ohne Fremdwoerter, aeltere sachlich-analytische Formulierungen. Untergrenze ist das Sprachniveau fuer 10-14-Jaehrige — darunter wird nicht vereinfacht. Inhalt und Schaerfe bleiben in jeder Altersstufe gleich, nur die Verpackung aendert sich. Betrifft beide Modi (Normal + Beast Mode).
@@ -3936,6 +4095,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **Normal-Modus: Erweiterte Eigenschafts-Palette**: Charaktereigenschaften von ~25 auf ~145 Begriffe massiv erweitert, geordnet in 8 Kategorien mit jeweils Staerken UND Schwaechen. Ausgewogenes Scoring wie ein echtes Profiling-System — nicht einseitig negativ. Kategorien: Psyche, Soziale Kompetenz, Gewohnheiten/Lebensstil, Gesundheit, Finanzverhalten, Beziehung, Beruf/Leistung, Weltbild/Denkweise.
 
 ## [1.2.7] — 2026-02-24
+
+
 
 ### Features
 
@@ -3950,6 +4111,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.2.6] — 2026-02-23
 
+
+
 ### Bugfixes
 
 - **Stats-Zaehler setzen sich um Mitternacht zurueck**: Tages-, Wochen-, Monats- und Jahreszaehler auf der Stats-Seite zeigten nach Mitternacht weiterhin die alten Werte — bis zum naechsten Upload. `getStats()` vergleicht jetzt die gespeicherten Datums-Keys live mit dem aktuellen Wiener Datum und gibt 0 zurueck wenn sie nicht mehr passen. Kein Cron-Job noetig.
@@ -3962,6 +4125,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **getStats Live-Reset**: 4 neue Tests (stale todayDate/weekStart/monthKey/yearKey → 0)
 
 ## [1.2.5] — 2026-02-22
+
+
 
 Accessibility-Verbesserungen, Hardening und Test-Ausbau.
 
@@ -3993,6 +4158,8 @@ Accessibility-Verbesserungen, Hardening und Test-Ausbau.
 
 ## [1.2.4] — 2026-02-22
 
+
+
 Wartungsmodus-Modal, Prompt-Verbesserungen und Backend-Hardening.
 
 ### Features
@@ -4022,6 +4189,8 @@ Wartungsmodus-Modal, Prompt-Verbesserungen und Backend-Hardening.
 
 ## [1.2.3] — 2026-02-22
 
+
+
 Demo-Bilder, UX-Verbesserungen und Code-Cleanup.
 
 ### Verbesserungen
@@ -4045,6 +4214,8 @@ Demo-Bilder, UX-Verbesserungen und Code-Cleanup.
 
 ## [1.2.2] — 2026-02-21
 
+
+
 Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 
 ### Sicherheit
@@ -4067,6 +4238,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 - **Testabdeckung**: 210 Backend + 126 Frontend = 336 Tests
 
 ## [1.2.1] — 2026-02-21
+
+
 
 ### Sicherheit
 
@@ -4094,6 +4267,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 
 ## [1.2.0] — 2026-02-21
 
+
+
 ### Features
 
 - **Stundenlimit mit rollendem Fenster**: Echtes rollendes 60-Minuten-Fenster basierend auf einem `recentAnalyses`-Array in Firestore. Alte Eintraege fallen automatisch heraus — sobald genug Eintraege altern, ist das System sofort wieder frei (kein starrer Countdown). Konfigurierbares Limit (Standard: 500/Stunde, zentral in `config.js`). Fail-open bei Firestore-Fehlern.
@@ -4115,6 +4290,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 
 ## [1.1.1] — 2026-02-20
 
+
+
 ### Verbesserungen
 
 - **Concurrency**: Cloud Function verarbeitet jetzt bis zu 20 gleichzeitige Anfragen pro Instanz (statt 1) — bessere Performance bei vielen Workshop-Teilnehmern
@@ -4130,6 +4307,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 - **Datenschutzseite**: Logging-Beschreibung praezisiert (genutztes Modell, Antwortlaenge erwaehnt)
 
 ## [1.1.0] — 2026-02-19
+
+
 
 ### Features
 
@@ -4186,6 +4365,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 - **Datenschutzseite praezisiert**: Klarstellung dass anonymisierte Fehlerzusammenfassungen (ohne personenbezogene Daten) zur Fehlerbehebung bestehen bleiben
 
 ## [1.0.0] — 2026-02-16
+
+
 
 Erster oeffentlicher Release.
 

@@ -4181,6 +4181,28 @@ a.sprach-knopf:hover {
      die Messung hat es bestaetigt. */
   margin-bottom: 20px;
 }
+/* BUG-2026-08-30-01: Auf der Zahlen-Seite steht die Kopfzeile NICHT im
+   Seitengeruest — sie wird von sprachumschalter.js um die Wortmarke gebaut,
+   weil die Seite in beiden Sprachen dieselbe Datei ist. Dabei kam der Abstand
+   doppelt: einmal von der Wortmarke, einmal vom neuen Container. Die
+   Ueberschrift sass dadurch 21 Bildpunkte tiefer als auf jeder anderen Seite.
+
+   Auf den Rechtsseiten steht die Kopfzeile fest im HTML; dort ist der Abstand
+   richtig und bleibt unangetastet. Nur die nachtraeglich gebaute Fassung
+   verzichtet darauf — erkennbar daran, dass sie direkt im Hauptbereich sitzt
+   statt in einer Seitenhuelle.
+
+   Aufgefallen dem Kopfbereich-Test, den ich dreimal faelschlich fuer wacklig
+   gehalten habe. Geklaert hat es das erste Fehlerbild der Pruefkette. */
+main.container:not(.legal-page) > .seiten-kopfzeile {
+  margin-bottom: 0;
+  /* Die Sprachpille misst 27,42 px, die Wortmarke 27 — der Container waechst
+     auf den groesseren Wert und schob die Ueberschrift um ein weiteres
+     Bildpunkt-Bruchteil. Eine feste Zeilenhoehe macht es unabhaengig davon,
+     welches Element gerade darin steht. */
+  min-height: 27px;
+  height: 27px;
+}
 .seiten-kopfzeile .sprachwahl {
   position: static;
   flex: 0 0 auto;

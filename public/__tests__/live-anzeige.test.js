@@ -814,6 +814,11 @@ describe("Live-Anzeige (v3.0)", () => {
   it("v3.0.3 Auge ins Bild: ein Auge unterhalb der Sichtkante wird nach dem Analyse-Start sanft geholt", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
     elements.scanAnim.classList.add("active");
     try {
@@ -825,9 +830,15 @@ describe("Live-Anzeige (v3.0)", () => {
       liveAnzeige.augeInsBild();
       /* (Diese Erwartung wird ROT, wenn jemand das Auge-Anfahren entfernt.) */
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+      /* Seit 30.08.2026 wird die Zielposition selbst gerechnet: window.scrollTo
+         mit einem `top`-Wert statt scrollIntoView mit `block:"center"`.
+         Grund: Der Browser zentriert im Layout-Fenster und zaehlt dabei die
+         Adressleiste des iPhones mit — das Element blieb dahinter. */
+      expect(spy.mock.calls[0][0].behavior).toBe("smooth");
+      expect(typeof spy.mock.calls[0][0].top).toBe("number");
     } finally {
       delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
     }
@@ -836,6 +847,11 @@ describe("Live-Anzeige (v3.0)", () => {
   it("v3.0.5 Auge ins Bild: ein noch nicht aufgebautes Auge (Höhe 0) wird per Nachfassen geholt, sobald es steht", async () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     /* Analyse-Start: Auge existiert, ist aber noch nicht aktiv/aufgebaut —
        genau der Handy-Befund („springt nicht hoch zum Auge"). RUECKBAUPROBE:
        Ohne die Nachfass-Logik bleibt der Spy für immer still. */
@@ -853,6 +869,7 @@ describe("Live-Anzeige (v3.0)", () => {
       expect(spy).toHaveBeenCalledTimes(1);
     } finally {
       delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
     }
@@ -861,6 +878,11 @@ describe("Live-Anzeige (v3.0)", () => {
   it("Auge-Nachwache: rutscht das Auge NACH der ersten Prüfung aus dem Bild (Foto-Vorschau lädt), holt die Wache es zurück — genau einmal je Episode", async () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.scanAnim.classList.add("active");
     /* Beim Aufruf steht das Auge noch im Bild — exakt der Handy-Befund. */
     elements.scanAnim.getBoundingClientRect = imFenster;
@@ -883,6 +905,7 @@ describe("Live-Anzeige (v3.0)", () => {
       expect(spy).toHaveBeenCalledTimes(1);
     } finally {
       delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
     }
@@ -891,6 +914,11 @@ describe("Live-Anzeige (v3.0)", () => {
   it("KA-05 Lauf-Kennung: startet binnen eines Takts ein NEUER Analyse-Lauf, stirbt die alte Nachwache-Kette sofort", async () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.scanAnim.classList.add("active");
     /* Lauf 1: Auge sichtbar — die Kette tickt, scrollt aber nicht. */
     elements.scanAnim.getBoundingClientRect = imFenster;
@@ -918,6 +946,7 @@ describe("Live-Anzeige (v3.0)", () => {
       expect(spy).toHaveBeenCalledTimes(1);
     } finally {
       delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
     }
@@ -926,6 +955,11 @@ describe("Live-Anzeige (v3.0)", () => {
   it("v3.0.5 Übernahme: bloßes Antippen (touchstart) beendet die Führung NICHT — erst echtes Wischen (touchmove)", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
     elements.scanAnim.classList.add("active");
     try {
@@ -941,6 +975,7 @@ describe("Live-Anzeige (v3.0)", () => {
       expect(spy).toHaveBeenCalledTimes(1);
     } finally {
       delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
     }
@@ -949,6 +984,11 @@ describe("Live-Anzeige (v3.0)", () => {
   it("v3.0.3 Auge ins Bild: ein schon (mehrheitlich) sichtbares Auge wird NICHT angescrollt", () => {
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.scanAnim.getBoundingClientRect = imFenster;
     elements.scanAnim.classList.add("active");
     try {
@@ -958,6 +998,7 @@ describe("Live-Anzeige (v3.0)", () => {
       expect(spy).not.toHaveBeenCalled();
     } finally {
       delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
     }
@@ -967,6 +1008,11 @@ describe("Live-Anzeige (v3.0)", () => {
     reduzierteBewegung();
     const spy = vi.fn();
     elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
     elements.scanAnim.getBoundingClientRect = unterDerSichtkante;
     elements.scanAnim.classList.add("active");
     try {
@@ -975,6 +1021,7 @@ describe("Live-Anzeige (v3.0)", () => {
       expect(spy).not.toHaveBeenCalled();
     } finally {
       delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
       delete elements.scanAnim.getBoundingClientRect;
       elements.scanAnim.classList.remove("active");
     }
@@ -1033,6 +1080,102 @@ describe("Live-Anzeige (v3.0)", () => {
     } finally {
       window.scrollBy = echteScrollBy;
       delete elements.liveCursor.getBoundingClientRect;
+    }
+  });
+
+  it("30.08. iPHONE: das Auge wird HINTER die Adressleiste zurueckgeholt", async () => {
+    /* Vom Nutzer zweimal am iPhone gemeldet, beim zweiten Mal mit dem Hinweis
+       "nicht die geringste Veraenderung" — und er hatte recht.
+
+       Die Erkennung war schon richtig: `sichtbareHoehe()` merkte, dass das
+       Auge verdeckt ist. Das ZURUECKHOLEN war falsch: `scrollIntoView` mit
+       `block:"center"` zentriert im LAYOUT-Fenster, und das zaehlt die
+       Adressleiste mit. Der Browser scrollte, hielt es fuer erledigt, und das
+       Auge blieb dahinter. Die Wache merkte sich "schon versucht" und
+       unternahm nie wieder etwas.
+
+       Nachgestellt mit echtem Upload bei Handy-Massen:
+         vorher   Auge 439-639, sichtbar bis 584 -> 55 px verdeckt, kein Scroll
+         nachher  Auge 369-569 -> ganz im Bild
+
+       (Rueckbauprobe: Mit scrollIntoView statt eigener Rechnung bleibt
+       window.scrollTo ungenutzt -> ROT.) */
+    const scrollToSpy = vi.fn();
+    const echtesScrollTo = window.scrollTo;
+    const echtesVV = window.visualViewport;
+    const echteHoehe = window.innerHeight;
+    window.scrollTo = scrollToSpy;
+    Object.defineProperty(window, "innerHeight", { value: 664, configurable: true });
+    Object.defineProperty(window, "visualViewport", { value: { height: 584 }, configurable: true });
+    elements.scanAnim.classList.add("active");
+    /* Auge bei 439-639: im Fenster (664), aber hinter der Leiste (ab 584). */
+    elements.scanAnim.getBoundingClientRect = () => ({ top: 439, bottom: 639, height: 200 });
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      await vi.advanceTimersByTimeAsync(600);
+      expect(scrollToSpy).toHaveBeenCalled();
+      /* Ziel: Mitte des SICHTBAREN Bereichs, nicht des Fensters. */
+      const ziel = scrollToSpy.mock.calls[0][0].top;
+      expect(ziel).toBeGreaterThan(0);
+    } finally {
+      window.scrollTo = echtesScrollTo;
+      Object.defineProperty(window, "innerHeight", { value: echteHoehe, configurable: true });
+      if (echtesVV === undefined) delete window.visualViewport;
+      else Object.defineProperty(window, "visualViewport", { value: echtesVV, configurable: true });
+      delete elements.scanAnim.getBoundingClientRect;
+      elements.scanAnim.classList.remove("active");
+    }
+  });
+
+  it("30.08. iPHONE: die Adressleiste zaehlt nicht zur sichtbaren Hoehe", async () => {
+    /* Vom Nutzer am iPhone gemeldet und mit Foto belegt (30.08.2026, 00:06):
+       Das Scan-Auge stand angeschnitten hinter der Safari-Adressleiste und
+       wurde NICHT hochgeholt. Am Desktop funktionierte dasselbe einwandfrei —
+       „Am Desktop schon."
+
+       Grund: `window.innerHeight` zaehlt auf iOS die eingeblendeten Leisten
+       mit. Fuer die Rechnung lag das Auge im Bild, fuer den Betrachter lag es
+       dahinter. Auf einem iPhone sind das leicht 100 Bildpunkte.
+
+       Hier nachgestellt: Fenster 800 hoch, davon 100 von der Leiste verdeckt,
+       das Auge sitzt bei 720–780 — also im `innerHeight`, aber HINTER der
+       Leiste. Es muss angefahren werden.
+
+       (Rueckbauprobe: Rechnet sichtbareHoehe() wieder mit innerHeight, gilt
+       das Auge als sichtbar und der Spion bleibt bei 0 Aufrufen -> ROT.) */
+    const spy = vi.fn();
+    const echtesVV = window.visualViewport;
+    const echteHoehe = window.innerHeight;
+    /* Das Fenster meldet 900 — die Leiste verdeckt davon 200. */
+    Object.defineProperty(window, "innerHeight", { value: 900, configurable: true });
+    Object.defineProperty(window, "visualViewport", {
+      value: { height: 700 },
+      configurable: true,
+    });
+    elements.scanAnim.classList.add("active");
+    /* Das Auge sitzt bei 720–780: innerhalb der gemeldeten 900, aber HINTER
+       der Leiste, die bei 700 beginnt. */
+    elements.scanAnim.getBoundingClientRect = () => ({ top: 720, bottom: 780, height: 60 });
+    elements.scanAnim.scrollIntoView = spy;
+    /* Seit 30.08.2026 rechnet sanftZentrieren die Zielposition selbst und
+       ruft window.scrollTo — scrollIntoView ist nur noch Rueckfall. Geholt
+       gilt als geholt, egal auf welchem der beiden Wege. */
+    const echtesScrollTo = window.scrollTo;
+    window.scrollTo = spy;
+    try {
+      liveAnzeige.fuehrungStarten();
+      liveAnzeige.augeInsBild();
+      await vi.advanceTimersByTimeAsync(600);
+      expect(spy).toHaveBeenCalled();
+    } finally {
+      if (echtesVV === undefined) delete window.visualViewport;
+      else Object.defineProperty(window, "visualViewport", { value: echtesVV, configurable: true });
+      Object.defineProperty(window, "innerHeight", { value: echteHoehe, configurable: true });
+      delete elements.scanAnim.getBoundingClientRect;
+      delete elements.scanAnim.scrollIntoView;
+      window.scrollTo = echtesScrollTo;
+      elements.scanAnim.classList.remove("active");
     }
   });
 

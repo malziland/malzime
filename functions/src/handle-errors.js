@@ -13,6 +13,7 @@
  */
 
 const { checkRateLimit, getClientIp } = require("./middleware");
+const { geltendeWerte } = require("./betriebsprofil");
 
 const STRING_FIELDS = {
   errorName: 100,
@@ -72,7 +73,8 @@ async function handleErrors(req, res) {
     }
 
     const ip = getClientIp(req);
-    if (!checkRateLimit(ip)) {
+    const { werte: grenzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
+    if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
       res.status(429).json({ error: "Rate limit exceeded" });
       return;
     }

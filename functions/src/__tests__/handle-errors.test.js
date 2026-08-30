@@ -1,5 +1,13 @@
 "use strict";
 
+/* Betriebswerte kommen seit 30.08.2026 aus Firestore; hier gestellt, damit
+   der Test nicht das Protokoll des Satz-Ladens mitzaehlt. */
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 const { handleErrors } = require("../handle-errors");
 
 function mockRes() {

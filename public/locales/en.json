@@ -249,5 +249,6 @@
   "sprache.laeuft.text": "The analysis starts over — your photo stays, you do not have to upload it again.",
   "sprache.laeuft.bleiben": "Cancel",
   "sprache.laeuft.wechseln": "Switch to German",
-  "sprache.fertig.textOhneBild": "<strong>Your current profile will be deleted.</strong> For a German one you would have to upload your photo again."
+  "sprache.fertig.textOhneBild": "<strong>Your current profile will be deleted.</strong> For a German one you would have to upload your photo again.",
+  "blocked.configMissing": "Something is misconfigured on our side — this is not your fault and not your photo. We have been notified and are fixing it. Please try again in a few minutes."
 }

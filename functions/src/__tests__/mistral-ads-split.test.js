@@ -1,3 +1,14 @@
+/* Betriebswerte kommen seit 30.08.2026 ausschliesslich aus Firestore. Fuer
+   Tests, die eine Analyse durchspielen, wird hier ein gueltiger Satz gestellt —
+   sonst bricht jeder Aufruf mit "Betriebswerte fehlen" ab, was diese Tests
+   nicht pruefen wollen. Wer das Verhalten OHNE Satz prueft, tut das in
+   betriebsprofil*.test.js. */
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 const mistral = require("../mistral");
 const { setFetchForTest, runSingleLargeCall, _buildBrandBlocklistBlock, _BRAND_BLOCKLIST_SETS } = mistral;
 const { _setRateIntervalMs, _resetRateBucket } = require("../throttle");

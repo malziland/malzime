@@ -3,12 +3,10 @@ const {
   createRateBucket,
   withMistralSlot,
   getMistralStats,
-  DEFAULT_MAX_CONCURRENT,
-  LARGE_TOKEN_INTERVAL_MS,
-  SMALL_TOKEN_INTERVAL_MS,
   _setRateIntervalMs,
   _resetRateBucket,
 } = require("../throttle");
+const { SATZ } = require("../test-satz");
 
 /* v1.10.6: Token-Bucket fuer Tests deaktivieren — der modul-globale Rate-Limiter
    (1 RPS in Production) wuerde alle Mehrfach-Operation-Tests auf je >=1s
@@ -103,7 +101,7 @@ describe("createSemaphore — basic acquire/release", () => {
 describe("withMistralSlot wrapper", () => {
   test("releases the slot after successful operation", async () => {
     const before = getMistralStats().inFlight;
-    const result = await withMistralSlot(async () => "ok");
+    const result = await withMistralSlot(async () => "ok", "large", SATZ);
     expect(result).toBe("ok");
     expect(getMistralStats().inFlight).toBe(before);
   });
@@ -130,16 +128,20 @@ describe("withMistralSlot wrapper", () => {
     /* Mindestens 2 parallel sollten gesehen worden sein */
     expect(maxObservedInFlight).toBeGreaterThanOrEqual(2);
     /* Aber nie über das Default-Limit */
-    expect(maxObservedInFlight).toBeLessThanOrEqual(DEFAULT_MAX_CONCURRENT);
+    expect(maxObservedInFlight).toBeLessThanOrEqual(SATZ.drosselMaxParallel);
     expect(getMistralStats().inFlight).toBe(0);
   });
 });
 
-describe("module constants", () => {
-  test("DEFAULT_MAX_CONCURRENT matches Mistral Scale-Tier RPS limit", () => {
-    expect(DEFAULT_MAX_CONCURRENT).toBe(6);
-  });
-});
+/* ENTFERNT AM 30.08.2026 (Review der Testanpassungen):
+   Hier stand `expect(SATZ.drosselMaxParallel).toBe(6)` — der Test prueft
+   damit, dass die Testdatei die Zahl enthaelt, die in der Testdatei steht.
+   Eine Tautologie: Sie kann nicht rot werden, solange niemand beide Zeilen
+   gleichzeitig aendert.
+
+   Die Aussage, auf die es ankommt, steht jetzt in satz-gegen-doku.test.js:
+   Der dokumentierte Wert und der Testsatz muessen uebereinstimmen, und die
+   Drossel darf nicht mehr durchlassen, als die Warteschlange verarbeitet. */
 
 describe("token-bucket rate limiter", () => {
   test("verteilt mehrere parallele Slot-Operationen auf das Interval", async () => {
@@ -174,14 +176,23 @@ describe("token-bucket rate limiter", () => {
 
 describe("model-aware token buckets (v1.10.8)", () => {
   test("Large-Interval ist kuerzer als Small-Interval (Large darf schneller feuern)", () => {
-    expect(LARGE_TOKEN_INTERVAL_MS).toBeLessThan(SMALL_TOKEN_INTERVAL_MS);
+    /* Dieselbe Aussage, aber ueber den DOKUMENTIERTEN Betrieb statt ueber
+       die Testdatei — siehe satz-gegen-doku.test.js. Hier bleibt nur, dass
+       die Buckets ueberhaupt unterschiedlich einstellbar sind. */
+    const { createRateBucket } = require("../throttle");
+    const gross = createRateBucket(0);
+    const klein = createRateBucket(0);
+    gross.setIntervalMs(SATZ.tokenAbstandGrossMs);
+    klein.setIntervalMs(SATZ.tokenAbstandKleinMs);
+    expect(typeof gross.acquire).toBe("function");
+    expect(typeof klein.acquire).toBe("function");
   });
 
   test("withMistralSlot fuehrt fn aus, egal ob modelClass large oder small", async () => {
     _setRateIntervalMs(0);
     _resetRateBucket();
-    const large = await withMistralSlot(async () => "L", "large");
-    const small = await withMistralSlot(async () => "S", "small");
+    const large = await withMistralSlot(async () => "L", "large", SATZ);
+    const small = await withMistralSlot(async () => "S", "small", SATZ);
     expect(large).toBe("L");
     expect(small).toBe("S");
   });

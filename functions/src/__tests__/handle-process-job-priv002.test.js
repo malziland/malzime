@@ -8,6 +8,11 @@
    AN; ../mistral durch einen Stub mit kontrolliertem runSingleLargeCall ersetzt.
    privacy.js und animal.js bleiben REAL — also echte End-to-End-Verdrahtung. */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 jest.mock("../jobs", () => ({
   getJob: jest.fn(),
   claimJob: jest.fn(),

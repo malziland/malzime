@@ -75,6 +75,28 @@ if [ -n "$ERWARTETE_VERSION" ]; then
   fi
 fi
 
+# 6) DER EINSTELLUNGSSATZ (seit v4.4, 30.08.2026).
+#    Ohne ihn läuft keine Analyse — das ist Absicht. Diese Probe stellt fest,
+#    ob er in der Produktion wirklich gilt, und zwar OHNE eine Analyse
+#    auszulösen: Der Stats-Endpunkt nennt das geltende Stundenlimit, und das
+#    kommt seit v4.4 ausschließlich aus dem Satz.
+#
+#    WARUM DAS NÖTIG IST: Der Deploy und das Anlegen des Satzes sind zwei
+#    getrennte Schritte. Wird der zweite vergessen, läuft die Seite, nimmt
+#    Fotos an — und JEDE Analyse scheitert. Ohne diese Probe fiele das erst
+#    einem Teilnehmer auf.
+STATS=$(curl -s --max-time 20 "$BASIS/api/stats" || true)
+LIMIT_LIVE=$(printf '%s' "$STATS" | grep -o '"limit":[0-9]*' | head -1 | grep -o '[0-9]*$' || true)
+if [ -z "$LIMIT_LIVE" ]; then
+  printf "  \033[31m✗\033[0m Einstellungssatz: kein Stundenlimit in /api/stats — gilt der Satz?\n"
+  FEHLER=1
+elif [ "$LIMIT_LIVE" -gt 0 ] 2>/dev/null; then
+  printf "  \033[32m✓\033[0m Einstellungssatz gilt: Stundenlimit %s aus der Datenbank\n" "$LIMIT_LIVE"
+else
+  printf "  \033[31m✗\033[0m Einstellungssatz: Stundenlimit ist »%s« — unbrauchbar\n" "$LIMIT_LIVE"
+  FEHLER=1
+fi
+
 if [ "$FEHLER" = "0" ]; then
   echo "ERGEBNIS: Live-Smoke grün — alle Proben wie erwartet."
   exit 0

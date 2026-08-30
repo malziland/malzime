@@ -1,5 +1,10 @@
 /* Tests for notify.js — ntfy push notification with HMAC tokens */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 const { notifyLimitReached } = require("../notify");
 
 describe("notifyLimitReached", () => {

@@ -183,11 +183,16 @@ Wenn du keine ntfy-Benachrichtigungen willst, setze die Secrets auf einen Platzh
 
 ### 5h. Stundenlimit anpassen (optional)
 
-Das Standard-Stundenlimit liegt bei 500 Analysen/Stunde. Du kannst es in `functions/src/config.js` aendern:
+Das Stundenlimit und alle anderen Betriebswerte stehen **nicht im Code**,
+sondern in Firestore im Dokument `config/betriebsprofil`. Aendern heisst: den
+Wert im aktiven Satz setzen — kein Deploy noetig, wirkt binnen 30 Sekunden.
 
-```js
-HOURLY_LIMIT: 500,  // Maximale Analysen pro Stunde
-```
+Welche 26 Werte es gibt, was sie bedeuten und welche vier Obergrenzen
+Datenschutzzusagen sind, steht in [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md).
+
+**Ohne gueltigen Einstellungssatz laeuft keine Analyse.** Beim Aufsetzen einer
+eigenen Instanz ist das Anlegen des Satzes deshalb ein Pflichtschritt, kein
+optionaler.
 
 ### 5i. Spenden-Button (optional)
 

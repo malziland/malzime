@@ -25,6 +25,8 @@ const {
   MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
   MISTRAL_SINGLE_LARGE_MAX_TOKENS,
 } = require("./config");
+/* Betriebsprofil: liefert die geltenden Werte (Firestore-Profil oder Code). */
+const { geltendeWerte } = require("./betriebsprofil");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 const { withMistralSlot } = require("./throttle");
@@ -442,10 +444,24 @@ async function callMistralRaw(options) {
      beantworten: bremst Mistral oder bremsen wir? */
   const t0 = Date.now();
   let waitMs = 0;
-  const result = await withMistralSlot(() => {
-    waitMs = Date.now() - t0;
-    return callMistralRawUnthrottled(options);
-  }, modelClassOf(options.model));
+  /* Die Drosselwerte kommen aus dem Einstellungssatz und werden hier
+     durchgereicht — an EINER Stelle, statt in jedem einzelnen Aufrufer. Der
+     Satz liegt im Zwischenspeicher, der Aufruf kostet nichts. */
+  const { werte } = await betriebswerteOderAbbruch();
+  /* Die Zeitgrenze des Einzelaufrufs kommt aus dem Einstellungssatz. Ein
+     Aufrufer darf sie ueberschreiben — der Single-Large-Pfad tut das, weil er
+     eine eigene, laengere Grenze hat (singleLargeTimeoutMs). Wer nichts sagt,
+     bekommt mistralTimeoutMs. Das ist KEIN Rueckfall auf einen Code-Wert:
+     Beide Zahlen stehen im selben Satz, es gibt sie nur einmal. */
+  const mitGrenze = options.timeoutCapMs == null ? { ...options, timeoutCapMs: werte.mistralTimeoutMs } : options;
+  const result = await withMistralSlot(
+    () => {
+      waitMs = Date.now() - t0;
+      return callMistralRawUnthrottled(mitGrenze);
+    },
+    modelClassOf(options.model),
+    werte
+  );
   return { ...result, waitMs };
 }
 
@@ -516,7 +532,11 @@ async function callMistralRawUnthrottled({
        der Single-Large-Call schreibt zwei vollstaendige Profile in EINEM Zug
        und bekommt deshalb sein eigenes, gemessenes Budget mit. Ohne
        `timeoutCapMs` bleibt alles exakt wie vorher. */
-    const cap = timeoutCapMs == null ? MISTRAL_TIMEOUT_MS : timeoutCapMs;
+    /* Die Obergrenze ist Pflicht — sie kommt aus dem Einstellungssatz. */
+    if (typeof timeoutCapMs !== "number" || !(timeoutCapMs > 0)) {
+      throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
+    }
+    const cap = timeoutCapMs;
     const budget = timeoutMs == null ? cap : timeoutMs;
     if (budget <= 0) {
       const err = new Error("Mistral-Budget erschoepft");
@@ -691,7 +711,7 @@ async function tryDescribeWithPrompt(prompt, imageBuffer, mimeType, remainingBud
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL,
       messages,
-      maxTokens: MISTRAL_DESCRIBE_MAX_TOKENS,
+      maxTokens: (await betriebswerteOderAbbruch()).werte.describeMaxTokens,
       /* v2.0.4: 0.2 → 0.1. Reduziert Run-to-Run-Schwankungen bei Alter/Geschlecht
          (Memory-Eintrag bestätigt Schwankungen als modellbedingt). Niedrigere
          Temperatur macht das Modell deterministischer ohne Token-Mehrkosten. */
@@ -1028,7 +1048,7 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
     const result = await callMistralRaw({
       model,
       messages,
-      maxTokens: MISTRAL_PROFILE_MAX_TOKENS,
+      maxTokens: (await betriebswerteOderAbbruch()).werte.profileMaxTokens,
       temperature,
       forceJSON: true,
       timeoutMs: budget,
@@ -1505,19 +1525,53 @@ function hatProfilText(block) {
   return Boolean(block && typeof block.profileText === "string" && block.profileText.trim().length > 0);
 }
 
+/**
+ * Die geltenden Betriebswerte, oder ein klarer Abbruch.
+ *
+ * Seit 30.08.2026 stehen sie ausschliesslich in der Datenbank. Fehlen sie,
+ * kann keine Analyse laufen — ohne Zeitgrenze und Textmenge weiss niemand,
+ * wie lange und wie viel erlaubt ist. Das scheitert LAUT und mit Grund, statt
+ * still mit irgendwelchen Zahlen weiterzumachen.
+ */
+async function betriebswerteOderAbbruch() {
+  const { werte, profil, grund } = await geltendeWerte();
+  if (!werte) {
+    const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
+    fehler.code = "config_missing";
+    throw fehler;
+  }
+  return { werte, profil: profil || null };
+}
+
 async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText) {
+  /* VOR dem try: Der Fehlerpfad protokolliert das Profil ebenfalls, und eine
+     im try angelegte Variable gibt es im catch nicht. Genau daran sind beim
+     ersten Anlauf zwei Pruefungen umgefallen. */
+  let aktivesProfil = null;
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
+    /* Betriebsprofil (30.08.2026): Zeitgrenze und Textmenge kommen aus dem
+       aktiven Profil, wenn eines hinterlegt und gueltig ist — sonst aus dem
+       Code. `geltendeWerte()` liefert IMMER einen brauchbaren Satz: Fehlt das
+       Dokument, ist es unlesbar oder besteht das Profil die Kopplungspruefung
+       nicht, sind es die Code-Werte. Der schlechteste Fall ist damit der
+       Zustand von vorher, nie ein schlechterer.
+
+       Die beiden Werte gehoeren zusammen und werden deshalb GEMEINSAM
+       gelesen — genau daran waere ein einzelner Firestore-Schalter
+       gescheitert (BUG-2026-08-17-01). */
+    const { werte: betriebswerte, profil } = await betriebswerteOderAbbruch();
+    aktivesProfil = profil;
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — multimodal, 2M TPM */,
       messages,
-      maxTokens: MISTRAL_SINGLE_LARGE_MAX_TOKENS,
+      maxTokens: betriebswerte.singleLargeMaxTokens,
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
       forceJSON: true,
       timeoutMs: budget,
       /* BUG-2026-08-17-01: eigenes Zeitbudget statt der allgemeinen 90 s —
          siehe Herleitung an der Konstante in config.js. */
-      timeoutCapMs: MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
+      timeoutCapMs: betriebswerte.singleLargeTimeoutMs,
       cacheKey,
       /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
          Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */
@@ -1531,6 +1585,11 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     console.log(
       JSON.stringify({
         step: "mistral-single-large",
+        /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
+           Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
+           bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,
+           es galten die Code-Werte. */
+        profil: aktivesProfil || null,
         model: MISTRAL_DESCRIBE_MODEL,
         attempt: attemptLabel,
         status: parsed ? "ok" : "parse-failed",
@@ -1588,6 +1647,11 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
         severity: "ERROR",
         alert: "single-large-failed",
         step: "mistral-single-large",
+        /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
+           Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
+           bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,
+           es galten die Code-Werte. */
+        profil: aktivesProfil || null,
         attempt: attemptLabel,
         status: "error",
         error: err.message,
@@ -1615,6 +1679,11 @@ module.exports = {
   /* Für Tests */
   setFetchForTest,
   _callMistralRaw: callMistralRaw,
+  /* Fuer die Rueckfall-Pruefung exportiert (30.08.2026): callMistralRaw setzt
+     die Zeitgrenze aus dem Einstellungssatz, bevor es hierher durchreicht —
+     ein Rueckfall auf eine feste Zahl WEITER INNEN waere von aussen deshalb
+     nicht sichtbar. Die Rueckbauprobe blieb genau daran gruen. */
+  _callMistralRawUnthrottled: callMistralRawUnthrottled,
   _buildBrandBlocklistBlock: buildBrandBlocklistBlock,
   _BRAND_BLOCKLIST_SETS: BRAND_BLOCKLIST_SETS,
   _extrahiereLiveText: extrahiereLiveText,

@@ -16,6 +16,17 @@
  * Reine Mock-Pruefung — kein Netzwerk, keine Cloud.
  */
 
+/* Betriebswerte kommen seit 30.08.2026 ausschliesslich aus Firestore. Fuer
+   Tests, die eine Analyse durchspielen, wird hier ein gueltiger Satz gestellt —
+   sonst bricht jeder Aufruf mit "Betriebswerte fehlen" ab, was diese Tests
+   nicht pruefen wollen. Wer das Verhalten OHNE Satz prueft, tut das in
+   betriebsprofil*.test.js. */
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 const { setFetchForTest, runSingleLargeCall } = require("../mistral");
 
 const ORIGINAL_API_KEY = process.env.MISTRAL_API_KEY;

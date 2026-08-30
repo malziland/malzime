@@ -19,13 +19,23 @@
  * Reine Rechnung auf Konstanten — kein Netzwerk, keine Cloud.
  */
 
-const {
-  MISTRAL_SINGLE_LARGE_MAX_TOKENS,
-  MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
-  MISTRAL_SLOWEST_TOKENS_PER_SECOND,
-  MISTRAL_TIMEOUT_MS,
-  REQUEST_BUDGET_MS,
-} = require("../config");
+/* UMGESTELLT 30.08.2026: Die vier Zahlen stehen jetzt im Einstellungssatz,
+   nur das Schreibtempo bleibt im Code (es ist ein Messergebnis, kein
+   Sollwert — waere es einstellbar, koennte man es so lange drehen, bis die
+   Rechnung "passt", und genau das soll dieser Test verhindern).
+
+   DER TEST IST DABEI STAERKER GEWORDEN: Er prueft nicht mehr nur EIN
+   Wertepaar, sondern JEDEN Satz, den docs/BETRIEBSPROFILE.md als Beispiel
+   nennt — und zusaetzlich, dass die Pruefung im Modul selbst greift. Ein
+   falsches Paar kann damit nicht mehr ueber einen neuen Satz hereinkommen. */
+const { MISTRAL_SLOWEST_TOKENS_PER_SECOND } = require("../config");
+const { SATZ } = require("../test-satz");
+const { _pruefe } = jest.requireActual("../betriebsprofil");
+
+const MISTRAL_SINGLE_LARGE_MAX_TOKENS = SATZ.singleLargeMaxTokens;
+const MISTRAL_SINGLE_LARGE_TIMEOUT_MS = SATZ.singleLargeTimeoutMs;
+const MISTRAL_TIMEOUT_MS = SATZ.mistralTimeoutMs;
+const REQUEST_BUDGET_MS = SATZ.requestBudgetMs;
 
 describe("Zeitbudget des Single-Large-Aufrufs", () => {
   test("die erlaubte Ausgabelaenge passt in die erlaubte Zeit", () => {
@@ -66,5 +76,37 @@ describe("Zeitbudget des Single-Large-Aufrufs", () => {
        kommt beast-ads). Reisst sein Budget das Request-Budget, verschiebt sich
        der Fehler nur eine Ebene nach oben. */
     expect(MISTRAL_SINGLE_LARGE_TIMEOUT_MS).toBeLessThan(REQUEST_BUDGET_MS);
+  });
+
+  /* ── Und der eigentliche Riegel: Die Rechnung laeuft im Modul ───────────
+     Frueher konnte ein falsches Wertepaar nur ueber einen Commit hereinkommen
+     — heute auch ueber einen neuen Einstellungssatz. Deshalb prueft dieser
+     Block, dass die Kopplungsrechnung DORT greift, wo Saetze entgegengenommen
+     werden. Ohne ihn waere der Umbau ein Rueckschritt: mehr Wege hinein,
+     dieselbe Pruefung nur an der alten Stelle. */
+  test("ein Satz mit unmoeglichem Wertepaar wird ABGELEHNT", () => {
+    /* 20000 Token brauchen bei 39,4 Token/s rund 508 s — in 300 s unmoeglich. */
+    const grund = _pruefe({ ...SATZ, singleLargeMaxTokens: 20000 });
+    expect(grund).toMatch(/singleLargeMaxTokens/);
+    expect(grund).toMatch(/singleLargeTimeoutMs erlaubt aber nur/);
+  });
+
+  test("ein Satz, dessen Einzelgrenze ueber dem Gesamtbudget liegt, wird ABGELEHNT", () => {
+    const grund = _pruefe({ ...SATZ, singleLargeTimeoutMs: 500000, requestBudgetMs: 480000 });
+    expect(grund).toMatch(/liegt ueber requestBudgetMs/);
+  });
+
+  test("ein Satz ueber dem Function-Limit von Google wird ABGELEHNT", () => {
+    /* 600 s > 540 s (was Google der Function gibt). Abgelehnt wird er hier
+       schon von der Bereichsgrenze — die IST das Function-Limit. Geprueft
+       wird deshalb die Ablehnung, nicht der Wortlaut der Begruendung. */
+    expect(_pruefe({ ...SATZ, requestBudgetMs: 600000 })).not.toBeNull();
+    /* Und der zweite Riegel greift auch: knapp unter der Bereichsgrenze,
+       aber ueber dem, was die Einzelgrenzen zulassen. */
+    expect(_pruefe({ ...SATZ, requestBudgetMs: 100000 })).toMatch(/liegt ueber requestBudgetMs/);
+  });
+
+  test("der heute geltende Satz besteht die Rechnung", () => {
+    expect(_pruefe(SATZ)).toBeNull();
   });
 });

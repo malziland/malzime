@@ -12,7 +12,9 @@ das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 - **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call
   (`featureFlags/current`: `useSingleLargeCall = true`),
   Cloud-Tasks-Concurrency **7** (seit v2.8 — zwei Mistral-Aufrufe je Analyse).
-- **Limits:** Stundenlimit 500 Analysen (rollendes Fenster), IP-Rate-Limit
+- **Limits:** Stundenlimit und IP-Rate-Limit stehen im Einstellungssatz
+  (`config/betriebsprofil`, siehe [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md)) —
+  hier bewusst ohne Zahl, damit sie nach einer Umstellung nicht falsch ist
   500 Requests / 10 min pro Instanz.
 - **Lastprofil:** Workshops sind Stoßlast (Mo–Fr vormittags); genau dafür ist die
   Queue da. Mistral-Latenz schwankt mit Tageszeit/Wochentag — Messungen immer im
@@ -263,11 +265,13 @@ oder ein Fehler auffällt. Kein Deploy, kein Neustart, keine Nebenwirkung.
 1. `featureFlags/current.useSingleLargeCall = false` (Firestore-Console).
 2. `./scripts/cloudtasks-concurrency-3.sh` ausführen (setzt die Queue auf
    Concurrency 3).
-3. In `functions/src/config.js`: `QUEUE_DISPATCH_CONCURRENCY` 7 → 3 und
-   `QUEUE_AVG_JOB_SECONDS` 65 → 100, dann `firebase deploy --only functions` —
-   sonst zeigt das Frontend falsche Wartezeit-Schätzungen.
+3. In Firestore `config/betriebsprofil`: `aktiv` auf den Satz `t1-drei-call`
+   setzen (`parallelitaet: 3`, `durchschnittsdauerSekunden: 100`). **Kein
+   Deploy mehr nötig** — seit dem Umbau vom 30.08.2026 stehen diese Werte in
+   der Datenbank. Ohne diesen Schritt zeigt das Frontend falsche
+   Wartezeit-Schätzungen.
 
-Schritte 1+2 wirken in ~30 s, Schritt 3 dauert ~2 min. **Warum die Kopplung:** Die
+Alle drei Schritte wirken in ~30 s. **Warum die Kopplung:** Die
 3-Call-Pipeline nutzt `mistral-small` (nur 100K Tokens/min) — bei Concurrency über 3
 drohen massenhaft 429-Fehler (gemessen 2026-05-20: bei Parallelität 6 kamen 6 von
 12 Jobs als 429 zurück). Rückweg: `./scripts/cloudtasks-concurrency-7.sh`, Werte in
@@ -282,7 +286,7 @@ Hauptaufruf. **Ein eigener Notfall-Hebel ist deshalb nicht nötig.**
 
 Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback):
 `./scripts/cloudtasks-concurrency-10.sh` ausführen und
-`QUEUE_DISPATCH_CONCURRENCY` in `config.js` auf 10 zurücksetzen — sonst läuft
+`parallelitaet` im Einstellungssatz auf 10 zurücksetzen (kein Deploy) — sonst läuft
 die Queue unnötig langsam.
 
 **Warum Concurrency 7:** `mistral-large-2512` erlaubt **15 Anfragen pro Minute**
@@ -366,7 +370,28 @@ und **Account-Dashboard** prüfen (Limits unterscheiden sich drastisch je
 Modellversion — immer das Dashboard, nicht Code-Kommentare). Notfalls Wartungsmodus
 (Hebel 1).
 
-### Stundenlimit erreicht (500/h rollend)
+### »notbremse-gegriffen« — der Stundenzähler ist ausgefallen
+
+**Was passiert ist:** Der reguläre Zähler kam nicht durch (Datenbanksperre bei
+Andrang), und das Netz hat übernommen — es hat die Aufträge der letzten Stunde
+gezählt und **blockiert**, weil das Limit erreicht war.
+
+**Ist das schlimm?** Nein, das ist die Bremse bei der Arbeit. Die Meldung sagt
+nur: Es ist gerade viel los, und die Kostengrenze greift.
+
+**Was tun:** Wie bei jedem erreichten Stundenlimit — abwarten oder den Boost
+nutzen. Kommt die Meldung außerhalb eines Workshops, lohnt ein Blick in die
+Zugriffszahlen.
+
+### »Zähler UND Netz fehlgeschlagen« — jetzt ist die Bremse wirklich weg
+
+**Das ist der ernste Fall.** Beide Wege zur Kostenbremse sind gescheitert, der
+Einlass läuft ungebremst weiter. Ursache ist fast immer ein Firestore-Ausfall.
+
+**Sofort:** Wartungsmodus einschalten (`config/maintenance`), damit keine
+weiteren Analysen starten. Danach den Datenbankzustand prüfen.
+
+### Stundenlimit erreicht (rollendes Fenster, Wert im Einstellungssatz)
 
 Gewollte Kostenbremse; der ntfy-Push kommt automatisch. Braucht ein Workshop mehr:
 Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über

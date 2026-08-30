@@ -1,7 +1,7 @@
 /**
  * durchsatz.test.js — Die Wartezeit-Ansage rechnet mit der Wirklichkeit.
  *
- * HINTERGRUND (FEATURE-2026-08-29-02): `QUEUE_AVG_JOB_SECONDS = 65` stammt aus
+ * HINTERGRUND (FEATURE-2026-08-29-02): `SATZ.durchschnittsdauerSekunden = 65` stammt aus
  * einem Lasttest vom 23.05.2026 und war am 28.08. um mehr als die Haelfte zu
  * optimistisch (real ~150 s). Aus derselben Zahl wird die Einlassgrenze
  * berechnet: 155 Plaetze statt der real schaffbaren 67.
@@ -9,6 +9,13 @@
  * Geprueft wird vor allem, dass die Riegel halten — eine Ansage, die nicht
  * stimmt, ist schlechter als gar keine.
  */
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
+const { SATZ } = require("../test-satz");
 
 const mockDoc = { daten: undefined };
 
@@ -33,7 +40,6 @@ jest.mock("../db", () => ({
 }));
 
 const { merkeDauer, gemesseneDauer, dauerJeAnalyse, _cacheLeeren, _MIN_WERTE } = require("../durchsatz");
-const { QUEUE_AVG_JOB_SECONDS } = require("../config");
 
 /** Legt n Messwerte mit gegebener Dauer und gegebenem Alter ab. */
 function werteSetzen(sekundenListe, alterMs = 0) {
@@ -96,20 +102,20 @@ describe("Gemessene Analysedauer", () => {
   });
 });
 
-describe("Rueckfallebene", () => {
-  test("ohne Flag gilt der Code-Wert", async () => {
+describe("Ausgangswert aus dem Einstellungssatz", () => {
+  test("ohne Flag gilt der Wert aus dem Einstellungssatz", async () => {
     werteSetzen([200, 210, 220, 230, 240]);
     const ergebnis = await dauerJeAnalyse(false);
 
-    expect(ergebnis.sekunden).toBe(QUEUE_AVG_JOB_SECONDS);
+    expect(ergebnis.sekunden).toBe(SATZ.durchschnittsdauerSekunden);
     expect(ergebnis.gemessen).toBe(false);
   });
 
-  test("ohne genug Messwerte gilt der Code-Wert", async () => {
+  test("ohne genug Messwerte gilt der Wert aus dem Einstellungssatz", async () => {
     werteSetzen([200, 210]);
     const ergebnis = await dauerJeAnalyse(true);
 
-    expect(ergebnis.sekunden).toBe(QUEUE_AVG_JOB_SECONDS);
+    expect(ergebnis.sekunden).toBe(SATZ.durchschnittsdauerSekunden);
     expect(ergebnis.gemessen).toBe(false);
   });
 
@@ -118,7 +124,7 @@ describe("Rueckfallebene", () => {
     const ergebnis = await dauerJeAnalyse(true);
 
     expect(ergebnis.gemessen).toBe(true);
-    expect(ergebnis.sekunden).toBeGreaterThan(QUEUE_AVG_JOB_SECONDS);
+    expect(ergebnis.sekunden).toBeGreaterThan(SATZ.durchschnittsdauerSekunden);
   });
 });
 

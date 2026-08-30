@@ -25,7 +25,20 @@
 
 const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
-const { LIVENESS_GRACE_MS, JOB_RETENTION_MS, ZUSTELLUNG_AUFBEWAHRUNG_MS } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
+
+/* Holt die Betriebswerte oder bricht ab. Es gibt keine Ersatzzahlen mehr:
+   Liegt kein gueltiger Einstellungssatz vor, laeuft auch keine Analyse — dann
+   entstehen keine neuen Jobs, und die Firestore-TTL raeumt die alten. */
+async function betriebswerteOderAbbruch() {
+  const { werte, grund } = await geltendeWerte();
+  if (!werte) {
+    const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
+    fehler.code = "config_missing";
+    throw fehler;
+  }
+  return werte;
+}
 
 /* ARCH-2026-08-12-27: Frist des Sicherheitsnetzes (Firestore-TTL). Bewusst weit
    ueber JOB_RETENTION_MS (2 h): Der Reaper ist die Loeschung, die TTL faengt nur
@@ -45,7 +58,6 @@ const JOBS_COLLECTION = "jobs";
    Pipeline-Budget (REQUEST_BUDGET_MS=480s) liegt darunter, daher werden echte
    Jobs (≈480s + Overhead) NICHT fälschlich gescheitert — und die jetzt
    bedingten Statusübergänge (s. completeJob/failJob) verhindern jede Race. */
-const PROCESSING_TIMEOUT_MS = 9 * 60 * 1000;
 
 function jobsRef() {
   return datenbank().collection(JOBS_COLLECTION);
@@ -93,6 +105,13 @@ async function createJob({ lang, traceId, imagePath, exif, resultToken }) {
     errorReason: null,
     attempts: 0,
   });
+  /* Gibt die ID zurueck, wie seit jeher.
+     ABWAEGUNG (30.08.2026): Kurzzeitig lieferte createJob zusaetzlich den
+     Zeitstempel, damit die zweite Stufe der Einlassgrenze ihn nicht nachlesen
+     muss. Das spart EINEN Lesevorgang pro Upload — bei 2000 Analysen etwa
+     einen Zehntelcent. Dafuer aendert es einen Vertrag, an dem 35 Teststellen
+     haengen. Das Verhaeltnis stimmt nicht: Ein gebrochener Vertrag kostet
+     mehr als er spart, und genau solche Kopplung wollen wir loswerden. */
   return ref.id;
 }
 
@@ -117,21 +136,163 @@ async function getJob(jobId) {
  * Die Firestore-Transaction garantiert: bei parallelen Aufrufen gewinnt
  * genau einer.
  */
+
+/* ══════════════════════════════════════════════════════════════════════
+   ATOMARE PLATZRESERVIERUNG (BUG-2026-08-30-14)
+   ══════════════════════════════════════════════════════════════════════
+
+   DAS PROBLEM: Der Einlass zaehlte die Warteschlange und legte den Auftrag
+   ERST DANACH an. Zwischen beidem liegen mehrere Schritte (Stundenlimit
+   pruefen, Bild speichern, Dokument schreiben). Bei gleichzeitigem Andrang
+   sehen alle Anfragen denselben Stand und kommen alle durch.
+
+   GEMESSEN im Emulator (30.08.2026): 200 Wartende bei einer Grenze von 155,
+   also 29 % darueber. Die Letzten warten damit ueber dem 30-Minuten-Deckel
+   des Browsers und sehen einen Fehler, obwohl ihr Auftrag laeuft.
+
+   Der Befund ist ALT — der Diff gegen main zeigt, dass die Pruefung selbst
+   nie anders war. Der Firestore-Umbau hat ihn nur sichtbar gemacht.
+
+   DIE LOESUNG, nach demselben Muster wie das Stundenlimit in counter.js:
+   Ein Zaehler-Dokument, das in EINER Transaktion geprueft und erhoeht wird.
+   Wer keinen Platz bekommt, wird abgewiesen, bevor irgendetwas geschrieben
+   wird. Die Entscheidung ist damit atomar — es gibt kein Fenster mehr.
+
+   WARUM EIN ZAEHLER UND KEINE ABFRAGE: Eine `count()`-Aggregation laesst sich
+   nicht in eine Transaktion legen. Der Zaehler kann es.
+
+   UND WAS, WENN ER DRIFTET? Ein Zaehler, der von der Wirklichkeit abweicht,
+   waere schlimmer als keiner — er wuerde Leute abweisen, obwohl Platz ist.
+   Dagegen zwei Netze:
+     1. Jeder Uebergang aus `queued` gibt den Platz zurueck (claim, fail,
+        abandon). Der Reaper deckt die Faelle ab, die kein Client meldet.
+     2. `platzAbgleichen()` setzt den Zaehler auf die echte Zahl. Der Reaper
+        ruft es bei jedem Lauf — also im Minutentakt.
+   ══════════════════════════════════════════════════════════════════════ */
+
+const WARTESCHLANGE_DOC = "stats/warteschlange";
+
+/**
+ * Reserviert einen Platz in der Warteschlange — atomar.
+ *
+ * @param {number} grenze  Hoechstzahl wartender Auftraege
+ * @returns {Promise<{ok: boolean, wartende: number, grenze: number}>}
+ *          ok=false heisst: kein Platz, es wurde NICHTS veraendert.
+ */
+async function platzReservieren(grenze) {
+  if (typeof grenze !== "number" || !(grenze > 0)) {
+    throw new Error("platzReservieren: warteschlangeTiefe fehlt");
+  }
+  const db = datenbank();
+  const ref = db.doc(WARTESCHLANGE_DOC);
+  /* Dieselbe Retry-Schleife wie beim Stundenlimit: Unter Last kollidieren
+     Transaktionen am selben Dokument (ABORTED). Das SDK versucht es intern
+     mehrfach; darueber noch zwei eigene Versuche mit Wartezeit. */
+  const VERSUCHE = 2;
+  let letzterFehler = null;
+  for (let versuch = 0; versuch <= VERSUCHE; versuch += 1) {
+    try {
+      return await db.runTransaction(async (tx) => {
+        const schnapp = await tx.get(ref);
+        const daten = schnapp.exists ? schnapp.data() : {};
+        const wartende = typeof daten.wartend === "number" && daten.wartend >= 0 ? daten.wartend : 0;
+        if (wartende >= grenze) {
+          return { ok: false, wartende, grenze };
+        }
+        tx.set(ref, { wartend: wartende + 1, zuletzt: Date.now() }, { merge: true });
+        return { ok: true, wartende: wartende + 1, grenze };
+      });
+    } catch (fehler) {
+      letzterFehler = fehler;
+      if (fehler && fehler.code === 10 /* ABORTED */ && versuch < VERSUCHE) {
+        await new Promise((r) => setTimeout(r, 50 + Math.random() * 100));
+        continue;
+      }
+      break;
+    }
+  }
+  /* FAIL-OPEN, mit lautem Protokoll: Lieber jemanden einlassen, als bei einem
+     Datenbankfehler den ganzen Einlass zu schliessen. Die Alarmierung greift
+     ueber console.error. */
+  console.error(
+    JSON.stringify({
+      severity: "ERROR",
+      error: "platzreservierung-fehlgeschlagen",
+      message: letzterFehler && letzterFehler.message,
+      hinweis: "Einlass laeuft ungebremst weiter, bis das behoben ist.",
+    })
+  );
+  return { ok: true, wartende: -1, grenze };
+}
+
+/**
+ * Gibt einen reservierten Platz zurueck. Nie unter null.
+ * Wird bei JEDEM Uebergang aus `queued` gerufen.
+ */
+async function platzFreigeben() {
+  try {
+    const db = datenbank();
+    const ref = db.doc(WARTESCHLANGE_DOC);
+    await db.runTransaction(async (tx) => {
+      const schnapp = await tx.get(ref);
+      const daten = schnapp.exists ? schnapp.data() : {};
+      const wartende = typeof daten.wartend === "number" ? daten.wartend : 0;
+      tx.set(ref, { wartend: Math.max(0, wartende - 1), zuletzt: Date.now() }, { merge: true });
+    });
+  } catch (fehler) {
+    /* Still: Ein verlorener Rueckgabe-Vorgang macht den Zaehler zu HOCH, und
+       das gleicht platzAbgleichen() im Minutentakt wieder aus. Ein Fehler hier
+       darf den Job-Uebergang nicht scheitern lassen. */
+    console.log(JSON.stringify({ step: "platz-freigeben", status: "fehlgeschlagen", grund: fehler.message }));
+  }
+}
+
+/**
+ * Setzt den Zaehler auf die WIRKLICHE Zahl wartender Auftraege.
+ *
+ * Das ist das Netz unter der Reservierung: Geht eine Rueckgabe verloren
+ * (Absturz zwischen Uebergang und Freigabe), stuende der Zaehler dauerhaft zu
+ * hoch und wuerde Leute abweisen, obwohl Platz ist. Der Reaper ruft das im
+ * Minutentakt — die Abweichung lebt damit hoechstens eine Minute.
+ */
+async function platzAbgleichen() {
+  const echt = await countQueuedJobs();
+  const db = datenbank();
+  const ref = db.doc(WARTESCHLANGE_DOC);
+  const vorher = await ref.get();
+  const alt = vorher.exists && typeof vorher.data().wartend === "number" ? vorher.data().wartend : null;
+  await ref.set({ wartend: echt, zuletzt: Date.now() }, { merge: true });
+  if (alt !== null && Math.abs(alt - echt) > 5) {
+    /* Eine grosse Abweichung ist ein Betriebshinweis: Entweder gehen
+       Rueckgaben verloren, oder es laeuft etwas anderes schief. */
+    console.log(JSON.stringify({ step: "platz-abgleich", vorher: alt, jetzt: echt, abweichung: alt - echt }));
+  }
+  return { vorher: alt, jetzt: echt };
+}
+
 async function claimJob(jobId) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) return false;
-    const data = snap.data();
-    if (data.status !== "queued") return false;
-    tx.update(ref, {
-      status: "processing",
-      startedAt: Date.now(),
-      attempts: (data.attempts || 0) + 1,
+  return db
+    .runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return false;
+      const data = snap.data();
+      if (data.status !== "queued") return false;
+      tx.update(ref, {
+        status: "processing",
+        startedAt: Date.now(),
+        attempts: (data.attempts || 0) + 1,
+      });
+      return true;
+    })
+    .then(async (uebernommen) => {
+      /* Ein Auftrag in Verarbeitung WARTET nicht mehr — der Platz gehoert dem
+         Naechsten. Die Freigabe laeuft nach der Transaktion, damit ein Fehler
+         dabei den Uebergang nicht scheitern laesst. */
+      if (uebernommen) await platzFreigeben();
+      return uebernommen;
     });
-    return true;
-  });
 }
 
 /**
@@ -162,18 +323,28 @@ async function completeJob(jobId, result) {
 async function failJob(jobId, reason) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) return false;
-    const st = snap.data().status;
-    if (st !== "queued" && st !== "processing") return false;
-    tx.update(ref, {
-      status: "failed",
-      finishedAt: Date.now(),
-      errorReason: typeof reason === "string" ? reason.slice(0, 300) : "unknown",
+  return db
+    .runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return false;
+      const st = snap.data().status;
+      if (st !== "queued" && st !== "processing") return false;
+      tx.update(ref, {
+        status: "failed",
+        finishedAt: Date.now(),
+        errorReason: typeof reason === "string" ? reason.slice(0, 300) : "unknown",
+      });
+      /* Nur ein WARTENDER Job haelt einen Platz. Kam er aus `processing`, wurde
+       der Platz schon bei claimJob zurueckgegeben. */
+      return st === "queued" ? "war-wartend" : true;
+    })
+    .then(async (ergebnis) => {
+      if (ergebnis === "war-wartend") {
+        await platzFreigeben();
+        return true;
+      }
+      return ergebnis;
     });
-    return true;
-  });
 }
 
 /**
@@ -193,6 +364,41 @@ async function getQueuePosition(job) {
   if (!job || job.status !== "queued") return 0;
   const agg = await jobsRef().where("status", "==", "queued").where("createdAt", "<", job.createdAt).count().get();
   return agg.data().count;
+}
+
+/**
+ * ZWEITE STUFE der Einlassgrenze — exakt, ohne Kollisionen.
+ *
+ * WARUM ES SIE BRAUCHT (BUG-2026-08-30-14, zweiter Anlauf): Die atomare
+ * Reservierung darueber loest den Wettlauf im Normalbetrieb. Unter echtem
+ * Andrang scheitert sie aber an einer Eigenschaft von Firestore: Ein einzelnes
+ * Dokument vertraegt nur ungefaehr einen Schreibvorgang pro Sekunde. Bei 170
+ * gleichzeitigen Anfragen wirft die Datenbank "ABORTED: Transaction lock
+ * timeout" — im Simulator 167 Mal —, und die Notbremse laesst alle durch.
+ * Gemessen: 177 Wartende bei Grenze 155.
+ *
+ * DIESE STUFE HAT DAS PROBLEM NICHT. Sie zaehlt nur (Aggregat-Abfrage, keine
+ * Sperre) und fragt: Wie viele warten VOR mir? Jeder Auftrag entscheidet fuer
+ * sich, und die Antwort ist stabil — die ersten 155 bleiben, alle weiteren
+ * nehmen sich selbst zurueck. Kein Wettlauf, weil niemand dasselbe Dokument
+ * schreibt.
+ *
+ * Der Preis: Ein abgewiesener Auftrag wurde kurz angelegt. Das kostet einen
+ * Schreib- und einen Loeschvorgang — verschwindend gegen eine Analyse.
+ *
+ * @returns {Promise<boolean>} true = der Platz ist bestaetigt, false = zu spaet
+ */
+async function platzBestaetigen(job, grenze) {
+  if (typeof grenze !== "number" || !(grenze > 0)) {
+    throw new Error("platzBestaetigen: warteschlangeTiefe fehlt");
+  }
+  if (!job || !job.createdAt) return true;
+  const vorMir = await jobsRef().where("status", "==", "queued").where("createdAt", "<", job.createdAt).count().get();
+  const position = vorMir.data().count;
+  if (position < grenze) return true;
+  /* Zu spaet: Der Auftrag wird zurueckgenommen, BEVOR er Kosten verursacht. */
+  console.log(JSON.stringify({ step: "platz-bestaetigen", status: "zu-spaet", position, grenze }));
+  return false;
 }
 
 /**
@@ -223,7 +429,8 @@ async function countQueuedJobs() {
 async function markFailedIfStale(job) {
   if (!job || job.status !== "processing") return job;
   const startedAt = job.startedAt || job.createdAt || 0;
-  if (Date.now() - startedAt < PROCESSING_TIMEOUT_MS) return job;
+  const werte = await betriebswerteOderAbbruch();
+  if (Date.now() - startedAt < werte.verarbeitungsZeitlimitMs) return job;
   const failed = await failJob(job.id, "processing_timeout");
   if (failed) return { ...job, status: "failed", errorReason: "processing_timeout" };
   /* BUG-001: failJob hat NICHT gegriffen — der Job ist inzwischen terminal
@@ -360,23 +567,40 @@ async function setLiveText(jobId, texte) {
 async function abandonJob(jobId) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    /* BUG-001: nur einen noch `queued` Job verlassen — ein inzwischen in
+  return db
+    .runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      /* BUG-001: nur einen noch `queued` Job verlassen — ein inzwischen in
        Verarbeitung gegangener (oder fertiger) Job wird NICHT abgewürgt. */
-    if (!snap.exists || snap.data().status !== "queued") return false;
-    tx.update(ref, { status: "abandoned", finishedAt: Date.now() });
-    return true;
-  });
+      if (!snap.exists || snap.data().status !== "queued") return false;
+      tx.update(ref, { status: "abandoned", finishedAt: Date.now() });
+      return true;
+    })
+    .then(async (verlassen) => {
+      /* abandonJob geht IMMER aus `queued` — der Platz wird frei. */
+      if (verlassen) await platzFreigeben();
+      return verlassen;
+    });
 }
 
 /**
  * Prüft, ob ein noch wartender Job als verlassen gilt: Status `queued` und
  * seit über LIVENESS_GRACE_MS kein Client-Poll mehr.
  */
-function isAbandoned(job) {
+/* Die Gnadenfrist kommt seit 30.08.2026 aus dem Einstellungssatz und wird
+   hereingereicht — diese Funktion bleibt synchron, weil sie in Schleifen ueber
+   viele Jobs laeuft. Fehlt der Wert, gilt die Konstante: Eine Aufraeum-Frist
+   darf nie fehlen, sonst blieben verwaiste Jobs ewig liegen. */
+function isAbandoned(job, gnadenfristMs) {
+  /* Die Frist ist Pflicht. Frueher stand hier ein Rueckfall auf eine Konstante
+     — damit gab es dieselbe Zahl an zwei Orten, und welche galt, hing vom
+     Aufrufweg ab. */
+  if (typeof gnadenfristMs !== "number" || !(gnadenfristMs > 0)) {
+    throw new Error("isAbandoned: livenessGnadenfristMs fehlt");
+  }
+  const frist = gnadenfristMs;
   if (!job || job.status !== "queued") return false;
-  return Date.now() - (job.lastSeenAt || job.createdAt || 0) > LIVENESS_GRACE_MS;
+  return Date.now() - (job.lastSeenAt || job.createdAt || 0) > frist;
 }
 
 /**
@@ -393,8 +617,10 @@ async function countProcessingJobs() {
  * ist — die Arbeitsliste des Reapers. `limit` deckelt die Batch-Größe pro
  * Lauf. Benötigt den zusammengesetzten Index (status, lastSeenAt).
  */
-async function findAbandonedJobs(limit = 200) {
-  const cutoff = Date.now() - LIVENESS_GRACE_MS;
+async function findAbandonedJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.livenessGnadenfristMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("status", "==", "queued").where("lastSeenAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -410,10 +636,11 @@ async function findAbandonedJobs(limit = 200) {
 
    Eine ehrliche Wartezeit liegt bei wenigen Minuten; der Browser gibt nach
    30 Minuten ohnehin auf. Alles darueber ist kein wartender Nutzer mehr. */
-const MAX_QUEUED_AGE_MS = 35 * 60 * 1000;
 
-async function findUeberfaelligeJobs(limit = 200) {
-  const cutoff = Date.now() - MAX_QUEUED_AGE_MS;
+async function findUeberfaelligeJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.wartendesHoechstalterMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("status", "==", "queued").where("createdAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -424,8 +651,10 @@ async function findUeberfaelligeJobs(limit = 200) {
  * Arbeitsliste des Reapers, damit solche Dokumente nicht ewig liegen bleiben.
  * Benötigt den zusammengesetzten Index (status, startedAt).
  */
-async function findStaleProcessingJobs(limit = 200) {
-  const cutoff = Date.now() - PROCESSING_TIMEOUT_MS;
+async function findStaleProcessingJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.verarbeitungsZeitlimitMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("status", "==", "processing").where("startedAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -437,8 +666,10 @@ async function findStaleProcessingJobs(limit = 200) {
  * Sekunden bis Minuten). Einfache Ungleichheit auf `createdAt`, daher vom
  * automatischen Einzelfeld-Index abgedeckt — kein zusammengesetzter Index.
  */
-async function findExpiredJobs(limit = 200) {
-  const cutoff = Date.now() - JOB_RETENTION_MS;
+async function findExpiredJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.jobAufbewahrungMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("createdAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -450,8 +681,10 @@ async function findExpiredJobs(limit = 200) {
  * ohnehin nicht mehr an. Die Ungleichheits-Abfrage überspringt Dokumente
  * ohne `deliveredAt` (nie zugestellt) von selbst.
  */
-async function findZugestellteJobs(limit = 200) {
-  const cutoff = Date.now() - ZUSTELLUNG_AUFBEWAHRUNG_MS;
+async function findZugestellteJobs(limit) {
+  const werte = await betriebswerteOderAbbruch();
+  const cutoff = Date.now() - werte.zustellfensterMs;
+  limit = limit || werte.aufraeumStapel;
   const snap = await jobsRef().where("deliveredAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -464,8 +697,12 @@ async function deleteJob(jobId) {
 }
 
 module.exports = {
+  platzReservieren,
+  platzBestaetigen,
+  platzFreigeben,
+  platzAbgleichen,
+  _WARTESCHLANGE_DOC: WARTESCHLANGE_DOC,
   JOBS_COLLECTION,
-  PROCESSING_TIMEOUT_MS,
   createJob,
   getJob,
   claimJob,
@@ -482,7 +719,6 @@ module.exports = {
   isAbandoned,
   findAbandonedJobs,
   findUeberfaelligeJobs,
-  MAX_QUEUED_AGE_MS,
   findStaleProcessingJobs,
   findExpiredJobs,
   findZugestellteJobs,

@@ -16,22 +16,40 @@
  */
 
 const crypto = require("crypto");
-const { ALLOWED_MIME, MAX_UPLOAD_BYTES, MAX_QUEUE_DEPTH, QUEUE_DISPATCH_CONCURRENCY } = require("./config");
+const { ALLOWED_MIME, MAX_UPLOAD_BYTES } = require("./config");
 const { dauerJeAnalyse } = require("./durchsatz");
+const { geltendeWerte } = require("./betriebsprofil");
 const { getFeatureFlags } = require("./feature-flags");
 
-/* FEATURE-2026-08-29-02: Wie viele Wartende sind in einer halben Stunde zu
-   schaffen? Dieselbe Rechnung wie MAX_QUEUE_DEPTH in config.js, nur mit der
-   gemessenen statt der angenommenen Dauer. Faellt die Messung aus, bleibt es
-   bei der Konstante — der schlechteste Fall ist der heutige Zustand. */
+/* Wie viele Wartende sind in einer halben Stunde zu schaffen?
+
+   Die Rechnung braucht ZWEI Groessen, und beide kommen aus der Datenbank:
+   die gemessene Dauer einer Analyse (`stats/durchsatz`, laufend aus echten
+   Laeufen fortgeschrieben) und die Parallelitaet aus dem Einstellungssatz.
+
+   BEFUND ARCH-2026-08-30-01 (Kurz-Audit): Die Parallelitaet stammte hier
+   weiterhin aus dem Code. Wer den Einstellungssatz auf einen groesseren Tarif
+   umstellte, sah im Zahlen-Endpunkt "quelle: firestore" und hielt alles fuer
+   umgestellt — die Einlassgrenze rechnete aber weiter mit dem alten Wert. Das
+   waere erst im Workshop unter Last aufgefallen, ohne Signal.
+
+   Faellt eine der beiden Groessen aus, bleibt es bei der Konstante aus
+   config.js: Die Einlassgrenze ist eine Schutzgrenze, keine Einstellung — sie
+   darf nie fehlen, sonst liesse die Seite unbegrenzt Leute herein. */
 async function aktuelleEinlassgrenze() {
+  const { werte } = await geltendeWerte();
+  /* Ohne Einstellungssatz laeuft ohnehin keine Analyse — dann ist die
+     ehrliche Einlassgrenze null, nicht eine Ersatzzahl aus dem Code. */
+  if (!werte) return 0;
   try {
     const flags = await getFeatureFlags();
     const { sekunden, gemessen } = await dauerJeAnalyse(flags.useGemesseneDauer === true);
-    if (!gemessen) return MAX_QUEUE_DEPTH;
-    return Math.max(1, Math.floor(((30 * 60) / sekunden) * QUEUE_DISPATCH_CONCURRENCY * 0.8));
+    /* Gemessene Dauer verfuegbar: Grenze daraus rechnen, sonst die Zahl aus
+       dem Einstellungssatz nehmen. */
+    if (!gemessen || !sekunden) return werte.warteschlangeTiefe;
+    return Math.max(1, Math.floor(((30 * 60) / sekunden) * werte.parallelitaet * 0.8));
   } catch (_) {
-    return MAX_QUEUE_DEPTH;
+    return werte.warteschlangeTiefe;
   }
 }
 const { getClientIp, checkRateLimit } = require("./middleware");
@@ -40,7 +58,7 @@ const { resolveLanguage } = require("./i18n");
 const { checkAndIncrement, getMaintenanceStatus, releaseHourlySlot } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
-const { createJob, failJob, countQueuedJobs } = require("./jobs");
+const { createJob, failJob, platzBestaetigen, getJob, abandonJob, countQueuedJobs } = require("./jobs");
 const { storeImage, deleteImage } = require("./queue-storage");
 const { enqueueJob } = require("./cloud-tasks");
 
@@ -72,6 +90,11 @@ function sanitizeExif(raw) {
 }
 
 async function handleEnqueue(req, res, secrets) {
+  /* Haelt dieser Aufruf einen reservierten Platz? Wird an JEDEM Rueckgabeweg
+     geprueft — ein nicht zurueckgegebener Platz blockiert sonst einen
+     Wartenden, bis der Reaper abgleicht. Bewusst GANZ AUSSEN deklariert,
+     damit auch der aeussere Fehlerweg ihn sieht. */
+  let einlassgrenze = null;
   const requestId = Math.random().toString(36).slice(2, 10);
   let traceId = null;
   try {
@@ -88,7 +111,8 @@ async function handleEnqueue(req, res, secrets) {
     }
 
     const ip = getClientIp(req);
-    if (!checkRateLimit(ip)) {
+    const { werte: grenzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
+    if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
       res.status(429).json({ error: "Rate limit exceeded" });
       return;
     }
@@ -202,21 +226,38 @@ async function handleEnqueue(req, res, secrets) {
       return;
     }
 
-    /* ── ARCH-001: Warteschlangen-Tiefe ──
-       Vor dem Zähler, damit ein abgelehnter Auftrag keinen Stunden-Platz
-       verbraucht. Fail-open: Klemmt die Abfrage, wird angenommen wie bisher —
-       eine Kapazitätsbremse darf nie zum Ausfall eskalieren. */
+    /* ── Einlassgrenze, erster Blick ──
+       Nur die Grenze holen. Die eigentliche Entscheidung faellt weiter unten,
+       NACH dem Anlegen — dort ist sie exakt und kostet keine Sperre.
+
+       WARUM NICHT HIER (BUG-2026-08-30-14, zweiter Anlauf):
+       Zwischenzeitlich stand hier eine atomare Reservierung ueber ein
+       Zaehler-Dokument in einer Transaktion. Sie loeste den Wettlauf sauber —
+       und erzeugte ein schlimmeres Problem: Ein einzelnes Firestore-Dokument
+       vertraegt etwa einen Schreibvorgang pro Sekunde. Bei 170 gleichzeitigen
+       Anfragen entstanden 373 Sperr-Konflikte, einzelne Anfragen hingen
+       SECHZIG SEKUNDEN, und 94 von 170 Verbindungen rissen ab.
+
+       Die Positionspruefung unten hat das Problem nicht: Sie zaehlt nur und
+       schreibt nichts Gemeinsames. Damit ist sie exakt UND schnell. */
     try {
-      const wartende = await countQueuedJobs();
-      /* FEATURE-2026-08-29-02: Die Grenze folgt der GEMESSENEN Dauer statt der
-         festen Annahme. Rechnung unveraendert (was ist in 30 Minuten zu
-         schaffen, mit 20 % Reserve) — nur die Dauer kommt jetzt aus der
-         Wirklichkeit. Mit den alten 65 s ergaben sich 155 Plaetze; bei real
-         150 s sind es 67. Die Differenz sind Leute, die garantiert umsonst
-         warten und am Ende einen Fehler sehen. */
-      const grenze = await aktuelleEinlassgrenze();
-      if (wartende >= grenze) {
-        console.log(JSON.stringify({ requestId, warning: "queue-too-deep", wartende, grenze }));
+      einlassgrenze = await aktuelleEinlassgrenze();
+
+      /* VORPRUEFUNG — grob, aber billig und OHNE Sperre.
+         Sie faengt den Normalfall ab, BEVOR ein Bild gespeichert oder ein
+         Stunden-Platz gezogen wird. Das ist nicht nur schneller, sondern auch
+         eine Datenschutzfrage: Ein Foto, das nie analysiert wird, soll auch
+         nie auf unserem Speicher liegen.
+
+         Sie ist NICHT exakt — zwischen Zaehlen und Anlegen koennen andere
+         dazukommen. Genau dafuer gibt es die Nachpruefung weiter unten, die
+         die Grenze exakt haelt. Zusammen: schnell im Normalfall, exakt an der
+         Grenze. */
+      const schonWartend = await countQueuedJobs();
+      if (einlassgrenze > 0 && schonWartend >= einlassgrenze) {
+        console.log(
+          JSON.stringify({ requestId, warning: "queue-too-deep", wartende: schonWartend, grenze: einlassgrenze })
+        );
         res.status(429).json({
           blocked: "queueFull",
           retryAfterSeconds: 300,
@@ -224,8 +265,19 @@ async function handleEnqueue(req, res, secrets) {
         });
         return;
       }
+
+      if (einlassgrenze === 0) {
+        /* Kein Einstellungssatz — ohne ihn laeuft ohnehin keine Analyse. */
+        console.log(JSON.stringify({ requestId, warning: "kein-einstellungssatz" }));
+        res.status(503).json({
+          blocked: "configMissing",
+          retryAfterSeconds: 300,
+          message: "Bei uns stimmt gerade eine Einstellung nicht — bitte in ein paar Minuten nochmal.",
+        });
+        return;
+      }
     } catch (err) {
-      console.log(JSON.stringify({ requestId, warning: "queue-depth-check-failed", error: err.message }));
+      console.log(JSON.stringify({ requestId, warning: "einlassgrenze-nicht-ermittelbar", error: err.message }));
     }
 
     /* ── Globales Stundenlimit (Firestore-Zähler) ──
@@ -244,6 +296,8 @@ async function handleEnqueue(req, res, secrets) {
       });
     }
     if (!counter.allowed) {
+      /* Der Auftrag kommt nicht zustande — der reservierte Platz gehoert
+         wieder dem Naechsten. */
       res.status(429).json({
         blocked: "limit",
         retryAfterSeconds: counter.retryAfterSeconds,
@@ -272,6 +326,58 @@ async function handleEnqueue(req, res, secrets) {
       return;
     }
 
+    /* ── ZWEITE STUFE der Einlassgrenze (BUG-2026-08-30-14) ──
+       NUR IM GRENZBEREICH. Die Stufe kostet zwei zusaetzliche
+       Datenbankzugriffe pro Upload. Bei 170 gleichzeitigen Anfragen wurde der
+       Einlass dadurch so langsam, dass Verbindungen abrissen — im Simulator
+       95 von 170, vorher hoechstens 23. Das ist der falsche Preis fuer eine
+       Bremse, die erst kurz vor der Grenze etwas bewirkt.
+
+       Ab 80 % der Grenze wird geprueft, darunter nicht. Im Workshop-Alltag
+       (30 Wartende von 155) laeuft der Einlass damit genauso schnell wie
+       vorher; erst wenn es eng wird, kostet er mehr. 
+       Die atomare Reservierung oben faengt den Normalbetrieb ab. Unter echtem
+       Andrang scheitert sie an einer Firestore-Eigenschaft: Ein einzelnes
+       Dokument vertraegt nur etwa einen Schreibvorgang pro Sekunde, und bei
+       170 gleichzeitigen Anfragen wirft die Datenbank ABORTED — die Notbremse
+       liess dann alle durch (gemessen 177 bei Grenze 155).
+
+       Hier wird nur GEZAEHLT, ohne Sperre: Wie viele warten vor mir? Die
+       Antwort ist stabil, jeder entscheidet fuer sich, und es gibt keinen
+       Wettlauf. Wer zu spaet kommt, nimmt sich selbst zurueck — bevor der
+       Auftrag Kosten verursacht. */
+    try {
+      if (einlassgrenze === null) throw { _uebersprungen: true };
+      const angelegt = await getJob(jobId);
+      if (!(await platzBestaetigen(angelegt, einlassgrenze))) {
+        await abandonJob(jobId);
+        if (imagePath) await deleteImage(imagePath);
+        releaseHourlySlot().catch(() => {});
+        console.log(JSON.stringify({ requestId, traceId, warning: "queue-too-deep-nachtraeglich" }));
+        res.status(429).json({
+          blocked: "queueFull",
+          retryAfterSeconds: 300,
+          message: "Gerade warten sehr viele Analysen — bitte in ein paar Minuten nochmal.",
+        });
+        return;
+      }
+    } catch (err) {
+      /* Uebersprungen ist kein Fehler — nur der Normalfall weit unter der
+         Grenze. Er darf nicht ins Fehlerprotokoll, sonst geht der echte
+         Fehler im Rauschen unter. */
+      if (!err || !err._uebersprungen) {
+        /* Fail-open wie die erste Stufe: Eine Kapazitaetsbremse darf nie zum
+           Ausfall eskalieren. Der Fehler geht laut ins Protokoll. */
+        console.error(
+          JSON.stringify({
+            severity: "ERROR",
+            error: "platz-bestaetigung-fehlgeschlagen",
+            message: err && err.message,
+          })
+        );
+      }
+    }
+
     try {
       await enqueueJob(jobId);
     } catch (err) {
@@ -292,9 +398,13 @@ async function handleEnqueue(req, res, secrets) {
   } catch (err) {
     const status = err.status || 500;
     const code = err.code || "unknown_error";
+    /* Auch der unerwartete Fehlerweg gibt den Platz zurueck. Ohne das haette
+       jeder Absturz nach der Reservierung einen Platz dauerhaft belegt — bis
+       der Reaper abgleicht, und bei genug Abstuerzen waere die Warteschlange
+       dauerhaft "voll", obwohl niemand wartet. */
     console.log(JSON.stringify({ requestId, traceId, status: "error", code, error: err.message }));
     res.status(status).json({ error: "Enqueue failed", code });
   }
 }
 
-module.exports = { handleEnqueue, detectImageType };
+module.exports = { handleEnqueue, detectImageType, _aktuelleEinlassgrenze: aktuelleEinlassgrenze };

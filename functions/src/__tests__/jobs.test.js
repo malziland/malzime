@@ -3,6 +3,13 @@
    prüfen (Status-Übergänge, Idempotenz, Positions-Zählung) statt nur
    Mock-Aufrufe abzuhaken. */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
+const { SATZ } = require("../test-satz");
+
 const mockStore = new Map();
 const mockState = { nextId: 1 };
 
@@ -108,7 +115,8 @@ jest.mock("firebase-admin/firestore", () => {
 });
 
 const jobs = require("../jobs");
-const { LIVENESS_GRACE_MS, JOB_RETENTION_MS } = require("../config");
+/* SATZ.livenessGnadenfristMs und JOB_RETENTION_MS gibt es nicht mehr — die Werte
+   stehen im Einstellungssatz (SATZ oben). */
 
 beforeEach(() => {
   mockStore.clear();
@@ -145,7 +153,7 @@ describe("createJob", () => {
     expect(job.expiresAt).toBeDefined();
     const ablauf = job.expiresAt.toMillis();
     /* Netz spaeter als die eigentliche Loeschung … */
-    expect(ablauf - vorher).toBeGreaterThan(JOB_RETENTION_MS);
+    expect(ablauf - vorher).toBeGreaterThan(SATZ.jobAufbewahrungMs);
     /* … und mit deutlichem Abstand, nicht knapp dahinter. */
     expect(ablauf - vorher).toBeGreaterThanOrEqual(12 * 60 * 60 * 1000);
   });
@@ -283,7 +291,7 @@ describe("markFailedIfStale", () => {
     const id = await jobs.createJob({ imagePath: "queue-uploads/k.jpg" });
     await jobs.claimJob(id);
     /* startedAt künstlich weit in die Vergangenheit setzen */
-    mockStore.get(id).startedAt = Date.now() - jobs.PROCESSING_TIMEOUT_MS - 1000;
+    mockStore.get(id).startedAt = Date.now() - SATZ.verarbeitungsZeitlimitMs - 1000;
     const job = await jobs.getJob(id);
     const result = await jobs.markFailedIfStale(job);
     expect(result.status).toBe("failed");
@@ -323,17 +331,22 @@ describe("abandonJob", () => {
 
 describe("isAbandoned", () => {
   test("true für einen queued-Job, dessen Herzschlag älter als das Karenz-Fenster ist", () => {
-    expect(jobs.isAbandoned({ status: "queued", lastSeenAt: Date.now() - LIVENESS_GRACE_MS - 1000 })).toBe(true);
+    expect(
+      jobs.isAbandoned(
+        { status: "queued", lastSeenAt: Date.now() - SATZ.livenessGnadenfristMs - 1000 },
+        SATZ.livenessGnadenfristMs
+      )
+    ).toBe(true);
   });
 
   test("false für einen frisch gepollten queued-Job", () => {
-    expect(jobs.isAbandoned({ status: "queued", lastSeenAt: Date.now() })).toBe(false);
+    expect(jobs.isAbandoned({ status: "queued", lastSeenAt: Date.now() }, SATZ.livenessGnadenfristMs)).toBe(false);
   });
 
   test("false für nicht-wartende Jobs und null", () => {
-    expect(jobs.isAbandoned({ status: "processing", lastSeenAt: 0 })).toBe(false);
-    expect(jobs.isAbandoned({ status: "done", lastSeenAt: 0 })).toBe(false);
-    expect(jobs.isAbandoned(null)).toBe(false);
+    expect(jobs.isAbandoned({ status: "processing", lastSeenAt: 0 }, SATZ.livenessGnadenfristMs)).toBe(false);
+    expect(jobs.isAbandoned({ status: "done", lastSeenAt: 0 }, SATZ.livenessGnadenfristMs)).toBe(false);
+    expect(jobs.isAbandoned(null, SATZ.livenessGnadenfristMs)).toBe(false);
   });
 });
 
@@ -342,8 +355,8 @@ describe("findAbandonedJobs", () => {
     const old1 = await jobs.createJob({ imagePath: "queue-uploads/1.jpg" });
     const old2 = await jobs.createJob({ imagePath: "queue-uploads/2.jpg" });
     const fresh = await jobs.createJob({ imagePath: "queue-uploads/3.jpg" });
-    mockStore.get(old1).lastSeenAt = Date.now() - LIVENESS_GRACE_MS - 5000;
-    mockStore.get(old2).lastSeenAt = Date.now() - LIVENESS_GRACE_MS - 5000;
+    mockStore.get(old1).lastSeenAt = Date.now() - SATZ.livenessGnadenfristMs - 5000;
+    mockStore.get(old2).lastSeenAt = Date.now() - SATZ.livenessGnadenfristMs - 5000;
 
     const found = await jobs.findAbandonedJobs();
     expect(found.map((j) => j.id).sort()).toEqual([old1, old2].sort());
@@ -352,7 +365,7 @@ describe("findAbandonedJobs", () => {
 
   test("ein bereits übernommener Job (processing) zählt nicht", async () => {
     const id = await jobs.createJob({ imagePath: "queue-uploads/4.jpg" });
-    mockStore.get(id).lastSeenAt = Date.now() - LIVENESS_GRACE_MS - 5000;
+    mockStore.get(id).lastSeenAt = Date.now() - SATZ.livenessGnadenfristMs - 5000;
     await jobs.claimJob(id);
     expect(await jobs.findAbandonedJobs()).toEqual([]);
   });
@@ -372,7 +385,7 @@ describe("findStaleProcessingJobs", () => {
     const fresh = await jobs.createJob({ imagePath: "queue-uploads/f.jpg" });
     await jobs.claimJob(stale);
     await jobs.claimJob(fresh);
-    mockStore.get(stale).startedAt = Date.now() - jobs.PROCESSING_TIMEOUT_MS - 5000;
+    mockStore.get(stale).startedAt = Date.now() - SATZ.verarbeitungsZeitlimitMs - 5000;
 
     const found = await jobs.findStaleProcessingJobs();
     expect(found.map((j) => j.id)).toEqual([stale]);
@@ -380,7 +393,7 @@ describe("findStaleProcessingJobs", () => {
 
   test("ein wartender (queued) Job zählt nicht", async () => {
     const id = await jobs.createJob({ imagePath: "queue-uploads/q.jpg" });
-    mockStore.get(id).startedAt = Date.now() - jobs.PROCESSING_TIMEOUT_MS - 5000;
+    mockStore.get(id).startedAt = Date.now() - SATZ.verarbeitungsZeitlimitMs - 5000;
     expect(await jobs.findStaleProcessingJobs()).toEqual([]);
   });
 });
@@ -392,9 +405,9 @@ describe("findExpiredJobs", () => {
     const oldDone = await jobs.createJob({ imagePath: "queue-uploads/o.jpg" });
     const oldQueued = await jobs.createJob({ imagePath: "queue-uploads/p.jpg" });
     const fresh = await jobs.createJob({ imagePath: "queue-uploads/r.jpg" });
-    mockStore.get(oldDone).createdAt = Date.now() - JOB_RETENTION_MS - 5000;
+    mockStore.get(oldDone).createdAt = Date.now() - SATZ.jobAufbewahrungMs - 5000;
     mockStore.get(oldDone).status = "done";
-    mockStore.get(oldQueued).createdAt = Date.now() - JOB_RETENTION_MS - 5000;
+    mockStore.get(oldQueued).createdAt = Date.now() - SATZ.jobAufbewahrungMs - 5000;
 
     const found = await jobs.findExpiredJobs();
     expect(found.map((j) => j.id).sort()).toEqual([oldDone, oldQueued].sort());
@@ -404,7 +417,7 @@ describe("findExpiredJobs", () => {
   test("limit deckelt die Batch-Größe", async () => {
     for (let i = 0; i < 5; i++) {
       const id = await jobs.createJob({ imagePath: `queue-uploads/e${i}.jpg` });
-      mockStore.get(id).createdAt = Date.now() - JOB_RETENTION_MS - 5000;
+      mockStore.get(id).createdAt = Date.now() - SATZ.jobAufbewahrungMs - 5000;
     }
     expect((await jobs.findExpiredJobs(3)).length).toBe(3);
   });

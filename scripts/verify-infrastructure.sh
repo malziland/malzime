@@ -372,6 +372,65 @@ case "$SCHED_STATE" in
   *)       rot   "Reaper-Zeitplan ist »$SCHED_STATE«, SOLL ENABLED — der Reaper laeuft nicht" ;;
 esac
 
+# ── 9. Der Riegel unter dem Einstellungssatz: Firestore-Sicherheitsregeln ──
+# SEC-2026-08-30-13: Seit dem Umbau vom 30.08.2026 stehen ALLE Betriebswerte in
+# `config/betriebsprofil`. Der gesamte Entwurf setzt voraus, dass niemand von
+# aussen dort schreiben kann — wer es koennte, koennte Zeitgrenzen, Limits und
+# Aufbewahrungsfristen der Anwendung von aussen umstellen.
+#
+# Diese Voraussetzung war bisher UNGEPRUEFT. Die Regeln stehen zwar im Repo,
+# aber `firestore.rules` im Repo ist nicht, was live gilt: Ein Deploy kann
+# ausbleiben, und die Konsole erlaubt Aenderungen direkt am Live-Stand.
+# Geprueft wird deshalb, was die Regel-Engine WIRKLICH ausliefert.
+echo "— Riegel unter dem Einstellungssatz (Firestore-Regeln)"
+if [ -n "${INFRA_PROBE_RULES:-}" ]; then
+  LIVE_RULES=$(cat "$INFRA_PROBE_RULES")
+else
+  RULES_TOKEN=$(gcloud auth print-access-token 2>/dev/null || true)
+  RULESET=$(curl -s "https://firebaserules.googleapis.com/v1/projects/$PROJECT/releases" \
+    -H "Authorization: Bearer $RULES_TOKEN" -H "x-goog-user-project: $PROJECT" 2>/dev/null \
+    | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for r in d.get('releases', []):
+    if r['name'].endswith('/malzime-eu'):
+        print(r['rulesetName'].split('/')[-1]); break
+" 2>/dev/null || true)
+  if [ -n "$RULESET" ]; then
+    LIVE_RULES=$(curl -s "https://firebaserules.googleapis.com/v1/projects/$PROJECT/rulesets/$RULESET" \
+      -H "Authorization: Bearer $RULES_TOKEN" -H "x-goog-user-project: $PROJECT" 2>/dev/null \
+      | python3 -c "
+import sys, json
+try:
+    d = json.load(sys.stdin)
+except Exception:
+    sys.exit(0)
+for f in d.get('source', {}).get('files', []):
+    print(f.get('content', ''))
+" 2>/dev/null || true)
+  else
+    LIVE_RULES=""
+  fi
+fi
+
+if [ -z "$LIVE_RULES" ]; then
+  rot "Firestore-Regeln NICHT ermittelbar — ungeprueft gilt als nicht bestanden"
+elif echo "$LIVE_RULES" | grep -q "allow read, write: if false"; then
+  # Zusaetzlich: stimmt der Live-Stand mit dem Repo ueberein? Ein Auseinander-
+  # laufen ist kein Sicherheitsproblem, aber es heisst, dass niemand mehr
+  # weiss, was gilt.
+  if [ "$(echo "$LIVE_RULES" | tr -d "[:space:]")" = "$(tr -d "[:space:]" < firestore.rules)" ]; then
+    gruen "Firestore-Regeln: kein Client-Zugriff, live == Repo"
+  else
+    rot "Firestore-Regeln sperren zwar, weichen aber vom Repo ab — welche gelten?"
+  fi
+else
+  rot "Firestore-Regeln erlauben Client-Zugriff — der Einstellungssatz waere von aussen aenderbar"
+fi
+
 # ── Ergebnis ──
 echo ""
 echo "Hinweis: Die Zero-Data-Retention-Zusage von Mistral ist VERTRAGLICH und"

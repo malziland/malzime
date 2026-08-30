@@ -16,7 +16,7 @@
  */
 
 const { randomUUID } = require("crypto");
-const { QUEUE_DISPATCH_CONCURRENCY } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
 const { dauerJeAnalyse } = require("./durchsatz");
 const { getFeatureFlags } = require("./feature-flags");
 const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
@@ -45,7 +45,12 @@ const TOUCH_MINDESTABSTAND_MS = 30_000;
 async function etaForPosition(position) {
   const { sekunden, frisch, gemessen } = await dauerJeAnalyse(await isGemesseneDauerAn());
   if (gemessen && !frisch) return null;
-  return Math.ceil(position / QUEUE_DISPATCH_CONCURRENCY) * sekunden;
+  /* Die Parallelitaet kommt aus dem Einstellungssatz. Frueher stand hier der
+     Code-Wert: Wer die Warteschlange umstellte, bekam eine Wartezeit-Ansage,
+     die zur alten Zahl passte — der Fehler war fuer den Wartenden unsichtbar. */
+  const { werte } = await geltendeWerte();
+  if (!werte || !sekunden) return null;
+  return Math.ceil(position / werte.parallelitaet) * sekunden;
 }
 
 /* Flag-Abfrage, die niemals wirft: Ist Firestore nicht erreichbar, gilt der
@@ -224,4 +229,8 @@ async function handleJobStatus(req, res) {
   });
 }
 
-module.exports = { handleJobStatus };
+/* _etaForPosition ist fuer die Pruefung exportiert: Ohne Einstellungssatz
+   muss die Wartezeit-Ansage "weiss nicht" liefern statt einer Zahl. Der Test
+   dafuer lief zuvor gruen, OHNE die Funktion je aufzurufen — sie war nicht
+   exportiert und die Pruefung uebersprang sich selbst (gefunden 30.08.2026). */
+module.exports = { handleJobStatus, _etaForPosition: etaForPosition };

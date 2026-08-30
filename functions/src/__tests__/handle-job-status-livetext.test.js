@@ -7,6 +7,13 @@
    muss die Antwort byte-gleich zu heute sein — das sichert der exakte
    toEqual-Vergleich. */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
+const { SATZ } = require("../test-satz");
+
 jest.mock("../jobs", () => ({
   getJob: jest.fn(),
   getQueuePosition: jest.fn(),
@@ -16,7 +23,6 @@ jest.mock("../jobs", () => ({
 }));
 
 const { handleJobStatus } = require("../handle-job-status");
-const { QUEUE_AVG_JOB_SECONDS } = require("../config");
 const jobs = require("../jobs");
 
 function makeRes() {
@@ -122,7 +128,7 @@ describe("handleJobStatus — Live-Text bei processing", () => {
     await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     /* toEqual mit dem VOLLEN Objekt: kein zusaetzliches Feld, nichts fehlt —
        das ist die „ohne Flag aendert sich nichts"-Garantie des Endpoints. */
-    expect(res.body).toEqual({ status: "processing", position: 0, etaSeconds: QUEUE_AVG_JOB_SECONDS });
+    expect(res.body).toEqual({ status: "processing", position: 0, etaSeconds: SATZ.durchschnittsdauerSekunden });
   });
 });
 

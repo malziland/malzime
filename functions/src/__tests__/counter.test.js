@@ -1,5 +1,15 @@
 /* Tests for counter.js — Rolling window analysis counter */
 
+/* Einstellungssatz gestellt: Die Betriebswerte kommen seit 30.08.2026 aus
+   Firestore, ohne Rueckfallwerte im Code. Ohne diesen Satz laeuft die
+   Einlasskontrolle nicht — das ist Absicht und wird in
+   betriebsprofil*.test.js geprueft, nicht hier. */
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 const mockGet = jest.fn();
 const mockSet = jest.fn();
 const mockUpdate = jest.fn();
@@ -329,7 +339,10 @@ describe("checkAndIncrement", () => {
     const result = await checkAndIncrement();
     expect(result.allowed).toBe(true);
     expect(result.error).toContain("ABORTED");
-    /* mockRunTransaction wurde 3× aufgerufen (initial + 2 Retries) */
+    /* Drei Aufrufe (einmal plus zwei Wiederholungen). Kurzzeitig waren es
+       sechs — das machte den Einlass unter Andrang unbrauchbar langsam. Den
+       Ausfall faengt jetzt das Netz ab (kostenbremse-netz.test.js), nicht
+       laengeres Warten. */
     expect(mockRunTransaction).toHaveBeenCalledTimes(3);
   });
 

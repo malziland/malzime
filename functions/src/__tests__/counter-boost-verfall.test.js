@@ -6,6 +6,16 @@
    Der Verfall ist BEWUSST SANFT gebaut, weil hier der Workshop-Betrieb hängt:
    Er greift erst, wenn die Frist um ist UND der Boost gerade nicht gebraucht
    wird. Genau das prüfen diese Tests — der zweite ist der wichtigere. */
+/* Einstellungssatz gestellt: Die Betriebswerte kommen seit 30.08.2026 aus
+   Firestore, ohne Rueckfallwerte im Code. Ohne diesen Satz laeuft die
+   Einlasskontrolle nicht — das ist Absicht und wird in
+   betriebsprofil*.test.js geprueft, nicht hier. */
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 const HOURLY_LIMIT = 500;
 const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;
 

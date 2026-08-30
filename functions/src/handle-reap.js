@@ -38,6 +38,7 @@ const {
   abandonJob,
   failJob,
   deleteJob,
+  platzAbgleichen,
 } = require("./jobs");
 const { datenbank } = require("./db");
 const { deleteImage } = require("./queue-storage");
@@ -46,7 +47,8 @@ const { releaseHourlySlot } = require("./counter");
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
    dass ein extremer Rückstau einen Lauf überlange macht. Der nächste Lauf
    (1 min später) nimmt den Rest. */
-const REAP_BATCH_LIMIT = 200;
+/* Die Stapelgroesse kommt aus dem Einstellungssatz (aufraeumStapel). Die
+   find*-Funktionen holen sie sich selbst, wenn kein Wert uebergeben wird. */
 
 /* OPS-2026-08-13-38: Jede Fund-Abfrage einzeln absichern. Vorher lagen die
    fünf `await findX(...)` ausserhalb jeder Fehlerbehandlung — eine einzige
@@ -73,7 +75,7 @@ async function sicherFinden(name, fn) {
 
 async function reapJobs() {
   /* (1) Verlassene wartende Jobs → abandoned. */
-  const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs(REAP_BATCH_LIMIT));
+  const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs());
   let reapedAbandoned = 0;
   for (const job of abandoned) {
     try {
@@ -91,7 +93,7 @@ async function reapJobs() {
   }
 
   /* (2) In `processing` hängende Jobs → failed. */
-  const stale = await sicherFinden("stale", () => findStaleProcessingJobs(REAP_BATCH_LIMIT));
+  const stale = await sicherFinden("stale", () => findStaleProcessingJobs());
   let reapedStale = 0;
   for (const job of stale) {
     try {
@@ -109,7 +111,7 @@ async function reapJobs() {
      damit das komplette Stundenfenster dauerhaft blockieren — ohne dass je ein
      Platz zurueckkommt. Nach 35 Minuten wartet niemand mehr ernsthaft; der
      Browser gibt bereits nach 30 auf. */
-  const ueberfaellig = await sicherFinden("ueberfaellig", () => findUeberfaelligeJobs(REAP_BATCH_LIMIT));
+  const ueberfaellig = await sicherFinden("ueberfaellig", () => findUeberfaelligeJobs());
   let reapedUeberfaellig = 0;
   for (const job of ueberfaellig) {
     try {
@@ -126,7 +128,7 @@ async function reapJobs() {
   /* (2c) PRIV-107b: Zugestellte Ergebnisse nach dem Browser-Wiederholungs-
      Fenster löschen — Bild zuerst (BUG-002-Regel), defensiv: normal ist es
      nach der Analyse längst weg. */
-  const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs(REAP_BATCH_LIMIT));
+  const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs());
   let reapedZugestellt = 0;
   for (const job of zugestellt) {
     try {
@@ -146,7 +148,27 @@ async function reapJobs() {
   }
 
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
-  const expired = await sicherFinden("expired", () => findExpiredJobs(REAP_BATCH_LIMIT));
+  const expired = await sicherFinden("expired", () => findExpiredJobs());
+
+  /* DAS NETZ UNTER DER PLATZRESERVIERUNG (BUG-2026-08-30-14).
+     Der Einlass reserviert Plaetze in einem Zaehler; jeder Uebergang aus
+     `queued` gibt sie zurueck. Geht eine Rueckgabe verloren — Absturz zwischen
+     Uebergang und Freigabe —, stuende der Zaehler dauerhaft zu hoch und wuerde
+     Leute abweisen, obwohl Platz ist. Hier wird er auf die WIRKLICHE Zahl
+     gesetzt. Der Reaper laeuft im Minutentakt, die Abweichung lebt also
+     hoechstens eine Minute. */
+  try {
+    await platzAbgleichen();
+  } catch (fehler) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "platz-abgleich-fehlgeschlagen",
+        message: fehler && fehler.message,
+        hinweis: "Der Warteschlangen-Zaehler kann driften — Einlass ggf. zu streng.",
+      })
+    );
+  }
   let reapedExpired = 0;
   for (const job of expired) {
     try {

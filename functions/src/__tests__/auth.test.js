@@ -18,6 +18,7 @@ jest.mock("firebase-admin/firestore", () => ({
   })),
 }));
 
+const { SATZ } = require("../test-satz");
 const {
   createAdminToken,
   verifyAdminToken,
@@ -62,25 +63,25 @@ describe("safeCompare (SEC-01)", () => {
 
 describe("createAdminToken", () => {
   test("returns token in format expires.signature", () => {
-    const token = createAdminToken("boost", "test-secret");
+    const token = createAdminToken("boost", "test-secret", SATZ.ticketGueltigkeitMs);
     expect(token).toMatch(/^\d+\.[a-f0-9]{64}$/);
   });
 
   test("token expires in the future", () => {
-    const token = createAdminToken("boost", "test-secret");
+    const token = createAdminToken("boost", "test-secret", SATZ.ticketGueltigkeitMs);
     const expires = Number(token.split(".")[0]);
     expect(expires).toBeGreaterThan(Date.now());
   });
 
   test("different actions produce different signatures", () => {
-    const t1 = createAdminToken("boost", "test-secret");
-    const t2 = createAdminToken("reset", "test-secret");
+    const t1 = createAdminToken("boost", "test-secret", SATZ.ticketGueltigkeitMs);
+    const t2 = createAdminToken("reset", "test-secret", SATZ.ticketGueltigkeitMs);
     expect(t1.split(".")[1]).not.toBe(t2.split(".")[1]);
   });
 
   test("different secrets produce different signatures", () => {
-    const t1 = createAdminToken("boost", "secret-a");
-    const t2 = createAdminToken("boost", "secret-b");
+    const t1 = createAdminToken("boost", "secret-a", SATZ.ticketGueltigkeitMs);
+    const t2 = createAdminToken("boost", "secret-b", SATZ.ticketGueltigkeitMs);
     expect(t1.split(".")[1]).not.toBe(t2.split(".")[1]);
   });
 });
@@ -89,22 +90,33 @@ describe("verifyAdminToken", () => {
   const SECRET = "test-secret-123";
 
   test("validates a valid token", () => {
-    const token = createAdminToken("boost", SECRET);
+    const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
     expect(verifyAdminToken(token, "boost", SECRET)).toBe(true);
   });
 
   test("rejects expired token", () => {
-    const expired = createAdminToken("boost", SECRET, -1000);
-    expect(verifyAdminToken(expired, "boost", SECRET)).toBe(false);
+    /* UMGESTELLT 30.08.2026: Frueher wurde das abgelaufene Token mit einer
+       NEGATIVEN Gueltigkeitsdauer (-1000 ms) erzeugt. Das geht nicht mehr —
+       createAdminToken verlangt eine positive Dauer, seit die Dauer ein
+       Pflichtwert aus dem Einstellungssatz ist.
+
+       Die Zusicherung bleibt unveraendert: Ein abgelaufenes Token wird
+       abgelehnt. Nur der Weg dorthin ist jetzt der echte — die Uhr laeuft
+       weiter, statt dass ein unmoeglicher Wert hineingereicht wird. */
+    const echteZeit = Date.now();
+    jest.spyOn(Date, "now").mockReturnValue(echteZeit - 60 * 60 * 1000);
+    const abgelaufen = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
+    Date.now.mockRestore();
+    expect(verifyAdminToken(abgelaufen, "boost", SECRET)).toBe(false);
   });
 
   test("rejects token with wrong action", () => {
-    const token = createAdminToken("boost", SECRET);
+    const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
     expect(verifyAdminToken(token, "reset", SECRET)).toBe(false);
   });
 
   test("rejects token with wrong secret", () => {
-    const token = createAdminToken("boost", SECRET);
+    const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
     expect(verifyAdminToken(token, "boost", "wrong-secret")).toBe(false);
   });
 
@@ -123,7 +135,7 @@ describe("verifyAdminToken", () => {
   });
 
   test("rejects token with wrong signature length", () => {
-    const token = createAdminToken("boost", SECRET);
+    const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
     const expires = token.split(".")[0];
     expect(verifyAdminToken(`${expires}.tooshort`, "boost", SECRET)).toBe(false);
   });
@@ -211,7 +223,7 @@ describe("SEC-2026-08-12-17 — Token und Nonce sind nicht austauschbar", () => 
   const SECRET = "geheim-fuer-den-test";
 
   test("ein Admin-Token gilt NICHT als Nonce", () => {
-    const token = createAdminToken("boost", SECRET);
+    const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
     expect(verifyAdminToken(token, "boost", SECRET)).toBe(true);
     expect(verifyNonce(token, "boost", SECRET)).toBe(false);
   });
@@ -223,7 +235,7 @@ describe("SEC-2026-08-12-17 — Token und Nonce sind nicht austauschbar", () => 
   });
 
   test("die Action-Bindung gilt weiterhin fuer beide", () => {
-    const token = createAdminToken("boost", SECRET);
+    const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
     const nonce = createNonce("boost", SECRET);
     expect(verifyAdminToken(token, "reset", SECRET)).toBe(false);
     expect(verifyNonce(nonce, "reset", SECRET)).toBe(false);

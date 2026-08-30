@@ -26,12 +26,13 @@
  * Stale-Timeout in jobs.js aufgefangen.
  */
 
-const { REQUEST_BUDGET_MS, isLocalQueueMode, localQueueConcurrency } = require("./config");
+const { isLocalQueueMode, localQueueConcurrency } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { applyMinorSafety } = require("./minor-safety");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs, setLiveText } = require("./jobs");
+const { geltendeWerte } = require("./betriebsprofil");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
 /* FEATURE-2026-08-29-02: Jede erfolgreiche Analyse meldet ihre Dauer. */
@@ -110,7 +111,17 @@ function loggeMinorSafety(safety, traceId, lang) {
 async function runPipeline(job) {
   const mistral = getMistral();
   const start = Date.now();
-  const remainingBudget = () => Math.max(0, REQUEST_BUDGET_MS - (Date.now() - start));
+  const { werte, grund } = await geltendeWerte();
+  if (!werte) {
+    const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
+    fehler.code = "config_missing";
+    throw fehler;
+  }
+  const budgetMs = werte.requestBudgetMs;
+  /* Das Zeitbudget kommt aus dem Einstellungssatz. Frueher stand hier der
+     Code-Wert — wer das Budget umstellte, aenderte damit NICHT, wie lange
+     dieser Lauf sich tatsaechlich Zeit liess. */
+  const remainingBudget = () => Math.max(0, budgetMs - (Date.now() - start));
   const lang = job.lang || "de";
   const exif = job.exif || {};
 
@@ -132,10 +143,14 @@ async function runPipeline(job) {
   let describeBlocked = false;
   let describeError = false;
   let quotaError = false;
+  /* Fehlender oder ungueltiger Einstellungssatz — unser Fehler, nicht der des
+     Nutzers, und er besteht fort, bis ihn jemand behebt. */
+  let configMissing = false;
   try {
     description = await mistral.describeImage(buffer, mimeType, remainingBudget, lang);
     if (!description) describeBlocked = true;
   } catch (err) {
+    if (err && err.code === "config_missing") configMissing = true;
     if (isQuotaError(err)) quotaError = true;
     describeError = true;
   }
@@ -170,6 +185,7 @@ async function runPipeline(job) {
       profiles = await mistral.generateBothProfiles(description, exif, remainingBudget, lang);
       profileBlocked = !profiles.normal && !profiles.boost;
     } catch (err) {
+      if (err && err.code === "config_missing") configMissing = true;
       if (isQuotaError(err)) quotaError = true;
       profileBlocked = true;
     }
@@ -234,7 +250,12 @@ async function runPipeline(job) {
 
   /* Blocked-Pfad — kein Profil zustande gekommen. */
   let blockedReason;
-  if (quotaError) blockedReason = "blocked.overloaded";
+  /* Konfigurationsfehler zuerst: Er sieht aus wie ein Serverfehler, ist aber
+     einer, den NUR wir beheben koennen — und er dauert an, bis das jemand tut.
+     Wer das nicht unterscheidet, schickt Nutzer in ein sinnloses "gleich
+     nochmal versuchen". */
+  if (configMissing) blockedReason = "blocked.configMissing";
+  else if (quotaError) blockedReason = "blocked.overloaded";
   else if (describeBlocked) blockedReason = "blocked.safetyFilter";
   else if (describeError) blockedReason = "blocked.apiError";
   else if (profileBlocked) blockedReason = "blocked.profileBlocked";
@@ -264,6 +285,9 @@ async function runPipeline(job) {
 async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, job, remainingBudget }) {
   let profiles = { normal: null, boost: null };
   let quotaError = false;
+  /* Fehlender oder ungueltiger Einstellungssatz — unser Fehler, nicht der des
+     Nutzers, und er besteht fort, bis ihn jemand behebt. */
+  let configMissing = false;
   let pipelineError = false;
   /* v2.5: Prompt-Cache-Flag. Reine Kostenmassnahme, ohne Einfluss auf Modell
      oder Ergebnis — abschaltbar in Firestore ohne Deploy (~30 s Cache). */
@@ -296,6 +320,7 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   try {
     profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts);
   } catch (err) {
+    if (err && err.code === "config_missing") configMissing = true;
     if (isQuotaError(err)) quotaError = true;
     else pipelineError = true;
   }
@@ -390,7 +415,12 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   }
 
   let blockedReason;
-  if (quotaError) blockedReason = "blocked.overloaded";
+  /* Konfigurationsfehler zuerst: Er sieht aus wie ein Serverfehler, ist aber
+     einer, den NUR wir beheben koennen — und er dauert an, bis das jemand tut.
+     Wer das nicht unterscheidet, schickt Nutzer in ein sinnloses "gleich
+     nochmal versuchen". */
+  if (configMissing) blockedReason = "blocked.configMissing";
+  else if (quotaError) blockedReason = "blocked.overloaded";
   else if (pipelineError) blockedReason = "blocked.apiError";
   else blockedReason = "blocked.profileBlocked";
 
@@ -514,7 +544,18 @@ async function handleProcessJob(req, res) {
   /* Liveness: Hat der Client die Seite verlassen, während der Job wartete?
      Dann gar nicht erst Mistral aufrufen — Job auf `abandoned` setzen, Bild
      löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
-  if (isAbandoned(job)) {
+  const { werte: betriebsW, grund: betriebsGrund } = await geltendeWerte();
+  if (!betriebsW) {
+    /* Ohne Einstellungssatz laeuft keine Analyse. Der Job bleibt liegen und
+       wird nach der Wiederholung ehrlich als Fehler gemeldet, statt mit
+       erfundenen Werten zu rechnen. */
+    console.error(
+      JSON.stringify({ step: "process-job", jobId, status: "kein-einstellungssatz", grund: betriebsGrund })
+    );
+    res.status(503).json({ ok: false, reason: "config_missing" });
+    return;
+  }
+  if (isAbandoned(job, betriebsW.livenessGnadenfristMs)) {
     const didAbandon = await abandonJob(jobId);
     if (!didAbandon) {
       /* Übergang verloren: Entweder hat der Reaper parallel abgeräumt (Bild

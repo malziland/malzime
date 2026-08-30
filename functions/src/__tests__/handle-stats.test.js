@@ -1,3 +1,14 @@
+/* Betriebswerte kommen seit 30.08.2026 ausschliesslich aus Firestore. Fuer
+   Tests, die eine Analyse durchspielen, wird hier ein gueltiger Satz gestellt —
+   sonst bricht jeder Aufruf mit "Betriebswerte fehlen" ab, was diese Tests
+   nicht pruefen wollen. Wer das Verhalten OHNE Satz prueft, tut das in
+   betriebsprofil*.test.js. */
+
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 const { handleStats } = require("../handle-stats");
 
 jest.mock("../counter");
@@ -57,6 +68,13 @@ describe("handleStats", () => {
       maintenance: false,
       useQueue: true,
       realitaetsCheck: undefined,
+      /* Betriebswerte (29.08.2026): Ohne Firestore-Profil steht hier die
+         Herkunft "code" und kein Profilname — genau der heutige Zustand.
+         Die Zeitgrenze geht mit, damit der Browser weiss, wie lange er
+         mindestens durchhalten muss. */
+      /* Seit 30.08.2026 kommen die Betriebswerte ausschliesslich aus Firestore;
+         der gestellte Satz oben liefert "firestore" und den Namen. */
+      betrieb: { profil: "test", quelle: "firestore", analyseZeitgrenzeMs: 300000 },
       /* v3.3: Merkmals-Schloss des Sprachumschalters. Ohne gesetztes Flag
          steht es auf false — das Frontend baut den Schalter dann nicht. */
       sprachumschalter: false,

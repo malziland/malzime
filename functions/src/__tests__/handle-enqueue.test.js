@@ -2,6 +2,13 @@
    Die externen Module (Counter, Storage, Cloud Tasks, Jobs) sind gemockt;
    getestet wird die Validierungs-Logik und der Annahme-Ablauf des Handlers. */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
+const { SATZ } = require("../test-satz");
+
 jest.mock("../counter", () => ({
   getMaintenanceStatus: jest.fn(),
   checkAndIncrement: jest.fn(),
@@ -15,6 +22,29 @@ jest.mock("../jobs", () => ({
   createJob: jest.fn(),
   failJob: jest.fn(),
   countQueuedJobs: jest.fn(() => Promise.resolve(0)),
+  /* UMGESTELLT (BUG-2026-08-30-14): Der Einlass zaehlt nicht mehr und legt
+     spaeter an, sondern reserviert den Platz ATOMAR. Der Mock bildet das ab:
+     `ok: false` heisst "kein Platz". */
+  platzReservieren: jest.fn(async () => ({ ok: true, wartende: 1, grenze: 155 })),
+  platzFreigeben: jest.fn(async () => {}),
+  /* ZWEITE STUFE der Einlassgrenze. Diese drei fehlten zuerst — die Tests
+     liefen dadurch NICHT durch die neue Pruefung, sondern in ihren
+     Notfallpfad, und meldeten trotzdem gruen. Ein Mock, der eine Funktion
+     nicht kennt, prueft den Weg dahinter nicht. */
+  platzBestaetigen: jest.fn(async () => true),
+  getJob: jest.fn(async (id) => ({ id, status: "queued", createdAt: Date.now() })),
+  abandonJob: jest.fn(async () => true),
+}));
+/* OHNE DIESE ZWEI scheiterte die Ermittlung der Einlassgrenze still (echtes
+   Firestore nicht erreichbar), der Code fiel in seinen Notfallpfad, und die
+   Vorpruefung wurde nie erreicht — der Test meldete 200 statt 429 und ich
+   suchte den Fehler im Produktivcode. */
+jest.mock("../feature-flags", () => ({
+  getFeatureFlags: jest.fn(async () => ({ useGemesseneDauer: false })),
+  isSingleLargeCallEnabled: jest.fn(async () => true),
+}));
+jest.mock("../durchsatz", () => ({
+  dauerJeAnalyse: jest.fn(async () => ({ sekunden: 65, gemessen: false, frisch: false })),
 }));
 jest.mock("../queue-storage", () => ({
   storeImage: jest.fn(),
@@ -33,7 +63,6 @@ const middleware = require("../middleware");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const tasks = require("../cloud-tasks");
-const { MAX_QUEUE_DEPTH } = require("../config");
 
 const VALID_JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(20)]);
 
@@ -80,6 +109,11 @@ beforeEach(() => {
   counter.getMaintenanceStatus.mockResolvedValue({ enabled: false, message: "" });
   counter.checkAndIncrement.mockResolvedValue({ allowed: true, justReached: false, count: 1, limit: 1500 });
   middleware.checkRateLimit.mockReturnValue(true);
+  /* createJob liefert die jobId (Signatur unveraendert — siehe Abwaegung in jobs.js)
+
+
+
+     */
   jobs.createJob.mockResolvedValue("job-abc");
   jobs.failJob.mockResolvedValue();
   storage.storeImage.mockResolvedValue("queue-uploads/test.jpg");
@@ -249,7 +283,7 @@ describe("SEC-002 — Größe aus der Kopfzeile", () => {
     jest.clearAllMocks();
     counter.getMaintenanceStatus.mockResolvedValue({ enabled: false });
     counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
-    jobs.countQueuedJobs.mockResolvedValue(0);
+    jobs.platzBestaetigen.mockResolvedValue(true);
     middleware.checkRateLimit.mockReturnValue(true);
   });
 
@@ -296,7 +330,13 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
     /* Ohne diese Bremse nimmt der Einlass Aufträge an, die den 30-Minuten-
        Deckel des Browsers garantiert überschreiten: Der Teilnehmer sieht einen
        Timeout, der Job läuft trotzdem und kostet Geld. */
-    jobs.countQueuedJobs.mockResolvedValue(MAX_QUEUE_DEPTH);
+    /* Die VORPRUEFUNG lehnt ab — bevor ein Bild gespeichert wird.
+       Datenschutz: Ein Foto, das nie analysiert wird, soll nie auf unserem
+       Speicher liegen. */
+    /* Die Grenze wird aus der gemessenen Dauer gerechnet und ist im Test
+       nicht zwingend warteschlangeTiefe. Ein absurd hoher Zaehlerstand liegt
+       sicher darueber — geprueft wird die ABLEHNUNG, nicht die genaue Zahl. */
+    jobs.countQueuedJobs.mockResolvedValue(99999);
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
 
@@ -307,7 +347,9 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
   });
 
   test("knapp unter der Grenze geht durch (Positivkontrolle)", async () => {
-    jobs.countQueuedJobs.mockResolvedValue(MAX_QUEUE_DEPTH - 1);
+    jobs.countQueuedJobs.mockResolvedValue(0);
+    jobs.platzBestaetigen.mockResolvedValue(true);
+    ({});
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
 
@@ -317,7 +359,7 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
 
   test("klemmt die Abfrage, wird angenommen statt blockiert (fail-open)", async () => {
     /* Eine Kapazitätsbremse darf nie zum Ausfall eskalieren. */
-    jobs.countQueuedJobs.mockRejectedValue(new Error("Firestore weg"));
+    jobs.platzBestaetigen.mockRejectedValue(new Error("Firestore weg"));
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
 
@@ -343,7 +385,7 @@ describe("TEST-002 — nachgezogene Upload-Prüfungen", () => {
     jest.clearAllMocks();
     counter.getMaintenanceStatus.mockResolvedValue({ enabled: false });
     counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
-    jobs.countQueuedJobs.mockResolvedValue(0);
+    jobs.platzBestaetigen.mockResolvedValue(true);
     jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
     middleware.checkRateLimit.mockReturnValue(true);
     storage.storeImage.mockResolvedValue("pfad.jpg");
@@ -428,5 +470,79 @@ describe("TEST-002 — nachgezogene Upload-Prüfungen", () => {
     expect(res.statusCode).toBe(403);
     expect(counter.checkAndIncrement).not.toHaveBeenCalled();
     expect(storage.storeImage).not.toHaveBeenCalled();
+  });
+});
+
+describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
+  /* Die atomare Reservierung fängt den Normalbetrieb ab. Unter echtem Andrang
+   * scheitert sie an einer Firestore-Eigenschaft — ein einzelnes Dokument
+   * verträgt etwa einen Schreibvorgang pro Sekunde, und bei 170 gleichzeitigen
+   * Anfragen wirft die Datenbank ABORTED. Im Simulator geschah das 167 Mal,
+   * und die Notbremse ließ alle durch: 177 Wartende bei Grenze 155.
+   *
+   * Die zweite Stufe zählt nur und kennt deshalb keine Kollisionen. Sie ist
+   * der Grund, warum die Grenze jetzt hält — und sie war bis zu diesem Test
+   * im Zusammenspiel ungeprüft. */
+  beforeEach(() => {
+    jest.clearAllMocks();
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
+    middleware.checkRateLimit.mockReturnValue(true);
+    storage.storeImage.mockResolvedValue("pfad.jpg");
+    jobs.createJob.mockResolvedValue("job-abc");
+    /* IM GRENZBEREICH: Die zweite Stufe laeuft erst ab 80 % der Grenze — sie
+       kostet zwei Datenbankzugriffe und soll den Alltag nicht belasten.
+       140 von 155 sind 90 %, also wird geprueft. */
+    jobs.platzReservieren.mockResolvedValue({ ok: true, wartende: 140, grenze: 155 });
+    jobs.getJob.mockResolvedValue({ id: "job-abc", status: "queued", createdAt: Date.now() });
+    tasks.enqueueJob.mockResolvedValue();
+  });
+
+  test("zu spät gekommen: der Auftrag wird zurückgenommen, nicht durchgelassen", async () => {
+    jobs.platzBestaetigen.mockResolvedValue(false);
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(429);
+    expect(res.body.blocked).toBe("queueFull");
+    /* Und es bleibt nichts liegen: */
+    expect(jobs.abandonJob).toHaveBeenCalledWith("job-abc");
+    expect(storage.deleteImage).toHaveBeenCalledWith("pfad.jpg");
+    expect(counter.releaseHourlySlot).toHaveBeenCalled();
+    /* Vor allem: Der Auftrag wird NICHT in die Verarbeitung geschickt. */
+    expect(tasks.enqueueJob).not.toHaveBeenCalled();
+  });
+
+  test("rechtzeitig: der Auftrag läuft normal weiter", async () => {
+    jobs.platzBestaetigen.mockResolvedValue(true);
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(200);
+    expect(tasks.enqueueJob).toHaveBeenCalledWith("job-abc");
+    expect(jobs.abandonJob).not.toHaveBeenCalled();
+  });
+
+  test("die Stufe wird WIRKLICH durchlaufen — nicht stillschweigend übersprungen", async () => {
+    /* Der Riegel gegen den blinden Fleck von vorhin: Fehlte getJob im Mock,
+       lief der Code in seinen Notfallpfad und der Test blieb grün, ohne die
+       Prüfung je berührt zu haben. */
+    jobs.platzBestaetigen.mockResolvedValue(true);
+    await handleEnqueue(jsonReq(), makeRes(), SECRETS);
+    expect(jobs.platzBestaetigen).toHaveBeenCalled();
+    expect(jobs.getJob).toHaveBeenCalledWith("job-abc");
+  });
+
+  test("bei einem Fehler in der Stufe wird eingelassen, nicht blockiert", async () => {
+    /* Fail-open: Eine Kapazitätsbremse darf nie zum Totalausfall werden.
+       Der Fehler geht laut ins Protokoll, der Nutzer bekommt seine Analyse. */
+    const fehler = [];
+    jest.spyOn(console, "error").mockImplementation((z) => fehler.push(String(z)));
+    jobs.platzBestaetigen.mockRejectedValue(new Error("Firestore weg"));
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(200);
+    expect(fehler.join(" ")).toContain("platz-bestaetigung-fehlgeschlagen");
+    jest.restoreAllMocks();
   });
 });

@@ -4,6 +4,11 @@
    so aussieht — ein Platzhalter wie "Aa1Bb2Cc3Dd4Ee5Ff6Gg" wuerde am Formatriegel haengen
    bleiben und die eigentliche Absicht des Tests verdecken. */
 
+/* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
+   aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
+   ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
+jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+
 jest.mock("../jobs", () => ({
   getJob: jest.fn(),
   getQueuePosition: jest.fn(),

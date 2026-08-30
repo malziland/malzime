@@ -334,7 +334,10 @@ async function verstossDiagnose(page, waehler) {
     let hinter = null;
     for (let k = el; k; k = k.parentElement) {
       const bg = getComputedStyle(k).backgroundColor;
-      if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") { hinter = bg; break; }
+      if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+        hinter = bg;
+        break;
+      }
     }
     const mitte = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return {
@@ -343,7 +346,8 @@ async function verstossDiagnose(page, waehler) {
       deckkraft: cs.opacity,
       schriftgroesse: cs.fontSize,
       sichtbar: cs.visibility + "/" + cs.display,
-      ueberdecktVon: mitte === el || el.contains(mitte) ? null : (mitte ? mitte.tagName + "." + mitte.className : "nichts"),
+      ueberdecktVon:
+        mitte === el || el.contains(mitte) ? null : mitte ? mitte.tagName + "." + mitte.className : "nichts",
       imBild: r.top >= 0 && r.bottom <= innerHeight,
       masse: Math.round(r.width) + "x" + Math.round(r.height) + " bei " + Math.round(r.top),
       laufendeAnimationen: document.getAnimations().length,
@@ -510,9 +514,7 @@ async function beruhigen(page) {
         new Promise((fertig) => {
           const messen = () => {
             const f = document.querySelector(".site-footer");
-            return (
-              document.documentElement.scrollHeight + "|" + (f ? Math.round(f.getBoundingClientRect().top) : "-")
-            );
+            return document.documentElement.scrollHeight + "|" + (f ? Math.round(f.getBoundingClientRect().top) : "-");
           };
           /* Abstand zwischen den Messungen, nicht Bild an Bild: Vier direkt
              aufeinanderfolgende Bilder laufen so schnell durch, dass eine
@@ -656,7 +658,6 @@ async function umbruchMessen(page, bildschirm) {
    ehrlicher Zusatz — und was wir nicht erfuellen, gehoert mit Begruendung
    dokumentiert statt verschwiegen. */
 const WCAG_AAA = ["wcag2aaa", "wcag21aaa", "wcag22aaa"];
-
 
 /* Auf Animations-Ruhe warten — ABER nur auf Animationen, die ueberhaupt
    enden koennen.

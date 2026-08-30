@@ -120,7 +120,10 @@ test.describe("Kurzvorstellung", () => {
          Formulierung ist fuer sie nicht von ihrer Verwendung zu unterscheiden
          (KERN 11). Gemeint ist die absolute Zusage, die Ortsdaten verliessen
          das Geraet nicht — richtig ist: sie erreichen unsere Server nie. */
-      { muster: new RegExp("verl" + "[\\u00e4a]sst\\s+nie\\s+den\\s+Brow" + "ser", "i"), name: "absolute Ortsdaten-Zusage" },
+      {
+        muster: new RegExp("verl" + "[\\u00e4a]sst\\s+nie\\s+den\\s+Brow" + "ser", "i"),
+        name: "absolute Ortsdaten-Zusage",
+      },
       { muster: /\bv\d+\.\d+\.\d+\b/, name: "Versionsnummer im Aussentext" },
     ];
     const treffer = [];

@@ -63,6 +63,7 @@ lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/ch
 lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/pruefungen/checks/test-blind.py .
 lauf "Pruefungen: Sichtbare Texte" "pruefungen" python3 scripts/pruefe-i18n-fallbacks.py
 lauf "Pruefungen: Tote Geduld" "pruefungen" python3 scripts/pruefe-tote-geduld.py
+lauf "Pruefungen: Doppelte Betriebswerte" "pruefungen" python3 scripts/pruefe-doppelte-werte.py
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend

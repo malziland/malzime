@@ -4,6 +4,11 @@
    atomares Hochzählen (eingaben +1, summeProzent +score) und das Lesen
    für /api/stats. Fehler dürfen nie nach aussen schlagen (Telemetrie). */
 
+/* Einstellungssatz gestellt: Die Betriebswerte kommen seit 30.08.2026 aus
+   Firestore, ohne Rueckfallwerte im Code. Ohne diesen Satz laeuft die
+   Einlasskontrolle nicht — das ist Absicht und wird in
+   betriebsprofil*.test.js geprueft, nicht hier. */
+
 const mockGet = jest.fn();
 const mockSet = jest.fn();
 const mockUpdate = jest.fn();

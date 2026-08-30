@@ -1,6 +1,6 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
-const { HOURLY_LIMIT, HOURLY_WINDOW_MINUTES } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
 
 const CURRENT_DOC = "stats/current";
 const TOTALS_DOC = "stats/totals";
@@ -37,6 +37,68 @@ function calcRetrySeconds(recent, limit, now, windowMs) {
  *
  * Bei Firestore-Fehler: fail-open (allowed: true).
  */
+
+/* ══════════════════════════════════════════════════════════════════════
+   DAS NETZ UNTER DER KOSTENBREMSE (30.08.2026)
+   ══════════════════════════════════════════════════════════════════════
+
+   DAS PROBLEM: Der Stundenzaehler schreibt alle Zeitstempel in EIN Dokument
+   (stats/current). Ein einzelnes Firestore-Dokument vertraegt etwa einen
+   Schreibvorgang pro Sekunde. Bei Andrang stehen alle Anfragen Schlange, die
+   Transaktion bricht mit ABORTED ab — und der Zaehler faellt fail-open aus.
+
+   GEMESSEN im Simulator: bei 170 gleichzeitigen Anfragen 206 Ausfaelle.
+
+   Das ist die schlechteste denkbare Eigenschaft fuer eine Kostenbremse: Sie
+   haelt im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+   Der Nutzer dazu: "Eine Kostenbremse ist dazu da, damit ich mich darauf
+   verlassen kann. Ich mag nicht auf einmal horrende Kosten haben."
+
+   DIESES NETZ KANN NICHT AUSFALLEN, weil es nichts schreibt. Es zaehlt die
+   Auftraege der letzten Stunde mit einer Aggregat-Abfrage — dieselbe Technik,
+   die auch die Warteschlangen-Position bestimmt. Aggregate kennen keine
+   Sperren und keine Kontention.
+
+   Es greift NUR, wenn der eigentliche Zaehler ausgefallen ist. Im Normalfall
+   kostet es nichts.
+
+   GRENZE DER AUSSAGE: Gezaehlt werden Auftraege in der Warteschlange. Eine
+   Analyse ohne Auftrag (der alte synchrone Pfad) taucht hier nicht auf. Im
+   Queue-Betrieb — und der ist seit v2.0 der einzige — entspricht ein Auftrag
+   genau einer Analyse.
+   ══════════════════════════════════════════════════════════════════════ */
+async function notbremseUeberJobs(fensterMs, limit) {
+  try {
+    const seit = Date.now() - fensterMs;
+    const agg = await datenbank().collection("jobs").where("createdAt", ">=", seit).count().get();
+    const inDerStunde = agg.data().count;
+    if (inDerStunde >= limit) {
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          alert: "notbremse-gegriffen",
+          message: "Der Stundenzaehler ist ausgefallen — die Notbremse hat uebernommen und blockiert.",
+          inDerStunde,
+          limit,
+        })
+      );
+      return { allowed: false, count: inDerStunde, limit, retryAfterSeconds: 300, notbremse: true };
+    }
+    return { allowed: true, count: inDerStunde, limit, retryAfterSeconds: 0, notbremse: true };
+  } catch (fehler) {
+    /* Auch das Netz kann reissen — dann bleibt nur fail-open, aber laut. */
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        alert: "notbremse-fehlgeschlagen",
+        message: "Weder Zaehler noch Notbremse verfuegbar — KEINE Kostenbremse aktiv.",
+        error: fehler && fehler.message,
+      })
+    );
+    return null;
+  }
+}
+
 async function checkAndIncrement() {
   /* v1.10.6: Eigene Retry-Schleife OBEN auf das Firestore-SDK-Retry (default 5).
      Hintergrund: Bei hoher Last (>=20 parallele Anfragen) kollidieren mehrere
@@ -45,90 +107,136 @@ async function checkAndIncrement() {
      nicht. Unsere Schleife versucht bei ABORTED noch 2× mit Backoff+Jitter,
      bevor wir fail-open + ERROR eskalieren. Andere Firestore-Fehler (Netz,
      Permission, etc.) gehen sofort in den ERROR-Pfad. */
+  /* MEHR VERSUCHE, GROESSERE ABSTAENDE (30.08.2026).
+     GEMESSEN im Simulator: Bei 170 gleichzeitigen Anfragen fiel die
+     Kostenbremse 206 Mal aus — jedes Mal, weil die zwei Wiederholungen nicht
+     reichten. Ein einzelnes Firestore-Dokument vertraegt etwa einen
+     Schreibvorgang pro Sekunde; bei Andrang stehen alle Anfragen an
+     stats/current Schlange.
+
+     ZWEI VERSUCHE, NICHT MEHR. Kurzzeitig standen hier fuenf mit Abstaenden
+     bis 2,5 Sekunden — in der Hoffnung, den Ausfall so zu vermeiden. Das war
+     die falsche Antwort: Der Einlass wurde dadurch unter Andrang so langsam,
+     dass ein Simulatorlauf ueber zehn Minuten brauchte. Jede Anfrage wartete
+     bis zu 4,5 Sekunden auf einen Zaehler, der ohnehin nicht durchkommt.
+
+     Die richtige Antwort steht darunter: das NETZ (notbremseUeberJobs). Es
+     zaehlt statt zu schreiben, kann deshalb nicht an derselben Ursache
+     scheitern — und braucht kein Warten. Zwei kurze Versuche fangen die
+     zufaellige Kollision ab; alles darueber uebernimmt das Netz sofort. */
+  const ZAEHLER_ZEITLIMIT_MS = 2000;
   const ABORTED_RETRIES = 2;
   let lastErr = null;
+  /* Einstellungssatz EINMAL vor der Transaktionsschleife holen — innerhalb
+     einer Firestore-Transaktion darf kein weiterer Lesevorgang laufen. */
+  const { werte: satzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
   for (let attempt = 0; attempt <= ABORTED_RETRIES; attempt++) {
     try {
       const db = datenbank();
       const ref = db.doc(CURRENT_DOC);
 
-      const result = await db.runTransaction(async (tx) => {
-        const snap = await tx.get(ref);
-        const data = snap.exists ? snap.data() : {};
+      /* EIGENES ZEITLIMIT UM DIE TRANSAKTION (30.08.2026).
+         GEMESSEN: Ohne das hingen 75 % der Anfragen 54 Sekunden. Nicht wegen
+         der eigenen Wiederholungen (die warten 240 ms), sondern weil Firestore
+         selbst sehr lange auf die Dokumentsperre wartet, bevor es aufgibt.
+         Bei 170 gleichzeitigen Anfragen auf EIN Dokument steht alles.
 
-        const wm = data.windowMinutes || HOURLY_WINDOW_MINUTES;
-        const windowMs = wm * 60 * 1000;
-        const now = Date.now();
+         Zwei Sekunden sind grosszuegig fuer eine Transaktion auf einem kleinen
+         Dokument und kurz genug, dass niemand es merkt. Danach uebernimmt das
+         Netz — es zaehlt nur und antwortet sofort. */
+      const result = await Promise.race([
+        db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          const data = snap.exists ? snap.data() : {};
 
-        /* Rollendes Fenster: nur Analysen der letzten Stunde */
-        const recent = filterRecent(data.recentAnalyses, now, windowMs);
+          /* Das Zeitfenster gehoert zum Limit — eine Zahl ohne ihren Bezugsraum
+           ist keine Einstellung. Reihenfolge: Einstellungssatz, dann ein
+           gesetzter Wert im Dokument, dann die Konstante. */
+          /* EINE QUELLE: Das Zeitfenster kommt aus dem Einstellungssatz. Der
+           Wert im Dokument stammt nur noch aus einem laufenden Boost. */
+          const wm = satzwerte.stundenfensterMinuten;
+          const windowMs = wm * 60 * 1000;
+          const now = Date.now();
 
-        /* BIZ-2026-08-20-28: Ein abgelaufener Boost faellt hier zurueck — aber nur,
+          /* Rollendes Fenster: nur Analysen der letzten Stunde */
+          const recent = filterRecent(data.recentAnalyses, now, windowMs);
+
+          /* BIZ-2026-08-20-28: Ein abgelaufener Boost faellt hier zurueck — aber nur,
            wenn er gerade nicht gebraucht wird (siehe wirksamesLimit). Der
            Rueckfall wird gleich mitgeschrieben, damit /stats und der naechste
            Aufruf dasselbe sehen. */
-        const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length);
+          const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length, satzwerte?.stundenlimit);
 
-        /* Limit erreicht → blockieren */
-        if (recent.length >= limit) {
-          const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
-          return {
-            allowed: false,
-            retryAfterSeconds,
-            count: recent.length,
-            limit,
-            hourlyTotal: recent.length,
-          };
-        }
+          /* Limit erreicht → blockieren */
+          if (recent.length >= limit) {
+            const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
+            return {
+              allowed: false,
+              retryAfterSeconds,
+              count: recent.length,
+              limit,
+              hourlyTotal: recent.length,
+            };
+          }
 
-        /* Unter dem Limit → Analyse erlauben */
-        recent.push(now);
-        const justReached = recent.length === limit;
+          /* Unter dem Limit → Analyse erlauben */
+          recent.push(now);
+          const justReached = recent.length === limit;
 
-        if (snap.exists) {
-          /* BIZ-2026-08-20-28: Ist der Boost verfallen, wird der Deckel in
+          if (snap.exists) {
+            /* BIZ-2026-08-20-28: Ist der Boost verfallen, wird der Deckel in
              derselben Transaktion zurueckgeschrieben — sonst wuerde er bei jedem
              Aufruf neu "verfallen", ohne je im Dokument anzukommen, und /stats
              zeigte weiter den erhoehten Wert. */
-          const aenderung = boostVerfallen
-            ? { recentAnalyses: recent, limit: HOURLY_LIMIT, limitBis: null }
-            : { recentAnalyses: recent };
-          if (boostVerfallen) {
-            console.log(
-              JSON.stringify({
-                step: "boost-verfallen",
-                zurueckAuf: HOURLY_LIMIT,
-                imFenster: recent.length,
-                hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
-              })
-            );
+            const aenderung = boostVerfallen
+              ? { recentAnalyses: recent, limit: satzwerte.stundenlimit, limitBis: null }
+              : { recentAnalyses: recent };
+            if (boostVerfallen) {
+              console.log(
+                JSON.stringify({
+                  step: "boost-verfallen",
+                  zurueckAuf: satzwerte.stundenlimit,
+                  imFenster: recent.length,
+                  hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
+                })
+              );
+            }
+            tx.update(ref, aenderung);
+          } else {
+            tx.set(ref, {
+              recentAnalyses: recent,
+              limit: satzwerte.stundenlimit,
+              windowMinutes: satzwerte.stundenfensterMinuten,
+            });
           }
-          tx.update(ref, aenderung);
-        } else {
-          tx.set(ref, {
-            recentAnalyses: recent,
-            limit: HOURLY_LIMIT,
-            windowMinutes: HOURLY_WINDOW_MINUTES,
-          });
-        }
 
-        return {
-          allowed: true,
-          retryAfterSeconds: 0,
-          count: recent.length,
-          limit,
-          hourlyTotal: recent.length,
-          justReached,
-        };
-      });
+          return {
+            allowed: true,
+            retryAfterSeconds: 0,
+            count: recent.length,
+            limit,
+            hourlyTotal: recent.length,
+            justReached,
+          };
+        }),
+        new Promise((_, ab) => {
+          const uhr = setTimeout(() => {
+            const f = new Error("Zeitlimit 2000 ms fuer den Stundenzaehler");
+            f.code = 10; /* wie ABORTED behandeln: Wiederholung, dann Netz */
+            ab(f);
+          }, ZAEHLER_ZEITLIMIT_MS);
+          if (typeof uhr.unref === "function") uhr.unref();
+        }),
+      ]);
 
       return result;
     } catch (err) {
       lastErr = err;
       const isAborted = err.code === 10 || /ABORTED/i.test(err.message || "");
       if (isAborted && attempt < ABORTED_RETRIES) {
-        /* Backoff mit Jitter: 80ms beim 1. Retry, 160ms beim 2. — plus 0-80ms
-           Zufall, damit nicht alle Caller im gleichen Moment zurueckkommen. */
+        /* Kurz: 80 und 160 ms, plus bis zu 80 ms Zufall. Genug fuer eine
+           zufaellige Kollision, zu kurz, um den Einlass aufzuhalten. Bei
+           echtem Andrang uebernimmt das Netz. */
         const backoff = 80 * (attempt + 1) + Math.random() * 80;
         await new Promise((r) => setTimeout(r, backoff));
         continue;
@@ -141,22 +249,32 @@ async function checkAndIncrement() {
          v1.10.6: Routinemaessige ABORTED-Kontention wird VORHER 2× geretried
          und triggert hier nur den ERROR-Pfad, wenn auch das nicht reicht. */
       const reason = isAborted ? "aborted-retries-exhausted" : "firestore-error";
-      console.error(
-        JSON.stringify({
-          severity: "ERROR",
-          alert: "counter-fail-open",
-          warning: "counter-error",
-          reason,
-          message: "Stundenlimit-Zaehler fehlgeschlagen — globale Kostenbremse momentan inaktiv",
-          error: err.message,
-        })
-      );
-      return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: err.message };
+
+      /* ZUERST DAS NETZ, DANN DIE MELDUNG.
+         Frueher stand hier ein ERROR mit dem Text "globale Kostenbremse
+         momentan inaktiv" — und zwar BEVOR ueberhaupt versucht wurde, sie
+         anderweitig zu halten. Nach dem Einbau des Netzes war dieser Text
+         schlicht falsch: Im Simulator meldete er 169 Mal einen Ausfall,
+         waehrend das Netz jedes Mal korrekt entschieden hatte.
+         169 Fehlalarme pro Workshop haetten die echte Meldung unauffindbar
+         gemacht. */
+      /* ZUERST DAS NETZ: Der Zaehler ist ausgefallen, aber die Kostenbremse
+         darf es nicht sein. Das Netz zaehlt statt zu schreiben und kann
+         deshalb nicht an derselben Ursache scheitern. */
+      if (satzwerte) {
+        const netz = await notbremseUeberJobs(satzwerte.stundenfensterMinuten * 60 * 1000, satzwerte.stundenlimit);
+        if (netz) return { ...netz, error: err.message };
+      }
+
+      /* Erst wenn AUCH das Netz reisst: fail-open, damit ein Datenbankproblem
+         den Workshop nicht stoppt. `limit: null` sagt ehrlich, dass hier keine
+         Grenze bekannt ist — eine erfundene Zahl waere schlechter als keine. */
+      return { allowed: true, retryAfterSeconds: 0, count: -1, limit: null, error: err.message };
     }
   }
   /* Unerreichbar — der Loop kommt aus jedem Iteration entweder mit return
      oder via continue heraus. Sicherheitshalber fail-open. */
-  return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: lastErr && lastErr.message };
+  return { allowed: true, retryAfterSeconds: 0, count: -1, limit: null, error: lastErr && lastErr.message };
 }
 
 /**
@@ -261,22 +379,23 @@ async function incrementTotals() {
  */
 async function getStats() {
   try {
+    const { werte: satzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
     const db = datenbank();
     const [currentSnap, totalsSnap] = await Promise.all([db.doc(CURRENT_DOC).get(), db.doc(TOTALS_DOC).get()]);
 
     const current = currentSnap.exists
       ? currentSnap.data()
-      : { limit: HOURLY_LIMIT, windowMinutes: HOURLY_WINDOW_MINUTES };
+      : { limit: satzwerte?.stundenlimit ?? null, windowMinutes: satzwerte?.stundenfensterMinuten ?? null };
     const totals = totalsSnap.exists ? totalsSnap.data() : { today: 0, week: 0, month: 0, year: 0, allTime: 0 };
 
-    const wm = current.windowMinutes || HOURLY_WINDOW_MINUTES;
+    const wm = satzwerte?.stundenfensterMinuten ?? current.windowMinutes;
     const windowMs = wm * 60 * 1000;
     const now = Date.now();
 
     const recent = filterRecent(current.recentAnalyses, now, windowMs);
     /* BIZ-2026-08-20-28: Dieselbe Quelle wie der Einlass — sonst zeigte /stats
        einen Deckel an, den der naechste Upload gar nicht mehr bekommt. */
-    const { limit: currentLimit } = wirksamesLimit(current, recent.length);
+    const { limit: currentLimit } = wirksamesLimit(current, recent.length, satzwerte?.stundenlimit);
     const recentCount = recent.length;
     const limitActive = recentCount >= currentLimit;
     const retryAfterSeconds = limitActive ? calcRetrySeconds(recent, currentLimit, now, windowMs) : 0;
@@ -319,7 +438,9 @@ async function getStats() {
    praktisch abschalten. Der Deckel begrenzt den Schaden auf das Doppelte des
    regulaeren Stundenlimits — genug fuer den gedachten Zweck (eine Schulklasse
    mehr), zu wenig fuer eine Kostenlawine. */
-const BOOST_OBERGRENZE = 2 * HOURLY_LIMIT;
+/* Der Deckel und die Frist kommen aus dem Einstellungssatz (boostFaktor,
+   boostFristMs) — frueher standen sie im Code und waren damit eine zweite
+   Definition neben dem Stundenlimit. */
 
 /* BIZ-2026-08-20-28 (Entscheidung E2 aus dem Audit, 2026-08-21): Ein Boost hob den
    Deckel DAUERHAFT an. Es gab keinen Rückfall auf das reguläre Stundenlimit, keinen
@@ -334,7 +455,6 @@ const BOOST_OBERGRENZE = 2 * HOURLY_LIMIT;
    regulären Limit liegt. So kann niemand mitten in einer laufenden Klasse
    ausgesperrt werden; der Deckel normalisiert sich von selbst in der ersten
    ruhigen Minute danach. */
-const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;
 
 /**
  * Das heute gültige Stundenlimit. EINE Quelle für alle Lesestellen — vorher
@@ -346,17 +466,32 @@ const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;
  * @returns {{limit:number, verfallen:boolean}} verfallen=true → der Boost ist
  *   abgelaufen und darf zurückgeschrieben werden.
  */
-function wirksamesLimit(daten, anzahlImFenster = 0) {
-  const gesetzt = Number((daten && daten.limit) || HOURLY_LIMIT);
-  if (gesetzt <= HOURLY_LIMIT) return { limit: HOURLY_LIMIT, verfallen: false };
+function wirksamesLimit(daten, anzahlImFenster = 0, grundlimit) {
+  /* EINE QUELLE FUER DEN GRUNDWERT (30.08.2026): Das regulaere Stundenlimit
+     kommt aus dem Einstellungssatz und wird hereingereicht. Der Boost ist
+     KEINE zweite Definition desselben Werts, sondern ein zeitlich begrenzter
+     Aufschlag darauf — er hat ein Ablaufdatum und faellt danach auf den
+     Grundwert zurueck.
+
+     Fehlt der Grundwert, gilt die Konstante aus config.js: Das Stundenlimit
+     ist eine Schutzgrenze, ohne sie waere der Einlass unbegrenzt. */
+  /* Der Grundwert ist PFLICHT — es gibt keinen Rueckfall mehr im Code
+     (Vorgabe des Nutzers, 30.08.2026: jeder Wert genau einmal, aus der
+     Datenbank). Fehlt er, ist das ein Konfigurationsfehler und soll auffallen. */
+  if (typeof grundlimit !== "number" || grundlimit <= 0) {
+    throw new Error("wirksamesLimit: Grundlimit fehlt — Einstellungssatz nicht geladen");
+  }
+  const basis = grundlimit;
+  const gesetzt = Number((daten && daten.limit) || basis);
+  if (gesetzt <= basis) return { limit: basis, verfallen: false };
   const bis = Number((daten && daten.limitBis) || 0);
   /* Ohne Ablaufdatum stammt der Boost aus der Zeit vor diesem Fix — dann gilt er
      weiter, bis ihn ein neuer Boost oder ein Reset ablöst. Bestehendes still zu
      entwerten wäre die schlechtere Überraschung. */
   if (!bis) return { limit: gesetzt, verfallen: false };
   const abgelaufen = Date.now() > bis;
-  const wirdNichtGebraucht = anzahlImFenster < HOURLY_LIMIT;
-  if (abgelaufen && wirdNichtGebraucht) return { limit: HOURLY_LIMIT, verfallen: true };
+  const wirdNichtGebraucht = anzahlImFenster < basis;
+  if (abgelaufen && wirdNichtGebraucht) return { limit: basis, verfallen: true };
   return { limit: gesetzt, verfallen: false };
 }
 
@@ -373,18 +508,35 @@ async function boostLimit(amount = 100) {
      wird aus der Transaktion zurückgegeben und ERST DANACH geloggt, damit ein
      Transaktions-Retry die Logzeile nicht vervielfacht. */
   let ergebnis;
+  /* Grundwert VOR der Transaktion holen — innerhalb einer Firestore-Transaktion
+     darf kein weiterer Lesevorgang laufen. */
+  const { werte: satzwerte, grund: satzgrund } = await geltendeWerte();
+  if (!satzwerte) {
+    /* Fail-closed: Ohne Einstellungssatz kein Boost. */
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "boost-ohne-einstellungssatz",
+        grund: satzgrund || null,
+        hinweis: "Boost abgelehnt, weil kein gueltiger Einstellungssatz vorliegt.",
+      })
+    );
+    return { limit: null, abgelehnt: true };
+  }
+  const obergrenze = satzwerte.stundenlimit * satzwerte.boostFaktor;
+  const fristMs = satzwerte.boostFristMs;
   try {
     ergebnis = await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const daten = snap && snap.exists ? snap.data() : null;
-      const aktuell = Number((daten && daten.limit) || HOURLY_LIMIT);
+      const aktuell = Number((daten && daten.limit) || satzwerte.stundenlimit);
       const gewuenscht = aktuell + amount;
-      if (gewuenscht > BOOST_OBERGRENZE) {
+      if (gewuenscht > obergrenze) {
         return { limit: aktuell, aktuell, gewuenscht, abgelehnt: true, grund: "obergrenze" };
       }
       /* BIZ-2026-08-20-28: mit Ablaufdatum statt fuer immer. */
-      tx.set(ref, { limit: gewuenscht, limitBis: Date.now() + BOOST_FRIST_MS }, { merge: true });
-      return { limit: gewuenscht, abgelehnt: false, gueltigBis: Date.now() + BOOST_FRIST_MS };
+      tx.set(ref, { limit: gewuenscht, limitBis: Date.now() + fristMs }, { merge: true });
+      return { limit: gewuenscht, abgelehnt: false, gueltigBis: Date.now() + fristMs };
     });
   } catch (err) {
     console.error(
@@ -404,7 +556,7 @@ async function boostLimit(amount = 100) {
         error: "boost-obergrenze-erreicht",
         aktuell: ergebnis.aktuell,
         angefragt: ergebnis.gewuenscht,
-        obergrenze: BOOST_OBERGRENZE,
+        obergrenze,
         hinweis: "Boost abgelehnt. Haeufige Ablehnungen koennen auf einen abgeflossenen Boost-Link hindeuten.",
       })
     );
@@ -420,7 +572,8 @@ async function boostLimit(amount = 100) {
 async function resetCounter() {
   const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
-  await ref.set({ recentAnalyses: [], limit: HOURLY_LIMIT, limitBis: null }, { merge: true });
+  const { werte: sw } = await geltendeWerte();
+  await ref.set({ recentAnalyses: [], limit: sw.stundenlimit, limitBis: null }, { merge: true });
 }
 
 /**

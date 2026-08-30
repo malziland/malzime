@@ -4,7 +4,91 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [4.2.3] — 2026-08-30
+## [Unveröffentlicht]
+
+### Neu
+
+- **Die Betriebswerte stehen jetzt ausschließlich in der Datenbank.**
+  Zeitgrenzen, erlaubte Textmenge, Kapazität und Einlassgrenzen lagen bisher
+  fest im Programmcode. Eine Änderung — etwa als der KI-Anbieter Ende August
+  langsamer wurde — bedeutete eine vollständige Auslieferung von
+  fünfundzwanzig Minuten, mitten im laufenden Betrieb.
+
+  Jetzt liegen sie als benannte Sätze in der Datenbank, etwa `t1-normal` oder
+  `t2-schnell`. Umgestellt wird ein einziges Feld; alle zusammengehörigen
+  Werte ziehen mit und gelten binnen dreißig Sekunden.
+
+  **Ohne Rückfallwerte im Programm.** Die Werte stehen an genau einer Stelle,
+  nicht an zweien — sonst wüsste in einem Jahr niemand mehr, welche gilt.
+  Fehlt der Einstellungssatz oder ist er widersprüchlich, läuft keine Analyse,
+  und das System meldet den Grund im Klartext. Ein Konfigurationsfehler soll
+  auffallen, nicht monatelang unbemerkt bleiben.
+
+  **Die Kopplung bleibt gesichert:** Die erlaubte Textmenge muss weiterhin in
+  die erlaubte Zeit passen. Diese Rechnung läuft jetzt beim Laden des Satzes —
+  ein widersprüchlicher Satz wird abgelehnt, statt Analysen abbrechen zu
+  lassen. Genau der Ausfall vom 17. August kann so nicht mehr entstehen.
+
+- **Welche Einstellungen sich im Betrieb ändern lassen — und welche nicht.**
+  Das ist die wichtigste Unterscheidung dieses Umbaus, und sie ist bewusst
+  gezogen.
+
+  **Änderbar, ohne Auslieferung, wirksam binnen dreißig Sekunden** sind alle
+  Werte, die den Betrieb steuern: wie lange die KI rechnen darf, wie viel Text
+  sie ausgeben darf, wie viele Analysen gleichzeitig laufen, wie viele pro
+  Stunde erlaubt sind, wie tief die Warteschlange werden darf, wie lange
+  Aufträge liegen bleiben. Insgesamt sechsundzwanzig Werte, alle in einem
+  einzigen Dokument.
+
+  **Vier davon haben eine Obergrenze, die sich nicht überschreiten lässt** —
+  und zwar genau dort, wo die Datenschutzerklärung eine Zusage macht:
+
+  ```
+  Aufbewahrung eines Auftrags   höchstens  2 Stunden
+  Abholfenster für ein Ergebnis höchstens 15 Minuten
+  IP-Adresse im Speicher        höchstens 10 Minuten
+  Zeitfenster des Stundenlimits höchstens 60 Minuten
+  ```
+
+  Diese vier Fristen lassen sich **verkürzen, aber nie verlängern**. Der Grund
+  ist einfach: Auf der Website steht, dass wir uns eine IP-Adresse höchstens
+  zehn Minuten merken. Wäre der Wert frei einstellbar, könnte ein einziger
+  Tippfehler daraus zehn Stunden machen — und niemand würde es merken. Wer
+  eine dieser Grenzen anheben will, muss zuerst die Datenschutzerklärung
+  ändern. Das steht so im Programmcode.
+
+- **Was eine Zusage trägt, bleibt bewusst außerhalb der Datenbank.**
+  Nicht jede Zahl darf sich im Betrieb ändern lassen. Der EU-Endpunkt, die
+  EU-Datenbank, das benannte KI-Modell, die Obergrenze für Dateigrößen und die
+  gekürzten Feldlängen der Fehlerprotokolle stehen weiterhin fest im
+  Programmcode — und das ist kein Rest, sondern eine Sicherheitsgrenze.
+
+  Ein Wert in der Datenbank lässt sich in Sekunden ändern: ohne Auslieferung,
+  ohne Prüfung, ohne Spur im offenen Quelltext. Für eine Zeitgrenze ist das
+  genau richtig. Stünde dort der Endpunkt, könnte ein einziger Schreibzugriff
+  die Analyse still auf einen Server außerhalb der EU umlenken — während die
+  Website weiter dasselbe verspricht, der Quelltext auf GitHub unverändert
+  bleibt und die Prüfsummen unter `malzi.me/build-info.json` weiter stimmen.
+  Der Bruch wäre von außen nicht nachweisbar.
+
+  Deshalb: Alles, was eine Zusage an die Teilnehmenden trägt, muss den Weg
+  über Commit, Prüfkette und Veröffentlichung nehmen. Die Datenbank kann diese
+  Werte auch nicht versehentlich übernehmen — gelesen werden ausschließlich
+  die bekannten Zahlenfelder, alles andere im Dokument wird ignoriert.
+
+- **Eine neue Prüfung verhindert, dass Werte wieder doppelt entstehen.**
+  Sie geht vom Programmcode aus, nicht von der Liste der Einstellungen, und
+  verlangt für jede Zahl eine von zwei Antworten: Sie steht in der Datenbank —
+  dann darf sie im Code nicht noch einmal stehen. Oder sie trägt eine
+  ausgeschriebene Begründung, warum sie dort bleibt. Alles andere ist ein
+  Fund und hält die Auslieferung an. Die Prüfung läuft in der Pipeline und vor
+  jedem Push.
+
+- **Eine tägliche Prüfung meldet, wenn Einstellung und Wirklichkeit
+  auseinanderlaufen.** Die Zahl, wie viele Analysen gleichzeitig laufen
+  dürfen, steht auch in der Warteschlange bei Google. Stimmen beide nicht
+  überein, rechnet die Wartezeit-Ansage still falsch. Die Prüfung meldet die
+  Abweichung mit beiden Zahlen und dem Weg zur Abhilfe.
 
 ### Behoben
 
@@ -12,6 +96,53 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Fortschrittsbalken verschwanden auf dem Handy hinter der Adressleiste — man
   sah sein Foto, aber nicht, dass die Analyse läuft. Auf dem Desktop trat das
   nie auf, weil dort keine Leisten ein- und ausfahren.
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+## [4.2.3] — 2026-08-30
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
+### Geändert
+
+- **Jede Analyse protokolliert, mit welchen Werten sie lief.** Bei einem
+  Vorfall ist das die erste Frage. Wird ein Einstellungssatz abgelehnt,
+  erscheint der Grund als Fehler im Protokoll und löst die Alarmierung aus —
+  statt dass stillschweigend keine Analyse mehr läuft. Protokolliert werden
+  ausschließlich Zahlen und der selbstgewählte Name des Satzes.
+
+
 
   Zwei Ursachen, beide behoben: Die Prüfung, ob die Anzeige im Bild liegt,
   rechnete mit der Fensterhöhe — und die zählt auf dem iPhone die Leisten mit.
@@ -51,7 +182,117 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   untersuchbar; man konnte den Lauf nur wiederholen. Jetzt liegen Screenshot,
   Aufzeichnung und Fehlerkontext bei. Im grünen Fall entsteht nichts.
 
+
+
+### Neu
+
+- **Betriebswerte lassen sich als benannte Sätze umstellen, ohne Auslieferung.**
+  Bisher standen Zeitgrenzen, Parallelität und Einlassgrenzen fest im Code. Eine
+  Änderung — etwa beim Wechsel auf einen größeren Mistral-Tarif — bedeutete
+  fünf Stellen von Hand, ein Skript für Googles Warteschlange und eine
+  vollständige Auslieferung, mit der Hoffnung, nichts vergessen zu haben.
+
+  Jetzt liegt in der Datenbank ein Dokument mit vollständigen Sätzen, etwa
+  `t1-normal` oder `t2-normal`. Umgestellt wird ein einziges Feld: der Name des
+  aktiven Satzes. Alle zugehörigen Werte ziehen mit.
+
+  **Bewusst keine einzelnen Schalter.** Genau daran war der frühere Vorschlag
+  gescheitert: Er hätte die Kopplung zwischen Zeitgrenze und erlaubter
+  Textmenge aufgehoben — die Sicherung, die im August einen Ausfall verhindert
+  hat. Diese Rechnung läuft jetzt beim Laden. Ein Satz, der sie nicht besteht,
+  wird abgelehnt; es gelten die bisherigen Werte weiter. Damit ist die
+  Umstellung sicherer als der alte Zustand: Statt beim Start abzustürzen,
+  verwirft das System den falschen Wert und arbeitet mit den bewährten weiter.
+
+  Nicht umstellbar bleiben Upload-Grenze, Feldlängen der Fehlererfassung sowie
+  Modell und Serverstandort. Das sind Sicherheits- und Datenschutzzusagen —
+  zur Laufzeit umschaltbar wären sie Wege, eine Zusage unbemerkt zu brechen.
+
+- **Eine tägliche Prüfung meldet, wenn Code und Warteschlange auseinanderlaufen.**
+  Die Zahl, wie viele Analysen gleichzeitig laufen dürfen, existiert an zwei
+  Stellen: im Code und in Googles Warteschlange. Der Code rechnet damit die
+  Wartezeit aus, Google entscheidet, was tatsächlich passiert. Standen die
+  beiden auseinander, rechnete die Seite still falsch — entweder wurden mehr
+  Leute eingelassen als bedient werden konnten, oder es blieb Kapazität
+  ungenutzt.
+
+  Die Prüfung liest den echten Wert und meldet Abweichungen mit beiden Zahlen
+  und dem Weg zur Abhilfe. Sie stellt bewusst nichts selbst um: Googles
+  Warteschlange ist ein fremdes System, eine Änderung dort gehört durch die
+  Prüfkette, nicht in eine nächtliche Automatik.
+
+## [4.2.4] — 2026-08-30
+
+
+
+### Behoben
+
+- **Das Scan-Auge wird auf dem iPhone jetzt wirklich ins Bild geholt.** Die
+  Korrektur davor erkannte zwar richtig, dass die Adressleiste es verdeckt —
+  das Zurückholen selbst benutzte aber die eingebaute Browser-Funktion, und die
+  zentriert im Fenster einschließlich der Leiste. Der Browser scrollte also,
+  hielt es für erledigt, und das Auge blieb dahinter; danach unternahm die
+  Wache nichts mehr, weil sie ihren Versuch als abgeschlossen verbucht hatte.
+
+  Die Zielposition wird jetzt selbst gerechnet, bezogen auf die tatsächlich
+  sichtbare Fläche. Nachgestellt mit echtem Upload bei Handy-Maßen: vorher
+  fünfundfünfzig Bildpunkte verdeckt und keine Bewegung, nachher vollständig
+  im Bild.
+
+## [4.2.3] — 2026-08-30
+
+
+
+### Behoben
+
+- **Am iPhone wird das Scan-Auge nicht mehr von der Adressleiste verdeckt.**
+  Die Seite prüfte, ob das Auge im Fenster liegt — und rechnete dabei mit einer
+  Fensterhöhe, die auf dem iPhone die eingeblendete Adress- und Werkzeugleiste
+  mitzählt. Für die Rechnung lag das Auge damit im Bild, für den Betrachter
+  hinter der Leiste; nachgeholt wurde es deshalb nie. Auf dem Desktop
+  funktionierte dasselbe einwandfrei, weil dort keine Leisten ein- und
+  ausfahren. Gemessen wird jetzt die tatsächlich sichtbare Fläche, die sich
+  mitverändert, wenn die Leisten erscheinen oder verschwinden.
+
+
+### Neu
+
+- **Betriebswerte lassen sich als benannte Sätze umstellen, ohne Auslieferung.**
+  Zeitgrenzen und Kapazität standen bisher fest im Code. Eine Änderung — etwa
+  beim Wechsel auf einen größeren Tarif oder wenn der KI-Anbieter langsamer
+  wird — bedeutete mehrere Stellen von Hand und eine vollständige Auslieferung.
+  Am 28. August kostete das Hochsetzen einer einzigen Zahl fünfundzwanzig
+  Minuten, mitten im Vorfall.
+
+  Jetzt liegt in der Datenbank ein Dokument mit vollständigen Sätzen. Umgestellt
+  wird ein einziges Feld; alle zugehörigen Werte ziehen mit, ohne Deploy.
+
+  **Bewusst keine einzelnen Schalter.** Genau daran war der frühere Vorschlag
+  gescheitert: Er hätte die Kopplung zwischen Zeitgrenze und erlaubter
+  Textmenge aufgehoben — die Sicherung, die im August einen Ausfall verhindert
+  hat. Diese Rechnung läuft jetzt beim Laden. Ein Satz, der sie nicht besteht,
+  wird abgelehnt; es gelten die bisherigen Werte weiter. Damit ist die
+  Umstellung sicherer als vorher: Statt beim Start abzustürzen, verwirft das
+  System den falschen Wert und arbeitet mit den bewährten weiter.
+
+  Nicht umstellbar bleiben Upload-Grenze, Feldlängen der Fehlererfassung sowie
+  Modell und Serverstandort — das sind Sicherheits- und Datenschutzzusagen.
+  Einzelheiten in `docs/BETRIEBSPROFILE.md`.
+
+- **Eine tägliche Prüfung meldet, wenn Code und Warteschlange auseinanderlaufen.**
+  Die Zahl, wie viele Analysen gleichzeitig laufen dürfen, existiert an zwei
+  Stellen: im Code und in der Warteschlange bei Google. Der Code rechnet damit
+  die Wartezeit aus, Google entscheidet, was tatsächlich passiert. Standen die
+  beiden auseinander, rechnete die Seite still falsch — entweder wurden mehr
+  Leute eingelassen als bedient werden konnten, oder Kapazität blieb ungenutzt.
+
+  Die Prüfung meldet Abweichungen mit beiden Zahlen und dem Weg zur Abhilfe.
+  Sie stellt bewusst nichts selbst um: Die Warteschlange ist ein fremdes
+  System, eine Änderung dort gehört durch die Prüfkette.
+
 ## [4.2.2] — 2026-08-30
+
+
 
 ### Behoben
 
@@ -73,6 +314,46 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [4.2.1] — 2026-08-29
 
+
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Das automatische Mitscrollen verhält sich in allen Modi gleich.** Bisher
@@ -93,6 +374,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   dem Off.
 
 ## [4.2.0] — 2026-08-29
+
+
 
 ### Neu
 
@@ -121,6 +404,44 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   ein Vergleich des Systems mit sich selbst nicht. Damit fällt eine schleichende
   Verschlechterung auf, bevor Rückmeldungen kommen.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Die Wartezeit-Ansage rechnet mit der tatsächlichen Dauer der letzten
@@ -137,6 +458,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [4.1.2] — 2026-08-28
 
+
+
 ### Behoben
 
 - **Bricht eine Analyse an der Zeitgrenze ab, geht das bereits Geschriebene
@@ -149,6 +472,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   alles wie bisher.
 
 ## [4.1.1] — 2026-08-28
+
+
 
 ### Behoben
 
@@ -167,6 +492,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [4.1.0] — 2026-08-23
 
+
+
 ### Neu
 
 - **Eine Kurzvorstellung erklärt malziME auf einer eigenen Seite.** Deutsch unter
@@ -184,6 +511,44 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   mit der Wortmarke in der Markenfarbe, damit die beiden inhaltlichen Einträge
   zwischen den Rechtsseiten auffallen.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Die Barrierefreiheitserklärung nennt 82 statt 70 geprüfte Zustände.** Die
@@ -191,6 +556,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   in Erklärung, Prüfbericht und Prüfprotokoll auf den 23. August 2026 gezogen.
 
 ## [4.0.1] — 2026-08-21
+
+
 
 ### Behoben
 
@@ -236,6 +603,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Fehlermeldungen in keiner einzigen Prüfung vor.
 
 ## [4.0.0] — 2026-08-21
+
+
 
 Ein Lang-Audit hat das Projekt in der Nacht auf den 21. August durchleuchtet:
 14 Prüfer entlang getrennter Fragen, jeder Verdacht danach von einem eigenen
@@ -375,6 +744,44 @@ Aussagen, die nicht mehr zum Code passten.
   heute mit den aktiven überein (nachgemessen); ab jetzt gehören sie zur
   Auslieferung.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Die Beschreibung des Schutzes „HSTS" ist ehrlicher.** Die Seite erzwingt
@@ -397,6 +804,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.9.1] — 2026-08-19
 
+
+
 ### Hinzugefügt
 
 - **Die Fußzeile verweist wieder auf malziland.at.** Der Verweis war seit dem
@@ -404,6 +813,44 @@ Aussagen, die nicht mehr zum Code passten.
   Baustelle schadet mehr, als er nutzt. Sie ist wieder erreichbar, also ist er
   wieder da: auf allen zehn Seiten, in einem neuen Tab, mit der Tastatur
   erreichbar.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -448,6 +895,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.9.0] — 2026-08-19
 
+
+
 ### Hinzugefügt
 
 - **Der Umschalter meldet sich einmal, wenn das Profil fertig ist.** Die Pille
@@ -462,6 +911,44 @@ Aussagen, die nicht mehr zum Code passten.
   Abbruch, und gar nicht, wenn der Schalter schon bedient wurde. Wer am Gerät
   Animationen abgeschaltet hat, sieht statt der Bewegung ein ruhiges Auf- und
   Abblenden. Nichts davon wird gespeichert.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -527,6 +1014,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.8.1] — 2026-08-19
 
+
+
 ### Behoben
 
 - **Das Logo aktualisierte sich im Browser nicht.** Die Verweise auf Favicon,
@@ -546,6 +1035,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.8.0] — 2026-08-19
 
+
+
 ### Hinzugefügt
 
 - **Die Wortmarke steht jetzt auf jeder Seite.** Oben links, daneben rechts der
@@ -559,6 +1050,44 @@ Aussagen, die nicht mehr zum Code passten.
   Was dabei nicht geht und immer wieder vermutet wird: Die Tab-_Leiste_ kann
   eine Website nicht einfärben — der Streifen gehört dem Browser. Nur Safari
   auf dem Mac folgt der Seitenfarbe.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -575,6 +1104,8 @@ Aussagen, die nicht mehr zum Code passten.
   oben. Er liegt jetzt an der Überschrift selbst, die immer vorhanden ist.
 
 ## [3.7.0] — 2026-08-19
+
+
 
 ### Hinzugefügt
 
@@ -597,6 +1128,44 @@ Aussagen, die nicht mehr zum Code passten.
   stand dort ein Hinweis „Diese Seite gibt es nur auf Deutsch" — seit es die
   Übersetzung gibt, war das eine Falschaussage.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Die Barrierefreiheits-Prüfung umfasst jetzt zehn Seiten statt sechs.**
@@ -618,6 +1187,8 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.6.2] — 2026-08-19
 
+
+
 ### Behoben
 
 - **Auf iPhones scheiterte das Hochladen ab dem zweiten Bild.** Das erste Foto
@@ -636,6 +1207,46 @@ Aussagen, die nicht mehr zum Code passten.
   Drei Tests halten den Fall fest; ohne die Behebung sind sie rot.
 
 ## [3.6.1] — 2026-08-18
+
+
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -668,6 +1279,8 @@ Aussagen, die nicht mehr zum Code passten.
   Dazu ein Wächter, der festhält, was nach dem Abbrechen gelten muss.
 
 ## [3.6.0] — 2026-08-18
+
+
 
 ### Hinzugefügt
 
@@ -702,6 +1315,8 @@ Aussagen, die nicht mehr zum Code passten.
   Detailteil korrigiert.
 
 ## [3.5.0] — 2026-08-18
+
+
 
 ### Behoben
 
@@ -765,6 +1380,46 @@ Aussagen, die nicht mehr zum Code passten.
 
 ## [3.4.1] — 2026-08-18
 
+
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Die Barrierefreiheitserklärung lädt jetzt ein, statt sich zu entschuldigen.**
@@ -782,6 +1437,8 @@ Aussagen, die nicht mehr zum Code passten.
   (Open Source, Projektunterstützung). Sie war die einzige Seite ohne.
 
 ## [3.4.0] — 2026-08-18
+
+
 
 Barrierefreiheit: geprüft nach der Methodik des W3C, sechs Mängel behoben.
 
@@ -866,6 +1523,8 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
 
 ## [3.3.2] — 2026-08-17
 
+
+
 ### Hinzugefügt
 
 - **Barrierefreiheitserklärung unter `/barrierefreiheit`.** malziME ist gegen
@@ -934,6 +1593,44 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   englisch) und ein Eintrag im bestehenden Wasserzeichen-Filter, der bisher nur
   fremde Stockfoto-Wasserzeichen kannte.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Der Wächter für Barrierefreiheit sah einen ganzen Bildschirmteil nicht.**
@@ -946,6 +1643,8 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   niemand vergleicht, driften gemeinsam ab; jetzt fragt der Test das Dateisystem.
 
 ## [3.3.1] — 2026-08-17
+
+
 
 ### Hinzugefügt
 
@@ -998,6 +1697,44 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   das Skript nicht kennt. Ohne ihn würde es beim ersten neuen CI-Schritt zur
   Beruhigungspille — „alles grün" für etwas, das es nicht mehr prüft. Jede
   bewusste Auslassung braucht eine Begründung, auch das prüft ein Test.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -1164,6 +1901,8 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   geräteweit und dauerhaft. Mit dem Rückbau ist auch diese Abweichung weg.
 
 ## [3.3.0] — 2026-08-13
+
+
 
 **Der Sprachumschalter — sichtbar.**
 
@@ -1333,6 +2072,8 @@ hatte.
 
 ## [3.2.0] — 2026-08-13
 
+
+
 **Der Kurzaudit und das zweite TIEF-Audit — restlos saniert.**
 
 Am selben Tag zwei Prüfungen: zuerst ein Kurzaudit der frischen Nachtarbeit, dann
@@ -1451,6 +2192,8 @@ Der vollständige Auditbericht mit allen Befunden liegt unter `docs/audit/`
 (bewusst nicht im öffentlichen Repository).
 
 ## [3.1.0] — 2026-08-13
+
+
 
 **Das TIEF-Audit und seine Sanierung.**
 
@@ -1740,6 +2483,8 @@ fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als
 
 ## [3.0.6] — 2026-08-12
 
+
+
 **Erinnerung an die ZDR-Nachprüfung — und die Ursache für ausbleibende
 Handy-Mitteilungen:**
 
@@ -1766,6 +2511,8 @@ Handy-Mitteilungen:**
   senden erlaubt, anonymes Mitlesen gesperrt — ist unverändert und geprüft.
 
 ## [3.0.5] — 2026-08-12
+
+
 
 **Qualitäts-Zug „Richtung 100" (Konzept vom 2026-08-12; ohne Änderung am
 Nutzerpfad):**
@@ -1796,6 +2543,8 @@ Nutzerpfad):**
 
 ## [3.0.4] — 2026-08-12
 
+
+
 **Wartungszug aus der externen Code-Review (Codex, 2026-08-12; drei Punkte im
 Konsens beider Prüfungen):**
 
@@ -1823,6 +2572,8 @@ Konsens beider Prüfungen):**
 
 ## [3.0.3] — 2026-08-11
 
+
+
 **Wording-Korrektur:** „Privat finanziert" heißt jetzt überall
 **„eigenfinanziert"** (Statistik-Seite, Stundenlimit-Banner, Deutsch und
 Englisch). Grund: Die Kosten trägt laut Impressum das Unternehmen
@@ -1831,6 +2582,8 @@ angreifbar, „eigenfinanziert" ist es nicht. An Kostenlosigkeit,
 Werbefreiheit und Tracking-Freiheit ändert sich selbstverständlich nichts.
 
 ## [3.0.2] — 2026-08-11
+
+
 
 Sanierung nach dem Kurzaudit des v3-Tags (unabhängige Prüfung von Code und
 Infrastruktur, Prüfstand 79ec393). Kein neues Feature — vier Härtungen und
@@ -1879,6 +2632,8 @@ etwas Feinschliff:
   30 Tage statt 1 Tag in den anonymen Diagnose-Speicher.
 
 ## [3.0.1] — 2026-08-11
+
+
 
 Feinschliff-Sammlung nach den Live-Tests des v3.0-Starts — Dramaturgie,
 Blick-Führung und eine deutliche Datenschutz-Härtung:
@@ -1931,6 +2686,8 @@ und Mistral-Verträgen)**
   Mistral-Zusagen stehen wörtlich drin.
 
 ## [3.0.0] — 2026-08-11
+
+
 
 v3.0 — Das Live-Erlebnis.
 
@@ -2002,6 +2759,8 @@ Seite wie früher bis zum fertigen Ergebnis. Testumfang jetzt 697 / 280 / 17.
 
 ## [2.12.3] — 2026-08-11
 
+
+
 Sanierung nach dem Kurzaudit vom selben Tag (kein Blocker, ein mittlerer und
 acht kleine Befunde) plus zwei bewusste Entscheidungen.
 
@@ -2060,6 +2819,8 @@ statt Alarm).
 
 ## [2.12.2] — 2026-08-11
 
+
+
 Eine Wache gegen einen Fehler, den bisher niemand sehen konnte.
 
 ### Der Anlass
@@ -2106,6 +2867,8 @@ Frontend 219 Tests, E2E 12.
 
 ## [2.12.1] — 2026-08-11
 
+
+
 Der Beast Mode überlebt jetzt ein Neuladen.
 
 ### Behoben
@@ -2143,6 +2906,8 @@ Frontend 209 Tests, E2E 12.
 
 ## [2.12.0] — 2026-08-11
 
+
+
 **Die Datenbank läuft ab jetzt in Europa.** Damit stimmt die Zusage der
 Datenschutzerklärung erstmals auch für die Datenbank — und das Projekt hat
 keinen Speicherort mehr ausserhalb der EU.
@@ -2174,6 +2939,8 @@ Nicht behauptet, sondern gemessen — Ablauf in
 Backend 618 Tests grün.
 
 ## [2.11.2] — 2026-08-11
+
+
 
 Vorbereitung des Umzugs **der Datenbank** nach Europa. **Ändert das Verhalten
 nicht** — der Schalter steht weiterhin auf der alten Datenbank.
@@ -2253,6 +3020,8 @@ des Repos gesichert.
 
 ## [2.11.1] — 2026-08-11
 
+
+
 Drei Fehler, die in der Browser-Konsole sichtbar waren, plus der echte Fehler
 dahinter. Im laufenden Betrieb aufgefallen.
 
@@ -2307,6 +3076,8 @@ schien.
 - `api.malzi.me` ist vollständig abgebaut (DNS und Cloud-Run-Zuordnung).
 
 ## [2.11.0] — 2026-08-11
+
+
 
 Sanierung des LANGAUDIT vom 2026-08-10 (Bericht wird nicht veröffentlicht).
 **36 der 38 Befunde geschlossen**, jeder mit einer Prüfung dahinter und einer
@@ -2374,6 +3145,44 @@ Audits sind.
   löschte das Job-Dokument samt Bildpfad, ohne das Bild selbst anzufassen.
 - **Die englischen Fehlermeldungen nannten „Google's safety filters".** Seit
   v1.6 läuft ausschließlich Mistral.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2456,6 +3265,8 @@ Audits sind.
 
 ## [2.10.0] — 2026-08-10
 
+
+
 ### Entfernt
 
 - **Der synchrone `/analyze`-Pfad ist abgebaut.** Der alte Weg vor der Warteschlange: Browser schickt das Bild, hält die Verbindung 30 bis 60 Sekunden offen, wartet auf die Antwort. Seit Mai 2026 trägt die Warteschlange jeden Upload; der synchrone Weg war nur noch Rückfall über ein Feature-Flag.
@@ -2468,11 +3279,89 @@ Audits sind.
 
   **Übergang für alte Clients:** `/api/stats` meldet weiterhin `useQueue: true`. Wer die Seite aus dem Zwischenspeicher lädt, prüft dieses Feld und würde ohne es auf einen Weg fallen, den es nicht mehr gibt. Kann in einigen Wochen ersatzlos weg.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Dokumentation auf den aktuellen Stand gebracht.** Dreiunddreißig Stellen in zehn Dateien beschrieben noch den synchronen Pfad als aktiven oder rückfallfähigen Weg — README (Schnittstellen-Beschreibung), ARCHITECTURE, FLAGS, RUNBOOK, SETUP, SELF-HOSTING, VERIFICATION, QUEUE-EMULATOR, CONTRIBUTING und AGENTS. In `FLAGS.md` ist damit auch das dort notierte Entfernungs-Kriterium erfüllt und abgehakt.
 
 ## [2.9.2] — 2026-08-10
+
+
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2484,6 +3373,8 @@ Audits sind.
 
 ## [2.9.1] — 2026-08-10
 
+
+
 ### Behoben
 
 - **Das Foto verschwand, wenn die Analyse aus dem Hintergrund zurückkam.** An seiner Stelle stand der Hinweis „Foto gelöscht" — obwohl gar kein Neuladen stattgefunden hatte. Die Wiederaufnahme war ursprünglich nur für den Reload-Fall gebaut, wo das Foto tatsächlich weg ist, und setzte den Hinweis unbesehen. Kommt die Seite dagegen aus dem Hintergrund zurück, lief sie durchgehend und das Bild steht noch im Fenster. Der Hinweis erscheint jetzt nur noch, wenn wirklich kein Foto mehr da ist.
@@ -2491,6 +3382,8 @@ Audits sind.
   Datenschutzrechtlich ändert das nichts: Gespeichert wird nach wie vor nirgends etwas, weder im Browser noch serverseitig. Es wird lediglich nicht weggeworfen, was ohnehin schon angezeigt wird. (+2 Tests, Mutationsprobe bestanden)
 
 ## [2.9.0] — 2026-08-10
+
+
 
 ### Hinzugefügt
 
@@ -2545,11 +3438,15 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.8.1] — 2026-08-10
 
+
+
 ### Behoben
 
 - **Umschalten ganz oben auf der Seite sprang zur Ergebnisliste.** Stand man bei der Überschrift und wechselte den Modus, scrollte die Seite nach unten und die Überschrift verschwand — der Einstieg begann plötzlich bei der Foto-Auswahl. Ursache war der Scroll-Anker aus v2.6.0: Er suchte die erste Karte, die unter der geklebten Leiste hervorschaut, und fand dabei auch Karten, die noch gar nicht im Bild waren. Beim Umschalten wurde dann dorthin gescrollt. Jetzt muss die Ankerkarte zusätzlich **innerhalb des Bildschirms beginnen** — steht keine Karte im Bild, ist man nicht in der Liste und es gibt nichts zu verankern. (`public/js/sticky-toggle.js`, +2 Unit-Tests, +1 E2E-Test, Mutationsprobe bestanden)
 
 ## [2.8.0] — 2026-08-10
+
+
 
 ### Hinzugefügt
 
@@ -2588,6 +3485,46 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.7.0] — 2026-08-09
 
+
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Beast Mode zeigt jetzt eigene Werbung.** Bisher landete EINE Werbeliste in beiden Modi (`mistral.js`, `ad_targeting: ads`) — der Beast-Text war zynisch und ausbeutend, die Werbung darunter dieselbe brave Liste wie im Standard. Das entwertete genau den Moment, auf den das Tool didaktisch hinarbeitet. Jetzt liefert das Modell **zwei getrennte Listen**: Standard zeigt, was zum sichtbaren Lebensstil passt, Beast zeigt, was die im Beast-Profil benannte Schwachstelle ausbeutet (Abo-Fallen, Ratenzahlung, Statusprodukte über Budget, bei Kindern Sammelzwang- und Quengel-Mechaniken). **Gemessen an 84 Analysen: Marken-Überlappung zwischen den Modi 100 % → 2,8 %, Produkt-Überlappung 100 % → 0,0 %.** Beispiel (14-jähriges Mädchen): Standard „Puma × Stranger Things, Converse Run Star Hike, Spotify Premium Student" — Beast „Zalando Lounge Abo, ASOS Premier Membership, Boohoo Trend-Abo, Wish Mystery Beauty Box". (`locales/de/prompts.js`, `locales/en/prompts.js`, `mistral.js`)
@@ -2609,6 +3546,8 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.6.0] — 2026-08-09
 
+
+
 ### Hinzugefügt
 
 - **Sticky-Umschalter zwischen „Seriöse Analyse" und „Beast Mode".** Sobald ein Ergebnis vorliegt, bleibt der Umschalter beim Scrollen oben stehen. Grund ist didaktisch, nicht bequemlichkeitshalber: Der Vergleich derselben Karte in beiden Modi ist der Kern des Tools, bisher musste man dafür hoch, umschalten, wieder runter und die Karte neu suchen. Umgesetzt als **Positionswechsel des bestehenden Schalters** (`position: sticky`), bewusst NICHT als zweite Leiste — ein Duplikat hätte einen zweiten Tab-Stopp erzeugt (der Tastatur-E2E-Test ist CI-Pflicht) und die `position: fixed`-Tooltips ein zweites Mal ausrichten müssen. Auf der Startseite klebt nichts: gesteuert über `html[data-has-result]`, das `renderCurrentMode` nur bei vollständigem Ergebnis setzt. (`public/js/sticky-toggle.js` neu, `public/styles.css`, `public/app.js`, `public/js/render.js`, `public/js/api.js`)
@@ -2627,6 +3566,8 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.5.2] — 2026-08-08
 
+
+
 ### Behoben
 
 - **`npm audit` wieder 0/0 in beiden Projekten** (Stand seit v2.4.2, war durch neue Advisories gekippt). Im Root fehlte noch dieselbe `brace-expansion`-Lücke wie in `functions/` — ebenfalls reine Entwicklungskette (`eslint → minimatch`), Root hat gar keine Produktiv-Abhängigkeiten. Behoben mit `overrides.brace-expansion: ^5.0.9` in der Wurzel (dort bisher keine overrides; **Rückbau-Bedingung identisch:** entfällt, sobald `eslint`/`minimatch` von sich aus ≥ 5.0.9 ziehen). Frontend-Tests 165 grün. (`package.json`, `package-lock.json`)
@@ -2634,11 +3575,15 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 ## [2.5.1] — 2026-08-08
 
+
+
 ### Behoben
 
 - **Audit-Gate wieder grün** (`main` war nach dem v2.5.0-Push rot). Ursache war kein Fehler in v2.5.0, sondern ein neu veröffentlichtes Advisory: `brace-expansion` < 5.0.9 (GHSA-rgw5-rvv9-x895, high, DoS). Das Paket kommt rein über die Entwicklungskette `eslint → minimatch → brace-expansion` und läuft **nie** in Produktion — `npm audit --omit=dev` filtert transitive Dev-Abhängigkeiten aber nicht zuverlässig heraus, deshalb schlug das Gate an. Behoben mit `overrides.brace-expansion: ^5.0.9` (der zulässige Bereich von `minimatch@10.2.5` ist `^5.0.5`, `npm update` hob es nur nicht von selbst). Keine Allowlist-Ausnahme, weil eine reparierte Version existiert. **Rückbau-Bedingung:** entfällt, sobald `eslint`/`minimatch` von sich aus ≥ 5.0.9 ziehen — damit jetzt 6 overrides in `functions/package.json`. Lockfile-Falle geprüft: `npm ci --dry-run` in Root und `functions/` je exit 0, optionale Einträge (`@emnapi/*`) unverändert. (`functions/package.json`, `functions/package-lock.json`)
 
 ## [2.5.0] — 2026-08-08
+
+
 
 Kostensenkung im Live-Pfad: Prompt-Caching bei Mistral, gemessen statt geschätzt.
 
@@ -2663,6 +3608,8 @@ Kostensenkung im Live-Pfad: Prompt-Caching bei Mistral, gemessen statt geschätz
 
 ## [2.4.4] — 2026-07-29
 
+
+
 Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu lassen.
 
 ### Behoben
@@ -2675,6 +3622,44 @@ Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu l
   - **Warum das nötig war:** Alle übrigen Backend-Tests ersetzen `onRequest` durch eine Attrappe und überspringen die Express-Schicht komplett. Beim Sprung Express 4 → 5 konnte deshalb **kein einziger** der 439 Tests eine Regression dort bemerken; die Prüfung lief über einen Wegwerf-Prüfstand.
   - **Gegenprobe gemacht:** Ohne die `rawBody`-Reparatur fallen genau 3 der 12 neuen Tests durch — der Test misst also wirklich etwas.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Auto-Merge schließt Backend-Produktivpakete aus.** Neu zusätzlich zur patch/minor-Regel: PRs in `/functions` mit `dependency-type: direct:production` laufen **nicht** mehr automatisch durch. Anlass ist der Vorfall aus v2.4.3 — Sammel-PR #58 war als `minor` etikettiert (`firebase-functions` 7.2.5 → 7.3.2), transportierte darin aber Express 4 → 5. Die update-type-Prüfung sieht nur das Etikett des äußeren Pakets, nicht den Lockfile darunter. Backend-**Werkzeuge** (eslint, prettier, jest) laufen weiterhin ohne Zutun durch; dafür trennt `dependabot.yml` die Bündel jetzt in `backend-werkzeuge` und `backend-produktiv`. (`.github/workflows/dependabot-automerge.yml`, `.github/dependabot.yml`)
@@ -2685,7 +3670,47 @@ Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu l
 
 ## [2.4.3] — 2026-07-29
 
+
+
 Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst erzeugt hat — gebündelt statt einzeln, und einer davon vollständig ohne Zutun durchgelaufen. Der Backend-Anteil enthält einen Major-Sprung im Innenleben (Express 4 → 5), der bewusst geprüft statt automatisch durchgewunken wurde.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2713,6 +3738,8 @@ Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst er
 
 ## [2.4.2] — 2026-07-29
 
+
+
 Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft. Ausgangspunkt war die Beobachtung, dass laufend Dependabot-Mails eintrudeln: Ursache war nicht Dependabot selbst, sondern zwei dauerhaft rote CI-Tore, an denen jeder Update-PR hängenblieb — die Auto-Merge-Automatik funktionierte, kam aber nie zum Zug.
 
 ### Behoben
@@ -2727,6 +3754,44 @@ Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft.
     - Die verbleibende Instanz unter `eslint` (`minimatch@10.2.5` → `brace-expansion@5.0.7`) brauchte keine Übersteuerung — 5.0.8 liegt in deren erlaubtem Bereich.
   - **Produktiv-Oberfläche bewusst unangetastet:** `firebase-functions` (7.2.5), `firebase-admin` (14.1.0), `express` (4.22.2), `google-gax` (5.0.7) und die `@google-cloud/*`-Pakete bleiben exakt auf dem Live-Stand. Ein vollständiger Lockfile-Neuaufbau hätte nebenbei `firebase-functions` 7.3.2 und damit **Express 4 → 5** in den Produktiv-Backend gezogen — eine Verhaltensänderung, die in einen bewusst freigegebenen eigenen Schritt gehört und nicht als Nebenwirkung hier hinein. Stattdessen minimal-invasiv: `npm install` gegen das bestehende Lockfile (ändert nur, was die Übersteuerungen erzwingen) plus gezielte Handkorrektur der drei Versionseinträge.
   - **macOS-Lockfile-Falle erneut bestätigt und diesmal sauber umschifft:** `npm audit fix`, `npm update --package-lock-only` _und_ `npm install` schneiden auf macOS die optionalen Einträge `@emnapi/core`, `@emnapi/runtime` und `@pkgjs/parseargs` aus dem Lockfile — die Linux-CI bricht daraufhin mit `npm ci`-EUSAGE ab (genau so geschehen im ersten Anlauf dieses Zweigs). Die Einträge wurden nach dem Eingriff gezielt zurückgeschrieben. **Verlässliche Vorabprüfung ist `npm ci --dry-run`** — reproduziert den CI-Fehler lokal; eine Textsuche nach „linux" im Lockfile tut das nicht (die betroffenen Pakete tragen kein „linux" im Namen). (`package.json`, `functions/package.json`, beide Lockfiles)
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2743,6 +3808,8 @@ Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft.
 
 ## [2.4.1] — 2026-07-17
 
+
+
 Visueller Feinschliff: Der Datenschutz-Link im neuen Upload-Hinweis (2.4.0) erschien im Browser-Standardblau statt in der Markenfarbe.
 
 ### Behoben
@@ -2750,6 +3817,8 @@ Visueller Feinschliff: Der Datenschutz-Link im neuen Upload-Hinweis (2.4.0) ersc
 - **Datenschutz-Link im Upload-Hinweis in CI-Petrol** (`var(--teal-text)`) statt Browser-Blau — konsistent mit den übrigen Inline-Links (Rechtstexte, Footer). Umgesetzt über den Kontext-Selektor `.disclaimer__workshop a` (`public/styles.css`); HTML und Sprachdateien unverändert. Cache-Buster 2026071703.
 
 ## [2.4.0] — 2026-07-17
+
+
 
 Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v2.3.4, Multi-Agent, read-only): drei Robustheits-Lücken im Queue-Pfad geschlossen, Diagnose-Daten weiter anonymisiert, eine latente Secret-Falle entschärft, die CI gehärtet und die gesamte Doku auf den tatsächlichen Live-Stand gebracht. Keine Verhaltensänderung im Normalpfad — der Live-Betrieb (u. a. das globale Stundenlimit von 500/h) lief durchgehend stabil weiter.
 
@@ -2759,6 +3828,44 @@ Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v
 - **Reaper/Worker-Race:** Reaper und Worker löschten das zwischengespeicherte Bild auch dann, wenn ihr `abandonJob`-Übergang das Race verloren hatte (Job inzwischen von einem Worker geclaimt) — der laufende Job fand sein Bild nicht mehr und endete als `blocked.apiError`. Aufräumen (Bild + Stunden-Slot) passiert jetzt nur noch nach **erfolgreichem** Statusübergang (`handle-reap.js`, `handle-process-job.js`; je ein neuer Race-Test).
 - **Stunden-Slot-Leck im Enqueue-Fehlerpfad:** Scheiterte `storeImage`/`createJob` NACH dem Ziehen des Stunden-Slots, blieb der Slot bis zu 60 min belegt und ein ggf. schon abgelegtes Bild bis zur 1-Tag-Lifecycle-Regel liegen. Jetzt wird analog zum bestehenden `enqueueJob`-Fehlerpfad aufgeräumt (Slot zurück + Bild weg, neuer Fehlercode `store_failed`; zwei neue Tests).
 - **Queue-Fetches ohne Timeout:** `enqueue`- und Poll-Fetch konnten bei nie settelnden Verbindungen (Mobilfunk-Blackhole) den Wartefluss einfrieren — der Sync-Pfad hatte längst einen Timeout. Jetzt `fetchWithTimeout` (Enqueue 90 s, Poll 30 s; Client gibt nie vor dem Server auf, Timeouts laufen in die bestehende 5-Fehler-Toleranz).
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2786,6 +3893,8 @@ Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v
 
 ## [2.3.4] — 2026-07-16
 
+
+
 Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar mit malziland und Christoph Krieger verknüpft — an der sichtbaren Seite ändert sich nichts. Bewusst KEIN Link auf malziland.at (Seite im Relaunch, Stand 2026-07-16). Nur-Hosting-Deploy, keine Funktionsänderung.
 
 ### Hinzugefügt
@@ -2795,6 +3904,44 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
 - **Urheber in den strukturierten Daten der Startseite:** Christoph Krieger als `creator` und als Gründer der Betreiber-Organisation, Verweis aufs GitHub-Repository (`sameAs`); Autor-Meta-Tag nennt jetzt Person + Firma. (`public/index.html`)
 - **Alternativtexte fürs Teilen-Vorschaubild** (`og:image:alt`, `twitter:image:alt`). (`public/index.html`)
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Impressum-Seitentitel korrigiert:** nannte bisher eine nicht existierende Kurz-Firmierung — jetzt „Impressum — malziME by malziland". Die Firma heißt überall vollständig „malziland - learning | training | consulting e.U." (Schreibweise laut Impressum). (`public/impressum.html`)
@@ -2803,7 +3950,47 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
 
 ## [2.3.3] — 2026-07-14
 
+
+
 Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten) axe-Hinweise behoben und der Tastatur-Durchlauf als dauerhafter Test verankert — der Wächter meldet jetzt **null Funde über alle Schweregrade**. Nur-Hosting-Deploy. 165 Frontend- + 435 Backend-Tests, 5 E2E, Lint und Format grün.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2816,7 +4003,47 @@ Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten
 
 ## [2.3.2] — 2026-07-14
 
+
+
 Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus Governance-Nachrüstung (Phasen 1–3: Betriebs-Doku, Verifikationsmatrix, A11y-Gate, Sammel-Scripts). Nur-Hosting-Deploy — Functions unberührt. 165 Frontend- + 435 Backend-Tests, 4 E2E (A11y-Gate ohne Ausnahmen), Lint und Format grün.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2835,7 +4062,47 @@ Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus 
 
 ## [2.3.1] — 2026-07-13
 
+
+
 Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teilen-Bild, README-Screenshots) plus ein Sicherheitsupdate im Backend. Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2847,7 +4114,47 @@ Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teile
 
 ## [2.3.0] — 2026-07-13
 
+
+
 Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2869,17 +4176,59 @@ Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleit
 
 ## [2.2.8] — 2026-07-06
 
+
+
 Reaktion auf den Workshop-Vorfall vom selben Vormittag: Foto-Einlesen abgehärtet, irreführende Fehlermeldung ersetzt, Fehler-Diagnose erweitert und anonyme Diagnose-Logs 30 Tage aufbewahrt (bisher war jede Häufigkeits-Analyse nach 1 Tag blind). Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests grün.
 
 ### Behoben
 
 - **„Dieses Bild konnte nicht geöffnet werden" auf einzelnen Android-Handys — Foto-Einlesen grundlegend robuster gemacht (Workshop-Vorfall 2026-07-06).** Manche Geräte übergeben der Webseite eine Foto-Referenz, deren Inhalt der Browser gar nicht lesen kann (z.&nbsp;B. nach Speicherdruck, bei Cloud-only-Fotos oder defekter Galerie-App) — dann scheiterte bisher erst der Bild-Decoder, und die Fehlermeldung riet fälschlich zu „JPEG oder PNG", was betroffenen Nutzern nicht helfen konnte (auch ein Screenshot scheiterte identisch). Drei Änderungen: (1)&nbsp;Das Foto wird jetzt sofort nach der Auswahl einmal komplett in den Speicher der Seite kopiert, mit automatischem zweitem Versuch — alle weiteren Schritte (EXIF, Verkleinern) arbeiten auf dieser Kopie, die nicht mehr kaputtgehen kann; ein Teil der Fälle (kurzzeitige Aussetzer des Geräts) wird damit ganz verhindert. (2)&nbsp;Kann das Gerät die Datei endgültig nicht liefern, kommt eine ehrliche, eigene Fehlermeldung mit Tipps, die wirklich helfen (Browser neu starten, Speicherplatz prüfen, Foto lokal speichern, anderes Gerät) statt des irreführenden Format-Hinweises — zweisprachig DE/EN. (3)&nbsp;Die anonyme Fehler-Diagnose überträgt jetzt zusätzlich den genauen technischen Fehlergrund (`errorDetail`, z.&nbsp;B. `NotReadableError`) und die Dateigröße (`fileSizeKb`), damit künftige Fälle in den Logs eindeutig zuzuordnen sind — weiterhin ohne Dateinamen oder Bildinhalt. (`public/js/exif.js`, `public/js/api.js`, `public/js/error-logger.js`, `functions/src/handle-errors.js`, `public/locales/de.json`, `public/locales/en.json`)
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Anonyme Diagnose-Daten werden jetzt 30 Tage aufbewahrt (bisher 1 Tag) — personenbezogene Infrastruktur-Logs weiterhin nur 1 Tag.** Hintergrund: Die gesamte Log-Aufbewahrung stand auf 1 Tag; damit war keinerlei Aussage möglich, wie oft ein Fehler über mehrere Workshops hinweg auftritt. Umsetzung datenschutzkonform über einen separaten Log-Speicher (`client-diagnostics`, EU-Region `europe-west1`, 30 Tage), in den ausschließlich die vollständig anonymen Client-Diagnose-Einträge (`client-error`/`client-telemetry` — Fehler-Typ, Geräteklasse, Dauer; keine IP-Adressen, keine Bilder, keine Dateinamen) gespiegelt werden. Der Standard-Log-Speicher mit Googles Infrastruktur-Fehlerlogs (enthalten IPs) bleibt unverändert bei 1 Tag — das Versprechen der Datenschutzerklärung gilt weiter. Die Datenschutzerklärung wurde um die 30-Tage-Aufbewahrung der anonymen Diagnose-Daten ergänzt (Stand-Datum aktualisiert). (Cloud-Logging-Konfiguration, `public/datenschutz.html`)
 
 ## [2.2.7] — 2026-07-05
+
+
 
 Wartungs- und Sicherheits-Release: Backend-Grundbibliothek `firebase-admin` auf Version 14 (schließt alle 3 hohen bekannten Sicherheitslücken), gesammelte Werkzeug- und CI-Updates, Mistral-2506-Aufräumen. Reiner Functions-Deploy, keine Frontend-Änderung. 432 Backend- + 157 Frontend-Tests grün, E2E in der CI grün.
 
@@ -2895,17 +4244,59 @@ Wartungs- und Sicherheits-Release: Backend-Grundbibliothek `firebase-admin` auf 
 
 ## [2.2.6] — 2026-06-07
 
+
+
 Weiterer Feinschliff der Reload-Erfahrung (zwei Punkte aus dem Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 157 Frontend-Tests grün.
 
 ### Behoben
 
 - **Der „Nichts davon ist wahr"-Hinweis erscheint beim Reload nicht erneut.** Hat man ihn beim ersten Ergebnis bereits bestätigt (weggeklickt), wird er beim Neuladen übersprungen — pro Job gemerkt, überlebt den Reload. Beim allerersten Anzeigen und bei jedem neuen Upload erscheint er wie gehabt. (`public/js/api.js`)
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert (bewusste Datenschutz-Entscheidung)
 
 - **Das hochgeladene Foto wird nach einem Reload bewusst NICHT wiederhergestellt — und das wird zum sichtbaren Datenschutz-Lerneffekt.** Das Foto wird unmittelbar nach der Analyse gelöscht und absichtlich nirgends — auch nicht im Browser — zwischengespeichert. An die Stelle, wo das Foto war, tritt nach dem Reload ein kurzer, positiver Hinweis: „Dein Foto ist schon gelöscht — gut für deine Privatsphäre." Zweisprachig (DE/EN), als Klasse `photo-deleted-note`. Das passt zur Bildungs-Mission des Tools: Datensparsamkeit sichtbar machen statt verstecken. (`public/js/api.js`, `public/styles.css`, `public/locales/de.json`, `public/locales/en.json`)
 
 ## [2.2.5] — 2026-06-07
+
+
 
 Feinschliff der Reload-Wiederherstellung aus v2.2.4 (zwei UX-Reparaturen nach Live-Test auf dem iPhone). Reiner Hosting-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.
 
@@ -2920,11 +4311,51 @@ Feinschliff der Reload-Wiederherstellung aus v2.2.4 (zwei UX-Reparaturen nach Li
 
 ## [2.2.4] — 2026-06-07
 
+
+
 Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte und der Doku mit dem aktuellen Stand (Single-Large-Pipeline, 2-h-Aufbewahrung aus v2.2.3). Reiner Hosting-/Doku-Release, keine Server-Änderung. 432 Backend- + 155 Frontend-Tests grün.
 
 ### Behoben
 
 - **Queue-Ergebnis überlebt jetzt einen Seiten-Reload.** Bisher warf der Browser das Abhol-Ticket (PRIV-003) sofort nach dem Rendern weg — ein Reload konnte das (serverseitig noch bis zu 2 h vorhandene) Profil nicht mehr abholen, es war „weg". Jetzt bleibt das Ticket im Tab erhalten: Ein Reload holt das Ergebnis ticket-geschützt erneut ab. Aufgeräumt wird beim nächsten Upload, bei Fehler/Abbruch oder wenn der Job serverseitig abgelaufen ist; der Resume beim Seitenstart ist still (kein Fehler-Banner bei bereits gelöschtem Job). Zwei neue Frontend-Tests decken das ab. (`public/js/api.js`, `public/__tests__/queue.test.js`)
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2936,6 +4367,8 @@ Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte un
 - **Test-Zahlen aktualisiert** auf real 432 Backend / 155 Frontend; alle verbliebenen „24 h"-Aufbewahrungsangaben in der Doku auf 2 h korrigiert.
 
 ## [2.2.3] — 2026-06-07
+
+
 
 Fünf kleinere Reparaturen aus dem Audit (alle P3) an der Queue-/Reliability-Schicht. Vorab gegen den Firestore-Emulator end-to-end getestet (Abhol-Ticket-Flow + voller Job-Lebenszyklus); 432 Backend- + 153 Frontend-Tests grün.
 
@@ -2957,6 +4390,8 @@ Fünf kleinere Reparaturen aus dem Audit (alle P3) an der Queue-/Reliability-Sch
 
 ## [2.2.2] — 2026-06-06
 
+
+
 Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverlässigkeit, Architektur, OSS, Lieferkette) mit Multi-Agent-Prüfung, adversarialer Gegenprüfung und Live-Verifikation gegen die echten Cloud-Dienste. **Keine ausnutzbare Sicherheitslücke (0× P0).** Die Codebasis ist solide; dieser Release bündelt eine funktionale Reparatur (PRIV-002, deployt) und mehrere Härtungen in Repository, CI/CD und Doku.
 
 ### Behoben
@@ -2964,6 +4399,44 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
 - **PRIV-002 — Datenschutz-Warnung + Tier-Easter-Egg im aktiven Single-Large-Pfad reaktiviert (deployt).** Der seit v2.2.0 live laufende Single-Large-Pfad speiste die OCR-Datenschutzwarnung („das hast du ungewollt verraten" — Adresse/Telefon) und die Tier-Erkennung aus `buildPseudoDescription`, das keine `SUBJECT:`-/`Sichtbarer Text:`-Marker enthält — die Warnung feuerte daher **nie**, das Tier-Easter-Egg war tot. Fix (rein additiv, fallback-sicher): zwei Pflichtfelder `subject` + `visible_text` im `singleLargePrompt` (DE + EN), `runSingleLargeCall` liest sie aus, `handle-process-job` verdrahtet sie zu den erwarteten Markern. Live gegen Mistral verifiziert (Felder kommen durch, Profile bleiben vollständig); neuer Regressions-Test `handle-process-job-priv002.test.js`. Rollback: `featureFlags/current.useSingleLargeCall=false`.
 - **PRIV-001 — `.gitignore`-Lücke geschlossen.** Ungetrackte Test-Artefakte (`ab-test-*`, `single-large-call-*-rc*`, `compare-prototype-home.html`) mit aus echten Testbildern abgeleiteten Profilen (inkl. Minderjähriger) waren von keinem Ignore-Muster erfasst — ein `git add -A` hätte sie ins öffentliche Repo committet. Breite Schutzmuster ergänzt, Profil-Ausgaben aus dem Repo entfernt (lokal gesichert), Forschungs-Skripte bewusst ignoriert.
 - **NTFY-001 — selbst-gehosteter `ntfy`-Benachrichtigungs-Server abgesichert + aktualisiert.** War öffentlich erreichbar und anonym lesbar (Image v2.22.0, außerhalb des Repos) → die Limit-Benachrichtigungen mit Admin-Aktionslinks waren für Fremde mitlesbar. Jetzt: eigenes Image auf **ntfy v2.24.0** (via Cloud Build), Passwortschutz (`NTFY_AUTH_DEFAULT_ACCESS=write-only` — die App sendet weiterhin ohne Änderung, Lesen nur mit Konto `malzime` + Passwort aus Secret `ntfy-owner-pass`), iPhone-Push über die Apple-Weiterleitung (`upstream-base-url` + `base-url`) live verifiziert. Rollback: Server-Env auf `read-write`.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert (Härtung)
 
@@ -2986,7 +4459,47 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
 
 ## [2.2.1] — 2026-05-29
 
+
+
 Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Sicherheits-Ergänzung im Minderjährigen-Abschnitt — keine Struktur-/Schema-Änderung, kostenneutral.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2998,7 +4511,47 @@ Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Si
 
 ## [2.2.0] — 2026-05-28
 
+
+
 Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) ist damit abgeschlossen — die seit rc3 live laufende Architektur (Single-Large hinter Feature-Flag, Cloud-Tasks-Concurrency 10) wird unverändert zur stabilen Version erklärt. Zusätzlich zwei kleine Verbesserungen aus dem Betrieb: lesbarere Altersbeschreibungen und gehärtete Diagnose-Endpunkte.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3009,82 +4562,9 @@ Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) 
 
 - **Erster Werktag-Vormittag unter rc3** (2026-05-28, Do): 27 Jobs, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Job-Median ~50 s (P95 67 s). Echte Gleichzeitigkeit im Burst 08:02–08:14 CEST (~24 Uploads in ~12 Min) ohne Überlast. Damit ist das zuvor offene Werktags-Verhalten der Single-Large-Pipeline bestätigt.
 
-## [2.2.0-rc3] — 2026-05-27
-
-Konsolidierter Single-Large-Prompt mit Sicherheits- und Qualitäts-Härtungen. Verhalten der Live-Pipeline (Single-Large hinter Feature-Flag) bleibt strukturell gleich; Prompt wurde gegen den RC2-Stand A/B-getestet (15 Bilder × 3 Läufe = 90 Mistral-Calls) und an den zwei messbaren Schwachpunkten nachgeschärft.
-
-### Geändert
-
-- **`singleLargePrompt` in beiden Locales (`functions/src/locales/de/prompts.js` UND `functions/src/locales/en/prompts.js`) konsolidiert.** Bisher ein Template-Literal aus den 3-Call-Bausteinen (`systemNormal`/`systemBoost`/`AGE_ANCHOR`/`GENDER_ANCHOR`); jetzt ein eigenständiger Prompt mit gemeinsamen Regeln (GEMEINSAME REGELN-Block für beide Modi), geteilten Charakter-Pools (8 Bereiche mit STANDARD-Stärken, STANDARD-Schwächen und BEAST-Schwächen pro Bereich) und konsistenter „keine klaren Bildsignale"-Phrase als einheitlichem Ausweg für nicht-beurteilbare Felder. Die 3-Call-Pipeline-Bausteine bleiben in beiden Locales unverändert; nur Single-Large hat ab rc3 einen getrennten Prompt-Text (Pflege-Notiz im Header beider Dateien — DE und EN sind ab jetzt parallel zu pflegen).
-- **Sicherheits-Klausel ergänzt:** Explizites Verbot sexualisierter Zuschreibungen bei Minderjährigen (war im Live-Prompt zuvor nicht codifiziert, sondern nur durch Mistrals Eigenvorsicht abgedeckt). Zentrale Schutzregel für Workshop-Tool mit Schüler:innen.
-- **Anti-Halluzinations-Härtungen:** „Erfinde KEINE Markennamen — nur real existierende Marken aus dem mitteleuropäischen Markt" in AD_TARGETING; expliziter Anti-Leakage-Block vor dem JSON-Schema („Übernimm NIEMALS die konkreten Beispiel-Inhalte wie Bikepacking oder Garmin Edge 1040, wenn das Foto sie nicht hergibt").
-- **Konsistenz-Pflicht zwischen Modi geschärft:** `hard_facts.alter_geschlecht` und `hard_facts.herkunft` müssen jetzt wortgenau in die jeweiligen Karten-Values übernommen werden (Satzanfang). A/B-Test zeigte: Substring-strikte Konsistenz 0 % → 100 %.
-- **Confidence-Differenzierung explizit gefordert:** Bei klarem Bildbeleg 0,75–0,95, bei „keine klaren Bildsignale" deutlich niedriger (typisch unter 0,60). A/B-Test zeigte: Confidence-Streuung 0,104 → 0,143 (ehrlicher differenziert).
-- **Karten-Wort-Untergrenze hart:** „MINDESTENS 15 Wörter pro Karte, MAXIMAL 25, 2 vollständige Sätze. Karten unter 15 Wörtern sind unvollständig und gelten als Fehler." Exemplar-Test mit den zwei A/B-Worst-Performern reduzierte zu-kurze Karten von ~26 % auf ~8 %.
-- **Anti-Stichwort-Listen-Regel mit Negativ-Beispiel** in GEMEINSAME REGELN hochgezogen: „FALSCH: 'unsicher, ängstlich, perfektionistisch.' RICHTIG: 'Du bist unsicher und perfektionistisch. Die hochgezogenen Schultern und der angespannte Kiefer verraten Anpassungsdruck.'" Exemplar-Test eliminierte Stichwort-Listen vollständig (vorher 6 in 3 Läufen, nachher 0).
-- **Beast-Variations-Pool** für korporative Stimme: Liste mit zehn Wir-Formulierungen („Wir wissen", „Wir verkaufen dir", „Wir kalkulieren", „Algorithmen sehen dich als", „Versicherer rechnen dich als", …), Empfehlung zur Variation gegen monotone Wiederholungen.
-- **Multi-Person-Regel:** Falls das Bild mehrere Personen zeigt, wird die Person im Vordergrund/in der Bildmitte analysiert.
-- **Marken-Spezifik gefördert:** „möglichst mit Modellnummer/Linie" in AD_TARGETING. Test zeigte spezifischere Werbe-Vorschläge wie „L'Oréal Paris True Match Foundation", „Nike Phantom GX 2 Elite", „L.O.L. Surprise! O.M.G. Fashion Dolls" (statt nur „L'Oréal", „Nike", „L.O.L. Surprise!").
-
-### Hinzugefügt (Test-Infrastruktur)
-
-- **`functions/scripts/single-large-ab-runner.js`** — generischer A/B-Test-Runner: fährt alle Bilder aus `compare-input/` mehrfach gegen Live- und Kandidat-Prompt, bewertet 7 automatische Metriken (Karten-Wort-Bereich, Stichwort-Listen, Confidence-Streuung, Leakage-Hits, Hard-Facts-Konsistenz, Beast-Opener-Wiederholungen, ad_targeting-Plausibilität), schreibt Markdown-Report. Wiederverwendbar für künftige Prompt-Iterationen.
-- **`functions/scripts/prompts-v2.2.1-rc1.js`** — Snapshot des in rc3 deployten Prompts, separat als Test-Referenz für spätere A/B-Läufe gegen die dann-aktuelle Live-Version.
-- **`PROMPT_VARIANT=rc1` ENV-Schalter in `functions/scripts/single-large-call-test.js`** — erlaubt schnellen Vergleich zwischen Live-Locale und Kandidat-Datei ohne Anpassung am Test-Skript.
-
-### Validiert
-
-- **A/B-Test 15 Bilder × 3 Läufe × 2 Varianten = 90 Calls** (kostete 2,69 EUR, dauerte 16,5 Min). Korrigierte Befunde nach Bereinigung um Mess-Artefakte (HTTP-Timeouts bei 2 Bildern und defekte „inventedBrands"-Heuristik): 6–7 echte Verbesserungen, 2 marginale Verschlechterungen im statistischen Rauschen. Wichtigste Verbesserungen: Hard-Facts-Konsistenz 0 % → 100 %, Confidence-Streuung 0,104 → 0,143, Marken spezifischer mit Modellbezeichnung, Karten näher am 15–25-Wort-Korridor.
-- **Exemplar-Stresstest** an den zwei A/B-Worst-Performern (`IMG_0378.jpg`, `IMG_0584.jpg`) mit den zwei Polituren (harte Wort-Untergrenze + Anti-Stichwort-Liste in GEMEINSAME REGELN): zu-kurze Karten von ~26 % auf ~8 % gefallen, Stichwort-Listen vollständig eliminiert.
-- **Tagesbilanz Live-Workshop 2026-05-27 vor Deploy:** 56 Jobs auf Single-Large-Pipeline, alle `done` beim 1. Versuch, 0 Mistral-429, 0 Retries, Server-Median ~57 s, Client-End-to-End ~59 s. Zwei stille Verluste (deliveredAt=null) — bekannter offener Punkt zum Auslieferungs-Loch, unverändert; Datenschutz-Entscheidung bleibt: kein `localStorage` (geteilte Schul-Geräte).
-
-### Nicht geändert
-
-- **3-Call-Pipeline-Bausteine** (`systemNormal`, `systemBoost`, `AGE_ANCHOR`, `GENDER_ANCHOR`) in beiden Locales unverändert — Fallback bei Rückschalten des Feature-Flags `useSingleLargeCall` auf `false` verhält sich identisch zu rc2.
-
-### Hinweis zur EN-Variante
-
-EN-Locale wurde strukturell parallel zur DE-Variante übersetzt (nicht separat A/B-getestet, da Live-Traffic >95 % de-DE/de-AT). Sollte EN-Traffic in Zukunft wachsen, wäre ein eigenständiger EN-A/B-Test gegen einen englischsprachigen Bilder-Pool sinnvoll. Beide Locales sind ab jetzt parallel zu pflegen.
-
-## [2.2.0-rc2] — 2026-05-24
-
-Kleinere Anpassungen am RC, bleibt prerelease. Single-Large-Pipeline weiterhin live aktiv hinter Feature-Flag.
-
-### Geändert
-
-- **Firmenname aktualisiert** auf „malziland - learning | training | consulting e.U." (vorher „malziland – digitale Wissensgestaltung e.U.") in Impressum, Datenschutz, Nutzungsbedingungen, JSON-LD schema.org und Meta-Tags. Inhaber-Name, Adresse, GISA, UID, FN unverändert.
-- **`QUEUE_DISPATCH_CONCURRENCY` 3 → 10** und **`QUEUE_AVG_JOB_SECONDS` 100 → 65** in `functions/src/config.js` an die Realwerte aus dem Single-Large-Lasttest angepasst. Frontend-ETA zeigt jetzt realistische Wartezeit-Schätzungen für User — vorher rechnete sie noch mit den Werten der alten 3-Call-Pipeline und überschätzte die Wartezeit ~3×.
-- **Cache-Buster aller HTML-Dateien** auf `v=2026052401` angehoben. `impressum.html` war noch auf `v=2026022106` (Februar) — überfällig.
-
-### Validiert
-
-- Zweiter Lasttest gegen Produktion (35 Jobs gegen Single-Large, Cloud-Tasks-Concurrency 10): 35/35 done, 0 Fehler, 0 × 429, 0 Retries. Mistral-Latenz Median 60 s, P95 69 s. Interner Throttle-Wait Median 0 ms. Bestätigt die Stabilität aus dem ersten Lasttest am 23.05. abends.
-- Sonntag-Vormittag (24.05. seit 00:00): 5 echte User-Jobs, alle 5 done über Single-Large-Pipeline, 0 Fehler. Median 51 s pro Job, Median 13.130 Tokens.
-
-## [2.2.0-rc1] — 2026-05-23
-
-**Architektur-Experiment „Single-Large-Call" eingebaut, dormant hinter Feature-Flag.** Live-Pipeline läuft weiterhin auf der bewährten 3-Call-Architektur (Describe Large + 2× Profile Small 2603). Erst wenn `featureFlags/current.useSingleLargeCall` in Firestore manuell auf `true` gesetzt wird, schaltet die Queue-Pipeline für jeden neuen Job auf einen einzigen `mistral-large-2512`-Aufruf um, der Bild-Beschreibung, Standard-Profil und Beast-Profil in einer Antwort liefert. **Release Candidate** — Workshop-Validierung steht aus, daher RC-Status. Diese Release ändert für Endnutzer mit deaktiviertem Flag NICHTS.
-
-### Hinzugefügt
-
-- **Feature-Flag `useSingleLargeCall` in Firestore (`featureFlags/current.useSingleLargeCall`)** — schaltet ohne Deploy zwischen den zwei Pipelines. Default `false`; im Lokal-Modus (`QUEUE_LOCAL=1`) immer `false`, damit Emulator-Klicks die bewährte Pipeline treffen. Cache-TTL 30 s wie beim bestehenden `useQueue`-Flag. Fail-safe: jeder Firestore-Lesefehler → 3-Call-Pipeline.
-- **Neue Funktion `runSingleLargeCall(buffer, mimeType, remainingBudget, lang)` in `functions/src/mistral.js`** — einziger `mistral-large-2512`-Call mit Bild + zusammengeführtem Prompt + großem JSON-Schema. Liefert dasselbe `{ normal, boost }`-Shape wie `generateBothProfiles`, damit `handle-process-job.js` nichts anderes anpassen muss als den Pipeline-Branch. Inklusive: Vollständigkeits-Check (alle 13 Karten pro Modus), gezielter Retry mit Hinweis auf fehlende Karten, Hard-Facts-Konsistenz server-seitig (`alter_geschlecht` + `herkunft` werden wortgenau in beide Modi überschrieben), zentrale Übernahme von `ad_targeting` + `manipulation_triggers` in beide Modi — analog zum v2.1-Konsistenz-Anker, nur in einer Antwort statt aus dem Describe-Footer.
-- **Single-Large-Pipeline in `handle-process-job.js` (`runPipelineSingleLarge`)** — kompletter Branch der Queue-Pipeline. Tier-Easter-Egg (reine Tier-Bilder bekommen vordefinierte Profile) und Privacy-Risks bleiben funktionsfähig: weil der Single-Call kein separates Description-Feld liefert, baut die Funktion eine Pseudo-Beschreibung aus `profileText` + allen Karten-Werten zusammen — reicht für die Schlüsselwort-Heuristiken (Hund, Katze, sichtbarer Text). Tracking-Meta-Feld `meta.pipeline = "single-large"` zur späteren Log-Auswertung.
-- **Wechsel-Scripts `scripts/cloudtasks-concurrency-3.sh` und `scripts/cloudtasks-concurrency-10.sh`** — passen die Cloud-Tasks-Queue-Drossel an die jeweilige Pipeline an. 3 für die bewährte 3-Call-Pipeline (Small-2603-TPM-Decke), 10 für Single-Large (Large-2M-TPM-Decke entlastet komplett). Cloud-Tasks-Konfiguration ist nicht runtime-toggle-bar, daher zwei separate gcloud-Befehle. Workflow im Script-Header dokumentiert: erst Flag in Firestore umlegen, dann Concurrency-Script ausführen.
-- **Forschungs-Tool `functions/scripts/single-large-call-test.js`** — eigenständiger Test gegen die Mistral-Produktion (kein Live-Deploy, kein Firestore-Schreibzugriff). Wählt 3 zufällige Bilder aus `compare-input/` (oder feste über `TEST_IMAGES=...`), misst Tokens + Latenz + Vollständigkeit, generiert HTML-Vergleich + JSON-Rohdaten. Lädt jetzt den Live-`singleLargePrompt` direkt — Drift zwischen Test und Production kann strukturell nicht passieren.
-- **Locale-Schlüssel `singleLargePrompt` in `functions/src/locales/de/prompts.js` und `en/prompts.js`** — als Template-Literal nach `module.exports` aus den bestehenden Live-Bausteinen (`systemNormal` + `systemBoost` + `AGE_ANCHOR` + `GENDER_ANCHOR`) zusammengesetzt. Single-Source-of-Truth: Verbesserungen an einem Live-Baustein wirken automatisch auf BEIDE Pipelines (3-Call + Single-Large). Damit gelten die vollen Live-Standards: kein „wahrscheinlich"/„könnte" im Standard, 8-Kategorien-Charakter-Katalog, FORCED-MAPPING-Altersregel (Nasolabialfalten → MINIMUM 38 Jahre), Gender-First-Aus-Gesichtsmerkmalen-Regel, Manipulation-Trigger-Pool mit 20+ Optionen, KEINE-Preisangaben-Verbot in `ad_targeting`/`werbeprofil`/`kaufkraft`. Single-Call-spezifisch sind nur die Einleitung (Modell sieht das Bild SELBST, beide Profile in einer Antwort), das JSON-Schema mit `standard`/`beast`-Sub-Objekten, sowie 13 konkrete „Aussage + Beleg"-Beispiele pro Modus (15-25 Wörter, „Du bist X. Bildbeleg Y."), die Mistral Karte für Karte imitiert. EN-Lokalisierung ist eine vollständige Übersetzung.
-
-### Geändert
-
-- **`feature-flags.js` liefert jetzt zwei Flags statt einem** — `{ useQueue, useSingleLargeCall }`. Bestehender Aufruf-Code (`isQueueEnabled`) unverändert, neue Funktion `isSingleLargeCallEnabled` analog. Caller in `handle-process-job.js` nutzt den Safe-Wrapper `isSingleLargeCallEnabledSafe`, damit ein Firestore-Fehler die Pipeline nicht blockiert.
-- **Reale Token- und Latenz-Werte des Single-Large-Pfads (1 Bild, Live-API-Messung vor Deploy):** 13.180 Tokens pro Analyse, 60,6 s Latenz. Vergleich zur heutigen 3-Call-Pipeline: **-38 % Tokens**, aber **+60 % langsamere Einzel-Latenz** (60 s vs 38 s). Hard-Facts identisch in beiden Modi, Beast-Profil substanziell (10-12 Sätze, ~150 Wörter, schockierend mit Bildbeleg), konkrete Marken (Garmin Edge 1040, GOREWEAR, Specialized) statt generischer Branchen, vielfältige Trigger, Karten im „Du bist X. Bildbeleg Y."-Format (16-23 Wörter).
-- **Architektur-Wert ehrlich:** der primäre Gewinn der Single-Large-Architektur ist NICHT die Einzelanalyse-Latenz, sondern die **vollständige Befreiung vom 2603-TPM-Bottleneck**. Alle Tokens landen im Large 2512 (2M TPM statt 100K) — Workshop-Concurrency kann auf 10+ ohne 429-Risiko. Bei einem 40er-Workshop bedeutet das rechnerisch: ~6 min Total-Zeit (Single-Large + Concurrency 10) statt ~13 min (heute Concurrency 3). Kostenseitig: ~3,2 ct pro Analyse statt 1,7 ct heute (+88 %). Lasttest steht aus.
-
-### Geprüft (aber nicht umgesetzt)
-
-- **Concurrency-Erhöhung der bestehenden 3-Call-Pipeline von 3 auf 4:** Mit den exakten Token-Werten aus den Live-Logs neu gerechnet — heutige Pipeline liegt mit Concurrency 3 bei ~95 % der 2603-TPM-Decke. Concurrency 4 würde uns rechnerisch ~27 % über die Decke heben. Verworfen. Sauberere Lösung ist der Single-Large-Call-Branch oben, der das 2603-Konto komplett entlastet.
-
 ## [2.1.0] — 2026-05-23
+
+
 
 Großer Konsistenz- und UX-Sprung. Standard- und Beast-Modus zeigen jetzt
 identische Grundfakten (Alter, Geschlecht, Herkunft) und identische Marken-
@@ -3101,6 +4581,44 @@ rund 12 %, Job-Latenz um rund 17 %.
 - **Beast-Profil bricht nicht mehr mitten im JSON ab:** Mistral hatte sich im Beast-Modus gelegentlich selbst entschieden, früh aufzuhören — `finishReason: "stop"` bei nur 7 von 13 gelieferten Karten und ohne Verdict-Text. Drei Maßnahmen zusammen lösen das: (1) Antwort-Budget pro Profile-Call von 8.000 auf 16.000 Tokens erhöht (Sicherheitsdeckel, kostenneutral), (2) Im JSON-Output kommt der Verdict-Text jetzt zuerst, dann die Karten — falls Mistral doch früh stoppt, ist wenigstens der Verdict da, (3) Server-seitige Vollständigkeitsprüfung: liefert Mistral weniger als 13 Karten, wird automatisch ein gezielter Retry-Call ausgelöst, der die fehlenden Felder explizit anfordert.
 - **Profil-Karte „Werbeprofil" fehlt nicht mehr im Standard-Modus:** Mistral hatte die letzte Karte gelegentlich weggelassen, vermutlich weil sie ganz am Ende des Schemas stand. Mit der Vollständigkeitsprüfung (siehe oben) und der neuen JSON-Reihenfolge gibt das System keine unvollständigen Profile mehr aus.
 - **Bei „im Bild nicht eindeutig erkennbar"-Fällen wird jetzt eine kurze Begründung mitgeliefert** statt abrupt zu enden. Vorher war „Im Bild nicht erkennbar." ein hartes Ende, das den Lesefluss zerriss; jetzt steht z. B. „Im Bild keine klaren Signale — weder Ehering noch Begleitung sichtbar." Der Workshop-Teilnehmer versteht, _warum_ keine Aussage möglich ist.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3119,6 +4637,8 @@ rund 12 %, Job-Latenz um rund 17 %.
 
 ## [2.0.3] — 2026-05-23
 
+
+
 Konsistenz im UI und Messbarkeit auf der Mistral-Seite: Die Profil-Karten erscheinen jetzt in beiden Modi in derselben festen Reihenfolge, und jeder Mistral-Call protokolliert Token-Verbrauch und Wartezeit getrennt.
 
 ### Behoben
@@ -3131,6 +4651,8 @@ Konsistenz im UI und Messbarkeit auf der Mistral-Seite: Die Profil-Karten ersche
 
 ## [2.0.2] — 2026-05-22
 
+
+
 Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zurückkehrende Nutzer schneller, und die vier Phasen einer Analyse — Upload → Warteschlange → Verarbeitung → Auslieferung — sind ab jetzt einzeln im Log messbar.
 
 ### Hinzugefügt
@@ -3139,15 +4661,93 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
 - **Auslieferungs-Messung:** Beim ersten Ausliefern eines fertigen Jobs hält `jobStatus` den Zeitpunkt fest (`deliveredAt`) und loggt eine `job-delivered`-Zeile mit `deliveryGapMs` (fertig gerechnet → beim Client angekommen) und `totalMs` (erstellt → ausgeliefert). Das trennt „fertig" von „tatsächlich abgeholt" — unabhängig von der best-effort Client-Telemetrie.
 - **Warteschlangen-Wartezeit im Log:** Die `process-job`-Erfolgsmeldung enthält jetzt zusätzlich `queueWaitMs` — die Zeit zwischen Einreihen und Verarbeitungsbeginn.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - Die client-seitig gemessene Upload-Dauer (`enqueueMs`) wird in der Erfolgs-Telemetrie nicht mehr verworfen — sie fehlte bisher auf der Server-Whitelist und ist jetzt mitgeloggt.
 
 ## [2.0.1] — 2026-05-21
 
+
+
 ### Behoben
 
 - Speicher der Warteschlangen-Statusabfrage (`jobStatus`) von 128 auf 256 MB angehoben. 128 MB hatte keinen Puffer über dem firebase-admin-Grundbedarf und lief beim Workshop am 21.05. unter Poll-Last in einen Speicherüberlauf.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3158,6 +4758,8 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
 - Diagnose-Logging: Scheitert das Öffnen eines Bildes im Browser, wird die Formatklasse der Datei (an den ersten Bytes erkannt, etwa `heic` oder `tiff`) anonym mitgeloggt — kein Dateiname, kein Bildinhalt, nur die Format-Art.
 
 ## [2.0.0] — 2026-05-20
+
+
 
 **Release: Queue-Architektur.** Jeder Upload läuft jetzt über eine Google-Cloud-Tasks-Warteschlange statt über eine lange offene Verbindung. Das fängt Workshop-Lastspitzen strukturell ab: Statt unter Stoßlast in eine 429-Fehlerkaskade zu laufen, werden Uploads dosiert und in fairer Reihenfolge abgearbeitet — kein verlorener Job, keine harten Fehler. Gesteuert über das Firestore-Feature-Flag `useQueue`; der synchrone `/analyze`-Pfad bleibt als sofortiger Rückfall erhalten (Flag umlegen, kein Deploy).
 
@@ -3171,6 +4773,44 @@ Diese Version fasst die fünf Entwicklungsphasen rc1–rc5 zusammen.
 - **Infrastruktur:** Cloud-Tasks-Queue `analyze-queue` (`europe-west1`, `maxConcurrentDispatches` 3), dedizierter nicht-öffentlicher Storage-Bucket `malzime-queue-uploads`, zwei zusammengesetzte Firestore-Indizes auf der `jobs`-Collection.
 - **Feature-Flag** `useQueue` (Firestore `featureFlags/current`, 30 s Cache, fail-safe auf `false`); `/api/stats` liefert es an das Frontend aus.
 - Lokale Emulator-Testumgebung für Entwicklung und Mock-Lasttests (`QUEUE_LOCAL`, `mistral-mock.js`, `docs/QUEUE-EMULATOR.md`).
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3191,6 +4831,8 @@ Diese Version fasst die fünf Entwicklungsphasen rc1–rc5 zusammen.
 - Umfangreiche neue Tests für alle Queue-Module (Backend + Frontend), inklusive Client-Liveness und gemocktem Polling.
 
 ## [1.10.9] — 2026-05-20
+
+
 
 ### Behoben — Wake-Lock wird wieder im User-Gesture-Kontext angefordert
 
@@ -3214,6 +4856,8 @@ Erwartung: Auf iPhones sollte aus `denied:NotAllowedError` künftig `acquired` w
 - Cache-Buster auf `?v=2026052002`.
 
 ## [1.10.8] — 2026-05-20
+
+
 
 ### Behoben — modell-bewusster Token-Bucket + Wake-Lock-Diagnose
 
@@ -3239,6 +4883,8 @@ Nach Auswertung des Workshop-Vormittags (2026-05-20): Der Server lief stabil (ke
 - Cache-Buster auf `?v=2026052001`.
 
 ## [1.10.7] — 2026-05-19 (Abend)
+
+
 
 ### Behoben — Modell-Limits korrekt erfasst, Token-Bucket entsprechend kalibriert
 
@@ -3277,6 +4923,8 @@ Lesson learned: Versions-Sprung Small 3.2 → Small 4 ist bei spezifischen Fähi
 - Frontend 143/143 gruen (unveraendert).
 
 ## [1.10.6] — 2026-05-19
+
+
 
 ### Behoben — Workshop-Tauglichkeit fuer 25-50 gleichzeitige Teilnehmer
 
@@ -3327,6 +4975,8 @@ Heutiger 13:00-15:00-Workshop hat die Pipeline gerissen: ab ~15 Geraeten gleichz
 
 ## [1.10.5] — 2026-05-15
 
+
+
 ### Behoben — Spinner verschwand mid-Pipeline mit Heartbeat
 
 Direkt nach v1.10.4-Deploy gemeldet: Spinner verschwand nach wenigen Sekunden, dann ~1 Minute leere UI, dann ploetzlich das Ergebnis. Ursache: `await fetch(...)` returnt bei chunked transfer **sofort sobald Headers da sind** (statt erst beim kompletten Body wie bei `Content-Length`-Response). `stopScanAnim()` lief deshalb mid-Pipeline statt erst beim fertigen JSON.
@@ -3342,6 +4992,8 @@ Direkt nach v1.10.4-Deploy gemeldet: Spinner verschwand nach wenigen Sekunden, d
 - Cache-Buster auf `?v=2026051509`.
 
 ## [1.10.4] — 2026-05-15
+
+
 
 ### Behoben — Safari/WebKit kappt fetch nach ~47 s ("Load failed")
 
@@ -3366,6 +5018,8 @@ Akutes Problem: Im Workshop-Setup auf macOS + iOS Safari brach jede Analyse mit 
 
 ## [1.10.3] — 2026-05-15
 
+
+
 ### Geaendert — Hosting-Fallback-Pfade entfernt
 
 Nach erfolgreicher Verifikation von `api.malzi.me` (v1.10.2) jetzt die beiden Fallbacks aufgeraeumt, die als Sicherheitsnetz waehrend des Uebergangs drin waren:
@@ -3385,6 +5039,8 @@ Cloud-Run-Services bleiben unveraendert; nur Frontend-Hosting-Konfig.
 
 ## [1.10.2] — 2026-05-15
 
+
+
 ### Geaendert — Analyze-Endpoint nutzt jetzt `api.malzi.me`
 
 Custom Domain `api.malzi.me` ist via Cloud Run Domain Mapping eingerichtet (CNAME → `ghs.googlehosted.com`, SSL automatisch ueber Lets Encrypt). Damit weg von der unschoenen `.run.app`-URL und in DevTools/Network-Tab sauber unter eigener Domain sichtbar. Funktional identisch zur direkten Cloud-Run-URL — Edge-Timeout-Falle bleibt umgangen.
@@ -3402,6 +5058,8 @@ Custom Domain `api.malzi.me` ist via Cloud Run Domain Mapping eingerichtet (CNAM
 - Cache-Buster auf `?v=2026051506`.
 
 ## [1.10.1] — 2026-05-15
+
+
 
 ### Geaendert — Trace-ID standardmaessig in Fehlermeldungen
 
@@ -3422,6 +5080,8 @@ Custom Domain `api.malzi.me` ist via Cloud Run Domain Mapping eingerichtet (CNAM
 - Cache-Buster auf `?v=2026051505`.
 
 ## [1.10.0] — 2026-05-15
+
+
 
 ### Neu — State-of-the-Art Logging-Pipeline (anonym, DSGVO-konform)
 
@@ -3451,6 +5111,8 @@ Geloggt: Fehler-Typ + -Message (gekuerzt), Phase, Dauer, gekuerzter User-Agent, 
 
 ## [1.9.1] — 2026-05-15
 
+
+
 ### Geaendert — Upload-Limit von 6 MB auf 25 MB hochgesetzt
 
 Frontend verkleinert das Bild ohnehin per Canvas-Resize (`exif.js`), bevor es an die API gesendet wird. Das alte 6-MB-Hardlimit blockierte aber bereits die Rohdatei — typische Handy-Originale (iPhone, iPad, Pixel) liegen oft bei 4–10 MB und scheiterten daran ohne Grund. Neues 25-MB-Limit laesst alle ueblichen Handy-Fotos durch, schuetzt aber weiterhin vor versehentlich hochgeladenen RAW-Dateien oder Videos.
@@ -3470,6 +5132,8 @@ Frontend verkleinert das Bild ohnehin per Canvas-Resize (`exif.js`), bevor es an
 - Cache-Buster auf `?v=2026051503`.
 
 ## [1.9.0] — 2026-05-15
+
+
 
 ### Neu — Anonymes Client-Error-Logging (DSGVO-konform)
 
@@ -3498,6 +5162,8 @@ Was NICHT geloggt wird: IPs persistent, Cookies, Bilder, EXIF, GPS, beliebige He
 
 ## [1.8.0] — 2026-05-15
 
+
+
 ### Behoben — Hosting-Edge-Timeout umgangen
 
 Beobachtet: Bei langsameren Mistral-Antworten (z.B. heute Vormittag um ~30 % erhoehte Latenz) reisst die komplette Pipeline (describe + 2x profile) die 60-Sekunden-Grenze des Firebase-Hosting-Rewrite-Edges. Symptom im Browser: „Server-Fehler" nach ~60–70 s, obwohl die Cloud Function selber sauber mit `status:"ok"` antwortet — der Hosting-Proxy davor kappt die Antwort.
@@ -3519,6 +5185,8 @@ Der bisherige `/analyze`-Rewrite in `firebase.json` bleibt als sanfter Fallback 
 
 ## [1.7.2] — 2026-05-14
 
+
+
 ### Aufgeraeumt — Gemini-Aera-Reste entfernt
 
 Nach der Pure-Mistral-Umstellung (v1.6.0) waren in Doku und Kommentaren noch veraltete Verweise auf Google Gemini / Vertex AI / Cloud Vision uebrig — teils schlicht falsch (z.B. „faellt automatisch auf Gemini-Fallback zurueck", obwohl es seit v1.6.0 keinen Fallback-Anbieter mehr gibt). Bereinigt:
@@ -3537,6 +5205,8 @@ Nach der Pure-Mistral-Umstellung (v1.6.0) waren in Doku und Kommentaren noch ver
 
 ## [1.7.1] — 2026-05-14
 
+
+
 ### Behoben / Verbessert
 
 - **Wake-Lock gegen Analyse-Abbruch** (`public/js/api.js` + Locales): Eine Analyse kann bis ~3 min dauern. Ging das Geraet in der Zeit in Standby, fror der Browser die Seite ein und die laufende fetch-Anfrage starb — der User sah beim Aufwachen einen Fehler, obwohl der Server fertig gerechnet hatte. Jetzt fordert der Browser waehrend der Analyse einen Screen-Wake-Lock an (Bildschirm bleibt an) und gibt ihn danach wieder frei. Best-Effort: nicht jedes Geraet unterstuetzt die API, und ein manueller Power-Knopf-Druck sperrt weiterhin.
@@ -3551,6 +5221,8 @@ Nach der Pure-Mistral-Umstellung (v1.6.0) waren in Doku und Kommentaren noch ver
 - Cache-Buster auf `?v=2026051404`.
 
 ## [1.7.0] — 2026-05-14
+
+
 
 ### Sicherheit & Stabilitaet — Audit-Massnahmen
 
@@ -3573,17 +5245,15 @@ Nicht-Code-Befunde des Audits: Das Mistral-Ausgabenlimit (100 EUR/Monat, harte N
 
 ## [1.6.2] — 2026-05-14
 
+
+
 ### Behoben
 
 - **Alter inkonsistent zwischen Normal- und Beast-Modus** (Prompts de + en): Bisher nannte die Bildbeschreibung absichtlich kein Alter — sie beschrieb nur die Merkmale, und beide Profil-Anfragen legten das Alter danach jeweils selbst fest. Dadurch kamen sie auf unterschiedliche Werte. Jetzt legt die bildsehende Stufe (Mistral Large 3) die Altersspanne EINMAL fest, beide Profile (Normal + Beast) uebernehmen sie unveraendert. Umgesetzt ueber `describePrompt` + `describeFallback` (Alter wird jetzt explizit geschaetzt) plus neue `ALTER`-Regel in `SCHEMA_RULES`. `AGE_ANCHOR`-Kalibrierung unveraendert. Reiner Prompt-Eingriff, keine zusaetzliche API-Anfrage.
 
-## [1.6.1.1] — 2026-05-14
-
-### Behoben
-
-- **Geschlecht inkonsistent zwischen Normal- und Beast-Modus** (`SCHEMA_RULES` in de + en `prompts.js`): Beide Profile bekommen dieselbe Bildbeschreibung von Large 3 — aber der Beast-Modus (hoehere Temperatur + konfrontativer System-Prompt) interpretierte das Geschlecht teils neu, statt es zu uebernehmen. Neue Regel in `SCHEMA_RULES`: Das Geschlecht steht in der Bildbeschreibung und wird exakt uebernommen — keine Neuinterpretation, keine Aenderung zur dramatischen Wirkung. Greift fuer Normal + Beast. Reiner Prompt-Eingriff, keine zusaetzliche API-Anfrage.
-
 ## [1.6.1] — 2026-05-14
+
+
 
 ### Behoben / Verbessert
 
@@ -3604,6 +5274,8 @@ Das sind Feinschliff-Massnahmen, kein Allheilmittel — Mistrals Grundgenauigkei
 - 283 Backend-Tests + 139 Frontend-Tests gruen.
 
 ## [1.6.0] — 2026-05-14
+
+
 
 ### Architektur-Wechsel: Pure-Mistral-only (Vision + Gemini entfernt)
 
@@ -3691,6 +5363,8 @@ Kaskade ist jetzt: Mistral-Call (90s) < Backend-Budget (120s) < Cloud-Function-H
 
 ## [1.5.3] — 2026-05-12
 
+
+
 ### Phase 4 der Mistral-Migration — Auto-Ramp (in v1.6.0 wieder entfernt)
 
 v1.5.3 brachte einen hartcodierten 8-Tage-Auto-Ramp, der den Mistral-Anteil
@@ -3706,6 +5380,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 `feature-flags.js`) wurde in v1.6.0 ersatzlos entfernt.
 
 ## [1.5.2] — 2026-05-12
+
+
 
 ### Verbesserungen (Phase 3 der Mistral-Migration — Feature-Flag + Multi-Provider-Fallback-Chain)
 
@@ -3727,6 +5403,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.5.1] — 2026-05-12
 
+
+
 ### Verbesserungen (Phase 2 der Mistral-Migration — dormanter Schatten-Code)
 
 - **`functions/src/json-repair.js`** neu (~310 Zeilen): provider-agnostische 4-stufige JSON-Reparatur-Schicht.
@@ -3747,6 +5425,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **Live-System unverändert**: weder `handle-analyze.js` noch `gemini.js` importieren die neuen Module. Der Code ist dormant und wird erst in Phase 3 (Feature-Flag + Multi-Provider-Fallback) aktiviert. Deploy ist daher rein additiv ohne Verhaltens-Aenderung in Produktion.
 
 ## [1.5.0] — 2026-05-12
+
+
 
 ### Verbesserungen (Phase 1 der Mistral-Migration)
 
@@ -3777,6 +5457,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.4.0] — 2026-05-11
 
+
+
 ### Wartung (zukunftssichernd)
 
 - **SDK-Migration auf `@google/genai` 2.0.1**: Die alte `@google-cloud/vertexai` SDK (1.12.0) wird am 24.06.2026 von Google entfernt. Komplettes Refactor von `functions/src/gemini.js` auf die neue, einheitliche Gen-AI-SDK:
@@ -3790,6 +5472,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **gitleaks-action auf Node.js 24 vorgezogen**: ENV-Variable `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` im `secret-scan`-Job. GitHub forced ab 02.06.2026 ohnehin Node 24; mit dem Override verschwindet die Deprecation-Warnung schon jetzt aus den CI-Logs. Action-Version auf `v2.3.9` gepinnt (Latest).
 
 ## [1.3.2] — 2026-05-11
+
+
 
 ### Verbesserungen
 
@@ -3812,6 +5496,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.3.1] — 2026-04-19
 
+
+
 ### Sicherheit
 
 - **protobufjs RCE gefixt (CRITICAL)**: `protobufjs` auf 7.5.5 aktualisiert — schliesst Arbitrary-Code-Execution-Luecke (GHSA-xq3m-2v4x-88gg), die transitiv ueber `@google-cloud/firestore` + `@google-cloud/vision` + `firebase-admin` in die Cloud Functions gelangte.
@@ -3829,11 +5515,15 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.3.0] — 2026-03-07
 
+
+
 ### Neu
 
 - **Englische Uebersetzung**: Komplette i18n-Unterstuetzung fuer Englisch — UI-Texte, Gemini-Prompts, Tier-Profile und Schemas. Sprache wird automatisch ueber Browser-Sprache oder `?lang=en` URL-Parameter gewaehlt. Beitrag von [@MechanikGamer](https://github.com/MechanikGamer) (PR #11, Issue #4).
 
 ## [1.2.10] — 2026-02-27
+
+
 
 ### Verbesserungen
 
@@ -3850,6 +5540,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.2.9] — 2026-02-27
 
+
+
 ### Bugfixes
 
 - **Altersschaetzung bei Erwachsenen 25+ (umfassende Ueberarbeitung)**: Personen ueber 25 wurden systematisch zu jung geschaetzt — oft 10 Jahre daneben. Drei Ursachen identifiziert und behoben:
@@ -3860,6 +5552,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.2.8] — 2026-02-24
 
+
+
 ### Verbesserungen
 
 - **Altersangepasste Sprache**: Profile passen Wortwahl und Ton automatisch an das geschaetzte Alter an. Jüngere Personen bekommen einfachere Sprache ohne Fremdwoerter, aeltere sachlich-analytische Formulierungen. Untergrenze ist das Sprachniveau fuer 10-14-Jaehrige — darunter wird nicht vereinfacht. Inhalt und Schaerfe bleiben in jeder Altersstufe gleich, nur die Verpackung aendert sich. Betrifft beide Modi (Normal + Beast Mode).
@@ -3869,6 +5563,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **Normal-Modus: Erweiterte Eigenschafts-Palette**: Charaktereigenschaften von ~25 auf ~145 Begriffe massiv erweitert, geordnet in 8 Kategorien mit jeweils Staerken UND Schwaechen. Ausgewogenes Scoring wie ein echtes Profiling-System — nicht einseitig negativ. Kategorien: Psyche, Soziale Kompetenz, Gewohnheiten/Lebensstil, Gesundheit, Finanzverhalten, Beziehung, Beruf/Leistung, Weltbild/Denkweise.
 
 ## [1.2.7] — 2026-02-24
+
+
 
 ### Features
 
@@ -3883,6 +5579,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 
 ## [1.2.6] — 2026-02-23
 
+
+
 ### Bugfixes
 
 - **Stats-Zaehler setzen sich um Mitternacht zurueck**: Tages-, Wochen-, Monats- und Jahreszaehler auf der Stats-Seite zeigten nach Mitternacht weiterhin die alten Werte — bis zum naechsten Upload. `getStats()` vergleicht jetzt die gespeicherten Datums-Keys live mit dem aktuellen Wiener Datum und gibt 0 zurueck wenn sie nicht mehr passen. Kein Cron-Job noetig.
@@ -3895,6 +5593,8 @@ Auto-Ramp-Mechanismus (`MISTRAL_RAMP_*` in `config.js`, `calculateRampPct` +
 - **getStats Live-Reset**: 4 neue Tests (stale todayDate/weekStart/monthKey/yearKey → 0)
 
 ## [1.2.5] — 2026-02-22
+
+
 
 Accessibility-Verbesserungen, Hardening und Test-Ausbau.
 
@@ -3926,6 +5626,8 @@ Accessibility-Verbesserungen, Hardening und Test-Ausbau.
 
 ## [1.2.4] — 2026-02-22
 
+
+
 Wartungsmodus-Modal, Prompt-Verbesserungen und Backend-Hardening.
 
 ### Features
@@ -3955,6 +5657,8 @@ Wartungsmodus-Modal, Prompt-Verbesserungen und Backend-Hardening.
 
 ## [1.2.3] — 2026-02-22
 
+
+
 Demo-Bilder, UX-Verbesserungen und Code-Cleanup.
 
 ### Verbesserungen
@@ -3978,6 +5682,8 @@ Demo-Bilder, UX-Verbesserungen und Code-Cleanup.
 
 ## [1.2.2] — 2026-02-21
 
+
+
 Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 
 ### Sicherheit
@@ -4000,6 +5706,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 - **Testabdeckung**: 210 Backend + 126 Frontend = 336 Tests
 
 ## [1.2.1] — 2026-02-21
+
+
 
 ### Sicherheit
 
@@ -4027,6 +5735,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 
 ## [1.2.0] — 2026-02-21
 
+
+
 ### Features
 
 - **Stundenlimit mit rollendem Fenster**: Echtes rollendes 60-Minuten-Fenster basierend auf einem `recentAnalyses`-Array in Firestore. Alte Eintraege fallen automatisch heraus — sobald genug Eintraege altern, ist das System sofort wieder frei (kein starrer Countdown). Konfigurierbares Limit (Standard: 500/Stunde, zentral in `config.js`). Fail-open bei Firestore-Fehlern.
@@ -4048,6 +5758,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 
 ## [1.1.1] — 2026-02-20
 
+
+
 ### Verbesserungen
 
 - **Concurrency**: Cloud Function verarbeitet jetzt bis zu 20 gleichzeitige Anfragen pro Instanz (statt 1) — bessere Performance bei vielen Workshop-Teilnehmern
@@ -4063,6 +5775,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 - **Datenschutzseite**: Logging-Beschreibung praezisiert (genutztes Modell, Antwortlaenge erwaehnt)
 
 ## [1.1.0] — 2026-02-19
+
+
 
 ### Features
 
@@ -4119,6 +5833,8 @@ Externer Code-Review: 5 Bugfixes + 3 Hardening-Massnahmen.
 - **Datenschutzseite praezisiert**: Klarstellung dass anonymisierte Fehlerzusammenfassungen (ohne personenbezogene Daten) zur Fehlerbehebung bestehen bleiben
 
 ## [1.0.0] — 2026-02-16
+
+
 
 Erster oeffentlicher Release.
 

@@ -7,6 +7,18 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
   process.exit(1);
 }
 const wurzel = pfad.resolve(__dirname, "..");
+
+/* Die Firebase-App MUSS vor dem ersten Datenbankzugriff stehen. Ohne das
+   stuerzt jeder Aufruf mit "The default Firebase app does not exist" ab — und
+   Schritt 7 des Simulators lief ins Leere, ohne dass es auffiel: Das Skript
+   brach ab, bevor es etwas ausgeben konnte. */
+const { createRequire } = require("module");
+const req = createRequire(pfad.join(wurzel, "functions", "package.json"));
+const { initializeApp, getApps } = req("firebase-admin/app");
+if (getApps().length === 0) {
+  initializeApp({ projectId: process.env.GCLOUD_PROJECT || "malzime" });
+}
+
 const jobs = require(pfad.join(wurzel, "functions", "src", "jobs.js"));
 
 (async () => {

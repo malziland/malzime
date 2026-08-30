@@ -212,11 +212,36 @@ Analyse läuft. Der Satz kann gefahrlos vorher angelegt werden — die alte
 Fassung liest ihn nicht.
 
 ```bash
-# 1. Satz anlegen und nachmessen
+# 1. ANSEHEN, was geschrieben würde — schreibt noch nichts
 node scripts/betriebsprofil-anlegen.js
-# 2. erst danach
+
+# 2. Wirklich schreiben. Das Skript misst danach nach und sagt
+#    ausdrücklich "Bereit fuer den Deploy" — oder bricht ab.
+node scripts/betriebsprofil-anlegen.js --ausfuehren
+
+# 3. Erst danach ausliefern
 sh scripts/deploy.sh
 ```
+
+Das Skript hat vier Sicherungen, weil es in die Produktionsdatenbank schreibt:
+
+- Es **weigert sich**, wenn `FIRESTORE_EMULATOR_HOST` gesetzt ist — dann wäre
+  der Emulator gemeint, nicht die echte Datenbank.
+- Es zeigt zuerst nur an und verlangt `--ausfuehren`.
+- Es überschreibt einen vorhandenen Satz nicht ohne `--ueberschreiben`.
+- Es prüft jeden Satz **vor** dem Schreiben mit derselben Funktion, die auch
+  im Betrieb entscheidet — und liest danach zurück, statt Erfolg zu behaupten.
+
+### Drei vorbereitete Sätze
+
+| Satz | wofür |
+|---|---|
+| `t1-normal` | der Alltag |
+| `t1-langsam` | wenn die KI langsamer wird (der Fall vom 28.08.2026) |
+| `t1-drei-call` | Rollback auf die 3-Call-Pipeline — ersetzt den früheren Deploy-Schritt im RUNBOOK |
+
+Umstellen heißt: `aktiv` auf einen dieser Namen setzen. Kein Deploy, wirksam
+binnen dreißig Sekunden.
 
 ## Zurück auf den Stand davor
 

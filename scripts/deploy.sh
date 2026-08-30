@@ -190,11 +190,25 @@ fi
 # Schreibweise nennt die Datenbank statt der Regeln — mit Trockenlauf belegt:
 #   firebase deploy --only firestore:malzime-eu --dry-run  ->  compiled successfully
 #
+# NACHTRAG 30.08.2026, gemessen: Auch die richtige Schreibweise scheitert IM
+# PAKET. `firebase deploy --only hosting,functions,firestore:malzime-eu` bricht
+# mit demselben `databases/(default) 404` ab — derselbe Aufruf ALLEIN laeuft
+# durch:
+#
+#   firebase deploy --only firestore:malzime-eu
+#   -> released rules firestore.rules to cloud.firestore
+#   -> deployed indexes successfully for malzime-eu database
+#
+# Deshalb rollt dieses Skript Firestore als EIGENEN Schritt aus, vor Hosting und
+# Functions: Regeln sind eine Sicherheitsgrenze und muessen stehen, bevor neuer
+# Code dagegen laeuft. Scheitert der Schritt, bricht der Deploy ab — ein Deploy
+# mit unbekanntem Regelstand ist keiner.
+#
 # Der Fehler war bis heute unsichtbar, weil der Schritt nie etwas aenderte.
 # Er scheiterte trotzdem — und riss den GANZEN Deploy mit, bevor Functions und
 # Hosting hochgeladen waren. Die Produktion blieb dabei unversehrt; das ist
 # Glueck, kein Entwurf.
-TARGET="${1:-hosting,functions,firestore:malzime-eu}"
+TARGET="${1:-hosting,functions}"
 
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,
@@ -307,6 +321,21 @@ fi
 # gescheitert — vermutlich der eigentliche Grund, warum es seit dem 2026-07-29
 # nicht mehr benutzt wurde und die Deploys stattdessen von Hand liefen
 # (Audit 2026-08-10, OPS-001).
+# ── SCHRITT 1: Firestore-Regeln und Indizes, ALLEIN ──
+# Warum allein: siehe Kopfkommentar (Nachtrag 30.08.2026). Im Paket scheitert er.
+if [ "${SKIP_FIRESTORE:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_FIRESTORE=1 — Regeln werden NICHT ausgerollt."
+else
+  echo "── Firestore-Regeln und Indizes (malzime-eu) ──"
+  if command -v firebase >/dev/null 2>&1; then
+    firebase deploy --only firestore:malzime-eu
+  else
+    npx firebase deploy --only firestore:malzime-eu
+  fi
+  echo "Regeln ausgerollt."
+fi
+
+# ── SCHRITT 2: Hosting und Functions ──
 if command -v firebase >/dev/null 2>&1; then
   firebase deploy --only "$TARGET"
 else

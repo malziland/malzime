@@ -10,6 +10,9 @@ const { handleAdmin } = require("./handle-admin");
 const { handleErrors } = require("./handle-errors");
 const { handleTelemetry } = require("./handle-telemetry");
 const { handleEnqueue } = require("./handle-enqueue");
+/* Nur fuer die satzWache: Sie ueberträgt die Dosierung aus dem Einstellungssatz
+   in die echte Cloud-Tasks-Queue. */
+const { warteschlangeNachziehen } = require("./cloud-tasks");
 const { handleProcessJob } = require("./handle-process-job");
 const { handleJobStatus } = require("./handle-job-status");
 const { reapJobs } = require("./handle-reap");
@@ -287,12 +290,45 @@ exports.satzWache = onDocumentWritten(
       return;
     }
 
+    /* Die Warteschlange bei Google nachziehen. Sie ist die GLOBALE Bremse gegen
+       das Mistral-Limit; ohne diesen Schritt beschriebe der Einstellungssatz
+       nur, was gelten soll, und die echte Drossel bliebe stehen.
+
+       Absichtlich NACH der Gueltigkeitspruefung: Ein ungueltiger Satz darf die
+       laufende Queue nicht anfassen. */
+    const queue = await warteschlangeNachziehen({
+      parallelitaet: werte.parallelitaet,
+      queueRatePerSekunde: werte.queueRatePerSekunde,
+    });
+
+    let queueSatz;
+    if (!queue.ok) {
+      /* Der gefaehrliche Fall: Der Satz sagt etwas anderes als die Queue tut.
+         Deshalb ausdruecklich als ACHTUNG und als console.error — nicht
+         stillschweigend. */
+      queueSatz =
+        ` ACHTUNG: Die Warteschlange konnte NICHT nachgezogen werden ` +
+        `(${queue.grund}) — sie laeuft mit dem alten Tempo weiter.`;
+      console.error(
+        JSON.stringify({ step: "satz-wache", status: "queue-nicht-gesetzt", grund: queue.grund })
+      );
+    } else if (queue.geaendert) {
+      queueSatz =
+        ` Warteschlange nachgezogen: ${queue.parallel} gleichzeitig, ` +
+        `${queue.rate}/s (vorher ${queue.vorherParallel} / ${queue.vorherRate}/s).`;
+    } else {
+      queueSatz = ` Warteschlange stand bereits richtig (${queue.parallel} / ${queue.rate}/s).`;
+    }
+
     const text =
       `Einstellungssatz geaendert und uebernommen: "${profil}". ` +
       `Zeitgrenze ${Math.round(werte.singleLargeTimeoutMs / 1000)} s, ` +
       `${werte.singleLargeMaxTokens} Token, ${werte.parallelitaet} parallel, ` +
-      `${werte.stundenlimit} pro Stunde.`;
+      `${werte.stundenlimit} pro Stunde.` +
+      queueSatz;
     await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
-    console.log(JSON.stringify({ step: "satz-wache", status: "uebernommen", quelle, profil }));
+    console.log(
+      JSON.stringify({ step: "satz-wache", status: "uebernommen", quelle, profil, queue })
+    );
   }
 );

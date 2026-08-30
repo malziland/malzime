@@ -49,9 +49,25 @@ const T1_NORMAL = {
   describeMaxTokens: 2048,
   profileMaxTokens: 16000,
   requestBudgetMs: 480000,
-  parallelitaet: 7,
+  /* GESENKT 30.08.2026 von 7 auf 4 — gemessen, nicht geschaetzt. Sieben
+     gleichzeitige Analysen sind zwei Mistral-Aufrufe je Analyse, also 0,39
+     Aufrufe pro Sekunde bei erlaubten 0,25. Wir fuhren seit jeher darueber;
+     im Alltag faellt es nicht auf, bei einem echten Andrang schon. */
+  parallelitaet: 4,
   warteschlangeTiefe: 155,
-  durchschnittsdauerSekunden: 65,
+  /* DIE BREMSE. Sie wird von der `satzWache` in die echte Cloud-Tasks-Queue
+     uebertragen (maxDispatchesPerSecond) und wirkt damit GLOBAL — anders als
+     `tokenAbstand*`, das nur im Arbeitsspeicher einer Instanz zaehlt.
+
+     Rechnung: Mistral-Stufe T1 erlaubt 0,25 Aufrufe/s, jede Analyse macht
+     zwei (Analyse + Beast-Werbung) -> 0,125 Analysen/s, eine alle acht
+     Sekunden. Bei einer hoeheren Mistral-Stufe darf der Wert steigen — aber
+     erst nach einem Blick ins Mistral-Dashboard, nicht nach Gefuehl. */
+  queueRatePerSekunde: 0.125,
+  /* GEMESSEN 30.08.2026 an der Produktion: Median 40 s (34-41 s), nicht 65.
+     Der Wert steuert die angezeigte Wartezeit — zu hoch heisst, die Leute
+     warten laenger als noetig auf eine Zahl, die nie eintrifft. */
+  durchschnittsdauerSekunden: 40,
   stundenlimit: 500,
   stundenfensterMinuten: 60,
   adressLimit: 500,
@@ -87,11 +103,22 @@ const T1_NORMAL = {
    werden muss statt sechsundzwanzig. */
 const PROFILE = {
   "t1-normal": T1_NORMAL,
-  /* Wenn die KI langsamer wird — der Fall vom 28.08.2026. */
+  /* Wenn die KI langsamer wird — der Fall vom 28.08.2026. Die Bremse bleibt
+     gleich: Sie haengt am Mistral-LIMIT, nicht an der Geschwindigkeit. */
   "t1-langsam": { ...T1_NORMAL, singleLargeTimeoutMs: 450000, durchschnittsdauerSekunden: 110 },
   /* Rollback auf die 3-Call-Pipeline: weniger parallel, laengere Dauer.
-     Ersetzt den frueheren Deploy-Schritt aus dem RUNBOOK. */
-  "t1-drei-call": { ...T1_NORMAL, parallelitaet: 3, durchschnittsdauerSekunden: 100 },
+     Ersetzt den frueheren Deploy-Schritt aus dem RUNBOOK.
+
+     ACHTUNG, die Bremse muss hier ANDERS stehen: Dieser Pfad macht DREI
+     Mistral-Aufrufe je Analyse statt zwei. 0,25 / 3 = 0,083. Wer das
+     vergisst, laeuft auf dem Rollback-Pfad in genau die Fehler, vor denen
+     der Rollback schuetzen soll. */
+  "t1-drei-call": {
+    ...T1_NORMAL,
+    parallelitaet: 3,
+    queueRatePerSekunde: 0.083,
+    durchschnittsdauerSekunden: 100,
+  },
 };
 
 const ausfuehren = process.argv.includes("--ausfuehren");

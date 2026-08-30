@@ -124,6 +124,7 @@ async function checkAndIncrement() {
      zaehlt statt zu schreiben, kann deshalb nicht an derselben Ursache
      scheitern — und braucht kein Warten. Zwei kurze Versuche fangen die
      zufaellige Kollision ab; alles darueber uebernimmt das Netz sofort. */
+  const ZAEHLER_ZEITLIMIT_MS = 2000;
   const ABORTED_RETRIES = 2;
   let lastErr = null;
   /* Einstellungssatz EINMAL vor der Transaktionsschleife holen — innerhalb
@@ -134,80 +135,99 @@ async function checkAndIncrement() {
       const db = datenbank();
       const ref = db.doc(CURRENT_DOC);
 
-      const result = await db.runTransaction(async (tx) => {
-        const snap = await tx.get(ref);
-        const data = snap.exists ? snap.data() : {};
+      /* EIGENES ZEITLIMIT UM DIE TRANSAKTION (30.08.2026).
+         GEMESSEN: Ohne das hingen 75 % der Anfragen 54 Sekunden. Nicht wegen
+         der eigenen Wiederholungen (die warten 240 ms), sondern weil Firestore
+         selbst sehr lange auf die Dokumentsperre wartet, bevor es aufgibt.
+         Bei 170 gleichzeitigen Anfragen auf EIN Dokument steht alles.
 
-        /* Das Zeitfenster gehoert zum Limit — eine Zahl ohne ihren Bezugsraum
+         Zwei Sekunden sind grosszuegig fuer eine Transaktion auf einem kleinen
+         Dokument und kurz genug, dass niemand es merkt. Danach uebernimmt das
+         Netz — es zaehlt nur und antwortet sofort. */
+      const result = await Promise.race([
+        db.runTransaction(async (tx) => {
+          const snap = await tx.get(ref);
+          const data = snap.exists ? snap.data() : {};
+
+          /* Das Zeitfenster gehoert zum Limit — eine Zahl ohne ihren Bezugsraum
            ist keine Einstellung. Reihenfolge: Einstellungssatz, dann ein
            gesetzter Wert im Dokument, dann die Konstante. */
-        /* EINE QUELLE: Das Zeitfenster kommt aus dem Einstellungssatz. Der
+          /* EINE QUELLE: Das Zeitfenster kommt aus dem Einstellungssatz. Der
            Wert im Dokument stammt nur noch aus einem laufenden Boost. */
-        const wm = satzwerte.stundenfensterMinuten;
-        const windowMs = wm * 60 * 1000;
-        const now = Date.now();
+          const wm = satzwerte.stundenfensterMinuten;
+          const windowMs = wm * 60 * 1000;
+          const now = Date.now();
 
-        /* Rollendes Fenster: nur Analysen der letzten Stunde */
-        const recent = filterRecent(data.recentAnalyses, now, windowMs);
+          /* Rollendes Fenster: nur Analysen der letzten Stunde */
+          const recent = filterRecent(data.recentAnalyses, now, windowMs);
 
-        /* BIZ-2026-08-20-28: Ein abgelaufener Boost faellt hier zurueck — aber nur,
+          /* BIZ-2026-08-20-28: Ein abgelaufener Boost faellt hier zurueck — aber nur,
            wenn er gerade nicht gebraucht wird (siehe wirksamesLimit). Der
            Rueckfall wird gleich mitgeschrieben, damit /stats und der naechste
            Aufruf dasselbe sehen. */
-        const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length, satzwerte?.stundenlimit);
+          const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length, satzwerte?.stundenlimit);
 
-        /* Limit erreicht → blockieren */
-        if (recent.length >= limit) {
-          const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
-          return {
-            allowed: false,
-            retryAfterSeconds,
-            count: recent.length,
-            limit,
-            hourlyTotal: recent.length,
-          };
-        }
+          /* Limit erreicht → blockieren */
+          if (recent.length >= limit) {
+            const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
+            return {
+              allowed: false,
+              retryAfterSeconds,
+              count: recent.length,
+              limit,
+              hourlyTotal: recent.length,
+            };
+          }
 
-        /* Unter dem Limit → Analyse erlauben */
-        recent.push(now);
-        const justReached = recent.length === limit;
+          /* Unter dem Limit → Analyse erlauben */
+          recent.push(now);
+          const justReached = recent.length === limit;
 
-        if (snap.exists) {
-          /* BIZ-2026-08-20-28: Ist der Boost verfallen, wird der Deckel in
+          if (snap.exists) {
+            /* BIZ-2026-08-20-28: Ist der Boost verfallen, wird der Deckel in
              derselben Transaktion zurueckgeschrieben — sonst wuerde er bei jedem
              Aufruf neu "verfallen", ohne je im Dokument anzukommen, und /stats
              zeigte weiter den erhoehten Wert. */
-          const aenderung = boostVerfallen
-            ? { recentAnalyses: recent, limit: satzwerte.stundenlimit, limitBis: null }
-            : { recentAnalyses: recent };
-          if (boostVerfallen) {
-            console.log(
-              JSON.stringify({
-                step: "boost-verfallen",
-                zurueckAuf: satzwerte.stundenlimit,
-                imFenster: recent.length,
-                hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
-              })
-            );
+            const aenderung = boostVerfallen
+              ? { recentAnalyses: recent, limit: satzwerte.stundenlimit, limitBis: null }
+              : { recentAnalyses: recent };
+            if (boostVerfallen) {
+              console.log(
+                JSON.stringify({
+                  step: "boost-verfallen",
+                  zurueckAuf: satzwerte.stundenlimit,
+                  imFenster: recent.length,
+                  hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
+                })
+              );
+            }
+            tx.update(ref, aenderung);
+          } else {
+            tx.set(ref, {
+              recentAnalyses: recent,
+              limit: satzwerte.stundenlimit,
+              windowMinutes: satzwerte.stundenfensterMinuten,
+            });
           }
-          tx.update(ref, aenderung);
-        } else {
-          tx.set(ref, {
-            recentAnalyses: recent,
-            limit: satzwerte.stundenlimit,
-            windowMinutes: satzwerte.stundenfensterMinuten,
-          });
-        }
 
-        return {
-          allowed: true,
-          retryAfterSeconds: 0,
-          count: recent.length,
-          limit,
-          hourlyTotal: recent.length,
-          justReached,
-        };
-      });
+          return {
+            allowed: true,
+            retryAfterSeconds: 0,
+            count: recent.length,
+            limit,
+            hourlyTotal: recent.length,
+            justReached,
+          };
+        }),
+        new Promise((_, ab) => {
+          const uhr = setTimeout(() => {
+            const f = new Error("Zeitlimit 2000 ms fuer den Stundenzaehler");
+            f.code = 10; /* wie ABORTED behandeln: Wiederholung, dann Netz */
+            ab(f);
+          }, ZAEHLER_ZEITLIMIT_MS);
+          if (typeof uhr.unref === "function") uhr.unref();
+        }),
+      ]);
 
       return result;
     } catch (err) {
@@ -229,16 +249,15 @@ async function checkAndIncrement() {
          v1.10.6: Routinemaessige ABORTED-Kontention wird VORHER 2× geretried
          und triggert hier nur den ERROR-Pfad, wenn auch das nicht reicht. */
       const reason = isAborted ? "aborted-retries-exhausted" : "firestore-error";
-      console.error(
-        JSON.stringify({
-          severity: "ERROR",
-          alert: "counter-fail-open",
-          warning: "counter-error",
-          reason,
-          message: "Stundenlimit-Zaehler fehlgeschlagen — globale Kostenbremse momentan inaktiv",
-          error: err.message,
-        })
-      );
+
+      /* ZUERST DAS NETZ, DANN DIE MELDUNG.
+         Frueher stand hier ein ERROR mit dem Text "globale Kostenbremse
+         momentan inaktiv" — und zwar BEVOR ueberhaupt versucht wurde, sie
+         anderweitig zu halten. Nach dem Einbau des Netzes war dieser Text
+         schlicht falsch: Im Simulator meldete er 169 Mal einen Ausfall,
+         waehrend das Netz jedes Mal korrekt entschieden hatte.
+         169 Fehlalarme pro Workshop haetten die echte Meldung unauffindbar
+         gemacht. */
       /* ZUERST DAS NETZ: Der Zaehler ist ausgefallen, aber die Kostenbremse
          darf es nicht sein. Das Netz zaehlt statt zu schreiben und kann
          deshalb nicht an derselben Ursache scheitern. */

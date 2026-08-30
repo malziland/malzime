@@ -114,6 +114,63 @@ describe("Kostenbremse — sie hält auch, wenn der Zähler ausfällt", () => {
     expect(fehlerZeilen.join(" ")).toContain("KEINE Kostenbremse aktiv");
   }, 30000);
 
+  test("wenn das Netz übernimmt, gibt es KEINEN Fehleralarm", async () => {
+    /* BEFUND aus dem Simulator (30.08.2026): Nach dem Einbau des Netzes
+       meldete der Code weiterhin 169 Mal "globale Kostenbremse momentan
+       inaktiv" — obwohl das Netz jedes Mal korrekt entschieden hatte. Der
+       Text war falsch, und 169 Fehlalarme pro Workshop hätten die eine echte
+       Meldung unauffindbar gemacht.
+
+       Ein Alarm, der bei Normalbetrieb feuert, ist schlimmer als keiner:
+       Man gewöhnt sich an ihn und übersieht den Ernstfall. */
+    mockDb = firestoreMitKontention(5);
+    const e = await counter.checkAndIncrement();
+
+    expect(e.allowed).toBe(true);
+    expect(e.notbremse).toBe(true);
+    /* KEIN counter-fail-open, solange das Netz trägt. */
+    expect(fehlerZeilen.join(" ")).not.toContain("counter-fail-open");
+  }, 30000);
+
+  test("blockiert das Netz, wird das SEHR WOHL gemeldet", async () => {
+    /* Die andere Richtung: Wenn die Notbremse wirklich eingreift, ist das ein
+       Betriebszustand, von dem der Betreiber erfahren muss. */
+    mockDb = firestoreMitKontention(SATZ.stundenlimit + 10);
+    await counter.checkAndIncrement();
+    expect(fehlerZeilen.join(" ")).toContain("notbremse-gegriffen");
+  }, 30000);
+
+  test("ein HÄNGENDER Zähler wird nach zwei Sekunden abgebrochen", async () => {
+    /* GEMESSEN im Simulator (30.08.2026): Ohne eigenes Zeitlimit hingen 75 %
+       der Anfragen 54 Sekunden. Nicht wegen der eigenen Wiederholungen — die
+       warten 240 ms —, sondern weil Firestore selbst sehr lange auf die
+       Dokumentsperre wartet, bevor es aufgibt.
+
+       Hier hängt die Transaktion für immer. Der Test muss trotzdem in
+       überschaubarer Zeit zurückkommen: Das Zeitlimit greift, danach das Netz. */
+    mockDb = {
+      doc: () => ({ get: async () => ({ exists: false, data: () => ({}) }) }),
+      collection: () => ({
+        where: function () {
+          return this;
+        },
+        count: () => ({ get: async () => ({ data: () => ({ count: 7 }) }) }),
+        doc: () => ({ get: async () => ({ exists: false }) }),
+      }),
+      /* Hängt für immer — wie eine Transaktion, die auf eine Sperre wartet. */
+      runTransaction: () => new Promise(() => {}),
+    };
+    const start = Date.now();
+    const e = await counter.checkAndIncrement();
+    const dauer = Date.now() - start;
+
+    expect(e.notbremse).toBe(true);
+    expect(e.count).toBe(7);
+    /* Zwei Sekunden Zeitlimit, zwei Wiederholungen, etwas Wartezeit dazwischen:
+       unter zehn Sekunden. Ohne das Zeitlimit käme der Aufruf NIE zurück. */
+    expect(dauer).toBeLessThan(10000);
+  }, 30000);
+
   test("das Netz kostet nichts, solange der Zähler läuft", async () => {
     /* Es darf nur im Ausfall greifen — sonst zahlt jeder Upload für einen
        Fall, der fast nie eintritt. */

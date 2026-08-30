@@ -67,6 +67,47 @@ else
     LAGE=$(gh api "repos/malziland/malzime/commits/$SHA/check-runs" \
       --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
             | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+
+    # ── Wenn main noch prüft: zählt der Lauf des PR, sofern der Code IDENTISCH ist ──
+    #
+    # BEFUND 30.08.2026: Die sechs Pflicht-Checks liefen zweimal über denselben
+    # Code — einmal auf dem Zweig, einmal auf `main` nach dem Squash-Merge. Der
+    # längste (`test-e2e`) dauert im Schnitt 8:41, gemessen über fünf Läufe.
+    # Das sind rund neun Minuten Wartezeit pro Auslieferung, für eine Prüfung,
+    # die dasselbe Ergebnis liefern MUSS.
+    #
+    # Muss sie das wirklich? Ja, und das ist beweisbar: Git berechnet für jeden
+    # Dateistand eine Baum-Kennung. Ist sie gleich, ist jede Datei bitgenau
+    # gleich — dann kann eine Prüfung gar nichts anderes finden. An den fünf
+    # letzten Zusammenführungen (#229 bis #234) nachgemessen: jedes Mal
+    # identisch.
+    #
+    # Der Riegel bleibt also derselbe, er akzeptiert nur einen zweiten Beleg
+    # für dieselbe Aussage. FAIL-CLOSED an jeder Stelle: Ohne PR-Nummer, ohne
+    # auffindbaren Kopf-Commit oder bei abweichendem Baum passiert nichts —
+    # dann gilt weiter, was `main` sagt.
+    if [ -n "$(printf '%s\n' "$LAGE" | grep -E '=(pending|null|)$' || true)" ]; then
+      PRNR=$(git log -1 --format=%s | grep -oE '#[0-9]+' | tail -1 | tr -d '#' || true)
+      if [ -n "$PRNR" ] && command -v gh >/dev/null 2>&1; then
+        PRKOPF=$(gh pr view "$PRNR" --json headRefOid -q .headRefOid 2>/dev/null || true)
+        if [ -n "$PRKOPF" ]; then
+          git fetch -q origin "$PRKOPF" 2>/dev/null || true
+          BAUM_HIER=$(git rev-parse "HEAD^{tree}" 2>/dev/null || echo "x")
+          BAUM_PR=$(git rev-parse "${PRKOPF}^{tree}" 2>/dev/null || echo "y")
+          if [ "$BAUM_HIER" = "$BAUM_PR" ]; then
+            LAGE_PR=$(gh api "repos/malziland/malzime/commits/$PRKOPF/check-runs" \
+              --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
+                    | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+            if [ -n "$LAGE_PR" ]; then
+              echo "Stand-Bindung: main prueft noch, aber PR #${PRNR} hat denselben Baum"
+              echo "               (${BAUM_HIER:0:8}) — dessen Ergebnisse gelten."
+              LAGE="$LAGE_PR"
+            fi
+          fi
+        fi
+      fi
+    fi
+
     if [ -z "$LAGE" ]; then
       echo "FEHLER: CI-Ergebnis für $SHA nicht abrufbar — Abbruch statt Deploy auf Verdacht." >&2
       echo "        Notschalter: SKIP_STAND=1" >&2
@@ -84,12 +125,31 @@ else
 fi
 
 # ── Test-Guard: Lint + Unit-Tests muessen gruen sein (Deploy-Konvention) ──
+#
+# BEFUND 30.08.2026: Diese drei Laeufe dauern rund drei Minuten und pruefen
+# denselben Code, den die Pipeline eben schon geprueft hat. Sie sind eine
+# ECHTE Doppelung, keine zweite Meinung:
+#
+#   · Die Stand-Bindung oben verlangt einen SAUBEREN Arbeitsbaum und
+#     HEAD == origin/main. Damit ist der Code hier bitgenau derselbe, der in
+#     der CI gelaufen ist.
+#   · Sie verlangt ausserdem, dass alle sechs Pflicht-Checks fuer genau diesen
+#     Commit gruen sind — darunter test-backend und test-frontend, also
+#     dieselben Suiten.
+#
+# Deshalb laufen sie nur noch, wenn die Stand-Bindung NICHT gegriffen hat.
+# Genau dann sind sie das Einzige, was zwischen ungepruefte Aenderungen und
+# die Produktion tritt — und dann laufen sie vollstaendig.
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_TESTS=1 gesetzt — Lint und Tests werden UEBERSPRUNGEN."
-else
+elif [ "${SKIP_STAND:-0}" = "1" ]; then
+  echo "— Lint und Tests (die Stand-Bindung war abgeschaltet, also hier vollstaendig)"
   npm run lint
   npm test --prefix functions
   npm run test:frontend
+else
+  echo "— Lint und Tests uebersprungen: Die Stand-Bindung hat sie bereits belegt"
+  echo "  (sauberer Baum, HEAD == origin/main, sechs Pflicht-Checks gruen)."
 fi
 
 # ── OPS-2026-08-12-25: Riegel gegen ein unbekanntes Auslieferungswerkzeug ──

@@ -380,7 +380,17 @@ function sanftZentrieren(el) {
     const r = el.getBoundingClientRect();
     const h = sichtbareHoehe();
     const obenJetzt = window.scrollY || window.pageYOffset || 0;
-    const ziel = Math.max(0, obenJetzt + r.top + r.height / 2 - h / 2);
+    /* OBERES DRITTEL STATT MITTE (30.08.2026, zweite Nachbesserung).
+       Mittig reichte nicht: Safari meldet die sichtbare Hoehe zeitweise zu
+       grosszuegig — die eingeblendete Werkzeugleiste ist dann nicht
+       eingerechnet. Bei mittiger Ausrichtung verschwand die untere Haelfte des
+       Blocks (Text und Fortschrittsbalken) hinter der Leiste, waehrend das
+       Auge selbst sichtbar war. Genau so hat der Nutzer es fotografiert.
+
+       Das obere Drittel gibt unten Reserve: Selbst wenn die gemeldete Hoehe um
+       ein Drittel zu gross ist, bleibt der ganze Block im Bild. Oben geht
+       nichts verloren — dort steht nur das Foto, das man ohnehin kennt. */
+    const ziel = Math.max(0, obenJetzt + r.top - h / 4);
     if (typeof window.scrollTo === "function") {
       window.scrollTo({ top: ziel, behavior: "smooth" });
       return;

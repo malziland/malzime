@@ -4,37 +4,23 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [4.2.4] — 2026-08-30
-
-### Behoben
-
-- **Das Scan-Auge wird auf dem iPhone jetzt wirklich ins Bild geholt.** Die
-  Korrektur davor erkannte zwar richtig, dass die Adressleiste es verdeckt —
-  das Zurückholen selbst benutzte aber die eingebaute Browser-Funktion, und die
-  zentriert im Fenster einschließlich der Leiste. Der Browser scrollte also,
-  hielt es für erledigt, und das Auge blieb dahinter; danach unternahm die
-  Wache nichts mehr, weil sie ihren Versuch als abgeschlossen verbucht hatte.
-
-  Die Zielposition wird jetzt selbst gerechnet, bezogen auf die tatsächlich
-  sichtbare Fläche. Nachgestellt mit echtem Upload bei Handy-Maßen: vorher
-  fünfundfünfzig Bildpunkte verdeckt und keine Bewegung, nachher vollständig
-  im Bild.
-
 ## [4.2.3] — 2026-08-30
 
 ### Behoben
 
-- **Am iPhone wird das Scan-Auge nicht mehr von der Adressleiste verdeckt.**
-  Die Seite prüfte, ob das Auge im Fenster liegt — und rechnete dabei mit einer
-  Fensterhöhe, die auf dem iPhone die eingeblendete Adress- und Werkzeugleiste
-  mitzählt. Für die Rechnung lag das Auge damit im Bild, für den Betrachter
-  hinter der Leiste; nachgeholt wurde es deshalb nie. Auf dem Desktop
-  funktionierte dasselbe einwandfrei, weil dort keine Leisten ein- und
-  ausfahren. Gemessen wird jetzt die tatsächlich sichtbare Fläche, die sich
-  mitverändert, wenn die Leisten erscheinen oder verschwinden.
+- **Am iPhone bleibt die Scan-Anzeige vollständig sichtbar.** Auge, Text und
+  Fortschrittsbalken verschwanden auf dem Handy hinter der Adressleiste — man
+  sah sein Foto, aber nicht, dass die Analyse läuft. Auf dem Desktop trat das
+  nie auf, weil dort keine Leisten ein- und ausfahren.
 
-
-### Behoben
+  Zwei Ursachen, beide behoben: Die Prüfung, ob die Anzeige im Bild liegt,
+  rechnete mit der Fensterhöhe — und die zählt auf dem iPhone die Leisten mit.
+  Und das Zurückholen benutzte die eingebaute Browser-Funktion, die ebenfalls
+  im Fenster zentriert; der Browser scrollte also, hielt es für erledigt, und
+  die Anzeige blieb dahinter. Beides rechnet jetzt mit der tatsächlich
+  sichtbaren Fläche, und die Anzeige wird ins obere Drittel geholt statt in die
+  Mitte — so bleibt sie auch dann vollständig sichtbar, wenn der Browser die
+  Höhe zu großzügig meldet.
 
 - **Wer während der Wartezeit scrollt, bekommt den mitlaufenden Text trotzdem
   zu sehen.** Bisher gab die Seite die Führung beim ersten Wischen endgültig
@@ -46,11 +32,6 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Zum Tippbeginn wird die Führung jetzt genau einmal neu scharf gestellt. Ab
   da gilt der Vorrang des Lesers wieder wie zuvor: Wer während des Tippens
   scrollt, übernimmt endgültig.
-
-- **Das Scan-Auge wird erst dann als sichtbar gewertet, wenn es ganz ins Bild
-  passt.** Die bisherige Regel ließ die halbe Höhe genügen — ein zur Hälfte
-  angeschnittenes Auge galt damit als sichtbar und wurde nie nachgezogen. Auf
-  kleinen Bildschirmen stand deshalb oft nur ein halber Kreis am Rand.
 
 ### Prüfkette
 

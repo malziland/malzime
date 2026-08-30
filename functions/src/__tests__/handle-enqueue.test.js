@@ -7,8 +7,6 @@
    ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
-const { SATZ } = require("../test-satz");
-
 jest.mock("../counter", () => ({
   getMaintenanceStatus: jest.fn(),
   checkAndIncrement: jest.fn(),

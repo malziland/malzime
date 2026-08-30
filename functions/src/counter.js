@@ -263,7 +263,26 @@ async function checkAndIncrement() {
          deshalb nicht an derselben Ursache scheitern. */
       if (satzwerte) {
         const netz = await notbremseUeberJobs(satzwerte.stundenfensterMinuten * 60 * 1000, satzwerte.stundenlimit);
-        if (netz) return { ...netz, error: err.message };
+        if (netz) {
+          /* Als HINWEIS protokollieren, nicht als Fehler: Die Bremse ist nicht
+             ausgefallen, sie hat nur den zweiten Weg genommen. Ein Alarm waere
+             hier falsch — im Simulator waeren es 169 Meldungen pro Lauf
+             gewesen, und die eine echte ginge darin unter.
+             Die beiden Ernstfaelle meldet notbremseUeberJobs selbst:
+             "notbremse-gegriffen" (blockiert) und "notbremse-fehlgeschlagen"
+             (auch das Netz reisst). */
+          console.log(
+            JSON.stringify({
+              step: "kostenbremse",
+              status: "netz-hat-uebernommen",
+              grund: reason,
+              inDerStunde: netz.count,
+              limit: netz.limit,
+              entscheidung: netz.allowed ? "eingelassen" : "blockiert",
+            })
+          );
+          return { ...netz, error: err.message };
+        }
       }
 
       /* Erst wenn AUCH das Netz reisst: fail-open, damit ein Datenbankproblem

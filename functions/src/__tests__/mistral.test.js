@@ -288,7 +288,7 @@ describe("callMistralRaw 429 retry behavior", () => {
 /* ── callMistralRaw: Throttle-Integration (REL-01) ─────────────── */
 
 describe("callMistralRaw throttle integration (REL-01)", () => {
-  const { getMistralStats, DEFAULT_MAX_CONCURRENT } = require("../throttle");
+  const { getMistralStats } = require("../throttle");
 
   test("routes every call through the per-instance semaphore — concurrency stays capped", async () => {
     let maxObserved = 0;

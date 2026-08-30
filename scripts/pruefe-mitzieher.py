@@ -41,6 +41,23 @@ def lauf(*befehl):
         return None
 
 
+def _hunk_fuer(diff, dateien):
+    """Gibt nur die Diff-Abschnitte der genannten Dateien zurueck.
+
+    Ohne diese Eingrenzung wuerde ein Ausloeser-Muster im ganzen Diff gesucht:
+    Eine passende Zeile in einer voellig anderen Datei loeste dann eine Regel
+    aus, die mit ihr nichts zu tun hat (Befund 31.08.2026).
+    """
+    abschnitte = []
+    aktuell = None
+    for zeile in diff.split("\n"):
+        if zeile.startswith("diff --git "):
+            aktuell = any(d in zeile for d in dateien)
+        if aktuell:
+            abschnitte.append(zeile)
+    return "\n".join(abschnitte)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # DIE REGELN
 #
@@ -79,7 +96,7 @@ REGELN = [
     },
     {
         "name": "Neue Seite unter public/",
-        "ausloeser_datei": r"public/[a-z-]+\.html",
+        "ausloeser_datei": r"public/(?:[a-z]+/)?[a-z0-9-]+\.html",
         "ausloeser_muster": None,  # das blosse Anlegen zaehlt
         "nur_neue": True,
         "begleiter": ["scripts/deploy.sh"],
@@ -90,9 +107,18 @@ REGELN = [
         ),
     },
     {
+        # BEFUND 31.08.2026: Diese Regel hatte eine LEERE Begleiter-Liste und
+        # meldete deshalb immer "ok" — sie konnte per Konstruktion nie
+        # anschlagen. Ein Waechter, der nicht rot werden kann, ist Zierrat.
+        #
+        # Zustaendig fuer diesen Fall ist ohnehin pruefe-doppelte-werte.py: Er
+        # geht vom Code aus und verlangt fuer jede Zahlenkonstante entweder
+        # einen Platz im Einstellungssatz oder die Begruendung BLEIBT IM CODE.
+        # Die Regel hier waere eine schwaechere Doppelung gewesen.
         "name": "Neuer Betriebswert im Code statt im Satz",
         "ausloeser_datei": "functions/src/config.js",
         "ausloeser_muster": r"^\+const [A-Z_]+ = \d",
+        "abgeschaltet": "geprueft von pruefe-doppelte-werte.py",
         "begleiter": [],
         "warum": (
             "Zahlen gehoeren in den Einstellungssatz, nicht in den Code. Bleibt sie\n"
@@ -121,25 +147,35 @@ def main():
     # Ohne die Probe waere er als "gruen" durchgegangen, ohne je etwas
     # gemessen zu haben. Jetzt zaehlt beides: was seit dem Vergleichsstand
     # committet wurde UND was im Arbeitsbaum liegt.
-    teile = []
+    # BEFUND 31.08.2026 (unvorbelastetes Review), drei Fehler auf einmal:
+    #
+    #   · `git diff <ref>` OHNE die drei Punkte zeigt auch, was seit dem
+    #     Abzweig auf `main` passiert ist. Ein PR, der hinter main liegt, bekam
+    #     so fremde Dateien in seine Liste — und lief in Fehlalarme.
+    #   · Neue Dateien wurden nicht von geaenderten unterschieden. Die Regel
+    #     "Neue Seite unter public/" feuerte deshalb auf JEDE Beruehrung einer
+    #     HTML-Datei — und haette jeden Cache-Buster-PR blockiert, der nach
+    #     JEDEM Deploy anfaellt. Die Auslieferungskette haette gestanden.
+    #   · Ein erfolgreicher Diff mit leerer Ausgabe galt als "nichts zu
+    #     pruefen". Genau im main-Lauf, an den die Stand-Bindung des Deploys
+    #     gebunden ist, mass der Waechter damit gar nichts.
     committet = lauf("git", "diff", "--name-only", f"{vergleich}...HEAD")
-    if committet:
-        teile += [z for z in committet.split("\n") if z.strip()]
-    # Ohne die drei Punkte: Arbeitsbaum gegen den Vergleichsstand.
-    arbeitsbaum = lauf("git", "diff", "--name-only", vergleich)
-    if arbeitsbaum:
-        teile += [z for z in arbeitsbaum.split("\n") if z.strip()]
-    # Auch noch nicht verfolgte Dateien zaehlen — eine neue Seite ist neu.
-    neue = lauf("git", "ls-files", "--others", "--exclude-standard")
-    if neue:
-        teile += [z for z in neue.split("\n") if z.strip()]
+    arbeitsbaum = lauf("git", "diff", "--name-only", "HEAD")
+    neue_dateien = lauf("git", "ls-files", "--others", "--exclude-standard")
+    # Welche Dateien sind seit dem Vergleichsstand NEU entstanden? Nur fuer die
+    # gilt eine Regel mit `nur_neue`.
+    hinzugefuegt = lauf("git", "diff", "--name-only", "--diff-filter=A", f"{vergleich}...HEAD")
 
     if committet is None and arbeitsbaum is None:
-        print("  NICHT MESSBAR: git diff liefert nichts.")
+        print("  NICHT MESSBAR: git diff liefert nichts — kein Vergleichsstand?")
         print("  Ein leeres Ergebnis ist zuerst ein Verdacht gegen die Messung.")
         return 2
 
-    geaendert = sorted(set(teile))
+    def zeilen(t):
+        return [z for z in (t or "").split("\n") if z.strip()]
+
+    geaendert = sorted(set(zeilen(committet) + zeilen(arbeitsbaum) + zeilen(neue_dateien)))
+    neu_entstanden = set(zeilen(hinzugefuegt) + zeilen(neue_dateien))
     if not geaendert:
         print("  Keine Aenderungen gefunden — nichts zu pruefen.")
         return 0
@@ -147,19 +183,40 @@ def main():
     print(f"  Geaenderte Dateien: {len(geaendert)}")
     print()
 
-    diff = (lauf("git", "diff", f"{vergleich}...HEAD") or "") + "\n" + (lauf("git", "diff", vergleich) or "")
+    diff = (lauf("git", "diff", f"{vergleich}...HEAD") or "") + "\n" + (lauf("git", "diff", "HEAD") or "")
 
     funde = []
 
     for regel in REGELN:
+        # Eine ausdruecklich abgeschaltete Regel wird GENANNT, nicht
+        # stillschweigend uebersprungen. Sonst weiss niemand, dass sie da ist.
+        if regel.get("abgeschaltet"):
+            print(f"  ---   {regel['name']}: abgeschaltet ({regel['abgeschaltet']})")
+            continue
+
         muster_datei = regel["ausloeser_datei"]
         betroffen = [d for d in geaendert if re.fullmatch(muster_datei, d) or d == muster_datei]
         if not betroffen:
             continue
 
+        # BEFUND 31.08.2026: `nur_neue` stand in der Regel und wurde NIRGENDS
+        # gelesen. Die Regel "Neue Seite unter public/" feuerte deshalb auf
+        # jede Beruehrung einer HTML-Datei — und haette jeden Cache-Buster-PR
+        # blockiert, der nach jedem Deploy anfaellt.
+        if regel.get("nur_neue"):
+            betroffen = [d for d in betroffen if d in neu_entstanden]
+            if not betroffen:
+                continue
+
         # Wurde das Muster wirklich hinzugefuegt?
+        #
+        # BEFUND 31.08.2026: Gesucht wurde im GANZEN Diff. Wird die
+        # Ausloeser-Datei aus anderem Grund beruehrt und steht irgendwo sonst
+        # eine passende Zeile, entstand ein Fehlalarm. Jetzt wird nur der
+        # Abschnitt dieser Datei durchsucht.
         if regel["ausloeser_muster"]:
-            treffer = re.findall(regel["ausloeser_muster"], diff, re.M)
+            abschnitt = _hunk_fuer(diff, betroffen)
+            treffer = re.findall(regel["ausloeser_muster"], abschnitt, re.M)
             if not treffer:
                 continue
             was = ", ".join(sorted(set(treffer))[:4])

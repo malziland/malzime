@@ -177,11 +177,16 @@ function parseDescribeFooter(text) {
   return { description, hardFacts, ads: ads.slice(0, 12), triggers: triggers.slice(0, 8) };
 }
 
+/* NUR was ausserhalb gebraucht wird. `dekodiereJsonEscapes` und
+   `PROFILE_TEXT_SCHLUESSEL` sind hausintern — sie standen hier, weil sie beim
+   Herausloesen mitgewandert sind, und niemand hat sie je von aussen gerufen.
+   Ein Export ohne Nutzer ist ein Versprechen, das nichts einloest: Er sieht
+   nach oeffentlicher Schnittstelle aus und bindet damit die Freiheit, das
+   Innere zu aendern. (Gefunden 31.08.2026 beim Abgleich gegen den Code —
+   nicht gegen eine Liste.) */
 module.exports = {
   findeProfileTextWert,
-  dekodiereJsonEscapes,
   parseDescribeFooter,
-  PROFILE_TEXT_SCHLUESSEL,
   KARTEN_WERT_SCHLUESSEL,
   KARTEN_LABEL_SCHLUESSEL,
 };

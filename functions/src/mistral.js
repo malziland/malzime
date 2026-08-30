@@ -24,9 +24,7 @@ const { withMistralSlot } = require("./throttle");
    einer eigenen Datei — reine Funktionen, kein Netz, kein Zustand. */
 const {
   findeProfileTextWert,
-  dekodiereJsonEscapes,
   parseDescribeFooter,
-  PROFILE_TEXT_SCHLUESSEL,
   KARTEN_WERT_SCHLUESSEL,
   KARTEN_LABEL_SCHLUESSEL,
 } = require("./mistral-antwort");

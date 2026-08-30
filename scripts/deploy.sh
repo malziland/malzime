@@ -86,7 +86,13 @@ else
     # für dieselbe Aussage. FAIL-CLOSED an jeder Stelle: Ohne PR-Nummer, ohne
     # auffindbaren Kopf-Commit oder bei abweichendem Baum passiert nichts —
     # dann gilt weiter, was `main` sagt.
-    if [ -n "$(printf '%s\n' "$LAGE" | grep -E '=(pending|null|)$' || true)" ]; then
+    # BEFUND 31.08.2026 (unvorbelastetes Review): Hier stand
+    # `grep -E '=(pending|null|)$'`. Die leere Alternative lehnt BSD-grep ab
+    # ("empty (sub)expression") — also genau auf dem Rechner, von dem
+    # ausgeliefert wird. Durch `|| true` wurde der Fehlschlag geschluckt, die
+    # Abkuerzung griff NIE, und der einzige Hinweis war eine Fehlerzeile im
+    # Protokoll, die wie Rauschen aussieht.
+    if printf '%s\n' "$LAGE" | grep -qE '=(pending|null)$'; then
       PRNR=$(git log -1 --format=%s | grep -oE '#[0-9]+' | tail -1 | tr -d '#' || true)
       if [ -n "$PRNR" ] && command -v gh >/dev/null 2>&1; then
         PRKOPF=$(gh pr view "$PRNR" --json headRefOid -q .headRefOid 2>/dev/null || true)
@@ -107,9 +113,31 @@ else
               --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
                     | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
             if [ -n "$LAGE_PR" ]; then
-              echo "Stand-Bindung: main prueft noch, aber PR #${PRNR} hat denselben Baum"
-              echo "               (${BAUM_HIER:0:8}) — dessen Ergebnisse gelten."
-              LAGE="$LAGE_PR"
+              # SICHERHEITSBEFUND 31.08.2026 (unvorbelastetes Review): Hier
+              # stand `LAGE="$LAGE_PR"` — die GESAMTE Lage von main wurde
+              # ersetzt. Steht auf main ein Pflicht-Check auf `failure` und
+              # ein anderer noch auf `pending` (der Normalfall: die schnellen
+              # sind fertig, e2e laeuft noch), verdraengte das gruene Ergebnis
+              # des PR das ROTE von main. Ein Stand mit rotem Pflicht-Check
+              # waere ausgeliefert worden — das war vorher nicht moeglich.
+              #
+              # Jetzt wird NUR nachgetragen, was auf main noch aussteht. Ein
+              # `failure` bleibt ein `failure`, egal was der PR sagt.
+              NEUE_LAGE=""
+              for EINTRAG in $LAGE; do
+                NAME="${EINTRAG%%=*}"
+                WERT="${EINTRAG#*=}"
+                if [ "$WERT" = "pending" ] || [ "$WERT" = "null" ] || [ -z "$WERT" ]; then
+                  ERSATZ=$(printf '%s\n' "$LAGE_PR" | grep "^${NAME}=" || true)
+                  [ -n "$ERSATZ" ] && EINTRAG="$ERSATZ"
+                fi
+                NEUE_LAGE="$NEUE_LAGE$EINTRAG
+"
+              done
+              echo "Stand-Bindung: main prueft noch, PR #${PRNR} hat denselben Baum"
+              echo "               (${BAUM_HIER:0:8}) — dessen Ergebnisse gelten fuer die"
+              echo "               noch ausstehenden Pruefungen. Rote bleiben rot."
+              LAGE="$NEUE_LAGE"
             fi
           fi
         fi
@@ -371,8 +399,33 @@ echo "Cache-Busting-Version: ?v=$VERSION"
 # Die Falle raeumt nur auf, was DIESES Skript geschrieben hat: die
 # Buster-Dateien unter public/. Fremde Aenderungen bleiben unberuehrt — der
 # Stand-Riegel oben hat ohnehin schon sichergestellt, dass es keine gibt.
+# Ab dem ersten echten Upload darf NICHTS mehr zurueckgenommen werden.
+HOCHGELADEN=0
+
 aufraeumen_bei_abbruch() {
   CODE=$?
+  # SICHERHEITSBEFUND 31.08.2026 (unvorbelastetes Review): Die Falle pruefte
+  # nur den Rueckgabewert. `live-smoke.sh` laeuft aber NACH beiden Uploads und
+  # beendet sich bei einem Fehlschlag mit `exit 1` — etwa wenn die Verteilung
+  # des Hostings noch nicht durch ist. Dann haette die Falle eine BEREITS
+  # AUSGELIEFERTE Cache-Kennung zurueckgenommen.
+  #
+  # Folge: Live steht ?v=NEU, lokal wieder ?v=ALT. Der naechste Deploy leitet
+  # aus index.html DIESELBE Nummer ab und liefert anderen Inhalt unter einer
+  # vergebenen Kennung aus — genau der Cache-Fehler, gegen den
+  # OPS-2026-08-13-47 fail-closed gebaut wurde. Dazu haette build-info.json,
+  # der Echtheitsbeweis, nicht mehr zur Produktion gepasst.
+  if [ "$HOCHGELADEN" = "1" ]; then
+    if [ "$CODE" -ne 0 ]; then
+      echo ""
+      echo "Abbruch NACH dem Hochladen (Code $CODE) — die Cache-Kennung bleibt,"
+      echo "wie sie ist. Sie steht bereits live; ein Rueckbau wuerde sie ein"
+      echo "zweites Mal vergeben."
+      echo "Naechster Schritt: pruefen, was live steht, und die Kennung"
+      echo "committen (chore-PR), damit der Arbeitsbaum wieder sauber ist."
+    fi
+    return
+  fi
   if [ "$CODE" -ne 0 ] && [ -n "$(git status --porcelain -- public/ 2>/dev/null)" ]; then
     echo ""
     echo "Deploy abgebrochen (Code $CODE) — nehme die Cache-Kennung zurueck,"
@@ -461,6 +514,10 @@ fi
 # gescheitert — vermutlich der eigentliche Grund, warum es seit dem 2026-07-29
 # nicht mehr benutzt wurde und die Deploys stattdessen von Hand liefen
 # (Audit 2026-08-10, OPS-001).
+# Ab hier wird HOCHGELADEN. Die Aufraeumfalle haelt sich von jetzt an raus:
+# Was live steht, laesst sich nicht durch ein `git checkout` zuruecknehmen.
+HOCHGELADEN=1
+
 # ── SCHRITT 1: Firestore-Regeln und Indizes, ALLEIN ──
 # Warum allein: siehe Kopfkommentar (Nachtrag 30.08.2026). Im Paket scheitert er.
 if [ "${SKIP_FIRESTORE:-0}" = "1" ]; then
@@ -509,6 +566,10 @@ UEBERSPRUNGEN=""
 [ "${SKIP_SMOKE:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_SMOKE"
 [ "${SKIP_FIRESTORE:-0}" = "1" ] && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_FIRESTORE"
 [ "${SKIP_DRYRUN:-0}" = "1" ]    && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_DRYRUN"
+# 31.08.2026: SKIP_SATZ fehlte hier seit seiner Einfuehrung. Ausgerechnet der
+# Schalter, der den Riegel unter dem Einstellungssatz abhebt — ohne Satz nimmt
+# die Seite Fotos an und JEDE Analyse scheitert.
+[ "${SKIP_SATZ:-0}" = "1" ]      && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_SATZ"
 
 echo ""
 if [ -n "$UEBERSPRUNGEN" ]; then

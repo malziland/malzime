@@ -98,18 +98,9 @@ RIEGEL_DEPLOY = [
     },
 ]
 
-# Jeder Notschalter MUSS in der Schlussbilanz auftauchen. Sonst ist er eine
-# Abschaltung mit Tarnkappe: Der Lauf sieht gruen aus, obwohl ein Riegel
-# uebersprungen wurde.
-NOTSCHALTER = [
-    "SKIP_STAND",
-    "SKIP_TESTS",
-    "SKIP_CLI_CHECK",
-    "SKIP_INFRA",
-    "SKIP_SMOKE",
-    "SKIP_FIRESTORE",
-    "SKIP_DRYRUN",
-]
+# Die Notschalter werden AUS DEM SKRIPT gelesen, nicht hier aufgezaehlt —
+# siehe die Begruendung weiter unten. Eine Liste an dieser Stelle waere genau
+# die Sorte Doppelquelle, die veraltet, sobald jemand einen Schalter zufuegt.
 
 
 def main():
@@ -117,12 +108,22 @@ def main():
         print(f"  NICHT MESSBAR: {SKRIPT} fehlt.")
         return 2
 
-    text = SKRIPT.read_text(encoding="utf-8")
+    roh = SKRIPT.read_text(encoding="utf-8")
+
+    # BEFUND 31.08.2026 (unvorbelastetes Review): Hier wurde im ROHTEXT
+    # gesucht, Kommentare eingeschlossen. Ein deploy.sh, das die Riegel nur als
+    # Kommentarzeilen enthaelt und sonst nichts tut, bestand die Pruefung —
+    # also genau der Zustand, den dieser Waechter aufdecken soll.
+    #
+    # Deshalb wird jetzt gegen den CODE geprueft: Kommentarzeilen fliegen
+    # raus, bevor gesucht wird. Ein Riegel, ueber den nur geschrieben wird,
+    # zaehlt nicht als Riegel.
+    text = "\n".join(z for z in roh.split("\n") if not z.lstrip().startswith("#"))
 
     # MESSMITTEL-PROBE: Ein leeres oder abgeschnittenes Skript wuerde jede
     # Pruefung unten scheitern lassen — aber aus dem falschen Grund.
-    if len(text) < 3000:
-        print(f"  NICHT MESSBAR: deploy.sh ist nur {len(text)} Zeichen gross.")
+    if len(roh) < 3000:
+        print(f"  NICHT MESSBAR: deploy.sh ist nur {len(roh)} Zeichen gross.")
         print("  Abgeschnitten oder ersetzt? Erst das klaeren.")
         return 2
 
@@ -157,18 +158,30 @@ def main():
     print()
     print("── Taucht jeder Notschalter in der Schlussbilanz auf? ──")
     bilanz = text[text.find("UEBERSPRUNGEN=") :] if "UEBERSPRUNGEN=" in text else ""
+    # Auch die Liste der Schalter kommt aus dem CODE, nicht aus einer
+    # handgepflegten Aufzaehlung — sonst fehlt genau der eine, der neu
+    # dazugekommen ist. (Befund 31.08.: SKIP_SATZ fehlte in beiden.)
+    gefundene_schalter = sorted(set(re.findall(r"\bSKIP_[A-Z_]+\b", text)))
     if not bilanz:
         print("  NICHT MESSBAR: Die Schlussbilanz fehlt ganz.")
         return 2
 
+    # BEFUND 31.08.2026: Hier wurde eine handgepflegte Liste durchgegangen —
+    # und ausgerechnet SKIP_SATZ fehlte in ihr UND in der Schlussbilanz. Ein
+    # Waechter gegen "Abschaltung mit Tarnkappe", der die eine existierende
+    # Tarnkappe nicht kannte.
+    #
+    # Jetzt kommt die Liste aus dem Skript selbst. Sie kann nicht veralten.
     ohne_bilanz = []
-    for s in NOTSCHALTER:
-        drin_im_skript = s in text
+    if not gefundene_schalter:
+        print("  NICHT MESSBAR: kein einziger SKIP_-Schalter im Code gefunden.")
+        return 2
+    for s in gefundene_schalter:
         drin_in_bilanz = re.search(rf'UEBERSPRUNGEN {s}"', bilanz) is not None
-        if drin_im_skript and not drin_in_bilanz:
+        if not drin_in_bilanz:
             print(f"  FEHLT   {s} — wird nicht gemeldet, wenn er gesetzt ist")
             ohne_bilanz.append(s)
-        elif drin_im_skript:
+        else:
             print(f"  ok      {s}")
 
     # Die CI-Regel gegen parallele Laeufe

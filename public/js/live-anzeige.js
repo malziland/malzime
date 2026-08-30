@@ -362,8 +362,33 @@ function imSichtfeld(el) {
    die Vorgabe wird frisch gelesen, damit ein Umstellen mitten im Lauf sofort
    greift. Nur noch fuer das Scan-Auge VOR dem Tippen. */
 function sanftZentrieren(el) {
-  if (reduziert()) return;
-  if (el && typeof el.scrollIntoView === "function") {
+  if (reduziert() || !el) return;
+  /* SELBST RECHNEN STATT scrollIntoView (30.08.2026, am Handy des Nutzers
+     reproduziert): `scrollIntoView({block:"center"})` zentriert im
+     LAYOUT-Fenster — und das zaehlt auf dem iPhone die eingeblendete
+     Adressleiste mit. Der Browser scrollt also, haelt das Ergebnis fuer
+     richtig, und das Element bleibt trotzdem hinter der Leiste.
+
+     Gemessen: Auge bei 439–639, sichtbar nur bis 584 — 55 Bildpunkte
+     verdeckt, und die Wache unternahm nichts mehr, weil sie ihren Versuch
+     bereits als erledigt verbucht hatte.
+
+     Jetzt wird die Mitte des SICHTBAREN Bereichs angefahren. Wo es kein
+     visualViewport gibt, ist sichtbareHoehe() die Fensterhoehe — dort
+     entspricht das Ergebnis dem bisherigen Verhalten. */
+  try {
+    const r = el.getBoundingClientRect();
+    const h = sichtbareHoehe();
+    const obenJetzt = window.scrollY || window.pageYOffset || 0;
+    const ziel = Math.max(0, obenJetzt + r.top + r.height / 2 - h / 2);
+    if (typeof window.scrollTo === "function") {
+      window.scrollTo({ top: ziel, behavior: "smooth" });
+      return;
+    }
+  } catch (_e) {
+    /* Rueckfall unten. */
+  }
+  if (typeof el.scrollIntoView === "function") {
     el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }

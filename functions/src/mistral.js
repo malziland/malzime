@@ -693,7 +693,7 @@ async function tryDescribeWithPrompt(prompt, imageBuffer, mimeType, remainingBud
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL,
       messages,
-      maxTokens: MISTRAL_DESCRIBE_MAX_TOKENS,
+      maxTokens: (await betriebswerteOderAbbruch()).werte.describeMaxTokens,
       /* v2.0.4: 0.2 → 0.1. Reduziert Run-to-Run-Schwankungen bei Alter/Geschlecht
          (Memory-Eintrag bestätigt Schwankungen als modellbedingt). Niedrigere
          Temperatur macht das Modell deterministischer ohne Token-Mehrkosten. */
@@ -1030,7 +1030,7 @@ async function tryProfileCall({ model, messages, temperature, mode, remainingBud
     const result = await callMistralRaw({
       model,
       messages,
-      maxTokens: MISTRAL_PROFILE_MAX_TOKENS,
+      maxTokens: (await betriebswerteOderAbbruch()).werte.profileMaxTokens,
       temperature,
       forceJSON: true,
       timeoutMs: budget,
@@ -1507,6 +1507,24 @@ function hatProfilText(block) {
   return Boolean(block && typeof block.profileText === "string" && block.profileText.trim().length > 0);
 }
 
+/**
+ * Die geltenden Betriebswerte, oder ein klarer Abbruch.
+ *
+ * Seit 30.08.2026 stehen sie ausschliesslich in der Datenbank. Fehlen sie,
+ * kann keine Analyse laufen — ohne Zeitgrenze und Textmenge weiss niemand,
+ * wie lange und wie viel erlaubt ist. Das scheitert LAUT und mit Grund, statt
+ * still mit irgendwelchen Zahlen weiterzumachen.
+ */
+async function betriebswerteOderAbbruch() {
+  const { werte, profil, grund } = await geltendeWerte();
+  if (!werte) {
+    const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
+    fehler.code = "config_missing";
+    throw fehler;
+  }
+  return { werte, profil: profil || null };
+}
+
 async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText) {
   /* VOR dem try: Der Fehlerpfad protokolliert das Profil ebenfalls, und eine
      im try angelegte Variable gibt es im catch nicht. Genau daran sind beim
@@ -1524,20 +1542,8 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        Die beiden Werte gehoeren zusammen und werden deshalb GEMEINSAM
        gelesen — genau daran waere ein einzelner Firestore-Schalter
        gescheitert (BUG-2026-08-17-01). */
-    const { werte: betriebswerte, profil, grund } = await geltendeWerte();
-    aktivesProfil = profil || null;
-    /* Seit 30.08.2026 kommen die Betriebswerte AUSSCHLIESSLICH aus Firestore —
-       es gibt keine Rueckfallwerte im Code mehr. Fehlt der Einstellungssatz
-       oder ist er ungueltig, kann keine Analyse laufen: Ohne Zeitgrenze weiss
-       niemand, wie lange auf die KI gewartet werden darf.
-
-       Das scheitert LAUT und mit Grund, statt still mit alten Zahlen
-       weiterzulaufen — ein Konfigurationsfehler soll auffallen. */
-    if (!betriebswerte) {
-      const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
-      fehler.code = "config_missing";
-      throw fehler;
-    }
+    const { werte: betriebswerte, profil } = await betriebswerteOderAbbruch();
+    aktivesProfil = profil;
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — multimodal, 2M TPM */,
       messages,

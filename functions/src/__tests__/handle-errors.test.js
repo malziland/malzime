@@ -1,5 +1,16 @@
 "use strict";
 
+/* Betriebswerte kommen seit 30.08.2026 aus Firestore; hier gestellt, damit
+   der Test nicht das Protokoll des Satz-Ladens mitzaehlt. */
+jest.mock("../betriebsprofil", () => ({
+  geltendeWerte: async () => ({
+    werte: { adressLimit: 500, adressfensterMs: 600000 },
+    quelle: "firestore",
+    profil: "test",
+    grund: null,
+  }),
+}));
+
 const { handleErrors } = require("../handle-errors");
 
 function mockRes() {

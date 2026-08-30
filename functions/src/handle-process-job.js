@@ -32,6 +32,7 @@ const { applyMinorSafety } = require("./minor-safety");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { incrementTotals, releaseHourlySlot } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs, setLiveText } = require("./jobs");
+const { geltendeWerte } = require("./betriebsprofil");
 const { loadImage, deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
 /* FEATURE-2026-08-29-02: Jede erfolgreiche Analyse meldet ihre Dauer. */
@@ -132,10 +133,14 @@ async function runPipeline(job) {
   let describeBlocked = false;
   let describeError = false;
   let quotaError = false;
+  /* Fehlender oder ungueltiger Einstellungssatz — unser Fehler, nicht der des
+     Nutzers, und er besteht fort, bis ihn jemand behebt. */
+  let configMissing = false;
   try {
     description = await mistral.describeImage(buffer, mimeType, remainingBudget, lang);
     if (!description) describeBlocked = true;
   } catch (err) {
+    if (err && err.code === "config_missing") configMissing = true;
     if (isQuotaError(err)) quotaError = true;
     describeError = true;
   }
@@ -170,6 +175,7 @@ async function runPipeline(job) {
       profiles = await mistral.generateBothProfiles(description, exif, remainingBudget, lang);
       profileBlocked = !profiles.normal && !profiles.boost;
     } catch (err) {
+      if (err && err.code === "config_missing") configMissing = true;
       if (isQuotaError(err)) quotaError = true;
       profileBlocked = true;
     }
@@ -234,7 +240,12 @@ async function runPipeline(job) {
 
   /* Blocked-Pfad — kein Profil zustande gekommen. */
   let blockedReason;
-  if (quotaError) blockedReason = "blocked.overloaded";
+  /* Konfigurationsfehler zuerst: Er sieht aus wie ein Serverfehler, ist aber
+     einer, den NUR wir beheben koennen — und er dauert an, bis das jemand tut.
+     Wer das nicht unterscheidet, schickt Nutzer in ein sinnloses "gleich
+     nochmal versuchen". */
+  if (configMissing) blockedReason = "blocked.configMissing";
+  else if (quotaError) blockedReason = "blocked.overloaded";
   else if (describeBlocked) blockedReason = "blocked.safetyFilter";
   else if (describeError) blockedReason = "blocked.apiError";
   else if (profileBlocked) blockedReason = "blocked.profileBlocked";
@@ -264,6 +275,9 @@ async function runPipeline(job) {
 async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, job, remainingBudget }) {
   let profiles = { normal: null, boost: null };
   let quotaError = false;
+  /* Fehlender oder ungueltiger Einstellungssatz — unser Fehler, nicht der des
+     Nutzers, und er besteht fort, bis ihn jemand behebt. */
+  let configMissing = false;
   let pipelineError = false;
   /* v2.5: Prompt-Cache-Flag. Reine Kostenmassnahme, ohne Einfluss auf Modell
      oder Ergebnis — abschaltbar in Firestore ohne Deploy (~30 s Cache). */
@@ -296,6 +310,7 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   try {
     profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts);
   } catch (err) {
+    if (err && err.code === "config_missing") configMissing = true;
     if (isQuotaError(err)) quotaError = true;
     else pipelineError = true;
   }
@@ -390,7 +405,12 @@ async function runPipelineSingleLarge({ mistral, buffer, mimeType, lang, exif, j
   }
 
   let blockedReason;
-  if (quotaError) blockedReason = "blocked.overloaded";
+  /* Konfigurationsfehler zuerst: Er sieht aus wie ein Serverfehler, ist aber
+     einer, den NUR wir beheben koennen — und er dauert an, bis das jemand tut.
+     Wer das nicht unterscheidet, schickt Nutzer in ein sinnloses "gleich
+     nochmal versuchen". */
+  if (configMissing) blockedReason = "blocked.configMissing";
+  else if (quotaError) blockedReason = "blocked.overloaded";
   else if (pipelineError) blockedReason = "blocked.apiError";
   else blockedReason = "blocked.profileBlocked";
 
@@ -514,7 +534,8 @@ async function handleProcessJob(req, res) {
   /* Liveness: Hat der Client die Seite verlassen, während der Job wartete?
      Dann gar nicht erst Mistral aufrufen — Job auf `abandoned` setzen, Bild
      löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
-  if (isAbandoned(job)) {
+  const { werte: betriebsW } = await geltendeWerte().catch(() => ({ werte: null }));
+  if (isAbandoned(job, betriebsW?.livenessGnadenfristMs)) {
     const didAbandon = await abandonJob(jobId);
     if (!didAbandon) {
       /* Übergang verloren: Entweder hat der Reaper parallel abgeräumt (Bild

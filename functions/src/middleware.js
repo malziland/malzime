@@ -21,7 +21,22 @@ function cleanupExpired() {
   }
 }
 
-function checkRateLimit(key) {
+/**
+ * Adress-Limit.
+ *
+ * Grenze und Zeitfenster kommen seit 30.08.2026 aus dem Einstellungssatz und
+ * werden als Parameter hereingereicht. Bewusst NICHT selbst aus der Datenbank
+ * gelesen: Diese Funktion sitzt im Eingang jeder Anfrage und muss synchron und
+ * ohne Netzzugriff bleiben. Die Aufrufer sind ohnehin asynchron und holen die
+ * Werte einmal.
+ *
+ * Fehlen die Werte, gelten die Konstanten aus config.js. Anders als bei den
+ * Zeitgrenzen ist der Rueckfall hier richtig: Das Adress-Limit ist eine
+ * Schutzgrenze — ohne sie waere der Eingang offen.
+ */
+function checkRateLimit(key, grenze, fensterMs) {
+  const limit = typeof grenze === "number" && grenze > 0 ? grenze : RATE_LIMIT;
+  const fenster = typeof fensterMs === "number" && fensterMs > 0 ? fensterMs : RATE_WINDOW_MS;
   cleanupExpired();
   const current = Date.now();
   const entry = rateState.get(key);
@@ -31,10 +46,10 @@ function checkRateLimit(key) {
       const oldest = rateState.keys().next().value;
       rateState.delete(oldest);
     }
-    rateState.set(key, { count: 1, resetAt: current + RATE_WINDOW_MS });
+    rateState.set(key, { count: 1, resetAt: current + fenster });
     return true;
   }
-  if (entry.count >= RATE_LIMIT) return false;
+  if (entry.count >= limit) return false;
   entry.count += 1;
   return true;
 }

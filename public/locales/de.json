@@ -249,5 +249,6 @@
   "sprache.laeuft.text": "Die Analyse beginnt von vorn — dein Foto bleibt, du musst es nicht noch einmal hochladen.",
   "sprache.laeuft.bleiben": "Abbrechen",
   "sprache.laeuft.wechseln": "Auf Englisch wechseln",
-  "sprache.fertig.textOhneBild": "<strong>Dein jetziges Profil wird gelöscht.</strong> Für ein englisches müsstest du dein Foto noch einmal hochladen."
+  "sprache.fertig.textOhneBild": "<strong>Dein jetziges Profil wird gelöscht.</strong> Für ein englisches müsstest du dein Foto noch einmal hochladen.",
+  "blocked.configMissing": "Bei uns stimmt gerade eine Einstellung nicht — das liegt nicht an dir und nicht an deinem Foto. Wir sind informiert und beheben es. Versuch es in ein paar Minuten noch einmal."
 }

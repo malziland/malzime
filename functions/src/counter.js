@@ -1,6 +1,7 @@
 const { FieldValue } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
 const { HOURLY_LIMIT, HOURLY_WINDOW_MINUTES } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
 
 const CURRENT_DOC = "stats/current";
 const TOTALS_DOC = "stats/totals";
@@ -47,6 +48,9 @@ async function checkAndIncrement() {
      Permission, etc.) gehen sofort in den ERROR-Pfad. */
   const ABORTED_RETRIES = 2;
   let lastErr = null;
+  /* Einstellungssatz EINMAL vor der Transaktionsschleife holen — innerhalb
+     einer Firestore-Transaktion darf kein weiterer Lesevorgang laufen. */
+  const { werte: satzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
   for (let attempt = 0; attempt <= ABORTED_RETRIES; attempt++) {
     try {
       const db = datenbank();
@@ -56,7 +60,12 @@ async function checkAndIncrement() {
         const snap = await tx.get(ref);
         const data = snap.exists ? snap.data() : {};
 
-        const wm = data.windowMinutes || HOURLY_WINDOW_MINUTES;
+        /* Das Zeitfenster gehoert zum Limit — eine Zahl ohne ihren Bezugsraum
+           ist keine Einstellung. Reihenfolge: Einstellungssatz, dann ein
+           gesetzter Wert im Dokument, dann die Konstante. */
+        /* EINE QUELLE: Das Zeitfenster kommt aus dem Einstellungssatz. Der
+           Wert im Dokument stammt nur noch aus einem laufenden Boost. */
+        const wm = satzwerte.stundenfensterMinuten;
         const windowMs = wm * 60 * 1000;
         const now = Date.now();
 
@@ -67,7 +76,7 @@ async function checkAndIncrement() {
            wenn er gerade nicht gebraucht wird (siehe wirksamesLimit). Der
            Rueckfall wird gleich mitgeschrieben, damit /stats und der naechste
            Aufruf dasselbe sehen. */
-        const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length);
+        const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length, satzwerte?.stundenlimit);
 
         /* Limit erreicht → blockieren */
         if (recent.length >= limit) {
@@ -91,13 +100,13 @@ async function checkAndIncrement() {
              Aufruf neu "verfallen", ohne je im Dokument anzukommen, und /stats
              zeigte weiter den erhoehten Wert. */
           const aenderung = boostVerfallen
-            ? { recentAnalyses: recent, limit: HOURLY_LIMIT, limitBis: null }
+            ? { recentAnalyses: recent, limit: satzwerte.stundenlimit, limitBis: null }
             : { recentAnalyses: recent };
           if (boostVerfallen) {
             console.log(
               JSON.stringify({
                 step: "boost-verfallen",
-                zurueckAuf: HOURLY_LIMIT,
+                zurueckAuf: satzwerte.stundenlimit,
                 imFenster: recent.length,
                 hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
               })
@@ -107,8 +116,8 @@ async function checkAndIncrement() {
         } else {
           tx.set(ref, {
             recentAnalyses: recent,
-            limit: HOURLY_LIMIT,
-            windowMinutes: HOURLY_WINDOW_MINUTES,
+            limit: satzwerte.stundenlimit,
+            windowMinutes: satzwerte.stundenfensterMinuten,
           });
         }
 
@@ -151,12 +160,16 @@ async function checkAndIncrement() {
           error: err.message,
         })
       );
-      return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: err.message };
+      /* FAIL-OPEN bei Firestore-Fehler: Der Einlass bleibt offen, damit ein
+         Datenbankproblem den Workshop nicht stoppt. `limit: null` sagt ehrlich,
+         dass hier keine Grenze bekannt ist — eine erfundene Zahl waere
+         schlechter als keine. */
+      return { allowed: true, retryAfterSeconds: 0, count: -1, limit: null, error: err.message };
     }
   }
   /* Unerreichbar — der Loop kommt aus jedem Iteration entweder mit return
      oder via continue heraus. Sicherheitshalber fail-open. */
-  return { allowed: true, retryAfterSeconds: 0, count: -1, limit: HOURLY_LIMIT, error: lastErr && lastErr.message };
+  return { allowed: true, retryAfterSeconds: 0, count: -1, limit: null, error: lastErr && lastErr.message };
 }
 
 /**
@@ -261,22 +274,23 @@ async function incrementTotals() {
  */
 async function getStats() {
   try {
+    const { werte: satzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
     const db = datenbank();
     const [currentSnap, totalsSnap] = await Promise.all([db.doc(CURRENT_DOC).get(), db.doc(TOTALS_DOC).get()]);
 
     const current = currentSnap.exists
       ? currentSnap.data()
-      : { limit: HOURLY_LIMIT, windowMinutes: HOURLY_WINDOW_MINUTES };
+      : { limit: satzwerte?.stundenlimit ?? null, windowMinutes: satzwerte?.stundenfensterMinuten ?? null };
     const totals = totalsSnap.exists ? totalsSnap.data() : { today: 0, week: 0, month: 0, year: 0, allTime: 0 };
 
-    const wm = current.windowMinutes || HOURLY_WINDOW_MINUTES;
+    const wm = satzwerte?.stundenfensterMinuten ?? current.windowMinutes;
     const windowMs = wm * 60 * 1000;
     const now = Date.now();
 
     const recent = filterRecent(current.recentAnalyses, now, windowMs);
     /* BIZ-2026-08-20-28: Dieselbe Quelle wie der Einlass — sonst zeigte /stats
        einen Deckel an, den der naechste Upload gar nicht mehr bekommt. */
-    const { limit: currentLimit } = wirksamesLimit(current, recent.length);
+    const { limit: currentLimit } = wirksamesLimit(current, recent.length, satzwerte?.stundenlimit);
     const recentCount = recent.length;
     const limitActive = recentCount >= currentLimit;
     const retryAfterSeconds = limitActive ? calcRetrySeconds(recent, currentLimit, now, windowMs) : 0;
@@ -346,17 +360,32 @@ const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;
  * @returns {{limit:number, verfallen:boolean}} verfallen=true → der Boost ist
  *   abgelaufen und darf zurückgeschrieben werden.
  */
-function wirksamesLimit(daten, anzahlImFenster = 0) {
-  const gesetzt = Number((daten && daten.limit) || HOURLY_LIMIT);
-  if (gesetzt <= HOURLY_LIMIT) return { limit: HOURLY_LIMIT, verfallen: false };
+function wirksamesLimit(daten, anzahlImFenster = 0, grundlimit) {
+  /* EINE QUELLE FUER DEN GRUNDWERT (30.08.2026): Das regulaere Stundenlimit
+     kommt aus dem Einstellungssatz und wird hereingereicht. Der Boost ist
+     KEINE zweite Definition desselben Werts, sondern ein zeitlich begrenzter
+     Aufschlag darauf — er hat ein Ablaufdatum und faellt danach auf den
+     Grundwert zurueck.
+
+     Fehlt der Grundwert, gilt die Konstante aus config.js: Das Stundenlimit
+     ist eine Schutzgrenze, ohne sie waere der Einlass unbegrenzt. */
+  /* Der Grundwert ist PFLICHT — es gibt keinen Rueckfall mehr im Code
+     (Vorgabe des Nutzers, 30.08.2026: jeder Wert genau einmal, aus der
+     Datenbank). Fehlt er, ist das ein Konfigurationsfehler und soll auffallen. */
+  if (typeof grundlimit !== "number" || grundlimit <= 0) {
+    throw new Error("wirksamesLimit: Grundlimit fehlt — Einstellungssatz nicht geladen");
+  }
+  const basis = grundlimit;
+  const gesetzt = Number((daten && daten.limit) || basis);
+  if (gesetzt <= basis) return { limit: basis, verfallen: false };
   const bis = Number((daten && daten.limitBis) || 0);
   /* Ohne Ablaufdatum stammt der Boost aus der Zeit vor diesem Fix — dann gilt er
      weiter, bis ihn ein neuer Boost oder ein Reset ablöst. Bestehendes still zu
      entwerten wäre die schlechtere Überraschung. */
   if (!bis) return { limit: gesetzt, verfallen: false };
   const abgelaufen = Date.now() > bis;
-  const wirdNichtGebraucht = anzahlImFenster < HOURLY_LIMIT;
-  if (abgelaufen && wirdNichtGebraucht) return { limit: HOURLY_LIMIT, verfallen: true };
+  const wirdNichtGebraucht = anzahlImFenster < basis;
+  if (abgelaufen && wirdNichtGebraucht) return { limit: basis, verfallen: true };
   return { limit: gesetzt, verfallen: false };
 }
 
@@ -373,11 +402,14 @@ async function boostLimit(amount = 100) {
      wird aus der Transaktion zurückgegeben und ERST DANACH geloggt, damit ein
      Transaktions-Retry die Logzeile nicht vervielfacht. */
   let ergebnis;
+  /* Grundwert VOR der Transaktion holen — innerhalb einer Firestore-Transaktion
+     darf kein weiterer Lesevorgang laufen. */
+  const { werte: satzwerte } = await geltendeWerte();
   try {
     ergebnis = await db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const daten = snap && snap.exists ? snap.data() : null;
-      const aktuell = Number((daten && daten.limit) || HOURLY_LIMIT);
+      const aktuell = Number((daten && daten.limit) || satzwerte.stundenlimit);
       const gewuenscht = aktuell + amount;
       if (gewuenscht > BOOST_OBERGRENZE) {
         return { limit: aktuell, aktuell, gewuenscht, abgelehnt: true, grund: "obergrenze" };
@@ -420,7 +452,8 @@ async function boostLimit(amount = 100) {
 async function resetCounter() {
   const db = datenbank();
   const ref = db.doc(CURRENT_DOC);
-  await ref.set({ recentAnalyses: [], limit: HOURLY_LIMIT, limitBis: null }, { merge: true });
+  const { werte: sw } = await geltendeWerte();
+  await ref.set({ recentAnalyses: [], limit: sw.stundenlimit, limitBis: null }, { merge: true });
 }
 
 /**

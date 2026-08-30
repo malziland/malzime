@@ -106,6 +106,13 @@ const FUNCTION_LIMIT_MS = 540 * 1000;
    verhindern, sondern nur Tippfehler und Unfug abfangen. */
 const GRENZEN = {
   parallelitaet: { min: 1, max: 100 },
+  describeMaxTokens: { min: 100, max: 100000 },
+  profileMaxTokens: { min: 100, max: 100000 },
+  stundenfensterMinuten: { min: 1, max: 1440 },
+  adressfensterMs: { min: 1000, max: 24 * 60 * 60 * 1000 },
+  jobAufbewahrungMs: { min: 60 * 1000, max: 7 * 24 * 60 * 60 * 1000 },
+  zustellfensterMs: { min: 60 * 1000, max: 24 * 60 * 60 * 1000 },
+  livenessGnadenfristMs: { min: 30 * 1000, max: 60 * 60 * 1000 },
   stundenlimit: { min: 1, max: 100000 },
   adressLimit: { min: 1, max: 100000 },
   singleLargeMaxTokens: { min: 100, max: 100000 },
@@ -117,12 +124,34 @@ const GRENZEN = {
    NICHT mehr im Code — sie kommen ausschliesslich aus Firestore.
 
    PFLICHT: ohne diese Felder ist ein Satz unvollstaendig und wird abgelehnt. */
-const PFLICHTFELDER = ["mistralTimeoutMs", "singleLargeTimeoutMs", "singleLargeMaxTokens", "requestBudgetMs"];
+const PFLICHTFELDER = [
+  "mistralTimeoutMs",
+  "singleLargeTimeoutMs",
+  "singleLargeMaxTokens",
+  "requestBudgetMs",
+  /* Textmengen der uebrigen KI-Aufrufe — Nachtrag 30.08.2026: Sie fehlten
+     zunaechst, obwohl sie genauso anpassbar sind wie die Hauptgrenze. */
+  "describeMaxTokens",
+  "profileMaxTokens",
+];
 
 /* KANN-FELDER: Sollwerte fuer den taeglichen Abgleich (kapazitaets-wache).
    Sie steuern nichts unmittelbar — die Warteschlange bei Google und der
    Boost-Mechanismus tun das —, benennen aber, was gelten SOLL. */
-const KANNFELDER = ["parallelitaet", "stundenlimit", "adressLimit"];
+const KANNFELDER = [
+  "parallelitaet",
+  "stundenlimit",
+  "adressLimit",
+  /* ZEITFENSTER — Nachtrag 30.08.2026. Ohne sie waren die Limits nur halb
+     einstellbar: "500 Analysen" liess sich aendern, "pro Stunde" nicht. Eine
+     Zahl ohne ihren Bezugsraum ist keine Einstellung. */
+  "stundenfensterMinuten",
+  "adressfensterMs",
+  /* Betriebsfristen — anpassbar, aber nicht analysekritisch. */
+  "jobAufbewahrungMs",
+  "zustellfensterMs",
+  "livenessGnadenfristMs",
+];
 
 let cache = { zeit: 0, werte: null, quelle: "code" };
 /* Laeuft gerade ein Lesevorgang? Dann warten alle weiteren darauf, statt

@@ -1,5 +1,33 @@
 /* Tests for counter.js — Rolling window analysis counter */
 
+/* Einstellungssatz gestellt: Die Betriebswerte kommen seit 30.08.2026 aus
+   Firestore, ohne Rueckfallwerte im Code. Ohne diesen Satz laeuft die
+   Einlasskontrolle nicht — das ist Absicht und wird in
+   betriebsprofil*.test.js geprueft, nicht hier. */
+jest.mock("../betriebsprofil", () => ({
+  geltendeWerte: async () => ({
+    werte: {
+      mistralTimeoutMs: 90000,
+      singleLargeTimeoutMs: 300000,
+      singleLargeMaxTokens: 5000,
+      requestBudgetMs: 480000,
+      describeMaxTokens: 2048,
+      profileMaxTokens: 16000,
+      parallelitaet: 7,
+      stundenlimit: 500,
+      adressLimit: 500,
+      stundenfensterMinuten: 60,
+      adressfensterMs: 600000,
+      jobAufbewahrungMs: 7200000,
+      zustellfensterMs: 900000,
+      livenessGnadenfristMs: 480000,
+    },
+    quelle: "firestore",
+    profil: "test",
+    grund: null,
+  }),
+}));
+
 const mockGet = jest.fn();
 const mockSet = jest.fn();
 const mockUpdate = jest.fn();

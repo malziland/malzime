@@ -26,6 +26,7 @@
 const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
 const { LIVENESS_GRACE_MS, JOB_RETENTION_MS, ZUSTELLUNG_AUFBEWAHRUNG_MS } = require("./config");
+const { geltendeWerte } = require("./betriebsprofil");
 
 /* ARCH-2026-08-12-27: Frist des Sicherheitsnetzes (Firestore-TTL). Bewusst weit
    ueber JOB_RETENTION_MS (2 h): Der Reaper ist die Loeschung, die TTL faengt nur
@@ -374,9 +375,14 @@ async function abandonJob(jobId) {
  * Prüft, ob ein noch wartender Job als verlassen gilt: Status `queued` und
  * seit über LIVENESS_GRACE_MS kein Client-Poll mehr.
  */
-function isAbandoned(job) {
+/* Die Gnadenfrist kommt seit 30.08.2026 aus dem Einstellungssatz und wird
+   hereingereicht — diese Funktion bleibt synchron, weil sie in Schleifen ueber
+   viele Jobs laeuft. Fehlt der Wert, gilt die Konstante: Eine Aufraeum-Frist
+   darf nie fehlen, sonst blieben verwaiste Jobs ewig liegen. */
+function isAbandoned(job, gnadenfristMs) {
+  const frist = typeof gnadenfristMs === "number" && gnadenfristMs > 0 ? gnadenfristMs : LIVENESS_GRACE_MS;
   if (!job || job.status !== "queued") return false;
-  return Date.now() - (job.lastSeenAt || job.createdAt || 0) > LIVENESS_GRACE_MS;
+  return Date.now() - (job.lastSeenAt || job.createdAt || 0) > frist;
 }
 
 /**
@@ -394,7 +400,9 @@ async function countProcessingJobs() {
  * Lauf. Benötigt den zusammengesetzten Index (status, lastSeenAt).
  */
 async function findAbandonedJobs(limit = 200) {
-  const cutoff = Date.now() - LIVENESS_GRACE_MS;
+  const { werte: lw } = await geltendeWerte().catch(() => ({ werte: null }));
+  const gnadenfrist = lw && lw.livenessGnadenfristMs ? lw.livenessGnadenfristMs : LIVENESS_GRACE_MS;
+  const cutoff = Date.now() - gnadenfrist;
   const snap = await jobsRef().where("status", "==", "queued").where("lastSeenAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -438,7 +446,9 @@ async function findStaleProcessingJobs(limit = 200) {
  * automatischen Einzelfeld-Index abgedeckt — kein zusammengesetzter Index.
  */
 async function findExpiredJobs(limit = 200) {
-  const cutoff = Date.now() - JOB_RETENTION_MS;
+  const { werte } = await geltendeWerte().catch(() => ({ werte: null }));
+  const aufbewahrung = werte && werte.jobAufbewahrungMs ? werte.jobAufbewahrungMs : JOB_RETENTION_MS;
+  const cutoff = Date.now() - aufbewahrung;
   const snap = await jobsRef().where("createdAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -451,7 +461,9 @@ async function findExpiredJobs(limit = 200) {
  * ohne `deliveredAt` (nie zugestellt) von selbst.
  */
 async function findZugestellteJobs(limit = 200) {
-  const cutoff = Date.now() - ZUSTELLUNG_AUFBEWAHRUNG_MS;
+  const { werte: zw } = await geltendeWerte().catch(() => ({ werte: null }));
+  const zustellfenster = zw && zw.zustellfensterMs ? zw.zustellfensterMs : ZUSTELLUNG_AUFBEWAHRUNG_MS;
+  const cutoff = Date.now() - zustellfenster;
   const snap = await jobsRef().where("deliveredAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

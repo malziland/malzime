@@ -16,20 +16,35 @@
  */
 
 const crypto = require("crypto");
-const { ALLOWED_MIME, MAX_UPLOAD_BYTES, MAX_QUEUE_DEPTH, QUEUE_DISPATCH_CONCURRENCY } = require("./config");
+const { ALLOWED_MIME, MAX_UPLOAD_BYTES, MAX_QUEUE_DEPTH } = require("./config");
 const { dauerJeAnalyse } = require("./durchsatz");
+const { geltendeWerte } = require("./betriebsprofil");
 const { getFeatureFlags } = require("./feature-flags");
 
-/* FEATURE-2026-08-29-02: Wie viele Wartende sind in einer halben Stunde zu
-   schaffen? Dieselbe Rechnung wie MAX_QUEUE_DEPTH in config.js, nur mit der
-   gemessenen statt der angenommenen Dauer. Faellt die Messung aus, bleibt es
-   bei der Konstante — der schlechteste Fall ist der heutige Zustand. */
+/* Wie viele Wartende sind in einer halben Stunde zu schaffen?
+
+   Die Rechnung braucht ZWEI Groessen, und beide kommen aus der Datenbank:
+   die gemessene Dauer einer Analyse (`stats/durchsatz`, laufend aus echten
+   Laeufen fortgeschrieben) und die Parallelitaet aus dem Einstellungssatz.
+
+   BEFUND ARCH-2026-08-30-01 (Kurz-Audit): Die Parallelitaet stammte hier
+   weiterhin aus dem Code. Wer den Einstellungssatz auf einen groesseren Tarif
+   umstellte, sah im Zahlen-Endpunkt "quelle: firestore" und hielt alles fuer
+   umgestellt — die Einlassgrenze rechnete aber weiter mit dem alten Wert. Das
+   waere erst im Workshop unter Last aufgefallen, ohne Signal.
+
+   Faellt eine der beiden Groessen aus, bleibt es bei der Konstante aus
+   config.js: Die Einlassgrenze ist eine Schutzgrenze, keine Einstellung — sie
+   darf nie fehlen, sonst liesse die Seite unbegrenzt Leute herein. */
 async function aktuelleEinlassgrenze() {
   try {
     const flags = await getFeatureFlags();
     const { sekunden, gemessen } = await dauerJeAnalyse(flags.useGemesseneDauer === true);
     if (!gemessen) return MAX_QUEUE_DEPTH;
-    return Math.max(1, Math.floor(((30 * 60) / sekunden) * QUEUE_DISPATCH_CONCURRENCY * 0.8));
+    const { werte } = await geltendeWerte();
+    const parallel = werte && typeof werte.parallelitaet === "number" ? werte.parallelitaet : null;
+    if (!parallel) return MAX_QUEUE_DEPTH;
+    return Math.max(1, Math.floor(((30 * 60) / sekunden) * parallel * 0.8));
   } catch (_) {
     return MAX_QUEUE_DEPTH;
   }
@@ -88,7 +103,8 @@ async function handleEnqueue(req, res, secrets) {
     }
 
     const ip = getClientIp(req);
-    if (!checkRateLimit(ip)) {
+    const { werte: grenzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
+    if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
       res.status(429).json({ error: "Rate limit exceeded" });
       return;
     }
@@ -297,4 +313,4 @@ async function handleEnqueue(req, res, secrets) {
   }
 }
 
-module.exports = { handleEnqueue, detectImageType };
+module.exports = { handleEnqueue, detectImageType, _aktuelleEinlassgrenze: aktuelleEinlassgrenze };

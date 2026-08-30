@@ -34,6 +34,8 @@ const GUELTIG = {
   singleLargeTimeoutMs: 300000,
   singleLargeMaxTokens: 5000,
   requestBudgetMs: 480000,
+  describeMaxTokens: 2048,
+  profileMaxTokens: 16000,
   parallelitaet: 7,
   stundenlimit: 500,
   adressLimit: 500,

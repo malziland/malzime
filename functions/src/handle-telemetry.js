@@ -10,6 +10,7 @@
  */
 
 const { checkRateLimit, getClientIp } = require("./middleware");
+const { geltendeWerte } = require("./betriebsprofil");
 const { zaehleRealitaetsCheck } = require("./counter");
 const { verbraucheRcTicket } = require("./jobs");
 const { sha256Hex } = require("./auth");
@@ -172,7 +173,8 @@ async function handleTelemetry(req, res) {
     }
 
     const ip = getClientIp(req);
-    if (!checkRateLimit(ip)) {
+    const { werte: grenzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
+    if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
       res.status(429).json({ error: "Rate limit exceeded" });
       return;
     }

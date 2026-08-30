@@ -6,6 +6,34 @@
    Der Verfall ist BEWUSST SANFT gebaut, weil hier der Workshop-Betrieb hängt:
    Er greift erst, wenn die Frist um ist UND der Boost gerade nicht gebraucht
    wird. Genau das prüfen diese Tests — der zweite ist der wichtigere. */
+/* Einstellungssatz gestellt: Die Betriebswerte kommen seit 30.08.2026 aus
+   Firestore, ohne Rueckfallwerte im Code. Ohne diesen Satz laeuft die
+   Einlasskontrolle nicht — das ist Absicht und wird in
+   betriebsprofil*.test.js geprueft, nicht hier. */
+jest.mock("../betriebsprofil", () => ({
+  geltendeWerte: async () => ({
+    werte: {
+      mistralTimeoutMs: 90000,
+      singleLargeTimeoutMs: 300000,
+      singleLargeMaxTokens: 5000,
+      requestBudgetMs: 480000,
+      describeMaxTokens: 2048,
+      profileMaxTokens: 16000,
+      parallelitaet: 7,
+      stundenlimit: 500,
+      adressLimit: 500,
+      stundenfensterMinuten: 60,
+      adressfensterMs: 600000,
+      jobAufbewahrungMs: 7200000,
+      zustellfensterMs: 900000,
+      livenessGnadenfristMs: 480000,
+    },
+    quelle: "firestore",
+    profil: "test",
+    grund: null,
+  }),
+}));
+
 const HOURLY_LIMIT = 500;
 const BOOST_FRIST_MS = 2 * 60 * 60 * 1000;
 

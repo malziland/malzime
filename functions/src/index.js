@@ -1,5 +1,6 @@
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { defineSecret } = require("firebase-functions/params");
 
@@ -14,6 +15,7 @@ const { reapJobs } = require("./handle-reap");
 const { pruefeZusagen } = require("./handle-erinnerung");
 const { pruefeLaufzeit } = require("./laufzeit-wache");
 const { pruefeKapazitaet } = require("./kapazitaets-wache");
+const { geltendeWerte, _cacheLeeren } = require("./betriebsprofil");
 const { sendeNtfy } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 
@@ -200,6 +202,25 @@ exports.laufzeitWache = onSchedule(
 
        Ein Fehler hier darf die Laufzeit-Pruefung nicht nachtraeglich
        entwerten — sie ist oben bereits gelaufen und protokolliert. */
+    /* Zuerst der Einstellungssatz: Ohne ihn laeuft keine einzige Analyse.
+       Die Alarmierung ueber den Analyse-Pfad greift erst, WENN jemand es
+       versucht — liegt der Fehler nachts vor, erfaehrt es niemand bis zum
+       ersten Nutzer am Morgen. Diese Pruefung um 7:20 findet ihn vorher. */
+    try {
+      const { werte, quelle, profil, grund } = await geltendeWerte();
+      if (!werte) {
+        const text =
+          `KEIN gueltiger Einstellungssatz — es laeuft derzeit KEINE Analyse. ` +
+          `Grund: ${grund || "unbekannt"}. Firestore-Dokument config/betriebsprofil pruefen.`;
+        await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
+        console.error(JSON.stringify({ step: "betriebsprofil-wache", status: "kein-satz", grund }));
+      } else {
+        console.log(JSON.stringify({ step: "betriebsprofil-wache", status: "ok", quelle, profil }));
+      }
+    } catch (fehler) {
+      console.error(JSON.stringify({ step: "betriebsprofil-wache", status: "fehler", grund: String(fehler.message) }));
+    }
+
     try {
       const kapazitaet = await pruefeKapazitaet();
       if (kapazitaet.auffaellig && kapazitaet.meldung) {
@@ -209,5 +230,55 @@ exports.laufzeitWache = onSchedule(
     } catch (fehler) {
       console.error(JSON.stringify({ step: "kapazitaets-wache", status: "fehler", grund: String(fehler.message) }));
     }
+  }
+);
+
+/* ── Wache am Einstellungssatz ────────────────────────────────────────────
+   ANLASS (Nutzer, 30.08.2026): „Die Meldung soll kommen, wenn der Fehler
+   passiert, oder nicht irgendwann danach."
+
+   Die Alarmierung ueber den Analyse-Pfad greift erst, WENN jemand eine Analyse
+   versucht. Wird der Satz nachts kaputt gemacht, erfaehrt es niemand bis zum
+   ersten Nutzer am Morgen — der dann eine Fehlermeldung sieht, die wir haetten
+   verhindern koennen.
+
+   Dieser Ausloeser haengt am Dokument selbst und feuert in dem Moment, in dem
+   es geschrieben wird. Er prueft den neuen Stand mit derselben Rechnung wie der
+   Analyse-Pfad und meldet sofort, wenn daraus keine Analyse mehr laufen wuerde.
+
+   BEWUSST AUCH BEI ERFOLG EINE MELDUNG: Wer eine Einstellung aendert, will
+   wissen, ob sie angekommen ist. Eine Umstellung, die stillschweigend abgelehnt
+   wird, ist die gefaehrlichste Form des Fehlschlags. */
+exports.satzWache = onDocumentWritten(
+  {
+    document: "config/betriebsprofil",
+    region: "europe-west1",
+    memory: "256MiB",
+    timeoutSeconds: 60,
+    secrets: [ntfyUrl, ntfyTopic],
+  },
+  async () => {
+    /* Der Zwischenspeicher haelt den alten Stand bis zu 30 Sekunden — hier
+       interessiert der NEUE, also frisch lesen. */
+    _cacheLeeren();
+    const { werte, quelle, profil, grund } = await geltendeWerte();
+
+    if (!werte) {
+      const text =
+        `ACHTUNG: Der Einstellungssatz wurde geaendert und ist UNGUELTIG — ` +
+        `es laeuft ab sofort KEINE Analyse. Grund: ${grund || "unbekannt"}. ` +
+        `Rueckweg: das Feld "aktiv" auf einen gueltigen Satz stellen.`;
+      await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
+      console.error(JSON.stringify({ step: "satz-wache", status: "ungueltig", grund }));
+      return;
+    }
+
+    const text =
+      `Einstellungssatz geaendert und uebernommen: "${profil}". ` +
+      `Zeitgrenze ${Math.round(werte.singleLargeTimeoutMs / 1000)} s, ` +
+      `${werte.singleLargeMaxTokens} Token, ${werte.parallelitaet} parallel, ` +
+      `${werte.stundenlimit} pro Stunde.`;
+    await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
+    console.log(JSON.stringify({ step: "satz-wache", status: "uebernommen", quelle, profil }));
   }
 );

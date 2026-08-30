@@ -281,6 +281,19 @@ test("A11y: Startseite ohne ernste Verstöße", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
 
+  /* AUF DEN FERTIGEN ZUSTAND WARTEN, nicht nur auf die Überschrift.
+     BEFUND (30.08.2026, CI-Lauf auf main): Der Test war lokal grün und im CI
+     rot. Die Abdeckungskontrolle meldete, dass axe `.info-i` und `a` nicht
+     gemessen hat — zu Recht: Auf der langsameren CI-Maschine setzt die
+     Übersetzung diese Elemente erst nach dem Erscheinen der Überschrift.
+     axe lief davor und sah sie nicht.
+
+     Die Zusicherung bleibt unverändert scharf: Es wird weiterhin verlangt,
+     dass axe JEDEN sichtbaren Bereich misst. Nur der Zeitpunkt der Messung
+     ist jetzt der richtige — nämlich dann, wenn die Seite steht. */
+  await expect(page.locator(".info-i").first()).toBeVisible();
+  await page.waitForLoadState("networkidle");
+
   await checkA11y(page, "Startseite");
 });
 

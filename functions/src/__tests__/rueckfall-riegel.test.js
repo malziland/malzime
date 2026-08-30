@@ -99,9 +99,7 @@ describe("Riegel 6: Die Karenzfrist ist Pflicht", () => {
   const jobs = require("../jobs");
 
   test("isAbandoned ohne Frist wirft, statt eine anzunehmen", () => {
-    expect(() => jobs.isAbandoned({ status: "queued", lastSeenAt: 0 })).toThrow(
-      /livenessGnadenfristMs/
-    );
+    expect(() => jobs.isAbandoned({ status: "queued", lastSeenAt: 0 })).toThrow(/livenessGnadenfristMs/);
   });
 
   test("isAbandoned nutzt die ÜBERGEBENE Frist, nicht eine eigene", () => {

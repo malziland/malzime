@@ -4,6 +4,7 @@ const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { defineSecret } = require("firebase-functions/params");
 
+const { FIRESTORE_DATABASE_ID } = require("./config");
 const { handleStats } = require("./handle-stats");
 const { handleAdmin } = require("./handle-admin");
 const { handleErrors } = require("./handle-errors");
@@ -252,6 +253,19 @@ exports.laufzeitWache = onSchedule(
 exports.satzWache = onDocumentWritten(
   {
     document: "config/betriebsprofil",
+    /* WELCHE Datenbank — ohne diese Angabe nimmt Firebase die Standard-
+       Datenbank "(default)". Die gibt es hier nicht: Seit dem Umzug nach
+       Europa (PRIV-001) heisst sie "malzime-eu".
+
+       BEFUND 30.08.2026: Genau daran ist der v4.4-Deploy DREIMAL gescheitert,
+       mit einer Meldung, die den Trigger nicht erwaehnt:
+         Error: Request to .../databases/(default) had HTTP Error: 404
+       Ich habe den Fehler zuerst beim Deploy-Ziel gesucht (firestore:rules)
+       und dort auch etwas gefunden — aber die Ursache lag hier. Erst als der
+       Deploy OHNE jedes Firestore-Ziel denselben Fehler warf, war klar, dass
+       es an einer Function liegen muss. Und die einzige neue mit
+       Firestore-Bezug ist diese. */
+    database: FIRESTORE_DATABASE_ID,
     region: "europe-west1",
     memory: "256MiB",
     timeoutSeconds: 60,

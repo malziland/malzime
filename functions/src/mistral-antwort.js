@@ -93,7 +93,6 @@ function findeProfileTextWert(jsonPraefix, abIdx, schluessel = PROFILE_TEXT_SCHL
   return { text: dekodiereJsonEscapes(jsonPraefix.slice(start, ende)), schluesselIdx, ende, abgeschlossen };
 }
 
-
 function dekodiereJsonEscapes(roh) {
   const einfacheEscapes = { '"': '"', "\\": "\\", "/": "/", n: "\n", t: "\t", r: "\r", b: "\b", f: "\f" };
   let klartext = "";
@@ -132,7 +131,6 @@ function dekodiereJsonEscapes(roh) {
      wir sie ab — sonst landet ein kaputtes Zeichen im Live-Text. */
   return klartext.replace(/[\uD800-\uDBFF]$/, "");
 }
-
 
 function parseDescribeFooter(text) {
   if (typeof text !== "string" || text.length === 0) {
@@ -178,7 +176,6 @@ function parseDescribeFooter(text) {
 
   return { description, hardFacts, ads: ads.slice(0, 12), triggers: triggers.slice(0, 8) };
 }
-
 
 module.exports = {
   findeProfileTextWert,

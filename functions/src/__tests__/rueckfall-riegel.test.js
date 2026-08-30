@@ -341,3 +341,51 @@ describe("Riegel 11: Realistische Fehleingaben aus der Konsole", () => {
     expect(grund.length).toBeGreaterThan(10);
   });
 });
+
+describe("Riegel 12: Aus dem Testbetrieb geht nichts nach draußen", () => {
+  /* VORFALL vom 30.08.2026: Ein Simulator-Lauf reihte 200 Analysen ein, riss
+   * damit das Stundenlimit — und schickte eine ECHTE Push-Nachricht auf das
+   * Handy des Betreibers. Der Firebase-Emulator holt sich bei angemeldetem
+   * Konto die echten Zugangsdaten aus dem Secret Manager.
+   *
+   * Ein Testlauf darf nicht nach außen wirken. Zwei Erkennungswege, damit es
+   * nicht an einer vergessenen Umgebungsvariablen hängt. */
+  const notify = jest.requireActual("../notify");
+
+  afterEach(() => {
+    delete process.env.NTFY_STUMM;
+    delete process.env.FIRESTORE_EMULATOR_HOST;
+  });
+
+  test.each([
+    ["FIRESTORE_EMULATOR_HOST", "localhost:8080"],
+    ["NTFY_STUMM", "1"],
+  ])("bei %s wird nichts gesendet", async (variable, wert) => {
+    process.env[variable] = wert;
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    global.fetch = jest.fn();
+    await notify.notifyLimitReached({
+      ntfyUrl: "https://beispiel.invalid",
+      ntfyTopic: "t",
+      adminSecret: "s",
+      count: 500,
+      limit: 500,
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test("OHNE die Kennzeichen wird gesendet — der Riegel ist nicht dauerhaft zu", async () => {
+    /* Sonst wäre die Alarmierung im Betrieb still, und niemand würde es
+       merken. Ein Riegel, der immer schließt, ist genauso schlimm wie keiner. */
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    global.fetch = jest.fn(async () => ({ ok: true, status: 200 }));
+    await notify.notifyLimitReached({
+      ntfyUrl: "https://beispiel.invalid",
+      ntfyTopic: "t",
+      adminSecret: "s",
+      count: 500,
+      limit: 500,
+    });
+    expect(global.fetch).toHaveBeenCalled();
+  });
+});

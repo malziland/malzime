@@ -6,8 +6,33 @@ const { SITE_URL } = require("./domains");
  * Sendet eine Push-Benachrichtigung über ntfy wenn das Stundenlimit erreicht wird.
  * Nur 1× pro Limit-Fenster (bei justReached), nicht bei jeder blockierten Anfrage.
  */
+
+/* ══════════════════════════════════════════════════════════════════════
+   KEIN VERSAND AUS DEM TESTBETRIEB (30.08.2026)
+   ══════════════════════════════════════════════════════════════════════
+   VORFALL: Ein Simulator-Lauf reihte 200 Analysen ein, riss damit das
+   Stundenlimit — und schickte eine echte Push-Nachricht auf das Handy des
+   Betreibers. Der Emulator holt sich bei angemeldetem Konto die ECHTEN
+   Zugangsdaten aus dem Secret Manager; lokale Testwerte gibt es nicht.
+
+   Ein Testlauf darf nicht nach aussen wirken. Zwei Erkennungswege, damit es
+   nicht an einer vergessenen Variablen haengt:
+     · FIRESTORE_EMULATOR_HOST ist gesetzt  -> Emulator, immer
+     · NTFY_STUMM=1                          -> ausdruecklich abgeschaltet
+   ══════════════════════════════════════════════════════════════════════ */
+function versandUnterdrueckt() {
+  if (process.env.NTFY_STUMM === "1") return "NTFY_STUMM=1";
+  if (process.env.FIRESTORE_EMULATOR_HOST) return "Emulator-Betrieb";
+  return null;
+}
+
 async function notifyLimitReached({ ntfyUrl, ntfyTopic, adminSecret, count, limit }) {
   if (!ntfyUrl || !ntfyTopic) return;
+  const stumm = versandUnterdrueckt();
+  if (stumm) {
+    console.log(JSON.stringify({ step: "notify", status: "unterdrueckt", grund: stumm, count, limit }));
+    return;
+  }
 
   const baseUrl = SITE_URL;
 
@@ -78,6 +103,11 @@ async function notifyLimitReached({ ntfyUrl, ntfyTopic, adminSecret, count, limi
  */
 async function sendeNtfy({ ntfyUrl, ntfyTopic, text, titel = "malziME", prioritaet = 4 }) {
   if (!ntfyUrl || !ntfyTopic || !text) return false;
+  const stumm = versandUnterdrueckt();
+  if (stumm) {
+    console.log(JSON.stringify({ step: "ntfy", status: "unterdrueckt", grund: stumm, titel }));
+    return false;
+  }
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), 5000);
   try {

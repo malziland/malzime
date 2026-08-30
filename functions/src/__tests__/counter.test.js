@@ -339,7 +339,10 @@ describe("checkAndIncrement", () => {
     const result = await checkAndIncrement();
     expect(result.allowed).toBe(true);
     expect(result.error).toContain("ABORTED");
-    /* mockRunTransaction wurde 3× aufgerufen (initial + 2 Retries) */
+    /* Drei Aufrufe (einmal plus zwei Wiederholungen). Kurzzeitig waren es
+       sechs — das machte den Einlass unter Andrang unbrauchbar langsam. Den
+       Ausfall faengt jetzt das Netz ab (kostenbremse-netz.test.js), nicht
+       laengeres Warten. */
     expect(mockRunTransaction).toHaveBeenCalledTimes(3);
   });
 

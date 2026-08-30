@@ -38,6 +38,7 @@ const {
   abandonJob,
   failJob,
   deleteJob,
+  platzAbgleichen,
 } = require("./jobs");
 const { datenbank } = require("./db");
 const { deleteImage } = require("./queue-storage");
@@ -148,6 +149,26 @@ async function reapJobs() {
 
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
   const expired = await sicherFinden("expired", () => findExpiredJobs());
+
+  /* DAS NETZ UNTER DER PLATZRESERVIERUNG (BUG-2026-08-30-14).
+     Der Einlass reserviert Plaetze in einem Zaehler; jeder Uebergang aus
+     `queued` gibt sie zurueck. Geht eine Rueckgabe verloren — Absturz zwischen
+     Uebergang und Freigabe —, stuende der Zaehler dauerhaft zu hoch und wuerde
+     Leute abweisen, obwohl Platz ist. Hier wird er auf die WIRKLICHE Zahl
+     gesetzt. Der Reaper laeuft im Minutentakt, die Abweichung lebt also
+     hoechstens eine Minute. */
+  try {
+    await platzAbgleichen();
+  } catch (fehler) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        error: "platz-abgleich-fehlgeschlagen",
+        message: fehler && fehler.message,
+        hinweis: "Der Warteschlangen-Zaehler kann driften — Einlass ggf. zu streng.",
+      })
+    );
+  }
   let reapedExpired = 0;
   for (const job of expired) {
     try {

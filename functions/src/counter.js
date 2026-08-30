@@ -37,6 +37,68 @@ function calcRetrySeconds(recent, limit, now, windowMs) {
  *
  * Bei Firestore-Fehler: fail-open (allowed: true).
  */
+
+/* ══════════════════════════════════════════════════════════════════════
+   DAS NETZ UNTER DER KOSTENBREMSE (30.08.2026)
+   ══════════════════════════════════════════════════════════════════════
+
+   DAS PROBLEM: Der Stundenzaehler schreibt alle Zeitstempel in EIN Dokument
+   (stats/current). Ein einzelnes Firestore-Dokument vertraegt etwa einen
+   Schreibvorgang pro Sekunde. Bei Andrang stehen alle Anfragen Schlange, die
+   Transaktion bricht mit ABORTED ab — und der Zaehler faellt fail-open aus.
+
+   GEMESSEN im Simulator: bei 170 gleichzeitigen Anfragen 206 Ausfaelle.
+
+   Das ist die schlechteste denkbare Eigenschaft fuer eine Kostenbremse: Sie
+   haelt im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+   Der Nutzer dazu: "Eine Kostenbremse ist dazu da, damit ich mich darauf
+   verlassen kann. Ich mag nicht auf einmal horrende Kosten haben."
+
+   DIESES NETZ KANN NICHT AUSFALLEN, weil es nichts schreibt. Es zaehlt die
+   Auftraege der letzten Stunde mit einer Aggregat-Abfrage — dieselbe Technik,
+   die auch die Warteschlangen-Position bestimmt. Aggregate kennen keine
+   Sperren und keine Kontention.
+
+   Es greift NUR, wenn der eigentliche Zaehler ausgefallen ist. Im Normalfall
+   kostet es nichts.
+
+   GRENZE DER AUSSAGE: Gezaehlt werden Auftraege in der Warteschlange. Eine
+   Analyse ohne Auftrag (der alte synchrone Pfad) taucht hier nicht auf. Im
+   Queue-Betrieb — und der ist seit v2.0 der einzige — entspricht ein Auftrag
+   genau einer Analyse.
+   ══════════════════════════════════════════════════════════════════════ */
+async function notbremseUeberJobs(fensterMs, limit) {
+  try {
+    const seit = Date.now() - fensterMs;
+    const agg = await datenbank().collection("jobs").where("createdAt", ">=", seit).count().get();
+    const inDerStunde = agg.data().count;
+    if (inDerStunde >= limit) {
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          alert: "notbremse-gegriffen",
+          message: "Der Stundenzaehler ist ausgefallen — die Notbremse hat uebernommen und blockiert.",
+          inDerStunde,
+          limit,
+        })
+      );
+      return { allowed: false, count: inDerStunde, limit, retryAfterSeconds: 300, notbremse: true };
+    }
+    return { allowed: true, count: inDerStunde, limit, retryAfterSeconds: 0, notbremse: true };
+  } catch (fehler) {
+    /* Auch das Netz kann reissen — dann bleibt nur fail-open, aber laut. */
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        alert: "notbremse-fehlgeschlagen",
+        message: "Weder Zaehler noch Notbremse verfuegbar — KEINE Kostenbremse aktiv.",
+        error: fehler && fehler.message,
+      })
+    );
+    return null;
+  }
+}
+
 async function checkAndIncrement() {
   /* v1.10.6: Eigene Retry-Schleife OBEN auf das Firestore-SDK-Retry (default 5).
      Hintergrund: Bei hoher Last (>=20 parallele Anfragen) kollidieren mehrere
@@ -45,6 +107,23 @@ async function checkAndIncrement() {
      nicht. Unsere Schleife versucht bei ABORTED noch 2× mit Backoff+Jitter,
      bevor wir fail-open + ERROR eskalieren. Andere Firestore-Fehler (Netz,
      Permission, etc.) gehen sofort in den ERROR-Pfad. */
+  /* MEHR VERSUCHE, GROESSERE ABSTAENDE (30.08.2026).
+     GEMESSEN im Simulator: Bei 170 gleichzeitigen Anfragen fiel die
+     Kostenbremse 206 Mal aus — jedes Mal, weil die zwei Wiederholungen nicht
+     reichten. Ein einzelnes Firestore-Dokument vertraegt etwa einen
+     Schreibvorgang pro Sekunde; bei Andrang stehen alle Anfragen an
+     stats/current Schlange.
+
+     ZWEI VERSUCHE, NICHT MEHR. Kurzzeitig standen hier fuenf mit Abstaenden
+     bis 2,5 Sekunden — in der Hoffnung, den Ausfall so zu vermeiden. Das war
+     die falsche Antwort: Der Einlass wurde dadurch unter Andrang so langsam,
+     dass ein Simulatorlauf ueber zehn Minuten brauchte. Jede Anfrage wartete
+     bis zu 4,5 Sekunden auf einen Zaehler, der ohnehin nicht durchkommt.
+
+     Die richtige Antwort steht darunter: das NETZ (notbremseUeberJobs). Es
+     zaehlt statt zu schreiben, kann deshalb nicht an derselben Ursache
+     scheitern — und braucht kein Warten. Zwei kurze Versuche fangen die
+     zufaellige Kollision ab; alles darueber uebernimmt das Netz sofort. */
   const ABORTED_RETRIES = 2;
   let lastErr = null;
   /* Einstellungssatz EINMAL vor der Transaktionsschleife holen — innerhalb
@@ -135,8 +214,9 @@ async function checkAndIncrement() {
       lastErr = err;
       const isAborted = err.code === 10 || /ABORTED/i.test(err.message || "");
       if (isAborted && attempt < ABORTED_RETRIES) {
-        /* Backoff mit Jitter: 80ms beim 1. Retry, 160ms beim 2. — plus 0-80ms
-           Zufall, damit nicht alle Caller im gleichen Moment zurueckkommen. */
+        /* Kurz: 80 und 160 ms, plus bis zu 80 ms Zufall. Genug fuer eine
+           zufaellige Kollision, zu kurz, um den Einlass aufzuhalten. Bei
+           echtem Andrang uebernimmt das Netz. */
         const backoff = 80 * (attempt + 1) + Math.random() * 80;
         await new Promise((r) => setTimeout(r, backoff));
         continue;
@@ -159,10 +239,17 @@ async function checkAndIncrement() {
           error: err.message,
         })
       );
-      /* FAIL-OPEN bei Firestore-Fehler: Der Einlass bleibt offen, damit ein
-         Datenbankproblem den Workshop nicht stoppt. `limit: null` sagt ehrlich,
-         dass hier keine Grenze bekannt ist — eine erfundene Zahl waere
-         schlechter als keine. */
+      /* ZUERST DAS NETZ: Der Zaehler ist ausgefallen, aber die Kostenbremse
+         darf es nicht sein. Das Netz zaehlt statt zu schreiben und kann
+         deshalb nicht an derselben Ursache scheitern. */
+      if (satzwerte) {
+        const netz = await notbremseUeberJobs(satzwerte.stundenfensterMinuten * 60 * 1000, satzwerte.stundenlimit);
+        if (netz) return { ...netz, error: err.message };
+      }
+
+      /* Erst wenn AUCH das Netz reisst: fail-open, damit ein Datenbankproblem
+         den Workshop nicht stoppt. `limit: null` sagt ehrlich, dass hier keine
+         Grenze bekannt ist — eine erfundene Zahl waere schlechter als keine. */
       return { allowed: true, retryAfterSeconds: 0, count: -1, limit: null, error: err.message };
     }
   }

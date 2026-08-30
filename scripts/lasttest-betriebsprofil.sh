@@ -13,6 +13,14 @@
 # Aufruf:  sh scripts/lasttest-betriebsprofil.sh [Anzahl]   (Vorgabe 40)
 
 set -e
+
+# KEIN VERSAND NACH DRAUSSEN.
+# VORFALL 30.08.2026: Ein Lauf dieses Skripts reihte 200 Analysen ein, riss das
+# Stundenlimit — und schickte eine ECHTE Push-Nachricht auf das Handy des
+# Betreibers. Der Emulator holt sich bei angemeldetem Konto die echten
+# Zugangsdaten aus dem Secret Manager. Ein Testlauf darf nicht nach aussen
+# wirken; notify.js erkennt beide Kennzeichen.
+export NTFY_STUMM=1
 ANZAHL="${1:-40}"
 PROJEKT="malzime"
 EMU_FIRESTORE="localhost:8080"

@@ -91,9 +91,17 @@ else
       if [ -n "$PRNR" ] && command -v gh >/dev/null 2>&1; then
         PRKOPF=$(gh pr view "$PRNR" --json headRefOid -q .headRefOid 2>/dev/null || true)
         if [ -n "$PRKOPF" ]; then
-          git fetch -q origin "$PRKOPF" 2>/dev/null || true
-          BAUM_HIER=$(git rev-parse "HEAD^{tree}" 2>/dev/null || echo "x")
-          BAUM_PR=$(git rev-parse "${PRKOPF}^{tree}" 2>/dev/null || echo "y")
+          # Der Kopf-Commit des PR liegt nach dem Squash-Merge nicht mehr
+          # zwingend lokal. Scheitert das Holen, entfaellt die Abkuerzung —
+          # und das wird GESAGT, statt still zu passieren.
+          if git fetch -q origin "$PRKOPF" 2>/dev/null; then
+            BAUM_HIER=$(git rev-parse "HEAD^{tree}" 2>/dev/null || echo "kein-baum-hier")
+            BAUM_PR=$(git rev-parse "${PRKOPF}^{tree}" 2>/dev/null || echo "kein-baum-dort")
+          else
+            echo "Hinweis: Kopf-Commit von PR #${PRNR} nicht abrufbar — die Baum-Regel entfaellt."
+            BAUM_HIER="kein-baum-hier"
+            BAUM_PR="kein-baum-dort"
+          fi
           if [ "$BAUM_HIER" = "$BAUM_PR" ]; then
             LAGE_PR=$(gh api "repos/malziland/malzime/commits/$PRKOPF/check-runs" \
               --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))

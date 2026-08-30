@@ -29,6 +29,34 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   ein widersprüchlicher Satz wird abgelehnt, statt Analysen abbrechen zu
   lassen. Genau der Ausfall vom 17. August kann so nicht mehr entstehen.
 
+- **Welche Einstellungen sich im Betrieb ändern lassen — und welche nicht.**
+  Das ist die wichtigste Unterscheidung dieses Umbaus, und sie ist bewusst
+  gezogen.
+
+  **Änderbar, ohne Auslieferung, wirksam binnen dreißig Sekunden** sind alle
+  Werte, die den Betrieb steuern: wie lange die KI rechnen darf, wie viel Text
+  sie ausgeben darf, wie viele Analysen gleichzeitig laufen, wie viele pro
+  Stunde erlaubt sind, wie tief die Warteschlange werden darf, wie lange
+  Aufträge liegen bleiben. Insgesamt sechsundzwanzig Werte, alle in einem
+  einzigen Dokument.
+
+  **Vier davon haben eine Obergrenze, die sich nicht überschreiten lässt** —
+  und zwar genau dort, wo die Datenschutzerklärung eine Zusage macht:
+
+  ```
+  Aufbewahrung eines Auftrags   höchstens  2 Stunden
+  Abholfenster für ein Ergebnis höchstens 15 Minuten
+  IP-Adresse im Speicher        höchstens 10 Minuten
+  Zeitfenster des Stundenlimits höchstens 60 Minuten
+  ```
+
+  Diese vier Fristen lassen sich **verkürzen, aber nie verlängern**. Der Grund
+  ist einfach: Auf der Website steht, dass wir uns eine IP-Adresse höchstens
+  zehn Minuten merken. Wäre der Wert frei einstellbar, könnte ein einziger
+  Tippfehler daraus zehn Stunden machen — und niemand würde es merken. Wer
+  eine dieser Grenzen anheben will, muss zuerst die Datenschutzerklärung
+  ändern. Das steht so im Programmcode.
+
 - **Was eine Zusage trägt, bleibt bewusst außerhalb der Datenbank.**
   Nicht jede Zahl darf sich im Betrieb ändern lassen. Der EU-Endpunkt, die
   EU-Datenbank, das benannte KI-Modell, die Obergrenze für Dateigrößen und die
@@ -61,6 +89,44 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   dürfen, steht auch in der Warteschlange bei Google. Stimmen beide nicht
   überein, rechnet die Wartezeit-Ansage still falsch. Die Prüfung meldet die
   Abweichung mit beiden Zahlen und dem Weg zur Abhilfe.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -244,6 +310,44 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Das automatische Mitscrollen verhält sich in allen Modi gleich.** Bisher
@@ -293,6 +397,44 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Vergleichswerten statt fester Schwellen: Eine einmal gemessene Zahl veraltet,
   ein Vergleich des Systems mit sich selbst nicht. Damit fällt eine schleichende
   Verschlechterung auf, bevor Rückmeldungen kommen.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -362,6 +504,44 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **Die Fußzeile führt die Kurzvorstellung auf allen zwölf Seiten** — zusammen
   mit der Wortmarke in der Markenfarbe, damit die beiden inhaltlichen Einträge
   zwischen den Rechtsseiten auffallen.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -558,6 +738,44 @@ Aussagen, die nicht mehr zum Code passten.
   heute mit den aktiven überein (nachgemessen); ab jetzt gehören sie zur
   Auslieferung.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Die Beschreibung des Schutzes „HSTS" ist ehrlicher.** Die Seite erzwingt
@@ -589,6 +807,44 @@ Aussagen, die nicht mehr zum Code passten.
   Baustelle schadet mehr, als er nutzt. Sie ist wieder erreichbar, also ist er
   wieder da: auf allen zehn Seiten, in einem neuen Tab, mit der Tastatur
   erreichbar.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -649,6 +905,44 @@ Aussagen, die nicht mehr zum Code passten.
   Abbruch, und gar nicht, wenn der Schalter schon bedient wurde. Wer am Gerät
   Animationen abgeschaltet hat, sieht statt der Bewegung ein ruhiges Auf- und
   Abblenden. Nichts davon wird gespeichert.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -751,6 +1045,44 @@ Aussagen, die nicht mehr zum Code passten.
   eine Website nicht einfärben — der Streifen gehört dem Browser. Nur Safari
   auf dem Mac folgt der Seitenfarbe.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Das Abzeichen „SYSTEM AKTIV" ist entfallen.** Es war reine Zier: Kein
@@ -789,6 +1121,44 @@ Aussagen, die nicht mehr zum Code passten.
   Datenschutzseiten laden eines, nämlich die Echtheits-Prüfung. Bis hierher
   stand dort ein Hinweis „Diese Seite gibt es nur auf Deutsch" — seit es die
   Übersetzung gibt, war das eine Falschaussage.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -833,6 +1203,44 @@ Aussagen, die nicht mehr zum Code passten.
 ## [3.6.1] — 2026-08-18
 
 
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -967,6 +1375,44 @@ Aussagen, die nicht mehr zum Code passten.
 ## [3.4.1] — 2026-08-18
 
 
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -1141,6 +1587,44 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   englisch) und ein Eintrag im bestehenden Wasserzeichen-Filter, der bisher nur
   fremde Stockfoto-Wasserzeichen kannte.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Der Wächter für Barrierefreiheit sah einen ganzen Bildschirmteil nicht.**
@@ -1207,6 +1691,44 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   das Skript nicht kennt. Ohne ihn würde es beim ersten neuen CI-Schritt zur
   Beruhigungspille — „alles grün" für etwas, das es nicht mehr prüft. Jede
   bewusste Auslassung braucht eine Begründung, auch das prüft ein Test.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2618,6 +3140,44 @@ Audits sind.
 - **Die englischen Fehlermeldungen nannten „Google's safety filters".** Seit
   v1.6 läuft ausschließlich Mistral.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Der Einlass bremst ab 155 Wartenden.** Seit die Parallelität in v2.8 von 10
@@ -2713,6 +3273,44 @@ Audits sind.
 
   **Übergang für alte Clients:** `/api/stats` meldet weiterhin `useQueue: true`. Wer die Seite aus dem Zwischenspeicher lädt, prüft dieses Feld und würde ohne es auf einen Weg fallen, den es nicht mehr gibt. Kann in einigen Wochen ersatzlos weg.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Dokumentation auf den aktuellen Stand gebracht.** Dreiunddreißig Stellen in zehn Dateien beschrieben noch den synchronen Pfad als aktiven oder rückfallfähigen Weg — README (Schnittstellen-Beschreibung), ARCHITECTURE, FLAGS, RUNBOOK, SETUP, SELF-HOSTING, VERIFICATION, QUEUE-EMULATOR, CONTRIBUTING und AGENTS. In `FLAGS.md` ist damit auch das dort notierte Entfernungs-Kriterium erfüllt und abgehakt.
@@ -2720,6 +3318,44 @@ Audits sind.
 ## [2.9.2] — 2026-08-10
 
 
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2845,6 +3481,44 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
 
 
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Beast Mode zeigt jetzt eigene Werbung.** Bisher landete EINE Werbeliste in beiden Modi (`mistral.js`, `ad_targeting: ads`) — der Beast-Text war zynisch und ausbeutend, die Werbung darunter dieselbe brave Liste wie im Standard. Das entwertete genau den Moment, auf den das Tool didaktisch hinarbeitet. Jetzt liefert das Modell **zwei getrennte Listen**: Standard zeigt, was zum sichtbaren Lebensstil passt, Beast zeigt, was die im Beast-Profil benannte Schwachstelle ausbeutet (Abo-Fallen, Ratenzahlung, Statusprodukte über Budget, bei Kindern Sammelzwang- und Quengel-Mechaniken). **Gemessen an 84 Analysen: Marken-Überlappung zwischen den Modi 100 % → 2,8 %, Produkt-Überlappung 100 % → 0,0 %.** Beispiel (14-jähriges Mädchen): Standard „Puma × Stranger Things, Converse Run Star Hike, Spotify Premium Student" — Beast „Zalando Lounge Abo, ASOS Premier Membership, Boohoo Trend-Abo, Wish Mystery Beauty Box". (`locales/de/prompts.js`, `locales/en/prompts.js`, `mistral.js`)
@@ -2942,6 +3616,44 @@ Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu l
   - **Warum das nötig war:** Alle übrigen Backend-Tests ersetzen `onRequest` durch eine Attrappe und überspringen die Express-Schicht komplett. Beim Sprung Express 4 → 5 konnte deshalb **kein einziger** der 439 Tests eine Regression dort bemerken; die Prüfung lief über einen Wegwerf-Prüfstand.
   - **Gegenprobe gemacht:** Ohne die `rawBody`-Reparatur fallen genau 3 der 12 neuen Tests durch — der Test misst also wirklich etwas.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Auto-Merge schließt Backend-Produktivpakete aus.** Neu zusätzlich zur patch/minor-Regel: PRs in `/functions` mit `dependency-type: direct:production` laufen **nicht** mehr automatisch durch. Anlass ist der Vorfall aus v2.4.3 — Sammel-PR #58 war als `minor` etikettiert (`firebase-functions` 7.2.5 → 7.3.2), transportierte darin aber Express 4 → 5. Die update-type-Prüfung sieht nur das Etikett des äußeren Pakets, nicht den Lockfile darunter. Backend-**Werkzeuge** (eslint, prettier, jest) laufen weiterhin ohne Zutun durch; dafür trennt `dependabot.yml` die Bündel jetzt in `backend-werkzeuge` und `backend-produktiv`. (`.github/workflows/dependabot-automerge.yml`, `.github/dependabot.yml`)
@@ -2955,6 +3667,44 @@ Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu l
 
 
 Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst erzeugt hat — gebündelt statt einzeln, und einer davon vollständig ohne Zutun durchgelaufen. Der Backend-Anteil enthält einen Major-Sprung im Innenleben (Express 4 → 5), der bewusst geprüft statt automatisch durchgewunken wurde.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -2999,6 +3749,44 @@ Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft.
   - **Produktiv-Oberfläche bewusst unangetastet:** `firebase-functions` (7.2.5), `firebase-admin` (14.1.0), `express` (4.22.2), `google-gax` (5.0.7) und die `@google-cloud/*`-Pakete bleiben exakt auf dem Live-Stand. Ein vollständiger Lockfile-Neuaufbau hätte nebenbei `firebase-functions` 7.3.2 und damit **Express 4 → 5** in den Produktiv-Backend gezogen — eine Verhaltensänderung, die in einen bewusst freigegebenen eigenen Schritt gehört und nicht als Nebenwirkung hier hinein. Stattdessen minimal-invasiv: `npm install` gegen das bestehende Lockfile (ändert nur, was die Übersteuerungen erzwingen) plus gezielte Handkorrektur der drei Versionseinträge.
   - **macOS-Lockfile-Falle erneut bestätigt und diesmal sauber umschifft:** `npm audit fix`, `npm update --package-lock-only` _und_ `npm install` schneiden auf macOS die optionalen Einträge `@emnapi/core`, `@emnapi/runtime` und `@pkgjs/parseargs` aus dem Lockfile — die Linux-CI bricht daraufhin mit `npm ci`-EUSAGE ab (genau so geschehen im ersten Anlauf dieses Zweigs). Die Einträge wurden nach dem Eingriff gezielt zurückgeschrieben. **Verlässliche Vorabprüfung ist `npm ci --dry-run`** — reproduziert den CI-Fehler lokal; eine Textsuche nach „linux" im Lockfile tut das nicht (die betroffenen Pakete tragen kein „linux" im Namen). (`package.json`, `functions/package.json`, beide Lockfiles)
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Audit-Gate mit begründeter, ablaufender Ausnahmeliste** (`scripts/audit-gate.mjs` + `.github/audit-allowlist.json`) ersetzt das nackte `npm audit --omit=dev --audit-level=high` im CI-Job `test-backend`. Grund: Das alte Gate war ein Alles-oder-nichts-Schalter — erschien irgendwo tief in einer fremden Abhängigkeitskette ein High-Advisory ohne verfügbare Reparatur, blockierte es **jeden** PR. Genau daran sind am 2026-07-01 alle acht Dependabot-PRs gescheitert (#30–#37, alle an `test-backend`), die deshalb von Hand weggeräumt werden mussten. Neu: High/Critical blockieren weiterhin, eine Ausnahme braucht Begründung **und** Ablaufdatum, danach fällt das Gate von selbst wieder auf rot; ein neues Advisory ist nie automatisch ausgenommen. Das Gate fasst außerdem Ketten korrekt zusammen (6 npm-Meldungen = 1 echte Lücke). Verhalten in allen vier Fällen gemessen: ungedeckt → rot, abgelaufen → rot, gedeckt → grün, verwaist → Hinweis.
@@ -3034,6 +3822,44 @@ Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v
 - **Reaper/Worker-Race:** Reaper und Worker löschten das zwischengespeicherte Bild auch dann, wenn ihr `abandonJob`-Übergang das Race verloren hatte (Job inzwischen von einem Worker geclaimt) — der laufende Job fand sein Bild nicht mehr und endete als `blocked.apiError`. Aufräumen (Bild + Stunden-Slot) passiert jetzt nur noch nach **erfolgreichem** Statusübergang (`handle-reap.js`, `handle-process-job.js`; je ein neuer Race-Test).
 - **Stunden-Slot-Leck im Enqueue-Fehlerpfad:** Scheiterte `storeImage`/`createJob` NACH dem Ziehen des Stunden-Slots, blieb der Slot bis zu 60 min belegt und ein ggf. schon abgelegtes Bild bis zur 1-Tag-Lifecycle-Regel liegen. Jetzt wird analog zum bestehenden `enqueueJob`-Fehlerpfad aufgeräumt (Slot zurück + Bild weg, neuer Fehlercode `store_failed`; zwei neue Tests).
 - **Queue-Fetches ohne Timeout:** `enqueue`- und Poll-Fetch konnten bei nie settelnden Verbindungen (Mobilfunk-Blackhole) den Wartefluss einfrieren — der Sync-Pfad hatte längst einen Timeout. Jetzt `fetchWithTimeout` (Enqueue 90 s, Poll 30 s; Client gibt nie vor dem Server auf, Timeouts laufen in die bestehende 5-Fehler-Toleranz).
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3072,6 +3898,44 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
 - **Urheber in den strukturierten Daten der Startseite:** Christoph Krieger als `creator` und als Gründer der Betreiber-Organisation, Verweis aufs GitHub-Repository (`sameAs`); Autor-Meta-Tag nennt jetzt Person + Firma. (`public/index.html`)
 - **Alternativtexte fürs Teilen-Vorschaubild** (`og:image:alt`, `twitter:image:alt`). (`public/index.html`)
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Impressum-Seitentitel korrigiert:** nannte bisher eine nicht existierende Kurz-Firmierung — jetzt „Impressum — malziME by malziland". Die Firma heißt überall vollständig „malziland - learning | training | consulting e.U." (Schreibweise laut Impressum). (`public/impressum.html`)
@@ -3083,6 +3947,44 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
 
 
 Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten) axe-Hinweise behoben und der Tastatur-Durchlauf als dauerhafter Test verankert — der Wächter meldet jetzt **null Funde über alle Schweregrade**. Nur-Hosting-Deploy. 165 Frontend- + 435 Backend-Tests, 5 E2E, Lint und Format grün.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3098,6 +4000,44 @@ Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten
 
 
 Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus Governance-Nachrüstung (Phasen 1–3: Betriebs-Doku, Verifikationsmatrix, A11y-Gate, Sammel-Scripts). Nur-Hosting-Deploy — Functions unberührt. 165 Frontend- + 435 Backend-Tests, 4 E2E (A11y-Gate ohne Ausnahmen), Lint und Format grün.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3120,6 +4060,44 @@ Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus 
 
 Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teilen-Bild, README-Screenshots) plus ein Sicherheitsupdate im Backend. Hosting- + Functions-Deploy. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Alle Marken-Bildflächen auf das malziland-Design gebracht.** Neues Favicon-Set als m-Medaillon nach Farbleitfaden (weißes m auf Teal-Kreis: `favicon.svg`, `favicon.ico`, 192/512-px-Icons; Apple-Touch-Icon als Teal-Kachel), neues Teilen-Vorschaubild `og-image.png` (1200×630, Papier-Look mit Wasserzeichen und m-Medaillon — das sehen Empfänger in WhatsApp/Signal/Teams), PWA-Manifest-Farben auf Teal/Warmweiß, neue `theme-color`-Meta auf allen Seiten (mobile Browser-Farbleiste folgt jetzt auch dem Beast-Modus). README-Screenshots erneuert: Desktop hell + Mobil im Beast-Dunkel. (`public/favicon*`, `public/apple-touch-icon.png`, `public/og-image.png`, `public/site.webmanifest`, alle HTML-Seiten, `public/app.js`, `docs/screenshots/`)
@@ -3133,6 +4111,44 @@ Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teile
 
 
 Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleitfaden 2026): heller Papier-Look mit Beast-Mode-Dunkel-Kopplung, Unterseiten im Dokument-Stil, Poppins statt Inter/JetBrains Mono, Marken-Lizenz-Ausnahme im Repo. Über Firebase-Preview-Channel am Gerät getestet und freigegeben. Reiner Hosting-Deploy — Backend/Functions unberührt. 165 Frontend- + 435 Backend-Tests, E2E, Lint und Format grün.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3161,6 +4177,44 @@ Reaktion auf den Workshop-Vorfall vom selben Vormittag: Foto-Einlesen abgehärte
 ### Behoben
 
 - **„Dieses Bild konnte nicht geöffnet werden" auf einzelnen Android-Handys — Foto-Einlesen grundlegend robuster gemacht (Workshop-Vorfall 2026-07-06).** Manche Geräte übergeben der Webseite eine Foto-Referenz, deren Inhalt der Browser gar nicht lesen kann (z.&nbsp;B. nach Speicherdruck, bei Cloud-only-Fotos oder defekter Galerie-App) — dann scheiterte bisher erst der Bild-Decoder, und die Fehlermeldung riet fälschlich zu „JPEG oder PNG", was betroffenen Nutzern nicht helfen konnte (auch ein Screenshot scheiterte identisch). Drei Änderungen: (1)&nbsp;Das Foto wird jetzt sofort nach der Auswahl einmal komplett in den Speicher der Seite kopiert, mit automatischem zweitem Versuch — alle weiteren Schritte (EXIF, Verkleinern) arbeiten auf dieser Kopie, die nicht mehr kaputtgehen kann; ein Teil der Fälle (kurzzeitige Aussetzer des Geräts) wird damit ganz verhindert. (2)&nbsp;Kann das Gerät die Datei endgültig nicht liefern, kommt eine ehrliche, eigene Fehlermeldung mit Tipps, die wirklich helfen (Browser neu starten, Speicherplatz prüfen, Foto lokal speichern, anderes Gerät) statt des irreführenden Format-Hinweises — zweisprachig DE/EN. (3)&nbsp;Die anonyme Fehler-Diagnose überträgt jetzt zusätzlich den genauen technischen Fehlergrund (`errorDetail`, z.&nbsp;B. `NotReadableError`) und die Dateigröße (`fileSizeKb`), damit künftige Fälle in den Logs eindeutig zuzuordnen sind — weiterhin ohne Dateinamen oder Bildinhalt. (`public/js/exif.js`, `public/js/api.js`, `public/js/error-logger.js`, `functions/src/handle-errors.js`, `public/locales/de.json`, `public/locales/en.json`)
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3192,6 +4246,44 @@ Weiterer Feinschliff der Reload-Erfahrung (zwei Punkte aus dem Live-Test auf dem
 
 - **Der „Nichts davon ist wahr"-Hinweis erscheint beim Reload nicht erneut.** Hat man ihn beim ersten Ergebnis bereits bestätigt (weggeklickt), wird er beim Neuladen übersprungen — pro Job gemerkt, überlebt den Reload. Beim allerersten Anzeigen und bei jedem neuen Upload erscheint er wie gehabt. (`public/js/api.js`)
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert (bewusste Datenschutz-Entscheidung)
 
 - **Das hochgeladene Foto wird nach einem Reload bewusst NICHT wiederhergestellt — und das wird zum sichtbaren Datenschutz-Lerneffekt.** Das Foto wird unmittelbar nach der Analyse gelöscht und absichtlich nirgends — auch nicht im Browser — zwischengespeichert. An die Stelle, wo das Foto war, tritt nach dem Reload ein kurzer, positiver Hinweis: „Dein Foto ist schon gelöscht — gut für deine Privatsphäre." Zweisprachig (DE/EN), als Klasse `photo-deleted-note`. Das passt zur Bildungs-Mission des Tools: Datensparsamkeit sichtbar machen statt verstecken. (`public/js/api.js`, `public/styles.css`, `public/locales/de.json`, `public/locales/en.json`)
@@ -3220,6 +4312,44 @@ Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte un
 ### Behoben
 
 - **Queue-Ergebnis überlebt jetzt einen Seiten-Reload.** Bisher warf der Browser das Abhol-Ticket (PRIV-003) sofort nach dem Rendern weg — ein Reload konnte das (serverseitig noch bis zu 2 h vorhandene) Profil nicht mehr abholen, es war „weg". Jetzt bleibt das Ticket im Tab erhalten: Ein Reload holt das Ergebnis ticket-geschützt erneut ab. Aufgeräumt wird beim nächsten Upload, bei Fehler/Abbruch oder wenn der Job serverseitig abgelaufen ist; der Resume beim Seitenstart ist still (kein Fehler-Banner bei bereits gelöschtem Job). Zwei neue Frontend-Tests decken das ab. (`public/js/api.js`, `public/__tests__/queue.test.js`)
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3264,6 +4394,44 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
 - **PRIV-001 — `.gitignore`-Lücke geschlossen.** Ungetrackte Test-Artefakte (`ab-test-*`, `single-large-call-*-rc*`, `compare-prototype-home.html`) mit aus echten Testbildern abgeleiteten Profilen (inkl. Minderjähriger) waren von keinem Ignore-Muster erfasst — ein `git add -A` hätte sie ins öffentliche Repo committet. Breite Schutzmuster ergänzt, Profil-Ausgaben aus dem Repo entfernt (lokal gesichert), Forschungs-Skripte bewusst ignoriert.
 - **NTFY-001 — selbst-gehosteter `ntfy`-Benachrichtigungs-Server abgesichert + aktualisiert.** War öffentlich erreichbar und anonym lesbar (Image v2.22.0, außerhalb des Repos) → die Limit-Benachrichtigungen mit Admin-Aktionslinks waren für Fremde mitlesbar. Jetzt: eigenes Image auf **ntfy v2.24.0** (via Cloud Build), Passwortschutz (`NTFY_AUTH_DEFAULT_ACCESS=write-only` — die App sendet weiterhin ohne Änderung, Lesen nur mit Konto `malzime` + Passwort aus Secret `ntfy-owner-pass`), iPhone-Push über die Apple-Weiterleitung (`upstream-base-url` + `base-url`) live verifiziert. Rollback: Server-Env auf `read-write`.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert (Härtung)
 
 - **OPS-003 — GitHub-Actions auf Commit-SHA gepinnt** (`ci.yml`: checkout, setup-node, gitleaks, lighthouse; `dependabot-automerge.yml`: fetch-metadata). Schutz gegen Tag-Repointing auf Schadcode.
@@ -3289,6 +4457,44 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
 
 Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Sicherheits-Ergänzung im Minderjährigen-Abschnitt — keine Struktur-/Schema-Änderung, kostenneutral.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - **Erweiterte Schutzklausel für erkennbar Minderjährige** (`singleLargePrompt` in `de` und `en`). Zusätzlich zur bestehenden Zeile gegen sexualisierte Zuschreibungen: keine persönliche Abwertung von Körper/Gewicht/Haut, keine Zuschreibung von Sucht/Alkohol/Substanzen/Untreue/Beziehungsversagen als Charakterurteil. Die Karten `beziehungsstatus`, `verletzlichkeit` und `gesundheit` werden bei Kindern/Teens stattdessen auf die System-Ebene gelenkt (Werbedruck, Plattform-Mechanik, Peer-Pressure, In-App-Käufe, Körperbild-Industrie) — also wie die Person ausgewertet wird, nicht auf persönliche Defizite. Hintergrund: Der aktive Single-Large-Pfad unterdrückt für Minderjährige keine Karten server-seitig; die Schärfe der Beast-Pools traf bisher nur eine einzige Schutzzeile.
@@ -3302,6 +4508,44 @@ Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Si
 
 
 Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) ist damit abgeschlossen — die seit rc3 live laufende Architektur (Single-Large hinter Feature-Flag, Cloud-Tasks-Concurrency 10) wird unverändert zur stabilen Version erklärt. Zusätzlich zwei kleine Verbesserungen aus dem Betrieb: lesbarere Altersbeschreibungen und gehärtete Diagnose-Endpunkte.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3331,6 +4575,44 @@ rund 12 %, Job-Latenz um rund 17 %.
 - **Beast-Profil bricht nicht mehr mitten im JSON ab:** Mistral hatte sich im Beast-Modus gelegentlich selbst entschieden, früh aufzuhören — `finishReason: "stop"` bei nur 7 von 13 gelieferten Karten und ohne Verdict-Text. Drei Maßnahmen zusammen lösen das: (1) Antwort-Budget pro Profile-Call von 8.000 auf 16.000 Tokens erhöht (Sicherheitsdeckel, kostenneutral), (2) Im JSON-Output kommt der Verdict-Text jetzt zuerst, dann die Karten — falls Mistral doch früh stoppt, ist wenigstens der Verdict da, (3) Server-seitige Vollständigkeitsprüfung: liefert Mistral weniger als 13 Karten, wird automatisch ein gezielter Retry-Call ausgelöst, der die fehlenden Felder explizit anfordert.
 - **Profil-Karte „Werbeprofil" fehlt nicht mehr im Standard-Modus:** Mistral hatte die letzte Karte gelegentlich weggelassen, vermutlich weil sie ganz am Ende des Schemas stand. Mit der Vollständigkeitsprüfung (siehe oben) und der neuen JSON-Reihenfolge gibt das System keine unvollständigen Profile mehr aus.
 - **Bei „im Bild nicht eindeutig erkennbar"-Fällen wird jetzt eine kurze Begründung mitgeliefert** statt abrupt zu enden. Vorher war „Im Bild nicht erkennbar." ein hartes Ende, das den Lesefluss zerriss; jetzt steht z. B. „Im Bild keine klaren Signale — weder Ehering noch Begleitung sichtbar." Der Workshop-Teilnehmer versteht, _warum_ keine Aussage möglich ist.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3373,6 +4655,44 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
 - **Auslieferungs-Messung:** Beim ersten Ausliefern eines fertigen Jobs hält `jobStatus` den Zeitpunkt fest (`deliveredAt`) und loggt eine `job-delivered`-Zeile mit `deliveryGapMs` (fertig gerechnet → beim Client angekommen) und `totalMs` (erstellt → ausgeliefert). Das trennt „fertig" von „tatsächlich abgeholt" — unabhängig von der best-effort Client-Telemetrie.
 - **Warteschlangen-Wartezeit im Log:** Die `process-job`-Erfolgsmeldung enthält jetzt zusätzlich `queueWaitMs` — die Zeit zwischen Einreihen und Verarbeitungsbeginn.
 
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
+
 ### Geändert
 
 - Die client-seitig gemessene Upload-Dauer (`enqueueMs`) wird in der Erfolgs-Telemetrie nicht mehr verworfen — sie fehlte bisher auf der Server-Whitelist und ist jetzt mitgeloggt.
@@ -3384,6 +4704,44 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
 ### Behoben
 
 - Speicher der Warteschlangen-Statusabfrage (`jobStatus`) von 128 auf 256 MB angehoben. 128 MB hatte keinen Puffer über dem firebase-admin-Grundbedarf und lief beim Workshop am 21.05. unter Poll-Last in einen Speicherüberlauf.
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 
@@ -3409,6 +4767,44 @@ Diese Version fasst die fünf Entwicklungsphasen rc1–rc5 zusammen.
 - **Infrastruktur:** Cloud-Tasks-Queue `analyze-queue` (`europe-west1`, `maxConcurrentDispatches` 3), dedizierter nicht-öffentlicher Storage-Bucket `malzime-queue-uploads`, zwei zusammengesetzte Firestore-Indizes auf der `jobs`-Collection.
 - **Feature-Flag** `useQueue` (Firestore `featureFlags/current`, 30 s Cache, fail-safe auf `false`); `/api/stats` liefert es an das Frontend aus.
 - Lokale Emulator-Testumgebung für Entwicklung und Mock-Lasttests (`QUEUE_LOCAL`, `mistral-mock.js`, `docs/QUEUE-EMULATOR.md`).
+
+### Behoben
+
+- **Die Einlassgrenze hält jetzt auch bei Massenandrang.** Bisher zählte der
+  Einlass die Warteschlange und legte den Auftrag erst mehrere Schritte später
+  an. Laden dreißig Kinder gleichzeitig hoch, sehen alle Anfragen denselben
+  Stand und kommen alle durch — gemessen wurden **200 Wartende bei einer
+  Grenze von 155**.
+
+  Die Folge wäre im Workshop nicht sichtbar, bei einer Presse-Welle schon: Die
+  Letzten in der Schlange warten über den Punkt hinaus, an dem ihr Browser
+  aufgibt. Sie sehen einen Fehler, während ihre Analyse läuft und Geld kostet.
+
+  Jetzt entscheidet nicht mehr eine Zählung von vorhin, sondern die
+  tatsächliche Position: Jeder Auftrag fragt nach dem Anlegen, wie viele vor
+  ihm warten. Wer zu spät kommt, wird zurückgenommen, bevor Kosten entstehen.
+  **Gemessen nach der Reparatur: genau 155 von 155.** Wer abgewiesen wird,
+  bekommt eine Absage mit Begründung statt einer abgebrochenen Verbindung.
+
+- **Die Kostenbremse fällt nicht mehr aus, wenn sie gebraucht wird.** Das
+  Stundenlimit trug alle Zeitstempel in ein einziges Datenbankdokument ein.
+  Bei vielen gleichzeitigen Uploads stehen alle Anfragen davor Schlange —
+  **die Bremse fiel im Test 206-mal aus und ließ durch.**
+
+  Das ist die schlechteste denkbare Eigenschaft für eine Kostenbremse: Sie
+  hält im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
+
+  Jetzt gibt es einen zweiten Weg, der nichts einträgt, sondern nur zählt — er
+  kann deshalb gar nicht an derselben Ursache scheitern. Er springt ein,
+  sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
+  dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
+  geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
+  löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
+  Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
+  Zugangsdaten, wenn man angemeldet ist. Er erkennt sich jetzt selbst und
+  schweigt.
 
 ### Geändert
 

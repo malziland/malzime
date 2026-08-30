@@ -370,6 +370,27 @@ und **Account-Dashboard** prüfen (Limits unterscheiden sich drastisch je
 Modellversion — immer das Dashboard, nicht Code-Kommentare). Notfalls Wartungsmodus
 (Hebel 1).
 
+### »notbremse-gegriffen« — der Stundenzähler ist ausgefallen
+
+**Was passiert ist:** Der reguläre Zähler kam nicht durch (Datenbanksperre bei
+Andrang), und das Netz hat übernommen — es hat die Aufträge der letzten Stunde
+gezählt und **blockiert**, weil das Limit erreicht war.
+
+**Ist das schlimm?** Nein, das ist die Bremse bei der Arbeit. Die Meldung sagt
+nur: Es ist gerade viel los, und die Kostengrenze greift.
+
+**Was tun:** Wie bei jedem erreichten Stundenlimit — abwarten oder den Boost
+nutzen. Kommt die Meldung außerhalb eines Workshops, lohnt ein Blick in die
+Zugriffszahlen.
+
+### »Zähler UND Netz fehlgeschlagen« — jetzt ist die Bremse wirklich weg
+
+**Das ist der ernste Fall.** Beide Wege zur Kostenbremse sind gescheitert, der
+Einlass läuft ungebremst weiter. Ursache ist fast immer ein Firestore-Ausfall.
+
+**Sofort:** Wartungsmodus einschalten (`config/maintenance`), damit keine
+weiteren Analysen starten. Danach den Datenbankzustand prüfen.
+
 ### Stundenlimit erreicht (rollendes Fenster, Wert im Einstellungssatz)
 
 Gewollte Kostenbremse; der ntfy-Push kommt automatisch. Braucht ein Workshop mehr:

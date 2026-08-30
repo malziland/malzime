@@ -40,7 +40,11 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
                      Firestore-Einstellungssatz -> docs/BETRIEBSPROFILE.md
   betriebsprofil.js  Die 26 einstellbaren Werte, ihre Grenzen und die Pruefung
                      jedes Satzes. Vier Obergrenzen SIND Datenschutzzusagen.
-  counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance-Mode
+  counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset,
+                     Maintenance-Mode. Seit 30.08.2026 mit NETZ
+                     (notbremseUeberJobs): Faellt der Zaehler bei Andrang aus
+                     — er schreibt in EIN Dokument —, zaehlt das Netz statt zu
+                     schreiben und haelt die Kostenbremse aufrecht.
   notify.js          ntfy Push-Benachrichtigungen bei Limit-Erreichung
   animal.js          SUBJECT-Klassifikation aus Mistral-Beschreibungstext + Easter-Egg-Profile (Hund/Katze/Vogel/...)
   middleware.js      Rate Limiting (IP-basiert, Grenze+Fenster aus dem Einstellungssatz), IP-Extraktion

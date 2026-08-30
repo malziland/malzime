@@ -532,16 +532,6 @@ describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
     expect(jobs.getJob).toHaveBeenCalledWith("job-abc");
   });
 
-  test("die Pruefung laeuft IMMER — sie ist billig genug", () => {
-    /* ENTFALLEN (30.08.2026): Kurzzeitig lief die Positionspruefung nur ab
-       80 % der Grenze, um Datenbankzugriffe zu sparen. Das war eine Antwort
-       auf die falsche Frage: Die Zugriffe waren nie das Problem, die SPERREN
-       der ersten Stufe waren es. Ohne sie ist die Pruefung billig — eine
-       Zaehlabfrage —, und eine Bremse, die nur manchmal greift, ist eine
-       Fehlerquelle mehr. */
-    expect(true).toBe(true);
-  });
-
   test("bei einem Fehler in der Stufe wird eingelassen, nicht blockiert", async () => {
     /* Fail-open: Eine Kapazitätsbremse darf nie zum Totalausfall werden.
        Der Fehler geht laut ins Protokoll, der Nutzer bekommt seine Analyse. */

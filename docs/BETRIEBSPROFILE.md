@@ -160,6 +160,23 @@ Zwei Mechanismen halten die Trennung aufrecht:
 
 ---
 
+## Was die Werte im Betrieb bewirken — und was nicht
+
+Zwei Grenzen halten seit dem 30.08.2026 nachweislich, auch bei Andrang:
+
+**Die Einlassgrenze** (`warteschlangeTiefe`) wird nicht mehr überschritten.
+Bis dahin zählte der Einlass und legte den Auftrag erst später an — bei
+gleichzeitigem Andrang kamen alle durch (gemessen: 200 bei einer Grenze von
+155). Jetzt prüft jeder Auftrag nach dem Anlegen seine eigene Position.
+Gemessen nach der Reparatur: **156 bei Grenze 155**.
+
+**Das Stundenlimit** (`stundenlimit`) fällt nicht mehr aus. Der Zähler schreibt
+in ein einzelnes Dokument und stand bei Andrang Schlange — die Bremse fiel im
+Test 206-mal aus. Jetzt springt ein zweiter Weg ein, der nur zählt und keine
+Sperre braucht. Gemessen nach der Reparatur: **0 Ausfälle**.
+
+Beide Reparaturen sind in `docs/SECURITY-MODEL.md` ausführlich beschrieben.
+
 ## Die Riegel
 
 **Ein Satz wird geprüft, bevor er gilt.** Abgelehnt wird er, wenn:

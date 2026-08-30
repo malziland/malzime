@@ -120,6 +120,31 @@ Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-
 
 ### Einlass-Politik
 
+### Die Einlassgrenze hält in zwei Stufen (seit 30.08.2026)
+
+Bis dahin zählte der Einlass die Warteschlange und legte den Auftrag erst
+mehrere Schritte später an. Bei gleichzeitigem Andrang sahen alle Anfragen
+denselben Stand und kamen alle durch — gemessen 200 Wartende bei einer Grenze
+von 155. Der Fehler bestand seit der Einführung der Warteschlange und wurde
+erst durch einen Lasttest im Emulator sichtbar (BUG-2026-08-30-14).
+
+1. **Vorprüfung vor dem Upload** (`countQueuedJobs`) — grob, billig, ohne
+   Sperre. Sie fängt den Normalfall ab, *bevor* ein Bild gespeichert wird.
+   Das ist auch eine Datenschutzfrage: Ein Foto, das nie analysiert wird, soll
+   nie auf unserem Speicher liegen.
+2. **Positionsprüfung nach dem Anlegen** (`platzBestaetigen`) — exakt. Jeder
+   Auftrag fragt: Wie viele warten *vor mir*? Die Antwort ist stabil, niemand
+   schreibt etwas Gemeinsames, es gibt keinen Wettlauf. Wer zu spät kommt,
+   nimmt sich selbst zurück, bevor Kosten entstehen.
+
+**Verworfen wurde eine atomare Reservierung** über ein Zähler-Dokument in einer
+Transaktion. Sie löste den Wettlauf sauber und erzeugte einen schlimmeren
+Fehler: Ein einzelnes Firestore-Dokument verträgt etwa einen Schreibvorgang pro
+Sekunde. Bei 170 gleichzeitigen Anfragen entstanden 373 Sperr-Konflikte,
+einzelne Anfragen hingen sechzig Sekunden, 94 von 170 Verbindungen rissen ab.
+Die Lehre gilt über diesen Fall hinaus: **Nicht in ein gemeinsames Dokument
+schreiben, sondern zählen.**
+
 Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab `warteschlangeTiefe` wartenden Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt (`parallelitaet` × gemessene Dauer je Analyse). Beide Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
 
 Dazu kommt die Selbstregulation: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten. Abbrecher werden nach der Karenz (`livenessGnadenfristMs`) gereapt und geben ihren Stunden-Slot zurück. Wartende Jobs haben zusätzlich ein absolutes Höchstalter (`wartendesHoechstalterMs`) — fortlaufendes Pollen hält einen Job also nicht unbegrenzt am Leben.

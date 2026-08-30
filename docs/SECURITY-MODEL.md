@@ -191,3 +191,66 @@ Verwaltungsseiten die Ausnahme.
 **Bedingung für Neubewertung.** Sobald feststeht, dass keine Unterdomain ohne sichere
 Verbindung mehr geplant ist — etwa nach dem Presse-Zug und der 4.0-Auslieferung. Der
 Eintrag bleibt jederzeit möglich; der Kopf ist bereits preload-fähig.
+
+
+## Die Kostenbremse und ihr Netz (30.08.2026)
+
+Das Stundenlimit ist die einzige globale Bremse gegen unerwartete Kosten. Es
+war bis zum 30.08.2026 so gebaut, dass es im Zweifel **durchließ**: Wenn die
+Datenbank nicht antwortete, wurde eingelassen statt abgewiesen — damit ein
+einzelner Datenbankfehler nicht alle Teilnehmer aussperrt.
+
+**Diese Abwägung war falsch, und eine Messung hat es gezeigt.** Sie stimmt für
+einen einzelnen Fehler. Sie stimmt nicht für den Fall, der im Lasttest auftrat:
+
+```
+170 gleichzeitige Anfragen  ->  225 Sperr-Konflikte
+                            ->  206 Ausfälle der Bremse
+```
+
+Der Zähler trägt alle Zeitstempel in *ein* Firestore-Dokument ein, und ein
+einzelnes Dokument verträgt etwa einen Schreibvorgang pro Sekunde. Die Bremse
+fiel damit **systematisch bei Andrang** aus — also genau dann, wenn viele
+Analysen laufen und Kosten entstehen. Eine Bremse, die im Stillstand hält und
+bei Tempo versagt, ist keine.
+
+### Was daraus wurde
+
+**Ein Netz, das nicht ausfallen kann** (`notbremseUeberJobs` in `counter.js`):
+eine zweite Prüfung, die nichts schreibt und deshalb nicht an derselben
+Ursache scheitern kann. Sie zählt die Aufträge der letzten Stunde mit einer
+Aggregat-Abfrage — dieselbe Technik wie die Warteschlangen-Position, und die
+kennt keine Sperren.
+
+**Ein Zeitlimit von zwei Sekunden** um die Transaktion. Ohne das hingen 75 %
+der Anfragen 54 Sekunden, weil Firestore selbst sehr lange auf die
+Dokumentsperre wartet, bevor es aufgibt.
+
+**Drei getrennte Meldungen**, damit die Alarmierung aussagekräftig bleibt:
+
+| Lage | Protokoll | Alarm |
+|---|---|---|
+| Zähler läuft | nichts | nein |
+| Netz übernimmt, lässt ein | Hinweis | nein |
+| Netz übernimmt, blockiert | ERROR | ja |
+| Zähler **und** Netz gescheitert | ERROR | ja |
+
+Die dritte Zeile ist die Lehre aus einem eigenen Fehler: Nach dem Einbau des
+Netzes meldete der Code weiterhin 169 Mal „Kostenbremse inaktiv", obwohl das
+Netz jedes Mal korrekt entschieden hatte. Ein Alarm, der im Normalbetrieb
+feuert, macht den Ernstfall unauffindbar.
+
+### Was das im Betrieb bedeutet
+
+Die Kostenbremse ist verlässlich, auch unter Last. Fällt sie *doch* einmal
+komplett aus — Zähler und Netz zugleich —, kommt eine Meldung auf beiden
+Kanälen mit dem Wortlaut „Zähler UND Netz fehlgeschlagen".
+
+Messwerte nach der Reparatur (Emulator, 170 gleichzeitige Anfragen):
+
+```
+Ausfälle der Bremse      206  ->  0
+Sperr-Konflikte          225  ->  0
+Antwortdauer (75 %)   54.000 ms -> 6.800 ms
+abgerissene Verbindungen  94  ->  0
+```

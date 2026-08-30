@@ -4,6 +4,22 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.2.4] — 2026-08-30
+
+### Behoben
+
+- **Das Scan-Auge wird auf dem iPhone jetzt wirklich ins Bild geholt.** Die
+  Korrektur davor erkannte zwar richtig, dass die Adressleiste es verdeckt —
+  das Zurückholen selbst benutzte aber die eingebaute Browser-Funktion, und die
+  zentriert im Fenster einschließlich der Leiste. Der Browser scrollte also,
+  hielt es für erledigt, und das Auge blieb dahinter; danach unternahm die
+  Wache nichts mehr, weil sie ihren Versuch als abgeschlossen verbucht hatte.
+
+  Die Zielposition wird jetzt selbst gerechnet, bezogen auf die tatsächlich
+  sichtbare Fläche. Nachgestellt mit echtem Upload bei Handy-Maßen: vorher
+  fünfundfünfzig Bildpunkte verdeckt und keine Bewegung, nachher vollständig
+  im Bild.
+
 ## [4.2.3] — 2026-08-30
 
 ### Behoben

@@ -60,8 +60,20 @@ const T1_NORMAL = {
   boostFristMs: 7200000,
   drosselMaxParallel: 6,
   drosselWartelimitMs: 360000,
-  tokenAbstandGrossMs: 800,
-  tokenAbstandKleinMs: 2500,
+  /* MINDESTABSTAND ZWISCHEN KI-AUFRUFEN — gemessen am 30.08.2026 gegen die
+     echte Produktion. Hier standen 800 ms; erlaubt sind auf der aktuellen
+     Mistral-Stufe (T1, 0,25 Anfragen/Sekunde) aber vier Sekunden. Bei
+     Andrang gingen dadurch bis zu DREI Aufrufe in derselben Sekunde raus,
+     und etwa jede zweite Analyse scheiterte an einer 429-Ueberlastmeldung.
+
+     Der Durchsatz leidet nicht: Eine Analyse dauert rund 65 Sekunden, der
+     Abstand bremst also nichts — er verhindert nur den Stau, wenn sieben
+     Auftraege gleichzeitig starten.
+
+     WER DIE MISTRAL-STUFE ANHEBT (T2 ab 20 $), darf diesen Wert senken —
+     aber erst nach einem Blick ins Mistral-Dashboard, nicht nach Gefuehl. */
+  tokenAbstandGrossMs: 4000,
+  tokenAbstandKleinMs: 4000,
   jobAufbewahrungMs: 7200000,
   zustellfensterMs: 900000,
   livenessGnadenfristMs: 480000,

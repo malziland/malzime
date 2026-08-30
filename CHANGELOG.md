@@ -6,6 +6,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+## [4.4.0] — 2026-08-30
+
 ### Neu
 
 - **Die Betriebswerte stehen jetzt ausschließlich in der Datenbank.**
@@ -127,6 +129,23 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -348,6 +367,23 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -435,6 +471,23 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -542,6 +595,23 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -776,6 +846,23 @@ Aussagen, die nicht mehr zum Code passten.
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -845,6 +932,23 @@ Aussagen, die nicht mehr zum Code passten.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -943,6 +1047,23 @@ Aussagen, die nicht mehr zum Code passten.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -1083,6 +1204,23 @@ Aussagen, die nicht mehr zum Code passten.
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -1159,6 +1297,23 @@ Aussagen, die nicht mehr zum Code passten.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -1241,6 +1396,23 @@ Aussagen, die nicht mehr zum Code passten.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -1413,6 +1585,23 @@ Aussagen, die nicht mehr zum Code passten.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -1625,6 +1814,23 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -1729,6 +1935,23 @@ ein neu gebautes Messmittel, zwei fielen beim Umbau auf die W3C-Prüfmethodik an
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -3178,6 +3401,23 @@ Audits sind.
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -3311,6 +3551,23 @@ Audits sind.
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -3356,6 +3613,23 @@ Audits sind.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -3519,6 +3793,23 @@ Die Alterszahlen selbst sind **kein Beweis**: Im Testset stecken nur sechs Minde
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -3654,6 +3945,23 @@ Schließt die drei offenen Punkte aus v2.4.3 — statt sie als Notiz stehen zu l
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -3705,6 +4013,23 @@ Erster Abhängigkeits-Schwung, den die mit v2.4.2 reparierte Automatik selbst er
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -3787,6 +4112,23 @@ Zwei blockierte Pflicht-Checks gelöst und die Dependabot-Automatik entschärft.
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -3860,6 +4202,23 @@ Umfassende Sanierung nach dem LANGAUDIT vom 2026-07-17 (Release-Gate-Audit auf v
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -3936,6 +4295,23 @@ Auffindbarkeit für Suchmaschinen und KI-Systeme: malziME wird maschinenlesbar m
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -3985,6 +4361,23 @@ Restlose Barrierefreiheit im geprüften Nutzerfluss: die letzten drei (moderaten
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4038,6 +4431,23 @@ Barrierefreiheits-Feinschliff nach dem ersten Lauf des neuen axe-Wächters plus 
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4098,6 +4508,23 @@ Nachzügler zum Redesign: die Markenflächen außerhalb der Seiten (Icons, Teile
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -4149,6 +4576,23 @@ Komplettes Redesign auf das malziland Design System (Corporate-Identity-Farbleit
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4215,6 +4659,23 @@ Reaktion auf den Workshop-Vorfall vom selben Vormittag: Foto-Einlesen abgehärte
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4284,6 +4745,23 @@ Weiterer Feinschliff der Reload-Erfahrung (zwei Punkte aus dem Live-Test auf dem
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -4350,6 +4828,23 @@ Frontend-Reparatur (Reload-Wiederherstellung) plus Gleichlauf der Rechtstexte un
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4432,6 +4927,23 @@ Ergebnis eines vollständigen Read-only-Audits (Sicherheit, Datenschutz, Zuverl�
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -4495,6 +5007,23 @@ Kinderschutz im `singleLargePrompt` gehärtet (beide Locales, DE + EN). Reine Si
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -4546,6 +5075,23 @@ Finale stabile Version der Single-Large-Call-Pipeline. Die RC-Phase (rc1–rc3) 
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4613,6 +5159,23 @@ rund 12 %, Job-Latenz um rund 17 %.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4693,6 +5256,23 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
 
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
+
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
   Push-Nachricht aufs Handy. Der lokale Testbetrieb verwendet die echten
@@ -4742,6 +5322,23 @@ Robustheit und Messbarkeit der Warteschlange: Das fertige Ergebnis erreicht zur�
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte
@@ -4805,6 +5402,23 @@ Diese Version fasst die fünf Entwicklungsphasen rc1–rc5 zusammen.
   sobald der erste Weg nicht binnen zwei Sekunden durchkommt, und wendet
   dieselbe Grenze an. **Zusätzlich sind die Anfragen deutlich schneller
   geworden:** Sie hingen zuvor unter Andrang bis zu einer Minute.
+
+- **Die Drosselung passt jetzt zur Stufe unseres KI-Anbieters.** Beim Lasttest
+  gegen die Produktion zeigte sich: Der Mindestabstand zwischen zwei
+  KI-Aufrufen stand auf 0,8 Sekunden — erlaubt sind auf unserer Stufe aber nur
+  vier. Bei Andrang gingen dadurch bis zu drei Aufrufe in derselben Sekunde
+  raus, und etwa jede zweite Analyse scheiterte an einer Überlastmeldung.
+
+  Die Warteschlange arbeitete dabei korrekt: Sie ließ genau sieben gleichzeitig
+  durch. Nur starteten diese sieben fast zeitgleich.
+
+  **Der Wert ist jetzt richtig gesetzt, und die Korrektur brauchte keine
+  Auslieferung** — ein Feld in der Datenbank, dreißig Sekunden später wirksam.
+  Vor diesem Umbau wären es fünfundzwanzig Minuten gewesen. Gemessen: von
+  dreißig Fehlschlägen bei einundfünfzig Analysen auf **null bei fünfzehn**.
+
+  Der Durchsatz leidet nicht darunter: Eine Analyse dauert ohnehin länger als
+  der Mindestabstand.
 
 - **Ein Testlauf schickt keine echten Benachrichtigungen mehr.** Beim Prüfen
   löste ein Lastversuch das Stundenlimit aus — und schickte eine echte

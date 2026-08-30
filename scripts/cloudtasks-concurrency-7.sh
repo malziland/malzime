@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 #
-# Concurrency  7, **65 s je Analyse** (Median, live gemessen 2026-08-10, n=21)
+# GEAENDERT 30.08.2026 — die Rate war die Ursache haeufiger 429-Fehler.
+#
+# Bis dahin: --max-dispatches-per-second=3. Die Rechnung darunter stimmte fuer
+# den DAUERBETRIEB (13 Anfragen/min = 0,22/s, unter dem Mistral-Limit von
+# 0,25/s) — aber nicht fuer die SPITZE. Laedt eine Klasse gleichzeitig hoch,
+# sind alle Plaetze auf einmal frei, und die Queue schickt drei Auftraege pro
+# Sekunde los: sechs Mistral-Aufrufe in einer Sekunde. Mistral misst die
+# Spitze, nicht den Durchschnitt.
+#
+# Gemessen am 30.08. gegen die Produktion: bei 30 gleichzeitigen Analysen
+# scheiterte etwa jede zweite an HTTP 429.
+#
+# JETZT: 0,125 Auftraege/Sekunde = ein Auftrag alle 8 Sekunden.
+#   0,125 x 2 Aufrufe je Analyse = 0,25 Aufrufe/s = genau das Mistral-Limit.
+# Dazu Parallelitaet 4 statt 7, damit auch der erste Stoss nach einer
+# Ruhephase klein bleibt (der Stoss-Wert selbst ist bei Cloud Tasks nicht
+# direkt setzbar).
+#
+# STEIGT DIE MISTRAL-STUFE, darf beides hoch — aber erst nach einem Blick ins
+# Dashboard, nicht nach Gefuehl.
+#
+# Historie: Concurrency 7, **65 s je Analyse** (Median, live gemessen 2026-08-10, n=21)
 #   -> ~6,5 Analysen/min -> ~13 Anfragen/min
 #
 # FRUEHER STAND HIER 56 s. Der Wert stammte aus der v2.2-Messung und wurde fuer
@@ -40,8 +61,8 @@ set -euo pipefail
 gcloud tasks queues update analyze-queue \
   --location=europe-west1 \
   --project=malzime \
-  --max-concurrent-dispatches=7 \
-  --max-dispatches-per-second=3
+  --max-concurrent-dispatches=4 \
+  --max-dispatches-per-second=0.125
 echo "Concurrency: 7 (v2.8 — zwei Mistral-Aufrufe je Analyse)"
 gcloud tasks queues describe analyze-queue \
   --location=europe-west1 --project=malzime \

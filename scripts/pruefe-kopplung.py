@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""
+pruefe-kopplung.py — Waechst wieder zusammen, was getrennt gehoert?
+
+WOZU: Am 30.08.2026 hat ein Umbau des Einstellungssatzes 39 Fundstellen
+erzeugt. Nicht weil der Code schlecht waere, sondern weil eine Aenderung
+dieser Art weit ausstrahlt: `mistral.js` war auf 1691 Zeilen gewachsen und
+vermischte vier Aufgaben, und an `betriebsprofil.js` haengen 14 Module.
+
+Aufteilen allein hilft nicht dauerhaft — Dateien wachsen zurueck, wenn niemand
+hinsieht. Dieses Skript sieht hin.
+
+WAS ES NICHT TUT: Es verbietet nichts. Es meldet, wenn eine Datei ueber ihre
+festgehaltene Groesse waechst, und verlangt dann eine Entscheidung: teilen oder
+die Grenze bewusst anheben. Beides ist in Ordnung — unbemerktes Wachsen nicht.
+
+DIE GRENZEN sind der GEMESSENE Stand vom 31.08.2026, aufgerundet. Sie sind
+kein Ideal, sondern eine Sperrklinke: von hier aus nur noch abwaerts.
+
+AUFRUF:
+    python3 scripts/pruefe-kopplung.py           pruefen
+    python3 scripts/pruefe-kopplung.py --stand   heutige Werte anzeigen
+
+RUECKGABE: 0 = alles innerhalb der Grenzen, 1 = etwas gewachsen, 2 = nicht messbar.
+"""
+
+import re
+import sys
+from pathlib import Path
+
+WURZEL = Path(__file__).resolve().parent.parent
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DIE SPERRKLINKEN
+#
+# Gemessen am 31.08.2026 nach dem ersten Schnitt an mistral.js. Wer eine Grenze
+# anhebt, schreibt daneben, warum — sonst ist die Sperrklinke ein Ornament.
+# ─────────────────────────────────────────────────────────────────────────────
+ZEILEN_GRENZEN = {
+    # Der grosse Brocken. Vier Aufgaben in einer Datei; die Aufteilung laeuft
+    # (mistral-antwort.js ist der erste Schnitt). Grenze sinkt mit jedem Schnitt.
+    "functions/src/mistral.js": 1540,
+    # Die Live-Anzeige im Browser. Noch nicht angefasst.
+    "public/js/live-anzeige.js": 1300,
+    # Der Netzzugriff des Frontends.
+    "public/js/api.js": 1030,
+    "public/js/render.js": 790,
+    "functions/src/counter.js": 760,
+    "functions/src/jobs.js": 740,
+    "functions/src/handle-process-job.js": 690,
+    # Die Sprachdateien sind Inhalt, kein Code — sie duerfen wachsen.
+    # Deshalb stehen prompts.js hier bewusst NICHT.
+}
+
+# Wie viele Module duerfen an einem einzelnen haengen? Ueber dieser Zahl wird
+# eine Aenderung dort teuer, weil sie ueberallhin ausstrahlt.
+ABHAENGIGKEITS_GRENZEN = {
+    "betriebsprofil": 15,  # heute 14 — der Umbau vom 30.08. hat hier verlagert
+    "config": 12,  # heute 11
+    "db": 10,  # heute 9
+}
+
+
+def zeilen(pfad):
+    p = WURZEL / pfad
+    if not p.exists():
+        return None
+    return len(p.read_text(encoding="utf-8").split("\n"))
+
+
+def haengen_an(modul):
+    """Wie viele Module unter functions/src requiren dieses Modul?"""
+    treffer = 0
+    for f in (WURZEL / "functions" / "src").glob("*.js"):
+        if f.stem == modul:
+            continue
+        if re.search(rf'require\("\./{re.escape(modul)}"\)', f.read_text(encoding="utf-8")):
+            treffer += 1
+    return treffer
+
+
+def main():
+    nur_stand = "--stand" in sys.argv
+
+    print("── Waechst wieder zusammen, was getrennt gehoert? ──")
+    print()
+
+    funde = []
+    fehlend = []
+
+    print("  Dateigroessen:")
+    for pfad, grenze in sorted(ZEILEN_GRENZEN.items()):
+        ist = zeilen(pfad)
+        if ist is None:
+            fehlend.append(pfad)
+            print(f"    FEHLT   {pfad}")
+            continue
+        rest = grenze - ist
+        marke = "ok   " if ist <= grenze else "ZU GROSS"
+        print(f"    {marke:8} {ist:5} / {grenze:5}  {pfad}  ({rest:+d})")
+        if ist > grenze:
+            funde.append((pfad, ist, grenze, "Zeilen"))
+
+    print()
+    print("  Wie viele Module haengen an einem einzelnen:")
+    for modul, grenze in sorted(ABHAENGIGKEITS_GRENZEN.items()):
+        ist = haengen_an(modul)
+        marke = "ok   " if ist <= grenze else "ZU VIELE"
+        print(f"    {marke:8} {ist:5} / {grenze:5}  {modul}")
+        if ist > grenze:
+            funde.append((modul, ist, grenze, "Module"))
+
+    # MESSMITTEL-PROBE: Eine Datei, die es nicht mehr gibt, macht die Pruefung
+    # stillschweigend wertlos. Ein leeres Ergebnis waere dann kein Bestehen.
+    if fehlend:
+        print()
+        print(f"  NICHT MESSBAR: {len(fehlend)} Datei(en) aus der Liste gibt es nicht mehr.")
+        print("  Umbenannt oder geloescht? Dann gehoert die Liste angepasst.")
+        for f in fehlend:
+            print(f"    {f}")
+        return 2
+
+    print()
+    if nur_stand:
+        print("  (Nur angezeigt — keine Bewertung.)")
+        return 0
+
+    if not funde:
+        print("  ERGEBNIS: Alles innerhalb der Grenzen.")
+        return 0
+
+    print(f"  ERGEBNIS: {len(funde)} Grenze(n) ueberschritten.")
+    print()
+    for was, ist, grenze, art in funde:
+        print(f"  ▸ {was}: {ist} {art} (Grenze {grenze})")
+    print()
+    print("  Zwei zulaessige Antworten:")
+    print("    1. Teilen — die Aufgabe herausloesen, die am wenigsten dazugehoert.")
+    print("    2. Die Grenze in scripts/pruefe-kopplung.py anheben UND daneben")
+    print("       schreiben, warum das hier richtig ist.")
+    print()
+    print("  Nicht zulaessig: die Meldung ignorieren. Dann waechst es weiter,")
+    print("  bis der naechste Querschnitts-Umbau 39 Fundstellen erzeugt.")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

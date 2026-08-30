@@ -65,6 +65,7 @@ lauf "Pruefungen: Sichtbare Texte" "pruefungen" python3 scripts/pruefe-i18n-fall
 lauf "Pruefungen: Tote Geduld" "pruefungen" python3 scripts/pruefe-tote-geduld.py
 lauf "Pruefungen: Doppelte Betriebswerte" "pruefungen" python3 scripts/pruefe-doppelte-werte.py
 lauf "Pruefungen: Mitzieher" "pruefungen" python3 scripts/pruefe-mitzieher.py
+lauf "Pruefungen: Kopplung" "pruefungen" python3 scripts/pruefe-kopplung.py
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend

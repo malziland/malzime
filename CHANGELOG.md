@@ -6,6 +6,45 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Die Betriebswerte stehen jetzt ausschließlich in der Datenbank.**
+  Zeitgrenzen, erlaubte Textmenge, Kapazität und Einlassgrenzen lagen bisher
+  fest im Programmcode. Eine Änderung — etwa als der KI-Anbieter Ende August
+  langsamer wurde — bedeutete eine vollständige Auslieferung von
+  fünfundzwanzig Minuten, mitten im laufenden Betrieb.
+
+  Jetzt liegen sie als benannte Sätze in der Datenbank, etwa `t1-normal` oder
+  `t2-schnell`. Umgestellt wird ein einziges Feld; alle zusammengehörigen
+  Werte ziehen mit und gelten binnen dreißig Sekunden.
+
+  **Ohne Rückfallwerte im Programm.** Die Werte stehen an genau einer Stelle,
+  nicht an zweien — sonst wüsste in einem Jahr niemand mehr, welche gilt.
+  Fehlt der Einstellungssatz oder ist er widersprüchlich, läuft keine Analyse,
+  und das System meldet den Grund im Klartext. Ein Konfigurationsfehler soll
+  auffallen, nicht monatelang unbemerkt bleiben.
+
+  **Die Kopplung bleibt gesichert:** Die erlaubte Textmenge muss weiterhin in
+  die erlaubte Zeit passen. Diese Rechnung läuft jetzt beim Laden des Satzes —
+  ein widersprüchlicher Satz wird abgelehnt, statt Analysen abbrechen zu
+  lassen. Genau der Ausfall vom 17. August kann so nicht mehr entstehen.
+
+- **Eine tägliche Prüfung meldet, wenn Einstellung und Wirklichkeit
+  auseinanderlaufen.** Die Zahl, wie viele Analysen gleichzeitig laufen
+  dürfen, steht auch in der Warteschlange bei Google. Stimmen beide nicht
+  überein, rechnet die Wartezeit-Ansage still falsch. Die Prüfung meldet die
+  Abweichung mit beiden Zahlen und dem Weg zur Abhilfe.
+
+### Geändert
+
+- **Jede Analyse protokolliert, mit welchen Werten sie lief.** Bei einem
+  Vorfall ist das die erste Frage. Wird ein Einstellungssatz abgelehnt,
+  erscheint der Grund als Fehler im Protokoll und löst die Alarmierung aus —
+  statt dass stillschweigend keine Analyse mehr läuft. Protokolliert werden
+  ausschließlich Zahlen und der selbstgewählte Name des Satzes.
+
+## [Unveröffentlicht]
+
 
 
 ### Behoben

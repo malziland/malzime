@@ -16,6 +16,29 @@
  * Reine Mock-Pruefung — kein Netzwerk, keine Cloud.
  */
 
+/* Betriebswerte kommen seit 30.08.2026 ausschliesslich aus Firestore. Fuer
+   Tests, die eine Analyse durchspielen, wird hier ein gueltiger Satz gestellt —
+   sonst bricht jeder Aufruf mit "Betriebswerte fehlen" ab, was diese Tests
+   nicht pruefen wollen. Wer das Verhalten OHNE Satz prueft, tut das in
+   betriebsprofil*.test.js. */
+jest.mock("../betriebsprofil", () => ({
+  geltendeWerte: async () => ({
+    werte: {
+      mistralTimeoutMs: 90000,
+      singleLargeTimeoutMs: 300000,
+      singleLargeMaxTokens: 5000,
+      requestBudgetMs: 480000,
+      parallelitaet: 7,
+      stundenlimit: 500,
+      adressLimit: 500,
+    },
+    quelle: "firestore",
+    profil: "test",
+    grund: null,
+  }),
+  PFLICHTFELDER: ["mistralTimeoutMs", "singleLargeTimeoutMs", "singleLargeMaxTokens", "requestBudgetMs"],
+}));
+
 const { setFetchForTest, runSingleLargeCall } = require("../mistral");
 
 const ORIGINAL_API_KEY = process.env.MISTRAL_API_KEY;

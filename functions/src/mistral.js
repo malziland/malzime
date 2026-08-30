@@ -1524,8 +1524,20 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        Die beiden Werte gehoeren zusammen und werden deshalb GEMEINSAM
        gelesen — genau daran waere ein einzelner Firestore-Schalter
        gescheitert (BUG-2026-08-17-01). */
-    const { werte: betriebswerte, profil } = await geltendeWerte();
+    const { werte: betriebswerte, profil, grund } = await geltendeWerte();
     aktivesProfil = profil || null;
+    /* Seit 30.08.2026 kommen die Betriebswerte AUSSCHLIESSLICH aus Firestore —
+       es gibt keine Rueckfallwerte im Code mehr. Fehlt der Einstellungssatz
+       oder ist er ungueltig, kann keine Analyse laufen: Ohne Zeitgrenze weiss
+       niemand, wie lange auf die KI gewartet werden darf.
+
+       Das scheitert LAUT und mit Grund, statt still mit alten Zahlen
+       weiterzulaufen — ein Konfigurationsfehler soll auffallen. */
+    if (!betriebswerte) {
+      const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
+      fehler.code = "config_missing";
+      throw fehler;
+    }
     const result = await callMistralRaw({
       model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — multimodal, 2M TPM */,
       messages,

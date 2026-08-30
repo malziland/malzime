@@ -11,6 +11,29 @@
       mitten in UTF-8-Sequenzen, Delta-Grenzen mitten in Escapes). Der
       Endtext muss byte-identisch zum Nicht-Stream-Pfad sein. */
 
+/* Betriebswerte kommen seit 30.08.2026 ausschliesslich aus Firestore. Fuer
+   Tests, die eine Analyse durchspielen, wird hier ein gueltiger Satz gestellt —
+   sonst bricht jeder Aufruf mit "Betriebswerte fehlen" ab, was diese Tests
+   nicht pruefen wollen. Wer das Verhalten OHNE Satz prueft, tut das in
+   betriebsprofil*.test.js. */
+jest.mock("../betriebsprofil", () => ({
+  geltendeWerte: async () => ({
+    werte: {
+      mistralTimeoutMs: 90000,
+      singleLargeTimeoutMs: 300000,
+      singleLargeMaxTokens: 5000,
+      requestBudgetMs: 480000,
+      parallelitaet: 7,
+      stundenlimit: 500,
+      adressLimit: 500,
+    },
+    quelle: "firestore",
+    profil: "test",
+    grund: null,
+  }),
+  PFLICHTFELDER: ["mistralTimeoutMs", "singleLargeTimeoutMs", "singleLargeMaxTokens", "requestBudgetMs"],
+}));
+
 const mistral = require("../mistral");
 const { setFetchForTest, _callMistralRaw, _extrahiereLiveText, _setLiveIntervalMsForTest, runSingleLargeCall } =
   mistral;

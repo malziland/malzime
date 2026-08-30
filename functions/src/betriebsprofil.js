@@ -23,7 +23,30 @@
  * Zustand, nicht laxer: Heute crasht ein falscher Wert beim Start, hier wird
  * er verworfen und der Betrieb laeuft mit den bewaehrten Zahlen weiter.
  *
- * WAS BEWUSST IM CODE BLEIBT, OBWOHL ES IN GRUPPE B STEHT:
+ * KEINE RUECKFALLWERTE IM CODE (Entscheidung des Nutzers, 30.08.2026):
+ * „Natuerlich gehoeren die Werte raus aus dem Code. Das war von Anfang an der
+ * Auftrag. Dass wir hier wirklich nur mehr ueber den Firestore unsere
+ * Konfiguration machen."
+ *
+ * Ein zunaechst eingebauter Notanker im Code wurde wieder entfernt. Das
+ * Argument dafuer — er rette den Betrieb bei einem Firestore-Ausfall — hielt
+ * der Pruefung nicht stand: Jeder Analyse-Auftrag liegt selbst in Firestore
+ * (Einreihen, Status, Ergebnis). Faellt die Datenbank aus, laeuft ohnehin
+ * keine Analyse. Der Notanker haette nur die Doppelstruktur gebracht, die man
+ * in Jahren nicht mehr zuordnen kann.
+ *
+ * FOLGE, die man kennen muss: OHNE gueltiges Profil laeuft KEINE Analyse. Das
+ * Profil muss in der Datenbank liegen, BEVOR diese Fassung ausgeliefert wird.
+ * Fehlt es, meldet das System das laut, statt still mit alten Zahlen
+ * weiterzulaufen — ein Konfigurationsfehler soll auffallen, nicht monatelang
+ * unbemerkt bleiben.
+ *
+ * WAS KEINE EINSTELLUNG IST und deshalb im Code bleibt: das Zeitlimit, das
+ * Google der Function gibt (540 s), und die langsamste je gemessene
+ * Mistral-Geschwindigkeit. Beides sind Tatsachen, gegen die geprueft wird,
+ * keine Werte, die jemand einstellen wuerde.
+ *
+ * WAS AUCH IM CODE BLEIBT:
  *
  * `HOURLY_LIMIT` — das Stundenlimit ist bereits zur Laufzeit steuerbar. Der
  * Boost-Mechanismus in counter.js hebt es ueber `stats/current.limit`, mit
@@ -90,38 +113,28 @@ const GRENZEN = {
 
 /* Die Werte, die ein Profil tragen darf — und ihre Herkunft im Code, die als
    Rueckfallebene gilt. Was hier nicht steht, ist nicht umstellbar. */
-const ERLAUBT = {
-  /* WIRKSAM: gehen direkt in den Analyse-Aufruf. */
-  mistralTimeoutMs: MISTRAL_TIMEOUT_MS,
-  singleLargeTimeoutMs: MISTRAL_SINGLE_LARGE_TIMEOUT_MS,
-  singleLargeMaxTokens: MISTRAL_SINGLE_LARGE_MAX_TOKENS,
-  requestBudgetMs: REQUEST_BUDGET_MS,
+/* Welche Felder ein Einstellungssatz tragen darf. Die Werte selbst stehen
+   NICHT mehr im Code — sie kommen ausschliesslich aus Firestore.
 
-  /* SOLLWERTE, KEINE SCHALTER (Befund aus dem zweiten Review, 30.08.2026):
-     Diese drei aendern von sich aus NICHTS. Sie stehen hier als das, was
-     gelten SOLL — die kapazitaets-wache vergleicht sie taeglich mit der
-     Wirklichkeit und meldet Abweichungen.
+   PFLICHT: ohne diese Felder ist ein Satz unvollstaendig und wird abgelehnt. */
+const PFLICHTFELDER = ["mistralTimeoutMs", "singleLargeTimeoutMs", "singleLargeMaxTokens", "requestBudgetMs"];
 
-     `parallelitaet` wird von der Cloud-Tasks-Warteschlange bei Google
-     bestimmt; ein fremdes System wird nicht aus Firestore umgestellt.
-     `stundenlimit` und `adressLimit` steuert weiterhin der Boost-Mechanismus
-     in counter.js.
-
-     WARUM SIE TROTZDEM HIER STEHEN: Ohne sie waere ein Profil unvollstaendig
-     — `t2-normal` waere nicht ablesbar als "vierzehn parallel", und der
-     Abgleich haette keinen Sollwert. Wer sie aendert, aendert damit die
-     ERWARTUNG; die Wache sagt dann, ob die Wirklichkeit noch dazu passt. */
-  parallelitaet: QUEUE_DISPATCH_CONCURRENCY,
-  stundenlimit: HOURLY_LIMIT,
-  adressLimit: RATE_LIMIT,
-};
+/* KANN-FELDER: Sollwerte fuer den taeglichen Abgleich (kapazitaets-wache).
+   Sie steuern nichts unmittelbar — die Warteschlange bei Google und der
+   Boost-Mechanismus tun das —, benennen aber, was gelten SOLL. */
+const KANNFELDER = ["parallelitaet", "stundenlimit", "adressLimit"];
 
 let cache = { zeit: 0, werte: null, quelle: "code" };
+/* Laeuft gerade ein Lesevorgang? Dann warten alle weiteren darauf, statt
+   selbst zu lesen.
 
-/** Die Code-Werte, unveraendert — die Rueckfallebene. */
-function codeWerte() {
-  return { ...ERLAUBT };
-}
+   BEFUND aus dem Lasttest (30.08.2026): Ohne das erzeugten 50 gleichzeitige
+   Analysen 50 Datenbankzugriffe statt einem. Der Zwischenspeicher greift erst,
+   wenn der erste Lesevorgang FERTIG ist — bei einer Klasse, die zeitgleich
+   hochlaedt, ist er das noch nicht. Sichtbar nur unter Last. */
+let laufenderLesevorgang = null;
+/* Zuletzt protokollierter Zustand — verhindert tausende gleiche Eintraege. */
+let letzterZustand = null;
 
 /**
  * Prueft einen Satz Werte auf Widerspruchsfreiheit.
@@ -130,6 +143,10 @@ function codeWerte() {
  * Gibt `null` zurueck, wenn alles stimmt, sonst den Grund im Klartext.
  */
 function pruefe(werte) {
+  /* Vollstaendigkeit zuerst: Ohne diese Werte kann keine Analyse laufen. */
+  for (const name of PFLICHTFELDER) {
+    if (werte[name] === undefined) return `${name} fehlt — ohne diesen Wert laeuft keine Analyse`;
+  }
   for (const [name, wert] of Object.entries(werte)) {
     if (typeof wert !== "number" || !Number.isFinite(wert) || wert <= 0) {
       return `${name} ist keine positive Zahl (${JSON.stringify(wert)})`;
@@ -137,6 +154,7 @@ function pruefe(werte) {
   }
   /* Plausibilitaetsgrenzen — fangen Tippfehler und Unfug ab. */
   for (const [name, g] of Object.entries(GRENZEN)) {
+    if (werte[name] === undefined) continue;
     if (werte[name] < g.min || werte[name] > g.max) {
       return `${name} (${werte[name]}) liegt ausserhalb des plausiblen Bereichs ${g.min}–${g.max}`;
     }
@@ -166,15 +184,18 @@ function pruefe(werte) {
 }
 
 /**
- * Setzt ein Profil aus Firestore auf die Code-Werte auf.
- * Unbekannte Felder werden ignoriert, fehlende bleiben beim Code-Wert —
- * ein unvollstaendiges Profil ist damit brauchbar statt gefaehrlich.
+ * Liest die Felder eines Satzes heraus. Unbekannte Felder werden ignoriert —
+ * ein Tippfehler im Dokument darf nichts einschleusen.
+ *
+ * Fehlende PFLICHTFELDER werden NICHT ersetzt: Seit die Werte ausschliesslich
+ * aus Firestore kommen (30.08.2026), gibt es nichts, womit man sie ersetzen
+ * koennte. Ein unvollstaendiger Satz wird abgelehnt.
  */
-function zusammenfuehren(profil) {
-  const werte = codeWerte();
-  if (!profil || typeof profil !== "object") return werte;
-  for (const name of Object.keys(ERLAUBT)) {
-    if (typeof profil[name] === "number") werte[name] = profil[name];
+function felderLesen(satz) {
+  const werte = {};
+  if (!satz || typeof satz !== "object") return werte;
+  for (const name of [...PFLICHTFELDER, ...KANNFELDER]) {
+    if (typeof satz[name] === "number") werte[name] = satz[name];
   }
   return werte;
 }
@@ -188,11 +209,30 @@ function zusammenfuehren(profil) {
  *
  * Der schlechteste Fall ist damit der heutige Zustand, nie ein schlechterer.
  */
+/* Eine Kopie herausgeben, nie den zwischengespeicherten Satz selbst.
+
+   BEFUND (Grenzfall-Pruefung 30.08.2026): Ohne das konnte ein Aufrufer die
+   Werte veraendern — und traf damit ALLE, die denselben Satz halten. In einem
+   Workshop haette ein einziger Fehlgriff die Werte aller laufenden Analysen
+   verbogen, ohne Spur im Protokoll. */
+function alsKopie(stand) {
+  return { ...stand, werte: stand.werte ? { ...stand.werte } : null };
+}
+
 async function geltendeWerte() {
   const jetzt = Date.now();
-  if (cache.werte && jetzt - cache.zeit < CACHE_MS) return cache;
+  if (cache.werte && jetzt - cache.zeit < CACHE_MS) return alsKopie(cache);
+  /* Ein zweiter Aufrufer waehrend des Lesens haengt sich an, statt selbst zu
+     lesen (siehe laufenderLesevorgang). */
+  if (laufenderLesevorgang) return laufenderLesevorgang.then(alsKopie);
+  laufenderLesevorgang = leseFrisch(jetzt).finally(() => {
+    laufenderLesevorgang = null;
+  });
+  return laufenderLesevorgang;
+}
 
-  let ergebnis = { werte: codeWerte(), quelle: "code", grund: null, profil: null };
+async function leseFrisch(jetzt) {
+  let ergebnis = { werte: null, quelle: "fehlt", grund: null, profil: null };
   try {
     const snap = await Promise.race([
       datenbank().doc(DOKUMENT).get(),
@@ -207,7 +247,7 @@ async function geltendeWerte() {
       } else if (!profile[aktiv]) {
         ergebnis.grund = `Profil "${aktiv}" ist nicht hinterlegt`;
       } else {
-        const werte = zusammenfuehren(profile[aktiv]);
+        const werte = felderLesen(profile[aktiv]);
         const fehler = pruefe(werte);
         if (fehler) {
           ergebnis.grund = `Profil "${aktiv}" abgelehnt: ${fehler}`;
@@ -222,21 +262,54 @@ async function geltendeWerte() {
     ergebnis.grund = `nicht lesbar: ${String(fehler.message)}`;
   }
 
+  /* PROTOKOLL — nur bei ZUSTANDSWECHSEL.
+     Ohne diese Zeilen waere ein abgelehnter Satz unsichtbar: Es liefe einfach
+     keine Analyse mehr, und niemand koennte sagen warum. Bei jedem Aufruf zu
+     protokollieren waere aber genauso wertlos — bei einem Workshop entstuenden
+     tausende gleiche Eintraege, in denen der eine wichtige untergeht.
+
+     DATENSCHUTZ: Hier stehen ausschliesslich der Name des Einstellungssatzes,
+     die Herkunft und der Ablehnungsgrund. Keine Nutzerdaten, keine Adressen,
+     keine Bildinhalte — der Satz enthaelt nur Zahlen und einen selbstgewaehlten
+     Namen. */
+  const wechsel = letzterZustand !== `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
+  if (wechsel) {
+    letzterZustand = `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
+    const zeile = {
+      step: "betriebsprofil",
+      quelle: ergebnis.quelle,
+      profil: ergebnis.profil || null,
+      grund: ergebnis.grund || null,
+    };
+    if (ergebnis.werte) {
+      /* Die geltenden Zahlen mitschreiben — bei einem Vorfall ist die erste
+         Frage, mit welchen Werten gearbeitet wurde. */
+      zeile.zeitgrenzeMs = ergebnis.werte.singleLargeTimeoutMs;
+      zeile.maxTokens = ergebnis.werte.singleLargeMaxTokens;
+      console.log(JSON.stringify(zeile));
+    } else {
+      /* Kein gueltiger Satz = keine Analyse. Das ist ein Betriebsfehler und
+         gehoert als solcher ins Protokoll, damit die Alarmierung greift. */
+      console.error(JSON.stringify(zeile));
+    }
+  }
+
   cache = { zeit: jetzt, ...ergebnis };
-  return cache;
+  return alsKopie(cache);
 }
 
 /* Fuer Tests: Cache leeren, damit jede Pruefung frisch liest. */
 function _cacheLeeren() {
+  letzterZustand = null;
   cache = { zeit: 0, werte: null, quelle: "code" };
 }
 
 module.exports = {
   geltendeWerte,
-  codeWerte,
+  PFLICHTFELDER,
   _pruefe: pruefe,
-  _zusammenfuehren: zusammenfuehren,
+  _felderLesen: felderLesen,
   _cacheLeeren,
   _DOKUMENT: DOKUMENT,
-  _ERLAUBT: ERLAUBT,
+  _KANNFELDER: KANNFELDER,
 };

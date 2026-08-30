@@ -172,10 +172,7 @@ async function warteschlangeNachziehen({ parallelitaet, queueRatePerSekunde }) {
         },
       },
       updateMask: {
-        paths: [
-          "rate_limits.max_dispatches_per_second",
-          "rate_limits.max_concurrent_dispatches",
-        ],
+        paths: ["rate_limits.max_dispatches_per_second", "rate_limits.max_concurrent_dispatches"],
       },
     });
 

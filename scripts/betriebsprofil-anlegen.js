@@ -39,87 +39,11 @@ const { getFirestore } = req("firebase-admin/firestore");
 const { FIRESTORE_DATABASE_ID } = require(pfad.join(wurzel, "functions", "src", "config.js"));
 const { PFLICHTFELDER, _pruefe, _FELDER } = require(pfad.join(wurzel, "functions", "src", "betriebsprofil.js"));
 
-/* Die Werte des laufenden Betriebs. Sie stehen bewusst HIER und nicht in
-   test-satz.js: Der Testsatz darf sich mit den Tests ändern, der
-   Produktivsatz nicht. Beide werden gegen dieselbe Prüfung gehalten. */
-const T1_NORMAL = {
-  mistralTimeoutMs: 90000,
-  singleLargeTimeoutMs: 300000,
-  singleLargeMaxTokens: 5000,
-  describeMaxTokens: 2048,
-  profileMaxTokens: 16000,
-  requestBudgetMs: 480000,
-  /* GESENKT 30.08.2026 von 7 auf 4 — gemessen, nicht geschaetzt. Sieben
-     gleichzeitige Analysen sind zwei Mistral-Aufrufe je Analyse, also 0,39
-     Aufrufe pro Sekunde bei erlaubten 0,25. Wir fuhren seit jeher darueber;
-     im Alltag faellt es nicht auf, bei einem echten Andrang schon. */
-  parallelitaet: 4,
-  warteschlangeTiefe: 155,
-  /* DIE BREMSE. Sie wird von der `satzWache` in die echte Cloud-Tasks-Queue
-     uebertragen (maxDispatchesPerSecond) und wirkt damit GLOBAL — anders als
-     `tokenAbstand*`, das nur im Arbeitsspeicher einer Instanz zaehlt.
-
-     Rechnung: Mistral-Stufe T1 erlaubt 0,25 Aufrufe/s, jede Analyse macht
-     zwei (Analyse + Beast-Werbung) -> 0,125 Analysen/s, eine alle acht
-     Sekunden. Bei einer hoeheren Mistral-Stufe darf der Wert steigen — aber
-     erst nach einem Blick ins Mistral-Dashboard, nicht nach Gefuehl. */
-  queueRatePerSekunde: 0.125,
-  /* GEMESSEN 30.08.2026 an der Produktion: Median 40 s (34-41 s), nicht 65.
-     Der Wert steuert die angezeigte Wartezeit — zu hoch heisst, die Leute
-     warten laenger als noetig auf eine Zahl, die nie eintrifft. */
-  durchschnittsdauerSekunden: 40,
-  stundenlimit: 500,
-  stundenfensterMinuten: 60,
-  adressLimit: 500,
-  adressfensterMs: 600000,
-  boostFaktor: 2,
-  boostFristMs: 7200000,
-  drosselMaxParallel: 6,
-  drosselWartelimitMs: 360000,
-  /* MINDESTABSTAND ZWISCHEN KI-AUFRUFEN — gemessen am 30.08.2026 gegen die
-     echte Produktion. Hier standen 800 ms; erlaubt sind auf der aktuellen
-     Mistral-Stufe (T1, 0,25 Anfragen/Sekunde) aber vier Sekunden. Bei
-     Andrang gingen dadurch bis zu DREI Aufrufe in derselben Sekunde raus,
-     und etwa jede zweite Analyse scheiterte an einer 429-Ueberlastmeldung.
-
-     Der Durchsatz leidet nicht: Eine Analyse dauert rund 65 Sekunden, der
-     Abstand bremst also nichts — er verhindert nur den Stau, wenn sieben
-     Auftraege gleichzeitig starten.
-
-     WER DIE MISTRAL-STUFE ANHEBT (T2 ab 20 $), darf diesen Wert senken —
-     aber erst nach einem Blick ins Mistral-Dashboard, nicht nach Gefuehl. */
-  tokenAbstandGrossMs: 4000,
-  tokenAbstandKleinMs: 4000,
-  jobAufbewahrungMs: 7200000,
-  zustellfensterMs: 900000,
-  livenessGnadenfristMs: 480000,
-  verarbeitungsZeitlimitMs: 540000,
-  wartendesHoechstalterMs: 2100000,
-  aufraeumStapel: 200,
-  ticketGueltigkeitMs: 1800000,
-};
-
-/* Zwei vorbereitete Alternativen, damit im Ernstfall nur EIN Feld umgestellt
-   werden muss statt sechsundzwanzig. */
-const PROFILE = {
-  "t1-normal": T1_NORMAL,
-  /* Wenn die KI langsamer wird — der Fall vom 28.08.2026. Die Bremse bleibt
-     gleich: Sie haengt am Mistral-LIMIT, nicht an der Geschwindigkeit. */
-  "t1-langsam": { ...T1_NORMAL, singleLargeTimeoutMs: 450000, durchschnittsdauerSekunden: 110 },
-  /* Rollback auf die 3-Call-Pipeline: weniger parallel, laengere Dauer.
-     Ersetzt den frueheren Deploy-Schritt aus dem RUNBOOK.
-
-     ACHTUNG, die Bremse muss hier ANDERS stehen: Dieser Pfad macht DREI
-     Mistral-Aufrufe je Analyse statt zwei. 0,25 / 3 = 0,083. Wer das
-     vergisst, laeuft auf dem Rollback-Pfad in genau die Fehler, vor denen
-     der Rollback schuetzen soll. */
-  "t1-drei-call": {
-    ...T1_NORMAL,
-    parallelitaet: 3,
-    queueRatePerSekunde: 0.083,
-    durchschnittsdauerSekunden: 100,
-  },
-};
+/* Die Betriebswerte liegen als reines Datenmodul in functions/src/produktiv-satz.js.
+   Sie standen frueher hier — und weil dieses Skript ausfuehrbar ist, konnte kein
+   Test sie lesen. Die Doku behauptete deshalb monatelang Werte (7 und 65), die in
+   der Produktion nicht liefen (4 und 40), ohne dass etwas rot wurde. */
+const { PROFILE, T1_NORMAL, AKTIV } = require(pfad.join(wurzel, "functions", "src", "produktiv-satz.js"));
 
 const ausfuehren = process.argv.includes("--ausfuehren");
 const ueberschreiben = process.argv.includes("--ueberschreiben");
@@ -152,7 +76,7 @@ if (Object.keys(T1_NORMAL).length !== PFLICHTFELDER.length) {
 
 console.log(`\nDatenbank:  ${FIRESTORE_DATABASE_ID}`);
 console.log(`Dokument:   config/betriebsprofil`);
-console.log(`Aktiv:      t1-normal`);
+console.log(`Aktiv:      ${AKTIV}`);
 console.log(`Profile:    ${Object.keys(PROFILE).join(", ")}`);
 console.log(`\nVier Obergrenzen sind Datenschutzzusagen und nicht ueberschreitbar:`);
 for (const feld of ["jobAufbewahrungMs", "zustellfensterMs", "adressfensterMs", "stundenfensterMinuten"]) {
@@ -179,7 +103,7 @@ const ref = db.doc("config/betriebsprofil");
     process.exit(1);
   }
 
-  await ref.set({ aktiv: "t1-normal", profile: PROFILE });
+  await ref.set({ aktiv: AKTIV, profile: PROFILE });
 
   /* NACHMESSEN, nicht behaupten: zurueckgelesen und erneut geprueft. */
   const zurueck = await ref.get();

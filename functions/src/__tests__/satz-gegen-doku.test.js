@@ -24,7 +24,12 @@
 
 const fs = require("fs");
 const pfad = require("path");
-const { SATZ } = require("../test-satz");
+/* BEFUND 30.08.2026: Hier stand der TESTSATZ. Der trug dieselben veralteten
+   Zahlen wie die Doku (7 und 65), waehrend die Produktion mit 4 und 40 lief.
+   Zwei gleichlautende Irrtuemer ergaben einen gruenen Test. Die Doku sagt
+   "heute" — also gehoert sie gegen den Satz gehalten, der wirklich in die
+   Produktion geschrieben wird. */
+const { T1_NORMAL: SATZ } = require("../produktiv-satz");
 const { PFLICHTFELDER, _pruefe } = require("../betriebsprofil");
 
 const DOKU = pfad.join(__dirname, "..", "..", "..", "docs", "BETRIEBSPROFILE.md");
@@ -34,7 +39,11 @@ function werteAusDoku() {
   const text = fs.readFileSync(DOKU, "utf8");
   const treffer = {};
   for (const zeile of text.split("\n")) {
-    const m = zeile.match(/^\|\s*`([a-zA-Z]+)`\s*\|\s*([0-9]+)\s*\|/);
+    /* Auch Dezimalzahlen: queueRatePerSekunde ist 0.125, keine ganze Zahl.
+       Mit dem alten Muster wurde die Zeile gar nicht erst gefunden — und ein
+       nicht gefundenes Feld faellt nur auf, weil die Messmittel-Probe oben
+       die ANZAHL prueft. */
+    const m = zeile.match(/^\|\s*`([a-zA-Z]+)`\s*\|\s*([0-9]+(?:\.[0-9]+)?)\s*\|/);
     if (m) treffer[m[1]] = Number(m[2]);
   }
   return treffer;
@@ -79,8 +88,38 @@ describe("Einstellungssatz und Dokumentation stimmen überein", () => {
     expect(ausDoku.drosselMaxParallel).toBeLessThanOrEqual(ausDoku.parallelitaet);
   });
 
-  test("große Aufrufe dürfen dichter feuern als kleine", () => {
-    expect(ausDoku.tokenAbstandGrossMs).toBeLessThan(ausDoku.tokenAbstandKleinMs);
+  /* HIER STAND: "große Aufrufe dürfen dichter feuern als kleine"
+     (tokenAbstandGrossMs < tokenAbstandKleinMs).
+
+     Die Annahme ist falsch, und sie wurde am 30.08.2026 teuer: Mistral zählt
+     ANFRAGEN pro Sekunde, nicht deren Größe. Ein großer Aufruf mit Bild zählt
+     genauso einmal wie ein kleiner. Es gibt keinen Grund, warum der eine
+     dichter feuern dürfte — und der Satz 800/2500 lag bei beiden unter dem
+     erlaubten Abstand.
+
+     Stattdessen wird jetzt geprüft, was tatsächlich gilt: Beide Abstände
+     müssen mindestens so groß sein, wie die Mistral-Stufe erlaubt. Das ist
+     eine schärfere Aussage als die alte, nicht eine gelockerte. */
+  test("beide Abstände halten die Mistral-Stufe ein", () => {
+    /* T1 erlaubt 0,25 Anfragen pro Sekunde -> ein Aufruf alle 4000 ms.
+       Diese Zahl steht bewusst hier und nicht im Einstellungssatz: Sie ist
+       keine Betriebsentscheidung, sondern eine Eigenschaft des Anbieters. */
+    const T1_MINDESTABSTAND_MS = 4000;
+    expect(ausDoku.tokenAbstandGrossMs).toBeGreaterThanOrEqual(T1_MINDESTABSTAND_MS);
+    expect(ausDoku.tokenAbstandKleinMs).toBeGreaterThanOrEqual(T1_MINDESTABSTAND_MS);
+  });
+
+  test("die Warteschlangen-Rate passt zur Mistral-Stufe", () => {
+    /* Die eigentliche Bremse: Jede Analyse macht zwei Mistral-Aufrufe
+       (Analyse + Beast-Werbung). Bei 0,25 erlaubten Aufrufen pro Sekunde
+       dürfen also höchstens 0,125 Analysen pro Sekunde losgeschickt werden.
+
+       Ohne diese Prüfung lässt sich die Rate versehentlich anheben, und der
+       Fehler zeigt sich erst beim nächsten Workshop — als Fehlermeldung bei
+       Kindern, nicht als roter Test. */
+    const T1_AUFRUFE_PRO_SEKUNDE = 0.25;
+    const AUFRUFE_JE_ANALYSE = 2;
+    expect(ausDoku.queueRatePerSekunde).toBeLessThanOrEqual(T1_AUFRUFE_PRO_SEKUNDE / AUFRUFE_JE_ANALYSE);
   });
 
   test("das Wiederholungsfenster liegt innerhalb der Aufbewahrung", () => {

@@ -309,9 +309,7 @@ exports.satzWache = onDocumentWritten(
       queueSatz =
         ` ACHTUNG: Die Warteschlange konnte NICHT nachgezogen werden ` +
         `(${queue.grund}) — sie laeuft mit dem alten Tempo weiter.`;
-      console.error(
-        JSON.stringify({ step: "satz-wache", status: "queue-nicht-gesetzt", grund: queue.grund })
-      );
+      console.error(JSON.stringify({ step: "satz-wache", status: "queue-nicht-gesetzt", grund: queue.grund }));
     } else if (queue.geaendert) {
       queueSatz =
         ` Warteschlange nachgezogen: ${queue.parallel} gleichzeitig, ` +
@@ -327,8 +325,6 @@ exports.satzWache = onDocumentWritten(
       `${werte.stundenlimit} pro Stunde.` +
       queueSatz;
     await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
-    console.log(
-      JSON.stringify({ step: "satz-wache", status: "uebernommen", quelle, profil, queue })
-    );
+    console.log(JSON.stringify({ step: "satz-wache", status: "uebernommen", quelle, profil, queue }));
   }
 );

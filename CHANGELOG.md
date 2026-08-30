@@ -6,6 +6,41 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Neu
+
+- **Das Tempo der Warteschlange lässt sich jetzt im laufenden Betrieb
+  umstellen.** Wie schnell Analysen an die KI weitergereicht werden, war
+  bisher eine Einstellung bei Google, die nur über die Kommandozeile änderbar
+  war. Damit lag ausgerechnet die wichtigste Bremse außerhalb des
+  Einstellungssatzes — jede Anpassung brauchte einen Fachmann.
+
+  Der Wert steht jetzt neben allen anderen in der Datenbank. Wer ihn ändert,
+  ändert die laufende Bremse; eine Wache überträgt ihn und meldet, was
+  tatsächlich gesetzt wurde. Scheitert die Übertragung, läuft die alte
+  Einstellung weiter und die Meldung sagt es ausdrücklich.
+
+- **Ein Befehl zeigt, ob Einstellung und Warteschlange übereinstimmen.**
+  `scripts/warteschlange-pruefen.sh` vergleicht beide Seiten und zieht auf
+  Wunsch nach. Damit lässt sich der wichtigste Betriebswert prüfen, ohne die
+  Google-Konsole zu öffnen.
+
+### Behoben
+
+- **Die Dokumentation nannte Betriebswerte, die so nicht liefen.** Für
+  Parallelität, Wartezeit-Ansage und die Abstände zwischen KI-Aufrufen standen
+  dort veraltete Zahlen. Die Prüfung, die das hätte finden sollen, hielt die
+  Doku gegen den Testsatz — und der trug dieselben veralteten Zahlen. Sie
+  prüft jetzt gegen die Werte, die wirklich in die Datenbank geschrieben
+  werden.
+
+- **Eine Drossel im Programm ließ mehr Aufrufe zu, als die Warteschlange
+  überhaupt weitergibt.** Sie konnte deshalb nie greifen. Beide Grenzen liegen
+  jetzt gleichauf.
+
+- **Firestore-Regeln werden wieder automatisch ausgeliefert.** Der Schritt
+  scheiterte, seit die Datenbank nach Europa umgezogen ist, und lief seither
+  von Hand. Er läuft jetzt als eigener Schritt vor der übrigen Auslieferung.
+
 ## [4.4.0] — 2026-08-30
 
 ### Neu

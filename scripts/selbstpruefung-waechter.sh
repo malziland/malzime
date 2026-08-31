@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# selbstpruefung-waechter.sh — prueft die drei Waechter, die das
+# selbstpruefung-waechter.sh — prueft die Waechter, die das
 # Repository selbst untersuchen.
 #
 # WARUM NEBEN scripts/pruefungen/ UND NICHT DARIN: Jenes Verzeichnis ist eine
@@ -10,7 +10,7 @@
 #
 # WARUM EINE EIGENE DATEI: `pruefungen/selbstpruefung.sh` arbeitet mit vorbereiteten
 # Verzeichnissen (kaputt/sauber) und ruft Pruefungen aus `checks/` auf. Die
-# drei Waechter hier untersuchen dagegen das laufende Repository — sie
+# die Waechter hier untersuchen dagegen das laufende Repository — sie
 # brauchen echte Aenderungen, keine Beispieldateien.
 #
 # ANLASS, 31.08.2026: Ein Pruefer ohne Vorwissen fand, dass zwei der drei

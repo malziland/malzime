@@ -775,7 +775,16 @@ fi
 # Reihenfolge muss bleiben: erst ausliefern, dann die Nummer setzen. Der
 # richtige Ort dafuer ist der Cache-Buster-PR, der ohnehin nach jedem Deploy
 # faellig ist.
-OBERSTE="$(sh scripts/changelog-oberste-version.sh CHANGELOG.md 2>/dev/null || true)"
+# BEFUND 01.09.2026 (Runde 6): Mit `|| true` sah ein DEFEKTES Skript genauso
+# aus wie ein CHANGELOG, das noch auf [Unveroeffentlicht] steht — beide leer.
+# Der Rueckgabewert wird jetzt getrennt gelesen.
+OBERSTE="$(bash scripts/changelog-oberste-version.sh CHANGELOG.md 2>/dev/null)"
+OBERSTE_RC=$?
+if [ "$OBERSTE_RC" -gt 1 ]; then
+  echo "FEHLER: changelog-oberste-version.sh liess sich nicht ausfuehren (Code $OBERSTE_RC)." >&2
+  echo "        Ohne sie ist nicht pruefbar, ob der CHANGELOG gestempelt wurde." >&2
+  exit 1
+fi
 case "$OBERSTE" in
   ""|*nver*)
     echo ""

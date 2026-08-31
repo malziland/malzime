@@ -99,7 +99,7 @@ ZEILEN_GRENZEN = {
     "public/js/render.js": 830,
     "functions/src/counter.js": 790,
     "functions/src/jobs.js": 770,
-    # Nach zwei Schnitten (Helfer, Analyse-Wege) von 679 auf 279 Zeilen.
+    # Nach zwei Schnitten (Helfer, Analyse-Wege) von 679 auf 285 Zeilen.
     "functions/src/handle-process-job.js": 320,
     # Die beiden Analyse-Wege.
     "functions/src/job-pipelines.js": 400,
@@ -259,7 +259,18 @@ def main():
         print("  ERGEBNIS: Alles innerhalb der Grenzen.")
         return 0
 
-    print(f"  ERGEBNIS: {len(funde)} Grenze(n) ueberschritten.")
+    # BEFUND 01.09.2026 (Runde 6, G-13): Hier stand nur die Zahl der
+    # ueberschrittenen Grenzen. Bei einer Datei OHNE Grenze meldete das Skript
+    # Rueckgabewert 1 und dazu "0 Grenze(n) ueberschritten" — wer nur die
+    # Meldung liest, haelt das fuer bestanden.
+    teile = []
+    if funde:
+        teile.append(f"{len(funde)} Grenze(n) ueberschritten")
+    if ungelistet:
+        teile.append(f"{len(ungelistet)} Datei(en) ohne Grenze")
+    if fehlend:
+        teile.append(f"{len(fehlend)} gelistete Datei(en) fehlen")
+    print(f"  ERGEBNIS: {', '.join(teile) if teile else 'Befund ohne Zaehlung'}.")
     print()
     for was, ist, grenze, art in funde:
         print(f"  ▸ {was}: {ist} {art} (Grenze {grenze})")

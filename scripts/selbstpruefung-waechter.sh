@@ -191,7 +191,10 @@ zurueck scripts/deploy.sh
 sichern scripts/pruefe-deploy-riegel.py
 python3 - <<'PYSELF'
 s = open("scripts/pruefe-deploy-riegel.py").read()
-s = s.replace('"muster": r"SKIP_SATZ",', '"muster": r"Konvention: .v=YYYYMMDDNN",', 1)
+# Ein HILFSANKER (nach) auf eine Kommentarzeile: genau der Fall, der eine
+# Regel lautlos toetet. Das Suchmuster selbst ist bewusst NICHT betroffen —
+# ein fehlendes Muster ist ein Befund, kein Messproblem.
+s = s.replace('"nach": r"Cache-Busting-Version: ",', '"nach": r"Konvention: .v=YYYYMMDDNN",', 1)
 open("scripts/pruefe-deploy-riegel.py", "w").write(s)
 PYSELF
 probe 2 "Anker auf einem Kommentar meldet NICHT MESSBAR" python3 scripts/pruefe-deploy-riegel.py

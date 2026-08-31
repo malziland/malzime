@@ -176,7 +176,16 @@ def pruefe_anker(text_roh, text_ohne_kommentar):
     """
     tote = []
     for r in RIEGEL_DEPLOY:
-        for feld in ("muster", "vor", "nach"):
+        # NUR die Hilfsanker pruefen, NICHT das Suchmuster selbst.
+        #
+        # BEFUND aus der eigenen Selbstpruefung (31.08.2026): Mit "muster" in
+        # dieser Liste meldete der Waechter bei einem AUSKOMMENTIERTEN Riegel
+        # "eigene Anker tot" (Rueckgabewert 2) statt "FEHLT" (1) — er verwechselte
+        # einen schlecht gewaehlten Anker mit dem Schaden, den er finden soll.
+        # Ein "muster", das nur im Kommentar steht, IST der Befund; ein "vor"
+        # oder "nach", das nur im Kommentar steht, macht die Regel dagegen
+        # wirkungslos, ohne dass jemand etwas sieht.
+        for feld in ("vor", "nach"):
             if feld not in r:
                 continue
             try:

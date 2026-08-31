@@ -109,7 +109,7 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
        Pipeline-Namen im Test veraltet zwangslaeufig. Jetzt kommen sie aus der
        Pipeline-Datei selbst. */
     const ci = fs.readFileSync(path.join(__dirname, "..", "..", "..", ".github", "workflows", "ci.yml"), "utf8");
-    const ciJobs = [...ci.matchAll(/^  ([a-z0-9-]+):$/gm)].map(([, name]) => name);
+    const ciJobs = [...ci.matchAll(/^ {2}([a-z0-9-]+):$/gm)].map(([, name]) => name);
     expect(ciJobs.length).toBeGreaterThan(3);
     const unbekannt = aufrufe
       .filter(([, , job]) => !ciJobs.includes(job))

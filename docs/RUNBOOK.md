@@ -7,6 +7,22 @@ das Sicherheitsmodell samt bewusster Abwägungen [SECURITY-MODEL.md](SECURITY-MO
 das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 [FLAGS.md](FLAGS.md).
 
+
+## Nach dem Klonen: einrichten
+
+```bash
+sh scripts/einrichten.sh
+```
+
+Setzt `core.hooksPath` auf `scripts/hooks` — damit laeuft `vor-dem-push.sh`
+vor jedem Push — und meldet fehlende Werkzeuge (`gh`, `firebase`, `gitleaks`).
+
+**Warum das hier steht:** Der Push-Riegel greift NUR mit dieser Einstellung.
+Bis zum 31.08.2026 stand der Befehl ausschliesslich im Kopf der Hook-Datei
+selbst — also in der Datei, die ohne ihn nie laeuft. Ein frischer Klon hatte
+den Riegel damit stillschweigend nicht (gemessen: Push mit entwaffnetem
+deploy.sh ging durch).
+
 ## Normalbetrieb (Soll-Zustand)
 
 - **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call

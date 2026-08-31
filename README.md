@@ -121,6 +121,10 @@ Datenschutz ist kein Feature — es ist das Fundament:
 git clone https://github.com/malziland/malzime.git
 cd malzime
 
+# 1b. Einmalig einrichten — setzt den Push-Riegel und prueft die Werkzeuge.
+#     Ohne diesen Schritt laeuft die Vorabpruefung NICHT vor einem Push.
+sh scripts/einrichten.sh
+
 # 2. Firebase CLI installieren (falls noch nicht vorhanden)
 npm i -g firebase-tools
 firebase login

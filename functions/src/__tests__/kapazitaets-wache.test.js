@@ -122,12 +122,32 @@ describe("OPS-2026-08-31-07 — die Rate wird mitbewertet", () => {
     expect(b.grund).toBe("queue-laeuft-zu-schnell");
   });
 
-  test("pruefeKapazitaet gibt einen Rate-Befund zurueck", async () => {
-    const modul = require("../kapazitaets-wache");
-    expect(typeof modul.echteRate).toBe("function");
-    /* Der Befund muss BEIDE Groessen tragen — sonst ist nicht erkennbar,
-       welche von beiden auseinanderlaeuft. */
-    const quelle = require("fs").readFileSync(require("path").join(__dirname, "..", "kapazitaets-wache.js"), "utf8");
-    expect(quelle).toMatch(/await echteRate\(\)/);
+  /* BEFUND 31.08.2026 (Runde 3): Hier stand ein QUELLTEXT-Test — er las die
+     Datei und suchte nach "await echteRate()". Ein Textmuster belegt kein
+     Verhalten: Wer die Zeile umformuliert, macht den Test rot, ohne etwas
+     kaputtzumachen; wer den Aufruf ins Leere laufen laesst, haelt ihn gruen.
+     Jetzt wird gemessen, was ankommt. */
+  test("pruefeKapazitaet misst die Rate wirklich, nicht nur die Parallelitaet", async () => {
+    jest.resetModules();
+    jest.doMock("../betriebsprofil", () => ({
+      geltendeWerte: async () => ({
+        werte: { parallelitaet: 4, queueRatePerSekunde: 0.125 },
+        quelle: "firestore",
+        grund: null,
+      }),
+    }));
+    const frisch = require("../kapazitaets-wache");
+    /* Attrappe: Parallelitaet stimmt (4), die RATE laeuft auseinander
+       (0.5 statt 0.125). Wuerde nur die Parallelitaet geprueft, bliebe der
+       Befund unauffaellig — genau der Vorfall vom 31.08. */
+    frisch.setClientForTest({
+      queuePath: () => "projects/x/locations/y/queues/z",
+      getQueue: async () => [{ rateLimits: { maxConcurrentDispatches: 4, maxDispatchesPerSecond: 0.5 } }],
+    });
+    const b = await frisch.pruefeKapazitaet();
+    expect(b.auffaellig).toBe(true);
+    expect(b.grund).toBe("queue-laeuft-zu-schnell");
+    expect(b.meldung).toMatch(/RATE:/);
+    frisch.setClientForTest(null);
   });
 });

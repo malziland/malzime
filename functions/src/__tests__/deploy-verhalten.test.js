@@ -67,6 +67,17 @@ function deploy(umgebung = {}, ziel = "hosting") {
       env: {
         ...process.env,
         PATH: `${ATTRAPPEN}:${process.env.PATH}`,
+        /* BEFUND 31.08.2026: Ohne diese drei Schalter brach das Skript ab,
+           BEVOR es die Cache-Kennung schreibt — an zwei Riegeln, fuer die es
+           keine Attrappe gibt. `expect(code).not.toBe(0)` war damit trivial
+           wahr, und die Tests belegten nichts.
+           Schwerer wiegt: Diese beiden Riegel rufen ECHTE Dienste. Gemessen
+           wurden sechs gcloud-Aufrufe gegen das Produktivprojekt je Lauf
+           (43 der 47 Sekunden Laufzeit). Und waere ein Riegel ausgebaut, liefe
+           das Skript bis live-smoke.sh durch — das POSTet auf
+           https://malzi.me/api/enqueue und legte einen ECHTEN Job an.
+           Ein Test darf die Produktion nicht anfassen. */
+        SKIP_SATZ: "1",
         ...umgebung,
       },
     });
@@ -76,11 +87,51 @@ function deploy(umgebung = {}, ziel = "hosting") {
   }
 }
 
-/** Kopiert die zu pruefenden Skripte AUS DEM ARBEITSBAUM in den Klon. */
+/** Kopiert die zu pruefenden Skripte AUS DEM ARBEITSBAUM in den Klon.
+ *
+ * BEFUND aus der eigenen Rueckbauprobe (31.08.2026): Das eingespielte Skript
+ * gilt im Klon als GEAENDERTE Datei. Der Sauberkeits-Riegel schlaegt dann an,
+ * bevor der eigentliche Riegel drankommt — die Tests wurden rot, aber aus dem
+ * falschen Grund. Ein Test, der aus dem falschen Grund rot wird, belegt so
+ * wenig wie einer, der nie rot wird. Deshalb wird die Datei im Klon committet;
+ * dort ist das gefahrlos, der Klon wird nach dem Lauf geloescht. */
 function skripteEinspielen() {
   for (const datei of ["scripts/deploy.sh"]) {
     fs.copyFileSync(path.join(WURZEL, datei), path.join(klon, datei));
   }
+  /* Drei Riegel rufen eigene Skripte ueber RELATIVEN Pfad — Attrappen im PATH
+     greifen dort nicht. Sie werden deshalb im Klon durch Attrappen ersetzt.
+     Ohne das blieben sie ungeprueft (die Tests umgehen sie mit SKIP_*), und
+     schlimmer: verify-infrastructure.sh ruft echtes gcloud, live-smoke.sh
+     POSTet auf malzi.me. Beides hat aus dieser Testdatei heraus nichts zu
+     suchen. Steuerung: ATTRAPPE_<NAME>_ROT=1 laesst das jeweilige scheitern. */
+  const eigene = {
+    "scripts/verify-infrastructure.sh": "INFRA",
+    "scripts/live-smoke.sh": "SMOKE",
+    "scripts/warteschlange-pruefen.sh": "SATZ",
+  };
+  for (const [datei, name] of Object.entries(eigene)) {
+    const ziel = path.join(klon, datei);
+    if (!fs.existsSync(path.join(WURZEL, datei))) continue;
+    fs.writeFileSync(
+      ziel,
+      `#!/bin/sh\n# ATTRAPPE (Testlauf) — beruehrt keinen echten Dienst.\n` +
+        `if [ "\${ATTRAPPE_${name}_ROT:-0}" = "1" ]; then\n` +
+        `  echo "ATTRAPPE ${name}: scheitert (so gewollt)" >&2\n  exit 1\nfi\n` +
+        `echo "ATTRAPPE ${name}: ok"\nexit 0\n`
+    );
+    fs.chmodSync(ziel, 0o755);
+  }
+  execSync(
+    [
+      `git -C "${klon}" add -A scripts/`,
+      `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
+      `git -C "${klon}" branch -f main HEAD`,
+      `git -C "${klon}" fetch -q origin main`,
+      `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+    ].join(" && "),
+    { stdio: "pipe" }
+  );
 }
 
 /** Setzt den Klon auf einen sauberen Stand zurueck.
@@ -113,6 +164,69 @@ describe("deploy.sh — Verhalten der Riegel", () => {
   test("gescheiterter Trockenlauf haelt an UND laesst den Baum sauber", () => {
     const r = deploy({ ATTRAPPE_DRYRUN_ROT: "1" });
     expect(r.code).not.toBe(0);
+    const offen = execSync(`git -C "${klon}" status --porcelain`, { encoding: "utf8" });
+    expect(offen.trim()).toBe("");
+  });
+
+  test("rote Infrastruktur-Pruefung haelt die Auslieferung an", () => {
+    const r = deploy({ ATTRAPPE_INFRA_ROT: "1" });
+    expect(r.code).not.toBe(0);
+  });
+
+  test("zu alte Firebase-CLI haelt die Auslieferung an", () => {
+    const r = deploy({ ATTRAPPE_FIREBASE_VERSION: "9.0.0" });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/CLI|Version/i);
+  });
+});
+
+/* ── Die Aufraeumfalle ──────────────────────────────────────────────────
+ *
+ * Hier hatten am 31.08. zwei Pruefer GEGENSAETZLICHE Ergebnisse: Der eine
+ * hielt die Marke `HOCHGELADEN=1` fuer richtig platziert, der andere fuer eine
+ * Stufe zu frueh. Beide hatten ausgefuehrt — nur unterschiedliche Faelle. Der
+ * entscheidende (Hosting-Upload scheitert) kam bei einem gar nicht vor.
+ *
+ * Deshalb stehen hier alle drei Faelle nebeneinander. Sie unterscheiden sich
+ * nur darin, WANN es schiefgeht.
+ * ────────────────────────────────────────────────────────────────────── */
+describe("deploy.sh — die Aufraeumfalle", () => {
+  afterEach(aufraeumen);
+
+  /** Liest die Cache-Kennung aus public/index.html im Klon. */
+  function kennung() {
+    const html = fs.readFileSync(path.join(klon, "public", "index.html"), "utf8");
+    const t = html.match(/styles\.css\?v=(\d+)/);
+    return t ? t[1] : null;
+  }
+
+  test("Firestore-Schritt scheitert -> Kennung wird zurueckgenommen", () => {
+    const vorher = kennung();
+    const r = deploy({ ATTRAPPE_FIRESTORE_ROT: "1" });
+    expect(r.code).not.toBe(0);
+    expect(kennung()).toBe(vorher);
+    const offen = execSync(`git -C "${klon}" status --porcelain`, { encoding: "utf8" });
+    expect(offen.trim()).toBe("");
+  });
+
+  test("Live-Probe nach dem Upload rot -> Kennung BLEIBT", () => {
+    /* Die Gegenrichtung: Hier IST etwas live. Wer jetzt zurueckbaut, bringt
+       den Quelltext aus dem Tritt mit dem, was ausgeliefert wurde. */
+    const vorher = kennung();
+    const r = deploy({ ATTRAPPE_SMOKE_ROT: "1" });
+    expect(r.code).not.toBe(0);
+    expect(kennung()).not.toBe(vorher);
+    expect(r.ausgabe).toMatch(/NACH dem Hochladen|bleibt/i);
+  });
+
+  test("Hosting-Upload scheitert -> Kennung wird zurueckgenommen", () => {
+    /* DER FALL, der den Streit entschieden hat: Bis zum 31.08. meldete das
+       Skript hier "steht bereits live" und liess 14 Dateien liegen. Live stand
+       nichts — Firestore rollt nur Regeln aus. */
+    const vorher = kennung();
+    const r = deploy({ ATTRAPPE_HOSTING_ROT: "1" });
+    expect(r.code).not.toBe(0);
+    expect(kennung()).toBe(vorher);
     const offen = execSync(`git -C "${klon}" status --porcelain`, { encoding: "utf8" });
     expect(offen.trim()).toBe("");
   });

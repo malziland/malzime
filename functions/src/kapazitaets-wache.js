@@ -94,6 +94,10 @@ async function echteParallelitaet() {
  * 0,5 statt 0,125 lief die Auslieferung auf VIERFACHEM Tempo gegen Mistrals
  * Grenze; am Morgen kamen die ersten Ueberlastmeldungen.
  */
+/* Der Grund des letzten gescheiterten Lesevorgangs. Nur fuer die Meldung —
+   die Wache selbst entscheidet weiterhin nur anhand der Zahlen. */
+let letzterLesefehler = null;
+
 async function echteRate() {
   if (isLocalQueueMode && isLocalQueueMode()) return null;
   const pid = projectId();
@@ -104,7 +108,14 @@ async function echteRate() {
     const [queue] = await client.getQueue({ name });
     const wert = queue?.rateLimits?.maxDispatchesPerSecond;
     return typeof wert === "number" && wert > 0 ? wert : null;
-  } catch (_e) {
+  } catch (e) {
+    /* BEFUND 31.08.2026 (Runde 3): Hier stand `catch (_e) { return null; }` —
+       der Grund wurde restlos verworfen. "Nicht messbar" liess sich danach
+       nicht mehr von "kein Projekt bekannt" oder "keine Berechtigung"
+       unterscheiden, und die Wache konnte DAUERHAFT blind sein, ohne dass es
+       jemandem auffiel. Sie gibt es wegen des Vorfalls vom 31.08.
+       Der Grund wird jetzt festgehalten; das Melden bleibt beim Aufrufer. */
+    letzterLesefehler = e && e.message ? e.message : String(e);
     return null;
   }
 }
@@ -186,6 +197,28 @@ async function pruefeKapazitaet() {
      nur falsche Wartezeit-Ansagen. */
   const auffaellige = [befund, rateBefund].filter((b) => b.auffaellig);
   if (!auffaellige.length) {
+    /* BEFUND 31.08.2026 (Runde 3): Ein Lauf, der NICHTS messen konnte, sah
+       genauso aus wie einer, bei dem alles stimmt — beide "unauffaellig",
+       beide ohne Meldung. Die Wache konnte dauerhaft blind sein, ohne dass es
+       jemandem auffiel. Sie ist wegen des Vorfalls vom 31.08. gebaut worden.
+       Alarm gibt es hier bewusst weiterhin nicht (eine Netzwerkstoerung ist
+       keine Fehlkonfiguration) — aber die Logzeile sagt jetzt, WARUM nicht
+       gemessen werden konnte. Wer im Protokoll dieselbe Zeile jeden Tag sieht,
+       erkennt eine dauerhaft blinde Wache. */
+    const nichtGemessen = [befund, rateBefund].filter((b) => b.grund === "nicht-messbar");
+    if (nichtGemessen.length) {
+      console.log(
+        JSON.stringify({
+          step: "kapazitaets-wache",
+          status: "nicht-messbar",
+          betroffen:
+            nichtGemessen === undefined ? [] : nichtGemessen.map((b) => (b === rateBefund ? "rate" : "parallelitaet")),
+          lesefehler: letzterLesefehler,
+          hinweis:
+            "Kein Abgleich moeglich. Wiederholt sich das taeglich, ist die Wache blind — dann von Hand nachsehen.",
+        })
+      );
+    }
     return { ...befund, rate: rateBefund, meldung: null };
   }
   const meldungen = auffaellige.map((b) =>

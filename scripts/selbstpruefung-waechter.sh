@@ -280,6 +280,21 @@ zurueck functions/src/betriebsprofil.js
 echo
 echo "── Ergebnis ──"
 if [ "$FEHLER" -eq 0 ]; then
+  # BEFUND 31.08.2026 (Pruefrunde 3): Hier stand nur die gezaehlte Zahl. Wer die
+  # Datei auf EINE positive Probe zusammenstrich, bekam "Alle 1 Proben
+  # bestanden. Die Waechter messen in beide Richtungen." — eine Aussage ueber
+  # alle Waechter, gestuetzt auf eine einzige Messung. Kein anderer Waechter
+  # merkte es. Deshalb steht die erwartete Zahl jetzt HIER und wird verglichen.
+  #
+  # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
+  # verschwindet damit nicht mehr unbemerkt.
+  ERWARTETE_PROBEN=14
+  if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
+    echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
+    echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."
+    echo "  Eine Selbstpruefung mit fehlenden Proben belegt nichts."
+    exit 2
+  fi
   echo "  Alle $PROBEN Proben bestanden. Die Waechter messen in beide Richtungen."
   exit 0
 fi

@@ -467,27 +467,65 @@ aufraeumen_bei_abbruch() {
     echo ""
     echo "Deploy abgebrochen (Code $CODE) — nehme die Cache-Kennung zurueck,"
     echo "damit der naechste Versuch nicht am Sauberkeits-Riegel scheitert."
-    # BEFUND 31.08.2026 (unvorbelastetes Review): Hier stand
-    # `git checkout -- public/` — das verwirft ALLES unter public/, nicht nur,
-    # was dieses Skript geschrieben hat. Der Kommentar behauptete das Gegenteil
-    # und stuetzte sich auf den Sauberkeits-Riegel. Der faellt aber bei
-    # SKIP_STAND=1 weg, dem dokumentierten Notschalter — dann waere fremde
-    # Handarbeit ohne Rueckfrage geloescht worden.
+    # Zurueckgenommen wird GENAU das, was dieses Skript geschrieben hat —
+    # nicht "alles unter public/" (das traefe fremde Handarbeit) und nicht
+    # "was ein ?v= enthaelt" (das verfehlt build-info.json).
     #
-    # Jetzt werden GENAU die Dateien zurueckgenommen, in die der Cache-Buster
-    # geschrieben hat. Der Suchpfad ist derselbe, mit dem sie oben gefunden
-    # wurden; laeuft er ins Leere, wird nichts angefasst und das gesagt.
-    ZURUECK=$(git diff --name-only -- public/ 2>/dev/null \
-      | while read -r D; do
-          git diff -- "$D" 2>/dev/null | grep -q '^[+-].*?v=[0-9]\{10\}' && echo "$D"
-        done)
-    if [ -z "$ZURUECK" ]; then
-      echo "  Keine Datei mit geaenderter Cache-Kennung gefunden — nichts angefasst."
-      echo "  (Was sonst unter public/ liegt, bleibt unberuehrt.)"
+    # DREI BEFUNDE aus dem Review vom 31.08.2026 stecken in dieser Fassung:
+    #
+    #   · `git checkout -- public/` verwarf ALLES dort. Der Sauberkeits-Riegel
+    #     sollte das abfangen, faellt aber bei SKIP_STAND=1 weg.
+    #   · Der Ersatz filterte auf `?v=` und liess `public/build-info.json`
+    #     liegen, das nie eine Kennung traegt. Damit war die Falle wirkungslos:
+    #     Der naechste Deploy scheiterte weiter am Sauberkeits-Riegel — also
+    #     genau der Vorfall vom 30.08., gegen den sie gebaut wurde.
+    #   · `git diff --name-only` gibt Pfade mit Umlauten ZITIERT und oktal
+    #     escaped aus. Eine deutschsprachige Seite waere still liegengeblieben.
+    #
+    # Deshalb kommt die Liste aus derselben Quelle wie oben beim Schreiben
+    # ($BUSTER_DATEIEN) plus build-info.json — kein Filter, keine Zitierung.
+    ZURUECK=""
+    # `${…:-}` weil `set -u` aktiv ist: Bricht der Deploy ab, BEVOR die
+    # Liste gebaut wurde (etwa am Trockenlauf), waere die Variable ungesetzt
+    # und die Falle stuerbe an ihrer eigenen Absicherung. Dann gibt es aber
+    # auch nichts zurueckzunehmen — leer ist hier die richtige Antwort.
+    for D in ${BUSTER_DATEIEN:-} "public/build-info.json"; do
+      [ -f "$D" ] || continue
+      if ! git diff --quiet -- "$D" 2>/dev/null; then
+        ZURUECK="$ZURUECK$D
+"
+      fi
+    done
+    ANZAHL=$(printf '%s' "$ZURUECK" | grep -c . || true)
+    if [ "$ANZAHL" -eq 0 ]; then
+      echo "  Keine der vom Skript geschriebenen Dateien ist veraendert —"
+      echo "  nichts angefasst. (Was sonst unter public/ liegt, bleibt unberuehrt.)"
     else
-      ANZAHL=$(printf '%s\n' "$ZURUECK" | grep -c .)
-      printf '%s\n' "$ZURUECK" | xargs git checkout -- 2>/dev/null \
-        && echo "  $ANZAHL Datei(en) mit der Cache-Kennung zurueckgesetzt."
+      # Einzeln statt ueber xargs: Nach einer Pipe misst `$?` den LETZTEN
+      # Befehl, nicht den, ueber den man etwas behauptet — genau die Falle, die
+      # der Waechter gegen stille Fehlschlaege bewacht. Und ein Fehlschlag bei
+      # EINER Datei soll die anderen nicht mitnehmen.
+      GESCHEITERT=0
+      SCHLEIFEN_IFS=$IFS
+      IFS='
+'
+      for D in $ZURUECK; do
+        IFS=$SCHLEIFEN_IFS
+        if ! git checkout -- "$D" 2>/dev/null; then
+          echo "  ACHTUNG: $D liess sich nicht zuruecksetzen."
+          GESCHEITERT=$((GESCHEITERT + 1))
+        fi
+        IFS='
+'
+      done
+      IFS=$SCHLEIFEN_IFS
+      if [ "$GESCHEITERT" -eq 0 ]; then
+        echo "  $ANZAHL Datei(en) zurueckgesetzt."
+      else
+        echo "  $GESCHEITERT von $ANZAHL Datei(en) blieben liegen."
+        echo "  Der naechste Deploy wird am Sauberkeits-Riegel abbrechen."
+        echo "  Von Hand: git checkout -- public/"
+      fi
     fi
   fi
 }
@@ -519,8 +557,33 @@ trap aufraeumen_bei_abbruch EXIT
 # mindestens eine Ziffer (BRE, kein + — bash 3.2 auf macOS kennt es nicht).
 # BUSTER-DATEIEN: Diese Zeile fuehrt functions/src/__tests__/deploy-buster-script.test.js
 # unveraendert aus. Ihre Form nicht ohne Blick dorthin aendern.
+# BEFUND 31.08.2026 (Gegenpruefer, ausgefuehrt): `for f in $BUSTER_DATEIEN`
+# ohne Anfuehrungszeichen zerlegt einen Dateinamen mit Leerzeichen in zwei
+# Woerter. `[ -f ]` ist dann falsch, die Seite wird STILL uebersprungen und
+# friert auf einem alten Stilblatt ein — genau der Fehler, gegen den
+# OPS-2026-08-18-02 gebaut wurde. `deploy-buster-script.test.js` bleibt dabei
+# gruen, weil er die Liste nur liest.
+#
+# Zeilenweise lesen statt Wortaufspaltung. Ein Zeilenumbruch im Dateinamen
+# bliebe ein Problem — den verbietet aber schon die Namenskonvention, und
+# `find` wuerde ihn ohnehin als zwei Eintraege liefern.
 BUSTER_DATEIEN=$(find public -name '*.html' | sort; echo public/js/demo.js)
+# BEFUND 31.08.2026 (Gegenpruefer, ausgefuehrt): Hier stand
+# `for f in $BUSTER_DATEIEN` ohne Anfuehrungszeichen. Ein Dateiname mit
+# Leerzeichen zerfaellt dabei in zwei Woerter, `[ -f ]` ist falsch, und die
+# Seite wird STILL uebersprungen — sie friert auf einem alten Stilblatt ein.
+# Genau der Fehler, gegen den OPS-2026-08-18-02 gebaut wurde, und
+# `deploy-buster-script.test.js` bleibt dabei gruen, weil er nur die Liste
+# liest.
+#
+# Zeilenweise ueber IFS statt ueber eine Pipe: Eine Pipe erzeugt eine
+# Subshell, in der ein Fehlschlag verschluckt wuerde — bei einem Schritt, der
+# Dateien schreibt, ist das die falsche Wahl.
+ALT_IFS=$IFS
+IFS='
+'
 for f in $BUSTER_DATEIEN; do
+  IFS=$ALT_IFS
   if [ -f "$f" ]; then
     # BUG-009: Cross-platform sed (macOS + Linux)
     if sed --version >/dev/null 2>&1; then
@@ -530,7 +593,10 @@ for f in $BUSTER_DATEIEN; do
     fi
     echo "  $f aktualisiert"
   fi
+  IFS='
+'
 done
+IFS=$ALT_IFS
 
 # Fingerabdruck des Ausgelieferten. MUSS nach der Buster-Ersetzung laufen —
 # sonst stehen dort die Pruefsummen des Zustands DAVOR, und jede Nachpruefung

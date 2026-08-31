@@ -96,15 +96,32 @@ REGELN = [
         ),
     },
     {
+        # BEFUND 31.08.2026 (beide Pruefer, ausgefuehrt): Diese Regel verlangte
+        # `scripts/deploy.sh` als Begleiter. Der Grund von damals ist aber weg:
+        # Seit OPS-2026-08-18-02 fuehrt das Skript KEINE Liste mehr, es fragt
+        # das Dateisystem (`find public -name '*.html'`). Der Fehler, den die
+        # Regel beschreibt, kann gar nicht mehr auftreten.
+        #
+        # Die Folge war schwer: `pruefungen` ist Pflicht-Check mit
+        # `enforce_admins: true` — die naechste neue Seite haette `main`
+        # blockiert, und der einzige Ausweg waere eine kosmetische Aenderung an
+        # genau der Datei gewesen, in der die Riegel stehen.
+        #
+        # Die Regel bleibt, aber mit dem Begleiter, der HEUTE noetig ist: Eine
+        # neue Seite braucht ihren Eintrag in der Sprachdatei, sonst steht sie
+        # ohne Uebersetzung da. Das prueft `pruefe-i18n-fallbacks.py` erst,
+        # wenn sie schon lebt.
         "name": "Neue Seite unter public/",
         "ausloeser_datei": r"public/(?:[a-z]+/)?[a-z0-9-]+\.html",
         "ausloeser_muster": None,  # das blosse Anlegen zaehlt
         "nur_neue": True,
-        "begleiter": ["scripts/deploy.sh"],
+        "begleiter": ["public/locales/de.json", "public/locales/en.json"],
         "warum": (
-            "Die Cache-Kennung wird ueber alle HTML-Dateien geschrieben. Eine Seite,\n"
-            "     die der Suchpfad nicht erfasst, friert auf einem alten Stilblatt ein\n"
-            "     — am 17.08. und noch einmal mit den englischen Seiten passiert."
+            "Eine neue Seite braucht ihre Texte in public/locales/de.json UND\n"
+            "     en.json — sonst steht sie ohne Uebersetzung da, und der i18n-Waechter\n"
+            "     merkt es erst, wenn sie schon lebt. Die Cache-Kennung dagegen braucht\n"
+            "     keine Nacharbeit mehr: Das Skript fragt seit OPS-2026-08-18-02 das\n"
+            "     Dateisystem."
         ),
     },
     {
@@ -209,6 +226,32 @@ def main():
     print()
 
     diff = (lauf("git", "diff", f"{vergleich}...HEAD") or "") + "\n" + (lauf("git", "diff", "HEAD") or "")
+
+    # MESSMITTEL-PROBE FUER DIE REGELN (Befund 31.08.2026): Eine Regel, deren
+    # Ausloeser-Datei oder Begleiter es gar nicht gibt, kann nie sinnvoll
+    # anschlagen — sie meldet entweder nie etwas oder immer dasselbe. Genau so
+    # war die Regel "Neue Seite unter public/" monatelang ein Fehlalarm: Ihr
+    # Begleiter `scripts/deploy.sh` brauchte seit OPS-2026-08-18-02 gar keine
+    # Nacharbeit mehr.
+    #
+    # Ein toter Verweis ist deshalb NICHT MESSBAR, nicht "nichts gefunden".
+    tot = []
+    for regel in REGELN:
+        if regel.get("abgeschaltet"):
+            continue
+        for b in regel["begleiter"]:
+            if not (WURZEL / b).exists():
+                tot.append(f"{regel['name']}: Begleiter {b} existiert nicht")
+        # Ausloeser mit festem Pfad (kein regulaerer Ausdruck) ebenso
+        pfad = regel["ausloeser_datei"]
+        if not any(z in pfad for z in "()[]?*+|\\") and not (WURZEL / pfad).exists():
+            tot.append(f"{regel['name']}: Ausloeser {pfad} existiert nicht")
+    if tot:
+        print("  NICHT MESSBAR: Regeln verweisen auf Dateien, die es nicht gibt.")
+        print("  Sie koennten nie sinnvoll anschlagen.")
+        for t in tot:
+            print(f"    {t}")
+        return 2
 
     funde = []
 

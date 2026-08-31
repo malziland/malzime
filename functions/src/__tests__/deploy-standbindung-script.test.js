@@ -100,6 +100,86 @@ describe("Stand-Bindung in deploy.sh", () => {
     expect(bindungLaesstDurch(zeilen)).toBe(false);
   });
 
+  /* ────────────────────────────────────────────────────────────────────
+     Die Abkuerzung ueber die Git-Baum-Kennung (31.08.2026)
+
+     BEFUND aus dem zweiten Review: Diese 48 Zeilen — der sicherheits-
+     kritischste Teil des Skripts — waren von KEINEM Test und keiner
+     Waechter-Regel erfasst. Der im Kommentar dokumentierte Rueckfall
+     (`LAGE="$LAGE_PR"` statt selektivem Nachtragen) liess sich wieder
+     einbauen, ohne dass irgendetwas rot wurde. Genau dieser Rueckfall
+     haette einen ROTEN Pflicht-Check auf main durch ein gruenes Ergebnis
+     des Pull Requests verdraengt.
+
+     Die Tests hier lesen die Logik AUS DER ECHTEN DATEI. Eine Kopie waere
+     wertlos: Sie bliebe gruen, waehrend deploy.sh auseinanderdriftet.
+     ──────────────────────────────────────────────────────────────────── */
+  describe("Abkuerzung ueber die Baum-Kennung", () => {
+    /* Der Abschnitt zwischen dem Baum-Vergleich und dem Ende der Ersetzung. */
+    function abschnitt() {
+      const start = skript.indexOf('if [ "$BAUM_HIER" = "$BAUM_PR" ]');
+      const ende = skript.indexOf('if [ -z "$LAGE" ]');
+      if (start === -1 || ende === -1) {
+        throw new Error("Abkuerzungs-Abschnitt in deploy.sh nicht gefunden");
+      }
+      return skript.slice(start, ende);
+    }
+
+    test("der Abschnitt ist ueberhaupt auffindbar (Messmittel-Probe)", () => {
+      /* Ohne diese Zeile wuerden alle folgenden Pruefungen an einem leeren
+         Text vorbeilaufen und stillschweigend bestehen. */
+      expect(abschnitt().length).toBeGreaterThan(400);
+    });
+
+    test("die GESAMTE Lage wird NICHT ersetzt — nur Ausstehendes nachgetragen", () => {
+      const a = abschnitt();
+      /* Der dokumentierte Rueckfall. Steht er wieder da, ist die
+         Sicherheitsluecke zurueck: gruen verdraengt rot. */
+      expect(a).not.toMatch(/^\s*LAGE="\$LAGE_PR"\s*$/m);
+      /* Stattdessen: eintragsweise, und nur wo nichts entschieden ist. */
+      expect(a).toContain("NEUE_LAGE");
+      expect(a).toMatch(/WERT.*=.*"pending"/);
+    });
+
+    test("ein rotes Ergebnis wird nicht ueberschrieben", () => {
+      const a = abschnitt();
+      /* Ersetzt wird ausschliesslich bei pending/null/leer — failure kommt
+         in keiner Bedingung vor, die eine Ersetzung ausloest. */
+      const bedingung = a.slice(a.indexOf("UEBERSPRINGEN"), a.indexOf('NEUE_LAGE="$NEUE_LAGE'));
+      expect(bedingung).toContain('"pending"');
+      expect(bedingung).not.toContain('"failure"');
+    });
+
+    test("zeitabhaengige Pruefungen sind ausgenommen", () => {
+      const a = abschnitt();
+      /* test-backend fuehrt audit-gate mit ablaufender Ausnahmeliste, die
+         Frist-Bremse und npm audit. Ein gruenes Ergebnis von gestern kann
+         dort heute falsch sein, ohne dass sich eine Zeile geaendert hat. */
+      expect(a).toContain("ZEITABHAENGIG=");
+      expect(a).toContain("test-backend");
+    });
+
+    test("ohne Baumgleichheit passiert gar nichts", () => {
+      /* Der Vergleich ist die einzige Tuer zur Abkuerzung. Faellt er weg,
+         gilt wieder ausschliesslich, was main sagt. */
+      expect(skript).toContain('if [ "$BAUM_HIER" = "$BAUM_PR" ]');
+      expect(skript).toContain('BAUM_HIER=$(git rev-parse "HEAD^{tree}"');
+    });
+
+    test("fail-closed, wenn der PR-Kopf nicht holbar ist", () => {
+      const stelle = skript.slice(
+        skript.indexOf("if git fetch -q origin"),
+        skript.indexOf('if [ "$BAUM_HIER" = "$BAUM_PR" ]')
+      );
+      expect(stelle).toContain("kein-baum-hier");
+      expect(stelle).toContain("kein-baum-dort");
+      /* Zwei verschiedene Platzhalter — sonst waeren sie gleich und die
+         Abkuerfung wuerde ausgerechnet im Fehlerfall greifen. */
+      expect(stelle).toMatch(/BAUM_HIER="kein-baum-hier"/);
+      expect(stelle).toMatch(/BAUM_PR="kein-baum-dort"/);
+    });
+  });
+
   test("OPS-12: fehlendes gh bricht ab, statt nur zu warnen", () => {
     const stelle = skript.slice(skript.indexOf("if ! command -v gh"), skript.indexOf("PFLICHT="));
     expect(stelle).toContain("FEHLER: gh nicht verfügbar");

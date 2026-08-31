@@ -153,3 +153,33 @@ describe("Lokal-Modus (QUEUE_LOCAL=1, Emulator)", () => {
     await expect(storage.deleteImage("queue-uploads/gibt-es-nicht.jpg")).resolves.toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-03 — Riegel gegen Zugriff auf den ECHTEN Bildspeicher.
+
+   Am 30.08. lagen 4.056 Testbilder (233 MB) im Produktions-Bucket. Die
+   Lifecycle-Regel war in Ordnung; was fehlte, war die aktive Loeschung nach
+   der Analyse — die Bilder waren nie durch einen Worker gelaufen. Derselbe
+   Fehlertyp hatte am selben Tag die Produktions-Warteschlange verstellt: Eine
+   Attrappe, die nur greift, wenn ein Test daran DENKT, sie zu setzen.
+
+   Der einzelne Test, der es vergisst, ist austauschbar — der Riegel nicht.
+   ══════════════════════════════════════════════════════════════════════ */
+
+describe("OPS-2026-08-31-03 — der echte Bildspeicher ist gegen Tests verriegelt", () => {
+  test("ohne Attrappe wirft der Zugriff, statt in die Produktion zu schreiben", () => {
+    jest.resetModules();
+    const frisch = require("../queue-storage");
+    frisch.setBucketForTest(null);
+    expect(() => frisch._bucketFuerTest()).toThrow(/Attrappe/i);
+  });
+
+  test("mit Attrappe laeuft alles normal weiter", () => {
+    jest.resetModules();
+    const frisch = require("../queue-storage");
+    const attrappe = { name: "attrappe" };
+    frisch.setBucketForTest(attrappe);
+    expect(frisch._bucketFuerTest()).toBe(attrappe);
+    frisch.setBucketForTest(null);
+  });
+});

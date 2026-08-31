@@ -67,6 +67,7 @@ lauf "Pruefungen: Doppelte Betriebswerte" "pruefungen" python3 scripts/pruefe-do
 lauf "Pruefungen: Mitzieher" "pruefungen" python3 scripts/pruefe-mitzieher.py
 lauf "Pruefungen: Kopplung" "pruefungen" python3 scripts/pruefe-kopplung.py
 lauf "Pruefungen: Deploy-Riegel" "pruefungen" python3 scripts/pruefe-deploy-riegel.py
+lauf "Pruefungen: Waechter-Selbstpruefung" "pruefungen" sh scripts/selbstpruefung-waechter.sh
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend

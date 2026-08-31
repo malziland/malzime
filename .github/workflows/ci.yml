@@ -319,6 +319,12 @@ jobs:
       # der Produktion fernhalten.
       - run: python3 scripts/pruefe-deploy-riegel.py
 
+      # Und die drei Waechter pruefen sich selbst — in BEIDE Richtungen.
+      # Anlass 31.08.2026: Ein Pruefer ohne Vorwissen fand, dass zwei von
+      # ihnen gruen meldeten, ohne etwas gemessen zu haben. Die Fehler waren
+      # behoben, aber nichts hielt sie fest.
+      - run: sh scripts/selbstpruefung-waechter.sh
+
       # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
       # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine
       # Aenderung an 147 KB minifiziertem Einzeiler faellt in einem Pull-Request

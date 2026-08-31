@@ -175,6 +175,85 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     expect(offen.trim()).toBe("");
   });
 
+  /* BEFUND 31.08.2026 (Runde 4, F-3): Diese vier Abbrueche erreichte KEIN
+     Test — sie liegen vor oder hinter dem, was die uebrigen Faelle abdecken,
+     oder werden von den Notschaltern uebersprungen. Alle vier `exit 1`
+     gleichzeitig durch `:` ersetzt: 51 von 51 Tests blieben gruen. */
+
+  test("HEAD ungleich origin/main haelt die Auslieferung an", () => {
+    /* Der eigentliche Riegel gegen ungeprueffte Staende. Die uebrigen Tests
+       koennen ihn nicht messen, weil der Klon per Konstruktion HEAD ==
+       origin/main setzt. Hier wird origin/main gezielt verschoben. */
+    /* `deploy.sh` holt origin/main per `git fetch` aus dem Klon selbst — eine
+       direkt gesetzte Referenz waere danach wieder ueberschrieben. Verschoben
+       wird deshalb der LOKALE Zweig main, den der fetch dann holt. */
+    execSync(`git -C "${klon}" branch -f main HEAD~1 && git -C "${klon}" fetch -q origin main`, {
+      stdio: "pipe",
+    });
+    try {
+      const r = deploy();
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(/origin\/main/);
+    } finally {
+      execSync(`git -C "${klon}" branch -f main HEAD && git -C "${klon}" fetch -q origin main`, {
+        stdio: "pipe",
+      });
+    }
+  });
+
+  /* GRENZE, gemessen (31.08.2026): Dieser Fall laesst sich mit dieser Bauart
+     nicht vollstaendig absichern. Entfernt man sein `exit`, faengt der naechste
+     Riegel den Lauf trotzdem auf — der Test bliebe gruen, obwohl der Riegel
+     entwaffnet ist. Was er belegt, ist die richtige Meldung an der richtigen
+     Stelle; was er NICHT belegt, ist der Abbruch selbst. Ein vollstaendiger
+     Nachweis braeuchte einen Lauf, in dem alle nachfolgenden Riegel gruen sind
+     — dann liefert das Skript aus, und der Test waere gefaehrlich. */
+  test("nicht abrufbares CI-Ergebnis wird als solches gemeldet", () => {
+    /* Nicht "leere Antwort", sondern "gh liefert gar nichts" — das ist der
+       Fall, den der Riegel meint. */
+    const r = deploy({ ATTRAPPE_GH_ROT: "1" });
+    expect(r.code).not.toBe(0);
+    /* BEFUND aus der eigenen Rueckbauprobe: "bricht ab" genuegt nicht — wird
+       DIESER Riegel entwaffnet, faengt der naechste den Lauf auf, und der Test
+       bliebe gruen. Geprueft wird deshalb die Meldung DIESES Riegels. */
+    /* Muster eng fassen: "nicht abrufbar" steht auch in einer harmlosen
+       Hinweiszeile ueber den PR-Kopf. Nur die Meldung DIESES Riegels zaehlt. */
+    expect(r.ausgabe).toMatch(/CI-Ergebnis f[uü]r .* nicht abrufbar/i);
+  });
+
+  test("unlesbare Cache-Kennung haelt an, statt auf 01 zurueckzufallen", () => {
+    /* Faellt das Skript hier blind auf ...01 zurueck, vergibt es beim zweiten
+       Deploy des Tages eine bereits benutzte Nummer — Browser behalten dann
+       alte Dateien. */
+    const seite = path.join(klon, "public", "index.html");
+    const inhalt = fs.readFileSync(seite, "utf8");
+    fs.writeFileSync(seite, inhalt.replace(/styles\.css\?v=\d+/, "styles.css"));
+    execSync(
+      [
+        `git -C "${klon}" add -A public`,
+        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
+        `git -C "${klon}" branch -f main HEAD`,
+        `git -C "${klon}" fetch -q origin main`,
+      ].join(" && "),
+      { stdio: "pipe" }
+    );
+    const r = deploy();
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Cache-Buster|nicht lesbar/i);
+    /* Der Klon traegt jetzt eine kaputte index.html im COMMIT — die folgenden
+       Faelle brauchen wieder eine lesbare Kennung. */
+    execSync(
+      [
+        `git -C "${klon}" checkout -q HEAD~1 -- public/index.html`,
+        `git -C "${klon}" add -A public`,
+        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
+        `git -C "${klon}" branch -f main HEAD`,
+        `git -C "${klon}" fetch -q origin main`,
+      ].join(" && "),
+      { stdio: "pipe" }
+    );
+  });
+
   test("rote Infrastruktur-Pruefung haelt die Auslieferung an", () => {
     const r = deploy({ ATTRAPPE_INFRA_ROT: "1" });
     expect(r.code).not.toBe(0);

@@ -12,6 +12,11 @@ secret-scan=success
 playwright-version=success
 pruefungen=success'
 
+if [ "${ATTRAPPE_GH_ROT:-0}" = "1" ]; then
+  echo "ATTRAPPE gh: nicht erreichbar (so gewollt)" >&2
+  exit 1
+fi
+
 case "$1" in
   api)
     printf '%s\n' "${ATTRAPPE_CHECKS:-$VORGABE}"

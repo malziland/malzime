@@ -82,10 +82,27 @@ fi
 
 # Stellt bei JEDEM Ende wieder her, auch bei Strg+C und bei einem Fehler
 # mittendrin. `git checkout --` braucht keine externe Kopie.
+# BEFUND 01.09.2026 (Runde 6, J-2): Beide Wiederherstellungen warfen ihren
+# Rueckgabewert weg. Scheitert `git checkout --`, meldete diese Datei weiter
+# "Alle 10 Proben bestanden" und Rueckgabewert 0 — und liess sechs SABOTIERTE
+# Dateien im Arbeitsbaum stehen, darunter deploy.sh ohne einen Notschalter in
+# der Schlussbilanz. Gemessen mit einer git-Attrappe, die nur `checkout`
+# scheitern laesst. Sie laeuft ueber den pre-push-Hook bei JEDEM Push.
+#
+# Eine Selbstpruefung, die ihre eigenen Eingriffe nicht zurueckdrehen kann,
+# richtet mehr Schaden an als sie verhindert.
 wiederherstellen() {
   [ -z "$BERUEHRT" ] && return 0
   # shellcheck disable=SC2086
-  git checkout -- $BERUEHRT 2>/dev/null
+  if ! git checkout -- $BERUEHRT; then
+    echo "" >&2
+    echo "  ✘ WIEDERHERSTELLUNG GESCHEITERT." >&2
+    echo "    Diese Pruefung veraendert Dateien und stellt sie danach zurueck." >&2
+    echo "    Das ist eben NICHT gelungen. Betroffen:" >&2
+    printf '      %s\n' $BERUEHRT >&2
+    echo "    Bitte pruefen: git status" >&2
+    exit 3
+  fi
 }
 trap wiederherstellen EXIT INT TERM
 
@@ -164,7 +181,12 @@ probe_text() {
 
 # Merkt sich, welche Datei angefasst wurde — der Trap oben stellt sie her.
 sichern() { BERUEHRT="$BERUEHRT $1"; }
-zurueck() { git checkout -- "$1" 2>/dev/null; }
+zurueck() {
+  if ! git checkout -- "$1"; then
+    echo "  ✘ WIEDERHERSTELLUNG GESCHEITERT fuer $1 — Abbruch." >&2
+    exit 3
+  fi
+}
 
 echo "── Selbstpruefung der Repository-Waechter ──"
 echo

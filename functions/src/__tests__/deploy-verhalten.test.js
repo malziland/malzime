@@ -484,7 +484,15 @@ describe("deploy.sh — Verhalten der Riegel", () => {
   test("erschoepfte Cache-Nummer haelt an, statt zu ueberlaufen", () => {
     const seite = path.join(klon, "public", "index.html");
     const inhalt = fs.readFileSync(seite, "utf8");
-    const heute = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    /* BEFUND 01.09.2026 (Runde 6, ZEITZUENDER): Hier stand
+       `new Date().toISOString()` — das ist UTC. `deploy.sh:424` bildet den Tag
+       aber mit `date +"%Y%m%d"`, also in ORTSZEIT. In MESZ laufen beide
+       zwischen 00:00 und 02:00 auseinander: Die Kennung im Test traegt dann
+       den Vortag, die Ueberlaufbedingung greift nicht, und der Test wird rot.
+       Gemessen um 00:29 CEST: 1 von 18 rot; mit TZ=UTC gruen.
+       Zwei Stunden lang jede Nacht — und in der CI (UTC) unsichtbar.
+       Deshalb kommt der Tag jetzt aus DERSELBEN Quelle wie im Skript. */
+    const heute = execSync('date +"%Y%m%d"', { encoding: "utf8" }).trim();
     fs.writeFileSync(seite, inhalt.replace(/styles\.css\?v=\d+/, `styles.css?v=${heute}99`));
     execSync(
       [

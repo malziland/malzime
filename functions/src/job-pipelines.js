@@ -22,7 +22,6 @@
  * und aendert sich aus anderen Gruenden.
  */
 
-const { isLocalQueueMode } = require("./config");
 const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
 const { applyMinorSafety } = require("./minor-safety");
 const { classifyDescription, buildAnimalProfiles } = require("./animal");

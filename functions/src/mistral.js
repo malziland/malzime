@@ -14,12 +14,9 @@
  * API-Key kommt aus process.env.MISTRAL_API_KEY (Firebase Secret).
  */
 
-const { MISTRAL_DESCRIBE_MODEL, MISTRAL_PROFILE_MODEL, MISTRAL_FALLBACK_MODEL, MISTRAL_ENDPOINT } = require("./config");
-/* Betriebsprofil: liefert die geltenden Werte (Firestore-Profil oder Code). */
-const { geltendeWerte } = require("./betriebsprofil");
+const { MISTRAL_DESCRIBE_MODEL } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
-const { withMistralSlot } = require("./throttle");
 /* AUFGETEILT 31.08.2026: Das Auseinandernehmen der Antworten steht jetzt in
    einer eigenen Datei — reine Funktionen, kein Netz, kein Zustand. */
 /* VIERTER SCHNITT 31.08.2026: Der Drei-Aufruf-Weg ist der Rueckfall und liegt
@@ -39,13 +36,13 @@ const {
 } = require("./mistral-http");
 
 const {
-  findeProfileTextWert,
-  parseDescribeFooter,
+  
+  
   extrahiereLiveText,
-  KARTEN_WERT_SCHLUESSEL,
-  KARTEN_LABEL_SCHLUESSEL,
-  STANDARD_SCHLUESSEL,
-  BEAST_SCHLUESSEL,
+  
+  
+  
+  
   REQUIRED_CARDS,
   findMissingCards,
   escapeXml,

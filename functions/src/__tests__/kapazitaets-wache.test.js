@@ -102,3 +102,34 @@ describe("Lesen der echten Warteschlange", () => {
     expect(await wache.echteParallelitaet()).toBeNull();
   });
 });
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-07 — die Wache muss die RATE messen, nicht nur die
+   Parallelitaet.
+
+   Am 31.08. wurde gemeldet, die Wache lese jetzt auch die Rate. Tatsaechlich
+   war `echteRate()` definiert und wurde nirgends aufgerufen (ESLint:
+   "defined but never used"); `pruefeKapazitaet` verglich weiter nur die
+   Parallelitaet. Wird allein die Rate verstellt — bei gleicher Parallelitaet —
+   bleibt die Wache blind. Genau diese Groesse bestimmt aber, wie schnell
+   Aufrufe an die KI gehen: Beim Vorfall lief die Warteschlange mit 0,5/s
+   statt 0,125/s.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-07 — die Rate wird mitbewertet", () => {
+  test("Rate hoeher als der Einstellungssatz ist auffaellig", () => {
+    const b = _bewerte(0.125, 0.5);
+    expect(b.auffaellig).toBe(true);
+    expect(b.grund).toBe("queue-laeuft-zu-schnell");
+  });
+
+  test("pruefeKapazitaet gibt einen Rate-Befund zurueck", async () => {
+    const modul = require("../kapazitaets-wache");
+    expect(typeof modul.echteRate).toBe("function");
+    /* Der Befund muss BEIDE Groessen tragen — sonst ist nicht erkennbar,
+       welche von beiden auseinanderlaeuft. */
+    const quelle = require("fs").readFileSync(
+      require("path").join(__dirname, "..", "kapazitaets-wache.js"), "utf8");
+    expect(quelle).toMatch(/await echteRate\(\)/);
+  });
+});

@@ -30,36 +30,27 @@ const { isLocalQueueMode, localQueueConcurrency } = require("./config");
 /* PUNKT 3 des Nachtlaufs, 31.08.2026: Die kleinen Entscheidungen liegen in
    einer eigenen Datei — alle drei Wege brauchen sie. */
 const {
-  isSingleLargeCallEnabledSafe,
-  isBeastAdsCallEnabledSafe,
-  isPromptCacheEnabledSafe,
-  isLiveTextEnabledSafe,
-  getMistral,
-  isQuotaError,
-  buildPseudoDescription,
+  
+  
+  
+  
+  
+  
+  
   loggeMinorSafety,
-  hasCategories,
+  
 } = require("./job-helfer");
 
 /* Die beiden Analyse-Wege liegen in einer eigenen Datei — was hier bleibt, ist
    die Annahme des Auftrags und das Wegschreiben des Ergebnisses. */
 const { runPipeline } = require("./job-pipelines");
-const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
-const { applyMinorSafety } = require("./minor-safety");
-const { classifyDescription, buildAnimalProfiles } = require("./animal");
 const { incrementTotals, releaseHourlySlot } = require("./counter");
-const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs, setLiveText } = require("./jobs");
+const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { geltendeWerte } = require("./betriebsprofil");
-const { loadImage, deleteImage } = require("./queue-storage");
+const { deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
 /* FEATURE-2026-08-29-02: Jede erfolgreiche Analyse meldet ihre Dauer. */
 const { merkeDauer } = require("./durchsatz");
-const {
-  isSingleLargeCallEnabled,
-  isPromptCacheEnabled,
-  isBeastAdsCallEnabled,
-  isLiveTextEnabled,
-} = require("./feature-flags");
 
 /* Mistral-Provider: im Mock-Modus die kostenlose Attrappe, sonst die echte
    API. Umschaltbar über die Umgebungsvariable MISTRAL_MOCK ("1" = Mock) —

@@ -142,6 +142,12 @@ function baueMeldung(befund) {
  */
 async function pruefeKapazitaet() {
   const inDerQueue = await echteParallelitaet();
+  /* OPS-2026-08-31-07: Auch die RATE messen. Sie bestimmt, wie schnell
+     Aufrufe an die KI gehen, und war beim Vorfall vom 31.08. die verstellte
+     Groesse (0,5/s statt 0,125/s). Bis hierher war `echteRate` zwar
+     geschrieben, wurde aber nie aufgerufen — die Wache haette eine allein
+     verstellte Rate nicht bemerkt. */
+  const rateInDerQueue = await echteRate();
   /* Der Sollwert kommt aus dem Einstellungssatz — die Wache soll gegen das
      pruefen, was heute gilt, nicht gegen eine Zahl im Quelltext. */
   const { werte } = await geltendeWerte();
@@ -152,12 +158,26 @@ async function pruefeKapazitaet() {
     return { gemeldet: false, grund: "kein-einstellungssatz" };
   }
   const befund = bewerte(werte.parallelitaet, inDerQueue);
-  return { ...befund, meldung: befund.auffaellig ? baueMeldung(befund) : null };
+  const rateBefund = bewerte(werte.queueRatePerSekunde, rateInDerQueue);
+  /* Auffaellig ist der Lauf, wenn EINE der beiden Groessen auseinanderlaeuft.
+     Gemeldet wird die gefaehrlichere zuerst: eine zu schnelle Warteschlange
+     erzeugt Ueberlastmeldungen bei echten Nutzern, ein zu optimistischer Code
+     nur falsche Wartezeit-Ansagen. */
+  const auffaellige = [befund, rateBefund].filter((b) => b.auffaellig);
+  if (!auffaellige.length) {
+    return { ...befund, rate: rateBefund, meldung: null };
+  }
+  const meldungen = auffaellige.map((b) =>
+    b === rateBefund ? `RATE: ${baueMeldung(b)}` : `PARALLELITAET: ${baueMeldung(b)}`
+  );
+  const fuehrend = auffaellige.find((b) => b.grund === "queue-laeuft-zu-schnell") || auffaellige[0];
+  return { ...fuehrend, rate: rateBefund, parallelitaet: befund, meldung: meldungen.join("\n\n") };
 }
 
 module.exports = {
   pruefeKapazitaet,
   echteParallelitaet,
+  echteRate,
   setClientForTest,
   /* Fuer Tests */
   _bewerte: bewerte,

@@ -8,8 +8,8 @@
   "scripts": {
     "test": "jest --forceExit --detectOpenHandles",
     "test:coverage": "jest --forceExit --detectOpenHandles --coverage",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix",
+    "lint": "eslint --max-warnings=0 src/",
+    "lint:fix": "eslint --max-warnings=0 src/ --fix",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "serve": "firebase emulators:start --only functions",
@@ -29,9 +29,9 @@
     "uuid": "^11.1.1"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "eslint": "^10.8.0",
-    "eslint-config-prettier": "^10.1.8",
+    "@eslint --max-warnings=0/js": "^10.0.1",
+    "eslint --max-warnings=0": "^10.8.0",
+    "eslint --max-warnings=0-config-prettier": "^10.1.8",
     "jest": "^30.3.0",
     "prettier": "^3.9.6"
   }

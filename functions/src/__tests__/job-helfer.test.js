@@ -14,8 +14,6 @@
  * keine Zufaelligkeit, und soll nicht unbemerkt umkippen.
  */
 
-const helfer = require("../job-helfer");
-
 describe("job-helfer — was gilt, wenn ein Schalter nicht lesbar ist", () => {
   const stumm = () => jest.spyOn(console, "log").mockImplementation(() => {});
 

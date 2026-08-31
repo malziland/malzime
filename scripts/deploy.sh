@@ -432,6 +432,15 @@ HOCHGELADEN=0
 
 aufraeumen_bei_abbruch() {
   CODE=$?
+  # BEFUND 31.08.2026 (Pruefer A, ausgefuehrt): `set -euo pipefail` gilt AUCH
+  # im EXIT-Trap. Die Suche unten gibt 1 zurueck, sobald die letzte Datei
+  # unter public/ keinen Cache-Buster traegt — und `build-info.json` traegt nie
+  # einen. Der Trap brach dann mitten drin ab: Er raeumte NICHT auf und
+  # verfaelschte obendrein den Fehlercode (7 wurde zu 1).
+  #
+  # Nachgestellt und belegt. Deshalb hier ausdruecklich abschalten — in einem
+  # Aufraeumpfad ist ein Abbruch bei erstem Fehlschlag genau falsch.
+  set +e
   # SICHERHEITSBEFUND 31.08.2026 (unvorbelastetes Review): Die Falle pruefte
   # nur den Rueckgabewert. `live-smoke.sh` laeuft aber NACH beiden Uploads und
   # beendet sich bei einem Fehlschlag mit `exit 1` — etwa wenn die Verteilung
@@ -563,10 +572,6 @@ fi
 # gescheitert — vermutlich der eigentliche Grund, warum es seit dem 2026-07-29
 # nicht mehr benutzt wurde und die Deploys stattdessen von Hand liefen
 # (Audit 2026-08-10, OPS-001).
-# Ab hier wird HOCHGELADEN. Die Aufraeumfalle haelt sich von jetzt an raus:
-# Was live steht, laesst sich nicht durch ein `git checkout` zuruecknehmen.
-HOCHGELADEN=1
-
 # ── SCHRITT 1: Firestore-Regeln und Indizes, ALLEIN ──
 # Warum allein: siehe Kopfkommentar (Nachtrag 30.08.2026). Im Paket scheitert er.
 if [ "${SKIP_FIRESTORE:-0}" = "1" ]; then
@@ -580,6 +585,19 @@ else
   fi
   echo "Regeln ausgerollt."
 fi
+
+# AB HIER IST ETWAS AUSGELIEFERT. Die Aufraeumfalle haelt sich von jetzt an
+# raus: Was live steht, laesst sich nicht durch ein `git checkout` zuruecknehmen.
+#
+# BEFUND 31.08.2026 (Pruefer A): Die Marke stand VOR dem Firestore-Schritt.
+# Genau der ist am 30.08. mehrfach gescheitert, bevor irgendetwas ausgerollt
+# war — die Falle trat dann zurueck und liess die Cache-Kennung liegen. Sie
+# versagte also ausgerechnet im Szenario, das sie ausgeloest hat.
+#
+# Der Firestore-Schritt aendert ausserdem nichts an der Cache-Kennung: Er rollt
+# Regeln und Indizes aus, keine Seiten. Ein Rueckbau der Kennung ist danach
+# noch richtig.
+HOCHGELADEN=1
 
 # ── SCHRITT 2: Hosting und Functions ──
 if command -v firebase >/dev/null 2>&1; then

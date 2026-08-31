@@ -43,13 +43,46 @@ fi
 set -uo pipefail
 
 WURZEL="$(cd "$(dirname "$0")/.." && pwd)"
-ABLAGE="$(mktemp -d)"
 FEHLER=0
 PROBEN=0
-
-trap 'rm -rf "$ABLAGE"' EXIT
+BERUEHRT=""
 
 cd "$WURZEL" || exit 2
+
+# ── SICHERHEIT ZUERST (Befund 31.08.2026, Pruefer A) ──
+#
+# Diese Pruefung veraendert echte Dateien im Arbeitsbaum: Sie baut Riegel aus,
+# verschiebt Grenzen, legt Felder an — und stellt danach wieder her. Vorher
+# sicherte sie in ein Verzeichnis aus `mktemp`, das ein EXIT-Trap loeschte.
+# Bei Strg+C lief dieser Trap MIT: Die Sicherung war weg, die verstuemmelte
+# Datei blieb. Und das bei jedem Push, im echten Repository.
+#
+# Zwei Aenderungen:
+#
+#   1. Wiederhergestellt wird ueber `git checkout --`, nicht ueber eine Kopie.
+#      Das ueberlebt jeden Abbruch, weil die Quelle im Repository liegt.
+#   2. Es laeuft NUR bei sauberem Arbeitsbaum. Sonst wuerde ein Rueckbau
+#      fremde, ungespeicherte Arbeit mitloeschen — genau das, was hier
+#      verhindert werden soll.
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+  echo "Uebersprungen: Der Arbeitsbaum ist nicht sauber."
+  echo ""
+  echo "  Diese Pruefung veraendert Dateien und stellt sie ueber git wieder"
+  echo "  her. Bei ungespeicherten Aenderungen wuerde sie diese mitloeschen."
+  echo "  Erst committen oder aufraeumen, dann erneut laufen lassen."
+  echo ""
+  echo "  (Kein Fehler — nur nicht durchfuehrbar.)"
+  exit 0
+fi
+
+# Stellt bei JEDEM Ende wieder her, auch bei Strg+C und bei einem Fehler
+# mittendrin. `git checkout --` braucht keine externe Kopie.
+wiederherstellen() {
+  [ -z "$BERUEHRT" ] && return 0
+  # shellcheck disable=SC2086
+  git checkout -- $BERUEHRT 2>/dev/null
+}
+trap wiederherstellen EXIT INT TERM
 
 # Fuehrt eine Pruefung aus und vergleicht ihren Rueckgabewert mit dem
 # erwarteten. Der Wert wird UNMITTELBAR aufgefangen — nicht erst in einer
@@ -71,8 +104,9 @@ probe() {
   return 1
 }
 
-sichern() { cp "$1" "$ABLAGE/$(basename "$1").sicher"; }
-zurueck() { cp "$ABLAGE/$(basename "$1").sicher" "$1"; }
+# Merkt sich, welche Datei angefasst wurde — der Trap oben stellt sie her.
+sichern() { BERUEHRT="$BERUEHRT $1"; }
+zurueck() { git checkout -- "$1" 2>/dev/null; }
 
 echo "── Selbstpruefung der Repository-Waechter ──"
 echo

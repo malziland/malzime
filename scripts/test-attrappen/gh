@@ -17,12 +17,22 @@ if [ "${ATTRAPPE_GH_ROT:-0}" = "1" ]; then
   exit 1
 fi
 
+# Die Abkuerzung fragt ZWEI Staende ab: erst main, dann den Kopf des Pull
+# Requests. Beide Abfragen tragen ihre SHA in der URL — daran lassen sie sich
+# auseinanderhalten. ATTRAPPE_PR_KOPF nennt die SHA des PR-Kopfs;
+# ATTRAPPE_CHECKS_PR seine Ergebnisse. Ohne beides verhaelt sich die Attrappe
+# wie zuvor.
 case "$1" in
   api)
+    if [ -n "${ATTRAPPE_PR_KOPF:-}" ] && [ -n "${ATTRAPPE_CHECKS_PR:-}" ]; then
+      case "$*" in
+        *"$ATTRAPPE_PR_KOPF"*) printf '%s\n' "$ATTRAPPE_CHECKS_PR"; exit 0 ;;
+      esac
+    fi
     printf '%s\n' "${ATTRAPPE_CHECKS:-$VORGABE}"
     exit 0 ;;
   pr)
-    echo "0000000000000000000000000000000000000000"
+    echo "${ATTRAPPE_PR_KOPF:-0000000000000000000000000000000000000000}"
     exit 0 ;;
   *)
     exit 0 ;;

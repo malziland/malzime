@@ -281,21 +281,63 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     }
   });
 
-  /* NICHT PRUEFBAR mit dieser Bauart, gemessen am 31.08.2026 (Befund E-2):
-     Der dokumentierte Sicherheitsbefund — die Check-Lage von main durch die des
-     PR zu ERSETZEN statt nur Ausstehendes nachzutragen — braucht einen Klon, in
-     dem main und PR-Kopf VERSCHIEDENE Ergebnisse tragen, aber denselben Baum.
-     Beides zugleich laesst sich hier nicht herstellen: Der Klon hat nur einen
-     Kopf, und die gh-Attrappe kann die beiden Abfragen dann nicht mehr
-     auseinanderhalten. Ein Testversuch war im Normalfall rot und bei der
-     Sabotage ebenfalls — er mass nichts.
+  /* BEFUND 31.08.2026 (Runde 5): Der dokumentierte Sicherheitsbefund — die
+     Check-Lage von main durch die des PR zu ERSETZEN statt nur Ausstehendes
+     nachzutragen — war nur durch ein Textmuster geschuetzt. Zwei geaenderte
+     Klammern, und ein Deploy lief mit rotem test-e2e durch.
 
-     Was stattdessen gilt: Der Gegenpruefer hat den Fall am 31.08. in einem
-     eigenen Wegwerf-Klon nachgestellt und belegt, dass das AUSGELIEFERTE
-     Verhalten korrekt ist (Original bricht bei `test-e2e=failure` ab, nur die
-     manipulierte Fassung liefert aus). Offen bleibt die Absicherung gegen
-     kuenftige Aenderungen — bewusst als Restrisiko benannt, statt sie durch
-     einen Test vorzutaeuschen. */
+     Eine frueher hier notierte Behauptung, das sei "mit dieser Bauart nicht
+     pruefbar", war falsch: Die beiden gh-Abfragen tragen ihre SHA in der URL
+     und lassen sich daran unterscheiden. Der zweite Kopf entsteht ueber
+     `git commit-tree` mit DEMSELBEN Baum — genau die Voraussetzung, unter der
+     die Abkuerzung ueberhaupt greift. */
+  test("rotes Ergebnis auf main wird nicht durch ein gruenes PR-Ergebnis verdraengt", () => {
+    const betreff = execSync(`git -C "${klon}" log -1 --format=%s`, { encoding: "utf8" }).trim();
+    /* Die Abkuerzung greift nur bei einer PR-Nummer im Betreff. */
+    execSync(
+      [
+        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend -m "test: Probe (#235)"`,
+        /* Dieselbe Kette wie in skripteEinspielen: main mitfuehren, dann
+           holen. `deploy.sh` ruft selbst `git fetch origin main` — ein blosses
+           update-ref waere danach wieder ueberschrieben. */
+        `git -C "${klon}" branch -f main HEAD`,
+        `git -C "${klon}" fetch -q origin main`,
+        `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+      ].join(" && "),
+      { stdio: "pipe" }
+    );
+    /* Zweiter Commit, gleicher Baum: der "PR-Kopf". */
+    const baum = execSync(`git -C "${klon}" rev-parse "HEAD^{tree}"`, { encoding: "utf8" }).trim();
+    const prKopf = execSync(`git -C "${klon}" -c user.email=t@t -c user.name=t commit-tree ${baum} -m "PR-Kopf"`, {
+      encoding: "utf8",
+    }).trim();
+    try {
+      const r = deploy({
+        ATTRAPPE_PR_KOPF: prKopf,
+        /* main: e2e ROT, zwei stehen noch aus — der Fall, in dem die
+           Abkuerzung greifen darf. */
+        ATTRAPPE_CHECKS:
+          "test-backend=success\ntest-frontend=success\ntest-e2e=failure\nsecret-scan=pending\nplaywright-version=pending\npruefungen=success",
+        /* Der PR ist vollstaendig gruen. */
+        ATTRAPPE_CHECKS_PR:
+          "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+      });
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(/test-e2e/);
+    } finally {
+      execSync(
+        [
+          /* Kein `branch -f`: Der ausgecheckte Zweig folgt dem --amend von
+             selbst, und ein erzwungenes Setzen scheitert an der Arbeitskopie. */
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend -m "${betreff}"`,
+          `git -C "${klon}" branch -f main HEAD`,
+          `git -C "${klon}" fetch -q origin main`,
+          `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+    }
+  });
 
   test("rote Infrastruktur-Pruefung haelt die Auslieferung an", () => {
     const r = deploy({ ATTRAPPE_INFRA_ROT: "1" });

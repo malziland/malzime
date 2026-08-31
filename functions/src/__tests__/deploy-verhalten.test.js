@@ -60,7 +60,14 @@ afterAll(() => {
 /** Fuehrt deploy.sh im Klon aus und gibt Rueckgabewert und Ausgabe zurueck. */
 function deploy(umgebung = {}, ziel = "hosting") {
   try {
-    const ausgabe = execFileSync("sh", ["scripts/deploy.sh", ziel], {
+    /* BEFUND 31.08.2026 (Runde 4): Hier stand "sh". Auf ubuntu-latest — also in
+       der Pipeline — ist `sh` gleich `dash`, und deploy.sh nutzt
+       `set -o pipefail`, das dash nicht kennt. Gemessen: RC 2, "set: Illegal
+       option -o pipefail", vier von acht Tests rot. Lokal faellt es nicht auf,
+       weil `sh` auf macOS bash ist.
+       Dieselbe Lehre steht im Kopf von selbstpruefung-waechter.sh und ist dort
+       mit einem BASH_VERSION-Riegel abgesichert — hier war sie neu entstanden. */
+    const ausgabe = execFileSync("bash", ["scripts/deploy.sh", ziel], {
       cwd: klon,
       encoding: "utf8",
       stdio: "pipe",

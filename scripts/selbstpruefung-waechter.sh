@@ -116,6 +116,32 @@ probe() {
 # einem fehlenden Skript ebenfalls Rueckgabewert 2. Die Probe mass also nur,
 # dass irgendetwas eine 2 zurueckgibt, nicht dass der Waechter richtig
 # entscheidet. Ein Rueckgabewert allein ist bei Rueckgabewert 2 kein Beleg.
+# BEFUND 31.08.2026 (Runde 4): Wie `probe_text`, aber OHNE Rueckgabewert.
+#
+# Die drei Bildspeicher-Proben verlangten Rueckgabe 0 bzw. 1 vom GESAMTEN
+# verify-infrastructure.sh. In der Pipeline gibt es keine gcloud-Anmeldung —
+# dort melden 14 andere Abschnitte rot, das Skript endet immer mit 1, und der
+# Pflicht-Check `pruefungen` waere gerissen. Auf dem Entwicklerrechner faellt
+# das nicht auf, weil dort eine Anmeldung besteht.
+#
+# Geprueft wird deshalb nur, was der Bildspeicher-Abschnitt SAGT. Genau darum
+# geht es bei diesen drei Proben; der Gesamtzustand der Infrastruktur ist eine
+# andere Frage.
+probe_ausgabe() {
+  MUSTER="$1"; NICHT="$2"; WAS="$3"; shift 3
+  PROBEN=$((PROBEN + 1))
+  AUSGABE="$("$@" 2>&1)"
+  if printf '%s' "$AUSGABE" | grep -qE "$MUSTER" && ! printf '%s' "$AUSGABE" | grep -qE "$NICHT"; then
+    echo "  ja    $WAS"
+    return 0
+  fi
+  echo "  NEIN  $WAS"
+  echo "        erwartet: '$MUSTER', nicht erwartet: '$NICHT'"
+  printf '%s\n' "$AUSGABE" | grep -iE "bildspeicher|bilder" | sed 's/^/          /' | head -3
+  FEHLER=$((FEHLER + 1))
+  return 1
+}
+
 probe_text() {
   ERWARTET="$1"; MUSTER="$2"; WAS="$3"; shift 3
   PROBEN=$((PROBEN + 1))
@@ -174,18 +200,21 @@ echo "2b. verify-infrastructure.sh — Bildspeicher"
 : > /tmp/probe-leer.txt
 INFRA_PROBE_BILDER=/tmp/probe-leer.txt INFRA_PROBE_BILDER_CODE=1 \
 INFRA_PROBE_BILDER_FEHLER="CommandException: One or more URLs matched no objects." \
-  probe_text 0 "Keine Bilder aelter" "leerer Bucket ist der SOLLZUSTAND, nicht ein Fehler" \
-  sh scripts/verify-infrastructure.sh
+  probe_ausgabe "Keine Bilder aelter" "Bildspeicher nicht lesbar" \
+  "leerer Bucket ist der SOLLZUSTAND, nicht ein Fehler" \
+  bash scripts/verify-infrastructure.sh
 
 INFRA_PROBE_BILDER=/tmp/probe-leer.txt INFRA_PROBE_BILDER_CODE=1 \
 INFRA_PROBE_BILDER_FEHLER="AccessDeniedException: 403 Forbidden" \
-  probe_text 1 "nicht lesbar" "echter Zugriffsfehler wird gemeldet" \
-  sh scripts/verify-infrastructure.sh
+  probe_ausgabe "Bildspeicher nicht lesbar" "Keine Bilder aelter" \
+  "echter Zugriffsfehler wird gemeldet" \
+  bash scripts/verify-infrastructure.sh
 
 printf '    123456  2026-08-30T05:00:00Z  gs://x/queue-uploads/alt.jpg\n' > /tmp/probe-alt.txt
 INFRA_PROBE_BILDER=/tmp/probe-alt.txt INFRA_PROBE_BILDER_CODE=0 \
-  probe_text 1 "aelter als 3 Stunden" "liegengebliebene Bilder werden gefunden" \
-  sh scripts/verify-infrastructure.sh
+  probe_ausgabe "aelter als 3 Stunden" "Keine Bilder aelter" \
+  "liegengebliebene Bilder werden gefunden" \
+  bash scripts/verify-infrastructure.sh
 rm -f /tmp/probe-leer.txt /tmp/probe-alt.txt
 
 echo

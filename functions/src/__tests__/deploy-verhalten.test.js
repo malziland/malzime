@@ -76,7 +76,7 @@ afterAll(() => {
 });
 
 /** Fuehrt deploy.sh im Klon aus und gibt Rueckgabewert und Ausgabe zurueck. */
-function deploy(umgebung = {}, ziel = "hosting") {
+function deploy(umgebung = {}, ziel = "hosting", ohneGh = false) {
   try {
     /* BEFUND 31.08.2026 (Runde 4): Hier stand "sh". Auf ubuntu-latest — also in
        der Pipeline — ist `sh` gleich `dash`, und deploy.sh nutzt
@@ -91,7 +91,9 @@ function deploy(umgebung = {}, ziel = "hosting") {
       stdio: "pipe",
       env: {
         ...process.env,
-        PATH: `${ATTRAPPEN}:${process.env.PATH}`,
+        /* ohneGh: Attrappen-Verzeichnis ohne gh — so laesst sich der Fall
+           "Werkzeug fehlt" pruefen, ohne den echten PATH anzutasten. */
+        PATH: ohneGh ? ohneGhBin() : `${ATTRAPPEN}:${process.env.PATH}`,
         /* BEFUND 31.08.2026: Ohne diese drei Schalter brach das Skript ab,
            BEVOR es die Cache-Kennung schreibt — an zwei Riegeln, fuer die es
            keine Attrappe gibt. `expect(code).not.toBe(0)` war damit trivial
@@ -157,6 +159,62 @@ function skripteEinspielen() {
     ].join(" && "),
     { stdio: "pipe" }
   );
+}
+
+/** Ein Attrappen-Verzeichnis OHNE gh — fuer den Fall "Werkzeug fehlt". */
+let ohneGhVerzeichnis;
+function ohneGhBin() {
+  if (!ohneGhVerzeichnis) {
+    ohneGhVerzeichnis = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-ohne-gh-"));
+    /* Die Attrappen uebernehmen, die echten Systemwerkzeuge verlinken — nur
+       `gh` fehlt. Ein blosses /usr/bin im PATH genuegt nicht: gh liegt dort
+       auf manchen Rechnern. */
+    for (const w of fs.readdirSync(ATTRAPPEN)) {
+      if (w === "gh") continue;
+      fs.copyFileSync(path.join(ATTRAPPEN, w), path.join(ohneGhVerzeichnis, w));
+      fs.chmodSync(path.join(ohneGhVerzeichnis, w), 0o755);
+    }
+    for (const w of [
+      "git",
+      "node",
+      "npx",
+      "python3",
+      "sed",
+      "grep",
+      "awk",
+      "date",
+      "cat",
+      "rm",
+      "cp",
+      "mv",
+      "printf",
+      "sort",
+      "head",
+      "tail",
+      "wc",
+      "mktemp",
+      "dirname",
+      "basename",
+      "tr",
+      "find",
+      "xargs",
+      "curl",
+      "sh",
+      "bash",
+      "env",
+      "chmod",
+      "ls",
+      "test",
+    ]) {
+      try {
+        const echt = execSync(`command -v ${w}`, { encoding: "utf8", shell: "/bin/bash" }).trim();
+        if (echt) fs.symlinkSync(echt, path.join(ohneGhVerzeichnis, w));
+      } catch {
+        /* Werkzeug gibt es hier nicht — dann braucht es der Lauf auch nicht. */
+      }
+    }
+  }
+  return ohneGhVerzeichnis;
 }
 
 /** Setzt den Klon auf einen sauberen Stand zurueck.
@@ -375,6 +433,76 @@ describe("deploy.sh — Verhalten der Riegel", () => {
       execSync(
         [
           `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend -m "${betreff}"`,
+          `git -C "${klon}" branch -f main HEAD`,
+          `git -C "${klon}" fetch -q origin main`,
+          `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+    }
+  });
+
+  /* BEFUND 31.08.2026 (Runde 5): Diese vier Abbrueche erreichte kein Test.
+     Sie sind jetzt geprueft — aber mit einer Grenze, die gemessen wurde und
+     benannt gehoert:
+
+     Die Tests belegen, dass der jeweilige Fall die RICHTIGE MELDUNG erzeugt
+     und der Lauf endet. Sie belegen NICHT, dass genau dieses `exit` den Lauf
+     beendet. Entfernt man es einzeln, bricht der naechste Riegel ab — die
+     Kette ist fail-closed gebaut, und ein einzelner Ausfall fuehrt in keinem
+     gemessenen Fall zu einer Auslieferung (nachgestellt: gh-Riegel entwaffnet
+     und gh aus dem PATH genommen -> Abbruch am naechsten Riegel, RC 1).
+
+     Ein Test, der ein einzelnes `exit` nachweist, muesste alle nachfolgenden
+     Riegel gleichzeitig gruen stellen — dann liefe das Skript aus, und der
+     Test waere gefaehrlicher als die Luecke, die er schliesst. */
+
+  test("fehlendes gh haelt an, statt die CI-Freigabe zu ueberspringen", () => {
+    /* Ein PATH ohne gh — der haeufige Fall auf einem frischen Rechner. */
+    const r = deploy({}, "hosting", true);
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/gh nicht verf/i);
+  });
+
+  test("nicht ermittelbare CLI-Version haelt an", () => {
+    const r = deploy({ ATTRAPPE_FIREBASE_VERSION: "" });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/nicht ermittelbar/i);
+  });
+
+  test("jeder der beiden Trockenlaeufe haelt fuer sich an", () => {
+    const nurFirestore = deploy({ ATTRAPPE_DRYRUN_FIRESTORE_ROT: "1" });
+    expect(nurFirestore.code).not.toBe(0);
+    expect(nurFirestore.ausgabe).toMatch(/Firestore/i);
+    const nurZiel = deploy({ ATTRAPPE_DRYRUN_ZIEL_ROT: "1" });
+    expect(nurZiel.code).not.toBe(0);
+  });
+
+  test("erschoepfte Cache-Nummer haelt an, statt zu ueberlaufen", () => {
+    const seite = path.join(klon, "public", "index.html");
+    const inhalt = fs.readFileSync(seite, "utf8");
+    const heute = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    fs.writeFileSync(seite, inhalt.replace(/styles\.css\?v=\d+/, `styles.css?v=${heute}99`));
+    execSync(
+      [
+        `git -C "${klon}" add -A public`,
+        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
+        `git -C "${klon}" branch -f main HEAD`,
+        `git -C "${klon}" fetch -q origin main`,
+        `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+      ].join(" && "),
+      { stdio: "pipe" }
+    );
+    try {
+      const r = deploy();
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(/99|ueberl|überl/i);
+    } finally {
+      fs.writeFileSync(seite, inhalt);
+      execSync(
+        [
+          `git -C "${klon}" add -A public`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
           `git -C "${klon}" branch -f main HEAD`,
           `git -C "${klon}" fetch -q origin main`,
           `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,

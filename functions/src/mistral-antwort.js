@@ -291,6 +291,29 @@ function extrahiereLiveText(jsonPraefix) {
   };
 }
 
+/* HERGEZOGEN 31.08.2026: Welche Karten in einer Antwort fehlen — das ist
+   Auswertung, und beide Wege (Ein-Aufruf und Drei-Aufruf) brauchen sie. */
+function findMissingCards(parsed) {
+  if (!parsed || !parsed.categories || typeof parsed.categories !== "object") {
+    return REQUIRED_CARDS.slice();
+  }
+  return REQUIRED_CARDS.filter((key) => !parsed.categories[key] || !parsed.categories[key].value);
+}
+
+/* HERGEZOGEN 31.08.2026: Ein reines Textwerkzeug — es sichert Text ab, bevor
+   er in einen Prompt geht, damit ein Foto-Text nicht wie eine Anweisung an die
+   KI aussieht. Beide Wege brauchen es (Ein-Aufruf und Drei-Aufruf), es gehoert
+   also keinem von beiden. Diese Datei ist der Ort fuer Funktionen, die nur
+   Text verarbeiten und sonst nichts. */
+function escapeXml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 module.exports = {
   findeProfileTextWert,
   parseDescribeFooter,
@@ -301,4 +324,6 @@ module.exports = {
   STANDARD_SCHLUESSEL,
   BEAST_SCHLUESSEL,
   REQUIRED_CARDS,
+  findMissingCards,
+  escapeXml,
 };

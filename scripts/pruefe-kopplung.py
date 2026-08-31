@@ -53,7 +53,11 @@ ZEILEN_GRENZEN = {
     # HTTP-Schicht) von 1691 auf 1090 Zeilen gefallen. Die Grenze sinkt mit
     # jedem Schnitt mit — sonst waere die Sperrklinke nach dem Aufteilen
     # wirkungslos und die Datei koennte unbemerkt zurueckwachsen.
-    "functions/src/mistral.js": 1150,
+    # Nach VIER Schnitten von 1691 auf rund 710 Zeilen. Uebrig ist der
+    # Ein-Aufruf-Weg, der taegliche Normalfall.
+    "functions/src/mistral.js": 760,
+    # Der Rueckfall-Weg mit drei Aufrufen, vierter Schnitt.
+    "functions/src/mistral-drei-call.js": 420,
     # Der Netzzugriff, dritter Schnitt.
     "functions/src/mistral-http.js": 450,
     # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.
@@ -84,7 +88,13 @@ ZEILEN_GRENZEN = {
 # eine Aenderung dort teuer, weil sie ueberallhin ausstrahlt.
 ABHAENGIGKEITS_GRENZEN = {
     "betriebsprofil": 15,  # heute 14 — der Umbau vom 30.08. hat hier verlagert
-    "config": 12,  # heute 11
+    # ANGEHOBEN 31.08.2026 von 12 auf 14: Die Aufteilung von mistral.js hat
+    # drei neue Dateien erzeugt, und jede holt ihre Adressen und Modellnamen
+    # selbst aus config — statt sie durchgereicht zu bekommen. Das ist die
+    # richtige Richtung (kein Durchreichen durch drei Schichten), erhoeht aber
+    # die Zahl der Abhaengigen. Der Gewinn steht daneben: mistral.js ist von
+    # 1691 auf 712 Zeilen gefallen.
+    "config": 14,
     "db": 10,  # heute 9
 }
 

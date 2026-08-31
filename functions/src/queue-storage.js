@@ -77,6 +77,28 @@ function bucket() {
         "wird nicht ausgefuehrt. setBucketForTest() verwenden."
     );
   }
+  /* OPS-2026-08-31-04: DIE Ursache der 4.056 liegengebliebenen Bilder. Der
+   * Lasttest (`scripts/lasttest-betriebsprofil.sh`) faehrt den Firebase-
+   * Emulator und laesst darin die ECHTEN Funktionen laufen. Ohne
+   * QUEUE_LOCAL=1 loeste diese Funktion auf den PRODUKTIONS-Bucket auf — und
+   * der Emulator holt sich bei angemeldetem Konto die echten Zugangsdaten.
+   * Die Bilder landeten also im Betrieb, wurden dort aber nie von einem
+   * Worker abgeholt und geloescht.
+   *
+   * Der Riegel oben half nicht: Jest laeuft dabei nicht.
+   *
+   * Laeuft irgendein Emulator, ist der echte Bildspeicher immer der falsche
+   * Ort — unabhaengig davon, ob jemand QUEUE_LOCAL zu setzen vergisst. */
+  const emulator =
+    process.env.FIRESTORE_EMULATOR_HOST ||
+    process.env.FUNCTIONS_EMULATOR ||
+    process.env.STORAGE_EMULATOR_HOST;
+  if (emulator) {
+    throw new Error(
+      "Es laeuft ein Emulator — der echte Bildspeicher wird nicht angefasst. " +
+        "QUEUE_LOCAL=1 setzen (legt die Bilder lokal ab)."
+    );
+  }
   return getStorage().bucket(QUEUE_BUCKET);
 }
 

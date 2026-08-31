@@ -170,3 +170,34 @@ describe("warteschlangeNachziehen", () => {
     expect(a.aufrufe.geschrieben).toBe(0);
   });
 });
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-05 — der Riegel muss auch den EMULATOR kennen.
+
+   Der Riegel gegen Jest allein genuegt nicht: Der Lasttest faehrt den
+   Firebase-Emulator und laesst darin die echten Funktionen laufen. Jest laeuft
+   dabei nicht — der Emulator holt sich bei angemeldetem Konto aber die
+   Produktions-Zugangsdaten. Genau dieser Weg hat am 31.08. dazu gefuehrt, dass
+   4.056 Testbilder im echten Bildspeicher lagen.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-05 — Emulator fasst die echte Warteschlange nicht an", () => {
+  test("mit laufendem Emulator wird nicht gesetzt", async () => {
+    jest.resetModules();
+    const frisch = require("../cloud-tasks");
+    frisch.setClientForTest(null);
+    const alterJest = process.env.JEST_WORKER_ID;
+    const alterEmu = process.env.FIRESTORE_EMULATOR_HOST;
+    delete process.env.JEST_WORKER_ID;
+    process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+    try {
+      const r = await frisch.warteschlangeNachziehen({ parallelitaet: 4, queueRatePerSekunde: 0.125 });
+      expect(r.ok).toBe(false);
+      expect(r.grund).toMatch(/Emulator/i);
+    } finally {
+      if (alterJest !== undefined) process.env.JEST_WORKER_ID = alterJest;
+      if (alterEmu === undefined) delete process.env.FIRESTORE_EMULATOR_HOST;
+      else process.env.FIRESTORE_EMULATOR_HOST = alterEmu;
+    }
+  });
+});

@@ -21,6 +21,13 @@ set -e
 # Zugangsdaten aus dem Secret Manager. Ein Testlauf darf nicht nach aussen
 # wirken; notify.js erkennt beide Kennzeichen.
 export NTFY_STUMM=1
+# VORFALL 31.08.2026: Ohne QUEUE_LOCAL=1 legt der Emulator die Bilder im
+# ECHTEN Cloud-Storage-Bucket ab — er holt sich bei angemeldetem Konto die
+# Produktions-Zugangsdaten. Dort blieben 4.056 Testbilder (233 MB) liegen,
+# weil sie nie ein Worker abholte und loeschte. Im Lokal-Modus landen sie
+# stattdessen in einem Temp-Verzeichnis. queue-storage.js verriegelt den
+# echten Bucket zusaetzlich, sobald ein Emulator laeuft.
+export QUEUE_LOCAL=1
 ANZAHL="${1:-40}"
 PROJEKT="malzime"
 EMU_FIRESTORE="localhost:8080"

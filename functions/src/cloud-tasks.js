@@ -170,6 +170,28 @@ async function warteschlangeNachziehen({ parallelitaet, queueRatePerSekunde }) {
           "wird nicht angefasst. setClientForTest() verwenden.",
       };
     }
+    /* OPS-2026-08-31-05: Der Jest-Riegel allein genuegt nicht. Der Lasttest
+     * faehrt den Firebase-Emulator und laesst darin die ECHTEN Funktionen
+     * laufen — Jest laeuft dabei nicht, der Emulator holt sich bei
+     * angemeldetem Konto aber die Produktions-Zugangsdaten. Auf genau diesem
+     * Weg lagen am 31.08. 4.056 Testbilder im echten Bildspeicher
+     * (`queue-storage.js` hat denselben Riegel bekommen).
+     *
+     * Eine Warteschlange gibt es im Emulator ohnehin nicht: Der Lokal-Modus
+     * ersetzt Cloud Tasks durch eigenen Dispatch. Wer hier landet, wollte den
+     * echten Dienst — aus einer Umgebung, die ihn nicht anfassen darf. */
+    const emulator =
+      process.env.FIRESTORE_EMULATOR_HOST ||
+      process.env.FUNCTIONS_EMULATOR ||
+      process.env.CLOUD_TASKS_EMULATOR_HOST;
+    if (emulator && !clientOverride) {
+      return {
+        ok: false,
+        grund:
+          "Es laeuft ein Emulator — die echte Warteschlange wird nicht " +
+          "angefasst. Im Lokal-Modus ersetzt eigener Dispatch die Cloud Tasks.",
+      };
+    }
 
     const projekt = projectId();
     if (!projekt) return { ok: false, grund: "kein Projekt bekannt" };

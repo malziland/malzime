@@ -180,7 +180,6 @@ else
                 for Z in $ZEITABHAENGIG; do
                   [ "$NAME" = "$Z" ] && UEBERSPRINGEN=1
                 done
-              set +f
                 if [ "$UEBERSPRINGEN" = "0" ] && \
                    { [ "$WERT" = "pending" ] || [ "$WERT" = "null" ] || [ -z "$WERT" ]; }; then
                   ERSATZ=$(printf '%s\n' "$LAGE_PR" | grep "^${NAME}=" || true)
@@ -192,6 +191,7 @@ else
               echo "Stand-Bindung: main prueft noch, PR #${PRNR} hat denselben Baum"
               echo "               (${BAUM_HIER:0:8}) — dessen Ergebnisse gelten fuer die"
               echo "               noch ausstehenden Pruefungen. Rote bleiben rot."
+              set +f
               LAGE="$NEUE_LAGE"
             fi
           fi

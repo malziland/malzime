@@ -66,3 +66,31 @@ describe("job-helfer — was gilt, wenn ein Schalter nicht lesbar ist", () => {
     expect(await frisch.isLiveTextEnabledSafe()).toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-09-01 (Runde 6, G-11) — hasCategories.
+
+   Mutationsprobe: `Object.keys(...).length > 0` auf `>= 0` gesetzt -> alle
+   1211 Tests blieben gruen. Die Funktion entscheidet in job-pipelines.js, ob
+   der ausfalltolerante Beast-Werbe-Zweitaufruf noch noetig ist. Faellt sie
+   immer auf "vorhanden", entfaellt er stillschweigend; faellt sie immer auf
+   "leer", kostet jede Analyse einen ueberfluessigen KI-Aufruf.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-09-01 — hasCategories unterscheidet leer von gefuellt", () => {
+  const { hasCategories } = require("../job-helfer");
+
+  test("ein Profil mit Kategorien gilt als vorhanden", () => {
+    expect(hasCategories({ categories: { interessen: ["Fussball"] } })).toBe(true);
+  });
+
+  test("ein LEERES Kategorien-Objekt gilt als nicht vorhanden", () => {
+    /* Genau hier stirbt die Mutation `>= 0`. */
+    expect(hasCategories({ categories: {} })).toBe(false);
+  });
+
+  test("fehlende Kategorien und leere Eingaben gelten als nicht vorhanden", () => {
+    expect(hasCategories({})).toBeFalsy();
+    expect(hasCategories(null)).toBeFalsy();
+    expect(hasCategories(undefined)).toBeFalsy();
+  });
+});

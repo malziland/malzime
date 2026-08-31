@@ -50,6 +50,18 @@ WURZEL = Path(__file__).resolve().parent.parent
 # Deshalb: jede Datei in der Liste, und rund 5 % Luft. Das laesst Raum fuer
 # Begruendungen und schlaegt trotzdem an, bevor eine Datei wirklich waechst.
 ZEILEN_GRENZEN = {
+    # BEFUND 01.09.2026 (Runde 6): Diese vier fand die Nachsuche erst, seit sie
+    # dieselben Baeume abdeckt wie die Liste (vorher nur functions/src/*.js,
+    # ohne Unterordner und ohne public/js/). Die Grenzen sind der gemessene
+    # Stand plus rund 5 Prozent.
+    #
+    # Die beiden Prompt-Dateien sind bewusst gross: Sie enthalten die Texte,
+    # nicht Logik. Eine Grenze haben sie trotzdem — waechst dort Code hinein,
+    # soll es auffallen.
+    "functions/src/locales/de/prompts.js": 1190,
+    "functions/src/locales/en/prompts.js": 1140,
+    "public/js/realitaets-check.js": 460,
+    "public/js/sprachumschalter.js": 680,
     # BEFUND 31.08.2026 (Runde 3): Diese vier standen in KEINER Grenze und
     # waren damit von der Sperrklinke nicht erfasst. Die Grenzen sind der
     # gemessene Stand plus rund 5 Prozent Luft — wie bei allen anderen auch.
@@ -194,8 +206,20 @@ def main():
     # alles andere ueber WURZEL geht. Aus einem anderen Verzeichnis heraus fand
     # der glob nichts und der Waechter meldete "Alles innerhalb der Grenzen" —
     # gemessen: aus der Projektwurzel rc 1, aus /tmp rc 0, bei gleichem Inhalt.
-    for pfad_abs in sorted((WURZEL / "functions" / "src").glob("*.js")):
+    # BEFUND 01.09.2026 (Runde 6, G-7): Gesucht wurde nur in
+    # `functions/src/*.js` — die Grenzenliste enthaelt aber auch drei Dateien
+    # unter `public/js/`, und Unterordner fehlten ganz. Gemessen: eine Datei
+    # mit 901 Zeilen unter `public/js/` -> "Alles innerhalb der Grenzen";
+    # dieselbe Datei unter `functions/src/` -> rot. Die Suche deckt jetzt
+    # dieselben Baeume ab wie die Liste, samt Unterordnern.
+    bereiche = sorted({str(Path(g).parent) for g in ZEILEN_GRENZEN})
+    kandidaten = []
+    for b in bereiche:
+        kandidaten.extend((WURZEL / b).rglob("*.js"))
+    for pfad_abs in sorted(set(kandidaten)):
         pfad = str(pfad_abs.relative_to(WURZEL))
+        if "/node_modules/" in pfad or "/__tests__/" in pfad:
+            continue
         if pfad in ZEILEN_GRENZEN:
             continue
         ist = zeilen(pfad)

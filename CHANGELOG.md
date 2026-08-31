@@ -24,7 +24,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   kaputtmacht und nachsieht, ob er das merkt — und ein Riegel, der einen Push
   mit roten Prüfungen verhindert.
 
-- **Die Riegel der Auslieferung werden ausgeführt geprüft, nicht gelesen.** Acht
+- **Die Riegel der Auslieferung werden ausgeführt geprüft, nicht gelesen.** Zwanzig
   Fälle fahren das Auslieferungs-Skript in einer Wegwerf-Kopie durch, mit
   Attrappen statt echter Dienste: roter Pflicht-Check, unsauberer Arbeitsstand,
   gescheiterter Trockenlauf, rote Infrastruktur-Prüfung, zu alte

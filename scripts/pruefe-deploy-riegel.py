@@ -11,7 +11,7 @@ blieben unbemerkt. Ein Textmuster belegt kein Verhalten.
 
 Die Riegel selbst prueft jetzt `functions/src/__tests__/deploy-verhalten.test.js`:
 Es fuehrt `deploy.sh` in einem Wegwerf-Klon aus, mit Attrappen fuer firebase,
-gh, verify-infrastructure und live-smoke. Acht Rueckbauproben belegen, dass
+gh, verify-infrastructure und live-smoke. Rueckbauproben belegen, dass
 jeder Fall rot wird, wenn der zugehoerige Riegel faellt.
 
 WAS HIER BLEIBT, sind die zwei Fragen, bei denen es wirklich um Text geht:
@@ -52,7 +52,7 @@ CI = WURZEL / ".github" / "workflows" / "ci.yml"
 # Diese neun Regeln stehen jetzt in
 # functions/src/__tests__/deploy-verhalten.test.js. Dort wird deploy.sh in
 # einem Wegwerf-Klon AUSGEFUEHRT, mit Attrappen fuer firebase, gh,
-# verify-infrastructure und live-smoke. Acht Rueckbauproben belegen, dass jeder
+# verify-infrastructure und live-smoke. Rueckbauproben belegen, dass jeder
 # Fall rot wird, wenn der zugehoerige Riegel faellt.
 #
 # Was HIER bleibt, sind die zwei Pruefungen, die zu Recht Text lesen, weil es

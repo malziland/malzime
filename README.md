@@ -284,7 +284,7 @@ Die Grenzen sind der gemessene Stand, aufgerundet: eine Sperrklinke, von hier
 aus nur noch abwaerts. Sie verbieten nichts, sie verlangen eine Entscheidung —
 teilen oder die Grenze bewusst anheben und danebenschreiben, warum.
 
-Beide laufen in der Pipeline und vor jedem Push. Beide melden **"nicht
+Alle laufen in der Pipeline und vor jedem Push. Alle melden **"nicht
 messbar"** statt stillschweigend gruen, wenn ihre Grundlage fehlt.
 
 ## Tests

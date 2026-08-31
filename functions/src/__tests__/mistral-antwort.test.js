@@ -152,3 +152,56 @@ describe("parseDescribeFooter — die Anker am Ende der Beschreibung", () => {
     expect(f.description).not.toContain("HARD_FACTS");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-09-01 (Runde 6, G-12) — die Laengengrenzen im Footer.
+
+   Mutationsprobe: `v.length <= 60` auf `<= 600` gesetzt -> alle 1211 Tests
+   blieben gruen. Die Grenzen sind aber kein Zierrat: Der Footer kommt von
+   der KI, und eine entgleiste Antwort wuerde sonst hundertzeilige "Werbung"
+   in ein Kinderprofil schreiben. Die Kappung bei 12 bzw. 8 Eintraegen
+   ebenso.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-09-01 — die Grenzen im Footer halten", () => {
+  const { parseDescribeFooter } = require("../mistral-antwort");
+
+  /* Der Footer beginnt fuer die Funktion erst bei HARD_FACTS: — davor steht
+     die Beschreibung. Ohne diesen Marker liefert sie leere Anker zurueck. */
+  function footer(ads, triggers) {
+    return [
+      "Beschreibung des Bildes.",
+      "",
+      "HARD_FACTS:",
+      "alter_geschlecht: 30-40, weiblich",
+      "herkunft: Europa",
+      "ADS:",
+      ...ads,
+      "TRIGGERS:",
+      ...triggers,
+    ].join("\n");
+  }
+
+  test("zu lange Werbezeilen werden verworfen", () => {
+    const kurz = "Sneaker im Angebot";
+    const lang = "W".repeat(61);
+    const e = parseDescribeFooter(footer([kurz, lang], []));
+    expect(e.ads).toContain(kurz);
+    expect(e.ads).not.toContain(lang);
+  });
+
+  test("zu lange Ausloeser werden verworfen", () => {
+    const kurz = "Unsicherheit ueber das eigene Aussehen";
+    const lang = "T".repeat(251);
+    const e = parseDescribeFooter(footer([], [kurz, lang]));
+    expect(e.triggers).toContain(kurz);
+    expect(e.triggers).not.toContain(lang);
+  });
+
+  test("die Anzahl ist gedeckelt", () => {
+    const viele = Array.from({ length: 30 }, (_, i) => `Werbung ${i}`);
+    const vieleT = Array.from({ length: 30 }, (_, i) => `Ausloeser ${i}`);
+    const e = parseDescribeFooter(footer(viele, vieleT));
+    expect(e.ads.length).toBe(12);
+    expect(e.triggers.length).toBe(8);
+  });
+});

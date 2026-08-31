@@ -339,6 +339,51 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     }
   });
 
+  /* BEFUND 31.08.2026 (Runde 5, H-2): Dieselbe Bauart wie beim PR-Rueckfall.
+     `ZEITABHAENGIG="test-backend"` nimmt die zeitabhaengige Suite von der
+     Abkuerzung aus — ihr Ergebnis von gestern sagt nichts ueber heute. Wer die
+     Liste leert, hebt das lautlos auf; abgesichert war es nur durch ein
+     Textmuster. */
+  test("test-backend wird nicht durch ein PR-Ergebnis ersetzt", () => {
+    const betreff = execSync(`git -C "${klon}" log -1 --format=%s`, { encoding: "utf8" }).trim();
+    execSync(
+      [
+        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend -m "test: Probe (#235)"`,
+        `git -C "${klon}" branch -f main HEAD`,
+        `git -C "${klon}" fetch -q origin main`,
+        `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+      ].join(" && "),
+      { stdio: "pipe" }
+    );
+    const baum = execSync(`git -C "${klon}" rev-parse "HEAD^{tree}"`, { encoding: "utf8" }).trim();
+    const prKopf = execSync(`git -C "${klon}" -c user.email=t@t -c user.name=t commit-tree ${baum} -m "PR-Kopf"`, {
+      encoding: "utf8",
+    }).trim();
+    try {
+      const r = deploy({
+        ATTRAPPE_PR_KOPF: prKopf,
+        /* Auf main steht NUR test-backend aus — genau die Suite, die nicht
+           uebernommen werden darf. Alles andere ist gruen. */
+        ATTRAPPE_CHECKS:
+          "test-backend=pending\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+        ATTRAPPE_CHECKS_PR:
+          "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+      });
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(/test-backend/);
+    } finally {
+      execSync(
+        [
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend -m "${betreff}"`,
+          `git -C "${klon}" branch -f main HEAD`,
+          `git -C "${klon}" fetch -q origin main`,
+          `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+    }
+  });
+
   test("rote Infrastruktur-Pruefung haelt die Auslieferung an", () => {
     const r = deploy({ ATTRAPPE_INFRA_ROT: "1" });
     expect(r.code).not.toBe(0);

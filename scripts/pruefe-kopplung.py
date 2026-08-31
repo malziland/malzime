@@ -24,6 +24,7 @@ AUFRUF:
 RUECKGABE: 0 = alles innerhalb der Grenzen, 1 = etwas gewachsen, 2 = nicht messbar.
 """
 
+import glob
 import re
 import sys
 from pathlib import Path
@@ -49,6 +50,13 @@ WURZEL = Path(__file__).resolve().parent.parent
 # Deshalb: jede Datei in der Liste, und rund 5 % Luft. Das laesst Raum fuer
 # Begruendungen und schlaegt trotzdem an, bevor eine Datei wirklich waechst.
 ZEILEN_GRENZEN = {
+    # BEFUND 31.08.2026 (Runde 3): Diese vier standen in KEINER Grenze und
+    # waren damit von der Sperrklinke nicht erfasst. Die Grenzen sind der
+    # gemessene Stand plus rund 5 Prozent Luft — wie bei allen anderen auch.
+    "functions/src/betriebsprofil.js": 440,
+    "functions/src/handle-enqueue.js": 435,
+    "functions/src/json-repair.js": 585,
+    "functions/src/mistral-mock.js": 465,
     # Der grosse Brocken. Nach drei Schnitten (Antwort-Parser, Live-Text,
     # HTTP-Schicht) von 1681 auf 1090 Zeilen gefallen. Die Grenze sinkt mit
     # jedem Schnitt mit — sonst waere die Sperrklinke nach dem Aufteilen
@@ -142,6 +150,7 @@ def main():
 
     funde = []
     fehlend = []
+    ungelistet = []
 
     print("  Dateigroessen:")
     for pfad, grenze in sorted(ZEILEN_GRENZEN.items()):
@@ -155,6 +164,24 @@ def main():
         print(f"    {marke:8} {ist:5} / {grenze:5}  {pfad}  ({rest:+d})")
         if ist > grenze:
             funde.append((pfad, ist, grenze, "Zeilen"))
+
+    # BEFUND 31.08.2026 (Runde 3, von zwei Pruefern): Die Sperrklinke deckte nur
+    # die Dateien in der Liste. Wer 900 Zeilen in eine NEUE, ungelistete Datei
+    # schob, bekam "Alles innerhalb der Grenzen" — genau das Schlupfloch, das
+    # der Kommentar oben fuer geschlossen erklaerte. Geschlossen war es nur fuer
+    # die damals bekannten Haelften.
+    SCHWELLE = 400
+    for pfad in sorted(glob.glob("functions/src/*.js")):
+        if pfad in ZEILEN_GRENZEN:
+            continue
+        ist = zeilen(pfad)
+        if ist is not None and ist > SCHWELLE:
+            ungelistet.append((pfad, ist))
+    if ungelistet:
+        print()
+        print(f"  Ohne Grenze, aber groesser als {SCHWELLE} Zeilen:")
+        for pfad, ist in ungelistet:
+            print(f"    OHNE GRENZE {ist:5}         {pfad}")
 
     print()
     print("  Wie viele Module haengen an einem einzelnen:")
@@ -180,7 +207,7 @@ def main():
         print("  (Nur angezeigt — keine Bewertung.)")
         return 0
 
-    if not funde:
+    if not funde and not ungelistet:
         print("  ERGEBNIS: Alles innerhalb der Grenzen.")
         return 0
 

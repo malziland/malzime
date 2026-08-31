@@ -157,16 +157,37 @@ def main():
     ci_fehlt = False
     if CI.exists():
         ci = CI.read_text(encoding="utf-8")
-        if "concurrency:" in ci and "cancel-in-progress" in ci:
-            if "refs/heads/main" in ci:
-                print("  ok      concurrency gesetzt, main ausgenommen")
-            else:
-                print("  WARNUNG concurrency gesetzt, aber main NICHT ausgenommen —")
-                print("          ein abgebrochener main-Lauf blockiert die Auslieferung")
-                ci_fehlt = True
-        else:
-            print("  FEHLT   Ohne sie laufen bis zu fuenf Pruefdurchgaenge gleichzeitig")
+        # BEFUND 31.08.2026 (Runde 3): Hier wurde nur geprueft, OB die Woerter
+        # vorkommen. `cancel-in-progress: true` haette weiter "ok" gemeldet,
+        # obwohl damit ein laufender main-Durchgang abgebrochen wuerde. Jetzt
+        # wird der WERT gelesen: main muss von beidem ausgenommen sein — vom
+        # Abbrechen (cancel-in-progress) und von der gemeinsamen Gruppe
+        # (sonst storniert ein dritter Push den zweiten).
+        # Kommentarzeilen VOR der Suche entfernen: In ci.yml steht die
+        # Begruendung ueber der Einstellung und nennt `cancel-in-progress:
+        # false` als Beispiel. re.search nahm den ersten Treffer — den
+        # Kommentar. Derselbe Fehler wie beim Riegel-Anker, gleicher Tag.
+        ci_ohne_kommentar = "\n".join(
+            z for z in ci.split("\n") if not z.lstrip().startswith("#")
+        )
+        abbruch = re.search(r"cancel-in-progress:\s*(.+)", ci_ohne_kommentar)
+        gruppe = re.search(r"group:\s*>?-?\s*\n((?:\s+.+\n)+)", ci_ohne_kommentar)
+        abbruch_text = abbruch.group(1).strip() if abbruch else ""
+        gruppe_text = gruppe.group(1) if gruppe else ""
+        if not abbruch:
+            print("  FEHLT   cancel-in-progress ist nicht gesetzt —")
+            print("          bis zu fuenf Pruefdurchgaenge laufen gleichzeitig")
             ci_fehlt = True
+        elif "refs/heads/main" not in abbruch_text:
+            print(f"  FEHLT   cancel-in-progress nimmt main nicht aus: {abbruch_text}")
+            print("          Ein abgebrochener main-Lauf blockiert die Auslieferung.")
+            ci_fehlt = True
+        elif "github.sha" not in gruppe_text:
+            print("  FEHLT   die Gruppe unterscheidet main-Laeufe nicht je Commit —")
+            print("          ein dritter Push storniert dann den zweiten wartenden.")
+            ci_fehlt = True
+        else:
+            print("  ok      main ist vom Abbrechen und von der Gruppe ausgenommen")
     else:
         print("  NICHT MESSBAR: ci.yml fehlt")
         return 2

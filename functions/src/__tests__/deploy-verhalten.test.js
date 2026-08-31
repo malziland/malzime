@@ -254,6 +254,22 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     );
   });
 
+  /* NICHT PRUEFBAR mit dieser Bauart, gemessen am 31.08.2026 (Befund E-2):
+     Der dokumentierte Sicherheitsbefund — die Check-Lage von main durch die des
+     PR zu ERSETZEN statt nur Ausstehendes nachzutragen — braucht einen Klon, in
+     dem main und PR-Kopf VERSCHIEDENE Ergebnisse tragen, aber denselben Baum.
+     Beides zugleich laesst sich hier nicht herstellen: Der Klon hat nur einen
+     Kopf, und die gh-Attrappe kann die beiden Abfragen dann nicht mehr
+     auseinanderhalten. Ein Testversuch war im Normalfall rot und bei der
+     Sabotage ebenfalls — er mass nichts.
+
+     Was stattdessen gilt: Der Gegenpruefer hat den Fall am 31.08. in einem
+     eigenen Wegwerf-Klon nachgestellt und belegt, dass das AUSGELIEFERTE
+     Verhalten korrekt ist (Original bricht bei `test-e2e=failure` ab, nur die
+     manipulierte Fassung liefert aus). Offen bleibt die Absicherung gegen
+     kuenftige Aenderungen — bewusst als Restrisiko benannt, statt sie durch
+     einen Test vorzutaeuschen. */
+
   test("rote Infrastruktur-Pruefung haelt die Auslieferung an", () => {
     const r = deploy({ ATTRAPPE_INFRA_ROT: "1" });
     expect(r.code).not.toBe(0);

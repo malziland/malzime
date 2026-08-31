@@ -65,10 +65,45 @@ function invokerServiceAccount() {
  * @param {string} jobId  Firestore-Job-ID (aus jobs.createJob)
  * @returns {Promise<string>} der von Cloud Tasks vergebene Task-Name
  */
+/* Gemeinsamer Riegel fuer JEDEN Pfad, der die echte Warteschlange anfasst.
+ *
+ * BEFUND 31.08.2026 (Runde 2, von beiden Pruefern gefunden): Der Riegel stand
+ * nur in `warteschlangeNachziehen()`. Der Kommentar dort behauptete, er greife
+ * "fuer JEDEN Pfad" — `enqueueJob()`, ueber den jeder echte Auftrag laeuft,
+ * hatte ihn nicht. Ausgefuehrt mit Attrappen-SDK: `enqueueJob` erreichte
+ * `createTask` gegen `projects/malzime/.../queues/analyze-queue`.
+ *
+ * Deshalb liegt die Pruefung jetzt an EINER Stelle, die beide benutzen. */
+function testUmgebungGrund(clientOverride) {
+  if (process.env.JEST_WORKER_ID !== undefined && !clientOverride) {
+    return (
+      "Aufruf aus einem Test ohne Attrappe — die echte Warteschlange wird " +
+      "nicht angefasst. setClientForTest() verwenden."
+    );
+  }
+  const emulator =
+    process.env.FIRESTORE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR || process.env.CLOUD_TASKS_EMULATOR_HOST;
+  if (emulator && !clientOverride) {
+    return (
+      "Es laeuft ein Emulator — die echte Warteschlange wird nicht angefasst. " +
+      "Im Lokal-Modus ersetzt eigener Dispatch die Cloud Tasks."
+    );
+  }
+  return null;
+}
+
 async function enqueueJob(jobId) {
   /* Lokal-Modus (Emulator): Es gibt keinen Cloud-Tasks-Emulator — daher
-     processJob direkt anstoßen statt einen echten Task zu erzeugen. */
+     processJob direkt anstoßen statt einen echten Task zu erzeugen.
+     ZUERST pruefen: Das ist der vorgesehene Weg im Emulator und darf nicht
+     am Riegel scheitern. Der Riegel greift nur, wenn jemand OHNE Lokal-Modus
+     aus einer Testumgebung heraus an die echte Warteschlange will. */
   if (isLocalQueueMode()) return enqueueJobLocal(jobId);
+
+  const gesperrt = testUmgebungGrund(clientOverride);
+  if (gesperrt) {
+    throw new Error(gesperrt);
+  }
 
   const c = getClient();
   const parent = c.queuePath(projectId(), QUEUE_REGION, QUEUE_NAME);

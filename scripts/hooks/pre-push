@@ -44,6 +44,22 @@ fi
 sh "$WURZEL/scripts/vor-dem-push.sh"
 CODE=$?
 
+if [ "$CODE" -eq 2 ]; then
+  # BEFUND 31.08.2026: Rueckgabewert 2 heisst "nicht messbar" — nichts ist
+  # kaputt, aber es liegt auch kein Beleg vor. Die Pipeline ruft dieselben
+  # Waechter direkt auf und macht daraus einen ROTEN Pflicht-Check. Ein Push
+  # in diesem Zustand kostet also acht Minuten und endet rot.
+  echo "" >&2
+  echo "  ✘ PUSH ANGEHALTEN. Eine Pruefung konnte nichts messen (Code 2)." >&2
+  echo "" >&2
+  echo "    Nichts ist kaputt — aber die Pipeline wertet das als Fehler." >&2
+  echo "    Meist genuegt: committen oder den Arbeitsbaum aufraeumen." >&2
+  echo "" >&2
+  echo "    Wenn es wirklich dringend ist: OHNE_VORABPRUEFUNG=1 git push" >&2
+  echo "" >&2
+  exit 1
+fi
+
 if [ "$CODE" -ne 0 ]; then
   echo "" >&2
   echo "  ✘ PUSH ANGEHALTEN. Die Vorabpruefung ist rot (Code $CODE)." >&2

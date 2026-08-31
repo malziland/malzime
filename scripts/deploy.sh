@@ -686,10 +686,9 @@ fi
 # war — die Falle trat dann zurueck und liess die Cache-Kennung liegen. Sie
 # versagte also ausgerechnet im Szenario, das sie ausgeloest hat.
 #
-# Der Firestore-Schritt aendert ausserdem nichts an der Cache-Kennung: Er rollt
-# Regeln und Indizes aus, keine Seiten. Ein Rueckbau der Kennung ist danach
-# noch richtig.
-HOCHGELADEN=1
+# Der Firestore-Schritt aendert nichts an der Cache-Kennung: Er rollt Regeln und
+# Indizes aus, keine Seiten. Ein Rueckbau der Kennung ist danach noch richtig —
+# deshalb wird die Marke hier NICHT gesetzt.
 
 # ── SCHRITT 2: Hosting und Functions ──
 if command -v firebase >/dev/null 2>&1; then
@@ -697,6 +696,26 @@ if command -v firebase >/dev/null 2>&1; then
 else
   npx firebase deploy --only "$TARGET"
 fi
+
+# BEFUND 31.08.2026 (Runde 2, von zwei Pruefern gegensaetzlich beurteilt, vom
+# Gegenpruefer entschieden): Die Marke stand VOR diesem Schritt. Scheiterte der
+# Upload — der lange, fehleranfaellige Teil —, meldete die Aufraeumfalle
+# "Abbruch NACH dem Hochladen, die Kennung steht bereits live" und liess 14
+# geaenderte Dateien liegen. Live stand aber nichts: Firestore rollt nur Regeln
+# aus. Folge waren ein blockierter Folgeversuch UND ein build-info.json, das
+# einen nie ausgelieferten Stand als echt ausgewiesen haette.
+#
+# Belegt mit drei Szenarien in einem Wegwerf-Klon (Attrappen-firebase):
+#   Firestore rot -> 14 Dateien zurueckgesetzt, Baum sauber
+#   Hosting rot   -> 14 Dateien zurueckgesetzt, Baum sauber  (vorher: falsch)
+#   Smoke rot     -> Kennung bleibt, wie sie ist
+#
+# OFFEN und bewusst in Kauf genommen: Scheitert `--only hosting,functions`
+# TEILWEISE (Hosting oben, Functions rot), naehme die Falle eine live stehende
+# Kennung zurueck. Das ist der seltenere Fall; sauber wird es erst, wenn die
+# Falle die live stehende Kennung MISST statt sie abzuleiten (das Werkzeug
+# dafuer liegt in scripts/live-smoke.sh bereit).
+HOCHGELADEN=1
 
 # ── Live-Beweis: vier kostenfreie Proben gegen die frisch deployte Produktion ──
 # (endet vor KI-Aufruf und Stundenzähler; Notschalter SKIP_SMOKE=1)

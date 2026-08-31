@@ -19,11 +19,11 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@eslint --max-warnings=0/js": "^10.0.1",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.62.0",
     "@vitest/coverage-v8": "^4.1.9",
-    "eslint --max-warnings=0": "^10.8.0",
-    "eslint --max-warnings=0-config-prettier": "^10.1.8",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "vitest": "^4.1.9"

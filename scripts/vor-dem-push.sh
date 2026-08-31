@@ -78,6 +78,14 @@ lauf "Pruefungen: Mitzieher" "pruefungen" python3 scripts/pruefe-mitzieher.py
 lauf "Pruefungen: Kopplung" "pruefungen" python3 scripts/pruefe-kopplung.py
 lauf "Pruefungen: Deploy-Riegel" "pruefungen" python3 scripts/pruefe-deploy-riegel.py
 lauf "Pruefungen: Waechter-Selbstpruefung" "pruefungen" bash scripts/selbstpruefung-waechter.sh
+# BEFUND 31.08.2026 (Runde 2, P1): Die Projektkonvention verlangt
+# `npm ci --dry-run` in Root UND functions/ — umgesetzt war sie nirgends.
+# Deshalb konnten zerstoerte Paketnamen ("eslint --max-warnings=0" als
+# Abhaengigkeit) durch diese Vorabpruefung gehen: 22 Schritte gruen, waehrend
+# `npm ci` in beiden Baeumen abbrach. npm ci ist der ERSTE Schritt von
+# test-backend, test-frontend und test-e2e — drei der sechs Pflicht-Checks.
+lauf "Lockfile: npm ci (Wurzel)" "test-frontend" npm ci --dry-run
+lauf "Lockfile: npm ci (functions)" "test-backend" npm ci --dry-run --prefix functions
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend
@@ -99,7 +107,13 @@ if [ "$FEHLER" -eq 0 ]; then
   echo ""
   echo "Nichts ist kaputt — aber fuer diese Punkte liegt kein Nachweis vor."
   echo "Meist genuegt: committen oder aufraeumen, dann erneut laufen lassen."
-  exit 0
+  # BEFUND 31.08.2026 (Runde 2, neu gefunden): Hier stand `exit 0`. Der
+  # pre-push-Riegel prueft `-ne 0` und liess den Push damit DURCH — waehrend
+  # die Pipeline denselben Waechter direkt aufruft, wo Rueckgabewert 2 den
+  # Pflicht-Check ROT macht. Der Riegel oeffnete sich fuer genau den Fall, fuer
+  # den er neu gebaut worden war. Jetzt gilt: Was die Pipeline anhaelt, haelt
+  # auch hier an — aber mit eigenem Wert, damit die Meldung stimmt.
+  exit 2
 fi
 
 printf 'ROT: %s Pruefung(en) wuerden die Pipeline brechen:%s\n' "$FEHLER" "$LISTE"

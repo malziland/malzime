@@ -200,3 +200,46 @@ describe("OPS-2026-08-31-05 — Emulator fasst die echte Warteschlange nicht an"
     }
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-15 — der Riegel gilt fuer JEDEN Pfad, nicht nur fuer
+   warteschlangeNachziehen().
+
+   Runde 2 der Pruefschleife, von beiden Pruefern unabhaengig gefunden: Der
+   Riegel stand nur in warteschlangeNachziehen(). `enqueueJob()` — der Weg,
+   ueber den JEDER echte Auftrag laeuft — hatte ihn nicht und erreichte aus
+   einem Test heraus `createTask` gegen die Produktions-Warteschlange.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-15 — enqueueJob ist genauso verriegelt", () => {
+  test("aus einem Test ohne Attrappe wird die echte Warteschlange nicht angefasst", async () => {
+    jest.resetModules();
+    const frisch = require("../cloud-tasks");
+    frisch.setClientForTest(null);
+    const alterLokal = process.env.QUEUE_LOCAL;
+    delete process.env.QUEUE_LOCAL;
+    try {
+      await expect(frisch.enqueueJob("probe-job")).rejects.toThrow(/Attrappe/i);
+    } finally {
+      if (alterLokal === undefined) delete process.env.QUEUE_LOCAL;
+      else process.env.QUEUE_LOCAL = alterLokal;
+    }
+  });
+
+  test("der Lokal-Modus bleibt offen — er ist der vorgesehene Weg", async () => {
+    jest.resetModules();
+    const frisch = require("../cloud-tasks");
+    frisch.setClientForTest(null);
+    const alterLokal = process.env.QUEUE_LOCAL;
+    process.env.QUEUE_LOCAL = "1";
+    try {
+      /* Darf NICHT am Riegel scheitern. Der lokale Dispatch laeuft ins Leere
+         (kein Emulator), aber eben nicht mit der Riegel-Meldung. */
+      await frisch.enqueueJob("probe-lokal").catch((e) => {
+        expect(String(e.message)).not.toMatch(/Attrappe|Emulator/i);
+      });
+    } finally {
+      if (alterLokal === undefined) delete process.env.QUEUE_LOCAL;
+      else process.env.QUEUE_LOCAL = alterLokal;
+    }
+  });
+});

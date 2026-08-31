@@ -21,6 +21,21 @@ const { getFirestore } = req("firebase-admin/firestore");
 const { FIRESTORE_DATABASE_ID } = require(pfad.join(wurzel, "functions", "src", "config.js"));
 const { SATZ } = require(pfad.join(wurzel, "functions", "src", "test-satz.js"));
 
+/* OPS-2026-08-31-14: NUR gegen den Emulator. Ohne FIRESTORE_EMULATOR_HOST
+   schreibt dieses Skript auf `config/betriebsprofil` in der PRODUKTION — den
+   Satz, der die laufende Anwendung steuert. Genau so entstanden am 30.08. die
+   Werte parallelitaet=7 / rate=0.5 im Betrieb; ein Nutzer bekam daraufhin eine
+   Ueberlastmeldung. Das Schwesterskript lasttest-umstellen.js hat den Riegel
+   bereits; diese beiden waren uebersehen worden. */
+if (!process.env.FIRESTORE_EMULATOR_HOST) {
+  console.error(
+    "   ABBRUCH: FIRESTORE_EMULATOR_HOST ist nicht gesetzt.\n" +
+      "   Dieses Skript wuerde den Einstellungssatz der PRODUKTION ueberschreiben.\n" +
+      "   Aufruf mit: FIRESTORE_EMULATOR_HOST=localhost:8080 node " + "scripts/lasttest-satz-anlegen.js" + " ..."
+  );
+  process.exit(1);
+}
+
 initializeApp({ projectId: process.env.GCLOUD_PROJECT || "malzime" });
 const db = getFirestore(FIRESTORE_DATABASE_ID);
 

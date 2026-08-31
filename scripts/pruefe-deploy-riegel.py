@@ -71,6 +71,23 @@ RIEGEL_DEPLOY = [
         "nach": r"Cache-Busting-Version: ",
     },
     {
+        # OPS-2026-08-31-13: Diese Regel war bei ihrer Entstehung SOFORT tot.
+        # `re.search` ohne `re.M` verankert `^` am Anfang der GANZEN Datei,
+        # nicht am Zeilenanfang — das Muster fand nie etwas, und die Regel
+        # meldete auch im richtigen Zustand "FEHLT". Die drei Suchstellen
+        # laufen jetzt mit re.M. Bestehende Regeln waren nicht betroffen,
+        # sie verwenden keinen Zeilenanker.
+        "name": "Hochgeladen-Marke nach dem Upload",
+        "muster": r"^HOCHGELADEN=1",
+        "warum": (
+            "Steht sie VOR `firebase deploy --only $TARGET`, meldet die Aufraeumfalle\n"
+            "     bei einem gescheiterten Upload faelschlich 'steht bereits live', laesst\n"
+            "     14 Dateien liegen und blockiert den naechsten Versuch. Schlimmer: dann\n"
+            "     behauptet build-info.json einen Stand, der nie ausgeliefert wurde."
+        ),
+        "nach": r"^  firebase deploy --only \"\$TARGET\"",
+    },
+    {
         "name": "Firestore als eigener Schritt",
         # OPS-2026-08-31-10: Das Muster traf zuerst auf den TROCKENLAUF
         # (dieselbe Zeile mit --dry-run). re.search liefert nur den ersten
@@ -139,7 +156,7 @@ def main():
     falsch_platziert = []
 
     for r in RIEGEL_DEPLOY:
-        treffer = re.search(r["muster"], text)
+        treffer = re.search(r["muster"], text, re.M)
         if not treffer:
             print(f"  FEHLT   {r['name']}")
             fehlt.append(r)
@@ -148,12 +165,12 @@ def main():
         # Reihenfolge pruefen, wo sie zaehlt
         lage = "ok   "
         if "vor" in r:
-            anderer = re.search(r["vor"], text)
+            anderer = re.search(r["vor"], text, re.M)
             if anderer and treffer.start() > anderer.start():
                 lage = "FALSCHE STELLE"
                 falsch_platziert.append((r, "muss VOR '" + r["vor"] + "' stehen"))
         if "nach" in r:
-            anderer = re.search(r["nach"], text)
+            anderer = re.search(r["nach"], text, re.M)
             if anderer and treffer.start() < anderer.start():
                 lage = "FALSCHE STELLE"
                 falsch_platziert.append((r, "muss NACH '" + r["nach"] + "' stehen"))

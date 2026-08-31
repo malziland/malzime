@@ -117,6 +117,32 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    Validierungs-Meldung, Honeypot 403, Admin-Zugriffsschutz 403, Stats 200) —
    alle enden vor KI-Aufruf und Stundenzähler. Notschalter `SKIP_SMOKE=1`.
 
+## Notschalter des Deploys
+
+Acht Stück, alle nur im Notfall und alle einzeln zu begründen. Jeder
+übersprungene Riegel erscheint in der Schlussbilanz des Laufs — ein Wächter
+erzwingt das, damit ein Lauf nicht grün aussieht, obwohl eine Prüfung ausfiel.
+
+| Schalter | Was entfällt |
+|---|---|
+| `SKIP_STAND=1` | Bindung an die CI-Freigabe. Dann laufen Lint und Unit-Tests stattdessen lokal |
+| `SKIP_TESTS=1` | der Test-Riegel |
+| `SKIP_DRYRUN=1` | der Trockenlauf |
+| `SKIP_INFRA=1` | die Infrastruktur-Prüfung (etwa bei abgelaufener gcloud-Anmeldung) |
+| `SKIP_SATZ=1` | die Prüfung des Einstellungssatzes gegen die laufende Anwendung |
+| `SKIP_FIRESTORE=1` | der Firestore-Schritt (Regeln und Indizes) |
+| `SKIP_SMOKE=1` | die Live-Proben nach der Auslieferung |
+| `SKIP_CLI_CHECK=1` | die Versionsprüfung der Firebase-CLI |
+
+## Der Firestore-Schritt
+
+`deploy.sh` rollt Firestore **als eigenen Aufruf** aus, vor Hosting und
+Functions. Im Paket mit ihnen scheitert er an der Standard-Datenbank, die es
+hier nicht gibt — malziME nutzt die benannte Datenbank `malzime-eu`.
+
+Das gilt auch bei `./scripts/deploy.sh hosting`: Der Firestore-Schritt läuft
+trotzdem mit. Wer das nicht will, setzt `SKIP_FIRESTORE=1`.
+
 ## Infrastruktur-Prüfung (`scripts/verify-infrastructure.sh`)
 
 Ein Teil der Sicherheits- und Datenschutz-Zusagen lebt **außerhalb des Repos**
@@ -133,6 +159,7 @@ gestartet werden.
 |---|---|
 | Cloud-Tasks-Queue `analyze-queue` | existiert in `europe-west1`, RUNNING, Dosierung == Einstellungssatz |
 | Bucket `malzime-queue-uploads` | Region `EUROPE-WEST1`, Lifecycle-Löschregel nach 1 Tag aktiv, Soft-Delete 0 |
+| Inhalt des Bildspeichers | **kein Bild älter als 3 Stunden** — ein Auftrag lebt höchstens zwei. Seit 31.08.2026; Anlass waren 4.056 liegengebliebene Testbilder. Ein **leerer** Speicher ist der Sollzustand und kein Fehler (`gsutil` meldet dafür Rückgabewert 1) |
 | Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
 | Worker-IAM | `processjob` und `reapjobs` ohne `allUsers`/`allAuthenticatedUsers` (nicht öffentlich; die `/api/*`-Functions sind bewusst öffentlich, Hosting reicht durch) |
 | Functions-Regionen | alle in `europe-west1` |

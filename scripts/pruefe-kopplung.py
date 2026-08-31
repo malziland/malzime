@@ -49,9 +49,13 @@ WURZEL = Path(__file__).resolve().parent.parent
 # Deshalb: jede Datei in der Liste, und rund 5 % Luft. Das laesst Raum fuer
 # Begruendungen und schlaegt trotzdem an, bevor eine Datei wirklich waechst.
 ZEILEN_GRENZEN = {
-    # Der grosse Brocken. Vier Aufgaben in einer Datei; die Aufteilung laeuft.
-    # Grenze sinkt mit jedem Schnitt.
-    "functions/src/mistral.js": 1610,
+    # Der grosse Brocken. Nach drei Schnitten (Antwort-Parser, Live-Text,
+    # HTTP-Schicht) von 1691 auf 1090 Zeilen gefallen. Die Grenze sinkt mit
+    # jedem Schnitt mit — sonst waere die Sperrklinke nach dem Aufteilen
+    # wirkungslos und die Datei koennte unbemerkt zurueckwachsen.
+    "functions/src/mistral.js": 1150,
+    # Der Netzzugriff, dritter Schnitt.
+    "functions/src/mistral-http.js": 450,
     # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.
     #
     # ANGEHOBEN 31.08.2026 von 260 auf 340, zweiter Schnitt: Die Live-Text- und

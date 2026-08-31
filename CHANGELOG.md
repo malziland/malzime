@@ -28,13 +28,15 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 ### Geändert
 
 - **Eine Auslieferung dauert rund neun Minuten weniger.** Die sechs Prüfungen
-  liefen zweimal über bitgenau denselben Code. Die Doppelung ist weg; kein
+  liefen zweimal über bitgenau denselben Code. Fünf der sechs laufen jetzt nur
+  noch einmal — `test-backend` hängt an der echten Uhr und bleibt bewusst
+  doppelt. Kein
   einziger Riegel wurde dafür entfernt. Grundlage sind drei gemessene Läufe der
   längsten Prüfung (8:13, 9:07 und 9:18).
 
 - **Die Antwort-Auswertung der KI und die Auftragsannahme liegen in eigenen
   Dateien.** Zwei Dateien waren auf 1681 und 680 Zeilen gewachsen und
-  vermischten mehrere Aufgaben; daraus sind fünf geworden, die Hauptdatei ist
+  vermischten mehrere Aufgaben; daraus sind sieben geworden, die Hauptdatei ist
   bei 696 Zeilen. Das Verhalten ist unverändert — belegt durch einen Vergleich
   aller Funktionen vor und nach der Aufteilung.
 

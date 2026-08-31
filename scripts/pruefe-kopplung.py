@@ -4,8 +4,8 @@ pruefe-kopplung.py — Waechst wieder zusammen, was getrennt gehoert?
 
 WOZU: Am 30.08.2026 hat ein Umbau des Einstellungssatzes 39 Fundstellen
 erzeugt. Nicht weil der Code schlecht waere, sondern weil eine Aenderung
-dieser Art weit ausstrahlt: `mistral.js` war auf 1691 Zeilen gewachsen und
-vermischte vier Aufgaben, und an `betriebsprofil.js` haengen 14 Module.
+dieser Art weit ausstrahlt: `mistral.js` war auf 1681 Zeilen gewachsen und
+vermischte vier Aufgaben, und an `betriebsprofil.js` haengen 15 Module.
 
 Aufteilen allein hilft nicht dauerhaft — Dateien wachsen zurueck, wenn niemand
 hinsieht. Dieses Skript sieht hin.
@@ -50,10 +50,10 @@ WURZEL = Path(__file__).resolve().parent.parent
 # Begruendungen und schlaegt trotzdem an, bevor eine Datei wirklich waechst.
 ZEILEN_GRENZEN = {
     # Der grosse Brocken. Nach drei Schnitten (Antwort-Parser, Live-Text,
-    # HTTP-Schicht) von 1691 auf 1090 Zeilen gefallen. Die Grenze sinkt mit
+    # HTTP-Schicht) von 1681 auf 1090 Zeilen gefallen. Die Grenze sinkt mit
     # jedem Schnitt mit — sonst waere die Sperrklinke nach dem Aufteilen
     # wirkungslos und die Datei koennte unbemerkt zurueckwachsen.
-    # Nach VIER Schnitten von 1691 auf rund 710 Zeilen. Uebrig ist der
+    # Nach VIER Schnitten von 1681 auf 696 Zeilen. Uebrig ist der
     # Ein-Aufruf-Weg, der taegliche Normalfall.
     "functions/src/mistral.js": 760,
     # Der Rueckfall-Weg mit drei Aufrufen, vierter Schnitt.
@@ -70,7 +70,7 @@ ZEILEN_GRENZEN = {
     #
     # Das ist die zulaessige Antwort auf eine Grenzverletzung: anheben UND
     # begruenden. Der Gewinn steht daneben — mistral.js ist im selben Schritt
-    # von 1691 auf 1438 Zeilen gefallen.
+    # von 1681 auf 1438 Zeilen gefallen.
     "functions/src/mistral-antwort.js": 340,
     # Die Live-Anzeige im Browser. Noch nicht angefasst.
     "public/js/live-anzeige.js": 1370,
@@ -79,7 +79,7 @@ ZEILEN_GRENZEN = {
     "public/js/render.js": 830,
     "functions/src/counter.js": 790,
     "functions/src/jobs.js": 770,
-    # Nach zwei Schnitten (Helfer, Analyse-Wege) von 680 auf 290 Zeilen.
+    # Nach zwei Schnitten (Helfer, Analyse-Wege) von 679 auf 279 Zeilen.
     "functions/src/handle-process-job.js": 320,
     # Die beiden Analyse-Wege.
     "functions/src/job-pipelines.js": 400,
@@ -110,7 +110,7 @@ ABHAENGIGKEITS_GRENZEN = {
     # selbst aus config — statt sie durchgereicht zu bekommen. Das ist die
     # richtige Richtung (kein Durchreichen durch drei Schichten), erhoeht aber
     # die Zahl der Abhaengigen. Der Gewinn steht daneben: mistral.js ist von
-    # 1691 auf 712 Zeilen gefallen.
+    # 1681 auf 696 Zeilen gefallen.
     "config": 14,
     "db": 10,  # heute 9
 }

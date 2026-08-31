@@ -1,0 +1,24 @@
+#!/bin/sh
+# Attrappe fuer die GitHub-CLI.
+#
+#   ATTRAPPE_CHECKS   Zeilen "name=conclusion" fuer die Pflicht-Checks.
+#                     Vorgabe: alle sechs auf success.
+[ -n "${ATTRAPPE_PROTOKOLL:-}" ] && echo "gh $*" >> "$ATTRAPPE_PROTOKOLL"
+
+VORGABE='test-backend=success
+test-frontend=success
+test-e2e=success
+secret-scan=success
+playwright-version=success
+pruefungen=success'
+
+case "$1" in
+  api)
+    printf '%s\n' "${ATTRAPPE_CHECKS:-$VORGABE}"
+    exit 0 ;;
+  pr)
+    echo "0000000000000000000000000000000000000000"
+    exit 0 ;;
+  *)
+    exit 0 ;;
+esac

@@ -230,7 +230,36 @@ def main():
     print(f"  Geaenderte Dateien: {len(geaendert)}")
     print()
 
-    diff = (lauf("git", "diff", f"{vergleich}...HEAD") or "") + "\n" + (lauf("git", "diff", "HEAD") or "")
+    # BEFUND 01.09.2026 (Runde 6, N-1 des Gegenpruefers): Diese Zeile hatte
+    # ZWEI Wege, still blind zu werden.
+    #
+    # 1. `(lauf(...) or "")` machte aus einem FEHLSCHLAG einen leeren Diff —
+    #    der Waechter meldete dann "Nichts vergessen" statt "nicht messbar".
+    # 2. Schwerer: Ein ERFOLGREICHER Aufruf genuegt nicht. Ist ein externer
+    #    Diff eingerichtet (GIT_EXTERNAL_DIFF, difftastic, delta), liefert git
+    #    Rueckgabewert 0 und eine Ausgabe in einem ganz anderen Format. Die
+    #    Regeln finden darin ihre `^+`-Muster nicht — und schweigen.
+    #    Gemessen: mit GIT_EXTERNAL_DIFF meldete der Waechter rc 0,
+    #    "Nichts vergessen", obwohl ein Begleiter fehlte.
+    #
+    # Deshalb: `--no-ext-diff` erzwingt das Standardformat, und eine
+    # Formatprobe prueft, ob ueberhaupt ein Diff angekommen ist.
+    diff_zweig = lauf("git", "diff", "--no-ext-diff", f"{vergleich}...HEAD")
+    diff_baum = lauf("git", "diff", "--no-ext-diff", "HEAD")
+    if diff_zweig is None or diff_baum is None:
+        print("  NICHT MESSBAR: Der Inhalts-Diff liess sich nicht erzeugen.")
+        print("  Ohne ihn koennen die Regeln ihre Ausloeser nicht finden —")
+        print("  ein leeres Ergebnis waere hier kein Bestehen, sondern Blindheit.")
+        return 2
+    diff = diff_zweig + "\n" + diff_baum
+    # Formatprobe: Wenn Dateien geaendert sind, MUSS der Diff sie nennen.
+    # Ein Diff ohne eine einzige `diff --git`-Zeile ist kein Diff.
+    if geaendert and "diff --git" not in diff:
+        print("  NICHT MESSBAR: Der Diff nennt keine einzige Datei,")
+        print(f"  obwohl {len(geaendert)} geaendert sind. Fremdes Diff-Format?")
+        print("  Pruefen: git config --get diff.external, GIT_EXTERNAL_DIFF,")
+        print("  und diff=-Treiber in .gitattributes.")
+        return 2
 
     # MESSMITTEL-PROBE FUER DIE REGELN (Befund 31.08.2026): Eine Regel, deren
     # Ausloeser-Datei oder Begleiter es gar nicht gibt, kann nie sinnvoll

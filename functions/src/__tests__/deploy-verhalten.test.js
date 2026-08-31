@@ -104,7 +104,12 @@ function deploy(umgebung = {}, ziel = "hosting", ohneGh = false) {
            das Skript bis live-smoke.sh durch — das POSTet auf
            https://malzi.me/api/enqueue und legte einen ECHTEN Job an.
            Ein Test darf die Produktion nicht anfassen. */
-        SKIP_SATZ: "1",
+        /* BEFUND 01.09.2026 (Runde 6): Hier stand SKIP_SATZ fest gesetzt —
+           damit war der Einstellungssatz-Riegel in JEDEM Test ausgeschaltet
+           und von nichts gedeckt. Die Begruendung ("er ruft curl gegen
+           malzi.me") traegt nicht: curl laesst sich wie firebase und gh durch
+           eine Attrappe ersetzen. Sie liegt jetzt in scripts/test-attrappen/
+           und liefert einen gueltigen Satz; ATTRAPPE_STATS steuert sie. */
         ...umgebung,
       },
     });
@@ -140,6 +145,20 @@ function skripteEinspielen() {
     "scripts/verify-infrastructure.sh": "INFRA",
     "scripts/live-smoke.sh": "SMOKE",
   };
+  /* build-info.mjs ist ein Node-Skript, keine Shell — es braucht eine eigene
+     Attrappe. Es erzeugt den Echtheitsbeweis der Auslieferung; scheitert es,
+     muss der Deploy anhalten (Befund Runde 6). */
+  const bi = path.join(klon, "scripts", "build-info.mjs");
+  if (fs.existsSync(bi)) {
+    fs.writeFileSync(
+      bi,
+      'if (process.env.ATTRAPPE_BUILDINFO_ROT === "1") {\n' +
+        '  console.error("ATTRAPPE build-info: scheitert (so gewollt)");\n' +
+        "  process.exit(1);\n}\n" +
+        'import { writeFileSync } from "fs";\n' +
+        'writeFileSync("public/build-info.json", JSON.stringify({ attrappe: true, version: process.argv[2] }));\n'
+    );
+  }
   for (const [datei, name] of Object.entries(eigene)) {
     const ziel = path.join(klon, datei);
     if (!fs.existsSync(path.join(WURZEL, datei))) continue;
@@ -533,6 +552,22 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     });
     expect(r.code).not.toBe(0);
     expect(r.ausgabe).toMatch(/test-e2e.*cancelled|cancelled/i);
+  });
+
+  test("fehlender Einstellungssatz haelt die Auslieferung an", () => {
+    /* Ohne gueltigen Satz scheitert nach dem Deploy JEDE Analyse. */
+    const r = deploy({ ATTRAPPE_STATS: '{"hourlyLimit":0}' });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Einstellungssatz/i);
+  });
+
+  test("gescheiterte build-info haelt an, statt ohne Echtheitsbeweis zu liefern", () => {
+    /* build-info.json ist der Echtheitsbeweis der Auslieferung — ohne ihn
+       kann niemand nachrechnen, ob das Ausgelieferte dem Quelltext
+       entspricht. */
+    const r = deploy({ ATTRAPPE_BUILDINFO_ROT: "1" });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/build-info/i);
   });
 
   test("rote Infrastruktur-Pruefung haelt die Auslieferung an", () => {

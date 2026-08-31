@@ -245,31 +245,40 @@ describe("deploy.sh — Verhalten der Riegel", () => {
        alte Dateien. */
     const seite = path.join(klon, "public", "index.html");
     const inhalt = fs.readFileSync(seite, "utf8");
+    /* Die Seite muss im COMMIT stehen, nicht nur im Arbeitsbaum: Sonst schlaegt
+       der Sauberkeits-Riegel an, bevor der Buster-Riegel drankommt. */
+    const einspielen = () =>
+      execSync(
+        [
+          `git -C "${klon}" add -A public`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
+          `git -C "${klon}" branch -f main HEAD`,
+          `git -C "${klon}" fetch -q origin main`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
     fs.writeFileSync(seite, inhalt.replace(/styles\.css\?v=\d+/, "styles.css"));
-    execSync(
-      [
-        `git -C "${klon}" add -A public`,
-        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
-        `git -C "${klon}" branch -f main HEAD`,
-        `git -C "${klon}" fetch -q origin main`,
-      ].join(" && "),
-      { stdio: "pipe" }
-    );
-    const r = deploy();
-    expect(r.code).not.toBe(0);
-    expect(r.ausgabe).toMatch(/Cache-Buster|nicht lesbar/i);
-    /* Der Klon traegt jetzt eine kaputte index.html im COMMIT — die folgenden
-       Faelle brauchen wieder eine lesbare Kennung. */
-    execSync(
-      [
-        `git -C "${klon}" checkout -q HEAD~1 -- public/index.html`,
-        `git -C "${klon}" add -A public`,
-        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend --no-edit`,
-        `git -C "${klon}" branch -f main HEAD`,
-        `git -C "${klon}" fetch -q origin main`,
-      ].join(" && "),
-      { stdio: "pipe" }
-    );
+    einspielen();
+    try {
+      const r = deploy();
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(/Cache-Buster|nicht lesbar/i);
+    } finally {
+      /* BEFUND 31.08.2026 (Rueckbauprobe, ausgefuehrt): Die Reparatur stand
+         HINTER den Erwartungen und ohne `finally`. Wird der Riegel in
+         `deploy.sh` entwaffnet, schlaegt `expect` fehl — und die Reparatur lief
+         dann NIE. Der Klon behielt eine index.html ohne Kennung im Commit, und
+         der naechste Fall ("Live-Probe ... Kennung BLEIBT") wurde ebenfalls rot,
+         obwohl an SEINEM Riegel nichts fehlte. Gemessen: Sabotage am
+         Buster-Riegel machte ZWEI Tests rot statt einen.
+         Ein Test, der aus dem falschen Grund rot wird, belegt so wenig wie
+         einer, der nie rot wird — deshalb `finally`.
+         Zurueckgeschrieben wird aus der gemerkten Fassung statt aus `HEAD~1`:
+         Das haelt den Fall unabhaengig von der Historie, die bei einer flachen
+         Auscheckung (`actions/checkout` ohne fetch-depth) gar nicht da ist. */
+      fs.writeFileSync(seite, inhalt);
+      einspielen();
+    }
   });
 
   /* NICHT PRUEFBAR mit dieser Bauart, gemessen am 31.08.2026 (Befund E-2):

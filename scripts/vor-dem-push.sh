@@ -86,6 +86,11 @@ lauf "Pruefungen: Waechter-Selbstpruefung" "pruefungen" bash scripts/selbstpruef
 # test-backend, test-frontend und test-e2e — drei der sechs Pflicht-Checks.
 lauf "Lockfile: npm ci (Wurzel)" "test-frontend" npm ci --dry-run
 lauf "Lockfile: npm ci (functions)" "test-backend" npm ci --dry-run --prefix functions
+# BEFUND 31.08.2026 (Runde 3): `secret-scan` ist ein Pflicht-Check und laeuft
+# in Sekunden — hier fehlte er, ohne dass der Kopf ihn als bewusste Auslassung
+# nannte. Ohne gitleaks im PATH gilt die Pruefung als nicht messbar (2), nicht
+# als bestanden.
+lauf "Secret-Scan (gitleaks)" "secret-scan" sh scripts/secret-scan-lokal.sh
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend

@@ -39,6 +39,23 @@ function setClientForTest(c) {
 
 function getClient() {
   if (clientOverride) return clientOverride;
+  /* OPS-2026-08-31-21 (Runde 3, von zwei Pruefern gefunden): Dies ist ein
+     ZWEITER Cloud-Tasks-Client, unabhaengig von dem in cloud-tasks.js — und
+     er hatte dessen Riegel nicht. Ausgefuehrt: unter JEST_WORKER_ID=1 und
+     unter FUNCTIONS_EMULATOR=true erzeugte er einen echten Client gegen die
+     Produktions-Warteschlange.
+
+     Die Wache LIEST nur (getQueue), richtet also nichts an. Trotzdem gehoert
+     der Riegel hierher: Sonst haengt die Sicherheit daran, dass niemand
+     spaeter einen schreibenden Aufruf ergaenzt. */
+  if (process.env.JEST_WORKER_ID !== undefined) {
+    throw new Error("Cloud-Tasks-Zugriff aus einem Test ohne Attrappe — setClientForTest() verwenden.");
+  }
+  const emulator =
+    process.env.FIRESTORE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR || process.env.CLOUD_TASKS_EMULATOR_HOST;
+  if (emulator) {
+    throw new Error("Es laeuft ein Emulator — die echte Warteschlange wird nicht gelesen.");
+  }
   const { CloudTasksClient } = require("@google-cloud/tasks");
   return new CloudTasksClient();
 }
@@ -125,7 +142,11 @@ function baueMeldung(befund) {
   }
   return (
     `ACHTUNG: Die Warteschlange laeuft SCHNELLER als eingestellt. Sie erlaubt ` +
-    `${inDerQueue} gleichzeitige Analysen, der Einstellungssatz sagt ${imCode}. ` +
+    /* OPS-2026-08-31-22: Dieselbe Meldung diente fuer Parallelitaet UND Rate.
+       Bei der Rate stand dann "Sie erlaubt 0.5 gleichzeitige Analysen" — eine
+       Rate pro Sekunde als Anzahl ausgegeben. Der Aufrufer stellt der Meldung
+       "RATE:" bzw. "PARALLELITAET:" voran; der Wortlaut passt jetzt zu beidem. */
+    `den Wert ${inDerQueue}, der Einstellungssatz sagt ${imCode}. ` +
     `Damit gehen mehr Aufrufe an die KI, als ihre Stufe zulaesst — es drohen ` +
     `Ueberlastmeldungen bei echten Nutzern. ` +
     `Abhilfe: ./scripts/warteschlange-pruefen.sh --setzen ` +

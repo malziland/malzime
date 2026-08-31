@@ -103,8 +103,16 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
     const skript = fs.readFileSync(SKRIPT, "utf8");
     const aufrufe = [...skript.matchAll(/^lauf "([^"]+)" "([^"]+)"/gm)];
     expect(aufrufe.length).toBeGreaterThan(8);
+    /* BEFUND 31.08.2026 (Runde 3): Hier stand eine feste Liste mit drei
+       Job-Namen. Als `secret-scan` ergaenzt wurde — ein echter Pflicht-Check —
+       wurde der Test rot, obwohl die Ergaenzung richtig war. Eine Kopie der
+       Pipeline-Namen im Test veraltet zwangslaeufig. Jetzt kommen sie aus der
+       Pipeline-Datei selbst. */
+    const ci = fs.readFileSync(path.join(__dirname, "..", "..", "..", ".github", "workflows", "ci.yml"), "utf8");
+    const ciJobs = [...ci.matchAll(/^  ([a-z0-9-]+):$/gm)].map(([, name]) => name);
+    expect(ciJobs.length).toBeGreaterThan(3);
     const unbekannt = aufrufe
-      .filter(([, , job]) => !["test-frontend", "test-backend", "pruefungen"].includes(job))
+      .filter(([, , job]) => !ciJobs.includes(job))
       .map(([, beschreibung, job]) => `${beschreibung} → "${job}"`);
     expect(unbekannt).toEqual([]);
   });

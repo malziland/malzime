@@ -176,10 +176,34 @@ def main():
 
     geaendert = sorted(set(zeilen(committet) + zeilen(arbeitsbaum) + zeilen(neue_dateien)))
     neu_entstanden = set(zeilen(hinzugefuegt) + zeilen(neue_dateien))
-    if not geaendert:
-        print("  Keine Aenderungen gefunden — nichts zu pruefen.")
-        return 0
 
+    # BEFUND 31.08.2026: "nicht messbar" griff nur, wenn `git diff`
+    # FEHLSCHLUG. Der haeufige Fall ist ein erfolgreicher Diff mit LEERER
+    # Ausgabe — etwa beim Push auf `main`, wo HEAD == origin/main ist. Dann
+    # meldete der Waechter "nichts zu pruefen" und Rueckgabewert 0, ohne je
+    # etwas gemessen zu haben. Ausgerechnet im main-Lauf, an den die
+    # Stand-Bindung des Deploys gebunden ist.
+    #
+    # Jetzt wird der Unterschied benannt: "es gibt nichts zu pruefen, weil der
+    # Vergleichsstand IDENTISCH ist" ist ein anderer Zustand als "ich habe
+    # geprueft und nichts gefunden".
+    if not geaendert:
+        kopf = lauf("git", "rev-parse", "HEAD")
+        ziel = lauf("git", "rev-parse", vergleich)
+        gleich = kopf and ziel and kopf.strip() == ziel.strip()
+        if gleich:
+            print(f"  Der Vergleichsstand ({vergleich}) IST der aktuelle Stand.")
+            print("  Es gibt keine Aenderung zu pruefen — das ist kein Bestehen,")
+            print("  sondern die Feststellung, dass hier nichts zu messen war.")
+            print()
+            print("  (Beim Lauf auf main ist das der Normalfall. Geprueft wird im")
+            print("   Pull Request, wo es einen Unterschied gibt.)")
+            return 0
+        print("  NICHT MESSBAR: Der Vergleich lieferte keine einzige Datei,")
+        print(f"  obwohl HEAD und {vergleich} verschieden sind.")
+        print("  Ein leeres Ergebnis ist zuerst ein Verdacht gegen die Messung —")
+        print("  hier stimmt etwas mit dem Vergleichsstand nicht.")
+        return 2
     print(f"  Geaenderte Dateien: {len(geaendert)}")
     print()
 

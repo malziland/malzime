@@ -36,18 +36,32 @@ WURZEL = Path(__file__).resolve().parent.parent
 # Gemessen am 31.08.2026 nach dem ersten Schnitt an mistral.js. Wer eine Grenze
 # anhebt, schreibt daneben, warum — sonst ist die Sperrklinke ein Ornament.
 # ─────────────────────────────────────────────────────────────────────────────
+# BEFUND 31.08.2026 (unvorbelastetes Review), zwei Punkte:
+#
+#   · Die abgetrennte Haelfte stand in KEINER Grenze. Eine Verletzung in
+#     mistral.js liesse sich also "beheben", indem man Code in die ungezaehlte
+#     Datei schiebt — die Sperrklinke waere umgehbar.
+#   · Die Grenzen lagen 3 bis 12 Zeilen ueber dem Ist-Stand. In einem Projekt,
+#     das zu jeder Aenderung eine ausfuehrliche Begruendung schreibt, reisst
+#     der Pflicht-Check dann an der DOKUMENTATION, nicht an der Kopplung — und
+#     die vorgeschlagene Abhilfe fuegt weitere Zeilen hinzu.
+#
+# Deshalb: jede Datei in der Liste, und rund 5 % Luft. Das laesst Raum fuer
+# Begruendungen und schlaegt trotzdem an, bevor eine Datei wirklich waechst.
 ZEILEN_GRENZEN = {
-    # Der grosse Brocken. Vier Aufgaben in einer Datei; die Aufteilung laeuft
-    # (mistral-antwort.js ist der erste Schnitt). Grenze sinkt mit jedem Schnitt.
-    "functions/src/mistral.js": 1540,
+    # Der grosse Brocken. Vier Aufgaben in einer Datei; die Aufteilung laeuft.
+    # Grenze sinkt mit jedem Schnitt.
+    "functions/src/mistral.js": 1610,
+    # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.
+    "functions/src/mistral-antwort.js": 260,
     # Die Live-Anzeige im Browser. Noch nicht angefasst.
-    "public/js/live-anzeige.js": 1300,
+    "public/js/live-anzeige.js": 1370,
     # Der Netzzugriff des Frontends.
-    "public/js/api.js": 1030,
-    "public/js/render.js": 790,
-    "functions/src/counter.js": 760,
-    "functions/src/jobs.js": 740,
-    "functions/src/handle-process-job.js": 690,
+    "public/js/api.js": 1080,
+    "public/js/render.js": 830,
+    "functions/src/counter.js": 790,
+    "functions/src/jobs.js": 770,
+    "functions/src/handle-process-job.js": 720,
     # Die Sprachdateien sind Inhalt, kein Code — sie duerfen wachsen.
     # Deshalb stehen prompts.js hier bewusst NICHT.
 }

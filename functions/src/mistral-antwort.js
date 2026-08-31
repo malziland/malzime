@@ -132,6 +132,16 @@ function dekodiereJsonEscapes(roh) {
   return klartext.replace(/[\uD800-\uDBFF]$/, "");
 }
 
+/* ── Footer-Parser (v2.1) ──
+   Extrahiert die strukturierten Anker-Blöcke (HARD_FACTS, ADS, TRIGGERS) am Ende
+   der Bildbeschreibung. Diese werden vom Describe-Prompt (mistralDescribeAddendum)
+   eingeleitet und liefern beide Profile-Calls einen konsistenten Anker:
+     - alter_geschlecht + herkunft werden wortgenau übernommen → Normal/Beast-Konsistenz
+     - ads + triggers werden zentral am Job-Result gesetzt → identisch in beiden Modi
+
+   Fallback-Verhalten: Wenn ein Block fehlt oder kaputt ist, gibt der Parser leere
+   Defaults zurück — handle-process-job.js entscheidet dann, ob die Profile-Calls
+   diese Felder ersatzweise selbst füllen müssen (alter Verhalten). */
 function parseDescribeFooter(text) {
   if (typeof text !== "string" || text.length === 0) {
     return { description: "", hardFacts: {}, ads: [], triggers: [] };

@@ -123,11 +123,33 @@ else
               #
               # Jetzt wird NUR nachgetragen, was auf main noch aussteht. Ein
               # `failure` bleibt ein `failure`, egal was der PR sagt.
+              # ZEITABHAENGIGE PRUEFUNGEN sind von der Abkuerzung
+              # ausgenommen (Befund 31.08.2026, unvorbelastetes Review).
+              #
+              # Die Begruendung "gleicher Baum, gleiches Ergebnis" gilt nur
+              # fuer Pruefungen, die ausschliesslich den Code ansehen.
+              # `test-backend` fuehrt drei Pruefungen, die von der UHR
+              # abhaengen: audit-gate mit ablaufender Ausnahmeliste, die
+              # Frist-Bremse zusagen-frische, und npm audit gegen eine
+              # Datenbank, die sich taeglich aendert. Ein gruenes Ergebnis von
+              # gestern kann heute falsch sein, ohne dass sich eine Zeile
+              # geaendert hat — genau deshalb gibt es den woechentlichen
+              # Zeitplan-Lauf (OPS-2026-08-20-03, vierzig Zeilen weiter oben).
+              #
+              # Der Verlust ist klein: test-backend dauert 179 s, der teure
+              # test-e2e 521 s. Die Abkuerzung spart also weiterhin den
+              # groesseren Teil.
+              ZEITABHAENGIG="test-backend"
               NEUE_LAGE=""
               for EINTRAG in $LAGE; do
                 NAME="${EINTRAG%%=*}"
                 WERT="${EINTRAG#*=}"
-                if [ "$WERT" = "pending" ] || [ "$WERT" = "null" ] || [ -z "$WERT" ]; then
+                UEBERSPRINGEN=0
+                for Z in $ZEITABHAENGIG; do
+                  [ "$NAME" = "$Z" ] && UEBERSPRINGEN=1
+                done
+                if [ "$UEBERSPRINGEN" = "0" ] && \
+                   { [ "$WERT" = "pending" ] || [ "$WERT" = "null" ] || [ -z "$WERT" ]; }; then
                   ERSATZ=$(printf '%s\n' "$LAGE_PR" | grep "^${NAME}=" || true)
                   [ -n "$ERSATZ" ] && EINTRAG="$ERSATZ"
                 fi
@@ -430,7 +452,28 @@ aufraeumen_bei_abbruch() {
     echo ""
     echo "Deploy abgebrochen (Code $CODE) — nehme die Cache-Kennung zurueck,"
     echo "damit der naechste Versuch nicht am Sauberkeits-Riegel scheitert."
-    git checkout -- public/ 2>/dev/null && echo "  zurueckgesetzt."
+    # BEFUND 31.08.2026 (unvorbelastetes Review): Hier stand
+    # `git checkout -- public/` — das verwirft ALLES unter public/, nicht nur,
+    # was dieses Skript geschrieben hat. Der Kommentar behauptete das Gegenteil
+    # und stuetzte sich auf den Sauberkeits-Riegel. Der faellt aber bei
+    # SKIP_STAND=1 weg, dem dokumentierten Notschalter — dann waere fremde
+    # Handarbeit ohne Rueckfrage geloescht worden.
+    #
+    # Jetzt werden GENAU die Dateien zurueckgenommen, in die der Cache-Buster
+    # geschrieben hat. Der Suchpfad ist derselbe, mit dem sie oben gefunden
+    # wurden; laeuft er ins Leere, wird nichts angefasst und das gesagt.
+    ZURUECK=$(git diff --name-only -- public/ 2>/dev/null \
+      | while read -r D; do
+          git diff -- "$D" 2>/dev/null | grep -q '^[+-].*?v=[0-9]\{10\}' && echo "$D"
+        done)
+    if [ -z "$ZURUECK" ]; then
+      echo "  Keine Datei mit geaenderter Cache-Kennung gefunden — nichts angefasst."
+      echo "  (Was sonst unter public/ liegt, bleibt unberuehrt.)"
+    else
+      ANZAHL=$(printf '%s\n' "$ZURUECK" | grep -c .)
+      printf '%s\n' "$ZURUECK" | xargs git checkout -- 2>/dev/null \
+        && echo "  $ANZAHL Datei(en) mit der Cache-Kennung zurueckgesetzt."
+    fi
   fi
 }
 trap aufraeumen_bei_abbruch EXIT

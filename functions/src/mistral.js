@@ -121,7 +121,6 @@ function _setLiveIntervalMsForTest(ms) {
   liveIntervalMs = typeof ms === "number" ? ms : 2000;
 }
 
-/* FEATURE-2026-08-29-01: Unter jedem Kartenschluessel steht der Text in `value`. */
 
 /* KA-11: Die Modus-Schluessel, an denen die beiden profileText-Werte verankert
    werden. In gueltigem JSON koennen diese Zeichenfolgen INNERHALB eines
@@ -225,11 +224,6 @@ function extrahiereLiveText(jsonPraefix) {
   };
 }
 
-/* Loest JSON-String-Escapes zu echten Zeichen auf. Bewusst von Hand statt
-   JSON.parse: Der Praefix ist zwar frei von UNVOLLSTAENDIGEN Escapes (der
-   Scanner oben schneidet sie ab), aber ein Modell koennte z.B. ein rohes
-   Steuerzeichen liefern — JSON.parse wuerfe dann, und ein Fehler hier darf
-   den Live-Weg nie zum Aufruf-Fehler machen. */
 /**
  * Liest eine Mistral-Antwort im SSE-Stream-Format zu Ende und liefert
  * dasselbe Ergebnis-Objekt wie der Nicht-Stream-Pfad. Nebenlaeufig wird
@@ -635,16 +629,6 @@ async function tryDescribeWithPrompt(prompt, imageBuffer, mimeType, remainingBud
   }
 }
 
-/* ── Footer-Parser (v2.1) ──
-   Extrahiert die strukturierten Anker-Blöcke (HARD_FACTS, ADS, TRIGGERS) am Ende
-   der Bildbeschreibung. Diese werden vom Describe-Prompt (mistralDescribeAddendum)
-   eingeleitet und liefern beide Profile-Calls einen konsistenten Anker:
-     - alter_geschlecht + herkunft werden wortgenau übernommen → Normal/Beast-Konsistenz
-     - ads + triggers werden zentral am Job-Result gesetzt → identisch in beiden Modi
-
-   Fallback-Verhalten: Wenn ein Block fehlt oder kaputt ist, gibt der Parser leere
-   Defaults zurück — handle-process-job.js entscheidet dann, ob die Profile-Calls
-   diese Felder ersatzweise selbst füllen müssen (alter Verhalten). */
 /* ── Public: generateBothProfiles ────────────────────────────────── */
 
 async function generateBothProfiles(imageDescription, exifData, remainingBudget, lang) {

@@ -131,8 +131,9 @@ describe("parseDescribeFooter — die Anker am Ende der Beschreibung", () => {
     /* Der Rueckfall ist der haeufigste Fehlerfall im Betrieb: Die KI liefert
        die Beschreibung, vergisst aber die Anker. Dann muss wenigstens der
        Fliesstext ankommen — sonst sieht das Kind eine leere Karte. */
-    const lang = "Ein Mensch steht auf einem Berg. Im Hintergrund Wolken. "
-      + "Die Kleidung wirkt sportlich, die Sonne steht tief.";
+    const lang =
+      "Ein Mensch steht auf einem Berg. Im Hintergrund Wolken. " +
+      "Die Kleidung wirkt sportlich, die Sonne steht tief.";
     expect(parseDescribeFooter(lang).description).toBe(lang);
   });
 

@@ -121,7 +121,6 @@ function _setLiveIntervalMsForTest(ms) {
   liveIntervalMs = typeof ms === "number" ? ms : 2000;
 }
 
-
 /* KA-11: Die Modus-Schluessel, an denen die beiden profileText-Werte verankert
    werden. In gueltigem JSON koennen diese Zeichenfolgen INNERHALB eines
    String-Werts nie roh auftauchen (die Anfuehrungszeichen waeren dort `\"`) —

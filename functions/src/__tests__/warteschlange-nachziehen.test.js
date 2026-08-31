@@ -134,6 +134,29 @@ describe("warteschlangeNachziehen", () => {
     expect(r.parallel).toBe(9);
   });
 
+  test("RIEGEL: aus einem Test heraus wird die echte Queue NIE angefasst", async () => {
+    /* VORFALL 30./31.08.2026: Ein Testlauf hat die PRODUKTIONS-Warteschlange
+       umgestellt — dreimal, auf die Werte aus test-satz.js (7/0,5 und 14/0,5).
+       Zehn Stunden lang lief die Auslieferung damit auf vierfachem Tempo gegen
+       Mistrals Grenze; am Morgen kamen die ersten Ueberlastmeldungen bei
+       echten Nutzern an.
+
+       Der einzelne Test, der die Attrappe vergass, ist austauschbar. Dieser
+       Riegel ist es nicht: Er greift fuer jeden Pfad, auch fuer den, den
+       morgen jemand neu schreibt.
+
+       Nachgemessen am 31.08.: Vorher 4/0,125 — Versuch, auf 99/9 zu stellen —
+       nachher 4/0,125. */
+    setClientForTest(null); /* KEINE Attrappe: der echte Client */
+    process.env.GCLOUD_PROJECT = "malzime"; /* das echte Projekt */
+
+    const r = await warteschlangeNachziehen({ parallelitaet: 99, queueRatePerSekunde: 9 });
+
+    expect(r.ok).toBe(false);
+    expect(r.grund).toContain("Test");
+    expect(r.grund).toContain("setClientForTest");
+  });
+
   test("ohne Projektkennung wird nichts angefasst", async () => {
     delete process.env.GCLOUD_PROJECT;
     delete process.env.GCP_PROJECT;

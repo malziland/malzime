@@ -69,6 +69,30 @@ async function echteParallelitaet() {
 }
 
 /**
+ * Liest die echte Rate der Warteschlange (Auftraege pro Sekunde).
+ *
+ * VORFALL 31.08.2026: Die Wache pruefte nur die Parallelitaet. Als ein
+ * Testlauf die Queue auf 7/0,5 stellte (Satz: 4/0,125), meldete sie zwar die
+ * Parallelitaet — die RATE, also das eigentliche Problem, sah sie nicht. Mit
+ * 0,5 statt 0,125 lief die Auslieferung auf VIERFACHEM Tempo gegen Mistrals
+ * Grenze; am Morgen kamen die ersten Ueberlastmeldungen.
+ */
+async function echteRate() {
+  if (isLocalQueueMode && isLocalQueueMode()) return null;
+  const pid = projectId();
+  if (!pid) return null;
+  try {
+    const client = getClient();
+    const name = client.queuePath(pid, QUEUE_REGION, QUEUE_NAME);
+    const [queue] = await client.getQueue({ name });
+    const wert = queue?.rateLimits?.maxDispatchesPerSecond;
+    return typeof wert === "number" && wert > 0 ? wert : null;
+  } catch (_e) {
+    return null;
+  }
+}
+
+/**
  * Vergleicht den Code-Wert mit dem echten Wert.
  * Reine Rechnung, damit sie ohne Netzwerk pruefbar ist.
  */
@@ -79,9 +103,12 @@ function bewerte(imCode, inDerQueue) {
   if (imCode === inDerQueue) {
     return { auffaellig: false, grund: "stimmt-ueberein", zahlen: { imCode, inDerQueue } };
   }
-  /* Welche Richtung? Beides ist schaedlich, aber unterschiedlich. */
-  /* Welche Richtung? Beides ist schaedlich, aber unterschiedlich. */
-  const richtung = imCode > inDerQueue ? "code-verspricht-zu-viel" : "kapazitaet-verschenkt";
+  /* Welche Richtung? Beides ist schaedlich, aber unterschiedlich.
+     BEFUND 31.08.2026: Hier stand "kapazitaet-verschenkt", wenn die Queue MEHR
+     erlaubt als der Satz. Das klang nach ungenutztem Potenzial — tatsaechlich
+     laeuft die Auslieferung dann schneller, als die KI-Stufe zulaesst, und
+     erzeugt Ueberlastmeldungen. Genau so ist es an diesem Tag passiert. */
+  const richtung = imCode > inDerQueue ? "code-verspricht-zu-viel" : "queue-laeuft-zu-schnell";
   return { auffaellig: true, grund: richtung, zahlen: { imCode, inDerQueue } };
 }
 
@@ -97,9 +124,13 @@ function baueMeldung(befund) {
     );
   }
   return (
-    `Kapazitaet wird verschenkt: Die Warteschlange erlaubt ${inDerQueue} gleichzeitige ` +
-    `Analysen, der Code rechnet nur mit ${imCode}. Es koennten mehr Leute gleichzeitig ` +
-    `arbeiten, als wir einlassen. Abhilfe: parallelitaet im Einstellungssatz auf ${inDerQueue} heben.`
+    `ACHTUNG: Die Warteschlange laeuft SCHNELLER als eingestellt. Sie erlaubt ` +
+    `${inDerQueue} gleichzeitige Analysen, der Einstellungssatz sagt ${imCode}. ` +
+    `Damit gehen mehr Aufrufe an die KI, als ihre Stufe zulaesst — es drohen ` +
+    `Ueberlastmeldungen bei echten Nutzern. ` +
+    `Abhilfe: ./scripts/warteschlange-pruefen.sh --setzen ` +
+    `(zieht die Warteschlange auf den Einstellungssatz nach). ` +
+    `NICHT den Satz anheben, ohne vorher ins Mistral-Dashboard zu sehen.`
   );
 }
 

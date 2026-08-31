@@ -163,6 +163,34 @@ sys.exit(0 if ok else 1)
   if [ "$BUCKET_RC" != "0" ]; then FEHLER=1; fi
 fi
 
+# ── 2b. Liegen ALTE Bilder im Speicher? (Zusage, nicht nur Code) ──
+#
+# VORFALL 31.08.2026: Im Bucket lagen 4.056 Bilder (233 MB) vom Vortag. Die
+# aktive Loeschung nach der Analyse hatte nicht gegriffen; das Sicherheitsnetz
+# (Lifecycle, 24 h) haette sie erst spaeter geraeumt.
+#
+# WARUM DAS HIER STEHT UND NICHT IM TEST: Es gibt Tests fuer `deleteImage` —
+# und trotzdem blieben die Bilder liegen. Ein Test prueft den Code, diese
+# Zeile prueft die WIRKLICHKEIT. Genau dieser Unterschied war der Befund.
+#
+# DIE ZUSAGE: Die Datenschutzerklaerung sagt, Bilder bleiben nur fuer die
+# Wartezeit gespeichert. Jobs leben hoechstens zwei Stunden. Ein Bild, das
+# aelter ist, gehoert zu keinem laufenden Auftrag mehr.
+echo "— Bildspeicher (Zusage: nur fuer die Wartezeit)"
+ALTE_BILDER=$(gsutil ls -l "$BUCKET/queue-uploads/" 2>/dev/null \
+  | grep -E "^ +[0-9]+" \
+  | awk -v grenze="$(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '3 hours ago' +%Y-%m-%dT%H:%M:%SZ)" \
+        '$2 < grenze {n++} END {print n+0}')
+if [ -z "$ALTE_BILDER" ]; then
+  rot "Bildspeicher nicht lesbar — ungeprueft gilt als nicht bestanden"
+elif [ "$ALTE_BILDER" -eq 0 ]; then
+  gruen "Keine Bilder aelter als 3 Stunden"
+else
+  rot "$ALTE_BILDER Bild(er) aelter als 3 Stunden — die aktive Loeschung greift nicht"
+  echo "        Ein Auftrag lebt hoechstens 2 h. Aeltere Bilder gehoeren zu keinem mehr."
+  echo "        Aufraeumen:  gsutil -m rm -r \"$BUCKET/queue-uploads/**\""
+fi
+
 # ── 3. Firestore: genau EINE Datenbank, malzime-eu in europe-west1 ──
 echo "— Firestore"
 DBS=$(gcloud firestore databases list --project="$PROJECT" --format="value(name,locationId)" 2>/dev/null || true)

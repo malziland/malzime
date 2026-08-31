@@ -40,6 +40,11 @@ const ERLAUBTE_LESE_MUSTER = [
      die Regeln selbst werden ueber die REST-Schnittstelle GELESEN (curl ohne
      -X, also GET). */
   /gcloud auth print-access-token\b/,
+  /* OPS-2026-08-31-02: Messung am ECHTEN Bildspeicher. Am 30.08. lagen 4.056
+     Testbilder im Bucket, waehrend alle Tests gruen meldeten — sie prueften
+     den Code, der das Loeschen verspricht, nie den Speicher selbst. `gsutil
+     ls -l` listet nur auf und veraendert nichts. */
+  /gsutil ls -l\b/,
 ];
 
 function gcloudZeilen(inhalt) {

@@ -264,6 +264,58 @@ describe("handleProcessJob — Blocked-Ergebnisse", () => {
     await handleProcessJob(postReq("job-1"), res);
     expect(lastResult().blockedReason).toBe("blocked.overloaded");
   });
+
+  /* OPS-2026-08-31-01: Der Sperrgrund muss IM SERVER-LOG stehen. Am 31.08.
+     brach eine echte Analyse mit blocked.overloaded ab; im Server-Log stand
+     nur `status: "blocked"` ohne Grund. Rekonstruierbar war die Ursache nur,
+     weil das Frontend sie als client-error zurueckmeldete — haette der Nutzer
+     die Seite eine Sekunde frueher geschlossen, waere sie fuer immer weg
+     gewesen. Bei einem Vorfall mit mehreren Betroffenen ist genau das die
+     Information, die man braucht. */
+  test("OPS-2026-08-31-01: der Sperrgrund steht im Server-Log, nicht nur im Ergebnis", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    process.env.MISTRAL_MOCK_FAIL = "rate_limit";
+    const res = makeRes();
+    await handleProcessJob(postReq("job-1"), res);
+
+    const abschluss = logSpy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0]);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .find((z) => z.step === "process-job" && z.status === "blocked");
+    logSpy.mockRestore();
+
+    expect(abschluss).toBeDefined();
+    expect(abschluss.blockedReason).toBe("blocked.overloaded");
+  });
+
+  /* Gegenprobe: Bei Erfolg darf das Feld NICHT auftauchen — sonst faerbt ein
+     leerer Grund die Logsuche nach echten Sperren ein. */
+  test("OPS-2026-08-31-01: bei Erfolg steht kein Sperrgrund im Log", async () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
+    const res = makeRes();
+    await handleProcessJob(postReq("job-1"), res);
+
+    const abschluss = logSpy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0]);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .find((z) => z.step === "process-job" && z.status === "done");
+    logSpy.mockRestore();
+
+    expect(abschluss).toBeDefined();
+    expect(abschluss.blockedReason).toBeUndefined();
+  });
 });
 
 /* ── Unerwarteter Fehler ─────────────────────────────────────────── */

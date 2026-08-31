@@ -147,6 +147,30 @@ function redispatchJobLocal(jobId) {
  */
 async function warteschlangeNachziehen({ parallelitaet, queueRatePerSekunde }) {
   try {
+    /* ── RIEGEL: NIEMALS aus einem Test heraus die echte Queue anfassen ──
+     *
+     * VORFALL 30./31.08.2026: In der Nacht hat ein Testlauf die
+     * PRODUKTIONS-Warteschlange umgestellt — dreimal, auf 7/0,5 und 14/0,5.
+     * Das sind die Werte aus `test-satz.js`. Zehn Stunden lang lief die
+     * Auslieferung damit auf vierfachem Tempo gegen Mistrals Grenze; am
+     * Morgen kamen die ersten Ueberlastmeldungen bei echten Nutzern an.
+     *
+     * Der einzelne Test, der die Attrappe vergass, ist austauschbar — der
+     * Riegel hier ist es nicht. Er greift fuer JEDEN Pfad, auch fuer den, den
+     * morgen jemand neu schreibt.
+     *
+     * `JEST_WORKER_ID` setzt Jest in jedem Arbeitsprozess. Wer die Funktion
+     * im Test wirklich pruefen will, ersetzt den Client ueber
+     * `setClientForTest()` — dann laeuft sie gegen die Attrappe weiter. */
+    if (process.env.JEST_WORKER_ID !== undefined && !clientOverride) {
+      return {
+        ok: false,
+        grund:
+          "Aufruf aus einem Test ohne Attrappe — die echte Warteschlange " +
+          "wird nicht angefasst. setClientForTest() verwenden.",
+      };
+    }
+
     const projekt = projectId();
     if (!projekt) return { ok: false, grund: "kein Projekt bekannt" };
 

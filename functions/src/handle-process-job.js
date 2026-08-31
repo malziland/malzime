@@ -242,6 +242,16 @@ async function handleProcessJob(req, res) {
         jobId,
         traceId: job.traceId || null,
         status: success ? "done" : "blocked",
+        /* OPS-2026-08-31-01: Der SPERRGRUND gehoert ins Server-Log. Vorher
+           stand hier nur `status: "blocked"` — bei einem Vorfall liess sich
+           die Ursache nicht mehr feststellen. Am 31.08. war sie nur deshalb
+           rekonstruierbar, weil das Frontend sie als client-error
+           zurueckmeldete; eine Sekunde frueher weggeklickt und sie waere fuer
+           immer weg gewesen. Kein Personenbezug: einer von sieben festen
+           Bezeichnern (blocked.overloaded, blocked.safetyFilter, ...).
+           Bei Erfolg bleibt das Feld WEG, damit die Logsuche nach echten
+           Sperren nicht von leeren Werten eingefaerbt wird. */
+        ...(success ? {} : { blockedReason: result.blockedReason || null }),
         mode: result.meta.mode,
         /* Wartezeit in der Warteschlange: erstellt → Verarbeitungsbeginn.
            `start` wird unmittelbar nach dem erfolgreichen Claim gesetzt. */

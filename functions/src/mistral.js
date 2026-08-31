@@ -25,8 +25,12 @@ const { withMistralSlot } = require("./throttle");
 const {
   findeProfileTextWert,
   parseDescribeFooter,
+  extrahiereLiveText,
   KARTEN_WERT_SCHLUESSEL,
   KARTEN_LABEL_SCHLUESSEL,
+  STANDARD_SCHLUESSEL,
+  BEAST_SCHLUESSEL,
+  REQUIRED_CARDS,
 } = require("./mistral-antwort");
 
 /* Wird beim Modul-Load via env-Variable gelesen. NICHT hartcodiert. */
@@ -125,8 +129,6 @@ function _setLiveIntervalMsForTest(ms) {
    werden. In gueltigem JSON koennen diese Zeichenfolgen INNERHALB eines
    String-Werts nie roh auftauchen (die Anfuehrungszeichen waeren dort `\"`) —
    dieselbe Escape-Garantie, auf der schon der profileText-Scanner beruht. */
-const STANDARD_SCHLUESSEL = '"standard"';
-const BEAST_SCHLUESSEL = '"beast"';
 
 /**
  * Extrahiert aus einem JSON-PRAEFIX (der noch mitten im Satz abbrechen kann)
@@ -159,69 +161,6 @@ const BEAST_SCHLUESSEL = '"beast"';
    Zurueckgegeben werden NUR abgeschlossene Werte. Eine halb angekommene Karte
    zu zeigen waere schlechter als keine — sie wuerde sich beim naechsten Poll
    veraendern und wirkte wie ein Fehler. */
-function extrahiereKarten(jsonPraefix, vonIdx, bisIdx) {
-  if (typeof jsonPraefix !== "string" || vonIdx < 0) return [];
-  const bereich = bisIdx > vonIdx ? jsonPraefix.slice(0, bisIdx) : jsonPraefix;
-  const fertige = [];
-  for (const schluessel of REQUIRED_CARDS) {
-    const marke = `"${schluessel}"`;
-    const idx = bereich.indexOf(marke, vonIdx);
-    if (idx < 0) continue;
-    /* Das Schema legt `label` VOR `value` — beide muessen komplett sein, sonst
-       stuende eine Karte ohne Beschriftung oder mit halbem Satz da. */
-    const bezeichnung = findeProfileTextWert(bereich, idx, KARTEN_LABEL_SCHLUESSEL);
-    if (!bezeichnung || !bezeichnung.abgeschlossen || !bezeichnung.text) continue;
-    const wert = findeProfileTextWert(bereich, idx, KARTEN_WERT_SCHLUESSEL);
-    if (!wert || !wert.abgeschlossen || !wert.text) continue;
-    /* Liegt zwischen dem Kartenschluessel und dem gefundenen `"value"` ein
-       ANDERER Kartenschluessel, gehoert der Wert zur naechsten Karte — diese
-       hier hat dann selbst noch keinen. Dieselbe Verankerung wie bei
-       standard/beast, nur eine Ebene tiefer. */
-    const dazwischen = bereich.slice(idx + marke.length, wert.schluesselIdx);
-    if (REQUIRED_CARDS.some((k) => k !== schluessel && dazwischen.includes(`"${k}"`))) continue;
-    fertige.push({ schluessel, bezeichnung: bezeichnung.text, wert: wert.text });
-  }
-  return fertige;
-}
-
-function extrahiereLiveText(jsonPraefix) {
-  /* Dieselbe Form wie im Normalfall — ein Aufrufer, der `kartenStandard.length`
-     liest, darf hier nicht ueber `undefined` stolpern. */
-  if (typeof jsonPraefix !== "string") return { standard: null, beast: null, kartenStandard: [], kartenBeast: [] };
-
-  const standardIdx = jsonPraefix.indexOf(STANDARD_SCHLUESSEL);
-  const beastIdx = jsonPraefix.indexOf(BEAST_SCHLUESSEL);
-
-  /* Standard: erst ab dem eigenen Modus-Schluessel suchen — ein profileText
-     VOR `"standard"` kann nie das Standard-Profil sein. Liegt zwischen dem
-     Schluessel und dem Fund ein `"beast"`, gehoert der Fund zum Beast-Block
-     (Standard hat dann selbst noch keinen profileText geliefert). */
-  let erster = standardIdx >= 0 ? findeProfileTextWert(jsonPraefix, standardIdx) : null;
-  if (erster) {
-    const beastDazwischen = jsonPraefix.indexOf(BEAST_SCHLUESSEL, standardIdx + 1);
-    if (beastDazwischen >= 0 && beastDazwischen < erster.schluesselIdx) erster = null;
-  }
-
-  /* Beast: symmetrisch verankert. */
-  let zweiter = null;
-  if (beastIdx >= 0) {
-    const kandidat = findeProfileTextWert(jsonPraefix, beastIdx);
-    if (kandidat) {
-      const standardDazwischen = jsonPraefix.indexOf(STANDARD_SCHLUESSEL, beastIdx + 1);
-      if (!(standardDazwischen >= 0 && standardDazwischen < kandidat.schluesselIdx)) zweiter = kandidat;
-    }
-  }
-
-  /* FEATURE-2026-08-29-01: Karten additiv dazu. `standard` und `beast` bleiben
-     unveraendert — alte Aufrufer merken nichts. */
-  const standardBis = beastIdx > standardIdx ? beastIdx : -1;
-  return {
-    standard: erster ? erster.text : null,
-    beast: zweiter ? zweiter.text : null,
-    kartenStandard: extrahiereKarten(jsonPraefix, standardIdx, standardBis),
-    kartenBeast: extrahiereKarten(jsonPraefix, beastIdx, -1),
-  };
-}
 
 /**
  * Liest eine Mistral-Antwort im SSE-Stream-Format zu Ende und liefert
@@ -743,21 +682,6 @@ function escapeXml(str) {
    `finishReason: "stop"`, aber categories enthielt nur 7 von 13. Wir prüfen
    das clientseitig und triggern einen Retry mit explizitem Hinweis auf die
    fehlenden Karten. */
-const REQUIRED_CARDS = [
-  "alter_geschlecht",
-  "herkunft",
-  "einkommen",
-  "bildung",
-  "beziehungsstatus",
-  "interessen",
-  "persoenlichkeit",
-  "charakterzuege",
-  "politisch",
-  "gesundheit",
-  "kaufkraft",
-  "verletzlichkeit",
-  "werbeprofil",
-];
 
 function findMissingCards(parsed) {
   if (!parsed || !parsed.categories || typeof parsed.categories !== "object") {

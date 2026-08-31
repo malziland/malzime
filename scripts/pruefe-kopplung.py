@@ -53,7 +53,17 @@ ZEILEN_GRENZEN = {
     # Grenze sinkt mit jedem Schnitt.
     "functions/src/mistral.js": 1610,
     # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.
-    "functions/src/mistral-antwort.js": 260,
+    #
+    # ANGEHOBEN 31.08.2026 von 260 auf 340, zweiter Schnitt: Die Live-Text- und
+    # Karten-Auswertung ist dazugekommen (extrahiereKarten, extrahiereLiveText,
+    # REQUIRED_CARDS und die vier Schluessel-Konstanten). Sie stand in
+    # mistral.js, ist aber Parsing — sie liest aus dem angefangenen JSON, was
+    # schon lesbar ist, und beruehrt kein Netz.
+    #
+    # Das ist die zulaessige Antwort auf eine Grenzverletzung: anheben UND
+    # begruenden. Der Gewinn steht daneben — mistral.js ist im selben Schritt
+    # von 1691 auf 1438 Zeilen gefallen.
+    "functions/src/mistral-antwort.js": 340,
     # Die Live-Anzeige im Browser. Noch nicht angefasst.
     "public/js/live-anzeige.js": 1370,
     # Der Netzzugriff des Frontends.

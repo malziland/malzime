@@ -51,7 +51,8 @@ abweichendem Baum passiert nichts — dann gilt weiter, was `main` sagt.
 
 **`scripts/pruefe-mitzieher.py`** — „wenn du X änderst, gehört Y mitgezogen".
 Vier Kopplungen sind aufgeschrieben, jede mit der Folge des Vergessens. Anlass:
-Das neue Pflichtfeld vom 30.08. war an sieben Stellen nachzuziehen, zwei wurden
+Das neue Pflichtfeld vom 30.08. war an vier weiteren Stellen nachzuziehen
+(Testsatz, Produktivsatz, Doku-Tabelle, Wirkungstest); zwei davon wurden
 übersehen.
 
 **`scripts/pruefe-kopplung.py`** — meldet, wenn Dateien wieder zusammenwachsen.
@@ -97,7 +98,8 @@ zeigte, dass mein Test grün blieb, auch ohne den Fix.** Er maß nichts. Und die
 Reproduktion mit englischem Browser widerlegte die ganze Hypothese — der Dialog
 erschien gar nicht.
 
-Der Verdacht steht in `befund-fokus-rueckgabe-offen.md`. **Prüfen lässt er sich
+Der Verdacht ist im Projekt-Gedächtnis festgehalten (nicht im Repository —
+es geht um eine Vermutung, keinen Befund). **Prüfen lässt er sich
 nur von Hand:** Sprachdialog öffnen, schließen, sofort Tab drücken und
 schauen, ob der Fokus zurückspringt.
 

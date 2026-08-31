@@ -43,7 +43,15 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 
    **Seit 31.08.2026 läuft zuerst ein Trockenlauf** (`firebase deploy
    --dry-run`, rund 28 Sekunden), in derselben Reihenfolge und mit denselben
-   Zielen wie der echte Deploy. Anlass waren sechs gescheiterte Auslieferungen
+   Zielen wie der echte Deploy.
+
+   *Er ist fast, aber nicht ganz folgenlos:* Die Firebase-CLI weist selbst
+   darauf hin, dass ein Trockenlauf am Zielprojekt **Programmierschnittstellen
+   einschalten kann** („this may still enable APIs on the target project").
+   Er läuft zudem vor der Rückfrage „Weiter?" — kann das also tun, bevor ein
+   Mensch zugestimmt hat. Bei malziME sind alle nötigen Schnittstellen seit
+   Langem aktiv; wer das Skript gegen ein frisches Projekt richtet, sollte es
+   wissen. Anlass waren sechs gescheiterte Auslieferungen
    an einem Tag — jede davon wäre hier sichtbar geworden, zusammen rund
    zweieinhalb Stunden. Bricht er ab, passiert nichts weiter (Notschalter
    `SKIP_DRYRUN=1`). Scheitert der Deploy später doch, nimmt das Skript die

@@ -78,7 +78,7 @@ else
     #
     # Muss sie das wirklich? Ja, und das ist beweisbar: Git berechnet für jeden
     # Dateistand eine Baum-Kennung. Ist sie gleich, ist jede Datei bitgenau
-    # gleich — dann kann eine Prüfung gar nichts anderes finden. An den fünf
+    # gleich — dann kann eine Prüfung gar nichts anderes finden. An den sechs
     # letzten Zusammenführungen (#229 bis #234) nachgemessen: jedes Mal
     # identisch.
     #
@@ -352,13 +352,18 @@ TARGET="${1:-hosting,functions}"
 if [ "${SKIP_DRYRUN:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_DRYRUN=1 gesetzt — der Trockenlauf wird UEBERSPRUNGEN."
 else
-  echo "— Trockenlauf (prueft, ohne etwas zu aendern)"
+  # "ohne etwas zu aendern" waere zu stark: Die Firebase-CLI weist selbst
+  # darauf hin, dass ein Trockenlauf Programmierschnittstellen am Zielprojekt
+  # einschalten kann. Bei uns sind alle laengst aktiv — die Aussage bleibt
+  # trotzdem genau. (Befund 31.08.2026, unvorbelastetes Review.)
+  echo "— Trockenlauf (prueft, ohne auszuliefern)"
   DRY_START=$(date +%s)
 
   if [ "${SKIP_FIRESTORE:-0}" != "1" ]; then
     if ! firebase deploy --only firestore:malzime-eu --dry-run >/tmp/malzime-dry-firestore.log 2>&1; then
       echo "FEHLER: Der Trockenlauf fuer Firestore ist gescheitert — nichts wurde ausgeliefert." >&2
       tail -15 /tmp/malzime-dry-firestore.log | sed 's/^/    /' >&2
+      echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-firestore.log" >&2
       echo "        Notschalter: SKIP_DRYRUN=1" >&2
       exit 1
     fi
@@ -368,6 +373,7 @@ else
   if ! firebase deploy --only "$TARGET" --dry-run >/tmp/malzime-dry-rest.log 2>&1; then
     echo "FEHLER: Der Trockenlauf fuer $TARGET ist gescheitert — nichts wurde ausgeliefert." >&2
     tail -15 /tmp/malzime-dry-rest.log | sed 's/^/    /' >&2
+    echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-rest.log" >&2
     echo "        Notschalter: SKIP_DRYRUN=1" >&2
     exit 1
   fi

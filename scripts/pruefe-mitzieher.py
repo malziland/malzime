@@ -3,9 +3,10 @@
 pruefe-mitzieher.py — "Wenn du X aenderst, gehoert Y mitgezogen."
 
 WOZU: Am 30.08.2026 wurde ein neues Pflichtfeld (`queueRatePerSekunde`) in den
-Einstellungssatz aufgenommen. Es musste an SIEBEN Stellen nachgezogen werden.
-Zwei davon wurden vergessen und erst vom Testlauf gefunden — also spaet, und
-nur weil es zufaellig einen Test gab, der es merkt.
+Einstellungssatz aufgenommen. Neben der Felddefinition selbst waren VIER
+weitere Stellen nachzuziehen: Testsatz, Produktivsatz, Doku-Tabelle und der
+Wirkungstest. Zwei davon wurden vergessen und erst vom Testlauf gefunden —
+also spaet, und nur weil es zufaellig einen Test gab, der es merkt.
 
 Christoph dazu: "Das sollst du zukuenftig doch selber machen, ohne dass ich
 dich darauf hinweisen muss. Das muss ja doch klar sein."

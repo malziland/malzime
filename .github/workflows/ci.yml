@@ -25,7 +25,21 @@ permissions:
 # verlangt gruene Pflicht-Checks fuer genau diesen Commit — ein abgebrochener
 # Lauf wuerde eine spaetere Auslieferung dieses Standes blockieren.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # BEFUND 31.08.2026 (unvorbelastetes Review): `cancel-in-progress: false`
+  # verhindert nur, dass ein LAUFENDER Lauf abgebrochen wird. GitHub haelt je
+  # Gruppe aber hoechstens EINEN wartenden — ein dritter Push storniert den
+  # zweiten. Drei schnelle Commits auf main (Release, Cache-Kennung,
+  # Nachzuegler — in dieser Nacht genau so passiert) haetten den mittleren
+  # als `cancelled` enden lassen. Der Deploy dieses Standes waere blockiert
+  # gewesen: genau das, was die Ausnahme verhindern sollte.
+  #
+  # Deshalb bekommt auf main JEDER Commit seine eigene Gruppe. Dann gibt es
+  # dort keine Konkurrenz und nichts zu verdraengen. Auf Zweigen bleibt es bei
+  # einer Gruppe je Zweig — dort ist das Verdraengen ja der Sinn.
+  group: >-
+    ${{ github.workflow }}-${{ github.ref }}${{
+      github.ref == 'refs/heads/main' && format('-{0}', github.sha) || ''
+    }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 on:

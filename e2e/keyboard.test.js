@@ -121,7 +121,19 @@ test("Tastatur: Demo-Foto → Profil, nur mit Tab + Enter", async ({ page }) => 
 
      `locator.press` macht beides in einem Schritt und wartet vorher darauf,
      dass das Element bedienbar ist. Die Aussage bleibt dieselbe: Die Leertaste
-     legt den Schalter um. Nur die Messung ist jetzt verlaesslich. */
+     legt den Schalter um.
+
+     WAS BELEGT IST: Der Test wird rot, wenn der Schalter wirklich kaputt ist
+     (nachgestellt am 30.08. mit entferntem setAttribute) — er misst also
+     weiterhin, was er messen soll. Und er trennt die beiden Handgriffe nicht
+     mehr, zwischen denen der Fokus verlorengehen konnte.
+
+     WAS NICHT BELEGT IST: dass genau DAS die Ursache des Flackerns war. Lokal
+     lief der alte Test achtmal gruen, auch mit englischem Browser; der
+     Fehlschlag trat nur in der Pipeline unter Last auf und liess sich nicht
+     nachstellen. Sollte er wiederkommen, ist die naechste Spur die
+     Konkurrenz um dieselbe Maschine — seit dem 31.08. bricht ein neuer Push
+     die vorigen Laeufe ab, was diese Last deutlich senkt. */
   await page.locator("#biasSwitch").press("Space");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });

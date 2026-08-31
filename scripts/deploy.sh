@@ -58,7 +58,7 @@ else
   if [ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]; then
     echo "FEHLER: HEAD != origin/main — der lokale Stand ist nicht der freigegebene." >&2
     echo "        Erst mergen/pullen, dann deployen. Notschalter: SKIP_STAND=1" >&2
-    :
+    exit 1
   fi
   if ! command -v gh >/dev/null 2>&1; then
     # OPS-2026-08-20-12: Hier stand eine WARNUNG, und der Deploy lief weiter — der

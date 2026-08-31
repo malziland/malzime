@@ -40,162 +40,29 @@ CI = WURZEL / ".github" / "workflows" / "ci.yml"
 # `warum`    — was passiert, wenn er fehlt
 # `vor`      — optional: dieser Riegel muss VOR dem genannten Muster stehen
 # ─────────────────────────────────────────────────────────────────────────────
-RIEGEL_DEPLOY = [
-    {
-        "name": "Stand-Bindung an die CI-Freigabe",
-        "muster": r"HEAD != origin/main",
-        "braucht_abbruch": True,
-        "warum": "Ohne sie wird der Arbeitsbaum ausgeliefert, egal was die Pipeline sagt.",
-    },
-    {
-        "name": "Sauberer Arbeitsbaum",
-        "muster": r"Arbeitsbaum nicht sauber",
-        "braucht_abbruch": True,
-        "warum": "Ohne sie gehen ungespeicherte Aenderungen mit in die Produktion.",
-    },
-    {
-        "name": "Trockenlauf",
-        "muster": r"firebase deploy --only .* --dry-run",
-        "warum": (
-            "Ohne ihn scheitert eine Auslieferung erst nach 25 Minuten an Dingen,\n"
-            "     die in 28 Sekunden sichtbar gewesen waeren. Am 30.08. sechsmal passiert."
-        ),
-        # OPS-2026-08-31-16: Hier stand `Cache-Busting-Version generieren` —
-        # dieser Text existiert in deploy.sh NUR in einer Kommentarzeile, und
-        # Zeile 126 entfernt Kommentare, bevor gesucht wird. `re.search` fand
-        # nichts, `anderer` war None, und die Reihenfolge-Pruefung fiel STILL
-        # aus. Belegt: Trockenlauf ans Dateiende verschoben -> Waechter meldete
-        # weiter "ok". Der neue Anker ist eine CODE-Zeile, die den Buster
-        # tatsaechlich erzeugt und die niemand entfernen kann, ohne die
-        # Auslieferung zu brechen.
-        # GRENZE, gemessen: `re.search` nimmt den ERSTEN Treffer. Es gibt zwei
-        # Trockenlauf-Zeilen (Firestore und Rest). Wird nur EINE hinter den
-        # Buster verschoben, findet die Regel noch die andere und meldet ok.
-        # Erst wenn beide falsch stehen, schlaegt sie an. Fuer den Schaden, um
-        # den es geht — ein Abbruch NACH dem Buster hinterlaesst einen
-        # unsauberen Arbeitsbaum — genuegt das, weil beide Zeilen im selben
-        # Block stehen und gemeinsam verschoben wuerden.
-        "vor": r'^VERSION="\(kein Hosting-Deploy',
-    },
-    {
-        "name": "Aufraeumen bei Abbruch",
-        "muster": r"trap aufraeumen_bei_abbruch EXIT",
-        "warum": (
-            "Ohne sie blockiert ein gescheiterter Versuch den naechsten: Die\n"
-            "     hochgezaehlte Cache-Kennung bleibt liegen und laesst den\n"
-            "     Sauberkeits-Riegel anschlagen."
-        ),
-        "nach": r"Cache-Busting-Version: ",
-    },
-    {
-        # OPS-2026-08-31-13: Diese Regel war bei ihrer Entstehung SOFORT tot.
-        # `re.search` ohne `re.M` verankert `^` am Anfang der GANZEN Datei,
-        # nicht am Zeilenanfang — das Muster fand nie etwas, und die Regel
-        # meldete auch im richtigen Zustand "FEHLT". Die drei Suchstellen
-        # laufen jetzt mit re.M. Bestehende Regeln waren nicht betroffen,
-        # sie verwenden keinen Zeilenanker.
-        "name": "Hochgeladen-Marke nach dem Upload",
-        "muster": r"^HOCHGELADEN=1",
-        "warum": (
-            "Steht sie VOR `firebase deploy --only $TARGET`, meldet die Aufraeumfalle\n"
-            "     bei einem gescheiterten Upload faelschlich 'steht bereits live', laesst\n"
-            "     14 Dateien liegen und blockiert den naechsten Versuch. Schlimmer: dann\n"
-            "     behauptet build-info.json einen Stand, der nie ausgeliefert wurde."
-        ),
-        "nach": r"^  firebase deploy --only \"\$TARGET\"",
-    },
-    {
-        "name": "Firestore als eigener Schritt",
-        # OPS-2026-08-31-10: Das Muster traf zuerst auf den TROCKENLAUF
-        # (dieselbe Zeile mit --dry-run). re.search liefert nur den ersten
-        # Treffer — der echte Deploy-Schritt konnte durch echo ersetzt werden,
-        # und der Waechter meldete weiter "ok". Jetzt muss eine Zeile OHNE
-        # --dry-run existieren.
-        "muster": r"firebase deploy --only firestore:malzime-eu\b(?!.*--dry-run)",
-        "warum": (
-            "Im Paket mit hosting/functions scheitert der Aufruf an der\n"
-            "     Standard-Datenbank, die es hier nicht gibt."
-        ),
-    },
-    {
-        "name": "Infrastruktur-Pruefung",
-        "muster": r"verify-infrastructure\.sh",
-        "warum": "Ohne sie faellt eine Abweichung im Cloud-Zustand erst im Betrieb auf.",
-    },
-    {
-        "name": "Einstellungssatz-Riegel",
-        "muster": r"SKIP_SATZ",
-        "warum": (
-            "Ohne ihn kann eine Fassung live gehen, fuer die kein Einstellungssatz\n"
-            "     liegt — die Seite nimmt dann Fotos an, und JEDE Analyse scheitert."
-        ),
-    },
-    {
-        "name": "Live-Proben nach der Auslieferung",
-        "muster": r"live-smoke\.sh",
-        "warum": "Ohne sie merkt niemand, wenn die frisch ausgelieferte Seite kaputt ist.",
-    },
-]
+# UMGEBAUT 31.08.2026 — dieser Waechter prueft KEIN Verhalten mehr.
+#
+# Er hatte neun Regeln, die Textmuster in deploy.sh suchten. Drei Pruefer haben
+# ihn unabhaengig ausgehebelt: `exit` durch `:` ersetzt, `echo` stehen gelassen
+# — er meldete weiter "Alle Riegel vorhanden". Zehn realistische Rueckbauten
+# blieben unbemerkt. Ein Textmuster belegt kein Verhalten.
+#
+# Diese neun Regeln stehen jetzt in
+# functions/src/__tests__/deploy-verhalten.test.js. Dort wird deploy.sh in
+# einem Wegwerf-Klon AUSGEFUEHRT, mit Attrappen fuer firebase, gh,
+# verify-infrastructure und live-smoke. Acht Rueckbauproben belegen, dass jeder
+# Fall rot wird, wenn der zugehoerige Riegel faellt.
+#
+# Was HIER bleibt, sind die zwei Pruefungen, die zu Recht Text lesen, weil es
+# um Text geht: Jeder Notschalter (SKIP_*) muss in der Schlussbilanz genannt
+# werden, und die concurrency-Einstellung der Pipeline.
+RIEGEL_DEPLOY = []
 
 # Die Notschalter werden AUS DEM SKRIPT gelesen, nicht hier aufgezaehlt —
 # siehe die Begruendung weiter unten. Eine Liste an dieser Stelle waere genau
 # die Sorte Doppelquelle, die veraltet, sobald jemand einen Schalter zufuegt.
 
 
-def pruefe_durchsetzung(text, muster, fenster=6):
-    """OPS-2026-08-31-18: Ein Riegel ist erst einer, wenn er auch ABBRICHT.
-
-    BEFUND 31.08.2026 (Runde 2): Mehrere Regeln ankerten auf dem MELDUNGSTEXT
-    ("FEHLER: Arbeitsbaum nicht sauber"). Ausgefuehrt: die `exit 1` durch `:`
-    ersetzt, die echo-Zeilen stehen gelassen — der Waechter meldete weiter
-    "Alle Riegel vorhanden", Rueckgabewert 0. Ein so entwaffnetes deploy.sh
-    liefert einen schmutzigen Arbeitsbaum mit roten Pflicht-Checks aus.
-
-    Jetzt muss auf den Meldungstext innerhalb weniger Zeilen ein Abbruch
-    folgen. `fenster` deckt die uebliche Form ab: ein bis drei echo-Zeilen,
-    dann exit.
-    """
-    zeilen = text.split("\n")
-    for i, z in enumerate(zeilen):
-        if re.search(muster, z):
-            umfeld = zeilen[i : i + fenster]
-            if any(re.search(r"\bexit\s+[1-9]", u) for u in umfeld):
-                return True
-            return False
-    return None  # Muster gar nicht gefunden — das meldet die Haupt-Pruefung
-
-
-def pruefe_anker(text_roh, text_ohne_kommentar):
-    """OPS-2026-08-31-17: Jeder Anker muss auf CODE zeigen, nicht auf einen
-    Kommentar.
-
-    Anlass: Die Reihenfolge-Regel des Trockenlaufs war von Anfang an tot — ihr
-    Anker stand nur in einer Kommentarzeile, und diese Funktion entfernt
-    Kommentare vor der Suche. Eine tote Regel verhaelt sich wie eine erfuellte:
-    beide schweigen. Deshalb prueft der Waechter jetzt SICH SELBST.
-    """
-    tote = []
-    for r in RIEGEL_DEPLOY:
-        # NUR die Hilfsanker pruefen, NICHT das Suchmuster selbst.
-        #
-        # BEFUND aus der eigenen Selbstpruefung (31.08.2026): Mit "muster" in
-        # dieser Liste meldete der Waechter bei einem AUSKOMMENTIERTEN Riegel
-        # "eigene Anker tot" (Rueckgabewert 2) statt "FEHLT" (1) — er verwechselte
-        # einen schlecht gewaehlten Anker mit dem Schaden, den er finden soll.
-        # Ein "muster", das nur im Kommentar steht, IST der Befund; ein "vor"
-        # oder "nach", das nur im Kommentar steht, macht die Regel dagegen
-        # wirkungslos, ohne dass jemand etwas sieht.
-        for feld in ("vor", "nach"):
-            if feld not in r:
-                continue
-            try:
-                im_code = re.search(r[feld], text_ohne_kommentar, re.M)
-                im_roh = re.search(r[feld], text_roh, re.M)
-            except re.error:
-                continue
-            if im_roh and not im_code:
-                tote.append((r["name"], feld, r[feld]))
-    return tote
 
 
 def main():
@@ -222,32 +89,19 @@ def main():
         print("  Abgeschnitten oder ersetzt? Erst das klaeren.")
         return 2
 
-    print("── Sind die Riegel im Auslieferungs-Skript noch da? ──")
+    print("── Notschalter und Pipeline-Einstellung ──")
     print()
 
     # OPS-2026-08-31-17: ZUERST die eigenen Anker pruefen. Ein Anker, der nur
     # auf einer Kommentarzeile liegt, findet nach dem Kommentarfilter nichts —
     # die Regel ist dann tot und schweigt wie eine erfuellte. Genau so war die
     # Reihenfolge-Regel des Trockenlaufs von Anfang an wirkungslos.
-    tote_anker = pruefe_anker(roh, text)
-    if tote_anker:
-        print("  ▸ EIGENE ANKER TOT — dieser Waechter kann nicht messen:")
-        for name, feld, muster in tote_anker:
-            print(f"     {name} ({feld}): '{muster}' steht NUR in einem Kommentar.")
-        print("     Anker gehoeren an Code-Zeilen, die niemand entfernen kann,")
-        print("     ohne dass die Auslieferung bricht.")
-        print()
-        return 2
-
     fehlt = []
     falsch_platziert = []
     ohne_abbruch = []
 
     for r in RIEGEL_DEPLOY:
         treffer = re.search(r["muster"], text, re.M)
-        if treffer and r.get("braucht_abbruch"):
-            if pruefe_durchsetzung(text, r["muster"]) is False:
-                ohne_abbruch.append(r)
         if not treffer:
             print(f"  FEHLT   {r['name']}")
             fehlt.append(r)
@@ -320,7 +174,8 @@ def main():
     print()
     anzahl = len(fehlt) + len(falsch_platziert) + len(ohne_abbruch) + len(ohne_bilanz) + (1 if ci_fehlt else 0)
     if anzahl == 0:
-        print("  ERGEBNIS: Alle Riegel vorhanden und richtig platziert.")
+        print("  ERGEBNIS: Notschalter vollstaendig gemeldet, Pipeline-Einstellung ok.")
+        print("  (Die Riegel SELBST prueft deploy-verhalten.test.js — ausgefuehrt, nicht gelesen.)")
         return 0
 
     print(f"  ERGEBNIS: {anzahl} Befund(e).")

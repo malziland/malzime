@@ -146,94 +146,30 @@ echo
 # ═══════════════════════════════════════════════════════════════════════════
 echo "1. pruefe-deploy-riegel.py"
 
+# UMGEBAUT 31.08.2026: Der Waechter prueft keine Riegel mehr, sondern nur noch
+# zwei Dinge, bei denen es wirklich um Text geht — dass jeder Notschalter in
+# der Schlussbilanz genannt wird, und die concurrency-Einstellung der Pipeline.
+#
+# Die Riegel selbst prueft jetzt deploy-verhalten.test.js, indem es deploy.sh
+# AUSFUEHRT. Die frueheren Proben hier (entfernte Aufraeumfalle, Trockenlauf
+# als Kommentar, Meldung ohne Abbruch) sind dorthin gewandert und liegen dort
+# als acht Rueckbauproben vor. Sie hier zu wiederholen hiesse, wieder
+# Textmuster zu pruefen.
 probe 0 "sauberes deploy.sh besteht" python3 scripts/pruefe-deploy-riegel.py
 
 sichern scripts/deploy.sh
-python3 - <<'PY'
+python3 - <<'PYSELF'
 s = open("scripts/deploy.sh").read()
-open("scripts/deploy.sh", "w").write(s.replace("trap aufraeumen_bei_abbruch EXIT", "# entfernt", 1))
-PY
-probe 1 "entfernte Aufraeumfalle wird gefunden" python3 scripts/pruefe-deploy-riegel.py
-zurueck scripts/deploy.sh
-
-# Der Befund vom 31.08.: Kommentare duerfen nicht als Riegel zaehlen.
-sichern scripts/deploy.sh
-python3 - <<'PY'
-s = open("scripts/deploy.sh").read()
-s = s.replace('  if ! firebase deploy --only firestore:malzime-eu --dry-run',
-              '  if ! echo ueberhaupt-kein-trockenlauf', 1)
-s = s.replace('  if ! firebase deploy --only "$TARGET" --dry-run',
-              '  if ! echo auch-keiner', 1)
+# Ein Notschalter, der in der Schlussbilanz NICHT genannt wird: genau der Fall,
+# in dem ein Lauf gruen aussieht, obwohl eine Pruefung uebersprungen wurde.
+s = s.replace("UEBERSPRUNGEN SKIP_SMOKE", "erledigt", 1)
 open("scripts/deploy.sh", "w").write(s)
-PY
-probe 1 "Trockenlauf nur noch als Kommentar wird gefunden" python3 scripts/pruefe-deploy-riegel.py
-zurueck scripts/deploy.sh
-
-# BEFUND 31.08.2026 (Runde 2, Gegenpruefer): Die beiden Sabotagen, mit denen
-# zwei Pruefer den Waechter ausgehebelt haben, kamen hier NICHT vor. Der
-# Waechter ueber den Waechtern hatte dieselben blinden Stellen wie der
-# Waechter selbst. Beide sind jetzt Proben.
-sichern scripts/deploy.sh
-python3 - <<'PYSELF'
-z = open("scripts/deploy.sh").read().split("\n")
-for i, l in enumerate(z):
-    if "Arbeitsbaum nicht sauber" in l:
-        for j in range(i, i + 6):
-            if z[j].strip() == "exit 1":
-                z[j] = z[j].replace("exit 1", ":")
-                break
-        break
-open("scripts/deploy.sh", "w").write("\n".join(z))
 PYSELF
-probe 1 "Meldung ohne Abbruch wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+probe 1 "Notschalter ohne Eintrag in der Schlussbilanz wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck scripts/deploy.sh
-
-sichern scripts/pruefe-deploy-riegel.py
-python3 - <<'PYSELF'
-s = open("scripts/pruefe-deploy-riegel.py").read()
-# Ein HILFSANKER (nach) auf eine Kommentarzeile: genau der Fall, der eine
-# Regel lautlos toetet. Das Suchmuster selbst ist bewusst NICHT betroffen —
-# ein fehlendes Muster ist ein Befund, kein Messproblem.
-s = s.replace('"nach": r"Cache-Busting-Version: ",', '"nach": r"Konvention: .v=YYYYMMDDNN",', 1)
-open("scripts/pruefe-deploy-riegel.py", "w").write(s)
-PYSELF
-probe 2 "Anker auf einem Kommentar meldet NICHT MESSBAR" python3 scripts/pruefe-deploy-riegel.py
-zurueck scripts/pruefe-deploy-riegel.py
 
 echo
 
-# ═══════════════════════════════════════════════════════════════════════════
-echo "2. pruefe-kopplung.py"
-
-probe 0 "Dateien innerhalb ihrer Grenzen bestehen" python3 scripts/pruefe-kopplung.py
-
-sichern scripts/pruefe-kopplung.py
-python3 - <<'PY'
-import re
-s = open("scripts/pruefe-kopplung.py").read()
-s = re.sub(r'"functions/src/jobs\.js": \d+', '"functions/src/jobs.js": 10', s)
-open("scripts/pruefe-kopplung.py", "w").write(s)
-PY
-probe 1 "ueberschrittene Grenze wird gefunden" python3 scripts/pruefe-kopplung.py
-zurueck scripts/pruefe-kopplung.py
-
-# Der wichtigste Fall: eine Datei aus der Liste verschwindet.
-sichern scripts/pruefe-kopplung.py
-python3 - <<'PY'
-s = open("scripts/pruefe-kopplung.py").read()
-s = s.replace('"functions/src/jobs.js"', '"functions/src/gibt-es-nicht.js"', 1)
-open("scripts/pruefe-kopplung.py", "w").write(s)
-PY
-probe_text 2 "NICHT MESSBAR" "fehlende Datei meldet NICHT MESSBAR statt gruen" python3 scripts/pruefe-kopplung.py
-zurueck scripts/pruefe-kopplung.py
-
-echo
-
-# ═══════════════════════════════════════════════════════════════════════════
-# BEFUND 31.08.2026 (Runde 3, von zwei Pruefern unabhaengig): Der
-# Bildspeicher-Abschnitt von verify-infrastructure.sh war der EINZIGE ohne
-# Einspeisepunkt — nie kaputtgemacht, nie nachgesehen. Folge: Er brach jeden
-# Deploy ab, sobald der Bucket LEER war, also im Sollzustand.
 echo "2b. verify-infrastructure.sh — Bildspeicher"
 : > /tmp/probe-leer.txt
 INFRA_PROBE_BILDER=/tmp/probe-leer.txt INFRA_PROBE_BILDER_CODE=1 \
@@ -288,7 +224,7 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  ERWARTETE_PROBEN=14
+  ERWARTETE_PROBEN=12
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

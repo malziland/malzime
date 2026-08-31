@@ -45,7 +45,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -183,8 +183,32 @@ echo "— Bildspeicher (Zusage: nur fuer die Wartezeit)"
 # werden. Ein Zugriffsfehler auf den Bucket meldete GRUEN, ausgerechnet bei der
 # Pruefung, die wegen 4.056 liegengebliebener Bilder gebaut wurde.
 # Jetzt wird der Rueckgabewert von gsutil SELBST gemessen, vor der Zaehlung.
+# OPS-2026-08-31-19: Einspeisepunkt fuer die Negativprobe. INFRA_PROBE_BILDER
+# nennt eine Datei mit der gsutil-Ausgabe; INFRA_PROBE_BILDER_CODE den
+# Rueckgabewert. Ohne ihn liess sich dieser Abschnitt nicht kaputtmachen —
+# genau deshalb blieb der Fehler mit dem leeren Bucket unentdeckt.
+if [ -n "${INFRA_PROBE_BILDER:-}" ]; then
+  BILDER_ROH=$(cat "$INFRA_PROBE_BILDER")
+  GSUTIL_CODE="${INFRA_PROBE_BILDER_CODE:-0}"
+  printf '%s' "${INFRA_PROBE_BILDER_FEHLER:-}" > /tmp/malzime-gsutil-fehler.log
+else
 BILDER_ROH=$(gsutil ls -l "$BUCKET/queue-uploads/" 2>/tmp/malzime-gsutil-fehler.log)
 GSUTIL_CODE=$?
+fi
+# BEFUND 31.08.2026 (Runde 3, von zwei Pruefern unabhaengig gefunden): Hier
+# galt JEDER Rueckgabewert ungleich 0 als "nicht lesbar" — auch der LEERE
+# Bucket. Der ist aber der SOLLZUSTAND: `gsutil ls` meldet dann
+# "One or more URLs matched no objects" mit Code 1. Der Riegel haette also
+# jeden Deploy abgebrochen, sobald der Bildspeicher sauber ist. Er laeuft bei
+# JEDEM Deploy.
+#
+# Ursache der Luecke: Dieser Abschnitt war der EINZIGE des Skripts ohne
+# Einspeisepunkt fuer eine Probe — er wurde nie kaputtgemacht und nachgesehen.
+# Der Einspeisepunkt INFRA_PROBE_BILDER unten schliesst das.
+if [ "$GSUTIL_CODE" -ne 0 ] && grep -q "matched no objects" /tmp/malzime-gsutil-fehler.log 2>/dev/null; then
+  GSUTIL_CODE=0
+  BILDER_ROH=""
+fi
 if [ "$GSUTIL_CODE" -ne 0 ]; then
   rot "Bildspeicher nicht lesbar (gsutil Code $GSUTIL_CODE) — ungeprueft gilt als nicht bestanden"
   sed 's/^/        /' /tmp/malzime-gsutil-fehler.log | head -3

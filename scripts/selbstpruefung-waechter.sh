@@ -230,6 +230,30 @@ zurueck scripts/pruefe-kopplung.py
 echo
 
 # ═══════════════════════════════════════════════════════════════════════════
+# BEFUND 31.08.2026 (Runde 3, von zwei Pruefern unabhaengig): Der
+# Bildspeicher-Abschnitt von verify-infrastructure.sh war der EINZIGE ohne
+# Einspeisepunkt — nie kaputtgemacht, nie nachgesehen. Folge: Er brach jeden
+# Deploy ab, sobald der Bucket LEER war, also im Sollzustand.
+echo "2b. verify-infrastructure.sh — Bildspeicher"
+: > /tmp/probe-leer.txt
+INFRA_PROBE_BILDER=/tmp/probe-leer.txt INFRA_PROBE_BILDER_CODE=1 \
+INFRA_PROBE_BILDER_FEHLER="CommandException: One or more URLs matched no objects." \
+  probe_text 0 "Keine Bilder aelter" "leerer Bucket ist der SOLLZUSTAND, nicht ein Fehler" \
+  sh scripts/verify-infrastructure.sh
+
+INFRA_PROBE_BILDER=/tmp/probe-leer.txt INFRA_PROBE_BILDER_CODE=1 \
+INFRA_PROBE_BILDER_FEHLER="AccessDeniedException: 403 Forbidden" \
+  probe_text 1 "nicht lesbar" "echter Zugriffsfehler wird gemeldet" \
+  sh scripts/verify-infrastructure.sh
+
+printf '    123456  2026-08-30T05:00:00Z  gs://x/queue-uploads/alt.jpg\n' > /tmp/probe-alt.txt
+INFRA_PROBE_BILDER=/tmp/probe-alt.txt INFRA_PROBE_BILDER_CODE=0 \
+  probe_text 1 "aelter als 3 Stunden" "liegengebliebene Bilder werden gefunden" \
+  sh scripts/verify-infrastructure.sh
+rm -f /tmp/probe-leer.txt /tmp/probe-alt.txt
+
+echo
+
 echo "3. pruefe-mitzieher.py"
 
 probe 0 "unveraenderter Baum besteht" python3 scripts/pruefe-mitzieher.py HEAD

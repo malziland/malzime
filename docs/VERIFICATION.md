@@ -13,7 +13,7 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 
 | Anforderung | Nachweisweg | Letztes Ergebnis |
 |---|---|---|
-| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 1199/1199 grün — `scripts/pruefstand.sh`, Commit 800250a, 2026-08-31 |
+| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 1199/1199 grün — `scripts/pruefstand.sh`, Commit 800250a, 2026-08-31 (mit installiertem `gcloud`; ohne werden zwei Tests uebersprungen, die die gcloud-Parameter der Rollback-Skripte abgleichen — dann 1198 von 1200) |
 | Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 483/483 grün — `scripts/pruefstand.sh`, Commit 800250a, 2026-08-31 |
 | E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 328/328 grün — `scripts/pruefstand.sh`, Commit 800250a, 2026-08-31 |
 | Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — 2026-08-10 |

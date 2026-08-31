@@ -57,8 +57,10 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    Datum stempeln.
 4. Deploy über `./scripts/deploy.sh [hosting|functions]`.
 
-   **Seit 31.08.2026 läuft ein Trockenlauf** (als sechster Riegel, nach
-   Stand-Bindung, Sauberkeits-Prüfung und CLI-Version) (`firebase deploy
+   **Seit 31.08.2026 läuft ein Trockenlauf** (nach Stand-Bindung,
+   Sauberkeits-Prüfung, CLI-Version, Infrastruktur-Prüfung und
+   Einstellungssatz — die genaue Position ist `deploy.sh` zu entnehmen, eine
+   Zahl hier veraltet bei jeder Umstellung) (`firebase deploy
    --dry-run`, rund 28 Sekunden), in derselben Reihenfolge und mit denselben
    Zielen wie der echte Deploy.
 

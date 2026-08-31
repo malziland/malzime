@@ -67,8 +67,6 @@ age-ab-v29-report.md
 docs/audit-*.md
 docs/sanierung-*.md
 # Auch der Ordner: Der Standardpfad der Audit-Prompts lautet
-# docs/audit/
-
 # docs/audit/JJJJ-MM-TT-....md und wird vom Muster oben NICHT gefasst.
 # Ohne diese Zeile landet der naechste Bericht wieder im oeffentlichen Repo.
 docs/audit/

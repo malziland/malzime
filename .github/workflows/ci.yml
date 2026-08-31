@@ -304,7 +304,7 @@ jobs:
       # Testlauf gefunden.
       #
       # Der zweite meldet, wenn Dateien wieder zusammenwachsen. mistral.js war
-      # auf 1691 Zeilen; an betriebsprofil.js haengen 14 Module. Aufteilen
+      # auf 1681 Zeilen; an betriebsprofil.js haengen 15 Module. Aufteilen
       # allein haelt nicht, wenn niemand hinsieht.
       #
       # BEIDE brauchen die Vergleichsbasis, deshalb steht fetch-depth: 0 im

@@ -3,7 +3,7 @@
 /**
  * mistral-antwort.js — Antworten der KI auseinandernehmen.
  *
- * HERAUSGELOEST AUS mistral.js am 31.08.2026. Grund: Die Datei war auf 1691
+ * HERAUSGELOEST AUS mistral.js am 31.08.2026. Grund: Die Datei war auf 1681
  * Zeilen gewachsen und vermischte vier Dinge — mit Mistral reden, die Antwort
  * zerlegen, den Ein-Aufruf-Weg, den Drei-Aufruf-Weg. Wer eine Zeile im Parser
  * aendert, musste die ganze Datei lesen.

@@ -296,7 +296,26 @@ def main():
         else:
             was = ", ".join(betroffen[:3])
 
-        fehlende = [b for b in regel["begleiter"] if b not in geaendert]
+        # BEFUND 31.08.2026 (Runde 4, F-6): Hier stand nur `b not in geaendert`.
+        # Ein Begleiter galt damit als mitgezogen, sobald er IRGENDWANN im
+        # Zweig beruehrt wurde — auch wenn er mit dieser Aenderung nichts zu
+        # tun hat. Gemessen: Eine neue Cloud Function an index.js angehaengt,
+        # keinen Begleiter angefasst -> "alle Begleiter mitgezogen", rc 0.
+        # Auf einem Zweig mit vielen Commits ist der Waechter so blind.
+        #
+        # Jetzt zaehlt der INHALT: Der Begleiter muss den ausgeloesten Namen
+        # nennen. Das ist die Frage, um die es geht — nicht, ob jemand die
+        # Datei einmal angefasst hat. Wo kein Name ermittelbar ist (Regeln
+        # ohne Ausloeser-Muster), bleibt es bei der Beruehrungspruefung.
+        namen = sorted(set(treffer)) if regel["ausloeser_muster"] else []
+        fehlende = []
+        for b in regel["begleiter"]:
+            if namen:
+                inhalt = (WURZEL / b).read_text(encoding="utf-8", errors="replace") if (WURZEL / b).exists() else ""
+                if not all(n in inhalt for n in namen):
+                    fehlende.append(b)
+            elif b not in geaendert:
+                fehlende.append(b)
         if not fehlende:
             print(f"  ok    {regel['name']}: alle Begleiter mitgezogen")
             continue

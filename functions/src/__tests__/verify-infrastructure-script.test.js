@@ -98,8 +98,9 @@ describe("verify-infrastructure.sh", () => {
   /* OPS-2026-08-13-40/41: Der Bucket-Riegel konnte vier Wochen lang nicht rot
      werden (PIPESTATUS[0]=printf statt [1]=python3), und niemand hätte es je
      bemerkt, weil dieser Riegel als einziger keine Negativprobe hatte. Diese
-     Tests treiben ihn über die Einspeisepunkte INFRA_PROBE_* rot und grün —
-     ohne gcloud, ohne Netz. */
+     Tests treiben ihn über die Einspeisepunkte INFRA_PROBE_* rot und grün.
+     Attrappen im PATH sorgen dafuer, dass dabei WIRKLICH kein gcloud und kein
+     Netz angefasst wird — bis zum 31.08.2026 stimmte dieser Satz nicht. */
   describe("der Bucket-Riegel kann rot werden (OPS-40/41)", () => {
     const os = require("os");
     const { execFileSync } = require("child_process");
@@ -118,10 +119,31 @@ describe("verify-infrastructure.sh", () => {
       /* Nur der Bucket-Abschnitt wird eingespeist; alle anderen Abschnitte
          fragen echtes gcloud. Ohne Anmeldung enden sie rot — deshalb prüfen
          wir hier NICHT den Gesamt-Exit, sondern die Bucket-Zeilen der Ausgabe. */
+      /* BEFUND 31.08.2026 (Runde 4): Hier lief das Skript mit vollem PATH.
+         Gemessen wurden 28 echte gcloud- und gsutil-Aufrufe gegen das
+         Produktivprojekt JE SUITE-LAUF, dazu zwei curl an firebaserules —
+         aus einem Unit-Test heraus. Der Kommentar darueber behauptete "ohne
+         gcloud, ohne Netz".
+         Jetzt liegen Attrappen im PATH: Sie antworten wie ein nicht
+         angemeldetes System. Die uebrigen Abschnitte melden dann rot, das ist
+         hier egal — geprueft werden ohnehin nur die Bucket-Zeilen. */
+      const attrappen = path.join(dir, "bin");
+      if (!fs.existsSync(attrappen)) {
+        fs.mkdirSync(attrappen);
+        for (const w of ["gcloud", "gsutil", "curl"]) {
+          const ziel = path.join(attrappen, w);
+          fs.writeFileSync(ziel, "#!/bin/sh\n" + `echo "ATTRAPPE ${w}: kein Zugriff im Test" >&2\n` + "exit 1\n");
+          fs.chmodSync(ziel, 0o755);
+        }
+      }
       try {
         return execFileSync("bash", [SCRIPT], {
           encoding: "utf8",
-          env: { ...process.env, INFRA_PROBE_BUCKET: bp },
+          env: {
+            ...process.env,
+            PATH: `${attrappen}:${process.env.PATH}`,
+            INFRA_PROBE_BUCKET: bp,
+          },
         });
       } catch (e) {
         return (e.stdout || "") + (e.stderr || "");

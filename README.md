@@ -275,7 +275,8 @@ das jetzt fest:
 `scripts/pruefe-mitzieher.py` beantwortet die Frage **"wenn du X aenderst,
 gehoert Y mitgezogen"**. Ein neues Pflichtfeld im Einstellungssatz braucht vier
 weitere Stellen; eine neue Cloud Function einen Eintrag im Alarm-Filter; eine
-neue Seite unter `public/` die Cache-Kennung. Jede Regel nennt, was passiert,
+neue Seite unter `public/` ihre Eintraege in beiden Sprachdateien. Jede Regel
+nennt, was passiert,
 wenn man sie vergisst — eine Meldung ohne Grund wird irgendwann weggeklickt.
 
 `scripts/pruefe-kopplung.py` meldet, wenn Dateien **wieder zusammenwachsen**.

@@ -219,6 +219,26 @@ rm -f /tmp/probe-leer.txt /tmp/probe-alt.txt
 
 echo
 
+# BEFUND 31.08.2026 (Runde 4, E-6): pruefe-kopplung.py kam in dieser Datei
+# GAR NICHT vor — waehrend Dateikopf, ci.yml und CHANGELOG behaupteten, alle
+# Waechter pruefen sich selbst. Der Waechter ueber den Waechtern hatte einen
+# blinden Fleck von der Groesse eines ganzen Werkzeugs.
+echo "2c. pruefe-kopplung.py"
+
+probe 0 "eingehaltene Grenzen bestehen" python3 scripts/pruefe-kopplung.py
+
+sichern scripts/pruefe-kopplung.py
+python3 - <<'PYSELF'
+s = open("scripts/pruefe-kopplung.py").read()
+# Eine Grenze so weit senken, dass die Datei sie reisst.
+s = s.replace('"functions/src/mistral.js": ', '"functions/src/mistral.js": 1, #', 1)
+open("scripts/pruefe-kopplung.py", "w").write(s)
+PYSELF
+probe 1 "gerissene Groessengrenze wird gefunden" python3 scripts/pruefe-kopplung.py
+zurueck scripts/pruefe-kopplung.py
+
+echo
+
 echo "3. pruefe-mitzieher.py"
 
 probe 0 "unveraenderter Baum besteht" python3 scripts/pruefe-mitzieher.py HEAD
@@ -253,7 +273,7 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  ERWARTETE_PROBEN=8
+  ERWARTETE_PROBEN=10
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

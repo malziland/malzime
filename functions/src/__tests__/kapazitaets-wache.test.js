@@ -151,3 +151,22 @@ describe("OPS-2026-08-31-07 — die Rate wird mitbewertet", () => {
     frisch.setClientForTest(null);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-23 (Runde 4, Befund F-9) — der Jest-Riegel dieser Datei war
+   durch nichts gesichert. Wer ihn entfernte, bekam weiterhin 10 gruene Tests.
+   Die Nachbarn cloud-tasks.js und queue-storage.js haben genau diesen
+   Nachweis; hier fehlte er.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-23 — die Wache fasst die echte Warteschlange nicht an", () => {
+  test("aus einem Test ohne Attrappe wird nicht gelesen", async () => {
+    jest.resetModules();
+    const frisch = require("../kapazitaets-wache");
+    frisch.setClientForTest(null);
+    /* echteParallelitaet faengt Fehler ab und liefert null — genau das ist der
+       Beleg: Ohne Riegel entstuende hier ein echter Client. */
+    await expect(frisch.echteParallelitaet()).resolves.toBeNull();
+    /* Direkt am Riegel: getClient wirft. */
+    expect(() => frisch._getClientFuerTest()).toThrow(/Attrappe|Emulator/i);
+  });
+});

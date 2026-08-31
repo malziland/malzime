@@ -152,6 +152,25 @@ def main():
     fehlend = []
     ungelistet = []
 
+    # BEFUND 31.08.2026 (Runde 4, F-4): `deploy-verhalten.test.js` ist der
+    # EINZIGE Nachweis, dass die acht Riegel der Auslieferung wirklich
+    # greifen — und liess sich spurlos loeschen, ohne dass ein Waechter
+    # anschlug. Gemessen: Datei entfernt, fuenf Waechter alle rc 0.
+    # Diese Dateien duerfen nicht verschwinden, ohne dass es auffaellt.
+    UNVERZICHTBAR = [
+        "functions/src/__tests__/deploy-verhalten.test.js",
+        "functions/jest.setup.js",
+        "scripts/selbstpruefung-waechter.sh",
+    ]
+    verschwunden = [d for d in UNVERZICHTBAR if not (WURZEL / d).exists()]
+    if verschwunden:
+        print("  UNVERZICHTBARE PRUEFUNG FEHLT:")
+        for d in verschwunden:
+            print(f"    {d}")
+        print("  Ohne sie gibt es fuer einen ganzen Bereich keinen Nachweis mehr.")
+        print()
+        return 1
+
     print("  Dateigroessen:")
     for pfad, grenze in sorted(ZEILEN_GRENZEN.items()):
         ist = zeilen(pfad)

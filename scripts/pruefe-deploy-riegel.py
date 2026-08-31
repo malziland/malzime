@@ -1,27 +1,29 @@
 #!/usr/bin/env python3
 """
-pruefe-deploy-riegel.py — Sind die Riegel im Auslieferungs-Skript noch da?
+pruefe-deploy-riegel.py — zwei Pruefungen an der Auslieferungskette.
 
-WOZU: Die Rueckbauprobe am 31.08.2026 hat gezeigt, dass `scripts/deploy.sh`
-von KEINEM Test abgedeckt ist. Trockenlauf, Aufraeumfalle, Stand-Bindung,
-Notschalter-Bilanz — alle liessen sich entfernen, ohne dass irgendetwas rot
-wurde.
+WAS DIESES SKRIPT NICHT (MEHR) TUT: Es prueft KEINE Riegel in `deploy.sh`.
 
-Das ist die gefaehrlichste Sorte Luecke: Das Skript enthaelt genau die Riegel,
-die verhindern, dass ungepruefter Code in die Produktion geht. Waeren sie weg,
-faellt es erst auf, wenn es zu spaet ist.
+Bis zum 31.08.2026 tat es das ueber Textmuster. Drei Pruefer haben es
+unabhaengig ausgehebelt — `exit` durch `:` ersetzt, `echo` stehen gelassen —
+und bekamen weiter "Alle Riegel vorhanden". Zwoelf realistische Rueckbauten
+blieben unbemerkt. Ein Textmuster belegt kein Verhalten.
 
-WAS HIER GEPRUEFT WIRD: Dass jeder Riegel vorhanden ist UND an der richtigen
-Stelle steht. Die Reihenfolge ist nicht kosmetisch — ein Trockenlauf nach dem
-Cache-Buster liesse bei jedem Abbruch einen unsauberen Arbeitsbaum zurueck, und
-eine Aufraeumfalle vor dem Cache-Buster fande nichts zum Aufraeumen.
+Die Riegel selbst prueft jetzt `functions/src/__tests__/deploy-verhalten.test.js`:
+Es fuehrt `deploy.sh` in einem Wegwerf-Klon aus, mit Attrappen fuer firebase,
+gh, verify-infrastructure und live-smoke. Acht Rueckbauproben belegen, dass
+jeder Fall rot wird, wenn der zugehoerige Riegel faellt.
 
-WAS ES NICHT KANN: Es fuehrt das Skript nicht aus. Ob ein Riegel WIRKT, zeigt
-nur ein echter Lauf — dafuer gibt es die Negativproben, die bei jeder Aenderung
-von Hand gefahren werden (dokumentiert im jeweiligen Commit).
+WAS HIER BLEIBT, sind die zwei Fragen, bei denen es wirklich um Text geht:
 
-AUFRUF:  python3 scripts/pruefe-deploy-riegel.py
-RUECKGABE: 0 = alle Riegel da, 1 = etwas fehlt, 2 = nicht messbar.
+  1. Wird jeder Notschalter (SKIP_*) in der Schlussbilanz genannt? Sonst sieht
+     ein Lauf gruen aus, obwohl eine Pruefung uebersprungen wurde.
+  2. Ist die concurrency-Einstellung der Pipeline richtig? Geprueft wird der
+     VERGLEICH, nicht nur das Vorkommen der Woerter.
+
+BEKANNTE GRENZE (Runde 4, F-4): Wer `deploy-verhalten.test.js` loescht, faellt
+hier nicht auf — dieses Skript kennt die Datei nicht. Der Schutz dagegen liegt
+in `pruefe-mitzieher.py`.
 """
 
 import re
@@ -177,6 +179,16 @@ def main():
         if not abbruch:
             print("  FEHLT   cancel-in-progress ist nicht gesetzt —")
             print("          bis zu fuenf Pruefdurchgaenge laufen gleichzeitig")
+            ci_fehlt = True
+        # BEFUND 31.08.2026 (Runde 4): Hier stand nur ein Test darauf, OB
+        # "refs/heads/main" im Wert vorkommt. Die exakte UMKEHRUNG — `==`
+        # statt `!=`, was genau die main-Laeufe abbricht — galt damit als
+        # "ok". Der Commit dazu hiess "Waechter pruefen Werte statt Woerter";
+        # eingeloest war nur ein Zeichenketten-Test. Jetzt wird der Vergleich
+        # selbst gelesen.
+        elif "!=" not in abbruch_text:
+            print(f"  FEHLT   cancel-in-progress bricht main nicht aus, sondern ein: {abbruch_text}")
+            print("          Erwartet ist `github.ref != 'refs/heads/main'`.")
             ci_fehlt = True
         elif "refs/heads/main" not in abbruch_text:
             print(f"  FEHLT   cancel-in-progress nimmt main nicht aus: {abbruch_text}")

@@ -18,10 +18,18 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **Fünf neue Wächter gegen teure Umbauten.** Einer merkt sich, was
   zusammengehört: Wer eine Einstellung hinzufügt, wird an die weiteren Stellen
   erinnert, die mitziehen müssen. Einer meldet, wenn Dateien wieder
-  zusammenwachsen, die getrennt gehören. Einer prüft, ob die Riegel der
-  Auslieferung vollständig und in der richtigen Reihenfolge stehen. Dazu eine
-  Selbstprüfung, die jeden Wächter absichtlich kaputtmacht und nachsieht, ob er
-  das merkt — und ein Riegel, der einen Push mit roten Prüfungen verhindert.
+  zusammenwachsen, die getrennt gehören. Einer prüft, ob jeder Notschalter der
+  Auslieferung in der Schlussbilanz genannt wird und die Pipeline-Einstellung
+  stimmt. Dazu eine Selbstprüfung, die jeden dieser Wächter absichtlich
+  kaputtmacht und nachsieht, ob er das merkt — und ein Riegel, der einen Push
+  mit roten Prüfungen verhindert.
+
+- **Die Riegel der Auslieferung werden ausgeführt geprüft, nicht gelesen.** Acht
+  Fälle fahren das Auslieferungs-Skript in einer Wegwerf-Kopie durch, mit
+  Attrappen statt echter Dienste: roter Pflicht-Check, unsauberer Arbeitsstand,
+  gescheiterter Trockenlauf, rote Infrastruktur-Prüfung, zu alte
+  Firebase-Version — und die drei Fälle, in denen die Cache-Kennung
+  zurückgenommen werden muss oder eben stehen bleiben.
   Alle melden ausdrücklich „nicht messbar", wenn ihre Grundlage fehlt, statt
   stillschweigend grün zu sein.
 

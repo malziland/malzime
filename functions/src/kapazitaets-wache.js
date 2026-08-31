@@ -235,5 +235,7 @@ module.exports = {
   setClientForTest,
   /* Fuer Tests */
   _bewerte: bewerte,
+  /* Nur fuer die Riegel-Probe: gibt getClient unveraendert nach aussen. */
+  _getClientFuerTest: () => getClient(),
   _baueMeldung: baueMeldung,
 };

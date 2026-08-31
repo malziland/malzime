@@ -197,25 +197,44 @@ zurueck scripts/deploy.sh
 echo
 
 echo "2b. verify-infrastructure.sh — Bildspeicher"
+
+# BEFUND 31.08.2026 (Runde 5, von beiden Pruefern): Diese drei Proben riefen
+# das Infrastruktur-Skript mit vollem PATH auf — gemessen 42 gcloud- und drei
+# curl-Aufrufe gegen das Produktivprojekt JE LAUF, dazu drei Lesezugriffe auf
+# config/betriebsprofil. Und das Skript haengt ueber vor-dem-push.sh an JEDEM
+# Push. Dieselbe Luecke wurde am selben Tag in verify-infrastructure-script.
+# test.js geschlossen, im Schwesterskript nicht.
+#
+# Attrappen kosten hier nichts: Geprueft wird ohnehin nur, was der
+# Bildspeicher-Abschnitt SAGT — die uebrigen Abschnitte sind fuer diese drei
+# Proben ohne Belang.
+ATTRAPPEN_BIN="$(mktemp -d)"
+for W in gcloud gsutil curl node; do
+  printf '#!/bin/sh\necho "ATTRAPPE %s: kein Zugriff in der Selbstpruefung" >&2\nexit 1\n' "$W" \
+    > "$ATTRAPPEN_BIN/$W"
+  chmod +x "$ATTRAPPEN_BIN/$W"
+done
+PATH_OHNE_CLOUD="$ATTRAPPEN_BIN:$PATH"
 : > /tmp/probe-leer.txt
 INFRA_PROBE_BILDER=/tmp/probe-leer.txt INFRA_PROBE_BILDER_CODE=1 \
 INFRA_PROBE_BILDER_FEHLER="CommandException: One or more URLs matched no objects." \
   probe_ausgabe "Keine Bilder aelter" "Bildspeicher nicht lesbar" \
   "leerer Bucket ist der SOLLZUSTAND, nicht ein Fehler" \
-  bash scripts/verify-infrastructure.sh
+  env PATH="$PATH_OHNE_CLOUD" bash scripts/verify-infrastructure.sh
 
 INFRA_PROBE_BILDER=/tmp/probe-leer.txt INFRA_PROBE_BILDER_CODE=1 \
 INFRA_PROBE_BILDER_FEHLER="AccessDeniedException: 403 Forbidden" \
   probe_ausgabe "Bildspeicher nicht lesbar" "Keine Bilder aelter" \
   "echter Zugriffsfehler wird gemeldet" \
-  bash scripts/verify-infrastructure.sh
+  env PATH="$PATH_OHNE_CLOUD" bash scripts/verify-infrastructure.sh
 
 printf '    123456  2026-08-30T05:00:00Z  gs://x/queue-uploads/alt.jpg\n' > /tmp/probe-alt.txt
 INFRA_PROBE_BILDER=/tmp/probe-alt.txt INFRA_PROBE_BILDER_CODE=0 \
   probe_ausgabe "aelter als 3 Stunden" "Keine Bilder aelter" \
   "liegengebliebene Bilder werden gefunden" \
-  bash scripts/verify-infrastructure.sh
+  env PATH="$PATH_OHNE_CLOUD" bash scripts/verify-infrastructure.sh
 rm -f /tmp/probe-leer.txt /tmp/probe-alt.txt
+rm -rf "$ATTRAPPEN_BIN"
 
 echo
 

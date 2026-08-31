@@ -29,6 +29,24 @@ let klon;
 beforeAll(() => {
   klon = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-deploy-"));
   execSync(`git clone --quiet --local --no-hardlinks "${WURZEL}" "${klon}"`, { stdio: "pipe" });
+  /* BEFUND 31.08.2026 (Runde 5): Zwei Ursachen machten diese Datei in der
+     Pipeline rot — beide hier unsichtbar, weil lokal weder das eine noch das
+     andere zutrifft.
+     (1) Beim Push auf main hat das Quell-Repo `main` ausgecheckt; der Klon
+         uebernimmt den aktiven Zweig, und `git branch -f main` scheitert dann
+         mit "cannot force update the branch 'main' used by worktree".
+         Deshalb wird im Klon ZUERST ein eigener Zweig ausgecheckt.
+     (2) `actions/checkout` holt fuer den Job `test-backend` FLACH (kein
+         fetch-depth) — `HEAD~1` gibt es dort nicht. Deshalb legt der Klon
+         selbst einen zusaetzlichen Commit an, statt sich auf die Historie des
+         Quell-Repos zu verlassen. */
+  execSync(
+    [
+      `git -C "${klon}" checkout -q -B pruefstand`,
+      `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "Pruefstand: Vorgaenger"`,
+    ].join(" && "),
+    { stdio: "pipe" }
+  );
   /* Der Klon braucht ein origin/main, das AUF HEAD zeigt — sonst schlaegt die
      Stand-Bindung schon an "HEAD != origin/main" an, und jeder Test wuerde
      denselben Riegel messen statt den, um den es geht.

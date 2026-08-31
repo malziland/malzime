@@ -190,7 +190,12 @@ def main():
     # der Kommentar oben fuer geschlossen erklaerte. Geschlossen war es nur fuer
     # die damals bekannten Haelften.
     SCHWELLE = 400
-    for pfad in sorted(glob.glob("functions/src/*.js")):
+    # BEFUND 31.08.2026 (Runde 5, H-10): Hier stand ein RELATIVER Pfad, waehrend
+    # alles andere ueber WURZEL geht. Aus einem anderen Verzeichnis heraus fand
+    # der glob nichts und der Waechter meldete "Alles innerhalb der Grenzen" —
+    # gemessen: aus der Projektwurzel rc 1, aus /tmp rc 0, bei gleichem Inhalt.
+    for pfad_abs in sorted((WURZEL / "functions" / "src").glob("*.js")):
+        pfad = str(pfad_abs.relative_to(WURZEL))
         if pfad in ZEILEN_GRENZEN:
             continue
         ist = zeilen(pfad)

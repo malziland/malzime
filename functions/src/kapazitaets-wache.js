@@ -80,7 +80,13 @@ async function echteParallelitaet() {
     const [queue] = await client.getQueue({ name });
     const wert = queue?.rateLimits?.maxConcurrentDispatches;
     return typeof wert === "number" && wert > 0 ? wert : null;
-  } catch (_e) {
+  } catch (e) {
+    /* BEFUND 31.08.2026 (Runde 5, H-11): Hier stand `catch (_e)` — der Grund
+       wurde verworfen. Der Kommentar acht Zeilen tiefer erklaert genau das
+       zum Fehler, diese Stelle hatte die alte Fassung behalten. Faellt nur das
+       Lesen der Parallelitaet aus, meldete die Logzeile `nicht-messbar` mit
+       `lesefehler: null`. */
+    letzterLesefehler = e && e.message ? e.message : String(e);
     return null;
   }
 }
@@ -173,6 +179,10 @@ function baueMeldung(befund) {
  * bleibt.
  */
 async function pruefeKapazitaet() {
+  /* Vor jedem Lauf zuruecksetzen: Sonst haengt der Grund eines EINMALIGEN
+     Fehlschlags dauerhaft in den Meldungen und sieht aus wie ein anhaltendes
+     Problem (Befund H-11, Runde 5). */
+  letzterLesefehler = null;
   const inDerQueue = await echteParallelitaet();
   /* OPS-2026-08-31-07: Auch die RATE messen. Sie bestimmt, wie schnell
      Aufrufe an die KI gehen, und war beim Vorfall vom 31.08. die verstellte
@@ -211,8 +221,7 @@ async function pruefeKapazitaet() {
         JSON.stringify({
           step: "kapazitaets-wache",
           status: "nicht-messbar",
-          betroffen:
-            nichtGemessen === undefined ? [] : nichtGemessen.map((b) => (b === rateBefund ? "rate" : "parallelitaet")),
+          betroffen: nichtGemessen.map((b) => (b === rateBefund ? "rate" : "parallelitaet")),
           lesefehler: letzterLesefehler,
           hinweis:
             "Kein Abgleich moeglich. Wiederholt sich das taeglich, ist die Wache blind — dann von Hand nachsehen.",

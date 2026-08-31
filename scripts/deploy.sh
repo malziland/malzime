@@ -1,14 +1,30 @@
 #!/usr/bin/env bash
 # malziME Deploy-Script
-# Fuehrt Lint + Unit-Tests aus, aktualisiert Cache-Busting-Versionen
-# (Konvention ?v=YYYYMMDDNN) und deployed auf Firebase.
+#
+# Bindet die Auslieferung an die CI-Freigabe, faehrt einen Trockenlauf,
+# aktualisiert die Cache-Kennungen (Konvention ?v=YYYYMMDDNN) und liefert auf
+# Firebase aus.
+#
+# BEFUND 31.08.2026 (A-8): Hier stand "Fuehrt Lint + Unit-Tests aus". Das
+# stimmt seit der Stand-Bindung nicht mehr — Lint und Tests laufen in der
+# Pipeline, hier nur noch bei SKIP_STAND=1. Und es war nur EIN Notschalter
+# genannt; es sind acht.
 #
 # Nutzung:
 #   ./scripts/deploy.sh              # Hosting + Functions
 #   ./scripts/deploy.sh hosting      # Nur Hosting
 #   ./scripts/deploy.sh functions    # Nur Functions
 #
-#   SKIP_TESTS=1 ./scripts/deploy.sh # Test-Guard ueberspringen (nur im Notfall!)
+# Notschalter, alle nur im Notfall und alle einzeln zu begruenden:
+#   SKIP_STAND=1      Stand-Bindung an die CI-Freigabe aus; dann laufen Lint
+#                     und Tests stattdessen hier
+#   SKIP_TESTS=1      Test-Riegel aus
+#   SKIP_DRYRUN=1     Trockenlauf aus
+#   SKIP_INFRA=1      Infrastruktur-Pruefung aus
+#   SKIP_SATZ=1       Pruefung des Einstellungssatzes aus
+#   SKIP_SMOKE=1      Live-Probe nach der Auslieferung aus
+#   SKIP_FIRESTORE=1  Firestore-Schritt aus
+#   SKIP_CLI_CHECK=1  Versionspruefung der Firebase-CLI aus
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -96,6 +112,12 @@ else
       PRNR=$(git log -1 --format=%s | grep -oE '#[0-9]+' | tail -1 | tr -d '#' || true)
       if [ -n "$PRNR" ] && command -v gh >/dev/null 2>&1; then
         PRKOPF=$(gh pr view "$PRNR" --json headRefOid -q .headRefOid 2>/dev/null || true)
+        # BEFUND 31.08.2026 (A-9): Hier stand `|| true` ohne Meldung. Der
+        # Ausfall war fail-closed, aber nicht diagnostizierbar — wer wissen
+        # wollte, warum die Abkuerzung entfiel, fand nichts im Protokoll.
+        if [ -z "$PRKOPF" ]; then
+          echo "Hinweis: Kopf-Commit von PR #${PRNR} nicht ermittelbar (gh pr view) — die Baum-Regel entfaellt."
+        fi
         if [ -n "$PRKOPF" ]; then
           # Der Kopf-Commit des PR liegt nach dem Squash-Merge nicht mehr
           # zwingend lokal. Scheitert das Holen, entfaellt die Abkuerzung —
@@ -112,6 +134,10 @@ else
             LAGE_PR=$(gh api "repos/malziland/malzime/commits/$PRKOPF/check-runs" \
               --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
                     | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+            # BEFUND 31.08.2026 (A-9): auch hier fehlte die Meldung.
+            if [ -z "$LAGE_PR" ]; then
+              echo "Hinweis: Pruefergebnisse zu PR #${PRNR} nicht abrufbar (gh api) — die Baum-Regel entfaellt."
+            fi
             if [ -n "$LAGE_PR" ]; then
               # SICHERHEITSBEFUND 31.08.2026 (unvorbelastetes Review): Hier
               # stand `LAGE="$LAGE_PR"` — die GESAMTE Lage von main wurde

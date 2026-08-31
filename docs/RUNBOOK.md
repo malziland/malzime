@@ -54,9 +54,12 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    wissen. Anlass waren sechs gescheiterte Auslieferungen
    an einem Tag — jede davon wäre hier sichtbar geworden, zusammen rund
    zweieinhalb Stunden. Bricht er ab, passiert nichts weiter (Notschalter
-   `SKIP_DRYRUN=1`). Scheitert der Deploy später doch, nimmt das Skript die
-   hochgezählte Cache-Kennung selbst zurück — sonst blockiert ein
-   gescheiterter Versuch den nächsten am Sauberkeits-Riegel.
+   `SKIP_DRYRUN=1`). Scheitert der Deploy später doch, nimmt das Skript
+   zurück, was es selbst geschrieben hat: die hochgezählte Cache-Kennung in
+   allen betroffenen Dateien **und** `public/build-info.json`. Sonst blockiert
+   ein gescheiterter Versuch den nächsten am Sauberkeits-Riegel. (Bis zum
+   31.08.2026 blieb `build-info.json` liegen — der nächste Versuch scheiterte
+   dann trotz Aufräumen.)
 
    **Lint und Unit-Tests laufen nur noch, wenn die Stand-Bindung NICHT
    gegriffen hat.** Sie verlangt ohnehin einen sauberen Arbeitsbaum,
@@ -67,8 +70,18 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    **Wartet der main-Lauf noch, zählen die Ergebnisse des Pull Requests** —
    aber nur, wenn dessen Baum-Kennung identisch ist. Dann ist jede Datei
    bitgenau gleich, und eine Prüfung kann nichts anderes finden. Zusammen mit
-   dem vorigen Punkt spart das rund elf Minuten je Auslieferung, ohne einen
+   dem vorigen Punkt spart das rund neun Minuten je Auslieferung, ohne einen
    Riegel aufzugeben.
+
+   Zwei Einschränkungen gehören dazu, sonst wäre es keine sichere Abkürzung:
+
+   - **Nur Ausstehendes wird nachgetragen.** Ersetzt werden ausschließlich
+     Checks, die auf `pending` oder ohne Ergebnis stehen. Ein `failure` auf
+     `main` bleibt ein `failure` — sonst könnte ein grünes PR-Ergebnis ein
+     rotes von `main` verdrängen.
+   - **`test-backend` ist ausgenommen.** Diese Suite hängt an der echten Uhr;
+     ihr Ergebnis von gestern sagt nichts über heute. Sie muss auf `main`
+     selbst grün sein.
 
    Das Skript prüft weiter die Version der Firebase-CLI gegen die
    in `deploy.sh` hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`; eine

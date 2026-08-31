@@ -15,28 +15,53 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   trotzdem ab, räumt sie jetzt hinter sich auf, statt den nächsten Versuch zu
   blockieren.
 
-- **Zwei neue Wächter gegen teure Umbauten.** Der eine merkt sich, was
-  zusammengehört: Wer eine Einstellung hinzufügt, wird an die vier weiteren
-  Stellen erinnert, die mitziehen müssen. Der andere meldet, wenn Dateien
-  wieder zusammenwachsen, die getrennt gehören. Beide melden ausdrücklich
-  „nicht messbar", wenn ihre Grundlage fehlt, statt stillschweigend grün zu
-  sein.
+- **Fünf neue Wächter gegen teure Umbauten.** Einer merkt sich, was
+  zusammengehört: Wer eine Einstellung hinzufügt, wird an die weiteren Stellen
+  erinnert, die mitziehen müssen. Einer meldet, wenn Dateien wieder
+  zusammenwachsen, die getrennt gehören. Einer prüft, ob die Riegel der
+  Auslieferung vollständig und in der richtigen Reihenfolge stehen. Dazu eine
+  Selbstprüfung, die jeden Wächter absichtlich kaputtmacht und nachsieht, ob er
+  das merkt — und ein Riegel, der einen Push mit roten Prüfungen verhindert.
+  Alle melden ausdrücklich „nicht messbar", wenn ihre Grundlage fehlt, statt
+  stillschweigend grün zu sein.
 
 ### Geändert
 
-- **Eine Auslieferung dauert rund elf Minuten weniger.** Die sechs Prüfungen
-  liefen zweimal über bitgenau denselben Code, und danach wiederholte das
-  Auslieferungs-Skript noch einmal Tests, die längst bestanden waren. Beide
-  Doppelungen sind weg; kein einziger Riegel wurde dafür entfernt.
+- **Eine Auslieferung dauert rund neun Minuten weniger.** Die sechs Prüfungen
+  liefen zweimal über bitgenau denselben Code. Die Doppelung ist weg; kein
+  einziger Riegel wurde dafür entfernt. Grundlage sind drei gemessene Läufe der
+  längsten Prüfung (8:13, 9:07 und 9:18).
 
-- **Die Antwort-Auswertung der KI liegt in einer eigenen Datei.** Die
-  Hauptdatei war auf 1691 Zeilen gewachsen und vermischte vier Aufgaben.
+- **Die Antwort-Auswertung der KI und die Auftragsannahme liegen in eigenen
+  Dateien.** Zwei Dateien waren auf 1681 und 680 Zeilen gewachsen und
+  vermischten mehrere Aufgaben; daraus sind fünf geworden, die Hauptdatei ist
+  bei 696 Zeilen. Das Verhalten ist unverändert — belegt durch einen Vergleich
+  aller Funktionen vor und nach der Aufteilung.
 
 ### Behoben
 
 - **Ein Test in der Prüfkette schlug gelegentlich grundlos fehl** und hielt
   damit Auslieferungen auf, obwohl nichts kaputt war. Er trennte zwei
   Handgriffe, zwischen denen unter Last etwas dazwischenkommen konnte.
+
+- **Fehlgeschlagene Analysen nennen ihren Grund jetzt auch im Protokoll.** Der
+  Server kennt sieben Gründe, warum eine Analyse nicht zustande kommt,
+  schrieb aber keinen davon auf. Nach einer Störung war deshalb nicht mehr
+  feststellbar, woran sie lag.
+
+- **Testläufe können die Produktion nicht mehr anfassen.** Ein Lasttest hatte
+  Bilder im echten Speicher abgelegt, wo sie liegen blieben, und die
+  Auslieferungs-Geschwindigkeit der laufenden Anwendung verstellt. Beides ist
+  jetzt verriegelt: Läuft ein Test oder ein lokaler Nachbau, verweigert der
+  Code den Zugriff auf die echten Dienste.
+
+- **Die tägliche Kapazitäts-Wache prüft jetzt beide Werte.** Sie verglich nur,
+  wie viele Analysen gleichzeitig laufen dürfen — nicht, wie schnell sie
+  losgeschickt werden. Genau der zweite Wert war verstellt.
+
+- **Die Prüfung auf ungenutzten Code kann wieder fehlschlagen.** Sie meldete
+  32 Fundstellen als Hinweis und beendete sich trotzdem erfolgreich. Unter den
+  Hinweisen steckte ein echter Fehler.
 
 ## [4.5.0] — 2026-08-30
 

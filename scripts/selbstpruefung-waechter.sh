@@ -25,9 +25,21 @@
 # JEDE PROBE PRUEFT BEIDE RICHTUNGEN. Nur zu testen, dass ein Waechter rot
 # werden kann, ist die haelfte: Einer, der IMMER rot ist, besteht das auch.
 #
-# Aufruf:  sh scripts/selbstpruefung-waechter.sh
+# Aufruf:  bash scripts/selbstpruefung-waechter.sh
 # Exit 0 = alle Waechter verhalten sich in beide Richtungen richtig.
 # ---------------------------------------------------------------------------
+# Wer die Datei mit `sh` aufruft, bekommt sonst nur "Illegal option -o
+# pipefail" — eine Meldung, die nicht sagt, was zu tun ist.
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "Diese Pruefung braucht bash (sie nutzt pipefail und Funktionen mit" >&2
+  echo "Rueckgabewert). Aufruf:  bash scripts/selbstpruefung-waechter.sh" >&2
+  exit 2
+fi
+
+# BASH, NICHT SH: `pipefail` gibt es in dash nicht, und dash ist auf
+# Ubuntu-Runnern das, worauf `sh` zeigt. Lokal auf macOS faellt das nicht auf —
+# dort ist `sh` gleich bash. Der Fehler zeigte sich erst in der Pipeline:
+# "set: Illegal option -o pipefail" (31.08.2026).
 set -uo pipefail
 
 WURZEL="$(cd "$(dirname "$0")/.." && pwd)"

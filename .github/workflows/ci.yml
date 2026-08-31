@@ -323,7 +323,7 @@ jobs:
       # Anlass 31.08.2026: Ein Pruefer ohne Vorwissen fand, dass zwei von
       # ihnen gruen meldeten, ohne etwas gemessen zu haben. Die Fehler waren
       # behoben, aber nichts hielt sie fest.
-      - run: sh scripts/selbstpruefung-waechter.sh
+      - run: bash scripts/selbstpruefung-waechter.sh
 
       # OSS-2026-08-12-22: Die selbst gehosteten Fremdbibliotheken (exifr,
       # Leaflet, die Schriften) hatten keinen Unveraendertheits-Nachweis. Eine

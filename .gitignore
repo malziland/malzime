@@ -67,9 +67,17 @@ age-ab-v29-report.md
 docs/audit-*.md
 docs/sanierung-*.md
 # Auch der Ordner: Der Standardpfad der Audit-Prompts lautet
+# docs/audit/
+
 # docs/audit/JJJJ-MM-TT-....md und wird vom Muster oben NICHT gefasst.
 # Ohne diese Zeile landet der naechste Bericht wieder im oeffentlichen Repo.
 docs/audit/
+
+# Uebergaben sind interne Arbeitsnotizen wie die Audit-Berichte: Auftraege,
+# Zitate des Auftraggebers, eigene Fehleranalysen. Am 31.08.2026 lagen zwei
+# davon im oeffentlichen Repository (Befund B-20 der Pruefschleife). Sie
+# gehoeren neben das Repo, nicht hinein.
+docs/handover/
 
 # Messdaten des Barrierefreiheits-Protokolls (werden bei jedem Lauf neu erzeugt)
 e2e/.protokoll/

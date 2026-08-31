@@ -79,7 +79,12 @@ ZEILEN_GRENZEN = {
     "public/js/render.js": 830,
     "functions/src/counter.js": 790,
     "functions/src/jobs.js": 770,
-    "functions/src/handle-process-job.js": 720,
+    # Nach zwei Schnitten (Helfer, Analyse-Wege) von 680 auf 290 Zeilen.
+    "functions/src/handle-process-job.js": 320,
+    # Die beiden Analyse-Wege.
+    "functions/src/job-pipelines.js": 400,
+    # Die kleinen Entscheidungen, die alle Wege brauchen.
+    "functions/src/job-helfer.js": 150,
     # Die Sprachdateien sind Inhalt, kein Code — sie duerfen wachsen.
     # Deshalb stehen prompts.js hier bewusst NICHT.
 }
@@ -87,7 +92,19 @@ ZEILEN_GRENZEN = {
 # Wie viele Module duerfen an einem einzelnen haengen? Ueber dieser Zahl wird
 # eine Aenderung dort teuer, weil sie ueberallhin ausstrahlt.
 ABHAENGIGKEITS_GRENZEN = {
-    "betriebsprofil": 15,  # heute 14 — der Umbau vom 30.08. hat hier verlagert
+    # ANGEHOBEN 31.08.2026 von 15 auf 17: Die Aufteilung von mistral.js und
+    # handle-process-job.js hat fuenf neue Dateien erzeugt, und jede holt ihre
+    # Betriebswerte selbst aus dem Einstellungssatz — statt sie durch drei
+    # Schichten gereicht zu bekommen.
+    #
+    # Das ist die gewollte Richtung: Wer einen Wert braucht, fragt danach. Die
+    # Alternative waere ein Durchreichen, das bei jeder Aenderung drei Stellen
+    # beruehrt — genau die Kopplung, gegen die dieser Waechter da ist.
+    #
+    # Wenn diese Zahl weiter steigt, ist die Frage nicht "hoeher setzen",
+    # sondern: Braucht es einen gemeinsamen Zugang, der die Werte einmal holt
+    # und weitergibt? Ab etwa 20 lohnt sich das.
+    "betriebsprofil": 17,
     # ANGEHOBEN 31.08.2026 von 12 auf 14: Die Aufteilung von mistral.js hat
     # drei neue Dateien erzeugt, und jede holt ihre Adressen und Modellnamen
     # selbst aus config — statt sie durchgereicht zu bekommen. Das ist die

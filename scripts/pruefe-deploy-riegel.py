@@ -72,7 +72,12 @@ RIEGEL_DEPLOY = [
     },
     {
         "name": "Firestore als eigener Schritt",
-        "muster": r"firebase deploy --only firestore:malzime-eu\b",
+        # OPS-2026-08-31-10: Das Muster traf zuerst auf den TROCKENLAUF
+        # (dieselbe Zeile mit --dry-run). re.search liefert nur den ersten
+        # Treffer — der echte Deploy-Schritt konnte durch echo ersetzt werden,
+        # und der Waechter meldete weiter "ok". Jetzt muss eine Zeile OHNE
+        # --dry-run existieren.
+        "muster": r"firebase deploy --only firestore:malzime-eu\b(?!.*--dry-run)",
         "warum": (
             "Im Paket mit hosting/functions scheitert der Aufruf an der\n"
             "     Standard-Datenbank, die es hier nicht gibt."

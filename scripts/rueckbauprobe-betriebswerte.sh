@@ -54,8 +54,12 @@ PY
 echo "── Rueckbauprobe: merkt die Testkette den Rueckfall? ────────"
 echo
 
-probe "1. Rueckfall auf Code-Zeitgrenze in mistral.js" \
-  "src/mistral.js" \
+# OPS-2026-08-31-08: Der Code steht seit der Aufteilung in mistral-http.js.
+# Die Probe suchte weiter in mistral.js und meldete MUSTER-NICHT-GEFUNDEN —
+# sie konnte den Rueckfall also gar nicht mehr pruefen. pruefe-mitzieher.py
+# kennt diese Kopplung nicht (siehe Regel unten).
+probe "1. Rueckfall auf Code-Zeitgrenze in mistral-http.js" \
+  "src/mistral-http.js" \
   'if (typeof timeoutCapMs !== "number" || !(timeoutCapMs > 0)) {
       throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
     }

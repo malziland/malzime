@@ -71,7 +71,7 @@ REGELN = [
     {
         "name": "Neues Pflichtfeld im Einstellungssatz",
         "ausloeser_datei": "functions/src/betriebsprofil.js",
-        "ausloeser_muster": r"^\+\s+([a-zA-Z]+):\s*\{\s*min:",
+        "ausloeser_muster": r"^\+\s+([A-Za-z_][A-Za-z0-9_]*):\s*\{\s*min:",
         "begleiter": [
             "functions/src/test-satz.js",
             "functions/src/produktiv-satz.js",
@@ -87,7 +87,7 @@ REGELN = [
     {
         "name": "Neue Cloud Function",
         "ausloeser_datei": "functions/src/index.js",
-        "ausloeser_muster": r"^\+exports\.([a-zA-Z]+)\s*=",
+        "ausloeser_muster": r"^\+exports\.([A-Za-z_][A-Za-z0-9_]*)\s*=",
         "begleiter": ["scripts/verify-infrastructure.sh"],
         "warum": (
             "Der Infrastruktur-Waechter prueft, ob JEDE Function im Filter der\n"
@@ -184,7 +184,12 @@ def main():
     # gilt eine Regel mit `nur_neue`.
     hinzugefuegt = lauf("git", "diff", "--name-only", "--diff-filter=A", f"{vergleich}...HEAD")
 
-    if committet is None and arbeitsbaum is None:
+    # OPS-2026-08-31-09: Hier stand `and`. Schlug der Diff gegen den
+    # Zielzweig fehl, gelang aber der Arbeitsbaum-Diff, lief der Waechter mit
+    # HALBER Messung weiter und meldete Rueckgabewert 0. Ein gescheitertes
+    # Messmittel ist zuerst ein Verdacht gegen die Messung, nicht gegen den
+    # Code — schon EIN Fehlschlag macht das Ergebnis unbrauchbar.
+    if committet is None or arbeitsbaum is None:
         print("  NICHT MESSBAR: git diff liefert nichts — kein Vergleichsstand?")
         print("  Ein leeres Ergebnis ist zuerst ein Verdacht gegen die Messung.")
         return 2

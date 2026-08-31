@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# pre-push — die Vorabpruefung ist ein RIEGEL, kein Hinweis.
+#
+# ANLASS, 31.08.2026: In einer einzigen Nacht wurde ZWEIMAL gepusht, obwohl
+# `vor-dem-push.sh` rot meldete. Beide Male dieselbe Ursache: Der Aufruf lief
+# in einer Befehlskette, die Ausgabe scrollte vorbei, und nichts hielt den
+# Push auf. Beide Male kostete es einen Pipeline-Durchlauf.
+#
+# Christoph dazu: "Wie kannst du pushen, obwohl rot ist? Genau das ist ja
+# unser Umbau und alles."
+#
+# Er hat recht: Der ganze Sinn der Waechter ist, dass sie HALTEN. Einer, der
+# nur meldet, verlaesst sich darauf, dass jemand hinsieht — und das ist genau
+# die Sorte Sicherung, die im entscheidenden Moment ausfaellt.
+#
+# EINRICHTEN (einmalig):
+#     git config core.hooksPath scripts/hooks
+#
+# NOTAUSGANG, wenn ein Push wirklich dringend ist:
+#     OHNE_VORABPRUEFUNG=1 git push
+#   Er meldet sich laut. Ein stiller Notausgang waere wieder nur ein Hinweis.
+# ---------------------------------------------------------------------------
+set -uo pipefail
+
+WURZEL="$(cd "$(dirname "$0")/../.." && pwd)"
+
+if [ "${OHNE_VORABPRUEFUNG:-0}" = "1" ]; then
+  echo ""
+  echo "  ⚠  OHNE_VORABPRUEFUNG=1 — die Vorabpruefung wurde UEBERSPRUNGEN."
+  echo "     Wenn die Pipeline gleich rot wird, liegt es daran."
+  echo ""
+  exit 0
+fi
+
+if [ ! -x "$WURZEL/scripts/vor-dem-push.sh" ] && [ ! -f "$WURZEL/scripts/vor-dem-push.sh" ]; then
+  # Fail-closed: Ohne Pruefung kein Push. Ein fehlendes Skript ist ein Grund
+  # zum Anhalten, nicht zum Durchwinken.
+  echo "FEHLER: scripts/vor-dem-push.sh nicht gefunden — Push angehalten." >&2
+  echo "        Notausgang: OHNE_VORABPRUEFUNG=1 git push" >&2
+  exit 1
+fi
+
+sh "$WURZEL/scripts/vor-dem-push.sh"
+CODE=$?
+
+if [ "$CODE" -ne 0 ]; then
+  echo "" >&2
+  echo "  ✘ PUSH ANGEHALTEN. Die Vorabpruefung ist rot (Code $CODE)." >&2
+  echo "" >&2
+  echo "    Erst beheben, dann pushen. Das spart pro Fehlschlag rund acht" >&2
+  echo "    Minuten Wartezeit an der Pipeline." >&2
+  echo "" >&2
+  echo "    Wenn es wirklich dringend ist: OHNE_VORABPRUEFUNG=1 git push" >&2
+  echo "" >&2
+  exit 1
+fi
+
+exit 0

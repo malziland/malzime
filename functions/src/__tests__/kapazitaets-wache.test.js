@@ -32,11 +32,20 @@ describe("Abgleich Code gegen echte Warteschlange", () => {
     expect(_baueMeldung(b)).toContain("cloudtasks-concurrency-7.sh");
   });
 
-  test("Kapazitaet wird verschenkt", () => {
+  /* OPS-2026-08-31: Frueher hiess dieser Fall "kapazitaet-verschenkt" und die
+     Meldung empfahl, den Einstellungssatz an die Warteschlange anzupassen. Der
+     Vorfall vom 31.08. hat gezeigt, dass das die GEFAEHRLICHE Richtung ist:
+     Ein Testlauf hatte die Warteschlange auf vierfaches Tempo gestellt, die
+     Wache haette empfohlen, das festzuschreiben. Es gehen dann mehr Aufrufe an
+     die KI, als ihre Stufe zulaesst — echte Nutzer sehen Ueberlastmeldungen. */
+  test("Warteschlange laeuft schneller als der Einstellungssatz", () => {
     const b = _bewerte(3, 10);
     expect(b.auffaellig).toBe(true);
-    expect(b.grund).toBe("kapazitaet-verschenkt");
-    expect(_baueMeldung(b)).toContain("verschenkt");
+    expect(b.grund).toBe("queue-laeuft-zu-schnell");
+    expect(_baueMeldung(b)).toContain("SCHNELLER als eingestellt");
+    /* Die Abhilfe muss die Warteschlange nachziehen, NICHT den Satz anheben. */
+    expect(_baueMeldung(b)).toContain("warteschlange-pruefen.sh --setzen");
+    expect(_baueMeldung(b)).toContain("NICHT den Satz anheben");
   });
 
   test("nicht messbar ist KEIN Befund", () => {

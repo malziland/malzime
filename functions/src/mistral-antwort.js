@@ -317,7 +317,6 @@ function escapeXml(str) {
 module.exports = {
   findeProfileTextWert,
   parseDescribeFooter,
-  extrahiereKarten,
   extrahiereLiveText,
   KARTEN_WERT_SCHLUESSEL,
   KARTEN_LABEL_SCHLUESSEL,

@@ -8,9 +8,14 @@
 # Dieses Skript macht die Regel „Zusagen über Infrastruktur werden an der
 # Infrastruktur belegt" automatisch statt händisch.
 #
-# Es verändert NICHTS: nur describe/list/get-iam-policy. Der Test
-# functions/src/__tests__/verify-infrastructure-script.test.js erzwingt das
-# (jede gcloud-/gsutil-Zeile muss ein Lese-Kommando sein).
+# Es verändert NICHTS an der Infrastruktur: nur describe/list/get-iam-policy.
+# Der Test functions/src/__tests__/verify-infrastructure-script.test.js
+# erzwingt das (jede gcloud-/gsutil-Zeile muss ein Lese-Kommando sein).
+#
+# Was es SEHR WOHL tut: Es fragt echte Dienste ab und braucht dafuer eine
+# gcloud-Anmeldung. Ohne sie melden die betroffenen Abschnitte rot. Fuer Tests
+# gibt es die Einspeisepunkte INFRA_PROBE_* — sie ersetzen die Antwort eines
+# Abschnitts, ohne den Dienst zu fragen.
 #
 # Nutzung:
 #   ./scripts/verify-infrastructure.sh      # direkt

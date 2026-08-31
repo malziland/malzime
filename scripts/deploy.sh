@@ -307,7 +307,7 @@ else
     echo "         Ohne ihn scheitert nach dem Deploy JEDE Analyse."
     echo
     echo "         Zuerst:  node scripts/betriebsprofil-anlegen.js --ausfuehren"
-    echo "         Danach:  sh scripts/deploy.sh"
+    echo "         Danach:  bash scripts/deploy.sh"
     echo
     echo "         (Beim allerersten Deploy von v4.4 ist das erwartet: Die alte"
     echo "          Fassung liest den Satz nicht, meldet aber ihr eigenes Limit."

@@ -44,11 +44,13 @@ RIEGEL_DEPLOY = [
     {
         "name": "Stand-Bindung an die CI-Freigabe",
         "muster": r"HEAD != origin/main",
+        "braucht_abbruch": True,
         "warum": "Ohne sie wird der Arbeitsbaum ausgeliefert, egal was die Pipeline sagt.",
     },
     {
         "name": "Sauberer Arbeitsbaum",
         "muster": r"Arbeitsbaum nicht sauber",
+        "braucht_abbruch": True,
         "warum": "Ohne sie gehen ungespeicherte Aenderungen mit in die Produktion.",
     },
     {
@@ -140,6 +142,29 @@ RIEGEL_DEPLOY = [
 # die Sorte Doppelquelle, die veraltet, sobald jemand einen Schalter zufuegt.
 
 
+def pruefe_durchsetzung(text, muster, fenster=6):
+    """OPS-2026-08-31-18: Ein Riegel ist erst einer, wenn er auch ABBRICHT.
+
+    BEFUND 31.08.2026 (Runde 2): Mehrere Regeln ankerten auf dem MELDUNGSTEXT
+    ("FEHLER: Arbeitsbaum nicht sauber"). Ausgefuehrt: die `exit 1` durch `:`
+    ersetzt, die echo-Zeilen stehen gelassen — der Waechter meldete weiter
+    "Alle Riegel vorhanden", Rueckgabewert 0. Ein so entwaffnetes deploy.sh
+    liefert einen schmutzigen Arbeitsbaum mit roten Pflicht-Checks aus.
+
+    Jetzt muss auf den Meldungstext innerhalb weniger Zeilen ein Abbruch
+    folgen. `fenster` deckt die uebliche Form ab: ein bis drei echo-Zeilen,
+    dann exit.
+    """
+    zeilen = text.split("\n")
+    for i, z in enumerate(zeilen):
+        if re.search(muster, z):
+            umfeld = zeilen[i : i + fenster]
+            if any(re.search(r"\bexit\s+[1-9]", u) for u in umfeld):
+                return True
+            return False
+    return None  # Muster gar nicht gefunden — das meldet die Haupt-Pruefung
+
+
 def pruefe_anker(text_roh, text_ohne_kommentar):
     """OPS-2026-08-31-17: Jeder Anker muss auf CODE zeigen, nicht auf einen
     Kommentar.
@@ -207,9 +232,13 @@ def main():
 
     fehlt = []
     falsch_platziert = []
+    ohne_abbruch = []
 
     for r in RIEGEL_DEPLOY:
         treffer = re.search(r["muster"], text, re.M)
+        if treffer and r.get("braucht_abbruch"):
+            if pruefe_durchsetzung(text, r["muster"]) is False:
+                ohne_abbruch.append(r)
         if not treffer:
             print(f"  FEHLT   {r['name']}")
             fehlt.append(r)
@@ -280,7 +309,7 @@ def main():
         return 2
 
     print()
-    anzahl = len(fehlt) + len(falsch_platziert) + len(ohne_bilanz) + (1 if ci_fehlt else 0)
+    anzahl = len(fehlt) + len(falsch_platziert) + len(ohne_abbruch) + len(ohne_bilanz) + (1 if ci_fehlt else 0)
     if anzahl == 0:
         print("  ERGEBNIS: Alle Riegel vorhanden und richtig platziert.")
         return 0
@@ -290,6 +319,11 @@ def main():
     for r in fehlt:
         print(f"  ▸ FEHLT: {r['name']}")
         print(f"     {r['warum']}")
+        print()
+    for r in ohne_abbruch:
+        print(f"  ▸ MELDUNG OHNE ABBRUCH: {r['name']}")
+        print("     Der Meldungstext steht da, aber kein `exit` dahinter — der Riegel")
+        print("     meldet und liefert trotzdem aus.")
         print()
     for r, wo in falsch_platziert:
         print(f"  ▸ FALSCHE STELLE: {r['name']} — {wo}")

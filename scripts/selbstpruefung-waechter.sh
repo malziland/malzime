@@ -169,6 +169,34 @@ PY
 probe 1 "Trockenlauf nur noch als Kommentar wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck scripts/deploy.sh
 
+# BEFUND 31.08.2026 (Runde 2, Gegenpruefer): Die beiden Sabotagen, mit denen
+# zwei Pruefer den Waechter ausgehebelt haben, kamen hier NICHT vor. Der
+# Waechter ueber den Waechtern hatte dieselben blinden Stellen wie der
+# Waechter selbst. Beide sind jetzt Proben.
+sichern scripts/deploy.sh
+python3 - <<'PYSELF'
+z = open("scripts/deploy.sh").read().split("\n")
+for i, l in enumerate(z):
+    if "Arbeitsbaum nicht sauber" in l:
+        for j in range(i, i + 6):
+            if z[j].strip() == "exit 1":
+                z[j] = z[j].replace("exit 1", ":")
+                break
+        break
+open("scripts/deploy.sh", "w").write("\n".join(z))
+PYSELF
+probe 1 "Meldung ohne Abbruch wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck scripts/deploy.sh
+
+sichern scripts/pruefe-deploy-riegel.py
+python3 - <<'PYSELF'
+s = open("scripts/pruefe-deploy-riegel.py").read()
+s = s.replace('"muster": r"SKIP_SATZ",', '"muster": r"Konvention: .v=YYYYMMDDNN",', 1)
+open("scripts/pruefe-deploy-riegel.py", "w").write(s)
+PYSELF
+probe 2 "Anker auf einem Kommentar meldet NICHT MESSBAR" python3 scripts/pruefe-deploy-riegel.py
+zurueck scripts/pruefe-deploy-riegel.py
+
 echo
 
 # ═══════════════════════════════════════════════════════════════════════════

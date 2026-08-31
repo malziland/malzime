@@ -265,11 +265,11 @@ Zwei Mechanismen halten die Trennung aufrecht:
    Begruendung `BLEIBT IM CODE — <Grund>`. Alles andere haelt die Auslieferung an.
    Die Pruefung laeuft in der Pipeline und vor jedem Push.
 
-### Zwei Waechter gegen teure Umbauten
+### Fuenf Waechter gegen teure Umbauten
 
 Ein Umbau des Einstellungssatzes am 30.08.2026 erzeugte 39 Fundstellen. Nicht
 weil der Code schlecht waere, sondern weil eine Aenderung dieser Art weit
-ausstrahlt — und weil nirgends stand, was zusammengehoert. Zwei Waechter halten
+ausstrahlt — und weil nirgends stand, was zusammengehoert. Fuenf Waechter halten
 das jetzt fest:
 
 `scripts/pruefe-mitzieher.py` beantwortet die Frage **"wenn du X aenderst,

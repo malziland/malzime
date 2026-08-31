@@ -88,7 +88,7 @@ else
     #
     # BEFUND 30.08.2026: Die sechs Pflicht-Checks liefen zweimal über denselben
     # Code — einmal auf dem Zweig, einmal auf `main` nach dem Squash-Merge. Der
-    # längste (`test-e2e`) dauert im Schnitt 8:41, gemessen über fünf Läufe.
+    # längste (`test-e2e`) dauert im Schnitt rund 8:45 (fünf Läufe: 8:13 bis 9:18).
     # Das sind rund neun Minuten Wartezeit pro Auslieferung, für eine Prüfung,
     # die dasselbe Ergebnis liefern MUSS.
     #
@@ -167,6 +167,12 @@ else
               # groesseren Teil.
               ZEITABHAENGIG="test-backend"
               NEUE_LAGE=""
+              # BEFUND aus Runde 1: `for X in $VAR` ohne `set -f` laesst die
+              # Shell Platzhalter aufloesen. Ein Check-Name mit `*` oder `?`
+              # wuerde dann gegen Dateinamen im Verzeichnis ersetzt. Heute
+              # unmoeglich (GitHub-Job-Namen enthalten das nicht), aber die
+              # Absicherung kostet eine Zeile.
+              set -f
               for EINTRAG in $LAGE; do
                 NAME="${EINTRAG%%=*}"
                 WERT="${EINTRAG#*=}"
@@ -174,6 +180,7 @@ else
                 for Z in $ZEITABHAENGIG; do
                   [ "$NAME" = "$Z" ] && UEBERSPRINGEN=1
                 done
+              set +f
                 if [ "$UEBERSPRINGEN" = "0" ] && \
                    { [ "$WERT" = "pending" ] || [ "$WERT" = "null" ] || [ -z "$WERT" ]; }; then
                   ERSATZ=$(printf '%s\n' "$LAGE_PR" | grep "^${NAME}=" || true)

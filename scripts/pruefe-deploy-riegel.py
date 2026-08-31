@@ -6,7 +6,7 @@ WAS DIESES SKRIPT NICHT (MEHR) TUT: Es prueft KEINE Riegel in `deploy.sh`.
 
 Bis zum 31.08.2026 tat es das ueber Textmuster. Drei Pruefer haben es
 unabhaengig ausgehebelt — `exit` durch `:` ersetzt, `echo` stehen gelassen —
-und bekamen weiter "Alle Riegel vorhanden". Zwoelf realistische Rueckbauten
+und bekamen weiter "Alle Riegel vorhanden". Zwoelf realistische Rueckbauten (einzeln gemessen)
 blieben unbemerkt. Ein Textmuster belegt kein Verhalten.
 
 Die Riegel selbst prueft jetzt `functions/src/__tests__/deploy-verhalten.test.js`:

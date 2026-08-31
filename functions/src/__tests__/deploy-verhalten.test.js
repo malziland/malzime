@@ -132,10 +132,13 @@ function skripteEinspielen() {
      schlimmer: verify-infrastructure.sh ruft echtes gcloud, live-smoke.sh
      POSTet auf malzi.me. Beides hat aus dieser Testdatei heraus nichts zu
      suchen. Steuerung: ATTRAPPE_<NAME>_ROT=1 laesst das jeweilige scheitern. */
+  /* BEFUND 31.08.2026 (Runde 5): Hier stand zusaetzlich eine Attrappe fuer
+     scripts/warteschlange-pruefen.sh — das ruft deploy.sh nirgends auf. Sie
+     suggerierte eine Abdeckung, die es nicht gibt. Der Satz-Riegel nutzt
+     stattdessen `curl` gegen malzi.me und ist deshalb per SKIP_SATZ=1 aus. */
   const eigene = {
     "scripts/verify-infrastructure.sh": "INFRA",
     "scripts/live-smoke.sh": "SMOKE",
-    "scripts/warteschlange-pruefen.sh": "SATZ",
   };
   for (const [datei, name] of Object.entries(eigene)) {
     const ziel = path.join(klon, datei);
@@ -510,6 +513,18 @@ describe("deploy.sh — Verhalten der Riegel", () => {
         { stdio: "pipe" }
       );
     }
+  });
+
+  test("abgebrochener Pflicht-Lauf gilt nicht als bestanden", () => {
+    /* BEFUND aus Runde 1, nie belegt: "cancelled-Fall nicht abgefangen".
+       Gemessen ist er es — `grep -qx "=success"` laesst nur exakt success
+       durch. Der Test haelt das fest, damit es so bleibt. */
+    const r = deploy({
+      ATTRAPPE_CHECKS:
+        "test-backend=success\ntest-frontend=success\ntest-e2e=cancelled\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/test-e2e.*cancelled|cancelled/i);
   });
 
   test("rote Infrastruktur-Pruefung haelt die Auslieferung an", () => {

@@ -246,7 +246,13 @@ async function handleProcessJob(req, res) {
        braucht, und wuerde die Ansage verfaelschen. Bewusst ohne await: Das
        Ergebnis steht bereits, niemand soll darauf warten. */
     if (success) {
-      merkeDauer((Date.now() - start) / 1000).catch(() => {});
+      merkeDauer((Date.now() - start) / 1000).catch((e) =>
+        /* BEFUND 31.08.2026: Der Fehlschlag wurde restlos verschluckt.
+           Scheitert das Fortschreiben dauerhaft, bleibt die Wartezeit-Ansage
+           auf einem alten Wert stehen — sichtbar fuer jeden Besucher, ohne
+           dass irgendwo etwas auffaellt. */
+        console.log(JSON.stringify({ warning: "merkeDauer-fehlgeschlagen", error: e.message }))
+      );
     }
   } catch (err) {
     /* Unerwarteter Fehler → trotzdem ein sauberes, renderbares blocked-

@@ -181,9 +181,7 @@ async function warteschlangeNachziehen({ parallelitaet, queueRatePerSekunde }) {
      * ersetzt Cloud Tasks durch eigenen Dispatch. Wer hier landet, wollte den
      * echten Dienst — aus einer Umgebung, die ihn nicht anfassen darf. */
     const emulator =
-      process.env.FIRESTORE_EMULATOR_HOST ||
-      process.env.FUNCTIONS_EMULATOR ||
-      process.env.CLOUD_TASKS_EMULATOR_HOST;
+      process.env.FIRESTORE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR || process.env.CLOUD_TASKS_EMULATOR_HOST;
     if (emulator && !clientOverride) {
       return {
         ok: false,

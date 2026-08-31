@@ -90,9 +90,7 @@ function bucket() {
    * Laeuft irgendein Emulator, ist der echte Bildspeicher immer der falsche
    * Ort — unabhaengig davon, ob jemand QUEUE_LOCAL zu setzen vergisst. */
   const emulator =
-    process.env.FIRESTORE_EMULATOR_HOST ||
-    process.env.FUNCTIONS_EMULATOR ||
-    process.env.STORAGE_EMULATOR_HOST;
+    process.env.FIRESTORE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR || process.env.STORAGE_EMULATOR_HOST;
   if (emulator) {
     throw new Error(
       "Es laeuft ein Emulator — der echte Bildspeicher wird nicht angefasst. " +

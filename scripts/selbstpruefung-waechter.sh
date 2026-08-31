@@ -71,8 +71,13 @@ if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   echo "  her. Bei ungespeicherten Aenderungen wuerde sie diese mitloeschen."
   echo "  Erst committen oder aufraeumen, dann erneut laufen lassen."
   echo ""
-  echo "  (Kein Fehler — nur nicht durchfuehrbar.)"
-  exit 0
+  echo "  (Kein Fehler — aber auch KEIN Beleg. Rueckgabewert 2.)"
+  # OPS-2026-08-31-12 (Befund B-7): Hier stand `exit 0`. Der Aufrufer
+  # vor-dem-push.sh zeigt die Ausgabe bei Rueckgabewert 0 nicht an — es
+  # erschien also "ok  Waechter-Selbstpruefung", obwohl NICHTS geprueft worden
+  # war. Ein uebersprungener Lauf darf nicht wie ein bestandener aussehen.
+  # 2 heisst hier wie ueberall: nicht messbar.
+  exit 2
 fi
 
 # Stellt bei JEDEM Ende wieder her, auch bei Strg+C und bei einem Fehler
@@ -99,6 +104,33 @@ probe() {
     return 0
   fi
   echo "  NEIN  $WAS (Rueckgabe $IST, erwartet $ERWARTET)"
+  printf '%s\n' "$AUSGABE" | tail -6 | sed 's/^/          /'
+  FEHLER=$((FEHLER + 1))
+  return 1
+}
+
+# OPS-2026-08-31-11: Wie `probe`, prueft aber ZUSAETZLICH die Ausgabe.
+#
+# BEFUND 31.08.2026: `probe 2 "fehlende Datei meldet NICHT MESSBAR"` bestand
+# auch dann, wenn der Waechter GAR NICHT MEHR EXISTIERTE — Python liefert bei
+# einem fehlenden Skript ebenfalls Rueckgabewert 2. Die Probe mass also nur,
+# dass irgendetwas eine 2 zurueckgibt, nicht dass der Waechter richtig
+# entscheidet. Ein Rueckgabewert allein ist bei Rueckgabewert 2 kein Beleg.
+probe_text() {
+  ERWARTET="$1"; MUSTER="$2"; WAS="$3"; shift 3
+  PROBEN=$((PROBEN + 1))
+  AUSGABE="$("$@" 2>&1)"
+  IST=$?
+  if [ "$IST" -eq "$ERWARTET" ] && printf '%s' "$AUSGABE" | grep -qE "$MUSTER"; then
+    echo "  ja    $WAS (Rueckgabe $IST, Text passt)"
+    return 0
+  fi
+  if [ "$IST" -ne "$ERWARTET" ]; then
+    echo "  NEIN  $WAS (Rueckgabe $IST, erwartet $ERWARTET)"
+  else
+    echo "  NEIN  $WAS (Rueckgabe stimmt, aber die Ausgabe nennt nicht '$MUSTER' —"
+    echo "        das passiert auch, wenn der Waechter gar nicht laeuft)"
+  fi
   printf '%s\n' "$AUSGABE" | tail -6 | sed 's/^/          /'
   FEHLER=$((FEHLER + 1))
   return 1
@@ -161,7 +193,7 @@ s = open("scripts/pruefe-kopplung.py").read()
 s = s.replace('"functions/src/jobs.js"', '"functions/src/gibt-es-nicht.js"', 1)
 open("scripts/pruefe-kopplung.py", "w").write(s)
 PY
-probe 2 "fehlende Datei meldet NICHT MESSBAR statt gruen" python3 scripts/pruefe-kopplung.py
+probe_text 2 "NICHT MESSBAR" "fehlende Datei meldet NICHT MESSBAR statt gruen" python3 scripts/pruefe-kopplung.py
 zurueck scripts/pruefe-kopplung.py
 
 echo

@@ -20,6 +20,7 @@ WURZEL=$(cd "$(dirname "$0")/.." && pwd)
 cd "$WURZEL" || exit 2
 
 FEHLER=0
+UNGEMESSEN=0
 LISTE=""
 
 # Fuehrt einen Schritt aus und merkt sich den Rueckgabewert.
@@ -32,6 +33,15 @@ lauf() {
   RC=$?
   if [ "$RC" -eq 0 ]; then
     printf '  ok    %s\n' "$BESCHREIBUNG"
+  elif [ "$RC" -eq 2 ]; then
+    # OPS-2026-08-31-12: Rueckgabewert 2 heisst ueberall in diesem Projekt
+    # "nicht messbar" — die Pruefung konnte nicht stattfinden. Das ist weder
+    # gruen (nichts wurde belegt) noch rot (nichts ist kaputt). Vorher fiel
+    # dieser Fall unter "sonst" und haette jeden Push blockiert; davor meldete
+    # die Selbstpruefung sogar 0 und log damit ein "ok".
+    printf '  ?     %s   (NICHT MESSBAR — kein Beleg)\n' "$BESCHREIBUNG"
+    printf '%s\n' "$AUSGABE" | sed 's/^/        /' | tail -8
+    UNGEMESSEN=$((UNGEMESSEN + 1))
   else
     printf '  ROT   %s   (Pipeline-Job: %s)\n' "$BESCHREIBUNG" "$CI_JOB"
     printf '%s\n' "$AUSGABE" | sed 's/^/        /' | tail -20
@@ -76,9 +86,19 @@ lauf "Zeitzuender (Frontend)" "test-frontend" sh scripts/pruefe-zeitzuender.sh .
 DAUER=$(($(date +%s) - START))
 echo "-----------------------------------------------------------"
 
-if [ "$FEHLER" -eq 0 ]; then
+if [ "$FEHLER" -eq 0 ] && [ "$UNGEMESSEN" -eq 0 ]; then
   echo "Alles gruen in ${DAUER} s. Die langen Suiten (Backend, E2E) fehlen hier"
   echo "bewusst — vor einem Release faehrt scripts/pruefstand.sh alles ab."
+  exit 0
+fi
+
+if [ "$FEHLER" -eq 0 ]; then
+  # OPS-2026-08-31-12: Kein Fehler, aber auch kein vollstaendiger Beleg.
+  # "Alles gruen" waere hier eine Luege ueber etwas, das nie gemessen wurde.
+  printf 'GRUEN, ABER UNVOLLSTAENDIG: %s Pruefung(en) konnten nicht messen.\n' "$UNGEMESSEN"
+  echo ""
+  echo "Nichts ist kaputt — aber fuer diese Punkte liegt kein Nachweis vor."
+  echo "Meist genuegt: committen oder aufraeumen, dann erneut laufen lassen."
   exit 0
 fi
 

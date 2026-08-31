@@ -103,7 +103,6 @@ describe("Lesen der echten Warteschlange", () => {
   });
 });
 
-
 /* ══════════════════════════════════════════════════════════════════════
    OPS-2026-08-31-07 — die Wache muss die RATE messen, nicht nur die
    Parallelitaet.
@@ -128,8 +127,7 @@ describe("OPS-2026-08-31-07 — die Rate wird mitbewertet", () => {
     expect(typeof modul.echteRate).toBe("function");
     /* Der Befund muss BEIDE Groessen tragen — sonst ist nicht erkennbar,
        welche von beiden auseinanderlaeuft. */
-    const quelle = require("fs").readFileSync(
-      require("path").join(__dirname, "..", "kapazitaets-wache.js"), "utf8");
+    const quelle = require("fs").readFileSync(require("path").join(__dirname, "..", "kapazitaets-wache.js"), "utf8");
     expect(quelle).toMatch(/await echteRate\(\)/);
   });
 });

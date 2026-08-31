@@ -171,7 +171,6 @@ describe("warteschlangeNachziehen", () => {
   });
 });
 
-
 /* ══════════════════════════════════════════════════════════════════════
    OPS-2026-08-31-05 — der Riegel muss auch den EMULATOR kennen.
 

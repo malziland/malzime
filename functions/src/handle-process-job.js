@@ -29,17 +29,7 @@
 const { isLocalQueueMode, localQueueConcurrency } = require("./config");
 /* PUNKT 3 des Nachtlaufs, 31.08.2026: Die kleinen Entscheidungen liegen in
    einer eigenen Datei — alle drei Wege brauchen sie. */
-const {
-  
-  
-  
-  
-  
-  
-  
-  loggeMinorSafety,
-  
-} = require("./job-helfer");
+const { loggeMinorSafety } = require("./job-helfer");
 
 /* Die beiden Analyse-Wege liegen in einer eigenen Datei — was hier bleibt, ist
    die Annahme des Auftrags und das Wegschreiben des Ergebnisses. */

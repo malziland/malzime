@@ -36,13 +36,8 @@ const {
 } = require("./mistral-http");
 
 const {
-  
-  
   extrahiereLiveText,
-  
-  
-  
-  
+
   REQUIRED_CARDS,
   findMissingCards,
   escapeXml,

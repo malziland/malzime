@@ -177,12 +177,26 @@ fi
 # Wartezeit gespeichert. Jobs leben hoechstens zwei Stunden. Ein Bild, das
 # aelter ist, gehoert zu keinem laufenden Auftrag mehr.
 echo "— Bildspeicher (Zusage: nur fuer die Wartezeit)"
-ALTE_BILDER=$(gsutil ls -l "$BUCKET/queue-uploads/" 2>/dev/null \
-  | grep -E "^ +[0-9]+" \
-  | awk -v grenze="$(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '3 hours ago' +%Y-%m-%dT%H:%M:%SZ)" \
-        '$2 < grenze {n++} END {print n+0}')
-if [ -z "$ALTE_BILDER" ]; then
-  rot "Bildspeicher nicht lesbar — ungeprueft gilt als nicht bestanden"
+# BEFUND 31.08.2026 (Runde 2): Der Zweig "nicht lesbar" war TOTER CODE.
+# `awk ... END {print n+0}` gibt auch bei leerer Eingabe "0" aus, und
+# `2>/dev/null` schluckte den Fehler von gsutil — `[ -z ]` konnte nie wahr
+# werden. Ein Zugriffsfehler auf den Bucket meldete GRUEN, ausgerechnet bei der
+# Pruefung, die wegen 4.056 liegengebliebener Bilder gebaut wurde.
+# Jetzt wird der Rueckgabewert von gsutil SELBST gemessen, vor der Zaehlung.
+BILDER_ROH=$(gsutil ls -l "$BUCKET/queue-uploads/" 2>/tmp/malzime-gsutil-fehler.log)
+GSUTIL_CODE=$?
+if [ "$GSUTIL_CODE" -ne 0 ]; then
+  rot "Bildspeicher nicht lesbar (gsutil Code $GSUTIL_CODE) — ungeprueft gilt als nicht bestanden"
+  sed 's/^/        /' /tmp/malzime-gsutil-fehler.log | head -3
+  ALTE_BILDER="nicht-messbar"
+else
+  ALTE_BILDER=$(printf '%s\n' "$BILDER_ROH" \
+    | grep -E "^ +[0-9]+" \
+    | awk -v grenze="$(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '3 hours ago' +%Y-%m-%dT%H:%M:%SZ)" \
+          '$2 < grenze {n++} END {print n+0}')
+fi
+if [ "$ALTE_BILDER" = "nicht-messbar" ]; then
+  : # Meldung steht bereits oben
 elif [ "$ALTE_BILDER" -eq 0 ]; then
   gruen "Keine Bilder aelter als 3 Stunden"
 else

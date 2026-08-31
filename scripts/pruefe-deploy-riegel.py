@@ -58,7 +58,22 @@ RIEGEL_DEPLOY = [
             "Ohne ihn scheitert eine Auslieferung erst nach 25 Minuten an Dingen,\n"
             "     die in 28 Sekunden sichtbar gewesen waeren. Am 30.08. sechsmal passiert."
         ),
-        "vor": r"Cache-Busting-Version generieren",
+        # OPS-2026-08-31-16: Hier stand `Cache-Busting-Version generieren` —
+        # dieser Text existiert in deploy.sh NUR in einer Kommentarzeile, und
+        # Zeile 126 entfernt Kommentare, bevor gesucht wird. `re.search` fand
+        # nichts, `anderer` war None, und die Reihenfolge-Pruefung fiel STILL
+        # aus. Belegt: Trockenlauf ans Dateiende verschoben -> Waechter meldete
+        # weiter "ok". Der neue Anker ist eine CODE-Zeile, die den Buster
+        # tatsaechlich erzeugt und die niemand entfernen kann, ohne die
+        # Auslieferung zu brechen.
+        # GRENZE, gemessen: `re.search` nimmt den ERSTEN Treffer. Es gibt zwei
+        # Trockenlauf-Zeilen (Firestore und Rest). Wird nur EINE hinter den
+        # Buster verschoben, findet die Regel noch die andere und meldet ok.
+        # Erst wenn beide falsch stehen, schlaegt sie an. Fuer den Schaden, um
+        # den es geht — ein Abbruch NACH dem Buster hinterlaesst einen
+        # unsauberen Arbeitsbaum — genuegt das, weil beide Zeilen im selben
+        # Block stehen und gemeinsam verschoben wuerden.
+        "vor": r'^VERSION="\(kein Hosting-Deploy',
     },
     {
         "name": "Aufraeumen bei Abbruch",
@@ -125,6 +140,30 @@ RIEGEL_DEPLOY = [
 # die Sorte Doppelquelle, die veraltet, sobald jemand einen Schalter zufuegt.
 
 
+def pruefe_anker(text_roh, text_ohne_kommentar):
+    """OPS-2026-08-31-17: Jeder Anker muss auf CODE zeigen, nicht auf einen
+    Kommentar.
+
+    Anlass: Die Reihenfolge-Regel des Trockenlaufs war von Anfang an tot — ihr
+    Anker stand nur in einer Kommentarzeile, und diese Funktion entfernt
+    Kommentare vor der Suche. Eine tote Regel verhaelt sich wie eine erfuellte:
+    beide schweigen. Deshalb prueft der Waechter jetzt SICH SELBST.
+    """
+    tote = []
+    for r in RIEGEL_DEPLOY:
+        for feld in ("muster", "vor", "nach"):
+            if feld not in r:
+                continue
+            try:
+                im_code = re.search(r[feld], text_ohne_kommentar, re.M)
+                im_roh = re.search(r[feld], text_roh, re.M)
+            except re.error:
+                continue
+            if im_roh and not im_code:
+                tote.append((r["name"], feld, r[feld]))
+    return tote
+
+
 def main():
     if not SKRIPT.exists():
         print(f"  NICHT MESSBAR: {SKRIPT} fehlt.")
@@ -151,6 +190,20 @@ def main():
 
     print("── Sind die Riegel im Auslieferungs-Skript noch da? ──")
     print()
+
+    # OPS-2026-08-31-17: ZUERST die eigenen Anker pruefen. Ein Anker, der nur
+    # auf einer Kommentarzeile liegt, findet nach dem Kommentarfilter nichts —
+    # die Regel ist dann tot und schweigt wie eine erfuellte. Genau so war die
+    # Reihenfolge-Regel des Trockenlaufs von Anfang an wirkungslos.
+    tote_anker = pruefe_anker(roh, text)
+    if tote_anker:
+        print("  ▸ EIGENE ANKER TOT — dieser Waechter kann nicht messen:")
+        for name, feld, muster in tote_anker:
+            print(f"     {name} ({feld}): '{muster}' steht NUR in einem Kommentar.")
+        print("     Anker gehoeren an Code-Zeilen, die niemand entfernen kann,")
+        print("     ohne dass die Auslieferung bricht.")
+        print()
+        return 2
 
     fehlt = []
     falsch_platziert = []

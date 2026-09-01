@@ -4,6 +4,21 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.6.2] — 2026-09-01
+
+### Behoben
+
+- **Die Kostenbremse zählte bei Andrang zu hoch.** Wenn viele Analysen
+  gleichzeitig starten, drängen sich alle am selben Zähler. Dauerte das zu
+  lange, gab die Anwendung auf und versuchte es noch einmal — obwohl der erste
+  Versuch in Wahrheit oft schon durchgegangen war. Dieselbe Analyse wurde so
+  zweimal gezählt. Gemessen bei 30 gleichzeitigen Uploads: **30 Analysen, aber
+  51 Einträge im Zähler.** Für den Workshop hieß das: Das Stundenlimit von 500
+  wäre schon bei rund 300 echten Analysen erreicht gewesen, und die Kinder
+  hätten „Limit erreicht" gesehen, obwohl die Hälfte des Kontingents frei war.
+  Der zweite Versuch entfällt jetzt genau dort, wo unklar ist, ob der erste
+  gezählt hat; wo es sicher ist, bleibt er.
+
 ## [4.6.1] — 2026-09-01
 
 ### Behoben

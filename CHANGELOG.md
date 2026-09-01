@@ -4,6 +4,40 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.6.1] — 2026-09-01
+
+### Behoben
+
+- **Der Sprachwechsel auf der Zahlen-Seite erreichte nur die Hälfte.** Wer auf
+  `/stats` von Deutsch auf Englisch umschaltete, bekam eine englische
+  Überschrift, aber deutsche Zahlen: „Ø 26 / Tag", „Verfügbar", „97,6 % frei" —
+  und deutsche Tausenderpunkte. Die englischen Texte gab es die ganze Zeit; sie
+  wurden nur nicht eingesetzt, weil der Umschalter allein fest hinterlegte Texte
+  austauscht und keine, die die Seite selbst berechnet. Beim Neuladen mit
+  englischer Adresse stimmte deshalb alles. Gefunden beim Durchklicken im
+  Browser nach der Auslieferung von 4.6.0.
+
+- **Ein Alarm wegen nichts.** Beim ersten Zugriff nach einer Ruhephase hatte der
+  Dienst zwei Sekunden Zeit, seine Einstellungen zu laden — zu knapp, solange
+  die Verbindung zur Datenbank noch aufgebaut wird. Einmal in sieben Tagen
+  reichte es nicht, und es ging eine Störungsmeldung raus, obwohl eine Sekunde
+  später alles normal lief und keine einzige Analyse betroffen war. Der erste
+  Zugriff bekommt jetzt mehr Zeit; im laufenden Betrieb bleibt es bei zwei
+  Sekunden.
+
+- **Das Betriebshandbuch beschrieb den Wartungsmodus falsch.** Dort stand ein
+  zweistufiger Weg mit Bestätigungsseite, den es für diesen Schalter nie gab —
+  jeder Versuch wäre mit „verboten" geendet, ohne zu sagen warum. Ausgerechnet
+  der Hebel für die kontrollierte Vollbremsung war damit im Ernstfall nicht
+  bedienbar. Der Text ist berichtigt, und es gibt jetzt ein Werkzeug, das
+  schaltet und danach nachmisst, ob es wirklich angekommen ist.
+
+- **Die Schlussprobe nach der Auslieferung meldete im Wartungsmodus falsch.**
+  Solange die Wartung läuft, antwortet der Einlass auf jede Anfrage gleich — die
+  Probe sah darin eine Abweichung und meldete rot, ohne den wahren Grund zu
+  nennen. Jetzt erkennt sie den Wartungsmodus, sagt „nicht messbar" statt
+  „kaputt" und nennt den Handgriff, der fehlt.
+
 ## [4.6.0] — 2026-09-01
 
 ### Neu

@@ -462,3 +462,53 @@ test.describe("Zahlen-Seite: echter Wechsel im laufenden Betrieb", () => {
     await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
   });
 });
+
+test.describe("Zahlen-Seite: der Wechsel erreicht auch die Zahlen", () => {
+  /* Sonst startet der Testbrowser (en-US) die Seite bereits englisch. */
+  test.use({ locale: "de-AT" });
+
+  /* WARUM DIESE PRUEFUNG EXISTIERT (01.09.2026, im Browser gefunden):
+     Der Test darueber prueft nach dem Wechsel die Ueberschrift. Die traegt
+     `data-sw-key`, also schreibt sie `beschriften()` ohnehin neu — er kann
+     deshalb gar nicht rot werden, egal was mit dem Rest der Seite passiert.
+
+     Rot war der Rest: Alles, was stats.js per textContent setzt, blieb nach
+     dem Wechsel auf Deutsch stehen — Durchschnitte, Verfuegbar-Marke, der
+     Frei-Anteil und die Zahlformatierung. Der Kommentar in stats.js behauptete
+     wortwoertlich das Gegenteil ("ein Wechsel zeichnet die Zahlen einfach
+     neu"). Genau dafuer gibt es Verhaltenstests: Eine Behauptung im Text ist
+     kein Beleg. Neu geladen mit ?lang=en war alles korrekt englisch — die
+     Uebersetzungen fehlten also nie, nur das Neuzeichnen. */
+  test("Durchschnitte, Marke und Zahlformat wechseln mit", async ({ page }) => {
+    await page.route("**/api/stats", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0, hourlyTotal: 10 },
+          totals: { today: 10, week: 50, month: 200, allTime: 4000 },
+          useQueue: true,
+          sprachumschalter: true,
+        }),
+      })
+    );
+    await page.goto("/stats.html");
+
+    /* Ausgangslage messen: Wer nicht belegt, dass es vorher deutsch WAR,
+       belegt auch nicht, dass der Wechsel etwas bewirkt hat. */
+    await expect(page.locator("#avgDay")).toContainText("Tag");
+    await expect(page.locator("#limitBadge")).toHaveText("Verfügbar");
+    await expect(page.locator("#totalValue")).toHaveText("4.000");
+
+    await page.click('.sprach-knopf[data-lang="en"]');
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+
+    await expect(page.locator("#avgDay")).toContainText("day");
+    await expect(page.locator("#avgWeek")).toContainText("week");
+    await expect(page.locator("#avgMonth")).toContainText("month");
+    await expect(page.locator("#limitBadge")).toHaveText("Available");
+    await expect(page.locator("#limitFree")).toContainText("free");
+    /* Die Zahlformatierung haengt an derselben Sprache (Intl.NumberFormat). */
+    await expect(page.locator("#totalValue")).toHaveText("4,000");
+  });
+});

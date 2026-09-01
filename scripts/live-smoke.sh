@@ -33,6 +33,27 @@ probe() { # $1 Beschreibung, $2 erwarteter HTTP-Code, $3 Methode, $4 Pfad, $5 Bo
 
 echo "Live-Smoke gegen $BASIS (kostenfrei, ohne Zustandsänderung)"
 
+# 0) ZUERST den Wartungsmodus abfragen.
+#
+#    BEFUND 01.09.2026: Bei aktivem Wartungsmodus antwortet /api/enqueue mit
+#    503 (handle-enqueue.js, noch vor jeder Validierung). Die Proben unten
+#    erwarten 400 bzw. 403 — der Smoke meldete deshalb ROT und nannte nur
+#    "SOLL 400, IST 503". Wer das im Ernstfall liest, sucht den Fehler in der
+#    Auslieferung, obwohl bloss die Wartung noch an ist. Ein Messmittel, das
+#    die falsche Ursache nennt, kostet mehr Zeit als gar keines.
+#
+#    Kein stiller Durchwinken: Der Lauf bricht ab und sagt, was zu tun ist.
+WARTUNG=$(curl -s --max-time 20 "$BASIS/api/stats" | grep -o '"maintenance":{"enabled":[a-z]*' | grep -o '[a-z]*$' || true)
+if [ "$WARTUNG" = "true" ]; then
+  printf "  \033[33m?\033[0m Wartungsmodus ist AN — die Proben unten koennen nicht messen.\n"
+  echo
+  echo "ERGEBNIS: NICHT MESSBAR (kein Fehler, aber auch kein Beleg)."
+  echo "  Der Einlass antwortet im Wartungsmodus mit 503, bevor er irgendetwas"
+  echo "  prueft. Erst ausschalten, dann erneut messen:"
+  echo "    sh scripts/wartungsmodus.sh aus"
+  exit 2
+fi
+
 # 1) Kompletter Request-Weg: Body ankommen, Base64 dekodieren, Validierung
 #    erreichen — BMP steht nicht auf der Erlaubt-Liste und MUSS 400 geben.
 probe "Upload-Weg (BMP → Ablehnung)" 400 POST "/api/enqueue" '{"imageBase64":"aGFsbG8gbWFsemlNRQ==","mimeType":"image/bmp","lang":"de"}'

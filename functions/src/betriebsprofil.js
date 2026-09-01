@@ -109,25 +109,13 @@ const DOKUMENT = "config/betriebsprofil";
    grosszuegig fuer das Lesen EINES kleinen Dokuments und kurz genug, dass
    niemand es merkt. */
 const LESE_ZEITLIMIT_MS = 2000;
-/* ABER: der ALLERERSTE Lesevorgang einer frisch gestarteten Instanz bekommt
-   mehr Zeit.
-
-   BETRIEBSVORFALL 01.09.2026, 19:01 Wien: Genau ein Lesevorgang riss die
-   2000 ms und meldete `nicht lesbar: Zeitlimit 2000 ms` — der Nutzer bekam
-   dafuer eine Alarm-Mail. Eine Sekunde spaeter war derselbe Satz wieder
-   lesbar, kein Nutzer war betroffen, und in sieben Tagen ist es genau einmal
-   passiert. Die Anwendung war also nicht kaputt; zu knapp war die Grenze fuer
-   den einen Moment, in dem die Instanz hochfaehrt und die Datenbank-
-   verbindung noch gar nicht steht.
-
-   Warum nicht einfach ein zweiter Versuch: Der haette die Wartezeit im
-   Fehlerfall auf 4 s verdoppelt und damit die Zusicherung gebrochen, dass
-   niemand laenger als das Zeitlimit wartet. Und er haette nicht geholfen —
-   wenn schon 2000 ms nicht reichen, reichen zwei Anlaeufe von je 2000 ms
-   erst recht nicht, wenn die Verbindung noch aufgebaut wird.
-
-   Die Grenze fuer den LAUFENDEN Betrieb bleibt deshalb unangetastet: Sobald
-   einmal gelesen wurde, gelten wieder 2000 ms. */
+/* BLEIBT IM CODE — Schutzgrenze wie oben, keine Einstellung.
+   Der ERSTE Lesevorgang einer frisch gestarteten Instanz bekommt mehr Zeit:
+   Solange die Datenbankverbindung aufgebaut wird, sind 2000 ms zu knapp
+   (belegt 01.09.2026, ein Fehlschlag in sieben Tagen, ohne Folge fuer eine
+   Analyse — Hergang im CHANGELOG). Im laufenden Betrieb bleibt es bei
+   2000 ms; ein zweiter Leseversuch haette stattdessen die Wartezeit im
+   Fehlerfall verdoppelt. */
 const ERSTES_LESE_ZEITLIMIT_MS = 5000;
 let schonGelesen = false;
 /* Wie die Feature-Flags: kurz genug, dass eine Umstellung in Sekunden wirkt,

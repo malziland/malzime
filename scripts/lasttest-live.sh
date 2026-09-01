@@ -115,7 +115,22 @@ fi
 #    Gemessen wird deshalb der zuletzt eingereihte.
 LETZTER=$(grep -ho '"jobId":"[^"]*"' "$ABLAGE"/ein-*.json | tail -1 | cut -d'"' -f4)
 LETZTER_TOKEN=$(grep -l "$LETZTER" "$ABLAGE"/ein-*.json | head -1 | xargs grep -ho '"resultToken":"[^"]*"' | cut -d'"' -f4)
-ANSAGE=$(curl -s --max-time 20 "$BASIS/api/jobStatus?jobId=$LETZTER&token=$LETZTER_TOKEN")
+# BEFUND 01.09.2026: Hier stand `/api/jobStatus`. Die Route heisst
+# `/api/job-status` (firebase.json). Der Aufruf lief ins Leere, das Skript
+# meldete "Position keine" und spaeter "abgelaufen: 30" — obwohl alle 30
+# Analysen fertig wurden. Ein Messmittel, das die falsche Adresse fragt,
+# misst nichts und sagt es nicht.
+ANSAGE=$(curl -s --max-time 20 "$BASIS/api/job-status?jobId=$LETZTER&token=$LETZTER_TOKEN")
+case "$ANSAGE" in
+  *'"status"'*) : ;;
+  *)
+    echo "   ABBRUCH: Die Statusabfrage liefert nichts Verwertbares."
+    echo "            Antwort: $(printf '%s' "$ANSAGE" | head -c 120)"
+    echo "            Ohne sie kann dieser Lauf nichts ueber Wartezeiten oder"
+    echo "            Ergebnisse sagen. Erst die Route pruefen (firebase.json)."
+    exit 1
+    ;;
+esac
 POS=$(printf '%s' "$ANSAGE" | grep -o '"position":[0-9]*' | cut -d: -f2)
 ETA=$(printf '%s' "$ANSAGE" | grep -o '"etaSeconds":[0-9]*' | cut -d: -f2)
 echo
@@ -136,7 +151,7 @@ for f in "$ABLAGE"/ein-*.json; do
   (
     JOB_START=$(date +%s)
     while [ $(( $(date +%s) - JOB_START )) -lt 1200 ]; do
-      ST=$(curl -s --max-time 20 "$BASIS/api/jobStatus?jobId=$JOB&token=$TOK")
+      ST=$(curl -s --max-time 20 "$BASIS/api/job-status?jobId=$JOB&token=$TOK")
       case "$ST" in
         *'"status":"done"'*)    echo "done $(( $(date +%s) - GESAMT_START ))" >> "$ABLAGE/zeiten.txt"; exit 0 ;;
         *'"status":"failed"'*)  echo "failed $(( $(date +%s) - GESAMT_START ))" >> "$ABLAGE/zeiten.txt"; exit 0 ;;
@@ -149,9 +164,13 @@ done
 wait
 GESAMT=$(( $(date +%s) - GESAMT_START ))
 
-FERTIG=$(grep -c '^done' "$ABLAGE/zeiten.txt" 2>/dev/null || echo 0)
-FEHLER=$(grep -c '^failed' "$ABLAGE/zeiten.txt" 2>/dev/null || echo 0)
-ABLAUF=$(grep -c '^timeout' "$ABLAGE/zeiten.txt" 2>/dev/null || echo 0)
+# `grep -c ... || echo 0` liefert bei fehlender Datei ZWEI Zeilen ("0\n0") —
+# die Vergleiche darunter brachen dann mit "integer expression expected" ab.
+# Erst zaehlen, dann auf genau eine Zahl reduzieren.
+zaehle() { grep -c "$1" "$ABLAGE/zeiten.txt" 2>/dev/null | head -1 | tr -dc '0-9'; }
+FERTIG=$(zaehle '^done'); FERTIG=${FERTIG:-0}
+FEHLER=$(zaehle '^failed'); FEHLER=${FEHLER:-0}
+ABLAUF=$(zaehle '^timeout'); ABLAUF=${ABLAUF:-0}
 
 # 5. Auswertung — Median und Spanne der Durchlaufzeiten.
 ZEITEN=$(grep '^done' "$ABLAGE/zeiten.txt" 2>/dev/null | awk '{print $2}' | sort -n)
@@ -184,3 +203,17 @@ if [ -n "${VOR_GESAMT:-}" ] && [ -n "${NACH_GESAMT:-}" ]; then
 fi
 echo
 echo "   Kosten (0,5-0,8 Cent je Analyse): rund $((ANGENOMMEN * 5 / 10)) bis $((ANGENOMMEN * 8 / 10)) Cent"
+
+# WIDERSPRUCHSPRUEFUNG (01.09.2026): Der erste Lauf meldete "abgelaufen: 30"
+# und im selben Atemzug "Zuwachs: 31". Ein Messmittel, das sich selbst
+# widerspricht, darf das nicht stillschweigend tun.
+if [ -n "${VOR_GESAMT:-}" ] && [ -n "${NACH_GESAMT:-}" ]; then
+  ZUWACHS=$((NACH_GESAMT - VOR_GESAMT))
+  if [ "$ZUWACHS" -gt 0 ] && [ "$FERTIG" -eq 0 ]; then
+    echo
+    echo "   WARNUNG: Die Zaehlung sagt 0 fertig, die Statistik zeigt aber"
+    echo "            $ZUWACHS neue Profile. Die Ergebnismessung dieses Skripts"
+    echo "            ist kaputt, nicht die Anwendung. Erst das Werkzeug pruefen."
+    exit 1
+  fi
+fi

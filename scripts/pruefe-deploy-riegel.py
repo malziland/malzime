@@ -318,8 +318,29 @@ def main():
         wo = [n for n, m in listen if datei.name not in m]
         if wo:
             waechter_fehlt.append((datei.name, ", ".join(wo)))
+    # Und steht jeder Waechter in der Uebersicht? Eine Pruefschicht, deren
+    # Zusammenhang nur einer kennt, ist unwartbar — unabhaengig davon, wie gut
+    # die einzelnen Teile sind. docs/WAECHTER.md beantwortet je Waechter:
+    # wovor schuetzt er, welcher Vorfall hat ihn ausgeloest, was kostet er,
+    # welche Ausnahmen kennt er. Ein Eintrag ist Pflicht, damit die Seite
+    # nicht so veraltet wie jede andere Doku.
+    uebersicht = WURZEL / "docs" / "WAECHTER.md"
+    if not uebersicht.exists():
+        print("  NICHT MESSBAR: docs/WAECHTER.md fehlt.")
+        return 2
+    text_uebersicht = uebersicht.read_text(encoding="utf-8")
+    undokumentiert = [d.name for d in skripte if d.name not in text_uebersicht]
+    if undokumentiert:
+        for name in undokumentiert:
+            print(f"  FEHLT   {name} steht nicht in docs/WAECHTER.md")
+        print("          Wer einen Waechter baut, traegt ihn dort ein — sonst")
+        print("          weiss in vier Wochen niemand mehr, wovor er schuetzt.")
+        waechter_fehlt.extend((n, "docs/WAECHTER.md") for n in undokumentiert)
+
     if waechter_fehlt:
         for name, wo in waechter_fehlt:
+            if wo == "docs/WAECHTER.md":
+                continue
             print(f"  FEHLT   {name} wird nicht aufgerufen aus: {wo}")
         print("          Ein Waechter, den niemand aufruft, ist kein Waechter.")
     else:

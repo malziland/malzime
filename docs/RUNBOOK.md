@@ -492,8 +492,9 @@ Modellversion — immer das Dashboard, nicht Code-Kommentare). Notfalls Wartungs
 ### »notbremse-gegriffen« — der Stundenzähler ist ausgefallen
 
 **Was passiert ist:** Der reguläre Zähler kam nicht durch (Datenbanksperre bei
-Andrang), und das Netz hat übernommen — es hat die Aufträge der letzten Stunde
-gezählt und **blockiert**, weil das Limit erreicht war.
+Andrang), und das Netz hat übernommen — es hat denselben Zählerstand ohne Sperre
+gelesen (seit 01.09.2026; vorher zählte es Auftrags-Dokumente, siehe
+BIZ-2026-09-01-01) und **blockiert**, weil das wirksame Limit erreicht war.
 
 **Ist das schlimm?** Nein, das ist die Bremse bei der Arbeit. Die Meldung sagt
 nur: Es ist gerade viel los, und die Kostengrenze greift.

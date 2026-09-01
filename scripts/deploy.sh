@@ -778,8 +778,14 @@ fi
 # BEFUND 01.09.2026 (Runde 6): Mit `|| true` sah ein DEFEKTES Skript genauso
 # aus wie ein CHANGELOG, das noch auf [Unveroeffentlicht] steht — beide leer.
 # Der Rueckgabewert wird jetzt getrennt gelesen.
-OBERSTE="$(bash scripts/changelog-oberste-version.sh CHANGELOG.md 2>/dev/null)"
-OBERSTE_RC=$?
+# ACHTUNG beim Bearbeiten: Unter `set -euo pipefail` bricht die Shell bei
+# einer ZUWEISUNG ab, deren Kommando ungleich 0 liefert. `OBERSTE_RC=$?` in
+# der naechsten Zeile wuerde nie erreicht — und genau das ist am 01.09.2026
+# zweimal passiert. Das Skript liefert bei [Unveroeffentlicht] absichtlich 1;
+# ein gruener Deploy endete dann mit Code 1, und alle 20 Riegel-Tests (die auf
+# "Code ungleich 0" pruefen) wurden dadurch wertlos.
+OBERSTE_RC=0
+OBERSTE="$(bash scripts/changelog-oberste-version.sh CHANGELOG.md 2>/dev/null)" || OBERSTE_RC=$?
 if [ "$OBERSTE_RC" -gt 1 ]; then
   echo "FEHLER: changelog-oberste-version.sh liess sich nicht ausfuehren (Code $OBERSTE_RC)." >&2
   echo "        Ohne sie ist nicht pruefbar, ob der CHANGELOG gestempelt wurde." >&2

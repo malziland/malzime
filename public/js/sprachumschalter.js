@@ -60,6 +60,7 @@ let modalLaeuft = null;
 let ansage = null;
 let neuAnalysieren = null;
 let zuruecksetzen = null;
+let neuZeichnen = null;
 
 /* ── Lage bestimmen ─────────────────────────────────────────────────────── */
 
@@ -449,6 +450,12 @@ async function wechseln(ziel, neuStarten) {
   }
 
   beschriften();
+  /* beschriften() erreicht nur, was `data-sw-key` trägt. Alles, was eine Seite
+     selbst per textContent setzt — Zahlen, Marken, formatierte Werte —, bliebe
+     sonst in der alten Sprache stehen. Genau das passierte auf /stats.html:
+     Überschrift englisch, Durchschnitte deutsch (gefunden am 01.09.2026).
+     Seiten mit solchen Feldern melden hier an, wie sie sich neu zeichnen. */
+  if (typeof neuZeichnen === "function") neuZeichnen();
   /* Eine stehende Fehlermeldung gehört mitgewechselt — sonst steht sie auf
      Deutsch unter einer englischen Seite. */
   statusNeuSchreiben();
@@ -597,10 +604,15 @@ function aufTaste(e) {
  *
  * @param {object} opts
  * @param {Function} opts.analysiere  Callback, der eine Datei neu analysiert.
+ * @param {Function} opts.zuruecksetze  Callback, der auf die leere Seite führt.
+ * @param {Function} opts.zeichneNeu  Callback für Felder, die die Seite selbst
+ *   per textContent setzt; `beschriften()` erreicht die nicht. Läuft bei JEDEM
+ *   Wechsel, auch ohne Neustart.
  */
-export function initSprachumschalter({ analysiere, zuruecksetze } = {}) {
+export function initSprachumschalter({ analysiere, zuruecksetze, zeichneNeu } = {}) {
   neuAnalysieren = analysiere || null;
   zuruecksetzen = zuruecksetze || null;
+  neuZeichnen = zeichneNeu || null;
 
   /* Ab hier entscheidet allein das Merkmals-Schloss, ob der Umschalter
      entsteht — app.js ruft merkmalUebernehmen(), sobald /api/stats geantwortet

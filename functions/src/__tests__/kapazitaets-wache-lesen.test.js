@@ -84,6 +84,30 @@ describe("echteParallelitaet liest die Warteschlange", () => {
    Der Befund nannte sie nicht — sie war aber genauso ungedeckt, und eine
    Luecke, die man beim Schliessen der Nachbarluecke sieht, laesst man nicht
    offen. */
+describe("Eine Lesestelle statt zwei", () => {
+  test("beide Werte kommen aus EINER Abfrage", async () => {
+    /* BEFUND 01.09.2026 (Runde 8, N-P3b): Vorher holte jede der beiden
+       Funktionen die gleiche Antwort selbst — zwei Netzabfragen fuer einen
+       Datensatz, und zwei Stellen, die auseinanderlaufen koennen. Genau das
+       war schon passiert (H-11, Runde 5: die eine mit Grundfestschreibung im
+       catch, die andere ohne). */
+    let abfragen = 0;
+    wache.setClientForTest({
+      queuePath: (p, r, n) => `projects/${p}/locations/${r}/queues/${n}`,
+      async getQueue() {
+        abfragen += 1;
+        return [{ rateLimits: { maxConcurrentDispatches: 7, maxDispatchesPerSecond: 0.5 } }];
+      },
+    });
+
+    await expect(wache.echteParallelitaet()).resolves.toBe(7);
+    expect(abfragen).toBe(1);
+
+    await expect(wache.echteRate()).resolves.toBe(0.5);
+    expect(abfragen).toBe(2); // je Aufruf eine, nicht zwei
+  });
+});
+
 describe("echteRate liest die Warteschlange", () => {
   test("eine gueltige Zahl kommt durch", async () => {
     wache.setClientForTest(clientMit({ maxDispatchesPerSecond: 0.125 }));

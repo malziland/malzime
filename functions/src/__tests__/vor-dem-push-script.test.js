@@ -33,8 +33,9 @@ const BEWUSST_DRAUSSEN = {
      denen 18 Testdateien haengen. In der Pipeline laeuft sie neben den langen
      Suiten; vor dem Push wuerde sie aus 13 Sekunden Minuten machen — und eine
      Vorabpruefung, die Minuten braucht, wird umgangen. */
-  "node scripts/pruefe-mutationen.mjs --zeitgrenze=4":
-    "Mutationsprobe, Minuten statt Sekunden — laeuft in der Pipeline",
+  "node scripts/pruefe-mutationen.mjs --zeitgrenze=3":
+    "Mutationsprobe, Minuten statt Sekunden — laeuft im Job test-backend, " +
+    "weil sie dort installierte Pakete vorfindet",
 };
 
 /** Alle `- run:`-Schritte der drei billigen Jobs aus der Workflow-Datei. */
@@ -123,5 +124,47 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
       .filter(([, , job]) => !ciJobs.includes(job))
       .map(([, beschreibung, job]) => `${beschreibung} → "${job}"`);
     expect(unbekannt).toEqual([]);
+  });
+
+  /* BEFUND 01.09.2026 (Pruefrunde 8, M-P2-4): Der Test darueber prueft nur
+     EINE Richtung — dass jeder Schritt aus ci.yml auch im Skript steht.
+     Entfernt jemand einen Schritt AUS ci.yml, ist die Bedingung trivial
+     erfuellt, und nichts wird rot. Gemessen: `audit-gate.mjs`, `test-blind.py`
+     und `format:check` liessen sich einzeln entfernen, die ganze Kette blieb
+     gruen ("Alles gruen in 13 s", 27 ok-Schritte).
+
+     Die Gegenrichtung schliesst das: Was das lokale Skript prueft, muss auch
+     in der Pipeline laufen. Sonst prueft man vor dem Push etwas, das die
+     Auslieferung gar nicht mehr verlangt. */
+  test("jeder Schritt des Skripts steht auch in der Pipeline", () => {
+    const yml = fs.readFileSync(WORKFLOW, "utf8");
+    const skript = fs.readFileSync(SKRIPT, "utf8");
+
+    /* Die `lauf`-Zeilen des Skripts nennen den Befehl ab dem dritten Feld. */
+    const werkzeuge = new Set();
+    for (const zeile of skript.split("\n")) {
+      const m = zeile.match(/^lauf\s+"[^"]*"\s+"[^"]*"\s+(.+)$/);
+      if (!m) continue;
+      const name = m[1].match(/[\w./-]+\.(mjs|py|sh)|lint:frontend|format:check/);
+      if (name) werkzeuge.add(name[0].replace(/^.*\//, ""));
+    }
+    expect(werkzeuge.size).toBeGreaterThan(8);
+
+    /* Was lokal anders heisst als in der Pipeline, aber dasselbe prueft.
+       Jeder Eintrag braucht den Beleg, WO die Pipeline es abdeckt. */
+    const ANDERS_BENANNT = {
+      "secret-scan-lokal.sh":
+        "Die Pipeline hat dafuer den eigenen Job `secret-scan` mit der " +
+        "gitleaks-Action (ci.yml:123-131) — ein Pflicht-Check. Lokal laeuft " +
+        "die schnelle Variante ueber dasselbe Werkzeug.",
+    };
+    const fehlend = [...werkzeuge].filter((w) => !ANDERS_BENANNT[w]).filter((w) => !yml.includes(w));
+    expect({
+      hinweis: "diese Pruefungen laufen lokal, aber NICHT in der Pipeline",
+      fehlend,
+    }).toEqual({
+      hinweis: "diese Pruefungen laufen lokal, aber NICHT in der Pipeline",
+      fehlend: [],
+    });
   });
 });

@@ -61,6 +61,41 @@ describe("kein Versand aus dem Testbetrieb", () => {
     if (grund !== null) expect(grund).toMatch(/JEST_WORKER_ID/);
   });
 
+  test.each([
+    ["FIRESTORE_EMULATOR_HOST", "localhost:8080"],
+    ["FUNCTIONS_EMULATOR", "true"],
+    ["CLOUD_TASKS_EMULATOR_HOST", "localhost:9090"],
+  ])("aus einem Emulator-Lauf geht nichts hinaus (%s)", async (name, wert) => {
+    /* BEFUND 01.09.2026 (Runde 8, N-P2-3): Geprueft wurde nur
+       FIRESTORE_EMULATOR_HOST. `npm run serve` setzt aber FUNCTIONS_EMULATOR —
+       und die Nachricht ging hinaus. Der Emulator holt sich bei angemeldetem
+       Konto die ECHTEN Zugangsdaten; genau so ist der Vorfall vom 30.08.
+       entstanden. */
+    delete process.env.NTFY_STUMM;
+    delete process.env.FIRESTORE_EMULATOR_HOST;
+    delete process.env.FUNCTIONS_EMULATOR;
+    delete process.env.CLOUD_TASKS_EMULATOR_HOST;
+    process.env[name] = wert;
+
+    const fetchAttrappe = jest.fn();
+    global.fetch = fetchAttrappe;
+    jest.resetModules();
+    const { notifyLimitReached, setFetchForTest } = require("../notify");
+    /* Attrappe hinterlegen, damit NICHT der Jest-Riegel antwortet, sondern
+       der Emulator-Zweig — sonst misst dieser Fall den falschen Riegel. */
+    setFetchForTest((...args) => global.fetch(...args));
+    await notifyLimitReached({
+      ntfyUrl: "https://beispiel.invalid",
+      ntfyTopic: "test",
+      adminSecret: "s",
+      count: 156,
+      limit: 155,
+    });
+    setFetchForTest(null);
+
+    expect(fetchAttrappe).not.toHaveBeenCalled();
+  });
+
   test("die ausdrueckliche Stummschaltung wirkt weiterhin", async () => {
     process.env.NTFY_STUMM = "1";
     const fetchAttrappe = jest.fn();

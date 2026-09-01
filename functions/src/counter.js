@@ -639,6 +639,18 @@ async function releaseHourlySlot() {
       const arr = snap.data().recentAnalyses;
       if (!Array.isArray(arr) || arr.length === 0) return;
       const normalized = arr.map((ts) => (ts && ts.toMillis ? ts.toMillis() : ts));
+      /* BEKANNTE GRENZE (Pruefrunde 8, N-P3c): Entfernt wird der JUENGSTE
+         Eintrag, nicht der eigene. Geben zwei gescheiterte Jobs kurz
+         nacheinander frei, waehrend ein dritter gerade eingereiht hat, kann
+         der Slot des Dritten fallen statt der des Zweiten.
+
+         Warum das trotzdem so bleibt: Die Transaktion serialisiert die
+         Zugriffe, es geht also kein Slot verloren und keiner entsteht doppelt
+         — nur die ZUORDNUNG kann daneben liegen. Fuer das Stundenlimit zaehlt
+         allein die Anzahl. Weder Pruefer noch Gegenpruefer konnten einen
+         Schaden reproduzieren; ein Umbau auf "genau meinen Eintrag" braeuchte
+         eine Kennung je Analyse durch die ganze Kette. Das ist mehr Risiko als
+         der Fehler, den es behebt. */
       let maxIdx = 0;
       for (let i = 1; i < normalized.length; i++) if (normalized[i] > normalized[maxIdx]) maxIdx = i;
       normalized.splice(maxIdx, 1);

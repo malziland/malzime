@@ -87,6 +87,9 @@ AUSNAHMEN = {
     "PLAUSIBEL_MIN_S", "PLAUSIBEL_MAX_S", "HOECHSTALTER_MS",
     "JUENGSTE_TAGE", "VERGLEICH_TAGE", "MIN_ANALYSEN", "FAKTOR_SCHWELLE",
     "NAH_AN_GRENZE_ANTEIL", "NAH_AN_GRENZE_FAKTOR", "ANHALTEND_TAGE",
+    # BLIND_TAGE: wie ANHALTEND_TAGE, nur fuer die Kapazitaets-Wache — ab wie
+    # vielen Tagen ohne Messung ihr Ausfall gemeldet wird (Runde 8, N-P3a).
+    "BLIND_TAGE",
     "FRIST_TAGE", "VORWARNUNG_TAGE", "REALITAETS_CHECK_MINDEST_EINGABEN",
     # Implementierungsdetails ohne Betriebswirkung
     "CLEANUP_INTERVAL_MS", "MAX_RATE_ENTRIES", "INITIAL_JITTER_MAX_MS",

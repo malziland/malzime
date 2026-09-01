@@ -768,6 +768,20 @@ async function analyzeImageQueued() {
         setStatus(t("error.queueFull"), traceId, "error.queueFull");
       } else if (enqueueResp.status === 503 && parsed && parsed.maintenance) {
         showMaintenanceModal(parsed.message);
+      } else if (enqueueResp.status === 503 && parsed && parsed.blocked === "configMissing") {
+        /* BEFUND 01.09.2026 (Pruefrunde 8, N-P2-2): Dieser Fall fiel in den
+           else-Zweig und zeigte "Die KI ist gerade ueberlastet — bitte 2-3
+           Minuten warten". Die KI ist nicht ueberlastet, und Warten hilft
+           nicht: Ohne gueltige Betriebseinstellungen kann keine Analyse
+           laufen, egal wie lange jemand wartet. Der Text dafuer existiert
+           seit jeher (blocked.configMissing, "das liegt nicht an dir und
+           nicht an deinem Foto") und wurde am Einlass nie erreicht — der Weg
+           dorthin ging nur ueber einen fertigen Job, also den seltenen Fall.
+
+           Der falsche Rat ist der eigentliche Schaden: Eine Klasse, die drei
+           Minuten wartet und es dann wieder versucht, verliert die
+           Workshop-Zeit zweimal. */
+        setStatus(t("blocked.configMissing"), traceId, "blocked.configMissing");
       } else if (enqueueResp.status === 413) {
         setStatus(t("error.imageTooLarge"), traceId, "error.imageTooLarge");
       } else if (enqueueResp.status === 400) {

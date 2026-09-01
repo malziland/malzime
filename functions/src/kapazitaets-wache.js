@@ -29,6 +29,24 @@
 
 const { QUEUE_NAME, QUEUE_REGION, isLocalQueueMode } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
+const { datenbank } = require("./db");
+
+/* BEFUND 01.09.2026 (Pruefrunde 8, N-P3a): Ein Lauf, der nichts messen kann,
+   ging als `console.log` hinaus — unterhalb der Alarmschwelle. Die
+   Begruendung dafuer war richtig (eine Netzstoerung ist keine
+   Fehlkonfiguration), die Folge aber nicht: Diese Wache konnte DAUERHAFT
+   blind sein, und niemand haette es erfahren. Sie ist wegen des Vorfalls vom
+   31.08. gebaut worden — eine blinde Wache ist dort das eigentliche Risiko.
+
+   Dieselbe Loesung wie bei der Schwester in laufzeit-wache.js: Der Zustand
+   wird ueber Tage gezaehlt. Ein einzelner Ausfall bleibt eine Logzeile; haelt
+   er an, wird daraus eine ERROR-Zeile, die die Alarmierung erreicht. */
+const ZUSTAND_DOKUMENT = "stats/kapazitaets-wache";
+/* Erst nach so vielen Tagen ohne Messung geht eine ERROR-Zeile raus — wie
+   ANHALTEND_TAGE bei der Schwester-Wache. Eine Auswertungsregel, keine
+   Stellschraube des Betriebs: Wer sie aendert, aendert nicht, wie schnell
+   analysiert wird, sondern ab wann ein Ausfall laut wird. */
+const BLIND_TAGE = 2;
 
 let clientOverride = null;
 
@@ -70,7 +88,13 @@ function projectId() {
  * KEIN Befund, sondern "nicht messbar". Eine Wache, die bei einem Lesefehler
  * Alarm schlaegt, meldet Netzwerkstoerungen als Fehlkonfiguration.
  */
-async function echteParallelitaet() {
+/* BEFUND 01.09.2026 (Pruefrunde 8, N-P3b): `echteParallelitaet` und
+   `echteRate` holten die GLEICHE Antwort zweimal und lasen daraus je ein
+   anderes Feld — zwei Netzabfragen fuer einen Datensatz, und vor allem zwei
+   Stellen, die auseinanderlaufen koennen. Genau das war schon passiert: Die
+   eine hatte `catch (e)` mit Grundfestschreibung, die andere `catch (_e)`
+   ohne (Befund H-11 der Runde 5). Ab jetzt gibt es eine Lesestelle. */
+async function warteschlangeLesen() {
   if (isLocalQueueMode && isLocalQueueMode()) return null;
   const pid = projectId();
   if (!pid) return null;
@@ -78,17 +102,22 @@ async function echteParallelitaet() {
     const client = getClient();
     const name = client.queuePath(pid, QUEUE_REGION, QUEUE_NAME);
     const [queue] = await client.getQueue({ name });
-    const wert = queue?.rateLimits?.maxConcurrentDispatches;
-    return typeof wert === "number" && wert > 0 ? wert : null;
+    return queue?.rateLimits ?? {};
   } catch (e) {
-    /* BEFUND 31.08.2026 (Runde 5, H-11): Hier stand `catch (_e)` — der Grund
-       wurde verworfen. Der Kommentar acht Zeilen tiefer erklaert genau das
-       zum Fehler, diese Stelle hatte die alte Fassung behalten. Faellt nur das
-       Lesen der Parallelitaet aus, meldete die Logzeile `nicht-messbar` mit
-       `lesefehler: null`. */
     letzterLesefehler = e && e.message ? e.message : String(e);
     return null;
   }
+}
+
+/** Ein Wert gilt nur als Messung, wenn er eine Zahl groesser null ist. */
+function alsMesswert(wert) {
+  return typeof wert === "number" && wert > 0 ? wert : null;
+}
+
+async function echteParallelitaet() {
+  const grenzen = await warteschlangeLesen();
+  if (!grenzen) return null;
+  return alsMesswert(grenzen.maxConcurrentDispatches);
 }
 
 /**
@@ -105,25 +134,9 @@ async function echteParallelitaet() {
 let letzterLesefehler = null;
 
 async function echteRate() {
-  if (isLocalQueueMode && isLocalQueueMode()) return null;
-  const pid = projectId();
-  if (!pid) return null;
-  try {
-    const client = getClient();
-    const name = client.queuePath(pid, QUEUE_REGION, QUEUE_NAME);
-    const [queue] = await client.getQueue({ name });
-    const wert = queue?.rateLimits?.maxDispatchesPerSecond;
-    return typeof wert === "number" && wert > 0 ? wert : null;
-  } catch (e) {
-    /* BEFUND 31.08.2026 (Runde 3): Hier stand `catch (_e) { return null; }` —
-       der Grund wurde restlos verworfen. "Nicht messbar" liess sich danach
-       nicht mehr von "kein Projekt bekannt" oder "keine Berechtigung"
-       unterscheiden, und die Wache konnte DAUERHAFT blind sein, ohne dass es
-       jemandem auffiel. Sie gibt es wegen des Vorfalls vom 31.08.
-       Der Grund wird jetzt festgehalten; das Melden bleibt beim Aufrufer. */
-    letzterLesefehler = e && e.message ? e.message : String(e);
-    return null;
-  }
+  const grenzen = await warteschlangeLesen();
+  if (!grenzen) return null;
+  return alsMesswert(grenzen.maxDispatchesPerSecond);
 }
 
 /**
@@ -217,16 +230,58 @@ async function pruefeKapazitaet() {
        erkennt eine dauerhaft blinde Wache. */
     const nichtGemessen = [befund, rateBefund].filter((b) => b.grund === "nicht-messbar");
     if (nichtGemessen.length) {
-      console.log(
-        JSON.stringify({
-          step: "kapazitaets-wache",
-          status: "nicht-messbar",
-          betroffen: nichtGemessen.map((b) => (b === rateBefund ? "rate" : "parallelitaet")),
-          lesefehler: letzterLesefehler,
-          hinweis:
-            "Kein Abgleich moeglich. Wiederholt sich das taeglich, ist die Wache blind — dann von Hand nachsehen.",
-        })
-      );
+      const heute = new Date().toISOString().slice(0, 10);
+      let blindSeit = heute;
+      let zustandLesbar = true;
+      try {
+        const snap = await datenbank().doc(ZUSTAND_DOKUMENT).get();
+        if (snap.exists && snap.data() && snap.data().blindSeit) blindSeit = snap.data().blindSeit;
+      } catch (_fehler) {
+        /* Der Grund selbst hilft hier nicht weiter — gemeldet wird, DASS der
+           Zustand unlesbar ist, und das steht unten in der ERROR-Zeile. */
+        zustandLesbar = false;
+      }
+      const tage = Math.round((Date.parse(heute) - Date.parse(blindSeit)) / 86400000) + 1;
+      const zeile = {
+        step: "kapazitaets-wache",
+        status: "nicht-messbar",
+        betroffen: nichtGemessen.map((b) => (b === rateBefund ? "rate" : "parallelitaet")),
+        lesefehler: letzterLesefehler,
+        blindSeit,
+        tage,
+      };
+      if (tage >= BLIND_TAGE || !zustandLesbar) {
+        /* Anhaltend blind — oder der Zustand selbst unlesbar, dann laesst sich
+           die Dauer gar nicht bestimmen. Beides gehoert gemeldet. */
+        console.error(
+          JSON.stringify({
+            ...zeile,
+            severity: "ERROR",
+            hinweis: zustandLesbar
+              ? `Die Wache kann seit ${tage} Tagen nicht messen. Sie ist blind — von Hand nachsehen.`
+              : "Die Wache kann nicht messen UND ihren eigenen Zustand nicht lesen.",
+          })
+        );
+      } else {
+        console.log(
+          JSON.stringify({
+            ...zeile,
+            hinweis: "Einmalig nicht messbar. Haelt es an, folgt eine ERROR-Zeile.",
+          })
+        );
+      }
+      try {
+        await datenbank().doc(ZUSTAND_DOKUMENT).set({ blindSeit }, { merge: true });
+      } catch (_) {
+        /* still — der Ausfall ist oben schon gemeldet */
+      }
+    } else {
+      /* Wieder messbar: Zaehler zuruecksetzen, sonst entsteht Dauerrot. */
+      try {
+        await datenbank().doc(ZUSTAND_DOKUMENT).set({ blindSeit: null }, { merge: true });
+      } catch (_) {
+        /* still */
+      }
     }
     return { ...befund, rate: rateBefund, meldung: null };
   }

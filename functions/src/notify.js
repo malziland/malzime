@@ -36,7 +36,17 @@ function versand(...args) {
 
 function versandUnterdrueckt() {
   if (process.env.NTFY_STUMM === "1") return "NTFY_STUMM=1";
+  /* BEFUND 01.09.2026 (Pruefrunde 8, N-P2-3): Hier stand nur
+     FIRESTORE_EMULATOR_HOST. `npm run serve` startet aber
+     `emulators:start --only functions` — dabei ist FUNCTIONS_EMULATOR gesetzt
+     und FIRESTORE_EMULATOR_HOST NICHT. Gemessen: Die Push-Nachricht ging
+     hinaus. cloud-tasks.js, queue-storage.js und kapazitaets-wache.js pruefen
+     alle drei Variablen; dieses Modul war das einzige mit nur einer. Genau so
+     ist der Vorfall vom 30.08. entstanden — ein Emulator-Lauf mit echten
+     Zugangsdaten. */
   if (process.env.FIRESTORE_EMULATOR_HOST) return "Emulator-Betrieb";
+  if (process.env.FUNCTIONS_EMULATOR) return "Emulator-Betrieb (FUNCTIONS_EMULATOR)";
+  if (process.env.CLOUD_TASKS_EMULATOR_HOST) return "Emulator-Betrieb (CLOUD_TASKS_EMULATOR_HOST)";
   /* BEFUND 31.08.2026 (Runde 4, E-3), behoben 01.09.2026: Beide Wege oben
      setzen voraus, dass jemand etwas gesetzt hat — eine Umgebungsvariable
      oder den Emulator. Ein gewoehnlicher Unit-Lauf setzt keines von beidem.

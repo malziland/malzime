@@ -651,6 +651,56 @@ describe("deploy.sh — der Erfolgsweg", () => {
   });
 });
 
+/* PROBELAUF (01.09.2026): "Kann man nicht alles durchspielen und vor dem
+   letzten Schritt anhalten, statt zu raten?" — genau das tut PROBELAUF=1.
+   Der Wert steht und faellt damit, dass er WIRKLICH nichts ausliefert; ein
+   Probelauf, der doch etwas anfasst, waere schlimmer als keiner. */
+describe("deploy.sh — der Probelauf", () => {
+  afterEach(aufraeumen);
+
+  test("laeuft durch und liefert NICHTS aus", () => {
+    const r = deploy({ PROBELAUF: "1" });
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/PROBELAUF: bis hierher waere alles bereit/);
+    /* Die Attrappe meldet jeden Aufruf. Kommt kein `deploy` vor, ist auch
+       keines versucht worden. */
+    expect(r.ausgabe).not.toMatch(/ATTRAPPE firebase: deploy/);
+  });
+
+  test("aber die Riegel und der Trockenlauf laufen wirklich", () => {
+    /* Sonst waere der Probelauf ein leeres Versprechen: durchgelaufen, ohne
+       etwas geprueft zu haben. */
+    const r = deploy({ PROBELAUF: "1" });
+    expect(r.ausgabe).toMatch(/Trockenlauf/i);
+    expect(r.ausgabe).toMatch(/Einstellungssatz/i);
+  });
+
+  test("ein gerissener Riegel haelt auch den Probelauf an", () => {
+    const r = deploy({ PROBELAUF: "1", ATTRAPPE_DRYRUN_ROT: "1" });
+    expect(r.code).not.toBe(0);
+    /* Auf die EIGENE Zeile des Probelaufs pruefen: Die Wendung "nichts wurde
+       ausgeliefert" steht auch in der Meldung des Trockenlauf-Riegels — der
+       erste Anlauf dieses Tests hat deshalb den falschen Text gemessen. */
+    expect(r.ausgabe).not.toMatch(/PROBELAUF: bis hierher waere alles bereit/);
+  });
+
+  test("und der Arbeitsbaum bleibt sauber", () => {
+    const r = deploy({ PROBELAUF: "1" });
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/Arbeitsbaum sauber/i);
+    /* Zusaetzlich selbst nachsehen, statt der Meldung zu glauben. */
+    const offen = execSync(`git -C "${klon}" status --porcelain`, { encoding: "utf8" });
+    expect(offen.trim()).toBe("");
+  });
+
+  test("ohne PROBELAUF wird ausgeliefert — der Schalter ist nicht dauerhaft an", () => {
+    const r = deploy();
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/ATTRAPPE firebase: deploy|Deploy abgeschlossen/i);
+    expect(r.ausgabe).not.toMatch(/PROBELAUF: bis hierher waere alles bereit/);
+  });
+});
+
 /* BEFUND 01.09.2026 (Runde 7, K-13): Alle Faelle oben fahren mit Ziel
    `hosting`. Zwei Zweige haengen aber am Ziel — die Cache-Kennung
    (deploy.sh:423) und das Argument fuer den Live-Smoke (deploy.sh:735).

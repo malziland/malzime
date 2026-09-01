@@ -87,12 +87,13 @@ describe("Wann gilt ein Profil als vorhanden", () => {
        woran es lag. Genau dieses Feld hat beim Vorfall vom 31.08. gefehlt, als
        niemand sagen konnte, was der Nutzer gesehen hat.
 
-       ANMERKUNG zur Mutationsprobe: Die Zeile
-       `profileBlocked = !normal && !boost` laesst sich zu `||` aendern, ohne
-       dass ein Test rot wird — und das ist KEIN Testloch. Fehlt nur ein
-       Profil, greift der Erfolgszweig und die Variable wird nie gelesen;
-       fehlen beide, sind beide Fassungen gleich. Eine aequivalente Mutation.
-       Gedeckt wird deshalb die WIRKUNG, nicht die Schreibweise. */
+       KORREKTUR 01.09.2026 (Pruefrunde 8, G-1): Hier stand, die Mutation an
+       Zeile 126 sei aequivalent und deshalb nicht deckbar. Das war FALSCH —
+       der Gegenpruefer hat es ausgefuehrt: Original liefert `blocked.generic`,
+       mit gedrehtem Operator `blocked.profileBlocked`. Zwei verschiedene
+       Ausgaben, also ein echtes Testloch. Meine Begruendung hat den Befund
+       wegerklaert, statt ihn zu pruefen. Die Zeile misst jetzt dasselbe wie
+       `hasAnyProfile`, und der Fall unten deckt sie ab. */
     const r = await laufMit({ normal: null, boost: null });
     expect(r.result.blockedReason).toBe("blocked.profileBlocked");
   });
@@ -107,5 +108,53 @@ describe("Wann gilt ein Profil als vorhanden", () => {
        Profil, auch wenn es nicht null ist. */
     const r = await laufMit({ normal: {}, boost: { categories: {} } });
     expect(r.success).toBe(false);
+  });
+});
+
+/* BEFUND 01.09.2026 (Pruefrunde 8, G-1): Ein Profil-Objekt OHNE Karten galt
+ * fuer `profileBlocked` als vorhanden, fuer `hasAnyProfile` aber nicht — das
+ * Kind bekam "irgendein Fehler, versuch es nochmal" statt der Benennung. */
+describe("Profil ohne Karten", () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+    jest.resetModules();
+  });
+
+  async function laufMit(profiles) {
+    jest.resetModules();
+    const { SATZ } = require("../test-satz");
+    jest.doMock("../betriebsprofil", () => ({
+      geltendeWerte: async () => ({ werte: SATZ, quelle: "firestore", grund: null }),
+    }));
+    jest.doMock("../queue-storage", () => ({
+      loadImage: async () => ({ buffer: Buffer.from("x"), mimeType: "image/jpeg" }),
+      deleteImage: async () => true,
+    }));
+    jest.doMock("../mistral", () => ({
+      describeImage: async () => "Ein Foto im Freien.",
+      generateBothProfiles: async () => profiles,
+      runSingleLargeCall: async () => profiles,
+    }));
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    jest.spyOn(console, "error").mockImplementation(() => {});
+    const { runPipeline } = require("../job-pipelines");
+    return runPipeline({
+      mistral: require("../mistral"),
+      job: { traceId: "t", imagePath: "queue-uploads/x.jpg", lang: "de", exif: {} },
+    }).catch((fehler) => ({ fehler }));
+  }
+
+  test("wird als fehlendes Profil gemeldet, nicht als 'irgendein Fehler'", async () => {
+    const r = await laufMit({ normal: { profileText: "Text ohne Karten" }, boost: null });
+    expect(r.success).toBe(false);
+    expect(r.result.blockedReason).toBe("blocked.profileBlocked");
+  });
+
+  test("auch wenn beide Profile Text ohne Karten haben", async () => {
+    const r = await laufMit({
+      normal: { profileText: "a" },
+      boost: { categories: {} },
+    });
+    expect(r.result.blockedReason).toBe("blocked.profileBlocked");
   });
 });

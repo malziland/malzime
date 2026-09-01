@@ -242,9 +242,15 @@ def main():
     # muss in ci.yml stehen; vor-dem-push.sh bleibt frei.
     NUR_PIPELINE = {
         "pruefe-mutationen.mjs": "setzt Mutationen und laesst je Mutation Tests "
-        "laufen — Minuten bis Stunden, je nachdem wie viele Testdateien an der "
-        "geaenderten Datei haengen. In der Pipeline laeuft er neben den langen "
-        "Suiten und kostet keine zusaetzliche Wartezeit.",
+        "laufen — Sekunden bei Modulen am Rand, ueber anderthalb Minuten je "
+        "Mutation bei zentralen Dateien, an denen 18 Testdateien haengen. Er "
+        "laeuft im Job `test-backend`, weil er dort installierte Pakete "
+        "vorfindet; ohne sie kann er nicht messen und bricht ehrlich ab. Vor "
+        "dem Push wuerde er aus 13 Sekunden Minuten machen — eine "
+        "Vorabpruefung, die Minuten braucht, wird umgangen. "
+        "(Die fruehere Begruendung 'laeuft neben den langen Suiten und kostet "
+        "keine zusaetzliche Wartezeit' war sachlich falsch: Er laeuft IN einem "
+        "der langen Jobs und verlaengert ihn — Befund M-P3 der Runde 8.)",
     }
     skripte = [d for d in skripte if d.name not in AUSGENOMMEN]
 

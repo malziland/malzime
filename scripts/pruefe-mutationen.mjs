@@ -31,7 +31,7 @@
  *          --eichung   nur die Selbstpruefung des Werkzeugs
  */
 import { readFileSync, writeFileSync, existsSync, mkdtempSync, rmSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
@@ -164,18 +164,46 @@ function findeMutationen(inhalt) {
   return gefunden;
 }
 
-/** Laesst Tests laufen. Gibt true zurueck, wenn sie ROT werden. */
+/** Laesst Tests laufen.
+ *
+ * Rueckgabe: "rot" | "gruen" | "nicht-gelaufen"
+ *
+ * BEFUND 01.09.2026 (Pruefrunde 8, M-P1-1 — der schwerste Befund gegen dieses
+ * Werkzeug): Hier stand `catch { return true; }` — JEDER Fehlschlag von jest
+ * galt als "Mutation bemerkt". Kann jest gar nicht starten, weil die Pakete
+ * fehlen, meldete das Werkzeug damit **100 % gruen und Rueckgabewert 0**,
+ * ohne einen einzigen Test ausgefuehrt zu haben. Genau dieser Zustand lag im
+ * CI-Job `pruefungen` vor: Er fuehrt kein `npm ci` aus.
+ *
+ * Gemessen am selben Dateisatz: mit Paketen 67 % und zwei echte Luecken
+ * (darunter `queue-storage.js:93`, der offene Punkt aus dem Vorfall vom
+ * 31.08.), ohne Pakete "keine Luecke, Rueckgabewert 0".
+ *
+ * Das ist die Fehlerform, gegen die dieses Werkzeug gebaut wurde — ein Gruen
+ * ohne Messung, eine Ebene hoeher. Jetzt wird unterschieden: Nur ein Lauf,
+ * der Tests AUSGEFUEHRT hat, darf ein Urteil begruenden.
+ */
 function testsWerdenRot(argumente) {
-  try {
-    execFileSync("npx", ["jest", ...argumente, "--silent"], {
-      cwd: FUNCTIONS,
-      stdio: "pipe",
-      encoding: "utf8",
-    });
-    return false;
-  } catch {
-    return true;
-  }
+  /* spawnSync statt execFileSync: Jest schreibt die Zusammenfassung ("Tests:
+     N passed") auf STDERR, auch im Erfolgsfall. execFileSync gibt aber nur
+     stdout zurueck — die Zeile fehlte dann, und jeder erfolgreiche Lauf waere
+     als "nicht-gelaufen" gewertet worden. Aufgefallen ist das erst durch die
+     neue Eichprobe, die den Erfolgsfall misst. */
+  const lauf = spawnSync("npx", ["jest", ...argumente, "--silent"], {
+    cwd: FUNCTIONS,
+    encoding: "utf8",
+    env: { ...process.env, CI: "1" },
+  });
+  if (lauf.error && lauf.error.code === "ENOENT") return "nicht-gelaufen";
+  const ausgabe = `${lauf.stdout || ""}${lauf.stderr || ""}`;
+  const lief = lauf.status === 0;
+  /* Jest meldet die Zahl gelaufener Tests. Steht dort 0 — oder fehlt die
+     Zeile ganz —, ist nichts gemessen worden, egal welcher Rueckgabewert
+     herauskam. */
+  const zahl = /^Tests:\s+(.*)$/m.exec(ausgabe || "");
+  if (!zahl) return "nicht-gelaufen";
+  if (/^\s*0 total/.test(zahl[1])) return "nicht-gelaufen";
+  return lief ? "gruen" : "rot";
 }
 
 export { findeMutationen, tabuBereiche, MUTATIONEN };
@@ -223,7 +251,39 @@ function eichung() {
     { was: "Vorgabewert (Funktionswert) wird uebergangen", code: "const g = e?.m || String(e);\n", erwartet: 0 },
     { was: "echte Oder-Logik bleibt messbar", code: "if (a || b) return;\n", erwartet: 1 },
   ];
+  /* BEFUND 01.09.2026 (Pruefrunde 8): Die Eichung prueft NUR findeMutationen.
+     `testsWerdenRot` — die Funktion, die ueber jedes Urteil entscheidet — kam
+     in keiner Probe vor. Genau dort sass der schwerste Befund: Sie hielt einen
+     gescheiterten jest-Start fuer ein rotes Testergebnis. Eine Eichung, die
+     die entscheidende Funktion auslaesst, ist Zierde.
+
+     Diese Probe faehrt einen echten jest-Lauf in einer Umgebung ohne Pakete
+     und verlangt, dass er als "nicht-gelaufen" erkannt wird. */
   let fehler = 0;
+  const leer = mkdtempSync(join(tmpdir(), "malzime-eichung-"));
+  try {
+    const alterOrt = process.env.PATH;
+    /* Kein npx auffindbar: muss "nicht-gelaufen" ergeben, nicht "rot". */
+    process.env.PATH = leer;
+    const ohneWerkzeug = testsWerdenRot(["--findRelatedTests", "src/notify.js"]);
+    process.env.PATH = alterOrt;
+    const ok = ohneWerkzeug === "nicht-gelaufen";
+    if (!ok) fehler += 1;
+    console.log(
+      `  ${ok ? "ja  " : "NEIN"}  ein gescheiterter Testlauf gilt NICHT als "bemerkt" ` +
+        `(${ohneWerkzeug}, erwartet nicht-gelaufen)`
+    );
+    /* Und die Gegenrichtung: Ein echter Lauf muss ein echtes Urteil liefern. */
+    const echt = testsWerdenRot(["--findRelatedTests", "src/notify.js"]);
+    const ok2 = echt === "gruen" || echt === "rot";
+    if (!ok2) fehler += 1;
+    console.log(
+      `  ${ok2 ? "ja  " : "NEIN"}  ein echter Testlauf liefert ein Urteil (${echt})`
+    );
+  } finally {
+    rmSync(leer, { recursive: true, force: true });
+  }
+
   for (const p of proben) {
     const n = findeMutationen(p.code).length;
     const ok = n === p.erwartet;
@@ -307,8 +367,21 @@ if (dateien.length === 0) {
 }
 dateien = dateien.map((d) => resolve(d)).filter((d) => existsSync(d));
 if (dateien.length === 0) {
-  console.log("NICHT MESSBAR: keine Dateien zu pruefen.");
-  process.exit(2);
+  /* BEFUND 01.09.2026 (Pruefrunde 8, M-P1-2): Hier stand `exit 2`. Beim Push
+     auf `main` — und beim woechentlichen Zeitplan-Lauf — zeigt `origin/main`
+     auf denselben Commit, der Diff ist leer, und der Pflicht-Check waere JEDES
+     MAL rot geworden. `pruefe-mitzieher.py` und `pruefe-kopplung.py` behandeln
+     denselben Fall im selben Job seit jeher als Normalfall.
+     Ohne Argumente und ohne Aenderung gibt es nichts zu messen — das ist kein
+     Messproblem, sondern ein leerer Auftrag. Wurden dagegen Dateien AUSDRUECK-
+     LICH genannt und existieren nicht, bleibt es ein Messproblem. */
+  if (argumente.some((a) => !a.startsWith("--"))) {
+    console.log("NICHT MESSBAR: die genannten Dateien gibt es nicht.");
+    process.exit(2);
+  }
+  console.log("Keine geaenderten Dateien gegenueber origin/main — nichts zu pruefen.");
+  console.log("(Beim Lauf auf main ist das der Normalfall.)");
+  process.exit(0);
 }
 
 /* Nur auf sauberem Baum messen: Sonst laesst sich hinterher nicht
@@ -401,16 +474,33 @@ for (const datei of dateien) {
     gesetzt += 1;
     try {
       /* Schnell: nur die Tests, die diese Datei anfassen. */
-      if (testsWerdenRot(["--findRelatedTests", relative(FUNCTIONS, datei)])) {
+      const schnell = testsWerdenRot(["--findRelatedTests", relative(FUNCTIONS, datei)]);
+      if (schnell === "nicht-gelaufen") {
+        stelleWiederHer("Abbruch");
+        console.log("\n\nABBRUCH: Die Tests konnten nicht ausgefuehrt werden.");
+        console.log("         Ohne einen Testlauf hat dieses Werkzeug nichts zu");
+        console.log("         sagen — weder gruen noch rot. Fehlen die Pakete?");
+        console.log("         (`npm ci --prefix functions`)");
+        process.exit(2);
+      }
+      if (schnell === "rot") {
         tot += 1;
         continue;
       }
       /* Ueberlebt die verwandten Tests. `--findRelatedTests` sieht nur
          direkte Abhaengigkeiten — ein entfernter Test koennte es doch
          fangen. Ohne Bestaetigung ist das ein VERDACHT, kein Befund. */
-      if (BESTAETIGEN && testsWerdenRot([])) {
-        tot += 1;
-        continue;
+      if (BESTAETIGEN) {
+        const voll = testsWerdenRot([]);
+        if (voll === "nicht-gelaufen") {
+          stelleWiederHer("Abbruch");
+          console.log("\n\nABBRUCH: Die volle Suite konnte nicht ausgefuehrt werden.");
+          process.exit(2);
+        }
+        if (voll === "rot") {
+          tot += 1;
+          continue;
+        }
       }
       hier.push(m);
     } finally {

@@ -88,6 +88,36 @@ def ohne_kommentare(inhalt):
             ergebnis.append(c)
             i += 1
             continue
+        # BEFUND 01.09.2026 (Pruefrunde 8, M-P2-3): Regex-Literale fehlten.
+        # Ein `/["']/` setzte den Zeichenketten-Zustand und liess ihn bis
+        # Dateiende haengen — ab dort war der Waechter wieder blind, genau die
+        # Fehlerform, gegen die der Umbau angetreten war, nur an einer anderen
+        # Zeichenklasse. Ein `/` beginnt ein Regex, wenn davor ein Operator
+        # oder eine oeffnende Klammer steht (nicht nach Wert oder Klammer-zu).
+        if c == "/" and naechstes not in ("/", "*"):
+            vorher = "".join(ergebnis).rstrip()
+            letztes = vorher[-1] if vorher else "("
+            if letztes in "(,=:[!&|?{};+-*%<>~^" or vorher.endswith(("return", "typeof", "case")):
+                ende = i + 1
+                in_klasse = False
+                while ende < laenge:
+                    z = inhalt[ende]
+                    if z == "\\":
+                        ende += 2
+                        continue
+                    if z == "[":
+                        in_klasse = True
+                    elif z == "]":
+                        in_klasse = False
+                    elif z == "/" and not in_klasse:
+                        ende += 1
+                        break
+                    elif z == "\n":
+                        break  # unbalanciert: kein Regex
+                    ende += 1
+                ergebnis.append(inhalt[i:ende])
+                i = ende
+                continue
         if c == "/" and naechstes == "/":
             while i < laenge and inhalt[i] != "\n":
                 ergebnis.append(" ")

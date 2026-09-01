@@ -691,6 +691,42 @@ fi
 # (Audit 2026-08-10, OPS-001).
 # ── SCHRITT 1: Firestore-Regeln und Indizes, ALLEIN ──
 # Warum allein: siehe Kopfkommentar (Nachtrag 30.08.2026). Im Paket scheitert er.
+# ── PROBELAUF: alles bis hierher, aber nichts ausliefern ──
+#
+# Bis zu dieser Zeile ist NICHTS live gegangen: Jeder Riegel ist gelaufen, der
+# Trockenlauf hat die echte Firebase-Seite gefragt, die Cache-Kennung und
+# build-info.json sind erzeugt. Was danach kommt, ist der Punkt ohne Rueckweg.
+#
+# `PROBELAUF=1` haelt genau hier an und nimmt die Aenderungen am Arbeitsbaum
+# wieder zurueck. Damit laesst sich vor dem echten Deploy pruefen, ob die
+# Auslieferung durchgehen WUERDE — ohne sie zu machen und ohne zu raten.
+#
+# Was der Probelauf NICHT beweist: dass das Hochladen selbst gelingt (Netz,
+# Kontingente, Rechte) und dass die neue Fassung live funktioniert. Dafuer gibt
+# es den Live-Smoke danach. Er beweist: alle Riegel gruen, der Stand ist
+# auslieferbar, und die Kette bricht nicht auf halbem Weg ab.
+if [ "${PROBELAUF:-0}" = "1" ]; then
+  echo
+  echo "── PROBELAUF: bis hierher waere alles bereit ──"
+  echo "Jeder Riegel ist gelaufen, der Trockenlauf hat Firebase gefragt,"
+  echo "die Cache-Kennung waere ?v=$VERSION."
+  echo
+  echo "NICHTS wurde ausgeliefert. Die Aenderungen am Arbeitsbaum werden"
+  echo "jetzt zurueckgenommen."
+  # Dieselben Dateien, die die Aufraeumfalle bei einem Abbruch zuruecknaehme.
+  if ! git checkout -- public/ 2>/dev/null; then
+    echo "WARNUNG: public/ konnte nicht zurueckgesetzt werden — bitte pruefen." >&2
+  fi
+  OFFEN="$(git status --porcelain)"
+  if [ -n "$OFFEN" ]; then
+    echo "WARNUNG: Der Arbeitsbaum ist nicht sauber:" >&2
+    printf '%s\n' "$OFFEN" | sed 's/^/    /' >&2
+    exit 1
+  fi
+  echo "Arbeitsbaum sauber. Fuer die echte Auslieferung: ohne PROBELAUF starten."
+  exit 0
+fi
+
 if [ "${SKIP_FIRESTORE:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_FIRESTORE=1 — Regeln werden NICHT ausgerollt."
 else

@@ -104,6 +104,20 @@ jobs:
       # Runner braucht — der schlanke Job `pruefungen` hat bewusst keine Pakete.
       # Exit 2 (Messproblem) gilt nie als bestanden.
       - run: sh scripts/pruefe-zeitzuender.sh . --nur backend
+
+      # Mutationsprobe: Merken die Tests es, wenn der geaenderte Code
+      # kaputtgeht? Sechs von achtzehn Befunden der Pruefrunde 7 waren
+      # Stellen, an denen sich Code aendern liess, ohne dass ein Test rot
+      # wurde.
+      #
+      # SIE LAEUFT HIER, nicht im Job `pruefungen` (Befund M-P1-1 der Runde 8):
+      # Dort gibt es kein `npm ci`. Ohne Pakete kann jest nicht starten — und
+      # die erste Fassung hielt einen gescheiterten Start fuer ein rotes
+      # Testergebnis und meldete 100 % gruen. Das Werkzeug bricht diesen
+      # Zustand jetzt ehrlich ab (Rueckgabewert 2); damit es ueberhaupt messen
+      # KANN, braucht es einen Job mit installierten Paketen. Hier laeuft es
+      # nach den Tests, die die Pakete ohnehin brauchen.
+      - run: node scripts/pruefe-mutationen.mjs --zeitgrenze=3
         working-directory: .
 
   secret-scan:
@@ -373,13 +387,6 @@ jobs:
       # die firebase.json nicht ausschliesst, wuerden ausgeliefert, ohne in
       # git oder im Sauberkeits-Riegel des Deploys aufzutauchen.
       - run: node scripts/pruefe-auslieferbare-reste.mjs
-      # Mutationsprobe: Merken die Tests es, wenn der geaenderte Code
-      # kaputtgeht? Sechs von achtzehn Befunden der Pruefrunde 7 waren
-      # Stellen, an denen sich Code aendern liess, ohne dass ein Test rot
-      # wurde. Sie laeuft NUR hier, nicht vor dem Push: je Mutation ein
-      # eigener Testlauf, das dauert Minuten. Zeitfenster je Datei, und
-      # was darin nicht geprueft wurde, meldet sie als ungemessen.
-      - run: node scripts/pruefe-mutationen.mjs --zeitgrenze=4
 
       # TEST-2026-08-12-28: `scripts/pruefungen/` ist eine Kopie aus der
       # Audit-Familie. Kopien driften — diese war es bereits: Beim Kopieren

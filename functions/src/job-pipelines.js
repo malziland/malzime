@@ -123,7 +123,27 @@ async function runPipeline(job) {
   if (description) {
     try {
       profiles = await mistral.generateBothProfiles(description, exif, remainingBudget, lang);
-      profileBlocked = !profiles.normal && !profiles.boost;
+      /* BEFUND 01.09.2026 (Pruefrunde 8, G-1): Hier stand `!profiles.normal &&
+         !profiles.boost` — eine Pruefung auf VORHANDENSEIN, waehrend zwoelf
+         Zeilen tiefer `hasAnyProfile` auf KARTEN prueft. Ein Profil-Objekt
+         ohne Karten galt damit als vorhanden, aber nicht als brauchbar: Der
+         Lauf ging in den blocked-Zweig, `profileBlocked` blieb false, und das
+         Kind bekam `blocked.generic` — "irgendein Fehler, versuch es nochmal".
+         Versuchen hilft aber nicht, wenn die Antwort keine Karten enthaelt.
+         Dieselbe Fehlerform wie die falsche Ueberlastungs-Meldung am Einlass
+         (N-P2-2), nur eine Stufe spaeter.
+         Beide Zeilen messen jetzt dasselbe.
+
+         NEBENWIRKUNG, gemessen: Dadurch wird die Mutation `&&` -> `||` an
+         dieser Zeile WIRKLICH aequivalent — `profileBlocked` wird nur noch
+         gelesen, wenn keines der Profile Karten hat, und dann liefern beide
+         Fassungen `true`. Vorher war sie es NICHT (die Divergenz zwischen
+         Vorhandensein und Karten machte sie sichtbar); genau deshalb hatte
+         die Mutationsprobe zu Recht angeschlagen. Die Mutationsprobe wird sie
+         weiter als VERDACHT melden — das ist richtig so und kein Grund fuer
+         eine Ausnahmeliste im Werkzeug: Ein Verdacht ist kein Befund, und der
+         Unterschied steht in ihrer Ausgabe. */
+      profileBlocked = !hasCategories(profiles.normal) && !hasCategories(profiles.boost);
     } catch (err) {
       if (err && err.code === "config_missing") configMissing = true;
       if (isQuotaError(err)) quotaError = true;

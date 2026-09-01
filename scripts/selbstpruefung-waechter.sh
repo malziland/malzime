@@ -159,6 +159,11 @@ probe_ausgabe() {
   return 1
 }
 
+# BEFUND 01.09.2026 (Pruefrunde 8, M-P3): Diese Funktion war definiert und
+# wurde NIE aufgerufen — alle negativen Proben verglichen nur den
+# Rueckgabewert. Ein abgestuerzter Waechter liefert aber auch 1, und der
+# Absturz haette als "Befund gefunden" gezaehlt. Genau die Fehlerform, gegen
+# die diese Datei gebaut ist, in ihr selbst.
 probe_text() {
   ERWARTET="$1"; MUSTER="$2"; WAS="$3"; shift 3
   PROBEN=$((PROBEN + 1))
@@ -213,12 +218,12 @@ s = open("scripts/deploy.sh").read()
 s = s.replace("UEBERSPRUNGEN SKIP_SMOKE", "erledigt", 1)
 open("scripts/deploy.sh", "w").write(s)
 PYSELF
-probe 1 "Notschalter ohne Eintrag in der Schlussbilanz wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+probe_text 1 "FEHLT|Schlussbilanz" "Notschalter ohne Eintrag in der Schlussbilanz wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck scripts/deploy.sh
 
 echo
 
-echo "2b. verify-infrastructure.sh — Bildspeicher"
+echo "2. verify-infrastructure.sh — Bildspeicher"
 
 # BEFUND 31.08.2026 (Runde 5, von beiden Pruefern): Diese drei Proben riefen
 # das Infrastruktur-Skript mit vollem PATH auf — gemessen 42 gcloud- und drei
@@ -264,7 +269,7 @@ echo
 # GAR NICHT vor — waehrend Dateikopf, ci.yml und CHANGELOG behaupteten, alle
 # Waechter pruefen sich selbst. Der Waechter ueber den Waechtern hatte einen
 # blinden Fleck von der Groesse eines ganzen Werkzeugs.
-echo "2c. pruefe-kopplung.py"
+echo "3. pruefe-kopplung.py"
 
 probe 0 "eingehaltene Grenzen bestehen" python3 scripts/pruefe-kopplung.py
 
@@ -275,12 +280,12 @@ s = open("scripts/pruefe-kopplung.py").read()
 s = s.replace('"functions/src/mistral.js": ', '"functions/src/mistral.js": 1, #', 1)
 open("scripts/pruefe-kopplung.py", "w").write(s)
 PYSELF
-probe 1 "gerissene Groessengrenze wird gefunden" python3 scripts/pruefe-kopplung.py
+probe_text 1 "Grenze|ueberschritten" "gerissene Groessengrenze wird gefunden" python3 scripts/pruefe-kopplung.py
 zurueck scripts/pruefe-kopplung.py
 
 echo
 
-echo "3. pruefe-mitzieher.py"
+echo "4. pruefe-mitzieher.py"
 
 probe 0 "unveraenderter Baum besteht" python3 scripts/pruefe-mitzieher.py HEAD
 
@@ -300,7 +305,7 @@ marke = "  parallelitaet: { min: 1, max: 100 },"
 open("functions/src/betriebsprofil.js", "w").write(
     s.replace(marke, marke + "\n  selbstpruefungFeld: { min: 1, max: 9 },", 1))
 PY
-probe 1 "neues Pflichtfeld ohne Begleiter wird gefunden" python3 scripts/pruefe-mitzieher.py HEAD
+probe_text 1 "vergessen|Begleiter|fehlt" "neues Pflichtfeld ohne Begleiter wird gefunden" python3 scripts/pruefe-mitzieher.py HEAD
 zurueck functions/src/betriebsprofil.js
 
 echo
@@ -318,7 +323,7 @@ RESTE_PROBE="public/selbstpruefung-rest.json"
 sichern .gitignore
 echo "$RESTE_PROBE" >> .gitignore
 printf '{"probe":1}' > "$RESTE_PROBE"
-probe 1 "ignorierte, auslieferbare Datei wird gefunden" node scripts/pruefe-auslieferbare-reste.mjs
+probe_text 1 "wuerden ausgeliefert|ERGEBNIS: [1-9]" "ignorierte, auslieferbare Datei wird gefunden" node scripts/pruefe-auslieferbare-reste.mjs
 rm -f "$RESTE_PROBE"
 zurueck .gitignore
 
@@ -342,7 +347,7 @@ s = open("functions/src/config.js").read()
 open("functions/src/config.js", "w").write(
     s + "\n// Selbstpruefung: absichtliche Doppelung\nconst RATE_LIMIT = 155;\n")
 PYSELF
-probe 1 "doppelt gefuehrter Betriebswert wird gefunden" python3 scripts/pruefe-doppelte-werte.py
+probe_text 1 "zweite Definition|Einstellungssatz" "doppelt gefuehrter Betriebswert wird gefunden" python3 scripts/pruefe-doppelte-werte.py
 zurueck functions/src/config.js
 
 echo
@@ -361,7 +366,7 @@ s = s.replace('data-i18n="hero.title">Wir sehen mehr als dein Foto.',
               'data-i18n="hero.title">Selbstpruefung: abweichender Text.', 1)
 open("public/index.html", "w").write(s)
 PYSELF
-probe 1 "abweichender sichtbarer Text wird gefunden" python3 scripts/pruefe-i18n-fallbacks.py
+probe_text 1 "weicht ab|Abweichung|stimmt nicht" "abweichender sichtbarer Text wird gefunden" python3 scripts/pruefe-i18n-fallbacks.py
 zurueck public/index.html
 
 echo
@@ -378,7 +383,7 @@ s = open("e2e/ansagen.test.js").read()
 s = s.replace("waitForTimeout(900)", "waitForTimeout(99000)", 1)
 open("e2e/ansagen.test.js", "w").write(s)
 PYSELF
-probe 1 "Wartezeit ueber dem Zeitlimit wird gefunden" python3 scripts/pruefe-tote-geduld.py
+probe_text 1 "TOTE GEDULD|wirkungslose Wartezeit" "Wartezeit ueber dem Zeitlimit wird gefunden" python3 scripts/pruefe-tote-geduld.py
 zurueck e2e/ansagen.test.js
 
 echo
@@ -399,7 +404,7 @@ process.stdout.write(k[0]||'');
 if [ -n "$FREMD" ] && [ -f "$FREMD" ]; then
   sichern "$FREMD"
   printf '\n/* Selbstpruefung */\n' >> "$FREMD"
-  probe 1 "veraenderte Fremddatei wird gefunden" node scripts/pruefe-fremddateien.mjs
+  probe_text 1 "ABWEICHUNG|abweich" "veraenderte Fremddatei wird gefunden" node scripts/pruefe-fremddateien.mjs
   zurueck "$FREMD"
 else
   echo "  ?     Fremddatei-Sabotage NICHT MESSBAR (keine Datei in PRUEFSUMMEN.json gefunden)"
@@ -415,8 +420,29 @@ probe 0 "unveraenderte Kopien bestehen" node scripts/pruefe-vendorierung.mjs
 
 sichern scripts/pruefungen/checks/aussentext.py
 printf '\n# Selbstpruefung: Kopie veraendert\n' >> scripts/pruefungen/checks/aussentext.py
-probe 1 "bearbeitete vendorierte Kopie wird gefunden" node scripts/pruefe-vendorierung.mjs
+probe_text 1 "Kopie stimmt nicht mehr" "bearbeitete vendorierte Kopie wird gefunden" node scripts/pruefe-vendorierung.mjs
 zurueck scripts/pruefungen/checks/aussentext.py
+
+echo
+
+# BEFUND 01.09.2026 (Pruefrunde 8, M-P1-1): pruefe-mutationen.mjs war der
+# EINZIGE neue Waechter ohne Probe hier — und ausgerechnet er meldete in der
+# Pipeline 100 % gruen, ohne einen Test ausgefuehrt zu haben. Ein Waechter
+# ohne Probe ist eine Behauptung; bei einem Waechter, der ueber die Guete
+# ALLER Tests urteilt, ist es eine gefaehrliche.
+echo "11. pruefe-mutationen.mjs"
+
+probe 0 "die Eichung besteht" node scripts/pruefe-mutationen.mjs --eichung
+
+# Die entscheidende Probe: Kann das Werkzeug ueberhaupt keine Tests starten,
+# darf es KEIN Urteil faellen. Nachgestellt mit einem PATH, der `node`
+# enthaelt (sonst startet das Werkzeug selbst nicht), aber KEIN `npx` — genau
+# die Lage im CI-Job ohne Pakete.
+OHNE_NPX="$(mktemp -d)"
+ln -s "$(command -v node)" "$OHNE_NPX/node"
+probe 2 "ohne ausfuehrbare Tests faellt es kein Urteil" \
+  env PATH="$OHNE_NPX" node scripts/pruefe-mutationen.mjs functions/src/notify.js
+rm -rf "$OHNE_NPX"
 
 echo
 echo "── Ergebnis ──"
@@ -429,7 +455,7 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  ERWARTETE_PROBEN=22
+  ERWARTETE_PROBEN=24
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

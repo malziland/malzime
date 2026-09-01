@@ -112,6 +112,25 @@ async function handleEnqueue(req, res, secrets) {
 
     const ip = getClientIp(req);
     const { werte: grenzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
+
+    /* BEFUND 01.09.2026 (Simulation im Emulator): Ohne Einstellungssatz warf
+       `checkRateLimit` eine Zeile weiter unten ("adressLimit fehlt") — und der
+       Einlass antwortete mit HTTP 500 "unknown_error". Das Kind sah damit
+       wieder die falsche Meldung, obwohl der freundliche 503-Riegel weiter
+       unten seit heute genau dafuer da ist: Er kam nie dran.
+       Gefunden hat es kein Test, sondern ein Durchgang durch die laufende
+       Anwendung — die Tests rufen handle-enqueue direkt auf und ueberspringen
+       die Middleware davor.
+       Der Riegel steht jetzt VOR jeder Pruefung, die Satzwerte braucht. */
+    if (!grenzwerte) {
+      console.log(JSON.stringify({ requestId, warning: "kein-einstellungssatz", stelle: "vor-ratenbegrenzung" }));
+      res.status(503).json({
+        blocked: "configMissing",
+        retryAfterSeconds: 300,
+      });
+      return;
+    }
+
     if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
       res.status(429).json({ error: "Rate limit exceeded" });
       return;

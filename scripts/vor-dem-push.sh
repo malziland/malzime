@@ -108,6 +108,11 @@ lauf "Secret-Scan (gitleaks)" "secret-scan" sh scripts/secret-scan-lokal.sh
 if ! git diff --quiet origin/main -- .github/workflows/ 2>/dev/null; then
   lauf "Pipeline geaendert: die Tests dazu" "test-backend" \
     npm test --prefix functions --silent -- vor-dem-push-script.test doku-drift
+  # Und die geaenderten Schritte WIRKLICH ausfuehren. Sieben Fehler in fuenf
+  # Pipeline-Laeufen am 01.09.2026 waren alle von dieser Art: Die Datei war
+  # geprueft, die Umgebung angenommen. Hier kostet es Sekunden.
+  lauf "Pipeline geaendert: die Schritte ausfuehren" "pruefungen" \
+    node scripts/pruefe-pipeline-schritte.mjs
 fi
 
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs

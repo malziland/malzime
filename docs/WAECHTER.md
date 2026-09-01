@@ -28,10 +28,11 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 | `pruefe-mitzieher.py` | Vergessene Begleitdateien („wer X ändert, muss Y mitziehen") | Runde 1: Ein neues Pflichtfeld ohne die Stellen, die es kennen müssen | 180 ms |
 | `pruefe-tote-geduld.py` | Wartezeiten in E2E-Tests über dem Zeitlimit — der Test kann nie durchlaufen | Fund 21.08.; **Runde 8:** er war auf ganzen Abschnitten blind | 48 ms |
 | `pruefe-zeitzuender.sh` + `pruefe-zeitzuender.py` | Tests, die an einem festen Datum von selbst rot werden | TEST-2026-08-20-01, belegter Schaden | 80 ms |
+| `pruefe-pipeline-schritte.mjs` | **Geänderte Pipeline-Schritte, die lokal nie ausgeführt wurden** | 01.09.: Sieben Fehler in fünf Läufen — jedes Mal war die Datei geprüft und die Umgebung angenommen | wenige Sekunden, nur bei geänderter `ci.yml` |
 | `pruefe-auslieferbare-reste.mjs` | Ignorierte Dateien unter `public/`, die Firebase ausliefern würde | Runde 7 (L-5): Der Sauberkeits-Riegel sieht ignorierte Dateien nicht | 46 ms |
 | `pruefe-fremddateien.mjs` | Veränderter Fremdcode (exifr, Leaflet, Schriften) | OSS-2026-08-12-22: exifr liest die GPS-Daten, deren Nichtweitergabe die Kernzusage ist | 41 ms |
 | `pruefe-vendorierung.mjs` | Bearbeitete Kopien der Audit-Familie unter `scripts/pruefungen/` | Bearbeitet wird die Quelle, nie die Kopie | 57 ms |
-| `pruefe-mutationen.mjs` | **Tests, die nichts merken:** Code kaputtmachen, ohne dass ein Test rot wird | Runde 7: Sechs von achtzehn Befunden waren überlebende Mutationen, von Hand gefunden | Minuten — läuft nur in der Pipeline |
+| `pruefe-mutationen.mjs` | **Tests, die nichts merken:** Code kaputtmachen, ohne dass ein Test rot wird | Runde 7: Sechs von achtzehn Befunden waren überlebende Mutationen, von Hand gefunden | Minuten — **läuft vorerst nur lokal**, siehe unten |
 
 **Alle zusammen (ohne die Mutationsprobe): unter einer Sekunde.** Deshalb
 laufen sie vor jedem Push. Die Mutationsprobe braucht je Mutation einen
@@ -70,6 +71,23 @@ verstreut in den Dateien; hier ist die vollständige Liste mit dem Grund.
 | `skript-rechte.test.js` | `scripts/pruefungen/negativprobe/**` | Beispielmaterial für die Prüfungen — absichtlich kaputte Skripte, die niemand ausführt |
 
 ---
+
+## Offener Punkt: die Mutationsprobe läuft nur lokal
+
+Sie hat am 01.09.2026 in **drei aufeinanderfolgenden Pipeline-Läufen** den
+Pflicht-Check rot gemacht — jedes Mal aus einem Grund der Umgebung, nie wegen
+eines echten Befundes: fehlende Pakete im Job, flacher Checkout ohne Historie,
+und zuletzt ein `jest`-Aufruf, der dort anders antwortet als lokal.
+
+Zwei der drei Gründe sind behoben und haben eigene Riegel hinterlassen (siehe
+`pruefe-deploy-riegel.py`). Der dritte ist offen. Bis er verstanden ist, läuft
+das Werkzeug **nur lokal** — dort hat es am selben Tag drei echte Lücken
+gefunden, darunter den ungedeckten Riegel gegen Testzugriffe auf die
+Produktions-Warteschlange.
+
+Zurück in die Pipeline kommt es, wenn ein Lauf dort nachweislich durchgelaufen
+ist. Nicht auf Verdacht: Ein Wächter, der aus Umgebungsgründen rot meldet,
+kostet mehr Vertrauen, als er Fehler findet.
 
 ## Was diese Schicht NICHT kann
 

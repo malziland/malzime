@@ -23,7 +23,10 @@ WAS HIER BLEIBT, sind die zwei Fragen, bei denen es wirklich um Text geht:
 
 BEKANNTE GRENZE (Runde 4, F-4): Wer `deploy-verhalten.test.js` loescht, faellt
 hier nicht auf — dieses Skript kennt die Datei nicht. Der Schutz dagegen liegt
-in `pruefe-mitzieher.py`.
+in `pruefe-kopplung.py` ("UNVERZICHTBARE PRUEFUNG FEHLT") und in
+`selbstpruefung-waechter.sh` (eine Probe schlaegt fehl); beide gemessen am
+01.09.2026 mit geloeschter Datei. `pruefe-mitzieher.py` faengt diesen Fall
+NICHT — die urspruengliche Zuschreibung war falsch (Runde 7, K-5).
 """
 
 import re
@@ -205,7 +208,107 @@ def main():
         return 2
 
     print()
-    anzahl = len(fehlt) + len(falsch_platziert) + len(ohne_abbruch) + len(ohne_bilanz) + (1 if ci_fehlt else 0)
+    # BEFUND 01.09.2026 (Runde 7, K-7): Einen Pruefschritt aus dem Job
+    # `pruefungen` zu entfernen fiel durch KEIN Netz — alle Waechter blieben
+    # gruen, die volle Suite auch, und weil der Job weiter gleich heisst, war
+    # auch die Branch Protection zufrieden. Ein Waechter, den niemand mehr
+    # aufruft, ist kein Waechter.
+    #
+    # Jeder Waechter muss an ZWEI Stellen erreichbar sein: aus der Pipeline
+    # und aus der lokalen Vorabpruefung. Erreichbar heisst nicht "steht
+    # woertlich drin": pruefe-zeitzuender.py wird von pruefe-zeitzuender.sh
+    # aufgerufen, und nur die .sh steht in den Listen. Darum wird der Aufruf
+    # verfolgt, bis nichts Neues mehr dazukommt.
+    print("── Wird jeder Waechter auch aufgerufen? ──")
+    skripte = sorted(
+        set(
+            list((WURZEL / "scripts").glob("pruefe-*.py"))
+            + list((WURZEL / "scripts").glob("pruefe-*.sh"))
+            + list((WURZEL / "scripts").glob("pruefe-*.mjs"))
+            + [WURZEL / "scripts" / "selbstpruefung-waechter.sh"]
+        )
+    )
+    skripte = [d for d in skripte if d.exists()]
+    # Nicht jedes pruefe-* gehoert in die Kette. Wer hier steht, braucht einen
+    # Grund; die Liste ist bewusst kurz und muss es bleiben.
+    AUSGENOMMEN = {
+        "pruefe-live.sh": "Werkzeug fuer Dritte: rechnet den AUSGELIEFERTEN "
+        "Stand gegen das Repo nach, braucht Netz und eine Live-Adresse. Vor "
+        "dem Deploy gibt es den Stand noch nicht.",
+    }
+    skripte = [d for d in skripte if d.name not in AUSGENOMMEN]
+
+    def ohne_kommentare(text):
+        """Kommentarzeilen weg — sonst zaehlt eine blosse Erwaehnung als
+        Aufruf. Dieselbe Falle wie beim cancel-in-progress-Anker: Die
+        Begruendung ueber einer Zeile nennt genau die Namen, um die es geht.
+        Der erste Entwurf dieser Pruefung meldete deshalb alles gruen, auch
+        mit entferntem Pruefschritt — die Rueckbauprobe hat es gezeigt."""
+        raus = []
+        for zeile in text.split("\n"):
+            k = zeile.lstrip()
+            if k.startswith("#") or k.startswith("//"):
+                continue
+            raus.append(zeile)
+        return "\n".join(raus)
+
+    def aufruf_von(name, text):
+        """Wird `name` hier AUFGERUFEN — oder nur genannt? Der Unterschied
+        entschied die Rueckbauprobe: pruefe-mitzieher.py nennt
+        pruefe-doppelte-werte.py in einer Zeichenkette als Zustaendigen, und
+        damit galt der Waechter als aufgerufen, obwohl sein Pipeline-Schritt
+        entfernt war. Verlangt wird jetzt ein Interpreter davor."""
+        return re.search(
+            r"(?:python3?|sh|bash|node)\s+[\"']?[^\s;|&\"']*"
+            + re.escape(name)
+            + r"(?=[\"'\s]|$)",
+            text,
+        ) is not None
+
+    def erreichbar_ab(text):
+        """Alle Skriptnamen, die von diesem Text aus aufgerufen werden —
+        auch ueber Zwischenschritte."""
+        gefunden = set()
+        offen = [ohne_kommentare(text)]
+        while offen:
+            jetzt = offen.pop()
+            for datei in skripte:
+                if datei.name in gefunden or not aufruf_von(datei.name, jetzt):
+                    continue
+                gefunden.add(datei.name)
+                # selbstpruefung-waechter.sh ruft JEDEN Waechter auf — gegen
+                # kuenstliche Proben, nicht gegen dieses Repo. Wer nur dort
+                # laeuft, wacht ueber nichts. Sie ist deshalb ein Blattknoten:
+                # selbst pruefbar, aber kein Weg zu anderen.
+                if datei.name == "selbstpruefung-waechter.sh":
+                    continue
+                try:
+                    offen.append(ohne_kommentare(datei.read_text(encoding="utf-8")))
+                except OSError:
+                    pass  # unlesbar: gilt als Blattknoten, nicht als Fehler
+        return gefunden
+
+    vorab = WURZEL / "scripts" / "vor-dem-push.sh"
+    if not vorab.exists():
+        print("  NICHT MESSBAR: scripts/vor-dem-push.sh fehlt")
+        return 2
+    aus_ci = erreichbar_ab(ci)
+    aus_vorab = erreichbar_ab(vorab.read_text(encoding="utf-8"))
+    waechter_fehlt = []
+    for datei in skripte:
+        wo = [n for n, m in (("ci.yml", aus_ci), ("vor-dem-push.sh", aus_vorab))
+              if datei.name not in m]
+        if wo:
+            waechter_fehlt.append((datei.name, ", ".join(wo)))
+    if waechter_fehlt:
+        for name, wo in waechter_fehlt:
+            print(f"  FEHLT   {name} wird nicht aufgerufen aus: {wo}")
+        print("          Ein Waechter, den niemand aufruft, ist kein Waechter.")
+    else:
+        print(f"  ok      alle {len(skripte)} Waechter sind aus beiden Listen erreichbar")
+    print()
+
+    anzahl = len(fehlt) + len(falsch_platziert) + len(ohne_abbruch) + len(ohne_bilanz) + (1 if ci_fehlt else 0) + len(waechter_fehlt)
     if anzahl == 0:
         print("  ERGEBNIS: Notschalter vollstaendig gemeldet, Pipeline-Einstellung ok.")
         print("  (Die Riegel SELBST prueft deploy-verhalten.test.js — ausgefuehrt, nicht gelesen.)")

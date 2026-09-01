@@ -77,6 +77,8 @@ afterAll(() => {
 
 /** Fuehrt deploy.sh im Klon aus und gibt Rueckgabewert und Ausgabe zurueck. */
 function deploy(umgebung = {}, ziel = "hosting", ohneGh = false) {
+  /* ziel === null: ganz ohne Argument aufrufen — dann greift der Standard
+     `hosting,functions` aus deploy.sh:362 (Runde 7, K-13). */
   try {
     /* BEFUND 31.08.2026 (Runde 4): Hier stand "sh". Auf ubuntu-latest — also in
        der Pipeline — ist `sh` gleich `dash`, und deploy.sh nutzt
@@ -85,7 +87,8 @@ function deploy(umgebung = {}, ziel = "hosting", ohneGh = false) {
        weil `sh` auf macOS bash ist.
        Dieselbe Lehre steht im Kopf von selbstpruefung-waechter.sh und ist dort
        mit einem BASH_VERSION-Riegel abgesichert — hier war sie neu entstanden. */
-    const ausgabe = execFileSync("bash", ["scripts/deploy.sh", ziel], {
+    const argumente = ziel === null ? ["scripts/deploy.sh"] : ["scripts/deploy.sh", ziel];
+    const ausgabe = execFileSync("bash", argumente, {
       cwd: klon,
       encoding: "utf8",
       stdio: "pipe",
@@ -167,7 +170,10 @@ function skripteEinspielen() {
       `#!/bin/sh\n# ATTRAPPE (Testlauf) — beruehrt keinen echten Dienst.\n` +
         `if [ "\${ATTRAPPE_${name}_ROT:-0}" = "1" ]; then\n` +
         `  echo "ATTRAPPE ${name}: scheitert (so gewollt)" >&2\n  exit 1\nfi\n` +
-        `echo "ATTRAPPE ${name}: ok"\nexit 0\n`
+        /* Argumente mitschreiben: Ob live-smoke.sh die Buster-Version
+           bekommt, haengt am Deploy-Ziel — ohne diese Zeile laesst sich das
+           von aussen nicht unterscheiden (Runde 7, K-13). */
+        `echo "ATTRAPPE ${name}: ok args=[$*]"\nexit 0\n`
     );
     fs.chmodSync(ziel, 0o755);
   }
@@ -612,6 +618,49 @@ describe("deploy.sh — der Erfolgsweg", () => {
     expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
     /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
     expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
+  });
+});
+
+/* BEFUND 01.09.2026 (Runde 7, K-13): Alle Faelle oben fahren mit Ziel
+   `hosting`. Zwei Zweige haengen aber am Ziel — die Cache-Kennung
+   (deploy.sh:423) und das Argument fuer den Live-Smoke (deploy.sh:735).
+   Ein reiner Functions-Deploy war damit vollstaendig ungeprueft, und der
+   haeufigste Aufruf ist der ganz ohne Argument. */
+describe("deploy.sh — das Deploy-Ziel", () => {
+  afterEach(aufraeumen);
+
+  /** Die Cache-Kennung im Klon, wie sie public/index.html zeigt. */
+  function busterImKlon() {
+    const html = fs.readFileSync(path.join(klon, "public", "index.html"), "utf8");
+    const m = /styles\.css\?v=(\d+)/.exec(html);
+    return m ? m[1] : null;
+  }
+
+  test("Ziel `functions` laesst die Cache-Kennung unangetastet", () => {
+    const vorher = busterImKlon();
+    expect(vorher).not.toBeNull();
+    const r = deploy({}, "functions");
+    expect(r.code).toBe(0);
+    expect(busterImKlon()).toBe(vorher);
+    expect(r.ausgabe).toMatch(/kein Hosting-Deploy/i);
+  });
+
+  test("Ziel `functions` ruft den Live-Smoke OHNE Buster-Version", () => {
+    const r = deploy({}, "functions");
+    expect(r.code).toBe(0);
+    /* Mit Argument waere es `args=[2026…]` — ohne Hosting gibt es keine neue
+       Kennung, die der Smoke live zuruecklesen koennte. */
+    expect(r.ausgabe).toMatch(/ATTRAPPE SMOKE: ok args=\[\]/);
+  });
+
+  test("ohne Argument gilt `hosting,functions` — die Kennung wird gesetzt", () => {
+    const vorher = busterImKlon();
+    const r = deploy({}, null);
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/Deploy-Ziel: hosting,functions/);
+    expect(busterImKlon()).not.toBe(vorher);
+    /* Und der Smoke bekommt die neue Kennung mit. */
+    expect(r.ausgabe).toMatch(new RegExp(`ATTRAPPE SMOKE: ok args=\\[${busterImKlon()}\\]`));
   });
 });
 

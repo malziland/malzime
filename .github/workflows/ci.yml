@@ -67,6 +67,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+      # BEFUND 01.09.2026 (Runde 7, L-15): Fuer Node steht die Begruendung
+      # oben — fuer Python galt sie genauso, nur stand sie nirgends. Sechs
+      # Waechter laufen mit python3; bisher mit dem, was das Runner-Image
+      # gerade mitbrachte. Faellt das weg oder springt es auf eine Fassung,
+      # die eine Datei anders liest, meldet die Pipeline keinen fehlenden
+      # Waechter, sondern einen Fehler an falscher Stelle.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
           cache: npm
           cache-dependency-path: functions/package-lock.json
 
@@ -117,6 +126,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+      # BEFUND 01.09.2026 (Runde 7, L-15): Fuer Node steht die Begruendung
+      # oben — fuer Python galt sie genauso, nur stand sie nirgends. Sechs
+      # Waechter laufen mit python3; bisher mit dem, was das Runner-Image
+      # gerade mitbrachte. Faellt das weg oder springt es auf eine Fassung,
+      # die eine Datei anders liest, meldet die Pipeline keinen fehlenden
+      # Waechter, sondern einen Fehler an falscher Stelle.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
           cache: npm
           cache-dependency-path: package-lock.json
 
@@ -264,6 +282,15 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+      # BEFUND 01.09.2026 (Runde 7, L-15): Fuer Node steht die Begruendung
+      # oben — fuer Python galt sie genauso, nur stand sie nirgends. Sechs
+      # Waechter laufen mit python3; bisher mit dem, was das Runner-Image
+      # gerade mitbrachte. Faellt das weg oder springt es auf eine Fassung,
+      # die eine Datei anders liest, meldet die Pipeline keinen fehlenden
+      # Waechter, sondern einen Fehler an falscher Stelle.
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
 
       # Zuerst die Pruefungen selbst pruefen: je Pruefung eine Probe gegen
       # kaputtes und eine gegen sauberes Material. Ohne diesen Schritt koennte

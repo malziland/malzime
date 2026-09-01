@@ -108,12 +108,25 @@ b_text = stempel(b, skip_b)
 f_text = stempel(f, os.environ.get("FRONTEND_SKIP", ""))
 e_text = stempel(e, os.environ.get("E2E_SKIP", ""))
 
+# BEFUND 01.09.2026 (Runde 7, L-9): Diese Ersetzung nahm die ganze dritte
+# Spalte und schrieb sie neu. Was dort von Hand ergänzt worden war, verschwand
+# beim nächsten Stempeln spurlos — so ging der Hinweis verloren, dass ohne
+# installiertes `gcloud` zwei Backend-Tests übersprungen werden. Eine
+# Einschränkung, die ein Automat wegwirft, wird kein zweites Mal geschrieben.
+# Jetzt bleibt alles erhalten, was in Klammern hinter dem Datum steht.
+def anmerkung_aus(zelle):
+    """Der von Hand ergänzte Klammerzusatz hinter dem Datum, oder ''."""
+    m = re.search(r"\d{4}-\d{2}-\d{2}\s*(\(.*)$", zelle.rstrip().rstrip("|").rstrip())
+    return " " + m.group(1).strip() if m else ""
+
 ersetzungen = [
-    (r"(\| Backend-Unit-Tests \|[^|]+\|) [^|]+\|",  rf"\1 ✅ {b_text} {stempel_ende}"),
-    (r"(\| Frontend-Unit-Tests \|[^|]+\|) [^|]+\|", rf"\1 ✅ {f_text} {stempel_ende}"),
-    (r"(\| E2E kritischster Nutzerfluss[^|]*\|[^|]+\|) [^|]+\|", rf"\1 ✅ {e_text} {stempel_ende}"),
+    (r"(\| Backend-Unit-Tests \|[^|]+\|)([^|]+)\|",  f"✅ {b_text} {stempel_ende}"),
+    (r"(\| Frontend-Unit-Tests \|[^|]+\|)([^|]+)\|", f"✅ {f_text} {stempel_ende}"),
+    (r"(\| E2E kritischster Nutzerfluss[^|]*\|[^|]+\|)([^|]+)\|", f"✅ {e_text} {stempel_ende}"),
 ]
-for muster, ersatz in ersetzungen:
+for muster, neuer_stand in ersetzungen:
+    def ersatz(m, _neu=neuer_stand):
+        return f"{m.group(1)} {_neu.rstrip('|').rstrip()}{anmerkung_aus(m.group(2))} |"
     text, anzahl = re.subn(muster, ersatz, text, count=1)
     if anzahl != 1:
         print(f"ABBRUCH: Zeile zu Muster {muster!r} nicht gefunden — Tabellenaufbau geändert?")

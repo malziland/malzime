@@ -365,8 +365,10 @@ oder ein Fehler auffällt. Kein Deploy, kein Neustart, keine Nebenwirkung.
 Alle drei Schritte wirken in ~30 s. **Warum die Kopplung:** Die
 3-Call-Pipeline nutzt `mistral-small` (nur 100K Tokens/min) — bei Concurrency über 3
 drohen massenhaft 429-Fehler (gemessen 2026-05-20: bei Parallelität 6 kamen 6 von
-12 Jobs als 429 zurück). Rückweg: `./scripts/cloudtasks-concurrency-7.sh`, Werte in
-`config.js` zurück (7 / 65), Flag wieder `true`.
+12 Jobs als 429 zurück). Rückweg: Betriebsprofil zurückstellen (Flag wieder `true`); die
+Warteschlangen-Werte zieht die Anwendung selbst nach. `config.js` wird dabei
+nicht mehr angefasst — dieser Satz stammte aus der Zeit vor dem Umbau vom
+30.08.2026 und widersprach dem Hinweis drei Zeilen darüber.
 
 ### 3a. Beast-Werbung im zweiten Aufruf zurückbauen (v2.8)
 

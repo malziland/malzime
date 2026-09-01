@@ -63,6 +63,13 @@ jobs:
         working-directory: functions
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Die Mutationsprobe unten vergleicht gegen origin/main, um die
+          # GEAENDERTEN Zeilen zu finden. Mit dem flachen Standard-Checkout
+          # gibt es kein origin/main — sie meldet dann ehrlich
+          # 'nicht messbar' (Rueckgabewert 2) und macht den Job rot.
+          # Gemessen am 01.09.2026, vierter Pipeline-Lauf.
+          fetch-depth: 0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:

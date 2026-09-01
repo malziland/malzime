@@ -71,6 +71,15 @@ RIEGEL_DEPLOY = []
 
 
 def main():
+    # BEFUND 01.09.2026: Dreimal an einem Tag scheiterte eine neue Pruefung
+    # daran, dass `ci` erst weiter unten gelesen wurde — die Variable gibt es
+    # an der Einfuegestelle noch nicht. Jetzt steht sie ganz oben; jede neue
+    # Pruefung findet sie vor, egal wo sie eingefuegt wird.
+    if not CI.exists():
+        print("NICHT MESSBAR: .github/workflows/ci.yml fehlt")
+        return 2
+    ci = CI.read_text(encoding="utf-8")
+
     if not SKRIPT.exists():
         print(f"  NICHT MESSBAR: {SKRIPT} fehlt.")
         return 2
@@ -158,10 +167,53 @@ def main():
 
     # Die CI-Regel gegen parallele Laeufe
     print()
+    # BEFUND 01.09.2026 (vierter Pipeline-Lauf): Die Mutationsprobe lief im
+    # Job `test-backend`, der FLACH auscheckt — sie fand kein origin/main und
+    # meldete "nicht messbar". Sie hat sich richtig verhalten; falsch war der
+    # Job. Dieselbe Lehre steht seit Runde 5 im Kopf von
+    # deploy-verhalten.test.js und im Job `pruefungen`; beim Verschieben eines
+    # Schrittes ist sie wieder herausgefallen.
+    #
+    # Wer die Historie braucht, muss sie bekommen. Das ist aus dem Aufruf
+    # ablesbar — also pruefbar.
+    print("── Bekommt jeder Job die Historie, die er braucht? ──")
+    BRAUCHT_HISTORIE = ("origin/main", "pruefe-mutationen", "pruefe-mitzieher")
+    job_zeilen = ci.split("\n")
+    aktueller_job = None
+    job_hat_tiefe = {}
+    job_braucht = {}
+    for zeile in job_zeilen:
+        m = re.match(r"^  ([a-z][a-z0-9-]*):\s*$", zeile)
+        if m:
+            aktueller_job = m.group(1)
+            job_hat_tiefe.setdefault(aktueller_job, False)
+            continue
+        if not aktueller_job:
+            continue
+        if "fetch-depth:" in zeile and zeile.strip().split(":", 1)[1].strip() == "0":
+            job_hat_tiefe[aktueller_job] = True
+        if any(w in zeile for w in BRAUCHT_HISTORIE) and "run:" in zeile:
+            job_braucht.setdefault(aktueller_job, []).append(zeile.strip()[:52])
+
+    ohne_historie = [
+        (job, aufrufe) for job, aufrufe in job_braucht.items() if not job_hat_tiefe.get(job)
+    ]
+    if ohne_historie:
+        for job, aufrufe in ohne_historie:
+            print(f"  FEHLT   Job `{job}` braucht die Historie, checkt aber flach aus:")
+            for a in aufrufe[:2]:
+                print(f"            {a}")
+        print("          `fetch-depth: 0` beim checkout ergaenzen. Ohne sie gibt")
+        print("          es kein origin/main — der Waechter meldet dann ehrlich")
+        print("          'nicht messbar' und der Job wird rot.")
+        ci_fehlt = True
+    else:
+        print(f"  ok      {len(job_braucht)} Job(s) brauchen Historie und bekommen sie")
+    print()
+
     print("── Bricht ein neuer Push den vorigen Lauf ab? ──")
     ci_fehlt = False
-    if CI.exists():
-        ci = CI.read_text(encoding="utf-8")
+    if True:
         # BEFUND 31.08.2026 (Runde 3): Hier wurde nur geprueft, OB die Woerter
         # vorkommen. `cancel-in-progress: true` haette weiter "ok" gemeldet,
         # obwohl damit ein laufender main-Durchgang abgebrochen wuerde. Jetzt

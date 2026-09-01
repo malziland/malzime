@@ -745,3 +745,51 @@ describe("setMaintenanceMode", () => {
     expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ enabled: false, message: "" }));
   });
 });
+
+/* ── Doppelzaehlung nach Zeitlimit (Befund 01.09.2026) ──────────────────────
+   BELEGT IM ECHTBETRIEB: Ein Lasttest mit 30 gleichzeitigen Uploads (alle
+   angenommen, keiner abgelehnt) hinterliess 51 Eintraege im Stundenzaehler.
+   Gemessen an stats/current: 51 Zeitstempel in derselben Minute, davon
+   17 Paare weniger als 50 ms auseinander.
+
+   URSACHE: `Promise.race` beendet den Verlierer nicht. Braucht die Transaktion
+   laenger als das Zeitlimit, gewinnt der Zeitgeber — die Transaktion laeuft
+   aber weiter und schreibt ihren Zeitstempel. Weil der Zeitlimit-Fehler mit
+   `code = 10` als ABORTED markiert war, wiederholte die Schleife und schrieb
+   einen zweiten.
+
+   Bei ECHTEM ABORTED ist die Wiederholung richtig: Firestore garantiert dann,
+   dass nichts geschrieben wurde. Beim Zeitlimit ist der Ausgang UNBEKANNT —
+   dort darf nicht wiederholt werden.
+
+   FOLGE IM BETRIEB: Die Kostenbremse zaehlte etwa 1,7-mal zu hoch. Bei einem
+   Workshop mit 155 gleichzeitigen Uploads haette das Stundenlimit von 500
+   schon bei rund 300 echten Analysen gegriffen — Kinder haetten "Limit
+   erreicht" gesehen, obwohl die Haelfte des Kontingents frei war. */
+describe("Zeitlimit fuehrt nicht zur Doppelzaehlung", () => {
+  test("nach einem Zeitlimit wird die Transaktion NICHT wiederholt", async () => {
+    /* Eine Transaktion, die nie zurueckkehrt: genau die Lage bei Andrang auf
+       ein einzelnes Dokument. */
+    mockRunTransaction.mockImplementation(() => new Promise(() => {}));
+    mockGet.mockResolvedValue({ exists: false, data: () => ({}) });
+
+    await checkAndIncrement();
+
+    /* EIN Versuch. Ohne den Fix waeren es drei — und jeder haette einen
+       weiteren Zeitstempel hinterlassen. */
+    expect(mockRunTransaction).toHaveBeenCalledTimes(1);
+  }, 20000);
+
+  test("echtes ABORTED wird weiterhin wiederholt", async () => {
+    /* Die Wiederholung bleibt, wo sie richtig ist: Bei ABORTED steht fest,
+       dass nichts geschrieben wurde. */
+    const abbruch = new Error("ABORTED: too much contention");
+    abbruch.code = 10;
+    mockRunTransaction.mockRejectedValue(abbruch);
+    mockGet.mockResolvedValue({ exists: false, data: () => ({}) });
+
+    await checkAndIncrement();
+
+    expect(mockRunTransaction).toHaveBeenCalledTimes(3);
+  }, 20000);
+});

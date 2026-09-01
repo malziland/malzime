@@ -245,8 +245,9 @@ async function checkAndIncrement() {
         }),
         new Promise((_, ab) => {
           const uhr = setTimeout(() => {
-            const f = new Error("Zeitlimit 2000 ms fuer den Stundenzaehler");
-            f.code = 10; /* wie ABORTED behandeln: Wiederholung, dann Netz */
+            const f = new Error(`Zeitlimit ${ZAEHLER_ZEITLIMIT_MS} ms fuer den Stundenzaehler`);
+            /* KEIN code = 10: die Transaktion schreibt nach dem race weiter — als ABORTED zaehlte sie doppelt. */
+            f.zeitlimit = true;
             ab(f);
           }, ZAEHLER_ZEITLIMIT_MS);
           if (typeof uhr.unref === "function") uhr.unref();
@@ -257,7 +258,7 @@ async function checkAndIncrement() {
     } catch (err) {
       lastErr = err;
       const isAborted = err.code === 10 || /ABORTED/i.test(err.message || "");
-      if (isAborted && attempt < ABORTED_RETRIES) {
+      if (!err.zeitlimit && isAborted && attempt < ABORTED_RETRIES) {
         /* Kurz: 80 und 160 ms, plus bis zu 80 ms Zufall. Genug fuer eine
            zufaellige Kollision, zu kurz, um den Einlass aufzuhalten. Bei
            echtem Andrang uebernimmt das Netz. */
@@ -272,7 +273,9 @@ async function checkAndIncrement() {
          Log-basierter Alert in Cloud Logging anschlagen kann.
          v1.10.6: Routinemaessige ABORTED-Kontention wird VORHER 2× geretried
          und triggert hier nur den ERROR-Pfad, wenn auch das nicht reicht. */
-      const reason = isAborted ? "aborted-retries-exhausted" : "firestore-error";
+      let reason = "firestore-error";
+      if (err.zeitlimit) reason = "zeitlimit-kein-retry";
+      else if (isAborted) reason = "aborted-retries-exhausted";
 
       /* ZUERST DAS NETZ, DANN DIE MELDUNG.
          Frueher stand hier ein ERROR mit dem Text "globale Kostenbremse

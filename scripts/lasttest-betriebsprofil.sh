@@ -119,7 +119,16 @@ fi
 echo
 echo "5. Nachweis: wirkt eine Umstellung des Satzes?"
 
-ERSTE_JOB=$(grep -ho '"jobId":"[^"]*"' /tmp/lasttest-*.json 2>/dev/null | head -1 | cut -d'"' -f4)
+# BEFUND 01.09.2026: Hier stand `head -1` — gemessen wurde der ZUERST
+# eingereihte Auftrag. Der ist nach den 32 Sekunden Wartezeit schon fast vorne,
+# und bei kleiner Position aendert eine hoehere Parallelitaet rechnerisch
+# NICHTS: Position 3 braucht bei 7 wie bei 14 Plaetzen genau eine Runde. Der
+# Lauf mit 30 Auftraegen meldete deshalb "DURCHGEFALLEN", obwohl die Anwendung
+# richtig rechnete — ein Fehlalarm des Messmittels, kein Befund.
+#
+# Gemessen wird jetzt der ZULETZT eingereihte Auftrag: Er steht hinten, und
+# dort wirkt die Umstellung.
+ERSTE_JOB=$(grep -ho '"jobId":"[^"]*"' /tmp/lasttest-*.json 2>/dev/null | tail -1 | cut -d'"' -f4)
 ERSTER_TOKEN=$(grep -l "$ERSTE_JOB" /tmp/lasttest-*.json | head -1 | xargs grep -ho '"resultToken":"[^"]*"' | cut -d'"' -f4)
 
 status_holen() {
@@ -152,10 +161,23 @@ if [ -n "$ETA_VORHER" ] && [ -n "$ETA_NACHHER" ]; then
   if [ "$ETA_NACHHER" -lt "$ETA_VORHER" ]; then
     echo "   * BESTANDEN: Die Umstellung wirkt — Wartezeit $ETA_VORHER s -> $ETA_NACHHER s"
     echo "     (doppelte Parallelitaet, halbe Wartezeit, ohne Deploy)"
+  elif [ -n "$POS_VORHER" ] && [ "$POS_VORHER" -le 7 ]; then
+    # BEFUND 01.09.2026: Bei kleiner Position KANN sich die Wartezeit nicht
+    # aendern — Position 3 braucht bei 7 wie bei 14 Plaetzen eine Runde. Der
+    # Lauf mit 30 Auftraegen meldete deshalb "DURCHGEFALLEN", obwohl die
+    # Anwendung richtig rechnete. Eine Messung, die nichts aussagen KANN, ist
+    # kein Durchfall — sie ist nicht messbar.
+    echo "   * NICHT MESSBAR: Der gemessene Auftrag stand auf Position"
+    echo "     $POS_VORHER — dort braucht er bei 7 wie bei 14 Plaetzen genau"
+    echo "     eine Runde, die Wartezeit ist rechnerisch gleich. Kein Befund"
+    echo "     ueber die Anwendung, sondern zu wenig Warteschlange."
+    echo "     Mit mehr Last erneut: sh $0 $((ANZAHL * 3))"
+    exit 2
   else
     echo "   * DURCHGEFALLEN: Die Wartezeit hat sich NICHT bewegt"
-    echo "     ($ETA_VORHER s -> $ETA_NACHHER s). Die Ansage rechnet nicht mit"
-    echo "     dem Satz — genau der Befund ARCH-2026-08-30-04."
+    echo "     ($ETA_VORHER s -> $ETA_NACHHER s) bei Position $POS_VORHER — dort"
+    echo "     muesste die doppelte Parallelitaet wirken. Die Ansage rechnet"
+    echo "     nicht mit dem Satz — Befund ARCH-2026-08-30-04."
     exit 1
   fi
 else

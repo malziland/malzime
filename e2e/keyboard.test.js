@@ -110,8 +110,30 @@ test("Tastatur: Demo-Foto → Profil, nur mit Tab + Enter", async ({ page }) => 
   });
   expect(erreichbar).toBe("ok");
 
-  /* Mit der Leertaste umschalten — nicht nur mit der Maus. */
-  await page.evaluate(() => document.getElementById("biasSwitch").focus());
-  await page.keyboard.press("Space");
+  /* Mit der Leertaste umschalten — nicht nur mit der Maus.
+
+     TEST-2026-08-30: Hier standen zwei getrennte Schritte — erst `focus()`
+     ueber `page.evaluate`, dann `page.keyboard.press` an das Dokument. Unter
+     Last in der Pipeline (328 Tests, vier Arbeiter) ging dazwischen der Fokus
+     verloren: Die Leertaste landete im Nichts, der Schalter blieb stehen, und
+     die Auslieferung stand — obwohl am Produkt nichts kaputt war. Lokal war
+     der Test achtmal hintereinander gruen, auch mit englischem Browser.
+
+     `locator.press` macht beides in einem Schritt und wartet vorher darauf,
+     dass das Element bedienbar ist. Die Aussage bleibt dieselbe: Die Leertaste
+     legt den Schalter um.
+
+     WAS BELEGT IST: Der Test wird rot, wenn der Schalter wirklich kaputt ist
+     (nachgestellt am 30.08. mit entferntem setAttribute) — er misst also
+     weiterhin, was er messen soll. Und er trennt die beiden Handgriffe nicht
+     mehr, zwischen denen der Fokus verlorengehen konnte.
+
+     WAS NICHT BELEGT IST: dass genau DAS die Ursache des Flackerns war. Lokal
+     lief der alte Test achtmal gruen, auch mit englischem Browser; der
+     Fehlschlag trat nur in der Pipeline unter Last auf und liess sich nicht
+     nachstellen. Sollte er wiederkommen, ist die naechste Spur die
+     Konkurrenz um dieselbe Maschine — seit dem 31.08. bricht ein neuer Push
+     die vorigen Laeufe ab, was diese Last deutlich senkt. */
+  await page.locator("#biasSwitch").press("Space");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });

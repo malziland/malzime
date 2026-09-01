@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const os = require("os");
 const { execSync } = require("child_process");
 
 /**
@@ -116,4 +117,45 @@ describe("Cloud-Tasks-Scripts", () => {
     // pruefungen:uebersprungen-weil der Abgleich braucht das Werkzeug gcloud, das in dieser Umgebung fehlt — die Alternative waere eine Schein-Zusicherung
     test.skip("Parameter-Abgleich gegen die gcloud-Hilfe (gcloud nicht installiert)", () => {});
   }
+
+  /* BEFUND 01.09.2026 (Runde 7, K-11): Datei "7" setzte `4` und meldete
+     "Concurrency: 7". Alles darueber liest den Quelltext — kein Test hat je
+     verglichen, WAS gesetzt wird mit dem, was gemeldet wird. Diese Pruefung
+     fuehrt das Script wirklich aus, mit einer gcloud-Attrappe im PATH, und
+     liest beide Seiten aus dem Lauf statt aus dem Text. */
+  describe("was gesetzt wird, wird auch gemeldet", () => {
+    let attrappen;
+
+    beforeAll(() => {
+      attrappen = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-gcloud-"));
+      /* Die Attrappe schreibt ihre Argumente in eine Datei, deren Namen sie
+         aus der Umgebung bekommt — so kann jeder Fall seine eigene lesen. */
+      fs.writeFileSync(path.join(attrappen, "gcloud"), '#!/bin/sh\nprintf "%s\\n" "$@" >> "$MITSCHRIFT"\nexit 0\n');
+      fs.chmodSync(path.join(attrappen, "gcloud"), 0o755);
+    });
+
+    afterAll(() => {
+      if (attrappen) fs.rmSync(attrappen, { recursive: true, force: true });
+    });
+
+    test.each(scripts.map((s) => [s.name]))("%s", (name) => {
+      const mitschrift = path.join(attrappen, `${name}.txt`);
+      const ausgabe = execSync(`bash ${JSON.stringify(path.join(SCRIPTS_DIR, name))}`, {
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${attrappen}:${process.env.PATH}`, MITSCHRIFT: mitschrift },
+      });
+      const argumente = fs.readFileSync(mitschrift, "utf8");
+
+      const gesetztParallel = /--max-concurrent-dispatches=(\S+)/.exec(argumente);
+      const gesetztRate = /--max-dispatches-per-second=(\S+)/.exec(argumente);
+      expect(gesetztParallel).not.toBeNull();
+      expect(gesetztRate).not.toBeNull();
+
+      const gemeldet = /Gesetzt: Parallelitaet (\S+), Rate (\S+)\/s/.exec(ausgabe);
+      expect(gemeldet).not.toBeNull();
+
+      expect(gemeldet[1]).toBe(gesetztParallel[1]);
+      expect(gemeldet[2]).toBe(gesetztRate[1]);
+    });
+  });
 });

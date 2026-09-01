@@ -7,6 +7,22 @@ das Sicherheitsmodell samt bewusster Abwägungen [SECURITY-MODEL.md](SECURITY-MO
 das Alerting-Setup [ERROR-ALERTING.md](ERROR-ALERTING.md), die Feature-Flags
 [FLAGS.md](FLAGS.md).
 
+
+## Nach dem Klonen: einrichten
+
+```bash
+sh scripts/einrichten.sh
+```
+
+Setzt `core.hooksPath` auf `scripts/hooks` — damit laeuft `vor-dem-push.sh`
+vor jedem Push — und meldet fehlende Werkzeuge (`gh`, `firebase`, `gitleaks`).
+
+**Warum das hier steht:** Der Push-Riegel greift NUR mit dieser Einstellung.
+Bis zum 31.08.2026 stand der Befehl ausschliesslich im Kopf der Hook-Datei
+selbst — also in der Datei, die ohne ihn nie laeuft. Ein frischer Klon hatte
+den Riegel damit stillschweigend nicht (gemessen: Push mit entwaffnetem
+deploy.sh ging durch).
+
 ## Normalbetrieb (Soll-Zustand)
 
 - **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call
@@ -39,9 +55,54 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 3. CHANGELOG: Sobald deployt wird, ist das ein Release — den
    `[Unveröffentlicht]`-Abschnitt im selben Schritt auf neue Versionsnummer und
    Datum stempeln.
-4. Deploy über `./scripts/deploy.sh [hosting|functions]` — das Script führt
-   zuerst Lint + Unit-Tests aus (Test-Guard; nur im Notfall mit `SKIP_TESTS=1`
-   überspringbar, mit Warnhinweis), prüft die Version der Firebase-CLI gegen die
+4. Deploy über `./scripts/deploy.sh [hosting|functions]`.
+
+   **Seit 31.08.2026 läuft ein Trockenlauf** (nach Stand-Bindung,
+   Sauberkeits-Prüfung, CLI-Version, Infrastruktur-Prüfung und
+   Einstellungssatz — die genaue Position ist `deploy.sh` zu entnehmen, eine
+   Zahl hier veraltet bei jeder Umstellung) (`firebase deploy
+   --dry-run`, rund 28 Sekunden), in derselben Reihenfolge und mit denselben
+   Zielen wie der echte Deploy.
+
+   *Er ist fast, aber nicht ganz folgenlos:* Die Firebase-CLI weist selbst
+   darauf hin, dass ein Trockenlauf am Zielprojekt **Programmierschnittstellen
+   einschalten kann** („this may still enable APIs on the target project").
+   Er läuft zudem vor der Rückfrage „Weiter?" — kann das also tun, bevor ein
+   Mensch zugestimmt hat. Bei malziME sind alle nötigen Schnittstellen seit
+   Langem aktiv; wer das Skript gegen ein frisches Projekt richtet, sollte es
+   wissen. Anlass waren sechs gescheiterte Auslieferungen
+   an einem Tag — jede davon wäre hier sichtbar geworden, zusammen rund
+   zweieinhalb Stunden. Bricht er ab, passiert nichts weiter (Notschalter
+   `SKIP_DRYRUN=1`). Scheitert der Deploy später doch, nimmt das Skript
+   zurück, was es selbst geschrieben hat: die hochgezählte Cache-Kennung in
+   allen betroffenen Dateien **und** `public/build-info.json`. Sonst blockiert
+   ein gescheiterter Versuch den nächsten am Sauberkeits-Riegel. (Bis zum
+   31.08.2026 blieb `build-info.json` liegen — der nächste Versuch scheiterte
+   dann trotz Aufräumen.)
+
+   **Lint und Unit-Tests laufen nur noch, wenn die Stand-Bindung NICHT
+   gegriffen hat.** Sie verlangt ohnehin einen sauberen Arbeitsbaum,
+   `HEAD == origin/main` und sechs grüne Pflicht-Checks — damit sind dieselben
+   Suiten über bitgenau denselben Code bereits belegt. Fällt sie aus
+   (`SKIP_STAND=1`), laufen sie vollständig.
+
+   **Wartet der main-Lauf noch, zählen die Ergebnisse des Pull Requests** —
+   aber nur, wenn dessen Baum-Kennung identisch ist. Dann ist jede Datei
+   bitgenau gleich, und eine Prüfung kann nichts anderes finden. Zusammen mit
+   dem vorigen Punkt spart das rund neun Minuten je Auslieferung, ohne einen
+   Riegel aufzugeben.
+
+   Zwei Einschränkungen gehören dazu, sonst wäre es keine sichere Abkürzung:
+
+   - **Nur Ausstehendes wird nachgetragen.** Ersetzt werden ausschließlich
+     Checks, die auf `pending` oder ohne Ergebnis stehen. Ein `failure` auf
+     `main` bleibt ein `failure` — sonst könnte ein grünes PR-Ergebnis ein
+     rotes von `main` verdrängen.
+   - **`test-backend` ist ausgenommen.** Diese Suite hängt an der echten Uhr;
+     ihr Ergebnis von gestern sagt nichts über heute. Sie muss auf `main`
+     selbst grün sein.
+
+   Das Skript prüft weiter die Version der Firebase-CLI gegen die
    in `deploy.sh` hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`; eine
    nicht ermittelbare Version bricht ab, statt durchzuwinken —
    `OPS-2026-08-12-25`) und zählt dann den Cache-Buster in allen
@@ -57,6 +118,32 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    kostenfreie Proben gegen die Live-API (Upload-Ablehnung 400 mit echter
    Validierungs-Meldung, Honeypot 403, Admin-Zugriffsschutz 403, Stats 200) —
    alle enden vor KI-Aufruf und Stundenzähler. Notschalter `SKIP_SMOKE=1`.
+
+## Notschalter des Deploys
+
+Acht Stück, alle nur im Notfall und alle einzeln zu begründen. Jeder
+übersprungene Riegel erscheint in der Schlussbilanz des Laufs — ein Wächter
+erzwingt das, damit ein Lauf nicht grün aussieht, obwohl eine Prüfung ausfiel.
+
+| Schalter | Was entfällt |
+|---|---|
+| `SKIP_STAND=1` | Bindung an die CI-Freigabe. Dann laufen Lint und Unit-Tests stattdessen lokal |
+| `SKIP_TESTS=1` | der Test-Riegel |
+| `SKIP_DRYRUN=1` | der Trockenlauf |
+| `SKIP_INFRA=1` | die Infrastruktur-Prüfung (etwa bei abgelaufener gcloud-Anmeldung) |
+| `SKIP_SATZ=1` | die Prüfung des Einstellungssatzes gegen die laufende Anwendung |
+| `SKIP_FIRESTORE=1` | der Firestore-Schritt (Regeln und Indizes) |
+| `SKIP_SMOKE=1` | die Live-Proben nach der Auslieferung |
+| `SKIP_CLI_CHECK=1` | die Versionsprüfung der Firebase-CLI |
+
+## Der Firestore-Schritt
+
+`deploy.sh` rollt Firestore **als eigenen Aufruf** aus, vor Hosting und
+Functions. Im Paket mit ihnen scheitert er an der Standard-Datenbank, die es
+hier nicht gibt — malziME nutzt die benannte Datenbank `malzime-eu`.
+
+Das gilt auch bei `./scripts/deploy.sh hosting`: Der Firestore-Schritt läuft
+trotzdem mit. Wer das nicht will, setzt `SKIP_FIRESTORE=1`.
 
 ## Infrastruktur-Prüfung (`scripts/verify-infrastructure.sh`)
 
@@ -74,6 +161,7 @@ gestartet werden.
 |---|---|
 | Cloud-Tasks-Queue `analyze-queue` | existiert in `europe-west1`, RUNNING, Dosierung == Einstellungssatz |
 | Bucket `malzime-queue-uploads` | Region `EUROPE-WEST1`, Lifecycle-Löschregel nach 1 Tag aktiv, Soft-Delete 0 |
+| Inhalt des Bildspeichers | **kein Bild älter als 3 Stunden** — ein Auftrag lebt höchstens zwei. Seit 31.08.2026; Anlass waren 4.056 liegengebliebene Testbilder. Ein **leerer** Speicher ist der Sollzustand und kein Fehler (`gsutil` meldet dafür Rückgabewert 1) |
 | Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
 | Worker-IAM | `processjob` und `reapjobs` ohne `allUsers`/`allAuthenticatedUsers` (nicht öffentlich; die `/api/*`-Functions sind bewusst öffentlich, Hosting reicht durch) |
 | Functions-Regionen | alle in `europe-west1` |
@@ -277,8 +365,10 @@ oder ein Fehler auffällt. Kein Deploy, kein Neustart, keine Nebenwirkung.
 Alle drei Schritte wirken in ~30 s. **Warum die Kopplung:** Die
 3-Call-Pipeline nutzt `mistral-small` (nur 100K Tokens/min) — bei Concurrency über 3
 drohen massenhaft 429-Fehler (gemessen 2026-05-20: bei Parallelität 6 kamen 6 von
-12 Jobs als 429 zurück). Rückweg: `./scripts/cloudtasks-concurrency-7.sh`, Werte in
-`config.js` zurück (7 / 65), Flag wieder `true`.
+12 Jobs als 429 zurück). Rückweg: Betriebsprofil zurückstellen (Flag wieder `true`); die
+Warteschlangen-Werte zieht die Anwendung selbst nach. `config.js` wird dabei
+nicht mehr angefasst — dieser Satz stammte aus der Zeit vor dem Umbau vom
+30.08.2026 und widersprach dem Hinweis drei Zeilen darüber.
 
 ### 3a. Beast-Werbung im zweiten Aufruf zurückbauen (v2.8)
 

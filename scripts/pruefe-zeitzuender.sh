@@ -62,8 +62,15 @@ if [ "$RC" -eq 2 ]; then
   exit 2
 fi
 if [ -z "$KANDIDATEN" ]; then
-  echo "Zeitzuender-Probe: keine Kandidaten, nichts zu messen."
-  exit 0
+  # BEFUND 31.08.2026 (Runde 5, P3-19): Hier stand Rueckgabewert 0. Findet das
+  # Suchmuster im GANZEN Baum keinen einzigen Kandidaten, ist das kein
+  # Bestehen, sondern ein Messproblem: Frueher gab es welche. Verschiebt sich
+  # die Konvention (anderer Dateiname, andere Schreibweise), verstummt die
+  # Pruefung lautlos und meldet weiter gruen.
+  echo "NICHT MESSBAR: Im ganzen Baum gibt es keinen einzigen Kandidaten."
+  echo "  Frueher gab es welche. Hat sich das Suchmuster verschoben?"
+  echo "  Ein Lauf ohne Messung ist kein bestandener Lauf."
+  exit 2
 fi
 
 # Wegwerf-Setup: stellt die Uhr INNERHALB der Testumgebung vor. NODE_OPTIONS genuegt
@@ -132,7 +139,22 @@ if [ "$FEHLER" -gt 0 ]; then
   exit 1
 fi
 if [ "$GEMESSEN" -eq 0 ]; then
-  echo "Kein Kandidat fuer diesen Lauf (--nur $NUR) — nichts gemessen."
+  # BEFUND 31.08.2026 (Runde 5, P3-19): Hier stand Rueckgabewert 0 fuer JEDEN
+  # Lauf ohne Messung — auch dann, wenn es ueberhaupt keine Kandidaten mehr
+  # gibt, weil sich etwa das Suchmuster verschoben hat. "Nichts gefunden" und
+  # "nichts geprueft" sahen gleich aus.
+  #
+  # Unterschieden wird jetzt: Gibt es GAR KEINEN Kandidaten im ganzen Baum, ist
+  # das ein Messproblem (2). Gibt es welche, passt aber der Filter dieses Laufs
+  # auf keinen — der Normalfall bei `--nur backend`, weil alle Kandidaten im
+  # Frontend liegen —, ist nichts zu tun (0).
+  if [ -z "$KANDIDATEN" ]; then
+    echo "NICHT MESSBAR: Im ganzen Baum gibt es keinen einzigen Kandidaten."
+    echo "  Frueher gab es welche. Hat sich das Suchmuster verschoben?"
+    exit 2
+  fi
+  echo "Kein Kandidat fuer diesen Lauf (--nur $NUR) — die vorhandenen liegen"
+  echo "im jeweils anderen Bereich. Nichts zu messen, nichts offen."
   exit 0
 fi
 echo "Kein Zeitzuender: alle $GEMESSEN gemessenen Kandidaten bleiben auch in der Zukunft gruen."

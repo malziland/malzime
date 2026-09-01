@@ -5,16 +5,23 @@
    ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
-const { notifyLimitReached } = require("../notify");
+const { notifyLimitReached, setFetchForTest } = require("../notify");
 
 describe("notifyLimitReached", () => {
   let fetchSpy;
 
   beforeEach(() => {
     fetchSpy = jest.spyOn(globalThis, "fetch").mockResolvedValue({ ok: true });
+    /* Seit 01.09.2026 (Runde 4, E-3) sperrt notify.js unter Jest, solange
+       keine Attrappe hinterlegt ist. Diese Datei prueft den Versandweg
+       SELBST — sie hinterlegt sie deshalb ausdruecklich. Genau das ist der
+       Unterschied zwischen "ein Test will senden" und "ein Test sendet
+       versehentlich". */
+    setFetchForTest((...args) => globalThis.fetch(...args));
   });
 
   afterEach(() => {
+    setFetchForTest(null);
     jest.restoreAllMocks();
   });
 

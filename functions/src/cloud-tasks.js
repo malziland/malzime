@@ -65,10 +65,45 @@ function invokerServiceAccount() {
  * @param {string} jobId  Firestore-Job-ID (aus jobs.createJob)
  * @returns {Promise<string>} der von Cloud Tasks vergebene Task-Name
  */
+/* Gemeinsamer Riegel fuer JEDEN Pfad, der die echte Warteschlange anfasst.
+ *
+ * BEFUND 31.08.2026 (Runde 2, von beiden Pruefern gefunden): Der Riegel stand
+ * nur in `warteschlangeNachziehen()`. Der Kommentar dort behauptete, er greife
+ * "fuer JEDEN Pfad" — `enqueueJob()`, ueber den jeder echte Auftrag laeuft,
+ * hatte ihn nicht. Ausgefuehrt mit Attrappen-SDK: `enqueueJob` erreichte
+ * `createTask` gegen `projects/malzime/.../queues/analyze-queue`.
+ *
+ * Deshalb liegt die Pruefung jetzt an EINER Stelle, die beide benutzen. */
+function testUmgebungGrund(clientOverride) {
+  if (process.env.JEST_WORKER_ID !== undefined && !clientOverride) {
+    return (
+      "Aufruf aus einem Test ohne Attrappe — die echte Warteschlange wird " +
+      "nicht angefasst. setClientForTest() verwenden."
+    );
+  }
+  const emulator =
+    process.env.FIRESTORE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR || process.env.CLOUD_TASKS_EMULATOR_HOST;
+  if (emulator && !clientOverride) {
+    return (
+      "Es laeuft ein Emulator — die echte Warteschlange wird nicht angefasst. " +
+      "Im Lokal-Modus ersetzt eigener Dispatch die Cloud Tasks."
+    );
+  }
+  return null;
+}
+
 async function enqueueJob(jobId) {
   /* Lokal-Modus (Emulator): Es gibt keinen Cloud-Tasks-Emulator — daher
-     processJob direkt anstoßen statt einen echten Task zu erzeugen. */
+     processJob direkt anstoßen statt einen echten Task zu erzeugen.
+     ZUERST pruefen: Das ist der vorgesehene Weg im Emulator und darf nicht
+     am Riegel scheitern. Der Riegel greift nur, wenn jemand OHNE Lokal-Modus
+     aus einer Testumgebung heraus an die echte Warteschlange will. */
   if (isLocalQueueMode()) return enqueueJobLocal(jobId);
+
+  const gesperrt = testUmgebungGrund(clientOverride);
+  if (gesperrt) {
+    throw new Error(gesperrt);
+  }
 
   const c = getClient();
   const parent = c.queuePath(projectId(), QUEUE_REGION, QUEUE_NAME);
@@ -147,6 +182,36 @@ function redispatchJobLocal(jobId) {
  */
 async function warteschlangeNachziehen({ parallelitaet, queueRatePerSekunde }) {
   try {
+    /* ── RIEGEL: NIEMALS aus einem Test heraus die echte Queue anfassen ──
+     *
+     * VORFALL 30./31.08.2026: In der Nacht hat ein Testlauf die
+     * PRODUKTIONS-Warteschlange umgestellt — dreimal, auf 7/0,5 und 14/0,5.
+     * Das sind die Werte aus `test-satz.js`. Zehn Stunden lang lief die
+     * Auslieferung damit auf vierfachem Tempo gegen Mistrals Grenze; am
+     * Morgen kamen die ersten Ueberlastmeldungen bei echten Nutzern an.
+     *
+     * Der einzelne Test, der die Attrappe vergass, ist austauschbar — der
+     * Riegel hier ist es nicht. Er greift fuer JEDEN Pfad, auch fuer den, den
+     * morgen jemand neu schreibt.
+     *
+     * `JEST_WORKER_ID` setzt Jest in jedem Arbeitsprozess. Wer die Funktion
+     * im Test wirklich pruefen will, ersetzt den Client ueber
+     * `setClientForTest()` — dann laeuft sie gegen die Attrappe weiter. */
+    /* BEFUND 01.09.2026 (Mutationsprobe): Hier stand die Riegel-Logik ein
+     * ZWEITES Mal, Wort fuer Wort — obwohl der Kommentar ueber
+     * `testUmgebungGrund()` sagt, sie liege "an EINER Stelle, die beide
+     * benutzen". Runde 4 hatte das als blossen Textfehler eingestuft
+     * (F-11: "falsch ist der Satz, nicht der Riegel"). Das stimmte nur
+     * solange, wie beide Kopien gleich blieben.
+     *
+     * Die Mutationsprobe hat gezeigt, dass die Kopie ungedeckt war: Die
+     * Emulator-Erkennung liess sich von `||` auf `&&` aendern, ohne dass ein
+     * Test rot wurde — dann gaelte ein Emulator erst als erkannt, wenn ALLE
+     * DREI Variablen gesetzt sind, und ein Lauf mit nur einer ginge an die
+     * echte Warteschlange. Jetzt gibt es die Logik wirklich nur einmal. */
+    const testGrund = testUmgebungGrund(clientOverride);
+    if (testGrund) return { ok: false, grund: testGrund };
+
     const projekt = projectId();
     if (!projekt) return { ok: false, grund: "kein Projekt bekannt" };
 
@@ -198,6 +263,13 @@ function setClientForTest(impl) {
 
 module.exports = {
   enqueueJob,
+  /* Fuer Tests: die Riegel-ENTSCHEIDUNG laesst sich so isoliert pruefen,
+     ohne die Funktion zu fahren. Das ist hier kein Komfort, sondern
+     Sicherheit — wer den Emulator-Zweig ueber `warteschlangeNachziehen`
+     prueft, muesste dafuer den Jest-Riegel abschalten, und eine kaputte
+     Bedingung ginge dann an die ECHTE Warteschlange. Genau der Vorfall vom
+     30.08. */
+  _testUmgebungGrund: testUmgebungGrund,
   redispatchJobLocal,
   processJobUrl,
   invokerServiceAccount,

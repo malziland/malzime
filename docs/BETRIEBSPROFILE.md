@@ -221,7 +221,7 @@ node scripts/betriebsprofil-anlegen.js
 node scripts/betriebsprofil-anlegen.js --ausfuehren
 
 # 3. Erst danach ausliefern
-sh scripts/deploy.sh
+bash scripts/deploy.sh
 ```
 
 Das Skript hat vier Sicherungen, weil es in die Produktionsdatenbank schreibt:
@@ -250,5 +250,5 @@ Der Rückweg führt auf **v4.2.3**. Der Einstellungssatz kann liegen bleiben —
 die alte Fassung ignoriert ihn.
 
 ```bash
-git checkout v4.2.3 && sh scripts/deploy.sh
+git checkout v4.2.3 && bash scripts/deploy.sh
 ```

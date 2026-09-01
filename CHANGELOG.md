@@ -4,6 +4,172 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Neu
+
+- **Vor jeder Auslieferung läuft eine Probe.** Sie prüft in einer halben
+  Minute, ob die Auslieferung durchgehen würde — ohne etwas zu verändern.
+  Anlass waren sechs abgebrochene Auslieferungen an einem einzigen Tag; jede
+  einzelne wäre in dieser Probe sichtbar gewesen. Bricht eine Auslieferung
+  trotzdem ab, räumt sie jetzt hinter sich auf, statt den nächsten Versuch zu
+  blockieren.
+
+- **Sechs neue Wächter gegen teure Umbauten.** Einer merkt sich, was
+  zusammengehört: Wer eine Einstellung hinzufügt, wird an die weiteren Stellen
+  erinnert, die mitziehen müssen. Einer meldet, wenn Dateien wieder
+  zusammenwachsen, die getrennt gehören. Einer prüft, ob jeder Notschalter der
+  Auslieferung in der Schlussbilanz genannt wird und die Pipeline-Einstellung
+  stimmt. Dazu eine Selbstprüfung, die jeden dieser Wächter absichtlich
+  kaputtmacht und nachsieht, ob er das merkt — und ein Riegel, der einen Push
+  mit roten Prüfungen verhindert. Der sechste meldet Dateien, die im
+  Auslieferungsverzeichnis liegen und mitausgeliefert würden, ohne dass sie in
+  der Versionsverwaltung auftauchen.
+
+- **Eine Auslieferung lässt sich vorher durchspielen.** `PROBELAUF=1` fährt
+  die ganze Kette — alle Riegel, der Trockenlauf gegen Firebase, die
+  Cache-Kennung — und hält vor dem letzten Schritt an. Danach ist der
+  Arbeitsstand unverändert. Damit lässt sich prüfen, ob eine Auslieferung
+  durchgehen *würde*, statt es zu hoffen. Beim ersten Einsatz meldete er in
+  dreißig Sekunden, was im Weg stand.
+
+- **Die geänderten Schritte der Prüfkette werden vor dem Hochladen
+  ausgeführt.** Bisher wurde die Beschreibung der Kette geprüft und ihre
+  Umgebung angenommen — sieben Fehler an einem Tag entstanden genau dort und
+  kosteten fünf Anläufe. Wer die Kette ändert, sieht jetzt in Sekunden, was
+  dort scheitern würde.
+
+- **Eine Übersicht über alle Wächter.** Für jeden steht jetzt an einer Stelle,
+  wovor er schützt, welcher echte Vorfall ihn ausgelöst hat, was er kostet und
+  welche Ausnahmen er kennt — samt der Frage, was diese Schicht *nicht* kann.
+  Ein neuer Wächter ohne Eintrag dort macht die Prüfung rot.
+
+- **Eine Probe misst jetzt, ob die Tests überhaupt etwas merken.** Sie ändert
+  den geänderten Code an einzelnen Stellen absichtlich ab — dreht Vergleiche
+  um, verschiebt Grenzen — und sieht nach, ob ein Test rot wird. Bleibt alles
+  grün, ist die Stelle ungeprüft, auch wenn die Zahlen anderes behaupten. Sie
+  läuft in der Pipeline und weist aus, was sie in ihrem Zeitfenster nicht
+  geschafft hat, statt es als geprüft zu verbuchen.
+
+- **Jeder Wächter hat jetzt eine Probe, die belegt, dass er anschlagen kann.**
+  Von elf hatten nur vier eine; für die übrigen gab es keinen Nachweis, dass
+  ihr Grün etwas bedeutet. Beim Bauen dieser Proben kam heraus, dass die
+  Prüfung auf wirkungslose Wartezeiten einen Teil der Testdateien gar nicht
+  gelesen hat (siehe unten).
+
+- **Die Wächter selbst können nicht mehr unbemerkt aus der Prüfkette
+  verschwinden.** Ein einzelner Prüfschritt liess sich aus der Kette
+  herausnehmen, ohne dass irgendetwas rot wurde. Jetzt wird nachgesehen, ob
+  jeder Wächter aus beiden Listen wirklich aufgerufen wird — aus der Pipeline
+  und aus der Prüfung vor dem Hochladen.
+
+- **Die Riegel der Auslieferung werden ausgeführt geprüft, nicht gelesen.** Zwanzig
+  Fälle fahren das Auslieferungs-Skript in einer Wegwerf-Kopie durch, mit
+  Attrappen statt echter Dienste: roter Pflicht-Check, unsauberer Arbeitsstand,
+  gescheiterter Trockenlauf, rote Infrastruktur-Prüfung, zu alte
+  Firebase-Version — und die drei Fälle, in denen die Cache-Kennung
+  zurückgenommen werden muss oder eben stehen bleiben.
+  Alle melden ausdrücklich „nicht messbar", wenn ihre Grundlage fehlt, statt
+  stillschweigend grün zu sein.
+
+### Geändert
+
+- **Eine Auslieferung dauert rund neun Minuten weniger.** Die sechs Prüfungen
+  liefen zweimal über bitgenau denselben Code. Fünf der sechs laufen jetzt nur
+  noch einmal — `test-backend` hängt an der echten Uhr und bleibt bewusst
+  doppelt. Kein
+  einziger Riegel wurde dafür entfernt. Grundlage sind drei gemessene Läufe der
+  längsten Prüfung (8:13, 9:07 und 9:18).
+
+- **Die Antwort-Auswertung der KI und die Auftragsannahme liegen in eigenen
+  Dateien.** Zwei Dateien waren auf 1681 und 680 Zeilen gewachsen und
+  vermischten mehrere Aufgaben; daraus sind sieben geworden, die Hauptdatei ist
+  bei 696 Zeilen. Das Verhalten ist unverändert — belegt durch einen Vergleich
+  aller Funktionen vor und nach der Aufteilung.
+
+### Behoben
+
+- **Der Schutz, der Testläufe von der echten Warteschlange fernhält, ist jetzt
+  selbst abgesichert.** Er entstand nach dem Vorfall vom 30. August, an dem ein
+  Testlauf die Produktion umgestellt hat — aber man konnte seine Bedingungen
+  umdrehen, ohne dass ein Test rot wurde. Ein Schutz, den man versehentlich
+  entfernen kann, ohne dass es auffällt, ist ein Schutz auf Zeit. Dabei kam
+  heraus, dass dieselbe Prüfung an zwei Stellen doppelt geführt wurde, obwohl
+  der Kommentar das Gegenteil behauptete; jetzt gibt es sie wirklich nur einmal.
+
+- **Die Prüfung auf wirkungslose Wartezeiten hat einen Teil der Testdateien
+  nicht gelesen.** Sie hielt alles hinter einem `//` für einen Kommentar — auch
+  in Adressen wie `http://localhost`. Damit war sie auf ganzen Abschnitten
+  blind, ohne das zu melden. Aufgefallen ist es erst, als eine Probe für sie
+  gebaut wurde: eine Wartezeit von 99 Sekunden in einem Test mit 30 Sekunden
+  Grenze — sie meldete grün.
+
+- **Ohne gültige Betriebseinstellungen wird kein Foto mehr angenommen.** Ging
+  beim Prüfen der Warteschlange etwas schief, wurde die Sperre übersprungen:
+  Der Auftrag entstand, das Foto landete im Speicher — für eine Analyse, die
+  ohne diese Einstellungen nie laufen kann. Ein Foto, das nie analysiert wird,
+  soll nie auf unserem Speicher liegen. Die Sperre greift jetzt vorher.
+
+- **Die Überwachung der Antwortzeiten kann nicht mehr dauerhaft verstummen.**
+  Sie merkt sich von Tag zu Tag, wie lange ein Einbruch schon anhält. Konnte
+  sie diesen Merkzettel nicht lesen, fing sie jeden Tag von vorne an und
+  meldete deshalb nie etwas. Der Ausfall wird jetzt gemeldet, statt in
+  Schweigen überzugehen.
+
+- **Eine gescheiterte Messung wird nicht mehr als Befund ausgegeben.** War
+  während der Auslieferung die Seite nicht erreichbar, meldete das Skript
+  "keine gültigen Betriebseinstellungen in der Produktion" — eine Aussage über
+  etwas, das es gar nicht gemessen hatte. Der Ratschlag daneben hätte die
+  Prüfung abgeschaltet, um ein Netzproblem zu umgehen.
+
+- **Die Umstell-Skripte der Warteschlange melden, was sie einstellen.** Eines
+  setzte vier gleichzeitige Analysen und meldete sieben.
+
+- **Der Prüfstand-Stempel behält, was von Hand ergänzt wurde.** Er schrieb die
+  Spalte jedes Mal neu und warf dabei den Hinweis weg, unter welcher
+  Voraussetzung die Zahlen gelten.
+
+- **Ein Test in der Prüfkette schlug gelegentlich grundlos fehl** und hielt
+  damit Auslieferungen auf, obwohl nichts kaputt war. Er trennte zwei
+  Handgriffe, zwischen denen unter Last etwas dazwischenkommen konnte.
+
+- **Fehlgeschlagene Analysen nennen ihren Grund jetzt auch im Protokoll.** Der
+  Server kennt sieben Gründe, warum eine Analyse nicht zustande kommt,
+  schrieb aber keinen davon auf. Nach einer Störung war deshalb nicht mehr
+  feststellbar, woran sie lag.
+
+- **Aus einem Testlauf kann keine Push-Nachricht mehr hinausgehen.** Der
+  Benachrichtigungs-Baustein erkannte den Emulator und eine ausdrückliche
+  Stummschaltung — beides muss jemand setzen. Ein gewöhnlicher Testlauf setzt
+  keines von beidem. Er war damit der einzige Baustein mit Außenwirkung ohne
+  diese Sperre; der Vorfall, der zu den anderen Sperren geführt hat, war
+  genauso entstanden.
+
+- **Aus einem Testlauf oder dem lokalen Nachbau geht keine Push-Nachricht mehr
+  hinaus.** Der Benachrichtigungs-Baustein erkannte nur eine von drei
+  Umgebungen; beim Start des lokalen Nachbaus ging die Nachricht wirklich
+  hinaus. Gemessen, nicht vermutet.
+
+- **Der Schutz, der Testläufe von der echten Warteschlange fernhält, ist jetzt
+  selbst abgesichert.** Er entstand nach dem Vorfall vom 30. August — aber man
+  konnte seine Bedingungen umdrehen, ohne dass ein Test rot wurde. Dabei kam
+  heraus, dass dieselbe Prüfung doppelt geführt wurde, obwohl der Kommentar das
+  Gegenteil behauptete.
+
+- **Testläufe können die Produktion nicht mehr anfassen.** Ein Lasttest hatte
+  Bilder im echten Speicher abgelegt, wo sie liegen blieben, und die
+  Auslieferungs-Geschwindigkeit der laufenden Anwendung verstellt. Beides ist
+  jetzt verriegelt: Läuft ein Test oder ein lokaler Nachbau, verweigert der
+  Code den Zugriff auf die echten Dienste.
+
+- **Die tägliche Kapazitäts-Wache prüft jetzt beide Werte.** Sie verglich nur,
+  wie viele Analysen gleichzeitig laufen dürfen — nicht, wie schnell sie
+  losgeschickt werden. Genau der zweite Wert war verstellt.
+
+- **Die Prüfung auf ungenutzten Code kann wieder fehlschlagen.** Sie meldete
+  32 Fundstellen als Hinweis und beendete sich trotzdem erfolgreich. Unter den
+  Hinweisen steckte ein echter Fehler.
+
 ## [4.5.0] — 2026-08-30
 
 ### Neu

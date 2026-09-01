@@ -134,6 +134,29 @@ describe("warteschlangeNachziehen", () => {
     expect(r.parallel).toBe(9);
   });
 
+  test("RIEGEL: aus einem Test heraus wird die echte Queue NIE angefasst", async () => {
+    /* VORFALL 30./31.08.2026: Ein Testlauf hat die PRODUKTIONS-Warteschlange
+       umgestellt — dreimal, auf die Werte aus test-satz.js (7/0,5 und 14/0,5).
+       Zehn Stunden lang lief die Auslieferung damit auf vierfachem Tempo gegen
+       Mistrals Grenze; am Morgen kamen die ersten Ueberlastmeldungen bei
+       echten Nutzern an.
+
+       Der einzelne Test, der die Attrappe vergass, ist austauschbar. Dieser
+       Riegel ist es nicht: Er greift fuer jeden Pfad, auch fuer den, den
+       morgen jemand neu schreibt.
+
+       Nachgemessen am 31.08.: Vorher 4/0,125 — Versuch, auf 99/9 zu stellen —
+       nachher 4/0,125. */
+    setClientForTest(null); /* KEINE Attrappe: der echte Client */
+    process.env.GCLOUD_PROJECT = "malzime"; /* das echte Projekt */
+
+    const r = await warteschlangeNachziehen({ parallelitaet: 99, queueRatePerSekunde: 9 });
+
+    expect(r.ok).toBe(false);
+    expect(r.grund).toContain("Test");
+    expect(r.grund).toContain("setClientForTest");
+  });
+
   test("ohne Projektkennung wird nichts angefasst", async () => {
     delete process.env.GCLOUD_PROJECT;
     delete process.env.GCP_PROJECT;
@@ -145,5 +168,78 @@ describe("warteschlangeNachziehen", () => {
     expect(r.ok).toBe(false);
     expect(a.aufrufe.gelesen).toBe(0);
     expect(a.aufrufe.geschrieben).toBe(0);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-05 — der Riegel muss auch den EMULATOR kennen.
+
+   Der Riegel gegen Jest allein genuegt nicht: Der Lasttest faehrt den
+   Firebase-Emulator und laesst darin die echten Funktionen laufen. Jest laeuft
+   dabei nicht — der Emulator holt sich bei angemeldetem Konto aber die
+   Produktions-Zugangsdaten. Genau dieser Weg hat am 31.08. dazu gefuehrt, dass
+   4.056 Testbilder im echten Bildspeicher lagen.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-05 — Emulator fasst die echte Warteschlange nicht an", () => {
+  test("mit laufendem Emulator wird nicht gesetzt", async () => {
+    jest.resetModules();
+    const frisch = require("../cloud-tasks");
+    frisch.setClientForTest(null);
+    const alterJest = process.env.JEST_WORKER_ID;
+    const alterEmu = process.env.FIRESTORE_EMULATOR_HOST;
+    delete process.env.JEST_WORKER_ID;
+    process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+    try {
+      const r = await frisch.warteschlangeNachziehen({ parallelitaet: 4, queueRatePerSekunde: 0.125 });
+      expect(r.ok).toBe(false);
+      expect(r.grund).toMatch(/Emulator/i);
+    } finally {
+      if (alterJest !== undefined) process.env.JEST_WORKER_ID = alterJest;
+      if (alterEmu === undefined) delete process.env.FIRESTORE_EMULATOR_HOST;
+      else process.env.FIRESTORE_EMULATOR_HOST = alterEmu;
+    }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-15 — der Riegel gilt fuer JEDEN Pfad, nicht nur fuer
+   warteschlangeNachziehen().
+
+   Runde 2 der Pruefschleife, von beiden Pruefern unabhaengig gefunden: Der
+   Riegel stand nur in warteschlangeNachziehen(). `enqueueJob()` — der Weg,
+   ueber den JEDER echte Auftrag laeuft — hatte ihn nicht und erreichte aus
+   einem Test heraus `createTask` gegen die Produktions-Warteschlange.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-15 — enqueueJob ist genauso verriegelt", () => {
+  test("aus einem Test ohne Attrappe wird die echte Warteschlange nicht angefasst", async () => {
+    jest.resetModules();
+    const frisch = require("../cloud-tasks");
+    frisch.setClientForTest(null);
+    const alterLokal = process.env.QUEUE_LOCAL;
+    delete process.env.QUEUE_LOCAL;
+    try {
+      await expect(frisch.enqueueJob("probe-job")).rejects.toThrow(/Attrappe/i);
+    } finally {
+      if (alterLokal === undefined) delete process.env.QUEUE_LOCAL;
+      else process.env.QUEUE_LOCAL = alterLokal;
+    }
+  });
+
+  test("der Lokal-Modus bleibt offen — er ist der vorgesehene Weg", async () => {
+    jest.resetModules();
+    const frisch = require("../cloud-tasks");
+    frisch.setClientForTest(null);
+    const alterLokal = process.env.QUEUE_LOCAL;
+    process.env.QUEUE_LOCAL = "1";
+    try {
+      /* Darf NICHT am Riegel scheitern. Der lokale Dispatch laeuft ins Leere
+         (kein Emulator), aber eben nicht mit der Riegel-Meldung. */
+      await frisch.enqueueJob("probe-lokal").catch((e) => {
+        expect(String(e.message)).not.toMatch(/Attrappe|Emulator/i);
+      });
+    } finally {
+      if (alterLokal === undefined) delete process.env.QUEUE_LOCAL;
+      else process.env.QUEUE_LOCAL = alterLokal;
+    }
   });
 });

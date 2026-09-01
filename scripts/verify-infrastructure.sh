@@ -8,9 +8,14 @@
 # Dieses Skript macht die Regel „Zusagen über Infrastruktur werden an der
 # Infrastruktur belegt" automatisch statt händisch.
 #
-# Es verändert NICHTS: nur describe/list/get-iam-policy. Der Test
-# functions/src/__tests__/verify-infrastructure-script.test.js erzwingt das
-# (jede gcloud-/gsutil-Zeile muss ein Lese-Kommando sein).
+# Es verändert NICHTS an der Infrastruktur: nur describe/list/get-iam-policy.
+# Der Test functions/src/__tests__/verify-infrastructure-script.test.js
+# erzwingt das (jede gcloud-/gsutil-Zeile muss ein Lese-Kommando sein).
+#
+# Was es SEHR WOHL tut: Es fragt echte Dienste ab und braucht dafuer eine
+# gcloud-Anmeldung. Ohne sie melden die betroffenen Abschnitte rot. Fuer Tests
+# gibt es die Einspeisepunkte INFRA_PROBE_* — sie ersetzen die Antwort eines
+# Abschnitts, ohne den Dienst zu fragen.
 #
 # Nutzung:
 #   ./scripts/verify-infrastructure.sh      # direkt
@@ -45,7 +50,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -161,6 +166,72 @@ sys.exit(0 if ok else 1)
   BUCKET_RC=$?
   printf "%s\n" "$BUCKET_AUSGABE" | sed -e "s/^  OK /  \x1b[32m✓\x1b[0m /" -e "s/^  FEHLT /  \x1b[31m✗\x1b[0m /"
   if [ "$BUCKET_RC" != "0" ]; then FEHLER=1; fi
+fi
+
+# ── 2b. Liegen ALTE Bilder im Speicher? (Zusage, nicht nur Code) ──
+#
+# VORFALL 31.08.2026: Im Bucket lagen 4.056 Bilder (233 MB) vom Vortag. Die
+# aktive Loeschung nach der Analyse hatte nicht gegriffen; das Sicherheitsnetz
+# (Lifecycle, 24 h) haette sie erst spaeter geraeumt.
+#
+# WARUM DAS HIER STEHT UND NICHT IM TEST: Es gibt Tests fuer `deleteImage` —
+# und trotzdem blieben die Bilder liegen. Ein Test prueft den Code, diese
+# Zeile prueft die WIRKLICHKEIT. Genau dieser Unterschied war der Befund.
+#
+# DIE ZUSAGE: Die Datenschutzerklaerung sagt, Bilder bleiben nur fuer die
+# Wartezeit gespeichert. Jobs leben hoechstens zwei Stunden. Ein Bild, das
+# aelter ist, gehoert zu keinem laufenden Auftrag mehr.
+echo "— Bildspeicher (Zusage: nur fuer die Wartezeit)"
+# BEFUND 31.08.2026 (Runde 2): Der Zweig "nicht lesbar" war TOTER CODE.
+# `awk ... END {print n+0}` gibt auch bei leerer Eingabe "0" aus, und
+# `2>/dev/null` schluckte den Fehler von gsutil — `[ -z ]` konnte nie wahr
+# werden. Ein Zugriffsfehler auf den Bucket meldete GRUEN, ausgerechnet bei der
+# Pruefung, die wegen 4.056 liegengebliebener Bilder gebaut wurde.
+# Jetzt wird der Rueckgabewert von gsutil SELBST gemessen, vor der Zaehlung.
+# OPS-2026-08-31-19: Einspeisepunkt fuer die Negativprobe. INFRA_PROBE_BILDER
+# nennt eine Datei mit der gsutil-Ausgabe; INFRA_PROBE_BILDER_CODE den
+# Rueckgabewert. Ohne ihn liess sich dieser Abschnitt nicht kaputtmachen —
+# genau deshalb blieb der Fehler mit dem leeren Bucket unentdeckt.
+if [ -n "${INFRA_PROBE_BILDER:-}" ]; then
+  BILDER_ROH=$(cat "$INFRA_PROBE_BILDER")
+  GSUTIL_CODE="${INFRA_PROBE_BILDER_CODE:-0}"
+  printf '%s' "${INFRA_PROBE_BILDER_FEHLER:-}" > /tmp/malzime-gsutil-fehler.log
+else
+BILDER_ROH=$(gsutil ls -l "$BUCKET/queue-uploads/" 2>/tmp/malzime-gsutil-fehler.log)
+GSUTIL_CODE=$?
+fi
+# BEFUND 31.08.2026 (Runde 3, von zwei Pruefern unabhaengig gefunden): Hier
+# galt JEDER Rueckgabewert ungleich 0 als "nicht lesbar" — auch der LEERE
+# Bucket. Der ist aber der SOLLZUSTAND: `gsutil ls` meldet dann
+# "One or more URLs matched no objects" mit Code 1. Der Riegel haette also
+# jeden Deploy abgebrochen, sobald der Bildspeicher sauber ist. Er laeuft bei
+# JEDEM Deploy.
+#
+# Ursache der Luecke: Dieser Abschnitt war der EINZIGE des Skripts ohne
+# Einspeisepunkt fuer eine Probe — er wurde nie kaputtgemacht und nachgesehen.
+# Der Einspeisepunkt INFRA_PROBE_BILDER unten schliesst das.
+if [ "$GSUTIL_CODE" -ne 0 ] && grep -q "matched no objects" /tmp/malzime-gsutil-fehler.log 2>/dev/null; then
+  GSUTIL_CODE=0
+  BILDER_ROH=""
+fi
+if [ "$GSUTIL_CODE" -ne 0 ]; then
+  rot "Bildspeicher nicht lesbar (gsutil Code $GSUTIL_CODE) — ungeprueft gilt als nicht bestanden"
+  sed 's/^/        /' /tmp/malzime-gsutil-fehler.log | head -3
+  ALTE_BILDER="nicht-messbar"
+else
+  ALTE_BILDER=$(printf '%s\n' "$BILDER_ROH" \
+    | grep -E "^ +[0-9]+" \
+    | awk -v grenze="$(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '3 hours ago' +%Y-%m-%dT%H:%M:%SZ)" \
+          '$2 < grenze {n++} END {print n+0}')
+fi
+if [ "$ALTE_BILDER" = "nicht-messbar" ]; then
+  : # Meldung steht bereits oben
+elif [ "$ALTE_BILDER" -eq 0 ]; then
+  gruen "Keine Bilder aelter als 3 Stunden"
+else
+  rot "$ALTE_BILDER Bild(er) aelter als 3 Stunden — die aktive Loeschung greift nicht"
+  echo "        Ein Auftrag lebt hoechstens 2 h. Aeltere Bilder gehoeren zu keinem mehr."
+  echo "        Aufraeumen:  gsutil -m rm -r \"$BUCKET/queue-uploads/**\""
 fi
 
 # ── 3. Firestore: genau EINE Datenbank, malzime-eu in europe-west1 ──

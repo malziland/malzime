@@ -32,11 +32,20 @@ describe("Abgleich Code gegen echte Warteschlange", () => {
     expect(_baueMeldung(b)).toContain("cloudtasks-concurrency-7.sh");
   });
 
-  test("Kapazitaet wird verschenkt", () => {
+  /* OPS-2026-08-31: Frueher hiess dieser Fall "kapazitaet-verschenkt" und die
+     Meldung empfahl, den Einstellungssatz an die Warteschlange anzupassen. Der
+     Vorfall vom 31.08. hat gezeigt, dass das die GEFAEHRLICHE Richtung ist:
+     Ein Testlauf hatte die Warteschlange auf vierfaches Tempo gestellt, die
+     Wache haette empfohlen, das festzuschreiben. Es gehen dann mehr Aufrufe an
+     die KI, als ihre Stufe zulaesst — echte Nutzer sehen Ueberlastmeldungen. */
+  test("Warteschlange laeuft schneller als der Einstellungssatz", () => {
     const b = _bewerte(3, 10);
     expect(b.auffaellig).toBe(true);
-    expect(b.grund).toBe("kapazitaet-verschenkt");
-    expect(_baueMeldung(b)).toContain("verschenkt");
+    expect(b.grund).toBe("queue-laeuft-zu-schnell");
+    expect(_baueMeldung(b)).toContain("SCHNELLER als eingestellt");
+    /* Die Abhilfe muss die Warteschlange nachziehen, NICHT den Satz anheben. */
+    expect(_baueMeldung(b)).toContain("warteschlange-pruefen.sh --setzen");
+    expect(_baueMeldung(b)).toContain("NICHT den Satz anheben");
   });
 
   test("nicht messbar ist KEIN Befund", () => {
@@ -91,5 +100,73 @@ describe("Lesen der echten Warteschlange", () => {
     });
     process.env.GCLOUD_PROJECT = "malzime-test";
     expect(await wache.echteParallelitaet()).toBeNull();
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-07 — die Wache muss die RATE messen, nicht nur die
+   Parallelitaet.
+
+   Am 31.08. wurde gemeldet, die Wache lese jetzt auch die Rate. Tatsaechlich
+   war `echteRate()` definiert und wurde nirgends aufgerufen (ESLint:
+   "defined but never used"); `pruefeKapazitaet` verglich weiter nur die
+   Parallelitaet. Wird allein die Rate verstellt — bei gleicher Parallelitaet —
+   bleibt die Wache blind. Genau diese Groesse bestimmt aber, wie schnell
+   Aufrufe an die KI gehen: Beim Vorfall lief die Warteschlange mit 0,5/s
+   statt 0,125/s.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-07 — die Rate wird mitbewertet", () => {
+  test("Rate hoeher als der Einstellungssatz ist auffaellig", () => {
+    const b = _bewerte(0.125, 0.5);
+    expect(b.auffaellig).toBe(true);
+    expect(b.grund).toBe("queue-laeuft-zu-schnell");
+  });
+
+  /* BEFUND 31.08.2026 (Runde 3): Hier stand ein QUELLTEXT-Test — er las die
+     Datei und suchte nach "await echteRate()". Ein Textmuster belegt kein
+     Verhalten: Wer die Zeile umformuliert, macht den Test rot, ohne etwas
+     kaputtzumachen; wer den Aufruf ins Leere laufen laesst, haelt ihn gruen.
+     Jetzt wird gemessen, was ankommt. */
+  test("pruefeKapazitaet misst die Rate wirklich, nicht nur die Parallelitaet", async () => {
+    jest.resetModules();
+    jest.doMock("../betriebsprofil", () => ({
+      geltendeWerte: async () => ({
+        werte: { parallelitaet: 4, queueRatePerSekunde: 0.125 },
+        quelle: "firestore",
+        grund: null,
+      }),
+    }));
+    const frisch = require("../kapazitaets-wache");
+    /* Attrappe: Parallelitaet stimmt (4), die RATE laeuft auseinander
+       (0.5 statt 0.125). Wuerde nur die Parallelitaet geprueft, bliebe der
+       Befund unauffaellig — genau der Vorfall vom 31.08. */
+    frisch.setClientForTest({
+      queuePath: () => "projects/x/locations/y/queues/z",
+      getQueue: async () => [{ rateLimits: { maxConcurrentDispatches: 4, maxDispatchesPerSecond: 0.5 } }],
+    });
+    const b = await frisch.pruefeKapazitaet();
+    expect(b.auffaellig).toBe(true);
+    expect(b.grund).toBe("queue-laeuft-zu-schnell");
+    expect(b.meldung).toMatch(/RATE:/);
+    frisch.setClientForTest(null);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-23 (Runde 4, Befund F-9) — der Jest-Riegel dieser Datei war
+   durch nichts gesichert. Wer ihn entfernte, bekam weiterhin 10 gruene Tests.
+   Die Nachbarn cloud-tasks.js und queue-storage.js haben genau diesen
+   Nachweis; hier fehlte er.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("OPS-2026-08-31-23 — die Wache fasst die echte Warteschlange nicht an", () => {
+  test("aus einem Test ohne Attrappe wird nicht gelesen", async () => {
+    jest.resetModules();
+    const frisch = require("../kapazitaets-wache");
+    frisch.setClientForTest(null);
+    /* echteParallelitaet faengt Fehler ab und liefert null — genau das ist der
+       Beleg: Ohne Riegel entstuende hier ein echter Client. */
+    await expect(frisch.echteParallelitaet()).resolves.toBeNull();
+    /* Direkt am Riegel: getClient wirft. */
+    expect(() => frisch._getClientFuerTest()).toThrow(/Attrappe|Emulator/i);
   });
 });

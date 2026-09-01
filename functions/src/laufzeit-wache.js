@@ -149,11 +149,31 @@ async function pruefeLaufzeit({ melder, jetzt = Date.now() } = {}) {
   const heute = new Date(jetzt).toISOString().slice(0, 10);
 
   let zustand = {};
+  let zustandLesbar = true;
   try {
     const snap = await datenbank().doc(ZUSTAND_DOKUMENT).get();
     if (snap.exists) zustand = snap.data() || {};
-  } catch (_) {
-    /* Ohne Zustand wird nur einmalig nicht gemeldet — kein Grund abzubrechen. */
+  } catch (fehler) {
+    /* BEFUND 01.09.2026 (Runde 7, K-10): Hier stand ein stummes catch mit dem
+       Kommentar "nur einmalig nicht gemeldet". Das stimmt fuer einen einzelnen
+       Fehlgriff. Bleibt das Dokument dauerhaft unlesbar — Rechte, ein
+       geloeschtes Dokument, ein Namenswechsel —, faengt der Zaehler JEDEN Tag
+       wieder bei 1 an und erreicht ANHALTEND_TAGE nie: Die Wache schweigt
+       fuer immer, ohne dass irgendwo etwas rot wird. Genau die Fehlerform, vor
+       der diese Wache schuetzen soll. Jetzt wird der Ausfall gemeldet. */
+    zustandLesbar = false;
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        step: "laufzeit-wache",
+        grund: "zustand-unlesbar",
+        dokument: ZUSTAND_DOKUMENT,
+        fehler: fehler?.message || String(fehler),
+        hinweis:
+          "Ohne Zustand kann die Wache nicht erkennen, ob ein Einbruch anhaelt — " +
+          "sie wuerde sonst dauerhaft schweigen.",
+      })
+    );
   }
 
   if (!befund.auffaellig) {
@@ -179,6 +199,15 @@ async function pruefeLaufzeit({ melder, jetzt = Date.now() } = {}) {
     /* still */
   }
 
+  /* Ist der Zustand unlesbar, ist `tageAuffaellig` keine Messung, sondern eine
+     Annahme (immer 1). Die Schwelle darauf anzuwenden hiesse, den Ausfall in
+     Schweigen zu uebersetzen. Der Befund selbst ist gemessen — er wird
+     gemeldet, mit dem Ausfall im Grund. */
+  if (!zustandLesbar) {
+    const text = baueMeldung(befund);
+    if (typeof melder === "function") await melder(text);
+    return { gemeldet: true, grund: "zustand-unlesbar", text, zahlen: befund.zahlen };
+  }
   if (tageAuffaellig < ANHALTEND_TAGE) {
     return { gemeldet: false, grund: "noch-nicht-anhaltend", tageAuffaellig, zahlen: befund.zahlen };
   }

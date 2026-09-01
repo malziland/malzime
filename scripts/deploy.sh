@@ -1,14 +1,30 @@
 #!/usr/bin/env bash
 # malziME Deploy-Script
-# Fuehrt Lint + Unit-Tests aus, aktualisiert Cache-Busting-Versionen
-# (Konvention ?v=YYYYMMDDNN) und deployed auf Firebase.
+#
+# Bindet die Auslieferung an die CI-Freigabe, faehrt einen Trockenlauf,
+# aktualisiert die Cache-Kennungen (Konvention ?v=YYYYMMDDNN) und liefert auf
+# Firebase aus.
+#
+# BEFUND 31.08.2026 (A-8): Hier stand "Fuehrt Lint + Unit-Tests aus". Das
+# stimmt seit der Stand-Bindung nicht mehr — Lint und Tests laufen in der
+# Pipeline, hier nur noch bei SKIP_STAND=1. Und es war nur EIN Notschalter
+# genannt; es sind acht.
 #
 # Nutzung:
 #   ./scripts/deploy.sh              # Hosting + Functions
 #   ./scripts/deploy.sh hosting      # Nur Hosting
 #   ./scripts/deploy.sh functions    # Nur Functions
 #
-#   SKIP_TESTS=1 ./scripts/deploy.sh # Test-Guard ueberspringen (nur im Notfall!)
+# Notschalter, alle nur im Notfall und alle einzeln zu begruenden:
+#   SKIP_STAND=1      Stand-Bindung an die CI-Freigabe aus; dann laufen Lint
+#                     und Tests stattdessen hier
+#   SKIP_TESTS=1      Test-Riegel aus
+#   SKIP_DRYRUN=1     Trockenlauf aus
+#   SKIP_INFRA=1      Infrastruktur-Pruefung aus
+#   SKIP_SATZ=1       Pruefung des Einstellungssatzes aus
+#   SKIP_SMOKE=1      Live-Probe nach der Auslieferung aus
+#   SKIP_FIRESTORE=1  Firestore-Schritt aus
+#   SKIP_CLI_CHECK=1  Versionspruefung der Firebase-CLI aus
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -67,6 +83,122 @@ else
     LAGE=$(gh api "repos/malziland/malzime/commits/$SHA/check-runs" \
       --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
             | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+
+    # ── Wenn main noch prüft: zählt der Lauf des PR, sofern der Code IDENTISCH ist ──
+    #
+    # BEFUND 30.08.2026: Die sechs Pflicht-Checks liefen zweimal über denselben
+    # Code — einmal auf dem Zweig, einmal auf `main` nach dem Squash-Merge. Der
+    # längste (`test-e2e`) dauert im Schnitt rund 8:45 (fünf Läufe: 8:13 bis 9:18).
+    # Das sind rund neun Minuten Wartezeit pro Auslieferung, für eine Prüfung,
+    # die dasselbe Ergebnis liefern MUSS.
+    #
+    # Muss sie das wirklich? Ja, und das ist beweisbar: Git berechnet für jeden
+    # Dateistand eine Baum-Kennung. Ist sie gleich, ist jede Datei bitgenau
+    # gleich — dann kann eine Prüfung gar nichts anderes finden. An den sechs
+    # letzten Zusammenführungen (#229 bis #234) nachgemessen: jedes Mal
+    # identisch.
+    #
+    # Der Riegel bleibt also derselbe, er akzeptiert nur einen zweiten Beleg
+    # für dieselbe Aussage. FAIL-CLOSED an jeder Stelle: Ohne PR-Nummer, ohne
+    # auffindbaren Kopf-Commit oder bei abweichendem Baum passiert nichts —
+    # dann gilt weiter, was `main` sagt.
+    # BEFUND 31.08.2026 (unvorbelastetes Review): Hier stand
+    # `grep -E '=(pending|null|)$'`. Die leere Alternative lehnt BSD-grep ab
+    # ("empty (sub)expression") — also genau auf dem Rechner, von dem
+    # ausgeliefert wird. Durch `|| true` wurde der Fehlschlag geschluckt, die
+    # Abkuerzung griff NIE, und der einzige Hinweis war eine Fehlerzeile im
+    # Protokoll, die wie Rauschen aussieht.
+    if printf '%s\n' "$LAGE" | grep -qE '=(pending|null)$'; then
+      PRNR=$(git log -1 --format=%s | grep -oE '#[0-9]+' | tail -1 | tr -d '#' || true)
+      if [ -n "$PRNR" ] && command -v gh >/dev/null 2>&1; then
+        PRKOPF=$(gh pr view "$PRNR" --json headRefOid -q .headRefOid 2>/dev/null || true)
+        # BEFUND 31.08.2026 (A-9): Hier stand `|| true` ohne Meldung. Der
+        # Ausfall war fail-closed, aber nicht diagnostizierbar — wer wissen
+        # wollte, warum die Abkuerzung entfiel, fand nichts im Protokoll.
+        if [ -z "$PRKOPF" ]; then
+          echo "Hinweis: Kopf-Commit von PR #${PRNR} nicht ermittelbar (gh pr view) — die Baum-Regel entfaellt."
+        fi
+        if [ -n "$PRKOPF" ]; then
+          # Der Kopf-Commit des PR liegt nach dem Squash-Merge nicht mehr
+          # zwingend lokal. Scheitert das Holen, entfaellt die Abkuerzung —
+          # und das wird GESAGT, statt still zu passieren.
+          if git fetch -q origin "$PRKOPF" 2>/dev/null; then
+            BAUM_HIER=$(git rev-parse "HEAD^{tree}" 2>/dev/null || echo "kein-baum-hier")
+            BAUM_PR=$(git rev-parse "${PRKOPF}^{tree}" 2>/dev/null || echo "kein-baum-dort")
+          else
+            echo "Hinweis: Kopf-Commit von PR #${PRNR} nicht abrufbar — die Baum-Regel entfaellt."
+            BAUM_HIER="kein-baum-hier"
+            BAUM_PR="kein-baum-dort"
+          fi
+          if [ "$BAUM_HIER" = "$BAUM_PR" ]; then
+            LAGE_PR=$(gh api "repos/malziland/malzime/commits/$PRKOPF/check-runs" \
+              --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
+                    | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+            # BEFUND 31.08.2026 (A-9): auch hier fehlte die Meldung.
+            if [ -z "$LAGE_PR" ]; then
+              echo "Hinweis: Pruefergebnisse zu PR #${PRNR} nicht abrufbar (gh api) — die Baum-Regel entfaellt."
+            fi
+            if [ -n "$LAGE_PR" ]; then
+              # SICHERHEITSBEFUND 31.08.2026 (unvorbelastetes Review): Hier
+              # stand `LAGE="$LAGE_PR"` — die GESAMTE Lage von main wurde
+              # ersetzt. Steht auf main ein Pflicht-Check auf `failure` und
+              # ein anderer noch auf `pending` (der Normalfall: die schnellen
+              # sind fertig, e2e laeuft noch), verdraengte das gruene Ergebnis
+              # des PR das ROTE von main. Ein Stand mit rotem Pflicht-Check
+              # waere ausgeliefert worden — das war vorher nicht moeglich.
+              #
+              # Jetzt wird NUR nachgetragen, was auf main noch aussteht. Ein
+              # `failure` bleibt ein `failure`, egal was der PR sagt.
+              # ZEITABHAENGIGE PRUEFUNGEN sind von der Abkuerzung
+              # ausgenommen (Befund 31.08.2026, unvorbelastetes Review).
+              #
+              # Die Begruendung "gleicher Baum, gleiches Ergebnis" gilt nur
+              # fuer Pruefungen, die ausschliesslich den Code ansehen.
+              # `test-backend` fuehrt drei Pruefungen, die von der UHR
+              # abhaengen: audit-gate mit ablaufender Ausnahmeliste, die
+              # Frist-Bremse zusagen-frische, und npm audit gegen eine
+              # Datenbank, die sich taeglich aendert. Ein gruenes Ergebnis von
+              # gestern kann heute falsch sein, ohne dass sich eine Zeile
+              # geaendert hat — genau deshalb gibt es den woechentlichen
+              # Zeitplan-Lauf (OPS-2026-08-20-03, vierzig Zeilen weiter oben).
+              #
+              # Der Verlust ist klein: test-backend dauert 179 s, der teure
+              # test-e2e 521 s. Die Abkuerzung spart also weiterhin den
+              # groesseren Teil.
+              ZEITABHAENGIG="test-backend"
+              NEUE_LAGE=""
+              # BEFUND aus Runde 1: `for X in $VAR` ohne `set -f` laesst die
+              # Shell Platzhalter aufloesen. Ein Check-Name mit `*` oder `?`
+              # wuerde dann gegen Dateinamen im Verzeichnis ersetzt. Heute
+              # unmoeglich (GitHub-Job-Namen enthalten das nicht), aber die
+              # Absicherung kostet eine Zeile.
+              set -f
+              for EINTRAG in $LAGE; do
+                NAME="${EINTRAG%%=*}"
+                WERT="${EINTRAG#*=}"
+                UEBERSPRINGEN=0
+                for Z in $ZEITABHAENGIG; do
+                  [ "$NAME" = "$Z" ] && UEBERSPRINGEN=1
+                done
+                if [ "$UEBERSPRINGEN" = "0" ] && \
+                   { [ "$WERT" = "pending" ] || [ "$WERT" = "null" ] || [ -z "$WERT" ]; }; then
+                  ERSATZ=$(printf '%s\n' "$LAGE_PR" | grep "^${NAME}=" || true)
+                  [ -n "$ERSATZ" ] && EINTRAG="$ERSATZ"
+                fi
+                NEUE_LAGE="$NEUE_LAGE$EINTRAG
+"
+              done
+              echo "Stand-Bindung: main prueft noch, PR #${PRNR} hat denselben Baum"
+              echo "               (${BAUM_HIER:0:8}) — dessen Ergebnisse gelten fuer die"
+              echo "               noch ausstehenden Pruefungen. Rote bleiben rot."
+              set +f
+              LAGE="$NEUE_LAGE"
+            fi
+          fi
+        fi
+      fi
+    fi
+
     if [ -z "$LAGE" ]; then
       echo "FEHLER: CI-Ergebnis für $SHA nicht abrufbar — Abbruch statt Deploy auf Verdacht." >&2
       echo "        Notschalter: SKIP_STAND=1" >&2
@@ -84,12 +216,31 @@ else
 fi
 
 # ── Test-Guard: Lint + Unit-Tests muessen gruen sein (Deploy-Konvention) ──
+#
+# BEFUND 30.08.2026: Diese drei Laeufe dauern rund drei Minuten und pruefen
+# denselben Code, den die Pipeline eben schon geprueft hat. Sie sind eine
+# ECHTE Doppelung, keine zweite Meinung:
+#
+#   · Die Stand-Bindung oben verlangt einen SAUBEREN Arbeitsbaum und
+#     HEAD == origin/main. Damit ist der Code hier bitgenau derselbe, der in
+#     der CI gelaufen ist.
+#   · Sie verlangt ausserdem, dass alle sechs Pflicht-Checks fuer genau diesen
+#     Commit gruen sind — darunter test-backend und test-frontend, also
+#     dieselben Suiten.
+#
+# Deshalb laufen sie nur noch, wenn die Stand-Bindung NICHT gegriffen hat.
+# Genau dann sind sie das Einzige, was zwischen ungepruefte Aenderungen und
+# die Produktion tritt — und dann laufen sie vollstaendig.
 if [ "${SKIP_TESTS:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_TESTS=1 gesetzt — Lint und Tests werden UEBERSPRUNGEN."
-else
+elif [ "${SKIP_STAND:-0}" = "1" ]; then
+  echo "— Lint und Tests (die Stand-Bindung war abgeschaltet, also hier vollstaendig)"
   npm run lint
   npm test --prefix functions
   npm run test:frontend
+else
+  echo "— Lint und Tests uebersprungen: Die Stand-Bindung hat sie bereits belegt"
+  echo "  (sauberer Baum, HEAD == origin/main, sechs Pflicht-Checks gruen)."
 fi
 
 # ── OPS-2026-08-12-25: Riegel gegen ein unbekanntes Auslieferungswerkzeug ──
@@ -149,14 +300,32 @@ if [ "${SKIP_SATZ:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_SATZ=1 gesetzt — Einstellungssatz wird NICHT geprueft."
 else
   echo "— Einstellungssatz"
-  SATZ_ANTWORT=$(curl -s --max-time 20 "https://malzi.me/api/stats" 2>/dev/null || true)
+  # BEFUND 01.09.2026 (Runde 7, L-14): Hier stand `|| true`. Faellt das Netz
+  # aus oder laeuft die Anfrage in die Zeitgrenze, blieb die Antwort leer und
+  # das Skript brach mit "kein gueltiger Einstellungssatz erkennbar" ab — eine
+  # Aussage ueber die Produktion, die es gar nicht gemessen hatte. Der falsche
+  # Rat daneben (Satz anlegen, oder SKIP_SATZ=1 setzen) haette den Riegel
+  # entwaffnet, um ein Netzproblem zu umgehen. Beide Faelle sind Abbruch, aber
+  # sie brauchen verschiedene Meldungen.
+  SATZ_RC=0
+  SATZ_ANTWORT=$(curl -s --max-time 20 "https://malzi.me/api/stats" 2>/dev/null) || SATZ_RC=$?
+  if [ "$SATZ_RC" -ne 0 ]; then
+    echo "ABBRUCH: https://malzi.me/api/stats war nicht erreichbar (curl-Rueckgabewert $SATZ_RC)."
+    echo "         Damit ist NICHT geprueft, ob ein Einstellungssatz vorliegt —"
+    echo "         das ist kein Befund ueber die Produktion, sondern eine"
+    echo "         gescheiterte Messung. Netz pruefen und erneut starten."
+    echo
+    echo "         SKIP_SATZ=1 waere hier das falsche Werkzeug: Es hebt den"
+    echo "         Riegel auf, statt die Messung zu wiederholen."
+    exit 1
+  fi
   SATZ_LIMIT=$(printf '%s' "$SATZ_ANTWORT" | grep -o '"limit":[0-9]*' | head -1 | grep -o '[0-9]*$' || true)
   if [ -z "$SATZ_LIMIT" ] || [ "$SATZ_LIMIT" -lt 1 ] 2>/dev/null; then
     echo "ABBRUCH: In der Produktion ist kein gueltiger Einstellungssatz erkennbar."
     echo "         Ohne ihn scheitert nach dem Deploy JEDE Analyse."
     echo
     echo "         Zuerst:  node scripts/betriebsprofil-anlegen.js --ausfuehren"
-    echo "         Danach:  sh scripts/deploy.sh"
+    echo "         Danach:  bash scripts/deploy.sh"
     echo
     echo "         (Beim allerersten Deploy von v4.4 ist das erwartet: Die alte"
     echo "          Fassung liest den Satz nicht, meldet aber ihr eigenes Limit."
@@ -210,6 +379,59 @@ fi
 # Glueck, kein Entwurf.
 TARGET="${1:-hosting,functions}"
 
+# ── TROCKENLAUF: würde diese Auslieferung überhaupt durchgehen? ──
+#
+# ANLASS, 30.08.2026: SECHS gescheiterte Auslieferungen an einem einzigen Tag —
+# falsches Firestore-Ziel, Firestore im Paket statt allein, die satzWache ohne
+# Datenbank-Angabe, der Infrastruktur-Wächter gegen eine feste RUNBOOK-Zahl,
+# ein verbotener Formwechsel der satzWache, und zuletzt ein unsauberer
+# Arbeitsbaum als Folge des vorigen Abbruchs.
+#
+# Jeder dieser Fehler wäre HIER sichtbar geworden. Zusammen kosteten sie rund
+# zweieinhalb Stunden. Der Trockenlauf kostet 28 Sekunden (gemessen 30.08.:
+# 3 s für Firestore, 25 s für hosting/functions).
+#
+# Er läuft in DERSELBEN Reihenfolge und mit denselben Zielen wie der echte
+# Deploy weiter unten — sonst prüft er etwas anderes, als später passiert.
+#
+# BEWUSST VOR DEM CACHE-BUSTER: Bricht der Trockenlauf ab, ist der Arbeitsbaum
+# noch unberührt. Sonst bliebe die hochgezählte Kennung ungespeichert liegen
+# und würde den nächsten Versuch am Sauberkeits-Riegel blockieren — genau das
+# ist am 30.08. passiert.
+#
+# Notschalter SKIP_DRYRUN=1, laut wie die anderen.
+if [ "${SKIP_DRYRUN:-0}" = "1" ]; then
+  echo "WARNUNG: SKIP_DRYRUN=1 gesetzt — der Trockenlauf wird UEBERSPRUNGEN."
+else
+  # "ohne etwas zu aendern" waere zu stark: Die Firebase-CLI weist selbst
+  # darauf hin, dass ein Trockenlauf Programmierschnittstellen am Zielprojekt
+  # einschalten kann. Bei uns sind alle laengst aktiv — die Aussage bleibt
+  # trotzdem genau. (Befund 31.08.2026, unvorbelastetes Review.)
+  echo "— Trockenlauf (prueft, ohne auszuliefern)"
+  DRY_START=$(date +%s)
+
+  if [ "${SKIP_FIRESTORE:-0}" != "1" ]; then
+    if ! firebase deploy --only firestore:malzime-eu --dry-run >/tmp/malzime-dry-firestore.log 2>&1; then
+      echo "FEHLER: Der Trockenlauf fuer Firestore ist gescheitert — nichts wurde ausgeliefert." >&2
+      tail -15 /tmp/malzime-dry-firestore.log | sed 's/^/    /' >&2
+      echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-firestore.log" >&2
+      echo "        Notschalter: SKIP_DRYRUN=1" >&2
+      exit 1
+    fi
+    echo "  ok    Firestore-Regeln und Indizes"
+  fi
+
+  if ! firebase deploy --only "$TARGET" --dry-run >/tmp/malzime-dry-rest.log 2>&1; then
+    echo "FEHLER: Der Trockenlauf fuer $TARGET ist gescheitert — nichts wurde ausgeliefert." >&2
+    tail -15 /tmp/malzime-dry-rest.log | sed 's/^/    /' >&2
+    echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-rest.log" >&2
+    echo "        Notschalter: SKIP_DRYRUN=1" >&2
+    exit 1
+  fi
+  echo "  ok    $TARGET"
+  echo "Trockenlauf gruen in $(( $(date +%s) - DRY_START )) s — die Auslieferung sollte durchgehen."
+fi
+
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,
 # sonst neuer Tag mit laufender Nummer 01. NUR wenn Hosting wirklich
@@ -242,6 +464,124 @@ else
 fi
 echo "Cache-Busting-Version: ?v=$VERSION"
 
+# ── AUFRAEUMEN BEI ABBRUCH ──
+#
+# BEFUND 30.08.2026: Ein gescheiterter Deploy blockierte den naechsten. Die
+# Kennung wird HIER hochgezaehlt und in vierzehn Dateien geschrieben; bricht
+# der Deploy danach ab, bleiben diese Aenderungen ungespeichert liegen. Der
+# Stand-Riegel ganz oben verlangt aber einen sauberen Arbeitsbaum — der
+# naechste Versuch scheitert also, ohne dass etwas Neues kaputt waere.
+#
+# An diesem Tag hat das einen ganzen Durchlauf gekostet, mitten in der Nacht,
+# und sah aus wie ein zweiter, unabhaengiger Fehler.
+#
+# Die Falle raeumt nur auf, was DIESES Skript geschrieben hat: die
+# Buster-Dateien unter public/. Fremde Aenderungen bleiben unberuehrt — der
+# Stand-Riegel oben hat ohnehin schon sichergestellt, dass es keine gibt.
+# Ab dem ersten echten Upload darf NICHTS mehr zurueckgenommen werden.
+HOCHGELADEN=0
+
+aufraeumen_bei_abbruch() {
+  CODE=$?
+  # BEFUND 31.08.2026 (Pruefer A, ausgefuehrt): `set -euo pipefail` gilt AUCH
+  # im EXIT-Trap. Die Suche unten gibt 1 zurueck, sobald die letzte Datei
+  # unter public/ keinen Cache-Buster traegt — und `build-info.json` traegt nie
+  # einen. Der Trap brach dann mitten drin ab: Er raeumte NICHT auf und
+  # verfaelschte obendrein den Fehlercode (7 wurde zu 1).
+  #
+  # Nachgestellt und belegt. Deshalb hier ausdruecklich abschalten — in einem
+  # Aufraeumpfad ist ein Abbruch bei erstem Fehlschlag genau falsch.
+  set +e
+  # SICHERHEITSBEFUND 31.08.2026 (unvorbelastetes Review): Die Falle pruefte
+  # nur den Rueckgabewert. `live-smoke.sh` laeuft aber NACH beiden Uploads und
+  # beendet sich bei einem Fehlschlag mit `exit 1` — etwa wenn die Verteilung
+  # des Hostings noch nicht durch ist. Dann haette die Falle eine BEREITS
+  # AUSGELIEFERTE Cache-Kennung zurueckgenommen.
+  #
+  # Folge: Live steht ?v=NEU, lokal wieder ?v=ALT. Der naechste Deploy leitet
+  # aus index.html DIESELBE Nummer ab und liefert anderen Inhalt unter einer
+  # vergebenen Kennung aus — genau der Cache-Fehler, gegen den
+  # OPS-2026-08-13-47 fail-closed gebaut wurde. Dazu haette build-info.json,
+  # der Echtheitsbeweis, nicht mehr zur Produktion gepasst.
+  if [ "$HOCHGELADEN" = "1" ]; then
+    if [ "$CODE" -ne 0 ]; then
+      echo ""
+      echo "Abbruch NACH dem Hochladen (Code $CODE) — die Cache-Kennung bleibt,"
+      echo "wie sie ist. Sie steht bereits live; ein Rueckbau wuerde sie ein"
+      echo "zweites Mal vergeben."
+      echo "Naechster Schritt: pruefen, was live steht, und die Kennung"
+      echo "committen (chore-PR), damit der Arbeitsbaum wieder sauber ist."
+    fi
+    return
+  fi
+  if [ "$CODE" -ne 0 ] && [ -n "$(git status --porcelain -- public/ 2>/dev/null)" ]; then
+    echo ""
+    echo "Deploy abgebrochen (Code $CODE) — nehme die Cache-Kennung zurueck,"
+    echo "damit der naechste Versuch nicht am Sauberkeits-Riegel scheitert."
+    # Zurueckgenommen wird GENAU das, was dieses Skript geschrieben hat —
+    # nicht "alles unter public/" (das traefe fremde Handarbeit) und nicht
+    # "was ein ?v= enthaelt" (das verfehlt build-info.json).
+    #
+    # DREI BEFUNDE aus dem Review vom 31.08.2026 stecken in dieser Fassung:
+    #
+    #   · `git checkout -- public/` verwarf ALLES dort. Der Sauberkeits-Riegel
+    #     sollte das abfangen, faellt aber bei SKIP_STAND=1 weg.
+    #   · Der Ersatz filterte auf `?v=` und liess `public/build-info.json`
+    #     liegen, das nie eine Kennung traegt. Damit war die Falle wirkungslos:
+    #     Der naechste Deploy scheiterte weiter am Sauberkeits-Riegel — also
+    #     genau der Vorfall vom 30.08., gegen den sie gebaut wurde.
+    #   · `git diff --name-only` gibt Pfade mit Umlauten ZITIERT und oktal
+    #     escaped aus. Eine deutschsprachige Seite waere still liegengeblieben.
+    #
+    # Deshalb kommt die Liste aus derselben Quelle wie oben beim Schreiben
+    # ($BUSTER_DATEIEN) plus build-info.json — kein Filter, keine Zitierung.
+    ZURUECK=""
+    # `${…:-}` weil `set -u` aktiv ist: Bricht der Deploy ab, BEVOR die
+    # Liste gebaut wurde (etwa am Trockenlauf), waere die Variable ungesetzt
+    # und die Falle stuerbe an ihrer eigenen Absicherung. Dann gibt es aber
+    # auch nichts zurueckzunehmen — leer ist hier die richtige Antwort.
+    for D in ${BUSTER_DATEIEN:-} "public/build-info.json"; do
+      [ -f "$D" ] || continue
+      if ! git diff --quiet -- "$D" 2>/dev/null; then
+        ZURUECK="$ZURUECK$D
+"
+      fi
+    done
+    ANZAHL=$(printf '%s' "$ZURUECK" | grep -c . || true)
+    if [ "$ANZAHL" -eq 0 ]; then
+      echo "  Keine der vom Skript geschriebenen Dateien ist veraendert —"
+      echo "  nichts angefasst. (Was sonst unter public/ liegt, bleibt unberuehrt.)"
+    else
+      # Einzeln statt ueber xargs: Nach einer Pipe misst `$?` den LETZTEN
+      # Befehl, nicht den, ueber den man etwas behauptet — genau die Falle, die
+      # der Waechter gegen stille Fehlschlaege bewacht. Und ein Fehlschlag bei
+      # EINER Datei soll die anderen nicht mitnehmen.
+      GESCHEITERT=0
+      SCHLEIFEN_IFS=$IFS
+      IFS='
+'
+      for D in $ZURUECK; do
+        IFS=$SCHLEIFEN_IFS
+        if ! git checkout -- "$D" 2>/dev/null; then
+          echo "  ACHTUNG: $D liess sich nicht zuruecksetzen."
+          GESCHEITERT=$((GESCHEITERT + 1))
+        fi
+        IFS='
+'
+      done
+      IFS=$SCHLEIFEN_IFS
+      if [ "$GESCHEITERT" -eq 0 ]; then
+        echo "  $ANZAHL Datei(en) zurueckgesetzt."
+      else
+        echo "  $GESCHEITERT von $ANZAHL Datei(en) blieben liegen."
+        echo "  Der naechste Deploy wird am Sauberkeits-Riegel abbrechen."
+        echo "  Von Hand: git checkout -- public/"
+      fi
+    fi
+  fi
+}
+trap aufraeumen_bei_abbruch EXIT
+
 # Alle Dateien mit ?v=-Verweisen aktualisieren: JEDE HTML-Seite unter public/
 # — auch in Unterordnern wie public/en/ — UND public/js/demo.js, dort haengen
 # die Buster der grossen Demo-Bilder.
@@ -268,8 +608,33 @@ echo "Cache-Busting-Version: ?v=$VERSION"
 # mindestens eine Ziffer (BRE, kein + — bash 3.2 auf macOS kennt es nicht).
 # BUSTER-DATEIEN: Diese Zeile fuehrt functions/src/__tests__/deploy-buster-script.test.js
 # unveraendert aus. Ihre Form nicht ohne Blick dorthin aendern.
+# BEFUND 31.08.2026 (Gegenpruefer, ausgefuehrt): `for f in $BUSTER_DATEIEN`
+# ohne Anfuehrungszeichen zerlegt einen Dateinamen mit Leerzeichen in zwei
+# Woerter. `[ -f ]` ist dann falsch, die Seite wird STILL uebersprungen und
+# friert auf einem alten Stilblatt ein — genau der Fehler, gegen den
+# OPS-2026-08-18-02 gebaut wurde. `deploy-buster-script.test.js` bleibt dabei
+# gruen, weil er die Liste nur liest.
+#
+# Zeilenweise lesen statt Wortaufspaltung. Ein Zeilenumbruch im Dateinamen
+# bliebe ein Problem — den verbietet aber schon die Namenskonvention, und
+# `find` wuerde ihn ohnehin als zwei Eintraege liefern.
 BUSTER_DATEIEN=$(find public -name '*.html' | sort; echo public/js/demo.js)
+# BEFUND 31.08.2026 (Gegenpruefer, ausgefuehrt): Hier stand
+# `for f in $BUSTER_DATEIEN` ohne Anfuehrungszeichen. Ein Dateiname mit
+# Leerzeichen zerfaellt dabei in zwei Woerter, `[ -f ]` ist falsch, und die
+# Seite wird STILL uebersprungen — sie friert auf einem alten Stilblatt ein.
+# Genau der Fehler, gegen den OPS-2026-08-18-02 gebaut wurde, und
+# `deploy-buster-script.test.js` bleibt dabei gruen, weil er nur die Liste
+# liest.
+#
+# Zeilenweise ueber IFS statt ueber eine Pipe: Eine Pipe erzeugt eine
+# Subshell, in der ein Fehlschlag verschluckt wuerde — bei einem Schritt, der
+# Dateien schreibt, ist das die falsche Wahl.
+ALT_IFS=$IFS
+IFS='
+'
 for f in $BUSTER_DATEIEN; do
+  IFS=$ALT_IFS
   if [ -f "$f" ]; then
     # BUG-009: Cross-platform sed (macOS + Linux)
     if sed --version >/dev/null 2>&1; then
@@ -279,7 +644,10 @@ for f in $BUSTER_DATEIEN; do
     fi
     echo "  $f aktualisiert"
   fi
+  IFS='
+'
 done
+IFS=$ALT_IFS
 
 # Fingerabdruck des Ausgelieferten. MUSS nach der Buster-Ersetzung laufen —
 # sonst stehen dort die Pruefsummen des Zustands DAVOR, und jede Nachpruefung
@@ -323,6 +691,42 @@ fi
 # (Audit 2026-08-10, OPS-001).
 # ── SCHRITT 1: Firestore-Regeln und Indizes, ALLEIN ──
 # Warum allein: siehe Kopfkommentar (Nachtrag 30.08.2026). Im Paket scheitert er.
+# ── PROBELAUF: alles bis hierher, aber nichts ausliefern ──
+#
+# Bis zu dieser Zeile ist NICHTS live gegangen: Jeder Riegel ist gelaufen, der
+# Trockenlauf hat die echte Firebase-Seite gefragt, die Cache-Kennung und
+# build-info.json sind erzeugt. Was danach kommt, ist der Punkt ohne Rueckweg.
+#
+# `PROBELAUF=1` haelt genau hier an und nimmt die Aenderungen am Arbeitsbaum
+# wieder zurueck. Damit laesst sich vor dem echten Deploy pruefen, ob die
+# Auslieferung durchgehen WUERDE — ohne sie zu machen und ohne zu raten.
+#
+# Was der Probelauf NICHT beweist: dass das Hochladen selbst gelingt (Netz,
+# Kontingente, Rechte) und dass die neue Fassung live funktioniert. Dafuer gibt
+# es den Live-Smoke danach. Er beweist: alle Riegel gruen, der Stand ist
+# auslieferbar, und die Kette bricht nicht auf halbem Weg ab.
+if [ "${PROBELAUF:-0}" = "1" ]; then
+  echo
+  echo "── PROBELAUF: bis hierher waere alles bereit ──"
+  echo "Jeder Riegel ist gelaufen, der Trockenlauf hat Firebase gefragt,"
+  echo "die Cache-Kennung waere ?v=$VERSION."
+  echo
+  echo "NICHTS wurde ausgeliefert. Die Aenderungen am Arbeitsbaum werden"
+  echo "jetzt zurueckgenommen."
+  # Dieselben Dateien, die die Aufraeumfalle bei einem Abbruch zuruecknaehme.
+  if ! git checkout -- public/ 2>/dev/null; then
+    echo "WARNUNG: public/ konnte nicht zurueckgesetzt werden — bitte pruefen." >&2
+  fi
+  OFFEN="$(git status --porcelain)"
+  if [ -n "$OFFEN" ]; then
+    echo "WARNUNG: Der Arbeitsbaum ist nicht sauber:" >&2
+    printf '%s\n' "$OFFEN" | sed 's/^/    /' >&2
+    exit 1
+  fi
+  echo "Arbeitsbaum sauber. Fuer die echte Auslieferung: ohne PROBELAUF starten."
+  exit 0
+fi
+
 if [ "${SKIP_FIRESTORE:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_FIRESTORE=1 — Regeln werden NICHT ausgerollt."
 else
@@ -335,12 +739,44 @@ else
   echo "Regeln ausgerollt."
 fi
 
+# AB HIER IST ETWAS AUSGELIEFERT. Die Aufraeumfalle haelt sich von jetzt an
+# raus: Was live steht, laesst sich nicht durch ein `git checkout` zuruecknehmen.
+#
+# BEFUND 31.08.2026 (Pruefer A): Die Marke stand VOR dem Firestore-Schritt.
+# Genau der ist am 30.08. mehrfach gescheitert, bevor irgendetwas ausgerollt
+# war — die Falle trat dann zurueck und liess die Cache-Kennung liegen. Sie
+# versagte also ausgerechnet im Szenario, das sie ausgeloest hat.
+#
+# Der Firestore-Schritt aendert nichts an der Cache-Kennung: Er rollt Regeln und
+# Indizes aus, keine Seiten. Ein Rueckbau der Kennung ist danach noch richtig —
+# deshalb wird die Marke hier NICHT gesetzt.
+
 # ── SCHRITT 2: Hosting und Functions ──
 if command -v firebase >/dev/null 2>&1; then
   firebase deploy --only "$TARGET"
 else
   npx firebase deploy --only "$TARGET"
 fi
+
+# BEFUND 31.08.2026 (Runde 2, von zwei Pruefern gegensaetzlich beurteilt, vom
+# Gegenpruefer entschieden): Die Marke stand VOR diesem Schritt. Scheiterte der
+# Upload — der lange, fehleranfaellige Teil —, meldete die Aufraeumfalle
+# "Abbruch NACH dem Hochladen, die Kennung steht bereits live" und liess 14
+# geaenderte Dateien liegen. Live stand aber nichts: Firestore rollt nur Regeln
+# aus. Folge waren ein blockierter Folgeversuch UND ein build-info.json, das
+# einen nie ausgelieferten Stand als echt ausgewiesen haette.
+#
+# Belegt mit drei Szenarien in einem Wegwerf-Klon (Attrappen-firebase):
+#   Firestore rot -> 14 Dateien zurueckgesetzt, Baum sauber
+#   Hosting rot   -> 14 Dateien zurueckgesetzt, Baum sauber  (vorher: falsch)
+#   Smoke rot     -> Kennung bleibt, wie sie ist
+#
+# OFFEN und bewusst in Kauf genommen: Scheitert `--only hosting,functions`
+# TEILWEISE (Hosting oben, Functions rot), naehme die Falle eine live stehende
+# Kennung zurueck. Das ist der seltenere Fall; sauber wird es erst, wenn die
+# Falle die live stehende Kennung MISST statt sie abzuleiten (das Werkzeug
+# dafuer liegt in scripts/live-smoke.sh bereit).
+HOCHGELADEN=1
 
 # ── Live-Beweis: vier kostenfreie Proben gegen die frisch deployte Produktion ──
 # (endet vor KI-Aufruf und Stundenzähler; Notschalter SKIP_SMOKE=1)
@@ -368,6 +804,17 @@ UEBERSPRUNGEN=""
 [ "${SKIP_INFRA:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_INFRA"
 [ "${SKIP_SMOKE:-0}" = "1" ]     && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_SMOKE"
 [ "${SKIP_FIRESTORE:-0}" = "1" ] && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_FIRESTORE"
+[ "${SKIP_DRYRUN:-0}" = "1" ]    && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_DRYRUN"
+# 31.08.2026: SKIP_SATZ fehlte hier seit seiner Einfuehrung. Ausgerechnet der
+# Schalter, der den Riegel unter dem Einstellungssatz abhebt — ohne Satz nimmt
+# die Seite Fotos an und JEDE Analyse scheitert.
+[ "${SKIP_SATZ:-0}" = "1" ]      && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_SATZ"
+# BEFUND 01.09.2026 (Runde 7, L-13): DEPLOY_JA ist der einzige Ausnahmeweg
+# ohne SKIP_-Namen und fehlte deshalb hier — auch der Waechter sucht nur nach
+# `SKIP_[A-Z_]+`. Er hebt keinen Riegel auf, sondern die Rueckfrage an den
+# Menschen davor. KERN 12 macht da keinen Unterschied: Wer die Bilanz liest,
+# soll sehen, dass niemand bestaetigt hat.
+[ -n "${DEPLOY_JA:-}" ]          && UEBERSPRUNGEN="$UEBERSPRUNGEN DEPLOY_JA(Rueckfrage)"
 
 echo ""
 if [ -n "$UEBERSPRUNGEN" ]; then
@@ -388,7 +835,22 @@ fi
 # Reihenfolge muss bleiben: erst ausliefern, dann die Nummer setzen. Der
 # richtige Ort dafuer ist der Cache-Buster-PR, der ohnehin nach jedem Deploy
 # faellig ist.
-OBERSTE="$(sh scripts/changelog-oberste-version.sh CHANGELOG.md 2>/dev/null || true)"
+# BEFUND 01.09.2026 (Runde 6): Mit `|| true` sah ein DEFEKTES Skript genauso
+# aus wie ein CHANGELOG, das noch auf [Unveroeffentlicht] steht — beide leer.
+# Der Rueckgabewert wird jetzt getrennt gelesen.
+# ACHTUNG beim Bearbeiten: Unter `set -euo pipefail` bricht die Shell bei
+# einer ZUWEISUNG ab, deren Kommando ungleich 0 liefert. `OBERSTE_RC=$?` in
+# der naechsten Zeile wuerde nie erreicht — und genau das ist am 01.09.2026
+# zweimal passiert. Das Skript liefert bei [Unveroeffentlicht] absichtlich 1;
+# ein gruener Deploy endete dann mit Code 1, und alle 20 Riegel-Tests (die auf
+# "Code ungleich 0" pruefen) wurden dadurch wertlos.
+OBERSTE_RC=0
+OBERSTE="$(bash scripts/changelog-oberste-version.sh CHANGELOG.md 2>/dev/null)" || OBERSTE_RC=$?
+if [ "$OBERSTE_RC" -gt 1 ]; then
+  echo "FEHLER: changelog-oberste-version.sh liess sich nicht ausfuehren (Code $OBERSTE_RC)." >&2
+  echo "        Ohne sie ist nicht pruefbar, ob der CHANGELOG gestempelt wurde." >&2
+  exit 1
+fi
 case "$OBERSTE" in
   ""|*nver*)
     echo ""

@@ -153,3 +153,56 @@ describe("Lokal-Modus (QUEUE_LOCAL=1, Emulator)", () => {
     await expect(storage.deleteImage("queue-uploads/gibt-es-nicht.jpg")).resolves.toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   OPS-2026-08-31-03 — Riegel gegen Zugriff auf den ECHTEN Bildspeicher.
+
+   Am 30.08. lagen 4.056 Testbilder (233 MB) im Produktions-Bucket. Die
+   Lifecycle-Regel war in Ordnung; was fehlte, war die aktive Loeschung nach
+   der Analyse — die Bilder waren nie durch einen Worker gelaufen. Derselbe
+   Fehlertyp hatte am selben Tag die Produktions-Warteschlange verstellt: Eine
+   Attrappe, die nur greift, wenn ein Test daran DENKT, sie zu setzen.
+
+   Der einzelne Test, der es vergisst, ist austauschbar — der Riegel nicht.
+   ══════════════════════════════════════════════════════════════════════ */
+
+describe("OPS-2026-08-31-03 — der echte Bildspeicher ist gegen Tests verriegelt", () => {
+  test("ohne Attrappe wirft der Zugriff, statt in die Produktion zu schreiben", () => {
+    jest.resetModules();
+    const frisch = require("../queue-storage");
+    frisch.setBucketForTest(null);
+    expect(() => frisch._bucketFuerTest()).toThrow(/Attrappe/i);
+  });
+
+  /* OPS-2026-08-31-04: DIE eigentliche Ursache der 4.056 Bilder. Der
+     Lasttest faehrt den Firebase-Emulator und laesst die ECHTEN Funktionen
+     laufen — ohne QUEUE_LOCAL=1 loeste bucket() auf den Produktions-Bucket
+     auf, und der Emulator holt sich bei angemeldetem Konto die echten
+     Zugangsdaten. Jest laeuft dabei nicht, der Riegel oben greift also nicht.
+     Laeuft ein Emulator, ist der echte Bildspeicher immer der falsche Ort. */
+  test("mit laufendem Emulator wirft der Zugriff auf den echten Speicher", () => {
+    jest.resetModules();
+    const frisch = require("../queue-storage");
+    frisch.setBucketForTest(null);
+    const alterWert = process.env.JEST_WORKER_ID;
+    const alterEmu = process.env.FIRESTORE_EMULATOR_HOST;
+    delete process.env.JEST_WORKER_ID;
+    process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
+    try {
+      expect(() => frisch._bucketFuerTest()).toThrow(/Emulator/i);
+    } finally {
+      if (alterWert !== undefined) process.env.JEST_WORKER_ID = alterWert;
+      if (alterEmu === undefined) delete process.env.FIRESTORE_EMULATOR_HOST;
+      else process.env.FIRESTORE_EMULATOR_HOST = alterEmu;
+    }
+  });
+
+  test("mit Attrappe laeuft alles normal weiter", () => {
+    jest.resetModules();
+    const frisch = require("../queue-storage");
+    const attrappe = { name: "attrappe" };
+    frisch.setBucketForTest(attrappe);
+    expect(frisch._bucketFuerTest()).toBe(attrappe);
+    frisch.setBucketForTest(null);
+  });
+});

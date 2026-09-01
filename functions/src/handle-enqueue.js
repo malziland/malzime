@@ -253,6 +253,23 @@ async function handleEnqueue(req, res, secrets) {
          dazukommen. Genau dafuer gibt es die Nachpruefung weiter unten, die
          die Grenze exakt haelt. Zusammen: schnell im Normalfall, exakt an der
          Grenze. */
+      /* BEFUND 01.09.2026 (Runde 7, K-6): Der 503-Block fuer "kein
+         Einstellungssatz" stand UNTER diesem Aufruf und im selben try. Wirft
+         countQueuedJobs (Zeitgrenze, Firestore-Stoerung), wird er
+         uebersprungen — der Auftrag laeuft weiter, das Bild wird gespeichert
+         und eingereiht, obwohl ohne Satz keine Analyse laufen kann. Gemessen:
+         HTTP 200, Job angelegt, Bild im Speicher.
+         Er braucht die Zaehlung nicht und steht deshalb jetzt davor. */
+      if (einlassgrenze === 0) {
+        console.log(JSON.stringify({ requestId, warning: "kein-einstellungssatz" }));
+        res.status(503).json({
+          blocked: "configMissing",
+          retryAfterSeconds: 300,
+          message: "Bei uns stimmt gerade eine Einstellung nicht — bitte in ein paar Minuten nochmal.",
+        });
+        return;
+      }
+
       const schonWartend = await countQueuedJobs();
       if (einlassgrenze > 0 && schonWartend >= einlassgrenze) {
         console.log(
@@ -262,17 +279,6 @@ async function handleEnqueue(req, res, secrets) {
           blocked: "queueFull",
           retryAfterSeconds: 300,
           message: "Gerade warten sehr viele Analysen — bitte in ein paar Minuten nochmal.",
-        });
-        return;
-      }
-
-      if (einlassgrenze === 0) {
-        /* Kein Einstellungssatz — ohne ihn laeuft ohnehin keine Analyse. */
-        console.log(JSON.stringify({ requestId, warning: "kein-einstellungssatz" }));
-        res.status(503).json({
-          blocked: "configMissing",
-          retryAfterSeconds: 300,
-          message: "Bei uns stimmt gerade eine Einstellung nicht — bitte in ein paar Minuten nochmal.",
         });
         return;
       }

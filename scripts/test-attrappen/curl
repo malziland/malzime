@@ -1,0 +1,19 @@
+#!/bin/sh
+# Attrappe fuer curl. Beruehrt kein Netz.
+#
+#   ATTRAPPE_STATS   was die Abfrage von /api/stats liefert.
+#                    Vorgabe: ein gueltiger Einstellungssatz.
+#   ATTRAPPE_CURL_ROT=1   der Aufruf scheitert
+VORGABE_STATS='{"hourlyLimit":155,"limit":155}'
+[ -n "${ATTRAPPE_PROTOKOLL:-}" ] && echo "curl $*" >> "$ATTRAPPE_PROTOKOLL"
+
+if [ "${ATTRAPPE_CURL_ROT:-0}" = "1" ]; then
+  echo "ATTRAPPE curl: nicht erreichbar (so gewollt)" >&2
+  exit 7
+fi
+
+case "$*" in
+  *api/stats*) printf '%s' "${ATTRAPPE_STATS-$VORGABE_STATS}" ;;
+  *)           printf '' ;;
+esac
+exit 0

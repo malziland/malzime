@@ -51,7 +51,53 @@ const MIME_BY_EXT = {
 let bucketOverride = null;
 
 function bucket() {
-  return bucketOverride || getStorage().bucket(QUEUE_BUCKET);
+  if (bucketOverride) return bucketOverride;
+  /* OPS-2026-08-31-03: RIEGEL gegen den echten Bildspeicher aus Tests heraus.
+   *
+   * Am 30.08.2026 lagen 4.056 Testbilder (233 MB) im Produktions-Bucket. Die
+   * Lifecycle-Regel griff korrekt, aber die AKTIVE Loeschung nach der Analyse
+   * hatte nie stattgefunden — die Bilder waren nie durch einen Worker
+   * gelaufen. Am selben Tag hatte derselbe Fehlertyp die Produktions-
+   * Warteschlange auf vierfaches Tempo gestellt; ein echter Nutzer bekam
+   * daraufhin eine Ueberlastmeldung.
+   *
+   * Die Gemeinsamkeit: `setBucketForTest()` schuetzt nur, wenn ein Test daran
+   * DENKT, sie zu setzen. Vergisst er es, schreibt er lautlos in die
+   * Produktion — und niemand merkt es, weil alle Tests gruen bleiben.
+   *
+   * Das wiegt hier schwerer als bei der Warteschlange: In diesem Bucket
+   * liegen Fotos von Kindern, und die Datenschutzerklaerung sagt zu, dass sie
+   * nur fuer die Dauer der Analyse dort liegen.
+   *
+   * `JEST_WORKER_ID` setzt Jest in jedem Arbeitsprozess. Wer den echten Weg
+   * pruefen will, setzt `setBucketForTest()` — dann laeuft alles weiter. */
+  if (process.env.JEST_WORKER_ID !== undefined) {
+    throw new Error(
+      "Zugriff auf den echten Bildspeicher aus einem Test ohne Attrappe — " +
+        "wird nicht ausgefuehrt. setBucketForTest() verwenden."
+    );
+  }
+  /* OPS-2026-08-31-04: DIE Ursache der 4.056 liegengebliebenen Bilder. Der
+   * Lasttest (`scripts/lasttest-betriebsprofil.sh`) faehrt den Firebase-
+   * Emulator und laesst darin die ECHTEN Funktionen laufen. Ohne
+   * QUEUE_LOCAL=1 loeste diese Funktion auf den PRODUKTIONS-Bucket auf — und
+   * der Emulator holt sich bei angemeldetem Konto die echten Zugangsdaten.
+   * Die Bilder landeten also im Betrieb, wurden dort aber nie von einem
+   * Worker abgeholt und geloescht.
+   *
+   * Der Riegel oben half nicht: Jest laeuft dabei nicht.
+   *
+   * Laeuft irgendein Emulator, ist der echte Bildspeicher immer der falsche
+   * Ort — unabhaengig davon, ob jemand QUEUE_LOCAL zu setzen vergisst. */
+  const emulator =
+    process.env.FIRESTORE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR || process.env.STORAGE_EMULATOR_HOST;
+  if (emulator) {
+    throw new Error(
+      "Es laeuft ein Emulator — der echte Bildspeicher wird nicht angefasst. " +
+        "QUEUE_LOCAL=1 setzen (legt die Bilder lokal ab)."
+    );
+  }
+  return getStorage().bucket(QUEUE_BUCKET);
 }
 
 /* Temp-Verzeichnis der Lokal-Modus-Ablage. */
@@ -153,7 +199,11 @@ function setBucketForTest(impl) {
   bucketOverride = impl;
 }
 
+/* Nur fuer die Riegel-Pruefung: gibt bucket() unveraendert nach aussen. */
+const _bucketFuerTest = () => bucket();
+
 module.exports = {
+  _bucketFuerTest,
   storeImage,
   loadImage,
   deleteImage,

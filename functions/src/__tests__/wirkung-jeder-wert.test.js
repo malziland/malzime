@@ -224,23 +224,69 @@ describe("Gruppe 1 — die KI-Aufrufe", () => {
     expect(b[0].max_tokens).toBe(888);
   });
 
+  /* BEFUND 31.08.2026 (Runde 2, P2): Dieser Test war BLIND. Er holte
+     `_restbudgetFuerTest` aus handle-process-job — den Export gibt es nicht.
+     Der else-Zweig schob dann die Schleifenkonstante selbst in `gemessen` und
+     verglich am Ende 100000 mit 400000: zwei Zahlen aus dem Test. Ein Bruch
+     bei requestBudgetMs waere unbemerkt geblieben, ausgerechnet in der Suite,
+     die Wirkung belegen soll.
+
+     Jetzt wird die Wirkung dort gemessen, wo sie entsteht: runPipeline baut
+     aus dem Satzwert die Restbudget-Funktion und reicht sie an den
+     Mistral-Aufruf weiter. Die Attrappe haelt fest, was ankommt. */
   test("requestBudgetMs wirkt: das Zeitbudget des Durchlaufs folgt dem Satz", async () => {
-    /* Gemessen an der Restbudget-Funktion, die runPipeline aufbaut. */
     const gemessen = [];
     for (const budget of [100000, 400000]) {
       jest.resetModules();
       jest.doMock("../betriebsprofil", () => ({
-        geltendeWerte: async () => ({ werte: { ...SATZ, requestBudgetMs: budget }, quelle: "firestore", grund: null }),
+        geltendeWerte: async () => ({
+          werte: { ...SATZ, requestBudgetMs: budget },
+          quelle: "firestore",
+          grund: null,
+        }),
       }));
-      const { _restbudgetFuerTest } = require("../handle-process-job");
-      if (typeof _restbudgetFuerTest === "function") {
-        gemessen.push(await _restbudgetFuerTest());
-      } else {
-        /* Nicht exportiert — dann ueber den Satz selbst, mit klarem Hinweis. */
-        gemessen.push(budget);
-      }
+      let gesehen = null;
+      /* Signaturen sind positional. BEIDE Wege abgreifen: Welcher laeuft,
+         haengt am Flag useSingleLargeCall — die Messung darf davon nicht
+         abhaengen. describeImage ist der Einstieg des Drei-Aufruf-Wegs. */
+      jest.doMock("../mistral", () => ({
+        runSingleLargeCall: async (_b, _m, remainingBudget) => {
+          gesehen = remainingBudget();
+          return null;
+        },
+        describeImage: async (_b, _m, remainingBudget) => {
+          gesehen = remainingBudget();
+          return null;
+        },
+      }));
+      jest.doMock("../queue-storage", () => ({
+        loadImage: async () => ({ buffer: Buffer.from("x"), mimeType: "image/jpeg" }),
+        deleteImage: async () => true,
+      }));
+      /* runPipeline (nicht die Single-Large-Variante direkt): NUR so baut der
+         Code die Restbudget-Funktion AUS DEM SATZWERT auf. Wer das Budget von
+         aussen hineinreicht, misst seine eigene Eingabe. */
+      const { runPipeline } = require("../job-pipelines");
+      const mistral = require("../mistral");
+      await runPipeline({
+        mistral,
+        job: { traceId: "t", imagePath: "queue-uploads/x.jpg", lang: "de", exif: {} },
+      }).catch(() => {});
+      gemessen.push(gesehen);
     }
-    expect(gemessen[0]).not.toBe(gemessen[1]);
+    /* Der ankommende Wert muss NAHE AM SATZWERT liegen — nicht bloss
+       "irgendwie anders". Ein Vergleich auf Ungleichheit waere wertlos: Zwei
+       Laeufe unterscheiden sich schon durch die vergangenen Millisekunden, der
+       Test bliebe also gruen, selbst wenn der Satzwert gar nicht durchreicht.
+       Genau daran ist die erste Fassung dieses Tests gescheitert
+       (Rueckbauprobe: budgetMs im Code fest verdrahtet -> Test blieb gruen).
+       Toleranz 2 s deckt die Laufzeit des Aufrufs ab. */
+    expect(gemessen[0]).not.toBeNull();
+    expect(gemessen[1]).not.toBeNull();
+    expect(gemessen[0]).toBeGreaterThan(100000 - 2000);
+    expect(gemessen[0]).toBeLessThanOrEqual(100000);
+    expect(gemessen[1]).toBeGreaterThan(400000 - 2000);
+    expect(gemessen[1]).toBeLessThanOrEqual(400000);
   });
 });
 

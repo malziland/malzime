@@ -78,7 +78,11 @@ test("Nach Abbrechen des Druckdialogs ist die Seite im Beast-Modus wieder da", a
   await endpunkte(page, { status: "done", result: PROFIL });
   await page.goto("/");
   await page.click('[data-demo="selfie"]');
-  await page.waitForSelector(".cat-card", { timeout: 45000 });
+  /* 75 s statt 45: Auf dem Firefox-Laeufer der CI reichten 45 Sekunden
+     nicht — am 01.09.2026 zweimal gerissen, waehrend derselbe Test lokal
+     Sekunden braucht. `test.slow()` gibt 90 s; 75 s Warten bleiben mit
+     Abstand darunter (pruefe-tote-geduld.py prueft genau das). */
+  await page.waitForSelector(".cat-card", { timeout: 75000 });
 
   /* In den Beast-Modus wechseln — dort trat der Fehler auf. */
   await page.locator('[data-mode="boost"]').first().click();

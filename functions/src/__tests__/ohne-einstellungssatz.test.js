@@ -142,8 +142,14 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
   });
 
   test("ntfy-Mitteilung geht ohne Satz nicht mit toten Knöpfen raus", async () => {
-    const { notifyLimitReached } = require("../notify");
+    const { notifyLimitReached, setFetchForTest } = require("../notify");
     global.fetch = jest.fn();
+    /* Die Attrappe wird hinterlegt, damit der Weg bis zum Satz-Check LÄUFT.
+       Ohne sie bräche schon der Test-Riegel ab (Runde 4, E-3) — dann bewiese
+       dieser Fall nur, dass Jest nichts nach draußen lässt, statt dessen, was
+       er zusagt: dass ohne Einstellungssatz keine Mitteilung mit toten
+       Knöpfen hinausgeht und der Grund im Protokoll steht. */
+    setFetchForTest((...args) => global.fetch(...args));
     await notifyLimitReached({
       ntfyUrl: "https://example.invalid",
       ntfyTopic: "t",
@@ -153,6 +159,7 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
     });
     expect(global.fetch).not.toHaveBeenCalled();
     expect(fehlerZeilen.join(" ")).toContain("kein Einstellungssatz");
+    setFetchForTest(null);
   });
 
   /* ── Die Drossel ──────────────────────────────────────────────────────
@@ -178,6 +185,38 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
     );
     expect(hoechstens).toBeLessThanOrEqual(6);
     expect(getMistralStats()).toBeDefined();
+  });
+
+  /* ── Die globale Kostenbremse ─────────────────────────────────────────
+     BEFUND 01.09.2026 (Runde 7): Diese Datei beansprucht im Kopf, "der Reihe
+     nach JEDEN Weg" zu pruefen — `checkAndIncrement` fehlte. Genau dort lief
+     die Bremse ohne Satz in einen Zugriffsfehler auf `null` und fiel
+     fail-open auf "erlaubt", mit einer Meldung, die nur "Fehler" sagte statt
+     "kein Satz". Der fehlende Testfall WAR die Wurzel des Befunds. */
+  test("Die Kostenbremse benennt den Zustand, statt ihn als Fehler zu tarnen", async () => {
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const { checkAndIncrement } = require("../counter");
+    const e = await checkAndIncrement();
+    /* Erst auslesen, dann zuruecksetzen: mockRestore() loescht die
+       aufgezeichneten Aufrufe. */
+    const gemeldet = fehlerSpy.mock.calls.map((c) => String(c[0])).join(" ");
+    fehlerSpy.mockRestore();
+
+    /* Sie laesst durch — ohne Satz laeuft ohnehin keine Analyse, und ein
+       geschlossenes Tor waere hier keine Sicherheit, sondern ein zweiter
+       Ausfall. Aber sie sagt WARUM. */
+    /* BEFUND 01.09.2026 (Mutationsprobe): Genau diese Zusicherung fehlte —
+       geprueft wurden Grund und Limit, nicht die ENTSCHEIDUNG. `allowed: true`
+       liess sich zu `false` aendern, ohne dass ein Test rot wurde. Damit war
+       die bewusste Abwaegung (durchlassen statt sperren, weil ohne Satz
+       ohnehin keine Analyse laeuft) von nichts festgehalten — sie haette
+       jederzeit unbemerkt kippen koennen, und der Einlass waere doppelt
+       gesperrt gewesen. */
+    expect(e.allowed).toBe(true);
+    expect(e.grund).toBe("kein-einstellungssatz");
+    expect(e.limit).toBeNull();
+    expect(gemeldet).toMatch(/kein-einstellungssatz/);
+    expect(gemeldet).toMatch(/ERROR/);
   });
 
   /* ── Der Analyse-Pfad selbst ──────────────────────────────────────────

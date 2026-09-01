@@ -379,6 +379,9 @@ describe("Riegel 12: Aus dem Testbetrieb geht nichts nach draußen", () => {
        merken. Ein Riegel, der immer schließt, ist genauso schlimm wie keiner. */
     jest.spyOn(console, "log").mockImplementation(() => {});
     global.fetch = jest.fn(async () => ({ ok: true, status: 200 }));
+    /* Ausdrueckliche Hinterlegung: Diese Pruefung will belegen, dass der
+       Versandweg im Betrieb offen ist (Runde 4, E-3). */
+    notify.setFetchForTest((...args) => global.fetch(...args));
     await notify.notifyLimitReached({
       ntfyUrl: "https://beispiel.invalid",
       ntfyTopic: "t",
@@ -387,5 +390,6 @@ describe("Riegel 12: Aus dem Testbetrieb geht nichts nach draußen", () => {
       limit: 500,
     });
     expect(global.fetch).toHaveBeenCalled();
+    notify.setFetchForTest(null);
   });
 });

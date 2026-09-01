@@ -25,8 +25,18 @@ const SKRIPT = path.join(WURZEL, "scripts/vor-dem-push.sh");
    eine Ausnahme, die man nicht liest, ist ein Loch. */
 const BEWUSST_DRAUSSEN = {
   "npm ci": "Installation, keine Prüfung",
+  "npm ci --prefix functions": "Installation, keine Prüfung",
   "npm test": "Backend-Suite, läuft lokal so lang wie in der Pipeline (~2,5 min)",
   "npm run test:e2e": "E2E-Suite, dito (~3,5 min) — beides deckt scripts/pruefstand.sh ab",
+  /* Die Mutationsprobe setzt je geaenderter Zeile eine Aenderung und laesst
+     dafuer Tests laufen. Gemessen am 01.09.2026: Sekunden bei Modulen am
+     Rand, ueber anderthalb Minuten je Mutation bei zentralen Dateien, an
+     denen 18 Testdateien haengen. In der Pipeline laeuft sie neben den langen
+     Suiten; vor dem Push wuerde sie aus 13 Sekunden Minuten machen — und eine
+     Vorabpruefung, die Minuten braucht, wird umgangen. */
+  "node scripts/pruefe-mutationen.mjs --zeitgrenze=3":
+    "Mutationsprobe, Minuten statt Sekunden — laeuft im Job test-backend, " +
+    "weil sie dort installierte Pakete vorfindet",
 };
 
 /** Alle `- run:`-Schritte der drei billigen Jobs aus der Workflow-Datei. */
@@ -103,9 +113,59 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
     const skript = fs.readFileSync(SKRIPT, "utf8");
     const aufrufe = [...skript.matchAll(/^lauf "([^"]+)" "([^"]+)"/gm)];
     expect(aufrufe.length).toBeGreaterThan(8);
+    /* BEFUND 31.08.2026 (Runde 3): Hier stand eine feste Liste mit drei
+       Job-Namen. Als `secret-scan` ergaenzt wurde — ein echter Pflicht-Check —
+       wurde der Test rot, obwohl die Ergaenzung richtig war. Eine Kopie der
+       Pipeline-Namen im Test veraltet zwangslaeufig. Jetzt kommen sie aus der
+       Pipeline-Datei selbst. */
+    const ci = fs.readFileSync(path.join(__dirname, "..", "..", "..", ".github", "workflows", "ci.yml"), "utf8");
+    const ciJobs = [...ci.matchAll(/^ {2}([a-z0-9-]+):$/gm)].map(([, name]) => name);
+    expect(ciJobs.length).toBeGreaterThan(3);
     const unbekannt = aufrufe
-      .filter(([, , job]) => !["test-frontend", "test-backend", "pruefungen"].includes(job))
+      .filter(([, , job]) => !ciJobs.includes(job))
       .map(([, beschreibung, job]) => `${beschreibung} → "${job}"`);
     expect(unbekannt).toEqual([]);
+  });
+
+  /* BEFUND 01.09.2026 (Pruefrunde 8, M-P2-4): Der Test darueber prueft nur
+     EINE Richtung — dass jeder Schritt aus ci.yml auch im Skript steht.
+     Entfernt jemand einen Schritt AUS ci.yml, ist die Bedingung trivial
+     erfuellt, und nichts wird rot. Gemessen: `audit-gate.mjs`, `test-blind.py`
+     und `format:check` liessen sich einzeln entfernen, die ganze Kette blieb
+     gruen ("Alles gruen in 13 s", 27 ok-Schritte).
+
+     Die Gegenrichtung schliesst das: Was das lokale Skript prueft, muss auch
+     in der Pipeline laufen. Sonst prueft man vor dem Push etwas, das die
+     Auslieferung gar nicht mehr verlangt. */
+  test("jeder Schritt des Skripts steht auch in der Pipeline", () => {
+    const yml = fs.readFileSync(WORKFLOW, "utf8");
+    const skript = fs.readFileSync(SKRIPT, "utf8");
+
+    /* Die `lauf`-Zeilen des Skripts nennen den Befehl ab dem dritten Feld. */
+    const werkzeuge = new Set();
+    for (const zeile of skript.split("\n")) {
+      const m = zeile.match(/^lauf\s+"[^"]*"\s+"[^"]*"\s+(.+)$/);
+      if (!m) continue;
+      const name = m[1].match(/[\w./-]+\.(mjs|py|sh)|lint:frontend|format:check/);
+      if (name) werkzeuge.add(name[0].replace(/^.*\//, ""));
+    }
+    expect(werkzeuge.size).toBeGreaterThan(8);
+
+    /* Was lokal anders heisst als in der Pipeline, aber dasselbe prueft.
+       Jeder Eintrag braucht den Beleg, WO die Pipeline es abdeckt. */
+    const ANDERS_BENANNT = {
+      "secret-scan-lokal.sh":
+        "Die Pipeline hat dafuer den eigenen Job `secret-scan` mit der " +
+        "gitleaks-Action (ci.yml:123-131) — ein Pflicht-Check. Lokal laeuft " +
+        "die schnelle Variante ueber dasselbe Werkzeug.",
+    };
+    const fehlend = [...werkzeuge].filter((w) => !ANDERS_BENANNT[w]).filter((w) => !yml.includes(w));
+    expect({
+      hinweis: "diese Pruefungen laufen lokal, aber NICHT in der Pipeline",
+      fehlend,
+    }).toEqual({
+      hinweis: "diese Pruefungen laufen lokal, aber NICHT in der Pipeline",
+      fehlend: [],
+    });
   });
 });

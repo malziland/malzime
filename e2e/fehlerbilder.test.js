@@ -45,6 +45,18 @@ const FEHLERBILDER = [
     sichtbar: "#status",
   },
   {
+    name: "Betriebseinstellungen fehlen",
+    antwort: { status: 503, body: { blocked: "configMissing" } },
+    sichtbar: "#status",
+    /* BEFUND 01.09.2026 (Pruefrunde 8, N-P2-2): Dieser Fall fiel in den
+       else-Zweig und zeigte "Die KI ist gerade ueberlastet — bitte 2-3 Minuten
+       warten". Die KI war nicht ueberlastet, und Warten half nicht. Der
+       richtige Text existierte und wurde am Einlass nie erreicht. Eine Klasse,
+       die drei Minuten wartet und es dann erneut versucht, verliert die
+       Workshop-Zeit zweimal. */
+    erwarteterText: { de: /liegt nicht an dir/i, en: /not your fault/i },
+  },
+  {
     name: "Wartungsmodus",
     antwort: { status: 503, body: { maintenance: true, message: "Kurze Wartung, gleich wieder da." } },
     sichtbar: ".maintenance-modal, #maintenanceModal, [role='dialog']",

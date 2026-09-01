@@ -20,6 +20,7 @@ WURZEL=$(cd "$(dirname "$0")/.." && pwd)
 cd "$WURZEL" || exit 2
 
 FEHLER=0
+UNGEMESSEN=0
 LISTE=""
 
 # Fuehrt einen Schritt aus und merkt sich den Rueckgabewert.
@@ -32,6 +33,15 @@ lauf() {
   RC=$?
   if [ "$RC" -eq 0 ]; then
     printf '  ok    %s\n' "$BESCHREIBUNG"
+  elif [ "$RC" -eq 2 ]; then
+    # OPS-2026-08-31-12: Rueckgabewert 2 heisst ueberall in diesem Projekt
+    # "nicht messbar" — die Pruefung konnte nicht stattfinden. Das ist weder
+    # gruen (nichts wurde belegt) noch rot (nichts ist kaputt). Vorher fiel
+    # dieser Fall unter "sonst" und haette jeden Push blockiert; davor meldete
+    # die Selbstpruefung sogar 0 und log damit ein "ok".
+    printf '  ?     %s   (NICHT MESSBAR — kein Beleg)\n' "$BESCHREIBUNG"
+    printf '%s\n' "$AUSGABE" | sed 's/^/        /' | tail -8
+    UNGEMESSEN=$((UNGEMESSEN + 1))
   else
     printf '  ROT   %s   (Pipeline-Job: %s)\n' "$BESCHREIBUNG" "$CI_JOB"
     printf '%s\n' "$AUSGABE" | sed 's/^/        /' | tail -20
@@ -60,11 +70,56 @@ lauf "Pruefungen: Selbstpruefung" "pruefungen" sh scripts/pruefungen/selbstpruef
 lauf "Pruefungen: Aussentext-Sperrliste" "pruefungen" python3 scripts/pruefungen/checks/aussentext.py .
 lauf "Pruefungen: Fakten-Drift" "pruefungen" python3 scripts/pruefungen/checks/fakten-drift.py .
 lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
+# BEFUND 01.09.2026 (Runde 7, K-8): Der Aufruf oben ueberspringt Verzeichnisse,
+# die mit einem Punkt beginnen — und ALLE fuenf yml-Dateien dieses Projekts
+# liegen unter .github/. Der Waechter fuer verschluckte Fehler sah also
+# ausgerechnet die Auslieferungskette nie. Das Werkzeug ist vendoriert und wird
+# hier nicht bearbeitet; stattdessen wird es zusaetzlich dorthin gerichtet.
+lauf "Pruefungen: Stiller Fehlschlag (.github)" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .github
 lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/pruefungen/checks/test-blind.py .
 lauf "Pruefungen: Sichtbare Texte" "pruefungen" python3 scripts/pruefe-i18n-fallbacks.py
 lauf "Pruefungen: Tote Geduld" "pruefungen" python3 scripts/pruefe-tote-geduld.py
 lauf "Pruefungen: Doppelte Betriebswerte" "pruefungen" python3 scripts/pruefe-doppelte-werte.py
+lauf "Pruefungen: Mitzieher" "pruefungen" python3 scripts/pruefe-mitzieher.py
+lauf "Pruefungen: Kopplung" "pruefungen" python3 scripts/pruefe-kopplung.py
+lauf "Pruefungen: Deploy-Riegel" "pruefungen" python3 scripts/pruefe-deploy-riegel.py
+lauf "Pruefungen: Waechter-Selbstpruefung" "pruefungen" bash scripts/selbstpruefung-waechter.sh
+# BEFUND 31.08.2026 (Runde 2, P1): Die Projektkonvention verlangt
+# `npm ci --dry-run` in Root UND functions/ — umgesetzt war sie nirgends.
+# Deshalb konnten zerstoerte Paketnamen ("eslint --max-warnings=0" als
+# Abhaengigkeit) durch diese Vorabpruefung gehen: 22 Schritte gruen, waehrend
+# `npm ci` in beiden Baeumen abbrach. npm ci ist der ERSTE Schritt von
+# test-backend, test-frontend und test-e2e — drei der sechs Pflicht-Checks.
+lauf "Lockfile: npm ci (Wurzel)" "test-frontend" npm ci --dry-run
+lauf "Lockfile: npm ci (functions)" "test-backend" npm ci --dry-run --prefix functions
+# BEFUND 31.08.2026 (Runde 3): `secret-scan` ist ein Pflicht-Check und laeuft
+# in Sekunden — hier fehlte er, ohne dass der Kopf ihn als bewusste Auslassung
+# nannte. Ohne gitleaks im PATH gilt die Pruefung als nicht messbar (2), nicht
+# als bestanden.
+lauf "Secret-Scan (gitleaks)" "secret-scan" sh scripts/secret-scan-lokal.sh
+# BEFUND 01.09.2026 (erster echter Pipeline-Lauf): Zwei von drei roten Jobs
+# gingen auf Aenderungen an ci.yml zurueck — und beide waren hier unsichtbar.
+# Die Tests, die ci.yml gegen dieses Skript pruefen (beide Richtungen), liegen
+# in der BACKEND-Suite, und die faehrt diese Vorabpruefung bewusst nicht.
+#
+# Wer die Pipeline anfasst, bekommt sie jetzt trotzdem: zwei gezielte Dateien,
+# rund zwei Sekunden. Das ist der Unterschied zwischen "lokal gruen" und
+# "wuerde durchgehen".
+if ! git diff --quiet origin/main -- .github/workflows/ 2>/dev/null; then
+  lauf "Pipeline geaendert: die Tests dazu" "test-backend" \
+    npm test --prefix functions --silent -- vor-dem-push-script.test doku-drift
+  # Und die geaenderten Schritte WIRKLICH ausfuehren. Sieben Fehler in fuenf
+  # Pipeline-Laeufen am 01.09.2026 waren alle von dieser Art: Die Datei war
+  # geprueft, die Umgebung angenommen. Hier kostet es Sekunden.
+  lauf "Pipeline geaendert: die Schritte ausfuehren" "pruefungen" \
+    node scripts/pruefe-pipeline-schritte.mjs
+fi
+
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
+# BEFUND 01.09.2026 (Runde 7, L-5): Der Sauberkeits-Riegel im Deploy prueft
+# `git status --porcelain` — der zeigt IGNORIERTE Dateien nicht. Firebase
+# liefert sie trotzdem aus, wenn firebase.json sie nicht ausschliesst.
+lauf "Pruefungen: Auslieferbare Reste" "pruefungen" node scripts/pruefe-auslieferbare-reste.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend
 lauf "Zeitzuender (Frontend)" "test-frontend" sh scripts/pruefe-zeitzuender.sh . --nur frontend
@@ -72,10 +127,26 @@ lauf "Zeitzuender (Frontend)" "test-frontend" sh scripts/pruefe-zeitzuender.sh .
 DAUER=$(($(date +%s) - START))
 echo "-----------------------------------------------------------"
 
-if [ "$FEHLER" -eq 0 ]; then
+if [ "$FEHLER" -eq 0 ] && [ "$UNGEMESSEN" -eq 0 ]; then
   echo "Alles gruen in ${DAUER} s. Die langen Suiten (Backend, E2E) fehlen hier"
   echo "bewusst — vor einem Release faehrt scripts/pruefstand.sh alles ab."
   exit 0
+fi
+
+if [ "$FEHLER" -eq 0 ]; then
+  # OPS-2026-08-31-12: Kein Fehler, aber auch kein vollstaendiger Beleg.
+  # "Alles gruen" waere hier eine Luege ueber etwas, das nie gemessen wurde.
+  printf 'GRUEN, ABER UNVOLLSTAENDIG: %s Pruefung(en) konnten nicht messen.\n' "$UNGEMESSEN"
+  echo ""
+  echo "Nichts ist kaputt — aber fuer diese Punkte liegt kein Nachweis vor."
+  echo "Meist genuegt: committen oder aufraeumen, dann erneut laufen lassen."
+  # BEFUND 31.08.2026 (Runde 2, neu gefunden): Hier stand `exit 0`. Der
+  # pre-push-Riegel prueft `-ne 0` und liess den Push damit DURCH — waehrend
+  # die Pipeline denselben Waechter direkt aufruft, wo Rueckgabewert 2 den
+  # Pflicht-Check ROT macht. Der Riegel oeffnete sich fuer genau den Fall, fuer
+  # den er neu gebaut worden war. Jetzt gilt: Was die Pipeline anhaelt, haelt
+  # auch hier an — aber mit eigenem Wert, damit die Meldung stimmt.
+  exit 2
 fi
 
 printf 'ROT: %s Pruefung(en) wuerden die Pipeline brechen:%s\n' "$FEHLER" "$LISTE"

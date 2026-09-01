@@ -52,12 +52,87 @@ def ohne_kommentare(inhalt):
     gruen, obwohl der Fix zurueckgedreht war.
 
     Zeilenumbrueche bleiben stehen, damit die gemeldeten Zeilennummern stimmen.
-    """
-    def ersetzen(treffer):
-        return re.sub(r"[^\n]", " ", treffer.group(0))
 
-    ohne_block = re.sub(r"/\*.*?\*/", ersetzen, inhalt, flags=re.S)
-    return re.sub(r"//[^\n]*", ersetzen, ohne_block)
+    BEFUND 01.09.2026 (Selbstpruefung): Die erste Fassung ersetzte Kommentare
+    per Regex — und traf damit auch `//` in Zeichenketten. Ein `page.goto(
+    "http://localhost:8081")` blendete den REST DER ZEILE aus. Gemessen ueber
+    alle E2E-Dateien: 984 Zeilen echten Codes galten als Kommentar. Der
+    Waechter war damit auf einem Fuenftel der Suite blind, und keine seiner
+    Meldungen sagte das.
+
+    Aufgefallen ist es erst, als fuer diesen Waechter eine Sabotage-Probe
+    gebaut wurde: Eine Wartezeit von 99 Sekunden in einem Test mit
+    30-Sekunden-Grenze — er meldete gruen.
+
+    Jetzt wird zeichenweise gelesen, mit Zustand fuer Zeichenketten.
+    """
+    ergebnis = []
+    i = 0
+    laenge = len(inhalt)
+    anfuehrung = None
+    while i < laenge:
+        c = inhalt[i]
+        naechstes = inhalt[i + 1] if i + 1 < laenge else ""
+        if anfuehrung:
+            ergebnis.append(c)
+            if c == "\\" and i + 1 < laenge:
+                ergebnis.append(naechstes)
+                i += 2
+                continue
+            if c == anfuehrung:
+                anfuehrung = None
+            i += 1
+            continue
+        if c in "\"'`":
+            anfuehrung = c
+            ergebnis.append(c)
+            i += 1
+            continue
+        # BEFUND 01.09.2026 (Pruefrunde 8, M-P2-3): Regex-Literale fehlten.
+        # Ein `/["']/` setzte den Zeichenketten-Zustand und liess ihn bis
+        # Dateiende haengen — ab dort war der Waechter wieder blind, genau die
+        # Fehlerform, gegen die der Umbau angetreten war, nur an einer anderen
+        # Zeichenklasse. Ein `/` beginnt ein Regex, wenn davor ein Operator
+        # oder eine oeffnende Klammer steht (nicht nach Wert oder Klammer-zu).
+        if c == "/" and naechstes not in ("/", "*"):
+            vorher = "".join(ergebnis).rstrip()
+            letztes = vorher[-1] if vorher else "("
+            if letztes in "(,=:[!&|?{};+-*%<>~^" or vorher.endswith(("return", "typeof", "case")):
+                ende = i + 1
+                in_klasse = False
+                while ende < laenge:
+                    z = inhalt[ende]
+                    if z == "\\":
+                        ende += 2
+                        continue
+                    if z == "[":
+                        in_klasse = True
+                    elif z == "]":
+                        in_klasse = False
+                    elif z == "/" and not in_klasse:
+                        ende += 1
+                        break
+                    elif z == "\n":
+                        break  # unbalanciert: kein Regex
+                    ende += 1
+                ergebnis.append(inhalt[i:ende])
+                i = ende
+                continue
+        if c == "/" and naechstes == "/":
+            while i < laenge and inhalt[i] != "\n":
+                ergebnis.append(" ")
+                i += 1
+            continue
+        if c == "/" and naechstes == "*":
+            ende = inhalt.find("*/", i + 2)
+            ende = laenge if ende == -1 else ende + 2
+            for zeichen in inhalt[i:ende]:
+                ergebnis.append("\n" if zeichen == "\n" else " ")
+            i = ende
+            continue
+        ergebnis.append(c)
+        i += 1
+    return "".join(ergebnis)
 
 
 def bloecke(inhalt):
@@ -124,7 +199,13 @@ def main():
             else:
                 erlaubt = grenze
 
-            for m in re.finditer(r"timeout:\s*(\d+)", block):
+            # BEFUND 01.09.2026 (Selbstpruefung): Bis hier wurde NUR nach der
+            # Option `timeout: <zahl>` gesucht. Eine feste Wartezeit
+            # `waitForTimeout(99000)` in einem Test mit 30-s-Grenze macht den
+            # Test genauso tot — der Waechter sah sie nicht. Aufgefallen ist es
+            # erst, als eine Sabotage-Probe fuer diesen Waechter gebaut wurde:
+            # Er meldete gruen, obwohl eine 99-Sekunden-Wartezeit im Test stand.
+            for m in re.finditer(r"(?:timeout:\s*|waitForTimeout\s*\(\s*)(\d+)", block):
                 wert = int(m.group(1))
                 if wert <= erlaubt:
                     continue

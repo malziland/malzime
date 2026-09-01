@@ -130,6 +130,30 @@ async function checkAndIncrement() {
   /* Einstellungssatz EINMAL vor der Transaktionsschleife holen — innerhalb
      einer Firestore-Transaktion darf kein weiterer Lesevorgang laufen. */
   const { werte: satzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
+  /* BEFUND 01.09.2026 (Runde 7, K-4): Ohne Einstellungssatz lief diese
+     Funktion in einen Zugriffsfehler auf `null` — gefangen vom aeusseren
+     catch, das fail-open auf `allowed: true` faellt. Die globale Kostenbremse
+     war damit aus, und die Meldung dazu sagte nur "Fehler", nicht "kein Satz".
+     Elf Zeilen weiter stand bereits `satzwerte?.stundenlimit` mit Fragezeichen
+     — der Unterschied war ein Versehen, keine Entscheidung.
+     Real ist die Lage entschaerft: Ohne Satz bricht handle-enqueue schon mit
+     503 ab, und der Worker liefert `config_missing`; es entstehen also keine
+     KI-Kosten, die zu bremsen waeren. Trotzdem gehoert der Zustand benannt,
+     statt als unklarer Fehler durchzurutschen. */
+  if (!satzwerte) {
+    console.error(
+      JSON.stringify({
+        severity: "ERROR",
+        step: "counter",
+        grund: "kein-einstellungssatz",
+        hinweis:
+          "Die globale Kostenbremse kann ohne Einstellungssatz nicht rechnen. " +
+          "Ohne ihn laeuft ohnehin keine Analyse — aber wer hier landet, hat ein " +
+          "Konfigurationsproblem, kein Kostenproblem.",
+      })
+    );
+    return { allowed: true, count: 0, limit: null, grund: "kein-einstellungssatz" };
+  }
   for (let attempt = 0; attempt <= ABORTED_RETRIES; attempt++) {
     try {
       const db = datenbank();

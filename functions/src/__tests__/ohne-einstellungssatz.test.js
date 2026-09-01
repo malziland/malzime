@@ -180,6 +180,30 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
     expect(getMistralStats()).toBeDefined();
   });
 
+  /* ── Die globale Kostenbremse ─────────────────────────────────────────
+     BEFUND 01.09.2026 (Runde 7): Diese Datei beansprucht im Kopf, "der Reihe
+     nach JEDEN Weg" zu pruefen — `checkAndIncrement` fehlte. Genau dort lief
+     die Bremse ohne Satz in einen Zugriffsfehler auf `null` und fiel
+     fail-open auf "erlaubt", mit einer Meldung, die nur "Fehler" sagte statt
+     "kein Satz". Der fehlende Testfall WAR die Wurzel des Befunds. */
+  test("Die Kostenbremse benennt den Zustand, statt ihn als Fehler zu tarnen", async () => {
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const { checkAndIncrement } = require("../counter");
+    const e = await checkAndIncrement();
+    /* Erst auslesen, dann zuruecksetzen: mockRestore() loescht die
+       aufgezeichneten Aufrufe. */
+    const gemeldet = fehlerSpy.mock.calls.map((c) => String(c[0])).join(" ");
+    fehlerSpy.mockRestore();
+
+    /* Sie laesst durch — ohne Satz laeuft ohnehin keine Analyse, und ein
+       geschlossenes Tor waere hier keine Sicherheit, sondern ein zweiter
+       Ausfall. Aber sie sagt WARUM. */
+    expect(e.grund).toBe("kein-einstellungssatz");
+    expect(e.limit).toBeNull();
+    expect(gemeldet).toMatch(/kein-einstellungssatz/);
+    expect(gemeldet).toMatch(/ERROR/);
+  });
+
   /* ── Der Analyse-Pfad selbst ──────────────────────────────────────────
      Das Kernversprechen des Umbaus: keine Analyse ohne gültige Werte. */
   test("Die Analyse startet gar nicht erst", async () => {

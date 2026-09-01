@@ -5,7 +5,13 @@
 /* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
    aber Betriebswerte in der Kette. Was OHNE Satz passiert, prueft
    ohne-einstellungssatz.test.js — an EINER Stelle, fuer alle Wege. */
-jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
+/* geltendeWerte als Jest-Attrappe, damit einzelne Faelle den Satz entziehen
+   koennen — der Standardmock liefert eine normale Funktion. */
+jest.mock("../betriebsprofil", () => {
+  const m = require("../test-satz").betriebsprofilMock();
+  return { ...m, geltendeWerte: jest.fn(m.geltendeWerte) };
+});
+const betriebsprofil = require("../betriebsprofil");
 
 jest.mock("../counter", () => ({
   getMaintenanceStatus: jest.fn(),
@@ -342,6 +348,30 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
     expect(res.body.blocked).toBe("queueFull");
     expect(counter.checkAndIncrement).not.toHaveBeenCalled();
     expect(storage.storeImage).not.toHaveBeenCalled();
+  });
+
+  /* BEFUND 01.09.2026 (Runde 7, K-6): Der 503-Riegel fuer "kein
+     Einstellungssatz" stand hinter `countQueuedJobs()` im selben try-Block.
+     Wirft die Zaehlung — Zeitgrenze, Firestore-Stoerung —, wurde er
+     uebersprungen: HTTP 200, Auftrag angelegt, Bild gespeichert. Und das fuer
+     einen Auftrag, den ohne Satz niemand analysieren kann. Ein Foto, das nie
+     analysiert wird, soll nie auf unserem Speicher liegen. */
+  test("ohne Einstellungssatz haelt der Riegel auch dann, wenn die Zaehlung wirft", async () => {
+    jest.spyOn(console, "log").mockImplementation(() => {});
+    betriebsprofil.geltendeWerte.mockResolvedValue({ werte: null, grund: "kein Satz" });
+    jobs.countQueuedJobs.mockRejectedValue(new Error("DEADLINE_EXCEEDED"));
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    console.log.mockRestore();
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body.blocked).toBe("configMissing");
+    /* Kein Bild, kein Auftrag — nichts, was hinterher aufzuraeumen waere. */
+    expect(storage.storeImage).not.toHaveBeenCalled();
+    expect(jobs.createJob).not.toHaveBeenCalled();
+    betriebsprofil.geltendeWerte.mockReset();
+    const { betriebsprofilMock } = require("../test-satz");
+    betriebsprofil.geltendeWerte.mockImplementation(betriebsprofilMock().geltendeWerte);
   });
 
   test("knapp unter der Grenze geht durch (Positivkontrolle)", async () => {

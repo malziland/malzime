@@ -20,6 +20,14 @@ eine Einstellung ändert und nichts passiert.
 **Ohne gültigen Satz läuft keine Analyse.** Das ist Absicht: Ein
 Konfigurationsfehler soll auffallen, nicht monatelang unbemerkt bleiben.
 
+**Die Datenbank ist die Wahrheit, `functions/src/produktiv-satz.js` die Kopie,
+aus der das Anlege-Skript schreibt.** Vor jedem Deploy vergleicht
+`verify-infrastructure.sh` beide feldweise (`scripts/betriebsprofil-vergleichen.js`);
+eine Abweichung stoppt die Auslieferung. Grund: Am 30.08.2026 wurde das Repo
+geändert und die Datenbank danach mit einem älteren Stand beschrieben — zwei
+Tage lang wichen acht Felder ab, sieben davon in den Ersatz-Profilen, ohne
+Signal (OPS-2026-09-01-02).
+
 ---
 
 ## Das Dokument

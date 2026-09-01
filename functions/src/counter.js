@@ -39,52 +39,74 @@ function calcRetrySeconds(recent, limit, now, windowMs) {
  */
 
 /* ══════════════════════════════════════════════════════════════════════
-   DAS NETZ UNTER DER KOSTENBREMSE (30.08.2026)
+   DAS NETZ UNTER DER KOSTENBREMSE (30.08.2026, umgebaut 01.09.2026)
    ══════════════════════════════════════════════════════════════════════
 
-   DAS PROBLEM: Der Stundenzaehler schreibt alle Zeitstempel in EIN Dokument
-   (stats/current). Ein einzelnes Firestore-Dokument vertraegt etwa einen
-   Schreibvorgang pro Sekunde. Bei Andrang stehen alle Anfragen Schlange, die
-   Transaktion bricht mit ABORTED ab — und der Zaehler faellt fail-open aus.
+   Warum es das Netz gibt, steht in checkAndIncrement (der Zaehler klemmt bei
+   Andrang an EINEM Dokument) und in docs/SECURITY-MODEL.md.
 
-   GEMESSEN im Simulator: bei 170 gleichzeitigen Anfragen 206 Ausfaelle.
+   BIZ-2026-09-01-01 (Audit vom 01.09.): Die erste Fassung zaehlte die
+   AUFTRAEGE der letzten Stunde per Aggregat-Abfrage — und uebersah, dass der
+   Aufraeumer zugestellte Auftraege 15 Minuten nach der Zustellung loescht
+   (PRIV-107b). Unter Andrang sah das Netz nur ein Viertel der Stunde und
+   erreichte das Limit nie; dazu rechnete es mit dem Grundlimit statt mit
+   einem laufenden Boost. Ein Ersatzweg, der eine andere Menge und eine andere
+   Grenze misst als der Hauptweg, ist keiner.
 
-   Das ist die schlechteste denkbare Eigenschaft fuer eine Kostenbremse: Sie
-   haelt im Ruhezustand und versagt genau dann, wenn viel Geld ausgegeben wird.
-   Der Nutzer dazu: "Eine Kostenbremse ist dazu da, damit ich mich darauf
-   verlassen kann. Ich mag nicht auf einmal horrende Kosten haben."
+   DIESES NETZ MISST DASSELBE WIE DER ZAEHLER: derselbe Stand (stats/current)
+   mit einem einfachen Lesezugriff AUSSERHALB der Transaktion — eine
+   Schreibsperre haelt Leser nicht auf —, dasselbe Fenster (filterRecent),
+   dasselbe wirksame Limit inklusive Boost (wirksamesLimit). Es schreibt
+   nichts und scheitert deshalb nicht an derselben Ursache.
 
-   DIESES NETZ KANN NICHT AUSFALLEN, weil es nichts schreibt. Es zaehlt die
-   Auftraege der letzten Stunde mit einer Aggregat-Abfrage — dieselbe Technik,
-   die auch die Warteschlangen-Position bestimmt. Aggregate kennen keine
-   Sperren und keine Kontention.
-
-   Es greift NUR, wenn der eigentliche Zaehler ausgefallen ist. Im Normalfall
-   kostet es nichts.
-
-   GRENZE DER AUSSAGE: Gezaehlt werden Auftraege in der Warteschlange. Eine
-   Analyse ohne Auftrag (der alte synchrone Pfad) taucht hier nicht auf. Im
-   Queue-Betrieb — und der ist seit v2.0 der einzige — entspricht ein Auftrag
-   genau einer Analyse.
+   GRENZE: Der eigene Zeitstempel fehlt im gelesenen Stand, wenn die
+   Transaktion nach dem Zeitlimit nicht mehr schrieb — Untererfassung eins
+   je Netz-Fall, kumulativ ueber eine Andrangswelle (docs/SECURITY-MODEL.md,
+   Restrisiko). Und weil nichts geschrieben wird, saehe jeder Aufruf
+   denselben Stand: "Limit erreicht" (justReached, daran haengt die
+   Push-Nachricht mit dem Boost-Knopf) geht je Instanz hoechstens einmal je
+   NETZ_MELDEABSTAND_MS hinaus. Greift NUR, wenn der Zaehler ausgefallen ist.
    ══════════════════════════════════════════════════════════════════════ */
-async function notbremseUeberJobs(fensterMs, limit) {
+/* BLEIBT IM CODE — Auswertungsregel der Meldung, keine Betriebsgroesse: Wie
+   oft eine Instanz im Netz-Fall "Limit erreicht" meldet. Aendert nichts an der
+   Bremse, nur an der Zahl der Nachrichten. */
+const NETZ_MELDEABSTAND_MS = 5 * 60 * 1000;
+let netzZuletztGemeldet = 0;
+
+async function netzUeberZeitstempel(satzwerte) {
   try {
-    const seit = Date.now() - fensterMs;
-    const agg = await datenbank().collection("jobs").where("createdAt", ">=", seit).count().get();
-    const inDerStunde = agg.data().count;
-    if (inDerStunde >= limit) {
+    const snap = await datenbank().doc(CURRENT_DOC).get();
+    const data = snap.exists ? snap.data() : {};
+    const windowMs = satzwerte.stundenfensterMinuten * 60 * 1000;
+    const now = Date.now();
+    const recent = filterRecent(data.recentAnalyses, now, windowMs);
+    const { limit } = wirksamesLimit(data, recent.length, satzwerte.stundenlimit);
+    if (recent.length >= limit) {
       console.error(
         JSON.stringify({
           severity: "ERROR",
           alert: "notbremse-gegriffen",
           message: "Der Stundenzaehler ist ausgefallen — die Notbremse hat uebernommen und blockiert.",
-          inDerStunde,
+          imFenster: recent.length,
           limit,
         })
       );
-      return { allowed: false, count: inDerStunde, limit, retryAfterSeconds: 300, notbremse: true };
+      return {
+        allowed: false,
+        count: recent.length,
+        limit,
+        retryAfterSeconds: calcRetrySeconds(recent, limit, now, windowMs),
+        notbremse: true,
+      };
     }
-    return { allowed: true, count: inDerStunde, limit, retryAfterSeconds: 0, notbremse: true };
+    /* Mit diesem Auftrag waere das Limit voll: dieselbe Bedingung wie
+       `justReached` im Zaehler-Pfad, nur ohne Schreibvorgang — darum die Frist. */
+    let justReached = false;
+    if (recent.length + 1 === limit && now - netzZuletztGemeldet >= NETZ_MELDEABSTAND_MS) {
+      netzZuletztGemeldet = now;
+      justReached = true;
+    }
+    return { allowed: true, count: recent.length, limit, retryAfterSeconds: 0, notbremse: true, justReached };
   } catch (fehler) {
     /* Auch das Netz kann reissen — dann bleibt nur fail-open, aber laut. */
     console.error(
@@ -99,31 +121,18 @@ async function notbremseUeberJobs(fensterMs, limit) {
   }
 }
 
+/* Nur fuer Tests: die Meldefrist des Netzes zuruecksetzen. */
+function _netzMeldungZuruecksetzen() {
+  netzZuletztGemeldet = 0;
+}
+
 async function checkAndIncrement() {
-  /* v1.10.6: Eigene Retry-Schleife OBEN auf das Firestore-SDK-Retry (default 5).
-     Hintergrund: Bei hoher Last (>=20 parallele Anfragen) kollidieren mehrere
-     Transactions am selben Counter-Dokument → Firestore wirft ABORTED. Das
-     SDK retried intern bis zu 5×, aber unter Workshop-Burst reicht das manchmal
-     nicht. Unsere Schleife versucht bei ABORTED noch 2× mit Backoff+Jitter,
-     bevor wir fail-open + ERROR eskalieren. Andere Firestore-Fehler (Netz,
-     Permission, etc.) gehen sofort in den ERROR-Pfad. */
-  /* MEHR VERSUCHE, GROESSERE ABSTAENDE (30.08.2026).
-     GEMESSEN im Simulator: Bei 170 gleichzeitigen Anfragen fiel die
-     Kostenbremse 206 Mal aus — jedes Mal, weil die zwei Wiederholungen nicht
-     reichten. Ein einzelnes Firestore-Dokument vertraegt etwa einen
-     Schreibvorgang pro Sekunde; bei Andrang stehen alle Anfragen an
-     stats/current Schlange.
-
-     ZWEI VERSUCHE, NICHT MEHR. Kurzzeitig standen hier fuenf mit Abstaenden
-     bis 2,5 Sekunden — in der Hoffnung, den Ausfall so zu vermeiden. Das war
-     die falsche Antwort: Der Einlass wurde dadurch unter Andrang so langsam,
-     dass ein Simulatorlauf ueber zehn Minuten brauchte. Jede Anfrage wartete
-     bis zu 4,5 Sekunden auf einen Zaehler, der ohnehin nicht durchkommt.
-
-     Die richtige Antwort steht darunter: das NETZ (notbremseUeberJobs). Es
-     zaehlt statt zu schreiben, kann deshalb nicht an derselben Ursache
-     scheitern — und braucht kein Warten. Zwei kurze Versuche fangen die
-     zufaellige Kollision ab; alles darueber uebernimmt das Netz sofort. */
+  /* Bei Andrang kollidieren Transaktionen am selben Dokument (ABORTED; das
+     SDK wiederholt intern bis zu 5x). Darueber ZWEI eigene kurze Versuche —
+     nicht mehr: Fuenf Versuche mit langen Abstaenden machten den Einlass am
+     30.08.2026 unter Andrang so langsam, dass Verbindungen rissen (Messwerte
+     in docs/SECURITY-MODEL.md). Alles darueber uebernimmt sofort das Netz
+     (netzUeberZeitstempel, oben), das denselben Stand ohne Sperre liest. */
   const ZAEHLER_ZEITLIMIT_MS = 2000;
   const ABORTED_RETRIES = 2;
   let lastErr = null;
@@ -159,15 +168,10 @@ async function checkAndIncrement() {
       const db = datenbank();
       const ref = db.doc(CURRENT_DOC);
 
-      /* EIGENES ZEITLIMIT UM DIE TRANSAKTION (30.08.2026).
-         GEMESSEN: Ohne das hingen 75 % der Anfragen 54 Sekunden. Nicht wegen
-         der eigenen Wiederholungen (die warten 240 ms), sondern weil Firestore
-         selbst sehr lange auf die Dokumentsperre wartet, bevor es aufgibt.
-         Bei 170 gleichzeitigen Anfragen auf EIN Dokument steht alles.
-
-         Zwei Sekunden sind grosszuegig fuer eine Transaktion auf einem kleinen
-         Dokument und kurz genug, dass niemand es merkt. Danach uebernimmt das
-         Netz — es zaehlt nur und antwortet sofort. */
+      /* EIGENES ZEITLIMIT UM DIE TRANSAKTION (30.08.2026): Ohne das hingen
+         75 % der Anfragen 54 Sekunden, weil Firestore selbst lange auf die
+         Dokumentsperre wartet. Zwei Sekunden reichen fuer ein kleines
+         Dokument; danach uebernimmt das Netz. */
       const result = await Promise.race([
         db.runTransaction(async (tx) => {
           const snap = await tx.get(ref);
@@ -266,44 +270,26 @@ async function checkAndIncrement() {
         await new Promise((r) => setTimeout(r, backoff));
         continue;
       }
-      /* Fail-open: Lieber ein paar Analysen zu viel als alle User blockieren.
-         REL-02: Der Stundenzaehler ist die einzige globale Kostenbremse fuer
-         Mistral-Calls. Faellt er aus, ist diese Bremse weg — darum als ERROR
-         (statt nur log) mit eindeutigem alert-Marker eskalieren, damit ein
-         Log-basierter Alert in Cloud Logging anschlagen kann.
-         v1.10.6: Routinemaessige ABORTED-Kontention wird VORHER 2× geretried
-         und triggert hier nur den ERROR-Pfad, wenn auch das nicht reicht. */
       let reason = "firestore-error";
       if (err.zeitlimit) reason = "zeitlimit-kein-retry";
       else if (isAborted) reason = "aborted-retries-exhausted";
 
-      /* ZUERST DAS NETZ, DANN DIE MELDUNG.
-         Frueher stand hier ein ERROR mit dem Text "globale Kostenbremse
-         momentan inaktiv" — und zwar BEVOR ueberhaupt versucht wurde, sie
-         anderweitig zu halten. Nach dem Einbau des Netzes war dieser Text
-         schlicht falsch: Im Simulator meldete er 169 Mal einen Ausfall,
-         waehrend das Netz jedes Mal korrekt entschieden hatte.
-         169 Fehlalarme pro Workshop haetten die echte Meldung unauffindbar
-         gemacht. */
-      /* ZUERST DAS NETZ: Der Zaehler ist ausgefallen, aber die Kostenbremse
-         darf es nicht sein. Das Netz zaehlt statt zu schreiben und kann
-         deshalb nicht an derselben Ursache scheitern. */
+      /* ZUERST DAS NETZ, DANN DIE MELDUNG: Der Zaehler ist ausgefallen, die
+         Kostenbremse darf es nicht sein. Ein ERROR an dieser Stelle meldete
+         frueher 169 Mal je Simulatorlauf einen Ausfall, den das Netz laengst
+         aufgefangen hatte — Fehlalarm, der den Ernstfall unauffindbar macht. */
       if (satzwerte) {
-        const netz = await notbremseUeberJobs(satzwerte.stundenfensterMinuten * 60 * 1000, satzwerte.stundenlimit);
+        const netz = await netzUeberZeitstempel(satzwerte);
         if (netz) {
-          /* Als HINWEIS protokollieren, nicht als Fehler: Die Bremse ist nicht
-             ausgefallen, sie hat nur den zweiten Weg genommen. Ein Alarm waere
-             hier falsch — im Simulator waeren es 169 Meldungen pro Lauf
-             gewesen, und die eine echte ginge darin unter.
-             Die beiden Ernstfaelle meldet notbremseUeberJobs selbst:
-             "notbremse-gegriffen" (blockiert) und "notbremse-fehlgeschlagen"
-             (auch das Netz reisst). */
+          /* HINWEIS, kein Fehler: Die Bremse hat nur den zweiten Weg genommen.
+             Die Ernstfaelle meldet netzUeberZeitstempel selbst
+             ("notbremse-gegriffen", "notbremse-fehlgeschlagen"). */
           console.log(
             JSON.stringify({
               step: "kostenbremse",
               status: "netz-hat-uebernommen",
               grund: reason,
-              inDerStunde: netz.count,
+              imFenster: netz.count,
               limit: netz.limit,
               entscheidung: netz.allowed ? "eingelassen" : "blockiert",
             })
@@ -782,6 +768,7 @@ module.exports = {
   getMaintenanceStatus,
   setMaintenanceMode,
   _clearMaintenanceCache,
+  _netzMeldungZuruecksetzen,
   filterRecent,
   calcRetrySeconds,
   getDateKeys,

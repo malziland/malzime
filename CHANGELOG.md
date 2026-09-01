@@ -4,6 +4,23 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveroeffentlicht]
+
+### Behoben
+
+- **Das Betriebshandbuch beschrieb den Wartungsmodus falsch.** Dort stand ein
+  zweistufiger Weg mit Bestätigungsseite, den es für diesen Schalter nie gab —
+  jeder Versuch wäre mit „verboten" geendet, ohne zu sagen warum. Ausgerechnet
+  der Hebel für die kontrollierte Vollbremsung war damit im Ernstfall nicht
+  bedienbar. Der Text ist berichtigt, und es gibt jetzt ein Werkzeug, das
+  schaltet und danach nachmisst, ob es wirklich angekommen ist.
+
+- **Die Schlussprobe nach der Auslieferung meldete im Wartungsmodus falsch.**
+  Solange die Wartung läuft, antwortet der Einlass auf jede Anfrage gleich —
+  die Probe sah darin eine Abweichung und meldete rot, ohne den wahren Grund zu
+  nennen. Jetzt erkennt sie den Wartungsmodus, sagt „nicht messbar" statt
+  „kaputt" und nennt den Handgriff, der fehlt.
+
 ## [4.6.0] — 2026-09-01
 
 ### Neu

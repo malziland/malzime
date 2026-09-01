@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveroeffentlicht]
+
+### Behoben
+
+- **Der Sprachwechsel auf der Zahlen-Seite erreichte nur die Hälfte.** Wer auf
+  `/stats` von Deutsch auf Englisch umschaltete, bekam eine englische
+  Überschrift, aber deutsche Zahlen: „Ø 26 / Tag", „Verfügbar", „97,6 % frei" —
+  und deutsche Tausenderpunkte. Die englischen Texte gab es die ganze Zeit; sie
+  wurden nur nicht eingesetzt, weil der Umschalter allein fest hinterlegte
+  Texte austauscht und keine, die die Seite selbst berechnet. Beim Neuladen mit
+  englischer Adresse stimmte deshalb alles. Gefunden beim Durchklicken im
+  Browser nach der Auslieferung von 4.6.0.
+
 ## [4.6.0] — 2026-09-01
 
 ### Neu

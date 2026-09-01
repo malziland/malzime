@@ -6,6 +6,16 @@ import { initSprachumschalter, merkmalUebernehmen } from "./sprachumschalter.js"
 /* Projekt-Start: 5. Februar 2026 */
 const PROJECT_START = new Date("2026-02-05");
 
+/* Die zuletzt geholte Antwort. Ein Sprachwechsel zeichnet daraus neu, statt
+   /api/stats noch einmal zu fragen: Die Zahlen sollen dabei dieselben bleiben,
+   und ein Wechsel darf nicht an einer wackligen Leitung scheitern. */
+let letzteDaten = null;
+
+/* Kennung des laufenden Countdowns. Seit die Seite mehrfach gezeichnet wird
+   (Sprachwechsel), muss der alte Takt weg, bevor ein neuer beginnt — sonst
+   zaehlen zwei Intervalle gleichzeitig herunter und die Anzeige springt. */
+let countdownTakt = null;
+
 function fmt(n) {
   return new Intl.NumberFormat(getLanguage()).format(n);
 }
@@ -25,8 +35,8 @@ function calcAverages(allTime) {
   };
 }
 
-async function loadStats() {
-  const el = {
+function elemente() {
+  return {
     liveCount: document.getElementById("liveCount"),
     totalValue: document.getElementById("totalValue"),
     todayValue: document.getElementById("todayValue"),
@@ -42,58 +52,80 @@ async function loadStats() {
     limitCountdown: document.getElementById("limitCountdownStats"),
     statsError: document.getElementById("statsError"),
   };
+}
 
+/**
+ * Setzt eine vorliegende Antwort in die Seite. Getrennt vom Holen, damit ein
+ * Sprachwechsel dieselben Zahlen in der neuen Sprache zeigen kann, ohne die
+ * Schnittstelle erneut zu fragen.
+ */
+function zeichne(data) {
+  const el = elemente();
+
+  /* Zahlen einsetzen — hourlyTotal ist die echte Anzahl (unabhängig von Resets) */
+  el.liveCount.textContent = fmt(data.current.hourlyTotal);
+  el.totalValue.textContent = fmt(data.totals.allTime);
+  el.todayValue.textContent = fmt(data.totals.today);
+  el.weekValue.textContent = fmt(data.totals.week);
+  el.monthValue.textContent = fmt(data.totals.month);
+
+  /* Durchschnitte */
+  const avg = calcAverages(data.totals.allTime);
+  el.avgDay.textContent = t("stats.avgDay", { value: fmt(avg.day) });
+  el.avgWeek.textContent = t("stats.avgWeek", { value: fmt(avg.week) });
+  el.avgMonth.textContent = t("stats.avgMonth", { value: fmt(avg.month) });
+
+  /* Limit-Balken */
+  const pct = Math.min(100, (data.current.count / data.current.limit) * 100);
+  el.limitBar.style.width = pct.toFixed(1) + "%";
+
+  const colorClass =
+    pct < 60 ? "stats-limit__bar-fill--low" : pct < 85 ? "stats-limit__bar-fill--mid" : "stats-limit__bar-fill--high";
+  el.limitBar.className = "stats-limit__bar-fill " + colorClass;
+
+  el.limitLabels.textContent = fmt(data.current.count) + " / " + fmt(data.current.limit);
+  el.limitFree.textContent = t("stats.percentFree", { value: (100 - pct).toFixed(1) });
+
+  /* Limit-Status */
+  if (data.current.limitActive) {
+    el.limitBadge.textContent = t("stats.limitReached");
+    el.limitBadge.className = "stats-limit__badge stats-limit__badge--warn";
+    if (data.current.retryAfterSeconds > 0) {
+      startCountdown(data.current.retryAfterSeconds, el.limitCountdown);
+    }
+  } else {
+    el.limitBadge.textContent = t("stats.available");
+    el.limitBadge.className = "stats-limit__badge stats-limit__badge--ok";
+  }
+}
+
+/**
+ * Holt die Antwort und zeichnet sie. Ein Fehlschlag zeigt die Fehlerzeile;
+ * eine frueher gezeichnete Seite bleibt dabei stehen.
+ */
+async function loadStats() {
   try {
     const res = await fetch("/api/stats");
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
+    letzteDaten = data;
 
     /* v3.3: Merkmals-Schloss des Sprachumschalters — dieselbe Antwort, die
        ohnehin geholt wird. Aus oder unlesbar ⇒ kein Bedienelement. */
     merkmalUebernehmen(data.sprachumschalter === true);
 
-    /* Zahlen einsetzen — hourlyTotal ist die echte Anzahl (unabhängig von Resets) */
-    el.liveCount.textContent = fmt(data.current.hourlyTotal);
-    el.totalValue.textContent = fmt(data.totals.allTime);
-    el.todayValue.textContent = fmt(data.totals.today);
-    el.weekValue.textContent = fmt(data.totals.week);
-    el.monthValue.textContent = fmt(data.totals.month);
-
-    /* Durchschnitte */
-    const avg = calcAverages(data.totals.allTime);
-    el.avgDay.textContent = t("stats.avgDay", { value: fmt(avg.day) });
-    el.avgWeek.textContent = t("stats.avgWeek", { value: fmt(avg.week) });
-    el.avgMonth.textContent = t("stats.avgMonth", { value: fmt(avg.month) });
-
-    /* Limit-Balken */
-    const pct = Math.min(100, (data.current.count / data.current.limit) * 100);
-    el.limitBar.style.width = pct.toFixed(1) + "%";
-
-    const colorClass =
-      pct < 60 ? "stats-limit__bar-fill--low" : pct < 85 ? "stats-limit__bar-fill--mid" : "stats-limit__bar-fill--high";
-    el.limitBar.className = "stats-limit__bar-fill " + colorClass;
-
-    el.limitLabels.textContent = fmt(data.current.count) + " / " + fmt(data.current.limit);
-    el.limitFree.textContent = t("stats.percentFree", { value: (100 - pct).toFixed(1) });
-
-    /* Limit-Status */
-    if (data.current.limitActive) {
-      el.limitBadge.textContent = t("stats.limitReached");
-      el.limitBadge.className = "stats-limit__badge stats-limit__badge--warn";
-      if (data.current.retryAfterSeconds > 0) {
-        startCountdown(data.current.retryAfterSeconds, el.limitCountdown);
-      }
-    } else {
-      el.limitBadge.textContent = t("stats.available");
-      el.limitBadge.className = "stats-limit__badge stats-limit__badge--ok";
-    }
+    zeichne(data);
   } catch (_err) {
-    el.statsError.style.display = "block";
+    elemente().statsError.style.display = "block";
   }
 }
 
 function startCountdown(seconds, el) {
   if (!el) return;
+  /* Ein Sprachwechsel zeichnet die Seite neu und landet wieder hier. Ohne das
+     Abraeumen liefe der alte Takt weiter mit — zwei Intervalle auf demselben
+     Feld, und die Sekunden springen. */
+  if (countdownTakt) clearInterval(countdownTakt);
   el.style.display = "block";
   let remaining = seconds;
 
@@ -111,12 +143,16 @@ function startCountdown(seconds, el) {
     remaining--;
     if (remaining <= 0) {
       clearInterval(iv);
+      /* Nur die eigene Kennung loeschen — ein inzwischen neu gestarteter Takt
+         darf nicht mit abgeraeumt werden. */
+      if (countdownTakt === iv) countdownTakt = null;
       el.textContent = t("stats.countdownDone");
       setTimeout(() => location.reload(), 2000);
       return;
     }
     update();
   }, 1000);
+  countdownTakt = iv;
 }
 
 async function init() {
@@ -124,12 +160,16 @@ async function init() {
   applyTranslations();
 
   /* v3.3: Diese Seite ist übersetzt, also bekommt sie den echten Umschalter.
-     Ohne Neuanalyse-Rückruf — hier steht nichts auf dem Spiel, ein Wechsel
-     zeichnet die Zahlen einfach neu. Gezeigt wird er nach derselben Regel wie
-     auf der Startseite: allein das Merkmals-Schloss aus /api/stats, das oben
-     bereits gelesen wurde. Die beiden Erprobungs-Türen (Adresse und Konsole)
-     sind mit v3.3.1 entfallen. */
-  initSprachumschalter({});
+     Ohne Neuanalyse-Rückruf — hier steht nichts auf dem Spiel. Gezeigt wird er
+     nach derselben Regel wie auf der Startseite: allein das Merkmals-Schloss
+     aus /api/stats, das oben bereits gelesen wurde. Die beiden Erprobungs-
+     Türen (Adresse und Konsole) sind mit v3.3.1 entfallen.
+
+     01.09.2026: Hier stand, ein Wechsel zeichne die Zahlen "einfach neu". Das
+     tat er nicht — `beschriften()` erreicht nur `data-sw-key`-Elemente, und
+     alles, was diese Datei per textContent setzt, blieb deutsch stehen.
+     Seither wird das Neuzeichnen ausdruecklich angemeldet. */
+  initSprachumschalter({ zeichneNeu: () => letzteDaten && zeichne(letzteDaten) });
 
   await loadStats();
 }

@@ -26,6 +26,24 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Auslieferungsverzeichnis liegen und mitausgeliefert würden, ohne dass sie in
   der Versionsverwaltung auftauchen.
 
+- **Eine Auslieferung lässt sich vorher durchspielen.** `PROBELAUF=1` fährt
+  die ganze Kette — alle Riegel, der Trockenlauf gegen Firebase, die
+  Cache-Kennung — und hält vor dem letzten Schritt an. Danach ist der
+  Arbeitsstand unverändert. Damit lässt sich prüfen, ob eine Auslieferung
+  durchgehen *würde*, statt es zu hoffen. Beim ersten Einsatz meldete er in
+  dreißig Sekunden, was im Weg stand.
+
+- **Die geänderten Schritte der Prüfkette werden vor dem Hochladen
+  ausgeführt.** Bisher wurde die Beschreibung der Kette geprüft und ihre
+  Umgebung angenommen — sieben Fehler an einem Tag entstanden genau dort und
+  kosteten fünf Anläufe. Wer die Kette ändert, sieht jetzt in Sekunden, was
+  dort scheitern würde.
+
+- **Eine Übersicht über alle Wächter.** Für jeden steht jetzt an einer Stelle,
+  wovor er schützt, welcher echte Vorfall ihn ausgelöst hat, was er kostet und
+  welche Ausnahmen er kennt — samt der Frage, was diese Schicht *nicht* kann.
+  Ein neuer Wächter ohne Eintrag dort macht die Prüfung rot.
+
 - **Eine Probe misst jetzt, ob die Tests überhaupt etwas merken.** Sie ändert
   den geänderten Code an einzelnen Stellen absichtlich ab — dreht Vergleiche
   um, verschiebt Grenzen — und sieht nach, ob ein Test rot wird. Bleibt alles
@@ -126,6 +144,17 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   keines von beidem. Er war damit der einzige Baustein mit Außenwirkung ohne
   diese Sperre; der Vorfall, der zu den anderen Sperren geführt hat, war
   genauso entstanden.
+
+- **Aus einem Testlauf oder dem lokalen Nachbau geht keine Push-Nachricht mehr
+  hinaus.** Der Benachrichtigungs-Baustein erkannte nur eine von drei
+  Umgebungen; beim Start des lokalen Nachbaus ging die Nachricht wirklich
+  hinaus. Gemessen, nicht vermutet.
+
+- **Der Schutz, der Testläufe von der echten Warteschlange fernhält, ist jetzt
+  selbst abgesichert.** Er entstand nach dem Vorfall vom 30. August — aber man
+  konnte seine Bedingungen umdrehen, ohne dass ein Test rot wurde. Dabei kam
+  heraus, dass dieselbe Prüfung doppelt geführt wurde, obwohl der Kommentar das
+  Gegenteil behauptete.
 
 - **Testläufe können die Produktion nicht mehr anfassen.** Ein Lasttest hatte
   Bilder im echten Speicher abgelegt, wo sie liegen blieben, und die

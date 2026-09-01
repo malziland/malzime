@@ -116,6 +116,11 @@ const NICHT_AUSFUEHREN = [
   [/^npm test\b/, "die volle Suite, laeuft in scripts/pruefstand.sh"],
   [/^npm run test:e2e/, "die E2E-Suite, dito"],
   [/gitleaks/, "eigener Job mit eigener Action"],
+  [
+    /selbstpruefung-waechter\.sh/,
+    "verlangt einen sauberen Arbeitsbaum — vor einem Commit gibt es den nie; " +
+      "sie laeuft ohnehin als eigener Schritt in vor-dem-push.sh",
+  ],
 ];
 
 let fehler = 0;

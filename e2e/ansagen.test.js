@@ -252,11 +252,14 @@ test.describe("Ansage-Protokoll", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await page.click('[data-demo="selfie"]');
-    /* 45 s statt 20: Auf dem Firefox-Laeufer der CI reichten 20 s nicht, der
-     Test wurde dort zeitweise rot, obwohl die Seite in Ordnung ist. Die
-     Zusicherung darunter bleibt unveraendert — verlaengert wird nur die
-     Geduld, nicht die Toleranz. */
-    await page.waitForSelector(".cat-card", { timeout: 45000 });
+    /* 75 s statt 45: Auf dem Firefox-Laeufer der CI reichten erst 20, dann 45
+       Sekunden nicht — am 01.09.2026 zweimal gerissen, waehrend derselbe Test
+       lokal Sekunden braucht. Vier Browser laufen dort parallel um eine
+       Maschine. `test.slow()` gibt dem Test 90 s; 75 s Warten bleiben mit
+       Abstand darunter, was pruefe-tote-geduld.py genau prueft. Verlaengert
+       wird die Geduld, nicht die Toleranz — die Zusicherung unten ist
+       unveraendert. */
+    await page.waitForSelector(".cat-card", { timeout: 75000 });
     await page.evaluate(() => document.getElementById("biasSwitch").click());
     await page.waitForTimeout(1200);
     const zeilen = await baumLesen(page, "Beast an");

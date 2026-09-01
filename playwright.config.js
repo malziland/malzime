@@ -19,6 +19,17 @@ export default defineConfig({
      (siehe e2e/sprachumschalter.test.js). Diese Kombination gab es vorher nie.
      Mehr als vier bringt nichts: Der Pipeline-Rechner hat vier Kerne. */
   workers: process.env.CI ? 4 : undefined,
+  /* BEFUND 31.08.2026 (Runde 4, F-8): Hier stand nichts zu `retries` —
+     Playwright nimmt dann 0. Das Ergebnis war richtig, aber es war keine
+     Entscheidung, sondern eine Vorgabe, die niemand geprueft hatte.
+     Sie bleibt bei 0, ausdruecklich: Ein Wiederholungslauf macht einen
+     flackernden Test gruen, ohne dass jemand erfaehrt, dass er flackert. In
+     einem Projekt, das "gruen" nur nach einer Messung gelten laesst, ist das
+     die falsche Richtung. Flackern wird an der Ursache behoben — so geschehen
+     bei e2e/sprachumschalter.test.js, wo eine zu knappe Reissleine der Grund
+     war und nicht der Test.
+     Wer das aendert, aendert damit die Aussage von "gruen". */
+  retries: 0,
   use: {
     baseURL: "http://localhost:8081",
     headless: true,

@@ -79,3 +79,29 @@ describe("echteParallelitaet liest die Warteschlange", () => {
     await expect(wache.echteParallelitaet()).resolves.toBeNull();
   });
 });
+
+/* `echteRate` liest dieselbe Antwort mit derselben Zeile, nur ein Feld weiter.
+   Der Befund nannte sie nicht — sie war aber genauso ungedeckt, und eine
+   Luecke, die man beim Schliessen der Nachbarluecke sieht, laesst man nicht
+   offen. */
+describe("echteRate liest die Warteschlange", () => {
+  test("eine gueltige Zahl kommt durch", async () => {
+    wache.setClientForTest(clientMit({ maxDispatchesPerSecond: 0.125 }));
+    await expect(wache.echteRate()).resolves.toBe(0.125);
+  });
+
+  test("0 pro Sekunde ist keine Rate, sondern Stillstand", async () => {
+    wache.setClientForTest(clientMit({ maxDispatchesPerSecond: 0 }));
+    await expect(wache.echteRate()).resolves.toBeNull();
+  });
+
+  test.each([
+    ["0.125", "Zeichenkette statt Zahl"],
+    [null, "ausdruecklich leer"],
+    [undefined, "Feld fehlt"],
+    [NaN, "keine Zahl"],
+  ])("%p gilt nicht als Messung (%s)", async (wert) => {
+    wache.setClientForTest(clientMit({ maxDispatchesPerSecond: wert }));
+    await expect(wache.echteRate()).resolves.toBeNull();
+  });
+});

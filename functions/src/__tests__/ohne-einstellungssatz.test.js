@@ -142,8 +142,14 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
   });
 
   test("ntfy-Mitteilung geht ohne Satz nicht mit toten Knöpfen raus", async () => {
-    const { notifyLimitReached } = require("../notify");
+    const { notifyLimitReached, setFetchForTest } = require("../notify");
     global.fetch = jest.fn();
+    /* Die Attrappe wird hinterlegt, damit der Weg bis zum Satz-Check LÄUFT.
+       Ohne sie bräche schon der Test-Riegel ab (Runde 4, E-3) — dann bewiese
+       dieser Fall nur, dass Jest nichts nach draußen lässt, statt dessen, was
+       er zusagt: dass ohne Einstellungssatz keine Mitteilung mit toten
+       Knöpfen hinausgeht und der Grund im Protokoll steht. */
+    setFetchForTest((...args) => global.fetch(...args));
     await notifyLimitReached({
       ntfyUrl: "https://example.invalid",
       ntfyTopic: "t",
@@ -153,6 +159,7 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
     });
     expect(global.fetch).not.toHaveBeenCalled();
     expect(fehlerZeilen.join(" ")).toContain("kein Einstellungssatz");
+    setFetchForTest(null);
   });
 
   /* ── Die Drossel ──────────────────────────────────────────────────────

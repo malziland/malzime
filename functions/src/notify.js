@@ -20,9 +20,42 @@ const { SITE_URL } = require("./domains");
      · FIRESTORE_EMULATOR_HOST ist gesetzt  -> Emulator, immer
      · NTFY_STUMM=1                          -> ausdruecklich abgeschaltet
    ══════════════════════════════════════════════════════════════════════ */
+/* Eine ausdruecklich hinterlegte Attrappe. Solange sie fehlt, sperrt der
+   Test-Riegel unten. */
+let fetchFuerTest = null;
+
+/** Nur fuer Tests: hinterlegt die fetch-Attrappe, die den Versand annimmt. */
+function setFetchForTest(impl) {
+  fetchFuerTest = impl || null;
+}
+
+/** Der Versandweg — Attrappe, falls hinterlegt, sonst das echte fetch. */
+function versand(...args) {
+  return (fetchFuerTest || fetch)(...args);
+}
+
 function versandUnterdrueckt() {
   if (process.env.NTFY_STUMM === "1") return "NTFY_STUMM=1";
   if (process.env.FIRESTORE_EMULATOR_HOST) return "Emulator-Betrieb";
+  /* BEFUND 31.08.2026 (Runde 4, E-3), behoben 01.09.2026: Beide Wege oben
+     setzen voraus, dass jemand etwas gesetzt hat — eine Umgebungsvariable
+     oder den Emulator. Ein gewoehnlicher Unit-Lauf setzt keines von beidem.
+     Damit war dieses Modul das einzige mit Aussenwirkung ohne den Riegel, den
+     cloud-tasks.js, kapazitaets-wache.js und queue-storage.js haben: Jest
+     setzt JEST_WORKER_ID in JEDEM Arbeitsprozess, ohne Zutun.
+
+     MIT AUSWEG, und das ist der Punkt: Ein erster Entwurf sperrte unter Jest
+     ausnahmslos — und machte damit `rueckfall-riegel.test.js` unmoeglich, den
+     Test "OHNE die Kennzeichen wird gesendet — der Riegel ist nicht dauerhaft
+     zu". Der hat recht: Ein Riegel, der immer schliesst, ist so schlimm wie
+     keiner, weil dann nichts mehr belegt, dass die Alarmierung im Betrieb
+     ueberhaupt hinausgeht. Wer den Versandweg pruefen will, hinterlegt darum
+     ausdruecklich eine Attrappe (setFetchForTest) — dasselbe Muster wie in
+     mistral-http.js. Ohne diese Hinterlegung geht aus einem Testlauf nichts
+     hinaus, auch nicht versehentlich. */
+  if (process.env.JEST_WORKER_ID !== undefined && !fetchFuerTest) {
+    return "Testlauf ohne hinterlegte Attrappe (setFetchForTest)";
+  }
   return null;
 }
 
@@ -50,7 +83,7 @@ async function notifyLimitReached({ ntfyUrl, ntfyTopic, adminSecret, count, limi
     const boostToken = createAdminToken("boost", adminSecret, werte.ticketGueltigkeitMs);
     const resetToken = createAdminToken("reset", adminSecret, werte.ticketGueltigkeitMs);
 
-    const res = await fetch(ntfyUrl, {
+    const res = await versand(ntfyUrl, {
       signal: controller.signal,
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -111,7 +144,7 @@ async function sendeNtfy({ ntfyUrl, ntfyTopic, text, titel = "malziME", priorita
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), 5000);
   try {
-    const res = await fetch(ntfyUrl, {
+    const res = await versand(ntfyUrl, {
       signal: controller.signal,
       method: "POST",
       headers: { "Content-Type": "application/json; charset=utf-8" },
@@ -137,4 +170,4 @@ async function sendeNtfy({ ntfyUrl, ntfyTopic, text, titel = "malziME", priorita
   }
 }
 
-module.exports = { notifyLimitReached, sendeNtfy };
+module.exports = { notifyLimitReached, sendeNtfy, setFetchForTest };

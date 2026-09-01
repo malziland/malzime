@@ -92,6 +92,13 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   schrieb aber keinen davon auf. Nach einer Störung war deshalb nicht mehr
   feststellbar, woran sie lag.
 
+- **Aus einem Testlauf kann keine Push-Nachricht mehr hinausgehen.** Der
+  Benachrichtigungs-Baustein erkannte den Emulator und eine ausdrückliche
+  Stummschaltung — beides muss jemand setzen. Ein gewöhnlicher Testlauf setzt
+  keines von beidem. Er war damit der einzige Baustein mit Außenwirkung ohne
+  diese Sperre; der Vorfall, der zu den anderen Sperren geführt hat, war
+  genauso entstanden.
+
 - **Testläufe können die Produktion nicht mehr anfassen.** Ein Lasttest hatte
   Bilder im echten Speicher abgelegt, wo sie liegen blieben, und die
   Auslieferungs-Geschwindigkeit der laufenden Anwendung verstellt. Beides ist

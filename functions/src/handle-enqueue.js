@@ -90,10 +90,9 @@ function sanitizeExif(raw) {
 }
 
 async function handleEnqueue(req, res, secrets) {
-  /* Haelt dieser Aufruf einen reservierten Platz? Wird an JEDEM Rueckgabeweg
-     geprueft — ein nicht zurueckgegebener Platz blockiert sonst einen
-     Wartenden, bis der Reaper abgleicht. Bewusst GANZ AUSSEN deklariert,
-     damit auch der aeussere Fehlerweg ihn sieht. */
+  /* Die Einlassgrenze wird in der Vorpruefung ermittelt und von der zweiten
+     Stufe nach dem Anlegen wieder gebraucht; `null` heisst dort "nicht
+     ermittelbar, Stufe ueberspringen". Bewusst GANZ AUSSEN deklariert. */
   let einlassgrenze = null;
   const requestId = Math.random().toString(36).slice(2, 10);
   let traceId = null;
@@ -321,8 +320,7 @@ async function handleEnqueue(req, res, secrets) {
       });
     }
     if (!counter.allowed) {
-      /* Der Auftrag kommt nicht zustande — der reservierte Platz gehoert
-         wieder dem Naechsten. */
+      /* Der Auftrag kommt nicht zustande; angelegt wurde noch nichts. */
       res.status(429).json({
         blocked: "limit",
         retryAfterSeconds: counter.retryAfterSeconds,
@@ -352,20 +350,15 @@ async function handleEnqueue(req, res, secrets) {
     }
 
     /* ── ZWEITE STUFE der Einlassgrenze (BUG-2026-08-30-14) ──
-       NUR IM GRENZBEREICH. Die Stufe kostet zwei zusaetzliche
-       Datenbankzugriffe pro Upload. Bei 170 gleichzeitigen Anfragen wurde der
-       Einlass dadurch so langsam, dass Verbindungen abrissen — im Simulator
-       95 von 170, vorher hoechstens 23. Das ist der falsche Preis fuer eine
-       Bremse, die erst kurz vor der Grenze etwas bewirkt.
-
-       Ab 80 % der Grenze wird geprueft, darunter nicht. Im Workshop-Alltag
-       (30 Wartende von 155) laeuft der Einlass damit genauso schnell wie
-       vorher; erst wenn es eng wird, kostet er mehr. 
-       Die atomare Reservierung oben faengt den Normalbetrieb ab. Unter echtem
-       Andrang scheitert sie an einer Firestore-Eigenschaft: Ein einzelnes
-       Dokument vertraegt nur etwa einen Schreibvorgang pro Sekunde, und bei
-       170 gleichzeitigen Anfragen wirft die Datenbank ABORTED — die Notbremse
-       liess dann alle durch (gemessen 177 bei Grenze 155).
+       Sie laeuft bei JEDEM Upload und kostet zwei Lesezugriffe (den Auftrag
+       und eine zaehlende Abfrage). Eine Schwelle "erst ab 80 % der Grenze"
+       stand hier vom 30.08. bis 01.09. als Kommentar — im Code gab es sie nie
+       (DOC-2026-09-01-04). Gemessen am 01.09. im Emulator: 170 gleichzeitige
+       Uploads mit dieser Stufe bei jedem Auftrag, keine einzige abgerissene
+       Verbindung, 128 angenommen, 42 sauber abgewiesen. Die Verbindungs-
+       abrisse vom 30.08. (94 von 170) stammten von der damals versuchten
+       atomaren Reservierung, nicht von dieser Stufe (docs/ARCHITECTURE.md,
+       "Einlass-Politik").
 
        Hier wird nur GEZAEHLT, ohne Sperre: Wie viele warten vor mir? Die
        Antwort ist stabil, jeder entscheidet fuer sich, und es gibt keinen
@@ -423,10 +416,12 @@ async function handleEnqueue(req, res, secrets) {
   } catch (err) {
     const status = err.status || 500;
     const code = err.code || "unknown_error";
-    /* Auch der unerwartete Fehlerweg gibt den Platz zurueck. Ohne das haette
-       jeder Absturz nach der Reservierung einen Platz dauerhaft belegt — bis
-       der Reaper abgleicht, und bei genug Abstuerzen waere die Warteschlange
-       dauerhaft "voll", obwohl niemand wartet. */
+    /* Der unerwartete Fehlerweg. Er hat nichts zurueckzugeben: Jeder Schritt,
+       der etwas anlegt (Stunden-Slot, Bild, Auftrag), raeumt in seinem eigenen
+       Fehlerzweig oben hinter sich auf; was danach noch scheitern kann, ist die
+       Antwort selbst. Ein Auftrag, der trotzdem liegen bliebe, faellt dem
+       Reaper zu (Herzschlag-Frist), weil dieser Browser nie eine jobId erhielt
+       und darum nie pollt. */
     console.log(JSON.stringify({ requestId, traceId, status: "error", code, error: err.message }));
     res.status(status).json({ error: "Enqueue failed", code });
   }

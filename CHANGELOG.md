@@ -4,6 +4,42 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Die Kostenbremse hielt bei Andrang nicht.** Wenn viele gleichzeitig
+  hochladen, klemmt der Stundenzähler und ein Ersatz übernimmt. Der zählte die
+  Aufträge der letzten Stunde — aber fertige Aufträge werden 15 Minuten nach
+  der Zustellung gelöscht. Der Ersatz sah so nur das letzte Viertel der Stunde
+  und erreichte das Stundenlimit nie; einen laufenden Boost kannte er gar
+  nicht. Er liest jetzt denselben Zähler wie der Hauptweg, nur ohne auf dessen
+  Sperre zu warten, und rechnet mit demselben Limit. Teuer wurde es in der
+  Zwischenzeit nicht: Die Warteschlange lässt ohnehin nur rund 450 Analysen je
+  Stunde durch. Gefunden im Audit vom 01.09. (BIZ-2026-09-01-01), nicht von
+  einem Test — der Test dafür existiert seitdem.
+
+- **Die Betriebswerte in der Datenbank waren nicht die im Repo.** Acht Felder
+  wichen zwei Tage lang ab, sieben davon in den beiden Ersatz-Profilen für den
+  Ernstfall. Der Test prüfte die Doku gegen die Repo-Datei — aber die Wahrheit
+  liegt in der Datenbank, und die hielt niemand dagegen. Die Datenbank ist
+  angeglichen, und vor jedem Deploy vergleicht die Infrastruktur-Prüfung jetzt
+  beide feldweise; eine Abweichung stoppt die Auslieferung
+  (OPS-2026-09-01-02).
+
+- **Ein Zähler, der gepflegt, aber nie gelesen wurde, ist entfernt.** Die am
+  30.08. verworfene Platzreservierung hatte ihren Zähler hinterlassen: Jeder
+  Übergang eines Auftrags schrieb ihn per Transaktion, der Aufräumer glich ihn
+  minütlich ab, und kein Code las ihn für eine Entscheidung. Kommentare
+  beschrieben ihn als aktives Sicherheitsnetz (ARCH-2026-09-01-03).
+
+- **Kommentare und ein Test am Einlass beschrieben Schutz, den es nie gab.**
+  Eine „80-Prozent-Schwelle" für die zweite Einlassstufe stand nur im
+  Kommentar; im Code lief die Stufe seit jeher bei jedem Upload. Gemessen im
+  Emulator: 170 gleichzeitige Uploads, keine abgerissene Verbindung, 128
+  angenommen, 42 sauber abgewiesen. Die Kommentare sagen jetzt, was der Code
+  tut (DOC-2026-09-01-04).
+
 ## [4.6.2] — 2026-09-01
 
 ### Behoben

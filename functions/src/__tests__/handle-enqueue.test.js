@@ -26,11 +26,6 @@ jest.mock("../jobs", () => ({
   createJob: jest.fn(),
   failJob: jest.fn(),
   countQueuedJobs: jest.fn(() => Promise.resolve(0)),
-  /* UMGESTELLT (BUG-2026-08-30-14): Der Einlass zaehlt nicht mehr und legt
-     spaeter an, sondern reserviert den Platz ATOMAR. Der Mock bildet das ab:
-     `ok: false` heisst "kein Platz". */
-  platzReservieren: jest.fn(async () => ({ ok: true, wartende: 1, grenze: 155 })),
-  platzFreigeben: jest.fn(async () => {}),
   /* ZWEITE STUFE der Einlassgrenze. Diese drei fehlten zuerst — die Tests
      liefen dadurch NICHT durch die neue Pruefung, sondern in ihren
      Notfallpfad, und meldeten trotzdem gruen. Ein Mock, der eine Funktion
@@ -517,10 +512,8 @@ describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
     middleware.checkRateLimit.mockReturnValue(true);
     storage.storeImage.mockResolvedValue("pfad.jpg");
     jobs.createJob.mockResolvedValue("job-abc");
-    /* IM GRENZBEREICH: Die zweite Stufe laeuft erst ab 80 % der Grenze — sie
-       kostet zwei Datenbankzugriffe und soll den Alltag nicht belasten.
-       140 von 155 sind 90 %, also wird geprueft. */
-    jobs.platzReservieren.mockResolvedValue({ ok: true, wartende: 140, grenze: 155 });
+    /* Die zweite Stufe laeuft bei JEDEM Upload (DOC-2026-09-01-04: eine
+       80-%-Schwelle stand hier nur im Kommentar, nie im Code). */
     jobs.getJob.mockResolvedValue({ id: "job-abc", status: "queued", createdAt: Date.now() });
     tasks.enqueueJob.mockResolvedValue();
   });

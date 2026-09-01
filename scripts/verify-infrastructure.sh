@@ -50,7 +50,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -114,6 +114,36 @@ else
   fi
 
   pruef "Queue-Status" "RUNNING" "$QUEUE_STATE"
+fi
+
+# ── 1b. Einstellungssatz: Datenbank == Repo ──
+# OPS-2026-09-01-02 (Audit 01.09.2026): Die Wahrheit ueber die Betriebswerte
+# liegt in `config/betriebsprofil`; `functions/src/produktiv-satz.js` ist die
+# Kopie, aus der das Anlege-Skript schreibt. Der Test `satz-gegen-doku` hielt
+# die Doku gegen die Kopie — niemand hielt die Kopie gegen die Wahrheit. Zwei
+# Tage lang wich die Datenbank in acht Feldern ab, sieben davon in den beiden
+# Ersatz-Profilen fuer den Ernstfall, ohne Signal.
+#
+# Der Vergleich ist reine Lesung (scripts/betriebsprofil-vergleichen.js). Im
+# Probemodus laeuft er NUR mit eigenem Einspeisepunkt (INFRA_PROBE_SATZ) —
+# sonst griffe der Unit-Test des Bucket-Riegels aus dem Test heraus auf die
+# echte Datenbank zu (Runde-5-Lehre: kein Netz aus einem Unit-Test).
+# FAIL-CLOSED: nicht messbar gilt als nicht bestanden.
+echo "— Einstellungssatz (config/betriebsprofil gegen functions/src/produktiv-satz.js)"
+if [ "$PROBEMODUS" = "1" ] && [ -z "${INFRA_PROBE_SATZ:-}" ]; then
+  echo "  · uebersprungen (Probemodus ohne INFRA_PROBE_SATZ)"
+else
+  if [ -n "${INFRA_PROBE_SATZ:-}" ]; then
+    SATZ_AUSGABE=$(node scripts/betriebsprofil-vergleichen.js --datei "$INFRA_PROBE_SATZ" 2>&1); SATZ_RC=$?
+  else
+    SATZ_AUSGABE=$(node scripts/betriebsprofil-vergleichen.js 2>&1); SATZ_RC=$?
+  fi
+  case "$SATZ_RC" in
+    0) gruen "Einstellungssatz: Datenbank und Repo stimmen ueberein" ;;
+    1) rot "Einstellungssatz weicht vom Repo ab — nachziehen oder bewusst entscheiden:"
+       printf '%s\n' "$SATZ_AUSGABE" | sed 's/^/      /' ;;
+    *) rot "Einstellungssatz nicht vergleichbar (ungeprueft gilt als nicht bestanden): $(printf '%s' "$SATZ_AUSGABE" | tail -1)" ;;
+  esac
 fi
 
 # ── 2. Upload-Bucket: EU-Region, Lifecycle-Sicherheitsnetz, Soft-Delete aus ──

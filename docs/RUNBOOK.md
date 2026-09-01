@@ -160,6 +160,7 @@ gestartet werden.
 | Bereich | Soll |
 |---|---|
 | Cloud-Tasks-Queue `analyze-queue` | existiert in `europe-west1`, RUNNING, Dosierung == Einstellungssatz |
+| Einstellungssatz `config/betriebsprofil` | **feldweise gleich** `functions/src/produktiv-satz.js` (alle Profile, aktives Profil). Seit 01.09.2026 (OPS-2026-09-01-02). Nachziehen: `node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`; vorher `node scripts/betriebsprofil-vergleichen.js` zeigt die Abweichungen |
 | Bucket `malzime-queue-uploads` | Region `EUROPE-WEST1`, Lifecycle-Löschregel nach 1 Tag aktiv, Soft-Delete 0 |
 | Inhalt des Bildspeichers | **kein Bild älter als 3 Stunden** — ein Auftrag lebt höchstens zwei. Seit 31.08.2026; Anlass waren 4.056 liegengebliebene Testbilder. Ein **leerer** Speicher ist der Sollzustand und kein Fehler (`gsutil` meldet dafür Rückgabewert 1) |
 | Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
@@ -491,8 +492,9 @@ Modellversion — immer das Dashboard, nicht Code-Kommentare). Notfalls Wartungs
 ### »notbremse-gegriffen« — der Stundenzähler ist ausgefallen
 
 **Was passiert ist:** Der reguläre Zähler kam nicht durch (Datenbanksperre bei
-Andrang), und das Netz hat übernommen — es hat die Aufträge der letzten Stunde
-gezählt und **blockiert**, weil das Limit erreicht war.
+Andrang), und das Netz hat übernommen — es hat denselben Zählerstand ohne Sperre
+gelesen (seit 01.09.2026; vorher zählte es Auftrags-Dokumente, siehe
+BIZ-2026-09-01-01) und **blockiert**, weil das wirksame Limit erreicht war.
 
 **Ist das schlimm?** Nein, das ist die Bremse bei der Arbeit. Die Meldung sagt
 nur: Es ist gerade viel los, und die Kostengrenze greift.

@@ -72,14 +72,55 @@ describe("NOTAUSSTIEG — zurueck ohne Auslieferung", () => {
     expect((await geltendeWerte()).werte.singleLargeTimeoutMs).toBe(300000);
   });
 
-  test("haengende Datenbank: niemand wartet laenger als das Zeitlimit", async () => {
+  /* ZWEI FAELLE, seit dem Betriebsvorfall vom 01.09.2026 getrennt geprueft.
+     Vorher stand hier nur der erste — und der misst ausgerechnet den Fall, in
+     dem die Grenze GROSSZUEGIGER ist. Die Zusage "im Betrieb wartet niemand
+     laenger als zwei Sekunden" war damit nie gemessen. */
+  test("erster Lesevorgang nach dem Start: darf laenger warten, aber nicht endlos", async () => {
     setze(satz(T1), null, 6000);
     const start = Date.now();
     const e = await geltendeWerte();
-    expect(Date.now() - start).toBeLessThan(4000);
+    /* 5000 ms Limit — die Toleranz deckt den Testlauf selbst ab. */
+    expect(Date.now() - start).toBeLessThan(6000);
     expect(e.werte).toBeNull();
     expect(e.grund).toContain("nicht lesbar");
-  }, 12000);
+  }, 15000);
+
+  /* DER EIGENTLICHE BELEG fuer den Vorfall vom 01.09.2026.
+     Die beiden Tests darum herum waeren auch OHNE die Aenderung gruen — sie
+     messen Obergrenzen, und eine engere Grenze reisst eine Obergrenze nicht.
+     Dieser hier misst den Unterschied selbst: Dieselbe traege Datenbank
+     (3 Sekunden) muss beim ersten Lesevorgang durchgehen und im laufenden
+     Betrieb abbrechen. Wird das Erstlimit zurueckgebaut, faellt genau diese
+     Pruefung um. */
+  test("dieselbe traege Datenbank: kalt geht durch, warm bricht ab", async () => {
+    setze(satz(T1), null, 3000);
+    const kalt = await geltendeWerte();
+    expect(kalt.grund).toBeNull();
+    expect(kalt.werte).not.toBeNull();
+
+    mockDoc.verzoegerung = 3000;
+    _cacheLeeren({ warmBleiben: true });
+    const warm = await geltendeWerte();
+    expect(warm.werte).toBeNull();
+    expect(warm.grund).toContain("Zeitlimit 2000 ms");
+  }, 20000);
+
+  test("im laufenden Betrieb bleibt es bei zwei Sekunden", async () => {
+    /* Erst einmal ERFOLGREICH lesen — danach gilt die Instanz als warm. */
+    setze(satz(T1));
+    expect((await geltendeWerte()).werte).not.toBeNull();
+
+    /* Jetzt haengt die Datenbank, der Cache ist abgelaufen, die Verbindung
+       steht aber. Genau hier muss die enge Grenze greifen. */
+    mockDoc.verzoegerung = 6000;
+    _cacheLeeren({ warmBleiben: true });
+    const start = Date.now();
+    const e = await geltendeWerte();
+    expect(Date.now() - start).toBeLessThan(3000);
+    expect(e.werte).toBeNull();
+    expect(e.grund).toContain("Zeitlimit 2000 ms");
+  }, 15000);
 });
 
 describe("WORKSHOP-LAST", () => {
@@ -121,7 +162,10 @@ describe("WORKSHOP-LAST", () => {
     setze(satz(T1), null, 6000);
     const start = Date.now();
     const alle = await Promise.all(Array.from({ length: 20 }, () => geltendeWerte()));
-    expect(Date.now() - start).toBeLessThan(5000);
+    /* Frische Instanz, also gilt das grosszuegigere Erstlimit (5000 ms).
+       Entscheidend ist nicht die Zahl, sondern dass ALLE zwanzig gemeinsam
+       darunter bleiben — niemand haengt hinter dem anderen. */
+    expect(Date.now() - start).toBeLessThan(6000);
     for (const e of alle) expect(e.werte).toBeNull();
   }, 15000);
 });

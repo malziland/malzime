@@ -592,6 +592,29 @@ describe("deploy.sh — Verhalten der Riegel", () => {
  * Deshalb stehen hier alle drei Faelle nebeneinander. Sie unterscheiden sich
  * nur darin, WANN es schiefgeht.
  * ────────────────────────────────────────────────────────────────────── */
+/* ── Der Erfolgsweg ────────────────────────────────────────────────────
+ *
+ * BEFUND 01.09.2026 (Runde 7): Alle 20 Faelle oben pruefen `code !== 0`. Als
+ * eine Reparatur dafuer sorgte, dass das Skript IMMER mit 1 endete — auch bei
+ * vollstaendigem Erfolg —, blieben alle 20 gruen, und sechs Riegel liessen
+ * sich spurlos ausbauen. Eine Suite, die nur Abbrueche prueft, kann nicht
+ * merken, dass gar nichts mehr durchlaeuft.
+ *
+ * Dieser Fall ist das Gegengewicht: Er verlangt, dass ein Lauf mit lauter
+ * gruenen Bedingungen auch WIRKLICH durchlaeuft.
+ * ──────────────────────────────────────────────────────────────────────── */
+describe("deploy.sh — der Erfolgsweg", () => {
+  afterEach(aufraeumen);
+
+  test("mit lauter gruenen Bedingungen laeuft die Auslieferung durch", () => {
+    const r = deploy();
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
+    /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
+    expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
+  });
+});
+
 describe("deploy.sh — die Aufraeumfalle", () => {
   afterEach(aufraeumen);
 

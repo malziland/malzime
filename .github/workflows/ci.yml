@@ -67,6 +67,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+          cache: npm
       # BEFUND 01.09.2026 (Runde 7, L-15): Fuer Node steht die Begruendung
       # oben — fuer Python galt sie genauso, nur stand sie nirgends. Sechs
       # Waechter laufen mit python3; bisher mit dem, was das Runner-Image
@@ -76,7 +77,6 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
-          cache: npm
           cache-dependency-path: functions/package-lock.json
 
       - run: npm ci
@@ -140,6 +140,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "24"
+          cache: npm
       # BEFUND 01.09.2026 (Runde 7, L-15): Fuer Node steht die Begruendung
       # oben — fuer Python galt sie genauso, nur stand sie nirgends. Sechs
       # Waechter laufen mit python3; bisher mit dem, was das Runner-Image
@@ -149,7 +150,6 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
-          cache: npm
           cache-dependency-path: package-lock.json
 
       - run: npm ci
@@ -305,6 +305,23 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
+
+      # BEFUND 01.09.2026 (erster echter Pipeline-Lauf): Dieser Job lief ohne
+      # Pakete — und zwei Waechter brauchen sie. `pruefe-auslieferbare-reste`
+      # wertet die ignore-Muster mit minimatch aus, die Eichung der
+      # Mutationsprobe startet jest. Beide meldeten deshalb "nicht messbar"
+      # (Rueckgabewert 2), und die Selbstpruefung wurde rot: 3 von 24 Proben.
+      #
+      # Das war KEIN Fehlalarm — die Waechter haben sich richtig verhalten und
+      # ein Gruen verweigert, das sie nicht messen konnten. Was fehlte, waren
+      # die Pakete. `npm ci` liegt hier bewusst NACH dem Node-Schritt und vor
+      # allem anderen.
+      # BEIDE Baeume: `minimatch` fuer pruefe-auslieferbare-reste loest gegen
+      # das WURZEL-Verzeichnis auf (createRequire ab scripts/), `jest` fuer die
+      # Eichung der Mutationsprobe gegen functions/. Nur einer von beiden
+      # genuegt nicht — gemessen.
+      - run: npm ci
+      - run: npm ci --prefix functions
 
       # Zuerst die Pruefungen selbst pruefen: je Pruefung eine Probe gegen
       # kaputtes und eine gegen sauberes Material. Ohne diesen Schritt koennte

@@ -21,7 +21,7 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 
 | Wächter | Fehlerklasse | Ausgelöst durch | Laufzeit |
 |---|---|---|---|
-| `pruefe-deploy-riegel.py` | Notschalter, die in der Schlussbilanz fehlen; Pipeline-Einstellung; **Wächter, die niemand mehr aufruft** | Runde 7 (K-7): Ein Prüfschritt liess sich aus der Pipeline entfernen, ohne dass etwas rot wurde | 24 ms |
+| `pruefe-deploy-riegel.py` | Notschalter, die in der Schlussbilanz fehlen; Pipeline-Einstellung; **Wächter, die niemand mehr aufruft**; **verrutschte Eingaben in `ci.yml`** | Runde 7 (K-7): Ein Prüfschritt liess sich aus der Pipeline entfernen, ohne dass etwas rot wurde. 01.09.: Vier Einfüge-Fehler in `ci.yml` an einem Tag, drei Pipeline-Läufe verbrannt | 24 ms |
 | `pruefe-doppelte-werte.py` | Betriebswerte, die im Code UND im Einstellungssatz stehen | Firestore-Umbau 30.08.: Die Doku nannte Werte, die so nicht liefen | 44 ms |
 | `pruefe-i18n-fallbacks.py` | Sichtbarer Text, der von seiner Sprachdatei abweicht | Fund 21.08.: Im HTML stand ein anderer Satz als in der Sprachdatei | 35 ms |
 | `pruefe-kopplung.py` | Dateien, die wieder zusammenwachsen; gelöschte Pflicht-Testdateien | Runde 5: Wer `deploy-verhalten.test.js` löscht, sollte auffallen | 32 ms |
@@ -81,6 +81,12 @@ Ehrlich benannt, damit niemand sich darauf verlässt:
 - **Sie prüft den Code, nicht die Wirklichkeit.** Ob die Warteschlange in der
   Produktion wirklich die eingestellten Werte hat, misst
   `verify-infrastructure.sh` gegen die Infrastruktur, nicht der Quelltext.
+- **Sie sah lange nicht auf sich selbst.** Bis zum 01.09.2026 prüfte nichts,
+  ob `ci.yml` strukturell stimmt. Vier Einfüge-Fehler an einem Tag — Zeilen
+  unter dem falschen Schritt — blieben lokal unsichtbar, weil das YAML gültig
+  bleibt und alle Tests grün. Sichtbar wurden sie erst, als GitHub die Datei
+  ausführte. Das kostete drei Läufe und rund vierzig Minuten.
+
 - **Sie ist selbst fehleranfällig.** In acht Prüfrunden sassen die meisten
   Befunde nicht in der Anwendung, sondern in dieser Schicht. Zwei Werkzeuge,
   die am 01.09. entstanden, hatten beide schwere Fehler — eines meldete

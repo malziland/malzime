@@ -346,6 +346,98 @@ def main():
     else:
         print(f"  ok      alle {len(skripte)} Waechter sind aus beiden Listen erreichbar")
     print()
+    # BEFUND 01.09.2026 (erster echter Pipeline-Lauf): VIER Fehler derselben
+    # Bauart an einem Tag. Beim Einfuegen neuer Schritte in ci.yml sind Zeilen
+    # unter den FALSCHEN Schritt gerutscht: `cache: npm` zweimal,
+    # `cache-dependency-path` zweimal, `working-directory` einmal. Das YAML
+    # bleibt dabei gueltig, alle 1353 Tests bleiben gruen — es faellt erst auf,
+    # wenn GitHub die Datei ausfuehrt ("Caching for 'npm' is not supported",
+    # "cannot open scripts/pruefe-zeitzuender.sh"). Drei Pipeline-Laeufe und
+    # rund vierzig Minuten Wartezeit gingen dafuer drauf.
+    #
+    # Diese Pruefung faengt genau das ab: Jede Action kennt eine feste Menge
+    # von Eingaben. Steht dort etwas anderes, ist es verrutscht.
+    print("── Bekommt jede Action nur Eingaben, die sie kennt? ──")
+    ERLAUBT = {
+        "actions/setup-node": {
+            "node-version", "node-version-file", "architecture", "check-latest",
+            "registry-url", "scope", "token", "cache", "cache-dependency-path",
+            "always-auth", "mirror", "mirror-token",
+        },
+        "actions/setup-python": {
+            "python-version", "python-version-file", "cache", "architecture",
+            "check-latest", "token", "cache-dependency-path",
+            "update-environment", "allow-prereleases", "freethreaded",
+        },
+        "actions/checkout": {
+            "repository", "ref", "token", "ssh-key", "ssh-known-hosts",
+            "ssh-strict", "ssh-user", "persist-credentials", "path", "clean",
+            "filter", "sparse-checkout", "sparse-checkout-cone-mode",
+            "fetch-depth", "fetch-tags", "show-progress", "lfs", "submodules",
+            "set-safe-directory", "github-server-url",
+        },
+    }
+    # `cache: npm` bei setup-python waere gueltiges YAML und formal erlaubt
+    # (setup-python KENNT cache) — aber nur mit pip/poetry/pipenv als Wert.
+    WERTE = {("actions/setup-python", "cache"): {"pip", "poetry", "pipenv"}}
+    # `cache-dependency-path` KENNEN beide Actions — nur zeigt es bei
+    # setup-python auf Python-Dateien. Ein `package-lock.json` dort ist
+    # formal gueltig und trotzdem verrutscht; genau so ist es heute zweimal
+    # passiert. Deshalb wird hier der WERT gelesen, nicht nur der Schluessel.
+    MUSTER = {
+        ("actions/setup-python", "cache-dependency-path"): (
+            r"(requirements.*\.txt|pyproject\.toml|Pipfile|setup\.py|\.python-version)",
+            "erwartet eine Python-Datei (requirements.txt, pyproject.toml, …)",
+        ),
+        ("actions/setup-node", "cache-dependency-path"): (
+            r"(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|npm-shrinkwrap\.json)",
+            "erwartet eine npm-Datei (package-lock.json, yarn.lock, …)",
+        ),
+    }
+
+    verrutscht = []
+    aktuelle_action = None
+    in_with = False
+    for nr, zeile in enumerate(ci.split("\n"), 1):
+        kern = zeile.strip()
+        if kern.startswith("- uses:"):
+            name = kern.split("uses:", 1)[1].strip().split("@")[0]
+            aktuelle_action = name if name in ERLAUBT else None
+            in_with = False
+            continue
+        if kern.startswith("- ") or (zeile and not zeile.startswith(" ")):
+            aktuelle_action = None
+            in_with = False
+            continue
+        if aktuelle_action and kern == "with:":
+            in_with = True
+            continue
+        if not (aktuelle_action and in_with) or not kern or kern.startswith("#"):
+            continue
+        if ":" not in kern:
+            continue
+        schluessel = kern.split(":", 1)[0].strip()
+        wert = kern.split(":", 1)[1].strip().strip('"').strip("'")
+        if schluessel not in ERLAUBT[aktuelle_action]:
+            verrutscht.append((nr, aktuelle_action, schluessel, "kennt diese Eingabe nicht"))
+        elif (aktuelle_action, schluessel) in WERTE and wert not in WERTE[(aktuelle_action, schluessel)]:
+            erlaubt = ", ".join(sorted(WERTE[(aktuelle_action, schluessel)]))
+            verrutscht.append((nr, aktuelle_action, schluessel, f"Wert '{wert}' — erlaubt: {erlaubt}"))
+        elif (aktuelle_action, schluessel) in MUSTER:
+            muster, erklaerung = MUSTER[(aktuelle_action, schluessel)]
+            if not re.search(muster, wert):
+                verrutscht.append((nr, aktuelle_action, schluessel, f"Wert '{wert}' — {erklaerung}"))
+
+    if verrutscht:
+        for nr, action, schluessel, grund in verrutscht:
+            print(f"  FEHLT   ci.yml:{nr}  {action} → '{schluessel}': {grund}")
+        print("          Beim Einfuegen verrutscht? Das YAML bleibt dabei gueltig.")
+        ci_fehlt = True
+    else:
+        print("  ok      jede Action bekommt nur Eingaben, die sie kennt")
+    print()
+
+    print()
 
     anzahl = len(fehlt) + len(falsch_platziert) + len(ohne_abbruch) + len(ohne_bilanz) + (1 if ci_fehlt else 0) + len(waechter_fehlt)
     if anzahl == 0:

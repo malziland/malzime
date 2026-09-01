@@ -21,6 +21,16 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   nennen. Jetzt erkennt sie den Wartungsmodus, sagt „nicht messbar" statt
   „kaputt" und nennt den Handgriff, der fehlt.
 
+### Behoben
+
+- **Ein Alarm wegen nichts.** Beim allerersten Zugriff nach einer Ruhephase
+  hatte der Dienst zwei Sekunden Zeit, seine Einstellungen zu laden — zu knapp,
+  solange die Verbindung zur Datenbank noch aufgebaut wird. Einmal in sieben
+  Tagen reichte es nicht, und es ging eine Störungsmeldung raus, obwohl eine
+  Sekunde später alles normal lief und keine einzige Analyse betroffen war. Der
+  erste Zugriff bekommt jetzt mehr Zeit; im laufenden Betrieb bleibt es bei zwei
+  Sekunden.
+
 ## [4.6.0] — 2026-09-01
 
 ### Neu

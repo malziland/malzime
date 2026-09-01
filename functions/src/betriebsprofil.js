@@ -109,6 +109,27 @@ const DOKUMENT = "config/betriebsprofil";
    grosszuegig fuer das Lesen EINES kleinen Dokuments und kurz genug, dass
    niemand es merkt. */
 const LESE_ZEITLIMIT_MS = 2000;
+/* ABER: der ALLERERSTE Lesevorgang einer frisch gestarteten Instanz bekommt
+   mehr Zeit.
+
+   BETRIEBSVORFALL 01.09.2026, 19:01 Wien: Genau ein Lesevorgang riss die
+   2000 ms und meldete `nicht lesbar: Zeitlimit 2000 ms` — der Nutzer bekam
+   dafuer eine Alarm-Mail. Eine Sekunde spaeter war derselbe Satz wieder
+   lesbar, kein Nutzer war betroffen, und in sieben Tagen ist es genau einmal
+   passiert. Die Anwendung war also nicht kaputt; zu knapp war die Grenze fuer
+   den einen Moment, in dem die Instanz hochfaehrt und die Datenbank-
+   verbindung noch gar nicht steht.
+
+   Warum nicht einfach ein zweiter Versuch: Der haette die Wartezeit im
+   Fehlerfall auf 4 s verdoppelt und damit die Zusicherung gebrochen, dass
+   niemand laenger als das Zeitlimit wartet. Und er haette nicht geholfen —
+   wenn schon 2000 ms nicht reichen, reichen zwei Anlaeufe von je 2000 ms
+   erst recht nicht, wenn die Verbindung noch aufgebaut wird.
+
+   Die Grenze fuer den LAUFENDEN Betrieb bleibt deshalb unangetastet: Sobald
+   einmal gelesen wurde, gelten wieder 2000 ms. */
+const ERSTES_LESE_ZEITLIMIT_MS = 5000;
+let schonGelesen = false;
 /* Wie die Feature-Flags: kurz genug, dass eine Umstellung in Sekunden wirkt,
    lang genug, dass nicht jeder Aufruf Firestore liest. */
 const CACHE_MS = 30 * 1000;
@@ -328,11 +349,16 @@ async function leseFrisch(jetzt) {
      die Instanz am Herunterfahren hindern. Im Test brach es die Suite ab,
      weil die Ablehnung nach dem Testende ankam. */
   let zeitgeber = null;
+  /* Das Limit wird VOR dem Versuch festgelegt und der Warmlauf sofort
+     vermerkt: Ein zweiter Aufrufer, der waehrend dieses Lesevorgangs
+     hereinkommt, soll nicht ebenfalls das grosse Limit bekommen. */
+  const limit = schonGelesen ? LESE_ZEITLIMIT_MS : ERSTES_LESE_ZEITLIMIT_MS;
+  schonGelesen = true;
   try {
     const snap = await Promise.race([
       datenbank().doc(DOKUMENT).get(),
       new Promise((_, ab) => {
-        zeitgeber = setTimeout(() => ab(new Error(`Zeitlimit ${LESE_ZEITLIMIT_MS} ms`)), LESE_ZEITLIMIT_MS);
+        zeitgeber = setTimeout(() => ab(new Error(`Zeitlimit ${limit} ms`)), limit);
         /* unref: Ein wartender Timer darf den Prozess nicht am Ende hindern. */
         if (typeof zeitgeber.unref === "function") zeitgeber.unref();
       }),
@@ -399,10 +425,17 @@ async function leseFrisch(jetzt) {
   return alsKopie(cache);
 }
 
-/* Fuer Tests: Cache leeren, damit jede Pruefung frisch liest. */
-function _cacheLeeren() {
+/* Fuer Tests: Cache leeren, damit jede Pruefung frisch liest. Der Warmlauf
+   wird MITZURUECKGESETZT — sonst hiesse "frisch" hier etwas anderes als nach
+   einem echten Instanzstart, und der Unterschied zwischen erstem und
+   spaeterem Lesevorgang waere nicht pruefbar. */
+function _cacheLeeren({ warmBleiben = false } = {}) {
   letzterZustand = null;
   cache = { zeit: 0, werte: null, quelle: "code" };
+  /* warmBleiben=true simuliert eine Instanz, die schon einmal gelesen hat:
+     Der Cache ist abgelaufen, die Verbindung steht aber. Nur so laesst sich
+     pruefen, dass im LAUFENDEN Betrieb weiterhin 2000 ms gelten. */
+  if (!warmBleiben) schonGelesen = false;
 }
 
 module.exports = {

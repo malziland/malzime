@@ -97,6 +97,19 @@ lauf "Lockfile: npm ci (functions)" "test-backend" npm ci --dry-run --prefix fun
 # nannte. Ohne gitleaks im PATH gilt die Pruefung als nicht messbar (2), nicht
 # als bestanden.
 lauf "Secret-Scan (gitleaks)" "secret-scan" sh scripts/secret-scan-lokal.sh
+# BEFUND 01.09.2026 (erster echter Pipeline-Lauf): Zwei von drei roten Jobs
+# gingen auf Aenderungen an ci.yml zurueck — und beide waren hier unsichtbar.
+# Die Tests, die ci.yml gegen dieses Skript pruefen (beide Richtungen), liegen
+# in der BACKEND-Suite, und die faehrt diese Vorabpruefung bewusst nicht.
+#
+# Wer die Pipeline anfasst, bekommt sie jetzt trotzdem: zwei gezielte Dateien,
+# rund zwei Sekunden. Das ist der Unterschied zwischen "lokal gruen" und
+# "wuerde durchgehen".
+if ! git diff --quiet origin/main -- .github/workflows/ 2>/dev/null; then
+  lauf "Pipeline geaendert: die Tests dazu" "test-backend" \
+    npm test --prefix functions --silent -- vor-dem-push-script.test doku-drift
+fi
+
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
 # BEFUND 01.09.2026 (Runde 7, L-5): Der Sauberkeits-Riegel im Deploy prueft
 # `git status --porcelain` — der zeigt IGNORIERTE Dateien nicht. Firebase

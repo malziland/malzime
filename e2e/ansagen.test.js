@@ -381,7 +381,16 @@ test("Nach der Analyse traegt der Ergebnisbereich einen Namen", async ({ page })
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
   await page.click('[data-demo="selfie"]');
-  await page.waitForSelector(".cat-card", { timeout: 45000 });
+  /* BEFUND 01.09.2026 (erster Pipeline-Lauf des Zweiges): Hier riss die
+     45-s-Grenze in Firefox — lokal braucht derselbe Test 8 Sekunden. Die
+     Pipeline faehrt vier Browser parallel, und in derselben Runde lief eine
+     Datei 5,7 Minuten. Unter dieser Last ist 45 s knapp bemessen.
+
+     Erhoeht wird die WARTEZEIT, nicht das Testlimit: `test.slow()` gibt dem
+     Test 90 s, davon sind 75 s Warten weiterhin mit Abstand darunter — die
+     Bedingung, die `pruefe-tote-geduld.py` prueft. Kein Wiederholungslauf:
+     Der wuerde das Flackern gruen faerben, statt die Ursache zu benennen. */
+  await page.waitForSelector(".cat-card", { timeout: 75000 });
   await page.waitForTimeout(1200);
 
   const fokus = await page.evaluate(() => {

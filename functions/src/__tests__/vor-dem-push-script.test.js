@@ -25,6 +25,7 @@ const SKRIPT = path.join(WURZEL, "scripts/vor-dem-push.sh");
    eine Ausnahme, die man nicht liest, ist ein Loch. */
 const BEWUSST_DRAUSSEN = {
   "npm ci": "Installation, keine Prüfung",
+  "npm ci --prefix functions": "Installation, keine Prüfung",
   "npm test": "Backend-Suite, läuft lokal so lang wie in der Pipeline (~2,5 min)",
   "npm run test:e2e": "E2E-Suite, dito (~3,5 min) — beides deckt scripts/pruefstand.sh ab",
   /* Die Mutationsprobe setzt je geaenderter Zeile eine Aenderung und laesst

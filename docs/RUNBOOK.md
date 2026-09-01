@@ -315,10 +315,26 @@ Vom schnellsten zum gründlichsten. Alle Flag-Hebel wirken **ohne Deploy** binne
 
 ### 1. Wartungsmodus (Sekunden — kontrollierte Vollbremsung)
 
-Admin-Endpunkt `/api/admin/maintenance` (HMAC-Token nötig; GET zeigt
-Bestätigungsseite, POST mit Nonce schaltet). Zustand liegt im Firestore-Dokument
-`config/maintenance` (30-s-Cache). Nutzer sehen einen Wartungs-Dialog statt der
+`sh scripts/wartungsmodus.sh ein "Text für die Besucher"`, zurücknehmen mit
+`sh scripts/wartungsmodus.sh aus`. Das Skript schaltet und misst danach nach,
+ob der Zustand wirklich angekommen ist — ohne diese Nachmessung wäre
+„geschaltet" eine Behauptung.
+
+Darunter liegt ein POST auf `/api/admin/maintenance` mit **Bearer-Auth**
+(`Authorization: Bearer <ADMIN_SECRET>`). Der Zustand steht im
+Firestore-Dokument `config/maintenance` und braucht bis zu 30 Sekunden, bis ihn
+alle Instanzen sehen. Besucher sehen dann einen Wartungs-Dialog statt der
 Analyse.
+
+**Nicht HMAC.** Bis zum 01.09.2026 stand hier der zweistufige HMAC-Weg mit
+Bestätigungsseite und Nonce. Den gibt es für den Wartungsmodus nicht:
+`handle-admin.js` schließt ihn ausdrücklich aus (`action !== "maintenance"`)
+und antwortet mit `403 Maintenance requires Bearer auth`. Für `boost` und
+`reset` stimmt der HMAC-Weg weiterhin — falsch beschrieben war ausgerechnet der
+Hebel, der am schnellsten greifen muss.
+
+Gemessen beim 4.6.0-Deploy am 01.09.2026: ein um 18:17:48, aus um 18:22:19 —
+4 Minuten 30 Sekunden Unerreichbarkeit.
 
 ### 2. ENTFALLEN mit v2.10 — es gibt keinen zweiten Weg mehr
 
@@ -490,8 +506,9 @@ Zugriffszahlen.
 **Das ist der ernste Fall.** Beide Wege zur Kostenbremse sind gescheitert, der
 Einlass läuft ungebremst weiter. Ursache ist fast immer ein Firestore-Ausfall.
 
-**Sofort:** Wartungsmodus einschalten (`config/maintenance`), damit keine
-weiteren Analysen starten. Danach den Datenbankzustand prüfen.
+**Sofort:** Wartungsmodus einschalten (`sh scripts/wartungsmodus.sh ein`, siehe
+Hebel 1), damit keine weiteren Analysen starten. Danach den Datenbankzustand
+prüfen.
 
 ### Stundenlimit erreicht (rollendes Fenster, Wert im Einstellungssatz)
 

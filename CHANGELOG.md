@@ -15,14 +15,22 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   trotzdem ab, räumt sie jetzt hinter sich auf, statt den nächsten Versuch zu
   blockieren.
 
-- **Fünf neue Wächter gegen teure Umbauten.** Einer merkt sich, was
+- **Sechs neue Wächter gegen teure Umbauten.** Einer merkt sich, was
   zusammengehört: Wer eine Einstellung hinzufügt, wird an die weiteren Stellen
   erinnert, die mitziehen müssen. Einer meldet, wenn Dateien wieder
   zusammenwachsen, die getrennt gehören. Einer prüft, ob jeder Notschalter der
   Auslieferung in der Schlussbilanz genannt wird und die Pipeline-Einstellung
   stimmt. Dazu eine Selbstprüfung, die jeden dieser Wächter absichtlich
   kaputtmacht und nachsieht, ob er das merkt — und ein Riegel, der einen Push
-  mit roten Prüfungen verhindert.
+  mit roten Prüfungen verhindert. Der sechste meldet Dateien, die im
+  Auslieferungsverzeichnis liegen und mitausgeliefert würden, ohne dass sie in
+  der Versionsverwaltung auftauchen.
+
+- **Die Wächter selbst können nicht mehr unbemerkt aus der Prüfkette
+  verschwinden.** Ein einzelner Prüfschritt liess sich aus der Kette
+  herausnehmen, ohne dass irgendetwas rot wurde. Jetzt wird nachgesehen, ob
+  jeder Wächter aus beiden Listen wirklich aufgerufen wird — aus der Pipeline
+  und aus der Prüfung vor dem Hochladen.
 
 - **Die Riegel der Auslieferung werden ausgeführt geprüft, nicht gelesen.** Zwanzig
   Fälle fahren das Auslieferungs-Skript in einer Wegwerf-Kopie durch, mit
@@ -49,6 +57,31 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   aller Funktionen vor und nach der Aufteilung.
 
 ### Behoben
+
+- **Ohne gültige Betriebseinstellungen wird kein Foto mehr angenommen.** Ging
+  beim Prüfen der Warteschlange etwas schief, wurde die Sperre übersprungen:
+  Der Auftrag entstand, das Foto landete im Speicher — für eine Analyse, die
+  ohne diese Einstellungen nie laufen kann. Ein Foto, das nie analysiert wird,
+  soll nie auf unserem Speicher liegen. Die Sperre greift jetzt vorher.
+
+- **Die Überwachung der Antwortzeiten kann nicht mehr dauerhaft verstummen.**
+  Sie merkt sich von Tag zu Tag, wie lange ein Einbruch schon anhält. Konnte
+  sie diesen Merkzettel nicht lesen, fing sie jeden Tag von vorne an und
+  meldete deshalb nie etwas. Der Ausfall wird jetzt gemeldet, statt in
+  Schweigen überzugehen.
+
+- **Eine gescheiterte Messung wird nicht mehr als Befund ausgegeben.** War
+  während der Auslieferung die Seite nicht erreichbar, meldete das Skript
+  "keine gültigen Betriebseinstellungen in der Produktion" — eine Aussage über
+  etwas, das es gar nicht gemessen hatte. Der Ratschlag daneben hätte die
+  Prüfung abgeschaltet, um ein Netzproblem zu umgehen.
+
+- **Die Umstell-Skripte der Warteschlange melden, was sie einstellen.** Eines
+  setzte vier gleichzeitige Analysen und meldete sieben.
+
+- **Der Prüfstand-Stempel behält, was von Hand ergänzt wurde.** Er schrieb die
+  Spalte jedes Mal neu und warf dabei den Hinweis weg, unter welcher
+  Voraussetzung die Zahlen gelten.
 
 - **Ein Test in der Prüfkette schlug gelegentlich grundlos fehl** und hielt
   damit Auslieferungen auf, obwohl nichts kaputt war. Er trennte zwei

@@ -304,6 +304,25 @@ probe 1 "neues Pflichtfeld ohne Begleiter wird gefunden" python3 scripts/pruefe-
 zurueck functions/src/betriebsprofil.js
 
 echo
+
+# BEFUND 01.09.2026 (Runde 7, L-5): Der Waechter ist neu — und ein neuer
+# Waechter ohne eigene Probe ist genau die Luecke, gegen die diese Datei
+# gebaut wurde. Die Probe legt eine ignorierte Datei unter public/ an, die
+# firebase.json NICHT ausschliesst: Firebase wuerde sie ausliefern, git zeigt
+# sie nirgends.
+echo "5. pruefe-auslieferbare-reste.mjs"
+
+probe 0 "sauberes public/ besteht" node scripts/pruefe-auslieferbare-reste.mjs
+
+RESTE_PROBE="public/selbstpruefung-rest.json"
+sichern .gitignore
+echo "$RESTE_PROBE" >> .gitignore
+printf '{"probe":1}' > "$RESTE_PROBE"
+probe 1 "ignorierte, auslieferbare Datei wird gefunden" node scripts/pruefe-auslieferbare-reste.mjs
+rm -f "$RESTE_PROBE"
+zurueck .gitignore
+
+echo
 echo "── Ergebnis ──"
 if [ "$FEHLER" -eq 0 ]; then
   # BEFUND 31.08.2026 (Pruefrunde 3): Hier stand nur die gezaehlte Zahl. Wer die
@@ -314,7 +333,7 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  ERWARTETE_PROBEN=10
+  ERWARTETE_PROBEN=12
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

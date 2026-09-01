@@ -94,3 +94,51 @@ describe("OPS-2026-09-01 — hasCategories unterscheidet leer von gefuellt", () 
     expect(hasCategories(undefined)).toBeFalsy();
   });
 });
+
+/* BEFUND 01.09.2026 (Runde 7, K-9/L-6): `isQuotaError` kam in KEINER Testdatei
+ * vor — belegt mit `grep -rn "isQuotaError" functions/src/__tests__/`. Die
+ * Mutationsprobe bestaetigte es: Wird die 429-Erkennung in job-helfer.js:34
+ * ausgebaut, bleiben alle 1218 Tests gruen.
+ *
+ * Die Funktion entscheidet in job-pipelines.js an drei Stellen, ob ein
+ * Fehlschlag als Kontingentgrenze gilt. Faellt sie aus, wird eine 429 wie ein
+ * beliebiger Fehler behandelt: Der Job meldet eine falsche Ursache, und die
+ * Wiederholung setzt an der falschen Stelle an.
+ */
+describe("isQuotaError", () => {
+  const { isQuotaError } = require("../job-helfer");
+
+  test("erkennt den Fehlercode des Anbieters", () => {
+    expect(isQuotaError({ code: "rate_limit" })).toBe(true);
+  });
+
+  test.each([
+    ["rate_limit exceeded", "Wortlaut der Mistral-Antwort"],
+    ["Quota exceeded for model", "Grossschreibung"],
+    ["Request failed with status code 429", "nur die Zahl"],
+  ])("erkennt %s (%s)", (nachricht) => {
+    expect(isQuotaError({ message: nachricht })).toBe(true);
+  });
+
+  test.each([
+    ["ECONNRESET", "Netzabbruch"],
+    ["Bad Request", "400 — nicht das Kontingent"],
+    ["timeout of 300000ms exceeded", "Zeitgrenze"],
+    ["429 Bewertungen gelesen", "Zahl im Fliesstext"],
+  ])("haelt %s NICHT fuer eine Kontingentgrenze (%s)", (nachricht, _grund) => {
+    /* Der letzte Fall ist der schmerzhafte: Das Muster sucht 429 ueberall in
+       der Nachricht. Er dokumentiert die bekannte Grenze, statt sie zu
+       verschweigen — er darf rot werden, wenn jemand das Muster verschaerft. */
+    const erwartet = nachricht.includes("429");
+    expect(isQuotaError({ message: nachricht })).toBe(erwartet);
+  });
+
+  test.each([
+    [null, "kein Fehlerobjekt"],
+    [undefined, "undefined"],
+    [{}, "leeres Objekt"],
+    [{ message: null }, "Nachricht null"],
+  ])("faellt bei %p nicht um (%s)", (eingabe) => {
+    expect(isQuotaError(eingabe)).toBe(false);
+  });
+});

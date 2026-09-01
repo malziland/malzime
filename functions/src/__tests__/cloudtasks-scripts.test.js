@@ -130,10 +130,7 @@ describe("Cloud-Tasks-Scripts", () => {
       attrappen = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-gcloud-"));
       /* Die Attrappe schreibt ihre Argumente in eine Datei, deren Namen sie
          aus der Umgebung bekommt — so kann jeder Fall seine eigene lesen. */
-      fs.writeFileSync(
-        path.join(attrappen, "gcloud"),
-        '#!/bin/sh\nprintf "%s\\n" "$@" >> "$MITSCHRIFT"\nexit 0\n'
-      );
+      fs.writeFileSync(path.join(attrappen, "gcloud"), '#!/bin/sh\nprintf "%s\\n" "$@" >> "$MITSCHRIFT"\nexit 0\n');
       fs.chmodSync(path.join(attrappen, "gcloud"), 0o755);
     });
 

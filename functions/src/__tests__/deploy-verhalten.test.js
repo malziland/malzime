@@ -567,6 +567,20 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     expect(r.ausgabe).toMatch(/Einstellungssatz/i);
   });
 
+  /* BEFUND 01.09.2026 (Runde 7, L-14): Der Test darueber deckt den Fall
+     "Satz fehlt". Der Fall "nicht gemessen" — Netz weg, Zeitgrenze — endete
+     bis dahin in derselben Meldung, obwohl ueber die Produktion nichts
+     bekannt war. Und der Rat darin (SKIP_SATZ=1) haette den Riegel entwaffnet,
+     um ein Netzproblem zu umgehen. */
+  test("nicht erreichbare Stats melden eine gescheiterte Messung, keinen fehlenden Satz", () => {
+    const r = deploy({ ATTRAPPE_CURL_ROT: "1" });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/nicht erreichbar/i);
+    expect(r.ausgabe).toMatch(/gescheiterte Messung/i);
+    /* Und ausdruecklich NICHT die Aussage ueber die Produktion. */
+    expect(r.ausgabe).not.toMatch(/kein gueltiger Einstellungssatz erkennbar/i);
+  });
+
   test("gescheiterte build-info haelt an, statt ohne Echtheitsbeweis zu liefern", () => {
     /* build-info.json ist der Echtheitsbeweis der Auslieferung — ohne ihn
        kann niemand nachrechnen, ob das Ausgelieferte dem Quelltext
@@ -618,6 +632,22 @@ describe("deploy.sh — der Erfolgsweg", () => {
     expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
     /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
     expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
+  });
+
+  /* BEFUND 01.09.2026 (Runde 7, L-13): Die Schlussbilanz listet jeden
+     uebersprungenen Riegel — aber nur solche mit SKIP_-Namen. DEPLOY_JA hebt
+     die Rueckfrage an den Menschen auf und fehlte darin. */
+  test("DEPLOY_JA erscheint in der Schlussbilanz", () => {
+    const r = deploy({ DEPLOY_JA: "1" });
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/UEBERSPRUNGENE RIEGEL|ÜBERSPRUNGENE RIEGEL/i);
+    expect(r.ausgabe).toMatch(/DEPLOY_JA/);
+  });
+
+  test("ohne DEPLOY_JA meldet die Bilanz alle Riegel gelaufen", () => {
+    const r = deploy();
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/alle Riegel gelaufen/i);
   });
 });
 

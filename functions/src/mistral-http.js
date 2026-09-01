@@ -47,6 +47,14 @@ function isRateLimitError(err) {
      Pipeline-Sicht ueberlastet — Der Aufrufer soll das als
      blocked.overloaded melden, damit der Client den Auto-Retry triggert. */
   if (err && err.code === "throttle_timeout") return true;
+  /* BEFUND 01.09.2026 (Runde 7, aus der Behebung von L-16): Die Zeile darueber
+     prueft `err &&`, die naechste tat es nicht — `isRateLimitError(null)` warf
+     einen TypeError. Ein catch-Block, der einen leeren Ablehnungsgrund faengt
+     (`Promise.reject()` ohne Argument, `throw null`), waere dadurch selbst
+     gescheitert, und der urspruengliche Fehler waere unterwegs verloren
+     gegangen — ausgerechnet in der Behandlung eines Fehlers. Die
+     Schwesterfunktion isQuotaError in job-helfer.js macht es richtig. */
+  if (!err) return false;
   const msg = (err.message || "").toLowerCase();
   return err.status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("rate_limited");
 }

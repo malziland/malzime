@@ -70,6 +70,12 @@ lauf "Pruefungen: Selbstpruefung" "pruefungen" sh scripts/pruefungen/selbstpruef
 lauf "Pruefungen: Aussentext-Sperrliste" "pruefungen" python3 scripts/pruefungen/checks/aussentext.py .
 lauf "Pruefungen: Fakten-Drift" "pruefungen" python3 scripts/pruefungen/checks/fakten-drift.py .
 lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
+# BEFUND 01.09.2026 (Runde 7, K-8): Der Aufruf oben ueberspringt Verzeichnisse,
+# die mit einem Punkt beginnen — und ALLE fuenf yml-Dateien dieses Projekts
+# liegen unter .github/. Der Waechter fuer verschluckte Fehler sah also
+# ausgerechnet die Auslieferungskette nie. Das Werkzeug ist vendoriert und wird
+# hier nicht bearbeitet; stattdessen wird es zusaetzlich dorthin gerichtet.
+lauf "Pruefungen: Stiller Fehlschlag (.github)" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .github
 lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/pruefungen/checks/test-blind.py .
 lauf "Pruefungen: Sichtbare Texte" "pruefungen" python3 scripts/pruefe-i18n-fallbacks.py
 lauf "Pruefungen: Tote Geduld" "pruefungen" python3 scripts/pruefe-tote-geduld.py
@@ -92,6 +98,10 @@ lauf "Lockfile: npm ci (functions)" "test-backend" npm ci --dry-run --prefix fun
 # als bestanden.
 lauf "Secret-Scan (gitleaks)" "secret-scan" sh scripts/secret-scan-lokal.sh
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
+# BEFUND 01.09.2026 (Runde 7, L-5): Der Sauberkeits-Riegel im Deploy prueft
+# `git status --porcelain` — der zeigt IGNORIERTE Dateien nicht. Firebase
+# liefert sie trotzdem aus, wenn firebase.json sie nicht ausschliesst.
+lauf "Pruefungen: Auslieferbare Reste" "pruefungen" node scripts/pruefe-auslieferbare-reste.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
 lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend
 lauf "Zeitzuender (Frontend)" "test-frontend" sh scripts/pruefe-zeitzuender.sh . --nur frontend

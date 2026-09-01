@@ -302,6 +302,12 @@ jobs:
       - run: python3 scripts/pruefungen/checks/aussentext.py .
       - run: python3 scripts/pruefungen/checks/fakten-drift.py .
       - run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
+      # BEFUND 01.09.2026 (Runde 7, K-8): Der Aufruf darueber ueberspringt
+      # Punkt-Verzeichnisse — und alle fuenf yml-Dateien liegen unter .github/.
+      # Der Waechter fuer verschluckte Fehler sah die Auslieferungskette nie.
+      # Das Werkzeug ist vendoriert; statt es zu bearbeiten, wird es hier
+      # zusaetzlich dorthin gerichtet.
+      - run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .github
       - run: python3 scripts/pruefungen/checks/test-blind.py .
 
       # UX-2026-08-21-06: Jedes uebersetzbare Element traegt einen Text fest im
@@ -363,6 +369,10 @@ jobs:
       # Der eigene Schalter ist Absicht: Der Austausch soll eine sichtbare
       # Zeile im Diff sein, keine Nebenwirkung.
       - run: node scripts/pruefe-fremddateien.mjs
+      # BEFUND 01.09.2026 (Runde 7, L-5): ignorierte Dateien unter public/,
+      # die firebase.json nicht ausschliesst, wuerden ausgeliefert, ohne in
+      # git oder im Sauberkeits-Riegel des Deploys aufzutauchen.
+      - run: node scripts/pruefe-auslieferbare-reste.mjs
 
       # TEST-2026-08-12-28: `scripts/pruefungen/` ist eine Kopie aus der
       # Audit-Familie. Kopien driften — diese war es bereits: Beim Kopieren

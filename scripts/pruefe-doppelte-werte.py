@@ -24,17 +24,30 @@ WURZEL = pathlib.Path(__file__).resolve().parent.parent
 SRC = WURZEL / "functions" / "src"
 
 # --- 1. Welche Felder traegt der Einstellungssatz? ---
-profil = (SRC / "betriebsprofil.js").read_text()
+# BEFUND 01.09.2026 (Runde 7, L-7): Fehlte betriebsprofil.js, endete dieser
+# Waechter mit einem FileNotFoundError-Traceback und Rueckgabewert 1 — also
+# derselben Antwort wie "ich habe Doppelungen gefunden". Die README sagt seit
+# jeher, jeder Waechter melde "nicht messbar" statt eines Ergebnisses, wenn
+# seine Grundlage fehlt; hier stimmte das nicht. Rueckgabewert 2 ist genau
+# dieser dritte Zustand: nicht gruen, aber auch kein Fund. Die Pipeline bricht
+# bei 2 unveraendert ab — es geht kein Schutz verloren, nur das Etikett stimmt.
+try:
+    profil = (SRC / "betriebsprofil.js").read_text()
+except OSError as fehler:
+    print(f"NICHT MESSBAR: {SRC / 'betriebsprofil.js'} nicht lesbar ({fehler.strerror}).")
+    print("               Ohne die Feldliste des Einstellungssatzes gibt es")
+    print("               nichts, wogegen die Werte im Code zu pruefen waeren.")
+    sys.exit(2)
 block = re.search(r"const FELDER = \{(.*?)\n\};", profil, re.S)
 if not block:
-    print("FEHLER: Feldliste in betriebsprofil.js nicht gefunden.")
-    print("        Der Waechter kann ohne sie nichts pruefen — das ist ein Fund,")
-    print("        kein gruenes Ergebnis. (Wurde die Datei umgebaut?)")
-    sys.exit(1)
+    print("NICHT MESSBAR: Feldliste in betriebsprofil.js nicht gefunden.")
+    print("               Der Waechter kann ohne sie nichts pruefen — das ist")
+    print("               kein gruenes Ergebnis. (Wurde die Datei umgebaut?)")
+    sys.exit(2)
 satzfelder = set(re.findall(r"^\s+(\w+):", block.group(1), re.M))
 if len(satzfelder) < 5:
-    print(f"FEHLER: nur {len(satzfelder)} Satzfelder erkannt — das Messmittel greift nicht.")
-    sys.exit(1)
+    print(f"NICHT MESSBAR: nur {len(satzfelder)} Satzfelder erkannt — das Messmittel greift nicht.")
+    sys.exit(2)
 
 # --- 2. Namensbruecke: Konstante im Code  ->  Feld im Satz ---
 #    Ein Wert kann anders heissen; diese Tabelle macht die Gleichheit sichtbar.

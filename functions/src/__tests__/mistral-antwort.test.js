@@ -110,6 +110,56 @@ describe("parseDescribeFooter — die Anker am Ende der Beschreibung", () => {
     expect(f.triggers).toContain("FOMO");
   });
 
+  /* BEFUND 01.09.2026 (Runde 7, K-9/L-6): Die Laengengrenzen der beiden
+     Bloecke waren von keinem Test beruehrt — `v.length <= 60` liess sich zu
+     `< 60` aendern, ohne dass etwas rot wurde. Sie sind kein Schoenheitsmass:
+     Eine ueberlange "Werbezeile" ist in Wahrheit ein Stueck Fliesstext, das
+     die Antwort an dieser Stelle nicht haette liefern duerfen. Genau auf der
+     Grenze entscheidet sich, ob ein Eintrag gehalten oder verworfen wird —
+     also wird genau dort gemessen, einmal knapp darunter und einmal darueber. */
+  describe("Laengengrenzen der Bloecke", () => {
+    const zeile = (n) => "A".repeat(n);
+
+    function baue(adsZeilen = [], triggerZeilen = []) {
+      /* Ohne HARD_FACTS: gibt es gar keinen Footer — parseDescribeFooter
+         liefert dann leere Anker, und die Grenzen waeren nie beruehrt. */
+      return [
+        "Ein Foto.",
+        "HARD_FACTS:",
+        "alter_geschlecht: 25-30 Jahre, maennlich",
+        "ADS:",
+        ...adsZeilen,
+        "TRIGGERS:",
+        ...triggerZeilen,
+      ].join("\n");
+    }
+
+    test("eine Werbezeile mit genau 60 Zeichen wird gehalten", () => {
+      const f = parseDescribeFooter(baue([zeile(60)]));
+      expect(f.ads).toContain(zeile(60));
+    });
+
+    test("eine Werbezeile mit 61 Zeichen faellt heraus", () => {
+      const f = parseDescribeFooter(baue([zeile(61)]));
+      expect(f.ads).toHaveLength(0);
+    });
+
+    test("ein Ausloeser mit genau 250 Zeichen wird gehalten", () => {
+      const f = parseDescribeFooter(baue([], [zeile(250)]));
+      expect(f.triggers).toContain(zeile(250));
+    });
+
+    test("ein Ausloeser mit 251 Zeichen faellt heraus", () => {
+      const f = parseDescribeFooter(baue([], [zeile(251)]));
+      expect(f.triggers).toHaveLength(0);
+    });
+
+    test("die Grenze trifft nur den zu langen Eintrag, nicht den Block", () => {
+      const f = parseDescribeFooter(baue(["Fitness-App", zeile(61), "Outdoor-Ausruestung"]));
+      expect(f.ads).toEqual(["Fitness-App", "Outdoor-Ausruestung"]);
+    });
+  });
+
   test("FEHLENDE Bloecke ergeben leere Vorgaben, keinen Fehler", () => {
     /* Der dokumentierte Rueckfall: handle-process-job entscheidet dann, ob die
        Profil-Aufrufe die Felder selbst fuellen. Ein Wurf hier wuerde die ganze

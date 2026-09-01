@@ -87,7 +87,23 @@ jobs:
               # Nummer bleibt gleich, aber der Abschnittstext kann gewachsen sein
               # (Nachtrag unter einer schon veroeffentlichten Version). Bei
               # Zuwachs die Release-Notizen nachziehen statt still auszusteigen.
-              git show "$GITHUB_SHA^:CHANGELOG.md" | abschnitt > notes-alt.md || true
+              # BEFUND 01.09.2026 (Runde 7, K-8): Hier stand `| abschnitt >
+              # notes-alt.md || true` — zwei Fehler in einer Zeile. Erstens
+              # traegt eine Pipe den Rueckgabewert des LETZTEN Glieds: ob
+              # `git show` ueberhaupt etwas fand, war nicht ablesbar.
+              # Zweitens machte `|| true` aus jedem Fehlschlag einen Erfolg —
+              # notes-alt.md blieb leer, `cmp` schlug fehl, und der Lauf
+              # meldete "Abschnittstext ist gewachsen", obwohl er in
+              # Wahrheit nichts gemessen hatte. Vier Zeilen weiter oben steht
+              # dieselbe Lehre schon einmal (RC_VORHER); hier war sie wieder
+              # herausgefallen.
+              RC_ALT=0
+              ALT_ROH="$(git show "$GITHUB_SHA^:CHANGELOG.md")" || RC_ALT=$?
+              if [ "$RC_ALT" -ne 0 ]; then
+                echo "FEHLER: Elternstand des CHANGELOG nicht lesbar (RC $RC_ALT) — Abbruch statt Nachziehen auf Verdacht."
+                exit 1
+              fi
+              printf '%s\n' "$ALT_ROH" | abschnitt > notes-alt.md
               abschnitt < CHANGELOG.md > notes-neu.md
               if cmp -s notes-alt.md notes-neu.md; then
                 echo "Release $TAG existiert; Abschnittstext unveraendert (Korrektur ausserhalb) — nichts zu tun."

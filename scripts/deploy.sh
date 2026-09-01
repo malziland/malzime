@@ -300,7 +300,25 @@ if [ "${SKIP_SATZ:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_SATZ=1 gesetzt — Einstellungssatz wird NICHT geprueft."
 else
   echo "— Einstellungssatz"
-  SATZ_ANTWORT=$(curl -s --max-time 20 "https://malzi.me/api/stats" 2>/dev/null || true)
+  # BEFUND 01.09.2026 (Runde 7, L-14): Hier stand `|| true`. Faellt das Netz
+  # aus oder laeuft die Anfrage in die Zeitgrenze, blieb die Antwort leer und
+  # das Skript brach mit "kein gueltiger Einstellungssatz erkennbar" ab — eine
+  # Aussage ueber die Produktion, die es gar nicht gemessen hatte. Der falsche
+  # Rat daneben (Satz anlegen, oder SKIP_SATZ=1 setzen) haette den Riegel
+  # entwaffnet, um ein Netzproblem zu umgehen. Beide Faelle sind Abbruch, aber
+  # sie brauchen verschiedene Meldungen.
+  SATZ_RC=0
+  SATZ_ANTWORT=$(curl -s --max-time 20 "https://malzi.me/api/stats" 2>/dev/null) || SATZ_RC=$?
+  if [ "$SATZ_RC" -ne 0 ]; then
+    echo "ABBRUCH: https://malzi.me/api/stats war nicht erreichbar (curl-Rueckgabewert $SATZ_RC)."
+    echo "         Damit ist NICHT geprueft, ob ein Einstellungssatz vorliegt —"
+    echo "         das ist kein Befund ueber die Produktion, sondern eine"
+    echo "         gescheiterte Messung. Netz pruefen und erneut starten."
+    echo
+    echo "         SKIP_SATZ=1 waere hier das falsche Werkzeug: Es hebt den"
+    echo "         Riegel auf, statt die Messung zu wiederholen."
+    exit 1
+  fi
   SATZ_LIMIT=$(printf '%s' "$SATZ_ANTWORT" | grep -o '"limit":[0-9]*' | head -1 | grep -o '[0-9]*$' || true)
   if [ -z "$SATZ_LIMIT" ] || [ "$SATZ_LIMIT" -lt 1 ] 2>/dev/null; then
     echo "ABBRUCH: In der Produktion ist kein gueltiger Einstellungssatz erkennbar."
@@ -755,6 +773,12 @@ UEBERSPRUNGEN=""
 # Schalter, der den Riegel unter dem Einstellungssatz abhebt — ohne Satz nimmt
 # die Seite Fotos an und JEDE Analyse scheitert.
 [ "${SKIP_SATZ:-0}" = "1" ]      && UEBERSPRUNGEN="$UEBERSPRUNGEN SKIP_SATZ"
+# BEFUND 01.09.2026 (Runde 7, L-13): DEPLOY_JA ist der einzige Ausnahmeweg
+# ohne SKIP_-Namen und fehlte deshalb hier — auch der Waechter sucht nur nach
+# `SKIP_[A-Z_]+`. Er hebt keinen Riegel auf, sondern die Rueckfrage an den
+# Menschen davor. KERN 12 macht da keinen Unterschied: Wer die Bilanz liest,
+# soll sehen, dass niemand bestaetigt hat.
+[ -n "${DEPLOY_JA:-}" ]          && UEBERSPRUNGEN="$UEBERSPRUNGEN DEPLOY_JA(Rueckfrage)"
 
 echo ""
 if [ -n "$UEBERSPRUNGEN" ]; then

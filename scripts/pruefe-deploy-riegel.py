@@ -236,6 +236,16 @@ def main():
         "Stand gegen das Repo nach, braucht Netz und eine Live-Adresse. Vor "
         "dem Deploy gibt es den Stand noch nicht.",
     }
+    # Manche Waechter gehoeren in die Pipeline, aber NICHT in die Pruefung vor
+    # dem Push: Die dauert heute 13 Sekunden, und dieser Wert ist ihr Zweck —
+    # eine Vorabpruefung, die Minuten braucht, wird umgangen. Wer hier steht,
+    # muss in ci.yml stehen; vor-dem-push.sh bleibt frei.
+    NUR_PIPELINE = {
+        "pruefe-mutationen.mjs": "setzt Mutationen und laesst je Mutation Tests "
+        "laufen — Minuten bis Stunden, je nachdem wie viele Testdateien an der "
+        "geaenderten Datei haengen. In der Pipeline laeuft er neben den langen "
+        "Suiten und kostet keine zusaetzliche Wartezeit.",
+    }
     skripte = [d for d in skripte if d.name not in AUSGENOMMEN]
 
     def ohne_kommentare(text):
@@ -296,8 +306,10 @@ def main():
     aus_vorab = erreichbar_ab(vorab.read_text(encoding="utf-8"))
     waechter_fehlt = []
     for datei in skripte:
-        wo = [n for n, m in (("ci.yml", aus_ci), ("vor-dem-push.sh", aus_vorab))
-              if datei.name not in m]
+        listen = [("ci.yml", aus_ci)]
+        if datei.name not in NUR_PIPELINE:
+            listen.append(("vor-dem-push.sh", aus_vorab))
+        wo = [n for n, m in listen if datei.name not in m]
         if wo:
             waechter_fehlt.append((datei.name, ", ".join(wo)))
     if waechter_fehlt:

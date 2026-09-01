@@ -197,34 +197,20 @@ async function warteschlangeNachziehen({ parallelitaet, queueRatePerSekunde }) {
      * `JEST_WORKER_ID` setzt Jest in jedem Arbeitsprozess. Wer die Funktion
      * im Test wirklich pruefen will, ersetzt den Client ueber
      * `setClientForTest()` — dann laeuft sie gegen die Attrappe weiter. */
-    if (process.env.JEST_WORKER_ID !== undefined && !clientOverride) {
-      return {
-        ok: false,
-        grund:
-          "Aufruf aus einem Test ohne Attrappe — die echte Warteschlange " +
-          "wird nicht angefasst. setClientForTest() verwenden.",
-      };
-    }
-    /* OPS-2026-08-31-05: Der Jest-Riegel allein genuegt nicht. Der Lasttest
-     * faehrt den Firebase-Emulator und laesst darin die ECHTEN Funktionen
-     * laufen — Jest laeuft dabei nicht, der Emulator holt sich bei
-     * angemeldetem Konto aber die Produktions-Zugangsdaten. Auf genau diesem
-     * Weg lagen am 31.08. 4.056 Testbilder im echten Bildspeicher
-     * (`queue-storage.js` hat denselben Riegel bekommen).
+    /* BEFUND 01.09.2026 (Mutationsprobe): Hier stand die Riegel-Logik ein
+     * ZWEITES Mal, Wort fuer Wort — obwohl der Kommentar ueber
+     * `testUmgebungGrund()` sagt, sie liege "an EINER Stelle, die beide
+     * benutzen". Runde 4 hatte das als blossen Textfehler eingestuft
+     * (F-11: "falsch ist der Satz, nicht der Riegel"). Das stimmte nur
+     * solange, wie beide Kopien gleich blieben.
      *
-     * Eine Warteschlange gibt es im Emulator ohnehin nicht: Der Lokal-Modus
-     * ersetzt Cloud Tasks durch eigenen Dispatch. Wer hier landet, wollte den
-     * echten Dienst — aus einer Umgebung, die ihn nicht anfassen darf. */
-    const emulator =
-      process.env.FIRESTORE_EMULATOR_HOST || process.env.FUNCTIONS_EMULATOR || process.env.CLOUD_TASKS_EMULATOR_HOST;
-    if (emulator && !clientOverride) {
-      return {
-        ok: false,
-        grund:
-          "Es laeuft ein Emulator — die echte Warteschlange wird nicht " +
-          "angefasst. Im Lokal-Modus ersetzt eigener Dispatch die Cloud Tasks.",
-      };
-    }
+     * Die Mutationsprobe hat gezeigt, dass die Kopie ungedeckt war: Die
+     * Emulator-Erkennung liess sich von `||` auf `&&` aendern, ohne dass ein
+     * Test rot wurde — dann gaelte ein Emulator erst als erkannt, wenn ALLE
+     * DREI Variablen gesetzt sind, und ein Lauf mit nur einer ginge an die
+     * echte Warteschlange. Jetzt gibt es die Logik wirklich nur einmal. */
+    const testGrund = testUmgebungGrund(clientOverride);
+    if (testGrund) return { ok: false, grund: testGrund };
 
     const projekt = projectId();
     if (!projekt) return { ok: false, grund: "kein Projekt bekannt" };
@@ -277,6 +263,13 @@ function setClientForTest(impl) {
 
 module.exports = {
   enqueueJob,
+  /* Fuer Tests: die Riegel-ENTSCHEIDUNG laesst sich so isoliert pruefen,
+     ohne die Funktion zu fahren. Das ist hier kein Komfort, sondern
+     Sicherheit — wer den Emulator-Zweig ueber `warteschlangeNachziehen`
+     prueft, muesste dafuer den Jest-Riegel abschalten, und eine kaputte
+     Bedingung ginge dann an die ECHTE Warteschlange. Genau der Vorfall vom
+     30.08. */
+  _testUmgebungGrund: testUmgebungGrund,
   redispatchJobLocal,
   processJobUrl,
   invokerServiceAccount,

@@ -27,6 +27,14 @@ const BEWUSST_DRAUSSEN = {
   "npm ci": "Installation, keine Prüfung",
   "npm test": "Backend-Suite, läuft lokal so lang wie in der Pipeline (~2,5 min)",
   "npm run test:e2e": "E2E-Suite, dito (~3,5 min) — beides deckt scripts/pruefstand.sh ab",
+  /* Die Mutationsprobe setzt je geaenderter Zeile eine Aenderung und laesst
+     dafuer Tests laufen. Gemessen am 01.09.2026: Sekunden bei Modulen am
+     Rand, ueber anderthalb Minuten je Mutation bei zentralen Dateien, an
+     denen 18 Testdateien haengen. In der Pipeline laeuft sie neben den langen
+     Suiten; vor dem Push wuerde sie aus 13 Sekunden Minuten machen — und eine
+     Vorabpruefung, die Minuten braucht, wird umgangen. */
+  "node scripts/pruefe-mutationen.mjs --zeitgrenze=4":
+    "Mutationsprobe, Minuten statt Sekunden — laeuft in der Pipeline",
 };
 
 /** Alle `- run:`-Schritte der drei billigen Jobs aus der Workflow-Datei. */

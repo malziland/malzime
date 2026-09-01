@@ -26,6 +26,19 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Auslieferungsverzeichnis liegen und mitausgeliefert würden, ohne dass sie in
   der Versionsverwaltung auftauchen.
 
+- **Eine Probe misst jetzt, ob die Tests überhaupt etwas merken.** Sie ändert
+  den geänderten Code an einzelnen Stellen absichtlich ab — dreht Vergleiche
+  um, verschiebt Grenzen — und sieht nach, ob ein Test rot wird. Bleibt alles
+  grün, ist die Stelle ungeprüft, auch wenn die Zahlen anderes behaupten. Sie
+  läuft in der Pipeline und weist aus, was sie in ihrem Zeitfenster nicht
+  geschafft hat, statt es als geprüft zu verbuchen.
+
+- **Jeder Wächter hat jetzt eine Probe, die belegt, dass er anschlagen kann.**
+  Von elf hatten nur vier eine; für die übrigen gab es keinen Nachweis, dass
+  ihr Grün etwas bedeutet. Beim Bauen dieser Proben kam heraus, dass die
+  Prüfung auf wirkungslose Wartezeiten einen Teil der Testdateien gar nicht
+  gelesen hat (siehe unten).
+
 - **Die Wächter selbst können nicht mehr unbemerkt aus der Prüfkette
   verschwinden.** Ein einzelner Prüfschritt liess sich aus der Kette
   herausnehmen, ohne dass irgendetwas rot wurde. Jetzt wird nachgesehen, ob
@@ -57,6 +70,21 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   aller Funktionen vor und nach der Aufteilung.
 
 ### Behoben
+
+- **Der Schutz, der Testläufe von der echten Warteschlange fernhält, ist jetzt
+  selbst abgesichert.** Er entstand nach dem Vorfall vom 30. August, an dem ein
+  Testlauf die Produktion umgestellt hat — aber man konnte seine Bedingungen
+  umdrehen, ohne dass ein Test rot wurde. Ein Schutz, den man versehentlich
+  entfernen kann, ohne dass es auffällt, ist ein Schutz auf Zeit. Dabei kam
+  heraus, dass dieselbe Prüfung an zwei Stellen doppelt geführt wurde, obwohl
+  der Kommentar das Gegenteil behauptete; jetzt gibt es sie wirklich nur einmal.
+
+- **Die Prüfung auf wirkungslose Wartezeiten hat einen Teil der Testdateien
+  nicht gelesen.** Sie hielt alles hinter einem `//` für einen Kommentar — auch
+  in Adressen wie `http://localhost`. Damit war sie auf ganzen Abschnitten
+  blind, ohne das zu melden. Aufgefallen ist es erst, als eine Probe für sie
+  gebaut wurde: eine Wartezeit von 99 Sekunden in einem Test mit 30 Sekunden
+  Grenze — sie meldete grün.
 
 - **Ohne gültige Betriebseinstellungen wird kein Foto mehr angenommen.** Ging
   beim Prüfen der Warteschlange etwas schief, wurde die Sperre übersprungen:

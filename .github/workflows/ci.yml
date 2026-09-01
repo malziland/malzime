@@ -373,6 +373,13 @@ jobs:
       # die firebase.json nicht ausschliesst, wuerden ausgeliefert, ohne in
       # git oder im Sauberkeits-Riegel des Deploys aufzutauchen.
       - run: node scripts/pruefe-auslieferbare-reste.mjs
+      # Mutationsprobe: Merken die Tests es, wenn der geaenderte Code
+      # kaputtgeht? Sechs von achtzehn Befunden der Pruefrunde 7 waren
+      # Stellen, an denen sich Code aendern liess, ohne dass ein Test rot
+      # wurde. Sie laeuft NUR hier, nicht vor dem Push: je Mutation ein
+      # eigener Testlauf, das dauert Minuten. Zeitfenster je Datei, und
+      # was darin nicht geprueft wurde, meldet sie als ungemessen.
+      - run: node scripts/pruefe-mutationen.mjs --zeitgrenze=4
 
       # TEST-2026-08-12-28: `scripts/pruefungen/` ist eine Kopie aus der
       # Audit-Familie. Kopien driften — diese war es bereits: Beim Kopieren

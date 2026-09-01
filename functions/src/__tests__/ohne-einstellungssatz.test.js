@@ -205,6 +205,14 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
     /* Sie laesst durch — ohne Satz laeuft ohnehin keine Analyse, und ein
        geschlossenes Tor waere hier keine Sicherheit, sondern ein zweiter
        Ausfall. Aber sie sagt WARUM. */
+    /* BEFUND 01.09.2026 (Mutationsprobe): Genau diese Zusicherung fehlte —
+       geprueft wurden Grund und Limit, nicht die ENTSCHEIDUNG. `allowed: true`
+       liess sich zu `false` aendern, ohne dass ein Test rot wurde. Damit war
+       die bewusste Abwaegung (durchlassen statt sperren, weil ohne Satz
+       ohnehin keine Analyse laeuft) von nichts festgehalten — sie haette
+       jederzeit unbemerkt kippen koennen, und der Einlass waere doppelt
+       gesperrt gewesen. */
+    expect(e.allowed).toBe(true);
     expect(e.grund).toBe("kein-einstellungssatz");
     expect(e.limit).toBeNull();
     expect(gemeldet).toMatch(/kein-einstellungssatz/);

@@ -323,6 +323,102 @@ rm -f "$RESTE_PROBE"
 zurueck .gitignore
 
 echo
+
+# BEFUND 01.09.2026 (Punkt 2 des Umbaus): Von elf Waechtern hatten nur vier
+# eine Probe hier. Fuer die uebrigen gab es KEINEN Beleg, dass sie ueberhaupt
+# rot werden koennen — sie meldeten seit Wochen gruen, und niemand hatte je
+# gemessen, ob das etwas bedeutet. Ein Waechter ohne Probe ist eine
+# Behauptung. Die folgenden fuenf schliessen die Luecke.
+
+echo "6. pruefe-doppelte-werte.py"
+
+probe 0 "einfach gefuehrte Werte bestehen" python3 scripts/pruefe-doppelte-werte.py
+
+sichern functions/src/config.js
+python3 - <<'PYSELF'
+# Einen Betriebswert, der im Einstellungssatz steht, zusaetzlich fest in den
+# Code schreiben — genau die Doppelung, gegen die der Waechter gebaut ist.
+s = open("functions/src/config.js").read()
+open("functions/src/config.js", "w").write(
+    s + "\n// Selbstpruefung: absichtliche Doppelung\nconst RATE_LIMIT = 155;\n")
+PYSELF
+probe 1 "doppelt gefuehrter Betriebswert wird gefunden" python3 scripts/pruefe-doppelte-werte.py
+zurueck functions/src/config.js
+
+echo
+
+echo "7. pruefe-i18n-fallbacks.py"
+
+probe 0 "uebereinstimmende Texte bestehen" python3 scripts/pruefe-i18n-fallbacks.py
+
+sichern public/index.html
+python3 - <<'PYSELF'
+# Den sichtbaren Text von seiner Sprachdatei abweichen lassen. Genau dieser
+# Fall ist am 21.08. real aufgetreten: Im HTML stand ein anderer Satz als in
+# der Sprachdatei, und wer die Seite ohne Uebersetzung sah, las den falschen.
+s = open("public/index.html").read()
+s = s.replace('data-i18n="hero.title">Wir sehen mehr als dein Foto.',
+              'data-i18n="hero.title">Selbstpruefung: abweichender Text.', 1)
+open("public/index.html", "w").write(s)
+PYSELF
+probe 1 "abweichender sichtbarer Text wird gefunden" python3 scripts/pruefe-i18n-fallbacks.py
+zurueck public/index.html
+
+echo
+
+echo "8. pruefe-tote-geduld.py"
+
+probe 0 "Wartezeiten unter dem Zeitlimit bestehen" python3 scripts/pruefe-tote-geduld.py
+
+sichern e2e/ansagen.test.js
+python3 - <<'PYSELF'
+# Eine Wartezeit ueber das Zeitlimit des Tests setzen: Der Test kann dann
+# NIE durchlaufen — er reisst die Reissleine, bevor die Wartezeit um ist.
+s = open("e2e/ansagen.test.js").read()
+s = s.replace("waitForTimeout(900)", "waitForTimeout(99000)", 1)
+open("e2e/ansagen.test.js", "w").write(s)
+PYSELF
+probe 1 "Wartezeit ueber dem Zeitlimit wird gefunden" python3 scripts/pruefe-tote-geduld.py
+zurueck e2e/ansagen.test.js
+
+echo
+
+echo "9. pruefe-fremddateien.mjs"
+
+probe 0 "unveraenderte Fremddateien bestehen" node scripts/pruefe-fremddateien.mjs
+
+# Die Schluessel in PRUEFSUMMEN.json sind bereits vollstaendige Pfade
+# ("public/fonts/..."), kein Zusatz noetig. Die erste Fassung setzte "public/"
+# davor und fand deshalb nichts — die Probe meldete "nicht messbar" statt zu
+# messen. Genau die Fehlerform, gegen die diese Datei gebaut ist.
+FREMD="$(node -e "
+const j=require('./public/lib/PRUEFSUMMEN.json');
+const k=Object.keys(j.dateien||j).filter((n) => /\.(js|css|txt)$/.test(n));
+process.stdout.write(k[0]||'');
+" 2>/dev/null)"
+if [ -n "$FREMD" ] && [ -f "$FREMD" ]; then
+  sichern "$FREMD"
+  printf '\n/* Selbstpruefung */\n' >> "$FREMD"
+  probe 1 "veraenderte Fremddatei wird gefunden" node scripts/pruefe-fremddateien.mjs
+  zurueck "$FREMD"
+else
+  echo "  ?     Fremddatei-Sabotage NICHT MESSBAR (keine Datei in PRUEFSUMMEN.json gefunden)"
+  echo "        Eine uebersprungene Probe ist kein Beleg — hier ist der Grund."
+  FEHLER=$((FEHLER + 1))
+fi
+
+echo
+
+echo "10. pruefe-vendorierung.mjs"
+
+probe 0 "unveraenderte Kopien bestehen" node scripts/pruefe-vendorierung.mjs
+
+sichern scripts/pruefungen/checks/aussentext.py
+printf '\n# Selbstpruefung: Kopie veraendert\n' >> scripts/pruefungen/checks/aussentext.py
+probe 1 "bearbeitete vendorierte Kopie wird gefunden" node scripts/pruefe-vendorierung.mjs
+zurueck scripts/pruefungen/checks/aussentext.py
+
+echo
 echo "── Ergebnis ──"
 if [ "$FEHLER" -eq 0 ]; then
   # BEFUND 31.08.2026 (Pruefrunde 3): Hier stand nur die gezaehlte Zahl. Wer die
@@ -333,7 +429,7 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  ERWARTETE_PROBEN=12
+  ERWARTETE_PROBEN=22
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

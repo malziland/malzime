@@ -18,11 +18,11 @@
     "emulator": "firebase emulators:start --only functions,firestore,hosting,pubsub"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.62.0",
-    "@vitest/coverage-v8": "^4.1.9",
-    "eslint": "^10.8.0",
+    "@playwright/test": "^1.62.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",

@@ -403,9 +403,11 @@ async function leseFrisch(jetzt) {
       zeile.maxTokens = ergebnis.werte.singleLargeMaxTokens;
       console.log(JSON.stringify(zeile));
     } else {
-      /* Kein gueltiger Satz = keine Analyse. Das ist ein Betriebsfehler und
-         gehoert als solcher ins Protokoll, damit die Alarmierung greift. */
-      console.error(JSON.stringify(zeile));
+      /* Kein gueltiger Satz = keine Analyse. Nur GERADE nicht lesbar heilt sich beim
+         naechsten Aufruf und ist eine Warnung; alles andere alarmiert (SECURITY-MODEL, 07.09.2026). */
+      if (String(ergebnis.grund).startsWith("nicht lesbar"))
+        console.warn(JSON.stringify({ ...zeile, severity: "WARNING" }));
+      else console.error(JSON.stringify(zeile));
     }
   }
 

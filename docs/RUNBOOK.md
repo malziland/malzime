@@ -484,10 +484,51 @@ und `fileSizeKb`.
 ### Mistral überlastet / 429 / 5xx
 
 Nutzer sehen `blocked.overloaded` bzw. `blocked.apiError`; die Queue puffert
-Stoßlast, interne Retries laufen automatisch. Bei anhaltender Störung: Mistral-Status
-und **Account-Dashboard** prüfen (Limits unterscheiden sich drastisch je
-Modellversion — immer das Dashboard, nicht Code-Kommentare). Notfalls Wartungsmodus
-(Hebel 1).
+Stoßlast, interne Retries laufen automatisch. Seit 07.09.2026 bekommt auch ein
+Aussetzer (502, 503, 504) EINE Wiederholung nach zwei Sekunden, genau wie ein
+429 — vorher lief ein einzelner 503 ungebremst bis zur Fehlermeldung durch.
+Bleibt der Aussetzer, bleibt die Fehlermeldung. Bei anhaltender Störung:
+Mistral-Status und **Account-Dashboard** prüfen (Limits unterscheiden sich
+drastisch je Modellversion — immer das Dashboard, nicht Code-Kommentare).
+Notfalls Wartungsmodus (Hebel 1).
+
+Nachsehen, ob es nur Aussetzer waren (eine Zeile je Analyse, die trotz
+Wiederholung scheiterte):
+
+    gcloud logging read 'jsonPayload.alert="single-large-failed"' \
+      --project=malzime --freshness=7d --format='value(timestamp,jsonPayload.error)'
+
+### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
+
+**Was passiert ist:** Der Aufräumer liest jede Minute den Einstellungssatz
+(`config/betriebsprofil`). Kam er in ZWEI Läufen hintereinander nicht heran,
+meldet er das mit `severity: ERROR` und der Anzahl der Läufe in Folge — und
+zwar jede Minute erneut, bis es wieder geht. EIN Lauf ohne Betriebswerte ist
+seit 07.09.2026 nur eine Warnung (`reap-query-ohne-betriebswerte:<abfrage>`):
+Am 07.09. hatte ein einzelner träger Datenbankzugriff zwei Alarme ausgelöst,
+obwohl der Lauf eine Minute später gesund war.
+
+**Ist das schlimm?** Zwei Minuten ohne Betriebswerte heißen: Firestore
+antwortet nicht in zwei Sekunden, oder das Dokument ist weg. Dann laufen auch
+keine Analysen — jede betroffene meldet sich selbst als Fehler
+(`kein-einstellungssatz` in `process-job`).
+
+**Was tun:** Firestore-Status und das Dokument prüfen
+(`scripts/betriebsprofil-vergleichen.js` zeigt, ob es da ist und zum Repo
+passt). Ein fehlendes oder abgelehntes Dokument meldet `betriebsprofil.js`
+weiterhin sofort als ERROR — das heilt sich nicht von selbst.
+
+Prüfen von Hand:
+
+    gcloud logging read 'jsonPayload.error="betriebswerte-wiederholt-nicht-lesbar"' \
+      --project=malzime --freshness=7d
+
+Erwartet: keine Zeile. Die Warnungen dazu (einzelne Ausrutscher) zählen — nach
+Minuten, denn ein träger Lauf erzeugt bis zu fünf Warnungen in derselben Minute
+und zählt als EIN Lauf:
+
+    gcloud logging read 'jsonPayload.warning:"reap-query-ohne-betriebswerte"' \
+      --project=malzime --freshness=7d --format='value(timestamp)' | cut -c1-16 | sort -u
 
 ### »notbremse-gegriffen« — der Stundenzähler ist ausgefallen
 

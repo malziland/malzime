@@ -154,6 +154,29 @@ describe("PROTOKOLL — damit ein Ausfall auffindbar ist", () => {
     expect(zeile.grund.length).toBeGreaterThan(5);
   });
 
+  test("NICHT LESBAR ist eine Warnung, kein Fehler — der naechste Aufruf liest wieder (07.09.2026)", async () => {
+    /* BELEG (Logauswertung 07.09.2026, 17:37 Wien): Ein einzelner traeger
+       Datenbankzugriff im Aufraeumer loeste zwei Alarme aus, obwohl der
+       naechste Lauf eine Minute spaeter gesund war. Ein Dokument, das es
+       nicht gibt oder das abgelehnt wird, bleibt ein Fehler — das heilt sich
+       nicht von selbst. Ein Zugriff, der nur gerade nicht klappt, ist eine
+       Warnung: Er wird beim naechsten Aufruf wiederholt (Test oben). */
+    const warnung = jest.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      setze(undefined, "UNAVAILABLE");
+      await geltendeWerte();
+
+      expect(fehler).not.toHaveBeenCalled();
+      expect(warnung).toHaveBeenCalledTimes(1);
+      const zeile = JSON.parse(warnung.mock.calls[0][0]);
+      expect(zeile.step).toBe("betriebsprofil");
+      expect(zeile.severity).toBe("WARNING");
+      expect(zeile.grund).toContain("nicht lesbar");
+    } finally {
+      warnung.mockRestore();
+    }
+  });
+
   test("ein gueltiger Satz wird mit seinen Zahlen protokolliert", async () => {
     setze({ aktiv: "t1", profile: { t1: T1 } });
     await geltendeWerte();

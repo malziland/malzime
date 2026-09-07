@@ -59,6 +59,12 @@ function isRateLimitError(err) {
   return err.status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("rate_limited");
 }
 
+/* Antworten, bei denen EINE Wiederholung sinnvoll ist: Ueberlast (429) und
+   die drei Aussetzer-Codes — ein Zwischenknoten oder der Dienst selbst ist
+   fuer einen Augenblick nicht da. Hintergrund steht am Einsatzort in
+   callMistralRawUnthrottled. */
+const WIEDERHOLBARE_STATUS = new Set([429, 502, 503, 504]);
+
 function modelClassOf(model) {
   return /large/i.test(model || "") ? "large" : "small";
 }
@@ -246,6 +252,9 @@ async function callMistralRawUnthrottled({
      Client kann via Auto-Retry sauber zurueckkommen. */
   const backoffs = [2000];
   let lastError;
+  /* Beginn des GANZEN Aufrufs, nicht des einzelnen Versuchs — davon zehrt das
+     Budget (siehe unten bei `verbraucht`). */
+  const aufrufStart = Date.now();
 
   for (let attempt = 0; attempt <= backoffs.length; attempt++) {
     const controller = new AbortController();
@@ -270,7 +279,16 @@ async function callMistralRawUnthrottled({
       throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
     }
     const cap = timeoutCapMs;
-    const budget = timeoutMs == null ? cap : timeoutMs;
+    /* Die Wiederholung bekommt nur das RESTbudget: Was der erste Versuch und
+       die Pause davor verbraucht haben, ist weg. ABNAHME-FUND 07.09.2026:
+       Vorher nahm jeder Durchlauf das volle Budget. Bei einem 429 war das
+       folgenlos (kommt in Millisekunden); ein spaeter 504 haette dem zweiten
+       Versuch aber noch einmal die volle Zeit gegeben und die Zeitgrenze der
+       Function reissen koennen — der Auftrag haengt dann in `processing`, bis
+       der Aufraeumer ihn kippt. Ohne uebergebenes Budget gilt weiter die
+       Obergrenze je Versuch. */
+    const verbraucht = Date.now() - aufrufStart;
+    const budget = timeoutMs == null ? cap : timeoutMs - verbraucht;
     if (budget <= 0) {
       const err = new Error("Mistral-Budget erschoepft");
       err.code = "timeout";
@@ -306,7 +324,16 @@ async function callMistralRawUnthrottled({
        Waechter koennte ein haengender Stream den Worker endlos festhalten. */
     if (!streamen) clearTimeout(timeoutId);
 
-    if (res.status === 429 && attempt < backoffs.length) {
+    /* 429 ist Ueberlast. 502, 503 und 504 sind ein Aussetzer: ein
+       Zwischenknoten oder der Dienst selbst ist fuer einen Augenblick nicht
+       da. BELEG 07.09.2026, 18:44 Wien: Mistral antwortete auf die erste
+       Analyse des Tages mit 503 "Service unavailable". Wiederholt wurde bis
+       dahin nur bei 429 — der Auftrag wurde "blocked", der Mensch am iPhone
+       sah "technischer Fehler", und sein zweiter Versuch eine Minute spaeter
+       lief in 41 Sekunden durch. Seitdem bekommt ein Aussetzer dieselbe EINE
+       Wiederholung wie ein 429. Ein 500 oder 4xx bekommt sie nicht: Das ist
+       eine Antwort auf genau diese Anfrage, keine Stoerung. */
+    if (WIEDERHOLBARE_STATUS.has(res.status) && attempt < backoffs.length) {
       if (streamen) clearTimeout(timeoutId);
       /* KA-09 (Kurzaudit 2026-08-12): Den nie gelesenen Antwortrumpf aktiv
          verwerfen, sonst bleibt die Verbindung bis zum Speicherbereiniger
@@ -316,8 +343,10 @@ async function callMistralRawUnthrottled({
       } catch (_) {
         /* Verwerfen ist best effort — ein Fehler hier ändert nichts am Retry. */
       }
-      lastError = new Error("Mistral 429 rate limited");
-      lastError.status = 429;
+      lastError = new Error(
+        res.status === 429 ? "Mistral 429 rate limited" : `Mistral HTTP ${res.status}: voruebergehend nicht erreichbar`
+      );
+      lastError.status = res.status;
       await new Promise((r) => setTimeout(r, backoffs[attempt]));
       continue;
     }
@@ -380,7 +409,7 @@ async function callMistralRawUnthrottled({
     };
   }
 
-  /* Wenn wir hier landen, sind alle Retry-Versuche fehlgeschlagen mit 429 */
+  /* Wenn wir hier landen, sind alle Wiederholungen fehlgeschlagen (429 oder Aussetzer). */
   throw lastError || new Error("Mistral request failed");
 }
 

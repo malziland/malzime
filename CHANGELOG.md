@@ -40,6 +40,30 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   angenommen, 42 sauber abgewiesen. Die Kommentare sagen jetzt, was der Code
   tut (DOC-2026-09-01-04).
 
+- **Ein kurzer Aussetzer bei Mistral ist kein Fehler mehr für den Menschen
+  vor dem Bildschirm.** Antwortet Mistral mit „Dienst nicht verfügbar" (502,
+  503 oder 504), wartet der Server zwei Sekunden und fragt einmal neu —
+  genauso, wie er es bei „zu viele Anfragen" schon tat. Am 07.09. um 18:44
+  war die erste Analyse des Tages daran gescheitert, obwohl der Dienst eine
+  Minute später wieder in 41 Sekunden antwortete; das iPhone davor sah
+  „technischer Fehler". Bleibt der Aussetzer, bleibt auch die Fehlermeldung.
+
+- **Ein einzelner träger Datenbankzugriff im Aufräumer löst keinen Alarm mehr
+  aus.** Am 07.09. um 17:37 konnte der Aufräumer die Betriebswerte einmal
+  nicht in zwei Sekunden lesen; der Lauf eine Minute später war gesund,
+  niemand war betroffen — trotzdem gingen E-Mail und Push raus. Jetzt ist ein
+  Lauf ohne Betriebswerte eine Warnung, zwei Läufe hintereinander sind ein
+  Fehler und alarmieren. Ein fehlendes oder abgelehntes Dokument alarmiert
+  weiter sofort, denn das heilt sich nicht von selbst.
+
+- **Die Karte bricht bei GPS-Werten, die keine Zahlen sind, nicht mehr ab.**
+  Am 05.09. brach der Kartenaufbau viermal auf einem Android-Gerät mit
+  „Invalid LatLng object: (NaN, NaN)" ab: Das Foto trug GPS-Felder, aus denen
+  sich keine Zahl machen ließ, und die Prüfung „ist nicht leer" ließ NaN
+  durch. Solche Werte gelten jetzt als „kein GPS", wie bei einem Foto ohne
+  Ortsangabe — keine Karte, keine Fehlermeldung, der Rest der Analyse wie
+  gehabt.
+
 ## [4.6.2] — 2026-09-01
 
 ### Behoben

@@ -480,7 +480,11 @@ async function renderGpsMap(data) {
   }
   elements.gpsMap.innerHTML = "";
 
-  if (exif.gpsLatitude == null || exif.gpsLongitude == null) return;
+  /* Zweite Sperre neben gpsAusTags in exif.js (05.09.2026): Was keine Zahl
+     ist, ist keine Koordinate. Leaflet wirft bei NaN, und der Abschnitt
+     bliebe mit einer Fehlermeldung leer statt einfach weg. Deckt null und
+     undefined mit ab. */
+  if (!Number.isFinite(exif.gpsLatitude) || !Number.isFinite(exif.gpsLongitude)) return;
   if (typeof L === "undefined") return;
 
   const lat = exif.gpsLatitude;

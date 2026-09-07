@@ -62,6 +62,24 @@ async function readFileBytes(file) {
   }
 }
 
+/* GPS nur, wenn beide Werte echte Koordinaten sind.
+   BELEG (Fehlererfassung 05.09.2026, viermal Android): Die EXIF-Bibliothek
+   lieferte NaN fuer Breite und Laenge — das Foto trug GPS-Felder, aus denen
+   sich keine Zahl machen liess. Die Pruefung "ist nicht null" liess NaN
+   durch (NaN ist nicht null), und Leaflet brach mit "Invalid LatLng object:
+   (NaN, NaN)" ab: Die Karte fehlte, vier Fehlermeldungen gingen an den
+   Server. Jetzt gilt: keine Zahl, unendlich oder ausserhalb des
+   Wertebereichs heisst kein GPS — genau wie bei einem Foto ohne Ortsangabe.
+   Exportiert fuer Tests. */
+export function gpsAusTags(tags) {
+  if (!tags) return null;
+  const { latitude, longitude } = tags;
+  if (typeof latitude !== "number" || typeof longitude !== "number") return null;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  if (Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return null;
+  return { latitude, longitude };
+}
+
 export async function prepareImage(file) {
   const buffer = await readFileBytes(file);
   const bytes = new Uint8Array(buffer);
@@ -81,9 +99,7 @@ export async function prepareImage(file) {
         dateTimeOriginal =
           tags.DateTimeOriginal instanceof Date ? tags.DateTimeOriginal.toISOString() : String(tags.DateTimeOriginal);
       }
-      if (tags.latitude != null && tags.longitude != null) {
-        gps = { latitude: tags.latitude, longitude: tags.longitude };
-      }
+      gps = gpsAusTags(tags);
     }
   } catch (_) {
     /* EXIF parse failed — continue without */

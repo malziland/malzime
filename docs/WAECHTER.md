@@ -33,6 +33,7 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 | `pruefe-fremddateien.mjs` | Veränderter Fremdcode (exifr, Leaflet, Schriften) | OSS-2026-08-12-22: exifr liest die GPS-Daten, deren Nichtweitergabe die Kernzusage ist | 41 ms |
 | `pruefe-vendorierung.mjs` | Bearbeitete Kopien der Audit-Familie unter `scripts/pruefungen/` | Bearbeitet wird die Quelle, nie die Kopie | 57 ms |
 | `pruefe-mutationen.mjs` | **Tests, die nichts merken:** Code kaputtmachen, ohne dass ein Test rot wird | Runde 7: Sechs von achtzehn Befunden waren überlebende Mutationen, von Hand gefunden | Minuten — **läuft vorerst nur lokal**, siehe unten |
+| `betriebsprofil-vergleichen.js` (Abschnitt 1b von `verify-infrastructure.sh`) | **Einstellungssatz in der Datenbank weicht vom Repo ab** — die Wahrheit liegt in Firestore, das Repo ist die Kopie | OPS-2026-09-01-02 (Audit 01.09.): zwei Tage lang acht abweichende Felder, sieben davon in den Ersatz-Profilen für den Ernstfall; kein Test sah es, weil `satz-gegen-doku` Kopie gegen Kopie prüft | ~1 s, **nur vor dem Deploy** (liest die echte Datenbank; Negativprobe in `verify-infrastructure-script.test.js`) |
 
 **Alle zusammen (ohne die Mutationsprobe): unter einer Sekunde.** Deshalb
 laufen sie vor jedem Push. Die Mutationsprobe braucht je Mutation einen

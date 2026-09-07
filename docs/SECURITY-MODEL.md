@@ -216,11 +216,21 @@ bei Tempo versagt, ist keine.
 
 ### Was daraus wurde
 
-**Ein Netz, das nicht ausfallen kann** (`notbremseUeberJobs` in `counter.js`):
+**Ein Netz, das nicht ausfallen kann** (`netzUeberZeitstempel` in `counter.js`):
 eine zweite Prüfung, die nichts schreibt und deshalb nicht an derselben
-Ursache scheitern kann. Sie zählt die Aufträge der letzten Stunde mit einer
-Aggregat-Abfrage — dieselbe Technik wie die Warteschlangen-Position, und die
-kennt keine Sperren.
+Ursache scheitern kann. Sie liest dasselbe Zähler-Dokument mit einem einfachen
+Lesezugriff außerhalb der Transaktion — eine Schreibsperre hält Leser nicht
+auf — und wendet dieselben Regeln an wie der Zähler: dasselbe Fenster,
+dasselbe wirksame Limit einschließlich eines laufenden Boosts.
+
+*Korrigiert am 01.09.2026 (BIZ-2026-09-01-01):* Die erste Fassung des Netzes
+zählte die Auftrags-Dokumente der letzten Stunde. Sie übersah, dass der
+Aufräumer zugestellte Aufträge 15 Minuten nach der Zustellung löscht — unter
+Andrang sah das Netz nur rund ein Viertel der Stunde und erreichte das Limit
+nie; außerdem rechnete es mit dem Grundlimit statt mit dem Boost. Ein
+Ersatzweg, der eine andere Menge und eine andere Grenze misst als der
+Hauptweg, ist keiner. Der Kostendeckel war in dieser Zeit die
+Warteschlangen-Rate (`queueRatePerSekunde`), nicht das Stundenlimit.
 
 **Ein Zeitlimit von zwei Sekunden** um die Transaktion. Ohne das hingen 75 %
 der Anfragen 54 Sekunden, weil Firestore selbst sehr lange auf die
@@ -242,11 +252,32 @@ feuert, macht den Ernstfall unauffindbar.
 
 ### Was das im Betrieb bedeutet
 
-Die Kostenbremse ist verlässlich, auch unter Last. Fällt sie *doch* einmal
-komplett aus — Zähler und Netz zugleich —, kommt eine Meldung auf beiden
-Kanälen mit dem Wortlaut „Zähler UND Netz fehlgeschlagen".
+Die Kostenbremse hält auch unter Last, weil Zähler und Netz denselben Stand
+lesen. Was jeder Betreiber trotzdem wissen muss: Die **erste** Grenze gegen
+Kosten ist die Warteschlangen-Rate (`queueRatePerSekunde`, heute 0,125
+Aufträge je Sekunde ≈ 450 Analysen je Stunde) — sie liegt unter dem
+Stundenlimit. Wer die Rate anhebt, hebt diesen Deckel mit an und macht das
+Stundenlimit zur einzigen Bremse. Fällt die Bremse *doch* einmal komplett
+aus — Zähler und Netz zugleich —, kommt eine Meldung auf beiden Kanälen
+(`alert: notbremse-fehlgeschlagen`, Text „Weder Zaehler noch Notbremse
+verfuegbar — KEINE Kostenbremse aktiv"). Im Netz-Fall geht die
+Push-Nachricht mit dem Boost-Knopf je Instanz höchstens einmal je fünf
+Minuten hinaus; bei bis zu zehn Einlass-Instanzen sind das bis zu zehn
+Nachrichten je fünf Minuten.
 
-Messwerte nach der Reparatur (Emulator, 170 gleichzeitige Anfragen):
+**Restrisiko, das bleibt:** Im Netz-Fall schreibt niemand den Zeitstempel
+des eingelassenen Auftrags — die Transaktion ist ja gerade gescheitert. Jeder
+Netz-Fall fehlt damit im Fenster, und zwar kumulativ: Klemmt der Zähler über
+eine ganze Andrangswelle, zählt das Fenster nur die Aufträge, deren
+Transaktion durchkam. Das Netz blockiert dann später, als es sollte. Wie groß
+diese Lücke im echten Betrieb ist, steht nach dem nächsten Workshop im Log
+(`netz-hat-uebernommen` zählen). Ein nachträgliches Schreiben ohne
+Transaktion wäre die Abhilfe, erhöht aber die Kontention auf demselben
+Dokument — nur mit Simulator-Messung einbauen.
+
+Messwerte nach der Reparatur vom 30.08.2026 (Emulator, 170 gleichzeitige
+Anfragen, Stand vor dem Netz-Umbau vom 01.09.; mit dem neuen Netz nicht
+nachgemessen):
 
 ```
 Ausfälle der Bremse      206  ->  0

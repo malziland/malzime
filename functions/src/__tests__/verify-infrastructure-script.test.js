@@ -167,4 +167,70 @@ describe("verify-infrastructure.sh", () => {
       expect(aus).not.toMatch(/Region: SOLL EUROPE-WEST1, IST/);
     });
   });
+
+  /* OPS-2026-09-01-02: Der Vergleich Datenbank ↔ Repo kann rot werden. Beide
+     Proben laufen ueber den Einspeisepunkt INFRA_PROBE_SATZ; gcloud, gsutil
+     und curl sind attrappiert, node ist echt — das Vergleichsskript liest
+     dann die Datei statt Firestore. */
+  describe("der Einstellungssatz-Riegel kann rot werden (OPS-2026-09-01-02)", () => {
+    const os = require("os");
+    const { execFileSync } = require("child_process");
+    const { PROFILE, AKTIV } = require("../produktiv-satz");
+    let dir;
+    beforeAll(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-satz-"));
+      const attrappen = path.join(dir, "bin");
+      fs.mkdirSync(attrappen);
+      for (const w of ["gcloud", "gsutil", "curl"]) {
+        const ziel = path.join(attrappen, w);
+        fs.writeFileSync(ziel, "#!/bin/sh\n" + `echo "ATTRAPPE ${w}: kein Zugriff im Test" >&2\n` + "exit 1\n");
+        fs.chmodSync(ziel, 0o755);
+      }
+    });
+    afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+    function lauf(umgebung) {
+      try {
+        return execFileSync("bash", [SCRIPT], {
+          encoding: "utf8",
+          env: { ...process.env, PATH: `${path.join(dir, "bin")}:${process.env.PATH}`, ...umgebung },
+        });
+      } catch (e) {
+        return (e.stdout || "") + (e.stderr || "");
+      }
+    }
+
+    function mitSatz(dokument) {
+      const datei = path.join(dir, "satz.json");
+      fs.writeFileSync(datei, JSON.stringify(dokument));
+      return lauf({ INFRA_PROBE_SATZ: datei });
+    }
+
+    test("Datenbank == Repo → gruen", () => {
+      const aus = mitSatz({ aktiv: AKTIV, profile: PROFILE });
+      expect(aus).toMatch(/Einstellungssatz: Datenbank und Repo stimmen ueberein/);
+      expect(aus).not.toMatch(/Einstellungssatz weicht vom Repo ab/);
+    });
+
+    test("ein Feld im Ersatz-Profil weicht ab → rot mit Feldname und beiden Werten", () => {
+      const profile = JSON.parse(JSON.stringify(PROFILE));
+      const soll = PROFILE["t1-langsam"].parallelitaet;
+      profile["t1-langsam"].parallelitaet = soll + 3;
+      const aus = mitSatz({ aktiv: AKTIV, profile });
+      expect(aus).toMatch(/Einstellungssatz weicht vom Repo ab/);
+      expect(aus).toContain(`t1-langsam.parallelitaet: DB=${soll + 3} Repo=${soll}`);
+    });
+
+    test("ohne Einspeisepunkt im Probemodus wird NICHT gegen die echte Datenbank verglichen", () => {
+      /* Der Bucket-Riegel-Test oben laeuft im Probemodus — er darf keinen
+         Datenbankzugriff ausloesen. */
+      const bp = path.join(dir, "bucket.json");
+      fs.writeFileSync(
+        bp,
+        '{"location":"EUROPE-WEST1","softDeletePolicy":{"retentionDurationSeconds":"0"},"lifecycle":{"rule":[{"action":{"type":"Delete"},"condition":{"age":1}}]}}'
+      );
+      const aus = lauf({ INFRA_PROBE_BUCKET: bp });
+      expect(aus).toMatch(/uebersprungen \(Probemodus ohne INFRA_PROBE_SATZ\)/);
+    });
+  });
 });

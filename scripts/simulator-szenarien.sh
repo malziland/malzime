@@ -173,12 +173,14 @@ print(m.group(1) if m else 155)")
 # BUG-2026-08-30-14, BEHOBEN am 30.08.2026.
 # Der Einlass zaehlte frueher und legte den Auftrag mehrere Schritte spaeter an.
 # Bei gleichzeitigem Andrang sahen alle Anfragen denselben Stand und kamen alle
-# durch — hier gemessen: 200 bei Grenze 155. Seit der atomaren
-# Platzreservierung (jobs.platzReservieren) entscheidet EINE Transaktion.
+# durch — hier gemessen: 200 bei Grenze 155. Seitdem prueft jeder Auftrag NACH
+# dem Anlegen seine Position (jobs.platzBestaetigen) und nimmt sich zurueck,
+# wenn er zu spaet ist. (Eine atomare Reservierung wurde am selben Tag
+# versucht und verworfen; der dazugehoerige Zaehler ist seit 01.09. entfernt.)
 #
 # Die Schwelle ist deshalb die ECHTE Grenze, nicht mehr das frueher gemessene
 # Ausmass. Ein paar Plaetze Toleranz bleiben fuer Auftraege, die zwischen
-# Reservierung und Zaehlung stehen — mehr nicht.
+# Anlegen und Positionspruefung stehen — mehr nicht.
 pruefe "die Warteschlange haelt die eingestellte Tiefe ein" \
   "${WARTEND:-?} wartend, Grenze $TIEFE" "hoechstens $TIEFE (+5 Toleranz)" \
   "$([ -n "$WARTEND" ] && [ "$WARTEND" -le "$((TIEFE + 5))" ] && echo 0 || echo 1)"

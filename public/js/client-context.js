@@ -58,6 +58,13 @@ export function collectClientContext() {
       if (typeof navigator.deviceMemory === "number") ctx.deviceMemoryGb = navigator.deviceMemory;
       if (typeof navigator.hardwareConcurrency === "number") ctx.hardwareConcurrency = navigator.hardwareConcurrency;
       if (typeof navigator.language === "string") ctx.language = navigator.language.slice(0, 10);
+      /* Weist der Browser sich selbst als automatisiert aus? Jeder
+         Test-Browser (Playwright, Puppeteer, Selenium) setzt das Merkmal.
+         NACHUNTERSUCHUNG 07.09.2026: Zehn "demo-image-load"-Meldungen in 30
+         Tagen kamen von genau solchen Browsern — erkennbar erst nach einer
+         Stunde Messen, weil dieses Feld fehlte. Ja/Nein, kein Personenbezug.
+         Kennt der Browser das Merkmal nicht, bleibt das Feld weg. */
+      if (typeof navigator.webdriver === "boolean") ctx.automatisiert = navigator.webdriver;
     }
     if (typeof screen !== "undefined") {
       if (typeof screen.width === "number" && typeof screen.height === "number") {

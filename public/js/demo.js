@@ -31,16 +31,24 @@ function demoBildPfad(key) {
 
 const DEMO_KEYS = ["selfie", "cafe", "hiker"];
 
-export function initDemo() {
+/* `bereit`: ein Versprechen, das erfuellt ist, sobald die Uebersetzung
+   geladen ist. BELEG (Pipeline-Lauf 34149354681, 07.09.2026): Die Knoepfe
+   wurden erst NACH `await initI18n()` verdrahtet; ein Klick 0,68 s davor tat
+   nichts, und 15 Sekunden lang blieb die Seite leer. Auf einer langsamen
+   Maschine ist das die Pruefkette, im Schul-WLAN ein Kind, das auf ein Foto
+   tippt. Jetzt wird sofort verdrahtet, und ein frueher Klick wartet auf die
+   Uebersetzung statt zu verpuffen. Ohne Argument: sofort, wie vorher. */
+export function initDemo(bereit = Promise.resolve()) {
   document.querySelectorAll(".demo-thumb[data-demo]").forEach((btn) => {
     btn.addEventListener("click", () => {
       /* v3.0: Klang-Aktivierung direkt in der Klick-Geste — nach dem ersten
          `await` wäre die Nutzer-Aktivierung für den AudioContext verfallen. */
       klangAktivieren();
       const key = btn.dataset.demo;
-      /* Pfad ERST beim Klick auflösen — die Sprache kann sich zwischen dem
-         Seitenaufbau und dem Klick geändert haben. */
-      if (key && DEMO_KEYS.includes(key)) loadDemoImage(demoBildPfad(key), key);
+      if (!key || !DEMO_KEYS.includes(key)) return;
+      /* Pfad ERST nach dem Warten auflösen — er haengt an der Sprache, und die
+         steht erst fest, wenn die Uebersetzung da ist. */
+      bereit.then(() => loadDemoImage(demoBildPfad(key), key));
     });
   });
 }

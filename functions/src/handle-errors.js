@@ -36,7 +36,11 @@ const TIMING_KEYS = ["prepareImageMs", "fetchMs", "parseMs", "renderMs", "totalM
 
 const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
 const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];
-const CLIENT_BOOL_KEYS = ["saveData"];
+/* `automatisiert` = navigator.webdriver des Browsers (07.09.2026): Zehn
+   "demo-image-load"-Meldungen in 30 Tagen stammten von automatisierten
+   Browsern — erkennbar erst nach einer Stunde Messen. Ein Ja/Nein-Wert ohne
+   Personenbezug; gefiltert wird nichts. */
+const CLIENT_BOOL_KEYS = ["saveData", "automatisiert"];
 
 function sanitizeTimings(raw) {
   if (!raw || typeof raw !== "object") return null;

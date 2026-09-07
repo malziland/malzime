@@ -4,6 +4,26 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.6.4] — 2026-09-07
+
+### Behoben
+
+- **Ein früher Klick auf ein Demo-Foto verpufft nicht mehr.** Die drei
+  Demo-Knöpfe wurden erst verdrahtet, nachdem die Übersetzung geladen war. Wer
+  im langsamen WLAN schneller tippte als die Seite fertig war, sah nichts —
+  und genau daran ist am 07.09. einmal die Prüfkette gescheitert. Jetzt sind
+  die Knöpfe sofort aktiv; ein Klick vor dem Ende der Übersetzung wartet auf
+  sie und läuft dann durch.
+
+### Geändert
+
+- **Die anonyme Fehlererfassung merkt sich, ob der Browser sich selbst als
+  automatisiert ausweist** (ja/nein, kein Personenbezug). Zehn Meldungen
+  „Demo-Bild konnte nicht geladen werden" in 30 Tagen stammten von
+  automatisierten Browsern, erkennbar erst nach einer Stunde Messen; mit dem
+  Feld erklärt sich die nächste solche Meldung selbst. Gefiltert wird nichts.
+  Die Datenschutzerklärung nennt das Feld und trägt den Stand 7. September 2026.
+
 ## [4.6.3] — 2026-09-07
 
 ### Behoben

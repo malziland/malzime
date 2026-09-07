@@ -254,3 +254,35 @@ Sperr-Konflikte          225  ->  0
 Antwortdauer (75 %)   54.000 ms -> 6.800 ms
 abgerissene Verbindungen  94  ->  0
 ```
+
+## Ein Ausrutscher der Datenbank ist kein Alarm (07.09.2026)
+
+**Entscheidung.** Kann eine Function den Einstellungssatz (`config/betriebsprofil`)
+gerade nicht lesen — Zeitlimit, Verbindung, kurze Störung —, protokolliert
+`betriebsprofil.js` das als WARNING, nicht als ERROR. Der Aufräumer, der jede
+Minute liest, alarmiert erst, wenn zwei Läufe hintereinander ohne Betriebswerte
+bleiben. Ein fehlendes, unbenanntes oder abgelehntes Dokument bleibt sofort ERROR.
+
+**Begründung.** Am 07.09.2026 um 17:37 löste ein einzelner träger Zugriff zwei
+Alarme aus (E-Mail und Push), obwohl der Lauf eine Minute später gesund war und
+kein Mensch betroffen. Ein Alarm, der nichts bedeutet, kostet das Vertrauen in die
+Alarme, die etwas bedeuten — und in einem Workshop entscheidet dieses Vertrauen,
+ob jemand hinschaut. Ein Lesefehler heilt sich beim nächsten Aufruf von selbst
+(der Cache hält Fehlschläge nicht fest); ein kaputtes Dokument nicht — deshalb
+die Trennung nach Grund, nicht nach Ort.
+
+**Betrachtete Alternative.** Das Zeitlimit von zwei Sekunden anheben. Verworfen:
+Das Limit sitzt im Analysepfad, und jede Sekunde mehr wäre eine Sekunde, die
+JEDE Analyse im Störungsfall länger hängt. Ein zweiter Leseversuch im Aufräumer:
+verworfen, weil er die Wartezeit im Fehlerfall verdoppelt, und der nächste Lauf
+ohnehin 60 Sekunden später kommt.
+
+**Was weiterhin alarmiert.** Jede Analyse, die ohne Betriebswerte abbricht
+(`kein-einstellungssatz` in `handle-process-job.js`), zwei Aufräumer-Läufe in
+Folge (`betriebswerte-wiederholt-nicht-lesbar`), jedes kaputte Dokument. Ein
+Dauerausfall von Firestore fällt damit spätestens nach zwei Minuten auf.
+
+**Bedingung für Neubewertung.** Mehr als drei Warnungen
+`reap-query-ohne-betriebswerte` an einem Tag (Abfrage im RUNBOOK) — dann ist es
+kein Ausrutscher mehr, sondern ein Muster, und die Ursache gehört gesucht, nicht
+die Schwelle verschoben.

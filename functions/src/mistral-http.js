@@ -59,6 +59,12 @@ function isRateLimitError(err) {
   return err.status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("rate_limited");
 }
 
+/* Antworten, bei denen EINE Wiederholung sinnvoll ist: Ueberlast (429) und
+   die drei Aussetzer-Codes — ein Zwischenknoten oder der Dienst selbst ist
+   fuer einen Augenblick nicht da. Hintergrund steht am Einsatzort in
+   callMistralRawUnthrottled. */
+const WIEDERHOLBARE_STATUS = new Set([429, 502, 503, 504]);
+
 function modelClassOf(model) {
   return /large/i.test(model || "") ? "large" : "small";
 }
@@ -306,7 +312,16 @@ async function callMistralRawUnthrottled({
        Waechter koennte ein haengender Stream den Worker endlos festhalten. */
     if (!streamen) clearTimeout(timeoutId);
 
-    if (res.status === 429 && attempt < backoffs.length) {
+    /* 429 ist Ueberlast. 502, 503 und 504 sind ein Aussetzer: ein
+       Zwischenknoten oder der Dienst selbst ist fuer einen Augenblick nicht
+       da. BELEG 07.09.2026, 18:44 Wien: Mistral antwortete auf die erste
+       Analyse des Tages mit 503 "Service unavailable". Wiederholt wurde bis
+       dahin nur bei 429 — der Auftrag wurde "blocked", der Mensch am iPhone
+       sah "technischer Fehler", und sein zweiter Versuch eine Minute spaeter
+       lief in 41 Sekunden durch. Seitdem bekommt ein Aussetzer dieselbe EINE
+       Wiederholung wie ein 429. Ein 500 oder 4xx bekommt sie nicht: Das ist
+       eine Antwort auf genau diese Anfrage, keine Stoerung. */
+    if (WIEDERHOLBARE_STATUS.has(res.status) && attempt < backoffs.length) {
       if (streamen) clearTimeout(timeoutId);
       /* KA-09 (Kurzaudit 2026-08-12): Den nie gelesenen Antwortrumpf aktiv
          verwerfen, sonst bleibt die Verbindung bis zum Speicherbereiniger
@@ -316,8 +331,10 @@ async function callMistralRawUnthrottled({
       } catch (_) {
         /* Verwerfen ist best effort — ein Fehler hier ändert nichts am Retry. */
       }
-      lastError = new Error("Mistral 429 rate limited");
-      lastError.status = 429;
+      lastError = new Error(
+        res.status === 429 ? "Mistral 429 rate limited" : `Mistral HTTP ${res.status}: voruebergehend nicht erreichbar`
+      );
+      lastError.status = res.status;
       await new Promise((r) => setTimeout(r, backoffs[attempt]));
       continue;
     }
@@ -380,7 +397,7 @@ async function callMistralRawUnthrottled({
     };
   }
 
-  /* Wenn wir hier landen, sind alle Retry-Versuche fehlgeschlagen mit 429 */
+  /* Wenn wir hier landen, sind alle Wiederholungen fehlgeschlagen (429 oder Aussetzer). */
   throw lastError || new Error("Mistral request failed");
 }
 

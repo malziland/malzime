@@ -56,11 +56,40 @@ const { releaseHourlySlot } = require("./counter");
    Stoerung) hielt den GANZEN Reaper an, inklusive der beiden Loeschzweige und
    des Erinnerungs-Waechters. Jetzt: schlaegt eine Abfrage fehl, meldet sie das
    laut (severity ERROR → Alarm) und liefert eine leere Liste, damit die
-   uebrigen Zweige weiterlaufen. */
-async function sicherFinden(name, fn) {
+   uebrigen Zweige weiterlaufen.
+
+   AUSNAHME seit 07.09.2026: fehlende Betriebswerte. Das ist kein kaputter
+   Index und keine entzogene Berechtigung, sondern meist ein einzelner traeger
+   Datenbankzugriff (BELEG 07.09.2026, 17:37 Wien: ein Lauf ohne Werte, der
+   naechste gesund, niemand betroffen — und trotzdem zwei Alarme). Ein Lauf
+   ist eine Warnung; ob es ein Fehler ist, entscheidet reapJobs am Ende ueber
+   die Laeufe in Folge. */
+/* Laeufe hintereinander, in denen mindestens eine Abfrage ohne Betriebswerte
+   blieb. Lebt in der Instanz; ein Instanzwechsel setzt auf null — dann
+   alarmiert ein Dauerzustand eine Minute spaeter, nicht gar nicht. */
+let laeufeOhneBetriebswerte = 0;
+/* BLEIBT IM CODE — Schutzgrenze der Alarmierung, keine Betriebseinstellung:
+   Sie haengt am Minutentakt des Aufraeumers, nicht an Last oder Modell. Zwei
+   Laeufe sind zwei Minuten — ein Ausrutscher bleibt still, ein Dauerzustand
+   nicht. */
+const LAEUFE_BIS_ALARM = 2;
+
+async function sicherFinden(name, fn, lauf) {
   try {
     return await fn();
   } catch (err) {
+    if (err && err.code === "config_missing") {
+      lauf.ohneBetriebswerte = true;
+      console.warn(
+        JSON.stringify({
+          severity: "WARNING",
+          step: "reap",
+          warning: `reap-query-ohne-betriebswerte:${name}`,
+          message: err.message,
+        })
+      );
+      return [];
+    }
     console.error(
       JSON.stringify({
         severity: "ERROR",
@@ -74,8 +103,9 @@ async function sicherFinden(name, fn) {
 }
 
 async function reapJobs() {
+  const lauf = { ohneBetriebswerte: false };
   /* (1) Verlassene wartende Jobs → abandoned. */
-  const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs());
+  const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs(), lauf);
   let reapedAbandoned = 0;
   for (const job of abandoned) {
     try {
@@ -93,7 +123,7 @@ async function reapJobs() {
   }
 
   /* (2) In `processing` hängende Jobs → failed. */
-  const stale = await sicherFinden("stale", () => findStaleProcessingJobs());
+  const stale = await sicherFinden("stale", () => findStaleProcessingJobs(), lauf);
   let reapedStale = 0;
   for (const job of stale) {
     try {
@@ -111,7 +141,7 @@ async function reapJobs() {
      damit das komplette Stundenfenster dauerhaft blockieren — ohne dass je ein
      Platz zurueckkommt. Nach 35 Minuten wartet niemand mehr ernsthaft; der
      Browser gibt bereits nach 30 auf. */
-  const ueberfaellig = await sicherFinden("ueberfaellig", () => findUeberfaelligeJobs());
+  const ueberfaellig = await sicherFinden("ueberfaellig", () => findUeberfaelligeJobs(), lauf);
   let reapedUeberfaellig = 0;
   for (const job of ueberfaellig) {
     try {
@@ -128,7 +158,7 @@ async function reapJobs() {
   /* (2c) PRIV-107b: Zugestellte Ergebnisse nach dem Browser-Wiederholungs-
      Fenster löschen — Bild zuerst (BUG-002-Regel), defensiv: normal ist es
      nach der Analyse längst weg. */
-  const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs());
+  const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs(), lauf);
   let reapedZugestellt = 0;
   for (const job of zugestellt) {
     try {
@@ -148,7 +178,7 @@ async function reapJobs() {
   }
 
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
-  const expired = await sicherFinden("expired", () => findExpiredJobs());
+  const expired = await sicherFinden("expired", () => findExpiredJobs(), lauf);
 
   /* DAS NETZ UNTER DER PLATZRESERVIERUNG (BUG-2026-08-30-14).
      Der Einlass reserviert Plaetze in einem Zaehler; jeder Uebergang aus
@@ -218,6 +248,29 @@ async function reapJobs() {
      Erinnerung selbst, die bewusst leise bleibt.
      Schwelle 9 Tage: ein ausgefallener Montag allein loest noch nichts aus. */
   await pruefeErinnerungsLebenszeichen();
+
+  /* Ohne Betriebswerte in ZWEI Laeufen hintereinander ist es kein Ausrutscher
+     mehr — dann alarmieren, jede Minute erneut, bis es wieder geht. Ein
+     gesunder Lauf setzt die Zaehlung zurueck (KERN 4: die Pruefung kann sich
+     erholen). */
+  if (lauf.ohneBetriebswerte) {
+    laeufeOhneBetriebswerte += 1;
+    if (laeufeOhneBetriebswerte >= LAEUFE_BIS_ALARM) {
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          step: "reap",
+          error: "betriebswerte-wiederholt-nicht-lesbar",
+          laeufeInFolge: laeufeOhneBetriebswerte,
+          hinweis:
+            "Der Aufraeumer kommt seit mehreren Laeufen nicht an die Betriebswerte (config/betriebsprofil). " +
+            "Firestore und das Dokument pruefen (RUNBOOK).",
+        })
+      );
+    }
+  } else {
+    laeufeOhneBetriebswerte = 0;
+  }
 
   console.log(
     JSON.stringify({

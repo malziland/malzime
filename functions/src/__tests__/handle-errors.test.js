@@ -71,6 +71,36 @@ describe("handleErrors", () => {
     expect(logged.fileSizeKb).toBe(3072);
   });
 
+  test("client.automatisiert (navigator.webdriver) kommt an, ein erfundenes client-Feld nicht (07.09.2026)", async () => {
+    /* Nachuntersuchung 07.09.2026: zehn "demo-image-load"-Meldungen in 30
+       Tagen, alle von automatisierten Browsern — erkennbar erst nach einer
+       Stunde Messen, weil das Kennzeichen fehlte, das jeder solche Browser
+       selbst setzt. Ein Ja/Nein-Wert, kein Personenbezug, kein Filter. */
+    const res = mockRes();
+    await handleErrors(
+      mockReq({
+        errorMessage: "Failed to fetch",
+        phase: "demo-image-load",
+        client: { automatisiert: true, saveData: false, erfunden: "nein", language: "en-US" },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(204);
+    const logged = loggedPayload();
+    expect(logged.client.automatisiert).toBe(true);
+    expect(logged.client.saveData).toBe(false);
+    expect(logged.client.language).toBe("en-US");
+    expect(logged.client).not.toHaveProperty("erfunden");
+  });
+
+  test("client.automatisiert als Text wird verworfen — nur boolesch zaehlt", async () => {
+    const res = mockRes();
+    await handleErrors(mockReq({ errorMessage: "x", phase: "p", client: { automatisiert: "true" } }), res);
+    expect(res.statusCode).toBe(204);
+    const logged = loggedPayload();
+    expect(logged.client == null || !("automatisiert" in logged.client)).toBe(true);
+  });
+
   test("verwirft Felder mit falschem Typ und kappt Ueberlaengen", async () => {
     const res = mockRes();
     await handleErrors(

@@ -30,13 +30,15 @@ import { pruefeSeiteNachDruck } from "./js/druck-wache.js";
 initAbsturzWache({ verwirfAuftrag: clearStoredJobId });
 merkePhase("start");
 
-/* ── i18n initialisieren (vor allem anderen) ── */
-await initI18n();
+/* ── i18n initialisieren (vor allem anderen) ──
+   Die Demo-Knoepfe werden VOR dem Warten verdrahtet und bekommen das
+   Versprechen mit: Ein Klick, der frueher kommt als die Uebersetzung, wartet
+   auf sie statt zu verpuffen (07.09.2026, Hergang in js/demo.js). */
+const uebersetzungBereit = initI18n();
+initDemo(uebersetzungBereit);
+await uebersetzungBereit;
 merkePhase("i18n");
 applyTranslations();
-
-/* ── Demo-Fotos initialisieren ── */
-initDemo();
 merkePhase("demo");
 
 /* ── Queue-Modus: offenes Ergebnis nach einem Reload weiter abholen ──

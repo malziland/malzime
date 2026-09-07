@@ -97,6 +97,32 @@ describe("callMistralRaw: voruebergehende Serverfehler (07.09.2026)", () => {
     expect(versuche).toBe(1);
   });
 
+  test("ein SPAETER 504: die Wiederholung bekommt nur das Restbudget (Abnahme 07.09.2026)", async () => {
+    /* Erster Versuch: 300 ms bis zum 504, dann 2000 ms Pause. Budget 3000 ms —
+       fuer den zweiten Versuch bleiben rund 700 ms. Die Attrappe braeuchte
+       jetzt 1500 ms; der zweite Versuch MUSS deshalb an der Uhr scheitern,
+       nicht am 504. Vorher bekam er das volle Budget und lief bis zum 504,
+       der ganze Aufruf dauerte 3800 ms statt hoechstens 3000. */
+    let versuche = 0;
+    setFetchForTest(
+      (_url, { signal }) =>
+        new Promise((erfuellen, ablehnen) => {
+          versuche += 1;
+          const uhr = setTimeout(() => erfuellen(kaputt(504)), versuche === 1 ? 300 : 1500);
+          signal.addEventListener("abort", () => {
+            clearTimeout(uhr);
+            const e = new Error("abgebrochen");
+            e.name = "AbortError";
+            ablehnen(e);
+          });
+        })
+    );
+    const start = Date.now();
+    await expect(_callMistralRaw({ ...AUFRUF, timeoutMs: 3000 })).rejects.toMatchObject({ code: "timeout" });
+    expect(versuche).toBe(2);
+    expect(Date.now() - start).toBeLessThan(3000 + 300);
+  }, 10000);
+
   test("KA-09 gilt auch hier: der nie gelesene 503-Antwortrumpf wird verworfen", async () => {
     let versuche = 0;
     const cancel = jest.fn(async () => {});

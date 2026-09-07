@@ -522,10 +522,12 @@ Prüfen von Hand:
     gcloud logging read 'jsonPayload.error="betriebswerte-wiederholt-nicht-lesbar"' \
       --project=malzime --freshness=7d
 
-Erwartet: keine Zeile. Die Warnungen dazu (einzelne Ausrutscher) zählen:
+Erwartet: keine Zeile. Die Warnungen dazu (einzelne Ausrutscher) zählen — nach
+Minuten, denn ein träger Lauf erzeugt bis zu fünf Warnungen in derselben Minute
+und zählt als EIN Lauf:
 
     gcloud logging read 'jsonPayload.warning:"reap-query-ohne-betriebswerte"' \
-      --project=malzime --freshness=7d --format='value(timestamp)'
+      --project=malzime --freshness=7d --format='value(timestamp)' | cut -c1-16 | sort -u
 
 ### »notbremse-gegriffen« — der Stundenzähler ist ausgefallen
 

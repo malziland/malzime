@@ -252,6 +252,9 @@ async function callMistralRawUnthrottled({
      Client kann via Auto-Retry sauber zurueckkommen. */
   const backoffs = [2000];
   let lastError;
+  /* Beginn des GANZEN Aufrufs, nicht des einzelnen Versuchs — davon zehrt das
+     Budget (siehe unten bei `verbraucht`). */
+  const aufrufStart = Date.now();
 
   for (let attempt = 0; attempt <= backoffs.length; attempt++) {
     const controller = new AbortController();
@@ -276,7 +279,16 @@ async function callMistralRawUnthrottled({
       throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
     }
     const cap = timeoutCapMs;
-    const budget = timeoutMs == null ? cap : timeoutMs;
+    /* Die Wiederholung bekommt nur das RESTbudget: Was der erste Versuch und
+       die Pause davor verbraucht haben, ist weg. ABNAHME-FUND 07.09.2026:
+       Vorher nahm jeder Durchlauf das volle Budget. Bei einem 429 war das
+       folgenlos (kommt in Millisekunden); ein spaeter 504 haette dem zweiten
+       Versuch aber noch einmal die volle Zeit gegeben und die Zeitgrenze der
+       Function reissen koennen — der Auftrag haengt dann in `processing`, bis
+       der Aufraeumer ihn kippt. Ohne uebergebenes Budget gilt weiter die
+       Obergrenze je Versuch. */
+    const verbraucht = Date.now() - aufrufStart;
+    const budget = timeoutMs == null ? cap : timeoutMs - verbraucht;
     if (budget <= 0) {
       const err = new Error("Mistral-Budget erschoepft");
       err.code = "timeout";

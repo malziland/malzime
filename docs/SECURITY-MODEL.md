@@ -273,16 +273,20 @@ die Trennung nach Grund, nicht nach Ort.
 
 **Betrachtete Alternative.** Das Zeitlimit von zwei Sekunden anheben. Verworfen:
 Das Limit sitzt im Analysepfad, und jede Sekunde mehr wäre eine Sekunde, die
-JEDE Analyse im Störungsfall länger hängt. Ein zweiter Leseversuch im Aufräumer:
-verworfen, weil er die Wartezeit im Fehlerfall verdoppelt, und der nächste Lauf
-ohnehin 60 Sekunden später kommt.
+JEDE Analyse im Störungsfall länger hängt. Ein eigener zweiter Leseversuch je
+Abfrage: verworfen — jede der fünf Abfragen eines Aufräumer-Laufs liest ohnehin
+neu (der Cache hält Fehlschläge nicht fest), ein träger Lauf kostet also schon
+bis zu fünfmal zwei Sekunden; ein weiterer Versuch verlängerte nur das, und der
+nächste Lauf kommt ohnehin 60 Sekunden später.
 
 **Was weiterhin alarmiert.** Jede Analyse, die ohne Betriebswerte abbricht
 (`kein-einstellungssatz` in `handle-process-job.js`), zwei Aufräumer-Läufe in
 Folge (`betriebswerte-wiederholt-nicht-lesbar`), jedes kaputte Dokument. Ein
 Dauerausfall von Firestore fällt damit spätestens nach zwei Minuten auf.
 
-**Bedingung für Neubewertung.** Mehr als drei Warnungen
-`reap-query-ohne-betriebswerte` an einem Tag (Abfrage im RUNBOOK) — dann ist es
-kein Ausrutscher mehr, sondern ein Muster, und die Ursache gehört gesucht, nicht
-die Schwelle verschoben.
+**Bedingung für Neubewertung.** Warnungen `reap-query-ohne-betriebswerte` in
+mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
+(Abfrage im RUNBOOK; ein einzelner träger Lauf erzeugt bis zu fünf Warnungen
+in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
+sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
+verschoben.

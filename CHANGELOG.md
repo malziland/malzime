@@ -4,6 +4,32 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.6.5] — 2026-09-08
+
+### Behoben
+
+- **Überlast bei Mistral ist jetzt Wartezeit, kein Fehler.** Am 08.09. lud eine
+  Klasse 47 Fotos in acht Minuten hoch; 6 davon scheiterten mit „technischer
+  Fehler", weil Mistral auf unserer Stufe nur 15 Aufrufe je Minute annimmt und
+  die Wiederholung nach zwei Sekunden dagegen wirkungslos war. Ein abgelehnter
+  Auftrag wartet jetzt 10, 20, 40 und 80 Sekunden und versucht es jeweils
+  wieder; sein Platz in der Warteschlange bleibt dabei belegt. Nennt Mistral in
+  der Antwort selbst eine Wartezeit, gilt die längere. Beide Werte stehen im
+  Einstellungssatz (`ueberlastWarteMs`, `ueberlastVersuche`) und sind an den
+  Messdaten des Vormittags nachgerechnet, nicht geschätzt. Jede Wiederholung
+  steht als eigene Zeile im Server-Log.
+- **Die Warteschlange fährt mit Abstand zum Limit statt exakt darauf.** Sie
+  schickte 7,5 Analysen je Minute los, genau die Kante von 15 Aufrufen; und
+  vier parallele Aufträge machten bei den heute schnelleren Antworten 16
+  Aufrufe je Minute. Jetzt 6 je Minute bei 3 parallel, ein Fünftel Abstand.
+  Eine Klasse von 25 wartet dadurch bis zu eine Minute länger, dafür scheitert
+  niemand. Nachgerechnet mit den Ankunfts- und Dauerdaten des Tages, auch für
+  zwei Klassen zugleich. Seit 13:24 Wien bereits ohne Auslieferung wirksam.
+- **Die Drossel je Server-Instanz folgt der Parallelität** (3 statt 4). Sie
+  ist keine Wache: Am 08.09. liefen sieben Instanzen zugleich, jede hielt für
+  sich vier Sekunden Abstand, zusammen feuerten sie siebenmal so dicht. Die
+  Wache sind Rate und Parallelität der Warteschlange.
+
 ## [4.6.4] — 2026-09-07
 
 ### Behoben

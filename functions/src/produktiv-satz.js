@@ -33,11 +33,15 @@ const T1_NORMAL = {
   profileMaxTokens: 16000,
   requestBudgetMs: 480000,
 
-  /* GESENKT 30.08.2026 von 7 auf 4 — gemessen, nicht geschätzt. Sieben
-     gleichzeitige Analysen sind zwei Mistral-Aufrufe je Analyse, also 0,39
-     Aufrufe pro Sekunde bei erlaubten 0,25. Wir fuhren seit jeher darüber; im
-     Alltag fällt es nicht auf, bei echtem Andrang schon. */
-  parallelitaet: 4,
+  /* GESENKT 08.09.2026 von 4 auf 3 — nachgerechnet am Vorfall vom selben
+     Vormittag (eine Klasse, 47 Analysen, 6 Ablehnungen "429 Rate limit").
+     Der Wert 4 war am 30.08. für 40 s je Aufruf gerechnet; am 08.09. lagen
+     die Aufrufe bei 29 s (Median), und vier parallele Aufträge machten damit
+     16 Aufrufe je Minute bei erlaubten 15. Mit drei sind es höchstens 12 —
+     auch im Anfangsschub, den die Warteschlange (Burst 10) durchlässt. Die
+     Nachrechnung mit den gemessenen Ankunfts- und Dauerdaten des Tages:
+     4 → 6 bis 11 Ablehnungen, 3 → keine; auch bei zwei Klassen zugleich. */
+  parallelitaet: 3,
 
   /* DIE GLOBALE BREMSE. Sie wird von der `satzWache` in die echte
      Cloud-Tasks-Queue übertragen (`maxDispatchesPerSecond`) und wirkt damit
@@ -45,13 +49,17 @@ const T1_NORMAL = {
      Arbeitsspeicher einer einzelnen Instanz zählt und bei Andrang deshalb
      prinzipiell nicht greifen kann.
 
-     Rechnung: Mistral-Stufe T1 erlaubt 0,25 Aufrufe pro Sekunde, jede Analyse
-     macht zwei (Analyse + Beast-Werbung) -> 0,125 Analysen pro Sekunde, also
-     eine alle acht Sekunden.
+     Rechnung: Mistral-Stufe T1 erlaubt 15 Aufrufe je 60 Sekunden (gemessen
+     08.09.2026: jede Ablehnung kam genau dann, wenn in den 60 s davor 15
+     Aufrufe angenommen worden waren). Jede Analyse macht zwei Aufrufe
+     (Analyse + Beast-Werbung), also höchstens 7,5 Analysen je Minute =
+     0,125 je Sekunde. GENAU DIESER WERT stand hier bis zum 08.09. — ohne
+     Abstand zur Grenze, und die Grenze riss. Jetzt 0,1 (6 je Minute, 12
+     Aufrufe), ein Fünftel Abstand.
 
      BEI EINER HÖHEREN MISTRAL-STUFE darf der Wert steigen — aber erst nach
      einem Blick ins Mistral-Dashboard, nicht nach Gefühl. */
-  queueRatePerSekunde: 0.125,
+  queueRatePerSekunde: 0.1,
 
   warteschlangeTiefe: 155,
 
@@ -66,13 +74,13 @@ const T1_NORMAL = {
   adressfensterMs: 600000,
   boostFaktor: 2,
   boostFristMs: 7200000,
-  /* GESENKT 30.08.2026 von 6 auf 4. Sechs war groesser als `parallelitaet`
-     (4) — die Drossel haette also nie greifen koennen, weil die Warteschlange
-     ohnehin nur vier gleichzeitig durchlaesst. Eine Bremse hinter einer
-     schaerferen Bremse ist keine Bremse, sondern toter Code mit dem Anschein
-     von Sicherheit. Aufgefallen, weil der Doku-Test seit heute gegen die
-     echten Betriebswerte prueft. */
-  drosselMaxParallel: 4,
+  /* GESENKT 30.08.2026 von 6 auf 4 und am 08.09.2026 mit `parallelitaet`
+     auf 3. Die Drossel darf nie groesser sein als die Warteschlange
+     durchlaesst — eine Bremse hinter einer schaerferen Bremse ist keine
+     Bremse, sondern toter Code mit dem Anschein von Sicherheit. Der Doku-Test
+     erzwingt das Verhaeltnis. Und sie zaehlt nur je Server-Instanz: Am
+     08.09. liefen sieben Instanzen zugleich, jede hielt fuer sich Abstand. */
+  drosselMaxParallel: 3,
   drosselWartelimitMs: 360000,
 
   /* MINDESTABSTAND ZWISCHEN KI-AUFRUFEN, gemessen 30.08.2026. Hier standen
@@ -80,6 +88,25 @@ const T1_NORMAL = {
      Instanz — die verlässliche Bremse ist `queueRatePerSekunde`. */
   tokenAbstandGrossMs: 4000,
   tokenAbstandKleinMs: 4000,
+
+  /* DAS NETZ UNTER DER BREMSE (08.09.2026). Lehnt Mistral ab (429) oder ist
+     kurz weg (502/503/504), wartet der Auftrag 10, 20, 40, 80 Sekunden und
+     versucht es wieder — vier Mal, statt wie bisher einmal nach 2 Sekunden.
+     Zwei Sekunden waren bei einem Limit von einem Aufruf je vier Sekunden
+     aussichtslos: Am 08.09. bekamen alle sechs abgelehnten Aufträge beim
+     zweiten Versuch wieder 429.
+
+     NICHT GESCHÄTZT, SONDERN GERECHNET: Nachrechnung mit den gemessenen
+     Ankunfts- und Dauerdaten des Vormittags, unter verschärften Annahmen
+     (Mistral zählt 12 statt 15 je Minute, Aufrufe 40 % schneller, zwei
+     Klassen zugleich): 10/20/40/80 → im Mittel 0,1 endgültige Ausfälle je
+     Doppelklasse, nie mehr als einer; 10/20/40 → 0,6 (bis 3); die alte Logik
+     → 12. Die Summe (150 s) liegt weit unter dem Gesamtbudget (480 s); was
+     der Hauptaufruf schon verbraucht hat, kürzt die Reihe — wiederholt wird
+     nur, solange das Restbudget für die nächste Wartezeit reicht. Nennt
+     Mistral in der Antwort eine Wartezeit (Retry-After), gilt die längere. */
+  ueberlastWarteMs: 10000,
+  ueberlastVersuche: 4,
 
   jobAufbewahrungMs: 7200000,
   zustellfensterMs: 900000,
@@ -91,7 +118,7 @@ const T1_NORMAL = {
 };
 
 /* Zwei vorbereitete Alternativen, damit im Ernstfall EIN Feld umgestellt wird
-   statt siebenundzwanzig. */
+   statt neunundzwanzig. */
 const PROFILE = {
   "t1-normal": T1_NORMAL,
 

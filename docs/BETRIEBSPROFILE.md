@@ -38,7 +38,7 @@ Firestore-Datenbank `malzime-eu`, Dokument **`config/betriebsprofil`**:
 {
   "aktiv": "t1-normal",
   "profile": {
-    "t1-normal": { … alle 26 Werte … },
+    "t1-normal": { … alle 29 Werte … },
     "t1-langsam": { … },
     "t2-schnell": { … }
   }
@@ -53,7 +53,7 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 ---
 
-## Die 26 Werte
+## Die 29 Werte
 
 ### 1 · Die KI-Aufrufe
 
@@ -70,8 +70,8 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `parallelitaet` | 4 | Wie viele Analysen gleichzeitig laufen |
-| `queueRatePerSekunde` | 0.125 | Wie schnell die Warteschlange Aufträge losschickt |
+| `parallelitaet` | 3 | Wie viele Analysen gleichzeitig laufen |
+| `queueRatePerSekunde` | 0.1 | Wie schnell die Warteschlange Aufträge losschickt |
 | `warteschlangeTiefe` | 155 | Ab wie vielen Wartenden abgelehnt wird |
 | `durchschnittsdauerSekunden` | 40 | Ausgangswert der Wartezeit-Ansage |
 | `stundenlimit` | 500 | Analysen pro Zeitfenster |
@@ -90,10 +90,25 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `drosselMaxParallel` | 4 | Gleichzeitige Aufrufe an Mistral |
+| `drosselMaxParallel` | 3 | Gleichzeitige Aufrufe an Mistral |
 | `drosselWartelimitMs` | 360000 | Wie lange ein Aufruf auf seinen Platz wartet |
 | `tokenAbstandGrossMs` | 4000 | Mindestabstand zwischen großen Aufrufen |
 | `tokenAbstandKleinMs` | 4000 | Mindestabstand zwischen kleinen Aufrufen |
+| `ueberlastWarteMs` | 10000 | Wartezeit vor der ersten Wiederholung, wenn Mistral ablehnt oder kurz weg ist; jede weitere verdoppelt sich |
+| `ueberlastVersuche` | 4 | Wie oft wiederholt wird, bevor der Auftrag als blockiert endet |
+
+**Was die beiden letzten Werte tun (seit 08.09.2026):** Lehnt Mistral einen
+Aufruf ab (HTTP 429, Limit erreicht) oder ist der Dienst kurz weg (502, 503,
+504), wartet der Auftrag 10, 20, 40 und 80 Sekunden und versucht es jeweils
+wieder. Der Platz in der Warteschlange bleibt dabei belegt, das nimmt Last
+von Mistral. Für das Kind vor dem Bildschirm ist das eine längere Wartezeit,
+kein Fehler. Vorher gab es eine Wiederholung nach 2 Sekunden, und die war bei
+einem Limit von 15 Aufrufen je Minute wirkungslos: Am 08.09. scheiterten so
+6 von 47 Analysen einer Klasse. Die Reihe ist an den Messdaten dieses
+Vormittags nachgerechnet (Herleitung in `functions/src/produktiv-satz.js`).
+Die Summe der Wartezeiten muss unter dem Gesamtbudget liegen, sonst wird der
+Satz abgelehnt. Jede Wiederholung steht als Zeile `mistral-wiederholung` im
+Log, mit Wartezeit und einer etwaigen Retry-After-Angabe von Mistral.
 
 ### 5 · Fristen und Aufräumen
 
@@ -159,7 +174,7 @@ Stelle:
 Zwei Mechanismen halten die Trennung aufrecht:
 
 1. **Der Satz kann diese Werte nicht übernehmen.** Gelesen werden
-   ausschließlich die 26 bekannten Zahlenfelder; alles andere im Dokument wird
+   ausschließlich die 29 bekannten Zahlenfelder; alles andere im Dokument wird
    ignoriert.
 2. **`scripts/pruefe-doppelte-werte.py` geht vom Code aus** — nicht von dieser
    Liste — und verlangt für jede Zahlenkonstante eine von zwei Antworten: Sie

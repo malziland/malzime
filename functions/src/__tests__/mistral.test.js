@@ -253,8 +253,10 @@ describe("callMistralRaw 429 retry behavior", () => {
     await expect(_callMistralRaw({ model: "x", messages: [], maxTokens: 1, temperature: 0 })).rejects.toMatchObject({
       status: 429,
     });
-    /* v1.10.6: 2 Versuche total (initial + 1 retry), war [1000,3000] → [2000] */
-    expect(attempts).toBe(2);
+    /* Der erste Versuch plus die Wiederholungen aus dem Einstellungssatz
+       (Testsatz: 2). Geschichte: v1.10.6 kuerzte auf [2000]; seit 08.09.2026
+       kommt die Reihe aus dem Satz — mistral-429-wiederholung.test.js. */
+    expect(attempts).toBe(1 + require("../test-satz").SATZ.ueberlastVersuche);
   }, 15000);
 
   test("v1.10.6: Einzel-Call-Timeout cappt bei mistralTimeoutMs aus dem Einstellungssatz auch wenn budget groesser ist", async () => {

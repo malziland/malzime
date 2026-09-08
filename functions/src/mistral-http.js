@@ -47,23 +47,17 @@ function isRateLimitError(err) {
      Pipeline-Sicht ueberlastet — Der Aufrufer soll das als
      blocked.overloaded melden, damit der Client den Auto-Retry triggert. */
   if (err && err.code === "throttle_timeout") return true;
-  /* BEFUND 01.09.2026 (Runde 7, aus der Behebung von L-16): Die Zeile darueber
-     prueft `err &&`, die naechste tat es nicht — `isRateLimitError(null)` warf
-     einen TypeError. Ein catch-Block, der einen leeren Ablehnungsgrund faengt
-     (`Promise.reject()` ohne Argument, `throw null`), waere dadurch selbst
-     gescheitert, und der urspruengliche Fehler waere unterwegs verloren
-     gegangen — ausgerechnet in der Behandlung eines Fehlers. Die
-     Schwesterfunktion isQuotaError in job-helfer.js macht es richtig. */
+  /* BEFUND 01.09.2026 (L-16): `isRateLimitError(null)` warf einen TypeError —
+     ausgerechnet in der Behandlung eines Fehlers. Wie isQuotaError in
+     job-helfer.js. */
   if (!err) return false;
   const msg = (err.message || "").toLowerCase();
   return err.status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("rate_limited");
 }
 
-/* Antworten, bei denen EINE Wiederholung sinnvoll ist: Ueberlast (429) und
-   die drei Aussetzer-Codes — ein Zwischenknoten oder der Dienst selbst ist
-   fuer einen Augenblick nicht da. Hintergrund steht am Einsatzort in
-   callMistralRawUnthrottled. */
-const WIEDERHOLBARE_STATUS = new Set([429, 502, 503, 504]);
+/* Ueberlast und Aussetzer (429, 502, 503, 504): Wartezeiten, Retry-After und
+   Logzeile je Wiederholung liegen in ueberlast.js (08.09.2026). */
+const { WIEDERHOLBARE_STATUS, ueberlastWartezeiten, planeWiederholung } = require("./ueberlast");
 
 function modelClassOf(model) {
   return /large/i.test(model || "") ? "large" : "small";
@@ -193,6 +187,10 @@ async function callMistralRaw(options) {
      bekommt mistralTimeoutMs. Das ist KEIN Rueckfall auf einen Code-Wert:
      Beide Zahlen stehen im selben Satz, es gibt sie nur einmal. */
   const mitGrenze = options.timeoutCapMs == null ? { ...options, timeoutCapMs: werte.mistralTimeoutMs } : options;
+  /* Die Wartezeiten bei Ueberlast kommen ebenfalls aus dem Satz. */
+  if (mitGrenze.ueberlastWartezeitenMs == null) {
+    mitGrenze.ueberlastWartezeitenMs = ueberlastWartezeiten(werte);
+  }
   const result = await withMistralSlot(
     () => {
       waitMs = Date.now() - t0;
@@ -214,6 +212,7 @@ async function callMistralRawUnthrottled({
   timeoutCapMs,
   cacheKey,
   onLiveText,
+  ueberlastWartezeitenMs,
 }) {
   const apiKey = getApiKey();
 
@@ -245,16 +244,25 @@ async function callMistralRawUnthrottled({
      Ohne Key (Flag aus) verhaelt sich der Call exakt wie vor v2.5. */
   if (cacheKey) body.prompt_cache_key = cacheKey;
 
-  /* v1.10.6: Von 2 auf 1 Retry reduziert. Hintergrund: Bei Workshop-Bursts
-     hat die alte 2-Retry-Strategie den 429-Stau verstaerkt — drei Wellen
-     gegen dasselbe Rate-Limit. Jetzt 1 Retry mit 2s Wartezeit; bleibt es
-     dabei, wird die Anfrage als Ueberlast nach oben propagiert und der
-     Client kann via Auto-Retry sauber zurueckkommen. */
-  const backoffs = [2000];
+  /* Wartezeiten bei Ueberlast — aus dem Einstellungssatz, Pflicht wie die
+     Zeitgrenze (Hintergrund in ueberlast.js). */
+  const backoffs = ueberlastWartezeitenMs;
   let lastError;
+  let wiederholungen = 0;
   /* Beginn des GANZEN Aufrufs, nicht des einzelnen Versuchs — davon zehrt das
      Budget (siehe unten bei `verbraucht`). */
   const aufrufStart = Date.now();
+
+  /* Beide Pflichtwerte kommen aus dem Einstellungssatz; ohne sie wird nicht
+     geraten, sondern abgebrochen. */
+  if (typeof timeoutCapMs !== "number" || !(timeoutCapMs > 0)) {
+    throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
+  }
+  if (!Array.isArray(backoffs)) {
+    throw new Error(
+      "callMistral: ueberlastWartezeitenMs fehlt (ueberlastWarteMs/ueberlastVersuche aus dem Einstellungssatz)"
+    );
+  }
 
   for (let attempt = 0; attempt <= backoffs.length; attempt++) {
     const controller = new AbortController();
@@ -274,10 +282,6 @@ async function callMistralRawUnthrottled({
        der Single-Large-Call schreibt zwei vollstaendige Profile in EINEM Zug
        und bekommt deshalb sein eigenes, gemessenes Budget mit. Ohne
        `timeoutCapMs` bleibt alles exakt wie vorher. */
-    /* Die Obergrenze ist Pflicht — sie kommt aus dem Einstellungssatz. */
-    if (typeof timeoutCapMs !== "number" || !(timeoutCapMs > 0)) {
-      throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
-    }
     const cap = timeoutCapMs;
     /* Die Wiederholung bekommt nur das RESTbudget: Was der erste Versuch und
        die Pause davor verbraucht haben, ist weg. ABNAHME-FUND 07.09.2026:
@@ -324,15 +328,8 @@ async function callMistralRawUnthrottled({
        Waechter koennte ein haengender Stream den Worker endlos festhalten. */
     if (!streamen) clearTimeout(timeoutId);
 
-    /* 429 ist Ueberlast. 502, 503 und 504 sind ein Aussetzer: ein
-       Zwischenknoten oder der Dienst selbst ist fuer einen Augenblick nicht
-       da. BELEG 07.09.2026, 18:44 Wien: Mistral antwortete auf die erste
-       Analyse des Tages mit 503 "Service unavailable". Wiederholt wurde bis
-       dahin nur bei 429 — der Auftrag wurde "blocked", der Mensch am iPhone
-       sah "technischer Fehler", und sein zweiter Versuch eine Minute spaeter
-       lief in 41 Sekunden durch. Seitdem bekommt ein Aussetzer dieselbe EINE
-       Wiederholung wie ein 429. Ein 500 oder 4xx bekommt sie nicht: Das ist
-       eine Antwort auf genau diese Anfrage, keine Stoerung. */
+    /* Ueberlast (429) oder Aussetzer (502/503/504): warten und wiederholen,
+       Hintergrund in ueberlast.js. */
     if (WIEDERHOLBARE_STATUS.has(res.status) && attempt < backoffs.length) {
       if (streamen) clearTimeout(timeoutId);
       /* KA-09 (Kurzaudit 2026-08-12): Den nie gelesenen Antwortrumpf aktiv
@@ -347,7 +344,10 @@ async function callMistralRawUnthrottled({
         res.status === 429 ? "Mistral 429 rate limited" : `Mistral HTTP ${res.status}: voruebergehend nicht erreichbar`
       );
       lastError.status = res.status;
-      await new Promise((r) => setTimeout(r, backoffs[attempt]));
+      const { wartezeitMs, aufgeben } = planeWiederholung({ res, attempt, backoffs, aufrufStart, timeoutMs });
+      if (aufgeben) break;
+      await new Promise((r) => setTimeout(r, wartezeitMs));
+      wiederholungen += 1;
       continue;
     }
 
@@ -371,7 +371,7 @@ async function callMistralRawUnthrottled({
          andere propagiert unveraendert in die bestehende Fehlerbehandlung. */
       const spur = {};
       try {
-        return await leseStreamAntwort(res, onLiveText, httpStart, spur);
+        return { ...(await leseStreamAntwort(res, onLiveText, httpStart, spur)), wiederholungen };
       } catch (err) {
         if (err && err.name === "AbortError") {
           const e = new Error(`Mistral request timeout after ${effectiveTimeout}ms`);
@@ -406,10 +406,13 @@ async function callMistralRawUnthrottled({
       outputTokens: usage.completion_tokens || 0,
       cachedTokens: readCachedTokens(usage),
       httpMs: Date.now() - httpStart,
+      wiederholungen,
     };
   }
 
-  /* Wenn wir hier landen, sind alle Wiederholungen fehlgeschlagen (429 oder Aussetzer). */
+  /* Wenn wir hier landen, sind alle Wiederholungen fehlgeschlagen (429 oder
+     Aussetzer) oder das Restbudget reichte nicht mehr fuer die naechste. */
+  if (lastError) lastError.wiederholungen = wiederholungen;
   throw lastError || new Error("Mistral request failed");
 }
 
@@ -440,4 +443,5 @@ module.exports = {
   isRateLimitError,
   setFetchForTest,
   _setLiveIntervalMsForTest,
+  _ueberlastWartezeiten: ueberlastWartezeiten,
 };

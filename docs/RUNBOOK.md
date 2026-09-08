@@ -399,15 +399,22 @@ Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback):
 `parallelitaet` im Einstellungssatz auf 10 zurücksetzen (kein Deploy) — sonst läuft
 die Queue unnötig langsam.
 
-**Warum die Dosierung so steht, wie sie steht (Stand 30.08.2026):** Mistral
-begrenzt auf der Stufe T1 **0,25 Anfragen pro Sekunde**. Jede Analyse macht
-zwei Aufrufe (Analyse + Beast-Werbung), also darf die Queue höchstens **0,125
-Analysen pro Sekunde** losschicken — eine alle acht Sekunden. Bei rund 40 s je
-Analyse (gemessen 30.08.2026) passt dazu eine Parallelität von **4**.
+**Warum die Dosierung so steht, wie sie steht (Stand 08.09.2026):** Mistral
+erlaubt auf der Stufe T1 **15 Aufrufe je 60 Sekunden** (gemessen 08.09.2026:
+jede Ablehnung kam genau dann, wenn in den 60 s davor 15 Aufrufe angenommen
+waren; abgelehnte zählen nicht mit). Jede Analyse macht zwei Aufrufe (Analyse
++ Beast-Werbung), also wären 7,5 Analysen je Minute die Kante. Die Queue
+schickt **0,1 Analysen pro Sekunde** los (6 je Minute, 12 Aufrufe) — ein
+Fünftel Abstand — bei einer Parallelität von **3**. Die Parallelität deckelt
+den Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch), die Rate
+die Dauerlast; beide zusammen sind nötig.
 
-Die frühere Rechnung ging von 15 Anfragen pro Minute und 65 s je Analyse aus
-und kam auf Concurrency 7. Beide Zahlen waren überholt; wir fuhren damit über
-dem Limit, was im Alltag nicht auffiel und bei Andrang 429-Fehler erzeugte.
+Die Geschichte der Zahl: 7 (65 s je Analyse angenommen), dann ab 30.08.2026
+4 und 0,125 — exakt am Limit, ohne Abstand, gerechnet für 40 s je Aufruf. Am
+08.09.2026 lagen die Aufrufe bei 29 s, vier parallele Aufträge machten 16
+Aufrufe je Minute, und 6 von 47 Analysen einer Klasse scheiterten. Die
+Nachrechnung mit den Messdaten des Tages: 4/0,125 → 6 bis 11 Ablehnungen,
+3/0,1 → keine, auch bei zwei Klassen zugleich.
 
 **Beide Werte stehen im Einstellungssatz und werden automatisch übertragen.**
 Wer sie ändert, ändert die laufende Queue — kein Deploy, kein gcloud-Befehl.
@@ -483,20 +490,30 @@ und `fileSizeKb`.
 
 ### Mistral überlastet / 429 / 5xx
 
-Nutzer sehen `blocked.overloaded` bzw. `blocked.apiError`; die Queue puffert
-Stoßlast, interne Retries laufen automatisch. Seit 07.09.2026 bekommt auch ein
-Aussetzer (502, 503, 504) EINE Wiederholung nach zwei Sekunden, genau wie ein
-429 — vorher lief ein einzelner 503 ungebremst bis zur Fehlermeldung durch.
-Bleibt der Aussetzer, bleibt die Fehlermeldung. Bei anhaltender Störung:
-Mistral-Status und **Account-Dashboard** prüfen (Limits unterscheiden sich
-drastisch je Modellversion — immer das Dashboard, nicht Code-Kommentare).
-Notfalls Wartungsmodus (Hebel 1).
+Die Queue puffert Stoßlast. Lehnt Mistral trotzdem ab (429) oder ist es kurz
+weg (502, 503, 504), wartet der Auftrag **10, 20, 40 und 80 Sekunden** und
+versucht es jeweils wieder (`ueberlastWarteMs`, `ueberlastVersuche` im
+Einstellungssatz, seit 08.09.2026). Der Nutzer sieht dabei nur eine längere
+Wartezeit. Erst wenn alle Wiederholungen scheitern oder das Restbudget nicht
+mehr reicht, sieht er `blocked.overloaded` bzw. `blocked.apiError`. Vorher
+gab es eine Wiederholung nach zwei Sekunden — bei 15 Aufrufen je Minute
+wirkungslos: Am 08.09.2026 scheiterten so 6 von 47 Analysen einer Klasse.
+Bei anhaltender Störung: Mistral-Status und **Account-Dashboard** prüfen
+(Limits unterscheiden sich drastisch je Modellversion — immer das Dashboard,
+nicht Code-Kommentare). Notfalls Wartungsmodus (Hebel 1).
 
-Nachsehen, ob es nur Aussetzer waren (eine Zeile je Analyse, die trotz
-Wiederholung scheiterte):
+Wie oft das Netz greift (eine Zeile je Wiederholung, mit Wartezeit und einer
+etwaigen Retry-After-Angabe von Mistral):
+
+    gcloud logging read 'jsonPayload.step="mistral-wiederholung"' \
+      --project=malzime --freshness=7d \
+      --format='value(timestamp,jsonPayload.status,jsonPayload.versuch,jsonPayload.wartezeitMs,jsonPayload.retryAfter)'
+
+Nachsehen, welche Analysen trotz aller Wiederholungen scheiterten (Feld
+`wiederholungen` sagt, wie viele es waren):
 
     gcloud logging read 'jsonPayload.alert="single-large-failed"' \
-      --project=malzime --freshness=7d --format='value(timestamp,jsonPayload.error)'
+      --project=malzime --freshness=7d --format='value(timestamp,jsonPayload.error,jsonPayload.wiederholungen)'
 
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
 

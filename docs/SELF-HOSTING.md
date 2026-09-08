@@ -187,7 +187,7 @@ Das Stundenlimit und alle anderen Betriebswerte stehen **nicht im Code**,
 sondern in Firestore im Dokument `config/betriebsprofil`. Aendern heisst: den
 Wert im aktiven Satz setzen — kein Deploy noetig, wirkt binnen 30 Sekunden.
 
-Welche 26 Werte es gibt, was sie bedeuten und welche vier Obergrenzen
+Welche 29 Werte es gibt, was sie bedeuten und welche vier Obergrenzen
 Datenschutzzusagen sind, steht in [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md).
 
 **Ohne gueltigen Einstellungssatz laeuft keine Analyse.** Beim Aufsetzen einer

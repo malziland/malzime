@@ -9,10 +9,11 @@
  * Fehler". Sein zweiter Versuch eine Minute spaeter lief in 41 Sekunden
  * sauber durch — der Dienst war also nur kurz weg.
  *
- * Geprueft wird: 502, 503 und 504 bekommen EINE Wiederholung nach derselben
- * Pause wie 429. Ein 500, 400 oder 401 bekommt sie NICHT — das sind keine
- * Aussetzer, sondern Antworten auf genau diese Anfrage; eine Wiederholung
- * kostete dort nur Zeit und Geld.
+ * Geprueft wird: 502, 503 und 504 bekommen dieselben Wiederholungen wie 429
+ * (Anzahl und Wartezeit aus dem Einstellungssatz; der Testsatz sagt zwei).
+ * Ein 500, 400 oder 401 bekommt sie NICHT — das sind keine Aussetzer,
+ * sondern Antworten auf genau diese Anfrage; eine Wiederholung kostete dort
+ * nur Zeit und Geld.
  */
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
@@ -75,16 +76,19 @@ describe("callMistralRaw: voruebergehende Serverfehler (07.09.2026)", () => {
     10000
   );
 
-  test("bleibt der 503, gibt er nach der einen Wiederholung auf — mit Status 503", async () => {
+  test("bleibt der 503, gibt er nach den Wiederholungen aus dem Satz auf — mit Status 503", async () => {
     let versuche = 0;
     setFetchForTest(async () => {
       versuche += 1;
       return kaputt(503);
     });
     await expect(_callMistralRaw(AUFRUF)).rejects.toMatchObject({ status: 503 });
-    /* Genau zwei Versuche: der erste und EINE Wiederholung. Mehr wuerde bei
-       einem laengeren Ausfall nur das Zeitbudget der Analyse aufbrauchen. */
-    expect(versuche).toBe(2);
+    /* Der erste Versuch plus so viele Wiederholungen, wie der Satz sagt
+       (Testsatz: 2). Seit 08.09.2026 sind es im Betrieb vier, mit 10, 20, 40
+       und 80 s Abstand — bei einem laengeren Ausfall begrenzt das Restbudget
+       die Reihe, nicht eine feste Zahl im Code. */
+    const { SATZ } = require("../test-satz");
+    expect(versuche).toBe(1 + SATZ.ueberlastVersuche);
   }, 10000);
 
   test.each([500, 400, 401])("HTTP %i wird NICHT wiederholt", async (status) => {
@@ -98,11 +102,12 @@ describe("callMistralRaw: voruebergehende Serverfehler (07.09.2026)", () => {
   });
 
   test("ein SPAETER 504: die Wiederholung bekommt nur das Restbudget (Abnahme 07.09.2026)", async () => {
-    /* Erster Versuch: 300 ms bis zum 504, dann 2000 ms Pause. Budget 3000 ms —
-       fuer den zweiten Versuch bleiben rund 700 ms. Die Attrappe braeuchte
-       jetzt 1500 ms; der zweite Versuch MUSS deshalb an der Uhr scheitern,
-       nicht am 504. Vorher bekam er das volle Budget und lief bis zum 504,
-       der ganze Aufruf dauerte 3800 ms statt hoechstens 3000. */
+    /* Erster Versuch: 300 ms bis zum 504, dann eine Pause (im Testsatz 1 ms).
+       Budget 3000 ms — die Wiederholungen bekommen nur den Rest. Die Attrappe
+       braucht danach je 1500 ms; spaetestens die zweite Wiederholung MUSS
+       deshalb an der Uhr scheitern, nicht am 504, und der ganze Aufruf darf
+       nicht laenger als das Budget dauern. Vorher bekam jede Wiederholung das
+       volle Budget: 3800 ms statt hoechstens 3000. */
     let versuche = 0;
     setFetchForTest(
       (_url, { signal }) =>
@@ -119,7 +124,7 @@ describe("callMistralRaw: voruebergehende Serverfehler (07.09.2026)", () => {
     );
     const start = Date.now();
     await expect(_callMistralRaw({ ...AUFRUF, timeoutMs: 3000 })).rejects.toMatchObject({ code: "timeout" });
-    expect(versuche).toBe(2);
+    expect(versuche).toBeGreaterThanOrEqual(2);
     expect(Date.now() - start).toBeLessThan(3000 + 300);
   }, 10000);
 

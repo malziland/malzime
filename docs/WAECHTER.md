@@ -30,6 +30,7 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 | `pruefe-zeitzuender.sh` + `pruefe-zeitzuender.py` | Tests, die an einem festen Datum von selbst rot werden | TEST-2026-08-20-01, belegter Schaden | 80 ms |
 | `pruefe-pipeline-schritte.mjs` | **Geänderte Pipeline-Schritte, die lokal nie ausgeführt wurden** | 01.09.: Sieben Fehler in fünf Läufen — jedes Mal war die Datei geprüft und die Umgebung angenommen | wenige Sekunden, nur bei geänderter `ci.yml` |
 | `pruefe-auslieferbare-reste.mjs` | Ignorierte Dateien unter `public/`, die Firebase ausliefern würde | Runde 7 (L-5): Der Sauberkeits-Riegel sieht ignorierte Dateien nicht | 46 ms |
+| `pruefe-commit-nachrichten.sh` | Commit-Nachrichten seit `origin/main` mit heiklen Formulierungen (Muster im Skript) — öffentlich und nach dem Push nicht zurücknehmbar | 08.09.: ein Commit-Titel auf main nannte genau das | 20 ms |
 | `pruefe-fremddateien.mjs` | Veränderter Fremdcode (exifr, Leaflet, Schriften) | OSS-2026-08-12-22: exifr liest die GPS-Daten, deren Nichtweitergabe die Kernzusage ist | 41 ms |
 | `pruefe-vendorierung.mjs` | Bearbeitete Kopien der Audit-Familie unter `scripts/pruefungen/` | Bearbeitet wird die Quelle, nie die Kopie | 57 ms |
 | `pruefe-mutationen.mjs` | **Tests, die nichts merken:** Code kaputtmachen, ohne dass ein Test rot wird | Runde 7: Sechs von achtzehn Befunden waren überlebende Mutationen, von Hand gefunden | Minuten — **läuft vorerst nur lokal**, siehe unten |

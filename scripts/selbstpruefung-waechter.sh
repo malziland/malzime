@@ -430,7 +430,14 @@ echo
 # Pipeline 100 % gruen, ohne einen Test ausgefuehrt zu haben. Ein Waechter
 # ohne Probe ist eine Behauptung; bei einem Waechter, der ueber die Guete
 # ALLER Tests urteilt, ist es eine gefaehrliche.
-echo "11. pruefe-mutationen.mjs"
+echo "11. pruefe-commit-nachrichten.sh"
+
+probe 0 "saubere Commit-Nachrichten bestehen" sh scripts/pruefe-commit-nachrichten.sh
+probe_text 1 "RECHTSRISIKO-FORMULIERUNG|FUND" "heikle Formulierung wird gefunden (Probe)" sh scripts/pruefe-commit-nachrichten.sh --probe "docs: Patentlage erklaert, Rechtsrisiko getragen"
+
+echo
+
+echo "12. pruefe-mutationen.mjs"
 
 probe 0 "die Eichung besteht" node scripts/pruefe-mutationen.mjs --eichung
 
@@ -455,7 +462,7 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  ERWARTETE_PROBEN=24
+  ERWARTETE_PROBEN=26
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

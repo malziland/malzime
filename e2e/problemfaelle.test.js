@@ -203,6 +203,11 @@ const ERFOLG = [
 
 for (const fall of ERFOLG) {
   test(`Problemfall ${fall.datei}: wird eingereiht, ohne Metadaten`, async ({ page }) => {
+    /* HEIC braucht auf dem geteilten Pipeline-Laeufer laenger: 1,4 MB Dekoder
+       laden und uebersetzen. Am 08.09.2026 riss Firefox dort einmal die 30 s
+       (lokal: 0,4 s). test.slow() verdreifacht das Zeitlimit dieses Tests;
+       die Zusicherung bleibt dieselbe. */
+    if (fall.heic) test.slow();
     const { gefangen, geladen } = await seiteMitAbgefangenerEinreihung(page);
     /* Kann DIESER Browser HEIC selbst? Gemessen mit der echten Datei, nicht
        angenommen: WebKit kann es auf dem Mac (ImageIO), auf dem Linux-Laeufer
@@ -224,7 +229,12 @@ for (const fall of ERFOLG) {
         )
       : false;
     await upload(page, fall.datei, fall.mime);
-    await expect.poll(() => gefangen.length, { timeout: 30000, message: "Einreihung muss abgefangen werden" }).toBe(1);
+    await expect
+      .poll(() => gefangen.length, {
+        timeout: fall.heic ? 60000 : 30000,
+        message: "Einreihung muss abgefangen werden",
+      })
+      .toBe(1);
     pruefeUpload(gefangen[0], { gpsFragmente: fall.gps, make: fall.make });
     /* Die Vorschau oben zeigt ein Bild — auch wenn der Browser das Original
        nicht anzeigen kann (HEIC: dann das umgewandelte). */
@@ -245,9 +255,10 @@ for (const fall of ERFOLG) {
 test("Problemfall HEIC mit GPS: die Karte erscheint im Browser — GPS wurde gelesen, aber nicht gesendet", async ({
   page,
 }) => {
+  test.slow(); /* HEIC-Dekoder auf dem Pipeline-Laeufer, siehe oben */
   const { gefangen } = await seiteMitAbgefangenerEinreihung(page, { ergebnisLiefern: true });
   await upload(page, "heic-samsung-mit-gps.heic", "image/heic");
-  await expect.poll(() => gefangen.length, { timeout: 30000 }).toBe(1);
+  await expect.poll(() => gefangen.length, { timeout: 60000 }).toBe(1);
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 30000 });
   /* Die Karte erscheint nur, wenn der Browser die Koordinaten kennt — aus dem
      HEIC gelesen, im Browser geblieben (der Upload hatte sie nicht). */

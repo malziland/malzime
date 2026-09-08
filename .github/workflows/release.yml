@@ -53,7 +53,14 @@ jobs:
           fi
           TAG="v$VERSION"
           # Extrahiert den CHANGELOG-Abschnitt genau dieser Version von stdin.
-          abschnitt() { awk -v v="## [$VERSION]" 'index($0, v)==1 {f=1; next} /^## \[/ {if (f) exit} f {print}'; }
+          # BEFUND 08.09.2026: Hier stand `… {if (f) exit} …`. Das `exit` beendet awk
+          # nach dem Abschnitt, waehrend printf (Zeile "ALT_ROH" unten) den Rest des
+          # 470-KB-CHANGELOG noch in das Rohr schreibt — auf dem Runner (SIGPIPE
+          # ignoriert) ein "write error: Broken pipe", und der Lauf stirbt mit
+          # Exit 1, obwohl Tag und Release in Ordnung sind. Jetzt liest awk alles
+          # und schaltet nur den Ausgabe-Schalter um; dieselbe Denkfigur wurde im
+          # selben Zug in scripts/changelog-oberste-version.sh behoben.
+          abschnitt() { awk -v v="## [$VERSION]" 'index($0, v)==1 {f=1; next} /^## \[/ {f=0} f {print}'; }
           if gh release view "$TAG" >/dev/null 2>&1; then
             # Release existiert schon. Zwei erlaubte Faelle:
             # (a) Text-Korrektur an einem veroeffentlichten Abschnitt — die

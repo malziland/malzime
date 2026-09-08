@@ -45,7 +45,16 @@ OHNE_ZAEUNE="$(printf '%s\n' "$INHALT" | awk '
   /^[[:space:]]*(```|~~~)/ { imblock = !imblock; next }
   !imblock { print }
 ')"
-KOPF="$(printf '%s\n' "$OHNE_ZAEUNE" | grep -m1 -oE '^## \[[^]]+\]' || true)"
+# BEFUND 08.09.2026 (Auto-Release rot auf main, "printf: I/O error", "Broken
+# pipe"): `grep -m1` beendet nach dem ersten Treffer, waehrend printf den Rest
+# des CHANGELOG (inzwischen ueber 64 KB, mehr als ein Pipe-Puffer) noch
+# schreibt — SIGPIPE, und der Release-Lauf stirbt. Sichtbar erst, seit die
+# Datei groesser als der Puffer ist und ein veroeffentlichter Abschnitt nach
+# dem Tag geaendert wurde. awk liest die Eingabe vollstaendig und merkt sich
+# nur den ersten Treffer: kein frueher Abbruch, keine abgerissene Pipe.
+KOPF="$(printf '%s\n' "$OHNE_ZAEUNE" | awk '
+  !gefunden && match($0, /^## \[[^]]+\]/) { print substr($0, RSTART, RLENGTH); gefunden = 1 }
+')"
 if [ -z "$KOPF" ]; then
   echo "FEHLER: keine Abschnitts-Ueberschrift der Form '## [...]' gefunden." >&2
   exit 2

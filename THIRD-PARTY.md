@@ -21,10 +21,8 @@ erst geladen, wenn ein HEIC-Foto ausgewählt wurde. Der eigene Code (`public/js/
 bleibt MIT. Wer die Bibliothek austauschen will, ersetzt die beiden Dateien;
 der Quelltext der Bibliothek liegt in den oben verlinkten Repositories in
 genau dieser Version. Die Nutzung ist auf der Website sichtbar genannt
-(Impressum, „Offene Bausteine") und in der Datenschutzerklärung beschrieben
-(Umwandlung vollständig im Browser). Patentlage: HEIC beruht auf HEVC, dessen
-Verfahren patentiert sind; die Software ist frei, das Verfahren nicht — eine
-bewusste Betreiberentscheidung vom 08.09.2026, siehe `docs/SECURITY-MODEL.md`. Alle Dateien sind mit einer Prüfsumme
+(Impressum, „Verwendete Open-Source-Software") und in der Datenschutzerklärung beschrieben
+(Umwandlung vollständig im Browser). Alle Dateien sind mit einer Prüfsumme
 hinterlegt (`public/lib/PRUEFSUMMEN.json`); eine Änderung an fremdem Code fällt
 dadurch im Bau auf.
 

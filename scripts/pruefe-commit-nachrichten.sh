@@ -15,6 +15,11 @@ MUSTER='[Pp]atent|[Rr]echtsrisik|[Rr]isiko wird getragen|[Hh]aftungsrisik|risk i
 if [ "${1:-}" = "--probe" ]; then
   printf '%s\n' "${2:-}" | grep -Eq "$MUSTER" && { echo "FUND (Probe): $2"; exit 1; } || { echo "sauber (Probe)"; exit 0; }
 fi
+# In der Pipeline (PR-Checkout) fehlt origin/main oft — einmal nachholen. Ob es
+# geklappt hat, prueft die Zeile danach ausdruecklich (Rueckgabe 2 = nicht messbar).
+if ! git rev-parse --verify -q origin/main >/dev/null 2>&1; then
+  git fetch --no-tags -q origin main:refs/remotes/origin/main >/dev/null 2>&1 || echo "Hinweis: origin/main konnte nicht geholt werden."
+fi
 git rev-parse --verify -q origin/main >/dev/null || { echo "NICHT MESSBAR: origin/main unbekannt."; exit 2; }
 FUNDE=$(git log origin/main..HEAD --format='%h %s%n%b' 2>/dev/null | grep -En "$MUSTER" || true)
 if [ -n "$FUNDE" ]; then

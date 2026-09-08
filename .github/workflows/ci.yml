@@ -366,6 +366,9 @@ jobs:
       # Auslieferung blockiert. Die Pruefung blendet Kommentare aus, sonst
       # tarnt ein auskommentiertes test.slow() den Befund.
       - run: python3 scripts/pruefe-tote-geduld.py
+      # Commit-Nachrichten seit origin/main (das Skript holt sich origin/main
+      # selbst; bei einem Push auf main ist die Menge leer und der Waechter gruen).
+      - run: sh scripts/pruefe-commit-nachrichten.sh
       - run: python3 scripts/pruefe-doppelte-werte.py
 
       # 31.08.2026: Zwei Waechter gegen die Fehlerklasse, die den Umbau vom

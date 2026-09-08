@@ -98,8 +98,8 @@ lauf "Lockfile: npm ci (functions)" "test-backend" npm ci --dry-run --prefix fun
 # als bestanden.
 lauf "Secret-Scan (gitleaks)" "secret-scan" sh scripts/secret-scan-lokal.sh
 # 08.09.2026: Commit-Nachrichten sind oeffentlich und nach dem Push nicht mehr
-# zuruecknehmbar — Rechtsrisiko-Formulierungen gehoeren nicht hinein.
-lauf "Commit-Nachrichten: keine Rechtsrisiko-Formulierung" "pruefungen" sh scripts/pruefe-commit-nachrichten.sh
+# zuruecknehmbar — heikle Formulierungen gehoeren nicht hinein.
+lauf "Commit-Nachrichten: keine heikle Formulierung" "pruefungen" sh scripts/pruefe-commit-nachrichten.sh
 # BEFUND 01.09.2026 (erster echter Pipeline-Lauf): Zwei von drei roten Jobs
 # gingen auf Aenderungen an ci.yml zurueck — und beide waren hier unsichtbar.
 # Die Tests, die ci.yml gegen dieses Skript pruefen (beide Richtungen), liegen

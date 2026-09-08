@@ -4,7 +4,7 @@
  * Rückfallwerte im Code. Jeder Test, der einen Code-Pfad mit Betriebswerten
  * berührt, braucht deshalb einen Satz.
  *
- * WARUM ZENTRAL: Dieselbe Regel wie für den Produktivcode. Stünden die 26
+ * WARUM ZENTRAL: Dieselbe Regel wie für den Produktivcode. Stünden die 29
  * Werte in dreißig Testdateien, hätte man dreißig Kopien, die auseinander
  * laufen — und ein neues Pflichtfeld müsste dreißigmal nachgetragen werden.
  *
@@ -39,6 +39,9 @@ const SATZ = {
   drosselWartelimitMs: 360000,
   tokenAbstandGrossMs: 800,
   tokenAbstandKleinMs: 2500,
+  /* Bewusst andere Zahlen als die Produktion (10000 / 4). */
+  ueberlastWarteMs: 5000,
+  ueberlastVersuche: 2,
   /* Fristen */
   jobAufbewahrungMs: 7200000,
   zustellfensterMs: 900000,
@@ -63,6 +66,11 @@ function betriebsprofilMock(ueberschreiben) {
        ohne-einstellungssatz.test.js. */
     tokenAbstandGrossMs: 0,
     tokenAbstandKleinMs: 0,
+    /* Dieselbe Ueberlegung fuer die Wartezeit bei Ueberlast: Fuenf Sekunden
+       je Wiederholung sind im Betrieb richtig und in Tests reine Wartezeit.
+       Geprueft wird sie in mistral-429-wiederholung.test.js, mit eigenem
+       Wert. */
+    ueberlastWarteMs: 1,
     ...(ueberschreiben || {}),
   };
   return {

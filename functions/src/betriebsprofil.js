@@ -3,95 +3,30 @@
 /**
  * betriebsprofil.js — Betriebswerte aus Firestore, als benannte Saetze.
  *
- * WARUM PROFILE UND NICHT EINZELNE SCHALTER:
+ * Die Werte haengen zusammen (Parallelitaet, Zeitgrenzen, Textmengen); deshalb
+ * gibt es VOLLSTAENDIGE Saetze statt einzelner Schalter, und umgestellt wird
+ * ein Feld: der Name des aktiven Satzes. Jeder Satz durchlaeuft beim Laden
+ * die Kopplungspruefungen unten (pruefe); ein Satz, der sie nicht besteht,
+ * wird abgelehnt.
  *
- * Die Betriebswerte haengen zusammen. Steigt malziME von Mistral-Tarif T1 auf
- * T2, gehoeren Parallelitaet, Stundenlimit und Zeitgrenzen GEMEINSAM angefasst
- * — wer einen vergisst, bekommt eine Anlage, die sich selbst widerspricht.
- * Genau daran ist der Vorschlag "einzelne Werte aus Firestore" am 18.08.2026
- * gescheitert und wurde zu Recht gestrichen: Er haette die Kopplung zwischen
- * Zeitgrenze und Token-Menge aufgehoben, die einen Ausfall am 17.08. verhindert
- * hat.
+ * KEINE RUECKFALLWERTE IM CODE (Entscheidung des Nutzers, 30.08.2026): Ohne
+ * gueltigen Satz laeuft keine Analyse. Der Satz muss in der Datenbank liegen,
+ * BEVOR eine Fassung ausgeliefert wird, die ihn braucht. Ein Notanker im Code
+ * wurde bewusst wieder entfernt — jeder Auftrag liegt selbst in Firestore;
+ * faellt die Datenbank aus, laeuft ohnehin keine Analyse.
  *
- * Ein Profil ist ein VOLLSTAENDIGER Satz. Umgestellt wird ein Feld — der Name
- * des aktiven Profils. Alles andere zieht mit.
+ * VIER OBERGRENZEN IN FELDER SIND ZUSAGEN, keine Plausibilitaetsgrenzen:
+ * jobAufbewahrungMs (2 h), zustellfensterMs (15 min), adressfensterMs
+ * (10 min), stundenfensterMinuten (60) stehen so in der Datenschutzerklaerung.
+ * Der Satz kann sie nur verkuerzen; wer sie anheben will, aendert zuerst die
+ * Erklaerung.
  *
- * DIE SICHERUNG BLEIBT, SIE WANDERT NUR MIT. Die Rechnung aus config.js
- * (erlaubte Ausgabelaenge muss in die erlaubte Zeit passen) laeuft hier beim
- * LADEN. Ein Profil, das sie nicht besteht, wird abgelehnt — es gelten die
- * Code-Werte weiter. Damit ist die Externalisierung strenger als der heutige
- * Zustand, nicht laxer: Heute crasht ein falscher Wert beim Start, hier wird
- * er verworfen und der Betrieb laeuft mit den bewaehrten Zahlen weiter.
- *
- * KEINE RUECKFALLWERTE IM CODE (Entscheidung des Nutzers, 30.08.2026):
- * „Natuerlich gehoeren die Werte raus aus dem Code. Das war von Anfang an der
- * Auftrag. Dass wir hier wirklich nur mehr ueber den Firestore unsere
- * Konfiguration machen."
- *
- * Ein zunaechst eingebauter Notanker im Code wurde wieder entfernt. Das
- * Argument dafuer — er rette den Betrieb bei einem Firestore-Ausfall — hielt
- * der Pruefung nicht stand: Jeder Analyse-Auftrag liegt selbst in Firestore
- * (Einreihen, Status, Ergebnis). Faellt die Datenbank aus, laeuft ohnehin
- * keine Analyse. Der Notanker haette nur die Doppelstruktur gebracht, die man
- * in Jahren nicht mehr zuordnen kann.
- *
- * FOLGE, die man kennen muss: OHNE gueltiges Profil laeuft KEINE Analyse. Das
- * Profil muss in der Datenbank liegen, BEVOR diese Fassung ausgeliefert wird.
- * Fehlt es, meldet das System das laut, statt still mit alten Zahlen
- * weiterzulaufen — ein Konfigurationsfehler soll auffallen, nicht monatelang
- * unbemerkt bleiben.
- *
- * WAS KEINE EINSTELLUNG IST und deshalb im Code bleibt: das Zeitlimit, das
- * Google der Function gibt (540 s), und die langsamste je gemessene
- * Mistral-Geschwindigkeit. Beides sind Tatsachen, gegen die geprueft wird,
- * keine Werte, die jemand einstellen wuerde.
- *
- * WAS AUCH IM CODE BLEIBT:
- *
- * `HOURLY_LIMIT` — das Stundenlimit ist bereits zur Laufzeit steuerbar. Der
- * Boost-Mechanismus in counter.js hebt es ueber `stats/current.limit`, mit
- * Ablauffrist und der bewussten Eigenschaft, niemanden mitten in einer
- * laufenden Klasse auszusperren. Es hier nochmals anzubinden hiesse, denselben
- * Wert an zwei Stellen steuerbar zu machen — genau die Vervielfachung, gegen
- * die dieser Entwurf antritt. `wirksamesLimit()` ist ausserdem synchron und
- * sitzt in der Einlasskontrolle; ein async-Umbau dort waere ein Eingriff in
- * den Pfad, ueber den jede Analyse hereinkommt, ohne neuen Nutzen.
- *
- * `QUEUE_DISPATCH_CONCURRENCY` — steht im Profil und wird gelesen, aber die
- * Warteschlange bei Google zieht NICHT automatisch mit (fremdes System, siehe
- * kapazitaets-wache.js). Der Profilwert dient der Wartezeit-Rechnung; die
- * Wache meldet, wenn beide Seiten auseinanderlaufen.
- *
- * ── VIER OBERGRENZEN SIND ZUSAGEN, KEINE PLAUSIBILITAETSGRENZEN ───────────
- *
- * Bei vier Feldern ist die Obergrenze in FELDER nicht willkuerlich weit
- * gewaehlt, sondern exakt das, was die Datenschutzerklaerung oeffentlich
- * verspricht:
- *
- *   jobAufbewahrungMs   max 2 h    "nie abgeholte spaetestens nach rund
- *                                   2 Stunden"
- *   zustellfensterMs    max 15 min "wenige Minuten nach der Abholung
- *                                   automatisch geloescht"
- *   adressfensterMs     max 10 min "merkt sich deine IP fuer maximal
- *                                   10 Minuten"
- *   stundenfensterMin.  max 60     "die Zeitpunkte der Analysen der letzten
- *                                   60 Minuten"
- *
- * Der Einstellungssatz kann diese Fristen nur VERKUERZEN. Waeren sie weiter
- * einstellbar, liesse sich eine oeffentliche Datenschutzzusage mit einem
- * Datenbankeintrag brechen — ohne Commit, ohne Review, ohne Spur im
- * Quelltext, waehrend die Erklaerung auf der Website weiter dasselbe sagt.
- *
- * WER EINE DIESER GRENZEN ANHEBEN WILL, AENDERT ZUERST DIE
- * DATENSCHUTZERKLAERUNG — nicht diese Datei. (Befund aus dem eigenen Review
- * am 30.08.2026: drei der vier Fristen waren zunaechst weit darueber hinaus
- * einstellbar.)
- *
- * WAS BEWUSST NICHT HIER STEHT: Upload-Grenze (Sicherheitsgrenze),
- * Feldlaengen der Fehlererfassung (Datenschutzzusage in Zahlenform),
- * Modellname und EU-Endpunkt (Zusage an die Nutzer). Zur Laufzeit umschaltbar
- * waeren das Wege, eine Zusage unbemerkt zu brechen. Sie bleiben im Code, wo
- * sie eine Pruefkette durchlaufen.
+ * Was bewusst KEINE Einstellung ist (Upload-Grenze, Feldlaengen der
+ * Fehlererfassung, Modell, EU-Endpunkt, Function-Zeitlimit, gemessenes
+ * Mistral-Tempo) und warum: docs/BETRIEBSPROFILE.md, Abschnitt "Was
+ * ausdruecklich nicht einstellbar ist". Die Vorgeschichte (gestrichener
+ * Einzelschalter-Vorschlag vom 18.08.2026, HOURLY_LIMIT, Warteschlange bei
+ * Google) steht dort ebenfalls — hier nur einmal, nicht zweimal.
  */
 
 const { datenbank } = require("./db");
@@ -184,6 +119,13 @@ const FELDER = {
   drosselWartelimitMs: { min: 1000, max: 30 * 60 * 1000 },
   tokenAbstandGrossMs: { min: 0, max: 60 * 1000 },
   tokenAbstandKleinMs: { min: 0, max: 60 * 1000 },
+  /* WENN MISTRAL ABLEHNT (429) ODER KURZ WEG IST (502/503/504): Wartezeit vor
+     der ersten Wiederholung; jede weitere wartet doppelt so lang. Die Reihe
+     10, 20, 40, 80 s ist am Vorfall vom 08.09.2026 nachgerechnet (siehe
+     produktiv-satz.js). Die Summe aller Wartezeiten muss zusammen mit dem
+     Hauptaufruf ins Gesamtbudget passen — Kopplungsregel in pruefe(). */
+  ueberlastWarteMs: { min: 1000, max: 120 * 1000 },
+  ueberlastVersuche: { min: 1, max: 10 },
 
   /* --- 5. Fristen: wie lange etwas liegen bleibt, bis aufgeraeumt wird ---
 
@@ -262,6 +204,22 @@ function pruefe(werte) {
     if (werte[name] > werte.requestBudgetMs) {
       return `${name} (${werte[name]} ms) liegt ueber requestBudgetMs (${werte.requestBudgetMs} ms)`;
     }
+  }
+  /* Die Wartezeiten bei Ueberlast muessen ins Gesamtbudget passen:
+     warte + 2·warte + 4·warte + … = warte·(2^n − 1). Liegt die Summe ueber
+     dem Budget, koennten die letzten Wiederholungen NIE stattfinden — der
+     Satz verspraeche ein Netz, das es nicht gibt. Was der Hauptaufruf vorher
+     verbraucht hat, regelt der Aufruf selbst: Er wiederholt nur, solange das
+     Restbudget fuer die naechste Wartezeit reicht (mistral-http.js). Deshalb
+     zaehlt hier die Summe allein, nicht Summe plus Aufrufdauer — sonst waere
+     der Langsam-Satz (450 s Aufruf) ohne Netz. (08.09.2026) */
+  const wartesummeMs = werte.ueberlastWarteMs * (2 ** werte.ueberlastVersuche - 1);
+  if (wartesummeMs >= werte.requestBudgetMs) {
+    return (
+      `ueberlastWarteMs (${werte.ueberlastWarteMs}) × ${werte.ueberlastVersuche} Wiederholungen ergeben ` +
+      `${Math.round(wartesummeMs / 1000)} s Wartezeit — mehr als requestBudgetMs ` +
+      `(${Math.round(werte.requestBudgetMs / 1000)} s); die letzten Wiederholungen faenden nie statt`
+    );
   }
   /* Das Zustellfenster darf die Aufbewahrung nicht ueberschreiten — sonst
      wartet der Reaper auf ein Fenster, das nach der Loeschung endet. */

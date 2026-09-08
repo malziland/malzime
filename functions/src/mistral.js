@@ -511,6 +511,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, opts = {}) {
         outputTokens: result.outputTokens,
         cachedTokens: result.cachedTokens,
         httpMs: result.httpMs,
+        wiederholungen: result.wiederholungen || 0,
       })
     );
     return ads.length ? ads : null;
@@ -606,6 +607,10 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
         cachedTokens: result.cachedTokens,
         httpMs: result.httpMs,
         waitMs: result.waitMs,
+        /* Wie oft der Aufruf bei Ueberlast warten musste, bevor er durchkam
+           (08.09.2026). 0 im Normalfall; jede andere Zahl heisst: das Netz
+           hat gegriffen, und die Dosierung verdient einen Blick. */
+        wiederholungen: result.wiederholungen || 0,
         repairStages: stages,
       })
     );
@@ -664,6 +669,9 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
            ohne diese Unterscheidung ist am Alarm nicht zu erkennen, ob eine
            Zeitgrenze zu knapp sitzt oder Mistral eine Stoerung hat. */
         errorCode: err.code || null,
+        /* Wie viele Wiederholungen dem Scheitern vorausgingen — am 08.09.2026
+           war es genau eine nach 2 s, und die Zahl stand nirgends. */
+        wiederholungen: typeof err.wiederholungen === "number" ? err.wiederholungen : null,
       })
     );
     if (isRateLimitError(err)) {

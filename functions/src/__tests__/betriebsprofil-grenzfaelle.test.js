@@ -34,6 +34,20 @@ const setze = (d, f = null) => {
 };
 
 describe("GRENZFAELLE", () => {
+  test("Wartezeiten bei Ueberlast, die zusammen ueber dem Budget liegen, werden abgelehnt (08.09.2026)", () => {
+    /* 60 s × (2^4 − 1) = 900 s Wartezeit bei 480 s Budget: Die letzten
+       Wiederholungen faenden nie statt — der Satz verspraeche ein Netz, das es
+       nicht gibt. */
+    const grund = _pruefe({ ...T1, ueberlastWarteMs: 60000, ueberlastVersuche: 4 });
+    expect(grund).toMatch(/ueberlastWarteMs/);
+    expect(grund).toMatch(/requestBudgetMs/);
+    /* Knapp darunter ist erlaubt: 10 s × 15 = 150 s. */
+    expect(_pruefe({ ...T1, ueberlastWarteMs: 10000, ueberlastVersuche: 4 })).toBeNull();
+    /* Und der Langsam-Satz mit 450 s Aufruf bleibt gueltig — die Aufrufdauer
+       zaehlt hier bewusst nicht mit (Restbudget regelt das im Aufruf). */
+    expect(_pruefe({ ...T1, singleLargeTimeoutMs: 450000, ueberlastWarteMs: 10000, ueberlastVersuche: 4 })).toBeNull();
+  });
+
   test("Wechsel WAEHREND einer laufenden Analyse: der Lauf behaelt seine Werte", async () => {
     /* Der heikelste Fall: Eine Analyse laeuft seit 200 s mit einer Grenze von
        300 s. Jemand stellt auf 100 s um. Waere der neue Wert sofort gueltig,

@@ -86,6 +86,11 @@ describe("Riegel 5: Die Zeitgrenze der KI-Aufrufe ist Pflicht", () => {
       await expect(roh({ model: "x", messages: [], maxTokens: 1, temperature: 0 })).rejects.toThrow(
         /timeoutCapMs fehlt/
       );
+      /* Und dieselbe Pflicht fuer die Wartezeiten bei Ueberlast (08.09.2026):
+         Ohne Reihe aus dem Satz darf kein Aufruf raten, wie lange er wartet. */
+      await expect(roh({ model: "x", messages: [], maxTokens: 1, temperature: 0, timeoutCapMs: 1000 })).rejects.toThrow(
+        /ueberlastWartezeitenMs fehlt/
+      );
     } finally {
       if (vorher === undefined) delete process.env.MISTRAL_API_KEY;
       else process.env.MISTRAL_API_KEY = vorher;
@@ -289,7 +294,7 @@ describe("Riegel 10: Der Store kann keine Zusage umlenken", () => {
     expect(gelesen).not.toHaveProperty(feld);
   });
 
-  test("ein Dokument voller Zusagen-Felder ergibt trotzdem nur die 26 bekannten", () => {
+  test("ein Dokument voller Zusagen-Felder ergibt trotzdem nur die bekannten Felder", () => {
     const angriff = { ...SATZ };
     for (const [feld, wert] of ZUSAGEN_FELDER) angriff[feld] = wert;
     const gelesen = _felderLesen(angriff);

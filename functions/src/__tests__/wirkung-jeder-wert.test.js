@@ -545,6 +545,60 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
     await expect(eng.acquire()).rejects.toThrow(/queue timeout/i);
     halten();
   }, 15000);
+
+  /* Die beiden Werte vom 08.09.2026: Sie steuern, wie ein Aufruf auf 429
+     reagiert. Gemessen wird ueber den ungedrosselten Aufruf mit einer
+     Attrappe, die immer 429 liefert — so zaehlt nur, was der Satz sagt. */
+  async function versucheUndDauerBei(wartezeiten) {
+    jest.resetModules();
+    process.env.MISTRAL_API_KEY = "test-key-not-real";
+    const { callMistralRawUnthrottled, setFetchForTest } = require("../mistral-http");
+    let versuche = 0;
+    setFetchForTest(async () => {
+      versuche += 1;
+      return { ok: false, status: 429, text: async () => "rate limited" };
+    });
+    const start = Date.now();
+    await expect(
+      callMistralRawUnthrottled({
+        model: "x",
+        messages: [],
+        maxTokens: 1,
+        temperature: 0,
+        timeoutCapMs: 5000,
+        ueberlastWartezeitenMs: wartezeiten,
+      })
+    ).rejects.toMatchObject({ status: 429 });
+    setFetchForTest(null);
+    return { versuche, dauer: Date.now() - start };
+  }
+
+  test("ueberlastVersuche wirkt: mehr Versuche aus dem Satz, mehr Aufrufe", async () => {
+    jest.resetModules();
+    const { _ueberlastWartezeiten } = require("../mistral-http");
+    const wenig = await versucheUndDauerBei(
+      _ueberlastWartezeiten({ ...SATZ, ueberlastWarteMs: 1, ueberlastVersuche: 1 })
+    );
+    const viel = await versucheUndDauerBei(
+      _ueberlastWartezeiten({ ...SATZ, ueberlastWarteMs: 1, ueberlastVersuche: 3 })
+    );
+    expect(wenig.versuche).toBe(2);
+    expect(viel.versuche).toBe(4);
+  }, 15000);
+
+  test("ueberlastWarteMs wirkt: laengere Wartezeit aus dem Satz, laengerer Lauf — und verdoppelnd", async () => {
+    jest.resetModules();
+    const { _ueberlastWartezeiten } = require("../mistral-http");
+    expect(_ueberlastWartezeiten({ ...SATZ, ueberlastWarteMs: 10, ueberlastVersuche: 4 })).toEqual([10, 20, 40, 80]);
+    const kurz = await versucheUndDauerBei(
+      _ueberlastWartezeiten({ ...SATZ, ueberlastWarteMs: 1, ueberlastVersuche: 2 })
+    );
+    const lang = await versucheUndDauerBei(
+      _ueberlastWartezeiten({ ...SATZ, ueberlastWarteMs: 60, ueberlastVersuche: 2 })
+    );
+    /* 60 + 120 = 180 ms Wartezeit gegenueber 1 + 2 = 3 ms. */
+    expect(lang.dauer).toBeGreaterThan(kurz.dauer + 150);
+  }, 15000);
 });
 
 /* ════════════════════════════════════════════════════════════════════

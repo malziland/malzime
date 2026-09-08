@@ -17,8 +17,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Ergebnis nimmt denselben Weg wie jedes andere Foto: Metadaten weg, verkleinert,
   dann erst zum Server. Die Sicherheitsrichtlinie der Seite erlaubt dafür
   WebAssembly von der eigenen Adresse (`'wasm-unsafe-eval'`), sonst nichts.
-  Begründung, Lizenz und Patentlage in `docs/SECURITY-MODEL.md`; der Baustein steht
-  im Impressum unter „Offene Bausteine" und in `THIRD-PARTY.md`.
+  Begründung und Lizenz in `docs/SECURITY-MODEL.md`; der Baustein steht im
+  Impressum unter „Verwendete Open-Source-Software" und in `THIRD-PARTY.md`.
 - **Lässt sich eine Datei nicht lesen, versucht die Seite einen zweiten Weg.**
   Fünf Android-Geräte derselben Klasse gaben das Foto nicht her („Datei nicht
   lesbar"), zwei Kinder probierten dieselbe Datei zweimal. Jetzt liest die Seite
@@ -37,8 +37,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   jeweils Ergebnis oder die richtige Meldung, und dass keine GPS-Koordinaten den
   Browser verlassen. Dazu ein Android-Emulator als Prüfgerät auf dem
   Entwicklungsrechner (`docs/RUNBOOK.md`).
-- **Alle fremden Bausteine sind auf der Website genannt** (Impressum, „Offene
-  Bausteine", DE und EN), einheitlich mit Version, Lizenz und Urheber, mit Verweis
+- **Alle fremden Bausteine sind auf der Website genannt** (Impressum, „Verwendete
+  Open-Source-Software", DE und EN), einheitlich mit Version, Lizenz und Urheber, mit Verweis
   auf die vollständige Liste `THIRD-PARTY.md`.
 
 ## [4.6.5] — 2026-09-08

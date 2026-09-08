@@ -186,14 +186,14 @@ const ERFOLG = [
     mime: "image/heic",
     gps: ["48.208", "48,208", "16.373"],
     make: "samsung",
-    dekoderErwartet: { chromium: true, firefox: true, webkit: false },
+    heic: true,
   },
   {
     datei: "heic-iphone-mit-gps.heic",
     mime: "image/heic",
     gps: ["47.070", "47,070", "15.439"],
     make: "Apple",
-    dekoderErwartet: { chromium: true, firefox: true, webkit: false },
+    heic: true,
   },
   { datei: "gedreht-orientation-6.jpg", mime: "image/jpeg", gps: [] },
   { datei: "bild.png", mime: "image/png", gps: [] },
@@ -202,8 +202,27 @@ const ERFOLG = [
 ];
 
 for (const fall of ERFOLG) {
-  test(`Problemfall ${fall.datei}: wird eingereiht, ohne Metadaten`, async ({ page, browserName }) => {
+  test(`Problemfall ${fall.datei}: wird eingereiht, ohne Metadaten`, async ({ page }) => {
     const { gefangen, geladen } = await seiteMitAbgefangenerEinreihung(page);
+    /* Kann DIESER Browser HEIC selbst? Gemessen mit der echten Datei, nicht
+       angenommen: WebKit kann es auf dem Mac (ImageIO), auf dem Linux-Laeufer
+       der Pipeline nicht — am 08.09.2026 machte genau diese Annahme zwei Tests
+       rot. (Eine Mini-HEIC aus nur einem Dateikopf taugt nicht als Probe: Die
+       lehnt auch ein faehiger Browser ab.) */
+    const kannHeicNativ = fall.heic
+      ? await page.evaluate(
+          /* eslint-disable no-undef -- laeuft im Browser */
+          (b64) =>
+            new Promise((res) => {
+              const i = new Image();
+              i.onload = () => res(i.naturalWidth > 0);
+              i.onerror = () => res(false);
+              i.src = "data:image/heic;base64," + b64;
+            }),
+          /* eslint-enable no-undef */
+          readFileSync(join(FIXTURES, fall.datei)).toString("base64")
+        )
+      : false;
     await upload(page, fall.datei, fall.mime);
     await expect.poll(() => gefangen.length, { timeout: 30000, message: "Einreihung muss abgefangen werden" }).toBe(1);
     pruefeUpload(gefangen[0], { gpsFragmente: fall.gps, make: fall.make });
@@ -216,13 +235,10 @@ for (const fall of ERFOLG) {
         message: "Vorschau muss ein anzeigbares Bild zeigen",
       })
       .toBeGreaterThan(0);
-    /* Der Dekoder wird NUR geladen, wenn der Browser HEIC nicht selbst kann. */
+    /* Der Dekoder wird NUR geladen, wenn es HEIC ist UND der Browser es nicht
+       selbst kann. */
     const dekoderGeladen = geladen.some((u) => u.includes("/lib/libheif/"));
-    if (fall.dekoderErwartet) {
-      expect(dekoderGeladen).toBe(fall.dekoderErwartet[browserName]);
-    } else {
-      expect(dekoderGeladen).toBe(false);
-    }
+    expect(dekoderGeladen).toBe(Boolean(fall.heic) && !kannHeicNativ);
   });
 }
 

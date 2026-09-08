@@ -4,6 +4,14 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.7.1] — 2026-09-08
+
+### Geändert
+
+- **Der Lizenzabschnitt im Impressum heißt „Verwendete Open-Source-Software"**
+  (englisch „Open-source software used") statt „Offene Bausteine". Inhalt
+  unverändert.
+
 ## [4.7.0] — 2026-09-08
 
 ### Behoben

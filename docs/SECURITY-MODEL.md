@@ -321,3 +321,45 @@ mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
 in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
 sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
 verschoben.
+
+## HEIC-Fotos im Browser öffnen: WebAssembly, LGPL und die Patentfrage (08.09.2026)
+
+**Anlass.** Am 08.09.2026 scheiterten in einer Klasse 3 von 31 Versuchen daran, dass
+Android-Browser HEIC-Fotos nicht öffnen können — das Standardformat vieler
+Samsung-Handys. Das Kind sah „Format nicht unterstützt". Ein Fehler, den der Nutzer
+sieht, ist unser Fehler, egal wo die technische Ursache liegt.
+
+**Was seitdem gilt.** Kann der Browser ein HEIC-Foto nicht selbst öffnen, wandelt es
+der Dekoder libheif (mit libde265) als WebAssembly-Baustein im Browser um. Danach
+nimmt das Bild exakt denselben Weg wie jedes andere: EXIF und GPS werden im Browser
+gelesen, das Bild wird verkleinert und neu kodiert, Metadaten bleiben zurück, erst
+dann geht es zum Server. Die Zusage „GPS erreicht nie unsere Server" bleibt
+wörtlich wahr; `e2e/problemfaelle.test.js` prüft am abgefangenen Upload, dass keine
+Koordinaten mitgehen.
+
+**Bewusste Lockerung der Sicherheitsrichtlinie.** `script-src` trägt zusätzlich
+`'wasm-unsafe-eval'`. Ohne diesen Eintrag lässt kein Browser WebAssembly
+instanziieren, auch nicht von der eigenen Adresse. Der Eintrag erlaubt **nur**
+WebAssembly, kein `eval`, keine Inline-Skripte, keine fremden Hosts — `script-src`
+bleibt sonst `'self'`. Das Binary kommt von unserem Server, ist per Prüfsumme
+festgeschrieben (`public/lib/PRUEFSUMMEN.json`) und wird erst geladen, wenn ein
+HEIC-Foto ausgewählt wurde und der Browser es nicht selbst konnte (rund 1,5 MB,
+einmal je Seite). Für JPEG-Fotos ändert sich nichts, kein zusätzlicher Abruf.
+
+**Lizenz.** libheif und libde265 stehen unter LGPL 3.0. Das ist mit der MIT-Lizenz
+dieses Projekts vereinbar, weil die Bibliothek als getrennte, unveränderte und
+austauschbare Datei vorliegt und nur über ihre öffentliche Schnittstelle benutzt
+wird. Lizenztext, Version und Herkunft: `public/lib/libheif/`, Übersicht in
+`THIRD-PARTY.md`, sichtbar auf der Website im Impressum („Offene Bausteine").
+
+**Restrisiko, benannt.** HEIC beruht auf dem Videoverfahren HEVC, dessen Verfahren
+patentiert sind. Die Software ist frei, das Verfahren nicht; wer HEVC-Dekoder
+verbreitet, nutzt ein patentiertes Verfahren ohne Lizenz der Patentpools. Diese
+holen sich Lizenzgebühren bei Geräteherstellern und großen Anbietern; gegen
+Open-Source-Projekte oder kleine Bildungsdienste sind uns keine Fälle bekannt.
+Betreiberentscheidung vom 08.09.2026: Das Risiko wird getragen, weil die
+Alternative (dem Kind eine Kameraeinstellung zu erklären) in einer Klasse nicht
+funktioniert. Rückweg ohne Deploy: keiner — der Baustein ist Teil der Auslieferung;
+Rückweg mit Deploy: Ordner `public/lib/libheif/` und den HEIC-Zweig in
+`public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen.
+

@@ -160,6 +160,7 @@ function handleNewFile(file) {
   elements.imagePreview.appendChild(img);
 
   state.lastFile = file;
+  state.auswahlZeit = Date.now();
   state.lastPrepared = null;
   state.lastData = null;
   analyzeImage();

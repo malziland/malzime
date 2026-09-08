@@ -633,6 +633,39 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 | `client-diagnostics` (europe-west1) | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge |
 | Anwendungs-Logs | — | keine Bildinhalte, keine personenbezogenen Daten; nur Request-ID, Step, Status, Token-Counts |
 
+## Prüfgerät Android (Emulator auf dem Entwicklungsrechner, seit 08.09.2026)
+
+**Warum:** Am 08.09.2026 scheiterten in einer Klasse 8 von 31 Versuchen im
+Browser, alle auf Android (HEIC-Fotos, „Datei nicht lesbar"). Unsere Prüfkette
+lief bis dahin nur in Desktop-Browsern auf dem Mac. Ein echtes Android-Gerät gibt
+es nicht; der Emulator ist der nächste Schritt zu einem. Er läuft lokal, nichts
+davon geht in eine fremde Cloud.
+
+**Einrichtung (einmalig, kostenlos, rund 2 GB):**
+
+    brew install --cask android-commandlinetools
+    export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+    export JAVA_HOME=/opt/homebrew/opt/openjdk@21
+    yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+    $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "emulator" \
+      "platforms;android-35" "system-images;android-35;google_apis_playstore;arm64-v8a"
+    echo no | $ANDROID_HOME/cmdline-tools/latest/bin/avdmanager create avd \
+      -n pruefgeraet -k "system-images;android-35;google_apis_playstore;arm64-v8a" -d pixel_7
+
+**Starten (kopflos, bootet in rund 20 s):**
+
+    $ANDROID_HOME/emulator/emulator -avd pruefgeraet -no-window -no-audio -no-boot-anim &
+    $ANDROID_HOME/platform-tools/adb wait-for-device shell \
+      'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done; echo BOOTED'
+
+Das Gerät ist Android 15 mit Chrome. Die Seite auf dem Mac erreicht der Emulator
+unter `http://10.0.2.2:<Port>` (Host-Loopback). Playwright steuert Chrome dort
+über `_android` (Attrappen für die Warteschlange wie in `e2e/problemfaelle.test.js`,
+kostenfrei). Was der Emulator NICHT kann: Fotos, die nur in Google Fotos in der
+Cloud liegen, und Hersteller-Galerien — dafür braucht es ein echtes Gerät.
+
+**Beenden:** `$ANDROID_HOME/platform-tools/adb emu kill`.
+
 ## Rollback-Probe
 
 Verfahren: Release-Tag in einem temporären `git worktree` auschecken, `npm ci`

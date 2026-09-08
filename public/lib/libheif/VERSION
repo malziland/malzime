@@ -1,0 +1,16 @@
+libheif-js 1.23.2 (WebAssembly-Build von libheif 1.23.2 mit libde265)
+Quelle:   npm libheif-js@1.23.2, Dateien libheif-wasm/libheif.js und
+          libheif-wasm/libheif.wasm — unveraendert kopiert (2026-09-08)
+Repos:    https://github.com/catdad-experiments/libheif-js
+          https://github.com/strukturag/libheif   (libheif, LGPL-3.0)
+          https://github.com/strukturag/libde265  (HEVC-Dekoder, LGPL-3.0)
+Lizenz:   GNU Lesser General Public License v3.0 — Text in LICENSE daneben.
+          Die Bibliothek liegt als getrennte, austauschbare Datei vor und wird
+          nur geladen, wenn ein HEIC-Foto ausgewaehlt wurde. Unser eigener Code
+          (MIT) ruft sie ueber ihre oeffentliche Schnittstelle auf und aendert
+          sie nicht.
+Wozu:     Android-Browser koennen HEIC-Fotos (Samsung-Standard) nicht oeffnen.
+          Die Umwandlung passiert vollstaendig im Browser; das Foto verlaesst
+          das Geraet nicht (siehe docs/SECURITY-MODEL.md).
+
+Self-hosted copy — no external CDN requests.

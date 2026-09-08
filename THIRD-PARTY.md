@@ -9,9 +9,22 @@ davon bringt seine eigene Lizenz mit, und die gilt unverändert weiter.
 | [Leaflet](https://leafletjs.com) 1.9.4               | BSD 2-Clause              | Volodymyr Agafonkin; CloudMade | `public/lib/leaflet/LICENSE`   |
 | [exifr](https://github.com/MikeKovarik/exifr) 7.1.x  | MIT                       | Mike Kovařík, Mutiny.cz        | `public/lib/exifr/LICENSE`     |
 | [Poppins](https://fonts.google.com/specimen/Poppins) | SIL Open Font License 1.1 | Indian Type Foundry            | `public/fonts/poppins/OFL.txt` |
+| [libheif](https://github.com/strukturag/libheif) 1.23.2 mit [libde265](https://github.com/strukturag/libde265), WebAssembly-Bau aus [libheif-js](https://github.com/catdad-experiments/libheif-js) 1.23.2 | LGPL 3.0 | Dirk Farin, struktur AG; Kiril Vatev (libheif-js) | `public/lib/libheif/LICENSE` |
 
 Die Herkunft jeder Datei und jede Abweichung vom Original stehen in der
-`VERSION`-Datei des jeweiligen Ordners. Alle Dateien sind mit einer Prüfsumme
+`VERSION`-Datei des jeweiligen Ordners.
+
+**libheif ist LGPL, nicht MIT oder BSD — das verlangt mehr:** Die Bibliothek
+liegt als getrennte, unveränderte und austauschbare Datei vor (`libheif.js` +
+`libheif.wasm`), wird nur über ihre öffentliche Schnittstelle aufgerufen und
+erst geladen, wenn ein HEIC-Foto ausgewählt wurde. Der eigene Code (`public/js/heic.js`)
+bleibt MIT. Wer die Bibliothek austauschen will, ersetzt die beiden Dateien;
+der Quelltext der Bibliothek liegt in den oben verlinkten Repositories in
+genau dieser Version. Die Nutzung ist auf der Website sichtbar genannt
+(Impressum, „Offene Bausteine") und in der Datenschutzerklärung beschrieben
+(Umwandlung vollständig im Browser). Patentlage: HEIC beruht auf HEVC, dessen
+Verfahren patentiert sind; die Software ist frei, das Verfahren nicht — eine
+bewusste Betreiberentscheidung vom 08.09.2026, siehe `docs/SECURITY-MODEL.md`. Alle Dateien sind mit einer Prüfsumme
 hinterlegt (`public/lib/PRUEFSUMMEN.json`); eine Änderung an fremdem Code fällt
 dadurch im Bau auf.
 

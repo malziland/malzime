@@ -4,6 +4,43 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **HEIC-Fotos öffnen sich jetzt auch auf Android.** Samsung-Handys speichern
+  Fotos ab Werk als HEIC, und Android-Browser können das Format nicht öffnen; am
+  08.09. sahen so 3 Kinder einer Klasse „Format nicht unterstützt". Kann der
+  Browser ein HEIC-Foto nicht selbst öffnen, wandelt es jetzt ein mitgelieferter
+  Baustein (libheif, LGPL 3.0, als getrennte Datei unter `lib/libheif/`) im
+  Browser um. Er wird nur dann geladen, das Foto verlässt das Gerät nicht, und das
+  Ergebnis nimmt denselben Weg wie jedes andere Foto: Metadaten weg, verkleinert,
+  dann erst zum Server. Die Sicherheitsrichtlinie der Seite erlaubt dafür
+  WebAssembly von der eigenen Adresse (`'wasm-unsafe-eval'`), sonst nichts.
+  Begründung, Lizenz und Patentlage in `docs/SECURITY-MODEL.md`; der Baustein steht
+  im Impressum unter „Offene Bausteine" und in `THIRD-PARTY.md`.
+- **Lässt sich eine Datei nicht lesen, versucht die Seite einen zweiten Weg.**
+  Fünf Android-Geräte derselben Klasse gaben das Foto nicht her („Datei nicht
+  lesbar"), zwei Kinder probierten dieselbe Datei zweimal. Jetzt liest die Seite
+  über einen zweiten Weg im Browser; klappt der, läuft die Analyse einfach weiter.
+  Klappt er nicht, nennt der anonyme Fehlerbericht zwei neue Werte, damit der
+  nächste Fall sich selbst erklärt: die Zeit zwischen Fotoauswahl und Leseversuch
+  und das Ergebnis des zweiten Wegs als Stichwort. Die Datenschutzerklärung nennt
+  beide und trägt den Stand 8. September 2026.
+
+### Geändert
+
+- **Die Prüfkette kennt jetzt Problemfälle**, nicht nur den Weg, der geht:
+  HEIC-Fotos von Samsung und iPhone, ein gedrehtes Foto, PNG, WebP, eine leere
+  Datei, ein umbenanntes PNG und Text mit Bildendung laufen in Chromium, Firefox
+  und WebKit durch die echte Seite (`e2e/problemfaelle.test.js`), geprüft wird
+  jeweils Ergebnis oder die richtige Meldung, und dass keine GPS-Koordinaten den
+  Browser verlassen. Dazu ein Android-Emulator als Prüfgerät auf dem
+  Entwicklungsrechner (`docs/RUNBOOK.md`).
+- **Alle fremden Bausteine sind auf der Website genannt** (Impressum, „Offene
+  Bausteine", DE und EN), einheitlich mit Version, Lizenz und Urheber, mit Verweis
+  auf die vollständige Liste `THIRD-PARTY.md`.
+
 ## [4.6.5] — 2026-09-08
 
 ### Behoben

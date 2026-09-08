@@ -53,6 +53,7 @@ public/                     Firebase Hosting (SPA, kein Build-Schritt)
   fonts/                    Self-hosted: Poppins (woff2, OFL)
   lib/leaflet/              Self-hosted: Leaflet 1.9.4
   lib/exifr/                Self-hosted: exifr lite (EXIF-Parsing im Browser)
+  lib/libheif/              Self-hosted: libheif 1.23.2 (HEIC-Dekoder, WebAssembly, LGPL)
 
 functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)
   index.js                  Cloud-Function-Exports + Firebase Secret Bindings
@@ -110,7 +111,7 @@ Datenschutz ist kein Feature — es ist das Fundament:
 - **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell (ohne GPS, ohne dateTimeOriginal)
 - **Geocoding direkt vom Browser**: Nominatim wird client-seitig aufgerufen, nicht ueber den Server
 - **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
-- **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK
+- **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr, libheif). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK
 - **Bot-Schutz ohne Tracking**: Rate Limiting (IP), Honeypot-Feld, Timing-Check
 - **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + `/api/…` (gleiche Domain)
 
@@ -400,7 +401,8 @@ Der Quellcode steht unter MIT — siehe [LICENSE](LICENSE).
 Nutzung ausserhalb dieses Projekts nur mit schriftlicher Zustimmung von
 malziland - learning | training | consulting e.U. Details: [TRADEMARKS.md](TRADEMARKS.md).
 
-**Fremde Bestandteile:** Leaflet (BSD 2-Clause), exifr (MIT) und die Schrift
+**Fremde Bestandteile:** Leaflet (BSD 2-Clause), exifr (MIT), der HEIC-Dekoder
+libheif mit libde265 (LGPL 3.0, als getrennte, austauschbare Datei) und die Schrift
 Poppins (SIL Open Font License 1.1) liegen selbst gehostet im Repository und sind
 **nicht** von der MIT-Lizenz dieses Projekts umfasst. Jeder Bestandteil bringt
 seinen eigenen Lizenztext mit; die Uebersicht steht in

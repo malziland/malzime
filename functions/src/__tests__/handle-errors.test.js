@@ -93,6 +93,36 @@ describe("handleErrors", () => {
     expect(logged.client).not.toHaveProperty("erfunden");
   });
 
+  test("Lesefehler-Diagnose (08.09.2026): msSeitAuswahl und zweiterLeseweg kommen an, gekappt und typgeprueft", async () => {
+    /* Fuenf Android-Geraete einer Klasse: NotReadableError, zwei Kinder mit
+       derselben Datei zweimal. Ob ein zweiter Leseweg hilft und wie lang die
+       Auswahl her war, stand nirgends. Zwei Felder ohne Personenbezug. */
+    const res = mockRes();
+    await handleErrors(
+      mockReq({
+        errorMessage: "read_failed",
+        phase: "image-read",
+        msSeitAuswahl: 1834,
+        zweiterLeseweg: "NotReadableError" + "x".repeat(100),
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(204);
+    const logged = loggedPayload();
+    expect(logged.msSeitAuswahl).toBe(1834);
+    expect(logged.zweiterLeseweg).toHaveLength(40);
+    expect(logged.zweiterLeseweg.startsWith("NotReadableError")).toBe(true);
+  });
+
+  test("Lesefehler-Diagnose mit falschem Typ wird verworfen", async () => {
+    const res = mockRes();
+    await handleErrors(mockReq({ errorMessage: "x", phase: "p", msSeitAuswahl: "1834", zweiterLeseweg: 7 }), res);
+    expect(res.statusCode).toBe(204);
+    const logged = loggedPayload();
+    expect(logged.msSeitAuswahl == null).toBe(true);
+    expect(logged.zweiterLeseweg == null).toBe(true);
+  });
+
   test("client.automatisiert als Text wird verworfen — nur boolesch zaehlt", async () => {
     const res = mockRes();
     await handleErrors(mockReq({ errorMessage: "x", phase: "p", client: { automatisiert: "true" } }), res);

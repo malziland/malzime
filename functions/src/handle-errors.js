@@ -28,8 +28,12 @@ const STRING_FIELDS = {
   wakeLock: 40,
   fileFormat: 40,
   errorDetail: 60,
+  /* Lesefehler-Diagnose (08.09.2026): Ergebnis des zweiten Lesewegs als
+     Stichwort ("ok:940kb" oder ein Fehlername). Kein Dateiname, kein Inhalt. */
+  zweiterLeseweg: 40,
 };
-const NUMBER_FIELDS = ["durationMs", "httpStatus", "fileSizeKb"];
+/* `msSeitAuswahl`: Zeit zwischen Dateiauswahl und Leseversuch (08.09.2026). */
+const NUMBER_FIELDS = ["durationMs", "httpStatus", "fileSizeKb", "msSeitAuswahl"];
 const BOOLEAN_FIELDS = ["online", "hidden"];
 
 const TIMING_KEYS = ["prepareImageMs", "fetchMs", "parseMs", "renderMs", "totalMs"];

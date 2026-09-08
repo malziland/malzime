@@ -81,6 +81,30 @@ function releaseWakeLock() {
   wakeLock = null;
 }
 
+/* Die Vorschau oben zeigt das Original ueber eine Objekt-URL. Kann der
+   Browser das Format nicht anzeigen (HEIC auf Android, 08.09.2026), bleibt
+   dort ein kaputtes Bildsymbol stehen, obwohl die Analyse laeuft. Dann zeigt
+   die Vorschau das, was der Browser aus dem Foto gemacht hat — dasselbe Bild,
+   das auch zum Server geht. Kann der Browser das Original anzeigen, aendert
+   sich nichts. */
+function vorschauAusErgebnisFallsNoetig(prepared) {
+  const img = elements.imagePreview && elements.imagePreview.querySelector("img");
+  if (!img || !prepared || !prepared.imageBase64) return;
+  const ersetzen = () => {
+    try {
+      URL.revokeObjectURL(img.src);
+    } catch (_) {
+      /* Objekt-URL war schon weg — egal. */
+    }
+    img.src = `data:${prepared.mimeType || "image/jpeg"};base64,${prepared.imageBase64}`;
+  };
+  if (img.complete) {
+    if (img.naturalWidth === 0) ersetzen();
+  } else {
+    img.addEventListener("error", ersetzen, { once: true });
+  }
+}
+
 /* v3.0.0: Das frühere Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
    (bewusste Entscheidung: „dieses Pop-Up liest sowieso keiner durch") —
    die Analyse startet direkt bei der Foto-/Demo-Wahl. Die Einordnung „nichts
@@ -713,9 +737,10 @@ async function analyzeImageQueued() {
     /* Bild komprimieren + EXIF extrahieren (client-seitig) */
     const prepareStart = Date.now();
     if (!state.lastPrepared) {
-      state.lastPrepared = await prepareImage(file);
+      state.lastPrepared = await prepareImage(file, { auswahlZeit: state.auswahlZeit });
     }
     timings.prepareImageMs = Date.now() - prepareStart;
+    vorschauAusErgebnisFallsNoetig(state.lastPrepared);
     if (state.requestId !== myId) return;
 
     /* Geocoding parallel starten wenn GPS vorhanden */
@@ -899,6 +924,10 @@ async function analyzeImageQueued() {
       fileFormat: err.fileFormat,
       errorDetail: err.errorDetail,
       fileSizeKb: err.fileSizeKb,
+      /* Lesefehler-Diagnose (08.09.2026): Zeit seit der Auswahl und das
+         Ergebnis des zweiten Lesewegs — beides ohne Personenbezug. */
+      msSeitAuswahl: err.msSeitAuswahl,
+      zweiterLeseweg: err.zweiterLeseweg,
     });
   } finally {
     releaseWakeLock();

@@ -14,6 +14,8 @@ export const state = {
   geocodeAbortController: null,
   lastPrepared: null,
   lastFile: null,
+  /* Zeitpunkt der Dateiauswahl (08.09.2026) — fuer die Lesefehler-Diagnose. */
+  auswahlZeit: null,
   lastData: null,
   requestId: 0,
   lastTraceId: null,

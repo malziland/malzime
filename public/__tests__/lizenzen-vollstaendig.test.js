@@ -69,9 +69,14 @@ const ALLE = bestandteile();
 describe("Fremde Bestandteile: Lizenzen", () => {
   it("es gibt überhaupt welche zu prüfen", () => {
     /* POSITIVKONTROLLE: Findet die Suche nichts, wäre alles Folgende ein
-       perfektes Ergebnis für nichts. Drei sind es aktuell — Leaflet, exifr,
-       Poppins. */
-    expect(ALLE.map((b) => b.rel).sort()).toEqual(["public/fonts/poppins", "public/lib/exifr", "public/lib/leaflet"]);
+       perfektes Ergebnis für nichts. Vier sind es aktuell — Leaflet, exifr,
+       Poppins und seit 08.09.2026 libheif (HEIC-Dekoder). */
+    expect(ALLE.map((b) => b.rel).sort()).toEqual([
+      "public/fonts/poppins",
+      "public/lib/exifr",
+      "public/lib/leaflet",
+      "public/lib/libheif",
+    ]);
   });
 
   /* Wo der Lizenztext eines Bestandteils liegt: im Ordner als eigene Datei,

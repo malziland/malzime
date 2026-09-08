@@ -153,6 +153,9 @@ export function logClientError(error, context = {}) {
       fileFormat: typeof context.fileFormat === "string" ? context.fileFormat : null,
       errorDetail: typeof context.errorDetail === "string" ? context.errorDetail : null,
       fileSizeKb: typeof context.fileSizeKb === "number" && isFinite(context.fileSizeKb) ? context.fileSizeKb : null,
+      msSeitAuswahl:
+        typeof context.msSeitAuswahl === "number" && isFinite(context.msSeitAuswahl) ? context.msSeitAuswahl : null,
+      zweiterLeseweg: typeof context.zweiterLeseweg === "string" ? context.zweiterLeseweg : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
       client: clientCtx,
     };

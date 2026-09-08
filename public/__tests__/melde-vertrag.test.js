@@ -27,6 +27,9 @@ const ERLAUBTE_FELDER = new Set([
   "fileFormat",
   "errorDetail",
   "fileSizeKb",
+  /* Lesefehler-Diagnose (08.09.2026), gespiegelt in handle-errors.js. */
+  "msSeitAuswahl",
+  "zweiterLeseweg",
   "timings",
 ]);
 

@@ -78,31 +78,35 @@ cp functions/.env.example functions/.env
 
 ### Firebase Secrets
 
-Die folgenden Secrets werden ueber `firebase functions:secrets:set` konfiguriert:
+Die Secrets tragen seit 09.09.2026 das Suffix `_EU` und werden mit `gcloud`
+angelegt, **nicht** mit `firebase functions:secrets:set` — das Firebase-Kommando
+legt Secrets weltweit repliziert an, und diese Einstellung laesst sich
+nachtraeglich nicht aendern. So bleiben sie in `europe-west1`:
 
 ```bash
-firebase functions:secrets:set ADMIN_SECRET    # Beliebiger Token fuer Admin-Endpunkte
-firebase functions:secrets:set MISTRAL_API_KEY # Key aus console.mistral.ai (Scale Tier)
-firebase functions:secrets:set NTFY_URL        # ntfy Server-URL (z.B. https://ntfy.example.com)
-firebase functions:secrets:set NTFY_TOPIC      # ntfy Topic-Name
+for s in ADMIN_SECRET_EU MISTRAL_API_KEY_EU NTFY_URL_EU NTFY_TOPIC_EU; do
+  gcloud secrets create "$s" --replication-policy=user-managed --locations=europe-west1
+done
+printf "%s" "DEIN_ADMIN_TOKEN"  | gcloud secrets versions add ADMIN_SECRET_EU    --data-file=-
+printf "%s" "DEIN_MISTRAL_KEY"  | gcloud secrets versions add MISTRAL_API_KEY_EU --data-file=-
+printf "%s" "https://ntfy.example.com" | gcloud secrets versions add NTFY_URL_EU --data-file=-
+printf "%s" "dein-topic"        | gcloud secrets versions add NTFY_TOPIC_EU      --data-file=-
 ```
 
-Beim Setzen des Mistral-Keys WICHTIG: `printf` statt `echo` benutzen, damit kein trailing Newline im Secret-Wert landet:
-
-```bash
-printf "%s" "DEIN_MISTRAL_KEY" | firebase functions:secrets:set MISTRAL_API_KEY --data-file=-
-```
+WICHTIG: `printf` statt `echo`, damit kein Zeilenumbruch im Secret-Wert landet.
+Das Laufzeit-Dienstkonto der Functions braucht auf jedem Secret die Rolle
+`roles/secretmanager.secretAccessor`.
 
 | Secret | Pflicht | Beschreibung |
 |--------|---------|--------------|
-| `ADMIN_SECRET` | Ja | Bearer-Token fuer Admin-Endpunkte (Boost, Reset) |
-| `MISTRAL_API_KEY` | Ja (seit v1.5.2) | Mistral AI API-Key fuer Hybrid-Provider |
-| `NTFY_URL` | Nein | URL des ntfy-Servers fuer Push-Benachrichtigungen |
-| `NTFY_TOPIC` | Nein | ntfy-Topic fuer Limit-Benachrichtigungen |
+| `ADMIN_SECRET_EU` | Ja | Bearer-Token fuer Admin-Endpunkte (Boost, Reset, Wartungsmodus) |
+| `MISTRAL_API_KEY_EU` | Ja | Mistral AI API-Key |
+| `NTFY_URL_EU` | Nein | URL des ntfy-Servers fuer Push-Benachrichtigungen |
+| `NTFY_TOPIC_EU` | Nein | ntfy-Topic fuer Limit-Benachrichtigungen |
 
-Wenn `NTFY_URL` oder `NTFY_TOPIC` leer sind, werden keine Push-Benachrichtigungen gesendet.
+Wenn `NTFY_URL_EU` oder `NTFY_TOPIC_EU` leer sind, werden keine Push-Benachrichtigungen gesendet.
 
-Hinweis: `MISTRAL_API_KEY` ist Pflicht — Mistral ist seit v1.6.0 der einzige KI-Anbieter. Fehlt der Key, schlagen alle Analyse-Anfragen mit einer blockierten Antwort fehl (kein Fallback-Anbieter).
+Hinweis: `MISTRAL_API_KEY_EU` ist Pflicht — Mistral ist seit v1.6.0 der einzige KI-Anbieter. Fehlt der Key, schlagen alle Analyse-Anfragen mit einer blockierten Antwort fehl (kein Fallback-Anbieter).
 
 ## 5. Lokal testen
 

@@ -21,6 +21,7 @@ import { logClientError } from "./error-logger.js";
 import { logTelemetry } from "./telemetry-logger.js";
 import { PROFIL_FERTIG } from "./beast-lockruf.js";
 import { generateTraceId } from "./client-context.js";
+import { apiUrl } from "./api-basis.js";
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
@@ -140,8 +141,9 @@ export async function analyzeImage() {
    Warteschlange gebaut wurde: lange offene Verbindungen brechen weg, und der
    Bildschirm-Wachhalter greift auf iPhones nicht. */
 
-const ENQUEUE_URL = "/api/enqueue";
-const JOB_STATUS_URL = "/api/job-status";
+/* Adressen aus api-basis.js: im Betrieb direkt Cloud Run (EU), sonst relativ. */
+const ENQUEUE_URL = apiUrl("/api/enqueue");
+const JOB_STATUS_URL = apiUrl("/api/job-status");
 const POLL_INTERVAL_MS = 2000;
 const JOB_ID_STORAGE_KEY = "malzime.queueJobId";
 const JOB_TOKEN_STORAGE_KEY = "malzime.queueResultToken"; /* PRIV-003: Abhol-Ticket */

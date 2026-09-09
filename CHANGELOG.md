@@ -4,6 +4,63 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Alle Betriebs-Logs liegen jetzt in der EU.** Bis zum 09.09.2026 lagen die
+  Betriebsmeldungen des Servers in Googles Standard-Log-Ablage ohne
+  Regionswahl, einen Tag lang; Personendaten waren nie darin, die Zeilen mit
+  IP-Adressen sind seit 12.08. ausgeschlossen. Seit 09.09. zeigt die Log-Weiche
+  auf einen eigenen Speicher in `europe-west1` mit einem Tag Aufbewahrung. Alle
+  Abfrage-Rezepte im RUNBOOK nennen diesen Speicher ausdrücklich. Was Google
+  nicht ändern lässt (Pflichtprotokoll über unsere eigenen Verwaltungszugriffe,
+  Alarm-Kanäle), steht im RUNBOOK unter „Logs und Aufbewahrung" und im
+  Sicherheitsmodell, Punkt 8.
+- **Foto, Status und Diagnose gehen direkt an die Server in `europe-west1`,
+  nicht mehr über das Auslieferungsnetz.** Bisher liefen alle Aufrufe an unsere
+  Schnittstellen über Firebase Hosting, ein weltweites Auslieferungsnetz; auch
+  das komprimierte Foto passierte den nächsten Knoten dieses Netzes. Jetzt ruft
+  die Seite die Dienste direkt unter ihren Adressen in `europe-west1` auf
+  (`public/js/api-basis.js`, eine Quelle). Nur die Seite selbst kommt weiter
+  aus dem Auslieferungsnetz. Die Sicherheitsrichtlinie erlaubt genau diese
+  Adressen, ein Test hält beide Listen deckungsgleich, der Server stimmt
+  Aufrufen nur von unseren eigenen Ursprüngen zu. Die Live-Probe nach dem
+  Deploy misst das. Rückweg ohne Function-Deploy im RUNBOOK (Hebel 5a),
+  Abwägung in `docs/SECURITY-MODEL.md`.
+- **Die Zugangsschlüssel sind an die EU gebunden.** Die Geheimnisse der
+  Functions (Schlüssel und Tokens) waren von Google weltweit repliziert. Weil
+  sich das nachträglich nicht ändern lässt, gibt es sie neu mit Bindung an
+  `europe-west1`; der Code liest die neuen Namen. Der Deploy-Riegel lässt
+  keinen Deploy zu, solange eines davon leer ist. Der Mistral-Schlüssel wurde
+  dabei erneuert.
+- **Kinder sehen dieselbe Anzahl Werbeideen wie Erwachsene.** Der Werbe-Aufruf
+  liefert jetzt zehn Einträge statt sechs bis acht, gezeigt werden höchstens
+  acht. Streicht der Kinderschutz-Filter bei einem erkennbar Minderjährigen ein
+  bis zwei Einträge (Alkohol, Wetten, Kredit, Diät, Schönheits-OP), bleibt die
+  Anzahl trotzdem gleich; vorher verriet die kürzere Liste den Filter.
+  Nachgefüllt wird nichts. Die Zahl steht einmal in
+  `functions/src/minor-safety.js`, die Prompts lesen sie von dort.
+- **Die Kinderschutz-Prüfung sagt jetzt, was sie gefunden hat.** Je Treffer
+  stehen im Log das Feld (Werbeliste, Profiltext oder Kategorie) und das
+  getroffene Wort aus der festen Sperrliste, etwa „sportwetten" oder
+  „cocktail", dazu die Anzahl der gezeigten Werbeeinträge. Nie der Satz, nie
+  der Werbetext. Diese Zeile bleibt 30 Tage im Diagnose-Speicher in
+  `europe-west1`, wie die Zeilen zu Dauer und Token-Zahlen der KI-Aufrufe; bisher
+  war sie nach einem Tag weg, so dass sich keine Quote über mehrere Tage messen
+  ließ. Abwägung in `docs/SECURITY-MODEL.md`, Abfrage-Rezept im RUNBOOK.
+- **Datenschutzerklärung präzisiert (Stand 9. September 2026, deutsch und
+  englisch).** Programm-Logs ohne Personenbezug liegen in der EU und löschen
+  sich nach einem Tag; Googles Pflichtprotokoll über unsere eigenen
+  Verwaltungszugriffe ist benannt; der Satz über eine „anonymisierte
+  Fehlerzusammenfassung" ist gestrichen, weil dieser Dienst nicht eingeschaltet
+  ist; das Foto geht direkt an den Server in der EU, nicht über das
+  Auslieferungsnetz.
+- **Der Infrastruktur-Riegel prüft vor jedem Deploy** das Ziel der Log-Weiche,
+  die Aufbewahrung, den IP-Ausschluss, den Filter des Diagnose-Speichers und die
+  EU-Bindung der Geheimnisse. Cloud-Build-Protokolle landen künftig im
+  EU-Speicher.
+
 ## [4.7.1] — 2026-09-08
 
 ### Geändert

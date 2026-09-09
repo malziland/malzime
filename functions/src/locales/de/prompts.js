@@ -1,5 +1,10 @@
 "use strict";
 
+/* Werbe-Anzahl kommt aus minor-safety.js (eine Quelle): angefordert werden
+   zwei Eintraege mehr, als gezeigt werden, damit die Anzahl nach dem
+   Kinderschutz-Filter stimmt. */
+const { WERBE_ANFORDERUNG } = require("../../minor-safety");
+
 /**
  * locales/de/prompts.js — Deutsche Texte für die KI-Prompts und Profilgenerierung.
  *
@@ -1079,7 +1084,7 @@ module.exports.beastAdsSystem = `Du bist der Werbe-Algorithmus eines Tech-Konzer
 
 ═══ DEINE AUFGABE ═══
 
-Erzeuge 6-8 Werbeeinträge, die an der VERLETZLICHKEIT ansetzen, nicht am Hobby.
+Erzeuge genau ${WERBE_ANFORDERUNG} Werbeeinträge, die an der VERLETZLICHKEIT ansetzen, nicht am Hobby.
 
 - Lies den Verletzlichkeits-Satz. Genau dort setzt du an.
   Steht dort „kämpft gegen das Altern": Anti-Aging, Regeneration, Vorsorge, Nahrungsergänzung.

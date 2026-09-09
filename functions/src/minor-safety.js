@@ -115,14 +115,40 @@ const NUR_MINDERJAEHRIG = [
   /slimming ?pills?|diet ?pills?|weight ?loss|appetite ?suppressant|fat ?burner/i,
 ];
 
-function istImmerVerboten(eintrag) {
+/* ── Werbe-Anzahl (09.09.2026) ────────────────────────────────────────────
+   BLEIBT IM CODE — Gestaltung, kein Betriebswert: Die Anzahl der Werbekarten
+   ist Teil des Bildschirms, nicht der Last, und der Prompt liest sie von
+   hier; ueber Firestore veraenderbar hiesse, Prompt und Kappung koennten
+   auseinanderlaufen.
+   Der Werbe-Aufruf liefert WERBE_ANFORDERUNG Eintraege, gezeigt werden
+   hoechstens WERBE_ANZAHL. Grund: Streicht der Filter bei einem Kind zwei
+   Eintraege, sah das Kind vorher sechs Werbeideen, ein Erwachsener acht —
+   die Anzahl verriet den Filter. Mit zwei Eintraegen Reserve stimmt die
+   Anzahl auch nach dem Streichen. Nachgefuellt wird nichts: Ersatz aus einer
+   festen Liste waere keine Analyse mehr. Die Prompt-Dateien unter locales
+   lesen WERBE_ANFORDERUNG von hier, damit die Zahl nur einmal steht. */
+const WERBE_ANZAHL = 8;
+const WERBE_ANFORDERUNG = WERBE_ANZAHL + 2;
+
+/* Liefert das getroffene Wort aus der Liste: nur das Wort selbst, klein
+   geschrieben, hoechstens 30 Zeichen. Kein Satz, kein Kontext. Das Log soll
+   sagen "wetten" oder "cocktail", nicht, was ueber die Person geschrieben
+   wurde — so bleibt die Diagnose ohne Personenbezug. */
+function stichwort(liste, eintrag) {
   const s = String(eintrag || "");
-  return IMMER_VERBOTEN.some((re) => re.test(s));
+  for (const re of liste) {
+    const m = re.exec(s);
+    if (m) return m[0].trim().toLowerCase().slice(0, 30);
+  }
+  return null;
+}
+
+function istImmerVerboten(eintrag) {
+  return stichwort(IMMER_VERBOTEN, eintrag) !== null;
 }
 
 function istBeiMinderjaehrigenVerboten(eintrag) {
-  const s = String(eintrag || "");
-  return NUR_MINDERJAEHRIG.some((re) => re.test(s));
+  return stichwort(NUR_MINDERJAEHRIG, eintrag) !== null;
 }
 
 /* Die UNTERE Altersgrenze aus dem hard-facts-Text lesen — also das jüngste
@@ -168,7 +194,17 @@ function untereAltersgrenze(text) {
  * kann daraus loggen, ohne dass hier Log-Abhängigkeiten entstehen.
  */
 function applyMinorSafety(profiles, opts = {}) {
-  const bericht = { applied: false, alter: null, entfernt: [], durchgerutscht: [], lang: opts.lang || null };
+  const bericht = {
+    applied: false,
+    alter: null,
+    entfernt: [],
+    durchgerutscht: [],
+    /* Anzahl der Werbeeintraege je Modus, nachdem Filter und Kappung durch
+       sind — also das, was das Kind tatsaechlich sieht. */
+    werbung: {},
+    gekappt: [],
+    lang: opts.lang || null,
+  };
   if (!profiles || typeof profiles !== "object") return bericht;
 
   /* Alter aus dem Profil selbst holen — die Karte alter_geschlecht wird
@@ -212,20 +248,30 @@ function applyMinorSafety(profiles, opts = {}) {
       const vorher = p[feld];
       const nachher = [];
       for (const e of vorher) {
-        if (istImmerVerboten(e)) {
+        const hart = stichwort(IMMER_VERBOTEN, e);
+        if (hart !== null) {
           bericht.applied = true;
-          bericht.entfernt.push({ modus, feld, grund: "immer", eintrag: String(e).slice(0, 80) });
+          bericht.entfernt.push({ modus, feld, grund: "immer", stichwort: hart, eintrag: String(e).slice(0, 80) });
           continue;
         }
-        if (mitAltersstufe && minderjaehrig && istBeiMinderjaehrigenVerboten(e)) {
+        const weich = mitAltersstufe && minderjaehrig ? stichwort(NUR_MINDERJAEHRIG, e) : null;
+        if (weich !== null) {
           bericht.applied = true;
-          bericht.entfernt.push({ modus, feld, grund: "minor", eintrag: String(e).slice(0, 80) });
+          bericht.entfernt.push({ modus, feld, grund: "minor", stichwort: weich, eintrag: String(e).slice(0, 80) });
           continue;
         }
         nachher.push(e);
       }
-      if (nachher.length !== vorher.length) p[feld] = nachher;
+      /* Kappen erst NACH dem Filter, nur die Werbung (siehe WERBE_ANZAHL).
+         Die Trigger sind Erklaersaetze und bleiben vollstaendig. */
+      let ergebnis = nachher;
+      if (feld === "ad_targeting" && ergebnis.length > WERBE_ANZAHL) {
+        ergebnis = ergebnis.slice(0, WERBE_ANZAHL);
+        bericht.gekappt.push({ modus, feld, von: nachher.length, auf: WERBE_ANZAHL });
+      }
+      if (ergebnis.length !== vorher.length) p[feld] = ergebnis;
     }
+    bericht.werbung[modus] = Array.isArray(p.ad_targeting) ? p.ad_targeting.length : null;
 
     /* ── Fliesstext: nur melden, nicht entfernen ────────────────────────
        SEC-001: Der Filter fasste nur zwei von rund fuenfzehn Textfeldern an.
@@ -241,12 +287,10 @@ function applyMinorSafety(profiles, opts = {}) {
     }
     for (const [feld, text] of fliesstext) {
       if (typeof text !== "string" || !text) continue;
-      const grund = istImmerVerboten(text)
-        ? "immer"
-        : minderjaehrig && istBeiMinderjaehrigenVerboten(text)
-          ? "minor"
-          : null;
-      if (grund) bericht.durchgerutscht.push({ modus, feld, grund });
+      const hart = stichwort(IMMER_VERBOTEN, text);
+      const weich = hart === null && minderjaehrig ? stichwort(NUR_MINDERJAEHRIG, text) : null;
+      if (hart !== null) bericht.durchgerutscht.push({ modus, feld, grund: "immer", stichwort: hart });
+      else if (weich !== null) bericht.durchgerutscht.push({ modus, feld, grund: "minor", stichwort: weich });
     }
   }
 
@@ -255,6 +299,8 @@ function applyMinorSafety(profiles, opts = {}) {
 
 module.exports = {
   applyMinorSafety,
+  WERBE_ANZAHL,
+  WERBE_ANFORDERUNG,
   /* Für Tests */
   _istImmerVerboten: istImmerVerboten,
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,

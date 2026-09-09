@@ -47,6 +47,19 @@ function loggeMinorSafety(safety, traceId, lang) {
       /* Treffer im Fliesstext: nicht entfernt, aber gemeldet — je Stufe. */
       durchgerutscht: safety.durchgerutscht.length,
       durchgerutschtGruende: [...new Set(safety.durchgerutscht.map((d) => d.grund))],
+      /* Seit 09.09.2026 je Treffer: Feld und das getroffene Wort aus der
+         festen Sperrliste — nie der Satz, nie der Werbetext. Damit sagt die
+         naechste Zeile selbst, ob "cocktail" in einer Bar-Beschreibung stand
+         oder "sportwetten" als Werbeidee fuer ein Kind. Und die Anzahl der
+         Werbeeintraege je Modus, wie das Kind sie sieht. */
+      entfernte: safety.entfernt.map((e) => ({ feld: `${e.modus}.${e.feld}`, grund: e.grund, stichwort: e.stichwort })),
+      durchgerutschte: safety.durchgerutscht.map((d) => ({
+        feld: `${d.modus}.${d.feld}`,
+        grund: d.grund,
+        stichwort: d.stichwort,
+      })),
+      werbung: safety.werbung || {},
+      gekappt: (safety.gekappt || []).length,
     })
   );
 

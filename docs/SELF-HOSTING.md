@@ -164,20 +164,22 @@ Wenn du die Texte anpassen oder eine neue Sprache hinzufuegen willst:
 
 Die Cloud Functions benoetigen Firebase Secrets fuer Admin-Endpunkte, den Mistral-Provider und optionale Push-Benachrichtigungen:
 
+Die Namen enden auf `_EU`, und die Secrets werden mit `gcloud` an eine
+EU-Region gebunden angelegt (`firebase functions:secrets:set` wuerde sie
+weltweit replizieren, und das laesst sich nachtraeglich nicht aendern):
+
 ```bash
-# Pflicht: Admin-Token fuer Boost/Reset-Endpunkte
-firebase functions:secrets:set ADMIN_SECRET
-
-# Pflicht: Mistral API-Key fuer Primaer-Provider (Hybrid)
+for s in ADMIN_SECRET_EU MISTRAL_API_KEY_EU NTFY_URL_EU NTFY_TOPIC_EU; do
+  gcloud secrets create "$s" --replication-policy=user-managed --locations=europe-west1
+done
 # WICHTIG: printf statt echo, damit kein Trailing-Newline im Secret landet!
-printf "%s" "DEIN_MISTRAL_KEY" | firebase functions:secrets:set MISTRAL_API_KEY --data-file=-
-
-# Optional: ntfy Push-Benachrichtigungen bei Limit-Erreichung
-firebase functions:secrets:set NTFY_URL      # z.B. https://ntfy.example.com
-firebase functions:secrets:set NTFY_TOPIC    # z.B. malzime-alerts
+printf "%s" "DEIN_ADMIN_TOKEN" | gcloud secrets versions add ADMIN_SECRET_EU    --data-file=-
+printf "%s" "DEIN_MISTRAL_KEY" | gcloud secrets versions add MISTRAL_API_KEY_EU --data-file=-
+printf "%s" "https://ntfy.example.com" | gcloud secrets versions add NTFY_URL_EU --data-file=-   # optional
+printf "%s" "malzime-alerts"   | gcloud secrets versions add NTFY_TOPIC_EU      --data-file=-   # optional
 ```
 
-`MISTRAL_API_KEY` ist Pflicht — Mistral ist seit v1.6.0 der einzige KI-Anbieter. Fehlt der Key, schlagen alle Analyse-Anfragen mit einer blockierten Antwort fehl (es gibt keinen Fallback-Anbieter).
+`MISTRAL_API_KEY_EU` ist Pflicht — Mistral ist seit v1.6.0 der einzige KI-Anbieter. Fehlt der Key, schlagen alle Analyse-Anfragen mit einer blockierten Antwort fehl (es gibt keinen Fallback-Anbieter).
 
 Wenn du keine ntfy-Benachrichtigungen willst, setze die Secrets auf einen Platzhalter-Wert (z.B. `none`). Der Code erkennt ungueltige URLs und sendet dann keine Benachrichtigungen.
 

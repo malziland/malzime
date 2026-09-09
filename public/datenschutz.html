@@ -56,7 +56,7 @@
       </div>
       <span class="page-eyebrow">Rechtliches</span>
       <h1>Datenschutz</h1>
-      <p class="legal-subtitle">Verst&auml;ndlich erkl&auml;rt &middot; Stand: 8. September 2026</p>
+      <p class="legal-subtitle">Verst&auml;ndlich erkl&auml;rt &middot; Stand: 9. September 2026</p>
       <div class="page-rule"></div>
       <div class="disclaimer disclaimer--flush">
         <p>
@@ -228,7 +228,7 @@
           Verarbeitungsschritte (Schritt-Name, Antwortl&auml;nge, Token-Counts) &ndash; keine Bildinhalte, keine
           Profile, keine IP-Adressen. Die serverseitigen Anfrage-Protokolle der Infrastruktur (Google) &ndash; die
           einzige Stelle, an der eine IP-Adresse anfiele &ndash; sind vollst&auml;ndig ausgeschlossen und werden gar
-          nicht erst gespeichert. Die verbleibenden Programm-Logs ohne Personenbezug l&ouml;schen sich nach 1&nbsp;Tag.
+          nicht erst gespeichert. Die verbleibenden Programm-Logs ohne Personenbezug liegen auf EU-Servern (Region europe-west1, Belgien) und l&ouml;schen sich nach 1&nbsp;Tag. Daneben f&uuml;hrt Google ein Pflicht-Protokoll &uuml;ber unsere eigenen Verwaltungszugriffe auf das Projekt, also unser Google-Konto und die Adresse unseres Rechners bei Wartungsarbeiten, 400&nbsp;Tage lang. Es enth&auml;lt keine Daten von Nutzerinnen und Nutzern und liegt bei Google ohne Regionswahl.
           Vollst&auml;ndig anonyme Diagnose-Daten ohne Personenbezug (z.&nbsp;B. Fehler-Typ, Dauer, grobe
           Browser-/Betriebssystem-Klasse wie &bdquo;Safari 17 / iOS&ldquo; statt des vollen User-Agents,
           Bildschirm-Gr&ouml;&szlig;enklasse (klein/mittel/gro&szlig;) statt exakter Aufl&ouml;sung, Netzwerk-Klasse und
@@ -237,9 +237,7 @@
           Fotoauswahl und Leseversuch sowie das Ergebnis eines zweiten Leseversuchs als Stichwort, eine grobe
           Motivklasse des Bildes (Mensch, Tier oder gemischt &ndash; nicht das Bild selbst) und die aufgerufene Seite
           ohne Suchparameter &ndash; keine IP-Adressen, keine Bilder, keine Dateinamen) bewahren wir bis zu 30&nbsp;Tage
-          auf, um seltene Ger&auml;tefehler &uuml;ber mehrere Workshops hinweg erkennen und beheben zu k&ouml;nnen. Eine
-          anonymisierte Fehlerzusammenfassung ohne personenbezogene Daten (nur Fehlermeldung und H&auml;ufigkeit) bleibt
-          zur Fehlerbehebung bestehen &ndash; eine k&uuml;rzere Aufbewahrung ist technisch nicht m&ouml;glich.
+          auf, um seltene Ger&auml;tefehler &uuml;ber mehrere Workshops hinweg erkennen und beheben zu k&ouml;nnen.
         </p>
         <p>
           Beim freiwilligen Realit&auml;ts-Check halten wir je Bewertung einen anonymen Datensatz fest (welche
@@ -332,9 +330,10 @@
           die Webseite, Cloud Functions f&uuml;r die Backend-Verarbeitung, Cloud Storage f&uuml;r die kurzzeitige
           Bild-Zwischenablage in der Warteschlange sowie Cloud Firestore f&uuml;r den anonymen Analyse-Z&auml;hler und
           die Warteschlangen-Verwaltung. Die gesamte Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore)
-          l&auml;uft auf EU-Servern (Region <code>europe-west1</code>, Belgien); die statischen Seiten der Website
-          &ndash; die keinerlei Nutzerdaten enthalten &ndash; liefert Firebase Hosting &uuml;ber ein weltweites
-          Auslieferungsnetz (CDN) aus. Google verarbeitet auch diese Daten als
+          l&auml;uft auf EU-Servern (Region <code>europe-west1</code>, Belgien); die Seiten der Website, die keinerlei
+          Nutzerdaten enthalten, liefert Firebase Hosting &uuml;ber ein weltweites Auslieferungsnetz (CDN) aus. Dein
+          Foto und alle Analysedaten schickt dein Browser direkt an unseren Server in der EU (Region europe-west1,
+          Belgien), nicht &uuml;ber dieses Netz. Google verarbeitet auch diese Daten als
           <strong>Auftragsverarbeiter</strong> (Art.&nbsp;28 DSGVO) und darf sie nicht f&uuml;r eigene Zwecke nutzen.
           Grundlage:
           <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener" tabindex="0"

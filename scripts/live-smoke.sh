@@ -75,6 +75,38 @@ probe "Admin-Zugriffsschutz" 403 POST "/api/admin/boost" '{"nonce":"ungueltig"}'
 # 4) Lebenszeichen: öffentliche Stats MUSS 200 geben.
 probe "Stats-Endpunkt" 200 GET "/api/stats" ""
 
+# 4a) DIREKTWEG (seit 09.09.2026): Der Browser ruft die Dienste im Betrieb
+#     nicht mehr über Hosting (Auslieferungsnetz), sondern direkt unter ihrer
+#     Cloud-Run-Adresse in europe-west1 auf. Das geht nur, wenn der Dienst
+#     einem Aufruf von https://malzi.me per CORS zustimmt. Diese Probe stellt
+#     die Vorab-Anfrage des Browsers nach (OPTIONS mit Origin) und verlangt die
+#     Zustimmung genau für unseren Ursprung; die Negativprobe verlangt, dass ein
+#     fremder Ursprung KEINE Zustimmung bekommt. Die Adresse kommt aus der
+#     einen Quelle im Client (public/js/api-basis.js), nicht aus diesem Skript.
+DIREKT_ENQUEUE=$(grep -o 'https://enqueue-[a-z0-9-]*\.a\.run\.app' public/js/api-basis.js | head -1 || true)
+if [ -z "$DIREKT_ENQUEUE" ]; then
+  printf "  \033[31m✗\033[0m Direktweg: keine Cloud-Run-Adresse in public/js/api-basis.js gefunden\n"
+  FEHLER=1
+else
+  CORS_EIGEN=$(curl -s -D - -o /dev/null --max-time 20 -X OPTIONS "$DIREKT_ENQUEUE/api/enqueue" \
+    -H "Origin: https://malzi.me" -H "Access-Control-Request-Method: POST" \
+    -H "Access-Control-Request-Headers: content-type" | tr -d '\r' | grep -i '^access-control-allow-origin:' | awk '{print $2}' || true)
+  CORS_FREMD=$(curl -s -D - -o /dev/null --max-time 20 -X OPTIONS "$DIREKT_ENQUEUE/api/enqueue" \
+    -H "Origin: https://boese.example" -H "Access-Control-Request-Method: POST" | tr -d '\r' | grep -ci '^access-control-allow-origin:' || true)
+  if [ "$CORS_EIGEN" = "https://malzi.me" ]; then
+    printf "  \033[32m✓\033[0m Direktweg: %s stimmt Aufrufen von https://malzi.me zu\n" "$DIREKT_ENQUEUE"
+  else
+    printf "  \033[31m✗\033[0m Direktweg: %s antwortet ohne CORS-Zustimmung für https://malzi.me (IST: '%s')\n" "$DIREKT_ENQUEUE" "$CORS_EIGEN"
+    FEHLER=1
+  fi
+  if [ "${CORS_FREMD:-0}" = "0" ]; then
+    printf "  \033[32m✓\033[0m Direktweg-Negativprobe: fremder Ursprung bekommt keine Zustimmung\n"
+  else
+    printf "  \033[31m✗\033[0m Direktweg-Negativprobe: fremder Ursprung bekommt CORS-Zustimmung — Server-CORS zu weit\n"
+    FEHLER=1
+  fi
+fi
+
 # 5) OPS-2026-08-13-42/K3: Kennungs-Rückmessung. Die vier Proben oben galten
 #    schon VOR dem Deploy — ein wirkungsloser Hosting-Deploy (Teil-Upload,
 #    falsches Ziel, CDN) wäre von ihnen nicht zu unterscheiden. Wird eine

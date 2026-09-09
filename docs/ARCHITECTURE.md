@@ -11,7 +11,8 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 | KI-Analyse (aktiv, Single-Call) | Mistral AI | `mistral-large-2512` — Beschreibung + beide Profile in einem Call | EU-Default |
 | Describe (Fallback-Pipeline) | Mistral AI | `mistral-large-2512` | EU-Default |
 | Profile (Fallback-Pipeline) | Mistral AI | `mistral-small-2603` | EU-Default |
-| Hosting + Functions + DB | Google | Firebase | `europe-west1` |
+| Functions + DB + Warteschlange | Google | Firebase / Cloud Run | `europe-west1` — der Browser ruft die Schnittstellen seit 09.09.2026 **direkt** unter ihren Cloud-Run-Adressen auf (`public/js/api-basis.js`) |
+| Hosting (nur die Seite selbst) | Google | Firebase Hosting | weltweites Auslieferungsnetz; enthält keine Nutzerdaten |
 
 > **Zwei Modi:** Aktiv ist seit v2.2 der **Single-Large-Call** (Feature-Flag `featureFlags/current.useSingleLargeCall`): ein Aufruf an `mistral-large-2512` liefert Bildbeschreibung + beide Profile. Die klassische **3-Call-Pipeline** (Large beschreibt, Small profiliert, Large als internes JSON-Backup) bleibt als Fallback im Code und ist per Flag umschaltbar.
 
@@ -92,8 +93,15 @@ Seit v2.0 läuft die Analyse nicht mehr synchron, sondern über eine Warteschlan
 
 Seit v2.10 ist die Warteschlange der einzige Weg. Der synchrone `/analyze`-Pfad ist entfernt: Er war seit Mai 2026 nur noch Rückfall über ein Feature-Flag und hätte bei Stoßlast genau das Problem zurückgebracht, wegen dem die Warteschlange gebaut wurde. Als Notfall-Hebel dient der Wartungsmodus ([RUNBOOK.md](RUNBOOK.md)).
 
+Seit 09.09.2026 gehen diese Aufrufe **direkt an die Cloud-Run-Adresse des jeweiligen
+Dienstes in `europe-west1`** (`https://enqueue-….a.run.app/api/enqueue` usw., eine Quelle:
+`public/js/api-basis.js`), nicht mehr über Firebase Hosting. Hosting ist ein weltweites
+Auslieferungsnetz; über den Umweg lief auch das Foto durch dessen nächsten Knoten. Die
+Hosting-Umleitungen für `/api/…` bleiben als Rückweg bestehen (RUNBOOK, Hebel 5a). Lokal
+und in Tests (localhost) bleibt der Pfad relativ.
+
 ```
-Browser ──POST /api/enqueue──► enqueue
+Browser ──POST /api/enqueue (direkt: https://enqueue-….a.run.app)──► enqueue
                                  │ Bild → GCS-Bucket
                                  │ Job-Dokument → Firestore-Collection `jobs` (queued)
                                  │ Task → Cloud-Tasks-Queue `analyze-queue`
@@ -178,7 +186,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 
 | Modul | Verantwortlich fuer |
 |-------|---------------------|
-| `index.js` | Cloud-Function-Exports, Secret-Deklarationen (`ADMIN_SECRET`, `MISTRAL_API_KEY`, `NTFY_*`) |
+| `index.js` | Cloud-Function-Exports, Secret-Deklarationen (`ADMIN_SECRET_EU`, `MISTRAL_API_KEY_EU`, `NTFY_*_EU`, alle an europe-west1 gebunden) |
 | `handle-stats.js` | GET-only Stats-Endpunkt |
 | `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
 | `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |
@@ -213,7 +221,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | Dienst | Genutzt fuer | Datensouveraenitaet |
 |--------|--------------|---------------------|
 | **Mistral AI API** | Alle KI-Analysen | Mistral AI SAS, Paris, FR — EU-Hosting Default |
-| **Firebase Hosting** | SPA-Auslieferung | Google Ireland Ltd. — Edge-Caches weltweit, Origin EU |
+| **Firebase Hosting** | Auslieferung der Seite (HTML, JS, CSS, Bilder) — keine Nutzerdaten; die Schnittstellen ruft der Browser direkt in `europe-west1` auf | Google Ireland Ltd. — Edge-Caches weltweit, Origin EU |
 | **Firebase Cloud Functions** | Backend-Runtime | Google Ireland Ltd. — `europe-west1` |
 | **Google Cloud Tasks** | Dosierter Job-Dispatch (Queue) | Google Ireland Ltd. — `europe-west1` |
 | **Google Cloud Storage** | Temporaere Bild-Ablage der Queue | Google Ireland Ltd. — `europe-west1` |
@@ -268,7 +276,8 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 
 ## Sicherheits-Architektur
 
-- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim + `/api/…` (gleiche Domain)
+- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim + die fünf Cloud-Run-Adressen unserer Schnittstellen in `europe-west1` (`connect-src`; Liste identisch mit `public/js/api-basis.js`, Wächter `public/__tests__/api-basis.test.js`)
+- **CORS** auf den öffentlichen Functions — nur unsere eigenen Ursprünge (`functions/src/domains.js`), keine Platzhalter
 - **HSTS** mit Preload
 - **Magic-Byte-Validierung** der hochgeladenen Bilder
 - **Honeypot-Feld** + **Timing-Check** als Bot-Defense
@@ -287,6 +296,7 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
   widerlegbar)
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr)
-- CSP nur self + OpenStreetMap Tiles + Nominatim + `/api/…` (gleiche Domain)
+- CSP nur self + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen (`europe-west1`)
+- Foto und Analysedaten gehen direkt an den EU-Server, nicht über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026)
 - Keine dauerhafte Persistenz: im Queue-Betrieb liegt das Bild kurz im GCS-Bucket und wird unmittelbar nach der Verarbeitung gelöscht; das Job-Dokument spätestens nach 2 h
 - Anwendungs-Logs enthalten keine Bildinhalte und keine personenbezogenen Daten — nur Request-ID, Step-Name, Status, Token-Counts

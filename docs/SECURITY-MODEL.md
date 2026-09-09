@@ -37,7 +37,9 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 ## Schutzschichten (Kurzreferenz)
 
 - **Client:** EXIF/GPS bleiben im Browser (Canvas-Recompress entfernt Metadaten);
-  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS.
+  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS. Foto und
+  Analysedaten gehen direkt an die Cloud-Run-Adressen in `europe-west1`, nicht
+  über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026, s. u.).
 - **Einlass:** Maintenance-Check → IP-Rate-Limit → Honeypot/Timing → MIME +
   Magic-Bytes → globales Stundenlimit → Queue-Tiefen-Bremse.
 - **Verarbeitung:** Worker `processJob` nur per OIDC (nicht öffentlich, per
@@ -105,19 +107,23 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    ein falsches Testergebnis — kein Zugriff auf Produktion, Daten oder Konten.
    *Neu bewerten,* sobald der E2E-Job ein Geheimnis braucht oder etwas
    veröffentlicht.
-8. **Nicht-personenbezogene Logs liegen weiter auf Standort `global`.**
-   (Rest von `PRIV-2026-08-12-12`) Die Standard-Log-Ablage von Google Cloud
-   (`_Default`) ist fest auf `global` und lässt sich nicht nach Europa
-   verschieben. Behoben ist der personenbezogene Teil: Cloud-Run-Request-Logs
-   sind der einzige Träger von Client-IP-Adressen und werden vollständig
-   ausgeschlossen (`exclude_run_requests_ip`, vom Deploy-Riegel bewacht, inkl.
-   Filterinhalt). *Was bleibt:* Programmausgaben der Functions und
-   Zeitplan-Läufe, ohne Personenbezug, **eine** Aufbewahrungstag lang.
-   *Verworfene Alternative:* die `_Default`-Senke auf einen EU-Speicher
-   umhängen — dann findet `gcloud logging read` ohne zusätzliche Angaben nichts
-   mehr, und jedes Störungsrezept im RUNBOOK liefert stillschweigend eine leere
-   Antwort statt eines Fehlers. Genau die Ausfallform, gegen die dieses Projekt
-   sonst überall anschreibt.
+8. **Betriebs-Logs liegen seit 09.09.2026 in `europe-west1`** (Rest von
+   `PRIV-2026-08-12-12`, erledigt). Googles Standard-Ablage `_Default` ist fest
+   auf `global`. Am 12.08. wurde der personenbezogene Teil entfernt
+   (Cloud-Run-Request-Logs, einziger IP-Träger, Ausschluss
+   `exclude_run_requests_ip`, vom Deploy-Riegel bewacht); der Rest blieb als
+   Restrisiko stehen, mit der Begründung, dass `gcloud logging read` nach einem
+   Umhängen der Weiche ohne Zusatzangaben nichts mehr fände. Diese Abwägung
+   wurde am 09.09.2026 verworfen: Die Zusage „alles auf EU-Servern" gilt ohne
+   Ausnahme für alles, was wir steuern können. Seither zeigt die Weiche
+   `_Default` auf den eigenen Speicher `betrieb-eu` (europe-west1, 1 Tag); alle
+   Rezepte im RUNBOOK nennen den Speicher ausdrücklich, und der Deploy-Riegel
+   prüft Ziel, Aufbewahrung und Ausschluss. *Was bleibt und nicht änderbar
+   ist:* Googles Pflichtprotokoll `_Required` (global, 400 Tage) mit unseren
+   eigenen Verwaltungszugriffen, und die Alarm-Kanäle mit unserer Adresse.
+   Keine Nutzerdaten. *Regel daraus:* Jede Abwägung, die eine Zusage nach
+   außen berührt, wird als Entscheidung vorgelegt und dort getroffen, nie nur
+   hier notiert.
 9. **Der Upload-Rumpf landet vor jeder App-Prüfung im Speicher.**
    (`SEC-2026-08-13-B`) Die Cloud-Functions-Laufzeit liest den Request-Body
    vollständig als `req.rawBody` ein, bevor `handle-enqueue.js` läuft — eine
@@ -355,4 +361,104 @@ wird. Lizenztext, Version und Herkunft: `public/lib/libheif/`, Übersicht in
 **Rückweg.** Rückweg ohne Deploy: keiner — der Baustein ist Teil der Auslieferung;
 Rückweg mit Deploy: Ordner `public/lib/libheif/` und den HEIC-Zweig in
 `public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen.
+
+## Kinderschutz-Filter: Anzahl und Diagnose (09.09.2026)
+
+**Was war.** Der Werbe-Aufruf lieferte sechs bis acht Einträge, der Filter
+strich bei erkennbar Minderjährigen einzelne davon. Ein Kind mit zwei
+gestrichenen Einträgen sah sechs Werbeideen, ein Erwachsener acht. Und die
+Kinderschutz-Zeile im Log nannte nur einen Zähler und die Stufe („minor"),
+nicht das Feld und nicht das Wort. Am 08. und 09.09. stand bei 8 von 19
+Analysen mit Minderjährigen ein Treffer im Fließtext, und niemand konnte sagen,
+ob das „Cocktail-Bar" in einer Beschreibung war oder eine Wett-Werbung für ein
+Kind. Die Zeile war zudem nach einem Tag gelöscht.
+
+**Entscheidung.**
+
+1. Der Werbe-Aufruf fordert zehn Einträge an, gezeigt werden höchstens acht
+   (`WERBE_ANFORDERUNG`, `WERBE_ANZAHL` in `functions/src/minor-safety.js`,
+   die Prompts lesen die Zahl von dort). Gekappt wird erst nach dem Filter,
+   nur die Werbung, nie die Manipulations-Trigger. Nachgefüllt wird nichts.
+2. Je Treffer stehen im Log das Feld (`boost.ad_targeting`,
+   `normal.profileText`, `boost.categories.kaufkraft`) und das getroffene
+   Stichwort aus der festen Sperrliste, klein geschrieben, höchstens 30
+   Zeichen. Dazu die Anzahl der Werbeeinträge je Modus nach Filter und Kappung.
+3. Die Zeile bleibt 30 Tage im Diagnose-Speicher `client-diagnostics`
+   (europe-west1), gesetzt über `scripts/log-sink-analyse-zeilen.sh`.
+
+**Warum kein Personenbezug.** Das Stichwort ist ein Wort aus unserer eigenen
+Liste, nicht aus dem Text über die Person. Der Test
+`minor-safety-diagnose.test.js` prüft, dass weder der Werbetext noch der Satz
+im Log landet. Das geschätzte Alter stand schon vorher in der Zeile.
+
+**Betrachtete Alternativen.** Nachfüllen aus einer festen Ersatzliste:
+verworfen, das wären erfundene Einträge in einer Anwendung, deren Kernaussage
+ist, dass die KI wirklich analysiert. Ein zweiter KI-Aufruf zum Nachfüllen:
+verworfen, kostet Zeit und Geld für einen Fall, den zwei Reserve-Einträge
+abdecken. Einen Satzausschnitt um das Stichwort loggen: verworfen, der
+Ausschnitt könnte eine Beschreibung der Person enthalten.
+
+**Bewusst getragene Folge.** Werden bei einem Kind mehr als zwei Einträge
+gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
+
+**Neubewertung.** Nach 30 Tagen Messung: Sind die Fließtext-Treffer
+überwiegend harmlose Wörter, wird die Sperrliste präzisiert. Sind es
+Werbebegriffe, wird die Prompt-Regel nachgeschärft und mit eigenen Fotos
+nachgestellt.
+## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
+
+**Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.
+Hosting ist ein weltweites Auslieferungsnetz (Fastly); der Standort-Inventar-Lauf
+vom 09.09.2026 maß den Transit über einen Knoten in Wien. Damit passierte auch
+das komprimierte Foto einen Knoten dieses Netzes, bevor es den Server in Belgien
+erreichte — ohne Speicherung (`cache-control: no-cache`), aber als Umweg, den
+die Zusage „alles auf EU-Servern" nicht kennt. Entscheidung vom 09.09.2026:
+kein Umweg.
+
+**Entscheidung.** Der Browser ruft `enqueue`, `job-status`, `stats`, `errors`
+und `telemetry` im Betrieb direkt unter ihren Cloud-Run-Adressen in
+`europe-west1` auf. Die eine Quelle dafür ist `public/js/api-basis.js`. Nur
+die Seite selbst (HTML, JS, CSS, Bilder, Fonts) kommt weiter aus dem
+Auslieferungsnetz — sie enthält keine Nutzerdaten. Lokal, im Emulator und in
+den Tests bleibt der Pfad relativ.
+
+**Zwei Schutzschichten ändern sich dafür bewusst:**
+
+1. **CSP `connect-src`** nennt die fünf Cloud-Run-Adressen einzeln, keinen
+   Platzhalter wie `*.run.app` (der würde jeden fremden Cloud-Run-Dienst
+   erlauben). Die Liste in `firebase.json` und die in `api-basis.js` werden vom
+   Test `public/__tests__/api-basis.test.js` gegeneinander geprüft: fehlt eine
+   Adresse, blockt der Browser den Upload; steht eine zu viel, weiß niemand
+   mehr, wofür.
+2. **CORS** auf den öffentlichen Functions war schon vorher gesetzt
+   (`cors: ALLOWED_ORIGINS` in `functions/src/index.js`, Liste in
+   `functions/src/domains.js`): Zustimmung nur für `malzi.me`, `www.malzi.me`
+   und die beiden Firebase-Hostnamen. Gemessen am 09.09.2026: Vorab-Anfrage mit
+   `Origin: https://malzi.me` → `204` mit `access-control-allow-origin:
+   https://malzi.me`; mit einem fremden Ursprung → `204` **ohne** diesen Header,
+   der Browser blockt. Die Live-Smoke-Probe „Direktweg" misst beides nach jedem
+   Deploy.
+
+**Was gleich bleibt.** Die Bremsen am Einlass (IP-Rate-Limit, Stundenlimit,
+Honeypot, Bot-Heuristik über `Origin`/`Referer`) laufen im Dienst selbst und
+sehen den Aufruf genauso wie vorher; beide Wege enden am selben Google-Front-End
+vor Cloud Run, `req.ip` ändert sich dadurch nicht. Die Hosting-Umleitungen für
+`/api/…` bleiben als Rückweg bestehen (RUNBOOK Hebel 5a) — und weil Browser mit
+einer alten `app.js` im Zwischenspeicher weiter `/api/…` rufen, bricht für sie
+nach dem Deploy nichts.
+
+**Betrachtete Alternative.** Eine eigene Adresse `api.malzi.me` vor Cloud Run:
+sauberer im Namen, aber ein DNS-Eintrag plus Zertifikat mehr — und der Abbau
+genau dieser Adresse hat am 10.08.2026 die Website eine halbe Stunde lahmgelegt.
+Verworfen zugunsten der nackten Cloud-Run-Adressen, die Google selbst mit
+Zertifikat betreibt.
+
+**Bewusst getragene Folge.** Die Cloud-Run-Adressen enthalten eine
+Projekt-Kennung (`5ymhpdpqcq`); sie stehen jetzt lesbar in der Seite. Sie waren
+schon vorher öffentlich erreichbar (`invoker: public`), neu ist nur die
+Sichtbarkeit. Die Zugangsschutzschichten hängen nicht am Verstecken der Adresse.
+
+**Neubewertung.** Wenn Firebase Hosting eine regionale Auslieferung ohne
+weltweites Netz anbietet, oder wenn der Direktweg messbar langsamer ist als der
+Hosting-Weg (Telemetrie `enqueueMs`, Vergleich 30 Tage vor/nach dem Deploy).
 

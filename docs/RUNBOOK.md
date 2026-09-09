@@ -288,7 +288,7 @@ unauffälligen — sonst wäre nicht zu unterscheiden, ob sie „in Ordnung" mel
 oder gar nicht lief:
 
     gcloud logging read 'jsonPayload.step="laufzeit-wache"' \
-      --project=malzime --limit=5 --format=json
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --limit=5 --format=json
 
 **Beim nächsten Deploy zu beachten.** `laufzeitWache` ist eine NEUE Function.
 Sie braucht die ntfy-Secrets (sind in `index.js` deklariert) und sollte in den
@@ -305,7 +305,10 @@ obwohl sie selbst bewusst leise bleibt (OPS-2026-08-12-11).
 Prüfen von Hand:
 
     gcloud logging read 'jsonPayload.error="erinnerung-lebenszeichen-veraltet"' \
-      --project=malzime --freshness=14d
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d
+
+(Der Betriebs-Speicher hält einen Tag; der Aufräumer meldet den Zustand jede
+Minute erneut, ein Tag reicht also.)
 
 Erwartet: keine Zeile.
 
@@ -450,6 +453,31 @@ Schnellster Weg: Firebase Console → Hosting → Release-Verlauf → **Rollback
 (ein Klick, stellt den vorherigen Stand wieder her). Alternativ: früheren Stand wie
 in Hebel 4 auschecken und `firebase deploy --only hosting`.
 
+### 5a. Schnittstellen zurück auf den Hosting-Weg (nur Hosting-Deploy, seit 09.09.2026)
+
+Seit 09.09.2026 ruft der Browser `enqueue`, `job-status`, `stats`, `errors` und
+`telemetry` direkt unter ihren Cloud-Run-Adressen in `europe-west1` auf
+(`public/js/api-basis.js`), nicht mehr über die Hosting-Umleitungen. Die
+Umleitungen in `firebase.json` bleiben genau für diesen Hebel bestehen.
+
+**Bedingung zum Ziehen:** Nach einem Deploy scheitern Analysen mit CORS- oder
+CSP-Fehlern in der Browser-Konsole (`blocked by CORS policy`, `Refused to connect`),
+oder die Live-Smoke-Probe „Direktweg" ist rot, während `/api/stats` über
+`https://malzi.me` weiter antwortet.
+
+**Schritte (~5 min, kein Function-Deploy):**
+
+1. In `public/js/api-basis.js` `DIREKT_AKTIV` auf `false` setzen.
+2. Im Wächter `public/__tests__/api-basis.test.js` die Zusicherung „der direkte
+   Weg ist eingeschaltet" auf `false` drehen und im Kommentar den Grund und das
+   Datum eintragen — der Test ist absichtlich so gebaut, dass ein stiller Rückbau
+   rot wird.
+3. `./scripts/deploy.sh hosting` — die Seite ruft danach wieder `/api/…` über
+   Hosting auf. Browser mit alter `app.js` im Zwischenspeicher laufen ohnehin
+   über die Umleitungen weiter.
+
+Zurück auf den direkten Weg: beides wieder auf `true`, Hosting-Deploy.
+
 ## Störungs-Rezepte
 
 ### ntfy-Fehleralarm („malziME Function Errors")
@@ -472,7 +500,7 @@ vereinbarte Weg:
 
 ```bash
 gcloud logging read 'resource.labels.service_name="errors" AND jsonPayload.phase="absturz-schleife"' \
-  --project=malzime --freshness=30d
+  --project=malzime --bucket=client-diagnostics --location=europe-west1 --view=_AllLogs --freshness=30d
 ```
 
 Treffer enthalten in `errorDetail` die Anzahl der Starts, die zuletzt
@@ -506,14 +534,39 @@ Wie oft das Netz greift (eine Zeile je Wiederholung, mit Wartezeit und einer
 etwaigen Retry-After-Angabe von Mistral):
 
     gcloud logging read 'jsonPayload.step="mistral-wiederholung"' \
-      --project=malzime --freshness=7d \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
       --format='value(timestamp,jsonPayload.status,jsonPayload.versuch,jsonPayload.wartezeitMs,jsonPayload.retryAfter)'
 
 Nachsehen, welche Analysen trotz aller Wiederholungen scheiterten (Feld
 `wiederholungen` sagt, wie viele es waren):
 
     gcloud logging read 'jsonPayload.alert="single-large-failed"' \
-      --project=malzime --freshness=7d --format='value(timestamp,jsonPayload.error,jsonPayload.wiederholungen)'
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.error,jsonPayload.wiederholungen)'
+
+(Beide Abfragen sehen einen Tag zurück — länger hält der Betriebs-Speicher
+nicht. Für Wochenvergleiche zählt die Zeile `mistral-single-large` im
+Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
+
+### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
+
+Der Filter (`functions/src/minor-safety.js`) streicht bei erkennbar
+Minderjährigen Werbeeinträge zu Alkohol, Wetten, Kredit, Diät und
+Schönheits-OP und meldet Treffer im Fließtext, ohne dort etwas zu streichen.
+Seit 09.09. steht je Treffer das Feld und das getroffene Stichwort aus der
+festen Sperrliste im Log, dazu die Anzahl der gezeigten Werbeeinträge je Modus.
+Die Zeile liegt 30 Tage im Diagnose-Speicher:
+
+    gcloud logging read 'jsonPayload.step="minor-safety" AND jsonPayload.minderjaehrig=true' \
+      --project=malzime --bucket=client-diagnostics --location=europe-west1 \
+      --view=_AllLogs --freshness=30d \
+      --format='value(timestamp,jsonPayload.alter,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
+
+Lesart: `entfernte` sind gestrichene Werbeeinträge, `durchgerutschte` sind
+Treffer im Profiltext oder in einer Kategorie-Karte (nur gemeldet). Steht bei
+`durchgerutschte` über Wochen ein Wort wie „cocktail" in Bar-Beschreibungen,
+ist die Sperrliste zu grob; stehen dort Werbebegriffe wie „sportwetten", hält
+der Prompt nicht. `werbung` unter 8 bei einem Kind heißt: mehr als zwei
+Einträge gestrichen, nachgefüllt wird nichts.
 
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
 
@@ -538,14 +591,14 @@ weiterhin sofort als ERROR — das heilt sich nicht von selbst.
 Prüfen von Hand:
 
     gcloud logging read 'jsonPayload.error="betriebswerte-wiederholt-nicht-lesbar"' \
-      --project=malzime --freshness=7d
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d
 
 Erwartet: keine Zeile. Die Warnungen dazu (einzelne Ausrutscher) zählen — nach
 Minuten, denn ein träger Lauf erzeugt bis zu fünf Warnungen in derselben Minute
 und zählt als EIN Lauf:
 
     gcloud logging read 'jsonPayload.warning:"reap-query-ohne-betriebswerte"' \
-      --project=malzime --freshness=7d --format='value(timestamp)' | cut -c1-16 | sort -u
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp)' | cut -c1-16 | sort -u
 
 ### »notbremse-gegriffen« — der Stundenzähler ist ausgefallen
 
@@ -627,11 +680,23 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 
 ## Logs und Aufbewahrung
 
-| Log | Aufbewahrung | Inhalt |
-|---|---|---|
-| `_Default`-Bucket | **1 Tag** — bewusst kurz, NICHT verlängern | IP-haltige Infrastruktur-Logs (Datenschutz-Versprechen) |
-| `client-diagnostics` (europe-west1) | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge |
-| Anwendungs-Logs | — | keine Bildinhalte, keine personenbezogenen Daten; nur Request-ID, Step, Status, Token-Counts |
+Seit 09.09.2026 liegen alle Logs, die wir selbst steuern, in `europe-west1`.
+Die Standard-Weiche `_Default` zeigt nicht mehr auf Googles globale Ablage,
+sondern auf unseren Speicher `betrieb-eu`. **Folge für jede Abfrage:** `gcloud
+logging read` findet ohne Speicher-Angabe nichts mehr. Jedes Rezept in diesem
+Buch nennt deshalb `--bucket=… --location=europe-west1 --view=_AllLogs`; ein
+leeres Ergebnis ohne diese Angaben ist ein Messfehler, kein Befund.
+
+| Speicher | Standort | Aufbewahrung | Inhalt |
+|---|---|---|---|
+| `betrieb-eu` (Ziel der Weiche `_Default`) | europe-west1 | **1 Tag** — bewusst kurz | Programmausgaben der Functions (Request-ID, Schritt, Status, Token-Zahlen), Aufräumer- und Zeitplan-Läufe. Cloud-Run-Request-Logs, der einzige IP-Träger, sind per Ausschluss `exclude_run_requests_ip` gar nicht erst darin |
+| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026) |
+| `_Default` (Googles Ablage) | global, nicht änderbar | 1 Tag | seit 09.09.2026 **leer** — bekommt nichts mehr; existiert weiter, weil Google sie nicht löschen lässt |
+| `_Required` (Googles Pflichtprotokoll) | global, nicht änderbar, gesperrt | 400 Tage | unsere eigenen Verwaltungszugriffe (Kontoadresse, Aufruf-IP unseres Rechners). Keine Nutzerdaten. Google-Vorgabe |
+
+Der Deploy-Riegel (`scripts/verify-infrastructure.sh`) prüft bei jedem Deploy:
+Weiche zeigt auf `betrieb-eu`, Aufbewahrung 1 Tag, IP-Ausschluss aktiv,
+Diagnose-Filter unverändert.
 
 ## Prüfgerät Android (Emulator auf dem Entwicklungsrechner, seit 08.09.2026)
 
@@ -763,8 +828,16 @@ Job-Dokument lag nur dort. Die alte Datenbank `(default)` in `nam5` (USA) ist
 am 2026-08-11 **gelöscht** (freigegeben im Kurzaudit) — damit ist
 der Rückweg entfallen, das Kopier-Skript `scripts/firestore-umzug-sync.mjs`
 wurde ausgebaut und `firebase.json` listet nur noch `malzime-eu`. Der
-US-Bucket `malzime_cloudbuild` ist ebenfalls seit 2026-08-11 gelöscht — es
-liegt kein Speicher mehr außerhalb Europas.
+US-Bucket `malzime_cloudbuild` ist ebenfalls seit 2026-08-11 gelöscht.
+**Korrektur 09.09.2026:** „kein Speicher mehr außerhalb Europas" stimmte nicht.
+Das Standort-Inventar vom 09.09. fand einen von Google verwalteten Bucket
+`<projektnummer>.cloudbuild-logs.googleusercontent.com` in den **USA** mit
+neun Build-Protokollen der ntfy-Image-Builds (Februar/Juni 2026), der in der
+normalen Bucket-Liste nicht erscheint, sowie die globale Log-Ablage (seit
+09.09. leer, siehe „Logs und Aufbewahrung") und die weltweit replizierten
+Secrets (seit 09.09. EU-gebunden). Künftige Builds im ntfy-Repo brauchen
+`--gcs-log-dir=gs://malzime-cloudbuild-eu/logs`, sonst entsteht der Bucket
+neu.
 
 Was bleibt und weiter gilt:
 

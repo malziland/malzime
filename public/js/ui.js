@@ -1,5 +1,6 @@
 import { elements } from "./dom.js";
 import { t } from "./i18n.js";
+import { apiUrl } from "./api-basis.js";
 
 /**
  * Schreibt eine gemerkte Statusmeldung in der aktuellen Sprache neu.
@@ -215,7 +216,7 @@ function startLimitCountdown(totalSeconds) {
     /* Alle 30s prüfen ob Limit per Boost/Reset aufgehoben wurde */
     if (ticksSinceCheck >= 30) {
       ticksSinceCheck = 0;
-      fetch("/api/stats")
+      fetch(apiUrl("/api/stats"))
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data && !data.current.limitActive) {

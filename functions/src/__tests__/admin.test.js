@@ -30,7 +30,7 @@ jest.mock("firebase-functions/params", () => ({
   defineSecret: jest.fn((name) => {
     const secret = () => {};
     secret.value = () => {
-      if (name === "ADMIN_SECRET") return TEST_SECRET;
+      if (name === "ADMIN_SECRET_EU") return TEST_SECRET;
       return "";
     };
     secret.name = name;

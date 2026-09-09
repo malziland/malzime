@@ -45,6 +45,12 @@ const ERLAUBTE_LESE_MUSTER = [
      den Code, der das Loeschen verspricht, nie den Speicher selbst. `gsutil
      ls -l` listet nur auf und veraendert nichts. */
   /gsutil ls -l\b/,
+  /* 09.09.2026 (EU-Umzug): Log-Weiche, Log-Speicher und Secrets. `buckets
+     describe` liest Aufbewahrung und Standort; `secrets describe` liest nur
+     die Replikationsrichtlinie, `secrets versions list` nur Versionsnamen und
+     Zustand — nie den Wert. */
+  /gcloud logging buckets describe\b/,
+  /gcloud secrets (describe|versions list)\b/,
 ];
 
 function gcloudZeilen(inhalt) {

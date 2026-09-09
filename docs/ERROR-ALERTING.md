@@ -112,7 +112,7 @@ damit nicht zurueck.
 
 ```bash
 gcloud logging read 'resource.labels.service_name="errors"' \
-  --project=malzime --freshness=2h \
+  --project=malzime --bucket=client-diagnostics --location=europe-west1 --view=_AllLogs --freshness=2h \
   --format='value(jsonPayload.phase,jsonPayload.errorDetail)'
 ```
 

@@ -62,7 +62,7 @@
       <span class="page-eyebrow">Legal</span>
       <h1>Privacy</h1>
       <p class="legal-subtitle">
-        Explained plainly &middot; English version: 8 September 2026 &middot; German original: 8 September 2026
+        Explained plainly &middot; English version: 9 September 2026 &middot; German original: 9 September 2026
       </p>
       <div class="page-rule"></div>
 
@@ -233,7 +233,10 @@
           response length, token counts) &ndash; no image content, no profiles, no IP addresses. The server-side request
           logs of the infrastructure (Google) &ndash; the only place where an IP address would arise &ndash; are
           excluded entirely and are not stored in the first place. The remaining program logs, which contain no personal
-          data, delete themselves after 1&nbsp;day. Entirely anonymous diagnostic data without personal reference (for
+          data, are stored on EU servers (region europe-west1, Belgium) and delete themselves after 1&nbsp;day. In
+          addition, Google keeps a mandatory record of administrative access by the operator, i.e. our account and the
+          address of our computer during maintenance work, for 400&nbsp;days. It contains no data of users and is
+          stored by Google without a choice of region. Entirely anonymous diagnostic data without personal reference (for
           example error type, duration, a coarse browser and operating system class such as &bdquo;Safari 17 /
           iOS&ldquo; instead of the full user agent, a screen size class &ndash; small, medium, large &ndash; instead of
           the exact resolution, network class and speed, data saver setting, language setting, number of processor
@@ -241,9 +244,7 @@
           read error the time between photo selection and read attempt and the outcome of a second read attempt as a
           keyword, a coarse subject class of the image (human, animal or mixed &ndash; not the image itself) and the
           page visited without query parameters &ndash; no IP addresses, no images, no file names) is kept for up to
-          30&nbsp;days so that rare device faults can be detected and fixed across several workshops. An anonymised
-          error summary without personal data (error message and frequency only) is retained for troubleshooting &ndash;
-          a shorter retention is not technically possible.
+          30&nbsp;days so that rare device faults can be detected and fixed across several workshops.
         </p>
         <p>
           For the voluntary reality check we record one anonymous entry per rating (which of the AI's assessments you
@@ -336,8 +337,9 @@
           website, Cloud Functions for the backend processing, Cloud Storage for the brief image buffering in the queue,
           and Cloud Firestore for the anonymous analysis counter and the queue management. All data processing (Cloud
           Functions, Cloud Storage, Firestore) runs on EU servers (region <code>europe-west1</code>, Belgium); the
-          static pages of the website &ndash; which contain no user data whatsoever &ndash; are delivered by Firebase
-          Hosting through a worldwide content delivery network. Google also processes this data as a
+          pages of the website, which contain no user data at all, are delivered by Firebase Hosting via a worldwide
+          content delivery network (CDN). Your photo and all analysis data are sent by your browser directly to our
+          server in the EU (region europe-west1, Belgium), not via this network. Google also processes this data as a
           <strong>processor</strong> (Art.&nbsp;28 GDPR) and may not use it for its own purposes. Legal basis:
           <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener" tabindex="0"
             >Google Cloud Data Processing Addendum</a

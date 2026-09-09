@@ -356,3 +356,46 @@ wird. Lizenztext, Version und Herkunft: `public/lib/libheif/`, Übersicht in
 Rückweg mit Deploy: Ordner `public/lib/libheif/` und den HEIC-Zweig in
 `public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen.
 
+## Kinderschutz-Filter: Anzahl und Diagnose (09.09.2026)
+
+**Was war.** Der Werbe-Aufruf lieferte sechs bis acht Einträge, der Filter
+strich bei erkennbar Minderjährigen einzelne davon. Ein Kind mit zwei
+gestrichenen Einträgen sah sechs Werbeideen, ein Erwachsener acht. Und die
+Kinderschutz-Zeile im Log nannte nur einen Zähler und die Stufe („minor"),
+nicht das Feld und nicht das Wort. Am 08. und 09.09. stand bei 8 von 19
+Analysen mit Minderjährigen ein Treffer im Fließtext, und niemand konnte sagen,
+ob das „Cocktail-Bar" in einer Beschreibung war oder eine Wett-Werbung für ein
+Kind. Die Zeile war zudem nach einem Tag gelöscht.
+
+**Entscheidung.**
+
+1. Der Werbe-Aufruf fordert zehn Einträge an, gezeigt werden höchstens acht
+   (`WERBE_ANFORDERUNG`, `WERBE_ANZAHL` in `functions/src/minor-safety.js`,
+   die Prompts lesen die Zahl von dort). Gekappt wird erst nach dem Filter,
+   nur die Werbung, nie die Manipulations-Trigger. Nachgefüllt wird nichts.
+2. Je Treffer stehen im Log das Feld (`boost.ad_targeting`,
+   `normal.profileText`, `boost.categories.kaufkraft`) und das getroffene
+   Stichwort aus der festen Sperrliste, klein geschrieben, höchstens 30
+   Zeichen. Dazu die Anzahl der Werbeeinträge je Modus nach Filter und Kappung.
+3. Die Zeile bleibt 30 Tage im Diagnose-Speicher `client-diagnostics`
+   (europe-west1), gesetzt über `scripts/log-sink-analyse-zeilen.sh`.
+
+**Warum kein Personenbezug.** Das Stichwort ist ein Wort aus unserer eigenen
+Liste, nicht aus dem Text über die Person. Der Test
+`minor-safety-diagnose.test.js` prüft, dass weder der Werbetext noch der Satz
+im Log landet. Das geschätzte Alter stand schon vorher in der Zeile.
+
+**Betrachtete Alternativen.** Nachfüllen aus einer festen Ersatzliste:
+verworfen, das wären erfundene Einträge in einer Anwendung, deren Kernaussage
+ist, dass die KI wirklich analysiert. Ein zweiter KI-Aufruf zum Nachfüllen:
+verworfen, kostet Zeit und Geld für einen Fall, den zwei Reserve-Einträge
+abdecken. Einen Satzausschnitt um das Stichwort loggen: verworfen, der
+Ausschnitt könnte eine Beschreibung der Person enthalten.
+
+**Bewusst getragene Folge.** Werden bei einem Kind mehr als zwei Einträge
+gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
+
+**Neubewertung.** Nach 30 Tagen Messung: Sind die Fließtext-Treffer
+überwiegend harmlose Wörter, wird die Sperrliste präzisiert. Sind es
+Werbebegriffe, wird die Prompt-Regel nachgeschärft und mit eigenen Fotos
+nachgestellt.

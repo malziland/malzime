@@ -515,6 +515,27 @@ Nachsehen, welche Analysen trotz aller Wiederholungen scheiterten (Feld
     gcloud logging read 'jsonPayload.alert="single-large-failed"' \
       --project=malzime --freshness=7d --format='value(timestamp,jsonPayload.error,jsonPayload.wiederholungen)'
 
+### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
+
+Der Filter (`functions/src/minor-safety.js`) streicht bei erkennbar
+Minderjährigen Werbeeinträge zu Alkohol, Wetten, Kredit, Diät und
+Schönheits-OP und meldet Treffer im Fließtext, ohne dort etwas zu streichen.
+Seit 09.09. steht je Treffer das Feld und das getroffene Stichwort aus der
+festen Sperrliste im Log, dazu die Anzahl der gezeigten Werbeeinträge je Modus.
+Die Zeile liegt 30 Tage im Diagnose-Speicher:
+
+    gcloud logging read 'jsonPayload.step="minor-safety" AND jsonPayload.minderjaehrig=true' \
+      --project=malzime --bucket=client-diagnostics --location=europe-west1 \
+      --view=_AllLogs --freshness=30d \
+      --format='value(timestamp,jsonPayload.alter,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
+
+Lesart: `entfernte` sind gestrichene Werbeeinträge, `durchgerutschte` sind
+Treffer im Profiltext oder in einer Kategorie-Karte (nur gemeldet). Steht bei
+`durchgerutschte` über Wochen ein Wort wie „cocktail" in Bar-Beschreibungen,
+ist die Sperrliste zu grob; stehen dort Werbebegriffe wie „sportwetten", hält
+der Prompt nicht. `werbung` unter 8 bei einem Kind heißt: mehr als zwei
+Einträge gestrichen, nachgefüllt wird nichts.
+
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
 
 **Was passiert ist:** Der Aufräumer liest jede Minute den Einstellungssatz
@@ -630,8 +651,8 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 | Log | Aufbewahrung | Inhalt |
 |---|---|---|
 | `_Default`-Bucket | **1 Tag** — bewusst kurz, NICHT verlängern | IP-haltige Infrastruktur-Logs (Datenschutz-Versprechen) |
-| `client-diagnostics` (europe-west1) | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge |
-| Anwendungs-Logs | — | keine Bildinhalte, keine personenbezogenen Daten; nur Request-ID, Step, Status, Token-Counts |
+| `client-diagnostics` (europe-west1) | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026). Filter setzt `scripts/log-sink-analyse-zeilen.sh` |
+| übrige Anwendungs-Logs | 1 Tag (liegen im `_Default`-Bucket) | keine Bildinhalte, keine personenbezogenen Daten; nur Request-ID, Step, Status, Token-Counts. Auftragsannahme, Zustellung und Aufräumer-Läufe sind nach einem Tag weg |
 
 ## Prüfgerät Android (Emulator auf dem Entwicklungsrechner, seit 08.09.2026)
 

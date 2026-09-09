@@ -4,6 +4,31 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Kinder sehen dieselbe Anzahl Werbeideen wie Erwachsene.** Der Werbe-Aufruf
+  liefert jetzt zehn Einträge statt sechs bis acht, gezeigt werden höchstens
+  acht. Streicht der Kinderschutz-Filter bei einem erkennbar Minderjährigen ein
+  bis zwei Einträge (Alkohol, Wetten, Kredit, Diät, Schönheits-OP), bleibt die
+  Anzahl trotzdem gleich; vorher verriet die kürzere Liste den Filter.
+  Nachgefüllt wird nichts, Ersatz aus einer festen Liste wäre keine Analyse
+  mehr. Die Zahl steht einmal in `functions/src/minor-safety.js`, die Prompts
+  lesen sie von dort.
+- **Die Kinderschutz-Prüfung sagt jetzt, was sie gefunden hat.** Je Treffer
+  stehen im Log das Feld (Werbeliste, Profiltext oder Kategorie) und das
+  getroffene Wort aus der festen Sperrliste, etwa „sportwetten" oder
+  „cocktail", dazu die Anzahl der gezeigten Werbeeinträge. Nie der Satz, nie
+  der Werbetext. Anlass: Am 08. und 09.09. meldete die Prüfung bei 8 von 19
+  Analysen mit Minderjährigen einen Treffer im Fließtext, und aus dem Log ging
+  nicht hervor, ob das eine Werbeidee für ein Kind war oder ein harmloses Wort.
+- **Diese Log-Zeile bleibt 30 Tage.** Bisher war sie nach einem Tag weg, so
+  dass sich keine Quote über mehrere Tage messen ließ. Der Diagnose-Speicher in
+  `europe-west1` hält sie jetzt wie die Zeilen zu Dauer und Token-Zahlen der
+  KI-Aufrufe (`scripts/log-sink-analyse-zeilen.sh`, am 09.09. ausgeführt).
+  Abwägung in `docs/SECURITY-MODEL.md`, Abfrage-Rezept im RUNBOOK.
+
 ## [4.7.1] — 2026-09-08
 
 ### Geändert

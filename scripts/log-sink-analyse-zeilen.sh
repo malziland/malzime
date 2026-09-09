@@ -14,14 +14,21 @@
 # 30-Tage-Zusage der Datenschutzerklaerung ("vollstaendig anonyme
 # Diagnose-Daten ohne Personenbezug ... bis zu 30 Tage") deckt sie ab.
 #
+# Erweiterung 09.09.2026: Auch die Kinderschutz-Zeile `step:"minor-safety"`
+# (geschaetztes Alter, Zaehler, Feldnamen, getroffenes Stichwort aus der
+# festen Sperrliste) bleibt 30 Tage. Grund: Am 08./09.09. meldete der Filter
+# bei 8 von 19 Analysen mit Minderjaehrigen einen Treffer im Fliesstext —
+# ob das eine Quote oder ein Ausreisser ist, laesst sich mit einem Tag
+# Aufbewahrung nicht sagen (die Abfrage fuer den 07.09. fand 0 Zeilen bei
+# 18 Analysen). Kein Satz, kein Kontext, kein Personenbezug.
+#
 # Ausfuehren: einmalig nach Freigabe (kein Deploy noetig, wirkt sofort).
-# Ruecknahme: denselben Befehl mit dem alten Filter (nur die zwei
-# client-*-Typen) erneut ausfuehren.
+# Ruecknahme: denselben Befehl mit dem vorigen Filter erneut ausfuehren.
 set -euo pipefail
 
 PROJECT="malzime"
 SINK="client-diagnostics-sink"
-FILTER='jsonPayload.type="client-error" OR jsonPayload.type="client-telemetry" OR jsonPayload.step="mistral-single-large"'
+FILTER='jsonPayload.type="client-error" OR jsonPayload.type="client-telemetry" OR jsonPayload.step="mistral-single-large" OR jsonPayload.step="minor-safety"'
 
 echo "Erweitere Filter von ${SINK} (Projekt ${PROJECT}) ..."
 gcloud logging sinks update "${SINK}" \

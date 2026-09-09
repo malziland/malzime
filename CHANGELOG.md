@@ -4,6 +4,17 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [4.8.1] — 2026-09-09
+
+### Behoben
+
+- **Ein Foto, das gewählt wird, bevor die Sprachdatei geladen ist, verpufft
+  nicht mehr.** Datei-Auswahl und Drag-and-drop sind jetzt sofort verdrahtet;
+  eine frühe Wahl wartet auf die Übersetzung und läuft dann durch. Im
+  Schul-WLAN traf das ein Kind, das schneller war als die Seite; in der
+  Pipeline zeigte sich derselbe Fall am 09.09. als roter Firefox-Test. Gleiches
+  Muster wie beim Demo-Klick am 07.09.
+
 ## [4.8.0] — 2026-09-09
 
 ### Geändert

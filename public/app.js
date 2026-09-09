@@ -36,6 +36,29 @@ merkePhase("start");
    auf sie statt zu verpuffen (07.09.2026, Hergang in js/demo.js). */
 const uebersetzungBereit = initI18n();
 initDemo(uebersetzungBereit);
+
+/* Datei-Auswahl und Ablegen SOFORT verdrahten — dasselbe Muster wie bei den
+   Demo-Fotos (09.09.2026, Pipeline-Lauf 34379594749): Beide Handler standen
+   hinter dem Warten auf die Uebersetzung. Auf der Pipeline setzte der Test
+   die Datei davor, im Schul-WLAN waehlt ein Kind ein Foto, waehrend die
+   Sprachdatei noch laedt — die Wahl verpuffte, das Statusfeld blieb leer.
+   Jetzt wartet eine fruehe Wahl auf die Uebersetzung und laeuft dann durch;
+   ist sie laengst da (Normalfall), kostet das Warten nichts. Der Zeitstempel
+   der Auswahl (Lesefehler-Diagnose) entsteht erst in handleNewFile, also nach
+   dem Warten — nur im Sonderfall der noch ladenden Sprachdatei um diese
+   Wartezeit versetzt. */
+elements.fileInput.addEventListener("change", () => {
+  const file = elements.fileInput.files[0];
+  if (!file) return;
+  uebersetzungBereit.then(() => handleNewFile(file));
+});
+document.querySelector(".file-drop").addEventListener("drop", (e) => {
+  const file = e.dataTransfer?.files?.[0];
+  if (file && file.type.startsWith("image/")) {
+    uebersetzungBereit.then(() => handleNewFile(file));
+  }
+});
+
 await uebersetzungBereit;
 merkePhase("i18n");
 applyTranslations();
@@ -166,12 +189,6 @@ function handleNewFile(file) {
   analyzeImage();
 }
 
-elements.fileInput.addEventListener("change", () => {
-  const file = elements.fileInput.files[0];
-  if (!file) return;
-  handleNewFile(file);
-});
-
 /* ── Drag & Drop (auch für macOS Fotos-App) ── */
 
 const dropTarget = document.querySelector(".file-drop");
@@ -190,13 +207,6 @@ const dropTarget = document.querySelector(".file-drop");
     e.stopPropagation();
     dropTarget.classList.remove("drag-over");
   });
-});
-
-dropTarget.addEventListener("drop", (e) => {
-  const file = e.dataTransfer?.files?.[0];
-  if (file && file.type.startsWith("image/")) {
-    handleNewFile(file);
-  }
 });
 
 /* Globaler dragover-Schutz: verhindert Navigation bei Drop außerhalb der Zone */

@@ -60,6 +60,13 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   die Aufbewahrung, den IP-Ausschluss, den Filter des Diagnose-Speichers und die
   EU-Bindung der Geheimnisse. Cloud-Build-Protokolle landen künftig im
   EU-Speicher.
+- **Bau-Protokolle des Push-Servers landen im EU-Speicher.** Bis zum
+  09.09.2026 legte Cloud Build sie standardmäßig in einem Google-eigenen
+  Speicher ohne Regionswahl ab: neun Protokolle mit Bau-Schritten und
+  Versionsnummern, ohne Nutzerdaten und ohne Geheimnisse. Diese neun lassen
+  sich dort nicht löschen, der Speicher gehört Google; der Punkt steht als
+  bekannter Rest in `docs/SECURITY-MODEL.md`. Seit dem 09.09.2026 nutzen alle
+  Bauaufträge unseren Speicher in `europe-west1`.
 
 ## [4.7.1] — 2026-09-08
 

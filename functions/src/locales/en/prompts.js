@@ -1,5 +1,10 @@
 "use strict";
 
+/* Werbe-Anzahl kommt aus minor-safety.js (eine Quelle): angefordert werden
+   zwei Eintraege mehr, als gezeigt werden, damit die Anzahl nach dem
+   Kinderschutz-Filter stimmt. */
+const { WERBE_ANFORDERUNG } = require("../../minor-safety");
+
 /**
  * locales/en/prompts.js — English texts for the AI prompts and profile generation.
  *
@@ -1037,7 +1042,7 @@ module.exports.beastAdsSystem = `You are the advertising algorithm of a tech cor
 
 ═══ YOUR TASK ═══
 
-Generate 6-8 ad entries that target the VULNERABILITY, not the hobby.
+Generate exactly ${WERBE_ANFORDERUNG} ad entries that target the VULNERABILITY, not the hobby.
 
 - Read the vulnerability sentence. That is exactly where you aim.
   If it says "fighting ageing": anti-ageing, regeneration, provision, supplements.

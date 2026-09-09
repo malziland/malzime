@@ -44,6 +44,17 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   erledigt `scripts/geheimnisse-eu-kopieren.sh` im lokalen Terminal, der
   Deploy-Riegel lässt keinen Deploy zu, solange ein Secret ohne Version ist.
   Der Mistral-Schlüssel wird dabei erneuert.
+- **Foto und Analysedaten gehen direkt an den EU-Server, nicht mehr über das
+  Auslieferungsnetz.** Bisher liefen alle Aufrufe an unsere Schnittstellen über
+  Firebase Hosting, und Hosting ist ein weltweites Auslieferungsnetz; auch das
+  komprimierte Foto passierte so den nächsten Knoten dieses Netzes. Jetzt ruft
+  die Seite die Dienste direkt unter ihren Adressen in `europe-west1` auf
+  (`public/js/api-basis.js`, eine Quelle). Nur die Seite selbst kommt weiter aus
+  dem Auslieferungsnetz. Die Sicherheitsrichtlinie erlaubt dafür genau diese
+  fünf Adressen, ein Test hält beide Listen deckungsgleich; der Server stimmt
+  Aufrufen nur von unseren eigenen Ursprüngen zu. Die Live-Probe nach dem Deploy
+  misst das. Rückweg ohne Function-Deploy im RUNBOOK (Hebel 5a), Abwägung in
+  `docs/SECURITY-MODEL.md`.
 
 ## [4.7.1] — 2026-09-08
 

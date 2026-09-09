@@ -37,7 +37,9 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 ## Schutzschichten (Kurzreferenz)
 
 - **Client:** EXIF/GPS bleiben im Browser (Canvas-Recompress entfernt Metadaten);
-  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS.
+  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS. Foto und
+  Analysedaten gehen direkt an die Cloud-Run-Adressen in `europe-west1`, nicht
+  über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026, s. u.).
 - **Einlass:** Maintenance-Check → IP-Rate-Limit → Honeypot/Timing → MIME +
   Magic-Bytes → globales Stundenlimit → Queue-Tiefen-Bremse.
 - **Verarbeitung:** Worker `processJob` nur per OIDC (nicht öffentlich, per
@@ -403,3 +405,60 @@ gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
 überwiegend harmlose Wörter, wird die Sperrliste präzisiert. Sind es
 Werbebegriffe, wird die Prompt-Regel nachgeschärft und mit eigenen Fotos
 nachgestellt.
+## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
+
+**Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.
+Hosting ist ein weltweites Auslieferungsnetz (Fastly); der Standort-Inventar-Lauf
+vom 09.09.2026 maß den Transit über einen Knoten in Wien. Damit passierte auch
+das komprimierte Foto einen Knoten dieses Netzes, bevor es den Server in Belgien
+erreichte — ohne Speicherung (`cache-control: no-cache`), aber als Umweg, den
+die Zusage „alles auf EU-Servern" nicht kennt. Der Eigentümer hat entschieden:
+kein Umweg.
+
+**Entscheidung.** Der Browser ruft `enqueue`, `job-status`, `stats`, `errors`
+und `telemetry` im Betrieb direkt unter ihren Cloud-Run-Adressen in
+`europe-west1` auf. Die eine Quelle dafür ist `public/js/api-basis.js`. Nur
+die Seite selbst (HTML, JS, CSS, Bilder, Fonts) kommt weiter aus dem
+Auslieferungsnetz — sie enthält keine Nutzerdaten. Lokal, im Emulator und in
+den Tests bleibt der Pfad relativ.
+
+**Zwei Schutzschichten ändern sich dafür bewusst:**
+
+1. **CSP `connect-src`** nennt die fünf Cloud-Run-Adressen einzeln, keinen
+   Platzhalter wie `*.run.app` (der würde jeden fremden Cloud-Run-Dienst
+   erlauben). Die Liste in `firebase.json` und die in `api-basis.js` werden vom
+   Test `public/__tests__/api-basis.test.js` gegeneinander geprüft: fehlt eine
+   Adresse, blockt der Browser den Upload; steht eine zu viel, weiß niemand
+   mehr, wofür.
+2. **CORS** auf den öffentlichen Functions war schon vorher gesetzt
+   (`cors: ALLOWED_ORIGINS` in `functions/src/index.js`, Liste in
+   `functions/src/domains.js`): Zustimmung nur für `malzi.me`, `www.malzi.me`
+   und die beiden Firebase-Hostnamen. Gemessen am 09.09.2026: Vorab-Anfrage mit
+   `Origin: https://malzi.me` → `204` mit `access-control-allow-origin:
+   https://malzi.me`; mit einem fremden Ursprung → `204` **ohne** diesen Header,
+   der Browser blockt. Die Live-Smoke-Probe „Direktweg" misst beides nach jedem
+   Deploy.
+
+**Was gleich bleibt.** Die Bremsen am Einlass (IP-Rate-Limit, Stundenlimit,
+Honeypot, Bot-Heuristik über `Origin`/`Referer`) laufen im Dienst selbst und
+sehen den Aufruf genauso wie vorher; beide Wege enden am selben Google-Front-End
+vor Cloud Run, `req.ip` ändert sich dadurch nicht. Die Hosting-Umleitungen für
+`/api/…` bleiben als Rückweg bestehen (RUNBOOK Hebel 5a) — und weil Browser mit
+einer alten `app.js` im Zwischenspeicher weiter `/api/…` rufen, bricht für sie
+nach dem Deploy nichts.
+
+**Betrachtete Alternative.** Eine eigene Adresse `api.malzi.me` vor Cloud Run:
+sauberer im Namen, aber ein DNS-Eintrag plus Zertifikat mehr — und der Abbau
+genau dieser Adresse hat am 10.08.2026 die Website eine halbe Stunde lahmgelegt.
+Verworfen zugunsten der nackten Cloud-Run-Adressen, die Google selbst mit
+Zertifikat betreibt.
+
+**Bewusst getragene Folge.** Die Cloud-Run-Adressen enthalten eine
+Projekt-Kennung (`5ymhpdpqcq`); sie stehen jetzt lesbar in der Seite. Sie waren
+schon vorher öffentlich erreichbar (`invoker: public`), neu ist nur die
+Sichtbarkeit. Die Zugangsschutzschichten hängen nicht am Verstecken der Adresse.
+
+**Neubewertung.** Wenn Firebase Hosting eine regionale Auslieferung ohne
+weltweites Netz anbietet, oder wenn der Direktweg messbar langsamer ist als der
+Hosting-Weg (Telemetrie `enqueueMs`, Vergleich 30 Tage vor/nach dem Deploy).
+

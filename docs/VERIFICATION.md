@@ -13,9 +13,9 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 
 | Anforderung | Nachweisweg | Letztes Ergebnis |
 |---|---|---|
-| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 1409/1409 grün — `scripts/pruefstand.sh`, Commit 94c91c7, 2026-09-09 (ohne installiertes `gcloud` werden die Tests übersprungen, die die gcloud-Parameter der Rollback-Skripte abgleichen) |
-| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 676/676 grün — `scripts/pruefstand.sh`, Commit 94c91c7, 2026-09-09 |
-| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 362/362 grün — `scripts/pruefstand.sh`, Commit 94c91c7, 2026-09-09 |
+| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 1409/1409 grün — `scripts/pruefstand.sh`, Commit 76ea8e4, 2026-09-09 (ohne installiertes `gcloud` werden die Tests übersprungen, die die gcloud-Parameter der Rollback-Skripte abgleichen) |
+| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 676/676 grün — `scripts/pruefstand.sh`, Commit 76ea8e4, 2026-09-09 |
+| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 365/365 grün — `scripts/pruefstand.sh`, Commit 76ea8e4, 2026-09-09 |
 | Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — 2026-08-10 |
 | Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29562535095, 2026-07-17 |
 | Dependency-Audit | CI-Job `test-backend`: `node ../scripts/audit-gate.mjs functions .` (aus `functions/` heraus) — **beide** Abhängigkeitsbäume (Gate, bricht Build; High/Critical blockieren, Ausnahmen nur begründet **und mit Ablaufdatum** in `.github/audit-allowlist.json`) | ✅ **0 Meldungen, Ausnahmeliste leer** — `npm audit` in beiden Projekten 0, auch inklusive Entwicklungswerkzeuge (vorher 27). Stand 2026-07-29 |

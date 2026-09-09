@@ -317,6 +317,13 @@ Erwartet: keine Zeile.
 Vom schnellsten zum gründlichsten. Alle Flag-Hebel wirken **ohne Deploy** binnen
 ~30 Sekunden (Cache-TTL der Flags).
 
+> **Seit 09.09.2026 (4.8.0):** Die Functions lesen ausschließlich die Geheimnisse mit
+> Endung `_EU` (europe-west1). Die alten Namen ohne Endung sind gelöscht. Ein Rollback
+> auf eine Fassung vor 4.8.0 (Hebel 4) braucht sie vorher neu: Secret unter altem Namen
+> anlegen, Wert aus dem `_EU`-Secret kopieren (`scripts/geheimnisse-eu-kopieren.sh`
+> in umgekehrter Richtung), IAM-Bindung setzen. Der Mistral-Schlüssel vor 4.8.0 ist
+> bei Mistral gelöscht; auch dafür den aktuellen Wert nehmen.
+
 ### 1. Wartungsmodus (Sekunden — kontrollierte Vollbremsung)
 
 `sh scripts/wartungsmodus.sh ein "Text für die Besucher"`, zurücknehmen mit

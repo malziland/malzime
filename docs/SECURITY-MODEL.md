@@ -138,6 +138,23 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    die der Endpunkt bewusst dünn und schnell ist. *Neu bewerten,* falls je ein
    realer Speicher-Erschöpfungs-Vorfall auftritt (bisher keiner beobachtet).
 
+10. **Neun Bau-Protokolle liegen in einem Google-eigenen Speicher ohne
+    Regionswahl.** Cloud Build legt Bau-Protokolle standardmäßig in einem
+    Google-eigenen Speicher ohne Regionswahl ab. Das betraf bis 09.09.2026 neun
+    Protokolle des Push-Servers, ohne Nutzerdaten und ohne Geheimnisse. Seit
+    09.09.2026 nutzen alle Bauaufträge unseren Speicher in europe-west1.
+    *Beleg:* Löschversuch am 09.09.2026 wurde mit „keine Berechtigung
+    storage.objects.delete" abgewiesen; Google beschreibt den Speicher in der
+    Cloud-Build-Dokumentation als „Google Cloud-owned bucket", eine
+    Löschanleitung gibt es nur für eigene Speicher. Inhalt geprüft: 387 Zeilen
+    Bau-Schritte und Versionsnummern, keine Adresse, kein Schlüssel.
+    *Betrachtete Alternative:* Löschanfrage an Google. Nicht gestellt, weil
+    keine Nutzerdaten betroffen sind und der Aufwand in keinem Verhältnis zum
+    Inhalt steht. *Neu bewerten,* sobald Google eine Löschung in Google-eigenen
+    Speichern anbietet oder ein Bauauftrag ohne EU-Speicherangabe abgesetzt wird
+    (der Infrastruktur-Wächter prüft das nicht; das Skript im malzime-Repo setzt
+    die Angabe, das ntfy-Repo braucht sie von Hand).
+
 ## Verworfene Maßnahmen
 
 | Maßnahme | Warum verworfen |

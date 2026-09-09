@@ -837,7 +837,9 @@ normalen Bucket-Liste nicht erscheint, sowie die globale Log-Ablage (seit
 09.09. leer, siehe „Logs und Aufbewahrung") und die weltweit replizierten
 Secrets (seit 09.09. EU-gebunden). Künftige Builds im ntfy-Repo brauchen
 `--gcs-log-dir=gs://malzime-cloudbuild-eu/logs`, sonst entsteht der Bucket
-neu.
+neu. Die neun alten Protokolle lassen sich nicht löschen (Löschversuch
+09.09.2026: keine Berechtigung, der Speicher gehört Google); Entscheidung und
+Begründung stehen in `docs/SECURITY-MODEL.md`, Restrisiko Punkt 10.
 
 Was bleibt und weiter gilt:
 

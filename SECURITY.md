@@ -60,6 +60,8 @@ Mistral is the only AI provider since v1.6.0 — no Google AI in the pipeline. S
 All production secrets are stored in Google Cloud Secret Manager and bound to Cloud Functions via Firebase's `defineSecret`. Secrets are never committed to git. Gitleaks runs on every push as a backstop.
 
 Required secrets:
-- `ADMIN_SECRET` — Bearer token for admin endpoints (Boost, Reset, Maintenance)
-- `MISTRAL_API_KEY` — Mistral AI API key (paid tier)
-- `NTFY_URL`, `NTFY_TOPIC` — optional, for limit-reached push notifications
+- `ADMIN_SECRET_EU` — Bearer token for admin endpoints (Boost, Reset, Maintenance)
+- `MISTRAL_API_KEY_EU` — Mistral AI API key (paid tier)
+- `NTFY_URL_EU`, `NTFY_TOPIC_EU` — optional, for limit-reached push notifications
+
+All four are bound to `europe-west1` (user-managed replication) since 2026-09-09; the `_EU` suffix marks that.

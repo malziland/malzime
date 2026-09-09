@@ -24,11 +24,12 @@ const { MISTRAL_ENDPOINT } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
 const { withMistralSlot } = require("./throttle");
 
-/* Wird beim Modul-Load via env-Variable gelesen. NICHT hartcodiert. */
+/* Env-Variable, NICHT hartcodiert. Produktion seit 09.09.2026: MISTRAL_API_KEY_EU
+   (an europe-west1 gebunden); lokal bleibt MISTRAL_API_KEY als zweiter Name. */
 function getApiKey() {
-  const key = process.env.MISTRAL_API_KEY;
+  const key = process.env.MISTRAL_API_KEY_EU || process.env.MISTRAL_API_KEY;
   if (!key) {
-    const e = new Error("MISTRAL_API_KEY environment variable not set");
+    const e = new Error("MISTRAL_API_KEY_EU environment variable not set");
     e.code = "no_api_key";
     throw e;
   }

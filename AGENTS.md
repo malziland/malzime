@@ -167,7 +167,7 @@ Small-Modells und erlaubt hoehere Cloud-Tasks-Concurrency. Laeuft im Queue-Worke
 4. **Profile-Stage**: bei `ANIMAL_ONLY` → Easter-Egg aus `locales/{lang}/animals.js`; sonst Mistral Small fuer Normal + Boost parallel
 5. **JSON-Repair**: alle LLM-Outputs gehen durch `json-repair.js` (4-stufige defensive Reparatur)
 
-`MISTRAL_API_KEY` ist als Firebase Secret hinterlegt und wird in `index.js` an die KI-Endpunkte gebunden. `mistral.js` liest den Key aus `process.env.MISTRAL_API_KEY`.
+`MISTRAL_API_KEY_EU` ist als Secret (an europe-west1 gebunden) hinterlegt und wird in `index.js` an die KI-Endpunkte gebunden. `mistral-http.js` liest den Key aus `process.env.MISTRAL_API_KEY_EU`, lokal ersatzweise aus `MISTRAL_API_KEY`.
 
 Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. Der User bekommt eine `blocked.apiError`- oder `blocked.overloaded`-Response. Google bleibt nur fuer die Infrastruktur-Schicht (Firebase Hosting + Cloud Functions + Firestore in `europe-west1`).
 

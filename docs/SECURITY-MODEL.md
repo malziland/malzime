@@ -105,19 +105,23 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    ein falsches Testergebnis — kein Zugriff auf Produktion, Daten oder Konten.
    *Neu bewerten,* sobald der E2E-Job ein Geheimnis braucht oder etwas
    veröffentlicht.
-8. **Nicht-personenbezogene Logs liegen weiter auf Standort `global`.**
-   (Rest von `PRIV-2026-08-12-12`) Die Standard-Log-Ablage von Google Cloud
-   (`_Default`) ist fest auf `global` und lässt sich nicht nach Europa
-   verschieben. Behoben ist der personenbezogene Teil: Cloud-Run-Request-Logs
-   sind der einzige Träger von Client-IP-Adressen und werden vollständig
-   ausgeschlossen (`exclude_run_requests_ip`, vom Deploy-Riegel bewacht, inkl.
-   Filterinhalt). *Was bleibt:* Programmausgaben der Functions und
-   Zeitplan-Läufe, ohne Personenbezug, **eine** Aufbewahrungstag lang.
-   *Verworfene Alternative:* die `_Default`-Senke auf einen EU-Speicher
-   umhängen — dann findet `gcloud logging read` ohne zusätzliche Angaben nichts
-   mehr, und jedes Störungsrezept im RUNBOOK liefert stillschweigend eine leere
-   Antwort statt eines Fehlers. Genau die Ausfallform, gegen die dieses Projekt
-   sonst überall anschreibt.
+8. **Betriebs-Logs liegen seit 09.09.2026 in `europe-west1`** (Rest von
+   `PRIV-2026-08-12-12`, erledigt). Googles Standard-Ablage `_Default` ist fest
+   auf `global`; am 12.08. wurde nur der personenbezogene Teil entfernt
+   (Cloud-Run-Request-Logs, einziger IP-Träger, Ausschluss
+   `exclude_run_requests_ip`, vom Deploy-Riegel bewacht) und der Rest als
+   Restrisiko hier notiert — mit der Begründung, dass `gcloud logging read` nach
+   einem Umhängen der Weiche ohne Zusatzangaben nichts mehr fände. *Das war eine
+   Alleinentscheidung der Assistenz ohne Vorlage an den Eigentümer.* Der
+   Eigentümer hat am 09.09.2026 entschieden: Alles liegt in der EU, keine
+   Aufweichung. Seither zeigt die Weiche `_Default` auf den eigenen Speicher
+   `betrieb-eu` (europe-west1, 1 Tag); alle Rezepte im RUNBOOK nennen den
+   Speicher ausdrücklich, und der Deploy-Riegel prüft Ziel, Aufbewahrung und
+   Ausschluss. *Was bleibt und nicht änderbar ist:* Googles Pflichtprotokoll
+   `_Required` (global, 400 Tage) mit unseren eigenen Verwaltungszugriffen, und
+   die Alarm-Kanäle mit unserer Adresse. Keine Nutzerdaten. *Regel
+   daraus:* Jede Abwägung, die eine Zusage nach außen berührt, wird dem
+   Eigentümer als Entscheidung vorgelegt, nie nur hier notiert.
 9. **Der Upload-Rumpf landet vor jeder App-Prüfung im Speicher.**
    (`SEC-2026-08-13-B`) Die Cloud-Functions-Laufzeit liest den Request-Body
    vollständig als `req.rawBody` ein, bevor `handle-enqueue.js` läuft — eine

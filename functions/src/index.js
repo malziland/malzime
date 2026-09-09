@@ -23,15 +23,20 @@ const { geltendeWerte, _cacheLeeren } = require("./betriebsprofil");
 const { sendeNtfy } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 
-const adminSecret = defineSecret("ADMIN_SECRET");
-const ntfyUrl = defineSecret("NTFY_URL");
-const ntfyTopic = defineSecret("NTFY_TOPIC");
+/* Seit 09.09.2026 tragen alle Secrets das Suffix _EU: Sie sind im Secret
+   Manager an europe-west1 gebunden statt von Google weltweit repliziert.
+   Die Replikation lässt sich nachträglich nicht ändern, deshalb neue Namen.
+   Der Deploy-Riegel prüft, dass jedes hier genannte Secret in der EU liegt
+   und eine Version hat. */
+const adminSecret = defineSecret("ADMIN_SECRET_EU");
+const ntfyUrl = defineSecret("NTFY_URL_EU");
+const ntfyTopic = defineSecret("NTFY_TOPIC_EU");
 /* Mistral AI API-Key — Pflicht seit v1.6.0 (Mistral-only Pipeline).
-   Wird via process.env.MISTRAL_API_KEY von mistral.js gelesen. Firebase
+   Wird via process.env.MISTRAL_API_KEY_EU von mistral-http.js gelesen. Firebase
    injiziert das Secret automatisch als env-Var wenn es in `secrets`
    deklariert ist. Wenn das Secret fehlt, schlagen alle Analyse-Calls
    mit code "no_api_key" fehl. */
-const mistralApiKey = defineSecret("MISTRAL_API_KEY");
+const mistralApiKey = defineSecret("MISTRAL_API_KEY_EU");
 
 initializeApp();
 

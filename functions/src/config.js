@@ -91,7 +91,7 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    Single-Large-Architektur ist 2603 wieder aktiv. 2506 wurde von Mistral zum
    31.07.2026 ZURUECKGEZOGEN (Retirement) — als Modell-Option dauerhaft tot.
 
-   API-Key kommt aus `process.env.MISTRAL_API_KEY` (Firebase Secret). */
+   API-Key kommt aus `process.env.MISTRAL_API_KEY_EU` (Firebase Secret, EU-gebunden; lokal `MISTRAL_API_KEY`). */
 /* v1.10.7: Large fest auf -2512 gepinnt statt -latest-Alias. Hintergrund:
    Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
    umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren

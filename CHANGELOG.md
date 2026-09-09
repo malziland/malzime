@@ -28,6 +28,22 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   `europe-west1` hält sie jetzt wie die Zeilen zu Dauer und Token-Zahlen der
   KI-Aufrufe (`scripts/log-sink-analyse-zeilen.sh`, am 09.09. ausgeführt).
   Abwägung in `docs/SECURITY-MODEL.md`, Abfrage-Rezept im RUNBOOK.
+- **Alle Logs, die wir steuern, liegen jetzt in der EU.** Googles
+  Standard-Weiche für Logs zeigte seit dem Start des Projekts auf Googles
+  globale Ablage ohne Regionswahl. Darin lagen nur Betriebsmeldungen ohne
+  Personenbezug für einen Tag, IP-Adressen waren seit 12.08. ausgeschlossen.
+  Seit 09.09.2026 zeigt die Weiche auf einen eigenen Speicher in
+  `europe-west1` mit einem Tag Aufbewahrung. Alle Abfrage-Rezepte im RUNBOOK
+  nennen den Speicher jetzt ausdrücklich, und der Deploy-Riegel prüft Ziel,
+  Aufbewahrung und IP-Ausschluss. Was Google nicht ändern lässt, steht im
+  RUNBOOK unter „Logs und Aufbewahrung" und im Sicherheitsmodell, Punkt 8.
+- **Die Zugangsschlüssel liegen an die EU gebunden.** Die vier Secrets der
+  Functions waren von Google weltweit repliziert. Weil sich das nachträglich
+  nicht ändern lässt, gibt es sie neu mit dem Suffix `_EU` und Bindung an
+  `europe-west1`; der Code liest die neuen Namen. Das Kopieren der Werte
+  erledigt `scripts/geheimnisse-eu-kopieren.sh` im lokalen Terminal, der
+  Deploy-Riegel lässt keinen Deploy zu, solange ein Secret ohne Version ist.
+  Der Mistral-Schlüssel wird dabei erneuert.
 
 ## [4.7.1] — 2026-09-08
 

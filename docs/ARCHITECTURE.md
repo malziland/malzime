@@ -178,7 +178,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 
 | Modul | Verantwortlich fuer |
 |-------|---------------------|
-| `index.js` | Cloud-Function-Exports, Secret-Deklarationen (`ADMIN_SECRET`, `MISTRAL_API_KEY`, `NTFY_*`) |
+| `index.js` | Cloud-Function-Exports, Secret-Deklarationen (`ADMIN_SECRET_EU`, `MISTRAL_API_KEY_EU`, `NTFY_*_EU`, alle an europe-west1 gebunden) |
 | `handle-stats.js` | GET-only Stats-Endpunkt |
 | `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
 | `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |

@@ -326,8 +326,27 @@ case "$BEFUND" in
   *)            rot   "Regionsprüfung NICHT durchgeführt (keine auswertbare Ausgabe) — ungeprüft gilt als nicht bestanden" ;;
 esac
 
-# ── 6. Logging: Routine-Ausschlüsse + Diagnose-Sink ──
+# ── 6. Logging: EU-Speicher, Routine-Ausschlüsse + Diagnose-Sink ──
 echo "— Logging"
+# 09.09.2026: Die Weiche _Default zeigt seit dem Umzug auf unseren Speicher
+# betrieb-eu (europe-west1, 1 Tag). Googles globale Ablage bekommt nichts mehr.
+# Drei Ausfallarten unterscheidbar: nicht messbar, falsches Ziel, falsche
+# Aufbewahrung — sonst sähe ein gescheiterter Aufruf aus wie ein bestandener.
+ZIEL_SOLL="logging.googleapis.com/projects/${PROJECT}/locations/europe-west1/buckets/betrieb-eu"
+ZIEL_IST=$(gcloud logging sinks describe _Default --project="$PROJECT" --format='value(destination)' 2>/dev/null || true)
+if [ -z "$ZIEL_IST" ]; then
+  rot "_Default: Ziel der Log-Weiche NICHT MESSBAR (gcloud lieferte nichts)"
+elif [ "$ZIEL_IST" = "$ZIEL_SOLL" ]; then
+  gruen "_Default: Log-Weiche zeigt auf betrieb-eu (europe-west1)"
+else
+  rot "_Default: Log-Weiche zeigt NICHT auf den EU-Speicher (IST: $ZIEL_IST)"
+fi
+AUFBEWAHRUNG=$(gcloud logging buckets describe betrieb-eu --location=europe-west1 --project="$PROJECT" --format='value(retentionDays)' 2>/dev/null || true)
+case "$AUFBEWAHRUNG" in
+  "")  rot "betrieb-eu: Aufbewahrung NICHT MESSBAR (Speicher fehlt oder gcloud lieferte nichts)" ;;
+  1)   gruen "betrieb-eu: Aufbewahrung 1 Tag (Datenschutz-Zusage)" ;;
+  *)   rot "betrieb-eu: Aufbewahrung ist $AUFBEWAHRUNG Tage, Zusage sagt 1" ;;
+esac
 # AUDIT-BEFUND PRIV-2026-08-12-12: Der _Default-Speicher liegt auf Standort
 # `global` und lässt sich nicht nach Europa verschieben. Einziger Träger von
 # Client-IP-Adressen sind die Cloud-Run-Request-Logs — sie werden deshalb
@@ -359,11 +378,50 @@ for e in daten.get("exclusions", []):
     gruen "_Default: Request-Logs (einziger IP-Träger) vollständig ausgeschlossen"
   fi
 fi
-SINKS=$(gcloud logging sinks list --project="$PROJECT" --format="value(name)" 2>/dev/null || true)
-case " $(printf "%s" "$SINKS" | tr '\n' ' ') " in
-  *" client-diagnostics-sink "*) gruen "Diagnose-Sink »client-diagnostics-sink« vorhanden" ;;
-  *) rot "Diagnose-Sink »client-diagnostics-sink« fehlt" ;;
-esac
+# Der Diagnose-Sink wird am FILTER geprüft, nicht am Namen: Er entscheidet,
+# welche Zeilen 30 Tage bleiben. Jede Zeile darin ist ohne Personenbezug —
+# eine fünfte Bedingung, die hier niemand eingetragen hat, ist ein Befund.
+DIAG_SOLL='jsonPayload.type="client-error" OR jsonPayload.type="client-telemetry" OR jsonPayload.step="mistral-single-large" OR jsonPayload.step="minor-safety"'
+DIAG_IST=$(gcloud logging sinks describe client-diagnostics-sink --project="$PROJECT" --format='value(filter)' 2>/dev/null || true)
+if [ -z "$DIAG_IST" ]; then
+  rot "Diagnose-Sink »client-diagnostics-sink« NICHT MESSBAR oder fehlt"
+elif [ "$DIAG_IST" = "$DIAG_SOLL" ]; then
+  gruen "Diagnose-Sink »client-diagnostics-sink«: Filter wie vereinbart (4 Zeilenarten)"
+else
+  rot "Diagnose-Sink »client-diagnostics-sink«: Filter weicht ab (IST: $DIAG_IST)"
+fi
+
+# ── 6b. Secrets: EU-gebunden und befüllt ──
+echo "— Secrets"
+# 09.09.2026: Die Secrets waren weltweit repliziert (Google-Voreinstellung).
+# Geprüft wird, was der Code tatsächlich verlangt (defineSecret in index.js):
+# jedes dieser Secrets liegt in europe-west1 und hat mindestens eine aktive
+# Version. Ohne Version startet die Function ohne Schlüssel — deshalb ist das
+# ein Deploy-Riegel, kein Hinweis. Rückweg auf einen alten Stand nimmt dessen
+# eigenen Riegel mit.
+SECRET_NAMEN=$(grep -o 'defineSecret("[A-Za-z0-9_-]*")' functions/src/index.js | sed 's/defineSecret("\(.*\)")/\1/' | sort -u)
+if [ -z "$SECRET_NAMEN" ]; then
+  rot "Secrets: keine defineSecret-Deklaration in functions/src/index.js gefunden — Messung unbrauchbar"
+fi
+for SN in $SECRET_NAMEN; do
+  ORT=$(gcloud secrets describe "$SN" --project="$PROJECT" --format='value(replication.userManaged.replicas[0].location)' 2>/dev/null || true)
+  AUTOMATISCH=$(gcloud secrets describe "$SN" --project="$PROJECT" --format='value(replication.automatic)' 2>/dev/null || true)
+  if [ -z "$ORT" ] && [ -z "$AUTOMATISCH" ]; then
+    rot "Secret $SN: NICHT MESSBAR oder nicht vorhanden"
+    continue
+  fi
+  if [ "$ORT" = "europe-west1" ]; then
+    gruen "Secret $SN: an europe-west1 gebunden"
+  else
+    rot "Secret $SN: nicht an europe-west1 gebunden (IST: ${ORT:-automatisch/weltweit})"
+  fi
+  VERSIONEN=$(gcloud secrets versions list "$SN" --project="$PROJECT" --filter="state=enabled" --format='value(name)' 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${VERSIONEN:-0}" -ge 1 ]; then
+    gruen "Secret $SN: $VERSIONEN aktive Version(en)"
+  else
+    rot "Secret $SN: KEINE aktive Version — Functions starten ohne Schlüssel (scripts/geheimnisse-eu-kopieren.sh ausführen)"
+  fi
+done
 
 # ── 7. Alarmweg: existiert er noch, ist er scharf, hat er zustellfähige Kanäle? ──
 # AUDIT-BEFUND OPS-2026-08-12-09: Der Alarmweg hatte keinen Wächter. Die Richtlinie

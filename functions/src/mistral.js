@@ -11,7 +11,7 @@
  *   - Normal/Boost: Mistral Small 4 (text-only, schneller + billiger)
  *   - Fallback pro Profil: Large 3, falls Small 4 nicht parsebares JSON liefert
  *
- * API-Key kommt aus process.env.MISTRAL_API_KEY (Firebase Secret).
+ * API-Key kommt aus process.env.MISTRAL_API_KEY_EU (Firebase Secret, EU-gebunden; lokal MISTRAL_API_KEY).
  */
 
 const { MISTRAL_DESCRIBE_MODEL } = require("./config");

@@ -32,9 +32,10 @@ esac
 
 echo "── Wartungsmodus $AKTION ($BASIS) ──"
 
-SECRET="$(gcloud secrets versions access latest --secret=ADMIN_SECRET --project=malzime 2>/dev/null)"
+# Seit 09.09.2026 liegt das Secret EU-gebunden unter ADMIN_SECRET_EU.
+SECRET="$(gcloud secrets versions access latest --secret=ADMIN_SECRET_EU --project=malzime 2>/dev/null)"
 if [ -z "$SECRET" ]; then
-  echo "ABBRUCH: ADMIN_SECRET nicht lesbar. Angemeldet? (gcloud auth login)" >&2
+  echo "ABBRUCH: ADMIN_SECRET_EU nicht lesbar. Angemeldet? (gcloud auth login) Kopiert? (scripts/geheimnisse-eu-kopieren.sh)" >&2
   exit 2
 fi
 

@@ -116,6 +116,10 @@ const NUR_MINDERJAEHRIG = [
 ];
 
 /* ── Werbe-Anzahl (09.09.2026) ────────────────────────────────────────────
+   BLEIBT IM CODE — Gestaltung, kein Betriebswert: Die Anzahl der Werbekarten
+   ist Teil des Bildschirms, nicht der Last, und der Prompt liest sie von
+   hier; ueber Firestore veraenderbar hiesse, Prompt und Kappung koennten
+   auseinanderlaufen.
    Der Werbe-Aufruf liefert WERBE_ANFORDERUNG Eintraege, gezeigt werden
    hoechstens WERBE_ANZAHL. Grund: Streicht der Filter bei einem Kind zwei
    Eintraege, sah das Kind vorher sechs Werbeideen, ein Erwachsener acht —

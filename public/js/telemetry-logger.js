@@ -10,8 +10,10 @@
 
 import { collectClientContext, coarseUserAgent } from "./client-context.js";
 import { leseRcTicket } from "./rc-ticket.js";
+import { apiUrl } from "./api-basis.js";
 
-const TELEMETRY_ENDPOINT = "/api/telemetry";
+/* Im Betrieb direkt Cloud Run (EU), sonst relativ — siehe api-basis.js. */
+const TELEMETRY_ENDPOINT = apiUrl("/api/telemetry");
 
 export function logTelemetry(eventType, context = {}) {
   try {

@@ -2,6 +2,7 @@
 
 import { initI18n, t, getLanguage, applyTranslations } from "./i18n.js";
 import { initSprachumschalter, merkmalUebernehmen } from "./sprachumschalter.js";
+import { apiUrl } from "./api-basis.js";
 
 /* Projekt-Start: 5. Februar 2026 */
 const PROJECT_START = new Date("2026-02-05");
@@ -105,7 +106,7 @@ function zeichne(data) {
  */
 async function loadStats() {
   try {
-    const res = await fetch("/api/stats");
+    const res = await fetch(apiUrl("/api/stats"));
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
     letzteDaten = data;

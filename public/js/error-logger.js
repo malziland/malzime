@@ -41,8 +41,10 @@
  */
 
 import { collectClientContext, coarseUserAgent } from "./client-context.js";
+import { apiUrl } from "./api-basis.js";
 
-const ERROR_ENDPOINT = "/api/errors";
+/* Im Betrieb direkt Cloud Run (EU), sonst relativ — siehe api-basis.js. */
+const ERROR_ENDPOINT = apiUrl("/api/errors");
 /* Deckel gegen Endlos-Wachstum: Bei einem laengeren Netzausfall koennte sonst
    jeder Poll-Durchgang eine Meldung nachlegen. Die aeltesten fliegen zuerst —
    der juengste Fehler ist der, der zum aktuellen Zustand passt. */

@@ -450,6 +450,31 @@ Schnellster Weg: Firebase Console → Hosting → Release-Verlauf → **Rollback
 (ein Klick, stellt den vorherigen Stand wieder her). Alternativ: früheren Stand wie
 in Hebel 4 auschecken und `firebase deploy --only hosting`.
 
+### 5a. Schnittstellen zurück auf den Hosting-Weg (nur Hosting-Deploy, seit 09.09.2026)
+
+Seit 09.09.2026 ruft der Browser `enqueue`, `job-status`, `stats`, `errors` und
+`telemetry` direkt unter ihren Cloud-Run-Adressen in `europe-west1` auf
+(`public/js/api-basis.js`), nicht mehr über die Hosting-Umleitungen. Die
+Umleitungen in `firebase.json` bleiben genau für diesen Hebel bestehen.
+
+**Bedingung zum Ziehen:** Nach einem Deploy scheitern Analysen mit CORS- oder
+CSP-Fehlern in der Browser-Konsole (`blocked by CORS policy`, `Refused to connect`),
+oder die Live-Smoke-Probe „Direktweg" ist rot, während `/api/stats` über
+`https://malzi.me` weiter antwortet.
+
+**Schritte (~5 min, kein Function-Deploy):**
+
+1. In `public/js/api-basis.js` `DIREKT_AKTIV` auf `false` setzen.
+2. Im Wächter `public/__tests__/api-basis.test.js` die Zusicherung „der direkte
+   Weg ist eingeschaltet" auf `false` drehen und im Kommentar den Grund und das
+   Datum eintragen — der Test ist absichtlich so gebaut, dass ein stiller Rückbau
+   rot wird.
+3. `./scripts/deploy.sh hosting` — die Seite ruft danach wieder `/api/…` über
+   Hosting auf. Browser mit alter `app.js` im Zwischenspeicher laufen ohnehin
+   über die Umleitungen weiter.
+
+Zurück auf den direkten Weg: beides wieder auf `true`, Hosting-Deploy.
+
 ## Störungs-Rezepte
 
 ### ntfy-Fehleralarm („malziME Function Errors")

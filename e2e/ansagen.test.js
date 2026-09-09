@@ -181,7 +181,11 @@ async function baumLesen(page, wo) {
   return zeilen;
 }
 
+/* Gibt den Zustand zurueck, damit der Test den Job-Status unterwegs umstellt,
+   statt den Handler zu tauschen (gleiche Luecke wie im Protokoll-Test, dort
+   erklaert; Pipeline 09.09.2026). */
 async function endpunkte(page, jobStatus) {
+  const zustand = { jobStatus };
   await page.route("**/api/stats", (r) =>
     r.fulfill({
       status: 200,
@@ -198,11 +202,12 @@ async function endpunkte(page, jobStatus) {
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ jobId: "a", resultToken: "t" }) })
   );
   await page.route("**/api/job-status**", (r) =>
-    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jobStatus) })
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(zustand.jobStatus) })
   );
   await page.route("**/nominatim.openstreetmap.org/**", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: "[]" })
   );
+  return zustand;
 }
 
 test.describe("Ansage-Protokoll", () => {
@@ -219,21 +224,14 @@ test.describe("Ansage-Protokoll", () => {
 
   test("Analyse: welche Ansagen von selbst kommen", async ({ page }) => {
     await ansagenMitschreiben(page, "Analyse");
-    await endpunkte(page, { status: "queued", position: 3, etaSeconds: 45 });
+    const zustand = await endpunkte(page, { status: "queued", position: 3, etaSeconds: 45 });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/");
     await page.waitForTimeout(600);
     await page.click('[data-demo="selfie"]');
     await page.waitForTimeout(5000);
 
-    await page.unroute("**/api/job-status**");
-    await page.route("**/api/job-status**", (r) =>
-      r.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ status: "done", result: PROFIL }),
-      })
-    );
+    zustand.jobStatus = { status: "done", result: PROFIL };
     await page.waitForTimeout(6000);
 
     await baumLesen(page, "Profil fertig");

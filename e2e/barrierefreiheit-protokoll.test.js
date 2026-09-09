@@ -165,7 +165,16 @@ function statsAntwort(zusatz = {}) {
   };
 }
 
+/* Gibt den Job-Status-Zustand zurueck, damit ein Test ihn UNTERWEGS umstellen
+   kann (`zustand.jobStatus = ...`). Vorher wurde dafuer der Handler getauscht
+   (`unroute` + `route`): Zwischen beiden Aufrufen ist die Route kurz offen, und
+   ein Poll, der genau dann kommt, geht an den Testserver — der antwortet mit
+   404 „File not found". Die Seite nimmt 404 zu Recht als „Job weg" und bricht
+   ab. In der Pipeline vom 09.09.2026 (Lauf 34385356776, WebKit) traf der
+   zweite Poll genau dieses Fenster; mit einem einzigen Handler, der bei jeder
+   Anfrage den aktuellen Zustand liest, gibt es das Fenster nicht mehr. */
 async function endpunkteStellen(page, { jobStatus = { status: "done", result: PROFIL } } = {}) {
+  const zustand = { jobStatus };
   await page.route("**/api/stats", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(statsAntwort()) })
   );
@@ -177,12 +186,13 @@ async function endpunkteStellen(page, { jobStatus = { status: "done", result: PR
     })
   );
   await page.route("**/api/job-status**", (r) =>
-    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(jobStatus) })
+    r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(zustand.jobStatus) })
   );
   await page.route("**/nominatim.openstreetmap.org/**", (r) =>
     r.fulfill({ status: 200, contentType: "application/json", body: "[]" })
   );
   await page.route("**/tile.openstreetmap.org/**", (r) => r.fulfill({ status: 200, body: "" }));
+  return zustand;
 }
 
 /**
@@ -1111,7 +1121,7 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
   });
 
   test("Warteschlange und Live-Text", async ({ page }) => {
-    await endpunkteStellen(page, {
+    const endpunkte = await endpunkteStellen(page, {
       jobStatus: { status: "queued", position: 3, etaSeconds: 45 },
     });
     await page.goto("/");
@@ -1125,14 +1135,9 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
     await expect(page.locator("#scanText")).not.toBeEmpty({ timeout: 20000 });
     await messen(page, "Warteschlange", "wartend mit Position und Restzeit");
 
-    await page.unroute("**/api/job-status**");
-    await page.route("**/api/job-status**", (r) =>
-      r.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ status: "processing", liveText: "Du bist vermutlich Mitte zwanzig und " }),
-      })
-    );
+    /* Umschalten ohne Handler-Tausch — kein Fenster, in dem ein Poll an den
+       Testserver ginge (siehe endpunkteStellen). */
+    endpunkte.jobStatus = { status: "processing", liveText: "Du bist vermutlich Mitte zwanzig und " };
     /* NICHT `locator("#a, #b").first()` — das waehlt nach Reihenfolge im
        Dokument, nicht nach "das mit Inhalt". Sobald die Verarbeitung beginnt,
        wird #scanText geleert und der Text steht in #liveTextFest; .first()

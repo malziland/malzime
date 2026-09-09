@@ -33,7 +33,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   sich das nachträglich nicht ändern lässt, gibt es sie neu mit Bindung an
   `europe-west1`; der Code liest die neuen Namen. Der Deploy-Riegel lässt
   keinen Deploy zu, solange eines davon leer ist. Der Mistral-Schlüssel wurde
-  dabei erneuert.
+  dabei erneuert. Die vier alten Einträge ohne EU-Bindung wurden am 09.09.2026 entfernt; ein Rückweg auf 4.7.1 bräuchte sie unter den alten Namen neu.
 - **Kinder sehen dieselbe Anzahl Werbeideen wie Erwachsene.** Der Werbe-Aufruf
   liefert jetzt zehn Einträge statt sechs bis acht, gezeigt werden höchstens
   acht. Streicht der Kinderschutz-Filter bei einem erkennbar Minderjährigen ein
@@ -60,6 +60,11 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   die Aufbewahrung, den IP-Ausschluss, den Filter des Diagnose-Speichers und die
   EU-Bindung der Geheimnisse. Cloud-Build-Protokolle landen künftig im
   EU-Speicher.
+- **Der Push-Server für Alarme ist an die EU gebunden.** Sein Passwort liegt
+  seit dem 09.09.2026 in einem Geheimnis, das nur in `europe-west1` repliziert
+  wird; der alte, weltweit replizierte Eintrag ist entfernt. Bilder und
+  Bau-Protokolle des Servers landen künftig in `europe-west1`; die Auslieferung
+  läuft über ein Skript im Bau-Repository statt über Handbefehle.
 - **Bau-Protokolle des Push-Servers landen im EU-Speicher.** Bis zum
   09.09.2026 legte Cloud Build sie standardmäßig in einem Google-eigenen
   Speicher ohne Regionswahl ab: neun Protokolle mit Bau-Schritten und

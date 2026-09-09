@@ -8,8 +8,8 @@
 # anzuzeigen, ohne sie in eine Datei zu schreiben, ohne sie zu protokollieren.
 #
 # Übersprungen wird jedes _EU-Secret, das schon eine aktive Version hat. So
-# bleibt der NEUE Mistral-Schlüssel, den der Betreiber am 09.09.2026 direkt
-# eingetragen hat, unangetastet; der alte Schlüssel wird nicht mitkopiert.
+# bleibt der NEUE Mistral-Schlüssel, der am 09.09.2026 direkt eingetragen
+# wurde, unangetastet; der alte Schlüssel wird nicht mitkopiert.
 #
 # Ausführen (im eigenen Terminal, mit angemeldetem gcloud-Konto):
 #   sh scripts/geheimnisse-eu-kopieren.sh

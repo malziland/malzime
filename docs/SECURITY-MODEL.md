@@ -109,21 +109,21 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    veröffentlicht.
 8. **Betriebs-Logs liegen seit 09.09.2026 in `europe-west1`** (Rest von
    `PRIV-2026-08-12-12`, erledigt). Googles Standard-Ablage `_Default` ist fest
-   auf `global`; am 12.08. wurde nur der personenbezogene Teil entfernt
+   auf `global`. Am 12.08. wurde der personenbezogene Teil entfernt
    (Cloud-Run-Request-Logs, einziger IP-Träger, Ausschluss
-   `exclude_run_requests_ip`, vom Deploy-Riegel bewacht) und der Rest als
-   Restrisiko hier notiert — mit der Begründung, dass `gcloud logging read` nach
-   einem Umhängen der Weiche ohne Zusatzangaben nichts mehr fände. *Das war eine
-   Alleinentscheidung der Assistenz ohne Vorlage an den Eigentümer.* Der
-   Eigentümer hat am 09.09.2026 entschieden: Alles liegt in der EU, keine
-   Aufweichung. Seither zeigt die Weiche `_Default` auf den eigenen Speicher
-   `betrieb-eu` (europe-west1, 1 Tag); alle Rezepte im RUNBOOK nennen den
-   Speicher ausdrücklich, und der Deploy-Riegel prüft Ziel, Aufbewahrung und
-   Ausschluss. *Was bleibt und nicht änderbar ist:* Googles Pflichtprotokoll
-   `_Required` (global, 400 Tage) mit unseren eigenen Verwaltungszugriffen, und
-   die Alarm-Kanäle mit unserer Adresse. Keine Nutzerdaten. *Regel
-   daraus:* Jede Abwägung, die eine Zusage nach außen berührt, wird dem
-   Eigentümer als Entscheidung vorgelegt, nie nur hier notiert.
+   `exclude_run_requests_ip`, vom Deploy-Riegel bewacht); der Rest blieb als
+   Restrisiko stehen, mit der Begründung, dass `gcloud logging read` nach einem
+   Umhängen der Weiche ohne Zusatzangaben nichts mehr fände. Diese Abwägung
+   wurde am 09.09.2026 verworfen: Die Zusage „alles auf EU-Servern" gilt ohne
+   Ausnahme für alles, was wir steuern können. Seither zeigt die Weiche
+   `_Default` auf den eigenen Speicher `betrieb-eu` (europe-west1, 1 Tag); alle
+   Rezepte im RUNBOOK nennen den Speicher ausdrücklich, und der Deploy-Riegel
+   prüft Ziel, Aufbewahrung und Ausschluss. *Was bleibt und nicht änderbar
+   ist:* Googles Pflichtprotokoll `_Required` (global, 400 Tage) mit unseren
+   eigenen Verwaltungszugriffen, und die Alarm-Kanäle mit unserer Adresse.
+   Keine Nutzerdaten. *Regel daraus:* Jede Abwägung, die eine Zusage nach
+   außen berührt, wird als Entscheidung vorgelegt und dort getroffen, nie nur
+   hier notiert.
 9. **Der Upload-Rumpf landet vor jeder App-Prüfung im Speicher.**
    (`SEC-2026-08-13-B`) Die Cloud-Functions-Laufzeit liest den Request-Body
    vollständig als `req.rawBody` ein, bevor `handle-enqueue.js` läuft — eine
@@ -412,7 +412,7 @@ Hosting ist ein weltweites Auslieferungsnetz (Fastly); der Standort-Inventar-Lau
 vom 09.09.2026 maß den Transit über einen Knoten in Wien. Damit passierte auch
 das komprimierte Foto einen Knoten dieses Netzes, bevor es den Server in Belgien
 erreichte — ohne Speicherung (`cache-control: no-cache`), aber als Umweg, den
-die Zusage „alles auf EU-Servern" nicht kennt. Der Eigentümer hat entschieden:
+die Zusage „alles auf EU-Servern" nicht kennt. Entscheidung vom 09.09.2026:
 kein Umweg.
 
 **Entscheidung.** Der Browser ruft `enqueue`, `job-status`, `stats`, `errors`

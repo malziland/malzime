@@ -293,3 +293,22 @@ test("Problemfall zu grosse Datei (ueber 25 MB): Meldung vor jedem Lesen", async
   await expect(page.locator("#status")).toContainText(/zu groß|too large|25 MB/i, { timeout: 15000 });
   expect(gefangen).toHaveLength(0);
 });
+
+/* Wettlauf-Probe (Pipeline-Lauf 34379594749, 09.09.2026): Der Fall „leer.jpg"
+   wurde im Firefox rot, weil die Datei gesetzt wurde, BEVOR die Seite ihren
+   Datei-Handler verdrahtet hatte — der stand hinter dem Warten auf die
+   Uebersetzung. Auf der Pipeline ist das Last, im Schul-WLAN ein Kind, das
+   ein Foto waehlt, waehrend die Sprachdatei noch laedt. Hier wird die
+   Sprachdatei kuenstlich um 2,5 s verzoegert und die Datei sofort gesetzt. */
+test("Problemfall Datei vor der Uebersetzung gewaehlt: die Wahl verpufft nicht", async ({ page }) => {
+  await page.route("**/locales/*.json", async (r) => {
+    await new Promise((weiter) => globalThis.setTimeout(weiter, 2500));
+    await r.continue();
+  });
+  const { gefangen } = await seiteMitAbgefangenerEinreihung(page);
+  await upload(page, "leer.jpg", "image/jpeg");
+  await expect(page.locator("#status")).toContainText(/nicht geöffnet werden|couldn.t be opened/i, {
+    timeout: 15000,
+  });
+  expect(gefangen).toHaveLength(0);
+});

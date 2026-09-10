@@ -609,7 +609,19 @@ async function renderQueueResult(data, myId, traceId, timings) {
        der Live-Karte („das wirkt irgendwie unnatürlich", Live-Test 11.08.).
        Ohne Live-Lauf bleibt das alte Verhalten unverändert. */
     if (!liveEnthuellung) window.scrollTo({ top: 0, behavior: "smooth" });
+    /* Fokus auf das Ergebnis, damit Screenreader dort weiterlesen — aber nur,
+       wenn niemand ihn inzwischen selbst bewegt hat.
+       BUG-2026-09-10-01: Bis 4.8.1 zog dieser Zeitgeber den Fokus in JEDEM
+       Fall auf den Ergebnisbereich. Wer in den 300 ms schon den Beast-
+       Umschalter angesteuert hatte, verlor ihn mitten im Tastendruck: Die
+       Leertaste ging am Schalter runter und am Ergebnisbereich hoch, und der
+       Schalter blieb stehen. Nachgestellt mit angehaltener Uhr (e2e/a11y-
+       fokus-nach-ergebnis.test.js); in der Pipeline dreimal als roter
+       Tastatur-Test (30.08., 01.09., 10.09.). */
+    const fokusBeimRendern = document.activeElement;
     setTimeout(() => {
+      const jetzt = document.activeElement;
+      if (jetzt !== fokusBeimRendern && jetzt !== document.body) return;
       if (elements.resultsPanel) elements.resultsPanel.focus({ preventScroll: true });
     }, 300);
     const meta = data.meta || {};

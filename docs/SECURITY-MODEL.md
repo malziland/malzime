@@ -314,8 +314,9 @@ abgerissene Verbindungen  94  ->  0
 **Entscheidung.** Kann eine Function den Einstellungssatz (`config/betriebsprofil`)
 gerade nicht lesen — Zeitlimit, Verbindung, kurze Störung —, protokolliert
 `betriebsprofil.js` das als WARNING, nicht als ERROR. Der Aufräumer, der jede
-Minute liest, alarmiert erst, wenn zwei Läufe hintereinander ohne Betriebswerte
-bleiben. Ein fehlendes, unbenanntes oder abgelehntes Dokument bleibt sofort ERROR.
+Minute liest, alarmiert erst, wenn fünf Läufe hintereinander ohne Betriebswerte
+bleiben (07.–10.09.2026: zwei). Ein fehlendes, unbenanntes oder abgelehntes
+Dokument bleibt sofort ERROR.
 
 **Begründung.** Am 07.09.2026 um 17:37 löste ein einzelner träger Zugriff zwei
 Alarme aus (E-Mail und Push), obwohl der Lauf eine Minute später gesund war und
@@ -324,6 +325,14 @@ Alarme, die etwas bedeuten — und in einem Workshop entscheidet dieses Vertraue
 ob jemand hinschaut. Ein Lesefehler heilt sich beim nächsten Aufruf von selbst
 (der Cache hält Fehlschläge nicht fest); ein kaputtes Dokument nicht — deshalb
 die Trennung nach Grund, nicht nach Ort.
+
+**Nachschärfung 10.09.2026: fünf statt zwei Läufe.** Um 11:18 und 11:19 Wien
+blieben zwei Läufe direkt hintereinander ohne Betriebswerte, der dritte war
+gesund, niemand betroffen — wieder Alarm. Firestore beantwortete in diesen
+Minuten laut Googles Messwerten jede Anfrage in höchstens 0,15 s; die zwei
+Sekunden gingen zwischen Function und Datenbank verloren. Fünf Minuten
+Verzögerung sind für diesen Alarm unschädlich, weil er nur die Reserve ist:
+Jede Analyse ohne Betriebswerte meldet sich sofort selbst.
 
 **Betrachtete Alternative.** Das Zeitlimit von zwei Sekunden anheben. Verworfen:
 Das Limit sitzt im Analysepfad, und jede Sekunde mehr wäre eine Sekunde, die
@@ -334,16 +343,18 @@ bis zu fünfmal zwei Sekunden; ein weiterer Versuch verlängerte nur das, und de
 nächste Lauf kommt ohnehin 60 Sekunden später.
 
 **Was weiterhin alarmiert.** Jede Analyse, die ohne Betriebswerte abbricht
-(`kein-einstellungssatz` in `handle-process-job.js`), zwei Aufräumer-Läufe in
-Folge (`betriebswerte-wiederholt-nicht-lesbar`), jedes kaputte Dokument. Ein
-Dauerausfall von Firestore fällt damit spätestens nach zwei Minuten auf.
+(`kein-einstellungssatz` in `handle-process-job.js`) — sofort; fünf
+Aufräumer-Läufe in Folge (`betriebswerte-wiederholt-nicht-lesbar`); jedes
+kaputte Dokument. Ein Dauerausfall von Firestore fällt damit sofort auf, wenn
+jemand analysiert, und sonst spätestens nach fünf Minuten.
 
 **Bedingung für Neubewertung.** Warnungen `reap-query-ohne-betriebswerte` in
 mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
 (Abfrage im RUNBOOK; ein einzelner träger Lauf erzeugt bis zu fünf Warnungen
 in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
 sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
-verschoben.
+verschoben. Stand 10.09.2026: drei Minuten an diesem Tag (10:55, 11:18, 11:19
+Wien) — an der Grenze, nicht darüber.
 
 ## HEIC-Fotos im Browser öffnen: WebAssembly und LGPL (08.09.2026)
 

@@ -128,12 +128,15 @@ test("Tastatur: Demo-Foto → Profil, nur mit Tab + Enter", async ({ page }) => 
      weiterhin, was er messen soll. Und er trennt die beiden Handgriffe nicht
      mehr, zwischen denen der Fokus verlorengehen konnte.
 
-     WAS NICHT BELEGT IST: dass genau DAS die Ursache des Flackerns war. Lokal
-     lief der alte Test achtmal gruen, auch mit englischem Browser; der
-     Fehlschlag trat nur in der Pipeline unter Last auf und liess sich nicht
-     nachstellen. Sollte er wiederkommen, ist die naechste Spur die
-     Konkurrenz um dieselbe Maschine — seit dem 31.08. bricht ein neuer Push
-     die vorigen Laeufe ab, was diese Last deutlich senkt. */
+     URSACHE GEFUNDEN (10.09.2026): Es war nicht der Test, sondern die Seite.
+     300 ms nach dem Ergebnis setzte api.js den Fokus bedingungslos auf den
+     Ergebnisbereich. Fiel das zwischen Druecken und Loslassen der Leertaste,
+     ging die Taste am Schalter runter und am Ergebnisbereich hoch — der
+     Schalter blieb stehen. Unter Last in der Pipeline traf der Test dieses
+     Fenster (30.08., 01.09., 10.09. zweimal in Folge), lokal fast nie. Seit
+     BUG-2026-09-10-01 laesst die Seite den Fokus dort, wo man ihn selbst
+     hingesetzt hat; e2e/a11y-fokus-nach-ergebnis.test.js stellt genau diesen
+     Fall mit angehaltener Uhr nach. */
   await page.locator("#biasSwitch").press("Space");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
 });

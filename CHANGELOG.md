@@ -4,6 +4,34 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Ein kurzer Hänger beim Lesen der Betriebswerte löst keinen Alarm mehr
+  aus.** Der Aufräumer meldet sich erst, wenn er fünf Minuten hintereinander
+  nicht an die Betriebswerte kommt, bisher nach zwei. Am 10.09. hatten zwei
+  träge Lesevorgänge in Folge einen Alarm per E-Mail und Push ausgelöst,
+  obwohl niemand betroffen war und die Datenbank selbst schnell antwortete.
+  Ein echter Ausfall bleibt nicht still: Jede Analyse ohne Betriebswerte
+  meldet sich weiterhin sofort selbst als Fehler.
+- **Abhängigkeiten angehoben (PR #240, #236):** `@google-cloud/tasks`
+  6.3.0 → 7.0.0 im Server — einzige angekündigte Bruchstelle ist „mindestens
+  Node 22", die Functions laufen auf Node 24; dass unser Code die Bibliothek
+  weiterhin laden kann, ist eigens gemessen, weil die Tests sie durch eine
+  Attrappe ersetzen. `actions/upload-artifact` 4.6.2 → 7.0.1 in der Pipeline,
+  wo es bei roten Browser-Tests die Fehlerbilder sichert.
+
+### Behoben
+
+- **Ein Tastendruck direkt nach dem Ergebnis geht nicht mehr verloren.** Die
+  Seite setzt den Fokus kurz nach dem Ergebnis auf den Ergebnisbereich, damit
+  ein Screenreader dort weiterliest. Bisher tat sie das auch dann, wenn man
+  schon selbst etwas angesteuert hatte, etwa den Beast-Umschalter — ein
+  Tastendruck in diesem Moment verpuffte. Jetzt bleibt der Fokus dort, wo man
+  ihn selbst hingesetzt hat. In der Pipeline zeigte sich das seit dem 30.08.
+  mehrfach als roter Tastatur-Test.
+
 ## [4.8.1] — 2026-09-09
 
 ### Behoben

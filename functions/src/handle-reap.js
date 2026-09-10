@@ -65,13 +65,19 @@ const { releaseHourlySlot } = require("./counter");
    die Laeufe in Folge. */
 /* Laeufe hintereinander, in denen mindestens eine Abfrage ohne Betriebswerte
    blieb. Lebt in der Instanz; ein Instanzwechsel setzt auf null — dann
-   alarmiert ein Dauerzustand eine Minute spaeter, nicht gar nicht. */
+   alarmiert ein Dauerzustand spaeter, nicht gar nicht. */
 let laeufeOhneBetriebswerte = 0;
 /* BLEIBT IM CODE — Schutzgrenze der Alarmierung, keine Betriebseinstellung:
-   Sie haengt am Minutentakt des Aufraeumers, nicht an Last oder Modell. Zwei
-   Laeufe sind zwei Minuten — ein Ausrutscher bleibt still, ein Dauerzustand
-   nicht. */
-const LAEUFE_BIS_ALARM = 2;
+   Sie haengt am Minutentakt des Aufraeumers, nicht an Last oder Modell. Fuenf
+   Laeufe sind fuenf Minuten — ein Ausrutscher bleibt still, ein Dauerzustand
+   nicht.
+   BELEG fuer fuenf statt zwei (10.09.2026, 11:18 und 11:19 Wien): zwei traege
+   Lesevorgaenge direkt hintereinander, der Lauf danach gesund, niemand
+   betroffen — und trotzdem Alarm. Firestore selbst beantwortete in diesen
+   Minuten laut Googles Messwerten jede Anfrage in hoechstens 0,15 s. Fuer
+   diesen Alarm sind fuenf Minuten unschaedlich: Er ist die Reserve fuer die
+   Zeit, in der niemand analysiert. */
+const LAEUFE_BIS_ALARM = 5;
 
 async function sicherFinden(name, fn, lauf) {
   try {
@@ -229,8 +235,8 @@ async function reapJobs() {
      Schwelle 9 Tage: ein ausgefallener Montag allein loest noch nichts aus. */
   await pruefeErinnerungsLebenszeichen();
 
-  /* Ohne Betriebswerte in ZWEI Laeufen hintereinander ist es kein Ausrutscher
-     mehr — dann alarmieren, jede Minute erneut, bis es wieder geht. Ein
+  /* Ohne Betriebswerte in LAEUFE_BIS_ALARM Laeufen hintereinander ist es kein
+     Ausrutscher mehr — dann alarmieren, jede Minute erneut, bis es wieder geht. Ein
      gesunder Lauf setzt die Zaehlung zurueck (KERN 4: die Pruefung kann sich
      erholen). */
   if (lauf.ohneBetriebswerte) {

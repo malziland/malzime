@@ -578,17 +578,21 @@ Einträge gestrichen, nachgefüllt wird nichts.
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
 
 **Was passiert ist:** Der Aufräumer liest jede Minute den Einstellungssatz
-(`config/betriebsprofil`). Kam er in ZWEI Läufen hintereinander nicht heran,
+(`config/betriebsprofil`). Kam er in FÜNF Läufen hintereinander nicht heran,
 meldet er das mit `severity: ERROR` und der Anzahl der Läufe in Folge — und
-zwar jede Minute erneut, bis es wieder geht. EIN Lauf ohne Betriebswerte ist
-seit 07.09.2026 nur eine Warnung (`reap-query-ohne-betriebswerte:<abfrage>`):
-Am 07.09. hatte ein einzelner träger Datenbankzugriff zwei Alarme ausgelöst,
-obwohl der Lauf eine Minute später gesund war.
+zwar jede Minute erneut, bis es wieder geht. Weniger Läufe in Folge sind nur
+Warnungen (`reap-query-ohne-betriebswerte:<abfrage>`). Die Grenze lag bis
+07.09.2026 bei einem Lauf, dann bei zwei, seit 10.09.2026 bei fünf: Beide Male
+hatte ein kurzer Hänger Alarm ausgelöst, obwohl der nächste Lauf gesund war und
+niemand betroffen. Am 10.09. beantwortete Firestore laut Googles eigenen
+Messwerten jede Anfrage in höchstens 0,15 s — die zwei Sekunden gingen auf dem
+Weg zwischen Function und Datenbank verloren, nicht in der Datenbank.
 
-**Ist das schlimm?** Zwei Minuten ohne Betriebswerte heißen: Firestore
+**Ist das schlimm?** Fünf Minuten ohne Betriebswerte heißen: Firestore
 antwortet nicht in zwei Sekunden, oder das Dokument ist weg. Dann laufen auch
-keine Analysen — jede betroffene meldet sich selbst als Fehler
-(`kein-einstellungssatz` in `process-job`).
+keine Analysen — jede betroffene meldet sich sofort selbst als Fehler
+(`kein-einstellungssatz` in `process-job`). Dieser Alarm hier ist die Reserve
+für die Zeit, in der niemand analysiert.
 
 **Was tun:** Firestore-Status und das Dokument prüfen
 (`scripts/betriebsprofil-vergleichen.js` zeigt, ob es da ist und zum Repo

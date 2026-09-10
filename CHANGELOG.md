@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Ein kurzer Hänger beim Lesen der Betriebswerte löst keinen Alarm mehr
+  aus.** Der Aufräumer meldet sich erst, wenn er fünf Minuten hintereinander
+  nicht an die Betriebswerte kommt, bisher nach zwei. Am 10.09. hatten zwei
+  träge Lesevorgänge in Folge einen Alarm per E-Mail und Push ausgelöst,
+  obwohl niemand betroffen war und die Datenbank selbst schnell antwortete.
+  Ein echter Ausfall bleibt nicht still: Jede Analyse ohne Betriebswerte
+  meldet sich weiterhin sofort selbst als Fehler.
+
 ## [4.8.1] — 2026-09-09
 
 ### Behoben

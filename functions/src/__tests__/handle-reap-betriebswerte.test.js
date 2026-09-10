@@ -9,10 +9,13 @@
  * meldete. Ein Alarm, der nichts bedeutet, kostet das Vertrauen in die
  * Alarme, die etwas bedeuten.
  *
- * Regel seitdem: Fehlen die Betriebswerte in EINEM Lauf, ist das eine
- * Warnung. Fehlen sie in ZWEI Laeufen hintereinander (= zwei Minuten), ist es
- * ein Fehler und alarmiert. Alle anderen Abfragefehler (fehlender Index,
- * Berechtigung, Firestore-Stoerung) alarmieren weiter sofort — wie bisher.
+ * Regel seitdem: Fehlen die Betriebswerte in einzelnen Laeufen, ist das eine
+ * Warnung. Erst in FUENF Laeufen hintereinander (= fuenf Minuten) ist es ein
+ * Fehler und alarmiert. Bis 10.09.2026 waren es zwei — an dem Tag blieben um
+ * 11:18 und 11:19 Wien zwei Laeufe in Folge ohne Werte, der dritte war gesund,
+ * niemand betroffen, und trotzdem ging Alarm raus. Alle anderen Abfragefehler
+ * (fehlender Index, Berechtigung, Firestore-Stoerung) alarmieren weiter
+ * sofort — wie bisher.
  */
 
 jest.mock("../jobs", () => ({
@@ -96,10 +99,19 @@ describe("Reaper ohne Betriebswerte (07.09.2026)", () => {
     expect(warnungen[0].message).toContain("Zeitlimit 2000 ms");
   });
 
-  test("ZWEI Laeufe hintereinander ohne Betriebswerte: Fehler mit Anzahl — das alarmiert", async () => {
+  test("VIER Laeufe hintereinander ohne Betriebswerte: noch kein Fehler (Fall vom 10.09.2026 mit Luft)", async () => {
     jobs.findAbandonedJobs.mockRejectedValue(ohneBetriebswerte());
 
-    await reapJobs();
+    for (let i = 0; i < 4; i += 1) await reapJobs();
+
+    expect(fehler).not.toHaveBeenCalled();
+    expect(zeilen(warnung)).toHaveLength(4);
+  });
+
+  test("FUENF Laeufe hintereinander ohne Betriebswerte: Fehler mit Anzahl — das alarmiert", async () => {
+    jobs.findAbandonedJobs.mockRejectedValue(ohneBetriebswerte());
+
+    for (let i = 0; i < 4; i += 1) await reapJobs();
     expect(fehler).not.toHaveBeenCalled();
     await reapJobs();
 
@@ -109,23 +121,32 @@ describe("Reaper ohne Betriebswerte (07.09.2026)", () => {
       severity: "ERROR",
       step: "reap",
       error: "betriebswerte-wiederholt-nicht-lesbar",
-      laeufeInFolge: 2,
+      laeufeInFolge: 5,
     });
     expect(typeof fehlerZeilen[0].hinweis).toBe("string");
   });
 
-  test("ein gesunder Lauf dazwischen setzt die Zaehlung zurueck", async () => {
-    jobs.findAbandonedJobs
-      .mockRejectedValueOnce(ohneBetriebswerte())
-      .mockResolvedValueOnce([])
-      .mockRejectedValueOnce(ohneBetriebswerte());
+  test("bleibt es dabei, alarmiert jeder weitere Lauf erneut", async () => {
+    jobs.findAbandonedJobs.mockRejectedValue(ohneBetriebswerte());
 
-    await reapJobs();
-    await reapJobs();
-    await reapJobs();
+    for (let i = 0; i < 6; i += 1) await reapJobs();
+
+    expect(zeilen(fehler).map((z) => z.laeufeInFolge)).toEqual([5, 6]);
+  });
+
+  test("ein gesunder Lauf dazwischen setzt die Zaehlung zurueck", async () => {
+    /* Vier Ausfaelle, ein gesunder Lauf, wieder vier: Ohne Zuruecksetzen
+       stuende der Zaehler bei acht und haette laengst alarmiert. */
+    const antworten = [...Array(4).fill("fehlt"), "gesund", ...Array(4).fill("fehlt")];
+    for (const a of antworten) {
+      if (a === "fehlt") jobs.findAbandonedJobs.mockRejectedValueOnce(ohneBetriebswerte());
+      else jobs.findAbandonedJobs.mockResolvedValueOnce([]);
+    }
+
+    for (let i = 0; i < antworten.length; i += 1) await reapJobs();
 
     expect(fehler).not.toHaveBeenCalled();
-    expect(zeilen(warnung)).toHaveLength(2);
+    expect(zeilen(warnung)).toHaveLength(8);
   });
 
   test("scheitern mehrere Abfragen im selben Lauf, zaehlt der Lauf EINMAL", async () => {

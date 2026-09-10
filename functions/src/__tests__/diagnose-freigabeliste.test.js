@@ -95,3 +95,24 @@ test("handle-telemetry liest genau die Felder seiner Freigabeliste (ohne Realita
   const normalweg = LISTE_TELEMETRIE.filter((f) => !f.startsWith("stufen.") && f !== "score");
   expect(blattpfade(gelesen)).toEqual([...normalweg].sort());
 });
+
+/* Das Bindeglied zur Deckungspruefung im Frontend (10.09.2026). Sie liest die
+   Felder aus ihrer Zuordnungstabelle statt aus den Handlern, weil diese
+   Server-Pakete (firebase-admin) brauchen, die der Frontend-Job der Pipeline
+   nicht installiert. Damit die Kette trotzdem geschlossen bleibt, muss die
+   Tabelle GENAU die Freigabelisten enthalten: ein neues Feld im Handler ohne
+   Tabelleneintrag ist hier rot, ein Tabelleneintrag ohne Feld ebenso. */
+describe("Zuordnungstabelle der Deckungspruefung = Freigabelisten", () => {
+  const TABELLE = require("../../../public/__tests__/fixtures/datenschutz-deckung.json");
+
+  test.each([
+    ["handle-errors", LISTE_ERRORS],
+    ["handle-telemetry", LISTE_TELEMETRIE],
+  ])("%s: Tabelle und Freigabeliste nennen dieselben Felder", (handler, liste) => {
+    const inTabelle = Object.keys(TABELLE.felder[handler] || {}).sort();
+    /* Messmittel-Kontrolle: Eine leere Tabelle waere mit einer leeren Liste
+       "gleich". */
+    expect(liste.length).toBeGreaterThan(10);
+    expect(inTabelle).toEqual([...liste].sort());
+  });
+});

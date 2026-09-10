@@ -10,10 +10,14 @@
    (a) Jede Zeilenart im Filter des 30-Tage-Speichers braucht einen Eintrag in
        fixtures/datenschutz-deckung.json mit einem Stichwort, das im
        Datenschutztext steht.
-   (b) Jedes Feld, das die Diagnose-Endpunkte annehmen (`_freigabeliste` in
-       handle-errors.js und handle-telemetry.js), braucht dort ebenfalls einen
-       Eintrag. Dass die Liste vollstaendig ist, belegt
-       functions/src/__tests__/diagnose-freigabeliste.test.js am echten Handler.
+   (b) Jedes Feld, das die Diagnose-Endpunkte annehmen, braucht dort ebenfalls
+       einen Eintrag mit Stichwort. Die Felder stehen in der Tabelle selbst;
+       dass sie GENAU der `_freigabeliste` von handle-errors.js und
+       handle-telemetry.js entsprechen und der Handler kein weiteres Feld
+       liest, belegt functions/src/__tests__/diagnose-freigabeliste.test.js.
+       Dort, nicht hier: Die Handler brauchen Server-Pakete (firebase-admin),
+       die der Frontend-Job der Pipeline nicht installiert (10.09.2026: lokal
+       gruen, in der Pipeline "Cannot find module").
 
    Ein neuer Filter-Eintrag, ein neues Feld oder ein gestrichener Satz im Text
    macht diese Pruefung rot. GRENZE: Das Stichwort muss irgendwo im Text
@@ -28,11 +32,9 @@ import { describe, test, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRequire } from "node:module";
 import { JSDOM } from "jsdom";
 
 const WURZEL = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const ladeCjs = createRequire(import.meta.url);
 
 const lies = (pfad) => readFileSync(join(WURZEL, pfad), "utf8");
 
@@ -67,8 +69,8 @@ const SOLL = leseSoll("scripts/verify-infrastructure.sh", "DIAG_SOLL");
 const ARTEN = SOLL.length === 1 ? zeilenarten(SOLL[0]) : [];
 
 const FREIGABE = {
-  "handle-errors": ladeCjs("../../functions/src/handle-errors.js")._freigabeliste,
-  "handle-telemetry": ladeCjs("../../functions/src/handle-telemetry.js")._freigabeliste,
+  "handle-errors": Object.keys(DECKUNG.felder["handle-errors"] || {}),
+  "handle-telemetry": Object.keys(DECKUNG.felder["handle-telemetry"] || {}),
 };
 
 describe("(a) 30-Tage-Speicher: jede Zeilenart steht im Datenschutztext", () => {
@@ -101,7 +103,7 @@ describe("(a) 30-Tage-Speicher: jede Zeilenart steht im Datenschutztext", () => 
 });
 
 describe("(b) Diagnose-Endpunkte: jedes angenommene Feld steht im Datenschutztext", () => {
-  test("die Freigabelisten sind geladen (Messmittel-Kontrolle)", () => {
+  test("die Feldlisten der Tabelle sind gelesen (Messmittel-Kontrolle)", () => {
     expect(FREIGABE["handle-errors"]).toContain("traceId");
     expect(FREIGABE["handle-telemetry"]).toContain("meta.subject");
   });

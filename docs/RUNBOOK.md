@@ -445,6 +445,23 @@ git worktree remove /tmp/malzime-rollback
 
 Das Haupt-Arbeitsverzeichnis bleibt dabei unberührt.
 
+**Rollback auf 4.8.2 oder früher (seit 4.9.0, 10.09.2026).** Diese Fassungen
+lesen im Einstellungssatz drei Felder, die 4.9.0 entfernt hat
+(`describeMaxTokens`, `profileMaxTokens`, `tokenAbstandKleinMs`), und fallen
+ohne das Flag `useSingleLargeCall` auf den ausgebauten Drei-Aufruf-Weg zurück.
+Ohne Vorbereitung liefe nach dem Rollback keine Analyse (Grund im Protokoll:
+„describeMaxTokens fehlt"). Deshalb VOR dem Functions-Deploy, im
+Rollback-Arbeitsverzeichnis:
+
+```bash
+cd /tmp/malzime-rollback && node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben
+```
+
+Das schreibt den Einstellungssatz des Ziel-Stands (die laufende Fassung
+ignoriert die zusätzlichen Felder, die Reihenfolge ist also gefahrlos). Dazu in
+`featureFlags/current` das Feld `useSingleLargeCall` auf `true` setzen. Die
+satzWache meldet den neuen Satz per Push — das ist erwartet.
+
 ### 5. Hosting-Rollback
 
 Schnellster Weg: Firebase Console → Hosting → Release-Verlauf → **Rollback**

@@ -490,3 +490,28 @@ Sichtbarkeit. Die Zugangsschutzschichten hängen nicht am Verstecken der Adresse
 weltweites Netz anbietet, oder wenn der Direktweg messbar langsamer ist als der
 Hosting-Weg (Telemetrie `enqueueMs`, Vergleich 30 Tage vor/nach dem Deploy).
 
+## Ein Einstellungswert wird ausgebaut: befristete Duldung im Abgleich (10.09.2026)
+
+**Lage.** Der Abgleich vor dem Deploy (`scripts/betriebsprofil-vergleichen.js`)
+verlangt, dass der Einstellungssatz in der Datenbank Feld für Feld dem Repo
+entspricht. Entfernt eine Fassung Pflichtfelder, liest die noch laufende
+Fassung sie weiter: Vor dem Deploy löschen hieße, die laufende Seite
+lahmzulegen (die satzWache schlägt Alarm, keine Analyse läuft); nicht löschen
+hieße, der Abgleich bricht die Auslieferung ab.
+
+**Entscheidung.** `AUSGEMUSTERT` in `functions/src/produktiv-satz.js` nennt die
+Reste mit Stichtag. Der Abgleich duldet genau diese — und zeigt sie bei jedem
+Lauf als HINWEIS —, alles andere bleibt eine Abweichung; nach dem Stichtag
+gelten auch die genannten wieder als Abweichung, und
+`ausgemustert-uebergang.test.js` wird rot. Nach dem Deploy wird der Satz neu
+geschrieben und die Liste geleert.
+
+**Betrachtete Alternativen.** Die Felder im Code weiterführen (tote
+Pflichtwerte, die niemand mehr braucht); den Riegel per Notschalter
+überspringen (verdeckt jede andere Abweichung im selben Lauf).
+
+**Erstmals genutzt** beim Ausbau des Drei-Aufruf-Wegs (4.9.0): drei Felder und
+der Satz `t1-drei-call`, geleert am 10.09.2026 nach dem Deploy.
+
+**Neubewertung**, wenn der Abgleich künftig mehr als die Pflichtfelder prüfen
+soll (z. B. Wertebereiche je Satz) — dann gilt die Duldung auch dort.

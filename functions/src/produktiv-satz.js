@@ -144,8 +144,11 @@ const PROFILE = {
    Dauerzustand werden. */
 const AUSGEMUSTERT = {
   bis: "2026-09-24",
-  felder: ["describeMaxTokens", "profileMaxTokens", "tokenAbstandKleinMs"],
-  saetze: ["t1-drei-call"],
+  /* LEER seit 10.09.2026: nach dem Deploy von 4.9.0 neu geschrieben. Zuletzt
+     standen hier describeMaxTokens, profileMaxTokens, tokenAbstandKleinMs und
+     der Satz t1-drei-call (docs/SECURITY-MODEL.md, Abschnitt zur Duldung). */
+  felder: [],
+  saetze: [],
 };
 
 module.exports = { PROFILE, T1_NORMAL, AKTIV: "t1-normal", AUSGEMUSTERT };

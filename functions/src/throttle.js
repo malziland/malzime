@@ -7,9 +7,9 @@
  * STUFEN-SYSTEM nach kumuliertem Umsatz (T1 = 0,25 req/s bis 20 $; T2/T3/T4
  * darüber) — die früher hier notierten „6 RPS" stammen vom Mai-Dashboard und
  * sind ÜBERHOLT. Die reale Durchsatzbremse ist heute die Tier-Stufe, in der
- * Praxis gehalten durch die Cloud-Tasks-Nebenläufigkeit (7 gleichzeitige
- * Jobs à ~55 s ≈ 0,25 req/s). Vor jeder Änderung an Nebenläufigkeit oder
- * den Intervallen unten: Tier-Stufe im Mistral-Dashboard prüfen, nicht
+ * Praxis gehalten durch `queueRatePerSekunde` im Einstellungssatz (die
+ * globale Bremse der Warteschlange). Vor jeder Änderung an Nebenläufigkeit
+ * oder dem Intervall unten: Tier-Stufe im Mistral-Dashboard prüfen, nicht
  * Kommentare zitieren.
  *
  * Wenn eine Cloud-Function-Instanz mehrere Analysen parallel verarbeitet
@@ -29,11 +29,10 @@
  * Implementierung: einfache FIFO-Queue mit max-concurrent-Limit.
  */
 
-/* 6 gleichzeitige Calls je Instanz — historisch am alten 6-RPS-Dashboard-Wert
-   ausgerichtet (überholt, s. Datei-Kopf), heute schlicht eine konservative
-   Parallelitäts-Decke: Die echte Raten-Grenze setzen Tier-Stufe und
-   Cloud-Tasks-Nebenläufigkeit. Bei Cold-Start oder Workshop-Burst greift
-   zusätzlich mistral.js' Retry-Backoff. */
+/* Wie viele Calls je Instanz gleichzeitig laufen, steht im Einstellungssatz
+   (`drosselMaxParallel`) — eine konservative Parallelitäts-Decke: Die echte
+   Raten-Grenze setzen Tier-Stufe und Warteschlange. Bei Cold-Start oder
+   Workshop-Burst greift zusätzlich der Retry-Backoff in mistral-http.js. */
 
 /* v1.10.6: Queue-Timeout von 90s auf 360s (6 Minuten) hochgesetzt.
    Hintergrund: Mistral braucht 60-90s pro Call, ein Slot wird also nur
@@ -198,20 +197,18 @@ function createRateBucket(defaultIntervalMs) {
 
 /* Startwert 0 = keine Drosselung, bis der Einstellungssatz sie setzt. Der
    Semaphore davor laesst in diesem Moment ohnehin nur einen Aufruf durch. */
-const largeBucket = createRateBucket(0);
-const smallBucket = createRateBucket(0);
-
-function bucketFor(modelClass) {
-  return modelClass === "large" ? largeBucket : smallBucket;
-}
+/* EIN Takt fuer alle Aufrufe: Mistral zaehlt Anfragen, nicht deren Groesse,
+   und seit dem Ausbau des Drei-Aufruf-Wegs (10.09.2026) gibt es nur noch ein
+   Modell. Bis dahin gab es einen zweiten Takt fuer das kleine Modell. */
+const rateBucket = createRateBucket(0);
 
 /**
  * Wrapper-Helper: führt eine Mistral-Operation aus, sobald ein Slot frei ist
- * UND ein Rate-Token des passenden Modell-Typs verfuegbar ist. Slot wird IMMER
- * released — auch wenn die Operation wirft.
+ * UND ein Rate-Token verfuegbar ist. Slot wird IMMER released — auch wenn
+ * die Operation wirft.
  *
- * @param {Function} fn         auszufuehrende Mistral-Operation
- * @param {string}   modelClass "large" oder "small" — bestimmt den Token-Bucket
+ * @param {Function} fn     auszufuehrende Mistral-Operation
+ * @param {object}   werte  Einstellungssatz (Drosselwerte)
  */
 /* Uebernimmt die Drosselwerte aus dem Einstellungssatz. Wird vor jedem
    Mistral-Aufruf gerufen; die Setter gab es schon, sie wurden bisher nur von
@@ -220,15 +217,14 @@ function drosselEinstellen(werte) {
   if (!werte) return;
   mistralSemaphore.setMaxConcurrent(werte.drosselMaxParallel);
   mistralSemaphore.setQueueTimeoutMs(werte.drosselWartelimitMs);
-  largeBucket.setIntervalMs(werte.tokenAbstandGrossMs);
-  smallBucket.setIntervalMs(werte.tokenAbstandKleinMs);
+  rateBucket.setIntervalMs(werte.tokenAbstandGrossMs);
 }
 
-async function withMistralSlot(fn, modelClass, werte) {
+async function withMistralSlot(fn, werte) {
   drosselEinstellen(werte);
   const release = await mistralSemaphore.acquire();
   try {
-    await bucketFor(modelClass).acquire();
+    await rateBucket.acquire();
     return await fn();
   } finally {
     release();
@@ -239,21 +235,18 @@ function getMistralStats() {
   return mistralSemaphore.stats();
 }
 
-/* Fuer Tests: beide Buckets zugleich konfigurieren/zuruecksetzen — sonst
+/* Fuer Tests: den Takt konfigurieren/zuruecksetzen — sonst
    serialisiert der Rate-Limiter parallele Test-Operationen auf Sekunden. */
 function _setRateIntervalMs(ms) {
-  largeBucket.setIntervalMs(ms);
-  smallBucket.setIntervalMs(ms);
+  rateBucket.setIntervalMs(ms);
 }
 
 function _setInitialJitterMs(ms) {
-  largeBucket.setInitialJitterMs(ms);
-  smallBucket.setInitialJitterMs(ms);
+  rateBucket.setInitialJitterMs(ms);
 }
 
 function _resetRateBucket() {
-  largeBucket.reset();
-  smallBucket.reset();
+  rateBucket.reset();
 }
 
 module.exports = {

@@ -59,14 +59,57 @@ describe("Adressen — alle in europe-west1", () => {
     }
   });
 
-  it("jeder Aufruf im Client-Code geht über apiUrl — kein nacktes fetch auf /api/", () => {
-    const js = path.join(WURZEL, "public", "js");
+  /* OPS-2026-09-10-11: Der Waechter las frueher nur public/js/ — der
+     Seitenstart in public/app.js rief /api/stats weiter relativ auf, also ueber
+     das Auslieferungsnetz, und niemand merkte es. Jetzt die ganze Flaeche unter
+     public/ (ausser den Tests), und jedes "/api/…"-Literal zaehlt, das nicht
+     direkt an apiUrl geht — auch eines, das erst in einer Konstante landet. */
+  function relativeApiLiterale(quelltext) {
+    const zeilen = [];
+    for (const m of quelltext.matchAll(/["'`]\/api\//g)) {
+      const davor = quelltext.slice(Math.max(0, m.index - 40), m.index);
+      if (/apiUrl\(\s*$/.test(davor)) continue;
+      zeilen.push(quelltext.slice(0, m.index).split("\n").length);
+    }
+    return zeilen;
+  }
+
+  function jsDateien(verzeichnis) {
+    const gefunden = [];
+    for (const name of fs.readdirSync(verzeichnis)) {
+      if (name === "__tests__") continue;
+      const pfad = path.join(verzeichnis, name);
+      if (fs.statSync(pfad).isDirectory()) gefunden.push(...jsDateien(pfad));
+      else if (name.endsWith(".js")) gefunden.push(pfad);
+    }
+    return gefunden;
+  }
+
+  it("das Suchmuster schlägt an eingespielten Proben an und lässt apiUrl-Aufrufe durch (Positivkontrolle)", () => {
+    for (const probe of [
+      'fetch("/api/stats", { signal })',
+      "fetchWithTimeout('/api/job-status?jobId=1', {}, 1)",
+      "const ZIEL = `/api/errors`;",
+      'navigator.sendBeacon("/api/telemetry", b)',
+    ]) {
+      expect(relativeApiLiterale(probe), probe).toHaveLength(1);
+    }
+    for (const probe of ['fetch(apiUrl("/api/stats"))', "apiUrl( '/api/enqueue' )"]) {
+      expect(relativeApiLiterale(probe), probe).toEqual([]);
+    }
+  });
+
+  it("jeder Aufruf unter public/ geht über apiUrl — kein relativer Weg auf /api/", () => {
+    const tabelle = path.join(WURZEL, "public", "js", "api-basis.js");
+    const dateien = jsDateien(path.join(WURZEL, "public")).filter((d) => d !== tabelle);
+    /* Messmittel-Kontrolle: Eine Suche, die app.js nicht erreicht, war genau
+       der blinde Fleck — und eine leere Suche waere wertlos gruen. */
+    expect(dateien).toContain(path.join(WURZEL, "public", "app.js"));
+    expect(dateien.length).toBeGreaterThan(20);
     const nackt = [];
-    for (const datei of fs.readdirSync(js)) {
-      if (!datei.endsWith(".js")) continue;
-      const text = fs.readFileSync(path.join(js, datei), "utf8");
-      const treffer = text.match(/fetch\(\s*["'`]\/api\//g);
-      if (treffer) nackt.push(`${datei}: ${treffer.length}`);
+    for (const datei of dateien) {
+      const zeilen = relativeApiLiterale(fs.readFileSync(datei, "utf8"));
+      if (zeilen.length) nackt.push(`${path.relative(WURZEL, datei)}:${zeilen.join(",")}`);
     }
     expect(nackt).toEqual([]);
   });

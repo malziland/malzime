@@ -74,8 +74,6 @@ const FELDER = {
   mistralTimeoutMs: { min: 5000, max: 540000 },
   singleLargeTimeoutMs: { min: 5000, max: 540000 },
   singleLargeMaxTokens: { min: 100, max: 100000 },
-  describeMaxTokens: { min: 100, max: 100000 },
-  profileMaxTokens: { min: 100, max: 100000 },
   requestBudgetMs: { min: 5000, max: 540000 },
 
   /* --- 2. Andrang: wie viele wir gleichzeitig und pro Stunde einlassen --- */
@@ -118,7 +116,6 @@ const FELDER = {
   drosselMaxParallel: { min: 1, max: 100 },
   drosselWartelimitMs: { min: 1000, max: 30 * 60 * 1000 },
   tokenAbstandGrossMs: { min: 0, max: 60 * 1000 },
-  tokenAbstandKleinMs: { min: 0, max: 60 * 1000 },
   /* WENN MISTRAL ABLEHNT (429) ODER KURZ WEG IST (502/503/504): Wartezeit vor
      der ersten Wiederholung; jede weitere wartet doppelt so lang. Die Reihe
      10, 20, 40, 80 s ist am Vorfall vom 08.09.2026 nachgerechnet (siehe

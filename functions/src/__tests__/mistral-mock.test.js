@@ -4,6 +4,8 @@
 
 const mock = require("../mistral-mock");
 
+const lauf = (lang = "de") => mock.runSingleLargeCall(Buffer.from(""), "image/jpeg", null, lang);
+
 beforeEach(() => {
   /* Verzögerung in Tests auf 0 — keine echte Wartezeit. */
   process.env.MISTRAL_MOCK_DELAY_MS = "0";
@@ -15,45 +17,26 @@ afterAll(() => {
   delete process.env.MISTRAL_MOCK_FAIL;
 });
 
-/* ── describeImage ────────────────────────────────────────────── */
+/* ── Schnittstelle ────────────────────────────────────────────── */
 
-describe("describeImage", () => {
-  test("liefert eine Beschreibung mit SUBJECT: HUMAN-Kopfzeile", async () => {
-    const text = await mock.describeImage(Buffer.from(""), "image/jpeg", null, "de");
-    expect(typeof text).toBe("string");
-    expect(text).toMatch(/^SUBJECT:\s*HUMAN/im);
-  });
-
-  test("respektiert die Sprache (en)", async () => {
-    const text = await mock.describeImage(Buffer.from(""), "image/jpeg", null, "en");
-    expect(text).toContain("Visible text");
-  });
-
-  test("MISTRAL_MOCK_FAIL=describe wirft einen api_error", async () => {
-    process.env.MISTRAL_MOCK_FAIL = "describe";
-    await expect(mock.describeImage(Buffer.from(""), "image/jpeg", null, "de")).rejects.toMatchObject({
-      code: "api_error",
-    });
-  });
-
-  test("MISTRAL_MOCK_FAIL=describe-empty liefert null (Safety-Filter)", async () => {
-    process.env.MISTRAL_MOCK_FAIL = "describe-empty";
-    expect(await mock.describeImage(Buffer.from(""), "image/jpeg", null, "de")).toBeNull();
-  });
-
-  test("MISTRAL_MOCK_FAIL=rate_limit wirft einen rate_limit-Fehler", async () => {
-    process.env.MISTRAL_MOCK_FAIL = "rate_limit";
-    await expect(mock.describeImage(Buffer.from(""), "image/jpeg", null, "de")).rejects.toMatchObject({
-      code: "rate_limit",
-    });
+describe("Schnittstelle", () => {
+  test("bietet genau die Aufrufe, die der Analyseweg braucht", () => {
+    expect(typeof mock.runSingleLargeCall).toBe("function");
+    expect(typeof mock.isRateLimitError).toBe("function");
+    /* Die Attrappe des ausgebauten Drei-Aufruf-Wegs (10.09.2026) darf nicht
+       zurueckkehren — sonst liefe ein Test still ueber einen Weg, den es im
+       Betrieb nicht mehr gibt. */
+    expect(mock.describeImage).toBeUndefined();
+    expect(mock.generateBothProfiles).toBeUndefined();
   });
 });
 
-/* ── generateBothProfiles ─────────────────────────────────────── */
+/* ── runSingleLargeCall ───────────────────────────────────────── */
 
-describe("generateBothProfiles", () => {
+describe("runSingleLargeCall", () => {
   test("liefert strukturell gültige normal- und boost-Profile", async () => {
-    const { normal, boost } = await mock.generateBothProfiles("desc", {}, null, "de");
+    const { normal, boost, subject } = await lauf();
+    expect(subject).toBe("HUMAN");
     for (const profile of [normal, boost]) {
       expect(Object.keys(profile.categories).length).toBeGreaterThan(0);
       expect(Array.isArray(profile.ad_targeting)).toBe(true);
@@ -63,7 +46,7 @@ describe("generateBothProfiles", () => {
   });
 
   test("jede Kategorie hat label, value und confidence", async () => {
-    const { normal } = await mock.generateBothProfiles("desc", {}, null, "de");
+    const { normal } = await lauf();
     for (const cat of Object.values(normal.categories)) {
       expect(typeof cat.label).toBe("string");
       expect(typeof cat.value).toBe("string");
@@ -72,31 +55,48 @@ describe("generateBothProfiles", () => {
   });
 
   test("normal- und boost-Profil unterscheiden sich im profileText", async () => {
-    const { normal, boost } = await mock.generateBothProfiles("desc", {}, null, "de");
+    const { normal, boost } = await lauf();
     expect(normal.profileText).not.toBe(boost.profileText);
   });
 
   test("Profile sind als Mock erkennbar markiert", async () => {
-    const { normal } = await mock.generateBothProfiles("desc", {}, null, "de");
+    const { normal } = await lauf();
     expect(normal.profileText).toContain("[MOCK-PROFIL]");
   });
 
   test("englische Profile nutzen englische Labels", async () => {
-    const { normal } = await mock.generateBothProfiles("desc", {}, null, "en");
+    const { normal } = await lauf("en");
     expect(normal.categories.alter_geschlecht.label).toBe("Age & Gender");
   });
+});
 
-  test("MISTRAL_MOCK_FAIL=profiles liefert { normal: null, boost: null }", async () => {
-    process.env.MISTRAL_MOCK_FAIL = "profiles";
-    const result = await mock.generateBothProfiles("desc", {}, null, "de");
-    expect(result).toEqual({ normal: null, boost: null });
+/* ── Fehlerverhalten ──────────────────────────────────────────── */
+
+describe("MISTRAL_MOCK_FAIL", () => {
+  test("api_error wirft einen api_error", async () => {
+    process.env.MISTRAL_MOCK_FAIL = "api_error";
+    await expect(lauf()).rejects.toMatchObject({ code: "api_error" });
   });
 
-  test("MISTRAL_MOCK_FAIL=rate_limit wirft einen rate_limit-Fehler", async () => {
+  test("leer liefert kein Profil — wie die echte Funktion ohne auswertbare Antwort", async () => {
+    process.env.MISTRAL_MOCK_FAIL = "leer";
+    const r = await lauf();
+    expect(r.normal).toBeNull();
+    expect(r.boost).toBeNull();
+  });
+
+  test("rate_limit wirft einen rate_limit-Fehler", async () => {
     process.env.MISTRAL_MOCK_FAIL = "rate_limit";
-    await expect(mock.generateBothProfiles("desc", {}, null, "de")).rejects.toMatchObject({
-      code: "rate_limit",
-    });
+    await expect(lauf()).rejects.toMatchObject({ code: "rate_limit" });
+  });
+
+  test("ein unbekannter Wert bricht laut ab, statt still zu gelingen", async () => {
+    /* Die Werte des ausgebauten Drei-Aufruf-Wegs zuerst: Ein Test, der sie
+       noch setzt, soll sofort auffallen und nicht gruen durchlaufen. */
+    for (const wert of ["describe", "describe-empty", "profiles", "Tippfehler"]) {
+      process.env.MISTRAL_MOCK_FAIL = wert;
+      await expect(lauf()).rejects.toThrow(/MISTRAL_MOCK_FAIL/);
+    }
   });
 });
 
@@ -119,7 +119,7 @@ describe("Verzögerung", () => {
   test("MISTRAL_MOCK_DELAY_MS verzögert den Aufruf messbar", async () => {
     process.env.MISTRAL_MOCK_DELAY_MS = "60";
     const start = Date.now();
-    await mock.describeImage(Buffer.from(""), "image/jpeg", null, "de");
+    await lauf();
     expect(Date.now() - start).toBeGreaterThanOrEqual(50);
   });
 });

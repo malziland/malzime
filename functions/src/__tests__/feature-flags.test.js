@@ -18,7 +18,6 @@ describe("getFeatureFlags", () => {
   test("fail-safe: bei Lesefehler gelten Flags als false", async () => {
     mockGet.mockRejectedValue(new Error("firestore down"));
     expect(await flags.getFeatureFlags()).toEqual({
-      useSingleLargeCall: false,
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: false,
@@ -39,22 +38,18 @@ describe("getFeatureFlags", () => {
     expect(mockGet).toHaveBeenCalledTimes(1);
   });
 
-  test("useSingleLargeCall ist true, wenn das Dokument es so setzt", async () => {
-    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSingleLargeCall: true }) });
-    expect(await flags.getFeatureFlags()).toEqual({
-      useSingleLargeCall: true,
-      usePromptCache: false,
-      useBeastAdsCall: true,
-      useLiveText: false,
-      useSprachumschalter: false,
-      useGemesseneDauer: true,
-    });
+  test("ein alter Eintrag useSingleLargeCall im Dokument wirkt nicht mehr", async () => {
+    /* Das Flag ist mit dem Drei-Aufruf-Weg ausgebaut (10.09.2026). Steht es
+       noch im Dokument, darf es weder gelesen noch weitergereicht werden. */
+    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSingleLargeCall: false }) });
+    const ergebnis = await flags.getFeatureFlags();
+    expect(ergebnis).not.toHaveProperty("useSingleLargeCall");
+    expect(flags.isSingleLargeCallEnabled).toBeUndefined();
   });
 
   test("usePromptCache ist true, wenn das Dokument es so setzt", async () => {
     mockGet.mockResolvedValue({ exists: true, data: () => ({ usePromptCache: true }) });
     expect(await flags.getFeatureFlags()).toEqual({
-      useSingleLargeCall: false,
       usePromptCache: true,
       useBeastAdsCall: true,
       useLiveText: false,
@@ -66,19 +61,6 @@ describe("getFeatureFlags", () => {
   test("usePromptCache ist false bei nicht-true-Wert (kein versehentliches Aktivieren)", async () => {
     mockGet.mockResolvedValue({ exists: true, data: () => ({ usePromptCache: "ja" }) });
     expect(await flags.getFeatureFlags()).toEqual({
-      useSingleLargeCall: false,
-      usePromptCache: false,
-      useBeastAdsCall: true,
-      useLiveText: false,
-      useSprachumschalter: false,
-      useGemesseneDauer: true,
-    });
-  });
-
-  test("useSingleLargeCall ist false bei nicht-true-Wert (kein versehentliches Aktivieren)", async () => {
-    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSingleLargeCall: 1 }) });
-    expect(await flags.getFeatureFlags()).toEqual({
-      useSingleLargeCall: false,
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: false,
@@ -126,18 +108,6 @@ describe("isLiveTextEnabled", () => {
   });
 });
 
-describe("isSingleLargeCallEnabled", () => {
-  test("spiegelt das useSingleLargeCall-Flag", async () => {
-    mockGet.mockResolvedValue({ exists: true, data: () => ({ useSingleLargeCall: true }) });
-    expect(await flags.isSingleLargeCallEnabled()).toBe(true);
-  });
-
-  test("ist false, wenn das Flag nicht gesetzt ist", async () => {
-    mockGet.mockResolvedValue({ exists: false });
-    expect(await flags.isSingleLargeCallEnabled()).toBe(false);
-  });
-});
-
 describe("isPromptCacheEnabled", () => {
   test("spiegelt das usePromptCache-Flag", async () => {
     mockGet.mockResolvedValue({ exists: true, data: () => ({ usePromptCache: true }) });
@@ -153,9 +123,18 @@ describe("isPromptCacheEnabled", () => {
 describe("Lokal-Modus (QUEUE_LOCAL=1)", () => {
   afterEach(() => delete process.env.QUEUE_LOCAL);
 
-  test("useSingleLargeCall standardmäßig aus im Emulator-Modus — ohne Firestore-Read", async () => {
+  test("Emulator-Modus: kein Firestore-Read, Live-Text nur mit QUEUE_LOCAL_LIVE", async () => {
     process.env.QUEUE_LOCAL = "1";
     flags._clearCache();
+    try {
+      const ohne = await flags.getFeatureFlags();
+      expect(ohne.useLiveText).toBe(false);
+      expect(ohne).not.toHaveProperty("useSingleLargeCall");
+      process.env.QUEUE_LOCAL_LIVE = "1";
+      expect((await flags.getFeatureFlags()).useLiveText).toBe(true);
+    } finally {
+      delete process.env.QUEUE_LOCAL_LIVE;
+    }
     expect(mockGet).not.toHaveBeenCalled();
   });
 });

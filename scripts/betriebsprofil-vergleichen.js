@@ -31,7 +31,7 @@ const fs = require("fs");
 const wurzel = pfad.resolve(__dirname, "..");
 const { createRequire } = require("module");
 const req = createRequire(pfad.join(wurzel, "functions", "package.json"));
-const { PROFILE, AKTIV } = require(pfad.join(wurzel, "functions", "src", "produktiv-satz.js"));
+const { PROFILE, AKTIV, AUSGEMUSTERT } = require(pfad.join(wurzel, "functions", "src", "produktiv-satz.js"));
 
 /* Dokumentdaten holen: aus der Datei (Probe) oder aus der echten Datenbank. */
 async function dokumentLesen() {
@@ -56,11 +56,23 @@ async function dokumentLesen() {
   return snap.data();
 }
 
+/* Uebergang (siehe AUSGEMUSTERT in produktiv-satz.js): Reste, die der Code
+   nicht mehr kennt, werden bis zum Stichtag geduldet — nur genau die dort
+   genannten, und nach dem Stichtag wieder als Abweichung gemeldet. */
+function geduldet(heute, aus) {
+  const gilt = !!aus && typeof aus.bis === "string" && heute.toISOString().slice(0, 10) <= aus.bis;
+  return {
+    felder: gilt && Array.isArray(aus.felder) ? aus.felder : [],
+    saetze: gilt && Array.isArray(aus.saetze) ? aus.saetze : [],
+  };
+}
+
 /* Reine Rechnung, ohne Netz: Liste der Abweichungen. Exportiert, damit ein
    Test sie ohne Datenbank pruefen kann. */
-function abweichungen(daten) {
+function abweichungen(daten, heute = new Date(), aus = AUSGEMUSTERT) {
   const liste = [];
   if (!daten || typeof daten !== "object") return ["Dokument leer oder kein Objekt"];
+  const ok = geduldet(heute, aus);
   if (daten.aktiv !== AKTIV) liste.push(`aktiv: DB=${daten.aktiv} Repo=${AKTIV}`);
   const dbProfile = daten.profile && typeof daten.profile === "object" ? daten.profile : {};
   for (const [name, repo] of Object.entries(PROFILE)) {
@@ -73,13 +85,34 @@ function abweichungen(daten) {
       if (db[feld] !== repo[feld]) liste.push(`${name}.${feld}: DB=${db[feld]} Repo=${repo[feld]}`);
     }
     for (const feld of Object.keys(db)) {
-      if (!(feld in repo)) liste.push(`${name}.${feld}: nur in der Datenbank (DB=${db[feld]})`);
+      if (!(feld in repo) && !ok.felder.includes(feld)) {
+        liste.push(`${name}.${feld}: nur in der Datenbank (DB=${db[feld]})`);
+      }
     }
   }
   for (const name of Object.keys(dbProfile)) {
-    if (!(name in PROFILE)) liste.push(`${name}: nur in der Datenbank`);
+    if (!(name in PROFILE) && !ok.saetze.includes(name)) liste.push(`${name}: nur in der Datenbank`);
   }
   return liste;
+}
+
+/* Die geduldeten Reste selbst — damit sie im Deploy-Protokoll SICHTBAR
+   bleiben, statt still durchzugehen. */
+function geduldeteReste(daten, heute = new Date(), aus = AUSGEMUSTERT) {
+  const reste = [];
+  if (!daten || typeof daten !== "object") return reste;
+  const ok = geduldet(heute, aus);
+  const dbProfile = daten.profile && typeof daten.profile === "object" ? daten.profile : {};
+  for (const [name, db] of Object.entries(dbProfile)) {
+    if (!(name in PROFILE)) {
+      if (ok.saetze.includes(name)) reste.push(`${name} (ganzer Satz)`);
+      continue;
+    }
+    for (const feld of Object.keys(db || {})) {
+      if (!(feld in PROFILE[name]) && ok.felder.includes(feld)) reste.push(`${name}.${feld}`);
+    }
+  }
+  return reste;
 }
 
 if (require.main === module) {
@@ -92,6 +125,13 @@ if (require.main === module) {
           `Einstellungssatz: Datenbank und Repo stimmen ueberein ` +
             `(${felder} Felder in ${Object.keys(PROFILE).length} Profilen, aktiv "${AKTIV}")`
         );
+        const reste = geduldeteReste(daten);
+        if (reste.length > 0) {
+          console.log(
+            `HINWEIS: ausgemustert, noch in der Datenbank — nach dem Deploy entfernen ` +
+              `(spaetestens ${AUSGEMUSTERT.bis}): ${reste.join(", ")}`
+          );
+        }
         process.exit(0);
       }
       console.log(`Einstellungssatz weicht vom Repo ab (${liste.length}):`);
@@ -105,4 +145,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { abweichungen };
+module.exports = { abweichungen, geduldeteReste };

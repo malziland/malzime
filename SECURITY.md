@@ -53,7 +53,7 @@ malziME relies on external AI providers as data processors (Art. 28 GDPR). See [
 |--------|------|-------------|
 | Mistral AI SAS (Paris, FR) | Sole AI provider — `mistral-large-2512` handles every live analysis | EU by default |
 
-Mistral is the only AI provider since v1.6.0 — no Google AI in the pipeline. Since v2.2 a single call to `mistral-large-2512` produces both profiles; `mistral-small-2603` exists only in the fallback pipeline behind a feature flag and has not processed an image in production for over a month (checked against the live logs on 2026-08-13). Mistral is contractually bound to not use uploaded images for training on the paid tier we use. See [Mistral DPA](https://legal.mistral.ai/terms/data-processing-addendum). (Google remains an infrastructure processor for Firebase Hosting / Cloud Functions / Firestore — see [datenschutz.html](public/datenschutz.html).)
+Mistral is the only AI provider since v1.6.0 — no Google AI in the pipeline. Since v2.2 a single call to `mistral-large-2512` produces both profiles. The older fallback pipeline with `mistral-small-2603` was removed on 2026-09-10; no other model processes images. Mistral is contractually bound to not use uploaded images for training on the paid tier we use. See [Mistral DPA](https://legal.mistral.ai/terms/data-processing-addendum). (Google remains an infrastructure processor for Firebase Hosting / Cloud Functions / Firestore — see [datenschutz.html](public/datenschutz.html).)
 
 ## Secrets management
 

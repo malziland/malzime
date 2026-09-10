@@ -132,61 +132,6 @@ function dekodiereJsonEscapes(roh) {
   return klartext.replace(/[\uD800-\uDBFF]$/, "");
 }
 
-/* ── Footer-Parser (v2.1) ──
-   Extrahiert die strukturierten Anker-Blöcke (HARD_FACTS, ADS, TRIGGERS) am Ende
-   der Bildbeschreibung. Diese werden vom Describe-Prompt (mistralDescribeAddendum)
-   eingeleitet und liefern beide Profile-Calls einen konsistenten Anker:
-     - alter_geschlecht + herkunft werden wortgenau übernommen → Normal/Beast-Konsistenz
-     - ads + triggers werden zentral am Job-Result gesetzt → identisch in beiden Modi
-
-   Fallback-Verhalten: Wenn ein Block fehlt oder kaputt ist, gibt der Parser leere
-   Defaults zurück — handle-process-job.js entscheidet dann, ob die Profile-Calls
-   diese Felder ersatzweise selbst füllen müssen (alter Verhalten). */
-function parseDescribeFooter(text) {
-  if (typeof text !== "string" || text.length === 0) {
-    return { description: "", hardFacts: {}, ads: [], triggers: [] };
-  }
-
-  /* Wir splitten den Text in Description + Footer. Marker ist das erste
-     Auftreten von "HARD_FACTS:" am Zeilenanfang (case-sensitive — Mistral hält
-     sich an den exakten Marker). */
-  const hardFactsIdx = text.search(/(^|\n)HARD_FACTS:/);
-  if (hardFactsIdx < 0) {
-    /* Kein Footer gefunden — alter Live-Stil oder Mistral hat sich nicht ans
-       Format gehalten. Beschreibung bleibt der ganze Text, Anker leer. */
-    return { description: text.trim(), hardFacts: {}, ads: [], triggers: [] };
-  }
-
-  const description = text.slice(0, hardFactsIdx).trim();
-  const footer = text.slice(hardFactsIdx);
-
-  /* Hard-Facts-Block parsen — nur die zwei fixierten Felder. */
-  const hardFacts = {};
-  const hfBlock = (footer.match(/HARD_FACTS:\s*([\s\S]*?)(?:\n\s*(?:ADS:|TRIGGERS:)|$)/) || ["", ""])[1];
-  for (const line of hfBlock.split(/\n/)) {
-    const m = line.match(/^\s*(alter_geschlecht|herkunft)\s*:\s*(.+?)\s*$/i);
-    if (m) hardFacts[m[1].toLowerCase()] = m[2].trim();
-  }
-
-  /* ADS-Block: jede nicht-leere Zeile nach "ADS:" bis vor "TRIGGERS:" ist ein Eintrag. */
-  const ads = [];
-  const adsBlock = (footer.match(/ADS:\s*([\s\S]*?)(?:\n\s*TRIGGERS:|$)/) || ["", ""])[1];
-  for (const raw of adsBlock.split(/\n/)) {
-    const v = raw.trim();
-    if (v && !v.startsWith("<") && v.length <= 60) ads.push(v);
-  }
-
-  /* TRIGGERS-Block: jede nicht-leere Zeile nach "TRIGGERS:" bis Ende. */
-  const triggers = [];
-  const trBlock = (footer.match(/TRIGGERS:\s*([\s\S]*)$/) || ["", ""])[1];
-  for (const raw of trBlock.split(/\n/)) {
-    const v = raw.trim();
-    if (v && !v.startsWith("<") && v.length <= 250) triggers.push(v);
-  }
-
-  return { description, hardFacts, ads: ads.slice(0, 12), triggers: triggers.slice(0, 8) };
-}
-
 /* NUR was ausserhalb gebraucht wird. `dekodiereJsonEscapes` und
    `PROFILE_TEXT_SCHLUESSEL` sind hausintern — sie standen hier, weil sie beim
    Herausloesen mitgewandert sind, und niemand hat sie je von aussen gerufen.
@@ -302,9 +247,8 @@ function findMissingCards(parsed) {
 
 /* HERGEZOGEN 31.08.2026: Ein reines Textwerkzeug — es sichert Text ab, bevor
    er in einen Prompt geht, damit ein Foto-Text nicht wie eine Anweisung an die
-   KI aussieht. Beide Wege brauchen es (Ein-Aufruf und Drei-Aufruf), es gehoert
-   also keinem von beiden. Diese Datei ist der Ort fuer Funktionen, die nur
-   Text verarbeiten und sonst nichts. */
+   KI aussieht (genutzt vom Werbe-Aufruf in mistral.js). Diese Datei ist der
+   Ort fuer Funktionen, die nur Text verarbeiten und sonst nichts. */
 function escapeXml(str) {
   return String(str)
     .replace(/&/g, "&amp;")
@@ -316,7 +260,6 @@ function escapeXml(str) {
 
 module.exports = {
   findeProfileTextWert,
-  parseDescribeFooter,
   extrahiereLiveText,
   KARTEN_WERT_SCHLUESSEL,
   KARTEN_LABEL_SCHLUESSEL,

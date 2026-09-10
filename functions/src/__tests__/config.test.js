@@ -44,8 +44,6 @@ describe("config", () => {
       "adressfensterMs",
       "stundenlimit",
       "stundenfensterMinuten",
-      "describeMaxTokens",
-      "profileMaxTokens",
       "mistralTimeoutMs",
       "singleLargeTimeoutMs",
       "singleLargeMaxTokens",
@@ -71,9 +69,12 @@ describe("config", () => {
   });
 
   test("Mistral constants are set", () => {
-    expect(config.MISTRAL_DESCRIBE_MODEL).toBe("mistral-large-2512");
-    expect(config.MISTRAL_PROFILE_MODEL).toBe("mistral-small-2603");
-    expect(config.MISTRAL_FALLBACK_MODEL).toBe("mistral-large-2512");
+    expect(config.MISTRAL_MODEL).toBe("mistral-large-2512");
+    /* Seit 10.09.2026 gibt es nur noch EIN Modell — die Konstanten des
+       ausgebauten Drei-Aufruf-Wegs duerfen nicht zurueckkehren. */
+    expect(config.MISTRAL_DESCRIBE_MODEL).toBeUndefined();
+    expect(config.MISTRAL_PROFILE_MODEL).toBeUndefined();
+    expect(config.MISTRAL_FALLBACK_MODEL).toBeUndefined();
     /* v3.0.4: EU-Regional-Endpunkt — vertragliche EU/EFTA-Garantie. Diese
        Probe wird ROT, wenn jemand versehentlich auf den globalen Endpunkt
        zurueckfaellt. */

@@ -98,6 +98,22 @@ describe("Queue-Modus", () => {
     expect(urls.some((u) => u.includes("/api/job-status?jobId=job-1"))).toBe(true);
   });
 
+  /* PRIV-2026-09-10-06: Das fertige Profil darf nicht im Browser-
+     Zwischenspeicher liegen bleiben. Der Server sendet `Cache-Control:
+     no-store`; der Abruf fragt zusaetzlich selbst mit `cache: "no-store"`. */
+  it("fragt den Job-Status mit cache: no-store ab", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+      if (String(url).includes("/api/enqueue")) return jsonResponse({ jobId: "job-1" });
+      return jsonResponse({ status: "done", result: DONE_RESULT });
+    });
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(8000);
+    await p;
+    const statusAbrufe = globalThis.fetch.mock.calls.filter((c) => String(c[0]).includes("/api/job-status"));
+    expect(statusAbrufe.length).toBeGreaterThan(0);
+    for (const [, optionen] of statusAbrufe) expect(optionen.cache).toBe("no-store");
+  });
+
   it("queued → processing → done: rendert am Ende das Ergebnis", async () => {
     const statuses = [
       { status: "queued", position: 3, etaSeconds: 180 },

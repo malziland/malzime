@@ -38,7 +38,7 @@ Firestore-Datenbank `malzime-eu`, Dokument **`config/betriebsprofil`**:
 {
   "aktiv": "t1-normal",
   "profile": {
-    "t1-normal": { … alle 29 Werte … },
+    "t1-normal": { … alle Werte … },
     "t1-langsam": { … },
     "t2-schnell": { … }
   }
@@ -53,7 +53,7 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 ---
 
-## Die 29 Werte
+## Die Werte
 
 ### 1 · Die KI-Aufrufe
 
@@ -62,8 +62,6 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 | `singleLargeTimeoutMs` | 300000 | Wie lange ein Analyse-Aufruf dauern darf |
 | `singleLargeMaxTokens` | 5000 | Wie viel Text die KI ausgeben darf |
 | `mistralTimeoutMs` | 90000 | Zeitgrenze der übrigen Aufrufe |
-| `describeMaxTokens` | 2048 | Textmenge der Bildbeschreibung |
-| `profileMaxTokens` | 16000 | Textmenge der Profilerstellung |
 | `requestBudgetMs` | 480000 | Gesamtbudget eines Durchlaufs |
 
 ### 2 · Andrang und Einlass
@@ -92,8 +90,7 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 |---|---|---|
 | `drosselMaxParallel` | 3 | Gleichzeitige Aufrufe an Mistral |
 | `drosselWartelimitMs` | 360000 | Wie lange ein Aufruf auf seinen Platz wartet |
-| `tokenAbstandGrossMs` | 4000 | Mindestabstand zwischen großen Aufrufen |
-| `tokenAbstandKleinMs` | 4000 | Mindestabstand zwischen kleinen Aufrufen |
+| `tokenAbstandGrossMs` | 4000 | Mindestabstand zwischen zwei KI-Aufrufen (je Server-Instanz) |
 | `ueberlastWarteMs` | 10000 | Wartezeit vor der ersten Wiederholung, wenn Mistral ablehnt oder kurz weg ist; jede weitere verdoppelt sich |
 | `ueberlastVersuche` | 4 | Wie oft wiederholt wird, bevor der Auftrag als blockiert endet |
 
@@ -174,7 +171,7 @@ Stelle:
 Zwei Mechanismen halten die Trennung aufrecht:
 
 1. **Der Satz kann diese Werte nicht übernehmen.** Gelesen werden
-   ausschließlich die 29 bekannten Zahlenfelder; alles andere im Dokument wird
+   ausschließlich die bekannten Zahlenfelder; alles andere im Dokument wird
    ignoriert.
 2. **`scripts/pruefe-doppelte-werte.py` geht vom Code aus** — nicht von dieser
    Liste — und verlangt für jede Zahlenkonstante eine von zwei Antworten: Sie
@@ -256,13 +253,12 @@ Das Skript hat vier Sicherungen, weil es in die Produktionsdatenbank schreibt:
 - Es prüft jeden Satz **vor** dem Schreiben mit derselben Funktion, die auch
   im Betrieb entscheidet — und liest danach zurück, statt Erfolg zu behaupten.
 
-### Drei vorbereitete Sätze
+### Zwei vorbereitete Sätze
 
 | Satz | wofür |
 |---|---|
 | `t1-normal` | der Alltag |
 | `t1-langsam` | wenn die KI langsamer wird (der Fall vom 28.08.2026) |
-| `t1-drei-call` | Rollback auf die 3-Call-Pipeline — ersetzt den früheren Deploy-Schritt im RUNBOOK |
 
 Umstellen heißt: `aktiv` auf einen dieser Namen setzen. Kein Deploy, wirksam
 binnen dreißig Sekunden.

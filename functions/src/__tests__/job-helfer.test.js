@@ -31,13 +31,10 @@ describe("job-helfer — was gilt, wenn ein Schalter nicht lesbar ist", () => {
     expect(ergebnis).toBe(true);
   });
 
-  test("die anderen drei fallen auf false", async () => {
+  test("die anderen beiden fallen auf false", async () => {
     const spy = stumm();
     jest.resetModules();
     jest.doMock("../feature-flags", () => ({
-      isSingleLargeCallEnabled: async () => {
-        throw new Error("x");
-      },
       isPromptCacheEnabled: async () => {
         throw new Error("x");
       },
@@ -46,13 +43,9 @@ describe("job-helfer — was gilt, wenn ein Schalter nicht lesbar ist", () => {
       },
     }));
     const frisch = require("../job-helfer");
-    const werte = await Promise.all([
-      frisch.isSingleLargeCallEnabledSafe(),
-      frisch.isPromptCacheEnabledSafe(),
-      frisch.isLiveTextEnabledSafe(),
-    ]);
+    const werte = await Promise.all([frisch.isPromptCacheEnabledSafe(), frisch.isLiveTextEnabledSafe()]);
     spy.mockRestore();
-    expect(werte).toEqual([false, false, false]);
+    expect(werte).toEqual([false, false]);
   });
 
   test("ohne Fehler kommt der echte Wert durch", async () => {

@@ -171,16 +171,12 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
       hoechstens = 0;
     await Promise.all(
       Array.from({ length: 5 }, () =>
-        withMistralSlot(
-          async () => {
-            gleichzeitig += 1;
-            hoechstens = Math.max(hoechstens, gleichzeitig);
-            await new Promise((r) => setTimeout(r, 5));
-            gleichzeitig -= 1;
-          },
-          "large",
-          undefined
-        )
+        withMistralSlot(async () => {
+          gleichzeitig += 1;
+          hoechstens = Math.max(hoechstens, gleichzeitig);
+          await new Promise((r) => setTimeout(r, 5));
+          gleichzeitig -= 1;
+        }, undefined)
       )
     );
     expect(hoechstens).toBeLessThanOrEqual(6);

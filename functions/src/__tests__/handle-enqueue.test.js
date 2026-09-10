@@ -40,7 +40,6 @@ jest.mock("../jobs", () => ({
    suchte den Fehler im Produktivcode. */
 jest.mock("../feature-flags", () => ({
   getFeatureFlags: jest.fn(async () => ({ useGemesseneDauer: false })),
-  isSingleLargeCallEnabled: jest.fn(async () => true),
 }));
 jest.mock("../durchsatz", () => ({
   dauerJeAnalyse: jest.fn(async () => ({ sekunden: 65, gemessen: false, frisch: false })),

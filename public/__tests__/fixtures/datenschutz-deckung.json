@@ -1,0 +1,111 @@
+{
+  "_zweck": "Zuordnung Technik -> Datenschutztext. Jede Zeilenart im 30-Tage-Speicher (Soll: DIAG_SOLL in scripts/verify-infrastructure.sh) und jedes Feld, das die Diagnose-Endpunkte annehmen (_freigabeliste in functions/src/handle-errors.js und handle-telemetry.js), braucht hier einen Eintrag mit einem Stichwort, das im sichtbaren Datenschutztext steht (Umlaute als Zeichen oder Entity, Leerraum egal). Pruefung: public/__tests__/datenschutz-deckung.test.js.",
+  "_felder": "Wert = Stichwort, unter dem der Text das Feld beschreibt; oder 'zusammengefasst' = nur durch den Sammelsatz 'zusammengefasstUnter' gedeckt, nicht einzeln genannt. Englisch: dasselbe Stichwort uebersetzt in 'stichwortEn' (Feld) bzw. 'en' (Zeilenart); es muss im sichtbaren Text von public/en/privacy.html stehen.",
+  "zeilenarten": {
+    "client-error": {
+      "de": "30&nbsp;Tage auf, um seltene Ger&auml;tefehler",
+      "en": "30&nbsp;days to find rare device errors"
+    },
+    "client-telemetry": {
+      "de": "30&nbsp;Tage auf, um seltene Ger&auml;tefehler",
+      "en": "30&nbsp;days to find rare device errors"
+    },
+    "mistral-single-large": {
+      "de": "wie lange die KI gebraucht hat",
+      "en": "how long the AI took"
+    },
+    "minor-safety": {
+      "de": "Kinderschutz-Filter",
+      "en": "child-protection filter"
+    }
+  },
+  "zusammengefasstUnter": "grobe Angaben wie",
+  "zusammengefasstUnterEn": "rough details such as",
+  "felder": {
+    "handle-errors": {
+      "errorName": "Fehlerart",
+      "errorMessage": "Fehlerart",
+      "phase": "zusammengefasst",
+      "url": "aufgerufene Seite",
+      "userAgent": "Browsertyp",
+      "requestId": "zusammengefasst",
+      "traceId": "dazu die Zufallsnummer",
+      "wakeLock": "zusammengefasst",
+      "fileFormat": "dessen Format und Größe",
+      "errorDetail": "Fehlerart",
+      "zweiterLeseweg": "zusammengefasst",
+      "durationMs": "Fehlerart, Dauer",
+      "httpStatus": "Fehlerart",
+      "fileSizeKb": "dessen Format und Größe",
+      "msSeitAuswahl": "Fehlerart, Dauer",
+      "online": "zusammengefasst",
+      "hidden": "zusammengefasst",
+      "timings.prepareImageMs": "Fehlerart, Dauer",
+      "timings.fetchMs": "Fehlerart, Dauer",
+      "timings.parseMs": "Fehlerart, Dauer",
+      "timings.renderMs": "Fehlerart, Dauer",
+      "timings.totalMs": "Fehlerart, Dauer",
+      "client.effectiveType": "Sprache, Netz",
+      "client.language": "Sprache, Netz",
+      "client.screen": "Bildschirmgröße",
+      "client.downlinkMbps": "Sprache, Netz",
+      "client.rttMs": "Sprache, Netz",
+      "client.deviceMemoryGb": "zusammengefasst",
+      "client.hardwareConcurrency": "zusammengefasst",
+      "client.dpr": "Bildschirmgröße",
+      "client.saveData": "Sprache, Netz",
+      "client.automatisiert": "zusammengefasst"
+    },
+    "handle-telemetry": {
+      "eventType": "Wenn etwas schiefgeht oder klappt",
+      "url": "aufgerufene Seite",
+      "userAgent": "Browsertyp",
+      "traceId": "dazu die Zufallsnummer",
+      "durationMs": "Fehlerart, Dauer",
+      "online": "zusammengefasst",
+      "hidden": "zusammengefasst",
+      "timings.prepareImageMs": "Fehlerart, Dauer",
+      "timings.fetchMs": "Fehlerart, Dauer",
+      "timings.enqueueMs": "Fehlerart, Dauer",
+      "timings.parseMs": "Fehlerart, Dauer",
+      "timings.renderMs": "Fehlerart, Dauer",
+      "timings.totalMs": "Fehlerart, Dauer",
+      "client.effectiveType": "Sprache, Netz",
+      "client.language": "Sprache, Netz",
+      "client.screen": "Bildschirmgröße",
+      "client.downlinkMbps": "Sprache, Netz",
+      "client.rttMs": "Sprache, Netz",
+      "client.deviceMemoryGb": "zusammengefasst",
+      "client.hardwareConcurrency": "zusammengefasst",
+      "client.dpr": "Bildschirmgröße",
+      "client.saveData": "Sprache, Netz",
+      "meta.subject": "ob ein Mensch, ein Tier oder beides auf dem Bild war",
+      "meta.mode": "zusammengefasst",
+      "meta.lang": "Sprache, Netz",
+      "meta.reason": "zusammengefasst",
+      "meta.wakeLock": "zusammengefasst",
+      "meta.maintenanceTriggered": "zusammengefasst",
+      "stufen.alter": "welche Einschätzungen der KI getroffen oder daneben waren",
+      "stufen.interessen": "welche Einschätzungen der KI getroffen oder daneben waren",
+      "stufen.charakter": "welche Einschätzungen der KI getroffen oder daneben waren",
+      "stufen.werbung": "welche Einschätzungen der KI getroffen oder daneben waren",
+      "stufen.manipulation": "welche Einschätzungen der KI getroffen oder daneben waren",
+      "stufen.geschlecht": "welche Einschätzungen der KI getroffen oder daneben waren",
+      "score": "wie gut die KI im Schnitt liegt"
+    }
+  },
+  "stichwortEn": {
+    "Fehlerart": "type of error",
+    "aufgerufene Seite": "the page opened",
+    "Browsertyp": "browser type",
+    "dazu die Zufallsnummer": "plus the random number",
+    "dessen Format und Größe": "its format and size",
+    "Fehlerart, Dauer": "type of error, duration",
+    "Sprache, Netz": "language, network",
+    "Bildschirmgröße": "screen size",
+    "Wenn etwas schiefgeht oder klappt": "When something goes wrong or works",
+    "ob ein Mensch, ein Tier oder beides auf dem Bild war": "whether a person, an animal or both were in the picture",
+    "welche Einschätzungen der KI getroffen oder daneben waren": "guesses were right or wrong",
+    "wie gut die KI im Schnitt liegt": "how accurate the AI is on average"
+  }
+}

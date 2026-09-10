@@ -2,7 +2,7 @@ const de = require("../locales/de/prompts");
 const en = require("../locales/en/prompts");
 
 /**
- * Sichert die Primaten-Regel in BEIDEN Pfaden und BEIDEN Sprachen ab.
+ * Sichert die Primaten-Regel in BEIDEN Sprachen ab.
  *
  * WARUM ES DIESEN TEST GIBT (Audit 2026-08-10, BUG-001):
  * Anlass war ein Affenbild, aus dem das Modell ein Profil eines afrikanischen
@@ -15,15 +15,13 @@ const en = require("../locales/en/prompts");
  * Legends", „Fell besetzt"). Damit ist die Prompt-Regel der EINZIGE verbliebene
  * Schutz — und sie stand bis dahin nur im `singleLargePrompt`.
  *
- * Nach einem Rollback auf den 3-Call-Pfad (RUNBOOK, Hebel 3) hätte also gar
- * kein Schutz mehr existiert. Genau das hält dieser Test fest: Die Regel muss
- * an allen vier Stellen stehen, sonst ist sie im Störfall weg.
+ * Genau das hält dieser Test fest: Die Regel muss im Analyse-Prompt beider
+ * Sprachen stehen. Bis zum Ausbau des Drei-Aufruf-Wegs (10.09.2026) galt das
+ * zusätzlich für dessen Beschreibungs-Baustein.
  */
 
 const PROMPTS = [
-  ["de/mistralDescribeAddendum (Fallback-Pfad)", de.mistralDescribeAddendum],
   ["de/singleLargePrompt (aktiver Pfad)", de.singleLargePrompt],
-  ["en/mistralDescribeAddendum (Fallback-Pfad)", en.mistralDescribeAddendum],
   ["en/singleLargePrompt (aktiver Pfad)", en.singleLargePrompt],
 ];
 

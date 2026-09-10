@@ -69,10 +69,6 @@ const { merkeDauer } = require("./durchsatz");
    classifyDescription/extractVisibleText weiter funktionieren. Pragmatischer
    Workaround, bis der Tier-Pfad bei Bedarf nativ eingebaut wird. */
 
-/* Fail-safe Flag-Lesen: jeder Fehler beim Firestore-Read → 3-Call-Pipeline.
-   Vermeidet, dass ein vorübergehender Firestore-Fehler die ganze Pipeline
-   blockiert. */
-
 /* Analog fail-safe: Kann das Prompt-Cache-Flag nicht gelesen werden, laeuft der
    Call ohne Cache-Key — also exakt wie vor v2.5. Ein Firestore-Wackler darf
    eine reine Kostenoptimierung niemals zum Ausfall eskalieren. */
@@ -228,8 +224,8 @@ async function handleProcessJob(req, res) {
            die Ursache nicht mehr feststellen. Am 31.08. war sie nur deshalb
            rekonstruierbar, weil das Frontend sie als client-error
            zurueckmeldete; eine Sekunde frueher weggeklickt und sie waere fuer
-           immer weg gewesen. Kein Personenbezug: einer von sieben festen
-           Bezeichnern (blocked.overloaded, blocked.safetyFilter, ...).
+           immer weg gewesen. Kein Personenbezug: einer von wenigen festen
+           Bezeichnern (blocked.overloaded, blocked.apiError, ...).
            Bei Erfolg bleibt das Feld WEG, damit die Logsuche nach echten
            Sperren nicht von leeren Werten eingefaerbt wird. */
         ...(success ? {} : { blockedReason: result.blockedReason || null }),

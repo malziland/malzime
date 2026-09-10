@@ -60,10 +60,6 @@ function isRateLimitError(err) {
    Logzeile je Wiederholung liegen in ueberlast.js (08.09.2026). */
 const { WIEDERHOLBARE_STATUS, ueberlastWartezeiten, planeWiederholung } = require("./ueberlast");
 
-function modelClassOf(model) {
-  return /large/i.test(model || "") ? "large" : "small";
-}
-
 function readCachedTokens(usage) {
   const candidates = [
     usage?.prompt_tokens_details?.cached_tokens,
@@ -192,14 +188,10 @@ async function callMistralRaw(options) {
   if (mitGrenze.ueberlastWartezeitenMs == null) {
     mitGrenze.ueberlastWartezeitenMs = ueberlastWartezeiten(werte);
   }
-  const result = await withMistralSlot(
-    () => {
-      waitMs = Date.now() - t0;
-      return callMistralRawUnthrottled(mitGrenze);
-    },
-    modelClassOf(options.model),
-    werte
-  );
+  const result = await withMistralSlot(() => {
+    waitMs = Date.now() - t0;
+    return callMistralRawUnthrottled(mitGrenze);
+  }, werte);
   return { ...result, waitMs };
 }
 

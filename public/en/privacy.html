@@ -62,320 +62,249 @@
       <span class="page-eyebrow">Legal</span>
       <h1>Privacy</h1>
       <p class="legal-subtitle">
-        Explained plainly &middot; English version: 9 September 2026 &middot; German original: 9 September 2026
+        Explained plainly &middot; English version: 10 September 2026 &middot; German original: 10 September 2026
       </p>
       <div class="page-rule"></div>
 
       <div class="disclaimer disclaimer--flush">
         <p>
-          <strong>malziME</strong> is a learning tool for media literacy and data protection awareness. The
-          <abbr title="Artificial Intelligence">AI</abbr> profiles are guesses. They only show what algorithms might
-          claim &ndash; none of it is true, and none of it is proven.
+          <strong>malziME</strong> shows you what an <abbr title="Artificial Intelligence">AI</abbr> believes it knows
+          about you from a single photo. Everything it writes is a guess – often wrong, never proven.
         </p>
         <p>
-          The AI deliberately also guesses sensitive attributes that it infers from appearance &ndash; apparent origin
-          or skin tone, for example. That is exactly what malziME demonstrates: that algorithms make such assumptions at
-          all. These assessments are guesses, frequently wrong, and are not stored.
+          The AI deliberately also guesses sensitive things such as origin or skin tone. That is exactly what malziME is
+          meant to show: that algorithms make such assumptions. These guesses are not stored permanently.
         </p>
         <p class="disclaimer__workshop">
-          For workshops you can also use the AI-generated example photos provided, or older pictures. No uploaded image
-          is stored permanently, and none can be retrieved after the analysis.
+          You can also use one of our example photos (made by an AI). Then you don't send a photo of your own.
         </p>
       </div>
-
       <!-- Kurzfassung -->
       <section class="legal-section">
-        <h2>The essentials, in four sentences</h2>
+        <h2>The most important points</h2>
         <div class="legal-block legal-block--highlight">
           <ul class="legal-list legal-list--kurz">
+            <li><strong>Your photo</strong> is deleted immediately after the analysis – usually about a minute after you upload it.</li>
             <li>
-              <strong>Your photo</strong> is deleted automatically and immediately after the analysis &ndash; usually
-              within seconds.
+              <strong>Where and when</strong> the photo was taken never reaches us. Your browser removes this
+              information before it sends anything.
             </li>
             <li>
-              <strong>Location data and the capture date</strong> never reach our servers &ndash; your browser reads
-              them and does not send them along.
+              <strong>We don't know who you are:</strong> no account, no cookies, no advertising, no selling of data.
             </li>
+            <li><strong>Your IP address</strong> is not stored permanently.</li>
             <li>
-              <strong>We store nothing about you:</strong> no account, no tracking cookies, no permanent
-              <abbr title="Internet Protocol">IP</abbr> address, no advertising, no data trade.
-            </li>
-            <li>
-              <strong>You do not have to take our word for it.</strong> The entire source code is open, and one click
-              lets you verify that this is exactly what is running here.
+              <strong>You don't have to trust us:</strong> the entire program code is open, and with one click you can
+              check that exactly this code is running here.
             </li>
           </ul>
-          <p class="legal-kurz-fuss">Everything else is spelled out below &ndash; nothing hidden, no small print.</p>
         </div>
       </section>
-
+      <!-- Kinder unter 14 -->
+      <section class="legal-section">
+        <h2>Are you under 14?</h2>
+        <div class="legal-block legal-block--highlight">
+          <p>
+            Then you need permission from your parents or guardians to use a <strong>photo of yourself</strong>.
+            Without that permission, please use one of the <strong>example photos</strong> – they work just the same.
+          </p>
+          <p class="legal-fein">
+            This is required by the Austrian Data Protection Act (<span lang="de">Datenschutzgesetz</span>,
+            §&nbsp;4(4) DSG).
+          </p>
+        </div>
+      </section>
       <!-- Verantwortlicher -->
       <section class="legal-section">
-        <h2>Controller</h2>
+        <h2>Who is responsible?</h2>
         <p>
-          malziland - learning | training | consulting e.U., owner Christoph Krieger. All contact details are in the
-          <a href="/en/legal-notice" tabindex="0">legal notice</a>.
+          malziland - learning | training | consulting e.U., owner Christoph Krieger. You'll find all contact details in
+          the <a href="/en/legal-notice" tabindex="0">legal notice</a>.
         </p>
-        <p>Data protection contact: <a href="mailto:datenschutz@malzi.me" tabindex="0">datenschutz@malzi.me</a></p>
+        <p>Questions about data protection: <a href="mailto:datenschutz@malzi.me" tabindex="0">datenschutz@malzi.me</a></p>
       </section>
-
-      <!-- Was passiert mit meinem Foto? -->
+      <!-- Ablauf -->
       <section class="legal-section">
-        <h2>What happens to my photo?</h2>
+        <h2>How an analysis works</h2>
         <ol class="legal-list">
           <li>
-            <strong>Your browser takes the first step.</strong> Before anything reaches a server, your browser scales
-            the photo down to a maximum of 1280&nbsp;pixels and compresses it &ndash; normally as a JPEG, on some
-            devices as a PNG. A HEIC photo (the default on many Samsung phones) that your browser cannot open itself is
-            converted by a bundled component, also in the browser &ndash; the photo never leaves your device. The file
-            name? Not transmitted. <abbr title="Global Positioning System">GPS</abbr> coordinates and the capture date?
-            They never reach our servers &ndash; your browser reads them, and they are not included with the newly
-            compressed photo. If GPS data is present, your browser asks OpenStreetMap directly for the address and the
-            map &ndash; without any detour through us. Our server learns nothing about it.
+            <strong>Your browser prepares the photo.</strong> It makes it smaller (at most 1280&nbsp;pixels) and sends
+            on only this new, small version. Location, date taken and file name are dropped. It also converts HEIC photos
+            (for example from Samsung phones) on your device.
           </li>
           <li>
-            <strong>Little goes to our server.</strong> Only the compressed image and two camera details: manufacturer
-            and model. No GPS, no capture date, no file name, no original photo.
+            <strong>The small photo goes to our server in Belgium (EU).</strong> Only these travel with it: the make and
+            model of your camera, your language (German or English) and a random number for this one run, so that we can
+            find errors.
           </li>
           <li>
-            <strong>Your photo waits briefly in a queue.</strong> So that nobody gets an error when many uploads arrive
-            at once, our server places your compressed image on a server in the EU for the short waiting period. It sits
-            there untouched &ndash; as long as it is not its turn, it is neither looked at nor processed. As soon as
-            your photo has been analysed, it is deleted immediately and automatically. Usually that takes only seconds,
-            at peak times a few minutes.
+            <strong>A short wait.</strong> When it's busy, your photo waits in a queue on a server in the EU. Nobody
+            looks at it there.
           </li>
           <li>
-            <strong>Mistral AI analyses the photo.</strong> Our server sends the compressed image and the camera
-            metadata to the French AI provider <strong>Mistral AI</strong> (registered office: Paris, EU). Mistral
-            analyses the image and creates two guessed profiles from it in a single call (modes &bdquo;normal&ldquo; and
-            &bdquo;Beast&ldquo;). For the exaggerated Beast variant a second call to the same AI follows, asking for
-            matching advertising categories &ndash; <strong>no image</strong> is sent with it, only the freshly
-            generated, guessed profile details &ndash; and for that we use the capable <em>Mistral Large</em> model. We
-            use Mistral's EU regional endpoint: under the contract, the image analysis therefore runs in data centres in
-            the EU or EFTA. For ancillary services Mistral may use temporary sub-processors outside the EU, in which
-            case with <abbr title="General Data Protection Regulation">GDPR</abbr> safeguards under Art.&nbsp;46
-            (standard contractual clauses). On the paid API tier we use, inputs and outputs are, according to the
-            provider's commitment, <strong>not used for training</strong>. In addition,
-            <strong>Zero Data Retention</strong> is activated for our organisation (confirmed by Mistral in writing on
-            11&nbsp;August&nbsp;2026): inputs and outputs are not stored or logged for longer than generating the
-            response technically requires. Mistral still screens requests automatically for illegal content such as
-            child abuse or violence. Mistral only knows the data from the specific request &ndash; not your
-            <abbr title="Internet Protocol">IP</abbr> address, and no other user data. Facial recognition is not
-            enabled. We last verified and documented these commitments &ndash; EU endpoint, Zero Data Retention, no
-            training &ndash; directly in the Mistral dashboard on 11&nbsp;August&nbsp;2026; we re-check them regularly,
-            at least every six months and before major releases. Further details on request.
+            <strong>The AI analyses the photo.</strong> This is done by Mistral AI from Paris. Mistral receives only the
+            photo – not your IP address and nothing that could identify you. From it, the AI writes two guessed profiles:
+            “Serious” and “Beast”.
           </li>
           <li>
-            <strong>After that, it is over.</strong> The finished profile arrives in your browser. So that your browser
-            can collect it after the queue, it remains on the server for a short while &ndash; with no link to any
-            person &ndash; and is deleted automatically a few minutes after collection; if a result is never collected,
-            the server clears it after roughly 2&nbsp;hours at the latest. Once you close the page, nothing is left in
-            the browser.
+            <strong>Your result arrives in your browser.</strong> It is deleted from the server shortly afterwards –
+            exactly when is listed below under “What we keep”.
           </li>
+          <li><strong>Close the page – everything is gone.</strong> Nothing stays behind in your browser either.</li>
         </ol>
+        <p>
+          If your photo contains GPS data, malziME shows you where it was taken. For this, your browser fetches the
+          address and the map directly from OpenStreetMap – without going through us. The location data never reaches our servers.
+        </p>
       </section>
-
-      <!-- Was bei uns nicht existiert -->
+      <!-- Aufbewahrung -->
       <section class="legal-section">
-        <h2>What does not exist here</h2>
-        <div class="legal-block legal-block--highlight">
-          <ul class="legal-list legal-list--flush">
-            <li>
-              <strong>No permanently stored photo</strong> &ndash; your image is buffered only for the brief processing
-              and deleted immediately afterwards (details under &bdquo;What happens to my photo?&ldquo;). At Mistral the
-              same applies, thanks to activated Zero Data Retention.
-            </li>
-            <li>
-              <strong>No permanently stored profile</strong> &ndash; the finished profile sits on the server only
-              briefly so that your browser can collect it, and is deleted automatically a few minutes after collection
-              (never-collected ones after roughly 2&nbsp;hours at the latest). It is not linked to any person.
-            </li>
-            <li>
-              <strong>No original photo</strong> &ndash; the server only receives a scaled-down, re-encoded version
-              (max. 1280&nbsp;px). Your high-resolution original stays with you.
-            </li>
-            <li>
-              <strong>No file name</strong> &ndash; whether your photo is called &bdquo;selfie_at_the_beach.jpg&ldquo;
-              is something we never learn. What travels along is a newly assigned name unrelated to your file
-              (&bdquo;upload.jpg&ldquo;, or &bdquo;upload.png&ldquo; depending on the format).
-            </li>
-            <li>
-              <strong>No GPS data on the server</strong> &ndash; GPS coordinates are read in the browser and go only to
-              OpenStreetMap, never to us or to Google.
-            </li>
-            <li>
-              <strong>No account</strong> &ndash; no login, no password, no email address. We do not know who you are.
-            </li>
-            <li>
-              <strong>No tracking</strong> &ndash; no cookie, no localStorage, no analytics tools. In the
-              <strong>sessionStorage of your tab</strong> the page remembers a few technical things: the anonymous
-              collection ticket (so your result survives an accidental reload), your mode choice (serious or Beast),
-              your language choice (German or English), the ticket for the reality check, and a small crash guard. None
-              of these values contains personal data, none is suitable for recognising you, and all of them delete
-              themselves as soon as you close the tab. After that your browser forgets us just as quickly as we forget
-              it.
-            </li>
-            <li>
-              <strong>No permanent IP address</strong> &ndash; the abuse protection keeps your IP in memory for at most
-              10&nbsp;minutes, then it is gone.
-            </li>
-          </ul>
+        <h2>What we keep – and for how long</h2>
+        <div class="legal-raster">
+        <div class="legal-block legal-block--eintrag">
+          <h3>Your photo <span class="dauer-plakette">about 1&nbsp;min</span></h3>
+          <p><strong>How long:</strong> We delete it right after the analysis – usually about a minute after you upload it. When it's busy, there is a wait before that.</p>
+          <p><strong>Double safety net:</strong> If that ever fails, our clean-up removes it after about 2&nbsp;hours. And if that fails too, Google deletes it by itself once it is 1&nbsp;day old – Google does not promise an exact time for this.</p>
+          <p><strong>Why:</strong> So that the queue works.</p>
         </div>
-        <p>
-          The <a href="/stats?lang=en" tabindex="0">analysis counter</a> stores only counts: the totals per period (day,
-          week, month, year, overall) &ndash; each with its date key, so the counter continues correctly when the day
-          changes &ndash; and, so that the hourly limit can roll, the timestamps of the analyses from the last
-          60&nbsp;minutes. No IP addresses, no image content, no user profiles. The counter serves cost protection and
-          transparent usage statistics.
-        </p>
-        <p>
-          Our application logs contain only a random request ID, the status and technical processing steps (step name,
-          response length, token counts) &ndash; no image content, no profiles, no IP addresses. The server-side request
-          logs of the infrastructure (Google) &ndash; the only place where an IP address would arise &ndash; are
-          excluded entirely and are not stored in the first place. The remaining program logs, which contain no personal
-          data, are stored on EU servers (region europe-west1, Belgium) and delete themselves after 1&nbsp;day. In
-          addition, Google keeps a mandatory record of our own administrative access to the project, i.e. our Google account and the
-          address of our computer during maintenance work, for 400&nbsp;days. It contains no data of users and is stored by
-          Google without a choice of region. Entirely anonymous diagnostic data without personal reference (for
-          example error type, duration, a coarse browser and operating system class such as &bdquo;Safari 17 /
-          iOS&ldquo; instead of the full user agent, a screen size class &ndash; small, medium, large &ndash; instead of
-          the exact resolution, network class and speed, data saver setting, language setting, number of processor
-          cores, memory class, whether the browser identifies itself as automated (yes/no), pixel density, in case of a
-          read error the time between photo selection and read attempt and the outcome of a second read attempt as a
-          keyword, a coarse subject class of the image (human, animal or mixed &ndash; not the image itself) and the
-          page visited without query parameters &ndash; no IP addresses, no images, no file names) is kept for up to
-          30&nbsp;days so that rare device faults can be detected and fixed across several workshops.
-        </p>
-        <p>
-          For the voluntary reality check we record one anonymous entry per rating (which of the AI's assessments you
-          marked as correct or wrong) and aggregate from it how well the AI performed on average &mdash; without the
-          photo, without the profile and without any connection to your analysis. These entries carry no identifier and
-          are kept for up to 30&nbsp;days.
+        <div class="legal-block legal-block--eintrag">
+          <h3>Your finished profile <span class="dauer-plakette">about 15&nbsp;min</span></h3>
+          <p><strong>What exactly:</strong> The profile, plus the make and model of your camera and your language. No name, no IP address.</p>
+          <p><strong>How long:</strong> About 15&nbsp;minutes after your browser has collected it. Never collected: after about 2&nbsp;hours.</p>
+          <p><strong>Double safety net:</strong> If our clean-up ever fails, Google deletes the profile by itself. This starts 24&nbsp;hours after the upload and usually takes no more than one more day.</p>
+          <p><strong>Why:</strong> So that your browser can collect it.</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>Your IP address <span class="dauer-plakette">about 10&nbsp;min</span></h3>
+          <p><strong>How long:</strong> About 10&nbsp;minutes, only in working memory, never on a hard drive.</p>
+          <p><strong>Why:</strong> Protection against misuse (too many requests in a row).</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>Technical log <span class="dauer-plakette">1&nbsp;day</span></h3>
+          <p><strong>What exactly:</strong> Which step ran, whether it worked, how long it took, how much text the AI processed, plus the random number. No photo, no profile, no IP address – we have switched off Google's access logs that would contain IP addresses.</p>
+          <p><strong>How long:</strong> 1&nbsp;day.</p>
+          <p><strong>Why:</strong> Finding errors.</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>Child-protection check <span class="dauer-plakette">30&nbsp;days</span></h3>
+          <p><strong>What exactly:</strong> Two entries per analysis: how long the AI took and what the child-protection filter decided (roughly which age the AI guessed and whether a word from our block list came up). No photo, no profile and no number that could link the entry to anything.</p>
+          <p><strong>How long:</strong> 30&nbsp;days.</p>
+          <p><strong>Why:</strong> Checking that child protection works reliably.</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>Reports from your browser <span class="dauer-plakette">30&nbsp;days</span></h3>
+          <p><strong>What exactly:</strong> When something goes wrong or works: rough details such as type of error, duration, the page opened, browser type (for example “Safari 17 / iOS”), screen size (small, medium, large), language, network, whether a person, an animal or both were in the picture (not the picture itself), and for a photo that could not be opened, its format and size – plus the random number. No IP address, no photo, no file name.</p>
+          <p><strong>How long:</strong> 30&nbsp;days.</p>
+          <p><strong>Why:</strong> We keep them for 30&nbsp;days to find rare device errors across several workshops.</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>Your rating in the reality check <span class="dauer-plakette">30&nbsp;days</span></h3>
+          <p><strong>What exactly:</strong> Voluntary: which of the AI's guesses were right or wrong. No photo, no profile, no number linking it to your analysis.</p>
+          <p><strong>How long:</strong> 30&nbsp;days.</p>
+          <p><strong>Why:</strong> Counting how accurate the AI is on average.</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>Counter <span class="dauer-plakette">ongoing</span></h3>
+          <p><strong>What exactly:</strong> How many analyses there have been (per day, week, month, year, in total), when the most recent ones were and how long the last ones took. No link to any person. You can see the figures on the <a href="/stats" tabindex="0">statistics page</a>.</p>
+          <p><strong>How long:</strong> Ongoing.</p>
+          <p><strong>Why:</strong> Cost protection, statistics and an honest waiting-time display.</p>
+        </div>
+        </div>
+        <p class="legal-fein">
+          Two things are Google's rules, not ours: Google keeps deleted database entries for up to one hour as a
+          technical backup – this cannot be switched off, and only we could access them. And Google keeps a mandatory log
+          of our own maintenance work for 400&nbsp;days (our Google account and our computer's address). It contains no
+          data about you and is stored by Google without a choice of country.
         </p>
       </section>
-
-      <!-- Wer ist beteiligt? -->
+      <!-- Browser -->
       <section class="legal-section">
-        <h2>Who is involved?</h2>
-        <div
-          class="legal-table-wrap"
-          tabindex="0"
-          role="region"
-          aria-label="Table: services involved, scrolls horizontally"
-        >
-          <table class="legal-table">
-            <thead>
-              <tr>
-                <th>Service</th>
-                <th>What it receives</th>
-                <th>Operator</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Mistral AI API</td>
-                <td>
-                  Compressed photo plus camera metadata (manufacturer, model) for the image description and profile
-                  generation. No facial recognition, no storage except on an abuse filter hit.
-                </td>
-                <td>Mistral AI SAS, 15 Rue des Halles, 75001 Paris, France (EU)</td>
-              </tr>
-              <tr>
-                <td>Firebase Hosting, Cloud Functions &amp; Cloud Storage</td>
-                <td>
-                  Compressed photo plus camera manufacturer and model &ndash; in memory during processing, buffered
-                  briefly in EU storage while in the queue, and deleted immediately after the analysis. Static delivery
-                  of HTML, CSS and JavaScript.
-                </td>
-                <td>Google Ireland Ltd., EU (europe-west1)</td>
-              </tr>
-              <tr>
-                <td>Cloud Firestore</td>
-                <td>
-                  Anonymous analysis counter (counts per period, no individual events), the maintenance flag and the
-                  short-lived queue management (status plus finished profile with no personal reference, deleted a few
-                  minutes after collection, never-collected ones after roughly 2&nbsp;hours). No accounts, no IP
-                  addresses.
-                </td>
-                <td>Google Ireland Ltd., EU (europe-west1)</td>
-              </tr>
-              <tr>
-                <td>OpenStreetMap / Nominatim</td>
-                <td>GPS coordinates plus IP address (from the browser only, and only if GPS data is present)</td>
-                <td>OpenStreetMap Foundation, UK</td>
-              </tr>
-            </tbody>
-          </table>
+        <h2>In your browser</h2>
+        <p>
+          No cookies, no permanent storage, no analytics tools. Only while the tab is open, the page remembers a few
+          technical things: the ticket for collecting your result and when it arrived, whether you confirmed the notice
+          before the analysis, your choice of “Serious” or “Beast”, your language, the ticket for the reality check and a
+          small crash guard. None of this reveals who you are. Close the tab – everything is gone.
+        </p>
+      </section>
+      <!-- IP-Adresse erklaert -->
+      <section class="legal-section">
+        <h2>What is an IP address?</h2>
+        <div class="legal-block">
+          <p>
+            Every device on the internet has an address, the IP address – just as a house has a postal address. Every
+            website needs it to be able to send you a page.
+          </p>
+          <p><strong>Receiving is not storing.</strong> We do not store your IP address permanently.</p>
         </div>
       </section>
-
-      <!-- Das Rechtliche -->
+      <!-- Beteiligte -->
       <section class="legal-section">
-        <h2>The legal part</h2>
-        <p>
-          Your photo is processed on the basis of your <strong>consent</strong> (Art.&nbsp;6(1)(a) GDPR) &ndash; you
-          give it by uploading a photo. No upload, no processing. The abuse protection (rate limiting) relies on our
-          legitimate interest (Art.&nbsp;6(1)(f) GDPR).
-        </p>
-        <p>
-          <strong>Mistral AI</strong> processes the photo data on our behalf as a <strong>processor</strong>
-          (Art.&nbsp;28 GDPR). Mistral AI is a French company (SAS) with its registered office in Paris and is directly
-          subject to the GDPR. We use the EU regional endpoint: under the contract, the image analysis therefore runs in
-          data centres in the EU or EFTA. Mistral may not use the data for its own purposes, and on the paid API tier we
-          use, inputs and outputs are, according to the provider's commitment, not used for training. Temporary
-          sub-processors may be used outside the EU, in which case with GDPR safeguards under Art.&nbsp;46 (for example
-          standard contractual clauses). Mistral provides a list of sub-processors in its
-          <a href="https://trust.mistral.ai/subprocessors" target="_blank" rel="noopener" tabindex="0">Trust Center</a>.
-          Legal basis:
-          <a href="https://legal.mistral.ai/terms/data-processing-addendum" target="_blank" rel="noopener" tabindex="0"
-            >Mistral Data Processing Addendum</a
-          >. Contact for Mistral's data protection officer:
-          <a href="mailto:DPO@mistral.ai" tabindex="0">DPO@mistral.ai</a>.
-        </p>
-        <p>
-          <strong>Google Ireland Limited</strong> now provides the infrastructure only: Firebase Hosting for the
-          website, Cloud Functions for the backend processing, Cloud Storage for the brief image buffering in the queue,
-          and Cloud Firestore for the anonymous analysis counter and the queue management. All data processing (Cloud
-          Functions, Cloud Storage, Firestore) runs on EU servers (region <code>europe-west1</code>, Belgium); the
-          pages of the website, which contain no user data at all, are delivered by Firebase Hosting via a worldwide
-          content delivery network (CDN). Your photo and all analysis data are sent by your browser directly to our
-          server in the EU (region europe-west1, Belgium), not via this network. Google also processes this data as a
-          <strong>processor</strong> (Art.&nbsp;28 GDPR) and may not use it for its own purposes. Legal basis:
-          <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener" tabindex="0"
-            >Google Cloud Data Processing Addendum</a
-          >. <strong>Important:</strong> since May 2026 we no longer use any Google AI services &ndash; neither Vertex
-          AI nor Cloud Vision. The AI analysis runs exclusively through Mistral AI in the EU.
-        </p>
-        <p>
-          The OpenStreetMap Foundation (UK) processes GPS coordinates when resolving an address. The United Kingdom has
-          an
-          <a
-            href="https://commission.europa.eu/law/law-topic/data-protection/international-dimension-data-protection/adequacy-decisions_en"
-            target="_blank"
-            rel="noopener"
-            tabindex="0"
-            >adequacy decision</a
-          >
-          from the European Commission.
-        </p>
+        <h2>Who is involved</h2>
+        <div class="legal-raster">
+        <div class="legal-block legal-block--eintrag">
+          <h3>Mistral AI <span class="ort-plakette">France · EU</span></h3>
+          <p><strong>Receives:</strong> The small photo, to analyse it. No IP address, no facial recognition. Nothing is stored – unless Mistral's abuse filter is triggered.</p>
+          <p><strong>Address:</strong> Mistral AI SAS, 15 Rue des Halles, 75001 Paris</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>Google <span class="ort-plakette">Belgium · EU</span></h3>
+          <p><strong>Receives:</strong> Our server, the queue and the database run there. When the page loads, Google's worldwide delivery network needs your device's IP address – as with every website; we don't receive it and don't store it.</p>
+          <p><strong>Address:</strong> Google Ireland Ltd.</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>OpenStreetMap <span class="ort-plakette">United Kingdom</span></h3>
+          <p><strong>Receives:</strong> Only if your photo contains GPS data: the coordinates (also as a map section), your IP address and the usual browser details (browser type, language, that the request comes from malzi.me). Your browser asks directly, without going through us.</p>
+          <p><strong>Address:</strong> OpenStreetMap Foundation</p>
+        </div>
+        <div class="legal-block legal-block--eintrag">
+          <h3>IONOS <span class="ort-plakette">Germany · EU</span></h3>
+          <p><strong>Receives:</strong> Only if you send us an email: your message.</p>
+          <p><strong>Address:</strong> IONOS SE</p>
+        </div>
+        </div>
       </section>
-
-      <!-- Was wir bewusst nicht tun -->
+      <!-- Nie -->
       <section class="legal-section">
-        <h2>What we deliberately do not do</h2>
-        <ul class="legal-list">
-          <li>No tracking &ndash; no analytics, no Facebook pixel, no Google Tag Manager</li>
-          <li>No advertising</li>
-          <li>No data trade</li>
-          <li>
-            No facial recognition &ndash; Mistral recognises <em>that</em> a face is present, but not <em>whose</em> it
-            is. No biometric comparison against databases.
-          </li>
-          <li>
-            No external scripts &ndash; fonts, maps and
-            <abbr title="Exchangeable Image File Format">EXIF</abbr> parsing all run locally
-          </li>
+        <h2>What we never do</h2>
+        <ul class="legal-kacheln">
+          <li><strong>No tracking</strong> – no analytics tools, no Facebook pixel, no Google Tag Manager.</li>
+          <li><strong>No advertising.</strong></li>
+          <li><strong>No selling of data.</strong></li>
+          <li><strong>No facial recognition</strong> – the AI recognises <em>that</em> there is a face, but not <em>whose</em>.</li>
+          <li><strong>No third-party scripts</strong> – fonts, the map software and reading the photo data come from our own server.</li>
         </ul>
+      </section>
+      <!-- Rechte -->
+      <section class="legal-section">
+        <h2>Your rights</h2>
+        <div class="legal-raster">
+          <div class="legal-block legal-block--eintrag">
+            <h3>Access</h3>
+            <p>We have stored nothing we could link to you.</p>
+          </div>
+          <div class="legal-block legal-block--eintrag">
+            <h3>Erasure, rectification, restriction</h3>
+            <p>There is nothing we could link to you.</p>
+          </div>
+          <div class="legal-block legal-block--eintrag">
+            <h3>Taking your data with you</h3>
+            <p>You can save your profile as a PDF.</p>
+          </div>
+          <div class="legal-block legal-block--eintrag">
+            <h3>Withdrawing consent</h3>
+            <p>Simply close the page.</p>
+          </div>
+          <div class="legal-block legal-block--eintrag">
+            <h3>Objecting</h3>
+            <p>You can object at any time to anything we do on the basis of legitimate interest (abuse protection, reports, logs) – a short email to <a href="mailto:datenschutz@malzi.me" tabindex="0">datenschutz@malzi.me</a> is enough.</p>
+          </div>
+          <div class="legal-block legal-block--eintrag">
+            <h3>Complaining</h3>
+            <p>To the Austrian data protection authority (<span lang="de">Datenschutzbehörde</span>), Barichgasse 40–42, 1030 Vienna (<a href="https://dsb.gv.at" target="_blank" rel="noopener" tabindex="0">dsb.gv.at</a>).</p>
+          </div>
+        </div>
+        <p class="legal-fein">Legal basis: Art.&nbsp;15, 16, 17, 18, 20, 21, 7(3) and 77 GDPR.</p>
       </section>
 
       <!-- Nachpruefbarkeit -->
@@ -464,43 +393,65 @@ sh scripts/pruefe-live.sh</code></pre>
         </div>
       </section>
 
-      <!-- Cookies -->
+      <!-- Rechtliche Einzelheiten -->
       <section class="legal-section">
-        <h2>Cookies</h2>
+        <h2>In detail: the legal particulars</h2>
+        <p class="legal-fein">For parents, teachers and anyone who wants to know exactly.</p>
+        <h3>Legal bases</h3>
         <p>
-          malziME sets <strong>no tracking cookies</strong>. Firebase Hosting may set a technical cookie
-          (<code>__session</code>) to route requests &ndash; it contains no personal data.
+          Your photo and the OpenStreetMap request: your <strong>consent</strong> (Art.&nbsp;6(1)(a) GDPR) – you give it
+          by uploading a photo; under 14, your parents' consent is also required (§&nbsp;4(4) DSG). No upload, no
+          processing. The secure operation of the website – abuse protection, reports, logs and the evaluation of the
+          child-protection filter – and answering emails: our <strong>legitimate interest</strong> (Art.&nbsp;6(1)(f)
+          GDPR).
         </p>
-      </section>
-
-      <!-- Workshops -->
-      <section class="legal-section">
-        <h2>Workshops</h2>
+        <h3>Mistral AI</h3>
         <p>
-          The AI profiles are <strong>guesses</strong>. Algorithms assert &ndash; they prove nothing. This is not
+          Mistral AI processes the photo on our behalf as a <strong>processor</strong> (Art.&nbsp;28 GDPR) and, as a
+          French company, is directly subject to the GDPR. We use the EU regional endpoint: according to the contract,
+          the image analysis runs in data centres in the EU or EFTA. For ancillary services Mistral may temporarily use
+          sub-processors outside the EU, in that case with safeguards under Art.&nbsp;46 GDPR (standard contractual
+          clauses); the list is in the
+          <a href="https://trust.mistral.ai/subprocessors" target="_blank" rel="noopener" tabindex="0">Trust Center</a>.
+          On our paid access, inputs and outputs are <strong>not used for training</strong> according to the provider's
+          commitment. <strong>Zero Data Retention</strong> is enabled for our organisation, confirmed in writing by
+          Mistral on 11&nbsp;August&nbsp;2026: inputs and outputs are not stored or logged for longer than technically
+          required to produce the answer. Mistral still checks requests automatically for illegal content such as child
+          abuse or violence. We last verified and documented these commitments directly in the Mistral dashboard on
+          11&nbsp;August&nbsp;2026; we check them again at least every six months and before major releases. Contractual
+          basis:
+          <a href="https://legal.mistral.ai/terms/data-processing-addendum" target="_blank" rel="noopener" tabindex="0"
+            >Mistral Data Processing Addendum</a
+          >. Mistral's data protection officer: <a href="mailto:DPO@mistral.ai" tabindex="0">DPO@mistral.ai</a>.
+        </p>
+        <h3>Google</h3>
+        <p>
+          Google Ireland Limited only provides the infrastructure: Firebase Hosting for the website, Cloud Functions for
+          our server, Cloud Storage for the queue and Cloud Firestore for the counter and queue management – all in the
+          region <code>europe-west1</code> (Belgium). Your browser sends your photo and all analysis data directly there,
+          not through the worldwide delivery network. Google processes the data as a <strong>processor</strong>
+          (Art.&nbsp;28 GDPR) and may not use it for its own purposes. Contractual basis:
+          <a href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener" tabindex="0"
+            >Google Cloud Data Processing Addendum</a
+          >. Since May 2026 we have used <strong>no Google AI services</strong> – neither Vertex AI nor Cloud Vision.
+        </p>
+        <h3>OpenStreetMap</h3>
+        <p>
+          For the United Kingdom, where the OpenStreetMap Foundation is based, there is an
+          <a
+            href="https://commission.europa.eu/law/law-topic/data-protection/international-dimension-data-protection/adequacy-decisions_en"
+            target="_blank"
+            rel="noopener"
+            tabindex="0"
+            >adequacy decision</a
+          >
+          by the European Commission.
+        </p>
+        <h3>No automated decision</h3>
+        <p>
+          The profiles are guesses and only show what algorithms might claim. Nothing is decided about you – this is not
           automated decision-making within the meaning of Art.&nbsp;22 GDPR.
         </p>
-      </section>
-
-      <!-- Deine Rechte -->
-      <section class="legal-section">
-        <h2>Your rights</h2>
-        <ul class="legal-list">
-          <li><strong>Access</strong> (Art.&nbsp;15): what we have stored about you &ndash; nothing.</li>
-          <li><strong>Erasure</strong> (Art.&nbsp;17): already done &ndash; there is nothing to erase.</li>
-          <li><strong>Withdrawal of consent</strong> (Art.&nbsp;7(3)): close the page, and that is that.</li>
-          <li>
-            <strong>Complaint</strong> (Art.&nbsp;77): Austrian data protection authority (<span lang="de"
-              >Datenschutzbeh&ouml;rde</span
-            >), Barichgasse 40&ndash;42, 1030 Vienna (<a
-              href="https://dsb.gv.at"
-              target="_blank"
-              rel="noopener"
-              tabindex="0"
-              >dsb.gv.at</a
-            >)
-          </li>
-        </ul>
       </section>
 
       <!-- Sprachhinweis als SCHLUSSBEMERKUNG, nicht als Vorspann.

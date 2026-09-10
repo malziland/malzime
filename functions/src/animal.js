@@ -6,9 +6,10 @@
  * Seit v1.6.0 (Pure-Mistral-Architektur) gibt es KEINE Vision-API mehr.
  * Tier-/Personen-Erkennung läuft jetzt über zwei Quellen:
  *
- *  1. SUBJECT-Kopfzeile in Mistrals Bildbeschreibung
- *     (Format "SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER" — siehe
- *     prompts.js mistralDescribeAddendum).
+ *  1. Feld `subject` der KI-Antwort (ANIMAL_ONLY | HUMAN | MIXED | OTHER).
+ *     job-pipelines.js setzt es als Kopfzeile "SUBJECT: …" vor die
+ *     Beschreibung, die hier ausgewertet wird (Schema: singleLargePrompt in
+ *     prompts.js).
  *
  *  2. Wenn SUBJECT == ANIMAL_ONLY: Keyword-Match im Beschreibungstext,
  *     um die konkrete Tierart fürs Easter-Egg-Profil zu wählen

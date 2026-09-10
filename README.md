@@ -73,7 +73,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket
   feature-flags.js          Laufzeit-Feature-Flags aus Firestore (30s-Cache)
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
-  mistral.js                Mistral AI: aktiv Single-Large-Call (Large erstellt Beschreibung + beide Profile); 3-Call-Hybrid (Large Describe + Small Profile) als Fallback
+  mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile, ein zweiter ohne Bild die Beast-Werbung
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
     animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
@@ -87,7 +87,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
   __tests__/                Jest Unit-Tests + fixtures/ fuer json-repair
-  scripts/                  Dev-Tools (test-subject.js, load-test-malzime.js, queue-emulator-loadtest.js)
+  scripts/                  Dev-Tools (load-test-malzime.js, queue-emulator-loadtest.js)
 ```
 
 ## Queue-Architektur (v2.0)
@@ -343,7 +343,6 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 | Queue              | Google Cloud Tasks (dosierter Job-Dispatch, europe-west1)                                                                    |
 | Datenbank          | Cloud Firestore (Zaehler, Maintenance-Flag, Queue-Jobs, europe-west1)                                                        |
 | KI-Analyse (aktiv) | Mistral Large (multimodal, Paris/EU) — ein Single-Call erstellt Bildbeschreibung + beide Profile                             |
-| KI-Fallback        | Klassische 3-Call-Pipeline (Large beschreibt, Small profiliert), per Feature-Flag umschaltbar                                |
 | Karten             | Leaflet + OpenStreetMap (self-hosted Lib + OSM-Tiles)                                                                        |
 | Geocoding          | Nominatim (client-seitig, OpenStreetMap Foundation)                                                                          |
 | EXIF-Parsing       | exifr (client-seitig im Browser)                                                                                             |
@@ -354,7 +353,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 ## Einschraenkungen
 
 - **Mistral-Abh&auml;ngigkeit**: Wenn Mistral nicht erreichbar ist, schlaegt die Analyse fehl (keine Fallback-Provider mehr seit v1.6.0). Der User sieht eine `blocked.apiError`-Antwort. Mistrals SLA + Multi-Region-Setup machen das selten.
-- **Safety-Filter**: Mistrals Sicherheitsfilter koennen die Bildbeschreibung bei sensiblen Inhalten blockieren. In dem Fall sieht der User `blocked.safetyFilter`.
+- **Safety-Filter**: Verweigert Mistral bei sensiblen Inhalten die Analyse, liefert die Antwort keine Profile; der User sieht `blocked.profileBlocked` (bzw. `blocked.apiError`, wenn der Aufruf selbst scheitert).
 - **SUBJECT-Klassifikation**: Tier-Easter-Egg-Profile werden ueber die `SUBJECT:`-Kopfzeile in Mistrals Antwort und Keyword-Matching im Beschreibungstext bestimmt (siehe `animal.js`). Bei Unsicherheit faellt die Pipeline auf den normalen Profil-Pfad zur&uuml;ck.
 - **Alters-Schaetzung**: erfolgt ausschliesslich durch Mistral anhand physischer Merkmale. Seit v1.5.0 mit zwei Anker-Bloecken in den Prompts: Koerperproportionen (Schulter-zu-Kopf, Hand) als primaere Achse fuer Kinder/Teens, plus Zwangs-Mapping fuer Erwachsene (sichtbare Falten/Lid-Erschlaffung/Pigmentflecken haben Mindest-Alter-Schwellen).
 

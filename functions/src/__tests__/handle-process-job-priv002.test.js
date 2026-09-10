@@ -4,8 +4,8 @@
    server-seitig zu SUBJECT-/"Sichtbarer Text:"-Markern verdrahtet, sodass
    classifyDescription + buildPrivacyRisks (real) anschlagen.
 
-   Aufbau: jobs/storage/counter/cloud-tasks gemockt; feature-flags → Single-Large
-   AN; ../mistral durch einen Stub mit kontrolliertem runSingleLargeCall ersetzt.
+   Aufbau: jobs/storage/counter/cloud-tasks gemockt; feature-flags mit festen
+   Werten; ../mistral durch einen Stub mit kontrolliertem runSingleLargeCall ersetzt.
    privacy.js und animal.js bleiben REAL — also echte End-to-End-Verdrahtung. */
 
 /* Der Einstellungssatz als Kulisse: Dieser Test prueft etwas anderes, braucht
@@ -24,12 +24,15 @@ jest.mock("../jobs", () => ({
 jest.mock("../queue-storage", () => ({ loadImage: jest.fn(), deleteImage: jest.fn() }));
 jest.mock("../counter", () => ({ incrementTotals: jest.fn(() => Promise.resolve()) }));
 jest.mock("../cloud-tasks", () => ({ redispatchJobLocal: jest.fn() }));
-jest.mock("../feature-flags", () => ({ isSingleLargeCallEnabled: jest.fn() }));
+jest.mock("../feature-flags", () => ({
+  isPromptCacheEnabled: jest.fn(async () => false),
+  isBeastAdsCallEnabled: jest.fn(async () => false),
+  isLiveTextEnabled: jest.fn(async () => false),
+}));
 jest.mock("../mistral", () => ({ runSingleLargeCall: jest.fn() }));
 
 const { runPipeline } = require("../handle-process-job");
 const storage = require("../queue-storage");
-const flags = require("../feature-flags");
 const mistral = require("../mistral");
 
 function profileWithCategory() {
@@ -45,7 +48,6 @@ describe("handle-process-job — PRIV-002 (Single-Large Datenschutz-Warnung)", (
   beforeEach(() => {
     jest.clearAllMocks();
     delete process.env.MISTRAL_MOCK; /* getMistral() nutzt dann den gemockten ../mistral */
-    flags.isSingleLargeCallEnabled.mockResolvedValue(true);
     storage.loadImage.mockResolvedValue({ buffer: Buffer.from("img"), mimeType: "image/jpeg" });
     storage.deleteImage.mockResolvedValue();
   });

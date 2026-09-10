@@ -6,13 +6,16 @@
  * von keinem Test gedeckt. Ihre Operatoren liessen sich umdrehen, ohne dass
  * etwas rot wurde:
  *
- *   job-pipelines.js:126   profileBlocked = !profiles.normal && !profiles.boost
- *   job-pipelines.js:134   hasAnyProfile  = hasCategories(normal) || hasCategories(boost)
+ *   profileBlocked = !profiles.normal && !profiles.boost   (Drei-Aufruf-Weg)
+ *   hasAnyProfile  = hasCategories(normal) || hasCategories(boost)
  *
  * Die Wirkung eines vertauschten Operators ist nicht theoretisch: Aus `&&`
  * wird `||`, und ein halbes Ergebnis gilt als blockiert — das Kind sieht eine
  * Fehlermeldung, obwohl ein Profil vorliegt. Andersherum wuerde ein leeres
  * Ergebnis als brauchbar durchgehen.
+ *
+ * Seit dem Ausbau des Drei-Aufruf-Wegs (10.09.2026) gibt es nur noch den
+ * Ein-Aufruf-Weg; die Faelle unten gelten dort unveraendert.
  */
 
 const { SATZ } = require("../test-satz");
@@ -37,8 +40,6 @@ describe("Wann gilt ein Profil als vorhanden", () => {
       deleteImage: async () => true,
     }));
     jest.doMock("../mistral", () => ({
-      describeImage: async () => "Ein Foto im Freien.",
-      generateBothProfiles: async () => profiles,
       runSingleLargeCall: async () => profiles,
     }));
     jest.spyOn(console, "log").mockImplementation(() => {});
@@ -131,8 +132,6 @@ describe("Profil ohne Karten", () => {
       deleteImage: async () => true,
     }));
     jest.doMock("../mistral", () => ({
-      describeImage: async () => "Ein Foto im Freien.",
-      generateBothProfiles: async () => profiles,
       runSingleLargeCall: async () => profiles,
     }));
     jest.spyOn(console, "log").mockImplementation(() => {});

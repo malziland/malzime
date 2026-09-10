@@ -96,7 +96,7 @@ export function renderCurrentMode(data) {
    Verwertung und den Verletzlichkeiten am Ende. Mistral garantiert im JSON-
    Output keine Key-Reihenfolge, deshalb sortieren wir clientseitig nach dieser
    Liste — damit Normal und Boost identisch geordnet sind und nicht zwischen
-   Analysen springen. Quelle: jsonSchemaNormal/jsonSchemaBoost in
+   Analysen springen. Quelle: das Antwortschema im singleLargePrompt in
    functions/src/locales/{de,en}/prompts.js. */
 /* eslint-disable-next-line no-unused-vars */
 const CATEGORY_ORDER = [

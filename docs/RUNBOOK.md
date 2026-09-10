@@ -25,8 +25,9 @@ deploy.sh ging durch).
 
 ## Normalbetrieb (Soll-Zustand)
 
-- **Aktiver Pfad:** Upload → Cloud-Tasks-Queue → Single-Large-Call
-  (`featureFlags/current`: `useSingleLargeCall = true`).
+- **Analyse-Weg:** Upload → Cloud-Tasks-Queue → ein Aufruf an Mistral Large
+  (Beschreibung + beide Profile). Einen zweiten, älteren Weg gibt es seit
+  10.09.2026 nicht mehr (Hebel 3 entfallen).
 - **Warteschlangen-Dosierung:** steht im Einstellungssatz
   (`parallelitaet` und `queueRatePerSekunde`) und wird von der `satzWache`
   automatisch in die Cloud-Tasks-Queue übertragen — hier bewusst ohne Zahl.
@@ -378,24 +379,15 @@ Hebel nimmt nur das Bedienelement zurück, nicht die Sprache.
 Wann er gebraucht wird: wenn der Umschalter mitten in einem Workshop irritiert
 oder ein Fehler auffällt. Kein Deploy, kein Neustart, keine Nebenwirkung.
 
-### 3. Single-Large-Call aus — IMMER alle drei Schritte
+### 3. Single-Large-Call aus — ENTFALLEN (10.09.2026)
 
-1. `featureFlags/current.useSingleLargeCall = false` (Firestore-Console).
-2. `./scripts/cloudtasks-concurrency-3.sh` ausführen (setzt die Queue auf
-   Concurrency 3).
-3. In Firestore `config/betriebsprofil`: `aktiv` auf den Satz `t1-drei-call`
-   setzen (`parallelitaet: 3`, `durchschnittsdauerSekunden: 100`). **Kein
-   Deploy mehr nötig** — seit dem Umbau vom 30.08.2026 stehen diese Werte in
-   der Datenbank. Ohne diesen Schritt zeigt das Frontend falsche
-   Wartezeit-Schätzungen.
-
-Alle drei Schritte wirken in ~30 s. **Warum die Kopplung:** Die
-3-Call-Pipeline nutzt `mistral-small` (nur 100K Tokens/min) — bei Concurrency über 3
-drohen massenhaft 429-Fehler (gemessen 2026-05-20: bei Parallelität 6 kamen 6 von
-12 Jobs als 429 zurück). Rückweg: Betriebsprofil zurückstellen (Flag wieder `true`); die
-Warteschlangen-Werte zieht die Anwendung selbst nach. `config.js` wird dabei
-nicht mehr angefasst — dieser Satz stammte aus der Zeit vor dem Umbau vom
-30.08.2026 und widersprach dem Hinweis drei Zeilen darüber.
+Dieser Hebel schaltete auf den älteren Drei-Aufruf-Weg (Mistral Large beschreibt,
+`mistral-small` profiliert) um. Der Weg ist ausgebaut: Er wurde nicht mehr genutzt,
+schaltete bei einer unlesbaren Einstellung sogar von selbst um und schickte dabei
+zusätzlich Hersteller und Modell der Kamera an Mistral. Fällt Mistral Large aus,
+bekommt der Nutzer eine Fehlermeldung (`blocked.apiError` bzw.
+`blocked.overloaded`) und kann es erneut versuchen. Der Notweg für eine längere
+Störung ist der Wartungsmodus (Hebel 1).
 
 ### 3a. Beast-Werbung im zweiten Aufruf zurückbauen (v2.8)
 
@@ -404,10 +396,10 @@ Bild, damit sie an der Schwachstelle ansetzt statt am Foto. Er ist so gebaut,
 dass ein Ausfall folgenlos bleibt: Schlägt er fehl, steht die Werbeliste aus dem
 Hauptaufruf. **Ein eigener Notfall-Hebel ist deshalb nicht nötig.**
 
-Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback):
-`./scripts/cloudtasks-concurrency-10.sh` ausführen und
-`parallelitaet` im Einstellungssatz auf 10 zurücksetzen (kein Deploy) — sonst läuft
-die Queue unnötig langsam.
+Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback): `parallelitaet`
+und `queueRatePerSekunde` im Einstellungssatz neu rechnen — vorher ins
+Mistral-Dashboard sehen. Kein Deploy nötig; die `satzWache` überträgt die Werte in
+die Queue.
 
 **Warum die Dosierung so steht, wie sie steht (Stand 08.09.2026):** Mistral
 erlaubt auf der Stufe T1 **15 Aufrufe je 60 Sekunden** (gemessen 08.09.2026:
@@ -436,8 +428,7 @@ Vorher ins Mistral-Dashboard sehen, nicht nach Gefühl entscheiden.
 Danach wird weder ein `prompt_cache_key` gesendet noch der Nachrichten-Aufbau
 umgestellt — der Pfad ist bitgenau der Stand v2.4.4.
 
-Anders als bei `useSingleLargeCall` (Punkt 3) gibt es hier **keine** Kopplung an
-Concurrency oder `config.js`: Es ist eine reine Kostenmaßnahme ohne Einfluss auf
+Es gibt hier **keine** Kopplung an die Warteschlange oder `config.js`: Es ist eine reine Kostenmaßnahme ohne Einfluss auf
 Modell, Durchsatz oder Rate-Limits. Wenn unklar ist, ob das Caching an einer
 Störung beteiligt ist, kostet das Umlegen nichts außer der Ersparnis — im Zweifel
 ausschalten. Details → [FLAGS.md](FLAGS.md#usepromptcache-seit-v25).

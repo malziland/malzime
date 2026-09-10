@@ -413,7 +413,7 @@ describe("real-world fixtures from compare-models failures", () => {
       expect(r.standard.profileText).toBeUndefined();
     });
 
-    test("3-Call-Shape (alles top-level) funktioniert unveraendert weiter", () => {
+    test("auch eine flache Antwort (alles ganz oben) wird begrenzt", () => {
       const raw = JSON.stringify({
         categories: { einkommen: { label: "L", value: "X".repeat(5000), confidence: 5 } },
         ad_targeting: ["A".repeat(5000)],

@@ -341,9 +341,10 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
     let data;
     try {
       const tokenParam = resultToken ? `&token=${encodeURIComponent(resultToken)}` : "";
+      /* PRIV-2026-09-10-06: traegt das Profil — nie zwischenspeichern, auch ohne Server-Kopfzeile. */
       const resp = await fetchWithTimeout(
         `${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}${tokenParam}`,
-        {},
+        { cache: "no-store" },
         POLL_TIMEOUT_MS
       );
       if (!resp.ok) {

@@ -21,6 +21,7 @@ import { initFehlerNachsendung, logClientError } from "./js/error-logger.js";
 import { initSprachumschalter, merkmalUebernehmen } from "./js/sprachumschalter.js";
 import { initBeastLockruf } from "./js/beast-lockruf.js";
 import { pruefeSeiteNachDruck } from "./js/druck-wache.js";
+import { apiUrl } from "./js/api-basis.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
    Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
@@ -87,7 +88,10 @@ initFehlerNachsendung();
    nicht, löst das Promise trotzdem auf (Fail-safe → synchroner Pfad). */
 const statsAbort = new AbortController();
 const statsTimer = setTimeout(() => statsAbort.abort(), 20000);
-state.statsReady = fetch("/api/stats", { signal: statsAbort.signal })
+/* OPS-2026-09-10-11: Ueber apiUrl — im Betrieb direkt an den EU-Dienst, nicht
+   relativ ueber das Auslieferungsnetz. Dieser Aufruf war der letzte relative:
+   Der Waechter in api-basis.test.js las nur public/js/, nicht diese Datei. */
+state.statsReady = fetch(apiUrl("/api/stats"), { signal: statsAbort.signal })
   .then((r) => (r.ok ? r.json() : null))
   .then((data) => {
     /* Antwort für den Realitäts-Check aufheben (anonymer Gesamtzähler für

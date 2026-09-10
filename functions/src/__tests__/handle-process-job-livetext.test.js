@@ -1,7 +1,7 @@
 /* Tests fuer die Live-Text-Verdrahtung (v3.0 Phase 1) im Queue-Worker.
 
    Hier ist ALLES gemockt (auch mistral.js und die Feature-Flags), denn
-   geprueft wird ausschliesslich die Verdrahtung in runPipelineSingleLarge:
+   geprueft wird ausschliesslich die Verdrahtung in runPipeline:
      - Flag AN  → runSingleLargeCall bekommt einen onLiveText-Callback, der
        (auf 1 Schreibvorgang je 2 s gedrosselt) jobs.setLiveText ruft.
      - Flag AUS → die opts sind EXAKT die heutigen — kein onLiveText,
@@ -34,7 +34,6 @@ jest.mock("../cloud-tasks", () => ({
   redispatchJobLocal: jest.fn(),
 }));
 jest.mock("../feature-flags", () => ({
-  isSingleLargeCallEnabled: jest.fn(),
   isPromptCacheEnabled: jest.fn(),
   isBeastAdsCallEnabled: jest.fn(),
   isLiveTextEnabled: jest.fn(),
@@ -42,8 +41,6 @@ jest.mock("../feature-flags", () => ({
 jest.mock("../mistral", () => ({
   runSingleLargeCall: jest.fn(),
   generateBeastAds: jest.fn(),
-  describeImage: jest.fn(),
-  generateBothProfiles: jest.fn(),
   isRateLimitError: jest.fn(() => false),
 }));
 
@@ -111,14 +108,13 @@ beforeEach(() => {
   jobs.countProcessingJobs.mockResolvedValue(0);
   storage.loadImage.mockResolvedValue({ buffer: Buffer.from("img"), mimeType: "image/jpeg" });
   storage.deleteImage.mockResolvedValue();
-  flags.isSingleLargeCallEnabled.mockResolvedValue(true);
   flags.isPromptCacheEnabled.mockResolvedValue(false);
   flags.isBeastAdsCallEnabled.mockResolvedValue(false);
   flags.isLiveTextEnabled.mockResolvedValue(false);
   mistral.runSingleLargeCall.mockResolvedValue(PROFIL);
 });
 
-describe("runPipelineSingleLarge — Flag useLiveText AUS (Default)", () => {
+describe("runPipeline — Flag useLiveText AUS (Default)", () => {
   test("opts sind EXAKT die heutigen — kein onLiveText, kein Schreibvorgang", async () => {
     await handleProcessJob(postReq(), makeRes());
     expect(mistral.runSingleLargeCall).toHaveBeenCalledTimes(1);
@@ -139,7 +135,7 @@ describe("runPipelineSingleLarge — Flag useLiveText AUS (Default)", () => {
   });
 });
 
-describe("runPipelineSingleLarge — Flag useLiveText AN", () => {
+describe("runPipeline — Flag useLiveText AN", () => {
   beforeEach(() => {
     flags.isLiveTextEnabled.mockResolvedValue(true);
   });
@@ -197,6 +193,6 @@ describe("runPipelineSingleLarge — Flag useLiveText AN", () => {
     expect(res.body.ok).toBe(true);
     const ergebnis = jobs.completeJob.mock.calls[0][1];
     expect(ergebnis.profiles.normal.profileText).toBe("Du bist sportlich.");
-    expect(ergebnis.meta.pipeline).toBe("single-large");
+    expect(ergebnis.meta.mode).toBe("multimodal");
   });
 });

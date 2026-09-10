@@ -3,26 +3,23 @@
 /**
  * mistral.js — Mistral-Anbieter (einziger KI-Anbieter seit v1.6.0).
  *
- *   - describeImage(buffer, mimeType, remainingBudget, lang) → text | null
- *   - generateBothProfiles(description, exif, remainingBudget, lang) → { normal, boost }
+ *   - runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts)
+ *       → { normal, boost, subject, visibleText }
+ *   - generateBeastAds(boostProfile, standardAds, lang, opts) → Liste | null
  *
- * Architektur:
- *   - Describe: Mistral Large 3 (multimodal, sieht das Bild direkt)
- *   - Normal/Boost: Mistral Small 4 (text-only, schneller + billiger)
- *   - Fallback pro Profil: Large 3, falls Small 4 nicht parsebares JSON liefert
+ * Architektur: EIN Aufruf an Mistral Large (mistral-large-2512, multimodal)
+ * liefert Bildbeschreibung und beide Profile; ein zweiter, kleiner Aufruf ohne
+ * Bild erzeugt die Beast-Werbung. Den aelteren Drei-Aufruf-Weg (Large
+ * beschreibt, Small profiliert) gibt es seit 10.09.2026 nicht mehr.
  *
  * API-Key kommt aus process.env.MISTRAL_API_KEY_EU (Firebase Secret, EU-gebunden; lokal MISTRAL_API_KEY).
  */
 
-const { MISTRAL_DESCRIBE_MODEL } = require("./config");
+const { MISTRAL_MODEL } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 /* AUFGETEILT 31.08.2026: Das Auseinandernehmen der Antworten steht jetzt in
    einer eigenen Datei — reine Funktionen, kein Netz, kein Zustand. */
-/* VIERTER SCHNITT 31.08.2026: Der Drei-Aufruf-Weg ist der Rueckfall und liegt
-   in einer eigenen Datei. Er laeuft nur, wenn der Einstellungssatz auf
-   `t1-drei-call` steht. */
-const { describeImage, generateBothProfiles } = require("./mistral-drei-call");
 
 /* DRITTER SCHNITT 31.08.2026: Der Netzzugriff liegt in einer eigenen Datei.
    Sie ruft nichts von hier auf — die Richtung stimmt. */
@@ -51,16 +48,15 @@ const {
 
 /* REL-01: Jeder Mistral-HTTP-Call läuft durch die Per-Instance-Semaphore aus
    throttle.js. Damit kann eine einzelne Cloud-Function-Instanz bei einem
-   Workshop-Burst (viele gleichzeitige Uploads, je 3 Mistral-Calls) nicht mehr
+   Workshop-Burst (viele gleichzeitige Uploads, je 2 Mistral-Calls) nicht mehr
    beliebig viele Requests gleichzeitig gegen Mistrals RPS-Limit feuern —
    überzählige Calls warten geordnet auf einen freien Slot, statt sofort 429 zu
    kassieren. Der Slot wird über die kompletten 429-Retry-Backoffs gehalten,
    was den Burst zusätzlich entzerrt.
 
-   v1.10.8: modelClass ("large"/"small") wird an withMistralSlot durchgereicht,
-   damit der modell-bewusste Token-Bucket den richtigen Rate-Bucket waehlt
-   (Large-Bucket taktet schneller als Small — Details und die heutige
-   Tier-Wahrheit: throttle.js-Kopf, KA-07). */
+   Seit 10.09.2026 gibt es dort nur noch EINEN Takt fuer alle Aufrufe
+   (throttle.js): Mistral zaehlt Anfragen, nicht deren Groesse, und es gibt
+   nur noch ein Modell. */
 
 /* v2.5: Wie viele Eingabe-Tokens kamen aus dem Prompt-Cache (10% Preis statt
    100%)? Das ist die einzige belastbare Erfolgskontrolle fuers Caching — ohne
@@ -131,10 +127,6 @@ const {
    zu zeigen waere schlechter als keine — sie wuerde sich beim naechsten Poll
    veraendern und wirkte wie ein Fehler. */
 
-/* ── Public: describeImage (multimodal via Large 3) ──────────────── */
-
-/* ── Public: generateBothProfiles ────────────────────────────────── */
-
 /* v2.1: Vollständigkeits-Check. Mistral hat sich in Live-Tests trotz Schema-
    Pflicht "alle 13 Karten" gelegentlich entschieden, früh aufzuhören —
    `finishReason: "stop"`, aber categories enthielt nur 7 von 13. Wir prüfen
@@ -144,12 +136,9 @@ const {
 /* ── v2.2: Single-Large-Call ──
    Macht in EINEM mistral-large-2512-Call:
      Bild sehen + Beschreibung + hard_facts + ads + triggers + Standard + Beast.
-   Ersetzt die 3-Call-Pipeline (Describe + 2× Profile) durch einen Aufruf.
-   Token-Einsparung in lokalen Tests (3 Bilder): ~70% (21.300 → ~5.700).
-   Liefert dasselbe { normal, boost }-Shape wie generateBothProfiles —
-   handle-process-job.js braucht nichts anzupassen außer dem Branch.
-   Kosten-Hinweis: alle Tokens landen im teureren Large 2512 statt im billigen
-   Small 2603 — Mehrkosten ~+6% gegenüber heutiger Pipeline (siehe CHANGELOG). */
+   Hat die fruehere Kette aus drei Aufrufen (Beschreibung + 2× Profil)
+   abgeloest; Token-Einsparung in lokalen Tests (3 Bilder): ~70%
+   (21.300 → ~5.700). Die Kette selbst ist seit 10.09.2026 ausgebaut. */
 
 /* MISTRAL_SINGLE_LARGE_MAX_TOKENS steht seit v3.3.1 in `config.js`, direkt
    neben MISTRAL_SINGLE_LARGE_TIMEOUT_MS: Die beiden Werte sind nur gemeinsam
@@ -347,9 +336,8 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
 
   if (!parsed) return { normal: null, boost: null, subject: "", visibleText: "" };
 
-  /* Hard-Facts server-seitig in beide Modi überschreiben — exakt wie in
-     generateBothProfiles. Mistral kann die Vorgabe ignorieren; hier garantieren
-     wir Konsistenz. */
+  /* Hard-Facts server-seitig in beide Modi überschreiben. Mistral kann die
+     Vorgabe ignorieren; hier garantieren wir Konsistenz. */
   const hardFacts = parsed.hard_facts || {};
   const ads = Array.isArray(parsed.ad_targeting) ? parsed.ad_targeting : [];
   const triggers = Array.isArray(parsed.manipulation_triggers) ? parsed.manipulation_triggers : [];
@@ -481,7 +469,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, opts = {}) {
 
   try {
     const result = await callMistralRaw({
-      model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — gleiches Modell wie die Analyse */,
+      model: MISTRAL_MODEL /* Large 2512 — gleiches Modell wie die Analyse */,
       /* OPS-008: system = konstante Anweisungen, user = nur das Profil.
          Der Cache greift ausschliesslich auf einem konstanten Anfang. */
       messages: [
@@ -569,7 +557,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     const { werte: betriebswerte, profil } = await betriebswerteOderAbbruch();
     aktivesProfil = profil;
     const result = await callMistralRaw({
-      model: MISTRAL_DESCRIBE_MODEL /* Large 2512 — multimodal, 2M TPM */,
+      model: MISTRAL_MODEL /* Large 2512 — multimodal, 2M TPM */,
       messages,
       maxTokens: betriebswerte.singleLargeMaxTokens,
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
@@ -596,7 +584,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
            bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,
            es galten die Code-Werte. */
         profil: aktivesProfil || null,
-        model: MISTRAL_DESCRIBE_MODEL,
+        model: MISTRAL_MODEL,
         attempt: attemptLabel,
         status: parsed ? "ok" : "parse-failed",
         finishReason: result.finishReason,
@@ -684,8 +672,6 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
 }
 
 module.exports = {
-  describeImage,
-  generateBothProfiles,
   runSingleLargeCall,
   generateBeastAds,
   isRateLimitError,

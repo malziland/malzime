@@ -97,16 +97,16 @@ describe("Einstellungssatz und Dokumentation stimmen überein", () => {
      dichter feuern dürfte — und der Satz 800/2500 lag bei beiden unter dem
      erlaubten Abstand.
 
-     Stattdessen wird jetzt geprüft, was tatsächlich gilt: Beide Abstände
-     müssen mindestens so groß sein, wie die Mistral-Stufe erlaubt. Das ist
-     eine schärfere Aussage als die alte, nicht eine gelockerte. */
-  test("beide Abstände halten die Mistral-Stufe ein", () => {
+     Stattdessen wird jetzt geprüft, was tatsächlich gilt: Der Abstand muss
+     mindestens so groß sein, wie die Mistral-Stufe erlaubt. Seit 10.09.2026
+     gibt es nur noch einen — der zweite gehörte zum kleinen Modell des
+     ausgebauten Drei-Aufruf-Wegs. */
+  test("der Abstand zwischen KI-Aufrufen hält die Mistral-Stufe ein", () => {
     /* T1 erlaubt 0,25 Anfragen pro Sekunde -> ein Aufruf alle 4000 ms.
        Diese Zahl steht bewusst hier und nicht im Einstellungssatz: Sie ist
        keine Betriebsentscheidung, sondern eine Eigenschaft des Anbieters. */
     const T1_MINDESTABSTAND_MS = 4000;
     expect(ausDoku.tokenAbstandGrossMs).toBeGreaterThanOrEqual(T1_MINDESTABSTAND_MS);
-    expect(ausDoku.tokenAbstandKleinMs).toBeGreaterThanOrEqual(T1_MINDESTABSTAND_MS);
   });
 
   test("die Warteschlangen-Rate passt zur Mistral-Stufe", () => {

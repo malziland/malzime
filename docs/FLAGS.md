@@ -2,7 +2,7 @@
 
 Laufzeit-Feature-Flags liegen im Firestore-Dokument **`featureFlags/current`** und
 werden von `functions/src/feature-flags.js` gelesen: 30-Sekunden-Cache, fail-safe —
-ist das Dokument nicht lesbar, gelten alle Flags als `false` (der bewährte Pfad).
+ist das Dokument nicht lesbar, gilt je Flag der Wert aus der Spalte „Fail-safe“.
 Umlegen geht **ohne Deploy** über die Firestore-Console (auch vom Handy); Wirkung
 nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 [RUNBOOK.md](RUNBOOK.md), Rollback-Hebel).
@@ -11,7 +11,6 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 
 | Flag | Typ | Soll live | Fail-safe | Owner |
 |---|---|---|---|---|
-| `useSingleLargeCall` | Architektur-Schalter (Kill-Switch-Funktion) | `true` | `false` | Christoph Krieger |
 | `usePromptCache` | Kostenschalter | `true` | `false` | Christoph Krieger |
 | `useLiveText` | Anzeige-Schalter (Live-Text waehrend der Analyse) | `true` | `false` | Christoph Krieger |
 | `useBeastAdsCall` | Zweiter, kleiner Mistral-Aufruf fuer die Beast-Werbung | `true` | `true` | Christoph Krieger |
@@ -44,21 +43,15 @@ gelesen und kann gelöscht werden.
 Das damals notierte Entfernungs-Kriterium — „entfällt, wenn der synchrone Pfad
 abgebaut wird" — ist damit erfüllt.
 
-### `useSingleLargeCall` (seit v2.2)
+### `useSingleLargeCall` — ENTFERNT (10.09.2026)
 
-Schaltet innerhalb der Queue-Pipeline zwischen Single-Large-Call (`true`: ein Aufruf
-an `mistral-large` liefert Beschreibung + beide Profile) und der 3-Call-Pipeline
-(`false`: Large beschreibt, `mistral-small` profiliert). Wird nur ausgewertet, wenn
-die Queue an ist.
+Das Flag schaltete zwischen dem Ein-Aufruf-Weg und dem älteren Drei-Aufruf-Weg
+(Large beschreibt, `mistral-small` profiliert). Der Drei-Aufruf-Weg ist ausgebaut;
+das Flag wird nicht mehr gelesen, ein vorhandener Firestore-Eintrag ist wirkungslos
+und wird entfernt.
 
-> ⚠️ **Nie allein umlegen!** Die 3-Call-Pipeline verträgt wegen des knappen
-> Small-Modell-Limits (100K Tokens/min) nur Cloud-Tasks-Concurrency 3. Beim
-> Zurückschalten immer das 3-Schritt-Rezept aus dem
-> [RUNBOOK](RUNBOOK.md#3-single-large-call-aus--immer-alle-drei-schritte) befolgen
-> (Flag + `cloudtasks-concurrency-3.sh` + `config.js`-Werte).
-
-**Entfernungs-Kriterium:** entfällt erst, wenn die 3-Call-Pipeline abgebaut wird
-(„Phase 6" — nur nach ausdrücklicher Freigabe).
+Das notierte Entfernungs-Kriterium — „entfällt, wenn die 3-Call-Pipeline abgebaut
+wird“ — ist damit erfüllt.
 
 ### `usePromptCache` (seit v2.5)
 
@@ -89,8 +82,8 @@ teurer als der Ist-Zustand kann es nicht werden.
 Nach dem ersten Workshop `cachedTokens / promptTokens` auswerten, statt zu schätzen.
 
 **Rückfall:** Flag auf `false` → weder Cache-Key noch geänderter Aufbau, bitgenau
-der Stand v2.4.4. Ohne Deploy, ~30 s Cache. Anders als bei `useSingleLargeCall`
-sind **keine** Begleitschritte nötig (keine Concurrency-Anpassung).
+der Stand v2.4.4. Ohne Deploy, ~30 s Cache. Begleitschritte
+sind **keine** nötig (keine Anpassung der Warteschlange).
 
 **Entfernungs-Kriterium:** Zeigt die Auswertung nach zwei Workshops eine dauerhafte
 Trefferquote > 50 %, kann das Flag entfallen und der `system`-Aufbau fest werden.

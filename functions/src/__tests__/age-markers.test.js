@@ -18,9 +18,8 @@ const en = require("../locales/en/prompts");
  * gegenläufig.
  *
  * Diese Tests halten drei Dinge fest, die leicht wieder verloren gehen:
- *   1. Die Kalibrierung steht ZWEIMAL in jeder Sprachdatei (AGE_ANCHOR für
- *      den 3-Call-Fallback, noch einmal wörtlich im singleLargePrompt für den
- *      aktiven Pfad). Wer nur eine Stelle ändert, ändert nichts am Livebetrieb.
+ *   1. Die Kalibrierung steht im singleLargePrompt jeder Sprachdatei — seit
+ *      dem Ausbau des Drei-Aufruf-Wegs (10.09.2026) die einzige Stelle.
  *   2. Reifemerkmale dürfen nur in der Negativliste vorkommen.
  *   3. Deutsch und Englisch müssen dieselben Merkmale führen.
  */
@@ -28,9 +27,7 @@ const en = require("../locales/en/prompts");
 /* Beide Stellen, an denen die Kalibrierung steht — hier zusammengefasst, damit
    jeder Test automatisch BEIDE prüft. */
 const PROMPTS = [
-  ["de/AGE_ANCHOR (Fallback-Pfad)", de.describePrompt],
   ["de/singleLargePrompt (aktiver Pfad)", de.singleLargePrompt],
-  ["en/AGE_ANCHOR (Fallback-Pfad)", en.describePrompt],
   ["en/singleLargePrompt (aktiver Pfad)", en.singleLargePrompt],
 ];
 

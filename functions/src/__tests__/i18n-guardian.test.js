@@ -74,42 +74,6 @@ describe("i18n Guardian (Backend)", () => {
     });
   });
 
-  /* ── 3. Schema Consistency ── */
-  describe("JSON Schema Consistency", () => {
-    const { loadPrompts } = require("../i18n");
-    const prompts = loadPrompts("de");
-
-    function extractJsonKeys(schemaStr) {
-      const match = schemaStr.match(/\{[\s\S]*\}/);
-      if (!match) return null;
-      try {
-        /* Schema enthaelt 0.0-1.0 Platzhalter — durch 0.5 ersetzen fuer JSON.parse */
-        const sanitized = match[0].replace(/0\.0-1\.0/g, "0.5");
-        const obj = JSON.parse(sanitized);
-        return {
-          categoryKeys: Object.keys(obj.categories || {}).sort(),
-          topKeys: Object.keys(obj).sort(),
-        };
-      } catch {
-        return null;
-      }
-    }
-
-    it("jsonSchemaNormal and jsonSchemaBoost exist", () => {
-      expect(typeof prompts.jsonSchemaNormal).toBe("string");
-      expect(typeof prompts.jsonSchemaBoost).toBe("string");
-    });
-
-    it("both schemas have identical JSON keys", () => {
-      const normal = extractJsonKeys(prompts.jsonSchemaNormal);
-      const boost = extractJsonKeys(prompts.jsonSchemaBoost);
-      expect(normal).not.toBeNull();
-      expect(boost).not.toBeNull();
-      expect(normal.topKeys).toEqual(boost.topKeys);
-      expect(normal.categoryKeys).toEqual(boost.categoryKeys);
-    });
-  });
-
   /* ── 4. Hardcoded String Detection ── */
   describe("No Hardcoded German in Backend JS", () => {
     /*

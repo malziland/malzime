@@ -3,9 +3,9 @@
 /**
  * privacy.js — OCR-basierte Datenschutz-Risiko-Erkennung.
  *
- * Seit v1.6.0 kommt der OCR-Text aus Mistrals Bildbeschreibung — konkret
- * aus der Zeile "Sichtbarer Text: <text>" am Ende der Antwort (vorgegeben
- * durch mistralDescribeAddendum in prompts.js).
+ * Der OCR-Text kommt aus dem Feld `visible_text` der KI-Antwort;
+ * job-pipelines.js haengt ihn als Zeile "Sichtbarer Text: <text>" an die
+ * Beschreibung an, die hier ausgewertet wird.
  *
  * Erkannt werden:
  *   - Adressen (Straßennamen, Schulen) — nur aus der "Sichtbarer Text:"-Zeile

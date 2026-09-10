@@ -19,16 +19,11 @@ firebase use --add   # Projekt-ID waehlen
 malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
 
 1. Account erstellen auf [console.mistral.ai](https://console.mistral.ai/)
-2. Stripe-Karte hinterlegen, **Scale Tier** aktivieren (Free Tier reicht NICHT fuer Image-Calls auf Small 4 — Limit 50 K TPM)
+2. Stripe-Karte hinterlegen, **Scale Tier** aktivieren (die Limits des Free Tier reichen fuer den Betrieb nicht)
 3. API-Key generieren unter https://console.mistral.ai/api-keys/ — Key NUR EINMAL angezeigt, sofort sichern
 4. Key spaeter als Firebase Secret hinterlegen (Schritt 4)
 
-Genutzte Modelle (in `functions/src/config.js`):
-- `mistral-large-2512` fuer die aktive **Single-Large-Analyse** (ein Call → Bildbeschreibung + beide Profile, seit v2.2)
-- `mistral-small-2603` fuer die Profilgenerierung in der **Fallback-3-Call-Pipeline** (Text-only)
-- `mistral-large-2512` zusaetzlich als internes JSON-Backup, falls Small invalides JSON liefert
-
-Umschaltbar ueber das Firestore-Feature-Flag `featureFlags/current.useSingleLargeCall` (aktiv = Single-Large).
+Genutztes Modell (in `functions/src/config.js`): `mistral-large-2512`. Ein Aufruf liefert Bildbeschreibung + beide Profile (seit v2.2), ein zweiter, kleiner Aufruf ohne Bild die Beast-Werbung (seit v2.8). Einen zweiten Analyseweg mit einem anderen Modell gibt es seit 10.09.2026 nicht mehr.
 
 Wenn der Mistral-Call fehlschlaegt, gibt es keinen anderen KI-Provider als Fallback. Der User sieht eine `blocked.apiError`- oder `blocked.overloaded`-Antwort.
 
@@ -50,7 +45,7 @@ Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange — Details in
 
 - Cloud-Tasks-Queue `analyze-queue` (`europe-west1`, `maxConcurrentDispatches` an Mistrals Limits angepasst)
 - GCS-Bucket `malzime-queue-uploads` fuer die temporaere Bild-Ablage (Lifecycle-Regel: 1 Tag)
-- Firestore-Feature-Flag `featureFlags/current.useSingleLargeCall` — schaltet die Ein-Aufruf-Pipeline, **ohne Deploy**
+- Firestore-Feature-Flags im Dokument `featureFlags/current` (Uebersicht in [`FLAGS.md`](FLAGS.md)) — umlegbar **ohne Deploy**
 
 Lokaler Durchklick der Queue ohne Cloud Tasks: [`docs/QUEUE-EMULATOR.md`](QUEUE-EMULATOR.md).
 
@@ -146,30 +141,6 @@ npm run format:frontend:check
 
 CI prueft Lint + Format automatisch bei jedem Push und Pull Request.
 
-## 7a. Tiererkennung testen (Dev-Tool)
-
-Die Tiererkennung in v1.6.0 haengt daran, dass Mistral Large 3 in der Bildbeschreibung eine `SUBJECT:`-Kopfzeile (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`) liefert. Mit `functions/scripts/test-subject.js` laesst sich gegen echte Bilder pruefen, ob Mistral diese Kopfzeile zuverlaessig setzt — ohne Deploy.
-
-**Aufruf:**
-
-```bash
-MISTRAL_API_KEY=<dein-key> node functions/scripts/test-subject.js <pfad-zum-bild> [anzahl-durchlaeufe]
-```
-
-**Was es tut:**
-
-- Verkleinert das Bild wie das Live-Frontend (1280px / JPEG 82%, via `sips` auf macOS).
-- Ruft genau den v1.6.0-Pfad auf: `mistral.describeImage()` + `classifyDescription()` + `extractVisibleText()`.
-- Zeigt pro Durchlauf die gelieferte `SUBJECT:`-Zeile, die Einordnung (Mensch/Tier/Tierart) und den sichtbaren Text.
-- Bei mehreren Durchlaeufen: Verteilung am Ende — so wird Run-to-Run-Varianz sichtbar.
-
-**Was es nicht tut:**
-
-- Schreibt nichts in Firestore, beruehrt das Live-System nicht.
-- Generiert keine Profile — nur die Describe- + Klassifikations-Stufe.
-
-**Voraussetzung:** `MISTRAL_API_KEY` als Umgebungsvariable gesetzt.
-
 ## 8. Deploy
 
 ```bash
@@ -196,15 +167,13 @@ Format: `?v=YYYYMMDDNN` (Datum + laufende Nummer)
 
 ### Was pro Analyse passiert
 
-Aktiv ist seit v2.2 der **Single-Large-Pfad**: ein einziger Call an `mistral-large-2512` liefert Bildbeschreibung + beide Profile. Die folgende Tabelle beschreibt den **3-Call-Fallback** (Feature-Flag `useSingleLargeCall` aus) — sie bleibt stehen, weil sie die einzelnen Posten am besten nachvollziehbar macht; die Gesamtkosten pro Analyse liegen in beiden Modi in derselben Groessenordnung.
-
 | API | Aufrufe | Was |
 |-----|---------|-----|
-| **Mistral Large 3** | 1 Call | multimodale Bildbeschreibung mit SUBJECT-Klassifikation + sichtbarem Text |
-| **Mistral Small 4** | 2 Calls | Profilgenerierung (Normal + Boost, parallel, Text-only) |
-| **Cloud Functions** | 1 Invocation | ~3–8 Sekunden, 512 MiB RAM |
+| **Mistral Large 3** | 1 Call | Bildbeschreibung, SUBJECT-Klassifikation, sichtbarer Text und beide Profile |
+| **Mistral Large 3** | 1 Call | Beast-Werbung (ohne Bild, seit v2.8) |
+| **Cloud Functions** | 1 Invocation | Dauer haengt an der Mistral-Antwortzeit (zuletzt gemessen rund 40 s), 512 MiB RAM |
 
-Bei Tier-Erkennung (SUBJECT=ANIMAL_ONLY) entfaellt der Small-4-Profile-Call — das Easter-Egg-Profil wird aus statischen Locale-Daten gebaut.
+Bei Tier-Fotos (SUBJECT=ANIMAL_ONLY) entfaellt der zweite Aufruf — das Easter-Egg-Profil wird aus statischen Locale-Daten gebaut.
 
 ### Preise (Stand Mai 2026)
 
@@ -213,7 +182,6 @@ Bei Tier-Erkennung (SUBJECT=ANIMAL_ONLY) entfaellt der Small-4-Profile-Call — 
 | Modell | Input | Output |
 |--------|-------|--------|
 | Large 3 (`mistral-large-2512`) | $0.50 | $1.50 |
-| Small 4 (`mistral-small-2603`) | $0.15 | $0.60 |
 
 **Google Cloud (nur Infrastruktur):**
 
@@ -227,13 +195,12 @@ Bei Tier-Erkennung (SUBJECT=ANIMAL_ONLY) entfaellt der Small-4-Profile-Call — 
 
 | Posten | Rechnung | Kosten |
 |--------|----------|--------|
-| Mistral Large 3 (Describe) | 30 × ~10.000 Input + ~1.500 Output Tokens = 300K in, 45K out | **~$0.22** |
-| Mistral Small 4 (Profile, 2x) | 30 × 2 × ~2.500 Input + ~2.500 Output = 150K in, 150K out je | **~$0.13** |
-| Cloud Functions | 30 Aufrufe × ~5s | **$0.00** |
+| Mistral Large 3 (Analyse + Werbe-Aufruf) | 30 Analysen, gemessen am 30.08.2026 mit Prompt-Cache | **rund $0.20–0.25** (unter 1 Cent je Analyse) |
+| Cloud Functions | 30 Aufrufe × ~1 Min. | **$0.00** |
 | Firebase Hosting | Statische Dateien, wenige MB | **$0.00** |
-| **Gesamt** | | **~$0.35** |
+| **Gesamt** | | **rund $0.20–0.25** |
 
-Mistral berechnet pro 1M Tokens unabhaengig vom Volumen, kein Frei-Kontingent. Die Describe-Stage laeuft ueber Mistral Large 3, die beiden Profile ueber das guenstigere Small 4.
+Mistral berechnet pro 1M Tokens unabhaengig vom Volumen, kein Frei-Kontingent. Beide Aufrufe laufen ueber Mistral Large 3; der gleichbleibende Prompt-Anfang wird zum Cache-Preis (10 %) berechnet. Die Schätzung ist gerundet; die genauen Kosten zeigt das eigene Mistral-Konto.
 
 ### Tipp fuer neue Google Cloud Konten
 

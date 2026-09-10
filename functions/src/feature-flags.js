@@ -3,15 +3,13 @@
 /**
  * feature-flags.js — Laufzeit-Feature-Flags (Firestore).
  *
- * Flags (live stehen BEIDE auf true — Queue + Single-Large = Normalbetrieb;
- * `false` ist jeweils nur der fail-safe Default bei unlesbarem Dokument):
- *   - `useQueue`: ENTFERNT mit v2.10 — es gibt nur noch die Warteschlange
- *     (false, Rückfall-Pfad) und der Queue-Architektur (true, Live-Pfad).
- *   - `useSingleLargeCall` (seit v2.2): schaltet innerhalb der Pipeline
- *     zwischen der 3-Call-Fallback-Architektur (Describe Large + 2× Profile
- *     Small, false) und der Single-Large-Architektur (1× Large macht alles,
- *     true). Wird nur ausgewertet, wenn die Queue an ist (im synchronen Pfad
- *     bleibt die 3-Call-Pipeline aktiv, weil dort nicht relevant).
+ * Flags (welcher Wert gilt, wenn das Dokument nicht lesbar ist, steht je
+ * Flag im catch-Zweig unten und in docs/FLAGS.md, Spalte „Fail-safe“):
+ *   - `useQueue`: ENTFERNT mit v2.10 — es gibt nur noch die Warteschlange.
+ *   - `useSingleLargeCall`: ENTFERNT am 10.09.2026 — es gibt nur noch den
+ *     Ein-Aufruf-Weg. Der aeltere Drei-Aufruf-Weg, zwischen dem dieses Flag
+ *     umschaltete, ist ausgebaut; ein vorhandener Eintrag im Dokument wirkt
+ *     nicht mehr.
  *   - `usePromptCache` (seit v2.5): schickt `prompt_cache_key` an Mistral mit,
  *     damit der immer gleiche Prompt-Anfang (~9.500 der 10.821 Eingabe-Tokens)
  *     nur zu 10% berechnet wird. Reine Kostenmassnahme — das Modell, die
@@ -31,14 +29,12 @@
  *     als keiner. Die englische Fassung selbst haengt NICHT an diesem Flag:
  *     Sie ist ueber ?lang=en und die Geraetesprache seit jeher erreichbar.
  *
- * Beide Flags liegen im Firestore-Dokument `featureFlags/current`. Umlegen
- * geht OHNE Deploy (Firestore-Console, auch vom Handy aus) — damit ist der
- * Rückfall auf den bewährten Pfad jederzeit in Sekunden möglich. Das ist das
- * zentrale Betriebssicherheits-Element jeder Architektur-Experiment-Einführung.
+ * Alle Flags liegen im Firestore-Dokument `featureFlags/current`. Umlegen
+ * geht OHNE Deploy (Firestore-Console, auch vom Handy aus).
  *
  * Gelesen wird mit 30-Sekunden-Cache (analog zum Maintenance-Status in
- * counter.js) und fail-safe: Ist das Dokument nicht lesbar, gelten die Flags
- * als `false` — im Zweifel also der bewährte Pfad.
+ * counter.js) und fail-safe: Ist das Dokument nicht lesbar, gilt je Flag der
+ * Wert aus dem catch-Zweig unten.
  */
 
 const { datenbank } = require("./db");
@@ -54,20 +50,16 @@ let cache = { data: null, expiresAt: 0 };
  */
 async function getFeatureFlags() {
   /* Lokal-Modus (Emulator): Die Queue ist per Definition an — der Emulator-
-     Lauf dient ja gerade ihrem Test. Single-Large-Call bleibt im Lokal-Modus
-     standardmäßig aus, damit der Emulator-Klick die bewährte Pipeline trifft.
-     Kein Firestore-Read, kein Seeding nötig. */
+     Lauf dient ja gerade ihrem Test. Kein Firestore-Read, kein Seeding nötig. */
   if (isLocalQueueMode()) {
-    /* Der Live-Weg (Single-Large + Live-Text) ist im Emulator standardmaessig
-       AUS, damit der gewoehnliche Durchklick die bewaehrte Pipeline trifft.
-       Seit 2026-08-29 laesst er sich per `QUEUE_LOCAL_LIVE=1` in
-       `functions/.env.local` einschalten — die Attrappe stellt seitdem auch
-       den Datenstrom nach. Ohne diesen Schalter waere die Live-Anzeige lokal
+    /* Der Live-Text-Strom ist im Emulator standardmaessig AUS. Seit
+       2026-08-29 laesst er sich per `QUEUE_LOCAL_LIVE=1` in
+       `functions/.env.local` einschalten — die Attrappe stellt den
+       Datenstrom nach. Ohne diesen Schalter waere die Live-Anzeige lokal
        ueberhaupt nicht zu sehen, und jede Pruefung an ihr braeuchte echte
        Mistral-Aufrufe. */
     const live = process.env.QUEUE_LOCAL_LIVE === "1";
     return {
-      useSingleLargeCall: live,
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: live,
@@ -82,7 +74,6 @@ async function getFeatureFlags() {
     const snap = await datenbank().doc(FLAGS_DOC).get();
     const data = snap.exists ? snap.data() : {};
     const flags = {
-      useSingleLargeCall: data.useSingleLargeCall === true,
       usePromptCache: data.usePromptCache === true,
       /* OPS-009 (Audit 2026-08-10): Notausschalter fuer den zweiten
          Mistral-Aufruf. Fehlt das Feld, ist er AN — der Zweitaufruf ist der
@@ -111,11 +102,10 @@ async function getFeatureFlags() {
     return flags;
   } catch (err) {
     console.log(JSON.stringify({ warning: "feature-flags-read-error", error: err.message }));
-    /* Fail-safe: bewaehrte Pipeline, kein Cache — der Zweitaufruf bleibt aber
+    /* Fail-safe: kein Cache, keine Experimente — der Zweitaufruf bleibt aber
        AN, denn er ist der Normalbetrieb und sein Ausfall waere ein stiller
        Qualitaetsverlust statt einer Absicherung. */
     return {
-      useSingleLargeCall: false,
       usePromptCache: false,
       useBeastAdsCall: true,
       useLiveText: false,
@@ -123,16 +113,6 @@ async function getFeatureFlags() {
       useGemesseneDauer: false,
     };
   }
-}
-
-/**
- * Kurzform: Ist der Queue-Pfad aktiv?
- */
-/**
- * Kurzform: Ist die Single-Large-Call-Architektur aktiv?
- */
-async function isSingleLargeCallEnabled() {
-  return (await getFeatureFlags()).useSingleLargeCall;
 }
 
 /**
@@ -170,7 +150,6 @@ function _clearCache() {
 
 module.exports = {
   getFeatureFlags,
-  isSingleLargeCallEnabled,
   isPromptCacheEnabled,
   isBeastAdsCallEnabled,
   isLiveTextEnabled,

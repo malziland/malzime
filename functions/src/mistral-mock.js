@@ -1,12 +1,12 @@
 "use strict";
 
 /**
- * mistral-mock.js — Attrappe der Mistral-Pipeline für kostenlose Tests.
+ * mistral-mock.js — Attrappe der Mistral-Anbindung für kostenlose Tests.
  *
- * Bietet exakt dieselbe Schnittstelle wie mistral.js (`describeImage`,
- * `generateBothProfiles`, `isRateLimitError`), ruft aber NIE die echte API.
- * Stattdessen: konfigurierbare Verzögerung + vorgefertigtes, strukturell
- * gültiges Profil-JSON.
+ * Bietet dieselbe Schnittstelle wie mistral.js (`runSingleLargeCall`,
+ * `isRateLimitError`), ruft aber NIE die echte API. Stattdessen:
+ * konfigurierbare Verzögerung + vorgefertigtes, strukturell gültiges
+ * Profil-JSON.
  *
  * Zweck: Queue-Mechanik, Frontend und Lasttests durchspielen, ohne
  * Mistral-Budget zu verbrauchen — Unit-Tests, Emulator-Durchklick,
@@ -15,19 +15,22 @@
  * Steuerung über Umgebungsvariablen (zur Laufzeit gelesen, damit Tests
  * sie pro Fall setzen können):
  *
- *   MISTRAL_MOCK_DELAY_MS  Simulierte Bearbeitungszeit pro Stufe in ms.
- *                          Default 1500. In Unit-Tests auf 0 setzen.
+ *   MISTRAL_MOCK_DELAY_MS  Simulierte Bearbeitungszeit in ms (mit Datenstrom:
+ *                          je Profil). Default 1500. In Unit-Tests auf 0.
  *   MISTRAL_MOCK_FAIL      Erzwingt einen Fehler:
- *                            "describe"        describeImage wirft api_error
- *                            "describe-empty"  describeImage liefert null
- *                                              (simuliert den Safety-Filter)
- *                            "profiles"        generateBothProfiles liefert
- *                                              { normal: null, boost: null }
- *                            "rate_limit"      wirft einen rate_limit-Fehler
- *                                              (wie ein echter 429er)
+ *                            "api_error"   wirft einen api_error
+ *                                          (wie ein echter 500er)
+ *                            "leer"        liefert kein Profil
+ *                                          ({ normal: null, boost: null })
+ *                            "rate_limit"  wirft einen rate_limit-Fehler
+ *                                          (wie ein echter 429er)
+ *                          Jeder andere Wert bricht laut ab — ein Tippfehler
+ *                          oder ein Wert des ausgebauten Drei-Aufruf-Wegs
+ *                          ("describe", "describe-empty", "profiles") darf
+ *                          nicht still als Erfolg durchgehen.
  *
- * Dieses Modul wird NICHT im synchronen Live-Pfad verwendet. `process-job`
- * wählt es nur, wenn der Mock-Modus aktiv ist (Test-/Emulator-Betrieb).
+ * Dieses Modul wird nur im Mock-Modus verwendet (`MISTRAL_MOCK=1`, Test- und
+ * Emulator-Betrieb), nie im echten Betrieb.
  */
 
 /* ── Konfiguration ────────────────────────────────────────────────── */
@@ -51,26 +54,6 @@ function rateLimitError() {
 function isRateLimitError(err) {
   return !!(err && err.code === "rate_limit");
 }
-
-/* ── Vorgefertigte Bildbeschreibung ───────────────────────────────── */
-
-/* Beginnt mit der SUBJECT-Kopfzeile, die animal.js/classifyDescription
-   erwartet — so läuft der Mock durch den Personen-Profil-Pfad. */
-const DESCRIPTIONS = {
-  de:
-    "SUBJECT: HUMAN\n" +
-    "Eine erwachsene Person, ca. 30 Jahre alt, mit mittellangen braunen Haaren " +
-    "und freundlichem Gesichtsausdruck. Sie trägt eine dunkelblaue Jacke und " +
-    "steht vor einem unscharfen städtischen Hintergrund. Die Kleidung wirkt " +
-    "modern und gepflegt.\n" +
-    "Sichtbarer Text: keiner",
-  en:
-    "SUBJECT: HUMAN\n" +
-    "An adult person, approximately 30 years old, with medium-length brown hair " +
-    "and a friendly expression. They wear a dark blue jacket and stand in front " +
-    "of a blurred urban background. The clothing looks modern and tidy.\n" +
-    "Visible text: none",
-};
 
 /* ── Vorgefertigtes Profil-JSON ───────────────────────────────────── */
 
@@ -318,63 +301,37 @@ function mockProfile(mode, lang) {
 
 /* ── Public: Schnittstellen-kompatibel zu mistral.js ──────────────── */
 
-/**
- * Attrappe für mistral.describeImage. Liefert nach der konfigurierten
- * Verzögerung eine vorgefertigte Bildbeschreibung (Personen-Pfad).
- *
- * Rückgabe / Fehlerverhalten identisch zur echten Funktion:
- *   - String         erfolgreiche Beschreibung
- *   - null           Safety-Filter (MISTRAL_MOCK_FAIL="describe-empty")
- *   - throw api_error / rate_limit  bei den entsprechenden Fail-Flags
- */
-async function describeImage(_imageBuffer, _mimeType, _remainingBudget, lang) {
-  await sleep(mockDelayMs());
-  const fail = process.env.MISTRAL_MOCK_FAIL;
-  if (fail === "rate_limit") throw rateLimitError();
-  if (fail === "describe") {
-    const e = new Error("Mistral describe failed: mock api error");
-    e.code = "api_error";
-    throw e;
-  }
-  if (fail === "describe-empty") return null;
-  return DESCRIPTIONS[lang === "en" ? "en" : "de"];
-}
+/* Die erlaubten Werte fuer MISTRAL_MOCK_FAIL (siehe Kopf der Datei). */
+const FEHLERARTEN = ["api_error", "leer", "rate_limit"];
 
 /**
- * Attrappe für mistral.generateBothProfiles. Liefert nach der konfigurierten
- * Verzögerung ein vorgefertigtes Normal- und Beast-Mode-Profil.
+ * Attrappe des Analyse-Aufrufs — auf Wunsch MIT simuliertem Datenstrom.
  *
- * Rückgabe / Fehlerverhalten identisch zur echten Funktion:
- *   - { normal, boost }            strukturell gültige Profile
- *   - { normal: null, boost: null} kein Profil (MISTRAL_MOCK_FAIL="profiles")
- *   - throw rate_limit             bei MISTRAL_MOCK_FAIL="rate_limit"
- */
-async function generateBothProfiles(_imageDescription, _exifData, _remainingBudget, lang) {
-  await sleep(mockDelayMs());
-  const fail = process.env.MISTRAL_MOCK_FAIL;
-  if (fail === "rate_limit") throw rateLimitError();
-  if (fail === "profiles") return { normal: null, boost: null };
-  const resolved = lang === "en" ? "en" : "de";
-  return {
-    normal: mockProfile("normal", resolved),
-    boost: mockProfile("boost", resolved),
-  };
-}
-
-/**
- * Attrappe des Single-Large-Aufrufs — MIT simuliertem Datenstrom.
+ * Rückgabe / Fehlerverhalten wie die echte Funktion:
+ *   - { normal, boost, subject, visibleText }  strukturell gültige Profile
+ *   - { normal: null, boost: null, ... }        kein Profil (MISTRAL_MOCK_FAIL="leer")
+ *   - throw api_error / rate_limit              bei den entsprechenden Werten
  *
- * WARUM ES DAS BRAUCHT (2026-08-29): Die Attrappe kannte diesen Aufruf bisher
- * nicht, deshalb steht `useSingleLargeCall` im Lokal-Modus auf `false`. Der
- * Live-Weg war damit im Emulator nicht nur abgeschaltet, sondern gar nicht
- * vorhanden — und die Live-Anzeige ohne echte Mistral-Kosten nicht zu sehen.
- *
- * Der Strom wird in derselben Reihenfolge nachgestellt, in der das Modell
- * schreibt: erst der Profiltext, dann die Karten einzeln. Genau diese
- * Reihenfolge erzeugt im Betrieb die Wartezeit, in der der Bildschirm bisher
- * stillstand.
+ * DATENSTROM (2026-08-29): Mit `opts.onLiveText` wird der Strom in derselben
+ * Reihenfolge nachgestellt, in der das Modell schreibt: erst der Profiltext,
+ * dann die Karten einzeln. Genau diese Reihenfolge erzeugt im Betrieb die
+ * Wartezeit, in der der Bildschirm bisher stillstand.
  */
 async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, opts = {}) {
+  const fail = process.env.MISTRAL_MOCK_FAIL;
+  if (fail) {
+    if (!FEHLERARTEN.includes(fail)) {
+      throw new Error(`MISTRAL_MOCK_FAIL="${fail}" ist unbekannt — erlaubt: ${FEHLERARTEN.join(", ")}`);
+    }
+    await sleep(mockDelayMs());
+    if (fail === "rate_limit") throw rateLimitError();
+    if (fail === "api_error") {
+      const e = new Error("Mistral call failed: mock api error");
+      e.code = "api_error";
+      throw e;
+    }
+    return { normal: null, boost: null, subject: "", visibleText: "" };
+  }
   const resolved = lang === "en" ? "en" : "de";
   const normal = mockProfile("normal", resolved);
   const boost = mockProfile("boost", resolved);
@@ -432,8 +389,6 @@ async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, op
 }
 
 module.exports = {
-  describeImage,
-  generateBothProfiles,
   runSingleLargeCall,
   isRateLimitError,
 };

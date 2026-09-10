@@ -6,7 +6,7 @@
  * WARUM ES DIESE WACHE GIBT:
  *
  * Die Zahl "wie viele Analysen duerfen gleichzeitig laufen" existiert ZWEIMAL:
- * einmal als `QUEUE_DISPATCH_CONCURRENCY` im Code, einmal als
+ * einmal als `parallelitaet` im Einstellungssatz, einmal als
  * `maxConcurrentDispatches` in der Cloud-Tasks-Warteschlange bei Google. Der
  * Code rechnet damit die Wartezeit und die Einlassgrenze aus; Google
  * entscheidet damit, was tatsaechlich passiert.
@@ -17,14 +17,15 @@
  * bedienen. Sagt der Code 3 und die Warteschlange laeuft auf 7, verschenken wir
  * mehr als die Haelfte der Kapazitaet.
  *
- * Dass es fuer das Umstellen DREI Skripte gibt (cloudtasks-concurrency-3/7/10),
- * ist der Beweis: Die Kopplung existiert und ist heute Handarbeit. Wer beim
- * Tarifwechsel eines der beiden vergisst, merkt es an nichts.
+ * Seit es die `satzWache` gibt (index.js), zieht jede Aenderung am
+ * Einstellungssatz die Warteschlange automatisch nach. Diese Wache faengt den
+ * Rest ab: eine Aenderung an der Warteschlange an der satzWache vorbei — so
+ * geschehen am 31.08.2026, als ein Testlauf die Produktions-Queue umstellte —
+ * oder einen Nachzug, der gescheitert ist.
  *
- * BEWUSST NUR EINE MELDUNG, KEINE AUTOMATIK. Cloud Tasks ist ein fremdes
- * System. Es aus unserem Code heraus umzustellen hiesse, eine Aenderung an der
- * Infrastruktur ohne Pruefkette und ohne Freigabe vorzunehmen. Die Wache liest
- * und meldet — gehandelt wird von Hand, mit den vorhandenen Skripten.
+ * BEWUSST NUR EINE MELDUNG. Die Wache selbst stellt nichts um: Sie laeuft
+ * zeitgesteuert und ohne Anlass. Eine Aenderung an der Warteschlange gehoert
+ * zu einer bewussten Aenderung am Einstellungssatz, nicht zu einer Messung.
  */
 
 const { QUEUE_NAME, QUEUE_REGION, isLocalQueueMode } = require("./config");
@@ -166,8 +167,9 @@ function baueMeldung(befund) {
       `Kapazitaet laeuft auseinander: Der Code rechnet mit ${imCode} gleichzeitigen ` +
       `Analysen, die Warteschlange laesst aber nur ${inDerQueue} zu. Wartezeit-Ansage und ` +
       `Einlassgrenze sind damit zu optimistisch — wer hinten einreiht, wartet umsonst. ` +
-      `Abhilfe: scripts/cloudtasks-concurrency-${imCode}.sh, oder parallelitaet im Einstellungssatz ` +
-      `auf ${inDerQueue} senken.`
+      `Abhilfe: den Einstellungssatz neu schreiben (node scripts/betriebsprofil-anlegen.js ` +
+      `--ausfuehren --ueberschreiben), dann zieht die satzWache die Warteschlange nach — oder ` +
+      `parallelitaet im Einstellungssatz auf ${inDerQueue} senken.`
     );
   }
   return (

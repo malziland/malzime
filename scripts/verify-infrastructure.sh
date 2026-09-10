@@ -139,7 +139,8 @@ else
     SATZ_AUSGABE=$(node scripts/betriebsprofil-vergleichen.js 2>&1); SATZ_RC=$?
   fi
   case "$SATZ_RC" in
-    0) gruen "Einstellungssatz: Datenbank und Repo stimmen ueberein" ;;
+    0) gruen "Einstellungssatz: Datenbank und Repo stimmen ueberein"
+       printf '%s\n' "$SATZ_AUSGABE" | grep '^HINWEIS' | sed 's/^/      /' || true ;;
     1) rot "Einstellungssatz weicht vom Repo ab — nachziehen oder bewusst entscheiden:"
        printf '%s\n' "$SATZ_AUSGABE" | sed 's/^/      /' ;;
     *) rot "Einstellungssatz nicht vergleichbar (ungeprueft gilt als nicht bestanden): $(printf '%s' "$SATZ_AUSGABE" | tail -1)" ;;

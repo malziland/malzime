@@ -1,6 +1,5 @@
 const {
   createSemaphore,
-  createRateBucket,
   withMistralSlot,
   getMistralStats,
   _setRateIntervalMs,
@@ -101,7 +100,7 @@ describe("createSemaphore — basic acquire/release", () => {
 describe("withMistralSlot wrapper", () => {
   test("releases the slot after successful operation", async () => {
     const before = getMistralStats().inFlight;
-    const result = await withMistralSlot(async () => "ok", "large", SATZ);
+    const result = await withMistralSlot(async () => "ok", SATZ);
     expect(result).toBe("ok");
     expect(getMistralStats().inFlight).toBe(before);
   });
@@ -171,49 +170,5 @@ describe("token-bucket rate limiter", () => {
     }
 
     _setRateIntervalMs(0); /* zurueck zu „deaktiviert" fuer andere Tests */
-  }, 10000);
-});
-
-describe("model-aware token buckets (v1.10.8)", () => {
-  test("Large-Interval ist kuerzer als Small-Interval (Large darf schneller feuern)", () => {
-    /* Dieselbe Aussage, aber ueber den DOKUMENTIERTEN Betrieb statt ueber
-       die Testdatei — siehe satz-gegen-doku.test.js. Hier bleibt nur, dass
-       die Buckets ueberhaupt unterschiedlich einstellbar sind. */
-    const { createRateBucket } = require("../throttle");
-    const gross = createRateBucket(0);
-    const klein = createRateBucket(0);
-    gross.setIntervalMs(SATZ.tokenAbstandGrossMs);
-    klein.setIntervalMs(SATZ.tokenAbstandKleinMs);
-    expect(typeof gross.acquire).toBe("function");
-    expect(typeof klein.acquire).toBe("function");
-  });
-
-  test("withMistralSlot fuehrt fn aus, egal ob modelClass large oder small", async () => {
-    _setRateIntervalMs(0);
-    _resetRateBucket();
-    const large = await withMistralSlot(async () => "L", "large", SATZ);
-    const small = await withMistralSlot(async () => "S", "small", SATZ);
-    expect(large).toBe("L");
-    expect(small).toBe("S");
-  });
-
-  test("zwei separate Buckets bremsen sich NICHT gegenseitig aus", async () => {
-    /* Ein langsamer Bucket (300ms) und ein schneller (0ms) — der schnelle
-       darf nicht vom langsamen ausgebremst werden. */
-    const slow = createRateBucket(300);
-    const fast = createRateBucket(0);
-
-    const fastStart = Date.now();
-    for (let i = 0; i < 4; i++) await fast.acquire();
-    const fastElapsed = Date.now() - fastStart;
-
-    /* 4 schnelle Acquires ohne Interval — praktisch instant (< 100ms) */
-    expect(fastElapsed).toBeLessThan(100);
-
-    /* Der langsame Bucket arbeitet unabhaengig mit seinem eigenen Tempo */
-    const slowStart = Date.now();
-    for (let i = 0; i < 3; i++) await slow.acquire();
-    const slowElapsed = Date.now() - slowStart;
-    expect(slowElapsed).toBeGreaterThanOrEqual(550);
   }, 10000);
 });

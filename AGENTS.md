@@ -50,13 +50,13 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   middleware.js      Rate Limiting (IP-basiert, Grenze+Fenster aus dem Einstellungssatz), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
-  mistral.js         Mistral AI: AKTIV runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call); Fallback 3-Call-Hybrid Large (Describe) + Small (Profile) hinter Feature-Flag useSingleLargeCall
+  mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call) + generateBeastAds (zweiter Aufruf ohne Bild)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
-  feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useSingleLargeCall, usePromptCache), 30s-Cache, fail-safe
+  feature-flags.js   Laufzeit-Feature-Flags aus Firestore (usePromptCache, useLiveText, useBeastAdsCall, ...), 30s-Cache, fail-safe
   --- Queue-Architektur (v2.0) — der einzige Pfad seit v2.10 ---
   handle-enqueue.js  Queue-Annahme: Validierung -> Bild in Storage -> Job anlegen -> in Cloud Tasks einreihen
   handle-process-job.js  Queue-Worker (nur Cloud Tasks): claimt Job, fuehrt Mistral-Pipeline aus, schreibt Ergebnis
@@ -68,11 +68,11 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   mistral-mock.js    Mistral-Attrappe fuer kostenlose Tests (Unit-Tests, Emulator-Durchklick, Mock-Lasttest)
   locales/           Backend-Locale-Dateien
     manifest.json    Verfuegbare Sprachen + Default
-    de/prompts.js    Deutsche Prompts (System-Prompts, AGE_ANCHOR + SCHEMA_RULES, Labels, jsonSchemaNormal + jsonSchemaBoost, mistralDescribeAddendum mit SUBJECT-Klassifikation)
+    de/prompts.js    Deutsche Prompts (singleLargePrompt mit Alterskalibrierung und SUBJECT-Klassifikation, beastAdsSystem/beastAdsUser, Marken-Sperre, injectionWarning)
     de/animals.js    Deutsche Tier-Easter-Egg-Profile
     en/prompts.js    Englische Prompts (Spiegelung von de/prompts.js)
   __tests__/         Jest Unit-Tests + fixtures/ fuer json-repair
-  scripts/           Dev-Tools (test-subject.js — Tiererkennung gegen echte Bilder pruefen)
+  scripts/           Dev-Tools (Lasttests, Forschungs-Skripte)
 
 docs/                Setup-Dokumentation
 .github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml, release.yml)
@@ -149,23 +149,16 @@ Einzelbefehle:
 
 ## Mistral-Architektur (seit v1.6.0)
 
-Die komplette KI-Pipeline laeuft ueber Mistral AI. Es gibt zwei Modi, umschaltbar
-ueber das Firestore-Feature-Flag `featureFlags/current.useSingleLargeCall`:
+Die komplette KI-Pipeline laeuft ueber Mistral AI, in genau einem Weg:
+`runSingleLargeCall` in `mistral.js` schickt das Bild EINMAL an Mistral Large (2512)
+und erhaelt Beschreibung + beide Profile (Normal + Beast) in einer Antwort. Laeuft im
+Queue-Worker `handle-process-job.js`; SUBJECT-Klassifikation + Privacy-Risks werden
+aus den `subject`/`visible_text`-Feldern der Antwort abgeleitet. Ein zweiter, kleiner
+Aufruf ohne Bild erzeugt die Beast-Werbung (`generateBeastAds`). Alle LLM-Ausgaben
+gehen durch `json-repair.js` (4-stufige defensive Reparatur).
 
-**AKTIV — Single-Large-Call (seit v2.2):** `runSingleLargeCall` in `mistral.js`
-schickt das Bild EINMAL an Mistral Large (2512) und erhaelt Beschreibung + beide
-Profile (Normal + Beast) in einer Antwort. Das entlastet das knappe TPM-Limit des
-Small-Modells und erlaubt hoehere Cloud-Tasks-Concurrency. Laeuft im Queue-Worker
-`handle-process-job.js`; SUBJECT-Klassifikation + Privacy-Risks werden aus den
-`subject`/`visible_text`-Feldern der Antwort abgeleitet.
-
-**FALLBACK — 3-Call-Hybrid (bis v2.1, bleibt im Code):**
-
-1. **Describe-Stage**: `mistral.js` ruft Mistral Large mit dem Bild + Describe-Prompt + SUBJECT-Klassifikations-Addendum auf
-2. **SUBJECT-Parsing**: `animal.js` parst die `SUBJECT:`-Kopfzeile (`ANIMAL_ONLY|HUMAN|MIXED|OTHER`)
-3. **Privacy-Risks**: `privacy.js` extrahiert die `Sichtbarer Text:`-Zeile aus der Beschreibung und matched Telefon-/Adress-/Kennzeichen-Patterns
-4. **Profile-Stage**: bei `ANIMAL_ONLY` → Easter-Egg aus `locales/{lang}/animals.js`; sonst Mistral Small fuer Normal + Boost parallel
-5. **JSON-Repair**: alle LLM-Outputs gehen durch `json-repair.js` (4-stufige defensive Reparatur)
+Den aelteren Drei-Aufruf-Weg (Large beschreibt, Small profiliert; bis v2.1 aktiv,
+danach Reserve hinter einem Feature-Flag) gibt es seit 10.09.2026 nicht mehr.
 
 `MISTRAL_API_KEY_EU` ist als Secret (an europe-west1 gebunden) hinterlegt und wird in `index.js` an die KI-Endpunkte gebunden. `mistral-http.js` liest den Key aus `process.env.MISTRAL_API_KEY_EU`, lokal ersatzweise aus `MISTRAL_API_KEY`.
 

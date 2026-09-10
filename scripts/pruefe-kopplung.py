@@ -81,8 +81,6 @@ ZEILEN_GRENZEN = {
     # Nach VIER Schnitten von 1681 auf 696 Zeilen. Uebrig ist der
     # Ein-Aufruf-Weg, der taegliche Normalfall.
     "functions/src/mistral.js": 760,
-    # Der Rueckfall-Weg mit drei Aufrufen, vierter Schnitt.
-    "functions/src/mistral-drei-call.js": 420,
     # Der Netzzugriff, dritter Schnitt.
     "functions/src/mistral-http.js": 450,
     # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.

@@ -63,16 +63,13 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
    Ein Store-Eintrag koennte hier stillschweigend SVG oder HTML ergaenzen. */
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-/* ── Mistral-Modelle ──
-   Describe-Stage via Large 3 = mistral-large-2512 (gute Bilderkennung),
-   Profile-Stage via Small 4 = mistral-small-2603 (aktive Konstante unten),
-   Mistral-internes Fallback bei Profile-Versagen: Large 3.
-   Im Single-Large-Betrieb (featureFlags/current.useSingleLargeCall) laeuft
-   alles ueber Large 3 — Small 4 bleibt der 3-Call-Fallback-Pfad.
+/* ── Mistral-Modell ──
+   Ein Modell fuer alles: mistral-large-2512 (Large 3, multimodal). Es liefert
+   Bildbeschreibung und beide Profile in einem Aufruf und schreibt in einem
+   zweiten Aufruf ohne Bild die Beast-Werbung. Das kleinere mistral-small-2603
+   lief bis 10.09.2026 im ausgebauten Drei-Aufruf-Weg.
 
-   Preise pro 1M Tokens (Stand 2026-05):
-     - mistral-large-2512: $0.50 / $1.50  in/out  (Large 3)
-     - mistral-small-2603: $0.15 / $0.60  in/out  (Small 4)
+   Preis pro 1M Tokens (Stand 2026-05): $0.50 / $1.50 in/out.
 
    RATE-LIMITS — WICHTIG, STAND 2026-08-11 (KA-07): Die frueher hier
    notierten Modell-Limits („6 RPS" Large, „1.67 RPS" Small, Dashboard-Stand
@@ -80,16 +77,10 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    STUFEN-SYSTEM nach kumuliertem Umsatz (org-weit, auch am EU-Endpunkt):
    T1 = 0,25 req/s (bis 20 $), T2 ab 20 $, T3 ab 100 $, T4 ab 500 $ —
    kein Vorkauf moeglich. Aktuell gilt T1: 0,25 req/s = die REALE
-   Durchsatzbremse (~7,5 Analysen/min bei 2 Calls je Analyse). In der
-   Praxis haelt die Cloud-Tasks-Nebenlaeufigkeit (7 gleichzeitige Jobs,
-   ~55 s je Analyse) den Durchsatz von selbst genau unter dieser Decke —
-   wer die Nebenlaeufigkeit hochdreht, MUSS vorher die Tier-Stufe im
-   Mistral-Dashboard pruefen, nicht diesen Kommentar.
-
-   Historie: v1.10.7 (2026-05-19) wich wegen der damaligen 2603-Limits
-   voruebergehend auf mistral-small-2506 (Small 3.2) aus; seit der Queue-/
-   Single-Large-Architektur ist 2603 wieder aktiv. 2506 wurde von Mistral zum
-   31.07.2026 ZURUECKGEZOGEN (Retirement) — als Modell-Option dauerhaft tot.
+   Durchsatzbremse (~7,5 Analysen/min bei 2 Calls je Analyse). Unter dieser
+   Decke halten den Durchsatz `parallelitaet` und `queueRatePerSekunde` im
+   Einstellungssatz (Rechnung in produktiv-satz.js) — wer sie hochdreht, MUSS
+   vorher die Tier-Stufe im Mistral-Dashboard pruefen, nicht diesen Kommentar.
 
    API-Key kommt aus `process.env.MISTRAL_API_KEY_EU` (Firebase Secret, EU-gebunden; lokal `MISTRAL_API_KEY`). */
 /* v1.10.7: Large fest auf -2512 gepinnt statt -latest-Alias. Hintergrund:
@@ -100,9 +91,7 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    WELCHES Modell rechnet, steht auf der Website und in den Rechtstexten.
    Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein anderes
    Modell, waehrend die Seite weiter das alte nennt. */
-const MISTRAL_DESCRIBE_MODEL = "mistral-large-2512";
-const MISTRAL_PROFILE_MODEL = "mistral-small-2603";
-const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";
+const MISTRAL_MODEL = "mistral-large-2512";
 /* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des
    globalen — Mistral sichert damit VERTRAGLICH zu, dass die Inferenz in
    EU-/EFTA-Rechenzentren laeuft (der globale Endpunkt verspricht nur
@@ -116,18 +105,10 @@ const MISTRAL_FALLBACK_MODEL = "mistral-large-2512";
    unveraendert, der Bruch waere von aussen nicht nachweisbar. */
 const MISTRAL_ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
 const MISTRAL_MODELS_ENDPOINT = "https://api.eu.mistral.ai/v1/models";
-/* v2.1 (2026-05-23 nachmittags): 12000 → 16000. Hintergrund: Beim ersten
-   v2.1-Live-Test schnitt Beast mehrere Karten mit "..." mitten im Wort ab,
-   weil Mistral trotz Variante-B-Längenvorgabe ausführlich schrieb. 16000
-   gibt ausreichend Puffer für die jetzt strengeren Beast-Schema-Beispiele
-   (siehe jsonSchemaBoost) bei trotzdem disziplinierterem Modell-Verhalten
-   (Temperatur Beast wurde von 1.0 → 0.8 in mistral.js). Kostenneutral,
-   da Mistral nur tatsächlich generierte Tokens berechnet. */
-
 /* ── Eigene Zeitgrenze fuer den Single-Large-Aufruf ──
    BUG-2026-08-17-01. Der Single-Large-Call schreibt Standard- UND Beast-Profil
    in EINEM Zug und ist damit der mit Abstand laengste Aufruf der Pipeline. Die
-   allgemeinen 90 s passen zu den kurzen Aufrufen (describe, beast-ads), nicht
+   allgemeinen 90 s passen zum kurzen Werbe-Aufruf (beast-ads), nicht
    zu diesem.
 
    WARUM DAS ERST SEIT v3.0.0 WEH TUT: Vor dem Live-Text lief der Aufruf ohne
@@ -230,29 +211,13 @@ const QUEUE_UPLOAD_PREFIX = "queue-uploads/";
    abandoned Job macht ohnehin keinen Mistral-Call; es wird nur der Bild-
    Zwischenspeicher + der Warteschlangen-Platz etwas länger gehalten. */
 
-/* Schätzwerte für die Warteschlangen-ETA im job-status-Endpoint:
-   durchschnittliche Verarbeitungsdauer pro Job und Anzahl parallel
-   dispatchter Jobs. BEWUSST leicht großzügig — die ETA soll lieber über-
-   als unterschätzen, damit Wartende nicht enttäuscht werden.
-   QUEUE_DISPATCH_CONCURRENCY muss dem `maxConcurrentDispatches` der echten
-   Cloud-Tasks-Queue entsprechen, sonst geht die ETA daneben.
-
-   v2.2.0-rc1 (2026-05-23 abends): von 100s/3 auf 65s/10 angepasst nach
-   Lasttest mit Single-Large-Pipeline + Cloud-Tasks-Concurrency 10. Reale
-   Messung (35 Jobs): Median 58s/Job, P95 65s. Concurrency wurde via
-   `scripts/cloudtasks-concurrency-10.sh` auf 10 gesetzt. Falls Flag
-   `useSingleLargeCall` wieder deaktiviert wird, muessen beide Werte
-   zurueck (100 / 3) — und die Cloud-Tasks-Queue per
-   `scripts/cloudtasks-concurrency-3.sh` ebenfalls.
-
-   v2.8.0 (2026-08-10): Concurrency von 10 auf 7 gesenkt. Seit v2.8 braucht
-   jede Analyse ZWEI Mistral-Aufrufe (Bildanalyse + Beast-Werbung), und
-   mistral-large-2512 erlaubt nur 15 Anfragen pro Minute — an der API
-   gemessen, die aeltere Annahme "6 Anfragen pro Sekunde" ist ueberholt.
-   Bei Concurrency 10 waeren es 22 Anfragen/min und damit 429-Fehler.
-   Die Queue muss per `scripts/cloudtasks-concurrency-7.sh` mitgezogen werden.
-   QUEUE_AVG_JOB_SECONDS bleibt bewusst bei 65, obwohl real 56 gemessen —
-   die ETA soll ueberschaetzen, und der zweite Aufruf kostet 1-2 Sekunden. */
+/* Wartezeit-Ansage und Einlassgrenze rechnen mit `parallelitaet` und
+   `durchschnittsdauerSekunden` aus dem Einstellungssatz — Werte und ihre
+   Begruendung stehen in produktiv-satz.js. `parallelitaet` uebertraegt die
+   satzWache zugleich in die echte Cloud-Tasks-Queue
+   (`maxConcurrentDispatches`); frueher war das Handarbeit mit eigenen
+   Skripten. BEWUSST leicht grosszuegig: Die Ansage soll lieber ueber- als
+   unterschaetzen, damit Wartende nicht enttaeuscht werden. */
 
 /* ARCH-001 (Audit 2026-08-10): Obergrenze der Warteschlangen-Tiefe beim Einlass.
    Der Browser gibt nach 30 Minuten auf (MAX_POLL_DURATION_MS in api.js). Bei
@@ -343,9 +308,7 @@ module.exports = {
   FIRESTORE_DATABASE_ID,
   MAX_UPLOAD_BYTES,
   ALLOWED_MIME,
-  MISTRAL_DESCRIBE_MODEL,
-  MISTRAL_PROFILE_MODEL,
-  MISTRAL_FALLBACK_MODEL,
+  MISTRAL_MODEL,
   MISTRAL_ENDPOINT,
   MISTRAL_MODELS_ENDPOINT,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,

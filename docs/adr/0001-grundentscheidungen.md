@@ -46,6 +46,8 @@ getroffen — sowie die bewussten Abweichungen vom Standard.
    Der Fallback-Pfad 3-Call-Pipeline bleibt bewusst im Code, bis sein Abbau
    ausdruecklich freigegeben wird. **Aktualisiert 2026-08-10:** Der synchrone
    `/analyze`-Pfad ist mit v2.10 abgebaut; die dortige Ausnahme entfaellt.
+   **Aktualisiert 2026-09-10:** Die 3-Call-Pipeline ist abgebaut (Freigabe des
+   Inhabers am 10.09.2026), das Flag `useSingleLargeCall` entfaellt.
 9. **Release-Tags leichtgewichtig** (durch `release.yml`/GitHub-Releases erzeugt)
    — Abweichung von „annotierte Tags": die Metadaten (Notizen, Datum, Urheber)
    trägt der GitHub-Release. Akzeptiert.

@@ -29,8 +29,6 @@ const T1_NORMAL = {
   mistralTimeoutMs: 90000,
   singleLargeTimeoutMs: 300000,
   singleLargeMaxTokens: 5000,
-  describeMaxTokens: 2048,
-  profileMaxTokens: 16000,
   requestBudgetMs: 480000,
 
   /* GESENKT 08.09.2026 von 4 auf 3 — nachgerechnet am Vorfall vom selben
@@ -87,7 +85,6 @@ const T1_NORMAL = {
      800 ms; erlaubt sind auf Stufe T1 vier Sekunden. Wirkt nur innerhalb einer
      Instanz — die verlässliche Bremse ist `queueRatePerSekunde`. */
   tokenAbstandGrossMs: 4000,
-  tokenAbstandKleinMs: 4000,
 
   /* DAS NETZ UNTER DER BREMSE (08.09.2026). Lehnt Mistral ab (429) oder ist
      kurz weg (502/503/504), wartet der Auftrag 10, 20, 40, 80 Sekunden und
@@ -117,8 +114,8 @@ const T1_NORMAL = {
   ticketGueltigkeitMs: 1800000,
 };
 
-/* Zwei vorbereitete Alternativen, damit im Ernstfall EIN Feld umgestellt wird
-   statt neunundzwanzig. */
+/* Eine vorbereitete Alternative, damit im Ernstfall EIN Feld umgestellt wird
+   statt jedes Wertes einzeln. */
 const PROFILE = {
   "t1-normal": T1_NORMAL,
 
@@ -129,20 +126,26 @@ const PROFILE = {
     singleLargeTimeoutMs: 450000,
     durchschnittsdauerSekunden: 110,
   },
-
-  /* Rollback auf die 3-Call-Pipeline, ohne Deploy. Ersetzt den früheren
-     Drei-Schritte-Rollback aus dem RUNBOOK.
-
-     ACHTUNG, die Bremse steht hier ANDERS: Dieser Pfad macht DREI
-     Mistral-Aufrufe je Analyse statt zwei. 0,25 / 3 = 0,083. Wer das vergisst,
-     läuft auf dem Rollback-Pfad in genau die Fehler, vor denen der Rollback
-     schützen soll. */
-  "t1-drei-call": {
-    ...T1_NORMAL,
-    parallelitaet: 3,
-    queueRatePerSekunde: 0.083,
-    durchschnittsdauerSekunden: 100,
-  },
 };
 
-module.exports = { PROFILE, T1_NORMAL, AKTIV: "t1-normal" };
+/* AUSGEMUSTERT — Uebergang beim Ausbau des Drei-Aufruf-Wegs (10.09.2026).
+   Der Code kennt diese Felder und diesen Satz nicht mehr. In der Datenbank
+   stehen sie noch, weil der BISHER laufende Code diese Felder als
+   Pflichtfelder liest: Sie vor dem Ausliefern zu loeschen, hiesse, der
+   laufenden Seite den Einstellungssatz ungueltig zu machen (die satzWache
+   schlaegt Alarm, und keine Analyse laeuft). Reihenfolge deshalb: ausliefern,
+   dann `node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`,
+   dann diese Liste leeren.
+
+   Bis dahin meldet der Abgleich vor dem Deploy (betriebsprofil-vergleichen.js)
+   genau diese Reste als Hinweis statt als Abweichung — nichts anderes. Nach
+   `bis` gelten sie dort wieder als Abweichung, und der Test
+   ausgemustert-uebergang.test.js wird rot: Der Uebergang darf kein
+   Dauerzustand werden. */
+const AUSGEMUSTERT = {
+  bis: "2026-09-24",
+  felder: ["describeMaxTokens", "profileMaxTokens", "tokenAbstandKleinMs"],
+  saetze: ["t1-drei-call"],
+};
+
+module.exports = { PROFILE, T1_NORMAL, AKTIV: "t1-normal", AUSGEMUSTERT };

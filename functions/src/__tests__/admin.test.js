@@ -68,10 +68,7 @@ jest.mock("../notify", () => ({ notifyLimitReached: jest.fn() }));
 jest.mock("../middleware", () => ({ checkRateLimit: jest.fn(), getClientIp: jest.fn() }));
 jest.mock("../upload", () => ({ parseMultipart: jest.fn(), parseJsonBody: jest.fn() }));
 jest.mock("../privacy", () => ({ buildPrivacyRisks: jest.fn(), extractVisibleText: jest.fn() }));
-jest.mock("../mistral", () => ({
-  describeImage: jest.fn(),
-  generateBothProfiles: jest.fn(),
-}));
+jest.mock("../mistral", () => ({}));
 jest.mock("../animal", () => ({
   classifyDescription: jest.fn(),
   buildAnimalProfiles: jest.fn(),
@@ -100,6 +97,9 @@ function mockRes() {
     statusCode: 200,
     body: null,
     htmlBody: null,
+    /* Seit PRIV-2026-09-10-06 setzt index.js an jeder oeffentlichen Antwort
+       die Kopfzeile Cache-Control (Express/Node: res.setHeader). */
+    setHeader: jest.fn(),
     status: jest.fn(function (code) {
       this.statusCode = code;
       return this;

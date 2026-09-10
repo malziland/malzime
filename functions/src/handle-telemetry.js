@@ -238,4 +238,22 @@ async function handleTelemetry(req, res) {
   }
 }
 
-module.exports = { handleTelemetry };
+/* PRIV-2026-09-10-01 (Ursache): Jedes Feld, das dieser Endpunkt annimmt und
+   damit bis zu 30 Tage im Diagnose-Speicher ablegt, als eine flache Liste
+   (verschachtelte Felder mit Praefix). Nur fuer die Pruefungen:
+   public/__tests__/datenschutz-deckung.test.js verlangt fuer jedes Feld eine
+   Stelle im Datenschutztext, diagnose-freigabeliste.test.js belegt am echten
+   Handler, dass er kein Feld liest, das hier fehlt. Der Realitaets-Check
+   steht mit seinen festen Stufen und dem serverseitig berechneten Score dabei. */
+const _freigabeliste = [
+  ...Object.keys(STRING_FIELDS),
+  ...NUMBER_FIELDS,
+  ...BOOLEAN_FIELDS,
+  ...TIMING_KEYS.map((k) => `timings.${k}`),
+  ...[...Object.keys(CLIENT_STRING_KEYS), ...CLIENT_NUMBER_KEYS, ...CLIENT_BOOL_KEYS].map((k) => `client.${k}`),
+  ...[...Object.keys(META_STRING_KEYS), ...META_BOOL_KEYS].map((k) => `meta.${k}`),
+  ...[...RC_PFLICHT_STUFEN, ...RC_OPTIONALE_STUFEN].map((k) => `stufen.${k}`),
+  "score",
+];
+
+module.exports = { handleTelemetry, _freigabeliste };

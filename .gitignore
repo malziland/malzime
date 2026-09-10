@@ -16,7 +16,7 @@ compare-result.html
 compare-result-*.html
 compare-failed-*.txt
 
-# Forschungs-Bilder für functions/scripts/compare-pipelines.js
+# Forschungs-Bilder des frueheren Modellvergleichs (Werkzeug entfernt 10.09.2026)
 compare-input/
 compare-results.json
 compare-prototype.html

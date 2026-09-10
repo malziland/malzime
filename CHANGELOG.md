@@ -4,6 +4,48 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Die Datenschutzerklärung ist neu aufgebaut, deutsch und englisch.**
+  Einspaltig, in Kästen mit der Aufbewahrungsdauer auf einen Blick und in
+  einfacher Sprache, die schon Kinder ab zehn verstehen. Jeder Satz ist mit der
+  tatsächlichen Technik abgeglichen. Genauer gefasst oder ergänzt sind dabei
+  unter anderem: die zwei Einträge, die 30 Tage aufbewahrt werden (wie lange
+  die KI gebraucht hat und was der Kinderschutz-Filter entschieden hat), die
+  Löschfristen samt ihrer Sicherheitsnetze und die aufgerufene Seite in den
+  Meldungen des Browsers. Eine neue Prüfung hält Text und Technik ab jetzt
+  aneinander: Jede Art von Eintrag im 30-Tage-Speicher und jedes Feld, das der
+  Browser meldet, muss im Text stehen — auf Deutsch und auf Englisch.
+- **Die Löschfristen stehen so da, wie sie gemessen sind.** Das Foto wird
+  unmittelbar nach der Analyse gelöscht, meist etwa eine Minute nach dem
+  Hochladen. Klappt das einmal nicht, räumt der Aufräumer nach rund zwei
+  Stunden auf, und dahinter löscht Google selbst. Die Kurzvorstellung sagt
+  jetzt dasselbe.
+- **Der ältere Analyseweg ist ausgebaut.** Seit v2.2 läuft jede Analyse über
+  einen einzigen Aufruf an Mistral Large. Der frühere Weg mit drei Aufrufen lag
+  seither als Reserve im Code, samt Schalter, zweitem Modell
+  (`mistral-small`), eigener Drossel und Hilfsskripten. Er ist vollständig
+  entfernt: weniger Code, weniger Altlasten, und jede Analyse läuft auf dem
+  einen Weg, den die Datenschutzerklärung beschreibt.
+
+### Behoben
+
+- **Die eigene KI-Kennzeichnung der Demo-Fotos zählt nicht mehr als
+  Bildinhalt.** Die Anweisung, „KI ERSTELLT“ nicht als sichtbaren Text
+  aufzuführen, stand bisher nur im Text des älteren Wegs. Sie steht jetzt im
+  Analyse-Prompt, deutsch und englisch.
+- **Antworten der Schnittstellen werden nirgends zwischengespeichert.** Jede
+  Antwort trägt „nicht speichern“, auch das fertige Profil beim Abholen.
+- **Die Liste der IP-Adressen gegen Missbrauch räumt sich selbst auf.** Jeder
+  Eintrag verschwindet nach zehn Minuten, auch wenn danach niemand mehr
+  anfragt.
+- **Die Kinderschutz-Auswertung trägt keine Vorgangsnummer mehr.** Ein
+  30-Tage-Eintrag lässt sich damit keiner Analyse und keinem Gerät zuordnen.
+- **Die Statistik beim Seitenstart kommt direkt vom Server in der EU**, wie
+  alle anderen Abrufe auch.
+
 ## [4.8.2] — 2026-09-10
 
 ### Geändert

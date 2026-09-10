@@ -9,12 +9,10 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 | Phase | Primaer | Modell | Region |
 |-------|---------|--------|--------|
 | KI-Analyse (aktiv, Single-Call) | Mistral AI | `mistral-large-2512` — Beschreibung + beide Profile in einem Call | EU-Default |
-| Describe (Fallback-Pipeline) | Mistral AI | `mistral-large-2512` | EU-Default |
-| Profile (Fallback-Pipeline) | Mistral AI | `mistral-small-2603` | EU-Default |
 | Functions + DB + Warteschlange | Google | Firebase / Cloud Run | `europe-west1` — der Browser ruft die Schnittstellen seit 09.09.2026 **direkt** unter ihren Cloud-Run-Adressen auf (`public/js/api-basis.js`) |
 | Hosting (nur die Seite selbst) | Google | Firebase Hosting | weltweites Auslieferungsnetz; enthält keine Nutzerdaten |
 
-> **Zwei Modi:** Aktiv ist seit v2.2 der **Single-Large-Call** (Feature-Flag `featureFlags/current.useSingleLargeCall`): ein Aufruf an `mistral-large-2512` liefert Bildbeschreibung + beide Profile. Die klassische **3-Call-Pipeline** (Large beschreibt, Small profiliert, Large als internes JSON-Backup) bleibt als Fallback im Code und ist per Flag umschaltbar.
+> **Ein Weg:** Seit v2.2 liefert ein Aufruf an `mistral-large-2512` Bildbeschreibung + beide Profile. Den älteren Drei-Aufruf-Weg (Large beschreibt, Small profiliert) gibt es seit 10.09.2026 nicht mehr.
 
 ## Datenfluss
 
@@ -55,7 +53,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │                                                                    │
 │  1. claimJob: queued → processing (idempotente Transaktion)        │
 │                                                                    │
-│  2. AKTIV: Single-Large-Call (Feature-Flag useSingleLargeCall)     │
+│  2. Analyse-Aufruf (Single-Large-Call)                             │
 │     └─ EIN Aufruf an mistral-large-2512 liefert Beschreibung       │
 │        UND beide Profile; ein zweiter, kleiner Aufruf ohne Bild    │
 │        erzeugt die Beast-Werbung (seit v2.8)                       │
@@ -69,11 +67,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │     ├─ extractVisibleText() parst "Sichtbarer Text:"-Zeile         │
 │     └─ buildPrivacyRisks() matcht Telefon/Adress/Kfz-Patterns       │
 │                                                                    │
-│  5. FALLBACK (Flag aus): 3-Call-Pipeline                           │
-│     ├─ Describe via Large, Profile via mistral-small-2603          │
-│     └─ Bei Small-JSON-Fail: Large als Mistral-internes Backup      │
-│                                                                    │
-│  6. Ergebnis-Aufbau                                                │
+│  5. Ergebnis-Aufbau                                                │
 │     ├─ Profile JSON in Output-Bounds geclampt (SEC-004)            │
 │     └─ Ergebnis ins Job-Dokument, Bild sofort geloescht            │
 └────────────────────────────────────┬───────────────────────────────┘
@@ -200,9 +194,9 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `jobs.js` | Queue: Job-Lebenszyklus + Firestore-Zugriff auf die `jobs`-Collection |
 | `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
-| `feature-flags.js` | Laufzeit-Feature-Flags `useSingleLargeCall` + `usePromptCache` (Firestore, 30 s Cache, fail-safe `false`) |
+| `feature-flags.js` | Laufzeit-Feature-Flags (u. a. `usePromptCache`, `useLiveText`, `useBeastAdsCall`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
 | `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
-| `mistral.js` | Mistral AI: Single-Large aktiv (1 Call `mistral-large-2512` liefert Beschreibung + beide Profile); 3-Call-Fallback (Describe Large + 2× Profil Small) mit Mistral-internem Large-3-Backup |
+| `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile; ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
 | ~~`heartbeat.js`~~ | Entfernt mit dem Audit 2026-08-10 — hatte seit v2.10 keinen Aufrufer mehr (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
@@ -233,7 +227,7 @@ Mistrals Sub-Prozessoren (Cloud-Provider, Compute) können temporär außerhalb 
 
 ## SUBJECT-Klassifikation
 
-Mistrals Describe-Prompt enthält das `mistralDescribeAddendum`, das eine `SUBJECT:`-Kopfzeile als erste Zeile der Antwort erzwingt:
+Der Analyse-Aufruf liefert im JSON die Felder `subject` (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`) und `visible_text`. `job-pipelines.js` setzt daraus eine Beschreibung in diesem Format zusammen, die `animal.js` und `privacy.js` auswerten:
 
 ```
 SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER
@@ -245,7 +239,7 @@ Sichtbarer Text: <Text 1>; <Text 2>; ...
 
 `animal.js:classifyDescription()` parst die SUBJECT-Zeile und routet:
 - `ANIMAL_ONLY` → Tier-Easter-Egg-Pfad (Profile aus `animals.js`, keine zweite KI-Anfrage)
-- `HUMAN` / `MIXED` / `OTHER` → Normaler Profil-Pfad im 3-Call-Fallback (Mistral Small 4); aktiv laeuft alles ueber Large 3
+- `HUMAN` / `MIXED` / `OTHER` → die Profile aus demselben Aufruf werden ausgeliefert
 
 Bei fehlender SUBJECT-Zeile fällt das System fail-safe auf `HUMAN` zurück — d.h. kein versehentliches Easter-Egg bei kaputter Mistral-Antwort.
 
@@ -255,11 +249,12 @@ Da es keine alternativen KI-Provider mehr gibt:
 
 | Mistral-Antwort | Reaktion |
 |---|---|
-| 200 OK mit Beschreibung | Normale Pipeline weiter |
-| 200 OK mit leerem Body | `blocked.safetyFilter` |
-| HTTP 429 (Rate-Limit) | `blocked.overloaded` (intern: 2 Retries mit Exponential Backoff) |
-| HTTP 5xx oder Timeout | `blocked.apiError` |
-| Profile-JSON nicht parsbar | `json-repair.js` → wenn 4 Stufen scheitern: Mistral Large 3 als interner Backup; wenn auch fällt: `blocked.profileBlocked` |
+| 200 OK mit auswertbarem JSON | Normale Pipeline weiter |
+| 200 OK ohne auswertbare Profile | `blocked.profileBlocked` |
+| JSON nicht parsbar | `json-repair.js` (4 Stufen) → wenn alle scheitern: `blocked.profileBlocked` |
+| HTTP 429 (Rate-Limit) | `blocked.overloaded` (vorher Wiederholungen mit wachsender Wartezeit, `ueberlast.js`) |
+| Sonstiger HTTP-Fehler oder Timeout | `blocked.apiError` |
+| Einstellungssatz fehlt oder ungültig | `blocked.configMissing` |
 
 Der User sieht in allen Blocked-Fällen eine erklärende Meldung statt eines internen Server-Fehlers. Das `blockedReason`-Feld in der Response erlaubt frontend-seitiges Mapping zu i18n-Strings.
 

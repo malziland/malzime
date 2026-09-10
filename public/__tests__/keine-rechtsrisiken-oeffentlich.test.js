@@ -12,7 +12,9 @@
  * Geprueft werden alle oeffentlichen Texte: Doku, README, THIRD-PARTY,
  * CHANGELOG, Website, eigener Code, Sprachdateien. Ausgenommen: fremde
  * Lizenztexte (public/lib, public/fonts — dort ist "PATENT" Teil der Lizenz),
- * docs/handover (privat) und Testdateien (Positivkontrolle unten).
+ * docs/handover (privat), docs/audit (privat und gitignoriert — der Test
+ * unten haelt fest, dass es so bleibt) und Testdateien (Positivkontrolle
+ * unten).
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -21,7 +23,14 @@ import { fileURLToPath } from "node:url";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const MUSTER = /patent|rechtsrisiko|risiko wird getragen|haftungsrisiko|risk is (accepted|borne)/i;
-const AUSGENOMMEN = [/^docs\/handover\//, /^public\/lib\//, /^public\/fonts\//, /__tests__\//, /node_modules/];
+const AUSGENOMMEN = [
+  /^docs\/handover\//,
+  /^docs\/audit\//,
+  /^public\/lib\//,
+  /^public\/fonts\//,
+  /__tests__\//,
+  /node_modules/,
+];
 
 function dateien(wurzel, endungen) {
   const raus = [];
@@ -53,6 +62,16 @@ describe("Rechtsrisiko-Abwaegungen stehen in keiner oeffentlichen Datei", () => 
     expect(OEFFENTLICH.length).toBeGreaterThan(50);
     expect(OEFFENTLICH).toContain("docs/SECURITY-MODEL.md");
     expect(OEFFENTLICH).toContain("THIRD-PARTY.md");
+  });
+
+  it("docs/audit/ ist wirklich gitignoriert — sonst waere die Ausnahme ein Loch", () => {
+    /* Die Audit-Berichte bleiben privat (docs/audit/, nicht im Repository).
+       Nur deshalb duerfen sie hier fehlen. Faellt die Ignorier-Regel weg,
+       muss dieser Test rot werden, bevor ein Bericht oeffentlich wird. */
+    const regeln = readFileSync(join(REPO, ".gitignore"), "utf8")
+      .split("\n")
+      .map((z) => z.trim());
+    expect(regeln).toContain("docs/audit/");
   });
 
   it("das Muster erkennt den Text vom 08.09.2026 (Positivkontrolle)", () => {

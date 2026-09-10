@@ -231,7 +231,7 @@ Trage den Bucket-Namen in `functions/src/config.js` (`QUEUE_BUCKET`) oder als Um
 firebase deploy --only firestore:indexes
 ```
 
-**4. Feature-Flags:** Die Warteschlange läuft immer; seit v2.10 gibt es keinen zweiten Weg mehr. Im Dokument `featureFlags/current` steuerst du `useSingleLargeCall` (Ein-Aufruf-Pipeline) und `usePromptCache` — beide ohne Deploy umlegbar.
+**4. Feature-Flags:** Die Warteschlange läuft immer; seit v2.10 gibt es keinen zweiten Weg mehr. Im Dokument `featureFlags/current` steuerst du u. a. `usePromptCache` und `useLiveText` — ohne Deploy umlegbar (Uebersicht in `FLAGS.md`).
 
 Die IAM-Rolle, mit der Cloud Tasks den Worker `processJob` aufrufen darf, vergibt `firebase deploy` automatisch.
 
@@ -295,15 +295,13 @@ Bevor du live gehst:
 
 ### Was pro Analyse passiert
 
-Aktiv ist seit v2.2 der **Single-Large-Pfad**: ein einziger Call an `mistral-large-2512` liefert Bildbeschreibung + beide Profile. Die folgende Tabelle beschreibt den **3-Call-Fallback** (Feature-Flag `useSingleLargeCall` aus) — sie bleibt stehen, weil sie die einzelnen Posten am besten nachvollziehbar macht; die Gesamtkosten pro Analyse liegen in beiden Modi in derselben Groessenordnung.
-
 | API | Aufrufe | Was |
 |-----|---------|-----|
-| **Mistral Large 3** | 1 Call | Multimodale Bildbeschreibung mit SUBJECT-Klassifikation |
-| **Mistral Small 4** | 2 Calls | Profilgenerierung (Normal + Boost, parallel) |
-| **Cloud Functions** | 1 Invocation | ~3–8 Sekunden, 512 MiB RAM |
+| **Mistral Large 3** | 1 Call | Bildbeschreibung, SUBJECT-Klassifikation, sichtbarer Text und beide Profile |
+| **Mistral Large 3** | 1 Call | Beast-Werbung (ohne Bild, seit v2.8) |
+| **Cloud Functions** | 1 Invocation | Dauer haengt an der Mistral-Antwortzeit (zuletzt gemessen rund 40 s), 512 MiB RAM |
 
-Bei Tier-Fotos entfaellt der Small-4-Call — Easter-Egg aus statischen Locales.
+Bei Tier-Fotos (SUBJECT=ANIMAL_ONLY) entfaellt der zweite Aufruf — das Easter-Egg-Profil wird aus statischen Locale-Daten gebaut.
 
 ### Preise (Stand Mai 2026)
 
@@ -312,7 +310,6 @@ Bei Tier-Fotos entfaellt der Small-4-Call — Easter-Egg aus statischen Locales.
 | Modell | Input | Output |
 |--------|-------|--------|
 | Large 3 | $0.50 | $1.50 |
-| Small 4 | $0.15 | $0.60 |
 
 **Google Cloud (nur Infrastruktur):**
 
@@ -326,10 +323,9 @@ Bei Tier-Fotos entfaellt der Small-4-Call — Easter-Egg aus statischen Locales.
 
 | Posten | Rechnung | Kosten |
 |--------|----------|--------|
-| Mistral Large 3 Describe | 30 × ~10.000 Input + ~1.500 Output Tokens | **~$0.22** |
-| Mistral Small 4 Profile (2x) | 30 × 2 × ~5.000 Tokens je in/out | **~$0.13** |
+| Mistral Large 3 (Analyse + Werbe-Aufruf) | 30 Analysen, gemessen am 30.08.2026 mit Prompt-Cache | **rund $0.20–0.25** (unter 1 Cent je Analyse) |
 | Cloud Functions + Hosting | minimal | **$0.00** |
-| **Gesamt** | | **~$0.35** |
+| **Gesamt** | | **rund $0.20–0.25** |
 
 Neue Google Cloud Konten erhalten **$300 Startguthaben**.
 

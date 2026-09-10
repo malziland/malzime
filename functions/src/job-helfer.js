@@ -19,12 +19,7 @@
  * ist, steht bei jeder Funktion einzeln.
  */
 
-const {
-  isSingleLargeCallEnabled,
-  isPromptCacheEnabled,
-  isBeastAdsCallEnabled,
-  isLiveTextEnabled,
-} = require("./feature-flags");
+const { isPromptCacheEnabled, isBeastAdsCallEnabled, isLiveTextEnabled } = require("./feature-flags");
 
 function getMistral() {
   return process.env.MISTRAL_MOCK === "1" ? require("./mistral-mock") : require("./mistral");
@@ -38,7 +33,14 @@ function loggeMinorSafety(safety, traceId, lang) {
   console.log(
     JSON.stringify({
       step: "minor-safety",
-      traceId: traceId || null,
+      /* PRIV-2026-09-10-02: BEWUSST OHNE Vorgangskennung (traceId). Diese
+         Zeile liegt 30 Tage im Diagnose-Speicher `client-diagnostics`, und
+         dort tragen die Browser-Meldungen (client-error, client-telemetry)
+         dieselbe Kennung samt Geraeteklasse. Mit ihr liesse sich die
+         Altersschaetzung einer Analyse mit dem Geraet verbinden — im Workshop
+         fuehren Uhrzeit und Geraet auf ein bestimmtes Kind. Die Durchbruch-
+         Zeile unten behaelt die Kennung: Sie geht nicht in den 30-Tage-
+         Speicher (Filter vergleicht step exakt) und traegt kein Alter. */
       lang,
       alter: safety.alter,
       minderjaehrig: safety.minderjaehrig,
@@ -89,15 +91,6 @@ function buildPseudoDescription(normalProfile) {
   return parts.filter(Boolean).join(" ").trim();
 }
 
-async function isSingleLargeCallEnabledSafe() {
-  try {
-    return await isSingleLargeCallEnabled();
-  } catch (err) {
-    console.log(JSON.stringify({ warning: "single-large-flag-read-error", error: err.message }));
-    return false;
-  }
-}
-
 async function isBeastAdsCallEnabledSafe() {
   try {
     return await isBeastAdsCallEnabled();
@@ -130,7 +123,6 @@ async function isLiveTextEnabledSafe() {
 const hasCategories = (obj) => obj && obj.categories && Object.keys(obj.categories).length > 0;
 
 module.exports = {
-  isSingleLargeCallEnabledSafe,
   isBeastAdsCallEnabledSafe,
   isPromptCacheEnabledSafe,
   isLiveTextEnabledSafe,

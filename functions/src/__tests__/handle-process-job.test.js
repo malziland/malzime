@@ -235,8 +235,8 @@ describe("handleProcessJob — Erfolgsfall", () => {
 /* ── Blocked-Pfade ───────────────────────────────────────────────── */
 
 describe("handleProcessJob — Blocked-Ergebnisse", () => {
-  test("Describe-Fehler → blocked.apiError, kein incrementTotals", async () => {
-    process.env.MISTRAL_MOCK_FAIL = "describe";
+  test("KI-Fehler → blocked.apiError, kein incrementTotals", async () => {
+    process.env.MISTRAL_MOCK_FAIL = "api_error";
     const res = makeRes();
     await handleProcessJob(postReq("job-1"), res);
     expect(lastResult().blockedReason).toBe("blocked.apiError");
@@ -244,15 +244,8 @@ describe("handleProcessJob — Blocked-Ergebnisse", () => {
     expect(storage.deleteImage).toHaveBeenCalled();
   });
 
-  test("leere Beschreibung (Safety-Filter) → blocked.safetyFilter", async () => {
-    process.env.MISTRAL_MOCK_FAIL = "describe-empty";
-    const res = makeRes();
-    await handleProcessJob(postReq("job-1"), res);
-    expect(lastResult().blockedReason).toBe("blocked.safetyFilter");
-  });
-
   test("kein Profil → blocked.profileBlocked", async () => {
-    process.env.MISTRAL_MOCK_FAIL = "profiles";
+    process.env.MISTRAL_MOCK_FAIL = "leer";
     const res = makeRes();
     await handleProcessJob(postReq("job-1"), res);
     expect(lastResult().blockedReason).toBe("blocked.profileBlocked");

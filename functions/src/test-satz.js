@@ -4,7 +4,7 @@
  * Rückfallwerte im Code. Jeder Test, der einen Code-Pfad mit Betriebswerten
  * berührt, braucht deshalb einen Satz.
  *
- * WARUM ZENTRAL: Dieselbe Regel wie für den Produktivcode. Stünden die 29
+ * WARUM ZENTRAL: Dieselbe Regel wie für den Produktivcode. Stünden die
  * Werte in dreißig Testdateien, hätte man dreißig Kopien, die auseinander
  * laufen — und ein neues Pflichtfeld müsste dreißigmal nachgetragen werden.
  *
@@ -15,8 +15,6 @@ const SATZ = {
   mistralTimeoutMs: 90000,
   singleLargeTimeoutMs: 300000,
   singleLargeMaxTokens: 5000,
-  describeMaxTokens: 2048,
-  profileMaxTokens: 16000,
   requestBudgetMs: 480000,
   /* Andrang und Einlass */
   parallelitaet: 7,
@@ -38,7 +36,6 @@ const SATZ = {
   drosselMaxParallel: 6,
   drosselWartelimitMs: 360000,
   tokenAbstandGrossMs: 800,
-  tokenAbstandKleinMs: 2500,
   /* Bewusst andere Zahlen als die Produktion (10000 / 4). */
   ueberlastWarteMs: 5000,
   ueberlastVersuche: 2,
@@ -59,13 +56,12 @@ function betriebsprofilMock(ueberschreiben) {
   const werte = {
     ...SATZ,
     /* KEINE echte Drosselung im Test.
-       Die Abstände zwischen Mistral-Aufrufen (800/2500 ms) sind im Betrieb
+       Die Abstände zwischen Mistral-Aufrufen (Sekunden) sind im Betrieb
        richtig und in Tests reine Wartezeit: Nach der Umstellung brauchte
        allein mistral.test.js 148 Sekunden statt weniger als einer. Geprüft
        wird die Drosselung dort, wo sie hingehört — in throttle.test.js und in
        ohne-einstellungssatz.test.js. */
     tokenAbstandGrossMs: 0,
-    tokenAbstandKleinMs: 0,
     /* Dieselbe Ueberlegung fuer die Wartezeit bei Ueberlast: Fuenf Sekunden
        je Wiederholung sind im Betrieb richtig und in Tests reine Wartezeit.
        Geprueft wird sie in mistral-429-wiederholung.test.js, mit eigenem

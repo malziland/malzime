@@ -145,6 +145,17 @@ describe("Log-Zeile minor-safety", () => {
     expect(roh).not.toContain("Live-Wetten Abo");
     expect(roh).not.toContain("Freundinnen");
   });
+  /* PRIV-2026-09-10-02: Die Zeile liegt 30 Tage im Diagnose-Speicher. Mit der
+     Vorgangskennung liesse sich die Altersschaetzung mit den Geraeteangaben
+     derselben Analyse verbinden — client-error und client-telemetry tragen
+     dieselbe Kennung. */
+  test("traegt keine Vorgangskennung (traceId), auch wenn der Aufrufer eine mitgibt", () => {
+    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), "trace-verbindbar-42", "de");
+    const roh = ausgabe.find((z) => z.includes('"minor-safety"'));
+    expect(roh).toBeDefined();
+    expect(JSON.parse(roh)).not.toHaveProperty("traceId");
+    expect(roh).not.toContain("trace-verbindbar-42");
+  });
   test("vertraegt einen leeren Bericht (kein Profil)", () => {
     loggeMinorSafety(applyMinorSafety(null), null, "de");
     const zeile = JSON.parse(ausgabe[0]);

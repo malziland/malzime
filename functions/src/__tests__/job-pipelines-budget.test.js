@@ -54,7 +54,7 @@ describe("Restbudget waehrend des Durchlaufs", () => {
         messwerte.push(remainingBudget());
         return null;
       };
-      return { runSingleLargeCall: nimm, describeImage: nimm };
+      return { runSingleLargeCall: nimm };
     });
 
     const { runPipeline } = require("../job-pipelines");

@@ -40,6 +40,25 @@ const mistralApiKey = defineSecret("MISTRAL_API_KEY_EU");
 
 initializeApp();
 
+/* PRIV-2026-09-10-06: Keine Antwort unserer oeffentlichen Schnittstellen darf
+   im Zwischenspeicher des Browsers liegen bleiben — allen voran das fertige
+   Profil aus job-status. Die Datenschutzerklaerung sagt, dass nach dem
+   Schliessen der Seite im Browser nichts mehr da ist; ohne diese Kopfzeile war
+   das nicht abgesichert.
+
+   BEWUSST HIER, an der EINEN Stelle, an der jede oeffentliche Function
+   entsteht, und nicht in jedem Handler: Eine neue Schnittstelle bekommt die
+   Kopfzeile, sobald sie hier eingehaengt wird. kein-zwischenspeicher.test.js
+   ruft jede Function mit `invoker: "public"` auf und wird rot, sobald eine
+   ohne `no-store` antwortet. processJob ist privat (nur Cloud Tasks) und
+   braucht sie nicht. */
+function ohneZwischenspeicher(handler) {
+  return (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    return handler(req, res);
+  };
+}
+
 exports.stats = onRequest(
   {
     region: "europe-west1",
@@ -48,7 +67,7 @@ exports.stats = onRequest(
     invoker: "public",
     maxInstances: 5,
   },
-  handleStats
+  ohneZwischenspeicher(handleStats)
 );
 
 exports.admin = onRequest(
@@ -60,7 +79,7 @@ exports.admin = onRequest(
     maxInstances: 2,
     secrets: [adminSecret],
   },
-  (req, res) => handleAdmin(req, res, { adminSecret })
+  ohneZwischenspeicher((req, res) => handleAdmin(req, res, { adminSecret }))
 );
 
 exports.errors = onRequest(
@@ -72,7 +91,7 @@ exports.errors = onRequest(
     maxInstances: 3,
     timeoutSeconds: 10,
   },
-  handleErrors
+  ohneZwischenspeicher(handleErrors)
 );
 
 exports.telemetry = onRequest(
@@ -84,7 +103,7 @@ exports.telemetry = onRequest(
     maxInstances: 3,
     timeoutSeconds: 10,
   },
-  handleTelemetry
+  ohneZwischenspeicher(handleTelemetry)
 );
 
 /* ── Queue-Architektur ──
@@ -105,7 +124,7 @@ exports.enqueue = onRequest(
     timeoutSeconds: 60,
     secrets: [ntfyUrl, ntfyTopic, adminSecret],
   },
-  (req, res) => handleEnqueue(req, res, { ntfyUrl, ntfyTopic, adminSecret })
+  ohneZwischenspeicher((req, res) => handleEnqueue(req, res, { ntfyUrl, ntfyTopic, adminSecret }))
 );
 
 /* processJob — Worker, NICHT public. Nur Cloud Tasks ruft ihn auf:
@@ -139,7 +158,7 @@ exports.jobStatus = onRequest(
     maxInstances: 10,
     timeoutSeconds: 10,
   },
-  handleJobStatus
+  ohneZwischenspeicher(handleJobStatus)
 );
 
 /* reapJobs — geplanter Lauf (jede Minute): markiert wartende Jobs, deren

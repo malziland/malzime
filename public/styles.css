@@ -2516,6 +2516,86 @@ html {
   text-decoration-thickness: 2px;
 }
 
+/* Eintrags-Boxen und Zwischenueberschriften der Datenschutzseite (10.09.2026).
+   Anlass: Titel klebten am Text, zwischen den Boxen fehlte Luft. Eigener
+   Modifikator, damit die uebrigen Rechtsseiten unveraendert bleiben. */
+.legal-section h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--heading);
+  margin: 20px 0 8px;
+}
+.legal-section .legal-block--eintrag {
+  margin-bottom: 18px;
+  padding: 16px 18px 14px;
+}
+.legal-block--eintrag h3 {
+  color: var(--teal-text);
+  margin: 0 0 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.legal-block--eintrag p {
+  margin: 0 0 8px;
+}
+.legal-block--eintrag p:last-child {
+  margin-bottom: 0;
+}
+
+/* Raster, Plaketten und Kacheln der Datenschutzseite (10.09.2026). Anlass:
+   Der Nutzer fand die zweite Seitenhaelfte "langweilig und fad". Gold nur
+   fuer Zahlen/Marker (Dauer), Petrol-Toene fuer Orte und Kacheln. Bewusst
+   EINSPALTIG: Zwei Spalten nebeneinander hat der Nutzer abgelehnt (schwer
+   lesbar, Seite ohnehin schmal). */
+.legal-raster {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.legal-raster > .legal-block {
+  margin-bottom: 0;
+}
+.legal-block--eintrag h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+.dauer-plakette,
+.ort-plakette {
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.dauer-plakette {
+  color: var(--num-chip-text);
+  background: var(--num-chip-bg);
+}
+.ort-plakette {
+  color: var(--teal-text);
+  background: var(--tint-teal-strong);
+}
+.legal-kacheln {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.legal-kacheln li {
+  background: var(--tint-teal);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid var(--ml-teal);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0;
+}
+
 .legal-list {
   padding-left: 20px;
   font-size: 1rem;

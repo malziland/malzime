@@ -332,9 +332,9 @@ function tryParseTruncated(cleanedText) {
 
 /* ── Output-Bounds (Schutz vor übergroßen Werten, identisch zu SEC-004) ── */
 
-/* Begrenzt EINE Profil-Ebene. Der 3-Call-Pfad legt diese Felder ganz oben ab,
-   der Single-Large-Pfad zusätzlich unter "standard" und "beast" — applyBounds
-   ruft das deshalb für jede vorhandene Ebene auf.
+/* Begrenzt EINE Profil-Ebene. Die Antwort des Analyse-Aufrufs traegt Felder
+   ganz oben (etwa ad_targeting) und je ein Profil unter "standard" und
+   "beast" — applyBounds ruft das deshalb für jede vorhandene Ebene auf.
 
    Vorher griffen die Bounds im Single-Large-Pfad NUR fuer das obere
    ad_targeting; Kartentexte, profileText und confidence aus standard/beast

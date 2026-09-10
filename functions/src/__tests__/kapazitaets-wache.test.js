@@ -29,7 +29,8 @@ describe("Abgleich Code gegen echte Warteschlange", () => {
     expect(b.grund).toBe("code-verspricht-zu-viel");
     expect(_baueMeldung(b)).toContain("zu optimistisch");
     /* Die Meldung muss den Weg zur Abhilfe nennen, sonst steht der Leser da. */
-    expect(_baueMeldung(b)).toContain("cloudtasks-concurrency-7.sh");
+    expect(_baueMeldung(b)).toContain("satzWache");
+    expect(_baueMeldung(b)).toContain("betriebsprofil-anlegen.js");
   });
 
   /* OPS-2026-08-31: Frueher hiess dieser Fall "kapazitaet-verschenkt" und die

@@ -52,7 +52,7 @@ function loadAnimals(lang) {
  * Fallback auf Default wenn das Modul nicht existiert.
  *
  * @param {string} lang — Aufgelöster Sprachcode
- * @returns {object} — Content-Modul (describe, systemNormal, systemBoost, jsonSchemaNormal, jsonSchemaBoost, labelPrefixes, ...)
+ * @returns {object} — Content-Modul (singleLargePrompt, beastAdsSystem, beastAdsUser, brandBlocklistBlock, injectionWarning)
  */
 function loadPrompts(lang) {
   const modulePath = path.join(localesDir, lang, "prompts.js");

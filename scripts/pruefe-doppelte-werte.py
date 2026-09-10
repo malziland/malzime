@@ -53,8 +53,6 @@ if len(satzfelder) < 5:
 #    Ein Wert kann anders heissen; diese Tabelle macht die Gleichheit sichtbar.
 BRUECKE = {
     "RATE_LIMIT": "adressLimit", "RATE_WINDOW_MS": "adressfensterMs",
-    "MISTRAL_DESCRIBE_MAX_TOKENS": "describeMaxTokens",
-    "MISTRAL_PROFILE_MAX_TOKENS": "profileMaxTokens",
     "MISTRAL_TIMEOUT_MS": "mistralTimeoutMs",
     "MISTRAL_SINGLE_LARGE_TIMEOUT_MS": "singleLargeTimeoutMs",
     "MISTRAL_SINGLE_LARGE_MAX_TOKENS": "singleLargeMaxTokens",
@@ -68,7 +66,6 @@ BRUECKE = {
     "DEFAULT_TTL_MS": "ticketGueltigkeitMs", "DEFAULT_MAX_CONCURRENT": "drosselMaxParallel",
     "DEFAULT_QUEUE_TIMEOUT_MS": "drosselWartelimitMs",
     "LARGE_TOKEN_INTERVAL_MS": "tokenAbstandGrossMs",
-    "SMALL_TOKEN_INTERVAL_MS": "tokenAbstandKleinMs",
     "BOOST_FRIST_MS": "boostFristMs", "BOOST_OBERGRENZE": "boostFaktor",
 }
 
@@ -92,7 +89,7 @@ AUSNAHMEN = {
     "BLIND_TAGE",
     "FRIST_TAGE", "VORWARNUNG_TAGE", "REALITAETS_CHECK_MINDEST_EINGABEN",
     # Implementierungsdetails ohne Betriebswirkung
-    "CLEANUP_INTERVAL_MS", "MAX_RATE_ENTRIES", "INITIAL_JITTER_MAX_MS",
+    "MAX_RATE_ENTRIES", "INITIAL_JITTER_MAX_MS",
     "LOCAL_REDISPATCH_MS", "TOUCH_MINDESTABSTAND_MS", "NONCE_TTL_MS",
     "ABRUF_TIMEOUT_MS", "TTL_NETZ_MS", "MAINTENANCE_CACHE_TTL_MS",
     "LEBENSZEICHEN_MAX_ALTER_MS", "SCHUTZ_BIS", "ERINNERUNG_AUSGELIEFERT_MS",

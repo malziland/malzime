@@ -1,5 +1,5 @@
 /**
- * WIRKT JEDER EINZELNE WERT? Alle 26, einzeln nachgewiesen.
+ * WIRKT JEDER EINZELNE WERT? Jeder, einzeln nachgewiesen.
  *
  * ANLASS (Nutzer, 30.08.2026): „Generell musst du jede Funktion und jede
  * Einstellung auf Wirkung überprüfen und nicht nur darauf abhängig sein."
@@ -108,17 +108,6 @@ describe("Gruppe 1 — die KI-Aufrufe", () => {
     return mitschnitt;
   }
 
-  test("describeMaxTokens wirkt: die KI bekommt die eingestellte Textmenge", async () => {
-    const a = await mistralAufrufMitschneiden(mit("describeMaxTokens", 111), (m) =>
-      m.describeImage(Buffer.from("x"), "image/jpeg", () => 60000, "de")
-    );
-    const b = await mistralAufrufMitschneiden(mit("describeMaxTokens", 222), (m) =>
-      m.describeImage(Buffer.from("x"), "image/jpeg", () => 60000, "de")
-    );
-    expect(a[0].max_tokens).toBe(111);
-    expect(b[0].max_tokens).toBe(222);
-  });
-
   test("singleLargeMaxTokens wirkt", async () => {
     const a = await mistralAufrufMitschneiden(mit("singleLargeMaxTokens", 333), (m) =>
       m.runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de", {})
@@ -211,19 +200,6 @@ describe("Gruppe 1 — die KI-Aufrufe", () => {
     );
   });
 
-  test("profileMaxTokens wirkt: die Profil-Aufrufe bekommen die eingestellte Menge", async () => {
-    /* Der 3-Call-Pfad (Rollback-Weg) nutzt diesen Wert. */
-    const a = await mistralAufrufMitschneiden(mit("profileMaxTokens", 777), (m) =>
-      m.generateBothProfiles("beschreibung", {}, () => 60000, "de")
-    );
-    const b = await mistralAufrufMitschneiden(mit("profileMaxTokens", 888), (m) =>
-      m.generateBothProfiles("beschreibung", {}, () => 60000, "de")
-    );
-    expect(a.length).toBeGreaterThan(0);
-    expect(a[0].max_tokens).toBe(777);
-    expect(b[0].max_tokens).toBe(888);
-  });
-
   /* BEFUND 31.08.2026 (Runde 2, P2): Dieser Test war BLIND. Er holte
      `_restbudgetFuerTest` aus handle-process-job — den Export gibt es nicht.
      Der else-Zweig schob dann die Schleifenkonstante selbst in `gemessen` und
@@ -246,15 +222,9 @@ describe("Gruppe 1 — die KI-Aufrufe", () => {
         }),
       }));
       let gesehen = null;
-      /* Signaturen sind positional. BEIDE Wege abgreifen: Welcher laeuft,
-         haengt am Flag useSingleLargeCall — die Messung darf davon nicht
-         abhaengen. describeImage ist der Einstieg des Drei-Aufruf-Wegs. */
+      /* Signaturen sind positional: das Restbudget ist das dritte Argument. */
       jest.doMock("../mistral", () => ({
         runSingleLargeCall: async (_b, _m, remainingBudget) => {
-          gesehen = remainingBudget();
-          return null;
-        },
-        describeImage: async (_b, _m, remainingBudget) => {
           gesehen = remainingBudget();
           return null;
         },
@@ -263,7 +233,7 @@ describe("Gruppe 1 — die KI-Aufrufe", () => {
         loadImage: async () => ({ buffer: Buffer.from("x"), mimeType: "image/jpeg" }),
         deleteImage: async () => true,
       }));
-      /* runPipeline (nicht die Single-Large-Variante direkt): NUR so baut der
+      /* Ueber runPipeline: NUR so baut der
          Code die Restbudget-Funktion AUS DEM SATZWERT auf. Wer das Budget von
          aussen hineinreicht, misst seine eigene Eingabe. */
       const { runPipeline } = require("../job-pipelines");
@@ -489,8 +459,7 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
               await new Promise((r) => setTimeout(r, 15));
               jetzt -= 1;
             },
-            "large",
-            { ...SATZ, drosselMaxParallel: max, tokenAbstandGrossMs: 0, tokenAbstandKleinMs: 0 }
+            { ...SATZ, drosselMaxParallel: max, tokenAbstandGrossMs: 0 }
           )
         )
       );
@@ -508,11 +477,10 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
       const { withMistralSlot } = require("../throttle");
       const start = Date.now();
       for (let i = 0; i < 3; i += 1) {
-        await withMistralSlot(async () => {}, "large", {
+        await withMistralSlot(async () => {}, {
           ...SATZ,
           drosselMaxParallel: 8,
           tokenAbstandGrossMs: abstand,
-          tokenAbstandKleinMs: 0,
         });
       }
       return Date.now() - start;
@@ -520,21 +488,6 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
     const ohne = await dauerFuerAbstand(0);
     const mitAbstand = await dauerFuerAbstand(60);
     expect(mitAbstand).toBeGreaterThan(ohne + 60);
-  }, 15000);
-
-  test("tokenAbstandKleinMs wirkt getrennt vom großen", async () => {
-    jest.resetModules();
-    const { withMistralSlot } = require("../throttle");
-    const start = Date.now();
-    for (let i = 0; i < 3; i += 1) {
-      await withMistralSlot(async () => {}, "small", {
-        ...SATZ,
-        drosselMaxParallel: 8,
-        tokenAbstandGrossMs: 0,
-        tokenAbstandKleinMs: 60,
-      });
-    }
-    expect(Date.now() - start).toBeGreaterThan(60);
   }, 15000);
 
   test("drosselWartelimitMs wirkt: zu langes Warten wird abgebrochen", async () => {

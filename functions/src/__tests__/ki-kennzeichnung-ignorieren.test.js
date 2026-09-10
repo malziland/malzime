@@ -22,37 +22,34 @@ const { buildPrivacyRisks } = require("../privacy");
 const de = require("../locales/de/prompts");
 const en = require("../locales/en/prompts");
 
-/** Alle Prompt-Texte einer Sprache als ein Suchraum. */
-function alleTexte(mod) {
-  return Object.values(mod)
-    .filter((v) => typeof v === "string")
-    .join("\n");
-}
+/* Geprueft wird der ANALYSE-PROMPT, nicht alle Prompt-Texte zusammen.
+
+   BEFUND 10.09.2026 (Ausbau des Drei-Aufruf-Wegs): Die Anweisung stand bis
+   dahin nur im Beschreibungs-Baustein des ausgebauten Wegs. Dieser Test
+   durchsuchte alle Texte einer Sprache, fand sie dort und war gruen — obwohl
+   der Analyse-Prompt, der jedes Bild tatsaechlich sieht, sie nie enthielt.
+   Seither steht sie bei der Aufgabe `visible_text` im singleLargePrompt. */
+const ANALYSE = [
+  ["de", de.singleLargePrompt, "NICHT AUFLISTEN"],
+  ["en", en.singleLargePrompt, "DO NOT LIST"],
+];
 
 describe("Die eigene KI-Kennzeichnung beeinflusst die Analyse nicht", () => {
-  test("der deutsche Prompt weist das Modell an, sie NICHT aufzulisten", () => {
-    const t = alleTexte(de);
-    expect(t).toMatch(/NICHT AUFLISTEN/);
-    expect(t).toMatch(/KI ERSTELLT/);
-    expect(t).toMatch(/AI GENERATED/);
+  test.each(ANALYSE)("der Analyse-Prompt (%s) weist das Modell an, sie NICHT aufzulisten", (_l, prompt, wort) => {
+    expect(typeof prompt).toBe("string");
+    expect(prompt).toContain(wort);
+    expect(prompt).toMatch(/KI ERSTELLT/);
+    expect(prompt).toMatch(/AI GENERATED/);
   });
 
-  test("der englische Prompt tut dasselbe", () => {
-    const t = alleTexte(en);
-    expect(t).toMatch(/DO NOT LIST/);
-    expect(t).toMatch(/KI ERSTELLT/);
-    expect(t).toMatch(/AI GENERATED/);
-  });
-
-  test("die Anweisung steht bei der Aufgabe zum sichtbaren Text, nicht irgendwo", () => {
+  test.each(ANALYSE)("die Anweisung steht bei der Aufgabe visible_text (%s), nicht irgendwo", (_l, prompt, wort) => {
     /* Sonst koennte sie im Prompt landen, ohne dort zu wirken, wo sie gebraucht
        wird — und der Test waere gruen fuer nichts. */
-    const t = alleTexte(de);
-    const anweisung = t.indexOf("NICHT AUFLISTEN");
-    const aufgabe = t.indexOf("Sichtbarer Text:");
-    expect(anweisung).toBeGreaterThan(-1);
+    const aufgabe = prompt.indexOf("- visible_text:");
+    const anweisung = prompt.indexOf(wort);
     expect(aufgabe).toBeGreaterThan(-1);
-    expect(Math.abs(anweisung - aufgabe)).toBeLessThan(600);
+    expect(anweisung).toBeGreaterThan(aufgabe);
+    expect(anweisung - aufgabe).toBeLessThan(900);
   });
 
   test.each([

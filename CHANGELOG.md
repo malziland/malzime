@@ -15,6 +15,12 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   obwohl niemand betroffen war und die Datenbank selbst schnell antwortete.
   Ein echter Ausfall bleibt nicht still: Jede Analyse ohne Betriebswerte
   meldet sich weiterhin sofort selbst als Fehler.
+- **Abhängigkeiten angehoben (PR #240, #236):** `@google-cloud/tasks`
+  6.3.0 → 7.0.0 im Server — einzige angekündigte Bruchstelle ist „mindestens
+  Node 22", die Functions laufen auf Node 24; dass unser Code die Bibliothek
+  weiterhin laden kann, ist eigens gemessen, weil die Tests sie durch eine
+  Attrappe ersetzen. `actions/upload-artifact` 4.6.2 → 7.0.1 in der Pipeline,
+  wo es bei roten Browser-Tests die Fehlerbilder sichert.
 
 ### Behoben
 

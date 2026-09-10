@@ -18,7 +18,7 @@ import * as realitaetsCheck from "./js/realitaets-check.js";
 import { merkeModus, gemerkterModus } from "./js/modus-speicher.js";
 import { initAbsturzWache, merkePhase } from "./js/absturz-wache.js";
 import { initFehlerNachsendung, logClientError } from "./js/error-logger.js";
-import { initSprachumschalter, merkmalUebernehmen } from "./js/sprachumschalter.js";
+import { initSprachumschalter } from "./js/sprachumschalter.js";
 import { initBeastLockruf } from "./js/beast-lockruf.js";
 import { pruefeSeiteNachDruck } from "./js/druck-wache.js";
 import { apiUrl } from "./js/api-basis.js";
@@ -82,10 +82,11 @@ initHintergrundWiederaufnahme();
    dafuer nichts abgelegt. */
 initFehlerNachsendung();
 
-/* ── Limit-, Maintenance- und Feature-Flag-Check beim Seitenstart ──
-   In state.statsReady abgelegt, damit analyzeImage darauf warten kann, bevor
-   es Sync vs. Queue entscheidet. Mit hartem Timeout: antwortet /api/stats
-   nicht, löst das Promise trotzdem auf (Fail-safe → synchroner Pfad). */
+/* ── Wartungsmodus und Stundenlimit beim Seitenstart ──
+   In state.statsReady abgelegt: analyzeImage wartet kurz darauf, weil in
+   dieser Antwort Wartungsmodus und Stundenlimit stehen (js/api.js). Mit
+   hartem Timeout — antwortet /api/stats nicht, löst das Versprechen nach
+   spätestens 20 Sekunden trotzdem auf, und die Seite bleibt bedienbar. */
 const statsAbort = new AbortController();
 const statsTimer = setTimeout(() => statsAbort.abort(), 20000);
 /* OPS-2026-09-10-11: Ueber apiUrl — im Betrieb direkt an den EU-Dienst, nicht
@@ -97,8 +98,6 @@ state.statsReady = fetch(apiUrl("/api/stats"), { signal: statsAbort.signal })
     /* Antwort für den Realitäts-Check aufheben (anonymer Gesamtzähler für
        den Vergleichsbalken — erscheint erst ab 100 Eingaben). */
     state.statsDaten = data || null;
-    /* Queue-Feature-Flag übernehmen. Bleibt es aus (Flag false oder Fetch
-       fehlgeschlagen), läuft der bewährte synchrone Pfad. */
     if (data?.maintenance?.enabled) {
       showMaintenanceModal(data.maintenance.message);
       return;
@@ -106,20 +105,14 @@ state.statsReady = fetch(apiUrl("/api/stats"), { signal: statsAbort.signal })
     if (data?.current?.limitActive) {
       showLimitBanner(data.current.retryAfterSeconds || 600);
     }
-    /* v3.3: Sprachumschalter nur bauen, wenn das Merkmal an ist. Steht es aus
-       oder war die Antwort nicht lesbar, entsteht kein Element — kein toter
-       Schalter, den jemand vergeblich anklickt. Auch bei `false` aufrufen:
-       Nur so erfahren die Unterseiten, dass das Merkmal wieder aus ist. */
-    merkmalUebernehmen(data?.sprachumschalter === true);
   })
   .catch(() => {})
   .finally(() => clearTimeout(statsTimer));
 
-/* v3.3: Sprachumschalter anmelden — bedingungslos, damit er auch dann entsteht,
-   wenn /api/stats nicht antwortet. Die Erprobungs-Tueren (Konsole,
-   Merkmals-Schloss) sind seit v3.3.1 ersatzlos gestrichen; sichtbar ist der
-   Umschalter ueber das Firestore-Flag `useSprachumschalter`
-   (DOC-2026-08-20-46). */
+/* Sprachumschalter anmelden. Er entsteht sofort und hängt an keiner Antwort
+   von /api/stats: Bis zum 10.09.2026 entschied dort ein Merkmal über ihn, und
+   fiel die Schnittstelle oder die Datenbank kurz aus, fehlte er still.
+   Begründung am Kopf von js/sprachumschalter.js. */
 initSprachumschalter({
   analysiere: handleNewFile,
   /* Nach einem Neuladen liegt zwar ein Ergebnis vor, die Bilddatei aber nicht

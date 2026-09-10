@@ -34,9 +34,7 @@ jest.mock("../cloud-tasks", () => ({
   redispatchJobLocal: jest.fn(),
 }));
 jest.mock("../feature-flags", () => ({
-  isPromptCacheEnabled: jest.fn(),
   isBeastAdsCallEnabled: jest.fn(),
-  isLiveTextEnabled: jest.fn(),
 }));
 jest.mock("../mistral", () => ({
   runSingleLargeCall: jest.fn(),
@@ -108,38 +106,22 @@ beforeEach(() => {
   jobs.countProcessingJobs.mockResolvedValue(0);
   storage.loadImage.mockResolvedValue({ buffer: Buffer.from("img"), mimeType: "image/jpeg" });
   storage.deleteImage.mockResolvedValue();
-  flags.isPromptCacheEnabled.mockResolvedValue(false);
   flags.isBeastAdsCallEnabled.mockResolvedValue(false);
-  flags.isLiveTextEnabled.mockResolvedValue(false);
   mistral.runSingleLargeCall.mockResolvedValue(PROFIL);
 });
 
-describe("runPipeline — Flag useLiveText AUS (Default)", () => {
-  test("opts sind EXAKT die heutigen — kein onLiveText, kein Schreibvorgang", async () => {
+describe("runPipeline — Live-Text ist fest eingebaut (seit 10.09.2026)", () => {
+  test("opts tragen immer den onLiveText-Callback und sonst nichts", async () => {
     await handleProcessJob(postReq(), makeRes());
     expect(mistral.runSingleLargeCall).toHaveBeenCalledTimes(1);
-    /* toEqual mit dem VOLLEN Objekt: haette sich auch nur die Form der opts
-       geaendert, faellt dieser Test um — Byte-Identitaets-Garantie. */
-    expect(letzteOpts()).toEqual({ usePromptCache: false });
-    expect(letzteOpts()).not.toHaveProperty("onLiveText");
-    expect(jobs.setLiveText).not.toHaveBeenCalled();
-  });
-
-  test("Flag-Lesefehler wirkt wie Flag AUS (fail-safe)", async () => {
-    flags.isLiveTextEnabled.mockRejectedValue(new Error("firestore down"));
-    const res = makeRes();
-    await handleProcessJob(postReq(), res);
-    expect(res.body.ok).toBe(true); /* die Analyse selbst laeuft normal durch */
-    expect(letzteOpts()).not.toHaveProperty("onLiveText");
-    expect(jobs.setLiveText).not.toHaveBeenCalled();
+    /* Kein Flag mehr, kein usePromptCache mehr — der Cache ist in mistral.js
+       fest. Haette sich die Form der opts geaendert, faellt dieser Test um. */
+    expect(Object.keys(letzteOpts())).toEqual(["onLiveText"]);
+    expect(typeof letzteOpts().onLiveText).toBe("function");
   });
 });
 
-describe("runPipeline — Flag useLiveText AN", () => {
-  beforeEach(() => {
-    flags.isLiveTextEnabled.mockResolvedValue(true);
-  });
-
+describe("runPipeline — Live-Text schreiben", () => {
   test("runSingleLargeCall bekommt einen onLiveText-Callback, der setLiveText mit jobId und BEIDEN Texten ruft", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
       expect(typeof opts.onLiveText).toBe("function");

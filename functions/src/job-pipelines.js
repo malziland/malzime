@@ -33,8 +33,6 @@ const { loadImage } = require("./queue-storage");
 /* Die kleinen Entscheidungen — ausgelagert, damit sie einzeln pruefbar sind. */
 const {
   isBeastAdsCallEnabledSafe,
-  isPromptCacheEnabledSafe,
-  isLiveTextEnabledSafe,
   getMistral,
   isQuotaError,
   buildPseudoDescription,
@@ -73,34 +71,27 @@ async function runPipeline(job) {
      Nutzers, und er besteht fort, bis ihn jemand behebt. */
   let configMissing = false;
   let pipelineError = false;
-  /* v2.5: Prompt-Cache-Flag. Reine Kostenmassnahme, ohne Einfluss auf Modell
-     oder Ergebnis — abschaltbar in Firestore ohne Deploy (~30 s Cache). */
-  const usePromptCache = await isPromptCacheEnabledSafe();
+  /* Live-Text-Strom (v3.0, fest eingebaut seit 10.09.2026, vorher Flag
+     `useLiveText`): Der Mistral-Aufruf bekommt einen Callback, der die bereits
+     angekommenen Profiltexte ({ standard, beast }) ins Job-Dokument legt — der
+     pollende Client sieht schon Text, waehrend das Modell noch schreibt. Den
+     Prompt-Zwischenspeicher nutzt mistral.js seit demselben Tag immer.
 
-  /* v3.0 Phase 1 (+Phase 3): Live-Text-Strom. Mit Flag bekommt der
-     Mistral-Aufruf einen Callback, der die bereits angekommenen Profiltexte
-     ({ standard, beast }) ins Job-Dokument legt — der pollende Client sieht
-     dann schon Text, waehrend das Modell noch schreibt. OHNE Flag wird die
-     Option gar nicht erst angelegt: Die opts sind dann exakt die heutigen,
-     mistral.js setzt kein `stream: true`, nichts am Live-Verhalten aendert
-     sich. */
-  const liveTextAktiv = await isLiveTextEnabledSafe();
-  const opts = { usePromptCache };
-  if (liveTextAktiv) {
-    /* Zusaetzliche Drossel VOR dem Firestore-Schreiben: mistral.js ruft den
-       Callback zwar selbst nur ~alle 2 s, aber dieser Riegel gehoert dem
-       Schreiber — er schuetzt das Job-Dokument auch dann noch, wenn sich die
-       Aufruf-Frequenz in mistral.js einmal aendert. EIN Schreibvorgang
-       traegt beide Felder (Standard + Beast, jobs.js). setLiveText selbst
-       schluckt jeden Firestore-Fehler. */
-    let letzterSchreibMs = 0;
-    opts.onLiveText = (texte) => {
+     Zusaetzliche Drossel VOR dem Firestore-Schreiben: mistral.js ruft den
+     Callback zwar selbst nur ~alle 2 s, aber dieser Riegel gehoert dem
+     Schreiber — er schuetzt das Job-Dokument auch dann noch, wenn sich die
+     Aufruf-Frequenz in mistral.js einmal aendert. EIN Schreibvorgang traegt
+     beide Felder (Standard + Beast, jobs.js). setLiveText selbst schluckt
+     jeden Firestore-Fehler. */
+  let letzterSchreibMs = 0;
+  const opts = {
+    onLiveText: (texte) => {
       const jetzt = Date.now();
       if (jetzt - letzterSchreibMs < 2000) return;
       letzterSchreibMs = jetzt;
       setLiveText(job.id, texte);
-    };
-  }
+    },
+  };
   try {
     profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts);
   } catch (err) {
@@ -154,9 +145,7 @@ async function runPipeline(job) {
       (await isBeastAdsCallEnabledSafe())
     ) {
       try {
-        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang, {
-          usePromptCache: await isPromptCacheEnabledSafe(),
-        });
+        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang);
         if (neueAds) profiles.boost.ad_targeting = neueAds;
       } catch (err) {
         /* Nie die Analyse daran scheitern lassen — die Liste aus dem

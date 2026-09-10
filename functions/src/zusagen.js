@@ -81,7 +81,6 @@ function formatiereDatum(datum) {
 module.exports = {
   FRIST_TAGE,
   VORWARNUNG_TAGE,
-  PRUEFDATUM_MUSTER,
   leseZdrPruefdatum,
   bewerteFrist,
   formatiereDatum,

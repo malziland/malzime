@@ -1291,49 +1291,11 @@ html {
   border-radius: var(--radius-sm);
 }
 
-/* Legacy-Konfidenz-Pillen (ältere Datenstände): Teal / Gold / Rost */
-.cat-conf.high {
-  background: var(--tint-teal-strong);
-  color: var(--teal-text);
-}
-.cat-conf.med {
-  background: var(--num-chip-bg);
-  color: var(--num-chip-text);
-}
-.cat-conf.low {
-  background: var(--tint-rust-strong);
-  color: var(--rust-text);
-}
-
 .cat-value {
   font-size: 1rem;
   line-height: 1.55;
   color: var(--text);
   margin-bottom: 8px;
-}
-
-.conf-track {
-  height: 3px;
-  background: var(--track);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.conf-bar {
-  height: 100%;
-  border-radius: 2px;
-  transition: width 0.8s var(--ease);
-}
-
-/* Balken behalten echte Markenfarben — hell wie dunkel */
-.conf-bar.high {
-  background: var(--ml-teal);
-}
-.conf-bar.med {
-  background: var(--ml-gold);
-}
-.conf-bar.low {
-  background: var(--ml-rust);
 }
 
 /* ── Karten-Gruppen + Punkt-Konfidenz + Akzent-Linien ── */
@@ -2389,14 +2351,6 @@ html {
   margin-bottom: 10px;
 }
 
-.eyebrow-home {
-  color: var(--teal-text);
-  text-decoration: none;
-}
-.eyebrow-home:hover {
-  text-decoration: underline;
-}
-
 .page-rule {
   height: 2px;
   background: var(--ml-grad-teal-line);
@@ -2649,47 +2603,6 @@ ol.legal-list > li::before {
   border: 1px solid var(--border-soft);
 }
 
-.legal-table-wrap {
-  overflow-x: auto;
-  margin-bottom: 10px;
-}
-
-.legal-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 1rem;
-}
-
-.legal-table th {
-  text-align: left;
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--heading);
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border-soft);
-}
-
-.legal-table td {
-  padding: 8px 10px;
-  color: var(--text);
-  border-bottom: 1px solid var(--border-soft);
-  vertical-align: top;
-}
-
-.legal-table tr:last-child td {
-  border-bottom: none;
-}
-
-.legal-table tbody tr {
-  transition: background 0.15s var(--ease);
-}
-
-.legal-table tbody tr:hover {
-  background: var(--hover);
-}
-
 /* ── Datenwert-Rechner (Zahlen = Gold, ruhige Teal-Infoflächen) ── */
 
 .data-value-section {
@@ -2793,19 +2706,6 @@ ol.legal-list > li::before {
   border-radius: var(--radius-pill);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.dv-scale-muted .dv-scale-label {
-  color: var(--muted);
-  font-weight: 400;
-  font-size: 0.82rem;
-}
-.dv-scale-muted .dv-scale-value {
-  background: transparent;
-  color: var(--muted);
-  font-weight: 400;
-  font-size: 0.82rem;
-  padding: 0;
 }
 
 .dv-divider {
@@ -3859,31 +3759,9 @@ html[lang="en"] .rc-zitat::after {
     border-left: 2px solid #9c4e36;
   }
 
-  /* ── Kategorie-Labels + Confidence im Print ── */
+  /* ── Kategorie-Labels im Print ── */
   .cat-label {
     color: #156480;
-  }
-  .cat-conf.high {
-    background: rgba(21, 100, 128, 0.15);
-    color: #156480;
-  }
-  .cat-conf.med {
-    background: rgba(191, 181, 66, 0.4);
-    color: #404749;
-  }
-  .cat-conf.low {
-    background: rgba(156, 78, 54, 0.15);
-    color: #9c4e36;
-  }
-
-  .conf-bar.high {
-    background: #156480;
-  }
-  .conf-bar.med {
-    background: #bfb542;
-  }
-  .conf-bar.low {
-    background: #9c4e36;
   }
 
   /* ── Verdict ── */
@@ -3954,8 +3832,9 @@ html[lang="en"] .rc-zitat::after {
 }
 
 /* ══ Sprachumschalter (DE/EN) ═════════════════════════════════════════════
-   Elemente entstehen erst zur Laufzeit (js/sprachumschalter.js) — ist das
-   Merkmal aus, greift von hier nichts. */
+   Auf der Start- und der Zahlen-Seite entstehen die Elemente zur Laufzeit
+   (js/sprachumschalter.js); die statischen Rechtsseiten bringen die Pille
+   fertig im Markup mit. */
 
 /* Gefüllte Flächen brauchen ein eigenes Tokenpaar: --heading ist im dunklen
    Thema fast weiss (siehe :root[data-theme="dark"]), weisse Schrift darauf

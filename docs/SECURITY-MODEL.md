@@ -277,9 +277,8 @@ feuert, macht den Ernstfall unauffindbar.
 
 Die Kostenbremse hält auch unter Last, weil Zähler und Netz denselben Stand
 lesen. Was jeder Betreiber trotzdem wissen muss: Die **erste** Grenze gegen
-Kosten ist die Warteschlangen-Rate (`queueRatePerSekunde`, heute 0,125
-Aufträge je Sekunde ≈ 450 Analysen je Stunde) — sie liegt unter dem
-Stundenlimit. Wer die Rate anhebt, hebt diesen Deckel mit an und macht das
+Kosten ist die Warteschlangen-Rate (`queueRatePerSekunde`; Wert und Rechnung
+in `functions/src/produktiv-satz.js`) — sie liegt unter dem Stundenlimit. Wer die Rate anhebt, hebt diesen Deckel mit an und macht das
 Stundenlimit zur einzigen Bremse. Fällt die Bremse *doch* einmal komplett
 aus — Zähler und Netz zugleich —, kommt eine Meldung auf beiden Kanälen
 (`alert: notbremse-fehlgeschlagen`, Text „Weder Zaehler noch Notbremse

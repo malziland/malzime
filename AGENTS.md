@@ -30,7 +30,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   lib/exifr/         Self-hosted: exifr lite ESM (Browser EXIF-Parsing)
 
 functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
-  index.js           Cloud-Function-Exports (stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs), Secret-Deklarationen (inkl. MISTRAL_API_KEY)
+  index.js           Cloud-Function-Exports (stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs, erinnerung, laufzeitWache, satzWache), Secret-Deklarationen (EU-gebunden, Endung _EU, u. a. MISTRAL_API_KEY_EU)
   handle-stats.js    Stats-Handler (GET-only)
   handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce
   config.js          NUR NOCH, was bewusst NICHT einstellbar ist: Modell-IDs,
@@ -56,7 +56,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
-  feature-flags.js   Laufzeit-Feature-Flags aus Firestore (usePromptCache, useLiveText, useBeastAdsCall, ...), 30s-Cache, fail-safe
+  feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useBeastAdsCall, useGemesseneDauer), 30s-Cache, fail-safe
   --- Queue-Architektur (v2.0) — der einzige Pfad seit v2.10 ---
   handle-enqueue.js  Queue-Annahme: Validierung -> Bild in Storage -> Job anlegen -> in Cloud Tasks einreihen
   handle-process-job.js  Queue-Worker (nur Cloud Tasks): claimt Job, fuehrt Mistral-Pipeline aus, schreibt Ergebnis
@@ -99,9 +99,7 @@ Einzelbefehle:
 - `npm run lint:frontend` — ESLint frontend
 - `npm run format:frontend:check` — Prettier frontend
 - `firebase emulators:start --only functions,hosting` — local dev
-- `firebase deploy --only functions,hosting` — deploy all
-- `firebase deploy --only hosting` — deploy frontend only
-- `firebase deploy --only functions` — deploy backend only
+- `./scripts/deploy.sh [hosting|functions]` — deploy (only with the owner's explicit release; the script runs the gates, the dry run and the live smoke — never `firebase deploy` directly, see docs/RUNBOOK.md)
 
 ## Coding Style & Naming Conventions
 
@@ -171,9 +169,9 @@ Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. D
 - Always run `npm run test:frontend` after frontend changes
 - Run `cd functions && npm run lint && npm run format:check` before committing backend changes
 - Run `npm run lint:frontend && npm run format:frontend:check` before committing frontend changes
-- Update cache-buster `?v=YYYYMMDDNN` on CSS/JS when editing frontend files
-- Both profiles (normal + boost) are generated in parallel — changes to prompts affect `mistral.js`
+- The cache-buster `?v=YYYYMMDDNN` is bumped by `scripts/deploy.sh` on every hosting deploy — never by hand
+- Both profiles (normal + boost) come from ONE call (`runSingleLargeCall` in `mistral.js`); the prompt text lives in `locales/*/prompts.js` (`singleLargePrompt`)
 - Bei Aenderungen an der Architektur oder neuen Features: README.md, AGENTS.md, CHANGELOG.md, docs/SETUP.md und docs/SELF-HOSTING.md aktualisieren
 - Bei neuen Features: Dokumentation und Anleitungen mitliefern
 - dateTimeOriginal wird NICHT an die KI gesendet (verleitet zu falschen Altersschaetzungen)
-- Describe-Prompt: kein konkretes Alter nennen, nur physische Merkmale beschreiben
+- Analyse-Prompt: das Alter nur ueber physische Merkmale kalibrieren (Merkmalsraster, abgesichert durch age-markers.test.js)

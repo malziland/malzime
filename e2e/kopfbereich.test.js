@@ -43,10 +43,11 @@ function alleSeiten(unter = "") {
 
 const SEITEN = alleSeiten();
 
-/* Die Zahlen-Seite und die Startseite holen ihr Merkmal von /api/stats. Ohne
-   Antwort entsteht der Umschalter nicht — dann prüfte der Test etwas anderes
-   als das, was live steht. */
-async function merkmalStellen(page) {
+/* Die Zahlen-Seite und die Startseite fragen /api/stats. Der Testserver
+   liefert die Schnittstelle nicht; ohne diese Antwort zeigte die Zahlen-Seite
+   ihre Fehlerzeile, und der Test mäße eine andere Seite als die, die live
+   steht. Der Sprachumschalter hängt seit dem 10.09.2026 nicht mehr daran. */
+async function statsStellen(page) {
   await page.route("**/api/stats", (r) =>
     r.fulfill({
       status: 200,
@@ -54,8 +55,6 @@ async function merkmalStellen(page) {
       body: JSON.stringify({
         current: { count: 6, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 6, week: 26, month: 172, allTime: 5129 },
-        useQueue: true,
-        sprachumschalter: true,
       }),
     })
   );
@@ -72,7 +71,7 @@ test.describe("Kopfbereich", () => {
 
   for (const pfad of SEITEN) {
     test(`Wortmarke steht auf ${pfad}`, async ({ page }) => {
-      await merkmalStellen(page);
+      await statsStellen(page);
       await page.goto(pfad);
       const marke = page.locator(".wortmarke");
       await expect(marke, "keine Wortmarke — der Nutzer sah hier gar kein Logo").toHaveCount(1);
@@ -85,7 +84,7 @@ test.describe("Kopfbereich", () => {
   }
 
   test("Wortmarke und Sprachumschalter liegen auf gleicher Höhe — auf JEDER Seite", async ({ page }) => {
-    await merkmalStellen(page);
+    await statsStellen(page);
     const versatz = [];
     for (const pfad of SEITEN) {
       await page.goto(pfad);
@@ -112,7 +111,7 @@ test.describe("Kopfbereich", () => {
   const HOEHEN_AUSNAHMEN = ["/kurzvorstellung.html", "/en/introduction.html"];
 
   test("alle Überschriften stehen auf derselben Höhe", async ({ page }) => {
-    await merkmalStellen(page);
+    await statsStellen(page);
     console.log(`[kopfbereich] Höhenregel ausgenommen: ${HOEHEN_AUSNAHMEN.join(", ")} (Landeseiten mit Verlaufs-Kopf)`);
     const hoehen = {};
     for (const pfad of SEITEN.filter((p) => !HOEHEN_AUSNAHMEN.includes(p))) {
@@ -173,7 +172,7 @@ test.describe("Kopfbereich", () => {
        behoben hat, nur diesmal an einen Fehlerfall gekoppelt. In der Pipeline
        fiel er auf, weil dort kein Backend antwortet; wer die Seite bei einer
        Störung öffnet, sah ihn ebenso. */
-    await merkmalStellen(page);
+    await statsStellen(page);
 
     await page.route("**/api/stats", (r) => r.fulfill({ status: 500, body: "kaputt" }));
     await page.goto("/stats.html");
@@ -196,14 +195,15 @@ test.describe("Kopfbereich", () => {
        Abstand weg und die Überschrift rutschte an die Wortmarke.
 
        Ein Abstand darf nicht davon abhängen, ob ein Skript durchläuft. */
-    await merkmalStellen(page);
+    await statsStellen(page);
     await page.goto("/index.html");
     await page.evaluate(() => document.fonts.ready);
-    /* WARTEN, nicht sofort zaehlen: Die Kopfzeile entsteht erst, nachdem
-       js/sprachumschalter.js das Merkmal von /api/stats gelesen hat. Ein
-       sofortiges `count()` traf die Luecke — lokal nie, in der Pipeline sofort.
-       (Genau derselbe Fehlertyp, den dieser Test eigentlich pruefen soll: eine
-       Aussage ueber etwas, das noch gar nicht da ist.) */
+    /* WARTEN, nicht sofort zaehlen: Die Kopfzeile entsteht erst, wenn
+       js/sprachumschalter.js gelaufen ist — nach dem Laden der Uebersetzung,
+       nicht zusammen mit dem HTML. Ein sofortiges `count()` traf die Luecke:
+       lokal nie, in der Pipeline sofort. (Genau derselbe Fehlertyp, den dieser
+       Test eigentlich pruefen soll: eine Aussage ueber etwas, das noch gar
+       nicht da ist.) */
     await expect(page.locator(".seiten-kopfzeile"), "ohne Kopfzeile prüft der Vergleich nichts").toHaveCount(1);
     const mit = await page.evaluate(() => Math.round(document.querySelector("h1").getBoundingClientRect().top));
 
@@ -225,7 +225,7 @@ test.describe("Kopfbereich", () => {
     /* Auch hier hatte ich zuerst nur das Attribut gelesen und „belegt" gemeldet.
        Geprüft wird deshalb, was der Browser tatsächlich laden WÜRDE: die Datei
        über die gesetzte Adresse abrufen und ihre Farben lesen. */
-    await merkmalStellen(page);
+    await statsStellen(page);
     await page.goto("/index.html");
 
     const zeichen = () =>

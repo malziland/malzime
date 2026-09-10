@@ -115,27 +115,24 @@ function createSemaphore(options = {}) {
   return { acquire, stats, setMaxConcurrent, setQueueTimeoutMs };
 }
 
-/* Modul-globale Semaphore für die Mistral-Calls aus mistral.js / Hybrid-Pfad. */
+/* Modul-globale Semaphore für die Mistral-Calls aus mistral-http.js. */
 const mistralSemaphore = createSemaphore();
 
 /**
- * Token-Bucket-Rate-Limiter — modell-bewusst seit v1.10.8.
+ * Token-Bucket-Rate-Limiter.
  *
- * Hintergrund: Die Semaphore limitiert PARALLELITAET (max 6 in-flight), aber
- * nicht die RATE. Wenn mehrere Slots gleichzeitig frei werden, bursten neue
- * Calls in derselben Millisekunde gegen Mistrals RPS-Limit. Der Token-Bucket
- * entzerrt das: jeder Caller wartet, bis seit dem letzten Start des gleichen
- * Modell-Typs genug Zeit verstrichen ist.
+ * Hintergrund: Die Semaphore limitiert PARALLELITAET (`drosselMaxParallel`),
+ * aber nicht die RATE. Wenn mehrere Slots gleichzeitig frei werden, bursten
+ * neue Calls in derselben Millisekunde gegen Mistrals Limit. Der Token-Bucket
+ * entzerrt das: Jeder Caller wartet, bis seit dem letzten Start genug Zeit
+ * verstrichen ist (`tokenAbstandGrossMs`). Er zaehlt nur je Instanz — die
+ * verlaessliche Bremse ueber alle Instanzen ist `queueRatePerSekunde` in der
+ * Warteschlange (KA-07: Mistral vergibt Limits als Stufen, T1 = 0,25 req/s
+ * org-weit). Wer hier schneller drehen will, prueft ZUERST die Tier-Stufe im
+ * Mistral-Dashboard.
  *
- * v1.10.8 — getrennte Buckets pro Modell-Typ: Das damalige Account-Dashboard
- * (Mai 2026) zeigte sehr unterschiedliche Limits je Modell; ein gemeinsamer
- * Bucket haette sich am LANGSAMSTEN orientieren muessen. Die getrennten
- * Buckets bleiben sinnvoll (Describe soll nicht hinter Profile-Calls warten),
- * aber die Intervalle unten stammen aus der Mai-Rechnung — KA-07: Heute gilt
- * das TIER-System (T1 = 0,25 req/s org-weit, s. config.js). Die Intervalle
- * sind damit KEINE Garantie mehr, unter dem Limit zu bleiben; das
- * uebernimmt real die Cloud-Tasks-Nebenlaeufigkeit (7). Wer hier schneller
- * drehen will, prueft ZUERST die Tier-Stufe im Mistral-Dashboard.
+ * Bis 10.09.2026 gab es je Modell-Typ einen eigenen Bucket (v1.10.8); seit dem
+ * Ausbau des Drei-Aufruf-Wegs gibt es nur noch ein Modell und einen Bucket.
  */
 /* Initial-Jitter beim allerersten Token-Acquire pro Instanz. Verhindert, dass
    mehrere frisch gestartete Cloud-Run-Instanzen ihren ersten Call in derselben
@@ -143,8 +140,8 @@ const mistralSemaphore = createSemaphore();
 const INITIAL_JITTER_MAX_MS = 2000;
 
 /**
- * Erzeugt einen unabhaengigen Token-Bucket. Jeder Modell-Typ bekommt einen
- * eigenen, damit langsame Modelle nicht die schnellen ausbremsen.
+ * Erzeugt einen unabhaengigen Token-Bucket (im Betrieb genau einer je
+ * Instanz; Tests erzeugen eigene).
  */
 function createRateBucket(defaultIntervalMs) {
   let intervalMs = defaultIntervalMs;
@@ -241,10 +238,6 @@ function _setRateIntervalMs(ms) {
   rateBucket.setIntervalMs(ms);
 }
 
-function _setInitialJitterMs(ms) {
-  rateBucket.setInitialJitterMs(ms);
-}
-
 function _resetRateBucket() {
   rateBucket.reset();
 }
@@ -257,5 +250,4 @@ module.exports = {
   INITIAL_JITTER_MAX_MS,
   _resetRateBucket,
   _setRateIntervalMs,
-  _setInitialJitterMs,
 };

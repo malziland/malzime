@@ -305,6 +305,5 @@ module.exports = {
   _istImmerVerboten: istImmerVerboten,
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,
   _untereAltersgrenze: untereAltersgrenze,
-  _VOLLJAEHRIG_AB: VOLLJAEHRIG_AB,
   _SCHUTZ_BIS: SCHUTZ_BIS,
 };

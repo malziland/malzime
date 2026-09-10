@@ -1,5 +1,5 @@
 {
-  "name": "bias-demo-functions",
+  "name": "malzime-functions",
   "private": true,
   "engines": {
     "node": "24"
@@ -12,8 +12,7 @@
     "lint:fix": "eslint --max-warnings=0 src/ --fix",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
-    "serve": "firebase emulators:start --only functions",
-    "deploy": "firebase deploy --only functions"
+    "serve": "firebase emulators:start --only functions"
   },
   "dependencies": {
     "@google-cloud/tasks": "^7.0.0",

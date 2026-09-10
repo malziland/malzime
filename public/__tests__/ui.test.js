@@ -136,7 +136,7 @@ describe("getBiasMode", () => {
 });
 
 describe("Limit Banner", () => {
-  let showLimitBanner, hideLimitBanner, elements;
+  let showLimitBanner, elements;
 
   beforeEach(async () => {
     setupDOM();
@@ -144,12 +144,14 @@ describe("Limit Banner", () => {
     const uiMod = await import("../js/ui.js");
     const domMod = await import("../js/dom.js");
     showLimitBanner = uiMod.showLimitBanner;
-    hideLimitBanner = uiMod.hideLimitBanner;
     elements = domMod.elements;
   });
 
   afterEach(() => {
-    hideLimitBanner();
+    /* Den laufenden Countdown abraeumen, sonst tickt er in den naechsten Test.
+       Im Betrieb verschwindet der Hinweis nie von selbst — die Seite laedt
+       neu, sobald das Limit ablaeuft oder aufgehoben ist. */
+    vi.clearAllTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -157,12 +159,6 @@ describe("Limit Banner", () => {
   it("adds active class on show", () => {
     showLimitBanner(60);
     expect(elements.limitBanner.classList.contains("active")).toBe(true);
-  });
-
-  it("removes active class on hide", () => {
-    showLimitBanner(60);
-    hideLimitBanner();
-    expect(elements.limitBanner.classList.contains("active")).toBe(false);
   });
 
   it("sets countdown text on show", () => {

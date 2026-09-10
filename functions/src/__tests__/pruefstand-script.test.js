@@ -55,7 +55,10 @@ function lauf(umgebung) {
   try {
     const aus = execFileSync("bash", [SKRIPT], {
       encoding: "utf8",
-      env: { ...process.env, ...umgebung },
+      /* Die Rueckbauprobe (seit 10.09.2026) wird immer eingespeist — ohne das
+         liefe in jedem dieser Tests die echte, drei Minuten lange Probe, und
+         sie veraendert voruebergehend Quelldateien. */
+      env: { ...process.env, PRUEFSTAND_PROBE_RUECKBAU: datei("r.log", RUECKBAU_GRUEN), ...umgebung },
     });
     return { code: 0, aus, fehler: "" };
   } catch (e) {
@@ -68,6 +71,7 @@ const BACKEND_MIT_SKIP = "Test Suites: 45 passed, 45 total\nTests:       1 skipp
 const BACKEND_OHNE_SKIP = "Test Suites: 45 passed, 45 total\nTests:       797 passed, 797 total\n";
 const FRONTEND = "      Tests  315 passed (315)\n";
 const E2E = "  18 passed (2.4m)\n";
+const RUECKBAU_GRUEN = "   Alle 10 Rueckbauten werden bemerkt. Die Fixes sind abgesichert.\n";
 
 describe("pruefstand.sh", () => {
   test("übersprungener Test: stempelt und weist ihn aus, statt ihn wegzurechnen", () => {
@@ -130,6 +134,23 @@ describe("pruefstand.sh", () => {
     expect(fs.readFileSync(m, "utf8")).toBe(vorher);
   });
 
+  test("rote Rückbauprobe: Abbruch mit Meldung, Matrix unberührt", () => {
+    const m = matrix();
+    const vorher = fs.readFileSync(m, "utf8");
+    /* Wie bei den Suiten: Eine fehlende Datei laesst cat scheitern — so sieht
+       ein unbemerkter Rueckbau oder ein fehlendes Muster fuer den Stempler aus. */
+    const r = lauf({
+      PRUEFSTAND_PROBE_BACKEND: datei("b.log", BACKEND_OHNE_SKIP),
+      PRUEFSTAND_PROBE_FRONTEND: datei("f.log", FRONTEND),
+      PRUEFSTAND_PROBE_E2E: datei("e.log", E2E),
+      PRUEFSTAND_PROBE_RUECKBAU: path.join(basis, "gibt-es-nicht.log"),
+      PRUEFSTAND_MATRIX: m,
+    });
+    expect(r.code).toBe(1);
+    expect(r.aus).toMatch(/Rueckbauprobe rot/);
+    expect(fs.readFileSync(m, "utf8")).toBe(vorher);
+  });
+
   test("veränderter Tabellenaufbau: Abbruch mit Meldung statt halbem Stempel", () => {
     const m = datei("matrix.md", "| Ganz andere Tabelle | x | y |\n");
     const r = lauf({
@@ -149,5 +170,6 @@ describe("pruefstand.sh", () => {
     expect(skript).toMatch(/probe_oder_lauf PRUEFSTAND_PROBE_BACKEND npm test --prefix functions/);
     expect(skript).toMatch(/probe_oder_lauf PRUEFSTAND_PROBE_FRONTEND npm run test:frontend/);
     expect(skript).toMatch(/probe_oder_lauf PRUEFSTAND_PROBE_E2E npm run test:e2e/);
+    expect(skript).toMatch(/probe_oder_lauf PRUEFSTAND_PROBE_RUECKBAU sh scripts\/rueckbauprobe-betriebswerte\.sh/);
   });
 });

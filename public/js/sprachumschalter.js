@@ -1,18 +1,12 @@
 /* ── Sprachumschalter (DE/EN) ─────────────────────────────────────────────
  *
- * Baut den Umschalter und seine beiden Rückfragen ERST, wenn das Merkmal an
- * ist. Ist es aus, entsteht kein einziges Element — ein sichtbarer, toter
- * Schalter wäre schlimmer als gar keiner (Nutzer-Ansage 2026-08-13).
+ * Baut den Umschalter und seine beiden Rückfragen, sobald eine Seite ihn
+ * anmeldet (initSprachumschalter) — immer, ohne Bedingung.
  *
- * Zum Erproben gibt es zwei Türen. Beide wirken nur im eigenen Tab und
- * überleben kein Neuladen — damit lässt sich die fertige Bedienung auf der
- * ECHTEN Seite durchspielen, ohne dass ein Workshop-Publikum etwas sieht.
- *
- * Ob er entsteht, entscheidet allein das Merkmals-Schloss `useSprachumschalter`
- * (Firestore, ohne Deploy umlegbar). Die frühere Erprobungs-Tür — Adress-
- * Anhängsel und Konsolen-Aufruf — ist mit v3.3.1 entfallen: Sie war für die
- * Zeit vor der Freischaltung gedacht, und ihre Spur im localStorage
- * widersprach der Datenschutzerklärung. Näheres weiter unten.
+ * Bis zum 10.09.2026 entschied ein Merkmal aus der Antwort von /api/stats, ob
+ * er entsteht. Antwortete die Schnittstelle nicht oder hakte die Datenbank
+ * kurz, fehlte er — still, ohne dass jemand es bemerkte. Das Merkmal ist
+ * deshalb entfallen: Ein fertiges Bedienelement hängt an keiner Server-Antwort.
  *
  * Der Wechsel selbst ist bewusst einfach gehalten: Es gibt keinen Weg, einem
  * laufenden Auftrag nachträglich eine andere Sprache zu geben. Stattdessen
@@ -544,15 +538,6 @@ function einhaengen() {
   beschriften();
 }
 
-function aushaengen() {
-  if (!eingehaengt) return;
-  modalSchliessen();
-  document.removeEventListener("keydown", aufTaste);
-  [umschalter, modalFertig, modalLaeuft, ansage].forEach((el) => el && el.remove());
-  umschalter = modalFertig = modalLaeuft = ansage = null;
-  eingehaengt = false;
-}
-
 /* Letztes Netz: Verliert der Fokus die Rückfrage trotzdem (in Safari tabbt man
    ohne „Vollzugriff Tastatur" gar nicht auf Knöpfe — der Fokus landet dann im
    Nichts und kommt nicht zurück), wird er zurückgeholt. In WebKit 26.5
@@ -598,9 +583,10 @@ function aufTaste(e) {
 /* ── Einstieg ───────────────────────────────────────────────────────────── */
 
 /**
- * Meldet den Umschalter an, baut ihn aber noch nicht. Wird beim Seitenstart
- * aufgerufen — bedingungslos, damit die Konsolen-Tür auch dann offensteht,
- * wenn die Merkmals-Abfrage scheitert.
+ * Meldet den Umschalter an und baut ihn sofort ein. Die Seiten rufen das beim
+ * Start auf, nachdem die Übersetzung geladen ist — bedingungslos, ohne auf
+ * eine Schnittstelle zu warten. Ein weiterer Aufruf ersetzt nur die Rückrufe;
+ * ein zweiter Umschalter entsteht dabei nicht.
  *
  * @param {object} opts
  * @param {Function} opts.analysiere  Callback, der eine Datei neu analysiert.
@@ -613,45 +599,5 @@ export function initSprachumschalter({ analysiere, zuruecksetze, zeichneNeu } = 
   neuAnalysieren = analysiere || null;
   zuruecksetzen = zuruecksetze || null;
   neuZeichnen = zeichneNeu || null;
-
-  /* Ab hier entscheidet allein das Merkmals-Schloss, ob der Umschalter
-     entsteht — app.js ruft merkmalUebernehmen(), sobald /api/stats geantwortet
-     hat. Die frühere Erprobungs-Tür (Adress-Anhängsel und Konsolen-Aufruf) ist
-     mit v3.3.1 entfallen; siehe die Begründung am Kopf der Datei. */
-}
-
-/**
- * Baut den Umschalter ein oder wieder aus. Ruft das Merkmals-Schloss auf,
- * sobald die Antwort von /api/stats da ist — und die Konsolen-Tür.
- *
- * @param {boolean} an
- */
-export function zeigeSprachumschalter(an) {
-  if (an) einhaengen();
-  else aushaengen();
-}
-
-/**
- * Übernimmt den Stand des Merkmals-Schlosses: baut den Umschalter und
- * hinterlässt die Spur für die Unterseiten. Ruft app.js auf, sobald die
- * Antwort von /api/stats da ist — mit `false` genauso wie mit `true`, damit
- * ein Abschalten ankommt.
- */
-export function merkmalUebernehmen(an) {
-  /* v3.3.1: KEIN localStorage mehr. Der Stand wurde hier hinterlegt, damit die
-     Unterseiten ihn sehen (sie öffnen mit target="_blank" und bekommen einen
-     leeren sessionStorage). Das legte bei JEDEM Besucher einen dauerhaften
-     Eintrag an und widersprach der Datenschutzerklärung.
-
-     Die Unterseiten holen den Stand jetzt selbst bei /api/stats — dieselbe
-     Quelle, aus der auch dieser Aufruf gespeist wird (app.js). Das ist nicht
-     nur datenschutzkonform, sondern auch richtiger: Der hinterlegte Wert
-     veraltete: Wurde das Merkmal abgeschaltet, trug ein Gerät den alten Stand
-     so lange weiter, bis jemand die Startseite erneut aufrief. */
-  if (an) einhaengen();
-}
-
-/** Nur für Tests: aktueller Einbauzustand. */
-export function istEingehaengt() {
-  return eingehaengt;
+  einhaengen();
 }

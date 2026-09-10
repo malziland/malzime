@@ -70,7 +70,7 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 |---|---|---|
 | `parallelitaet` | 3 | Wie viele Analysen gleichzeitig laufen |
 | `queueRatePerSekunde` | 0.1 | Wie schnell die Warteschlange Aufträge losschickt |
-| `warteschlangeTiefe` | 155 | Ab wie vielen Wartenden abgelehnt wird |
+| `warteschlangeTiefe` | 108 | Ab wie vielen Wartenden abgelehnt wird, wenn keine gemessene Dauer vorliegt |
 | `durchschnittsdauerSekunden` | 40 | Ausgangswert der Wartezeit-Ansage |
 | `stundenlimit` | 500 | Analysen pro Zeitfenster |
 | `stundenfensterMinuten` | 60 | Größe dieses Fensters |

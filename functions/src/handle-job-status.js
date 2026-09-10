@@ -135,12 +135,12 @@ async function handleJobStatus(req, res) {
       position: 0,
       etaSeconds: laufend.gemessen && !laufend.frisch ? null : laufend.sekunden,
     };
-    /* v3.0 Phase 1: Der bereits angekommene Live-Profiltext, falls der Worker
-       ihn (Flag `useLiveText`) ins Job-Dokument gelegt hat. Er ist ein
-       Vorgriff auf das `result` und unterliegt deshalb DEMSELBEN
-       PRIV-003-Abhol-Ticket wie das fertige Ergebnis — der Client schickt
-       das Ticket ohnehin bei jedem Poll mit. Ohne Live-Text (Flag aus,
-       Analyse vor der ersten Welle) ist die Antwort byte-gleich zu heute. */
+    /* v3.0 Phase 1: Der bereits angekommene Live-Profiltext, sobald der
+       Worker ihn ins Job-Dokument gelegt hat (fest eingebaut seit 10.09.2026,
+       vorher Flag `useLiveText`). Er ist ein Vorgriff auf das `result` und
+       unterliegt deshalb DEMSELBEN PRIV-003-Abhol-Ticket wie das fertige
+       Ergebnis — der Client schickt das Ticket ohnehin bei jedem Poll mit.
+       Vor der ersten Welle fehlen die Felder einfach. */
     if (typeof job.liveText === "string" && job.resultToken && safeCompare(token, job.resultToken)) {
       antwort.liveText = job.liveText;
       /* DOC-2026-08-13-FE-08: Zeitstempel des Live-Text-Stands. Der Client wertet

@@ -14,7 +14,7 @@ import {
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import * as liveAnzeige from "./live-anzeige.js";
-import { speichereRcTicket, loescheRcTicket } from "./rc-ticket.js";
+import { speichereRcTicket } from "./rc-ticket.js";
 import * as realitaetsCheck from "./realitaets-check.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
@@ -22,64 +22,26 @@ import { logTelemetry } from "./telemetry-logger.js";
 import { PROFIL_FERTIG } from "./beast-lockruf.js";
 import { generateTraceId } from "./client-context.js";
 import { apiUrl } from "./api-basis.js";
+import { acquireWakeLock, releaseWakeLock, wakeLockStatus } from "./wake-lock.js";
+import {
+  storeJobId,
+  markiereErgebnisZustellung,
+  ergebnisFristAbgelaufen,
+  clearStoredJobId,
+  getStoredJobId,
+  getStoredResultToken,
+} from "./auftrag-speicher.js";
+
+/* Wake-Lock und Auftragsgedächtnis liegen seit 10.09.2026 in eigenen Modulen
+   (js/wake-lock.js, js/auftrag-speicher.js). app.js und die Tests holen diese
+   drei weiter hier. */
+export { acquireWakeLock, clearStoredJobId, getStoredJobId };
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
 
-/* ── Wake-Lock ──────────────────────────────────────────────────────
-   Verhindert, dass das Gerät während der (bis ~3 min langen) Analyse in
-   Standby geht. Geht es schlafen, friert der Browser die Seite ein und die
-   laufende fetch-Anfrage stirbt — der User sieht beim Aufwachen einen Fehler,
-   obwohl der Server fertig gerechnet hat. Best-Effort: nicht jedes Gerät
-   unterstützt die API, und ein manueller Power-Knopf-Druck sperrt trotzdem.
-
-   v1.10.8: wakeLockStatus erfasst, ob/warum der Wake-Lock scheitert. Wird in
-   der Telemetrie (Success + Error) mitgeschickt. Hintergrund: Der Wake-Lock
-   greift offenbar auf keinem Geraet — bisher verschluckte das catch jeden
-   Fehler stumm, wir hatten null Diagnose-Daten. Werte: "not-attempted",
-   "unsupported", "acquired", "denied:<FehlerName>". */
-let wakeLock = null;
-let wakeLockStatus = "not-attempted";
-/* v1.10.8: Guard gegen Doppel-Anfrage. acquireWakeLock wird jetzt aus dem
-   User-Gesture-Kontext heraus aufgerufen (app.js handleNewFile, direkt im
-   change/drop-Event) — und zusaetzlich als Fallback in analyzeImage. Der
-   Guard stellt sicher, dass nur die ERSTE Anfrage zaehlt: ein zweiter Aufruf
-   nach `await`-Punkten wuerde auf iOS mit NotAllowedError scheitern und den
-   bereits gewonnenen Status ueberschreiben. */
-let wakeLockRequested = false;
-
-/* WICHTIG: iOS Safari erlaubt navigator.wakeLock.request("screen") nur,
-   solange noch transiente User-Aktivierung besteht — also unmittelbar nach
-   dem Tippen, VOR jedem `await`. Deshalb wird diese Funktion aus dem
-   synchronen change/drop-Handler (app.js) aufgerufen, nicht erst tief in der
-   asynchronen analyzeImage-Pipeline. */
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-export async function acquireWakeLock() {
-  if (wakeLockRequested) return;
-  wakeLockRequested = true;
-  if (!("wakeLock" in navigator)) {
-    wakeLockStatus = "unsupported";
-    return;
-  }
-  try {
-    wakeLock = await navigator.wakeLock.request("screen");
-    wakeLockStatus = "acquired";
-  } catch (err) {
-    /* Verweigert/nicht verfügbar — kein Abbruch, läuft ohne Wake-Lock weiter. */
-    wakeLock = null;
-    wakeLockStatus = "denied:" + (err && err.name ? err.name : "unknown");
-  }
-}
-
-function releaseWakeLock() {
-  /* Guard zuruecksetzen, damit die naechste Analyse wieder anfordern darf. */
-  wakeLockRequested = false;
-  if (!wakeLock) return;
-  wakeLock.release().catch(() => {});
-  wakeLock = null;
 }
 
 /* Die Vorschau oben zeigt das Original ueber eine Objekt-URL. Kann der
@@ -145,22 +107,6 @@ export async function analyzeImage() {
 const ENQUEUE_URL = apiUrl("/api/enqueue");
 const JOB_STATUS_URL = apiUrl("/api/job-status");
 const POLL_INTERVAL_MS = 2000;
-const JOB_ID_STORAGE_KEY = "malzime.queueJobId";
-const JOB_TOKEN_STORAGE_KEY = "malzime.queueResultToken"; /* PRIV-003: Abhol-Ticket */
-const JOB_DELIVERED_AT_KEY = "malzime.queueErgebnisZeit"; /* PRIV-107: erste Zustellung */
-
-/* PRIV-107 (Kurzaudit 2026-08-11): Absolute Frist, wie lange ein FERTIGES
-   Ergebnis per Reload wiederholbar bleibt — gerechnet ab der ERSTEN
-   Zustellung, nicht ab dem letzten Reload (sonst schöbe jedes Neuladen die
-   Frist vor sich her). Die 3-Minuten-Übergabepause unten greift nur über den
-   Sichtbarkeits-Wechsel des Tabs; ein Gerät, das mit durchgehend sichtbarem
-   Tab weitergereicht wird, fiel bisher durch — bis der Job serverseitig nach
-   ~2 h verfällt. Diese Frist schließt das Fenster auch für diesen Fall. */
-const ERGEBNIS_WIEDERHOLUNG_MS = 15 * 60 * 1000;
-/* Historischer Schlüssel des entfernten Hinweis-Pop-ups (bis v3.0.1) — wird
-   beim Aufräumen weiterhin mitgelöscht, damit alte Tab-Stände keinen toten
-   Eintrag behalten. */
-const JOB_DISCLAIMER_ACK_KEY = "malzime.queueDisclaimerAcked";
 /* Aufeinanderfolgende job-status-Fehler, die der Poll-Loop toleriert, bevor
    er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
    das Ergebnis liegt serverseitig sicher. */
@@ -206,79 +152,6 @@ function fetchWithTimeout(url, options, timeoutMs) {
       throw err;
     }
   );
-}
-
-function storeJobId(jobId, resultToken) {
-  try {
-    sessionStorage.setItem(JOB_ID_STORAGE_KEY, jobId);
-    /* PRIV-003: Abhol-Ticket zusammen mit der jobId merken (überlebt Reload/Tab). */
-    if (resultToken) sessionStorage.setItem(JOB_TOKEN_STORAGE_KEY, resultToken);
-    /* Neuer Auftrag → die Zustell-Uhr des vorigen Ergebnisses gilt nicht mehr. */
-    sessionStorage.removeItem(JOB_DELIVERED_AT_KEY);
-  } catch (_) {
-    /* sessionStorage kann im privaten Modus werfen — kein harter Fehler. */
-  }
-  /* KA-02: Neuer Auftrag → das Realitäts-Check-Ticket des vorigen Ergebnisses
-     ist verbraucht oder hinfällig. */
-  loescheRcTicket();
-}
-
-/* PRIV-107: Zeitpunkt der ERSTEN Zustellung festhalten. Bewusst nur setzen,
-   wenn noch nichts gemerkt ist — ein Resume-Rerender darf die Frist nicht
-   verlängern. */
-function markiereErgebnisZustellung() {
-  try {
-    if (!sessionStorage.getItem(JOB_DELIVERED_AT_KEY)) {
-      sessionStorage.setItem(JOB_DELIVERED_AT_KEY, String(Date.now()));
-    }
-  } catch (_) {
-    /* ohne Speicher keine Frist — dann räumt weiterhin die 2-h-Job-Frist ab */
-  }
-}
-
-/* PRIV-107: true, wenn die Wiederholungs-Frist eines zugestellten Ergebnisses
-   abgelaufen ist. Ohne gemerkten Zeitpunkt (laufender Auftrag) immer false. */
-function ergebnisFristAbgelaufen() {
-  try {
-    const roh = sessionStorage.getItem(JOB_DELIVERED_AT_KEY);
-    if (!roh) return false;
-    return Date.now() - Number(roh) > ERGEBNIS_WIEDERHOLUNG_MS;
-  } catch (_) {
-    return false;
-  }
-}
-
-/* Auch von der Absturz-Wache genutzt: Haengt ein Absturz an einem bestimmten
-   wiederaufgenommenen Auftrag, muss der weg, sonst wiederholt er sich endlos. */
-export function clearStoredJobId() {
-  try {
-    sessionStorage.removeItem(JOB_ID_STORAGE_KEY);
-    sessionStorage.removeItem(JOB_TOKEN_STORAGE_KEY);
-    sessionStorage.removeItem(JOB_DISCLAIMER_ACK_KEY);
-    sessionStorage.removeItem(JOB_DELIVERED_AT_KEY);
-  } catch (_) {
-    /* dito */
-  }
-  /* KA-02: Zum Tab-Stand gehört auch das Realitäts-Check-Ticket. */
-  loescheRcTicket();
-}
-
-/** Gibt eine offene jobId aus einem früheren Seitenbesuch zurück (oder null). */
-export function getStoredJobId() {
-  try {
-    return sessionStorage.getItem(JOB_ID_STORAGE_KEY);
-  } catch (_) {
-    return null;
-  }
-}
-
-/** PRIV-003: Gibt das gespeicherte Abhol-Ticket zurück (oder null). */
-function getStoredResultToken() {
-  try {
-    return sessionStorage.getItem(JOB_TOKEN_STORAGE_KEY);
-  } catch (_) {
-    return null;
-  }
 }
 
 /**
@@ -378,19 +251,19 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
         break;
       case "processing":
         showQueueWaiting("processing");
-        /* v3.0: Liefert der Server schon Live-Text (Flag useLiveText), tippt
-           die Live-Anzeige ihn mit — sie versteckt beim ersten Zeichen selbst
-           die Scan-Animation. Beide Felder gehen als EINE Welle ans Modul:
-           `standard` (liveText) und, sobald das Modell es schreibt, das
-           Beast-Profil (liveTextBeast) — angezeigt wird dort der Puffer des
-           gerade gewählten Modus. Ohne liveText-Feld ist das ein No-Op und
-           alles bleibt exakt wie heute. */
+        /* v3.0: Liefert der Server schon Live-Text, tippt die Live-Anzeige ihn
+           mit — sie versteckt beim ersten Zeichen selbst die Scan-Animation.
+           Beide Felder gehen als EINE Welle ans Modul: `standard` (liveText)
+           und, sobald das Modell es schreibt, das Beast-Profil (liveTextBeast)
+           — angezeigt wird dort der Puffer des gerade gewählten Modus. Fehlt
+           das Feld noch, passiert hier nichts. Einen Schalter dafür gibt es
+           seit dem 10.09.2026 nicht mehr: Live-Text ist immer an. */
         if (liveErlaubt && typeof data.liveText === "string") {
           liveAnzeige.welle({
             standard: data.liveText,
             beast: typeof data.liveTextBeast === "string" ? data.liveTextBeast : null,
             /* FEATURE-2026-08-29-01: Fertige Merkmale derselben Welle. Fehlen
-               sie (alter Server, Flag aus), bleibt es beim reinen Text. */
+               sie (noch keine Karte fertig), bleibt es beim reinen Text. */
             kartenStandard: Array.isArray(data.liveKartenStandard) ? data.liveKartenStandard : null,
             kartenBeast: Array.isArray(data.liveKartenBeast) ? data.liveKartenBeast : null,
           });
@@ -589,9 +462,9 @@ async function renderQueueResult(data, myId, traceId, timings) {
     realitaetsCheck.neuesErgebnis(data);
     /* v3.0: Lief für diesen Job Live-Text, wird das eben Gerenderte im selben
        Frame verdeckt und gestaffelt enthüllt (live-anzeige.js). Lief KEINER
-       (Flag aus, Tier-Profil, blocked, Resume nach Reload), räumt abbrechen()
-       höchstens eine verwaiste Live-Karte weg — der heutige Pfad bleibt
-       Pixel für Pixel unverändert. */
+       (Tier-Profil, blocked, Wiederaufnahme nach einem Neuladen), räumt
+       abbrechen() höchstens eine verwaiste Live-Karte weg — der heutige Pfad
+       bleibt Pixel für Pixel unverändert. */
     const liveEnthuellung = liveAnzeige.hatLiveGelaufen() && data.profiles && data.meta?.mode !== "animal";
     if (liveEnthuellung) {
       liveAnzeige.starteEnthuellung();
@@ -599,8 +472,8 @@ async function renderQueueResult(data, myId, traceId, timings) {
       liveAnzeige.abbrechen();
       /* OHNE Enthuellung steht das Profil hier schon vollstaendig da — dann
          meldet es niemand sonst. Der Beast-Lockruf haengt sonst nur am Ende
-         der Enthuellung und bliebe in genau diesen Faellen stumm: Tier-Profil,
-         Merkmal aus, und vor allem die Wiederaufnahme nach einem Neuladen.
+         der Enthuellung und bliebe in genau diesen Faellen stumm: beim
+         Tier-Profil und vor allem bei der Wiederaufnahme nach einem Neuladen.
          Die Wache gegen Fehlerfaelle sitzt im Empfaenger, der auf
          `data-has-result` prueft (js/beast-lockruf.js). */
       document.dispatchEvent(new CustomEvent(PROFIL_FERTIG));
@@ -639,7 +512,7 @@ async function renderQueueResult(data, myId, traceId, timings) {
         durationMs: timings.totalMs,
         requestId: String(myId),
         traceId,
-        wakeLock: wakeLockStatus,
+        wakeLock: wakeLockStatus(),
       });
     }
     logTelemetry("analyze-success", {
@@ -650,7 +523,7 @@ async function renderQueueResult(data, myId, traceId, timings) {
         subject: typeof meta.subject === "string" ? meta.subject : undefined,
         mode: typeof meta.mode === "string" ? meta.mode : undefined,
         lang: getLanguage(),
-        wakeLock: wakeLockStatus,
+        wakeLock: wakeLockStatus(),
         queue: true,
       },
     });
@@ -835,7 +708,7 @@ async function analyzeImageQueued() {
         requestId: String(myId),
         traceId,
         httpStatus: enqueueResp.status,
-        wakeLock: wakeLockStatus,
+        wakeLock: wakeLockStatus(),
       });
       return;
     }
@@ -894,7 +767,7 @@ async function analyzeImageQueued() {
         durationMs: Date.now() - analyzeStartTime,
         requestId: String(myId),
         traceId,
-        wakeLock: wakeLockStatus,
+        wakeLock: wakeLockStatus(),
       });
       return;
     }
@@ -935,7 +808,7 @@ async function analyzeImageQueued() {
       durationMs: Date.now() - analyzeStartTime,
       requestId: String(myId),
       traceId,
-      wakeLock: wakeLockStatus,
+      wakeLock: wakeLockStatus(),
       fileFormat: err.fileFormat,
       errorDetail: err.errorDetail,
       fileSizeKb: err.fileSizeKb,

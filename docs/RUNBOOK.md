@@ -320,9 +320,10 @@ Vom schnellsten zum gründlichsten. Alle Flag-Hebel wirken **ohne Deploy** binne
 
 > **Seit 09.09.2026 (4.8.0):** Die Functions lesen ausschließlich die Geheimnisse mit
 > Endung `_EU` (europe-west1). Die alten Namen ohne Endung sind gelöscht. Ein Rollback
-> auf eine Fassung vor 4.8.0 (Hebel 4) braucht sie vorher neu: Secret unter altem Namen
-> anlegen, Wert aus dem `_EU`-Secret kopieren (`scripts/geheimnisse-eu-kopieren.sh`
-> in umgekehrter Richtung), IAM-Bindung setzen. Der Mistral-Schlüssel vor 4.8.0 ist
+> auf eine Fassung vor 4.8.0 (Hebel 4) braucht sie vorher neu, je Geheimnis:
+> `gcloud secrets versions access latest --secret=<NAME>_EU --project=malzime | gcloud secrets create <NAME> --data-file=- --replication-policy=user-managed --locations=europe-west1 --project=malzime`,
+> danach die IAM-Bindung des Functions-Dienstkontos setzen. (Das frühere
+> Kopierskript lief nur in die Gegenrichtung und ist seit 10.09.2026 entfernt.) Der Mistral-Schlüssel vor 4.8.0 ist
 > bei Mistral gelöscht; auch dafür den aktuellen Wert nehmen.
 
 ### 1. Wartungsmodus (Sekunden — kontrollierte Vollbremsung)
@@ -366,18 +367,10 @@ greift.
 ehrlich „gleich zurück", statt sie auf einen Weg zu schicken, der unter Last
 auch nicht trägt.
 
-### 2a. Sprachumschalter aus (Sekunden — ein Bedienelement zurücknehmen)
+### 2a. Sprachumschalter aus — ENTFALLEN (10.09.2026)
 
-`featureFlags/current.useSprachumschalter = false` in der Firestore-Console,
-auch vom Handy aus. Wirkt beim nächsten Seitenaufruf (Flag-Cache 30 s).
-
-Danach entsteht der Umschalter gar nicht mehr im Dokument — nicht ausgegraut,
-sondern weg. Laufende Analysen sind nicht betroffen, und **Englisch bleibt
-erreichbar**: über `?lang=en` in der Adresse und über die Gerätesprache. Der
-Hebel nimmt nur das Bedienelement zurück, nicht die Sprache.
-
-Wann er gebraucht wird: wenn der Umschalter mitten in einem Workshop irritiert
-oder ein Fehler auffällt. Kein Deploy, kein Neustart, keine Nebenwirkung.
+Der DE/EN-Umschalter ist fest eingebaut (docs/FLAGS.md). Stört er mitten in einem
+Workshop, ist der Weg ein Hosting-Rollback (Hebel 5).
 
 ### 3. Single-Large-Call aus — ENTFALLEN (10.09.2026)
 
@@ -422,16 +415,12 @@ Nachrechnung mit den Messdaten des Tages: 4/0,125 → 6 bis 11 Ablehnungen,
 Wer sie ändert, ändert die laufende Queue — kein Deploy, kein gcloud-Befehl.
 Vorher ins Mistral-Dashboard sehen, nicht nach Gefühl entscheiden.
 
-### 3b. Prompt-Caching aus (~30 s, kein Deploy, keine Begleitschritte)
+### 3b. Prompt-Caching aus — ENTFALLEN (10.09.2026)
 
-`featureFlags/current.usePromptCache = false` in der Firestore-Console setzen.
-Danach wird weder ein `prompt_cache_key` gesendet noch der Nachrichten-Aufbau
-umgestellt — der Pfad ist bitgenau der Stand v2.4.4.
-
-Es gibt hier **keine** Kopplung an die Warteschlange oder `config.js`: Es ist eine reine Kostenmaßnahme ohne Einfluss auf
-Modell, Durchsatz oder Rate-Limits. Wenn unklar ist, ob das Caching an einer
-Störung beteiligt ist, kostet das Umlegen nichts außer der Ersparnis — im Zweifel
-ausschalten. Details → [FLAGS.md](FLAGS.md#usepromptcache-seit-v25).
+Der Prompt-Zwischenspeicher ist fest eingebaut (docs/FLAGS.md): reine
+Kostenmaßnahme ohne Einfluss auf Modell, Ergebnis oder Durchsatz. Ein Verdacht,
+dass er an einer Störung beteiligt ist, wird über einen Functions-Rollback
+(Hebel 4) geklärt, nicht über einen Schalter.
 
 ### 4. Functions-Rollback auf einen früheren Stand (~2 min)
 

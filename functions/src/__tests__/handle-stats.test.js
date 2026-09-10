@@ -66,7 +66,6 @@ describe("handleStats", () => {
     expect(res.json).toHaveBeenCalledWith({
       ...statsData,
       maintenance: false,
-      useQueue: true,
       realitaetsCheck: undefined,
       /* Betriebswerte (29.08.2026): Ohne Firestore-Profil steht hier die
          Herkunft "code" und kein Profilname — genau der heutige Zustand.
@@ -75,9 +74,6 @@ describe("handleStats", () => {
       /* Seit 30.08.2026 kommen die Betriebswerte ausschliesslich aus Firestore;
          der gestellte Satz oben liefert "firestore" und den Namen. */
       betrieb: { profil: "test", quelle: "firestore", analyseZeitgrenzeMs: 300000 },
-      /* v3.3: Merkmals-Schloss des Sprachumschalters. Ohne gesetztes Flag
-         steht es auf false — das Frontend baut den Schalter dann nicht. */
-      sprachumschalter: false,
     });
   });
 
@@ -89,12 +85,15 @@ describe("handleStats", () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ maintenance: true }));
   });
 
-  test("meldet useQueue: true — Uebergang fuer alte, zwischengespeicherte Clients", async () => {
+  test("die Antwort traegt weder useQueue noch sprachumschalter (entfernt 10.09.2026)", async () => {
     getStats.mockResolvedValue({ current: { count: 0 } });
     getMaintenanceStatus.mockResolvedValue(false);
     const res = mockRes();
     await handleStats(mockReq(), res);
-    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ useQueue: true }));
+    const antwort = res.json.mock.calls[0][0];
+    expect(antwort).not.toHaveProperty("useQueue");
+    expect(antwort).not.toHaveProperty("sprachumschalter");
+    expect(antwort).toHaveProperty("maintenance"); /* Positivkontrolle: die Antwort ist da */
   });
 
   test("liefert den anonymen Realitäts-Check-Zähler mit (eingaben + mittelProzent)", async () => {

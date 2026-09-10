@@ -4,9 +4,9 @@
  * job-helfer.js — die kleinen Entscheidungen im Analyse-Ablauf.
  *
  * HERAUSGELOEST AUS handle-process-job.js am 31.08.2026 (Punkt 3 des
- * Nachtlaufs). Die Datei war auf 680 Zeilen gewachsen und mischte drei Dinge:
- * die Annahme des Auftrags, den Ein-Aufruf-Weg, den Drei-Aufruf-Weg — und
- * dazwischen acht kleine Helfer, die alle drei brauchen.
+ * Nachtlaufs). Die Datei war auf 680 Zeilen gewachsen und mischte die Annahme
+ * des Auftrags, die beiden damaligen Analysewege und die kleinen Helfer, die
+ * beide brauchten. (Der Drei-Aufruf-Weg ist seit 10.09.2026 ausgebaut.)
  *
  * WAS HIER STEHT: Fragen mit einer Antwort. Ist ein Merkmal eingeschaltet?
  * Ist dieser Fehler ein Kontingent-Problem? Wie sieht die Ersatzbeschreibung
@@ -19,7 +19,7 @@
  * ist, steht bei jeder Funktion einzeln.
  */
 
-const { isPromptCacheEnabled, isBeastAdsCallEnabled, isLiveTextEnabled } = require("./feature-flags");
+const { isBeastAdsCallEnabled } = require("./feature-flags");
 
 function getMistral() {
   return process.env.MISTRAL_MOCK === "1" ? require("./mistral-mock") : require("./mistral");
@@ -100,32 +100,12 @@ async function isBeastAdsCallEnabledSafe() {
   }
 }
 
-async function isPromptCacheEnabledSafe() {
-  try {
-    return await isPromptCacheEnabled();
-  } catch (err) {
-    console.log(JSON.stringify({ warning: "prompt-cache-flag-read-error", error: err.message }));
-    return false;
-  }
-}
-
-async function isLiveTextEnabledSafe() {
-  try {
-    return await isLiveTextEnabled();
-  } catch (err) {
-    console.log(JSON.stringify({ warning: "live-text-flag-read-error", error: err.message }));
-    return false;
-  }
-}
-
 /* Hat dieses Profil ueberhaupt Karten? Die Frage steht an mehreren Stellen im
    Ablauf — ein leeres Profil ist kein Fehler, aber auch kein Ergebnis. */
 const hasCategories = (obj) => obj && obj.categories && Object.keys(obj.categories).length > 0;
 
 module.exports = {
   isBeastAdsCallEnabledSafe,
-  isPromptCacheEnabledSafe,
-  isLiveTextEnabledSafe,
   getMistral,
   isQuotaError,
   buildPseudoDescription,

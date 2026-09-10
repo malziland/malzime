@@ -58,13 +58,18 @@ echo
 # Die Probe suchte weiter in mistral.js und meldete MUSTER-NICHT-GEFUNDEN —
 # sie konnte den Rueckfall also gar nicht mehr pruefen. pruefe-mitzieher.py
 # kennt diese Kopplung nicht (siehe Regel unten).
-probe "1. Rueckfall auf Code-Zeitgrenze in mistral-http.js" \
+# NACHGEZOGEN 10.09.2026: Seit 1c9cad9 (08.09.) steht zwischen dem Riegel und
+# `const cap` die Pruefung der Ueberlast-Wartezeiten; das alte Muster fand die
+# Stelle nicht mehr und meldete zwei Tage lang "MUSTER FEHLT", ohne dass es
+# jemand sah (die Probe lief nirgends automatisch — jetzt in pruefstand.sh).
+# Zurueckgebaut wird jetzt der Riegel selbst: Fehlt die Zeitgrenze, muss der
+# Aufruf abbrechen statt ohne Grenze weiterzulaufen.
+probe "1. Riegel gegen fehlende Zeitgrenze in mistral-http.js" \
   "src/mistral-http.js" \
   'if (typeof timeoutCapMs !== "number" || !(timeoutCapMs > 0)) {
-      throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
-    }
-    const cap = timeoutCapMs;' \
-  'const cap = timeoutCapMs == null ? 90000 : timeoutCapMs;' \
+    throw new Error("callMistral: timeoutCapMs fehlt (mistralTimeoutMs aus dem Einstellungssatz)");
+  }' \
+  '/* Riegel zurueckgebaut (Probe) */' \
   "src/__tests__/ohne-einstellungssatz.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/mistral.test.js"
 
 probe "2. Rueckfall auf Code-Karenzfrist in jobs.js" \

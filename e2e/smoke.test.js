@@ -30,7 +30,7 @@ const MOCK_RESPONSE = {
    Analyse direkt bei der Foto-Wahl — ohne Hinweis-Pop-up. Die drei
    Queue-Endpunkte werden gemockt, damit der Test ohne echtes Backend läuft. */
 test("Smoke: Demo-Foto → Queue → Profil wird angezeigt", async ({ page }) => {
-  /* Feature-Flag „Queue an" + Limit-Infos */
+  /* Zähler und Limit, wie /api/stats sie liefert */
   await page.route("**/api/stats", (route) =>
     route.fulfill({
       status: 200,
@@ -38,7 +38,6 @@ test("Smoke: Demo-Foto → Queue → Profil wird angezeigt", async ({ page }) =>
       body: JSON.stringify({
         current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 10, week: 50, month: 200, total: 1000 },
-        useQueue: true,
       }),
     })
   );

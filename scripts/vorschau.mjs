@@ -13,12 +13,12 @@
  *
  * Aufruf:  node scripts/vorschau.mjs [port]     (Vorgabe: 8099)
  *
- * /api/stats wird beantwortet, /api/* sonst nicht. Grund: Ohne diese eine
- * Antwort entsteht der SPRACHUMSCHALTER nicht — app.js liest das Merkmal von
- * dort. In der ersten Fassung fiel /api/stats in die Auffang-Regel und lieferte
- * HTML; der Browser konnte es nicht lesen, und der Umschalter fehlte lautlos.
- * Der Nutzer hat das gefunden, nicht ich: "der Sprachumschalter ist gar nicht
- * da ... irgendwas stimmt mit deinen Angaben nicht."
+ * /api/stats wird mit einer erfundenen Antwort bedient, /api/* sonst nicht.
+ * Ohne sie zeigte die Zahlen-Seite nur ihre Fehlerzeile — die Vorschau saehe
+ * anders aus als live. In der ersten Fassung fiel /api/stats in die
+ * Auffang-Regel und lieferte HTML; damals fehlte dadurch lautlos der
+ * Sprachumschalter, und der Nutzer hat es gefunden, nicht ich. Seit dem
+ * 10.09.2026 haengt der Umschalter an keiner Antwort mehr, er entsteht immer.
  *
  * Genau das ist der Sinn einer Vorschau — sie muss zeigen, was live steht.
  * Verschluckt sie ein sichtbares Element, ist sie schlechter als gar keine.
@@ -83,8 +83,6 @@ const STATS_VORSCHAU = {
   totals: { today: 19, week: 26, month: 172, year: 5129, allTime: 5129 },
   maintenance: { enabled: false, message: "" },
   realitaetsCheck: { eingaben: 8, mittelProzent: null },
-  useQueue: true,
-  sprachumschalter: true,
   vorschau: true,
 };
 

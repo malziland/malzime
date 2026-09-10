@@ -620,7 +620,7 @@ Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;
 /* SEC-2026-08-12-18: Derselbe Schutz wie im ersten Aufruf. Alles hier stammt
    mittelbar aus dem hochgeladenen Bild — ein Foto mit lesbarem Text kann Sätze
    in das Profil tragen, die im zweiten Aufruf wie Anweisungen aussehen. Drei
-   Maßnahmen, wie in buildProfilePrompt(): Warnung voran, Daten in Blöcke
+   Maßnahmen, wie beim Analyse-Aufruf: Warnung voran, Daten in Blöcke
    gefasst, Inhalte maskiert (die Maskierung passiert in mistral.js, wo
    escapeXml liegt). Die Warnung steht nur an einer Stelle und wird hier
    verwendet, nicht kopiert. */

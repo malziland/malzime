@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
 
-/* v3.0 Live-Erlebnis: Der Server (Flag useLiveText) liefert in den
-   processing-Antworten den bereits angekommenen Profiltext mit. Die Seite
-   tippt ihn in der Live-Karte (Matrix-Dekodierung) und fährt nach `done`
-   die gestaffelte Enthüllung. Hier wird /api/job-status gemockt: zweimal
-   processing mit wachsendem liveText, dann done mit vollem Ergebnis. */
+/* v3.0 Live-Erlebnis: Der Server liefert in den processing-Antworten den
+   bereits angekommenen Profiltext mit — seit dem 10.09.2026 immer, ohne
+   Schalter. Die Seite tippt ihn in der Live-Karte (Matrix-Dekodierung) und
+   fährt nach `done` die gestaffelte Enthüllung. Hier wird /api/job-status
+   gemockt: zweimal processing mit wachsendem liveText, dann done mit vollem
+   Ergebnis. */
 
 const PROFIL_TEXT =
   "Ein junger Erwachsener mit aktivem Lebensstil, der gern unterwegs ist und Momente festhält. " +
@@ -57,7 +58,6 @@ async function basisRouten(page) {
       body: JSON.stringify({
         current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 10, week: 50, month: 200, total: 1000 },
-        useQueue: true,
       }),
     })
   );

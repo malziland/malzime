@@ -45,7 +45,6 @@ async function seiteMitMocks(page) {
         current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 10, week: 50, month: 200, total: 1000 },
         realitaetsCheck: { eingaben: 137, mittelProzent: 58 },
-        useQueue: true,
       }),
     })
   );

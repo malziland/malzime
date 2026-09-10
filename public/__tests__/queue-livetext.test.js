@@ -157,7 +157,7 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     });
   });
 
-  it("processing OHNE liveText (Flag aus) → keine einzige Welle, heutiger Pfad", async () => {
+  it("processing OHNE liveText (noch nichts geschrieben) → keine einzige Welle, heutiger Pfad", async () => {
     mockeStatusFolge([{ status: "processing" }, { status: "done", result: DONE_RESULT }]);
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(10000);

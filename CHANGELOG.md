@@ -4,6 +4,70 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **DE/EN-Umschalter, Live-Text und Prompt-Zwischenspeicher sind fest
+  eingebaut.** Alle drei hingen an Schaltern in der Datenbank, die dauerhaft an
+  standen. Bei einer kurzen Datenbank-Störung sprangen sie still auf „aus“: der
+  Umschalter verschwand, der Live-Text fehlte, die Kosten stiegen. Die Schalter
+  sind entfernt. Der Umschalter steht jetzt auf jeder Seite sofort da, auch
+  wenn die Zahlen-Schnittstelle nicht antwortet.
+- **Die Einlassgrenze ohne Messwert passt zum heutigen Betrieb.** Liegt keine
+  gemessene Analysedauer vor, nimmt die Warteschlange höchstens 108 Wartende an
+  (bisher 155, gerechnet für einen früheren Takt; im Satz für eine langsame KI
+  39). So verspricht die Seite nie mehr Plätze, als in 30 Minuten drankommen.
+- **Die Zahlen-Schnittstelle `/api/stats` liefert zwei Altfelder nicht mehr**
+  (`useQueue`, `sprachumschalter`); die Webseite liest keines davon.
+- **Die Anleitungen führen ausschließlich über `scripts/deploy.sh`.** README,
+  SETUP und AGENTS nannten den direkten Befehl `firebase deploy` — am
+  Wartungsmodus und an allen Prüfungen vorbei. Der Kurzbefehl im Server-Paket
+  ist entfernt, der Paketname (bisher `bias-demo-functions`) korrigiert.
+- **Die Rückbauprobe ist repariert und läuft bei jedem Prüfstand-Stempel
+  mit.** Sie baut behobene Fehler absichtlich zurück und prüft, ob die Tests es
+  merken. Eine ihrer zehn Proben war seit dem 08.09. blind, und die Probe lief
+  nirgends von selbst. Jetzt stempelt der Prüfstand nichts, wenn ein Rückbau
+  unbemerkt bliebe.
+- **Der Analyse-Ablauf der Webseite ist in kleinere Teile zerlegt.** Das
+  Wachhalten des Bildschirms und das Auftragsgedächtnis des Tabs liegen in
+  eigenen Dateien; `public/js/api.js` hat 952 statt 1079 Zeilen und stand
+  vorher genau an seiner Größengrenze. Das Wachhalten hat dabei erstmals eigene
+  Tests bekommen. Am Verhalten der Seite ändert sich nichts.
+
+### Entfernt
+
+- **Zwölf alte Forschungs- und Einmalprogramme** (Prompt- und Modellvergleiche,
+  A/B-Läufe, Lasttests gegen nicht mehr vorhandene Wege). Behalten ist der
+  Lasttest gegen den Emulator.
+- **Das Kopierprogramm für die Geheimnisse aus dem EU-Umzug**, das seit dem
+  Löschen der alten Geheimnisse nicht mehr funktionieren konnte. Die drei
+  Hinweise darauf (Wartungsmodus, Infrastruktur-Prüfung, RUNBOOK) nennen jetzt
+  den richtigen Handgriff.
+- **Ungenutzte Programmteile im Server:** Exporte ohne Verwender, eine nie
+  genutzte Adresse, eine Test-Hilfsfunktion ohne Test.
+- **Zwei tote Einträge in der Datenbank:** das Schalterfeld `useQueue` (seit
+  v2.10 wirkungslos) und das Zählerdokument `stats/warteschlange` (seit 07.09.
+  nicht mehr beschrieben).
+- **Ungenutzte Teile der Webseite:** sieben Übersetzungen, die nirgends mehr
+  angezeigt wurden; CSS für Elemente, die es nicht mehr gibt, darunter die
+  alten Konfidenz-Pillen (Bildvergleich in Chromium und WebKit, hell, dunkel
+  und im Druck: die Ergebnis-Karten sehen danach gleich aus); das alte
+  Wortmarken-Logo; zwei Funktionen ohne Aufrufer (Druck-Wache anmelden,
+  Limit-Hinweis ausblenden).
+
+### Behoben
+
+- **Veraltete Angaben in Doku, Code-Kommentaren und Tests:** alte Zahlen (7
+  parallel, 0,125 Aufträge je Sekunde), Hinweise auf den ausgebauten zweiten
+  Analyseweg und auf die entfernten Schalter, Namen der Geheimnisse ohne
+  EU-Endung in der Selbstbetreiber-Anleitung, ein Barrierefreiheits-Entwurf,
+  der sich als unveröffentlicht bezeichnete, obwohl die Seite live ist,
+  lückenhafte Dateilisten in README und ARCHITECTURE (in der Modultabelle der
+  Webseite fehlte die Hälfte der Module), der falsch angegebene Rückfallwert
+  von `useGemesseneDauer` in FLAGS.md, ein überholter Hinweis im
+  Prüfstand-Stempel und ein veralteter Zeilenverweis in einem Browser-Test.
+
 ## [4.9.0] — 2026-09-10
 
 ### Geändert

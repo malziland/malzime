@@ -232,5 +232,4 @@ module.exports = {
   _bewerte: bewerte,
   _baueMeldung: baueMeldung,
   _MIN_ANALYSEN: MIN_ANALYSEN,
-  _FAKTOR_SCHWELLE: FAKTOR_SCHWELLE,
 };

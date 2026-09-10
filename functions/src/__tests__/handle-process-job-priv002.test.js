@@ -20,14 +20,13 @@ jest.mock("../jobs", () => ({
   isAbandoned: jest.fn(),
   abandonJob: jest.fn(),
   countProcessingJobs: jest.fn(),
+  setLiveText: jest.fn(),
 }));
 jest.mock("../queue-storage", () => ({ loadImage: jest.fn(), deleteImage: jest.fn() }));
 jest.mock("../counter", () => ({ incrementTotals: jest.fn(() => Promise.resolve()) }));
 jest.mock("../cloud-tasks", () => ({ redispatchJobLocal: jest.fn() }));
 jest.mock("../feature-flags", () => ({
-  isPromptCacheEnabled: jest.fn(async () => false),
   isBeastAdsCallEnabled: jest.fn(async () => false),
-  isLiveTextEnabled: jest.fn(async () => false),
 }));
 jest.mock("../mistral", () => ({ runSingleLargeCall: jest.fn() }));
 

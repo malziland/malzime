@@ -198,8 +198,5 @@ module.exports = {
   dauerJeAnalyse,
   /* Fuer Tests */
   _cacheLeeren,
-  _RING_GROESSE: RING_GROESSE,
   _MIN_WERTE: MIN_WERTE,
-  _PLAUSIBEL_MIN_S: PLAUSIBEL_MIN_S,
-  _PLAUSIBEL_MAX_S: PLAUSIBEL_MAX_S,
 };

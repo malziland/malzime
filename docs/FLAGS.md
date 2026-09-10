@@ -11,18 +11,16 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 
 | Flag | Typ | Soll live | Fail-safe | Owner |
 |---|---|---|---|---|
-| `usePromptCache` | Kostenschalter | `true` | `false` | Christoph Krieger |
-| `useLiveText` | Anzeige-Schalter (Live-Text waehrend der Analyse) | `true` | `false` | Christoph Krieger |
 | `useBeastAdsCall` | Zweiter, kleiner Mistral-Aufruf fuer die Beast-Werbung | `true` | `true` | Christoph Krieger |
-| `useSprachumschalter` | Sichtbarkeit eines Bedienelements | `true` (seit v3.3.0 live) | `false` | Christoph Krieger |
-| `useGemesseneDauer` | Wartezeit und Einlassgrenze aus der gemessenen statt der angenommenen Analysedauer (seit v4.2.0) | `true` | `true` | Christoph Krieger |
+| `useGemesseneDauer` | Wartezeit und Einlassgrenze aus der gemessenen statt der angenommenen Analysedauer (seit v4.2.0) | `true` | `false` (Dokument nicht lesbar); fehlt nur das Feld: `true` | Christoph Krieger |
 
-> **`useGemesseneDauer` ist fail-safe `true`** — anders als die uebrigen Flags. Grund:
-> Der Schalter waehlt nicht zwischen "Funktion an" und "Funktion aus", sondern zwischen
-> zwei Rechenwegen. Der gemessene ist der richtigere, und sein schlechtester Fall ist
-> ohnehin `durchschnittsdauerSekunden` aus dem Einstellungssatz — bei zu wenigen, unplausiblen oder
-> unlesbaren Messwerten faellt er von selbst dorthin zurueck. Ausschalten ist der
-> Notweg, nicht der Normalzustand.
+> **`useGemesseneDauer` hat zwei Rueckfallwerte.** Fehlt nur das Feld, gilt `true`: Der
+> Schalter waehlt zwischen zwei Rechenwegen, der gemessene ist der richtigere, und sein
+> schlechtester Fall ist ohnehin `durchschnittsdauerSekunden` aus dem Einstellungssatz. Ist
+> das ganze Dokument nicht lesbar, gilt `false` — dann kann auch die Messung nichts lesen,
+> und der Fehlerfall soll keine Messung behaupten, die es nicht gibt (Code:
+> `feature-flags.js`, catch-Zweig; Test: `feature-flags.test.js`). Bis 10.09.2026 stand
+> hier "fail-safe `true`" — das galt nur fuer das fehlende Feld.
 
 > **Stand 2026-08-21 (DOC-2026-08-20-09).** Die Spalte „Soll live" trug zuvor fuer
 > `useSprachumschalter` noch `false` — den Stand von der Vorbereitung am 13.08., obwohl
@@ -53,14 +51,17 @@ und wird entfernt.
 Das notierte Entfernungs-Kriterium — „entfällt, wenn die 3-Call-Pipeline abgebaut
 wird“ — ist damit erfüllt.
 
-### `usePromptCache` (seit v2.5)
+### `usePromptCache` — FEST EINGEBAUT (10.09.2026)
 
-Schickt `prompt_cache_key` an Mistral mit **und** stellt dafür den Nachrichten-Aufbau
-des Single-Large-Calls um: statischer Anweisungstext als `system`-Message, Bild
+Seit v2.5 schickt der Analyse-Aufruf einen `prompt_cache_key` mit und stellt dafür
+den Nachrichten-Aufbau um: statischer Anweisungstext als `system`-Message, Bild
 getrennt in `user`. Reine Kostenmaßnahme — Modell, Ausgabequalität und Laufzeit
-bleiben unverändert.
+bleiben unverändert. Das Entfernungs-Kriterium („dauerhaft > 50 % Treffer") ist
+erfüllt (unter Last 59–71 %, 01.09.2026; 77 % am 30.08.2026). Seit 10.09.2026 ist
+der Aufbau fest, der Rückfallweg ohne Cache und das Flag sind entfernt; ein Eintrag
+im Dokument wirkt nicht mehr.
 
-**Warum der Umbau nötig ist** (an der echten API gemessen, wechselnde Bilder):
+**Warum der Aufbau so sein muss** (an der echten API gemessen, wechselnde Bilder):
 
 | Aufbau | Cache-Treffer |
 |---|---|
@@ -69,25 +70,17 @@ bleiben unverändert.
 | `user[ text ]` + `user[ bild ]` | 0 % |
 
 Mistral cacht einen multimodalen `content`-Array nur als Ganzes. Da das Bild pro
-Anfrage wechselt, fällt ohne den Rollenwechsel der komplette Präfix aus dem Cache —
-der Parameter allein bringt **nichts**.
-
-**Erwartbarer Effekt:** unter Produktionsmuster (Parallelität 10, ohne Pause)
-76,4 % der Eingabe-Tokens aus dem Cache, ~8,10 € → ~4,80 € pro 1000 Analysen. Bei
-vereinzelten Uploads mit Pausen dazwischen greift der Cache dagegen kaum (0–9 %);
-Mistral garantiert keine Trefferquote. Ein Fehlschlag kostet den bisherigen Preis —
-teurer als der Ist-Zustand kann es nicht werden.
+Anfrage wechselt, fällt ohne den Rollenwechsel der komplette Präfix aus dem Cache.
 
 **Erfolgskontrolle:** `cachedTokens` in jeder `mistral-single-large`-Logzeile.
-Nach dem ersten Workshop `cachedTokens / promptTokens` auswerten, statt zu schätzen.
 
-**Rückfall:** Flag auf `false` → weder Cache-Key noch geänderter Aufbau, bitgenau
-der Stand v2.4.4. Ohne Deploy, ~30 s Cache. Begleitschritte
-sind **keine** nötig (keine Anpassung der Warteschlange).
+### `useLiveText` — FEST EINGEBAUT (10.09.2026)
 
-**Entfernungs-Kriterium:** Zeigt die Auswertung nach zwei Workshops eine dauerhafte
-Trefferquote > 50 %, kann das Flag entfallen und der `system`-Aufbau fest werden.
-Bleibt sie darunter, Flag auf `false` und Code zurückbauen.
+Seit v3.0 liest der Worker die Mistral-Antwort als Strom mit und legt die bereits
+angekommenen Profiltexte ins Job-Dokument, damit der wartende Browser sie zeigt.
+Das Flag stand seither dauerhaft an; als Schalter konnte es nur noch bei einer
+Datenbank-Störung still auf „aus" springen. Seit 10.09.2026 fest, Flag entfernt. Im
+Emulator läuft der Datenstrom ebenfalls immer (`QUEUE_LOCAL_LIVE` entfällt).
 
 ## Weitere Betriebsschalter (kein `featureFlags`-Feld)
 
@@ -109,9 +102,8 @@ Bleibt sie darunter, Flag auf `false` und Code zurückbauen.
   Entfernungs-Kriterium) — im selben Change, der das Flag einführt.
 - Ein Flag, dessen Feature stabil ist und dessen Entfernungs-Kriterium erfüllt ist,
   wird samt totem Code entfernt; das Entfernen ist Teil der Feature-Arbeit.
-- Abgelaufene Flags gelten im Audit als Finding. Die beiden Firestore-Flags oben
-  sind davon ausgenommen, solange ihr jeweiliger Fallback-Pfad bewusst im Code
-  bleibt (Entscheidung siehe [ADR-0001](adr/0001-grundentscheidungen.md)).
+- Abgelaufene Flags gelten im Audit als Finding (Entscheidung siehe
+  [ADR-0001](adr/0001-grundentscheidungen.md)).
 - Feature-Flags sind kein Ersatz für Autorisierung und kein Versteck für Secrets.
 
 ### `useBeastAdsCall` — Notausschalter fuer den zweiten Mistral-Aufruf
@@ -131,40 +123,15 @@ gab es keinen Weg, den zweiten Aufruf ohne Deploy stillzulegen.
 - **Entfernungs-Kriterium:** sobald die Anfragerate dauerhaft unkritisch ist —
   dann Flag und Zweig entfernen.
 
-### `useSprachumschalter` (seit v3.3)
+### `useSprachumschalter` — FEST EINGEBAUT (10.09.2026)
 
-Zeigt auf der Startseite den DE/EN-Umschalter (rechts oben). Grundstellung
-**aus**.
-
-**Was der Schalter NICHT steuert:** die englische Fassung selbst. Die ist seit
-jeher erreichbar — über `?lang=en` in der Adresse und über die Gerätesprache.
-Aus heißt also nur: kein Bedienelement, nicht etwa „kein Englisch".
-
-**Warum kein ausgegrautes Element:** Steht das Flag auf `false`, entsteht der
-Umschalter gar nicht erst im Dokument. Ein sichtbarer, wirkungsloser Schalter
-wäre schlimmer als keiner — man klickt darauf, und nichts passiert. Ein Test
-prüft die Elementzahl auf null, ein zweiter (Positivkontrolle) prüft, dass er
-mit Flag sehr wohl entsteht.
-
-**Erproben ohne Flag: entfallen mit v3.3.1.** Es gab zwei Türen — das Anhängsel
-`?sprachumschalter=1` in der Adresse und den Konsolen-Aufruf
-`malziME.sprachumschalter()`. Beide sind ersatzlos entfernt. Zwei Gründe:
-
-1. **Sie legten eine Spur im `localStorage` ab** (`malzime-tuer-sprachumschalter`
-   und `malzime-umschalter-aktiv`) — Letzteres bei *jedem* Besucher, weil es den
-   Merkmals-Stand an die Unterseiten weiterreichte. Die Datenschutzerklärung
-   sagt zu, im Browser nichts Dauerhaftes abzulegen. Der Rechtstext ist die
-   Vorgabe, nicht der Code.
-2. **Sie waren für die Zeit vor der Freischaltung gedacht.** Seit v3.3.0 ist der
-   Umschalter live; eine Tür an einem offenen Zimmer braucht niemand.
-
-Nebenbei stimmte die Beschreibung hier nicht mehr mit dem Code überein: Sie sagte,
-die Tür überlebe kein Neuladen — der `localStorage` machte daraus geräteweit und
-dauerhaft. Mit dem Rückbau ist auch diese Abweichung weg.
-
-Die Unterseiten mit den Rechtstexten zeigen den Umschalter jetzt unabhängig vom
-Flag (sie rufen bewusst keine Schnittstelle auf — diese Festlegung bleibt). Auf
-Startseite und Zahlen-Seite entscheidet allein das Flag.
+Zeigt auf allen Seiten den DE/EN-Umschalter (rechts oben). Das Flag stand seit
+v3.3.0 dauerhaft an; als Schalter konnte es nur noch eines: den Umschalter
+verschwinden lassen, wenn `/api/stats` oder die Datenbank kurz nicht antwortet.
+Seit 10.09.2026 entsteht er immer, unabhängig von der Server-Antwort; Flag und
+das Feld `sprachumschalter` in `/api/stats` sind entfernt. Die englische Fassung
+war davon nie abhängig (`?lang=en`, Gerätesprache). Die frühere Erprobungs-Tür
+(Adress-Anhängsel, Konsolen-Aufruf, `localStorage`-Spur) ist seit v3.3.1 entfernt.
 
 **Verhalten beim Umschalten:** Auf der leeren Seite sofort. Läuft eine Analyse
 oder liegt ein Profil vor, kommt erst eine Rückfrage — in der aktuellen

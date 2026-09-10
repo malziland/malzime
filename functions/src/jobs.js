@@ -363,8 +363,8 @@ async function verbraucheRcTicket(rcTicketHash) {
  * v3.0 Phase 1 (+Phase 3): Legt die bereits angekommenen Live-Profiltexte
  * ins Job-Dokument.
  *
- * Der Worker ruft das waehrend eines laufenden Mistral-Streams (Flag
- * `useLiveText`) mit `{ standard, beast }`, der job-status-Handler gibt die
+ * Der Worker ruft das waehrend jedes laufenden Mistral-Streams mit
+ * `{ standard, beast }` auf (fest seit 10.09.2026), der job-status-Handler gibt die
  * Felder bei `processing` an den Client weiter. Die Feldnamen bleiben
  * abwaertskompatibel: `liveText` traegt weiter den Standard-Text, der
  * Beast-Text kommt ZUSAETZLICH als `liveTextBeast` dazu; `liveTextStand`
@@ -550,7 +550,6 @@ async function deleteJob(jobId) {
 
 module.exports = {
   platzBestaetigen,
-  JOBS_COLLECTION,
   createJob,
   getJob,
   claimJob,

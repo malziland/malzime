@@ -97,8 +97,11 @@ ZEILEN_GRENZEN = {
     "functions/src/mistral-antwort.js": 340,
     # Die Live-Anzeige im Browser. Noch nicht angefasst.
     "public/js/live-anzeige.js": 1370,
-    # Der Netzzugriff des Frontends.
-    "public/js/api.js": 1080,
+    # Der Netzzugriff des Frontends. 10.09.2026: Wake-Lock und
+    # Auftragsgedaechtnis ausgelagert (js/wake-lock.js, js/auftrag-speicher.js),
+    # 1079 -> 952 Zeilen; die Grenze sinkt mit, sonst waechst die Datei
+    # unbemerkt zurueck.
+    "public/js/api.js": 1000,
     "public/js/render.js": 830,
     "functions/src/counter.js": 790,
     "functions/src/jobs.js": 770,

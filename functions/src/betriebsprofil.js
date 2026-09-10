@@ -87,8 +87,8 @@ const FELDER = {
      uebertragen; er beschreibt also nicht bloss, er STELLT.
 
      Rechnung: Mistral-Limit (Aufrufe/s) geteilt durch 2, weil jede Analyse
-     zwei Aufrufe macht (Analyse + Beast-Werbung). Bei Stufe T1 mit 0,25/s
-     ergibt das 0,125.
+     zwei Aufrufe macht (Analyse + Beast-Werbung), dazu Abstand zur Grenze.
+     Heutiger Wert und Begruendung: produktiv-satz.js.
 
      OBERGRENZE 5: Darueber liegt keine Mistral-Stufe, die wir haben koennten;
      ein Tippfehler wuerde sonst Kosten und Fehler erzeugen, bevor jemand
@@ -389,6 +389,5 @@ module.exports = {
   _pruefe: pruefe,
   _felderLesen: felderLesen,
   _cacheLeeren,
-  _DOKUMENT: DOKUMENT,
   _FELDER: FELDER,
 };

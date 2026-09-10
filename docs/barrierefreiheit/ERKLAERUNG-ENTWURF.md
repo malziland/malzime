@@ -1,9 +1,8 @@
 # ENTWURF — Barrierefreiheitserklärung
 
-> **Nichts davon ist veröffentlicht.** Dieser Entwurf liegt zum Lesen und Freigeben.
-> Er geht erst live, wenn Christoph ihn Satz für Satz freigegeben hat. Vorgesehener
-> Ort wäre eine eigene Seite `/barrierefreiheit`, verlinkt in der Fußzeile neben
-> Impressum, Datenschutz und Nutzungsbedingungen.
+> **Inzwischen veröffentlicht** unter `/barrierefreiheit` (`public/barrierefreiheit.html`,
+> englisch `/en/accessibility`), verlinkt in der Fußzeile. Maßgeblich ist die Seite;
+> dieser Entwurf ist der Stand vor der Freigabe und wird nicht weiter gepflegt.
 >
 > **Zwei Stellen sind noch offen** und im Text mit `⟨…⟩` markiert: die
 > Konformitätsaussage und das Datum — beide hängen am VoiceOver-Durchgang.

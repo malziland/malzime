@@ -420,7 +420,7 @@ for SN in $SECRET_NAMEN; do
   if [ "${VERSIONEN:-0}" -ge 1 ]; then
     gruen "Secret $SN: $VERSIONEN aktive Version(en)"
   else
-    rot "Secret $SN: KEINE aktive Version — Functions starten ohne Schlüssel (scripts/geheimnisse-eu-kopieren.sh ausführen)"
+    rot "Secret $SN: KEINE aktive Version — Functions starten ohne Schlüssel (neue Version: gcloud secrets versions add $SN --data-file=- --project=$PROJECT)"
   fi
 done
 

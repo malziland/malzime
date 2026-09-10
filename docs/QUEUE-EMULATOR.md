@@ -40,11 +40,11 @@ un-getrackt — einmalig anlegen per `cp functions/.env.local.example functions/
 - **Storage** läuft über ein Temp-Verzeichnis statt über den GCS-Bucket.
 - Die Warteschlange ist der einzige Weg — der Emulator dient ja gerade
   dem Queue-Test.
-- **Der Live-Text ist standardmaessig AUS.** `QUEUE_LOCAL_LIVE=1` in
-  `functions/.env.local` schaltet ihn ein: Live-Text und die Merkmale, die
-  sich waehrend der Analyse scharfstellen. Die Attrappe stellt den
-  Datenstrom dann nach — Profiltext zuerst, danach die Karten
-  einzeln, im selben Zeitverhaeltnis wie im Betrieb.
+- **Der Live-Text laeuft immer mit** (fest eingebaut seit 10.09.2026;
+  `QUEUE_LOCAL_LIVE` gibt es nicht mehr). Die Attrappe stellt den Datenstrom
+  nach — Profiltext zuerst, danach die Karten einzeln, im selben
+  Zeitverhaeltnis wie im Betrieb. Mit `MISTRAL_MOCK_DELAY_MS=0` laeuft er ohne
+  jede Wartezeit (Unit-Tests).
 - **`MISTRAL_MOCK_DELAY_MS` ist die Dauer je PROFIL**, nicht je Schritt. Bei
   33000 dauert ein Durchlauf rund 67 Sekunden — die real gemessene Laufzeit
   (Stand 29.08.2026). Frueher stand hier eine Zeit je Karte; als die Attrappe

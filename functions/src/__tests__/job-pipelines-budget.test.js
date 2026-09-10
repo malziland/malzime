@@ -8,9 +8,10 @@
  * Fassung liefert denselben Wert wie die richtige. Gemessen wurde also, dass
  * das Budget aus dem Satz kommt — nicht, dass es vergeht.
  *
- * Was daran haengt: Beim Drei-Aufruf-Weg bekommt jeder Aufruf das RESTbudget.
- * Schrumpft es nicht, darf der zweite Aufruf noch einmal die volle Zeit
- * verbrauchen — die Zeitgrenze des Durchlaufs waere wirkungslos. Genau diese
+ * Was daran haengt: Der Analyse-Aufruf, seine Nachforderung fehlender Karten
+ * und jede Wiederholung bekommen das RESTbudget. Schrumpft es nicht, darf ein
+ * spaeterer Versuch noch einmal die volle Zeit verbrauchen — die Zeitgrenze
+ * des Durchlaufs waere wirkungslos. Genau diese
  * Klasse von Fehler hat der Betriebsvorfall vom 28.08.2026 sichtbar gemacht.
  *
  * BEFUND (Runde 7, L-16): job-pipelines.js hatte ueberhaupt keine eigene

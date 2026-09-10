@@ -1,5 +1,4 @@
 const { getStats, getMaintenanceStatus, leseRealitaetsCheck } = require("./counter");
-const { isSprachumschalterEnabled } = require("./feature-flags");
 const { geltendeWerte } = require("./betriebsprofil");
 
 async function handleStats(req, res) {
@@ -7,24 +6,16 @@ async function handleStats(req, res) {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
-  /* ÜBERGANG (v2.10): `useQueue: true` steht hier nur noch fuer Besucher mit
-     einer alten, zwischengespeicherten Seite. Deren Code prueft das Feld und
-     wuerde ohne es auf den synchronen Weg fallen, den es nicht mehr gibt.
-     Kann ein paar Wochen nach dem Umstieg ersatzlos weg.
-     Frueherer Kommentar: das Frontend holt die Antwort ohnehin
-     beim Seitenstart und entscheidet damit zwischen Queue- und Sync-Pfad. */
-  const [data, maintenance, realitaetsCheck, sprachumschalter, betrieb] = await Promise.all([
+  /* ENTFERNT 10.09.2026: `useQueue: true` (Uebergang fuer Seiten vor v2.10)
+     und `sprachumschalter` (der DE/EN-Umschalter ist fest eingebaut und haengt
+     nicht mehr an dieser Antwort). */
+  const [data, maintenance, realitaetsCheck, betrieb] = await Promise.all([
     getStats(),
     getMaintenanceStatus(),
     /* Realitäts-Check (v3.1): anonymer Gesamtzähler fuer den Vergleichs-
        balken — { eingaben, mittelProzent }; mittelProzent ist null, solange
        es keine Eingaben gibt. */
     leseRealitaetsCheck(),
-    /* v3.3: Merkmals-Schloss fuer den DE/EN-Umschalter. Das Frontend holt
-       diese Antwort ohnehin beim Seitenstart; ein eigener Endpunkt waere ein
-       zusaetzlicher Netzweg fuer ein einziges Ja/Nein. Faellt der Aufruf aus,
-       gilt `false` — dann entsteht das Bedienelement gar nicht. */
-    isSprachumschalterEnabled().catch(() => false),
     /* Geltende Betriebswerte. Zwei Gruende, sie hier mitzuliefern:
 
        1. GEDULD DES BROWSERS. Die Wartewerte im Browser muessen laenger sein
@@ -54,7 +45,7 @@ async function handleStats(req, res) {
         analyseZeitgrenzeMs: betrieb.werte.singleLargeTimeoutMs,
       }
     : undefined;
-  res.json({ ...data, maintenance, realitaetsCheck, useQueue: true, sprachumschalter, betrieb: betriebswerte });
+  res.json({ ...data, maintenance, realitaetsCheck, betrieb: betriebswerte });
 }
 
 module.exports = { handleStats };

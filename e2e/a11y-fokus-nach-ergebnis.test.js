@@ -54,7 +54,6 @@ async function bisZumErgebnis(page) {
       body: JSON.stringify({
         current: { count: 1, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 1, week: 1, month: 1, total: 1 },
-        useQueue: true,
       }),
     })
   );

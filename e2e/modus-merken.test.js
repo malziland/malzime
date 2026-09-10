@@ -45,7 +45,6 @@ async function seiteMitMocks(page) {
       body: JSON.stringify({
         current: { count: 0, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 0, week: 0, month: 0, year: 0, allTime: 0 },
-        useQueue: true,
       }),
     })
   );

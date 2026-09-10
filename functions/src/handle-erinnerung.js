@@ -166,4 +166,4 @@ async function schreibeLebenszeichen(erfolg = false) {
   }
 }
 
-module.exports = { pruefeZusagen, baueMeldung, schreibeLebenszeichen, LEBENSZEICHEN_DOC };
+module.exports = { pruefeZusagen, baueMeldung, LEBENSZEICHEN_DOC };

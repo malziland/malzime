@@ -39,6 +39,10 @@ describe("Demo-Klick vor dem Ende der Uebersetzung (07.09.2026)", () => {
 
   beforeEach(() => {
     vi.resetModules();
+    /* resetModules laedt die Module neu, die Attrappen oben bleiben aber
+       dieselben — ohne Zuruecksetzen zaehlte klangAktivieren die Klicks der
+       vorigen Tests mit, und der erste Test war nur in dieser Reihenfolge gruen. */
+    vi.clearAllMocks();
     setupDOM();
     fetchSpion = vi.fn(async () => ({ blob: async () => new Blob([new Uint8Array([0xff, 0xd8])]) }));
     globalThis.fetch = fetchSpion;

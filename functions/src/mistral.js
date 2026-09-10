@@ -200,7 +200,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   /* v2.5: Cache-Schluessel pro Sprache — de und en haben verschiedene Prompts
      und damit verschiedene Praefixe. Ein gemeinsamer Key wuerde die Trefferquote
      nur verwaessern. Konstant, ohne Nutzerbezug (siehe callMistralRawUnthrottled). */
-  const cacheKey = opts.usePromptCache ? `malzime-single-large-${lang || "de"}` : null;
+  const cacheKey = `malzime-single-large-${lang || "de"}`;
 
   /* v2.5: Nachrichten-Aufbau haengt vom Caching ab — MESSERGEBNIS, nicht Theorie:
        ohne Cache: user[ text, bild ]        (Struktur bis v2.4, unveraendert)
@@ -214,8 +214,8 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
          also nicht umgehbar, blosses Auftrennen genuegt nicht.
      Qualitaetsgegenprobe (3 Demo-Bilder, volle Analysen, beide Strukturen):
      identische hard_facts, 0 fehlende Karten, gleiche Ausgabelaenge.
-     Die alte Struktur bleibt der Pfad bei ausgeschaltetem Flag — damit ist der
-     Rueckfall bitgenau der Stand vor v2.5. */
+     Seit 10.09.2026 ist das der einzige Aufbau; bis dahin liess ein Flag den
+     alten (ohne Cache) zu. */
   /* v2.7: Marken-Sperre gegen Wiederholung. Sie sitzt bewusst HINTER dem Bild
      in der user-Message — dort war ohnehin nie Cache, die Rotation kostet also
      KEINEN Treffer. Waere sie im system-Teil, wechselte der statische Anfang
@@ -223,27 +223,16 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      oben). Statisch oben, dynamisch unten. */
   const blocklistBlock = buildBrandBlocklistBlock(lang, opts.blocklistIndex);
 
-  const messages = cacheKey
-    ? [
-        { role: "system", content: prompts.singleLargePrompt },
-        {
-          role: "user",
-          content: [
-            { type: "image_url", image_url: dataUrl },
-            { type: "text", text: blocklistBlock },
-          ],
-        },
-      ]
-    : [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompts.singleLargePrompt },
-            { type: "image_url", image_url: dataUrl },
-            { type: "text", text: blocklistBlock },
-          ],
-        },
-      ];
+  const messages = [
+    { role: "system", content: prompts.singleLargePrompt },
+    {
+      role: "user",
+      content: [
+        { type: "image_url", image_url: dataUrl },
+        { type: "text", text: blocklistBlock },
+      ],
+    },
+  ];
 
   /* v3.0 Phase 1: Live-Text-Callback — optional von aussen (Worker) gesetzt.
      Er laeuft NUR im ersten Versuch mit: Ein Retry findet ausschliesslich
@@ -280,27 +269,16 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     /* Die Marken-Sperre gilt auch im Retry — sonst duerfte das Modell im
        zweiten Anlauf wieder auf die verbrauchten Marken zurueckfallen.
        Bleibt im dynamischen Teil, der statische Anfang ist bitgleich. */
-    const retryMessages = cacheKey
-      ? [
-          { role: "system", content: prompts.singleLargePrompt },
-          {
-            role: "user",
-            content: [
-              { type: "image_url", image_url: dataUrl },
-              { type: "text", text: blocklistBlock + hint },
-            ],
-          },
-        ]
-      : [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompts.singleLargePrompt + hint },
-              { type: "image_url", image_url: dataUrl },
-              { type: "text", text: blocklistBlock },
-            ],
-          },
-        ];
+    const retryMessages = [
+      { role: "system", content: prompts.singleLargePrompt },
+      {
+        role: "user",
+        content: [
+          { type: "image_url", image_url: dataUrl },
+          { type: "text", text: blocklistBlock + hint },
+        ],
+      },
+    ];
     try {
       /* Gleicher cacheKey wie im ersten Versuch — der statische Anfang ist in
          beiden Versuchen bitgleich, der Cache traegt also auch den Retry. */
@@ -445,8 +423,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
    Der Aufruf ist klein (~870 Tokens) und laeuft auf demselben Modell wie die
    Analyse. Faellt er aus, bleibt die Werbung aus dem Hauptaufruf stehen — eine
    Analyse darf daran NIE scheitern. */
-async function generateBeastAds(boostProfile, standardAds, lang, opts = {}) {
-  const cachenErlaubt = opts.usePromptCache !== false;
+async function generateBeastAds(boostProfile, standardAds, lang) {
   if (!boostProfile || !boostProfile.categories) return null;
   const prompts = loadPrompts(lang || "de");
   if (typeof prompts.beastAdsSystem !== "string" || typeof prompts.beastAdsUser !== "function") return null;
@@ -480,11 +457,9 @@ async function generateBeastAds(boostProfile, standardAds, lang, opts = {}) {
       temperature: 0.5,
       forceJSON: true,
       timeoutMs: 30_000,
-      /* Der Cache-Schluessel wird nur gesetzt, wenn das Flag es erlaubt —
-         sonst behauptete RUNBOOK-Hebel 3b faelschlich, nach dem Umlegen werde
-         "weder ein prompt_cache_key gesendet noch der Nachrichten-Aufbau
-         umgestellt" (Audit OPS-008). */
-      cacheKey: cachenErlaubt ? `malzime-beast-ads-${lang || "de"}` : null,
+      /* Konstanter Cache-Schluessel je Sprache, ohne Nutzerbezug (fest seit
+         10.09.2026; vorher per Flag abschaltbar, Audit OPS-008). */
+      cacheKey: `malzime-beast-ads-${lang || "de"}`,
     });
     const parsed = parseSafely(result.text, { requireSchema: false });
     const ads = Array.isArray(parsed?.ad_targeting)

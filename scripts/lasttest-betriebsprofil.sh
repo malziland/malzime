@@ -138,7 +138,7 @@ status_holen() {
 VORHER=$(status_holen)
 ETA_VORHER=$(echo "$VORHER" | grep -o '"etaSeconds":[0-9]*' | cut -d: -f2)
 POS_VORHER=$(echo "$VORHER" | grep -o '"position":[0-9]*' | cut -d: -f2)
-echo "   mit t1-normal (parallelitaet 7):  Position ${POS_VORHER:-?}, Wartezeit ${ETA_VORHER:-keine} s"
+echo "   mit t1-normal:                    Position ${POS_VORHER:-?}, Wartezeit ${ETA_VORHER:-keine} s"
 
 FIRESTORE_EMULATOR_HOST="$EMU_FIRESTORE" GCLOUD_PROJECT="$PROJEKT" \
   node "$(pwd)/scripts/lasttest-umstellen.js" t2-schnell || exit 1

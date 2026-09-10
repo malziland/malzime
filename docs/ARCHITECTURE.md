@@ -164,8 +164,23 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call) |
-| `js/api.js` | API-Client: Einreihen, Statusabfrage, Wiederaufnahme — mit AbortController + Stale-Guard |
+| `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Status abfragen, Ergebnis zustellen, Wiederaufnahme nach Neuladen — mit AbortController + Stale-Guard |
+| `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
+| `js/auftrag-speicher.js` | Auftragsgedächtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, 15-Minuten-Frist für ein zugestelltes Ergebnis |
+| `js/wake-lock.js` | Bildschirm während der Analyse wach halten (Best-Effort) und den Stand für die Telemetrie melden |
+| `js/rc-ticket.js` | Einmal-Ticket des Realitäts-Checks (sessionStorage), eigenes Modul gegen einen Import-Kreis |
 | `js/render.js` | Profile-Rendering, Bias-Toggle, Privacy-Cards, Karte |
+| `js/live-anzeige.js` | Live-Karte während der Analyse: getippter Zusammenfassungstext, ankommende Ergebnis-Boxen |
+| `js/klang.js` | Die zwei Klänge des Live-Erlebnisses (Web Audio, im Browser erzeugt) |
+| `js/beast-lockruf.js` | Einmaliger Hinweis auf den Beast-Umschalter, wenn das Profil fertig dasteht |
+| `js/sticky-toggle.js` | Umschalter bleibt nach dem Ergebnis oben stehen, Leseposition beim Moduswechsel halten |
+| `js/modus-speicher.js` | Modus-Wahl (seriös / Beast) über ein Neuladen hinweg merken |
+| `js/realitaets-check.js` | Realitäts-Check: anonyme Selbsteinschätzung, wie gut die KI getroffen hat |
+| `js/sprachumschalter.js` | DE/EN-Umschalter samt Rückfragen; startet eine laufende Analyse in der neuen Sprache neu |
+| `js/heic.js` | HEIC-Fotos im Browser öffnen, wenn der Browser es nicht selbst kann (Dekoder nur bei Bedarf geladen) |
+| `js/absturz-wache.js` | Erkennt eine Neustart-Schleife der Seite, meldet sie einmal und bricht sie ab |
+| `js/druck-wache.js` | Meldet eine leer gebliebene Seite nach dem Druckdialog (Diagnose) |
+| `js/echtheit-pruefen.js` | Rechnet die Prüfsummen aus `build-info.json` im Browser nach (Echtheits-Nachweis) |
 | `js/ui.js` | Maintenance-Modal, Limit-Banner, Scan-Animation, Warteschlangen-Anzeige |
 | `js/state.js` | Globaler State (`requestId`, `isAnalyzing`) |
 | `js/i18n.js` | i18n Micro-Modul (`initI18n`, `t`, `applyTranslations`) |
@@ -194,7 +209,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `jobs.js` | Queue: Job-Lebenszyklus + Firestore-Zugriff auf die `jobs`-Collection |
 | `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
-| `feature-flags.js` | Laufzeit-Feature-Flags (u. a. `usePromptCache`, `useLiveText`, `useBeastAdsCall`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
+| `feature-flags.js` | Laufzeit-Feature-Flags (`useBeastAdsCall`, `useGemesseneDauer`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
 | `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
 | `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile; ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
@@ -209,6 +224,18 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `notify.js` | ntfy-Push bei Limit-Erreichung |
 | `domains.js` | Zentrale CORS-Whitelist |
 | `i18n.js` | Backend-Locale-Loader |
+| `mistral-http.js` | Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Überlast, Antwort als Strom |
+| `mistral-antwort.js` | Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung (`escapeXml`) |
+| `mistral-mock.js` | Mistral-Attrappe für Unit-Tests und Emulator (`MISTRAL_MOCK=1`) |
+| `job-helfer.js` | Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung) |
+| `minor-safety.js` | Kinderschutz-Filter für Werbekategorien bei erkennbar Minderjährigen |
+| `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Prüfung, Cache, Rückfall |
+| `produktiv-satz.js` | Betriebswerte für den echten Betrieb — Quelle für `config/betriebsprofil` |
+| `test-satz.js` | Einstellungssatz für die Tests |
+| `durchsatz.js` | Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze) |
+| `kapazitaets-wache.js` | Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen |
+| `laufzeit-wache.js` | Meldet, wenn Analysen an ihre Zeitgrenze stoßen |
+| `db.js` | Firestore-Zugang (benannte Datenbank `malzime-eu`) |
 
 ## Externe Abhängigkeiten
 

@@ -39,7 +39,7 @@ function werteAusDoku() {
   const text = fs.readFileSync(DOKU, "utf8");
   const treffer = {};
   for (const zeile of text.split("\n")) {
-    /* Auch Dezimalzahlen: queueRatePerSekunde ist 0.125, keine ganze Zahl.
+    /* Auch Dezimalzahlen: queueRatePerSekunde ist keine ganze Zahl.
        Mit dem alten Muster wurde die Zeile gar nicht erst gefunden — und ein
        nicht gefundenes Feld faellt nur auf, weil die Messmittel-Probe oben
        die ANZAHL prueft. */

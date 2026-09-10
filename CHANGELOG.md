@@ -66,7 +66,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   lückenhafte Dateilisten in README und ARCHITECTURE (in der Modultabelle der
   Webseite fehlte die Hälfte der Module), der falsch angegebene Rückfallwert
   von `useGemesseneDauer` in FLAGS.md, ein überholter Hinweis im
-  Prüfstand-Stempel und ein veralteter Zeilenverweis in einem Browser-Test.
+  Prüfstand-Stempel, ein veralteter Zeilenverweis in einem Browser-Test und
+  ein Widerspruch im RUNBOOK: Dort hieß es, die Beast-Werbung brauche keinen
+  Notfall-Hebel, obwohl es den Notausschalter `useBeastAdsCall` gibt.
 
 ## [4.9.0] — 2026-09-10
 

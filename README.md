@@ -43,8 +43,8 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 public/                     Firebase Hosting (SPA, kein Build-Schritt)
   index.html                Hauptseite
   app.js                    Entry Point (ES Module)
-  js/                       Frontend-Module (api, client-context, demo, dom, error-logger, exif, geocoding, i18n, render, state, stats, telemetry-logger, ui)
-  locales/                  Frontend-Locale-Dateien (de.json, manifest.json)
+  js/                       Frontend-Module (Liste und Aufgaben: docs/ARCHITECTURE.md, Abschnitt Frontend)
+  locales/                  Frontend-Locale-Dateien (de.json, en.json, manifest.json)
   styles.css                malziland Design System (Hell/Dunkel via Beast-Mode-Kopplung) + Print Styles
   __tests__/                Vitest Frontend-Tests
   impressum.html            Impressum

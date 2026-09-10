@@ -9,10 +9,11 @@
  *
  *   1. Die Wartezeit-Ansage ("noch etwa 8 Minuten") war um mehr als die Haelfte
  *      zu optimistisch.
- *   2. `MAX_QUEUE_DEPTH` wird aus ihr BERECHNET: Mit 65 s ergeben sich 155
- *      Plaetze, bei real 150 s sind in derselben halben Stunde nur 67 zu
- *      schaffen. Wer dahinter einreiht, wartet garantiert umsonst und sieht am
- *      Ende einen Fehler.
+ *   2. Die Einlassgrenze (damals `MAX_QUEUE_DEPTH`, heute
+ *      `warteschlangeTiefe` im Einstellungssatz) wurde aus ihr BERECHNET: Mit
+ *      65 s ergaben sich 155 Plaetze, bei real 150 s waren in derselben halben
+ *      Stunde nur 67 zu schaffen. Wer dahinter einreihte, wartete garantiert
+ *      umsonst und sah am Ende einen Fehler.
  *
  * Die Lehre aus dem Vorfall vom 28.08. lautet: Eine gemessene Eigenschaft der
  * Aussenwelt darf nicht als feste Zahl im Code einfrieren. Also wird sie hier

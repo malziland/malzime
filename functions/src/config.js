@@ -282,7 +282,7 @@ function localQueueConcurrency() {
                     auch die Functions und der Foto-Bucket liegen)
 
    ═══ UMSCHALTEN ═══
-   Diesen einen Wert ändern, dann `firebase deploy --only functions`.
+   Diesen einen Wert ändern, dann über `scripts/deploy.sh` ausliefern.
    Zurück geht es genauso — der Wert ist der gesamte Hebel.
    Ablauf, Kontrollen und Rückweg: docs/RUNBOOK.md, Abschnitt „Firestore-Umzug".
 

@@ -212,6 +212,8 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `feature-flags.js` | Laufzeit-Feature-Flags (`useBeastAdsCall`, `useGemesseneDauer`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
 | `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
 | `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile; ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
+| `job-pipelines.js` | Der Analyseweg eines Auftrags (`runPipeline`): ein Aufruf an Mistral Large liefert Beschreibung und beide Profile, danach die Beast-Werbung |
+| `ueberlast.js` | Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504) |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
 | ~~`heartbeat.js`~~ | Entfernt mit dem Audit 2026-08-10 — hatte seit v2.10 keinen Aufrufer mehr (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |

@@ -5,7 +5,7 @@
  *
  *   - runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts)
  *       → { normal, boost, subject, visibleText }
- *   - generateBeastAds(boostProfile, standardAds, lang, opts) → Liste | null
+ *   - generateBeastAds(boostProfile, standardAds, lang) → Liste | null
  *
  * Architektur: EIN Aufruf an Mistral Large (mistral-large-2512, multimodal)
  * liefert Bildbeschreibung und beide Profile; ein zweiter, kleiner Aufruf ohne

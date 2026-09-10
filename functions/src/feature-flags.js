@@ -60,9 +60,10 @@ async function getFeatureFlags() {
          bisher gab es keinen Weg, ihn ohne Deploy stillzulegen. */
       useBeastAdsCall: data.useBeastAdsCall !== false,
       /* FEATURE-2026-08-29-02: Wartezeit und Einlassgrenze aus der gemessenen
-         Dauer statt aus QUEUE_AVG_JOB_SECONDS. Fehlt das Feld, ist die Messung
-         AN — sie ist die richtigere Rechnung, und ihr schlechtester Fall ist
-         der bisherige Code-Wert. Ausschalten ist der Notweg, nicht der
+         Dauer statt aus dem festen Wert `durchschnittsdauerSekunden` im
+         Einstellungssatz (bis August 2026 die Konstante QUEUE_AVG_JOB_SECONDS).
+         Fehlt das Feld, ist die Messung AN — sie ist die richtigere Rechnung,
+         und ihr schlechtester Fall ist der feste Satzwert. Ausschalten ist der Notweg, nicht der
          Normalfall. */
       useGemesseneDauer: data.useGemesseneDauer !== false,
     };

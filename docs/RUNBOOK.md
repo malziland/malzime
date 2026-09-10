@@ -34,8 +34,7 @@ deploy.sh ging durch).
   Nachsehen: `./scripts/warteschlange-pruefen.sh`.
 - **Limits:** Stundenlimit und IP-Rate-Limit stehen im Einstellungssatz
   (`config/betriebsprofil`, siehe [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md)) —
-  hier bewusst ohne Zahl, damit sie nach einer Umstellung nicht falsch ist
-  500 Requests / 10 min pro Instanz.
+  hier bewusst ohne Zahl, damit sie nach einer Umstellung nicht falsch ist.
 - **Lastprofil:** Workshops sind Stoßlast (Mo–Fr vormittags); genau dafür ist die
   Queue da. Mistral-Latenz schwankt mit Tageszeit/Wochentag — Messungen immer im
   repräsentativen Zeitfenster bewerten.
@@ -315,8 +314,9 @@ Erwartet: keine Zeile.
 
 ## Rollback-Hebel
 
-Vom schnellsten zum gründlichsten. Alle Flag-Hebel wirken **ohne Deploy** binnen
-~30 Sekunden (Cache-TTL der Flags).
+Vom schnellsten zum gründlichsten. Der einzige verbliebene Schalter-Hebel ist
+`useBeastAdsCall` (3a); er wirkt **ohne Deploy** binnen ~30 Sekunden (Cache-TTL
+der Flags).
 
 > **Seit 09.09.2026 (4.8.0):** Die Functions lesen ausschließlich die Geheimnisse mit
 > Endung `_EU` (europe-west1). Die alten Namen ohne Endung sind gelöscht. Ein Rollback
@@ -387,7 +387,11 @@ Störung ist der Wartungsmodus (Hebel 1).
 Seit v2.8 erzeugt ein zweiter, kleiner Mistral-Aufruf die Beast-Werbung — ohne
 Bild, damit sie an der Schwachstelle ansetzt statt am Foto. Er ist so gebaut,
 dass ein Ausfall folgenlos bleibt: Schlägt er fehl, steht die Werbeliste aus dem
-Hauptaufruf. **Ein eigener Notfall-Hebel ist deshalb nicht nötig.**
+Hauptaufruf. Stilllegen lässt er sich trotzdem ohne Deploy — gebraucht, wenn
+die Anfragen pro Minute knapp werden, denn er verdoppelt sie: in
+`featureFlags/current` das Feld `useBeastAdsCall` auf `false` setzen (wirkt
+binnen ~30 s, Näheres in [FLAGS.md](FLAGS.md)). Zurück: Feld löschen oder auf
+`true` setzen.
 
 Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback): `parallelitaet`
 und `queueRatePerSekunde` im Einstellungssatz neu rechnen — vorher ins
@@ -685,6 +689,19 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 > neuesten Stand innerhalb ihrer Bereiche — im Backend zuletzt bis hin zu
 > `firebase-functions` 7.3.2 und damit Express 4 → 5. Das gehört in einen
 > eigenen, bewusst freigegebenen Schritt.
+
+## Handwerkzeuge (nur von Hand, laufen nie automatisch)
+
+- `node scripts/vorschau.mjs [port]` — lokale Vorschau, die die Umleitungen aus
+  `firebase.json` nachbildet (saubere Adressen wie `/impressum`); Vorgabe-Port 8099.
+- `sh scripts/simulator-szenarien.sh` — Workshop-Lagen im Emulator mit
+  Mistral-Attrappe: ganze Klasse gleichzeitig, volle Warteliste, Umstellung des
+  Einstellungssatzes, während Leute warten. Kostet nichts; Voraussetzung und
+  Start des Emulators stehen im Kopf des Skripts.
+- `sh scripts/lasttest-live.sh <anzahl>` — echte Analysen gegen die Produktion.
+  **Kostet Geld**, zählt dauerhaft in der öffentlichen Statistik mit und
+  verbraucht das Stundenlimit. Nur mit Freigabe; nach einem Deploy genügt
+  `sh scripts/lasttest-live.sh 1` als Beweis, dass eine echte Analyse durchläuft.
 
 ## Logs und Aufbewahrung
 

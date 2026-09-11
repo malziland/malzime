@@ -59,12 +59,13 @@ function calcRetrySeconds(recent, limit, now, windowMs) {
    dasselbe wirksame Limit inklusive Boost (wirksamesLimit). Es schreibt
    nichts und scheitert deshalb nicht an derselben Ursache.
 
-   GRENZE: Der eigene Zeitstempel fehlt im gelesenen Stand, wenn die
-   Transaktion nach dem Zeitlimit nicht mehr schrieb — Untererfassung eins
-   je Netz-Fall, kumulativ ueber eine Andrangswelle (docs/SECURITY-MODEL.md,
-   Restrisiko). Und weil nichts geschrieben wird, saehe jeder Aufruf
-   denselben Stand: "Limit erreicht" (justReached, daran haengt die
-   Push-Nachricht mit dem Boost-Knopf) geht je Instanz hoechstens einmal je
+   GRENZE: Der eigene Eintrag fehlt im gelesenen Stand, bis die Transaktion
+   ihn doch noch schreibt oder der Worker ihn nachtraegt (GENAU EINMAL IM
+   FENSTER, unten). Waehrend einer Andrangswelle sieht das Netz also etwas zu
+   wenig; danach stimmt die Zahl (docs/SECURITY-MODEL.md, "Jeder eingelassene
+   Auftrag zaehlt genau einmal"). Und weil das Netz nichts schreibt, saehe
+   jeder Aufruf denselben Stand: "Limit erreicht" (justReached, daran haengt
+   die Push-Nachricht mit dem Boost-Knopf) geht je Instanz hoechstens einmal je
    NETZ_MELDEABSTAND_MS hinaus. Greift NUR, wenn der Zaehler ausgefallen ist.
    ══════════════════════════════════════════════════════════════════════ */
 /* BLEIBT IM CODE — Auswertungsregel der Meldung, keine Betriebsgroesse: Wie
@@ -126,6 +127,93 @@ function _netzMeldungZuruecksetzen() {
   netzZuletztGemeldet = 0;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   GENAU EINMAL IM FENSTER (11.09.2026)
+   ══════════════════════════════════════════════════════════════════════
+
+   BELEG (Lasttest 11.09.2026, 30 Auftraege gleichzeitig): Neunmal griff das
+   Netz nach dem Zeitlimit. Acht der haengenden Transaktionen schrieben ihren
+   Eintrag spaeter doch noch (bis 43 Sekunden danach), eine nie. Die
+   Statusseite zeigte 35 in der letzten Stunde bei 36 fertigen Analysen.
+
+   SEITHER hat jeder Einlass eine eigene MARKE (neuerZaehlerStempel), und sein
+   Eintrag im Fenster IST diese Marke. Faellt der Zaehler aus und laesst das
+   Netz ein, bekommt der Auftrag das Kennzeichen `zaehlerNachtrag`, und der
+   Worker traegt die Marke zu Beginn der Analyse nach (zaehlerNachtragen).
+   arrayUnion fuegt einen Wert, der schon im Feld steht, nicht ein zweites Mal
+   ein: Schreibt die alte Transaktion doch noch, bleibt es bei einem Eintrag.
+   Umgekehrt schaut die nachlaufende Transaktion nach, ob die Marke schon
+   drinsteht.
+
+   WARUM DER WORKER und nicht der Einlass selbst: Der Einlass antwortet nach
+   Sekunden, danach drosselt die Plattform die Instanz — was dann noch laeuft,
+   kommt vielleicht nie an (der eine von neun). Der Worker laeuft ohnehin rund
+   40 Sekunden; der Nachtrag laeuft neben der Analyse her und kostet keine
+   Wartezeit.
+
+   NACHLAUF: Eine Transaktion, deren Zeitlimit abgelaufen ist, traegt nur noch
+   ein, wenn ihr Auftrag eingelassen und nicht freigegeben wurde, und
+   hoechstens NACHLAUF_HOECHSTENS_MS nach dem Start. Eine gedrosselte Instanz
+   kann sie sonst Minuten spaeter fortsetzen — nach einer Freigabe in einem
+   anderen Prozess, von der dieser nichts weiss.
+
+   GRENZE: Eine Marke ist die Millisekunde plus ein Zufallsbruchteil; eine Zahl
+   dieser Groesse traegt rund 4000 verschiedene Bruchteile je Millisekunde.
+   Treffen zwei Netz-Faelle auf dieselbe Millisekunde UND denselben Bruchteil,
+   haelt der Nachtrag den zweiten fuer den ersten. Im Normalfall (die
+   Transaktion schreibt) spielt das keine Rolle.
+   ══════════════════════════════════════════════════════════════════════ */
+/* BLEIBT IM CODE — Riegel der Zaehllogik, keine Betriebsgroesse: Er muss
+   ueber dem laengsten gemessenen Nachlauf liegen (43 s, 11.09.2026) und klar
+   unter der Karenz, nach der ein wartender Auftrag als verlassen gilt
+   (livenessGnadenfristMs). Wer ihn verstellt, aendert nicht das Tempo,
+   sondern ob ein Auftrag doppelt zaehlen kann. */
+const NACHLAUF_HOECHSTENS_MS = 60 * 1000;
+/* Einlaesse, deren Zeitlimit abgelaufen ist und deren Transaktion noch nicht
+   zurueck ist (Marke → Zustand). Nur so erfaehrt ein spaeter Rueckruf in
+   DIESEM Prozess, dass sein Auftrag inzwischen freigegeben wurde. */
+const offeneNachlaeufe = new Map();
+
+function neuerZaehlerStempel() {
+  return Date.now() + Math.random();
+}
+
+function nachlaufMerken(stempel, lauf) {
+  /* Eine Transaktion, die nie zurueckkommt, darf die Liste nicht wachsen lassen. */
+  const grenze = Date.now() - NACHLAUF_HOECHSTENS_MS;
+  for (const [marke, alt] of offeneNachlaeufe) if (alt.start < grenze) offeneNachlaeufe.delete(marke);
+  offeneNachlaeufe.set(stempel, lauf);
+}
+
+/**
+ * Traegt die Marke eines eingelassenen Auftrags ins Stundenfenster nach, wenn
+ * der Zaehler beim Einlass ausgewichen war (GENAU EINMAL IM FENSTER, oben).
+ * Ohne Transaktion: arrayUnion liest nichts, wartet auf keine Lesesperre und
+ * traegt einen schon vorhandenen Wert nicht doppelt ein. Zwei Versuche; gibt
+ * `true` zurueck, wenn der Schreibvorgang ankam. Wirft nie.
+ */
+async function zaehlerNachtragen(stempel) {
+  if (typeof stempel !== "number" || !Number.isFinite(stempel)) return false;
+  let fehler = null;
+  for (let versuch = 0; versuch < 2; versuch++) {
+    try {
+      await datenbank()
+        .doc(CURRENT_DOC)
+        .set({ recentAnalyses: FieldValue.arrayUnion(stempel) }, { merge: true });
+      console.log(JSON.stringify({ step: "zaehler-nachtrag", status: "ok", versuch: versuch + 1 }));
+      return true;
+    } catch (f) {
+      fehler = f;
+      if (versuch === 0) await new Promise((r) => setTimeout(r, 500));
+    }
+  }
+  /* Dann fehlt dieser eine Auftrag im Fenster — genau der Fehler, den der
+     Nachtrag beheben soll. Darum laut, aber ohne Alarm: Die Kostenbremse haelt
+     weiter, nur die Zahl liegt um eins daneben. */
+  console.log(JSON.stringify({ step: "zaehler-nachtrag", warning: "fehlgeschlagen", error: fehler && fehler.message }));
+  return false;
+}
+
 async function checkAndIncrement() {
   /* Bei Andrang kollidieren Transaktionen am selben Dokument (ABORTED; das
      SDK wiederholt intern bis zu 5x). Darueber ZWEI eigene kurze Versuche —
@@ -163,6 +251,10 @@ async function checkAndIncrement() {
     );
     return { allowed: true, count: 0, limit: null, grund: "kein-einstellungssatz" };
   }
+  /* Die Marke dieses Einlasses und sein Zustand fuer eine Transaktion, die das
+     Zeitlimit ueberlebt (GENAU EINMAL IM FENSTER, oben). */
+  const stempel = neuerZaehlerStempel();
+  const lauf = { start: Date.now(), zeitlimit: false, verzichtet: false };
   for (let attempt = 0; attempt <= ABORTED_RETRIES; attempt++) {
     try {
       const db = datenbank();
@@ -172,93 +264,125 @@ async function checkAndIncrement() {
          75 % der Anfragen 54 Sekunden, weil Firestore selbst lange auf die
          Dokumentsperre wartet. Zwei Sekunden reichen fuer ein kleines
          Dokument; danach uebernimmt das Netz. */
-      const result = await Promise.race([
-        db.runTransaction(async (tx) => {
-          const snap = await tx.get(ref);
-          const data = snap.exists ? snap.data() : {};
+      let uhr = null;
+      const zeitlimit = new Promise((_, ab) => {
+        uhr = setTimeout(() => {
+          /* Ab jetzt entscheidet das Netz. Die Transaktion laeuft als Nachlauf
+             weiter und traegt nur noch unter Bedingungen ein. */
+          lauf.zeitlimit = true;
+          nachlaufMerken(stempel, lauf);
+          const f = new Error(`Zeitlimit ${ZAEHLER_ZEITLIMIT_MS} ms fuer den Stundenzaehler`);
+          /* KEIN code = 10: die Transaktion schreibt nach dem race weiter — als ABORTED zaehlte sie doppelt. */
+          f.zeitlimit = true;
+          ab(f);
+        }, ZAEHLER_ZEITLIMIT_MS);
+        if (typeof uhr.unref === "function") uhr.unref();
+      });
+      const transaktion = db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const data = snap.exists ? snap.data() : {};
 
-          /* Das Zeitfenster gehoert zum Limit — eine Zahl ohne ihren Bezugsraum
+        /* NACHLAUF: Das Zeitlimit ist abgelaufen, das Netz hat entschieden.
+             Wurde der Auftrag abgewiesen oder freigegeben, oder liegt der Start
+             laenger als NACHLAUF_HOECHSTENS_MS zurueck, traegt diese
+             Transaktion nichts mehr ein. Ein eingelassener Auftrag zaehlt dann
+             ueber den Nachtrag des Workers. */
+        if (lauf.zeitlimit && (lauf.verzichtet || Date.now() - lauf.start > NACHLAUF_HOECHSTENS_MS)) {
+          const verzicht = new Error("Nachlauf des Stundenzaehlers traegt nicht mehr ein");
+          verzicht.nachlaufVerzichtet = true;
+          throw verzicht;
+        }
+
+        /* Das Zeitfenster gehoert zum Limit — eine Zahl ohne ihren Bezugsraum
            ist keine Einstellung. Reihenfolge: Einstellungssatz, dann ein
            gesetzter Wert im Dokument, dann die Konstante. */
-          /* EINE QUELLE: Das Zeitfenster kommt aus dem Einstellungssatz. Der
+        /* EINE QUELLE: Das Zeitfenster kommt aus dem Einstellungssatz. Der
            Wert im Dokument stammt nur noch aus einem laufenden Boost. */
-          const wm = satzwerte.stundenfensterMinuten;
-          const windowMs = wm * 60 * 1000;
-          const now = Date.now();
+        const wm = satzwerte.stundenfensterMinuten;
+        const windowMs = wm * 60 * 1000;
+        const now = Date.now();
 
-          /* Rollendes Fenster: nur Analysen der letzten Stunde */
-          const recent = filterRecent(data.recentAnalyses, now, windowMs);
+        /* Rollendes Fenster: nur Analysen der letzten Stunde */
+        const recent = filterRecent(data.recentAnalyses, now, windowMs);
 
-          /* BIZ-2026-08-20-28: Ein abgelaufener Boost faellt hier zurueck — aber nur,
+        /* Hat der Worker die Marke schon nachgetragen, ist der Auftrag
+             gezaehlt. Gefragt wird nur im Nachlauf: Im Normalfall kann die
+             eigene Marke nicht drinstehen, und ein zufaellig gleicher Wert
+             eines anderen Auftrags wuerde diesen sonst verschlucken. */
+        if (lauf.zeitlimit && recent.includes(stempel)) {
+          return { allowed: true, retryAfterSeconds: 0, count: recent.length, limit: null, hourlyTotal: recent.length };
+        }
+
+        /* BIZ-2026-08-20-28: Ein abgelaufener Boost faellt hier zurueck — aber nur,
            wenn er gerade nicht gebraucht wird (siehe wirksamesLimit). Der
            Rueckfall wird gleich mitgeschrieben, damit /stats und der naechste
            Aufruf dasselbe sehen. */
-          const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length, satzwerte?.stundenlimit);
+        const { limit, verfallen: boostVerfallen } = wirksamesLimit(data, recent.length, satzwerte?.stundenlimit);
 
-          /* Limit erreicht → blockieren */
-          if (recent.length >= limit) {
-            const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
-            return {
-              allowed: false,
-              retryAfterSeconds,
-              count: recent.length,
-              limit,
-              hourlyTotal: recent.length,
-            };
-          }
-
-          /* Unter dem Limit → Analyse erlauben */
-          recent.push(now);
-          const justReached = recent.length === limit;
-
-          if (snap.exists) {
-            /* BIZ-2026-08-20-28: Ist der Boost verfallen, wird der Deckel in
-             derselben Transaktion zurueckgeschrieben — sonst wuerde er bei jedem
-             Aufruf neu "verfallen", ohne je im Dokument anzukommen, und /stats
-             zeigte weiter den erhoehten Wert. */
-            const aenderung = boostVerfallen
-              ? { recentAnalyses: recent, limit: satzwerte.stundenlimit, limitBis: null }
-              : { recentAnalyses: recent };
-            if (boostVerfallen) {
-              console.log(
-                JSON.stringify({
-                  step: "boost-verfallen",
-                  zurueckAuf: satzwerte.stundenlimit,
-                  imFenster: recent.length,
-                  hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
-                })
-              );
-            }
-            tx.update(ref, aenderung);
-          } else {
-            tx.set(ref, {
-              recentAnalyses: recent,
-              limit: satzwerte.stundenlimit,
-              windowMinutes: satzwerte.stundenfensterMinuten,
-            });
-          }
-
+        /* Limit erreicht → blockieren */
+        if (recent.length >= limit) {
+          const retryAfterSeconds = calcRetrySeconds(recent, limit, now, windowMs);
           return {
-            allowed: true,
-            retryAfterSeconds: 0,
+            allowed: false,
+            retryAfterSeconds,
             count: recent.length,
             limit,
             hourlyTotal: recent.length,
-            justReached,
           };
-        }),
-        new Promise((_, ab) => {
-          const uhr = setTimeout(() => {
-            const f = new Error(`Zeitlimit ${ZAEHLER_ZEITLIMIT_MS} ms fuer den Stundenzaehler`);
-            /* KEIN code = 10: die Transaktion schreibt nach dem race weiter — als ABORTED zaehlte sie doppelt. */
-            f.zeitlimit = true;
-            ab(f);
-          }, ZAEHLER_ZEITLIMIT_MS);
-          if (typeof uhr.unref === "function") uhr.unref();
-        }),
-      ]);
+        }
 
-      return result;
+        /* Unter dem Limit → Analyse erlauben */
+        /* Der Eintrag ist die Marke des Auftrags, nicht die Uhrzeit dieses
+             Durchlaufs — nur so finden Nachtrag und Freigabe genau ihn. */
+        recent.push(stempel);
+        const justReached = recent.length === limit;
+
+        if (snap.exists) {
+          /* BIZ-2026-08-20-28: Ist der Boost verfallen, wird der Deckel in
+             derselben Transaktion zurueckgeschrieben — sonst wuerde er bei jedem
+             Aufruf neu "verfallen", ohne je im Dokument anzukommen, und /stats
+             zeigte weiter den erhoehten Wert. */
+          const aenderung = boostVerfallen
+            ? { recentAnalyses: recent, limit: satzwerte.stundenlimit, limitBis: null }
+            : { recentAnalyses: recent };
+          if (boostVerfallen) {
+            console.log(
+              JSON.stringify({
+                step: "boost-verfallen",
+                zurueckAuf: satzwerte.stundenlimit,
+                imFenster: recent.length,
+                hinweis: "Der zeitlich befristete Boost ist abgelaufen und wurde gerade nicht gebraucht.",
+              })
+            );
+          }
+          tx.update(ref, aenderung);
+        } else {
+          tx.set(ref, {
+            recentAnalyses: recent,
+            limit: satzwerte.stundenlimit,
+            windowMinutes: satzwerte.stundenfensterMinuten,
+          });
+        }
+
+        return {
+          allowed: true,
+          retryAfterSeconds: 0,
+          count: recent.length,
+          limit,
+          hourlyTotal: recent.length,
+          justReached,
+        };
+      });
+      /* Wer das Rennen verliert, laeuft weiter. Ist er zurueck, braucht es die
+         Uhr nicht mehr, und der Nachlauf ist erledigt. */
+      const erledigt = () => {
+        clearTimeout(uhr);
+        offeneNachlaeufe.delete(stempel);
+      };
+      Promise.resolve(transaktion).then(erledigt, erledigt);
+      const result = await Promise.race([transaktion, zeitlimit]);
+
+      return { ...result, stempel };
     } catch (err) {
       lastErr = err;
       const isAborted = err.code === 10 || /ABORTED/i.test(err.message || "");
@@ -281,6 +405,8 @@ async function checkAndIncrement() {
       if (satzwerte) {
         const netz = await netzUeberZeitstempel(satzwerte);
         if (netz) {
+          /* Abgewiesen zaehlt nicht — auch nicht ueber einen spaeten Nachlauf. */
+          if (!netz.allowed) lauf.verzichtet = true;
           /* HINWEIS, kein Fehler: Die Bremse hat nur den zweiten Weg genommen.
              Die Ernstfaelle meldet netzUeberZeitstempel selbst
              ("notbremse-gegriffen", "notbremse-fehlgeschlagen"). */
@@ -294,19 +420,37 @@ async function checkAndIncrement() {
               entscheidung: netz.allowed ? "eingelassen" : "blockiert",
             })
           );
-          return { ...netz, error: err.message };
+          /* Eingelassen, aber nicht sicher gezaehlt: Der Worker traegt die Marke
+             nach (zaehlerNachtragen). */
+          return { ...netz, error: err.message, stempel, nachtragNoetig: netz.allowed };
         }
       }
 
       /* Erst wenn AUCH das Netz reisst: fail-open, damit ein Datenbankproblem
          den Workshop nicht stoppt. `limit: null` sagt ehrlich, dass hier keine
          Grenze bekannt ist — eine erfundene Zahl waere schlechter als keine. */
-      return { allowed: true, retryAfterSeconds: 0, count: -1, limit: null, error: err.message };
+      return {
+        allowed: true,
+        retryAfterSeconds: 0,
+        count: -1,
+        limit: null,
+        error: err.message,
+        stempel,
+        nachtragNoetig: true,
+      };
     }
   }
   /* Unerreichbar — der Loop kommt aus jedem Iteration entweder mit return
      oder via continue heraus. Sicherheitshalber fail-open. */
-  return { allowed: true, retryAfterSeconds: 0, count: -1, limit: null, error: lastErr && lastErr.message };
+  return {
+    allowed: true,
+    retryAfterSeconds: 0,
+    count: -1,
+    limit: null,
+    error: lastErr && lastErr.message,
+    stempel,
+    nachtragNoetig: true,
+  };
 }
 
 /**
@@ -611,11 +755,18 @@ async function resetCounter() {
  * abgebrochen werden (abandoned) oder gar nicht in die Queue kamen
  * (enqueue_failed), haben aber NIE eine echte Mistral-Analyse ausgelöst. Ohne
  * Freigabe würden solche „Phantom-Analysen" das globale Budget verbrauchen und
- * echte Nutzer früher als nötig aussperren. Entfernt den jüngsten
- * recentAnalyses-Eintrag in einer Transaktion. Fail-safe: bei Fehler passiert
+ * echte Nutzer früher als nötig aussperren. Fail-safe: bei Fehler passiert
  * nichts (das Limit bleibt dann konservativ — kostet nur etwas Verfügbarkeit).
+ *
+ * @param {number} [stempel] die Marke des Auftrags (`zaehlerStempel` im
+ *   Auftrag, `stempel` aus checkAndIncrement). Mit Marke fällt GENAU dieser
+ *   Eintrag; steht er nicht im Fenster, fällt keiner.
  */
-async function releaseHourlySlot() {
+async function releaseHourlySlot(stempel) {
+  const mitMarke = typeof stempel === "number" && Number.isFinite(stempel);
+  /* Laeuft die Transaktion dieses Einlasses in DIESEM Prozess noch, darf sie
+     nach der Freigabe nicht mehr eintragen. */
+  if (mitMarke && offeneNachlaeufe.has(stempel)) offeneNachlaeufe.get(stempel).verzichtet = true;
   try {
     const db = datenbank();
     const ref = db.doc(CURRENT_DOC);
@@ -625,21 +776,25 @@ async function releaseHourlySlot() {
       const arr = snap.data().recentAnalyses;
       if (!Array.isArray(arr) || arr.length === 0) return;
       const normalized = arr.map((ts) => (ts && ts.toMillis ? ts.toMillis() : ts));
-      /* BEKANNTE GRENZE (Pruefrunde 8, N-P3c): Entfernt wird der JUENGSTE
-         Eintrag, nicht der eigene. Geben zwei gescheiterte Jobs kurz
-         nacheinander frei, waehrend ein dritter gerade eingereiht hat, kann
-         der Slot des Dritten fallen statt der des Zweiten.
+      /* SEIT 11.09.2026 GENAU DER EIGENE EINTRAG (vorher Pruefrunde 8, N-P3c:
+         immer der juengste). Die Anzahl stimmte damit nur, solange jeder
+         eigene Eintrag da war. Im Netz-Fall ist er das nicht — dann nahm die
+         Freigabe einem anderen Auftrag den Platz, und die Stunde zaehlte einen
+         zu wenig. Die Kennung, die dafuer "durch die ganze Kette" noetig war,
+         gibt es jetzt: die Marke im Auftrag (GENAU EINMAL IM FENSTER).
 
-         Warum das trotzdem so bleibt: Die Transaktion serialisiert die
-         Zugriffe, es geht also kein Slot verloren und keiner entsteht doppelt
-         — nur die ZUORDNUNG kann daneben liegen. Fuer das Stundenlimit zaehlt
-         allein die Anzahl. Weder Pruefer noch Gegenpruefer konnten einen
-         Schaden reproduzieren; ein Umbau auf "genau meinen Eintrag" braeuchte
-         eine Kennung je Analyse durch die ganze Kette. Das ist mehr Risiko als
-         der Fehler, den es behebt. */
-      let maxIdx = 0;
-      for (let i = 1; i < normalized.length; i++) if (normalized[i] > normalized[maxIdx]) maxIdx = i;
-      normalized.splice(maxIdx, 1);
+         Auftraege von vor dem Umbau tragen keine Marke; fuer sie bleibt der
+         juengste Eintrag, bis sie nach spaetestens zwei Stunden verschwunden
+         sind. */
+      let idx;
+      if (mitMarke) {
+        idx = normalized.indexOf(stempel);
+        if (idx === -1) return;
+      } else {
+        idx = 0;
+        for (let i = 1; i < normalized.length; i++) if (normalized[i] > normalized[idx]) idx = i;
+      }
+      normalized.splice(idx, 1);
       tx.update(ref, { recentAnalyses: normalized });
     });
   } catch (err) {
@@ -762,6 +917,7 @@ module.exports = {
   boostLimit,
   resetCounter,
   releaseHourlySlot,
+  zaehlerNachtragen,
   getMaintenanceStatus,
   setMaintenanceMode,
   _clearMaintenanceCache,

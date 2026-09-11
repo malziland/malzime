@@ -100,6 +100,14 @@ describe("reapJobs", () => {
     expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(2);
   });
 
+  test("11.09.2026: ein verlassener Job gibt genau seinen eigenen Eintrag im Stundenfenster frei", async () => {
+    jobs.findAbandonedJobs.mockResolvedValue([
+      { id: "a1", imagePath: "queue-uploads/a1.jpg", zaehlerStempel: 1789000000000.5 },
+    ]);
+    await reapJobs();
+    expect(counter.releaseHourlySlot).toHaveBeenCalledWith(1789000000000.5);
+  });
+
   test("abandonJob verliert das Race (Job inzwischen geclaimt) → Bild bleibt, kein Slot zurück", async () => {
     jobs.findAbandonedJobs.mockResolvedValue([{ id: "a1", imagePath: "queue-uploads/a1.jpg" }]);
     jobs.abandonJob.mockResolvedValue(false);

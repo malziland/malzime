@@ -72,8 +72,10 @@ function jobsRef() {
  * @param {string} params.imagePath  Storage-Pfad des zwischengespeicherten Bildes
  * @param {object} [params.exif]     sanitisierte Kamera-Metadaten (make/model),
  *                                   die der Worker an die Profil-Stufe weiterreicht
+ * @param {number} [params.zaehlerStempel]  Marke des Einlasses im Stundenfenster
+ * @param {boolean} [params.zaehlerNachtrag] true = der Worker traegt die Marke nach
  */
-async function createJob({ lang, traceId, imagePath, exif, resultToken }) {
+async function createJob({ lang, traceId, imagePath, exif, resultToken, zaehlerStempel, zaehlerNachtrag }) {
   const ref = jobsRef().doc();
   const now = Date.now();
   await ref.set({
@@ -101,6 +103,13 @@ async function createJob({ lang, traceId, imagePath, exif, resultToken }) {
        Ticket hat (der Browser, der den Job angelegt hat), bekommt von job-status
        das `result` zurück — nicht jeder, der die jobId kennt. */
     resultToken: resultToken || null,
+    /* Stundenzaehler (11.09.2026, counter.js "GENAU EINMAL IM FENSTER"): die
+       Marke dieses Einlasses im rollenden Fenster — eine Zeitzahl, nichts
+       ueber die Person. Damit gibt ein abgebrochener Auftrag genau seinen
+       eigenen Platz frei, und der Worker traegt ihn nach, wenn der Zaehler
+       beim Einlass ausgewichen war. */
+    zaehlerStempel: typeof zaehlerStempel === "number" && Number.isFinite(zaehlerStempel) ? zaehlerStempel : null,
+    zaehlerNachtrag: zaehlerNachtrag === true,
     result: null,
     errorReason: null,
     attempts: 0,

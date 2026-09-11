@@ -119,7 +119,7 @@ async function reapJobs() {
          Abbruch geclaimt — er läuft noch und braucht das Bild: nichts anfassen. */
       if (!ok) continue;
       /* BIZ-001: Stunden-Slot zurückgeben — verlassener Job machte nie eine Analyse. */
-      await releaseHourlySlot();
+      await releaseHourlySlot(job.zaehlerStempel);
       await deleteImage(job.imagePath);
       reapedAbandoned += 1;
     } catch (err) {
@@ -152,7 +152,7 @@ async function reapJobs() {
     try {
       const ok = await abandonJob(job.id);
       if (!ok) continue;
-      await releaseHourlySlot();
+      await releaseHourlySlot(job.zaehlerStempel);
       await deleteImage(job.imagePath);
       reapedUeberfaellig += 1;
     } catch (err) {

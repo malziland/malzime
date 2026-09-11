@@ -34,7 +34,7 @@ const { loggeMinorSafety } = require("./job-helfer");
 /* Die beiden Analyse-Wege liegen in einer eigenen Datei — was hier bleibt, ist
    die Annahme des Auftrags und das Wegschreiben des Ergebnisses. */
 const { runPipeline } = require("./job-pipelines");
-const { incrementTotals, releaseHourlySlot } = require("./counter");
+const { incrementTotals, releaseHourlySlot, zaehlerNachtragen } = require("./counter");
 const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { geltendeWerte } = require("./betriebsprofil");
 const { deleteImage } = require("./queue-storage");
@@ -153,7 +153,7 @@ async function handleProcessJob(req, res) {
     }
     /* BIZ-001: nur freigeben, wenn DIESER Aufruf den Job wirklich verlassen hat
        (sonst Doppel-Freigabe, falls der Reaper parallel war). */
-    releaseHourlySlot().catch(() => {});
+    releaseHourlySlot(job.zaehlerStempel).catch(() => {});
     await deleteImage(job.imagePath);
     console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
     res.status(200).json({ ok: false, reason: "abandoned" });
@@ -184,6 +184,11 @@ async function handleProcessJob(req, res) {
   }
 
   const start = Date.now();
+  /* Stundenzaehler (11.09.2026): War der Zaehler beim Einlass ausgewichen,
+     traegt dieser Auftrag seine Marke jetzt selbst nach — neben der Analyse
+     her und vor der Antwort abgewartet, solange die Instanz sicher rechnet
+     (counter.js, "GENAU EINMAL IM FENSTER"). Wirft nie. */
+  const zaehlerNachtrag = job.zaehlerNachtrag === true ? zaehlerNachtragen(job.zaehlerStempel) : null;
   try {
     const { result, success } = await runPipeline(job);
     /* BUG-2026-08-13-35: Rückgabewert von completeJob auswerten. Er liefert
@@ -273,6 +278,7 @@ async function handleProcessJob(req, res) {
     /* Bild immer löschen — Erfolg ODER Fehler. Die Storage-Lifecycle-Regel
        ist das zweite Sicherheitsnetz. */
     await deleteImage(job.imagePath);
+    if (zaehlerNachtrag) await zaehlerNachtrag;
   }
 
   res.status(200).json({ ok: true });

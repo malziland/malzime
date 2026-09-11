@@ -267,6 +267,7 @@ Dokumentsperre wartet, bevor es aufgibt.
 | Netz übernimmt, lässt ein | Hinweis | nein |
 | Netz übernimmt, blockiert | ERROR | ja |
 | Zähler **und** Netz gescheitert | ERROR | ja |
+| Nachtrag des Workers gescheitert (seit 11.09.2026, unten) | Hinweis | nein |
 
 Die dritte Zeile ist die Lehre aus einem eigenen Fehler: Nach dem Einbau des
 Netzes meldete der Code weiterhin 169 Mal „Kostenbremse inaktiv", obwohl das
@@ -287,26 +288,6 @@ Push-Nachricht mit dem Boost-Knopf je Instanz höchstens einmal je fünf
 Minuten hinaus; bei bis zu zehn Einlass-Instanzen sind das bis zu zehn
 Nachrichten je fünf Minuten.
 
-**Restrisiko, das bleibt:** Im Netz-Fall schreibt niemand den Zeitstempel
-des eingelassenen Auftrags — die Transaktion ist ja gerade gescheitert. Jeder
-Netz-Fall fehlt damit im Fenster, und zwar kumulativ: Klemmt der Zähler über
-eine ganze Andrangswelle, zählt das Fenster nur die Aufträge, deren
-Transaktion durchkam. Das Netz blockiert dann später, als es sollte. Wie groß
-diese Lücke im echten Betrieb ist, steht nach dem nächsten Workshop im Log
-(`netz-hat-uebernommen` zählen). Ein nachträgliches Schreiben ohne
-Transaktion wäre die Abhilfe, erhöht aber die Kontention auf demselben
-Dokument — nur mit Simulator-Messung einbauen.
-
-**Erste Messung im echten Betrieb (11.09.2026, Lasttest mit 30 gleichzeitigen
-Analysen gegen malzi.me):** 9 Netz-Fälle (`netz-hat-uebernommen`, alle in derselben
-Sekunde, Grund `zeitlimit-kein-retry`). 8 der 9 Transaktionen schrieben ihren
-Zeitstempel nach dem Zeitlimit doch noch; im Fenster fehlte am Ende **einer von
-30** (`stats/current` 35 Einträge, Protokoll 36 angenommene Aufträge). Die Lücke ist
-damit deutlich kleiner als der schlechteste Fall oben (einer je Netz-Fall), weil die
-Transaktion nach dem Zeitlimit weiterläuft und meist noch schreibt. Kein Auftrag ging
-verloren — es fehlt nur ein Strich in der Zählung. Abhilfe deshalb weiter nicht
-eingebaut.
-
 Messwerte nach der Reparatur vom 30.08.2026 (Emulator, 170 gleichzeitige
 Anfragen, Stand vor dem Netz-Umbau vom 01.09.; mit dem neuen Netz nicht
 nachgemessen):
@@ -317,6 +298,59 @@ Sperr-Konflikte          225  ->  0
 Antwortdauer (75 %)   54.000 ms -> 6.800 ms
 abgerissene Verbindungen  94  ->  0
 ```
+
+### Jeder eingelassene Auftrag zählt genau einmal (seit 11.09.2026)
+
+**Der Befund.** Im Netz-Fall schrieb niemand den Eintrag des eingelassenen
+Auftrags. Er stand nur dann im Fenster, wenn die hängende Transaktion nach dem
+Zeitlimit doch noch durchkam. Gemessen im echten Betrieb (11.09.2026, Lasttest mit
+30 gleichzeitigen Analysen gegen malzi.me): 9 Netz-Fälle in derselben Sekunde
+(`netz-hat-uebernommen`, Grund `zeitlimit-kein-retry`). 8 der 9 Transaktionen
+schrieben später noch, eine nie. Die Statusseite zeigte 35 Analysen in der letzten
+Stunde bei 36 fertigen.
+
+**Die Abhilfe** (`counter.js`, Abschnitt „GENAU EINMAL IM FENSTER“). Jeder Einlass
+hat eine eigene Marke (`zaehlerStempel` im Auftrag), und sein Eintrag im Fenster
+ist diese Marke. Lässt das Netz ein, trägt der Worker die Marke zu Beginn der
+Analyse per `arrayUnion` nach (`zaehlerNachtragen`). Das geschieht ohne
+Transaktion, also ohne Lesesperre, und ohne Doppelung, denn `arrayUnion` trägt
+einen vorhandenen Wert nicht ein zweites Mal ein. Die nachlaufende Transaktion
+prüft ihrerseits, ob die Marke schon drinsteht. Nach einer Abweisung, nach einer
+Freigabe und später als 60 Sekunden nach dem Start trägt sie gar nichts mehr ein.
+Eine Freigabe (abgebrochener Auftrag) nimmt genau den eigenen Eintrag heraus, nicht
+mehr den jüngsten.
+
+Warum der Worker den Nachtrag schreibt und nicht der Einlass: Der Einlass antwortet
+nach Sekunden, danach drosselt die Plattform die Instanz, und was dann noch läuft,
+kommt vielleicht nie an. Der Worker läuft ohnehin rund 40 Sekunden; der Nachtrag
+läuft neben der Analyse her und wird vor der Antwort abgewartet. Die frühere Sorge,
+ein Schreiben ohne Transaktion erhöhe die Kontention, trifft den Einlass nicht:
+Der Nachtrag kommt nur im Netz-Fall, einmal je Auftrag, und erst beim Start der
+Analyse.
+
+**Gemessen im Simulator** (11.09.2026, 30 gleichzeitige Aufträge,
+`functions/scripts/stundenzaehler-emulator-messung.js`): 29 der 30 Einlässe liefen
+über das Netz; direkt nach dem Einlass stand ein einziger Eintrag im Fenster. Als
+alle 30 Analysen fertig waren, standen genau 30 Einträge im Fenster, alle
+verschieden, jeder Auftrag mit seiner eigenen Marke; 29 Nachträge, keiner
+gescheitert. Der Simulator drosselt seine Instanzen nach der Antwort nicht. Den
+einen Eintrag, der im echten Betrieb nie ankam, stellt deshalb der Test
+`zaehler-genau-einmal.test.js` nach (Transaktion schreibt nie, schreibt spät, schreibt
+im Augenblick des Zeitlimits).
+
+**Was bleibt:**
+
+- Während einer Andrangswelle sieht das Netz zu wenig. Es fehlen die Aufträge,
+  deren Analyse noch nicht begonnen hat und deren Transaktion noch nicht schrieb,
+  also höchstens so viele, wie gerade warten. Das Netz blockiert dann entsprechend
+  später. Die erste Grenze gegen Kosten bleibt die Warteschlangen-Rate (oben).
+- Scheitert der Nachtrag in beiden Versuchen, fehlt der eine Auftrag weiter. Das
+  steht im Protokoll (`zaehler-nachtrag`, `warning: fehlgeschlagen`).
+- Eine Marke ist die Millisekunde plus ein Zufallsbruchteil, rund 4000 Werte je
+  Millisekunde. Treffen zwei Netz-Fälle auf denselben Wert, zählt einer nicht.
+- Kommt der Schreibvorgang einer Transaktion genau in dem Augenblick an, in dem das
+  Zeitlimit abläuft, und wird der Auftrag danach abgewiesen oder freigegeben,
+  bleibt sein Eintrag stehen: ein Strich zu viel.
 
 ## Ein Ausrutscher der Datenbank ist kein Alarm (07.09.2026)
 

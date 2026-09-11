@@ -9,7 +9,7 @@
 # den Handgriff ab: Gestempelt wird NUR, was gerade wirklich grün gelaufen
 # ist. Schlägt eine Suite fehl, wird NICHTS gestempelt.
 #
-# Nutzung: ./scripts/pruefstand.sh   (Dauer ~5 min, E2E inklusive)
+# Nutzung: ./scripts/pruefstand.sh   (Dauer ~8 min, E2E und Rueckbauprobe inklusive)
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -73,6 +73,14 @@ echo "— E2E-Suite läuft (dauert am längsten)…"
 E2E_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_E2E npm run test:e2e) || { echo "$E2E_LOG" | tail -20; echo "ABBRUCH: E2E-Suite rot — es wird nichts gestempelt."; exit 1; }
 E2E=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | tail -1 || true)
 E2E_SKIP=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ skipped" | grep -Eo "[0-9]+" | head -1 || true)
+
+# ── 4. Rueckbauprobe (seit 10.09.2026) ──
+# Baut zehn behobene Befunde absichtlich zurueck und prueft, ob die Tests es
+# merken. Sie lief bis dahin nirgends automatisch — und war zwei Tage lang zur
+# Haelfte blind (ein Muster fehlte), ohne dass es jemand sah. Jetzt gilt: kein
+# Stempel, wenn ein Rueckbau unbemerkt bleibt oder ein Muster fehlt.
+echo "— Rueckbauprobe laeuft (rund 3 Minuten)…"
+RUECKBAU_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_RUECKBAU sh scripts/rueckbauprobe-betriebswerte.sh) || { echo "$RUECKBAU_LOG" | tail -20; echo "ABBRUCH: Rueckbauprobe rot — es wird nichts gestempelt."; exit 1; }
 
 # ── Plausibilität: alle drei Zahlen müssen da sein ──
 for WERT in "$BACKEND" "$FRONTEND" "$E2E"; do

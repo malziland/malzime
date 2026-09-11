@@ -144,24 +144,16 @@ CI prueft Lint + Format automatisch bei jedem Push und Pull Request.
 ## 8. Deploy
 
 ```bash
-# Alles
-firebase deploy --only functions,hosting
-
-# Nur Frontend (nach CSS/JS-Aenderungen)
-firebase deploy --only hosting
-
-# Nur Backend (nach Functions-Aenderungen)
-firebase deploy --only functions
+./scripts/deploy.sh            # Hosting + Functions
+./scripts/deploy.sh hosting    # nur Frontend
+./scripts/deploy.sh functions  # nur Backend
 ```
 
-**Wichtig**: Nach Frontend-Aenderungen den Cache-Buster in `public/index.html` hochzaehlen:
-```html
-<link rel="stylesheet" href="./styles.css?v=2026021608" />
-<!-- ... -->
-<script type="module" src="./app.js?v=2026021608"></script>
-```
-
-Format: `?v=YYYYMMDDNN` (Datum + laufende Nummer)
+Das Skript prüft vorher Tests, Infrastruktur und Einstellungssatz, macht einen
+Trockenlauf, zählt die Cache-Kennung (`?v=YYYYMMDDNN`) in allen ausgelieferten
+Seiten selbst hoch und endet mit einer Live-Probe. Ablauf, Notschalter und
+Rückweg stehen in [`RUNBOOK.md`](RUNBOOK.md). Nie direkt per `firebase deploy`
+ausliefern — dann fehlen alle Riegel.
 
 ## Kosten
 
@@ -222,7 +214,7 @@ Die Privacy-Architektur ist ein Kernbestandteil des Projekts:
 GitHub Actions Workflow:
 - **`ci.yml`** — Tests + Lint + Format + Secret-Scan bei jedem Push und Pull Request
 
-Deploy ist manuell per `firebase deploy` (kein automatisches Deployment via CI).
+Deploy ist manuell über `scripts/deploy.sh` (kein automatisches Deployment via CI).
 
 ## Eigene Instanz aufsetzen (Fork)
 

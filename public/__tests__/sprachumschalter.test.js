@@ -27,8 +27,18 @@ vi.mock("../js/i18n.js", () => ({
   },
 }));
 
-const { initSprachumschalter, zeigeSprachumschalter, istEingehaengt } = await import("../js/sprachumschalter.js");
-const { state } = await import("../js/state.js");
+/* Das Modul baut den Umschalter beim Anmelden sofort und merkt sich, dass er
+   steht — ein zweiter entsteht nie. Jeder Test lädt es deshalb frisch: Sonst
+   gälte der Umschalter aus dem ersten Test als eingebaut, obwohl setupDOM ihn
+   längst entfernt hat, und alle folgenden Tests liefen ins Leere. */
+let initSprachumschalter;
+let state;
+
+async function frischLaden() {
+  vi.resetModules();
+  ({ initSprachumschalter } = await import("../js/sprachumschalter.js"));
+  ({ state } = await import("../js/state.js"));
+}
 
 /* Der echte Aufbau hat ein <main id="main">; setup.js kennt es nicht. */
 function baueSeite() {
@@ -50,12 +60,13 @@ function sichtbaresModal() {
 
 let analysiert;
 
-beforeEach(() => {
+beforeEach(async () => {
   aktuelleSprache = "de";
   document.documentElement.lang = "de";
   ladenScheitert = false;
   analysiert = [];
   baueSeite();
+  await frischLaden();
   state.isAnalyzing = false;
   state.uploadLaeuft = false;
   state.lastData = null;
@@ -69,26 +80,49 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  zeigeSprachumschalter(false);
+  /* Ein Dialog, den ein Test offen gelassen hat, hielte den Tasten-Horcher
+     seines (dann alten) Moduls scharf — ein Escape im nächsten Test schlösse
+     ihn mit. Escape räumt ihn hier ab; danach bleibt der Horcher wirkungslos. */
+  document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
 });
 
-describe("Sprachumschalter — Merkmals-Schloss", () => {
-  it("ohne Merkmal entsteht KEIN einziges Element", () => {
-    expect(document.querySelectorAll(".sprach-pille, .sw-grund")).toHaveLength(0);
-    expect(istEingehaengt()).toBe(false);
-  });
-
-  it("Positivkontrolle: mit Merkmal entstehen sie sehr wohl", () => {
-    /* Ohne diese Gegenprobe wäre der Test oben auch dann grün, wenn der
-       Umschalter überhaupt nicht mehr gebaut werden KANN. */
-    zeigeSprachumschalter(true);
+describe("Sprachumschalter — entsteht immer", () => {
+  /* Bis zum 10.09.2026 entstand er erst, wenn /api/stats ein Merkmal meldete.
+     Fiel die Schnittstelle oder die Datenbank kurz aus, fehlte er still. Das
+     Zusammenspiel mit der echten Seite prüfen e2e/sprachumschalter.test.js und
+     e2e/sprachumschalter-unterseiten.test.js; hier geht es um das Modul. */
+  it("steht nach dem Anmelden sofort da, samt beiden Rückfragen", () => {
     expect(pille()).not.toBeNull();
     expect(document.querySelectorAll(".sw-grund")).toHaveLength(2);
   });
 
+  it("braucht dafür kein Netz — auch wenn nie eine Antwort ankommt", async () => {
+    /* Das Netz antwortet hier nie. Der Umschalter darf weder darauf warten
+       noch überhaupt fragen — sonst hinge er wieder an einer Antwort. */
+    const netz = vi.fn(() => new Promise(() => {}));
+    vi.stubGlobal("fetch", netz);
+    try {
+      baueSeite();
+      await frischLaden();
+      initSprachumschalter({});
+      expect(pille()).not.toBeNull();
+      expect(netz).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("ein zweites Anmelden baut keinen zweiten Umschalter", () => {
+    initSprachumschalter({ analysiere: () => {} });
+    expect(document.querySelectorAll(".sprach-pille")).toHaveLength(1);
+    expect(document.querySelectorAll(".sw-grund")).toHaveLength(2);
+  });
+
   it("der Schalter ist nie sichtbar-aber-wirkungslos: kein disabled-Zustand", () => {
-    zeigeSprachumschalter(true);
-    document.querySelectorAll(".sprach-knopf").forEach((b) => {
+    const knoepfe = document.querySelectorAll(".sprach-knopf");
+    /* Positivkontrolle: Ohne Knöpfe liefe die Schleife still leer. */
+    expect(knoepfe).toHaveLength(2);
+    knoepfe.forEach((b) => {
       expect(b.disabled).toBe(false);
       expect(b.getAttribute("aria-disabled")).toBeNull();
     });
@@ -100,17 +134,9 @@ describe("Sprachumschalter — Merkmals-Schloss", () => {
        im localStorage, was der Datenschutzerklaerung widersprach. */
     expect(window.malziME && window.malziME.sprachumschalter).toBeUndefined();
   });
-
-  it("Aushängen lässt nichts zurück", () => {
-    zeigeSprachumschalter(true);
-    zeigeSprachumschalter(false);
-    expect(document.querySelectorAll(".sprach-pille, .sw-grund, .sprachwahl")).toHaveLength(0);
-  });
 });
 
 describe("Sprachumschalter — wann gefragt wird", () => {
-  beforeEach(() => zeigeSprachumschalter(true));
-
   it("leere Seite: sofortiger Wechsel ohne Rückfrage", async () => {
     langKnopf("en").click();
     await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
@@ -173,7 +199,6 @@ describe("Sprachumschalter — wann gefragt wird", () => {
 
 describe("Sprachumschalter — Abbrechen hinterlässt nichts", () => {
   beforeEach(() => {
-    zeigeSprachumschalter(true);
     state.lastData = { profileText: "x" };
     state.lastFile = { name: "a.jpg" };
   });
@@ -211,7 +236,6 @@ describe("Sprachumschalter — Abbrechen hinterlässt nichts", () => {
 
 describe("Sprachumschalter — Bestätigen", () => {
   beforeEach(() => {
-    zeigeSprachumschalter(true);
     state.lastData = { profileText: "x" };
     state.lastFile = { name: "foto.jpg" };
   });
@@ -255,8 +279,6 @@ describe("Sprachumschalter — Bestätigen", () => {
 });
 
 describe("Sprachumschalter — Barrierefreiheit", () => {
-  beforeEach(() => zeigeSprachumschalter(true));
-
   it("jeder Knopf trägt seine eigene Sprache als lang-Attribut", () => {
     expect(langKnopf("de").getAttribute("lang")).toBe("de");
     expect(langKnopf("en").getAttribute("lang")).toBe("en");
@@ -340,40 +362,39 @@ describe("Sprachumschalter — die Erprobungs-Tür ist entfernt (v3.3.1)", () =>
   });
 
   it.each([
-    ["1", "/?sprachumschalter=1"],
-    ["0", "/?sprachumschalter=0"],
+    ["=0", "/?sprachumschalter=0"],
+    ["=1", "/?sprachumschalter=1"],
     ["mit lang=en", "/?lang=en&sprachumschalter=1"],
-  ])("das Anhängsel %s hat keine Wirkung mehr", (_name, suche) => {
+  ])("das Anhängsel %s ändert nichts: genau ein Umschalter", async (_name, suche) => {
+    /* Früher blendete `=1` ihn ein. Heute steht er immer da — eine Adresse
+       kann ihn weder ausblenden noch verdoppeln. */
     adresse(suche);
+    baueSeite();
+    await frischLaden();
     initSprachumschalter({ analysiere: () => {} });
-    /* Ob der Umschalter entsteht, entscheidet jetzt allein das
-       Merkmals-Schloss ueber merkmalUebernehmen(). */
-    expect(pille()).toBeNull();
+    expect(document.querySelectorAll(".sprach-pille")).toHaveLength(1);
   });
 
-  it("DATENSCHUTZ: der Umschalter legt NICHTS dauerhaft im Browser ab", () => {
-    /* Der Kern des Rueckbaus. Bis v3.3.0 schrieb merkmalUebernehmen() den
+  it("DATENSCHUTZ: der Umschalter legt NICHTS dauerhaft im Browser ab", async () => {
+    /* Der Kern des Rueckbaus von v3.3.1. Bis v3.3.0 schrieb der Umschalter den
        Schluessel `malzime-umschalter-aktiv` in den localStorage — bei JEDEM
        Besucher, waehrend die Datenschutzerklaerung zusagt, dort nichts
-       abzulegen. Dieser Test wird rot, wenn das zurueckkommt. */
+       abzulegen. Dieser Test wird rot, wenn das zurueckkommt. Geprueft wird
+       auch nach einem Wechsel: Die Wahl gehoert in den sessionStorage. */
     localStorage.clear();
 
     adresse("/?sprachumschalter=1");
+    baueSeite();
+    await frischLaden();
     initSprachumschalter({ analysiere: () => {} });
-    zeigeSprachumschalter(true);
     expect(pille()).not.toBeNull();
-    zeigeSprachumschalter(false);
+    langKnopf("en").click();
+    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
 
+    /* Positivkontrolle: Der Wechsel lief, und der Tab-Speicher funktioniert —
+       sonst saehe ein leerer localStorage nur zufaellig richtig aus. */
+    expect(sessionStorage.getItem("malzime-sprache")).toBe("en");
     expect(localStorage.length).toBe(0);
-  });
-
-  it("Positivkontrolle: ueber das Merkmals-Schloss entsteht er sehr wohl", () => {
-    adresse("/");
-    initSprachumschalter({ analysiere: () => {} });
-    expect(pille()).toBeNull();
-
-    zeigeSprachumschalter(true);
-    expect(pille()).not.toBeNull();
   });
 });
 
@@ -392,7 +413,6 @@ describe("Sprachumschalter — nach einem Neuladen ist das Bild weg", () => {
       analysiere: (datei) => analysiert.push(datei),
       zuruecksetze: () => zurueckgesetzt++,
     });
-    zeigeSprachumschalter(true);
     document.getElementById("facts").innerHTML = '<div class="cat-card"></div>';
     state.lastData = { profileText: "x" };
     state.lastFile = null;
@@ -441,7 +461,6 @@ describe("Sprachumschalter — stehende Meldungen wechseln mit", () => {
      Zeichenkette, die niemand mehr anfasst. */
   beforeEach(() => {
     statusNeuGeschrieben = 0;
-    zeigeSprachumschalter(true);
   });
 
   it("jeder Wechsel schreibt die Statuszeile neu", async () => {
@@ -471,7 +490,6 @@ describe("Sprachumschalter — die Rückfrage handelt vom Sprachwechsel", () => 
   ];
 
   it.each(faelle)("%s: Überschrift und Knöpfe sind dieselben", (_name, zustand) => {
-    zeigeSprachumschalter(true);
     Object.assign(state, zustand);
     langKnopf("en").click();
     const modal = sichtbaresModal();

@@ -78,4 +78,4 @@ function planeWiederholung({ res, attempt, backoffs, aufrufStart, timeoutMs }) {
   return { wartezeitMs, retryAfter, aufgeben };
 }
 
-module.exports = { WIEDERHOLBARE_STATUS, ueberlastWartezeiten, retryAfterSekunden, planeWiederholung };
+module.exports = { WIEDERHOLBARE_STATUS, ueberlastWartezeiten, planeWiederholung };

@@ -12,7 +12,7 @@
 # Last wirklich braucht.
 #
 # DIESER LAUF KOSTET GELD UND VERAENDERT DIE OEFFENTLICHE STATISTIK.
-#   * ~0,5 bis 0,8 Cent je Analyse (docs/FLAGS.md)
+#   * Mistral-Kosten, grob unter 1 Cent je Analyse (Kostentabelle in docs/SETUP.md)
 #   * jede Analyse zaehlt dauerhaft in "Profile erstellt" auf /stats mit
 #   * das Stundenlimit (500) wird mitverbraucht
 # Deshalb laeuft er NIE ohne ausdrueckliche Freigabe und NIE mit einer

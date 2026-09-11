@@ -237,7 +237,8 @@ function extrahiereLiveText(jsonPraefix) {
 }
 
 /* HERGEZOGEN 31.08.2026: Welche Karten in einer Antwort fehlen — das ist
-   Auswertung, und beide Wege (Ein-Aufruf und Drei-Aufruf) brauchen sie. */
+   Auswertung (genutzt vom Analyse-Aufruf in mistral.js fuer die
+   Nachforderung fehlender Karten). */
 function findMissingCards(parsed) {
   if (!parsed || !parsed.categories || typeof parsed.categories !== "object") {
     return REQUIRED_CARDS.slice();
@@ -263,8 +264,6 @@ module.exports = {
   extrahiereLiveText,
   KARTEN_WERT_SCHLUESSEL,
   KARTEN_LABEL_SCHLUESSEL,
-  STANDARD_SCHLUESSEL,
-  BEAST_SCHLUESSEL,
   REQUIRED_CARDS,
   findMissingCards,
   escapeXml,

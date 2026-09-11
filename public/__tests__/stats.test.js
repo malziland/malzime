@@ -12,7 +12,6 @@ describe("stats page", () => {
     const deJson = JSON.parse(readFileSync(resolve(__dirname, "../locales/de.json"), "utf-8"));
 
     const requiredKeys = [
-      "stats.backLink",
       "stats.errorText",
       "stats.heroTitle",
       "stats.heroSub",

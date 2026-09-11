@@ -28,8 +28,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 const HANDY = { width: 390, height: 844 };
 
-/* Die Zuordnung stammt aus public/js/api.js:755-773 — dort verzweigt der Code
-   die Server-Antwort auf das Fehlerbild. Ändert sich die Verzweigung, muss diese
+/* Die Zuordnung stammt aus public/js/api.js, analyzeImage, Zweig
+   `if (!enqueueResp.ok)` — dort verzweigt der Code die Server-Antwort auf das
+   Fehlerbild. Ändert sich die Verzweigung, muss diese
    Tabelle mitgehen; der Test schlägt dann an, weil das Bild ausbleibt. */
 const FEHLERBILDER = [
   {

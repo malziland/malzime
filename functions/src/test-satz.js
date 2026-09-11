@@ -8,7 +8,10 @@
  * Werte in dreißig Testdateien, hätte man dreißig Kopien, die auseinander
  * laufen — und ein neues Pflichtfeld müsste dreißigmal nachgetragen werden.
  *
- * Die Werte entsprechen dem Satz `t1-normal`, also dem echten Betrieb.
+ * Die Werte sind Testwerte und weichen vom echten Betrieb ab — der steht
+ * allein in produktiv-satz.js. Das ist gewollt: Ein Test, der zufaellig den
+ * Produktionswert traegt, merkt nicht, wenn der Code statt des Satzwertes eine
+ * Konstante liest.
  */
 const SATZ = {
   /* KI-Aufrufe */
@@ -19,7 +22,7 @@ const SATZ = {
   /* Andrang und Einlass */
   parallelitaet: 7,
   /* Die Bremse, die in die echte Cloud-Tasks-Queue uebertragen wird. Im Test
-     bewusst ein anderer Wert als in der Produktion (0,125): Ein Test, der
+     bewusst ein anderer Wert als in der Produktion (produktiv-satz.js): Ein Test, der
      zufaellig denselben Wert traegt, wuerde nicht auffallen, wenn der Code
      statt des Satzwertes eine Konstante liest. */
   queueRatePerSekunde: 0.5,

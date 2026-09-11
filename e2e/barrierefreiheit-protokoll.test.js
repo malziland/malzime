@@ -159,8 +159,6 @@ function statsAntwort(zusatz = {}) {
   return {
     current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
     totals: { today: 10, week: 50, month: 200, total: 1000 },
-    useQueue: true,
-    sprachumschalter: true,
     ...zusatz,
   };
 }

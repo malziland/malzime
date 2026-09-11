@@ -1,7 +1,7 @@
 /* ── Stats-Seite: Lädt /api/stats und befüllt die Anzeige ── */
 
 import { initI18n, t, getLanguage, applyTranslations } from "./i18n.js";
-import { initSprachumschalter, merkmalUebernehmen } from "./sprachumschalter.js";
+import { initSprachumschalter } from "./sprachumschalter.js";
 import { apiUrl } from "./api-basis.js";
 
 /* Projekt-Start: 5. Februar 2026 */
@@ -110,11 +110,6 @@ async function loadStats() {
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
     letzteDaten = data;
-
-    /* v3.3: Merkmals-Schloss des Sprachumschalters — dieselbe Antwort, die
-       ohnehin geholt wird. Aus oder unlesbar ⇒ kein Bedienelement. */
-    merkmalUebernehmen(data.sprachumschalter === true);
-
     zeichne(data);
   } catch (_err) {
     elemente().statsError.style.display = "block";
@@ -160,16 +155,14 @@ async function init() {
   await initI18n();
   applyTranslations();
 
-  /* v3.3: Diese Seite ist übersetzt, also bekommt sie den echten Umschalter.
-     Ohne Neuanalyse-Rückruf — hier steht nichts auf dem Spiel. Gezeigt wird er
-     nach derselben Regel wie auf der Startseite: allein das Merkmals-Schloss
-     aus /api/stats, das oben bereits gelesen wurde. Die beiden Erprobungs-
-     Türen (Adresse und Konsole) sind mit v3.3.1 entfallen.
+  /* Diese Seite ist übersetzt, also bekommt sie den echten Umschalter — ohne
+     Neuanalyse-Rückruf, hier steht nichts auf dem Spiel. Er entsteht sofort
+     und VOR dem Holen der Zahlen: Scheitert /api/stats, zeigt die Seite ihre
+     Fehlerzeile, und die Sprache lässt sich trotzdem wechseln.
 
-     01.09.2026: Hier stand, ein Wechsel zeichne die Zahlen "einfach neu". Das
-     tat er nicht — `beschriften()` erreicht nur `data-sw-key`-Elemente, und
-     alles, was diese Datei per textContent setzt, blieb deutsch stehen.
-     Seither wird das Neuzeichnen ausdruecklich angemeldet. */
+     Ein Wechsel zeichnet auch die Felder neu, die diese Datei per textContent
+     setzt; `beschriften()` erreicht nur `data-sw-key`-Elemente. Bis zum
+     01.09.2026 blieben sie nach einem Wechsel deutsch stehen. */
   initSprachumschalter({ zeichneNeu: () => letzteDaten && zeichne(letzteDaten) });
 
   await loadStats();

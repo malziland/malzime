@@ -15,6 +15,7 @@ jest.mock("../jobs", () => ({
   isAbandoned: jest.fn(),
   abandonJob: jest.fn(),
   countProcessingJobs: jest.fn(),
+  setLiveText: jest.fn(),
 }));
 jest.mock("../queue-storage", () => ({
   loadImage: jest.fn(),

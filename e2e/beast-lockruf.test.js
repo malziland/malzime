@@ -50,8 +50,6 @@ async function endpunkte(page) {
       body: JSON.stringify({
         current: { count: 1, limit: 500, limitActive: false },
         totals: { today: 1, week: 1, month: 1, total: 1 },
-        useQueue: true,
-        sprachumschalter: true,
       }),
     })
   );
@@ -72,7 +70,7 @@ async function endpunkte(page) {
 
 /** Fuehrt eine vollstaendige Analyse bis zum fertigen Profil — OHNE Live-Text,
     also ohne gestaffelte Enthuellung. Dieser Weg ist der leicht zu uebersehende:
-    Wiederaufnahme nach Neuladen, Tier-Profil, Merkmal aus. */
+    Er gilt nach einem Neuladen (Wiederaufnahme) und beim Tier-Profil. */
 async function analyseLaufen(page) {
   await endpunkte(page);
   await page.goto("/");
@@ -91,8 +89,6 @@ async function analyseMitEnthuellung(page) {
       body: JSON.stringify({
         current: { count: 1, limit: 500, limitActive: false },
         totals: { today: 1, week: 1, month: 1, total: 1 },
-        useQueue: true,
-        sprachumschalter: true,
       }),
     })
   );

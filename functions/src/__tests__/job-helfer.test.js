@@ -1,14 +1,14 @@
-/* job-helfer.test.js — die vier Fail-safe-Entscheidungen.
+/* job-helfer.test.js — die Fail-safe-Entscheidung des Werbe-Aufrufs.
  *
  * ANLASS (Pruefschleife, 31.08.2026): job-helfer.js hatte keine eigene
  * Testdatei. Eine Mutationsprobe zeigte, wo das wirklich weh tut: Wer
  * `isBeastAdsCallEnabledSafe` durch `return null` ersetzt, bekommt alle 1206
  * Tests gruen — die Funktion ist von nichts gedeckt.
  *
- * Sie ist die einzige der vier, die im Fehlerfall auf `true` faellt. Das ist
- * Absicht: Die Beast-Werbung gehoert zum Lerninhalt, ihr Ausfall waere ein
- * stiller Qualitaetsverlust im Workshop. Die anderen drei fallen auf `false`,
- * weil ein ausgefallener Schalter dort nur Kosten oder Tempo betrifft.
+ * Sie faellt im Fehlerfall auf `true`. Das ist Absicht: Die Beast-Werbung
+ * gehoert zum Lerninhalt, ihr Ausfall waere ein stiller Qualitaetsverlust im
+ * Workshop. (Die frueheren Schalter fuer Prompt-Cache und Live-Text sind seit
+ * 10.09.2026 fest eingebaut — ihre Safe-Varianten gibt es nicht mehr.)
  *
  * Genau diese Asymmetrie haelt diese Datei fest — sie ist eine Entscheidung,
  * keine Zufaelligkeit, und soll nicht unbemerkt umkippen.
@@ -31,32 +31,13 @@ describe("job-helfer — was gilt, wenn ein Schalter nicht lesbar ist", () => {
     expect(ergebnis).toBe(true);
   });
 
-  test("die anderen beiden fallen auf false", async () => {
-    const spy = stumm();
-    jest.resetModules();
-    jest.doMock("../feature-flags", () => ({
-      isPromptCacheEnabled: async () => {
-        throw new Error("x");
-      },
-      isLiveTextEnabled: async () => {
-        throw new Error("x");
-      },
-    }));
-    const frisch = require("../job-helfer");
-    const werte = await Promise.all([frisch.isPromptCacheEnabledSafe(), frisch.isLiveTextEnabledSafe()]);
-    spy.mockRestore();
-    expect(werte).toEqual([false, false]);
-  });
-
   test("ohne Fehler kommt der echte Wert durch", async () => {
     jest.resetModules();
     jest.doMock("../feature-flags", () => ({
       isBeastAdsCallEnabled: async () => false,
-      isLiveTextEnabled: async () => true,
     }));
     const frisch = require("../job-helfer");
     expect(await frisch.isBeastAdsCallEnabledSafe()).toBe(false);
-    expect(await frisch.isLiveTextEnabledSafe()).toBe(true);
   });
 });
 

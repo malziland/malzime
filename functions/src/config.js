@@ -104,7 +104,6 @@ const MISTRAL_MODEL = "mistral-large-2512";
    Nicht-EU-Server umlenken: Website, Quelltext und Pruefsummen blieben
    unveraendert, der Bruch waere von aussen nicht nachweisbar. */
 const MISTRAL_ENDPOINT = "https://api.eu.mistral.ai/v1/chat/completions";
-const MISTRAL_MODELS_ENDPOINT = "https://api.eu.mistral.ai/v1/models";
 /* ── Eigene Zeitgrenze fuer den Single-Large-Aufruf ──
    BUG-2026-08-17-01. Der Single-Large-Call schreibt Standard- UND Beast-Profil
    in EINEM Zug und ist damit der mit Abstand laengste Aufruf der Pipeline. Die
@@ -220,10 +219,11 @@ const QUEUE_UPLOAD_PREFIX = "queue-uploads/";
    unterschaetzen, damit Wartende nicht enttaeuscht werden. */
 
 /* ARCH-001 (Audit 2026-08-10): Obergrenze der Warteschlangen-Tiefe beim Einlass.
-   Der Browser gibt nach 30 Minuten auf (MAX_POLL_DURATION_MS in api.js). Bei
-   7 parallel und ~65 s je Analyse sind in 30 Minuten rund 190 Jobs zu schaffen
-   — wer dahinter einreiht, sieht garantiert einen Timeout, obwohl sein Job
-   noch lebt und Geld kostet. Deshalb wird ab dieser Schwelle ehrlich abgelehnt
+   Der Browser gibt nach 30 Minuten auf (MAX_POLL_DURATION_MS in api.js). Wie
+   viele Auftraege in dieser Zeit zu schaffen sind, rechnet handle-enqueue.js
+   aus `parallelitaet` und der gemessenen Dauer (Rueckfall: `warteschlangeTiefe`
+   im Einstellungssatz) — wer dahinter einreiht, saehe garantiert einen
+   Timeout, obwohl sein Job noch lebt und Geld kostet. Deshalb wird ab dieser Schwelle ehrlich abgelehnt
    statt einen aussichtslosen Auftrag anzunehmen.
 
    Bewusst NICHT das Stundenlimit gesenkt: Ein Vormittag kann 1000-2000
@@ -246,7 +246,7 @@ const QUEUE_UPLOAD_PREFIX = "queue-uploads/";
    Aufbewahrung der abgeleiteten Profile aber um das 12-fache. */
 /* PRIV-107b (User-Freigabe 11.08. abends): Zugestellte Ergebnisse leben am
    Server nur noch so lange wie das Wiederholungs-Fenster im Browser
-   (ERGEBNIS_WIEDERHOLUNG_MS in public/js/api.js, 15 min ab Erstzustellung) —
+   (ERGEBNIS_WIEDERHOLUNG_MS in public/js/auftrag-speicher.js, 15 min ab Erstzustellung) —
    danach hat das Dokument keinen Zweck mehr und der Reaper löscht es.
    JOB_RETENTION_MS oben bleibt die Obergrenze für NIE abgeholte Ergebnisse. */
 
@@ -282,7 +282,7 @@ function localQueueConcurrency() {
                     auch die Functions und der Foto-Bucket liegen)
 
    ═══ UMSCHALTEN ═══
-   Diesen einen Wert ändern, dann `firebase deploy --only functions`.
+   Diesen einen Wert ändern, dann über `scripts/deploy.sh` ausliefern.
    Zurück geht es genauso — der Wert ist der gesamte Hebel.
    Ablauf, Kontrollen und Rückweg: docs/RUNBOOK.md, Abschnitt „Firestore-Umzug".
 
@@ -310,7 +310,6 @@ module.exports = {
   ALLOWED_MIME,
   MISTRAL_MODEL,
   MISTRAL_ENDPOINT,
-  MISTRAL_MODELS_ENDPOINT,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,
   QUEUE_NAME,
   QUEUE_REGION,

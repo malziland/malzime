@@ -63,13 +63,3 @@ export function pruefeSeiteNachDruck(melde, dok = document) {
   });
   return true;
 }
-
-/**
- * Haengt die Wache an `afterprint`. Zwei Bildschirmrahmen Abstand, damit der
- * Browser fertig gezeichnet hat.
- */
-export function initDruckWache(melde, ziel = window) {
-  ziel.addEventListener("afterprint", () => {
-    ziel.requestAnimationFrame(() => ziel.requestAnimationFrame(() => pruefeSeiteNachDruck(melde, ziel.document)));
-  });
-}

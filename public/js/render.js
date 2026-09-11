@@ -182,13 +182,12 @@ function renderCategories(profile) {
         if (!cat) return "";
         const conf = typeof cat.confidence === "number" ? cat.confidence : 0;
         const dotCount = conf >= 0.7 ? 3 : conf >= 0.4 ? 2 : 1;
-        const cls = dotCount === 3 ? "high" : dotCount === 2 ? "med" : "low";
         const dotsHtml = [0, 1, 2].map((i) => `<span class="conf-dot ${i < dotCount ? "on" : ""}"></span>`).join("");
         return `
           <div class="cat-card" data-key="${escapeHtml(key)}" data-grp="${grp.id}">
             <div class="cat-head">
               <span class="cat-label">${escapeHtml(cat.label)}</span>
-              <span class="cat-conf cat-conf--dots ${cls}" role="img" aria-label="${ariaKonfidenz}">${dotsHtml}</span>
+              <span class="cat-conf cat-conf--dots" role="img" aria-label="${ariaKonfidenz}">${dotsHtml}</span>
             </div>
             <p class="cat-value">${highlightKeyTerms(escapeHtml(cat.value))}</p>
           </div>

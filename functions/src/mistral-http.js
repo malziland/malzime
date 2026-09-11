@@ -9,9 +9,9 @@
  * Ueberlastmeldung erkennen.
  *
  * WARUM DAS EINE EIGENE DATEI IST: Die Aufrufer weiter oben — der
- * Ein-Aufruf-Weg, der Drei-Aufruf-Weg, die Beast-Werbung — teilen sich genau
- * diese Schicht. Sie stand mitten zwischen ihnen; wer eine Zeitgrenze aendern
- * wollte, musste an drei Stellen suchen, ob sie noch woanders gilt.
+ * Analyse-Aufruf und die Beast-Werbung — teilen sich genau diese Schicht. Sie
+ * stand mitten zwischen ihnen; wer eine Zeitgrenze aendern wollte, musste an
+ * mehreren Stellen suchen, ob sie noch woanders gilt.
  *
  * DIE RICHTUNG STIMMT: Diese Datei ruft NICHTS von oben auf. Sie liest die
  * Betriebswerte aus dem Einstellungssatz und gibt Ergebnisse zurueck — mehr

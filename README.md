@@ -43,8 +43,8 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 public/                     Firebase Hosting (SPA, kein Build-Schritt)
   index.html                Hauptseite
   app.js                    Entry Point (ES Module)
-  js/                       Frontend-Module (api, client-context, demo, dom, error-logger, exif, geocoding, i18n, render, state, stats, telemetry-logger, ui)
-  locales/                  Frontend-Locale-Dateien (de.json, manifest.json)
+  js/                       Frontend-Module (Liste und Aufgaben: docs/ARCHITECTURE.md, Abschnitt Frontend)
+  locales/                  Frontend-Locale-Dateien (de.json, en.json, manifest.json)
   styles.css                malziland Design System (Hell/Dunkel via Beast-Mode-Kopplung) + Print Styles
   __tests__/                Vitest Frontend-Tests
   impressum.html            Impressum
@@ -75,6 +75,19 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
   mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile, ein zweiter ohne Bild die Beast-Werbung
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
+  mistral-http.js           Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Ueberlast, Antwort als Strom
+  mistral-antwort.js        Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung
+  ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504
+  job-pipelines.js          Der Analyseweg: KI-Aufruf, Tier-Easter-Egg, Beast-Werbung, Kinderschutz
+  job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
+  minor-safety.js           Kinderschutz-Filter fuer Werbekategorien bei Minderjaehrigen
+  betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Pruefung, Cache
+  produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)
+  test-satz.js              Einstellungssatz fuer die Tests
+  durchsatz.js              Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze)
+  kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
+  laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
+  db.js                     Firestore-Zugang (benannte Datenbank malzime-eu)
   throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
     animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
   privacy.js                OCR-Privacy-Risiken aus Mistrals "Sichtbarer Text"
@@ -87,7 +100,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
   __tests__/                Jest Unit-Tests + fixtures/ fuer json-repair
-  scripts/                  Dev-Tools (load-test-malzime.js, queue-emulator-loadtest.js)
+  scripts/                  Dev-Tools (queue-emulator-loadtest.js — Lasttest gegen den Emulator)
 ```
 
 ## Queue-Architektur (v2.0)
@@ -137,8 +150,8 @@ cd functions && npm install && cd .. # Backend
 # 4. Lokal testen
 firebase emulators:start --only functions,hosting
 
-# 5. Deploy
-firebase deploy --only functions,hosting
+# 5. Deploy (Riegel, Trockenlauf, Live-Smoke — Ablauf in docs/RUNBOOK.md)
+./scripts/deploy.sh
 ```
 
 Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md) | Eigene Instanz aufsetzen: [`docs/SELF-HOSTING.md`](docs/SELF-HOSTING.md) | Betrieb & Rollback: [`docs/RUNBOOK.md`](docs/RUNBOOK.md)
@@ -332,7 +345,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - **Audit-Gate** im Backend-Job (`scripts/audit-gate.mjs`): blockiert bei hohen und kritischen Schwachstellen. Laesst sich eine Luecke tief in einer fremden Abhaengigkeitskette nachweislich (noch) nicht reparieren, kann sie **begruendet und mit Ablaufdatum** in `.github/audit-allowlist.json` ausgenommen werden — danach faellt das Gate von selbst wieder auf rot
 - **Pruefungen** (`pruefungen`, alle blockierend): verbotene Formulierungen in Aussentexten (`.pruefungen/aussentext.txt`), Zahlen mit mehr als einem Wert (`.pruefungen/fakten.txt`), stille Fehlschlaege in Skripten, Tests ohne Zusicherung. Der Job prueft zuerst die Pruefungen selbst — je Pruefung eine Probe gegen kaputtes und eine gegen sauberes Material. Die genaue Probenzahl steht bewusst nur im Skript und wird von `selbstpruefung.sh` gezaehlt, nicht hier (sonst driftet sie)
 - **Branch Protection** fuer `main`: Merges erst nach allen gruenen Pflicht-Checks. Kanonische Quelle ist `gh api repos/malziland/malzime/branches/main/protection` (Stand 2026-08-13: sechs Checks inkl. `playwright-version` und `pruefungen`, `enforce_admins: true`)
-- Deploy erfolgt manuell per `npx firebase deploy`
+- Deploy erfolgt manuell ueber `scripts/deploy.sh` (Riegel, Trockenlauf, Live-Smoke; Ablauf in `docs/RUNBOOK.md`), nie direkt per `firebase deploy`
 
 ## Tech-Stack
 

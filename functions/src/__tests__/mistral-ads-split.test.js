@@ -166,7 +166,6 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
   test("liegt HINTER dem Bild in der user-Message — nicht im gecachten system-Teil", async () => {
     const captured = mockAnswer(answerSplit());
     await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de", {
-      usePromptCache: true,
       blocklistIndex: 0,
     });
 
@@ -186,11 +185,9 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
   test("der gecachte system-Teil ist über verschiedene Sperrlisten hinweg bitgleich", async () => {
     const captured = mockAnswer(answerSplit());
     await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de", {
-      usePromptCache: true,
       blocklistIndex: 0,
     });
     await runSingleLargeCall(Buffer.from("y"), "image/jpeg", () => 60000, "de", {
-      usePromptCache: true,
       blocklistIndex: 3,
     });
 
@@ -202,17 +199,6 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
     const u0 = captured[0].messages.find((m) => m.role === "user").content[1].text;
     const u1 = captured[1].messages.find((m) => m.role === "user").content[1].text;
     expect(u0).not.toBe(u1);
-  });
-
-  test("ohne Cache-Flag hängt die Sperre ans Ende der user-Message", async () => {
-    const captured = mockAnswer(answerSplit());
-    await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de", { blocklistIndex: 0 });
-
-    const body = captured[0];
-    expect(body.messages).toHaveLength(1);
-    const types = body.messages[0].content.map((c) => c.type);
-    expect(types).toEqual(["text", "image_url", "text"]);
-    expect(body.messages[0].content[2].text).toContain("MARKEN-SPERRE");
   });
 
   test("rotiert über alle Sets und nennt die verbrannten Dauerbrenner", () => {
@@ -456,15 +442,9 @@ describe("OPS-008 — Prompt-Cache am Zweitaufruf", () => {
     expect(msgs[0].content.length).toBeGreaterThan(500);
   });
 
-  test("ausgeschaltetes Flag schickt keinen Cache-Schlüssel mehr", async () => {
+  test("schickt immer den Cache-Schlüssel (fest seit 10.09.2026)", async () => {
     const captured = fangen();
-    await mistral.generateBeastAds(boostProfil, [], "de", { usePromptCache: false });
-    expect(captured[0].prompt_cache_key ?? null).toBeNull();
-  });
-
-  test("eingeschaltetes Flag schickt ihn (Positivkontrolle)", async () => {
-    const captured = fangen();
-    await mistral.generateBeastAds(boostProfil, [], "de", { usePromptCache: true });
+    await mistral.generateBeastAds(boostProfil, [], "de");
     expect(captured[0].prompt_cache_key).toBe("malzime-beast-ads-de");
   });
 });

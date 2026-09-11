@@ -44,22 +44,33 @@ const PROFIL = {
   meta: { requestId: "sw-test", mode: "multimodal" },
 };
 
-/** Baut die Seite mit gestellten Endpunkten. `merkmal` schaltet das Flag. */
-async function seiteVorbereiten(page, { merkmal = true, jobHaengt = false } = {}) {
-  const zaehler = { enqueue: 0 };
+/** Baut die Seite mit gestellten Endpunkten.
+    `stats` stellt die Antwort von /api/stats: "normal" (wie live), "fehler"
+    (500), "altesFeldAus" (ein alter Server meldet noch `sprachumschalter:
+    false`) oder "haengt" (die Anfrage bleibt ohne Antwort, bis der Test sie
+    mit `zaehler.freigeben()` abbricht). `zaehler.stats` zaehlt die Anfragen. */
+async function seiteVorbereiten(page, { stats = "normal", jobHaengt = false } = {}) {
+  const zaehler = { enqueue: 0, stats: 0 };
+  const gehalten = [];
+  zaehler.freigeben = () => Promise.all(gehalten.map((r) => r.abort().catch(() => {})));
 
-  await page.route("**/api/stats", (route) =>
-    route.fulfill({
+  await page.route("**/api/stats", (route) => {
+    zaehler.stats += 1;
+    if (stats === "haengt") {
+      gehalten.push(route);
+      return undefined;
+    }
+    if (stats === "fehler") return route.fulfill({ status: 500, body: "kaputt" });
+    return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
         current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
         totals: { today: 10, week: 50, month: 200, total: 1000 },
-        useQueue: true,
-        sprachumschalter: merkmal,
+        ...(stats === "altesFeldAus" ? { sprachumschalter: false } : {}),
       }),
-    })
-  );
+    });
+  });
   await page.route("**/api/enqueue", (route) => {
     zaehler.enqueue += 1;
     return route.fulfill({
@@ -91,7 +102,8 @@ async function settle(page) {
   await page.evaluate(() => new Promise((fertig) => requestAnimationFrame(() => requestAnimationFrame(fertig))));
 }
 
-/** Wartet, bis der Umschalter da ist (er entsteht erst nach /api/stats). */
+/** Wartet, bis der Umschalter da ist. Er entsteht, sobald das Seitenskript
+    nach dem Laden der Uebersetzung laeuft — nicht schon mit dem HTML. */
 async function warteAufSchalter(page) {
   await expect(page.locator(".sprach-pille")).toBeVisible();
 }
@@ -211,51 +223,84 @@ async function axePruefen(page, kontext) {
   ).toEqual([]);
 }
 
-/* ══ Merkmals-Schloss ═══════════════════════════════════════════════════ */
+/* ══ Entsteht immer ═════════════════════════════════════════════════════ */
+/* Bis zum 10.09.2026 baute die Startseite den Umschalter erst, wenn /api/stats
+   ein Merkmal meldete. Fiel die Schnittstelle oder die Datenbank kurz aus,
+   fehlte er still. Die Tests hier stellen genau die Faelle nach, in denen er
+   frueher verschwand — und verlangen, dass er dasteht UND wirkt. */
 
-test("Flag aus: der Umschalter existiert nicht im Dokument", async ({ page }) => {
-  await seiteVorbereiten(page, { merkmal: false });
-  /* Den Wächter VOR dem Laden aufstellen: Wartet man erst danach, ist die
-     Antwort oft längst da und das Warten läuft in den Zeitausfall. */
-  const antwort = page.waitForResponse("**/api/stats");
-  await page.goto("/");
-  await expect(page.locator("h1")).toBeVisible();
-  await antwort;
-  await settle(page);
-
-  /* „Zählt null" ist für sich genommen schwach — es wäre auch dann erfüllt,
-     wenn der Umschalter erst später erschiene. Die Gegenprobe direkt darunter
-     zeigt, dass er unter denselben Bedingungen sehr wohl entsteht. */
-  await expect(page.locator(".sprach-pille")).toHaveCount(0);
-  await expect(page.locator(".sw-grund")).toHaveCount(0);
-});
-
-test("Positivkontrolle: mit Flag entsteht er sehr wohl", async ({ page }) => {
-  /* Ohne diese Gegenprobe wäre der Test oben auch dann grün, wenn der
-     Umschalter überhaupt nicht mehr gebaut werden kann. */
-  await seiteVorbereiten(page, { merkmal: true });
+test("mit normaler Antwort entsteht er, samt beiden Rückfragen", async ({ page }) => {
+  await seiteVorbereiten(page);
   await page.goto("/");
   await warteAufSchalter(page);
+  await expect(page.locator(".sprach-pille")).toHaveCount(1);
   await expect(page.locator(".sw-grund")).toHaveCount(2);
 });
 
-test("die Adress-Tür ist entfernt — das Anhängsel wirkt nicht mehr (v3.3.1)", async ({ page }) => {
+for (const [fall, beschreibung] of [
+  ["fehler", "/api/stats mit einem Fehler antwortet"],
+  ["altesFeldAus", "ein alter Server noch `sprachumschalter: false` meldet"],
+]) {
+  test(`er entsteht auch, wenn ${beschreibung}`, async ({ page }) => {
+    const zaehler = await seiteVorbereiten(page, { stats: fall });
+    /* Den Wächter VOR dem Laden aufstellen: Wartet man erst danach, ist die
+       Antwort oft längst da und das Warten läuft in den Zeitausfall. */
+    const antwort = page.waitForResponse("**/api/stats");
+    await page.goto("/");
+    await antwort;
+    /* Erst messen, nachdem der Antwort-Empfänger gearbeitet hat — sonst zählte
+       man einen Umschalter, den die Antwort danach vielleicht wieder entfernt. */
+    await settle(page);
+    expect(zaehler.stats, "die gestellte Antwort wurde nie abgerufen").toBe(1);
+    await expect(page.locator(".sprach-pille")).toHaveCount(1);
+    await expect(page.locator(".sprach-pille")).toBeVisible();
+    await expect(page.locator(".sw-grund")).toHaveCount(2);
+    /* Und er wirkt: Auf der leeren Seite geht ein Wechsel sofort durch. */
+    await page.click('.sprach-knopf[data-lang="en"]');
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  });
+}
+
+test("er entsteht auch, wenn /api/stats gar nicht antwortet", async ({ page }) => {
+  /* Der härteste Fall: Die Anfrage läuft, eine Antwort kommt nie. Früher
+     wartete der Umschalter genau darauf. */
+  const zaehler = await seiteVorbereiten(page, { stats: "haengt" });
+  try {
+    await page.goto("/");
+    await expect.poll(() => zaehler.stats, { message: "die Anfrage an /api/stats ging nie hinaus" }).toBe(1);
+    await warteAufSchalter(page);
+    await expect(page.locator(".sw-grund")).toHaveCount(2);
+    await page.click('.sprach-knopf[data-lang="en"]');
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  } finally {
+    await zaehler.freigeben();
+  }
+});
+
+test("die Adress-Tür ist entfernt — ein Anhängsel blendet nichts aus und nichts doppelt ein (v3.3.1)", async ({
+  page,
+}) => {
   /* Bis v3.3.0 blendete `?sprachumschalter=1` den Schalter auch ohne Flag ein
-     und hinterliess dafuer eine Spur im localStorage. Der Umschalter ist seit
-     v3.3.0 live, die Tuer also ueberfluessig — und ihre Spur widersprach der
-     Datenschutzerklaerung. */
-  await seiteVorbereiten(page, { merkmal: false });
-  const antwort = page.waitForResponse("**/api/stats");
-  await page.goto("/?sprachumschalter=1");
-  await antwort;
-  await settle(page);
-  await expect(page.locator(".sprach-pille")).toHaveCount(0);
+     und hinterliess dafuer eine Spur im localStorage — das widersprach der
+     Datenschutzerklaerung. Heute steht er immer da; eine Adresse darf daran
+     nichts aendern, weder mit =0 noch mit =1. */
+  await seiteVorbereiten(page);
+  for (const suche of ["/?sprachumschalter=0", "/?sprachumschalter=1"]) {
+    const antwort = page.waitForResponse("**/api/stats");
+    await page.goto(suche);
+    await antwort;
+    await settle(page);
+    await expect(page.locator(".sprach-pille"), suche).toHaveCount(1);
+    await expect(page.locator(".sprach-pille"), suche).toBeVisible();
+  }
+  const speicher = await page.evaluate(() => Object.keys(localStorage));
+  expect(speicher).toEqual([]);
 });
 
 test("die Daumen-Größe stimmt auch am Handy", async ({ page }) => {
-  /* Positivkontrolle zum Test darueber: ueber das Merkmals-Schloss entsteht er
-     sehr wohl — und ist dort gross genug fuer einen Daumen. */
-  await seiteVorbereiten(page, { merkmal: true });
+  /* Am Handy muss er gross genug fuer einen Daumen sein. Gemessen wird die
+     Flaeche, die ein Tippen wirklich trifft (siehe trefferflaeche). */
+  await seiteVorbereiten(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await warteAufSchalter(page);
@@ -265,17 +310,8 @@ test("die Daumen-Größe stimmt auch am Handy", async ({ page }) => {
   expect(f.hoehe).toBeGreaterThanOrEqual(44);
 });
 
-test("ein Tippfehler in der Adresse blendet nichts ein", async ({ page }) => {
-  await seiteVorbereiten(page, { merkmal: false });
-  const antwort = page.waitForResponse("**/api/stats");
-  await page.goto("/?sprachumschalter=0");
-  await antwort;
-  await settle(page);
-  await expect(page.locator(".sprach-pille")).toHaveCount(0);
-});
-
 test("die Konsolen-Tür ist entfernt, und der Browser bleibt leer (v3.3.1)", async ({ page }) => {
-  await seiteVorbereiten(page, { merkmal: true });
+  await seiteVorbereiten(page);
   await page.goto("/");
   await warteAufSchalter(page);
 
@@ -614,7 +650,7 @@ test("die Sprache reist in einen neuen Tab mit (v3.3.1)", async ({ page }) => {
      target="_blank" geoeffneter Tab bekommt einen LEEREN sessionStorage, und
      alle sechs Links der Startseite oeffnen einen neuen Tab. Ohne Anhaengsel
      landete man von der englischen Startseite ueberall wieder auf Deutsch. */
-  await seiteVorbereiten(page, { merkmal: true });
+  await seiteVorbereiten(page);
   await page.goto("/");
   await warteAufSchalter(page);
 

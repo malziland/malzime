@@ -33,9 +33,10 @@ const { getFeatureFlags } = require("./feature-flags");
    umgestellt — die Einlassgrenze rechnete aber weiter mit dem alten Wert. Das
    waere erst im Workshop unter Last aufgefallen, ohne Signal.
 
-   Faellt eine der beiden Groessen aus, bleibt es bei der Konstante aus
-   config.js: Die Einlassgrenze ist eine Schutzgrenze, keine Einstellung — sie
-   darf nie fehlen, sonst liesse die Seite unbegrenzt Leute herein. */
+   Faellt die Messung aus, gilt `warteschlangeTiefe` aus dem Einstellungssatz;
+   ohne Satz ist die Einlassgrenze null (siehe unten). Eine Konstante im Code
+   gibt es seit 30.08.2026 nicht mehr: Die Einlassgrenze darf nie fehlen,
+   aber auch nie aus einer zweiten Quelle kommen. */
 async function aktuelleEinlassgrenze() {
   const { werte } = await geltendeWerte();
   /* Ohne Einstellungssatz laeuft ohnehin keine Analyse — dann ist die

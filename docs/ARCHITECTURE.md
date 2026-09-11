@@ -40,7 +40,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │     ├─ Rate-Limit (IP-basiert, Wert im Einstellungssatz)          │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
 │     ├─ Hourly-Limit-Check (Firestore, rollendes Fenster)           │
-│     └─ Queue-Tiefen-Bremse (warteschlangeTiefe)                    │
+│     └─ Einlassgrenze (Messung, sonst warteschlangeTiefe)           │
 │                                                                    │
 │  Bild → GCS-Bucket, Job-Dokument → Firestore, Task → Cloud Tasks   │
 │  Antwort an den Browser: { jobId } — KEINE Analyse in dieser       │
@@ -147,7 +147,7 @@ einzelne Anfragen hingen sechzig Sekunden, 94 von 170 Verbindungen rissen ab.
 Die Lehre gilt über diesen Fall hinaus: **Nicht in ein gemeinsames Dokument
 schreiben, sondern zählen.**
 
-Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab `warteschlangeTiefe` wartenden Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt (`parallelitaet` × gemessene Dauer je Analyse). Beide Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
+Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab einer Einlassgrenze wartender Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. Die Grenze rechnet `handle-enqueue.js` laufend aus der gemessenen Dauer der letzten Analysen; nur ohne Messung gilt der feste Wert `warteschlangeTiefe`. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt (`parallelitaet` × gemessene Dauer je Analyse). Beide Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
 
 Dazu kommt die Selbstregulation: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten. Abbrecher werden nach der Karenz (`livenessGnadenfristMs`) gereapt und geben ihren Stunden-Slot zurück. Wartende Jobs haben zusätzlich ein absolutes Höchstalter (`wartendesHoechstalterMs`) — fortlaufendes Pollen hält einen Job also nicht unbegrenzt am Leben.
 
@@ -164,8 +164,23 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call) |
-| `js/api.js` | API-Client: Einreihen, Statusabfrage, Wiederaufnahme — mit AbortController + Stale-Guard |
+| `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Status abfragen, Ergebnis zustellen, Wiederaufnahme nach Neuladen — mit AbortController + Stale-Guard |
+| `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
+| `js/auftrag-speicher.js` | Auftragsgedächtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, 15-Minuten-Frist für ein zugestelltes Ergebnis |
+| `js/wake-lock.js` | Bildschirm während der Analyse wach halten (Best-Effort) und den Stand für die Telemetrie melden |
+| `js/rc-ticket.js` | Einmal-Ticket des Realitäts-Checks (sessionStorage), eigenes Modul gegen einen Import-Kreis |
 | `js/render.js` | Profile-Rendering, Bias-Toggle, Privacy-Cards, Karte |
+| `js/live-anzeige.js` | Live-Karte während der Analyse: getippter Zusammenfassungstext, ankommende Ergebnis-Boxen |
+| `js/klang.js` | Die zwei Klänge des Live-Erlebnisses (Web Audio, im Browser erzeugt) |
+| `js/beast-lockruf.js` | Einmaliger Hinweis auf den Beast-Umschalter, wenn das Profil fertig dasteht |
+| `js/sticky-toggle.js` | Umschalter bleibt nach dem Ergebnis oben stehen, Leseposition beim Moduswechsel halten |
+| `js/modus-speicher.js` | Modus-Wahl (seriös / Beast) über ein Neuladen hinweg merken |
+| `js/realitaets-check.js` | Realitäts-Check: anonyme Selbsteinschätzung, wie gut die KI getroffen hat |
+| `js/sprachumschalter.js` | DE/EN-Umschalter samt Rückfragen; startet eine laufende Analyse in der neuen Sprache neu |
+| `js/heic.js` | HEIC-Fotos im Browser öffnen, wenn der Browser es nicht selbst kann (Dekoder nur bei Bedarf geladen) |
+| `js/absturz-wache.js` | Erkennt eine Neustart-Schleife der Seite, meldet sie einmal und bricht sie ab |
+| `js/druck-wache.js` | Meldet eine leer gebliebene Seite nach dem Druckdialog (Diagnose) |
+| `js/echtheit-pruefen.js` | Rechnet die Prüfsummen aus `build-info.json` im Browser nach (Echtheits-Nachweis) |
 | `js/ui.js` | Maintenance-Modal, Limit-Banner, Scan-Animation, Warteschlangen-Anzeige |
 | `js/state.js` | Globaler State (`requestId`, `isAnalyzing`) |
 | `js/i18n.js` | i18n Micro-Modul (`initI18n`, `t`, `applyTranslations`) |
@@ -194,9 +209,11 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `jobs.js` | Queue: Job-Lebenszyklus + Firestore-Zugriff auf die `jobs`-Collection |
 | `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
-| `feature-flags.js` | Laufzeit-Feature-Flags (u. a. `usePromptCache`, `useLiveText`, `useBeastAdsCall`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
+| `feature-flags.js` | Laufzeit-Feature-Flags (`useBeastAdsCall`, `useGemesseneDauer`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
 | `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
 | `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile; ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
+| `job-pipelines.js` | Der Analyseweg eines Auftrags (`runPipeline`): ein Aufruf an Mistral Large liefert Beschreibung und beide Profile, danach die Beast-Werbung |
+| `ueberlast.js` | Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504) |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
 | ~~`heartbeat.js`~~ | Entfernt mit dem Audit 2026-08-10 — hatte seit v2.10 keinen Aufrufer mehr (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
@@ -209,6 +226,18 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `notify.js` | ntfy-Push bei Limit-Erreichung |
 | `domains.js` | Zentrale CORS-Whitelist |
 | `i18n.js` | Backend-Locale-Loader |
+| `mistral-http.js` | Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Überlast, Antwort als Strom |
+| `mistral-antwort.js` | Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung (`escapeXml`) |
+| `mistral-mock.js` | Mistral-Attrappe für Unit-Tests und Emulator (`MISTRAL_MOCK=1`) |
+| `job-helfer.js` | Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung) |
+| `minor-safety.js` | Kinderschutz-Filter für Werbekategorien bei erkennbar Minderjährigen |
+| `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Prüfung, Cache, Rückfall |
+| `produktiv-satz.js` | Betriebswerte für den echten Betrieb — Quelle für `config/betriebsprofil` |
+| `test-satz.js` | Einstellungssatz für die Tests |
+| `durchsatz.js` | Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze) |
+| `kapazitaets-wache.js` | Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen |
+| `laufzeit-wache.js` | Meldet, wenn Analysen an ihre Zeitgrenze stoßen |
+| `db.js` | Firestore-Zugang (benannte Datenbank `malzime-eu`) |
 
 ## Externe Abhängigkeiten
 

@@ -503,10 +503,7 @@ function wirksamesLimit(daten, anzahlImFenster = 0, grundlimit) {
      kommt aus dem Einstellungssatz und wird hereingereicht. Der Boost ist
      KEINE zweite Definition desselben Werts, sondern ein zeitlich begrenzter
      Aufschlag darauf — er hat ein Ablaufdatum und faellt danach auf den
-     Grundwert zurueck.
-
-     Fehlt der Grundwert, gilt die Konstante aus config.js: Das Stundenlimit
-     ist eine Schutzgrenze, ohne sie waere der Einlass unbegrenzt. */
+     Grundwert zurueck. */
   /* Der Grundwert ist PFLICHT — es gibt keinen Rueckfall mehr im Code
      (Vorgabe des Nutzers, 30.08.2026: jeder Wert genau einmal, aus der
      Datenbank). Fehlt er, ist das ein Konfigurationsfehler und soll auffallen. */

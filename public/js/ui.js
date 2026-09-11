@@ -181,18 +181,6 @@ export function showLimitBanner(retryAfterSeconds) {
   startLimitCountdown(retryAfterSeconds);
 }
 
-export function hideLimitBanner() {
-  if (!elements.limitBanner) return;
-  elements.limitBanner.classList.remove("active");
-
-  bereicheSchalten(false);
-
-  if (countdownInterval) {
-    clearInterval(countdownInterval);
-    countdownInterval = null;
-  }
-}
-
 function startLimitCountdown(totalSeconds) {
   if (countdownInterval) clearInterval(countdownInterval);
   let remaining = totalSeconds;

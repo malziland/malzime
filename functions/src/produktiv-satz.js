@@ -59,7 +59,17 @@ const T1_NORMAL = {
      einem Blick ins Mistral-Dashboard, nicht nach Gefühl. */
   queueRatePerSekunde: 0.1,
 
-  warteschlangeTiefe: 155,
+  /* EINLASSGRENZE OHNE MESSUNG: 100, bewusst eine runde Zahl (Festlegung
+     11.09.2026; bis dahin 155). Gilt nur, wenn keine gemessene Dauer vorliegt
+     — frische Installation, Messung abgeschaltet, Datenbank hakt. Sonst
+     rechnet handle-enqueue.js laufend aus den letzten 20 Analysen: 30 Minuten
+     Browser-Geduld / Dauer je Analyse (80-Perzentil) × parallelitaet × 0,8
+     Abstand. Zum Vergleich mit derselben Formel: 40 s (Median, gemessen
+     30.08.2026) ergaeben 108; rund 63 s ergaeben 68 (80-Perzentil des
+     Mistral-Aufrufs ueber 567 Analysen vom 12.08. bis 10.09.2026: 59 s, dazu
+     geschaetzt 4 s fuer den Werbe-Aufruf). Die 155 stammten aus der Rechnung
+     mit 7 parallel und 65 s. */
+  warteschlangeTiefe: 100,
 
   /* GEMESSEN 30.08.2026 an der Produktion: Median 40 s (Spanne 34–41), nicht
      65. Der Wert steuert die angezeigte Wartezeit — zu hoch heißt, die Leute
@@ -125,6 +135,8 @@ const PROFILE = {
     ...T1_NORMAL,
     singleLargeTimeoutMs: 450000,
     durchschnittsdauerSekunden: 110,
+    /* Dieselbe Formel wie oben mit 110 s: 1800 / 110 × 3 × 0,8 = 39. */
+    warteschlangeTiefe: 39,
   },
 };
 

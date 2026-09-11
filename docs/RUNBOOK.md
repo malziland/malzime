@@ -34,8 +34,7 @@ deploy.sh ging durch).
   Nachsehen: `./scripts/warteschlange-pruefen.sh`.
 - **Limits:** Stundenlimit und IP-Rate-Limit stehen im Einstellungssatz
   (`config/betriebsprofil`, siehe [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md)) —
-  hier bewusst ohne Zahl, damit sie nach einer Umstellung nicht falsch ist
-  500 Requests / 10 min pro Instanz.
+  hier bewusst ohne Zahl, damit sie nach einer Umstellung nicht falsch ist.
 - **Lastprofil:** Workshops sind Stoßlast (Mo–Fr vormittags); genau dafür ist die
   Queue da. Mistral-Latenz schwankt mit Tageszeit/Wochentag — Messungen immer im
   repräsentativen Zeitfenster bewerten.
@@ -315,14 +314,16 @@ Erwartet: keine Zeile.
 
 ## Rollback-Hebel
 
-Vom schnellsten zum gründlichsten. Alle Flag-Hebel wirken **ohne Deploy** binnen
-~30 Sekunden (Cache-TTL der Flags).
+Vom schnellsten zum gründlichsten. Der einzige verbliebene Schalter-Hebel ist
+`useBeastAdsCall` (3a); er wirkt **ohne Deploy** binnen ~30 Sekunden (Cache-TTL
+der Flags).
 
 > **Seit 09.09.2026 (4.8.0):** Die Functions lesen ausschließlich die Geheimnisse mit
 > Endung `_EU` (europe-west1). Die alten Namen ohne Endung sind gelöscht. Ein Rollback
-> auf eine Fassung vor 4.8.0 (Hebel 4) braucht sie vorher neu: Secret unter altem Namen
-> anlegen, Wert aus dem `_EU`-Secret kopieren (`scripts/geheimnisse-eu-kopieren.sh`
-> in umgekehrter Richtung), IAM-Bindung setzen. Der Mistral-Schlüssel vor 4.8.0 ist
+> auf eine Fassung vor 4.8.0 (Hebel 4) braucht sie vorher neu, je Geheimnis:
+> `gcloud secrets versions access latest --secret=<NAME>_EU --project=malzime | gcloud secrets create <NAME> --data-file=- --replication-policy=user-managed --locations=europe-west1 --project=malzime`,
+> danach die IAM-Bindung des Functions-Dienstkontos setzen. (Das frühere
+> Kopierskript lief nur in die Gegenrichtung und ist seit 10.09.2026 entfernt.) Der Mistral-Schlüssel vor 4.8.0 ist
 > bei Mistral gelöscht; auch dafür den aktuellen Wert nehmen.
 
 ### 1. Wartungsmodus (Sekunden — kontrollierte Vollbremsung)
@@ -366,18 +367,13 @@ greift.
 ehrlich „gleich zurück", statt sie auf einen Weg zu schicken, der unter Last
 auch nicht trägt.
 
-### 2a. Sprachumschalter aus (Sekunden — ein Bedienelement zurücknehmen)
+### 2a. Sprachumschalter aus — ENTFALLEN (10.09.2026)
 
-`featureFlags/current.useSprachumschalter = false` in der Firestore-Console,
-auch vom Handy aus. Wirkt beim nächsten Seitenaufruf (Flag-Cache 30 s).
-
-Danach entsteht der Umschalter gar nicht mehr im Dokument — nicht ausgegraut,
-sondern weg. Laufende Analysen sind nicht betroffen, und **Englisch bleibt
-erreichbar**: über `?lang=en` in der Adresse und über die Gerätesprache. Der
-Hebel nimmt nur das Bedienelement zurück, nicht die Sprache.
-
-Wann er gebraucht wird: wenn der Umschalter mitten in einem Workshop irritiert
-oder ein Fehler auffällt. Kein Deploy, kein Neustart, keine Nebenwirkung.
+Der DE/EN-Umschalter ist fest eingebaut (docs/FLAGS.md). Einen schnellen Hebel, nur
+ihn abzuschalten, gibt es nicht mehr. Stört er mitten in einem Workshop, bleibt der
+Wartungsmodus (Hebel 1) oder der Rückweg auf 4.9.0 — Functions und Webseite
+zusammen (Hebel 4, dann 5); dort lässt er sich mit `useSprachumschalter: false`
+abschalten. Nur die Webseite zurückzunehmen hilft nicht gezielt (Hebel 5).
 
 ### 3. Single-Large-Call aus — ENTFALLEN (10.09.2026)
 
@@ -394,7 +390,11 @@ Störung ist der Wartungsmodus (Hebel 1).
 Seit v2.8 erzeugt ein zweiter, kleiner Mistral-Aufruf die Beast-Werbung — ohne
 Bild, damit sie an der Schwachstelle ansetzt statt am Foto. Er ist so gebaut,
 dass ein Ausfall folgenlos bleibt: Schlägt er fehl, steht die Werbeliste aus dem
-Hauptaufruf. **Ein eigener Notfall-Hebel ist deshalb nicht nötig.**
+Hauptaufruf. Stilllegen lässt er sich trotzdem ohne Deploy — gebraucht, wenn
+die Anfragen pro Minute knapp werden, denn er verdoppelt sie: in
+`featureFlags/current` das Feld `useBeastAdsCall` auf `false` setzen (wirkt
+binnen ~30 s, Näheres in [FLAGS.md](FLAGS.md)). Zurück: Feld löschen oder auf
+`true` setzen.
 
 Falls der Aufruf dauerhaft zurückgebaut werden soll (Code-Rollback): `parallelitaet`
 und `queueRatePerSekunde` im Einstellungssatz neu rechnen — vorher ins
@@ -422,16 +422,12 @@ Nachrechnung mit den Messdaten des Tages: 4/0,125 → 6 bis 11 Ablehnungen,
 Wer sie ändert, ändert die laufende Queue — kein Deploy, kein gcloud-Befehl.
 Vorher ins Mistral-Dashboard sehen, nicht nach Gefühl entscheiden.
 
-### 3b. Prompt-Caching aus (~30 s, kein Deploy, keine Begleitschritte)
+### 3b. Prompt-Caching aus — ENTFALLEN (10.09.2026)
 
-`featureFlags/current.usePromptCache = false` in der Firestore-Console setzen.
-Danach wird weder ein `prompt_cache_key` gesendet noch der Nachrichten-Aufbau
-umgestellt — der Pfad ist bitgenau der Stand v2.4.4.
-
-Es gibt hier **keine** Kopplung an die Warteschlange oder `config.js`: Es ist eine reine Kostenmaßnahme ohne Einfluss auf
-Modell, Durchsatz oder Rate-Limits. Wenn unklar ist, ob das Caching an einer
-Störung beteiligt ist, kostet das Umlegen nichts außer der Ersparnis — im Zweifel
-ausschalten. Details → [FLAGS.md](FLAGS.md#usepromptcache-seit-v25).
+Der Prompt-Zwischenspeicher ist fest eingebaut (docs/FLAGS.md): reine
+Kostenmaßnahme ohne Einfluss auf Modell, Ergebnis oder Durchsatz. Ein Verdacht,
+dass er an einer Störung beteiligt ist, wird über einen Functions-Rollback
+(Hebel 4) geklärt, nicht über einen Schalter.
 
 ### 4. Functions-Rollback auf einen früheren Stand (~2 min)
 
@@ -462,11 +458,31 @@ ignoriert die zusätzlichen Felder, die Reihenfolge ist also gefahrlos). Dazu in
 `featureFlags/current` das Feld `useSingleLargeCall` auf `true` setzen. Die
 satzWache meldet den neuen Satz per Push — das ist erwartet.
 
+**Rollback auf 4.9.0 (nach der Auslieferung, die drei Schalter fest eingebaut
+hat).** 4.9.0 liest `usePromptCache`, `useLiveText` und `useSprachumschalter`
+aus `featureFlags/current`; ein fehlendes Feld heißt dort „aus". Die drei Felder
+bleiben deshalb mit `true` stehen, bis eine weitere Auslieferung draußen ist
+([FLAGS.md](FLAGS.md)). Vor dem Rollback prüfen, dass alle drei noch auf `true`
+stehen, und sie sonst wieder anlegen — ohne sie fehlen nach dem Rollback der
+DE/EN-Umschalter und der Live-Text, und der Prompt-Zwischenspeicher ist aus
+(höhere Kosten). Für den Betrieb braucht der Einstellungssatz keinen Handgriff:
+4.9.0 kennt dieselben Felder, nur `warteschlangeTiefe` steht auf 100 statt 155.
+Wird der 4.9.0-Stand später über `scripts/deploy.sh` ausgeliefert, stoppt der
+Abgleich (Datenbank 100, Repo 155) — dann vorher im Rollback-Verzeichnis
+`node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`.
+
 ### 5. Hosting-Rollback
 
 Schnellster Weg: Firebase Console → Hosting → Release-Verlauf → **Rollback**
 (ein Klick, stellt den vorherigen Stand wieder her). Alternativ: früheren Stand wie
 in Hebel 4 auschecken und `firebase deploy --only hosting`.
+
+**Webseite nur zusammen mit den Functions auf 4.9.0 zurück.** Die
+4.9.0-Webseite baut den DE/EN-Umschalter nur, wenn `/api/stats` das Feld
+`sprachumschalter: true` liefert; die neuen Functions liefern es nicht mehr. Die
+Seite liefe weiter, nur ohne Umschalter. Deshalb bei einem Rückweg auf 4.9.0
+zuerst die Functions (Hebel 4), dann die Webseite. Umgekehrt ist unkritisch: Die
+neue Webseite liest das Feld nicht (`public/app.js`, `public/js/stats.js`).
 
 ### 5a. Schnittstellen zurück auf den Hosting-Weg (nur Hosting-Deploy, seit 09.09.2026)
 
@@ -696,6 +712,19 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 > neuesten Stand innerhalb ihrer Bereiche — im Backend zuletzt bis hin zu
 > `firebase-functions` 7.3.2 und damit Express 4 → 5. Das gehört in einen
 > eigenen, bewusst freigegebenen Schritt.
+
+## Handwerkzeuge (nur von Hand, laufen nie automatisch)
+
+- `node scripts/vorschau.mjs [port]` — lokale Vorschau, die die Umleitungen aus
+  `firebase.json` nachbildet (saubere Adressen wie `/impressum`); Vorgabe-Port 8099.
+- `sh scripts/simulator-szenarien.sh` — Workshop-Lagen im Emulator mit
+  Mistral-Attrappe: ganze Klasse gleichzeitig, volle Warteliste, Umstellung des
+  Einstellungssatzes, während Leute warten. Kostet nichts; Voraussetzung und
+  Start des Emulators stehen im Kopf des Skripts.
+- `sh scripts/lasttest-live.sh <anzahl>` — echte Analysen gegen die Produktion.
+  **Kostet Geld**, zählt dauerhaft in der öffentlichen Statistik mit und
+  verbraucht das Stundenlimit. Nur mit Freigabe; nach einem Deploy genügt
+  `sh scripts/lasttest-live.sh 1` als Beweis, dass eine echte Analyse durchläuft.
 
 ## Logs und Aufbewahrung
 

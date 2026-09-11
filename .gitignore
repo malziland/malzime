@@ -42,11 +42,6 @@ single-large-call-results-*.json
 compare-prototype*.html
 compare-result*.json
 
-# Forschungs-/Prototyp-Skripte: bleiben lokal nutzbar, werden aber NICHT
-# automatisch committet (bewusst mit `git add -f` einzeln freizugeben).
-functions/scripts/prompts-candidate-*.js
-functions/scripts/single-large-ab-runner-v2.js
-
 # Design-Prototyp im malziland-Look (2026-07-12): enthält malziland-Marken-
 # Assets (Monogramm) — gehört nicht ins öffentliche malziME-Repo.
 prototype-malziland/

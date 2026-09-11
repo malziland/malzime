@@ -352,9 +352,13 @@ async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, op
      ein Zehntel davon (er ist im Betrieb frueh fertig), die Karten teilen sich
      den Rest. */
   const gesamt = mockDelayMs();
-  const textSchritt = Math.max(80, Math.round(gesamt / 30));
+  /* Verzoegerung 0 heisst: gar nicht warten (Unit-Tests). Seit der Live-Text
+     fest eingebaut ist (10.09.2026), laeuft JEDER Aufruf mit Datenstrom — die
+     Mindestschritte unten wuerden sonst jeden Test um Sekunden verlaengern. */
+  const ohneWarten = gesamt === 0;
+  const textSchritt = ohneWarten ? 0 : Math.max(80, Math.round(gesamt / 30));
   const kartenAnzahl = Math.max(1, Object.keys(normal.categories || {}).length);
-  const kartenSchritt = Math.max(150, Math.round((gesamt * 0.9) / kartenAnzahl));
+  const kartenSchritt = ohneWarten ? 0 : Math.max(150, Math.round((gesamt * 0.9) / kartenAnzahl));
   const karten = (profil) =>
     Object.entries(profil.categories || {}).map(([schluessel, k]) => ({
       schluessel,

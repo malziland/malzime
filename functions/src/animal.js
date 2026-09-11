@@ -194,6 +194,4 @@ module.exports = {
   detectAnimalType,
   buildAnimalProfiles,
   TYPE_KEYWORDS,
-  VALID_SUBJECTS,
-  SUBJECT_REGEX,
 };

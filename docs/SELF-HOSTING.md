@@ -231,7 +231,7 @@ Trage den Bucket-Namen in `functions/src/config.js` (`QUEUE_BUCKET`) oder als Um
 firebase deploy --only firestore:indexes
 ```
 
-**4. Feature-Flags:** Die Warteschlange läuft immer; seit v2.10 gibt es keinen zweiten Weg mehr. Im Dokument `featureFlags/current` steuerst du u. a. `usePromptCache` und `useLiveText` — ohne Deploy umlegbar (Uebersicht in `FLAGS.md`).
+**4. Feature-Flags:** Die Warteschlange läuft immer; seit v2.10 gibt es keinen zweiten Weg mehr. Im Dokument `featureFlags/current` steuerst du `useBeastAdsCall` (Notausschalter fuer den Werbe-Aufruf) und `useGemesseneDauer` — ohne Deploy umlegbar (Uebersicht in `FLAGS.md`).
 
 Die IAM-Rolle, mit der Cloud Tasks den Worker `processJob` aufrufen darf, vergibt `firebase deploy` automatisch.
 
@@ -285,7 +285,7 @@ Bevor du live gehst:
 - [ ] User-Agent in geocoding.js enthaelt deinen Projektnamen
 - [ ] Eigenes OG-Image erstellt
 - [ ] Locale-Dateien angepasst (falls gewuenscht)
-- [ ] Firebase Secrets gesetzt: ADMIN_SECRET, MISTRAL_API_KEY (+ optional NTFY_URL, NTFY_TOPIC)
+- [ ] Secrets gesetzt, EU-gebunden: ADMIN_SECRET_EU, MISTRAL_API_KEY_EU, NTFY_URL_EU, NTFY_TOPIC_EU (Namen wie in `functions/src/index.js`)
 - [ ] Firestore Security Rules deployed: `firebase deploy --only firestore`
 - [ ] Queue eingerichtet: Cloud-Tasks-Queue + GCS-Bucket + `QUEUE_BUCKET` gesetzt + Firestore-Indizes deployt (siehe »Queue-Architektur einrichten«)
 - [ ] Tests laufen: `cd functions && npm test` und `npm run test:frontend`

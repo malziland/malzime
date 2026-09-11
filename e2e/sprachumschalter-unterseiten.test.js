@@ -436,9 +436,10 @@ test.describe("Zahlen-Seite: echter Wechsel im laufenden Betrieb", () => {
        anderen Weg — eigene Datei je Sprache, bloßer Link. Beide Wege stehen
        nebeneinander, deshalb steht diese Prüfung in derselben Datei.
 
-       Ob der Umschalter überhaupt entsteht, entscheidet allein das
-       Merkmals-Schloss, das stats.js aus /api/stats liest. Der Testserver
-       liefert die Schnittstelle nicht, also wird sie hier gestellt. */
+       Der Umschalter entsteht dort sofort, unabhängig von /api/stats (Test
+       weiter unten). Gestellt wird die Schnittstelle trotzdem: Der Testserver
+       liefert sie nicht, und ohne Antwort zeigte die Seite ihre Fehlerzeile
+       statt der Zahlen. */
     await page.route("**/api/stats", (route) =>
       route.fulfill({
         status: 200,
@@ -446,8 +447,6 @@ test.describe("Zahlen-Seite: echter Wechsel im laufenden Betrieb", () => {
         body: JSON.stringify({
           current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
           totals: { today: 10, week: 50, month: 200, total: 1000 },
-          useQueue: true,
-          sprachumschalter: true,
         }),
       })
     );
@@ -460,6 +459,28 @@ test.describe("Zahlen-Seite: echter Wechsel im laufenden Betrieb", () => {
     await expect(page.locator("h1")).toContainText("numbers");
     /* Hier steht nichts auf dem Spiel — es darf keine Rückfrage kommen. */
     await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
+  });
+});
+
+test.describe("Zahlen-Seite: der Umschalter hängt nicht an den Zahlen", () => {
+  /* Sonst startet der Testbrowser (en-US) die Seite bereits englisch. */
+  test.use({ locale: "de-AT" });
+
+  /* Bis zum 10.09.2026 entstand der Umschalter hier erst, wenn /api/stats ein
+     Merkmal meldete. Schlug die Anfrage fehl, zeigte die Seite ihre
+     Fehlerzeile — und keinen Umschalter. Jetzt muss er gerade dann dastehen
+     und wirken. */
+  test("scheitert /api/stats, steht der Umschalter trotzdem da und wirkt", async ({ page }) => {
+    await page.route("**/api/stats", (route) => route.fulfill({ status: 500, body: "kaputt" }));
+    await page.goto("/stats.html");
+    /* Positivkontrolle: Der Fehlerfall ist wirklich eingetreten. */
+    await expect(page.locator("#statsError")).toBeVisible();
+    await expect(page.locator(".sprach-pille")).toHaveCount(1);
+    await expect(page.locator(".sprach-pille")).toBeVisible();
+
+    await page.click('.sprach-knopf[data-lang="en"]');
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator("h1")).toContainText("numbers");
   });
 });
 
@@ -487,8 +508,6 @@ test.describe("Zahlen-Seite: der Wechsel erreicht auch die Zahlen", () => {
         body: JSON.stringify({
           current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0, hourlyTotal: 10 },
           totals: { today: 10, week: 50, month: 200, allTime: 4000 },
-          useQueue: true,
-          sprachumschalter: true,
         }),
       })
     );

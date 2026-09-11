@@ -40,7 +40,7 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │     ├─ Rate-Limit (IP-basiert, Wert im Einstellungssatz)          │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
 │     ├─ Hourly-Limit-Check (Firestore, rollendes Fenster)           │
-│     └─ Queue-Tiefen-Bremse (warteschlangeTiefe)                    │
+│     └─ Einlassgrenze (Messung, sonst warteschlangeTiefe)           │
 │                                                                    │
 │  Bild → GCS-Bucket, Job-Dokument → Firestore, Task → Cloud Tasks   │
 │  Antwort an den Browser: { jobId } — KEINE Analyse in dieser       │
@@ -147,7 +147,7 @@ einzelne Anfragen hingen sechzig Sekunden, 94 von 170 Verbindungen rissen ab.
 Die Lehre gilt über diesen Fall hinaus: **Nicht in ein gemeinsames Dokument
 schreiben, sondern zählen.**
 
-Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab `warteschlangeTiefe` wartenden Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt (`parallelitaet` × gemessene Dauer je Analyse). Beide Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
+Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab einer Einlassgrenze wartender Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. Die Grenze rechnet `handle-enqueue.js` laufend aus der gemessenen Dauer der letzten Analysen; nur ohne Messung gilt der feste Wert `warteschlangeTiefe`. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt (`parallelitaet` × gemessene Dauer je Analyse). Beide Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
 
 Dazu kommt die Selbstregulation: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten. Abbrecher werden nach der Karenz (`livenessGnadenfristMs`) gereapt und geben ihren Stunden-Slot zurück. Wartende Jobs haben zusätzlich ein absolutes Höchstalter (`wartendesHoechstalterMs`) — fortlaufendes Pollen hält einen Job also nicht unbegrenzt am Leben.
 

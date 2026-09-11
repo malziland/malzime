@@ -369,8 +369,11 @@ auch nicht trägt.
 
 ### 2a. Sprachumschalter aus — ENTFALLEN (10.09.2026)
 
-Der DE/EN-Umschalter ist fest eingebaut (docs/FLAGS.md). Stört er mitten in einem
-Workshop, ist der Weg ein Hosting-Rollback (Hebel 5).
+Der DE/EN-Umschalter ist fest eingebaut (docs/FLAGS.md). Einen schnellen Hebel, nur
+ihn abzuschalten, gibt es nicht mehr. Stört er mitten in einem Workshop, bleibt der
+Wartungsmodus (Hebel 1) oder der Rückweg auf 4.9.0 — Functions und Webseite
+zusammen (Hebel 4, dann 5); dort lässt er sich mit `useSprachumschalter: false`
+abschalten. Nur die Webseite zurückzunehmen hilft nicht gezielt (Hebel 5).
 
 ### 3. Single-Large-Call aus — ENTFALLEN (10.09.2026)
 
@@ -462,8 +465,11 @@ bleiben deshalb mit `true` stehen, bis eine weitere Auslieferung draußen ist
 ([FLAGS.md](FLAGS.md)). Vor dem Rollback prüfen, dass alle drei noch auf `true`
 stehen, und sie sonst wieder anlegen — ohne sie fehlen nach dem Rollback der
 DE/EN-Umschalter und der Live-Text, und der Prompt-Zwischenspeicher ist aus
-(höhere Kosten). Der Einstellungssatz braucht keinen Handgriff: 4.9.0 kennt
-dieselben Felder, nur `warteschlangeTiefe` steht auf 100 statt 108.
+(höhere Kosten). Für den Betrieb braucht der Einstellungssatz keinen Handgriff:
+4.9.0 kennt dieselben Felder, nur `warteschlangeTiefe` steht auf 100 statt 155.
+Wird der 4.9.0-Stand später über `scripts/deploy.sh` ausgeliefert, stoppt der
+Abgleich (Datenbank 100, Repo 155) — dann vorher im Rollback-Verzeichnis
+`node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`.
 
 ### 5. Hosting-Rollback
 

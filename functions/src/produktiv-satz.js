@@ -65,9 +65,10 @@ const T1_NORMAL = {
      rechnet handle-enqueue.js laufend aus den letzten 20 Analysen: 30 Minuten
      Browser-Geduld / Dauer je Analyse (80-Perzentil) × parallelitaet × 0,8
      Abstand. Zum Vergleich mit derselben Formel: 40 s (Median, gemessen
-     30.08.2026) ergaeben 108, 63 s (80-Perzentil ueber 567 Analysen vom
-     12.08. bis 10.09.2026) ergaeben 68. Die 155 stammten aus der Rechnung mit
-     7 parallel und 65 s. */
+     30.08.2026) ergaeben 108; rund 63 s ergaeben 68 (80-Perzentil des
+     Mistral-Aufrufs ueber 567 Analysen vom 12.08. bis 10.09.2026: 59 s, dazu
+     geschaetzt 4 s fuer den Werbe-Aufruf). Die 155 stammten aus der Rechnung
+     mit 7 parallel und 65 s. */
   warteschlangeTiefe: 100,
 
   /* GEMESSEN 30.08.2026 an der Produktion: Median 40 s (Spanne 34–41), nicht

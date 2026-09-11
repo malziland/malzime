@@ -103,7 +103,14 @@ ZEILEN_GRENZEN = {
     # unbemerkt zurueck.
     "public/js/api.js": 1000,
     "public/js/render.js": 830,
-    "functions/src/counter.js": 790,
+    # ANGEHOBEN 11.09.2026 von 790 auf 975 (gemessen 928 plus rund 5 Prozent):
+    # Der Stundenzaehler zaehlt seitdem jeden Auftrag genau einmal — Marke je
+    # Einlass, Nachtrag, Nachlauf-Riegel. Das gehoert in DIESE Datei: Einlass
+    # (checkAndIncrement) und Freigabe (releaseHourlySlot) teilen sich den
+    # Zustand der offenen Nachlaeufe; getrennt muesste er ueber eine
+    # Modulgrenze gereicht werden. Der naechste Schnitt, wenn die Datei wieder
+    # waechst: Wartungsmodus und Realitaets-Check gehoeren am wenigsten dazu.
+    "functions/src/counter.js": 975,
     "functions/src/jobs.js": 770,
     # Nach zwei Schnitten (Helfer, Analyse-Wege) von 679 auf 285 Zeilen.
     "functions/src/handle-process-job.js": 320,

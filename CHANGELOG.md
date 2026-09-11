@@ -12,6 +12,15 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   `useLiveText`, `useSprachumschalter`), die seit 4.9.1 niemand mehr liest.
   Ein Rückweg auf 4.9.0 legt sie vorher wieder an (RUNBOOK, Hebel 4).
 
+### Behoben
+
+- **„Analysen in der letzten Stunde“ stimmt auch nach einem Ansturm.** Kamen
+  viele Analysen gleichzeitig, fehlte im Stundenzähler vereinzelt eine
+  (Lasttest am 11.09.: 35 statt 36). Jeder Auftrag trägt jetzt eine eigene
+  Marke. Ist der Zähler beim Einlass überlastet, trägt die Analyse ihre Marke
+  selbst nach, genau einmal. Ein abgebrochener Auftrag gibt genau seinen
+  eigenen Platz frei, nicht den eines anderen.
+
 ## [4.9.1] — 2026-09-11
 
 ### Geändert

@@ -338,13 +338,24 @@ async function handleEnqueue(req, res, secrets) {
     let jobId;
     try {
       imagePath = await storeImage(file.buffer, file.mimeType);
-      jobId = await createJob({ lang, traceId, imagePath, exif, resultToken });
+      /* Die Marke des Einlasses reist mit dem Auftrag: fuer den Nachtrag im
+         Worker und fuer eine Freigabe, die genau diesen Eintrag trifft
+         (counter.js, "GENAU EINMAL IM FENSTER"). */
+      jobId = await createJob({
+        lang,
+        traceId,
+        imagePath,
+        exif,
+        resultToken,
+        zaehlerStempel: counter.stempel,
+        zaehlerNachtrag: counter.nachtragNoetig === true,
+      });
     } catch (err) {
       /* Der Stunden-Slot ist hier schon gezogen, aber es entsteht nie eine
          Analyse — Slot zurückgeben und ein evtl. schon abgelegtes Bild nicht
          bis zur Lifecycle-Regel liegen lassen. */
       console.log(JSON.stringify({ requestId, traceId, warning: "store-or-create-failed", error: err.message }));
-      releaseHourlySlot().catch(() => {});
+      releaseHourlySlot(counter.stempel).catch(() => {});
       if (imagePath) await deleteImage(imagePath);
       res.status(503).json({ error: "Queue unavailable", code: "store_failed" });
       return;
@@ -371,7 +382,7 @@ async function handleEnqueue(req, res, secrets) {
       if (!(await platzBestaetigen(angelegt, einlassgrenze))) {
         await abandonJob(jobId);
         if (imagePath) await deleteImage(imagePath);
-        releaseHourlySlot().catch(() => {});
+        releaseHourlySlot(counter.stempel).catch(() => {});
         console.log(JSON.stringify({ requestId, traceId, warning: "queue-too-deep-nachtraeglich" }));
         res.status(429).json({
           blocked: "queueFull",
@@ -406,7 +417,7 @@ async function handleEnqueue(req, res, secrets) {
       console.log(JSON.stringify({ requestId, traceId, jobId, warning: "enqueue-failed", error: err.message }));
       await failJob(jobId, "enqueue_failed");
       /* BIZ-001: Slot zurückgeben — dieser Job löst nie eine echte Analyse aus. */
-      releaseHourlySlot().catch(() => {});
+      releaseHourlySlot(counter.stempel).catch(() => {});
       await deleteImage(imagePath);
       res.status(503).json({ error: "Queue unavailable", code: "enqueue_failed" });
       return;

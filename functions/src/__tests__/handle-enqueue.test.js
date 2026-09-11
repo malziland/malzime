@@ -232,6 +232,46 @@ describe("handleEnqueue — Erfolgsfall", () => {
   });
 });
 
+/* ── Stundenzähler: die Marke des Einlasses reist mit dem Auftrag ── */
+
+describe("handleEnqueue — Marke des Stundenzählers (11.09.2026)", () => {
+  test("Normalfall: der Auftrag trägt die Marke, ein Nachtrag ist nicht bestellt", async () => {
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500, stempel: 1789000000000.25 });
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(jobs.createJob).toHaveBeenCalledWith(
+      expect.objectContaining({ zaehlerStempel: 1789000000000.25, zaehlerNachtrag: false })
+    );
+  });
+
+  test("Zähler ausgewichen, das Netz ließ ein: der Auftrag bestellt den Nachtrag", async () => {
+    counter.checkAndIncrement.mockResolvedValue({
+      allowed: true,
+      count: 3,
+      limit: 500,
+      notbremse: true,
+      stempel: 1789000000000.5,
+      nachtragNoetig: true,
+    });
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(jobs.createJob).toHaveBeenCalledWith(
+      expect.objectContaining({ zaehlerStempel: 1789000000000.5, zaehlerNachtrag: true })
+    );
+  });
+
+  test("scheitert das Ablegen, fällt genau der eigene Eintrag", async () => {
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500, stempel: 1789000000000.75 });
+    storage.storeImage.mockRejectedValue(new Error("gcs down"));
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(503);
+    expect(counter.releaseHourlySlot).toHaveBeenCalledWith(1789000000000.75);
+  });
+});
+
 /* ── Cloud-Tasks-Ausfall ─────────────────────────────────────────── */
 
 describe("handleEnqueue — Cloud-Tasks-Ausfall", () => {

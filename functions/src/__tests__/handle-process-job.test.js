@@ -24,6 +24,7 @@ jest.mock("../queue-storage", () => ({
 jest.mock("../counter", () => ({
   incrementTotals: jest.fn(() => Promise.resolve()),
   releaseHourlySlot: jest.fn(() => Promise.resolve()),
+  zaehlerNachtragen: jest.fn(() => Promise.resolve(true)),
 }));
 jest.mock("../cloud-tasks", () => ({
   redispatchJobLocal: jest.fn(),
@@ -87,6 +88,50 @@ afterAll(() => {
 
 /* completeJob-Ergebnis des letzten Aufrufs. */
 const lastResult = () => jobs.completeJob.mock.calls[0][1];
+
+/* ── Stundenzähler: Nachtrag der Marke (11.09.2026) ──────────────── */
+
+describe("handleProcessJob — Nachtrag des Stundenzählers", () => {
+  test("bestellter Nachtrag: die Marke wird eingetragen, BEVOR der Worker antwortet", async () => {
+    /* Nach der Antwort drosselt die Plattform die Instanz — was dann noch
+       läuft, kommt vielleicht nie an. Genau so fehlte am 11.09. ein Auftrag. */
+    let eintragen;
+    counter.zaehlerNachtragen.mockImplementationOnce(() => new Promise((r) => (eintragen = r)));
+    jobs.getJob.mockResolvedValue({ ...JOB, zaehlerStempel: 1789000000000.5, zaehlerNachtrag: true });
+    const res = makeRes();
+    const lauf = handleProcessJob(postReq("job-1"), res);
+
+    for (let i = 0; i < 100 && jobs.completeJob.mock.calls.length === 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    /* Die Analyse ist durch, der Nachtrag hängt noch: keine Antwort. */
+    expect(jobs.completeJob).toHaveBeenCalled();
+    expect(counter.zaehlerNachtragen).toHaveBeenCalledWith(1789000000000.5);
+    expect(res.body).toBeNull();
+
+    eintragen(true);
+    await lauf;
+    expect(res.body).toEqual({ ok: true });
+  });
+
+  test("ohne bestellten Nachtrag schreibt der Worker nichts in den Stundenzähler", async () => {
+    jobs.getJob.mockResolvedValue({ ...JOB, zaehlerStempel: 1789000000000.5, zaehlerNachtrag: false });
+    const res = makeRes();
+    await handleProcessJob(postReq("job-1"), res);
+    expect(res.body).toEqual({ ok: true });
+    expect(counter.zaehlerNachtragen).not.toHaveBeenCalled();
+  });
+
+  test("verlassener Auftrag: kein Nachtrag, und es fällt genau sein eigener Eintrag", async () => {
+    jobs.isAbandoned.mockReturnValue(true);
+    jobs.getJob.mockResolvedValue({ ...JOB, zaehlerStempel: 1789000000000.5, zaehlerNachtrag: true });
+    const res = makeRes();
+    await handleProcessJob(postReq("job-1"), res);
+    expect(res.body.reason).toBe("abandoned");
+    expect(counter.zaehlerNachtragen).not.toHaveBeenCalled();
+    expect(counter.releaseHourlySlot).toHaveBeenCalledWith(1789000000000.5);
+  });
+});
 
 /* ── Frühe Abweisungen ───────────────────────────────────────────── */
 

@@ -297,6 +297,16 @@ diese Lücke im echten Betrieb ist, steht nach dem nächsten Workshop im Log
 Transaktion wäre die Abhilfe, erhöht aber die Kontention auf demselben
 Dokument — nur mit Simulator-Messung einbauen.
 
+**Erste Messung im echten Betrieb (11.09.2026, Lasttest mit 30 gleichzeitigen
+Analysen gegen malzi.me):** 9 Netz-Fälle (`netz-hat-uebernommen`, alle in derselben
+Sekunde, Grund `zeitlimit-kein-retry`). 8 der 9 Transaktionen schrieben ihren
+Zeitstempel nach dem Zeitlimit doch noch; im Fenster fehlte am Ende **einer von
+30** (`stats/current` 35 Einträge, Protokoll 36 angenommene Aufträge). Die Lücke ist
+damit deutlich kleiner als der schlechteste Fall oben (einer je Netz-Fall), weil die
+Transaktion nach dem Zeitlimit weiterläuft und meist noch schreibt. Kein Auftrag ging
+verloren — es fehlt nur ein Strich in der Zählung. Abhilfe deshalb weiter nicht
+eingebaut.
+
 Messwerte nach der Reparatur vom 30.08.2026 (Emulator, 170 gleichzeitige
 Anfragen, Stand vor dem Netz-Umbau vom 01.09.; mit dem neuen Netz nicht
 nachgemessen):

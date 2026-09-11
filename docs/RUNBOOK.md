@@ -455,11 +455,28 @@ ignoriert die zusätzlichen Felder, die Reihenfolge ist also gefahrlos). Dazu in
 `featureFlags/current` das Feld `useSingleLargeCall` auf `true` setzen. Die
 satzWache meldet den neuen Satz per Push — das ist erwartet.
 
+**Rollback auf 4.9.0 (nach der Auslieferung, die drei Schalter fest eingebaut
+hat).** 4.9.0 liest `usePromptCache`, `useLiveText` und `useSprachumschalter`
+aus `featureFlags/current`; ein fehlendes Feld heißt dort „aus". Die drei Felder
+bleiben deshalb mit `true` stehen, bis eine weitere Auslieferung draußen ist
+([FLAGS.md](FLAGS.md)). Vor dem Rollback prüfen, dass alle drei noch auf `true`
+stehen, und sie sonst wieder anlegen — ohne sie fehlen nach dem Rollback der
+DE/EN-Umschalter und der Live-Text, und der Prompt-Zwischenspeicher ist aus
+(höhere Kosten). Der Einstellungssatz braucht keinen Handgriff: 4.9.0 kennt
+dieselben Felder, nur `warteschlangeTiefe` steht auf 100 statt 108.
+
 ### 5. Hosting-Rollback
 
 Schnellster Weg: Firebase Console → Hosting → Release-Verlauf → **Rollback**
 (ein Klick, stellt den vorherigen Stand wieder her). Alternativ: früheren Stand wie
 in Hebel 4 auschecken und `firebase deploy --only hosting`.
+
+**Webseite nur zusammen mit den Functions auf 4.9.0 zurück.** Die
+4.9.0-Webseite baut den DE/EN-Umschalter nur, wenn `/api/stats` das Feld
+`sprachumschalter: true` liefert; die neuen Functions liefern es nicht mehr. Die
+Seite liefe weiter, nur ohne Umschalter. Deshalb bei einem Rückweg auf 4.9.0
+zuerst die Functions (Hebel 4), dann die Webseite. Umgekehrt ist unkritisch: Die
+neue Webseite liest das Feld nicht (`public/app.js`, `public/js/stats.js`).
 
 ### 5a. Schnittstellen zurück auf den Hosting-Weg (nur Hosting-Deploy, seit 09.09.2026)
 

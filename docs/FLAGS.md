@@ -22,6 +22,13 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 > `feature-flags.js`, catch-Zweig; Test: `feature-flags.test.js`). Bis 10.09.2026 stand
 > hier "fail-safe `true`" — das galt nur fuer das fehlende Feld.
 
+> **Alte Felder bleiben vorerst stehen.** `usePromptCache`, `useLiveText` und
+> `useSprachumschalter` stehen weiter mit `true` in `featureFlags/current`, bis eine
+> Auslieferung nach der ersten Fassung ohne diese Schalter draussen ist. Der heutige Code
+> liest sie nicht; die Fassung 4.9.0 schon, und dort heisst ein fehlendes Feld „aus".
+> Ohne sie fehlten nach einem Rueckweg auf 4.9.0 Umschalter und Live-Text (RUNBOOK,
+> Hebel 4).
+
 > **Stand 2026-08-21 (DOC-2026-08-20-09).** Die Spalte „Soll live" trug zuvor fuer
 > `useSprachumschalter` noch `false` — den Stand von der Vorbereitung am 13.08., obwohl
 > derselbe Text weiter unten den Umschalter seit v3.3.0 als live beschreibt. `useLiveText`

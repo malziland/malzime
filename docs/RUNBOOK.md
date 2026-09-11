@@ -461,9 +461,8 @@ satzWache meldet den neuen Satz per Push — das ist erwartet.
 **Rollback auf 4.9.0 (nach der Auslieferung, die drei Schalter fest eingebaut
 hat).** 4.9.0 liest `usePromptCache`, `useLiveText` und `useSprachumschalter`
 aus `featureFlags/current`; ein fehlendes Feld heißt dort „aus". Die drei Felder
-bleiben deshalb mit `true` stehen, bis eine weitere Auslieferung draußen ist
-([FLAGS.md](FLAGS.md)). Vor dem Rollback prüfen, dass alle drei noch auf `true`
-stehen, und sie sonst wieder anlegen — ohne sie fehlen nach dem Rollback der
+sind seit 11.09.2026 gelöscht ([FLAGS.md](FLAGS.md)). Vor dem Rollback deshalb
+alle drei mit `true` anlegen — ohne sie fehlen nach dem Rollback der
 DE/EN-Umschalter und der Live-Text, und der Prompt-Zwischenspeicher ist aus
 (höhere Kosten). Für den Betrieb braucht der Einstellungssatz keinen Handgriff:
 4.9.0 kennt dieselben Felder, nur `warteschlangeTiefe` steht auf 100 statt 155.

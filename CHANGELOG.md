@@ -4,6 +4,14 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Entfernt
+
+- **Die drei alten Schalterfelder in der Datenbank** (`usePromptCache`,
+  `useLiveText`, `useSprachumschalter`), die seit 4.9.1 niemand mehr liest.
+  Ein Rückweg auf 4.9.0 legt sie vorher wieder an (RUNBOOK, Hebel 4).
+
 ## [4.9.1] — 2026-09-11
 
 ### Geändert

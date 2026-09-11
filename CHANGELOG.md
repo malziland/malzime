@@ -14,10 +14,11 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Umschalter verschwand, der Live-Text fehlte, die Kosten stiegen. Die Schalter
   sind entfernt. Der Umschalter steht jetzt auf jeder Seite sofort da, auch
   wenn die Zahlen-Schnittstelle nicht antwortet.
-- **Die Einlassgrenze ohne Messwert passt zum heutigen Betrieb.** Liegt keine
-  gemessene Analysedauer vor, nimmt die Warteschlange höchstens 108 Wartende an
-  (bisher 155, gerechnet für einen früheren Takt; im Satz für eine langsame KI
-  39). So verspricht die Seite nie mehr Plätze, als in 30 Minuten drankommen.
+- **Die Einlassgrenze ohne Messwert passt zum heutigen Betrieb.** Im
+  Normalbetrieb rechnet der Server die Grenze laufend aus der gemessenen Dauer
+  der letzten Analysen. Fehlt diese Messung, nimmt die Warteschlange jetzt
+  höchstens 100 Wartende an (bisher 155, gerechnet für einen früheren Takt; im
+  Satz für eine langsame KI 39).
 - **Die Zahlen-Schnittstelle `/api/stats` liefert zwei Altfelder nicht mehr**
   (`useQueue`, `sprachumschalter`); die Webseite liest keines davon.
 - **Die Anleitungen führen ausschließlich über `scripts/deploy.sh`.** README,

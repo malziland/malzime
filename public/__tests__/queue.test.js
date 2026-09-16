@@ -416,6 +416,11 @@ describe("Queue-Modus", () => {
   });
 
   it("resumeQueueJob zeigt den Foto-gelöscht-Datenschutzhinweis statt des Fotos", async () => {
+    /* Leere Vorschau wie nach einem Neuladen. Ohne diese Zeile hing der Test an
+       der Reihenfolge: Lief der Test mit Foto in der Vorschau (oben) vorher,
+       stand dort noch ein Bild, und der Hinweis erschien zu Recht nicht
+       (gefunden 16.09.2026 mit zufaelliger Reihenfolge, Seeds 1 und 5). */
+    elements.imagePreview.innerHTML = "";
     sessionStorage.setItem("malzime.queueJobId", "job-note");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ status: "done", result: DONE_RESULT }));
     const p = resumeQueueJob();

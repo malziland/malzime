@@ -18,6 +18,15 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   meist ein Treffer des Kinderschutz-Filters dahintersteht und kein Ausfall,
   und wo man nachsieht (seit 16.09.2026).
 
+- **Die KI liest das Alter nur noch an der Person ab.** Gegenstände in der
+  Hand, Hintergrund und Tätigkeit zählen für die Altersschätzung nicht mehr,
+  und die Regel „22–28 Jahre, nicht jünger“ greift nur, wenn keine Kinder- oder
+  Jugendmerkmale zu sehen sind. Anlass: Im Workshop wurde ein 12-jähriges Kind
+  wegen der Gegenstände, die es hielt, auf rund 32 geschätzt. Vorher geprüft an
+  14 Fotos mit bekanntem Alter, je dreimal: keine Altersgruppe schlechter.
+- **Kein Slang wie „Food-Porn“ in den Profilen.** Die KI hat dafür jetzt eine
+  ausdrückliche Regel — das Werkzeug läuft in Schulklassen.
+
 ### Behoben
 
 - **Jede Fehlermeldung, die auf dem Bildschirm erscheint, wird jetzt auch

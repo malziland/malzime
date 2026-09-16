@@ -114,6 +114,17 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    relevant, reine Functions-Deploys brauchen keinen).
 5. `release.yml` legt automatisch einen GitHub-Release an, sobald die neue
    CHANGELOG-Version auf `main` landet (idempotent).
+
+   **Der Nachtrag-PR nach dem Deploy braucht keinen Browser-Test** (seit
+   16.09.2026). Ändert ein Pull Request nur die Cache-Kennung in den Seiten,
+   `public/build-info.json`, das CHANGELOG und `docs/VERIFICATION.md`,
+   erkennt das `scripts/nur-nachtrag.sh` im Pflicht-Job `playwright-version`;
+   `test-e2e` endet dann grün ohne Suite und sagt das im Protokoll. Die Regel
+   ist eng: Unterscheidet sich eine Seite in mehr als `?v=<Ziffern>`, kommt
+   eine andere Datei hinzu, fehlt eine Basis oder scheitert etwas, läuft die
+   volle Suite. Auf `main` und im Zeitplan-Lauf läuft sie immer. Begründung
+   und Neubewertung: `docs/SECURITY-MODEL.md`, Abschnitt „Nachtrag ohne
+   Browser-Test“.
 6. Nach dem Deploy läuft automatisch `scripts/live-smoke.sh`: vier
    kostenfreie Proben gegen die Live-API (Upload-Ablehnung 400 mit echter
    Validierungs-Meldung, Honeypot 403, Admin-Zugriffsschutz 403, Stats 200) —

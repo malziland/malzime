@@ -558,3 +558,37 @@ der Satz `t1-drei-call`, geleert am 10.09.2026 nach dem Deploy.
 
 **Neubewertung**, wenn der Abgleich künftig mehr als die Pflichtfelder prüfen
 soll (z. B. Wertebereiche je Satz) — dann gilt die Duldung auch dort.
+
+## Nachtrag ohne Browser-Test (16.09.2026)
+
+**Lage.** Nach jeder Auslieferung folgt ein Nachtrag-PR: neue Cache-Kennung in
+den Seiten, `public/build-info.json`, Versionszeile im CHANGELOG,
+Prüfstand-Stempel. Sein Inhalt ist zu diesem Zeitpunkt schon live und mit
+`scripts/pruefe-live.sh` gegen den Quelltext nachgerechnet. Der Browser-Test
+lief trotzdem voll — gut zehn Minuten, in denen er über Dateien ging, die sich
+von der geprüften Fassung nur in `?v=`-Kennungen unterscheiden.
+
+**Entscheidung.** `scripts/nur-nachtrag.sh` erkennt einen solchen PR im
+Pflicht-Job `playwright-version`; `test-e2e` endet dann ohne Suite mit Erfolg.
+„Ja“ nur, wenn jede geänderte Datei geändert (nicht neu, gelöscht, umbenannt)
+und eine von vier Arten ist: CHANGELOG, `docs/VERIFICATION.md`, ein gültiger
+Fingerabdruck, oder eine Seite aus der Kennungs-Liste von `deploy.sh`, die sich
+ausschließlich in `?v=<Ziffern>` unterscheidet. Alles andere ist „nein“.
+Die Erkennung sitzt in einem Pflicht-Job, damit ihr eigener Ausfall den PR
+blockiert, statt den Browser-Test still auszulassen. `test-backend`,
+`test-frontend`, `pruefungen` und `secret-scan` laufen unverändert.
+
+**Betrachtete Alternativen.** Pfadfilter in `on: pull_request` (lässt den
+Pflicht-Check ganz aus und prüft nicht, ob sich in einer Seite mehr als die
+Kennung ändert); den Nachtrag ohne PR direkt auf `main` schreiben (der
+Hauptzweig ist geschützt, auch für Verwaltende); die Versionszeile vor dem
+Deploy in den Feature-PR nehmen (der Auto-Release würde eine Fassung
+verkünden, die noch nicht live ist).
+
+**Geprüft durch** `functions/src/__tests__/nur-nachtrag-script.test.js`
+(13 Fälle in Wegwerf-Repositorys, davon 11 „nein“; Driftwächter gegen die
+Kennungs-Liste in `deploy.sh`; Rückbauprobe 16.09.2026: 4 rot).
+
+**Neubewertung**, wenn der Nachtrag weitere Dateiarten bekommt, wenn eine Seite
+die Cache-Kennung anders als über `?v=` trägt, oder wenn ein Fehler auftritt,
+den nur der Browser-Test in einem Nachtrag gefunden hätte.

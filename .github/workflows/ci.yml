@@ -185,16 +185,37 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.lesen.outputs.version }}
+      nur_nachtrag: ${{ steps.nachtrag.outputs.nur_nachtrag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Die Nachtrag-Erkennung unten vergleicht mit der Basis des PR.
+          fetch-depth: 0
       - id: lesen
         run: |
           VERSION=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
           echo "Playwright laut Lockfile: $VERSION"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      # NACHTRAG-ERKENNUNG (16.09.2026): Ein reiner Auslieferungs-Nachtrag
+      # (Cache-Kennung, build-info.json, CHANGELOG-Version, Pruefstand-Stempel)
+      # braucht den Browser-Test nicht — sein Stand ist zu diesem Zeitpunkt
+      # schon live und nachgerechnet. Die Regel steht in scripts/nur-nachtrag.sh
+      # und ist eng: jede andere Aenderung, jeder Fehler ergibt "nein". Die
+      # Erkennung sitzt bewusst HIER, in einem Pflicht-Job: Scheitert sie, ist
+      # der PR blockiert — test-e2e wird nie still uebersprungen.
+      - id: nachtrag
+        env:
+          BASIS: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
+        run: sh scripts/nur-nachtrag.sh
 
   test-e2e:
     needs: playwright-version
+    # Reiner Nachtrag (siehe playwright-version): Der GANZE Job entfaellt und
+    # steht auf "skipped" — nicht auf "success". Der Branch-Schutz laesst einen
+    # uebersprungenen Pflicht-Check durch; scripts/deploy.sh und die Baum-Regel
+    # verlangen dagegen "success" und werten ihn nie als bestandenen
+    # Browser-Test (Befund der unabhaengigen Pruefung, 16.09.2026).
+    if: needs.playwright-version.outputs.nur_nachtrag != 'ja'
     runs-on: ubuntu-latest
     # Offizielles Playwright-Image mit VORINSTALLIERTEM Chromium (Browser-Version
     # exakt passend zur installierten @playwright/test). Damit entfaellt der

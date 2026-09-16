@@ -594,14 +594,15 @@ Versionszeile vor dem Deploy in den Feature-PR nehmen (der Auto-Release würde
 eine Fassung verkünden, die noch nicht live ist).
 
 **Geprüft durch** `functions/src/__tests__/nur-nachtrag-script.test.js`
-(23 Fälle in Wegwerf-Repositorys, darunter Submodul-Zeiger, Symlink,
-Rechte-Änderung, Dateiname mit Zeilenumbruch, Ziffern hinter `?v=` im Code,
-unvollständiger Fingerabdruck; Driftwächter gegen die Kennungs-Liste in
-`deploy.sh`). Rückbauprobe 16.09.2026 je Prüfung rot (Modus 3, Kennungsform 3,
-Dateiliste des Fingerabdrucks 1). Unabhängige Prüfung am selben Tag: drei
-mittlere Befunde (übersprungener Test als `success`, von einer Pipe
-verschluckte git-Fehler, Ziffern hinter `?v=` als Code), alle vor dem Merge
-behoben.
+(25 Fälle in Wegwerf-Repositorys, darunter Submodul-Zeiger, auch ein per
+`.gitmodules` ausgeblendeter, Symlink, Rechte-Änderung, Dateiname mit
+Zeilenumbruch, Ziffern hinter `?v=` im Code, unvollständiger Fingerabdruck;
+Driftwächter gegen die Kennungs-Liste in `deploy.sh`). Rückbauprobe
+16.09.2026 je Prüfung rot (Modus 3, Kennungsform 3, Dateiliste des
+Fingerabdrucks 1, ausgeblendete Submodule 1, Auslieferungszeit 1).
+Unabhängige Prüfung am selben Tag: drei mittlere Befunde (übersprungener Test
+als `success`, von einer Pipe verschluckte git-Fehler, Ziffern hinter `?v=` als
+Code) und kleinere, alle vor dem Merge behoben und nachgeprüft.
 
 **Neubewertung**, wenn der Nachtrag weitere Dateiarten bekommt, wenn eine Seite
 die Cache-Kennung anders als über `?v=<10 Ziffern>"` trägt, wenn GitHub

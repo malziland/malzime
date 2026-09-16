@@ -353,4 +353,33 @@ describe("nur-nachtrag.sh — wann der Browser-Test entfallen darf", () => {
     committen(repo);
     expect(pruefen(repo, basis).ergebnis).toBe("nein");
   });
+  test("N1: ein Submodul, das .gitmodules mit ignore = all ausblendet, ist trotzdem 'nein'", () => {
+    const { repo, basis } = neu({
+      ".gitmodules": '[submodule "vendor"]\n\tpath = vendor\n\turl = ./x\n\tignore = all\n',
+    });
+    git(repo, "update-index", "--add", "--cacheinfo", `160000,${basis},vendor`);
+    git(repo, "commit", "-q", "-m", "submodul");
+    const zwischen = git(repo, "rev-parse", "HEAD").trim();
+    nachtragSchreiben(repo);
+    /* Gezielt hinzufuegen: `add -A` wuerde den Zeiger entfernen, weil es das
+       Verzeichnis vendor nicht gibt. */
+    git(repo, "add", "CHANGELOG.md", "docs", "public");
+    git(repo, "update-index", "--add", "--cacheinfo", `160000,${zwischen},vendor`);
+    git(repo, "commit", "-q", "-m", "nachtrag plus zeiger");
+    const r = pruefen(repo, zwischen);
+    expect(r.ergebnis).toBe("nein");
+    expect(r.stdout).toContain("vendor hat Modus 160000 -> 160000");
+  });
+
+  test("N1: ein Fingerabdruck ohne Auslieferungszeit ist 'nein'", () => {
+    const { repo, basis } = neu();
+    nachtragSchreiben(repo);
+    schreiben(
+      repo,
+      "public/build-info.json",
+      JSON.stringify({ commit: "bbbbbbb1111", cacheBuster: "2026091601", dateien: { "index.html": "sha256:1" } })
+    );
+    committen(repo);
+    expect(pruefen(repo, basis).ergebnis).toBe("nein");
+  });
 });

@@ -4,20 +4,16 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [4.10.0] — 2026-09-16
 
 ### Geändert
 
 - **Kürzere Wartezeit, wenn eine ganze Klasse gleichzeitig abschickt.** Es
-  laufen wieder vier Analysen gleichzeitig statt drei (seit 16.09.2026 über
-  den Einstellungssatz in Betrieb, ohne Deploy). Am Workshop-Tag davor lag die
-  Zeit bis zum Ergebnis im Mittel bei rund zwei Minuten; nachgerechnet mit
-  denselben Ankunftszeiten sinkt sie auf rund eine Minute. Lehnt der
-  KI-Anbieter dabei einmal ab, wartet die Analyse kurz und versucht es erneut.
-- **Die Alarm-Mail erklärt sich selbst.** Betreff und Text sagen jetzt, dass
-  meist ein Treffer des Kinderschutz-Filters dahintersteht und kein Ausfall,
-  und wo man nachsieht (seit 16.09.2026).
-
+  laufen wieder vier Analysen gleichzeitig statt drei. Am Workshop-Tag vom
+  16.09. lag die Zeit bis zum Ergebnis im Mittel bei rund zwei Minuten;
+  nachgerechnet mit denselben Ankunftszeiten sinkt sie auf rund eine Minute.
+  Lehnt der KI-Anbieter dabei einmal ab, wartet die Analyse kurz und versucht
+  es erneut.
 - **Die KI liest das Alter nur noch an der Person ab.** Gegenstände in der
   Hand, Hintergrund und Tätigkeit zählen für die Altersschätzung nicht mehr,
   und die Regel „22–28 Jahre, nicht jünger“ greift nur, wenn keine Kinder- oder
@@ -26,6 +22,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   14 Fotos mit bekanntem Alter, je dreimal: keine Altersgruppe schlechter.
 - **Kein Slang wie „Food-Porn“ in den Profilen.** Die KI hat dafür jetzt eine
   ausdrückliche Regel — das Werkzeug läuft in Schulklassen.
+- **Die Alarm-Mail erklärt sich selbst.** Betreff und Text sagen jetzt, dass
+  meist ein Treffer des Kinderschutz-Filters dahintersteht und kein Ausfall,
+  und wo man nachsieht.
 
 ### Behoben
 

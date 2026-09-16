@@ -50,7 +50,16 @@ initDemo(uebersetzungBereit);
    Wartezeit versetzt. */
 elements.fileInput.addEventListener("change", () => {
   const file = elements.fileInput.files[0];
-  if (!file) return;
+  if (!file) {
+    /* LEERE AUSWAHL (16.09.2026): Kommt die Auswahl ohne Datei zurueck, sieht
+       das Kind gar nichts — und die Fehlererfassung bisher auch nicht. Die
+       Phase sagt, ob vorher schon ein Foto gewaehlt war (dann kann es auch ein
+       Abbrechen der Auswahl sein). */
+    logClientError(new Error("auswahl_leer"), {
+      phase: state.lastFile ? "auswahl-leer-nach-foto" : "auswahl-leer",
+    });
+    return;
+  }
   uebersetzungBereit.then(() => handleNewFile(file));
 });
 document.querySelector(".file-drop").addEventListener("drop", (e) => {

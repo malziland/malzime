@@ -107,8 +107,12 @@ describe("analyzeImage", () => {
     const p2 = analyzeImage();
     await p1;
     await p2;
-    /* fetch sollte nur einmal aufgerufen werden */
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    /* Eingereiht wird genau einmal. Gezaehlt werden nur die Einreih-Aufrufe:
+       Seit 16.09.2026 meldet der Lauf den Fall "Einreihen ohne Auftragsnummer"
+       (diese Attrappe liefert keine) ueber denselben fetch an die
+       Fehlererfassung — das ist ein zweiter Aufruf, aber keine zweite Analyse. */
+    const einreihungen = globalThis.fetch.mock.calls.filter(([url]) => String(url).includes("/api/enqueue"));
+    expect(einreihungen).toHaveLength(1);
   });
 
   it("shows error when no file selected", async () => {

@@ -34,6 +34,7 @@
       "fileFormat": "dessen Format und Größe",
       "errorDetail": "Fehlerart",
       "zweiterLeseweg": "zusammengefasst",
+      "kopfLesetest": "zusammengefasst",
       "durationMs": "Fehlerart, Dauer",
       "httpStatus": "Fehlerart",
       "fileSizeKb": "dessen Format und Größe",

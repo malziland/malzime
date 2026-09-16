@@ -87,9 +87,17 @@ export default defineConfig({
        Dateien nachlaedt) reisst er Verbindungen ab: "BrokenPipeError" und
        "ConnectionResetError" standen wiederholt im Pipeline-Protokoll, einmal
        hat ein solcher Aussetzer einen Testlauf rot gemacht. Die mehrspurige
-       Variante steht in derselben Standardbibliothek und kostet nichts. */
+       Variante steht in derselben Standardbibliothek und kostet nichts.
+       WARTESCHLANGE 128 (16.09.2026): Der Server nimmt von Haus aus nur 5
+       wartende Verbindungen an. Auf dem Mac (14 Kerne, 7 Arbeiter) liefen
+       dadurch drei volle Laeufe hintereinander mit 5 bis 12 roten Tests —
+       in den Aufzeichnungen jedes Mal ERR_CONNECTION_RESET, die Seite bekam
+       app.js nicht. macOS bricht ueberzaehlige Verbindungen ab, Linux (die
+       Pipeline) laesst sie warten; deshalb war die Pipeline gruen. Mit 128
+       Plaetzen: 373 von 373 gruen bei voller Parallelitaet (gemessen mit
+       einem von Hand gestarteten Server und PW_REUSE=1). */
     command:
-      "python3 -c \"from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler;import functools,os;os.chdir('public');ThreadingHTTPServer(('',8081),SimpleHTTPRequestHandler).serve_forever()\"",
+      "python3 -c \"from http.server import ThreadingHTTPServer,SimpleHTTPRequestHandler;import functools,os;os.chdir('public');ThreadingHTTPServer.request_queue_size=128;ThreadingHTTPServer(('',8081),SimpleHTTPRequestHandler).serve_forever()\"",
     port: 8081,
     // TEST-2026-08-13-K6: Standardmäßig NICHT wiederverwenden. Vorher teilten
     // sich zwei gleichzeitige Läufe Port 8081 — der zweite bekam einen fremden

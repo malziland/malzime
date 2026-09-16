@@ -64,9 +64,9 @@ Policy-Definition als JSON (`policy.json`):
 {
   "displayName": "malziME Function Errors",
   "documentation": {
-    "subject": "malziME: Function-Fehler",
+    "subject": "malziME-Hinweis: Fehlerzeile oder Kinderschutz-Treffer (Details im Text)",
     "mimeType": "text/markdown",
-    "content": "Eine Cloud Function hat einen Fehler geloggt (severity>=ERROR)."
+    "content": "<Klartext: was die Mail bedeutet, häufigste Anlässe, wo nachsehen>"
   },
   "conditions": [{
     "displayName": "ERROR-Log in malziME-Functions",
@@ -90,6 +90,16 @@ gcloud alpha monitoring policies create \
 ```
 
 Der `notificationRateLimit` (300s) verhindert Push-Spam bei einem Fehler-Sturm.
+
+**Warum Betreff und Text den Kinderschutz-Treffer nennen (seit 16.09.2026).**
+Die Mail kam am 16.09.2026 während eines Workshops und sah aus wie ein
+Systemausfall. Anlass war aber die Zeile `minor-safety-durchbruch`: ein Wort
+aus der harten Sperrliste im Profiltext, die Analyse selbst lief normal. Der
+Text der Richtlinie sagt seitdem in Klartext, was die Mail bedeutet, welche
+Anlässe am häufigsten sind (Kinderschutz-Treffer, Scanner-Rauschen) und wo im
+RUNBOOK nachzusehen ist. Geändert wird er über die Monitoring-Schnittstelle
+(`PATCH …/alertPolicies/<ID>?updateMask=documentation`), weil
+`gcloud alpha monitoring policies update` den Betreff nicht setzen kann.
 
 ## Zweite Richtlinie: Haeufung von Client-Fehlern (seit 2026-08-21)
 

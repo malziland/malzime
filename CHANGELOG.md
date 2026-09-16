@@ -4,6 +4,39 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Kürzere Wartezeit, wenn eine ganze Klasse gleichzeitig abschickt.** Es
+  laufen wieder vier Analysen gleichzeitig statt drei (seit 16.09.2026 über
+  den Einstellungssatz in Betrieb, ohne Deploy). Am Workshop-Tag davor lag die
+  Zeit bis zum Ergebnis im Mittel bei rund zwei Minuten; nachgerechnet mit
+  denselben Ankunftszeiten sinkt sie auf rund eine Minute. Lehnt der
+  KI-Anbieter dabei einmal ab, wartet die Analyse kurz und versucht es erneut.
+- **Die Alarm-Mail erklärt sich selbst.** Betreff und Text sagen jetzt, dass
+  meist ein Treffer des Kinderschutz-Filters dahintersteht und kein Ausfall,
+  und wo man nachsieht (seit 16.09.2026).
+
+- **Die KI liest das Alter nur noch an der Person ab.** Gegenstände in der
+  Hand, Hintergrund und Tätigkeit zählen für die Altersschätzung nicht mehr,
+  und die Regel „22–28 Jahre, nicht jünger“ greift nur, wenn keine Kinder- oder
+  Jugendmerkmale zu sehen sind. Anlass: Im Workshop wurde ein 12-jähriges Kind
+  wegen der Gegenstände, die es hielt, auf rund 32 geschätzt. Vorher geprüft an
+  14 Fotos mit bekanntem Alter, je dreimal: keine Altersgruppe schlechter.
+- **Kein Slang wie „Food-Porn“ in den Profilen.** Die KI hat dafür jetzt eine
+  ausdrückliche Regel — das Werkzeug läuft in Schulklassen.
+
+### Behoben
+
+- **Jede Fehlermeldung, die auf dem Bildschirm erscheint, wird jetzt auch
+  anonym erfasst.** Sechs Meldungen (etwa „Datei zu groß“ oder „Auftrag
+  verworfen“) und eine leer zurückgekommene Fotoauswahl blieben bisher
+  unsichtbar. Kann ein Handy ein Foto nicht übergeben, zeigt die Meldung jetzt
+  auch, ob wenigstens der Anfang der Datei lesbar war — ohne Inhalt, ohne
+  Dateiname. Damit lässt sich eingrenzen, warum manche Android-Handys Fotos
+  nicht herausgeben.
+
 ## [4.9.2] — 2026-09-11
 
 ### Entfernt

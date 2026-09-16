@@ -61,6 +61,12 @@ async function readFileBytes(file, auswahlZeit) {
          erklaert. */
       const zweiter = await zweiterLeseweg(file);
       if (zweiter.bytes) return zweiter.bytes;
+      /* KOPF-LESETEST (16.09.2026): Im Workshop scheiterte der zweite Leseweg in
+         11 von 11 Faellen — er hat die Ursache nicht eingegrenzt. Offen blieb:
+         Gibt das Geraet die Datei GAR NICHT heraus, oder nur nicht vollstaendig?
+         Die ersten 16 Bytes zu lesen trennt beides. Gemeldet wird nur das
+         Stichwort, die Bytes werden verworfen. */
+      const kopf = await kopfLesetest(file);
       const wrapped = new Error("read_failed");
       wrapped.errorDetail = (err && err.name) || "ReadError";
       /* Browser-deklarierter MIME-Typ statt Magic Bytes — mehr haben wir bei
@@ -68,6 +74,7 @@ async function readFileBytes(file, auswahlZeit) {
       wrapped.fileFormat = "decl:" + (file.type || "ohne-mime");
       wrapped.fileSizeKb = Math.round((file.size || 0) / 1024);
       wrapped.zweiterLeseweg = zweiter.ergebnis;
+      wrapped.kopfLesetest = kopf;
       wrapped.msSeitAuswahl = msSeit(auswahlZeit);
       throw wrapped;
     }
@@ -100,6 +107,18 @@ function zweiterLeseweg(file) {
       resolve({ bytes: null, ergebnis: (err && err.name) || "ReadError" });
     }
   });
+}
+
+/* Liest nur den Anfang der Datei. Ergebnis als Stichwort: "ok", "leer" (null
+   Bytes) oder der Fehlername, hoechstens 40 Zeichen. Kein Inhalt verlaesst
+   diese Funktion. */
+async function kopfLesetest(file) {
+  try {
+    const kopf = await file.slice(0, 16).arrayBuffer();
+    return kopf && kopf.byteLength > 0 ? "ok" : "leer";
+  } catch (err) {
+    return String((err && err.name) || "ReadError").slice(0, 40);
+  }
 }
 
 /* GPS nur, wenn beide Werte echte Koordinaten sind.

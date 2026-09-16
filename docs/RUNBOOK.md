@@ -401,22 +401,28 @@ und `queueRatePerSekunde` im Einstellungssatz neu rechnen — vorher ins
 Mistral-Dashboard sehen. Kein Deploy nötig; die `satzWache` überträgt die Werte in
 die Queue.
 
-**Warum die Dosierung so steht, wie sie steht (Stand 08.09.2026):** Mistral
+**Warum die Dosierung so steht, wie sie steht (Stand 16.09.2026):** Mistral
 erlaubt auf der Stufe T1 **15 Aufrufe je 60 Sekunden** (gemessen 08.09.2026:
 jede Ablehnung kam genau dann, wenn in den 60 s davor 15 Aufrufe angenommen
 waren; abgelehnte zählen nicht mit). Jede Analyse macht zwei Aufrufe (Analyse
 + Beast-Werbung), also wären 7,5 Analysen je Minute die Kante. Die Queue
-schickt **0,1 Analysen pro Sekunde** los (6 je Minute, 12 Aufrufe) — ein
-Fünftel Abstand — bei einer Parallelität von **3**. Die Parallelität deckelt
-den Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch), die Rate
-die Dauerlast; beide zusammen sind nötig.
+schickt höchstens **0,1 Analysen pro Sekunde** los (6 je Minute, 12 Aufrufe) —
+ein Fünftel Abstand — bei einer Parallelität von **4**. Die Parallelität
+deckelt den Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch),
+die Rate die Dauerlast. Lehnt Mistral trotzdem ab, wartet der Auftrag und
+versucht es erneut (Abschnitt „Mistral überlastet“); Ablehnungen sind dadurch
+längere Wartezeit, kein Fehler.
 
-Die Geschichte der Zahl: 7 (65 s je Analyse angenommen), dann ab 30.08.2026
-4 und 0,125 — exakt am Limit, ohne Abstand, gerechnet für 40 s je Aufruf. Am
-08.09.2026 lagen die Aufrufe bei 29 s, vier parallele Aufträge machten 16
-Aufrufe je Minute, und 6 von 47 Analysen einer Klasse scheiterten. Die
-Nachrechnung mit den Messdaten des Tages: 4/0,125 → 6 bis 11 Ablehnungen,
-3/0,1 → keine, auch bei zwei Klassen zugleich.
+Die Geschichte der Zahl: 7 (65 s je Analyse angenommen); ab 30.08.2026 4 und
+0,125 — exakt am Limit, und bei Ablehnung nur ein Versuch nach 2 s. Am
+08.09.2026 lagen die Aufrufe bei 29 s, 6 von 47 Analysen einer Klasse
+scheiterten; danach 3 und 0,1 plus das Wiederholungsnetz. Am 16.09.2026
+(199 Analysen, keine Ablehnung, höchstens 12 Aufrufe je Minute) lag die Zeit
+vom Einreihen bis zum Ergebnis im Median bei 126 s, 43 von 193 warteten über
+drei Minuten. Die Nachrechnung mit den Daten dieses Tages ergab für 4 und 0,1
+einen Median um 60 s, im Mittel 2 Ablehnungen, die das Netz auffängt, und
+keine gescheiterte Analyse — daher seit 16.09.2026 wieder 4. Rückweg: 3
+eintragen.
 
 **Beide Werte stehen im Einstellungssatz und werden automatisch übertragen.**
 Wer sie ändert, ändert die laufende Queue — kein Deploy, kein gcloud-Befehl.
@@ -541,10 +547,36 @@ aufgetreten. Manuelles Neuladen zählt seit v2.12.3 nicht mehr mit.
 
 ### „Bild konnte nicht geöffnet werden" (`error.readFailed`)
 
-Datei-**Lese**fehler am Endgerät, kein Formatproblem (Workshop-Vorfall 2026-07-06).
-Seit v2.2.8 macht das Frontend eine Sofort-Kopie mit Retry; eine Häufung wäre neu zu
-bewerten. Diagnose: Log-Bucket `client-diagnostics` (30 Tage), Felder `errorDetail`
-und `fileSizeKb`.
+Der Browser bekommt die Datei vom Gerät nicht — kein Formatproblem. Stand
+16.09.2026: bisher ausschließlich Chrome 151/152 auf Android (Pixeldichte der
+Meldungen passt zu Samsung-Galaxy-Geräten), 20 Fälle in 30 Tagen, davon 11 an
+einem Workshop-Tag; Samsung Internet war nicht betroffen. Die Seite liest die
+Datei zweimal über `arrayBuffer()` und dann über `FileReader` (seit 08.09.2026)
+— der zweite Weg hat im Workshop in keinem der 11 Fälle geholfen. Die Ursache
+ist noch offen.
+
+**Was die Meldung jetzt mitbringt** (Diagnose-Speicher, 30 Tage): `errorDetail`
+(Fehlername), `fileFormat` (vom Browser angegebener Typ), `fileSizeKb`,
+`msSeitAuswahl`, `zweiterLeseweg` und seit 16.09.2026 `kopfLesetest`: `ok`
+heißt, der Anfang der Datei war lesbar, nur das Ganze nicht (Datei verändert
+oder unvollständig); ein Fehlername heißt, das Gerät gibt die Datei gar nicht
+heraus (etwa ein Foto, das nur in der Cloud liegt). Übertragen wird nur dieses
+Stichwort, nie Bytes.
+
+**Seit 16.09.2026 werden auch diese sichtbaren Meldungen erfasst** (Phase in
+Klammern): Datei fehlt (`datei-fehlt`), Datei zu groß (`datei-zu-gross`, mit
+Größe), fertig ohne Ergebnis (`ergebnis-leer`), Einreihen ohne Auftragsnummer
+(`einreihen-ohne-auftrag`), Auftrag verworfen (`auftrag-verworfen`),
+Wiederaufnahme ohne Verbindung (`resume-verbindung`) sowie eine Dateiauswahl,
+die ohne Datei zurückkam (`auswahl-leer`, `auswahl-leer-nach-foto` — letzteres
+kann auch ein Abbrechen der Auswahl sein).
+
+Nachsehen:
+
+    gcloud logging read 'resource.labels.service_name="errors"' \
+      --project=malzime --bucket=client-diagnostics --location=europe-west1 \
+      --view=_AllLogs --freshness=30d \
+      --format='value(timestamp,jsonPayload.phase,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest)'
 
 ### Mistral überlastet / 429 / 5xx
 

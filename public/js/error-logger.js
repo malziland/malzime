@@ -158,6 +158,8 @@ export function logClientError(error, context = {}) {
       msSeitAuswahl:
         typeof context.msSeitAuswahl === "number" && isFinite(context.msSeitAuswahl) ? context.msSeitAuswahl : null,
       zweiterLeseweg: typeof context.zweiterLeseweg === "string" ? context.zweiterLeseweg : null,
+      /* Kopf-Lesetest (16.09.2026): "ok", "leer" oder ein Fehlername — kein Inhalt. */
+      kopfLesetest: typeof context.kopfLesetest === "string" ? context.kopfLesetest.slice(0, 40) : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
       client: clientCtx,
     };

@@ -30,6 +30,8 @@ const ERLAUBTE_FELDER = new Set([
   /* Lesefehler-Diagnose (08.09.2026), gespiegelt in handle-errors.js. */
   "msSeitAuswahl",
   "zweiterLeseweg",
+  /* Kopf-Lesetest (16.09.2026), gespiegelt in handle-errors.js. */
+  "kopfLesetest",
   "timings",
 ]);
 

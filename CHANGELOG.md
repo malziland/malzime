@@ -4,6 +4,17 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Kürzere Wartezeit, wenn eine ganze Klasse gleichzeitig abschickt.** Es
+  laufen wieder vier Analysen gleichzeitig statt drei (seit 16.09.2026 über
+  den Einstellungssatz in Betrieb, ohne Deploy). Am Workshop-Tag davor lag die
+  Zeit bis zum Ergebnis im Mittel bei rund zwei Minuten; nachgerechnet mit
+  denselben Ankunftszeiten sinkt sie auf rund eine Minute. Lehnt der
+  KI-Anbieter dabei einmal ab, wartet die Analyse kurz und versucht es erneut.
+
 ## [4.9.2] — 2026-09-11
 
 ### Entfernt

@@ -401,22 +401,28 @@ und `queueRatePerSekunde` im Einstellungssatz neu rechnen — vorher ins
 Mistral-Dashboard sehen. Kein Deploy nötig; die `satzWache` überträgt die Werte in
 die Queue.
 
-**Warum die Dosierung so steht, wie sie steht (Stand 08.09.2026):** Mistral
+**Warum die Dosierung so steht, wie sie steht (Stand 16.09.2026):** Mistral
 erlaubt auf der Stufe T1 **15 Aufrufe je 60 Sekunden** (gemessen 08.09.2026:
 jede Ablehnung kam genau dann, wenn in den 60 s davor 15 Aufrufe angenommen
 waren; abgelehnte zählen nicht mit). Jede Analyse macht zwei Aufrufe (Analyse
 + Beast-Werbung), also wären 7,5 Analysen je Minute die Kante. Die Queue
-schickt **0,1 Analysen pro Sekunde** los (6 je Minute, 12 Aufrufe) — ein
-Fünftel Abstand — bei einer Parallelität von **3**. Die Parallelität deckelt
-den Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch), die Rate
-die Dauerlast; beide zusammen sind nötig.
+schickt höchstens **0,1 Analysen pro Sekunde** los (6 je Minute, 12 Aufrufe) —
+ein Fünftel Abstand — bei einer Parallelität von **4**. Die Parallelität
+deckelt den Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch),
+die Rate die Dauerlast. Lehnt Mistral trotzdem ab, wartet der Auftrag und
+versucht es erneut (Abschnitt „Mistral überlastet“); Ablehnungen sind dadurch
+längere Wartezeit, kein Fehler.
 
-Die Geschichte der Zahl: 7 (65 s je Analyse angenommen), dann ab 30.08.2026
-4 und 0,125 — exakt am Limit, ohne Abstand, gerechnet für 40 s je Aufruf. Am
-08.09.2026 lagen die Aufrufe bei 29 s, vier parallele Aufträge machten 16
-Aufrufe je Minute, und 6 von 47 Analysen einer Klasse scheiterten. Die
-Nachrechnung mit den Messdaten des Tages: 4/0,125 → 6 bis 11 Ablehnungen,
-3/0,1 → keine, auch bei zwei Klassen zugleich.
+Die Geschichte der Zahl: 7 (65 s je Analyse angenommen); ab 30.08.2026 4 und
+0,125 — exakt am Limit, und bei Ablehnung nur ein Versuch nach 2 s. Am
+08.09.2026 lagen die Aufrufe bei 29 s, 6 von 47 Analysen einer Klasse
+scheiterten; danach 3 und 0,1 plus das Wiederholungsnetz. Am 16.09.2026
+(199 Analysen, keine Ablehnung, höchstens 12 Aufrufe je Minute) lag die Zeit
+vom Einreihen bis zum Ergebnis im Median bei 126 s, 43 von 193 warteten über
+drei Minuten. Die Nachrechnung mit den Daten dieses Tages ergab für 4 und 0,1
+einen Median um 60 s, im Mittel 2 Ablehnungen, die das Netz auffängt, und
+keine gescheiterte Analyse — daher seit 16.09.2026 wieder 4. Rückweg: 3
+eintragen.
 
 **Beide Werte stehen im Einstellungssatz und werden automatisch übertragen.**
 Wer sie ändert, ändert die laufende Queue — kein Deploy, kein gcloud-Befehl.

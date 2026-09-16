@@ -31,15 +31,23 @@ const T1_NORMAL = {
   singleLargeMaxTokens: 5000,
   requestBudgetMs: 480000,
 
-  /* GESENKT 08.09.2026 von 4 auf 3 — nachgerechnet am Vorfall vom selben
-     Vormittag (eine Klasse, 47 Analysen, 6 Ablehnungen "429 Rate limit").
-     Der Wert 4 war am 30.08. für 40 s je Aufruf gerechnet; am 08.09. lagen
-     die Aufrufe bei 29 s (Median), und vier parallele Aufträge machten damit
-     16 Aufrufe je Minute bei erlaubten 15. Mit drei sind es höchstens 12 —
-     auch im Anfangsschub, den die Warteschlange (Burst 10) durchlässt. Die
-     Nachrechnung mit den gemessenen Ankunfts- und Dauerdaten des Tages:
-     4 → 6 bis 11 Ablehnungen, 3 → keine; auch bei zwei Klassen zugleich. */
-  parallelitaet: 3,
+  /* WIEDER 4 SEIT 16.09.2026 (Freigabe Christoph nach dem Workshop-Tag).
+     Am 08.09. von 4 auf 3 gesenkt, weil Mistral (Stufe T1, 15 Aufrufe je
+     60 s) bei 4 parallelen Aufträgen und damals nur einem Wiederholversuch
+     nach 2 s sechs Analysen einer Klasse ablehnte. Im selben Schritt kam das
+     Netz unten (ueberlastWarteMs/ueberlastVersuche) dazu — beides zusammen
+     war doppelt abgesichert und kostete Wartezeit: Am 16.09. (199 Analysen,
+     0 Ablehnungen, höchstens 12 Aufrufe je 60 s) dauerte es vom Einreihen
+     bis zum Ergebnis im Median 126 s, 43 von 193 warteten über 3 Minuten,
+     29 fertige Ergebnisse wurden nie abgeholt.
+     Nachrechnung mit den Ankunftszeiten und Dauern dieses Tages (Mistral-
+     Grenze 15/60 s, Burst 10, Netz 10/20/40/80 s, je 20 Läufe; das Modell
+     traf den gemessenen Median bis auf 5 %): 4 → Median rund 60 s, praktisch
+     niemand über 3 Minuten, im Mittel 2 Ablehnungen (höchstens 6), die das
+     Netz auffängt, 0 gescheiterte Analysen; bei 30 % schnellerem Mistral
+     rund 30 Ablehnungen, weiterhin 0 gescheiterte. Rückweg: 3 eintragen,
+     die satzWache zieht die Warteschlange binnen Sekunden nach. */
+  parallelitaet: 4,
 
   /* DIE GLOBALE BREMSE. Sie wird von der `satzWache` in die echte
      Cloud-Tasks-Queue übertragen (`maxDispatchesPerSecond`) und wirkt damit
@@ -64,11 +72,11 @@ const T1_NORMAL = {
      — frische Installation, Messung abgeschaltet, Datenbank hakt. Sonst
      rechnet handle-enqueue.js laufend aus den letzten 20 Analysen: 30 Minuten
      Browser-Geduld / Dauer je Analyse (80-Perzentil) × parallelitaet × 0,8
-     Abstand. Zum Vergleich mit derselben Formel: 40 s (Median, gemessen
-     30.08.2026) ergaeben 108; rund 63 s ergaeben 68 (80-Perzentil des
-     Mistral-Aufrufs ueber 567 Analysen vom 12.08. bis 10.09.2026: 59 s, dazu
-     geschaetzt 4 s fuer den Werbe-Aufruf). Die 155 stammten aus der Rechnung
-     mit 7 parallel und 65 s. */
+     Abstand. Zum Vergleich mit derselben Formel und 4 parallel (seit
+     16.09.2026): 40 s (Median, gemessen 30.08.2026) ergaeben 144; rund 63 s
+     ergaeben 91 (80-Perzentil des Mistral-Aufrufs ueber 567 Analysen vom
+     12.08. bis 10.09.2026: 59 s, dazu geschaetzt 4 s fuer den Werbe-Aufruf).
+     Die 155 stammten aus der Rechnung mit 7 parallel und 65 s. */
   warteschlangeTiefe: 100,
 
   /* GEMESSEN 30.08.2026 an der Produktion: Median 40 s (Spanne 34–41), nicht
@@ -82,13 +90,13 @@ const T1_NORMAL = {
   adressfensterMs: 600000,
   boostFaktor: 2,
   boostFristMs: 7200000,
-  /* GESENKT 30.08.2026 von 6 auf 4 und am 08.09.2026 mit `parallelitaet`
-     auf 3. Die Drossel darf nie groesser sein als die Warteschlange
-     durchlaesst — eine Bremse hinter einer schaerferen Bremse ist keine
-     Bremse, sondern toter Code mit dem Anschein von Sicherheit. Der Doku-Test
-     erzwingt das Verhaeltnis. Und sie zaehlt nur je Server-Instanz: Am
-     08.09. liefen sieben Instanzen zugleich, jede hielt fuer sich Abstand. */
-  drosselMaxParallel: 3,
+  /* FOLGT `parallelitaet` (30.08.2026 6 → 4, 08.09. → 3, 16.09. wieder 4).
+     Die Drossel darf nie groesser sein als die Warteschlange durchlaesst —
+     eine Bremse hinter einer schaerferen Bremse ist keine Bremse, sondern
+     toter Code mit dem Anschein von Sicherheit. Der Doku-Test erzwingt das
+     Verhaeltnis. Und sie zaehlt nur je Server-Instanz: Am 08.09. liefen
+     sieben Instanzen zugleich, jede hielt fuer sich Abstand. */
+  drosselMaxParallel: 4,
   drosselWartelimitMs: 360000,
 
   /* MINDESTABSTAND ZWISCHEN KI-AUFRUFEN, gemessen 30.08.2026. Hier standen
@@ -135,8 +143,9 @@ const PROFILE = {
     ...T1_NORMAL,
     singleLargeTimeoutMs: 450000,
     durchschnittsdauerSekunden: 110,
-    /* Dieselbe Formel wie oben mit 110 s: 1800 / 110 × 3 × 0,8 = 39. */
-    warteschlangeTiefe: 39,
+    /* Dieselbe Formel wie oben mit 110 s und 4 parallel (seit 16.09.2026):
+       1800 / 110 × 4 × 0,8 = 52 (vorher mit 3 parallel: 39). */
+    warteschlangeTiefe: 52,
   },
 };
 

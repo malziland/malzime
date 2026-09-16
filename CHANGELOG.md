@@ -14,6 +14,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Zeit bis zum Ergebnis im Mittel bei rund zwei Minuten; nachgerechnet mit
   denselben Ankunftszeiten sinkt sie auf rund eine Minute. Lehnt der
   KI-Anbieter dabei einmal ab, wartet die Analyse kurz und versucht es erneut.
+- **Die Alarm-Mail erklärt sich selbst.** Betreff und Text sagen jetzt, dass
+  meist ein Treffer des Kinderschutz-Filters dahintersteht und kein Ausfall,
+  und wo man nachsieht (seit 16.09.2026).
 
 ## [4.9.2] — 2026-09-11
 

@@ -18,7 +18,7 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { execFileSync } = require("child_process");
+const { execFileSync, spawnSync } = require("child_process");
 
 const WURZEL = path.join(__dirname, "../../..");
 const SKRIPT = path.join(WURZEL, "scripts/nur-nachtrag.sh");
@@ -81,10 +81,13 @@ function pruefen(repo, basis, { mitAusgabe = false } = {}) {
     fs.writeFileSync(ausgabeDatei, "");
     env.GITHUB_OUTPUT = ausgabeDatei;
   }
-  const stdout = execFileSync("sh", [SKRIPT], { cwd: repo, env, encoding: "utf8" });
+  const lauf = spawnSync("sh", [SKRIPT], { cwd: repo, env, encoding: "utf8" });
+  const stdout = lauf.stdout;
   const ergebnis = /nur_nachtrag=(ja|nein)/.exec(stdout);
   return {
     ergebnis: ergebnis ? ergebnis[1] : null,
+    status: lauf.status,
+    stderr: lauf.stderr,
     stdout,
     github: ausgabeDatei ? fs.readFileSync(ausgabeDatei, "utf8") : null,
   };
@@ -112,6 +115,7 @@ describe("nur-nachtrag.sh — wann der Browser-Test entfallen darf", () => {
     committen(repo);
     const r = pruefen(repo, basis, { mitAusgabe: true });
     expect(r.ergebnis).toBe("ja");
+    expect(r.status).toBe(0);
     expect(r.github).toBe("nur_nachtrag=ja\n");
   });
 
@@ -124,6 +128,7 @@ describe("nur-nachtrag.sh — wann der Browser-Test entfallen darf", () => {
     const r = pruefen(repo, basis, { mitAusgabe: true });
     expect(r.ergebnis).toBe("nein");
     expect(r.stdout).toContain("public/index.html aendert mehr als die Cache-Kennung");
+    expect(r.status).toBe(0);
     expect(r.github).toBe("nur_nachtrag=nein\n");
   });
 
@@ -199,9 +204,13 @@ describe("nur-nachtrag.sh — wann der Browser-Test entfallen darf", () => {
     expect(r.stdout).toContain("kein Pull-Request");
   });
 
-  test("eine unbekannte Basis ist 'nein'", () => {
+  test("eine unbekannte Basis ist ein technischer Fehler: 'nein' UND Rueckgabewert 1", () => {
+    /* Laut statt still: Im Pflicht-Job laesst Rueckgabewert 1 den PR scheitern. */
     const { repo } = neu();
-    expect(pruefen(repo, "origin/gibt-es-nicht").ergebnis).toBe("nein");
+    const r = pruefen(repo, "origin/gibt-es-nicht");
+    expect(r.ergebnis).toBe("nein");
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("Basis origin/gibt-es-nicht nicht auffindbar");
   });
 
   test("ohne jede Änderung ist es 'nein'", () => {

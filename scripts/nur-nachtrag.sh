@@ -23,9 +23,13 @@
 # der volle Browser-Test.
 #
 # Ausgabe: `nur_nachtrag=ja|nein` auf stdout und, falls gesetzt, in
-# $GITHUB_OUTPUT; dazu eine Zeile `Grund: …`. Rueckgabewert 0, sobald eine
-# Entscheidung steht (auch "nein" ist eine Entscheidung, und die sichere).
+# $GITHUB_OUTPUT; dazu eine Zeile `Grund: …`.
+# Rueckgabewert: 0 = Entscheidung steht ("ja" oder "nein"); 1 = technischer
+# Fehler (Basis fehlt, git scheitert, Datei unlesbar) — dann steht zusaetzlich
+# "nein" in der Ausgabe, und der Pflicht-Job scheitert laut, statt still den
+# vollen Test zu fahren oder gar zu ueberspringen.
 # Eingabe: Umgebungsvariable BASIS (z. B. origin/main); leer = kein PR.
+set -eu
 
 ergebnis() {
   echo "nur_nachtrag=$1"
@@ -37,27 +41,37 @@ ergebnis() {
   exit 0
 }
 
+fehler() {
+  echo "nur_nachtrag=nein"
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    echo "nur_nachtrag=nein" >> "$GITHUB_OUTPUT"
+  fi
+  echo "FEHLER: $1" >&2
+  rm -f "${ALT:-}" "${NEU:-}"
+  exit 1
+}
+
 BASIS="${BASIS:-}"
 if [ -z "$BASIS" ]; then
   ergebnis nein "kein Pull-Request (BASIS leer) — main und Zeitplan pruefen immer voll"
 fi
 if ! git rev-parse --verify -q "$BASIS^{commit}" > /dev/null; then
-  ergebnis nein "Basis $BASIS nicht auffindbar"
+  fehler "Basis $BASIS nicht auffindbar"
 fi
 if ! LISTE=$(git diff --name-status "$BASIS" HEAD); then
-  ergebnis nein "git diff gegen $BASIS gescheitert"
+  fehler "git diff gegen $BASIS gescheitert"
 fi
 if [ -z "$LISTE" ]; then
   ergebnis nein "keine Aenderung gegenueber $BASIS"
 fi
 
-ALT=$(mktemp)
-NEU=$(mktemp)
+ALT=$(mktemp) || fehler "mktemp gescheitert"
+NEU=$(mktemp) || fehler "mktemp gescheitert"
 # Eine Zeile je Datei: "<Status><TAB><Pfad>". Tabulator als Trenner, damit
 # Leerzeichen im Pfad nichts verschieben.
 TAB=$(printf '\t')
 ANZAHL=0
-while IFS="$TAB" read -r STATUS PFAD REST; do
+while IFS="$TAB" read -r STATUS PFAD REST || [ -n "${STATUS:-}" ]; do
   [ -n "$STATUS" ] || continue
   if [ "$STATUS" != "M" ] || [ -n "$REST" ]; then
     ergebnis nein "$PFAD hat Status $STATUS (nur geaenderte Dateien zaehlen als Nachtrag)"
@@ -80,10 +94,10 @@ while IFS="$TAB" read -r STATUS PFAD REST; do
       ;;
     public/*.html | public/js/demo.js)
       if ! git show "$BASIS:$PFAD" | sed 's/[?]v=[0-9][0-9]*/?v=K/g' > "$ALT"; then
-        ergebnis nein "$PFAD in der Basis nicht lesbar"
+        fehler "$PFAD in der Basis nicht lesbar"
       fi
       if ! git show "HEAD:$PFAD" | sed 's/[?]v=[0-9][0-9]*/?v=K/g' > "$NEU"; then
-        ergebnis nein "$PFAD im PR nicht lesbar"
+        fehler "$PFAD im PR nicht lesbar"
       fi
       if ! cmp -s "$ALT" "$NEU"; then
         ergebnis nein "$PFAD aendert mehr als die Cache-Kennung"

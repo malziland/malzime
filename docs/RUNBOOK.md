@@ -118,13 +118,18 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    **Der Nachtrag-PR nach dem Deploy braucht keinen Browser-Test** (seit
    16.09.2026). Ändert ein Pull Request nur die Cache-Kennung in den Seiten,
    `public/build-info.json`, das CHANGELOG und `docs/VERIFICATION.md`,
-   erkennt das `scripts/nur-nachtrag.sh` im Pflicht-Job `playwright-version`;
-   `test-e2e` endet dann grün ohne Suite und sagt das im Protokoll. Die Regel
-   ist eng: Unterscheidet sich eine Seite in mehr als `?v=<Ziffern>`, kommt
-   eine andere Datei hinzu, fehlt eine Basis oder scheitert etwas, läuft die
-   volle Suite. Auf `main` und im Zeitplan-Lauf läuft sie immer. Begründung
-   und Neubewertung: `docs/SECURITY-MODEL.md`, Abschnitt „Nachtrag ohne
-   Browser-Test“.
+   erkennt das `scripts/nur-nachtrag.sh` im Pflicht-Job `playwright-version`
+   (Protokollzeile `nur_nachtrag=ja`). Der Job `test-e2e` steht dann auf
+   „skipped“: Der Branch-Schutz lässt den PR durch, `deploy.sh` und die
+   Baum-Regel werten „skipped“ aber nie als bestandenen Browser-Test. Die
+   Regel ist eng: nur geänderte gewöhnliche Dateien (keine Symlinks,
+   Submodule, Rechte-Änderungen), Seiten dürfen sich nur in Kennungen der
+   Form `?v=<10 Ziffern>"` unterscheiden, der Fingerabdruck muss vollständig
+   sein und nur vorhandene Dateien nennen. Alles andere ergibt „nein“ und die
+   volle Suite; ein technischer Fehler der Erkennung lässt den Pflicht-Job
+   scheitern. Auf `main` und im Zeitplan-Lauf läuft die Suite immer.
+   Begründung und Neubewertung: `docs/SECURITY-MODEL.md`, Abschnitt
+   „Nachtrag ohne Browser-Test“.
 6. Nach dem Deploy läuft automatisch `scripts/live-smoke.sh`: vier
    kostenfreie Proben gegen die Live-API (Upload-Ablehnung 400 mit echter
    Validierungs-Meldung, Honeypot 403, Admin-Zugriffsschutz 403, Stats 200) —

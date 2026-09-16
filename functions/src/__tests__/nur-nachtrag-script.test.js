@@ -24,8 +24,11 @@ const WURZEL = path.join(__dirname, "../../..");
 const SKRIPT = path.join(WURZEL, "scripts/nur-nachtrag.sh");
 const DEPLOY = path.join(WURZEL, "scripts/deploy.sh");
 
-const FINGERABDRUCK_ALT = JSON.stringify({ commit: "aaaaaaa0000", dateien: { "index.html": "sha256:1" } }, null, 2);
-const FINGERABDRUCK_NEU = JSON.stringify({ commit: "bbbbbbb1111", dateien: { "index.html": "sha256:2" } }, null, 2);
+function fingerabdruck(commit, kennung, dateien = { "index.html": "sha256:1", "js/demo.js": "sha256:2" }) {
+  return JSON.stringify({ commit, cacheBuster: kennung, ausgeliefertAm: "2026-09-16T18:04:55.713Z", dateien }, null, 2);
+}
+const FINGERABDRUCK_ALT = fingerabdruck("aaaaaaa0000", "2026091501");
+const FINGERABDRUCK_NEU = fingerabdruck("bbbbbbb1111", "2026091601");
 
 function git(repo, ...args) {
   return execFileSync("git", args, { cwd: repo, encoding: "utf8" });
@@ -201,6 +204,7 @@ describe("nur-nachtrag.sh — wann der Browser-Test entfallen darf", () => {
     committen(repo);
     const r = pruefen(repo, "");
     expect(r.ergebnis).toBe("nein");
+    expect(r.status).toBe(0);
     expect(r.stdout).toContain("kein Pull-Request");
   });
 
@@ -215,7 +219,9 @@ describe("nur-nachtrag.sh — wann der Browser-Test entfallen darf", () => {
 
   test("ohne jede Änderung ist es 'nein'", () => {
     const { repo, basis } = neu();
-    expect(pruefen(repo, basis).ergebnis).toBe("nein");
+    const r = pruefen(repo, basis);
+    expect(r.ergebnis).toBe("nein");
+    expect(r.status).toBe(0);
   });
 
   test("jede Datei, deren Kennung deploy.sh setzt, wird als Kennungs-Datei erkannt", () => {
@@ -240,5 +246,111 @@ describe("nur-nachtrag.sh — wann der Browser-Test entfallen darf", () => {
     const r = pruefen(repo, basis);
     expect(r.stdout).not.toContain("gehoert nicht zu einem Nachtrag");
     expect(r.ergebnis).toBe("ja");
+  });
+  /* ── Befunde der unabhaengigen Pruefung vom 16.09.2026 ── */
+
+  test("B3: Ziffern hinter ?v=, die keine 10-stellige Kennung sind, zählen als Code", () => {
+    const { repo, basis } = neu({ "public/js/demo.js": "const ms = schnell?v=100:v=5000;\n" });
+    schreiben(repo, "public/js/demo.js", "const ms = schnell?v=0:v=5000;\n");
+    committen(repo);
+    const r = pruefen(repo, basis);
+    expect(r.ergebnis).toBe("nein");
+    expect(r.stdout).toContain("public/js/demo.js aendert mehr als die Cache-Kennung");
+  });
+
+  test("B3: eine Kennung ohne schließendes Anführungszeichen zählt nicht als Kennung", () => {
+    const { repo, basis } = neu({ "public/index.html": "<script>fetch('/api?v=2026091501')</script>\n" });
+    schreiben(repo, "public/index.html", "<script>fetch('/api?v=2026091601')</script>\n");
+    committen(repo);
+    expect(pruefen(repo, basis).ergebnis).toBe("nein");
+  });
+
+  test("B7: ein leeres ?v= in der Basis und Ziffern im PR sind keine Kennungs-Änderung", () => {
+    const { repo, basis } = neu({ "public/index.html": '<script>fetch("/api?v=")</script>\n' });
+    schreiben(repo, "public/index.html", '<script>fetch("/api?v=2")</script>\n');
+    committen(repo);
+    expect(pruefen(repo, basis).ergebnis).toBe("nein");
+  });
+
+  test("B2/B4: ein Submodul-Zeiger unter public/ ist 'nein', kein stilles 'ja'", () => {
+    const { repo, basis } = neu();
+    git(repo, "update-index", "--add", "--cacheinfo", `160000,${basis},public/sub.html`);
+    git(repo, "commit", "-q", "-m", "zeiger");
+    const zwischen = git(repo, "rev-parse", "HEAD").trim();
+    /* Zeiger auf einen ANDEREN Commit umbiegen (vorher: Basis). */
+    git(repo, "update-index", "--cacheinfo", `160000,${zwischen},public/sub.html`);
+    git(repo, "commit", "-q", "-m", "zeiger geaendert");
+    const r = pruefen(repo, zwischen);
+    expect(r.ergebnis).toBe("nein");
+    expect(r.stdout).toContain("Modus 160000 -> 160000");
+  });
+
+  test("B4: eine reine Rechte-Änderung an einer Seite ist 'nein'", () => {
+    const { repo, basis } = neu();
+    fs.chmodSync(path.join(repo, "public/index.html"), 0o755);
+    committen(repo);
+    const r = pruefen(repo, basis);
+    expect(r.ergebnis).toBe("nein");
+    expect(r.stdout).toContain("Modus 100644 -> 100755");
+  });
+
+  test("B4: ein Symlink, dessen Ziel nur in ?v= wechselt, ist 'nein'", () => {
+    const { repo, basis } = neu();
+    fs.symlinkSync('../functions/src/x.js?v=2026091501"', path.join(repo, "public/link.html"));
+    committen(repo);
+    const zwischen = git(repo, "rev-parse", "HEAD").trim();
+    fs.rmSync(path.join(repo, "public/link.html"));
+    fs.symlinkSync('../functions/src/x.js?v=2026091601"', path.join(repo, "public/link.html"));
+    committen(repo);
+    const r = pruefen(repo, zwischen);
+    expect(r.ergebnis).toBe("nein");
+    expect(r.stdout).toContain("Modus 120000 -> 120000");
+    expect(basis).not.toBe(zwischen);
+  });
+
+  test("B5: ein Dateiname mit Zeilenumbruch erzeugt keine eigene Ausgabezeile", () => {
+    const { repo, basis } = neu();
+    schreiben(repo, "public/x\n::warning title=Test::aus Dateiname\n.html", "<p>x</p>\n");
+    committen(repo);
+    const r = pruefen(repo, basis, { mitAusgabe: true });
+    expect(r.ergebnis).toBe("nein");
+    expect(r.stdout.split("\n").some((z) => z.startsWith("::warning"))).toBe(false);
+    expect(r.github).toBe("nur_nachtrag=nein\n");
+  });
+
+  test("B6: ein Fingerabdruck, der eine nicht vorhandene Datei nennt, ist 'nein'", () => {
+    const { repo, basis } = neu();
+    nachtragSchreiben(repo);
+    schreiben(
+      repo,
+      "public/build-info.json",
+      fingerabdruck("bbbbbbb1111", "2026091601", { "gibt/es/nicht.js": "sha256:3" })
+    );
+    committen(repo);
+    expect(pruefen(repo, basis).ergebnis).toBe("nein");
+  });
+
+  test("B6: ein Fingerabdruck mit Dateiliste als Array ist 'nein'", () => {
+    const { repo, basis } = neu();
+    nachtragSchreiben(repo);
+    schreiben(
+      repo,
+      "public/build-info.json",
+      JSON.stringify({ commit: "bbbbbbb1111", cacheBuster: "2026091601", ausgeliefertAm: "x", dateien: ["index.html"] })
+    );
+    committen(repo);
+    expect(pruefen(repo, basis).ergebnis).toBe("nein");
+  });
+
+  test("B6: ein Fingerabdruck ohne Cache-Kennung ist 'nein'", () => {
+    const { repo, basis } = neu();
+    nachtragSchreiben(repo);
+    schreiben(
+      repo,
+      "public/build-info.json",
+      JSON.stringify({ commit: "bbbbbbb1111", ausgeliefertAm: "x", dateien: { "index.html": "sha256:1" } })
+    );
+    committen(repo);
+    expect(pruefen(repo, basis).ergebnis).toBe("nein");
   });
 });

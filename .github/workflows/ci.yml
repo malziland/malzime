@@ -210,6 +210,12 @@ jobs:
 
   test-e2e:
     needs: playwright-version
+    # Reiner Nachtrag (siehe playwright-version): Der GANZE Job entfaellt und
+    # steht auf "skipped" — nicht auf "success". Der Branch-Schutz laesst einen
+    # uebersprungenen Pflicht-Check durch; scripts/deploy.sh und die Baum-Regel
+    # verlangen dagegen "success" und werten ihn nie als bestandenen
+    # Browser-Test (Befund der unabhaengigen Pruefung, 16.09.2026).
+    if: needs.playwright-version.outputs.nur_nachtrag != 'ja'
     runs-on: ubuntu-latest
     # Offizielles Playwright-Image mit VORINSTALLIERTEM Chromium (Browser-Version
     # exakt passend zur installierten @playwright/test). Damit entfaellt der
@@ -247,14 +253,7 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm ci
-        if: needs.playwright-version.outputs.nur_nachtrag != 'ja'
       - run: npm run test:e2e
-        if: needs.playwright-version.outputs.nur_nachtrag != 'ja'
-      # Nur bei einem reinen Nachtrag (siehe playwright-version): Der Job endet
-      # gruen, ohne die Suite zu fahren — und sagt das im Protokoll.
-      - name: Nachtrag erkannt — Browser-Test entfaellt
-        if: needs.playwright-version.outputs.nur_nachtrag == 'ja'
-        run: echo "Reiner Nachtrag laut scripts/nur-nachtrag.sh — kein Browser-Test fuer diesen PR."
 
       # Ohne diesen Schritt hinterlaesst ein roter Browser-Test NICHTS — kein
       # Bild, kein Ablaufprotokoll. Ein Fehler, der sich lokal nicht

@@ -565,30 +565,45 @@ soll (z. B. Wertebereiche je Satz) — dann gilt die Duldung auch dort.
 den Seiten, `public/build-info.json`, Versionszeile im CHANGELOG,
 Prüfstand-Stempel. Sein Inhalt ist zu diesem Zeitpunkt schon live und mit
 `scripts/pruefe-live.sh` gegen den Quelltext nachgerechnet. Der Browser-Test
-lief trotzdem voll — gut zehn Minuten, in denen er über Dateien ging, die sich
-von der geprüften Fassung nur in `?v=`-Kennungen unterscheiden.
+lief trotzdem voll — gut zehn Minuten über Dateien, die sich von der geprüften
+Fassung nur in Cache-Kennungen unterscheiden.
 
 **Entscheidung.** `scripts/nur-nachtrag.sh` erkennt einen solchen PR im
-Pflicht-Job `playwright-version`; `test-e2e` endet dann ohne Suite mit Erfolg.
-„Ja“ nur, wenn jede geänderte Datei geändert (nicht neu, gelöscht, umbenannt)
-und eine von vier Arten ist: CHANGELOG, `docs/VERIFICATION.md`, ein gültiger
-Fingerabdruck, oder eine Seite aus der Kennungs-Liste von `deploy.sh`, die sich
-ausschließlich in `?v=<Ziffern>` unterscheidet. Alles andere ist „nein“.
-Die Erkennung sitzt in einem Pflicht-Job, damit ihr eigener Ausfall den PR
-blockiert, statt den Browser-Test still auszulassen. `test-backend`,
-`test-frontend`, `pruefungen` und `secret-scan` laufen unverändert.
+Pflicht-Job `playwright-version`; der Job `test-e2e` entfällt dann als Ganzes
+und steht auf „skipped“. „Ja“ nur, wenn jede geänderte Datei eine geänderte
+gewöhnliche Datei ist (Status M, Modus 100644 vorher und nachher) und eine von
+vier Arten: CHANGELOG, `docs/VERIFICATION.md`, ein Fingerabdruck mit allen
+Pflichtfeldern, der nur vorhandene Dateien nennt, oder eine Seite aus der
+Kennungs-Liste von `deploy.sh`, die sich ausschließlich in `?v=<10 Ziffern>"`
+unterscheidet. Alles andere ist „nein“; ein technischer Fehler (Basis fehlt,
+git scheitert) lässt den Pflicht-Job scheitern und blockiert den PR.
+`test-backend`, `test-frontend`, `pruefungen` und `secret-scan` laufen
+unverändert, auf `main` und im Zeitplan auch der Browser-Test.
 
-**Betrachtete Alternativen.** Pfadfilter in `on: pull_request` (lässt den
-Pflicht-Check ganz aus und prüft nicht, ob sich in einer Seite mehr als die
-Kennung ändert); den Nachtrag ohne PR direkt auf `main` schreiben (der
-Hauptzweig ist geschützt, auch für Verwaltende); die Versionszeile vor dem
-Deploy in den Feature-PR nehmen (der Auto-Release würde eine Fassung
-verkünden, die noch nicht live ist).
+**Warum „skipped“ und nicht „success“.** Der Branch-Schutz lässt einen
+übersprungenen Pflicht-Check durch. `scripts/deploy.sh` und die Baum-Regel
+verlangen dagegen wörtlich `success` — ein übersprungener Browser-Test kann so
+nie als bestanden in eine Auslieferung einfließen. Die erste Fassung übersprang
+nur die Schritte und meldete `success`; die unabhängige Prüfung hat das
+gefunden.
+
+**Betrachtete Alternativen.** Pfadfilter in `on: pull_request` (prüft nicht,
+ob sich in einer Seite mehr als die Kennung ändert); den Nachtrag direkt auf
+`main` schreiben (der Hauptzweig ist geschützt, auch für Verwaltende); die
+Versionszeile vor dem Deploy in den Feature-PR nehmen (der Auto-Release würde
+eine Fassung verkünden, die noch nicht live ist).
 
 **Geprüft durch** `functions/src/__tests__/nur-nachtrag-script.test.js`
-(13 Fälle in Wegwerf-Repositorys, davon 11 „nein“; Driftwächter gegen die
-Kennungs-Liste in `deploy.sh`; Rückbauprobe 16.09.2026: 4 rot).
+(23 Fälle in Wegwerf-Repositorys, darunter Submodul-Zeiger, Symlink,
+Rechte-Änderung, Dateiname mit Zeilenumbruch, Ziffern hinter `?v=` im Code,
+unvollständiger Fingerabdruck; Driftwächter gegen die Kennungs-Liste in
+`deploy.sh`). Rückbauprobe 16.09.2026 je Prüfung rot (Modus 3, Kennungsform 3,
+Dateiliste des Fingerabdrucks 1). Unabhängige Prüfung am selben Tag: drei
+mittlere Befunde (übersprungener Test als `success`, von einer Pipe
+verschluckte git-Fehler, Ziffern hinter `?v=` als Code), alle vor dem Merge
+behoben.
 
 **Neubewertung**, wenn der Nachtrag weitere Dateiarten bekommt, wenn eine Seite
-die Cache-Kennung anders als über `?v=` trägt, oder wenn ein Fehler auftritt,
+die Cache-Kennung anders als über `?v=<10 Ziffern>"` trägt, wenn GitHub
+übersprungene Pflicht-Checks anders behandelt, oder wenn ein Fehler auftritt,
 den nur der Browser-Test in einem Nachtrag gefunden hätte.

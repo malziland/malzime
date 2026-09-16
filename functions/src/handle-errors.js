@@ -31,6 +31,10 @@ const STRING_FIELDS = {
   /* Lesefehler-Diagnose (08.09.2026): Ergebnis des zweiten Lesewegs als
      Stichwort ("ok:940kb" oder ein Fehlername). Kein Dateiname, kein Inhalt. */
   zweiterLeseweg: 40,
+  /* Kopf-Lesetest (16.09.2026): Liess sich wenigstens der Anfang der Datei
+     lesen? "ok", "leer" oder ein Fehlername. Trennt "Geraet gibt die Datei gar
+     nicht heraus" von "nicht vollstaendig". Kein Inhalt, kein Dateiname. */
+  kopfLesetest: 40,
 };
 /* `msSeitAuswahl`: Zeit zwischen Dateiauswahl und Leseversuch (08.09.2026). */
 const NUMBER_FIELDS = ["durationMs", "httpStatus", "fileSizeKb", "msSeitAuswahl"];

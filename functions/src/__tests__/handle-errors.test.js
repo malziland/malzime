@@ -123,6 +123,31 @@ describe("handleErrors", () => {
     expect(logged.zweiterLeseweg == null).toBe(true);
   });
 
+  test("Kopf-Lesetest (16.09.2026): kommt als Stichwort an, auf 40 Zeichen gekappt", async () => {
+    /* Workshop 16.09.: elf Lesefehler auf Android, zweiter Leseweg jedes Mal
+       ohne Erfolg. Das Stichwort trennt "Geraet gibt nichts heraus" von
+       "nicht vollstaendig" — ohne Inhalt, ohne Dateiname. */
+    const res = mockRes();
+    await handleErrors(
+      mockReq({ errorMessage: "read_failed", phase: "image-read", kopfLesetest: "NotReadableError" + "y".repeat(100) }),
+      res
+    );
+    expect(res.statusCode).toBe(204);
+    const logged = loggedPayload();
+    expect(logged.kopfLesetest).toHaveLength(40);
+    expect(logged.kopfLesetest.startsWith("NotReadableError")).toBe(true);
+  });
+
+  test("Kopf-Lesetest mit falschem Typ oder leer wird verworfen", async () => {
+    for (const wert of [16, { ok: true }, ""]) {
+      errorSpy.mockClear();
+      const res = mockRes();
+      await handleErrors(mockReq({ errorMessage: "x", phase: "p", kopfLesetest: wert }), res);
+      expect(res.statusCode).toBe(204);
+      expect(loggedPayload().kopfLesetest == null).toBe(true);
+    }
+  });
+
   test("client.automatisiert als Text wird verworfen — nur boolesch zaehlt", async () => {
     const res = mockRes();
     await handleErrors(mockReq({ errorMessage: "x", phase: "p", client: { automatisiert: "true" } }), res);

@@ -44,6 +44,15 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/* SICHTBAR HEISST GEMELDET (16.09.2026): Sechs Fehlermeldungen, die ein Kind
+   auf dem Bildschirm sieht, gingen nie an die Fehlererfassung — die Auswertung
+   des Workshop-Tags konnte deshalb nur die Faelle zaehlen, die ohnehin gemeldet
+   wurden. Die Meldung traegt den Schluessel des angezeigten Textes als
+   Fehlerart; weitere Felder nur aus der festen Liste des Melders. */
+function meldeSichtbarenFehler(schluessel, phase, zusatz = {}) {
+  logClientError(new Error(schluessel), { phase, wakeLock: wakeLockStatus(), ...zusatz });
+}
+
 /* Die Vorschau oben zeigt das Original ueber eine Objekt-URL. Kann der
    Browser das Format nicht anzeigen (HEIC auf Android, 08.09.2026), bleibt
    dort ein kaputtes Bildsymbol stehen, obwohl die Analyse laeuft. Dann zeigt
@@ -437,6 +446,7 @@ async function renderQueueResult(data, myId, traceId, timings) {
     /* Nie halben Live-Text stehen lassen — Karte weg, normale Fehlermeldung. */
     liveAnzeige.abbrechen();
     setStatus(t("error.queueFailed"), traceId, "error.queueFailed");
+    meldeSichtbarenFehler("error.queueFailed", "ergebnis-leer", { traceId, requestId: String(myId) });
     return;
   }
   /* Client-seitige Daten injizieren — GPS/dateTimeOriginal erreichen nie unsere
@@ -595,6 +605,7 @@ async function analyzeImageQueued() {
   if (!file) {
     stopScanAnim();
     setStatus(t("error.noFile"), undefined, "error.noFile");
+    meldeSichtbarenFehler("error.noFile", "datei-fehlt", { requestId: String(myId), traceId });
     state.isAnalyzing = false;
     state.uploadLaeuft = false;
     return;
@@ -602,6 +613,11 @@ async function analyzeImageQueued() {
   if (file.size > 25 * 1024 * 1024) {
     stopScanAnim();
     setStatus(t("error.fileTooLarge"), undefined, "error.fileTooLarge");
+    meldeSichtbarenFehler("error.fileTooLarge", "datei-zu-gross", {
+      requestId: String(myId),
+      traceId,
+      fileSizeKb: Math.round(file.size / 1024),
+    });
     state.isAnalyzing = false;
     state.uploadLaeuft = false;
     return;
@@ -718,6 +734,12 @@ async function analyzeImageQueued() {
     if (!jobId) {
       stopScanAnim();
       setStatus(t("error.queueFailed"), traceId, "error.queueFailed");
+      meldeSichtbarenFehler("error.queueFailed", "einreihen-ohne-auftrag", {
+        requestId: String(myId),
+        traceId,
+        httpStatus: enqueueResp.status,
+        durationMs: Date.now() - analyzeStartTime,
+      });
       return;
     }
     /* PRIV-003: Abhol-Ticket vom Server merken + bei jedem Poll mitschicken. */
@@ -743,6 +765,11 @@ async function analyzeImageQueued() {
       liveAnzeige.abbrechen();
       clearStoredJobId();
       setStatus(t("error.queueAbandoned"), traceId, "error.queueAbandoned");
+      meldeSichtbarenFehler("error.queueAbandoned", "auftrag-verworfen", {
+        requestId: String(myId),
+        traceId,
+        durationMs: Date.now() - analyzeStartTime,
+      });
       return;
     }
     if (outcome.error) {
@@ -816,6 +843,7 @@ async function analyzeImageQueued() {
          Ergebnis des zweiten Lesewegs — beides ohne Personenbezug. */
       msSeitAuswahl: err.msSeitAuswahl,
       zweiterLeseweg: err.zweiterLeseweg,
+      kopfLesetest: err.kopfLesetest,
     });
   } finally {
     releaseWakeLock();
@@ -912,6 +940,7 @@ export async function resumeQueueJob({ force = false } = {}) {
       if (!liveAnzeige.pausieren()) startScanAnim(false);
       state.wartetAufVerbindung = true;
       setStatus(outcome.error, traceId, "error.connectionLost");
+      meldeSichtbarenFehler("error.connectionLost", "resume-verbindung", { requestId: String(myId), traceId });
       return;
     }
 

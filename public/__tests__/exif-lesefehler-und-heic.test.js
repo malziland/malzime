@@ -23,7 +23,7 @@ import { prepareImage } from "../js/exif.js";
 const HEIC_KOPF = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0]);
 const JPEG_KOPF = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1]);
 
-function datei(bytes, { arrayBufferWirft = false, readerWirft = false, type = "image/jpeg" } = {}) {
+function datei(bytes, { arrayBufferWirft = false, readerWirft = false, kopfWirft = false, type = "image/jpeg" } = {}) {
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
   const f = new Blob([bytes], { type });
   Object.defineProperty(f, "size", { value: bytes.length });
@@ -35,6 +35,18 @@ function datei(bytes, { arrayBufferWirft = false, readerWirft = false, type = "i
     }
     return buffer;
   };
+  /* Kopf-Lesetest (16.09.2026): slice(0, 16) liefert den Anfang — oder wirft
+     wie auf den betroffenen Android-Geraeten. */
+  f.slice = (von, bis) => ({
+    arrayBuffer: async () => {
+      if (kopfWirft) {
+        const e = new Error("nicht lesbar");
+        e.name = "NotReadableError";
+        throw e;
+      }
+      return buffer.slice(von, bis);
+    },
+  });
   f._readerWirft = readerWirft;
   f._buffer = buffer;
   return f;
@@ -95,6 +107,32 @@ describe("Lesefehler: zweiter Leseweg", () => {
     expect(err.msSeitAuswahl).toBeGreaterThanOrEqual(1500);
     expect(err.msSeitAuswahl).toBeLessThan(60000);
     expect(err.fileFormat).toBe("decl:image/jpeg");
+  }, 10000);
+
+  it("Kopf-Lesetest: ist der Anfang lesbar, meldet der Fehler 'ok'", async () => {
+    const f = datei(JPEG_KOPF, { arrayBufferWirft: true, readerWirft: true });
+    const err = await prepareImage(f, { auswahlZeit: Date.now() }).catch((e) => e);
+    expect(err.message).toBe("read_failed");
+    expect(err.kopfLesetest).toBe("ok");
+  }, 10000);
+
+  it("Kopf-Lesetest: ist auch der Anfang nicht lesbar, steht dort der Fehlername", async () => {
+    const f = datei(JPEG_KOPF, { arrayBufferWirft: true, readerWirft: true, kopfWirft: true });
+    const err = await prepareImage(f, { auswahlZeit: Date.now() }).catch((e) => e);
+    expect(err.kopfLesetest).toBe("NotReadableError");
+  }, 10000);
+
+  it("Kopf-Lesetest: eine leere Datei heisst 'leer', nicht 'ok'", async () => {
+    const f = datei(new Uint8Array(0), { arrayBufferWirft: true, readerWirft: true });
+    const err = await prepareImage(f, { auswahlZeit: Date.now() }).catch((e) => e);
+    expect(err.kopfLesetest).toBe("leer");
+  }, 10000);
+
+  it("klappt der zweite Leseweg, gibt es keinen Kopf-Lesetest und keinen Fehler", async () => {
+    bildLaedt = true;
+    const f = datei(JPEG_KOPF, { arrayBufferWirft: true, kopfWirft: true });
+    const ergebnis = await prepareImage(f, { auswahlZeit: Date.now() });
+    expect(ergebnis.imageBase64).toBe("QUJD");
   }, 10000);
 
   it("ohne Auswahlzeit bleibt msSeitAuswahl null statt einer erfundenen Zahl", async () => {

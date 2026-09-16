@@ -18,6 +18,16 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   meist ein Treffer des Kinderschutz-Filters dahintersteht und kein Ausfall,
   und wo man nachsieht (seit 16.09.2026).
 
+### Behoben
+
+- **Jede Fehlermeldung, die auf dem Bildschirm erscheint, wird jetzt auch
+  anonym erfasst.** Sechs Meldungen (etwa „Datei zu groß“ oder „Auftrag
+  verworfen“) und eine leer zurückgekommene Fotoauswahl blieben bisher
+  unsichtbar. Kann ein Handy ein Foto nicht übergeben, zeigt die Meldung jetzt
+  auch, ob wenigstens der Anfang der Datei lesbar war — ohne Inhalt, ohne
+  Dateiname. Damit lässt sich eingrenzen, warum manche Android-Handys Fotos
+  nicht herausgeben.
+
 ## [4.9.2] — 2026-09-11
 
 ### Entfernt

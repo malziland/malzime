@@ -547,10 +547,36 @@ aufgetreten. Manuelles Neuladen zählt seit v2.12.3 nicht mehr mit.
 
 ### „Bild konnte nicht geöffnet werden" (`error.readFailed`)
 
-Datei-**Lese**fehler am Endgerät, kein Formatproblem (Workshop-Vorfall 2026-07-06).
-Seit v2.2.8 macht das Frontend eine Sofort-Kopie mit Retry; eine Häufung wäre neu zu
-bewerten. Diagnose: Log-Bucket `client-diagnostics` (30 Tage), Felder `errorDetail`
-und `fileSizeKb`.
+Der Browser bekommt die Datei vom Gerät nicht — kein Formatproblem. Stand
+16.09.2026: bisher ausschließlich Chrome 151/152 auf Android (Pixeldichte der
+Meldungen passt zu Samsung-Galaxy-Geräten), 20 Fälle in 30 Tagen, davon 11 an
+einem Workshop-Tag; Samsung Internet war nicht betroffen. Die Seite liest die
+Datei zweimal über `arrayBuffer()` und dann über `FileReader` (seit 08.09.2026)
+— der zweite Weg hat im Workshop in keinem der 11 Fälle geholfen. Die Ursache
+ist noch offen.
+
+**Was die Meldung jetzt mitbringt** (Diagnose-Speicher, 30 Tage): `errorDetail`
+(Fehlername), `fileFormat` (vom Browser angegebener Typ), `fileSizeKb`,
+`msSeitAuswahl`, `zweiterLeseweg` und seit 16.09.2026 `kopfLesetest`: `ok`
+heißt, der Anfang der Datei war lesbar, nur das Ganze nicht (Datei verändert
+oder unvollständig); ein Fehlername heißt, das Gerät gibt die Datei gar nicht
+heraus (etwa ein Foto, das nur in der Cloud liegt). Übertragen wird nur dieses
+Stichwort, nie Bytes.
+
+**Seit 16.09.2026 werden auch diese sichtbaren Meldungen erfasst** (Phase in
+Klammern): Datei fehlt (`datei-fehlt`), Datei zu groß (`datei-zu-gross`, mit
+Größe), fertig ohne Ergebnis (`ergebnis-leer`), Einreihen ohne Auftragsnummer
+(`einreihen-ohne-auftrag`), Auftrag verworfen (`auftrag-verworfen`),
+Wiederaufnahme ohne Verbindung (`resume-verbindung`) sowie eine Dateiauswahl,
+die ohne Datei zurückkam (`auswahl-leer`, `auswahl-leer-nach-foto` — letzteres
+kann auch ein Abbrechen der Auswahl sein).
+
+Nachsehen:
+
+    gcloud logging read 'resource.labels.service_name="errors"' \
+      --project=malzime --bucket=client-diagnostics --location=europe-west1 \
+      --view=_AllLogs --freshness=30d \
+      --format='value(timestamp,jsonPayload.phase,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest)'
 
 ### Mistral überlastet / 429 / 5xx
 

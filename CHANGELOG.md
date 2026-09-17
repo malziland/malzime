@@ -4,6 +4,24 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Kinder werden seltener als erwachsen geschätzt.** In zwei Workshops mit
+  12- bis 13-Jährigen lagen die zu hohen Schätzungen fast alle auf genau 19
+  oder 25 Jahren — den Zahlen, die als Beispiel in der Anweisung an die KI
+  standen. Solche Beispielzahlen stehen dort nicht mehr. Außerdem gilt: Nichts
+  außer Gesicht, Hals, Händen und Haaren macht eine Person älter, auch
+  Make-up, Filter und Styling nicht; deutliche Hinweise auf Kindheit dürfen die
+  Schätzung dagegen senken.
+- **Werbeschutz für Kinder mit Sicherheitspuffer.** Werbeideen zu Kredit,
+  Wetten, Alkohol, Schönheits-OP und Diät werden jetzt entfernt, solange die
+  geschätzte Altersspanne bei 25 oder darunter beginnen kann (bisher: 18).
+  Nachgerechnet an den beiden Workshop-Tagen wären statt 31 und 50 nur noch 7
+  und 10 Analysen ohne diesen Schutz geblieben. Erwachsene, deren Schätzung bei
+  25 oder darunter beginnt, sehen diese Ideen dadurch ebenfalls nicht.
+
 ## [4.10.0] — 2026-09-16
 
 ### Geändert

@@ -24,8 +24,9 @@
  *      nichts verloren. Damit hängt die schwerste Absicherung nicht mehr an
  *      einer Schätzung.
  *   2. Glücksspiel, Kredit, Alkohol, Schönheits-OP und Diätmittel nur bei
- *      erkennbar Minderjährigen. Bei Erwachsenen sind sie legitimer
- *      Lerninhalt — wie diese Branchen Menschen adressieren, IST das Thema.
+ *      möglicherweise Minderjährigen — mit Sicherheitspuffer, siehe
+ *      Altersgrenze unten. Bei Erwachsenen sind sie legitimer Lerninhalt —
+ *      wie diese Branchen Menschen adressieren, IST das Thema.
  *
  * BEWUSST ENG GEFASST: Gefiltert wird nur, was unzweifelhaft nicht zu Kindern
  * gehört. NICHT gefiltert wird die didaktisch gewollte System-Perspektive —
@@ -38,25 +39,45 @@
 /* ── Altersgrenze ─────────────────────────────────────────────────────────
    Bezieht sich auf die Schaetzung des Modells, nicht auf Wahrheit.
 
-   VEREINBARTE REGEL (bewusste Entscheidung, 2026-08-11): Stufe 2 greift,
-   wenn die UNTERGRENZE der geschaetzten Spanne 18 oder darunter ist. Nicht
-   der Punktwert zaehlt, sondern das juengste Alter, das die Angabe zulaesst —
-   wer laut Modell "17-24" sein koennte, wird geschuetzt; wer laut Modell
-   fruehestens 19 ist, nicht.
+   REGEL (seit 2026-09-17, loest die Vereinbarung vom 2026-08-11 ab): Stufe 2
+   greift, wenn die UNTERGRENZE der geschaetzten Spanne 25 oder darunter ist.
+   Nicht der Punktwert zaehlt, sondern das juengste Alter, das die Angabe
+   zulaesst.
 
-   Die beiden Beispiele aus der Entscheidung:
-     Spanne 17-24, Schaetzwert 21  →  Filter greift       (Untergrenze 17)
-     Spanne 19-21, Schaetzwert 20  →  Filter greift nicht (Untergrenze 19)
+     Spanne 17-24  →  Filter greift       (Untergrenze 17)
+     Spanne 25-30  →  Filter greift       (Untergrenze 25)
+     Spanne 26-32  →  Filter greift nicht (Untergrenze 26)
 
-   Bis zum 2026-08-11 lag auf der Untergrenze zusaetzlich ein Abstand von
-   3 Jahren (Schutz bis unter 21). Das entsprach nicht der Vereinbarung und
-   ist entfernt. Bewusst getragene Folge: Ein real minderjaehriges Kind,
-   dessen Spanne komplett ueber 18 geschaetzt wird, faellt aus Stufe 2.
-   Stufe 1 (Pornografie, Waffen, Extremismus) bleibt davon unberuehrt und
-   gilt altersunabhaengig fuer alle. */
+   WARUM DER PUFFER: Bis 2026-09-17 galt "Untergrenze 18 oder darunter" ohne
+   Abstand. In zwei Workshops mit 12- bis 13-Jaehrigen (16. und 17.09.2026)
+   hatten 31 von 186 bzw. 50 von 143 Schaetzungen eine Untergrenze von 19 oder
+   mehr, fast alle genau 19 oder 25 — diese Kinder fielen aus Stufe 2. Die
+   Fachwelt rechnet deshalb mit einem Puffer: NIST nennt fuer die Grenze 18
+   einen Puffer von sieben Jahren, also die Schwelle 25, als ueblich (NIST IR
+   8525, "Challenge-T"); allgemeine Bild-Sprachmodelle schaetzen 16 bis 29 %
+   der Minderjaehrigen als erwachsen (Ren u. a. 2026, arXiv 2602.07815).
+   Nachgerechnet mit derselben Regel an beiden Tagen: 7 statt 31 und 10 statt
+   50 Analysen ohne Stufe 2.
+
+   Bewusst getragene Folge: Erwachsene, deren Spanne bei 25 oder darunter
+   beginnt, bekommen keine Kredit-, Wett-, Alkohol-, Schoenheits-OP- und
+   Diaet-Ideen. Stufe 1 (Pornografie, Waffen, Extremismus) gilt unveraendert
+   fuer alle. */
 const VOLLJAEHRIG_AB = 18;
-/* „Untergrenze ≤ 18" als strikter Vergleich geschrieben: untergrenze < 19. */
-const SCHUTZ_BIS = VOLLJAEHRIG_AB + 1;
+/* BLEIBT IM CODE — Kinderschutz-Regel, keine Betriebseinstellung. Wer den
+   Puffer aendert, aendert die Entscheidung vom 17.09.2026; das geht nur mit
+   Test und Deploy, nicht per Datenbankeintrag. */
+const PUFFER_JAHRE = 7;
+/* „Untergrenze ≤ 25" als strikter Vergleich geschrieben: untergrenze < 26. */
+const SCHUTZ_BIS = VOLLJAEHRIG_AB + PUFFER_JAHRE + 1;
+
+/* Platzhalter der Formatvorlage im Prompt ("~‹Zahl› Jahre alt"). Steht er
+   noch in der Altersangabe, hat das Modell die Vorlage abgeschrieben statt zu
+   schaetzen. Dann gilt Stufe 2 — anders als bei einer Angabe ganz ohne
+   Alter (siehe applyMinorSafety): Ein Kind, dessen Karte "‹Zahl› Jahre"
+   zeigt, darf nicht deshalb Kredit-Ideen bekommen, weil keine Zahl lesbar
+   war. */
+const PLATZHALTER = /[‹›]/;
 
 /* ── Zwei Stufen ──────────────────────────────────────────────────────────
    IMMER_VERBOTEN gilt unabhaengig vom geschaetzten Alter. Das ist bewusst so:
@@ -216,10 +237,14 @@ function applyMinorSafety(profiles, opts = {}) {
     "";
   const untergrenze = untereAltersgrenze(quelle);
   bericht.alter = untergrenze;
+  const platzhalter = PLATZHALTER.test(quelle);
+  bericht.platzhalter = platzhalter;
 
   /* "Koennte minderjaehrig sein", nicht "ist es wahrscheinlich". Siehe die
-     Begruendung bei SCHUTZ_BIS oben. */
-  const minderjaehrig = untergrenze !== null && untergrenze < SCHUTZ_BIS;
+     Begruendung bei SCHUTZ_BIS und PLATZHALTER oben. Das Feld heisst weiter
+     `minderjaehrig`, weil die Auswertungen des Diagnose-Speichers es so
+     zaehlen; gemeint ist "Stufe 2 greift". */
+  const minderjaehrig = platzhalter || (untergrenze !== null && untergrenze < SCHUTZ_BIS);
   bericht.minderjaehrig = minderjaehrig;
 
   /* Ist kein Alter erkennbar, wird NICHT als minderjaehrig behandelt — sonst

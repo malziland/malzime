@@ -44,6 +44,10 @@ function loggeMinorSafety(safety, traceId, lang) {
       lang,
       alter: safety.alter,
       minderjaehrig: safety.minderjaehrig,
+      /* Seit 17.09.2026: Stand statt einer Zahl der Platzhalter der
+         Formatvorlage in der Altersangabe? Zaehlt, wie oft das Modell die
+         Vorlage abschreibt (dann greift Stufe 2, siehe minor-safety.js). */
+      platzhalter: safety.platzhalter === true,
       entfernt: safety.entfernt.length,
       gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
       /* Treffer im Fliesstext: nicht entfernt, aber gemeldet — je Stufe. */

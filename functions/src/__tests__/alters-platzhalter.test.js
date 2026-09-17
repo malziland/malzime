@@ -22,6 +22,11 @@ describe("Erkennen und Entfernen", () => {
     ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)", "männlich"],
     ["female, ~‹number› years old (range ‹number›-‹number›)", "female"],
     ["männlich, ~Zahl Jahre alt (Spanne Zahl-Zahl)", "männlich"],
+    /* ohne Tilde und ohne Klammern (Gegenprüfung 17.09.) */
+    ["männlich, Zahl Jahre alt.", "männlich."],
+    /* eine echte Spanne bleibt stehen */
+    ["weiblich, Zahl Jahre alt (Spanne 12-16).", "weiblich (Spanne 12-16)."],
+    ["female, number years old", "female"],
     [
       "Du bist weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Deine Wangen sind noch rund.",
       "Du bist weiblich. Deine Wangen sind noch rund.",
@@ -120,6 +125,15 @@ describe("Fertige Karte und Anker für den Filter", () => {
     );
   });
 
+  test("ohne hard_facts: der Filter bekommt die UNbereinigte Karte", async () => {
+    /* Sonst sähe minor-safety.js nur die bereinigte Karte und könnte den
+       Platzhalter nicht mehr erkennen (Gegenprüfung 17.09.). */
+    antwortMit("", "Du bist weiblich, ~‹Zahl› Jahre alt. Deine Wangen sind noch rund.");
+    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+    expect(r.normal.categories.alter_geschlecht.value).toBe("Du bist weiblich. Deine Wangen sind noch rund.");
+    expect(r.alterAnker).toBe("Du bist weiblich, ~‹Zahl› Jahre alt. Deine Wangen sind noch rund.");
+  });
+
   test("ohne Platzhalter bleibt alles wie bisher", async () => {
     antwortMit("männlich, ~38 (Spanne 35-42)", "Du bist männlich, etwa 38. Die Linien bleiben sichtbar.");
     const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
@@ -149,5 +163,24 @@ describe("Live-Anzeige", () => {
     expect(kartenStandard[0].wert).toBe("weiblich. Runde Wangen.");
     /* Nur die Alterskarte wird bereinigt. */
     expect(kartenStandard[1].wert).toBe("Text ‹nicht Alter›");
+  });
+
+  test("ein halb angekommener Alterswert erscheint gar nicht — also auch nicht halb bereinigt", () => {
+    const voll = JSON.stringify({
+      standard: {
+        profileText: "Text.",
+        categories: {
+          alter_geschlecht: {
+            label: "Alter & Geschlecht",
+            value: "weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Runde Wangen.",
+            confidence: 0.8,
+          },
+        },
+      },
+    });
+    for (const marke of ["(Spanne ‹", "‹Zahl›-‹Za", "Runde"]) {
+      const { kartenStandard } = _extrahiereLiveText(voll.slice(0, voll.indexOf(marke) + marke.length));
+      expect(kartenStandard).toEqual([]);
+    }
   });
 });

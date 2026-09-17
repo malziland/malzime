@@ -103,6 +103,7 @@ describe("Platzhalter der Formatvorlage statt einer Zahl", () => {
     /* ohne spitze Klammern abgeschrieben */
     ["männlich, ~Zahl Jahre alt (Spanne Zahl-Zahl)"],
     ["male, ~number years old"],
+    ["männlich, Zahl Jahre alt."],
   ])("%s — Filter greift", (alterText) => {
     const p = profil(alterText, ["Tipico Wetten", "Nike Air Max"]);
     const b = applyMinorSafety(p);

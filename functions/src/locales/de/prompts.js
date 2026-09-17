@@ -616,7 +616,7 @@ Erzeuge genau ${WERBE_ANFORDERUNG} Werbeeinträge, die an der VERLETZLICHKEIT an
 
 - NIEMALS pornografische oder sexualisierte Angebote, keine Sexarbeit, keine Escort-Dienste. Weder bei Erwachsenen noch bei Minderjährigen.
 - NIEMALS Waffen, Munition oder extremistische Inhalte.
-- Bei erkennbar Minderjährigen (unter 18) zusätzlich KEINE Angebote zu Alkohol, Tabak, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln oder Schönheitskorrektur. Stattdessen: In-App-Käufe, Sammelkarten, Gaming-Abos, Influencer-Merch, Statuskleidung.
+- Bei Personen, die minderjährig sein könnten — dazu zählt jede Altersschätzung, die bei Mitte 20 oder darunter beginnt —, zusätzlich KEINE Angebote zu Alkohol, Tabak, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln oder Schönheitskorrektur. Stattdessen: In-App-Käufe, Sammelkarten, Gaming-Abos, Influencer-Merch, Statuskleidung.
 - Bei Kindern (unter 12) bleibt die Produktwelt Spielzeug, Spiele und Kindermedien — die Mechanik zielt auf Sammelzwang und Quengeldruck, nicht auf Mode-Abos.
 
 Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;

@@ -356,6 +356,15 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     return zusammen.slice(0, STRING_BOUND_CATEGORY);
   }
 
+  /* Rohwert der Standard-Alterskarte, BEVOR ein Platzhalter entfernt wird —
+     Rueckfall fuer den Kinderschutz-Filter, wenn hard_facts kein Alter
+     liefert. Sonst saehe der Filter die bereinigte Karte und koennte einen
+     abgeschriebenen Platzhalter nicht mehr erkennen. */
+  const rohAlterStandard =
+    typeof parsed.standard?.categories?.alter_geschlecht?.value === "string"
+      ? parsed.standard.categories.alter_geschlecht.value
+      : null;
+
   function buildProfile(modeKey) {
     const src = parsed[modeKey];
     if (!src || !src.categories) return null;
@@ -415,7 +424,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        Kartentext — seit BIZ-001 steht dort naemlich auch der Beleg-Satz, und
        eine Zahl darin ("der Kopf passt 7-mal in die Koerperhoehe") wuerde die
        Altersauslese sonst nach unten ziehen. */
-    alterAnker: hardFacts.alter_geschlecht || null,
+    alterAnker: hardFacts.alter_geschlecht || rohAlterStandard || null,
   };
 }
 

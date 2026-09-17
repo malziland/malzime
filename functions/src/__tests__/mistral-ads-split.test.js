@@ -297,7 +297,10 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
     expect(prompt).toMatch(/pornografisch/i);
     expect(prompt).toMatch(/Waffen/i);
     expect(prompt).toMatch(/Glücksspiel/i);
-    expect(prompt).toMatch(/unter 18/i);
+    /* Seit 17.09.2026 mit Puffer wie der Server-Filter (minor-safety.js):
+       nicht nur "unter 18", sondern alle, die minderjährig sein könnten. */
+    expect(prompt).toMatch(/minderjährig sein könnten/i);
+    expect(prompt).not.toMatch(/unter 18/i);
   });
 
   /* SEC-2026-08-12-18: Der zweite Aufruf bekam kein Bild — aber alles, was er

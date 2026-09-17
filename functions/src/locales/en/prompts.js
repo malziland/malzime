@@ -601,7 +601,7 @@ Generate exactly ${WERBE_ANFORDERUNG} ad entries that target the VULNERABILITY, 
 
 - NEVER pornographic or sexualised offers, no sex work, no escort services. Neither for adults nor for minors.
 - NEVER weapons, ammunition or extremist content.
-- For recognisable minors (under 18) additionally NO offers involving alcohol, tobacco, gambling, sports betting, credit, instalments, diet products or cosmetic surgery. Instead: in-app purchases, trading cards, gaming subscriptions, influencer merch, status clothing.
+- For persons who could be minors — this includes any age estimate starting in the mid-twenties or below — additionally NO offers involving alcohol, tobacco, gambling, sports betting, credit, instalments, diet products or cosmetic surgery. Instead: in-app purchases, trading cards, gaming subscriptions, influencer merch, status clothing.
 - For children (under 12) the product world stays toys, games and children's media — the mechanic targets collecting compulsion and pester power, not fashion subscriptions.
 
 Answer ONLY with JSON: {"ad_targeting": ["...", "..."]}`;

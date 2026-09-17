@@ -166,12 +166,14 @@ const REQUIRED_CARDS = [
    alt (Spanne ‹Zahl›-‹Zahl›)" — eine Beispielzahl zog die Schaetzungen an.
    Schreibt das Modell die Vorlage ab, darf das Kind "‹Zahl›" nie auf der
    Karte sehen, und der Kinderschutz-Filter muss den Fall erkennen
-   (minor-safety.js). Erkannt werden die spitzen Klammern und die nackte Form
-   "~Zahl" bzw. "Zahl-Zahl"; ein einzelnes Wort "number" im Fliesstext ("a
-   number of fine lines") zaehlt nicht. Ziffern in spitzen Klammern ("‹40›")
-   sind eine echte Schaetzung und werden nur ausgepackt. */
+   (minor-safety.js). Erkannt werden die spitzen Klammern und die nackten
+   Formen "~Zahl", "Zahl Jahre", "Zahl-Zahl" und "Spanne Zahl"; ein einzelnes
+   Wort "number" im Fliesstext ("a number of fine lines") zaehlt nicht.
+   Ziffern in spitzen Klammern ("‹40›") sind eine echte Schaetzung und werden
+   nur ausgepackt. */
 const ZIFFERN_IN_KLAMMERN = /‹\s*(\d{1,3})\s*›/g;
-const ALTERS_PLATZHALTER = /[‹›]|~\s*(?:zahl|number)\b|\b(?:zahl|number)\s*[-–]\s*(?:zahl|number)\b/i;
+const ALTERS_PLATZHALTER =
+  /[‹›]|~\s*(?:zahl|number)\b|\b(?:zahl|number)\s+(?:jahre|years)\b|\b(?:zahl|number)\s*[-–]\s*(?:zahl|number)\b|\b(?:spanne|range)\s+(?:zahl|number)\b/i;
 
 function hatAltersPlatzhalter(text) {
   return ALTERS_PLATZHALTER.test(String(text || "").replace(ZIFFERN_IN_KLAMMERN, "$1"));
@@ -187,6 +189,7 @@ function ohneAltersPlatzhalter(text) {
     .replace(/\s*\([^)]*(?:‹[^›]*›|\b(?:zahl|number)\b)[^)]*\)/gi, "")
     .replace(/,?\s*(?:~\s*)?‹[^›]*›(?:\s+(?:jahre|years)(?:\s+(?:alt|old))?)?/gi, "")
     .replace(/,?\s*~\s*(?:zahl|number)\b(?:\s+(?:jahre|years)(?:\s+(?:alt|old))?)?/gi, "")
+    .replace(/,?\s*\b(?:zahl|number)\s+(?:jahre|years)(?:\s+(?:alt|old))?/gi, "")
     .replace(/[‹›]/g, "")
     .replace(/\s+([.,;!?])/g, "$1")
     .replace(/\s{2,}/g, " ")

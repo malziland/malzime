@@ -80,7 +80,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504
   job-pipelines.js          Der Analyseweg: KI-Aufruf, Tier-Easter-Egg, Beast-Werbung, Kinderschutz
   job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
-  minor-safety.js           Kinderschutz-Filter fuer Werbekategorien bei Minderjaehrigen
+  minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer)
   betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Pruefung, Cache
   produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)
   test-satz.js              Einstellungssatz fuer die Tests

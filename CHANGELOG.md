@@ -8,19 +8,22 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Geändert
 
-- **Kinder werden seltener als erwachsen geschätzt.** In zwei Workshops mit
-  12- bis 13-Jährigen lagen die zu hohen Schätzungen fast alle auf genau 19
-  oder 25 Jahren — den Zahlen, die als Beispiel in der Anweisung an die KI
-  standen. Solche Beispielzahlen stehen dort nicht mehr. Außerdem gilt: Nichts
-  außer Gesicht, Hals, Händen und Haaren macht eine Person älter, auch
-  Make-up, Filter und Styling nicht; deutliche Hinweise auf Kindheit dürfen die
-  Schätzung dagegen senken.
+- **Kinder werden seltener als erwachsen geschätzt.** In zwei Workshops lagen
+  drei Viertel bis vier Fünftel der Schätzungen ab 19 Jahren auf genau 19 oder
+  25 — Zahlen, die so in der Anweisung an die KI standen. Diese Zahlen und die
+  Beispielzahl beim Alter stehen dort nicht mehr. Außerdem gilt: Nichts außer
+  Gesicht, Hals, Händen und Haaren macht eine Person älter, auch Make-up,
+  Filter und Styling nicht; deutliche Hinweise auf Kindheit im Bild dürfen die
+  Schätzung senken.
 - **Werbeschutz für Kinder mit Sicherheitspuffer.** Werbeideen zu Kredit,
   Wetten, Alkohol, Schönheits-OP und Diät werden jetzt entfernt, solange die
   geschätzte Altersspanne bei 25 oder darunter beginnen kann (bisher: 18).
   Nachgerechnet an den beiden Workshop-Tagen wären statt 31 und 50 nur noch 7
   und 10 Analysen ohne diesen Schutz geblieben. Erwachsene, deren Schätzung bei
   25 oder darunter beginnt, sehen diese Ideen dadurch ebenfalls nicht.
+- **Kein Platzhalter auf der Alterskarte.** Schreibt die KI statt einer Zahl
+  nur die Vorlage „‹Zahl›“ hin, wird sie vor der Anzeige entfernt, und der
+  Werbeschutz greift.
 
 ## [4.10.0] — 2026-09-16
 

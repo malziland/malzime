@@ -49,10 +49,10 @@
      Spanne 26-32  →  Filter greift nicht (Untergrenze 26)
 
    WARUM DER PUFFER: Bis 2026-09-17 galt "Untergrenze 18 oder darunter" ohne
-   Abstand. In zwei Workshops mit 12- bis 13-Jaehrigen (16. und 17.09.2026)
-   hatten 31 von 186 bzw. 50 von 143 Schaetzungen eine Untergrenze von 19 oder
-   mehr, fast alle genau 19 oder 25 — diese Kinder fielen aus Stufe 2. Die
-   Fachwelt rechnet deshalb mit einem Puffer: NIST nennt fuer die Grenze 18
+   Abstand. In zwei Workshops mit Schulklassen (16. und 17.09.2026) hatten 31
+   von 186 bzw. 50 von 143 Analysen eine Untergrenze von 19 oder mehr, davon
+   24 bzw. 40 genau 19 oder 25. Wo darunter Minderjaehrige waren, griff Stufe 2
+   nicht. Die Fachwelt rechnet deshalb mit einem Puffer: NIST nennt fuer die Grenze 18
    einen Puffer von sieben Jahren, also die Schwelle 25, als ueblich (NIST IR
    8525, "Challenge-T"); allgemeine Bild-Sprachmodelle schaetzen 16 bis 29 %
    der Minderjaehrigen als erwachsen (Ren u. a. 2026, arXiv 2602.07815).
@@ -71,13 +71,13 @@ const PUFFER_JAHRE = 7;
 /* „Untergrenze ≤ 25" als strikter Vergleich geschrieben: untergrenze < 26. */
 const SCHUTZ_BIS = VOLLJAEHRIG_AB + PUFFER_JAHRE + 1;
 
-/* Platzhalter der Formatvorlage im Prompt ("~‹Zahl› Jahre alt"). Steht er
-   noch in der Altersangabe, hat das Modell die Vorlage abgeschrieben statt zu
-   schaetzen. Dann gilt Stufe 2 — anders als bei einer Angabe ganz ohne
-   Alter (siehe applyMinorSafety): Ein Kind, dessen Karte "‹Zahl› Jahre"
-   zeigt, darf nicht deshalb Kredit-Ideen bekommen, weil keine Zahl lesbar
-   war. */
-const PLATZHALTER = /[‹›]/;
+/* Platzhalter der Formatvorlage im Prompt ("~‹Zahl› Jahre alt", Erkennung in
+   mistral-antwort.js). Steht er noch in der Altersangabe, hat das Modell die
+   Vorlage abgeschrieben statt zu schaetzen. Dann gilt Stufe 2 — anders als
+   bei einer Angabe ganz ohne Alter (siehe applyMinorSafety): Ein Kind darf
+   nicht deshalb Kredit-Ideen bekommen, weil keine Zahl lesbar war. Auf der
+   Karte selbst entfernt mistral.js den Platzhalter vor der Anzeige. */
+const { hatAltersPlatzhalter } = require("./mistral-antwort");
 
 /* ── Zwei Stufen ──────────────────────────────────────────────────────────
    IMMER_VERBOTEN gilt unabhaengig vom geschaetzten Alter. Das ist bewusst so:
@@ -113,7 +113,8 @@ const IMMER_VERBOTEN = [
   /extremis|rechtsradikal|neo-?nazi|terror|white ?supremac/i,
 ];
 
-/* Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei Minderjaehrigen.
+/* Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei moeglicherweise
+   Minderjaehrigen (Untergrenze bis SCHUTZ_BIS, siehe oben).
    Fuer die Manipulations-Trigger wird sie bewusst NICHT angewandt — siehe
    applyMinorSafety. */
 const NUR_MINDERJAEHRIG = [
@@ -228,8 +229,10 @@ function applyMinorSafety(profiles, opts = {}) {
   };
   if (!profiles || typeof profiles !== "object") return bericht;
 
-  /* Alter aus dem Profil selbst holen — die Karte alter_geschlecht wird
-     server-seitig aus hard_facts überschrieben und ist deshalb verlässlich. */
+  /* Alter zuerst aus dem Anker (hard_facts, vom Aufrufer als alterText
+     uebergeben) — unveraendert, also auch mit abgeschriebenem Platzhalter.
+     Nur ohne Anker aus der Karte; die ist seit 17.09.2026 vor der Anzeige um
+     einen Platzhalter bereinigt (mistral.js). */
   const quelle =
     opts.alterText ||
     profiles.normal?.categories?.alter_geschlecht?.value ||
@@ -237,7 +240,7 @@ function applyMinorSafety(profiles, opts = {}) {
     "";
   const untergrenze = untereAltersgrenze(quelle);
   bericht.alter = untergrenze;
-  const platzhalter = PLATZHALTER.test(quelle);
+  const platzhalter = hatAltersPlatzhalter(quelle);
   bericht.platzhalter = platzhalter;
 
   /* "Koennte minderjaehrig sein", nicht "ist es wahrscheinlich". Siehe die
@@ -247,9 +250,10 @@ function applyMinorSafety(profiles, opts = {}) {
   const minderjaehrig = platzhalter || (untergrenze !== null && untergrenze < SCHUTZ_BIS);
   bericht.minderjaehrig = minderjaehrig;
 
-  /* Ist kein Alter erkennbar, wird NICHT als minderjaehrig behandelt — sonst
-     verloere man bei Erwachsenen legitime Inhalte (Kredit, Wein, Wellness sind
-     dort Teil der Aufklaerung). Die harte Liste greift trotzdem. */
+  /* Ist gar kein Alter erkennbar und auch kein Platzhalter da, wird NICHT
+     als minderjaehrig behandelt — sonst verloere man bei Erwachsenen legitime
+     Inhalte (Kredit, Wein, Wellness sind dort Teil der Aufklaerung). Die harte
+     Liste greift trotzdem. */
   for (const modus of ["normal", "boost"]) {
     const p = profiles[modus];
     if (!p) continue;

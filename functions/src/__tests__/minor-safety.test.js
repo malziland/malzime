@@ -45,9 +45,8 @@ describe("Untere Altersgrenze", () => {
 
 describe("Untergrenze der Spanne entscheidet (Regel mit Puffer, seit 2026-09-17)", () => {
   /* Stufe 2 greift, wenn die Untergrenze 25 oder darunter ist. Bis
-     2026-09-17 lag die Grenze bei 18 ohne Abstand; in zwei Workshops mit
-     12- bis 13-Jährigen fiel damit rund jedes sechste bzw. jedes dritte Kind
-     aus Stufe 2. Begründung und Quellen siehe SCHUTZ_BIS in minor-safety.js. */
+     2026-09-17 lag die Grenze bei 18 ohne Abstand. Begründung, Messung und
+     Quellen siehe SCHUTZ_BIS in minor-safety.js. */
   const gluecksspiel = ["Bet365 Live-Wetten", "Nike Air Max"];
 
   test("Spanne 17-24 — Filter greift", () => {
@@ -101,6 +100,9 @@ describe("Platzhalter der Formatvorlage statt einer Zahl", () => {
     ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)"],
     ["female, ~‹number› years old (range ‹number›-‹number›)"],
     ["weiblich, ~‹Zahl› Jahre alt (Spanne 30-36)"],
+    /* ohne spitze Klammern abgeschrieben */
+    ["männlich, ~Zahl Jahre alt (Spanne Zahl-Zahl)"],
+    ["male, ~number years old"],
   ])("%s — Filter greift", (alterText) => {
     const p = profil(alterText, ["Tipico Wetten", "Nike Air Max"]);
     const b = applyMinorSafety(p);
@@ -115,6 +117,21 @@ describe("Platzhalter der Formatvorlage statt einer Zahl", () => {
     expect(b.platzhalter).toBe(false);
     expect(b.minderjaehrig).toBe(false);
     expect(p.normal.ad_targeting).toEqual(["Tipico Wetten"]);
+  });
+
+  test("Ziffern in spitzen Klammern sind eine echte Schätzung, kein Platzhalter", () => {
+    const p = profil("weiblich, ~‹40› Jahre alt (Spanne ‹35›-‹45›)", ["Tipico Wetten"]);
+    const b = applyMinorSafety(p);
+    expect(b.platzhalter).toBe(false);
+    expect(b.alter).toBe(35);
+    expect(b.minderjaehrig).toBe(false);
+  });
+
+  test("das Wort „number“ im Fließtext ist kein Platzhalter", () => {
+    const p = profil("male, ~44 years old (range 40-48). A number of fine lines show it.", ["Tipico Wetten"]);
+    const b = applyMinorSafety(p);
+    expect(b.platzhalter).toBe(false);
+    expect(b.minderjaehrig).toBe(false);
   });
 
   test("gar keine Altersangabe ist kein Platzhalter — dort gilt weiter: nicht filtern", () => {

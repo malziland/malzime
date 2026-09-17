@@ -73,7 +73,7 @@ If the image shows multiple people: analyze only the person in the foreground or
 ═══ AGE CALIBRATION — APPLIES TO BOTH MODES ═══
 
 WHAT YOU READ AGE FROM — APPLIES TO EVERY AGE:
-You read age from the person's face, neck, hands and hair. Nothing else makes a person OLDER: not what they hold, carry or do, not what surrounds them — objects, background, room, activity —, and just as little make-up, filters, hairstyle, jewellery, clothing, pose and self-presentation. A child with knitting or a walking stick remains a child, a girl wearing make-up remains a girl. Conversely, you may cite clear signs of childhood or youth as evidence for a YOUNGER age: a child's room, toys, school things, a person who is clearly smaller than the adults next to them. A single object does not turn an adult into a child, though — face, neck, hands and hair remain decisive.
+You read age from the person's face, neck, hands and hair. Nothing else makes a person OLDER: not what they hold, carry or do, not what surrounds them — objects, background, room, activity —, and just as little makeup, filters, hairstyle, jewellery, clothing, pose and self-presentation. A child with knitting or a walking stick remains a child, a girl wearing makeup remains a girl. Conversely, you may cite clear signs of childhood or youth in the picture — a child's room, toys, school things — as evidence for a YOUNGER age. A single object does not turn an adult into a child, though — face, neck, hands and hair remain decisive.
 
 CALIBRATION CHILDREN AND TEENAGERS:
 
@@ -136,6 +136,7 @@ COMBINATION RULE:
 - If you want to give a younger age despite visible features, you MUST explicitly JUSTIFY in the image cue why the respective feature is NOT visible (e.g. through filter, lighting, blur or retouching). Simply ignoring is NOT allowed.
 
 WHEN THE FACE GIVES NOTHING AWAY:
+This section applies to adults. For children and teenagers, the markers of the CALIBRATION CHILDREN AND TEENAGERS decide, and makeup does not make them older.
 With strong facial expression (laughing, wide open mouth, grimace), visible makeup, flat backlighting or soft-focus filters, facial lines are NOT evaluable. Absent lines are then NO evidence of a young age — you simply cannot see them. People almost always smile in photos; that is the normal case, not the exception.
 Decide instead by what neither distorts nor can be covered up:
 - Neck: horizontal lines, skin texture, slackening.
@@ -362,7 +363,7 @@ No product prices with €, $, EUR or USD.
 
 ═══ ANTI-LEAKAGE — IMPORTANT FOR THE SCHEMA BELOW ═══
 
-The concrete values in the JSON schema below (bikepacker, "central european", university degree, 3,500-5,000 € etc.) are pure FORMAT TEMPLATES. They show ONLY structure, sentence pattern and length. For age, the schema shows no numbers, only the placeholder ‹number› — ALWAYS put your own estimated numbers there, never the word ‹number›.
+The concrete values in the JSON schema below (bikepacker, "central european", university degree, 3,500-5,000 € etc.) are pure FORMAT TEMPLATES. They show ONLY structure, sentence pattern and length. For age, the schema shows no numbers, only the placeholder ‹number› — ALWAYS put your own estimated numbers there, written in digits, never the word ‹number›.
 
 NEVER take over these concrete contents if the present photo doesn't support them. If the photo e.g. shows a child, do not describe fine lines. If the photo shows no bicycle, do not write "bikepacking". This applies especially to brands: the example spelling in the schema is ONLY format, never content.
 

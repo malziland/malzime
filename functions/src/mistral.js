@@ -37,6 +37,7 @@ const {
 
   REQUIRED_CARDS,
   findMissingCards,
+  ohneAltersPlatzhalter,
   escapeXml,
 } = require("./mistral-antwort");
 
@@ -358,11 +359,15 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   function buildProfile(modeKey) {
     const src = parsed[modeKey];
     if (!src || !src.categories) return null;
-    if (hardFacts.alter_geschlecht && src.categories.alter_geschlecht) {
-      src.categories.alter_geschlecht.value = mitAnkerVoran(
-        hardFacts.alter_geschlecht,
-        src.categories.alter_geschlecht.value
-      );
+    const karteAlter = src.categories.alter_geschlecht;
+    if (karteAlter) {
+      /* Abgeschriebener Platzhalter ("~‹Zahl› Jahre") wird vor der Anzeige
+         entfernt — im Anker wie im Modellwert. Der Kinderschutz-Filter liest
+         den unveraenderten Anker (alterAnker unten) und schuetzt dann. */
+      const mitAnker = hardFacts.alter_geschlecht
+        ? mitAnkerVoran(ohneAltersPlatzhalter(hardFacts.alter_geschlecht), karteAlter.value)
+        : karteAlter.value;
+      karteAlter.value = ohneAltersPlatzhalter(mitAnker);
     }
     if (hardFacts.herkunft && src.categories.herkunft) {
       src.categories.herkunft.value = mitAnkerVoran(hardFacts.herkunft, src.categories.herkunft.value);

@@ -627,9 +627,10 @@ Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
 
 ### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
 
-Der Filter (`functions/src/minor-safety.js`) streicht bei erkennbar
-Minderjährigen Werbeeinträge zu Alkohol, Wetten, Kredit, Diät und
-Schönheits-OP und meldet Treffer im Fließtext, ohne dort etwas zu streichen.
+Der Filter (`functions/src/minor-safety.js`) streicht bei möglicherweise
+Minderjährigen — seit 17.09.2026 bis zur Untergrenze 25, siehe `SCHUTZ_BIS` —
+Werbeeinträge zu Alkohol, Wetten, Kredit, Diät und Schönheits-OP und meldet
+Treffer im Fließtext, ohne dort etwas zu streichen.
 Seit 09.09. steht je Treffer das Feld und das getroffene Stichwort aus der
 festen Sperrliste im Log, dazu die Anzahl der gezeigten Werbeeinträge je Modus.
 Die Zeile liegt 30 Tage im Diagnose-Speicher:
@@ -637,9 +638,13 @@ Die Zeile liegt 30 Tage im Diagnose-Speicher:
     gcloud logging read 'jsonPayload.step="minor-safety" AND jsonPayload.minderjaehrig=true' \
       --project=malzime --bucket=client-diagnostics --location=europe-west1 \
       --view=_AllLogs --freshness=30d \
-      --format='value(timestamp,jsonPayload.alter,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
+      --format='value(timestamp,jsonPayload.alter,jsonPayload.platzhalter,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
 
-Lesart: `entfernte` sind gestrichene Werbeeinträge, `durchgerutschte` sind
+Lesart: `minderjaehrig=true` heißt seit 17.09.2026 „Stufe 2 greift“ — also
+Untergrenze bis 25 oder abgeschriebener Platzhalter, nicht nur unter 19. Wer
+Minderjährige im engeren Sinn zählen will, zählt `alter` unter 19.
+`platzhalter=true` heißt: Die KI hat statt einer Zahl die Vorlage „‹Zahl›“
+geschrieben (der Server entfernt sie vor der Anzeige). `entfernte` sind gestrichene Werbeeinträge, `durchgerutschte` sind
 Treffer im Profiltext oder in einer Kategorie-Karte (nur gemeldet). Steht bei
 `durchgerutschte` über Wochen ein Wort wie „cocktail" in Bar-Beschreibungen,
 ist die Sperrliste zu grob; stehen dort Werbebegriffe wie „sportwetten", hält
@@ -785,7 +790,7 @@ leeres Ergebnis ohne diese Angaben ist ein Messfehler, kein Befund.
 | Speicher | Standort | Aufbewahrung | Inhalt |
 |---|---|---|---|
 | `betrieb-eu` (Ziel der Weiche `_Default`) | europe-west1 | **1 Tag** — bewusst kurz | Programmausgaben der Functions (Request-ID, Schritt, Status, Token-Zahlen), Aufräumer- und Zeitplan-Läufe. Cloud-Run-Request-Logs, der einzige IP-Träger, sind per Ausschluss `exclude_run_requests_ip` gar nicht erst darin |
-| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026) |
+| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026; Platzhalter ja/nein seit 17.09.2026) |
 | `_Default` (Googles Ablage) | global, nicht änderbar | 1 Tag | seit 09.09.2026 **leer** — bekommt nichts mehr; existiert weiter, weil Google sie nicht löschen lässt |
 | `_Required` (Googles Pflichtprotokoll) | global, nicht änderbar, gesperrt | 400 Tage | unsere eigenen Verwaltungszugriffe (Kontoadresse, Aufruf-IP unseres Rechners). Keine Nutzerdaten. Google-Vorgabe |
 

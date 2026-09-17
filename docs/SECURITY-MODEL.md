@@ -469,48 +469,6 @@ verworfen, kostet Zeit und Geld für einen Fall, den zwei Reserve-Einträge
 abdecken. Einen Satzausschnitt um das Stichwort loggen: verworfen, der
 Ausschnitt könnte eine Beschreibung der Person enthalten.
 
-## Kinderschutz-Filter: Schutzgrenze mit Puffer (17.09.2026)
-
-**Was war.** Stufe 2 des Filters (Kredit, Wetten, Alkohol, Schönheits-OP,
-Diät) griff, wenn die Untergrenze der geschätzten Altersspanne 18 oder darunter
-war — ohne Abstand (Entscheidung vom 11.08.2026). In zwei Workshops mit 12- bis
-13-Jährigen hatten 31 von 186 (16.09.) und 50 von 143 (17.09.) Schätzungen eine
-Untergrenze von 19 oder mehr. Diese Kinder bekamen die Werbeideen für
-Erwachsene. Fast alle Werte lagen auf genau 19 oder 25, kein einziger zwischen
-20 und 24 — die Zahlen der Überschrift „19-25“ im Prompt.
-
-**Entscheidung.**
-
-1. Stufe 2 greift, solange die Untergrenze 25 oder darunter ist
-   (`SCHUTZ_BIS` in `functions/src/minor-safety.js`, dort auch die Beispiele).
-2. Steht statt einer Zahl der Platzhalter der Formatvorlage in der
-   Altersangabe, greift Stufe 2 ebenfalls; die Kinderschutz-Zeile meldet das
-   als `platzhalter: true`. Eine Angabe ganz ohne Alter bleibt wie bisher
-   ungefiltert.
-3. Der Prompt enthält im Altersteil und in den Beispielen keine Zahlen mehr,
-   die die Schätzung anziehen (Prüfung: `age-markers.test.js`).
-
-**Warum.** Das US-Normungsinstitut NIST nennt für die Grenze 18 einen Puffer von
-sieben Jahren (Schwelle 25) als üblich (NIST IR 8525). Allgemeine
-Bild-Sprachmodelle schätzen 16 bis 29 % der Minderjährigen als erwachsen (Ren
-u. a. 2026, arXiv 2602.07815). Dass Zahlen im Prompt die Antwort anziehen und
-Ermahnungen dagegen nicht helfen, ist mehrfach belegt (Lou & Sun 2024, arXiv
-2412.06593). Mit Puffer wären an den beiden Tagen 7 statt 31 und 10 statt 50
-Analysen ohne Stufe 2 geblieben.
-
-**Getragene Folge.** Erwachsene, deren Spanne bei 25 oder darunter beginnt,
-sehen diese Werbeideen nicht. Stufe 1 (Pornografie, Waffen, Extremismus) gilt
-unverändert für alle.
-
-**Betrachtete Alternativen.** Stufe 2 für alle: verworfen (Entscheidung des
-Inhabers vom 16.09.2026) — Kredit- und Wett-Werbung ist bei Erwachsenen Teil
-der Aufklärung. Mehrfache Schätzung und den niedrigsten Wert nehmen: für
-Altersschätzung nicht belegt und doppelt so teuer. Ein eigener Altersschätzer
-im Browser: bei Kindern nicht nachweislich besser als das Sprachmodell.
-
-**Rückweg.** Nur mit Deploy: `PUFFER_JAHRE` in `minor-safety.js` ändern; der
-Test „die Schwelle ist exakt …“ pinnt den Wert und muss mitgeändert werden.
-
 **Bewusst getragene Folge.** Werden bei einem Kind mehr als zwei Einträge
 gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
 
@@ -518,6 +476,59 @@ gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
 überwiegend harmlose Wörter, wird die Sperrliste präzisiert. Sind es
 Werbebegriffe, wird die Prompt-Regel nachgeschärft und mit eigenen Fotos
 nachgestellt.
+## Kinderschutz-Filter: Schutzgrenze mit Puffer (17.09.2026)
+
+**Was war.** Stufe 2 des Filters (Kredit, Wetten, Alkohol, Schönheits-OP,
+Diät) griff, wenn die Untergrenze der geschätzten Altersspanne 18 oder darunter
+war — ohne Abstand (Entscheidung vom 11.08.2026). In zwei Workshops mit
+Schulklassen hatten 31 von 186 (16.09.) und 50 von 143 (17.09.) Analysen eine
+Untergrenze von 19 oder mehr; bei diesen Analysen griff Stufe 2 nicht, auch
+wenn die Person minderjährig war. 24 der 31 und 40 der 50 Werte lagen auf genau
+19 oder 25, kein einziger zwischen 20 und 24. Im Prompt standen die Überschrift
+„19-25“, die Regel „22-28, nicht jünger“ und das Beispiel „~38 (Spanne 35-42)“.
+Belegt ist die Übereinstimmung der Zahlen, nicht die Ursache: Das Log enthält
+nur die Untergrenze.
+
+**Entscheidung.**
+
+1. Stufe 2 greift, solange die Untergrenze 25 oder darunter ist
+   (`SCHUTZ_BIS` in `functions/src/minor-safety.js`, dort auch die Beispiele).
+2. Die drei genannten Zahlen-Anker sind aus dem Prompt entfernt; das
+   Formatbeispiel zeigt beim Alter nur den Platzhalter „‹Zahl›“. Welche
+   Spannen im Altersteil noch stehen dürfen (die Merkmals-Tabellen), legt eine
+   Positivliste in `age-markers.test.js` fest.
+3. Schreibt das Modell den Platzhalter ab, entfernt der Server ihn vor der
+   Anzeige (`ohneAltersPlatzhalter` in `mistral-antwort.js`, auch in der
+   Live-Anzeige). Der Filter bekommt den unveränderten Anker und lässt Stufe 2
+   greifen; die Kinderschutz-Zeile meldet das als `platzhalter: true`. Eine
+   Angabe ganz ohne Alter bleibt wie bisher ungefiltert.
+
+**Warum.** Das US-Normungsinstitut NIST nennt für die Grenze 18 einen Puffer von
+sieben Jahren (Schwelle 25) als üblich (NIST IR 8525, dort bezogen auf den
+Schätzwert; die Regel hier nimmt die Untergrenze und ist damit strenger).
+Allgemeine Bild-Sprachmodelle schätzen 16 bis 29 % der Minderjährigen als
+erwachsen (Ren u. a. 2026, arXiv 2602.07815). Dass Zahlen im Prompt die
+Antwort anziehen und Ermahnungen dagegen nicht genügen, zeigen Lou & Sun 2024
+(arXiv 2412.06593). Mit Puffer wären an den beiden Tagen 7 statt 31 und 10
+statt 50 Analysen ohne Stufe 2 geblieben.
+
+**Getragene Folge.** Erwachsene, deren Spanne bei 25 oder darunter beginnt,
+sehen diese Werbeideen nicht. Das Feld `minderjaehrig` in der
+Kinderschutz-Zeile heißt weiter so, bedeutet aber seit 17.09.2026 „Stufe 2
+greift“. Stufe 1 (Pornografie, Waffen, Extremismus) gilt unverändert für alle.
+
+**Betrachtete Alternativen.** Stufe 2 für alle: verworfen (Entscheidung vom
+16.09.2026) — Kredit- und Wett-Werbung ist bei Erwachsenen Teil der
+Aufklärung. Mehrfache Schätzung und den niedrigsten Wert nehmen: für
+Altersschätzung nicht belegt und doppelt so teuer. Ein eigener Altersschätzer
+im Browser: bei Kindern nicht nachweislich besser als das Sprachmodell. Bei
+abgeschriebenem Platzhalter ein zweiter KI-Aufruf: verworfen, er kostet einen
+Platz im Mistral-Kontingent, während die Klasse wartet; die Häufigkeit zeigt
+das Feld `platzhalter`.
+
+**Rückweg.** Nur mit Deploy: `PUFFER_JAHRE` in `minor-safety.js` ändern; der
+Test „die Schwelle ist exakt …“ pinnt den Wert und muss mitgeändert werden.
+
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 
 **Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.

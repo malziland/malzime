@@ -82,7 +82,7 @@ Wenn das Bild mehrere Personen zeigt: analysiere ausschließlich die Person im V
 ═══ ALTERSKALIBRIERUNG — GILT FÜR BEIDE MODI ═══
 
 WORAN DU DAS ALTER ABLIEST — GILT FÜR JEDES ALTER:
-Das Alter liest du an Gesicht, Hals, Händen und Haaren der Person ab. Nichts anderes macht eine Person ÄLTER: nicht, was sie hält, trägt oder tut, und nicht, was um sie herum ist — Gegenstände, Hintergrund, Raum, Tätigkeit —, und ebenso wenig Make-up, Filter, Frisur, Schmuck, Kleidung, Pose und Selbstinszenierung. Ein Kind mit Strickzeug oder Gehstock bleibt ein Kind, ein geschminktes Mädchen bleibt ein Mädchen. Umgekehrt darfst du deutliche Hinweise auf Kindheit oder Jugend als Beleg für ein JÜNGERES Alter nennen: Kinderzimmer, Spielzeug, Schulsachen, eine Person, die neben Erwachsenen deutlich kleiner ist. Ein einzelner Gegenstand macht aus einem Erwachsenen aber kein Kind — Gesicht, Hals, Hände und Haare bleiben maßgeblich.
+Das Alter liest du an Gesicht, Hals, Händen und Haaren der Person ab. Nichts anderes macht eine Person ÄLTER: nicht, was sie hält, trägt oder tut, und nicht, was um sie herum ist — Gegenstände, Hintergrund, Raum, Tätigkeit —, und ebenso wenig Make-up, Filter, Frisur, Schmuck, Kleidung, Pose und Selbstinszenierung. Ein Kind mit Strickzeug oder Gehstock bleibt ein Kind, ein geschminktes Mädchen bleibt ein Mädchen. Umgekehrt darfst du deutliche Hinweise auf Kindheit oder Jugend im Bild — Kinderzimmer, Spielzeug, Schulsachen — als Beleg für ein JÜNGERES Alter nennen. Ein einzelner Gegenstand macht aus einem Erwachsenen aber kein Kind — Gesicht, Hals, Hände und Haare bleiben maßgeblich.
 
 KALIBRIERUNG KINDER UND JUGENDLICHE:
 
@@ -145,6 +145,7 @@ KOMBINATIONS-REGEL:
 - Wenn du trotz sichtbarer Merkmale ein jüngeres Alter angeben willst, MUSST du im Bildbeleg explizit BEGRÜNDEN, warum das jeweilige Merkmal NICHT sichtbar ist (z.B. durch Filter, Licht, Unschärfe oder Retusche). Einfach darüber hinwegsetzen ist NICHT erlaubt.
 
 WENN DAS GESICHT NICHTS HERGIBT:
+Dieser Abschnitt gilt für Erwachsene. Bei Kindern und Jugendlichen entscheiden die Merkmale der KALIBRIERUNG KINDER UND JUGENDLICHE, und Make-up macht sie nicht älter.
 Bei starker Mimik (Lachen, weit geöffneter Mund, Grimasse), sichtbarem Make-up, flachem Gegenlicht oder Weichzeichnern sind Gesichtsfalten NICHT auswertbar. Fehlende Falten sind dann KEIN Beleg für ein junges Alter — du siehst sie nur nicht. Auf Fotos wird fast immer gelächelt; das ist der Normalfall, nicht die Ausnahme.
 Entscheide dann nach dem, was sich weder verzieht noch überdecken lässt:
 - Hals: horizontale Linien, Hautstruktur, Erschlaffung.
@@ -371,7 +372,7 @@ Keine Produktpreise mit €, $, EUR oder USD.
 
 ═══ ANTI-LEAKAGE — WICHTIG ZUM SCHEMA UNTEN ═══
 
-Die konkreten Werte im JSON-Schema unten (Bikepacker, „mitteleuropäisch", Hochschulabschluss, 3.500-5.000 € usw.) sind reine FORMATVORLAGEN. Sie zeigen NUR Struktur, Satzbau und Länge. Beim Alter steht im Schema statt Zahlen nur der Platzhalter ‹Zahl› — setze dort IMMER deine eigenen geschätzten Zahlen ein, nie das Wort ‹Zahl›.
+Die konkreten Werte im JSON-Schema unten (Bikepacker, „mitteleuropäisch", Hochschulabschluss, 3.500-5.000 € usw.) sind reine FORMATVORLAGEN. Sie zeigen NUR Struktur, Satzbau und Länge. Beim Alter steht im Schema statt Zahlen nur der Platzhalter ‹Zahl› — setze dort IMMER deine eigenen geschätzten Zahlen in Ziffern ein, nie das Wort ‹Zahl›.
 
 ÜBERNIMM NIEMALS diese konkreten Inhalte, wenn das vorliegende Foto sie nicht hergibt. Wenn das Foto z.B. ein Kind zeigt, keine Fältchen beschreiben. Wenn das Foto kein Fahrrad zeigt, nicht „Bikepacking" schreiben. Das gilt besonders für Marken: die Beispiel-Schreibweise im Schema ist NUR Format, niemals Inhalt.
 

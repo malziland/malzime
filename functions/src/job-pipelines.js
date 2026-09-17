@@ -156,8 +156,9 @@ async function runPipeline(job) {
 
     /* Serverseitiges Netz, bevor irgendetwas ausgeliefert wird: Pornografie,
        Waffen und Extremismus fliegen immer raus, Gluecksspiel/Kredit/Alkohol
-       zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
-       Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
+       zusaetzlich bei moeglicherweise Minderjaehrigen (Schwelle mit Puffer,
+       siehe minor-safety.js). Ein Modell KANN die Prompt-Regel ignorieren —
+       im Modellvergleich ist genau das passiert. */
     const safety = applyMinorSafety(profiles, { lang, alterText: profiles.alterAnker || undefined });
     loggeMinorSafety(safety, job.traceId, lang);
     const n = profiles.normal || {};

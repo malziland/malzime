@@ -103,10 +103,41 @@ describe("Erkennung", () => {
     }
   );
 
+  test("beim Kürzen bleibt kein angeschnittenes Zahlwort stehen", () => {
+    const text = `${". ".repeat(398)} achtzehn Jahre`;
+    expect(text.indexOf("achtzehn")).toBeLessThan(800);
+    expect(text.indexOf("achtzehn") + "achtzehn".length).toBeGreaterThan(800);
+    expect(hatLesbaresAlter(text)).toBe(false);
+  });
+
   test("ein Platzhalter weit hinten in einer langen Karte wird erkannt", () => {
     const lang = `weiblich, ~14 Jahre alt. ${"Text ".repeat(100)}Das zeigt ‹Zahl› Merkmale.`;
     expect(lang.indexOf("‹Zahl›")).toBeGreaterThan(300);
     expect(hatAltersPlatzhalter(lang)).toBe(true);
+  });
+
+  /* Letzte Prüfrunde 17.09.: weitere Wortformen. */
+  test.each([
+    ["Du bist weiblich, dreizehnjährig.", 13],
+    ["weiblich, etwa fünfundzwanzig", 25],
+    ["male, ~twenty-five", 25],
+    ["Du bist ein Schulkind.", 8],
+    ["You are a teenage girl.", 13],
+    ["weiblich, jugendliches Gesicht", 13],
+  ])("Wortform lesbar: %s", (text, alter) => {
+    expect(istAlterUnlesbar(text)).toBe(false);
+    expect(_untereAltersgrenze(text)).toBe(alter);
+  });
+
+  test("eine Kategorie zieht eine genannte Zahl nicht nach unten", () => {
+    expect(_untereAltersgrenze("männlich, ~35 Jahre, jugendlich wirkend")).toBe(35);
+  });
+
+  test("„Alter“ in Anführungszeichen ist kein Platzhalter, „Zahl“ schon", () => {
+    expect(hatAltersPlatzhalter("Deine Tasse sagt „Alter“.")).toBe(false);
+    expect(hatAltersPlatzhalter('Your shirt says "age" is just a number.')).toBe(false);
+    expect(hatAltersPlatzhalter("weiblich, ~„Zahl“ Jahre")).toBe(true);
+    expect(hatAltersPlatzhalter("weiblich, ~‹Alter›")).toBe(true);
   });
 
   test.each([["Achtsam und oft ruhig."], ["Die Achtzigerjahre-Jacke."]])("kein Zahlwort in: %s", (text) => {
@@ -153,6 +184,17 @@ describe("Erkennung", () => {
     );
     expect(alterNichtLesbarText("~‹Zahl› Jahre", DE)).toBe(
       "Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
+    );
+    /* Geschlecht aus der Karte, wenn der Anker keins nennt */
+    expect(alterNichtLesbarText(["~‹Zahl› Jahre", "Du bist männlich, ~‹Zahl›"], DE)).toBe(
+      "Du bist männlich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
+    );
+    expect(alterNichtLesbarText(["Gender: female"], EN)).toBe(
+      "You are female. Your age cannot be read reliably from this picture."
+    );
+    /* "nicht eindeutig" bekommt einen eigenen Satz */
+    expect(alterNichtLesbarText(["Geschlecht nicht eindeutig erkennbar, ~‹Zahl›"], DE)).toBe(
+      "Dein Geschlecht ist nicht eindeutig erkennbar. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
     );
   });
 });
@@ -242,7 +284,9 @@ describe("Fertige Karte und Werte für den Filter", () => {
     const r = await lauf("", "Du bist weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
     expect(r.alterUnlesbar).toBe(false);
     /* Beide unveränderten Karten gehen an den Filter; die niedrigste Zahl zählt. */
-    expect(r.alterAnker).toContain("Du bist weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
+    /* Der erste Satz beider Karten geht an den Filter, der Beleg-Satz nicht. */
+    expect(r.alterAnker).toContain("Du bist weiblich, ~14 Jahre alt (Spanne 12-16).");
+    expect(r.alterAnker).not.toContain("Runde Wangen");
     expect(_untereAltersgrenze(r.alterAnker)).toBe(12);
   });
 
@@ -264,8 +308,34 @@ describe("Fertige Karte und Werte für den Filter", () => {
     expect(r.normal.categories.alter_geschlecht.value).toBe(
       "Du bist weiblich, ~13 Jahre alt (Spanne 11-15). Zwei Merkmale zeigen das."
     );
-    expect(r.alterAnker).toContain("Du bist weiblich, ~13 Jahre alt (Spanne 11-15). Zwei Merkmale zeigen das.");
+    expect(r.alterAnker).toContain("Du bist weiblich, ~13 Jahre alt (Spanne 11-15).");
+    expect(r.alterAnker).not.toContain("Zwei Merkmale");
     expect(_untereAltersgrenze(r.alterAnker)).toBe(11);
+  });
+
+  /* Letzte Prüfrunde 17.09.: Zahlen und Zahlwörter im Beleg-Satz sind kein
+     Alter — sonst würde eine Erwachsene wegen "Trikot mit der Nummer acht"
+     als Kind gefiltert. */
+  test.each([
+    ["Du bist weiblich, ~35 Jahre alt. Sie trägt ein Trikot mit der Nummer acht.", 35],
+    ["Du bist männlich, ~30 Jahre alt. Er hat seine sieben Sachen dabei.", 30],
+    ["You are female, ~33 years old. Ten fingers are visible.", 33],
+  ])("Beleg-Satz zählt nicht: %s", async (karte, alter) => {
+    const r = await lauf("weiblich", karte);
+    expect(r.alterUnlesbar).toBe(false);
+    expect(_untereAltersgrenze(r.alterAnker)).toBe(alter);
+  });
+
+  test("Beleg-Satz ohne Alter im ersten Satz: kein Alter, kein Fehlalarm", async () => {
+    const r = await lauf("weiblich", "Du bist weiblich. Sie ist als Elf verkleidet.");
+    expect(r.alterUnlesbar).toBe(false);
+    expect(_untereAltersgrenze(r.alterAnker)).toBeNull();
+  });
+
+  test("Alter im ersten Satz lesbar, Platzhalter nur im Beleg-Satz: Alter bleibt, Platzhalter fällt weg", async () => {
+    const r = await lauf("weiblich", "Du bist weiblich, ~13 Jahre alt. ‹Zahl› Merkmale zeigen das.");
+    expect(r.alterUnlesbar).toBe(false);
+    expect(r.normal.categories.alter_geschlecht.value).toBe("Du bist weiblich, ~13 Jahre alt");
   });
 
   test("Altersversuch ohne Zahl: fester Satz und unlesbar", async () => {

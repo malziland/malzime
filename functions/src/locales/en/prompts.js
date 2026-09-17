@@ -26,6 +26,7 @@ module.exports = {
      alterNichtLesbarText in minor-safety.js). */
   alterNichtLesbar: "Your age cannot be read reliably from this picture.",
   geschlechtSatz: "You are {geschlecht}.",
+  geschlechtUnklarSatz: "Your gender is not clearly identifiable.",
 };
 
 /* ── The analysis prompt (single-large call, v2.2-rc3).

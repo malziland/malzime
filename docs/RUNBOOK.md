@@ -657,9 +657,10 @@ Lesart:
   Profiltext oder in einer Kategorie-Karte (nur gemeldet). Steht dort über
   Wochen ein Wort wie „cocktail" in Bar-Beschreibungen, ist die Sperrliste zu
   grob; stehen dort Werbebegriffe wie „sportwetten", hält der Prompt nicht.
-- `werbung` unter 8 heißt beim Beast-Modus (zehn Einträge angefordert): mehr
-  als zwei Einträge gestrichen, nachgefüllt wird nichts. Die Standard-Liste
-  hat von sich aus sechs bis acht Einträge — dort zeigt nur `entfernte`, ob
+- `werbung` unter 8 heißt beim Beast-Modus nur dann „mehr als zwei Einträge
+  gestrichen“, wenn der zweite Werbe-Aufruf geliefert hat (zehn Einträge
+  angefordert). Sonst stammt die Liste wie die Standard-Liste aus dem
+  Hauptaufruf mit sechs bis acht Einträgen — dort zeigt nur `entfernte`, ob
   gestrichen wurde.
 
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte

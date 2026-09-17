@@ -175,6 +175,20 @@ describe("Realitäts-Check (v3.1)", () => {
     expect(zeilen()).toHaveLength(4);
   });
 
+  it("Alter nicht lesbar: die Meldung geht OHNE Alter raus (Server zählt sie so)", () => {
+    const daten = menschDaten();
+    daten.profiles.normal.categories.alter_geschlecht.value =
+      "Du bist weiblich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen.";
+    daten.meta = { mode: "multimodal", alterUnlesbar: true };
+    rc.neuesErgebnis(daten);
+    beantworteAlle(0);
+    elements.rcAbsenden.click();
+    expect(telemetrie.logRealitaetsCheck).toHaveBeenCalledTimes(1);
+    const gemeldet = telemetrie.logRealitaetsCheck.mock.calls[0][0];
+    expect(gemeldet).not.toHaveProperty("alter");
+    expect(Object.keys(gemeldet).sort()).toEqual(["charakter", "geschlecht", "interessen", "manipulation", "werbung"]);
+  });
+
   it("ohne das Kennzeichen bleibt es bei sechs Zeilen", () => {
     const daten = menschDaten();
     daten.meta = { mode: "multimodal", alterUnlesbar: false };

@@ -365,8 +365,11 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   /* Nicht lesbares Alter (17.09.2026, siehe alters-lesbarkeit.js): aus den
      ROHWERTEN bestimmt, bevor eine Karte umgeschrieben wird. Unlesbar ist das
      Alter, wenn der Anker einen Altersversuch ohne lesbare Zahl enthaelt,
-     oder wenn der Anker gar keine Zahl hat und eine der beiden Karten den
-     Platzhalter oder ein Alter ohne Ziffer zeigt. */
+     oder wenn weder der Anker noch der erste Satz einer Karte ein lesbares
+     Alter hat und eine Karte den Platzhalter oder ein Alter ohne Zahl zeigt.
+     Nur der ERSTE Satz einer Karte zaehlt als Altersangabe — der Beleg-Satz
+     danach ("Trikot mit der Nummer acht") ist kein Alter (letzte
+     Pruefrunde 17.09.). */
   const ankerRoh = typeof hardFacts.alter_geschlecht === "string" ? hardFacts.alter_geschlecht : "";
   const rohKarte = (modus) => {
     const w = parsed[modus]?.categories?.alter_geschlecht?.value;
@@ -374,26 +377,29 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   };
   const rohStandard = rohKarte("standard");
   const rohBeast = rohKarte("beast");
+  const ersterSatz = (text) => (/^[^.!?]*[.!?]?/.exec(text) || [""])[0].trim();
+  const satzStandard = ersterSatz(rohStandard);
+  const satzBeast = ersterSatz(rohBeast);
+  const irgendeinAlterLesbar = [ankerRoh, satzStandard, satzBeast].some(hatLesbaresAlter);
   const alterUnlesbar =
     istAlterUnlesbar(ankerRoh) ||
-    (!hatLesbaresAlter(ankerRoh) && (istAlterUnlesbar(rohStandard) || istAlterUnlesbar(rohBeast)));
+    (!irgendeinAlterLesbar && (istAlterUnlesbar(rohStandard) || istAlterUnlesbar(rohBeast)));
 
   /* Was die Alterskarte zeigt. Normalfall wie bisher: Anker vorn, Beleg-Satz
-     des Modells dahinter. Traegt nur der Beleg-Satz einen Platzhalter, bleibt
-     der Anker allein stehen. Ist das Alter nicht lesbar, steht ein fester
-     Satz da — nie ein geflickter Text mit Luecken. */
+     des Modells dahinter. Hat der Anker kein lesbares Alter (etwa nur
+     "weiblich"), der erste Satz der Karte aber schon, steht dieser vorn — der
+     Anker wuerde das Alter sonst verdraengen. Traegt der Beleg-Satz einen
+     Platzhalter, bleibt die Altersangabe allein stehen. Ist das Alter nicht
+     lesbar, steht ein fester Satz da — nie ein geflickter Text mit Luecken. */
   function alterskarteText(modellwert) {
     const wert = String(modellwert || "");
-    if (alterUnlesbar) return alterNichtLesbarText(ankerRoh || wert, prompts);
-    /* Anker ohne Alter (etwa nur "weiblich"), Karte mit lesbarem Alter: Der
-       Anker wuerde den Satz mit dem Alter verdraengen — die Karte bleibt,
-       wie das Modell sie schrieb. */
-    if (!hatLesbaresAlter(ankerRoh) && hatLesbaresAlter(wert)) return ohneZiffernKlammern(wert);
-    const mitAnker = ankerRoh ? mitAnkerVoran(ankerRoh, wert) : wert;
-    if (!hatAltersPlatzhalter(mitAnker)) return ohneZiffernKlammern(mitAnker);
-    return hatLesbaresAlter(ankerRoh)
-      ? ohneZiffernKlammern(mitAnkerVoran(ankerRoh, ""))
-      : alterNichtLesbarText(ankerRoh || wert, prompts);
+    if (alterUnlesbar) return alterNichtLesbarText([ankerRoh, wert], prompts);
+    const satz = ersterSatz(wert);
+    const altersSatz = hatLesbaresAlter(ankerRoh) ? ankerRoh : hatLesbaresAlter(satz) ? satz : ankerRoh;
+    let text = mitAnkerVoran(altersSatz, wert);
+    if (hatAltersPlatzhalter(text)) text = mitAnkerVoran(altersSatz, "");
+    if (hatAltersPlatzhalter(text)) return alterNichtLesbarText([ankerRoh, wert], prompts);
+    return ohneZiffernKlammern(text);
   }
 
   function buildProfile(modeKey) {
@@ -447,10 +453,11 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        Kartentext — seit BIZ-001 steht dort naemlich auch der Beleg-Satz, und
        eine Zahl darin ("der Kopf passt 7-mal in die Koerperhoehe") wuerde die
        Altersauslese sonst nach unten ziehen. */
-    /* Hat der Anker kein lesbares Alter, bekommt der Filter beide
-       unveraenderten Karten — die niedrigste Zahl darin zaehlt. */
+    /* Hat der Anker kein lesbares Alter, bekommt der Filter den ersten Satz
+       beider unveraenderten Karten — die niedrigste Zahl darin zaehlt; der
+       Beleg-Satz bleibt draussen. */
     alterAnker:
-      (hatLesbaresAlter(ankerRoh) ? ankerRoh : [rohStandard, rohBeast].filter(Boolean).join(" ") || ankerRoh) || null,
+      (hatLesbaresAlter(ankerRoh) ? ankerRoh : [satzStandard, satzBeast].filter(Boolean).join(" ") || ankerRoh) || null,
     alterUnlesbar,
   };
 }

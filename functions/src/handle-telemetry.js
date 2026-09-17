@@ -69,11 +69,14 @@ function sanitizeClient(raw) {
    jobId, nichts Verknüpfbares (Privacy-Zusage der Spezifikation). Alles,
    was nicht exakt dem Schema entspricht, wird verworfen: kein Log, kein
    Zähler-Inkrement. Geschlecht ist optional (die Zeile entfällt im
-   Frontend, wenn die KI sich nicht festgelegt hat) und binär (0|1);
-   alle anderen Stufen sind Pflicht mit den Werten 0 | 0,5 | 1. */
+   Frontend, wenn die KI sich nicht festgelegt hat) und binär (0|1). Alter
+   ist seit 17.09.2026 ebenfalls optional: Ließ sich das Alter nicht ablesen,
+   fragt das Frontend es nicht ab (meta.alterUnlesbar) — ohne diese Ausnahme
+   würde genau diese Bewertung still verworfen. Alle anderen Stufen sind
+   Pflicht mit den Werten 0 | 0,5 | 1. */
 
-const RC_PFLICHT_STUFEN = ["alter", "interessen", "charakter", "werbung", "manipulation"];
-const RC_OPTIONALE_STUFEN = ["geschlecht"];
+const RC_PFLICHT_STUFEN = ["interessen", "charakter", "werbung", "manipulation"];
+const RC_OPTIONALE_STUFEN = ["alter", "geschlecht"];
 
 /**
  * Validiert das stufen-Objekt strikt: nur die erlaubten Schlüssel, nur die

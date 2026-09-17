@@ -30,8 +30,8 @@
    "Keine klaren Bildsignale." oder ein blosses "weiblich" sind KEIN
    unlesbares Alter — dort steht gar kein Altersversuch, und es bleibt bei der
    Regel "ohne Alter nicht filtern".
-   Auch Kategoriewoerter ("Teenager", "jugendlich", "Kind") sind eine
-   Angabe: Sie zaehlen als junges Alter.
+   Auch Kategoriewoerter ("Teenager", "jugendlich", "Schulkind") sind eine
+   Angabe: Sie zaehlen als junges Alter — aber nur, wenn keine Zahl dasteht.
    Geprueft werden hoechstens die ersten PRUEF_MAX Zeichen — so lang darf eine
    Karte hoechstens sein (json-repair.js); die Suchmuster laufen linear. */
 /* BLEIBT IM CODE — Grenze gegen lange Modellausgaben, gleich der
@@ -40,7 +40,12 @@ const PRUEF_MAX = 800;
 const KLAMMER_AUF = "‹<\\[{«(„“\"'‚‘⟨〈";
 const KLAMMER_ZU = "›>\\]}»)“”\"'‘’⟩〉";
 const ZIFFERN_IN_KLAMMERN = new RegExp(`[${KLAMMER_AUF}]\\s*(\\d{1,3})\\s*[${KLAMMER_ZU}]`, "g");
-const PLATZHALTER_IN_KLAMMERN = new RegExp(`[${KLAMMER_AUF}]\\s*(?:zahl|number|alter|age)\\s*[${KLAMMER_ZU}]`, "i");
+/* "Zahl"/"number" in jeder Klammer oder in Anfuehrungszeichen; "Alter"/"age"
+   nur in Vorlagen-Klammern — "Deine Tasse sagt „Alter“" ist kein Platzhalter. */
+const PLATZHALTER_IN_KLAMMERN = new RegExp(
+  `[${KLAMMER_AUF}]\\s*(?:zahl|number)\\s*[${KLAMMER_ZU}]|[‹<\\[{«]\\s*(?:alter|age)\\s*[›>\\]}»]`,
+  "i"
+);
 const PLATZHALTER_NACKT =
   /~\s*(?:zahl|number)\b|\b(?:zahl|number)\s*(?:[-–]|bis|to)\s*(?:zahl|number)\b|\b(?:zahl|number)[\s-]+(?:jahre|j\u00e4hrig|years?|yrs)\b|\b(?:spanne|range|circa|ca\.|etwa|about|aged|zwischen|between)\s+(?:zahl|number)\b/i;
 /* Woerter, die einen Altersversuch anzeigen — mit Wortgrenzen, damit
@@ -93,14 +98,6 @@ const ZAHLWOERTER = {
   sixty: 60,
   seventy: 70,
   eighty: 80,
-  teens: 13,
-  teen: 13,
-  teenager: 13,
-  teenagerin: 13,
-  jugendlich: 13,
-  jugendliche: 13,
-  jugendlicher: 13,
-  adolescent: 13,
   twenties: 20,
   thirties: 30,
   forties: 40,
@@ -110,20 +107,54 @@ const ZAHLWOERTER = {
 };
 /* Wortgrenzen ueber Buchstaben (auch Umlaute): "acht" trifft nicht in
    "achtzehn", "zehn" nicht in "dreizehn", "ten" nicht in "often". */
-const ZAHLWORT = new RegExp(`(?<!\\p{L})(${Object.keys(ZAHLWOERTER).join("|")})(?!\\p{L})`, "giu");
+/* Ein Zahlwort darf ein "-jaehrig" tragen ("dreizehnjaehrig"). */
+const WORTENDE = "(?=-?j\\u00e4hrig|(?!\\p{L}))";
+const ZAHLWORT = new RegExp(`(?<!\\p{L})(${Object.keys(ZAHLWOERTER).join("|")})${WORTENDE}`, "giu");
 
-/* "Kind" nur gross geschrieben — das englische "kind" (freundlich) ist kein
-   Alter. */
-const KIND = /(?<!\p{L})(?:Kind|child)(?!\p{L})/gu;
+/* Zusammengesetzte Zahlen: "fuenfundzwanzig", "twenty-five". */
+const EINER = { ein: 1, zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9 };
+const ONES = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const ZEHNER_DE = { zwanzig: 20, dreißig: 30, vierzig: 40, fünfzig: 50, sechzig: 60, siebzig: 70, achtzig: 80 };
+const ZEHNER_EN = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80 };
+const ZUSAMMEN_DE = new RegExp(
+  `(?<!\\p{L})(${Object.keys(EINER).join("|")})und(${Object.keys(ZEHNER_DE).join("|")})${WORTENDE}`,
+  "giu"
+);
+const ZUSAMMEN_EN = new RegExp(
+  `(?<!\\p{L})(${Object.keys(ZEHNER_EN).join("|")})[- ](${Object.keys(ONES).join("|")})(?!\\p{L})`,
+  "giu"
+);
 
 function mitZiffern(text) {
   return String(text || "")
-    .replace(ZAHLWORT, (w) => String(ZAHLWOERTER[w.toLowerCase()]))
-    .replace(KIND, "8");
+    .replace(ZUSAMMEN_DE, (_w, e, z) => String(EINER[e.toLowerCase()] + ZEHNER_DE[z.toLowerCase()]))
+    .replace(ZUSAMMEN_EN, (_w, z, e) => String(ZEHNER_EN[z.toLowerCase()] + ONES[e.toLowerCase()]))
+    .replace(ZAHLWORT, (w) => String(ZAHLWOERTER[w.toLowerCase()]));
+}
+
+/* Kategorien ("Teenager", "jugendlich", "Schulkind") — zaehlen NUR, wenn
+   keine Zahl dasteht: "~35 Jahre, jugendlich wirkend" ist 35, nicht 13.
+   "Kind" nur gross geschrieben — das englische "kind" (freundlich) ist kein
+   Alter. */
+const KATEGORIEN = [
+  [/(?<!\p{L})(?:teen\p{L}*|jugendlich\p{L}*|adolescent\p{L}*)/iu, 13],
+  [/(?<!\p{L})pubert\p{L}*/iu, 12],
+  [/(?<!\p{L})(?:schoolgirl|schoolboy)(?!\p{L})/iu, 10],
+  [/(?<!\p{L})(?:schul|klein|vorschul|grundschul)kind\p{L}*|(?<!\p{L})grundschulalter(?!\p{L})/iu, 8],
+  [/(?<!\p{L})Kind(?:er)?(?!\p{L})|(?<!\p{L})(?:child\p{L}*|kids?)(?!\p{L})/u, 8],
+];
+
+function kategorieAlter(text) {
+  const werte = KATEGORIEN.filter(([re]) => re.test(String(text || ""))).map(([, w]) => w);
+  return werte.length ? Math.min(...werte) : null;
 }
 
 function pruefText(text) {
-  return mitZiffern(String(text || "").slice(0, PRUEF_MAX)).replace(ZIFFERN_IN_KLAMMERN, "$1");
+  const roh = String(text || "");
+  /* Beim Kuerzen kein angeschnittenes Wort am Ende lassen ("achtzehn" darf
+     nicht zu "acht" werden). */
+  const kurz = roh.length > PRUEF_MAX ? roh.slice(0, PRUEF_MAX).replace(/\p{L}+$/u, "") : roh;
+  return mitZiffern(kurz).replace(ZIFFERN_IN_KLAMMERN, "$1");
 }
 
 function hatAltersPlatzhalter(text) {
@@ -151,17 +182,26 @@ function ohneZiffernKlammern(text) {
 }
 
 const GESCHLECHT =
-  /^(?:du bist |you are )?(?:geschlecht |gender )?(männlich|weiblich|divers|nicht eindeutig erkennbar|male|female|not clearly identifiable)(?!\p{L})/iu;
+  /^(?:du bist |you are )?(?:geschlecht|gender)?[:\s]*(männlich|weiblich|divers|nicht eindeutig erkennbar|male|female|not clearly identifiable)(?!\p{L})/iu;
+const GESCHLECHT_UNKLAR = /nicht eindeutig|not clearly/i;
 
 /* Fester Satz fuer die Alterskarte, wenn das Alter nicht lesbar ist. Die
    Saetze stehen in der Sprachdatei (prompts.js: alterNichtLesbar,
-   geschlechtSatz); das Geschlecht wird uebernommen, wenn es am Anfang klar
-   dasteht. */
-function alterNichtLesbarText(quelle, texte) {
-  const m = GESCHLECHT.exec(String(quelle || "").trim());
-  const g = m ? m[1].toLowerCase() : "";
-  const vorn = g && texte.geschlechtSatz ? `${texte.geschlechtSatz.replace("{geschlecht}", g)} ` : "";
-  return `${vorn}${texte.alterNichtLesbar}`;
+   geschlechtSatz, geschlechtUnklarSatz). Das Geschlecht wird aus der ersten
+   Quelle uebernommen, die es am Anfang klar nennt (Anker, sonst Karte). */
+function alterNichtLesbarText(quellen, texte) {
+  let g = "";
+  for (const q of [].concat(quellen)) {
+    const m = GESCHLECHT.exec(String(q || "").trim());
+    if (m) {
+      g = m[1].toLowerCase();
+      break;
+    }
+  }
+  let vorn = "";
+  if (g && GESCHLECHT_UNKLAR.test(g)) vorn = texte.geschlechtUnklarSatz || "";
+  else if (g && texte.geschlechtSatz) vorn = texte.geschlechtSatz.replace("{geschlecht}", g);
+  return vorn ? `${vorn} ${texte.alterNichtLesbar}` : texte.alterNichtLesbar;
 }
 
 /* Die UNTERE Altersgrenze aus dem hard-facts-Text lesen — also das jüngste
@@ -198,7 +238,8 @@ function untereAltersgrenze(text) {
     if (plausibel(n)) kandidaten.push(n);
   }
 
-  return kandidaten.length ? Math.min(...kandidaten) : null;
+  if (kandidaten.length) return Math.min(...kandidaten);
+  return kategorieAlter(text);
 }
 
 module.exports = {

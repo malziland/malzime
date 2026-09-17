@@ -508,9 +508,13 @@ Untergrenze.
    Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
    Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
    `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht
-   ab. Zahlwörter („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und
-   Kategoriewörter („Teenager“, „Kind“) gelten als lesbar und werden für die
-   Altersauslese in Zahlen übersetzt; „13jährig“ wird ebenfalls gelesen. Eine
+   ab; der Server nimmt dessen Bewertung deshalb auch ohne Alter an
+   (`handle-telemetry.js`). Als Altersangabe einer Karte zählt nur ihr erster
+   Satz — Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) sind kein
+   Alter. Zahlwörter („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und
+   Kategoriewörter („Teenager“, „Schulkind“) gelten als lesbar und werden für
+   die Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl
+   dasteht; „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Eine
    Antwort ohne jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie
    bisher ungefiltert.
 4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus

@@ -301,6 +301,15 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
        nicht nur "unter 18", sondern alle, die minderjährig sein könnten. */
     expect(prompt).toMatch(/minderjährig sein könnten/i);
     expect(prompt).not.toMatch(/unter 18/i);
+    /* Die Grenze kommt aus minor-safety.js (eine Quelle), und das nicht
+       lesbare Alter zählt mit — in beiden Sprachen. */
+    const { SCHUTZ_ALTER } = require("../minor-safety");
+    expect(prompt).toContain(`bei ${SCHUTZ_ALTER} Jahren oder darunter`);
+    expect(prompt).toMatch(/Alter sich nicht ablesen ließ/);
+    const en = require("../locales/en/prompts").beastAdsSystem;
+    expect(en).toContain(`starting at ${SCHUTZ_ALTER} or below`);
+    expect(en).toMatch(/age could not be read/);
+    expect(en).not.toMatch(/under 18/i);
   });
 
   /* SEC-2026-08-12-18: Der zweite Aufruf bekam kein Bild — aber alles, was er

@@ -19,7 +19,13 @@
    jeder Aufruf mit "Betriebswerte fehlen" ab, was hier nicht Thema ist. */
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
-const { hatAltersPlatzhalter, istAlterUnlesbar, hatLesbaresAlter, alterNichtLesbarText } = require("../minor-safety");
+const {
+  hatAltersPlatzhalter,
+  istAlterUnlesbar,
+  hatLesbaresAlter,
+  alterNichtLesbarText,
+  _untereAltersgrenze,
+} = require("../minor-safety");
 const DE = require("../locales/de/prompts");
 const EN = require("../locales/en/prompts");
 const { runSingleLargeCall, setFetchForTest, _extrahiereLiveText } = require("../mistral");
@@ -45,13 +51,67 @@ describe("Erkennung", () => {
     expect(hatLesbaresAlter(text)).toBe(false);
   });
 
-  test.each([["weiblich, ~dreizehn Jahre alt"], ["male, in his teens, range unclear"]])(
-    "Altersversuch ohne Ziffer ist unlesbar: %s",
+  test.each([["weiblich, Alter unklar, Spanne offen"], ["male, age range unclear"]])(
+    "Altersversuch ohne Zahl ist unlesbar: %s",
     (text) => {
       expect(hatAltersPlatzhalter(text)).toBe(false);
       expect(istAlterUnlesbar(text)).toBe(true);
     }
   );
+
+  /* Gegenprüfung Runde 3: Zahlwörter sind eine lesbare Angabe. */
+  test.each([
+    ["weiblich, etwa dreizehn.", 13],
+    ["weiblich, ~dreizehn Jahre alt", 13],
+    ["männlich, Mitte vierzig", 40],
+    ["male, in his teens", 13],
+    ["female, in her forties", 40],
+    ["weiblich, achtzehn Jahre", 18],
+  ])("Zahlwort ist lesbar: %s", (text, alter) => {
+    expect(istAlterUnlesbar(text)).toBe(false);
+    expect(hatLesbaresAlter(text)).toBe(true);
+    expect(_untereAltersgrenze(text)).toBe(alter);
+  });
+
+  test.each([
+    ["weiblich, 13jährig", 13],
+    ["female, ~13yo", 13],
+    ["weiblich, Teenager", 13],
+    ["female, early teens", 13],
+    ["weiblich, noch ein Kind", 8],
+    ["Spanne 12 bis 15", 12],
+    ["range 12 to 15", 12],
+  ])("lesbar (Runde 3): %s", (text, alter) => {
+    expect(istAlterUnlesbar(text)).toBe(false);
+    expect(_untereAltersgrenze(text)).toBe(alter);
+  });
+
+  test.each([
+    ["Du bist weiblich. Deine Frisur ist spannend."],
+    ["Du bist weiblich. Die Jahreszeit ist Winter."],
+    ["Keine klaren Bildsignale für eine sichere Altersspanne."],
+    ["You are female with a kind smile."],
+  ])("kein Altersversuch (Runde 3): %s", (text) => {
+    expect(istAlterUnlesbar(text)).toBe(false);
+    expect(_untereAltersgrenze(text)).toBeNull();
+  });
+
+  test.each([["female, ~(number)."], ["weiblich, ~„Zahl“ Jahre alt."], ["weiblich, ~'Zahl'"]])(
+    "weitere Klammern (Runde 3): %s",
+    (text) => {
+      expect(hatAltersPlatzhalter(text)).toBe(true);
+    }
+  );
+
+  test("ein Platzhalter weit hinten in einer langen Karte wird erkannt", () => {
+    const lang = `weiblich, ~14 Jahre alt. ${"Text ".repeat(100)}Das zeigt ‹Zahl› Merkmale.`;
+    expect(lang.indexOf("‹Zahl›")).toBeGreaterThan(300);
+    expect(hatAltersPlatzhalter(lang)).toBe(true);
+  });
+
+  test.each([["Achtsam und oft ruhig."], ["Die Achtzigerjahre-Jacke."]])("kein Zahlwort in: %s", (text) => {
+    expect(_untereAltersgrenze(text)).toBeNull();
+  });
 
   test.each([
     ["weiblich, ~14 Jahre alt (Spanne 12-16)"],
@@ -181,7 +241,9 @@ describe("Fertige Karte und Werte für den Filter", () => {
   test("ohne hard_facts-Alter: der Filter bekommt die unveränderte Karte mit Zahl", async () => {
     const r = await lauf("", "Du bist weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
     expect(r.alterUnlesbar).toBe(false);
-    expect(r.alterAnker).toBe("Du bist weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
+    /* Beide unveränderten Karten gehen an den Filter; die niedrigste Zahl zählt. */
+    expect(r.alterAnker).toContain("Du bist weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
+    expect(_untereAltersgrenze(r.alterAnker)).toBe(12);
   });
 
   test("Anker lesbar, nur der Beleg-Satz mit Platzhalter: der Anker steht allein", async () => {
@@ -190,9 +252,28 @@ describe("Fertige Karte und Werte für den Filter", () => {
     expect(r.normal.categories.alter_geschlecht.value).toBe("weiblich, ~14 Jahre alt (Spanne 12-16)");
   });
 
-  test("Alter in Worten ohne Ziffer: unlesbar", async () => {
+  test("Alter in Worten: lesbar, die Karte bleibt", async () => {
     const r = await lauf("weiblich, ~dreizehn Jahre alt", "Du bist weiblich, ~dreizehn Jahre alt. Runde Wangen.");
+    expect(r.alterUnlesbar).toBe(false);
+    expect(r.normal.categories.alter_geschlecht.value).toBe("weiblich, ~dreizehn Jahre alt. Runde Wangen.");
+  });
+
+  test("Anker nur Geschlecht, Karte mit Alter: das Alter bleibt auf der Karte (Runde 3)", async () => {
+    const r = await lauf("weiblich", "Du bist weiblich, ~13 Jahre alt (Spanne 11-15). Zwei Merkmale zeigen das.");
+    expect(r.alterUnlesbar).toBe(false);
+    expect(r.normal.categories.alter_geschlecht.value).toBe(
+      "Du bist weiblich, ~13 Jahre alt (Spanne 11-15). Zwei Merkmale zeigen das."
+    );
+    expect(r.alterAnker).toContain("Du bist weiblich, ~13 Jahre alt (Spanne 11-15). Zwei Merkmale zeigen das.");
+    expect(_untereAltersgrenze(r.alterAnker)).toBe(11);
+  });
+
+  test("Altersversuch ohne Zahl: fester Satz und unlesbar", async () => {
+    const r = await lauf("weiblich, Alter unklar, Spanne offen", "Du bist weiblich. Runde Wangen.");
     expect(r.alterUnlesbar).toBe(true);
+    expect(r.normal.categories.alter_geschlecht.value).toBe(
+      "Du bist weiblich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
+    );
   });
 
   test("ohne Platzhalter bleibt alles wie bisher", async () => {
@@ -202,6 +283,65 @@ describe("Fertige Karte und Werte für den Filter", () => {
     );
     expect(r.alterAnker).toBe("männlich, ~38 (Spanne 35-42)");
     expect(r.alterUnlesbar).toBe(false);
+  });
+
+  test("REGRESSION Runde 3: Alter in Worten im Anker, Karten ohne Alter — der Filter bekommt den Anker", async () => {
+    const r = await lauf(
+      "weiblich, ~dreizehn Jahre alt (Spanne zwölf bis fünfzehn)",
+      "Du bist weiblich. Runde Wangen."
+    );
+    expect(r.alterUnlesbar).toBe(false);
+    expect(r.alterAnker).toBe("weiblich, ~dreizehn Jahre alt (Spanne zwölf bis fünfzehn)");
+    expect(_untereAltersgrenze(r.alterAnker)).toBe(12);
+  });
+
+  test("Anker ohne Alter: auch eine Zahl nur in der Beast-Karte zählt", async () => {
+    const body = {
+      hard_facts: { alter_geschlecht: "", herkunft: "x" },
+      ad_targeting: ["A"],
+      manipulation_triggers: ["T"],
+      standard: { profileText: "Text.", categories: kategorien("Standard") },
+      beast: { profileText: "Text.", categories: kategorien("Beast") },
+    };
+    body.standard.categories.alter_geschlecht.value = "Du bist weiblich. Runde Wangen.";
+    body.beast.categories.alter_geschlecht.value = "Weiblich, ~9 Jahre alt. Leichte Beute.";
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(body) }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 100 },
+      }),
+    }));
+    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+    expect(_untereAltersgrenze(r.alterAnker)).toBe(9);
+  });
+
+  test("Anker ohne Alter: ein Platzhalter nur in der Beast-Karte macht das Alter unlesbar", async () => {
+    const body = {
+      hard_facts: { alter_geschlecht: "weiblich", herkunft: "x" },
+      ad_targeting: ["A"],
+      manipulation_triggers: ["T"],
+      standard: { profileText: "Text.", categories: kategorien("Standard") },
+      beast: { profileText: "Text.", categories: kategorien("Beast") },
+    };
+    body.standard.categories.alter_geschlecht.value = "Du bist weiblich. Runde Wangen.";
+    body.beast.categories.alter_geschlecht.value = "Weiblich, ~‹Zahl› Jahre alt. Leichte Beute.";
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(body) }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 100 },
+      }),
+    }));
+    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+    expect(r.alterUnlesbar).toBe(true);
+  });
+
+  test("Ziffern in Klammern erscheinen auf der Karte ohne Klammern", async () => {
+    const r = await lauf("weiblich, ~‹14› Jahre alt (Spanne ‹12›-‹16›)", "Du bist weiblich. Runde Wangen.");
+    expect(r.normal.categories.alter_geschlecht.value).toBe("weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
   });
 
   test("keine Altersangabe überhaupt: nicht unlesbar (Regel: ohne Alter nicht filtern)", async () => {
@@ -228,6 +368,48 @@ describe("Live-Anzeige", () => {
     const { kartenStandard } = _extrahiereLiveText(strom("weiblich, ~‹Zahl› Jahre alt. Runde Wangen."));
     expect(kartenStandard.map((k) => k.schluessel)).toEqual(["herkunft"]);
     expect(kartenStandard[0].wert).toBe("Text ‹nicht Alter›");
+  });
+
+  test("eine Alterskarte ohne Zahl, aber mit Altersversuch erscheint live ebenfalls nicht (Runde 3)", () => {
+    const { kartenStandard } = _extrahiereLiveText(strom("weiblich, Alter unklar, Spanne offen. Runde Wangen."));
+    expect(kartenStandard.map((k) => k.schluessel)).toEqual(["herkunft"]);
+  });
+
+  test("Anker unlesbar, Karte mit Zahl: die Alterskarte erscheint live nicht (Runde 3)", () => {
+    const text = JSON.stringify({
+      hard_facts: { alter_geschlecht: "weiblich, ~‹Zahl› Jahre alt", herkunft: "x" },
+      standard: {
+        profileText: "Text.",
+        categories: {
+          alter_geschlecht: {
+            label: "Alter & Geschlecht",
+            value: "weiblich, ~13 Jahre alt. Runde Wangen.",
+            confidence: 0.8,
+          },
+          herkunft: { label: "Herkunft", value: "Mitteleuropa", confidence: 0.7 },
+        },
+      },
+    });
+    const { kartenStandard } = _extrahiereLiveText(text);
+    expect(kartenStandard.map((k) => k.schluessel)).toEqual(["herkunft"]);
+  });
+
+  test("Anker lesbar, Karte mit Zahl: die Alterskarte erscheint live", () => {
+    const text = JSON.stringify({
+      hard_facts: { alter_geschlecht: "weiblich, ~13 Jahre alt", herkunft: "x" },
+      standard: {
+        profileText: "Text.",
+        categories: {
+          alter_geschlecht: {
+            label: "Alter & Geschlecht",
+            value: "weiblich, ~13 Jahre alt. Runde Wangen.",
+            confidence: 0.8,
+          },
+        },
+      },
+    });
+    const { kartenStandard } = _extrahiereLiveText(text);
+    expect(kartenStandard.map((k) => k.schluessel)).toEqual(["alter_geschlecht"]);
   });
 
   test("eine lesbare Alterskarte erscheint live unverändert", () => {

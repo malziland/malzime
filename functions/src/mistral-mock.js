@@ -294,6 +294,14 @@ function profileEn(isBoost) {
   };
 }
 
+/* Dieselben Zusatzfelder wie runSingleLargeCall in mistral.js (seit
+   17.09.2026): der Altersanker fuer den Kinderschutz-Filter und das Urteil
+   "Alter nicht lesbar". Die Attrappe liefert immer ein lesbares Alter. */
+function altersFelder(normal) {
+  const wert = normal && normal.categories && normal.categories.alter_geschlecht;
+  return { alterAnker: (wert && wert.value) || null, alterUnlesbar: false };
+}
+
 function mockProfile(mode, lang) {
   const isBoost = mode === "boost";
   return lang === "en" ? profileEn(isBoost) : profileDe(isBoost);
@@ -340,7 +348,7 @@ async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, op
   /* Ohne Callback verhaelt sich die Attrappe wie der Nicht-Stream-Pfad. */
   if (!onLiveText) {
     await sleep(mockDelayMs());
-    return { normal, boost, subject: "HUMAN", visibleText: "" };
+    return { normal, boost, subject: "HUMAN", visibleText: "", ...altersFelder(normal) };
   }
 
   /* Zeitverhaeltnis wie im Betrieb: Der Profiltext ist FRUEH fertig, die Karten
@@ -389,7 +397,7 @@ async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, op
     }
   }
 
-  return { normal, boost, subject: "HUMAN", visibleText: "" };
+  return { normal, boost, subject: "HUMAN", visibleText: "", ...altersFelder(normal) };
 }
 
 module.exports = {

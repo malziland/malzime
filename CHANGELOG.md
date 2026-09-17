@@ -24,8 +24,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Erwachsene, deren Schätzung bei 25 oder darunter beginnt, sehen diese Ideen
   dadurch ebenfalls nicht.
 - **Wenn sich das Alter nicht lesen lässt.** Schreibt die KI statt einer Zahl
-  nur die Vorlage hin oder nennt sie ein Alter ohne Ziffer, steht auf der
-  Alterskarte ein klarer Satz dazu, und der Werbeschutz greift.
+  nur die Vorlage hin oder nennt sie ein Alter ganz ohne Zahl, steht auf der
+  Alterskarte ein klarer Satz dazu, der Werbeschutz greift, und der
+  Realitäts-Check fragt das Alter nicht ab. Ein Alter in Worten („etwa
+  dreizehn“, „Teenager“) zählt wie eine Zahl.
 
 ## [4.10.0] — 2026-09-16
 

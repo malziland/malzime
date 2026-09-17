@@ -501,13 +501,19 @@ Untergrenze.
    Positivliste fest, welche Spannen im Altersteil noch stehen dürfen (die
    Merkmals-Tabellen).
 3. Ist das Alter nicht lesbar — abgeschriebene Vorlage in beliebiger Klammer,
-   oder ein Altersversuch ohne Ziffer —, zeigt die Alterskarte einen festen
+   oder ein Altersversuch ohne jede Zahl —, zeigt die Alterskarte einen festen
    Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte vorher
    nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das aus den
    Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
-   Kinderschutz-Zeile meldet es als `alterUnlesbar: true`. Eine Antwort ohne
-   jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie bisher
-   ungefiltert.
+   Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
+   `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht
+   ab. Zahlwörter („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und
+   Kategoriewörter („Teenager“, „Kind“) gelten als lesbar und werden für die
+   Altersauslese in Zahlen übersetzt; „13jährig“ wird ebenfalls gelesen. Eine
+   Antwort ohne jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie
+   bisher ungefiltert.
+4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus
+   `minor-safety.js` (`SCHUTZ_ALTER`), steht also nur an einer Stelle.
 
 **Warum.** Das US-Normungsinstitut NIST nennt für die Grenze 18 einen Puffer von
 sieben Jahren (Schwelle 25) als üblich (NIST IR 8525, dort bezogen auf den
@@ -535,8 +541,14 @@ im Mistral-Kontingent, während die Klasse wartet; die Häufigkeit zeigt das Fel
 festen Satzes: verworfen, die zweite Gegenprüfung fand Reste und zerstörte
 Sätze.
 
-**Rückweg.** Nur mit Deploy: `PUFFER_JAHRE` in `minor-safety.js` ändern; der
-Test „die Schwelle ist exakt …“ pinnt den Wert und muss mitgeändert werden.
+**Rückweg.** Nur mit Deploy: `PUFFER_JAHRE` in `minor-safety.js` ändern. Die
+Schwellen-Tests in `minor-safety.test.js` pinnen den Wert und müssen
+mitgeändert werden; der Werbe-Prompt zieht automatisch nach.
+
+**Offen, bewusst nach der nächsten Messung.** Die Werberegel im Haupt-Prompt
+nennt den Puffer noch nicht (der Server streicht trotzdem); die Beispiel-Belege
+der Alterskarte sind allgemein formuliert — ob die KI dadurch seltener ein
+konkretes Merkmal nennt, zeigt der Vortest (Kennzahl „Begründung konkret“).
 
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 

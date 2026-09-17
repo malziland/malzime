@@ -78,27 +78,109 @@ const SCHUTZ_BIS = VOLLJAEHRIG_AB + PUFFER_JAHRE + 1;
    nennt es ein Alter ohne eine einzige Ziffer ("~dreizehn Jahre"), gilt das
    Alter als NICHT LESBAR:
      - Die Alterskarte zeigt dann einen festen Satz statt eines geflickten
-       Textes (alterskarteText unten).
-     - Der Kinderschutz-Filter laesst Stufe 2 greifen (minor-safety.js).
+       Textes (alterskarteText in mistral.js, Satz aus alterNichtLesbarText).
+     - Der Kinderschutz-Filter laesst Stufe 2 greifen (applyMinorSafety).
+   Zahlwoerter ("etwa dreizehn", "Mitte vierzig", "in his teens") sind eine
+   LESBARE Angabe: Sie werden fuer die Pruefung und fuer die Altersauslese in
+   Ziffern uebersetzt (Gegenpruefung 17.09.2026). Nur einfache Woerter von
+   fuenf bis achtzig, keine zusammengesetzten Zahlen.
    "Keine klaren Bildsignale." oder ein blosses "weiblich" sind KEIN
    unlesbares Alter — dort steht gar kein Altersversuch, und es bleibt bei der
    Regel "ohne Alter nicht filtern".
-   Geprueft werden hoechstens die ersten PRUEF_MAX Zeichen: Die Altersangabe
-   steht am Anfang, und die Pruefung bleibt auch bei einem durchdrehenden
-   Modell schnell. */
-/* BLEIBT IM CODE — Schutzgrenze gegen lange Modellausgaben, keine
-   Betriebseinstellung. */
-const PRUEF_MAX = 300;
-const ZIFFERN_IN_KLAMMERN = /[‹<[{«]\s*(\d{1,3})\s*[›>\]}»]/g;
-const PLATZHALTER_IN_KLAMMERN = /[‹<[{«]\s*(?:zahl|number|alter|age)\s*[›>\]}»]/i;
+   Auch Kategoriewoerter ("Teenager", "jugendlich", "Kind") sind eine
+   Angabe: Sie zaehlen als junges Alter.
+   Geprueft werden hoechstens die ersten PRUEF_MAX Zeichen — so lang darf eine
+   Karte hoechstens sein (json-repair.js); die Suchmuster laufen linear. */
+/* BLEIBT IM CODE — Grenze gegen lange Modellausgaben, gleich der
+   Kartenlaenge, keine Betriebseinstellung. */
+const PRUEF_MAX = 800;
+const KLAMMER_AUF = "‹<\\[{«(„“\"'‚‘⟨〈";
+const KLAMMER_ZU = "›>\\]}»)“”\"'‘’⟩〉";
+const ZIFFERN_IN_KLAMMERN = new RegExp(`[${KLAMMER_AUF}]\\s*(\\d{1,3})\\s*[${KLAMMER_ZU}]`, "g");
+const PLATZHALTER_IN_KLAMMERN = new RegExp(`[${KLAMMER_AUF}]\\s*(?:zahl|number|alter|age)\\s*[${KLAMMER_ZU}]`, "i");
 const PLATZHALTER_NACKT =
   /~\s*(?:zahl|number)\b|\b(?:zahl|number)\s*(?:[-–]|bis|to)\s*(?:zahl|number)\b|\b(?:zahl|number)[\s-]+(?:jahre|j\u00e4hrig|years?|yrs)\b|\b(?:spanne|range|circa|ca\.|etwa|about|aged|zwischen|between)\s+(?:zahl|number)\b/i;
-const ALTERSWORT = /jahre|j\u00e4hrig|\byears?\b|\byrs\b|spanne|\brange\b/i;
+/* Woerter, die einen Altersversuch anzeigen — mit Wortgrenzen, damit
+   "spannend", "Jahreszeit" oder "Altersspanne" nicht zaehlen. "-jaehrig" darf
+   angehaengt sein ("dreizehnjaehrig"). */
+const ALTERSWORT = /(?<!\p{L})(?:jahre|jahren|years?|yrs|spanne|range)(?!\p{L})|j\u00e4hrig/iu;
+
+const ZAHLWOERTER = {
+  fünf: 5,
+  sechs: 6,
+  sieben: 7,
+  acht: 8,
+  neun: 9,
+  zehn: 10,
+  elf: 11,
+  zwölf: 12,
+  dreizehn: 13,
+  vierzehn: 14,
+  fünfzehn: 15,
+  sechzehn: 16,
+  siebzehn: 17,
+  achtzehn: 18,
+  neunzehn: 19,
+  zwanzig: 20,
+  dreißig: 30,
+  vierzig: 40,
+  fünfzig: 50,
+  sechzig: 60,
+  siebzig: 70,
+  achtzig: 80,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  sixty: 60,
+  seventy: 70,
+  eighty: 80,
+  teens: 13,
+  teen: 13,
+  teenager: 13,
+  teenagerin: 13,
+  jugendlich: 13,
+  jugendliche: 13,
+  jugendlicher: 13,
+  adolescent: 13,
+  twenties: 20,
+  thirties: 30,
+  forties: 40,
+  fifties: 50,
+  sixties: 60,
+  seventies: 70,
+};
+/* Wortgrenzen ueber Buchstaben (auch Umlaute): "acht" trifft nicht in
+   "achtzehn", "zehn" nicht in "dreizehn", "ten" nicht in "often". */
+const ZAHLWORT = new RegExp(`(?<!\\p{L})(${Object.keys(ZAHLWOERTER).join("|")})(?!\\p{L})`, "giu");
+
+/* "Kind" nur gross geschrieben — das englische "kind" (freundlich) ist kein
+   Alter. */
+const KIND = /(?<!\p{L})(?:Kind|child)(?!\p{L})/gu;
+
+function mitZiffern(text) {
+  return String(text || "")
+    .replace(ZAHLWORT, (w) => String(ZAHLWOERTER[w.toLowerCase()]))
+    .replace(KIND, "8");
+}
 
 function pruefText(text) {
-  return String(text || "")
-    .slice(0, PRUEF_MAX)
-    .replace(ZIFFERN_IN_KLAMMERN, "$1");
+  return mitZiffern(String(text || "").slice(0, PRUEF_MAX)).replace(ZIFFERN_IN_KLAMMERN, "$1");
 }
 
 function hatAltersPlatzhalter(text) {
@@ -106,21 +188,27 @@ function hatAltersPlatzhalter(text) {
   return PLATZHALTER_IN_KLAMMERN.test(s) || PLATZHALTER_NACKT.test(s);
 }
 
-/* Ein Altersversuch ohne lesbare Zahl: Platzhalter, oder Alterswort ohne
-   jede Ziffer. */
+/* Ein Altersversuch ohne lesbare Zahl: Platzhalter, oder Alterswort, aus dem
+   die Altersauslese keine Zahl gewinnt. */
 function istAlterUnlesbar(text) {
   const s = pruefText(text);
-  return hatAltersPlatzhalter(s) || (ALTERSWORT.test(s) && !/\d/.test(s));
+  return hatAltersPlatzhalter(s) || (ALTERSWORT.test(s) && untereAltersgrenze(s) === null);
 }
 
-/* Hat der Text ein lesbares Alter (Ziffer, kein Platzhalter)? */
+/* Hat der Text ein lesbares Alter? Dieselbe Auslese wie der Filter — "lesbar"
+   heisst: Der Filter findet eine Zahl, und kein Platzhalter steht da. */
 function hatLesbaresAlter(text) {
   const s = pruefText(text);
-  return /\d/.test(s) && !hatAltersPlatzhalter(s);
+  return !hatAltersPlatzhalter(s) && untereAltersgrenze(s) !== null;
+}
+
+/* Fuer die Anzeige: Ziffern in Klammern auspacken ("~‹14›" → "~14"). */
+function ohneZiffernKlammern(text) {
+  return String(text || "").replace(ZIFFERN_IN_KLAMMERN, "$1");
 }
 
 const GESCHLECHT =
-  /^(?:du bist |you are )?(männlich|weiblich|divers|nicht eindeutig erkennbar|male|female|not clearly identifiable)\b/i;
+  /^(?:du bist |you are )?(?:geschlecht |gender )?(männlich|weiblich|divers|nicht eindeutig erkennbar|male|female|not clearly identifiable)(?!\p{L})/iu;
 
 /* Fester Satz fuer die Alterskarte, wenn das Alter nicht lesbar ist. Die
    Saetze stehen in der Sprachdatei (prompts.js: alterNichtLesbar,
@@ -241,20 +329,22 @@ function istBeiMinderjaehrigenVerboten(eintrag) {
    MEHR Schutz. Der Fehler geht so immer auf die sichere Seite. Nach oben kann
    ihn keine Zahl verschieben — das wäre die gefährliche Richtung. */
 function untereAltersgrenze(text) {
-  const s = String(text || "").toLowerCase();
+  const s = mitZiffern(text).toLowerCase();
   const plausibel = (n) => Number.isFinite(n) && n >= 1 && n <= 100;
   const kandidaten = [];
 
-  /* Spannen zuerst — "12-16", "12–16", "12 bis 16". Die Untergrenze zählt. */
-  for (const m of s.matchAll(/\b(\d{1,2})\s*(?:[-–—]|bis)\s*(\d{1,2})\b/g)) {
+  /* Spannen zuerst — "12-16", "12–16", "12 bis 16", "12 to 16". Die
+     Untergrenze zählt. */
+  for (const m of s.matchAll(/(?<!\d)(\d{1,2})\s*(?:[-–—]|bis|to)\s*(\d{1,2})(?!\d)/g)) {
     const von = Number(m[1]);
     const nach = Number(m[2]);
     if (plausibel(von) && plausibel(nach) && nach >= von) kandidaten.push(von);
   }
 
-  /* Dazu jede freistehende Zahl — deckt Punktwerte wie "~14" und "40 Jahre"
-     ab. Bei einer Spanne findet das ohnehin dieselbe Untergrenze noch einmal. */
-  for (const roh of s.match(/\b\d{1,2}\b/g) || []) {
+  /* Dazu jede ein- oder zweistellige Zahl — deckt Punktwerte wie "~14",
+     "40 Jahre" und seit 17.09.2026 auch "13jährig" oder "13yo" ab. Bei einer
+     Spanne findet das ohnehin dieselbe Untergrenze noch einmal. */
+  for (const roh of s.match(/(?<!\d)\d{1,2}(?!\d)/g) || []) {
     const n = Number(roh);
     if (plausibel(n)) kandidaten.push(n);
   }
@@ -393,4 +483,6 @@ module.exports = {
   istAlterUnlesbar,
   hatLesbaresAlter,
   alterNichtLesbarText,
+  ohneZiffernKlammern,
+  SCHUTZ_ALTER: SCHUTZ_BIS - 1,
 };

@@ -3,7 +3,7 @@
 /* Werbe-Anzahl kommt aus minor-safety.js (eine Quelle): angefordert werden
    zwei Eintraege mehr, als gezeigt werden, damit die Anzahl nach dem
    Kinderschutz-Filter stimmt. */
-const { WERBE_ANFORDERUNG } = require("../../minor-safety");
+const { WERBE_ANFORDERUNG, SCHUTZ_ALTER } = require("../../minor-safety");
 
 /**
  * locales/en/prompts.js — English texts for the AI prompts and profile generation.
@@ -606,7 +606,7 @@ Generate exactly ${WERBE_ANFORDERUNG} ad entries that target the VULNERABILITY, 
 
 - NEVER pornographic or sexualised offers, no sex work, no escort services. Neither for adults nor for minors.
 - NEVER weapons, ammunition or extremist content.
-- For persons who could be minors — this includes any age estimate starting in the mid-twenties or below, and any profile whose age could not be read — additionally NO offers involving alcohol, tobacco, gambling, sports betting, credit, instalments, diet products or cosmetic surgery. Instead: in-app purchases, trading cards, gaming subscriptions, influencer merch, status clothing.
+- For persons who could be minors — this includes any age estimate starting at ${SCHUTZ_ALTER} or below, and any profile whose age could not be read — additionally NO offers involving alcohol, tobacco, gambling, sports betting, credit, instalments, diet products or cosmetic surgery. Instead: in-app purchases, trading cards, gaming subscriptions, influencer merch, status clothing.
 - For children (under 12) the product world stays toys, games and children's media — the mechanic targets collecting compulsion and pester power, not fashion subscriptions.
 
 Answer ONLY with JSON: {"ad_targeting": ["...", "..."]}`;

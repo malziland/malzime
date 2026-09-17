@@ -3,7 +3,7 @@
 /* Werbe-Anzahl kommt aus minor-safety.js (eine Quelle): angefordert werden
    zwei Eintraege mehr, als gezeigt werden, damit die Anzahl nach dem
    Kinderschutz-Filter stimmt. */
-const { WERBE_ANFORDERUNG } = require("../../minor-safety");
+const { WERBE_ANFORDERUNG, SCHUTZ_ALTER } = require("../../minor-safety");
 
 /**
  * locales/de/prompts.js — Deutsche Texte für die KI-Prompts und Profilgenerierung.
@@ -621,7 +621,7 @@ Erzeuge genau ${WERBE_ANFORDERUNG} Werbeeinträge, die an der VERLETZLICHKEIT an
 
 - NIEMALS pornografische oder sexualisierte Angebote, keine Sexarbeit, keine Escort-Dienste. Weder bei Erwachsenen noch bei Minderjährigen.
 - NIEMALS Waffen, Munition oder extremistische Inhalte.
-- Bei Personen, die minderjährig sein könnten — dazu zählt jede Altersschätzung, die bei Mitte 20 oder darunter beginnt, und jedes Profil, dessen Alter sich nicht ablesen ließ —, zusätzlich KEINE Angebote zu Alkohol, Tabak, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln oder Schönheitskorrektur. Stattdessen: In-App-Käufe, Sammelkarten, Gaming-Abos, Influencer-Merch, Statuskleidung.
+- Bei Personen, die minderjährig sein könnten — dazu zählt jede Altersschätzung, die bei ${SCHUTZ_ALTER} Jahren oder darunter beginnt, und jedes Profil, dessen Alter sich nicht ablesen ließ —, zusätzlich KEINE Angebote zu Alkohol, Tabak, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln oder Schönheitskorrektur. Stattdessen: In-App-Käufe, Sammelkarten, Gaming-Abos, Influencer-Merch, Statuskleidung.
 - Bei Kindern (unter 12) bleibt die Produktwelt Spielzeug, Spiele und Kindermedien — die Mechanik zielt auf Sammelzwang und Quengeldruck, nicht auf Mode-Abos.
 
 Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;

@@ -185,7 +185,14 @@ async function runPipeline(job) {
         },
         privacyRisks,
         exif,
-        meta: { traceId: job.traceId || null, mode: "multimodal", subject },
+        /* alterUnlesbar (17.09.2026): Die Alterskarte zeigt dann einen festen
+           Satz; der Realitaets-Check fragt das Alter nicht ab. Nur Ja/Nein. */
+        meta: {
+          traceId: job.traceId || null,
+          mode: "multimodal",
+          subject,
+          alterUnlesbar: safety.alterUnlesbar === true,
+        },
       },
       success: true,
     };

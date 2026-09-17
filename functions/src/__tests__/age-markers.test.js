@@ -322,8 +322,8 @@ describe("Zahlenspannen im Alters- und Sprachteil nur aus der Positivliste", () 
       })
       .join("\n")
       .replace(/[–—]/g, "-");
-    const spannen = text.match(/\b\d{1,3}\s*-\s*\d{1,3}\b/g) || [];
-    return [...new Set(spannen.map((x) => x.replace(/\s/g, "")))].filter((x) => !ERLAUBT.includes(x));
+    const spannen = [...text.matchAll(/\b(\d{1,3})\s*(?:-|bis|to)\s*(\d{1,3})\b/g)].map((m) => `${m[1]}-${m[2]}`);
+    return [...new Set(spannen)].filter((x) => !ERLAUBT.includes(x));
   }
 
   test.each(PROMPTS)("%s enthält nur erlaubte Spannen", (name, prompt) => {
@@ -336,6 +336,8 @@ describe("Zahlenspannen im Alters- und Sprachteil nur aus der Positivliste", () 
     expect(fremdeSpannen(prompt.replace("18-30", "19-30"), sprache)).toEqual(["19-30"]);
     const kopf = ABSCHNITTE[sprache][0][0];
     expect(fremdeSpannen(prompt.replace(kopf, `${kopf} 19–25`), sprache)).toEqual(["19-25"]);
+    expect(fremdeSpannen(prompt.replace(kopf, `${kopf} 19 bis 25`), sprache)).toEqual(["19-25"]);
+    expect(fremdeSpannen(prompt.replace(kopf, `${kopf} 19 to 25`), sprache)).toEqual(["19-25"]);
   });
 });
 

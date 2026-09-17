@@ -57,6 +57,12 @@ const ZITAT_MAX_ZEICHEN = 70;
    Nicht-Festlegung in beiden Sprachen (Erkennungsmarker, keine UI-Texte). */
 const GESCHLECHT_UNKLAR_MARKER = ["nicht eindeutig", "not clearly"];
 
+/* Ob die Karte überhaupt ein Geschlecht nennt (Erkennungsmarker, keine
+   UI-Texte). Gebraucht, wenn das Alter nicht lesbar war: Dann steht auf der
+   Karte ein fester Satz, der das Geschlecht nur trägt, wenn es klar war. */
+/* \u00e4 statt Umlaut: Erkennungsmarker, kein Anzeigetext (i18n-Wächter). */
+const GESCHLECHT_MARKER = ["m\u00e4nnlich", "weiblich", "divers", "male", "female"];
+
 /* Umfang des Ergebnis-Rings (r=52 → 2·π·52), exakt wie im Prototyp. */
 const RING_UMFANG = 326.7;
 
@@ -95,6 +101,10 @@ function istMenschenErgebnis(data) {
     (profil.profileText && profil.profileText.trim()) ||
     (profil.categories && Object.keys(profil.categories).length > 0)
   );
+}
+
+function alterUnlesbarIn(data) {
+  return Boolean(data && data.meta && data.meta.alterUnlesbar === true);
 }
 
 function kuerzen(text) {
@@ -158,12 +168,23 @@ function rcFarbe(score) {
    createElement/textContent — Profil-Werte kommen vom Modell und landen so
    garantiert als Text, nie als Markup (XSS-Schutz). `erhaltene` restauriert
    beim Moduswechsel die schon gegebenen Antworten. */
-function zeilenBauen(profil, erhaltene) {
+/* Entfällt eine Zeile? Seit 17.09.2026 auch die Alter-Zeile, wenn der Server
+   meldet, dass sich das Alter nicht ablesen ließ — die Karte behauptet dann
+   kein Alter, eine „Getroffen/Daneben"-Frage ergäbe keinen Sinn. */
+function zeileEntfaellt(key, profil, alterUnlesbar) {
+  if (key === "alter") return alterUnlesbar;
+  if (key !== "geschlecht") return false;
+  if (geschlechtEntfaellt(profil)) return true;
+  const wert = zitatFuer("geschlecht", profil).toLowerCase();
+  return alterUnlesbar && !GESCHLECHT_MARKER.some((marker) => wert.includes(marker));
+}
+
+function zeilenBauen(profil, erhaltene, alterUnlesbar = false) {
   const ziel = elements.rcZeilen;
   if (!ziel) return;
   ziel.innerHTML = "";
   antworten = {};
-  aktiveZeilen = ZEILEN.filter((zeile) => !(zeile.key === "geschlecht" && geschlechtEntfaellt(profil)));
+  aktiveZeilen = ZEILEN.filter((zeile) => !zeileEntfaellt(zeile.key, profil, alterUnlesbar));
 
   for (const zeile of aktiveZeilen) {
     const zeilenEl = document.createElement("div");
@@ -414,7 +435,7 @@ export function zuruecksetzen() {
 export function neuesErgebnis(data) {
   zuruecksetzen();
   if (!istMenschenErgebnis(data)) return;
-  zeilenBauen(profilFuerAktivenModus(data), null);
+  zeilenBauen(profilFuerAktivenModus(data), null, alterUnlesbarIn(data));
   if (elements.realCheck) elements.realCheck.hidden = false;
 }
 
@@ -432,5 +453,5 @@ export function modusGewechselt(data) {
     return;
   }
   const bisherige = { ...antworten };
-  zeilenBauen(profilFuerAktivenModus(data), bisherige);
+  zeilenBauen(profilFuerAktivenModus(data), bisherige, alterUnlesbarIn(data));
 }

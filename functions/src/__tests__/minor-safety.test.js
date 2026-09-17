@@ -100,13 +100,21 @@ describe("Nicht lesbares Alter", () => {
     ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)"],
     ["female, ~<number> years old"],
     ["männlich, Zahl Jahre alt."],
-    ["weiblich, ~dreizehn Jahre alt"],
+    ["weiblich, Alter unklar, Spanne offen"],
     ["weiblich, ~‹Zahl› Jahre alt (Spanne 30-36)"],
   ])("%s — Filter greift", (alterText) => {
     const p = profil(alterText, ["Tipico Wetten", "Nike Air Max"]);
     const b = applyMinorSafety(p);
     expect(b.alterUnlesbar).toBe(true);
     expect(b.minderjaehrig).toBe(true);
+    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  });
+
+  test("Zahlwort unter 26: lesbar und geschützt", () => {
+    const p = profil("weiblich, etwa dreizehn.", ["Tipico Wetten", "Nike Air Max"]);
+    const b = applyMinorSafety(p);
+    expect(b.alterUnlesbar).toBe(false);
+    expect(b.alter).toBe(13);
     expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
   });
 

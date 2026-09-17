@@ -650,14 +650,17 @@ Lesart:
   davor nur Untergrenzen bis 18. Wer Zeiträume vergleicht, zählt deshalb
   `alter` selbst (zum Beispiel unter 19).
 - `alterUnlesbar=true` (ab derselben Auslieferung): Die KI hat die Vorlage
-  „‹Zahl›“ abgeschrieben oder ein Alter ohne Ziffer genannt. Die Karte zeigt
-  dann einen festen Satz statt eines Alters.
+  „‹Zahl›“ abgeschrieben oder ein Alter ganz ohne Zahl genannt (Zahlwörter wie
+  „dreizehn“ zählen als Zahl). Die Karte zeigt dann einen festen Satz statt
+  eines Alters.
 - `entfernte` sind gestrichene Werbeeinträge, `durchgerutschte` Treffer im
   Profiltext oder in einer Kategorie-Karte (nur gemeldet). Steht dort über
   Wochen ein Wort wie „cocktail" in Bar-Beschreibungen, ist die Sperrliste zu
   grob; stehen dort Werbebegriffe wie „sportwetten", hält der Prompt nicht.
-- `werbung` unter 8 heißt bei jeder Analyse mit Stufe 2: mehr als zwei
-  Einträge gestrichen, nachgefüllt wird nichts.
+- `werbung` unter 8 heißt beim Beast-Modus (zehn Einträge angefordert): mehr
+  als zwei Einträge gestrichen, nachgefüllt wird nichts. Die Standard-Liste
+  hat von sich aus sechs bis acht Einträge — dort zeigt nur `entfernte`, ob
+  gestrichen wurde.
 
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
 

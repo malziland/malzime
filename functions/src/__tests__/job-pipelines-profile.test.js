@@ -74,6 +74,39 @@ describe("Wann gilt ein Profil als vorhanden", () => {
     expect(r.success).toBe(true);
   });
 
+  /* Gegenprüfung 17.09.2026: Die Pipeline muss dem Kinderschutz-Filter
+     Anker UND das Urteil "Alter nicht lesbar" übergeben. Ohne diese Übergabe
+     sähe der Filter nur die umgeschriebene Karte, und der Schutz fiele
+     unbemerkt weg. */
+  const mitWerbung = () => ({
+    categories: { alter_geschlecht: { value: "Du bist weiblich. Dein Alter lässt sich nicht ablesen." } },
+    ad_targeting: ["Tipico Wetten", "Nike Air Max"],
+  });
+
+  test("Alter nicht lesbar: die Pipeline gibt es an den Filter weiter, Wett-Werbung fliegt raus", async () => {
+    const r = await laufMit({
+      normal: mitWerbung(),
+      boost: mitWerbung(),
+      alterAnker: "weiblich",
+      alterUnlesbar: true,
+    });
+    expect(r.success).toBe(true);
+    expect(r.result.profiles.normal.ad_targeting).toEqual(["Nike Air Max"]);
+    expect(r.result.profiles.boost.ad_targeting).toEqual(["Nike Air Max"]);
+    const zeile = console.log.mock.calls.map((c) => String(c[0])).find((z) => z.includes('"minor-safety"'));
+    expect(JSON.parse(zeile)).toMatchObject({ alterUnlesbar: true, minderjaehrig: true });
+  });
+
+  test("Gegenprobe: lesbares Erwachsenenalter im Anker — Wett-Werbung bleibt", async () => {
+    const r = await laufMit({
+      normal: mitWerbung(),
+      boost: mitWerbung(),
+      alterAnker: "weiblich, ~44 Jahre alt (Spanne 40-48)",
+      alterUnlesbar: false,
+    });
+    expect(r.result.profiles.normal.ad_targeting).toEqual(["Tipico Wetten", "Nike Air Max"]);
+  });
+
   test("gar kein Profil ist ein blockiertes Ergebnis, kein leeres", async () => {
     /* Die Gegenrichtung: Ohne jedes Profil darf NICHT "erfolgreich" gemeldet
        werden — sonst sieht das Kind eine leere Seite statt einer Erklaerung. */

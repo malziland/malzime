@@ -49,15 +49,15 @@
      Spanne 26-32  →  Filter greift nicht (Untergrenze 26)
 
    WARUM DER PUFFER: Bis 2026-09-17 galt "Untergrenze 18 oder darunter" ohne
-   Abstand. In zwei Workshops mit Schulklassen (16. und 17.09.2026) hatten 31
-   von 186 bzw. 50 von 143 Analysen eine Untergrenze von 19 oder mehr, davon
-   24 bzw. 40 genau 19 oder 25. Wo darunter Minderjaehrige waren, griff Stufe 2
-   nicht. Die Fachwelt rechnet deshalb mit einem Puffer: NIST nennt fuer die Grenze 18
+   Abstand. In zwei Workshops mit Schulklassen (16. und 17.09.2026, jeweils 7
+   bis 12 Uhr) hatten 31 von 186 bzw. 50 von 143 Analysen eine Untergrenze von
+   19 oder mehr, davon 24 bzw. 40 genau 19 oder 25. Wo darunter Minderjaehrige
+   waren, griff Stufe 2 nicht. Die Fachwelt rechnet deshalb mit einem Puffer: NIST nennt fuer die Grenze 18
    einen Puffer von sieben Jahren, also die Schwelle 25, als ueblich (NIST IR
    8525, "Challenge-T"); allgemeine Bild-Sprachmodelle schaetzen 16 bis 29 %
    der Minderjaehrigen als erwachsen (Ren u. a. 2026, arXiv 2602.07815).
-   Nachgerechnet mit derselben Regel an beiden Tagen: 7 statt 31 und 10 statt
-   50 Analysen ohne Stufe 2.
+   Nachgerechnet an beiden Tagen bei gleichen Schaetzungen: 7 statt 31 und 10
+   statt 50 Analysen ohne Stufe 2.
 
    Bewusst getragene Folge: Erwachsene, deren Spanne bei 25 oder darunter
    beginnt, bekommen keine Kredit-, Wett-, Alkohol-, Schoenheits-OP- und
@@ -71,13 +71,67 @@ const PUFFER_JAHRE = 7;
 /* „Untergrenze ≤ 25" als strikter Vergleich geschrieben: untergrenze < 26. */
 const SCHUTZ_BIS = VOLLJAEHRIG_AB + PUFFER_JAHRE + 1;
 
-/* Platzhalter der Formatvorlage im Prompt ("~‹Zahl› Jahre alt", Erkennung in
-   mistral-antwort.js). Steht er noch in der Altersangabe, hat das Modell die
-   Vorlage abgeschrieben statt zu schaetzen. Dann gilt Stufe 2 — anders als
-   bei einer Angabe ganz ohne Alter (siehe applyMinorSafety): Ein Kind darf
-   nicht deshalb Kredit-Ideen bekommen, weil keine Zahl lesbar war. Auf der
-   Karte selbst entfernt mistral.js den Platzhalter vor der Anzeige. */
-const { hatAltersPlatzhalter } = require("./mistral-antwort");
+/* ── Nicht lesbares Alter (17.09.2026) ────────────────────────────────────
+   Das Formatbeispiel im Prompt zeigt das Alter nur noch als "~‹Zahl› Jahre
+   alt (Spanne ‹Zahl›-‹Zahl›)" — eine Beispielzahl zog die Schaetzungen an.
+   Schreibt das Modell die Vorlage ab (in welcher Klammer auch immer) oder
+   nennt es ein Alter ohne eine einzige Ziffer ("~dreizehn Jahre"), gilt das
+   Alter als NICHT LESBAR:
+     - Die Alterskarte zeigt dann einen festen Satz statt eines geflickten
+       Textes (alterskarteText unten).
+     - Der Kinderschutz-Filter laesst Stufe 2 greifen (minor-safety.js).
+   "Keine klaren Bildsignale." oder ein blosses "weiblich" sind KEIN
+   unlesbares Alter — dort steht gar kein Altersversuch, und es bleibt bei der
+   Regel "ohne Alter nicht filtern".
+   Geprueft werden hoechstens die ersten PRUEF_MAX Zeichen: Die Altersangabe
+   steht am Anfang, und die Pruefung bleibt auch bei einem durchdrehenden
+   Modell schnell. */
+/* BLEIBT IM CODE — Schutzgrenze gegen lange Modellausgaben, keine
+   Betriebseinstellung. */
+const PRUEF_MAX = 300;
+const ZIFFERN_IN_KLAMMERN = /[‹<[{«]\s*(\d{1,3})\s*[›>\]}»]/g;
+const PLATZHALTER_IN_KLAMMERN = /[‹<[{«]\s*(?:zahl|number|alter|age)\s*[›>\]}»]/i;
+const PLATZHALTER_NACKT =
+  /~\s*(?:zahl|number)\b|\b(?:zahl|number)\s*(?:[-–]|bis|to)\s*(?:zahl|number)\b|\b(?:zahl|number)[\s-]+(?:jahre|j\u00e4hrig|years?|yrs)\b|\b(?:spanne|range|circa|ca\.|etwa|about|aged|zwischen|between)\s+(?:zahl|number)\b/i;
+const ALTERSWORT = /jahre|j\u00e4hrig|\byears?\b|\byrs\b|spanne|\brange\b/i;
+
+function pruefText(text) {
+  return String(text || "")
+    .slice(0, PRUEF_MAX)
+    .replace(ZIFFERN_IN_KLAMMERN, "$1");
+}
+
+function hatAltersPlatzhalter(text) {
+  const s = pruefText(text);
+  return PLATZHALTER_IN_KLAMMERN.test(s) || PLATZHALTER_NACKT.test(s);
+}
+
+/* Ein Altersversuch ohne lesbare Zahl: Platzhalter, oder Alterswort ohne
+   jede Ziffer. */
+function istAlterUnlesbar(text) {
+  const s = pruefText(text);
+  return hatAltersPlatzhalter(s) || (ALTERSWORT.test(s) && !/\d/.test(s));
+}
+
+/* Hat der Text ein lesbares Alter (Ziffer, kein Platzhalter)? */
+function hatLesbaresAlter(text) {
+  const s = pruefText(text);
+  return /\d/.test(s) && !hatAltersPlatzhalter(s);
+}
+
+const GESCHLECHT =
+  /^(?:du bist |you are )?(männlich|weiblich|divers|nicht eindeutig erkennbar|male|female|not clearly identifiable)\b/i;
+
+/* Fester Satz fuer die Alterskarte, wenn das Alter nicht lesbar ist. Die
+   Saetze stehen in der Sprachdatei (prompts.js: alterNichtLesbar,
+   geschlechtSatz); das Geschlecht wird uebernommen, wenn es am Anfang klar
+   dasteht. */
+function alterNichtLesbarText(quelle, texte) {
+  const m = GESCHLECHT.exec(String(quelle || "").trim());
+  const g = m ? m[1].toLowerCase() : "";
+  const vorn = g && texte.geschlechtSatz ? `${texte.geschlechtSatz.replace("{geschlecht}", g)} ` : "";
+  return `${vorn}${texte.alterNichtLesbar}`;
+}
 
 /* ── Zwei Stufen ──────────────────────────────────────────────────────────
    IMMER_VERBOTEN gilt unabhaengig vom geschaetzten Alter. Das ist bewusst so:
@@ -240,17 +294,17 @@ function applyMinorSafety(profiles, opts = {}) {
     "";
   const untergrenze = untereAltersgrenze(quelle);
   bericht.alter = untergrenze;
-  const platzhalter = hatAltersPlatzhalter(quelle);
-  bericht.platzhalter = platzhalter;
+  const alterUnlesbar = opts.alterUnlesbar === true || istAlterUnlesbar(quelle);
+  bericht.alterUnlesbar = alterUnlesbar;
 
   /* "Koennte minderjaehrig sein", nicht "ist es wahrscheinlich". Siehe die
-     Begruendung bei SCHUTZ_BIS und PLATZHALTER oben. Das Feld heisst weiter
+     Begruendung bei SCHUTZ_BIS und beim nicht lesbaren Alter oben. Das Feld heisst weiter
      `minderjaehrig`, weil die Auswertungen des Diagnose-Speichers es so
      zaehlen; gemeint ist "Stufe 2 greift". */
-  const minderjaehrig = platzhalter || (untergrenze !== null && untergrenze < SCHUTZ_BIS);
+  const minderjaehrig = alterUnlesbar || (untergrenze !== null && untergrenze < SCHUTZ_BIS);
   bericht.minderjaehrig = minderjaehrig;
 
-  /* Ist gar kein Alter erkennbar und auch kein Platzhalter da, wird NICHT
+  /* Ist gar kein Altersversuch erkennbar ("Keine klaren Bildsignale."), wird NICHT
      als minderjaehrig behandelt — sonst verloere man bei Erwachsenen legitime
      Inhalte (Kredit, Wein, Wellness sind dort Teil der Aufklaerung). Die harte
      Liste greift trotzdem. */
@@ -335,4 +389,8 @@ module.exports = {
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,
   _untereAltersgrenze: untereAltersgrenze,
   _SCHUTZ_BIS: SCHUTZ_BIS,
+  hatAltersPlatzhalter,
+  istAlterUnlesbar,
+  hatLesbaresAlter,
+  alterNichtLesbarText,
 };

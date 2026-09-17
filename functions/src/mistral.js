@@ -37,9 +37,9 @@ const {
 
   REQUIRED_CARDS,
   findMissingCards,
-  ohneAltersPlatzhalter,
   escapeXml,
 } = require("./mistral-antwort");
+const { hatAltersPlatzhalter, istAlterUnlesbar, hatLesbaresAlter, alterNichtLesbarText } = require("./minor-safety");
 
 /* Für Tests: erlaubt fetch zu mocken ohne globalThis zu überschreiben. */
 
@@ -356,28 +356,39 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     return zusammen.slice(0, STRING_BOUND_CATEGORY);
   }
 
-  /* Rohwert der Standard-Alterskarte, BEVOR ein Platzhalter entfernt wird —
-     Rueckfall fuer den Kinderschutz-Filter, wenn hard_facts kein Alter
-     liefert. Sonst saehe der Filter die bereinigte Karte und koennte einen
-     abgeschriebenen Platzhalter nicht mehr erkennen. */
-  const rohAlterStandard =
-    typeof parsed.standard?.categories?.alter_geschlecht?.value === "string"
-      ? parsed.standard.categories.alter_geschlecht.value
-      : null;
+  /* Nicht lesbares Alter (17.09.2026, siehe mistral-antwort.js): aus den
+     ROHWERTEN bestimmt, bevor eine Karte umgeschrieben wird. Unlesbar ist das
+     Alter, wenn der Anker einen Altersversuch ohne lesbare Zahl enthaelt,
+     oder wenn der Anker gar keine Zahl hat und eine der beiden Karten den
+     Platzhalter oder ein Alter ohne Ziffer zeigt. */
+  const ankerRoh = typeof hardFacts.alter_geschlecht === "string" ? hardFacts.alter_geschlecht : "";
+  const rohKarte = (modus) => {
+    const w = parsed[modus]?.categories?.alter_geschlecht?.value;
+    return typeof w === "string" ? w : "";
+  };
+  const rohStandard = rohKarte("standard");
+  const alterUnlesbar =
+    istAlterUnlesbar(ankerRoh) ||
+    (!/\d/.test(ankerRoh) && (istAlterUnlesbar(rohStandard) || istAlterUnlesbar(rohKarte("beast"))));
+
+  /* Was die Alterskarte zeigt. Normalfall wie bisher: Anker vorn, Beleg-Satz
+     des Modells dahinter. Traegt nur der Beleg-Satz einen Platzhalter, bleibt
+     der Anker allein stehen. Ist das Alter nicht lesbar, steht ein fester
+     Satz da — nie ein geflickter Text mit Luecken. */
+  function alterskarteText(modellwert) {
+    if (alterUnlesbar) return alterNichtLesbarText(ankerRoh || modellwert, prompts);
+    const mitAnker = ankerRoh ? mitAnkerVoran(ankerRoh, modellwert) : String(modellwert || "");
+    if (!hatAltersPlatzhalter(mitAnker)) return mitAnker;
+    return hatLesbaresAlter(ankerRoh)
+      ? mitAnkerVoran(ankerRoh, "")
+      : alterNichtLesbarText(ankerRoh || modellwert, prompts);
+  }
 
   function buildProfile(modeKey) {
     const src = parsed[modeKey];
     if (!src || !src.categories) return null;
     const karteAlter = src.categories.alter_geschlecht;
-    if (karteAlter) {
-      /* Abgeschriebener Platzhalter ("~‹Zahl› Jahre") wird vor der Anzeige
-         entfernt — im Anker wie im Modellwert. Der Kinderschutz-Filter liest
-         den unveraenderten Anker (alterAnker unten) und schuetzt dann. */
-      const mitAnker = hardFacts.alter_geschlecht
-        ? mitAnkerVoran(ohneAltersPlatzhalter(hardFacts.alter_geschlecht), karteAlter.value)
-        : karteAlter.value;
-      karteAlter.value = ohneAltersPlatzhalter(mitAnker);
-    }
+    if (karteAlter) karteAlter.value = alterskarteText(karteAlter.value);
     if (hardFacts.herkunft && src.categories.herkunft) {
       src.categories.herkunft.value = mitAnkerVoran(hardFacts.herkunft, src.categories.herkunft.value);
     }
@@ -424,7 +435,10 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        Kartentext — seit BIZ-001 steht dort naemlich auch der Beleg-Satz, und
        eine Zahl darin ("der Kopf passt 7-mal in die Koerperhoehe") wuerde die
        Altersauslese sonst nach unten ziehen. */
-    alterAnker: hardFacts.alter_geschlecht || rohAlterStandard || null,
+    /* Hat der Anker keine Zahl, bekommt der Filter die unveraenderte
+       Standard-Karte — steht dort eine Zahl, zaehlt sie. */
+    alterAnker: (/\d/.test(ankerRoh) ? ankerRoh : rohStandard || ankerRoh) || null,
+    alterUnlesbar,
   };
 }
 

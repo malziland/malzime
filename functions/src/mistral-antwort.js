@@ -161,40 +161,9 @@ const REQUIRED_CARDS = [
   "werbeprofil",
 ];
 
-/* ── Platzhalter beim Alter (17.09.2026) ──────────────────────────────────
-   Das Formatbeispiel im Prompt zeigt das Alter nur noch als "~‹Zahl› Jahre
-   alt (Spanne ‹Zahl›-‹Zahl›)" — eine Beispielzahl zog die Schaetzungen an.
-   Schreibt das Modell die Vorlage ab, darf das Kind "‹Zahl›" nie auf der
-   Karte sehen, und der Kinderschutz-Filter muss den Fall erkennen
-   (minor-safety.js). Erkannt werden die spitzen Klammern und die nackten
-   Formen "~Zahl", "Zahl Jahre", "Zahl-Zahl" und "Spanne Zahl"; ein einzelnes
-   Wort "number" im Fliesstext ("a number of fine lines") zaehlt nicht.
-   Ziffern in spitzen Klammern ("‹40›") sind eine echte Schaetzung und werden
-   nur ausgepackt. */
-const ZIFFERN_IN_KLAMMERN = /‹\s*(\d{1,3})\s*›/g;
-const ALTERS_PLATZHALTER =
-  /[‹›]|~\s*(?:zahl|number)\b|\b(?:zahl|number)\s+(?:jahre|years)\b|\b(?:zahl|number)\s*[-–]\s*(?:zahl|number)\b|\b(?:spanne|range)\s+(?:zahl|number)\b/i;
-
-function hatAltersPlatzhalter(text) {
-  return ALTERS_PLATZHALTER.test(String(text || "").replace(ZIFFERN_IN_KLAMMERN, "$1"));
-}
-
-/* Entfernt die abgeschriebene Altersangabe und laesst den Rest stehen:
-   "männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Die Wangen …"
-   → "männlich. Die Wangen …". Ohne Platzhalter bleibt der Text unveraendert. */
-function ohneAltersPlatzhalter(text) {
-  const s = String(text || "").replace(ZIFFERN_IN_KLAMMERN, "$1");
-  if (!ALTERS_PLATZHALTER.test(s)) return s;
-  return s
-    .replace(/\s*\([^)]*(?:‹[^›]*›|\b(?:zahl|number)\b)[^)]*\)/gi, "")
-    .replace(/,?\s*(?:~\s*)?‹[^›]*›(?:\s+(?:jahre|years)(?:\s+(?:alt|old))?)?/gi, "")
-    .replace(/,?\s*~\s*(?:zahl|number)\b(?:\s+(?:jahre|years)(?:\s+(?:alt|old))?)?/gi, "")
-    .replace(/,?\s*\b(?:zahl|number)\s+(?:jahre|years)(?:\s+(?:alt|old))?/gi, "")
-    .replace(/[‹›]/g, "")
-    .replace(/\s+([.,;!?])/g, "$1")
-    .replace(/\s{2,}/g, " ")
-    .trim();
-}
+/* Nicht lesbares Alter (17.09.2026): Erkennung in minor-safety.js — dort
+   stehen die Suchmuster des Kinderschutzes, auch die deutschen. */
+const { hatAltersPlatzhalter } = require("./minor-safety");
 
 /* ── Live-Text und Karten aus dem laufenden Strom ─────────────────────────
    HERGEZOGEN AUS mistral.js am 31.08.2026, zweiter Schnitt.
@@ -227,10 +196,10 @@ function extrahiereKarten(jsonPraefix, vonIdx, bisIdx) {
        standard/beast, nur eine Ebene tiefer. */
     const dazwischen = bereich.slice(idx + marke.length, wert.schluesselIdx);
     if (REQUIRED_CARDS.some((k) => k !== schluessel && dazwischen.includes(`"${k}"`))) continue;
-    /* Die Alterskarte kann waehrend des Schreibens den abgeschriebenen
-       Platzhalter tragen — auch live darf er nicht erscheinen. */
-    const anzeige = schluessel === "alter_geschlecht" ? ohneAltersPlatzhalter(wert.text) : wert.text;
-    fertige.push({ schluessel, bezeichnung: bezeichnung.text, wert: anzeige });
+    /* Eine Alterskarte mit abgeschriebenem Platzhalter erscheint live gar
+       nicht — die fertige Karte bekommt danach den festen Satz (mistral.js). */
+    if (schluessel === "alter_geschlecht" && hatAltersPlatzhalter(wert.text)) continue;
+    fertige.push({ schluessel, bezeichnung: bezeichnung.text, wert: wert.text });
   }
   return fertige;
 }
@@ -305,6 +274,4 @@ module.exports = {
   REQUIRED_CARDS,
   findMissingCards,
   escapeXml,
-  hatAltersPlatzhalter,
-  ohneAltersPlatzhalter,
 };

@@ -119,11 +119,14 @@ describe("Alter nur an der Person ablesen — nichts macht älter", () => {
           Körpergröße gehört nicht dazu (sie steht unter KEINE
           ALTERSMERKMALE).
        C. Der Übergang Jugendlich/Erwachsen verweist auf die Kalibrierung für
-          Erwachsene statt auf eine feste Spanne.
+          Erwachsene statt auf eine feste Spanne und macht niemanden sicher
+          erwachsen: ohne sichere Erwachsenenmerkmale schließt die Spanne das
+          Jugendalter ein.
        D. Das Anti-Bias-Verbot für Setting und Outfit gilt nur nach oben.
        E. "Wenn das Gesicht nichts hergibt" (fehlende Falten sind kein Beleg
-          für jung, Make-up verdeckt sie) gilt nur für Erwachsene — sonst
-          zöge der Abschnitt geschminkte Mädchen nach oben.
+          für jung, Make-up verdeckt sie) gilt erst nach den Kindermerkmalen —
+          sonst zöge der Abschnitt geschminkte Mädchen nach oben. Bleibt offen,
+          ob jugendlich oder erwachsen, schließt die Spanne das Jugendalter ein.
      Geprüft wird der Modul-Export, also genau der Text, der an Mistral geht. */
   const REGELN = {
     de: {
@@ -131,9 +134,9 @@ describe("Alter nur an der Person ablesen — nichts macht älter", () => {
       B:
         "WORAN DU DAS ALTER ABLIEST — GILT FÜR JEDES ALTER:\n" +
         "Das Alter liest du an Gesicht, Hals, Händen und Haaren der Person ab. Nichts anderes macht eine Person ÄLTER: nicht, was sie hält, trägt oder tut, und nicht, was um sie herum ist — Gegenstände, Hintergrund, Raum, Tätigkeit —, und ebenso wenig Make-up, Filter, Frisur, Schmuck, Kleidung, Pose und Selbstinszenierung. Ein Kind mit Strickzeug oder Gehstock bleibt ein Kind, ein geschminktes Mädchen bleibt ein Mädchen. Umgekehrt darfst du deutliche Hinweise auf Kindheit oder Jugend im Bild — Kinderzimmer, Spielzeug, Schulsachen — als Beleg für ein JÜNGERES Alter nennen. Ein einzelner Gegenstand macht aus einem Erwachsenen aber kein Kind — Gesicht, Hals, Hände und Haare bleiben maßgeblich.",
-      C: "- Wenn Halspartie und Hände erwachsen wirken, das Gesicht ausgewachsene Proportionen zeigt, KEINES der Kinder- und Jugendmerkmale oben (Augenlinie, Zahnstand, Wangenfett, Nasenrücken) sichtbar ist und noch keine Linie sichtbar ist: Die Person ist erwachsen — schätze ihr Alter nach der KALIBRIERUNG ERWACHSENE oben.",
+      C: "- Wenn Halspartie und Hände erwachsen wirken, das Gesicht ausgewachsene Proportionen zeigt, KEINES der Kinder- und Jugendmerkmale oben (Augenlinie, Zahnstand, Wangenfett, Nasenrücken) sichtbar ist und noch keine Linie sichtbar ist: Die Person ist mindestens jugendlich. Schätze ihr Alter nach der KALIBRIERUNG ERWACHSENE oben; fehlen sichere Erwachsenenmerkmale (Linien, Hals, Hände), schließt die Spanne das Jugendalter ein.",
       D: "- Setting, Outfit, Trikot, Bühne, Sportkleidung oder Bildbearbeitung machen niemanden älter.",
-      E: "WENN DAS GESICHT NICHTS HERGIBT:\nDieser Abschnitt gilt für Erwachsene. Bei Kindern und Jugendlichen entscheiden die Merkmale der KALIBRIERUNG KINDER UND JUGENDLICHE, und Make-up macht sie nicht älter.\n",
+      E: "WENN DAS GESICHT NICHTS HERGIBT:\nPrüfe zuerst die Merkmale der KALIBRIERUNG KINDER UND JUGENDLICHE. Zeigt eines davon ein Kind oder eine jugendliche Person, gilt dieser Abschnitt nicht — und Make-up macht niemanden älter. Bleibt offen, ob die Person jugendlich oder erwachsen ist, nenne eine breite Spanne, die das Jugendalter einschließt.\n",
       kopf: "═══ ALTERSKALIBRIERUNG — GILT FÜR BEIDE MODI ═══",
       kinderTeil: "KALIBRIERUNG KINDER UND JUGENDLICHE:",
       /* Frühere Fassungen — kehrt eine zurück, ist die jeweilige Lücke wieder da. */
@@ -149,9 +152,9 @@ describe("Alter nur an der Person ablesen — nichts macht älter", () => {
       B:
         "WHAT YOU READ AGE FROM — APPLIES TO EVERY AGE:\n" +
         "You read age from the person's face, neck, hands and hair. Nothing else makes a person OLDER: not what they hold, carry or do, not what surrounds them — objects, background, room, activity —, and just as little makeup, filters, hairstyle, jewellery, clothing, pose and self-presentation. A child with knitting or a walking stick remains a child, a girl wearing makeup remains a girl. Conversely, you may cite clear signs of childhood or youth in the picture — a child's room, toys, school things — as evidence for a YOUNGER age. A single object does not turn an adult into a child, though — face, neck, hands and hair remain decisive.",
-      C: "- If neck and hands appear adult, the face shows fully grown proportions, NONE of the child and teen markers above (eye line, dentition, cheek fat, nasal bridge) is visible and no line is visible yet: the person is an adult — estimate their age using the CALIBRATION ADULTS above.",
+      C: "- If neck and hands appear adult, the face shows fully grown proportions, NONE of the child and teen markers above (eye line, dentition, cheek fat, nasal bridge) is visible and no line is visible yet: the person is at least a teenager. Estimate their age using the CALIBRATION ADULTS above; if reliable adult markers (lines, neck, hands) are missing, the range includes the teenage years.",
       D: "- Setting, outfit, jersey, stage, sportswear or image editing make nobody older.",
-      E: "WHEN THE FACE GIVES NOTHING AWAY:\nThis section applies to adults. For children and teenagers, the markers of the CALIBRATION CHILDREN AND TEENAGERS decide, and makeup does not make them older.\n",
+      E: "WHEN THE FACE GIVES NOTHING AWAY:\nFirst check the markers of the CALIBRATION CHILDREN AND TEENAGERS. If one of them shows a child or a teenager, this section does not apply — and makeup makes nobody older. If it remains open whether the person is a teenager or an adult, give a wide range that includes the teenage years.\n",
       kopf: "═══ AGE CALIBRATION — APPLIES TO BOTH MODES ═══",
       kinderTeil: "CALIBRATION CHILDREN AND TEENAGERS:",
       alt: [
@@ -258,6 +261,36 @@ describe("Keine Zahlen als Anker im Altersteil", () => {
     );
     expect(ankerBefunde(mitZahl, sprache)).toEqual(["35-42", ANKER[sprache][6], "Platzhalter-Beispiel"]);
     expect(ankerBefunde(prompt.replace(v.anweisung, ""), sprache)).toEqual(["Platzhalter-Anweisung"]);
+  });
+});
+
+describe("Das Formatbeispiel beschreibt kein Alter", () => {
+  /* Gegenprüfung 17.09.2026: Nach dem Entfernen der Zahlen stand im Beispiel
+     weiter "ein Mann Mitte dreißig" mit "leichten Falten" und "feinen
+     Fältchen" — ein Alters-Anker in Worten. Das Beispiel (ab "FORMATVORLAGEN")
+     beschreibt jetzt Format, kein Alter. */
+  const WORT_ANKER = {
+    de: [/zwanzig|dreißig|vierzig|fünfzig|sechzig/i, /fältchen|falten|alterszeichen|altersspuren/i],
+    en: [/twenties|thirties|forties|fifties|sixties/i, /fine lines|wrinkles|signs of aging/i],
+  };
+  const START = { de: "FORMATVORLAGEN", en: "FORMAT TEMPLATES" };
+
+  function wortAnker(prompt, sprache) {
+    const i = prompt.indexOf(START[sprache]);
+    if (i < 0) throw new Error("Beispielteil nicht gefunden");
+    const beispiel = prompt.slice(i);
+    return WORT_ANKER[sprache].filter((re) => re.test(beispiel)).map(String);
+  }
+
+  test.each(PROMPTS)("%s: kein Alter in Worten im Beispiel", (name, prompt) => {
+    const sprache = name.startsWith("de") ? "de" : "en";
+    expect(wortAnker(prompt, sprache)).toEqual([]);
+  });
+
+  test.each(PROMPTS)("%s: die Prüfung erkennt ein Alter in Worten (Gegenprobe)", (name, prompt) => {
+    const sprache = name.startsWith("de") ? "de" : "en";
+    const zusatz = sprache === "de" ? "Ein Mann Mitte dreißig mit Falten." : "A man in his thirties with fine lines.";
+    expect(wortAnker(`${prompt}\n${zusatz}`, sprache)).toHaveLength(2);
   });
 });
 

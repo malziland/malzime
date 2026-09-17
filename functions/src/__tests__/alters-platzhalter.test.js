@@ -1,60 +1,103 @@
 /**
- * alters-platzhalter.test.js — Der abgeschriebene Platzhalter beim Alter.
+ * alters-platzhalter.test.js — Nicht lesbares Alter.
  *
  * HINTERGRUND (17.09.2026): Das Formatbeispiel im Prompt zeigt das Alter nur
  * noch als "~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)", weil eine Beispielzahl
- * die Schätzungen anzog. Schreibt das Modell die Vorlage ab, darf das Kind
- * "‹Zahl›" weder auf der fertigen Karte noch in der Live-Anzeige sehen, und
- * der Kinderschutz-Filter muss den unveränderten Anker bekommen (dann greift
- * Stufe 2, siehe minor-safety.test.js).
+ * die Schätzungen anzog. Schreibt das Modell die Vorlage ab (in welcher
+ * Klammer auch immer) oder nennt es ein Alter ohne Ziffer, gilt das Alter als
+ * nicht lesbar:
+ *   - Die Alterskarte zeigt einen festen Satz, nie "‹Zahl›" und nie einen
+ *     geflickten Text mit Lücken — auch nicht in der Live-Anzeige.
+ *   - Der Kinderschutz-Filter bekommt `alterUnlesbar` und lässt Stufe 2
+ *     greifen (minor-safety.test.js, job-pipelines-profile.test.js).
+ * Zwei Gegenprüfungen am 17.09. haben die Lücken gefunden, die hier
+ * festgehalten sind (andere Klammern, fehlende Tilde, Anker ohne Alter,
+ * Fehlalarme, lange Texte).
  */
 
 /* Der Einstellungssatz als Kulisse, wie in mistral.test.js — sonst bricht
    jeder Aufruf mit "Betriebswerte fehlen" ab, was hier nicht Thema ist. */
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
-const { hatAltersPlatzhalter, ohneAltersPlatzhalter } = require("../mistral-antwort");
+const { hatAltersPlatzhalter, istAlterUnlesbar, hatLesbaresAlter, alterNichtLesbarText } = require("../minor-safety");
+const DE = require("../locales/de/prompts");
+const EN = require("../locales/en/prompts");
 const { runSingleLargeCall, setFetchForTest, _extrahiereLiveText } = require("../mistral");
 const { _setRateIntervalMs, _resetRateBucket } = require("../throttle");
 
-describe("Erkennen und Entfernen", () => {
+describe("Erkennung", () => {
   test.each([
-    ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)", "männlich"],
-    ["female, ~‹number› years old (range ‹number›-‹number›)", "female"],
-    ["männlich, ~Zahl Jahre alt (Spanne Zahl-Zahl)", "männlich"],
-    /* ohne Tilde und ohne Klammern (Gegenprüfung 17.09.) */
-    ["männlich, Zahl Jahre alt.", "männlich."],
-    /* eine echte Spanne bleibt stehen */
-    ["weiblich, Zahl Jahre alt (Spanne 12-16).", "weiblich (Spanne 12-16)."],
-    ["female, number years old", "female"],
-    [
-      "Du bist weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Deine Wangen sind noch rund.",
-      "Du bist weiblich. Deine Wangen sind noch rund.",
-    ],
-  ])("%s → %s", (roh, erwartet) => {
-    expect(hatAltersPlatzhalter(roh)).toBe(true);
-    const sauber = ohneAltersPlatzhalter(roh);
-    expect(sauber).toBe(erwartet);
-    expect(hatAltersPlatzhalter(sauber)).toBe(false);
+    ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)"],
+    ["female, ~‹number› years old (range ‹number›-‹number›)"],
+    ["männlich, ~<Zahl> Jahre alt (Spanne <Zahl>-<Zahl>)"],
+    ["männlich, ~[Zahl] Jahre alt"],
+    ["männlich, ~{Zahl} Jahre alt"],
+    ["männlich, ~«Zahl» Jahre alt"],
+    ["männlich, ~Zahl Jahre alt (Spanne Zahl-Zahl)"],
+    ["männlich, Zahl Jahre alt."],
+    ["weiblich, etwa Zahl, Spanne Zahl bis Zahl"],
+    ["Du bist ein ‹Zahl›-jähriger Junge."],
+    ["aged ‹number› to ‹number›"],
+    ["zwischen Zahl und 16"],
+  ])("Platzhalter: %s", (text) => {
+    expect(hatAltersPlatzhalter(text)).toBe(true);
+    expect(istAlterUnlesbar(text)).toBe(true);
+    expect(hatLesbaresAlter(text)).toBe(false);
   });
+
+  test.each([["weiblich, ~dreizehn Jahre alt"], ["male, in his teens, range unclear"]])(
+    "Altersversuch ohne Ziffer ist unlesbar: %s",
+    (text) => {
+      expect(hatAltersPlatzhalter(text)).toBe(false);
+      expect(istAlterUnlesbar(text)).toBe(true);
+    }
+  );
 
   test.each([
     ["weiblich, ~14 Jahre alt (Spanne 12-16)"],
     ["male, ~44 years old (range 40-48). A number of fine lines show it."],
-    ["Die Anzahl der Linien verrät dich."],
-    [""],
-  ])("unverändert: %s", (text) => {
+    ["Die Zahl der Pickel sagt nichts, die Anzahl der Linien auch nicht, ~30 Jahre."],
+    ["weiblich, ~‹40› Jahre alt (Spanne ‹35›-‹45›)"],
+    ["weiblich (Spanne ‹13-17›)"],
+    ["dein Style ist ‹cool›, ~22 Jahre"],
+  ])("lesbar: %s", (text) => {
     expect(hatAltersPlatzhalter(text)).toBe(false);
-    expect(ohneAltersPlatzhalter(text)).toBe(text);
+    expect(istAlterUnlesbar(text)).toBe(false);
+    expect(hatLesbaresAlter(text)).toBe(true);
   });
 
-  test("Ziffern in spitzen Klammern werden nur ausgepackt", () => {
-    expect(hatAltersPlatzhalter("~‹40› Jahre (Spanne ‹35›-‹45›)")).toBe(false);
-    expect(ohneAltersPlatzhalter("~‹40› Jahre (Spanne ‹35›-‹45›)")).toBe("~40 Jahre (Spanne 35-45)");
+  test.each([["Keine klaren Bildsignale."], ["weiblich"], [""], [null]])(
+    "kein Altersversuch ist NICHT unlesbar: %s",
+    (text) => {
+      expect(istAlterUnlesbar(text)).toBe(false);
+    }
+  );
+
+  test("bleibt auch bei sehr langen Texten schnell", () => {
+    const lang = "(" + "Spanne x ".repeat(2000) + " Zahl";
+    const start = Date.now();
+    istAlterUnlesbar(lang);
+    hatAltersPlatzhalter(lang);
+    expect(Date.now() - start).toBeLessThan(200);
+  });
+
+  test("fester Satz übernimmt das Geschlecht, wenn es vorn klar dasteht", () => {
+    expect(alterNichtLesbarText("weiblich, ~‹Zahl› Jahre", DE)).toBe(
+      "Du bist weiblich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
+    );
+    expect(alterNichtLesbarText("Du bist männlich, ~Zahl", DE)).toBe(
+      "Du bist männlich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
+    );
+    expect(alterNichtLesbarText("female, ~‹number›", EN)).toBe(
+      "You are female. Your age cannot be read reliably from this picture."
+    );
+    expect(alterNichtLesbarText("~‹Zahl› Jahre", DE)).toBe(
+      "Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
+    );
   });
 });
 
-describe("Fertige Karte und Anker für den Filter", () => {
+describe("Fertige Karte und Werte für den Filter", () => {
   const KARTEN = [
     "alter_geschlecht",
     "herkunft",
@@ -85,7 +128,7 @@ describe("Fertige Karte und Anker für den Filter", () => {
     setFetchForTest(null);
   });
 
-  function antwortMit(anker, kartenwert) {
+  async function lauf(anker, kartenwert, lang = "de") {
     const body = {
       hard_facts: { alter_geschlecht: anker, herkunft: "mitteleuropäisch" },
       ad_targeting: ["A"],
@@ -103,81 +146,97 @@ describe("Fertige Karte und Anker für den Filter", () => {
         usage: { prompt_tokens: 100, completion_tokens: 100 },
       }),
     }));
+    return runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, lang);
   }
 
-  test("abgeschriebener Platzhalter erscheint nicht auf der Karte, der Filter bekommt ihn", async () => {
-    antwortMit(
+  test("abgeschriebene Vorlage: fester Satz auf beiden Karten, Filter bekommt alterUnlesbar", async () => {
+    const r = await lauf(
       "weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)",
-      "Du bist weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Deine Wangen sind noch rund."
+      "Du bist weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Zwei Merkmale bestätigen genau diese Altersspanne."
     );
-    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
     for (const profil of [r.normal, r.boost]) {
-      expect(profil.categories.alter_geschlecht.value).toBe("weiblich. Deine Wangen sind noch rund.");
+      expect(profil.categories.alter_geschlecht.value).toBe(
+        "Du bist weiblich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
+      );
     }
-    expect(r.alterAnker).toBe("weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)");
+    expect(r.alterUnlesbar).toBe(true);
   });
 
-  test("Platzhalter nur im Kartenwert, Anker sauber: Anker steht vorn, kein Platzhalter", async () => {
-    antwortMit("weiblich, ~14 Jahre alt (Spanne 12-16)", "Du bist weiblich, ~‹Zahl›. Deine Wangen sind noch rund.");
-    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+  test("englisch: fester Satz auf Englisch", async () => {
+    const r = await lauf("female, ~<number> years old", "You are female, ~<number> years old. Round cheeks.", "en");
     expect(r.normal.categories.alter_geschlecht.value).toBe(
-      "weiblich, ~14 Jahre alt (Spanne 12-16). Deine Wangen sind noch rund."
+      "You are female. Your age cannot be read reliably from this picture."
+    );
+    expect(r.alterUnlesbar).toBe(true);
+  });
+
+  test("Anker ohne Alter, Karte mit Platzhalter: trotzdem unlesbar (Gegenprüfung Fall B)", async () => {
+    const r = await lauf("weiblich", "Du bist weiblich, ~‹Zahl› Jahre alt. Runde Wangen.");
+    expect(r.alterUnlesbar).toBe(true);
+    expect(r.normal.categories.alter_geschlecht.value).toBe(
+      "Du bist weiblich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen."
     );
   });
 
-  test("ohne hard_facts: der Filter bekommt die UNbereinigte Karte", async () => {
-    /* Sonst sähe minor-safety.js nur die bereinigte Karte und könnte den
-       Platzhalter nicht mehr erkennen (Gegenprüfung 17.09.). */
-    antwortMit("", "Du bist weiblich, ~‹Zahl› Jahre alt. Deine Wangen sind noch rund.");
-    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
-    expect(r.normal.categories.alter_geschlecht.value).toBe("Du bist weiblich. Deine Wangen sind noch rund.");
-    expect(r.alterAnker).toBe("Du bist weiblich, ~‹Zahl› Jahre alt. Deine Wangen sind noch rund.");
+  test("ohne hard_facts-Alter: der Filter bekommt die unveränderte Karte mit Zahl", async () => {
+    const r = await lauf("", "Du bist weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
+    expect(r.alterUnlesbar).toBe(false);
+    expect(r.alterAnker).toBe("Du bist weiblich, ~14 Jahre alt (Spanne 12-16). Runde Wangen.");
+  });
+
+  test("Anker lesbar, nur der Beleg-Satz mit Platzhalter: der Anker steht allein", async () => {
+    const r = await lauf("weiblich, ~14 Jahre alt (Spanne 12-16)", "Du bist weiblich. ‹Zahl› Merkmale zeigen das.");
+    expect(r.alterUnlesbar).toBe(false);
+    expect(r.normal.categories.alter_geschlecht.value).toBe("weiblich, ~14 Jahre alt (Spanne 12-16)");
+  });
+
+  test("Alter in Worten ohne Ziffer: unlesbar", async () => {
+    const r = await lauf("weiblich, ~dreizehn Jahre alt", "Du bist weiblich, ~dreizehn Jahre alt. Runde Wangen.");
+    expect(r.alterUnlesbar).toBe(true);
   });
 
   test("ohne Platzhalter bleibt alles wie bisher", async () => {
-    antwortMit("männlich, ~38 (Spanne 35-42)", "Du bist männlich, etwa 38. Die Linien bleiben sichtbar.");
-    const r = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+    const r = await lauf("männlich, ~38 (Spanne 35-42)", "Du bist männlich, etwa 38. Die Linien bleiben sichtbar.");
     expect(r.normal.categories.alter_geschlecht.value).toBe(
       "männlich, ~38 (Spanne 35-42). Die Linien bleiben sichtbar."
     );
     expect(r.alterAnker).toBe("männlich, ~38 (Spanne 35-42)");
+    expect(r.alterUnlesbar).toBe(false);
+  });
+
+  test("keine Altersangabe überhaupt: nicht unlesbar (Regel: ohne Alter nicht filtern)", async () => {
+    const r = await lauf("", "Keine klaren Bildsignale.");
+    expect(r.alterUnlesbar).toBe(false);
+    expect(r.normal.categories.alter_geschlecht.value).toBe("Keine klaren Bildsignale.");
   });
 });
 
 describe("Live-Anzeige", () => {
-  test("die Alterskarte zeigt den Platzhalter auch während des Schreibens nicht", () => {
-    const strom = JSON.stringify({
+  function strom(wert) {
+    return JSON.stringify({
       standard: {
         profileText: "Text.",
         categories: {
-          alter_geschlecht: {
-            label: "Alter & Geschlecht",
-            value: "weiblich, ~‹Zahl› Jahre alt. Runde Wangen.",
-            confidence: 0.8,
-          },
+          alter_geschlecht: { label: "Alter & Geschlecht", value: wert, confidence: 0.8 },
           herkunft: { label: "Herkunft", value: "Text ‹nicht Alter›", confidence: 0.7 },
         },
       },
     });
-    const { kartenStandard } = _extrahiereLiveText(strom);
-    expect(kartenStandard[0].wert).toBe("weiblich. Runde Wangen.");
-    /* Nur die Alterskarte wird bereinigt. */
-    expect(kartenStandard[1].wert).toBe("Text ‹nicht Alter›");
+  }
+
+  test("eine Alterskarte mit Platzhalter erscheint live gar nicht, andere Karten schon", () => {
+    const { kartenStandard } = _extrahiereLiveText(strom("weiblich, ~‹Zahl› Jahre alt. Runde Wangen."));
+    expect(kartenStandard.map((k) => k.schluessel)).toEqual(["herkunft"]);
+    expect(kartenStandard[0].wert).toBe("Text ‹nicht Alter›");
   });
 
-  test("ein halb angekommener Alterswert erscheint gar nicht — also auch nicht halb bereinigt", () => {
-    const voll = JSON.stringify({
-      standard: {
-        profileText: "Text.",
-        categories: {
-          alter_geschlecht: {
-            label: "Alter & Geschlecht",
-            value: "weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Runde Wangen.",
-            confidence: 0.8,
-          },
-        },
-      },
-    });
+  test("eine lesbare Alterskarte erscheint live unverändert", () => {
+    const { kartenStandard } = _extrahiereLiveText(strom("weiblich, ~14 Jahre alt. Runde Wangen."));
+    expect(kartenStandard[0].wert).toBe("weiblich, ~14 Jahre alt. Runde Wangen.");
+  });
+
+  test("ein halb angekommener Alterswert erscheint gar nicht", () => {
+    const voll = strom("weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›). Runde Wangen.");
     for (const marke of ["(Spanne ‹", "‹Zahl›-‹Za", "Runde"]) {
       const { kartenStandard } = _extrahiereLiveText(voll.slice(0, voll.indexOf(marke) + marke.length));
       expect(kartenStandard).toEqual([]);

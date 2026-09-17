@@ -8,22 +8,24 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Geändert
 
-- **Kinder werden seltener als erwachsen geschätzt.** In zwei Workshops lagen
-  drei Viertel bis vier Fünftel der Schätzungen ab 19 Jahren auf genau 19 oder
-  25 — Zahlen, die so in der Anweisung an die KI standen. Diese Zahlen und die
-  Beispielzahl beim Alter stehen dort nicht mehr. Außerdem gilt: Nichts außer
-  Gesicht, Hals, Händen und Haaren macht eine Person älter, auch Make-up,
-  Filter und Styling nicht; deutliche Hinweise auf Kindheit im Bild dürfen die
-  Schätzung senken.
+- **Beim Alter keine Beispielzahlen mehr in der Anweisung an die KI.** In zwei
+  Workshops lagen drei Viertel bis vier Fünftel der Schätzungen ab 19 Jahren
+  auf genau 19 oder 25 — Zahlen, die so in der Anweisung standen. Diese Zahlen
+  und das Beispiel „Mann Mitte dreißig“ sind entfernt. Außerdem gilt: Nichts
+  außer Gesicht, Hals, Händen und Haaren macht eine Person älter, auch
+  Make-up, Filter und Styling nicht; deutliche Hinweise auf Kindheit im Bild
+  dürfen die Schätzung senken, und wo offen bleibt, ob jemand jugendlich oder
+  erwachsen ist, schließt die Spanne das Jugendalter ein.
 - **Werbeschutz für Kinder mit Sicherheitspuffer.** Werbeideen zu Kredit,
-  Wetten, Alkohol, Schönheits-OP und Diät werden jetzt entfernt, solange die
-  geschätzte Altersspanne bei 25 oder darunter beginnen kann (bisher: 18).
-  Nachgerechnet an den beiden Workshop-Tagen wären statt 31 und 50 nur noch 7
-  und 10 Analysen ohne diesen Schutz geblieben. Erwachsene, deren Schätzung bei
-  25 oder darunter beginnt, sehen diese Ideen dadurch ebenfalls nicht.
-- **Kein Platzhalter auf der Alterskarte.** Schreibt die KI statt einer Zahl
-  nur die Vorlage „‹Zahl›“ hin, wird sie vor der Anzeige entfernt, und der
-  Werbeschutz greift.
+  Wetten, Alkohol, Tabak, Schönheits-OP und Diät werden jetzt entfernt, solange
+  die geschätzte Altersspanne bei 25 oder darunter beginnen kann (bisher: 18).
+  Nachgerechnet an den beiden Workshop-Tagen wären bei gleichen Schätzungen
+  statt 31 und 50 nur noch 7 und 10 Analysen ohne diesen Schutz geblieben.
+  Erwachsene, deren Schätzung bei 25 oder darunter beginnt, sehen diese Ideen
+  dadurch ebenfalls nicht.
+- **Wenn sich das Alter nicht lesen lässt.** Schreibt die KI statt einer Zahl
+  nur die Vorlage hin oder nennt sie ein Alter ohne Ziffer, steht auf der
+  Alterskarte ein klarer Satz dazu, und der Werbeschutz greift.
 
 ## [4.10.0] — 2026-09-16
 

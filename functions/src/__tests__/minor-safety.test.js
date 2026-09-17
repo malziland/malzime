@@ -91,54 +91,44 @@ describe("Untergrenze der Spanne entscheidet (Regel mit Puffer, seit 2026-09-17)
   });
 });
 
-describe("Platzhalter der Formatvorlage statt einer Zahl", () => {
-  /* Der Prompt zeigt das Alter seit 2026-09-17 nur noch als "‹Zahl›" (keine
-     Beispielzahl, die die Schätzung anzieht). Schreibt das Modell die
-     Vorlage ab, steht keine lesbare Zahl da — dann muss Stufe 2 trotzdem
-     greifen. */
+describe("Nicht lesbares Alter", () => {
+  /* Seit 2026-09-17 zeigt der Prompt das Alter nur noch als "‹Zahl›" (keine
+     Beispielzahl, die die Schätzung anzieht). Schreibt das Modell die Vorlage
+     ab oder nennt es ein Alter ohne Ziffer, muss Stufe 2 trotzdem greifen. Die
+     Erkennung selbst prüft alters-platzhalter.test.js. */
   test.each([
     ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)"],
-    ["female, ~‹number› years old (range ‹number›-‹number›)"],
-    ["weiblich, ~‹Zahl› Jahre alt (Spanne 30-36)"],
-    /* ohne spitze Klammern abgeschrieben */
-    ["männlich, ~Zahl Jahre alt (Spanne Zahl-Zahl)"],
-    ["male, ~number years old"],
+    ["female, ~<number> years old"],
     ["männlich, Zahl Jahre alt."],
+    ["weiblich, ~dreizehn Jahre alt"],
+    ["weiblich, ~‹Zahl› Jahre alt (Spanne 30-36)"],
   ])("%s — Filter greift", (alterText) => {
     const p = profil(alterText, ["Tipico Wetten", "Nike Air Max"]);
     const b = applyMinorSafety(p);
-    expect(b.platzhalter).toBe(true);
+    expect(b.alterUnlesbar).toBe(true);
     expect(b.minderjaehrig).toBe(true);
     expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
   });
 
-  test("ohne Platzhalter bleibt es bei der Zahl", () => {
+  test("der Aufrufer kann das Urteil mitgeben (aus den Rohwerten bestimmt)", () => {
+    const p = profil("weiblich", ["Tipico Wetten"]);
+    const b = applyMinorSafety(p, { alterText: "weiblich", alterUnlesbar: true });
+    expect(b.alterUnlesbar).toBe(true);
+    expect(p.normal.ad_targeting).toEqual([]);
+  });
+
+  test("lesbares Alter ab 26 bleibt ungefiltert", () => {
     const p = profil("Du bist männlich, ~44 Jahre alt (Spanne 40-48).", ["Tipico Wetten"]);
     const b = applyMinorSafety(p);
-    expect(b.platzhalter).toBe(false);
+    expect(b.alterUnlesbar).toBe(false);
     expect(b.minderjaehrig).toBe(false);
     expect(p.normal.ad_targeting).toEqual(["Tipico Wetten"]);
   });
 
-  test("Ziffern in spitzen Klammern sind eine echte Schätzung, kein Platzhalter", () => {
-    const p = profil("weiblich, ~‹40› Jahre alt (Spanne ‹35›-‹45›)", ["Tipico Wetten"]);
-    const b = applyMinorSafety(p);
-    expect(b.platzhalter).toBe(false);
-    expect(b.alter).toBe(35);
-    expect(b.minderjaehrig).toBe(false);
-  });
-
-  test("das Wort „number“ im Fließtext ist kein Platzhalter", () => {
-    const p = profil("male, ~44 years old (range 40-48). A number of fine lines show it.", ["Tipico Wetten"]);
-    const b = applyMinorSafety(p);
-    expect(b.platzhalter).toBe(false);
-    expect(b.minderjaehrig).toBe(false);
-  });
-
-  test("gar keine Altersangabe ist kein Platzhalter — dort gilt weiter: nicht filtern", () => {
+  test("gar kein Altersversuch — dort gilt weiter: nicht filtern", () => {
     const p = profil("Keine klaren Bildsignale.", ["Tipico Wetten"]);
     const b = applyMinorSafety(p);
-    expect(b.platzhalter).toBe(false);
+    expect(b.alterUnlesbar).toBe(false);
     expect(b.minderjaehrig).toBe(false);
   });
 });

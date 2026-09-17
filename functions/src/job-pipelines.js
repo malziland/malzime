@@ -156,9 +156,14 @@ async function runPipeline(job) {
 
     /* Serverseitiges Netz, bevor irgendetwas ausgeliefert wird: Pornografie,
        Waffen und Extremismus fliegen immer raus, Gluecksspiel/Kredit/Alkohol
-       zusaetzlich bei erkennbar Minderjaehrigen. Ein Modell KANN die
-       Prompt-Regel ignorieren — im Modellvergleich ist genau das passiert. */
-    const safety = applyMinorSafety(profiles, { lang, alterText: profiles.alterAnker || undefined });
+       zusaetzlich bei moeglicherweise Minderjaehrigen (Schwelle mit Puffer,
+       siehe minor-safety.js). Ein Modell KANN die Prompt-Regel ignorieren —
+       im Modellvergleich ist genau das passiert. */
+    const safety = applyMinorSafety(profiles, {
+      lang,
+      alterText: profiles.alterAnker || undefined,
+      alterUnlesbar: profiles.alterUnlesbar === true,
+    });
     loggeMinorSafety(safety, job.traceId, lang);
     const n = profiles.normal || {};
     const b = profiles.boost || {};
@@ -180,7 +185,14 @@ async function runPipeline(job) {
         },
         privacyRisks,
         exif,
-        meta: { traceId: job.traceId || null, mode: "multimodal", subject },
+        /* alterUnlesbar (17.09.2026): Die Alterskarte zeigt dann einen festen
+           Satz; der Realitaets-Check fragt das Alter nicht ab. Nur Ja/Nein. */
+        meta: {
+          traceId: job.traceId || null,
+          mode: "multimodal",
+          subject,
+          alterUnlesbar: safety.alterUnlesbar === true,
+        },
       },
       success: true,
     };

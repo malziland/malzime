@@ -43,20 +43,35 @@ describe("Untere Altersgrenze", () => {
   });
 });
 
-describe("Untergrenze der Spanne entscheidet (vereinbarte Regel, 2026-08-11)", () => {
-  /* Die Regel samt beiden Beispielen stammt wörtlich aus der Entscheidung des
-     Inhabers: Stufe 2 greift, wenn die Untergrenze 18 oder darunter ist. */
+describe("Untergrenze der Spanne entscheidet (Regel mit Puffer, seit 2026-09-17)", () => {
+  /* Stufe 2 greift, wenn die Untergrenze 25 oder darunter ist. Bis
+     2026-09-17 lag die Grenze bei 18 ohne Abstand. Begründung, Messung und
+     Quellen siehe SCHUTZ_BIS in minor-safety.js. */
   const gluecksspiel = ["Bet365 Live-Wetten", "Nike Air Max"];
 
-  test("Spanne 17-24, Schätzwert 21 — Filter greift (Beispiel aus der Entscheidung)", () => {
+  test("Spanne 17-24 — Filter greift", () => {
     const p = profil("weiblich, ~21 Jahre (Spanne 17-24).", gluecksspiel);
     const b = applyMinorSafety(p);
     expect(b.minderjaehrig).toBe(true);
     expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
   });
 
-  test("Spanne 19-21, Schätzwert 20 — Filter greift nicht (Beispiel aus der Entscheidung)", () => {
-    const p = profil("weiblich, ~20 Jahre (Spanne 19-21).", gluecksspiel);
+  test("Spanne 19-21 — Filter greift (bis 2026-09-17 griff er hier nicht)", () => {
+    const p = profil("männlich, ~20 Jahre (Spanne 19-21).", gluecksspiel);
+    const b = applyMinorSafety(p);
+    expect(b.minderjaehrig).toBe(true);
+    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  });
+
+  test("Spanne 25-30 — Filter greift (Grenzfall, Untergrenze genau 25)", () => {
+    const p = profil("weiblich, ~27 Jahre (Spanne 25-30).", gluecksspiel);
+    const b = applyMinorSafety(p);
+    expect(b.minderjaehrig).toBe(true);
+    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  });
+
+  test("Spanne 26-32 — Filter greift nicht (Grenzfall, Untergrenze 26)", () => {
+    const p = profil("männlich, ~29 Jahre (Spanne 26-32).", gluecksspiel);
     const b = applyMinorSafety(p);
     expect(b.minderjaehrig).toBe(false);
     expect(p.normal.ad_targeting).toEqual(gluecksspiel);
@@ -69,10 +84,60 @@ describe("Untergrenze der Spanne entscheidet (vereinbarte Regel, 2026-08-11)", (
     expect(p.normal.ad_targeting).toEqual(gluecksspiel);
   });
 
-  test("die Schwelle ist exakt „Untergrenze ≤ 18“", () => {
-    /* Pinnt die vereinbarte Regel fest: Wer diesen Wert ändert, ändert die
-       Entscheidung vom 2026-08-11 und muss das bewusst tun. */
-    expect(_SCHUTZ_BIS).toBe(19);
+  test("die Schwelle ist exakt „Untergrenze ≤ 25“", () => {
+    /* Pinnt die Regel fest: Wer diesen Wert ändert, ändert die Entscheidung
+       vom 2026-09-17 und muss das bewusst tun. */
+    expect(_SCHUTZ_BIS).toBe(26);
+  });
+});
+
+describe("Nicht lesbares Alter", () => {
+  /* Seit 2026-09-17 zeigt der Prompt das Alter nur noch als "‹Zahl›" (keine
+     Beispielzahl, die die Schätzung anzieht). Schreibt das Modell die Vorlage
+     ab oder nennt es ein Alter ohne Ziffer, muss Stufe 2 trotzdem greifen. Die
+     Erkennung selbst prüft alters-platzhalter.test.js. */
+  test.each([
+    ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)"],
+    ["female, ~<number> years old"],
+    ["männlich, Zahl Jahre alt."],
+    ["weiblich, Alter unklar, Spanne offen"],
+    ["weiblich, ~‹Zahl› Jahre alt (Spanne 30-36)"],
+  ])("%s — Filter greift", (alterText) => {
+    const p = profil(alterText, ["Tipico Wetten", "Nike Air Max"]);
+    const b = applyMinorSafety(p);
+    expect(b.alterUnlesbar).toBe(true);
+    expect(b.minderjaehrig).toBe(true);
+    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  });
+
+  test("Zahlwort unter 26: lesbar und geschützt", () => {
+    const p = profil("weiblich, etwa dreizehn.", ["Tipico Wetten", "Nike Air Max"]);
+    const b = applyMinorSafety(p);
+    expect(b.alterUnlesbar).toBe(false);
+    expect(b.alter).toBe(13);
+    expect(p.normal.ad_targeting).toEqual(["Nike Air Max"]);
+  });
+
+  test("der Aufrufer kann das Urteil mitgeben (aus den Rohwerten bestimmt)", () => {
+    const p = profil("weiblich", ["Tipico Wetten"]);
+    const b = applyMinorSafety(p, { alterText: "weiblich", alterUnlesbar: true });
+    expect(b.alterUnlesbar).toBe(true);
+    expect(p.normal.ad_targeting).toEqual([]);
+  });
+
+  test("lesbares Alter ab 26 bleibt ungefiltert", () => {
+    const p = profil("Du bist männlich, ~44 Jahre alt (Spanne 40-48).", ["Tipico Wetten"]);
+    const b = applyMinorSafety(p);
+    expect(b.alterUnlesbar).toBe(false);
+    expect(b.minderjaehrig).toBe(false);
+    expect(p.normal.ad_targeting).toEqual(["Tipico Wetten"]);
+  });
+
+  test("gar kein Altersversuch — dort gilt weiter: nicht filtern", () => {
+    const p = profil("Keine klaren Bildsignale.", ["Tipico Wetten"]);
+    const b = applyMinorSafety(p);
+    expect(b.alterUnlesbar).toBe(false);
+    expect(b.minderjaehrig).toBe(false);
   });
 });
 
@@ -136,17 +201,16 @@ describe("Stufe 2 — nur bei Minderjährigen", () => {
     expect(p.normal.ad_targeting).toEqual(heikel);
   });
 
-  test("die Schwelle: 18 oder darunter geschützt, ab 19 nicht mehr", () => {
-    /* GEÄNDERT 2026-08-11 auf die vereinbarte Regel (Untergrenze ≤ 18).
-       Der frühere +3-Jahre-Abstand (Schutz bis unter 21) entsprach nicht der
-       Vereinbarung. Begründung siehe SCHUTZ_BIS in minor-safety.js. */
-    for (const alter of [17, 18]) {
+  test("die Schwelle: 25 oder darunter geschützt, ab 26 nicht mehr", () => {
+    /* GEÄNDERT 2026-09-17: Puffer von sieben Jahren auf die Volljährigkeit.
+       Begründung siehe SCHUTZ_BIS in minor-safety.js. */
+    for (const alter of [17, 18, 19, 24, 25]) {
       const p = profil(`~${alter} Jahre alt`, ["Tipico Wetten"]);
       applyMinorSafety(p);
       expect(p.normal.ad_targeting).toEqual([]);
     }
 
-    for (const alter of [19, 20, 21]) {
+    for (const alter of [26, 27, 30]) {
       const erwachsen = profil(`~${alter} Jahre alt`, ["Tipico Wetten"]);
       applyMinorSafety(erwachsen);
       expect(erwachsen.normal.ad_targeting).toEqual(["Tipico Wetten"]);

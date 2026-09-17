@@ -24,8 +24,9 @@
  *      nichts verloren. Damit hängt die schwerste Absicherung nicht mehr an
  *      einer Schätzung.
  *   2. Glücksspiel, Kredit, Alkohol, Schönheits-OP und Diätmittel nur bei
- *      erkennbar Minderjährigen. Bei Erwachsenen sind sie legitimer
- *      Lerninhalt — wie diese Branchen Menschen adressieren, IST das Thema.
+ *      möglicherweise Minderjährigen — mit Sicherheitspuffer, siehe
+ *      Altersgrenze unten. Bei Erwachsenen sind sie legitimer Lerninhalt —
+ *      wie diese Branchen Menschen adressieren, IST das Thema.
  *
  * BEWUSST ENG GEFASST: Gefiltert wird nur, was unzweifelhaft nicht zu Kindern
  * gehört. NICHT gefiltert wird die didaktisch gewollte System-Perspektive —
@@ -38,25 +39,42 @@
 /* ── Altersgrenze ─────────────────────────────────────────────────────────
    Bezieht sich auf die Schaetzung des Modells, nicht auf Wahrheit.
 
-   VEREINBARTE REGEL (bewusste Entscheidung, 2026-08-11): Stufe 2 greift,
-   wenn die UNTERGRENZE der geschaetzten Spanne 18 oder darunter ist. Nicht
-   der Punktwert zaehlt, sondern das juengste Alter, das die Angabe zulaesst —
-   wer laut Modell "17-24" sein koennte, wird geschuetzt; wer laut Modell
-   fruehestens 19 ist, nicht.
+   REGEL (seit 2026-09-17, loest die Vereinbarung vom 2026-08-11 ab): Stufe 2
+   greift, wenn die UNTERGRENZE der geschaetzten Spanne 25 oder darunter ist.
+   Nicht der Punktwert zaehlt, sondern das juengste Alter, das die Angabe
+   zulaesst.
 
-   Die beiden Beispiele aus der Entscheidung:
-     Spanne 17-24, Schaetzwert 21  →  Filter greift       (Untergrenze 17)
-     Spanne 19-21, Schaetzwert 20  →  Filter greift nicht (Untergrenze 19)
+     Spanne 17-24  →  Filter greift       (Untergrenze 17)
+     Spanne 25-30  →  Filter greift       (Untergrenze 25)
+     Spanne 26-32  →  Filter greift nicht (Untergrenze 26)
 
-   Bis zum 2026-08-11 lag auf der Untergrenze zusaetzlich ein Abstand von
-   3 Jahren (Schutz bis unter 21). Das entsprach nicht der Vereinbarung und
-   ist entfernt. Bewusst getragene Folge: Ein real minderjaehriges Kind,
-   dessen Spanne komplett ueber 18 geschaetzt wird, faellt aus Stufe 2.
-   Stufe 1 (Pornografie, Waffen, Extremismus) bleibt davon unberuehrt und
-   gilt altersunabhaengig fuer alle. */
+   WARUM DER PUFFER: Bis 2026-09-17 galt "Untergrenze 18 oder darunter" ohne
+   Abstand. In zwei Workshops mit Schulklassen (16. und 17.09.2026, jeweils 7
+   bis 12 Uhr) hatten 31 von 186 bzw. 50 von 143 Analysen eine Untergrenze von
+   19 oder mehr, davon 24 bzw. 40 genau 19 oder 25. Wo darunter Minderjaehrige
+   waren, griff Stufe 2 nicht. Die Fachwelt rechnet deshalb mit einem Puffer: NIST nennt fuer die Grenze 18
+   einen Puffer von sieben Jahren, also die Schwelle 25, als ueblich (NIST IR
+   8525, "Challenge-T"); allgemeine Bild-Sprachmodelle schaetzen 16 bis 29 %
+   der Minderjaehrigen als erwachsen (Ren u. a. 2026, arXiv 2602.07815).
+   Nachgerechnet an beiden Tagen bei gleichen Schaetzungen: 7 statt 31 und 10
+   statt 50 Analysen ohne Stufe 2.
+
+   Bewusst getragene Folge: Erwachsene, deren Spanne bei 25 oder darunter
+   beginnt, bekommen keine Kredit-, Wett-, Alkohol-, Schoenheits-OP- und
+   Diaet-Ideen. Stufe 1 (Pornografie, Waffen, Extremismus) gilt unveraendert
+   fuer alle. */
 const VOLLJAEHRIG_AB = 18;
-/* „Untergrenze ≤ 18" als strikter Vergleich geschrieben: untergrenze < 19. */
-const SCHUTZ_BIS = VOLLJAEHRIG_AB + 1;
+/* BLEIBT IM CODE — Kinderschutz-Regel, keine Betriebseinstellung. Wer den
+   Puffer aendert, aendert die Entscheidung vom 17.09.2026; das geht nur mit
+   Test und Deploy, nicht per Datenbankeintrag. */
+const PUFFER_JAHRE = 7;
+/* „Untergrenze ≤ 25" als strikter Vergleich geschrieben: untergrenze < 26. */
+const SCHUTZ_BIS = VOLLJAEHRIG_AB + PUFFER_JAHRE + 1;
+
+/* Nicht lesbares Alter und Altersauslese: alters-lesbarkeit.js (seit
+   17.09.2026 eigene Datei — reine Textpruefung, die auch mistral.js und die
+   Live-Anzeige brauchen). */
+const { untereAltersgrenze, istAlterUnlesbar } = require("./alters-lesbarkeit");
 
 /* ── Zwei Stufen ──────────────────────────────────────────────────────────
    IMMER_VERBOTEN gilt unabhaengig vom geschaetzten Alter. Das ist bewusst so:
@@ -92,7 +110,8 @@ const IMMER_VERBOTEN = [
   /extremis|rechtsradikal|neo-?nazi|terror|white ?supremac/i,
 ];
 
-/* Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei Minderjaehrigen.
+/* Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei moeglicherweise
+   Minderjaehrigen (Untergrenze bis SCHUTZ_BIS, siehe oben).
    Fuer die Manipulations-Trigger wird sie bewusst NICHT angewandt — siehe
    applyMinorSafety. */
 const NUR_MINDERJAEHRIG = [
@@ -151,41 +170,6 @@ function istBeiMinderjaehrigenVerboten(eintrag) {
   return stichwort(NUR_MINDERJAEHRIG, eintrag) !== null;
 }
 
-/* Die UNTERE Altersgrenze aus dem hard-facts-Text lesen — also das jüngste
-   Alter, das die Angabe des Modells noch zulässt.
-
-   Beispiele (alle real so vorgekommen):
-     "Du bist weiblich, ~14 Jahre alt (Spanne 12-16)."  -> 12
-     "Männlich, ~38 — die Krähenfüße verraten dich."     -> 38
-     "Du bist männlich, etwa 38. Spanne 35-42."          -> 35
-     "weiblich, 16 bis 22"                               -> 16
-
-   Bewusst das MINIMUM aller plausiblen Alterswerte im Text: Streut eine
-   Fremdzahl herein, zieht sie das Ergebnis nach unten und damit in Richtung
-   MEHR Schutz. Der Fehler geht so immer auf die sichere Seite. Nach oben kann
-   ihn keine Zahl verschieben — das wäre die gefährliche Richtung. */
-function untereAltersgrenze(text) {
-  const s = String(text || "").toLowerCase();
-  const plausibel = (n) => Number.isFinite(n) && n >= 1 && n <= 100;
-  const kandidaten = [];
-
-  /* Spannen zuerst — "12-16", "12–16", "12 bis 16". Die Untergrenze zählt. */
-  for (const m of s.matchAll(/\b(\d{1,2})\s*(?:[-–—]|bis)\s*(\d{1,2})\b/g)) {
-    const von = Number(m[1]);
-    const nach = Number(m[2]);
-    if (plausibel(von) && plausibel(nach) && nach >= von) kandidaten.push(von);
-  }
-
-  /* Dazu jede freistehende Zahl — deckt Punktwerte wie "~14" und "40 Jahre"
-     ab. Bei einer Spanne findet das ohnehin dieselbe Untergrenze noch einmal. */
-  for (const roh of s.match(/\b\d{1,2}\b/g) || []) {
-    const n = Number(roh);
-    if (plausibel(n)) kandidaten.push(n);
-  }
-
-  return kandidaten.length ? Math.min(...kandidaten) : null;
-}
-
 /**
  * Prüft ein fertiges Profil-Paar und entfernt unzulässige Werbe- und
  * Trigger-Einträge, wenn die Person als minderjährig eingestuft wurde.
@@ -207,8 +191,10 @@ function applyMinorSafety(profiles, opts = {}) {
   };
   if (!profiles || typeof profiles !== "object") return bericht;
 
-  /* Alter aus dem Profil selbst holen — die Karte alter_geschlecht wird
-     server-seitig aus hard_facts überschrieben und ist deshalb verlässlich. */
+  /* Alter zuerst aus dem Anker (hard_facts, vom Aufrufer als alterText
+     uebergeben) — unveraendert, also auch mit abgeschriebenem Platzhalter.
+     Nur ohne Anker aus der Karte; die ist seit 17.09.2026 vor der Anzeige um
+     einen Platzhalter bereinigt (mistral.js). */
   const quelle =
     opts.alterText ||
     profiles.normal?.categories?.alter_geschlecht?.value ||
@@ -216,15 +202,20 @@ function applyMinorSafety(profiles, opts = {}) {
     "";
   const untergrenze = untereAltersgrenze(quelle);
   bericht.alter = untergrenze;
+  const alterUnlesbar = opts.alterUnlesbar === true || istAlterUnlesbar(quelle);
+  bericht.alterUnlesbar = alterUnlesbar;
 
   /* "Koennte minderjaehrig sein", nicht "ist es wahrscheinlich". Siehe die
-     Begruendung bei SCHUTZ_BIS oben. */
-  const minderjaehrig = untergrenze !== null && untergrenze < SCHUTZ_BIS;
+     Begruendung bei SCHUTZ_BIS und beim nicht lesbaren Alter oben. Das Feld heisst weiter
+     `minderjaehrig`, weil die Auswertungen des Diagnose-Speichers es so
+     zaehlen; gemeint ist "Stufe 2 greift". */
+  const minderjaehrig = alterUnlesbar || (untergrenze !== null && untergrenze < SCHUTZ_BIS);
   bericht.minderjaehrig = minderjaehrig;
 
-  /* Ist kein Alter erkennbar, wird NICHT als minderjaehrig behandelt — sonst
-     verloere man bei Erwachsenen legitime Inhalte (Kredit, Wein, Wellness sind
-     dort Teil der Aufklaerung). Die harte Liste greift trotzdem. */
+  /* Ist gar kein Altersversuch erkennbar ("Keine klaren Bildsignale."), wird NICHT
+     als minderjaehrig behandelt — sonst verloere man bei Erwachsenen legitime
+     Inhalte (Kredit, Wein, Wellness sind dort Teil der Aufklaerung). Die harte
+     Liste greift trotzdem. */
   for (const modus of ["normal", "boost"]) {
     const p = profiles[modus];
     if (!p) continue;
@@ -306,4 +297,5 @@ module.exports = {
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,
   _untereAltersgrenze: untereAltersgrenze,
   _SCHUTZ_BIS: SCHUTZ_BIS,
+  SCHUTZ_ALTER: SCHUTZ_BIS - 1,
 };

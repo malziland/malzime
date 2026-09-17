@@ -476,6 +476,85 @@ gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
 überwiegend harmlose Wörter, wird die Sperrliste präzisiert. Sind es
 Werbebegriffe, wird die Prompt-Regel nachgeschärft und mit eigenen Fotos
 nachgestellt.
+
+## Kinderschutz-Filter: Schutzgrenze mit Puffer (17.09.2026)
+
+**Was war.** Stufe 2 des Filters (Kredit, Wetten, Alkohol, Tabak,
+Schönheits-OP, Diät) griff, wenn die Untergrenze der geschätzten Altersspanne
+18 oder darunter war — ohne Abstand (Entscheidung vom 11.08.2026). In zwei
+Workshops mit Schulklassen hatten zwischen 7 und 12 Uhr 31 von 186 (16.09.) und
+50 von 143 (17.09.) Analysen eine Untergrenze von 19 oder mehr; bei diesen
+Analysen griff Stufe 2 nicht, auch wenn die Person minderjährig war. 24 der 31
+und 40 der 50 Werte lagen auf genau 19 oder 25, kein einziger zwischen 20 und
+24. Im Prompt standen die Überschrift „19-25“, die Regel „22-28, nicht jünger“
+und das Beispiel „~38 (Spanne 35-42)“ samt „Mann Mitte dreißig“. Belegt ist die
+Übereinstimmung der Zahlen, nicht die Ursache: Das Log enthält nur die
+Untergrenze.
+
+**Entscheidung.**
+
+1. Stufe 2 greift, solange die Untergrenze 25 oder darunter ist
+   (`SCHUTZ_BIS` in `functions/src/minor-safety.js`, dort auch die Beispiele).
+2. Die genannten Zahlen-Anker sind aus dem Prompt entfernt. Das Formatbeispiel
+   nennt kein Alter, weder in Ziffern noch in Worten; die Altersangabe zeigt nur
+   den Platzhalter „‹Zahl›“. `age-markers.test.js` prüft das und legt per
+   Positivliste fest, welche Spannen im Altersteil noch stehen dürfen (die
+   Merkmals-Tabellen).
+3. Ist das Alter nicht lesbar — abgeschriebene Vorlage in beliebiger Klammer,
+   oder ein Altersversuch ohne jede Zahl —, zeigt die Alterskarte einen festen
+   Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte vorher
+   nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das (Erkennung
+   in `alters-lesbarkeit.js`) aus den
+   Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
+   Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
+   `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht
+   ab; der Server nimmt dessen Bewertung deshalb auch ohne Alter an
+   (`handle-telemetry.js`). Als Altersangabe einer Karte zählt nur ihr erster
+   Satz — Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) sind kein
+   Alter. Zahlwörter („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und
+   Kategoriewörter („Teenager“, „Schulkind“) gelten als lesbar und werden für
+   die Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl
+   dasteht; „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Eine
+   Antwort ohne jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie
+   bisher ungefiltert.
+4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus
+   `minor-safety.js` (`SCHUTZ_ALTER`), steht also nur an einer Stelle.
+
+**Warum.** Das US-Normungsinstitut NIST nennt für die Grenze 18 einen Puffer von
+sieben Jahren (Schwelle 25) als üblich (NIST IR 8525, dort bezogen auf den
+Schätzwert; die Regel hier nimmt die Untergrenze und ist damit strenger).
+Allgemeine Bild-Sprachmodelle schätzen 16 bis 29 % der Minderjährigen als
+erwachsen (Ren u. a. 2026, arXiv 2602.07815). Dass Zahlen im Prompt die
+Antwort anziehen und Ermahnungen dagegen nicht genügen, zeigen Lou & Sun 2024
+(arXiv 2412.06593). Mit Puffer wären an den beiden Tagen bei gleichen
+Schätzungen 7 statt 31 und 10 statt 50 Analysen ohne Stufe 2 geblieben.
+
+**Getragene Folge.** Erwachsene, deren Spanne bei 25 oder darunter beginnt,
+sehen diese Werbeideen nicht. Das Feld `minderjaehrig` in der
+Kinderschutz-Zeile heißt weiter so, bedeutet ab dieser Auslieferung aber
+„Stufe 2 greift“. Stufe 1 (Pornografie, Waffen, Extremismus) gilt unverändert
+für alle.
+
+**Betrachtete Alternativen.** Stufe 2 für alle: verworfen (Entscheidung vom
+16.09.2026) — Kredit- und Wett-Werbung ist bei Erwachsenen Teil der
+Aufklärung. Mehrfache Schätzung und den niedrigsten Wert nehmen: für
+Altersschätzung nicht belegt und doppelt so teuer. Ein eigener Altersschätzer
+im Browser: bei Kindern nicht nachweislich besser als das Sprachmodell. Bei
+nicht lesbarem Alter ein zweiter KI-Aufruf: verworfen, er kostet einen Platz
+im Mistral-Kontingent, während die Klasse wartet; die Häufigkeit zeigt das Feld
+`alterUnlesbar`. Den Platzhalter aus dem Text herausschneiden statt eines
+festen Satzes: verworfen, die zweite Gegenprüfung fand Reste und zerstörte
+Sätze.
+
+**Rückweg.** Nur mit Deploy: `PUFFER_JAHRE` in `minor-safety.js` ändern. Die
+Schwellen-Tests in `minor-safety.test.js` pinnen den Wert und müssen
+mitgeändert werden; der Werbe-Prompt zieht automatisch nach.
+
+**Offen, bewusst nach der nächsten Messung.** Die Werberegel im Haupt-Prompt
+nennt den Puffer noch nicht (der Server streicht trotzdem); die Beispiel-Belege
+der Alterskarte sind allgemein formuliert — ob die KI dadurch seltener ein
+konkretes Merkmal nennt, zeigt der Vortest (Kennzahl „Begründung konkret“).
+
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 
 **Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.

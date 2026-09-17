@@ -161,5 +161,16 @@ describe("Log-Zeile minor-safety", () => {
     const zeile = JSON.parse(ausgabe[0]);
     expect(zeile.werbung).toEqual({});
     expect(zeile.gekappt).toBe(0);
+    expect(zeile.alterUnlesbar).toBe(false);
+  });
+  /* Seit 17.09.2026: Die Zeile zaehlt, wie oft das Alter nicht lesbar war
+     (abgeschriebene Vorlage, Alter ohne Ziffer) — nur als Ja/Nein. */
+  test("meldet ein nicht lesbares Alter als Ja/Nein, ohne den Text", () => {
+    loggeMinorSafety(applyMinorSafety(profil("männlich, ~‹Zahl› Jahre alt", ["Nike"])), null, "de");
+    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), null, "de");
+    const zeilen = ausgabe.filter((z) => z.includes('"minor-safety"')).map((z) => JSON.parse(z));
+    expect(zeilen.map((z) => z.alterUnlesbar)).toEqual([true, false]);
+    expect(zeilen[0].minderjaehrig).toBe(true);
+    expect(ausgabe.join("\n")).not.toContain("‹Zahl›");
   });
 });

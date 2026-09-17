@@ -39,6 +39,13 @@ const {
   findMissingCards,
   escapeXml,
 } = require("./mistral-antwort");
+const {
+  hatAltersPlatzhalter,
+  istAlterUnlesbar,
+  hatLesbaresAlter,
+  alterNichtLesbarText,
+  ohneZiffernKlammern,
+} = require("./alters-lesbarkeit");
 
 /* Für Tests: erlaubt fetch zu mocken ohne globalThis zu überschreiben. */
 
@@ -355,15 +362,51 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     return zusammen.slice(0, STRING_BOUND_CATEGORY);
   }
 
+  /* Nicht lesbares Alter (17.09.2026, siehe alters-lesbarkeit.js): aus den
+     ROHWERTEN bestimmt, bevor eine Karte umgeschrieben wird. Unlesbar ist das
+     Alter, wenn der Anker einen Altersversuch ohne lesbare Zahl enthaelt,
+     oder wenn weder der Anker noch der erste Satz einer Karte ein lesbares
+     Alter hat und eine Karte den Platzhalter oder ein Alter ohne Zahl zeigt.
+     Nur der ERSTE Satz einer Karte zaehlt als Altersangabe — der Beleg-Satz
+     danach ("Trikot mit der Nummer acht") ist kein Alter (letzte
+     Pruefrunde 17.09.). */
+  const ankerRoh = typeof hardFacts.alter_geschlecht === "string" ? hardFacts.alter_geschlecht : "";
+  const rohKarte = (modus) => {
+    const w = parsed[modus]?.categories?.alter_geschlecht?.value;
+    return typeof w === "string" ? w : "";
+  };
+  const rohStandard = rohKarte("standard");
+  const rohBeast = rohKarte("beast");
+  const ersterSatz = (text) => (/^[^.!?]*[.!?]?/.exec(text) || [""])[0].trim();
+  const satzStandard = ersterSatz(rohStandard);
+  const satzBeast = ersterSatz(rohBeast);
+  const irgendeinAlterLesbar = [ankerRoh, satzStandard, satzBeast].some(hatLesbaresAlter);
+  const alterUnlesbar =
+    istAlterUnlesbar(ankerRoh) ||
+    (!irgendeinAlterLesbar && (istAlterUnlesbar(rohStandard) || istAlterUnlesbar(rohBeast)));
+
+  /* Was die Alterskarte zeigt. Normalfall wie bisher: Anker vorn, Beleg-Satz
+     des Modells dahinter. Hat der Anker kein lesbares Alter (etwa nur
+     "weiblich"), der erste Satz der Karte aber schon, steht dieser vorn — der
+     Anker wuerde das Alter sonst verdraengen. Traegt der Beleg-Satz einen
+     Platzhalter, bleibt die Altersangabe allein stehen. Ist das Alter nicht
+     lesbar, steht ein fester Satz da — nie ein geflickter Text mit Luecken. */
+  function alterskarteText(modellwert) {
+    const wert = String(modellwert || "");
+    if (alterUnlesbar) return alterNichtLesbarText([ankerRoh, wert], prompts);
+    const satz = ersterSatz(wert);
+    const altersSatz = hatLesbaresAlter(ankerRoh) ? ankerRoh : hatLesbaresAlter(satz) ? satz : ankerRoh;
+    let text = mitAnkerVoran(altersSatz, wert);
+    if (hatAltersPlatzhalter(text)) text = mitAnkerVoran(altersSatz, "");
+    if (hatAltersPlatzhalter(text)) return alterNichtLesbarText([ankerRoh, wert], prompts);
+    return ohneZiffernKlammern(text);
+  }
+
   function buildProfile(modeKey) {
     const src = parsed[modeKey];
     if (!src || !src.categories) return null;
-    if (hardFacts.alter_geschlecht && src.categories.alter_geschlecht) {
-      src.categories.alter_geschlecht.value = mitAnkerVoran(
-        hardFacts.alter_geschlecht,
-        src.categories.alter_geschlecht.value
-      );
-    }
+    const karteAlter = src.categories.alter_geschlecht;
+    if (karteAlter) karteAlter.value = alterskarteText(karteAlter.value);
     if (hardFacts.herkunft && src.categories.herkunft) {
       src.categories.herkunft.value = mitAnkerVoran(hardFacts.herkunft, src.categories.herkunft.value);
     }
@@ -410,7 +453,12 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        Kartentext — seit BIZ-001 steht dort naemlich auch der Beleg-Satz, und
        eine Zahl darin ("der Kopf passt 7-mal in die Koerperhoehe") wuerde die
        Altersauslese sonst nach unten ziehen. */
-    alterAnker: hardFacts.alter_geschlecht || null,
+    /* Hat der Anker kein lesbares Alter, bekommt der Filter den ersten Satz
+       beider unveraenderten Karten — die niedrigste Zahl darin zaehlt; der
+       Beleg-Satz bleibt draussen. */
+    alterAnker:
+      (hatLesbaresAlter(ankerRoh) ? ankerRoh : [satzStandard, satzBeast].filter(Boolean).join(" ") || ankerRoh) || null,
+    alterUnlesbar,
   };
 }
 

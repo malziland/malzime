@@ -161,6 +161,9 @@ const REQUIRED_CARDS = [
   "werbeprofil",
 ];
 
+/* Nicht lesbares Alter (17.09.2026): Erkennung in alters-lesbarkeit.js. */
+const { istAlterUnlesbar } = require("./alters-lesbarkeit");
+
 /* ── Live-Text und Karten aus dem laufenden Strom ─────────────────────────
    HERGEZOGEN AUS mistral.js am 31.08.2026, zweiter Schnitt.
 
@@ -172,7 +175,7 @@ const STANDARD_SCHLUESSEL = '"standard"';
 
 const BEAST_SCHLUESSEL = '"beast"';
 
-function extrahiereKarten(jsonPraefix, vonIdx, bisIdx) {
+function extrahiereKarten(jsonPraefix, vonIdx, bisIdx, alterVerbergen = false) {
   if (typeof jsonPraefix !== "string" || vonIdx < 0) return [];
   const bereich = bisIdx > vonIdx ? jsonPraefix.slice(0, bisIdx) : jsonPraefix;
   const fertige = [];
@@ -192,9 +195,28 @@ function extrahiereKarten(jsonPraefix, vonIdx, bisIdx) {
        standard/beast, nur eine Ebene tiefer. */
     const dazwischen = bereich.slice(idx + marke.length, wert.schluesselIdx);
     if (REQUIRED_CARDS.some((k) => k !== schluessel && dazwischen.includes(`"${k}"`))) continue;
+    /* Eine Alterskarte mit nicht lesbarem Alter — in der Karte selbst oder im
+       schon angekommenen Anker — erscheint live gar nicht; die fertige Karte
+       bekommt danach den festen Satz (mistral.js). */
+    if (schluessel === "alter_geschlecht" && (alterVerbergen || istAlterUnlesbar(wert.text))) continue;
     fertige.push({ schluessel, bezeichnung: bezeichnung.text, wert: wert.text });
   }
   return fertige;
+}
+
+/* Ist der Altersanker aus hard_facts (steht im Schema VOR den Profilen)
+   schon komplett da und nicht lesbar? Dann zeigt die fertige Karte den
+   festen Satz — live soll die Alterskarte vorher nicht aufscheinen. */
+const HARD_FACTS_SCHLUESSEL = '"hard_facts"';
+const ALTER_SCHLUESSEL = '"alter_geschlecht"';
+
+function liveAnkerUnlesbar(jsonPraefix, standardIdx) {
+  const hf = jsonPraefix.indexOf(HARD_FACTS_SCHLUESSEL);
+  if (hf < 0 || (standardIdx >= 0 && hf > standardIdx)) return false;
+  const anker = findeProfileTextWert(jsonPraefix, hf, ALTER_SCHLUESSEL);
+  if (!anker || !anker.abgeschlossen) return false;
+  if (standardIdx >= 0 && anker.schluesselIdx > standardIdx) return false;
+  return istAlterUnlesbar(anker.text);
 }
 
 function extrahiereLiveText(jsonPraefix) {
@@ -228,11 +250,13 @@ function extrahiereLiveText(jsonPraefix) {
   /* FEATURE-2026-08-29-01: Karten additiv dazu. `standard` und `beast` bleiben
      unveraendert — alte Aufrufer merken nichts. */
   const standardBis = beastIdx > standardIdx ? beastIdx : -1;
+  const erstesProfil = [standardIdx, beastIdx].filter((i) => i >= 0);
+  const ankerUnlesbar = liveAnkerUnlesbar(jsonPraefix, erstesProfil.length ? Math.min(...erstesProfil) : -1);
   return {
     standard: erster ? erster.text : null,
     beast: zweiter ? zweiter.text : null,
-    kartenStandard: extrahiereKarten(jsonPraefix, standardIdx, standardBis),
-    kartenBeast: extrahiereKarten(jsonPraefix, beastIdx, -1),
+    kartenStandard: extrahiereKarten(jsonPraefix, standardIdx, standardBis, ankerUnlesbar),
+    kartenBeast: extrahiereKarten(jsonPraefix, beastIdx, -1, ankerUnlesbar),
   };
 }
 

@@ -154,6 +154,48 @@ describe("Realitäts-Check (v3.1)", () => {
     expect(elements.rcProzent.textContent).toBe("90");
   });
 
+  /* Seit 17.09.2026: Ließ sich das Alter nicht ablesen, steht auf der Karte
+     ein fester Satz — die Alter-Zeile entfällt; die Geschlecht-Zeile nur,
+     wenn der Satz kein Geschlecht nennt. */
+  it("Alter nicht lesbar: die Alter-Zeile entfällt, die Geschlecht-Zeile bleibt", () => {
+    const daten = menschDaten();
+    daten.profiles.normal.categories.alter_geschlecht.value =
+      "Du bist weiblich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen.";
+    daten.meta = { mode: "multimodal", alterUnlesbar: true };
+    rc.neuesErgebnis(daten);
+    expect(zeilen()).toHaveLength(5);
+  });
+
+  it("Alter nicht lesbar und kein Geschlecht genannt: beide Zeilen entfallen", () => {
+    const daten = menschDaten();
+    daten.profiles.normal.categories.alter_geschlecht.value =
+      "Dein Alter lässt sich aus diesem Bild nicht sicher ablesen.";
+    daten.meta = { mode: "multimodal", alterUnlesbar: true };
+    rc.neuesErgebnis(daten);
+    expect(zeilen()).toHaveLength(4);
+  });
+
+  it("Alter nicht lesbar: die Meldung geht OHNE Alter raus (Server zählt sie so)", () => {
+    const daten = menschDaten();
+    daten.profiles.normal.categories.alter_geschlecht.value =
+      "Du bist weiblich. Dein Alter lässt sich aus diesem Bild nicht sicher ablesen.";
+    daten.meta = { mode: "multimodal", alterUnlesbar: true };
+    rc.neuesErgebnis(daten);
+    beantworteAlle(0);
+    elements.rcAbsenden.click();
+    expect(telemetrie.logRealitaetsCheck).toHaveBeenCalledTimes(1);
+    const gemeldet = telemetrie.logRealitaetsCheck.mock.calls[0][0];
+    expect(gemeldet).not.toHaveProperty("alter");
+    expect(Object.keys(gemeldet).sort()).toEqual(["charakter", "geschlecht", "interessen", "manipulation", "werbung"]);
+  });
+
+  it("ohne das Kennzeichen bleibt es bei sechs Zeilen", () => {
+    const daten = menschDaten();
+    daten.meta = { mode: "multimodal", alterUnlesbar: false };
+    rc.neuesErgebnis(daten);
+    expect(zeilen()).toHaveLength(6);
+  });
+
   /* ── Scoring ─────────────────────────────────────────────────────────── */
 
   it("Geschlecht ist binär: zwei Knöpfe, Daneben sitzt in Spalte 3", () => {

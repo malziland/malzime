@@ -44,6 +44,10 @@ function loggeMinorSafety(safety, traceId, lang) {
       lang,
       alter: safety.alter,
       minderjaehrig: safety.minderjaehrig,
+      /* Seit 17.09.2026: Altersversuch ohne lesbare Zahl (abgeschriebene
+         Formatvorlage oder Alter ohne Ziffer)? Zaehlt, wie oft das vorkommt;
+         dann greift Stufe 2 (minor-safety.js). Nur Ja/Nein. */
+      alterUnlesbar: safety.alterUnlesbar === true,
       entfernt: safety.entfernt.length,
       gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
       /* Treffer im Fliesstext: nicht entfernt, aber gemeldet — je Stufe. */

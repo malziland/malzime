@@ -85,6 +85,7 @@ describe("i18n Guardian (Backend)", () => {
       "privacy.js", // OCR detection patterns (straße, ÄÖÜ) — not translatable
       "animal.js", // German + English animal keywords for SUBJECT classification — not translatable
       "minor-safety.js", // German ad-category patterns (glücksspiel, schönheits-op) — filter logic, never shown to users
+      "alters-lesbarkeit.js", // German number words and age patterns (fünf, jährig) — detection logic, never shown to users
     ];
 
     /* Infrastructure files — no user-facing text, permanently excluded.

@@ -627,24 +627,41 @@ Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
 
 ### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
 
-Der Filter (`functions/src/minor-safety.js`) streicht bei erkennbar
-Minderjährigen Werbeeinträge zu Alkohol, Wetten, Kredit, Diät und
+Der Filter (`functions/src/minor-safety.js`) streicht bei möglicherweise
+Minderjährigen Werbeeinträge zu Alkohol, Tabak, Wetten, Kredit, Diät und
 Schönheits-OP und meldet Treffer im Fließtext, ohne dort etwas zu streichen.
-Seit 09.09. steht je Treffer das Feld und das getroffene Stichwort aus der
-festen Sperrliste im Log, dazu die Anzahl der gezeigten Werbeeinträge je Modus.
-Die Zeile liegt 30 Tage im Diagnose-Speicher:
+„Möglicherweise minderjährig“ heißt: Untergrenze der Altersschätzung bis
+`SCHUTZ_BIS` (mit Puffer) oder ein Alter, das sich nicht lesen ließ. Je Treffer
+stehen das Feld und das getroffene Stichwort aus der festen Sperrliste im Log,
+dazu die Anzahl der gezeigten Werbeeinträge je Modus. Die Zeile liegt 30 Tage
+im Diagnose-Speicher:
 
     gcloud logging read 'jsonPayload.step="minor-safety" AND jsonPayload.minderjaehrig=true' \
       --project=malzime --bucket=client-diagnostics --location=europe-west1 \
       --view=_AllLogs --freshness=30d \
-      --format='value(timestamp,jsonPayload.alter,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
+      --format='value(timestamp,jsonPayload.alter,jsonPayload.alterUnlesbar,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
 
-Lesart: `entfernte` sind gestrichene Werbeeinträge, `durchgerutschte` sind
-Treffer im Profiltext oder in einer Kategorie-Karte (nur gemeldet). Steht bei
-`durchgerutschte` über Wochen ein Wort wie „cocktail" in Bar-Beschreibungen,
-ist die Sperrliste zu grob; stehen dort Werbebegriffe wie „sportwetten", hält
-der Prompt nicht. `werbung` unter 8 bei einem Kind heißt: mehr als zwei
-Einträge gestrichen, nachgefüllt wird nichts.
+Lesart:
+
+- `alter` ist die Untergrenze der Schätzung, nicht das wahre Alter.
+- `minderjaehrig=true` heißt „Stufe 2 greift“. Ab der Auslieferung der
+  Puffer-Regel (Eintrag „Werbeschutz für Kinder mit Sicherheitspuffer“ im
+  CHANGELOG) umfasst das auch Untergrenzen bis 25 und nicht lesbare Alter;
+  davor nur Untergrenzen bis 18. Wer Zeiträume vergleicht, zählt deshalb
+  `alter` selbst (zum Beispiel unter 19).
+- `alterUnlesbar=true` (ab derselben Auslieferung): Die KI hat die Vorlage
+  „‹Zahl›“ abgeschrieben oder ein Alter ganz ohne Zahl genannt (Zahlwörter wie
+  „dreizehn“ zählen als Zahl). Die Karte zeigt dann einen festen Satz statt
+  eines Alters.
+- `entfernte` sind gestrichene Werbeeinträge, `durchgerutschte` Treffer im
+  Profiltext oder in einer Kategorie-Karte (nur gemeldet). Steht dort über
+  Wochen ein Wort wie „cocktail" in Bar-Beschreibungen, ist die Sperrliste zu
+  grob; stehen dort Werbebegriffe wie „sportwetten", hält der Prompt nicht.
+- `werbung` unter 8 heißt beim Beast-Modus nur dann „mehr als zwei Einträge
+  gestrichen“, wenn der zweite Werbe-Aufruf geliefert hat (zehn Einträge
+  angefordert). Sonst stammt die Liste wie die Standard-Liste aus dem
+  Hauptaufruf mit sechs bis acht Einträgen — dort zeigt nur `entfernte`, ob
+  gestrichen wurde.
 
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
 
@@ -785,7 +802,7 @@ leeres Ergebnis ohne diese Angaben ist ein Messfehler, kein Befund.
 | Speicher | Standort | Aufbewahrung | Inhalt |
 |---|---|---|---|
 | `betrieb-eu` (Ziel der Weiche `_Default`) | europe-west1 | **1 Tag** — bewusst kurz | Programmausgaben der Functions (Request-ID, Schritt, Status, Token-Zahlen), Aufräumer- und Zeitplan-Läufe. Cloud-Run-Request-Logs, der einzige IP-Träger, sind per Ausschluss `exclude_run_requests_ip` gar nicht erst darin |
-| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026) |
+| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026; „Alter nicht lesbar“ ja/nein ab der Auslieferung der Puffer-Regel) |
 | `_Default` (Googles Ablage) | global, nicht änderbar | 1 Tag | seit 09.09.2026 **leer** — bekommt nichts mehr; existiert weiter, weil Google sie nicht löschen lässt |
 | `_Required` (Googles Pflichtprotokoll) | global, nicht änderbar, gesperrt | 400 Tage | unsere eigenen Verwaltungszugriffe (Kontoadresse, Aufruf-IP unseres Rechners). Keine Nutzerdaten. Google-Vorgabe |
 

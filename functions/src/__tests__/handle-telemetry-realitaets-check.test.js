@@ -126,6 +126,32 @@ describe("handleTelemetry — Ereignis realitaets-check", () => {
     expect(zaehleRealitaetsCheck).not.toHaveBeenCalled();
   });
 
+  /* Seit 17.09.2026: Ließ sich das Alter nicht ablesen, fehlt die Alter-Zeile
+     im Frontend — die Bewertung muss trotzdem gezählt werden. */
+  test("ohne Alter (Alter nicht lesbar) → gezählt, Score aus den übrigen Stufen", async () => {
+    const res = mockRes();
+    const stufen = gueltigeStufen();
+    delete stufen.alter;
+    await handleTelemetry(mockReq({ eventType: "realitaets-check", stufen, ticket: TICKET }), res);
+    expect(zaehleRealitaetsCheck).toHaveBeenCalledTimes(1);
+  });
+
+  test("ohne Alter und ohne Geschlecht → gezählt", async () => {
+    const res = mockRes();
+    const stufen = gueltigeStufen();
+    delete stufen.alter;
+    delete stufen.geschlecht;
+    await handleTelemetry(mockReq({ eventType: "realitaets-check", stufen, ticket: TICKET }), res);
+    expect(zaehleRealitaetsCheck).toHaveBeenCalledTimes(1);
+  });
+
+  test("Alter mit 0,7 → verworfen (optional heißt nicht beliebig)", async () => {
+    const res = mockRes();
+    const stufen = { ...gueltigeStufen(), alter: 0.7 };
+    await handleTelemetry(mockReq({ eventType: "realitaets-check", stufen, ticket: TICKET }), res);
+    expect(zaehleRealitaetsCheck).not.toHaveBeenCalled();
+  });
+
   test("fehlende Pflicht-Stufe → verworfen", async () => {
     const res = mockRes();
     const stufen = gueltigeStufen();

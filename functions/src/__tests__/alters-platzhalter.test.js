@@ -24,8 +24,8 @@ const {
   istAlterUnlesbar,
   hatLesbaresAlter,
   alterNichtLesbarText,
-  _untereAltersgrenze,
-} = require("../minor-safety");
+  untereAltersgrenze: _untereAltersgrenze,
+} = require("../alters-lesbarkeit");
 const DE = require("../locales/de/prompts");
 const EN = require("../locales/en/prompts");
 const { runSingleLargeCall, setFetchForTest, _extrahiereLiveText } = require("../mistral");

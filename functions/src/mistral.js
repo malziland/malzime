@@ -45,7 +45,7 @@ const {
   hatLesbaresAlter,
   alterNichtLesbarText,
   ohneZiffernKlammern,
-} = require("./minor-safety");
+} = require("./alters-lesbarkeit");
 
 /* Für Tests: erlaubt fetch zu mocken ohne globalThis zu überschreiben. */
 
@@ -362,7 +362,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     return zusammen.slice(0, STRING_BOUND_CATEGORY);
   }
 
-  /* Nicht lesbares Alter (17.09.2026, siehe minor-safety.js): aus den
+  /* Nicht lesbares Alter (17.09.2026, siehe alters-lesbarkeit.js): aus den
      ROHWERTEN bestimmt, bevor eine Karte umgeschrieben wird. Unlesbar ist das
      Alter, wenn der Anker einen Altersversuch ohne lesbare Zahl enthaelt,
      oder wenn der Anker gar keine Zahl hat und eine der beiden Karten den

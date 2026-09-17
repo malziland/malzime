@@ -503,7 +503,8 @@ Untergrenze.
 3. Ist das Alter nicht lesbar — abgeschriebene Vorlage in beliebiger Klammer,
    oder ein Altersversuch ohne jede Zahl —, zeigt die Alterskarte einen festen
    Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte vorher
-   nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das aus den
+   nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das (Erkennung
+   in `alters-lesbarkeit.js`) aus den
    Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
    Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
    `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht

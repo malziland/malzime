@@ -161,9 +161,8 @@ const REQUIRED_CARDS = [
   "werbeprofil",
 ];
 
-/* Nicht lesbares Alter (17.09.2026): Erkennung in minor-safety.js — dort
-   stehen die Suchmuster des Kinderschutzes, auch die deutschen. */
-const { istAlterUnlesbar } = require("./minor-safety");
+/* Nicht lesbares Alter (17.09.2026): Erkennung in alters-lesbarkeit.js. */
+const { istAlterUnlesbar } = require("./alters-lesbarkeit");
 
 /* ── Live-Text und Karten aus dem laufenden Strom ─────────────────────────
    HERGEZOGEN AUS mistral.js am 31.08.2026, zweiter Schnitt.

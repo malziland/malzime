@@ -639,11 +639,15 @@ im Diagnose-Speicher:
     gcloud logging read 'jsonPayload.step="minor-safety" AND jsonPayload.minderjaehrig=true' \
       --project=malzime --bucket=client-diagnostics --location=europe-west1 \
       --view=_AllLogs --freshness=30d \
-      --format='value(timestamp,jsonPayload.alter,jsonPayload.alterUnlesbar,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
+      --format='value(timestamp,jsonPayload.alter,jsonPayload.alterBis,jsonPayload.alterUnlesbar,jsonPayload.entfernte,jsonPayload.durchgerutschte,jsonPayload.werbung)'
 
 Lesart:
 
-- `alter` ist die Untergrenze der Schätzung, nicht das wahre Alter.
+- `alter` ist die Untergrenze der Schätzung, `alterBis` ihr oberes Ende
+  (größte Alterszahl der Angabe) — beides Schätzung, nicht das wahre Alter.
+  `alterBis` gibt es ab der Auslieferung mit dem CHANGELOG-Eintrag „oberes
+  Ende der Altersschätzung“; ältere Zeilen haben das Feld nicht, `null` heißt:
+  keine Zahl in der Angabe. Nur `alter` entscheidet über Stufe 2.
 - `minderjaehrig=true` heißt „Stufe 2 greift“. Ab der Auslieferung der
   Puffer-Regel (Eintrag „Werbeschutz für Kinder mit Sicherheitspuffer“ im
   CHANGELOG) umfasst das auch Untergrenzen bis 25 und nicht lesbare Alter;

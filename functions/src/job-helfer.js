@@ -42,7 +42,11 @@ function loggeMinorSafety(safety, traceId, lang) {
          Zeile unten behaelt die Kennung: Sie geht nicht in den 30-Tage-
          Speicher (Filter vergleicht step exakt) und traegt kein Alter. */
       lang,
+      /* `alter` ist die Untergrenze der Schaetzung, `alterBis` (seit
+         25.09.2026) ihr oberes Ende. Erst beide zusammen sagen, ob eine
+         Spanne ein bekanntes Klassenalter einschliesst. */
       alter: safety.alter,
+      alterBis: safety.alterBis ?? null,
       minderjaehrig: safety.minderjaehrig,
       /* Seit 17.09.2026: Altersversuch ohne lesbare Zahl (abgeschriebene
          Formatvorlage oder Alter ohne Ziffer)? Zaehlt, wie oft das vorkommt;

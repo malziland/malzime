@@ -555,6 +555,44 @@ nennt den Puffer noch nicht (der Server streicht trotzdem); die Beispiel-Belege
 der Alterskarte sind allgemein formuliert — ob die KI dadurch seltener ein
 konkretes Merkmal nennt, zeigt der Vortest (Kennzahl „Begründung konkret“).
 
+## Kinderschutz-Zeile: oberes Ende der Altersschätzung (25.09.2026)
+
+**Was war.** Die Kinderschutz-Zeile hielt nur die Untergrenze der geschätzten
+Altersspanne fest (`alter`). In Workshops mit Schulklassen begann die Spanne
+bei einem großen Teil der Kinder deutlich unter dem Alter der Klasse. Ob das
+eine falsche Schätzung ist oder nur eine breite Spanne, die das echte Alter
+einschließt, ließ sich damit nicht auswerten: „8–13“ und „8–9“ ergeben
+dieselbe Zeile.
+
+**Entscheidung.** Die Zeile trägt zusätzlich `alterBis`: die größte plausible
+Alterszahl der Altersangabe, bei einer Spanne also ihr oberes Ende
+(`obereAltersgrenze` in `functions/src/alters-lesbarkeit.js`, Beispiele dort).
+Ohne Zahl — Kategoriewort, kein Altersversuch, abgeschriebene Vorlage — steht
+`null`. Das Feld dient nur der Auswertung. Stufe 2 richtet sich weiter allein
+nach der Untergrenze; `alters-obergrenze.test.js` prüft das an Spannen
+beiderseits der Schutzgrenze.
+
+**Warum kein zusätzlicher Personenbezug.** Es ist dieselbe Schätzung, deren
+unteres Ende schon in der Zeile stand, jetzt mit beiden Enden. Die
+Datenschutzerklärung nennt für diesen Eintrag, „auf welches Alter die KI
+ungefähr getippt hat“; das deckt die Spanne. Kein Text, keine
+Vorgangskennung — der Test prüft auch das.
+
+**Betrachtete Alternativen.** Den Punktwert (`~14`) statt des oberen Endes
+loggen: verworfen, er sagt nicht, ob die Spanne ein bekanntes Alter
+einschließt. Den ganzen Alterssatz loggen: verworfen, er kann eine
+Beschreibung der Person enthalten. Die Beispielfotos der Startseite im Log
+kennzeichnen: zurückgestellt. Sie laufen durch dieselbe Analyse und zeigen
+Erwachsene; die Auswertung trennt sie über die Bildgröße, die im Log der
+KI-Aufrufe steht.
+
+**Rückweg.** Nur mit Deploy: das Feld in `loggeMinorSafety`
+(`functions/src/job-helfer.js`) weglassen. Am Filter ändert das nichts.
+
+**Neubewertung.** Wenn Workshops mit bekanntem Klassenalter zeigen, dass die
+Spannen das Alter überwiegend einschließen, ist „zu jung“ kein Schätzfehler,
+sondern Breite; sonst wird der Alters-Prompt nachgeschärft.
+
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 
 **Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.

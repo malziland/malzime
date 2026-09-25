@@ -74,7 +74,7 @@ const SCHUTZ_BIS = VOLLJAEHRIG_AB + PUFFER_JAHRE + 1;
 /* Nicht lesbares Alter und Altersauslese: alters-lesbarkeit.js (seit
    17.09.2026 eigene Datei — reine Textpruefung, die auch mistral.js und die
    Live-Anzeige brauchen). */
-const { untereAltersgrenze, istAlterUnlesbar } = require("./alters-lesbarkeit");
+const { untereAltersgrenze, obereAltersgrenze, istAlterUnlesbar } = require("./alters-lesbarkeit");
 
 /* ── Zwei Stufen ──────────────────────────────────────────────────────────
    IMMER_VERBOTEN gilt unabhaengig vom geschaetzten Alter. Das ist bewusst so:
@@ -181,6 +181,7 @@ function applyMinorSafety(profiles, opts = {}) {
   const bericht = {
     applied: false,
     alter: null,
+    alterBis: null,
     entfernt: [],
     durchgerutscht: [],
     /* Anzahl der Werbeeintraege je Modus, nachdem Filter und Kappung durch
@@ -202,6 +203,8 @@ function applyMinorSafety(profiles, opts = {}) {
     "";
   const untergrenze = untereAltersgrenze(quelle);
   bericht.alter = untergrenze;
+  /* Nur fuer die Auswertung, siehe obereAltersgrenze — entscheidet nichts. */
+  bericht.alterBis = obereAltersgrenze(quelle);
   const alterUnlesbar = opts.alterUnlesbar === true || istAlterUnlesbar(quelle);
   bericht.alterUnlesbar = alterUnlesbar;
 

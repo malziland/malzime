@@ -4,6 +4,17 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Das Kinderschutz-Protokoll hält jetzt auch das obere Ende der
+  Altersschätzung fest.** Bisher stand dort nur, bei welchem Alter die
+  geschätzte Spanne beginnt. Ob eine Schätzung wie „8 bis 13“ ein
+  zwölfjähriges Kind trifft oder verfehlt, ließ sich so nicht auswerten. Am
+  Schutz ändert sich nichts: Er richtet sich weiter allein nach dem unteren
+  Ende.
+
 ## [4.11.0] — 2026-09-18
 
 ### Geändert

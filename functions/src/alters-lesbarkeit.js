@@ -242,8 +242,27 @@ function untereAltersgrenze(text) {
   return kategorieAlter(text);
 }
 
+/* Die OBERE Altersgrenze — die groesste plausible Alterszahl im Text, bei
+   einer Spanne also ihr oberes Ende (seit 25.09.2026).
+
+     "Du bist weiblich, ~14 Jahre alt (Spanne 12-16)."  -> 16
+     "Männlich, ~38 — die Krähenfüße verraten dich."     -> 38
+     "Du bist männlich, etwa 38. Spanne 35-42."          -> 42
+
+   NUR FUER DIE AUSWERTUNG, nie fuer eine Schutzentscheidung: Stufe 2 haengt
+   allein an der Untergrenze (minor-safety.js). Grund fuer das Feld: Geloggt
+   war bisher nur die Untergrenze. Ob eine Schaetzung "8–13" ein
+   12-jaehriges Kind verfehlt oder trifft, liess sich so nicht sagen.
+   Kategoriewoerter ("Teenager") nennen kein oberes Ende -> null. */
+function obereAltersgrenze(text) {
+  const s = mitZiffern(text).toLowerCase();
+  const zahlen = (s.match(/(?<!\d)\d{1,2}(?!\d)/g) || []).map(Number).filter((n) => n >= 1 && n <= 100);
+  return zahlen.length ? Math.max(...zahlen) : null;
+}
+
 module.exports = {
   untereAltersgrenze,
+  obereAltersgrenze,
   hatAltersPlatzhalter,
   istAlterUnlesbar,
   hatLesbaresAlter,

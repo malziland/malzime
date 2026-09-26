@@ -643,11 +643,23 @@ im Diagnose-Speicher:
 
 Lesart:
 
-- `alter` ist die Untergrenze der Schätzung, `alterBis` ihr oberes Ende
-  (größte Alterszahl der Angabe) — beides Schätzung, nicht das wahre Alter.
-  `alterBis` gibt es ab der Auslieferung mit dem CHANGELOG-Eintrag „oberes
-  Ende der Altersschätzung“; ältere Zeilen haben das Feld nicht, `null` heißt:
-  keine Zahl in der Angabe. Nur `alter` entscheidet über Stufe 2.
+- `alter` ist die Untergrenze der Schätzung, `alterBis` das obere Ende der
+  Spanne — beides Schätzung, nicht das wahre Alter. `alterBis` gibt es ab der
+  Auslieferung mit dem CHANGELOG-Eintrag
+  „Kinderschutz-Protokoll mit oberem Ende der Altersschätzung“; ältere Zeilen
+  haben das Feld nicht. `null` heißt: kein oberes Ende in der Angabe (keine
+  Zahl, nur ein Kategoriewort, oder ein Jahrzehnt wie „Ende zwanzig“). Wie
+  das obere Ende gelesen wird, steht bei `obereAltersgrenze` in
+  `functions/src/alters-lesbarkeit.js`. `alterBis` entscheidet über nichts;
+  Stufe 2 hängt wie bisher an `alter` und am lesbaren Alter.
+- Für die Frage „schließt die Spanne ein bekanntes Alter ein?“ nicht auf
+  `minderjaehrig=true` filtern — sonst fehlen gerade die Zeilen, deren Spanne
+  ein Kind sicher verfehlt (Untergrenze über der Schutzgrenze):
+
+      gcloud logging read 'jsonPayload.step="minor-safety"' \
+        --project=malzime --bucket=client-diagnostics --location=europe-west1 \
+        --view=_AllLogs --freshness=30d \
+        --format='value(timestamp,jsonPayload.alter,jsonPayload.alterBis)'
 - `minderjaehrig=true` heißt „Stufe 2 greift“. Ab der Auslieferung der
   Puffer-Regel (Eintrag „Werbeschutz für Kinder mit Sicherheitspuffer“ im
   CHANGELOG) umfasst das auch Untergrenzen bis 25 und nicht lesbare Alter;
@@ -806,7 +818,7 @@ leeres Ergebnis ohne diese Angaben ist ein Messfehler, kein Befund.
 | Speicher | Standort | Aufbewahrung | Inhalt |
 |---|---|---|---|
 | `betrieb-eu` (Ziel der Weiche `_Default`) | europe-west1 | **1 Tag** — bewusst kurz | Programmausgaben der Functions (Request-ID, Schritt, Status, Token-Zahlen), Aufräumer- und Zeitplan-Läufe. Cloud-Run-Request-Logs, der einzige IP-Träger, sind per Ausschluss `exclude_run_requests_ip` gar nicht erst darin |
-| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026; „Alter nicht lesbar“ ja/nein ab der Auslieferung der Puffer-Regel) |
+| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026; „Alter nicht lesbar“ ja/nein ab der Auslieferung der Puffer-Regel; oberes Ende der geschätzten Spanne ab der Auslieferung mit dem CHANGELOG-Eintrag „Kinderschutz-Protokoll mit oberem Ende der Altersschätzung“) |
 | `_Default` (Googles Ablage) | global, nicht änderbar | 1 Tag | seit 09.09.2026 **leer** — bekommt nichts mehr; existiert weiter, weil Google sie nicht löschen lässt |
 | `_Required` (Googles Pflichtprotokoll) | global, nicht änderbar, gesperrt | 400 Tage | unsere eigenen Verwaltungszugriffe (Kontoadresse, Aufruf-IP unseres Rechners). Keine Nutzerdaten. Google-Vorgabe |
 

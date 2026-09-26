@@ -564,34 +564,45 @@ eine falsche Schätzung ist oder nur eine breite Spanne, die das echte Alter
 einschließt, ließ sich damit nicht auswerten: „8–13“ und „8–9“ ergeben
 dieselbe Zeile.
 
-**Entscheidung.** Die Zeile trägt zusätzlich `alterBis`: die größte plausible
-Alterszahl der Altersangabe, bei einer Spanne also ihr oberes Ende
-(`obereAltersgrenze` in `functions/src/alters-lesbarkeit.js`, Beispiele dort).
-Ohne Zahl — Kategoriewort, kein Altersversuch, abgeschriebene Vorlage — steht
-`null`. Das Feld dient nur der Auswertung. Stufe 2 richtet sich weiter allein
-nach der Untergrenze; `alters-obergrenze.test.js` prüft das an Spannen
-beiderseits der Schutzgrenze.
+**Entscheidung.** Die Zeile trägt zusätzlich `alterBis`: das obere Ende der
+geschätzten Spanne (`obereAltersgrenze` in `functions/src/alters-lesbarkeit.js`,
+Regeln und Beispiele dort). Gelesen wird zuerst eine erkannte Spanne oder
+Plus-Minus-Angabe, sonst eine Zahl mit Altersbezug. Fremdzahlen wie
+Körpergröße oder Uhrzeit zählen nicht — anders als bei der Untergrenze, wo sie
+bewusst Richtung Schutz ziehen. Ohne oberes Ende (Kategoriewort, Jahrzehnt wie
+„Ende zwanzig“, kein Altersversuch, abgeschriebene Vorlage) steht `null`. Das
+Feld entscheidet über nichts: Stufe 2 hängt wie bisher an Untergrenze und
+lesbarem Alter. `alters-obergrenze.test.js` prüft das über ein Raster aller
+Spannen und schreibt die Feldmenge der Zeile fest.
 
-**Warum kein zusätzlicher Personenbezug.** Es ist dieselbe Schätzung, deren
-unteres Ende schon in der Zeile stand, jetzt mit beiden Enden. Die
-Datenschutzerklärung nennt für diesen Eintrag, „auf welches Alter die KI
-ungefähr getippt hat“; das deckt die Spanne. Kein Text, keine
-Vorgangskennung — der Test prüft auch das.
+**Zweck und Datenart.** Der Zweck ist derselbe wie beim ganzen Eintrag: prüfen,
+ob der Kinderschutz zuverlässig wirkt. Stufe 2 hängt an der Altersschätzung.
+Liegt sie bei Kindern zu tief, wäre die naheliegende Korrektur ein Umbau des
+Alters-Prompts, und ein solcher Umbau kann Kinder über die Schutzgrenze
+schieben. Das obere Ende zeigt vorher, ob die Spannen das Alter ohnehin
+einschließen und ein Umbau überhaupt nötig ist. Die Datenschutzerklärung nennt
+für diesen Eintrag, „auf welches Alter die KI ungefähr getippt hat“; das deckt
+beide Enden der Spanne. Neu ist keine Art von Angabe, sondern das zweite Ende
+derselben Schätzung; die Zeile trägt weiterhin keinen Text aus dem Profil.
 
 **Betrachtete Alternativen.** Den Punktwert (`~14`) statt des oberen Endes
 loggen: verworfen, er sagt nicht, ob die Spanne ein bekanntes Alter
 einschließt. Den ganzen Alterssatz loggen: verworfen, er kann eine
-Beschreibung der Person enthalten. Die Beispielfotos der Startseite im Log
-kennzeichnen: zurückgestellt. Sie laufen durch dieselbe Analyse und zeigen
-Erwachsene; die Auswertung trennt sie über die Bildgröße, die im Log der
-KI-Aufrufe steht.
+Beschreibung der Person enthalten. Die größte Zahl der Angabe nehmen:
+verworfen, eine Körpergröße („1,60 m“) oder Uhrzeit würde die Spanne
+künstlich breit machen. Die Beispielfotos der Startseite im Log kennzeichnen:
+zurückgestellt.
 
 **Rückweg.** Nur mit Deploy: das Feld in `loggeMinorSafety`
 (`functions/src/job-helfer.js`) weglassen. Am Filter ändert das nichts.
+Bereits geschriebene Werte bleiben bis zum Ende ihrer Aufbewahrung im
+Diagnose-Speicher (RUNBOOK, „Logs und Aufbewahrung“).
 
-**Neubewertung.** Wenn Workshops mit bekanntem Klassenalter zeigen, dass die
-Spannen das Alter überwiegend einschließen, ist „zu jung“ kein Schätzfehler,
-sondern Breite; sonst wird der Alters-Prompt nachgeschärft.
+**Neubewertung.** Zeigen Workshops mit bekanntem Klassenalter, dass die
+Spannen das Alter überwiegend einschließen, ist „zu jung“ Breite und kein
+Schätzfehler; am Alters-Prompt ändert sich dann nichts. Verfehlen sie es
+überwiegend, wird der Alters-Prompt überarbeitet und vor der Auslieferung
+daraufhin geprüft, dass keine Kinder über die Schutzgrenze rutschen.
 
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 

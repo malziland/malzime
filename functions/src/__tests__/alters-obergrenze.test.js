@@ -1,19 +1,22 @@
 /**
  * Obere Altersgrenze in der Kinderschutz-Zeile (25.09.2026).
  *
- * Anlass: Geloggt war nur die Untergrenze der Altersschaetzung. In den
- * Workshops vom 21. und 25.09. begann bei 41 bzw. 45 % der Kinder die Spanne
- * bei 9 oder darunter. Ob "8–13" ein 12-jaehriges Kind verfehlt oder trifft,
- * liess sich ohne das obere Ende nicht sagen.
+ * Anlass: Geloggt war nur die Untergrenze der Altersschaetzung. In Workshops
+ * begann die Spanne oft deutlich unter dem Alter der Klasse. Ob "8–13" ein
+ * 12-jaehriges Kind verfehlt oder trifft, liess sich ohne das obere Ende
+ * nicht sagen.
  *
- * Drei Zusicherungen:
- *   1. Die Obergrenze ist die groesste plausible Alterszahl der Angabe —
- *      bei einer Spanne ihr oberes Ende, auch in Worten geschrieben.
- *   2. Sie entscheidet nichts: Stufe 2 haengt allein an der Untergrenze.
- *   3. Die Logzeile traegt sie, weiterhin ohne Vorgangskennung.
+ * Vier Zusicherungen:
+ *   1. Die Obergrenze ist das obere Ende der erkannten Spanne; Fremdzahlen
+ *      im Text ("1,60 m", "14:30", "80 %") verschieben sie nicht.
+ *   2. Sie entscheidet nichts: Stufe 2 haengt an Untergrenze und lesbarem
+ *      Alter — geprueft ueber ein Raster aller Spannen, nicht an Beispielen.
+ *   3. Sie kommt aus derselben Quelle wie die Untergrenze (Anker vor Karte).
+ *   4. Die Logzeile traegt sie, ohne Vorgangskennung, und ihre Feldmenge ist
+ *      festgeschrieben.
  */
 const { obereAltersgrenze, untereAltersgrenze } = require("../alters-lesbarkeit");
-const { applyMinorSafety } = require("../minor-safety");
+const { applyMinorSafety, _SCHUTZ_BIS } = require("../minor-safety");
 const { loggeMinorSafety } = require("../job-helfer");
 
 const FAELLE = [
@@ -24,6 +27,8 @@ const FAELLE = [
   ["Du bist weiblich, etwa dreizehn (Spanne elf bis fünfzehn).", 11, 15],
   ["male, around twenty-five (range twenty-two to thirty)", 22, 30],
   ["Du bist männlich, ~14 Jahre alt, rund 170 cm groß (Spanne 12–16).", 12, 16],
+  ["weiblich, zwölf- bis vierzehnjährig", 12, 14],
+  ["männlich, ~‹14› Jahre alt (Spanne ‹12›-‹16›)", 12, 16],
 ];
 
 describe("obereAltersgrenze", () => {
@@ -32,52 +37,106 @@ describe("obereAltersgrenze", () => {
     expect(obereAltersgrenze(text)).toBe(oben);
   });
 
-  test("nie kleiner als die Untergrenze", () => {
-    for (const [text] of FAELLE) {
-      expect(obereAltersgrenze(text)).toBeGreaterThanOrEqual(untereAltersgrenze(text));
-    }
+  /* Fremdzahlen: bei der Untergrenze ziehen sie Richtung Schutz (gewollt),
+     hier duerfen sie die Spanne nicht kuenstlich breit machen. */
+  test.each([
+    ["weiblich, ~14, etwa 1,60 m groß (Spanne 12-16)", 16],
+    ["männlich, ~13 Jahre alt (Spanne 11-15), Foto um 14:30", 15],
+    ["weiblich, ~12 (Spanne 10-14) — zu 80 % sicher", 14],
+    ["Du bist männlich, ~14 Jahre, trägt Größe 42", 14],
+    ["Trikot Nummer 99, ~12 Jahre alt", 12],
+    ["als Elf verkleidet, ~9 Jahre", 9],
+    ["Du bist weiblich, ~14 Jahre alt (± 2).", 16],
+    ["0-3 Jahre", 3],
+  ])("Fremdzahl: %s → %i", (text, oben) => {
+    expect(obereAltersgrenze(text)).toBe(oben);
   });
 
   test.each([
+    ["Jahrzehnt ohne Ende", "männlich, Ende zwanzig"],
+    ["Jahrzehnt englisch", "male, in his twenties"],
+    ["Jahrzehnt in Ziffern", "weiblich, Mitte 30"],
+    ["Jahrzehnt als Mehrzahl", "in den Zwanzigern"],
     ["Kategorie ohne Zahl", "Du bist männlich, ein Teenager."],
     ["kein Altersversuch", "Keine klaren Bildsignale."],
     ["abgeschriebene Vorlage", "männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)"],
     ["leer", ""],
+    ["null", null],
   ])("%s → null", (_name, text) => {
     expect(obereAltersgrenze(text)).toBeNull();
   });
-});
 
-describe("Obergrenze entscheidet nichts", () => {
-  function profil(alterText) {
-    const modus = () => ({
-      categories: { alter_geschlecht: { value: alterText } },
-      ad_targeting: ["Klarna Ratenkauf", "Nike"],
-      manipulation_triggers: [],
-      profileText: "",
-    });
-    return { normal: modus(), boost: modus() };
-  }
-
-  test("Spanne 24-40: Stufe 2 greift wegen der Untergrenze, trotz hoher Obergrenze", () => {
-    const b = applyMinorSafety(profil("Du bist weiblich, ~30 Jahre alt (Spanne 24-40)."));
-    expect(b.alter).toBe(24);
-    expect(b.alterBis).toBe(40);
-    expect(b.minderjaehrig).toBe(true);
-    expect(b.entfernt.some((e) => e.stichwort === "klarna")).toBe(true);
+  test.each([
+    ["zwanzigjährig", 20],
+    ["fünfundzwanzig Jahre", 25],
+    ["twenty-five years old", 25],
+  ])("genaue Zahl in Worten: %s → %i", (text, oben) => {
+    expect(obereAltersgrenze(text)).toBe(oben);
   });
 
-  test("Spanne 26-30: Stufe 2 greift nicht, die Obergrenze aendert daran nichts", () => {
-    const b = applyMinorSafety(profil("Du bist weiblich, ~28 Jahre alt (Spanne 26-30)."));
-    expect(b.alterBis).toBe(30);
-    expect(b.minderjaehrig).toBe(false);
-    expect(b.entfernt).toEqual([]);
+  test("nie kleiner als die Untergrenze, wenn beide gesetzt sind", () => {
+    const texte = [
+      ...FAELLE.map(([t]) => t),
+      "weiblich, ~14, etwa 1,60 m groß (Spanne 12-16)",
+      "Du bist weiblich, ~14 Jahre alt (± 2).",
+      "Trikot Nummer 99, ~12 Jahre alt",
+      "männlich, Ende zwanzig",
+      "Teenager, Spanne 13-19",
+      "16-12",
+    ];
+    for (const t of texte) {
+      const u = untereAltersgrenze(t);
+      const o = obereAltersgrenze(t);
+      if (u !== null && o !== null) expect(o).toBeGreaterThanOrEqual(u);
+    }
+  });
+});
+
+function profil(karte, ads = ["Klarna Ratenkauf", "Nike"]) {
+  const modus = () => ({
+    categories: { alter_geschlecht: { value: karte } },
+    ad_targeting: [...ads],
+    manipulation_triggers: [],
+    profileText: "",
+  });
+  return { normal: modus(), boost: modus() };
+}
+
+describe("Obergrenze entscheidet nichts", () => {
+  /* Raster statt Beispiele: Jede Kopplung der Schutzentscheidung an alterBis
+     (etwa "nur, wenn die Spanne nicht bis 60 reicht") bricht hier irgendwo.
+     Soll: Stufe 2 genau dann, wenn die Untergrenze unter SCHUTZ_BIS liegt. */
+  test("Raster Untergrenze 1-60 × Obergrenze bis 99: Stufe 2 folgt allein der Untergrenze", () => {
+    const brueche = [];
+    for (let u = 1; u <= 60; u++) {
+      for (let o = u; o <= 99; o++) {
+        const b = applyMinorSafety(profil(`Du bist weiblich, ~${u} Jahre alt (Spanne ${u}-${o}).`));
+        if (b.alter !== u || b.alterBis !== o || b.minderjaehrig !== u < _SCHUTZ_BIS) brueche.push(`${u}-${o}`);
+      }
+    }
+    expect(brueche).toEqual([]);
+  });
+
+  test("breite Spanne bei einem Kind: Werbung wird trotzdem gestrichen", () => {
+    const b = applyMinorSafety(profil("Du bist weiblich, ~12 Jahre alt (Spanne 12-60)."));
+    expect(b.minderjaehrig).toBe(true);
+    expect(b.entfernt.some((e) => e.stichwort === "klarna")).toBe(true);
   });
 
   test("ohne Profil: beide Grenzen null", () => {
     const b = applyMinorSafety(null);
     expect(b.alter).toBeNull();
     expect(b.alterBis).toBeNull();
+  });
+});
+
+describe("Obergrenze aus derselben Quelle wie die Untergrenze", () => {
+  test("der Anker gilt, nicht die Karte", () => {
+    const b = applyMinorSafety(profil("Du bist weiblich, ~40 Jahre, 1,60 m groß (Spanne 35-45)."), {
+      alterText: "Du bist weiblich, ~10 Jahre alt (Spanne 8-13).",
+    });
+    expect(b.alter).toBe(8);
+    expect(b.alterBis).toBe(13);
   });
 });
 
@@ -90,21 +149,49 @@ describe("Logzeile minor-safety traegt die Obergrenze", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  test("alter und alterBis stehen nebeneinander, keine Vorgangskennung", () => {
-    const b = applyMinorSafety({
-      normal: { categories: { alter_geschlecht: { value: "Du bist weiblich, ~10 Jahre alt (Spanne 8-13)." } } },
-    });
-    loggeMinorSafety(b, "trace-verbindbar-7", "de");
-    const zeile = JSON.parse(ausgabe.find((z) => z.includes('"minor-safety"')));
-    expect(zeile.alter).toBe(8);
-    expect(zeile.alterBis).toBe(13);
-    expect(zeile).not.toHaveProperty("traceId");
-    expect(ausgabe.join("\n")).not.toContain("trace-verbindbar-7");
+  const zeile = () => JSON.parse(ausgabe.find((z) => z.includes('"minor-safety"')));
+
+  test("Kind: alter und alterBis stehen nebeneinander, keine Vorgangskennung", () => {
+    loggeMinorSafety(applyMinorSafety(profil("Du bist weiblich, ~10 Jahre alt (Spanne 8-13).")), "trace-7", "de");
+    expect(zeile().alter).toBe(8);
+    expect(zeile().alterBis).toBe(13);
+    expect(zeile()).not.toHaveProperty("traceId");
+    expect(ausgabe.join("\n")).not.toContain("trace-7");
+  });
+
+  test("Erwachsener ohne Stufe 2: alterBis steht ebenfalls in der Zeile", () => {
+    loggeMinorSafety(applyMinorSafety(profil("Du bist männlich, ~35 Jahre alt (Spanne 30-40).")), null, "de");
+    expect(zeile().minderjaehrig).toBe(false);
+    expect(zeile().alterBis).toBe(40);
   });
 
   test("ein Bericht ohne Obergrenze loggt null statt das Feld wegzulassen", () => {
     loggeMinorSafety({ alter: 14, minderjaehrig: true, entfernt: [], durchgerutscht: [] }, null, "de");
-    const zeile = JSON.parse(ausgabe[0]);
-    expect(zeile).toHaveProperty("alterBis", null);
+    expect(zeile()).toHaveProperty("alterBis", null);
+  });
+
+  /* Die Zeile liegt im 30-Tage-Diagnose-Speicher. Wer hier ein Feld ergaenzt
+     oder umbenennt, prueft im selben Commit, ob der Datenschutztext
+     (Abschnitt Kinderschutz-Auswertung, DE und EN) es deckt. */
+  test("Feldmenge der Zeile ist festgeschrieben", () => {
+    loggeMinorSafety(applyMinorSafety(profil("Du bist weiblich, ~10 Jahre alt (Spanne 8-13).")), "trace-8", "de");
+    expect(Object.keys(zeile()).sort()).toEqual(
+      [
+        "alter",
+        "alterBis",
+        "alterUnlesbar",
+        "durchgerutscht",
+        "durchgerutschtGruende",
+        "durchgerutschte",
+        "entfernt",
+        "entfernte",
+        "gekappt",
+        "gruende",
+        "lang",
+        "minderjaehrig",
+        "step",
+        "werbung",
+      ].sort()
+    );
   });
 });

@@ -622,7 +622,7 @@ Nachsehen, welche Analysen trotz aller Wiederholungen scheiterten (Feld
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.error,jsonPayload.wiederholungen)'
 
 (Beide Abfragen sehen einen Tag zurück — länger hält der Betriebs-Speicher
-nicht. Für Wochenvergleiche zählt die Zeile `mistral-single-large` im
+nicht. Für Wochenvergleiche von Dauer und Wiederholungen zählt die Zeile `mistral-single-large` im
 Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
 
 ### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
@@ -818,7 +818,7 @@ leeres Ergebnis ohne diese Angaben ist ein Messfehler, kein Befund.
 | Speicher | Standort | Aufbewahrung | Inhalt |
 |---|---|---|---|
 | `betrieb-eu` (Ziel der Weiche `_Default`) | europe-west1 | **1 Tag** — bewusst kurz | Programmausgaben der Functions (Request-ID, Schritt, Status, Token-Zahlen), Aufräumer- und Zeitplan-Läufe. Cloud-Run-Request-Logs, der einzige IP-Träger, sind per Ausschluss `exclude_run_requests_ip` gar nicht erst darin |
-| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer, Token-Zahlen; seit 12.08.2026) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026; „Alter nicht lesbar“ ja/nein ab der Auslieferung der Puffer-Regel; oberes Ende der geschätzten Spanne ab der Auslieferung mit dem CHANGELOG-Eintrag „Kinderschutz-Protokoll mit oberem Ende der Altersschätzung“) |
+| `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer und Wiederholungen; seit 12.08.2026, Token-Zahlen, Modell und Status seit 26.09.2026 nur noch in `mistral-single-large-details` im Betriebs-Speicher) und `minor-safety` (geschätztes Alter, Zähler, Feld und Stichwort aus der Sperrliste, Werbe-Anzahl; seit 09.09.2026; „Alter nicht lesbar“ ja/nein ab der Auslieferung der Puffer-Regel; oberes Ende der geschätzten Spanne ab der Auslieferung mit dem CHANGELOG-Eintrag „Kinderschutz-Protokoll mit oberem Ende der Altersschätzung“) |
 | `_Default` (Googles Ablage) | global, nicht änderbar | 1 Tag | seit 09.09.2026 **leer** — bekommt nichts mehr; existiert weiter, weil Google sie nicht löschen lässt |
 | `_Required` (Googles Pflichtprotokoll) | global, nicht änderbar, gesperrt | 400 Tage | unsere eigenen Verwaltungszugriffe (Kontoadresse, Aufruf-IP unseres Rechners). Keine Nutzerdaten. Google-Vorgabe |
 

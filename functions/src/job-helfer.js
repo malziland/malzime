@@ -43,8 +43,12 @@ function loggeMinorSafety(safety, lang) {
          und Geraet auf ein bestimmtes Kind. Seit 26.09.2026 gilt das fuer
          jede Zeile desselben Aufrufs: Cloud Run versieht sie alle mit demselben
          Label `execution_id` (siehe handle-process-job.js, "AB HIER KEINE
-         KENNUNG IM LOG"). */
-      lang,
+         KENNUNG IM LOG").
+         Die Feldmenge folgt dem Datenschutztext (Kinderschutz-Auswertung:
+         Alter, Filterentscheidung, Sperrwort) — deshalb seit 26.09.2026 ohne
+         Sprache; die steht nur noch in der Alarmzeile unten (Betriebsprotokoll).
+         Festgeschrieben in alters-obergrenze.test.js, gegen den Text geprueft
+         in public/__tests__/datenschutz-deckung.test.js. */
       /* `alter` ist die Untergrenze der Schaetzung, `alterBis` (seit
          25.09.2026) ihr oberes Ende. Erst beide zusammen sagen, ob eine
          Spanne ein bekanntes Klassenalter einschliesst. */

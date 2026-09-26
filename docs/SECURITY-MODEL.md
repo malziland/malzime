@@ -643,6 +643,46 @@ rot werden — das ist gewollt.
 **Neubewertung.** Braucht eine neue Zeile im Analyse-Aufruf eine Kennung, wird
 vorher geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.
 
+## Diagnose-Speicher: nur, was der Datenschutztext nennt (26.09.2026)
+
+**Warum.** Der Datenschutztext ist die Vorgabe, das Programm folgt ihm. Er
+nennt für den 30-Tage-Speicher bei der KI nur, wie lange sie gebraucht hat,
+und beim Kinderschutz das geschätzte Alter, die Filterentscheidung und
+Sperrwort-Treffer. Die Erfolgsmeldung des Browsers kommt zudem Sekunden nach
+der Kinderschutz-Zeile an; trug sie Geräteangaben, ließ sich die
+Altersschätzung über die Uhrzeit einem Gerät zuordnen.
+
+**Entscheidung.**
+1. Die Erfolgsmeldung (`analyze-success`) trägt weder Browsertyp noch
+   Geräte- und Netzangaben noch Vorgangskennung noch Wake-Lock-Zustand. Der
+   Browser schickt sie nicht (`public/js/telemetry-logger.js`), der Server
+   verwirft sie auch von älteren Seiten (`functions/src/handle-telemetry.js`).
+   Geräteangaben bleiben in den Fehlermeldungen, wie der Datenschutztext
+   beschreibt, für die Fehlersuche.
+2. `mistral-single-large` trägt nur Dauer und Wiederholungen. Modell, Status,
+   Token-Zahlen und Reparaturstufen stehen in `mistral-single-large-details`,
+   die nicht in den 30-Tage-Speicher geht (Filter vergleicht `step` exakt).
+3. Die Kinderschutz-Zeile trägt keine Sprache mehr.
+4. `public/__tests__/datenschutz-deckung.test.js` prüft jetzt auch die Felder
+   der beiden Server-Zeilen einzeln gegen den Text (DE und EN), ohne
+   Sammelbegriff; `alters-obergrenze.test.js` und `ki-zeile-ohne-tokens.test.js`
+   halten fest, dass die echten Zeilen genau diese Felder haben.
+
+**Getragene Folge.** Mit welchen Geräten erfolgreich analysiert wurde, lässt
+sich nicht mehr auswerten. Status, Modell und Token-Zahlen der KI-Aufrufe
+gibt es nur noch einen Tag; das Herausrechnen der Beispielfotos über die
+Token-Zahlen geht damit nur am Tag der Analyse.
+
+**Betrachtete Alternativen.** Die Zeit der Kinderschutz-Zeile vergröbern:
+verworfen, Cloud Logging speichert zusätzlich den Empfangszeitpunkt
+sekundengenau. Geräteangaben auch aus den Fehlermeldungen nehmen: verworfen,
+sie sind der Zweck dieser Meldungen (Lesefehler je Browser und System). Den
+Datenschutztext an die Zeilen anpassen: verworfen, der Text ist die Vorgabe.
+
+**Rückweg.** Nur mit Deploy. Ein zusätzliches Feld in einer der Zeilen lässt
+die Feldmengen-Tests rot werden; wer es braucht, prüft zuerst, ob der
+Datenschutztext es deckt.
+
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 
 **Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.

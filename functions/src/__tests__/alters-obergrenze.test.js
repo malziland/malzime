@@ -170,28 +170,13 @@ describe("Logzeile minor-safety traegt die Obergrenze", () => {
     expect(zeile()).toHaveProperty("alterBis", null);
   });
 
-  /* Die Zeile liegt im 30-Tage-Diagnose-Speicher. Wer hier ein Feld ergaenzt
-     oder umbenennt, prueft im selben Commit, ob der Datenschutztext
-     (Abschnitt Kinderschutz-Auswertung, DE und EN) es deckt. */
-  test("Feldmenge der Zeile ist festgeschrieben", () => {
+  /* Die Zeile liegt im 30-Tage-Diagnose-Speicher. Ihre Felder stehen EINMAL,
+     in der Deckungstabelle des Datenschutztexts; dort prueft
+     public/__tests__/datenschutz-deckung.test.js jedes Feld gegen den Text
+     (DE und EN). Hier: die echte Zeile hat genau diese Felder. */
+  test("Feldmenge der Zeile = Feldgruppe der Deckungstabelle", () => {
+    const tabelle = require("../../../public/__tests__/fixtures/datenschutz-deckung.json");
     loggeMinorSafety(applyMinorSafety(profil("Du bist weiblich, ~10 Jahre alt (Spanne 8-13).")), "de");
-    expect(Object.keys(zeile()).sort()).toEqual(
-      [
-        "alter",
-        "alterBis",
-        "alterUnlesbar",
-        "durchgerutscht",
-        "durchgerutschtGruende",
-        "durchgerutschte",
-        "entfernt",
-        "entfernte",
-        "gekappt",
-        "gruende",
-        "lang",
-        "minderjaehrig",
-        "step",
-        "werbung",
-      ].sort()
-    );
+    expect(Object.keys(zeile()).sort()).toEqual(Object.keys(tabelle.felder["minor-safety"]).sort());
   });
 });

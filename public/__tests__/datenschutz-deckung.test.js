@@ -129,6 +129,40 @@ describe("(b) Diagnose-Endpunkte: jedes angenommene Feld steht im Datenschutztex
   }
 });
 
+/* (c) Seit 26.09.2026: Die Server-Zeilen im 30-Tage-Speicher (alles im Filter
+   ausser den beiden Browser-Meldungen) Feld fuer Feld. Strenger als (b): Der
+   Sammelsatz "grobe Angaben wie" beschreibt die Browser-Meldungen, nicht diese
+   Zeilen — hier braucht jedes Feld sein eigenes Stichwort. Dass die Tabelle
+   GENAU die Felder der echten Zeilen enthaelt, pruefen
+   functions/src/__tests__/alters-obergrenze.test.js (minor-safety) und
+   ki-zeile-ohne-tokens.test.js (mistral-single-large). */
+const BROWSER_ARTEN = ["client-error", "client-telemetry"];
+const SERVER_ARTEN = ARTEN.filter((art) => !BROWSER_ARTEN.includes(art));
+
+describe("(c) Server-Zeilen im 30-Tage-Speicher: jedes Feld steht im Datenschutztext", () => {
+  test("die Server-Zeilen sind erkannt (Messmittel-Kontrolle)", () => {
+    expect(SERVER_ARTEN).toEqual(expect.arrayContaining(["minor-safety", "mistral-single-large"]));
+  });
+
+  test.each(SERVER_ARTEN)("%s: hat eine Feldgruppe in der Tabelle", (art) => {
+    const felder = DECKUNG.felder[art];
+    expect(felder, `Feldgruppe ${art} fehlt in fixtures/datenschutz-deckung.json`).toBeDefined();
+    expect(Object.keys(felder).length).toBeGreaterThan(1);
+  });
+
+  for (const art of SERVER_ARTEN) {
+    for (const [feld, stichwort] of Object.entries(DECKUNG.felder[art] || {})) {
+      test(`${art}.${feld}: eigenes Stichwort im deutschen und englischen Text`, () => {
+        expect(stichwort, `${art}.${feld}: Sammelsatz ist hier nicht zulaessig`).not.toBe("zusammengefasst");
+        expect(TEXT_DE.includes(klartext(stichwort)), `fehlt in datenschutz.html: ${klartext(stichwort)}`).toBe(true);
+        const en = DECKUNG.stichwortEn?.[stichwort];
+        expect(en, `Uebersetzung fuer "${stichwort}" fehlt in stichwortEn`).toBeTruthy();
+        expect(TEXT_EN.includes(klartext(en)), `fehlt in en/privacy.html: ${en}`).toBe(true);
+      });
+    }
+  }
+});
+
 describe("englische Fassung", () => {
   test("der englische Seitentext ist lesbar (Messmittel-Kontrolle)", () => {
     expect(TEXT_EN.toLowerCase()).toContain("privacy");

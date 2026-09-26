@@ -60,8 +60,6 @@
     "handle-telemetry": {
       "eventType": "Wenn etwas schiefgeht oder klappt",
       "url": "aufgerufene Seite",
-      "userAgent": "Browsertyp",
-      "traceId": "dazu die Zufallsnummer",
       "durationMs": "Fehlerart, Dauer",
       "online": "zusammengefasst",
       "hidden": "zusammengefasst",
@@ -71,20 +69,10 @@
       "timings.parseMs": "Fehlerart, Dauer",
       "timings.renderMs": "Fehlerart, Dauer",
       "timings.totalMs": "Fehlerart, Dauer",
-      "client.effectiveType": "Sprache, Netz",
-      "client.language": "Sprache, Netz",
-      "client.screen": "Bildschirmgröße",
-      "client.downlinkMbps": "Sprache, Netz",
-      "client.rttMs": "Sprache, Netz",
-      "client.deviceMemoryGb": "zusammengefasst",
-      "client.hardwareConcurrency": "zusammengefasst",
-      "client.dpr": "Bildschirmgröße",
-      "client.saveData": "Sprache, Netz",
       "meta.subject": "ob ein Mensch, ein Tier oder beides auf dem Bild war",
       "meta.mode": "zusammengefasst",
       "meta.lang": "Sprache, Netz",
       "meta.reason": "zusammengefasst",
-      "meta.wakeLock": "zusammengefasst",
       "meta.maintenanceTriggered": "zusammengefasst",
       "stufen.alter": "welche Einschätzungen der KI getroffen oder daneben waren",
       "stufen.interessen": "welche Einschätzungen der KI getroffen oder daneben waren",
@@ -93,6 +81,27 @@
       "stufen.manipulation": "welche Einschätzungen der KI getroffen oder daneben waren",
       "stufen.geschlecht": "welche Einschätzungen der KI getroffen oder daneben waren",
       "score": "wie gut die KI im Schnitt liegt"
+    },
+    "minor-safety": {
+      "step": "was der Kinderschutz-Filter entschieden hat",
+      "alter": "auf welches Alter die KI ungef&auml;hr getippt hat",
+      "alterBis": "auf welches Alter die KI ungef&auml;hr getippt hat",
+      "alterUnlesbar": "auf welches Alter die KI ungef&auml;hr getippt hat",
+      "minderjaehrig": "was der Kinderschutz-Filter entschieden hat",
+      "entfernt": "was der Kinderschutz-Filter entschieden hat",
+      "gruende": "was der Kinderschutz-Filter entschieden hat",
+      "entfernte": "was der Kinderschutz-Filter entschieden hat",
+      "werbung": "was der Kinderschutz-Filter entschieden hat",
+      "gekappt": "was der Kinderschutz-Filter entschieden hat",
+      "durchgerutscht": "ob ein Wort unserer Sperrliste vorkam",
+      "durchgerutschtGruende": "ob ein Wort unserer Sperrliste vorkam",
+      "durchgerutschte": "ob ein Wort unserer Sperrliste vorkam"
+    },
+    "mistral-single-large": {
+      "step": "wie lange die KI gebraucht hat",
+      "httpMs": "wie lange die KI gebraucht hat",
+      "waitMs": "wie lange die KI gebraucht hat",
+      "wiederholungen": "wie lange die KI gebraucht hat"
     }
   },
   "stichwortEn": {
@@ -107,6 +116,11 @@
     "Wenn etwas schiefgeht oder klappt": "When something goes wrong or works",
     "ob ein Mensch, ein Tier oder beides auf dem Bild war": "whether a person, an animal or both were in the picture",
     "welche Einschätzungen der KI getroffen oder daneben waren": "guesses were right or wrong",
-    "wie gut die KI im Schnitt liegt": "how accurate the AI is on average"
-  }
+    "wie gut die KI im Schnitt liegt": "how accurate the AI is on average",
+    "was der Kinderschutz-Filter entschieden hat": "what the child-protection filter decided",
+    "auf welches Alter die KI ungef&auml;hr getippt hat": "roughly which age the AI guessed",
+    "ob ein Wort unserer Sperrliste vorkam": "whether a word from our block list came up",
+    "wie lange die KI gebraucht hat": "how long the AI took"
+  },
+  "_serverzeilen": "Server-Zeilen im 30-Tage-Speicher (felder.minor-safety, felder.mistral-single-large): jedes Feld der Logzeile mit eigenem Stichwort, KEIN 'zusammengefasst' - der Sammelsatz gehoert zu den Browser-Meldungen. Die Feldmenge der echten Zeilen pruefen functions/src/__tests__/alters-obergrenze.test.js und ki-zeile-ohne-tokens.test.js gegen diese Tabelle."
 }

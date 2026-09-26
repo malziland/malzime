@@ -17,6 +17,11 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   und Alarmmeldungen der Analyse tragen weder Auftrags- noch Vorgangsnummer.
   So gibt es keine Nummer, über die sich die Altersschätzung im
   Kinderschutz-Protokoll mit den Geräteangaben des Browsers verbinden ließe.
+- **Weniger Angaben im Diagnose-Protokoll.** Die Meldung, dass eine Analyse
+  geklappt hat, enthält keine Angaben zum Gerät und keine Vorgangsnummer mehr.
+  Was 30 Tage aufbewahrt wird, beschränkt sich auf das, was die
+  Datenschutzerklärung nennt: bei der KI die Dauer, beim Kinderschutz das
+  geschätzte Alter, die Filterentscheidung und Sperrwort-Treffer.
 
 ## [4.11.0] — 2026-09-18
 

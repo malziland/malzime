@@ -3,10 +3,12 @@
 /**
  * handle-telemetry.js — Anonyme Performance-/Success-Telemetrie.
  *
- * Spiegel zu handle-errors.js, aber INFO-severity (statt ERROR), getrennter
- * Endpoint damit Cloud Logging Success-Events sauber von Fehlern trennt.
- * DSGVO: keine PII, keine IP-Speicherung, keine Cookies, keine persistente
- * Speicherung. Whitelist + Laengenlimits identisch zum Error-Endpoint.
+ * Gegenstueck zu handle-errors.js, aber INFO-severity (statt ERROR),
+ * getrennter Endpoint damit Cloud Logging Success-Events sauber von Fehlern
+ * trennt. DSGVO: keine PII, keine IP-Speicherung, keine Cookies, keine
+ * persistente Speicherung. Whitelist + Laengenlimits wie beim Error-Endpoint,
+ * aber seit 26.09.2026 OHNE Geraeteangaben und ohne Vorgangskennung (siehe
+ * STRING_FIELDS).
  */
 
 const { checkRateLimit, getClientIp } = require("./middleware");
@@ -15,12 +17,20 @@ const { zaehleRealitaetsCheck } = require("./counter");
 const { verbraucheRcTicket } = require("./jobs");
 const { sha256Hex } = require("./auth");
 
+/* ERFOLGSMELDUNG OHNE GERAET UND OHNE KENNUNG (26.09.2026): Diese Meldung
+   kommt Sekunden nach der Kinderschutz-Zeile (geschaetztes Alter) an, beide
+   liegen 30 Tage im Diagnose-Speicher. Gemessen 16.–26.09.2026: Bei 390 von
+   638 Kinderschutz-Zeilen kam in den 10 s danach genau eine Erfolgsmeldung —
+   ueber die Uhrzeit liess sich die Altersschaetzung also dem Geraet
+   zuordnen. Deshalb nimmt der Server hier weder Browsertyp noch
+   Geraete-/Netzangaben (client) noch die Vorgangskennung an, auch wenn ein
+   aelterer Browser sie noch schickt. Geraeteangaben bleiben in den
+   FEHLERmeldungen (handle-errors.js) — dort dienen sie der Fehlersuche
+   (Lesefehler je Browser und System). Pruefung:
+   handle-telemetry-ohne-geraet.test.js. */
 const STRING_FIELDS = {
   eventType: 50,
   url: 200,
-  /* Client sendet nur noch den vergröberten UA — knappes Limit als zweites Netz. */
-  userAgent: 80,
-  traceId: 50,
 };
 const NUMBER_FIELDS = ["durationMs"];
 const BOOLEAN_FIELDS = ["online", "hidden"];
@@ -30,11 +40,8 @@ const BOOLEAN_FIELDS = ["online", "hidden"];
    Client misst es bereits, es fehlte nur auf dieser Liste und wurde verworfen. */
 const TIMING_KEYS = ["prepareImageMs", "fetchMs", "enqueueMs", "parseMs", "renderMs", "totalMs"];
 
-const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
-const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];
-const CLIENT_BOOL_KEYS = ["saveData"];
-
-const META_STRING_KEYS = { subject: 30, mode: 30, lang: 10, reason: 100, wakeLock: 40 };
+/* wakeLock verraet, was der Browser kann — ebenfalls eine Geraeteangabe. */
+const META_STRING_KEYS = { subject: 30, mode: 30, lang: 10, reason: 100 };
 const META_BOOL_KEYS = ["maintenanceTriggered"];
 
 function sanitizeTimings(raw) {
@@ -45,21 +52,6 @@ function sanitizeTimings(raw) {
     if (typeof v === "number" && isFinite(v)) {
       out[key] = Math.max(0, Math.min(600000, Math.round(v)));
     }
-  }
-  return Object.keys(out).length > 0 ? out : null;
-}
-
-function sanitizeClient(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const out = {};
-  for (const [key, maxLen] of Object.entries(CLIENT_STRING_KEYS)) {
-    if (typeof raw[key] === "string") out[key] = raw[key].slice(0, maxLen);
-  }
-  for (const key of CLIENT_NUMBER_KEYS) {
-    if (typeof raw[key] === "number" && isFinite(raw[key])) out[key] = raw[key];
-  }
-  for (const key of CLIENT_BOOL_KEYS) {
-    if (typeof raw[key] === "boolean") out[key] = raw[key];
   }
   return Object.keys(out).length > 0 ? out : null;
 }
@@ -225,9 +217,6 @@ async function handleTelemetry(req, res) {
     const timings = sanitizeTimings(body.timings);
     if (timings) sanitized.timings = timings;
 
-    const client = sanitizeClient(body.client);
-    if (client) sanitized.client = client;
-
     const meta = sanitizeMeta(body.meta);
     if (meta) sanitized.meta = meta;
 
@@ -253,7 +242,6 @@ const _freigabeliste = [
   ...NUMBER_FIELDS,
   ...BOOLEAN_FIELDS,
   ...TIMING_KEYS.map((k) => `timings.${k}`),
-  ...[...Object.keys(CLIENT_STRING_KEYS), ...CLIENT_NUMBER_KEYS, ...CLIENT_BOOL_KEYS].map((k) => `client.${k}`),
   ...[...Object.keys(META_STRING_KEYS), ...META_BOOL_KEYS].map((k) => `meta.${k}`),
   ...[...RC_PFLICHT_STUFEN, ...RC_OPTIONALE_STUFEN].map((k) => `stufen.${k}`),
   "score",

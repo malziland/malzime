@@ -77,7 +77,7 @@ im Dokument wirkt nicht mehr.
 Mistral cacht einen multimodalen `content`-Array nur als Ganzes. Da das Bild pro
 Anfrage wechselt, fällt ohne den Rollenwechsel der komplette Präfix aus dem Cache.
 
-**Erfolgskontrolle:** `cachedTokens` in jeder `mistral-single-large`-Logzeile.
+**Erfolgskontrolle:** `cachedTokens` in jeder `mistral-single-large-details`-Logzeile (seit 26.09.2026 nur im Betriebsprotokoll, 1 Tag).
 
 ### `useLiveText` — FEST EINGEBAUT (10.09.2026)
 

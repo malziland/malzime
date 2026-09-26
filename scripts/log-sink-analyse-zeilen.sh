@@ -2,7 +2,8 @@
 # KA-04 (Kurzaudit 2026-08-12): Analyse-Logzeilen 30 Tage aufheben.
 #
 # Problem: Der Standard-Log-Speicher (_Default) hebt nur 1 Tag auf. Die
-# Zeilen `step:"mistral-single-large"` (Dauer, Token-Zahlen, cachedTokens)
+# Zeilen `step:"mistral-single-large"` (seit 26.09.2026 nur noch die Dauer;
+# Token-Zahlen stehen in `mistral-single-large-details`, 1 Tag)
 # sind damit am Folgetag weg — die geplanten September-Messungen
 # (Prompt-Caching-Trefferquote unter Last, HEIC-Formatanteile) waeren
 # unmoeglich.

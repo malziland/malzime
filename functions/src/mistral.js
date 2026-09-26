@@ -264,7 +264,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
       (missing.beast.length > 0 ? `\nBeast fehlt: ${missing.beast.join(", ")}.` : "");
     console.log(
       JSON.stringify({
-        step: "mistral-single-large",
+        step: "mistral-single-large-details",
         status: "incomplete-retry",
         missingStandard: missing.standard,
         missingBeast: missing.beast,
@@ -311,7 +311,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     } catch (err) {
       console.log(
         JSON.stringify({
-          step: "mistral-single-large",
+          step: "mistral-single-large-details",
           status: "incomplete-retry-failed",
           error: err.message,
         })
@@ -599,9 +599,31 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       requireSchema: false /* unser Schema unterscheidet sich vom Live-Schema (categories sitzt unter standard/beast) */,
       onRepair: (stage, err) => stages.push(stage + (err ? `:${err.name || "Error"}` : "")),
     });
+    /* ZWEI ZEILEN, NACH AUFBEWAHRUNG GETRENNT (26.09.2026): Die Zeile
+       `mistral-single-large` geht 30 Tage in den Diagnose-Speicher (Filter
+       vergleicht `step` exakt, scripts/log-sink-analyse-zeilen.sh). Der
+       Datenschutztext nennt dafuer nur, wie lange die KI gebraucht hat —
+       deshalb traegt sie nur die Dauer. Alles Weitere (Modell, Status,
+       Textmenge) steht in `mistral-single-large-details` und bleibt im
+       Betriebsprotokoll (1 Tag), dessen Beschreibung auch "wie viel Text die
+       KI verarbeitet hat" nennt. Die Eingabe-Token verraten zudem das Format
+       des Fotos. Feldmenge festgeschrieben in ki-zeile-ohne-tokens.test.js,
+       gegen den Text geprueft in public/__tests__/datenschutz-deckung.test.js. */
     console.log(
       JSON.stringify({
         step: "mistral-single-large",
+        httpMs: result.httpMs,
+        waitMs: result.waitMs,
+        /* Wie oft der Aufruf bei Ueberlast warten musste, bevor er durchkam
+           (08.09.2026) — Teil der Dauer. 0 im Normalfall; jede andere Zahl
+           heisst: das Netz hat gegriffen, und die Dosierung verdient einen
+           Blick. */
+        wiederholungen: result.wiederholungen || 0,
+      })
+    );
+    console.log(
+      JSON.stringify({
+        step: "mistral-single-large-details",
         /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
            Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
            bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,
@@ -616,12 +638,6 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
         /* v2.5: Erfolgskontrolle Prompt-Cache. cachedTokens/promptTokens ist die
            Trefferquote; 0 bei ausgeschaltetem Flag ODER Cache-Miss. */
         cachedTokens: result.cachedTokens,
-        httpMs: result.httpMs,
-        waitMs: result.waitMs,
-        /* Wie oft der Aufruf bei Ueberlast warten musste, bevor er durchkam
-           (08.09.2026). 0 im Normalfall; jede andere Zahl heisst: das Netz
-           hat gegriffen, und die Dosierung verdient einen Blick. */
-        wiederholungen: result.wiederholungen || 0,
         repairStages: stages,
       })
     );
@@ -667,7 +683,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       JSON.stringify({
         severity: "ERROR",
         alert: "single-large-failed",
-        step: "mistral-single-large",
+        step: "mistral-single-large-details",
         /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
            Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
            bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,

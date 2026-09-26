@@ -152,7 +152,7 @@ describe("Logzeile minor-safety traegt die Obergrenze", () => {
   const zeile = () => JSON.parse(ausgabe.find((z) => z.includes('"minor-safety"')));
 
   test("Kind: alter und alterBis stehen nebeneinander, keine Vorgangskennung", () => {
-    loggeMinorSafety(applyMinorSafety(profil("Du bist weiblich, ~10 Jahre alt (Spanne 8-13).")), "trace-7", "de");
+    loggeMinorSafety(applyMinorSafety(profil("Du bist weiblich, ~10 Jahre alt (Spanne 8-13).")), "de", "trace-7");
     expect(zeile().alter).toBe(8);
     expect(zeile().alterBis).toBe(13);
     expect(zeile()).not.toHaveProperty("traceId");
@@ -160,13 +160,13 @@ describe("Logzeile minor-safety traegt die Obergrenze", () => {
   });
 
   test("Erwachsener ohne Stufe 2: alterBis steht ebenfalls in der Zeile", () => {
-    loggeMinorSafety(applyMinorSafety(profil("Du bist männlich, ~35 Jahre alt (Spanne 30-40).")), null, "de");
+    loggeMinorSafety(applyMinorSafety(profil("Du bist männlich, ~35 Jahre alt (Spanne 30-40).")), "de");
     expect(zeile().minderjaehrig).toBe(false);
     expect(zeile().alterBis).toBe(40);
   });
 
   test("ein Bericht ohne Obergrenze loggt null statt das Feld wegzulassen", () => {
-    loggeMinorSafety({ alter: 14, minderjaehrig: true, entfernt: [], durchgerutscht: [] }, null, "de");
+    loggeMinorSafety({ alter: 14, minderjaehrig: true, entfernt: [], durchgerutscht: [] }, "de");
     expect(zeile()).toHaveProperty("alterBis", null);
   });
 
@@ -174,7 +174,7 @@ describe("Logzeile minor-safety traegt die Obergrenze", () => {
      oder umbenennt, prueft im selben Commit, ob der Datenschutztext
      (Abschnitt Kinderschutz-Auswertung, DE und EN) es deckt. */
   test("Feldmenge der Zeile ist festgeschrieben", () => {
-    loggeMinorSafety(applyMinorSafety(profil("Du bist weiblich, ~10 Jahre alt (Spanne 8-13).")), "trace-8", "de");
+    loggeMinorSafety(applyMinorSafety(profil("Du bist weiblich, ~10 Jahre alt (Spanne 8-13).")), "de");
     expect(Object.keys(zeile()).sort()).toEqual(
       [
         "alter",

@@ -164,7 +164,7 @@ async function runPipeline(job) {
       alterText: profiles.alterAnker || undefined,
       alterUnlesbar: profiles.alterUnlesbar === true,
     });
-    loggeMinorSafety(safety, job.traceId, lang);
+    loggeMinorSafety(safety, lang);
     const n = profiles.normal || {};
     const b = profiles.boost || {};
     return {

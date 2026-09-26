@@ -132,7 +132,7 @@ describe("Log-Zeile minor-safety", () => {
     const p = profil(KIND, zehnAds("Bet365 Live-Wetten Abo"), {
       profileText: "Cocktail-Abende mit Freundinnen.",
     });
-    loggeMinorSafety(applyMinorSafety(p), "trace-1", "de");
+    loggeMinorSafety(applyMinorSafety(p), "de");
     const zeile = JSON.parse(ausgabe.find((z) => z.includes('"minor-safety"')));
     expect(zeile.entfernte).toContainEqual({ feld: "boost.ad_targeting", grund: "minor", stichwort: "bet365" });
     expect(zeile.durchgerutschte).toContainEqual({ feld: "normal.profileText", grund: "minor", stichwort: "cocktail" });
@@ -150,14 +150,17 @@ describe("Log-Zeile minor-safety", () => {
      derselben Analyse verbinden — client-error und client-telemetry tragen
      dieselbe Kennung. */
   test("traegt keine Vorgangskennung (traceId), auch wenn der Aufrufer eine mitgibt", () => {
-    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), "trace-verbindbar-42", "de");
+    /* Seit 26.09.2026 nimmt loggeMinorSafety keine Kennung mehr entgegen; ein
+       dritter Wert steht hier als Rueckfall-Waechter, falls jemand den
+       Parameter wieder einfuehrt. */
+    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), "de", "trace-verbindbar-42");
     const roh = ausgabe.find((z) => z.includes('"minor-safety"'));
     expect(roh).toBeDefined();
     expect(JSON.parse(roh)).not.toHaveProperty("traceId");
     expect(roh).not.toContain("trace-verbindbar-42");
   });
   test("vertraegt einen leeren Bericht (kein Profil)", () => {
-    loggeMinorSafety(applyMinorSafety(null), null, "de");
+    loggeMinorSafety(applyMinorSafety(null), "de");
     const zeile = JSON.parse(ausgabe[0]);
     expect(zeile.werbung).toEqual({});
     expect(zeile.gekappt).toBe(0);
@@ -166,8 +169,8 @@ describe("Log-Zeile minor-safety", () => {
   /* Seit 17.09.2026: Die Zeile zaehlt, wie oft das Alter nicht lesbar war
      (abgeschriebene Vorlage, Alter ohne Ziffer) — nur als Ja/Nein. */
   test("meldet ein nicht lesbares Alter als Ja/Nein, ohne den Text", () => {
-    loggeMinorSafety(applyMinorSafety(profil("männlich, ~‹Zahl› Jahre alt", ["Nike"])), null, "de");
-    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), null, "de");
+    loggeMinorSafety(applyMinorSafety(profil("männlich, ~‹Zahl› Jahre alt", ["Nike"])), "de");
+    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), "de");
     const zeilen = ausgabe.filter((z) => z.includes('"minor-safety"')).map((z) => JSON.parse(z));
     expect(zeilen.map((z) => z.alterUnlesbar)).toEqual([true, false]);
     expect(zeilen[0].minderjaehrig).toBe(true);

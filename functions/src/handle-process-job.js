@@ -183,6 +183,20 @@ async function handleProcessJob(req, res) {
     return;
   }
 
+  /* AB HIER KEINE KENNUNG IM LOG (26.09.2026): Ab dem Claim kann dieser
+     Aufruf die Kinderschutz-Zeile schreiben (geschaetztes Alter, 30 Tage im
+     Diagnose-Speicher, bewusst ohne Vorgangskennung, PRIV-2026-09-10-02).
+     Cloud Run versieht aber JEDE Logzeile eines Aufrufs mit demselben Label
+     `execution_id`. Truege hier eine Zeile jobId oder traceId, liesse sich die
+     Altersschaetzung ueber dieses Label mit der Vorgangskennung und darueber
+     mit den Geraeteangaben verbinden, die der Browser unter derselben
+     Kennung meldet — gemessen am 25.09.2026. Deshalb schreibt ab hier keine
+     Zeile eine Kennung, auch nicht die Fehlerzeilen. Wie viele Ergebnisse
+     nie abgeholt wurden, zaehlt der Aufraeumdienst (handle-reap.js:
+     `zugestellt`/`expired`). analyse-aufruf-ohne-kennung.test.js haelt das
+     fuer alle Wege fest. Die Zeilen VOR dem Claim behalten die jobId: Diese
+     Wege enden, ohne dass eine Analyse laeuft (claimJob nimmt nur
+     `queued`-Auftraege). */
   const start = Date.now();
   /* Stundenzaehler (11.09.2026): War der Zaehler beim Einlass ausgewichen,
      traegt dieser Auftrag seine Marke jetzt selbst nach — neben der Analyse
@@ -204,7 +218,6 @@ async function handleProcessJob(req, res) {
         JSON.stringify({
           severity: "ERROR",
           step: "process-job",
-          jobId,
           error: "ergebnis-verworfen-job-bereits-terminal",
           hinweis:
             "completeJob gab false - der Job war nicht mehr processing (Reaper/markFailedIfStale war schneller). Ergebnis wird NICHT gezaehlt.",
@@ -221,8 +234,6 @@ async function handleProcessJob(req, res) {
     console.log(
       JSON.stringify({
         step: "process-job",
-        jobId,
-        traceId: job.traceId || null,
         status: success ? "done" : "blocked",
         /* OPS-2026-08-31-01: Der SPERRGRUND gehoert ins Server-Log. Vorher
            stand hier nur `status: "blocked"` — bei einem Vorfall liess sich
@@ -261,7 +272,6 @@ async function handleProcessJob(req, res) {
     console.log(
       JSON.stringify({
         step: "process-job",
-        jobId,
         status: "error",
         error: err.message,
         totalMs: Date.now() - start,
@@ -273,7 +283,7 @@ async function handleProcessJob(req, res) {
       privacyRisks: [],
       exif: job.exif || {},
       meta: { traceId: job.traceId || null, mode: "blocked" },
-    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", jobId, error: e.message })));
+    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", error: e.message })));
   } finally {
     /* Bild immer löschen — Erfolg ODER Fehler. Die Storage-Lifecycle-Regel
        ist das zweite Sicherheitsnetz. */

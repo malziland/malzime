@@ -604,6 +604,45 @@ Schätzfehler; am Alters-Prompt ändert sich dann nichts. Verfehlen sie es
 überwiegend, wird der Alters-Prompt überarbeitet und vor der Auslieferung
 daraufhin geprüft, dass keine Kinder über die Schutzgrenze rutschen.
 
+## Analyse-Aufruf ohne Kennung im Log (26.09.2026)
+
+**Warum.** Die Kinderschutz-Zeile trägt keine Vorgangskennung
+(PRIV-2026-09-10-02), damit sich die Altersschätzung nicht mit den
+Geräteangaben verbinden lässt, die der Browser unter dieser Kennung meldet.
+Cloud Run versieht aber jede Logzeile eines Aufrufs mit demselben Label
+`execution_id`. Eine Auftrags- oder Vorgangskennung in irgendeiner anderen
+Zeile desselben Aufrufs würde die Kinderschutz-Zeile darüber wieder mit ihr
+verbinden.
+
+**Entscheidung.** Ab dem Claim schreibt der Analyse-Aufruf
+(`functions/src/handle-process-job.js`, Kommentar „AB HIER KEINE KENNUNG IM
+LOG“) weder Auftrags- noch Vorgangskennung ins Log: nicht in der
+Abschlusszeile, nicht in den Fehlerzeilen, nicht in der Alarmzeile bei harten
+Sperrwort-Treffern. `loggeMinorSafety` nimmt keine Kennung mehr entgegen. Die
+Zeilen vor dem Claim behalten die Auftragskennung; diese Wege enden, ohne dass
+eine Analyse läuft. `analyse-aufruf-ohne-kennung.test.js` lässt den Aufruf auf
+dem Erfolgsweg und auf den Fehlerwegen laufen und sucht in jeder Ausgabe nach
+den Werten beider Kennungen; eine Positivkontrolle zeigt, dass die Suche eine
+Kennung findet, wenn sie dasteht.
+
+**Getragene Folge.** Ein einzelner Auftrag lässt sich im Log nicht mehr über
+seine Nummer finden, wenn er nach dem Claim scheitert; Fehlerart und Zeitpunkt
+bleiben. Wie viele Ergebnisse nie abgeholt wurden, zählt der Aufräumdienst
+(`handle-reap.js`, Felder `zugestellt` und `expired`).
+
+**Betrachtete Alternativen.** Das Label entfernen: nicht möglich, Cloud Run
+setzt es selbst. Nur die Abschlusszeile ändern: verworfen, die Fehlerzeilen
+desselben Aufrufs hätten dieselbe Verbindung hergestellt. Die
+Kinderschutz-Zeile in einem anderen Aufruf schreiben, gesammelt durch den
+Aufräumdienst: verworfen, mehr Umbau und eine zusätzliche Ablage der Werte in
+der Datenbank.
+
+**Rückweg.** Nur mit Deploy. Eine Kennung im Analyse-Aufruf lässt den Test
+rot werden — das ist gewollt.
+
+**Neubewertung.** Braucht eine neue Zeile im Analyse-Aufruf eine Kennung, wird
+vorher geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.
+
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 
 **Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.

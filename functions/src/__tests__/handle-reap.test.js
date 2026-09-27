@@ -134,11 +134,10 @@ describe("reapJobs", () => {
   });
 
   /* 27.09.2026: Bleibt das Bild eines abgelaufenen Auftrags liegen, nennt
-     die Meldung die jobId, aber nicht den Bildpfad — der Pfad verband sie
-     mit der Loeschfehler-Zeile im Analyse-Aufruf und damit mit der
-     Kinderschutz-Zeile. */
+     die Meldung weder Bildpfad noch jobId (Begruendung in handle-reap.js,
+     Kommentar "FEHLERZEILEN DES AUFRAEUMDIENSTES"). */
   test("liegengebliebenes Bild: Meldung ohne Bildpfad", async () => {
-    jobs.findExpiredJobs.mockResolvedValue([{ id: "e1", imagePath: "queue-uploads/geheimer-pfad-7.jpg" }]);
+    jobs.findExpiredJobs.mockResolvedValue([{ id: "kennung-bild-e1", imagePath: "queue-uploads/geheimer-pfad-7.jpg" }]);
     storage.deleteImage.mockResolvedValueOnce(false);
     const fehler = [];
     const spy = jest.spyOn(console, "error").mockImplementation((z) => fehler.push(String(z)));
@@ -148,8 +147,8 @@ describe("reapJobs", () => {
     expect(zeile).toBeDefined();
     expect(zeile).not.toContain("geheimer-pfad-7");
     /* Auch ohne jobId: siehe den naechsten Test. */
-    expect(zeile).not.toContain("e1");
-    expect(jobs.deleteJob).toHaveBeenCalledWith("e1");
+    expect(zeile).not.toContain("kennung-bild-e1");
+    expect(jobs.deleteJob).toHaveBeenCalledWith("kennung-bild-e1");
   });
 
   /* 27.09.2026: Die Fristen, nach denen der Aufraeumdienst einen Auftrag

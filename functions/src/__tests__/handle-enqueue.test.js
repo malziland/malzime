@@ -246,7 +246,13 @@ describe("handleEnqueue — Erfolgsfall", () => {
     ],
     [
       "Platzbestaetigung gescheitert",
-      () => jobs.platzBestaetigen.mockRejectedValueOnce(new Error("zeitgrenze")),
+      /* Fehlertext mit Dokumentpfad samt jobId, wie Firestore ihn liefern kann. */
+      () =>
+        jobs.platzBestaetigen.mockRejectedValueOnce(
+          Object.assign(new Error("No document to update: projects/p/databases/d/documents/jobs/job-abc"), {
+            code: 5,
+          })
+        ),
       "platz-bestaetigung-fehlgeschlagen",
     ],
     [

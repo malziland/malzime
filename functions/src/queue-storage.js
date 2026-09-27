@@ -180,9 +180,9 @@ async function deleteImage(objectPath) {
     if (err && (err.code === 404 || err.code === "ENOENT")) return true;
     /* Ohne Pfad und ohne Fehlertext (27.09.2026): Die Zeile kann im
        Analyse-Aufruf neben der Kinderschutz-Zeile stehen (gemeinsames Label
-       execution_id), und Pfad wie Speicher-Fehlertext fuehren ueber die
-       Zeile des Aufraeumdienstes zur jobId. Das Bild raeumt die
-       Lifecycle-Regel ohnehin; fuer die Fehlersuche genuegt der Code. */
+       execution_id). Der Pfad ist je Auftrag eindeutig, und ein
+       Speicher-Fehlertext kann ihn enthalten — ein eindeutiger Wert neben der
+       Kinderschutz-Zeile. Das Bild raeumt die Lifecycle-Regel ohnehin. */
     console.error(
       JSON.stringify({
         severity: "ERROR",

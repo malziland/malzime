@@ -632,11 +632,20 @@ Vorgangskennung ins Log:
   fasst Aufträge nach festen Fristen an, eine jobId dort ließe sich darüber
   minutengenau der Abschlusszeile der Analyse zuordnen.
 
-Wo solche Zeilen einen Fehler melden, nennen sie nur Fehlercode und -art, nicht
-den Fehlertext: Firestore- und Speicher-Meldungen können den Dokument- oder
-Bildpfad enthalten. Die beiden Löschfehler-Zeilen (Speichermodul,
-liegengebliebenes Bild) nennen auch den Bildpfad nicht mehr; er ist je Auftrag
-eindeutig. Das Bild räumt die Lifecycle-Regel ohnehin. Die Dauern bleiben.
+Fehlerzeilen, die einen einzelnen Auftrag in Firestore oder im Bildspeicher
+betreffen, nennen nur Fehlercode und -art, nicht den Fehlertext, denn solche
+Meldungen können den Dokument- oder Bildpfad enthalten: die Fehlerzeilen des
+Aufräumdienstes je Auftrag, die Warnung bei gescheitertem Abhol-Vermerk, die
+Warnung bei gescheiterter Platzbestätigung im Einlass und die Löschfehler-Zeile
+im Speichermodul. Die beiden Löschfehler-Zeilen (Speichermodul,
+liegengebliebenes Bild) nennen auch den Bildpfad nicht; er ist je Auftrag
+eindeutig, und das Bild räumt die Lifecycle-Regel ohnehin. Andere Fehlerzeilen
+auf diesen Wegen nennen den Fehlertext weiter, weil sie keinen einzelnen
+Auftrag betreffen (Suchabfragen, Benachrichtigungsdienst) oder weil ihr Text
+die Fehlersuche trägt (Fehler der KI-Analyse). Der Fehlertext einer
+gescheiterten Analyse kann den Bildpfad enthalten (Bild nicht gefunden); der
+Pfad steht in keiner anderen Zeile und führt damit zu keiner Kennung. Die
+Dauern bleiben.
 
 Kennungen tragen nur noch Wege, auf denen der jeweilige Aufruf keine Analyse
 macht: Zeilen des Analyse-Aufrufs vor dem Claim und Fehlerzeilen eines
@@ -647,7 +656,8 @@ Positivkontrolle: `analyse-aufruf-ohne-kennung.test.js` (Erfolgs- und
 Fehlerwege der Analyse), `handle-enqueue.test.js` (Annahme, auch über die
 Warnwege, nach denen der Einlass weiterläuft), `handle-job-status.test.js`
 (Abholung, auch mit gescheitertem Abhol-Vermerk), `handle-reap.test.js` (jeder
-Fehlerweg des Aufräumdienstes, mit Fehlertexten, die die jobId enthalten).
+Fehlerweg des Aufräumdienstes je Auftrag, mit Fehlertexten, die die jobId
+enthalten).
 
 **Getragene Folge.** Eine vom Browser gemeldete Vorgangsnummer findet bei einem
 erfolgreichen Auftrag im Server-Log nichts mehr. „Nie abgeholt“ lässt sich ohne

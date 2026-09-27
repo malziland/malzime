@@ -402,7 +402,11 @@ async function handleEnqueue(req, res, secrets) {
           JSON.stringify({
             severity: "ERROR",
             error: "platz-bestaetigung-fehlgeschlagen",
-            message: err && err.message,
+            /* Nur Code und Art (27.09.2026): Der Fehlertext von Firestore kann
+               den Dokumentpfad samt jobId enthalten, und der Auftrag wird
+               danach analysiert. */
+            code: (err && err.code) || null,
+            art: (err && err.name) || null,
           })
         );
       }

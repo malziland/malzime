@@ -101,7 +101,9 @@ describe("deleteImage", () => {
      Gemessen: 11 solcher Fehlschläge in 30 Tagen, alle unbemerkt. */
   test("ein echter Löschfehler gibt false zurück UND meldet mit severity ERROR", async () => {
     const pfad = await storage.storeImage(Buffer.from("x"), "image/jpeg");
-    const echterFehler = new Error("permission denied");
+    /* Der Fehlertext enthaelt den Pfad, wie es echte Speicher-Meldungen tun
+       koennen — so faellt auch ein Fehlertext unter anderem Schluessel auf. */
+    const echterFehler = new Error(`permission denied on ${pfad}`);
     echterFehler.code = 403;
     jest.spyOn(bucket, "file").mockReturnValue({
       async delete() {

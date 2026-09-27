@@ -188,6 +188,7 @@ async function deleteImage(objectPath) {
         severity: "ERROR",
         error: "queue-image-delete-failed",
         code: (err && err.code) || null,
+        art: (err && err.name) || null,
         hinweis:
           "Bild konnte nicht aktiv geloescht werden. Es faellt jetzt auf die " +
           "Lifecycle-Regel (1 Tag) zurueck — die Zusage 'unmittelbar geloescht' " +

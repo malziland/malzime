@@ -199,16 +199,13 @@ async function handleProcessJob(req, res) {
           Fertigzeitpunkt des Auftrags millisekundengenau, und der
           Fertigzeitpunkt liegt Millisekunden neben der Kinderschutz-Zeile.
      Deshalb schreibt kein Aufruf mit Analyse und weder Annahme noch
-     Abholung eines erfolgreichen Auftrags jobId oder traceId ins Log: nicht die Zeilen des Einlasses bis zur Annahme
-     (handle-enqueue.js), keine Zeile ab hier (auch nicht die Fehlerzeilen),
-     keine Zeile der Abholung (handle-job-status.js). Die Dauern bleiben.
-     Wie man "nie abgeholt" ohne Kennung naehert: docs/SECURITY-MODEL.md,
-     Abschnitt "Erfolgsweg eines Auftrags ohne Kennung im Log". Kennungen tragen nur
-     noch Wege, auf denen dieser Aufruf keine Analyse macht: die Zeilen vor
-     dem Claim (claimJob nimmt nur `queued`-Auftraege), Fehlerzeilen eines
-     gescheiterten Einlasses und der Aufraeumdienst. Pruefung (alle Ausgaben
-     des jeweiligen Aufrufs): analyse-aufruf-ohne-kennung.test.js,
-     handle-enqueue.test.js, handle-job-status.test.js. */
+     Abholung eines erfolgreichen Auftrags jobId oder traceId ins Log, auch
+     keine Fehlerzeile des Aufraeumdienstes (feste Fristen). Die Dauern
+     bleiben. Wie man "nie abgeholt" ohne Kennung naehert und welche Wege
+     noch Kennungen tragen: docs/SECURITY-MODEL.md, Abschnitt "Erfolgsweg
+     eines Auftrags ohne Kennung im Log". Pruefung (alle Ausgaben des
+     jeweiligen Aufrufs): analyse-aufruf-ohne-kennung.test.js,
+     handle-enqueue.test.js, handle-job-status.test.js, handle-reap.test.js. */
   const start = Date.now();
   /* Stundenzaehler (11.09.2026): War der Zaehler beim Einlass ausgewichen,
      traegt dieser Auftrag seine Marke jetzt selbst nach — neben der Analyse

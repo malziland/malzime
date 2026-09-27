@@ -619,25 +619,35 @@ genügt.
 
 **Entscheidung.** Kein Aufruf, in dem eine Analyse läuft, und weder Annahme
 noch Abholung eines erfolgreichen Auftrags schreiben Auftrags- oder
-Vorgangskennung ins Log: nicht die Zeilen des Einlasses bis zur Annahme (`functions/src/handle-enqueue.js`), keine Zeile des
-Analyse-Aufrufs ab dem Claim, auch nicht dessen Fehler- und Alarmzeilen
-(`functions/src/handle-process-job.js`, Kommentar „AB HIER KEINE KENNUNG IM
-LOG“), keine Zeile der Abholung, auch nicht die Warnung bei gescheitertem
-Abhol-Vermerk, die nur noch den Fehlercode nennt
-(`functions/src/handle-job-status.js`). `loggeMinorSafety` nimmt keine
-Kennung entgegen. Auch den Bildpfad nennt keine Fehlerzeile mehr (Löschfehler
-im Speichermodul, liegengebliebenes Bild beim Aufräumdienst): Er ist je Auftrag
-eindeutig und verband beide Zeilen und damit die Kinderschutz-Zeile mit der
-jobId. Das Bild räumt die Lifecycle-Regel ohnehin. Die Dauern bleiben. Kennungen tragen nur noch Wege, auf
-denen der jeweilige Aufruf keine Analyse macht: Zeilen des Analyse-Aufrufs vor
-dem Claim, Fehlerzeilen eines gescheiterten Einlasses (dort einmal beide
-Kennungen zusammen; der Auftrag wird verworfen) und der Aufräumdienst. Auftrag
-und Antwort an den Browser tragen die Vorgangskennung weiter. Geprüft werden
-jeweils ALLE Ausgaben eines Aufrufs nach den Werten beider Kennungen, mit
+Vorgangskennung ins Log:
+
+- nicht die Zeilen des Einlasses bis zur Annahme
+  (`functions/src/handle-enqueue.js`);
+- keine Zeile des Analyse-Aufrufs ab dem Claim, auch nicht dessen Fehler- und
+  Alarmzeilen (`functions/src/handle-process-job.js`, Kommentar „AB HIER KEINE
+  KENNUNG IM LOG“); `loggeMinorSafety` nimmt keine Kennung entgegen;
+- keine Zeile der Abholung, auch nicht die Warnung bei gescheitertem
+  Abhol-Vermerk (`functions/src/handle-job-status.js`);
+- keine Fehlerzeile des Aufräumdienstes (`functions/src/handle-reap.js`): Er
+  fasst Aufträge nach festen Fristen an, eine jobId dort ließe sich darüber
+  minutengenau der Abschlusszeile der Analyse zuordnen.
+
+Wo solche Zeilen einen Fehler melden, nennen sie nur Fehlercode und -art, nicht
+den Fehlertext: Firestore- und Speicher-Meldungen können den Dokument- oder
+Bildpfad enthalten. Die beiden Löschfehler-Zeilen (Speichermodul,
+liegengebliebenes Bild) nennen auch den Bildpfad nicht mehr; er ist je Auftrag
+eindeutig. Das Bild räumt die Lifecycle-Regel ohnehin. Die Dauern bleiben.
+
+Kennungen tragen nur noch Wege, auf denen der jeweilige Aufruf keine Analyse
+macht: Zeilen des Analyse-Aufrufs vor dem Claim und Fehlerzeilen eines
+gescheiterten Einlasses (dort einmal beide Kennungen zusammen). Auftrag und
+Antwort an den Browser tragen die Vorgangskennung weiter. Geprüft werden
+jeweils ALLE Ausgaben eines Aufrufs nach den Werten der Kennungen, mit
 Positivkontrolle: `analyse-aufruf-ohne-kennung.test.js` (Erfolgs- und
 Fehlerwege der Analyse), `handle-enqueue.test.js` (Annahme, auch über die
 Warnwege, nach denen der Einlass weiterläuft), `handle-job-status.test.js`
-(Abholung, auch mit gescheitertem Abhol-Vermerk).
+(Abholung, auch mit gescheitertem Abhol-Vermerk), `handle-reap.test.js` (jeder
+Fehlerweg des Aufräumdienstes, mit Fehlertexten, die die jobId enthalten).
 
 **Getragene Folge.** Eine vom Browser gemeldete Vorgangsnummer findet bei einem
 erfolgreichen Auftrag im Server-Log nichts mehr. „Nie abgeholt“ lässt sich ohne

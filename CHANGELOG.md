@@ -16,9 +16,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **Keine Auftragsnummer mehr im Protokoll einer Analyse.** Ein Aufruf, in dem
   eine Analyse läuft, schreibt keine Auftrags- oder Vorgangsnummer mehr ins
   Protokoll, auch nicht bei Fehlern; ebenso wenig die Annahme und die Abholung
-  eines erfolgreichen Auftrags. Nummern stehen nur noch in Meldungen von
-  Aufrufen ohne Analyse (etwa abgewiesene Annahme, Wiederholungen,
-  Aufräumdienst).
+  eines erfolgreichen Auftrags, noch der Aufräumdienst bei Fehlern. Nummern
+  stehen nur noch in Meldungen von Aufrufen ohne Analyse (etwa abgewiesene
+  Annahme, Wiederholungen). Fehlermeldungen beim Löschen eines Bildes nennen
+  dessen Dateinamen nicht mehr.
 - **Weniger Angaben im Diagnose-Protokoll.** Die Meldung, dass eine Analyse
   geklappt hat, enthält keine Angaben zum Gerät und keine Vorgangsnummer mehr.
   Was 30 Tage aufbewahrt wird, beschränkt sich auf das, was die

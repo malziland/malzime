@@ -253,7 +253,12 @@ describe("handleEnqueue — Erfolgsfall", () => {
       "Limit-Benachrichtigung gescheitert",
       () => {
         counter.checkAndIncrement.mockResolvedValueOnce({ allowed: true, justReached: true, count: 500, limit: 500 });
-        require("../notify").notifyLimitReached.mockRejectedValueOnce(new Error("ntfy weg"));
+        /* Verzoegert ablehnen, damit die Warnung erst entsteht, wenn der
+           Auftrag schon angelegt ist — sonst koennte eine jobId darin gar
+           nicht auffallen. */
+        require("../notify").notifyLimitReached.mockImplementationOnce(
+          () => new Promise((_, ablehnen) => setTimeout(() => ablehnen(new Error("ntfy weg")), 5))
+        );
       },
       "ntfy-error",
     ],
@@ -266,12 +271,12 @@ describe("handleEnqueue — Erfolgsfall", () => {
     const res = makeRes();
     await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
     /* Nebenlaeufige Warnungen (Benachrichtigung) abwarten. */
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 30));
     spies.forEach((s) => s.mockRestore());
     expect(res.statusCode).toBe(200);
     expect(res.body.jobId).toBe("job-abc");
     expect(ausgaben.join("\n")).toContain('"status":"ok"');
-    /* Positivkontrolle: Der geprueften Weg wurde wirklich durchlaufen. */
+    /* Positivkontrolle: Der gepruefte Weg wurde wirklich durchlaufen. */
     expect(ausgaben.join("\n")).toContain(erwarteteZeile);
     expect(ausgaben.join("\n")).not.toContain("abc123XYZ");
     expect(ausgaben.join("\n")).not.toContain("job-abc");

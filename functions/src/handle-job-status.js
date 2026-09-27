@@ -203,7 +203,13 @@ async function handleJobStatus(req, res) {
          und ein Firestore-Fehlertext kann den Dokumentpfad samt jobId
          enthalten. Nur der Fehlercode. */
       markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
-        console.log(JSON.stringify({ warning: "markDelivered-error", code: (err && err.code) || null }))
+        console.log(
+          JSON.stringify({
+            warning: "markDelivered-error",
+            code: (err && err.code) || null,
+            art: (err && err.name) || null,
+          })
+        )
       );
       /* OHNE jobId UND traceId (27.09.2026): Zeitstempel minus deliveryGapMs
          ergibt den Fertigzeitpunkt, und der liegt Millisekunden neben der

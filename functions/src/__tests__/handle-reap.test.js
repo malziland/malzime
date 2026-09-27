@@ -147,7 +147,71 @@ describe("reapJobs", () => {
     const zeile = fehler.find((z) => z.includes("reap-bild-blieb-liegen"));
     expect(zeile).toBeDefined();
     expect(zeile).not.toContain("geheimer-pfad-7");
+    /* Auch ohne jobId: siehe den naechsten Test. */
+    expect(zeile).not.toContain("e1");
     expect(jobs.deleteJob).toHaveBeenCalledWith("e1");
+  });
+
+  /* 27.09.2026: Die Fristen, nach denen der Aufraeumdienst einen Auftrag
+     anfasst, liegen fest — eine jobId in seinen Fehlerzeilen liesse sich
+     darueber der Kinderschutz-Zeile zuordnen, und Firestore-Fehlertexte
+     koennen den Dokumentpfad samt jobId enthalten. Jeder Fehlerweg wird mit
+     einem Fehlertext ausgeloest, der die jobId enthaelt; keine Ausgabe darf
+     sie nennen, die Warnzeile muss aber erscheinen (Positivkontrolle). */
+  const pfadFehler = (id) =>
+    Object.assign(new Error(`No document to update: projects/p/databases/d/documents/jobs/${id}`), { code: 5 });
+  test.each([
+    [
+      "abandon-failed",
+      () => {
+        jobs.findAbandonedJobs.mockResolvedValue([{ id: "kennung-a1", imagePath: "x" }]);
+        jobs.abandonJob.mockRejectedValueOnce(pfadFehler("kennung-a1"));
+      },
+      "kennung-a1",
+    ],
+    [
+      "fail-stale-failed",
+      () => {
+        jobs.findStaleProcessingJobs.mockResolvedValue([{ id: "kennung-p1", imagePath: "x" }]);
+        jobs.failJob.mockRejectedValueOnce(pfadFehler("kennung-p1"));
+      },
+      "kennung-p1",
+    ],
+    [
+      "overdue-failed",
+      () => {
+        jobs.findUeberfaelligeJobs.mockResolvedValue([{ id: "kennung-u1", imagePath: "x" }]);
+        jobs.abandonJob.mockRejectedValueOnce(pfadFehler("kennung-u1"));
+      },
+      "kennung-u1",
+    ],
+    [
+      "delete-delivered-failed",
+      () => {
+        jobs.findZugestellteJobs.mockResolvedValue([{ id: "kennung-z1" }]);
+        jobs.deleteJob.mockRejectedValueOnce(pfadFehler("kennung-z1"));
+      },
+      "kennung-z1",
+    ],
+    [
+      "delete-expired-failed",
+      () => {
+        jobs.findExpiredJobs.mockResolvedValue([{ id: "kennung-e1" }]);
+        jobs.deleteJob.mockRejectedValueOnce(pfadFehler("kennung-e1"));
+      },
+      "kennung-e1",
+    ],
+  ])("%s: Warnzeile erscheint, ohne jobId", async (warnung, vorbereiten, id) => {
+    vorbereiten();
+    const ausgaben = [];
+    const spies = ["log", "warn", "error", "info"].map((art) =>
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+    );
+    await reapJobs();
+    spies.forEach((sp) => sp.mockRestore());
+    const alles = ausgaben.join("\n");
+    expect(alles).toContain(warnung);
+    expect(alles).not.toContain(id);
   });
 
   test("räumt alle drei Sorten in einem Lauf ab", async () => {

@@ -716,8 +716,9 @@ Altersschätzung über die Uhrzeit einem Gerät zuordnen.
    höchstens einmal je Analyse (seit 27.09.2026): Fragt der Server die KI
    nach, weil Karten fehlten, stehen die Versuche, die eine Antwort lieferten,
    addiert in dieser einen Zeile (`loggeKiDauer` in
-   `functions/src/mistral.js`). Scheitert schon der erste Versuch oder wird
-   von ihm nur ein Teil gerettet, entsteht keine. Modell, Status,
+   `functions/src/mistral.js`). Sie entsteht nur, wenn mindestens ein Versuch
+   eine Antwort der KI erhalten hat; ein abgebrochener Versuch zählt nicht,
+   auch wenn aus seinem Teiltext gerettet wird. Modell, Status,
    Token-Zahlen, Reparaturstufen und der Versuch stehen je Versuch in
    `mistral-single-large-details`, die nicht in den 30-Tage-Speicher geht
    (Filter vergleicht `step` exakt).

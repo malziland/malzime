@@ -573,8 +573,9 @@ function hatProfilText(block) {
    "zwei Eintraege je Analyse" (diese Zeile und die Kinderschutz-Zeile).
    Deshalb traegt sie nur die Dauer, und es gibt hoechstens EINE je Analyse:
    Bei einer Nachfrage an die KI stehen die Versuche, die eine Antwort
-   lieferten, addiert darin. Scheitert schon der erste Versuch oder wird von
-   ihm nur ein Teil gerettet, entsteht keine. Alles Weitere (Modell,
+   lieferten, addiert darin. Sie entsteht nur, wenn mindestens ein Versuch
+   eine Antwort der KI erhalten hat; ein abgebrochener Versuch zaehlt nicht,
+   auch wenn aus seinem Teiltext gerettet wird. Alles Weitere (Modell,
    Status, Textmenge, Versuch) steht je Versuch in
    `mistral-single-large-details` und bleibt im Betriebsprotokoll (1 Tag),
    dessen Beschreibung auch "wie viel Text die KI verarbeitet hat" nennt. Die

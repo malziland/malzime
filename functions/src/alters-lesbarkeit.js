@@ -273,12 +273,15 @@ function untereAltersgrenze(text) {
    gelten von 1 bis 99. Ist der Anker nicht lesbar, liest der Aufrufer die
    ersten Saetze beider Karten zusammen; dann ist das Ergebnis das obere Ende
    der weiteren Spanne. */
-/* Was nach dem zweiten Wert einer Spanne stehen darf: ein Alterswort
-   ("Jahre", "-jährig", "years", "alt"), ein Bindewort ("und", "oder") oder
-   kein Wort (Klammer, Satzzeichen, Ende). Steht dort etwas anderes ("Uhr",
-   "kg", "Geschwister", "friends", "%"), ist das Paar keine Altersspanne und
-   zaehlt nicht (27.09.2026: "zwischen 1 und 3 Uhr" ergab sonst 3). */
-const PAAR_ENDE = String.raw`(?=\s*-?\s*(?:jahr|jähr|j\.|j\b|year|yr|yo\b|alt\b|old\b)|\s*(?:und|oder|and|or|bzw)\b|(?!\s*-?\s*[\p{L}%°€$]))`;
+/* Was nach dem zweiten Wert einer Spanne NICHT stehen darf: eine Einheit oder
+   ein Zaehlwort, das nie ein Alter ist (Uhrzeit, Gewicht, Laenge, Prozent,
+   Grad, Geld, Geschwister, Freunde ...). Dann ist das Paar keine
+   Altersspanne und zaehlt nicht (27.09.2026: "zwischen 1 und 3 Uhr" ergab
+   sonst 3). Bewusst eine Sperrliste und keine Liste erlaubter Woerter: Die
+   KI haengt an echte Spannen allerlei an ("y", "y/o", "geschätzt",
+   "roughly", "ca.", "ish"), und jede fehlende Form wuerde das obere Ende
+   still auf den Punktwert fallen lassen. */
+const PAAR_ENDE = String.raw`(?!\s*-?\s*(?:uhr|h(?!\p{L})|pm(?!\p{L})|kg|kilo|g(?!\p{L})|gramm|pfund|lbs?(?!\p{L})|cm|mm|m(?!\p{L})|meter|km|zoll|inch|%|prozent|percent|°|grad|€|euro|\$|dollar|mal(?!\p{L})|times(?!\p{L})|x(?!\p{L})|geschwister|kinder|kids|children|freund|friend|sibling|person|people|leute|stück))`;
 const SPANNE_OBEN = new RegExp(
   String.raw`(?<!\d)(\d{1,2})\s*(?:[-–—]\s*)?(?:[-–—]|bis|to)\s*(\d{1,2})(?!\d)` + PAAR_ENDE,
   "gu"

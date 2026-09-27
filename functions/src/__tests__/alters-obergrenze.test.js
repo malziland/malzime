@@ -60,11 +60,23 @@ describe("obereAltersgrenze", () => {
     ["weiblich, ~14 (Spanne 12-16), zwischen 45 und 55 kg", 16],
     ["~40 Jahre, zwischen 2 und 3 Kinder", 40],
     ["weiblich, ~14, 45-55 kg", 14],
-    /* Gegenprobe: Bindewort, Alterswort oder Abkuerzung nach der Spanne. */
+    ["(Spanne 35-45), zwischen 1 und 99 Prozent sicher", 45],
+    /* Gegenprobe: Was die KI sonst an echte Spannen haengt, laesst die Spanne
+       stehen — auch die Schreibweise des eigenen EN-Prompts ("range 40-55 y"). */
     ["weiblich, Spanne 12-16 und damit Teenager", 16],
     ["weiblich, zwischen 12 und 14 oder etwas älter", 14],
     ["12–16 J.", 16],
     ["male, 12 to 14-year-old", 14],
+    ["male, ~45 years old (range 40-55 y)", 55],
+    ["female, 12-16 y/o", 16],
+    ["female, 12-16 y.o.", 16],
+    ["weiblich, ~14 Jahre alt (Spanne 12-16 geschätzt)", 16],
+    ["female, ~14 years old (range 12-16 roughly)", 16],
+    ["female, 12-16ish", 16],
+    ["weiblich, 12-16 ca.", 16],
+    ["weiblich, 12-16 - eher 14", 16],
+    ["weiblich, 12-16 am ehesten 14", 16],
+    ["12-16 Lebensjahre", 16],
   ])("Fremdzahl: %s → %i", (text, oben) => {
     expect(obereAltersgrenze(text)).toBe(oben);
   });

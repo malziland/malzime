@@ -280,8 +280,9 @@ function untereAltersgrenze(text) {
    sonst 3). Bewusst eine Sperrliste und keine Liste erlaubter Woerter: Die
    KI haengt an echte Spannen allerlei an ("y", "y/o", "geschätzt",
    "roughly", "ca.", "ish"), und jede fehlende Form wuerde das obere Ende
-   still auf den Punktwert fallen lassen. */
-const PAAR_ENDE = String.raw`(?!\s*-?\s*(?:uhr|h(?!\p{L})|pm(?!\p{L})|kg|kilo|g(?!\p{L})|gramm|pfund|lbs?(?!\p{L})|cm|mm|m(?!\p{L})|meter|km|zoll|inch|%|prozent|percent|°|grad|€|euro|\$|dollar|mal(?!\p{L})|times(?!\p{L})|x(?!\p{L})|geschwister|kinder|kids|children|freund|friend|sibling|person|people|leute|stück))`;
+   still auf den Punktwert fallen lassen. Jedes Wort der Liste zaehlt nur
+   als ganzes Wort ("freundlich", "gradually" lassen die Spanne stehen). */
+const PAAR_ENDE = String.raw`(?!\s*-?\s*(?:(?:uhr|h|pm|kg|kilos?|kilogramm|g|gramm|pfund|lbs?|cm|mm|m|meter|metern|km|zoll|inch|inches|prozent|percent|grad|euro|euros|dollar|dollars|mal|times|x|geschwistern?|kindern?|kids|children|freunde|freunden|freundinnen|friends|siblings|personen|people|leute|stück)(?!\p{L})|[%°€$]))`;
 const SPANNE_OBEN = new RegExp(
   String.raw`(?<!\d)(\d{1,2})\s*(?:[-–—]\s*)?(?:[-–—]|bis|to)\s*(\d{1,2})(?!\d)` + PAAR_ENDE,
   "gu"

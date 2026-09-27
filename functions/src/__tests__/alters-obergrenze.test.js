@@ -77,6 +77,11 @@ describe("obereAltersgrenze", () => {
     ["weiblich, 12-16 - eher 14", 16],
     ["weiblich, 12-16 am ehesten 14", 16],
     ["12-16 Lebensjahre", 16],
+    /* Woerter der Sperrliste zaehlen nur ganz. */
+    ["Spanne 12-16 freundlich wirkend", 16],
+    ["female, range 12-16 personally", 16],
+    ["male, range 12-16 gradually", 16],
+    ["~40, zwischen 2 und 3 Kindern", 40],
   ])("Fremdzahl: %s → %i", (text, oben) => {
     expect(obereAltersgrenze(text)).toBe(oben);
   });

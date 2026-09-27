@@ -188,7 +188,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `js/stats.js` | Stats-Seite mit Limit-Balken + Countdown |
 | `js/dom.js` | DOM-Helpers (`escapeHtml`, sanitize) |
 | `js/error-logger.js` | Anonymes Client-Fehler-Logging an `/api/errors` (Fehler-Typ, Phase, Dauer — grober User-Agent, keine PII) |
-| `js/telemetry-logger.js` | Anonyme Success-/Performance-Telemetrie an `/api/telemetry` (Spiegel zum Error-Logger, Timings statt Fehler) |
+| `js/telemetry-logger.js` | Anonyme Success-/Performance-Telemetrie an `/api/telemetry` (Gegenstück zum Error-Logger: Timings statt Fehler, ohne Geräteangaben und ohne Vorgangsnummer) |
 | `js/client-context.js` | Anonyme Geräte-/Netzwerk-Klassen für die Diagnose (`coarseUserAgent`, Bildschirm-Größenklasse, Netzwerk-Klasse) + Trace-ID |
 
 ### Backend (`functions/src/`)
@@ -199,7 +199,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `handle-stats.js` | GET-only Stats-Endpunkt |
 | `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
 | `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |
-| `handle-telemetry.js` | Anonyme Success-/Performance-Telemetrie (Spiegel zu `handle-errors.js`, severity INFO, eigener Endpoint) |
+| `handle-telemetry.js` | Anonyme Success-/Performance-Telemetrie (Gegenstück zu `handle-errors.js`, severity INFO, eigener Endpoint; verwirft Geräteangaben und Vorgangsnummer) |
 | `handle-enqueue.js` | Queue: Job anlegen, Bild in den Bucket, Task einreihen |
 | `handle-process-job.js` | Queue-Worker: claimt den Job, ruft die Mistral-Pipeline, schreibt das Ergebnis |
 | `handle-job-status.js` | Queue: Status-Polling für den Client + Liveness-Herzschlag |

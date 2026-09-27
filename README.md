@@ -61,7 +61,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
     handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
   handle-stats.js           Stats-Endpunkt
   handle-errors.js          Anonymes Client-Fehler-Logging (whitelist-validiert, keine PII, severity ERROR)
-  handle-telemetry.js       Anonyme Success-/Performance-Telemetrie (Spiegel zu handle-errors.js, severity INFO)
+  handle-telemetry.js       Anonyme Success-/Performance-Telemetrie (ohne Geraeteangaben, severity INFO)
   handle-enqueue.js         Queue: Job anlegen + in Cloud Tasks einreihen
   handle-process-job.js     Queue: Worker — claimt Job, ruft Mistral, schreibt Ergebnis
   handle-job-status.js      Queue: Status-Polling + Liveness-Herzschlag

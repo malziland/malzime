@@ -281,8 +281,10 @@ function untereAltersgrenze(text) {
    KI haengt an echte Spannen allerlei an ("y", "y/o", "geschätzt",
    "roughly", "ca.", "ish"), und jede fehlende Form wuerde das obere Ende
    still auf den Punktwert fallen lassen. Jedes Wort der Liste zaehlt nur
-   als ganzes Wort ("freundlich", "gradually" lassen die Spanne stehen). */
-const PAAR_ENDE = String.raw`(?!\s*-?\s*(?:(?:uhr|h|pm|kg|kilos?|kilogramm|g|gramm|pfund|lbs?|cm|mm|m|meter|metern|km|zoll|inch|inches|prozent|percent|grad|euro|euros|dollar|dollars|mal|times|x|stunden|std|hours?|minuten|minutes?|geschwistern?|kindern?|kids|children|brüdern?|schwestern|brothers|sisters|freunde|freunden|freundinnen|friends|siblings|personen|people|leute|stück)(?![\p{L}/])|[%°€$]))`;
+   als ganzes Wort ("freundlich", "gradually" lassen die Spanne stehen).
+   Ausnahme: Geschlechtskuerzel wie "m/w" oder "m/f" sind keine Einheit,
+   "km/h" und "kg/m²" schon. */
+const PAAR_ENDE = String.raw`(?!\s*-?\s*(?![mwfd]\/[mwfd](?!\p{L}))(?:(?:uhr|h|pm|kg|kilos?|kilogramm|g|gramm|pfund|lbs?|cm|mm|m|meter|metern|km|zoll|inch|inches|prozent|percent|grad|euro|euros|dollar|dollars|mal|times|x|stunden|std|hours?|minuten|minutes?|geschwistern?|kindern?|kids|children|brüdern?|schwestern|brothers|sisters|freunde|freunden|freundinnen|friends|siblings|personen|people|leute|stück)(?!\p{L})|[%°€$]))`;
 const SPANNE_OBEN = new RegExp(
   String.raw`(?<!\d)(\d{1,2})\s*(?:[-–—]\s*)?(?:[-–—]|bis|to)\s*(\d{1,2})(?!\d)` + PAAR_ENDE,
   "gu"

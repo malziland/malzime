@@ -86,6 +86,10 @@ describe("obereAltersgrenze", () => {
     ["~14, zwischen 2 und 3 Brüder", 14],
     ["male, ~14, between 2 and 3 sisters", 14],
     ["weiblich, Spanne 12-16 m/w", 16],
+    ["female, range 12-16 m/f", 16],
+    ["~14, zwischen 30 und 50 km/h", 14],
+    ["~14, zwischen 18 und 25 kg/m²", 14],
+    ["~14, zwischen 1 und 3 h/Tag", 14],
   ])("Fremdzahl: %s → %i", (text, oben) => {
     expect(obereAltersgrenze(text)).toBe(oben);
   });

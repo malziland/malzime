@@ -232,21 +232,29 @@ describe("handleEnqueue — Erfolgsfall", () => {
   });
 
   /* 27.09.2026: Der Auftrag und die Antwort an den Browser tragen die
-     Vorgangskennung weiter (siehe oben) — die Protokollzeile nicht. Auf dem
-     Erfolgsweg eines Auftrags traegt keine Logzeile eine Kennung
-     (Begruendung in handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"). */
-  test("die Erfolgszeile im Log traegt weder Vorgangs- noch Auftragskennung", async () => {
-    const zeilen = [];
-    const spy = jest.spyOn(console, "log").mockImplementation((z) => zeilen.push(String(z)));
+     Vorgangskennung weiter (siehe oben) — das Log nicht. Auf dem Weg eines
+     erfolgreichen Auftrags traegt keine Logzeile eine Kennung (Begruendung in
+     handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"). Gesucht wird in
+     ALLEN Ausgaben des Aufrufs, auch auf den Warnwegen, nach denen der
+     Einlass weiterlaeuft. */
+  test.each([
+    ["Normalfall", () => {}],
+    ["Einlassgrenze nicht ermittelbar", () => jobs.countQueuedJobs.mockRejectedValueOnce(new Error("zeitgrenze"))],
+    ["Platzbestaetigung gescheitert", () => jobs.platzBestaetigen.mockRejectedValueOnce(new Error("zeitgrenze"))],
+  ])("%s: keine Ausgabe traegt Vorgangs- oder Auftragskennung", async (_name, vorbereiten) => {
+    vorbereiten();
+    const ausgaben = [];
+    const spies = ["log", "warn", "error", "info"].map((art) =>
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+    );
     const res = makeRes();
     await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
-    spy.mockRestore();
-    const ok = zeilen.find((z) => z.includes('"step":"enqueue"') && z.includes('"status":"ok"'));
-    expect(ok).toBeDefined();
-    expect(ok).not.toContain("abc123XYZ");
-    expect(ok).not.toContain(res.body.jobId);
-    expect(JSON.parse(ok)).not.toHaveProperty("traceId");
-    expect(JSON.parse(ok)).not.toHaveProperty("jobId");
+    spies.forEach((s) => s.mockRestore());
+    expect(res.statusCode).toBe(200);
+    expect(res.body.jobId).toBe("job-abc");
+    expect(ausgaben.join("\n")).toContain('"status":"ok"');
+    expect(ausgaben.join("\n")).not.toContain("abc123XYZ");
+    expect(ausgaben.join("\n")).not.toContain("job-abc");
   });
 });
 

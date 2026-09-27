@@ -198,16 +198,17 @@ async function handleProcessJob(req, res) {
        2. Die Dauern der Zeilen von Analyse und Abholung ergeben Anlage- und
           Fertigzeitpunkt des Auftrags millisekundengenau, und der
           Fertigzeitpunkt liegt Millisekunden neben der Kinderschutz-Zeile.
-     Deshalb traegt auf dem ganzen Erfolgsweg eines Auftrags keine Logzeile
-     jobId oder traceId: nicht die Erfolgszeile des Einlasses
+     Deshalb traegt auf dem Weg eines erfolgreichen Auftrags keine Logzeile
+     jobId oder traceId: nicht die Zeilen des Einlasses bis zur Annahme
      (handle-enqueue.js), keine Zeile ab hier (auch nicht die Fehlerzeilen),
-     nicht die Abholung (handle-job-status.js, `job-delivered`). Die Dauern
-     bleiben. "Nie abgeholt" = Anzahl `process-job` mit `status: done` minus
-     Anzahl `job-delivered`. Die Zeilen VOR dem Claim behalten die jobId:
-     Diese Wege enden, ohne dass eine Analyse laeuft (claimJob nimmt nur
-     `queued`-Auftraege), und keine Zeile nennt jobId und traceId zusammen.
-     Pruefung: analyse-aufruf-ohne-kennung.test.js, handle-enqueue.test.js,
-     handle-job-status.test.js. */
+     keine Zeile der Abholung (handle-job-status.js). Die Dauern bleiben.
+     "Nie abgeholt" naehert man als Anzahl `process-job` mit `status` done,
+     blocked oder error minus Anzahl `job-delivered`. Kennungen tragen nur
+     noch Wege, auf denen dieser Aufruf keine Analyse macht: die Zeilen vor
+     dem Claim (claimJob nimmt nur `queued`-Auftraege), Fehlerzeilen eines
+     gescheiterten Einlasses und der Aufraeumdienst. Pruefung (alle Ausgaben
+     des jeweiligen Aufrufs): analyse-aufruf-ohne-kennung.test.js,
+     handle-enqueue.test.js, handle-job-status.test.js. */
   const start = Date.now();
   /* Stundenzaehler (11.09.2026): War der Zaehler beim Einlass ausgewichen,
      traegt dieser Auftrag seine Marke jetzt selbst nach — neben der Analyse

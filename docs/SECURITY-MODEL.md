@@ -617,26 +617,34 @@ millisekundengenau; der Fertigzeitpunkt liegt Millisekunden neben der
 Kinderschutz-Zeile. Jede Kennung irgendwo auf diesem Weg hätte deshalb
 genügt.
 
-**Entscheidung.** Auf dem ganzen Erfolgsweg eines Auftrags trägt keine
-Logzeile Auftrags- oder Vorgangskennung: nicht die Erfolgszeile des Einlasses
-(`functions/src/handle-enqueue.js`), keine Zeile des Analyse-Aufrufs ab dem
-Claim, auch nicht die Fehler- und Alarmzeilen (`functions/src/handle-process-job.js`,
-Kommentar „AB HIER KEINE KENNUNG IM LOG“), nicht die Abholung
-(`functions/src/handle-job-status.js`, `job-delivered`). `loggeMinorSafety`
-nimmt keine Kennung entgegen. Die Dauern bleiben. Zeilen vor dem Claim behalten
-die Auftragskennung; diese Wege enden ohne Analyse, und keine Zeile nennt
-Auftrags- und Vorgangskennung zusammen. Auftrag und Antwort an den Browser
-tragen die Vorgangskennung weiter; nur das Log nicht. Geprüft von
-`analyse-aufruf-ohne-kennung.test.js` (Suche nach den Werten beider Kennungen,
-mit Positivkontrolle), `handle-enqueue.test.js` und `handle-job-status.test.js`.
+**Entscheidung.** Auf dem Weg eines erfolgreichen Auftrags trägt keine
+Logzeile Auftrags- oder Vorgangskennung: nicht die Zeilen des Einlasses bis
+zur Annahme (`functions/src/handle-enqueue.js`), keine Zeile des
+Analyse-Aufrufs ab dem Claim, auch nicht dessen Fehler- und Alarmzeilen
+(`functions/src/handle-process-job.js`, Kommentar „AB HIER KEINE KENNUNG IM
+LOG“), keine Zeile der Abholung, auch nicht die Warnung bei gescheitertem
+Abhol-Vermerk, die nur noch den Fehlercode nennt
+(`functions/src/handle-job-status.js`). `loggeMinorSafety` nimmt keine
+Kennung entgegen. Die Dauern bleiben. Kennungen tragen nur noch Wege, auf
+denen der jeweilige Aufruf keine Analyse macht: Zeilen des Analyse-Aufrufs vor
+dem Claim, Fehlerzeilen eines gescheiterten Einlasses (dort einmal beide
+Kennungen zusammen; der Auftrag wird verworfen) und der Aufräumdienst. Auftrag
+und Antwort an den Browser tragen die Vorgangskennung weiter. Geprüft werden
+jeweils ALLE Ausgaben eines Aufrufs nach den Werten beider Kennungen, mit
+Positivkontrolle: `analyse-aufruf-ohne-kennung.test.js` (Erfolgs- und
+Fehlerwege der Analyse), `handle-enqueue.test.js` (Annahme, auch über die
+Warnwege, nach denen der Einlass weiterläuft), `handle-job-status.test.js`
+(Abholung, auch mit gescheitertem Abhol-Vermerk).
 
 **Getragene Folge.** Eine vom Browser gemeldete Vorgangsnummer findet bei einem
-erfolgreichen Auftrag im Server-Log nichts mehr, nur die Fehlerzeilen des
-Einlasses. „Nie abgeholt“ ergibt sich ohne Kennung als Anzahl `process-job`
-mit `status: done` minus Anzahl `job-delivered`. Zeitliche Nähe bleibt:
-Fehlermeldungen des Browsers tragen Geräteangaben und liegen, wenn es zu einer
-Analyse eine gibt, Sekunden neben ihrer Kinderschutz-Zeile. Sie sind für die
-Fehlersuche nötig; eine Nummer, die beide verbindet, gibt es nicht.
+erfolgreichen Auftrag im Server-Log nichts mehr. „Nie abgeholt“ lässt sich ohne
+Kennung nur nähern: Anzahl `process-job` mit `status` done, blocked oder error
+minus Anzahl `job-delivered` (auch gesperrte Ergebnisse werden abgeholt;
+scheitert der Abhol-Vermerk, zählt eine erneute Abholung doppelt). Zeitliche
+Nähe bleibt: Fehlermeldungen des Browsers tragen Geräteangaben und liegen, wenn
+es zu einer Analyse eine gibt, Sekunden neben ihrer Kinderschutz-Zeile. Sie
+sind für die Fehlersuche nötig; eine Nummer, die beide verbindet, gibt es
+nicht.
 
 **Betrachtete Alternativen.** Das Label abschalten: nicht möglich, firebase-tools
 setzt es nach den eigenen Umgebungsvariablen. Die Dauern auf Sekunden runden:
@@ -644,8 +652,8 @@ verworfen, der Fertigzeitpunkt folgt auch aus der Abholzeile und liegt ohnehin
 neben der Kinderschutz-Zeile. Nur die Abschlusszeile ändern: verworfen, die
 Zeilen von Einlass und Abholung hätten dieselbe Verbindung hergestellt.
 
-**Rückweg.** Nur mit Deploy. Eine Kennung auf dem Erfolgsweg lässt die Tests
-rot werden — das ist gewollt.
+**Rückweg.** Nur mit Deploy. Eine Kennung in einer der geprüften Ausgaben lässt
+die Tests rot werden — das ist gewollt.
 
 **Neubewertung.** Braucht eine Zeile auf diesem Weg eine Kennung, wird vorher
 geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.

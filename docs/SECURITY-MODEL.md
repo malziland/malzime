@@ -711,9 +711,9 @@ Altersschätzung über die Uhrzeit einem Gerät zuordnen.
    noch Wake-Lock-Zustand. Der Browser schickt sie nicht
    (`public/js/telemetry-logger.js`), der Server verwirft sie auch von
    älteren Seiten (`functions/src/handle-telemetry.js`). Übrig bleiben
-   Dauern, Modus, Motiv, Sprache der Oberfläche und zwei Ja/Nein-Werte
-   (Browser online, Seite sichtbar), die bei fast jeder Erfolgsmeldung gleich
-   sind. Geräteangaben bleiben in den Fehlermeldungen, wie der
+   Dauern, Modus, Motiv, Sprache der Oberfläche, die aufgerufene Seite (nur
+   der Pfad, etwa „/“ oder „/en/“) und zwei Ja/Nein-Werte (Browser online,
+   Seite sichtbar). Geräteangaben bleiben in den Fehlermeldungen, wie der
    Datenschutztext beschreibt, für die Fehlersuche.
 2. `mistral-single-large` trägt nur Dauer und Wiederholungen und entsteht
    höchstens einmal je Analyse (seit 27.09.2026): Fragt der Server die KI

@@ -146,7 +146,7 @@ describe("reapJobs", () => {
     const zeile = fehler.find((z) => z.includes("reap-bild-blieb-liegen"));
     expect(zeile).toBeDefined();
     expect(zeile).not.toContain("geheimer-pfad-7");
-    /* Auch ohne jobId: siehe den naechsten Test. */
+    /* Auch ohne jobId (Begruendung in handle-reap.js). */
     expect(zeile).not.toContain("kennung-bild-e1");
     expect(jobs.deleteJob).toHaveBeenCalledWith("kennung-bild-e1");
   });

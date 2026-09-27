@@ -206,6 +206,18 @@ async function handleProcessJob(req, res) {
      eines Auftrags ohne Kennung im Log". Pruefung (alle Ausgaben des
      jeweiligen Aufrufs): analyse-aufruf-ohne-kennung.test.js,
      handle-enqueue.test.js, handle-job-status.test.js, handle-reap.test.js. */
+  /* Fehlertexte ohne Kennung (27.09.2026): Ein Firestore-Fehler zu diesem
+     Auftrag kann den Dokumentpfad samt jobId nennen (etwa "No document to
+     update: projects/.../jobs/<jobId>"), ein Speicherfehler den Bildpfad.
+     Die Texte bleiben fuer die Fehlersuche lesbar; entfernt werden die
+     bekannten Werte dieses Auftrags und jeder Firestore-Pfad. */
+  const ohneKennung = (text) => {
+    let t = String(text || "").replace(/projects\/[^\s'"`,)]+/g, "‹pfad›");
+    for (const wert of [jobId, job.traceId, job.imagePath]) {
+      if (typeof wert === "string" && wert) t = t.split(wert).join("‹kennung›");
+    }
+    return t;
+  };
   const start = Date.now();
   /* Stundenzaehler (11.09.2026): War der Zaehler beim Einlass ausgewichen,
      traegt dieser Auftrag seine Marke jetzt selbst nach — neben der Analyse
@@ -237,7 +249,7 @@ async function handleProcessJob(req, res) {
     }
     if (success) {
       incrementTotals().catch((err) =>
-        console.log(JSON.stringify({ warning: "incrementTotals-error", error: err.message }))
+        console.log(JSON.stringify({ warning: "incrementTotals-error", error: ohneKennung(err.message) }))
       );
     }
     console.log(
@@ -272,7 +284,7 @@ async function handleProcessJob(req, res) {
            Scheitert das Fortschreiben dauerhaft, bleibt die Wartezeit-Ansage
            auf einem alten Wert stehen — sichtbar fuer jeden Besucher, ohne
            dass irgendwo etwas auffaellt. */
-        console.log(JSON.stringify({ warning: "merkeDauer-fehlgeschlagen", error: e.message }))
+        console.log(JSON.stringify({ warning: "merkeDauer-fehlgeschlagen", error: ohneKennung(e.message) }))
       );
     }
   } catch (err) {
@@ -282,7 +294,7 @@ async function handleProcessJob(req, res) {
       JSON.stringify({
         step: "process-job",
         status: "error",
-        error: err.message,
+        error: ohneKennung(err.message),
         totalMs: Date.now() - start,
       })
     );
@@ -292,7 +304,7 @@ async function handleProcessJob(req, res) {
       privacyRisks: [],
       exif: job.exif || {},
       meta: { traceId: job.traceId || null, mode: "blocked" },
-    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", error: e.message })));
+    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", error: ohneKennung(e.message) })));
   } finally {
     /* Bild immer löschen — Erfolg ODER Fehler. Die Storage-Lifecycle-Regel
        ist das zweite Sicherheitsnetz. */

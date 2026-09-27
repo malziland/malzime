@@ -128,6 +128,24 @@ describe("Aufruf mit Kinderschutz-Zeile: keine Kennung in irgendeiner Ausgabe", 
   });
 });
 
+describe("Fehlertexte mit Kennung (27.09.2026)", () => {
+  /* Firestore nennt bei einem Fehler zum Auftrag dessen Dokumentpfad samt
+     jobId — in Produktion als Pfad, im lokalen Emulator als `name: "<id>"`.
+     Der Fehlertext bleibt im Log, die Kennungen nicht. */
+  test.each([
+    ["Pfad", `No document to update: projects/p/databases/d/documents/jobs/${JOB_ID}`],
+    ["Name", `5 NOT_FOUND: no entity to update: name: "${JOB_ID}" trace ${TRACE_ID}`],
+  ])("Speichern scheitert mit Firestore-Text (%s)", async (_art, meldung) => {
+    jobs.completeJob.mockRejectedValue(new Error(meldung));
+    const log = await lauf();
+    expect(log).toContain('"status":"error"');
+    expect(log).toContain("completeJob-error");
+    /* Positivkontrolle: Der Fehlertext selbst ist noch da. */
+    expect(log).toMatch(/No document to update|NOT_FOUND/);
+    pruefeOhneKennung(log);
+  });
+});
+
 describe("Positivkontrolle des Messmittels", () => {
   test("vor dem Claim steht die jobId im Log — die Suche findet sie", async () => {
     jobs.claimJob.mockResolvedValue(false);

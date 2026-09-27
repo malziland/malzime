@@ -208,11 +208,9 @@ async function handleJobStatus(req, res) {
       /* OHNE jobId UND traceId (27.09.2026): Zeitstempel minus deliveryGapMs
          ergibt den Fertigzeitpunkt, und der liegt Millisekunden neben der
          Kinderschutz-Zeile. Mit Kennung waere die Altersschaetzung darueber
-         dem Vorgang zuzuordnen. "Nie abgeholt" naehert man ohne Kennung:
-         Anzahl `process-job` mit `status` done, blocked oder error, minus
-         `completeJob-error`, minus Anzahl dieser Zeilen (auch gesperrte
-         Ergebnisse werden abgeholt; eine erneute Abholung vor dem Vermerk
-         zaehlt doppelt). */
+         dem Vorgang zuzuordnen. Wie man "nie abgeholt" ohne Kennung
+         naehert: docs/SECURITY-MODEL.md, Abschnitt "Erfolgsweg eines
+         Auftrags ohne Kennung im Log". */
       console.log(
         JSON.stringify({
           step: "job-delivered",

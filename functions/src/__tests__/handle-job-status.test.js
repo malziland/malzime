@@ -269,6 +269,8 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
     spies.forEach((s) => s.mockRestore());
     const alles = ausgaben.join("\n");
     expect(alles).toContain('"step":"job-delivered"');
+    /* Positivkontrolle: Im Fehlerfall steht die Warnung wirklich im Log. */
+    if (_name === "Abhol-Vermerk scheitert") expect(alles).toContain("markDelivered-error");
     expect(alles).not.toContain("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
     expect(alles).not.toContain("vorgang-geheim-9");
   });

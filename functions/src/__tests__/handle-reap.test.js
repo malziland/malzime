@@ -133,6 +133,23 @@ describe("reapJobs", () => {
     expect(jobs.deleteJob).toHaveBeenCalledWith("e2");
   });
 
+  /* 27.09.2026: Bleibt das Bild eines abgelaufenen Auftrags liegen, nennt
+     die Meldung die jobId, aber nicht den Bildpfad — der Pfad verband sie
+     mit der Loeschfehler-Zeile im Analyse-Aufruf und damit mit der
+     Kinderschutz-Zeile. */
+  test("liegengebliebenes Bild: Meldung ohne Bildpfad", async () => {
+    jobs.findExpiredJobs.mockResolvedValue([{ id: "e1", imagePath: "queue-uploads/geheimer-pfad-7.jpg" }]);
+    storage.deleteImage.mockResolvedValueOnce(false);
+    const fehler = [];
+    const spy = jest.spyOn(console, "error").mockImplementation((z) => fehler.push(String(z)));
+    await reapJobs();
+    spy.mockRestore();
+    const zeile = fehler.find((z) => z.includes("reap-bild-blieb-liegen"));
+    expect(zeile).toBeDefined();
+    expect(zeile).not.toContain("geheimer-pfad-7");
+    expect(jobs.deleteJob).toHaveBeenCalledWith("e1");
+  });
+
   test("räumt alle drei Sorten in einem Lauf ab", async () => {
     jobs.findAbandonedJobs.mockResolvedValue([{ id: "a1", imagePath: "a" }]);
     jobs.findStaleProcessingJobs.mockResolvedValue([{ id: "p1", imagePath: "p" }]);

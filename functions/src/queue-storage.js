@@ -178,12 +178,16 @@ async function deleteImage(objectPath) {
   } catch (err) {
     /* 404 = schon weg. Kein Fehler, keine Meldung. */
     if (err && (err.code === 404 || err.code === "ENOENT")) return true;
+    /* Ohne Pfad und ohne Fehlertext (27.09.2026): Die Zeile kann im
+       Analyse-Aufruf neben der Kinderschutz-Zeile stehen (gemeinsames Label
+       execution_id), und Pfad wie Speicher-Fehlertext fuehren ueber die
+       Zeile des Aufraeumdienstes zur jobId. Das Bild raeumt die
+       Lifecycle-Regel ohnehin; fuer die Fehlersuche genuegt der Code. */
     console.error(
       JSON.stringify({
         severity: "ERROR",
         error: "queue-image-delete-failed",
-        path: objectPath,
-        message: err && err.message,
+        code: (err && err.code) || null,
         hinweis:
           "Bild konnte nicht aktiv geloescht werden. Es faellt jetzt auf die " +
           "Lifecycle-Regel (1 Tag) zurueck — die Zusage 'unmittelbar geloescht' " +

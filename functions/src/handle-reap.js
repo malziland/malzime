@@ -211,7 +211,9 @@ async function reapJobs() {
             severity: "ERROR",
             error: "reap-bild-blieb-liegen",
             jobId: job.id,
-            path: job.imagePath,
+            /* Ohne Bildpfad (27.09.2026): Der Pfad verband diese Zeile mit
+               der Loeschfehler-Zeile im Analyse-Aufruf und damit die jobId
+               mit der Kinderschutz-Zeile. */
             hinweis: "Dokument wird trotzdem geraeumt; das Bild faellt auf die Lifecycle-Regel zurueck.",
           })
         );

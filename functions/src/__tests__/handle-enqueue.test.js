@@ -238,10 +238,26 @@ describe("handleEnqueue — Erfolgsfall", () => {
      ALLEN Ausgaben des Aufrufs, auch auf den Warnwegen, nach denen der
      Einlass weiterlaeuft. */
   test.each([
-    ["Normalfall", () => {}],
-    ["Einlassgrenze nicht ermittelbar", () => jobs.countQueuedJobs.mockRejectedValueOnce(new Error("zeitgrenze"))],
-    ["Platzbestaetigung gescheitert", () => jobs.platzBestaetigen.mockRejectedValueOnce(new Error("zeitgrenze"))],
-  ])("%s: keine Ausgabe traegt Vorgangs- oder Auftragskennung", async (_name, vorbereiten) => {
+    ["Normalfall", () => {}, '"status":"ok"'],
+    [
+      "Einlassgrenze nicht ermittelbar",
+      () => jobs.countQueuedJobs.mockRejectedValueOnce(new Error("zeitgrenze")),
+      "einlassgrenze-nicht-ermittelbar",
+    ],
+    [
+      "Platzbestaetigung gescheitert",
+      () => jobs.platzBestaetigen.mockRejectedValueOnce(new Error("zeitgrenze")),
+      "platz-bestaetigung-fehlgeschlagen",
+    ],
+    [
+      "Limit-Benachrichtigung gescheitert",
+      () => {
+        counter.checkAndIncrement.mockResolvedValueOnce({ allowed: true, justReached: true, count: 500, limit: 500 });
+        require("../notify").notifyLimitReached.mockRejectedValueOnce(new Error("ntfy weg"));
+      },
+      "ntfy-error",
+    ],
+  ])("%s: keine Ausgabe traegt Vorgangs- oder Auftragskennung", async (_name, vorbereiten, erwarteteZeile) => {
     vorbereiten();
     const ausgaben = [];
     const spies = ["log", "warn", "error", "info"].map((art) =>
@@ -249,10 +265,14 @@ describe("handleEnqueue — Erfolgsfall", () => {
     );
     const res = makeRes();
     await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
+    /* Nebenlaeufige Warnungen (Benachrichtigung) abwarten. */
+    await new Promise((r) => setTimeout(r, 0));
     spies.forEach((s) => s.mockRestore());
     expect(res.statusCode).toBe(200);
     expect(res.body.jobId).toBe("job-abc");
     expect(ausgaben.join("\n")).toContain('"status":"ok"');
+    /* Positivkontrolle: Der geprueften Weg wurde wirklich durchlaufen. */
+    expect(ausgaben.join("\n")).toContain(erwarteteZeile);
     expect(ausgaben.join("\n")).not.toContain("abc123XYZ");
     expect(ausgaben.join("\n")).not.toContain("job-abc");
   });

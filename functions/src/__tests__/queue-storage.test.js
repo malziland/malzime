@@ -116,7 +116,11 @@ describe("deleteImage", () => {
     const zeile = JSON.parse(fehlerSpy.mock.calls[0][0]);
     expect(zeile.severity).toBe("ERROR");
     expect(zeile.error).toBe("queue-image-delete-failed");
-    expect(zeile.path).toBe(pfad);
+    expect(zeile.code).toBe(403);
+    /* Seit 27.09.2026 ohne Pfad und ohne Fehlertext (siehe queue-storage.js). */
+    expect(fehlerSpy.mock.calls[0][0]).not.toContain(pfad);
+    expect(zeile).not.toHaveProperty("path");
+    expect(zeile).not.toHaveProperty("message");
     fehlerSpy.mockRestore();
   });
 });

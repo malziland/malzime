@@ -625,7 +625,10 @@ Analyse-Aufrufs ab dem Claim, auch nicht dessen Fehler- und Alarmzeilen
 LOG“), keine Zeile der Abholung, auch nicht die Warnung bei gescheitertem
 Abhol-Vermerk, die nur noch den Fehlercode nennt
 (`functions/src/handle-job-status.js`). `loggeMinorSafety` nimmt keine
-Kennung entgegen. Die Dauern bleiben. Kennungen tragen nur noch Wege, auf
+Kennung entgegen. Auch den Bildpfad nennt keine Fehlerzeile mehr (Löschfehler
+im Speichermodul, liegengebliebenes Bild beim Aufräumdienst): Er ist je Auftrag
+eindeutig und verband beide Zeilen und damit die Kinderschutz-Zeile mit der
+jobId. Das Bild räumt die Lifecycle-Regel ohnehin. Die Dauern bleiben. Kennungen tragen nur noch Wege, auf
 denen der jeweilige Aufruf keine Analyse macht: Zeilen des Analyse-Aufrufs vor
 dem Claim, Fehlerzeilen eines gescheiterten Einlasses (dort einmal beide
 Kennungen zusammen; der Auftrag wird verworfen) und der Aufräumdienst. Auftrag
@@ -640,8 +643,11 @@ Warnwege, nach denen der Einlass weiterläuft), `handle-job-status.test.js`
 erfolgreichen Auftrag im Server-Log nichts mehr. „Nie abgeholt“ lässt sich ohne
 Kennung nur nähern: Anzahl `process-job` mit `status` done, blocked oder error,
 minus Anzahl der Warnungen `completeJob-error` (Ergebnis nie gespeichert),
-minus Anzahl `job-delivered` (auch gesperrte Ergebnisse werden abgeholt; eine
-erneute Abholung, bevor der Abhol-Vermerk steht, zählt doppelt). Zeitliche
+minus Anzahl `job-delivered` (auch gesperrte Ergebnisse werden abgeholt). Ungenau
+bleibt: Eine erneute Abholung, bevor der Abhol-Vermerk steht, zählt doppelt; und
+scheitert im Fehlerweg das Speichern still, weil der Auftrag schon abgeschlossen
+war, zählt der Lauf als nie abgeholt. Diese Stelle ist die einzige Quelle der
+Regel; die Code-Kommentare verweisen hierher. Zeitliche
 Nähe bleibt: Fehlermeldungen des Browsers tragen Geräteangaben und liegen, wenn
 es zu einer Analyse eine gibt, Sekunden neben ihrer Kinderschutz-Zeile. Sie
 sind für die Fehlersuche nötig; eine Nummer, die beide verbindet, gibt es

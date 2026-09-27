@@ -198,8 +198,8 @@ async function handleProcessJob(req, res) {
        2. Die Dauern der Zeilen von Analyse und Abholung ergeben Anlage- und
           Fertigzeitpunkt des Auftrags millisekundengenau, und der
           Fertigzeitpunkt liegt Millisekunden neben der Kinderschutz-Zeile.
-     Deshalb traegt auf dem Weg eines erfolgreichen Auftrags keine Logzeile
-     jobId oder traceId: nicht die Zeilen des Einlasses bis zur Annahme
+     Deshalb schreibt kein Aufruf mit Analyse und weder Annahme noch
+     Abholung eines erfolgreichen Auftrags jobId oder traceId ins Log: nicht die Zeilen des Einlasses bis zur Annahme
      (handle-enqueue.js), keine Zeile ab hier (auch nicht die Fehlerzeilen),
      keine Zeile der Abholung (handle-job-status.js). Die Dauern bleiben.
      "Nie abgeholt" naehert man als Anzahl `process-job` mit `status` done,

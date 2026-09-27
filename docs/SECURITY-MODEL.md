@@ -617,9 +617,9 @@ millisekundengenau; der Fertigzeitpunkt liegt Millisekunden neben der
 Kinderschutz-Zeile. Jede Kennung irgendwo auf diesem Weg hätte deshalb
 genügt.
 
-**Entscheidung.** Auf dem Weg eines erfolgreichen Auftrags trägt keine
-Logzeile Auftrags- oder Vorgangskennung: nicht die Zeilen des Einlasses bis
-zur Annahme (`functions/src/handle-enqueue.js`), keine Zeile des
+**Entscheidung.** Kein Aufruf, in dem eine Analyse läuft, und weder Annahme
+noch Abholung eines erfolgreichen Auftrags schreiben Auftrags- oder
+Vorgangskennung ins Log: nicht die Zeilen des Einlasses bis zur Annahme (`functions/src/handle-enqueue.js`), keine Zeile des
 Analyse-Aufrufs ab dem Claim, auch nicht dessen Fehler- und Alarmzeilen
 (`functions/src/handle-process-job.js`, Kommentar „AB HIER KEINE KENNUNG IM
 LOG“), keine Zeile der Abholung, auch nicht die Warnung bei gescheitertem

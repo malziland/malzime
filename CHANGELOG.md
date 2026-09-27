@@ -13,14 +13,12 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   wie „8 bis 13“ ein zwölfjähriges Kind trifft oder verfehlt, ließ sich so
   nicht auswerten. Am Schutz ändert sich nichts: Die neue Zahl entscheidet
   über nichts, der Werbeschutz greift wie bisher.
-- **Keine Auftragsnummer mehr im Protokoll eines erfolgreichen Auftrags.** Von
-  der Annahme bis zur Abholung trägt keine Protokollzeile eines erfolgreichen
-  Auftrags eine Auftrags- oder Vorgangsnummer; ab dem Start der Analyse gilt
-  das auch für Fehler- und Alarmmeldungen. Nummern stehen nur noch in Meldungen
-  von Aufrufen, in denen keine Analyse läuft (abgewiesene oder gescheiterte
-  Annahme, Wiederholungen, Aufräumdienst). So gibt es keine Nummer, über die
-  sich die Altersschätzung im Kinderschutz-Protokoll mit den Geräteangaben des
-  Browsers verbinden ließe.
+- **Keine Auftragsnummer mehr im Protokoll einer Analyse.** Ein Aufruf, in dem
+  eine Analyse läuft, schreibt keine Auftrags- oder Vorgangsnummer mehr ins
+  Protokoll, auch nicht bei Fehlern; ebenso wenig die Annahme und die Abholung
+  eines erfolgreichen Auftrags. Nummern stehen nur noch in Meldungen von
+  Aufrufen ohne Analyse (etwa abgewiesene Annahme, Wiederholungen,
+  Aufräumdienst).
 - **Weniger Angaben im Diagnose-Protokoll.** Die Meldung, dass eine Analyse
   geklappt hat, enthält keine Angaben zum Gerät und keine Vorgangsnummer mehr.
   Was 30 Tage aufbewahrt wird, beschränkt sich auf das, was die

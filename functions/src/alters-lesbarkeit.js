@@ -273,10 +273,22 @@ function untereAltersgrenze(text) {
    gelten von 1 bis 99. Ist der Anker nicht lesbar, liest der Aufrufer die
    ersten Saetze beider Karten zusammen; dann ist das Ergebnis das obere Ende
    der weiteren Spanne. */
-const SPANNE_OBEN = /(?<!\d)(\d{1,2})\s*(?:[-–—]\s*)?(?:[-–—]|bis|to)\s*(\d{1,2})(?!\d)/g;
+/* Was nach dem zweiten Wert einer Spanne stehen darf: ein Alterswort
+   ("Jahre", "-jährig", "years", "alt"), ein Bindewort ("und", "oder") oder
+   kein Wort (Klammer, Satzzeichen, Ende). Steht dort etwas anderes ("Uhr",
+   "kg", "Geschwister", "friends", "%"), ist das Paar keine Altersspanne und
+   zaehlt nicht (27.09.2026: "zwischen 1 und 3 Uhr" ergab sonst 3). */
+const PAAR_ENDE = String.raw`(?=\s*-?\s*(?:jahr|jähr|j\.|j\b|year|yr|yo\b|alt\b|old\b)|\s*(?:und|oder|and|or|bzw)\b|(?!\s*-?\s*[\p{L}%°€$]))`;
+const SPANNE_OBEN = new RegExp(
+  String.raw`(?<!\d)(\d{1,2})\s*(?:[-–—]\s*)?(?:[-–—]|bis|to)\s*(\d{1,2})(?!\d)` + PAAR_ENDE,
+  "gu"
+);
 /* "zwischen 12 und 14" / "between 12 and 14": ohne das Wort davor waere
    "und" zu weit gefasst ("12 und 3 Geschwister"). */
-const ZWISCHEN_OBEN = /(?:zwischen|between)\s+(\d{1,2})\s*(?:jahren?\s*)?(?:und|and)\s*(\d{1,2})(?!\d)/g;
+const ZWISCHEN_OBEN = new RegExp(
+  String.raw`(?:zwischen|between)\s+(\d{1,2})\s*(?:jahren?\s*)?(?:und|and)\s*(\d{1,2})(?!\d)` + PAAR_ENDE,
+  "gu"
+);
 const PLUS_MINUS = /(?<!\d)(\d{1,2})[^\d]{0,20}?(?:±|\+\/-|\+-)\s*(\d{1,2})(?!\d)/g;
 const ALTERSZAHL =
   /(?:~|\b(?:etwa|circa|ca\.|ungefähr|about|around|approximately|aged))\s*(\d{1,2})(?!\d)|(?<!\d)(\d{1,2})\s*(?:-?\s*jährig|jahre|years?|yrs|yo\b)/;

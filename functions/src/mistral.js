@@ -250,8 +250,9 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   const onLiveText = typeof opts.onLiveText === "function" ? opts.onLiveText : null;
 
   /* Erster Versuch */
-  /* Dauer beider Versuche, addiert: Die 30-Tage-Zeile entsteht EINMAL je
-     Analyse, auch wenn nachgefragt wird (siehe loggeKiDauer). */
+  /* Dauer der Versuche mit Antwort, addiert: Die 30-Tage-Zeile entsteht
+     HOECHSTENS EINMAL je Analyse, auch wenn nachgefragt wird (siehe
+     loggeKiDauer). */
   const dauer = { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false };
   let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer);
   let missing = parsed
@@ -570,8 +571,10 @@ function hatProfilText(block) {
    vergleicht `step` exakt, scripts/log-sink-analyse-zeilen.sh). Der
    Datenschutztext nennt dafuer nur, wie lange die KI gebraucht hat, und
    "zwei Eintraege je Analyse" (diese Zeile und die Kinderschutz-Zeile).
-   Deshalb traegt sie nur die Dauer, und bei einer Nachfrage an die KI stehen
-   beide Versuche addiert in EINER Zeile statt in zwei. Alles Weitere (Modell,
+   Deshalb traegt sie nur die Dauer, und es gibt hoechstens EINE je Analyse:
+   Bei einer Nachfrage an die KI stehen die Versuche, die eine Antwort
+   lieferten, addiert darin. Scheitert schon der erste Versuch oder wird von
+   ihm nur ein Teil gerettet, entsteht keine. Alles Weitere (Modell,
    Status, Textmenge, Versuch) steht je Versuch in
    `mistral-single-large-details` und bleibt im Betriebsprotokoll (1 Tag),
    dessen Beschreibung auch "wie viel Text die KI verarbeitet hat" nennt. Die

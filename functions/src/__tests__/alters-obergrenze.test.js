@@ -52,6 +52,19 @@ describe("obereAltersgrenze", () => {
     ["als Elf verkleidet, ~9 Jahre", 9],
     ["Du bist weiblich, ~14 Jahre alt (± 2).", 16],
     ["0-3 Jahre", 3],
+    /* Zahlenpaare, die keine Altersspanne sind (27.09.2026): Nach dem zweiten
+       Wert steht ein anderes Wort als Jahre/alt oder ein Bindewort. */
+    ["~14 Jahre, zwischen 1 und 3 Uhr", 14],
+    ["weiblich, ~14, zwischen 2 und 3 Geschwister", 14],
+    ["male, ~14, between 2 and 99 friends", 14],
+    ["weiblich, ~14 (Spanne 12-16), zwischen 45 und 55 kg", 16],
+    ["~40 Jahre, zwischen 2 und 3 Kinder", 40],
+    ["weiblich, ~14, 45-55 kg", 14],
+    /* Gegenprobe: Bindewort, Alterswort oder Abkuerzung nach der Spanne. */
+    ["weiblich, Spanne 12-16 und damit Teenager", 16],
+    ["weiblich, zwischen 12 und 14 oder etwas älter", 14],
+    ["12–16 J.", 16],
+    ["male, 12 to 14-year-old", 14],
   ])("Fremdzahl: %s → %i", (text, oben) => {
     expect(obereAltersgrenze(text)).toBe(oben);
   });

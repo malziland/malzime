@@ -10,7 +10,8 @@
 # Analyse, die der Datenschutztext nennt (Abschnitt Kinderschutz-Auswertung):
 #   - `step:"mistral-single-large"`: nur die Dauer (seit 26.09.2026; Modell,
 #     Status und Token-Zahlen stehen in `mistral-single-large-details`,
-#     1 Tag), eine Zeile je Analyse auch bei Nachfrage an die KI (27.09.2026).
+#     1 Tag), hoechstens eine Zeile je Analyse, auch bei Nachfrage an die KI
+#     (27.09.2026).
 #   - `step:"minor-safety"` (seit 09.09.2026): geschaetztes Alter,
 #     Filterentscheidung, Anzahl und Grund der Sperrwort-Treffer — seit
 #     27.09.2026 ohne das getroffene Wort und ohne Feldnamen.

@@ -698,7 +698,8 @@ geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.
 ## Diagnose-Speicher: nur, was der Datenschutztext nennt (26.09.2026)
 
 **Warum.** Der Datenschutztext ist die Vorgabe, das Programm folgt ihm. Er
-nennt für den 30-Tage-Speicher zwei Einträge je Analyse: bei der KI nur, wie
+nennt für den 30-Tage-Speicher bei der Kinderschutz-Auswertung zwei Einträge
+je Analyse (daneben liegen dort die Browser-Meldungen): bei der KI nur, wie
 lange sie gebraucht hat, und beim Kinderschutz das geschätzte Alter, die
 Filterentscheidung und ob ein Wort der Sperrliste vorkam. Die Erfolgsmeldung des Browsers kommt zudem Sekunden nach
 der Kinderschutz-Zeile an; trug sie Geräteangaben, ließ sich die
@@ -712,9 +713,11 @@ Altersschätzung über die Uhrzeit einem Gerät zuordnen.
    Geräteangaben bleiben in den Fehlermeldungen, wie der Datenschutztext
    beschreibt, für die Fehlersuche.
 2. `mistral-single-large` trägt nur Dauer und Wiederholungen und entsteht
-   einmal je Analyse (seit 27.09.2026): Fragt der Server die KI nach, weil
-   Karten fehlten, stehen beide Versuche addiert in dieser einen Zeile
-   (`loggeKiDauer` in `functions/src/mistral.js`). Modell, Status,
+   höchstens einmal je Analyse (seit 27.09.2026): Fragt der Server die KI
+   nach, weil Karten fehlten, stehen die Versuche, die eine Antwort lieferten,
+   addiert in dieser einen Zeile (`loggeKiDauer` in
+   `functions/src/mistral.js`). Scheitert schon der erste Versuch oder wird
+   von ihm nur ein Teil gerettet, entsteht keine. Modell, Status,
    Token-Zahlen, Reparaturstufen und der Versuch stehen je Versuch in
    `mistral-single-large-details`, die nicht in den 30-Tage-Speicher geht
    (Filter vergleicht `step` exakt).

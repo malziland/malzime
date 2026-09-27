@@ -203,7 +203,7 @@ async function handleProcessJob(req, res) {
      (handle-enqueue.js), keine Zeile ab hier (auch nicht die Fehlerzeilen),
      keine Zeile der Abholung (handle-job-status.js). Die Dauern bleiben.
      "Nie abgeholt" naehert man als Anzahl `process-job` mit `status` done,
-     blocked oder error minus Anzahl `job-delivered`. Kennungen tragen nur
+     blocked oder error, minus `completeJob-error`, minus `job-delivered`. Kennungen tragen nur
      noch Wege, auf denen dieser Aufruf keine Analyse macht: die Zeilen vor
      dem Claim (claimJob nimmt nur `queued`-Auftraege), Fehlerzeilen eines
      gescheiterten Einlasses und der Aufraeumdienst. Pruefung (alle Ausgaben

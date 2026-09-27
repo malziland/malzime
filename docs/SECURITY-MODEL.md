@@ -638,9 +638,10 @@ Warnwege, nach denen der Einlass weiterläuft), `handle-job-status.test.js`
 
 **Getragene Folge.** Eine vom Browser gemeldete Vorgangsnummer findet bei einem
 erfolgreichen Auftrag im Server-Log nichts mehr. „Nie abgeholt“ lässt sich ohne
-Kennung nur nähern: Anzahl `process-job` mit `status` done, blocked oder error
-minus Anzahl `job-delivered` (auch gesperrte Ergebnisse werden abgeholt;
-scheitert der Abhol-Vermerk, zählt eine erneute Abholung doppelt). Zeitliche
+Kennung nur nähern: Anzahl `process-job` mit `status` done, blocked oder error,
+minus Anzahl der Warnungen `completeJob-error` (Ergebnis nie gespeichert),
+minus Anzahl `job-delivered` (auch gesperrte Ergebnisse werden abgeholt; eine
+erneute Abholung, bevor der Abhol-Vermerk steht, zählt doppelt). Zeitliche
 Nähe bleibt: Fehlermeldungen des Browsers tragen Geräteangaben und liegen, wenn
 es zu einer Analyse eine gibt, Sekunden neben ihrer Kinderschutz-Zeile. Sie
 sind für die Fehlersuche nötig; eine Nummer, die beide verbindet, gibt es

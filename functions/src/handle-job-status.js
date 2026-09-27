@@ -209,9 +209,10 @@ async function handleJobStatus(req, res) {
          ergibt den Fertigzeitpunkt, und der liegt Millisekunden neben der
          Kinderschutz-Zeile. Mit Kennung waere die Altersschaetzung darueber
          dem Vorgang zuzuordnen. "Nie abgeholt" naehert man ohne Kennung:
-         Anzahl `process-job` mit `status` done, blocked oder error minus
-         Anzahl dieser Zeilen (auch gesperrte Ergebnisse werden abgeholt;
-         scheitert markDelivered, zaehlt eine erneute Abholung doppelt). */
+         Anzahl `process-job` mit `status` done, blocked oder error, minus
+         `completeJob-error`, minus Anzahl dieser Zeilen (auch gesperrte
+         Ergebnisse werden abgeholt; eine erneute Abholung vor dem Vermerk
+         zaehlt doppelt). */
       console.log(
         JSON.stringify({
           step: "job-delivered",

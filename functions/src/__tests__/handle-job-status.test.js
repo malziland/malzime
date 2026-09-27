@@ -222,7 +222,11 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
       .find((o) => o && o.step === "job-delivered");
     logSpy.mockRestore();
     expect(delivered).toBeTruthy();
-    expect(delivered.jobId).toBe("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
+    /* Seit 27.09.2026 ohne Kennung: Die Dauern ergeben den Fertigzeitpunkt,
+       der Millisekunden neben der Kinderschutz-Zeile liegt. */
+    expect(delivered).not.toHaveProperty("jobId");
+    expect(delivered).not.toHaveProperty("traceId");
+    expect(JSON.stringify(delivered)).not.toContain("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
     expect(typeof delivered.deliveryGapMs).toBe("number");
     expect(typeof delivered.totalMs).toBe("number");
   });

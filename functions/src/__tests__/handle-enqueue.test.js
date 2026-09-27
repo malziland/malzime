@@ -230,6 +230,24 @@ describe("handleEnqueue — Erfolgsfall", () => {
     expect(jobs.createJob).toHaveBeenCalledWith(expect.objectContaining({ traceId: "abc123XYZ" }));
     expect(res.headers["X-Trace-Id"]).toBe("abc123XYZ");
   });
+
+  /* 27.09.2026: Der Auftrag und die Antwort an den Browser tragen die
+     Vorgangskennung weiter (siehe oben) — die Protokollzeile nicht. Auf dem
+     Erfolgsweg eines Auftrags traegt keine Logzeile eine Kennung
+     (Begruendung in handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"). */
+  test("die Erfolgszeile im Log traegt weder Vorgangs- noch Auftragskennung", async () => {
+    const zeilen = [];
+    const spy = jest.spyOn(console, "log").mockImplementation((z) => zeilen.push(String(z)));
+    const res = makeRes();
+    await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
+    spy.mockRestore();
+    const ok = zeilen.find((z) => z.includes('"step":"enqueue"') && z.includes('"status":"ok"'));
+    expect(ok).toBeDefined();
+    expect(ok).not.toContain("abc123XYZ");
+    expect(ok).not.toContain(res.body.jobId);
+    expect(JSON.parse(ok)).not.toHaveProperty("traceId");
+    expect(JSON.parse(ok)).not.toHaveProperty("jobId");
+  });
 });
 
 /* ── Stundenzähler: die Marke des Einlasses reist mit dem Auftrag ── */

@@ -423,7 +423,15 @@ async function handleEnqueue(req, res, secrets) {
       return;
     }
 
-    console.log(JSON.stringify({ requestId, traceId, jobId, step: "enqueue", status: "ok" }));
+    /* OHNE jobId UND traceId (27.09.2026): Auf dem Erfolgsweg eines Auftrags
+       traegt keine Logzeile eine Kennung. Die Dauern in den Zeilen von
+       Analyse und Abholung ergeben Anlage- und Fertigzeitpunkt
+       millisekundengenau — eine Kennung in irgendeiner Zeile dieses Weges
+       verbaende darueber die Kinderschutz-Zeile (geschaetztes Alter) wieder
+       mit der Vorgangskennung. Begruendung und Pruefung: handle-process-job.js
+       ("AB HIER KEINE KENNUNG IM LOG"), docs/SECURITY-MODEL.md. requestId ist
+       ein Server-Zufall ohne Gegenstueck im Browser. */
+    console.log(JSON.stringify({ requestId, step: "enqueue", status: "ok" }));
     res.status(200).json({ jobId, resultToken });
   } catch (err) {
     const status = err.status || 500;

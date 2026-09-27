@@ -48,9 +48,12 @@ const { merkeDauer } = require("./durchsatz");
 
 /* ── Kinderschutz-Bericht loggen (beide Pipelines) ────────────────────────
    IMMER loggen, nicht nur bei einem Treffer (Audit SEC-001): Ein
-   systematischer Ausfall (englischsprachiger Durchgang, kein erkanntes
-   Alter) erzeugte sonst exakt null Spuren und waere von "alles sauber" nicht
-   zu unterscheiden. `alter: null` ist die wichtigste dieser Zeilen.
+   systematischer Ausfall (kein erkanntes Alter) erzeugte sonst exakt null
+   Spuren und waere von "alles sauber" nicht zu unterscheiden. `alter: null`
+   ist die wichtigste dieser Zeilen. Seit 26.09.2026 traegt die Zeile keine
+   Sprache mehr (Datenschutztext) — einen Ausfall nur einer Sprache zeigt sie
+   deshalb nicht mehr getrennt; nur die Alarmzeile bei harten Treffern
+   (`minor-safety-durchbruch`, Betriebsprotokoll) nennt sie.
 
    ESKALATION (Kurzaudit 2026-08-11, SEC-108): Taucht ein Begriff der HARTEN
    Stufe (Pornografie, Waffen, Extremismus) im Fliesstext auf, ist das kein
@@ -183,20 +186,28 @@ async function handleProcessJob(req, res) {
     return;
   }
 
-  /* AB HIER KEINE KENNUNG IM LOG (26.09.2026): Ab dem Claim kann dieser
+  /* AB HIER KEINE KENNUNG IM LOG (26./27.09.2026): Ab dem Claim kann dieser
      Aufruf die Kinderschutz-Zeile schreiben (geschaetztes Alter, 30 Tage im
      Diagnose-Speicher, bewusst ohne Vorgangskennung, PRIV-2026-09-10-02).
-     Cloud Run versieht aber JEDE Logzeile eines Aufrufs mit demselben Label
-     `execution_id`. Truege hier eine Zeile jobId oder traceId, liesse sich die
-     Altersschaetzung ueber dieses Label mit der Vorgangskennung und darueber
-     mit den Geraeteangaben verbinden, die der Browser unter derselben
-     Kennung meldet — gemessen am 25.09.2026. Deshalb schreibt ab hier keine
-     Zeile eine Kennung, auch nicht die Fehlerzeilen. Wie viele Ergebnisse
-     nie abgeholt wurden, zaehlt der Aufraeumdienst (handle-reap.js:
-     `zugestellt`/`expired`). analyse-aufruf-ohne-kennung.test.js haelt das
-     fuer alle Wege fest. Die Zeilen VOR dem Claim behalten die jobId: Diese
-     Wege enden, ohne dass eine Analyse laeuft (claimJob nimmt nur
-     `queued`-Auftraege). */
+     Zwei Wege wuerden sie trotzdem mit der Vorgangskennung verbinden — und
+     darueber mit den Geraeteangaben, die der Browser unter dieser Kennung in
+     Fehlermeldungen schickt:
+       1. Das Label `execution_id` steht an JEDER Logzeile eines Aufrufs (die
+          Laufzeit schreibt es; firebase-tools schaltet es beim Deploy ein,
+          abschalten laesst es sich nicht).
+       2. Die Dauern der Zeilen von Analyse und Abholung ergeben Anlage- und
+          Fertigzeitpunkt des Auftrags millisekundengenau, und der
+          Fertigzeitpunkt liegt Millisekunden neben der Kinderschutz-Zeile.
+     Deshalb traegt auf dem ganzen Erfolgsweg eines Auftrags keine Logzeile
+     jobId oder traceId: nicht die Erfolgszeile des Einlasses
+     (handle-enqueue.js), keine Zeile ab hier (auch nicht die Fehlerzeilen),
+     nicht die Abholung (handle-job-status.js, `job-delivered`). Die Dauern
+     bleiben. "Nie abgeholt" = Anzahl `process-job` mit `status: done` minus
+     Anzahl `job-delivered`. Die Zeilen VOR dem Claim behalten die jobId:
+     Diese Wege enden, ohne dass eine Analyse laeuft (claimJob nimmt nur
+     `queued`-Auftraege), und keine Zeile nennt jobId und traceId zusammen.
+     Pruefung: analyse-aufruf-ohne-kennung.test.js, handle-enqueue.test.js,
+     handle-job-status.test.js. */
   const start = Date.now();
   /* Stundenzaehler (11.09.2026): War der Zaehler beim Einlass ausgewichen,
      traegt dieser Auftrag seine Marke jetzt selbst nach — neben der Analyse

@@ -604,44 +604,51 @@ Schätzfehler; am Alters-Prompt ändert sich dann nichts. Verfehlen sie es
 überwiegend, wird der Alters-Prompt überarbeitet und vor der Auslieferung
 daraufhin geprüft, dass keine Kinder über die Schutzgrenze rutschen.
 
-## Analyse-Aufruf ohne Kennung im Log (26.09.2026)
+## Erfolgsweg eines Auftrags ohne Kennung im Log (26./27.09.2026)
 
 **Warum.** Die Kinderschutz-Zeile trägt keine Vorgangskennung
 (PRIV-2026-09-10-02), damit sich die Altersschätzung nicht mit den
-Geräteangaben verbinden lässt, die der Browser unter dieser Kennung meldet.
-Cloud Run versieht aber jede Logzeile eines Aufrufs mit demselben Label
-`execution_id`. Eine Auftrags- oder Vorgangskennung in irgendeiner anderen
-Zeile desselben Aufrufs würde die Kinderschutz-Zeile darüber wieder mit ihr
-verbinden.
+Geräteangaben verbinden lässt, die der Browser unter dieser Kennung in
+Fehlermeldungen schickt. Zwei Wege hätten sie trotzdem verbunden: Das Label
+`execution_id` steht an jeder Logzeile eines Aufrufs (die Laufzeit schreibt es,
+firebase-tools schaltet es beim Deploy ein). Und die Dauern in den Zeilen von
+Analyse und Abholung ergeben Anlage- und Fertigzeitpunkt eines Auftrags
+millisekundengenau; der Fertigzeitpunkt liegt Millisekunden neben der
+Kinderschutz-Zeile. Jede Kennung irgendwo auf diesem Weg hätte deshalb
+genügt.
 
-**Entscheidung.** Ab dem Claim schreibt der Analyse-Aufruf
-(`functions/src/handle-process-job.js`, Kommentar „AB HIER KEINE KENNUNG IM
-LOG“) weder Auftrags- noch Vorgangskennung ins Log: nicht in der
-Abschlusszeile, nicht in den Fehlerzeilen, nicht in der Alarmzeile bei harten
-Sperrwort-Treffern. `loggeMinorSafety` nimmt keine Kennung mehr entgegen. Die
-Zeilen vor dem Claim behalten die Auftragskennung; diese Wege enden, ohne dass
-eine Analyse läuft. `analyse-aufruf-ohne-kennung.test.js` lässt den Aufruf auf
-dem Erfolgsweg und auf den Fehlerwegen laufen und sucht in jeder Ausgabe nach
-den Werten beider Kennungen; eine Positivkontrolle zeigt, dass die Suche eine
-Kennung findet, wenn sie dasteht.
+**Entscheidung.** Auf dem ganzen Erfolgsweg eines Auftrags trägt keine
+Logzeile Auftrags- oder Vorgangskennung: nicht die Erfolgszeile des Einlasses
+(`functions/src/handle-enqueue.js`), keine Zeile des Analyse-Aufrufs ab dem
+Claim, auch nicht die Fehler- und Alarmzeilen (`functions/src/handle-process-job.js`,
+Kommentar „AB HIER KEINE KENNUNG IM LOG“), nicht die Abholung
+(`functions/src/handle-job-status.js`, `job-delivered`). `loggeMinorSafety`
+nimmt keine Kennung entgegen. Die Dauern bleiben. Zeilen vor dem Claim behalten
+die Auftragskennung; diese Wege enden ohne Analyse, und keine Zeile nennt
+Auftrags- und Vorgangskennung zusammen. Auftrag und Antwort an den Browser
+tragen die Vorgangskennung weiter; nur das Log nicht. Geprüft von
+`analyse-aufruf-ohne-kennung.test.js` (Suche nach den Werten beider Kennungen,
+mit Positivkontrolle), `handle-enqueue.test.js` und `handle-job-status.test.js`.
 
-**Getragene Folge.** Ein einzelner Auftrag lässt sich im Log nicht mehr über
-seine Nummer finden, wenn er nach dem Claim scheitert; Fehlerart und Zeitpunkt
-bleiben. Wie viele Ergebnisse nie abgeholt wurden, zählt der Aufräumdienst
-(`handle-reap.js`, Felder `zugestellt` und `expired`).
+**Getragene Folge.** Eine vom Browser gemeldete Vorgangsnummer findet bei einem
+erfolgreichen Auftrag im Server-Log nichts mehr, nur die Fehlerzeilen des
+Einlasses. „Nie abgeholt“ ergibt sich ohne Kennung als Anzahl `process-job`
+mit `status: done` minus Anzahl `job-delivered`. Zeitliche Nähe bleibt:
+Fehlermeldungen des Browsers tragen Geräteangaben und liegen, wenn es zu einer
+Analyse eine gibt, Sekunden neben ihrer Kinderschutz-Zeile. Sie sind für die
+Fehlersuche nötig; eine Nummer, die beide verbindet, gibt es nicht.
 
-**Betrachtete Alternativen.** Das Label entfernen: nicht möglich, Cloud Run
-setzt es selbst. Nur die Abschlusszeile ändern: verworfen, die Fehlerzeilen
-desselben Aufrufs hätten dieselbe Verbindung hergestellt. Die
-Kinderschutz-Zeile in einem anderen Aufruf schreiben, gesammelt durch den
-Aufräumdienst: verworfen, mehr Umbau und eine zusätzliche Ablage der Werte in
-der Datenbank.
+**Betrachtete Alternativen.** Das Label abschalten: nicht möglich, firebase-tools
+setzt es nach den eigenen Umgebungsvariablen. Die Dauern auf Sekunden runden:
+verworfen, der Fertigzeitpunkt folgt auch aus der Abholzeile und liegt ohnehin
+neben der Kinderschutz-Zeile. Nur die Abschlusszeile ändern: verworfen, die
+Zeilen von Einlass und Abholung hätten dieselbe Verbindung hergestellt.
 
-**Rückweg.** Nur mit Deploy. Eine Kennung im Analyse-Aufruf lässt den Test
+**Rückweg.** Nur mit Deploy. Eine Kennung auf dem Erfolgsweg lässt die Tests
 rot werden — das ist gewollt.
 
-**Neubewertung.** Braucht eine neue Zeile im Analyse-Aufruf eine Kennung, wird
-vorher geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.
+**Neubewertung.** Braucht eine Zeile auf diesem Weg eine Kennung, wird vorher
+geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.
 
 ## Diagnose-Speicher: nur, was der Datenschutztext nennt (26.09.2026)
 
@@ -669,9 +676,11 @@ Altersschätzung über die Uhrzeit einem Gerät zuordnen.
    halten fest, dass die echten Zeilen genau diese Felder haben.
 
 **Getragene Folge.** Mit welchen Geräten erfolgreich analysiert wurde, lässt
-sich nicht mehr auswerten. Status, Modell und Token-Zahlen der KI-Aufrufe
-gibt es nur noch einen Tag; das Herausrechnen der Beispielfotos über die
-Token-Zahlen geht damit nur am Tag der Analyse.
+sich nicht mehr auswerten. Status, Modell, Token-Zahlen und Scheitern der
+KI-Aufrufe gibt es nur noch einen Tag; das Herausrechnen der Beispielfotos
+über die Token-Zahlen geht nur innerhalb dieses Tages. Die Kinderschutz-Zeile
+nennt keine Sprache mehr; ein Ausfall nur einer Sprache ist darin nicht mehr
+getrennt zu sehen.
 
 **Betrachtete Alternativen.** Die Zeit der Kinderschutz-Zeile vergröbern:
 verworfen, Cloud Logging speichert zusätzlich den Empfangszeitpunkt

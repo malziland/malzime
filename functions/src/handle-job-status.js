@@ -201,11 +201,14 @@ async function handleJobStatus(req, res) {
       markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
         console.log(JSON.stringify({ warning: "markDelivered-error", jobId: job.id, error: err.message }))
       );
+      /* OHNE jobId UND traceId (27.09.2026): Zeitstempel minus deliveryGapMs
+         ergibt den Fertigzeitpunkt, und der liegt Millisekunden neben der
+         Kinderschutz-Zeile. Mit Kennung waere die Altersschaetzung darueber
+         dem Vorgang zuzuordnen. "Nie abgeholt" zaehlt man ohne Kennung:
+         Anzahl `process-job` mit `status: done` minus Anzahl dieser Zeilen. */
       console.log(
         JSON.stringify({
           step: "job-delivered",
-          jobId: job.id,
-          traceId: job.traceId || null,
           deliveryGapMs: typeof job.finishedAt === "number" ? now - job.finishedAt : null,
           totalMs: typeof job.createdAt === "number" ? now - job.createdAt : null,
         })

@@ -144,3 +144,54 @@ test("genau eine Stelle im Code schreibt die 30-Tage-Zeile der KI", () => {
   const stellen = quellen.join("\n").match(/step:\s*"mistral-single-large"/g) || [];
   expect(stellen).toHaveLength(1);
 });
+
+/* Datenschutztext: "Zwei Eintraege je Analyse" — die KI-Dauer und die
+   Kinderschutz-Zeile. Fragt der Server die KI nach, weil Karten fehlten,
+   entstand bis 27.09.2026 eine zweite Dauer-Zeile, also drei Eintraege. */
+test("auch mit Nachfrage an die KI: genau eine 30-Tage-Zeile der KI je Analyse", async () => {
+  const steps = diagnoseSteps();
+  const karten = (liste) =>
+    Object.fromEntries(liste.map((k) => [k, { label: k, value: "Du bist X.", confidence: 0.8 }]));
+  const body = (liste) => ({
+    subject: "HUMAN",
+    visible_text: "",
+    hard_facts: { alter_geschlecht: "Du bist weiblich, ~14 Jahre alt (Spanne 12-16)." },
+    standard: {
+      profileText: "Sachlich.",
+      ad_targeting: ["A"],
+      manipulation_triggers: ["T"],
+      categories: karten(liste),
+    },
+    beast: { profileText: "Zynisch.", ad_targeting: ["A"], manipulation_triggers: ["T"], categories: karten(liste) },
+  });
+  const antworten = [body(KARTEN.slice(0, 5)), body(KARTEN)];
+  setFetchForTest(async () => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      choices: [{ message: { content: JSON.stringify(antworten.shift()) }, finish_reason: "stop" }],
+      usage: { prompt_tokens: PROMPT_TOKENS, completion_tokens: 3021 },
+    }),
+  }));
+  await runSingleLargeCall("BASE64", "image/jpeg", () => 90000, "de");
+
+  const geparst = zeilen
+    .map((z) => {
+      try {
+        return JSON.parse(z);
+      } catch (_) {
+        return null;
+      }
+    })
+    .filter(Boolean);
+  /* Positivkontrolle: Die Nachfrage hat wirklich stattgefunden. */
+  const versuche = geparst.filter((j) => j.step === "mistral-single-large-details" && j.attempt).map((j) => j.attempt);
+  expect(versuche).toEqual(["first", "retry"]);
+  expect(antworten).toHaveLength(0);
+
+  const imSpeicher = geparst.filter((j) => steps.includes(j.step));
+  expect(imSpeicher.map((j) => j.step)).toEqual(["mistral-single-large"]);
+  const [dauerZeile] = imSpeicher;
+  expect(typeof dauerZeile.httpMs).toBe("number");
+  expect(dauerZeile.wiederholungen).toBe(0);
+});

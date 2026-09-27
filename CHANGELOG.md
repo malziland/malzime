@@ -23,8 +23,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **Weniger Angaben im Diagnose-Protokoll.** Die Meldung, dass eine Analyse
   geklappt hat, enthält keine Angaben zum Gerät und keine Vorgangsnummer mehr.
   Was 30 Tage aufbewahrt wird, beschränkt sich auf das, was die
-  Datenschutzerklärung nennt: bei der KI die Dauer, beim Kinderschutz das
-  geschätzte Alter, die Filterentscheidung und Sperrwort-Treffer.
+  Datenschutzerklärung nennt: zwei Einträge je Analyse, bei der KI die Dauer,
+  beim Kinderschutz das geschätzte Alter, die Filterentscheidung und ob ein
+  Wort der Sperrliste vorkam, aber nicht mehr welches Wort in welchem Feld.
+  Muss die KI nachgefragt werden, bleibt es bei einem Eintrag zur Dauer.
 
 ## [4.11.0] — 2026-09-18
 

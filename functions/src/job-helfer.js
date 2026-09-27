@@ -45,7 +45,7 @@ function loggeMinorSafety(safety, lang) {
          Label `execution_id` (siehe handle-process-job.js, "AB HIER KEINE
          KENNUNG IM LOG").
          Die Feldmenge folgt dem Datenschutztext (Kinderschutz-Auswertung:
-         Alter, Filterentscheidung, Sperrwort) — deshalb seit 26.09.2026 ohne
+         Alter, Filterentscheidung, ob ein Sperrwort vorkam) — deshalb seit 26.09.2026 ohne
          Sprache; die steht nur noch in der Alarmzeile unten (Betriebsprotokoll).
          Festgeschrieben in alters-obergrenze.test.js, gegen den Text geprueft
          in public/__tests__/datenschutz-deckung.test.js. */
@@ -64,17 +64,11 @@ function loggeMinorSafety(safety, lang) {
       /* Treffer im Fliesstext: nicht entfernt, aber gemeldet — je Stufe. */
       durchgerutscht: safety.durchgerutscht.length,
       durchgerutschtGruende: [...new Set(safety.durchgerutscht.map((d) => d.grund))],
-      /* Seit 09.09.2026 je Treffer: Feld und das getroffene Wort aus der
-         festen Sperrliste — nie der Satz, nie der Werbetext. Damit sagt die
-         naechste Zeile selbst, ob "cocktail" in einer Bar-Beschreibung stand
-         oder "sportwetten" als Werbeidee fuer ein Kind. Und die Anzahl der
-         Werbeeintraege je Modus, wie das Kind sie sieht. */
-      entfernte: safety.entfernt.map((e) => ({ feld: `${e.modus}.${e.feld}`, grund: e.grund, stichwort: e.stichwort })),
-      durchgerutschte: safety.durchgerutscht.map((d) => ({
-        feld: `${d.modus}.${d.feld}`,
-        grund: d.grund,
-        stichwort: d.stichwort,
-      })),
+      /* Welches Wort der Sperrliste in welchem Feld stand, steht seit
+         27.09.2026 NICHT mehr in der Zeile: Der Datenschutztext nennt nur,
+         OB ein Wort vorkam. Die Anzahlen und Gruende oben sagen das. Dazu die
+         Anzahl der Werbeeintraege je Modus, wie das Kind sie nach dem Filter
+         sieht. */
       werbung: safety.werbung || {},
       gekappt: (safety.gekappt || []).length,
     })

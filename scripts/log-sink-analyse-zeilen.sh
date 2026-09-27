@@ -1,27 +1,22 @@
 #!/usr/bin/env bash
 # KA-04 (Kurzaudit 2026-08-12): Analyse-Logzeilen 30 Tage aufheben.
 #
-# Problem: Der Standard-Log-Speicher (_Default) hebt nur 1 Tag auf. Die
-# Zeilen `step:"mistral-single-large"` (seit 26.09.2026 nur noch die Dauer;
-# Token-Zahlen stehen in `mistral-single-large-details`, 1 Tag)
-# sind damit am Folgetag weg — die geplanten September-Messungen
-# (Prompt-Caching-Trefferquote unter Last, HEIC-Formatanteile) waeren
-# unmoeglich.
+# Problem: Der Standard-Log-Speicher (_Default) hebt nur 1 Tag auf.
+# Kinderschutz-Auswertung und KI-Dauer waeren damit am Folgetag weg.
 #
 # Loesung: Der bestehende 30-Tage-Speicher `client-diagnostics`
 # (europe-west1, beschrieben als "Anonyme Client-Diagnose ... keine PII,
-# keine IPs") bekommt diese Zeilen dazu. Sie enthalten Schritt-Name, Dauer
-# und Token-Zahlen — keine IP, kein Bild, nichts Personenbezogenes. Die
-# 30-Tage-Zusage der Datenschutzerklaerung ("vollstaendig anonyme
-# Diagnose-Daten ohne Personenbezug ... bis zu 30 Tage") deckt sie ab.
-#
-# Erweiterung 09.09.2026: Auch die Kinderschutz-Zeile `step:"minor-safety"`
-# (geschaetztes Alter, Zaehler, Feldnamen, getroffenes Stichwort aus der
-# festen Sperrliste) bleibt 30 Tage. Grund: Am 08./09.09. meldete der Filter
-# bei 8 von 19 Analysen mit Minderjaehrigen einen Treffer im Fliesstext —
-# ob das eine Quote oder ein Ausreisser ist, laesst sich mit einem Tag
-# Aufbewahrung nicht sagen (die Abfrage fuer den 07.09. fand 0 Zeilen bei
-# 18 Analysen). Kein Satz, kein Kontext, kein Personenbezug.
+# keine IPs") bekommt zwei Server-Zeilen dazu — die zwei Eintraege je
+# Analyse, die der Datenschutztext nennt (Abschnitt Kinderschutz-Auswertung):
+#   - `step:"mistral-single-large"`: nur die Dauer (seit 26.09.2026; Modell,
+#     Status und Token-Zahlen stehen in `mistral-single-large-details`,
+#     1 Tag), eine Zeile je Analyse auch bei Nachfrage an die KI (27.09.2026).
+#   - `step:"minor-safety"` (seit 09.09.2026): geschaetztes Alter,
+#     Filterentscheidung, Anzahl und Grund der Sperrwort-Treffer — seit
+#     27.09.2026 ohne das getroffene Wort und ohne Feldnamen.
+# Keine Kennung, keine IP, kein Bild, kein Satz aus dem Profil. Welche
+# Felder erlaubt sind, haelt public/__tests__/fixtures/datenschutz-deckung.json
+# fest; der Filter vergleicht `step` exakt, andere Zeilen bleiben draussen.
 #
 # Ausfuehren: einmalig nach Freigabe (kein Deploy noetig, wirkt sofort).
 # Ruecknahme: denselben Befehl mit dem vorigen Filter erneut ausfuehren.

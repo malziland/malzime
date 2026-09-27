@@ -90,12 +90,10 @@
       "minderjaehrig": "was der Kinderschutz-Filter entschieden hat",
       "entfernt": "was der Kinderschutz-Filter entschieden hat",
       "gruende": "was der Kinderschutz-Filter entschieden hat",
-      "entfernte": "was der Kinderschutz-Filter entschieden hat",
       "werbung": "was der Kinderschutz-Filter entschieden hat",
       "gekappt": "was der Kinderschutz-Filter entschieden hat",
       "durchgerutscht": "ob ein Wort unserer Sperrliste vorkam",
-      "durchgerutschtGruende": "ob ein Wort unserer Sperrliste vorkam",
-      "durchgerutschte": "ob ein Wort unserer Sperrliste vorkam"
+      "durchgerutschtGruende": "ob ein Wort unserer Sperrliste vorkam"
     },
     "mistral-single-large": {
       "step": "wie lange die KI gebraucht hat",

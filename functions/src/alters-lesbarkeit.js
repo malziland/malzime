@@ -261,8 +261,9 @@ function untereAltersgrenze(text) {
    Schutz. Hier wuerde sie die Spanne kuenstlich breit machen — genau die
    Frage, fuer die das Feld da ist ("schliesst die Spanne das Alter ein?"),
    faende dann zu oft ein Ja. Deshalb in dieser Reihenfolge:
-     1. erkannte Spanne ("12-16", "12 bis 16", "zwölf- bis vierzehnjährig")
-        oder Plus-Minus-Angabe ("~14 (± 2)") -> ihr oberes Ende;
+     1. erkannte Spanne ("12-16", "12 bis 16", "zwölf- bis vierzehnjährig",
+        "zwischen 12 und 14") oder Plus-Minus-Angabe ("~14 (± 2)") -> ihr
+        oberes Ende;
      2. sonst eine Zahl mit Altersbezug ("~14", "etwa 14", "14 Jahre",
         "14-jährig") -> dieser Punktwert;
      3. sonst eine Jahrzehnt-Angabe ("Ende zwanzig", "in his twenties",
@@ -273,6 +274,9 @@ function untereAltersgrenze(text) {
    ersten Saetze beider Karten zusammen; dann ist das Ergebnis das obere Ende
    der weiteren Spanne. */
 const SPANNE_OBEN = /(?<!\d)(\d{1,2})\s*(?:[-–—]\s*)?(?:[-–—]|bis|to)\s*(\d{1,2})(?!\d)/g;
+/* "zwischen 12 und 14" / "between 12 and 14": ohne das Wort davor waere
+   "und" zu weit gefasst ("12 und 3 Geschwister"). */
+const ZWISCHEN_OBEN = /(?:zwischen|between)\s+(\d{1,2})\s*(?:jahren?\s*)?(?:und|and)\s*(\d{1,2})(?!\d)/g;
 const PLUS_MINUS = /(?<!\d)(\d{1,2})[^\d]{0,20}?(?:±|\+\/-|\+-)\s*(\d{1,2})(?!\d)/g;
 const ALTERSZAHL =
   /(?:~|\b(?:etwa|circa|ca\.|ungefähr|about|around|approximately|aged))\s*(\d{1,2})(?!\d)|(?<!\d)(\d{1,2})\s*(?:-?\s*jährig|jahre|years?|yrs|yo\b)/;
@@ -283,7 +287,7 @@ function obereAltersgrenze(text) {
   const roh = String(text || "").toLowerCase();
   const s = mitZiffern(ohneZiffernKlammern(text)).toLowerCase();
   const enden = [];
-  for (const m of s.matchAll(SPANNE_OBEN)) {
+  for (const m of [...s.matchAll(SPANNE_OBEN), ...s.matchAll(ZWISCHEN_OBEN)]) {
     const von = Number(m[1]);
     const bis = Number(m[2]);
     if (von >= 1 && bis >= von) enden.push(bis);

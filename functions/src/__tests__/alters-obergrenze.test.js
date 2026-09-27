@@ -29,6 +29,10 @@ const FAELLE = [
   ["Du bist männlich, ~14 Jahre alt, rund 170 cm groß (Spanne 12–16).", 12, 16],
   ["weiblich, zwölf- bis vierzehnjährig", 12, 14],
   ["männlich, ~‹14› Jahre alt (Spanne ‹12›-‹16›)", 12, 16],
+  /* "zwischen … und …" ohne "Jahre" ergab bis 27.09.2026 die erste Zahl. */
+  ["weiblich, zwischen 12 und 14", 12, 14],
+  ["weiblich, zwischen zwölf und vierzehn", 12, 14],
+  ["male, between 12 and 14", 12, 14],
 ];
 
 describe("obereAltersgrenze", () => {

@@ -250,7 +250,10 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   const onLiveText = typeof opts.onLiveText === "function" ? opts.onLiveText : null;
 
   /* Erster Versuch */
-  let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText);
+  /* Dauer beider Versuche, addiert: Die 30-Tage-Zeile entsteht EINMAL je
+     Analyse, auch wenn nachgefragt wird (siehe loggeKiDauer). */
+  const dauer = { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false };
+  let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer);
   let missing = parsed
     ? collectMissingForBothModes(parsed)
     : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };
@@ -289,7 +292,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     try {
       /* Gleicher cacheKey wie im ersten Versuch — der statische Anfang ist in
          beiden Versuchen bitgleich, der Cache traegt also auch den Retry. */
-      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry", cacheKey);
+      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry", cacheKey, undefined, dauer);
       if (retryParsed) {
         /* Fehlende Karten aus Retry in Originalergebnis mergen (analog runProfile) */
         for (const mode of ["standard", "beast"]) {
@@ -318,6 +321,8 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
       );
     }
   }
+
+  if (dauer.gemessen) loggeKiDauer(dauer);
 
   if (!parsed) return { normal: null, boost: null, subject: "", visibleText: "" };
 
@@ -560,7 +565,35 @@ function hatProfilText(block) {
   return Boolean(block && typeof block.profileText === "string" && block.profileText.trim().length > 0);
 }
 
-async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText) {
+/* EINE 30-TAGE-ZEILE JE ANALYSE (27.09.2026): Die Zeile
+   `mistral-single-large` geht 30 Tage in den Diagnose-Speicher (Filter
+   vergleicht `step` exakt, scripts/log-sink-analyse-zeilen.sh). Der
+   Datenschutztext nennt dafuer nur, wie lange die KI gebraucht hat, und
+   "zwei Eintraege je Analyse" (diese Zeile und die Kinderschutz-Zeile).
+   Deshalb traegt sie nur die Dauer, und bei einer Nachfrage an die KI stehen
+   beide Versuche addiert in EINER Zeile statt in zwei. Alles Weitere (Modell,
+   Status, Textmenge, Versuch) steht je Versuch in
+   `mistral-single-large-details` und bleibt im Betriebsprotokoll (1 Tag),
+   dessen Beschreibung auch "wie viel Text die KI verarbeitet hat" nennt. Die
+   Eingabe-Token verraten zudem das Format des Fotos. Feldmenge
+   festgeschrieben in ki-zeile-ohne-tokens.test.js, gegen den Text geprueft
+   in public/__tests__/datenschutz-deckung.test.js. */
+function loggeKiDauer(dauer) {
+  console.log(
+    JSON.stringify({
+      step: "mistral-single-large",
+      httpMs: dauer.httpMs,
+      waitMs: dauer.waitMs,
+      /* Wie oft der Aufruf bei Ueberlast warten musste, bevor er durchkam
+         (08.09.2026) — Teil der Dauer. 0 im Normalfall; jede andere Zahl
+         heisst: das Netz hat gegriffen, und die Dosierung verdient einen
+         Blick. */
+      wiederholungen: dauer.wiederholungen,
+    })
+  );
+}
+
+async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey, onLiveText, dauer) {
   /* VOR dem try: Der Fehlerpfad protokolliert das Profil ebenfalls, und eine
      im try angelegte Variable gibt es im catch nicht. Genau daran sind beim
      ersten Anlauf zwei Pruefungen umgefallen. */
@@ -599,28 +632,13 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       requireSchema: false /* unser Schema unterscheidet sich vom Live-Schema (categories sitzt unter standard/beast) */,
       onRepair: (stage, err) => stages.push(stage + (err ? `:${err.name || "Error"}` : "")),
     });
-    /* ZWEI ZEILEN, NACH AUFBEWAHRUNG GETRENNT (26.09.2026): Die Zeile
-       `mistral-single-large` geht 30 Tage in den Diagnose-Speicher (Filter
-       vergleicht `step` exakt, scripts/log-sink-analyse-zeilen.sh). Der
-       Datenschutztext nennt dafuer nur, wie lange die KI gebraucht hat —
-       deshalb traegt sie nur die Dauer. Alles Weitere (Modell, Status,
-       Textmenge) steht in `mistral-single-large-details` und bleibt im
-       Betriebsprotokoll (1 Tag), dessen Beschreibung auch "wie viel Text die
-       KI verarbeitet hat" nennt. Die Eingabe-Token verraten zudem das Format
-       des Fotos. Feldmenge festgeschrieben in ki-zeile-ohne-tokens.test.js,
-       gegen den Text geprueft in public/__tests__/datenschutz-deckung.test.js. */
-    console.log(
-      JSON.stringify({
-        step: "mistral-single-large",
-        httpMs: result.httpMs,
-        waitMs: result.waitMs,
-        /* Wie oft der Aufruf bei Ueberlast warten musste, bevor er durchkam
-           (08.09.2026) — Teil der Dauer. 0 im Normalfall; jede andere Zahl
-           heisst: das Netz hat gegriffen, und die Dosierung verdient einen
-           Blick. */
-        wiederholungen: result.wiederholungen || 0,
-      })
-    );
+    /* Dauer sammeln; geschrieben wird sie einmal je Analyse (loggeKiDauer). */
+    if (dauer) {
+      dauer.httpMs += result.httpMs || 0;
+      dauer.waitMs += result.waitMs || 0;
+      dauer.wiederholungen += result.wiederholungen || 0;
+      dauer.gemessen = true;
+    }
     console.log(
       JSON.stringify({
         step: "mistral-single-large-details",

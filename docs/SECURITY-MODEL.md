@@ -450,10 +450,14 @@ Kind. Die Zeile war zudem nach einem Tag gelöscht.
    (`WERBE_ANFORDERUNG`, `WERBE_ANZAHL` in `functions/src/minor-safety.js`,
    die Prompts lesen die Zahl von dort). Gekappt wird erst nach dem Filter,
    nur die Werbung, nie die Manipulations-Trigger. Nachgefüllt wird nichts.
-2. Je Treffer stehen im Log das Feld (`boost.ad_targeting`,
+2. Je Treffer standen im Log das Feld (`boost.ad_targeting`,
    `normal.profileText`, `boost.categories.kaufkraft`) und das getroffene
    Stichwort aus der festen Sperrliste, klein geschrieben, höchstens 30
    Zeichen. Dazu die Anzahl der Werbeeinträge je Modus nach Filter und Kappung.
+   Feld und Stichwort sind seit 27.09.2026 wieder aus der Zeile, weil der
+   Datenschutztext nur nennt, ob ein Wort vorkam (Abschnitt „Diagnose-Speicher:
+   nur, was der Datenschutztext nennt“); der Bericht des Filters kennt sie
+   weiterhin, geloggt werden Anzahl und Grund.
 3. Die Zeile bleibt 30 Tage im Diagnose-Speicher `client-diagnostics`
    (europe-west1), gesetzt über `scripts/log-sink-analyse-zeilen.sh`.
 
@@ -472,10 +476,9 @@ Ausschnitt könnte eine Beschreibung der Person enthalten.
 **Bewusst getragene Folge.** Werden bei einem Kind mehr als zwei Einträge
 gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
 
-**Neubewertung.** Nach 30 Tagen Messung: Sind die Fließtext-Treffer
-überwiegend harmlose Wörter, wird die Sperrliste präzisiert. Sind es
-Werbebegriffe, wird die Prompt-Regel nachgeschärft und mit eigenen Fotos
-nachgestellt.
+**Neubewertung.** Die geplante Auswertung nach 30 Tagen (harmlose Wörter
+oder Werbebegriffe?) geht seit 27.09.2026 nicht mehr aus dem Protokoll; sie
+wird mit eigenen Fotos nachgestellt.
 
 ## Kinderschutz-Filter: Schutzgrenze mit Puffer (17.09.2026)
 
@@ -695,9 +698,9 @@ geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.
 ## Diagnose-Speicher: nur, was der Datenschutztext nennt (26.09.2026)
 
 **Warum.** Der Datenschutztext ist die Vorgabe, das Programm folgt ihm. Er
-nennt für den 30-Tage-Speicher bei der KI nur, wie lange sie gebraucht hat,
-und beim Kinderschutz das geschätzte Alter, die Filterentscheidung und
-Sperrwort-Treffer. Die Erfolgsmeldung des Browsers kommt zudem Sekunden nach
+nennt für den 30-Tage-Speicher zwei Einträge je Analyse: bei der KI nur, wie
+lange sie gebraucht hat, und beim Kinderschutz das geschätzte Alter, die
+Filterentscheidung und ob ein Wort der Sperrliste vorkam. Die Erfolgsmeldung des Browsers kommt zudem Sekunden nach
 der Kinderschutz-Zeile an; trug sie Geräteangaben, ließ sich die
 Altersschätzung über die Uhrzeit einem Gerät zuordnen.
 
@@ -708,17 +711,25 @@ Altersschätzung über die Uhrzeit einem Gerät zuordnen.
    verwirft sie auch von älteren Seiten (`functions/src/handle-telemetry.js`).
    Geräteangaben bleiben in den Fehlermeldungen, wie der Datenschutztext
    beschreibt, für die Fehlersuche.
-2. `mistral-single-large` trägt nur Dauer und Wiederholungen. Modell, Status,
-   Token-Zahlen und Reparaturstufen stehen in `mistral-single-large-details`,
-   die nicht in den 30-Tage-Speicher geht (Filter vergleicht `step` exakt).
-3. Die Kinderschutz-Zeile trägt keine Sprache mehr.
+2. `mistral-single-large` trägt nur Dauer und Wiederholungen und entsteht
+   einmal je Analyse (seit 27.09.2026): Fragt der Server die KI nach, weil
+   Karten fehlten, stehen beide Versuche addiert in dieser einen Zeile
+   (`loggeKiDauer` in `functions/src/mistral.js`). Modell, Status,
+   Token-Zahlen, Reparaturstufen und der Versuch stehen je Versuch in
+   `mistral-single-large-details`, die nicht in den 30-Tage-Speicher geht
+   (Filter vergleicht `step` exakt).
+3. Die Kinderschutz-Zeile trägt keine Sprache mehr und seit 27.09.2026 weder
+   das getroffene Wort der Sperrliste noch das Feld, in dem es stand — nur
+   Anzahl und Grund („immer“ oder „minor“) der Treffer.
 4. `public/__tests__/datenschutz-deckung.test.js` prüft jetzt auch die Felder
    der beiden Server-Zeilen einzeln gegen den Text (DE und EN), ohne
    Sammelbegriff; `alters-obergrenze.test.js` und `ki-zeile-ohne-tokens.test.js`
    halten fest, dass die echten Zeilen genau diese Felder haben.
 
 **Getragene Folge.** Mit welchen Geräten erfolgreich analysiert wurde, lässt
-sich nicht mehr auswerten. Status, Modell, Token-Zahlen und Scheitern der
+sich nicht mehr auswerten. Welches Wort der Sperrliste in welchem Feld stand,
+zeigt das Protokoll nicht mehr; ob die Sperrliste zu grob ist, lässt sich nur
+noch mit eigenen Fotos nachstellen, nicht aus 30 Tagen Betrieb ablesen. Status, Modell, Token-Zahlen und Scheitern der
 KI-Aufrufe gibt es nur noch einen Tag; das Herausrechnen der Beispielfotos
 über die Token-Zahlen geht nur innerhalb dieses Tages. Die Kinderschutz-Zeile
 nennt keine Sprache mehr; ein Ausfall nur einer Sprache ist darin nicht mehr

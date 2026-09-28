@@ -222,9 +222,57 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
       .find((o) => o && o.step === "job-delivered");
     logSpy.mockRestore();
     expect(delivered).toBeTruthy();
-    expect(delivered.jobId).toBe("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
+    /* Seit 27.09.2026 ohne Kennung: Die Dauern ergeben den Fertigzeitpunkt,
+       der Millisekunden neben der Kinderschutz-Zeile liegt. */
+    expect(delivered).not.toHaveProperty("jobId");
+    expect(delivered).not.toHaveProperty("traceId");
+    expect(JSON.stringify(delivered)).not.toContain("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
     expect(typeof delivered.deliveryGapMs).toBe("number");
     expect(typeof delivered.totalMs).toBe("number");
+  });
+
+  /* 27.09.2026: In ALLEN Ausgaben des Abholaufrufs steht weder Auftrags- noch
+     Vorgangskennung — auch nicht, wenn der Abhol-Vermerk scheitert und
+     Firestore eine Meldung mit dem Dokumentpfad liefert. */
+  test.each([
+    ["Normalfall", () => {}],
+    [
+      "Abhol-Vermerk scheitert",
+      () =>
+        jobs.markDelivered.mockRejectedValueOnce(
+          Object.assign(
+            new Error("No document to update: projects/p/databases/d/documents/jobs/Aa1Bb2Cc3Dd4Ee5Ff6Gg"),
+            {
+              code: 5,
+            }
+          )
+        ),
+    ],
+  ])("%s: keine Ausgabe traegt Auftrags- oder Vorgangskennung", async (_name, vorbereiten) => {
+    vorbereiten();
+    jobs.getJob.mockResolvedValue({
+      id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
+      status: "done",
+      result: {},
+      resultToken: "ticket-abc",
+      traceId: "vorgang-geheim-9",
+      createdAt: 1000,
+      finishedAt: 5000,
+    });
+    const ausgaben = [];
+    const spies = ["log", "warn", "error", "info"].map((art) =>
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+    );
+    await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, makeRes());
+    /* Der Vermerk laeuft nebenlaeufig — seinen .catch abwarten. */
+    await new Promise((r) => setTimeout(r, 0));
+    spies.forEach((s) => s.mockRestore());
+    const alles = ausgaben.join("\n");
+    expect(alles).toContain('"step":"job-delivered"');
+    /* Positivkontrolle: Im Fehlerfall steht die Warnung wirklich im Log. */
+    if (_name === "Abhol-Vermerk scheitert") expect(alles).toContain("markDelivered-error");
+    expect(alles).not.toContain("Aa1Bb2Cc3Dd4Ee5Ff6Gg");
+    expect(alles).not.toContain("vorgang-geheim-9");
   });
 
   test("bereits ausgelieferter Job → kein erneutes markDelivered", async () => {

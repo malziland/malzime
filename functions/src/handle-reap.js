@@ -123,7 +123,21 @@ async function reapJobs() {
       await deleteImage(job.imagePath);
       reapedAbandoned += 1;
     } catch (err) {
-      console.log(JSON.stringify({ step: "reap", jobId: job.id, warning: "abandon-failed", error: err.message }));
+      /* FEHLERZEILEN DES AUFRAEUMDIENSTES OHNE jobId UND OHNE FEHLERTEXT
+         (27.09.2026): Die Fristen, nach denen er einen Auftrag anfasst,
+         liegen fest (Anlage + Aufbewahrung, Abholung + Zustellfenster). Eine
+         jobId hier liesse sich darueber minutengenau der Abschlusszeile der
+         Analyse und damit der Kinderschutz-Zeile zuordnen; ein
+         Firestore-Fehlertext kann den Dokumentpfad samt jobId enthalten.
+         Fehlgeschlagene Schritte wiederholt der naechste Lauf ohnehin. */
+      console.log(
+        JSON.stringify({
+          step: "reap",
+          warning: "abandon-failed",
+          code: (err && err.code) || null,
+          art: (err && err.name) || null,
+        })
+      );
     }
   }
 
@@ -136,7 +150,14 @@ async function reapJobs() {
       await deleteImage(job.imagePath);
       reapedStale += 1;
     } catch (err) {
-      console.log(JSON.stringify({ step: "reap", jobId: job.id, warning: "fail-stale-failed", error: err.message }));
+      console.log(
+        JSON.stringify({
+          step: "reap",
+          warning: "fail-stale-failed",
+          code: (err && err.code) || null,
+          art: (err && err.name) || null,
+        })
+      );
     }
   }
 
@@ -156,7 +177,14 @@ async function reapJobs() {
       await deleteImage(job.imagePath);
       reapedUeberfaellig += 1;
     } catch (err) {
-      console.log(JSON.stringify({ step: "reap", jobId: job.id, warning: "overdue-failed", error: err.message }));
+      console.log(
+        JSON.stringify({
+          step: "reap",
+          warning: "overdue-failed",
+          code: (err && err.code) || null,
+          art: (err && err.name) || null,
+        })
+      );
     }
   }
 
@@ -177,7 +205,12 @@ async function reapJobs() {
       reapedZugestellt += 1;
     } catch (err) {
       console.log(
-        JSON.stringify({ step: "reap", jobId: job.id, warning: "delete-delivered-failed", error: err.message })
+        JSON.stringify({
+          step: "reap",
+          warning: "delete-delivered-failed",
+          code: (err && err.code) || null,
+          art: (err && err.name) || null,
+        })
       );
     }
   }
@@ -210,8 +243,6 @@ async function reapJobs() {
           JSON.stringify({
             severity: "ERROR",
             error: "reap-bild-blieb-liegen",
-            jobId: job.id,
-            path: job.imagePath,
             hinweis: "Dokument wird trotzdem geraeumt; das Bild faellt auf die Lifecycle-Regel zurueck.",
           })
         );
@@ -220,7 +251,12 @@ async function reapJobs() {
       reapedExpired += 1;
     } catch (err) {
       console.log(
-        JSON.stringify({ step: "reap", jobId: job.id, warning: "delete-expired-failed", error: err.message })
+        JSON.stringify({
+          step: "reap",
+          warning: "delete-expired-failed",
+          code: (err && err.code) || null,
+          art: (err && err.name) || null,
+        })
       );
     }
   }

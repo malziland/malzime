@@ -525,15 +525,15 @@ async function renderQueueResult(data, myId, traceId, timings) {
         wakeLock: wakeLockStatus(),
       });
     }
+    /* Ohne Vorgangskennung und ohne Geraeteangaben (26.09.2026, Begruendung
+       in telemetry-logger.js). */
     logTelemetry("analyze-success", {
-      traceId,
       durationMs: timings.totalMs,
       timings: { ...timings, renderMs: Date.now() - renderStart },
       meta: {
         subject: typeof meta.subject === "string" ? meta.subject : undefined,
         mode: typeof meta.mode === "string" ? meta.mode : undefined,
         lang: getLanguage(),
-        wakeLock: wakeLockStatus(),
         queue: true,
       },
     });

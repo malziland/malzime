@@ -450,10 +450,14 @@ Kind. Die Zeile war zudem nach einem Tag gelöscht.
    (`WERBE_ANFORDERUNG`, `WERBE_ANZAHL` in `functions/src/minor-safety.js`,
    die Prompts lesen die Zahl von dort). Gekappt wird erst nach dem Filter,
    nur die Werbung, nie die Manipulations-Trigger. Nachgefüllt wird nichts.
-2. Je Treffer stehen im Log das Feld (`boost.ad_targeting`,
+2. Je Treffer standen im Log das Feld (`boost.ad_targeting`,
    `normal.profileText`, `boost.categories.kaufkraft`) und das getroffene
    Stichwort aus der festen Sperrliste, klein geschrieben, höchstens 30
    Zeichen. Dazu die Anzahl der Werbeeinträge je Modus nach Filter und Kappung.
+   Feld und Stichwort sind seit 27.09.2026 wieder aus der Zeile, weil der
+   Datenschutztext nur nennt, ob ein Wort vorkam (Abschnitt „Diagnose-Speicher:
+   nur, was der Datenschutztext nennt“); der Bericht des Filters kennt sie
+   weiterhin, geloggt werden Anzahl und Grund.
 3. Die Zeile bleibt 30 Tage im Diagnose-Speicher `client-diagnostics`
    (europe-west1), gesetzt über `scripts/log-sink-analyse-zeilen.sh`.
 
@@ -472,10 +476,9 @@ Ausschnitt könnte eine Beschreibung der Person enthalten.
 **Bewusst getragene Folge.** Werden bei einem Kind mehr als zwei Einträge
 gestrichen, sieht es weniger als acht. Das Log zeigt das (`werbung` unter 8).
 
-**Neubewertung.** Nach 30 Tagen Messung: Sind die Fließtext-Treffer
-überwiegend harmlose Wörter, wird die Sperrliste präzisiert. Sind es
-Werbebegriffe, wird die Prompt-Regel nachgeschärft und mit eigenen Fotos
-nachgestellt.
+**Neubewertung.** Die geplante Auswertung nach 30 Tagen (harmlose Wörter
+oder Werbebegriffe?) geht seit 27.09.2026 nicht mehr aus dem Protokoll; sie
+wird mit eigenen Fotos nachgestellt.
 
 ## Kinderschutz-Filter: Schutzgrenze mit Puffer (17.09.2026)
 
@@ -554,6 +557,200 @@ mitgeändert werden; der Werbe-Prompt zieht automatisch nach.
 nennt den Puffer noch nicht (der Server streicht trotzdem); die Beispiel-Belege
 der Alterskarte sind allgemein formuliert — ob die KI dadurch seltener ein
 konkretes Merkmal nennt, zeigt der Vortest (Kennzahl „Begründung konkret“).
+
+## Kinderschutz-Zeile: oberes Ende der Altersschätzung (25.09.2026)
+
+**Was war.** Die Kinderschutz-Zeile hielt nur die Untergrenze der geschätzten
+Altersspanne fest (`alter`). In Workshops mit Schulklassen begann die Spanne
+bei einem großen Teil der Kinder deutlich unter dem Alter der Klasse. Ob das
+eine falsche Schätzung ist oder nur eine breite Spanne, die das echte Alter
+einschließt, ließ sich damit nicht auswerten: „8–13“ und „8–9“ ergeben
+dieselbe Zeile.
+
+**Entscheidung.** Die Zeile trägt zusätzlich `alterBis`: das obere Ende der
+geschätzten Spanne (`obereAltersgrenze` in `functions/src/alters-lesbarkeit.js`,
+Regeln und Beispiele dort). Gelesen wird zuerst eine erkannte Spanne oder
+Plus-Minus-Angabe, sonst eine Zahl mit Altersbezug. Fremdzahlen wie
+Körpergröße oder Uhrzeit zählen nicht — anders als bei der Untergrenze, wo sie
+bewusst Richtung Schutz ziehen. Ohne oberes Ende (Kategoriewort, Jahrzehnt wie
+„Ende zwanzig“, kein Altersversuch, abgeschriebene Vorlage) steht `null`. Das
+Feld entscheidet über nichts: Stufe 2 hängt wie bisher an Untergrenze und
+lesbarem Alter. `alters-obergrenze.test.js` prüft das über ein Raster aller
+Spannen und schreibt die Feldmenge der Zeile fest.
+
+**Zweck und Datenart.** Der Zweck ist derselbe wie beim ganzen Eintrag: prüfen,
+ob der Kinderschutz zuverlässig wirkt. Stufe 2 hängt an der Altersschätzung.
+Liegt sie bei Kindern zu tief, wäre die naheliegende Korrektur ein Umbau des
+Alters-Prompts, und ein solcher Umbau kann Kinder über die Schutzgrenze
+schieben. Das obere Ende zeigt vorher, ob die Spannen das Alter ohnehin
+einschließen und ein Umbau überhaupt nötig ist. Die Datenschutzerklärung nennt
+für diesen Eintrag, „auf welches Alter die KI ungefähr getippt hat“; das deckt
+beide Enden der Spanne. Neu ist keine Art von Angabe, sondern das zweite Ende
+derselben Schätzung; die Zeile trägt weiterhin keinen Text aus dem Profil.
+
+**Betrachtete Alternativen.** Den Punktwert (`~14`) statt des oberen Endes
+loggen: verworfen, er sagt nicht, ob die Spanne ein bekanntes Alter
+einschließt. Den ganzen Alterssatz loggen: verworfen, er kann eine
+Beschreibung der Person enthalten. Die größte Zahl der Angabe nehmen:
+verworfen, eine Körpergröße („1,60 m“) oder Uhrzeit würde die Spanne
+künstlich breit machen. Die Beispielfotos der Startseite im Log kennzeichnen:
+zurückgestellt.
+
+**Rückweg.** Nur mit Deploy: das Feld in `loggeMinorSafety`
+(`functions/src/job-helfer.js`) weglassen. Am Filter ändert das nichts.
+Bereits geschriebene Werte bleiben bis zum Ende ihrer Aufbewahrung im
+Diagnose-Speicher (RUNBOOK, „Logs und Aufbewahrung“).
+
+**Neubewertung.** Zeigen Workshops mit bekanntem Klassenalter, dass die
+Spannen das Alter überwiegend einschließen, ist „zu jung“ Breite und kein
+Schätzfehler; am Alters-Prompt ändert sich dann nichts. Verfehlen sie es
+überwiegend, wird der Alters-Prompt überarbeitet und vor der Auslieferung
+daraufhin geprüft, dass keine Kinder über die Schutzgrenze rutschen.
+
+## Erfolgsweg eines Auftrags ohne Kennung im Log (26./27.09.2026)
+
+**Warum.** Die Kinderschutz-Zeile trägt keine Vorgangskennung
+(PRIV-2026-09-10-02), damit sich die Altersschätzung nicht mit den
+Geräteangaben verbinden lässt, die der Browser unter dieser Kennung in
+Fehlermeldungen schickt. Zwei Wege hätten sie trotzdem verbunden: Das Label
+`execution_id` steht an jeder Logzeile eines Aufrufs (die Laufzeit schreibt es,
+firebase-tools schaltet es beim Deploy ein). Und die Dauern in den Zeilen von
+Analyse und Abholung ergeben Anlage- und Fertigzeitpunkt eines Auftrags
+millisekundengenau; der Fertigzeitpunkt liegt Millisekunden neben der
+Kinderschutz-Zeile. Jede Kennung irgendwo auf diesem Weg hätte deshalb
+genügt.
+
+**Entscheidung.** Kein Aufruf, in dem eine Analyse läuft, und weder Annahme
+noch Abholung eines erfolgreichen Auftrags schreiben Auftrags- oder
+Vorgangskennung ins Log:
+
+- nicht die Zeilen des Einlasses bis zur Annahme
+  (`functions/src/handle-enqueue.js`);
+- keine Zeile des Analyse-Aufrufs ab dem Claim, auch nicht dessen Fehler- und
+  Alarmzeilen (`functions/src/handle-process-job.js`, Kommentar „AB HIER KEINE
+  KENNUNG IM LOG“); `loggeMinorSafety` nimmt keine Kennung entgegen;
+- keine Zeile der Abholung, auch nicht die Warnung bei gescheitertem
+  Abhol-Vermerk (`functions/src/handle-job-status.js`);
+- keine Fehlerzeile des Aufräumdienstes (`functions/src/handle-reap.js`): Er
+  fasst Aufträge nach festen Fristen an, eine jobId dort ließe sich darüber
+  minutengenau der Abschlusszeile der Analyse zuordnen.
+
+Firestore- und Speicher-Meldungen zu einem Auftrag können dessen Dokument- oder
+Bildpfad enthalten. Deshalb:
+
+- Nur Fehlercode und -art nennen die Fehlerzeilen des Aufräumdienstes je
+  Auftrag, die Warnung bei gescheitertem Abhol-Vermerk, die Fehlerzeile bei
+  gescheiterter Platzbestätigung im Einlass und die Löschfehler-Zeile im
+  Speichermodul. Die beiden Löschfehler-Zeilen (Speichermodul, liegengebliebenes
+  Bild) nennen auch den Bildpfad nicht; er ist je Auftrag eindeutig, und das
+  Bild räumt die Lifecycle-Regel ohnehin.
+- Die Fehlerzeilen im Analyse-Aufruf von `handle-process-job.js` (Abbruch mit
+  `status: error`, `completeJob-error`, Zähler- und Dauer-Warnung) behalten den
+  Fehlertext, weil er die Fehlersuche trägt, aber ohne jobId, traceId,
+  Bildpfad und Firestore-Pfad (`ohneKennung`).
+- Übrige Fehlerzeilen auf diesen Wegen nennen den Fehlertext unverändert. Sie
+  betreffen keinen einzelnen Auftrag in Firestore (Suchabfragen, Zähler und
+  Statistik, Einstellungen, Lebenszeichen des Aufräumdienstes,
+  Benachrichtigungsdienst) oder melden Fehler der KI. Die Fehlerzeilen eines
+  gescheiterten Einlasses tragen ohnehin Kennungen (siehe unten).
+
+Die Dauern bleiben.
+
+Kennungen tragen nur noch Wege, auf denen der jeweilige Aufruf keine Analyse
+macht: Zeilen des Analyse-Aufrufs vor dem Claim und Fehlerzeilen eines
+gescheiterten Einlasses (dort einmal beide Kennungen zusammen). Auftrag und
+Antwort an den Browser tragen die Vorgangskennung weiter. Geprüft werden
+jeweils ALLE Ausgaben eines Aufrufs nach den Werten der Kennungen, mit
+Positivkontrolle: `analyse-aufruf-ohne-kennung.test.js` (Erfolgs- und
+Fehlerwege der Analyse, auch mit Firestore-Fehlertexten, die die Kennungen
+enthalten), `handle-enqueue.test.js` (Annahme, auch über die
+Warnwege, nach denen der Einlass weiterläuft), `handle-job-status.test.js`
+(Abholung, auch mit gescheitertem Abhol-Vermerk), `handle-reap.test.js` (jeder
+Fehlerweg des Aufräumdienstes je Auftrag, mit Fehlertexten, die die jobId
+enthalten).
+
+**Getragene Folge.** Eine vom Browser gemeldete Vorgangsnummer findet bei einem
+erfolgreichen Auftrag im Server-Log nichts mehr. „Nie abgeholt“ lässt sich ohne
+Kennung nur nähern: Anzahl `process-job` mit `status` done, blocked oder error,
+minus Anzahl der Warnungen `completeJob-error` (Ergebnis nie gespeichert),
+minus Anzahl `job-delivered` (auch gesperrte Ergebnisse werden abgeholt). Ungenau
+bleibt: Eine erneute Abholung, bevor der Abhol-Vermerk steht, zählt doppelt; und
+scheitert im Fehlerweg das Speichern still, weil der Auftrag schon abgeschlossen
+war, zählt der Lauf als nie abgeholt. Diese Stelle ist die einzige Quelle der
+Regel; die Code-Kommentare verweisen hierher. Zeitliche
+Nähe bleibt: Fehlermeldungen des Browsers tragen Geräteangaben und liegen, wenn
+es zu einer Analyse eine gibt, Sekunden neben ihrer Kinderschutz-Zeile. Sie
+sind für die Fehlersuche nötig; eine Nummer, die beide verbindet, gibt es
+nicht.
+
+**Betrachtete Alternativen.** Das Label abschalten: nicht möglich, firebase-tools
+setzt es nach den eigenen Umgebungsvariablen. Die Dauern auf Sekunden runden:
+verworfen, der Fertigzeitpunkt folgt auch aus der Abholzeile und liegt ohnehin
+neben der Kinderschutz-Zeile. Nur die Abschlusszeile ändern: verworfen, die
+Zeilen von Einlass und Abholung hätten dieselbe Verbindung hergestellt.
+
+**Rückweg.** Nur mit Deploy. Eine Kennung in einer der geprüften Ausgaben lässt
+die Tests rot werden — das ist gewollt.
+
+**Neubewertung.** Braucht eine Zeile auf diesem Weg eine Kennung, wird vorher
+geklärt, wie sie ohne Verbindung zur Kinderschutz-Zeile auskommt.
+
+## Diagnose-Speicher: nur, was der Datenschutztext nennt (26.09.2026)
+
+**Warum.** Der Datenschutztext ist die Vorgabe, das Programm folgt ihm. Er
+nennt für den 30-Tage-Speicher bei der Kinderschutz-Auswertung zwei Einträge
+je Analyse (daneben liegen dort die Browser-Meldungen): bei der KI nur, wie
+lange sie gebraucht hat, und beim Kinderschutz das geschätzte Alter, die
+Filterentscheidung und ob ein Wort der Sperrliste vorkam. Die Erfolgsmeldung des Browsers kommt zudem Sekunden nach
+der Kinderschutz-Zeile an; trug sie Geräteangaben, ließ sich die
+Altersschätzung über die Uhrzeit einem Gerät zuordnen.
+
+**Entscheidung.**
+1. Die Erfolgsmeldung (`analyze-success`) trägt weder Browsertyp noch
+   Geräteangaben noch Art oder Tempo der Verbindung noch Vorgangskennung
+   noch Wake-Lock-Zustand. Der Browser schickt sie nicht
+   (`public/js/telemetry-logger.js`), der Server verwirft sie auch von
+   älteren Seiten (`functions/src/handle-telemetry.js`). Übrig bleiben
+   Dauern, Modus, Motiv, Sprache der Oberfläche, die aufgerufene Seite (nur
+   der Pfad, etwa „/“ oder „/en/“) und zwei Ja/Nein-Werte (Browser online,
+   Seite sichtbar). Geräteangaben bleiben in den Fehlermeldungen, wie der
+   Datenschutztext beschreibt, für die Fehlersuche.
+2. `mistral-single-large` trägt nur Dauer und Wiederholungen und entsteht
+   höchstens einmal je Analyse (seit 27.09.2026): Fragt der Server die KI
+   nach, weil Karten fehlten, stehen die Versuche, die eine Antwort lieferten,
+   addiert in dieser einen Zeile (`loggeKiDauer` in
+   `functions/src/mistral.js`). Sie entsteht nur, wenn mindestens ein Versuch
+   eine Antwort der KI erhalten hat; ein abgebrochener Versuch zählt nicht,
+   auch wenn aus seinem Teiltext gerettet wird. Modell, Status,
+   Token-Zahlen, Reparaturstufen und der Versuch stehen je Versuch in
+   `mistral-single-large-details`, die nicht in den 30-Tage-Speicher geht
+   (Filter vergleicht `step` exakt).
+3. Die Kinderschutz-Zeile trägt keine Sprache mehr und seit 27.09.2026 weder
+   das getroffene Wort der Sperrliste noch das Feld, in dem es stand — nur
+   Anzahl und Grund („immer“ oder „minor“) der Treffer.
+4. `public/__tests__/datenschutz-deckung.test.js` prüft jetzt auch die Felder
+   der beiden Server-Zeilen einzeln gegen den Text (DE und EN), ohne
+   Sammelbegriff; `alters-obergrenze.test.js` und `ki-zeile-ohne-tokens.test.js`
+   halten fest, dass die echten Zeilen genau diese Felder haben.
+
+**Getragene Folge.** Mit welchen Geräten erfolgreich analysiert wurde, lässt
+sich nicht mehr auswerten. Welches Wort der Sperrliste in welchem Feld stand,
+zeigt das Protokoll nicht mehr; ob die Sperrliste zu grob ist, lässt sich nur
+noch mit eigenen Fotos nachstellen, nicht aus 30 Tagen Betrieb ablesen. Status, Modell, Token-Zahlen und Scheitern der
+KI-Aufrufe gibt es nur noch einen Tag; das Herausrechnen der Beispielfotos
+über die Token-Zahlen geht nur innerhalb dieses Tages. Die Kinderschutz-Zeile
+nennt keine Sprache mehr; ein Ausfall nur einer Sprache ist darin nicht mehr
+getrennt zu sehen.
+
+**Betrachtete Alternativen.** Die Zeit der Kinderschutz-Zeile vergröbern:
+verworfen, Cloud Logging speichert zusätzlich den Empfangszeitpunkt
+sekundengenau. Geräteangaben auch aus den Fehlermeldungen nehmen: verworfen,
+sie sind der Zweck dieser Meldungen (Lesefehler je Browser und System). Den
+Datenschutztext an die Zeilen anpassen: verworfen, der Text ist die Vorgabe.
+
+**Rückweg.** Nur mit Deploy. Ein zusätzliches Feld in einer der Zeilen lässt
+die Feldmengen-Tests rot werden; wer es braucht, prüft zuerst, ob der
+Datenschutztext es deckt.
 
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 

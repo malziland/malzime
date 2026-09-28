@@ -29,20 +29,31 @@ function isQuotaError(err) {
   return !!(err && (err.code === "rate_limit" || /rate_limit|quota|429/i.test(err.message || "")));
 }
 
-function loggeMinorSafety(safety, traceId, lang) {
+/* Nimmt BEWUSST keine Vorgangskennung entgegen (26.09.2026): Was nicht
+   uebergeben wird, kann nicht ins Log rutschen. */
+function loggeMinorSafety(safety, lang) {
   console.log(
     JSON.stringify({
       step: "minor-safety",
-      /* PRIV-2026-09-10-02: BEWUSST OHNE Vorgangskennung (traceId). Diese
-         Zeile liegt 30 Tage im Diagnose-Speicher `client-diagnostics`, und
-         dort tragen die Browser-Meldungen (client-error, client-telemetry)
-         dieselbe Kennung samt Geraeteklasse. Mit ihr liesse sich die
-         Altersschaetzung einer Analyse mit dem Geraet verbinden — im Workshop
-         fuehren Uhrzeit und Geraet auf ein bestimmtes Kind. Die Durchbruch-
-         Zeile unten behaelt die Kennung: Sie geht nicht in den 30-Tage-
-         Speicher (Filter vergleicht step exakt) und traegt kein Alter. */
-      lang,
+      /* PRIV-2026-09-10-02: OHNE Vorgangskennung (traceId). Diese Zeile liegt
+         30 Tage im Diagnose-Speicher `client-diagnostics`, und dort tragen
+         die Browser-Meldungen (client-error, client-telemetry) dieselbe
+         Kennung samt Geraeteklasse. Mit ihr liesse sich die Altersschaetzung
+         einer Analyse mit dem Geraet verbinden — im Workshop fuehren Uhrzeit
+         und Geraet auf ein bestimmtes Kind. Seit 26.09.2026 gilt das fuer
+         jede Zeile desselben Aufrufs: Cloud Run versieht sie alle mit demselben
+         Label `execution_id` (siehe handle-process-job.js, "AB HIER KEINE
+         KENNUNG IM LOG").
+         Die Feldmenge folgt dem Datenschutztext (Kinderschutz-Auswertung:
+         Alter, Filterentscheidung, ob ein Sperrwort vorkam) — deshalb seit 26.09.2026 ohne
+         Sprache; die steht nur noch in der Alarmzeile unten (Betriebsprotokoll).
+         Festgeschrieben in alters-obergrenze.test.js, gegen den Text geprueft
+         in public/__tests__/datenschutz-deckung.test.js. */
+      /* `alter` ist die Untergrenze der Schaetzung, `alterBis` (seit
+         25.09.2026) ihr oberes Ende. Erst beide zusammen sagen, ob eine
+         Spanne ein bekanntes Klassenalter einschliesst. */
       alter: safety.alter,
+      alterBis: safety.alterBis ?? null,
       minderjaehrig: safety.minderjaehrig,
       /* Seit 17.09.2026: Altersversuch ohne lesbare Zahl (abgeschriebene
          Formatvorlage oder Alter ohne Ziffer)? Zaehlt, wie oft das vorkommt;
@@ -53,17 +64,11 @@ function loggeMinorSafety(safety, traceId, lang) {
       /* Treffer im Fliesstext: nicht entfernt, aber gemeldet — je Stufe. */
       durchgerutscht: safety.durchgerutscht.length,
       durchgerutschtGruende: [...new Set(safety.durchgerutscht.map((d) => d.grund))],
-      /* Seit 09.09.2026 je Treffer: Feld und das getroffene Wort aus der
-         festen Sperrliste — nie der Satz, nie der Werbetext. Damit sagt die
-         naechste Zeile selbst, ob "cocktail" in einer Bar-Beschreibung stand
-         oder "sportwetten" als Werbeidee fuer ein Kind. Und die Anzahl der
-         Werbeeintraege je Modus, wie das Kind sie sieht. */
-      entfernte: safety.entfernt.map((e) => ({ feld: `${e.modus}.${e.feld}`, grund: e.grund, stichwort: e.stichwort })),
-      durchgerutschte: safety.durchgerutscht.map((d) => ({
-        feld: `${d.modus}.${d.feld}`,
-        grund: d.grund,
-        stichwort: d.stichwort,
-      })),
+      /* Welches Wort der Sperrliste in welchem Feld stand, steht seit
+         27.09.2026 NICHT mehr in der Zeile: Der Datenschutztext nennt nur,
+         OB ein Wort vorkam. Die Anzahlen und Gruende oben sagen das. Dazu die
+         Anzahl der Werbeeintraege je Modus, wie das Kind sie nach dem Filter
+         sieht. */
       werbung: safety.werbung || {},
       gekappt: (safety.gekappt || []).length,
     })
@@ -71,13 +76,14 @@ function loggeMinorSafety(safety, traceId, lang) {
 
   const harteTreffer = safety.durchgerutscht.filter((d) => d.grund === "immer");
   if (harteTreffer.length) {
-    /* Nur Feldnamen, keine Inhalte: Der Einzelfall ist per Design nicht
-       rekonstruierbar (Foto geloescht, Job verfaellt). Die Meldung sagt
-       allein: die Prompt-Regel haelt nicht mehr — mit Demo-Fotos nachtesten. */
+    /* Nur Feldnamen, keine Inhalte und keine Kennung: Der Einzelfall ist per
+       Design nicht rekonstruierbar (Foto geloescht, Job verfaellt). Die
+       Meldung sagt allein: die Prompt-Regel haelt nicht mehr — mit
+       Demo-Fotos nachtesten. Eine Vorgangskennung hier waere ueber das
+       gemeinsame Aufruf-Label mit der Altersschaetzung verbunden. */
     console.error(
       JSON.stringify({
         step: "minor-safety-durchbruch",
-        traceId: traceId || null,
         lang,
         felder: harteTreffer.map((d) => `${d.modus}.${d.feld}`),
       })

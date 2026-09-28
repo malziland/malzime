@@ -101,7 +101,9 @@ describe("deleteImage", () => {
      Gemessen: 11 solcher Fehlschläge in 30 Tagen, alle unbemerkt. */
   test("ein echter Löschfehler gibt false zurück UND meldet mit severity ERROR", async () => {
     const pfad = await storage.storeImage(Buffer.from("x"), "image/jpeg");
-    const echterFehler = new Error("permission denied");
+    /* Der Fehlertext enthaelt den Pfad, wie es echte Speicher-Meldungen tun
+       koennen — so faellt auch ein Fehlertext unter anderem Schluessel auf. */
+    const echterFehler = new Error(`permission denied on ${pfad}`);
     echterFehler.code = 403;
     jest.spyOn(bucket, "file").mockReturnValue({
       async delete() {
@@ -116,7 +118,11 @@ describe("deleteImage", () => {
     const zeile = JSON.parse(fehlerSpy.mock.calls[0][0]);
     expect(zeile.severity).toBe("ERROR");
     expect(zeile.error).toBe("queue-image-delete-failed");
-    expect(zeile.path).toBe(pfad);
+    expect(zeile.code).toBe(403);
+    /* Seit 27.09.2026 ohne Pfad und ohne Fehlertext (siehe queue-storage.js). */
+    expect(fehlerSpy.mock.calls[0][0]).not.toContain(pfad);
+    expect(zeile).not.toHaveProperty("path");
+    expect(zeile).not.toHaveProperty("message");
     fehlerSpy.mockRestore();
   });
 });

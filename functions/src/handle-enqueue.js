@@ -402,7 +402,11 @@ async function handleEnqueue(req, res, secrets) {
           JSON.stringify({
             severity: "ERROR",
             error: "platz-bestaetigung-fehlgeschlagen",
-            message: err && err.message,
+            /* Nur Code und Art (27.09.2026): Der Fehlertext von Firestore kann
+               den Dokumentpfad samt jobId enthalten, und der Auftrag wird
+               danach analysiert. */
+            code: (err && err.code) || null,
+            art: (err && err.name) || null,
           })
         );
       }
@@ -423,7 +427,10 @@ async function handleEnqueue(req, res, secrets) {
       return;
     }
 
-    console.log(JSON.stringify({ requestId, traceId, jobId, step: "enqueue", status: "ok" }));
+    /* Ohne jobId und traceId (27.09.2026): Auf dem Erfolgsweg eines Auftrags
+       traegt keine Logzeile eine Kennung — Begruendung in handle-process-job.js
+       ("AB HIER KEINE KENNUNG IM LOG"). requestId ist ein Server-Zufall. */
+    console.log(JSON.stringify({ requestId, step: "enqueue", status: "ok" }));
     res.status(200).json({ jobId, resultToken });
   } catch (err) {
     const status = err.status || 500;

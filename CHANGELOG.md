@@ -4,6 +4,30 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Kinderschutz-Protokoll mit oberem Ende der Altersschätzung.** Bisher stand
+  dort nur, bei welchem Alter die geschätzte Spanne beginnt. Ob eine Schätzung
+  wie „8 bis 13“ ein zwölfjähriges Kind trifft oder verfehlt, ließ sich so
+  nicht auswerten. Am Schutz ändert sich nichts: Die neue Zahl entscheidet
+  über nichts, der Werbeschutz greift wie bisher.
+- **Keine Auftragsnummer mehr im Protokoll einer Analyse.** Ein Aufruf, in dem
+  eine Analyse läuft, schreibt keine Auftrags- oder Vorgangsnummer mehr ins
+  Protokoll, auch nicht bei Fehlern; ebenso wenig die Annahme und die Abholung
+  eines erfolgreichen Auftrags, noch der Aufräumdienst bei Fehlern. Nummern
+  stehen nur noch in Meldungen von Aufrufen ohne Analyse (etwa abgewiesene
+  Annahme, Wiederholungen). Fehlermeldungen beim Löschen eines Bildes nennen
+  dessen Dateinamen nicht mehr.
+- **Weniger Angaben im Diagnose-Protokoll.** Die Meldung, dass eine Analyse
+  geklappt hat, enthält keine Angaben zum Gerät und keine Vorgangsnummer mehr.
+  Was 30 Tage aufbewahrt wird, beschränkt sich auf das, was die
+  Datenschutzerklärung nennt: zwei Einträge je Analyse, bei der KI die Dauer,
+  beim Kinderschutz das geschätzte Alter, die Filterentscheidung und ob ein
+  Wort der Sperrliste vorkam, aber nicht mehr welches Wort in welchem Feld.
+  Muss die KI nachgefragt werden, bleibt es bei einem Eintrag zur Dauer.
+
 ## [4.11.0] — 2026-09-18
 
 ### Geändert

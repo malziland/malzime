@@ -400,7 +400,6 @@ describe("SEC-108 — Logging des Kinderschutz-Berichts", () => {
   test("minor-Treffer im Fliesstext bleiben ein stiller Zaehler (kein ERROR)", () => {
     _loggeMinorSafety(
       { ...basisBericht, durchgerutscht: [{ modus: "boost", feld: "profileText", grund: "minor" }] },
-      "trace-1",
       "de"
     );
     expect(errorSpy).not.toHaveBeenCalled();
@@ -418,8 +417,8 @@ describe("SEC-108 — Logging des Kinderschutz-Berichts", () => {
           { modus: "boost", feld: "categories.werbeprofil", grund: "minor" },
         ],
       },
-      "trace-2",
-      "de"
+      "de",
+      "trace-2"
     );
     expect(errorSpy).toHaveBeenCalledTimes(1);
     const fehler = JSON.parse(errorSpy.mock.calls[0][0]);
@@ -428,10 +427,15 @@ describe("SEC-108 — Logging des Kinderschutz-Berichts", () => {
        rekonstruierbar; die Meldung heisst: Prompt-Regel haelt nicht mehr. */
     expect(fehler.felder).toEqual(["normal.profileText"]);
     expect(JSON.stringify(fehler)).not.toContain("eintrag");
+    /* Seit 26.09.2026 auch ohne Vorgangskennung: ueber das gemeinsame
+       Aufruf-Label waere sie mit der Altersschaetzung verbunden. Ein
+       zusaetzlich uebergebener Wert darf nirgends auftauchen. */
+    expect(fehler).not.toHaveProperty("traceId");
+    expect([...logSpy.mock.calls, ...errorSpy.mock.calls].join("\n")).not.toContain("trace-2");
   });
 
   test("ohne jeden Treffer: genau eine INFO-Zeile, kein ERROR (Positivkontrolle)", () => {
-    _loggeMinorSafety(basisBericht, null, "en");
+    _loggeMinorSafety(basisBericht, "en");
     expect(logSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).not.toHaveBeenCalled();
     expect(JSON.parse(logSpy.mock.calls[0][0]).step).toBe("minor-safety");

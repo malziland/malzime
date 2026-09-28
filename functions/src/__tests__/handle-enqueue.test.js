@@ -230,6 +230,63 @@ describe("handleEnqueue — Erfolgsfall", () => {
     expect(jobs.createJob).toHaveBeenCalledWith(expect.objectContaining({ traceId: "abc123XYZ" }));
     expect(res.headers["X-Trace-Id"]).toBe("abc123XYZ");
   });
+
+  /* 27.09.2026: Der Auftrag und die Antwort an den Browser tragen die
+     Vorgangskennung weiter (siehe oben) — das Log nicht. Auf dem Weg eines
+     erfolgreichen Auftrags traegt keine Logzeile eine Kennung (Begruendung in
+     handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"). Gesucht wird in
+     ALLEN Ausgaben des Aufrufs, auch auf den Warnwegen, nach denen der
+     Einlass weiterlaeuft. */
+  test.each([
+    ["Normalfall", () => {}, '"status":"ok"'],
+    [
+      "Einlassgrenze nicht ermittelbar",
+      () => jobs.countQueuedJobs.mockRejectedValueOnce(new Error("zeitgrenze")),
+      "einlassgrenze-nicht-ermittelbar",
+    ],
+    [
+      "Platzbestaetigung gescheitert",
+      /* Fehlertext mit Dokumentpfad samt jobId, wie Firestore ihn liefern kann. */
+      () =>
+        jobs.platzBestaetigen.mockRejectedValueOnce(
+          Object.assign(new Error("No document to update: projects/p/databases/d/documents/jobs/job-abc"), {
+            code: 5,
+          })
+        ),
+      "platz-bestaetigung-fehlgeschlagen",
+    ],
+    [
+      "Limit-Benachrichtigung gescheitert",
+      () => {
+        counter.checkAndIncrement.mockResolvedValueOnce({ allowed: true, justReached: true, count: 500, limit: 500 });
+        /* Verzoegert ablehnen, damit die Warnung erst entsteht, wenn der
+           Auftrag schon angelegt ist — sonst koennte eine jobId darin gar
+           nicht auffallen. */
+        require("../notify").notifyLimitReached.mockImplementationOnce(
+          () => new Promise((_, ablehnen) => setTimeout(() => ablehnen(new Error("ntfy weg")), 5))
+        );
+      },
+      "ntfy-error",
+    ],
+  ])("%s: keine Ausgabe traegt Vorgangs- oder Auftragskennung", async (_name, vorbereiten, erwarteteZeile) => {
+    vorbereiten();
+    const ausgaben = [];
+    const spies = ["log", "warn", "error", "info"].map((art) =>
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+    );
+    const res = makeRes();
+    await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
+    /* Nebenlaeufige Warnungen (Benachrichtigung) abwarten. */
+    await new Promise((r) => setTimeout(r, 30));
+    spies.forEach((s) => s.mockRestore());
+    expect(res.statusCode).toBe(200);
+    expect(res.body.jobId).toBe("job-abc");
+    expect(ausgaben.join("\n")).toContain('"status":"ok"');
+    /* Positivkontrolle: Der gepruefte Weg wurde wirklich durchlaufen. */
+    expect(ausgaben.join("\n")).toContain(erwarteteZeile);
+    expect(ausgaben.join("\n")).not.toContain("abc123XYZ");
+    expect(ausgaben.join("\n")).not.toContain("job-abc");
+  });
 });
 
 /* ── Stundenzähler: die Marke des Einlasses reist mit dem Auftrag ── */

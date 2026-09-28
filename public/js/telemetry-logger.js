@@ -1,14 +1,20 @@
 /**
  * telemetry-logger.js — Anonyme Success-/Performance-Telemetrie.
  *
- * Sendet strukturierte Performance-Metriken an /api/telemetry. DSGVO-Profil
- * identisch zu error-logger: keine PII, keine IP, kein Cookie, keine
- * persistente Speicherung — nur grobe Hardware-/Netzwerk-Klassen + Timings.
- * Gegenstueck zum error-logger, separater Endpoint (INFO severity statt
- * ERROR), damit Cloud Logging die Klassen sauber trennt.
+ * Sendet strukturierte Performance-Metriken an /api/telemetry: keine PII,
+ * keine IP, kein Cookie, keine persistente Speicherung — nur Timings, Modus
+ * und Motiv (Mensch/Tier). Gegenstueck zum error-logger, separater Endpoint
+ * (INFO severity statt ERROR), damit Cloud Logging die Klassen sauber trennt.
+ *
+ * SEIT 26.09.2026 OHNE GERAETEANGABEN UND OHNE VORGANGSKENNUNG: Die
+ * Erfolgsmeldung kommt Sekunden nach der Kinderschutz-Zeile an (beide 30 Tage
+ * im Diagnose-Speicher); ueber die Uhrzeit liess sich die Altersschaetzung
+ * dem Geraet zuordnen. Browsertyp, Bildschirm, Netz und Sprache des Geraets
+ * schickt nur noch der error-logger — fuer die Fehlersuche. Der Server
+ * verwirft die Angaben auch, falls ein aelterer Browser sie noch sendet
+ * (functions/src/handle-telemetry.js).
  */
 
-import { collectClientContext, coarseUserAgent } from "./client-context.js";
 import { leseRcTicket } from "./rc-ticket.js";
 import { apiUrl } from "./api-basis.js";
 
@@ -17,19 +23,14 @@ const TELEMETRY_ENDPOINT = apiUrl("/api/telemetry");
 
 export function logTelemetry(eventType, context = {}) {
   try {
-    const clientCtx = collectClientContext();
-
     const payload = {
       eventType: typeof eventType === "string" ? eventType : "unknown",
       durationMs: typeof context.durationMs === "number" && isFinite(context.durationMs) ? context.durationMs : 0,
       online: typeof navigator !== "undefined" ? navigator.onLine : true,
       hidden: typeof document !== "undefined" ? document.hidden : false,
-      userAgent: coarseUserAgent(),
       url: (typeof location !== "undefined" && location.pathname) || "",
-      traceId: typeof context.traceId === "string" ? context.traceId : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
       meta: context.meta && typeof context.meta === "object" ? context.meta : null,
-      client: clientCtx,
     };
 
     fetch(TELEMETRY_ENDPOINT, {

@@ -128,14 +128,29 @@ describe("Log-Zeile minor-safety", () => {
   });
   afterEach(() => jest.restoreAllMocks());
 
-  test("traegt Stichwort, Feld und Werbe-Anzahl — aber nie den Werbetext", () => {
+  /* Seit 27.09.2026: Der Datenschutztext nennt nur, OB ein Wort der
+     Sperrliste vorkam — also Anzahl und Grund, nicht welches Wort in welchem
+     Feld. Der Bericht selbst behaelt Wort und Feld (Tests oben); in die
+     30-Tage-Zeile gelangen sie nicht. */
+  test("traegt Anzahl, Grund und Werbe-Anzahl — aber weder Sperrwort noch Feld noch Werbetext", () => {
     const p = profil(KIND, zehnAds("Bet365 Live-Wetten Abo"), {
       profileText: "Cocktail-Abende mit Freundinnen.",
     });
-    loggeMinorSafety(applyMinorSafety(p), "trace-1", "de");
-    const zeile = JSON.parse(ausgabe.find((z) => z.includes('"minor-safety"')));
-    expect(zeile.entfernte).toContainEqual({ feld: "boost.ad_targeting", grund: "minor", stichwort: "bet365" });
-    expect(zeile.durchgerutschte).toContainEqual({ feld: "normal.profileText", grund: "minor", stichwort: "cocktail" });
+    const bericht = applyMinorSafety(p);
+    /* Positivkontrolle: Der Bericht kennt Wort und Feld, sonst waere die
+       Pruefung unten leer bestanden. */
+    expect(bericht.entfernt.map((e) => e.stichwort)).toContain("bet365");
+    expect(bericht.durchgerutscht.map((d) => d.stichwort)).toContain("cocktail");
+    loggeMinorSafety(bericht, "de");
+    const zeileRoh = ausgabe.find((z) => z.includes('"minor-safety"'));
+    const zeile = JSON.parse(zeileRoh);
+    expect(zeile).not.toHaveProperty("entfernte");
+    expect(zeile).not.toHaveProperty("durchgerutschte");
+    for (const verboten of ["bet365", "cocktail", "ad_targeting", "profileText", "stichwort", "feld"]) {
+      expect(zeileRoh.toLowerCase()).not.toContain(verboten.toLowerCase());
+    }
+    expect(zeile.gruende).toEqual(["minor"]);
+    expect(zeile.durchgerutschtGruende).toEqual(["minor"]);
     expect(zeile.werbung).toEqual({ normal: 8, boost: 8 });
     expect(zeile.gekappt).toBe(2);
     /* Die alten Zaehler bleiben, damit die gesicherte Zaehlung vom 08./09.09. vergleichbar bleibt. */
@@ -150,14 +165,17 @@ describe("Log-Zeile minor-safety", () => {
      derselben Analyse verbinden — client-error und client-telemetry tragen
      dieselbe Kennung. */
   test("traegt keine Vorgangskennung (traceId), auch wenn der Aufrufer eine mitgibt", () => {
-    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), "trace-verbindbar-42", "de");
+    /* Seit 26.09.2026 nimmt loggeMinorSafety keine Kennung mehr entgegen; ein
+       dritter Wert steht hier als Rueckfall-Waechter, falls jemand den
+       Parameter wieder einfuehrt. */
+    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), "de", "trace-verbindbar-42");
     const roh = ausgabe.find((z) => z.includes('"minor-safety"'));
     expect(roh).toBeDefined();
     expect(JSON.parse(roh)).not.toHaveProperty("traceId");
     expect(roh).not.toContain("trace-verbindbar-42");
   });
   test("vertraegt einen leeren Bericht (kein Profil)", () => {
-    loggeMinorSafety(applyMinorSafety(null), null, "de");
+    loggeMinorSafety(applyMinorSafety(null), "de");
     const zeile = JSON.parse(ausgabe[0]);
     expect(zeile.werbung).toEqual({});
     expect(zeile.gekappt).toBe(0);
@@ -166,8 +184,8 @@ describe("Log-Zeile minor-safety", () => {
   /* Seit 17.09.2026: Die Zeile zaehlt, wie oft das Alter nicht lesbar war
      (abgeschriebene Vorlage, Alter ohne Ziffer) — nur als Ja/Nein. */
   test("meldet ein nicht lesbares Alter als Ja/Nein, ohne den Text", () => {
-    loggeMinorSafety(applyMinorSafety(profil("männlich, ~‹Zahl› Jahre alt", ["Nike"])), null, "de");
-    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), null, "de");
+    loggeMinorSafety(applyMinorSafety(profil("männlich, ~‹Zahl› Jahre alt", ["Nike"])), "de");
+    loggeMinorSafety(applyMinorSafety(profil(KIND, ["Nike"])), "de");
     const zeilen = ausgabe.filter((z) => z.includes('"minor-safety"')).map((z) => JSON.parse(z));
     expect(zeilen.map((z) => z.alterUnlesbar)).toEqual([true, false]);
     expect(zeilen[0].minderjaehrig).toBe(true);

@@ -48,9 +48,12 @@ const { merkeDauer } = require("./durchsatz");
 
 /* ── Kinderschutz-Bericht loggen (beide Pipelines) ────────────────────────
    IMMER loggen, nicht nur bei einem Treffer (Audit SEC-001): Ein
-   systematischer Ausfall (englischsprachiger Durchgang, kein erkanntes
-   Alter) erzeugte sonst exakt null Spuren und waere von "alles sauber" nicht
-   zu unterscheiden. `alter: null` ist die wichtigste dieser Zeilen.
+   systematischer Ausfall (kein erkanntes Alter) erzeugte sonst exakt null
+   Spuren und waere von "alles sauber" nicht zu unterscheiden. `alter: null`
+   ist die wichtigste dieser Zeilen. Seit 26.09.2026 traegt die Zeile keine
+   Sprache mehr (Datenschutztext) — einen Ausfall nur einer Sprache zeigt sie
+   deshalb nicht mehr getrennt; nur die Alarmzeile bei harten Treffern
+   (`minor-safety-durchbruch`, Betriebsprotokoll) nennt sie.
 
    ESKALATION (Kurzaudit 2026-08-11, SEC-108): Taucht ein Begriff der HARTEN
    Stufe (Pornografie, Waffen, Extremismus) im Fliesstext auf, ist das kein
@@ -183,6 +186,38 @@ async function handleProcessJob(req, res) {
     return;
   }
 
+  /* AB HIER KEINE KENNUNG IM LOG (26./27.09.2026): Ab dem Claim kann dieser
+     Aufruf die Kinderschutz-Zeile schreiben (geschaetztes Alter, 30 Tage im
+     Diagnose-Speicher, bewusst ohne Vorgangskennung, PRIV-2026-09-10-02).
+     Zwei Wege wuerden sie trotzdem mit der Vorgangskennung verbinden — und
+     darueber mit den Geraeteangaben, die der Browser unter dieser Kennung in
+     Fehlermeldungen schickt:
+       1. Das Label `execution_id` steht an JEDER Logzeile eines Aufrufs (die
+          Laufzeit schreibt es; firebase-tools schaltet es beim Deploy ein,
+          abschalten laesst es sich nicht).
+       2. Die Dauern der Zeilen von Analyse und Abholung ergeben Anlage- und
+          Fertigzeitpunkt des Auftrags millisekundengenau, und der
+          Fertigzeitpunkt liegt Millisekunden neben der Kinderschutz-Zeile.
+     Deshalb schreibt kein Aufruf mit Analyse und weder Annahme noch
+     Abholung eines erfolgreichen Auftrags jobId oder traceId ins Log, auch
+     keine Fehlerzeile des Aufraeumdienstes (feste Fristen). Die Dauern
+     bleiben. Wie man "nie abgeholt" ohne Kennung naehert und welche Wege
+     noch Kennungen tragen: docs/SECURITY-MODEL.md, Abschnitt "Erfolgsweg
+     eines Auftrags ohne Kennung im Log". Pruefung (alle Ausgaben des
+     jeweiligen Aufrufs): analyse-aufruf-ohne-kennung.test.js,
+     handle-enqueue.test.js, handle-job-status.test.js, handle-reap.test.js. */
+  /* Fehlertexte ohne Kennung (27.09.2026): Ein Firestore-Fehler zu diesem
+     Auftrag kann den Dokumentpfad samt jobId nennen (etwa "No document to
+     update: projects/.../jobs/<jobId>"), ein Speicherfehler den Bildpfad.
+     Die Texte bleiben fuer die Fehlersuche lesbar; entfernt werden die
+     bekannten Werte dieses Auftrags und jeder Firestore-Pfad. */
+  const ohneKennung = (text) => {
+    let t = String(text || "").replace(/projects\/[^\s'"`,)]+/g, "‹pfad›");
+    for (const wert of [jobId, job.traceId, job.imagePath]) {
+      if (typeof wert === "string" && wert) t = t.split(wert).join("‹kennung›");
+    }
+    return t;
+  };
   const start = Date.now();
   /* Stundenzaehler (11.09.2026): War der Zaehler beim Einlass ausgewichen,
      traegt dieser Auftrag seine Marke jetzt selbst nach — neben der Analyse
@@ -204,7 +239,6 @@ async function handleProcessJob(req, res) {
         JSON.stringify({
           severity: "ERROR",
           step: "process-job",
-          jobId,
           error: "ergebnis-verworfen-job-bereits-terminal",
           hinweis:
             "completeJob gab false - der Job war nicht mehr processing (Reaper/markFailedIfStale war schneller). Ergebnis wird NICHT gezaehlt.",
@@ -215,14 +249,12 @@ async function handleProcessJob(req, res) {
     }
     if (success) {
       incrementTotals().catch((err) =>
-        console.log(JSON.stringify({ warning: "incrementTotals-error", error: err.message }))
+        console.log(JSON.stringify({ warning: "incrementTotals-error", error: ohneKennung(err.message) }))
       );
     }
     console.log(
       JSON.stringify({
         step: "process-job",
-        jobId,
-        traceId: job.traceId || null,
         status: success ? "done" : "blocked",
         /* OPS-2026-08-31-01: Der SPERRGRUND gehoert ins Server-Log. Vorher
            stand hier nur `status: "blocked"` — bei einem Vorfall liess sich
@@ -252,7 +284,7 @@ async function handleProcessJob(req, res) {
            Scheitert das Fortschreiben dauerhaft, bleibt die Wartezeit-Ansage
            auf einem alten Wert stehen — sichtbar fuer jeden Besucher, ohne
            dass irgendwo etwas auffaellt. */
-        console.log(JSON.stringify({ warning: "merkeDauer-fehlgeschlagen", error: e.message }))
+        console.log(JSON.stringify({ warning: "merkeDauer-fehlgeschlagen", error: ohneKennung(e.message) }))
       );
     }
   } catch (err) {
@@ -261,9 +293,8 @@ async function handleProcessJob(req, res) {
     console.log(
       JSON.stringify({
         step: "process-job",
-        jobId,
         status: "error",
-        error: err.message,
+        error: ohneKennung(err.message),
         totalMs: Date.now() - start,
       })
     );
@@ -273,7 +304,7 @@ async function handleProcessJob(req, res) {
       privacyRisks: [],
       exif: job.exif || {},
       meta: { traceId: job.traceId || null, mode: "blocked" },
-    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", jobId, error: e.message })));
+    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", error: ohneKennung(e.message) })));
   } finally {
     /* Bild immer löschen — Erfolg ODER Fehler. Die Storage-Lifecycle-Regel
        ist das zweite Sicherheitsnetz. */

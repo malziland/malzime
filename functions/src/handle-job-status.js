@@ -198,14 +198,28 @@ async function handleJobStatus(req, res) {
          schlägt er fehl, verfällt schlimmstenfalls diese eine Stimme. */
       const rcTicket = randomUUID();
       antwort.rcTicket = rcTicket;
+      /* Ohne jobId und ohne Fehlertext (27.09.2026): Diese Zeile steht im
+         selben Aufruf wie `job-delivered` (gemeinsames Label execution_id),
+         und ein Firestore-Fehlertext kann den Dokumentpfad samt jobId
+         enthalten. Nur der Fehlercode. */
       markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
-        console.log(JSON.stringify({ warning: "markDelivered-error", jobId: job.id, error: err.message }))
+        console.log(
+          JSON.stringify({
+            warning: "markDelivered-error",
+            code: (err && err.code) || null,
+            art: (err && err.name) || null,
+          })
+        )
       );
+      /* OHNE jobId UND traceId (27.09.2026): Zeitstempel minus deliveryGapMs
+         ergibt den Fertigzeitpunkt, und der liegt Millisekunden neben der
+         Kinderschutz-Zeile. Mit Kennung waere die Altersschaetzung darueber
+         dem Vorgang zuzuordnen. Wie man "nie abgeholt" ohne Kennung
+         naehert: docs/SECURITY-MODEL.md, Abschnitt "Erfolgsweg eines
+         Auftrags ohne Kennung im Log". */
       console.log(
         JSON.stringify({
           step: "job-delivered",
-          jobId: job.id,
-          traceId: job.traceId || null,
           deliveryGapMs: typeof job.finishedAt === "number" ? now - job.finishedAt : null,
           totalMs: typeof job.createdAt === "number" ? now - job.createdAt : null,
         })

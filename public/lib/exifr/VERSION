@@ -1,7 +1,10 @@
-exifr (lite ESM bundle)
+exifr 7.1.3 (lite ESM bundle, dist/lite.esm.mjs)
 Source: https://github.com/MikeKovarik/exifr
 License: MIT
 (c) Mike Kovarik
 
 Self-hosted copy — no external CDN requests.
-Note: Exact version not embedded in minified build.
+Version: Die Datei ist in exifr 7.1.0, 7.1.1, 7.1.2 und 7.1.3 Byte fuer Byte
+         identisch (Pruefsumme gegen die npm-Pakete abgeglichen, 2026-09-30),
+         entspricht also 7.1.3, der neuesten Version. Die Zeile oben liest
+         scripts/pruefe-fremd-meldungen.mjs aus.

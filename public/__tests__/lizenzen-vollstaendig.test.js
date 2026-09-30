@@ -127,6 +127,44 @@ describe("Fremde Bestandteile: Lizenzen", () => {
     ).toBe(true);
   });
 
+  /* ── Genannte Versionen passen zur VERSION-Datei ─────────────────────────
+     Die Version jeder Bibliothek steht kanonisch in ihrer VERSION-Datei.
+     THIRD-PARTY.md, README und die Impressumsseiten nennen sie zusätzlich,
+     weil die Lizenzangabe die Version braucht. Seit 30.09.2026 (libheif-
+     Eigenbau, Befund OSS-2026-09-30-01) ist diese Kopie gekoppelt: Wer eine
+     Bibliothek austauscht und eine Nennung vergisst, wird hier rot — sonst
+     stünde im Impressum still eine Version, die gar nicht ausgeliefert wird. */
+  const KANONISCH = {
+    Leaflet: { datei: "public/lib/leaflet/VERSION", zeile: /^Leaflet (\d+\.\d+\.\d+)/m },
+    exifr: { datei: "public/lib/exifr/VERSION", zeile: /^exifr (\d+\.\d+\.\d+)/m },
+    libheif: { datei: "public/lib/libheif/VERSION", zeile: /^libheif (\d+\.\d+\.\d+)/m },
+    libde265: { datei: "public/lib/libheif/VERSION", zeile: /^libde265 (\d+\.\d+\.\d+)/m },
+  };
+  const NENNUNGEN = ["THIRD-PARTY.md", "README.md", "public/impressum.html", "public/en/legal-notice.html"];
+
+  it.each(Object.keys(KANONISCH))("%s: jede genannte Version passt zur VERSION-Datei", (name) => {
+    const { datei, zeile } = KANONISCH[name];
+    const treffer = zeile.exec(fs.readFileSync(path.join(REPO, datei), "utf8"));
+    expect(treffer, `${datei}: keine Zeile „${name} x.y.z"`).not.toBeNull();
+    const version = treffer[1];
+    let nennungen = 0;
+    for (const rel of NENNUNGEN) {
+      const text = fs.readFileSync(path.join(REPO, rel), "utf8");
+      /* „exifr 7.1" im Impressum ist eine erlaubte Kurzform von 7.1.3 — die
+         Nennung muss ein Anfang der kanonischen Version sein. */
+      for (const m of text.matchAll(new RegExp(`\\b${name} (\\d+(?:\\.\\d+){0,2})\\b`, "g"))) {
+        nennungen++;
+        expect(
+          version === m[1] || version.startsWith(m[1] + "."),
+          `${rel} nennt ${name} ${m[1]}, ausgeliefert wird ${version} (${datei})`
+        ).toBe(true);
+      }
+    }
+    /* Positivkontrolle: Die Suche muss überhaupt etwas finden, sonst prüfte
+       dieser Test nichts. */
+    expect(nennungen, `${name}: in ${NENNUNGEN.join(", ")} keine Versionsnennung gefunden`).toBeGreaterThan(0);
+  });
+
   it("die eigene MIT-Lizenz nennt die Ausnahmen nicht stillschweigend", () => {
     /* Wer README liest, muss erfahren, dass „MIT" nicht für alles im
        Repository gilt. */

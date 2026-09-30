@@ -1,16 +1,28 @@
-libheif-js 1.23.2 (WebAssembly-Build von libheif 1.23.2 mit libde265)
-Quelle:   npm libheif-js@1.23.2, Dateien libheif-wasm/libheif.js und
-          libheif-wasm/libheif.wasm — unveraendert kopiert (2026-09-08)
-Repos:    https://github.com/catdad-experiments/libheif-js
-          https://github.com/strukturag/libheif   (libheif, LGPL-3.0)
-          https://github.com/strukturag/libde265  (HEVC-Dekoder, LGPL-3.0)
-Lizenz:   GNU Lesser General Public License v3.0 — Text in LICENSE daneben.
+libheif 1.23.5
+libde265 1.1.3
+
+HEIC-Dekoder als WebAssembly, SELBST GEBAUT aus den Original-Quellen der
+Hersteller (seit 2026-09-30; vorher Fertigpaket npm libheif-js 1.23.2).
+
+Rezept:   scripts/libheif-bauen.sh — Quellen per Pruefsumme festgenagelt,
+          Bauskript des Herstellers (build-emscripten.sh) unveraendert,
+          Emscripten 3.1.61. Die eine Abweichung (libde265 ab 1.1 wird vorab
+          mit cmake gebaut) steht im Kopf des Rezepts.
+Nachweis: .github/workflows/libheif-bau.yml baut auf GitHub nach und
+          vergleicht libheif.js und libheif.wasm Byte fuer Byte mit diesem
+          Ordner. Der Kontrollbau darin baut die fruehere Fassung nach; deren
+          libheif.wasm war Byte fuer Byte gleich der des Fertigpakets.
+Quellen:  https://github.com/strukturag/libheif/releases/tag/v1.23.5
+          https://github.com/strukturag/libde265/releases/tag/v1.1.3
+Lizenz:   GNU Lesser General Public License v3.0 — libheif: LICENSE,
+          libde265: LICENSE-libde265 (beide woertlich aus den Quellpaketen).
           Die Bibliothek liegt als getrennte, austauschbare Datei vor und wird
-          nur geladen, wenn ein HEIC-Foto ausgewaehlt wurde. Unser eigener Code
-          (MIT) ruft sie ueber ihre oeffentliche Schnittstelle auf und aendert
-          sie nicht.
+          nur geladen, wenn ein HEIC-Foto ausgewaehlt wurde und der Browser es
+          nicht selbst oeffnen kann. Unser eigener Code (MIT) ruft sie ueber
+          ihre oeffentliche Schnittstelle auf.
 Wozu:     Android-Browser koennen HEIC-Fotos (Samsung-Standard) nicht oeffnen.
           Die Umwandlung passiert vollstaendig im Browser; das Foto verlaesst
           das Geraet nicht (siehe docs/SECURITY-MODEL.md).
 
+Die ersten beiden Zeilen liest scripts/pruefe-fremd-meldungen.mjs aus.
 Self-hosted copy — no external CDN requests.

@@ -164,3 +164,77 @@ test("die echte Ausnahmeliste ist vollständig ausgefüllt", () => {
     expect(a.pruefen_bis).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   }
 });
+
+/* ── Der echte Netzweg (Befund H-12) ─────────────────────────────────────────
+   Die Tests oben speisen die Läufe fertig ein. Hier läuft der Code, der die
+   Workflows einzeln abfragt, bei fehlendem Lauf auf main auf andere Zweige
+   ausweicht und ungesehene Workflows meldet — gegen eine Attrappe von fetch. */
+describe("pruefe-abkuendigungen: Netzweg", () => {
+  const API = "https://api.github.com/repos/test/repo/actions";
+  const leer = { workflow_runs: [] };
+  const lauf = (id, name) => ({ id, name, run_number: 1, head_sha: "abcdef1234567", conclusion: "success" });
+
+  function karte({ autoMergeHinweis, neuerWorkflow = false }) {
+    const workflows = [
+      { id: 1, name: "CI", state: "active" },
+      { id: 2, name: "Auto-Merge", state: "active" },
+    ];
+    if (neuerWorkflow) workflows.push({ id: 3, name: "Neu", state: "active" });
+    return {
+      [`${API}/workflows?per_page=100`]: { body: { workflows } },
+      [`${API}/workflows/1/runs?branch=main&status=completed&per_page=10`]: {
+        body: { workflow_runs: [lauf(11, "CI")] },
+      },
+      [`${API}/runs/11/jobs?per_page=100`]: { body: { jobs: [{ id: 111, name: "test" }] } },
+      ["https://api.github.com/repos/test/repo/check-runs/111/annotations?per_page=100"]: { body: [] },
+      /* Auto-Merge läuft nie auf main — nur im Pull Request. */
+      [`${API}/workflows/2/runs?branch=main&status=completed&per_page=10`]: { body: leer },
+      [`${API}/workflows/2/runs?status=completed&per_page=10`]: { body: { workflow_runs: [lauf(22, "Auto-Merge")] } },
+      [`${API}/runs/22/jobs?per_page=100`]: { body: { jobs: [{ id: 222, name: "automerge" }] } },
+      ["https://api.github.com/repos/test/repo/check-runs/222/annotations?per_page=100"]: {
+        body: autoMergeHinweis ? [{ annotation_level: "warning", message: NODE20 }] : [],
+      },
+      [`${API}/workflows/3/runs?branch=main&status=completed&per_page=10`]: { body: leer },
+      [`${API}/workflows/3/runs?status=completed&per_page=10`]: { body: leer },
+    };
+  }
+
+  function netzLauf(k) {
+    const p = path.join(basis, "fetch.json");
+    fs.writeFileSync(p, JSON.stringify(k));
+    try {
+      const aus = execFileSync("node", [SKRIPT], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          FETCH_ATTRAPPE: p,
+          GITHUB_REPOSITORY: "test/repo",
+          ABKUENDIGUNG_DATEN: "",
+          ABKUENDIGUNG_AUSNAHMEN: path.join(basis, "keine.json"),
+          ABKUENDIGUNG_HEUTE: "2026-09-30",
+        },
+      });
+      return { code: 0, aus };
+    } catch (e) {
+      return { code: e.status, aus: e.stdout || "", fehler: e.stderr || "" };
+    }
+  }
+
+  test("Hinweis an einem Workflow, der nur im Pull Request läuft, wird gefunden", () => {
+    const r = netzLauf(karte({ autoMergeHinweis: true }));
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("Node.js 20 is deprecated");
+  });
+
+  test("ohne Hinweise: grün, und beide Workflows wurden gelesen", () => {
+    const r = netzLauf(karte({ autoMergeHinweis: false }));
+    expect(r.code).toBe(0);
+    expect(r.aus).toContain("Gelesen: 2 Lauf/Laeufe");
+  });
+
+  test("ein Workflow ohne jeden abgeschlossenen Lauf ist UNGESEHEN: rot", () => {
+    const r = netzLauf(karte({ autoMergeHinweis: false, neuerWorkflow: true }));
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain('UNGESEHEN  Workflow "Neu"');
+  });
+});

@@ -434,6 +434,11 @@ jobs:
       # Der eigene Schalter ist Absicht: Der Austausch soll eine sichtbare
       # Zeile im Diff sein, keine Nebenwirkung.
       - run: node scripts/pruefe-fremddateien.mjs
+      # Befund H-11 (30.09.2026): Jede Bibliothek und jede einzelne Datei unter
+      # public/lib braucht eine Beobachtung im Nachtlauf. Dieser Teil braucht
+      # kein Netz und laeuft deshalb hier — eine neue, unbeobachtete
+      # Bibliothek soll gar nicht erst ausgeliefert werden.
+      - run: node scripts/pruefe-fremd-meldungen.mjs --nur-deckung
       # BEFUND 01.09.2026 (Runde 7, L-5): ignorierte Dateien unter public/,
       # die firebase.json nicht ausschliesst, wuerden ausgeliefert, ohne in
       # git oder im Sauberkeits-Riegel des Deploys aufzutauchen.

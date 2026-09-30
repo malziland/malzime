@@ -119,6 +119,7 @@ if ! git diff --quiet origin/main -- .github/workflows/ 2>/dev/null; then
 fi
 
 lauf "Pruefungen: Fremddateien" "pruefungen" node scripts/pruefe-fremddateien.mjs
+lauf "Pruefungen: Mitgelieferte Bibliotheken beobachtet" "pruefungen" node scripts/pruefe-fremd-meldungen.mjs --nur-deckung
 # BEFUND 01.09.2026 (Runde 7, L-5): Der Sauberkeits-Riegel im Deploy prueft
 # `git status --porcelain` — der zeigt IGNORIERTE Dateien nicht. Firebase
 # liefert sie trotzdem aus, wenn firebase.json sie nicht ausschliesst.

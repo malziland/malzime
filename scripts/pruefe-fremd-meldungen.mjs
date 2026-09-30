@@ -62,8 +62,23 @@ export const BIBLIOTHEKEN = {
   ],
   "public/lib/exifr": [{ name: "exifr", zeile: /^exifr (\d+\.\d+\.\d+)\b/m, repo: "MikeKovarik/exifr", npm: "exifr" }],
   "public/lib/libheif": [
-    { name: "libheif", zeile: /^libheif (\d+\.\d+\.\d+)\b/m, repo: "strukturag/libheif" },
-    { name: "libde265", zeile: /^libde265 (\d+\.\d+\.\d+)\b/m, repo: "strukturag/libde265" },
+    /* bekannt: eine veroeffentlichte Meldung, die in jeder Antwort stehen muss
+       (Befund H-16). Fehlt sie, hat die Abfrage nicht das Erwartete geliefert —
+       eine leere Liste hiesse sonst "sauber". Leaflet und exifr haben heute
+       keine Meldung; dort ist eine leere Antwort normal (Restrisiko,
+       docs/SECURITY-MODEL.md). */
+    {
+      name: "libheif",
+      zeile: /^libheif (\d+\.\d+\.\d+)\b/m,
+      repo: "strukturag/libheif",
+      bekannt: "GHSA-2jg2-4ch7-h545",
+    },
+    {
+      name: "libde265",
+      zeile: /^libde265 (\d+\.\d+\.\d+)\b/m,
+      repo: "strukturag/libde265",
+      bekannt: "GHSA-g2rg-wj66-w594",
+    },
   ],
 };
 export const OHNE_CODE = {
@@ -143,9 +158,10 @@ export function bewerte(versionText, bereich, behobenText) {
       /* Liegt unsere Version UNTER dem Bereich (eine Untergrenze greift nicht),
          gab es den Fehler bei uns noch nicht — etwa libde265 "ab 1.0.16" bei
          1.0.15. Das ist eindeutig. */
-      const darunter = verfehlt.some(
-        (b) => b.op === ">=" || b.op === ">" || (b.op.startsWith("=") && vergleiche(version, b.version) < 0)
-      );
+      /* Nur eine Untergrenze (>=, >) kann sagen "gab es bei uns noch nicht". Eine
+         nackte Version darueber meint "gefunden in" — ob der Fehler aelter ist,
+         sagt sie nicht (Befund H-05); sie laeuft weiter unten als "unklar". */
+      const darunter = verfehlt.some((b) => b.op === ">=" || b.op === ">");
       if (darunter) return "nicht betroffen";
       /* Eine einzelne nackte Version ("1.17.0") meint bei libheif "gefunden in",
          nicht "nur dort". Liegt unsere Version darueber und ist keine Reparatur
@@ -183,6 +199,23 @@ export function bewerteMeldung(versionText, meldung) {
 /* ── Quellen ──────────────────────────────────────────────────────────────── */
 
 class Messfehler extends Error {}
+
+/* Einspeisepunkt fuer Tests des ECHTEN Netzwegs (Befund H-12): FETCH_ATTRAPPE
+   nennt eine JSON-Datei { "<url>": { "status": 200, "body": [...], "link": "..." } }.
+   Eine nicht hinterlegte Adresse ist ein Netzfehler — sie faellt also auf. */
+if (process.env.FETCH_ATTRAPPE) {
+  const karte = JSON.parse(readFileSync(process.env.FETCH_ATTRAPPE, "utf8"));
+  globalThis.fetch = async (url) => {
+    const eintrag = karte[String(url)];
+    if (!eintrag) throw new Error(`Attrappe kennt ${url} nicht`);
+    return {
+      ok: (eintrag.status || 200) < 400,
+      status: eintrag.status || 200,
+      headers: { get: (n) => (n.toLowerCase() === "link" ? eintrag.link || null : null) },
+      json: async () => eintrag.body,
+    };
+  };
+}
 
 let festeMeldungen = null;
 if (process.env.FREMD_MELDUNGEN) {
@@ -297,6 +330,10 @@ export function datumGueltig(text) {
 async function main() {
   const befunde = [];
   const hinweise = [];
+  /* --nur-deckung (Befund H-11): nur die Deckungspruefung, ohne Netz. Laeuft
+     in jedem Pull Request und vor dem Push, damit eine neue, unbeobachtete
+     Bibliothek gar nicht erst ausgeliefert wird — nicht erst nachts auffaellt. */
+  const nurDeckung = process.argv.includes("--nur-deckung");
 
   /* Deckung: jeder Ordner beobachtet oder begruendet ausgenommen. */
   for (const bereich of BEREICHE) {
@@ -312,6 +349,16 @@ async function main() {
         befunde.push(`UNGEDECKT  ${rel}: mitgelieferte(r) ${art}, aber von keiner Pruefung beobachtet`);
       }
     }
+  }
+
+  if (nurDeckung) {
+    for (const b of befunde) console.log(`  ${b}`);
+    console.log(
+      befunde.length
+        ? `ERGEBNIS: ${befunde.length} ungedeckte(r) Bestandteil(e) unter public/lib bzw. public/fonts.`
+        : "ERGEBNIS: jeder Bestandteil unter public/lib und public/fonts wird beobachtet."
+    );
+    return befunde.length ? 1 : 0;
   }
 
   const ausnahmen = ausnahmenLesen();
@@ -351,7 +398,14 @@ async function main() {
       }
       const version = treffer[1];
       const meldungen = new Map();
-      for (const m of await repoMeldungen(teil.repo)) {
+      const ausDemRepo = await repoMeldungen(teil.repo);
+      if (teil.bekannt && !ausDemRepo.some((m) => m.ghsa_id === teil.bekannt)) {
+        throw new Messfehler(
+          `${teil.repo}: die bekannte Meldung ${teil.bekannt} fehlt in der Antwort (${ausDemRepo.length} gelesen) — ` +
+            "die Abfrage hat nicht das Erwartete geliefert"
+        );
+      }
+      for (const m of ausDemRepo) {
         if (m.withdrawn_at) continue;
         meldungen.set(m.ghsa_id, { ...m, urteil: bewerteMeldung(version, m) });
       }

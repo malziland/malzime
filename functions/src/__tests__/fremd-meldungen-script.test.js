@@ -43,8 +43,16 @@ function meldung(ghsa, bereich, behobenIn, weiteres = {}) {
   };
 }
 
-/* Alle Quellen leer, einzelne per Überschreibung befüllt. */
-function meldungen(ueberschreibung = {}, { exifr = "7.1.3", leaflet = "1.9.4" } = {}) {
+/* Die bekannten Meldungen, die in jeder Hersteller-Antwort stehen müssen
+   (Positivkontrolle im Skript, Befund H-16). Ihr Bereich trifft keine
+   Testversion, damit sie das Ergebnis sonst nicht beeinflussen. */
+const BEKANNT = {
+  "repo:strukturag/libheif": meldung("GHSA-2jg2-4ch7-h545", "< 0.0.1", "0.0.1"),
+  "repo:strukturag/libde265": meldung("GHSA-g2rg-wj66-w594", "< 0.0.1", "0.0.1"),
+};
+
+/* Alle Quellen leer (bis auf die bekannten Meldungen), einzelne per Überschreibung befüllt. */
+function meldungen(ueberschreibung = {}, { exifr = "7.1.3", leaflet = "1.9.4", ohneBekannte = false } = {}) {
   const daten = {
     "repo:Leaflet/Leaflet": [],
     "repo:MikeKovarik/exifr": [],
@@ -56,6 +64,13 @@ function meldungen(ueberschreibung = {}, { exifr = "7.1.3", leaflet = "1.9.4" } 
     "npm-paket:exifr": true,
     ...ueberschreibung,
   };
+  if (!ohneBekannte) {
+    for (const [schluessel, bekannte] of Object.entries(BEKANNT)) {
+      if (Array.isArray(daten[schluessel]) && !daten[schluessel].some((m) => m.ghsa_id === bekannte.ghsa_id)) {
+        daten[schluessel] = [...daten[schluessel], bekannte];
+      }
+    }
+  }
   const p = path.join(basis, "meldungen.json");
   fs.writeFileSync(p, JSON.stringify(daten));
   return p;
@@ -100,6 +115,8 @@ describe("pruefe-fremd-meldungen: Grundfall", () => {
     expect(r.code).toBe(0);
     expect(r.aus).toContain("Beobachtet: 4 Bibliotheksteile");
     expect(r.aus).toContain("libheif 1.23.5");
+    /* Die bekannten Meldungen zählen mit, betreffen die Version aber nicht. */
+    expect(r.aus).toContain("libheif 1.23.5: 1 Meldung(en) gelesen, 0 offen");
     expect(r.aus).toContain("libde265 1.1.3");
   });
 
@@ -188,6 +205,19 @@ describe("pruefe-fremd-meldungen: Versionsangaben der Hersteller", () => {
     /* Nur fremde Linien genannt, Bereich schließt uns ein: betroffen. */
     const fremd = { "repo:strukturag/libheif": [meldung("GHSA-l", "<= 1.23.5", "1.17.7, 1.22.9")] };
     expect(lauf({ meldungenPfad: meldungen(fremd) }).code).toBe(1);
+  });
+
+  test("H-05: nackte Fundversion ÜBER unserer: unklar = rot, auch mit Reparatur darüber", () => {
+    versionen({ libheif: "1.23.5" });
+    const mitReparatur = { "repo:strukturag/libheif": [meldung("GHSA-m", "1.24.0", "1.24.1")] };
+    const r1 = lauf({ meldungenPfad: meldungen(mitReparatur) });
+    expect(r1.code).toBe(1);
+    expect(r1.aus).toContain("UNKLAR  libheif 1.23.5  GHSA-m");
+    const ohneReparatur = { "repo:strukturag/libheif": [meldung("GHSA-m", "1.24.0", "")] };
+    expect(lauf({ meldungenPfad: meldungen(ohneReparatur) }).code).toBe(1);
+    /* Eine echte Untergrenze darüber bleibt eindeutig "noch nicht betroffen". */
+    const untergrenze = { "repo:strukturag/libheif": [meldung("GHSA-m", ">= 1.24.0", "1.24.1")] };
+    expect(lauf({ meldungenPfad: meldungen(untergrenze) }).code).toBe(0);
   });
 
   test("Meldung ohne Einträge: unklar = rot", () => {
@@ -336,10 +366,107 @@ describe("pruefe-fremd-meldungen: Deckung und Messfehler", () => {
     expect(r.fehler).toContain("MESSUNG NICHT DURCHFUEHRBAR");
   });
 
+  test("H-16: fehlt die bekannte Meldung in der Hersteller-Antwort: 2, nicht grün", () => {
+    versionen();
+    const r = lauf({ meldungenPfad: meldungen({}, { ohneBekannte: true }) });
+    expect(r.code).toBe(2);
+    expect(r.fehler).toContain("bekannte Meldung");
+  });
+
+  test("H-11: --nur-deckung prüft ohne Netz und ohne Meldungen nur die Deckung", () => {
+    versionen();
+    const aufruf = (extra) => {
+      try {
+        return {
+          code: 0,
+          aus: execFileSync("node", [SKRIPT, "--nur-deckung"], {
+            encoding: "utf8",
+            env: { ...process.env, FREMD_BASIS: basis, ...extra },
+          }),
+        };
+      } catch (e) {
+        return { code: e.status, aus: e.stdout || "" };
+      }
+    };
+    expect(aufruf({}).code).toBe(0);
+    fs.writeFileSync(path.join(basis, "public/lib/neu.min.js"), "/* fremd */\n");
+    const r = aufruf({});
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("UNGEDECKT  public/lib/neu.min.js");
+  });
+
   test("Quelle fehlt (Abfrage gescheitert): 2, nicht grün", () => {
     versionen();
     const p = path.join(basis, "unvollstaendig.json");
     fs.writeFileSync(p, JSON.stringify({ "repo:Leaflet/Leaflet": [] }));
     expect(lauf({ meldungenPfad: p }).code).toBe(2);
+  });
+});
+
+/* ── Der echte Netzweg (Befund H-12) ─────────────────────────────────────────
+   Alle übrigen Tests speisen die Meldungen fertig ein und umgehen damit den
+   Code, der die GitHub-API abfragt und blättert. Hier läuft genau dieser Code,
+   gegen eine Attrappe von fetch (FETCH_ATTRAPPE). */
+describe("pruefe-fremd-meldungen: Netzweg mit Blättern", () => {
+  const API = "https://api.github.com";
+  const repoUrl = (repo, seite = "") => `${API}/repos/${repo}/security-advisories?state=published&per_page=100${seite}`;
+  const npmUrl = (paket, version) =>
+    `${API}/advisories?ecosystem=npm&affects=${encodeURIComponent(`${paket}@${version}`)}&per_page=100`;
+
+  function karte(libheifSeite2) {
+    return {
+      [repoUrl("Leaflet/Leaflet")]: { body: [] },
+      [repoUrl("MikeKovarik/exifr")]: { body: [] },
+      [`https://registry.npmjs.org/leaflet`]: { body: {} },
+      [`https://registry.npmjs.org/exifr`]: { body: {} },
+      [npmUrl("leaflet", "1.9.4")]: { body: [] },
+      [npmUrl("exifr", "7.1.3")]: { body: [] },
+      /* Seite 1 trägt nur die bekannte Meldung und verweist auf Seite 2. */
+      [repoUrl("strukturag/libheif")]: {
+        body: [BEKANNT["repo:strukturag/libheif"]],
+        link: `<${repoUrl("strukturag/libheif", "&page=2")}>; rel="next"`,
+      },
+      [repoUrl("strukturag/libheif", "&page=2")]: { body: libheifSeite2 },
+      [repoUrl("strukturag/libde265")]: { body: [BEKANNT["repo:strukturag/libde265"]] },
+    };
+  }
+
+  function netzLauf(k) {
+    const p = path.join(basis, "fetch.json");
+    fs.writeFileSync(p, JSON.stringify(k));
+    try {
+      const aus = execFileSync("node", [SKRIPT], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          FREMD_BASIS: basis,
+          FETCH_ATTRAPPE: p,
+          FREMD_HEUTE: "2026-09-30",
+          FREMD_AUSNAHMEN: path.join(basis, "keine.json"),
+        },
+      });
+      return { code: 0, aus };
+    } catch (e) {
+      return { code: e.status, aus: e.stdout || "", fehler: e.stderr || "" };
+    }
+  }
+
+  test("eine Meldung auf Seite 2 wird gefunden: rot", () => {
+    versionen({ libheif: "1.23.2" });
+    const r = netzLauf(karte([meldung("GHSA-seite2", "<= 1.23.2", "1.23.3")]));
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("BETROFFEN  libheif 1.23.2  GHSA-seite2");
+  });
+
+  test("ohne betreffende Meldung: grün", () => {
+    versionen();
+    expect(netzLauf(karte([])).code).toBe(0);
+  });
+
+  test("Fehlerantwort der API: 2, nicht grün", () => {
+    versionen();
+    const k = karte([]);
+    k[repoUrl("strukturag/libde265")] = { status: 502, body: {} };
+    expect(netzLauf(k).code).toBe(2);
   });
 });

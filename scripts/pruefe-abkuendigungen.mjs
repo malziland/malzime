@@ -47,6 +47,19 @@ export const MUSTER =
 
 class Messfehler extends Error {}
 
+/* Einspeisepunkt fuer Tests des ECHTEN Netzwegs (Befund H-12), wie in
+   pruefe-fremd-meldungen.mjs: FETCH_ATTRAPPE nennt eine JSON-Datei
+   { "<url>": { "status": 200, "body": ... } }. Unbekannte Adressen sind
+   Netzfehler. */
+if (process.env.FETCH_ATTRAPPE) {
+  const karte = JSON.parse(readFileSync(process.env.FETCH_ATTRAPPE, "utf8"));
+  globalThis.fetch = async (url) => {
+    const eintrag = karte[String(url)];
+    if (!eintrag) throw new Error(`Attrappe kennt ${url} nicht`);
+    return { ok: (eintrag.status || 200) < 400, status: eintrag.status || 200, json: async () => eintrag.body };
+  };
+}
+
 function repoName() {
   if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
   let url;
@@ -93,10 +106,19 @@ async function laeufeLesen() {
   const ungesehen = [];
   for (const wf of workflows.workflows || []) {
     if (wf.state !== "active") continue;
-    const liste = await github(
+    const zaehlt = (l) => !["cancelled", "skipped"].includes(l.conclusion);
+    const aufMain = await github(
       `/repos/${repo}/actions/workflows/${wf.id}/runs?branch=main&status=completed&per_page=10`
     );
-    const lauf = (liste.workflow_runs || []).find((l) => !["cancelled", "skipped"].includes(l.conclusion));
+    let lauf = (aufMain.workflow_runs || []).find(zaehlt);
+    /* Manche Workflows laufen nie auf main (Dependabot Auto-Merge nur im Pull
+       Request). Dann gilt der juengste Lauf auf irgendeinem Zweig (Befund H-12);
+       sonst saehe diese Pruefung genau die Klasse Hinweise nicht, fuer die es
+       sie gibt. */
+    if (!lauf) {
+      const irgendwo = await github(`/repos/${repo}/actions/workflows/${wf.id}/runs?status=completed&per_page=10`);
+      lauf = (irgendwo.workflow_runs || []).find(zaehlt);
+    }
     if (lauf) letzte.push(lauf);
     else ungesehen.push(wf.name);
   }
@@ -175,8 +197,10 @@ async function main() {
     }
   }
   console.log(`Gelesen: ${laeufe.length} Lauf/Laeufe auf main, ${gelesen} Hinweis(e), Stand ${HEUTE}`);
-  if (ungesehen.length) {
-    console.log(`Ohne abgeschlossenen Lauf auf main (nicht geprueft): ${ungesehen.join(", ")}`);
+  /* Ein aktiver Workflow ohne einen einzigen abgeschlossenen Lauf wurde nicht
+     geprueft — das ist kein "sauber" (KERN 5c). */
+  for (const name of ungesehen) {
+    befunde.push(`UNGESEHEN  Workflow "${name}": kein abgeschlossener Lauf — seine Hinweise wurden nicht gelesen`);
   }
   for (const h of hinweise) console.log(`  [Ausnahme] ${h}`);
   if (befunde.length === 0) {

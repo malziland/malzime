@@ -265,6 +265,22 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     expect(r.ausgabe).toMatch(/test-backend/);
   });
 
+  /* Befund G-02 (30.09.2026): Der Herkunftsnachweis des HEIC-Dekoders
+     (Workflow libheif-Bau, Job "bauen") ist kein Pflicht-Check — ohne diesen
+     Riegel liess sich ein Stand ausliefern, dessen Dekoder nicht als Bau aus
+     dem Rezept belegt ist. */
+  test("roter Herkunftsnachweis des HEIC-Dekoders haelt die Auslieferung an", () => {
+    const r = deploy({ ATTRAPPE_LIBHEIF_BAU: "failure" });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: failure/);
+  });
+
+  test("fehlender Lauf des Herkunftsnachweises haelt ebenfalls an", () => {
+    const r = deploy({ ATTRAPPE_LIBHEIF_BAU: "fehlt" });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: fehlt/);
+  });
+
   test("unsauberer Arbeitsbaum haelt die Auslieferung an", () => {
     fs.appendFileSync(path.join(klon, "public", "index.html"), "\n<!-- Probe -->\n");
     const r = deploy();
@@ -630,6 +646,8 @@ describe("deploy.sh — der Erfolgsweg", () => {
     const r = deploy();
     expect(r.code).toBe(0);
     expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
+    /* Der Herkunftsriegel hat wirklich gefragt, nicht nur geschwiegen. */
+    expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Job bauen gruen/);
     /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
     expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
   });

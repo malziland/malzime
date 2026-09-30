@@ -394,7 +394,27 @@ def main():
         return 2
     aus_ci = erreichbar_ab(ci)
     aus_vorab = erreichbar_ab(vorab.read_text(encoding="utf-8"))
-    aus_nachts = erreichbar_ab(nachts.read_text(encoding="utf-8"))
+    nachts_text = nachts.read_text(encoding="utf-8")
+    aus_nachts = erreichbar_ab(nachts_text)
+    # Befund G-10 (30.09.2026): Dass der Aufruf im Text steht, beweist nicht,
+    # dass er etwas bewirkt. Ohne Zeitplan laeuft der Nachtlauf nie, mit
+    # `|| true` oder `continue-on-error` wird jede Pruefung gruen, und ein `if:`
+    # am pruefenden Job kann ihn still ueberspringen. Gemessen: Alle drei
+    # Mutationen liessen diesen Riegel frueher gruen.
+    nachts_ohne = ohne_kommentare(nachts_text)
+    nachts_maengel = []
+    if not re.search(r"^\s*schedule:\s*\n\s*-\s*cron:", nachts_ohne, re.M):
+        nachts_maengel.append("kein Zeitplan (schedule/cron) — der Nachtlauf liefe nie von selbst")
+    if re.search(r"continue-on-error", nachts_ohne):
+        nachts_maengel.append("continue-on-error — ein roter Schritt zaehlte als gruen")
+    if re.search(r"\|\|\s*(true|:)\b", nachts_ohne):
+        nachts_maengel.append("'|| true' — der Rueckgabewert einer Pruefung wird verschluckt")
+    # Jobs, die einen NUR_NACHTS-Waechter aufrufen, duerfen kein `if:` tragen.
+    for block in re.split(r"(?m)^  (?=[A-Za-z0-9_-]+:\s*$)", nachts_ohne.split("\njobs:", 1)[-1])[1:]:
+        name = block.split(":", 1)[0]
+        ruft = [n for n in NUR_NACHTS if aufruf_von(n, block)]
+        if ruft and re.search(r"^\s+if:", block, re.M):
+            nachts_maengel.append(f"Job {name} ruft {', '.join(ruft)} auf und traegt ein 'if:' — er koennte still entfallen")
     waechter_fehlt = []
     for datei in skripte:
         if datei.name in NUR_LOKAL:
@@ -420,6 +440,8 @@ def main():
         print("  NICHT MESSBAR: docs/WAECHTER.md fehlt.")
         return 2
     text_uebersicht = uebersicht.read_text(encoding="utf-8")
+    for mangel in nachts_maengel:
+        waechter_fehlt.append(("sicherheit-nachts.yml", mangel))
     undokumentiert = [d.name for d in skripte if d.name not in text_uebersicht]
     if undokumentiert:
         for name in undokumentiert:
@@ -431,6 +453,9 @@ def main():
     if waechter_fehlt:
         for name, wo in waechter_fehlt:
             if wo == "docs/WAECHTER.md":
+                continue
+            if name == "sicherheit-nachts.yml":
+                print(f"  FEHLT   {name}: {wo}")
                 continue
             print(f"  FEHLT   {name} wird nicht aufgerufen aus: {wo}")
         print("          Ein Waechter, den niemand aufruft, ist kein Waechter.")

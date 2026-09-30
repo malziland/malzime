@@ -24,6 +24,11 @@ fi
 # wie zuvor.
 case "$1" in
   api)
+    # Herkunftsnachweis des HEIC-Dekoders: Abfrage des Jobs "bauen".
+    # ATTRAPPE_LIBHEIF_BAU bestimmt die Antwort (Vorgabe: success).
+    case "$*" in
+      *"check_name=bauen"*) printf '%s\n' "${ATTRAPPE_LIBHEIF_BAU:-success}"; exit 0 ;;
+    esac
     if [ -n "${ATTRAPPE_PR_KOPF:-}" ] && [ -n "${ATTRAPPE_CHECKS_PR:-}" ]; then
       case "$*" in
         *"$ATTRAPPE_PR_KOPF"*) printf '%s\n' "$ATTRAPPE_CHECKS_PR"; exit 0 ;;

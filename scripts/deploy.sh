@@ -211,6 +211,27 @@ else
         exit 1
       fi
     done
+    # ── Herkunft des HEIC-Dekoders (Befund G-02, 30.09.2026) ──
+    # Der Workflow libheif-Bau baut public/lib/libheif/ aus den Hersteller-
+    # Quellen nach und vergleicht Byte fuer Byte. Er ist KEIN Pflicht-Check:
+    # Er laeuft nur bei Aenderungen am Dekoder oder am Rezept, und ein
+    # Pflicht-Check mit Pfadfilter bliebe bei allen anderen Pull Requests auf
+    # "wartend" stehen. Deshalb verlangt ihn der Deploy: Fuer den juengsten
+    # Commit, der den Dekoder, das Rezept oder den Workflow geaendert hat,
+    # muss der Job "bauen" gruen sein. Fehlt der Lauf noch: Abbruch.
+    LIBHEIF_SHA=$(git log -1 --format=%H -- public/lib/libheif scripts/libheif-bauen.sh .github/workflows/libheif-bau.yml)
+    if [ -n "$LIBHEIF_SHA" ]; then
+      BAU=$(gh api "repos/malziland/malzime/commits/$LIBHEIF_SHA/check-runs?check_name=bauen" \
+        --jq '[.check_runs[]] | if length == 0 then "fehlt" else (max_by(.started_at) | .conclusion // "pending") end' \
+        2>/dev/null || echo "nicht abrufbar")
+      if [ "$BAU" != "success" ]; then
+        echo "FEHLER: Herkunftsnachweis des HEIC-Dekoders (Workflow libheif-Bau, Job bauen) ist fuer $LIBHEIF_SHA nicht gruen (Ist: $BAU)." >&2
+        echo "        Die ausgelieferten Dateien waeren dann nicht als Bau aus dem Rezept belegt. docs/RUNBOOK.md, libheif neu bauen." >&2
+        echo "        Notschalter: SKIP_STAND=1" >&2
+        exit 1
+      fi
+      echo "Herkunft HEIC-Dekoder: Job bauen gruen fuer $LIBHEIF_SHA."
+    fi
     echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA (jüngster Lauf je Check)."
   fi
 fi

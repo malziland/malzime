@@ -221,6 +221,28 @@ PYSELF
 probe_text 1 "FEHLT|Schlussbilanz" "Notschalter ohne Eintrag in der Schlussbilanz wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck scripts/deploy.sh
 
+# Befund G-10 (30.09.2026): Der Nachtlauf darf nicht still entfallen — weder
+# ohne Zeitplan noch mit einer Pruefung, deren Rueckgabewert verschluckt wird.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace('  schedule:\n    - cron: "43 3 * * *"', "", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "kein Zeitplan" "Nachtlauf ohne Zeitplan wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace("node scripts/pruefe-abkuendigungen.mjs", "node scripts/pruefe-abkuendigungen.mjs || true", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "verschluckt" "Pruefung mit '|| true' im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
 echo
 
 echo "2. verify-infrastructure.sh — Bildspeicher"

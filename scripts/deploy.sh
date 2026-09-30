@@ -211,27 +211,50 @@ else
         exit 1
       fi
     done
-    # ── Herkunft des HEIC-Dekoders (Befund G-02, 30.09.2026) ──
+    # ── Herkunft des HEIC-Dekoders (Befunde G-02, H-04, H-10 vom 30.09.2026) ──
     # Der Workflow libheif-Bau baut public/lib/libheif/ aus den Hersteller-
-    # Quellen nach und vergleicht Byte fuer Byte. Er ist KEIN Pflicht-Check:
-    # Er laeuft nur bei Aenderungen am Dekoder oder am Rezept, und ein
-    # Pflicht-Check mit Pfadfilter bliebe bei allen anderen Pull Requests auf
-    # "wartend" stehen. Deshalb verlangt ihn der Deploy: Fuer den juengsten
-    # Commit, der den Dekoder, das Rezept oder den Workflow geaendert hat,
-    # muss der Job "bauen" gruen sein. Fehlt der Lauf noch: Abbruch.
+    # Quellen nach und vergleicht Byte fuer Byte (Job bauen); der Job
+    # kontrollbau haelt die Bauumgebung gegen die frueher ausgelieferte Datei.
+    # Er ist KEIN Pflicht-Check: Er laeuft nur bei Aenderungen am Dekoder oder
+    # am Rezept, und ein Pflicht-Check mit Pfadfilter bliebe bei allen anderen
+    # Pull Requests auf "wartend" stehen. Deshalb verlangt ihn der Deploy: Fuer
+    # den juengsten Commit, der Dekoder, Rezept oder Workflow geaendert hat,
+    # muss der juengste Lauf DIESES Workflows abgeschlossen und gruen sein —
+    # beide Jobs zusammen, gebunden an den Workflow statt an einen Jobnamen.
     LIBHEIF_SHA=$(git log -1 --format=%H -- public/lib/libheif scripts/libheif-bauen.sh .github/workflows/libheif-bau.yml)
-    if [ -n "$LIBHEIF_SHA" ]; then
-      BAU=$(gh api "repos/malziland/malzime/commits/$LIBHEIF_SHA/check-runs?check_name=bauen" \
-        --jq '[.check_runs[]] | if length == 0 then "fehlt" else (max_by(.started_at) | .conclusion // "pending") end' \
+    if [ -n "$LIBHEIF_SHA" ] && [ ! -d public/lib/libheif ]; then
+      # Rueckweg (docs/SECURITY-MODEL.md): Dekoder entfernt — dann gibt es nichts
+      # nachzuweisen.
+      echo "Hinweis: public/lib/libheif fehlt (Dekoder entfernt) — kein Herkunftsnachweis noetig."
+    elif [ -n "$LIBHEIF_SHA" ]; then
+      BAU=$(gh api "repos/malziland/malzime/actions/workflows/libheif-bau.yml/runs?head_sha=$LIBHEIF_SHA&per_page=20" \
+        --jq '[.workflow_runs[]] | if length == 0 then "fehlt" else (max_by(.created_at) | if .status != "completed" then "laeuft" else (.conclusion // "unbekannt") end) end' \
         2>/dev/null || echo "nicht abrufbar")
       if [ "$BAU" != "success" ]; then
-        echo "FEHLER: Herkunftsnachweis des HEIC-Dekoders (Workflow libheif-Bau, Job bauen) ist fuer $LIBHEIF_SHA nicht gruen (Ist: $BAU)." >&2
+        echo "FEHLER: Herkunftsnachweis des HEIC-Dekoders (Workflow libheif-Bau) ist fuer $LIBHEIF_SHA nicht gruen (Ist: $BAU)." >&2
         echo "        Die ausgelieferten Dateien waeren dann nicht als Bau aus dem Rezept belegt. docs/RUNBOOK.md, libheif neu bauen." >&2
         echo "        Notschalter: SKIP_STAND=1" >&2
         exit 1
       fi
-      echo "Herkunft HEIC-Dekoder: Job bauen gruen fuer $LIBHEIF_SHA."
+      echo "Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen fuer $LIBHEIF_SHA."
     fi
+
+    # ── Laeuft der Nachtlauf ueberhaupt? (Befund H-03) ──
+    # Ein ausbleibender Nachtlauf alarmiert niemanden: GitHub schaltet geplante
+    # Workflows nach 60 Tagen ohne Aktivitaet ab und verwirft unter Last
+    # gelegentlich Laeufe. Geprueft wird nur das ALTER des juengsten
+    # abgeschlossenen Laufs auf main, nicht seine Farbe — ein roter Nachtlauf
+    # darf den Deploy nicht blockieren, der ihn behebt.
+    NACHT=$(gh api "repos/malziland/malzime/actions/workflows/sicherheit-nachts.yml/runs?branch=main&status=completed&per_page=1" \
+      --jq '.workflow_runs[0].created_at // "fehlt"' 2>/dev/null || echo "nicht abrufbar")
+    NACHT_STUNDEN=$(node -e 'const t = Date.parse(process.argv[1]); console.log(Number.isNaN(t) ? -1 : Math.floor((Date.now() - t) / 3600000));' "$NACHT")
+    if [ "$NACHT_STUNDEN" -lt 0 ] || [ "$NACHT_STUNDEN" -gt 26 ]; then
+      echo "FEHLER: Juengster Nachtlauf \"Sicherheit nachts\" auf main: $NACHT (${NACHT_STUNDEN} h) — fehlt oder ist aelter als 26 Stunden." >&2
+      echo "        Dann meldet niemand neue Sicherheitsluecken. Starten: gh workflow run sicherheit-nachts.yml," >&2
+      echo "        abwarten, erneut deployen. Ist er abgeschaltet: unter \"Actions\" einschalten. Notschalter: SKIP_STAND=1" >&2
+      exit 1
+    fi
+    echo "Nachtlauf: juengster Lauf auf main vor ${NACHT_STUNDEN} h."
     echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA (jüngster Lauf je Check)."
   fi
 fi

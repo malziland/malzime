@@ -265,20 +265,84 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     expect(r.ausgabe).toMatch(/test-backend/);
   });
 
-  /* Befund G-02 (30.09.2026): Der Herkunftsnachweis des HEIC-Dekoders
-     (Workflow libheif-Bau, Job "bauen") ist kein Pflicht-Check — ohne diesen
-     Riegel liess sich ein Stand ausliefern, dessen Dekoder nicht als Bau aus
-     dem Rezept belegt ist. */
+  /* Befunde G-02/H-04 (30.09.2026): Der Herkunftsnachweis des HEIC-Dekoders
+     (Workflow libheif-Bau: Nachbau + Kontrollbau) ist kein Pflicht-Check —
+     ohne diesen Riegel liess sich ein Stand ausliefern, dessen Dekoder nicht
+     als Bau aus dem Rezept belegt ist. Die Attrappe wendet den jq-Ausdruck aus
+     deploy.sh mit echtem jq auf API-JSON an (Befund H-17). */
+  const libheifLaeufe = (...laeufe) => JSON.stringify({ workflow_runs: laeufe });
+  const laufHeif = (created_at, status, conclusion) => ({ created_at, status, conclusion });
+
   test("roter Herkunftsnachweis des HEIC-Dekoders haelt die Auslieferung an", () => {
-    const r = deploy({ ATTRAPPE_LIBHEIF_BAU: "failure" });
+    const r = deploy({
+      ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(laufHeif("2026-09-30T10:00:00Z", "completed", "failure")),
+    });
     expect(r.code).not.toBe(0);
     expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: failure/);
   });
 
   test("fehlender Lauf des Herkunftsnachweises haelt ebenfalls an", () => {
-    const r = deploy({ ATTRAPPE_LIBHEIF_BAU: "fehlt" });
+    const r = deploy({ ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe() });
     expect(r.code).not.toBe(0);
     expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: fehlt/);
+  });
+
+  test("noch laufender Herkunftsnachweis haelt an, statt zu warten oder durchzuwinken", () => {
+    const r = deploy({ ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(laufHeif("2026-09-30T10:00:00Z", "in_progress", null)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: laeuft/);
+  });
+
+  test("es zaehlt der juengste Lauf: alter gruen, neuer rot -> rot", () => {
+    const r = deploy({
+      ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(
+        laufHeif("2026-09-30T10:00:00Z", "completed", "success"),
+        laufHeif("2026-09-30T11:00:00Z", "completed", "failure")
+      ),
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Ist: failure/);
+  });
+
+  /* Befund H-10: Der dokumentierte Rueckweg (Dekoder entfernen) darf nicht am
+     Herkunftsriegel scheitern — ohne Dekoder gibt es nichts nachzuweisen. */
+  test("ohne Dekoder-Ordner (Rueckweg) gibt es nur einen Hinweis, keinen Abbruch", () => {
+    const vorher = execSync(`git -C "${klon}" rev-parse HEAD`, { encoding: "utf8" }).trim();
+    try {
+      execSync(
+        [
+          `git -C "${klon}" rm -r -q public/lib/libheif`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q -m "Rueckweg: Dekoder entfernt"`,
+          `git -C "${klon}" branch -f main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+      /* Selbst ein roter Nachbau darf hier nicht mehr zaehlen. */
+      const r = deploy({
+        ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(laufHeif("2026-09-30T10:00:00Z", "completed", "failure")),
+      });
+      expect(r.ausgabe).toMatch(/public\/lib\/libheif fehlt \(Dekoder entfernt\)/);
+      expect(r.ausgabe).not.toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist:/);
+    } finally {
+      execSync(`git -C "${klon}" reset -q --hard ${vorher} && git -C "${klon}" branch -f main ${vorher}`, {
+        stdio: "pipe",
+      });
+    }
+  });
+
+  /* Befund H-03: Ein ausbleibender Nachtlauf alarmiert niemanden — der
+     Deploy prueft deshalb das ALTER des juengsten Laufs auf main. */
+  test("zu alter Nachtlauf haelt die Auslieferung an", () => {
+    const alt = new Date(Date.now() - 30 * 3600000).toISOString();
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: JSON.stringify({ workflow_runs: [{ created_at: alt }] }) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Nachtlauf .*aelter als 26 Stunden/);
+  });
+
+  test("fehlender Nachtlauf haelt die Auslieferung an", () => {
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: JSON.stringify({ workflow_runs: [] }) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Nachtlauf .*fehlt/);
   });
 
   test("unsauberer Arbeitsbaum haelt die Auslieferung an", () => {
@@ -647,7 +711,8 @@ describe("deploy.sh — der Erfolgsweg", () => {
     expect(r.code).toBe(0);
     expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
     /* Der Herkunftsriegel hat wirklich gefragt, nicht nur geschwiegen. */
-    expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Job bauen gruen/);
+    expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen/);
+    expect(r.ausgabe).toMatch(/Nachtlauf: juengster Lauf auf main vor \d+ h/);
     /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
     expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
   });

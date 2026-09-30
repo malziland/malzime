@@ -24,10 +24,25 @@ fi
 # wie zuvor.
 case "$1" in
   api)
-    # Herkunftsnachweis des HEIC-Dekoders: Abfrage des Jobs "bauen".
-    # ATTRAPPE_LIBHEIF_BAU bestimmt die Antwort (Vorgabe: success).
+    # Herkunftsnachweis des HEIC-Dekoders und Alter des Nachtlaufs: Die
+    # Attrappe liefert API-JSON und wendet den uebergebenen jq-Ausdruck mit
+    # ECHTEM jq an (Befund H-17) — sonst bliebe genau dieser Ausdruck
+    # ungetestet. ATTRAPPE_LIBHEIF_LAEUFE / ATTRAPPE_NACHT_LAEUFE: JSON wie die
+    # API; Vorgabe ein gruener, abgeschlossener Lauf bzw. ein Lauf vor 2 h.
     case "$*" in
-      *"check_name=bauen"*) printf '%s\n' "${ATTRAPPE_LIBHEIF_BAU:-success}"; exit 0 ;;
+      *"workflows/libheif-bau.yml/runs"*|*"workflows/sicherheit-nachts.yml/runs"*)
+        JQ=""; VORIG=""
+        for a in "$@"; do [ "$VORIG" = "--jq" ] && JQ="$a"; VORIG="$a"; done
+        case "$*" in
+          *libheif-bau*)
+            if [ -n "${ATTRAPPE_LIBHEIF_LAEUFE:-}" ]; then JSON="$ATTRAPPE_LIBHEIF_LAEUFE"
+            else JSON='{"workflow_runs":[{"created_at":"2026-09-30T10:00:00Z","status":"completed","conclusion":"success"}]}'; fi ;;
+          *)
+            if [ -n "${ATTRAPPE_NACHT_LAEUFE:-}" ]; then JSON="$ATTRAPPE_NACHT_LAEUFE"
+            else JSON="{\"workflow_runs\":[{\"created_at\":\"$(node -e 'console.log(new Date(Date.now()-2*3600000).toISOString())')\"}]}"; fi ;;
+        esac
+        printf '%s' "$JSON" | jq -r "$JQ"
+        exit $? ;;
     esac
     if [ -n "${ATTRAPPE_PR_KOPF:-}" ] && [ -n "${ATTRAPPE_CHECKS_PR:-}" ]; then
       case "$*" in

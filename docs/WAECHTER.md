@@ -55,7 +55,7 @@ absichtlich das, was er bewacht, und verlangt den erwarteten Rückgabewert —
 seit Runde 8 zusätzlich einen passenden Text, weil ein abgestürzter Wächter
 sonst als „hat etwas gefunden" durchgeht.
 
-**24 Proben, elf Wächter.** Die erwartete Zahl steht im Skript und wird
+Die erwartete Zahl der Proben steht nur im Skript (`ERWARTETE_PROBEN`) und wird
 verglichen: Wer eine Probe entfernt, bekommt „nicht messbar" statt eines
 grünen Laufs. Wer eine hinzufügt, muss die Zahl hochsetzen — das ist Absicht.
 

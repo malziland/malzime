@@ -18,6 +18,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { join, resolve, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,12 +33,43 @@ const AUSGENOMMEN = [
   /node_modules/,
 ];
 
+/* Von Git ausdruecklich ignorierte Dateien sind nicht oeffentlich (lokale
+   Audit- und Sanierungsnotizen, docs/audit-*.md). Frueher zaehlten sie mit:
+   Lokal liefen dadurch zwei Pruefungen mehr als in der Pipeline, und die in
+   docs/VERIFICATION.md gestempelte Testzahl hing vom Rechner ab (gefunden
+   30.09.2026, Pruefschleife G-16). Neue, noch nicht committete Dateien bleiben
+   drin — gerade vor dem Commit soll der Waechter sie sehen. Ohne Git (Abzug per
+   git archive) gibt es keine ignorierten Dateien, dann bleibt die Liste leer. */
+const IGNORIERT = (() => {
+  /* Kein Git (Abzug per git archive): keine ignorierten Dateien, nichts zu
+     filtern. Mit Git darf die Abfrage dagegen nicht still scheitern — eine
+     leere Liste saehe aus wie "nichts ignoriert", und die Zahl wuerde wieder
+     vom Rechner abhaengen. Eingegrenzt auf die geprueften Ordner: Ohne
+     Eingrenzung liefert Git ueber 17 000 Zeilen (node_modules) und sprengte
+     den Puffer. */
+  try {
+    statSync(join(REPO, ".git"));
+  } catch (_) {
+    return new Set();
+  }
+  return new Set(
+    execFileSync(
+      "git",
+      ["-C", REPO, "ls-files", "--others", "--ignored", "--exclude-standard", "--", "docs", "public", "functions/src"],
+      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }
+    )
+      .split("\n")
+      .filter(Boolean)
+  );
+})();
+
 function dateien(wurzel, endungen) {
   const raus = [];
   for (const name of readdirSync(wurzel)) {
     const voll = join(wurzel, name);
     const rel = relative(REPO, voll);
     if (AUSGENOMMEN.some((m) => m.test(rel))) continue;
+    if (IGNORIERT.has(rel)) continue;
     if (statSync(voll).isDirectory()) raus.push(...dateien(voll, endungen));
     else if (endungen.some((e) => name.endsWith(e))) raus.push(rel);
   }

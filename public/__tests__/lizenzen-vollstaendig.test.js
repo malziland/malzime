@@ -141,28 +141,37 @@ describe("Fremde Bestandteile: Lizenzen", () => {
     libde265: { datei: "public/lib/libheif/VERSION", zeile: /^libde265 (\d+\.\d+\.\d+)/m },
   };
   const NENNUNGEN = ["THIRD-PARTY.md", "README.md", "public/impressum.html", "public/en/legal-notice.html"];
+  /* Hier MUSS jede Bibliothek mit Version stehen (Lizenzangabe). Die README
+     nennt exifr bewusst ohne Version — dort wird nur geprüft, was genannt ist
+     (Befund G-06: die Positivkontrolle zählte früher über alle Dateien
+     zusammen und merkte nicht, dass THIRD-PARTY.md nie getroffen wurde). */
+  const PFLICHT_MIT_VERSION = ["THIRD-PARTY.md", "public/impressum.html", "public/en/legal-notice.html"];
 
   it.each(Object.keys(KANONISCH))("%s: jede genannte Version passt zur VERSION-Datei", (name) => {
     const { datei, zeile } = KANONISCH[name];
     const treffer = zeile.exec(fs.readFileSync(path.join(REPO, datei), "utf8"));
     expect(treffer, `${datei}: keine Zeile „${name} x.y.z"`).not.toBeNull();
     const version = treffer[1];
-    let nennungen = 0;
     for (const rel of NENNUNGEN) {
       const text = fs.readFileSync(path.join(REPO, rel), "utf8");
+      let nennungen = 0;
       /* „exifr 7.1" im Impressum ist eine erlaubte Kurzform von 7.1.3 — die
-         Nennung muss ein Anfang der kanonischen Version sein. */
-      for (const m of text.matchAll(new RegExp(`\\b${name} (\\d+(?:\\.\\d+){0,2})\\b`, "g"))) {
+         Nennung muss ein Anfang der kanonischen Version sein. In THIRD-PARTY.md
+         steht der Name als Link: „[libheif](https://…) 1.23.5". */
+      const muster = new RegExp(`\\b${name}(?:\\]\\([^)]*\\))? (\\d+(?:\\.\\d+){0,2})\\b`, "g");
+      for (const m of text.matchAll(muster)) {
         nennungen++;
         expect(
           version === m[1] || version.startsWith(m[1] + "."),
           `${rel} nennt ${name} ${m[1]}, ausgeliefert wird ${version} (${datei})`
         ).toBe(true);
       }
+      /* Positivkontrolle je Datei: Wo die Version stehen muss, muss die Suche
+         sie auch finden — sonst prüfte dieser Test dort nichts. */
+      if (PFLICHT_MIT_VERSION.includes(rel)) {
+        expect(nennungen, `${rel}: keine Versionsnennung für ${name} gefunden`).toBeGreaterThan(0);
+      }
     }
-    /* Positivkontrolle: Die Suche muss überhaupt etwas finden, sonst prüfte
-       dieser Test nichts. */
-    expect(nennungen, `${name}: in ${NENNUNGEN.join(", ")} keine Versionsnennung gefunden`).toBeGreaterThan(0);
   });
 
   it("die eigene MIT-Lizenz nennt die Ausnahmen nicht stillschweigend", () => {

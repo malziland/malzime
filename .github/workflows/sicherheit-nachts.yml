@@ -27,9 +27,13 @@ on:
   schedule:
     - cron: "43 3 * * *" # taeglich 03:43 UTC, vor dem Arbeitstag in Wien
   workflow_dispatch:
-  # Aenderungen an den Pruefungen selbst werden sofort ausprobiert, nicht erst
-  # in der naechsten Nacht.
+  # Aenderungen an den Pruefungen selbst werden auf ihrem Zweig sofort
+  # ausprobiert, nicht erst in der naechsten Nacht. Nicht auf main: Dort liefe
+  # der Lauf direkt beim Zusammenfuehren, noch bevor die Pipeline des neuen
+  # Standes fertig ist — der Job abkuendigungen laese dann die Hinweise des
+  # VORIGEN Standes und schluege falschen Alarm (Befund G-14, 30.09.2026).
   push:
+    branches-ignore: [main]
     paths:
       - scripts/audit-gate.mjs
       - scripts/pruefe-fremd-meldungen.mjs

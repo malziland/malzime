@@ -65,7 +65,7 @@ jobs:
         with:
           name: libheif-bau
           path: ${{ runner.temp }}/ergebnis
-          retention-days: 14
+          retention-days: 90
           if-no-files-found: error
 
   kontrollbau:

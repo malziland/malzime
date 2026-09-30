@@ -62,6 +62,13 @@ ALT_LIBDE265_VERSION="1.0.15"
 ALT_LIBDE265_SHA256="00251986c29d34d3af7117ed05874950c875dd9292d016be29d3b3762666511d"
 # Pruefsumme der bis 30.09.2026 ausgelieferten libheif.wasm (npm libheif-js 1.23.2).
 ALT_WASM_SHA256="e4aa8333fbe55ec7c6c776f735236f40bed9103188498f8131d4e52b73cdfee8"
+# libheif.js des Kontrollbaus. Das Fertigpaket hatte seine JS-Datei nachtraeglich
+# mit esbuild umgeschrieben; eine Vergleichsdatei von dort gibt es also nicht.
+# Diese Summe ist deshalb kein Gleichheitsbeweis, sondern ein Driftmelder: In
+# drei Laeufen am 30.09.2026 (36720408925, 36723113379, 36723169462) war sie
+# gleich. Aendert sie sich, hat sich die Bauumgebung (Emscripten-Download,
+# Runner-Abbild) veraendert.
+ALT_KONTROLL_JS_SHA256="fb707a7e820e5668eed8426e06b837782729f955900293f7cbca300c27220ed6"
 
 # ── Aufruf ───────────────────────────────────────────────────────────────────
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
@@ -149,10 +156,16 @@ if [ "$KONTROLLE" = "0" ]; then
   # CMAKE_*_FLAGS_RELEASE=-O3 statt des cmake-Standards "-O3 -DNDEBUG": Der
   # autotools-Bau setzte kein NDEBUG, die internen Pruefungen (assert) von
   # libde265 blieben aktiv. Das behalten wir bei.
+  # -ffile-prefix-map: Jede aktive Pruefung traegt ihren Quelldateinamen im
+  # Ergebnis. cmake reicht absolute Pfade an den Compiler weiter, der Bauordner
+  # hat einen zufaelligen Namen (mktemp) — ohne Umschreibung stuende er 22-mal in
+  # libheif.wasm, und jeder Bau ergaebe eine andere Datei (Befund G-01 der
+  # Pruefschleife vom 30.09.2026). Mit der Umschreibung steht dort
+  # "libde265-1.1.3/libde265/sps.cc", wie beim autotools-Weg nur relative Namen.
   emcmake cmake -S "$DE265_QUELLE" -B "$DE265_BAU" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_FLAGS_RELEASE=-O3 \
-    -DCMAKE_CXX_FLAGS_RELEASE=-O3 \
+    -DCMAKE_C_FLAGS_RELEASE="-O3 -ffile-prefix-map=$ARBEIT/=" \
+    -DCMAKE_CXX_FLAGS_RELEASE="-O3 -ffile-prefix-map=$ARBEIT/=" \
     -DBUILD_SHARED_LIBS=OFF \
     -DENABLE_SDL=OFF \
     -DENABLE_SIMD=OFF \
@@ -206,6 +219,18 @@ for v in "$LIBDE265_VERSION" "$LIBHEIF_VERSION"; do
     exit 1
   fi
 done
+# Kein Bauordner im Ergebnis: Stuende der (zufaellige) Pfad darin, liesse sich
+# der Bau nicht Byte fuer Byte wiederholen, und der Vergleich im Workflow
+# koennte nie gruen werden. Geprueft wird der Pfad in beiden Schreibweisen
+# (unter macOS zeigt /var auf /private/var).
+ARBEIT_ECHT="$(cd "$ARBEIT" && pwd -P)"
+for f in libheif.js libheif.wasm; do
+  if grep -aqF "$ARBEIT" "$QUELLE/$f" || grep -aqF "$ARBEIT_ECHT" "$QUELLE/$f"; then
+    echo "FEHLER: $f enthaelt den Bauordner ($ARBEIT) — der Bau waere nicht nachbaubar." >&2
+    exit 1
+  fi
+done
+
 # Kein eval im erzeugten Code: Die Sicherheitsrichtlinie der Seite verbietet es,
 # der Dekoder wuerde sonst im Browser still scheitern.
 if grep -qE '(^|[^A-Za-z_.])eval\(|new Function\(' "$QUELLE/libheif.js"; then
@@ -221,12 +246,22 @@ echo "libheif $LIBHEIF_VERSION, libde265 $LIBDE265_VERSION, Emscripten $EMSDK_VE
 
 if [ "$KONTROLLE" = "1" ]; then
   IST="$(sha256 "$ZIEL/libheif.wasm")"
+  IST_JS="$(sha256 "$ZIEL/libheif.js")"
   if [ "$IST" = "$ALT_WASM_SHA256" ]; then
     echo "KONTROLLBAU: libheif.wasm ist Byte fuer Byte gleich der bisher ausgelieferten Datei."
   else
     echo "KONTROLLBAU: libheif.wasm WEICHT von der bisher ausgelieferten Datei ab." >&2
     echo "  bisher:   $ALT_WASM_SHA256" >&2
     echo "  Kontroll: $IST" >&2
+    exit 1
+  fi
+  if [ "$IST_JS" = "$ALT_KONTROLL_JS_SHA256" ]; then
+    echo "KONTROLLBAU: libheif.js unveraendert gegenueber den Kontrollbauten vom 30.09.2026."
+  else
+    echo "KONTROLLBAU: libheif.js hat sich gegenueber den Kontrollbauten vom 30.09.2026 veraendert —" >&2
+    echo "  die Bauumgebung ist nicht mehr dieselbe. Erst klaeren, dann neu ausliefern." >&2
+    echo "  bisher:   $ALT_KONTROLL_JS_SHA256" >&2
+    echo "  Kontroll: $IST_JS" >&2
     exit 1
   fi
 fi

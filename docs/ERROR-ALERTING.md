@@ -212,6 +212,32 @@ zweite (nach der Aktualisierung des ntfy-Servers auf v2.27.0) als **Push in
 der ntfy-App**. Damit ist jeder der beiden Wege einzeln nachgewiesen, nicht
 nur eingerichtet.
 
+## Dritter Kanal: Nachtlauf „Sicherheit nachts" (seit 2026-09-30)
+
+Nicht aus Google Cloud, sondern aus GitHub: Der Workflow
+`.github/workflows/sicherheit-nachts.yml` prüft täglich um 03:43 UTC auf neue
+Sicherheitslücken (npm-Pakete, Herstellermeldungen zu `public/lib`) und auf
+Abkündigungshinweise von GitHub. Ist auf `main` einer seiner Prüf-Jobs rot, schickt
+der Job `alarm` einen **ntfy-Push mit Stufe „urgent" (5)** an denselben ntfy-Server
+und dasselbe Thema wie die übrigen Alarme.
+
+- **Warum Stufe 5:** Niedrigere Stufen landen je nach Handy-Einstellung still in der
+  App. Stufe 5 erscheint als sichtbare Meldung. Zustellung eines Probealarms mit
+  Stufe 5 am 30.09.2026 vom Empfänger bestätigt.
+- **Warum nicht nur die GitHub-Mail:** GitHub-Benachrichtigungen werden beim
+  Empfänger automatisch gelöscht; eine Warnung per Mail käme also nie an.
+- **Zugangsdaten:** GitHub-Secrets `NTFY_URL_EU` und `NTFY_TOPIC_EU` (gesetzt am
+  30.09.2026 aus den gleichnamigen Werten im Secret Manager von `malzime`). Sie
+  stehen nie im Repository. Fehlen sie, wird der Job `alarm` rot und meldet das.
+- **Probe von Hand** (nach jeder Änderung am Alarmweg, und sobald der Workflow auf
+  `main` liegt): `gh workflow run sicherheit-nachts.yml -f alarmprobe=true` — schickt
+  „malziME PROBE: Sicherheit nachts", auch wenn alles grün ist. Kommt die Meldung
+  nicht als sichtbare Benachrichtigung an, ist der Kanal gestört.
+- **Nur `main`:** Läufe auf Arbeitszweigen alarmieren nicht.
+
+Was bei einem roten Nachtlauf zu tun ist: `docs/RUNBOOK.md`, Abschnitt
+„Nachtlauf Sicherheit nachts rot".
+
 ## Was passiert dann?
 
 - Loggt eine Function einen Fehler, kommt eine Benachrichtigung — bei malziME

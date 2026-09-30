@@ -75,23 +75,33 @@ async function github(pfad) {
 }
 
 /* Je Workflow der letzte abgeschlossene Lauf auf main, mit allen Hinweisen
-   aller seiner Jobs. */
+   aller seiner Jobs. Gefragt wird JEDER Workflow einzeln (Befund G-11): Die
+   frueher genutzte Liste der 50 juengsten Laeufe enthielt nur die haeufigen
+   Workflows, seltene (libheif-Bau) fielen heraus, ohne dass es jemand sah.
+   Abgebrochene und uebersprungene Laeufe zaehlen nicht als "letzter Lauf". */
 async function laeufeLesen() {
   if (process.env.ABKUENDIGUNG_DATEN) {
     try {
-      return JSON.parse(readFileSync(process.env.ABKUENDIGUNG_DATEN, "utf8"));
+      return { laeufe: JSON.parse(readFileSync(process.env.ABKUENDIGUNG_DATEN, "utf8")), ungesehen: [] };
     } catch (fehler) {
       throw new Messfehler(`${process.env.ABKUENDIGUNG_DATEN} unlesbar: ${fehler.message}`);
     }
   }
   const repo = repoName();
-  const liste = await github(`/repos/${repo}/actions/runs?branch=main&status=completed&per_page=50`);
-  const letzte = new Map();
-  for (const lauf of liste.workflow_runs || []) {
-    if (!letzte.has(lauf.workflow_id)) letzte.set(lauf.workflow_id, lauf);
+  const workflows = await github(`/repos/${repo}/actions/workflows?per_page=100`);
+  const letzte = [];
+  const ungesehen = [];
+  for (const wf of workflows.workflows || []) {
+    if (wf.state !== "active") continue;
+    const liste = await github(
+      `/repos/${repo}/actions/workflows/${wf.id}/runs?branch=main&status=completed&per_page=10`
+    );
+    const lauf = (liste.workflow_runs || []).find((l) => !["cancelled", "skipped"].includes(l.conclusion));
+    if (lauf) letzte.push(lauf);
+    else ungesehen.push(wf.name);
   }
   const ergebnis = [];
-  for (const lauf of letzte.values()) {
+  for (const lauf of letzte) {
     const jobs = await github(`/repos/${repo}/actions/runs/${lauf.id}/jobs?per_page=100`);
     const hinweise = [];
     for (const job of jobs.jobs || []) {
@@ -100,7 +110,7 @@ async function laeufeLesen() {
     }
     ergebnis.push({ lauf: `${lauf.name} #${lauf.run_number} (${lauf.head_sha.slice(0, 7)})`, hinweise });
   }
-  return ergebnis;
+  return { laeufe: ergebnis, ungesehen };
 }
 
 function ausnahmenLesen() {
@@ -115,8 +125,16 @@ function ausnahmenLesen() {
 
 const PFLICHTFELDER = ["muster", "grund", "eingetragen", "pruefen_bis"];
 
+/* Befund G-04 (30.09.2026): Ablaufdatum nur in der Form JJJJ-MM-TT, sonst
+   liefe es im Zeichenkettenvergleich nie ab (vgl. OSS-2026-08-12-21). */
+export function datumGueltig(text) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(text || ""))) return false;
+  const wert = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(wert.getTime()) && wert.toISOString().slice(0, 10) === text;
+}
+
 async function main() {
-  const laeufe = await laeufeLesen();
+  const { laeufe, ungesehen } = await laeufeLesen();
   /* Kein einziger Lauf gelesen heisst nicht "keine Hinweise", sondern
      "nicht gemessen" (KERN 5c). */
   if (!Array.isArray(laeufe) || laeufe.length === 0) {
@@ -128,6 +146,11 @@ async function main() {
   for (const a of ausnahmen) {
     const fehlt = PFLICHTFELDER.filter((f) => !a[f]);
     if (fehlt.length) befunde.push(`AUSNAHME UNGUELTIG  "${a.muster || "?"}": es fehlt ${fehlt.join(", ")}`);
+    else if (!datumGueltig(a.pruefen_bis)) {
+      befunde.push(
+        `AUSNAHME UNGUELTIG  "${a.muster}": pruefen_bis "${a.pruefen_bis}" ist kein Datum der Form JJJJ-MM-TT`
+      );
+    }
   }
   const gesehen = new Set();
   let gelesen = 0;
@@ -140,7 +163,11 @@ async function main() {
       if (gesehen.has(text)) continue;
       gesehen.add(text);
       const ausnahme = ausnahmen.find(
-        (a) => PFLICHTFELDER.every((f) => a[f]) && text.includes(a.muster) && a.pruefen_bis >= HEUTE
+        (a) =>
+          PFLICHTFELDER.every((f) => a[f]) &&
+          datumGueltig(a.pruefen_bis) &&
+          text.includes(a.muster) &&
+          a.pruefen_bis >= HEUTE
       );
       const zeile = `${String(h.annotation_level || "?").toUpperCase()}  ${lauf}: ${text.slice(0, 300)}`;
       if (ausnahme) hinweise.push(`${zeile}\n      ausgenommen bis ${ausnahme.pruefen_bis}: ${ausnahme.grund}`);
@@ -148,6 +175,9 @@ async function main() {
     }
   }
   console.log(`Gelesen: ${laeufe.length} Lauf/Laeufe auf main, ${gelesen} Hinweis(e), Stand ${HEUTE}`);
+  if (ungesehen.length) {
+    console.log(`Ohne abgeschlossenen Lauf auf main (nicht geprueft): ${ungesehen.join(", ")}`);
+  }
   for (const h of hinweise) console.log(`  [Ausnahme] ${h}`);
   if (befunde.length === 0) {
     console.log("ERGEBNIS: kein offener Abkuendigungs- oder Fristhinweis.");

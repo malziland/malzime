@@ -52,6 +52,8 @@ function meldungen(ueberschreibung = {}, { exifr = "7.1.3", leaflet = "1.9.4" } 
     "repo:strukturag/libde265": [],
     [`npm:leaflet@${leaflet}`]: [],
     [`npm:exifr@${exifr}`]: [],
+    "npm-paket:leaflet": true,
+    "npm-paket:exifr": true,
     ...ueberschreibung,
   };
   const p = path.join(basis, "meldungen.json");
@@ -163,6 +165,31 @@ describe("pruefe-fremd-meldungen: Versionsangaben der Hersteller", () => {
     expect(r.aus).toContain("UNKLAR  libheif 1.23.5  GHSA-f");
   });
 
+  test("G-03: nackte Fundversion unter unserer, ohne Reparatur: unklar = rot", () => {
+    /* libheif schreibt "1.17.0" im Sinn von "gefunden in"; ohne Reparaturangabe
+       lässt sich für eine spätere Version nichts ausschließen. */
+    const m = { "repo:strukturag/libheif": [meldung("GHSA-k", "1.23.4", "")] };
+    versionen({ libheif: "1.23.5" });
+    const r = lauf({ meldungenPfad: meldungen(m) });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("UNKLAR  libheif 1.23.5  GHSA-k");
+  });
+
+  test("G-03: Reparatur in mehreren Linien — es zählt nur unsere Linie (Haupt- und Nebenversion)", () => {
+    versionen({ libheif: "1.23.5" });
+    /* Reparatur in 1.17.7 (fremde Linie) und 1.23.6 (unsere Linie, über uns): betroffen. */
+    const betroffen = { "repo:strukturag/libheif": [meldung("GHSA-l", "<= 1.23.5", "1.17.7, 1.23.6")] };
+    const r1 = lauf({ meldungenPfad: meldungen(betroffen) });
+    expect(r1.code).toBe(1);
+    expect(r1.aus).toContain("BETROFFEN  libheif 1.23.5  GHSA-l");
+    /* Reparatur unserer Linie liegt auf oder unter uns: nicht betroffen. */
+    const behoben = { "repo:strukturag/libheif": [meldung("GHSA-l", ">= 1.20.0", "1.17.7, 1.23.5")] };
+    expect(lauf({ meldungenPfad: meldungen(behoben) }).code).toBe(0);
+    /* Nur fremde Linien genannt, Bereich schließt uns ein: betroffen. */
+    const fremd = { "repo:strukturag/libheif": [meldung("GHSA-l", "<= 1.23.5", "1.17.7, 1.22.9")] };
+    expect(lauf({ meldungenPfad: meldungen(fremd) }).code).toBe(1);
+  });
+
   test("Meldung ohne Einträge: unklar = rot", () => {
     const leer = { ...meldung("GHSA-g", "", ""), vulnerabilities: [] };
     versionen();
@@ -175,6 +202,13 @@ describe("pruefe-fremd-meldungen: Versionsangaben der Hersteller", () => {
     };
     versionen();
     expect(lauf({ meldungenPfad: meldungen(m) }).code).toBe(0);
+  });
+
+  test("G-09: npm-Paket gibt es nicht — 2, nicht grün (eine leere Antwort hieße sonst 'sauber')", () => {
+    versionen();
+    const r = lauf({ meldungenPfad: meldungen({ "npm-paket:leaflet": false }) });
+    expect(r.code).toBe(2);
+    expect(r.fehler).toContain('npm-Paket "leaflet" gibt es nicht');
   });
 
   test("Treffer aus der npm-Datenbank zählt als betroffen", () => {
@@ -191,6 +225,7 @@ describe("pruefe-fremd-meldungen: Ausnahmen", () => {
   const eintrag = {
     ghsa: "GHSA-j",
     bibliothek: "libheif",
+    version: "1.23.5",
     grund: "am Quelltext belegt",
     eingetragen: "2026-09-30",
     pruefen_bis: "2027-03-31",
@@ -219,6 +254,36 @@ describe("pruefe-fremd-meldungen: Ausnahmen", () => {
     expect(r.code).toBe(1);
   });
 
+  test("G-04: Ablaufdatum in anderer Schreibweise ist ungültig und läuft nicht ewig", () => {
+    versionen();
+    const r = lauf({
+      meldungenPfad: meldungen(unklar),
+      ausnahmenPfad: ausnahmen([{ ...eintrag, pruefen_bis: "31.12.2026" }]),
+      heute: "2099-01-01",
+    });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("AUSNAHME UNGUELTIG");
+    expect(r.aus).not.toContain("[Ausnahme]");
+  });
+
+  test("G-04: unmögliches Datum (2027-02-30) ist ungültig", () => {
+    versionen();
+    const r = lauf({
+      meldungenPfad: meldungen(unklar),
+      ausnahmenPfad: ausnahmen([{ ...eintrag, pruefen_bis: "2027-02-30" }]),
+    });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("AUSNAHME UNGUELTIG");
+  });
+
+  test("G-12: Ausnahme gilt nur für die Version, an der sie begründet ist", () => {
+    versionen({ libheif: "1.23.6" });
+    const r = lauf({ meldungenPfad: meldungen(unklar), ausnahmenPfad: ausnahmen([eintrag]) });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("UNKLAR  libheif 1.23.6  GHSA-j");
+    expect(r.aus).not.toContain("[Ausnahme]");
+  });
+
   test("Ausnahme ohne Begründung ist ungültig", () => {
     versionen();
     const r = lauf({
@@ -232,7 +297,7 @@ describe("pruefe-fremd-meldungen: Ausnahmen", () => {
   test("die echte Ausnahmeliste ist vollständig ausgefüllt", () => {
     const echt = JSON.parse(fs.readFileSync(path.join(REPO, ".github/fremd-meldungen-ausnahmen.json"), "utf8"));
     for (const a of echt.ausnahmen) {
-      for (const feld of ["ghsa", "bibliothek", "grund", "eingetragen", "pruefen_bis"]) {
+      for (const feld of ["ghsa", "bibliothek", "version", "grund", "eingetragen", "pruefen_bis"]) {
         expect(a[feld]).toBeTruthy();
       }
       expect(a.pruefen_bis).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -247,6 +312,20 @@ describe("pruefe-fremd-meldungen: Deckung und Messfehler", () => {
     const r = lauf({ meldungenPfad: meldungen() });
     expect(r.code).toBe(1);
     expect(r.aus).toContain("UNGEDECKT  public/lib/neu");
+  });
+
+  test("G-13: einzeln abgelegte Datei unter public/lib ohne Beobachtung: rot", () => {
+    versionen();
+    fs.writeFileSync(path.join(basis, "public/lib/fremd-bibliothek.min.js"), "/* fremd */\n");
+    const r = lauf({ meldungenPfad: meldungen() });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("UNGEDECKT  public/lib/fremd-bibliothek.min.js");
+  });
+
+  test("G-13: die eigene Prüfsummen-Datei ist kein Fremdcode", () => {
+    versionen();
+    fs.writeFileSync(path.join(basis, "public/lib/PRUEFSUMMEN.json"), "{}\n");
+    expect(lauf({ meldungenPfad: meldungen() }).code).toBe(0);
   });
 
   test("VERSION-Zeile nicht lesbar: 2, nicht grün", () => {

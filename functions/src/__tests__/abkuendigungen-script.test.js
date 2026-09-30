@@ -103,6 +103,17 @@ test("nach dem Ablaufdatum: wieder rot", () => {
   expect(r.code).toBe(1);
 });
 
+test("G-04: Ablaufdatum in anderer Schreibweise ist ungültig und läuft nicht ewig", () => {
+  const r = lauf({
+    datenPfad: daten([{ lauf: "CI #903", hinweise: [{ annotation_level: "notice", message: UBUNTU }] }]),
+    ausnahmenPfad: ausnahmen([{ ...ubuntuAusnahme, pruefen_bis: "20.11.2026" }]),
+    heute: "2099-01-01",
+  });
+  expect(r.code).toBe(1);
+  expect(r.aus).toContain("AUSNAHME UNGUELTIG");
+  expect(r.aus).not.toContain("[Ausnahme]");
+});
+
 test("Ausnahme ohne Begründung ist ungültig", () => {
   const r = lauf({
     datenPfad: daten([{ lauf: "CI #903", hinweise: [] }]),

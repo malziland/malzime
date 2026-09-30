@@ -9,9 +9,13 @@ name: Sicherheit nachts
 # standen ungelesen an gruenen Laeufen. Befunde OSS-2026-09-30-01/-02/-06,
 # OPS-2026-09-30-03.
 #
-# ALARM: Ein roter Lauf dieses Workflows loest die Benachrichtigung von GitHub
-# aus (bei geplanten Laeufen an die Person, die den Zeitplan zuletzt geaendert
-# hat). Drei getrennte Jobs, damit sofort sichtbar ist, WELCHE Pruefung rot ist.
+# ALARM: Ist auf main einer der drei Jobs rot, schickt der Job `alarm` einen
+# ntfy-Push aufs Handy, Stufe "urgent" (5) — nur so erscheint er als sichtbare
+# Meldung, nicht still in der App. Die Mail von GitHub allein reicht nicht: Sie
+# wird beim Empfaenger automatisch geloescht (Befund G-05, 30.09.2026; Zustellung
+# eines Probealarms mit Stufe 5 am selben Tag bestaetigt). Adresse und Thema
+# liegen als GitHub-Secrets NTFY_URL_EU / NTFY_TOPIC_EU vor, nie im Repository.
+# Drei getrennte Jobs, damit sofort sichtbar ist, WELCHE Pruefung rot ist.
 # Was bei Rot zu tun ist: docs/RUNBOOK.md, Abschnitt "Nachtlauf Sicherheit rot".
 
 permissions:
@@ -27,6 +31,11 @@ on:
   schedule:
     - cron: "43 3 * * *" # taeglich 03:43 UTC, vor dem Arbeitstag in Wien
   workflow_dispatch:
+    inputs:
+      alarmprobe:
+        description: "Probealarm senden, auch wenn alles gruen ist (prueft den Weg aufs Handy)"
+        type: boolean
+        default: false
   # Aenderungen an den Pruefungen selbst werden auf ihrem Zweig sofort
   # ausprobiert, nicht erst in der naechsten Nacht. Nicht auf main: Dort liefe
   # der Lauf direkt beim Zusammenfuehren, noch bevor die Pipeline des neuen
@@ -76,3 +85,42 @@ jobs:
       - run: node scripts/pruefe-abkuendigungen.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  alarm:
+    # Nur auf main (Zeitplan oder Handstart): Probelaeufe auf Zweigen sollen
+    # niemanden wecken. always(), damit der Job auch dann entschieden wird, wenn
+    # ein Vorgaenger rot ist.
+    needs: [npm-luecken, mitgelieferte-bibliotheken, abkuendigungen]
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      (contains(needs.*.result, 'failure') || inputs.alarmprobe == true)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push an ntfy (Stufe urgent)
+        env:
+          NTFY_URL: ${{ secrets.NTFY_URL_EU }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC_EU }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          NPM: ${{ needs.npm-luecken.result }}
+          BIBLIOTHEKEN: ${{ needs.mitgelieferte-bibliotheken.result }}
+          ABKUENDIGUNGEN: ${{ needs.abkuendigungen.result }}
+          PROBE: ${{ inputs.alarmprobe }}
+        run: |
+          if [ -z "$NTFY_URL" ] || [ -z "$NTFY_TOPIC" ]; then
+            echo "::error::Secrets NTFY_URL_EU / NTFY_TOPIC_EU fehlen — der Alarm kann nicht hinaus."
+            exit 1
+          fi
+          if [ "$PROBE" = "true" ]; then
+            TITEL="malziME PROBE: Sicherheit nachts"
+            TEXT="Probealarm von Hand. npm: $NPM, Bibliotheken: $BIBLIOTHEKEN, Abkuendigungen: $ABKUENDIGUNGEN."
+          else
+            TITEL="malziME: Sicherheit nachts ROT"
+            TEXT="npm: $NPM, Bibliotheken: $BIBLIOTHEKEN, Abkuendigungen: $ABKUENDIGUNGEN. Was tun: docs/RUNBOOK.md, Nachtlauf rot."
+          fi
+          BODY=$(jq -n --arg t "$NTFY_TOPIC" --arg ti "$TITEL" --arg m "$TEXT" --arg c "$LAUF" \
+            '{topic: $t, title: $ti, message: $m, priority: 5, tags: ["rotating_light"], click: $c}')
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X POST \
+            -H 'Content-Type: application/json; charset=utf-8' --data "$BODY" "$NTFY_URL")
+          echo "ntfy antwortete HTTP $CODE"
+          # Nur 200 heisst: angenommen. Alles andere macht diesen Job rot.
+          [ "$CODE" = "200" ]

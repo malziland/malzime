@@ -69,6 +69,10 @@ export const BIBLIOTHEKEN = {
 export const OHNE_CODE = {
   "public/fonts/poppins": "Schriftdateien (woff2), kein ausfuehrbarer Code",
 };
+/* Eigene Erzeugnisse direkt in den Fremd-Ordnern, kein Fremdcode. */
+export const EIGENE_DATEIEN = {
+  "public/lib/PRUEFSUMMEN.json": "von scripts/pruefe-fremddateien.mjs erzeugt",
+};
 const BEREICHE = ["public/lib", "public/fonts"];
 
 /* ── Versionen vergleichen ────────────────────────────────────────────────── */
@@ -108,9 +112,12 @@ function erfuellt(version, { op, version: grenze }) {
 }
 
 /* Behobene Versionen wie "1.23.3", "v1.22.0", ">= 1.0.17", "2.1.7, 5.0.12".
-   Unsere Version gilt als behoben, wenn eine Angabe mit derselben
-   Hauptversion kleiner/gleich ist — oder, bei genau einer Angabe, wenn sie
-   kleiner/gleich ist. Liefert null, wenn nichts lesbar ist. */
+   Bei genau einer Angabe: behoben, wenn unsere Version darauf oder darueber
+   liegt. Bei mehreren (Reparatur in mehreren Versionslinien) zaehlt nur die
+   Angabe derselben Linie, also gleiche Haupt- UND Nebenversion — bei libheif
+   und libde265 ist alles 1.x, die Hauptversion allein unterscheidet nichts
+   (Befund G-03, 30.09.2026). Gibt es keine Angabe unserer Linie, ist das
+   unklar (null). Liefert null auch, wenn nichts lesbar ist. */
 export function behoben(version, behobenText) {
   if (!behobenText || !String(behobenText).trim()) return null;
   const angaben = String(behobenText)
@@ -119,7 +126,9 @@ export function behoben(version, behobenText) {
     .filter(Boolean);
   if (angaben.length === 0) return null;
   if (angaben.length === 1) return vergleiche(version, angaben[0]) >= 0;
-  return angaben.some((p) => p[0] === version[0] && vergleiche(version, p) >= 0);
+  const linie = angaben.filter((p) => p[0] === version[0] && p[1] === version[1]);
+  if (linie.length === 0) return null;
+  return linie.some((p) => vergleiche(version, p) >= 0);
 }
 
 /* Ein Eintrag einer Meldung (Bereich + behobene Version) gegen unsere Version. */
@@ -138,6 +147,12 @@ export function bewerte(versionText, bereich, behobenText) {
         (b) => b.op === ">=" || b.op === ">" || (b.op.startsWith("=") && vergleiche(version, b.version) < 0)
       );
       if (darunter) return "nicht betroffen";
+      /* Eine einzelne nackte Version ("1.17.0") meint bei libheif "gefunden in",
+         nicht "nur dort". Liegt unsere Version darueber und ist keine Reparatur
+         genannt, laesst sich nichts ausschliessen (Befund G-03). */
+      if (bedingungen.length === 1 && bedingungen[0].op.startsWith("=") && istBehoben !== true) {
+        return "unklar";
+      }
       /* Liegt sie DARUEBER, die Reparatur aber noch hoeher, widersprechen sich
          die Angaben (bei libheif mehrfach so gemeldet, etwa Bereich "1.17.0",
          repariert in 1.23.3). Welche stimmt, kann das Skript nicht wissen; ein
@@ -213,7 +228,33 @@ async function repoMeldungen(repo) {
   return github(`/repos/${repo}/security-advisories?state=published&per_page=100`);
 }
 
+/* Die Advisory-Datenbank antwortet auf ein Paket, das es gar nicht gibt
+   (Tippfehler, umbenannt), genauso mit einer leeren Liste wie auf ein sauberes.
+   Deshalb vorher die Existenz pruefen — leer darf nur "keine Meldung" heissen
+   (Befund G-09). */
+async function npmPaketExistiert(paket) {
+  if (festeMeldungen) {
+    const eintrag = festeMeldungen[`npm-paket:${paket}`];
+    if (typeof eintrag !== "boolean") throw new Messfehler(`keine Testdaten fuer npm-paket:${paket}`);
+    return eintrag;
+  }
+  let antwort;
+  try {
+    antwort = await fetch(`https://registry.npmjs.org/${encodeURIComponent(paket)}`, {
+      headers: { Accept: "application/vnd.npm.install-v1+json" },
+    });
+  } catch (fehler) {
+    throw new Messfehler(`Netzfehler bei der npm-Registry (${paket}): ${fehler.message}`);
+  }
+  if (antwort.status === 404) return false;
+  if (!antwort.ok) throw new Messfehler(`npm-Registry antwortete ${antwort.status} fuer ${paket}`);
+  return true;
+}
+
 async function npmMeldungen(paket, version) {
+  if (!(await npmPaketExistiert(paket))) {
+    throw new Messfehler(`npm-Paket "${paket}" gibt es nicht — die Abfrage waere leer, ohne etwas zu pruefen`);
+  }
   if (festeMeldungen) {
     const eintrag = festeMeldungen[`npm:${paket}@${version}`];
     if (!Array.isArray(eintrag)) throw new Messfehler(`keine Testdaten fuer npm:${paket}@${version}`);
@@ -236,7 +277,20 @@ function ausnahmenLesen() {
   return Array.isArray(daten.ausnahmen) ? daten.ausnahmen : [];
 }
 
-const PFLICHTFELDER = ["ghsa", "bibliothek", "grund", "eingetragen", "pruefen_bis"];
+/* "version": Eine Ausnahme ist am Quelltext EINER Version begruendet und gilt
+   nur fuer sie (Befund G-12). Nach einem Neubau mit anderer Version zaehlt die
+   Meldung wieder, bis jemand sie an der neuen Version geprueft hat. */
+const PFLICHTFELDER = ["ghsa", "bibliothek", "version", "grund", "eingetragen", "pruefen_bis"];
+
+/* Befund G-04 (30.09.2026), dieselbe Fehlerklasse wie OSS-2026-08-12-21 im
+   Audit-Gate: Das Ablaufdatum wird als Zeichenkette verglichen. "31.12.2026"
+   waere als Text groesser als jedes "20xx-"-Datum und liefe nie ab. Deshalb
+   Form und Gueltigkeit pruefen; ein fehlerhafter Eintrag ist ungueltig. */
+export function datumGueltig(text) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(text || ""))) return false;
+  const wert = new Date(`${text}T00:00:00Z`);
+  return !Number.isNaN(wert.getTime()) && wert.toISOString().slice(0, 10) === text;
+}
 
 /* ── Lauf ─────────────────────────────────────────────────────────────────── */
 
@@ -250,24 +304,37 @@ async function main() {
     if (!existsSync(wurzel)) continue;
     for (const name of readdirSync(wurzel)) {
       const rel = `${bereich}/${name}`;
-      if (name.startsWith(".") || !statSync(join(wurzel, name)).isDirectory()) continue;
+      if (name.startsWith(".") || EIGENE_DATEIEN[rel]) continue;
+      /* Auch eine einzeln abgelegte Datei (public/lib/irgendwas.min.js) ist
+         mitgelieferter Fremdcode und braucht eine Beobachtung (Befund G-13). */
       if (!BIBLIOTHEKEN[rel] && !OHNE_CODE[rel]) {
-        befunde.push(`UNGEDECKT  ${rel}: mitgeliefert, aber von keiner Pruefung beobachtet`);
+        const art = statSync(join(wurzel, name)).isDirectory() ? "Ordner" : "Datei";
+        befunde.push(`UNGEDECKT  ${rel}: mitgelieferte(r) ${art}, aber von keiner Pruefung beobachtet`);
       }
     }
   }
 
   const ausnahmen = ausnahmenLesen();
+  const brauchbar = (a) => PFLICHTFELDER.every((f) => a[f]) && datumGueltig(a.pruefen_bis);
   for (const a of ausnahmen) {
     const fehlt = PFLICHTFELDER.filter((f) => !a[f]);
     if (fehlt.length) {
       befunde.push(`AUSNAHME UNGUELTIG  ${a.ghsa || "?"}: es fehlt ${fehlt.join(", ")}`);
+    } else if (!datumGueltig(a.pruefen_bis)) {
+      befunde.push(
+        `AUSNAHME UNGUELTIG  ${a.ghsa}: pruefen_bis "${a.pruefen_bis}" ist kein Datum der Form JJJJ-MM-TT ` +
+          "(andere Schreibweisen liefen im Zeichenkettenvergleich nie ab)"
+      );
     }
   }
-  const gueltigeAusnahme = (ghsa, bibliothek) =>
+  const gueltigeAusnahme = (ghsa, bibliothek, version) =>
     ausnahmen.find(
       (a) =>
-        a.ghsa === ghsa && a.bibliothek === bibliothek && PFLICHTFELDER.every((f) => a[f]) && a.pruefen_bis >= HEUTE
+        a.ghsa === ghsa &&
+        a.bibliothek === bibliothek &&
+        a.version === version &&
+        brauchbar(a) &&
+        a.pruefen_bis >= HEUTE
     );
 
   let geprueft = 0;
@@ -299,7 +366,7 @@ async function main() {
       const offen = [...meldungen.values()].filter((m) => m.urteil !== "nicht betroffen");
       console.log(`${teil.name} ${version}: ${meldungen.size} Meldung(en) gelesen, ${offen.length} offen`);
       for (const m of offen) {
-        const ausnahme = gueltigeAusnahme(m.ghsa_id, teil.name);
+        const ausnahme = gueltigeAusnahme(m.ghsa_id, teil.name, version);
         const zeile = `${m.urteil.toUpperCase()}  ${teil.name} ${version}  ${m.ghsa_id} (${m.severity})  ${m.summary || ""}`;
         if (ausnahme) {
           hinweise.push(`${zeile}\n      ausgenommen bis ${ausnahme.pruefen_bis}: ${ausnahme.grund}`);

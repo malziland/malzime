@@ -33,13 +33,14 @@ const AUSGENOMMEN = [
   /node_modules/,
 ];
 
-/* Von Git ausdruecklich ignorierte Dateien sind nicht oeffentlich (lokale
-   Audit- und Sanierungsnotizen, docs/audit-*.md). Frueher zaehlten sie mit:
-   Lokal liefen dadurch zwei Pruefungen mehr als in der Pipeline, und die in
+/* Von Git ausdruecklich ignorierte Dateien unter docs/ sind nicht oeffentlich
+   (lokale Audit- und Sanierungsnotizen, docs/audit-*.md). Frueher zaehlten sie
+   mit: Lokal liefen dadurch zwei Pruefungen mehr als in der Pipeline, und die in
    docs/VERIFICATION.md gestempelte Testzahl hing vom Rechner ab (gefunden
-   30.09.2026, Pruefschleife G-16). Neue, noch nicht committete Dateien bleiben
-   drin — gerade vor dem Commit soll der Waechter sie sehen. Ohne Git (Abzug per
-   git archive) gibt es keine ignorierten Dateien, dann bleibt die Liste leer. */
+   30.09.2026, Pruefschleife G-16). NUR docs/: Unter public/ liefert Firebase
+   Hosting auch von Git ignorierte Dateien aus (Befund H-14) — dort bleibt jede
+   Datei im Blick. Neue, noch nicht committete Dateien bleiben ebenfalls drin.
+   Ohne Git (Abzug per git archive) gibt es keine ignorierten Dateien. */
 const IGNORIERT = (() => {
   /* Kein Git (Abzug per git archive): keine ignorierten Dateien, nichts zu
      filtern. Mit Git darf die Abfrage dagegen nicht still scheitern — eine
@@ -53,11 +54,10 @@ const IGNORIERT = (() => {
     return new Set();
   }
   return new Set(
-    execFileSync(
-      "git",
-      ["-C", REPO, "ls-files", "--others", "--ignored", "--exclude-standard", "--", "docs", "public", "functions/src"],
-      { encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }
-    )
+    execFileSync("git", ["-C", REPO, "ls-files", "--others", "--ignored", "--exclude-standard", "--", "docs"], {
+      encoding: "utf8",
+      maxBuffer: 16 * 1024 * 1024,
+    })
       .split("\n")
       .filter(Boolean)
   );

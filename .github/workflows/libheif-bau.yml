@@ -1,0 +1,83 @@
+name: libheif-Bau
+
+# Baut den HEIC-Dekoder (public/lib/libheif) aus den Original-Quellen der
+# Hersteller und vergleicht das Ergebnis Byte fuer Byte mit den ausgelieferten
+# Dateien. Damit ist fuer jeden Stand belegt, dass libheif.js und libheif.wasm
+# aus dem oeffentlichen Rezept scripts/libheif-bauen.sh stammen und aus nichts
+# anderem. Hintergrund und Abweichungen vom Herstellerweg: Kopf des Skripts.
+#
+# Zwei Laeufe nebeneinander:
+#   · bauen       — der aktuelle Bau; muss den ausgelieferten Dateien gleichen
+#   · kontrollbau — baut die bis 30.09.2026 ausgelieferte Fassung auf demselben
+#                   Weg nach und vergleicht mit deren Pruefsumme. Belegt, dass
+#                   das Rezept dasselbe liefert wie das fruehere Fertigpaket.
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    paths:
+      - scripts/libheif-bauen.sh
+      - public/lib/libheif/**
+      - .github/workflows/libheif-bau.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/libheif-bauen.sh
+      - public/lib/libheif/**
+      - .github/workflows/libheif-bau.yml
+  workflow_dispatch:
+
+jobs:
+  bauen:
+    # Fest auf 24.04, nicht ubuntu-latest: Ein Bau soll nicht still auf einem
+    # anderen Betriebssystem landen, nur weil GitHub die Voreinstellung umstellt.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Bauen
+        run: bash scripts/libheif-bauen.sh "$RUNNER_TEMP/ergebnis"
+
+      - name: Vergleich mit den ausgelieferten Dateien
+        run: |
+          abweichung=0
+          for f in libheif.js libheif.wasm; do
+            gebaut=$(sha256sum "$RUNNER_TEMP/ergebnis/$f" | cut -d' ' -f1)
+            geliefert=$(sha256sum "public/lib/libheif/$f" | cut -d' ' -f1)
+            if [ "$gebaut" = "$geliefert" ]; then
+              echo "gleich: $f sha256:$gebaut"
+            else
+              echo "::error file=public/lib/libheif/$f::$f stammt nicht aus diesem Bau (gebaut sha256:$gebaut, ausgeliefert sha256:$geliefert)"
+              abweichung=1
+            fi
+          done
+          exit $abweichung
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: libheif-bau
+          path: ${{ runner.temp }}/ergebnis
+          retention-days: 14
+          if-no-files-found: error
+
+  kontrollbau:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # libde265 1.0.15 baut noch mit autotools; das bringt das Runner-Abbild
+      # nicht in jedem Fall vollstaendig mit.
+      - name: Bauwerkzeuge fuer den Kontrollbau
+        run: sudo apt-get update -q && sudo apt-get install -y -q autoconf automake libtool
+
+      - name: Bisherige Fassung nachbauen und vergleichen
+        run: bash scripts/libheif-bauen.sh "$RUNNER_TEMP/kontrolle" --kontrollbau

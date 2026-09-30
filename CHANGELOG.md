@@ -30,20 +30,25 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 - **HEIC-Dekoder selbst gebaut.** Er kommt nicht mehr als Fertigpaket eines
   Dritten, sondern wird aus den unveränderten Original-Quellen der Hersteller
-  gebaut. Das Rezept liegt offen (`scripts/libheif-bauen.sh`); der Workflow
-  `libheif-bau.yml` baut auf GitHub nach und vergleicht Byte für Byte mit den
-  ausgelieferten Dateien. Ein Kontrollbau der früheren Fassung ergab die
-  identische Datei wie das Fertigpaket. Das Impressum nennt die neuen Versionen.
+  gebaut. Das Rezept liegt offen (`scripts/libheif-bauen.sh`); zwei
+  unabhängige Bauten ergeben Byte für Byte dieselben Dateien, der Workflow
+  `libheif-bau.yml` vergleicht bei jeder Änderung, und der Deploy verlangt
+  diesen Vergleich grün. Das Impressum nennt die neuen Versionen. Das
+  Umwandeln von HEIC-Fotos setzt etwas neuere Browser voraus (Firefox 79,
+  Safari 14.1); die Seite selbst braucht ohnehin Chrome 85.
+- **Browser-Tests mit der Sicherheitsrichtlinie der Produktion.** Der
+  Testserver setzt jetzt dieselben Kopfzeilen wie die echte Seite; ein
+  Verstoß gegen die Richtlinie fällt damit schon im Test auf.
 - **Prüfkette:** setup-python 7 (läuft auf Node 24).
 
 ### Hinzugefügt
 
 - **Nächtliche Sicherheitsprüfung.** Der Workflow `sicherheit-nachts.yml` prüft
-  täglich, auch ohne Änderung am Projekt: neue Lücken in den npm-Paketen,
-  veröffentlichte Sicherheitsmeldungen der Hersteller zu den mitgelieferten
-  Bibliotheken (Leaflet, exifr, libheif, libde265 — die sieht Dependabot
-  nicht) und Abkündigungshinweise von GitHub an den Läufen. Bei einem Fund
-  wird der Lauf rot und GitHub benachrichtigt. Ausnahmen nur begründet und mit
+  täglich: neue Lücken in den npm-Paketen, veröffentlichte
+  Sicherheitsmeldungen der Hersteller zu den mitgelieferten Bibliotheken
+  (Leaflet, exifr, libheif, libde265 — die sieht Dependabot nicht) und
+  Abkündigungshinweise von GitHub an den Läufen. Bei einem Fund kommt ein
+  Push aufs Handy (ntfy, höchste Stufe). Ausnahmen nur begründet und mit
   Ablaufdatum; was zu tun ist, steht in `docs/RUNBOOK.md`.
 
 ## [4.12.0] — 2026-09-28

@@ -23,8 +23,9 @@
  * OSS-2026-09-30-06): Frueher lief npm audit mit --omit=dev. Im Wurzelprojekt
  * gibt es aber nur Werkzeuge (Playwright, Vitest, ESLint) — dort wurde also gar
  * nichts geprueft, obwohl genau dieser Code in der Pipeline ueber dem
- * ausgecheckten Repository laeuft. Nachgewiesen am 30.09.2026: undici 8.9.0
- * (High, ueber jsdom) lag im Wurzelbaum, und das Gate meldete GRUEN.
+ * ausgecheckten Repository laeuft. Nachgewiesen am 30.09.2026 per Rueckbauprobe
+ * mit dem Wurzel-Lockfile vor #293 (undici 8.9.0, High, ueber jsdom): Das Gate
+ * meldete GRUEN.
  *
  * Aufruf:  node scripts/audit-gate.mjs <verzeichnis> [...]
  * Beispiel: node scripts/audit-gate.mjs functions .

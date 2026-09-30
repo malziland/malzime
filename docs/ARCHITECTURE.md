@@ -320,7 +320,7 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
   malziME (Formulierung nach DOC-2026-08-12-05: die alte Fassung war im Netzwerk-Tab
   widerlegbar)
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
-- Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr)
+- Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr, libheif)
 - CSP nur self + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen (`europe-west1`)
 - Foto und Analysedaten gehen direkt an den EU-Server, nicht über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026)
 - Keine dauerhafte Persistenz: im Queue-Betrieb liegt das Bild kurz im GCS-Bucket und wird unmittelbar nach der Verarbeitung gelöscht; das Job-Dokument spätestens nach 2 h

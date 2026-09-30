@@ -446,9 +446,9 @@ Befund OSS-2026-09-30-01.
 den per Prüfsumme festgenagelten Original-Quellen, mit dem unveränderten Bauskript des
 Herstellers und der Emscripten-Version, mit der der Hersteller testet. Der Workflow
 `libheif-Bau` führt das auf GitHub aus und vergleicht Byte für Byte mit den
-ausgelieferten Dateien. Ein Kontrollbau baut die frühere Fassung nach: Die
-WebAssembly-Datei war Byte für Byte gleich der des Fertigpakets. Damit ist belegt,
-dass der Weg derselbe ist und sich nur die Quellen unterscheiden.
+ausgelieferten Dateien; der Deploy verlangt diesen Vergleich grün für den jüngsten
+Commit, der den Dekoder oder das Rezept geändert hat (`scripts/deploy.sh`). Zwei
+unabhängige Bauten auf verschiedenen Rechnern ergaben identische Dateien.
 *Betrachtete Alternativen:* auf ein neues Fertigpaket warten (kein Termin; auch dessen
 Bauweg stellt libde265 1.0.15 ein) und den Dekoder abschalten (Samsung-Fotos scheitern
 wieder, 3 von 31 Versuchen am 08.09.).
@@ -459,25 +459,55 @@ libde265 veröffentlicht.
 - libde265 ab 1.1 baut nur noch mit cmake, das Herstellerskript kennt nur den
   älteren Weg. Das Rezept baut libde265 deshalb vorab und legt das Ergebnis dort ab,
   wo das Skript es erwartet. Dass wirklich die neue libde265 im Ergebnis steckt,
-  prüft das Rezept an der Versionsnummer in der WebAssembly-Datei.
+  prüft das Rezept an der Versionsnummer in der WebAssembly-Datei; ein Test hält
+  Rezept, VERSION-Datei und diese Versionsnummer zusammen.
 - libde265 wird ohne `NDEBUG` gebaut, die internen Prüfungen (`assert`) bleiben aktiv —
-  wie beim bisherigen Herstellerweg.
+  wie beim bisherigen Herstellerweg. Damit ihre Dateinamen keinen Bauordner tragen,
+  werden die Pfade umgeschrieben (`-ffile-prefix-map`); das Rezept bricht ab, wenn der
+  Bauordner doch im Ergebnis steht.
 - `libheif.js` wird nicht mehr nachträglich mit esbuild umgeschrieben (das tat das
   Fertigpaket für ältere Node-Versionen); ausgeliefert wird die Ausgabe von Emscripten.
+  Sie setzt etwas neuere Browser voraus (Emscripten-Vorgabe: Chrome 85, Firefox 79,
+  Safari 14.1). Die Seite selbst braucht schon Chrome 85; neu ausgeschlossen sind nur
+  Firefox 77–78 und Safari 13.1–14.0, und nur beim Umwandeln eines HEIC-Fotos — dort
+  erscheint dann die Meldung, dass das Foto nicht geöffnet werden konnte.
 
-**Restrisiko.** Emscripten lädt seine Werkzeuge beim Bau selbst herunter; deren
-Unverändertheit sichern wir nicht einzeln ab. Der Kontrollbau zeigt eine Änderung
-dort an, weil er dann nicht mehr Byte für Byte übereinstimmt.
+**Was der Kontrollbau belegt — und was nicht.** Er baut die frühere Fassung
+(libheif 1.23.2, libde265 1.0.15) auf dem autotools-Weg nach. Seine `libheif.wasm` ist
+Byte für Byte gleich der des Fertigpakets: Der Emscripten-Teil des Rezepts arbeitet
+wie der des Zulieferers. Den neuen cmake-Weg für libde265 durchläuft er nicht; der ist
+durch die Versionsnummer im Ergebnis, den Byte-Vergleich zweier Bauten und die
+Browser-Tests mit echten HEIC-Fotos abgesichert. Für `libheif.js` gibt es keine
+Vergleichsdatei vom Zulieferer (seine war mit esbuild umgeschrieben); die Summe des
+Kontrollbaus ist deshalb nur ein Driftmelder für die Bauumgebung.
+
+**Restrisiken.**
+- Emscripten lädt seine Werkzeuge beim Bau selbst herunter und prüft sie nicht per
+  Prüfsumme. Eine Änderung dort zeigen der Byte-Vergleich des Kontrollbaus
+  (`libheif.wasm`) und sein Driftmelder (`libheif.js`) an — eine Garantie, dass die
+  Werkzeuge unverändert sind, ist das nicht.
+- Der Nachtlauf liest die Sicherheitsmeldungen im GitHub-Repository der Hersteller und
+  die geprüften Einträge der GitHub-Datenbank für npm-Pakete. Meldungen, die nur in der
+  NVD oder bei OSV stehen, sieht er nicht. Stichprobe 30.09.2026: Zu libde265 stehen
+  in der NVD zwei Einträge ohne Herstellermeldung (CVE-2025-61147, CVE-2026-88373);
+  die dort genannten Reparatur-Commits 8b17e09 und f8d3249 sind in 1.1.3 enthalten
+  (GitHub-Vergleich mit dem Tag v1.1.3).
 
 **Nachtlauf.** `.github/workflows/sicherheit-nachts.yml` prüft täglich: npm-Lücken in
 beiden Bäumen einschließlich der Werkzeuge (der PR-Riegel prüfte bis 30.09.2026 den
 Wurzelbaum nicht, Befund OSS-2026-09-30-06), die Herstellermeldungen zu jeder
-Bibliothek unter `public/lib` und die Abkündigungshinweise von GitHub. Diese Prüfungen
-laufen bewusst nicht im Pull Request: Sie lesen fremde Quellen, und eine neue fremde
-Meldung dürfte nicht jeden unbeteiligten PR blockieren (2026-07-01). Ausnahmen gibt es
-nur begründet und mit Ablaufdatum; jede steht in jeder Ausgabe. Alarm: die
-Benachrichtigung von GitHub bei einem roten Lauf. Was dann zu tun ist:
-`docs/RUNBOOK.md`.
+Bibliothek und jeder einzelnen Datei unter `public/lib` und die Abkündigungshinweise
+von GitHub. Diese Prüfungen laufen bewusst nicht im Pull Request: Sie lesen fremde
+Quellen, und eine neue fremde Meldung dürfte nicht jeden unbeteiligten PR blockieren
+(2026-07-01). Ausnahmen gibt es nur begründet, mit Ablaufdatum in der Form JJJJ-MM-TT
+und — bei Herstellermeldungen — für genau eine Version; jede steht in jeder Ausgabe.
+*Alarm:* Ist auf `main` einer der Jobs rot, geht ein ntfy-Push mit Stufe „urgent"
+aufs Handy (Adresse als GitHub-Secret). Die Mail von GitHub allein genügt nicht, sie
+wird beim Empfänger automatisch gelöscht; die Zustellung eines Probealarms mit dieser
+Stufe ist bestätigt (30.09.2026). *Grenze:* GitHub schaltet geplante Workflows in
+öffentlichen Repositories nach 60 Tagen ohne Aktivität ab. Der Deploy-Riegel prüft,
+dass der Zeitplan im Workflow steht und keine Prüfung stillgelegt ist; ob GitHub ihn
+tatsächlich ausführt, zeigt nur der Lauf selbst (Handgriff in `docs/RUNBOOK.md`).
 
 ## Kinderschutz-Filter: Anzahl und Diagnose (09.09.2026)
 

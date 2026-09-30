@@ -801,8 +801,10 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 ### Nachtlauf „Sicherheit nachts" rot
 
 Der Workflow `.github/workflows/sicherheit-nachts.yml` läuft täglich um 03:43 UTC.
-Ist er rot, schickt GitHub eine Benachrichtigung. Er hat drei Jobs; der Name des
-roten Jobs sagt, was zu tun ist:
+Ist auf `main` einer seiner Prüf-Jobs rot, kommt ein ntfy-Push mit Stufe „urgent"
+(Titel „malziME: Sicherheit nachts ROT", Link zum Lauf; Einrichtung in
+`docs/ERROR-ALERTING.md`). Die drei Prüf-Jobs; der Name des roten Jobs sagt, was zu
+tun ist:
 
 | Roter Job | Bedeutung | Was tun |
 |---|---|---|
@@ -816,6 +818,15 @@ bestandener Lauf: meist eine Störung der GitHub-API. Lauf von Hand neu starten
 
 Lokal prüfen: `GH_TOKEN=$(gh auth token) node scripts/pruefe-fremd-meldungen.mjs`
 bzw. `… node scripts/pruefe-abkuendigungen.mjs`.
+
+**Kommt nie ein Alarm, heißt das nicht „alles gut".** Zwei Fälle, in denen der
+Nachtlauf gar nicht läuft: GitHub schaltet geplante Workflows in öffentlichen
+Repositories nach 60 Tagen ohne Aktivität ab, und unter Last verwirft GitHub
+gelegentlich geplante Läufe. Handgriff, einmal im Monat oder vor jedem Deploy:
+`gh run list --workflow sicherheit-nachts.yml --branch main --limit 3` — der jüngste
+Lauf darf höchstens einen Tag alt sein. Ist der Workflow abgeschaltet: unter
+„Actions" wieder einschalten. Den Alarmweg selbst prüft
+`gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
 
 ### HEIC-Dekoder (libheif) neu bauen
 
@@ -843,6 +854,10 @@ meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
    echte Samsung- und iPhone-HEIC-Fotos durch den Dekoder).
 6. Pushen: Jetzt muss der Vergleich im Workflow `libheif-Bau` grün sein — erst
    dann ist belegt, dass die ausgelieferten Dateien aus dem Rezept stammen.
+   `scripts/deploy.sh` verlangt das: Für den jüngsten Commit, der den Dekoder, das
+   Rezept oder den Workflow geändert hat, muss der Job `bauen` grün sein, sonst
+   bricht der Deploy ab. Nach dem Zusammenführen läuft der Workflow auf `main` noch
+   einmal (rund 11 Minuten) — so lange wartet der Deploy.
 
 Der Job `kontrollbau` baut bei jedem Lauf zusätzlich die bis 30.09.2026
 ausgelieferte Fassung (libheif 1.23.2, libde265 1.0.15) nach und vergleicht sie

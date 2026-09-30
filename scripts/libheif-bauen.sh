@@ -4,11 +4,13 @@
 #
 # WARUM SELBST BAUEN (30.09.2026, Befund OSS-2026-09-30-01): Bis dahin kam der
 # Dekoder als fertiges Paket eines Dritten (npm libheif-js 1.23.2). Darin steckten
-# libheif 1.23.2 und libde265 1.0.15 mit zusammen 36 veroeffentlichten
-# Sicherheitsmeldungen. Die reparierten Fassungen gab es beim Hersteller, im
-# fertigen Paket nicht: Das Bauskript von libheif stellt libde265 1.0.15 ein, und
-# der Zulieferer hat diese Einstellung nie geaendert. Mit dem eigenen Bau
-# bestimmen wir beide Versionen selbst.
+# libheif 1.23.2 und libde265 1.0.15, fuer die es veroeffentlichte
+# Sicherheitsmeldungen der Hersteller gibt (welche und wie viele, zeigt
+# scripts/pruefe-fremd-meldungen.mjs; die Zahl aendert sich mit jeder Meldung).
+# Die reparierten Fassungen gab es beim Hersteller, im fertigen Paket nicht: Das
+# Bauskript von libheif stellt libde265 1.0.15 ein, und der Zulieferer hat diese
+# Einstellung nie geaendert. Mit dem eigenen Bau bestimmen wir beide Versionen
+# selbst.
 #
 # WAS HIER GEBAUT WIRD — und was nicht:
 #   · libheif (LGPL-3.0) und libde265 (LGPL-3.0), sonst nichts. Das Hersteller-

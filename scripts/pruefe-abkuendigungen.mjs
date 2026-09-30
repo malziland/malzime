@@ -1,0 +1,179 @@
+#!/usr/bin/env node
+/**
+ * pruefe-abkuendigungen.mjs — liest die Hinweise, die GitHub an die letzten
+ * Pipeline-Laeufe auf main heftet, und meldet Abkuendigungen und Fristen.
+ *
+ * WARUM (Befund OPS-2026-09-30-03, 30.09.2026): GitHub hat monatelang bei jedem
+ * Lauf gewarnt, dass ein Baustein der Pipeline (setup-python v5) auf das
+ * abgekuendigte Node 20 zielt, und am 23.09.2026 Node 20 entfernt. Ebenso steht
+ * seit September bei jedem Lauf, dass "ubuntu-latest" ab 19.10.2026 auf
+ * Ubuntu 26 umzieht. Solche Hinweise sieht nur, wer einen Lauf aufklappt — die
+ * Laeufe waren gruen, niemand hatte einen Grund dazu.
+ *
+ * WAS GEMELDET WIRD: Jeder Hinweis (notice, warning oder failure) der jeweils
+ * letzten abgeschlossenen Laeufe auf main, dessen Text nach Abkuendigung oder
+ * Frist klingt. Andere Fehlermeldungen (rote Tests) sind nicht Sache dieses
+ * Skripts — die meldet die Pipeline selbst.
+ *
+ * AUSWEG: .github/abkuendigungen-ausnahmen.json — Textmuster mit Begruendung
+ * und Ablaufdatum, fuer Hinweise, bei denen bewusst nichts zu tun ist. Jede
+ * Ausnahme wird bei jedem Lauf mit ausgegeben.
+ *
+ * Rueckgabewerte: 0 kein offener Hinweis, 1 offene(r) Hinweis(e),
+ * 2 Messung nicht durchfuehrbar (kein Lauf gefunden, API-Fehler).
+ *
+ * Einspeisepunkte fuer Tests (im Betrieb nicht gesetzt):
+ *   ABKUENDIGUNG_DATEN      JSON-Datei statt Netzabfrage:
+ *                           [{ "lauf": "CI #123", "hinweise": [{ "annotation_level", "message" }] }]
+ *   ABKUENDIGUNG_AUSNAHMEN  Ausnahmedatei
+ *   ABKUENDIGUNG_HEUTE      Datum JJJJ-MM-TT statt der Systemuhr
+ */
+import { readFileSync, existsSync } from "node:fs";
+import { resolve, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const AUSNAHMEN_DATEI = resolve(
+  process.env.ABKUENDIGUNG_AUSNAHMEN || join(REPO, ".github/abkuendigungen-ausnahmen.json")
+);
+const HEUTE = process.env.ABKUENDIGUNG_HEUTE || new Date().toISOString().slice(0, 10);
+
+/* Woran ein Abkuendigungs- oder Fristhinweis zu erkennen ist. Absichtlich
+   breit: Ein Fehlalarm kostet einen Ausnahme-Eintrag, ein uebersehener
+   Hinweis kostet im schlimmsten Fall eine stehende Pipeline. */
+export const MUSTER =
+  /deprecat|no longer (available|supported)|will (be )?(removed|retired|migrate|stop)|end[- ]of[- ]life|\bEOL\b|sunset|retire|is being removed|will be forced/i;
+
+class Messfehler extends Error {}
+
+function repoName() {
+  if (process.env.GITHUB_REPOSITORY) return process.env.GITHUB_REPOSITORY;
+  let url;
+  try {
+    url = execFileSync("git", ["-C", REPO, "remote", "get-url", "origin"], { encoding: "utf8" }).trim();
+  } catch {
+    throw new Messfehler("Repository nicht ermittelbar (weder GITHUB_REPOSITORY noch git remote origin)");
+  }
+  const m = /github\.com[/:]([^/]+\/[^/.]+?)(?:\.git)?$/.exec(url);
+  if (!m) throw new Messfehler(`Kein GitHub-Repository erkennbar: ${url}`);
+  return m[1];
+}
+
+async function github(pfad) {
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
+  const kopf = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
+  if (token) kopf.Authorization = `Bearer ${token}`;
+  let antwort;
+  try {
+    antwort = await fetch(`https://api.github.com${pfad}`, { headers: kopf });
+  } catch (fehler) {
+    throw new Messfehler(`Netzfehler bei ${pfad}: ${fehler.message}`);
+  }
+  if (!antwort.ok) throw new Messfehler(`GitHub antwortete ${antwort.status} auf ${pfad}`);
+  return antwort.json();
+}
+
+/* Je Workflow der letzte abgeschlossene Lauf auf main, mit allen Hinweisen
+   aller seiner Jobs. */
+async function laeufeLesen() {
+  if (process.env.ABKUENDIGUNG_DATEN) {
+    try {
+      return JSON.parse(readFileSync(process.env.ABKUENDIGUNG_DATEN, "utf8"));
+    } catch (fehler) {
+      throw new Messfehler(`${process.env.ABKUENDIGUNG_DATEN} unlesbar: ${fehler.message}`);
+    }
+  }
+  const repo = repoName();
+  const liste = await github(`/repos/${repo}/actions/runs?branch=main&status=completed&per_page=50`);
+  const letzte = new Map();
+  for (const lauf of liste.workflow_runs || []) {
+    if (!letzte.has(lauf.workflow_id)) letzte.set(lauf.workflow_id, lauf);
+  }
+  const ergebnis = [];
+  for (const lauf of letzte.values()) {
+    const jobs = await github(`/repos/${repo}/actions/runs/${lauf.id}/jobs?per_page=100`);
+    const hinweise = [];
+    for (const job of jobs.jobs || []) {
+      const liste2 = await github(`/repos/${repo}/check-runs/${job.id}/annotations?per_page=100`);
+      for (const h of liste2) hinweise.push({ ...h, job: job.name });
+    }
+    ergebnis.push({ lauf: `${lauf.name} #${lauf.run_number} (${lauf.head_sha.slice(0, 7)})`, hinweise });
+  }
+  return ergebnis;
+}
+
+function ausnahmenLesen() {
+  if (!existsSync(AUSNAHMEN_DATEI)) return [];
+  try {
+    const daten = JSON.parse(readFileSync(AUSNAHMEN_DATEI, "utf8"));
+    return Array.isArray(daten.ausnahmen) ? daten.ausnahmen : [];
+  } catch (fehler) {
+    throw new Messfehler(`${AUSNAHMEN_DATEI} unlesbar: ${fehler.message}`);
+  }
+}
+
+const PFLICHTFELDER = ["muster", "grund", "eingetragen", "pruefen_bis"];
+
+async function main() {
+  const laeufe = await laeufeLesen();
+  /* Kein einziger Lauf gelesen heisst nicht "keine Hinweise", sondern
+     "nicht gemessen" (KERN 5c). */
+  if (!Array.isArray(laeufe) || laeufe.length === 0) {
+    throw new Messfehler("kein abgeschlossener Lauf auf main gefunden");
+  }
+  const ausnahmen = ausnahmenLesen();
+  const befunde = [];
+  const hinweise = [];
+  for (const a of ausnahmen) {
+    const fehlt = PFLICHTFELDER.filter((f) => !a[f]);
+    if (fehlt.length) befunde.push(`AUSNAHME UNGUELTIG  "${a.muster || "?"}": es fehlt ${fehlt.join(", ")}`);
+  }
+  const gesehen = new Set();
+  let gelesen = 0;
+  for (const { lauf, hinweise: liste } of laeufe) {
+    for (const h of liste || []) {
+      gelesen++;
+      const text = String(h.message || "");
+      if (!MUSTER.test(text)) continue;
+      /* Derselbe Hinweis steht oft an jedem Job — einmal melden genuegt. */
+      if (gesehen.has(text)) continue;
+      gesehen.add(text);
+      const ausnahme = ausnahmen.find(
+        (a) => PFLICHTFELDER.every((f) => a[f]) && text.includes(a.muster) && a.pruefen_bis >= HEUTE
+      );
+      const zeile = `${String(h.annotation_level || "?").toUpperCase()}  ${lauf}: ${text.slice(0, 300)}`;
+      if (ausnahme) hinweise.push(`${zeile}\n      ausgenommen bis ${ausnahme.pruefen_bis}: ${ausnahme.grund}`);
+      else befunde.push(zeile);
+    }
+  }
+  console.log(`Gelesen: ${laeufe.length} Lauf/Laeufe auf main, ${gelesen} Hinweis(e), Stand ${HEUTE}`);
+  for (const h of hinweise) console.log(`  [Ausnahme] ${h}`);
+  if (befunde.length === 0) {
+    console.log("ERGEBNIS: kein offener Abkuendigungs- oder Fristhinweis.");
+    return 0;
+  }
+  console.log("");
+  for (const b of befunde) console.log(`  ${b}`);
+  console.log(
+    `\nERGEBNIS: ${befunde.length} offene(r) Hinweis(e). Betroffenen Baustein anheben; nur wenn ` +
+      "bewusst nichts zu tun ist, begruendeten Eintrag mit Ablaufdatum in " +
+      ".github/abkuendigungen-ausnahmen.json."
+  );
+  return 1;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().then(
+    (code) => process.exit(code),
+    (fehler) => {
+      if (fehler instanceof Messfehler) {
+        console.error(`MESSUNG NICHT DURCHFUEHRBAR: ${fehler.message}`);
+        console.error("Das ist kein bestandener Lauf.");
+      } else {
+        console.error(fehler);
+      }
+      process.exit(2);
+    }
+  );
+}

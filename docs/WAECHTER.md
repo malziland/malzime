@@ -1,8 +1,10 @@
 # Die Wächter — was jeder prüft, und warum es ihn gibt
 
-Dieses Projekt hat eine eigene Prüfschicht: elf Wächter, eine Selbstprüfung
-mit 24 Proben und mehrere Tests, die Werkzeug statt Anwendung prüfen. Diese
-Seite beantwortet für jeden Wächter vier Fragen — **wovor schützt er, welcher
+Dieses Projekt hat eine eigene Prüfschicht: die Wächter in der Übersicht
+unten, eine Selbstprüfung und mehrere Tests, die Werkzeug statt Anwendung
+prüfen. Wie viele es sind, steht nur in der Tabelle — eine Zahl im Fließtext
+veraltet mit jedem neuen Wächter. Diese Seite beantwortet für jeden Wächter
+vier Fragen — **wovor schützt er, welcher
 echte Vorfall hat ihn ausgelöst, was kostet er, welche Ausnahmen kennt er.**
 
 **Warum es diese Seite gibt (01.09.2026):** Die Prüfschicht ist in einer Woche
@@ -35,6 +37,8 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 | `pruefe-vendorierung.mjs` | Bearbeitete Kopien der Audit-Familie unter `scripts/pruefungen/` | Bearbeitet wird die Quelle, nie die Kopie | 57 ms |
 | `pruefe-mutationen.mjs` | **Tests, die nichts merken:** Code kaputtmachen, ohne dass ein Test rot wird | Runde 7: Sechs von achtzehn Befunden waren überlebende Mutationen, von Hand gefunden | Minuten — **läuft vorerst nur lokal**, siehe unten |
 | `betriebsprofil-vergleichen.js` (Abschnitt 1b von `verify-infrastructure.sh`) | **Einstellungssatz in der Datenbank weicht vom Repo ab** — die Wahrheit liegt in Firestore, das Repo ist die Kopie | OPS-2026-09-01-02 (Audit 01.09.): zwei Tage lang acht abweichende Felder, sieben davon in den Ersatz-Profilen für den Ernstfall; kein Test sah es, weil `satz-gegen-doku` Kopie gegen Kopie prüft | ~1 s, **nur vor dem Deploy** (liest die echte Datenbank; Negativprobe in `verify-infrastructure-script.test.js`) |
+| `pruefe-fremd-meldungen.mjs` | **Mitgelieferte Bibliotheken mit veröffentlichter Sicherheitsmeldung** (`public/lib`: Leaflet, exifr, libheif, libde265) — sieht weder Dependabot noch `npm audit`; dazu jeder neue Ordner unter `public/lib`/`public/fonts` ohne Beobachtung | OSS-2026-09-30-01: Der HEIC-Dekoder lag mit 36 veröffentlichten Meldungen (libheif 1.23.2, libde265 1.0.15) im Auslieferungsstand, ohne dass etwas anschlug | wenige Sekunden, **nur nachts** (`sicherheit-nachts.yml`, liest die GitHub-API); Negativproben in `fremd-meldungen-script.test.js` |
+| `pruefe-abkuendigungen.mjs` | **Abkündigungs- und Fristhinweise von GitHub** an den letzten Läufen auf main (veraltete Actions, Runner-Umstellungen) | OPS-2026-09-30-03: Die Warnung „Node.js 20 is deprecated" stand bei jedem Lauf da, bis GitHub Node 20 am 23.09.2026 entfernte — die Läufe waren grün, niemand klappte sie auf | wenige Sekunden, **nur nachts** (`sicherheit-nachts.yml`); Negativproben in `abkuendigungen-script.test.js` |
 
 **Alle zusammen (ohne die Mutationsprobe): unter einer Sekunde.** Deshalb
 laufen sie vor jedem Push. Die Mutationsprobe braucht je Mutation einen
@@ -65,6 +69,9 @@ verstreut in den Dateien; hier ist die vollständige Liste mit dem Grund.
 | Wo | Was ausgenommen ist | Warum |
 |---|---|---|
 | `pruefe-deploy-riegel.py` → `AUSGENOMMEN` | `pruefe-live.sh` | Werkzeug für Dritte: rechnet den AUSGELIEFERTEN Stand gegen das Repo nach, braucht Netz und Live-Adresse |
+| `pruefe-deploy-riegel.py` → `NUR_NACHTS` | `pruefe-fremd-meldungen.mjs`, `pruefe-abkuendigungen.mjs` | Lesen äußere Quellen (GitHub-API). Im Pull Request würde eine neue fremde Meldung jeden unbeteiligten PR blockieren (2026-07-01: alle acht Dependabot-PRs). Ihr Aufruf in `sicherheit-nachts.yml` wird genauso verlangt wie der in `ci.yml` |
+| `.github/fremd-meldungen-ausnahmen.json` | einzelne Herstellermeldungen je Bibliothek | Meldungen ohne auswertbare Versionsangabe, bei denen am Quelltext belegt ist, dass unser Stand nicht betroffen ist; Pflichtfelder Begründung und Ablaufdatum, jede Ausnahme steht in jeder Ausgabe |
+| `.github/abkuendigungen-ausnahmen.json` | einzelne GitHub-Hinweise (Textmuster) | Hinweise, bei denen bewusst nichts zu tun ist (etwa die Umstellung von `ubuntu-latest`); Pflichtfelder Begründung und Ablaufdatum |
 | `pruefe-deploy-riegel.py` → `NUR_PIPELINE` | `pruefe-mutationen.mjs` | Braucht Minuten und installierte Pakete; vor dem Push würde es aus 14 Sekunden Minuten machen |
 | `vor-dem-push-script.test.js` → `BEWUSST_DRAUSSEN` | `npm ci`, `npm test`, `npm run test:e2e`, Mutationsprobe | Installation bzw. lange Suiten — die deckt `scripts/pruefstand.sh` ab |
 | `vor-dem-push-script.test.js` → `ANDERS_BENANNT` | `secret-scan-lokal.sh` | Die Pipeline hat dafür den eigenen Job `secret-scan` mit gitleaks |

@@ -318,6 +318,20 @@ def main():
         "keine zusaetzliche Wartezeit' war sachlich falsch: Er laeuft IN einem "
         "der langen Jobs und verlaengert ihn — Befund M-P3 der Runde 8.)",
     }
+    # Waechter, die aeussere Quellen lesen (GitHub-API: Sicherheitsmeldungen der
+    # Hersteller, Hinweise an den Laeufen auf main). Sie laufen NICHT vor dem
+    # Push und NICHT im Pull Request: Eine neue fremde Meldung wuerde sonst
+    # jeden unbeteiligten Pull Request blockieren — genau das ist am 2026-07-01
+    # mit allen acht Dependabot-PRs passiert. Ihr Ort ist der naechtliche
+    # Workflow sicherheit-nachts.yml; dort wird ihr Aufruf genauso verlangt
+    # wie bei allen anderen in ci.yml (Befunde OSS-2026-09-30-01,
+    # OPS-2026-09-30-03).
+    NUR_NACHTS = {
+        "pruefe-fremd-meldungen.mjs": "Sicherheitsmeldungen der Hersteller "
+        "der mitgelieferten Bibliotheken, liest die GitHub-API",
+        "pruefe-abkuendigungen.mjs": "Abkuendigungshinweise an den Laeufen "
+        "auf main, liest die GitHub-API",
+    }
     skripte = [d for d in skripte if d.name not in AUSGENOMMEN]
 
     def ohne_kommentare(text):
@@ -374,11 +388,20 @@ def main():
     if not vorab.exists():
         print("  NICHT MESSBAR: scripts/vor-dem-push.sh fehlt")
         return 2
+    nachts = WURZEL / ".github" / "workflows" / "sicherheit-nachts.yml"
+    if not nachts.exists():
+        print("  NICHT MESSBAR: .github/workflows/sicherheit-nachts.yml fehlt")
+        return 2
     aus_ci = erreichbar_ab(ci)
     aus_vorab = erreichbar_ab(vorab.read_text(encoding="utf-8"))
+    aus_nachts = erreichbar_ab(nachts.read_text(encoding="utf-8"))
     waechter_fehlt = []
     for datei in skripte:
         if datei.name in NUR_LOKAL:
+            continue
+        if datei.name in NUR_NACHTS:
+            if datei.name not in aus_nachts:
+                waechter_fehlt.append((datei.name, "sicherheit-nachts.yml"))
             continue
         listen = [("ci.yml", aus_ci)]
         if datei.name not in NUR_PIPELINE:

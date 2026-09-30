@@ -798,6 +798,58 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 > `firebase-functions` 7.3.2 und damit Express 4 → 5. Das gehört in einen
 > eigenen, bewusst freigegebenen Schritt.
 
+### Nachtlauf „Sicherheit nachts" rot
+
+Der Workflow `.github/workflows/sicherheit-nachts.yml` läuft täglich um 03:43 UTC.
+Ist er rot, schickt GitHub eine Benachrichtigung. Er hat drei Jobs; der Name des
+roten Jobs sagt, was zu tun ist:
+
+| Roter Job | Bedeutung | Was tun |
+|---|---|---|
+| `npm-luecken` | Neue High/Critical-Lücke in einem npm-Paket (beide Bäume, auch Werkzeuge) | Wie „Audit-Gate rot" oben. Oft kommt Dependabot binnen eines Tages mit einem PR; sonst selbst anheben |
+| `mitgelieferte-bibliotheken` | Veröffentlichte Herstellermeldung zu einer Bibliothek unter `public/lib`, oder ein neuer Ordner dort ohne Beobachtung | Betroffen: Bibliothek neu bauen (libheif, siehe unten) oder neu kopieren. **Unklar**: am Quelltext des Herstellers klären; ist unser Stand nachweislich nicht betroffen, begründeter Eintrag mit Ablaufdatum in `.github/fremd-meldungen-ausnahmen.json` |
+| `abkuendigungen` | GitHub meldet an einem Lauf auf main einen abgekündigten Baustein oder eine Frist | Betroffene Action anheben (mit SHA-Pin, Release-Notes lesen). Ist bewusst nichts zu tun, begründeter Eintrag mit Ablaufdatum in `.github/abkuendigungen-ausnahmen.json` |
+
+„MESSUNG NICHT DURCHFÜHRBAR" (Rückgabewert 2) ist kein Fund, aber auch kein
+bestandener Lauf: meist eine Störung der GitHub-API. Lauf von Hand neu starten
+(`gh workflow run sicherheit-nachts.yml`); bleibt es rot, die Meldung lesen.
+
+Lokal prüfen: `GH_TOKEN=$(gh auth token) node scripts/pruefe-fremd-meldungen.mjs`
+bzw. `… node scripts/pruefe-abkuendigungen.mjs`.
+
+### HEIC-Dekoder (libheif) neu bauen
+
+Der Dekoder unter `public/lib/libheif/` wird aus den Original-Quellen der
+Hersteller gebaut — Rezept `scripts/libheif-bauen.sh`, Begründung und die eine
+Abweichung vom Herstellerweg stehen in dessen Kopf. Anlass für einen Neubau ist
+meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
+
+1. Neue Versionen und Prüfsummen im Skript eintragen (`NEU_LIBHEIF_*`,
+   `NEU_LIBDE265_*`). Die Prüfsumme steht auf der Release-Seite des Herstellers
+   bei der Datei (GitHub zeigt sie als `sha256:`); zusätzlich selbst nachrechnen.
+2. Zweig pushen. Der Workflow `libheif-Bau` baut auf GitHub (feste
+   Ubuntu-Version 24.04, ca. 10–20 Minuten) und legt das Ergebnis als Artefakt
+   `libheif-bau` ab. Der Schritt „Vergleich" ist in diesem Lauf rot — die
+   Dateien im Repository sind ja noch die alten.
+3. Artefakt holen: `gh run download <lauf-id> -n libheif-bau -D /tmp/libheif`,
+   die zwei Dateien nach `public/lib/libheif/` kopieren.
+4. `public/lib/libheif/VERSION` neu schreiben (die Zeilen `libheif x.y.z` und
+   `libde265 x.y.z` liest der Nachtlauf aus), dazu die Versionsnennungen in
+   `THIRD-PARTY.md`, `README.md`, `public/impressum.html` und
+   `public/en/legal-notice.html` — ein Test (`lizenzen-vollstaendig.test.js`)
+   hält sie gegen die VERSION-Datei.
+5. `node scripts/pruefe-fremddateien.mjs --aktualisieren`, dann alle Suiten,
+   **einschließlich der Browser-Tests** (`e2e/problemfaelle.test.js` schickt
+   echte Samsung- und iPhone-HEIC-Fotos durch den Dekoder).
+6. Pushen: Jetzt muss der Vergleich im Workflow `libheif-Bau` grün sein — erst
+   dann ist belegt, dass die ausgelieferten Dateien aus dem Rezept stammen.
+
+Der Job `kontrollbau` baut bei jedem Lauf zusätzlich die bis 30.09.2026
+ausgelieferte Fassung (libheif 1.23.2, libde265 1.0.15) nach und vergleicht sie
+mit deren Prüfsumme. Wird er rot, hat sich an der Bauumgebung etwas geändert
+(Emscripten-Download, Runner-Abbild) — dann dem nachgehen, bevor ein neuer Bau
+ausgeliefert wird.
+
 ## Handwerkzeuge (nur von Hand, laufen nie automatisch)
 
 - `node scripts/vorschau.mjs [port]` — lokale Vorschau, die die Umleitungen aus

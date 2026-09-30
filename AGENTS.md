@@ -28,6 +28,9 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   fonts/             Self-hosted: Poppins (woff2, OFL)
   lib/leaflet/       Self-hosted: Leaflet 1.9.4 (JS, CSS, Marker-Images)
   lib/exifr/         Self-hosted: exifr lite ESM (Browser EXIF-Parsing)
+  lib/libheif/       Self-hosted: HEIC-Dekoder (libheif + libde265, WebAssembly, LGPL),
+                     SELBST GEBAUT: Rezept scripts/libheif-bauen.sh, Nachweis per
+                     Workflow libheif-bau.yml; Neubau-Anleitung docs/RUNBOOK.md
 
 functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   index.js           Cloud-Function-Exports (stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs, erinnerung, laufzeitWache, satzWache), Secret-Deklarationen (EU-gebunden, Endung _EU, u. a. MISTRAL_API_KEY_EU)
@@ -132,7 +135,10 @@ Einzelbefehle:
   Diese Formulierung ist verbindlich (DOC-2026-08-12-05); die frühere Fassung war im
   Netzwerk-Tab widerlegbar und steht auf der Sperrliste in `.pruefungen/aussentext.txt`
 - Server bekommt nur: komprimiertes Bild + Kamera-Metadaten (make, model) OHNE GPS, OHNE dateTimeOriginal
-- Keine externen Scripts: Alles self-hosted (Fonts, Leaflet, exifr). Kein CDN, kein reCAPTCHA, kein Firebase SDK
+- Keine externen Scripts: Alles self-hosted (Fonts, Leaflet, exifr, libheif). Kein CDN, kein reCAPTCHA, kein Firebase SDK
+- Selbst gehostet heisst selbst gewartet: Dependabot und npm audit sehen `public/lib` nicht. Das
+  uebernimmt der Nachtlauf `sicherheit-nachts.yml` (`scripts/pruefe-fremd-meldungen.mjs`); eine
+  neue Bibliothek unter `public/lib` braucht dort einen Eintrag, sonst wird der Lauf rot
 - Bot-Schutz: Rate Limiting (IP) + Honeypot + Timing-Check
 - CSP: nur 'self' + OpenStreetMap Tiles + Cloud Functions Endpoint + Nominatim
 

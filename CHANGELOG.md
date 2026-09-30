@@ -4,6 +4,48 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **HEIC-Dekoder auf reparierten Stand.** Der Baustein, der Samsung-Fotos (HEIC)
+  im Browser öffnet, enthielt libheif 1.23.2 und libde265 1.0.15, für die es
+  veröffentlichte Sicherheitsmeldungen gibt. Jetzt sind es libheif 1.23.5 und
+  libde265 1.1.3, in denen sie behoben sind. Sonst ändert sich nichts: Samsung-
+  und iPhone-Fotos öffnen wie bisher, die Umwandlung bleibt vollständig im
+  Browser.
+- **Lizenztext von libde265 liegt bei.** libde265 steckt im HEIC-Dekoder; ihr
+  Lizenztext liegt jetzt wörtlich neben dem von libheif
+  (`public/lib/libheif/LICENSE-libde265`).
+- **Sicherheitslücke in einem Hilfspaket geschlossen.** brace-expansion
+  (enthalten in firebase-admin und in Test-Werkzeugen) jetzt in 2.1.7 bzw.
+  5.0.12. Die übrigen Pakete stehen auf dem neuesten Stand ihrer
+  Versionsbereiche, darunter firebase-admin 14.5, firebase-functions 7.4 und
+  Cloud Tasks 7.2; die Browser-Modultests laufen mit Vitest 5.
+- **Prüfung auf bekannte Lücken deckt auch die Werkzeuge ab.** Der Riegel im
+  Pull Request prüfte die Test- und Prüfwerkzeuge im Hauptordner bisher nicht.
+  Jetzt prüft er beide Paketbäume vollständig.
+
+### Geändert
+
+- **HEIC-Dekoder selbst gebaut.** Er kommt nicht mehr als Fertigpaket eines
+  Dritten, sondern wird aus den unveränderten Original-Quellen der Hersteller
+  gebaut. Das Rezept liegt offen (`scripts/libheif-bauen.sh`); der Workflow
+  `libheif-bau.yml` baut auf GitHub nach und vergleicht Byte für Byte mit den
+  ausgelieferten Dateien. Ein Kontrollbau der früheren Fassung ergab die
+  identische Datei wie das Fertigpaket. Das Impressum nennt die neuen Versionen.
+- **Prüfkette:** setup-python 7 (läuft auf Node 24).
+
+### Hinzugefügt
+
+- **Nächtliche Sicherheitsprüfung.** Der Workflow `sicherheit-nachts.yml` prüft
+  täglich, auch ohne Änderung am Projekt: neue Lücken in den npm-Paketen,
+  veröffentlichte Sicherheitsmeldungen der Hersteller zu den mitgelieferten
+  Bibliotheken (Leaflet, exifr, libheif, libde265 — die sieht Dependabot
+  nicht) und Abkündigungshinweise von GitHub an den Läufen. Bei einem Fund
+  wird der Lauf rot und GitHub benachrichtigt. Ausnahmen nur begründet und mit
+  Ablaufdatum; was zu tun ist, steht in `docs/RUNBOOK.md`.
+
 ## [4.12.0] — 2026-09-28
 
 ### Geändert

@@ -433,6 +433,52 @@ wird. Lizenztext, Version und Herkunft: `public/lib/libheif/`, Übersicht in
 Rückweg mit Deploy: Ordner `public/lib/libheif/` und den HEIC-Zweig in
 `public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen.
 
+## HEIC-Dekoder aus den Hersteller-Quellen, Nachtlauf Sicherheit (30.09.2026)
+
+**Was war.** Der Dekoder kam als Fertigpaket eines Dritten (npm `libheif-js` 1.23.2).
+Darin steckten libheif 1.23.2 und libde265 1.0.15, für die es veröffentlichte
+Sicherheitsmeldungen gab; die Reparaturen gab es beim Hersteller (libheif 1.23.5,
+libde265 1.1.3), im Fertigpaket nicht. Aufgefallen ist das keiner Prüfung: Dependabot
+und `npm audit` kennen nur die Paketlisten, nicht die Dateien unter `public/lib`.
+Befund OSS-2026-09-30-01.
+
+**Entscheidung: selbst bauen.** `scripts/libheif-bauen.sh` baut beide Bibliotheken aus
+den per Prüfsumme festgenagelten Original-Quellen, mit dem unveränderten Bauskript des
+Herstellers und der Emscripten-Version, mit der der Hersteller testet. Der Workflow
+`libheif-Bau` führt das auf GitHub aus und vergleicht Byte für Byte mit den
+ausgelieferten Dateien. Ein Kontrollbau baut die frühere Fassung nach: Die
+WebAssembly-Datei war Byte für Byte gleich der des Fertigpakets. Damit ist belegt,
+dass der Weg derselbe ist und sich nur die Quellen unterscheiden.
+*Betrachtete Alternativen:* auf ein neues Fertigpaket warten (kein Termin; auch dessen
+Bauweg stellt libde265 1.0.15 ein) und den Dekoder abschalten (Samsung-Fotos scheitern
+wieder, 3 von 31 Versuchen am 08.09.).
+*Neu bewerten, wenn* der Hersteller selbst fertige WebAssembly-Dateien mit aktueller
+libde265 veröffentlicht.
+
+**Bewusste Abweichungen vom Herstellerweg.**
+- libde265 ab 1.1 baut nur noch mit cmake, das Herstellerskript kennt nur den
+  älteren Weg. Das Rezept baut libde265 deshalb vorab und legt das Ergebnis dort ab,
+  wo das Skript es erwartet. Dass wirklich die neue libde265 im Ergebnis steckt,
+  prüft das Rezept an der Versionsnummer in der WebAssembly-Datei.
+- libde265 wird ohne `NDEBUG` gebaut, die internen Prüfungen (`assert`) bleiben aktiv —
+  wie beim bisherigen Herstellerweg.
+- `libheif.js` wird nicht mehr nachträglich mit esbuild umgeschrieben (das tat das
+  Fertigpaket für ältere Node-Versionen); ausgeliefert wird die Ausgabe von Emscripten.
+
+**Restrisiko.** Emscripten lädt seine Werkzeuge beim Bau selbst herunter; deren
+Unverändertheit sichern wir nicht einzeln ab. Der Kontrollbau zeigt eine Änderung
+dort an, weil er dann nicht mehr Byte für Byte übereinstimmt.
+
+**Nachtlauf.** `.github/workflows/sicherheit-nachts.yml` prüft täglich: npm-Lücken in
+beiden Bäumen einschließlich der Werkzeuge (der PR-Riegel prüfte bis 30.09.2026 den
+Wurzelbaum nicht, Befund OSS-2026-09-30-06), die Herstellermeldungen zu jeder
+Bibliothek unter `public/lib` und die Abkündigungshinweise von GitHub. Diese Prüfungen
+laufen bewusst nicht im Pull Request: Sie lesen fremde Quellen, und eine neue fremde
+Meldung dürfte nicht jeden unbeteiligten PR blockieren (2026-07-01). Ausnahmen gibt es
+nur begründet und mit Ablaufdatum; jede steht in jeder Ausgabe. Alarm: die
+Benachrichtigung von GitHub bei einem roten Lauf. Was dann zu tun ist:
+`docs/RUNBOOK.md`.
+
 ## Kinderschutz-Filter: Anzahl und Diagnose (09.09.2026)
 
 **Was war.** Der Werbe-Aufruf lieferte sechs bis acht Einträge, der Filter

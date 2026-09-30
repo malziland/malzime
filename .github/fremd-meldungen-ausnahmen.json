@@ -1,0 +1,40 @@
+{
+  "_hinweis": [
+    "Begruendete Ausnahmen fuer scripts/pruefe-fremd-meldungen.mjs (naechtlicher",
+    "Sicherheitslauf fuer die mitgelieferten Bibliotheken unter public/lib).",
+    "",
+    "Hier gehoert nur herein, was nachweislich keine Reparatur braucht: eine",
+    "Meldung, deren Versionsangaben das Skript nicht auswerten kann oder die sich",
+    "widersprechen, bei der aber am Quelltext belegt ist, dass unser Stand nicht",
+    "betroffen ist. Eine Meldung, die uns betrifft, wird behoben (neu bauen oder",
+    "neu kopieren), nicht eingetragen.",
+    "",
+    "Pflichtfelder: ghsa, bibliothek (Name wie im Skript, z. B. libheif), grund",
+    "(mit Beleg), eingetragen, pruefen_bis. Nach dem Pruefdatum zaehlt die Meldung",
+    "wieder als offen — keine Ausnahme bleibt still liegen. Jede Ausnahme wird bei",
+    "jedem Lauf mit ausgegeben."
+  ],
+  "ausnahmen": [
+    {
+      "ghsa": "GHSA-5hqq-636x-r3cr",
+      "bibliothek": "libheif",
+      "grund": "Meldung nennt keine Version ('current main at b12b733', 'fixed version unknown'). Behoben mit Commit 40f361a1e1c3 (25.05.2026, Commit-Nachricht nennt GHSA-5hqq-636x-r3cr); laut GitHub-Vergleich 40f361a...v1.23.5 in 1.23.5 enthalten. Betrifft ausserdem die Schreibfunktion heif_region_item_add_region_inline_mask, die post.js und public/js/heic.js nicht aufrufen.",
+      "eingetragen": "2026-09-30",
+      "pruefen_bis": "2027-03-31"
+    },
+    {
+      "ghsa": "GHSA-h27h-4hc4-5vf5",
+      "bibliothek": "libheif",
+      "grund": "Meldung nennt weder betroffene noch behobene Version. Nullzeiger in HeifFile::get_item_data bei fehlender iloc-Box: libheif 1.23.5 prueft in libheif/file.cc vor jedem Zugriff 'if (!m_iloc_box) return Error(heif_error_Invalid_input, heif_suberror_No_iloc_box)'. Die betroffene Funktion heif_item_get_item_data ruft unser Dekodierweg (post.js) ausserdem nicht auf.",
+      "eingetragen": "2026-09-30",
+      "pruefen_bis": "2027-03-31"
+    },
+    {
+      "ghsa": "GHSA-wjj2-gjqj-5gr4",
+      "bibliothek": "libheif",
+      "grund": "Betrifft heifio/decoder_tiff.cc (TIFF-Leser der Beispielprogramme), nicht die Bibliothek. In unser Ergebnis wird nur libheif/libheif.a eingebunden (build-emscripten.sh, Aufruf von emcc); heifio ist nicht Teil davon.",
+      "eingetragen": "2026-09-30",
+      "pruefen_bis": "2027-03-31"
+    }
+  ]
+}

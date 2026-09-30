@@ -143,6 +143,13 @@ Diese Dateien enthalten malziME-spezifische Inhalte (Domain, Firma, Kontakt) die
 
 Der CI-Workflow laeuft automatisch bei Push und Pull Request. Er fuehrt Tests, Lint und Secret-Scan aus.
 
+Zwei weitere Workflows laufen ohne Anpassung mit: `sicherheit-nachts.yml` (taeglich; meldet
+Sicherheitsluecken und Abkuendigungen, braucht nur das eingebaute `GITHUB_TOKEN`) und
+`libheif-bau.yml` (baut den HEIC-Dekoder nach, nur bei Aenderungen an ihm). Die
+Benachrichtigung bei einem roten Nachtlauf schickt GitHub an das Konto, das den Zeitplan
+zuletzt geaendert hat. In einem Fork schaltet GitHub geplante Workflows zunaechst ab; den
+Nachtlauf unter „Actions" einmal aktivieren.
+
 Deploy ist manuell per `firebase deploy` — es gibt keinen automatischen Deploy-Workflow.
 
 ### 5f. Locale-Dateien (optional)

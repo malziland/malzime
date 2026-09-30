@@ -26,20 +26,28 @@ case "$1" in
   api)
     # Herkunftsnachweis des HEIC-Dekoders und Alter des Nachtlaufs: Die
     # Attrappe liefert API-JSON und wendet den uebergebenen jq-Ausdruck mit
-    # ECHTEM jq an (Befund H-17) — sonst bliebe genau dieser Ausdruck
-    # ungetestet. ATTRAPPE_LIBHEIF_LAEUFE / ATTRAPPE_NACHT_LAEUFE: JSON wie die
-    # API; Vorgabe ein gruener, abgeschlossener Lauf bzw. ein Lauf vor 2 h.
+    # ECHTEM jq an (Befund H-17). Sie prueft ausserdem die ABFRAGE (Befund
+    # J-05): falscher Commit, fehlender Zweig- oder Statusfilter -> lauter
+    # Fehlschlag statt einer passenden Antwort. Der erwartete Commit ist der
+    # juengste mit Aenderung an Dekoder, Rezept oder Workflow im Arbeitsbaum
+    # (dem Testklon).
+    # ATTRAPPE_LIBHEIF_LAEUFE / ATTRAPPE_NACHT_LAEUFE: JSON wie die API.
     case "$*" in
-      *"workflows/libheif-bau.yml/runs"*|*"workflows/sicherheit-nachts.yml/runs"*)
+      *"/actions/workflows/"*)
         JQ=""; VORIG=""
         for a in "$@"; do [ "$VORIG" = "--jq" ] && JQ="$a"; VORIG="$a"; done
         case "$*" in
-          *libheif-bau*)
+          *"workflows/libheif-bau.yml/runs"*)
+            ERWARTET=$(git log -1 --format=%H -- public/lib/libheif scripts/libheif-bauen.sh .github/workflows/libheif-bau.yml)
+            case "$*" in *"head_sha=$ERWARTET"*) ;; *) echo "ATTRAPPE gh: libheif-Abfrage ohne head_sha=$ERWARTET: $*" >&2; exit 97 ;; esac
             if [ -n "${ATTRAPPE_LIBHEIF_LAEUFE:-}" ]; then JSON="$ATTRAPPE_LIBHEIF_LAEUFE"
             else JSON='{"workflow_runs":[{"created_at":"2026-09-30T10:00:00Z","status":"completed","conclusion":"success"}]}'; fi ;;
-          *)
+          *"workflows/sicherheit-nachts.yml/runs"*)
+            case "$*" in *"branch=main"*"status=completed"*|*"status=completed"*"branch=main"*) ;;
+              *) echo "ATTRAPPE gh: Nachtlauf-Abfrage ohne branch=main und status=completed: $*" >&2; exit 97 ;; esac
             if [ -n "${ATTRAPPE_NACHT_LAEUFE:-}" ]; then JSON="$ATTRAPPE_NACHT_LAEUFE"
-            else JSON="{\"workflow_runs\":[{\"created_at\":\"$(node -e 'console.log(new Date(Date.now()-2*3600000).toISOString())')\"}]}"; fi ;;
+            else JSON="{\"workflow_runs\":[{\"created_at\":\"$(node -e 'console.log(new Date(Date.now()-2*3600000).toISOString())')\",\"event\":\"schedule\",\"head_repository\":{\"full_name\":\"malziland/malzime\"}}]}"; fi ;;
+          *) echo "ATTRAPPE gh: unbekannte Workflow-Abfrage: $*" >&2; exit 97 ;;
         esac
         printf '%s' "$JSON" | jq -r "$JQ"
         exit $? ;;

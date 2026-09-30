@@ -152,8 +152,8 @@ GitHub-Secrets `NTFY_URL_EU` und `NTFY_TOPIC_EU` und passt die Bedingung
 `github.repository` im Workflow an (der Deploy-Riegel hält den Alarm-Job per
 Prüfsumme fest; die neue Summe zeigt `python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`).
 In einem Fork schaltet GitHub geplante Workflows zunächst ab; den Nachtlauf unter
-„Actions" einmal aktivieren — `scripts/deploy.sh` verlangt einen Nachtlauf, der
-höchstens 26 Stunden alt ist.
+„Actions" einmal aktivieren. (`scripts/deploy.sh` ist auf das Original-Repository
+zugeschnitten; Selbst-Hoster deployen wie oben beschrieben mit `firebase deploy`.)
 
 Deploy ist manuell per `firebase deploy` — es gibt keinen automatischen Deploy-Workflow.
 

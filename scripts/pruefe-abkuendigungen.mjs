@@ -104,21 +104,41 @@ async function laeufeLesen() {
   const workflows = await github(`/repos/${repo}/actions/workflows?per_page=100`);
   const letzte = [];
   const ungesehen = [];
-  for (const wf of workflows.workflows || []) {
-    if (wf.state !== "active") continue;
-    const zaehlt = (l) => !["cancelled", "skipped"].includes(l.conclusion);
-    const aufMain = await github(
-      `/repos/${repo}/actions/workflows/${wf.id}/runs?branch=main&status=completed&per_page=10`
-    );
-    let lauf = (aufMain.workflow_runs || []).find(zaehlt);
-    /* Manche Workflows laufen nie auf main (Dependabot Auto-Merge nur im Pull
-       Request). Dann gilt der juengste Lauf auf irgendeinem Zweig (Befund H-12);
-       sonst saehe diese Pruefung genau die Klasse Hinweise nicht, fuer die es
-       sie gibt. */
-    if (!lauf) {
-      const irgendwo = await github(`/repos/${repo}/actions/workflows/${wf.id}/runs?status=completed&per_page=10`);
-      lauf = (irgendwo.workflow_runs || []).find(zaehlt);
+  /* Welche Laeufe zaehlen (Befunde J-02, J-03, 30.09.2026):
+     · nur Laeufe dieses Repositorys — `branch=main` liefert auch Laeufe aus
+       Forks, deren Zweig zufaellig "main" heisst,
+     · nicht uebersprungen, nicht abgebrochen, nicht "Freigabe noetig" (solche
+       Laeufe haben keinen einzigen Job, also auch keine Hinweise).
+     Geblaettert wird, bis ein zaehlender Lauf gefunden ist, hoechstens
+     SEITEN_MAX Seiten: Dependabot Auto-Merge endet bei jedem Pull Request
+     eines Menschen als "skipped" — im September lagen 40 solche Laeufe
+     zwischen zwei echten. Ein kleines festes Fenster haette jede Nacht einen
+     falschen Alarm ausgeloest. */
+  const SEITEN_MAX = 5;
+  const zaehlt = (l, aufMain) =>
+    l.head_repository?.full_name === repo &&
+    !["cancelled", "skipped", "action_required"].includes(l.conclusion) &&
+    (!aufMain || l.event !== "pull_request");
+  async function suche(abfrage, aufMain) {
+    for (let seite = 1; seite <= SEITEN_MAX; seite++) {
+      const antwort = await github(`${abfrage}&per_page=100&page=${seite}`);
+      const liste = antwort.workflow_runs || [];
+      const treffer = liste.find((l) => zaehlt(l, aufMain));
+      if (treffer) return treffer;
+      if (liste.length < 100) return null;
     }
+    return null;
+  }
+  for (const wf of workflows.workflows || []) {
+    if (wf.state !== "active") {
+      console.log(`Nicht aktiv, uebergangen: ${wf.name} (${wf.state})`);
+      continue;
+    }
+    const basis = `/repos/${repo}/actions/workflows/${wf.id}/runs?status=completed`;
+    /* Zuerst main. Manche Workflows laufen nie auf main (Dependabot Auto-Merge
+       nur im Pull Request) — dann gilt der juengste zaehlende Lauf auf
+       irgendeinem Zweig dieses Repositorys (Befund H-12). */
+    const lauf = (await suche(`${basis}&branch=main`, true)) || (await suche(basis, false));
     if (lauf) letzte.push(lauf);
     else ungesehen.push(wf.name);
   }
@@ -145,7 +165,11 @@ function ausnahmenLesen() {
   }
 }
 
-const PFLICHTFELDER = ["muster", "grund", "eingetragen", "pruefen_bis"];
+/* Zwei Arten von Ausnahmen: "muster" (ein Hinweistext, bei dem bewusst nichts
+   zu tun ist) und "ungesehen" (ein Workflow, der absichtlich nie laeuft —
+   sonst waere "kein Lauf" ein Befund). Beide mit Begruendung und Ablaufdatum. */
+const PFLICHTFELDER = ["grund", "eingetragen", "pruefen_bis"];
+const art = (a) => (a.muster ? "muster" : a.ungesehen ? "ungesehen" : null);
 
 /* Befund G-04 (30.09.2026): Ablaufdatum nur in der Form JJJJ-MM-TT, sonst
    liefe es im Zeichenkettenvergleich nie ab (vgl. OSS-2026-08-12-21). */
@@ -165,13 +189,14 @@ async function main() {
   const ausnahmen = ausnahmenLesen();
   const befunde = [];
   const hinweise = [];
+  const brauchbar = (a) => art(a) && PFLICHTFELDER.every((f) => a[f]) && datumGueltig(a.pruefen_bis);
   for (const a of ausnahmen) {
+    const name = a.muster || a.ungesehen || "?";
     const fehlt = PFLICHTFELDER.filter((f) => !a[f]);
-    if (fehlt.length) befunde.push(`AUSNAHME UNGUELTIG  "${a.muster || "?"}": es fehlt ${fehlt.join(", ")}`);
+    if (!art(a)) befunde.push(`AUSNAHME UNGUELTIG  "${name}": weder "muster" noch "ungesehen" angegeben`);
+    else if (fehlt.length) befunde.push(`AUSNAHME UNGUELTIG  "${name}": es fehlt ${fehlt.join(", ")}`);
     else if (!datumGueltig(a.pruefen_bis)) {
-      befunde.push(
-        `AUSNAHME UNGUELTIG  "${a.muster}": pruefen_bis "${a.pruefen_bis}" ist kein Datum der Form JJJJ-MM-TT`
-      );
+      befunde.push(`AUSNAHME UNGUELTIG  "${name}": pruefen_bis "${a.pruefen_bis}" ist kein Datum der Form JJJJ-MM-TT`);
     }
   }
   const gesehen = new Set();
@@ -185,11 +210,7 @@ async function main() {
       if (gesehen.has(text)) continue;
       gesehen.add(text);
       const ausnahme = ausnahmen.find(
-        (a) =>
-          PFLICHTFELDER.every((f) => a[f]) &&
-          datumGueltig(a.pruefen_bis) &&
-          text.includes(a.muster) &&
-          a.pruefen_bis >= HEUTE
+        (a) => brauchbar(a) && art(a) === "muster" && text.includes(a.muster) && a.pruefen_bis >= HEUTE
       );
       const zeile = `${String(h.annotation_level || "?").toUpperCase()}  ${lauf}: ${text.slice(0, 300)}`;
       if (ausnahme) hinweise.push(`${zeile}\n      ausgenommen bis ${ausnahme.pruefen_bis}: ${ausnahme.grund}`);
@@ -200,7 +221,12 @@ async function main() {
   /* Ein aktiver Workflow ohne einen einzigen abgeschlossenen Lauf wurde nicht
      geprueft — das ist kein "sauber" (KERN 5c). */
   for (const name of ungesehen) {
-    befunde.push(`UNGESEHEN  Workflow "${name}": kein abgeschlossener Lauf — seine Hinweise wurden nicht gelesen`);
+    const zeile = `UNGESEHEN  Workflow "${name}": kein zaehlender abgeschlossener Lauf — seine Hinweise wurden nicht gelesen`;
+    const ausnahme = ausnahmen.find(
+      (a) => brauchbar(a) && art(a) === "ungesehen" && a.ungesehen === name && a.pruefen_bis >= HEUTE
+    );
+    if (ausnahme) hinweise.push(`${zeile}\n      ausgenommen bis ${ausnahme.pruefen_bis}: ${ausnahme.grund}`);
+    else befunde.push(zeile);
   }
   for (const h of hinweise) console.log(`  [Ausnahme] ${h}`);
   if (befunde.length === 0) {

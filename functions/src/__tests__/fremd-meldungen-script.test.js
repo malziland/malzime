@@ -220,6 +220,14 @@ describe("pruefe-fremd-meldungen: Versionsangaben der Hersteller", () => {
     expect(lauf({ meldungenPfad: meldungen(untergrenze) }).code).toBe(0);
   });
 
+  test("J-12: eine Liste nackter Fundversionen ist ebenso unklar wie eine einzelne", () => {
+    versionen({ libheif: "1.23.5" });
+    const m = { "repo:strukturag/libheif": [meldung("GHSA-n", "1.17.0, 1.18.0", "")] };
+    const r = lauf({ meldungenPfad: meldungen(m) });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("UNKLAR  libheif 1.23.5  GHSA-n");
+  });
+
   test("Meldung ohne Einträge: unklar = rot", () => {
     const leer = { ...meldung("GHSA-g", "", ""), vulnerabilities: [] };
     versionen();

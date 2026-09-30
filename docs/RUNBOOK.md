@@ -825,7 +825,8 @@ Schutz still ausfällt, und was sie auffängt:
 - *Der Nachtlauf läuft nicht* (GitHub schaltet geplante Workflows in öffentlichen
   Repositories nach 60 Tagen ohne Aktivität ab und verwirft unter Last gelegentlich
   geplante Läufe). `scripts/deploy.sh` bricht ab, wenn der jüngste abgeschlossene
-  Nachtlauf auf `main` fehlt oder älter als 26 Stunden ist — geprüft wird nur das
+  Nachtlauf auf `main` fehlt oder älter ist als `NACHT_GRENZE_MINUTEN` in
+  `scripts/deploy.sh` — geprüft wird nur das
   Alter, nicht die Farbe. Dann: `gh workflow run sicherheit-nachts.yml`, abwarten
   (rund eine Minute), erneut deployen; ist der Workflow abgeschaltet, unter
   „Actions" einschalten.

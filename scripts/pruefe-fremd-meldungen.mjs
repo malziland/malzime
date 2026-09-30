@@ -166,7 +166,9 @@ export function bewerte(versionText, bereich, behobenText) {
       /* Eine einzelne nackte Version ("1.17.0") meint bei libheif "gefunden in",
          nicht "nur dort". Liegt unsere Version darueber und ist keine Reparatur
          genannt, laesst sich nichts ausschliessen (Befund G-03). */
-      if (bedingungen.length === 1 && bedingungen[0].op.startsWith("=") && istBehoben !== true) {
+      /* Auch eine Liste nackter Versionen ("1.17.0, 1.18.0") meint "gefunden in"
+         — dieselbe Bedeutung, dasselbe Urteil (Befund J-12). */
+      if (bedingungen.every((b) => b.op.startsWith("=")) && istBehoben !== true) {
         return "unklar";
       }
       /* Liegt sie DARUEBER, die Reparatur aber noch hoeher, widersprechen sich

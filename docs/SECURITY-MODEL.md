@@ -509,22 +509,30 @@ unbeteiligten PR blockieren (2026-07-01). Der netzfreie Teil — ist jede Biblio
 Ausnahmen gibt es nur begründet, mit Ablaufdatum in der Form JJJJ-MM-TT und — bei
 Herstellermeldungen — für genau eine Version; jede steht in jeder Ausgabe.
 
-*Alarm:* Ist auf `main` einer der Prüf-Jobs rot oder abgebrochen, geht ein
-ntfy-Push mit Stufe „urgent" aufs Handy (Adresse als GitHub-Secret). Die Mail von
-GitHub genügt nicht, sie wird beim Empfänger automatisch gelöscht. Am 1. jedes
-Monats kommt eine sichtbare Probe; bleibt sie aus, ist der Alarmweg gestört.
+*Alarm:* Ist auf `main` einer der Prüf-Jobs nicht erfolgreich — rot, abgebrochen
+oder übersprungen —, geht ein ntfy-Push mit Stufe „urgent" aufs Handy (Adresse als
+GitHub-Secret). Die Mail von GitHub genügt nicht, sie wird beim Empfänger
+automatisch gelöscht. Am 1. jedes Monats kommt eine sichtbare Probe; bleibt sie aus,
+ist der Alarmweg gestört. Ist in einem Probelauf eine Prüfung nicht grün, meldet
+der Push „ROT", nicht „PROBE".
 
-*Festgeschrieben:* Wie die beiden Sicherheits-Workflows aussehen müssen, prüft
-`scripts/pruefe-deploy-riegel.py` als positiven Vertrag — genau ein festgelegter
-Befehl je Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden
-Umgebungswerte, ein täglicher Zeitplan; der Alarm-Job und die Jobs des Nachbaus sind
-per Prüfsumme festgeschrieben. Frei bleiben nur die `uses:`-Zeilen, damit Dependabot
-die Actions anheben kann.
+*Festgeschrieben:* Die beiden Sicherheits-Workflows sind im Deploy-Riegel
+(`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben. Frei
+bleiben nur die Versionskennungen der Actions (`uses: owner/repo@<SHA> # vN` — SHA und
+Kommentar; Dependabot hebt sie an) sowie Kommentar- und Leerzeilen außerhalb
+mehrzeiliger Befehle und Ausdrücke. Jede andere Änderung macht den Riegel rot; eine
+bewusste Änderung trägt man dort nach (`--vertrag-summen`). Zusätzlich prüft er
+inhaltlich: genau ein festgelegter Befehl je Prüf-Job, kein `if`, kein
+`continue-on-error`, keine umlenkenden Umgebungswerte, ein täglicher Zeitplan.
+*Grenze:* Die Prüfsumme schützt vor versehentlichem Stilllegen, nicht vor Absicht —
+wer den Workflow ändert, kann die Summe mitändern; beides steht dann im selben Pull
+Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig.
 
 *Restrisiken:*
 - Ob GitHub den Nachtlauf tatsächlich ausführt, sieht der Vertrag nicht (60-Tage-
   Abschaltung, verworfene Läufe). Aufgefangen beim nächsten Deploy: `deploy.sh`
-  verlangt einen abgeschlossenen Nachtlauf auf `main`, höchstens 26 Stunden alt.
+  verlangt einen abgeschlossenen Nachtlauf auf `main`, nicht älter als die Grenze
+  `NACHT_GRENZE_MINUTEN` in `scripts/deploy.sh`.
   Zwischen zwei Deploys fällt ein ausbleibender Nachtlauf nur durch die ausbleibende
   Monatsprobe auf.
 - Der Alarm-Job kann seinen eigenen Fehlschlag nicht melden (fehlendes Secret,

@@ -165,41 +165,64 @@ test("die echte Ausnahmeliste ist vollständig ausgefüllt", () => {
   }
 });
 
-/* ── Der echte Netzweg (Befund H-12) ─────────────────────────────────────────
+/* ── Der echte Netzweg (Befunde H-12, J-02, J-03) ────────────────────────────
    Die Tests oben speisen die Läufe fertig ein. Hier läuft der Code, der die
-   Workflows einzeln abfragt, bei fehlendem Lauf auf main auf andere Zweige
-   ausweicht und ungesehene Workflows meldet — gegen eine Attrappe von fetch. */
+   Workflows einzeln abfragt, blättert, fremde und leere Läufe aussortiert und
+   ungesehene Workflows meldet — gegen eine Attrappe von fetch. */
 describe("pruefe-abkuendigungen: Netzweg", () => {
   const API = "https://api.github.com/repos/test/repo/actions";
+  const eigenes = { full_name: "test/repo" };
+  const fremdes = { full_name: "jemand/fork" };
+  const lauf = (id, name, weiteres = {}) => ({
+    id,
+    name,
+    run_number: 1,
+    head_sha: "abcdef1234567",
+    conclusion: "success",
+    event: "push",
+    head_repository: eigenes,
+    ...weiteres,
+  });
+  const uebersprungen = (n, start) =>
+    Array.from({ length: n }, (_, i) =>
+      lauf(start + i, "Auto-Merge", { conclusion: "skipped", event: "pull_request" })
+    );
+  const seite = (wf, main, nr) =>
+    `${API}/workflows/${wf}/runs?status=completed${main ? "&branch=main" : ""}&per_page=100&page=${nr}`;
   const leer = { workflow_runs: [] };
-  const lauf = (id, name) => ({ id, name, run_number: 1, head_sha: "abcdef1234567", conclusion: "success" });
 
-  function karte({ autoMergeHinweis, neuerWorkflow = false }) {
+  function karte({ autoMergeHinweis = false, neuerWorkflow = false, ciMain = [lauf(11, "CI")] } = {}) {
     const workflows = [
       { id: 1, name: "CI", state: "active" },
       { id: 2, name: "Auto-Merge", state: "active" },
+      { id: 4, name: "Alt", state: "disabled_manually" },
     ];
     if (neuerWorkflow) workflows.push({ id: 3, name: "Neu", state: "active" });
     return {
       [`${API}/workflows?per_page=100`]: { body: { workflows } },
-      [`${API}/workflows/1/runs?branch=main&status=completed&per_page=10`]: {
-        body: { workflow_runs: [lauf(11, "CI")] },
-      },
+      [seite(1, true, 1)]: { body: { workflow_runs: ciMain } },
+      [seite(1, false, 1)]: { body: { workflow_runs: [lauf(12, "CI", { event: "pull_request" })] } },
       [`${API}/runs/11/jobs?per_page=100`]: { body: { jobs: [{ id: 111, name: "test" }] } },
+      [`${API}/runs/12/jobs?per_page=100`]: { body: { jobs: [{ id: 121, name: "test" }] } },
       ["https://api.github.com/repos/test/repo/check-runs/111/annotations?per_page=100"]: { body: [] },
-      /* Auto-Merge läuft nie auf main — nur im Pull Request. */
-      [`${API}/workflows/2/runs?branch=main&status=completed&per_page=10`]: { body: leer },
-      [`${API}/workflows/2/runs?status=completed&per_page=10`]: { body: { workflow_runs: [lauf(22, "Auto-Merge")] } },
+      ["https://api.github.com/repos/test/repo/check-runs/121/annotations?per_page=100"]: { body: [] },
+      /* Auto-Merge läuft nie auf main — und auf Seite 1 stehen nur 100
+         übersprungene Läufe; der zählende steht erst auf Seite 2 (J-02). */
+      [seite(2, true, 1)]: { body: leer },
+      [seite(2, false, 1)]: { body: { workflow_runs: uebersprungen(100, 1000) } },
+      [seite(2, false, 2)]: {
+        body: { workflow_runs: [...uebersprungen(3, 2000), lauf(22, "Auto-Merge", { event: "pull_request" })] },
+      },
       [`${API}/runs/22/jobs?per_page=100`]: { body: { jobs: [{ id: 222, name: "automerge" }] } },
       ["https://api.github.com/repos/test/repo/check-runs/222/annotations?per_page=100"]: {
         body: autoMergeHinweis ? [{ annotation_level: "warning", message: NODE20 }] : [],
       },
-      [`${API}/workflows/3/runs?branch=main&status=completed&per_page=10`]: { body: leer },
-      [`${API}/workflows/3/runs?status=completed&per_page=10`]: { body: leer },
+      [seite(3, true, 1)]: { body: leer },
+      [seite(3, false, 1)]: { body: leer },
     };
   }
 
-  function netzLauf(k) {
+  function netzLauf(k, ausnahmenListe = []) {
     const p = path.join(basis, "fetch.json");
     fs.writeFileSync(p, JSON.stringify(k));
     try {
@@ -210,7 +233,7 @@ describe("pruefe-abkuendigungen: Netzweg", () => {
           FETCH_ATTRAPPE: p,
           GITHUB_REPOSITORY: "test/repo",
           ABKUENDIGUNG_DATEN: "",
-          ABKUENDIGUNG_AUSNAHMEN: path.join(basis, "keine.json"),
+          ABKUENDIGUNG_AUSNAHMEN: ausnahmen(ausnahmenListe),
           ABKUENDIGUNG_HEUTE: "2026-09-30",
         },
       });
@@ -220,21 +243,49 @@ describe("pruefe-abkuendigungen: Netzweg", () => {
     }
   }
 
-  test("Hinweis an einem Workflow, der nur im Pull Request läuft, wird gefunden", () => {
+  test("J-02: der zählende Lauf hinter 103 übersprungenen wird gefunden — kein falscher UNGESEHEN-Alarm", () => {
+    const r = netzLauf(karte());
+    expect(r.code).toBe(0);
+    expect(r.aus).toContain("Gelesen: 2 Lauf/Laeufe");
+    expect(r.aus).not.toContain("UNGESEHEN");
+  });
+
+  test("Hinweis an diesem Lauf (nur im Pull Request) wird gefunden: rot", () => {
     const r = netzLauf(karte({ autoMergeHinweis: true }));
     expect(r.code).toBe(1);
     expect(r.aus).toContain("Node.js 20 is deprecated");
   });
 
-  test("ohne Hinweise: grün, und beide Workflows wurden gelesen", () => {
-    const r = netzLauf(karte({ autoMergeHinweis: false }));
+  test("J-03: ein Fork-Lauf mit Zweig main und ein Lauf 'Freigabe nötig' zählen nicht als letzter Lauf auf main", () => {
+    const k = karte({
+      ciMain: [
+        lauf(91, "CI", { head_repository: fremdes, event: "pull_request" }),
+        lauf(92, "CI", { conclusion: "action_required" }),
+        lauf(11, "CI"),
+      ],
+    });
+    const r = netzLauf(k);
+    /* Gelesen wurde Lauf 11 — für 91 und 92 hat die Attrappe keine Jobs, ein
+       Zugriff darauf wäre ein Messfehler (rc 2). */
     expect(r.code).toBe(0);
-    expect(r.aus).toContain("Gelesen: 2 Lauf/Laeufe");
   });
 
-  test("ein Workflow ohne jeden abgeschlossenen Lauf ist UNGESEHEN: rot", () => {
-    const r = netzLauf(karte({ autoMergeHinweis: false, neuerWorkflow: true }));
+  test("ein aktiver Workflow ohne jeden zählenden Lauf ist UNGESEHEN: rot", () => {
+    const r = netzLauf(karte({ neuerWorkflow: true }));
     expect(r.code).toBe(1);
     expect(r.aus).toContain('UNGESEHEN  Workflow "Neu"');
+  });
+
+  test("… mit begründeter Ausnahme: grün, aber sichtbar", () => {
+    const r = netzLauf(karte({ neuerWorkflow: true }), [
+      { ungesehen: "Neu", grund: "laeuft nur von Hand", eingetragen: "2026-09-30", pruefen_bis: "2027-03-31" },
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.aus).toContain("[Ausnahme] UNGESEHEN");
+  });
+
+  test("nicht aktive Workflows werden genannt, nicht still übergangen", () => {
+    const r = netzLauf(karte());
+    expect(r.aus).toContain("Nicht aktiv, uebergangen: Alt");
   });
 });

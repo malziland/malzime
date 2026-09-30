@@ -304,6 +304,31 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     expect(r.ausgabe).toMatch(/Ist: failure/);
   });
 
+  /* Befund J-05: Aendert der juengste Commit nur das Rezept, muss genau DIESER
+     Commit abgefragt werden — die Attrappe prueft die Abfrage und scheitert
+     laut, wenn deploy.sh einen anderen Commit nennt (etwa bei gekuerzter
+     Pfadliste). */
+  test("ein Commit, der nur das Rezept aendert, wird als Herkunfts-Commit abgefragt", () => {
+    const vorher = execSync(`git -C "${klon}" rev-parse HEAD`, { encoding: "utf8" }).trim();
+    try {
+      execSync(
+        [
+          `printf '\n# Probe\n' >> "${klon}/scripts/libheif-bauen.sh"`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q -am "nur Rezept"`,
+          `git -C "${klon}" branch -f main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+      const r = deploy();
+      expect(r.ausgabe).not.toMatch(/ATTRAPPE gh: libheif-Abfrage ohne head_sha/);
+      expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen fuer [0-9a-f]{40}/);
+    } finally {
+      execSync(`git -C "${klon}" reset -q --hard ${vorher} && git -C "${klon}" branch -f main ${vorher}`, {
+        stdio: "pipe",
+      });
+    }
+  });
+
   /* Befund H-10: Der dokumentierte Rueckweg (Dekoder entfernen) darf nicht am
      Herkunftsriegel scheitern — ohne Dekoder gibt es nichts nachzuweisen. */
   test("ohne Dekoder-Ordner (Rueckweg) gibt es nur einen Hinweis, keinen Abbruch", () => {
@@ -332,11 +357,42 @@ describe("deploy.sh — Verhalten der Riegel", () => {
 
   /* Befund H-03: Ein ausbleibender Nachtlauf alarmiert niemanden — der
      Deploy prueft deshalb das ALTER des juengsten Laufs auf main. */
+  const nachtLauf = (minutenAlt, weiteres = {}) => ({
+    created_at: new Date(Date.now() - minutenAlt * 60000).toISOString(),
+    event: "schedule",
+    head_repository: { full_name: "malziland/malzime" },
+    ...weiteres,
+  });
+  const nacht = (...laeufe) => JSON.stringify({ workflow_runs: laeufe });
+
   test("zu alter Nachtlauf haelt die Auslieferung an", () => {
-    const alt = new Date(Date.now() - 30 * 3600000).toISOString();
-    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: JSON.stringify({ workflow_runs: [{ created_at: alt }] }) });
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(30 * 60)) });
     expect(r.code).not.toBe(0);
-    expect(r.ausgabe).toMatch(/Nachtlauf .*aelter als 26 Stunden/);
+    expect(r.ausgabe).toMatch(/Nachtlauf .*aelter als 1560 min/);
+  });
+
+  /* Befund J-08: knapp unter und knapp ueber der Grenze (zwei Tests, weil ein
+     durchlaufender Deploy den Testklon veraendert). */
+  test("Nachtlauf 25 h 50 min alt: geht durch", () => {
+    expect(deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(1550)) }).code).toBe(0);
+  });
+
+  test("Nachtlauf 26 h 10 min alt: haelt an", () => {
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(1570)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  /* Befund J-03: ein frischer Lauf aus einem Fork (Zweig "main") zaehlt nicht. */
+  test("ein frischer Fork-Lauf verdeckt keinen fehlenden eigenen Nachtlauf", () => {
+    const r = deploy({
+      ATTRAPPE_NACHT_LAEUFE: nacht(
+        nachtLauf(10, { event: "pull_request", head_repository: { full_name: "jemand/fork" } }),
+        nachtLauf(40 * 60)
+      ),
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
   });
 
   test("fehlender Nachtlauf haelt die Auslieferung an", () => {
@@ -712,7 +768,7 @@ describe("deploy.sh — der Erfolgsweg", () => {
     expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
     /* Der Herkunftsriegel hat wirklich gefragt, nicht nur geschwiegen. */
     expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen/);
-    expect(r.ausgabe).toMatch(/Nachtlauf: juengster Lauf auf main vor \d+ h/);
+    expect(r.ausgabe).toMatch(/Nachtlauf: juengster Lauf auf main vor \d+ min \(Grenze 1560 min\)/);
     /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
     expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
   });

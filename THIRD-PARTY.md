@@ -20,7 +20,9 @@ nur über ihre öffentliche Schnittstelle aufgerufen und erst geladen, wenn ein
 HEIC-Foto ausgewählt wurde. Der eigene Code (`public/js/heic.js`) bleibt MIT. Wer
 die Bibliothek austauschen will, ersetzt die beiden Dateien. Seit 30.09.2026 bauen
 wir sie selbst: aus den unveränderten Quellen der Hersteller in genau der
-genannten Version, mit dem Bauskript des Herstellers. Das Rezept liegt offen
+genannten Version, mit dem Bauskript des Herstellers für libheif; libde265 wird
+vorab mit cmake gebaut, weil das Herstellerskript den neueren Bauweg von libde265
+nicht kennt (Begründung im Kopf des Rezepts). Das Rezept liegt offen
 (`scripts/libheif-bauen.sh`), der Workflow `.github/workflows/libheif-bau.yml` baut
 es auf GitHub nach und vergleicht Byte für Byte mit den ausgelieferten Dateien —
 jede und jeder kann den Bau damit wiederholen. Die Nutzung ist auf der Website

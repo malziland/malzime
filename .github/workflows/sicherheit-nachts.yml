@@ -25,7 +25,9 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Auf main nie abbrechen: Ein Handstart wuerde sonst einen laufenden
+  # Nachtlauf abbrechen, und "abgebrochen" loest einen Alarm aus (J-04).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 on:
   schedule:
@@ -95,13 +97,15 @@ jobs:
     # Nur auf main (Zeitplan oder Handstart): Probelaeufe auf Zweigen sollen
     # niemanden wecken. always(), damit der Job auch dann entschieden wird, wenn
     # ein Vorgaenger rot ist.
-    # Auch "cancelled" alarmiert: Ein abgebrochener Pruefjob hat nichts geprueft.
+    # Jedes Ergebnis ausser "success" alarmiert — auch "cancelled" und
+    # "skipped": Ein Pruefjob, der nicht gelaufen ist, hat nichts geprueft (J-04).
     # Nur im Original-Repository — in einer Kopie (Fork) fehlen die Secrets.
     needs: [npm-luecken, mitgelieferte-bibliotheken, abkuendigungen]
     if: >-
       always() && github.ref == 'refs/heads/main' && github.repository == 'malziland/malzime' &&
-      (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') ||
-      inputs.alarmprobe == true || github.event.schedule == '7 8 1 * *')
+      (needs.npm-luecken.result != 'success' || needs.mitgelieferte-bibliotheken.result != 'success' ||
+      needs.abkuendigungen.result != 'success' || inputs.alarmprobe == true ||
+      github.event.schedule == '7 8 1 * *')
     runs-on: ubuntu-latest
     steps:
       - name: Push an ntfy (Stufe urgent)
@@ -118,12 +122,15 @@ jobs:
             echo "::error::Secrets NTFY_URL_EU / NTFY_TOPIC_EU fehlen — der Alarm kann nicht hinaus."
             exit 1
           fi
-          if [ "$PROBE" = "true" ]; then
-            TITEL="malziME PROBE: Sicherheit nachts"
-            TEXT="Probe des Alarmwegs (monatlich oder von Hand). npm: $NPM, Bibliotheken: $BIBLIOTHEKEN, Abkuendigungen: $ABKUENDIGUNGEN."
-          else
+          # ROT hat Vorrang: Ist eine Pruefung nicht erfolgreich, darf eine
+          # gleichzeitige Probe das nicht verdecken (J-04).
+          if [ "$NPM" != "success" ] || [ "$BIBLIOTHEKEN" != "success" ] || [ "$ABKUENDIGUNGEN" != "success" ]; then
             TITEL="malziME: Sicherheit nachts ROT"
             TEXT="npm: $NPM, Bibliotheken: $BIBLIOTHEKEN, Abkuendigungen: $ABKUENDIGUNGEN. Was tun: docs/RUNBOOK.md, Nachtlauf rot."
+            [ "$PROBE" = "true" ] && TEXT="$TEXT (Lauf war zugleich eine Probe.)"
+          else
+            TITEL="malziME PROBE: Sicherheit nachts"
+            TEXT="Probe des Alarmwegs (monatlich oder von Hand): alle drei Pruefungen gruen."
           fi
           BODY=$(jq -n --arg t "$NTFY_TOPIC" --arg ti "$TITEL" --arg m "$TEXT" --arg c "$LAUF" \
             '{topic: $t, title: $ti, message: $m, priority: 5, tags: ["rotating_light"], click: $c}')

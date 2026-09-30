@@ -21,7 +21,11 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   (enthalten in firebase-admin und in Test-Werkzeugen) jetzt in 2.1.7 bzw.
   5.0.12. Die übrigen Pakete stehen auf dem neuesten Stand ihrer
   Versionsbereiche, darunter firebase-admin 14.5, firebase-functions 7.4 und
-  Cloud Tasks 7.2; die Browser-Modultests laufen mit Vitest 5.
+  Cloud Tasks 7.2; die Browser-Modultests laufen mit Vitest 5. Mit
+  firebase-admin 14.5 kommen neue Hauptversionen der Google-Bibliotheken
+  darunter: Firestore-Client 9, Storage-Client 8, google-gax 6 und
+  google-auth-library 11 (einzige angekündigte Bruchstelle: Node 22 oder
+  neuer; wir laufen auf Node 24).
 - **Prüfung auf bekannte Lücken deckt auch die Werkzeuge ab.** Der Riegel im
   Pull Request prüfte die Test- und Prüfwerkzeuge im Hauptordner bisher nicht.
   Jetzt prüft er beide Paketbäume vollständig.
@@ -50,8 +54,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Abkündigungshinweise von GitHub an den Läufen. Bei einem Fund kommt ein
   Push aufs Handy (ntfy, höchste Stufe), am 1. jedes Monats zusätzlich eine
   Probe. Ausnahmen nur begründet und mit Ablaufdatum; was zu tun ist, steht
-  in `docs/RUNBOOK.md`. Der Deploy bricht ab, wenn der Nachtlauf seit mehr als
-  26 Stunden nicht gelaufen ist, und ein neuer Fremdbaustein unter
+  in `docs/RUNBOOK.md`. Der Deploy bricht ab, wenn der Nachtlauf länger nicht
+  gelaufen ist (Grenze in `scripts/deploy.sh`), und ein neuer Fremdbaustein unter
   `public/lib` braucht schon im Pull Request einen Eintrag in der Beobachtung.
 
 ## [4.12.0] — 2026-09-28

@@ -29,7 +29,7 @@
       "ghsa": "GHSA-h27h-4hc4-5vf5",
       "bibliothek": "libheif",
       "version": "1.23.5",
-      "grund": "Meldung nennt weder betroffene noch behobene Version. Nullzeiger in HeifFile::get_item_data bei fehlender iloc-Box: libheif 1.23.5 prueft in libheif/file.cc vor jedem Zugriff 'if (!m_iloc_box) return Error(heif_error_Invalid_input, heif_suberror_No_iloc_box)'. Die betroffene Funktion heif_item_get_item_data ruft unser Dekodierweg (post.js) ausserdem nicht auf.",
+      "grund": "Meldung nennt weder betroffene noch behobene Version. Nullzeiger in HeifFile::get_item_data bei fehlender iloc-Box: libheif 1.23.5 bricht das Einlesen einer Datei ohne iloc-Box bereits ab (libheif/file.cc, Zeilen 618-621), und get_item_data prueft vor dem ersten Zugriff 'if (!m_iloc_box) return Error(...)' (Zeile 899). Die betroffene Funktion heif_item_get_item_data ruft unser Dekodierweg (post.js) ausserdem nicht auf.",
       "eingetragen": "2026-09-30",
       "pruefen_bis": "2027-03-31"
     },

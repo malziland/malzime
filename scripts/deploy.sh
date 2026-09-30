@@ -245,16 +245,23 @@ else
     # gelegentlich Laeufe. Geprueft wird nur das ALTER des juengsten
     # abgeschlossenen Laufs auf main, nicht seine Farbe — ein roter Nachtlauf
     # darf den Deploy nicht blockieren, der ihn behebt.
-    NACHT=$(gh api "repos/malziland/malzime/actions/workflows/sicherheit-nachts.yml/runs?branch=main&status=completed&per_page=1" \
-      --jq '.workflow_runs[0].created_at // "fehlt"' 2>/dev/null || echo "nicht abrufbar")
-    NACHT_STUNDEN=$(node -e 'const t = Date.parse(process.argv[1]); console.log(Number.isNaN(t) ? -1 : Math.floor((Date.now() - t) / 3600000));' "$NACHT")
-    if [ "$NACHT_STUNDEN" -lt 0 ] || [ "$NACHT_STUNDEN" -gt 26 ]; then
-      echo "FEHLER: Juengster Nachtlauf \"Sicherheit nachts\" auf main: $NACHT (${NACHT_STUNDEN} h) — fehlt oder ist aelter als 26 Stunden." >&2
-      echo "        Dann meldet niemand neue Sicherheitsluecken. Starten: gh workflow run sicherheit-nachts.yml," >&2
-      echo "        abwarten, erneut deployen. Ist er abgeschaltet: unter \"Actions\" einschalten. Notschalter: SKIP_STAND=1" >&2
+    # Die Grenze steht NUR hier (Befund J-08); die Doku verweist auf sie.
+    # Verglichen wird in Minuten — mit ganzen Stunden liesse "26" bis 26:59 durch.
+    NACHT_GRENZE_MINUTEN=1560 # 26 Stunden: taeglicher Lauf um 03:43 UTC plus Spielraum
+    # Nur Laeufe dieses Repositorys und nicht aus Pull Requests (Befund J-03):
+    # `branch=main` liefert auch Laeufe aus Forks, deren Zweig "main" heisst.
+    NACHT=$(gh api "repos/malziland/malzime/actions/workflows/sicherheit-nachts.yml/runs?branch=main&status=completed&per_page=20" \
+      --jq '[.workflow_runs[] | select(.head_repository.full_name == "malziland/malzime" and .event != "pull_request")] | if length == 0 then "fehlt" else .[0].created_at end' \
+      2>/dev/null || echo "nicht abrufbar")
+    NACHT_MINUTEN=$(node -e 'const t = Date.parse(process.argv[1]); console.log(Number.isNaN(t) ? -1 : Math.floor((Date.now() - t) / 60000));' "$NACHT")
+    if [ "$NACHT_MINUTEN" -lt 0 ] || [ "$NACHT_MINUTEN" -gt "$NACHT_GRENZE_MINUTEN" ]; then
+      echo "FEHLER: Juengster Nachtlauf \"Sicherheit nachts\" auf main: $NACHT (vor ${NACHT_MINUTEN} min) — fehlt oder ist aelter als ${NACHT_GRENZE_MINUTEN} min." >&2
+      echo "        Dann meldet niemand neue Sicherheitsluecken. Starten: gh workflow run sicherheit-nachts.yml" >&2
+      echo "        (erst wenn die Pipeline des Merge-Commits fertig ist), abwarten, erneut deployen." >&2
+      echo "        Ist er abgeschaltet: unter \"Actions\" einschalten. Notschalter: SKIP_STAND=1" >&2
       exit 1
     fi
-    echo "Nachtlauf: juengster Lauf auf main vor ${NACHT_STUNDEN} h."
+    echo "Nachtlauf: juengster Lauf auf main vor ${NACHT_MINUTEN} min (Grenze ${NACHT_GRENZE_MINUTEN} min)."
     echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA (jüngster Lauf je Check)."
   fi
 fi

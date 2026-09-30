@@ -77,12 +77,26 @@ PRUEFJOBS_NACHTS = {
     "mitgelieferte-bibliotheken": "node scripts/pruefe-fremd-meldungen.mjs",
     "abkuendigungen": "node scripts/pruefe-abkuendigungen.mjs",
 }
-# Pruefsummen der festgeschriebenen Jobs (ohne Kommentar- und `uses:`-Zeilen).
+# Pruefsummen der beiden Workflow-Dateien, VOLLSTAENDIG (Befund J-01,
+# 30.09.2026). Die erste Fassung schrieb nur einzelne Jobs fest und liess
+# jede Zeile mit "uses:" aus — 23 Veraenderungen bestanden sie, darunter ein
+# geloeschter Monats-Zeitplan, Schluessel in Anfuehrungszeichen, Job-env und
+# eine Kommentarzeile mitten in einem mehrzeiligen Befehl. Jetzt zaehlt die
+# ganze Datei. Normalisiert wird nur, was nachweislich nichts bewirkt:
+#   · ganze Zeilen der Form `uses: owner/repo@<40 hex> # vN` — SHA und
+#     Kommentar (Dependabot hebt sie an); owner/repo zaehlt weiter,
+#   · Kommentar- und Leerzeilen AUSSERHALB von Blockskalaren (| >). Innerhalb
+#     eines `run: |` oder `if: >-` zaehlt jede Zeile: Dort kann eine
+#     "#"-Zeile einen Befehl zerteilen oder Teil eines Ausdrucks werden.
+# Eine bewusste Aenderung traegt man hier nach:
+# `python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`. Die Summe
+# schuetzt vor Versehen, nicht vor Absicht — die Aenderung am Workflow steht
+# im selben Pull Request sichtbar im Diff.
 VERTRAG_SUMMEN = {
-    "sicherheit-nachts.yml/alarm": "50ce1751e901e046",
-    "libheif-bau.yml/bauen": "4de9cce43e3e7ad6",
-    "libheif-bau.yml/kontrollbau": "304510cddd06770f",
+    "sicherheit-nachts.yml": "08fac19d661973d9",
+    "libheif-bau.yml": "39f0db0be0a0a3e0",
 }
+_USES_ZEILE = re.compile(r"^(\s*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[0-9a-f]{40} # .*$")
 
 
 def _ohne_kommentarzeilen(text):
@@ -99,11 +113,27 @@ def _jobbloecke(text):
     return bloecke
 
 
-def _summe(block):
+def _summe(text):
+    """Pruefsumme einer Workflow-Datei, blockbewusst normalisiert (siehe oben)."""
     import hashlib
 
-    zeilen = [z.rstrip() for z in block.split("\n") if "uses:" not in z and z.strip()]
-    return hashlib.sha256("\n".join(zeilen).encode("utf-8")).hexdigest()[:16]
+    raus = []
+    block = None
+    for zeile in text.split("\n"):
+        einzug = len(zeile) - len(zeile.lstrip())
+        if block is not None and zeile.strip() and einzug <= block:
+            block = None
+        if block is None:
+            if not zeile.strip() or zeile.lstrip().startswith("#"):
+                continue
+            m = _USES_ZEILE.match(zeile)
+            raus.append(m.group(1) + m.group(2) + "@SHA # K" if m else zeile)
+            k = re.match(r"""^(\s*)(?:- )?[A-Za-z0-9_"'-]+:\s*[|>][-+0-9]*\s*(#.*)?$""", zeile)
+            if k:
+                block = len(k.group(1)) + (2 if zeile.lstrip().startswith("- ") else 0)
+        else:
+            raus.append(zeile)
+    return hashlib.sha256("\n".join(raus).encode("utf-8")).hexdigest()[:16]
 
 
 def _kopfteil_maengel(text, name):
@@ -115,6 +145,14 @@ def _kopfteil_maengel(text, name):
 
 
 def vertrag_nachts(text):
+    if _summe(text) != VERTRAG_SUMMEN["sicherheit-nachts.yml"]:
+        return ["sicherheit-nachts.yml weicht vom festgeschriebenen Stand ab (Pruefsumme der ganzen Datei)"] + (
+            _vertrag_nachts_einzeln(text)
+        )
+    return _vertrag_nachts_einzeln(text)
+
+
+def _vertrag_nachts_einzeln(text):
     t = _ohne_kommentarzeilen(text)
     m = _kopfteil_maengel(t, "sicherheit-nachts.yml")
     if not re.search(r'(?m)^    - cron: "\d{1,2} \d{1,2} \* \* \*"(?:\s+#.*)?$', t):
@@ -133,8 +171,6 @@ def vertrag_nachts(text):
         fremd = [e for e in re.findall(r"(?m)^\s{10}([A-Za-z_][A-Za-z0-9_]*):", b) if e != "GITHUB_TOKEN"]
         if fremd:
             m.append(f"sicherheit-nachts.yml: Job {job} setzt {fremd} — die Pruefung liesse sich umlenken")
-    if "alarm" in bloecke and _summe(bloecke["alarm"]) != VERTRAG_SUMMEN["sicherheit-nachts.yml/alarm"]:
-        m.append("sicherheit-nachts.yml: Job alarm weicht vom festgeschriebenen Stand ab (Pruefsumme)")
     return m
 
 
@@ -142,23 +178,21 @@ def vertrag_libheif_bau():
     datei = WURZEL / ".github" / "workflows" / "libheif-bau.yml"
     if not datei.exists():
         return ["libheif-bau.yml fehlt — der Deploy-Riegel verlangt seinen Lauf"]
-    t = _ohne_kommentarzeilen(datei.read_text(encoding="utf-8"))
+    roh = datei.read_text(encoding="utf-8")
+    t = _ohne_kommentarzeilen(roh)
     m = _kopfteil_maengel(t, "libheif-bau.yml")
+    if _summe(roh) != VERTRAG_SUMMEN["libheif-bau.yml"]:
+        m.append("libheif-bau.yml weicht vom festgeschriebenen Stand ab (Pruefsumme der ganzen Datei)")
     bloecke = _jobbloecke(t)
     if set(bloecke) != {"bauen", "kontrollbau"}:
         m.append(f"libheif-bau.yml: Jobliste {sorted(bloecke)} statt ['bauen', 'kontrollbau']")
-    for job in ("bauen", "kontrollbau"):
-        if job in bloecke and _summe(bloecke[job]) != VERTRAG_SUMMEN[f"libheif-bau.yml/{job}"]:
-            m.append(f"libheif-bau.yml: Job {job} weicht vom festgeschriebenen Stand ab (Pruefsumme)")
     return m
 
 
 def vertrag_summen_ausgeben():
-    nachts = _ohne_kommentarzeilen((WURZEL / ".github/workflows/sicherheit-nachts.yml").read_text(encoding="utf-8"))
-    bau = _ohne_kommentarzeilen((WURZEL / ".github/workflows/libheif-bau.yml").read_text(encoding="utf-8"))
-    print(f'    "sicherheit-nachts.yml/alarm": "{_summe(_jobbloecke(nachts)["alarm"])}",')
-    for job in ("bauen", "kontrollbau"):
-        print(f'    "libheif-bau.yml/{job}": "{_summe(_jobbloecke(bau)[job])}",')
+    for name in ("sicherheit-nachts.yml", "libheif-bau.yml"):
+        text = (WURZEL / ".github/workflows" / name).read_text(encoding="utf-8")
+        print(f'    "{name}": "{_summe(text)}",')
 
 def main():
     # BEFUND 01.09.2026: Dreimal an einem Tag scheiterte eine neue Pruefung

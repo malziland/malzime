@@ -252,7 +252,7 @@ s = open(p).read()
 s = s.replace("priority: 5", "priority: 3", 1)
 open(p, "w").write(s)
 PYSELF
-probe_text 1 "Job alarm weicht" "abgeschwaechter Alarm im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+probe_text 1 "sicherheit-nachts.yml weicht" "abgeschwaechter Alarm im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck .github/workflows/sicherheit-nachts.yml
 
 sichern .github/workflows/libheif-bau.yml
@@ -262,8 +262,31 @@ s = open(p).read()
 s = s.replace("          exit $abweichung", "          exit 0", 1)
 open(p, "w").write(s)
 PYSELF
-probe_text 1 "Job bauen weicht" "entwaffneter Herkunftsvergleich wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+probe_text 1 "libheif-bau.yml weicht" "entwaffneter Herkunftsvergleich wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck .github/workflows/libheif-bau.yml
+
+# Befund J-01 (30.09.2026): Umgehungen, die die erste Fassung des Vertrags
+# durchliess — ein "exit 0" mit "uses:" im Kommentar und eine Kommentarzeile
+# mitten in einem mehrzeiligen Befehl.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace('          if [ -z "$NTFY_URL" ]', '          exit 0 # uses: nichts\n          if [ -z "$NTFY_URL" ]', 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "sicherheit-nachts.yml weicht" "'exit 0 # uses:' im Alarm wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace("          BODY=$(jq -n", "          # zwischengeschoben\n          BODY=$(jq -n", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "sicherheit-nachts.yml weicht" "Kommentarzeile im mehrzeiligen Befehl wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
 
 echo
 
@@ -506,9 +529,10 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  # 30 seit 30.09.2026: vier Proben fuer die Sicherheits-Workflows (Zeitplan,
-  # '|| true', Alarm, Herkunftsvergleich).
-  ERWARTETE_PROBEN=30
+  # 32 seit 30.09.2026: sechs Proben fuer die Sicherheits-Workflows (Zeitplan,
+  # '|| true', Alarm, Herkunftsvergleich, 'exit 0 # uses:', Kommentarzeile im
+  # Befehl).
+  ERWARTETE_PROBEN=32
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

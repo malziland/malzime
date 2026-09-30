@@ -823,13 +823,16 @@ bzw. `… node scripts/pruefe-abkuendigungen.mjs`.
 Schutz still ausfällt, und was sie auffängt:
 
 - *Der Nachtlauf läuft nicht* (GitHub schaltet geplante Workflows in öffentlichen
-  Repositories nach 60 Tagen ohne Aktivität ab und verwirft unter Last gelegentlich
-  geplante Läufe). `scripts/deploy.sh` bricht ab, wenn der jüngste abgeschlossene
-  Nachtlauf auf `main` fehlt oder älter ist als `NACHT_GRENZE_MINUTEN` in
-  `scripts/deploy.sh` — geprüft wird nur das
-  Alter, nicht die Farbe. Dann: `gh workflow run sicherheit-nachts.yml`, abwarten
-  (rund eine Minute), erneut deployen; ist der Workflow abgeschaltet, unter
-  „Actions" einschalten.
+  Repositories nach 60 Tagen ohne Aktivität ab, verwirft unter Last gelegentlich
+  geplante Läufe, oder die Datei ist für GitHub unlesbar). `scripts/deploy.sh` bricht
+  ab, wenn auf `main` kein Nachtlauf wirklich gelaufen ist — mit der ausgelieferten
+  Fassung von `sicherheit-nachts.yml` und nicht älter als `NACHT_GRENZE_MINUTEN` in
+  `scripts/deploy.sh`; die Kriterien stehen in `docs/SECURITY-MODEL.md`. Geprüft wird
+  nicht die Farbe: Ein roter Nachtlauf hat Alarm gegeben. Dann: `gh workflow run
+  sicherheit-nachts.yml`, abwarten (rund eine Minute), erneut deployen; ist der
+  Workflow abgeschaltet, unter „Actions" einschalten. **Nach jeder Änderung an
+  `sicherheit-nachts.yml`** gilt dasselbe: nach dem Merge und der grünen Pipeline des
+  Merge-Commits einmal von Hand starten, sonst bricht der Deploy ab.
 - *Der Alarmweg ist kaputt* (Secret, ntfy-Server, Thema). Am 1. jedes Monats kommt
   eine sichtbare Probe aufs Handy; bleibt sie aus, ist der Weg gestört
   (`docs/ERROR-ALERTING.md`). Von Hand: `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.

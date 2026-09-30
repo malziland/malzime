@@ -96,7 +96,7 @@ VERTRAG_SUMMEN = {
     "sicherheit-nachts.yml": "08fac19d661973d9",
     "libheif-bau.yml": "39f0db0be0a0a3e0",
 }
-_USES_ZEILE = re.compile(r"^(\s*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[0-9a-f]{40} # .*$")
+_USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[0-9a-f]{40} # .*$")
 
 
 def _ohne_kommentarzeilen(text):
@@ -117,20 +117,26 @@ def _summe(text):
     """Pruefsumme einer Workflow-Datei, blockbewusst normalisiert (siehe oben)."""
     import hashlib
 
+    # Befund K-01 (Runde 4): Als Leerraum gilt NUR, was YAML dafuer haelt —
+    # Leerzeichen und Tab. Pythons strip() nahm auch das geschuetzte
+    # Leerzeichen (U+00A0) dafuer, das YAML als Inhalt liest. Und eine
+    # Kommentarzeile beendet keinen Block: Mit zu wenig Einzug macht sie die
+    # Datei ungueltig, sie muss also mitzaehlen.
     raus = []
     block = None
     for zeile in text.split("\n"):
-        einzug = len(zeile) - len(zeile.lstrip())
-        if block is not None and zeile.strip() and einzug <= block:
+        kern = zeile.strip(" \t")
+        einzug = len(zeile) - len(zeile.lstrip(" \t"))
+        if block is not None and kern and not kern.startswith("#") and einzug <= block:
             block = None
         if block is None:
-            if not zeile.strip() or zeile.lstrip().startswith("#"):
+            if not kern or kern.startswith("#"):
                 continue
             m = _USES_ZEILE.match(zeile)
             raus.append(m.group(1) + m.group(2) + "@SHA # K" if m else zeile)
-            k = re.match(r"""^(\s*)(?:- )?[A-Za-z0-9_"'-]+:\s*[|>][-+0-9]*\s*(#.*)?$""", zeile)
+            k = re.match(r"""^([ ]*)(?:- )?[A-Za-z0-9_"'-]+:\s*[|>][-+0-9]*\s*(#.*)?$""", zeile)
             if k:
-                block = len(k.group(1)) + (2 if zeile.lstrip().startswith("- ") else 0)
+                block = len(k.group(1)) + (2 if zeile.lstrip(" \t").startswith("- ") else 0)
         else:
             raus.append(zeile)
     return hashlib.sha256("\n".join(raus).encode("utf-8")).hexdigest()[:16]

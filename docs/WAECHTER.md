@@ -24,6 +24,7 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 | Wächter | Fehlerklasse | Ausgelöst durch | Laufzeit |
 |---|---|---|---|
 | `pruefe-deploy-riegel.py` | Notschalter, die in der Schlussbilanz fehlen; Pipeline-Einstellung; **Wächter, die niemand mehr aufruft**; **verrutschte Eingaben in `ci.yml`**; **Vertrag der Sicherheits-Workflows** (`sicherheit-nachts.yml`, `libheif-bau.yml` vollständig per Prüfsumme; frei nur die Versionskennungen der Actions) | Runde 7 (K-7): Ein Prüfschritt liess sich aus der Pipeline entfernen, ohne dass etwas rot wurde. 01.09.: Vier Einfüge-Fehler in `ci.yml` an einem Tag, drei Pipeline-Läufe verbrannt | 24 ms |
+| `pruefe-workflows-gueltig.mjs` | Workflow-Dateien, die GitHub nicht lesen kann (YAML-Fehler, fehlendes Grundgerüst) — sie laufen nie, und der Pull Request zeigt den Fehllauf nicht an; mit Positivkontrolle | Befund K-01 (30.09.2026): Ein Kommentar mit zu wenig Einzug im Nachtlauf legte ihn samt Alarm still, jede Prüfung blieb grün | 40 ms |
 | `pruefe-doppelte-werte.py` | Betriebswerte, die im Code UND im Einstellungssatz stehen | Firestore-Umbau 30.08.: Die Doku nannte Werte, die so nicht liefen | 44 ms |
 | `pruefe-i18n-fallbacks.py` | Sichtbarer Text, der von seiner Sprachdatei abweicht | Fund 21.08.: Im HTML stand ein anderer Satz als in der Sprachdatei | 35 ms |
 | `pruefe-kopplung.py` | Dateien, die wieder zusammenwachsen; gelöschte Pflicht-Testdateien | Runde 5: Wer `deploy-verhalten.test.js` löscht, sollte auffallen | 32 ms |

@@ -83,6 +83,7 @@ lauf "Pruefungen: Doppelte Betriebswerte" "pruefungen" python3 scripts/pruefe-do
 lauf "Pruefungen: Mitzieher" "pruefungen" python3 scripts/pruefe-mitzieher.py
 lauf "Pruefungen: Kopplung" "pruefungen" python3 scripts/pruefe-kopplung.py
 lauf "Pruefungen: Deploy-Riegel" "pruefungen" python3 scripts/pruefe-deploy-riegel.py
+lauf "Pruefungen: Workflow-Dateien lesbar" "pruefungen" node scripts/pruefe-workflows-gueltig.mjs
 lauf "Pruefungen: Waechter-Selbstpruefung" "pruefungen" bash scripts/selbstpruefung-waechter.sh
 # BEFUND 31.08.2026 (Runde 2, P1): Die Projektkonvention verlangt
 # `npm ci --dry-run` in Root UND functions/ — umgesetzt war sie nirgends.

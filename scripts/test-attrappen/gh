@@ -46,7 +46,10 @@ case "$1" in
             case "$*" in *"branch=main"*"status=completed"*|*"status=completed"*"branch=main"*) ;;
               *) echo "ATTRAPPE gh: Nachtlauf-Abfrage ohne branch=main und status=completed: $*" >&2; exit 97 ;; esac
             if [ -n "${ATTRAPPE_NACHT_LAEUFE:-}" ]; then JSON="$ATTRAPPE_NACHT_LAEUFE"
-            else JSON="{\"workflow_runs\":[{\"created_at\":\"$(node -e 'console.log(new Date(Date.now()-2*3600000).toISOString())')\",\"event\":\"schedule\",\"head_repository\":{\"full_name\":\"malziland/malzime\"}}]}"; fi ;;
+            else JSON="{\"workflow_runs\":[{\"created_at\":\"$(node -e 'console.log(new Date(Date.now()-2*3600000).toISOString())')\",\"event\":\"schedule\",\"conclusion\":\"success\",\"head_sha\":\"$(git rev-parse HEAD)\",\"head_repository\":{\"full_name\":\"malziland/malzime\"}}]}"; fi
+            # Platzhalter HEAD in ATTRAPPE_NACHT_LAEUFE wird zur Kennung des
+            # Test-Commits (die Tests kennen sie beim Zusammenbauen nicht).
+            JSON=$(printf '%s' "$JSON" | sed "s/\"head_sha\":\"HEAD\"/\"head_sha\":\"$(git rev-parse HEAD)\"/g") ;;
           *) echo "ATTRAPPE gh: unbekannte Workflow-Abfrage: $*" >&2; exit 97 ;;
         esac
         printf '%s' "$JSON" | jq -r "$JQ"

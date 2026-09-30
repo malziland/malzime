@@ -416,6 +416,10 @@ jobs:
       # wurde. Ausgerechnet dort stehen die Riegel, die ungeprueften Code von
       # der Produktion fernhalten.
       - run: python3 scripts/pruefe-deploy-riegel.py
+      # Befund K-01 (Runde 4, 30.09.2026): Eine Workflow-Datei, die GitHub nicht
+      # lesen kann, bestand jede Pruefung — und der Pull Request zeigt den
+      # Fehllauf nicht an. Liest jede Datei unter .github/workflows wie GitHub.
+      - run: node scripts/pruefe-workflows-gueltig.mjs
 
       # Und die drei Waechter pruefen sich selbst — in BEIDE Richtungen.
       # Anlass 31.08.2026: Ein Pruefer ohne Vorwissen fand, dass zwei von

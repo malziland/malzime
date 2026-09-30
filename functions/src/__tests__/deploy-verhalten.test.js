@@ -304,6 +304,52 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     expect(r.ausgabe).toMatch(/Ist: failure/);
   });
 
+  /* Befund K-01 (Runde 4): Ist sicherheit-nachts.yml unlesbar, legt GitHub bei
+     jedem Push einen roten Lauf ohne Jobs an (Ereignis push, Name = Dateipfad).
+     Der darf nicht als frischer Nachtlauf zaehlen — ebenso wenig ein
+     abgebrochener Lauf. */
+  test("ein Fehllauf einer unlesbaren Workflow-Datei zaehlt nicht als Nachtlauf", () => {
+    const r = deploy({
+      ATTRAPPE_NACHT_LAEUFE: nacht(
+        nachtLauf(10, { event: "push", conclusion: "failure", name: ".github/workflows/sicherheit-nachts.yml" }),
+        nachtLauf(40 * 60)
+      ),
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  test("ein abgebrochener Lauf zaehlt nicht als Nachtlauf", () => {
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(10, { conclusion: "cancelled" }), nachtLauf(40 * 60)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  test("ein roter, aber gelaufener Nachtlauf haelt den Deploy nicht an", () => {
+    expect(deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(10, { conclusion: "failure" })) }).code).toBe(0);
+  });
+
+  test("ein Nachtlauf mit der vorigen Fassung von sicherheit-nachts.yml haelt an", () => {
+    const vorher = execSync(`git -C "${klon}" rev-parse HEAD`, { encoding: "utf8" }).trim();
+    try {
+      execSync(
+        [
+          `printf '\n# Probe\n' >> "${klon}/.github/workflows/sicherheit-nachts.yml"`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q -am "Nachtlauf geaendert"`,
+          `git -C "${klon}" branch -f main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+      const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(10, { head_sha: vorher })) });
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(/lief nicht mit der Fassung/);
+    } finally {
+      execSync(`git -C "${klon}" reset -q --hard ${vorher} && git -C "${klon}" branch -f main ${vorher}`, {
+        stdio: "pipe",
+      });
+    }
+  });
+
   /* Befund J-05: Aendert der juengste Commit nur das Rezept, muss genau DIESER
      Commit abgefragt werden — die Attrappe prueft die Abfrage und scheitert
      laut, wenn deploy.sh einen anderen Commit nennt (etwa bei gekuerzter
@@ -360,6 +406,8 @@ describe("deploy.sh — Verhalten der Riegel", () => {
   const nachtLauf = (minutenAlt, weiteres = {}) => ({
     created_at: new Date(Date.now() - minutenAlt * 60000).toISOString(),
     event: "schedule",
+    conclusion: "success",
+    head_sha: "HEAD",
     head_repository: { full_name: "malziland/malzime" },
     ...weiteres,
   });
@@ -768,7 +816,9 @@ describe("deploy.sh — der Erfolgsweg", () => {
     expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
     /* Der Herkunftsriegel hat wirklich gefragt, nicht nur geschwiegen. */
     expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen/);
-    expect(r.ausgabe).toMatch(/Nachtlauf: juengster Lauf auf main vor \d+ min \(Grenze 1560 min\)/);
+    expect(r.ausgabe).toMatch(
+      /Nachtlauf: juengster gelaufener Lauf auf main vor \d+ min \(Grenze 1560 min\), mit der ausgelieferten Fassung/
+    );
     /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
     expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
   });

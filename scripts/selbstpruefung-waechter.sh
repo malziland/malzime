@@ -288,6 +288,37 @@ PYSELF
 probe_text 1 "sicherheit-nachts.yml weicht" "Kommentarzeile im mehrzeiligen Befehl wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck .github/workflows/sicherheit-nachts.yml
 
+# Befund K-01 (Runde 4, 30.09.2026): Aenderungen, die die Datei fuer GitHub
+# UNLESBAR machen — ein Kommentar mit zu wenig Einzug mitten im mehrzeiligen
+# Ausdruck, eine Kommentarzeile, deren Einzug ein geschuetztes Leerzeichen ist
+# (aus einer kopierten Zeile). Beide Schichten muessen anschlagen: der Leser
+# (wie GitHub) und die Pruefsumme.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+alt = "      always() && github.ref == 'refs/heads/main'"
+assert s.count(alt) == 1, "Anker der Probe fehlt"
+s = s.replace(alt, "    # Anmerkung zur Bedingung\n" + alt, 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "UNLESBAR" "Kommentar mit zu wenig Einzug im Ausdruck: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+probe_text 1 "sicherheit-nachts.yml weicht" "... und die Pruefsumme schlaegt an" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+alt = "      - run: node scripts/pruefe-abkuendigungen.mjs"
+assert s.count(alt) == 1, "Anker der Probe fehlt"
+s = s.replace(alt, "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0# kopierte Anmerkung\n" + alt, 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "UNLESBAR" "geschuetztes Leerzeichen als Einzug: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+probe_text 1 "sicherheit-nachts.yml weicht" "... und die Pruefsumme schlaegt an" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
 echo
 
 echo "2. verify-infrastructure.sh — Bildspeicher"
@@ -529,10 +560,10 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  # 32 seit 30.09.2026: sechs Proben fuer die Sicherheits-Workflows (Zeitplan,
+  # 36 seit 01.10.2026: zehn Proben fuer die Sicherheits-Workflows (Zeitplan,
   # '|| true', Alarm, Herkunftsvergleich, 'exit 0 # uses:', Kommentarzeile im
-  # Befehl).
-  ERWARTETE_PROBEN=32
+  # Befehl, zwei unlesbare Dateien je gegen Leser und Pruefsumme).
+  ERWARTETE_PROBEN=36
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

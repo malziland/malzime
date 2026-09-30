@@ -520,21 +520,33 @@ der Push „ROT", nicht „PROBE".
 (`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben. Frei
 bleiben nur die Versionskennungen der Actions (`uses: owner/repo@<SHA> # vN` — SHA und
 Kommentar; Dependabot hebt sie an) sowie Kommentar- und Leerzeilen außerhalb
-mehrzeiliger Befehle und Ausdrücke. Jede andere Änderung macht den Riegel rot; eine
-bewusste Änderung trägt man dort nach (`--vertrag-summen`). Zusätzlich prüft er
-inhaltlich: genau ein festgelegter Befehl je Prüf-Job, kein `if`, kein
-`continue-on-error`, keine umlenkenden Umgebungswerte, ein täglicher Zeitplan.
+mehrzeiliger Befehle und Ausdrücke; als Leerraum zählen dabei nur Leerzeichen und
+Tab, wie in YAML. Jede andere Änderung macht den Riegel rot; eine bewusste Änderung
+trägt man dort nach (`--vertrag-summen`). Zusätzlich prüft er inhaltlich: genau ein
+festgelegter Befehl je Prüf-Job, kein `if`, kein `continue-on-error`, keine
+umlenkenden Umgebungswerte, ein täglicher Zeitplan.
+*Lesbarkeit:* Eine Workflow-Datei, die GitHub nicht lesen kann, läuft nie — und der
+Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` liest
+im Pull Request und vor dem Push jede Datei unter `.github/workflows` mit dem
+YAML-Leser, auf dem GitHubs Workflow-Leser aufbaut, samt Grundgerüst (`on`, Jobs mit
+`runs-on` oder `uses`) und einer Positivkontrolle.
 *Grenze:* Die Prüfsumme schützt vor versehentlichem Stilllegen, nicht vor Absicht —
 wer den Workflow ändert, kann die Summe mitändern; beides steht dann im selben Pull
-Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig.
+Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig. Ob GitHubs
+Server eine Datei strenger liest als dieser Leser, sieht die Prüfung nicht; das fängt
+der Deploy auf (nächster Absatz).
 
 *Restrisiken:*
 - Ob GitHub den Nachtlauf tatsächlich ausführt, sieht der Vertrag nicht (60-Tage-
-  Abschaltung, verworfene Läufe). Aufgefangen beim nächsten Deploy: `deploy.sh`
-  verlangt einen abgeschlossenen Nachtlauf auf `main`, nicht älter als die Grenze
-  `NACHT_GRENZE_MINUTEN` in `scripts/deploy.sh`.
-  Zwischen zwei Deploys fällt ein ausbleibender Nachtlauf nur durch die ausbleibende
-  Monatsprobe auf.
+  Abschaltung, verworfene Läufe, eine Datei, die GitHubs Server anders liest).
+  Aufgefangen beim nächsten Deploy: `deploy.sh` verlangt einen Nachtlauf auf `main`,
+  der wirklich gelaufen ist — nach Zeitplan oder von Hand gestartet, mit Ergebnis
+  „success" oder „failure", mit genau der ausgelieferten Fassung von
+  `sicherheit-nachts.yml` und nicht älter als die Grenze `NACHT_GRENZE_MINUTEN` in
+  `scripts/deploy.sh`. Die roten Läufe ohne Jobs, die GitHub bei einer unlesbaren
+  Datei je Push anlegt, zählen damit nicht. Nach jeder Änderung am Nachtlauf muss er
+  deshalb einmal laufen, bevor ausgeliefert wird. Zwischen zwei Deploys fällt ein
+  ausbleibender Nachtlauf nur durch die ausbleibende Monatsprobe auf.
 - Der Alarm-Job kann seinen eigenen Fehlschlag nicht melden (fehlendes Secret,
   ntfy nicht erreichbar); „200" vom ntfy-Server heißt nur „angenommen". Auch das
   zeigt erst die ausbleibende Monatsprobe.

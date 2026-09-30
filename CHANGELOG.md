@@ -55,8 +55,13 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Push aufs Handy (ntfy, höchste Stufe), am 1. jedes Monats zusätzlich eine
   Probe. Ausnahmen nur begründet und mit Ablaufdatum; was zu tun ist, steht
   in `docs/RUNBOOK.md`. Der Deploy bricht ab, wenn der Nachtlauf länger nicht
-  gelaufen ist (Grenze in `scripts/deploy.sh`), und ein neuer Fremdbaustein unter
-  `public/lib` braucht schon im Pull Request einen Eintrag in der Beobachtung.
+  gelaufen ist (Grenze in `scripts/deploy.sh`) oder seit der letzten Änderung an
+  ihm noch nicht gelaufen ist, und ein neuer Fremdbaustein unter `public/lib`
+  braucht schon im Pull Request einen Eintrag in der Beobachtung.
+- **Workflow-Dateien werden gelesen wie von GitHub.** Eine Datei unter
+  `.github/workflows`, die GitHub nicht lesen könnte, würde nie laufen, ohne dass
+  der Pull Request es anzeigt. Die Prüfung `scripts/pruefe-workflows-gueltig.mjs`
+  macht das schon im Pull Request und vor dem Push rot.
 
 ## [4.12.0] — 2026-09-28
 

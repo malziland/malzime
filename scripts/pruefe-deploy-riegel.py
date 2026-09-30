@@ -70,6 +70,96 @@ RIEGEL_DEPLOY = []
 
 
 
+
+# ── Vertraege fuer die Sicherheits-Workflows (Befunde H-01, H-02) ──────────────
+PRUEFJOBS_NACHTS = {
+    "npm-luecken": "node scripts/audit-gate.mjs functions .",
+    "mitgelieferte-bibliotheken": "node scripts/pruefe-fremd-meldungen.mjs",
+    "abkuendigungen": "node scripts/pruefe-abkuendigungen.mjs",
+}
+# Pruefsummen der festgeschriebenen Jobs (ohne Kommentar- und `uses:`-Zeilen).
+VERTRAG_SUMMEN = {
+    "sicherheit-nachts.yml/alarm": "50ce1751e901e046",
+    "libheif-bau.yml/bauen": "4de9cce43e3e7ad6",
+    "libheif-bau.yml/kontrollbau": "304510cddd06770f",
+}
+
+
+def _ohne_kommentarzeilen(text):
+    return "\n".join(z for z in text.split("\n") if not z.lstrip().startswith("#"))
+
+
+def _jobbloecke(text):
+    if "\njobs:\n" not in text:
+        return {}
+    teil = text.split("\njobs:\n", 1)[1]
+    bloecke = {}
+    for b in re.split(r"(?m)^  (?=[A-Za-z0-9_-]+:\s*$)", teil)[1:]:
+        bloecke[b.split(":", 1)[0]] = b
+    return bloecke
+
+
+def _summe(block):
+    import hashlib
+
+    zeilen = [z.rstrip() for z in block.split("\n") if "uses:" not in z and z.strip()]
+    return hashlib.sha256("\n".join(zeilen).encode("utf-8")).hexdigest()[:16]
+
+
+def _kopfteil_maengel(text, name):
+    maengel = []
+    kopf = text.split("\njobs:\n", 1)[0]
+    if re.search(r"(?m)^(env|defaults):", kopf):
+        maengel.append(f"{name}: env/defaults auf oberster Ebene — koennte jede Pruefung umlenken")
+    return maengel
+
+
+def vertrag_nachts(text):
+    t = _ohne_kommentarzeilen(text)
+    m = _kopfteil_maengel(t, "sicherheit-nachts.yml")
+    if not re.search(r'(?m)^    - cron: "\d{1,2} \d{1,2} \* \* \*"(?:\s+#.*)?$', t):
+        m.append("sicherheit-nachts.yml: kein taeglicher Zeitplan — der Nachtlauf liefe nie von selbst")
+    bloecke = _jobbloecke(t)
+    if set(bloecke) != set(PRUEFJOBS_NACHTS) | {"alarm"}:
+        m.append(f"sicherheit-nachts.yml: Jobliste {sorted(bloecke)} statt {sorted(set(PRUEFJOBS_NACHTS) | {'alarm'})}")
+    for job, befehl in PRUEFJOBS_NACHTS.items():
+        b = bloecke.get(job, "")
+        laeufe = re.findall(r"(?m)^\s+(?:- )?run:\s*(.*)$", b)
+        if laeufe != [befehl]:
+            m.append(f"sicherheit-nachts.yml: Job {job} hat run {laeufe!r} statt genau {befehl!r}")
+        for verboten in ("if:", "continue-on-error", "timeout-minutes", "shell:", "working-directory"):
+            if re.search(rf"(?m)^\s+(?:- )?{verboten}", b):
+                m.append(f"sicherheit-nachts.yml: Job {job} traegt '{verboten}' — er koennte still entfallen")
+        fremd = [e for e in re.findall(r"(?m)^\s{10}([A-Za-z_][A-Za-z0-9_]*):", b) if e != "GITHUB_TOKEN"]
+        if fremd:
+            m.append(f"sicherheit-nachts.yml: Job {job} setzt {fremd} — die Pruefung liesse sich umlenken")
+    if "alarm" in bloecke and _summe(bloecke["alarm"]) != VERTRAG_SUMMEN["sicherheit-nachts.yml/alarm"]:
+        m.append("sicherheit-nachts.yml: Job alarm weicht vom festgeschriebenen Stand ab (Pruefsumme)")
+    return m
+
+
+def vertrag_libheif_bau():
+    datei = WURZEL / ".github" / "workflows" / "libheif-bau.yml"
+    if not datei.exists():
+        return ["libheif-bau.yml fehlt — der Deploy-Riegel verlangt seinen Lauf"]
+    t = _ohne_kommentarzeilen(datei.read_text(encoding="utf-8"))
+    m = _kopfteil_maengel(t, "libheif-bau.yml")
+    bloecke = _jobbloecke(t)
+    if set(bloecke) != {"bauen", "kontrollbau"}:
+        m.append(f"libheif-bau.yml: Jobliste {sorted(bloecke)} statt ['bauen', 'kontrollbau']")
+    for job in ("bauen", "kontrollbau"):
+        if job in bloecke and _summe(bloecke[job]) != VERTRAG_SUMMEN[f"libheif-bau.yml/{job}"]:
+            m.append(f"libheif-bau.yml: Job {job} weicht vom festgeschriebenen Stand ab (Pruefsumme)")
+    return m
+
+
+def vertrag_summen_ausgeben():
+    nachts = _ohne_kommentarzeilen((WURZEL / ".github/workflows/sicherheit-nachts.yml").read_text(encoding="utf-8"))
+    bau = _ohne_kommentarzeilen((WURZEL / ".github/workflows/libheif-bau.yml").read_text(encoding="utf-8"))
+    print(f'    "sicherheit-nachts.yml/alarm": "{_summe(_jobbloecke(nachts)["alarm"])}",')
+    for job in ("bauen", "kontrollbau"):
+        print(f'    "libheif-bau.yml/{job}": "{_summe(_jobbloecke(bau)[job])}",')
+
 def main():
     # BEFUND 01.09.2026: Dreimal an einem Tag scheiterte eine neue Pruefung
     # daran, dass `ci` erst weiter unten gelesen wurde — die Variable gibt es
@@ -396,25 +486,17 @@ def main():
     aus_vorab = erreichbar_ab(vorab.read_text(encoding="utf-8"))
     nachts_text = nachts.read_text(encoding="utf-8")
     aus_nachts = erreichbar_ab(nachts_text)
-    # Befund G-10 (30.09.2026): Dass der Aufruf im Text steht, beweist nicht,
-    # dass er etwas bewirkt. Ohne Zeitplan laeuft der Nachtlauf nie, mit
-    # `|| true` oder `continue-on-error` wird jede Pruefung gruen, und ein `if:`
-    # am pruefenden Job kann ihn still ueberspringen. Gemessen: Alle drei
-    # Mutationen liessen diesen Riegel frueher gruen.
-    nachts_ohne = ohne_kommentare(nachts_text)
-    nachts_maengel = []
-    if not re.search(r"^\s*schedule:\s*\n\s*-\s*cron:", nachts_ohne, re.M):
-        nachts_maengel.append("kein Zeitplan (schedule/cron) — der Nachtlauf liefe nie von selbst")
-    if re.search(r"continue-on-error", nachts_ohne):
-        nachts_maengel.append("continue-on-error — ein roter Schritt zaehlte als gruen")
-    if re.search(r"\|\|\s*(true|:)\b", nachts_ohne):
-        nachts_maengel.append("'|| true' — der Rueckgabewert einer Pruefung wird verschluckt")
-    # Jobs, die einen NUR_NACHTS-Waechter aufrufen, duerfen kein `if:` tragen.
-    for block in re.split(r"(?m)^  (?=[A-Za-z0-9_-]+:\s*$)", nachts_ohne.split("\njobs:", 1)[-1])[1:]:
-        name = block.split(":", 1)[0]
-        ruft = [n for n in NUR_NACHTS if aufruf_von(n, block)]
-        if ruft and re.search(r"^\s+if:", block, re.M):
-            nachts_maengel.append(f"Job {name} ruft {', '.join(ruft)} auf und traegt ein 'if:' — er koennte still entfallen")
+    # Befund G-10/H-01/H-02 (30.09.2026): Dass der Aufruf im Text steht,
+    # beweist nicht, dass er etwas bewirkt. Eine Liste verbotener Muster ("kein
+    # || true") liess in der Gegenpruefung 14 naheliegende Stilllegungen gruen
+    # (|| exit 0, | tee, "- if: false", geloeschter Alarm-Job, priority 3, cron
+    # am 31.2., ...). Deshalb ein POSITIVER Vertrag: Beschrieben ist, wie die
+    # beiden Workflows aussehen MUESSEN; jede Abweichung ist ein Befund.
+    # Frei bleiben nur die `uses:`-Zeilen, damit Dependabot die Actions anheben
+    # kann. Der Alarm-Job und die Jobs des Nachbaus sind per Pruefsumme
+    # festgeschrieben — eine bewusste Aenderung dort traegt man hier nach
+    # (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`).
+    nachts_maengel = vertrag_nachts(nachts_text) + vertrag_libheif_bau()
     waechter_fehlt = []
     for datei in skripte:
         if datei.name in NUR_LOKAL:
@@ -441,7 +523,7 @@ def main():
         return 2
     text_uebersicht = uebersicht.read_text(encoding="utf-8")
     for mangel in nachts_maengel:
-        waechter_fehlt.append(("sicherheit-nachts.yml", mangel))
+        waechter_fehlt.append(("vertrag", mangel))
     undokumentiert = [d.name for d in skripte if d.name not in text_uebersicht]
     if undokumentiert:
         for name in undokumentiert:
@@ -454,8 +536,8 @@ def main():
         for name, wo in waechter_fehlt:
             if wo == "docs/WAECHTER.md":
                 continue
-            if name == "sicherheit-nachts.yml":
-                print(f"  FEHLT   {name}: {wo}")
+            if name == "vertrag":
+                print(f"  FEHLT   Vertrag {wo}")
                 continue
             print(f"  FEHLT   {name} wird nicht aufgerufen aus: {wo}")
         print("          Ein Waechter, den niemand aufruft, ist kein Waechter.")
@@ -585,4 +667,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--vertrag-summen" in sys.argv:
+        vertrag_summen_ausgeben()
+        sys.exit(0)
     sys.exit(main())

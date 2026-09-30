@@ -230,7 +230,7 @@ s = open(p).read()
 s = s.replace('  schedule:\n    - cron: "43 3 * * *"', "", 1)
 open(p, "w").write(s)
 PYSELF
-probe_text 1 "kein Zeitplan" "Nachtlauf ohne Zeitplan wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+probe_text 1 "kein taeglicher Zeitplan" "Nachtlauf ohne Zeitplan wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck .github/workflows/sicherheit-nachts.yml
 
 sichern .github/workflows/sicherheit-nachts.yml
@@ -240,8 +240,30 @@ s = open(p).read()
 s = s.replace("node scripts/pruefe-abkuendigungen.mjs", "node scripts/pruefe-abkuendigungen.mjs || true", 1)
 open(p, "w").write(s)
 PYSELF
-probe_text 1 "verschluckt" "Pruefung mit '|| true' im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+probe_text 1 "statt genau" "Pruefung mit '|| true' im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck .github/workflows/sicherheit-nachts.yml
+
+# Befund H-01/H-02 (30.09.2026): Alarm-Job und Nachbau-Vergleich sind per
+# Pruefsumme festgeschrieben — eine Stilllegung dort muss auffallen.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace("priority: 5", "priority: 3", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "Job alarm weicht" "abgeschwaechter Alarm im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/libheif-bau.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/libheif-bau.yml"
+s = open(p).read()
+s = s.replace("          exit $abweichung", "          exit 0", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "Job bauen weicht" "entwaffneter Herkunftsvergleich wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/libheif-bau.yml
 
 echo
 
@@ -484,8 +506,9 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  # 28 seit 30.09.2026: zwei Proben fuer den Nachtlauf (Zeitplan, '|| true').
-  ERWARTETE_PROBEN=28
+  # 30 seit 30.09.2026: vier Proben fuer die Sicherheits-Workflows (Zeitplan,
+  # '|| true', Alarm, Herkunftsvergleich).
+  ERWARTETE_PROBEN=30
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

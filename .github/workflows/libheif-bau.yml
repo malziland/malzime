@@ -46,15 +46,29 @@ jobs:
         run: bash scripts/libheif-bauen.sh "$RUNNER_TEMP/ergebnis"
 
       - name: Vergleich mit den ausgelieferten Dateien
+        # Verglichen wird in BEIDE Richtungen und ueber die volle Dateiliste
+        # (Befund H-02): jede gebaute .js/.wasm muss ausgeliefert sein und
+        # gleich, und jede ausgelieferte .js/.wasm muss gebaut worden sein. Eine
+        # zusaetzliche oder fehlende Dekoderdatei ist ein Fehlschlag.
         run: |
+          set -euo pipefail
+          GEBAUT="$RUNNER_TEMP/ergebnis"
+          GELIEFERT="public/lib/libheif"
           abweichung=0
-          for f in libheif.js libheif.wasm; do
-            gebaut=$(sha256sum "$RUNNER_TEMP/ergebnis/$f" | cut -d' ' -f1)
-            geliefert=$(sha256sum "public/lib/libheif/$f" | cut -d' ' -f1)
+          liste() { (cd "$1" && ls -1 -- *.js *.wasm 2>/dev/null | sort); }
+          if [ "$(liste "$GEBAUT")" != "$(liste "$GELIEFERT")" ]; then
+            echo "::error::Dateilisten verschieden — gebaut: $(liste "$GEBAUT" | tr '\n' ' ') ausgeliefert: $(liste "$GELIEFERT" | tr '\n' ' ')"
+            abweichung=1
+          fi
+          test -n "$(liste "$GEBAUT")" || { echo "::error::Der Bau hat keine Dekoderdatei erzeugt."; exit 1; }
+          for f in $(liste "$GEBAUT"); do
+            test -s "$GELIEFERT/$f" || { echo "::error file=$GELIEFERT/$f::$f fehlt oder ist leer"; abweichung=1; continue; }
+            gebaut=$(sha256sum "$GEBAUT/$f" | cut -d' ' -f1)
+            geliefert=$(sha256sum "$GELIEFERT/$f" | cut -d' ' -f1)
             if [ "$gebaut" = "$geliefert" ]; then
               echo "gleich: $f sha256:$gebaut"
             else
-              echo "::error file=public/lib/libheif/$f::$f stammt nicht aus diesem Bau (gebaut sha256:$gebaut, ausgeliefert sha256:$geliefert)"
+              echo "::error file=$GELIEFERT/$f::$f stammt nicht aus diesem Bau (gebaut sha256:$gebaut, ausgeliefert sha256:$geliefert)"
               abweichung=1
             fi
           done

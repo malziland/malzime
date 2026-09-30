@@ -32,8 +32,8 @@
     "public/fonts/poppins/VERSION": "sha256:8799ca17fd5928e88739429f2fc1d7d8c5241e6ff58d46d81b4996de1d5609cc",
     "public/lib/libheif/LICENSE": "sha256:fa81ce652315b013359d6e8e4744335f31a50c7c192907176d3632f78a3b4596",
     "public/lib/libheif/VERSION": "sha256:a074d39a61d465b363c192100490e302d4ed524c35c69e8d6f88929ee919d27a",
-    "public/lib/libheif/libheif.js": "sha256:a74a56e1e89f6fdccc109cfcf3993feea7cd5746467f948e0d9efee915a26f25",
-    "public/lib/libheif/libheif.wasm": "sha256:3d4038816c9b9f0b7864beecf6083cb513ed625654eaa9b7aa93a050d4bb63f1",
+    "public/lib/libheif/libheif.js": "sha256:2e6116325f74beccfe69831edff88e83bda3b021366d671d0cfa2454a67a3031",
+    "public/lib/libheif/libheif.wasm": "sha256:b2d06c10f94ffcef063a3bf4e15d786a0ecef74004128cff50f768d492d7db89",
     "public/lib/libheif/LICENSE-libde265": "sha256:02cc1585a20677992e0ba578fa692635dc193735f2691dc81de924b51c4e8020"
   }
 }

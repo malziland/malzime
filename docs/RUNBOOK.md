@@ -819,14 +819,27 @@ bestandener Lauf: meist eine Störung der GitHub-API. Lauf von Hand neu starten
 Lokal prüfen: `GH_TOKEN=$(gh auth token) node scripts/pruefe-fremd-meldungen.mjs`
 bzw. `… node scripts/pruefe-abkuendigungen.mjs`.
 
-**Kommt nie ein Alarm, heißt das nicht „alles gut".** Zwei Fälle, in denen der
-Nachtlauf gar nicht läuft: GitHub schaltet geplante Workflows in öffentlichen
-Repositories nach 60 Tagen ohne Aktivität ab, und unter Last verwirft GitHub
-gelegentlich geplante Läufe. Handgriff, einmal im Monat oder vor jedem Deploy:
-`gh run list --workflow sicherheit-nachts.yml --branch main --limit 3` — der jüngste
-Lauf darf höchstens einen Tag alt sein. Ist der Workflow abgeschaltet: unter
-„Actions" wieder einschalten. Den Alarmweg selbst prüft
-`gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
+**Kommt nie ein Alarm, heißt das nicht „alles gut".** Zwei Wege, auf denen der
+Schutz still ausfällt, und was sie auffängt:
+
+- *Der Nachtlauf läuft nicht* (GitHub schaltet geplante Workflows in öffentlichen
+  Repositories nach 60 Tagen ohne Aktivität ab und verwirft unter Last gelegentlich
+  geplante Läufe). `scripts/deploy.sh` bricht ab, wenn der jüngste abgeschlossene
+  Nachtlauf auf `main` fehlt oder älter als 26 Stunden ist — geprüft wird nur das
+  Alter, nicht die Farbe. Dann: `gh workflow run sicherheit-nachts.yml`, abwarten
+  (rund eine Minute), erneut deployen; ist der Workflow abgeschaltet, unter
+  „Actions" einschalten.
+- *Der Alarmweg ist kaputt* (Secret, ntfy-Server, Thema). Am 1. jedes Monats kommt
+  eine sichtbare Probe aufs Handy; bleibt sie aus, ist der Weg gestört
+  (`docs/ERROR-ALERTING.md`). Von Hand: `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
+
+**Einmalig nach dem Zusammenführen des Sicherheitspakets (PR #294):** Auf `main`
+gibt es noch keinen Nachtlauf, der Deploy bricht deshalb ab, bis einer gelaufen
+ist. In der Deploy-Kette nach dem Merge und NACH der grünen Pipeline des
+Merge-Commits (sonst liest der Job `abkuendigungen` noch die alte Warnung zu
+setup-python 5): `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`
+starten — das belegt zugleich den Alarmweg Ende-zu-Ende; der Empfang der Probe
+wird beim Empfänger bestätigt.
 
 ### HEIC-Dekoder (libheif) neu bauen
 
@@ -839,7 +852,8 @@ meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
    `NEU_LIBDE265_*`). Die Prüfsumme steht auf der Release-Seite des Herstellers
    bei der Datei (GitHub zeigt sie als `sha256:`); zusätzlich selbst nachrechnen.
 2. Zweig pushen. Der Workflow `libheif-Bau` baut auf GitHub (feste
-   Ubuntu-Version 24.04, ca. 10–20 Minuten) und legt das Ergebnis als Artefakt
+   Ubuntu-Version 24.04; am 30.09.2026 dauerte der Job `bauen` 8 bis 10 Minuten)
+   und legt das Ergebnis als Artefakt
    `libheif-bau` ab. Der Schritt „Vergleich" ist in diesem Lauf rot — die
    Dateien im Repository sind ja noch die alten.
 3. Artefakt holen: `gh run download <lauf-id> -n libheif-bau -D /tmp/libheif`,
@@ -852,18 +866,21 @@ meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
 5. `node scripts/pruefe-fremddateien.mjs --aktualisieren`, dann alle Suiten,
    **einschließlich der Browser-Tests** (`e2e/problemfaelle.test.js` schickt
    echte Samsung- und iPhone-HEIC-Fotos durch den Dekoder).
-6. Pushen: Jetzt muss der Vergleich im Workflow `libheif-Bau` grün sein — erst
-   dann ist belegt, dass die ausgelieferten Dateien aus dem Rezept stammen.
-   `scripts/deploy.sh` verlangt das: Für den jüngsten Commit, der den Dekoder, das
-   Rezept oder den Workflow geändert hat, muss der Job `bauen` grün sein, sonst
-   bricht der Deploy ab. Nach dem Zusammenführen läuft der Workflow auf `main` noch
-   einmal (rund 11 Minuten) — so lange wartet der Deploy.
+6. Pushen: Jetzt muss der Workflow `libheif-Bau` grün sein, beide Jobs — `bauen`
+   (Vergleich Byte für Byte) und `kontrollbau` (Bauumgebung unverändert). Erst dann
+   ist belegt, dass die ausgelieferten Dateien aus dem Rezept stammen.
+   `scripts/deploy.sh` verlangt das für den jüngsten Commit, der Dekoder, Rezept oder
+   Workflow geändert hat: Der jüngste Lauf dieses Workflows muss abgeschlossen und
+   grün sein. Nach dem Zusammenführen läuft er auf `main` noch einmal; `deploy.sh`
+   wartet NICHT darauf, sondern bricht ab, solange der Lauf fehlt, noch läuft oder
+   rot ist. Die Deploy-Kette wartet deshalb vor dem Wartungsmodus auch auf diesen
+   Lauf, nicht nur auf die sechs Pflicht-Checks.
 
 Der Job `kontrollbau` baut bei jedem Lauf zusätzlich die bis 30.09.2026
 ausgelieferte Fassung (libheif 1.23.2, libde265 1.0.15) nach und vergleicht sie
 mit deren Prüfsumme. Wird er rot, hat sich an der Bauumgebung etwas geändert
-(Emscripten-Download, Runner-Abbild) — dann dem nachgehen, bevor ein neuer Bau
-ausgeliefert wird.
+(Emscripten-Download, Runner-Abbild). Der Deploy verlangt ihn grün (Schritt 6);
+vor einem neuen Bau also erst die Ursache klären.
 
 ## Handwerkzeuge (nur von Hand, laufen nie automatisch)
 

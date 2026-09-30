@@ -30,8 +30,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 - **HEIC-Dekoder selbst gebaut.** Er kommt nicht mehr als Fertigpaket eines
   Dritten, sondern wird aus den unveränderten Original-Quellen der Hersteller
-  gebaut. Das Rezept liegt offen (`scripts/libheif-bauen.sh`); zwei
-  unabhängige Bauten ergeben Byte für Byte dieselben Dateien, der Workflow
+  gebaut. Das Rezept liegt offen (`scripts/libheif-bauen.sh`); wiederholte
+  Bauten ergeben Byte für Byte dieselben Dateien, der Workflow
   `libheif-bau.yml` vergleicht bei jeder Änderung, und der Deploy verlangt
   diesen Vergleich grün. Das Impressum nennt die neuen Versionen. Das
   Umwandeln von HEIC-Fotos setzt etwas neuere Browser voraus (Firefox 79,
@@ -48,8 +48,11 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Sicherheitsmeldungen der Hersteller zu den mitgelieferten Bibliotheken
   (Leaflet, exifr, libheif, libde265 — die sieht Dependabot nicht) und
   Abkündigungshinweise von GitHub an den Läufen. Bei einem Fund kommt ein
-  Push aufs Handy (ntfy, höchste Stufe). Ausnahmen nur begründet und mit
-  Ablaufdatum; was zu tun ist, steht in `docs/RUNBOOK.md`.
+  Push aufs Handy (ntfy, höchste Stufe), am 1. jedes Monats zusätzlich eine
+  Probe. Ausnahmen nur begründet und mit Ablaufdatum; was zu tun ist, steht
+  in `docs/RUNBOOK.md`. Der Deploy bricht ab, wenn der Nachtlauf seit mehr als
+  26 Stunden nicht gelaufen ist, und ein neuer Fremdbaustein unter
+  `public/lib` braucht schon im Pull Request einen Eintrag in der Beobachtung.
 
 ## [4.12.0] — 2026-09-28
 

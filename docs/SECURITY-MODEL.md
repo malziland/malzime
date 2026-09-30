@@ -431,7 +431,10 @@ wird. Lizenztext, Version und Herkunft: `public/lib/libheif/`, Übersicht in
 
 **Rückweg.** Rückweg ohne Deploy: keiner — der Baustein ist Teil der Auslieferung;
 Rückweg mit Deploy: Ordner `public/lib/libheif/` und den HEIC-Zweig in
-`public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen.
+`public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen. Seit 30.09.2026 verlangt
+`scripts/deploy.sh` für den Dekoder einen grünen Herkunftsnachweis; fehlt der
+Ordner, gibt es nichts nachzuweisen — der Deploy meldet das als Hinweis und geht
+weiter, ohne Notschalter.
 
 ## HEIC-Dekoder aus den Hersteller-Quellen, Nachtlauf Sicherheit (30.09.2026)
 
@@ -446,9 +449,11 @@ Befund OSS-2026-09-30-01.
 den per Prüfsumme festgenagelten Original-Quellen, mit dem unveränderten Bauskript des
 Herstellers und der Emscripten-Version, mit der der Hersteller testet. Der Workflow
 `libheif-Bau` führt das auf GitHub aus und vergleicht Byte für Byte mit den
-ausgelieferten Dateien; der Deploy verlangt diesen Vergleich grün für den jüngsten
-Commit, der den Dekoder oder das Rezept geändert hat (`scripts/deploy.sh`). Zwei
-unabhängige Bauten auf verschiedenen Rechnern ergaben identische Dateien.
+ausgelieferten Dateien; der Deploy verlangt den Lauf dieses Workflows (Vergleich und
+Kontrollbau) grün für den jüngsten Commit, der Dekoder, Rezept oder Workflow
+geändert hat (`scripts/deploy.sh`). Mehrere Läufe auf getrennten Runnern ergaben
+identische Dateien — mit demselben Runner-Abbild und denselben Downloads; eine
+unabhängige zweite Bauumgebung ist das nicht.
 *Betrachtete Alternativen:* auf ein neues Fertigpaket warten (kein Termin; auch dessen
 Bauweg stellt libde265 1.0.15 ein) und den Dekoder abschalten (Samsung-Fotos scheitern
 wieder, 3 von 31 Versuchen am 08.09.).
@@ -497,17 +502,36 @@ Kontrollbaus ist deshalb nur ein Driftmelder für die Bauumgebung.
 beiden Bäumen einschließlich der Werkzeuge (der PR-Riegel prüfte bis 30.09.2026 den
 Wurzelbaum nicht, Befund OSS-2026-09-30-06), die Herstellermeldungen zu jeder
 Bibliothek und jeder einzelnen Datei unter `public/lib` und die Abkündigungshinweise
-von GitHub. Diese Prüfungen laufen bewusst nicht im Pull Request: Sie lesen fremde
-Quellen, und eine neue fremde Meldung dürfte nicht jeden unbeteiligten PR blockieren
-(2026-07-01). Ausnahmen gibt es nur begründet, mit Ablaufdatum in der Form JJJJ-MM-TT
-und — bei Herstellermeldungen — für genau eine Version; jede steht in jeder Ausgabe.
-*Alarm:* Ist auf `main` einer der Jobs rot, geht ein ntfy-Push mit Stufe „urgent"
-aufs Handy (Adresse als GitHub-Secret). Die Mail von GitHub allein genügt nicht, sie
-wird beim Empfänger automatisch gelöscht; die Zustellung eines Probealarms mit dieser
-Stufe ist bestätigt (30.09.2026). *Grenze:* GitHub schaltet geplante Workflows in
-öffentlichen Repositories nach 60 Tagen ohne Aktivität ab. Der Deploy-Riegel prüft,
-dass der Zeitplan im Workflow steht und keine Prüfung stillgelegt ist; ob GitHub ihn
-tatsächlich ausführt, zeigt nur der Lauf selbst (Handgriff in `docs/RUNBOOK.md`).
+von GitHub an den jüngsten Läufen jedes Workflows. Die Prüfungen mit fremden Quellen
+laufen bewusst nicht im Pull Request: Eine neue fremde Meldung dürfte nicht jeden
+unbeteiligten PR blockieren (2026-07-01). Der netzfreie Teil — ist jede Bibliothek
+überhaupt beobachtet? — läuft dagegen in jedem Pull Request und vor dem Push.
+Ausnahmen gibt es nur begründet, mit Ablaufdatum in der Form JJJJ-MM-TT und — bei
+Herstellermeldungen — für genau eine Version; jede steht in jeder Ausgabe.
+
+*Alarm:* Ist auf `main` einer der Prüf-Jobs rot oder abgebrochen, geht ein
+ntfy-Push mit Stufe „urgent" aufs Handy (Adresse als GitHub-Secret). Die Mail von
+GitHub genügt nicht, sie wird beim Empfänger automatisch gelöscht. Am 1. jedes
+Monats kommt eine sichtbare Probe; bleibt sie aus, ist der Alarmweg gestört.
+
+*Festgeschrieben:* Wie die beiden Sicherheits-Workflows aussehen müssen, prüft
+`scripts/pruefe-deploy-riegel.py` als positiven Vertrag — genau ein festgelegter
+Befehl je Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden
+Umgebungswerte, ein täglicher Zeitplan; der Alarm-Job und die Jobs des Nachbaus sind
+per Prüfsumme festgeschrieben. Frei bleiben nur die `uses:`-Zeilen, damit Dependabot
+die Actions anheben kann.
+
+*Restrisiken:*
+- Ob GitHub den Nachtlauf tatsächlich ausführt, sieht der Vertrag nicht (60-Tage-
+  Abschaltung, verworfene Läufe). Aufgefangen beim nächsten Deploy: `deploy.sh`
+  verlangt einen abgeschlossenen Nachtlauf auf `main`, höchstens 26 Stunden alt.
+  Zwischen zwei Deploys fällt ein ausbleibender Nachtlauf nur durch die ausbleibende
+  Monatsprobe auf.
+- Der Alarm-Job kann seinen eigenen Fehlschlag nicht melden (fehlendes Secret,
+  ntfy nicht erreichbar); „200" vom ntfy-Server heißt nur „angenommen". Auch das
+  zeigt erst die ausbleibende Monatsprobe.
+- Die ntfy-Zugangsdaten stehen an zwei Stellen (Secret Manager und GitHub-Secrets);
+  wer sie an einer ändert, muss die andere nachziehen (`docs/ERROR-ALERTING.md`).
 
 ## Kinderschutz-Filter: Anzahl und Diagnose (09.09.2026)
 

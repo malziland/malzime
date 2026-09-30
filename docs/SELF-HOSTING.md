@@ -143,12 +143,17 @@ Diese Dateien enthalten malziME-spezifische Inhalte (Domain, Firma, Kontakt) die
 
 Der CI-Workflow laeuft automatisch bei Push und Pull Request. Er fuehrt Tests, Lint und Secret-Scan aus.
 
-Zwei weitere Workflows laufen ohne Anpassung mit: `sicherheit-nachts.yml` (taeglich; meldet
-Sicherheitsluecken und Abkuendigungen, braucht nur das eingebaute `GITHUB_TOKEN`) und
-`libheif-bau.yml` (baut den HEIC-Dekoder nach, nur bei Aenderungen an ihm). Die
-Benachrichtigung bei einem roten Nachtlauf schickt GitHub an das Konto, das den Zeitplan
-zuletzt geaendert hat. In einem Fork schaltet GitHub geplante Workflows zunaechst ab; den
-Nachtlauf unter „Actions" einmal aktivieren.
+Zwei weitere Workflows laufen mit: `libheif-bau.yml` (baut den HEIC-Dekoder nach, nur
+bei Änderungen an ihm; braucht nichts außer dem eingebauten `GITHUB_TOKEN`) und
+`sicherheit-nachts.yml` (täglich; meldet Sicherheitslücken und Abkündigungen). Dessen
+Job `alarm`, der Push aufs Handy, läuft nur im Original-Repository `malziland/malzime`
+— in einem Fork wird er übersprungen. Wer ihn im eigenen Fork nutzen will, setzt die
+GitHub-Secrets `NTFY_URL_EU` und `NTFY_TOPIC_EU` und passt die Bedingung
+`github.repository` im Workflow an (der Deploy-Riegel hält den Alarm-Job per
+Prüfsumme fest; die neue Summe zeigt `python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`).
+In einem Fork schaltet GitHub geplante Workflows zunächst ab; den Nachtlauf unter
+„Actions" einmal aktivieren — `scripts/deploy.sh` verlangt einen Nachtlauf, der
+höchstens 26 Stunden alt ist.
 
 Deploy ist manuell per `firebase deploy` — es gibt keinen automatischen Deploy-Workflow.
 

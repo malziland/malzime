@@ -217,23 +217,36 @@ nur eingerichtet.
 Nicht aus Google Cloud, sondern aus GitHub: Der Workflow
 `.github/workflows/sicherheit-nachts.yml` prüft täglich um 03:43 UTC auf neue
 Sicherheitslücken (npm-Pakete, Herstellermeldungen zu `public/lib`) und auf
-Abkündigungshinweise von GitHub. Ist auf `main` einer seiner Prüf-Jobs rot, schickt
-der Job `alarm` einen **ntfy-Push mit Stufe „urgent" (5)** an denselben ntfy-Server
-und dasselbe Thema wie die übrigen Alarme.
+Abkündigungshinweise von GitHub. Ist auf `main` einer seiner Prüf-Jobs rot oder
+abgebrochen, schickt der Job `alarm` einen **ntfy-Push mit Stufe „urgent" (5)** an
+denselben ntfy-Server und dasselbe Thema wie die übrigen Alarme.
 
 - **Warum Stufe 5:** Niedrigere Stufen landen je nach Handy-Einstellung still in der
   App. Stufe 5 erscheint als sichtbare Meldung. Zustellung eines Probealarms mit
-  Stufe 5 am 30.09.2026 vom Empfänger bestätigt.
+  Stufe 5 am 30.09.2026 vom Empfänger bestätigt (von Hand gesendet, derselbe Server
+  und dasselbe Thema).
 - **Warum nicht nur die GitHub-Mail:** GitHub-Benachrichtigungen werden beim
   Empfänger automatisch gelöscht; eine Warnung per Mail käme also nie an.
-- **Zugangsdaten:** GitHub-Secrets `NTFY_URL_EU` und `NTFY_TOPIC_EU` (gesetzt am
-  30.09.2026 aus den gleichnamigen Werten im Secret Manager von `malzime`). Sie
-  stehen nie im Repository. Fehlen sie, wird der Job `alarm` rot und meldet das.
-- **Probe von Hand** (nach jeder Änderung am Alarmweg, und sobald der Workflow auf
-  `main` liegt): `gh workflow run sicherheit-nachts.yml -f alarmprobe=true` — schickt
-  „malziME PROBE: Sicherheit nachts", auch wenn alles grün ist. Kommt die Meldung
-  nicht als sichtbare Benachrichtigung an, ist der Kanal gestört.
-- **Nur `main`:** Läufe auf Arbeitszweigen alarmieren nicht.
+- **Monatliche Probe:** Am 1. jedes Monats (08:07 UTC) kommt „malziME PROBE:
+  Sicherheit nachts", auch wenn alles grün ist. **Bleibt sie aus, ist der Alarmweg
+  gestört** — dann sofort nachsehen (Lauf unter „Actions", Secrets, ntfy-Server).
+  Ohne diese Probe fiele ein kaputter Alarmweg erst auf, wenn ein echter Alarm nicht
+  ankommt: Der Job `alarm` kann seinen eigenen Fehlschlag nicht melden, und die
+  Mail von GitHub wird gelöscht.
+- **Zugangsdaten an zwei Stellen:** GitHub-Secrets `NTFY_URL_EU` und
+  `NTFY_TOPIC_EU` (gesetzt am 30.09.2026 aus den gleichnamigen Werten im Secret
+  Manager von `malzime`). **Wer ntfy-Server oder -Thema im Secret Manager ändert,
+  muss beide GitHub-Secrets im selben Schritt nachziehen**
+  (`gh secret set NTFY_URL_EU -R malziland/malzime`, ebenso `NTFY_TOPIC_EU`) —
+  sonst geht der Alarm mit „angenommen" an ein altes Thema. Die monatliche Probe
+  zeigt das spätestens am nächsten Monatsersten.
+- **Was „200" belegt:** nur, dass der ntfy-Server die Nachricht angenommen hat,
+  nicht, dass sie auf dem Handy ankam. Die Zustellung belegt nur die sichtbare
+  Probe.
+- **Probe von Hand:** `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`
+  (erst möglich, wenn der Workflow auf `main` liegt).
+- **Nur `main` und nur dieses Repository:** Läufe auf Arbeitszweigen und in Kopien
+  (Forks) alarmieren nicht.
 
 Was bei einem roten Nachtlauf zu tun ist: `docs/RUNBOOK.md`, Abschnitt
 „Nachtlauf Sicherheit nachts rot".

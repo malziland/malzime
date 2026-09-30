@@ -92,10 +92,11 @@ jobs:
       # `npm audit --audit-level=high`. Grund: das nackte audit blockiert bei
       # einer unreparierbaren Fremd-Luecke JEDEN PR — am 2026-07-01 sind daran
       # alle acht Dependabot-PRs gescheitert. Details: scripts/audit-gate.mjs
-      # AUDIT-BEFUND OSS-2026-08-12-23: Das Gate prueft jetzt BEIDE Baeume. Der
-      # Wurzel-Baum (Playwright, Vitest, ESLint) lief bisher durch keinen Riegel,
-      # obwohl genau dieser Code in der CI ueber dem ausgecheckten Repository
-      # laeuft. Aktuell sind beide Baeume auf 0 — der Riegel fehlte trotzdem.
+      # Geprueft werden beide Baeume mit ALLEN Abhaengigkeiten, auch den
+      # Werkzeugen (OSS-2026-08-12-23, OSS-2026-09-30-06): Der Wurzel-Baum
+      # besteht nur aus Werkzeugen (Playwright, Vitest, ESLint), die hier ueber
+      # dem ausgecheckten Repository laufen. Bis 30.09.2026 lief das Gate mit
+      # --omit=dev und sah diesen Baum deshalb gar nicht.
       - run: node ../scripts/audit-gate.mjs functions .
 
       - run: npm run lint

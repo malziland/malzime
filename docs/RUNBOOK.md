@@ -750,8 +750,9 @@ Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über
 
 ### Audit-Gate rot / Dependabot-PRs bleiben liegen
 
-Erst nachsehen, **was** rot ist: `node scripts/audit-gate.mjs functions` (läuft
-lokal identisch zur CI und nennt Paket, Advisory und Kette).
+Erst nachsehen, **was** rot ist: `node scripts/audit-gate.mjs functions .` (läuft
+lokal identisch zur CI, prüft beide Bäume mit allen Abhängigkeiten einschließlich
+der Werkzeuge und nennt Paket, Advisory und Kette).
 
 - **Es gibt eine reparierte Version** → anheben, Tests laufen lassen, committen.
   **Danach IMMER `npm ci --dry-run` in Root und `functions/`** (siehe Kasten

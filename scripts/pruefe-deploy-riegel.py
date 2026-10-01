@@ -93,7 +93,7 @@ PRUEFJOBS_NACHTS = {
 # schuetzt vor Versehen, nicht vor Absicht — die Aenderung am Workflow steht
 # im selben Pull Request sichtbar im Diff.
 VERTRAG_SUMMEN = {
-    "sicherheit-nachts.yml": "08fac19d661973d9",
+    "sicherheit-nachts.yml": "46e7e74b721601db",
     "libheif-bau.yml": "39f0db0be0a0a3e0",
 }
 _USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[0-9a-f]{40} # .*$")
@@ -117,16 +117,18 @@ def _summe(text):
     """Pruefsumme einer Workflow-Datei, blockbewusst normalisiert (siehe oben)."""
     import hashlib
 
-    # Befund K-01 (Runde 4): Als Leerraum gilt NUR, was YAML dafuer haelt —
-    # Leerzeichen und Tab. Pythons strip() nahm auch das geschuetzte
-    # Leerzeichen (U+00A0) dafuer, das YAML als Inhalt liest. Und eine
+    # Befunde K-01 (Runde 4) und N-01 (Runde 5): Als Leerraum gilt NUR das
+    # Leerzeichen. Pythons strip() nahm auch das geschuetzte Leerzeichen
+    # (U+00A0) dafuer, das YAML als Inhalt liest; und einen Tab vor einem
+    # Kommentar lehnt GitHubs Leser ab, obwohl YAML 1.2 ihn erlaubt. Eine
     # Kommentarzeile beendet keinen Block: Mit zu wenig Einzug macht sie die
-    # Datei ungueltig, sie muss also mitzaehlen.
+    # Datei ungueltig, sie muss also mitzaehlen. Leerzeilen am Dateiende
+    # zaehlen nicht (sonst Fehlalarm, Befund N-03).
     raus = []
     block = None
-    for zeile in text.split("\n"):
-        kern = zeile.strip(" \t")
-        einzug = len(zeile) - len(zeile.lstrip(" \t"))
+    for zeile in text.rstrip("\n").split("\n"):
+        kern = zeile.strip(" ")
+        einzug = len(zeile) - len(zeile.lstrip(" "))
         if block is not None and kern and not kern.startswith("#") and einzug <= block:
             block = None
         if block is None:
@@ -136,7 +138,7 @@ def _summe(text):
             raus.append(m.group(1) + m.group(2) + "@SHA # K" if m else zeile)
             k = re.match(r"""^([ ]*)(?:- )?[A-Za-z0-9_"'-]+:\s*[|>][-+0-9]*\s*(#.*)?$""", zeile)
             if k:
-                block = len(k.group(1)) + (2 if zeile.lstrip(" \t").startswith("- ") else 0)
+                block = len(k.group(1)) + (2 if zeile.lstrip(" ").startswith("- ") else 0)
         else:
             raus.append(zeile)
     return hashlib.sha256("\n".join(raus).encode("utf-8")).hexdigest()[:16]

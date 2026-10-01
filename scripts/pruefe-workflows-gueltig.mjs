@@ -11,16 +11,27 @@
  * roten Lauf ohne Jobs an, den der Pull Request nicht anzeigt. Kein Test, kein
  * Waechter hat die Dateien je so gelesen, wie GitHub sie liest.
  *
- * Diese Pruefung liest JEDE Datei unter .github/workflows mit dem YAML-Leser,
- * auf dem GitHubs quelloffener Workflow-Leser aufbaut (`yaml`; die Fehler im
- * Befund stammen woertlich aus ihm). Jeder Lesefehler und jede Warnung ist ein
- * Befund; dazu das Grundgeruest eines Workflows: `on`, mindestens ein Job,
- * jeder Job mit `runs-on` oder `uses`. GitHubs Workflow-Leser selbst
- * (@actions/workflow-parser 0.3.61) laesst sich in der veroeffentlichten
- * Fassung unter Node 24 nicht laden (JSON-Import ohne Attribut).
- * Was sie NICHT sieht: ob GitHubs Server eine Datei strenger liest als dieser
- * Leser. Den Rest faengt deploy.sh ab — es zaehlt nur Nachtlaeufe, die nach
- * der letzten Aenderung am Workflow wirklich gelaufen sind.
+ * Diese Pruefung liest JEDE Datei unter .github/workflows in zwei Schritten:
+ *
+ *   1. ZEICHEN UND GROESSE, die GitHubs Server-Leser (YamlDotNet, Quellcode in
+ *      actions/runner, src/Sdk/WorkflowParser) ablehnt, ein YAML-1.2-Leser aber
+ *      durchlaesst — Befund N-01 (Runde 5, 01.10.2026), dort mit GitHubs Leser
+ *      gemessen: Tab (als Einzug vor einem Kommentar oder in einer Leerzeile
+ *      genuegt), NUL, die Zeilentrenner U+0085, U+2028, U+2029 (GitHub bricht
+ *      dort die Zeile um — in einer Kommentarzeile laesst sich so sogar ein
+ *      echter Schluessel einschleusen, Befund N-02) und Dateien ueber
+ *      1.048.576 Zeichen. Keines davon steht heute in einer Workflow-Datei;
+ *      verboten ist es deshalb ueberall in der Datei, nicht nur am Zeilenanfang.
+ *   2. YAML-SYNTAX mit `yaml` (auf diesem Leser baut GitHubs Editor-Werkzeug
+ *      @actions/workflow-parser auf; dieses selbst laesst sich in Fassung
+ *      0.3.61 unter Node 24 nicht laden — JSON-Import ohne Attribut). Jeder
+ *      Lesefehler und jede Warnung ist ein Befund; dazu das Grundgeruest eines
+ *      Workflows: `on`, mindestens ein Job, jeder Job mit `runs-on` oder `uses`.
+ *
+ * Was sie NICHT sieht: weitere Stellen, an denen GitHubs Server strenger liest
+ * als diese beiden Schritte. Das faengt deploy.sh ab — es zaehlt nur
+ * Nachtlaeufe, die mit der ausgelieferten Fassung wirklich gelaufen sind —,
+ * und zwischen zwei Deploys die ausbleibende Monatsprobe.
  *
  * Positivkontrolle: Vor den echten Dateien muss eine absichtlich kaputte Datei
  * als fehlerhaft erkannt werden. Meldet der Leser dort nichts (andere Version,
@@ -49,7 +60,32 @@ try {
 
 const istObjekt = (w) => w !== null && typeof w === "object" && !Array.isArray(w);
 
+/* Schritt 1 (Befund N-01): Zeichen, die GitHubs Server-Leser ablehnt. */
+const GITHUB_HOECHSTLAENGE = 1048576;
+const VERBOTEN = [
+  ["\t", "Tab (GitHub: 'find a tab character that violate indentation')"],
+  ["\u0000", "NUL"],
+  ["\u0085", "Zeilentrenner U+0085 (GitHub bricht dort die Zeile um)"],
+  ["\u2028", "Zeilentrenner U+2028 (GitHub bricht dort die Zeile um)"],
+  ["\u2029", "Absatztrenner U+2029 (GitHub bricht dort die Zeile um)"],
+];
+
+function zeichenFehler(inhalt) {
+  const fehler = [];
+  if (inhalt.length > GITHUB_HOECHSTLAENGE) {
+    fehler.push(`${inhalt.length} Zeichen — GitHub liest hoechstens ${GITHUB_HOECHSTLAENGE}`);
+  }
+  const zeilen = inhalt.split("\n");
+  for (const [zeichen, name] of VERBOTEN) {
+    const nr = zeilen.findIndex((z) => z.includes(zeichen));
+    if (nr >= 0) fehler.push(`${name} in Zeile ${nr + 1}`);
+  }
+  return fehler;
+}
+
 function fehlerIn(inhalt) {
+  const zeichen = zeichenFehler(inhalt);
+  if (zeichen.length) return { fehler: zeichen, jobs: 0 };
   const dok = YAML.parseDocument(inhalt, { uniqueKeys: true, strict: true });
   const fehler = [...dok.errors, ...dok.warnings].map((e) => e.message.split("\n")[0]);
   if (fehler.length) return { fehler, jobs: 0 };
@@ -81,7 +117,10 @@ const KAPUTT = [
   "",
 ].join("\n");
 const kontrolle = fehlerIn(KAPUTT);
-if (kontrolle.fehler.length === 0) {
+const kontrolleZeichen = fehlerIn(
+  KAPUTT.replace("always() &&", "always() && #\u2028x").replace("# Kommentar mit zu wenig Einzug\n", "")
+);
+if (kontrolle.fehler.length === 0 || kontrolleZeichen.fehler.length === 0) {
   console.log("MESSUNG NICHT DURCHFUEHRBAR: Der Leser erkennt eine absichtlich kaputte Datei nicht.");
   console.log("  Ohne diese Positivkontrolle waere jedes Gruen wertlos.");
   process.exit(2);

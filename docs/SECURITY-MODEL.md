@@ -526,15 +526,17 @@ trägt man dort nach (`--vertrag-summen`). Zusätzlich prüft er inhaltlich: gen
 festgelegter Befehl je Prüf-Job, kein `if`, kein `continue-on-error`, keine
 umlenkenden Umgebungswerte, ein täglicher Zeitplan.
 *Lesbarkeit:* Eine Workflow-Datei, die GitHub nicht lesen kann, läuft nie — und der
-Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` liest
-im Pull Request und vor dem Push jede Datei unter `.github/workflows` mit dem
-YAML-Leser, auf dem GitHubs Workflow-Leser aufbaut, samt Grundgerüst (`on`, Jobs mit
-`runs-on` oder `uses`) und einer Positivkontrolle.
+Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` prüft
+im Pull Request und vor dem Push jede Datei unter `.github/workflows` in zwei Schritten:
+zuerst Zeichen und Größe, die GitHubs Server-Leser ablehnt, obwohl YAML sie erlaubt
+(Tab, NUL, die Zeilentrenner U+0085/U+2028/U+2029, mehr als 1.048.576 Zeichen —
+gemessen mit GitHubs eigenem Leser aus `actions/runner`), dann die YAML-Syntax samt
+Grundgerüst (`on`, Jobs mit `runs-on` oder `uses`); beides mit Positivkontrolle.
 *Grenze:* Die Prüfsumme schützt vor versehentlichem Stilllegen, nicht vor Absicht —
 wer den Workflow ändert, kann die Summe mitändern; beides steht dann im selben Pull
-Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig. Ob GitHubs
-Server eine Datei strenger liest als dieser Leser, sieht die Prüfung nicht; das fängt
-der Deploy auf (nächster Absatz).
+Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig. Weitere
+Stellen, an denen GitHubs Server strenger liest als diese Prüfung, sieht sie nicht;
+das fängt der Deploy auf (nächster Absatz).
 
 *Restrisiken:*
 - Ob GitHub den Nachtlauf tatsächlich ausführt, sieht der Vertrag nicht (60-Tage-

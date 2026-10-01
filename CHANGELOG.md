@@ -58,10 +58,11 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   gelaufen ist (Grenze in `scripts/deploy.sh`) oder seit der letzten Änderung an
   ihm noch nicht gelaufen ist, und ein neuer Fremdbaustein unter `public/lib`
   braucht schon im Pull Request einen Eintrag in der Beobachtung.
-- **Workflow-Dateien werden gelesen wie von GitHub.** Eine Datei unter
+- **Workflow-Dateien werden auf Lesbarkeit für GitHub geprüft.** Eine Datei unter
   `.github/workflows`, die GitHub nicht lesen könnte, würde nie laufen, ohne dass
   der Pull Request es anzeigt. Die Prüfung `scripts/pruefe-workflows-gueltig.mjs`
-  macht das schon im Pull Request und vor dem Push rot.
+  macht das schon im Pull Request und vor dem Push rot — auch bei Zeichen wie einem
+  Tab, die YAML erlaubt, GitHub aber ablehnt.
 
 ## [4.12.0] — 2026-09-28
 

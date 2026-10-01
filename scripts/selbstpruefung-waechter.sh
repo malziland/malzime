@@ -319,6 +319,36 @@ probe_text 1 "UNLESBAR" "geschuetztes Leerzeichen als Einzug: Datei unlesbar" no
 probe_text 1 "sicherheit-nachts.yml weicht" "... und die Pruefsumme schlaegt an" python3 scripts/pruefe-deploy-riegel.py
 zurueck .github/workflows/sicherheit-nachts.yml
 
+# Befund N-01 (Runde 5, 01.10.2026): Zeichen, die YAML 1.2 erlaubt, GitHubs
+# Server-Leser aber ablehnt — eine Leerzeile nur aus einem Tab, ein
+# Zeilentrenner U+2028 in einer Kopfkommentarzeile (dort laesst sich sogar ein
+# Schluessel einschleusen). Beide waren in der ersten Fassung beider Schichten
+# gruen.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+alt = "\njobs:\n"
+assert s.count(alt) == 1, "Anker der Probe fehlt"
+s = s.replace(alt, "\n\t\njobs:\n", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "Tab" "Leerzeile nur aus einem Tab: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+probe_text 1 "sicherheit-nachts.yml weicht" "... und die Pruefsumme schlaegt an" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+z = s.split("\n")
+i = next(n for n, zeile in enumerate(z) if zeile.startswith("#"))
+z[i] = z[i] + "\u2028if: false"
+open(p, "w").write("\n".join(z))
+PYSELF
+probe_text 1 "Zeilentrenner" "Zeilentrenner U+2028 im Kommentar: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+zurueck .github/workflows/sicherheit-nachts.yml
+
 echo
 
 echo "2. verify-infrastructure.sh — Bildspeicher"
@@ -560,10 +590,12 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  # 36 seit 01.10.2026: zehn Proben fuer die Sicherheits-Workflows (Zeitplan,
-  # '|| true', Alarm, Herkunftsvergleich, 'exit 0 # uses:', Kommentarzeile im
-  # Befehl, zwei unlesbare Dateien je gegen Leser und Pruefsumme).
-  ERWARTETE_PROBEN=36
+  # 39 seit 01.10.2026: dreizehn Proben fuer die Sicherheits-Workflows
+  # (Zeitplan, '|| true', Alarm, Herkunftsvergleich, 'exit 0 # uses:',
+  # Kommentarzeile im Befehl, vier unlesbare Dateien gegen Leser und
+  # Pruefsumme — die mit U+2028 im Kopfkommentar nur gegen den Leser, denn
+  # Kommentare ausserhalb von Bloecken zaehlen in der Summe bewusst nicht).
+  ERWARTETE_PROBEN=39
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

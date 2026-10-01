@@ -4,6 +4,33 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Alarme mit passendem Betreff.** Statt einer Nachricht „Fehlerzeile oder
+  Kinderschutz-Treffer“ für alles gibt es drei: „Kinderschutz-Treffer (Analyse
+  lief normal)“, „Analyse gescheitert – KI-Dienst (Mistral) nicht erreichbar“
+  und „Fehler im Server“ für den Rest. Der Push aufs Handy trägt denselben
+  Betreff als Titel; die Nachricht bei vielen Fehlern aus Browsern hat erstmals
+  einen eigenen Betreff.
+
+### Behoben
+
+- **Abgerissene Verbindung zu Mistral führt nicht mehr sofort zur
+  Fehlermeldung.** Am 01.10.2026 scheiterten zwei Analysen eines Workshops,
+  weil die Verbindung mitten in der Antwort abriss. Jetzt wird ein schon fast
+  fertiges Ergebnis gerettet, sonst einmal neu gefragt. Der Grund eines
+  Abrisses steht im Protokoll (Code und Kurztext, ohne Adressen) — bisher war
+  nicht feststellbar, wer die Verbindung beendet hatte.
+- **Keine Warnung mehr bei jedem Foto.** Seit 4.13.0 schrieb jede Analyse eine
+  Warnung ins Protokoll, ausgelöst von einem Fehler in einem Hilfspaket der
+  Google-Speicher-Bibliothek (harmlos, aber sie verdeckte andere Warnungen).
+  Das Foto wird jetzt direkt geladen, mit einer statt zwei Anfragen.
+- **Verspätete Antworten der Datenbank werden gemessen.** Kommt der Zugriff
+  auf die Betriebswerte nach dem Zeitlimit doch noch an, steht seine
+  tatsächliche Dauer im Protokoll.
+
 ## [4.13.0] — 2026-10-01
 
 ### Hinzugefügt

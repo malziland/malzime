@@ -123,6 +123,47 @@ describe("NOTAUSSTIEG — zurueck ohne Auslieferung", () => {
   }, 15000);
 });
 
+/* Workshop 01.10.2026: Wie lange brauchte der zu spaete Zugriff WIRKLICH?
+   Bisher stand nur "laenger als 2000 ms" im Protokoll. Kommt die Antwort
+   nach dem Zeitlimit doch noch, wird ihre Dauer einmal geschrieben — nur die
+   Zahl (Datenschutzerklaerung: "wie lange er dauerte"). */
+describe("VERSPAETETE ANTWORT", () => {
+  test("die tatsaechliche Dauer wird nachgetragen, sobald die Antwort doch kommt", async () => {
+    setze(satz(T1));
+    expect((await geltendeWerte()).werte).not.toBeNull();
+    const zeilen = [];
+    const spion = jest.spyOn(console, "log").mockImplementation((t) => zeilen.push(String(t)));
+    try {
+      mockDoc.verzoegerung = 2600;
+      _cacheLeeren({ warmBleiben: true });
+      const e = await geltendeWerte();
+      expect(e.grund).toContain("Zeitlimit 2000 ms");
+      expect(zeilen.join("\n")).not.toMatch(/spaete-antwort/);
+      await new Promise((r) => setTimeout(r, 900));
+      const spaet = zeilen.map((z) => JSON.parse(z)).find((z) => z.status === "spaete-antwort");
+      expect(spaet).toBeDefined();
+      expect(spaet.dauerMs).toBeGreaterThanOrEqual(2500);
+      /* Nur Schritt, Status und Dauer — sonst nichts. */
+      expect(Object.keys(spaet).sort()).toEqual(["dauerMs", "status", "step"]);
+    } finally {
+      spion.mockRestore();
+    }
+  }, 15000);
+
+  test("eine rechtzeitige Antwort erzeugt keine solche Zeile", async () => {
+    const zeilen = [];
+    const spion = jest.spyOn(console, "log").mockImplementation((t) => zeilen.push(String(t)));
+    try {
+      setze(satz(T1));
+      await geltendeWerte();
+      await new Promise((r) => setTimeout(r, 50));
+      expect(zeilen.join("\n")).not.toMatch(/spaete-antwort/);
+    } finally {
+      spion.mockRestore();
+    }
+  });
+});
+
 describe("WORKSHOP-LAST", () => {
   test("50 gleichzeitige Analysen lesen die Datenbank hoechstens einmal", async () => {
     setze(satz(T1));

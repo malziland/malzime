@@ -23,6 +23,7 @@ const { extrahiereLiveText } = require("./mistral-antwort");
 const { MISTRAL_ENDPOINT } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
 const { withMistralSlot } = require("./throttle");
+const { istVerbindungsabbruch } = require("./verbindungsfehler");
 
 /* Env-Variable, NICHT hartcodiert. Produktion seit 09.09.2026: MISTRAL_API_KEY_EU
    (an europe-west1 gebunden); lokal bleibt MISTRAL_API_KEY als zweiter Name. */
@@ -313,6 +314,13 @@ async function callMistralRawUnthrottled({
         e.code = "timeout";
         throw e;
       }
+      /* Workshop 01.10.2026: Abriss, bevor die Antwort begann ("fetch
+         failed"). Markiert, damit mistral.js einmal neu fragen kann; der
+         Grund steht in err.cause (verbindungsfehler.js). */
+      if (istVerbindungsabbruch(err)) {
+        err.verbindungsabbruch = true;
+        err.teiltext = "";
+      }
       throw err;
     }
     /* Im Stream-Modus bleibt der Timeout SCHARF, bis der Stream zu Ende
@@ -373,13 +381,31 @@ async function callMistralRawUnthrottled({
           e.teiltext = spur.text || "";
           throw e;
         }
+        /* Workshop 01.10.2026: Der Strom riss mitten in der Antwort ab
+           ("terminated"). Wie beim Zeitlimit faehrt der gelesene Text mit —
+           steht darin schon ein brauchbares Ergebnis, rettet es mistral.js,
+           sonst fragt es einmal neu. */
+        if (istVerbindungsabbruch(err)) {
+          err.verbindungsabbruch = true;
+          err.teiltext = spur.text || "";
+        }
         throw err;
       } finally {
         clearTimeout(timeoutId);
       }
     }
 
-    const json = await res.json();
+    let json;
+    try {
+      json = await res.json();
+    } catch (err) {
+      /* Auch ohne Strom kann die Antwort beim Lesen abreissen. */
+      if (istVerbindungsabbruch(err)) {
+        err.verbindungsabbruch = true;
+        err.teiltext = "";
+      }
+      throw err;
+    }
     const choice = json.choices?.[0];
     let text = "";
     const msgContent = choice?.message?.content;

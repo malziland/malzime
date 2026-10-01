@@ -33,6 +33,7 @@ const os = require("os");
 const path = require("path");
 const { getStorage } = require("firebase-admin/storage");
 const { QUEUE_BUCKET, QUEUE_UPLOAD_PREFIX, isLocalQueueMode } = require("./config");
+const { istVerbindungsabbruch } = require("./verbindungsfehler");
 
 const EXT_BY_MIME = {
   "image/jpeg": "jpg",
@@ -144,10 +145,74 @@ async function loadImage(objectPath) {
     return { buffer, mimeType: MIME_BY_EXT[ext] || "image/jpeg" };
   }
 
-  const file = bucket().file(objectPath);
+  const b = bucket();
+  /* Die echte Bibliothek: direkt laden (siehe ladeVomSpeicher). Die Attrappen
+     der aelteren Tests haben keinen Speicher-Dienst und laden wie bisher. */
+  if (b && typeof b.name === "string" && b.storage && b.storage.authClient) return ladeVomSpeicher(b, objectPath);
+  const file = b.file(objectPath);
   const [buffer] = await file.download();
   const [metadata] = await file.getMetadata();
   return { buffer, mimeType: (metadata && metadata.contentType) || "image/jpeg" };
+}
+
+/* Workshop 01.10.2026 (erster nach 4.13.0): Jede Analyse schrieb
+   "MaxListenersExceededWarning ... PassThrough" ins Protokoll. Gemessen: Die
+   Speicher-Bibliothek 8 haengt beim Herunterladen ueber ihr Hilfspaket
+   teeny-request 11 (index.js:194) dieselben Zuhoerer mehrfach an einen Strom
+   — ab etwa 64 KB, also bei jedem echten Foto; mit 7.22 nie. Harmlos (eine
+   Anfrage, Daten gleich, kein Speicherwachstum ueber 1000 Downloads), aber
+   eine Warnung, die immer kommt, verdeckt die eine, die zaehlt. Eine
+   reparierte Fassung gibt es nicht (8.2.0 und teeny-request 11.0.1 sind die
+   neuesten). Deshalb wird das Foto hier mit EINER Anfrage an dieselbe
+   Adresse geholt, die die Bibliothek benutzt — mit ihrer Anmeldung und nach
+   ihren Wiederholungsregeln (retryOptions: bis zu 3 Wiederholungen bei
+   408/429/5xx und Verbindungsabriss, Pause 1 s, 2 s, 4 s). Nebenbei entfaellt
+   die zweite Anfrage nach den Metadaten: Den Bildtyp nennt die Antwort selbst.
+   Datenweg unveraendert: unser Server liest unser Fach, sonst niemand. */
+const WIEDERHOLBARE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+let ladeFetch = (...args) => fetch(...args);
+let warten = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function ladeVomSpeicher(b, objectPath) {
+  const dienst = b.storage;
+  const basis = String(dienst.apiEndpoint || "https://storage.googleapis.com").replace(/\/+$/, "");
+  const adresse = `${basis}/storage/v1/b/${encodeURIComponent(b.name)}/o/${encodeURIComponent(objectPath)}?alt=media`;
+  const regeln = dienst.retryOptions || {};
+  const maxWiederholungen =
+    regeln.autoRetry === false ? 0 : Number.isInteger(regeln.maxRetries) ? regeln.maxRetries : 3;
+  const faktor = typeof regeln.retryDelayMultiplier === "number" ? regeln.retryDelayMultiplier : 2;
+  let letzterFehler = null;
+  for (let versuch = 0; versuch <= maxWiederholungen; versuch++) {
+    if (versuch > 0) await warten(1000 * faktor ** (versuch - 1));
+    /* GoogleAuth liefert den Zugang als Text, ein OAuth2-Client als { token }. */
+    const zugang = await dienst.authClient.getAccessToken();
+    const token = typeof zugang === "string" ? zugang : zugang && zugang.token;
+    let res;
+    try {
+      res = await ladeFetch(adresse, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const typ = String(res.headers.get("content-type") || "")
+          .split(";")[0]
+          .trim();
+        return { buffer, mimeType: typ || "image/jpeg" };
+      }
+    } catch (err) {
+      if (!istVerbindungsabbruch(err)) throw err;
+      letzterFehler = err;
+      continue;
+    }
+    try {
+      if (res.body && typeof res.body.cancel === "function") await res.body.cancel();
+    } catch (_) {
+      /* Verwerfen ist best effort. */
+    }
+    letzterFehler = new Error(`Bildspeicher HTTP ${res.status}`);
+    /* Wie ApiError der Bibliothek: Aufrufer pruefen `code` (404 = schon weg). */
+    letzterFehler.code = res.status;
+    if (!WIEDERHOLBARE_STATUS.has(res.status)) throw letzterFehler;
+  }
+  throw letzterFehler;
 }
 
 /**
@@ -211,6 +276,10 @@ module.exports = {
   _bucketFuerTest,
   storeImage,
   loadImage,
+  /* Nur fuer Tests: Pausen der Wiederholungen ersetzen (null = echte). */
+  _setWartenForTest: (f) => {
+    warten = f || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  },
   deleteImage,
   setBucketForTest,
 };

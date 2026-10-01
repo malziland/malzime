@@ -56,6 +56,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call) + generateBeastAds (zweiter Aufruf ohne Bild)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
+  verbindungsfehler.js  Erkennt einen Verbindungsabriss (terminated/fetch failed) und gibt seinen Grund protokollierbar heraus — nur Code und Kurztext, nie Adressen
   auth.js            HMAC-basierte Admin-Token + Nonces (createAdminToken, verifyAdminToken, createNonce, verifyNonce)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)

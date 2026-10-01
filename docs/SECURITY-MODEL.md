@@ -396,8 +396,70 @@ mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
 (Abfrage im RUNBOOK; ein einzelner träger Lauf erzeugt bis zu fünf Warnungen
 in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
 sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
-verschoben. Stand 10.09.2026: drei Minuten an diesem Tag (10:55, 11:18, 11:19
-Wien) — an der Grenze, nicht darüber.
+verschoben. Stand 01.10.2026: zwei Minuten an diesem Tag (10:52, 11:30 Wien),
+unter der Grenze; am 10.09.2026 waren es drei. Seit 01.10.2026 protokolliert
+`betriebsprofil.js` zusätzlich, wie lange ein zu später Zugriff tatsächlich
+brauchte, sobald die Antwort doch noch kommt (`status: "spaete-antwort"`, nur
+`dauerMs`) — bisher stand dort nur „länger als 2000 ms“.
+
+## Verbindungsabriss zu Mistral: einmal neu fragen (01.10.2026)
+
+**Entscheidung.** Reißt die Verbindung zu Mistral während einer Analyse ab
+(Node.js meldet „terminated“ oder „fetch failed“, Grund in `err.cause`), wird
+zuerst ein schon im Strom angekommener Text gerettet wie beim Zeitlimit; reicht
+er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget.
+Der erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
+Neuversuch alarmiert. Antworten von Mistral (HTTP-Fehler) und unser eigenes
+Zeitlimit sind kein Abriss und werden nicht so behandelt.
+
+**Begründung.** Am 01.10.2026 scheiterten 2 von 30 Analysen eines Workshops an
+einem Abriss; beide Kinder sahen sofort die Fehlermeldung. In den 30 Tagen
+davor kam die Fehlerart bei rund 770 Aufrufen nicht vor. Ein Neuversuch kostet
+höchstens einen KI-Aufruf mehr je Abriss.
+
+**Datenschutz.** Ins technische Protokoll kommt der Grund nur als Code und
+Kurztext (`ursache: { code, text }`), jede Adresse im Text wird zu
+„[Adresse]“; die Verbindungsdaten, die Node.js anhängt (Adressen und Ports
+beider Seiten), werden nie geschrieben (`verbindungsfehler.js`, geprüft in
+`mistral-verbindungsabbruch.test.js` an jeder Zeile). Das entspricht dem, was
+die Datenschutzerklärung für das technische Protokoll nennt: ob ein Schritt
+geklappt hat — keine IP-Adresse.
+
+**Betrachtete Alternative.** Mehrere Neuversuche oder mit Pause wie bei der
+Überlastung (429): verworfen — ein Abriss ist kein Zeichen von Überlast, und
+jeder weitere Versuch verlängert die Wartezeit des Kindes. Den Neuversuch mit
+Live-Text zu streamen: verworfen aus demselben Grund wie bei der Nachfrage nach
+fehlenden Karten — er überschriebe den schon gezeigten Text.
+
+**Bedingung für Neubewertung.** Mehr als drei `abbruch-neuversuch` an einem Tag
+oder ein Neuversuch, der selbst scheitert — dann liegt die Ursache außerhalb
+eines Einzelfalls, und der Grund in `ursache` zeigt, wo.
+
+## Foto direkt laden statt über den Strom-Weg der Speicher-Bibliothek (01.10.2026)
+
+**Entscheidung.** `queue-storage.js` lädt das Foto mit EINER Anfrage an dieselbe
+Adresse, die `@google-cloud/storage` benutzt (`…/storage/v1/b/<Fach>/o/<Objekt>?alt=media`),
+mit der Anmeldung und den Wiederholungsregeln der Bibliothek (`retryOptions`:
+bis zu 3 Wiederholungen bei 408/429/5xx und Verbindungsabriss). Den Bildtyp
+liefert die Antwort selbst; die zweite Anfrage nach den Metadaten entfällt.
+
+**Begründung, gemessen.** Seit 4.13.0 schrieb jede Analyse
+„MaxListenersExceededWarning … PassThrough“ ins Protokoll. Ursache: Die
+Speicher-Bibliothek 8 hängt beim Herunterladen über ihr Hilfspaket teeny-request
+11 (`index.js:194`) dieselben Zuhörer mehrfach an einen Strom, ab etwa 64 KB.
+Mit 7.22 nie. Harmlos — eine Anfrage, Daten byte-gleich, kein Speicherwachstum
+über 1000 Downloads —, aber eine Warnung, die immer kommt, verdeckt die eine,
+die zählt. Eine reparierte Fassung gab es nicht (8.2.0 und teeny-request 11.0.1
+waren die neuesten). Datenweg unverändert: unser Server liest unser Fach.
+
+**Betrachtete Alternativen.** Die Speicher-Bibliothek auf 7.22 zurückstellen:
+verworfen, firebase-admin 14.5 verlangt 8. Die Warnung abschalten: verworfen,
+das verdeckte genau die Fehlerklasse, für die es die Warnung gibt.
+
+**Bedingung für Neubewertung.** Eine Fassung von teeny-request oder der
+Speicher-Bibliothek, die den Fehler behebt — dann zurück zu `file.download()`.
+Geprüft wird das mit `src/__tests__/hilfen/foto-laden-probe.cjs`, wenn man den
+direkten Weg darin abschaltet.
 
 ## HEIC-Fotos im Browser öffnen: WebAssembly und LGPL (08.09.2026)
 

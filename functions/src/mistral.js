@@ -31,6 +31,7 @@ const {
   setFetchForTest,
   _setLiveIntervalMsForTest,
 } = require("./mistral-http");
+const { ursacheVon } = require("./verbindungsfehler");
 
 const {
   extrahiereLiveText,
@@ -254,7 +255,20 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      HOECHSTENS EINMAL je Analyse, auch wenn nachgefragt wird (siehe
      loggeKiDauer). */
   const dauer = { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false };
-  let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer);
+  let parsed;
+  try {
+    parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer);
+  } catch (err) {
+    /* Workshop 01.10.2026: Zwei Analysen scheiterten, weil die Verbindung zu
+       Mistral mitten in der Antwort abriss — beide Kinder sahen sofort die
+       Fehlermeldung. Bei einem Abriss (nicht bei einer Antwort von Mistral,
+       nicht bei unserem Zeitlimit) wird EINMAL neu gefragt, mit dem
+       Restbudget. Ohne Live-Text, aus demselben Grund wie bei der Nachfrage
+       unten: Er wuerde den schon gezeigten Text nur ueberschreiben. Kostet
+       hoechstens einen Aufruf mehr je Abriss. */
+    if (!(err && err.verbindungsabbruch)) throw err;
+    parsed = await callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer);
+  }
   let missing = parsed
     ? collectMissingForBothModes(parsed)
     : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };
@@ -547,6 +561,8 @@ async function generateBeastAds(boostProfile, standardAds, lang) {
         step: "mistral-beast-ads",
         status: "failed",
         error: err.message,
+        /* Grund eines Abrisses, ohne Adressen (verbindungsfehler.js). */
+        ursache: ursacheVon(err),
       })
     );
     return null;
@@ -672,7 +688,12 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        abgeschnittenes JSON bereits mit (Stufe truncation-recovery); sie war
        hier nur nie erreichbar, weil der Teiltext mit dem Stack-Frame starb.
        Greift die Rettung nicht, laeuft alles exakt wie bisher weiter. */
-    if (err && err.code === "timeout" && typeof err.teiltext === "string" && err.teiltext.length > 0) {
+    if (
+      err &&
+      (err.code === "timeout" || err.verbindungsabbruch) &&
+      typeof err.teiltext === "string" &&
+      err.teiltext.length > 0
+    ) {
       const rettungsStufen = [];
       const gerettet = parseSafely(err.teiltext, {
         requireSchema: false,
@@ -701,6 +722,23 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        erreicht — gefunden wurden sie erst, weil ein Nutzer sich beschwerte.
        Genau das ist die Frage aus KERN 4: Wer wuerde es merken, wenn das hier
        falsch waere? Bis hierher: niemand. */
+    /* Workshop 01.10.2026: Beim ersten Abriss folgt ein Neuversuch (siehe
+       runSingleLargeCall) — das ist eine Warnung, kein Alarm. Gelingt der
+       Neuversuch nicht, schreibt DIESER den Fehler mit Alarm. */
+    if (err && err.verbindungsabbruch && attemptLabel === "first") {
+      console.warn(
+        JSON.stringify({
+          severity: "WARNING",
+          step: "mistral-single-large-details",
+          profil: aktivesProfil || null,
+          attempt: attemptLabel,
+          status: "abbruch-neuversuch",
+          error: err.message,
+          ursache: ursacheVon(err),
+        })
+      );
+      throw err;
+    }
     console.error(
       JSON.stringify({
         severity: "ERROR",
@@ -718,6 +756,10 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
            ohne diese Unterscheidung ist am Alarm nicht zu erkennen, ob eine
            Zeitgrenze zu knapp sitzt oder Mistral eine Stoerung hat. */
         errorCode: err.code || null,
+        /* Workshop 01.10.2026: der eigentliche Grund eines Abrisses — ohne ihn
+           war nicht feststellbar, wer die Verbindung beendet hatte. Nur Code
+           und Kurztext, keine Adressen (verbindungsfehler.js). */
+        ursache: ursacheVon(err),
         /* Wie viele Wiederholungen dem Scheitern vorausgingen — am 08.09.2026
            war es genau eine nach 2 s, und die Zahl stand nirgends. */
         wiederholungen: typeof err.wiederholungen === "number" ? err.wiederholungen : null,

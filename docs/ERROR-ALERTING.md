@@ -52,9 +52,10 @@ gcloud alpha monitoring channels create \
 
 > malziME pusht an einen eigenen ntfy-Server. Die URL nutzt ntfy-Templating
 > (`?template=1`), um `title`/`message` aus dem Cloud-Monitoring-Incident-JSON
-> zu rendern (`{{.incident.summary}}`, `{{.incident.url}}`). Wichtig: ntfy
-> templatet nur `title` und `message` — **nicht** `click`. Tap-Links daher in
-> den Nachrichtentext legen.
+> zu rendern: Titel `⚠️ {{.incident.documentation.subject}}` (der Betreff des
+> jeweiligen Alarms, seit 01.10.2026), Text `{{.incident.summary}}` und
+> `{{.incident.url}}`. Wichtig: ntfy templatet nur `title` und `message` —
+> **nicht** `click`. Tap-Links daher in den Nachrichtentext legen.
 
 ### 2. Log-basierte Alert-Policy anlegen
 
@@ -100,6 +101,28 @@ Anlässe am häufigsten sind (Kinderschutz-Treffer, Scanner-Rauschen) und wo im
 RUNBOOK nachzusehen ist. Geändert wird er über die Monitoring-Schnittstelle
 (`PATCH …/alertPolicies/<ID>?updateMask=documentation`), weil
 `gcloud alpha monitoring policies update` den Betreff nicht setzen kann.
+
+## Drei Alarme statt einem: der Betreff sagt, was los ist (seit 01.10.2026)
+
+Bis 01.10.2026 lief jede Fehlerzeile über die eine Richtlinie oben, mit einem
+festen Betreff, der „Fehlerzeile oder Kinderschutz-Treffer“ nannte — auch wenn
+es eine gescheiterte Analyse war. Seitdem sind es drei Richtlinien mit eigenem
+Betreff; alle drei an dieselben Kanäle (Push und E-Mail), mit denselben
+Diensten im Filter wie oben:
+
+| Richtlinie | Betreff | Filter (zusätzlich zu den Diensten) |
+|---|---|---|
+| `malziME Kinderschutz-Treffer` | „malziME: Kinderschutz-Treffer (Analyse lief normal)“ | `jsonPayload.step="minor-safety-durchbruch"` |
+| `malziME Analyse gescheitert (KI-Dienst)` | „malziME: Analyse gescheitert – KI-Dienst (Mistral) nicht erreichbar“ | `severity>=ERROR AND jsonPayload.alert="single-large-failed"` |
+| `malziME Function Errors` (die bestehende) | „malziME: Fehler im Server (kein Kinderschutz, keine KI-Störung – Details im Text)“ | `severity>=ERROR` ohne die beiden oben |
+
+Den Betreff trägt die E-Mail direkt; der Push übernimmt ihn als Titel (siehe
+Hinweis zum ntfy-Kanal). Der Text jeder Richtlinie sagt in Klartext, was die
+Nachricht bedeutet und wo im RUNBOOK nachzusehen ist. Stand vor der Umstellung
+und danach: `docs/handover/2026-10-01-alarm-policies-vorher.json` bzw.
+`-nachher.json` (lokal, nicht im Repo). Geprüft wurden die drei Filter vor dem
+Anlegen an den echten Protokollen des 01.10.: Der KI-Filter traf genau die zwei
+gescheiterten Analysen von 11:01 und 11:03, der Rest-Filter keine davon.
 
 ## Zweite Richtlinie: Haeufung von Client-Fehlern (seit 2026-08-21)
 
@@ -254,8 +277,9 @@ Was bei einem roten Nachtlauf zu tun ist: `docs/RUNBOOK.md`, Abschnitt
 ## Was passiert dann?
 
 - Loggt eine Function einen Fehler, kommt eine Benachrichtigung — bei malziME
-  per E-Mail (nachweislich zugestellt) und zusätzlich als ntfy-Push mit
-  ⚠️-Symbol, Fehlertext und Link zur Cloud Console.
+  per E-Mail und als ntfy-Push. Betreff der E-Mail und Titel des Pushs nennen
+  die Art (Kinderschutz-Treffer, gescheiterte Analyse, sonstiger Fehler); der
+  Push-Text enthält Googles Zusammenfassung und den Link zur Cloud Console.
 - Handled per-Request-Fehler (HTTP 4xx/5xx an den Client, nur `console.log`)
   lösen **nicht** aus — nur echte `severity>=ERROR`-Logs (Abstürze, OOM,
   Timeouts, eskalierte Fehler wie `counter-fail-open`).

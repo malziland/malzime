@@ -232,3 +232,36 @@ test("endgueltig gescheitert: Fehlerzeile 'foto-laden-gescheitert', ohne Pfad", 
     spion.mockRestore();
   }
 });
+
+/* Befunde T-02/T-03: Die Fehlerart steht nur in fester Form im Protokoll. */
+test("Zeitueberschreitung als 'TimeoutError' (nicht als Altcode 23)", async () => {
+  const fehler = [];
+  const spion = jest.spyOn(console, "error").mockImplementation((t) => fehler.push(String(t)));
+  try {
+    storage._setVersuchZeitlimitForTest(200);
+    antwortStatus = ["haengt", "haengt", "haengt", "haengt"];
+    await expect(storage.loadImage("queue-uploads/x.png")).rejects.toMatchObject({ name: "TimeoutError" });
+    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.alert === "foto-laden-gescheitert");
+    expect(zeile.fehler).toBe("TimeoutError");
+  } finally {
+    spion.mockRestore();
+  }
+}, 15000);
+
+test("ein frei formulierter Fehlercode kommt nie ins Protokoll", async () => {
+  const fehler = [];
+  const spion = jest.spyOn(console, "error").mockImplementation((t) => fehler.push(String(t)));
+  try {
+    speicher.authClient.getAccessToken = async () => {
+      const e = new Error("Anmeldung gescheitert");
+      e.code = "ECONNREFUSED 169.254.169.254:80 queue-uploads/x.png";
+      throw e;
+    };
+    await expect(storage.loadImage("queue-uploads/x.png")).rejects.toBeDefined();
+    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.alert === "foto-laden-gescheitert");
+    expect(zeile.fehler).toBe("unbekannt");
+    expect(fehler.join("\n")).not.toMatch(/169\.254|queue-uploads/);
+  } finally {
+    spion.mockRestore();
+  }
+});

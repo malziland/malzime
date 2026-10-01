@@ -285,9 +285,10 @@ Was bei einem roten Nachtlauf zu tun ist: `docs/RUNBOOK.md`, Abschnitt
 - Handled per-Request-Fehler (HTTP 4xx/5xx an den Client, nur `console.log`)
   lösen **nicht** aus. Die drei log-basierten Richtlinien reagieren auf
   `severity>=ERROR` (Abstürze, OOM, Timeouts, eskalierte Fehler wie
-  `counter-fail-open`, gescheiterte Analysen, Kinderschutz-Treffer); die zwei
-  Schwellen-Richtlinien zählen dagegen auch Zeilen ohne Fehler-Schwere — die
-  Browser-Meldungen und die Warnungen `abbruch-neuversuch`.
+  `counter-fail-open`, gescheiterte Analysen, Kinderschutz-Treffer) der
+  Server-Dienste. Die zwei Schwellen-Richtlinien zählen Zeilen außerhalb davon:
+  die Fehlermeldungen aus Browsern (Dienst `errors`, nicht in der Dienstliste
+  der drei Filter) und die Warnungen `abbruch-neuversuch`.
 
 ## Datenschutz
 

@@ -411,8 +411,8 @@ er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget. Der
 erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
 Neuversuch schreibt die Fehlerzeile mit Alarm. Antworten von Mistral
 (HTTP-Fehler) und unser eigenes Zeitlimit sind kein Abriss. Scheitert nur die
-Nachfrage nach fehlenden Karten und trägt das erste Ergebnis schon ein Profil,
-ist die Analyse geliefert — das ist eine Warnung (`nachfrage-gescheitert`), kein
+Nachfrage nach fehlenden Karten und trägt das erste Ergebnis schon Karten
+(dasselbe Merkmal, nach dem die Verarbeitung entscheidet), ist die Analyse geliefert — das ist eine Warnung (`nachfrage-gescheitert`), kein
 Alarm; trägt es keines, bleibt es die Fehlerzeile mit Alarm
 (`attempt: retry-ohne-ergebnis`). Gehäufte Abrisse zählt die
 log-basierte Metrik `ki_verbindungsabriss`; mehr als drei in 24 Stunden lösen den

@@ -312,6 +312,30 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     keineAdressenImProtokoll();
   });
 
+  /* Befund T-01: "geliefert" heisst dasselbe wie in der Pipeline — Karten,
+     nicht Profiltext. Beide Richtungen. */
+  test.each([
+    ["Profiltext ohne Karten", { standard: { profileText: "Du bist da." } }, "error"],
+    ["Karten ohne Profiltext", { standard: { categories: { herkunft: { value: "x" } } } }, "warn"],
+  ])("erste Antwort: %s, Nachfrage scheitert", async (_name, erste, erwartet) => {
+    let aufrufe = 0;
+    setFetchForTest(async (_url, init) => {
+      if (!mitBild(init)) return WERBUNG;
+      aufrufe += 1;
+      return aufrufe === 1 ? stueckAntwort(JSON.stringify({ subject: "PERSON", ...erste })) : stueckDasAbreisst();
+    });
+    await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de");
+    const alarm = zeilen("error").filter((t) => t.includes("single-large-failed"));
+    const warnung = zeilen("warn").filter((t) => t.includes("nachfrage-gescheitert"));
+    if (erwartet === "error") {
+      expect(alarm).toHaveLength(1);
+      expect(warnung).toHaveLength(0);
+    } else {
+      expect(alarm).toHaveLength(0);
+      expect(warnung).toHaveLength(1);
+    }
+  });
+
   test("auch die Fehlerzeile des Werbe-Aufrufs nennt den Grund — ohne Adressen", async () => {
     setFetchForTest(async () => {
       const grund = new Error("connect ECONNREFUSED ::ffff:104.18.33.7:443");

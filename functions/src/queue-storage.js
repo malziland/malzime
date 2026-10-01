@@ -163,7 +163,7 @@ async function loadImage(objectPath) {
           alert: "foto-laden-gescheitert",
           step: "bild-laden",
           status: "error",
-          fehler: String((err && (err.code || err.name)) || "unbekannt").slice(0, 40),
+          fehler: fehlerArt(err),
           ursache: ursacheVon(err),
         })
       );
@@ -217,6 +217,19 @@ function pruefsummeStimmt(dienst, buffer, hashKopf) {
   const summe = dienst.crc32cGenerator();
   summe.update(buffer);
   return summe.toString() === angabe[1];
+}
+
+/* Befunde T-02/T-03: Die Fehlerart nur in fester Form — HTTP-Status,
+   eine Grossbuchstaben-Kennung (CONTENT_DOWNLOAD_MISMATCH, ECONNRESET) oder
+   ein bekannter Fehlername (TimeoutError statt DOMException-Altcode 23).
+   Nie freier Text: Er koennte eine Adresse oder einen Pfad tragen. */
+const FEHLERNAMEN = new Set(["TimeoutError", "AbortError", "TypeError"]);
+function fehlerArt(err) {
+  const code = err && err.code;
+  if (Number.isInteger(code) && code >= 100 && code <= 599) return String(code);
+  if (typeof code === "string" && /^[A-Z][A-Z0-9_]{1,40}$/.test(code)) return code;
+  if (err && FEHLERNAMEN.has(err.name)) return err.name;
+  return "unbekannt";
 }
 
 /** Nimmt dieses Fach den direkten Weg? (Die echte Bibliothek: ja.) */

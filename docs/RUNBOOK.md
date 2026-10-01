@@ -631,7 +631,7 @@ schon fast fertigen Text; sonst fragt es EINMAL neu (Warnung
 `abbruch-neuversuch`, kein Alarm). Erst wenn auch der Neuversuch scheitert,
 kommt die Nachricht „Analyse gescheitert“; mehr als drei Abrisse in 24 Stunden
 melden sich als „KI-Verbindung bricht gehäuft ab“. Scheitert nur die Nachfrage
-nach fehlenden Karten und war schon ein Profil da, steht eine Warnung
+nach fehlenden Karten und trug das erste Ergebnis schon Karten, steht eine Warnung
 `nachfrage-gescheitert` im Protokoll — die Analyse ist geliefert. Scheitert das
 Laden des Fotos endgültig, steht `foto-laden-gescheitert` (Feld `fehler`) im
 Protokoll und es kommt die Nachricht „Analyse gescheitert“. Wie oft Abrisse

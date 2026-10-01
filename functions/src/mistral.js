@@ -306,10 +306,12 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     try {
       /* Gleicher cacheKey wie im ersten Versuch — der statische Anfang ist in
          beiden Versuchen bitgleich, der Cache traegt also auch den Retry. */
-      /* Befund Q-02: Nur wenn das erste Ergebnis schon ein Profil traegt, ist
-         die Analyse bei einer gescheiterten Nachfrage geliefert (Warnung).
-         Sonst ist es ein Ausfall — eigener Name, Fehlerzeile mit Alarm. */
-      const geliefert = hatProfilText(parsed.standard) || hatProfilText(parsed.beast);
+      /* Befunde Q-02/T-01: Nur wenn das erste Ergebnis schon Karten traegt —
+         dasselbe Merkmal wie job-helfer.hasCategories in der Pipeline —, ist
+         die Analyse bei gescheiterter Nachfrage geliefert (Warnung); sonst
+         Ausfall: eigener Name, Fehlerzeile mit Alarm. */
+      const karten = (b) => Boolean(b && b.categories && Object.keys(b.categories).length > 0);
+      const geliefert = karten(parsed.standard) || karten(parsed.beast);
       const nachfrage = geliefert ? "retry" : "retry-ohne-ergebnis";
       const retryParsed = await callSingleLarge(retryMessages, remainingBudget, nachfrage, cacheKey, undefined, dauer);
       if (retryParsed) {

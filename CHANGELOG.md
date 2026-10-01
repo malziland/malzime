@@ -6,45 +6,6 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
-### Behoben
-
-- **HEIC-Dekoder auf reparierten Stand.** Der Baustein, der Samsung-Fotos (HEIC)
-  im Browser öffnet, enthielt libheif 1.23.2 und libde265 1.0.15, für die es
-  veröffentlichte Sicherheitsmeldungen gibt. Jetzt sind es libheif 1.23.5 und
-  libde265 1.1.3, in denen sie behoben sind. Sonst ändert sich nichts: Samsung-
-  und iPhone-Fotos öffnen wie bisher, die Umwandlung bleibt vollständig im
-  Browser.
-- **Lizenztext von libde265 liegt bei.** libde265 steckt im HEIC-Dekoder; ihr
-  Lizenztext liegt jetzt wörtlich neben dem von libheif
-  (`public/lib/libheif/LICENSE-libde265`).
-- **Sicherheitslücke in einem Hilfspaket geschlossen.** brace-expansion
-  (enthalten in firebase-admin und in Test-Werkzeugen) jetzt in 2.1.7 bzw.
-  5.0.12. Die übrigen Pakete stehen auf dem neuesten Stand ihrer
-  Versionsbereiche, darunter firebase-admin 14.5, firebase-functions 7.4 und
-  Cloud Tasks 7.2; die Browser-Modultests laufen mit Vitest 5. Mit
-  firebase-admin 14.5 kommen neue Hauptversionen der Google-Bibliotheken
-  darunter: Firestore-Client 9, Storage-Client 8, google-gax 6 und
-  google-auth-library 11 (einzige angekündigte Bruchstelle: Node 22 oder
-  neuer; wir laufen auf Node 24).
-- **Prüfung auf bekannte Lücken deckt auch die Werkzeuge ab.** Der Riegel im
-  Pull Request prüfte die Test- und Prüfwerkzeuge im Hauptordner bisher nicht.
-  Jetzt prüft er beide Paketbäume vollständig.
-
-### Geändert
-
-- **HEIC-Dekoder selbst gebaut.** Er kommt nicht mehr als Fertigpaket eines
-  Dritten, sondern wird aus den unveränderten Original-Quellen der Hersteller
-  gebaut. Das Rezept liegt offen (`scripts/libheif-bauen.sh`); wiederholte
-  Bauten ergeben Byte für Byte dieselben Dateien, der Workflow
-  `libheif-bau.yml` vergleicht bei jeder Änderung, und der Deploy verlangt
-  diesen Vergleich grün. Das Impressum nennt die neuen Versionen. Das
-  Umwandeln von HEIC-Fotos setzt etwas neuere Browser voraus (Firefox 79,
-  Safari 14.1); die Seite selbst braucht ohnehin Chrome 85.
-- **Browser-Tests mit der Sicherheitsrichtlinie der Produktion.** Der
-  Testserver setzt jetzt dieselben Kopfzeilen wie die echte Seite; ein
-  Verstoß gegen die Richtlinie fällt damit schon im Test auf.
-- **Prüfkette:** setup-python 7 (läuft auf Node 24).
-
 ### Hinzugefügt
 
 - **Nächtliche Sicherheitsprüfung.** Der Workflow `sicherheit-nachts.yml` prüft
@@ -63,6 +24,44 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   der Pull Request es anzeigt. Die Prüfung `scripts/pruefe-workflows-gueltig.mjs`
   macht das schon im Pull Request und vor dem Push rot — auch bei Zeichen wie einem
   Tab, die YAML erlaubt, GitHub aber ablehnt.
+
+### Geändert
+
+- **HEIC-Dekoder selbst gebaut.** Er kommt nicht mehr als Fertigpaket eines
+  Dritten, sondern wird aus den unveränderten Original-Quellen der Hersteller
+  gebaut. Das Rezept liegt offen (`scripts/libheif-bauen.sh`); wiederholte
+  Bauten ergeben Byte für Byte dieselben Dateien, der Workflow
+  `libheif-bau.yml` vergleicht bei jeder Änderung, und der Deploy verlangt
+  diesen Vergleich grün. Das Impressum nennt die neuen Versionen. Das
+  Umwandeln von HEIC-Fotos setzt etwas neuere Browser voraus (Firefox 79,
+  Safari 14.1); die Seite selbst braucht ohnehin Chrome 85.
+- **Browser-Tests mit der Sicherheitsrichtlinie der Produktion.** Der
+  Testserver setzt jetzt dieselben Kopfzeilen wie die echte Seite; ein
+  Verstoß gegen die Richtlinie fällt damit schon im Test auf.
+- **Prüfkette:** setup-python 7 (läuft auf Node 24).
+
+### Behoben
+
+- **HEIC-Dekoder auf reparierten Stand.** Der Baustein, der Samsung-Fotos (HEIC)
+  im Browser öffnet, enthielt libheif 1.23.2 und libde265 1.0.15, für die es
+  veröffentlichte Sicherheitsmeldungen gibt. Jetzt sind es libheif 1.23.5 und
+  libde265 1.1.3, in denen sie behoben sind. Sonst ändert sich nichts: Samsung-
+  und iPhone-Fotos öffnen wie bisher, die Umwandlung bleibt vollständig im
+  Browser.
+- **Lizenztext von libde265 liegt bei.** libde265 steckt im HEIC-Dekoder; ihr
+  Lizenztext liegt jetzt wörtlich neben dem von libheif
+  (`public/lib/libheif/LICENSE-libde265`).
+- **Sicherheitslücke in einem Hilfspaket geschlossen.** brace-expansion
+  (enthalten in firebase-admin und in Test-Werkzeugen) jetzt in 2.1.7 bzw.
+  5.0.12. Die übrigen Pakete stehen auf dem neuesten Stand ihrer
+  Versionsbereiche, darunter firebase-admin 14.5, firebase-functions 7.4 und
+  Cloud Tasks 7.2; die Browser-Modultests laufen mit Vitest 5. Mit
+  firebase-admin 14.5 kommen neue Hauptversionen des Firestore-Clients (9) und
+  des Storage-Clients (8); einzige angekündigte Bruchstelle: Node 22 oder
+  neuer, wir laufen auf Node 24.
+- **Prüfung auf bekannte Lücken deckt auch die Werkzeuge ab.** Der Riegel im
+  Pull Request prüfte die Test- und Prüfwerkzeuge im Hauptordner bisher nicht.
+  Jetzt prüft er beide Paketbäume vollständig.
 
 ## [4.12.0] — 2026-09-28
 

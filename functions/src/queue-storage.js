@@ -171,8 +171,10 @@ async function loadImage(objectPath) {
    nach den Metadaten entfaellt. Datenweg unveraendert: unser Server liest
    unser Fach, sonst niemand. SECURITY-MODEL, 01.10.2026. */
 const WIEDERHOLBARE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
-/* Je Versuch hoechstens so lange — sonst haengt ein stockender Speicher die
-   Analyse bis an Nodes eigene Grenzen (Minuten). Ein Foto ist klein. */
+/* BLEIBT IM CODE — Schutzgrenze, keine Einstellung (wie LESE_ZEITLIMIT_MS in
+   betriebsprofil.js): Je Versuch hoechstens so lange, sonst haengt ein
+   stockender Speicher die Analyse bis an Nodes eigene Grenzen (Minuten). Ein
+   Foto ist klein (hoechstens 1280 Pixel, im Browser verkleinert). */
 const VERSUCH_ZEITLIMIT_MS = 30 * 1000;
 let ladeFetch = (...args) => fetch(...args);
 let warten = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -262,7 +262,8 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   const dauer = { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false };
   /* Workshop 01.10.2026: Reisst die Verbindung ab (nicht: Antwort von
      Mistral, unser Zeitlimit), wird EINMAL neu gefragt — Restbudget, ohne
-     Live-Text (wie die Nachfrage unten). SECURITY-MODEL, 01.10.2026. */
+     Live-Text; der gezeigte Text bleibt bis zum Ergebnis stehen (bewusst,
+     SECURITY-MODEL 01.10.2026). */
   let parsed = await mitEinemNeuversuchBeiAbbruch(
     () => callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer),
     () => callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer)
@@ -720,10 +721,15 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       meldeAbbruchMitNeuversuch({ profil: aktivesProfil, attempt: attemptLabel, err });
       throw err;
     }
-    console.error(
+    /* Befunde R-05/S-07 (01.10.2026): Scheitert nur die NACHFRAGE nach
+       fehlenden Karten, ist die Analyse schon geliefert (runSingleLargeCall
+       macht mit dem ersten Ergebnis weiter) — Warnung, kein Alarm
+       "Analyse gescheitert". Felder wie die Fehlerzeile. */
+    const melde = attemptLabel === "retry" ? console.warn : console.error;
+    melde(
       JSON.stringify({
-        severity: "ERROR",
-        alert: "single-large-failed",
+        severity: attemptLabel === "retry" ? "WARNING" : "ERROR",
+        alert: attemptLabel === "retry" ? undefined : "single-large-failed",
         step: "mistral-single-large-details",
         /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
            Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
@@ -731,7 +737,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
            es galten die Code-Werte. */
         profil: aktivesProfil || null,
         attempt: attemptLabel,
-        status: "error",
+        status: attemptLabel === "retry" ? "nachfrage-gescheitert" : "error",
         error: err.message,
         /* `timeout` trennt „das Modell war zu langsam" von „die API war weg" —
            ohne diese Unterscheidung ist am Alarm nicht zu erkennen, ob eine

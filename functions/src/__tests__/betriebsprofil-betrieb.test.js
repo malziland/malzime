@@ -11,20 +11,24 @@
  * kein Mistral-Aufruf, kein echtes Firestore.
  */
 
-const mockDoc = { daten: undefined, fehler: null, verzoegerung: 0 };
+const mockDoc = { daten: undefined, fehler: null, verzoegerung: 0, sofortWurf: null };
 let lesevorgaenge = 0;
 
 jest.mock("../db", () => ({
-  datenbank: () => ({
-    doc: () => ({
-      async get() {
-        lesevorgaenge += 1;
-        if (mockDoc.verzoegerung) await new Promise((f) => setTimeout(f, mockDoc.verzoegerung));
-        if (mockDoc.fehler) throw new Error(mockDoc.fehler);
-        return { exists: mockDoc.daten !== undefined, data: () => mockDoc.daten };
-      },
-    }),
-  }),
+  datenbank: () => {
+    /* Befund R-07: Die Datenbank wirft schon beim Zugriff, nicht erst beim Lesen. */
+    if (mockDoc.sofortWurf) throw new Error(mockDoc.sofortWurf);
+    return {
+      doc: () => ({
+        async get() {
+          lesevorgaenge += 1;
+          if (mockDoc.verzoegerung) await new Promise((f) => setTimeout(f, mockDoc.verzoegerung));
+          if (mockDoc.fehler) throw new Error(mockDoc.fehler);
+          return { exists: mockDoc.daten !== undefined, data: () => mockDoc.daten };
+        },
+      }),
+    };
+  },
 }));
 
 const { geltendeWerte, _cacheLeeren } = require("../betriebsprofil");
@@ -149,6 +153,25 @@ describe("VERSPAETETE ANTWORT", () => {
       spion.mockRestore();
     }
   }, 15000);
+
+  /* Befund R-07: Wirft schon der Zugriff auf die Datenbank, muss das wie jeder
+     Lesefehler enden — mit "nicht lesbar" und einer Warnung, nie als Fehler,
+     der ungeprotokolliert beim Aufrufer landet. */
+  test("ein sofortiger Wurf beim Zugriff endet als 'nicht lesbar' mit Warnung", async () => {
+    const warnungen = [];
+    const spion = jest.spyOn(console, "warn").mockImplementation((t) => warnungen.push(String(t)));
+    try {
+      mockDoc.sofortWurf = "Firestore nicht initialisiert";
+      _cacheLeeren({ warmBleiben: true });
+      const e = await geltendeWerte();
+      expect(e.werte).toBeNull();
+      expect(e.grund).toContain("nicht lesbar");
+      expect(warnungen.join("\n")).toMatch(/nicht lesbar/);
+    } finally {
+      mockDoc.sofortWurf = null;
+      spion.mockRestore();
+    }
+  });
 
   test("eine rechtzeitige Antwort erzeugt keine solche Zeile", async () => {
     const zeilen = [];

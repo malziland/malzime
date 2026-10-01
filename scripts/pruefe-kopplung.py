@@ -90,7 +90,10 @@ ZEILEN_GRENZEN = {
     # Ablauf des Normalfalls zu verstecken.
     "functions/src/mistral.js": 790,
     # Abgetrennt 01.10.2026 — sonst waere die Grenze oben umgehbar.
-    "functions/src/verbindungsfehler.js": 150,
+    # 150 -> 170 noch am selben Tag: Die Positivliste der zulaessigen
+    # Fehlertexte (Befund R-03, Datenschutz) ersetzt die Maskierung nach
+    # Mustern und ist eine Liste, keine Logik.
+    "functions/src/verbindungsfehler.js": 170,
     # Der Netzzugriff, dritter Schnitt.
     "functions/src/mistral-http.js": 450,
     # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.

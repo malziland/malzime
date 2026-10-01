@@ -396,8 +396,8 @@ mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
 (Abfrage im RUNBOOK; ein einzelner träger Lauf erzeugt bis zu fünf Warnungen
 in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
 sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
-verschoben. Stand 01.10.2026: zwei Minuten an diesem Tag (10:52, 11:30 Wien),
-unter der Grenze; am 10.09.2026 waren es drei. Seit 01.10.2026 protokolliert
+verschoben. Stand 01.10.2026, 13:00 Wien: drei Minuten an diesem Tag (10:52,
+11:30, 12:57) — an der Grenze, nicht darüber, wie am 10.09.2026. Seit 01.10.2026 protokolliert
 `betriebsprofil.js` zusätzlich, wie lange ein zu später Zugriff tatsächlich
 brauchte, sobald die Antwort doch noch kommt (`status: "spaete-antwort"`, nur
 `dauerMs`) — bisher stand dort nur „länger als 2000 ms“.
@@ -407,59 +407,85 @@ brauchte, sobald die Antwort doch noch kommt (`status: "spaete-antwort"`, nur
 **Entscheidung.** Reißt die Verbindung zu Mistral während einer Analyse ab
 (Node.js meldet „terminated“ oder „fetch failed“, Grund in `err.cause`), wird
 zuerst ein schon im Strom angekommener Text gerettet wie beim Zeitlimit; reicht
-er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget.
-Der erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
-Neuversuch alarmiert. Antworten von Mistral (HTTP-Fehler) und unser eigenes
-Zeitlimit sind kein Abriss und werden nicht so behandelt.
+er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget. Der
+erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
+Neuversuch schreibt die Fehlerzeile mit Alarm. Antworten von Mistral
+(HTTP-Fehler) und unser eigenes Zeitlimit sind kein Abriss. Scheitert nur die
+Nachfrage nach fehlenden Karten, ist die Analyse schon geliefert — das ist eine
+Warnung (`nachfrage-gescheitert`), kein Alarm. Gehäufte Abrisse zählt die
+log-basierte Metrik `ki_verbindungsabriss`; mehr als drei in 24 Stunden lösen den
+Alarm „KI-Verbindung bricht gehäuft ab“ aus — auch wenn jeder Neuversuch gelang.
 
 **Begründung.** Am 01.10.2026 scheiterten 2 von 30 Analysen eines Workshops an
-einem Abriss; beide Kinder sahen sofort die Fehlermeldung. In den 30 Tagen
-davor kam die Fehlerart bei rund 770 Aufrufen nicht vor. Ein Neuversuch kostet
-höchstens einen KI-Aufruf mehr je Abriss.
+einem Abriss; beide Kinder sahen sofort die Fehlermeldung. Ein Neuversuch kostet
+höchstens einen KI-Aufruf mehr je Abriss. Wie oft die Fehlerart früher vorkam,
+ist nur eingeschränkt belegbar: Der 30-Tage-Speicher enthält Fehlerzeilen der KI
+nur aus der Zeit vor der Umstellung des Diagnose-Speichers (Abschnitt
+„Diagnose-Speicher: nur, was der Datenschutztext nennt“) — darin kein Abriss,
+gefunden wurden nur Überlastungen (429) und ein 503 am 07./08.09.2026; seither
+bleiben Fehlerzeilen nur einen Tag.
 
-**Datenschutz.** Ins technische Protokoll kommt der Grund nur als Code und
-Kurztext (`ursache: { code, text }`), jede Adresse im Text wird zu
-„[Adresse]“; die Verbindungsdaten, die Node.js anhängt (Adressen und Ports
-beider Seiten), werden nie geschrieben (`verbindungsfehler.js`, geprüft in
-`mistral-verbindungsabbruch.test.js` an jeder Zeile). Das entspricht dem, was
-die Datenschutzerklärung für das technische Protokoll nennt: ob ein Schritt
-geklappt hat — keine IP-Adresse.
+**Datenschutz.** Ins technische Protokoll kommt der Grund nur als
+`ursache: { code, text }`: der Fehlercode als feste Kennung (z. B.
+`UND_ERR_SOCKET`) und ein Kurztext NUR, wenn er wörtlich einer festen Meldung aus
+einer Positivliste entspricht (z. B. „other side closed“) — sonst `null`. Eine
+Maskierung nach Mustern wurde verworfen, weil sie nicht jede Adress-Schreibweise
+erwischte. Die Verbindungsdaten, die Node.js anhängt (Adressen und Ports beider
+Seiten), werden nie geschrieben (`verbindungsfehler.js`, geprüft in
+`mistral-verbindungsabbruch.test.js` an jeder Zeile, auch gegen halbe Adressen).
+Das entspricht dem, was die Datenschutzerklärung für das technische Protokoll
+nennt: ob ein Schritt geklappt hat — keine IP-Adresse. Dass das Foto beim
+Neuversuch ein zweites Mal an Mistral geht, deckt die Erklärung (sie nennt den
+Zweck, keine Anzahl).
 
-**Betrachtete Alternative.** Mehrere Neuversuche oder mit Pause wie bei der
-Überlastung (429): verworfen — ein Abriss ist kein Zeichen von Überlast, und
-jeder weitere Versuch verlängert die Wartezeit des Kindes. Den Neuversuch mit
-Live-Text zu streamen: verworfen aus demselben Grund wie bei der Nachfrage nach
-fehlenden Karten — er überschriebe den schon gezeigten Text.
+**Bewusste Abweichung: Live-Text bleibt stehen.** Der Neuversuch läuft ohne
+Live-Text. Bis sein Ergebnis da ist, sieht das Kind den Text, der vor dem Abriss
+ankam; das Ergebnis kommt dann aus einer anderen Modellantwort und ersetzt ihn.
+In Kauf genommen, weil es nur nach einem Abriss vorkommt. Betrachtete
+Alternative: den Live-Text im Auftrag zurücksetzen und im Browser sichtbar neu
+anfangen — braucht eine Änderung an der Live-Anzeige, steht auf der Liste für
+später.
 
-**Bedingung für Neubewertung.** Mehr als drei `abbruch-neuversuch` an einem Tag
-oder ein Neuversuch, der selbst scheitert — dann liegt die Ursache außerhalb
-eines Einzelfalls, und der Grund in `ursache` zeigt, wo.
+**Betrachtete Alternative.** Mehrere Neuversuche oder Pausen wie bei der
+Überlastung (429): verworfen — ein Abriss ist kein Zeichen von Überlast, und jeder
+weitere Versuch verlängert die Wartezeit des Kindes.
 
-## Foto direkt laden statt über den Strom-Weg der Speicher-Bibliothek (01.10.2026)
+**Bedingung für Neubewertung.** Der Alarm „KI-Verbindung bricht gehäuft ab“
+(mehr als drei Abrisse in 24 Stunden) oder ein Neuversuch, der selbst scheitert —
+dann liegt die Ursache außerhalb eines Einzelfalls, und `ursache.code` zeigt, wo.
+
+## Foto direkt laden statt über den Download-Weg der Speicher-Bibliothek (01.10.2026)
 
 **Entscheidung.** `queue-storage.js` lädt das Foto mit EINER Anfrage an dieselbe
 Adresse, die `@google-cloud/storage` benutzt (`…/storage/v1/b/<Fach>/o/<Objekt>?alt=media`),
-mit der Anmeldung und den Wiederholungsregeln der Bibliothek (`retryOptions`:
-bis zu 3 Wiederholungen bei 408/429/5xx und Verbindungsabriss). Den Bildtyp
-liefert die Antwort selbst; die zweite Anfrage nach den Metadaten entfällt.
+mit der Anmeldung der Bibliothek, ihrer Prüfsumme (crc32c aus `x-goog-hash`, mit
+ihrem Prüfsummen-Erzeuger) und ihren Wiederholungsregeln (`retryOptions`;
+wiederholt bei 408/429/5xx, Verbindungsabriss, Zeitüberschreitung und falscher
+Prüfsumme; Pause wie in `retry-request`). Je Versuch gilt ein Zeitlimit, ein Foto
+ist klein. Den Bildtyp liefert die Antwort selbst; die zweite Anfrage nach den
+Metadaten entfällt.
 
 **Begründung, gemessen.** Seit 4.13.0 schrieb jede Analyse
-„MaxListenersExceededWarning … PassThrough“ ins Protokoll. Ursache: Die
-Speicher-Bibliothek 8 hängt beim Herunterladen über ihr Hilfspaket teeny-request
-11 (`index.js:194`) dieselben Zuhörer mehrfach an einen Strom, ab etwa 64 KB.
-Mit 7.22 nie. Harmlos — eine Anfrage, Daten byte-gleich, kein Speicherwachstum
-über 1000 Downloads —, aber eine Warnung, die immer kommt, verdeckt die eine,
-die zählt. Eine reparierte Fassung gab es nicht (8.2.0 und teeny-request 11.0.1
-waren die neuesten). Datenweg unverändert: unser Server liest unser Fach.
+„MaxListenersExceededWarning … PassThrough“ ins Protokoll: Der Download-Weg der
+Bibliothek hängt über ihr Hilfspaket teeny-request (`index.js:194`) dieselben
+Zuhörer mehrfach an einen Strom, ab etwa 64 KB; mit 7.22 nie. Die unabhängige
+Prüfung fand an derselben Stelle den schwereren Fehler: Antwortet der Speicher
+mit 429 oder 5xx, wirft dieser Weg einen ungefangenen Fehler
+(`ERR_STREAM_UNABLE_TO_PIPE`) und reißt den ganzen Prozess mit — gemessen am
+lokalen Schein-Speicher mit 8.2.0 UND 7.22.0, also auch in den ausgelieferten
+Fassungen bis 4.13.0. Eine reparierte Fassung gab es nicht. Datenweg unverändert:
+unser Server liest unser Fach.
 
 **Betrachtete Alternativen.** Die Speicher-Bibliothek auf 7.22 zurückstellen:
-verworfen, firebase-admin 14.5 verlangt 8. Die Warnung abschalten: verworfen,
-das verdeckte genau die Fehlerklasse, für die es die Warnung gibt.
+verworfen — firebase-admin 14.5 verlangt 8, und 7.22 stürzt bei 429/5xx genauso
+ab. Die Warnung abschalten: verworfen, das ließe den Absturz stehen und
+verdeckte die Fehlerklasse, für die es die Warnung gibt.
 
 **Bedingung für Neubewertung.** Eine Fassung von teeny-request oder der
-Speicher-Bibliothek, die den Fehler behebt — dann zurück zu `file.download()`.
-Geprüft wird das mit `src/__tests__/hilfen/foto-laden-probe.cjs`, wenn man den
-direkten Weg darin abschaltet.
+Speicher-Bibliothek, die BEIDES behebt — die Warnung und den Absturz bei 429/5xx.
+Geprüft wird das mit `functions/src/__tests__/hilfen/foto-laden-probe.cjs` bei
+abgeschaltetem direktem Weg, auch mit einer Antwortfolge „429, dann 200“
+(`PROBE_STATUS=429,200`).
 
 ## HEIC-Fotos im Browser öffnen: WebAssembly und LGPL (08.09.2026)
 

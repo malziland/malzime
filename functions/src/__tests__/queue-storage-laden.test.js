@@ -36,6 +36,26 @@ beforeAll(async () => {
   server = http.createServer((req, res) => {
     anfragen.push({ url: req.url, auth: req.headers.authorization });
     const status = antwortStatus.length ? antwortStatus.shift() : 200;
+    /* Stoerungen wie im Netz: Verbindung kappen, bevor eine Antwort kommt;
+       mitten im Bild abbrechen; falsche Bytes mit der Pruefsumme des echten
+       Fotos schicken. */
+    if (status === "abriss") {
+      req.socket.destroy();
+      return;
+    }
+    if (status === "mitte") {
+      res.writeHead(200, { "content-type": "image/png", "content-length": FOTO.length, "x-goog-hash": HASH });
+      res.write(FOTO.subarray(0, 100 * 1024));
+      setTimeout(() => req.socket.destroy(), 20);
+      return;
+    }
+    if (status === "falsch") {
+      const falsch = Buffer.from(FOTO);
+      falsch[1000] ^= 0xff;
+      res.writeHead(200, { "content-type": "image/png", "content-length": falsch.length, "x-goog-hash": HASH });
+      res.end(falsch);
+      return;
+    }
     if (status !== 200) {
       res.writeHead(status, { "content-type": "application/json" });
       res.end('{"error":{"code":' + status + "}}");
@@ -92,6 +112,19 @@ test("ein echtes Foto laden: gleiche Bytes, richtiger Typ, EINE Anfrage, KEINE W
   expect(ergebnis.anfragen).toBe(1);
 });
 
+test("Speicher antwortet erst 429, dann 200: geladen, ohne Absturz (echter Node-Prozess)", () => {
+  const aus = execFileSync(process.execPath, [path.join(__dirname, "hilfen", "foto-laden-probe.cjs")], {
+    encoding: "utf8",
+    timeout: 30000,
+    stdio: ["ignore", "pipe", "ignore"],
+    env: { ...process.env, PROBE_STATUS: "429,200" },
+  });
+  const ergebnis = JSON.parse(aus.trim().split("\n").pop());
+  expect(ergebnis.fehler).toBeUndefined();
+  expect(ergebnis.bytesGleich).toBe(true);
+  expect(ergebnis.anfragen).toBe(2);
+});
+
 test("eine Anfrage, mit Anmeldung, an die Objekt-Adresse des Fachs", async () => {
   await storage.loadImage("queue-uploads/x.png");
   expect(anfragen).toHaveLength(1);
@@ -99,7 +132,7 @@ test("eine Anfrage, mit Anmeldung, an die Objekt-Adresse des Fachs", async () =>
   expect(anfragen[0].auth).toBe("Bearer test-zugang");
 });
 
-test("voruebergehende Stoerung (503) wird wiederholt wie in der Bibliothek", async () => {
+test("voruebergehende Stoerung (503) wird wiederholt — der alte Bibliotheksweg brach hier den Prozess ab", async () => {
   antwortStatus = [503, 503];
   const geladen = await storage.loadImage("queue-uploads/x.png");
   expect(Buffer.compare(geladen.buffer, FOTO)).toBe(0);
@@ -116,4 +149,54 @@ test("hoechstens so oft wie die Bibliothek (3 Wiederholungen), dann Fehler", asy
   antwortStatus = [503, 503, 503, 503, 503];
   await expect(storage.loadImage("queue-uploads/x.png")).rejects.toMatchObject({ code: 503 });
   expect(anfragen).toHaveLength(4);
+});
+
+test("Abriss, bevor eine Antwort kommt: wiederholt, dann geladen", async () => {
+  antwortStatus = ["abriss"];
+  const geladen = await storage.loadImage("queue-uploads/x.png");
+  expect(Buffer.compare(geladen.buffer, FOTO)).toBe(0);
+  expect(anfragen).toHaveLength(2);
+});
+
+test("Abriss mitten im Bild: kein halbes Foto, sondern ein neuer Versuch", async () => {
+  antwortStatus = ["mitte"];
+  const geladen = await storage.loadImage("queue-uploads/x.png");
+  expect(Buffer.compare(geladen.buffer, FOTO)).toBe(0);
+  expect(anfragen).toHaveLength(2);
+});
+
+test("falsche Bytes (Pruefsumme stimmt nicht): neu laden statt weitergeben", async () => {
+  antwortStatus = ["falsch"];
+  const geladen = await storage.loadImage("queue-uploads/x.png");
+  expect(Buffer.compare(geladen.buffer, FOTO)).toBe(0);
+  expect(anfragen).toHaveLength(2);
+});
+
+test("bleiben die Bytes falsch: Fehler CONTENT_DOWNLOAD_MISMATCH, nie ein verfaelschtes Foto", async () => {
+  antwortStatus = ["falsch", "falsch", "falsch", "falsch"];
+  await expect(storage.loadImage("queue-uploads/x.png")).rejects.toMatchObject({ code: "CONTENT_DOWNLOAD_MISMATCH" });
+  expect(anfragen).toHaveLength(4);
+});
+
+test("Pausen zwischen den Versuchen wie in der Bibliothek (2 s, 4 s, 8 s plus Zufall bis 1 s)", async () => {
+  const pausen = [];
+  storage._setWartenForTest(async (ms) => pausen.push(ms));
+  antwortStatus = [503, 503, 503];
+  await storage.loadImage("queue-uploads/x.png");
+  expect(pausen).toHaveLength(3);
+  [2000, 4000, 8000].forEach((basis, i) => {
+    expect(pausen[i]).toBeGreaterThanOrEqual(basis);
+    expect(pausen[i]).toBeLessThan(basis + 1000);
+  });
+});
+
+/* Befund S-05: Die echte Verdrahtung (firebase-admin) muss den direkten Weg
+   nehmen — sonst fiele das Laden still auf den alten, abstuerzenden Weg
+   zurueck, und alle Tests oben blieben gruen. Ohne Netz: nur Aufbau. */
+test("das Fach aus firebase-admin nimmt den direkten Weg", () => {
+  const { initializeApp, getApps } = require("firebase-admin/app");
+  const { getStorage } = require("firebase-admin/storage");
+  const app = getApps().find((a) => a.name === "verdrahtung") || initializeApp({ projectId: "p" }, "verdrahtung");
+  const fach = getStorage(app).bucket("fach-probe");
+  expect(storage._hatSpeicherDienst(fach)).toBe(true);
 });

@@ -16,8 +16,21 @@ const HASH = `crc32c=${pruefsumme.toString()},md5=${crypto.createHash("md5").upd
 const warnungen = [];
 process.on("warning", (w) => warnungen.push(w.name));
 let anfragen = 0;
+/* PROBE_STATUS=429,200 laesst den Speicher zuerst mit diesen Codes antworten
+   (200 = normal). Der alte Download-Weg der Bibliothek stuerzte bei 429/5xx
+   mit ERR_STREAM_UNABLE_TO_PIPE ab — Pruefung vor jeder Rueckkehr zu ihm. */
+const folge = String(process.env.PROBE_STATUS || "")
+  .split(",")
+  .filter(Boolean)
+  .map(Number);
 const server = http.createServer((req, res) => {
   anfragen += 1;
+  const status = folge.length ? folge.shift() : 200;
+  if (status !== 200) {
+    res.writeHead(status, { "content-type": "application/json" });
+    res.end(`{"error":{"code":${status}}}`);
+    return;
+  }
   if (req.url.includes("alt=media")) {
     res.writeHead(200, {
       "content-type": "image/png",
@@ -35,6 +48,7 @@ server.listen(0, "127.0.0.1", async () => {
   const dienst = new Storage({ apiEndpoint: `http://127.0.0.1:${server.address().port}`, projectId: "p" });
   dienst.authClient.getAccessToken = async () => "test-zugang";
   storage.setBucketForTest(dienst.bucket("fach"));
+  storage._setWartenForTest(async () => {});
   let ergebnis;
   try {
     const geladen = await storage.loadImage("queue-uploads/x.png");

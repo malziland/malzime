@@ -306,7 +306,10 @@ async function leseFrisch(jetzt) {
      (Datenschutzerklaerung: "wie lange er dauerte"). */
   const leseStart = Date.now();
   let zuSpaet = false;
-  const lesen = datenbank().doc(DOKUMENT).get();
+  /* In einer Promise-Kette: Wirft schon `datenbank()` sofort (Befund R-07),
+     landet das im catch unten wie jeder andere Lesefehler — nicht ungeprotokolliert
+     beim Aufrufer. */
+  const lesen = Promise.resolve().then(() => datenbank().doc(DOKUMENT).get());
   lesen.then(
     () => {
       if (zuSpaet)

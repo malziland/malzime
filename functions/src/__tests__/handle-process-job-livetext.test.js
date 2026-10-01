@@ -165,6 +165,23 @@ describe("runPipeline — Live-Text schreiben", () => {
     expect(jobs.setLiveText).toHaveBeenLastCalledWith("job-1", { standard: "Du bist sportlich", beast: "Du bist ein" });
   });
 
+  /* Neuversuch nach Verbindungsabriss (01.10.2026): Die erste Welle des neuen
+     Versuchs setzt den Bildschirm zurueck und darf nicht in der Drossel
+     haengen bleiben — sonst stuende der alte Text bis zu 2 s weiter da. */
+  test("Drossel: die erste Welle eines neuen Versuchs geht sofort durch, danach wird wieder gedrosselt", async () => {
+    mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
+      opts.onLiveText({ standard: "Du bist alt", beast: null });
+      opts.onLiveText({ standard: "", beast: null, versuch: 2 });
+      opts.onLiveText({ standard: "Du bist neu", beast: null, versuch: 2 });
+      return PROFIL;
+    });
+    await handleProcessJob(postReq(), makeRes());
+    expect(jobs.setLiveText.mock.calls.map((c) => c[1])).toEqual([
+      { standard: "Du bist alt", beast: null },
+      { standard: "", beast: null, versuch: 2 },
+    ]);
+  });
+
   test("das Analyse-Ergebnis bleibt mit Flag identisch — completeJob bekommt das normale Profil", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
       opts.onLiveText({ standard: "Du bist", beast: null });

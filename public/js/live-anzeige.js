@@ -158,6 +158,10 @@ let liveLief = false;
    weil `stop` auch das endgueltige Ende bedeutet und beides sonst nicht
    unterscheidbar waere. */
 let pausiert = false;
+/* Neuversuch nach einem Verbindungsabriss (01.10.2026): Nummer des Versuchs,
+   dessen Text gerade angezeigt wird. Der Server fragt die KI hoechstens einmal
+   neu; jede Welle traegt ihren Versuch (functions/src/jobs.js setLiveText). */
+let aktuellerVersuch = 1;
 
 /* Bewegungs-Vorgabe des Systems — bewusst bei jedem Zugriff frisch lesen,
    damit ein Umstellen während der Analyse sofort greift. */
@@ -813,10 +817,48 @@ function uebernehmen(puffer, neu) {
   puffer.text = neu;
 }
 
+/**
+ * Der Server hat die KI nach einem Verbindungsabriss neu gefragt: Der bisher
+ * gezeigte Text stammt aus einer Antwort, die verworfen ist, und die neue
+ * schreibt einen anderen. Statt ihn stehen zu lassen und am Ende auszutauschen,
+ * faengt die Anzeige sichtbar von vorn an — Text und Live-Karten weg, das
+ * Warte-Auge mit den gewohnten Meldungen zurueck, der neue Text tippt wie bei
+ * einem neuen Lauf. Die Blick-Fuehrung bleibt: Das Auge wird ins Bild geholt
+ * wie beim Analyse-Start (ohne das lag es nach dem Wegfall der Karte ueber dem
+ * Bildrand, gesehen am Bildschirmfoto 01.10.2026), wer schon selbst gescrollt
+ * hat, behaelt den Vorrang. Die versteckten Daten des Fotos (EXIF, Karte)
+ * stammen aus dem Browser und bleiben stehen.
+ */
+function vonVornBeginnen() {
+  if (!lauf) return;
+  const karteWarSichtbar = elements.liveKarte && elements.liveKarte.classList.contains("active");
+  lauf.stop = true;
+  spinnerVerstecken(lauf);
+  lauf = null;
+  pausiert = false;
+  if (elements.liveKarte) elements.liveKarte.classList.remove("live-karte--pausiert");
+  karteEntfernen();
+  liveLief = false;
+  /* Lief die Karte noch nicht, laeuft das Auge ohnehin und steht im Bild. */
+  if (!karteWarSichtbar) return;
+  startScanAnim(true, true);
+  augeInsBild();
+}
+
 export function welle(texte) {
-  if (!texte || typeof texte.standard !== "string" || texte.standard.length === 0) return;
+  if (!texte || typeof texte.standard !== "string") return;
   /* Späte Wellen nach Beginn der Enthüllung ändern nichts mehr. */
   if (enthuellungGestartet) return;
+  /* Neuversuch (01.10.2026): Eine Welle eines frueheren Versuchs kam verspaetet
+     an und wird verworfen; die erste eines neuen Versuchs (der Server schickt
+     sie sofort und leer) setzt die Anzeige zurueck. */
+  const versuch = Number.isInteger(texte.versuch) && texte.versuch > 1 ? texte.versuch : 1;
+  if (versuch < aktuellerVersuch) return;
+  if (versuch > aktuellerVersuch) {
+    aktuellerVersuch = versuch;
+    vonVornBeginnen();
+  }
+  if (texte.standard.length === 0) return;
   if (!lauf) lauf = neuerLauf();
   /* Sicherheitsnetz: Normalerweise startet api.js die Blick-Führung beim
      Analyse-Beginn — kam der Aufruf nicht (direkter Modul-Gebrauch, Tests),
@@ -1287,6 +1329,7 @@ export function abbrechen() {
 export function zuruecksetzen() {
   abbrechen();
   liveLief = false;
+  aktuellerVersuch = 1;
 }
 
 /* Nur für Tests: verkürzt oder verlängert den Zeit-Anlauf gezielt —

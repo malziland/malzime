@@ -13,7 +13,7 @@ Function loggt eine Fehlerzeile
         │
         ▼
 Cloud Monitoring  ── drei log-basierte Richtlinien, je nach Art der Zeile:
-        │             „Kinderschutz-Treffer“, „Analyse gescheitert (KI-Dienst)“,
+        │             „Kinderschutz-Treffer“, „Analyse gescheitert“,
         │             „Function Errors“ (alles andere) — jede mit eigenem Betreff
         ▼
 Notification Channels  ── Webhook (ntfy-Push) und E-Mail
@@ -69,8 +69,25 @@ Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung.
 | Richtlinie | Betreff | Filter (nach dem gemeinsamen Teil) |
 |---|---|---|
 | `malziME Kinderschutz-Treffer` | „malziME: Kinderschutz-Treffer (Analyse lief normal)“ | `jsonPayload.step="minor-safety-durchbruch"` |
-| `malziME Analyse gescheitert (KI-Dienst)` | „malziME: Analyse gescheitert – ein Kind sah eine Fehlermeldung (Details im Text)“ | `severity>=ERROR AND jsonPayload.alert=("single-large-failed" OR "foto-laden-gescheitert")` |
-| `malziME Function Errors` | „malziME: Fehler im Server (Details im Text)“ | `severity>=ERROR AND NOT jsonPayload.step="minor-safety-durchbruch" AND NOT jsonPayload.alert=("single-large-failed" OR "foto-laden-gescheitert")` |
+| `malziME Analyse gescheitert` | „malziME: Analyse gescheitert – mindestens ein Kind sah eine Fehlermeldung (Details im Text)“ | `severity>=ERROR AND jsonPayload.alert="analyse-gescheitert"` |
+| `malziME Function Errors` | „malziME: Fehler im Server (Details im Text)“ | `severity>=ERROR AND NOT jsonPayload.step="minor-safety-durchbruch" AND NOT jsonPayload.alert="analyse-gescheitert"` |
+
+**Analyse gescheitert: eine Zeile je Fehlermeldung (seit 01.10.2026 abends).**
+Die Zeile `alert: "analyse-gescheitert"` schreibt allein `functions/src/jobs.js`,
+und zwar genau dann, wenn ein Auftrag mit einem blockierten Ergebnis oder als
+`failed` endet — also genau dann, wenn ein Kind nach einer Analyse eine
+Fehlermeldung sieht. Das Feld `grund` sagt, welche (`blocked.apiError`,
+`blocked.profileBlocked`, `blocked.overloaded`, `blocked.configMissing`,
+`processing_timeout`). Was dazu geführt hat, steht in Warnungen davor
+(KI-Aufruf, Foto laden, Absturzverdacht; Abfragen im RUNBOOK, Abschnitt
+„Mistral-Fehler“). Begründung und Grenzen: `docs/SECURITY-MODEL.md`, Abschnitt
+„Ein Alarm je gescheiterter Analyse“.
+
+**Wie oft eine Nachricht kommt.** Jede log-basierte Richtlinie schickt
+höchstens eine Nachricht je fünf Minuten (`notificationRateLimit` 300 s, das
+Kleinste, was Google zulässt). Scheitern in dieser Zeit mehrere Analysen, kommt
+eine Nachricht; wie viele es waren, zeigt die Abfrage der Zeile im Protokoll.
+Darum sagt der Betreff „mindestens ein Kind“.
 
 Dazu kommt eine Schwellen-Richtlinie (wie die für Browser-Fehler unten):
 `malziME KI-Verbindung bricht gehäuft ab` — Betreff „malziME: KI-Verbindung bricht
@@ -124,7 +141,9 @@ KI-Filter traf genau die zwei gescheiterten Analysen von 11:01 und 11:03, der
 Rest-Filter keine davon; eine Probezeile löste die Richtlinie „Analyse gescheitert
 (KI-Dienst)“ aus. Der Kinderschutz-Filter hatte an diesem Tag keine echte Zeile,
 an der er sich hätte beweisen können — er ist an der Code-Stelle belegt
-(`job-helfer.js`, einzige Quelle des Schritts).
+(`job-helfer.js`, einzige Quelle des Schritts). Am Abend desselben Tages wurde
+aus „Analyse gescheitert (KI-Dienst)“ die Richtlinie „Analyse gescheitert“, die
+auf die eine zentrale Zeile je gescheiterter Analyse hört (oben).
 
 ## Zweite Richtlinie: Haeufung von Client-Fehlern (seit 2026-08-21)
 

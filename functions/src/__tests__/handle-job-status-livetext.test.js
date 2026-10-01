@@ -114,6 +114,16 @@ describe("handleJobStatus — Live-Text bei processing", () => {
     expect(res.body).not.toHaveProperty("liveTextBeast");
   });
 
+  test("die Nummer des Versuchs kommt mit, nur mit Ticket", async () => {
+    jobs.getJob.mockResolvedValue({ ...PROCESSING_JOB, liveTextVersuch: 2 });
+    const mit = makeRes();
+    await handleJobStatus(reqMit(PROCESSING_JOB.id, "ticket-abc"), mit);
+    expect(mit.body.liveTextVersuch).toBe(2);
+    const ohne = makeRes();
+    await handleJobStatus(reqMit(PROCESSING_JOB.id), ohne);
+    expect(ohne.body).not.toHaveProperty("liveTextVersuch");
+  });
+
   test("fehlender liveTextStand wird als null mitgegeben, nicht als undefined", async () => {
     jobs.getJob.mockResolvedValue({ ...PROCESSING_JOB, liveTextStand: undefined });
     const res = makeRes();

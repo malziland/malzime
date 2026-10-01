@@ -63,6 +63,30 @@ function jobsRef() {
   return datenbank().collection(JOBS_COLLECTION);
 }
 
+/* EIN ALARM JE GESCHEITERTER ANALYSE (01.10.2026). Sieht ein Kind nach einer
+   Analyse eine Fehlermeldung, endet sein Auftrag auf einem von genau zwei
+   Wegen: `done` mit blockiertem Ergebnis (completeJob) oder `failed`
+   (failJob). Nur dort, und nur wenn DIESER Aufruf den Uebergang gemacht hat,
+   entsteht die eine Fehlerzeile, auf die der Alarm "Analyse gescheitert"
+   hoert. Die Zeilen, die den Grund im Einzelnen beschreiben (KI-Aufruf, Foto
+   laden, Absturzverdacht, verworfenes Ergebnis), sind Warnungen — sonst kaemen
+   fuer eine Fehlermeldung zwei Nachrichten, und ein Tierfoto, das trotz
+   gescheiterter Nachfrage sein Profil bekommt, loeste einen Fehlalarm aus.
+   Ohne Kennung (handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"): nur
+   der Grund, und nur als feste Kennung wie `blocked.apiError` oder
+   `processing_timeout` — alles andere wird "unbekannt". */
+const GRUND_MUSTER = /^(blocked\.[A-Za-z]{1,40}|[a-z_]{1,40})$/;
+function meldeGescheiterteAnalyse(grund) {
+  console.error(
+    JSON.stringify({
+      severity: "ERROR",
+      alert: "analyse-gescheitert",
+      step: "analyse-ausgang",
+      grund: typeof grund === "string" && GRUND_MUSTER.test(grund) ? grund : "unbekannt",
+    })
+  );
+}
+
 /**
  * Legt einen neuen Job an (Status `queued`). Gibt die generierte jobId zurück.
  *
@@ -182,12 +206,17 @@ async function claimJob(jobId) {
 async function completeJob(jobId, result) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  return db.runTransaction(async (tx) => {
+  const gemacht = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.data().status !== "processing") return false;
     tx.update(ref, { status: "done", finishedAt: Date.now(), result: result || null, errorReason: null });
     return true;
   });
+  /* Ein blockiertes Ergebnis zeigt dem Kind eine Fehlermeldung. */
+  if (gemacht && result && result.meta && result.meta.mode === "blocked") {
+    meldeGescheiterteAnalyse(result.blockedReason);
+  }
+  return gemacht;
 }
 
 /**
@@ -199,7 +228,7 @@ async function completeJob(jobId, result) {
 async function failJob(jobId, reason) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  return db.runTransaction(async (tx) => {
+  const gemacht = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) return false;
     const st = snap.data().status;
@@ -211,6 +240,8 @@ async function failJob(jobId, reason) {
     });
     return true;
   });
+  if (gemacht) meldeGescheiterteAnalyse(reason);
+  return gemacht;
 }
 
 /**
@@ -397,10 +428,19 @@ async function setLiveText(jobId, texte) {
     /* Abwaertskompatibel: ein nackter String (alter Aufrufstil) zaehlt als
        Standard-Text ohne Beast. */
     const eingabe = typeof texte === "string" ? { standard: texte } : texte || {};
+    /* Neuversuch nach einem Verbindungsabriss (01.10.2026, mistral.js): JEDE
+       Welle traegt ihren Versuch. Eine verspaetet ankommende Welle des ersten
+       Versuchs setzt ihn damit auf 1 zurueck, und der Browser verwirft sie,
+       statt alten Text als neuen zu zeigen. Ab dem zweiten Versuch ist jede
+       Welle der GANZE Stand: Beast-Text und Karten der verworfenen Antwort
+       werden geleert, solange der neue Versuch keine eigenen liefert. */
+    const versuch = Number.isInteger(eingabe.versuch) && eingabe.versuch > 1 ? eingabe.versuch : 1;
     const patch = {
       liveText: String(eingabe.standard || "").slice(0, 4000),
       liveTextStand: Date.now(),
+      liveTextVersuch: versuch,
     };
+    if (versuch > 1) Object.assign(patch, { liveTextBeast: null, liveKartenStandard: null, liveKartenBeast: null });
     if (typeof eingabe.beast === "string") {
       patch.liveTextBeast = eingabe.beast.slice(0, 4000);
     }

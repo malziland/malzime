@@ -217,31 +217,37 @@ test("ein haengender Speicher: Zeitlimit je Versuch, dann neuer Versuch", async 
   expect(anfragen).toHaveLength(2);
 });
 
-/* Befund Q-01: Scheitert das Laden endgueltig, steht eine Fehlerzeile mit
-   Alarm im Protokoll — ohne Pfad und ohne Kennung. */
-test("endgueltig gescheitert: Fehlerzeile 'foto-laden-gescheitert', ohne Pfad", async () => {
+/* Befund Q-01: Scheitert das Laden endgueltig, steht der Grund im Protokoll —
+   ohne Pfad und ohne Kennung. Seit 01.10.2026 als WARNUNG: Den Alarm loest
+   der Ausgang des Auftrags aus (ein-alarm-je-fehlermeldung.test.js), eine
+   Fehlerzeile hier waere eine zweite Nachricht. */
+test("endgueltig gescheitert: Warnung mit Grund, ohne Pfad, keine Fehlerzeile", async () => {
   const fehler = [];
-  const spion = jest.spyOn(console, "error").mockImplementation((t) => fehler.push(String(t)));
+  const fehlerSpion = jest.spyOn(console, "error").mockImplementation(() => {});
+  const spion = jest.spyOn(console, "warn").mockImplementation((t) => fehler.push(String(t)));
   try {
     antwortStatus = [404];
     await expect(storage.loadImage("queue-uploads/geheim-123.png")).rejects.toMatchObject({ code: 404 });
-    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.alert === "foto-laden-gescheitert");
-    expect(zeile).toMatchObject({ severity: "ERROR", step: "bild-laden", fehler: "404" });
+    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.step === "bild-laden");
+    expect(zeile).toMatchObject({ severity: "WARNING", step: "bild-laden", fehler: "404" });
+    expect(zeile.alert).toBeUndefined();
+    expect(fehlerSpion).not.toHaveBeenCalled();
     expect(fehler.join("\n")).not.toMatch(/queue-uploads|geheim-123/);
   } finally {
     spion.mockRestore();
+    fehlerSpion.mockRestore();
   }
 });
 
 /* Befunde T-02/T-03: Die Fehlerart steht nur in fester Form im Protokoll. */
 test("Zeitueberschreitung als 'TimeoutError' (nicht als Altcode 23)", async () => {
   const fehler = [];
-  const spion = jest.spyOn(console, "error").mockImplementation((t) => fehler.push(String(t)));
+  const spion = jest.spyOn(console, "warn").mockImplementation((t) => fehler.push(String(t)));
   try {
     storage._setVersuchZeitlimitForTest(200);
     antwortStatus = ["haengt", "haengt", "haengt", "haengt"];
     await expect(storage.loadImage("queue-uploads/x.png")).rejects.toMatchObject({ name: "TimeoutError" });
-    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.alert === "foto-laden-gescheitert");
+    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.step === "bild-laden");
     expect(zeile.fehler).toBe("TimeoutError");
   } finally {
     spion.mockRestore();
@@ -250,7 +256,7 @@ test("Zeitueberschreitung als 'TimeoutError' (nicht als Altcode 23)", async () =
 
 test("ein frei formulierter Fehlercode kommt nie ins Protokoll", async () => {
   const fehler = [];
-  const spion = jest.spyOn(console, "error").mockImplementation((t) => fehler.push(String(t)));
+  const spion = jest.spyOn(console, "warn").mockImplementation((t) => fehler.push(String(t)));
   try {
     speicher.authClient.getAccessToken = async () => {
       const e = new Error("Anmeldung gescheitert");
@@ -258,7 +264,7 @@ test("ein frei formulierter Fehlercode kommt nie ins Protokoll", async () => {
       throw e;
     };
     await expect(storage.loadImage("queue-uploads/x.png")).rejects.toBeDefined();
-    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.alert === "foto-laden-gescheitert");
+    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.step === "bild-laden");
     expect(zeile.fehler).toBe("unbekannt");
     expect(fehler.join("\n")).not.toMatch(/169\.254|queue-uploads/);
   } finally {

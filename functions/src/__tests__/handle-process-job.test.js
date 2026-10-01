@@ -243,9 +243,13 @@ describe("handleProcessJob — Erfolgsfall", () => {
 
   /* BUG-2026-08-13-35: completeJob gibt false (Reaper war schneller). Das
      fertige Ergebnis darf dann NICHT als "done" gezählt oder geloggt werden. */
-  test("completeJob=false → nicht gezählt, ERROR-Log, ok:false", async () => {
+  /* Seit 01.10.2026 eine Warnung: Der Auftrag ist schon gescheitert, und
+     DIESER Wechsel hat den Alarm ausgeloest (ein-alarm-je-fehlermeldung.test.js)
+     — eine Fehlerzeile hier waere eine zweite Nachricht. */
+  test("completeJob=false → nicht gezählt, Warnung (kein zweiter Alarm), ok:false", async () => {
     jobs.completeJob.mockResolvedValue(false);
     const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
     const res = makeRes();
     await handleProcessJob(postReq("job-1"), res);
 
@@ -253,10 +257,12 @@ describe("handleProcessJob — Erfolgsfall", () => {
     expect(res.body.ok).toBe(false);
     expect(res.body.reason).toBe("already_terminal");
     expect(counter.incrementTotals).not.toHaveBeenCalled();
-    const zeile = fehlerSpy.mock.calls.map((c) => c[0]).find((s) => String(s).includes("ergebnis-verworfen"));
+    const zeile = warnSpy.mock.calls.map((c) => c[0]).find((s) => String(s).includes("ergebnis-verworfen"));
     expect(zeile).toBeTruthy();
-    expect(JSON.parse(zeile).severity).toBe("ERROR");
+    expect(JSON.parse(zeile).severity).toBe("WARNING");
+    expect(fehlerSpy.mock.calls.map((c) => c[0]).join("\n")).not.toContain("ergebnis-verworfen");
     fehlerSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   test("Erfolgs-Log enthält queueWaitMs (Wartezeit in der Warteschlange)", async () => {

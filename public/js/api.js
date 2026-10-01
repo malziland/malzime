@@ -275,6 +275,9 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
                sie (noch keine Karte fertig), bleibt es beim reinen Text. */
             kartenStandard: Array.isArray(data.liveKartenStandard) ? data.liveKartenStandard : null,
             kartenBeast: Array.isArray(data.liveKartenBeast) ? data.liveKartenBeast : null,
+            /* Neuversuch nach Verbindungsabriss: steigt die Zahl, faengt die
+               Anzeige von vorn an (live-anzeige.js). */
+            versuch: data.liveTextVersuch,
           });
         }
         break;

@@ -111,15 +111,15 @@ async function handleProcessJob(req, res) {
      `X-CloudTasks-TaskRetryCount ≥ 1`. Trifft eine solche Wiederholung auf einen
      Job, der noch `processing` ist, ist der vorige Versuch mit hoher
      Wahrscheinlichkeit abgestürzt — der Nutzer wartet sonst bis zu 9 Minuten auf
-     `failed`, ohne dass ein Alarm feuert (die Request-Logs mit dem 503 sind per
-     PRIV-12 ausgeschlossen, `staleProcessing` loggt ohne severity). Eine
-     ERROR-Zeile hier löst die bestehende Alarmrichtlinie aus und ist gefahrlos:
-     der idempotente Claim unten verhindert weiterhin jede Doppelverarbeitung. */
+     `failed` (die Request-Logs mit dem 503 sind per PRIV-12 ausgeschlossen).
+     Seit 01.10.2026 eine WARNUNG: Den Alarm loest das `failed` aus (jobs.js),
+     sonst kaeme eine zweite Nachricht, bei falschem Verdacht eine ohne Fehler
+     beim Kind. Der idempotente Claim verhindert jede Doppelverarbeitung. */
   const retryCount = Number(req.headers && req.headers["x-cloudtasks-taskretrycount"]);
   if (retryCount >= 1 && job.status === "processing") {
-    console.error(
+    console.warn(
       JSON.stringify({
-        severity: "ERROR",
+        severity: "WARNING",
         step: "process-job",
         jobId,
         error: "worker-abgestuerzt-verdacht",
@@ -232,12 +232,13 @@ async function handleProcessJob(req, res) {
        auflebende Fortsetzung landet hier). Vorher wurde das verworfen: das
        fertige Ergebnis ging still verloren, `incrementTotals` zählte trotzdem
        eine Analyse, und die Logzeile behauptete `status: "done"` — das Log log
-       aktiv, statt zu schweigen. */
+       aktiv, statt zu schweigen. Seit 01.10.2026 eine Warnung: Den Alarm hat
+       der Wechsel auf `failed` bereits ausgeloest (jobs.js). */
     const gespeichert = await completeJob(jobId, result);
     if (!gespeichert) {
-      console.error(
+      console.warn(
         JSON.stringify({
-          severity: "ERROR",
+          severity: "WARNING",
           step: "process-job",
           error: "ergebnis-verworfen-job-bereits-terminal",
           hinweis:

@@ -300,6 +300,99 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
   });
 
+  /* ── Neuversuch nach Verbindungsabriss (01.10.2026, Befund R-01) ─────────
+     Reisst die Verbindung zur KI ab, fragt der Server einmal neu — und die
+     neue Antwort ist eine ANDERE. Bis 4.13.1 blieb der halbe alte Text rund
+     40 s stehen und wurde am Ende gegen das Ergebnis ausgetauscht. Jetzt
+     schickt der Server sofort eine leere Welle des zweiten Versuchs, und die
+     Anzeige faengt sichtbar von vorn an (functions/src/mistral.js). */
+  function wv(standard, versuch, beast = null) {
+    liveAnzeige.welle({ standard, beast, versuch });
+  }
+
+  it("Neuversuch: der alte Text verschwindet sofort, das Auge kommt zurück, der neue tippt von vorn", async () => {
+    w("Du bist alt " + "a".repeat(200));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(elements.liveKarte.classList.contains("active")).toBe(true);
+    expect(elements.liveTextFest.textContent.startsWith("Du bist alt")).toBe(true);
+
+    wv("", 2);
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.liveTextFest.textContent).toBe("");
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
+    /* Leise: Der Neustart des Auges ist keine neue "Analyse gestartet". */
+    expect(elements.srAnnounce.textContent).toBe("");
+    /* Die gestoppte alte Schleife tippt nicht weiter. */
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(elements.liveTextFest.textContent).toBe("");
+
+    wv("Du bist neu " + "n".repeat(200), 2);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(elements.liveKarte.classList.contains("active")).toBe(true);
+    expect(elements.liveTextFest.textContent.startsWith("Du bist neu")).toBe(true);
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
+    expect(liveAnzeige.hatLiveGelaufen()).toBe(true);
+  });
+
+  it("Neuversuch: eine verspätete Welle des ersten Versuchs wird verworfen", async () => {
+    w("Du bist alt");
+    wv("", 2);
+    wv("Du bist neu", 2);
+    /* Ohne Nummer = erster Versuch, und laenger als der neue Stand. */
+    w("Du bist alt und deutlich länger als der neue Text");
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(elements.liveTextFest.textContent).toBe("Du bist neu");
+  });
+
+  it("Neuversuch vor dem ersten sichtbaren Zeichen: der gesammelte Text ist verworfen, das Auge läuft weiter", async () => {
+    liveAnzeige._setzeTippAnlaufMsFuerTest(10000);
+    ui.startScanAnim(true);
+    w("Du bist alt " + "a".repeat(200));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+
+    wv("", 2);
+    expect(elements.scanAnim.classList.contains("active")).toBe(true);
+    wv("Du bist neu " + "n".repeat(200), 2);
+    /* Der neue Lauf beginnt mit eigenem Anlauf ab seiner ersten Welle. */
+    await vi.advanceTimersByTimeAsync(11500);
+    expect(elements.liveTextFest.textContent.startsWith("Du bist neu")).toBe(true);
+  });
+
+  it("Neuversuch im Beast-Modus: der Beast-Text der verworfenen Antwort ist ebenfalls weg", async () => {
+    schalte(true);
+    w("S".repeat(100), "Du bist ein alter Beast-Text");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(elements.liveTextFest.textContent.startsWith("Du bist ein alter")).toBe(true);
+
+    wv("", 2);
+    wv("S neu", 2);
+    await vi.advanceTimersByTimeAsync(1000);
+    /* Der neue Versuch hat noch keinen Beast-Text: Karte zu, nichts Altes. */
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.liveTextFest.textContent).toBe("");
+  });
+
+  it("reduced-motion: auch hier verschwindet der alte Text, der neue steht sofort vollständig da", async () => {
+    reduzierteBewegung();
+    w("Du bist alt");
+    expect(elements.liveTextFest.textContent).toBe("Du bist alt");
+    wv("", 2);
+    expect(elements.liveTextFest.textContent).toBe("");
+    wv("Du bist neu", 2);
+    expect(elements.liveTextFest.textContent).toBe("Du bist neu");
+  });
+
+  it("ein neuer Analyse-Durchgang beginnt wieder beim ersten Versuch", async () => {
+    wv("", 2);
+    wv("Zweiter Versuch", 2);
+    liveAnzeige.zuruecksetzen();
+    w("Neuer Durchgang");
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(elements.liveTextFest.textContent).toBe("Neuer Durchgang");
+  });
+
   /* ── Warte-Auge oberhalb der Karte (v3.0.2, ersetzt die Status-Zeile) ───
      Läuft der aktive Puffer leer, kehrt das vertraute Scan-Auge (#scanAnim)
      zurück und trägt die rotierenden Warte-Zeilen (`live.warten`) im

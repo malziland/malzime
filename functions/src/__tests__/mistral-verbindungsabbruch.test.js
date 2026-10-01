@@ -23,7 +23,7 @@
 
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
-const { setFetchForTest, runSingleLargeCall, generateBeastAds } = require("../mistral");
+const { setFetchForTest, runSingleLargeCall, generateBeastAds, _setLiveIntervalMsForTest } = require("../mistral");
 const { ursacheVon } = require("../verbindungsfehler");
 
 const ORIGINAL_API_KEY = process.env.MISTRAL_API_KEY;
@@ -38,6 +38,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   setFetchForTest(null);
+  _setLiveIntervalMsForTest(null);
   for (const s of spione) s.mockRestore();
   if (ORIGINAL_API_KEY === undefined) delete process.env.MISTRAL_API_KEY;
   else process.env.MISTRAL_API_KEY = ORIGINAL_API_KEY;
@@ -100,8 +101,30 @@ function stromDerAbreisst(text) {
   };
 }
 
+/* Vollstaendiger Strom in mehreren Stuecken, mit Ende-Marker. */
+function stromVollstaendig(text) {
+  const stuecke = [text.slice(0, 40), text.slice(40)].map((t) =>
+    new TextEncoder().encode(`data: ${JSON.stringify({ choices: [{ delta: { content: t } }] })}\n\n`)
+  );
+  stuecke.push(
+    new TextEncoder().encode(
+      `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }], usage: {} })}\n\ndata: [DONE]\n\n`
+    )
+  );
+  return {
+    ok: true,
+    status: 200,
+    body: new ReadableStream({
+      pull(controller) {
+        if (stuecke.length) controller.enqueue(stuecke.shift());
+        else controller.close();
+      },
+    }),
+  };
+}
+
 /* Antwort in einem Stueck — so antwortet Mistral, wenn ohne Strom gefragt
-   wird (der Neuversuch fragt ohne Live-Text, also ohne Strom). */
+   wird (die Nachfrage nach fehlenden Karten fragt ohne Live-Text). */
 function stueckAntwort(text) {
   return {
     ok: true,
@@ -146,8 +169,8 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
       aufrufe += 1;
       strom.push(gestreamt(init));
       return aufrufe === 1
-        ? stromDerAbreisst('{"subject":"PERSON","standard":{"profileText":"Du bi')
-        : stueckAntwort(VOLLSTAENDIG);
+        ? stromDerAbreisst('{"subject":"HUMAN","standard":{"profileText":"Du bist alt')
+        : stromVollstaendig(VOLLSTAENDIG);
     });
 
     const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de", {
@@ -155,11 +178,9 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     });
 
     expect(aufrufe).toBe(2);
-    /* Erster Versuch mit Live-Text (Strom), der Neuversuch ohne. */
-    expect(strom).toEqual([true, false]);
     expect(ergebnis.normal.profileText).toBe("Du bist sachlich beschrieben.");
-    /* Kein Alarm: Der erste Versuch ist eine Warnung, kein Fehler. */
-    expect(zeilen("error").join("\n")).not.toMatch(/single-large-failed/);
+    /* Kein Alarm aus dem KI-Aufruf: Der erste Versuch ist eine Warnung. */
+    expect(zeilen("error")).toEqual([]);
     const warnung = zeilen("warn").find((t) => t.includes("abbruch-neuversuch"));
     expect(warnung).toBeDefined();
     const w = JSON.parse(warnung);
@@ -168,7 +189,42 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     keineAdressenImProtokoll();
   });
 
-  test("reisst auch der zweite Versuch ab: Fehler mit Grund, ohne Adressen — und kein dritter Versuch", async () => {
+  /* Befund R-01 (01.10.2026): Lief der Neuversuch ohne Live-Text, blieb der
+     halbe Text des ersten Versuchs rund 40 s stehen, und am Ende ersetzte ihn
+     ein ANDERER Text. Jetzt laeuft auch der Neuversuch als Strom; seine erste
+     Welle kommt sofort und leer, jede traegt `versuch: 2` — der Bildschirm
+     faengt sichtbar von vorn an (live-anzeige.js). */
+  test("Neuversuch: die Anzeige bekommt sofort eine leere Welle des zweiten Versuchs, dann dessen Text", async () => {
+    _setLiveIntervalMsForTest(0);
+    let aufrufe = 0;
+    const strom = [];
+    setFetchForTest(async (_url, init) => {
+      if (!mitBild(init)) return WERBUNG;
+      aufrufe += 1;
+      strom.push(gestreamt(init));
+      return aufrufe === 1
+        ? stromDerAbreisst('{"subject":"HUMAN","standard":{"profileText":"Du bist alt')
+        : stromVollstaendig(VOLLSTAENDIG);
+    });
+    const wellen = [];
+    await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de", {
+      onLiveText: (t) => wellen.push(t),
+    });
+
+    expect(strom).toEqual([true, true]);
+    const erste = wellen.findIndex((w) => w.versuch === 2);
+    /* Vorher Text des ersten Versuchs, ohne Versuchsnummer. */
+    expect(wellen.slice(0, erste).map((w) => w.standard)).toContain("Du bist alt");
+    expect(wellen.slice(0, erste).every((w) => w.versuch === undefined)).toBe(true);
+    /* Dann sofort die leere Welle, danach nur noch Text des zweiten Versuchs. */
+    expect(wellen[erste]).toEqual({ standard: "", beast: null, versuch: 2 });
+    const danach = wellen.slice(erste + 1);
+    expect(danach.length).toBeGreaterThan(0);
+    expect(danach.every((w) => w.versuch === 2)).toBe(true);
+    expect(danach[danach.length - 1].standard).toBe("Du bist sachlich beschrieben.");
+  });
+
+  test("reisst auch der zweite Versuch ab: Grund im Protokoll, ohne Adressen — kein dritter Versuch, keine Fehlerzeile hier", async () => {
     let aufrufe = 0;
     setFetchForTest(async (_url, init) => {
       if (!mitBild(init)) return WERBUNG;
@@ -181,10 +237,14 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     ).rejects.toThrow(/terminated/);
 
     expect(aufrufe).toBe(2);
-    const fehler = zeilen("error").filter((t) => t.includes("single-large-failed"));
-    expect(fehler).toHaveLength(1);
-    const f = JSON.parse(fehler[0]);
-    expect(f.attempt).toBe("neuversuch");
+    /* Den Alarm loest der Ausgang des Auftrags aus (ein-alarm-je-fehlermeldung
+       .test.js) — eine Fehlerzeile hier waere eine zweite Nachricht. */
+    expect(zeilen("error")).toEqual([]);
+    const f = zeilen("warn")
+      .map((t) => JSON.parse(t))
+      .find((z) => z.attempt === "neuversuch");
+    expect(f).toMatchObject({ severity: "WARNING", status: "error" });
+    expect(f.alert).toBeUndefined();
     expect(f.ursache).toEqual({ code: "UND_ERR_SOCKET", text: "other side closed" });
     keineAdressenImProtokoll();
   });
@@ -229,7 +289,7 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
         grund.code = "ECONNRESET";
         throw new TypeError("fetch failed", { cause: grund });
       }
-      return stueckAntwort(VOLLSTAENDIG);
+      return stromVollstaendig(VOLLSTAENDIG);
     });
 
     const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de", {
@@ -273,67 +333,32 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     keineAdressenImProtokoll();
   });
 
-  test("scheitert nur die Nachfrage nach fehlenden Karten: Warnung, kein Alarm — die Analyse ist geliefert", async () => {
-    let aufrufe = 0;
-    const ohneKarten = JSON.parse(VOLLSTAENDIG);
-    delete ohneKarten.beast.categories.werbeprofil;
-    setFetchForTest(async (_url, init) => {
-      if (!mitBild(init)) return WERBUNG;
-      aufrufe += 1;
-      return aufrufe === 1 ? stueckAntwort(JSON.stringify(ohneKarten)) : stueckDasAbreisst();
-    });
-    const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de");
-    expect(aufrufe).toBe(2);
-    expect(ergebnis.normal.profileText).toBe("Du bist sachlich beschrieben.");
-    expect(zeilen("error").join("\n")).not.toMatch(/single-large-failed/);
-    const w = JSON.parse(zeilen("warn").find((t) => t.includes("nachfrage-gescheitert")));
-    expect(w.severity).toBe("WARNING");
-    expect(w.alert).toBeUndefined();
-    expect(w.ursache).toEqual({ code: "UND_ERR_SOCKET", text: "other side closed" });
-    keineAdressenImProtokoll();
-  });
-
-  /* Befund Q-02: Traegt die erste Antwort KEIN Profil und scheitert die
-     Nachfrage, ist die Analyse NICHT geliefert — das muss alarmieren. */
-  test("erste Antwort ohne Profil, Nachfrage scheitert: Fehlerzeile mit Alarm", async () => {
-    let aufrufe = 0;
-    setFetchForTest(async (_url, init) => {
-      if (!mitBild(init)) return WERBUNG;
-      aufrufe += 1;
-      return aufrufe === 1 ? stueckAntwort(JSON.stringify({ subject: "PERSON" })) : stueckDasAbreisst();
-    });
-    const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de");
-    expect(aufrufe).toBe(2);
-    expect(ergebnis.normal).toBeFalsy();
-    const fehler = zeilen("error").filter((t) => t.includes("single-large-failed"));
-    expect(fehler).toHaveLength(1);
-    expect(JSON.parse(fehler[0]).attempt).toBe("retry-ohne-ergebnis");
-    expect(zeilen("warn").join("\n")).not.toMatch(/nachfrage-gescheitert/);
-    keineAdressenImProtokoll();
-  });
-
-  /* Befund T-01: "geliefert" heisst dasselbe wie in der Pipeline — Karten,
-     nicht Profiltext. Beide Richtungen. */
+  /* Scheitert die Nachfrage nach fehlenden Karten, schreibt mistral.js nur
+     eine Warnung — gleich, ob das erste Ergebnis schon Karten trug. Ob das
+     Kind eine Fehlermeldung sieht, entscheidet der Ausgang des Auftrags, und
+     nur dort entsteht der Alarm (ein-alarm-je-fehlermeldung.test.js; dort auch
+     das Tierfoto, das trotz gescheiterter Nachfrage sein Profil bekommt). */
   test.each([
-    ["Profiltext ohne Karten", { standard: { profileText: "Du bist da." } }, "error"],
-    ["Karten ohne Profiltext", { standard: { categories: { herkunft: { value: "x" } } } }, "warn"],
-  ])("erste Antwort: %s, Nachfrage scheitert", async (_name, erste, erwartet) => {
+    ["mit Karten", { standard: { profileText: "Du bist da.", categories: { herkunft: { value: "x" } } } }],
+    ["ohne Karten", { standard: { profileText: "Du bist da." } }],
+    ["ohne Profil", {}],
+  ])("erste Antwort %s, Nachfrage scheitert: Warnung, keine Fehlerzeile", async (_name, erste) => {
     let aufrufe = 0;
     setFetchForTest(async (_url, init) => {
       if (!mitBild(init)) return WERBUNG;
       aufrufe += 1;
-      return aufrufe === 1 ? stueckAntwort(JSON.stringify({ subject: "PERSON", ...erste })) : stueckDasAbreisst();
+      return aufrufe === 1 ? stueckAntwort(JSON.stringify({ subject: "HUMAN", ...erste })) : stueckDasAbreisst();
     });
     await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de");
-    const alarm = zeilen("error").filter((t) => t.includes("single-large-failed"));
-    const warnung = zeilen("warn").filter((t) => t.includes("nachfrage-gescheitert"));
-    if (erwartet === "error") {
-      expect(alarm).toHaveLength(1);
-      expect(warnung).toHaveLength(0);
-    } else {
-      expect(alarm).toHaveLength(0);
-      expect(warnung).toHaveLength(1);
-    }
+    expect(aufrufe).toBe(2);
+    expect(zeilen("error")).toEqual([]);
+    const w = zeilen("warn")
+      .map((t) => JSON.parse(t))
+      .filter((z) => z.status === "nachfrage-gescheitert");
+    expect(w).toHaveLength(1);
+    expect(w[0]).toMatchObject({ severity: "WARNING", attempt: "retry" });
+    expect(w[0].ursache).toEqual({ code: "UND_ERR_SOCKET", text: "other side closed" });
+    keineAdressenImProtokoll();
   });
 
   test("auch die Fehlerzeile des Werbe-Aufrufs nennt den Grund — ohne Adressen", async () => {

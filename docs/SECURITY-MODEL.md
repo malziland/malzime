@@ -407,19 +407,23 @@ brauchte, sobald die Antwort doch noch kommt (`status: "spaete-antwort"`, nur
 **Entscheidung.** Reißt die Verbindung zu Mistral während einer Analyse ab
 (Node.js meldet „terminated“ oder „fetch failed“, Grund in `err.cause`), wird
 zuerst ein schon im Strom angekommener Text gerettet wie beim Zeitlimit; reicht
-er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget. Der
-erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
-Neuversuch schreibt die Fehlerzeile mit Alarm. Antworten von Mistral
-(HTTP-Fehler) und unser eigenes Zeitlimit sind kein Abriss.
+er nicht, fragt `mistral.js` EINMAL neu, mit dem Restbudget. Der Abriss ist eine
+Warnung (`abbruch-neuversuch`). Antworten von Mistral (HTTP-Fehler) und unser
+eigenes Zeitlimit sind kein Abriss. Ob das Kind am Ende eine Fehlermeldung
+sieht, meldet allein der Ausgang des Auftrags (Abschnitt „Ein Alarm je
+gescheiterter Analyse“); die Zeilen des KI-Aufrufs sind Warnungen, auch wenn
+der Neuversuch oder die Nachfrage nach fehlenden Karten scheitert.
 
-Scheitert nur die Nachfrage nach fehlenden Karten, entscheidet dasselbe Merkmal
-wie in der Verarbeitung (`hasCategories`): Trägt das erste Ergebnis schon
-Karten, ist die Analyse geliefert — Warnung `nachfrage-gescheitert`, kein Alarm.
-Trägt es keine, ist es ein Ausfall — Fehlerzeile mit Alarm
-(`attempt: retry-ohne-ergebnis`). Ausnahme ohne Behebung: Ein Tierfoto ohne
-Karten wird trotzdem mit Tierprofilen ausgeliefert, der Alarm ist dann ein
-Fehlalarm (setzt ein Fehlverhalten des Modells voraus; gehört zur offenen Frage,
-den Alarm dort zu entscheiden, wo der Ausgang der Analyse bekannt ist).
+**Der Bildschirm fängt beim Neuversuch von vorn an (seit 01.10.2026 abends).**
+Der Neuversuch schreibt wie der erste Versuch Live-Text. Seine erste Welle
+kommt sofort und leer, jede trägt `versuch: 2` (`jobs.setLiveText` legt
+`liveTextVersuch` ins Auftragsdokument, die Statusabfrage gibt es mit dem
+Abhol-Ticket weiter). Die Live-Anzeige (`live-anzeige.js`) verwirft daraufhin
+den Text der abgerissenen Antwort: Karte und Live-Karten weg, das Warte-Auge
+kommt zurück und wird ins Bild geholt, der neue Text tippt von vorn. Eine
+verspätete Welle des ersten Versuchs wird verworfen. Vorher lief der
+Neuversuch ohne Live-Text; der halbe alte Text blieb rund 40 Sekunden stehen
+und wurde am Ende durch das Ergebnis einer anderen Modellantwort ersetzt.
 
 Gehäufte Abrisse zählt die log-basierte Metrik `ki_verbindungsabriss`; mehr als
 drei in 24 Stunden lösen den Alarm „KI-Verbindung bricht gehäuft ab“ aus — auch
@@ -447,13 +451,6 @@ nennt: ob ein Schritt geklappt hat — keine IP-Adresse. Dass das Foto beim
 Neuversuch ein zweites Mal an Mistral geht, deckt die Erklärung (sie nennt den
 Zweck, keine Anzahl).
 
-**Offen: Live-Text bleibt beim Neuversuch stehen.** Der Neuversuch läuft ohne
-Live-Text. Bis sein Ergebnis da ist, sieht das Kind den Text, der vor dem Abriss
-ankam; das Ergebnis kommt dann aus einer anderen Modellantwort und ersetzt ihn.
-Das Ergebnis selbst ist richtig. Eine Behebung (den Live-Text im Auftrag
-zurücksetzen und im Browser sichtbar neu anfangen) braucht eine Änderung an der
-Live-Anzeige; ob sie gebaut wird, entscheidet Christoph (vorgelegt 01.10.2026).
-
 **Betrachtete Alternative.** Mehrere Neuversuche oder Pausen wie bei der
 Überlastung (429): verworfen — ein Abriss ist kein Zeichen von Überlast, und jeder
 weitere Versuch verlängert die Wartezeit des Kindes.
@@ -461,6 +458,55 @@ weitere Versuch verlängert die Wartezeit des Kindes.
 **Bedingung für Neubewertung.** Der Alarm „KI-Verbindung bricht gehäuft ab“
 (mehr als drei Abrisse in 24 Stunden) oder ein Neuversuch, der selbst scheitert —
 dann liegt die Ursache außerhalb eines Einzelfalls, und `ursache.code` zeigt, wo.
+
+## Ein Alarm je gescheiterter Analyse (01.10.2026)
+
+**Entscheidung.** Sieht ein Kind nach einer Analyse eine Fehlermeldung, endet
+sein Auftrag auf einem von genau zwei Wegen: `done` mit blockiertem Ergebnis
+(`completeJob`) oder `failed` (`failJob`, wenn der Worker nicht fertig wurde).
+Genau dort, und nur wenn dieser Aufruf den Übergang gemacht hat, schreibt
+`jobs.js` die eine Fehlerzeile `alert: "analyse-gescheitert"` mit dem Grund
+(`blocked.apiError`, `blocked.profileBlocked`, `processing_timeout` …). Auf
+sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
+Einzelnen beschreiben — KI-Aufruf, Neuversuch, Nachfrage, Foto laden,
+Absturzverdacht, verworfenes Ergebnis —, sind Warnungen. Wie die Richtlinien
+filtern und wie oft sie melden: `docs/ERROR-ALERTING.md`.
+
+**Begründung.** Vorher entschied jede Stelle selbst, ob sie alarmiert. Das gab
+Lücken und Doppelungen: Eine unlesbare KI-Antwort endete als
+`blocked.profileBlocked` ohne jede Nachricht; ein Tierfoto, dessen Nachfrage
+scheiterte, alarmierte, obwohl das Kind sein Tierprofil bekam; ein
+Absturzverdacht meldete sich als „Fehler im Server“ und später noch einmal.
+Am Ausgang des Auftrags ist bekannt, was das Kind sieht. Abgesichert in
+`functions/src/__tests__/ein-alarm-je-fehlermeldung.test.js` über den echten
+Weg (Worker, Pipeline, KI-Aufruf, Auftragsverwaltung): je Fehlerfall genau
+eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine.
+
+**Datenschutz.** Die Zeile trägt nur Schritt und Grund, und den Grund nur als
+feste Kennung (Muster in `jobs.js`, sonst „unbekannt“); keine Vorgangskennung
+(Abschnitt „Erfolgsweg eines Auftrags ohne Kennung im Log“). Das entspricht
+dem, was die Datenschutzerklärung für das technische Protokoll nennt: welcher
+Schritt, ob er geklappt hat.
+
+**Grenzen, bewusst.**
+- Google verschickt aus einer Richtlinie höchstens eine Nachricht je fünf
+  Minuten; weitere gescheiterte Analysen in dieser Zeit stehen nur im
+  Protokoll. Kürzer lässt sich das nicht einstellen. Christoph hat am
+  01.10.2026 entschieden, dass das genügt (Alternative wäre ein eigener Push je
+  Fehler gewesen).
+- Fehlermeldungen, die nur der Browser kennt (Foto lässt sich am Gerät nicht
+  lesen, Verbindung weg, Analyse dauert über 30 Minuten), lösen keine Nachricht
+  je Einzelfall aus: Diese Meldungen schickt der Browser selbst, und jeder
+  könnte sie fälschen — ein Alarm je Meldung wäre ein Weg, Christophs Handy
+  von außen klingeln zu lassen. Sie zählt die Nachricht „viele Fehlermeldungen
+  aus Browsern“.
+- Wer ein Foto hochlädt, das die KI ablehnt, löst eine Nachricht aus. Der
+  Fünf-Minuten-Takt begrenzt das.
+
+**Bedingung für Neubewertung.** Kommen Nachrichten „Analyse gescheitert“, ohne
+dass ein Kind eine Fehlermeldung sah, oder sieht ein Kind eine Fehlermeldung
+nach einer Analyse ohne Nachricht, stimmt die Annahme „zwei Wege, ein Ausgang“
+nicht mehr.
 
 ## Foto direkt laden statt über den Download-Weg der Speicher-Bibliothek (01.10.2026)
 
@@ -485,9 +531,10 @@ Fassungen bis 4.13.0. Eine reparierte Fassung gab es nicht. Datenweg unveränder
 unser Server liest unser Fach.
 
 **Scheitert das Laden endgültig** (nach allen Wiederholungen, oder 401/403/404),
-schreibt `queue-storage.js` eine Fehlerzeile `foto-laden-gescheitert` (nur
-Fehlerart und Grund-Code, kein Pfad, keine Kennung); sie löst die Nachricht
-„Analyse gescheitert“ aus. Vorher war dieser Fall nur laut, weil der Prozess
+schreibt `queue-storage.js` eine Warnung mit `step: "bild-laden"` (nur
+Fehlerart und Grund-Code, kein Pfad, keine Kennung); die Nachricht „Analyse
+gescheitert“ löst der Ausgang des Auftrags aus (Abschnitt „Ein Alarm je
+gescheiterter Analyse“). Vorher war dieser Fall nur laut, weil der Prozess
 abstürzte.
 
 **Bewusste Abweichung bei der Prüfsumme.** Fehlt die Angabe `x-goog-hash` in

@@ -147,6 +147,10 @@ async function handleJobStatus(req, res) {
          ihn derzeit nicht aus (Teil des Live-Text-Protokolls, für Reihenfolge/
          Debugging reserviert) — bewusst mitgegeben und getestet, kein toter Rest. */
       antwort.liveTextStand = typeof job.liveTextStand === "number" ? job.liveTextStand : null;
+      /* Neuversuch nach Verbindungsabriss (01.10.2026, jobs.setLiveText): Steigt
+         die Zahl, faengt die Live-Anzeige von vorn an; eine kleinere ist eine
+         verspaetete Welle der verworfenen Antwort. */
+      if (Number.isInteger(job.liveTextVersuch)) antwort.liveTextVersuch = job.liveTextVersuch;
       /* v3.0 Phase 3: Der Beast-Text, sobald das Modell ihn schreibt —
          BEWUSST im selben Ticket-Block: dieselbe PRIV-003-Bindung, kein
          zweiter Pruefpfad. Solange Beast fehlt, fehlt auch das Feld. */

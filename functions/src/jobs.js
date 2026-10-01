@@ -69,7 +69,8 @@ function jobsRef() {
    `failed` (failJob — Worker nicht fertig, oder schon das Einreihen scheiterte,
    `enqueue_failed`). Nur dort, und nur wenn DIESER Aufruf den Uebergang gemacht
    hat, entsteht die eine Fehlerzeile, auf die der Alarm "Analyse gescheitert"
-   hoert. Die Zeilen, die den Grund im Einzelnen beschreiben (KI-Aufruf, Foto
+   hoert. Scheitert das Einreihen, bevor es einen Auftrag gibt (Speicher oder
+   Datenbank weg), ruft handle-enqueue.js dieselbe Meldung selbst. Die Zeilen, die den Grund im Einzelnen beschreiben (KI-Aufruf, Foto
    laden, Absturzverdacht, verworfenes Ergebnis), sind Warnungen — sonst kaemen
    fuer eine Fehlermeldung zwei Nachrichten, und ein Tierfoto, das trotz
    gescheiterter Nachfrage sein Profil bekommt, loeste einen Fehlalarm aus.
@@ -633,6 +634,7 @@ module.exports = {
   markDelivered,
   verbraucheRcTicket,
   setLiveText,
+  meldeGescheiterteAnalyse,
   abandonJob,
   isAbandoned,
   findAbandonedJobs,

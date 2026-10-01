@@ -66,12 +66,16 @@ ZEILEN_GRENZEN = {
     # waren damit von der Sperrklinke nicht erfasst. Die Grenzen sind der
     # gemessene Stand plus rund 5 Prozent Luft — wie bei allen anderen auch.
     "functions/src/betriebsprofil.js": 440,
-    "functions/src/handle-enqueue.js": 450,  # 01.09.2026: +15 fuer den
+    "functions/src/handle-enqueue.js": 455,  # 01.09.2026: +15 fuer den
     # configMissing-Riegel VOR der Ratenbegrenzung. Die Simulation zeigte,
     # dass ohne Satz `checkRateLimit` wirft und der Einlass mit HTTP 500
     # antwortet statt mit dem freundlichen 503. Der Riegel ist kein neuer
     # Aufgabenbereich, sondern eine Vorbedingung — Teilen wuerde die Datei
-    # nicht verstaendlicher machen, nur die Reihenfolge verstecken.,
+    # nicht verstaendlicher machen, nur die Reihenfolge verstecken.
+    # 01.10.2026: +5 fuer "ein Alarm je gescheiterter Analyse" — die zwei
+    # Fehlerwege ohne Auftrag (Speicher/Datenbank weg, unerwarteter 5xx)
+    # melden sich selbst (je eine Zeile plus Import); die Meldung selbst
+    # liegt in jobs.js, hier steht nur der Aufruf.
     "functions/src/json-repair.js": 585,
     "functions/src/mistral-mock.js": 465,
     # Der grosse Brocken. Nach drei Schnitten (Antwort-Parser, Live-Text,

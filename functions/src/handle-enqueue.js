@@ -60,6 +60,7 @@ const { checkAndIncrement, getMaintenanceStatus, releaseHourlySlot } = require("
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 const { createJob, failJob, platzBestaetigen, getJob, abandonJob, countQueuedJobs } = require("./jobs");
+const { meldeGescheiterteAnalyse } = require("./jobs");
 const { storeImage, deleteImage } = require("./queue-storage");
 const { enqueueJob } = require("./cloud-tasks");
 
@@ -355,6 +356,7 @@ async function handleEnqueue(req, res, secrets) {
          Analyse — Slot zurückgeben und ein evtl. schon abgelegtes Bild nicht
          bis zur Lifecycle-Regel liegen lassen. */
       console.log(JSON.stringify({ requestId, traceId, warning: "store-or-create-failed", error: err.message }));
+      meldeGescheiterteAnalyse("store_failed"); /* Kind sieht "ueberlastet" — eine Nachricht (jobs.js) */
       releaseHourlySlot(counter.stempel).catch(() => {});
       if (imagePath) await deleteImage(imagePath);
       res.status(503).json({ error: "Queue unavailable", code: "store_failed" });
@@ -442,6 +444,7 @@ async function handleEnqueue(req, res, secrets) {
        Reaper zu (Herzschlag-Frist), weil dieser Browser nie eine jobId erhielt
        und darum nie pollt. */
     console.log(JSON.stringify({ requestId, traceId, status: "error", code, error: err.message }));
+    if (status >= 500) meldeGescheiterteAnalyse("enqueue_unerwartet"); /* 4xx = Eingabefehler, keine Nachricht */
     res.status(status).json({ error: "Enqueue failed", code });
   }
 }

@@ -12,8 +12,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Analyse.** Die Nachricht hängt jetzt am Ausgang der Analyse statt an
   einzelnen Schritten: Jede Analyse, die mit einer Fehlermeldung endet, löst
   sie einmal aus — auch eine unlesbare Antwort der KI und ein Ergebnis mit
-  leerem Beast-Profil, die bisher still blieben, und eine Analyse, deren
-  Bearbeitung abbrach. Ein Tierfoto, das sein Tierprofil bekommt, löst keine
+  leerem Beast-Profil, die bisher still blieben, eine Analyse, deren
+  Bearbeitung abbrach, und ein Hochladen, das an Speicher oder Datenbank
+  scheiterte. Ein Tierfoto, das sein Tierprofil bekommt, löst keine
   Nachricht mehr aus, und der bloße Verdacht auf einen Absturz meldet sich
   nicht mehr zusätzlich als „Fehler im Server“. Wie bei allen Alarmen kommt
   höchstens eine Nachricht je fünf Minuten.

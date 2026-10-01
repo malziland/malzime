@@ -85,13 +85,29 @@ async function runPipeline(job) {
      jeden Firestore-Fehler. Die erste Welle eines NEUEN Versuchs (Neuversuch
      nach Verbindungsabriss, mistral.js) geht sofort durch — sie setzt den
      Bildschirm zurueck und darf nicht bis zu 2 s hinter dem alten Text haengen.
-     Die Schreibvorgaenge laufen NACHEINANDER (Kette): Zwei gleichzeitige
+     Die Schreibvorgaenge laufen NACHEINANDER: Zwei gleichzeitige
      update-Aufrufe kommen in Firestore in beliebiger Reihenfolge an, und eine
      spaete Welle des ersten Versuchs koennte die leere des zweiten
-     ueberschreiben. setLiveText wirft nie, die Kette reisst also nicht. */
+     ueberschreiben. Hoechstens einer ist unterwegs, dahinter wartet nur der
+     JUENGSTE Stand — bei langsamer Datenbank staut sich nichts (jede Welle
+     traegt den ganzen Stand). setLiveText wirft nie. */
   let letzterSchreibMs = 0;
   let letzterVersuch = 1;
-  let schreibKette = Promise.resolve();
+  let schreibtGerade = false;
+  let wartend = null;
+  const schreibe = (texte) => {
+    if (schreibtGerade) {
+      wartend = texte;
+      return;
+    }
+    schreibtGerade = true;
+    Promise.resolve(setLiveText(job.id, texte)).then(() => {
+      schreibtGerade = false;
+      const naechste = wartend;
+      wartend = null;
+      if (naechste) schreibe(naechste);
+    });
+  };
   const opts = {
     onLiveText: (texte) => {
       const jetzt = Date.now();
@@ -99,7 +115,7 @@ async function runPipeline(job) {
       if (versuch === letzterVersuch && jetzt - letzterSchreibMs < 2000) return;
       letzterSchreibMs = jetzt;
       letzterVersuch = versuch;
-      schreibKette = schreibKette.then(() => setLiveText(job.id, texte));
+      schreibe(texte);
     },
   };
   try {

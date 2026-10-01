@@ -558,7 +558,9 @@ Warnungen des KI-Aufrufs und `step: "bild-laden"`); `blocked.configMissing` →
 [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md); `processing_timeout` → Warnung
 `worker-abgestuerzt-verdacht` und Plattform-Fehlerzeilen des Dienstes
 `processjob`; `enqueue_failed` → Cloud Tasks prüfen (Warteschlange pausiert,
-Rechte).
+Rechte); `store_failed` und `enqueue_unerwartet` → Zeilen des Dienstes
+`enqueue` (`store-or-create-failed` bzw. `status: "error"`), Speicher und
+Firestore prüfen.
 
 ### Verdacht auf Absturz-Schleife (Safari: „wiederholt ein Problem aufgetreten")
 

@@ -33,6 +33,7 @@ jest.mock("../jobs", () => ({
   platzBestaetigen: jest.fn(async () => true),
   getJob: jest.fn(async (id) => ({ id, status: "queued", createdAt: Date.now() })),
   abandonJob: jest.fn(async () => true),
+  meldeGescheiterteAnalyse: jest.fn(),
 }));
 /* OHNE DIESE ZWEI scheiterte die Ermittlung der Einlassgrenze still (echtes
    Firestore nicht erreichbar), der Code fiel in seinen Notfallpfad, und die
@@ -366,6 +367,43 @@ describe("handleEnqueue — Ausfall zwischen Slot und Task", () => {
     expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
     expect(tasks.enqueueJob).not.toHaveBeenCalled();
+  });
+});
+
+/* Befund W-03 (Gegenpruefung 01.10.2026): Scheitert das Einreihen, sieht das
+   Kind "Die KI ist gerade ueberlastet". Wie bei enqueue_failed (jobs.failJob)
+   kommt dann EINE Nachricht "Analyse gescheitert" — auch auf den zwei Wegen,
+   auf denen es noch keinen Auftrag gibt. Eingabefehler (4xx) nicht. */
+describe("handleEnqueue — Nachricht bei gescheitertem Einreihen", () => {
+  test.each([
+    ["Speicher weg", () => storage.storeImage.mockRejectedValue(new Error("gcs down"))],
+    ["Datenbank weg", () => jobs.createJob.mockRejectedValue(new Error("firestore blip"))],
+  ])("%s → genau eine Meldung store_failed", async (_fall, stoerung) => {
+    stoerung();
+    await handleEnqueue(jsonReq(), makeRes(), SECRETS);
+    expect(jobs.meldeGescheiterteAnalyse.mock.calls).toEqual([["store_failed"]]);
+  });
+
+  test("unerwarteter Serverfehler (5xx) → eine Meldung enqueue_unerwartet", async () => {
+    counter.checkAndIncrement.mockRejectedValue(new Error("unerwartet"));
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBeGreaterThanOrEqual(500);
+    expect(jobs.meldeGescheiterteAnalyse.mock.calls).toEqual([["enqueue_unerwartet"]]);
+  });
+
+  test("Eingabefehler (400) → keine Meldung", async () => {
+    const res = makeRes();
+    await handleEnqueue(jsonReq({ imageBase64: undefined }), res, SECRETS);
+    expect(res.statusCode).toBe(400);
+    expect(jobs.meldeGescheiterteAnalyse).not.toHaveBeenCalled();
+  });
+
+  test("Erfolg → keine Meldung", async () => {
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(jobs.meldeGescheiterteAnalyse).not.toHaveBeenCalled();
   });
 });
 

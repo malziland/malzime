@@ -424,8 +424,10 @@ Live-Karte und schon gezeigte Kategorie-Karten weg, das Warte-Auge kommt
 zurück und wird ins Bild geholt, der neue Text tippt von vorn; die Box mit den
 Fotodaten bleibt stehen (sie stammt aus dem Browser). Sah die Anzeige den neuen
 Versuch nie (kurz offline), wird der alte Text beim Ergebnis verworfen statt
-zu Ende getippt. Der Worker schreibt die Wellen nacheinander, eine verspätete
-Welle des ersten Versuchs verwirft der Browser. Weil der Neuversuch streamt,
+zu Ende getippt. Der Worker schreibt die Wellen nacheinander (hinter dem
+laufenden Schreibvorgang wartet nur der jüngste Stand, bei langsamer Datenbank
+staut sich nichts); eine verspätete Welle des ersten Versuchs verwirft der
+Browser. Weil der Neuversuch streamt,
 wird auch sein schon gelesener Text gerettet, wenn er abreißt. Vorher lief der
 Neuversuch ohne Live-Text; der halbe alte Text blieb rund 40 Sekunden stehen
 und wurde am Ende durch das Ergebnis einer anderen Modellantwort ersetzt.
@@ -472,7 +474,10 @@ einem der beiden Modi (`completeJob`) oder `failed` (`failJob`: der Worker
 wurde nicht fertig, oder schon das Einreihen scheiterte). Dort, und nur wenn
 dieser Aufruf den Übergang gemacht hat, schreibt `jobs.js` die eine
 Fehlerzeile `alert: "analyse-gescheitert"` mit dem Grund (Liste in
-`docs/ERROR-ALERTING.md`). Auf sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
+`docs/ERROR-ALERTING.md`). Scheitert das Hochladen, bevor es einen Auftrag
+gibt (Speicher oder Datenbank weg, unerwarteter Serverfehler), ruft
+`handle-enqueue.js` dieselbe Meldung; Eingabefehler (4xx) melden sich nicht.
+Auf sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
 Einzelnen beschreiben — KI-Aufruf, Neuversuch, Nachfrage, Foto laden,
 Absturzverdacht, verworfenes Ergebnis —, sind Warnungen. Wie die Richtlinien
 filtern und wie oft sie melden: `docs/ERROR-ALERTING.md`.

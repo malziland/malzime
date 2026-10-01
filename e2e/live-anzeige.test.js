@@ -349,6 +349,9 @@ test("Neuversuch: der Text des abgerissenen Versuchs verschwindet, der neue tipp
             : { status: "done", result: MOCK_RESPONSE };
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
   });
+  /* Handy-Groesse: Dort entscheidet sich, ob das Auge nach dem Neustart im
+     Bild ist (Befund W-02 der Gegenpruefung 01.10.2026). */
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
   await expect(page.locator("h1")).toBeVisible();
   await page.click('[data-demo="selfie"]');
@@ -360,6 +363,11 @@ test("Neuversuch: der Text des abgerissenen Versuchs verschwindet, der neue tipp
   await expect(page.locator("#facts")).toContainText("ALTERWERT-VERSUCH-1", { timeout: 30000 });
   await page.screenshot({ path: testInfo.outputPath("1-erster-versuch.png") });
 
+  /* Wie ein Kind, das die Merkmale ansieht: ans Seitenende. Ein Scrollen per
+     Skript ist keine Uebernahme der Blick-Fuehrung (die hoert auf Rad,
+     Wischen und Tasten). Ohne das Nachholen laege das Auge danach
+     ausserhalb des Bildes — so bleibt der Pruefschritt unten trennscharf. */
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   /* Abriss, der Server fragt neu: sofort weg mit dem alten Text. */
   phase = "leer";
   await expect(page.locator("#liveKarte")).not.toHaveClass(/active/, { timeout: 10000 });

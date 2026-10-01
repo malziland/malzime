@@ -75,8 +75,10 @@ Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung.
 **Analyse gescheitert: eine Zeile je gescheiterter Analyse (seit Release 4.13.2).**
 Die Zeile `alert: "analyse-gescheitert"` schreibt allein `functions/src/jobs.js`,
 und zwar wenn ein Auftrag mit einem blockierten Ergebnis, mit einem leeren
-Profil in einem der beiden Modi oder als `failed` endet. Das Feld `grund` sagt,
-welche Meldung das Kind sah (bzw. bei geschlossenem Tab gesehen hätte):
+Profil in einem der beiden Modi oder als `failed` endet; scheitert schon das
+Hochladen, bevor es einen Auftrag gibt, ruft `handle-enqueue.js` dieselbe
+Meldung. Das Feld `grund` sagt, welche Meldung das Kind sah (bzw. bei
+geschlossenem Tab gesehen hätte):
 
 | `grund` | Bedeutung |
 |---|---|
@@ -86,7 +88,9 @@ welche Meldung das Kind sah (bzw. bei geschlossenem Tab gesehen hätte):
 | `blocked.configMissing` | Einstellungssatz fehlt oder ist ungültig — sofort handeln |
 | `profil_leer_standard`, `profil_leer_beast` | nur ein Teil gerettet, im genannten Modus steht „leeres Profil“ |
 | `processing_timeout` | die Bearbeitung wurde nicht fertig (Absturz oder Zeitlimit) |
-| `enqueue_failed` | schon das Einreihen scheiterte, das Kind sah „Die KI ist gerade überlastet“ |
+| `enqueue_failed` | Cloud Tasks nahm den Auftrag nicht an, das Kind sah „Die KI ist gerade überlastet“ |
+| `store_failed` | Foto oder Auftrag ließ sich beim Hochladen nicht ablegen (Speicher oder Datenbank), Meldung wie oben |
+| `enqueue_unerwartet` | unerwarteter Serverfehler beim Hochladen (5xx), Meldung wie oben |
 | `unbekannt` | ein Grund, der keine feste Kennung ist (sollte nicht vorkommen) |
 
 Was dazu geführt hat, steht in Warnungen davor (KI-Aufruf, Foto laden,

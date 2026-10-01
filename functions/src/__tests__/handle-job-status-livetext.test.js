@@ -167,7 +167,9 @@ describe("handleJobStatus — Versuch auch bei done", () => {
 });
 
 describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
-  test("auch wenn das Dokument noch liveText-Felder traegt, liefert done nur result", async () => {
+  /* Seit 01.10.2026 traegt jedes Dokument mit Live-Text auch liveTextVersuch;
+     done gibt davon nur die Nummer weiter, keinen Text. */
+  test("auch wenn das Dokument noch liveText-Felder traegt, liefert done nur result und die Versuchsnummer", async () => {
     jobs.getJob.mockResolvedValue({
       id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
       status: "done",
@@ -177,10 +179,11 @@ describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
       liveText: "Du bist neugierig und",
       liveTextBeast: "Du bist ein zynisches",
       liveTextStand: 1754900000000,
+      liveTextVersuch: 1,
     });
     const res = makeRes();
     await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
-    expect(res.body).toEqual({ status: "done", result: { profiles: { normal: {}, boost: {} } } });
+    expect(res.body).toEqual({ status: "done", result: { profiles: { normal: {}, boost: {} } }, liveTextVersuch: 1 });
     expect(res.body).not.toHaveProperty("liveText");
     expect(res.body).not.toHaveProperty("liveTextBeast");
   });

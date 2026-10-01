@@ -410,13 +410,20 @@ zuerst ein schon im Strom angekommener Text gerettet wie beim Zeitlimit; reicht
 er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget. Der
 erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
 Neuversuch schreibt die Fehlerzeile mit Alarm. Antworten von Mistral
-(HTTP-Fehler) und unser eigenes Zeitlimit sind kein Abriss. Scheitert nur die
-Nachfrage nach fehlenden Karten und trägt das erste Ergebnis schon Karten
-(dasselbe Merkmal, nach dem die Verarbeitung entscheidet), ist die Analyse geliefert — das ist eine Warnung (`nachfrage-gescheitert`), kein
-Alarm; trägt es keines, bleibt es die Fehlerzeile mit Alarm
-(`attempt: retry-ohne-ergebnis`). Gehäufte Abrisse zählt die
-log-basierte Metrik `ki_verbindungsabriss`; mehr als drei in 24 Stunden lösen den
-Alarm „KI-Verbindung bricht gehäuft ab“ aus — auch wenn jeder Neuversuch gelang.
+(HTTP-Fehler) und unser eigenes Zeitlimit sind kein Abriss.
+
+Scheitert nur die Nachfrage nach fehlenden Karten, entscheidet dasselbe Merkmal
+wie in der Verarbeitung (`hasCategories`): Trägt das erste Ergebnis schon
+Karten, ist die Analyse geliefert — Warnung `nachfrage-gescheitert`, kein Alarm.
+Trägt es keine, ist es ein Ausfall — Fehlerzeile mit Alarm
+(`attempt: retry-ohne-ergebnis`). Ausnahme ohne Behebung: Ein Tierfoto ohne
+Karten wird trotzdem mit Tierprofilen ausgeliefert, der Alarm ist dann ein
+Fehlalarm (setzt ein Fehlverhalten des Modells voraus; gehört zur offenen Frage,
+den Alarm dort zu entscheiden, wo der Ausgang der Analyse bekannt ist).
+
+Gehäufte Abrisse zählt die log-basierte Metrik `ki_verbindungsabriss`; mehr als
+drei in 24 Stunden lösen den Alarm „KI-Verbindung bricht gehäuft ab“ aus — auch
+wenn jeder Neuversuch gelang.
 
 **Begründung.** Am 01.10.2026 scheiterten 2 von 30 Analysen eines Workshops an
 einem Abriss; beide Kinder sahen sofort die Fehlermeldung. Ein Neuversuch kostet

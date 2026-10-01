@@ -306,7 +306,12 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     try {
       /* Gleicher cacheKey wie im ersten Versuch — der statische Anfang ist in
          beiden Versuchen bitgleich, der Cache traegt also auch den Retry. */
-      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry", cacheKey, undefined, dauer);
+      /* Befund Q-02: Nur wenn das erste Ergebnis schon ein Profil traegt, ist
+         die Analyse bei einer gescheiterten Nachfrage geliefert (Warnung).
+         Sonst ist es ein Ausfall — eigener Name, Fehlerzeile mit Alarm. */
+      const geliefert = hatProfilText(parsed.standard) || hatProfilText(parsed.beast);
+      const nachfrage = geliefert ? "retry" : "retry-ohne-ergebnis";
+      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, nachfrage, cacheKey, undefined, dauer);
       if (retryParsed) {
         /* Fehlende Karten aus Retry in Originalergebnis mergen (analog runProfile) */
         for (const mode of ["standard", "beast"]) {

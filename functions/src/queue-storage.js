@@ -33,7 +33,7 @@ const os = require("os");
 const path = require("path");
 const { getStorage } = require("firebase-admin/storage");
 const { QUEUE_BUCKET, QUEUE_UPLOAD_PREFIX, isLocalQueueMode } = require("./config");
-const { istVerbindungsabbruch } = require("./verbindungsfehler");
+const { istVerbindungsabbruch, ursacheVon } = require("./verbindungsfehler");
 
 const EXT_BY_MIME = {
   "image/jpeg": "jpg",
@@ -148,7 +148,28 @@ async function loadImage(objectPath) {
   const b = bucket();
   /* Die echte Bibliothek: direkt laden (siehe ladeVomSpeicher). Die Attrappen
      der aelteren Tests haben keinen Speicher-Dienst und laden wie bisher. */
-  if (hatSpeicherDienst(b)) return ladeVomSpeicher(b, objectPath);
+  if (hatSpeicherDienst(b)) {
+    try {
+      return await ladeVomSpeicher(b, objectPath);
+    } catch (err) {
+      /* Befund Q-01 (01.10.2026): Scheitert das Laden endgueltig, scheitert die
+         Analyse — das Kind sieht eine Fehlermeldung. Bisher war das laut, weil
+         der alte Weg den Prozess abstuerzen liess; jetzt meldet es diese Zeile
+         (Alarm "Analyse gescheitert"). Nur Fehlerart und Grund-Code, kein Pfad,
+         keine Kennung (Datenschutzerklaerung: welcher Schritt, ob er klappte). */
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          alert: "foto-laden-gescheitert",
+          step: "bild-laden",
+          status: "error",
+          fehler: String((err && (err.code || err.name)) || "unbekannt").slice(0, 40),
+          ursache: ursacheVon(err),
+        })
+      );
+      throw err;
+    }
+  }
   const file = b.file(objectPath);
   const [buffer] = await file.download();
   const [metadata] = await file.getMetadata();
@@ -176,6 +197,7 @@ const WIEDERHOLBARE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
    stockender Speicher die Analyse bis an Nodes eigene Grenzen (Minuten). Ein
    Foto ist klein (hoechstens 1280 Pixel, im Browser verkleinert). */
 const VERSUCH_ZEITLIMIT_MS = 30 * 1000;
+let versuchZeitlimitMs = VERSUCH_ZEITLIMIT_MS;
 let ladeFetch = (...args) => fetch(...args);
 let warten = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -219,7 +241,7 @@ async function ladeVomSpeicher(b, objectPath) {
     try {
       res = await ladeFetch(adresse, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: AbortSignal.timeout(VERSUCH_ZEITLIMIT_MS),
+        signal: AbortSignal.timeout(versuchZeitlimitMs),
       });
       if (res.ok) {
         const buffer = Buffer.from(await res.arrayBuffer());
@@ -314,6 +336,10 @@ module.exports = {
   loadImage,
   /* Fuer den Test der echten Verdrahtung (firebase-admin). */
   _hatSpeicherDienst: hatSpeicherDienst,
+  /* Nur fuer Tests: Zeitlimit je Versuch (null = echtes). */
+  _setVersuchZeitlimitForTest: (ms) => {
+    versuchZeitlimitMs = ms || VERSUCH_ZEITLIMIT_MS;
+  },
   /* Nur fuer Tests: Pausen der Wiederholungen ersetzen (null = echte). */
   _setWartenForTest: (f) => {
     warten = f || ((ms) => new Promise((r) => setTimeout(r, ms)));

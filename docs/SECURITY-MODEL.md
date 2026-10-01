@@ -411,8 +411,10 @@ er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget. Der
 erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
 Neuversuch schreibt die Fehlerzeile mit Alarm. Antworten von Mistral
 (HTTP-Fehler) und unser eigenes Zeitlimit sind kein Abriss. Scheitert nur die
-Nachfrage nach fehlenden Karten, ist die Analyse schon geliefert — das ist eine
-Warnung (`nachfrage-gescheitert`), kein Alarm. Gehäufte Abrisse zählt die
+Nachfrage nach fehlenden Karten und trägt das erste Ergebnis schon ein Profil,
+ist die Analyse geliefert — das ist eine Warnung (`nachfrage-gescheitert`), kein
+Alarm; trägt es keines, bleibt es die Fehlerzeile mit Alarm
+(`attempt: retry-ohne-ergebnis`). Gehäufte Abrisse zählt die
 log-basierte Metrik `ki_verbindungsabriss`; mehr als drei in 24 Stunden lösen den
 Alarm „KI-Verbindung bricht gehäuft ab“ aus — auch wenn jeder Neuversuch gelang.
 
@@ -438,13 +440,12 @@ nennt: ob ein Schritt geklappt hat — keine IP-Adresse. Dass das Foto beim
 Neuversuch ein zweites Mal an Mistral geht, deckt die Erklärung (sie nennt den
 Zweck, keine Anzahl).
 
-**Bewusste Abweichung: Live-Text bleibt stehen.** Der Neuversuch läuft ohne
+**Offen: Live-Text bleibt beim Neuversuch stehen.** Der Neuversuch läuft ohne
 Live-Text. Bis sein Ergebnis da ist, sieht das Kind den Text, der vor dem Abriss
 ankam; das Ergebnis kommt dann aus einer anderen Modellantwort und ersetzt ihn.
-In Kauf genommen, weil es nur nach einem Abriss vorkommt. Betrachtete
-Alternative: den Live-Text im Auftrag zurücksetzen und im Browser sichtbar neu
-anfangen — braucht eine Änderung an der Live-Anzeige, steht auf der Liste für
-später.
+Das Ergebnis selbst ist richtig. Eine Behebung (den Live-Text im Auftrag
+zurücksetzen und im Browser sichtbar neu anfangen) braucht eine Änderung an der
+Live-Anzeige; ob sie gebaut wird, entscheidet Christoph (vorgelegt 01.10.2026).
 
 **Betrachtete Alternative.** Mehrere Neuversuche oder Pausen wie bei der
 Überlastung (429): verworfen — ein Abriss ist kein Zeichen von Überlast, und jeder
@@ -475,6 +476,18 @@ mit 429 oder 5xx, wirft dieser Weg einen ungefangenen Fehler
 lokalen Schein-Speicher mit 8.2.0 UND 7.22.0, also auch in den ausgelieferten
 Fassungen bis 4.13.0. Eine reparierte Fassung gab es nicht. Datenweg unverändert:
 unser Server liest unser Fach.
+
+**Scheitert das Laden endgültig** (nach allen Wiederholungen, oder 401/403/404),
+schreibt `queue-storage.js` eine Fehlerzeile `foto-laden-gescheitert` (nur
+Fehlerart und Grund-Code, kein Pfad, keine Kennung); sie löst die Nachricht
+„Analyse gescheitert“ aus. Vorher war dieser Fall nur laut, weil der Prozess
+abstürzte.
+
+**Bewusste Abweichung bei der Prüfsumme.** Fehlt die Angabe `x-goog-hash` in
+der Antwort, wird das Foto ohne Vergleich angenommen (die Bibliothek würde
+abbrechen); Google sendet sie bei jedem Download. Mit `Content-Encoding: gzip`
+gespeicherte Objekte vergleicht der direkte Weg nicht entpackt — `storeImage`
+speichert nie so.
 
 **Betrachtete Alternativen.** Die Speicher-Bibliothek auf 7.22 zurückstellen:
 verworfen — firebase-admin 14.5 verlangt 8, und 7.22 stürzt bei 429/5xx genauso

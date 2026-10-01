@@ -24,16 +24,18 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Abrisses steht im Protokoll (Fehlercode, ein fester Kurztext nur aus einer
   Liste bekannter Meldungen, nie Adressen) — bisher war nicht feststellbar, wer
   die Verbindung beendet hatte.
-- **Gescheiterte Nachfrage ist kein Alarm mehr.** Scheitert nur die Nachfrage
-  nach fehlenden Karten, ist die Analyse schon geliefert; das steht jetzt als
-  Warnung im Protokoll statt als Nachricht „Analyse gescheitert“.
+- **Gescheiterte Nachfrage ist kein Alarm mehr, wenn das Profil schon da ist.**
+  Scheitert nur die Nachfrage nach fehlenden Karten und trägt das erste Ergebnis
+  bereits ein Profil, ist die Analyse geliefert; das steht jetzt als Warnung im
+  Protokoll statt als Nachricht „Analyse gescheitert“.
 - **Foto laden: keine Warnung mehr, kein Absturz bei Störungen des
   Speichers.** Seit 4.13.0 schrieb jede Analyse eine Warnung ins Protokoll,
   ausgelöst von einem Fehler im Download-Weg der Google-Speicher-Bibliothek. An
   derselben Stelle stürzte der Server-Prozess ab, wenn der Speicher kurz mit
   „überlastet“ oder einem Serverfehler antwortete (auch in früheren Fassungen).
   Das Foto wird jetzt direkt geladen — mit Prüfsumme, den Wiederholungsregeln
-  der Bibliothek und einer statt zwei Anfragen.
+  der Bibliothek und einer statt zwei Anfragen. Scheitert das Laden endgültig,
+  kommt die Nachricht „Analyse gescheitert“.
 - **Verspätete Antworten der Datenbank werden gemessen.** Kommt der Zugriff
   auf die Betriebswerte nach dem Zeitlimit doch noch an, steht seine
   tatsächliche Dauer im Protokoll.

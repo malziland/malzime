@@ -4,11 +4,12 @@
  *
  * ANLASS (01.10.2026, erster Workshop nach 4.13.0): Jede der 30 Analysen
  * schrieb "MaxListenersExceededWarning ... PassThrough" ins Protokoll; mit
- * 4.12.0 keine. Ursache gemessen: Die Speicher-Bibliothek 8 (Hilfspaket
- * teeny-request 11, index.js:194) haengt beim Herunterladen dieselben
- * Zuhoerer mehrfach an — ab etwa 64 KB, also bei jedem echten Foto. Harmlos
- * (eine Anfrage, Daten gleich, kein Speicherwachstum ueber 1000 Downloads),
- * aber eine Warnung, die IMMER kommt, verdeckt die eine, die zaehlt.
+ * 4.12.0 keine. Ursache gemessen: Der Download-Weg der Speicher-Bibliothek
+ * (Hilfspaket teeny-request, index.js:194) haengt dieselben Zuhoerer mehrfach
+ * an — ab etwa 64 KB, also bei jedem echten Foto. Schwerer wog, was die
+ * Pruefung dabei fand: Antwortet der Speicher mit 429/5xx, stuerzt derselbe
+ * Weg mit ERR_STREAM_UNABLE_TO_PIPE ab und reisst den Prozess mit — auch mit
+ * 7.22. Der direkte Weg hat beides nicht (Tests unten, echter Node-Prozess).
  *
  * Hier laeuft die ECHTE Speicher-Bibliothek gegen einen lokalen Schein-
  * Speicher (kein Netz, keine Cloud). Die Anmeldung wird ersetzt, weil es
@@ -39,6 +40,10 @@ beforeAll(async () => {
     /* Stoerungen wie im Netz: Verbindung kappen, bevor eine Antwort kommt;
        mitten im Bild abbrechen; falsche Bytes mit der Pruefsumme des echten
        Fotos schicken. */
+    if (status === "haengt") {
+      /* Antwortet nie — nur das Zeitlimit je Versuch beendet das. */
+      return;
+    }
     if (status === "abriss") {
       req.socket.destroy();
       return;
@@ -91,6 +96,7 @@ beforeEach(() => {
   storage._setWartenForTest(async () => {});
 });
 afterEach(() => {
+  storage._setVersuchZeitlimitForTest(null);
   process.removeListener("warning", merke);
   storage.setBucketForTest(null);
   storage._setWartenForTest(null);
@@ -199,4 +205,30 @@ test("das Fach aus firebase-admin nimmt den direkten Weg", () => {
   const app = getApps().find((a) => a.name === "verdrahtung") || initializeApp({ projectId: "p" }, "verdrahtung");
   const fach = getStorage(app).bucket("fach-probe");
   expect(storage._hatSpeicherDienst(fach)).toBe(true);
+});
+
+/* Befund S-13: Haengt der Speicher, beendet das Zeitlimit je Versuch das
+   Warten, und es wird neu versucht. */
+test("ein haengender Speicher: Zeitlimit je Versuch, dann neuer Versuch", async () => {
+  storage._setVersuchZeitlimitForTest(300);
+  antwortStatus = ["haengt"];
+  const geladen = await storage.loadImage("queue-uploads/x.png");
+  expect(Buffer.compare(geladen.buffer, FOTO)).toBe(0);
+  expect(anfragen).toHaveLength(2);
+});
+
+/* Befund Q-01: Scheitert das Laden endgueltig, steht eine Fehlerzeile mit
+   Alarm im Protokoll — ohne Pfad und ohne Kennung. */
+test("endgueltig gescheitert: Fehlerzeile 'foto-laden-gescheitert', ohne Pfad", async () => {
+  const fehler = [];
+  const spion = jest.spyOn(console, "error").mockImplementation((t) => fehler.push(String(t)));
+  try {
+    antwortStatus = [404];
+    await expect(storage.loadImage("queue-uploads/geheim-123.png")).rejects.toMatchObject({ code: 404 });
+    const zeile = fehler.map((t) => JSON.parse(t)).find((z) => z.alert === "foto-laden-gescheitert");
+    expect(zeile).toMatchObject({ severity: "ERROR", step: "bild-laden", fehler: "404" });
+    expect(fehler.join("\n")).not.toMatch(/queue-uploads|geheim-123/);
+  } finally {
+    spion.mockRestore();
+  }
 });

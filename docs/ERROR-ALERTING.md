@@ -69,8 +69,8 @@ Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung.
 | Richtlinie | Betreff | Filter (nach dem gemeinsamen Teil) |
 |---|---|---|
 | `malziME Kinderschutz-Treffer` | „malziME: Kinderschutz-Treffer (Analyse lief normal)“ | `jsonPayload.step="minor-safety-durchbruch"` |
-| `malziME Analyse gescheitert (KI-Dienst)` | „malziME: Analyse gescheitert – der KI-Aufruf brachte kein Ergebnis (Details im Text)“ | `severity>=ERROR AND jsonPayload.alert="single-large-failed"` |
-| `malziME Function Errors` | „malziME: Fehler im Server (kein Kinderschutz, keine gescheiterte Analyse – Details im Text)“ | `severity>=ERROR AND NOT jsonPayload.step="minor-safety-durchbruch" AND NOT jsonPayload.alert="single-large-failed"` |
+| `malziME Analyse gescheitert (KI-Dienst)` | „malziME: Analyse gescheitert – ein Kind sah eine Fehlermeldung (Details im Text)“ | `severity>=ERROR AND jsonPayload.alert=("single-large-failed" OR "foto-laden-gescheitert")` |
+| `malziME Function Errors` | „malziME: Fehler im Server (Details im Text)“ | `severity>=ERROR AND NOT jsonPayload.step="minor-safety-durchbruch" AND NOT jsonPayload.alert=("single-large-failed" OR "foto-laden-gescheitert")` |
 
 Dazu kommt eine Schwellen-Richtlinie (wie die für Browser-Fehler unten):
 `malziME KI-Verbindung bricht gehäuft ab` — Betreff „malziME: KI-Verbindung bricht
@@ -283,8 +283,11 @@ Was bei einem roten Nachtlauf zu tun ist: `docs/RUNBOOK.md`, Abschnitt
   die Art (Kinderschutz-Treffer, gescheiterte Analyse, sonstiger Fehler); der
   Push-Text enthält Googles Zusammenfassung und den Link zur Cloud Console.
 - Handled per-Request-Fehler (HTTP 4xx/5xx an den Client, nur `console.log`)
-  lösen **nicht** aus — nur echte `severity>=ERROR`-Logs (Abstürze, OOM,
-  Timeouts, eskalierte Fehler wie `counter-fail-open`).
+  lösen **nicht** aus. Die drei log-basierten Richtlinien reagieren auf
+  `severity>=ERROR` (Abstürze, OOM, Timeouts, eskalierte Fehler wie
+  `counter-fail-open`, gescheiterte Analysen, Kinderschutz-Treffer); die zwei
+  Schwellen-Richtlinien zählen dagegen auch Zeilen ohne Fehler-Schwere — die
+  Browser-Meldungen und die Warnungen `abbruch-neuversuch`.
 
 ## Datenschutz
 

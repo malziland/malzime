@@ -293,6 +293,25 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     keineAdressenImProtokoll();
   });
 
+  /* Befund Q-02: Traegt die erste Antwort KEIN Profil und scheitert die
+     Nachfrage, ist die Analyse NICHT geliefert — das muss alarmieren. */
+  test("erste Antwort ohne Profil, Nachfrage scheitert: Fehlerzeile mit Alarm", async () => {
+    let aufrufe = 0;
+    setFetchForTest(async (_url, init) => {
+      if (!mitBild(init)) return WERBUNG;
+      aufrufe += 1;
+      return aufrufe === 1 ? stueckAntwort(JSON.stringify({ subject: "PERSON" })) : stueckDasAbreisst();
+    });
+    const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de");
+    expect(aufrufe).toBe(2);
+    expect(ergebnis.normal).toBeFalsy();
+    const fehler = zeilen("error").filter((t) => t.includes("single-large-failed"));
+    expect(fehler).toHaveLength(1);
+    expect(JSON.parse(fehler[0]).attempt).toBe("retry-ohne-ergebnis");
+    expect(zeilen("warn").join("\n")).not.toMatch(/nachfrage-gescheitert/);
+    keineAdressenImProtokoll();
+  });
+
   test("auch die Fehlerzeile des Werbe-Aufrufs nennt den Grund — ohne Adressen", async () => {
     setFetchForTest(async () => {
       const grund = new Error("connect ECONNREFUSED ::ffff:104.18.33.7:443");

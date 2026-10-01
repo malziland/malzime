@@ -631,8 +631,11 @@ schon fast fertigen Text; sonst fragt es EINMAL neu (Warnung
 `abbruch-neuversuch`, kein Alarm). Erst wenn auch der Neuversuch scheitert,
 kommt die Nachricht „Analyse gescheitert“; mehr als drei Abrisse in 24 Stunden
 melden sich als „KI-Verbindung bricht gehäuft ab“. Scheitert nur die Nachfrage
-nach fehlenden Karten, steht eine Warnung `nachfrage-gescheitert` im Protokoll —
-die Analyse ist geliefert. Wie oft Abrisse vorkommen:
+nach fehlenden Karten und war schon ein Profil da, steht eine Warnung
+`nachfrage-gescheitert` im Protokoll — die Analyse ist geliefert. Scheitert das
+Laden des Fotos endgültig, steht `foto-laden-gescheitert` (Feld `fehler`) im
+Protokoll und es kommt die Nachricht „Analyse gescheitert“. Wie oft Abrisse
+vorkommen:
 
     gcloud logging read 'jsonPayload.status="abbruch-neuversuch"' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.ursache.code,jsonPayload.ursache.text)'

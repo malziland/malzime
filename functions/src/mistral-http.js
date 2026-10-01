@@ -23,7 +23,10 @@ const { extrahiereLiveText } = require("./mistral-antwort");
 const { MISTRAL_ENDPOINT } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
 const { withMistralSlot } = require("./throttle");
-const { istVerbindungsabbruch } = require("./verbindungsfehler");
+/* Workshop 01.10.2026: Ein Verbindungsabriss ("terminated", "fetch failed")
+   wird markiert und traegt den schon gelesenen Text mit — mistral.js rettet
+   ihn oder fragt einmal neu (verbindungsfehler.js). */
+const { markiereAbbruch } = require("./verbindungsfehler");
 
 /* Env-Variable, NICHT hartcodiert. Produktion seit 09.09.2026: MISTRAL_API_KEY_EU
    (an europe-west1 gebunden); lokal bleibt MISTRAL_API_KEY als zweiter Name. */
@@ -314,14 +317,7 @@ async function callMistralRawUnthrottled({
         e.code = "timeout";
         throw e;
       }
-      /* Workshop 01.10.2026: Abriss, bevor die Antwort begann ("fetch
-         failed"). Markiert, damit mistral.js einmal neu fragen kann; der
-         Grund steht in err.cause (verbindungsfehler.js). */
-      if (istVerbindungsabbruch(err)) {
-        err.verbindungsabbruch = true;
-        err.teiltext = "";
-      }
-      throw err;
+      throw markiereAbbruch(err, "");
     }
     /* Im Stream-Modus bleibt der Timeout SCHARF, bis der Stream zu Ende
        gelesen ist: `fetch` liefert dort schon bei den Headern zurueck, die
@@ -381,31 +377,15 @@ async function callMistralRawUnthrottled({
           e.teiltext = spur.text || "";
           throw e;
         }
-        /* Workshop 01.10.2026: Der Strom riss mitten in der Antwort ab
-           ("terminated"). Wie beim Zeitlimit faehrt der gelesene Text mit —
-           steht darin schon ein brauchbares Ergebnis, rettet es mistral.js,
-           sonst fragt es einmal neu. */
-        if (istVerbindungsabbruch(err)) {
-          err.verbindungsabbruch = true;
-          err.teiltext = spur.text || "";
-        }
-        throw err;
+        throw markiereAbbruch(err, spur.text);
       } finally {
         clearTimeout(timeoutId);
       }
     }
 
-    let json;
-    try {
-      json = await res.json();
-    } catch (err) {
-      /* Auch ohne Strom kann die Antwort beim Lesen abreissen. */
-      if (istVerbindungsabbruch(err)) {
-        err.verbindungsabbruch = true;
-        err.teiltext = "";
-      }
-      throw err;
-    }
+    const json = await res.json().catch((err) => {
+      throw markiereAbbruch(err, "");
+    });
     const choice = json.choices?.[0];
     let text = "";
     const msgContent = choice?.message?.content;

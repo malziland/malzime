@@ -70,4 +70,67 @@ function ursacheVon(err) {
   return { code, text };
 }
 
-module.exports = { istVerbindungsabbruch, ursacheVon };
+/**
+ * Markiert einen Abriss fuer mistral.js (Rettung des Teiltexts, sonst ein
+ * Neuversuch) und gibt den Fehler zurueck — `throw markiereAbbruch(err, text)`.
+ * Alles andere bleibt unveraendert.
+ */
+function markiereAbbruch(err, teiltext) {
+  if (istVerbindungsabbruch(err)) {
+    err.verbindungsabbruch = true;
+    err.teiltext = teiltext || "";
+  }
+  return err;
+}
+
+/**
+ * Warnung (kein Alarm) fuer den ersten Abriss eines Analyse-Aufrufs: Es folgt
+ * ein Neuversuch; erst wenn der scheitert, schreibt mistral.js den Fehler mit
+ * Alarm. Felder wie die Fehlerzeile, der Grund nur ueber ursacheVon.
+ */
+function meldeAbbruchMitNeuversuch({ profil, attempt, err }) {
+  console.warn(
+    JSON.stringify({
+      severity: "WARNING",
+      step: "mistral-single-large-details",
+      profil: profil || null,
+      attempt,
+      status: "abbruch-neuversuch",
+      error: err.message,
+      ursache: ursacheVon(err),
+    })
+  );
+}
+
+/**
+ * Fuehrt `erster()` aus; scheitert er an einem markierten Abriss (und NUR
+ * dann), einmal `neuversuch()`. Alles andere wird unveraendert geworfen.
+ */
+async function mitEinemNeuversuchBeiAbbruch(erster, neuversuch) {
+  try {
+    return await erster();
+  } catch (err) {
+    if (!(err && err.verbindungsabbruch)) throw err;
+    return neuversuch();
+  }
+}
+
+/** Liegt ein gelesener Teiltext vor, der gerettet werden kann (Zeitlimit
+ *  oder Abriss mitten im Strom)? */
+function hatRettbarenTeiltext(err) {
+  return Boolean(
+    err &&
+    (err.code === "timeout" || err.verbindungsabbruch) &&
+    typeof err.teiltext === "string" &&
+    err.teiltext.length > 0
+  );
+}
+
+module.exports = {
+  istVerbindungsabbruch,
+  ursacheVon,
+  markiereAbbruch,
+  meldeAbbruchMitNeuversuch,
+  mitEinemNeuversuchBeiAbbruch,
+  hatRettbarenTeiltext,
+};

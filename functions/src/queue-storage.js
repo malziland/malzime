@@ -153,14 +153,13 @@ async function loadImage(objectPath) {
       return await ladeVomSpeicher(b, objectPath);
     } catch (err) {
       /* Befund Q-01 (01.10.2026): Scheitert das Laden endgueltig, scheitert die
-         Analyse — das Kind sieht eine Fehlermeldung. Bisher war das laut, weil
-         der alte Weg den Prozess abstuerzen liess; jetzt meldet es diese Zeile
-         (Alarm "Analyse gescheitert"). Nur Fehlerart und Grund-Code, kein Pfad,
+         Analyse — das Kind sieht eine Fehlermeldung, und deren Alarm loest der
+         Ausgang des Auftrags aus (jobs.js, einer je gescheiterter Analyse).
+         Diese Warnung sagt, WARUM. Nur Fehlerart und Grund-Code, kein Pfad,
          keine Kennung (Datenschutzerklaerung: welcher Schritt, ob er klappte). */
-      console.error(
+      console.warn(
         JSON.stringify({
-          severity: "ERROR",
-          alert: "foto-laden-gescheitert",
+          severity: "WARNING",
           step: "bild-laden",
           status: "error",
           fehler: fehlerArt(err),

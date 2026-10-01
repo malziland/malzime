@@ -158,6 +158,15 @@ let liveLief = false;
    weil `stop` auch das endgueltige Ende bedeutet und beides sonst nicht
    unterscheidbar waere. */
 let pausiert = false;
+/* Neuversuch nach einem Verbindungsabriss (01.10.2026): Nummer des Versuchs,
+   dessen Text gerade angezeigt wird. Der Server fragt die KI hoechstens einmal
+   neu; jede Welle traegt ihren Versuch (functions/src/jobs.js setLiveText). */
+let aktuellerVersuch = 1;
+/* Die Box mit den versteckten Daten des Fotos (EXIF, Karte) stammt aus dem
+   Browser, nicht aus der verworfenen Antwort. War sie schon sichtbar, bleibt
+   sie es ueber den Neustart hinweg — ohne neuen Aufbau und ohne dass die
+   Enthuellung sie noch einmal verdeckt (das Aufblitzen vom 29.08.). */
+let datenAusVorversuch = false;
 
 /* Bewegungs-Vorgabe des Systems — bewusst bei jedem Zugriff frisch lesen,
    damit ein Umstellen während der Analyse sofort greift. */
@@ -190,7 +199,8 @@ function neuerLauf() {
   /* Ein neuer Lauf beginnt ohne Vorgeschichte — hier gehört das Zurücksetzen
      hin, nicht in karteEntfernen(): Das läuft auch mitten in der Enthüllung,
      die den Stand dann noch braucht. */
-  fruehGezeigt = { daten: false, fakten: false };
+  fruehGezeigt = { daten: datenAusVorversuch, fakten: false };
+  datenAusVorversuch = false;
   return {
     stop: false,
     tippt: false,
@@ -813,10 +823,70 @@ function uebernehmen(puffer, neu) {
   puffer.text = neu;
 }
 
+/**
+ * Der Server hat die KI nach einem Verbindungsabriss neu gefragt; der gezeigte
+ * Text stammt aus einer verworfenen Antwort. Statt ihn am Ende auszutauschen,
+ * faengt die Anzeige sichtbar von vorn an: Text, Live-Karte und schon gezeigte
+ * Kategorie-Karten weg, das Warte-Auge zurueck und ins Bild geholt wie beim
+ * Analyse-Start (sonst lag es ueber dem Bildrand, Bildschirmfoto 01.10.2026),
+ * der neue Text tippt wie bei einem neuen Lauf. Eigenes Scrollen behaelt den
+ * Vorrang; die Fotodaten bleiben stehen (datenAusVorversuch). `mitAuge` false:
+ * Das Ergebnis ist schon da (versuchAbgleichen), gleich wird gerendert.
+ */
+function vonVornBeginnen(mitAuge) {
+  if (!lauf) return;
+  const karteWarSichtbar = elements.liveKarte && elements.liveKarte.classList.contains("active");
+  /* Die Kategorie-Karten im Ergebnis-Bereich (#facts) gehoeren der
+     verworfenen Antwort. Vor der Enthuellung steht dort nichts anderes. */
+  if (fruehGezeigt.fakten && elements.facts) elements.facts.innerHTML = "";
+  datenAusVorversuch = fruehGezeigt.daten;
+  const datenZeit = datenUndKarteGezeigt;
+  lauf.stop = true;
+  spinnerVerstecken(lauf);
+  lauf = null;
+  pausiert = false;
+  if (elements.liveKarte) elements.liveKarte.classList.remove("live-karte--pausiert");
+  karteEntfernen();
+  datenUndKarteGezeigt = datenAusVorversuch ? datenZeit : 0;
+  liveLief = false;
+  /* Lief die Karte noch nicht, laeuft das Auge ohnehin und steht im Bild. */
+  if (!karteWarSichtbar || !mitAuge) return;
+  startScanAnim(true, true);
+  augeInsBild();
+}
+
+/* Neuer Versuch? Dann von vorn; aelterer Versuch? Dann verwerfen (false). */
+function versuchPruefen(versuch, mitAuge) {
+  const v = Number.isInteger(versuch) && versuch > 1 ? versuch : 1;
+  if (v < aktuellerVersuch) return false;
+  if (v > aktuellerVersuch) {
+    aktuellerVersuch = v;
+    vonVornBeginnen(mitAuge);
+  }
+  return true;
+}
+
+/**
+ * Das Ergebnis ist da, und es stammt aus einem Versuch, dessen Text die
+ * Anzeige nie bekam (das Kind war kurz offline, waehrend der Server neu
+ * fragte): Den Text der verworfenen Antwort nicht noch zu Ende tippen, sondern
+ * verwerfen — gerendert wird dann direkt, ohne Enthuellung (api.js ruft das
+ * vor dem Schnellvorlauf).
+ */
+export function versuchAbgleichen(versuch) {
+  if (enthuellungGestartet) return;
+  versuchPruefen(versuch, false);
+}
+
 export function welle(texte) {
-  if (!texte || typeof texte.standard !== "string" || texte.standard.length === 0) return;
+  if (!texte || typeof texte.standard !== "string") return;
   /* Späte Wellen nach Beginn der Enthüllung ändern nichts mehr. */
   if (enthuellungGestartet) return;
+  /* Neuversuch (01.10.2026): Eine Welle eines frueheren Versuchs kam verspaetet
+     an und wird verworfen; die erste eines neuen Versuchs (der Server schickt
+     sie sofort und leer) setzt die Anzeige zurueck. */
+  if (!versuchPruefen(texte.versuch, true)) return;
+  if (texte.standard.length === 0) return;
   if (!lauf) lauf = neuerLauf();
   /* Sicherheitsnetz: Normalerweise startet api.js die Blick-Führung beim
      Analyse-Beginn — kam der Aufruf nicht (direkter Modul-Gebrauch, Tests),
@@ -1287,6 +1357,8 @@ export function abbrechen() {
 export function zuruecksetzen() {
   abbrechen();
   liveLief = false;
+  aktuellerVersuch = 1;
+  datenAusVorversuch = false;
 }
 
 /* Nur für Tests: verkürzt oder verlängert den Zeit-Anlauf gezielt —

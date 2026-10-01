@@ -541,6 +541,27 @@ Handlungsbedarf (so geschehen 2026-07-13). Logs unter Cloud Logging mit
 5xx-Antworten oder echten Stacktraces aus eigenem Code handeln.
 Alerting-Aufbau: [ERROR-ALERTING.md](ERROR-ALERTING.md).
 
+### Nachricht „Analyse gescheitert“ (seit 01.10.2026)
+
+Mindestens ein Kind hat nach einer Analyse eine Fehlermeldung gesehen (eine
+Nachricht je fünf Minuten, Aufbau in [ERROR-ALERTING.md](ERROR-ALERTING.md)).
+Wie viele es waren und welche Meldung sie sahen:
+
+    gcloud logging read 'jsonPayload.alert="analyse-gescheitert"' \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
+      --format='value(timestamp,jsonPayload.grund)'
+
+Was jeder `grund` bedeutet, steht in [ERROR-ALERTING.md](ERROR-ALERTING.md)
+(Tabelle unter „Analyse gescheitert“). Weiter je Grund: `blocked.overloaded`
+und `blocked.apiError` → unten „Mistral überlastet / 429 / 5xx“ (dort auch die
+Warnungen des KI-Aufrufs und `step: "bild-laden"`); `blocked.configMissing` →
+[BETRIEBSPROFILE.md](BETRIEBSPROFILE.md); `processing_timeout` → Warnung
+`worker-abgestuerzt-verdacht` und Plattform-Fehlerzeilen des Dienstes
+`processjob`; `enqueue_failed` → Cloud Tasks prüfen (Warteschlange pausiert,
+Rechte); `store_failed` und `enqueue_unerwartet` → Zeilen des Dienstes
+`enqueue` (`store-or-create-failed` bzw. `status: "error"`), Speicher und
+Firestore prüfen.
+
 ### Verdacht auf Absturz-Schleife (Safari: „wiederholt ein Problem aufgetreten")
 
 Die Absturz-Wache (`public/js/absturz-wache.js`, seit v2.12.2) erkennt drei
@@ -622,20 +643,22 @@ einer festen bekannten Meldung entspricht, den Kurztext; nie Adressen. Beispiel:
 `UND_ERR_SOCKET` / „other side closed“ = die Gegenstelle (Mistral oder das
 vorgeschaltete Netz von Cloudflare) hat die Verbindung beendet):
 
-    gcloud logging read 'jsonPayload.alert="single-large-failed"' \
-      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.error,jsonPayload.ursache.code,jsonPayload.ursache.text,jsonPayload.wiederholungen)'
+    gcloud logging read 'jsonPayload.step="mistral-single-large-details" AND severity=WARNING AND jsonPayload.status=("error" OR "nachfrage-gescheitert")' \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.attempt,jsonPayload.error,jsonPayload.ursache.code,jsonPayload.ursache.text,jsonPayload.wiederholungen)'
+
+(`attempt`: `first` = erster Aufruf, `neuversuch` = nach einem Abriss,
+`retry` = Nachfrage nach fehlenden Karten. Ob das Kind dadurch eine
+Fehlermeldung sah, sagt nur die Zeile `analyse-gescheitert` oben.)
 
 **Verbindungsabriss (seit 01.10.2026).** Reißt die Verbindung zu Mistral ab
 (`error` = „terminated“ oder „fetch failed“), rettet das Programm zuerst einen
 schon fast fertigen Text; sonst fragt es EINMAL neu (Warnung
-`abbruch-neuversuch`, kein Alarm). Erst wenn auch der Neuversuch scheitert,
-kommt die Nachricht „Analyse gescheitert“; mehr als drei Abrisse in 24 Stunden
-melden sich als „KI-Verbindung bricht gehäuft ab“. Scheitert nur die Nachfrage
-nach fehlenden Karten und trug das erste Ergebnis schon Karten, steht eine Warnung
-`nachfrage-gescheitert` im Protokoll — die Analyse ist geliefert. Scheitert das
-Laden des Fotos endgültig, steht `foto-laden-gescheitert` (Feld `fehler`) im
-Protokoll und es kommt die Nachricht „Analyse gescheitert“. Wie oft Abrisse
-vorkommen:
+`abbruch-neuversuch`). Auf dem Bildschirm verschwindet dabei der halbe Text des
+ersten Versuchs, und der neue tippt von vorn. Erst wenn das Kind am Ende eine
+Fehlermeldung sieht, kommt die Nachricht „Analyse gescheitert“; mehr als drei
+Abrisse in 24 Stunden melden sich als „KI-Verbindung bricht gehäuft ab“.
+Scheitert das Laden des Fotos endgültig, steht eine Warnung mit
+`step: "bild-laden"` (Feld `fehler`) im Protokoll. Wie oft Abrisse vorkommen:
 
     gcloud logging read 'jsonPayload.status="abbruch-neuversuch"' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.ursache.code,jsonPayload.ursache.text)'

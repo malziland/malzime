@@ -114,6 +114,16 @@ describe("handleJobStatus — Live-Text bei processing", () => {
     expect(res.body).not.toHaveProperty("liveTextBeast");
   });
 
+  test("die Nummer des Versuchs kommt mit, nur mit Ticket", async () => {
+    jobs.getJob.mockResolvedValue({ ...PROCESSING_JOB, liveTextVersuch: 2 });
+    const mit = makeRes();
+    await handleJobStatus(reqMit(PROCESSING_JOB.id, "ticket-abc"), mit);
+    expect(mit.body.liveTextVersuch).toBe(2);
+    const ohne = makeRes();
+    await handleJobStatus(reqMit(PROCESSING_JOB.id), ohne);
+    expect(ohne.body).not.toHaveProperty("liveTextVersuch");
+  });
+
   test("fehlender liveTextStand wird als null mitgegeben, nicht als undefined", async () => {
     jobs.getJob.mockResolvedValue({ ...PROCESSING_JOB, liveTextStand: undefined });
     const res = makeRes();
@@ -132,8 +142,34 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   });
 });
 
+/* Befunde U-06/V-03: Sah die Anzeige den letzten Versuch nicht (kurz
+   offline), erfaehrt sie ihn mit dem Ergebnis — nur mit Abhol-Ticket. */
+describe("handleJobStatus — Versuch auch bei done", () => {
+  const DONE = {
+    id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
+    status: "done",
+    resultToken: "ticket-abc",
+    deliveredAt: 1,
+    result: { x: 1 },
+  };
+  test("mit Ticket kommt liveTextVersuch mit", async () => {
+    jobs.getJob.mockResolvedValue({ ...DONE, liveTextVersuch: 2 });
+    const res = makeRes();
+    await handleJobStatus(reqMit(DONE.id, "ticket-abc"), res);
+    expect(res.body).toMatchObject({ status: "done", liveTextVersuch: 2 });
+  });
+  test("ohne Ticket nicht", async () => {
+    jobs.getJob.mockResolvedValue({ ...DONE, liveTextVersuch: 2 });
+    const res = makeRes();
+    await handleJobStatus(reqMit(DONE.id), res);
+    expect(res.body).not.toHaveProperty("liveTextVersuch");
+  });
+});
+
 describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
-  test("auch wenn das Dokument noch liveText-Felder traegt, liefert done nur result", async () => {
+  /* Seit 01.10.2026 traegt jedes Dokument mit Live-Text auch liveTextVersuch;
+     done gibt davon nur die Nummer weiter, keinen Text. */
+  test("auch wenn das Dokument noch liveText-Felder traegt, liefert done nur result und die Versuchsnummer", async () => {
     jobs.getJob.mockResolvedValue({
       id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
       status: "done",
@@ -143,10 +179,11 @@ describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
       liveText: "Du bist neugierig und",
       liveTextBeast: "Du bist ein zynisches",
       liveTextStand: 1754900000000,
+      liveTextVersuch: 1,
     });
     const res = makeRes();
     await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
-    expect(res.body).toEqual({ status: "done", result: { profiles: { normal: {}, boost: {} } } });
+    expect(res.body).toEqual({ status: "done", result: { profiles: { normal: {}, boost: {} } }, liveTextVersuch: 1 });
     expect(res.body).not.toHaveProperty("liveText");
     expect(res.body).not.toHaveProperty("liveTextBeast");
   });

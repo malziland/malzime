@@ -165,6 +165,81 @@ describe("runPipeline — Live-Text schreiben", () => {
     expect(jobs.setLiveText).toHaveBeenLastCalledWith("job-1", { standard: "Du bist sportlich", beast: "Du bist ein" });
   });
 
+  /* Neuversuch nach Verbindungsabriss (01.10.2026): Die erste Welle des neuen
+     Versuchs setzt den Bildschirm zurueck und darf nicht in der Drossel
+     haengen bleiben — sonst stuende der alte Text bis zu 2 s weiter da. */
+  test("Drossel: die erste Welle eines neuen Versuchs geht sofort durch, danach wird wieder gedrosselt", async () => {
+    mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
+      opts.onLiveText({ standard: "Du bist alt", beast: null });
+      opts.onLiveText({ standard: "", beast: null, versuch: 2 });
+      opts.onLiveText({ standard: "Du bist neu", beast: null, versuch: 2 });
+      return PROFIL;
+    });
+    await handleProcessJob(postReq(), makeRes());
+    expect(jobs.setLiveText.mock.calls.map((c) => c[1])).toEqual([
+      { standard: "Du bist alt", beast: null },
+      { standard: "", beast: null, versuch: 2 },
+    ]);
+  });
+
+  /* Befunde U-05/V-04: Zwei gleichzeitige update-Aufrufe kommen in Firestore
+     in beliebiger Reihenfolge an — eine spaete Welle des ersten Versuchs
+     koennte die leere des zweiten ueberschreiben. Darum nacheinander. */
+  test("Schreibvorgaenge laufen nacheinander: der zweite beginnt erst, wenn der erste fertig ist", async () => {
+    const erledigt = [];
+    let ersterFertig;
+    jobs.setLiveText.mockImplementationOnce(
+      () =>
+        new Promise((aufloesen) => {
+          ersterFertig = () => {
+            erledigt.push("erster fertig");
+            aufloesen();
+          };
+        })
+    );
+    jobs.setLiveText.mockImplementationOnce(async () => {
+      erledigt.push("zweiter beginnt");
+    });
+    mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
+      opts.onLiveText({ standard: "Du bist alt", beast: null });
+      opts.onLiveText({ standard: "", beast: null, versuch: 2 });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(erledigt).toEqual([]);
+      ersterFertig();
+      await new Promise((r) => setTimeout(r, 0));
+      return PROFIL;
+    });
+    await handleProcessJob(postReq(), makeRes());
+    expect(erledigt).toEqual(["erster fertig", "zweiter beginnt"]);
+  });
+
+  /* Befund W-01 (Gegenpruefung 01.10.2026): Ist die Datenbank langsam, darf
+     sich nichts stauen — hinter dem laufenden Schreibvorgang wartet nur der
+     juengste Stand, Zwischenstaende entfallen (jede Welle traegt alles). */
+  test("langsame Datenbank: hinter dem laufenden Schreibvorgang wartet nur der juengste Stand", async () => {
+    const echteNow = Date.now.bind(Date);
+    let versatzMs = 0;
+    const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => echteNow() + versatzMs);
+    let ersterFertig;
+    jobs.setLiveText.mockImplementationOnce(() => new Promise((aufloesen) => (ersterFertig = aufloesen)));
+    try {
+      mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
+        for (const text of ["Du", "Du bist", "Du bist neu", "Du bist neugierig"]) {
+          opts.onLiveText({ standard: text, beast: null });
+          versatzMs += 2500; /* jede Welle nach Ablauf der Drossel */
+        }
+        expect(jobs.setLiveText).toHaveBeenCalledTimes(1);
+        ersterFertig();
+        await new Promise((r) => setTimeout(r, 0));
+        return PROFIL;
+      });
+      await handleProcessJob(postReq(), makeRes());
+    } finally {
+      nowSpy.mockRestore();
+    }
+    expect(jobs.setLiveText.mock.calls.map((c) => c[1].standard)).toEqual(["Du", "Du bist neugierig"]);
+  });
+
   test("das Analyse-Ergebnis bleibt mit Flag identisch — completeJob bekommt das normale Profil", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
       opts.onLiveText({ standard: "Du bist", beast: null });

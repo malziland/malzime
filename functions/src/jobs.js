@@ -63,6 +63,51 @@ function jobsRef() {
   return datenbank().collection(JOBS_COLLECTION);
 }
 
+/* EIN ALARM JE GESCHEITERTER ANALYSE (01.10.2026). Endet eine Analyse mit
+   einer Fehlermeldung, endet ihr Auftrag `done` mit blockiertem Ergebnis,
+   `done` mit einem leeren Profil in einem der beiden Modi (completeJob) oder
+   `failed` (failJob — Worker nicht fertig, oder schon das Einreihen scheiterte,
+   `enqueue_failed`). Nur dort, und nur wenn DIESER Aufruf den Uebergang gemacht
+   hat, entsteht die eine Fehlerzeile, auf die der Alarm "Analyse gescheitert"
+   hoert. Scheitert das Einreihen, bevor es einen Auftrag gibt (Speicher oder
+   Datenbank weg), ruft handle-enqueue.js dieselbe Meldung selbst. Die Zeilen, die den Grund im Einzelnen beschreiben (KI-Aufruf, Foto
+   laden, Absturzverdacht, verworfenes Ergebnis), sind Warnungen — sonst kaemen
+   fuer eine Fehlermeldung zwei Nachrichten, und ein Tierfoto, das trotz
+   gescheiterter Nachfrage sein Profil bekommt, loeste einen Fehlalarm aus.
+   Ohne Kennung (handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"): nur
+   der Grund, und nur als feste Kennung wie `blocked.apiError` oder
+   `processing_timeout` — alles andere wird "unbekannt". */
+const GRUND_MUSTER = /^(blocked\.[A-Za-z]{1,40}|[a-z_]{1,40})$/;
+
+/* Ein Profil ohne Text und ohne Karten zeigt im jeweiligen Modus "Die KI hat
+   ein leeres Profil zurueckgeliefert" (public/js/render.js, hasContent —
+   dieselbe Regel). Das passiert, wenn nur ein Teil gerettet wurde und die
+   Nachfrage nach den fehlenden Karten scheiterte. Tierprofile sind immer
+   gefuellt, blockierte Ergebnisse haben keine Profile. */
+function leeresProfil(result) {
+  if (!result || !result.profiles || !result.meta || result.meta.mode === "animal") return null;
+  const hatInhalt = (p) =>
+    Boolean(
+      p &&
+      ((typeof p.profileText === "string" && p.profileText.trim()) ||
+        (p.categories && Object.keys(p.categories).length > 0))
+    );
+  if (!hatInhalt(result.profiles.normal)) return "profil_leer_standard";
+  if (!hatInhalt(result.profiles.boost)) return "profil_leer_beast";
+  return null;
+}
+
+function meldeGescheiterteAnalyse(grund) {
+  console.error(
+    JSON.stringify({
+      severity: "ERROR",
+      alert: "analyse-gescheitert",
+      step: "analyse-ausgang",
+      grund: typeof grund === "string" && GRUND_MUSTER.test(grund) ? grund : "unbekannt",
+    })
+  );
+}
+
 /**
  * Legt einen neuen Job an (Status `queued`). Gibt die generierte jobId zurück.
  *
@@ -182,12 +227,19 @@ async function claimJob(jobId) {
 async function completeJob(jobId, result) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  return db.runTransaction(async (tx) => {
+  const gemacht = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists || snap.data().status !== "processing") return false;
     tx.update(ref, { status: "done", finishedAt: Date.now(), result: result || null, errorReason: null });
     return true;
   });
+  /* Ein blockiertes Ergebnis oder ein leeres Profil zeigt dem Kind eine
+     Fehlermeldung. */
+  if (gemacht) {
+    if (result && result.meta && result.meta.mode === "blocked") meldeGescheiterteAnalyse(result.blockedReason);
+    else if (leeresProfil(result)) meldeGescheiterteAnalyse(leeresProfil(result));
+  }
+  return gemacht;
 }
 
 /**
@@ -199,7 +251,7 @@ async function completeJob(jobId, result) {
 async function failJob(jobId, reason) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  return db.runTransaction(async (tx) => {
+  const gemacht = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) return false;
     const st = snap.data().status;
@@ -211,6 +263,8 @@ async function failJob(jobId, reason) {
     });
     return true;
   });
+  if (gemacht) meldeGescheiterteAnalyse(reason);
+  return gemacht;
 }
 
 /**
@@ -397,10 +451,19 @@ async function setLiveText(jobId, texte) {
     /* Abwaertskompatibel: ein nackter String (alter Aufrufstil) zaehlt als
        Standard-Text ohne Beast. */
     const eingabe = typeof texte === "string" ? { standard: texte } : texte || {};
+    /* Neuversuch nach einem Verbindungsabriss (01.10.2026, mistral.js): JEDE
+       Welle traegt ihren Versuch. Eine verspaetet ankommende Welle des ersten
+       Versuchs setzt ihn damit auf 1 zurueck, und der Browser verwirft sie,
+       statt alten Text als neuen zu zeigen. Ab dem zweiten Versuch ist jede
+       Welle der GANZE Stand: Beast-Text und Karten der verworfenen Antwort
+       werden geleert, solange der neue Versuch keine eigenen liefert. */
+    const versuch = Number.isInteger(eingabe.versuch) && eingabe.versuch > 1 ? eingabe.versuch : 1;
     const patch = {
       liveText: String(eingabe.standard || "").slice(0, 4000),
       liveTextStand: Date.now(),
+      liveTextVersuch: versuch,
     };
+    if (versuch > 1) Object.assign(patch, { liveTextBeast: null, liveKartenStandard: null, liveKartenBeast: null });
     if (typeof eingabe.beast === "string") {
       patch.liveTextBeast = eingabe.beast.slice(0, 4000);
     }
@@ -571,6 +634,7 @@ module.exports = {
   markDelivered,
   verbraucheRcTicket,
   setLiveText,
+  meldeGescheiterteAnalyse,
   abandonJob,
   isAbandoned,
   findAbandonedJobs,

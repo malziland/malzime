@@ -82,14 +82,40 @@ async function runPipeline(job) {
      Schreiber — er schuetzt das Job-Dokument auch dann noch, wenn sich die
      Aufruf-Frequenz in mistral.js einmal aendert. EIN Schreibvorgang traegt
      beide Felder (Standard + Beast, jobs.js). setLiveText selbst schluckt
-     jeden Firestore-Fehler. */
+     jeden Firestore-Fehler. Die erste Welle eines NEUEN Versuchs (Neuversuch
+     nach Verbindungsabriss, mistral.js) geht sofort durch — sie setzt den
+     Bildschirm zurueck und darf nicht bis zu 2 s hinter dem alten Text haengen.
+     Die Schreibvorgaenge laufen NACHEINANDER: Zwei gleichzeitige
+     update-Aufrufe kommen in Firestore in beliebiger Reihenfolge an, und eine
+     spaete Welle des ersten Versuchs koennte die leere des zweiten
+     ueberschreiben. Hoechstens einer ist unterwegs, dahinter wartet nur der
+     JUENGSTE Stand — bei langsamer Datenbank staut sich nichts (jede Welle
+     traegt den ganzen Stand). setLiveText wirft nie. */
   let letzterSchreibMs = 0;
+  let letzterVersuch = 1;
+  let schreibtGerade = false;
+  let wartend = null;
+  const schreibe = (texte) => {
+    if (schreibtGerade) {
+      wartend = texte;
+      return;
+    }
+    schreibtGerade = true;
+    Promise.resolve(setLiveText(job.id, texte)).then(() => {
+      schreibtGerade = false;
+      const naechste = wartend;
+      wartend = null;
+      if (naechste) schreibe(naechste);
+    });
+  };
   const opts = {
     onLiveText: (texte) => {
       const jetzt = Date.now();
-      if (jetzt - letzterSchreibMs < 2000) return;
+      const versuch = (texte && texte.versuch) || 1;
+      if (versuch === letzterVersuch && jetzt - letzterSchreibMs < 2000) return;
       letzterSchreibMs = jetzt;
-      setLiveText(job.id, texte);
+      letzterVersuch = versuch;
+      schreibe(texte);
     },
   };
   try {

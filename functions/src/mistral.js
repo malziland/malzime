@@ -248,11 +248,8 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   ];
 
   /* v3.0 Phase 1: Live-Text-Callback — optional von aussen (Worker) gesetzt.
-     Er laeuft NUR im ersten Versuch mit: Ein Retry findet ausschliesslich
-     statt, wenn der erste Versuch bereits ein parsebares (nur unvollstaendiges)
-     Ergebnis geliefert hat — dessen Standard-Profiltext ist dann laengst
-     komplett angekommen. Den Retry auch noch zu streamen wuerde den bereits
-     gezeigten Live-Text nur mit einer NEUEN Modellantwort ueberschreiben. */
+     Die NACHFRAGE nach fehlenden Karten laeuft ohne ihn: Sie folgt nur auf ein
+     parsebares Ergebnis, dessen Profiltexte laengst komplett angekommen sind. */
   const onLiveText = typeof opts.onLiveText === "function" ? opts.onLiveText : null;
 
   /* Erster Versuch */
@@ -261,12 +258,22 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      loggeKiDauer). */
   const dauer = { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false };
   /* Workshop 01.10.2026: Reisst die Verbindung ab (nicht: Antwort von
-     Mistral, unser Zeitlimit), wird EINMAL neu gefragt — Restbudget, ohne
-     Live-Text; der gezeigte Text bleibt bis zum Ergebnis stehen (bewusst,
-     SECURITY-MODEL 01.10.2026). */
+     Mistral, unser Zeitlimit), wird EINMAL neu gefragt, mit dem Restbudget.
+     Der gezeigte Text stammt dann aus einer verworfenen Antwort: Jede Welle des
+     Neuversuchs traegt `versuch: 2`, die erste kommt sofort und leer — der
+     Bildschirm faengt sichtbar von vorn an (jobs.setLiveText, live-anzeige.js
+     vonVornBeginnen). Weil er streamt, kann auch sein Teiltext gerettet werden. */
+  const liveNeu = onLiveText && ((texte) => onLiveText({ ...texte, versuch: 2 }));
   let parsed = await mitEinemNeuversuchBeiAbbruch(
     () => callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer),
-    () => callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer)
+    () => {
+      try {
+        if (liveNeu) liveNeu({ standard: "", beast: null });
+      } catch (_) {
+        /* still: Der Live-Text ist Komfort, nie Pflicht. */
+      }
+      return callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, liveNeu || undefined, dauer);
+    }
   );
   let missing = parsed
     ? collectMissingForBothModes(parsed)
@@ -306,14 +313,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     try {
       /* Gleicher cacheKey wie im ersten Versuch — der statische Anfang ist in
          beiden Versuchen bitgleich, der Cache traegt also auch den Retry. */
-      /* Befunde Q-02/T-01: Nur wenn das erste Ergebnis schon Karten traegt —
-         dasselbe Merkmal wie job-helfer.hasCategories in der Pipeline —, ist
-         die Analyse bei gescheiterter Nachfrage geliefert (Warnung); sonst
-         Ausfall: eigener Name, Fehlerzeile mit Alarm. */
-      const karten = (b) => Boolean(b && b.categories && Object.keys(b.categories).length > 0);
-      const geliefert = karten(parsed.standard) || karten(parsed.beast);
-      const nachfrage = geliefert ? "retry" : "retry-ohne-ergebnis";
-      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, nachfrage, cacheKey, undefined, dauer);
+      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry", cacheKey, undefined, dauer);
       if (retryParsed) {
         /* Fehlende Karten aus Retry in Originalergebnis mergen (analog runProfile) */
         for (const mode of ["standard", "beast"]) {
@@ -713,30 +713,20 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       if (brauchbar) return gerettet;
     }
 
-    /* BUG-2026-08-17-06: console.error statt console.log — das ergibt severity
-       ERROR in Cloud Logging und faellt damit unter die bestehende
-       Alarm-Policy (dieselbe Begruendung wie OPS-004 beim Werbe-Ersatzaufruf).
-
-       Vorher war die Lage absurd herum: Der NEBENSAECHLICHE Ersatzaufruf fuer
-       die Werbeliste schlug Alarm, waehrend die Analyse selbst still starb.
-       Zwei abgebrochene Laeufe (11.08. und 14.08.2026) haben so niemanden
-       erreicht — gefunden wurden sie erst, weil ein Nutzer sich beschwerte.
-       Genau das ist die Frage aus KERN 4: Wer wuerde es merken, wenn das hier
-       falsch waere? Bis hierher: niemand. */
+    /* BUG-2026-08-17-06: Zwei abgebrochene Laeufe (11.08. und 14.08.2026)
+       erreichten niemanden — die Analyse starb still. Den Alarm loest seit
+       01.10.2026 der Ausgang des Auftrags aus (jobs.js, einer je gescheiterter
+       Analyse, ob nun der erste Aufruf, der Neuversuch oder die Nachfrage
+       scheiterte). Diese Warnung sagt, WARUM; ein Tierfoto, das trotzdem
+       sein Profil bekommt, loest so keinen Fehlalarm mehr aus. */
     /* Erster Abriss: Warnung, es folgt ein Neuversuch (runSingleLargeCall). */
     if (err && err.verbindungsabbruch && attemptLabel === "first") {
       meldeAbbruchMitNeuversuch({ profil: aktivesProfil, attempt: attemptLabel, err });
       throw err;
     }
-    /* Befunde R-05/S-07 (01.10.2026): Scheitert nur die NACHFRAGE nach
-       fehlenden Karten, ist die Analyse schon geliefert (runSingleLargeCall
-       macht mit dem ersten Ergebnis weiter) — Warnung, kein Alarm
-       "Analyse gescheitert". Felder wie die Fehlerzeile. */
-    const melde = attemptLabel === "retry" ? console.warn : console.error;
-    melde(
+    console.warn(
       JSON.stringify({
-        severity: attemptLabel === "retry" ? "WARNING" : "ERROR",
-        alert: attemptLabel === "retry" ? undefined : "single-large-failed",
+        severity: "WARNING",
         step: "mistral-single-large-details",
         /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
            Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
@@ -747,7 +737,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
         status: attemptLabel === "retry" ? "nachfrage-gescheitert" : "error",
         error: err.message,
         /* `timeout` trennt „das Modell war zu langsam" von „die API war weg" —
-           ohne diese Unterscheidung ist am Alarm nicht zu erkennen, ob eine
+           ohne diese Unterscheidung ist im Protokoll nicht zu erkennen, ob eine
            Zeitgrenze zu knapp sitzt oder Mistral eine Stoerung hat. */
         errorCode: err.code || null,
         /* Grund eines Abrisses, nur Code und Kurztext (verbindungsfehler.js). */

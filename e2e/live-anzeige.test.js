@@ -316,3 +316,77 @@ test("Live-Erlebnis mit reduced-motion: Text sofort vollständig, Enthüllung oh
   await expect(page.locator("#facts .cat-card").first()).toBeVisible();
   await expect(page.locator("#dataValue .dv-card")).toBeVisible();
 });
+
+/* Neuversuch nach Verbindungsabriss (01.10.2026, Befund R-01): Reisst die
+   Verbindung zur KI ab, fragt der Server einmal neu — mit einer ANDEREN
+   Antwort. Bis 4.13.1 blieb der halbe alte Text rund 40 s stehen und wurde am
+   Ende ausgetauscht. Jetzt schickt der Server sofort eine leere Welle des
+   zweiten Versuchs (`liveTextVersuch: 2`): Der alte Text verschwindet, das
+   Auge kommt zurueck, der neue Text tippt von vorn. */
+test("Neuversuch: der Text des abgerissenen Versuchs verschwindet, der neue tippt von vorn", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(150000);
+  await basisRouten(page);
+  const ALT = "Du bist ALT, dieser Text stammt aus der abgerissenen Antwort. " + PROFIL_TEXT.slice(0, 180);
+  let phase = "alt";
+  await page.route("**/api/job-status**", (route) => {
+    const laufend = { status: "processing", position: 0, etaSeconds: 60 };
+    const body =
+      phase === "alt"
+        ? {
+            ...laufend,
+            liveText: ALT,
+            liveTextVersuch: 1,
+            liveKartenStandard: [
+              { schluessel: "alter_geschlecht", bezeichnung: "Alter & Geschlecht", wert: "ALTERWERT-VERSUCH-1" },
+            ],
+          }
+        : phase === "leer"
+          ? { ...laufend, liveText: "", liveTextVersuch: 2 }
+          : phase === "neu"
+            ? { ...laufend, liveText: PROFIL_TEXT, liveTextVersuch: 2 }
+            : { status: "done", result: MOCK_RESPONSE };
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  /* Handy-Groesse: Dort entscheidet sich, ob das Auge nach dem Neustart im
+     Bild ist (Befund W-02 der Gegenpruefung 01.10.2026). */
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await expect(page.locator("h1")).toBeVisible();
+  await page.click('[data-demo="selfie"]');
+
+  const text = async () => (await page.locator("#liveTextFest").textContent()) || "";
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 45000 });
+  await expect.poll(text, { timeout: 15000 }).toContain("Du bist ALT");
+  /* Die Merkmale des ersten Versuchs stehen schon im Ergebnis-Bereich. */
+  await expect(page.locator("#facts")).toContainText("ALTERWERT-VERSUCH-1", { timeout: 30000 });
+  await page.screenshot({ path: testInfo.outputPath("1-erster-versuch.png") });
+
+  /* Wie ein Kind, das die Merkmale ansieht: ans Seitenende. Ein Scrollen per
+     Skript ist keine Uebernahme der Blick-Fuehrung (die hoert auf Rad,
+     Wischen und Tasten). Ohne das Nachholen laege das Auge danach
+     ausserhalb des Bildes — so bleibt der Pruefschritt unten trennscharf. */
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  /* Abriss, der Server fragt neu: sofort weg mit dem alten Text. */
+  phase = "leer";
+  await expect(page.locator("#liveKarte")).not.toHaveClass(/active/, { timeout: 10000 });
+  await expect(page.locator("#scanAnim")).toHaveClass(/active/);
+  /* Das Auge steht im Bild — ohne Nachholen lag es nach dem Wegfall der Karte
+     ueber dem Bildrand (Bildschirmfoto 01.10.2026). */
+  await expect(page.locator("#scanAnim")).toBeInViewport({ ratio: 1, timeout: 5000 });
+  expect(await text()).toBe("");
+  /* ... und die Merkmale der verworfenen Antwort auch (Befunde U-01/V-01). */
+  await expect(page.locator("#facts")).not.toContainText("ALTERWERT-VERSUCH-1");
+  await page.screenshot({ path: testInfo.outputPath("2-neuversuch-beginnt.png") });
+
+  /* Der neue Text tippt von vorn — nichts vom alten. */
+  phase = "neu";
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 45000 });
+  await expect.poll(text, { timeout: 15000 }).toContain("Ein junger");
+  expect(await text()).not.toContain("ALT");
+  await page.screenshot({ path: testInfo.outputPath("3-zweiter-versuch.png") });
+
+  phase = "fertig";
+  await expect(page.locator("#simulation .verdict")).toBeVisible({ timeout: 30000 });
+});

@@ -275,6 +275,9 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
                sie (noch keine Karte fertig), bleibt es beim reinen Text. */
             kartenStandard: Array.isArray(data.liveKartenStandard) ? data.liveKartenStandard : null,
             kartenBeast: Array.isArray(data.liveKartenBeast) ? data.liveKartenBeast : null,
+            /* Neuversuch nach Verbindungsabriss: steigt die Zahl, faengt die
+               Anzeige von vorn an (live-anzeige.js). */
+            versuch: data.liveTextVersuch,
           });
         }
         break;
@@ -292,6 +295,9 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
            der ersten Auslieferung (danach nie wieder) — sofort merken, damit
            es Reload und Tab-Wiederaufnahme im 15-Minuten-Fenster überlebt. */
         if (typeof data.rcTicket === "string") speichereRcTicket(data.rcTicket);
+        /* Fragte der Server neu, ohne dass die Anzeige den neuen Versuch sah
+           (kurz offline), wird der alte Text verworfen statt zu Ende getippt. */
+        if (liveErlaubt) liveAnzeige.versuchAbgleichen(data.liveTextVersuch);
         return { result: data.result };
       case "failed":
         return { error: t("error.queueFailed"), reason: data.errorReason };

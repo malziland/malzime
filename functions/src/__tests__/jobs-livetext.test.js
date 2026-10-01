@@ -92,6 +92,48 @@ describe("setLiveText — schreibt die Live-Felder", () => {
   });
 });
 
+/* Neuversuch nach Verbindungsabriss (01.10.2026): Jede Welle traegt ihren
+   Versuch; ab dem zweiten ist jede Welle der ganze Stand. */
+describe("setLiveText — Versuch", () => {
+  test("jede Welle traegt ihren Versuch, ohne Angabe ist es der erste", async () => {
+    mockStore.set("job-1", { status: "processing" });
+    await jobs.setLiveText("job-1", { standard: "Du bist", beast: null });
+    expect(mockStore.get("job-1").liveTextVersuch).toBe(1);
+  });
+
+  test("die erste Welle des zweiten Versuchs leert Beast-Text und Karten der verworfenen Antwort", async () => {
+    mockStore.set("job-1", {
+      status: "processing",
+      liveText: "Du bist alt",
+      liveTextBeast: "Du bist ein alter",
+      liveKartenStandard: [{ schluessel: "herkunft", bezeichnung: "Herkunft", wert: "alt" }],
+      liveKartenBeast: [{ schluessel: "herkunft", bezeichnung: "Herkunft", wert: "alt" }],
+    });
+    await jobs.setLiveText("job-1", { standard: "", beast: null, versuch: 2 });
+    const doc = mockStore.get("job-1");
+    expect(doc).toMatchObject({ liveText: "", liveTextVersuch: 2 });
+    expect(doc.liveTextBeast).toBeNull();
+    expect(doc.liveKartenStandard).toBeNull();
+    expect(doc.liveKartenBeast).toBeNull();
+  });
+
+  test("im zweiten Versuch bleiben eigene Beast-Texte und Karten stehen", async () => {
+    mockStore.set("job-1", { status: "processing" });
+    const karte = { schluessel: "herkunft", bezeichnung: "Herkunft", wert: "neu" };
+    await jobs.setLiveText("job-1", { standard: "Du bist neu", beast: "Du bist", kartenStandard: [karte], versuch: 2 });
+    const doc = mockStore.get("job-1");
+    expect(doc.liveTextBeast).toBe("Du bist");
+    expect(doc.liveKartenStandard).toEqual([karte]);
+    expect(doc.liveKartenBeast).toBeNull();
+  });
+
+  test("eine verspaetete Welle des ersten Versuchs setzt die Nummer zurueck — der Browser verwirft sie", async () => {
+    mockStore.set("job-1", { status: "processing", liveTextVersuch: 2, liveText: "Du bist neu" });
+    await jobs.setLiveText("job-1", { standard: "Du bist alt", beast: null });
+    expect(mockStore.get("job-1").liveTextVersuch).toBe(1);
+  });
+});
+
 describe("setLiveText — schluckt Fehler", () => {
   test("ein Firestore-Fehler (Dokument weg) laesst den Aufruf NICHT scheitern", async () => {
     /* Kein Dokument angelegt → update() wirft im Mock. Eine verpasste

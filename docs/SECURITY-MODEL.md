@@ -518,13 +518,15 @@ der Push „ROT", nicht „PROBE".
 
 *Festgeschrieben:* Die beiden Sicherheits-Workflows sind im Deploy-Riegel
 (`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben. Frei
-bleiben nur die Versionskennungen der Actions (`uses: owner/repo@<SHA> # vN` — SHA und
-Kommentar; Dependabot hebt sie an) sowie Kommentar- und Leerzeilen außerhalb
-mehrzeiliger Befehle und Ausdrücke; als Leerraum zählen dabei nur Leerzeichen und
-Tab, wie in YAML. Jede andere Änderung macht den Riegel rot; eine bewusste Änderung
-trägt man dort nach (`--vertrag-summen`). Zusätzlich prüft er inhaltlich: genau ein
-festgelegter Befehl je Prüf-Job, kein `if`, kein `continue-on-error`, keine
-umlenkenden Umgebungswerte, ein täglicher Zeitplan.
+bleiben nur, was nachweislich nichts bewirkt: die Versionskennungen der Actions
+(`uses: owner/repo@<SHA> # vN` — SHA und Kommentar; Dependabot hebt sie an),
+Kommentar- und Leerzeilen außerhalb mehrzeiliger Befehle und Ausdrücke sowie
+Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leerzeichen — einen Tab
+vor einem Kommentar lehnt GitHub ab, er macht die Summe deshalb rot. Jede andere
+Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
+(`--vertrag-summen`). Zusätzlich prüft er inhaltlich: genau ein festgelegter Befehl
+je Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte,
+ein täglicher Zeitplan.
 *Lesbarkeit:* Eine Workflow-Datei, die GitHub nicht lesen kann, läuft nie — und der
 Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` prüft
 im Pull Request und vor dem Push jede Datei unter `.github/workflows` in zwei Schritten:

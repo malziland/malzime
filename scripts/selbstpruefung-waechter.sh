@@ -292,7 +292,7 @@ zurueck .github/workflows/sicherheit-nachts.yml
 # UNLESBAR machen — ein Kommentar mit zu wenig Einzug mitten im mehrzeiligen
 # Ausdruck, eine Kommentarzeile, deren Einzug ein geschuetztes Leerzeichen ist
 # (aus einer kopierten Zeile). Beide Schichten muessen anschlagen: der Leser
-# (wie GitHub) und die Pruefsumme.
+# (Zeichen, Groesse, YAML-Syntax) und die Pruefsumme.
 sichern .github/workflows/sicherheit-nachts.yml
 python3 - <<'PYSELF'
 p = ".github/workflows/sicherheit-nachts.yml"

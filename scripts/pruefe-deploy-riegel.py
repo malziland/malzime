@@ -87,7 +87,10 @@ PRUEFJOBS_NACHTS = {
 #     Kommentar (Dependabot hebt sie an); owner/repo zaehlt weiter,
 #   · Kommentar- und Leerzeilen AUSSERHALB von Blockskalaren (| >). Innerhalb
 #     eines `run: |` oder `if: >-` zaehlt jede Zeile: Dort kann eine
-#     "#"-Zeile einen Befehl zerteilen oder Teil eines Ausdrucks werden.
+#     "#"-Zeile einen Befehl zerteilen oder Teil eines Ausdrucks werden,
+#   · Leerzeilen am Dateiende, auch im letzten Block (Befund N-03: bei `|`
+#     aendern sie den Wert nicht; ein `|+` am Ende waere eine geaenderte
+#     Nicht-Kommentarzeile und zaehlt).
 # Eine bewusste Aenderung traegt man hier nach:
 # `python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`. Die Summe
 # schuetzt vor Versehen, nicht vor Absicht — die Aenderung am Workflow steht

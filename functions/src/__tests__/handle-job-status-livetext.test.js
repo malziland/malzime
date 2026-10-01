@@ -142,6 +142,30 @@ describe("handleJobStatus — Live-Text bei processing", () => {
   });
 });
 
+/* Befunde U-06/V-03: Sah die Anzeige den letzten Versuch nicht (kurz
+   offline), erfaehrt sie ihn mit dem Ergebnis — nur mit Abhol-Ticket. */
+describe("handleJobStatus — Versuch auch bei done", () => {
+  const DONE = {
+    id: "Aa1Bb2Cc3Dd4Ee5Ff6Gg",
+    status: "done",
+    resultToken: "ticket-abc",
+    deliveredAt: 1,
+    result: { x: 1 },
+  };
+  test("mit Ticket kommt liveTextVersuch mit", async () => {
+    jobs.getJob.mockResolvedValue({ ...DONE, liveTextVersuch: 2 });
+    const res = makeRes();
+    await handleJobStatus(reqMit(DONE.id, "ticket-abc"), res);
+    expect(res.body).toMatchObject({ status: "done", liveTextVersuch: 2 });
+  });
+  test("ohne Ticket nicht", async () => {
+    jobs.getJob.mockResolvedValue({ ...DONE, liveTextVersuch: 2 });
+    const res = makeRes();
+    await handleJobStatus(reqMit(DONE.id), res);
+    expect(res.body).not.toHaveProperty("liveTextVersuch");
+  });
+});
+
 describe("handleJobStatus — done-Antwort bleibt unveraendert", () => {
   test("auch wenn das Dokument noch liveText-Felder traegt, liefert done nur result", async () => {
     jobs.getJob.mockResolvedValue({

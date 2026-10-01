@@ -106,9 +106,10 @@ function markiereAbbruch(err, teiltext) {
 }
 
 /**
- * Warnung (kein Alarm) fuer den ersten Abriss eines Analyse-Aufrufs: Es folgt
- * ein Neuversuch; erst wenn der scheitert, schreibt mistral.js den Fehler mit
- * Alarm. Felder wie die Fehlerzeile, der Grund nur ueber ursacheVon.
+ * Warnung fuer den ersten Abriss eines Analyse-Aufrufs: Es folgt ein
+ * Neuversuch. Scheitert die Analyse am Ende, meldet das ihr Ausgang (jobs.js,
+ * ein Alarm je gescheiterter Analyse). Felder wie die Warnung des
+ * gescheiterten Aufrufs in mistral.js, der Grund nur ueber ursacheVon.
  */
 function meldeAbbruchMitNeuversuch({ profil, attempt, err }) {
   console.warn(

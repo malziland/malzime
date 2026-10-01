@@ -384,6 +384,88 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent).toBe("Du bist neu");
   });
 
+  /* Befunde U-01/V-01 (Pruefrunde 01.10.2026): Die Kategorie-Karten, die
+     waehrend des ersten Versuchs schon im Ergebnis-Bereich standen, gehoeren
+     der verworfenen Antwort — sie muessen mit weg. */
+  it("Neuversuch: auch die schon gezeigten Kategorie-Karten der verworfenen Antwort verschwinden", async () => {
+    liveAnzeige.welle({
+      standard: "Du bist alt",
+      beast: null,
+      kartenStandard: [{ schluessel: "alter_geschlecht", bezeichnung: "Alter", wert: "ALTERWERT-VERSUCH-1" }],
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(elements.facts.textContent).toContain("ALTERWERT-VERSUCH-1");
+
+    wv("", 2);
+    expect(elements.facts.textContent).not.toContain("ALTERWERT-VERSUCH-1");
+    expect(elements.facts.querySelectorAll(".cat-card").length).toBe(0);
+
+    /* Die Karten des neuen Versuchs erscheinen wie gewohnt nach dem Text. */
+    liveAnzeige.welle({
+      standard: "Du bist neu",
+      beast: null,
+      kartenStandard: [{ schluessel: "alter_geschlecht", bezeichnung: "Alter", wert: "ALTERWERT-VERSUCH-2" }],
+      versuch: 2,
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(elements.facts.textContent).toContain("ALTERWERT-VERSUCH-2");
+    expect(elements.facts.textContent).not.toContain("ALTERWERT-VERSUCH-1");
+  });
+
+  /* Befund U-04: Die Fotodaten stammen aus dem Browser, nicht aus der
+     verworfenen Antwort — die Box bleibt, wird nicht neu gebaut und von der
+     Enthuellung nicht noch einmal verdeckt (das Aufblitzen vom 29.08.). */
+  it("Neuversuch: die Box mit den Fotodaten bleibt stehen und blitzt nicht neu auf", async () => {
+    const { state } = await import("../js/state.js");
+    state.lastPrepared = { exif: { make: "Apple", model: "iPhone 15" } };
+    try {
+      w("Du bist alt");
+      await vi.advanceTimersByTimeAsync(3000);
+      const box = elements.privacy.firstElementChild;
+      expect(box).toBeTruthy();
+
+      wv("", 2);
+      wv("Du bist neu", 2);
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(elements.privacy.firstElementChild).toBe(box);
+
+      liveAnzeige.starteEnthuellung();
+      expect(elements.privacy.classList.contains("lv-verdeckt")).toBe(false);
+    } finally {
+      state.lastPrepared = null;
+    }
+  });
+
+  /* Befunde U-06/V-03: Das Kind war kurz offline, waehrend der Server neu
+     fragte; die naechste Antwort ist schon das Ergebnis. Der Text der
+     verworfenen Antwort darf dann nicht noch zu Ende getippt werden. */
+  it("Ergebnis aus einem nie gesehenen Versuch: alter Text verworfen, kein Schnellvorlauf, kein Auge", async () => {
+    w("Du bist alt " + "a".repeat(200));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(liveAnzeige.hatLiveGelaufen()).toBe(true);
+
+    liveAnzeige.versuchAbgleichen(2);
+    expect(elements.liveKarte.classList.contains("active")).toBe(false);
+    expect(elements.liveTextFest.textContent).toBe("");
+    expect(elements.scanAnim.classList.contains("active")).toBe(false);
+    expect(liveAnzeige.hatLiveGelaufen()).toBe(false);
+    /* Kein Lauf mehr da: Der Schnellvorlauf loest sofort auf. */
+    let fertig = false;
+    liveAnzeige.schnellVorlauf().then(() => (fertig = true));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fertig).toBe(true);
+  });
+
+  it("Ergebnis aus dem schon gezeigten Versuch: nichts wird verworfen", async () => {
+    wv("", 2);
+    wv("Du bist neu " + "n".repeat(200), 2);
+    await vi.advanceTimersByTimeAsync(1000);
+    liveAnzeige.versuchAbgleichen(2);
+    expect(elements.liveTextFest.textContent.startsWith("Du bist neu")).toBe(true);
+    liveAnzeige.versuchAbgleichen(undefined);
+    expect(elements.liveTextFest.textContent.startsWith("Du bist neu")).toBe(true);
+  });
+
   it("ein neuer Analyse-Durchgang beginnt wieder beim ersten Versuch", async () => {
     wv("", 2);
     wv("Zweiter Versuch", 2);

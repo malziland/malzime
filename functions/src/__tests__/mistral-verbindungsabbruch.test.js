@@ -224,6 +224,33 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     expect(danach[danach.length - 1].standard).toBe("Du bist sachlich beschrieben.");
   });
 
+  /* Befund V-07 (Pruefrunde 01.10.2026): Weil der Neuversuch jetzt streamt,
+     bringt auch sein Abriss den schon gelesenen Text mit — und der wird
+     gerettet wie beim ersten Versuch, statt dass das Kind die Fehlermeldung
+     sieht. */
+  test("reisst der Neuversuch ab, nachdem das Ergebnis fast da ist, wird es gerettet", async () => {
+    let aufrufe = 0;
+    const fastFertig = VOLLSTAENDIG.slice(0, -3);
+    setFetchForTest(async (_url, init) => {
+      if (!mitBild(init)) return WERBUNG;
+      aufrufe += 1;
+      return aufrufe === 1 ? stromDerAbreisst('{"subj') : stromDerAbreisst(fastFertig);
+    });
+    const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de", {
+      onLiveText: () => {},
+    });
+    expect(ergebnis.normal.profileText).toBe("Du bist sachlich beschrieben.");
+    const rettung = zeilen("log")
+      .map((t) => JSON.parse(t))
+      .filter((z) => z.step === "single-large-rettung");
+    expect(rettung.map((z) => [z.attempt, z.status])).toEqual([
+      ["first", "nicht-rettbar"],
+      ["neuversuch", "gerettet"],
+    ]);
+    expect(zeilen("error")).toEqual([]);
+    keineAdressenImProtokoll();
+  });
+
   test("reisst auch der zweite Versuch ab: Grund im Protokoll, ohne Adressen — kein dritter Versuch, keine Fehlerzeile hier", async () => {
     let aufrufe = 0;
     setFetchForTest(async (_url, init) => {

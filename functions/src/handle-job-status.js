@@ -190,6 +190,9 @@ async function handleJobStatus(req, res) {
       status: "done",
       result: job.result || null,
     };
+    /* Neuversuch (01.10.2026): Sah die Anzeige den letzten Versuch nicht, wirft
+       sie den Text der verworfenen Antwort weg statt ihn zu Ende zu tippen. */
+    if (Number.isInteger(job.liveTextVersuch)) antwort.liveTextVersuch = job.liveTextVersuch;
     if (!job.deliveredAt) {
       const now = Date.now();
       /* KA-02 (Kurzaudit 2026-08-12): Einmal-Ticket für den Realitäts-Check.

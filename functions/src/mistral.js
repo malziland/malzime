@@ -262,7 +262,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      Der gezeigte Text stammt dann aus einer verworfenen Antwort: Jede Welle des
      Neuversuchs traegt `versuch: 2`, die erste kommt sofort und leer — der
      Bildschirm faengt sichtbar von vorn an (jobs.setLiveText, live-anzeige.js
-     neuerVersuch). */
+     vonVornBeginnen). Weil er streamt, kann auch sein Teiltext gerettet werden. */
   const liveNeu = onLiveText && ((texte) => onLiveText({ ...texte, versuch: 2 }));
   let parsed = await mitEinemNeuversuchBeiAbbruch(
     () => callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer),
@@ -737,7 +737,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
         status: attemptLabel === "retry" ? "nachfrage-gescheitert" : "error",
         error: err.message,
         /* `timeout` trennt „das Modell war zu langsam" von „die API war weg" —
-           ohne diese Unterscheidung ist am Alarm nicht zu erkennen, ob eine
+           ohne diese Unterscheidung ist im Protokoll nicht zu erkennen, ob eine
            Zeitgrenze zu knapp sitzt oder Mistral eine Stoerung hat. */
         errorCode: err.code || null,
         /* Grund eines Abrisses, nur Code und Kurztext (verbindungsfehler.js). */

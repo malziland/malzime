@@ -72,16 +72,27 @@ Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung.
 | `malziME Analyse gescheitert` | „malziME: Analyse gescheitert – mindestens ein Kind sah eine Fehlermeldung (Details im Text)“ | `severity>=ERROR AND jsonPayload.alert="analyse-gescheitert"` |
 | `malziME Function Errors` | „malziME: Fehler im Server (Details im Text)“ | `severity>=ERROR AND NOT jsonPayload.step="minor-safety-durchbruch" AND NOT jsonPayload.alert="analyse-gescheitert"` |
 
-**Analyse gescheitert: eine Zeile je Fehlermeldung (seit 01.10.2026 abends).**
+**Analyse gescheitert: eine Zeile je gescheiterter Analyse (seit Release 4.13.2).**
 Die Zeile `alert: "analyse-gescheitert"` schreibt allein `functions/src/jobs.js`,
-und zwar genau dann, wenn ein Auftrag mit einem blockierten Ergebnis oder als
-`failed` endet — also genau dann, wenn ein Kind nach einer Analyse eine
-Fehlermeldung sieht. Das Feld `grund` sagt, welche (`blocked.apiError`,
-`blocked.profileBlocked`, `blocked.overloaded`, `blocked.configMissing`,
-`processing_timeout`). Was dazu geführt hat, steht in Warnungen davor
-(KI-Aufruf, Foto laden, Absturzverdacht; Abfragen im RUNBOOK, Abschnitt
-„Mistral-Fehler“). Begründung und Grenzen: `docs/SECURITY-MODEL.md`, Abschnitt
-„Ein Alarm je gescheiterter Analyse“.
+und zwar wenn ein Auftrag mit einem blockierten Ergebnis, mit einem leeren
+Profil in einem der beiden Modi oder als `failed` endet. Das Feld `grund` sagt,
+welche Meldung das Kind sah (bzw. bei geschlossenem Tab gesehen hätte):
+
+| `grund` | Bedeutung |
+|---|---|
+| `blocked.overloaded` | Mistral überlastet, auch nach den Wiederholungen |
+| `blocked.apiError` | technischer Fehler: KI-Aufruf ohne Ergebnis oder Foto nicht ladbar |
+| `blocked.profileBlocked` | kein verwertbares Profil (KI hat abgelehnt oder unlesbar geantwortet) |
+| `blocked.configMissing` | Einstellungssatz fehlt oder ist ungültig — sofort handeln |
+| `profil_leer_standard`, `profil_leer_beast` | nur ein Teil gerettet, im genannten Modus steht „leeres Profil“ |
+| `processing_timeout` | die Bearbeitung wurde nicht fertig (Absturz oder Zeitlimit) |
+| `enqueue_failed` | schon das Einreihen scheiterte, das Kind sah „Die KI ist gerade überlastet“ |
+| `unbekannt` | ein Grund, der keine feste Kennung ist (sollte nicht vorkommen) |
+
+Was dazu geführt hat, steht in Warnungen davor (KI-Aufruf, Foto laden,
+Absturzverdacht; Abfragen im RUNBOOK, Abschnitte „Nachricht „Analyse
+gescheitert““ und „Mistral überlastet / 429 / 5xx“). Begründung und Grenzen:
+`docs/SECURITY-MODEL.md`, Abschnitt „Ein Alarm je gescheiterter Analyse“.
 
 **Wie oft eine Nachricht kommt.** Jede log-basierte Richtlinie schickt
 höchstens eine Nachricht je fünf Minuten (`notificationRateLimit` 300 s, das

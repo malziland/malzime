@@ -182,6 +182,37 @@ describe("runPipeline — Live-Text schreiben", () => {
     ]);
   });
 
+  /* Befunde U-05/V-04: Zwei gleichzeitige update-Aufrufe kommen in Firestore
+     in beliebiger Reihenfolge an — eine spaete Welle des ersten Versuchs
+     koennte die leere des zweiten ueberschreiben. Darum nacheinander. */
+  test("Schreibvorgaenge laufen nacheinander: der zweite beginnt erst, wenn der erste fertig ist", async () => {
+    const erledigt = [];
+    let ersterFertig;
+    jobs.setLiveText.mockImplementationOnce(
+      () =>
+        new Promise((aufloesen) => {
+          ersterFertig = () => {
+            erledigt.push("erster fertig");
+            aufloesen();
+          };
+        })
+    );
+    jobs.setLiveText.mockImplementationOnce(async () => {
+      erledigt.push("zweiter beginnt");
+    });
+    mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
+      opts.onLiveText({ standard: "Du bist alt", beast: null });
+      opts.onLiveText({ standard: "", beast: null, versuch: 2 });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(erledigt).toEqual([]);
+      ersterFertig();
+      await new Promise((r) => setTimeout(r, 0));
+      return PROFIL;
+    });
+    await handleProcessJob(postReq(), makeRes());
+    expect(erledigt).toEqual(["erster fertig", "zweiter beginnt"]);
+  });
+
   test("das Analyse-Ergebnis bleibt mit Flag identisch — completeJob bekommt das normale Profil", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
       opts.onLiveText({ standard: "Du bist", beast: null });

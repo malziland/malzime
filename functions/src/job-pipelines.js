@@ -84,9 +84,14 @@ async function runPipeline(job) {
      beide Felder (Standard + Beast, jobs.js). setLiveText selbst schluckt
      jeden Firestore-Fehler. Die erste Welle eines NEUEN Versuchs (Neuversuch
      nach Verbindungsabriss, mistral.js) geht sofort durch — sie setzt den
-     Bildschirm zurueck und darf nicht bis zu 2 s hinter dem alten Text haengen. */
+     Bildschirm zurueck und darf nicht bis zu 2 s hinter dem alten Text haengen.
+     Die Schreibvorgaenge laufen NACHEINANDER (Kette): Zwei gleichzeitige
+     update-Aufrufe kommen in Firestore in beliebiger Reihenfolge an, und eine
+     spaete Welle des ersten Versuchs koennte die leere des zweiten
+     ueberschreiben. setLiveText wirft nie, die Kette reisst also nicht. */
   let letzterSchreibMs = 0;
   let letzterVersuch = 1;
+  let schreibKette = Promise.resolve();
   const opts = {
     onLiveText: (texte) => {
       const jetzt = Date.now();
@@ -94,7 +99,7 @@ async function runPipeline(job) {
       if (versuch === letzterVersuch && jetzt - letzterSchreibMs < 2000) return;
       letzterSchreibMs = jetzt;
       letzterVersuch = versuch;
-      setLiveText(job.id, texte);
+      schreibKette = schreibKette.then(() => setLiveText(job.id, texte));
     },
   };
   try {

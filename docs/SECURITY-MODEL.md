@@ -414,14 +414,19 @@ sieht, meldet allein der Ausgang des Auftrags (Abschnitt „Ein Alarm je
 gescheiterter Analyse“); die Zeilen des KI-Aufrufs sind Warnungen, auch wenn
 der Neuversuch oder die Nachfrage nach fehlenden Karten scheitert.
 
-**Der Bildschirm fängt beim Neuversuch von vorn an (seit 01.10.2026 abends).**
+**Der Bildschirm fängt beim Neuversuch von vorn an (seit Release 4.13.2).**
 Der Neuversuch schreibt wie der erste Versuch Live-Text. Seine erste Welle
 kommt sofort und leer, jede trägt `versuch: 2` (`jobs.setLiveText` legt
 `liveTextVersuch` ins Auftragsdokument, die Statusabfrage gibt es mit dem
-Abhol-Ticket weiter). Die Live-Anzeige (`live-anzeige.js`) verwirft daraufhin
-den Text der abgerissenen Antwort: Karte und Live-Karten weg, das Warte-Auge
-kommt zurück und wird ins Bild geholt, der neue Text tippt von vorn. Eine
-verspätete Welle des ersten Versuchs wird verworfen. Vorher lief der
+Abhol-Ticket weiter, auch mit dem fertigen Ergebnis). Die Live-Anzeige
+(`live-anzeige.js`) verwirft daraufhin den Text der abgerissenen Antwort:
+Live-Karte und schon gezeigte Kategorie-Karten weg, das Warte-Auge kommt
+zurück und wird ins Bild geholt, der neue Text tippt von vorn; die Box mit den
+Fotodaten bleibt stehen (sie stammt aus dem Browser). Sah die Anzeige den neuen
+Versuch nie (kurz offline), wird der alte Text beim Ergebnis verworfen statt
+zu Ende getippt. Der Worker schreibt die Wellen nacheinander, eine verspätete
+Welle des ersten Versuchs verwirft der Browser. Weil der Neuversuch streamt,
+wird auch sein schon gelesener Text gerettet, wenn er abreißt. Vorher lief der
 Neuversuch ohne Live-Text; der halbe alte Text blieb rund 40 Sekunden stehen
 und wurde am Ende durch das Ergebnis einer anderen Modellantwort ersetzt.
 
@@ -462,25 +467,28 @@ dann liegt die Ursache außerhalb eines Einzelfalls, und `ursache.code` zeigt, w
 ## Ein Alarm je gescheiterter Analyse (01.10.2026)
 
 **Entscheidung.** Sieht ein Kind nach einer Analyse eine Fehlermeldung, endet
-sein Auftrag auf einem von genau zwei Wegen: `done` mit blockiertem Ergebnis
-(`completeJob`) oder `failed` (`failJob`, wenn der Worker nicht fertig wurde).
-Genau dort, und nur wenn dieser Aufruf den Übergang gemacht hat, schreibt
-`jobs.js` die eine Fehlerzeile `alert: "analyse-gescheitert"` mit dem Grund
-(`blocked.apiError`, `blocked.profileBlocked`, `processing_timeout` …). Auf
-sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
+sein Auftrag `done` mit blockiertem Ergebnis, `done` mit einem leeren Profil in
+einem der beiden Modi (`completeJob`) oder `failed` (`failJob`: der Worker
+wurde nicht fertig, oder schon das Einreihen scheiterte). Dort, und nur wenn
+dieser Aufruf den Übergang gemacht hat, schreibt `jobs.js` die eine
+Fehlerzeile `alert: "analyse-gescheitert"` mit dem Grund (Liste in
+`docs/ERROR-ALERTING.md`). Auf sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
 Einzelnen beschreiben — KI-Aufruf, Neuversuch, Nachfrage, Foto laden,
 Absturzverdacht, verworfenes Ergebnis —, sind Warnungen. Wie die Richtlinien
 filtern und wie oft sie melden: `docs/ERROR-ALERTING.md`.
 
 **Begründung.** Vorher entschied jede Stelle selbst, ob sie alarmiert. Das gab
 Lücken und Doppelungen: Eine unlesbare KI-Antwort endete als
-`blocked.profileBlocked` ohne jede Nachricht; ein Tierfoto, dessen Nachfrage
-scheiterte, alarmierte, obwohl das Kind sein Tierprofil bekam; ein
-Absturzverdacht meldete sich als „Fehler im Server“ und später noch einmal.
-Am Ausgang des Auftrags ist bekannt, was das Kind sieht. Abgesichert in
+`blocked.profileBlocked` ohne jede Nachricht, ein Teilergebnis mit leerem
+Beast-Profil ebenso; ein Tierfoto, dessen Nachfrage scheiterte, alarmierte,
+obwohl das Kind sein Tierprofil bekam; ein Absturzverdacht meldete sich als
+„Fehler im Server“ und später noch einmal. Am Ausgang des Auftrags ist
+bekannt, was das Kind sieht. Abgesichert in
 `functions/src/__tests__/ein-alarm-je-fehlermeldung.test.js` über den echten
 Weg (Worker, Pipeline, KI-Aufruf, Auftragsverwaltung): je Fehlerfall genau
-eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine.
+eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine. Ob
+„leeres Profil“ vorliegt, entscheidet dieselbe Regel wie in
+`public/js/render.js` (Text oder mindestens eine Karte).
 
 **Datenschutz.** Die Zeile trägt nur Schritt und Grund, und den Grund nur als
 feste Kennung (Muster in `jobs.js`, sonst „unbekannt“); keine Vorgangskennung
@@ -502,11 +510,20 @@ Schritt, ob er geklappt hat.
   aus Browsern“.
 - Wer ein Foto hochlädt, das die KI ablehnt, löst eine Nachricht aus. Der
   Fünf-Minuten-Takt begrenzt das.
+- Ein eigener Fehler auf demselben Weg meldet sich zusätzlich als „Fehler im
+  Server“, bewusst: Lässt sich das Foto danach nicht löschen
+  (`queue-image-delete-failed`), ist die Zusage „sofort gelöscht“ verletzt;
+  stürzt der Worker wirklich ab, schreibt die Plattform selbst eine
+  Fehlerzeile. Beides ist ein Mangel für sich, nicht die Fehlermeldung des
+  Kindes.
+- Die Nachricht kommt auch, wenn das Kind die Meldung nicht mehr sieht (Tab
+  geschlossen, stilles Aufräumen nach dem Neuladen) — die Analyse ist dann
+  trotzdem gescheitert.
 
-**Bedingung für Neubewertung.** Kommen Nachrichten „Analyse gescheitert“, ohne
-dass ein Kind eine Fehlermeldung sah, oder sieht ein Kind eine Fehlermeldung
-nach einer Analyse ohne Nachricht, stimmt die Annahme „zwei Wege, ein Ausgang“
-nicht mehr.
+**Bedingung für Neubewertung.** Sieht ein Kind nach einer Analyse eine
+Fehlermeldung ohne Nachricht, oder kommt eine Nachricht zu einer Analyse, die
+geliefert wurde, stimmt die Annahme „der Ausgang des Auftrags kennt die
+Meldung“ nicht mehr.
 
 ## Foto direkt laden statt über den Download-Weg der Speicher-Bibliothek (01.10.2026)
 

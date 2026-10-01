@@ -63,11 +63,12 @@ function jobsRef() {
   return datenbank().collection(JOBS_COLLECTION);
 }
 
-/* EIN ALARM JE GESCHEITERTER ANALYSE (01.10.2026). Sieht ein Kind nach einer
-   Analyse eine Fehlermeldung, endet sein Auftrag auf einem von genau zwei
-   Wegen: `done` mit blockiertem Ergebnis (completeJob) oder `failed`
-   (failJob). Nur dort, und nur wenn DIESER Aufruf den Uebergang gemacht hat,
-   entsteht die eine Fehlerzeile, auf die der Alarm "Analyse gescheitert"
+/* EIN ALARM JE GESCHEITERTER ANALYSE (01.10.2026). Endet eine Analyse mit
+   einer Fehlermeldung, endet ihr Auftrag `done` mit blockiertem Ergebnis,
+   `done` mit einem leeren Profil in einem der beiden Modi (completeJob) oder
+   `failed` (failJob — Worker nicht fertig, oder schon das Einreihen scheiterte,
+   `enqueue_failed`). Nur dort, und nur wenn DIESER Aufruf den Uebergang gemacht
+   hat, entsteht die eine Fehlerzeile, auf die der Alarm "Analyse gescheitert"
    hoert. Die Zeilen, die den Grund im Einzelnen beschreiben (KI-Aufruf, Foto
    laden, Absturzverdacht, verworfenes Ergebnis), sind Warnungen — sonst kaemen
    fuer eine Fehlermeldung zwei Nachrichten, und ein Tierfoto, das trotz
@@ -76,6 +77,25 @@ function jobsRef() {
    der Grund, und nur als feste Kennung wie `blocked.apiError` oder
    `processing_timeout` — alles andere wird "unbekannt". */
 const GRUND_MUSTER = /^(blocked\.[A-Za-z]{1,40}|[a-z_]{1,40})$/;
+
+/* Ein Profil ohne Text und ohne Karten zeigt im jeweiligen Modus "Die KI hat
+   ein leeres Profil zurueckgeliefert" (public/js/render.js, hasContent —
+   dieselbe Regel). Das passiert, wenn nur ein Teil gerettet wurde und die
+   Nachfrage nach den fehlenden Karten scheiterte. Tierprofile sind immer
+   gefuellt, blockierte Ergebnisse haben keine Profile. */
+function leeresProfil(result) {
+  if (!result || !result.profiles || !result.meta || result.meta.mode === "animal") return null;
+  const hatInhalt = (p) =>
+    Boolean(
+      p &&
+      ((typeof p.profileText === "string" && p.profileText.trim()) ||
+        (p.categories && Object.keys(p.categories).length > 0))
+    );
+  if (!hatInhalt(result.profiles.normal)) return "profil_leer_standard";
+  if (!hatInhalt(result.profiles.boost)) return "profil_leer_beast";
+  return null;
+}
+
 function meldeGescheiterteAnalyse(grund) {
   console.error(
     JSON.stringify({
@@ -212,9 +232,11 @@ async function completeJob(jobId, result) {
     tx.update(ref, { status: "done", finishedAt: Date.now(), result: result || null, errorReason: null });
     return true;
   });
-  /* Ein blockiertes Ergebnis zeigt dem Kind eine Fehlermeldung. */
-  if (gemacht && result && result.meta && result.meta.mode === "blocked") {
-    meldeGescheiterteAnalyse(result.blockedReason);
+  /* Ein blockiertes Ergebnis oder ein leeres Profil zeigt dem Kind eine
+     Fehlermeldung. */
+  if (gemacht) {
+    if (result && result.meta && result.meta.mode === "blocked") meldeGescheiterteAnalyse(result.blockedReason);
+    else if (leeresProfil(result)) meldeGescheiterteAnalyse(leeresProfil(result));
   }
   return gemacht;
 }

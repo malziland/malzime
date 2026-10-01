@@ -10,20 +10,23 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 - **Eine Nachricht „Analyse gescheitert“ für jede Fehlermeldung nach einer
   Analyse.** Die Nachricht hängt jetzt am Ausgang der Analyse statt an
-  einzelnen Schritten: Jede Analyse, die mit einer Fehlermeldung endet, meldet
-  sich genau einmal — auch eine unlesbare Antwort der KI, die bisher still
-  blieb, und eine Analyse, deren Bearbeitung abbrach. Ein Tierfoto, das sein
-  Tierprofil bekommt, löst keine Nachricht mehr aus, und ein vermuteter Absturz
-  meldet sich nicht mehr zusätzlich als „Fehler im Server“. Wie bei allen
-  Alarmen kommt höchstens eine Nachricht je fünf Minuten.
+  einzelnen Schritten: Jede Analyse, die mit einer Fehlermeldung endet, löst
+  sie einmal aus — auch eine unlesbare Antwort der KI und ein Ergebnis mit
+  leerem Beast-Profil, die bisher still blieben, und eine Analyse, deren
+  Bearbeitung abbrach. Ein Tierfoto, das sein Tierprofil bekommt, löst keine
+  Nachricht mehr aus, und der bloße Verdacht auf einen Absturz meldet sich
+  nicht mehr zusätzlich als „Fehler im Server“. Wie bei allen Alarmen kommt
+  höchstens eine Nachricht je fünf Minuten.
 
 ### Behoben
 
 - **Neuer Versuch nach einem Verbindungsabriss beginnt sichtbar von vorn.**
-  Reißt die Verbindung zur KI ab und fragt das Programm neu, verschwindet der
-  halbe Text des ersten Versuchs sofort, die Warteanzeige kommt zurück, und der
-  Text der neuen Antwort erscheint von Anfang an. Bisher blieb der alte Text
-  rund 40 Sekunden stehen und wurde dann durch einen anderen ersetzt.
+  Reißt die Verbindung zur KI ab und fragt das Programm neu, verschwinden der
+  halbe Text und die schon gezeigten Merkmale des ersten Versuchs sofort, die
+  Warteanzeige kommt zurück, und der Text der neuen Antwort erscheint von
+  Anfang an. Bisher blieb der alte Text rund 40 Sekunden stehen und wurde dann
+  durch einen anderen ersetzt. Reißt auch der neue Versuch ab, wird sein schon
+  angekommener Text gerettet, wo es geht.
 
 ## [4.13.1] — 2026-10-01
 

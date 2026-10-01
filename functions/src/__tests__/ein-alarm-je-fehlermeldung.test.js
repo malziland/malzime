@@ -225,6 +225,49 @@ describe("Fehlermeldung beim Kind: genau eine Fehlerzeile, und es ist die des Al
   });
 });
 
+/* Befund U-02 (Pruefrunde 01.10.2026): Ein gerettetes Teilergebnis traegt das
+   Standard-Profil, das Beast-Profil fehlt, und die Nachfrage nach den
+   fehlenden Karten scheitert. Im Beast-Modus sieht das Kind dann "Die KI hat
+   ein leeres Profil zurueckgeliefert" — auch das ist eine Fehlermeldung. */
+describe("Teilergebnis mit leerem Profil", () => {
+  test("Standard gerettet, Beast leer, Nachfrage scheitert: eine Nachricht mit Grund profil_leer_beast", async () => {
+    const nurStandard =
+      JSON.stringify({
+        subject: "HUMAN",
+        visible_text: "",
+        standard: { profileText: "Du bist gerettet.", categories: karten("S") },
+      }).slice(0, -1) + ',"beast":{"profileT';
+    mistralAntwortet((init) => (gestreamt(init) ? sse(nurStandard, true) : abriss(init)), abriss);
+    await lauf();
+
+    const ergebnis = mockStore.get(JOB_ID).result;
+    expect(ergebnis.meta.mode).toBe("multimodal");
+    expect(ergebnis.profiles.normal.profileText).toBe("Du bist gerettet.");
+    expect(Object.keys(ergebnis.profiles.boost.categories)).toHaveLength(0);
+    expect(fehlerzeilen()).toEqual([
+      { severity: "ERROR", alert: "analyse-gescheitert", step: "analyse-ausgang", grund: "profil_leer_beast" },
+    ]);
+  });
+
+  test.each([
+    ["Standard leer", { normal: {}, boost: { profileText: "Du bist." } }, "profil_leer_standard"],
+    ["Beast leer", { normal: { categories: { a: {} } }, boost: { profileText: "  " } }, "profil_leer_beast"],
+    ["beide gefuellt", { normal: { profileText: "Du." }, boost: { categories: { a: {} } } }, null],
+  ])("completeJob: %s", async (_fall, profiles, grund) => {
+    mockStore.set(JOB_ID, { status: "processing" });
+    await jobs.completeJob(JOB_ID, { profiles, meta: { mode: "multimodal" } });
+    expect(fehlerzeilen()).toEqual(
+      grund ? [{ severity: "ERROR", alert: "analyse-gescheitert", step: "analyse-ausgang", grund }] : []
+    );
+  });
+
+  test("Tierprofil: nie eine Nachricht, auch nicht bei leerem Feld", async () => {
+    mockStore.set(JOB_ID, { status: "processing" });
+    await jobs.completeJob(JOB_ID, { profiles: { normal: {}, boost: {} }, meta: { mode: "animal" } });
+    expect(fehlerzeilen()).toEqual([]);
+  });
+});
+
 describe("Kein Alarm, wenn das Kind sein Ergebnis bekommt", () => {
   test("Erfolg", async () => {
     mistralAntwortet(antwort(MENSCH));

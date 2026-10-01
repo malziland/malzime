@@ -60,6 +60,7 @@ vi.mock("../js/live-anzeige.js", () => ({
   istPausiert: vi.fn(() => false),
   fuehrungStarten: vi.fn(),
   augeInsBild: vi.fn(),
+  versuchAbgleichen: vi.fn(),
 }));
 
 const DONE_RESULT = {

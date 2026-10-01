@@ -334,7 +334,14 @@ test("Neuversuch: der Text des abgerissenen Versuchs verschwindet, der neue tipp
     const laufend = { status: "processing", position: 0, etaSeconds: 60 };
     const body =
       phase === "alt"
-        ? { ...laufend, liveText: ALT, liveTextVersuch: 1 }
+        ? {
+            ...laufend,
+            liveText: ALT,
+            liveTextVersuch: 1,
+            liveKartenStandard: [
+              { schluessel: "alter_geschlecht", bezeichnung: "Alter & Geschlecht", wert: "ALTERWERT-VERSUCH-1" },
+            ],
+          }
         : phase === "leer"
           ? { ...laufend, liveText: "", liveTextVersuch: 2 }
           : phase === "neu"
@@ -349,6 +356,8 @@ test("Neuversuch: der Text des abgerissenen Versuchs verschwindet, der neue tipp
   const text = async () => (await page.locator("#liveTextFest").textContent()) || "";
   await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 45000 });
   await expect.poll(text, { timeout: 15000 }).toContain("Du bist ALT");
+  /* Die Merkmale des ersten Versuchs stehen schon im Ergebnis-Bereich. */
+  await expect(page.locator("#facts")).toContainText("ALTERWERT-VERSUCH-1", { timeout: 30000 });
   await page.screenshot({ path: testInfo.outputPath("1-erster-versuch.png") });
 
   /* Abriss, der Server fragt neu: sofort weg mit dem alten Text. */
@@ -359,6 +368,8 @@ test("Neuversuch: der Text des abgerissenen Versuchs verschwindet, der neue tipp
      ueber dem Bildrand (Bildschirmfoto 01.10.2026). */
   await expect(page.locator("#scanAnim")).toBeInViewport({ ratio: 1, timeout: 5000 });
   expect(await text()).toBe("");
+  /* ... und die Merkmale der verworfenen Antwort auch (Befunde U-01/V-01). */
+  await expect(page.locator("#facts")).not.toContainText("ALTERWERT-VERSUCH-1");
   await page.screenshot({ path: testInfo.outputPath("2-neuversuch-beginnt.png") });
 
   /* Der neue Text tippt von vorn — nichts vom alten. */

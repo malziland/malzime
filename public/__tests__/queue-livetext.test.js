@@ -50,6 +50,7 @@ vi.mock("../js/live-anzeige.js", () => ({
   /* v3.0.3 Blick-Führung: api.js ruft beides beim Analyse-Beginn. */
   fuehrungStarten: vi.fn(),
   augeInsBild: vi.fn(),
+  versuchAbgleichen: vi.fn(),
 }));
 
 const DONE_RESULT = {
@@ -168,6 +169,20 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     await vi.advanceTimersByTimeAsync(12000);
     await p;
     expect(liveAnzeige.welle).toHaveBeenCalledWith(expect.objectContaining({ standard: "", versuch: 2 }));
+  });
+
+  it("done mit liveTextVersuch → die Live-Anzeige gleicht den Versuch ab, bevor gerendert wird", async () => {
+    mockeStatusFolge([
+      { status: "processing", liveText: "Erste Welle" },
+      { status: "done", result: DONE_RESULT, liveTextVersuch: 2 },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(12000);
+    await p;
+    expect(liveAnzeige.versuchAbgleichen).toHaveBeenCalledWith(2);
+    expect(liveAnzeige.versuchAbgleichen.mock.invocationCallOrder[0]).toBeLessThan(
+      liveAnzeige.schnellVorlauf.mock.invocationCallOrder[0]
+    );
   });
 
   it("processing OHNE liveText (noch nichts geschrieben) → keine einzige Welle, heutiger Pfad", async () => {

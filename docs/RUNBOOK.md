@@ -551,12 +551,14 @@ Wie viele es waren und welche Meldung sie sahen:
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
       --format='value(timestamp,jsonPayload.grund)'
 
-`grund`: `blocked.overloaded` = Mistral überlastet (unten „Mistral überlastet“),
-`blocked.apiError` = technischer Fehler (KI-Aufruf oder Foto laden, Warnungen
-unten), `blocked.profileBlocked` = die KI lieferte kein verwertbares Profil
-(abgelehnt oder unlesbar), `blocked.configMissing` = Einstellungssatz fehlt
-(Abschnitt Betriebsprofile), `processing_timeout` = der Worker wurde nicht
-fertig (Absturz oder Zeitlimit; Warnung `worker-abgestuerzt-verdacht`).
+Was jeder `grund` bedeutet, steht in [ERROR-ALERTING.md](ERROR-ALERTING.md)
+(Tabelle unter „Analyse gescheitert“). Weiter je Grund: `blocked.overloaded`
+und `blocked.apiError` → unten „Mistral überlastet / 429 / 5xx“ (dort auch die
+Warnungen des KI-Aufrufs und `step: "bild-laden"`); `blocked.configMissing` →
+[BETRIEBSPROFILE.md](BETRIEBSPROFILE.md); `processing_timeout` → Warnung
+`worker-abgestuerzt-verdacht` und Plattform-Fehlerzeilen des Dienstes
+`processjob`; `enqueue_failed` → Cloud Tasks prüfen (Warteschlange pausiert,
+Rechte).
 
 ### Verdacht auf Absturz-Schleife (Safari: „wiederholt ein Problem aufgetreten")
 

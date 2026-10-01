@@ -295,6 +295,9 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
            der ersten Auslieferung (danach nie wieder) — sofort merken, damit
            es Reload und Tab-Wiederaufnahme im 15-Minuten-Fenster überlebt. */
         if (typeof data.rcTicket === "string") speichereRcTicket(data.rcTicket);
+        /* Fragte der Server neu, ohne dass die Anzeige den neuen Versuch sah
+           (kurz offline), wird der alte Text verworfen statt zu Ende getippt. */
+        if (liveErlaubt) liveAnzeige.versuchAbgleichen(data.liveTextVersuch);
         return { result: data.result };
       case "failed":
         return { error: t("error.queueFailed"), reason: data.errorReason };

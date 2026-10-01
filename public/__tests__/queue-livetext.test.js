@@ -185,6 +185,38 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     );
   });
 
+  /* Fund der Pruefrunde 01.10.2026: Scheitert die Analyse, nachdem schon
+     Kategorie-Karten im Ergebnis-Bereich standen, muessen auch die weg —
+     neben der Fehlermeldung saehen sie aus wie ein halbes Profil. */
+  it("Fehlerweg (failed): auch die schon gezeigten Kategorie-Karten verschwinden", async () => {
+    mockeStatusFolge([
+      { status: "processing", liveText: "Erste Welle" },
+      { status: "processing", liveText: "Erste Welle, zweite" },
+      { status: "failed", errorReason: "processing_timeout" },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(2500);
+    elements.facts.innerHTML = '<div class="cat-card">ALTERWERT-LIVE</div>';
+    await vi.advanceTimersByTimeAsync(10000);
+    await p;
+    expect(liveAnzeige.abbrechen).toHaveBeenCalled();
+    expect(elements.facts.innerHTML).toBe("");
+  });
+
+  it("Erfolg: der Ergebnis-Bereich wird NICHT geleert (Gegenprobe)", async () => {
+    mockeStatusFolge([
+      { status: "processing", liveText: "Erste Welle" },
+      { status: "processing", liveText: "Erste Welle, zweite" },
+      { status: "done", result: DONE_RESULT },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(2500);
+    elements.facts.innerHTML = '<div class="cat-card">ERGEBNIS</div>';
+    await vi.advanceTimersByTimeAsync(10000);
+    await p;
+    expect(elements.facts.textContent).toContain("ERGEBNIS");
+  });
+
   it("processing OHNE liveText (noch nichts geschrieben) → keine einzige Welle, heutiger Pfad", async () => {
     mockeStatusFolge([{ status: "processing" }, { status: "done", result: DONE_RESULT }]);
     const p = analyzeImage();

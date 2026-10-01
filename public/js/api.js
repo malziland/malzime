@@ -53,6 +53,15 @@ function meldeSichtbarenFehler(schluessel, phase, zusatz = {}) {
   logClientError(new Error(schluessel), { phase, wakeLock: wakeLockStatus(), ...zusatz });
 }
 
+/* Fehlerweg: Live-Anzeige weg UND die waehrend des Laufs schon gezeigten
+   Kategorie-Karten — neben der Fehlermeldung saehen sie aus wie ein halbes
+   Profil (Fund der Pruefrunde 01.10.2026). Nicht in liveAnzeige.abbrechen():
+   Das laeuft auch nach dem Rendern eines fertigen Ergebnisses. */
+function liveAbbrechenWegenFehler() {
+  liveAnzeige.abbrechen();
+  if (elements.facts) elements.facts.innerHTML = "";
+}
+
 /* Die Vorschau oben zeigt das Original ueber eine Objekt-URL. Kann der
    Browser das Format nicht anzeigen (HEIC auf Android, 08.09.2026), bleibt
    dort ein kaputtes Bildsymbol stehen, obwohl die Analyse laeuft. Dann zeigt
@@ -450,7 +459,7 @@ async function renderQueueResult(data, myId, traceId, timings) {
   markiereErgebnisZustellung();
   if (!data) {
     /* Nie halben Live-Text stehen lassen — Karte weg, normale Fehlermeldung. */
-    liveAnzeige.abbrechen();
+    liveAbbrechenWegenFehler();
     setStatus(t("error.queueFailed"), traceId, "error.queueFailed");
     meldeSichtbarenFehler("error.queueFailed", "ergebnis-leer", { traceId, requestId: String(myId) });
     return;
@@ -768,7 +777,7 @@ async function analyzeImageQueued() {
 
     if (outcome.abandoned) {
       /* v3.0: nie halben Live-Text stehen lassen — Karte samt Text weg. */
-      liveAnzeige.abbrechen();
+      liveAbbrechenWegenFehler();
       clearStoredJobId();
       setStatus(t("error.queueAbandoned"), traceId, "error.queueAbandoned");
       meldeSichtbarenFehler("error.queueAbandoned", "auftrag-verworfen", {
@@ -786,7 +795,7 @@ async function analyzeImageQueued() {
          (Job weg, fehlgeschlagen, 404) ist der Text gegenstandslos und wird
          wie bisher restlos abgeräumt. */
       if (outcome.transient) liveAnzeige.pausieren();
-      else liveAnzeige.abbrechen();
+      else liveAbbrechenWegenFehler();
       /* Anker fuer die Wiederaufnahme — siehe state.js. */
       state.wartetAufVerbindung = Boolean(outcome.transient);
       /* Nur aufräumen, wenn der Job WIRKLICH weg ist (404, failed, abgelaufen).
@@ -818,7 +827,7 @@ async function analyzeImageQueued() {
   } catch (err) {
     if (state.requestId !== myId) return;
     /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
-    liveAnzeige.abbrechen();
+    liveAbbrechenWegenFehler();
     stopScanAnim();
     textSetzen(elements.scanText, "");
 
@@ -955,7 +964,7 @@ export async function resumeQueueJob({ force = false } = {}) {
        serverseitig gelöscht → 404), den User NICHT mit einer Fehlermeldung
        erschrecken: still aufräumen und die normale Startseite zeigen. */
     if (!outcome || outcome.abandoned || outcome.error) {
-      liveAnzeige.abbrechen();
+      liveAbbrechenWegenFehler();
       clearStoredJobId();
       setStatus("");
       return;

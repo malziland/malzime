@@ -30,6 +30,10 @@ function mockRes() {
 
 describe("handleStats", () => {
   afterEach(() => jest.restoreAllMocks());
+  /* Rueckgabewerte der Zaehler-Attrappe gelten sonst fuer den naechsten Test
+     weiter — in anderer Reihenfolge lieferte leseRealitaetsCheck dann die
+     Werte eines frueheren Tests (gefunden mit --randomize, 01.10.2026). */
+  beforeEach(() => [getStats, getMaintenanceStatus, leseRealitaetsCheck].forEach((f) => f.mockReset()));
 
   test("returns 405 for POST", async () => {
     const res = mockRes();

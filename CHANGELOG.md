@@ -4,6 +4,15 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Nach einer gescheiterten Analyse verschwinden auch die schon gezeigten
+  Merkmale.** Scheiterte eine Analyse, nachdem schon erste Merkmal-Karten zu
+  sehen waren, standen diese halb gefüllt neben der Fehlermeldung. Jetzt
+  räumt jeder Fehlerweg sie mit ab.
+
 ## [4.13.2] — 2026-10-01
 
 ### Geändert

@@ -23,6 +23,10 @@ const { extrahiereLiveText } = require("./mistral-antwort");
 const { MISTRAL_ENDPOINT } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
 const { withMistralSlot } = require("./throttle");
+/* Workshop 01.10.2026: Ein Verbindungsabriss ("terminated", "fetch failed")
+   wird markiert und traegt den schon gelesenen Text mit — mistral.js rettet
+   ihn oder fragt einmal neu (verbindungsfehler.js). */
+const { markiereAbbruch } = require("./verbindungsfehler");
 
 /* Env-Variable, NICHT hartcodiert. Produktion seit 09.09.2026: MISTRAL_API_KEY_EU
    (an europe-west1 gebunden); lokal bleibt MISTRAL_API_KEY als zweiter Name. */
@@ -313,7 +317,7 @@ async function callMistralRawUnthrottled({
         e.code = "timeout";
         throw e;
       }
-      throw err;
+      throw markiereAbbruch(err, "");
     }
     /* Im Stream-Modus bleibt der Timeout SCHARF, bis der Stream zu Ende
        gelesen ist: `fetch` liefert dort schon bei den Headern zurueck, die
@@ -373,13 +377,15 @@ async function callMistralRawUnthrottled({
           e.teiltext = spur.text || "";
           throw e;
         }
-        throw err;
+        throw markiereAbbruch(err, spur.text);
       } finally {
         clearTimeout(timeoutId);
       }
     }
 
-    const json = await res.json();
+    const json = await res.json().catch((err) => {
+      throw markiereAbbruch(err, "");
+    });
     const choice = json.choices?.[0];
     let text = "";
     const msgContent = choice?.message?.content;

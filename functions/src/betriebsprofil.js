@@ -297,9 +297,31 @@ async function leseFrisch(jetzt) {
      hereinkommt, soll nicht ebenfalls das grosse Limit bekommen. */
   const limit = schonGelesen ? LESE_ZEITLIMIT_MS : ERSTES_LESE_ZEITLIMIT_MS;
   schonGelesen = true;
+  /* Workshop 01.10.2026: Bei einer Zeitueberschreitung stand bisher nur
+     "laenger als 2000 ms" im Protokoll — wie lange der Zugriff WIRKLICH
+     brauchte, blieb offen (SECURITY-MODEL, "Ein Ausrutscher der Datenbank
+     ist kein Alarm": gemessen am 10.09. auf Googles Seite <= 0,15 s, die Zeit
+     ging dazwischen verloren). Kommt die Antwort nach dem Zeitlimit doch
+     noch, wird ihre Dauer einmal protokolliert. Nur eine Zahl, nichts sonst
+     (Datenschutzerklaerung: "wie lange er dauerte"). */
+  const leseStart = Date.now();
+  let zuSpaet = false;
+  /* In einer Promise-Kette: Wirft schon `datenbank()` sofort (Befund R-07),
+     landet das im catch unten wie jeder andere Lesefehler — nicht ungeprotokolliert
+     beim Aufrufer. */
+  const lesen = Promise.resolve().then(() => datenbank().doc(DOKUMENT).get());
+  lesen.then(
+    () => {
+      if (zuSpaet)
+        console.log(
+          JSON.stringify({ step: "betriebsprofil", status: "spaete-antwort", dauerMs: Date.now() - leseStart })
+        );
+    },
+    () => {}
+  );
   try {
     const snap = await Promise.race([
-      datenbank().doc(DOKUMENT).get(),
+      lesen,
       new Promise((_, ab) => {
         zeitgeber = setTimeout(() => ab(new Error(`Zeitlimit ${limit} ms`)), limit);
         /* unref: Ein wartender Timer darf den Prozess nicht am Ende hindern. */
@@ -328,6 +350,7 @@ async function leseFrisch(jetzt) {
     }
   } catch (fehler) {
     ergebnis.grund = `nicht lesbar: ${String(fehler.message)}`;
+    if (/^Zeitlimit /.test(String(fehler.message))) zuSpaet = true;
   } finally {
     if (zeitgeber) clearTimeout(zeitgeber);
   }

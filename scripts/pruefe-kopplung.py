@@ -80,7 +80,20 @@ ZEILEN_GRENZEN = {
     # wirkungslos und die Datei koennte unbemerkt zurueckwachsen.
     # Nach VIER Schnitten von 1681 auf 696 Zeilen. Uebrig ist der
     # Ein-Aufruf-Weg, der taegliche Normalfall.
-    "functions/src/mistral.js": 760,
+    #
+    # ANGEHOBEN 01.10.2026 von 760 auf 790 (Workshop 01.10.: Verbindungsabriss
+    # zu Mistral): Die Behandlung selbst — Erkennen, Markieren, Grund ohne
+    # Adressen, Neuversuch, Rettbarkeit — steht im NEUEN verbindungsfehler.js
+    # (Grenze unten). Hier bleiben nur die Aufrufstellen im Ein-Aufruf-Weg:
+    # der Neuversuch um den ersten Aufruf, die Warnung beim ersten Abriss und
+    # das Feld `ursache` in zwei Fehlerzeilen. Sie herauszuloesen hiesse, den
+    # Ablauf des Normalfalls zu verstecken.
+    "functions/src/mistral.js": 790,
+    # Abgetrennt 01.10.2026 — sonst waere die Grenze oben umgehbar.
+    # 150 -> 170 noch am selben Tag: Die Positivliste der zulaessigen
+    # Fehlertexte (Befund R-03, Datenschutz) ersetzt die Maskierung nach
+    # Mustern und ist eine Liste, keine Logik.
+    "functions/src/verbindungsfehler.js": 170,
     # Der Netzzugriff, dritter Schnitt.
     "functions/src/mistral-http.js": 450,
     # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.

@@ -616,10 +616,29 @@ etwaigen Retry-After-Angabe von Mistral):
       --format='value(timestamp,jsonPayload.status,jsonPayload.versuch,jsonPayload.wartezeitMs,jsonPayload.retryAfter)'
 
 Nachsehen, welche Analysen trotz aller Wiederholungen scheiterten (Feld
-`wiederholungen` sagt, wie viele es waren):
+`wiederholungen` sagt, wie viele es waren; `ursache` nennt bei einem
+Verbindungsabriss den Grund, den Node.js liefert — den Code und, nur wenn er
+einer festen bekannten Meldung entspricht, den Kurztext; nie Adressen. Beispiel:
+`UND_ERR_SOCKET` / „other side closed“ = die Gegenstelle (Mistral oder das
+vorgeschaltete Netz von Cloudflare) hat die Verbindung beendet):
 
     gcloud logging read 'jsonPayload.alert="single-large-failed"' \
-      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.error,jsonPayload.wiederholungen)'
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.error,jsonPayload.ursache.code,jsonPayload.ursache.text,jsonPayload.wiederholungen)'
+
+**Verbindungsabriss (seit 01.10.2026).** Reißt die Verbindung zu Mistral ab
+(`error` = „terminated“ oder „fetch failed“), rettet das Programm zuerst einen
+schon fast fertigen Text; sonst fragt es EINMAL neu (Warnung
+`abbruch-neuversuch`, kein Alarm). Erst wenn auch der Neuversuch scheitert,
+kommt die Nachricht „Analyse gescheitert“; mehr als drei Abrisse in 24 Stunden
+melden sich als „KI-Verbindung bricht gehäuft ab“. Scheitert nur die Nachfrage
+nach fehlenden Karten und trug das erste Ergebnis schon Karten, steht eine Warnung
+`nachfrage-gescheitert` im Protokoll — die Analyse ist geliefert. Scheitert das
+Laden des Fotos endgültig, steht `foto-laden-gescheitert` (Feld `fehler`) im
+Protokoll und es kommt die Nachricht „Analyse gescheitert“. Wie oft Abrisse
+vorkommen:
+
+    gcloud logging read 'jsonPayload.status="abbruch-neuversuch"' \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.ursache.code,jsonPayload.ursache.text)'
 
 (Beide Abfragen sehen einen Tag zurück — länger hält der Betriebs-Speicher
 nicht. Für Wochenvergleiche von Dauer und Wiederholungen zählt die Zeile `mistral-single-large` im

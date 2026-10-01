@@ -9,16 +9,17 @@ erst Tage später zu merken.
 ## Wie es funktioniert
 
 ```
-Function loggt severity>=ERROR
+Function loggt eine Fehlerzeile
         │
         ▼
-Cloud Monitoring  ── log-basierte Alert-Policy "malziME Function Errors"
+Cloud Monitoring  ── drei log-basierte Richtlinien, je nach Art der Zeile:
+        │             „Kinderschutz-Treffer“, „Analyse gescheitert (KI-Dienst)“,
+        │             „Function Errors“ (alles andere) — jede mit eigenem Betreff
+        ▼
+Notification Channels  ── Webhook (ntfy-Push) und E-Mail
         │
         ▼
-Notification Channel  ── Webhook
-        │
-        ▼
-Benachrichtigung (malziME nutzt ntfy-Push aufs Handy)
+Benachrichtigung: Betreff der E-Mail = Titel des Pushs = Art des Fehlers
 ```
 
 Bewusst **log-basiert**, nicht metrik-basiert: Die Functions laufen als 2nd-Gen
@@ -52,54 +53,78 @@ gcloud alpha monitoring channels create \
 
 > malziME pusht an einen eigenen ntfy-Server. Die URL nutzt ntfy-Templating
 > (`?template=1`), um `title`/`message` aus dem Cloud-Monitoring-Incident-JSON
-> zu rendern (`{{.incident.summary}}`, `{{.incident.url}}`). Wichtig: ntfy
-> templatet nur `title` und `message` — **nicht** `click`. Tap-Links daher in
-> den Nachrichtentext legen.
+> zu rendern: Titel `⚠️ {{.incident.documentation.subject}}` (der Betreff des
+> jeweiligen Alarms, seit 01.10.2026), Text `{{.incident.summary}}` und
+> `{{.incident.url}}`. Wichtig: ntfy templatet nur `title` und `message` —
+> **nicht** `click`. Tap-Links daher in den Nachrichtentext legen.
 
-### 2. Log-basierte Alert-Policy anlegen
+### 2. Log-basierte Richtlinien anlegen (drei, seit 01.10.2026)
 
-Policy-Definition als JSON (`policy.json`):
+Jede Art Fehlerzeile bekommt eine eigene Richtlinie mit eigenem Betreff — der
+Betreff steht in der E-Mail und als Titel im Push, also sieht man schon auf dem
+Sperrbildschirm, was los ist. Alle drei haben dieselben Dienste im Filter und
+dieselben Kanäle; zusammen decken sie genau das ab, was vorher eine einzige
+Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung.
+
+| Richtlinie | Betreff | Filter (nach dem gemeinsamen Teil) |
+|---|---|---|
+| `malziME Kinderschutz-Treffer` | „malziME: Kinderschutz-Treffer (Analyse lief normal)“ | `jsonPayload.step="minor-safety-durchbruch"` |
+| `malziME Analyse gescheitert (KI-Dienst)` | „malziME: Analyse gescheitert – ein Kind sah eine Fehlermeldung (Details im Text)“ | `severity>=ERROR AND jsonPayload.alert=("single-large-failed" OR "foto-laden-gescheitert")` |
+| `malziME Function Errors` | „malziME: Fehler im Server (Details im Text)“ | `severity>=ERROR AND NOT jsonPayload.step="minor-safety-durchbruch" AND NOT jsonPayload.alert=("single-large-failed" OR "foto-laden-gescheitert")` |
+
+Dazu kommt eine Schwellen-Richtlinie (wie die für Browser-Fehler unten):
+`malziME KI-Verbindung bricht gehäuft ab` — Betreff „malziME: KI-Verbindung bricht
+gehäuft ab (mehr als 3 Neuversuche an einem Tag)“, zählt die log-basierte Metrik
+`ki_verbindungsabriss` (Filter: Dienst `processjob`,
+`jsonPayload.status="abbruch-neuversuch"`) über 24 Stunden. Sie meldet gehäufte
+Abrisse auch dann, wenn jeder Neuversuch gelang.
+
+Gemeinsamer Teil jedes Filters:
+`resource.type="cloud_run_revision" AND resource.labels.service_name=("admin" OR "stats" OR "enqueue" OR "processjob" OR "jobstatus" OR "reapjobs" OR "laufzeitwache" OR "satzwache")`.
+Die Kinderschutz-Zeile schreibt `console.error` ohne eigenes Schwere-Feld; sie kommt
+als ERROR an, ihr Filter braucht die Schwere deshalb nicht.
+
+Muster einer Richtlinie (`policy.json`, Platzhalter in spitzen Klammern):
 
 ```json
 {
-  "displayName": "malziME Function Errors",
+  "displayName": "<Name aus der Tabelle>",
   "documentation": {
-    "subject": "malziME-Hinweis: Fehlerzeile oder Kinderschutz-Treffer (Details im Text)",
+    "subject": "<Betreff aus der Tabelle>",
     "mimeType": "text/markdown",
-    "content": "<Klartext: was die Mail bedeutet, häufigste Anlässe, wo nachsehen>"
+    "content": "<Klartext: was die Nachricht bedeutet, wo im RUNBOOK nachsehen>"
   },
   "conditions": [{
-    "displayName": "ERROR-Log in malziME-Functions",
-    "conditionMatchedLog": {
-      "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=(\"analyze\" OR \"admin\" OR \"stats\" OR \"enqueue\" OR \"processjob\" OR \"jobstatus\" OR \"reapjobs\") AND severity>=ERROR"
-    }
+    "displayName": "<kurzer Name>",
+    "conditionMatchedLog": { "filter": "<gemeinsamer Teil> AND <Filter aus der Tabelle>" }
   }],
   "combiner": "OR",
-  "alertStrategy": {
-    "notificationRateLimit": { "period": "300s" },
-    "autoClose": "1800s"
-  },
-  "notificationChannels": ["<CHANNEL-RESOURCE-NAME>"],
+  "alertStrategy": { "notificationRateLimit": { "period": "300s" }, "autoClose": "1800s" },
+  "notificationChannels": ["<CHANNEL-RESOURCE-NAME>", "<…>"],
   "enabled": true
 }
 ```
 
 ```bash
-gcloud alpha monitoring policies create \
-  --policy-from-file=policy.json --project=<PROJECT>
+gcloud alpha monitoring policies create --policy-from-file=policy.json --project=<PROJECT>
 ```
 
 Der `notificationRateLimit` (300s) verhindert Push-Spam bei einem Fehler-Sturm.
-
-**Warum Betreff und Text den Kinderschutz-Treffer nennen (seit 16.09.2026).**
-Die Mail kam am 16.09.2026 während eines Workshops und sah aus wie ein
-Systemausfall. Anlass war aber die Zeile `minor-safety-durchbruch`: ein Wort
-aus der harten Sperrliste im Profiltext, die Analyse selbst lief normal. Der
-Text der Richtlinie sagt seitdem in Klartext, was die Mail bedeutet, welche
-Anlässe am häufigsten sind (Kinderschutz-Treffer, Scanner-Rauschen) und wo im
-RUNBOOK nachzusehen ist. Geändert wird er über die Monitoring-Schnittstelle
+Betreff und Text ändert man über die Monitoring-Schnittstelle
 (`PATCH …/alertPolicies/<ID>?updateMask=documentation`), weil
-`gcloud alpha monitoring policies update` den Betreff nicht setzen kann.
+`gcloud alpha monitoring policies update` den Betreff nicht setzen kann. Den
+Ist-Stand zeigt jederzeit `gcloud alpha monitoring policies list --project=malzime`.
+
+**Vorgeschichte.** Bis 01.10.2026 lief jede Fehlerzeile über die eine Richtlinie
+„malziME Function Errors“. Ihr Betreff nannte seit 16.09.2026 „Fehlerzeile oder
+Kinderschutz-Treffer“, weil ein Kinderschutz-Treffer wie ein Systemausfall
+ausgesehen hatte — und passte damit am 01.10.2026 nicht zu zwei gescheiterten
+Analysen. Geprüft wurde die Aufteilung an den echten Protokollen des 01.10.: Der
+KI-Filter traf genau die zwei gescheiterten Analysen von 11:01 und 11:03, der
+Rest-Filter keine davon; eine Probezeile löste die Richtlinie „Analyse gescheitert
+(KI-Dienst)“ aus. Der Kinderschutz-Filter hatte an diesem Tag keine echte Zeile,
+an der er sich hätte beweisen können — er ist an der Code-Stelle belegt
+(`job-helfer.js`, einzige Quelle des Schritts).
 
 ## Zweite Richtlinie: Haeufung von Client-Fehlern (seit 2026-08-21)
 
@@ -254,11 +279,16 @@ Was bei einem roten Nachtlauf zu tun ist: `docs/RUNBOOK.md`, Abschnitt
 ## Was passiert dann?
 
 - Loggt eine Function einen Fehler, kommt eine Benachrichtigung — bei malziME
-  per E-Mail (nachweislich zugestellt) und zusätzlich als ntfy-Push mit
-  ⚠️-Symbol, Fehlertext und Link zur Cloud Console.
+  per E-Mail und als ntfy-Push. Betreff der E-Mail und Titel des Pushs nennen
+  die Art (Kinderschutz-Treffer, gescheiterte Analyse, sonstiger Fehler); der
+  Push-Text enthält Googles Zusammenfassung und den Link zur Cloud Console.
 - Handled per-Request-Fehler (HTTP 4xx/5xx an den Client, nur `console.log`)
-  lösen **nicht** aus — nur echte `severity>=ERROR`-Logs (Abstürze, OOM,
-  Timeouts, eskalierte Fehler wie `counter-fail-open`).
+  lösen **nicht** aus. Die drei log-basierten Richtlinien reagieren auf
+  `severity>=ERROR` (Abstürze, OOM, Timeouts, eskalierte Fehler wie
+  `counter-fail-open`, gescheiterte Analysen, Kinderschutz-Treffer) der
+  Server-Dienste. Die zwei Schwellen-Richtlinien zählen Zeilen außerhalb davon:
+  die Fehlermeldungen aus Browsern (Dienst `errors`, nicht in der Dienstliste
+  der drei Filter) und die Warnungen `abbruch-neuversuch`.
 
 ## Datenschutz
 

@@ -396,8 +396,116 @@ mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
 (Abfrage im RUNBOOK; ein einzelner träger Lauf erzeugt bis zu fünf Warnungen
 in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
 sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
-verschoben. Stand 10.09.2026: drei Minuten an diesem Tag (10:55, 11:18, 11:19
-Wien) — an der Grenze, nicht darüber.
+verschoben. Stand 01.10.2026, 13:00 Wien: drei Minuten an diesem Tag (10:52,
+11:30, 12:57) — an der Grenze, nicht darüber, wie am 10.09.2026. Seit 01.10.2026 protokolliert
+`betriebsprofil.js` zusätzlich, wie lange ein zu später Zugriff tatsächlich
+brauchte, sobald die Antwort doch noch kommt (`status: "spaete-antwort"`, nur
+`dauerMs`) — bisher stand dort nur „länger als 2000 ms“.
+
+## Verbindungsabriss zu Mistral: einmal neu fragen (01.10.2026)
+
+**Entscheidung.** Reißt die Verbindung zu Mistral während einer Analyse ab
+(Node.js meldet „terminated“ oder „fetch failed“, Grund in `err.cause`), wird
+zuerst ein schon im Strom angekommener Text gerettet wie beim Zeitlimit; reicht
+er nicht, fragt `mistral.js` EINMAL neu, ohne Live-Text, mit dem Restbudget. Der
+erste Abriss ist eine Warnung (`abbruch-neuversuch`), erst ein gescheiterter
+Neuversuch schreibt die Fehlerzeile mit Alarm. Antworten von Mistral
+(HTTP-Fehler) und unser eigenes Zeitlimit sind kein Abriss.
+
+Scheitert nur die Nachfrage nach fehlenden Karten, entscheidet dasselbe Merkmal
+wie in der Verarbeitung (`hasCategories`): Trägt das erste Ergebnis schon
+Karten, ist die Analyse geliefert — Warnung `nachfrage-gescheitert`, kein Alarm.
+Trägt es keine, ist es ein Ausfall — Fehlerzeile mit Alarm
+(`attempt: retry-ohne-ergebnis`). Ausnahme ohne Behebung: Ein Tierfoto ohne
+Karten wird trotzdem mit Tierprofilen ausgeliefert, der Alarm ist dann ein
+Fehlalarm (setzt ein Fehlverhalten des Modells voraus; gehört zur offenen Frage,
+den Alarm dort zu entscheiden, wo der Ausgang der Analyse bekannt ist).
+
+Gehäufte Abrisse zählt die log-basierte Metrik `ki_verbindungsabriss`; mehr als
+drei in 24 Stunden lösen den Alarm „KI-Verbindung bricht gehäuft ab“ aus — auch
+wenn jeder Neuversuch gelang.
+
+**Begründung.** Am 01.10.2026 scheiterten 2 von 30 Analysen eines Workshops an
+einem Abriss; beide Kinder sahen sofort die Fehlermeldung. Ein Neuversuch kostet
+höchstens einen KI-Aufruf mehr je Abriss. Wie oft die Fehlerart früher vorkam,
+ist nur eingeschränkt belegbar: Der 30-Tage-Speicher enthält Fehlerzeilen der KI
+nur aus der Zeit vor der Umstellung des Diagnose-Speichers (Abschnitt
+„Diagnose-Speicher: nur, was der Datenschutztext nennt“) — darin kein Abriss,
+gefunden wurden nur Überlastungen (429) und ein 503 am 07./08.09.2026; seither
+bleiben Fehlerzeilen nur einen Tag.
+
+**Datenschutz.** Ins technische Protokoll kommt der Grund nur als
+`ursache: { code, text }`: der Fehlercode als feste Kennung (z. B.
+`UND_ERR_SOCKET`) und ein Kurztext NUR, wenn er wörtlich einer festen Meldung aus
+einer Positivliste entspricht (z. B. „other side closed“) — sonst `null`. Eine
+Maskierung nach Mustern wurde verworfen, weil sie nicht jede Adress-Schreibweise
+erwischte. Die Verbindungsdaten, die Node.js anhängt (Adressen und Ports beider
+Seiten), werden nie geschrieben (`verbindungsfehler.js`, geprüft in
+`mistral-verbindungsabbruch.test.js` an jeder Zeile, auch gegen halbe Adressen).
+Das entspricht dem, was die Datenschutzerklärung für das technische Protokoll
+nennt: ob ein Schritt geklappt hat — keine IP-Adresse. Dass das Foto beim
+Neuversuch ein zweites Mal an Mistral geht, deckt die Erklärung (sie nennt den
+Zweck, keine Anzahl).
+
+**Offen: Live-Text bleibt beim Neuversuch stehen.** Der Neuversuch läuft ohne
+Live-Text. Bis sein Ergebnis da ist, sieht das Kind den Text, der vor dem Abriss
+ankam; das Ergebnis kommt dann aus einer anderen Modellantwort und ersetzt ihn.
+Das Ergebnis selbst ist richtig. Eine Behebung (den Live-Text im Auftrag
+zurücksetzen und im Browser sichtbar neu anfangen) braucht eine Änderung an der
+Live-Anzeige; ob sie gebaut wird, entscheidet Christoph (vorgelegt 01.10.2026).
+
+**Betrachtete Alternative.** Mehrere Neuversuche oder Pausen wie bei der
+Überlastung (429): verworfen — ein Abriss ist kein Zeichen von Überlast, und jeder
+weitere Versuch verlängert die Wartezeit des Kindes.
+
+**Bedingung für Neubewertung.** Der Alarm „KI-Verbindung bricht gehäuft ab“
+(mehr als drei Abrisse in 24 Stunden) oder ein Neuversuch, der selbst scheitert —
+dann liegt die Ursache außerhalb eines Einzelfalls, und `ursache.code` zeigt, wo.
+
+## Foto direkt laden statt über den Download-Weg der Speicher-Bibliothek (01.10.2026)
+
+**Entscheidung.** `queue-storage.js` lädt das Foto mit EINER Anfrage an dieselbe
+Adresse, die `@google-cloud/storage` benutzt (`…/storage/v1/b/<Fach>/o/<Objekt>?alt=media`),
+mit der Anmeldung der Bibliothek, ihrer Prüfsumme (crc32c aus `x-goog-hash`, mit
+ihrem Prüfsummen-Erzeuger) und ihren Wiederholungsregeln (`retryOptions`;
+wiederholt bei 408/429/5xx, Verbindungsabriss, Zeitüberschreitung und falscher
+Prüfsumme; Pause wie in `retry-request`). Je Versuch gilt ein Zeitlimit, ein Foto
+ist klein. Den Bildtyp liefert die Antwort selbst; die zweite Anfrage nach den
+Metadaten entfällt.
+
+**Begründung, gemessen.** Seit 4.13.0 schrieb jede Analyse
+„MaxListenersExceededWarning … PassThrough“ ins Protokoll: Der Download-Weg der
+Bibliothek hängt über ihr Hilfspaket teeny-request (`index.js:194`) dieselben
+Zuhörer mehrfach an einen Strom, ab etwa 64 KB; mit 7.22 nie. Die unabhängige
+Prüfung fand an derselben Stelle den schwereren Fehler: Antwortet der Speicher
+mit 429 oder 5xx, wirft dieser Weg einen ungefangenen Fehler
+(`ERR_STREAM_UNABLE_TO_PIPE`) und reißt den ganzen Prozess mit — gemessen am
+lokalen Schein-Speicher mit 8.2.0 UND 7.22.0, also auch in den ausgelieferten
+Fassungen bis 4.13.0. Eine reparierte Fassung gab es nicht. Datenweg unverändert:
+unser Server liest unser Fach.
+
+**Scheitert das Laden endgültig** (nach allen Wiederholungen, oder 401/403/404),
+schreibt `queue-storage.js` eine Fehlerzeile `foto-laden-gescheitert` (nur
+Fehlerart und Grund-Code, kein Pfad, keine Kennung); sie löst die Nachricht
+„Analyse gescheitert“ aus. Vorher war dieser Fall nur laut, weil der Prozess
+abstürzte.
+
+**Bewusste Abweichung bei der Prüfsumme.** Fehlt die Angabe `x-goog-hash` in
+der Antwort, wird das Foto ohne Vergleich angenommen (die Bibliothek würde
+abbrechen); Google sendet sie bei jedem Download. Mit `Content-Encoding: gzip`
+gespeicherte Objekte vergleicht der direkte Weg nicht entpackt — `storeImage`
+speichert nie so.
+
+**Betrachtete Alternativen.** Die Speicher-Bibliothek auf 7.22 zurückstellen:
+verworfen — firebase-admin 14.5 verlangt 8, und 7.22 stürzt bei 429/5xx genauso
+ab. Die Warnung abschalten: verworfen, das ließe den Absturz stehen und
+verdeckte die Fehlerklasse, für die es die Warnung gibt.
+
+**Bedingung für Neubewertung.** Eine Fassung von teeny-request oder der
+Speicher-Bibliothek, die BEIDES behebt — die Warnung und den Absturz bei 429/5xx.
+Geprüft wird das mit `functions/src/__tests__/hilfen/foto-laden-probe.cjs` bei
+abgeschaltetem direktem Weg, auch mit einer Antwortfolge „429, dann 200“
+(`PROBE_STATUS=429,200`).
 
 ## HEIC-Fotos im Browser öffnen: WebAssembly und LGPL (08.09.2026)
 

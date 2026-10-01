@@ -31,6 +31,12 @@ const {
   setFetchForTest,
   _setLiveIntervalMsForTest,
 } = require("./mistral-http");
+const {
+  ursacheVon,
+  meldeAbbruchMitNeuversuch,
+  mitEinemNeuversuchBeiAbbruch,
+  hatRettbarenTeiltext,
+} = require("./verbindungsfehler");
 
 const {
   extrahiereLiveText,
@@ -254,7 +260,14 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      HOECHSTENS EINMAL je Analyse, auch wenn nachgefragt wird (siehe
      loggeKiDauer). */
   const dauer = { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false };
-  let parsed = await callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer);
+  /* Workshop 01.10.2026: Reisst die Verbindung ab (nicht: Antwort von
+     Mistral, unser Zeitlimit), wird EINMAL neu gefragt — Restbudget, ohne
+     Live-Text; der gezeigte Text bleibt bis zum Ergebnis stehen (bewusst,
+     SECURITY-MODEL 01.10.2026). */
+  let parsed = await mitEinemNeuversuchBeiAbbruch(
+    () => callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer),
+    () => callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer)
+  );
   let missing = parsed
     ? collectMissingForBothModes(parsed)
     : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };
@@ -293,7 +306,14 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
     try {
       /* Gleicher cacheKey wie im ersten Versuch — der statische Anfang ist in
          beiden Versuchen bitgleich, der Cache traegt also auch den Retry. */
-      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, "retry", cacheKey, undefined, dauer);
+      /* Befunde Q-02/T-01: Nur wenn das erste Ergebnis schon Karten traegt —
+         dasselbe Merkmal wie job-helfer.hasCategories in der Pipeline —, ist
+         die Analyse bei gescheiterter Nachfrage geliefert (Warnung); sonst
+         Ausfall: eigener Name, Fehlerzeile mit Alarm. */
+      const karten = (b) => Boolean(b && b.categories && Object.keys(b.categories).length > 0);
+      const geliefert = karten(parsed.standard) || karten(parsed.beast);
+      const nachfrage = geliefert ? "retry" : "retry-ohne-ergebnis";
+      const retryParsed = await callSingleLarge(retryMessages, remainingBudget, nachfrage, cacheKey, undefined, dauer);
       if (retryParsed) {
         /* Fehlende Karten aus Retry in Originalergebnis mergen (analog runProfile) */
         for (const mode of ["standard", "beast"]) {
@@ -547,6 +567,8 @@ async function generateBeastAds(boostProfile, standardAds, lang) {
         step: "mistral-beast-ads",
         status: "failed",
         error: err.message,
+        /* Grund eines Abrisses, ohne Adressen (verbindungsfehler.js). */
+        ursache: ursacheVon(err),
       })
     );
     return null;
@@ -672,7 +694,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        abgeschnittenes JSON bereits mit (Stufe truncation-recovery); sie war
        hier nur nie erreichbar, weil der Teiltext mit dem Stack-Frame starb.
        Greift die Rettung nicht, laeuft alles exakt wie bisher weiter. */
-    if (err && err.code === "timeout" && typeof err.teiltext === "string" && err.teiltext.length > 0) {
+    if (hatRettbarenTeiltext(err)) {
       const rettungsStufen = [];
       const gerettet = parseSafely(err.teiltext, {
         requireSchema: false,
@@ -701,10 +723,20 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        erreicht — gefunden wurden sie erst, weil ein Nutzer sich beschwerte.
        Genau das ist die Frage aus KERN 4: Wer wuerde es merken, wenn das hier
        falsch waere? Bis hierher: niemand. */
-    console.error(
+    /* Erster Abriss: Warnung, es folgt ein Neuversuch (runSingleLargeCall). */
+    if (err && err.verbindungsabbruch && attemptLabel === "first") {
+      meldeAbbruchMitNeuversuch({ profil: aktivesProfil, attempt: attemptLabel, err });
+      throw err;
+    }
+    /* Befunde R-05/S-07 (01.10.2026): Scheitert nur die NACHFRAGE nach
+       fehlenden Karten, ist die Analyse schon geliefert (runSingleLargeCall
+       macht mit dem ersten Ergebnis weiter) — Warnung, kein Alarm
+       "Analyse gescheitert". Felder wie die Fehlerzeile. */
+    const melde = attemptLabel === "retry" ? console.warn : console.error;
+    melde(
       JSON.stringify({
-        severity: "ERROR",
-        alert: "single-large-failed",
+        severity: attemptLabel === "retry" ? "WARNING" : "ERROR",
+        alert: attemptLabel === "retry" ? undefined : "single-large-failed",
         step: "mistral-single-large-details",
         /* Befund aus dem zweiten Review (30.08.2026): Ohne diese Angabe war im
            Fehlerfall nicht feststellbar, mit welchen Werten die Analyse lief —
@@ -712,12 +744,14 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
            es galten die Code-Werte. */
         profil: aktivesProfil || null,
         attempt: attemptLabel,
-        status: "error",
+        status: attemptLabel === "retry" ? "nachfrage-gescheitert" : "error",
         error: err.message,
         /* `timeout` trennt „das Modell war zu langsam" von „die API war weg" —
            ohne diese Unterscheidung ist am Alarm nicht zu erkennen, ob eine
            Zeitgrenze zu knapp sitzt oder Mistral eine Stoerung hat. */
         errorCode: err.code || null,
+        /* Grund eines Abrisses, nur Code und Kurztext (verbindungsfehler.js). */
+        ursache: ursacheVon(err),
         /* Wie viele Wiederholungen dem Scheitern vorausgingen — am 08.09.2026
            war es genau eine nach 2 s, und die Zahl stand nirgends. */
         wiederholungen: typeof err.wiederholungen === "number" ? err.wiederholungen : null,

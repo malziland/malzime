@@ -33,6 +33,7 @@ const os = require("os");
 const path = require("path");
 const { getStorage } = require("firebase-admin/storage");
 const { QUEUE_BUCKET, QUEUE_UPLOAD_PREFIX, isLocalQueueMode } = require("./config");
+const { istVerbindungsabbruch, ursacheVon } = require("./verbindungsfehler");
 
 const EXT_BY_MIME = {
   "image/jpeg": "jpg",
@@ -144,10 +145,145 @@ async function loadImage(objectPath) {
     return { buffer, mimeType: MIME_BY_EXT[ext] || "image/jpeg" };
   }
 
-  const file = bucket().file(objectPath);
+  const b = bucket();
+  /* Die echte Bibliothek: direkt laden (siehe ladeVomSpeicher). Die Attrappen
+     der aelteren Tests haben keinen Speicher-Dienst und laden wie bisher. */
+  if (hatSpeicherDienst(b)) {
+    try {
+      return await ladeVomSpeicher(b, objectPath);
+    } catch (err) {
+      /* Befund Q-01 (01.10.2026): Scheitert das Laden endgueltig, scheitert die
+         Analyse — das Kind sieht eine Fehlermeldung. Bisher war das laut, weil
+         der alte Weg den Prozess abstuerzen liess; jetzt meldet es diese Zeile
+         (Alarm "Analyse gescheitert"). Nur Fehlerart und Grund-Code, kein Pfad,
+         keine Kennung (Datenschutzerklaerung: welcher Schritt, ob er klappte). */
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          alert: "foto-laden-gescheitert",
+          step: "bild-laden",
+          status: "error",
+          fehler: fehlerArt(err),
+          ursache: ursacheVon(err),
+        })
+      );
+      throw err;
+    }
+  }
+  const file = b.file(objectPath);
   const [buffer] = await file.download();
   const [metadata] = await file.getMetadata();
   return { buffer, mimeType: (metadata && metadata.contentType) || "image/jpeg" };
+}
+
+/* Workshop 01.10.2026 (erster nach 4.13.0): Jede Analyse schrieb
+   "MaxListenersExceededWarning ... PassThrough" ins Protokoll. Gemessen: Der
+   Download-Weg der Speicher-Bibliothek (Hilfspaket teeny-request, index.js:194)
+   haengt dieselben Zuhoerer mehrfach an einen Strom — ab etwa 64 KB, also bei
+   jedem echten Foto; mit 7.22 nie. Schwerer wiegt, was die Pruefung dabei
+   fand: Antwortet der Speicher mit 429 oder 5xx, wirft derselbe Weg einen
+   ungefangenen Fehler (ERR_STREAM_UNABLE_TO_PIPE) und reisst den ganzen
+   Prozess mit — auch mit 7.22. Eine reparierte Fassung gibt es nicht.
+   Deshalb wird das Foto hier mit EINER Anfrage an dieselbe Adresse geholt,
+   die die Bibliothek benutzt, mit ihrer Anmeldung, ihrer Pruefsumme
+   (crc32c) und ihren Wiederholungsregeln (`retryOptions`: wiederholt bei
+   408/429/5xx, Verbindungsabriss und Pruefsummenfehler; Pause wie in
+   retry-request). Den Bildtyp nennt die Antwort selbst, die zweite Anfrage
+   nach den Metadaten entfaellt. Datenweg unveraendert: unser Server liest
+   unser Fach, sonst niemand. SECURITY-MODEL, 01.10.2026. */
+const WIEDERHOLBARE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+/* BLEIBT IM CODE — Schutzgrenze, keine Einstellung (wie LESE_ZEITLIMIT_MS in
+   betriebsprofil.js): Je Versuch hoechstens so lange, sonst haengt ein
+   stockender Speicher die Analyse bis an Nodes eigene Grenzen (Minuten). Ein
+   Foto ist klein (hoechstens 1280 Pixel, im Browser verkleinert). */
+const VERSUCH_ZEITLIMIT_MS = 30 * 1000;
+let versuchZeitlimitMs = VERSUCH_ZEITLIMIT_MS;
+let ladeFetch = (...args) => fetch(...args);
+let warten = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Dieselbe Pause wie retry-request der Bibliothek: Faktor hoch Versuch
+   Sekunden plus Zufall bis 1 s, gedeckelt durch maxRetryDelay. */
+function pauseVor(versuch, regeln) {
+  const faktor = typeof regeln.retryDelayMultiplier === "number" ? regeln.retryDelayMultiplier : 2;
+  const deckel = (typeof regeln.maxRetryDelay === "number" ? regeln.maxRetryDelay : 64) * 1000;
+  return Math.min(faktor ** versuch * 1000 + Math.floor(Math.random() * 1000), deckel);
+}
+
+/* Prueft die crc32c-Angabe der Antwort mit dem Pruefsummen-Erzeuger der
+   Bibliothek. Google sendet sie bei jedem Download (x-goog-hash). */
+function pruefsummeStimmt(dienst, buffer, hashKopf) {
+  const angabe = /(?:^|,)\s*crc32c=([^,\s]+)/.exec(String(hashKopf || ""));
+  if (!angabe || typeof dienst.crc32cGenerator !== "function") return true;
+  const summe = dienst.crc32cGenerator();
+  summe.update(buffer);
+  return summe.toString() === angabe[1];
+}
+
+/* Befunde T-02/T-03: Die Fehlerart nur in fester Form — HTTP-Status,
+   eine Grossbuchstaben-Kennung (CONTENT_DOWNLOAD_MISMATCH, ECONNRESET) oder
+   ein bekannter Fehlername (TimeoutError statt DOMException-Altcode 23).
+   Nie freier Text: Er koennte eine Adresse oder einen Pfad tragen. */
+const FEHLERNAMEN = new Set(["TimeoutError", "AbortError", "TypeError"]);
+function fehlerArt(err) {
+  const code = err && err.code;
+  if (Number.isInteger(code) && code >= 100 && code <= 599) return String(code);
+  if (typeof code === "string" && /^[A-Z][A-Z0-9_]{1,40}$/.test(code)) return code;
+  if (err && FEHLERNAMEN.has(err.name)) return err.name;
+  return "unbekannt";
+}
+
+/** Nimmt dieses Fach den direkten Weg? (Die echte Bibliothek: ja.) */
+function hatSpeicherDienst(b) {
+  return Boolean(b && typeof b.name === "string" && b.storage && b.storage.authClient);
+}
+
+async function ladeVomSpeicher(b, objectPath) {
+  const dienst = b.storage;
+  const basis = String(dienst.apiEndpoint || "https://storage.googleapis.com").replace(/\/+$/, "");
+  const adresse = `${basis}/storage/v1/b/${encodeURIComponent(b.name)}/o/${encodeURIComponent(objectPath)}?alt=media`;
+  const regeln = dienst.retryOptions || {};
+  const maxWiederholungen =
+    regeln.autoRetry === false ? 0 : Number.isInteger(regeln.maxRetries) ? regeln.maxRetries : 3;
+  let letzterFehler = null;
+  for (let versuch = 0; versuch <= maxWiederholungen; versuch++) {
+    if (versuch > 0) await warten(pauseVor(versuch, regeln));
+    /* GoogleAuth liefert den Zugang als Text, ein OAuth2-Client als { token }. */
+    const zugang = await dienst.authClient.getAccessToken();
+    const token = typeof zugang === "string" ? zugang : zugang && zugang.token;
+    let res;
+    try {
+      res = await ladeFetch(adresse, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(versuchZeitlimitMs),
+      });
+      if (res.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        if (!pruefsummeStimmt(dienst, buffer, res.headers.get("x-goog-hash"))) {
+          letzterFehler = new Error("Bildspeicher: Pruefsumme stimmt nicht");
+          letzterFehler.code = "CONTENT_DOWNLOAD_MISMATCH";
+          continue;
+        }
+        const typ = String(res.headers.get("content-type") || "")
+          .split(";")[0]
+          .trim();
+        return { buffer, mimeType: typ || "image/jpeg" };
+      }
+    } catch (err) {
+      if (!(err && err.name === "TimeoutError") && !istVerbindungsabbruch(err)) throw err;
+      letzterFehler = err;
+      continue;
+    }
+    try {
+      if (res.body && typeof res.body.cancel === "function") await res.body.cancel();
+    } catch (_) {
+      /* Verwerfen ist best effort. */
+    }
+    letzterFehler = new Error(`Bildspeicher HTTP ${res.status}`);
+    /* Wie ApiError der Bibliothek: Aufrufer pruefen `code` (404 = schon weg). */
+    letzterFehler.code = res.status;
+    if (!WIEDERHOLBARE_STATUS.has(res.status)) throw letzterFehler;
+  }
+  throw letzterFehler;
 }
 
 /**
@@ -211,6 +347,16 @@ module.exports = {
   _bucketFuerTest,
   storeImage,
   loadImage,
+  /* Fuer den Test der echten Verdrahtung (firebase-admin). */
+  _hatSpeicherDienst: hatSpeicherDienst,
+  /* Nur fuer Tests: Zeitlimit je Versuch (null = echtes). */
+  _setVersuchZeitlimitForTest: (ms) => {
+    versuchZeitlimitMs = ms || VERSUCH_ZEITLIMIT_MS;
+  },
+  /* Nur fuer Tests: Pausen der Wiederholungen ersetzen (null = echte). */
+  _setWartenForTest: (f) => {
+    warten = f || ((ms) => new Promise((r) => setTimeout(r, ms)));
+  },
   deleteImage,
   setBucketForTest,
 };

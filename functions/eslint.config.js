@@ -28,16 +28,20 @@ module.exports = [
            TextDecoder({stream:true}) — wie TextEncoder ein Node-Global. */
         TextDecoder: "readonly",
         AbortController: "readonly",
+        AbortSignal: "readonly",
         fetch: "readonly",
       },
     },
     rules: {
-      "no-unused-vars": ["warn", {
-        argsIgnorePattern: "^_",
-        varsIgnorePattern: "^_",
-        caughtErrorsIgnorePattern: "^_",
-        destructuredArrayIgnorePattern: "^_",
-      }],
+      "no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+        },
+      ],
       "no-console": "off",
     },
   },

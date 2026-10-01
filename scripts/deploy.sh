@@ -211,6 +211,79 @@ else
         exit 1
       fi
     done
+    # ── Herkunft des HEIC-Dekoders (Befunde G-02, H-04, H-10 vom 30.09.2026) ──
+    # Der Workflow libheif-Bau baut public/lib/libheif/ aus den Hersteller-
+    # Quellen nach und vergleicht Byte fuer Byte (Job bauen); der Job
+    # kontrollbau haelt die Bauumgebung gegen die frueher ausgelieferte Datei.
+    # Er ist KEIN Pflicht-Check: Er laeuft nur bei Aenderungen am Dekoder oder
+    # am Rezept, und ein Pflicht-Check mit Pfadfilter bliebe bei allen anderen
+    # Pull Requests auf "wartend" stehen. Deshalb verlangt ihn der Deploy: Fuer
+    # den juengsten Commit, der Dekoder, Rezept oder Workflow geaendert hat,
+    # muss der juengste Lauf DIESES Workflows abgeschlossen und gruen sein —
+    # beide Jobs zusammen, gebunden an den Workflow statt an einen Jobnamen.
+    LIBHEIF_SHA=$(git log -1 --format=%H -- public/lib/libheif scripts/libheif-bauen.sh .github/workflows/libheif-bau.yml)
+    if [ -n "$LIBHEIF_SHA" ] && [ ! -d public/lib/libheif ]; then
+      # Rueckweg (docs/SECURITY-MODEL.md): Dekoder entfernt — dann gibt es nichts
+      # nachzuweisen.
+      echo "Hinweis: public/lib/libheif fehlt (Dekoder entfernt) — kein Herkunftsnachweis noetig."
+    elif [ -n "$LIBHEIF_SHA" ]; then
+      BAU=$(gh api "repos/malziland/malzime/actions/workflows/libheif-bau.yml/runs?head_sha=$LIBHEIF_SHA&per_page=20" \
+        --jq '[.workflow_runs[]] | if length == 0 then "fehlt" else (max_by(.created_at) | if .status != "completed" then "laeuft" else (.conclusion // "unbekannt") end) end' \
+        2>/dev/null || echo "nicht abrufbar")
+      if [ "$BAU" != "success" ]; then
+        echo "FEHLER: Herkunftsnachweis des HEIC-Dekoders (Workflow libheif-Bau) ist fuer $LIBHEIF_SHA nicht gruen (Ist: $BAU)." >&2
+        echo "        Die ausgelieferten Dateien waeren dann nicht als Bau aus dem Rezept belegt. docs/RUNBOOK.md, libheif neu bauen." >&2
+        echo "        Notschalter: SKIP_STAND=1" >&2
+        exit 1
+      fi
+      echo "Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen fuer $LIBHEIF_SHA."
+    fi
+
+    # ── Laeuft der Nachtlauf ueberhaupt? (Befunde H-03, K-01) ──
+    # Ein ausbleibender Nachtlauf alarmiert niemanden: GitHub schaltet geplante
+    # Workflows nach 60 Tagen ohne Aktivitaet ab und verwirft unter Last
+    # gelegentlich Laeufe. Geprueft wird nicht seine Farbe — ein roter
+    # Nachtlauf hat Alarm gegeben und darf den Deploy nicht blockieren, der ihn
+    # behebt —, sondern dass er WIRKLICH gelaufen ist:
+    #   · nur Laeufe dieses Repositorys (Befund J-03: `branch=main` liefert auch
+    #     Laeufe aus Forks, deren Zweig "main" heisst),
+    #   · nur nach Zeitplan oder von Hand gestartet, und nur mit Ergebnis
+    #     "success" oder "failure" (Befund K-01: Ist die Workflow-Datei
+    #     unlesbar, legt GitHub bei jedem Push einen roten Lauf OHNE Jobs an —
+    #     Ereignis "push", den der Pull Request nicht anzeigt. Abgebrochene
+    #     oder nie gestartete Laeufe haben ebenfalls nichts geprueft),
+    #   · mit GENAU der Fassung von sicherheit-nachts.yml, die ausgeliefert
+    #     wird: Nach jeder Aenderung am Nachtlauf muss er einmal gelaufen sein,
+    #     sonst ist nicht belegt, dass die neue Fassung ueberhaupt laeuft,
+    #   · nicht aelter als die Grenze.
+    # Die Grenze steht NUR hier (Befund J-08); die Doku verweist auf sie.
+    # Verglichen wird in Minuten — mit ganzen Stunden liesse "26" bis 26:59 durch.
+    NACHT_GRENZE_MINUTEN=1560 # 26 Stunden: taeglicher Lauf plus Spielraum
+    NACHT=$(gh api "repos/malziland/malzime/actions/workflows/sicherheit-nachts.yml/runs?branch=main&status=completed&per_page=20" \
+      --jq '[.workflow_runs[] | select(.head_repository.full_name == "malziland/malzime" and (.event == "schedule" or .event == "workflow_dispatch") and (.conclusion == "success" or .conclusion == "failure"))] | if length == 0 then "fehlt fehlt" else (.[0] | .created_at + " " + .head_sha) end' \
+      2>/dev/null || echo "nicht-abrufbar nicht-abrufbar")
+    NACHT_ZEIT=${NACHT%% *}
+    NACHT_SHA=${NACHT##* }
+    NACHT_MINUTEN=$(node -e 'const t = Date.parse(process.argv[1]); console.log(Number.isNaN(t) ? -1 : Math.floor((Date.now() - t) / 60000));' "$NACHT_ZEIT")
+    if [ "$NACHT_MINUTEN" -lt 0 ] || [ "$NACHT_MINUTEN" -gt "$NACHT_GRENZE_MINUTEN" ]; then
+      echo "FEHLER: Juengster gelaufener Nachtlauf \"Sicherheit nachts\" auf main: $NACHT_ZEIT (vor ${NACHT_MINUTEN} min) — fehlt oder ist aelter als ${NACHT_GRENZE_MINUTEN} min." >&2
+      echo "        Dann meldet niemand neue Sicherheitsluecken. Starten: gh workflow run sicherheit-nachts.yml" >&2
+      echo "        (erst wenn die Pipeline des Merge-Commits fertig ist), abwarten, erneut deployen." >&2
+      echo "        Ist er abgeschaltet: unter \"Actions\" einschalten. Notschalter: SKIP_STAND=1" >&2
+      exit 1
+    fi
+    NACHT_WF=.github/workflows/sicherheit-nachts.yml
+    NACHT_SOLL=$(git rev-parse "HEAD:$NACHT_WF" 2>/dev/null || echo "fehlt")
+    NACHT_IST=$(git rev-parse "$NACHT_SHA:$NACHT_WF" 2>/dev/null || echo "unbekannt")
+    if [ "$NACHT_IST" != "$NACHT_SOLL" ]; then
+      echo "FEHLER: Der juengste Nachtlauf (Commit $NACHT_SHA) lief nicht mit der Fassung von" >&2
+      echo "        $NACHT_WF, die ausgeliefert wird. Nach jeder Aenderung am Nachtlauf muss er" >&2
+      echo "        einmal laufen — sonst ist nicht belegt, dass die neue Fassung ueberhaupt laeuft." >&2
+      echo "        Starten: gh workflow run sicherheit-nachts.yml (erst wenn die Pipeline des" >&2
+      echo "        Merge-Commits fertig ist), abwarten, erneut deployen. Notschalter: SKIP_STAND=1" >&2
+      exit 1
+    fi
+    echo "Nachtlauf: juengster gelaufener Lauf auf main vor ${NACHT_MINUTEN} min (Grenze ${NACHT_GRENZE_MINUTEN} min), mit der ausgelieferten Fassung."
     echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA (jüngster Lauf je Check)."
   fi
 fi

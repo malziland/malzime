@@ -221,6 +221,134 @@ PYSELF
 probe_text 1 "FEHLT|Schlussbilanz" "Notschalter ohne Eintrag in der Schlussbilanz wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck scripts/deploy.sh
 
+# Befund G-10 (30.09.2026): Der Nachtlauf darf nicht still entfallen — weder
+# ohne Zeitplan noch mit einer Pruefung, deren Rueckgabewert verschluckt wird.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace('  schedule:\n    - cron: "43 3 * * *"', "", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "kein taeglicher Zeitplan" "Nachtlauf ohne Zeitplan wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace("node scripts/pruefe-abkuendigungen.mjs", "node scripts/pruefe-abkuendigungen.mjs || true", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "statt genau" "Pruefung mit '|| true' im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+# Befund H-01/H-02 (30.09.2026): Alarm-Job und Nachbau-Vergleich sind per
+# Pruefsumme festgeschrieben — eine Stilllegung dort muss auffallen.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace("priority: 5", "priority: 3", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "sicherheit-nachts.yml weicht" "abgeschwaechter Alarm im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/libheif-bau.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/libheif-bau.yml"
+s = open(p).read()
+s = s.replace("          exit $abweichung", "          exit 0", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "libheif-bau.yml weicht" "entwaffneter Herkunftsvergleich wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/libheif-bau.yml
+
+# Befund J-01 (30.09.2026): Umgehungen, die die erste Fassung des Vertrags
+# durchliess — ein "exit 0" mit "uses:" im Kommentar und eine Kommentarzeile
+# mitten in einem mehrzeiligen Befehl.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace('          if [ -z "$NTFY_URL" ]', '          exit 0 # uses: nichts\n          if [ -z "$NTFY_URL" ]', 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "sicherheit-nachts.yml weicht" "'exit 0 # uses:' im Alarm wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+s = s.replace("          BODY=$(jq -n", "          # zwischengeschoben\n          BODY=$(jq -n", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "sicherheit-nachts.yml weicht" "Kommentarzeile im mehrzeiligen Befehl wird gefunden" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+# Befund K-01 (Runde 4, 30.09.2026): Aenderungen, die die Datei fuer GitHub
+# UNLESBAR machen — ein Kommentar mit zu wenig Einzug mitten im mehrzeiligen
+# Ausdruck, eine Kommentarzeile, deren Einzug ein geschuetztes Leerzeichen ist
+# (aus einer kopierten Zeile). Beide Schichten muessen anschlagen: der Leser
+# (Zeichen, Groesse, YAML-Syntax) und die Pruefsumme.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+alt = "      always() && github.ref == 'refs/heads/main'"
+assert s.count(alt) == 1, "Anker der Probe fehlt"
+s = s.replace(alt, "    # Anmerkung zur Bedingung\n" + alt, 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "UNLESBAR" "Kommentar mit zu wenig Einzug im Ausdruck: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+probe_text 1 "sicherheit-nachts.yml weicht" "... und die Pruefsumme schlaegt an" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+alt = "      - run: node scripts/pruefe-abkuendigungen.mjs"
+assert s.count(alt) == 1, "Anker der Probe fehlt"
+s = s.replace(alt, "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0# kopierte Anmerkung\n" + alt, 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "UNLESBAR" "geschuetztes Leerzeichen als Einzug: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+probe_text 1 "sicherheit-nachts.yml weicht" "... und die Pruefsumme schlaegt an" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+# Befund N-01 (Runde 5, 01.10.2026): Zeichen, die YAML 1.2 erlaubt, GitHubs
+# Server-Leser aber ablehnt — eine Leerzeile nur aus einem Tab, ein
+# Zeilentrenner U+2028 in einer Kopfkommentarzeile (dort laesst sich sogar ein
+# Schluessel einschleusen). Beide waren in der ersten Fassung beider Schichten
+# gruen.
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+alt = "\njobs:\n"
+assert s.count(alt) == 1, "Anker der Probe fehlt"
+s = s.replace(alt, "\n\t\njobs:\n", 1)
+open(p, "w").write(s)
+PYSELF
+probe_text 1 "Tab" "Leerzeile nur aus einem Tab: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+probe_text 1 "sicherheit-nachts.yml weicht" "... und die Pruefsumme schlaegt an" python3 scripts/pruefe-deploy-riegel.py
+zurueck .github/workflows/sicherheit-nachts.yml
+
+sichern .github/workflows/sicherheit-nachts.yml
+python3 - <<'PYSELF'
+p = ".github/workflows/sicherheit-nachts.yml"
+s = open(p).read()
+z = s.split("\n")
+i = next(n for n, zeile in enumerate(z) if zeile.startswith("#"))
+z[i] = z[i] + "\u2028if: false"
+open(p, "w").write("\n".join(z))
+PYSELF
+probe_text 1 "Zeilentrenner" "Zeilentrenner U+2028 im Kommentar: Datei unlesbar" node scripts/pruefe-workflows-gueltig.mjs
+zurueck .github/workflows/sicherheit-nachts.yml
+
 echo
 
 echo "2. verify-infrastructure.sh — Bildspeicher"
@@ -462,7 +590,12 @@ if [ "$FEHLER" -eq 0 ]; then
   #
   # Beim Ergaenzen einer Probe: Zahl hochsetzen. Das ist Absicht — eine Probe
   # verschwindet damit nicht mehr unbemerkt.
-  ERWARTETE_PROBEN=26
+  # 39 seit 01.10.2026: dreizehn Proben fuer die Sicherheits-Workflows
+  # (Zeitplan, '|| true', Alarm, Herkunftsvergleich, 'exit 0 # uses:',
+  # Kommentarzeile im Befehl, vier unlesbare Dateien gegen Leser und
+  # Pruefsumme — die mit U+2028 im Kopfkommentar nur gegen den Leser, denn
+  # Kommentare ausserhalb von Bloecken zaehlen in der Summe bewusst nicht).
+  ERWARTETE_PROBEN=39
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

@@ -70,6 +70,141 @@ RIEGEL_DEPLOY = []
 
 
 
+
+# ── Vertraege fuer die Sicherheits-Workflows (Befunde H-01, H-02) ──────────────
+PRUEFJOBS_NACHTS = {
+    "npm-luecken": "node scripts/audit-gate.mjs functions .",
+    "mitgelieferte-bibliotheken": "node scripts/pruefe-fremd-meldungen.mjs",
+    "abkuendigungen": "node scripts/pruefe-abkuendigungen.mjs",
+}
+# Pruefsummen der beiden Workflow-Dateien, VOLLSTAENDIG (Befund J-01,
+# 30.09.2026). Die erste Fassung schrieb nur einzelne Jobs fest und liess
+# jede Zeile mit "uses:" aus — 23 Veraenderungen bestanden sie, darunter ein
+# geloeschter Monats-Zeitplan, Schluessel in Anfuehrungszeichen, Job-env und
+# eine Kommentarzeile mitten in einem mehrzeiligen Befehl. Jetzt zaehlt die
+# ganze Datei. Normalisiert wird nur, was nachweislich nichts bewirkt:
+#   · ganze Zeilen der Form `uses: owner/repo@<40 hex> # vN` — SHA und
+#     Kommentar (Dependabot hebt sie an); owner/repo zaehlt weiter,
+#   · Kommentar- und Leerzeilen AUSSERHALB von Blockskalaren (| >). Innerhalb
+#     eines `run: |` oder `if: >-` zaehlt jede Zeile: Dort kann eine
+#     "#"-Zeile einen Befehl zerteilen oder Teil eines Ausdrucks werden,
+#   · Leerzeilen am Dateiende, auch im letzten Block (Befund N-03: bei `|`
+#     aendern sie den Wert nicht; ein `|+` am Ende waere eine geaenderte
+#     Nicht-Kommentarzeile und zaehlt).
+# Eine bewusste Aenderung traegt man hier nach:
+# `python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`. Die Summe
+# schuetzt vor Versehen, nicht vor Absicht — die Aenderung am Workflow steht
+# im selben Pull Request sichtbar im Diff.
+VERTRAG_SUMMEN = {
+    "sicherheit-nachts.yml": "46e7e74b721601db",
+    "libheif-bau.yml": "39f0db0be0a0a3e0",
+}
+_USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[0-9a-f]{40} # .*$")
+
+
+def _ohne_kommentarzeilen(text):
+    return "\n".join(z for z in text.split("\n") if not z.lstrip().startswith("#"))
+
+
+def _jobbloecke(text):
+    if "\njobs:\n" not in text:
+        return {}
+    teil = text.split("\njobs:\n", 1)[1]
+    bloecke = {}
+    for b in re.split(r"(?m)^  (?=[A-Za-z0-9_-]+:\s*$)", teil)[1:]:
+        bloecke[b.split(":", 1)[0]] = b
+    return bloecke
+
+
+def _summe(text):
+    """Pruefsumme einer Workflow-Datei, blockbewusst normalisiert (siehe oben)."""
+    import hashlib
+
+    # Befunde K-01 (Runde 4) und N-01 (Runde 5): Als Leerraum gilt NUR das
+    # Leerzeichen. Pythons strip() nahm auch das geschuetzte Leerzeichen
+    # (U+00A0) dafuer, das YAML als Inhalt liest; und einen Tab vor einem
+    # Kommentar lehnt GitHubs Leser ab, obwohl YAML 1.2 ihn erlaubt. Eine
+    # Kommentarzeile beendet keinen Block: Mit zu wenig Einzug macht sie die
+    # Datei ungueltig, sie muss also mitzaehlen. Leerzeilen am Dateiende
+    # zaehlen nicht (sonst Fehlalarm, Befund N-03).
+    raus = []
+    block = None
+    for zeile in text.rstrip("\n").split("\n"):
+        kern = zeile.strip(" ")
+        einzug = len(zeile) - len(zeile.lstrip(" "))
+        if block is not None and kern and not kern.startswith("#") and einzug <= block:
+            block = None
+        if block is None:
+            if not kern or kern.startswith("#"):
+                continue
+            m = _USES_ZEILE.match(zeile)
+            raus.append(m.group(1) + m.group(2) + "@SHA # K" if m else zeile)
+            k = re.match(r"""^([ ]*)(?:- )?[A-Za-z0-9_"'-]+:\s*[|>][-+0-9]*\s*(#.*)?$""", zeile)
+            if k:
+                block = len(k.group(1)) + (2 if zeile.lstrip(" ").startswith("- ") else 0)
+        else:
+            raus.append(zeile)
+    return hashlib.sha256("\n".join(raus).encode("utf-8")).hexdigest()[:16]
+
+
+def _kopfteil_maengel(text, name):
+    maengel = []
+    kopf = text.split("\njobs:\n", 1)[0]
+    if re.search(r"(?m)^(env|defaults):", kopf):
+        maengel.append(f"{name}: env/defaults auf oberster Ebene — koennte jede Pruefung umlenken")
+    return maengel
+
+
+def vertrag_nachts(text):
+    if _summe(text) != VERTRAG_SUMMEN["sicherheit-nachts.yml"]:
+        return ["sicherheit-nachts.yml weicht vom festgeschriebenen Stand ab (Pruefsumme der ganzen Datei)"] + (
+            _vertrag_nachts_einzeln(text)
+        )
+    return _vertrag_nachts_einzeln(text)
+
+
+def _vertrag_nachts_einzeln(text):
+    t = _ohne_kommentarzeilen(text)
+    m = _kopfteil_maengel(t, "sicherheit-nachts.yml")
+    if not re.search(r'(?m)^    - cron: "\d{1,2} \d{1,2} \* \* \*"(?:\s+#.*)?$', t):
+        m.append("sicherheit-nachts.yml: kein taeglicher Zeitplan — der Nachtlauf liefe nie von selbst")
+    bloecke = _jobbloecke(t)
+    if set(bloecke) != set(PRUEFJOBS_NACHTS) | {"alarm"}:
+        m.append(f"sicherheit-nachts.yml: Jobliste {sorted(bloecke)} statt {sorted(set(PRUEFJOBS_NACHTS) | {'alarm'})}")
+    for job, befehl in PRUEFJOBS_NACHTS.items():
+        b = bloecke.get(job, "")
+        laeufe = re.findall(r"(?m)^\s+(?:- )?run:\s*(.*)$", b)
+        if laeufe != [befehl]:
+            m.append(f"sicherheit-nachts.yml: Job {job} hat run {laeufe!r} statt genau {befehl!r}")
+        for verboten in ("if:", "continue-on-error", "timeout-minutes", "shell:", "working-directory"):
+            if re.search(rf"(?m)^\s+(?:- )?{verboten}", b):
+                m.append(f"sicherheit-nachts.yml: Job {job} traegt '{verboten}' — er koennte still entfallen")
+        fremd = [e for e in re.findall(r"(?m)^\s{10}([A-Za-z_][A-Za-z0-9_]*):", b) if e != "GITHUB_TOKEN"]
+        if fremd:
+            m.append(f"sicherheit-nachts.yml: Job {job} setzt {fremd} — die Pruefung liesse sich umlenken")
+    return m
+
+
+def vertrag_libheif_bau():
+    datei = WURZEL / ".github" / "workflows" / "libheif-bau.yml"
+    if not datei.exists():
+        return ["libheif-bau.yml fehlt — der Deploy-Riegel verlangt seinen Lauf"]
+    roh = datei.read_text(encoding="utf-8")
+    t = _ohne_kommentarzeilen(roh)
+    m = _kopfteil_maengel(t, "libheif-bau.yml")
+    if _summe(roh) != VERTRAG_SUMMEN["libheif-bau.yml"]:
+        m.append("libheif-bau.yml weicht vom festgeschriebenen Stand ab (Pruefsumme der ganzen Datei)")
+    bloecke = _jobbloecke(t)
+    if set(bloecke) != {"bauen", "kontrollbau"}:
+        m.append(f"libheif-bau.yml: Jobliste {sorted(bloecke)} statt ['bauen', 'kontrollbau']")
+    return m
+
+
+def vertrag_summen_ausgeben():
+    for name in ("sicherheit-nachts.yml", "libheif-bau.yml"):
+        text = (WURZEL / ".github/workflows" / name).read_text(encoding="utf-8")
+        print(f'    "{name}": "{_summe(text)}",')
+
 def main():
     # BEFUND 01.09.2026: Dreimal an einem Tag scheiterte eine neue Pruefung
     # daran, dass `ci` erst weiter unten gelesen wurde — die Variable gibt es
@@ -318,6 +453,20 @@ def main():
         "keine zusaetzliche Wartezeit' war sachlich falsch: Er laeuft IN einem "
         "der langen Jobs und verlaengert ihn — Befund M-P3 der Runde 8.)",
     }
+    # Waechter, die aeussere Quellen lesen (GitHub-API: Sicherheitsmeldungen der
+    # Hersteller, Hinweise an den Laeufen auf main). Sie laufen NICHT vor dem
+    # Push und NICHT im Pull Request: Eine neue fremde Meldung wuerde sonst
+    # jeden unbeteiligten Pull Request blockieren — genau das ist am 2026-07-01
+    # mit allen acht Dependabot-PRs passiert. Ihr Ort ist der naechtliche
+    # Workflow sicherheit-nachts.yml; dort wird ihr Aufruf genauso verlangt
+    # wie bei allen anderen in ci.yml (Befunde OSS-2026-09-30-01,
+    # OPS-2026-09-30-03).
+    NUR_NACHTS = {
+        "pruefe-fremd-meldungen.mjs": "Sicherheitsmeldungen der Hersteller "
+        "der mitgelieferten Bibliotheken, liest die GitHub-API",
+        "pruefe-abkuendigungen.mjs": "Abkuendigungshinweise an den Laeufen "
+        "auf main, liest die GitHub-API",
+    }
     skripte = [d for d in skripte if d.name not in AUSGENOMMEN]
 
     def ohne_kommentare(text):
@@ -374,11 +523,32 @@ def main():
     if not vorab.exists():
         print("  NICHT MESSBAR: scripts/vor-dem-push.sh fehlt")
         return 2
+    nachts = WURZEL / ".github" / "workflows" / "sicherheit-nachts.yml"
+    if not nachts.exists():
+        print("  NICHT MESSBAR: .github/workflows/sicherheit-nachts.yml fehlt")
+        return 2
     aus_ci = erreichbar_ab(ci)
     aus_vorab = erreichbar_ab(vorab.read_text(encoding="utf-8"))
+    nachts_text = nachts.read_text(encoding="utf-8")
+    aus_nachts = erreichbar_ab(nachts_text)
+    # Befund G-10/H-01/H-02 (30.09.2026): Dass der Aufruf im Text steht,
+    # beweist nicht, dass er etwas bewirkt. Eine Liste verbotener Muster ("kein
+    # || true") liess in der Gegenpruefung 14 naheliegende Stilllegungen gruen
+    # (|| exit 0, | tee, "- if: false", geloeschter Alarm-Job, priority 3, cron
+    # am 31.2., ...). Deshalb ein POSITIVER Vertrag: Beschrieben ist, wie die
+    # beiden Workflows aussehen MUESSEN; jede Abweichung ist ein Befund.
+    # Frei bleiben nur die `uses:`-Zeilen, damit Dependabot die Actions anheben
+    # kann. Der Alarm-Job und die Jobs des Nachbaus sind per Pruefsumme
+    # festgeschrieben — eine bewusste Aenderung dort traegt man hier nach
+    # (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`).
+    nachts_maengel = vertrag_nachts(nachts_text) + vertrag_libheif_bau()
     waechter_fehlt = []
     for datei in skripte:
         if datei.name in NUR_LOKAL:
+            continue
+        if datei.name in NUR_NACHTS:
+            if datei.name not in aus_nachts:
+                waechter_fehlt.append((datei.name, "sicherheit-nachts.yml"))
             continue
         listen = [("ci.yml", aus_ci)]
         if datei.name not in NUR_PIPELINE:
@@ -397,6 +567,8 @@ def main():
         print("  NICHT MESSBAR: docs/WAECHTER.md fehlt.")
         return 2
     text_uebersicht = uebersicht.read_text(encoding="utf-8")
+    for mangel in nachts_maengel:
+        waechter_fehlt.append(("vertrag", mangel))
     undokumentiert = [d.name for d in skripte if d.name not in text_uebersicht]
     if undokumentiert:
         for name in undokumentiert:
@@ -408,6 +580,9 @@ def main():
     if waechter_fehlt:
         for name, wo in waechter_fehlt:
             if wo == "docs/WAECHTER.md":
+                continue
+            if name == "vertrag":
+                print(f"  FEHLT   Vertrag {wo}")
                 continue
             print(f"  FEHLT   {name} wird nicht aufgerufen aus: {wo}")
         print("          Ein Waechter, den niemand aufruft, ist kein Waechter.")
@@ -537,4 +712,7 @@ def main():
 
 
 if __name__ == "__main__":
+    if "--vertrag-summen" in sys.argv:
+        vertrag_summen_ausgeben()
+        sys.exit(0)
     sys.exit(main())

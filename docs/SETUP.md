@@ -211,8 +211,13 @@ Die Privacy-Architektur ist ein Kernbestandteil des Projekts:
 
 ## CI/CD
 
-GitHub Actions Workflow:
+GitHub Actions Workflows:
 - **`ci.yml`** — Tests + Lint + Format + Secret-Scan bei jedem Push und Pull Request
+- **`sicherheit-nachts.yml`** — taeglich: npm-Luecken (beide Baeume, auch Werkzeuge),
+  Herstellermeldungen zu den mitgelieferten Bibliotheken unter `public/lib`,
+  Abkuendigungshinweise von GitHub. Was bei Rot zu tun ist: `docs/RUNBOOK.md`
+- **`libheif-bau.yml`** — baut den HEIC-Dekoder aus den Original-Quellen nach und
+  vergleicht ihn Byte fuer Byte mit `public/lib/libheif/` (bei Aenderungen daran)
 
 Deploy ist manuell über `scripts/deploy.sh` (kein automatisches Deployment via CI).
 

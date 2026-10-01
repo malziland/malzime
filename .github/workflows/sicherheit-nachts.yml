@@ -1,0 +1,141 @@
+name: Sicherheit nachts
+
+# Jede Nacht drei Pruefungen, die nicht auf einen Pull Request warten duerfen.
+#
+# WARUM (30.09.2026): Eine neue Sicherheitsluecke in einem Paket fiel bisher
+# erst beim naechsten Pull Request auf, weil der Audit-Riegel nur dort lief —
+# ohne Arbeit am Projekt kein Alarm. Die mitgelieferten Bibliotheken unter
+# public/lib sah gar keine Pruefung, und die Abkuendigungshinweise von GitHub
+# standen ungelesen an gruenen Laeufen. Befunde OSS-2026-09-30-01/-02/-06,
+# OPS-2026-09-30-03.
+#
+# ALARM: Ist auf main einer der drei Jobs rot, schickt der Job `alarm` einen
+# ntfy-Push aufs Handy, Stufe "urgent" (5) — nur so erscheint er als sichtbare
+# Meldung, nicht still in der App. Die Mail von GitHub allein reicht nicht: Sie
+# wird beim Empfaenger automatisch geloescht (Befund G-05, 30.09.2026; Zustellung
+# eines Probealarms mit Stufe 5 am selben Tag bestaetigt). Adresse und Thema
+# liegen als GitHub-Secrets NTFY_URL_EU / NTFY_TOPIC_EU vor, nie im Repository.
+# Drei getrennte Jobs, damit sofort sichtbar ist, WELCHE Pruefung rot ist.
+# Was bei Rot zu tun ist: docs/RUNBOOK.md, Abschnitt "Nachtlauf Sicherheit rot".
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Auf main nie abbrechen: Ein Handstart wuerde sonst einen laufenden
+  # Nachtlauf abbrechen, und "abgebrochen" loest einen Alarm aus (J-04).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+on:
+  schedule:
+    - cron: "43 3 * * *" # taeglich 03:43 UTC, vor dem Arbeitstag in Wien
+    # Monatliche Probe des Alarmwegs (Befund H-03): Am 1. jedes Monats kommt
+    # "malziME PROBE (monatlich)" aufs Handy, auch wenn alles gruen ist. Bleibt
+    # sie aus, ist der Weg gestoert (Secret, ntfy-Server, Thema) — das faellt
+    # sonst erst auf, wenn ein echter Alarm nicht ankommt.
+    - cron: "7 8 1 * *"
+  workflow_dispatch:
+    inputs:
+      alarmprobe:
+        description: "Probealarm senden, auch wenn alles gruen ist (prueft den Weg aufs Handy)"
+        type: boolean
+        default: false
+  # Aenderungen an den Pruefungen selbst werden auf ihrem Zweig sofort
+  # ausprobiert, nicht erst in der naechsten Nacht. Nicht auf main: Dort liefe
+  # der Lauf direkt beim Zusammenfuehren, noch bevor die Pipeline des neuen
+  # Standes fertig ist — der Job abkuendigungen laese dann die Hinweise des
+  # VORIGEN Standes und schluege falschen Alarm (Befund G-14, 30.09.2026).
+  push:
+    branches-ignore: [main]
+    paths:
+      - scripts/audit-gate.mjs
+      - scripts/pruefe-fremd-meldungen.mjs
+      - scripts/pruefe-abkuendigungen.mjs
+      - .github/audit-allowlist.json
+      - .github/fremd-meldungen-ausnahmen.json
+      - .github/abkuendigungen-ausnahmen.json
+      - .github/workflows/sicherheit-nachts.yml
+
+jobs:
+  npm-luecken:
+    # Derselbe Riegel wie im Pull Request, beide Baeume, alle Abhaengigkeiten.
+    # npm audit braucht nur die Lockfiles, keine Installation.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - run: node scripts/audit-gate.mjs functions .
+
+  mitgelieferte-bibliotheken:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - run: node scripts/pruefe-fremd-meldungen.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  abkuendigungen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - run: node scripts/pruefe-abkuendigungen.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  alarm:
+    # Nur auf main (Zeitplan oder Handstart): Probelaeufe auf Zweigen sollen
+    # niemanden wecken. always(), damit der Job auch dann entschieden wird, wenn
+    # ein Vorgaenger rot ist.
+    # Jedes Ergebnis ausser "success" alarmiert — auch "cancelled" und
+    # "skipped": Ein Pruefjob, der nicht gelaufen ist, hat nichts geprueft (J-04).
+    # Nur im Original-Repository — in einer Kopie (Fork) fehlen die Secrets.
+    needs: [npm-luecken, mitgelieferte-bibliotheken, abkuendigungen]
+    if: >-
+      always() && github.ref == 'refs/heads/main' && github.repository == 'malziland/malzime' &&
+      (needs.npm-luecken.result != 'success' || needs.mitgelieferte-bibliotheken.result != 'success' ||
+      needs.abkuendigungen.result != 'success' || inputs.alarmprobe == true ||
+      github.event.schedule == '7 8 1 * *')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Push an ntfy (Stufe urgent)
+        env:
+          NTFY_URL: ${{ secrets.NTFY_URL_EU }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC_EU }}
+          LAUF: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          NPM: ${{ needs.npm-luecken.result }}
+          BIBLIOTHEKEN: ${{ needs.mitgelieferte-bibliotheken.result }}
+          ABKUENDIGUNGEN: ${{ needs.abkuendigungen.result }}
+          PROBE: ${{ inputs.alarmprobe == true || github.event.schedule == '7 8 1 * *' }}
+        run: |
+          if [ -z "$NTFY_URL" ] || [ -z "$NTFY_TOPIC" ]; then
+            echo "::error::Secrets NTFY_URL_EU / NTFY_TOPIC_EU fehlen — der Alarm kann nicht hinaus."
+            exit 1
+          fi
+          # ROT hat Vorrang: Ist eine Pruefung nicht erfolgreich, darf eine
+          # gleichzeitige Probe das nicht verdecken (J-04).
+          if [ "$NPM" != "success" ] || [ "$BIBLIOTHEKEN" != "success" ] || [ "$ABKUENDIGUNGEN" != "success" ]; then
+            TITEL="malziME: Sicherheit nachts ROT"
+            TEXT="npm: $NPM, Bibliotheken: $BIBLIOTHEKEN, Abkuendigungen: $ABKUENDIGUNGEN. Was tun: docs/RUNBOOK.md, Nachtlauf rot."
+            [ "$PROBE" = "true" ] && TEXT="$TEXT (Lauf war zugleich eine Probe.)"
+          else
+            TITEL="malziME PROBE: Sicherheit nachts"
+            TEXT="Probe des Alarmwegs (monatlich oder von Hand): alle drei Pruefungen gruen."
+          fi
+          BODY=$(jq -n --arg t "$NTFY_TOPIC" --arg ti "$TITEL" --arg m "$TEXT" --arg c "$LAUF" \
+            '{topic: $t, title: $ti, message: $m, priority: 5, tags: ["rotating_light"], click: $c}')
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X POST \
+            -H 'Content-Type: application/json; charset=utf-8' --data "$BODY" "$NTFY_URL")
+          echo "ntfy antwortete HTTP $CODE"
+          # Nur 200 heisst: angenommen. Alles andere macht diesen Job rot.
+          [ "$CODE" = "200" ]

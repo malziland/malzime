@@ -1,8 +1,10 @@
 # Die Wächter — was jeder prüft, und warum es ihn gibt
 
-Dieses Projekt hat eine eigene Prüfschicht: elf Wächter, eine Selbstprüfung
-mit 24 Proben und mehrere Tests, die Werkzeug statt Anwendung prüfen. Diese
-Seite beantwortet für jeden Wächter vier Fragen — **wovor schützt er, welcher
+Dieses Projekt hat eine eigene Prüfschicht: die Wächter in der Übersicht
+unten, eine Selbstprüfung und mehrere Tests, die Werkzeug statt Anwendung
+prüfen. Wie viele es sind, steht nur in der Tabelle — eine Zahl im Fließtext
+veraltet mit jedem neuen Wächter. Diese Seite beantwortet für jeden Wächter
+vier Fragen — **wovor schützt er, welcher
 echte Vorfall hat ihn ausgelöst, was kostet er, welche Ausnahmen kennt er.**
 
 **Warum es diese Seite gibt (01.09.2026):** Die Prüfschicht ist in einer Woche
@@ -21,7 +23,8 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 
 | Wächter | Fehlerklasse | Ausgelöst durch | Laufzeit |
 |---|---|---|---|
-| `pruefe-deploy-riegel.py` | Notschalter, die in der Schlussbilanz fehlen; Pipeline-Einstellung; **Wächter, die niemand mehr aufruft**; **verrutschte Eingaben in `ci.yml`** | Runde 7 (K-7): Ein Prüfschritt liess sich aus der Pipeline entfernen, ohne dass etwas rot wurde. 01.09.: Vier Einfüge-Fehler in `ci.yml` an einem Tag, drei Pipeline-Läufe verbrannt | 24 ms |
+| `pruefe-deploy-riegel.py` | Notschalter, die in der Schlussbilanz fehlen; Pipeline-Einstellung; **Wächter, die niemand mehr aufruft**; **verrutschte Eingaben in `ci.yml`**; **Vertrag der Sicherheits-Workflows** (`sicherheit-nachts.yml`, `libheif-bau.yml` vollständig per Prüfsumme; frei nur die Versionskennungen der Actions) | Runde 7 (K-7): Ein Prüfschritt liess sich aus der Pipeline entfernen, ohne dass etwas rot wurde. 01.09.: Vier Einfüge-Fehler in `ci.yml` an einem Tag, drei Pipeline-Läufe verbrannt | 24 ms |
+| `pruefe-workflows-gueltig.mjs` | Workflow-Dateien, die GitHub nicht lesen kann (Zeichen und Größe, die GitHubs Server-Leser ablehnt; YAML-Fehler; fehlendes Grundgerüst) — sie laufen nie, und der Pull Request zeigt den Fehllauf nicht an; mit Positivkontrolle | Befunde K-01 (30.09.2026) und N-01 (01.10.2026): In Proben hätte ein Kommentar mit zu wenig Einzug oder ein Tab vor einem Kommentar den Nachtlauf samt Alarm stillgelegt, und jede Prüfung wäre grün geblieben | 40 ms |
 | `pruefe-doppelte-werte.py` | Betriebswerte, die im Code UND im Einstellungssatz stehen | Firestore-Umbau 30.08.: Die Doku nannte Werte, die so nicht liefen | 44 ms |
 | `pruefe-i18n-fallbacks.py` | Sichtbarer Text, der von seiner Sprachdatei abweicht | Fund 21.08.: Im HTML stand ein anderer Satz als in der Sprachdatei | 35 ms |
 | `pruefe-kopplung.py` | Dateien, die wieder zusammenwachsen; gelöschte Pflicht-Testdateien | Runde 5: Wer `deploy-verhalten.test.js` löscht, sollte auffallen | 32 ms |
@@ -35,6 +38,8 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 | `pruefe-vendorierung.mjs` | Bearbeitete Kopien der Audit-Familie unter `scripts/pruefungen/` | Bearbeitet wird die Quelle, nie die Kopie | 57 ms |
 | `pruefe-mutationen.mjs` | **Tests, die nichts merken:** Code kaputtmachen, ohne dass ein Test rot wird | Runde 7: Sechs von achtzehn Befunden waren überlebende Mutationen, von Hand gefunden | Minuten — **läuft vorerst nur lokal**, siehe unten |
 | `betriebsprofil-vergleichen.js` (Abschnitt 1b von `verify-infrastructure.sh`) | **Einstellungssatz in der Datenbank weicht vom Repo ab** — die Wahrheit liegt in Firestore, das Repo ist die Kopie | OPS-2026-09-01-02 (Audit 01.09.): zwei Tage lang acht abweichende Felder, sieben davon in den Ersatz-Profilen für den Ernstfall; kein Test sah es, weil `satz-gegen-doku` Kopie gegen Kopie prüft | ~1 s, **nur vor dem Deploy** (liest die echte Datenbank; Negativprobe in `verify-infrastructure-script.test.js`) |
+| `pruefe-fremd-meldungen.mjs` | **Mitgelieferte Bibliotheken mit veröffentlichter Sicherheitsmeldung** (`public/lib`: Leaflet, exifr, libheif, libde265) — sieht weder Dependabot noch `npm audit`; dazu jeder neue Ordner und jede einzelne Datei unter `public/lib`/`public/fonts` ohne Beobachtung | OSS-2026-09-30-01: Der HEIC-Dekoder lag mit veröffentlichten Herstellermeldungen (libheif 1.23.2, libde265 1.0.15) im Auslieferungsstand, ohne dass etwas anschlug | wenige Sekunden, **nachts** (`sicherheit-nachts.yml`, liest die GitHub-API); der netzfreie Teil `--nur-deckung` zusätzlich in `pruefungen` und vor dem Push; Negativproben einschließlich Netzweg in `fremd-meldungen-script.test.js` |
+| `pruefe-abkuendigungen.mjs` | **Abkündigungs- und Fristhinweise von GitHub** an den letzten Läufen auf main (veraltete Actions, Runner-Umstellungen) | OPS-2026-09-30-03: Eine Abkündigungswarnung zu einem Baustein der Pipeline (`setup-python`) stand bei jedem Lauf da, bis GitHub die alte Laufzeit am 23.09.2026 entfernte — die Läufe waren grün, niemand klappte sie auf | wenige Sekunden, **nur nachts** (`sicherheit-nachts.yml`); Negativproben in `abkuendigungen-script.test.js` |
 
 **Alle zusammen (ohne die Mutationsprobe): unter einer Sekunde.** Deshalb
 laufen sie vor jedem Push. Die Mutationsprobe braucht je Mutation einen
@@ -51,7 +56,7 @@ absichtlich das, was er bewacht, und verlangt den erwarteten Rückgabewert —
 seit Runde 8 zusätzlich einen passenden Text, weil ein abgestürzter Wächter
 sonst als „hat etwas gefunden" durchgeht.
 
-**24 Proben, elf Wächter.** Die erwartete Zahl steht im Skript und wird
+Die erwartete Zahl der Proben steht nur im Skript (`ERWARTETE_PROBEN`) und wird
 verglichen: Wer eine Probe entfernt, bekommt „nicht messbar" statt eines
 grünen Laufs. Wer eine hinzufügt, muss die Zahl hochsetzen — das ist Absicht.
 
@@ -65,6 +70,9 @@ verstreut in den Dateien; hier ist die vollständige Liste mit dem Grund.
 | Wo | Was ausgenommen ist | Warum |
 |---|---|---|
 | `pruefe-deploy-riegel.py` → `AUSGENOMMEN` | `pruefe-live.sh` | Werkzeug für Dritte: rechnet den AUSGELIEFERTEN Stand gegen das Repo nach, braucht Netz und Live-Adresse |
+| `pruefe-deploy-riegel.py` → `NUR_NACHTS` | `pruefe-fremd-meldungen.mjs`, `pruefe-abkuendigungen.mjs` | Lesen äußere Quellen (GitHub-API). Im Pull Request würde eine neue fremde Meldung jeden unbeteiligten PR blockieren (2026-07-01: alle acht Dependabot-PRs). Ihr Aufruf in `sicherheit-nachts.yml` wird genauso verlangt wie der in `ci.yml` |
+| `.github/fremd-meldungen-ausnahmen.json` | einzelne Herstellermeldungen je Bibliothek | Meldungen ohne auswertbare Versionsangabe, bei denen am Quelltext belegt ist, dass unser Stand nicht betroffen ist; Pflichtfelder Begründung und Ablaufdatum, jede Ausnahme steht in jeder Ausgabe |
+| `.github/abkuendigungen-ausnahmen.json` | einzelne GitHub-Hinweise (Textmuster) | Hinweise, bei denen bewusst nichts zu tun ist (etwa die Umstellung von `ubuntu-latest`); Pflichtfelder Begründung und Ablaufdatum |
 | `pruefe-deploy-riegel.py` → `NUR_PIPELINE` | `pruefe-mutationen.mjs` | Braucht Minuten und installierte Pakete; vor dem Push würde es aus 14 Sekunden Minuten machen |
 | `vor-dem-push-script.test.js` → `BEWUSST_DRAUSSEN` | `npm ci`, `npm test`, `npm run test:e2e`, Mutationsprobe | Installation bzw. lange Suiten — die deckt `scripts/pruefstand.sh` ab |
 | `vor-dem-push-script.test.js` → `ANDERS_BENANNT` | `secret-scan-lokal.sh` | Die Pipeline hat dafür den eigenen Job `secret-scan` mit gitleaks |

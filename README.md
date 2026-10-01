@@ -53,7 +53,7 @@ public/                     Firebase Hosting (SPA, kein Build-Schritt)
   fonts/                    Self-hosted: Poppins (woff2, OFL)
   lib/leaflet/              Self-hosted: Leaflet 1.9.4
   lib/exifr/                Self-hosted: exifr lite (EXIF-Parsing im Browser)
-  lib/libheif/              Self-hosted: libheif 1.23.2 (HEIC-Dekoder, WebAssembly, LGPL)
+  lib/libheif/              Self-hosted: libheif 1.23.5 + libde265 1.1.3 (HEIC-Dekoder, WebAssembly, LGPL; selbst gebaut, scripts/libheif-bauen.sh)
 
 functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)
   index.js                  Cloud-Function-Exports + Firebase Secret Bindings

@@ -431,7 +431,131 @@ wird. Lizenztext, Version und Herkunft: `public/lib/libheif/`, Übersicht in
 
 **Rückweg.** Rückweg ohne Deploy: keiner — der Baustein ist Teil der Auslieferung;
 Rückweg mit Deploy: Ordner `public/lib/libheif/` und den HEIC-Zweig in
-`public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen.
+`public/js/exif.js` entfernen, CSP-Eintrag zurücknehmen. Seit 30.09.2026 verlangt
+`scripts/deploy.sh` für den Dekoder einen grünen Herkunftsnachweis; fehlt der
+Ordner, gibt es nichts nachzuweisen — der Deploy meldet das als Hinweis und geht
+weiter, ohne Notschalter.
+
+## HEIC-Dekoder aus den Hersteller-Quellen, Nachtlauf Sicherheit (30.09.2026)
+
+**Was war.** Der Dekoder kam als Fertigpaket eines Dritten (npm `libheif-js` 1.23.2).
+Darin steckten libheif 1.23.2 und libde265 1.0.15, für die es veröffentlichte
+Sicherheitsmeldungen gab; die Reparaturen gab es beim Hersteller (libheif 1.23.5,
+libde265 1.1.3), im Fertigpaket nicht. Aufgefallen ist das keiner Prüfung: Dependabot
+und `npm audit` kennen nur die Paketlisten, nicht die Dateien unter `public/lib`.
+Befund OSS-2026-09-30-01.
+
+**Entscheidung: selbst bauen.** `scripts/libheif-bauen.sh` baut beide Bibliotheken aus
+den per Prüfsumme festgenagelten Original-Quellen, mit dem unveränderten Bauskript des
+Herstellers und der Emscripten-Version, mit der der Hersteller testet. Der Workflow
+`libheif-Bau` führt das auf GitHub aus und vergleicht Byte für Byte mit den
+ausgelieferten Dateien; der Deploy verlangt den Lauf dieses Workflows (Vergleich und
+Kontrollbau) grün für den jüngsten Commit, der Dekoder, Rezept oder Workflow
+geändert hat (`scripts/deploy.sh`). Mehrere Läufe auf getrennten Runnern ergaben
+identische Dateien — mit demselben Runner-Abbild und denselben Downloads; eine
+unabhängige zweite Bauumgebung ist das nicht.
+*Betrachtete Alternativen:* auf ein neues Fertigpaket warten (kein Termin; auch dessen
+Bauweg stellt libde265 1.0.15 ein) und den Dekoder abschalten (Samsung-Fotos scheitern
+wieder, 3 von 31 Versuchen am 08.09.).
+*Neu bewerten, wenn* der Hersteller selbst fertige WebAssembly-Dateien mit aktueller
+libde265 veröffentlicht.
+
+**Bewusste Abweichungen vom Herstellerweg.**
+- libde265 ab 1.1 baut nur noch mit cmake, das Herstellerskript kennt nur den
+  älteren Weg. Das Rezept baut libde265 deshalb vorab und legt das Ergebnis dort ab,
+  wo das Skript es erwartet. Dass wirklich die neue libde265 im Ergebnis steckt,
+  prüft das Rezept an der Versionsnummer in der WebAssembly-Datei; ein Test hält
+  Rezept, VERSION-Datei und diese Versionsnummer zusammen.
+- libde265 wird ohne `NDEBUG` gebaut, die internen Prüfungen (`assert`) bleiben aktiv —
+  wie beim bisherigen Herstellerweg. Damit ihre Dateinamen keinen Bauordner tragen,
+  werden die Pfade umgeschrieben (`-ffile-prefix-map`); das Rezept bricht ab, wenn der
+  Bauordner doch im Ergebnis steht.
+- `libheif.js` wird nicht mehr nachträglich mit esbuild umgeschrieben (das tat das
+  Fertigpaket für ältere Node-Versionen); ausgeliefert wird die Ausgabe von Emscripten.
+  Sie setzt etwas neuere Browser voraus (Emscripten-Vorgabe: Chrome 85, Firefox 79,
+  Safari 14.1). Die Seite selbst braucht schon Chrome 85; neu ausgeschlossen sind nur
+  Firefox 77–78 und Safari 13.1–14.0, und nur beim Umwandeln eines HEIC-Fotos — dort
+  erscheint dann die Meldung, dass das Foto nicht geöffnet werden konnte.
+
+**Was der Kontrollbau belegt — und was nicht.** Er baut die frühere Fassung
+(libheif 1.23.2, libde265 1.0.15) auf dem autotools-Weg nach. Seine `libheif.wasm` ist
+Byte für Byte gleich der des Fertigpakets: Der Emscripten-Teil des Rezepts arbeitet
+wie der des Zulieferers. Den neuen cmake-Weg für libde265 durchläuft er nicht; der ist
+durch die Versionsnummer im Ergebnis, den Byte-Vergleich zweier Bauten und die
+Browser-Tests mit echten HEIC-Fotos abgesichert. Für `libheif.js` gibt es keine
+Vergleichsdatei vom Zulieferer (seine war mit esbuild umgeschrieben); die Summe des
+Kontrollbaus ist deshalb nur ein Driftmelder für die Bauumgebung.
+
+**Restrisiken.**
+- Emscripten lädt seine Werkzeuge beim Bau selbst herunter und prüft sie nicht per
+  Prüfsumme. Eine Änderung dort zeigen der Byte-Vergleich des Kontrollbaus
+  (`libheif.wasm`) und sein Driftmelder (`libheif.js`) an — eine Garantie, dass die
+  Werkzeuge unverändert sind, ist das nicht.
+- Der Nachtlauf liest die Sicherheitsmeldungen im GitHub-Repository der Hersteller und
+  die geprüften Einträge der GitHub-Datenbank für npm-Pakete. Meldungen, die nur in der
+  NVD oder bei OSV stehen, sieht er nicht. Stichprobe 30.09.2026: Zu libde265 stehen
+  in der NVD zwei Einträge ohne Herstellermeldung (CVE-2025-61147, CVE-2026-88373);
+  die dort genannten Reparatur-Commits 8b17e09 und f8d3249 sind in 1.1.3 enthalten
+  (GitHub-Vergleich mit dem Tag v1.1.3).
+
+**Nachtlauf.** `.github/workflows/sicherheit-nachts.yml` prüft täglich: npm-Lücken in
+beiden Bäumen einschließlich der Werkzeuge (der PR-Riegel prüfte bis 30.09.2026 den
+Wurzelbaum nicht, Befund OSS-2026-09-30-06), die Herstellermeldungen zu jeder
+Bibliothek und jeder einzelnen Datei unter `public/lib` und die Abkündigungshinweise
+von GitHub an den jüngsten Läufen jedes Workflows. Die Prüfungen mit fremden Quellen
+laufen bewusst nicht im Pull Request: Eine neue fremde Meldung dürfte nicht jeden
+unbeteiligten PR blockieren (2026-07-01). Der netzfreie Teil — ist jede Bibliothek
+überhaupt beobachtet? — läuft dagegen in jedem Pull Request und vor dem Push.
+Ausnahmen gibt es nur begründet, mit Ablaufdatum in der Form JJJJ-MM-TT und — bei
+Herstellermeldungen — für genau eine Version; jede steht in jeder Ausgabe.
+
+*Alarm:* Ist auf `main` einer der Prüf-Jobs nicht erfolgreich — rot, abgebrochen
+oder übersprungen —, geht ein ntfy-Push mit Stufe „urgent" aufs Handy (Adresse als
+GitHub-Secret). Die Mail von GitHub genügt nicht, sie wird beim Empfänger
+automatisch gelöscht. Am 1. jedes Monats kommt eine sichtbare Probe; bleibt sie aus,
+ist der Alarmweg gestört. Ist in einem Probelauf eine Prüfung nicht grün, meldet
+der Push „ROT", nicht „PROBE".
+
+*Festgeschrieben:* Die beiden Sicherheits-Workflows sind im Deploy-Riegel
+(`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben. Frei
+bleiben nur, was nachweislich nichts bewirkt: die Versionskennungen der Actions
+(`uses: owner/repo@<SHA> # vN` — SHA und Kommentar; Dependabot hebt sie an),
+Kommentar- und Leerzeilen außerhalb mehrzeiliger Befehle und Ausdrücke sowie
+Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leerzeichen — einen Tab
+vor einem Kommentar lehnt GitHub ab, er macht die Summe deshalb rot. Jede andere
+Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
+(`--vertrag-summen`). Zusätzlich prüft er inhaltlich: genau ein festgelegter Befehl
+je Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte,
+ein täglicher Zeitplan.
+*Lesbarkeit:* Eine Workflow-Datei, die GitHub nicht lesen kann, läuft nie — und der
+Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` prüft
+im Pull Request und vor dem Push jede Datei unter `.github/workflows` in zwei Schritten:
+zuerst Zeichen und Größe, die GitHubs Server-Leser ablehnt, obwohl YAML sie erlaubt
+(Tab, NUL, die Zeilentrenner U+0085/U+2028/U+2029, mehr als 1.048.576 Zeichen —
+gemessen mit GitHubs eigenem Leser aus `actions/runner`), dann die YAML-Syntax samt
+Grundgerüst (`on`, Jobs mit `runs-on` oder `uses`); beides mit Positivkontrolle.
+*Grenze:* Die Prüfsumme schützt vor versehentlichem Stilllegen, nicht vor Absicht —
+wer den Workflow ändert, kann die Summe mitändern; beides steht dann im selben Pull
+Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig. Weitere
+Stellen, an denen GitHubs Server strenger liest als diese Prüfung, sieht sie nicht;
+das fängt der Deploy auf (nächster Absatz).
+
+*Restrisiken:*
+- Ob GitHub den Nachtlauf tatsächlich ausführt, sieht der Vertrag nicht (60-Tage-
+  Abschaltung, verworfene Läufe, eine Datei, die GitHubs Server anders liest).
+  Aufgefangen beim nächsten Deploy: `deploy.sh` verlangt einen Nachtlauf auf `main`,
+  der wirklich gelaufen ist — nach Zeitplan oder von Hand gestartet, mit Ergebnis
+  „success" oder „failure", mit genau der ausgelieferten Fassung von
+  `sicherheit-nachts.yml` und nicht älter als die Grenze `NACHT_GRENZE_MINUTEN` in
+  `scripts/deploy.sh`. Die roten Läufe ohne Jobs, die GitHub bei einer unlesbaren
+  Datei je Push anlegt, zählen damit nicht. Nach jeder Änderung am Nachtlauf muss er
+  deshalb einmal laufen, bevor ausgeliefert wird. Zwischen zwei Deploys fällt ein
+  ausbleibender Nachtlauf nur durch die ausbleibende Monatsprobe auf.
+- Der Alarm-Job kann seinen eigenen Fehlschlag nicht melden (fehlendes Secret,
+  ntfy nicht erreichbar); „200" vom ntfy-Server heißt nur „angenommen". Auch das
+  zeigt erst die ausbleibende Monatsprobe.
+- Die ntfy-Zugangsdaten stehen an zwei Stellen (Secret Manager und GitHub-Secrets);
+  wer sie an einer ändert, muss die andere nachziehen (`docs/ERROR-ALERTING.md`).
 
 ## Kinderschutz-Filter: Anzahl und Diagnose (09.09.2026)
 

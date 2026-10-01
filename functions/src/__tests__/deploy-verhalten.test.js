@@ -265,6 +265,190 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     expect(r.ausgabe).toMatch(/test-backend/);
   });
 
+  /* Befunde G-02/H-04 (30.09.2026): Der Herkunftsnachweis des HEIC-Dekoders
+     (Workflow libheif-Bau: Nachbau + Kontrollbau) ist kein Pflicht-Check —
+     ohne diesen Riegel liess sich ein Stand ausliefern, dessen Dekoder nicht
+     als Bau aus dem Rezept belegt ist. Die Attrappe wendet den jq-Ausdruck aus
+     deploy.sh mit echtem jq auf API-JSON an (Befund H-17). */
+  const libheifLaeufe = (...laeufe) => JSON.stringify({ workflow_runs: laeufe });
+  const laufHeif = (created_at, status, conclusion) => ({ created_at, status, conclusion });
+
+  test("roter Herkunftsnachweis des HEIC-Dekoders haelt die Auslieferung an", () => {
+    const r = deploy({
+      ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(laufHeif("2026-09-30T10:00:00Z", "completed", "failure")),
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: failure/);
+  });
+
+  test("fehlender Lauf des Herkunftsnachweises haelt ebenfalls an", () => {
+    const r = deploy({ ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe() });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: fehlt/);
+  });
+
+  test("noch laufender Herkunftsnachweis haelt an, statt zu warten oder durchzuwinken", () => {
+    const r = deploy({ ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(laufHeif("2026-09-30T10:00:00Z", "in_progress", null)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist: laeuft/);
+  });
+
+  test("es zaehlt der juengste Lauf: alter gruen, neuer rot -> rot", () => {
+    const r = deploy({
+      ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(
+        laufHeif("2026-09-30T10:00:00Z", "completed", "success"),
+        laufHeif("2026-09-30T11:00:00Z", "completed", "failure")
+      ),
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Ist: failure/);
+  });
+
+  /* Befund K-01 (Runde 4): Ist sicherheit-nachts.yml unlesbar, legt GitHub bei
+     jedem Push einen roten Lauf ohne Jobs an (Ereignis push, Name = Dateipfad).
+     Der darf nicht als frischer Nachtlauf zaehlen — ebenso wenig ein
+     abgebrochener Lauf. */
+  test("ein Fehllauf einer unlesbaren Workflow-Datei zaehlt nicht als Nachtlauf", () => {
+    const r = deploy({
+      ATTRAPPE_NACHT_LAEUFE: nacht(
+        nachtLauf(10, { event: "push", conclusion: "failure", name: ".github/workflows/sicherheit-nachts.yml" }),
+        nachtLauf(40 * 60)
+      ),
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  test("ein abgebrochener Lauf zaehlt nicht als Nachtlauf", () => {
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(10, { conclusion: "cancelled" }), nachtLauf(40 * 60)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  test("ein roter, aber gelaufener Nachtlauf haelt den Deploy nicht an", () => {
+    expect(deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(10, { conclusion: "failure" })) }).code).toBe(0);
+  });
+
+  test("ein Nachtlauf mit der vorigen Fassung von sicherheit-nachts.yml haelt an", () => {
+    const vorher = execSync(`git -C "${klon}" rev-parse HEAD`, { encoding: "utf8" }).trim();
+    try {
+      execSync(
+        [
+          `printf '\n# Probe\n' >> "${klon}/.github/workflows/sicherheit-nachts.yml"`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q -am "Nachtlauf geaendert"`,
+          `git -C "${klon}" branch -f main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+      const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(10, { head_sha: vorher })) });
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(/lief nicht mit der Fassung/);
+    } finally {
+      execSync(`git -C "${klon}" reset -q --hard ${vorher} && git -C "${klon}" branch -f main ${vorher}`, {
+        stdio: "pipe",
+      });
+    }
+  });
+
+  /* Befund J-05: Aendert der juengste Commit nur das Rezept, muss genau DIESER
+     Commit abgefragt werden — die Attrappe prueft die Abfrage und scheitert
+     laut, wenn deploy.sh einen anderen Commit nennt (etwa bei gekuerzter
+     Pfadliste). */
+  test("ein Commit, der nur das Rezept aendert, wird als Herkunfts-Commit abgefragt", () => {
+    const vorher = execSync(`git -C "${klon}" rev-parse HEAD`, { encoding: "utf8" }).trim();
+    try {
+      execSync(
+        [
+          `printf '\n# Probe\n' >> "${klon}/scripts/libheif-bauen.sh"`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q -am "nur Rezept"`,
+          `git -C "${klon}" branch -f main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+      const r = deploy();
+      expect(r.ausgabe).not.toMatch(/ATTRAPPE gh: libheif-Abfrage ohne head_sha/);
+      expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen fuer [0-9a-f]{40}/);
+    } finally {
+      execSync(`git -C "${klon}" reset -q --hard ${vorher} && git -C "${klon}" branch -f main ${vorher}`, {
+        stdio: "pipe",
+      });
+    }
+  });
+
+  /* Befund H-10: Der dokumentierte Rueckweg (Dekoder entfernen) darf nicht am
+     Herkunftsriegel scheitern — ohne Dekoder gibt es nichts nachzuweisen. */
+  test("ohne Dekoder-Ordner (Rueckweg) gibt es nur einen Hinweis, keinen Abbruch", () => {
+    const vorher = execSync(`git -C "${klon}" rev-parse HEAD`, { encoding: "utf8" }).trim();
+    try {
+      execSync(
+        [
+          `git -C "${klon}" rm -r -q public/lib/libheif`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q -m "Rueckweg: Dekoder entfernt"`,
+          `git -C "${klon}" branch -f main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+      /* Selbst ein roter Nachbau darf hier nicht mehr zaehlen. */
+      const r = deploy({
+        ATTRAPPE_LIBHEIF_LAEUFE: libheifLaeufe(laufHeif("2026-09-30T10:00:00Z", "completed", "failure")),
+      });
+      expect(r.ausgabe).toMatch(/public\/lib\/libheif fehlt \(Dekoder entfernt\)/);
+      expect(r.ausgabe).not.toMatch(/Herkunftsnachweis des HEIC-Dekoders.*Ist:/);
+    } finally {
+      execSync(`git -C "${klon}" reset -q --hard ${vorher} && git -C "${klon}" branch -f main ${vorher}`, {
+        stdio: "pipe",
+      });
+    }
+  });
+
+  /* Befund H-03: Ein ausbleibender Nachtlauf alarmiert niemanden — der
+     Deploy prueft deshalb das ALTER des juengsten Laufs auf main. */
+  const nachtLauf = (minutenAlt, weiteres = {}) => ({
+    created_at: new Date(Date.now() - minutenAlt * 60000).toISOString(),
+    event: "schedule",
+    conclusion: "success",
+    head_sha: "HEAD",
+    head_repository: { full_name: "malziland/malzime" },
+    ...weiteres,
+  });
+  const nacht = (...laeufe) => JSON.stringify({ workflow_runs: laeufe });
+
+  test("zu alter Nachtlauf haelt die Auslieferung an", () => {
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(30 * 60)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Nachtlauf .*aelter als 1560 min/);
+  });
+
+  /* Befund J-08: knapp unter und knapp ueber der Grenze (zwei Tests, weil ein
+     durchlaufender Deploy den Testklon veraendert). */
+  test("Nachtlauf 25 h 50 min alt: geht durch", () => {
+    expect(deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(1550)) }).code).toBe(0);
+  });
+
+  test("Nachtlauf 26 h 10 min alt: haelt an", () => {
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: nacht(nachtLauf(1570)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  /* Befund J-03: ein frischer Lauf aus einem Fork (Zweig "main") zaehlt nicht. */
+  test("ein frischer Fork-Lauf verdeckt keinen fehlenden eigenen Nachtlauf", () => {
+    const r = deploy({
+      ATTRAPPE_NACHT_LAEUFE: nacht(
+        nachtLauf(10, { event: "pull_request", head_repository: { full_name: "jemand/fork" } }),
+        nachtLauf(40 * 60)
+      ),
+    });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  test("fehlender Nachtlauf haelt die Auslieferung an", () => {
+    const r = deploy({ ATTRAPPE_NACHT_LAEUFE: JSON.stringify({ workflow_runs: [] }) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Nachtlauf .*fehlt/);
+  });
+
   test("unsauberer Arbeitsbaum haelt die Auslieferung an", () => {
     fs.appendFileSync(path.join(klon, "public", "index.html"), "\n<!-- Probe -->\n");
     const r = deploy();
@@ -630,6 +814,11 @@ describe("deploy.sh — der Erfolgsweg", () => {
     const r = deploy();
     expect(r.code).toBe(0);
     expect(r.ausgabe).toMatch(/Deploy abgeschlossen|abgeschlossen/i);
+    /* Der Herkunftsriegel hat wirklich gefragt, nicht nur geschwiegen. */
+    expect(r.ausgabe).toMatch(/Herkunft HEIC-Dekoder: Workflow libheif-Bau gruen/);
+    expect(r.ausgabe).toMatch(
+      /Nachtlauf: juengster gelaufener Lauf auf main vor \d+ min \(Grenze 1560 min\), mit der ausgelieferten Fassung/
+    );
     /* Und der CHANGELOG-Hinweis erscheint, statt still zu verschwinden. */
     expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
   });

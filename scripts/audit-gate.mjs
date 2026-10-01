@@ -19,8 +19,16 @@
  *     Ausnahme kann also nicht still vergammeln.
  *   - Ein NEUES Advisory ist nie automatisch ausgenommen.
  *
+ * Geprueft werden ALLE Abhaengigkeiten, auch die Werkzeuge (Befund
+ * OSS-2026-09-30-06): Frueher lief npm audit mit --omit=dev. Im Wurzelprojekt
+ * gibt es aber nur Werkzeuge (Playwright, Vitest, ESLint) — dort wurde also gar
+ * nichts geprueft, obwohl genau dieser Code in der Pipeline ueber dem
+ * ausgecheckten Repository laeuft. Nachgewiesen am 30.09.2026 per Rueckbauprobe
+ * mit dem Wurzel-Lockfile vor #293 (undici 8.9.0, High, ueber jsdom): Das Gate
+ * meldete GRUEN.
+ *
  * Aufruf:  node scripts/audit-gate.mjs <verzeichnis> [...]
- * Beispiel: node scripts/audit-gate.mjs functions
+ * Beispiel: node scripts/audit-gate.mjs functions .
  */
 
 import { execFileSync } from "node:child_process";
@@ -47,7 +55,7 @@ function auditLesen(verzeichnis) {
   };
   let bericht;
   try {
-    bericht = JSON.parse(execFileSync("npm", ["audit", "--json", "--omit=dev"], optionen));
+    bericht = JSON.parse(execFileSync("npm", ["audit", "--json"], optionen));
   } catch (fehler) {
     /* Exit 1 heisst "Funde gefunden" — dann liegt der Bericht auf stdout. */
     if (!fehler.stdout) throw fehler;
@@ -211,7 +219,7 @@ const verwaist = ausnahmen.filter((a) => !alleAdvisories.has(a.ghsa));
 
 // --- Ausgabe -------------------------------------------------------------
 
-console.log(`Audit-Gate — geprueft: ${ziele.join(", ")} (nur Produktiv-Abhaengigkeiten)`);
+console.log(`Audit-Gate — geprueft: ${ziele.join(", ")} (alle Abhaengigkeiten, auch Werkzeuge)`);
 console.log(`High/Critical-Advisories gesamt: ${alleAdvisories.size}\n`);
 
 for (const { advisory, ausnahme } of gedeckt) {

@@ -750,8 +750,9 @@ Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über
 
 ### Audit-Gate rot / Dependabot-PRs bleiben liegen
 
-Erst nachsehen, **was** rot ist: `node scripts/audit-gate.mjs functions` (läuft
-lokal identisch zur CI und nennt Paket, Advisory und Kette).
+Erst nachsehen, **was** rot ist: `node scripts/audit-gate.mjs functions .` (läuft
+lokal identisch zur CI, prüft beide Bäume mit allen Abhängigkeiten einschließlich
+der Werkzeuge und nennt Paket, Advisory und Kette).
 
 - **Es gibt eine reparierte Version** → anheben, Tests laufen lassen, committen.
   **Danach IMMER `npm ci --dry-run` in Root und `functions/`** (siehe Kasten
@@ -796,6 +797,94 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 > neuesten Stand innerhalb ihrer Bereiche — im Backend zuletzt bis hin zu
 > `firebase-functions` 7.3.2 und damit Express 4 → 5. Das gehört in einen
 > eigenen, bewusst freigegebenen Schritt.
+
+### Nachtlauf „Sicherheit nachts" rot
+
+Der Workflow `.github/workflows/sicherheit-nachts.yml` läuft täglich um 03:43 UTC.
+Ist auf `main` einer seiner Prüf-Jobs rot, kommt ein ntfy-Push mit Stufe „urgent"
+(Titel „malziME: Sicherheit nachts ROT", Link zum Lauf; Einrichtung in
+`docs/ERROR-ALERTING.md`). Die drei Prüf-Jobs; der Name des roten Jobs sagt, was zu
+tun ist:
+
+| Roter Job | Bedeutung | Was tun |
+|---|---|---|
+| `npm-luecken` | Neue High/Critical-Lücke in einem npm-Paket (beide Bäume, auch Werkzeuge) | Wie „Audit-Gate rot" oben. Oft kommt Dependabot binnen eines Tages mit einem PR; sonst selbst anheben |
+| `mitgelieferte-bibliotheken` | Veröffentlichte Herstellermeldung zu einer Bibliothek unter `public/lib`, oder ein neuer Ordner dort ohne Beobachtung | Betroffen: Bibliothek neu bauen (libheif, siehe unten) oder neu kopieren. **Unklar**: am Quelltext des Herstellers klären; ist unser Stand nachweislich nicht betroffen, begründeter Eintrag mit Ablaufdatum in `.github/fremd-meldungen-ausnahmen.json` |
+| `abkuendigungen` | GitHub meldet an einem Lauf auf main einen abgekündigten Baustein oder eine Frist | Betroffene Action anheben (mit SHA-Pin, Release-Notes lesen). Ist bewusst nichts zu tun, begründeter Eintrag mit Ablaufdatum in `.github/abkuendigungen-ausnahmen.json` |
+
+„MESSUNG NICHT DURCHFÜHRBAR" (Rückgabewert 2) ist kein Fund, aber auch kein
+bestandener Lauf: meist eine Störung der GitHub-API. Lauf von Hand neu starten
+(`gh workflow run sicherheit-nachts.yml`); bleibt es rot, die Meldung lesen.
+
+Lokal prüfen: `GH_TOKEN=$(gh auth token) node scripts/pruefe-fremd-meldungen.mjs`
+bzw. `… node scripts/pruefe-abkuendigungen.mjs`.
+
+**Kommt nie ein Alarm, heißt das nicht „alles gut".** Zwei Wege, auf denen der
+Schutz still ausfällt, und was sie auffängt:
+
+- *Der Nachtlauf läuft nicht* (GitHub schaltet geplante Workflows in öffentlichen
+  Repositories nach 60 Tagen ohne Aktivität ab, verwirft unter Last gelegentlich
+  geplante Läufe, oder die Datei ist für GitHub unlesbar). `scripts/deploy.sh` bricht
+  ab, wenn auf `main` kein Nachtlauf wirklich gelaufen ist — mit der ausgelieferten
+  Fassung von `sicherheit-nachts.yml` und nicht älter als `NACHT_GRENZE_MINUTEN` in
+  `scripts/deploy.sh`; die Kriterien stehen in `docs/SECURITY-MODEL.md`. Geprüft wird
+  nicht die Farbe: Ein roter Nachtlauf hat Alarm gegeben. Dann: `gh workflow run
+  sicherheit-nachts.yml`, abwarten (rund eine Minute), erneut deployen; ist der
+  Workflow abgeschaltet, unter „Actions" einschalten. **Nach jeder Änderung an
+  `sicherheit-nachts.yml`** gilt dasselbe: nach dem Merge und der grünen Pipeline des
+  Merge-Commits einmal von Hand starten, sonst bricht der Deploy ab.
+- *Der Alarmweg ist kaputt* (Secret, ntfy-Server, Thema). Am 1. jedes Monats kommt
+  eine sichtbare Probe aufs Handy; bleibt sie aus, ist der Weg gestört
+  (`docs/ERROR-ALERTING.md`). Von Hand: `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
+
+**Einmalig nach dem Zusammenführen des Sicherheitspakets (PR #294):** Auf `main`
+gibt es noch keinen Nachtlauf, der Deploy bricht deshalb ab, bis einer gelaufen
+ist. In der Deploy-Kette nach dem Merge und NACH der grünen Pipeline des
+Merge-Commits (sonst liest der Job `abkuendigungen` noch die alte Warnung zu
+setup-python 5): `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`
+starten — das belegt zugleich den Alarmweg Ende-zu-Ende; der Empfang der Probe
+wird beim Empfänger bestätigt.
+
+### HEIC-Dekoder (libheif) neu bauen
+
+Der Dekoder unter `public/lib/libheif/` wird aus den Original-Quellen der
+Hersteller gebaut — Rezept `scripts/libheif-bauen.sh`, Begründung und die eine
+Abweichung vom Herstellerweg stehen in dessen Kopf. Anlass für einen Neubau ist
+meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
+
+1. Neue Versionen und Prüfsummen im Skript eintragen (`NEU_LIBHEIF_*`,
+   `NEU_LIBDE265_*`). Die Prüfsumme steht auf der Release-Seite des Herstellers
+   bei der Datei (GitHub zeigt sie als `sha256:`); zusätzlich selbst nachrechnen.
+2. Zweig pushen. Der Workflow `libheif-Bau` baut auf GitHub (feste
+   Ubuntu-Version 24.04; am 30.09.2026 dauerte der Job `bauen` 8 bis 10 Minuten)
+   und legt das Ergebnis als Artefakt
+   `libheif-bau` ab. Der Schritt „Vergleich" ist in diesem Lauf rot — die
+   Dateien im Repository sind ja noch die alten.
+3. Artefakt holen: `gh run download <lauf-id> -n libheif-bau -D /tmp/libheif`,
+   die zwei Dateien nach `public/lib/libheif/` kopieren.
+4. `public/lib/libheif/VERSION` neu schreiben (die Zeilen `libheif x.y.z` und
+   `libde265 x.y.z` liest der Nachtlauf aus), dazu die Versionsnennungen in
+   `THIRD-PARTY.md`, `README.md`, `public/impressum.html` und
+   `public/en/legal-notice.html` — ein Test (`lizenzen-vollstaendig.test.js`)
+   hält sie gegen die VERSION-Datei.
+5. `node scripts/pruefe-fremddateien.mjs --aktualisieren`, dann alle Suiten,
+   **einschließlich der Browser-Tests** (`e2e/problemfaelle.test.js` schickt
+   echte Samsung- und iPhone-HEIC-Fotos durch den Dekoder).
+6. Pushen: Jetzt muss der Workflow `libheif-Bau` grün sein, beide Jobs — `bauen`
+   (Vergleich Byte für Byte) und `kontrollbau` (Bauumgebung unverändert). Erst dann
+   ist belegt, dass die ausgelieferten Dateien aus dem Rezept stammen.
+   `scripts/deploy.sh` verlangt das für den jüngsten Commit, der Dekoder, Rezept oder
+   Workflow geändert hat: Der jüngste Lauf dieses Workflows muss abgeschlossen und
+   grün sein. Nach dem Zusammenführen läuft er auf `main` noch einmal; `deploy.sh`
+   wartet NICHT darauf, sondern bricht ab, solange der Lauf fehlt, noch läuft oder
+   rot ist. Die Deploy-Kette wartet deshalb vor dem Wartungsmodus auch auf diesen
+   Lauf, nicht nur auf die sechs Pflicht-Checks.
+
+Der Job `kontrollbau` baut bei jedem Lauf zusätzlich die bis 30.09.2026
+ausgelieferte Fassung (libheif 1.23.2, libde265 1.0.15) nach und vergleicht sie
+mit deren Prüfsumme. Wird er rot, hat sich an der Bauumgebung etwas geändert
+(Emscripten-Download, Runner-Abbild). Der Deploy verlangt ihn grün (Schritt 6);
+vor einem neuen Bau also erst die Ursache klären.
 
 ## Handwerkzeuge (nur von Hand, laufen nie automatisch)
 

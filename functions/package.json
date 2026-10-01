@@ -15,10 +15,10 @@
     "serve": "firebase emulators:start --only functions"
   },
   "dependencies": {
-    "@google-cloud/tasks": "^7.0.0",
+    "@google-cloud/tasks": "^7.2.1",
     "busboy": "^1.6.0",
-    "firebase-admin": "^14.3.0",
-    "firebase-functions": "^7.3.2",
+    "firebase-admin": "^14.5.0",
+    "firebase-functions": "^7.4.0",
     "json5": "^2.2.3"
   },
   "overrides": {
@@ -29,10 +29,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "eslint": "^10.9.1",
+    "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
-    "jest": "^30.5.0",
-    "prettier": "^3.9.6"
+    "jest": "^30.5.2",
+    "prettier": "^3.9.9"
   },
   "jest": {
     "setupFilesAfterEnv": [

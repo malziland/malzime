@@ -884,8 +884,29 @@ async function textAnpassungMessen(page, bildschirm) {
        p, li { margin-bottom: 2em !important; }`,
     ],
   ]) {
-    const kennung = await page.addStyleTag({ content: css });
+    /* Der Stil kommt als eigene Datei von derselben Adresse, nicht eingebettet:
+       Die Browser-Tests laufen mit der Sicherheitsrichtlinie der Produktion
+       (scripts/e2e-server.py, Befund G-19), und die erlaubt nur Stile von
+       'self'. Ein eingebetteter Stil wuerde blockiert — die Messung saehe dann
+       die unveraenderte Seite und meldete faelschlich "besteht". Eine
+       Nutzereinstellung (Browser-Erweiterung, Lesehilfe) unterliegt der
+       Richtlinie nicht; die Datei bildet genau das nach. */
+    const pfad = `/__e2e-textanpassung-${name.replace(/[^0-9a-z]+/gi, "-")}.css`;
+    await page.route(`**${pfad}`, (route) => route.fulfill({ status: 200, contentType: "text/css", body: css }));
+    const kennung = await page.addStyleTag({ url: pfad });
     await beruhigen(page);
+    /* Positivkontrolle: Wirkt der Stil ueberhaupt? Wuerde er blockiert oder
+       nicht geladen, maesse der Rest dieser Funktion die unveraenderte Seite
+       und meldete "besteht" — gruen ohne Aussage. */
+    const gewirkt = await page.evaluate(() => ({
+      schrift: getComputedStyle(document.documentElement).fontSize,
+      abstand: getComputedStyle(document.body).letterSpacing,
+    }));
+    if (name.startsWith("1.4.4")) {
+      expect(gewirkt.schrift, `${name}: der eingespielte Stil wirkt nicht`).toBe("32px");
+    } else {
+      expect(gewirkt.abstand, `${name}: der eingespielte Stil wirkt nicht`).not.toBe("normal");
+    }
     const mass = await page.evaluate(() => {
       const abgeschnitten = [];
       /* Abgeschnitten heisst: Der Kasten verbirgt Inhalt, der nicht
@@ -916,7 +937,7 @@ async function textAnpassungMessen(page, bildschirm) {
     ergebnisse[name] = mass;
     await page.evaluate((k) => {
       const el = document.querySelector(`style[data-pw="${k}"]`) || document.head.lastElementChild;
-      if (el && el.tagName === "STYLE") el.remove();
+      if (el && (el.tagName === "STYLE" || el.tagName === "LINK")) el.remove();
     }, kennung);
     await beruhigen(page);
   }

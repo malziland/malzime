@@ -1,3 +1,9 @@
+/* Zuerst, vor allem anderen: Steht in der Produktion ein Schalter auf 1, der
+   nur fuer lokale Laeufe gedacht ist (Attrappe statt KI, lokale Warteschlange,
+   stumme Benachrichtigung), startet diese Fassung nicht. Die Auslieferung
+   scheitert dann sichtbar, die bisherige Fassung laeuft weiter. */
+require("./lokale-schalter").verweigereLokalSchalterInProduktion();
+
 const { onRequest } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");

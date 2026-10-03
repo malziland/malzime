@@ -61,11 +61,19 @@ npm install
 
 ## 5. Umgebungsvariablen
 
-Kopiere `functions/.env.example` nach `functions/.env` und passe die Werte an:
+Lokale Einstellungen stehen ausschliesslich in `functions/.env.local` (nicht in git, nur vom
+Emulator geladen). Lege die Datei aus der Vorlage an und passe die Werte an:
 
 ```bash
-cp functions/.env.example functions/.env
+cp functions/.env.local.example functions/.env.local
 ```
+
+Die Vorlage startet mit der Attrappe statt der echten KI (kostenlos). Fuer Laeufe mit der
+echten KI traegst du dort `MISTRAL_API_KEY` ein und setzt `MISTRAL_MOCK=0`.
+
+**Lege keine Datei `functions/.env` an.** `firebase deploy` haengt ihren Inhalt als Einstellung
+an alle Functions der Produktion — ein Schluessel stuende dort im Klartext, ein Test-Schalter
+wuerde dort wirken. Das Auslieferskript bricht deshalb ab, sobald es eine solche Datei findet.
 
 | Variable | Standard | Beschreibung |
 |----------|----------|--------------|
@@ -111,7 +119,7 @@ firebase emulators:start --only functions,hosting
 
 Dann: http://localhost:5050
 
-**Hinweis**: Damit die Analyse-Pipeline lokal funktioniert, muss `MISTRAL_API_KEY` in `functions/.env` gesetzt sein (siehe `functions/.env.example`). Der Firestore-Emulator startet automatisch mit, ein Google-Login ist fuer die lokale Entwicklung nicht noetig.
+**Hinweis**: Mit der Attrappe aus der Vorlage laeuft die Analyse-Pipeline lokal ohne Schluessel. Fuer die echte KI muss `MISTRAL_API_KEY` in `functions/.env.local` gesetzt sein (siehe `functions/.env.local.example`). Der Firestore-Emulator startet automatisch mit, ein Google-Login ist fuer die lokale Entwicklung nicht noetig.
 
 ## 6. Tests ausfuehren
 

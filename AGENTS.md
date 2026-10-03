@@ -145,7 +145,7 @@ Einzelbefehle:
 
 ## Security & Configuration
 
-- Use `functions/.env` for local config (see `functions/.env.example`)
+- Use `functions/.env.local` for local config (see `functions/.env.local.example`). Never create `functions/.env`: `firebase deploy` would attach its content to every production function; `scripts/deploy.sh` aborts when such a file exists
 - Never commit secrets or API keys
 - CSP headers configured in `firebase.json`
 - Honeypot field for bot protection

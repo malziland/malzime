@@ -20,9 +20,12 @@
  */
 
 const { isBeastAdsCallEnabled } = require("./feature-flags");
+const { lokalSchalterAn } = require("./lokale-schalter");
 
+/* Die Attrappe gibt es nur ausserhalb der Produktion — dort liefert
+   lokalSchalterAn immer "aus" (siehe lokale-schalter.js). */
 function getMistral() {
-  return process.env.MISTRAL_MOCK === "1" ? require("./mistral-mock") : require("./mistral");
+  return lokalSchalterAn("MISTRAL_MOCK") ? require("./mistral-mock") : require("./mistral");
 }
 
 function isQuotaError(err) {

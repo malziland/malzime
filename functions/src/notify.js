@@ -1,6 +1,7 @@
 const { createAdminToken } = require("./auth");
 const { geltendeWerte } = require("./betriebsprofil");
 const { SITE_URL } = require("./domains");
+const { lokalSchalterAn } = require("./lokale-schalter");
 
 /**
  * Sendet eine Push-Benachrichtigung über ntfy wenn das Stundenlimit erreicht wird.
@@ -19,6 +20,7 @@ const { SITE_URL } = require("./domains");
    nicht an einer vergessenen Variablen haengt:
      · FIRESTORE_EMULATOR_HOST ist gesetzt  -> Emulator, immer
      · NTFY_STUMM=1                          -> ausdruecklich abgeschaltet
+                                                (nur ausserhalb der Produktion)
    ══════════════════════════════════════════════════════════════════════ */
 /* Eine ausdruecklich hinterlegte Attrappe. Solange sie fehlt, sperrt der
    Test-Riegel unten. */
@@ -35,7 +37,9 @@ function versand(...args) {
 }
 
 function versandUnterdrueckt() {
-  if (process.env.NTFY_STUMM === "1") return "NTFY_STUMM=1";
+  /* In der Produktion wirkt NTFY_STUMM nie (lokale-schalter.js): Eine
+     stummgeschaltete Benachrichtigung waere dort ein Ausfall ohne Signal. */
+  if (lokalSchalterAn("NTFY_STUMM")) return "NTFY_STUMM=1";
   /* BEFUND 01.09.2026 (Pruefrunde 8, N-P2-3): Hier stand nur
      FIRESTORE_EMULATOR_HOST. `npm run serve` startet aber
      `emulators:start --only functions` — dabei ist FUNCTIONS_EMULATOR gesetzt

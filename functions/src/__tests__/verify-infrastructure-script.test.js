@@ -258,6 +258,9 @@ describe("verify-infrastructure.sh", () => {
       "malziME Client-Fehler-Haeufung",
       "malziME KI-Verbindung bricht gehäuft ab",
     ];
+    /* Farbcodes der Ausgabe (gruen/rot) fuer den Textvergleich entfernen. */
+    // eslint-disable-next-line no-control-regex
+    const FARBCODES = /\x1b\[[0-9;]*m/g;
     const MAIL = "projects/probe/notificationChannels/1";
     const PUSH = "projects/probe/notificationChannels/2";
 
@@ -305,8 +308,7 @@ describe("verify-infrastructure.sh", () => {
       } catch (e) {
         aus = (e.stdout || "") + (e.stderr || "");
       }
-      // eslint-disable-next-line no-control-regex
-      const ohneFarbe = aus.replace(/\x1b\[[0-9;]*m/g, "");
+      const ohneFarbe = aus.replace(FARBCODES, "");
       return ohneFarbe.split("\n").filter((z) => /Alarmregel|Alarmweg NICHT|Benachrichtigungskan|Kanäle NICHT/.test(z));
     }
     const gruen = (name) => `✓ Alarmregel scharf: »${name}«, 2 Kanal/Kanäle, E-Mail dabei`;
@@ -391,6 +393,120 @@ describe("verify-infrastructure.sh", () => {
       expect(enthaelt(zeilen, "✗ Alarmweg NICHT geprueft (Liste der Kanaele nicht lesbar")).toBe(true);
       expect(zeilen.filter((z) => z.includes("✓ Alarmregel"))).toEqual([]);
       expect(enthaelt(zeilen, "✗ Kanäle NICHT geprueft")).toBe(true);
+    });
+
+    /* Nachlauf zu OPS-2026-10-03-11: Die Pruefung "deckt der Alarmfilter alle
+       Dienste ab" nahm die Dienstnamen aus den Filtern ALLER Regeln zusammen. Fehlte
+       ein Dienst in einer Regel, stand aber in einer anderen, blieb sie gruen. */
+    describe("Abdeckung der Dienste je Regel", () => {
+      const DIENSTE = ["admin", "enqueue", "processjob", "errors", "telemetry", "erinnerung", "ntfy"];
+      const mitListe = (displayName, dienste) => ({
+        displayName,
+        enabled: true,
+        notificationChannels: [MAIL, PUSH],
+        conditions: [
+          {
+            conditionMatchedLog: {
+              filter: `resource.type="cloud_run_revision" AND resource.labels.service_name=(${dienste
+                .map((d) => `"${d}"`)
+                .join(" OR ")}) AND severity>=ERROR AND NOT jsonPayload.step="processjob"`,
+            },
+          },
+        ],
+      });
+      const ohneListe = (displayName) => ({
+        displayName,
+        enabled: true,
+        notificationChannels: [MAIL, PUSH],
+        conditions: [{ conditionThreshold: { filter: 'metric.type = "logging.googleapis.com/user/probe"' } }],
+      });
+      const alle = ["admin", "enqueue", "processjob"];
+      const regelSatz = (aenderung = {}) => [
+        mitListe(REGELN[0], aenderung[REGELN[0]] || alle),
+        mitListe(REGELN[1], aenderung[REGELN[1]] || alle),
+        mitListe(REGELN[2], aenderung[REGELN[2]] || alle),
+        ohneListe(REGELN[3]),
+        ohneListe(REGELN[4]),
+      ];
+
+      function abdeckung(regeln, dienste = DIENSTE) {
+        const rp = path.join(dir, "regeln-abdeckung.json");
+        const kp = path.join(dir, "kanaele-abdeckung.json");
+        const dp = path.join(dir, "dienste.txt");
+        fs.writeFileSync(rp, typeof regeln === "string" ? regeln : JSON.stringify(regeln));
+        fs.writeFileSync(kp, JSON.stringify(guteKanaele()));
+        fs.writeFileSync(dp, dienste.join("\n") + "\n");
+        let aus;
+        try {
+          aus = execFileSync("bash", [SCRIPT], {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              PATH: `${path.join(dir, "bin")}:${process.env.PATH}`,
+              INFRA_PROBE_ALARMREGELN: rp,
+              INFRA_PROBE_ALARMKANAELE: kp,
+              INFRA_PROBE_DIENSTE: dp,
+            },
+          });
+        } catch (e) {
+          aus = (e.stdout || "") + (e.stderr || "");
+        }
+        return aus
+          .replace(FARBCODES, "")
+          .split("\n")
+          .filter((z) => z.includes("Alarm-Abdeckung"));
+      }
+
+      test("Erfolgsweg: jede der drei Regeln mit Dienstliste nennt alle Dienste → drei gruene Zeilen", () => {
+        const zeilen = abdeckung(regelSatz());
+        expect(zeilen).toHaveLength(3);
+        for (const name of REGELN.slice(0, 3)) {
+          expect(
+            enthaelt(zeilen, `✓ Alarm-Abdeckung »${name}«: jeder Dienst ist im Filter oder benannte Ausnahme`)
+          ).toBe(true);
+        }
+      });
+
+      test.each(REGELN.slice(0, 3))(
+        "ein Dienst fehlt nur in »%s« → genau diese Regel rot, die zwei anderen gruen",
+        (name) => {
+          const zeilen = abdeckung(regelSatz({ [name]: ["admin", "enqueue"] }));
+          expect(
+            enthaelt(
+              zeilen,
+              `✗ Alarm-Abdeckung »${name}«: Dienste ohne Abdeckung und ohne benannte Ausnahme: processjob`
+            )
+          ).toBe(true);
+          expect(zeilen.filter((z) => z.includes("✓"))).toHaveLength(2);
+        }
+      );
+
+      test("ein neuer Dienst, den keine Regel nennt → alle drei rot", () => {
+        const zeilen = abdeckung(regelSatz(), [...DIENSTE, "neuerdienst"]);
+        expect(zeilen.filter((z) => z.includes("✗") && z.includes("neuerdienst"))).toHaveLength(3);
+      });
+
+      test("ein Name, der nur ausserhalb der Dienstliste im Filter steht, zaehlt nicht als Abdeckung", () => {
+        /* Der Filter nennt "processjob" auch als Wert von jsonPayload.step. */
+        const zeilen = abdeckung(regelSatz({ [REGELN[0]]: ["admin", "enqueue"] }));
+        expect(enthaelt(zeilen, `✗ Alarm-Abdeckung »${REGELN[0]}«`)).toBe(true);
+      });
+
+      test("keine Regel mit Dienstliste → ungeprueft gilt als nicht bestanden", () => {
+        const zeilen = abdeckung([ohneListe(REGELN[3]), ohneListe(REGELN[4])]);
+        expect(enthaelt(zeilen, "✗ Alarm-Abdeckung NICHT geprueft (keine Alarmregel mit Dienstliste gefunden)")).toBe(
+          true
+        );
+      });
+
+      test("unlesbare Regeln oder unlesbare Dienstliste → ungeprueft gilt als nicht bestanden", () => {
+        expect(enthaelt(abdeckung("kein JSON"), "✗ Alarm-Abdeckung NICHT geprueft (Alarmregeln nicht lesbar)")).toBe(
+          true
+        );
+        expect(
+          enthaelt(abdeckung(regelSatz(), []), "✗ Alarm-Abdeckung NICHT geprueft (Dienstliste nicht lesbar)")
+        ).toBe(true);
+      });
     });
 
     test("die Liste im Skript und die Doku nennen dieselben fuenf Regeln", () => {

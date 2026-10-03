@@ -50,7 +50,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -551,23 +551,11 @@ esac
 # Jeder ANDERE Dienst, der weder im Filter noch auf dieser Ausnahmeliste steht,
 # ist rot — das erzwingt eine bewusste Entscheidung pro neuem Dienst.
 ALARM_AUSNAHMEN="errors telemetry erinnerung ntfy"
-if [ -n "${INFRA_PROBE_POLICY:-}" ]; then
-  FILTER_DIENSTE=$(cat "$INFRA_PROBE_POLICY")
-else
-  FILTER_DIENSTE=$(printf '%s' "${POLICY_JSON:-}" | python3 -c '
-import json, re, sys
-try:
-    daten = json.load(sys.stdin)
-except Exception:
-    print(""); raise SystemExit(0)
-namen = set()
-for p in (daten if isinstance(daten, list) else []):
-    for c in p.get("conditions", []):
-        f = (c.get("conditionMatchedLog") or {}).get("filter", "")
-        namen.update(re.findall(r"\"([a-z0-9-]+)\"", f))
-print(" ".join(sorted(namen)))
-' 2>/dev/null)
-fi
+# OPS-2026-10-03-11 (Nachlauf): Bis 03.10.2026 galt ein Dienst als abgedeckt,
+# sobald sein Name im Filter IRGENDEINER Regel stand. Drei Regeln fuehren eine
+# eigene Dienstliste; fehlte ein Dienst in einer davon, blieb die Pruefung gruen.
+# Jetzt wird jede Regel mit Dienstliste fuer sich geprueft. Regeln ohne
+# Dienstliste (sie zaehlen eine Kennzahl) kommen hier nicht vor.
 if [ -n "${INFRA_PROBE_DIENSTE:-}" ]; then
   ALLE_DIENSTE=$(cat "$INFRA_PROBE_DIENSTE")
 else
@@ -576,17 +564,46 @@ fi
 if [ -z "$ALLE_DIENSTE" ]; then
   rot "Alarm-Abdeckung NICHT geprueft (Dienstliste nicht lesbar) — ungeprueft gilt als nicht bestanden"
 else
-  UNGEDECKT=""
-  for D in $ALLE_DIENSTE; do
-    case " $FILTER_DIENSTE " in *" $D "*) continue ;; esac
-    case " $ALARM_AUSNAHMEN " in *" $D "*) continue ;; esac
-    UNGEDECKT="$UNGEDECKT $D"
-  done
-  if [ -n "$UNGEDECKT" ]; then
-    rot "Dienste ohne Alarm-Abdeckung und ohne benannte Ausnahme:$UNGEDECKT — Filter erweitern oder Ausnahme begruenden"
-  else
-    gruen "Alarm-Abdeckung: jeder Dienst ist im Filter oder benannte Ausnahme"
+  ABDECKUNG=$(POLICY_JSON="$POLICY_JSON" ALLE_DIENSTE="$ALLE_DIENSTE" ALARM_AUSNAHMEN="$ALARM_AUSNAHMEN" PYTHONIOENCODING=utf-8 python3 -c '
+import json, os, re
+try:
+    regeln = json.loads(os.environ.get("POLICY_JSON", ""))
+except Exception:
+    print("MESSFEHLER"); raise SystemExit(0)
+if not isinstance(regeln, list) or not regeln:
+    print("MESSFEHLER"); raise SystemExit(0)
+ausnahmen = set(os.environ.get("ALARM_AUSNAHMEN", "").split())
+pflicht = [d for d in os.environ.get("ALLE_DIENSTE", "").split() if d not in ausnahmen]
+mit_liste = 0
+for regel in regeln:
+    for bedingung in regel.get("conditions", []):
+        filter_text = (bedingung.get("conditionMatchedLog") or {}).get("filter", "")
+        liste = re.search(r"service_name\s*=\s*\(([^)]*)\)", filter_text)
+        if not liste:
+            continue
+        mit_liste += 1
+        genannt = set(re.findall(r"\"([a-z0-9-]+)\"", liste.group(1)))
+        fehlt = [d for d in pflicht if d not in genannt]
+        name = regel.get("displayName", "?")
+        print(("LUECKE:%s:%s" % (name, " ".join(fehlt))) if fehlt else ("OK:" + name))
+if mit_liste == 0:
+    print("KEINE_LISTE")
+' 2>/dev/null)
+  if [ -z "$ABDECKUNG" ]; then
+    rot "Alarm-Abdeckung NICHT geprueft (keine auswertbare Ausgabe) — ungeprueft gilt als nicht bestanden"
   fi
+  while IFS= read -r ZEILE; do
+    case "$ZEILE" in
+      OK:*)        gruen "Alarm-Abdeckung »${ZEILE#OK:}«: jeder Dienst ist im Filter oder benannte Ausnahme" ;;
+      LUECKE:*)    REST="${ZEILE#LUECKE:}"; rot "Alarm-Abdeckung »${REST%%:*}«: Dienste ohne Abdeckung und ohne benannte Ausnahme: ${REST#*:} — Filter erweitern oder Ausnahme begruenden" ;;
+      KEINE_LISTE) rot "Alarm-Abdeckung NICHT geprueft (keine Alarmregel mit Dienstliste gefunden) — ungeprueft gilt als nicht bestanden" ;;
+      MESSFEHLER)  rot "Alarm-Abdeckung NICHT geprueft (Alarmregeln nicht lesbar) — ungeprueft gilt als nicht bestanden" ;;
+      "")          ;;
+      *)           rot "Alarm-Abdeckung NICHT geprueft (unerwartete Ausgabe) — ungeprueft gilt als nicht bestanden" ;;
+    esac
+  done <<ABDECKUNG_ENDE
+$ABDECKUNG
+ABDECKUNG_ENDE
 fi
 
 # ── 8. Die zwei Netze unter der Löschzusage: Firestore-TTL + Reaper-Zeitplan ──

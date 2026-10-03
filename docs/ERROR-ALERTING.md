@@ -64,7 +64,10 @@ Jede Art Fehlerzeile bekommt eine eigene Richtlinie mit eigenem Betreff — der
 Betreff steht in der E-Mail und als Titel im Push, also sieht man schon auf dem
 Sperrbildschirm, was los ist. Alle drei haben dieselben Dienste im Filter und
 dieselben Kanäle; zusammen decken sie genau das ab, was vorher eine einzige
-Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung.
+Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung. Dass jede der
+drei wirklich jeden Dienst nennt, prüft `scripts/verify-infrastructure.sh` bei
+jeder Auslieferung je Richtlinie — kommt ein Dienst dazu, muss er in alle drei
+Filter (oder mit Begründung auf die Ausnahmeliste im Skript).
 
 | Richtlinie | Betreff | Filter (nach dem gemeinsamen Teil) |
 |---|---|---|

@@ -226,11 +226,17 @@ Webseite etwas Unbelegtes, und genau davor schützt der Wächter.
 
 ## Wächter über den Alarmweg (seit 2026-08-12)
 
-`scripts/verify-infrastructure.sh` prüft seit OPS-2026-08-12-09 vor jedem Deploy mit:
-Gibt es noch eine Richtlinie mit `severity>=ERROR`, ist sie scharf, hat sie
-Benachrichtigungskanäle, und sind die Kanäle eingeschaltet? Vier Ausfallarten führen zu
-rot: Richtlinie fehlt, Richtlinie aus, kein Kanal, Kanal abgeschaltet — dazu „nicht
-geprüft" bei einer gescheiterten Messung.
+`scripts/verify-infrastructure.sh` prüft seit OPS-2026-08-12-09 vor jedem Deploy mit — seit
+03.10.2026 jede der fünf Alarmregeln einzeln nach ihrem Namen (Liste `ALARM_REGELN` im
+Skript; beschrieben sind die Regeln in `docs/ERROR-ALERTING.md`, ein Test hält beides
+gegeneinander): Gibt es die Regel, ist sie scharf, hat sie Benachrichtigungskanäle, und ist
+ein eingeschalteter E-Mail-Kanal dabei? Dazu: Sind alle Kanäle eingeschaltet, und gibt es im
+Projekt eine Alarmregel, die nicht auf der Liste steht? Sechs Ausfallarten führen zu rot:
+Regel fehlt, Regel aus, kein Kanal, kein E-Mail-Kanal, Kanal abgeschaltet, Regel ohne
+Wächter — dazu „nicht geprüft" bei einer gescheiterten Messung.
+
+Kommt eine Alarmregel dazu oder wird eine umbenannt: Namen in `ALARM_REGELN` und in
+`docs/ERROR-ALERTING.md` im selben Schritt nachziehen, sonst wird die nächste Auslieferung rot.
 
 **Grenze dieser Maßnahme, ausdrücklich:** Sie greift zur Deploy-Zeit, nicht in der Minute
 des Ausfalls. Zwischen zwei Deploys kann der Alarmweg tot sein, ohne dass es auffällt. Ein

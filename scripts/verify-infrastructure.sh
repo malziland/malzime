@@ -50,7 +50,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -434,41 +434,96 @@ done
 # nächsten Deploy, nicht in der Minute des Ausfalls. Das ist die Grenze dieser
 # Maßnahme und steht so im RUNBOOK.
 echo "— Alarmweg"
-POLICY_JSON=$(gcloud alpha monitoring policies list --project="$PROJECT" --format=json 2>&1) || POLICY_JSON=""
-ALARM=$(printf '%s' "$POLICY_JSON" | python3 -c '
-import json, sys
+# OPS-2026-10-03-11: Seit 01.10.2026 gibt es fuenf Alarmregeln statt einer. Der
+# Waechter prueft jede einzeln nach ihrem Anzeigenamen — vorher sah er nur die
+# erste Regel mit severity>=ERROR; die vier anderen konnten aus, geloescht oder
+# ohne Kanal sein, und jede Auslieferung meldete weiter "scharf".
+# Die Namen stehen kanonisch in docs/ERROR-ALERTING.md; ein Test haelt diese
+# Liste und die Doku gegeneinander. Eine Regel im Projekt, die hier NICHT steht,
+# ist ebenfalls rot — sonst waere die naechste neue Regel wieder unbewacht.
+# Jede Regel braucht einen eingeschalteten E-Mail-Kanal: Der Push aufs Handy
+# haengt an einem fremden Dienst und kann ausbleiben (docs/ERROR-ALERTING.md,
+# "Wenn der Push nicht weckt"); die E-Mail ist der Weg, der ankommen muss.
+ALARM_REGELN='malziME Function Errors
+malziME Analyse gescheitert
+malziME Kinderschutz-Treffer
+malziME Client-Fehler-Haeufung
+malziME KI-Verbindung bricht gehäuft ab'
+
+# Einspeisepunkte fuer Tests: INFRA_PROBE_ALARMREGELN und INFRA_PROBE_ALARMKANAELE
+# nennen je eine Datei mit der Antwort, die sonst gcloud liefert.
+if [ -n "${INFRA_PROBE_ALARMREGELN:-}" ]; then
+  POLICY_JSON=$(cat "$INFRA_PROBE_ALARMREGELN")
+else
+  POLICY_JSON=$(gcloud alpha monitoring policies list --project="$PROJECT" --format=json 2>&1) || POLICY_JSON=""
+fi
+if [ -n "${INFRA_PROBE_ALARMKANAELE:-}" ]; then
+  KANAL_JSON=$(cat "$INFRA_PROBE_ALARMKANAELE")
+else
+  KANAL_JSON=$(gcloud alpha monitoring channels list --project="$PROJECT" --format=json 2>&1) || KANAL_JSON=""
+fi
+ALARM=$(POLICY_JSON="$POLICY_JSON" KANAL_JSON="$KANAL_JSON" ALARM_REGELN="$ALARM_REGELN" PYTHONIOENCODING=utf-8 python3 -c '
+import json, os
+soll = [z.strip() for z in os.environ.get("ALARM_REGELN", "").split("\n") if z.strip()]
 try:
-    daten = json.load(sys.stdin)
+    regeln = json.loads(os.environ.get("POLICY_JSON", ""))
 except Exception:
-    print("MESSFEHLER:Antwort nicht lesbar"); raise SystemExit(0)
-if not isinstance(daten, list) or not daten:
-    print("MESSFEHLER:keine Richtlinie in der Antwort"); raise SystemExit(0)
-for pol in daten:
-    filter_text = " ".join(
-        (b.get("conditionMatchedLog") or {}).get("filter", "") for b in pol.get("conditions", [])
-    )
-    if "severity>=ERROR" not in filter_text.replace(" ", ""):
-        continue
-    if not pol.get("enabled", False):
-        print("AUS:" + pol.get("displayName", "?")); raise SystemExit(0)
-    kanaele = pol.get("notificationChannels", [])
+    print("MESSFEHLER:Antwort zu den Alarmregeln nicht lesbar"); raise SystemExit(0)
+if not isinstance(regeln, list) or not regeln:
+    print("MESSFEHLER:keine Alarmregel in der Antwort"); raise SystemExit(0)
+try:
+    kanal_liste = json.loads(os.environ.get("KANAL_JSON", ""))
+    kanal = {k.get("name"): k for k in kanal_liste} if isinstance(kanal_liste, list) and kanal_liste else None
+except Exception:
+    kanal = None
+if kanal is None:
+    print("MESSFEHLER:Liste der Kanaele nicht lesbar, E-Mail-Kanal je Regel ungeprueft")
+nach_name = {}
+for regel in regeln:
+    nach_name.setdefault(regel.get("displayName", "?"), []).append(regel)
+for name in soll:
+    treffer = nach_name.get(name, [])
+    if not treffer:
+        print("FEHLT:" + name); continue
+    regel = next((r for r in treffer if r.get("enabled", False)), None)
+    if regel is None:
+        print("AUS:" + name); continue
+    kanaele = regel.get("notificationChannels", [])
     if not kanaele:
-        print("OHNE_KANAL:" + pol.get("displayName", "?")); raise SystemExit(0)
-    print("OK:%s:%d" % (pol.get("displayName", "?"), len(kanaele))); raise SystemExit(0)
-print("FEHLT:keine Richtlinie mit severity>=ERROR")
+        print("OHNE_KANAL:" + name); continue
+    if kanal is None:
+        continue
+    mail = [k for k in kanaele if kanal.get(k, {}).get("type") == "email" and kanal.get(k, {}).get("enabled")]
+    if not mail:
+        print("OHNE_MAIL:" + name); continue
+    print("OK:%s:%d" % (name, len(kanaele)))
+for name in sorted(nach_name):
+    if name not in soll:
+        print("UNBEWACHT:" + name)
 ' 2>/dev/null)
 
-case "$ALARM" in
-  OK:*)         gruen "Fehler-Alarm scharf: »$(printf '%s' "${ALARM#OK:}" | cut -d: -f1)«, $(printf '%s' "$ALARM" | rev | cut -d: -f1 | rev) Kanal/Kanäle" ;;
-  AUS:*)        rot   "Fehler-Alarm ist DEAKTIVIERT: ${ALARM#AUS:}" ;;
-  OHNE_KANAL:*) rot   "Fehler-Alarm hat KEINEN Benachrichtigungskanal: ${ALARM#OHNE_KANAL:}" ;;
-  FEHLT:*)      rot   "Kein Fehler-Alarm gefunden — eine Stoerung wuerde niemanden erreichen" ;;
-  MESSFEHLER:*) rot   "Alarmweg NICHT geprueft (${ALARM#MESSFEHLER:}) — ungeprueft gilt als nicht bestanden" ;;
-  *)            rot   "Alarmweg NICHT geprueft (keine auswertbare Ausgabe)" ;;
-esac
+if [ -z "$ALARM" ]; then
+  rot "Alarmweg NICHT geprueft (keine auswertbare Ausgabe) — ungeprueft gilt als nicht bestanden"
+fi
+# Hier-Dokument statt Rohr: `rot` setzt FEHLER=1, und in einer Rohr-Schleife
+# ginge diese Zuweisung in einer Unter-Shell verloren.
+while IFS= read -r ZEILE; do
+  case "$ZEILE" in
+    OK:*)         REST="${ZEILE#OK:}"; gruen "Alarmregel scharf: »${REST%:*}«, ${REST##*:} Kanal/Kanäle, E-Mail dabei" ;;
+    AUS:*)        rot   "Alarmregel ist DEAKTIVIERT: »${ZEILE#AUS:}«" ;;
+    OHNE_KANAL:*) rot   "Alarmregel hat KEINEN Benachrichtigungskanal: »${ZEILE#OHNE_KANAL:}«" ;;
+    OHNE_MAIL:*)  rot   "Alarmregel hat keinen eingeschalteten E-Mail-Kanal: »${ZEILE#OHNE_MAIL:}«" ;;
+    FEHLT:*)      rot   "Alarmregel FEHLT: »${ZEILE#FEHLT:}« — dieses Ereignis wuerde niemanden erreichen" ;;
+    UNBEWACHT:*)  rot   "Alarmregel ohne Waechter: »${ZEILE#UNBEWACHT:}« — in ALARM_REGELN (dieses Skript) und docs/ERROR-ALERTING.md aufnehmen" ;;
+    MESSFEHLER:*) rot   "Alarmweg NICHT geprueft (${ZEILE#MESSFEHLER:}) — ungeprueft gilt als nicht bestanden" ;;
+    "")           ;;
+    *)            rot   "Alarmweg NICHT geprueft (unerwartete Ausgabe) — ungeprueft gilt als nicht bestanden" ;;
+  esac
+done <<ALARM_ENDE
+$ALARM
+ALARM_ENDE
 
 # Und die Kanäle selbst: ein Kanal kann verwaist oder abgeschaltet sein.
-KANAL_JSON=$(gcloud alpha monitoring channels list --project="$PROJECT" --format=json 2>&1) || KANAL_JSON=""
 KANAELE=$(printf '%s' "$KANAL_JSON" | python3 -c '
 import json, sys
 try:

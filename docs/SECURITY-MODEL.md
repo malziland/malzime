@@ -171,12 +171,12 @@ Commit wie die Entscheidung.
 
 ## Restrisiko: Der Alarmweg kann sich nicht selbst überwachen (seit 2026-08-12)
 
-**Entscheidung.** Der Fehler-Alarm (Log-Richtlinie → E-Mail + ntfy-Push) wird beim Deploy
-auf Existenz, Schärfe und zustellfähige Kanäle geprüft (`verify-infrastructure.sh`), aber
-nicht laufend.
+**Entscheidung.** Die Alarmregeln (Log-Richtlinien → E-Mail + ntfy-Push; seit 01.10.2026
+fünf) werden beim Deploy je einzeln auf Existenz, Schärfe und zustellfähige Kanäle geprüft
+(`verify-infrastructure.sh`), aber nicht laufend.
 
-**Begründung.** Die Richtlinie ist eine Anwesenheits-Bedingung auf `severity>=ERROR`: Ihr
-eigener Ausfall erzeugt keine Logzeile, auf die sie feuern könnte. Ein laufender Wächter
+**Begründung.** Jede Regel ist eine Anwesenheits-Bedingung auf Logzeilen: Ihr eigener
+Ausfall erzeugt keine Logzeile, auf die sie feuern könnte. Ein laufender Wächter
 müsste außerhalb des Projekts sitzen und wäre selbst wieder unbewacht — die Kette hat kein
 Ende, nur einen Punkt, an dem man sie abschneidet.
 
@@ -187,6 +187,30 @@ Schwelle gekommen.
 
 **Bedingung für Neubewertung.** Sobald das Projekt einen zweiten Betreuer hat (Bus-Faktor
 > 1) oder ein externer Verfügbarkeitsdienst ohnehin läuft, gehört der Alarmweg dorthin.
+
+## Restrisiko: Der Push aufs Handy kann ausbleiben (seit 2026-10-03)
+
+**Entscheidung.** Der ntfy-Push bleibt, wie er ist. Der Weg, der ankommen muss, ist die
+E-Mail, die jede Alarmregel zusätzlich verschickt.
+
+**Begründung.** Der eigene ntfy-Server kann ein iPhone nicht selbst wecken; er bittet dafür
+den Dienst des Herstellers (`ntfy.sh`) um einen Weckruf. `ntfy.sh` nimmt ohne Konto je Tag
+250 solche Bitten je Absender-Adresse an. Cloud Run sendet von Adressen, die sich viele
+Google-Kunden teilen — ist deren Tagesbudget verbraucht, wird der Weckruf abgewiesen. Die
+Nachricht liegt dann in der App, das Handy meldet sich aber nicht von selbst. Gemessen am
+03.10.2026 abends: 6 von 6 Weckrufen abgewiesen; derselbe Weckruf von einer anderen Adresse
+wurde angenommen. Einzelheiten: `docs/ERROR-ALERTING.md`, „Wenn der Push nicht weckt".
+
+**Was dagegen gesetzt ist.** Kein Alarm geht verloren: `verify-infrastructure.sh` verlangt
+bei jedem Deploy je Alarmregel einen eingeschalteten E-Mail-Kanal. Ohne zweiten Weg bleiben
+die Nachricht „Stundenlimit erreicht" und die Meldungen des Nachtlaufs.
+
+**Betrachtete Alternativen.** Eine bezahlte Stufe bei `ntfy.sh` (dort wird dann nach Konto
+gezählt) und eine eigene feste Absender-Adresse. Beide verworfen: laufende Kosten für einen
+Weg, der nur das Wecken betrifft.
+
+**Bedingung für Neubewertung.** Wenn Alarme zu Zeiten ausbleiben, zu denen jemand sofort
+handeln müsste — etwa „Stundenlimit erreicht" während eines Workshops.
 
 ## Restrisiko: Kein Eintrag in der HSTS-Preload-Liste (seit 2026-08-21)
 

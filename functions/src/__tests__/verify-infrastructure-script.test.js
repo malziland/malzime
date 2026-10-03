@@ -239,4 +239,171 @@ describe("verify-infrastructure.sh", () => {
       expect(aus).toMatch(/uebersprungen \(Probemodus ohne INFRA_PROBE_SATZ\)/);
     });
   });
+
+  /* OPS-2026-10-03-11: Der Waechter ueber den Alarmweg sah nur EINE Alarmregel
+     (die erste mit severity>=ERROR). Seit es fuenf gibt, konnten vier davon aus,
+     geloescht oder ohne Kanal sein, und der Waechter meldete weiter "scharf".
+     Jetzt prueft er jede Regel einzeln nach ihrem Namen. Die Proben laufen ueber
+     die Einspeisepunkte INFRA_PROBE_ALARMREGELN und INFRA_PROBE_ALARMKANAELE mit
+     erfundenen Antworten — keine echte Kennung, keine Adresse. */
+  describe("der Alarm-Waechter prueft jede Alarmregel einzeln (OPS-2026-10-03-11)", () => {
+    const os = require("os");
+    const { execFileSync } = require("child_process");
+    let dir;
+
+    const REGELN = [
+      "malziME Function Errors",
+      "malziME Analyse gescheitert",
+      "malziME Kinderschutz-Treffer",
+      "malziME Client-Fehler-Haeufung",
+      "malziME KI-Verbindung bricht gehäuft ab",
+    ];
+    const MAIL = "projects/probe/notificationChannels/1";
+    const PUSH = "projects/probe/notificationChannels/2";
+
+    const guteKanaele = () => [
+      { name: MAIL, type: "email", enabled: true, displayName: "Probe E-Mail" },
+      { name: PUSH, type: "webhook_tokenauth", enabled: true, displayName: "Probe Push" },
+    ];
+    const guteRegeln = () =>
+      REGELN.map((displayName) => ({ displayName, enabled: true, notificationChannels: [MAIL, PUSH] }));
+    /** Alle Regeln gut, nur die genannte wird veraendert (oder entfernt, wenn die Aenderung null liefert). */
+    const regelnMit = (name, aendere) =>
+      guteRegeln()
+        .map((regel) => (regel.displayName === name ? aendere(regel) : regel))
+        .filter(Boolean);
+
+    beforeAll(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-alarm-"));
+      const attrappen = path.join(dir, "bin");
+      fs.mkdirSync(attrappen);
+      for (const w of ["gcloud", "gsutil", "curl"]) {
+        const ziel = path.join(attrappen, w);
+        fs.writeFileSync(ziel, "#!/bin/sh\n" + `echo "ATTRAPPE ${w}: kein Zugriff im Test" >&2\n` + "exit 1\n");
+        fs.chmodSync(ziel, 0o755);
+      }
+    });
+    afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+    /** Laesst das Skript mit den eingespeisten Antworten laufen und liefert die Zeilen des Alarm-Waechters. */
+    function lauf(regeln, kanaele) {
+      const rp = path.join(dir, "regeln.json");
+      const kp = path.join(dir, "kanaele.json");
+      fs.writeFileSync(rp, typeof regeln === "string" ? regeln : JSON.stringify(regeln));
+      fs.writeFileSync(kp, typeof kanaele === "string" ? kanaele : JSON.stringify(kanaele));
+      let aus;
+      try {
+        aus = execFileSync("bash", [SCRIPT], {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            PATH: `${path.join(dir, "bin")}:${process.env.PATH}`,
+            INFRA_PROBE_ALARMREGELN: rp,
+            INFRA_PROBE_ALARMKANAELE: kp,
+          },
+        });
+      } catch (e) {
+        aus = (e.stdout || "") + (e.stderr || "");
+      }
+      // eslint-disable-next-line no-control-regex
+      const ohneFarbe = aus.replace(/\x1b\[[0-9;]*m/g, "");
+      return ohneFarbe.split("\n").filter((z) => /Alarmregel|Alarmweg NICHT|Benachrichtigungskan|Kanäle NICHT/.test(z));
+    }
+    const gruen = (name) => `✓ Alarmregel scharf: »${name}«, 2 Kanal/Kanäle, E-Mail dabei`;
+    const enthaelt = (zeilen, text) => zeilen.some((z) => z.includes(text));
+
+    test("Erfolgsweg: alle fuenf Regeln scharf → fuenf gruene Zeilen, keine rote", () => {
+      const zeilen = lauf(guteRegeln(), guteKanaele());
+      for (const name of REGELN) expect(enthaelt(zeilen, gruen(name))).toBe(true);
+      expect(zeilen.filter((z) => z.includes("✗"))).toEqual([]);
+      expect(enthaelt(zeilen, "✓ Benachrichtigungskanäle aktiv: 2")).toBe(true);
+    });
+
+    test.each(REGELN)("»%s« ausgeschaltet → rot, die vier anderen bleiben gruen", (name) => {
+      const zeilen = lauf(
+        regelnMit(name, (r) => ({ ...r, enabled: false })),
+        guteKanaele()
+      );
+      expect(enthaelt(zeilen, `✗ Alarmregel ist DEAKTIVIERT: »${name}«`)).toBe(true);
+      for (const andere of REGELN.filter((n) => n !== name)) expect(enthaelt(zeilen, gruen(andere))).toBe(true);
+    });
+
+    test.each(REGELN)("»%s« geloescht → rot", (name) => {
+      const zeilen = lauf(
+        regelnMit(name, () => null),
+        guteKanaele()
+      );
+      expect(enthaelt(zeilen, `✗ Alarmregel FEHLT: »${name}«`)).toBe(true);
+    });
+
+    test.each(REGELN)("»%s« ohne Kanal → rot", (name) => {
+      const zeilen = lauf(
+        regelnMit(name, (r) => ({ ...r, notificationChannels: [] })),
+        guteKanaele()
+      );
+      expect(enthaelt(zeilen, `✗ Alarmregel hat KEINEN Benachrichtigungskanal: »${name}«`)).toBe(true);
+    });
+
+    test.each(REGELN)("»%s« nur mit Push, ohne E-Mail → rot", (name) => {
+      const zeilen = lauf(
+        regelnMit(name, (r) => ({ ...r, notificationChannels: [PUSH] })),
+        guteKanaele()
+      );
+      expect(enthaelt(zeilen, `✗ Alarmregel hat keinen eingeschalteten E-Mail-Kanal: »${name}«`)).toBe(true);
+    });
+
+    test("E-Mail-Kanal abgeschaltet → alle fuenf Regeln rot, und der Kanal wird genannt", () => {
+      const kanaele = guteKanaele();
+      kanaele[0].enabled = false;
+      const zeilen = lauf(guteRegeln(), kanaele);
+      for (const name of REGELN) {
+        expect(enthaelt(zeilen, `✗ Alarmregel hat keinen eingeschalteten E-Mail-Kanal: »${name}«`)).toBe(true);
+      }
+      expect(enthaelt(zeilen, "✗ Abgeschaltete Benachrichtigungskanäle: Probe E-Mail")).toBe(true);
+    });
+
+    test("eine Regel, die der Waechter nicht kennt → rot (sonst waere die naechste neue Regel unbewacht)", () => {
+      const regeln = [
+        ...guteRegeln(),
+        { displayName: "malziME Neue Regel", enabled: true, notificationChannels: [MAIL] },
+      ];
+      const zeilen = lauf(regeln, guteKanaele());
+      expect(enthaelt(zeilen, "✗ Alarmregel ohne Waechter: »malziME Neue Regel«")).toBe(true);
+      for (const name of REGELN) expect(enthaelt(zeilen, gruen(name))).toBe(true);
+    });
+
+    test("gleichnamiges, ausgeschaltetes Duplikat macht eine scharfe Regel nicht rot", () => {
+      const regeln = [{ displayName: REGELN[0], enabled: false, notificationChannels: [] }, ...guteRegeln()];
+      expect(enthaelt(lauf(regeln, guteKanaele()), gruen(REGELN[0]))).toBe(true);
+    });
+
+    test.each([
+      ["unlesbare Antwort", "das ist kein JSON", "Antwort zu den Alarmregeln nicht lesbar"],
+      ["leere Liste", "[]", "keine Alarmregel in der Antwort"],
+    ])("Messfehler bei den Regeln (%s) → ungeprueft gilt als nicht bestanden", (_name, antwort, grund) => {
+      const zeilen = lauf(antwort, guteKanaele());
+      expect(enthaelt(zeilen, `✗ Alarmweg NICHT geprueft (${grund})`)).toBe(true);
+      expect(zeilen.filter((z) => z.includes("✓ Alarmregel"))).toEqual([]);
+    });
+
+    test("Messfehler bei den Kanaelen → keine Regel gilt als geprueft", () => {
+      const zeilen = lauf(guteRegeln(), "das ist kein JSON");
+      expect(enthaelt(zeilen, "✗ Alarmweg NICHT geprueft (Liste der Kanaele nicht lesbar")).toBe(true);
+      expect(zeilen.filter((z) => z.includes("✓ Alarmregel"))).toEqual([]);
+      expect(enthaelt(zeilen, "✗ Kanäle NICHT geprueft")).toBe(true);
+    });
+
+    test("die Liste im Skript und die Doku nennen dieselben fuenf Regeln", () => {
+      const block = inhalt.match(/ALARM_REGELN='([^']+)'/);
+      expect(block).not.toBeNull();
+      const imSkript = block[1]
+        .split("\n")
+        .map((z) => z.trim())
+        .filter(Boolean);
+      expect([...imSkript].sort()).toEqual([...REGELN].sort());
+      const doku = fs.readFileSync(path.join(__dirname, "..", "..", "..", "docs", "ERROR-ALERTING.md"), "utf8");
+      const inDerDoku = [...new Set([...doku.matchAll(/`(malziME [^`]+)`/g)].map((m) => m[1]))];
+      expect(inDerDoku.sort()).toEqual([...imSkript].sort());
+    });
+  });
 });

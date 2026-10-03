@@ -50,8 +50,13 @@ const PLATZHALTER_NACKT =
   /~\s*(?:zahl|number)\b|\b(?:zahl|number)\s*(?:[-–]|bis|to)\s*(?:zahl|number)\b|\b(?:zahl|number)[\s-]+(?:jahre|j\u00e4hrig|years?|yrs)\b|\b(?:spanne|range|circa|ca\.|etwa|about|aged|zwischen|between)\s+(?:zahl|number)\b/i;
 /* Woerter, die einen Altersversuch anzeigen — mit Wortgrenzen, damit
    "spannend", "Jahreszeit" oder "Altersspanne" nicht zaehlen. "-jaehrig" darf
-   angehaengt sein ("dreizehnjaehrig"). */
-const ALTERSWORT = /(?<!\p{L})(?:jahre|jahren|years?|yrs|spanne|range)(?!\p{L})|j\u00e4hrig/iu;
+   angehaengt sein ("dreizehnjaehrig", "minderjaehrig"). "underage" und
+   "a minor" sagen dasselbe wie "minderjaehrig": unter 18, aber ohne Zahl.
+   "minor" zaehlt nur vor einem Satzzeichen oder am Textende — in "minor
+   details" ist es kein Alter. Ein Geburtsjahr ("geboren 2012") ist ebenfalls
+   ein Altersversuch ohne lesbares Alter; "geboren fuer die Buehne" nicht. */
+const ALTERSWORT =
+  /(?<!\p{L})(?:jahre|jahren|years?|yrs|spanne|range|under-?age)(?!\p{L})|(?<!\p{L})minors?(?=\s*(?:[.,;:!?)]|$))|(?<!\p{L})(?:geboren|jahrgang|born)(?!\p{L})[^.!?\d]{0,12}(?:19|20)\d\d(?!\d)|j\u00e4hrig/iu;
 
 const ZAHLWOERTER = {
   fünf: 5,
@@ -135,18 +140,32 @@ function mitZiffern(text) {
 /* Kategorien ("Teenager", "jugendlich", "Schulkind") — zaehlen NUR, wenn
    keine Zahl dasteht: "~35 Jahre, jugendlich wirkend" ist 35, nicht 13.
    "Kind" nur gross geschrieben — das englische "kind" (freundlich) ist kein
-   Alter. */
+   Alter. Seit SEC-2026-10-03-02 auch Volksschul..., Schueler..., Baby und
+   die englischen Entsprechungen. */
 const KATEGORIEN = [
   [/(?<!\p{L})(?:teen\p{L}*|jugendlich\p{L}*|adolescent\p{L}*)/iu, 13],
   [/(?<!\p{L})pubert\p{L}*/iu, 12],
-  [/(?<!\p{L})(?:schoolgirl|schoolboy)(?!\p{L})/iu, 10],
-  [/(?<!\p{L})(?:schul|klein|vorschul|grundschul)kind\p{L}*|(?<!\p{L})grundschulalter(?!\p{L})/iu, 8],
+  [/(?<!\p{L})(?:school(?:girl|boy|child|kid)\p{L}*|pupil|pre-?teen\p{L}*|tween\p{L}*)(?!\p{L})|sch(?:ü|ue)ler/iu, 10],
+  [/(?<!\p{L})(?:schul|klein|vorschul)kind\p{L}*|(?:grund|volks)sch(?:u|ü|ue)l\p{L}*/iu, 8],
+  [/(?<!\p{L})(?:elementary|primary|grade)[ -]school/iu, 8],
   [/(?<!\p{L})Kind(?:er)?(?!\p{L})|(?<!\p{L})(?:child\p{L}*|kids?)(?!\p{L})/u, 8],
+  [/(?<!\p{L})toddlers?(?!\p{L})/iu, 2],
+  [/(?<!\p{L})(?:bab(?:y|ys|ies)|infants?)(?!\p{L})|s(?:ä|ae)ugling/iu, 1],
+];
+/* Maedchen, Bub, Junge, girl, boy: ein Kind, aber ohne Altersstufe — zaehlt
+   deshalb nur, wenn keine Kategorie oben greift ("teenage girl" bleibt 13).
+   "Junge" nur als Hauptwort: gross geschrieben, nach einem Wort oder Komma
+   und nicht vor einem Hauptwort — "Junge Frau" ist kein Kind. */
+const KINDWOERTER = [
+  /m(?:ä|ae)dchen|m(?:ä|ae)dels?(?!\p{L})|(?<!\p{L})(?:girls?|boys?)(?!\p{L})/iu,
+  /(?<!\p{L})(?:Schulb|B)ub(?:en)?(?!\p{L})|(?<=[\p{L},:]\s)(?:Jung(?:e|en|s)|Schuljungen?)(?!\p{L})(?!\s+\p{Lu})/u,
 ];
 
 function kategorieAlter(text) {
-  const werte = KATEGORIEN.filter(([re]) => re.test(String(text || ""))).map(([, w]) => w);
-  return werte.length ? Math.min(...werte) : null;
+  const s = String(text || "");
+  const werte = KATEGORIEN.filter(([re]) => re.test(s)).map(([, w]) => w);
+  if (werte.length) return Math.min(...werte);
+  return KINDWOERTER.some((re) => re.test(s)) ? 8 : null;
 }
 
 function pruefText(text) {
@@ -175,6 +194,41 @@ function hatLesbaresAlter(text) {
   const s = pruefText(text);
   return !hatAltersPlatzhalter(s) && untereAltersgrenze(s) !== null;
 }
+
+/* Steht irgendwo im Text ein Altersversuch — Platzhalter oder Alterswort?
+   Fuer ganze Karten gedacht: Ob der Versuch LESBAR ist, entscheidet allein
+   die Stelle, die als Altersangabe zaehlt (Anker, sonst erster Satz). Eine
+   Zahl im Beleg-Satz macht ihn nicht lesbar (SEC-2026-10-03-02). */
+function hatAltersversuch(text) {
+  const s = pruefText(text);
+  return hatAltersPlatzhalter(s) || ALTERSWORT.test(s);
+}
+
+/* ── Erster Satz einer Karte (SEC-2026-10-03-02) ──────────────────────────
+   Als Altersangabe einer Karte zaehlt nur ihr erster Satz. Er endet am
+   ersten Satzzeichen — aber nicht am Punkt hinter einer Naeherungs-Abkuerzung
+   ("ca. 13 Jahre", "approx. 14") und nicht an einem Punkt zwischen Ziffern
+   ("12.–14.", "1.80"): Sonst endete der Satz vor dem Alter. Eine Abkuerzung
+   zaehlt nur, wenn danach weder ein Grossbuchstabe noch das Textende kommt
+   ("Du bist Max. Deine Wangen ..." bleibt ein Satzende). Bewusst ohne
+   i-Schalter: Mit ihm traefe die Grossbuchstaben-Klasse auch Kleinbuchstaben. */
+const ABKUERZUNGEN = "ca cca ungef ugf approx appr zw rd mind max min evtl vermutl wahrsch est abt bzw".split(" ");
+const KEIN_SATZENDE = new RegExp(
+  `(?<!\\p{L})(?:${ABKUERZUNGEN.flatMap((a) => [a, a[0].toUpperCase() + a.slice(1)]).join("|")})\\.(?!\\s*(?:\\p{Lu}|$))` +
+    `|(?<=\\d)\\.(?=\\d|\\s*[-–—]\\s*\\d)`,
+  "gu"
+);
+
+/* [erster Satz, Rest dahinter]. Die Punkte, die kein Satzende sind, werden
+   nur fuer die Suche ausgeblendet — gleich lang, damit die Stelle stimmt. */
+function satzUndRest(text) {
+  const s = String(text || "");
+  const m = /[.!?]/.exec(s.replace(KEIN_SATZENDE, (t) => `${t.slice(0, -1)}_`));
+  const ende = m ? m.index + 1 : s.length;
+  return [s.slice(0, ende).trim(), s.slice(ende).trim()];
+}
+const ersterSatz = (text) => satzUndRest(text)[0];
+const nachErstemSatz = (text) => satzUndRest(text)[1];
 
 /* Fuer die Anzeige: Ziffern in Klammern auspacken ("~‹14›" → "~14"). */
 function ohneZiffernKlammern(text) {
@@ -332,6 +386,9 @@ module.exports = {
   hatAltersPlatzhalter,
   istAlterUnlesbar,
   hatLesbaresAlter,
+  hatAltersversuch,
+  ersterSatz,
+  nachErstemSatz,
   alterNichtLesbarText,
   ohneZiffernKlammern,
 };

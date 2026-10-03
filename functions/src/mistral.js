@@ -49,6 +49,9 @@ const {
   hatAltersPlatzhalter,
   istAlterUnlesbar,
   hatLesbaresAlter,
+  hatAltersversuch,
+  ersterSatz,
+  nachErstemSatz,
   alterNichtLesbarText,
   ohneZiffernKlammern,
 } = require("./alters-lesbarkeit");
@@ -372,9 +375,9 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        verbindliche Fassung ersetzt, alles DANACH bleibt erhalten.
        Hat die Antwort gar keinen Satzabschluss, gibt es auch keinen zweiten
        Satz: dann bleibt es beim reinen Anker wie bisher, statt den Anker
-       doppelt zu schreiben. */
-    const m = String(modellwert || "").match(/^[^.!?]*[.!?]\s*(.+)$/s);
-    const rest = m ? m[1].trim() : "";
+       doppelt zu schreiben. Wo der erste Satz endet, sagt dieselbe Regel wie
+       bei der Altersauslese (alters-lesbarkeit.js) — nicht hinter "ca.". */
+    const rest = nachErstemSatz(modellwert);
     /* BUG-2026-08-20-26: Der Anker wird NACH applyBounds vorangestellt und umging
        damit die Laengengrenze der Karte. Ein praepariertes Foto (Prompt-Injection
        ueber Bildinhalt) oder ein durchdrehendes Modell konnte so einen bis zu
@@ -392,10 +395,10 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      ROHWERTEN bestimmt, bevor eine Karte umgeschrieben wird. Unlesbar ist das
      Alter, wenn der Anker einen Altersversuch ohne lesbare Zahl enthaelt,
      oder wenn weder der Anker noch der erste Satz einer Karte ein lesbares
-     Alter hat und eine Karte den Platzhalter oder ein Alter ohne Zahl zeigt.
-     Nur der ERSTE Satz einer Karte zaehlt als Altersangabe — der Beleg-Satz
-     danach ("Trikot mit der Nummer acht") ist kein Alter (letzte
-     Pruefrunde 17.09.). */
+     Alter hat und eine Karte irgendwo einen Altersversuch zeigt (Platzhalter
+     oder Alterswort). Nur der ERSTE Satz einer Karte zaehlt als Altersangabe
+     — der Beleg-Satz danach ("Trikot mit der Nummer acht") ist kein Alter
+     und macht einen Altersversuch auch nicht lesbar (SEC-2026-10-03-02). */
   const ankerRoh = typeof hardFacts.alter_geschlecht === "string" ? hardFacts.alter_geschlecht : "";
   const rohKarte = (modus) => {
     const w = parsed[modus]?.categories?.alter_geschlecht?.value;
@@ -403,13 +406,12 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   };
   const rohStandard = rohKarte("standard");
   const rohBeast = rohKarte("beast");
-  const ersterSatz = (text) => (/^[^.!?]*[.!?]?/.exec(text) || [""])[0].trim();
   const satzStandard = ersterSatz(rohStandard);
   const satzBeast = ersterSatz(rohBeast);
   const irgendeinAlterLesbar = [ankerRoh, satzStandard, satzBeast].some(hatLesbaresAlter);
   const alterUnlesbar =
     istAlterUnlesbar(ankerRoh) ||
-    (!irgendeinAlterLesbar && (istAlterUnlesbar(rohStandard) || istAlterUnlesbar(rohBeast)));
+    (!irgendeinAlterLesbar && (hatAltersversuch(rohStandard) || hatAltersversuch(rohBeast)));
 
   /* Was die Alterskarte zeigt. Normalfall wie bisher: Anker vorn, Beleg-Satz
      des Modells dahinter. Hat der Anker kein lesbares Alter (etwa nur

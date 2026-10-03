@@ -8,9 +8,14 @@
 #
 # So geht es vor:
 #   1. holt https://malzi.me/build-info.json (Commit + Pruefsumme je Datei),
-#   2. prueft, ob dieser Commit im lokalen Repository existiert,
-#   3. laedt jede genannte Datei vom Server und rechnet ihre Pruefsumme nach,
-#   4. meldet Uebereinstimmung oder nennt jede Abweichung beim Namen.
+#   2. prueft, ob dieser Commit im lokalen Repository existiert, und bildet
+#      aus ihm SELBST die Liste der Dateien, die ausgeliefert sein muessen
+#      (die Liste des Servers allein genuegt nicht — er koennte eine
+#      veraenderte Datei einfach weglassen),
+#   3. laedt jede dieser Dateien und jede vom Server genannte Datei und rechnet
+#      sie gegen den Fingerabdruck UND gegen den Inhalt des Commits nach,
+#   4. haelt die Pruefsummen des Server-Codes gegen denselben Commit,
+#   5. meldet Uebereinstimmung oder nennt jede Abweichung beim Namen.
 #
 # Aufruf:  sh scripts/pruefe-live.sh [basis-adresse]
 #          Standard: https://malzi.me
@@ -93,15 +98,105 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
 else
   echo "  Commit im Repository: nicht pruefbar (kein git-Repository)."
 fi
+
+# ── 2b. Was MUESSTE ausgeliefert sein? Die Dateiliste des genannten Commits ──
+# ARCH-2026-08-20-04: Welche Dateien geprueft werden, bestimmte bisher allein
+# der Fingerabdruck — also der Server, der geprueft wird. Eine veraenderte
+# Datei, die er dort weglaesst, wurde nie angesehen. Jetzt bildet das Skript
+# die Liste selbst: aus dem genannten Commit, mit denselben Ausschluessen
+# (hosting.ignore in firebase.json), nach denen scripts/build-info.mjs den
+# Fingerabdruck schreibt. Ebenso fuer den Server-Code.
+: > "$ARBEIT/erwartet.txt"
+: > "$ARBEIT/server-erwartet.txt"
+ERWARTET_ANZAHL=0
+if [ "$COMMIT_DA" = "ja" ]; then
+  python3 - "$COMMIT" "$ARBEIT" <<'PYTHON'
+import json, re, subprocess, sys
+
+commit, arbeit = sys.argv[1], sys.argv[2]
+
+
+def git(*args):
+    return subprocess.run(
+        ["git", "-c", "core.quotepath=false", *args], check=True, capture_output=True
+    ).stdout
+
+
+try:
+    konfig = json.loads(git("show", commit + ":firebase.json"))
+    hosting = konfig["hosting"][0] if isinstance(konfig.get("hosting"), list) else konfig["hosting"]
+    muster = hosting["ignore"]
+    if not isinstance(muster, list):
+        raise ValueError("hosting.ignore ist keine Liste")
+except Exception as fehler:
+    sys.stderr.write("MESSPROBLEM: firebase.json in Commit %s nicht lesbar (%s).\n" % (commit, fehler))
+    sys.exit(2)
+
+
+def passt(rel, m):
+    # Dieselben Formen wie in scripts/build-info.mjs (passtAufMuster). Eine
+    # unbekannte Form ist ein Messproblem: Raten wuerde still danebengreifen.
+    teile = rel.split("/")
+    if m == "firebase.json":
+        return rel == "firebase.json"
+    if m == "**/.*":
+        return any(t.startswith(".") for t in teile)
+    ordner = re.match(r"^\*\*/(.+)/\*\*$", m)
+    if ordner:
+        return ordner.group(1) in teile
+    pfad_ordner = re.match(r"^(.+)/\*\*$", m)
+    if pfad_ordner:
+        return rel == pfad_ordner.group(1) or rel.startswith(pfad_ordner.group(1) + "/")
+    if "*" not in m:
+        return rel == m
+    sys.stderr.write("MESSPROBLEM: unbekanntes Hosting-Muster in firebase.json: %s\n" % m)
+    sys.exit(2)
+
+
+def dateien(ordner):
+    roh = git("ls-tree", "-r", "--name-only", "-z", commit, "--", ordner + "/").decode("utf-8")
+    return [n[len(ordner) + 1 :] for n in roh.split("\0") if n]
+
+
+website = [
+    rel
+    for rel in dateien("public")
+    # Der Fingerabdruck kann sich nicht selbst enthalten.
+    if rel != "build-info.json" and not any(passt(rel, m) for m in muster)
+]
+server = [
+    rel
+    for rel in dateien("functions/src")
+    # Wie build-info.mjs: nur .js, ohne Tests und ohne mitgebrachte Pakete.
+    if rel.endswith(".js") and not {"__tests__", "node_modules"} & set(rel.split("/")[:-1])
+]
+if not website:
+    sys.stderr.write("MESSPROBLEM: Commit %s enthaelt keine auslieferbare Datei unter public/.\n" % commit)
+    sys.exit(2)
+open(arbeit + "/erwartet.txt", "w", encoding="utf-8").write("".join(z + "\n" for z in sorted(website)))
+open(arbeit + "/server-erwartet.txt", "w", encoding="utf-8").write("".join(z + "\n" for z in sorted(server)))
+PYTHON
+  if [ $? -ne 0 ]; then
+    echo "MESSPROBLEM: Dateiliste von Commit $COMMIT nicht ermittelbar." >&2
+    exit 2
+  fi
+  ERWARTET_ANZAHL=$(grep -c . "$ARBEIT/erwartet.txt")
+  echo "  Dateien laut Commit: $ERWARTET_ANZAHL"
+fi
 echo "-----------------------------------------------------------"
 
 # ── 3. Jede Datei laden und nachrechnen ─────────────────────────────────────
+# Geprueft wird die Vereinigung: was der Fingerabdruck nennt UND was der Commit
+# verlangt. "-" in der zweiten Spalte heisst: Der Fingerabdruck nennt die Datei
+# nicht.
 python3 -c "
 import json, sys
 d = json.load(open(sys.argv[1]))
-for pfad, summe in sorted(d['dateien'].items()):
-    print(pfad + '\t' + summe)
-" "$ARBEIT/build-info.json" > "$ARBEIT/soll.txt" || {
+soll = d['dateien']
+erwartet = set(z.rstrip('\n') for z in open(sys.argv[2], encoding='utf-8') if z.strip())
+for pfad in sorted(set(soll) | erwartet):
+    print(pfad + '\t' + soll.get(pfad, '-'))
+" "$ARBEIT/build-info.json" "$ARBEIT/erwartet.txt" > "$ARBEIT/soll.txt" || {
   echo "MESSPROBLEM: Dateiliste nicht lesbar." >&2
   exit 2
 }
@@ -109,6 +204,7 @@ for pfad, summe in sorted(d['dateien'].items()):
 ABWEICHUNG=0
 FEHLEND=0
 GEPRUEFT=0
+NICHT_GENANNT=0
 
 TRANSPORT=0
 
@@ -135,7 +231,15 @@ while IFS="$(printf '\t')" read -r PFAD SOLL; do
   fi
   IST="sha256:$($SUMME "$ARBEIT/datei" | cut -d' ' -f1)"
   GEPRUEFT=$((GEPRUEFT + 1))
-  if [ "$IST" != "$SOLL" ]; then
+  if [ "$SOLL" = "-" ]; then
+    # Die Datei gehoert zum Commit, aber der Server fuehrt sie nicht im
+    # Fingerabdruck. Das ist ein Befund fuer sich — und sie wird trotzdem
+    # weiter unten gegen den Commit nachgerechnet.
+    NICHT_GENANNT=$((NICHT_GENANNT + 1))
+    if [ "$NICHT_GENANNT" -le 10 ]; then
+      echo "  FEHLT IM FINGERABDRUCK: $PFAD — gehoert zu Commit $COMMIT, der Server nennt die Datei nicht."
+    fi
+  elif [ "$IST" != "$SOLL" ]; then
     echo "  ABWEICHUNG: $PFAD"
     echo "      erwartet: $SOLL"
     echo "      gefunden: $IST"
@@ -174,25 +278,71 @@ done < "$ARBEIT/soll.txt"
 
 echo "-----------------------------------------------------------"
 
-# ── Server-Code gegen dieses Repository ───────────────────────────────────
+if [ "$NICHT_GENANNT" -gt 10 ]; then
+  echo "  … und $((NICHT_GENANNT - 10)) weitere Datei(en) des Commits, die der Fingerabdruck nicht nennt."
+fi
+
+# ── Server-Code gegen den genannten Commit ────────────────────────────────
 # Seit 2026-08-18 nennt der Fingerabdruck auch Pruefsummen fuer functions/src/.
 # Die kann man nicht vom Webserver holen — der Server-Code wird nicht
-# ausgeliefert, er laeuft. Nachrechenbar ist er trotzdem: gegen die Dateien in
-# genau diesem Repository. Das beantwortet die Frage "ist der Code, den ich
-# hier lese, wirklich der, aus dem ausgeliefert wurde?"
+# ausgeliefert, er laeuft. Nachrechenbar ist er trotzdem: gegen die Dateien des
+# GENANNTEN COMMITS. Das beantwortet die Frage "ist der Code, den ich hier
+# lese, wirklich der, aus dem ausgeliefert wurde?"
+# ARCH-2026-08-20-04: Verglichen wird mit dem Commit, nicht mit dem, was gerade
+# im Ordner liegt — sonst meldet ein Repository, das der Auslieferung einen
+# Commit voraus ist, eine Abweichung, die keine ist. Und auch hier gilt die
+# Liste des Commits: Ein Fingerabdruck ohne Server-Dateien, oder mit weniger,
+# ist ein Befund.
 SERVER_ABWEICHUNG=0
 SERVER_GEPRUEFT=0
-if python3 -c "
+python3 -c "
 import json, sys
 d = json.load(open(sys.argv[1]))
-for pfad, summe in sorted(d.get('serverDateien', {}).items()):
+for pfad, summe in sorted((d.get('serverDateien') or {}).items()):
     print(pfad + '\t' + summe)
-" "$ARBEIT/build-info.json" > "$ARBEIT/server-soll.txt" 2>/dev/null && [ -s "$ARBEIT/server-soll.txt" ]; then
+" "$ARBEIT/build-info.json" > "$ARBEIT/server-soll.txt" 2>/dev/null || : > "$ARBEIT/server-soll.txt"
+
+if [ "$COMMIT_DA" = "ja" ]; then
+  SERVER_ERWARTET=$(grep -c . "$ARBEIT/server-erwartet.txt")
+  if [ ! -s "$ARBEIT/server-soll.txt" ] && [ "$SERVER_ERWARTET" -gt 0 ]; then
+    echo "  FEHLT IM FINGERABDRUCK: die Server-Dateien — Commit $COMMIT hat $SERVER_ERWARTET, der Server nennt keine."
+    SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+  else
+    # Erst: jede Datei des Commits muss genannt sein und stimmen.
+    while IFS= read -r PFAD; do
+      [ -z "$PFAD" ] && continue
+      SOLL=$(awk -F '\t' -v p="$PFAD" '$1 == p { print $2 }' "$ARBEIT/server-soll.txt")
+      if [ -z "$SOLL" ]; then
+        echo "  FEHLT IM FINGERABDRUCK (Server-Code): functions/src/$PFAD"
+        SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+        continue
+      fi
+      git show "${COMMIT}:functions/src/${PFAD}" > "$ARBEIT/server-datei" 2>/dev/null
+      IST="sha256:$($SUMME "$ARBEIT/server-datei" | cut -d' ' -f1)"
+      SERVER_GEPRUEFT=$((SERVER_GEPRUEFT + 1))
+      if [ "$IST" != "$SOLL" ]; then
+        echo "  ABWEICHUNG im Server-Code: functions/src/$PFAD"
+        SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+      fi
+    done < "$ARBEIT/server-erwartet.txt"
+    # Dann: nichts genannt, was der Commit nicht kennt.
+    while IFS="$(printf '\t')" read -r PFAD SOLL; do
+      [ -z "$PFAD" ] && continue
+      if ! grep -qxF "$PFAD" "$ARBEIT/server-erwartet.txt"; then
+        echo "  NICHT IM COMMIT (Server-Code): functions/src/$PFAD"
+        SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+      fi
+    done < "$ARBEIT/server-soll.txt"
+  fi
+  echo "  Server-Code: $SERVER_GEPRUEFT Datei(en) gegen Commit $COMMIT geprueft."
+  echo "-----------------------------------------------------------"
+elif [ -s "$ARBEIT/server-soll.txt" ]; then
+  # Ohne den Commit bleibt nur der Vergleich mit dem, was im Ordner liegt.
   while IFS="$(printf '\t')" read -r PFAD SOLL; do
     [ -z "$PFAD" ] && continue
     QUELLE="functions/src/$PFAD"
     if [ ! -f "$QUELLE" ]; then
-      echo "  FEHLT im Repository: $QUELLE"
+      echo "  FEHLT in diesem Ordner: $QUELLE"
       SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
       continue
     fi
@@ -203,7 +353,7 @@ for pfad, summe in sorted(d.get('serverDateien', {}).items()):
       SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
     fi
   done < "$ARBEIT/server-soll.txt"
-  echo "  Server-Code: $SERVER_GEPRUEFT Datei(en) gegen dieses Repository geprueft."
+  echo "  Server-Code: $SERVER_GEPRUEFT Datei(en) gegen die Dateien in diesem Ordner geprueft."
   echo "-----------------------------------------------------------"
 fi
 
@@ -217,17 +367,18 @@ if [ "$TRANSPORT" -gt 0 ]; then
   exit 2
 fi
 
-if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ] && [ "$SERVER_ABWEICHUNG" -eq 0 ] && [ "$REPO_ABWEICHUNG" -eq 0 ]; then
+if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ] && [ "$SERVER_ABWEICHUNG" -eq 0 ] && [ "$REPO_ABWEICHUNG" -eq 0 ] && [ "$NICHT_GENANNT" -eq 0 ]; then
   echo "ERGEBNIS: $GEPRUEFT von $ANZAHL Website-Dateien geprueft, alle deckungsgleich"
   echo "          mit dem Fingerabdruck der Auslieferung."
   if [ "$SERVER_GEPRUEFT" -gt 0 ]; then
-    echo "          $SERVER_GEPRUEFT Server-Dateien in diesem Repository ebenfalls deckungsgleich."
+    echo "          $SERVER_GEPRUEFT Server-Dateien ebenfalls deckungsgleich."
   fi
   # ARCH-2026-08-20-04: Die Schlusszeile sagt jetzt genau so viel, wie gemessen
   # wurde. Ohne lokales Repository ist der Commit nur BENANNT, nicht geprueft —
   # vorher stand dort trotzdem "entspricht Commit X".
   if [ "$COMMIT_DA" = "ja" ] && [ "$REPO_GEPRUEFT" -gt 0 ]; then
-    echo "          $REPO_GEPRUEFT Datei(en) zusaetzlich gegen den Inhalt von $COMMIT nachgerechnet."
+    echo "          $REPO_GEPRUEFT Datei(en) zusaetzlich gegen den Inhalt von $COMMIT nachgerechnet;"
+    echo "          der Commit verlangt $ERWARTET_ANZAHL Website-Dateien, keine fehlt im Fingerabdruck."
     if [ "$NUR_KENNUNG" -gt 0 ]; then
       echo "          Davon $NUR_KENNUNG nur in der Cache-Kennung abweichend (?v=…): Die schreibt"
       echo "          das Deploy-Skript vor der Auslieferung, committet wird sie unmittelbar danach."
@@ -245,5 +396,6 @@ fi
 echo "ERGEBNIS: $ABWEICHUNG Abweichung(en), $FEHLEND fehlend, bei $GEPRUEFT geprueften Dateien."
 [ "$SERVER_ABWEICHUNG" -gt 0 ] && echo "          Dazu $SERVER_ABWEICHUNG Abweichung(en) im Server-Code."
 [ "$REPO_ABWEICHUNG" -gt 0 ] && echo "          Dazu $REPO_ABWEICHUNG Abweichung(en) gegenueber dem Inhalt von $COMMIT."
+[ "$NICHT_GENANNT" -gt 0 ] && echo "          Dazu $NICHT_GENANNT Datei(en) des Commits, die der Fingerabdruck nicht nennt."
 echo "Der ausgelieferte Stand entspricht NICHT dem genannten Commit."
 exit 1

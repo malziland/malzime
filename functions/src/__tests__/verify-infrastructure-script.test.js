@@ -523,3 +523,100 @@ describe("verify-infrastructure.sh", () => {
     });
   });
 });
+
+/* SEC-2026-10-03-14: Der selbst betriebene Benachrichtigungsdienst. Das Skript
+   haelt die laufende Fassung gegen den Spiegel im Repository und verlangt ein
+   eigenes Dienstkonto. Erfundene Antworten, keine echte Kennung. */
+describe("verify-infrastructure.sh: Benachrichtigungsdienst (SEC-2026-10-03-14)", () => {
+  const os = require("os");
+  const { execFileSync } = require("child_process");
+  let dir;
+  const BILD = "europe-west1-docker.pkg.dev/probe/ntfy/ntfy";
+  const EIGENES_KONTO = "ntfy-dienst@probe.iam.gserviceaccount.com";
+
+  beforeAll(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-ntfy-"));
+    fs.mkdirSync(path.join(dir, "bin"));
+    for (const w of ["gcloud", "gsutil", "curl"]) {
+      const ziel = path.join(dir, "bin", w);
+      fs.writeFileSync(ziel, "#!/bin/sh\n" + `echo "ATTRAPPE ${w}: kein Zugriff im Test" >&2\n` + "exit 1\n");
+      fs.chmodSync(ziel, 0o755);
+    }
+  });
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  function lauf({ ist = `${BILD}:v2.28.0-auth\t${EIGENES_KONTO}`, spiegel = "ntfy 2.28.0\nSource: Probe\n" } = {}) {
+    const ip = path.join(dir, "ntfy.txt");
+    const sp = path.join(dir, "VERSION");
+    fs.writeFileSync(ip, ist);
+    fs.writeFileSync(sp, spiegel);
+    let aus;
+    try {
+      aus = execFileSync("bash", [SCRIPT], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${path.join(dir, "bin")}:${process.env.PATH}`,
+          INFRA_PROBE_NTFY: ip,
+          INFRA_PROBE_NTFY_SPIEGEL: sp,
+        },
+      });
+    } catch (e) {
+      aus = (e.stdout || "") + (e.stderr || "");
+    }
+    // eslint-disable-next-line no-control-regex
+    const FARBCODES = /\x1b\[[0-9;]*m/g;
+    return aus
+      .replace(FARBCODES, "")
+      .split("\n")
+      .filter((z) => /ntfy/.test(z) && /[✓✗]/.test(z));
+  }
+  const enthaelt = (zeilen, text) => zeilen.some((z) => z.includes(text));
+
+  test("Erfolgsweg: Fassung wie gespiegelt, eigenes Konto → zwei gruene Zeilen, keine rote", () => {
+    const zeilen = lauf();
+    expect(enthaelt(zeilen, "✓ ntfy-Fassung: es laeuft 2.28.0, wie im Repository gespiegelt")).toBe(true);
+    expect(enthaelt(zeilen, "✓ ntfy laeuft unter einem eigenen Konto")).toBe(true);
+    expect(zeilen.filter((z) => z.includes("✗"))).toEqual([]);
+  });
+
+  test("auch ein Bildname ohne Zusatz nach der Fassung wird gelesen", () => {
+    expect(enthaelt(lauf({ ist: `${BILD}:v2.28.0\t${EIGENES_KONTO}` }), "✓ ntfy-Fassung: es laeuft 2.28.0")).toBe(true);
+  });
+
+  test("es laeuft eine andere Fassung als gespiegelt → rot, mit beiden Fassungen", () => {
+    const zeilen = lauf({ ist: `${BILD}:v2.29.0-auth\t${EIGENES_KONTO}` });
+    expect(enthaelt(zeilen, "✗ ntfy-Fassung: es laeuft 2.29.0, gespiegelt ist 2.28.0")).toBe(true);
+  });
+
+  test.each([
+    ["Standard-Konto fuer Rechendienste", "123456789012-compute@developer.gserviceaccount.com"],
+    ["App-Engine-Standardkonto", "probe@appspot.gserviceaccount.com"],
+  ])("Dienst laeuft unter einem Standard-Konto (%s) → rot", (_name, konto) => {
+    const zeilen = lauf({ ist: `${BILD}:v2.28.0-auth\t${konto}` });
+    expect(enthaelt(zeilen, "✗ ntfy laeuft unter einem Standard-Konto des Projekts")).toBe(true);
+    expect(enthaelt(zeilen, "✓ ntfy-Fassung: es laeuft 2.28.0")).toBe(true);
+  });
+
+  test.each([
+    [
+      "Bildname ohne lesbare Fassung",
+      { ist: `${BILD}:latest\t${EIGENES_KONTO}` },
+      "✗ ntfy-Fassung NICHT geprueft (nicht aus dem Bildnamen lesbar: ntfy:latest)",
+    ],
+    ["Antwort ohne Dienstkonto", { ist: `${BILD}:v2.28.0-auth` }, "✗ ntfy-Konto NICHT geprueft"],
+    ["leere Antwort", { ist: "" }, "✗ ntfy NICHT geprueft (Dienst nicht lesbar)"],
+    [
+      "Spiegel ohne lesbare erste Zeile",
+      { spiegel: "Fassung: neueste\n" },
+      "✗ ntfy-Fassung NICHT geprueft (.github/fremd-dienste/ntfy/VERSION nicht lesbar)",
+    ],
+  ])("Messfehler (%s) → ungeprueft gilt als nicht bestanden", (_name, eingabe, erwartet) => {
+    expect(enthaelt(lauf(eingabe), erwartet)).toBe(true);
+  });
+
+  test("der echte Spiegel im Repository hat eine lesbare erste Zeile", () => {
+    const spiegel = fs.readFileSync(path.join(__dirname, "../../../.github/fremd-dienste/ntfy/VERSION"), "utf8");
+    expect(spiegel.split("\n")[0]).toMatch(/^ntfy \d+\.\d+\.\d+$/);
+  });
+});

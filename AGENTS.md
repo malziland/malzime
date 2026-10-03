@@ -139,7 +139,9 @@ Einzelbefehle:
 - Keine externen Scripts: Alles self-hosted (Fonts, Leaflet, exifr, libheif). Kein CDN, kein reCAPTCHA, kein Firebase SDK
 - Selbst gehostet heisst selbst gewartet: Dependabot und npm audit sehen `public/lib` nicht. Das
   uebernimmt der Nachtlauf `sicherheit-nachts.yml` (`scripts/pruefe-fremd-meldungen.mjs`); eine
-  neue Bibliothek unter `public/lib` braucht dort einen Eintrag, sonst wird der Lauf rot
+  neue Bibliothek unter `public/lib` braucht dort einen Eintrag, sonst wird der Lauf rot. Derselbe
+  Lauf beobachtet den selbst betriebenen ntfy-Server (Fassung gespiegelt in
+  `.github/fremd-dienste/ntfy/VERSION`; nach jedem Update des Dienstes nachziehen)
 - Bot-Schutz: Rate Limiting (IP) + Honeypot + Timing-Check
 - CSP: nur 'self' + OpenStreetMap Tiles + Cloud Functions Endpoint + Nominatim
 

@@ -50,7 +50,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -604,6 +604,50 @@ if mit_liste == 0:
   done <<ABDECKUNG_ENDE
 $ABDECKUNG
 ABDECKUNG_ENDE
+fi
+
+# ── 7b. Der selbst betriebene Benachrichtigungsdienst (ntfy) ──
+# SEC-2026-10-03-14: Der Dienst ist oeffentlich erreichbar und fremde Software.
+# Zwei Dinge duerfen nicht unbemerkt zurueckfallen:
+#   · Er laeuft unter einem EIGENEN Konto, nicht unter einem Standard-Konto des
+#     Projekts (das darf das Projekt bearbeiten und alle Geheimnisse lesen).
+#   · Es laeuft die Fassung, die .github/fremd-dienste/ntfy/VERSION nennt —
+#     sonst beobachtet der Nachtlauf die falsche Fassung.
+# Einspeisepunkte fuer Tests: INFRA_PROBE_NTFY nennt eine Datei mit der Zeile
+# "<Bildname><TAB><Dienstkonto>", wie gcloud sie liefert; INFRA_PROBE_NTFY_SPIEGEL
+# eine Datei anstelle der VERSION-Datei.
+echo "— Benachrichtigungsdienst (ntfy)"
+if [ -n "${INFRA_PROBE_NTFY:-}" ]; then
+  NTFY_IST=$(cat "$INFRA_PROBE_NTFY")
+else
+  NTFY_IST=$(gcloud run services describe ntfy --project="$PROJECT" --region="$REGION" \
+    --format='value(spec.template.spec.containers[0].image,spec.template.spec.serviceAccountName)' 2>/dev/null || true)
+fi
+NTFY_SPIEGEL=$(sed -n '1s/^ntfy \([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)[[:space:]]*$/\1/p' \
+  "${INFRA_PROBE_NTFY_SPIEGEL:-.github/fremd-dienste/ntfy/VERSION}" 2>/dev/null)
+if [ -z "$NTFY_IST" ]; then
+  rot "ntfy NICHT geprueft (Dienst nicht lesbar) — ungeprueft gilt als nicht bestanden"
+else
+  NTFY_BILD=$(printf '%s' "$NTFY_IST" | cut -f1)
+  NTFY_KONTO=$(printf '%s' "$NTFY_IST" | cut -f2 -s)
+  NTFY_LAEUFT=$(printf '%s' "$NTFY_BILD" | sed -n 's/^.*:v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)\(-[a-z]*\)\{0,1\}$/\1/p')
+  if [ -z "$NTFY_SPIEGEL" ]; then
+    rot "ntfy-Fassung NICHT geprueft (.github/fremd-dienste/ntfy/VERSION nicht lesbar) — ungeprueft gilt als nicht bestanden"
+  elif [ -z "$NTFY_LAEUFT" ]; then
+    rot "ntfy-Fassung NICHT geprueft (nicht aus dem Bildnamen lesbar: ${NTFY_BILD##*/}) — ungeprueft gilt als nicht bestanden"
+  elif [ "$NTFY_LAEUFT" = "$NTFY_SPIEGEL" ]; then
+    gruen "ntfy-Fassung: es laeuft $NTFY_LAEUFT, wie im Repository gespiegelt"
+  else
+    rot "ntfy-Fassung: es laeuft $NTFY_LAEUFT, gespiegelt ist $NTFY_SPIEGEL — .github/fremd-dienste/ntfy/VERSION nachziehen, sonst beobachtet der Nachtlauf die falsche Fassung"
+  fi
+  case "$NTFY_KONTO" in
+    "")
+      rot "ntfy-Konto NICHT geprueft (kein Dienstkonto in der Antwort) — ungeprueft gilt als nicht bestanden" ;;
+    *-compute@developer.gserviceaccount.com|*@appspot.gserviceaccount.com)
+      rot "ntfy laeuft unter einem Standard-Konto des Projekts (darf das Projekt bearbeiten und alle Geheimnisse lesen) — eigenes Konto im Bauweg des Dienstes setzen" ;;
+    *)
+      gruen "ntfy laeuft unter einem eigenen Konto, nicht unter einem Standard-Konto des Projekts" ;;
+  esac
 fi
 
 # ── 8. Die zwei Netze unter der Löschzusage: Firestore-TTL + Reaper-Zeitplan ──

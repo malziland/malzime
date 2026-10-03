@@ -21,7 +21,13 @@ const REPO = path.join(__dirname, "../../..");
 
 let basis;
 
-function versionen({ leaflet = "1.9.4", exifr = "7.1.3", libheif = "1.23.5", libde265 = "1.1.3" } = {}) {
+function versionen({
+  leaflet = "1.9.4",
+  exifr = "7.1.3",
+  libheif = "1.23.5",
+  libde265 = "1.1.3",
+  ntfy = "2.28.0",
+} = {}) {
   const schreibe = (ordner, text) => {
     fs.mkdirSync(path.join(basis, ordner), { recursive: true });
     fs.writeFileSync(path.join(basis, ordner, "VERSION"), text);
@@ -29,6 +35,7 @@ function versionen({ leaflet = "1.9.4", exifr = "7.1.3", libheif = "1.23.5", lib
   schreibe("public/lib/leaflet", `Leaflet ${leaflet}\n`);
   schreibe("public/lib/exifr", `exifr ${exifr} (lite ESM bundle)\n`);
   schreibe("public/lib/libheif", `libheif ${libheif}\nlibde265 ${libde265}\n`);
+  schreibe(".github/fremd-dienste/ntfy", `ntfy ${ntfy}\nSource: https://example.invalid\n`);
   fs.mkdirSync(path.join(basis, "public/fonts/poppins"), { recursive: true });
 }
 
@@ -62,6 +69,10 @@ function meldungen(ueberschreibung = {}, { exifr = "7.1.3", leaflet = "1.9.4", o
     [`npm:exifr@${exifr}`]: [],
     "npm-paket:leaflet": true,
     "npm-paket:exifr": true,
+    /* Der selbst betriebene Dienst: keine Meldung, und die juengste Fassung des
+       Herstellers ist die, die laeuft. */
+    "repo:binwiederhier/ntfy": [],
+    "fassung:binwiederhier/ntfy": { tag_name: "v2.28.0", published_at: "2026-08-27T10:00:00Z" },
     ...ueberschreibung,
   };
   if (!ohneBekannte) {
@@ -127,6 +138,106 @@ describe("pruefe-fremd-meldungen: Grundfall", () => {
     expect(r.fehler).toBe("");
     expect(r.code).toBe(0);
     expect(r.aus).toContain("Beobachtet: 4 Bibliotheksteile");
+  });
+});
+
+/* SEC-2026-10-03-14: Der selbst betriebene Benachrichtigungs-Server stand
+   ausserhalb jeder Beobachtung. Sein Hersteller fuehrt keine
+   Sicherheitsmeldungen; beobachtet wird deshalb zusaetzlich, ob es seit mehr
+   als 30 Tagen eine neuere Fassung gibt. */
+describe("pruefe-fremd-meldungen: selbst betriebener Dienst (ntfy)", () => {
+  const neuere = (erschienen, tag = "v2.29.0") => ({
+    "fassung:binwiederhier/ntfy": { tag_name: tag, published_at: `${erschienen}T10:00:00Z` },
+  });
+
+  test("Erfolgsweg: laufende Fassung ist die juengste — gruen, und der Dienst wurde wirklich geprueft", () => {
+    versionen();
+    const r = lauf({ meldungenPfad: meldungen() });
+    expect(r.code).toBe(0);
+    expect(r.aus).toContain("ntfy 2.28.0: 0 Meldung(en) gelesen, 0 offen");
+    expect(r.aus).toContain("ntfy 2.28.0: keine neuere Fassung, die aelter als 30 Tage ist");
+    expect(r.aus).toContain("Beobachtet: 4 Bibliotheksteile und 1 selbst betriebene(r) Dienst(e)");
+  });
+
+  test("neuere Fassung seit GENAU 30 Tagen: noch gruen", () => {
+    versionen();
+    const r = lauf({ meldungenPfad: meldungen(neuere("2026-08-31")), heute: "2026-09-30" });
+    expect(r.code).toBe(0);
+    expect(r.aus).not.toContain("VERALTET");
+  });
+
+  test("neuere Fassung seit 31 Tagen: rot, mit beiden Fassungen und der Frist", () => {
+    versionen();
+    const r = lauf({ meldungenPfad: meldungen(neuere("2026-08-30")), heute: "2026-09-30" });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("VERALTET  ntfy 2.28.0  seit 31 Tagen gibt es 2.29.0 (Frist 30 Tage)");
+    expect(r.aus).toContain("Veraltete Fassung eines Dienstes");
+  });
+
+  test("der Hersteller ist NICHT weiter als wir (gleich oder aelter): gruen, egal wie alt", () => {
+    versionen();
+    expect(lauf({ meldungenPfad: meldungen(neuere("2025-01-01", "v2.28.0")) }).code).toBe(0);
+    expect(lauf({ meldungenPfad: meldungen(neuere("2025-01-01", "v2.27.0")) }).code).toBe(0);
+  });
+
+  test("zurueckgestellt mit begruendetem Eintrag FASSUNG-<Fassung>: gruen, aber sichtbar", () => {
+    versionen();
+    const eintrag = {
+      ghsa: "FASSUNG-2.29.0",
+      bibliothek: "ntfy",
+      version: "2.28.0",
+      grund: "Update fuer naechste Woche eingeplant",
+      eingetragen: "2026-09-30",
+      pruefen_bis: "2026-10-15",
+    };
+    const gut = lauf({
+      meldungenPfad: meldungen(neuere("2026-08-01")),
+      ausnahmenPfad: ausnahmen([eintrag]),
+      heute: "2026-09-30",
+    });
+    expect(gut.code).toBe(0);
+    expect(gut.aus).toContain("[Ausnahme] VERALTET  ntfy 2.28.0");
+    const abgelaufen = lauf({
+      meldungenPfad: meldungen(neuere("2026-08-01")),
+      ausnahmenPfad: ausnahmen([eintrag]),
+      heute: "2026-10-16",
+    });
+    expect(abgelaufen.code).toBe(1);
+    /* Der Eintrag gilt nur fuer genau diese neue Fassung. */
+    const naechste = lauf({
+      meldungenPfad: meldungen(neuere("2026-08-01", "v2.30.0")),
+      ausnahmenPfad: ausnahmen([eintrag]),
+      heute: "2026-09-30",
+    });
+    expect(naechste.code).toBe(1);
+  });
+
+  test("Sicherheitsmeldung des Herstellers, die unsere Fassung trifft: rot", () => {
+    versionen();
+    const r = lauf({
+      meldungenPfad: meldungen({ "repo:binwiederhier/ntfy": [meldung("GHSA-ntfy-0000-0001", "<= 2.28.0", "2.28.1")] }),
+    });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("BETROFFEN  ntfy 2.28.0  GHSA-ntfy-0000-0001");
+  });
+
+  test.each([
+    ["Fassung des Herstellers nicht lesbar", { tag_name: "latest", published_at: "2026-08-27T10:00:00Z" }],
+    ["Erscheinungsdatum nicht lesbar", { tag_name: "v2.29.0", published_at: "irgendwann" }],
+    ["Erscheinungsdatum fehlt", { tag_name: "v2.29.0" }],
+  ])("%s: 2, nicht gruen", (_name, fassung) => {
+    versionen();
+    const r = lauf({ meldungenPfad: meldungen({ "fassung:binwiederhier/ntfy": fassung }) });
+    expect(r.code).toBe(2);
+    expect(r.fehler).toContain("MESSUNG NICHT DURCHFUEHRBAR");
+  });
+
+  test("Spiegel der Fassung fehlt oder ist unlesbar: 2, nicht gruen", () => {
+    versionen();
+    fs.writeFileSync(path.join(basis, ".github/fremd-dienste/ntfy/VERSION"), "ntfy neueste\n");
+    expect(lauf({ meldungenPfad: meldungen() }).code).toBe(2);
+    fs.rmSync(path.join(basis, ".github/fremd-dienste/ntfy/VERSION"));
+    expect(lauf({ meldungenPfad: meldungen() }).code).toBe(2);
   });
 });
 
@@ -418,6 +529,7 @@ describe("pruefe-fremd-meldungen: Deckung und Messfehler", () => {
 describe("pruefe-fremd-meldungen: Netzweg mit Blättern", () => {
   const API = "https://api.github.com";
   const repoUrl = (repo, seite = "") => `${API}/repos/${repo}/security-advisories?state=published&per_page=100${seite}`;
+  const fassungUrl = (repo) => `${API}/repos/${repo}/releases/latest`;
   const npmUrl = (paket, version) =>
     `${API}/advisories?ecosystem=npm&affects=${encodeURIComponent(`${paket}@${version}`)}&per_page=100`;
 
@@ -436,6 +548,9 @@ describe("pruefe-fremd-meldungen: Netzweg mit Blättern", () => {
       },
       [repoUrl("strukturag/libheif", "&page=2")]: { body: libheifSeite2 },
       [repoUrl("strukturag/libde265")]: { body: [BEKANNT["repo:strukturag/libde265"]] },
+      /* Der selbst betriebene Dienst: keine Meldung, juengste Fassung = laufende. */
+      [repoUrl("binwiederhier/ntfy")]: { body: [] },
+      [fassungUrl("binwiederhier/ntfy")]: { body: { tag_name: "v2.28.0", published_at: "2026-08-27T10:00:00Z" } },
     };
   }
 
@@ -475,6 +590,24 @@ describe("pruefe-fremd-meldungen: Netzweg mit Blättern", () => {
     versionen();
     const k = karte([]);
     k[repoUrl("strukturag/libde265")] = { status: 502, body: {} };
+    expect(netzLauf(k).code).toBe(2);
+  });
+
+  test("neuere Fassung des Dienstes ueber den echten Netzweg: rot nach der Frist", () => {
+    versionen();
+    const k = karte([]);
+    k[fassungUrl("binwiederhier/ntfy")] = { body: { tag_name: "v2.29.0", published_at: "2026-08-01T10:00:00Z" } };
+    const r = netzLauf(k);
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("VERALTET  ntfy 2.28.0  seit 60 Tagen gibt es 2.29.0");
+  });
+
+  test("Abfrage der juengsten Fassung scheitert oder liefert Unerwartetes: 2, nicht gruen", () => {
+    versionen();
+    const k = karte([]);
+    k[fassungUrl("binwiederhier/ntfy")] = { status: 404, body: {} };
+    expect(netzLauf(k).code).toBe(2);
+    k[fassungUrl("binwiederhier/ntfy")] = { body: [] };
     expect(netzLauf(k).code).toBe(2);
   });
 });

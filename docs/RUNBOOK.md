@@ -102,16 +102,22 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
      ihr Ergebnis von gestern sagt nichts über heute. Sie muss auf `main`
      selbst grün sein.
 
-   Das Skript prüft weiter die Version der Firebase-CLI gegen die
-   in `deploy.sh` hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`; eine
-   nicht ermittelbare Version bricht ab, statt durchzuwinken —
-   `OPS-2026-08-12-25`) und zählt dann den Cache-Buster in allen
-   ausgelieferten Seiten automatisch hoch — welche das sind, fragt das Skript
-   beim Dateisystem ab, es führt keine eigene Liste (DOC-2026-08-20-13: hier
-   stand „fünf HTML-Seiten", real sind es seit den englischen Rechtsseiten zehn
-   plus `js/demo.js`) (Konvention `?v=YYYYMMDDNN`: gleicher Tag
-   → laufende Nummer +1, sonst neuer Tag mit `01`; nur bei Hosting-Deploys
-   relevant, reine Functions-Deploys brauchen keinen).
+   Das Skript prüft weiter die Version der Firebase-CLI gegen die in `deploy.sh`
+   hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`). Eine nicht
+   ermittelbare Version bricht ab, statt durchzuwinken (`OPS-2026-08-12-25`) —
+   und nicht ermittelbar ist jede Ausgabe von `firebase --version`, deren erste
+   Zeile nicht genau aus drei Zahlen besteht (etwa `15.1.0`): eine leere Ausgabe
+   ebenso wie eine Warnung, eine Fehlermeldung oder eine Vorabversion
+   (`OPS-2026-10-03-16`).
+
+   Danach zählt es den Cache-Buster in allen ausgelieferten Seiten automatisch
+   hoch — welche das sind, fragt das Skript beim Dateisystem ab, es führt keine
+   eigene Liste (DOC-2026-08-20-13: hier stand „fünf HTML-Seiten", real sind es
+   seit den englischen Rechtsseiten zehn plus `js/demo.js`). Konvention
+   `?v=YYYYMMDDNN`: gleicher Tag → laufende Nummer +1, sonst neuer Tag mit `01`.
+   Die Website gehört zu jeder Auslieferung über das Skript, der Buster also
+   auch: Ein Ziel ohne `hosting` lehnt es ab (`ARCH-2026-10-03-10`, Begründung
+   bei Hebel 4).
 5. `release.yml` legt automatisch einen GitHub-Release an, sobald die neue
    CHANGELOG-Version auf `main` landet (idempotent).
 
@@ -468,6 +474,26 @@ git worktree remove /tmp/malzime-rollback
 ```
 
 Das Haupt-Arbeitsverzeichnis bleibt dabei unberührt.
+
+**Nach diesem Notweg stimmt der Fingerabdruck nicht mehr.** Er läuft am
+Auslieferskript vorbei und wechselt nur den Server-Code. Die Website — und mit ihr
+`build-info.json` — bleibt, wie sie ist, und weist weiter den Server-Stand von VOR
+dem Rollback aus. `scripts/pruefe-live.sh` hält den Fingerabdruck gegen das
+Repository, nicht gegen den laufenden Server: Es meldet „deckungsgleich", obwohl ein
+anderer Server-Code läuft. Die Angabe auf der Seite, welcher Server-Code ausgeliefert
+wurde, stimmt in dieser Zeit nicht.
+
+Wieder richtig wird er nur durch eine Auslieferung von Website und Server zusammen:
+`./scripts/deploy.sh` ohne Argument. Nur auf diesem Weg entsteht der Fingerabdruck
+neu; ein Ziel ohne Website lehnt das Skript deshalb ab (ARCH-2026-10-03-10).
+
+- *Die Störung ist behoben:* den reparierten Stand per PR auf `main` bringen und
+  normal ausliefern.
+- *Der alte Stand soll vorerst bleiben:* die Änderungen seit dem Release-Tag per PR
+  auf `main` zurücknehmen und normal ausliefern. Website und Server stehen dann
+  beide auf diesem Stand, und der Fingerabdruck weist ihn aus.
+
+Bis dahin in der Übergabe festhalten, seit wann der Server auf welchem Tag läuft.
 
 **Rollback auf 4.8.2 oder früher (seit 4.9.0, 10.09.2026).** Diese Fassungen
 lesen im Einstellungssatz drei Felder, die 4.9.0 entfernt hat
@@ -872,15 +898,32 @@ Schutz still ausfällt, und was sie auffängt:
 
 - *Der Nachtlauf läuft nicht* (GitHub schaltet geplante Workflows in öffentlichen
   Repositories nach 60 Tagen ohne Aktivität ab, verwirft unter Last gelegentlich
-  geplante Läufe, oder die Datei ist für GitHub unlesbar). `scripts/deploy.sh` bricht
-  ab, wenn auf `main` kein Nachtlauf wirklich gelaufen ist — mit der ausgelieferten
-  Fassung von `sicherheit-nachts.yml` und nicht älter als `NACHT_GRENZE_MINUTEN` in
-  `scripts/deploy.sh`; die Kriterien stehen in `docs/SECURITY-MODEL.md`. Geprüft wird
-  nicht die Farbe: Ein roter Nachtlauf hat Alarm gegeben. Dann: `gh workflow run
-  sicherheit-nachts.yml`, abwarten (rund eine Minute), erneut deployen; ist der
-  Workflow abgeschaltet, unter „Actions" einschalten. **Nach jeder Änderung an
-  `sicherheit-nachts.yml`** gilt dasselbe: nach dem Merge und der grünen Pipeline des
-  Merge-Commits einmal von Hand starten, sonst bricht der Deploy ab.
+  geplante Läufe, oder die Datei ist für GitHub unlesbar). `scripts/deploy.sh`
+  verlangt auf `main` einen Nachtlauf, der wirklich gelaufen ist — mit der
+  ausgelieferten Fassung von `sicherheit-nachts.yml` und nicht älter als
+  `NACHT_GRENZE_MINUTEN` in `scripts/deploy.sh`; die Kriterien stehen in
+  `docs/SECURITY-MODEL.md`. Geprüft wird nicht die Farbe: Ein roter Nachtlauf hat
+  Alarm gegeben. Fehlt ein solcher Lauf, bricht das Skript ab; dann: `gh workflow run
+  sicherheit-nachts.yml`, abwarten (rund eine Minute), erneut deployen.
+
+  **Dieser Auffang hält einen stehenden Zeitplan nicht an.** Dem Riegel genügt auch
+  ein von Hand gestarteter Lauf, und die Auslieferkette startet einen fehlenden Lauf
+  selbst. Zwei Fälle sind deshalb zu trennen:
+
+  - *Die Fassung von `sicherheit-nachts.yml` hat sich geändert.* Der Handstart ist
+    richtig: nach dem Merge und der grünen Pipeline des Merge-Commits einmal von
+    Hand starten, sonst bricht der Deploy ab.
+  - *Der Lauf nach Zeitplan fehlt oder ist alt.* Ist der jüngste Lauf, den GitHub
+    selbst nach Zeitplan gestartet hat, älter als `NACHT_ZEITPLAN_GRENZE_MINUTEN`
+    (ebenfalls nur in `scripts/deploy.sh`), liefert das Skript aus, setzt aber einen
+    Kasten „ACHTUNG: Der Nachtlauf … läuft nicht nach Zeitplan" ins Protokoll — vor
+    dem Hochladen und noch einmal am Ende. Dann unter „Actions" nachsehen, ob der
+    Workflow abgeschaltet ist, und ihn einschalten. Wer die Auslieferung fährt, gibt
+    diese Meldung weiter; ein Handstart allein behebt die Ursache nicht.
+
+  Zwischen zwei Auslieferungen fällt ein ausbleibender Nachtlauf weiterhin nur durch
+  die ausbleibende Monatsprobe auf (nächster Punkt; bewusst getragen,
+  `docs/SECURITY-MODEL.md`).
 - *Der Alarmweg ist kaputt* (Secret, ntfy-Server, Thema). Am 1. jedes Monats kommt
   eine sichtbare Probe aufs Handy; bleibt sie aus, ist der Weg gestört
   (`docs/ERROR-ALERTING.md`). Von Hand: `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.

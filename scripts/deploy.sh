@@ -11,9 +11,10 @@
 # genannt; es sind acht.
 #
 # Nutzung:
-#   ./scripts/deploy.sh              # Hosting + Functions
-#   ./scripts/deploy.sh hosting      # Nur Hosting
-#   ./scripts/deploy.sh functions    # Nur Functions
+#   ./scripts/deploy.sh              # Website + Server (der Normalfall)
+#   ./scripts/deploy.sh hosting      # nur die Website
+# Den Server allein liefert dieses Skript nicht aus (ARCH-2026-10-03-10, Riegel
+# gleich unten): Der Fingerabdruck des Server-Codes geht mit der Website hinaus.
 #
 # Notschalter, alle nur im Notfall und alle einzeln zu begruenden:
 #   SKIP_STAND=1      Stand-Bindung an die CI-Freigabe aus; dann laufen Lint
@@ -37,6 +38,137 @@ cd "$(dirname "$0")/.."
 # Pruefen:  gsutil lifecycle get gs://malzime-queue-uploads
 # (Stand 2026-06-06 verifiziert: Regel am Produktiv-Bucket aktiv.)
 
+# ── ARCH-2026-10-03-10: Der Server geht nie ohne die Website hinaus ──
+# Der Fingerabdruck `public/build-info.json` weist auch den Server-Code aus,
+# Datei fuer Datei. Er wird weiter unten erzeugt und mit der Website
+# ausgeliefert. Ein Ziel ohne `hosting` wechselte den Server-Code und liesse die
+# Seite weiter den vorigen Stand ausweisen — die Nachpruefung (pruefe-live.sh)
+# meldete dann "deckungsgleich" ueber ein Programm, das nicht mehr laeuft.
+# Deshalb steht das Ziel schon hier fest, und ein Ziel ohne Website ist ein
+# Aufruffehler: abgelehnt, bevor irgendein Dienst gefragt wird. Kein
+# Notschalter. (Der Notweg am Skript vorbei steht im RUNBOOK, Hebel 4.)
+TARGET="${1:-hosting,functions}"
+if [[ ",$TARGET," != *",hosting,"* ]]; then
+  echo "FEHLER: Deploy-Ziel \"$TARGET\" enthaelt die Website nicht (hosting)." >&2
+  echo "        Der Fingerabdruck des Server-Codes (public/build-info.json) wird mit der Website" >&2
+  echo "        ausgeliefert; ohne sie wiese die Seite danach einen Server-Stand aus, der nicht" >&2
+  echo "        mehr laeuft. Website und Server zusammen: ./scripts/deploy.sh (ohne Argument)." >&2
+  exit 1
+fi
+
+# ── OPS-2026-10-03-09: Was der Sauberkeits-Riegel nicht sieht ──
+# `git status` (weiter unten) zeigt keine Dateien, die .gitignore nennt. Die
+# Firebase-CLI richtet sich aber nicht nach .gitignore. Zwei Riegel schliessen
+# das — bewusst VOR der Stand-Bindung und ohne Notschalter: Sie gelten auch bei
+# SKIP_STAND=1, brauchen kein Netz, und fuer keinen der beiden Faelle gibt es
+# einen Grund, trotzdem auszuliefern.
+#
+# 1. Umgebungsdateien. Die CLI laedt beim Ausliefern `functions/.env` und
+#    `functions/.env.<projekt>` und setzt jede Zeile daraus als
+#    Umgebungsvariable an ALLE Functions. Dort bleibt sie stehen: Datei loeschen
+#    und neu ausliefern nimmt sie nicht zurueck. Erlaubt sind nur die beiden
+#    Vorlagen und `.env.local` — die liest die CLI ausschliesslich im Emulator.
+UMGEBUNGSDATEIEN=""
+for D in functions/.env functions/.env.*; do
+  # Ohne Treffer bleibt das Muster woertlich stehen — dann gibt es die Datei nicht.
+  [ -e "$D" ] || [ -L "$D" ] || continue
+  case "${D#functions/}" in
+    .env.example | .env.local | .env.local.example) ;;
+    *) UMGEBUNGSDATEIEN="$UMGEBUNGSDATEIEN $D" ;;
+  esac
+done
+if [ -n "$UMGEBUNGSDATEIEN" ]; then
+  echo "FEHLER: Umgebungsdatei im Server-Ordner:$UMGEBUNGSDATEIEN" >&2
+  echo "        Die Firebase-CLI setzte ihren Inhalt als Einstellung an jede Function, und er" >&2
+  echo "        bliebe dort auch nach dem Loeschen der Datei stehen. Lokale Schalter und der" >&2
+  echo "        lokale KI-Schluessel gehoeren nach functions/.env.local (nur der Emulator" >&2
+  echo "        liest sie). Datei verschieben oder loeschen, dann erneut starten." >&2
+  exit 1
+fi
+
+# 2. Reste in den beiden Auslieferungsverzeichnissen. Was als Server-Paket zu
+#    Google geht, bestimmt `functions.ignore` in firebase.json; was als Website
+#    hinausgeht, `hosting.ignore`. Der Waechter bildet beide Listen nach den
+#    Regeln der CLI und haelt an, sobald etwas darin nicht im Repository steht.
+#    Rueckgabewert 2 heisst "nicht messbar" — auch das ist kein Freibrief.
+RESTE_RC=0
+RESTE_AUSGABE=$(node scripts/pruefe-auslieferbare-reste.mjs 2>&1) || RESTE_RC=$?
+if [ "$RESTE_RC" -ne 0 ]; then
+  printf '%s\n' "$RESTE_AUSGABE" >&2
+  if [ "$RESTE_RC" -eq 1 ]; then
+    echo "FEHLER: Es wuerde etwas ausgeliefert, das nicht im Repository steht (Liste oben)." >&2
+    echo "        Datei entfernen oder in die ignore-Liste von firebase.json aufnehmen." >&2
+  else
+    echo "FEHLER: Was ausgeliefert wuerde, liess sich nicht messen (Meldung oben, Code $RESTE_RC) —" >&2
+    echo "        Abbruch statt Deploy auf Verdacht. Fehlen die Pakete: npm ci im Wurzelordner." >&2
+  fi
+  exit 1
+fi
+PAKET_ZAHL=$(printf '%s\n' "$RESTE_AUSGABE" | sed -n 's/.*Dateien im Paket: \([0-9][0-9]*\).*/\1/p')
+echo "Server-Paket: ${PAKET_ZAHL:-?} Dateien, jede steht im Repository; keine Umgebungsdatei im Server-Ordner."
+
+# ── Die Pruefergebnisse eines Commits: je Check der JUENGSTE Lauf ──
+# Gibt je Check-Namen eine Zeile "name=ergebnis" aus ("pending", solange ein
+# Lauf kein Ergebnis hat). Zwei Stellen der Stand-Bindung rufen das auf: fuer
+# den Stand von main und fuer den Kopf des Pull Requests.
+#
+# OPS-2026-08-20-03: Je Check-Namen zaehlt NUR der juengste Lauf. Derselbe
+# Commit traegt mehrere Laeufe, sobald der woechentliche Zeitplan ihn erneut
+# prueft (am 2026-08-17 real geschehen: b3908c3 trug jeden Pflicht-Check
+# doppelt). Wird der spaetere Lauf rot — eine ablaufende Ausnahme im
+# Abhaengigkeits-Gate, eine neu gemeldete Luecke, beides ohne Code-Aenderung —,
+# darf ein aelteres "success" ihn nicht verdecken.
+#
+# OPS-2026-10-03-18: Die Schnittstelle liefert die Laeufe seitenweise, ohne
+# Angabe 30 je Seite. Jeder Nachtlauf haengt vier weitere an denselben Commit;
+# nach einigen Tagen fielen die Pflicht-Checks aus der ersten Seite, und die
+# Bindung meldete "fehlt". Deshalb die groesste Seitenlaenge (100) und
+# blaettern, bis eine Seite nicht mehr voll ist.
+#
+# Je Seite kommen nur ROHZEILEN (Name=Ergebnis, Tabulator, Startzeit). Der
+# juengste Lauf je Name wird erst UEBER ALLE Seiten bestimmt: Je Seite
+# ausgewertet, staenden bei zwei Seiten zwei Ergebnisse je Check da — ein altes
+# "success" neben einem juengeren "failure", und die Pruefung unten faende das
+# gruene. (`gh api --paginate` wertet `--jq` genau so aus, je Seite; deshalb
+# wird hier von Hand geblaettert.)
+#
+# Scheitert EINE Seite, gibt die Funktion NICHTS aus: Ein Teilergebnis koennte
+# gerade den juengeren, roten Lauf verschweigen. Der Aufrufer wertet "leer" als
+# "nicht abrufbar" und bricht ab.
+check_lage() {
+  local sha="$1" seite=1 zeilen="" antwort anzahl
+  while :; do
+    antwort=$(gh api "repos/malziland/malzime/commits/$sha/check-runs?per_page=100&page=$seite" \
+      --jq '.check_runs[] | "\(.name)=\(.conclusion // "pending")\t\(.started_at // "")"' 2>/dev/null) || return 0
+    [ -n "$antwort" ] || break
+    zeilen="$zeilen$antwort
+"
+    # Weniger als eine volle Seite (dieselbe Zahl wie per_page oben): Das war
+    # die letzte. Eine volle Seite heisst, es kann weitere geben.
+    anzahl=$(printf '%s\n' "$antwort" | grep -c . || true)
+    [ "$anzahl" -ge 100 ] || break
+    seite=$((seite + 1))
+    # 20 volle Seiten waeren 2000 Laeufe an einem Commit. Das gibt es nicht —
+    # dann laeuft die Schleife ins Leere. Lieber "nicht abrufbar" als endlos.
+    [ "$seite" -le 20 ] || return 0
+  done
+  # Je Name der Eintrag mit der spaetesten Startzeit; bei Gleichstand der
+  # spaetere in der Antwort. ISO-Zeiten sortieren als Text richtig; das
+  # angehaengte "" erzwingt den Textvergleich.
+  printf '%s' "$zeilen" | LC_ALL=C awk -F '\t' '
+    $1 == "" { next }
+    {
+      name = $1
+      sub(/=[^=]*$/, "", name)
+      if (!(name in zeit) || ($2 "") >= (zeit[name] "")) {
+        zeit[name] = $2
+        eintrag[name] = $1
+      }
+    }
+    END { for (name in eintrag) print eintrag[name] }
+  ' | LC_ALL=C sort
+}
+
 # ── OPS-2026-08-13-43: Stand-Bindung — deployt wird nur, was die CI freigab ──
 # Der Deploy liefert den ARBEITSBAUM aus (`firebase deploy`), prüfte aber
 # nirgends, ob dieser Stand der von der CI freigegebene ist. Sein Test-Guard ist
@@ -46,6 +178,9 @@ cd "$(dirname "$0")/.."
 # doppeln, wird an die CI-Freigabe gebunden: sauberer Baum, HEAD == origin/main,
 # und für HEAD müssen alle Pflicht-Checks grün sein. Notschalter SKIP_STAND=1,
 # laut wie die anderen.
+# Vorbelegt, weil `set -u` gilt und der Block unten bei SKIP_STAND=1 entfaellt:
+# Laeuft der Nachtlauf nicht mehr nach Zeitplan, steht hier die Meldung dazu.
+NACHT_ZEITPLAN_HINWEIS=""
 if [ "${SKIP_STAND:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_STAND=1 gesetzt — Stand-Bindung an die CI-Freigabe wird UEBERSPRUNGEN."
 else
@@ -73,16 +208,8 @@ else
     # Die sechs Pflicht-Checks müssen für DIESEN Commit success sein. Fehlt ein
     # Ergebnis (Lauf noch nicht durch), ist das kein Freibrief — dann Abbruch.
     PFLICHT="test-backend test-frontend test-e2e secret-scan playwright-version pruefungen"
-    # OPS-2026-08-20-03: Je Check-Namen zählt NUR der jüngste Lauf. Vorher wurde die
-    # gesamte Liste durchsucht, und ein einziges altes "success" genügte. Derselbe
-    # Commit trägt aber mehrere Läufe, sobald der wöchentliche Zeitplan ihn erneut
-    # prüft (am 2026-08-17 real geschehen: b3908c3 trug jeden Pflicht-Check doppelt).
-    # Wird der Zeitplan-Lauf rot — etwa weil eine Ausnahme im Abhängigkeits-Gate
-    # abläuft oder eine neue Lücke gemeldet wird, beides ohne jede Code-Änderung —,
-    # meldete die Bindung weiterhin "alle sechs grün".
-    LAGE=$(gh api "repos/malziland/malzime/commits/$SHA/check-runs" \
-      --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
-            | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+    # Je Check der juengste Lauf, ueber alle Seiten der Antwort — check_lage oben.
+    LAGE=$(check_lage "$SHA")
 
     # ── Wenn main noch prüft: zählt der Lauf des PR, sofern der Code IDENTISCH ist ──
     #
@@ -131,9 +258,7 @@ else
             BAUM_PR="kein-baum-dort"
           fi
           if [ "$BAUM_HIER" = "$BAUM_PR" ]; then
-            LAGE_PR=$(gh api "repos/malziland/malzime/commits/$PRKOPF/check-runs" \
-              --jq '[.check_runs[]] | group_by(.name) | map(max_by(.started_at))
-                    | .[] | "\(.name)=\(.conclusion // "pending")"' 2>/dev/null || true)
+            LAGE_PR=$(check_lage "$PRKOPF")
             # BEFUND 31.08.2026 (A-9): auch hier fehlte die Meldung.
             if [ -z "$LAGE_PR" ]; then
               echo "Hinweis: Pruefergebnisse zu PR #${PRNR} nicht abrufbar (gh api) — die Baum-Regel entfaellt."
@@ -259,17 +384,42 @@ else
     # Die Grenze steht NUR hier (Befund J-08); die Doku verweist auf sie.
     # Verglichen wird in Minuten — mit ganzen Stunden liesse "26" bis 26:59 durch.
     NACHT_GRENZE_MINUTEN=1560 # 26 Stunden: taeglicher Lauf plus Spielraum
+    #
+    # OPS-2026-10-03-13: Ein von Hand gestarteter Lauf genuegt diesem Riegel —
+    # das ist so entschieden (docs/SECURITY-MODEL.md) und nach einer Aenderung
+    # an sicherheit-nachts.yml auch der richtige Handgriff. Er sagt aber nichts
+    # darueber, ob GitHub den ZEITPLAN noch ausfuehrt: Die Auslieferkette startet
+    # einen fehlenden Lauf selbst, und ein abgeschalteter Zeitplan fiele bei
+    # keiner Auslieferung auf. Deshalb liest dieselbe Abfrage zusaetzlich den
+    # juengsten Lauf mit Ereignis "schedule". Ist er aelter als die zweite
+    # Grenze oder fehlt er, wird ausgeliefert wie entschieden — aber mit einer
+    # Meldung, die nicht zu uebersehen ist: hier, vor dem Upload, und noch
+    # einmal ganz am Ende. Zwei Tage: Der Lauf ist taeglich geplant, GitHub
+    # startet ihn bis zu einem halben Tag verspaetet (gemessen 01.–03.10.2026);
+    # eine einzelne Verspaetung loest die Meldung also nicht aus.
+    NACHT_ZEITPLAN_GRENZE_MINUTEN=2880
     NACHT=$(gh api "repos/malziland/malzime/actions/workflows/sicherheit-nachts.yml/runs?branch=main&status=completed&per_page=20" \
-      --jq '[.workflow_runs[] | select(.head_repository.full_name == "malziland/malzime" and (.event == "schedule" or .event == "workflow_dispatch") and (.conclusion == "success" or .conclusion == "failure"))] | if length == 0 then "fehlt fehlt" else (.[0] | .created_at + " " + .head_sha) end' \
-      2>/dev/null || echo "nicht-abrufbar nicht-abrufbar")
-    NACHT_ZEIT=${NACHT%% *}
-    NACHT_SHA=${NACHT##* }
+      --jq '[.workflow_runs[] | select(.head_repository.full_name == "malziland/malzime" and (.event == "schedule" or .event == "workflow_dispatch") and (.conclusion == "success" or .conclusion == "failure"))] | (if length == 0 then "fehlt fehlt" else (.[0] | .created_at + " " + .head_sha) end) + " " + (map(select(.event == "schedule")) | if length == 0 then "fehlt" else .[0].created_at end)' \
+      2>/dev/null || echo "nicht-abrufbar nicht-abrufbar nicht-abrufbar")
+    # Drei Felder: Zeit und Commit des juengsten gelaufenen Laufs, dann die Zeit
+    # des juengsten Laufs nach Zeitplan.
+    read -r NACHT_ZEIT NACHT_SHA NACHT_PLAN_ZEIT <<<"$NACHT"
     NACHT_MINUTEN=$(node -e 'const t = Date.parse(process.argv[1]); console.log(Number.isNaN(t) ? -1 : Math.floor((Date.now() - t) / 60000));' "$NACHT_ZEIT")
+    NACHT_PLAN_MINUTEN=$(node -e 'const t = Date.parse(process.argv[1]); console.log(Number.isNaN(t) ? -1 : Math.floor((Date.now() - t) / 60000));' "${NACHT_PLAN_ZEIT:-fehlt}")
+    NACHT_PLAN_STEHT=0
+    if [ "$NACHT_PLAN_MINUTEN" -lt 0 ] || [ "$NACHT_PLAN_MINUTEN" -gt "$NACHT_ZEITPLAN_GRENZE_MINUTEN" ]; then
+      NACHT_PLAN_STEHT=1
+    fi
     if [ "$NACHT_MINUTEN" -lt 0 ] || [ "$NACHT_MINUTEN" -gt "$NACHT_GRENZE_MINUTEN" ]; then
       echo "FEHLER: Juengster gelaufener Nachtlauf \"Sicherheit nachts\" auf main: $NACHT_ZEIT (vor ${NACHT_MINUTEN} min) — fehlt oder ist aelter als ${NACHT_GRENZE_MINUTEN} min." >&2
       echo "        Dann meldet niemand neue Sicherheitsluecken. Starten: gh workflow run sicherheit-nachts.yml" >&2
       echo "        (erst wenn die Pipeline des Merge-Commits fertig ist), abwarten, erneut deployen." >&2
       echo "        Ist er abgeschaltet: unter \"Actions\" einschalten. Notschalter: SKIP_STAND=1" >&2
+      if [ "$NACHT_PLAN_STEHT" = "1" ] && [ "$NACHT_ZEIT" != "nicht-abrufbar" ]; then
+        echo "        Der Zeitplan selbst laeuft nicht: Der juengste Lauf nach Zeitplan ist aelter als" >&2
+        echo "        ${NACHT_ZEITPLAN_GRENZE_MINUTEN} min oder fehlt. Ein Handstart oeffnet nur diesen Riegel — die" >&2
+        echo "        Ursache (Workflow abgeschaltet?) bleibt. Erst klaeren und weitermelden, dann starten." >&2
+      fi
       exit 1
     fi
     NACHT_WF=.github/workflows/sicherheit-nachts.yml
@@ -284,6 +434,29 @@ else
       exit 1
     fi
     echo "Nachtlauf: juengster gelaufener Lauf auf main vor ${NACHT_MINUTEN} min (Grenze ${NACHT_GRENZE_MINUTEN} min), mit der ausgelieferten Fassung."
+    if [ "$NACHT_PLAN_STEHT" = "1" ]; then
+      if [ "$NACHT_PLAN_MINUTEN" -lt 0 ]; then
+        NACHT_PLAN_LAGE="Unter den letzten 20 abgeschlossenen Laeufen auf main ist kein einziger nach Zeitplan."
+      else
+        NACHT_PLAN_LAGE="Juengster Lauf NACH ZEITPLAN auf main: $NACHT_PLAN_ZEIT (vor ${NACHT_PLAN_MINUTEN} min) — aelter als ${NACHT_ZEITPLAN_GRENZE_MINUTEN} min."
+      fi
+      NACHT_ZEITPLAN_HINWEIS="ACHTUNG: Der Nachtlauf \"Sicherheit nachts\" laeuft nicht nach Zeitplan.
+ $NACHT_PLAN_LAGE
+ Der Lauf, der diese Auslieferung freigibt, wurde von Hand gestartet. Heute ist
+ damit geprueft; ZWISCHEN den Auslieferungen sucht aber niemand mehr nach neuen
+ Sicherheitsluecken, und es kommt auch kein Alarm.
+ ZU TUN: auf GitHub unter \"Actions\" nachsehen, ob der Workflow abgeschaltet ist
+ (das geschieht nach 60 Tagen ohne Aktivitaet), und ihn einschalten. Diese
+ Meldung weitergeben — ein Lauf von Hand behebt die Ursache nicht.
+ docs/RUNBOOK.md, Abschnitt \"Nachtlauf Sicherheit nachts rot\"."
+      echo ""
+      echo "════════════════════════════════════════════════════════════════"
+      echo " $NACHT_ZEITPLAN_HINWEIS"
+      echo "════════════════════════════════════════════════════════════════"
+      echo ""
+    else
+      echo "Nachtlauf: juengster Lauf nach Zeitplan vor ${NACHT_PLAN_MINUTEN} min (Meldung ab ${NACHT_ZEITPLAN_GRENZE_MINUTEN} min)."
+    fi
     echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA (jüngster Lauf je Check)."
   fi
 fi
@@ -334,11 +507,25 @@ FIREBASE_MIN="15.1.0"
 if [ "${SKIP_CLI_CHECK:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_CLI_CHECK=1 gesetzt — Versionspruefung der CLI wird UEBERSPRUNGEN."
 else
-  FIREBASE_IST="$(firebase --version 2>/dev/null | head -1 | tr -d '[:space:]' || true)"
+  FIREBASE_ZEILE="$(firebase --version 2>/dev/null | head -1 || true)"
+  FIREBASE_IST="$(printf '%s' "$FIREBASE_ZEILE" | tr -d '[:space:]')"
   # Fail-closed: Eine nicht ermittelbare Version ist ausdruecklich kein
   # bestandener Riegel. Leer ist zuerst ein Verdacht gegen die Messung.
   if [ -z "$FIREBASE_IST" ]; then
     echo "FEHLER: Version der Firebase-CLI nicht ermittelbar (\`firebase --version\` lieferte nichts)." >&2
+    echo "        Ohne bekanntes Werkzeug kein Deploy. Notschalter: SKIP_CLI_CHECK=1" >&2
+    exit 1
+  fi
+  # OPS-2026-10-03-16: "Nicht ermittelbar" ist auch jede Ausgabe, die keine
+  # Versionsnummer ist — eine Warnung, eine Fehlermeldung, ein Hinweis vor der
+  # eigentlichen Zeile. Im Vergleich unten sortiert Text hinter Ziffern: Die
+  # Untergrenze stuende vorn, der Riegel gaelte als bestanden, und das Protokoll
+  # hielte den Fremdtext als "Version" fest. Verlangt sind genau drei Zahlen.
+  # Das Muster steht in einer Variablen: So liest es jede bash-Fassung gleich.
+  VERSIONSMUSTER='^[0-9]+\.[0-9]+\.[0-9]+$'
+  if ! [[ "$FIREBASE_IST" =~ $VERSIONSMUSTER ]]; then
+    echo "FEHLER: Version der Firebase-CLI nicht ermittelbar — \`firebase --version\` lieferte keine" >&2
+    echo "        Versionsnummer aus drei Zahlen (etwa $FIREBASE_MIN), sondern: $FIREBASE_ZEILE" >&2
     echo "        Ohne bekanntes Werkzeug kein Deploy. Notschalter: SKIP_CLI_CHECK=1" >&2
     exit 1
   fi
@@ -408,12 +595,10 @@ else
   echo "  ok    Einstellungssatz erkennbar (Stundenlimit $SATZ_LIMIT)"
 fi
 
-# ── Deploy-Ziel bestimmen ──
-# KURZAUDIT-Befund OPS-2026-08-13-34: Das Ziel muss VOR dem Buster-Block
-# feststehen. Vorher lief der Buster bei jedem Aufruf — ein reiner
-# Functions-Deploy veraenderte sechs Hosting-Dateien, die dann unausgeliefert
-# im Arbeitsbaum lagen. Rutscht so etwas in einen Commit, behauptet das
-# Repository einen Buster-Stand, der nie online war.
+# ── Deploy-Ziel und der Firestore-Schritt ──
+# Das Ziel ($TARGET) steht seit ARCH-2026-10-03-10 am Anfang des Skripts fest;
+# es enthaelt immer die Website. Was hier folgt, erklaert, warum Firestore
+# nicht zum Ziel gehoert, sondern als eigener Schritt ausgerollt wird.
 # OPS-2026-08-20-49: `firestore:rules` gehoerte nicht zu den Zielen — die Regeln
 # im Repository wurden also nie ausgerollt. Sie sind heute deckungsgleich mit den
 # aktiven (gemessen 2026-08-21 ueber die Firebase-Regel-Schnittstelle: beide
@@ -450,7 +635,6 @@ fi
 # Er scheiterte trotzdem — und riss den GANZEN Deploy mit, bevor Functions und
 # Hosting hochgeladen waren. Die Produktion blieb dabei unversehrt; das ist
 # Glueck, kein Entwurf.
-TARGET="${1:-hosting,functions}"
 
 # ── TROCKENLAUF: würde diese Auslieferung überhaupt durchgehen? ──
 #
@@ -507,11 +691,8 @@ fi
 
 # ── Cache-Busting-Version generieren (Konvention: ?v=YYYYMMDDNN) ──
 # Aktuellen Buster aus index.html lesen; am selben Tag laufende Nummer +1,
-# sonst neuer Tag mit laufender Nummer 01. NUR wenn Hosting wirklich
-# ausgeliefert wird — der Buster gehoert zur Auslieferung der Seiten, nicht
-# zum Aufruf des Skripts.
-VERSION="(kein Hosting-Deploy — Buster unveraendert)"
-if [[ ",$TARGET," == *",hosting,"* ]]; then
+# sonst neuer Tag mit laufender Nummer 01. Die Website gehoert zu jedem Ziel
+# (Riegel am Anfang des Skripts), der Buster also zu jeder Auslieferung.
 TODAY=$(date +"%Y%m%d")
 CURRENT=$(grep -o 'styles\.css?v=[0-9]*' public/index.html | head -1 | grep -o '[0-9]*$' || true)
 # OPS-2026-08-13-47: Ein leeres CURRENT (Muster nicht getroffen — Datei
@@ -729,7 +910,6 @@ if ! node scripts/build-info.mjs "$VERSION"; then
   echo "FEHLER: build-info.json konnte nicht erzeugt werden." >&2
   exit 1
 fi
-fi
 
 echo ""
 echo "Deploy-Ziel: $TARGET"
@@ -856,14 +1036,9 @@ HOCHGELADEN=1
 if [ "${SKIP_SMOKE:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_SMOKE=1 gesetzt — Live-Smoke wird UEBERSPRUNGEN."
 else
-  # OPS-2026-08-13-42: Bei Hosting im Ziel bekommt der Smoke die erwartete
-  # Buster-Version und liest sie live zurück. Bei reinem Functions-Deploy gibt
-  # es keinen neuen Buster — dann ohne Argument (nur die vier Verhaltensproben).
-  if [[ ",$TARGET," == *",hosting,"* ]]; then
-    ./scripts/live-smoke.sh "$VERSION"
-  else
-    ./scripts/live-smoke.sh
-  fi
+  # OPS-2026-08-13-42: Der Smoke bekommt die erwartete Buster-Version und liest
+  # sie live zurück.
+  ./scripts/live-smoke.sh "$VERSION"
 fi
 
 # ── OPS-2026-08-13-48: Schlussbilanz der übersprungenen Riegel ──
@@ -894,6 +1069,15 @@ if [ -n "$UEBERSPRUNGEN" ]; then
   echo "Deploy abgeschlossen. Version: ?v=$VERSION — ⚠ ÜBERSPRUNGENE RIEGEL:$UEBERSPRUNGEN"
 else
   echo "Deploy abgeschlossen. Version: ?v=$VERSION — alle Riegel gelaufen."
+fi
+
+# OPS-2026-10-03-13: Die Meldung von oben noch einmal, an der Stelle, an der
+# zuletzt gelesen wird — die erste ist hinter der Ausgabe des Uploads verschwunden.
+if [ -n "$NACHT_ZEITPLAN_HINWEIS" ]; then
+  echo ""
+  echo "════════════════════════════════════════════════════════════════"
+  echo " $NACHT_ZEITPLAN_HINWEIS"
+  echo "════════════════════════════════════════════════════════════════"
 fi
 
 # ── OPS-2026-08-18-01: Der Versionsschnitt darf nicht vergessen werden ──

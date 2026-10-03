@@ -143,3 +143,78 @@ describe("Sicherheitsrichtlinie (firebase.json) und api-basis.js sind eine Liste
     expect(csp).not.toMatch(/\*\.run\.app|\*\.a\.run\.app/);
   });
 });
+
+/* ── Formularziele (SEC-2026-10-03-08) ─────────────────────────────────────
+ *
+ * `form-action` fällt nicht auf `default-src` zurück: Ohne eigene Regel darf
+ * ein Formular in der Seite an JEDE Adresse senden. Die Seite setzt fremden
+ * Text ein (die Antwort der KI); versagte dessen Maskierung einmal, hielte die
+ * Richtlinie Skripte auf — ein eingeschleustes Formular mit fremdem Ziel nicht.
+ *
+ * Erlaubt ist die eigene Adresse ('self'), nicht 'none': Die Bestätigungsseite
+ * der Verwaltung (functions/src/handle-admin.js) schickt ein echtes Formular an
+ * /api/admin/… ab und kommt über dieselbe Adresse wie die Seite. Mit 'self'
+ * bleibt sie in jedem Fall bedienbar — gleich, welche der beiden Richtlinien
+ * aus firebase.json Hosting dort setzt.
+ */
+describe("Sicherheitsrichtlinie (firebase.json): Formularziele", () => {
+  const konfig = JSON.parse(fs.readFileSync(path.join(WURZEL, "firebase.json"), "utf8"));
+  const richtlinie = (quelle) =>
+    konfig.hosting.headers.find((h) => h.source === quelle).headers.find((h) => h.key === "Content-Security-Policy")
+      .value;
+  const regel = (csp, name) =>
+    csp
+      .split(";")
+      .map((s) => s.trim())
+      .find((s) => s === name || s.startsWith(`${name} `));
+
+  function htmlDateien(verzeichnis) {
+    const gefunden = [];
+    for (const name of fs.readdirSync(verzeichnis)) {
+      if (name === "__tests__" || name === "lib") continue;
+      const pfad = path.join(verzeichnis, name);
+      if (fs.statSync(pfad).isDirectory()) gefunden.push(...htmlDateien(pfad));
+      else if (name.endsWith(".html")) gefunden.push(pfad);
+    }
+    return gefunden;
+  }
+
+  /** Ziele aller Formulare und Absende-Knöpfe in einem HTML-Text. */
+  const formularziele = (text) => [...text.matchAll(/\b(?:form)?action\s*=\s*["']([^"']*)["']/gi)].map((m) => m[1]);
+  const fremd = (ziel) => /^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(ziel.trim());
+
+  it("die Richtlinie der Seite nennt Formularziele: nur die eigene Adresse", () => {
+    expect(regel(richtlinie("**"), "form-action")).toBe("form-action 'self'");
+  });
+
+  it("die eigene Richtlinie der Verwaltungsseite ebenso", () => {
+    expect(regel(richtlinie("/api/admin/**"), "form-action")).toBe("form-action 'self'");
+  });
+
+  it("das Formular der Verwaltungsseite zielt auf die eigene Adresse — 'self' sperrt es nicht aus", () => {
+    const quelltext = fs.readFileSync(path.join(WURZEL, "functions", "src", "handle-admin.js"), "utf8");
+    const ziele = [...quelltext.matchAll(/<form\b[^>]*\baction="([^"]*)"/g)].map((m) => m[1]);
+    /* Positivkontrolle: Ohne Treffer wäre die Schleife leer und grün. */
+    expect(ziele.length).toBeGreaterThan(0);
+    for (const ziel of ziele) expect(ziel).toMatch(/^\/api\/admin\//);
+  });
+
+  it("kein Formular unter public/ zielt auf eine fremde Adresse", () => {
+    const seiten = htmlDateien(path.join(WURZEL, "public"));
+    /* Positivkontrolle der Suche. */
+    expect(seiten.length).toBeGreaterThanOrEqual(5);
+    const treffer = [];
+    for (const seite of seiten) {
+      for (const ziel of formularziele(fs.readFileSync(seite, "utf8"))) {
+        if (fremd(ziel)) treffer.push(`${path.relative(WURZEL, seite)}: ${ziel}`);
+      }
+    }
+    expect(treffer).toEqual([]);
+  });
+
+  it("die Suche erkennt ein fremdes Formularziel (Gegenprobe)", () => {
+    expect(formularziele('<form method="post" action="https://fremd.example/x">').filter(fremd)).toHaveLength(1);
+    expect(formularziele('<button formaction="//fremd.example">').filter(fremd)).toHaveLength(1);
+    expect(formularziele('<form action="/api/admin/boost">').filter(fremd)).toEqual([]);
+  });
+});

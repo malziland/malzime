@@ -707,9 +707,14 @@ Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
 
 ### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
 
-Der Filter (`functions/src/minor-safety.js`) streicht bei möglicherweise
-Minderjährigen Werbeeinträge zu Alkohol, Tabak, Wetten, Kredit, Diät und
-Schönheits-OP und meldet Treffer im Fließtext, ohne dort etwas zu streichen.
+Der Filter (`functions/src/minor-safety.js`) ist eine Wortliste. Er streicht
+einen Werbeeintrag, wenn darin ein Wort der Liste steht: bei allen zu
+Pornografie, Waffen und Extremismus, bei möglicherweise Minderjährigen
+zusätzlich zu Alkohol, Tabak, Wetten, Kredit, Diät und Schönheits-OP. Treffer
+im Fließtext meldet er, ohne dort etwas zu streichen. Ein Werbeeintrag ohne
+Listenwort geht durch und hinterlässt keine Spur im Log; was die Liste fängt
+und was nicht, zeigt die Prüfreihe
+`functions/src/__tests__/minor-safety-woerter.test.js`.
 „Möglicherweise minderjährig“ heißt: Untergrenze der Altersschätzung bis
 `SCHUTZ_BIS` (mit Puffer) oder ein Alter, das sich nicht lesen ließ. Im Log
 stehen Anzahl und Grund der Treffer, dazu die Anzahl der gezeigten

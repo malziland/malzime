@@ -43,7 +43,9 @@ der Seite an der Karte und in den Metadaten jeder Datei. Die Kartenausschnitte
 sind keine KI-Bilder und tragen deshalb keine KI-Kennzeichnung.
 
 Ändern sich die Ortsdaten eines Demo-Fotos, gehören Kartenausschnitt und Adresse
-neu erzeugt — `public/__tests__/beispielbild-karten.test.js` wird sonst rot.
+neu erzeugt — `public/__tests__/beispielbild-karten.test.js` wird sonst rot. Wie
+die Kartenausschnitte hergestellt werden, steht als Rezept in
+`scripts/demo-karten/` (drei Schritte: Kacheln laden, zuschneiden, ausgeben).
 
 Lizenz der Demo-Fotos: wie das Repository — **MIT** (siehe
 [`/LICENSE`](../../../LICENSE)). Die Kartenausschnitte und Adressen sind davon
@@ -91,3 +93,5 @@ AI marking.
 
 If the location data of a demo photo changes, its map section and address must
 be regenerated — otherwise `public/__tests__/beispielbild-karten.test.js` fails.
+How the map sections are produced is recorded as a recipe in
+`scripts/demo-karten/` (three steps: fetch the tiles, crop, write the files).

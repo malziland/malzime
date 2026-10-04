@@ -92,12 +92,13 @@ const DIAET = `diät*, *diät, dieting, diet pill*, abnehm, abnehmspritze*, abne
   schlankheits*, slimming*, weight loss*, lose weight, appetite suppressant*, gewichtsverlust*, gewichtsabnahme*,
   gewichtsreduktion*`;
 const DROGEN = `drogen*, *droge, partydrogen*, designerdrogen*, einstiegsdrogen*, modedrogen*, drugs, rauschgift*,
-  rauschmittel*, narcotic*, *cannabis*, cbd, thc, hhc, marihuana*, marijuana*, haschisch*, hashish*, hasch,
-  hanfblüte*, ganja, spliff*, kiff*, bekifft*, bong, bongs, head shop*, grow shop*, growbox*, legal high*, lachgas*,
-  laughing gas*, mdma, xtc, kokain*, cocaine*, koks, koksen, kokser*, lsd, magic mushroom*, zauberpilz*, psilocybin*,
-  shrooms, heroin, crystal meth*, methamphetamin*, amphetamin*, ketamin*`;
+  rauschmittel*, suchtgift*, suchtmittel*, betäubungsmittel*, narkotik*, narcotic*, *cannabis*, cbd, thc, hhc,
+  marihuana*, marijuana*, haschisch*, hashish*, hasch, hanfblüte*, ganja, spliff*, kiff*, bekifft*, bong, bongs,
+  head shop*, grow shop*, growbox*, legal high*, lachgas*, laughing gas*, mdma, xtc, kokain*, cocaine*, koks, koksen,
+  kokser*, lsd, magic mushroom*, zauberpilz*, psilocybin*, shrooms, heroin, crystal meth*, methamphetamin*,
+  amphetamin*, ketamin*, opioid*, opiat*, fentanyl*, kratom, psychedelika, psychedelics`;
 const MINOR_NUR_ALS_WERBUNG = `*wette, admiral, stake, slots, raten*, später bezahlen, später zahlen, weine, rum,
-  radler, spritzer, ottakringer, spirits, velo, diet, abnehmen, weed, joint, joints, ecstasy, grinder`;
+  radler, spritzer, ottakringer, spirits, velo, diet, abnehmen, weed, joint, joints, ecstasy, grinder, edibles`;
 
 /* Harmlose Wendungen, in denen ein Listenwort steckt. Sie werden vor dem
    Vergleich aus dem Text genommen. */

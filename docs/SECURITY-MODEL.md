@@ -860,9 +860,10 @@ Untergrenze.
 3. Ist das Alter nicht lesbar — abgeschriebene Vorlage in beliebiger Klammer,
    oder ein Altersversuch ohne lesbares Alter —, zeigt die Alterskarte einen
    festen Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte
-   vorher nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das
-   (Erkennung in `alters-lesbarkeit.js`) aus den Rohwerten der KI-Antwort,
-   bevor eine Karte umgeschrieben wird. Die Kinderschutz-Zeile meldet es als
+   vorher nicht (eine Ausnahme steht am Ende dieses Punkts). Der Filter lässt
+   Stufe 2 greifen; `mistral.js` bestimmt das (Erkennung in
+   `alters-lesbarkeit.js`) aus den Rohwerten der KI-Antwort, bevor eine Karte
+   umgeschrieben wird. Die Kinderschutz-Zeile meldet es als
    `alterUnlesbar: true`, das Ergebnis trägt `meta.alterUnlesbar`, und der
    Realitäts-Check fragt das Alter dann nicht ab; der Server nimmt dessen
    Bewertung deshalb auch ohne Alter an (`handle-telemetry.js`). Als
@@ -874,16 +875,20 @@ Untergrenze.
    nicht lesbar; die Zahl im späteren Satz wird nicht gelesen. Zahlwörter
    („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und Kategoriewörter
    („Teenager“, „Schulkind“) gelten als lesbar und werden für die
-   Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl
-   dasteht; „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Wörter,
-   die ein Kind ohne Zahl benennen („Mädchen“, „Bub“, „Junge“,
-   „Volksschulkind“, „Schülerin“, „Baby“ und ihre englischen Entsprechungen),
-   zählen wie „Schulkind“; „underage“, „a minor“ und ein Geburtsjahr sind wie
+   Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl dasteht;
+   „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Wörter, die ein
+   Kind ohne Zahl benennen („Mädchen“, „Bub“, „Junge“, „Volksschulkind“,
+   „Schülerin“, „Baby“ und ihre englischen Entsprechungen), zählen wie
+   „Schulkind“; „underage“, „a minor“ und ein Geburtsjahr sind wie
    „minderjährig“ ein Altersversuch ohne lesbares Alter. Eine Antwort ohne
    jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie bisher
-   ungefiltert. (Die Regeln zum Satzende, zum Altersversuch außerhalb des
-   ersten Satzes und zu den Kinderwörtern gelten seit 04.10.2026; die
-   Live-Anzeige entscheidet seither mit derselben Regel wie das Endergebnis.)
+   ungefiltert. Die Regeln zum Satzende, zum Altersversuch außerhalb des
+   ersten Satzes und zu den Kinderwörtern sind am 04.10.2026 ergänzt. Die
+   Live-Anzeige entscheidet über die Alterskarte mit derselben Regel wie das
+   Endergebnis (`mistral-antwort.js`). Die Ausnahme: Zeigt erst die später
+   eintreffende Beast-Karte einen Altersversuch ohne lesbares Alter, steht
+   eine Standard-Karte ohne Altersversuch schon da und wechselt dann auf den
+   festen Satz.
 4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus
    `minor-safety.js` (`SCHUTZ_ALTER`), steht also nur an einer Stelle.
 
@@ -998,7 +1003,7 @@ im ganzen Satz aber Redewendung oder Bildbeschreibung („deine stärkste
 Waffe“, „wie aus der Pistole geschossen“, „ein Soldat mit Gewehr“, „wir raten
 dir“, „on the far right“). Sie gelten nur für Werbe-Einträge
 (`ad_targeting`), nicht für Erklärsätze und Fließtext. Eindeutige Wörter
-(Softair, Munition, die Pornografie- und Extremismus-Wörter) gelten überall.
+(„Softair“, „Munition“, „Pornoseite“, „rechtsextrem“) gelten überall.
 
 **Harmlose Wendungen.** Wendungen, in denen ein Listenwort steckt
 („Wasserpistole“, „Top Gun“, „People-Pleasing“, „Cocktailkleid“), werden vor
@@ -1009,8 +1014,8 @@ gefangen.
 keine Protokollzeile zeigt ihn: Die Kinderschutz-Zeile zählt nur
 Listentreffer. Ob bei Kinderfotos solche Einträge vorkommen, zeigt nur das
 Nachstellen mit eigenen Fotos (Abschnitt „Anzahl und Diagnose“,
-Neubewertung). Schreibweisen mit Ziffern statt Buchstaben oder gesperrter
-Schrift fängt die Liste nicht; der Auslöser ist die Antwort der KI.
+Neubewertung). Schreibweisen mit Ziffern statt Buchstaben („0nlyFans“) oder
+gesperrter Schrift („W e t t e n“) fängt die Liste nicht.
 
 **Alarm.** Der Alarm „Kinderschutz-Treffer“ (`minor-safety-durchbruch`,
 `docs/ERROR-ALERTING.md`) hört allein auf Stufe-1-Wörter im Fließtext, und

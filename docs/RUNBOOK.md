@@ -765,10 +765,11 @@ Lesart:
   `durchgerutschte` mit Feld und Wort. Ob die Sperrliste zu grob ist, lässt
   sich danach nur mit eigenen Fotos nachstellen.
 - `entfernt` und `durchgerutscht` zählen Treffer der Wortliste und hängen
-  deshalb an ihrem Umfang. Ab der Auslieferung, mit der die Liste in
-  `functions/src/minor-safety-woerter.js` liegt (Oktober 2026), kennt sie
-  mehr Wörter, das Thema Drogen und einige Wörter nur noch als Werbe-Eintrag.
-  Zahlen davor und danach nicht miteinander vergleichen.
+  deshalb an ihrem Umfang. Ab der Auslieferung, die Drogen als Thema des
+  Filters aufnimmt (CHANGELOG; die Liste liegt seither in
+  `functions/src/minor-safety-woerter.js`), kennt sie mehr Wörter und einige
+  Wörter nur noch als Werbe-Eintrag. Zahlen davor und danach nicht
+  miteinander vergleichen.
 - `werbung` unter 8 heißt beim Beast-Modus nur dann „mehr als zwei Einträge
   gestrichen“, wenn der zweite Werbe-Aufruf geliefert hat (zehn Einträge
   angefordert). Sonst stammt die Liste wie die Standard-Liste aus dem

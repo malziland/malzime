@@ -953,6 +953,14 @@ mitgeändert werden; der Werbe-Prompt zieht automatisch nach.
 nennt den Puffer noch nicht (der Server streicht trotzdem); die Beispiel-Belege
 der Alterskarte sind allgemein formuliert — ob die KI dadurch seltener ein
 konkretes Merkmal nennt, zeigt der Vortest (Kennzahl „Begründung konkret“).
+Seit 04.10.2026 nennen die Verbotssätze beider KI-Aufrufe dieselben Themen wie
+der Filter für möglicherweise Minderjährige, auch Drogen und Tabak (ein Test
+hält beides zusammen, `functions/src/__tests__/prompt-verbot-themen.test.js`);
+an echten Fotos gemessen ist diese Ergänzung nicht. Ein eigenes Verbot von
+Werbung zu Pornografie, Waffen und Extremismus steht nur im zweiten
+Werbe-Aufruf, nicht im Analyse-Aufruf: Für die Werbe-Einträge der sachlichen
+Ansicht ist bei diesen Themen der Filter die einzige Linie. Beides gehört in
+dieselbe Messung.
 
 ## Kinderschutz-Zeile: oberes Ende der Altersschätzung (25.09.2026)
 

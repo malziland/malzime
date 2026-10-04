@@ -67,6 +67,11 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 - **Die Auslieferung sieht alle Prüfergebnisse eines Standes**, auch wenn sich
   über mehrere Tage viele angesammelt haben, und hält an, wenn sich die
   Version des Auslieferungswerkzeugs nicht lesen lässt.
+- **Tests halten jetzt fest, was bisher nur das Programm sicherstellte:** dass
+  keine IP-Adresse im Protokoll landet, dass die Löschfristen stimmen und dass
+  ein Testlauf nie den echten Foto-Speicher oder die echte Warteschlange
+  anfasst. Die Schutzstellen wirkten schon; ihr Wegfall wäre aber keinem Test
+  aufgefallen.
 
 ### Geändert — Auslieferung und Betrieb
 

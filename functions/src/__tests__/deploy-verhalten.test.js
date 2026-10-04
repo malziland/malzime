@@ -1065,16 +1065,19 @@ describe("deploy.sh — Umgebungsdateien und Reste, die git nicht zeigt", () => 
     expect(firebaseDeploy(r.aufrufe)).toEqual([]);
   });
 
-  test.each([".env.malzime", ".env.default", ".env.production"])("functions/%s haelt die Auslieferung an", (name) => {
-    streue(name, "NTFY_STUMM=1\n");
-    const r = deployMitProtokoll();
-    expect(r.code).not.toBe(0);
-    /* Die Meldung DIESES Riegels: Diese Namen kennt .gitignore nicht, der
+  test.each([".env.malzime", ".env.default", ".env.production", ".env.example"])(
+    "functions/%s haelt die Auslieferung an",
+    (name) => {
+      streue(name, "NTFY_STUMM=1\n");
+      const r = deployMitProtokoll();
+      expect(r.code).not.toBe(0);
+      /* Die Meldung DIESES Riegels: Diese Namen kennt .gitignore nicht, der
          Sauberkeits-Riegel hielte also auch an — nur spaeter und ohne zu
          sagen, worum es geht. */
-    expect(r.ausgabe).toMatch(new RegExp(`Umgebungsdatei im Server-Ordner: functions/${name.replace(/\./g, "\\.")}`));
-    expect(firebaseDeploy(r.aufrufe)).toEqual([]);
-  });
+      expect(r.ausgabe).toMatch(new RegExp(`Umgebungsdatei im Server-Ordner: functions/${name.replace(/\./g, "\\.")}`));
+      expect(firebaseDeploy(r.aufrufe)).toEqual([]);
+    }
+  );
 
   test("auch bei SKIP_STAND=1 haelt functions/.env an", () => {
     /* Der Notschalter hebt die Bindung an die CI-Freigabe auf, nicht diesen
@@ -1087,13 +1090,12 @@ describe("deploy.sh — Umgebungsdateien und Reste, die git nicht zeigt", () => 
     expect(firebaseDeploy(r.aufrufe)).toEqual([]);
   });
 
-  test("die Vorlagen und functions/.env.local halten nicht an — der Riegel schlaegt nicht immer zu", () => {
-    /* .env.local liest die Firebase-CLI nur im Emulator; die beiden Vorlagen
-       sind eingecheckt. */
+  test("functions/.env.local und ihre Vorlage halten nicht an — der Riegel schlaegt nicht immer zu", () => {
+    /* .env.local liest die Firebase-CLI nur im Emulator; die Vorlage ist
+       eingecheckt. */
     streue(".env.local", "QUEUE_LOCAL=1\n");
-    for (const vorlage of [".env.example", ".env.local.example"]) {
-      expect(fs.existsSync(path.join(klon, "functions", vorlage))).toBe(true);
-    }
+    expect(fs.existsSync(path.join(klon, "functions", ".env.local.example"))).toBe(true);
+    expect(fs.existsSync(path.join(klon, "functions", ".env.example"))).toBe(false);
     const r = deployMitProtokoll();
     expect(r.code).toBe(0);
     expect(r.uploads).toContain("firebase deploy --only hosting");

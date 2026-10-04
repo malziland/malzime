@@ -103,7 +103,7 @@ Einzelbefehle:
 - `npm run lint:frontend` — ESLint frontend
 - `npm run format:frontend:check` — Prettier frontend
 - `firebase emulators:start --only functions,hosting` — local dev
-- `./scripts/deploy.sh [hosting|functions]` — deploy (only with the owner's explicit release; the script runs the gates, the dry run and the live smoke — never `firebase deploy` directly, see docs/RUNBOOK.md)
+- `./scripts/deploy.sh [hosting]` — deploy website and server (no argument) or the website only (`hosting`); the server alone is refused, because the server fingerprint ships with the website (only with the owner's explicit release; the script runs the gates, the dry run and the live smoke — never `firebase deploy` directly, see docs/RUNBOOK.md)
 
 ## Coding Style & Naming Conventions
 
@@ -178,7 +178,7 @@ Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. D
 - Always run `npm run test:frontend` after frontend changes
 - Run `cd functions && npm run lint && npm run format:check` before committing backend changes
 - Run `npm run lint:frontend && npm run format:frontend:check` before committing frontend changes
-- The cache-buster `?v=YYYYMMDDNN` is bumped by `scripts/deploy.sh` on every hosting deploy — never by hand
+- The cache-buster `?v=YYYYMMDDNN` is bumped by `scripts/deploy.sh` on every deploy (every deploy includes the website) — never by hand
 - Both profiles (normal + boost) come from ONE call (`runSingleLargeCall` in `mistral.js`); the prompt text lives in `locales/*/prompts.js` (`singleLargePrompt`)
 - Bei Aenderungen an der Architektur oder neuen Features: README.md, AGENTS.md, CHANGELOG.md, docs/SETUP.md und docs/SELF-HOSTING.md aktualisieren
 - Bei neuen Features: Dokumentation und Anleitungen mitliefern

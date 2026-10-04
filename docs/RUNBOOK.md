@@ -55,7 +55,8 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 3. CHANGELOG: Sobald deployt wird, ist das ein Release — den
    `[Unveröffentlicht]`-Abschnitt im selben Schritt auf neue Versionsnummer und
    Datum stempeln.
-4. Deploy über `./scripts/deploy.sh [hosting|functions]`.
+4. Deploy über `./scripts/deploy.sh` (Website und Server; nur die Website: `./scripts/deploy.sh hosting`).
+   Der Server allein wird abgelehnt — der Fingerabdruck des Server-Codes geht mit der Website hinaus.
 
    **Seit 31.08.2026 läuft ein Trockenlauf** (nach Stand-Bindung,
    Sauberkeits-Prüfung, CLI-Version, Infrastruktur-Prüfung und
@@ -530,6 +531,11 @@ Schnellster Weg: Firebase Console → Hosting → Release-Verlauf → **Rollback
 (ein Klick, stellt den vorherigen Stand wieder her). Alternativ: früheren Stand wie
 in Hebel 4 auschecken und `firebase deploy --only hosting`.
 
+**Der Fingerabdruck stimmt danach nicht:** Die zurückgeholte Website weist den
+Server-Stand ihrer eigenen Auslieferung aus, während der neuere Server weiterläuft.
+Richtig wird die Angabe erst mit der nächsten vollständigen Auslieferung
+(`./scripts/deploy.sh` ohne Argument).
+
 **Webseite nur zusammen mit den Functions auf 4.9.0 zurück.** Die
 4.9.0-Webseite baut den DE/EN-Umschalter nur, wenn `/api/stats` das Feld
 `sprachumschalter: true` liefert; die neuen Functions liefern es nicht mehr. Die
@@ -925,8 +931,10 @@ Schutz still ausfällt, und was sie auffängt:
   die ausbleibende Monatsprobe auf (nächster Punkt; bewusst getragen,
   `docs/SECURITY-MODEL.md`).
 - *Der Alarmweg ist kaputt* (Secret, ntfy-Server, Thema). Am 1. jedes Monats kommt
-  eine sichtbare Probe aufs Handy; bleibt sie aus, ist der Weg gestört
-  (`docs/ERROR-ALERTING.md`). Von Hand: `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
+  eine Probe aufs Handy. Meldet sich das Handy nicht von selbst, in der ntfy-App
+  nachsehen — der Weckruf kann ausbleiben (`docs/ERROR-ALERTING.md`, „Wenn der Push
+  nicht weckt"); steht die Probe auch dort nicht, ist der Weg gestört. Von Hand:
+  `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
 
 **Einmalig nach dem Zusammenführen des Sicherheitspakets (PR #294):** Auf `main`
 gibt es noch keinen Nachtlauf, der Deploy bricht deshalb ab, bis einer gelaufen

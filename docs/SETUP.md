@@ -152,9 +152,8 @@ CI prueft Lint + Format automatisch bei jedem Push und Pull Request.
 ## 8. Deploy
 
 ```bash
-./scripts/deploy.sh            # Hosting + Functions
-./scripts/deploy.sh hosting    # nur Frontend
-./scripts/deploy.sh functions  # nur Backend
+./scripts/deploy.sh            # Website + Server
+./scripts/deploy.sh hosting    # nur die Website (der Server allein wird abgelehnt)
 ```
 
 Das Skript prüft vorher Tests, Infrastruktur und Einstellungssatz, macht einen

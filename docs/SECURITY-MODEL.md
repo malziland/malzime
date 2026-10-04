@@ -169,6 +169,30 @@ Dieses Dokument wird bei jedem LANGAUDIT und vor jeder Presse-Welle
 gegengelesen. Neue bewusste Abwägungen gehören **hier** hinein — im selben
 Commit wie die Entscheidung.
 
+## Umfang des Server-Pakets (seit 2026-10-03)
+
+**Entscheidung.** Zu Google geht beim Ausliefern nur das Programm: die Dateien unter
+`functions/src/` (ohne Tests), `package.json` und `package-lock.json`. Testdateien,
+Hilfsskripte, Abdeckungsberichte und jede Punkt-Datei (also auch `.env*`) bleiben auf dem
+Auslieferungsrechner (`functions.ignore` in `firebase.json`).
+
+**Begründung.** Ohne diese Liste lädt die Firebase-CLI den ganzen Ordner hoch, und
+`functions/.env` oder `functions/.env.<projekt>` setzt sie als Einstellung an jede Function —
+dort bleibt der Inhalt stehen, auch wenn die Datei gelöscht und neu ausgeliefert wird. Der
+Sauberkeits-Riegel (`git status`) sieht von git ignorierte Dateien nicht.
+
+**Was es hält.** (1) `scripts/deploy.sh` bricht ab, wenn `functions/.env` oder
+`functions/.env.*` existiert (erlaubt: `.env.local` und ihre Vorlage); (2) der Wächter
+`scripts/pruefe-auslieferbare-reste.mjs` bildet die Paketliste nach den Regeln der CLI und
+hält an, sobald eine Datei darin nicht im Repository steht; (3) im Programm wirken die
+Schalter für lokale Läufe in der Produktion nicht, und eine Fassung mit einem solchen
+Schalter startet dort nicht (`functions/src/lokale-schalter.js`).
+
+**Grenze.** Der Notweg „Hebel 4" im Betriebshandbuch (`firebase deploy` aus einem frischen
+Arbeitsverzeichnis) läuft an `deploy.sh` vorbei; dort gilt nur die Liste in `firebase.json`.
+Der Fingerabdruck (`build-info.json`) nennt die `.js`-Dateien unter `functions/src/`, nicht
+`package.json`, `package-lock.json` und `locales/manifest.json`.
+
 ## Restrisiko: Der Alarmweg kann sich nicht selbst überwachen (seit 2026-08-12)
 
 **Entscheidung.** Die Alarmregeln (Log-Richtlinien → E-Mail + ntfy-Push; seit 01.10.2026
@@ -751,7 +775,11 @@ das fängt der Deploy auf (nächster Absatz).
   `scripts/deploy.sh`. Die roten Läufe ohne Jobs, die GitHub bei einer unlesbaren
   Datei je Push anlegt, zählen damit nicht. Nach jeder Änderung am Nachtlauf muss er
   deshalb einmal laufen, bevor ausgeliefert wird. Zwischen zwei Deploys fällt ein
-  ausbleibender Nachtlauf nur durch die ausbleibende Monatsprobe auf.
+  ausbleibender Nachtlauf nur durch die ausbleibende Monatsprobe auf. Weil die
+  Auslieferkette einen fehlenden Lauf selbst von Hand startet, meldet `deploy.sh`
+  gesondert, wenn der jüngste Lauf NACH ZEITPLAN älter als
+  `NACHT_ZEITPLAN_GRENZE_MINUTEN` ist — der Zeitplan steht dann, auch wenn der
+  Riegel erfüllt ist (OPS-2026-10-03-13).
 - Der Alarm-Job kann seinen eigenen Fehlschlag nicht melden (fehlendes Secret,
   ntfy nicht erreichbar); „200" vom ntfy-Server heißt nur „angenommen". Auch das
   zeigt erst die ausbleibende Monatsprobe.

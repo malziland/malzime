@@ -66,14 +66,16 @@ fi
 # 1. Umgebungsdateien. Die CLI laedt beim Ausliefern `functions/.env` und
 #    `functions/.env.<projekt>` und setzt jede Zeile daraus als
 #    Umgebungsvariable an ALLE Functions. Dort bleibt sie stehen: Datei loeschen
-#    und neu ausliefern nimmt sie nicht zurueck. Erlaubt sind nur die beiden
-#    Vorlagen und `.env.local` — die liest die CLI ausschliesslich im Emulator.
+#    und neu ausliefern nimmt sie nicht zurueck. Erlaubt sind nur `.env.local`
+#    (die liest die CLI ausschliesslich im Emulator) und ihre Vorlage. Eine Datei
+#    `.env.example` gibt es nicht mehr: Hiesse ein Projekt-Kuerzel "example",
+#    wuerde die CLI auch sie laden.
 UMGEBUNGSDATEIEN=""
 for D in functions/.env functions/.env.*; do
   # Ohne Treffer bleibt das Muster woertlich stehen — dann gibt es die Datei nicht.
   [ -e "$D" ] || [ -L "$D" ] || continue
   case "${D#functions/}" in
-    .env.example | .env.local | .env.local.example) ;;
+    .env.local | .env.local.example) ;;
     *) UMGEBUNGSDATEIEN="$UMGEBUNGSDATEIEN $D" ;;
   esac
 done

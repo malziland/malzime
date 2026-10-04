@@ -356,8 +356,12 @@ for (const weg of PROFIL_WEGE) {
     await page.route("**/nominatim.openstreetmap.org/**", (route) =>
       route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
     );
-    await page.route("**/tile.openstreetmap.org/**", (route) =>
-      route.fulfill({ status: 200, contentType: "image/png", body: KACHEL })
+    /* Nach dem Rechnernamen: Die Seite holt Kacheln von
+       a./b./c.tile.openstreetmap.org, ein Muster mit Schraegstrich davor
+       trifft diese Adressen nicht. */
+    await page.route(
+      (url) => url.hostname.endsWith("tile.openstreetmap.org"),
+      (route) => route.fulfill({ status: 200, contentType: "image/png", body: KACHEL })
     );
 
     await page.emulateMedia({ reducedMotion: "reduce" });

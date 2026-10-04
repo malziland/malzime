@@ -25,6 +25,9 @@
    Frist gilt es noch nicht ("<" im Code). Die Beispiele liegen eine Sekunde
    darunter, genau auf der Frist und eine Sekunde darueber.
 
+   Dazu, am Ende der Datei, die Frist fuer verlassene Auftraege
+   (`isAbandoned`, `livenessGnadenfristMs`) mit derselben Grenze.
+
    Der Aufraeumdienst selbst (handle-reap.js) ist in handle-reap.test.js mit
    Attrappen fuer diese Funktionen geprueft; hier laufen die echten Funktionen
    gegen eine Datenbank im Arbeitsspeicher. */
@@ -261,5 +264,52 @@ describe("findUeberfaelligeJobs: ein nur durch Nachfragen am Leben gehaltener Au
   test("ohne Einstellungssatz keine Antwort statt einer Ersatzfrist", async () => {
     betriebsprofil.geltendeWerte.mockReset().mockResolvedValue({ werte: null, quelle: "keiner", grund: "fehlt" });
     await expect(jobs.findUeberfaelligeJobs()).rejects.toThrow(/Betriebswerte fehlen/);
+  });
+});
+
+/* Nachlauf 04.10.2026: Die dritte Frist dieser Datei. Ein wartender Auftrag
+   gilt als verlassen, wenn sein Browser laenger als `livenessGnadenfristMs`
+   nicht nachgefragt hat. Die Funktion war in den Tests der Handler nur als
+   Attrappe vertreten; ihre Grenze (ausschliesslich: erst AELTER als die Frist)
+   hielt kein Test. */
+describe("isAbandoned: verlassen ist ein wartender Auftrag erst, wenn sein Herzschlag aelter ist als die Gnadenfrist", () => {
+  const FRISTEN = [
+    ["Wert aus dem Einstellungssatz", SATZ.livenessGnadenfristMs],
+    ["doppelter Wert", SATZ.livenessGnadenfristMs * 2],
+  ];
+
+  test.each(FRISTEN)("%s: eine Sekunde darunter, genau auf der Frist, eine Millisekunde darueber", (_name, frist) => {
+    const job = { status: "queued", createdAt: T0 - MINUTE, lastSeenAt: T0 };
+    uhrStehtBei(T0 + frist - SEKUNDE);
+    expect(jobs.isAbandoned(job, frist)).toBe(false);
+    uhrStehtBei(T0 + frist);
+    expect(jobs.isAbandoned(job, frist)).toBe(false);
+    uhrStehtBei(T0 + frist + 1);
+    expect(jobs.isAbandoned(job, frist)).toBe(true);
+  });
+
+  test("ohne Herzschlag zaehlt der Zeitpunkt des Anlegens", () => {
+    const frist = SATZ.livenessGnadenfristMs;
+    const job = { status: "queued", createdAt: T0 };
+    uhrStehtBei(T0 + frist);
+    expect(jobs.isAbandoned(job, frist)).toBe(false);
+    uhrStehtBei(T0 + frist + 1);
+    expect(jobs.isAbandoned(job, frist)).toBe(true);
+  });
+
+  test("nur wartende Auftraege: wer verarbeitet wird oder fertig ist, gilt nie als verlassen", () => {
+    const frist = SATZ.livenessGnadenfristMs;
+    uhrStehtBei(T0 + frist * 10);
+    for (const status of ["processing", "done", "failed", "abandoned"]) {
+      expect(jobs.isAbandoned({ status, createdAt: T0, lastSeenAt: T0 }, frist)).toBe(false);
+    }
+    /* Kontrolle: Derselbe Auftrag im Wartezustand gilt als verlassen. */
+    expect(jobs.isAbandoned({ status: "queued", createdAt: T0, lastSeenAt: T0 }, frist)).toBe(true);
+  });
+
+  test("ohne Frist keine Antwort statt einer Ersatzfrist", () => {
+    const job = { status: "queued", createdAt: T0, lastSeenAt: T0 };
+    expect(() => jobs.isAbandoned(job)).toThrow(/livenessGnadenfristMs fehlt/);
+    expect(() => jobs.isAbandoned(job, 0)).toThrow(/livenessGnadenfristMs fehlt/);
   });
 });

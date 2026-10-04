@@ -107,6 +107,41 @@ describe("Wann gilt ein Profil als vorhanden", () => {
     expect(r.result.profiles.normal.ad_targeting).toEqual(["Tipico Wetten", "Nike Air Max"]);
   });
 
+  /* Nachlauf 04.10.2026: Der Filter liest das Alter aus dem Anker, den die
+     Pipeline ihm uebergibt. Nennt nur der Anker das Kinderalter — die Karte
+     traegt keines —, haengt der Schutz allein an dieser Uebergabe. Sie liess
+     sich herausnehmen, ohne dass ein Test rot wurde. */
+  const ohneAlterInDerKarte = () => ({
+    categories: { alter_geschlecht: { value: "Du bist weiblich. Runde Wangen." } },
+    ad_targeting: ["Tipico Wetten", "Nike Air Max"],
+  });
+
+  test("Kinderalter steht nur im Anker: die Pipeline gibt ihn an den Filter weiter, Wett-Werbung fliegt raus", async () => {
+    const r = await laufMit({
+      normal: ohneAlterInDerKarte(),
+      boost: ohneAlterInDerKarte(),
+      alterAnker: "weiblich, ~12 Jahre alt (Spanne 11-13)",
+      alterUnlesbar: false,
+    });
+    expect(r.success).toBe(true);
+    expect(r.result.profiles.normal.ad_targeting).toEqual(["Nike Air Max"]);
+    expect(r.result.profiles.boost.ad_targeting).toEqual(["Nike Air Max"]);
+    const zeile = console.log.mock.calls.map((c) => String(c[0])).find((z) => z.includes('"minor-safety"'));
+    expect(JSON.parse(zeile)).toMatchObject({ alter: 11, minderjaehrig: true, alterUnlesbar: false });
+  });
+
+  test("Gegenprobe: ohne Anker und ohne Alter in der Karte bleibt die Wett-Werbung", async () => {
+    const r = await laufMit({
+      normal: ohneAlterInDerKarte(),
+      boost: ohneAlterInDerKarte(),
+      alterAnker: "",
+      alterUnlesbar: false,
+    });
+    expect(r.result.profiles.normal.ad_targeting).toEqual(["Tipico Wetten", "Nike Air Max"]);
+    const zeile = console.log.mock.calls.map((c) => String(c[0])).find((z) => z.includes('"minor-safety"'));
+    expect(JSON.parse(zeile)).toMatchObject({ alter: null, minderjaehrig: false });
+  });
+
   test("gar kein Profil ist ein blockiertes Ergebnis, kein leeres", async () => {
     /* Die Gegenrichtung: Ohne jedes Profil darf NICHT "erfolgreich" gemeldet
        werden — sonst sieht das Kind eine leere Seite statt einer Erklaerung. */

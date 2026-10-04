@@ -199,14 +199,28 @@ def main():
     # greifen — und liess sich spurlos loeschen, ohne dass ein Waechter
     # anschlug. Gemessen: Datei entfernt, fuenf Waechter alle rc 0.
     # Diese Dateien duerfen nicht verschwinden, ohne dass es auffaellt.
-    # Seit 04.10.2026 dazu die drei Testdateien, die fuer je einen Riegel
-    # der einzige Nachweis sind: der Vertrag der Pipeline-Dateien, die
-    # oeffentliche Nachpruefung und der Umfang des Server-Pakets.
+    # Seit 04.10.2026 dazu die Testdateien, die fuer je einen Riegel oder eine
+    # Zusage der einzige Nachweis sind: der Vertrag der Pipeline-Dateien, die
+    # oeffentliche Nachpruefung, der Umfang des Server-Pakets, die Schalter
+    # fuer lokale Laeufe — und die Tests hinter den Datenschutz- und
+    # Kinderschutz-Zusagen (keine IP-Adresse im Protokoll, Loeschfristen,
+    # Riegel gegen Testlaeufe an echtem Speicher und echter Warteschlange,
+    # Sperrliste, Alterslesung, Verbotssatz der KI-Anweisung, Beispielbilder
+    # ohne Abfrage nach aussen).
     UNVERZICHTBAR = [
         "functions/src/__tests__/deploy-verhalten.test.js",
         "functions/src/__tests__/pipeline-vertrag-script.test.js",
         "functions/src/__tests__/pruefe-live-verhalten.test.js",
         "functions/src/__tests__/server-paket.test.js",
+        "functions/src/__tests__/lokale-schalter.test.js",
+        "functions/src/__tests__/keine-ip-im-protokoll.test.js",
+        "functions/src/__tests__/jobs-fristen-groesse.test.js",
+        "functions/src/__tests__/queue-storage-emulator-riegel.test.js",
+        "functions/src/__tests__/kapazitaets-wache-emulator-riegel.test.js",
+        "functions/src/__tests__/minor-safety-woerter.test.js",
+        "functions/src/__tests__/alters-platzhalter.test.js",
+        "functions/src/__tests__/prompt-verbot-themen.test.js",
+        "e2e/beispielbild-ohne-ortsabfrage.test.js",
         "functions/jest.setup.js",
         "scripts/selbstpruefung-waechter.sh",
     ]

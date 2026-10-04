@@ -187,7 +187,11 @@ Sauberkeits-Riegel (`git status`) sieht von git ignorierte Dateien nicht.
 `scripts/pruefe-auslieferbare-reste.mjs` bildet die Paketliste nach den Regeln der CLI und
 hält an, sobald eine Datei darin nicht im Repository steht; (3) im Programm wirken die
 Schalter für lokale Läufe in der Produktion nicht, und eine Fassung mit einem solchen
-Schalter startet dort nicht (`functions/src/lokale-schalter.js`).
+Schalter startet dort nicht (`functions/src/lokale-schalter.js`). Das Programm erkennt die
+Produktion an der Variablen `K_SERVICE` ohne das Merkmal des Emulators
+(`FUNCTIONS_EMULATOR`); stünde dieses Merkmal an einem Dienst, wirkten die Schalter dort
+wieder. Deshalb (4) verlangt `scripts/verify-infrastructure.sh` vor jeder Auslieferung, dass
+an keinem Dienst einer der vier Namen gesetzt ist.
 
 **Grenze.** Der Notweg „Hebel 4" im Betriebshandbuch (`firebase deploy` aus einem frischen
 Arbeitsverzeichnis) läuft an `deploy.sh` vorbei; dort gilt nur die Liste in `firebase.json`.

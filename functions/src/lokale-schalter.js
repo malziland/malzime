@@ -13,7 +13,7 @@
  * nur in der Doku. Jetzt gilt es im Programm, auf zwei Wegen:
  *
  *   1. Jede Lesestelle fragt lokalSchalterAn() — in der Produktion ist die
- *      Antwort immer "aus", egal was in der Umgebung steht.
+ *      Antwort "aus", auch wenn der Schalter dort gesetzt ist.
  *   2. index.js ruft beim Laden verweigereLokalSchalterInProduktion(). Steht
  *      ein Schalter in der Produktion auf 1, startet die neue Fassung nicht;
  *      die Auslieferung scheitert sichtbar, die alte Fassung laeuft weiter.
@@ -22,6 +22,12 @@
  * Instanz. Der Firebase-Emulator setzt K_SERVICE ebenfalls, dazu aber
  * FUNCTIONS_EMULATOR=true. Ein Testlauf oder ein Skript am eigenen Rechner
  * setzt keines von beiden.
+ *
+ * GRENZE: Stuende FUNCTIONS_EMULATOR=true an einem Dienst der Produktion,
+ * hielte das Programm ihn fuer den Emulator, und die Schalter wirkten dort
+ * wieder. Das laesst sich im Programm nicht unterscheiden; deshalb verlangt
+ * scripts/verify-infrastructure.sh vor jeder Auslieferung, dass an keinem
+ * Dienst einer der vier Namen gesetzt ist.
  */
 
 const NUR_LOKAL = Object.freeze(["MISTRAL_MOCK", "QUEUE_LOCAL", "NTFY_STUMM"]);

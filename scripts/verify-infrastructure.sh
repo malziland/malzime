@@ -50,7 +50,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}${INFRA_PROBE_DIENST_UMGEBUNG:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -223,12 +223,18 @@ echo "— Bildspeicher (Zusage: nur fuer die Wartezeit)"
 # nennt eine Datei mit der gsutil-Ausgabe; INFRA_PROBE_BILDER_CODE den
 # Rueckgabewert. Ohne ihn liess sich dieser Abschnitt nicht kaputtmachen —
 # genau deshalb blieb der Fehler mit dem leeren Bucket unentdeckt.
+# Nachlauf 04.10.2026: Die Fehlermeldung von gsutil lag in einer FESTEN Datei
+# unter /tmp. Liefen zwei Laeufe gleichzeitig (etwa eine Auslieferung und die
+# Tests dieses Skripts), las jeder die Meldung des anderen: Ein Zugriffsfehler
+# galt dann als "leerer Bucket" oder umgekehrt (gemessen: 30 von 30 Paaren).
+# Jetzt hat jeder Lauf seine eigene Datei.
+GSUTIL_FEHLER=$(mktemp "${TMPDIR:-/tmp}/malzime-gsutil-fehler.XXXXXX") || { rot "Bildspeicher NICHT geprueft (keine Arbeitsdatei) — ungeprueft gilt als nicht bestanden"; GSUTIL_FEHLER=/dev/null; }
 if [ -n "${INFRA_PROBE_BILDER:-}" ]; then
   BILDER_ROH=$(cat "$INFRA_PROBE_BILDER")
   GSUTIL_CODE="${INFRA_PROBE_BILDER_CODE:-0}"
-  printf '%s' "${INFRA_PROBE_BILDER_FEHLER:-}" > /tmp/malzime-gsutil-fehler.log
+  printf '%s' "${INFRA_PROBE_BILDER_FEHLER:-}" > "$GSUTIL_FEHLER"
 else
-BILDER_ROH=$(gsutil ls -l "$BUCKET/queue-uploads/" 2>/tmp/malzime-gsutil-fehler.log)
+BILDER_ROH=$(gsutil ls -l "$BUCKET/queue-uploads/" 2>"$GSUTIL_FEHLER")
 GSUTIL_CODE=$?
 fi
 # BEFUND 31.08.2026 (Runde 3, von zwei Pruefern unabhaengig gefunden): Hier
@@ -241,13 +247,13 @@ fi
 # Ursache der Luecke: Dieser Abschnitt war der EINZIGE des Skripts ohne
 # Einspeisepunkt fuer eine Probe — er wurde nie kaputtgemacht und nachgesehen.
 # Der Einspeisepunkt INFRA_PROBE_BILDER unten schliesst das.
-if [ "$GSUTIL_CODE" -ne 0 ] && grep -q "matched no objects" /tmp/malzime-gsutil-fehler.log 2>/dev/null; then
+if [ "$GSUTIL_CODE" -ne 0 ] && grep -q "matched no objects" "$GSUTIL_FEHLER" 2>/dev/null; then
   GSUTIL_CODE=0
   BILDER_ROH=""
 fi
 if [ "$GSUTIL_CODE" -ne 0 ]; then
   rot "Bildspeicher nicht lesbar (gsutil Code $GSUTIL_CODE) — ungeprueft gilt als nicht bestanden"
-  sed 's/^/        /' /tmp/malzime-gsutil-fehler.log | head -3
+  sed 's/^/        /' "$GSUTIL_FEHLER" | head -3
   ALTE_BILDER="nicht-messbar"
 else
   ALTE_BILDER=$(printf '%s\n' "$BILDER_ROH" \
@@ -255,6 +261,7 @@ else
     | awk -v grenze="$(date -u -v-3H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '3 hours ago' +%Y-%m-%dT%H:%M:%SZ)" \
           '$2 < grenze {n++} END {print n+0}')
 fi
+[ "$GSUTIL_FEHLER" = /dev/null ] || rm -f "$GSUTIL_FEHLER"
 if [ "$ALTE_BILDER" = "nicht-messbar" ]; then
   : # Meldung steht bereits oben
 elif [ "$ALTE_BILDER" -eq 0 ]; then
@@ -556,6 +563,14 @@ ALARM_AUSNAHMEN="errors telemetry erinnerung ntfy"
 # eigene Dienstliste; fehlte ein Dienst in einer davon, blieb die Pruefung gruen.
 # Jetzt wird jede Regel mit Dienstliste fuer sich geprueft. Regeln ohne
 # Dienstliste (sie zaehlen eine Kennzahl) kommen hier nicht vor.
+#
+# Nachlauf 04.10.2026: Welche Regeln eine Dienstliste fuehren MUESSEN, steht
+# hier beim Namen. Verlor eine davon ihre Liste — etwa weil ihr Filter auf
+# einen einzelnen Dienst umgestellt wurde —, fiel sie bis dahin still aus der
+# Pruefung: fuer sie erschien weder eine gruene noch eine rote Zeile.
+ALARM_REGELN_MIT_DIENSTLISTE='malziME Function Errors
+malziME Analyse gescheitert
+malziME Kinderschutz-Treffer'
 if [ -n "${INFRA_PROBE_DIENSTE:-}" ]; then
   ALLE_DIENSTE=$(cat "$INFRA_PROBE_DIENSTE")
 else
@@ -564,7 +579,7 @@ fi
 if [ -z "$ALLE_DIENSTE" ]; then
   rot "Alarm-Abdeckung NICHT geprueft (Dienstliste nicht lesbar) — ungeprueft gilt als nicht bestanden"
 else
-  ABDECKUNG=$(POLICY_JSON="$POLICY_JSON" ALLE_DIENSTE="$ALLE_DIENSTE" ALARM_AUSNAHMEN="$ALARM_AUSNAHMEN" PYTHONIOENCODING=utf-8 python3 -c '
+  ABDECKUNG=$(POLICY_JSON="$POLICY_JSON" ALLE_DIENSTE="$ALLE_DIENSTE" ALARM_AUSNAHMEN="$ALARM_AUSNAHMEN" MIT_DIENSTLISTE="$ALARM_REGELN_MIT_DIENSTLISTE" PYTHONIOENCODING=utf-8 python3 -c '
 import json, os, re
 try:
     regeln = json.loads(os.environ.get("POLICY_JSON", ""))
@@ -574,18 +589,23 @@ if not isinstance(regeln, list) or not regeln:
     print("MESSFEHLER"); raise SystemExit(0)
 ausnahmen = set(os.environ.get("ALARM_AUSNAHMEN", "").split())
 pflicht = [d for d in os.environ.get("ALLE_DIENSTE", "").split() if d not in ausnahmen]
+muss_liste = [z.strip() for z in os.environ.get("MIT_DIENSTLISTE", "").split("\n") if z.strip()]
 mit_liste = 0
 for regel in regeln:
+    name = regel.get("displayName", "?")
+    hat_liste = False
     for bedingung in regel.get("conditions", []):
         filter_text = (bedingung.get("conditionMatchedLog") or {}).get("filter", "")
         liste = re.search(r"service_name\s*=\s*\(([^)]*)\)", filter_text)
         if not liste:
             continue
+        hat_liste = True
         mit_liste += 1
         genannt = set(re.findall(r"\"([a-z0-9-]+)\"", liste.group(1)))
         fehlt = [d for d in pflicht if d not in genannt]
-        name = regel.get("displayName", "?")
         print(("LUECKE:%s:%s" % (name, " ".join(fehlt))) if fehlt else ("OK:" + name))
+    if name in muss_liste and not hat_liste:
+        print("LISTE_FEHLT:" + name)
 if mit_liste == 0:
     print("KEINE_LISTE")
 ' 2>/dev/null)
@@ -596,6 +616,7 @@ if mit_liste == 0:
     case "$ZEILE" in
       OK:*)        gruen "Alarm-Abdeckung »${ZEILE#OK:}«: jeder Dienst ist im Filter oder benannte Ausnahme" ;;
       LUECKE:*)    REST="${ZEILE#LUECKE:}"; rot "Alarm-Abdeckung »${REST%%:*}«: Dienste ohne Abdeckung und ohne benannte Ausnahme: ${REST#*:} — Filter erweitern oder Ausnahme begruenden" ;;
+      LISTE_FEHLT:*) rot "Alarm-Abdeckung »${ZEILE#LISTE_FEHLT:}«: die Regel fuehrt keine Dienstliste mehr (service_name=(…)) — so ist nicht pruefbar, ob sie jeden Dienst abdeckt; Filter der Regel ansehen" ;;
       KEINE_LISTE) rot "Alarm-Abdeckung NICHT geprueft (keine Alarmregel mit Dienstliste gefunden) — ungeprueft gilt als nicht bestanden" ;;
       MESSFEHLER)  rot "Alarm-Abdeckung NICHT geprueft (Alarmregeln nicht lesbar) — ungeprueft gilt als nicht bestanden" ;;
       "")          ;;
@@ -649,6 +670,51 @@ else
       gruen "ntfy laeuft unter einem eigenen Konto, nicht unter einem Standard-Konto des Projekts" ;;
   esac
 fi
+
+# ── 7c. Kein Schalter fuer lokale Laeufe an einem Dienst ──
+# OPS-2026-10-03-09 (Nachlauf 04.10.2026): Das Programm haelt MISTRAL_MOCK,
+# QUEUE_LOCAL und NTFY_STUMM von der Produktion fern und erkennt die Produktion
+# an K_SERVICE — ausser FUNCTIONS_EMULATOR steht auf "true" (so unterscheidet
+# es den Emulator, functions/src/lokale-schalter.js). Stuende diese Variable an
+# einem Dienst, wirkten die Schalter dort wieder, und der Startriegel schwiege.
+# Deshalb hier, an der Infrastruktur: An keinem Dienst darf einer der vier
+# Namen gesetzt sein. Gelesen werden nur die NAMEN der Variablen, nie Werte.
+# Einspeisepunkt fuer Tests: INFRA_PROBE_DIENST_UMGEBUNG nennt eine Datei mit
+# der Antwort von gcloud (JSON-Liste der Dienste).
+echo "— Schalter fuer lokale Laeufe"
+LOKAL_NAMEN="MISTRAL_MOCK QUEUE_LOCAL NTFY_STUMM FUNCTIONS_EMULATOR"
+if [ -n "${INFRA_PROBE_DIENST_UMGEBUNG:-}" ]; then
+  UMGEBUNG_JSON=$(cat "$INFRA_PROBE_DIENST_UMGEBUNG")
+else
+  UMGEBUNG_JSON=$(gcloud run services list --project="$PROJECT" --region="$REGION" \
+    --format='json(metadata.name,spec.template.spec.containers[].env[].name)' 2>/dev/null || true)
+fi
+LOKAL_LAGE=$(UMGEBUNG_JSON="$UMGEBUNG_JSON" LOKAL_NAMEN="$LOKAL_NAMEN" PYTHONIOENCODING=utf-8 python3 -c '
+import json, os
+try:
+    dienste = json.loads(os.environ.get("UMGEBUNG_JSON", ""))
+except Exception:
+    print("MESSFEHLER"); raise SystemExit(0)
+if not isinstance(dienste, list) or not dienste:
+    print("MESSFEHLER"); raise SystemExit(0)
+verboten = set(os.environ.get("LOKAL_NAMEN", "").split())
+funde = []
+for dienst in dienste:
+    if not isinstance(dienst, dict) or not (dienst.get("metadata") or {}).get("name"):
+        print("MESSFEHLER"); raise SystemExit(0)
+    name = dienst["metadata"]["name"]
+    behaelter = (((dienst.get("spec") or {}).get("template") or {}).get("spec") or {}).get("containers") or []
+    for teil in behaelter:
+        for eintrag in (teil or {}).get("env") or []:
+            if (eintrag or {}).get("name") in verboten:
+                funde.append("%s (%s)" % (name, eintrag["name"]))
+print(("GESETZT:" + ", ".join(sorted(funde))) if funde else "OK:%d" % len(dienste))
+' 2>/dev/null)
+case "$LOKAL_LAGE" in
+  OK:*)      gruen "An keinem der ${LOKAL_LAGE#OK:} Dienste steht ein Schalter fuer lokale Laeufe" ;;
+  GESETZT:*) rot   "Schalter fuer lokale Laeufe an einem Dienst gesetzt: ${LOKAL_LAGE#GESETZT:} — aus den Einstellungen des Dienstes entfernen (functions/src/lokale-schalter.js)" ;;
+  *)         rot   "Schalter fuer lokale Laeufe NICHT geprueft (Dienste nicht lesbar) — ungeprueft gilt als nicht bestanden" ;;
+esac
 
 # ── 8. Die zwei Netze unter der Löschzusage: Firestore-TTL + Reaper-Zeitplan ──
 # OPS-2026-08-13-33: Beide sind reine Cloud-Konfiguration, die `firebase deploy`

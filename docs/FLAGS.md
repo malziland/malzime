@@ -104,8 +104,11 @@ Emulator läuft der Datenstrom ebenfalls immer (`QUEUE_LOCAL_LIVE` entfällt).
 
 Für `QUEUE_LOCAL`, `MISTRAL_MOCK` und `NTFY_STUMM` erzwingt das Programm die Regel selbst
 (`functions/src/lokale-schalter.js`): In der Produktion wirken sie nicht, und eine Fassung, bei
-der einer davon auf 1 steht, startet dort gar nicht erst. Lokal stehen die Werte in
-`functions/.env.local` (Vorlage `functions/.env.local.example`), nie in `functions/.env`.
+der einer davon auf 1 steht, startet dort gar nicht erst. Die Produktion erkennt das Programm
+an `K_SERVICE` ohne das Emulator-Merkmal `FUNCTIONS_EMULATOR`; dass an keinem Dienst einer
+dieser vier Namen gesetzt ist, prüft `scripts/verify-infrastructure.sh` vor jeder
+Auslieferung. Lokal stehen die Werte in `functions/.env.local` (Vorlage
+`functions/.env.local.example`), nie in `functions/.env`.
 
 ## Regeln
 

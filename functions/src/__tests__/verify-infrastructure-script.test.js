@@ -507,6 +507,127 @@ describe("verify-infrastructure.sh", () => {
           enthaelt(abdeckung(regelSatz(), []), "✗ Alarm-Abdeckung NICHT geprueft (Dienstliste nicht lesbar)")
         ).toBe(true);
       });
+
+      /* Nachlauf 04.10.2026: Eine Regel, deren Filter auf einen einzelnen
+         Dienst umgestellt wird, hatte keine Klammerliste mehr — fuer sie
+         erschien weder eine gruene noch eine rote Zeile. */
+      const nurEinDienst = (displayName) => ({
+        displayName,
+        enabled: true,
+        notificationChannels: [MAIL, PUSH],
+        conditions: [
+          {
+            conditionMatchedLog: {
+              filter: 'resource.type="cloud_run_revision" AND resource.labels.service_name="admin" AND severity>=ERROR',
+            },
+          },
+        ],
+      });
+
+      test.each(REGELN.slice(0, 3))(
+        "»%s« verliert ihre Dienstliste (Filter nur noch auf einen Dienst) → genau diese Regel rot",
+        (name) => {
+          const zeilen = abdeckung(
+            regelSatz().map((regel) => (regel.displayName === name ? nurEinDienst(name) : regel))
+          );
+          expect(enthaelt(zeilen, `✗ Alarm-Abdeckung »${name}«: die Regel fuehrt keine Dienstliste mehr`)).toBe(true);
+          expect(zeilen.filter((z) => z.includes("✓"))).toHaveLength(2);
+          expect(zeilen).toHaveLength(3);
+        }
+      );
+
+      test("Erfolgsweg: eine Regel, die nur eine Kennzahl zaehlt, braucht keine Dienstliste", () => {
+        const zeilen = abdeckung(regelSatz());
+        expect(zeilen.filter((z) => z.includes("keine Dienstliste mehr"))).toEqual([]);
+      });
+
+      test("die Regeln mit Pflicht-Dienstliste sind drei der fuenf Alarmregeln", () => {
+        const block = inhalt.match(/ALARM_REGELN_MIT_DIENSTLISTE='([^']+)'/);
+        expect(block).not.toBeNull();
+        const namen = block[1]
+          .split("\n")
+          .map((z) => z.trim())
+          .filter(Boolean);
+        expect([...namen].sort()).toEqual([...REGELN.slice(0, 3)].sort());
+      });
+    });
+
+    /* OPS-2026-10-03-09, Nachlauf 04.10.2026: Die Schalter fuer lokale Laeufe
+       wirken in der Produktion nicht — ausser dort steht zusaetzlich
+       FUNCTIONS_EMULATOR. Der Waechter verlangt deshalb, dass an keinem
+       Dienst einer der vier Namen gesetzt ist. Gelesen werden nur Namen. */
+    describe("kein Schalter fuer lokale Laeufe an einem Dienst", () => {
+      const dienst = (name, variablen) => ({
+        metadata: { name },
+        spec: { template: { spec: { containers: [{ env: variablen.map((v) => ({ name: v })) }] } } },
+      });
+      const sauber = () => [
+        dienst("enqueue", ["MISTRAL_API_KEY_EU", "MISTRAL_MOCK_DELAY_MS"]),
+        dienst("processjob", ["MISTRAL_API_KEY_EU"]),
+        { metadata: { name: "ntfy" }, spec: { template: { spec: { containers: [{}] } } } },
+      ];
+
+      function schalter(dienste) {
+        const up = path.join(dir, "dienst-umgebung.json");
+        fs.writeFileSync(up, typeof dienste === "string" ? dienste : JSON.stringify(dienste));
+        let aus;
+        try {
+          aus = execFileSync("bash", [SCRIPT], {
+            encoding: "utf8",
+            env: {
+              ...process.env,
+              PATH: `${path.join(dir, "bin")}:${process.env.PATH}`,
+              INFRA_PROBE_DIENST_UMGEBUNG: up,
+            },
+          });
+        } catch (e) {
+          aus = (e.stdout || "") + (e.stderr || "");
+        }
+        return aus
+          .replace(FARBCODES, "")
+          .split("\n")
+          .filter((z) => /Schalter fuer lokale Laeufe|ein Schalter fuer lokale/.test(z) && /[✓✗]/.test(z));
+      }
+
+      test("Erfolgsweg: an keinem Dienst steht einer der vier Namen → gruen, mit der Zahl der Dienste", () => {
+        const zeilen = schalter(sauber());
+        expect(zeilen).toHaveLength(1);
+        expect(enthaelt(zeilen, "✓ An keinem der 3 Dienste steht ein Schalter fuer lokale Laeufe")).toBe(true);
+      });
+
+      test.each(["MISTRAL_MOCK", "QUEUE_LOCAL", "NTFY_STUMM", "FUNCTIONS_EMULATOR"])(
+        "%s an einem Dienst → rot, mit Dienst und Name",
+        (name) => {
+          const dienste = sauber();
+          dienste[1] = dienst("processjob", ["MISTRAL_API_KEY_EU", name]);
+          const zeilen = schalter(dienste);
+          expect(zeilen).toHaveLength(1);
+          expect(enthaelt(zeilen, `✗ Schalter fuer lokale Laeufe an einem Dienst gesetzt: processjob (${name})`)).toBe(
+            true
+          );
+        }
+      );
+
+      test("ein aehnlicher Name ist kein Schalter (MISTRAL_MOCK_DELAY_MS)", () => {
+        expect(enthaelt(schalter(sauber()), "✗")).toBe(false);
+      });
+
+      test.each([
+        ["kein JSON", "kein JSON"],
+        ["leere Liste", []],
+        ["Eintrag ohne Namen", [{ spec: {} }]],
+      ])("Antwort nicht lesbar (%s) → ungeprueft gilt als nicht bestanden", (_fall, antwort) => {
+        const zeilen = schalter(antwort);
+        expect(zeilen).toHaveLength(1);
+        expect(enthaelt(zeilen, "✗ Schalter fuer lokale Laeufe NICHT geprueft")).toBe(true);
+      });
+
+      test("die Liste im Skript nennt die drei Schalter des Programms und das Emulator-Merkmal", () => {
+        const { NUR_LOKAL } = require("../lokale-schalter");
+        const block = inhalt.match(/LOKAL_NAMEN="([^"]+)"/);
+        expect(block).not.toBeNull();
+        expect(block[1].split(" ").sort()).toEqual([...NUR_LOKAL, "FUNCTIONS_EMULATOR"].sort());
+      });
     });
 
     test("die Liste im Skript und die Doku nennen dieselben fuenf Regeln", () => {
@@ -619,4 +740,78 @@ describe("verify-infrastructure.sh: Benachrichtigungsdienst (SEC-2026-10-03-14)"
     const spiegel = fs.readFileSync(path.join(__dirname, "../../../.github/fremd-dienste/ntfy/VERSION"), "utf8");
     expect(spiegel.split("\n")[0]).toMatch(/^ntfy \d+\.\d+\.\d+$/);
   });
+});
+
+/* Nachlauf 04.10.2026: Die Fehlermeldung von gsutil lag in einer festen Datei
+   unter /tmp. Liefen zwei Laeufe gleichzeitig — etwa eine Auslieferung und
+   diese Tests —, las jeder die Meldung des anderen: Ein Zugriffsfehler galt
+   dann als "leerer Bucket" (gruen) oder ein leerer Bucket als "nicht lesbar". */
+describe("verify-infrastructure.sh: gleichzeitige Laeufe stoeren einander nicht", () => {
+  const os = require("os");
+  const { execFile } = require("child_process");
+  // eslint-disable-next-line no-control-regex
+  const FARBCODES = /\x1b\[[0-9;]*m/g;
+  const LEER = "CommandException: One or more URLs matched no objects.";
+  const KEIN_ZUGRIFF = "AccessDeniedException: 403 kein Zugriff";
+  let dir;
+
+  beforeAll(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-gleichzeitig-"));
+    const attrappen = path.join(dir, "bin");
+    fs.mkdirSync(attrappen);
+    for (const w of ["gcloud", "gsutil", "curl"]) {
+      const ziel = path.join(attrappen, w);
+      fs.writeFileSync(ziel, "#!/bin/sh\nexit 1\n");
+      fs.chmodSync(ziel, 0o755);
+    }
+    fs.writeFileSync(path.join(dir, "leer.txt"), "");
+  });
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  /** Ein Lauf mit eingespeister Antwort fuer den Bildspeicher; liefert dessen Ergebniszeilen. */
+  function lauf(fehlertext) {
+    return new Promise((fertig) => {
+      execFile(
+        "bash",
+        [SCRIPT],
+        {
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            PATH: `${path.join(dir, "bin")}:${process.env.PATH}`,
+            INFRA_PROBE_BILDER: path.join(dir, "leer.txt"),
+            INFRA_PROBE_BILDER_CODE: "1",
+            INFRA_PROBE_BILDER_FEHLER: fehlertext,
+          },
+        },
+        (_fehler, stdout, stderr) => {
+          fertig(
+            `${stdout || ""}${stderr || ""}`
+              .replace(FARBCODES, "")
+              .split("\n")
+              .filter((z) => /Bilder aelter als 3 Stunden|Bildspeicher nicht lesbar/.test(z))
+          );
+        }
+      );
+    });
+  }
+
+  test("das Skript legt nichts in eine feste Datei unter /tmp", () => {
+    const quelle = fs.readFileSync(SCRIPT, "utf8");
+    expect(quelle).not.toMatch(/\/tmp\/[A-Za-z0-9._-]+/);
+    expect(quelle).toMatch(/GSUTIL_FEHLER=\$\(mktemp /);
+  });
+
+  test("Kontrolle des Aufbaus: einzeln liefert jeder Lauf sein Ergebnis", async () => {
+    expect(await lauf(LEER)).toEqual([expect.stringContaining("✓ Keine Bilder aelter als 3 Stunden")]);
+    expect(await lauf(KEIN_ZUGRIFF)).toEqual([expect.stringContaining("✗ Bildspeicher nicht lesbar (gsutil Code 1)")]);
+  }, 60000);
+
+  test("sechs Paare gleichzeitig: der leere Bucket bleibt gruen, der Zugriffsfehler bleibt rot", async () => {
+    for (let paar = 0; paar < 6; paar++) {
+      const [leer, zu] = await Promise.all([lauf(LEER), lauf(KEIN_ZUGRIFF)]);
+      expect(leer).toEqual([expect.stringContaining("✓ Keine Bilder aelter als 3 Stunden")]);
+      expect(zu).toEqual([expect.stringContaining("✗ Bildspeicher nicht lesbar (gsutil Code 1)")]);
+    }
+  }, 120000);
 });

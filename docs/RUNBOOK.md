@@ -200,6 +200,7 @@ gestartet werden.
 | Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
 | Worker-IAM | `processjob` und `reapjobs` ohne `allUsers`/`allAuthenticatedUsers` (nicht öffentlich; die `/api/*`-Functions sind bewusst öffentlich, Hosting reicht durch) |
 | Functions-Regionen | alle in `europe-west1` |
+| Schalter für lokale Läufe | an **keinem** Dienst steht `MISTRAL_MOCK`, `QUEUE_LOCAL`, `NTFY_STUMM` oder `FUNCTIONS_EMULATOR` als Umgebungsvariable (gelesen werden nur die Namen). Seit 04.10.2026: Das Programm hält die Schalter von der Produktion fern, erkennt die Produktion aber an `K_SERVICE` ohne das Emulator-Merkmal — stünde dieses an einem Dienst, wirkten sie wieder |
 | Logging | `_Default`-Ausschluss `exclude_run_requests_ip` aktiv (Request-Logs vollständig, **ohne** Schwere-Bedingung — sie sind der einzige Träger von Client-IPs, und `_Default` liegt fest auf Standort `global`), Sink `client-diagnostics-sink` vorhanden |
 
 Exit-Codes: 0 = grün, 1 = Abweichung (Deploy stoppt), 2 = Voraussetzung fehlt
@@ -253,7 +254,15 @@ Projekt eine Alarmregel, die nicht auf der Liste steht? Sechs Ausfallarten führ
 Regel fehlt, Regel aus, kein Kanal, kein E-Mail-Kanal, Kanal abgeschaltet, Regel ohne
 Wächter — dazu „nicht geprüft" bei einer gescheiterten Messung.
 
-Kommt eine Alarmregel dazu oder wird eine umbenannt: Namen in `ALARM_REGELN` und in
+Drei der fünf Regeln hören auf einzelne Dienste (Liste `ALARM_REGELN_MIT_DIENSTLISTE` im
+Skript). Für jede davon wird einzeln geprüft, dass ihr Filter jeden Dienst nennt, der nicht
+benannte Ausnahme ist. Führt eine dieser Regeln keine Dienstliste mehr — etwa weil ihr Filter
+auf einen einzelnen Dienst umgestellt wurde —, ist das seit 04.10.2026 rot; vorher erschien
+für sie dann gar keine Zeile. Die zwei übrigen Regeln zählen eine Kennzahl und kommen in
+dieser Prüfung nicht vor.
+
+Kommt eine Alarmregel dazu oder wird eine umbenannt: Namen in `ALARM_REGELN` (und, wenn sie
+auf einzelne Dienste hört, in `ALARM_REGELN_MIT_DIENSTLISTE`) und in
 `docs/ERROR-ALERTING.md` im selben Schritt nachziehen, sonst wird die nächste Auslieferung rot.
 
 **Grenze dieser Maßnahme, ausdrücklich:** Sie greift zur Deploy-Zeit, nicht in der Minute

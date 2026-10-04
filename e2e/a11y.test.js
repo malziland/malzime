@@ -297,58 +297,94 @@ test("A11y: Startseite ohne ernste Verstöße", async ({ page }) => {
   await checkA11y(page, "Startseite");
 });
 
-test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
-  /* Gleiche Mocks wie im Smoke-Test: Queue-Endpunkte liefern sofort ein Ergebnis */
-  await page.route("**/api/stats", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
-        totals: { today: 10, week: 50, month: 200, total: 1000 },
-      }),
-    })
-  );
-  await page.route("**/api/enqueue", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ jobId: "a11y-job-1", resultToken: "a11y-token-1" }),
-    })
-  );
-  await page.route("**/api/job-status**", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ status: "done", result: MOCK_RESPONSE }),
-    })
-  );
-  await page.route("**/nominatim.openstreetmap.org/**", (route) =>
-    route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
-  );
+/* ZWEI WEGE ZUR PROFIL-ANSICHT, zwei verschiedene Ortsbereiche (seit
+   PRIV-2026-10-03-38): Ein Beispielbild zeigt einen festen Kartenausschnitt —
+   ein Bild der Seite mit Textalternative. Ein eigenes Foto mit Ortsdaten zeigt
+   die bewegliche Karte mit Zoomtasten, Zeiger und zwei Verweisen. Bis dahin
+   gab es nur die bewegliche Karte, und dieser Test erreichte sie ueber ein
+   Beispielbild. Gemessen werden jetzt BEIDE: Sonst waere die bewegliche Karte
+   still aus dem Gate gefallen, obwohl es sie weiter gibt.
+   Das eigene Foto ist die Datei eines Beispielbilds, ueber die Dateiauswahl
+   hochgeladen — gleiche Ortsdaten, aber der Weg eines eigenen Fotos. */
+const PROFIL_WEGE = [
+  {
+    name: "Beispielbild (fester Kartenausschnitt)",
+    waehle: (page) => page.click('[data-demo="selfie"]'),
+    ortsbereich: "#gpsMap .gps-festkarte img",
+  },
+  {
+    name: "eigenes Foto mit Ortsdaten (bewegliche Karte)",
+    waehle: (page) => page.setInputFiles("#fileInput", join(PUBLIC, "img", "demo", "demo-selfie.jpg")),
+    ortsbereich: "#gpsMapLeaflet",
+  },
+];
 
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
-  /* v3.0.0: Die Analyse startet direkt bei der Demo-Wahl (kein Hinweis-
+/* Ein gueltiges Bild als Kachel — ein leerer Koerper liesse die bewegliche
+   Karte ohne Kacheln stehen (Begruendung in e2e/karte.test.js). */
+const KACHEL = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64"
+);
+
+for (const weg of PROFIL_WEGE) {
+  test(`A11y: Profil-Ansicht ohne ernste Verstöße — ${weg.name}`, async ({ page }) => {
+    /* Gleiche Mocks wie im Smoke-Test: Queue-Endpunkte liefern sofort ein Ergebnis */
+    await page.route("**/api/stats", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          current: { count: 10, limit: 500, limitActive: false, retryAfterSeconds: 0 },
+          totals: { today: 10, week: 50, month: 200, total: 1000 },
+        }),
+      })
+    );
+    await page.route("**/api/enqueue", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ jobId: "a11y-job-1", resultToken: "a11y-token-1" }),
+      })
+    );
+    await page.route("**/api/job-status**", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ status: "done", result: MOCK_RESPONSE }),
+      })
+    );
+    await page.route("**/nominatim.openstreetmap.org/**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: "[]" })
+    );
+    await page.route("**/tile.openstreetmap.org/**", (route) =>
+      route.fulfill({ status: 200, contentType: "image/png", body: KACHEL })
+    );
+
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/");
+    /* v3.0.0: Die Analyse startet direkt bei der Foto-Wahl (kein Hinweis-
      Pop-up mehr) — das Timeout deckt Bild-Prep + Mindest-Interaktionszeit. */
-  await page.click('[data-demo="selfie"]');
-  await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
-  await expect(page.locator(".cat-card").first()).toBeVisible();
+    await weg.waehle(page);
+    await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 15000 });
+    await expect(page.locator(".cat-card").first()).toBeVisible();
+    /* POSITIVKONTROLLE: Der Ortsbereich dieses Weges steht wirklich da — sonst
+     maesse axe eine Seite ohne Karte und meldete dafuer "keine Verstoesse". */
+    await expect(page.locator(weg.ortsbereich)).toBeVisible({ timeout: 15000 });
 
-  await checkA11y(page, "Profil-Ansicht");
+    await checkA11y(page, "Profil-Ansicht");
 
-  /* TEST-003 (Audit 2026-08-10): Beast Mode wurde nie gemessen.
+    /* TEST-003 (Audit 2026-08-10): Beast Mode wurde nie gemessen.
      Das Umschalten wechselt das GESAMTE Farbschema (data-theme="dark") — ein
      Kontrastproblem dort fiel durch jede Pruefung, obwohl das Gate als „ohne
      Ausnahmen" gilt. Und der Beast Mode ist im Workshop die Haelfte der
      Nutzung; er ist der Modus, um den es didaktisch geht. */
-  /* Die Checkbox ist visuell durch den Schalter ersetzt und daher nicht
+    /* Die Checkbox ist visuell durch den Schalter ersetzt und daher nicht
      direkt klickbar — wie in sticky-toggle.test.js ueber das Element selbst. */
-  await page.evaluate(() => document.getElementById("biasSwitch").click());
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await expect(page.locator(".cat-card").first()).toBeVisible();
+    await page.evaluate(() => document.getElementById("biasSwitch").click());
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.locator(".cat-card").first()).toBeVisible();
 
-  /* Bei reduzierter Bewegung darf KEINE Karte unsichtbar sein.
+    /* Bei reduzierter Bewegung darf KEINE Karte unsichtbar sein.
      Die Karten laufen mit `animation: fadeUp … both` und gestaffelten
      `animation-delay` bis 0,33 s; `both` haelt waehrend der Wartezeit den
      Startzustand `opacity: 0`. Der reduced-motion-Block setzte lange nur die
@@ -367,32 +403,37 @@ test("A11y: Profil-Ansicht ohne ernste Verstöße", async ({ page }) => {
      `fill: both` nach dem Neu-Rendern noch den Startzustand haelt. Die
      Sichtbarkeit selbst wird zusaetzlich geprueft, sobald alle Animationen
      beendet sind. */
-  const kartenAnimation = await page.$$eval(".cat-card", (karten) =>
-    karten.map((k, i) => {
-      const s = getComputedStyle(k);
-      return { i, delay: parseFloat(s.animationDelay), dauer: parseFloat(s.animationDuration) };
-    })
-  );
-  for (const k of kartenAnimation) {
-    expect(k.delay, `Karte ${k.i}: animation-delay bei reduzierter Bewegung nicht zurueckgesetzt`).toBe(0);
-    expect(k.dauer, `Karte ${k.i}: animation-duration bei reduzierter Bewegung nicht zurueckgesetzt`).toBeLessThan(
-      0.05
+    const kartenAnimation = await page.$$eval(".cat-card", (karten) =>
+      karten.map((k, i) => {
+        const s = getComputedStyle(k);
+        return { i, delay: parseFloat(s.animationDelay), dauer: parseFloat(s.animationDuration) };
+      })
     );
-  }
-  await animationsRuhe(page);
-  const unsichtbar = await page.$$eval(".cat-card", (karten) =>
-    karten.map((k, i) => ({ i, opacity: Number(getComputedStyle(k).opacity) })).filter((k) => k.opacity < 1)
-  );
-  expect(unsichtbar, "Karten, die bei reduzierter Bewegung unsichtbar bleiben").toEqual([]);
+    for (const k of kartenAnimation) {
+      expect(k.delay, `Karte ${k.i}: animation-delay bei reduzierter Bewegung nicht zurueckgesetzt`).toBe(0);
+      expect(k.dauer, `Karte ${k.i}: animation-duration bei reduzierter Bewegung nicht zurueckgesetzt`).toBeLessThan(
+        0.05
+      );
+    }
+    await animationsRuhe(page);
+    const unsichtbar = await page.$$eval(".cat-card", (karten) =>
+      karten.map((k, i) => ({ i, opacity: Number(getComputedStyle(k).opacity) })).filter((k) => k.opacity < 1)
+    );
+    expect(unsichtbar, "Karten, die bei reduzierter Bewegung unsichtbar bleiben").toEqual([]);
 
-  await checkA11y(page, "Profil-Ansicht im Beast Mode");
+    /* Der Ortsbereich wird beim Umschalten neu aufgebaut — auch er muss
+     wieder stehen, bevor gemessen wird. */
+    await expect(page.locator(weg.ortsbereich)).toBeVisible({ timeout: 15000 });
 
-  /* Und der geklebte Umschalter im gescrollten Zustand — er liegt dann ueber
+    await checkA11y(page, "Profil-Ansicht im Beast Mode");
+
+    /* Und der geklebte Umschalter im gescrollten Zustand — er liegt dann ueber
      dem Inhalt und war ebenfalls nie gemessen. */
-  await page.evaluate(() => window.scrollTo(0, 1200));
-  await page.waitForTimeout(300);
-  await checkA11y(page, "Beast Mode, Umschalter geklebt");
-});
+    await page.evaluate(() => window.scrollTo(0, 1200));
+    await page.waitForTimeout(300);
+    await checkA11y(page, "Beast Mode, Umschalter geklebt");
+  });
+}
 
 /* ── Zwei Riegel fuer die Behebungen vom 2026-08-17 ───────────────────────── */
 

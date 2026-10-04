@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { join } from "node:path";
 
 /* Die GPS-Karte — geprueft an ihrer Wirkung, nicht an ihren Einstellungen.
  *
@@ -34,6 +35,15 @@ const PROFIL = {
 
 const ADRESSE = "Bergstraße 12, 4501 Neuhofen an der Krems, Oberösterreich, Österreich";
 
+/* Ein EIGENES Foto mit Ortsdaten — nur dafuer gibt es die bewegliche Karte,
+   die hier geprueft wird. Frueher loeste sie ein Klick auf ein Beispielbild
+   aus. Ein Beispielbild zeigt inzwischen einen festen Kartenausschnitt und
+   fragt nichts bei OpenStreetMap an (PRIV-2026-10-03-38); das prueft
+   e2e/beispielbild-ohne-ortsabfrage.test.js. Die Datei hier ist die eines
+   Beispielbilds, aber ueber die Dateiauswahl hochgeladen: dieselben Ortsdaten
+   auf dem Weg, den jedes eigene Foto nimmt. */
+const EIGENES_FOTO = join(process.cwd(), "public", "img", "demo", "demo-selfie.jpg");
+
 async function seiteMitKarte(page) {
   const j = (o) => ({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
   await page.route("**/api/stats", (r) =>
@@ -63,7 +73,7 @@ async function seiteMitKarte(page) {
   );
   await page.goto("/");
   await page.waitForTimeout(600);
-  await page.click('[data-demo="selfie"]');
+  await page.setInputFiles("#fileInput", EIGENES_FOTO);
   await expect(page.locator("#gpsMapLeaflet")).toBeVisible({ timeout: 40000 });
 }
 

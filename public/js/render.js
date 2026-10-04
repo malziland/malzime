@@ -3,6 +3,7 @@ import { logClientError } from "./error-logger.js";
 import { state } from "./state.js";
 import { getBiasMode } from "./ui.js";
 import { t, getLanguage } from "./i18n.js";
+import { festerOrtsbereichHtml, ORTSZEIGER_SVG } from "./geocoding.js";
 
 /* ── Locale-aware Zahlenformatierung ── */
 
@@ -213,9 +214,11 @@ function renderCategories(profile) {
  * Zeigt die versteckten Daten und die Landkarte, sobald der Profiltext steht.
  *
  * FEATURE-2026-08-29-01: Beide brauchen den Server NICHT. EXIF liest der
- * Browser selbst aus dem Foto, die Ortsaufloesung laeuft direkt zu Nominatim,
- * die Kartenkacheln kommen von OpenStreetMap — genau die Datenschutz-
- * Architektur, wegen der GPS unsere Server nie erreicht. Die Daten liegen
+ * Browser selbst aus dem Foto. Bei einem eigenen Foto laeuft die
+ * Ortsaufloesung direkt zu Nominatim, und die Kartenkacheln kommen von
+ * OpenStreetMap — genau die Datenschutz-Architektur, wegen der GPS unsere
+ * Server nie erreicht. Bei einem Beispielbild kommen Adresse und
+ * Kartenausschnitt aus der Seite selbst (renderGpsMap). Die Daten liegen
  * also fertig vor, sobald das Bild vorbereitet ist.
  *
  * Sie gehoeren VOR die Kategorie-Boxen: erst der Profiltext, dann die
@@ -470,8 +473,29 @@ function renderPrivacyRisks(data) {
 
 /* ── Rendering: GPS-Karte ── */
 
+/* Jeder Aufbau des Ortsbereichs bekommt eine laufende Nummer. Die bewegliche
+   Karte wartet beim Aufbau auf die Ortsaufloesung; ist inzwischen ein neuerer
+   Aufbau gestartet oder der Bereich verworfen worden, zeichnet der wartende
+   nichts mehr — sonst entstuende eine zweite Karte, die niemand abbaut und die
+   Kacheln anfragt, obwohl laengst ein anderes Foto gewaehlt ist. */
+let kartenAufbau = 0;
+
+/* Verwirft den Ortsbereich: baut eine bewegliche Karte sofort ab und macht
+   einen noch wartenden Aufbau ungueltig. Gebraucht beim Klick auf ein
+   Beispielbild (js/demo.js, PRIV-2026-10-03-38) — ab dann fragt der Browser
+   nichts mehr nach aussen, auch nicht ueber die Karte des Fotos davor. */
+export function kartenAufbauVerwerfen() {
+  kartenAufbau += 1;
+  if (state.gpsMapInstance) {
+    state.gpsMapInstance.remove();
+    state.gpsMapInstance = null;
+  }
+  elements.gpsMap.innerHTML = "";
+}
+
 async function renderGpsMap(data) {
   const exif = data.exif || {};
+  const meinAufbau = ++kartenAufbau;
 
   if (state.gpsMapInstance) {
     state.gpsMapInstance.remove();
@@ -484,10 +508,21 @@ async function renderGpsMap(data) {
      bliebe mit einer Fehlermeldung leer statt einfach weg. Deckt null und
      undefined mit ab. */
   if (!Number.isFinite(exif.gpsLatitude) || !Number.isFinite(exif.gpsLongitude)) return;
-  if (typeof L === "undefined") return;
 
   const lat = exif.gpsLatitude;
   const lng = exif.gpsLongitude;
+
+  /* Beispielbild: fester Kartenausschnitt statt beweglicher Karte — keine
+     Kachel, keine Ortsaufloesung (js/geocoding.js). Entschieden wird an der
+     Aufnahme (state.lastFile), nicht an den Koordinaten, und bevor irgendetwas
+     abgewartet wird. */
+  const festerOrtsbereich = festerOrtsbereichHtml(state.lastFile, `${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+  if (festerOrtsbereich) {
+    elements.gpsMap.innerHTML = festerOrtsbereich;
+    return;
+  }
+
+  if (typeof L === "undefined") return;
 
   try {
     /* Geocoding wurde bereits beim EXIF-Parsen gestartet (parallel zur Analyse).
@@ -496,6 +531,8 @@ async function renderGpsMap(data) {
        ueberschrieben wird wenn zwischen await und Cleanup eine neue Analyse startet */
     const geocodePromise = state.pendingGeocode;
     let address = geocodePromise ? await geocodePromise : null;
+    /* Waehrend des Wartens ueberholt (siehe kartenAufbau): nichts zeichnen. */
+    if (meinAufbau !== kartenAufbau) return;
     if (state.pendingGeocode === geocodePromise) state.pendingGeocode = null;
 
     /* BUG-2026-08-20-06: Beim zweiten Aufbau derselben Analyse (Moduswechsel,
@@ -556,16 +593,11 @@ async function renderGpsMap(data) {
       referrerPolicy: "origin",
     }).addTo(karte);
 
-    /* Eigener Zeiger in Rost statt Leaflets Standard-Blau — das Blau gehoert
-       zu keiner Farbe dieser Seite. Als divIcon, damit keine weitere Bilddatei
-       geladen werden muss. */
+    /* Eigener Zeiger in Rost (ORTSZEIGER_SVG, js/geocoding.js). Als divIcon,
+       damit keine weitere Bilddatei geladen werden muss. */
     const zeiger = L.divIcon({
       className: "gps-zeiger",
-      html:
-        '<svg viewBox="0 0 24 32" width="28" height="37" aria-hidden="true">' +
-        '<path fill="#9c4e36" stroke="#fff" stroke-width="1.6" ' +
-        'd="M12 1.4c-4.9 0-8.9 3.9-8.9 8.7 0 6.3 7.9 20 8.3 20.6a.7.7 0 0 0 1.2 0c.4-.6 8.3-14.3 8.3-20.6 0-4.8-4-8.7-8.9-8.7Z"/>' +
-        '<circle cx="12" cy="10.1" r="3.3" fill="#fff"/></svg>',
+      html: ORTSZEIGER_SVG,
       iconSize: [28, 37],
       iconAnchor: [14, 37],
     });

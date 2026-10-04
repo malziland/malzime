@@ -1,0 +1,46 @@
+{
+  "_wozu": "Die festen Kartenausschnitte der Beispielbilder (public/img/demo/karte-*.webp): fuer welche Ortsdaten sie hergestellt sind und woran die Dateien erkannt werden. Gelesen von demo-bilder.test.js und beispielbild-karten.test.js. Wer einen Ausschnitt neu erzeugt oder die Ortsdaten eines Beispielbilds aendert, traegt hier die neuen Werte ein — sonst werden beide Pruefungen rot.",
+  "orte": {
+    "selfie": { "breitengrad": 48.2082, "laengengrad": 16.3738 },
+    "cafe": { "breitengrad": 47.8005, "laengengrad": 13.044 },
+    "hiker": { "breitengrad": 47.5622, "laengengrad": 13.6493 }
+  },
+  "karten": {
+    "karte-selfie.webp": {
+      "ort": "selfie",
+      "breite": 640,
+      "hoehe": 238,
+      "sha256": "ea049a5e9b75b927f0e2063bdcf26df866dccf63a14caf94ce5c68658cef6f48"
+    },
+    "karte-selfie-2x.webp": {
+      "ort": "selfie",
+      "breite": 1280,
+      "hoehe": 476,
+      "sha256": "482534c395a46073c556729b3c5117e57fa504ed8b882d7fb0ed50cf2887e31d"
+    },
+    "karte-cafe.webp": {
+      "ort": "cafe",
+      "breite": 640,
+      "hoehe": 238,
+      "sha256": "67f8c8e33d9adb8c38d8e6dc9614f221296e6f140399d6b3fce48f07433c76cf"
+    },
+    "karte-cafe-2x.webp": {
+      "ort": "cafe",
+      "breite": 1280,
+      "hoehe": 476,
+      "sha256": "5f5992830dd3e767832fc09c7867a17b1caac65ccd3b88e88500096207a66807"
+    },
+    "karte-hiker.webp": {
+      "ort": "hiker",
+      "breite": 640,
+      "hoehe": 238,
+      "sha256": "3067b8d64dd8d5555af846466574f811805904731b3fc5324829609ea654abec"
+    },
+    "karte-hiker-2x.webp": {
+      "ort": "hiker",
+      "breite": 1280,
+      "hoehe": 476,
+      "sha256": "0411d350dda1113a80c998dc0bb89723d55f52ed7146b9b8eb1c57244b075208"
+    }
+  }
+}

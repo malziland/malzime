@@ -48,7 +48,8 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   Demo-Fotos nicht. Das Impressum nennt für die Karten die heute gültige
   Lizenz (ODbL).
 - **Formulare auf der Seite dürfen nur noch an malziME selbst senden.** Die
-  Sicherheitsrichtlinie der Seite nennt jetzt auch Formularziele.
+  Sicherheitsrichtlinie der Seite nennt jetzt auch Formularziele; ein Test im
+  Browser hält es fest.
 
 ### Behoben — was Besucher merken
 
@@ -74,6 +75,13 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 - **Die Auslieferung sieht alle Prüfergebnisse eines Standes**, auch wenn sich
   über mehrere Tage viele angesammelt haben, und hält an, wenn sich die
   Version des Auslieferungswerkzeugs nicht lesen lässt.
+- **Die Prüfabläufe selbst sind festgeschrieben.** Fällt eine der sechs
+  Pflicht-Prüfungen aus dem Ablauf oder verliert sie ihren Prüfbefehl, hält
+  eine Kontrolle an, bevor etwas zusammengeführt oder ausgeliefert wird.
+- **Die Browser-Tests fragen beim Prüfen der Karte nichts mehr bei
+  OpenStreetMap an.** Ihre Abfang-Regel griff nicht, die Kartenkacheln kamen
+  unbemerkt aus dem Netz. Jetzt liefert der Test sie selbst und prüft, dass
+  sie angekommen sind.
 - **Tests halten jetzt fest, was bisher nur das Programm sicherstellte:** dass
   keine IP-Adresse im Protokoll landet, dass die Löschfristen stimmen und dass
   ein Testlauf nie den echten Foto-Speicher oder die echte Warteschlange
@@ -86,9 +94,10 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   Hilfsskripte und lokale Einstellungsdateien bleiben auf dem Rechner. Die
   Auslieferung startet nicht, wenn im Server-Ordner eine Einstellungsdatei
   (`.env`) liegt oder eine Datei, die nicht im offenen Quelltext steht.
-- **Der Server wird nur noch zusammen mit der Website ausgeliefert.** Der
-  Fingerabdruck auf der Seite nennt damit bei jeder Auslieferung genau das
-  Server-Programm, das hinausgegangen ist.
+- **Der Server wird nur noch zusammen mit der Website ausgeliefert, die
+  Website allein nur bei unverändertem Server-Programm.** Der Fingerabdruck auf
+  der Seite nennt damit bei jeder Auslieferung genau das Server-Programm, das
+  hinausgegangen ist.
 - **Test-Schalter können in der Produktion nichts mehr anrichten.** Drei
   Einstellungen sind nur für Läufe am eigenen Rechner gedacht (erfundene
   Beispiel-Antwort statt echter KI, lokale Warteschlange, stumme

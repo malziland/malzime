@@ -199,8 +199,14 @@ def main():
     # greifen — und liess sich spurlos loeschen, ohne dass ein Waechter
     # anschlug. Gemessen: Datei entfernt, fuenf Waechter alle rc 0.
     # Diese Dateien duerfen nicht verschwinden, ohne dass es auffaellt.
+    # Seit 04.10.2026 dazu die drei Testdateien, die fuer je einen Riegel
+    # der einzige Nachweis sind: der Vertrag der Pipeline-Dateien, die
+    # oeffentliche Nachpruefung und der Umfang des Server-Pakets.
     UNVERZICHTBAR = [
         "functions/src/__tests__/deploy-verhalten.test.js",
+        "functions/src/__tests__/pipeline-vertrag-script.test.js",
+        "functions/src/__tests__/pruefe-live-verhalten.test.js",
+        "functions/src/__tests__/server-paket.test.js",
         "functions/jest.setup.js",
         "scripts/selbstpruefung-waechter.sh",
     ]

@@ -149,8 +149,10 @@ bei Änderungen an ihm; braucht nichts außer dem eingebauten `GITHUB_TOKEN`) un
 Job `alarm`, der Push aufs Handy, läuft nur im Original-Repository `malziland/malzime`
 — in einem Fork wird er übersprungen. Wer ihn im eigenen Fork nutzen will, setzt die
 GitHub-Secrets `NTFY_URL_EU` und `NTFY_TOPIC_EU` und passt die Bedingung
-`github.repository` im Workflow an (der Deploy-Riegel hält den Alarm-Job per
-Prüfsumme fest; die neue Summe zeigt `python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`).
+`github.repository` im Workflow an. Der Deploy-Riegel hält alle fünf Workflows und
+`.github/dependabot.yml` per Prüfsumme fest: Nach jeder Änderung an einer dieser
+Dateien die neue Summe eintragen (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`
+zeigt sie), sonst wird der Pflicht-Check `pruefungen` rot.
 In einem Fork schaltet GitHub geplante Workflows zunächst ab; den Nachtlauf unter
 „Actions" einmal aktivieren. (`scripts/deploy.sh` ist auf das Original-Repository
 zugeschnitten; Selbst-Hoster deployen wie oben beschrieben mit `firebase deploy`.)

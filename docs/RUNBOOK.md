@@ -66,6 +66,8 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    Datum stempeln.
 4. Deploy über `./scripts/deploy.sh` (Website und Server; nur die Website: `./scripts/deploy.sh hosting`).
    Der Server allein wird abgelehnt — der Fingerabdruck des Server-Codes geht mit der Website hinaus.
+   Die Website allein geht nur hinaus, solange der Server-Code seit der letzten Auslieferung
+   unverändert ist (Hebel 5a); sonst hält das Skript an und verlangt die vollständige Auslieferung.
 
    **Seit 31.08.2026 läuft ein Trockenlauf** (nach Stand-Bindung,
    Sauberkeits-Prüfung, CLI-Version, Infrastruktur-Prüfung und

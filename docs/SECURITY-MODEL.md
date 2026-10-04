@@ -757,7 +757,10 @@ Dependabot hebt sie an), Kommentar- und Leerzeilen außerhalb mehrzeiliger Befeh
 Ausdrücke sowie Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leerzeichen
 — einen Tab vor einem Kommentar lehnt GitHub ab, er macht die Summe deshalb rot. Jede
 andere Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
-(`--vertrag-summen`).
+(`--vertrag-summen`). Seit 05.10.2026 sind ebenso die Einstellungsdateien der
+Prüfwerkzeuge festgeschrieben — `vitest.config.js`, `playwright.config.js`, die beiden
+ESLint-Einstellungen und `.prettierignore` —, bei ihnen über jedes Byte, ohne freie
+Zeilen.
 
 Zusätzlich prüft er inhaltlich. Im Nachtlauf: genau ein festgelegter Befehl je
 Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte, ein
@@ -770,11 +773,25 @@ Browser-Tests beim reinen Nachtrag (unten, „Nachtrag ohne Browser-Test"); das
 Pipeline-Token darf nur lesen; und die Pflicht-Jobs sind dieselben sechs, die
 `scripts/deploy.sh` grün verlangt. In allen Workflows ist jede Action per
 Commit-Kennung festgenagelt.
+Festgelegt ist auch, unter welchen Umständen ein Pflichtbefehl läuft: An seinem Schritt
+steht keine Bedingung, keine eigene Shell, kein anderer Ordner und keine zusätzliche
+Umgebung — außer dem, was der Riegel für diesen Schritt nennt; `defaults` und `env`
+stehen am Job nur wie festgelegt und ganz oben in der Datei gar nicht. Und festgelegt
+ist, was hinter einem Pflicht-Schritt steht: der Inhalt der npm-Skripte, die er
+aufruft, samt der Sammelbefehle, die diese Skripte ihrerseits aufrufen (beide
+`package.json`, Liste `NPM_SKRIPTE` im Riegel), und die Einstellung von Jest im
+Wortlaut. Neben den festgeschriebenen Einstellungen gibt es keine zweite
+Einstellungsdatei und keine `.npmrc`, und keine eingecheckte Datei ist von `.gitignore`
+erfasst.
 *Warum der Inhalt, wenn die Summe schon jede Zeile hält:* Der Zweigschutz und
 `deploy.sh` sehen von einem Pflicht-Check nur Name und Ergebnis. Ein Job, aus dem der
 Testlauf gestrichen wurde, bleibt grün. `ci.yml` wird mehrmals im Monat bewusst
 geändert; wer dabei die Summe nachträgt, soll einen verlorenen Testlauf nicht mit
-nachtragen können.
+nachtragen können — auch nicht einen, der mit `if: false` nur abgeschaltet ist. Und
+der Wortlaut eines Schritts sagt nicht, was dahinter geschieht: `npm test` bleibt `npm
+test`, wenn das Skript in `package.json` nur noch `echo ok` ausführt oder die
+Einstellung des Testläufers keine Testdatei mehr findet. Beides ließ am 04.10.2026
+jeden Wächter und jeden Test grün.
 *Lesbarkeit:* Eine Workflow-Datei, die GitHub nicht lesen kann, läuft nie — und der
 Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` prüft
 im Pull Request und vor dem Push jede Datei unter `.github/workflows` in zwei Schritten:
@@ -784,7 +801,11 @@ gemessen mit GitHubs eigenem Leser aus `actions/runner`), dann die YAML-Syntax s
 Grundgerüst (`on`, Jobs mit `runs-on` oder `uses`); beides mit Positivkontrolle.
 *Grenze:* Die Prüfsumme schützt vor versehentlichem Stilllegen, nicht vor Absicht —
 wer den Workflow ändert, kann die Summe mitändern; beides steht dann im selben Pull
-Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig. Weitere
+Request im Diff. Für die Einstellungsdateien gibt es nur diese Summe, keinen
+inhaltlichen Teil. Der Vertrag hält fest, DASS und WOMIT geprüft wird, nicht WIE VIEL:
+Eine gelöschte Testdatei oder eine geschrumpfte Testanzahl sieht er nicht (wer welchen
+Weg bemerkt, steht in `docs/WAECHTER.md`, „Was diese Schicht NICHT kann").
+Eine reine SHA-Änderung an einer Action bleibt zulässig. Weitere
 Stellen, an denen GitHubs Server strenger liest als diese Prüfung, sieht sie nicht;
 das fängt der Deploy auf (nächster Absatz). Der Vertrag läuft im Pflicht-Job
 `pruefungen`, seine Gegenprobe (`vor-dem-push-script.test.js`) im Pflicht-Job

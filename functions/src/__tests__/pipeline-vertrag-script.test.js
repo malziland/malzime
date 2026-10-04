@@ -6,12 +6,20 @@
  *
  * `scripts/pruefe-deploy-riegel.py` haelt deshalb fest, wie die Pipeline-Dateien
  * aussehen muessen: alle fuenf Workflows und `dependabot.yml` per Pruefsumme,
- * dazu fuer `ci.yml` je Pflicht-Job die Pruefbefehle, die ihn ausmachen.
+ * dazu fuer `ci.yml` je Pflicht-Job die Pruefbefehle, die ihn ausmachen — und
+ * unter welchen Umstaenden sie laufen (keine Bedingung am Schritt, festgelegter
+ * Arbeitsordner, festgelegte Umgebung).
+ *
+ * Der Wortlaut `npm test` sagt nicht, was dahinter geschieht. Festgelegt ist
+ * deshalb auch der Inhalt der npm-Skripte in beiden `package.json`, die
+ * Einstellung von Jest und — per Pruefsumme — die Einstellungsdateien der
+ * uebrigen Pruefwerkzeuge.
  *
  * Diese Tests fuehren den Waechter AUS — gegen einen Nachbau des Repositorys in
- * einem Wegwerf-Ordner (die Skripte, `.github` und die Waechter-Uebersicht, alle
- * aus dem Arbeitsbaum kopiert). Dort wird eine Datei veraendert, und der
- * Waechter muss anhalten. Im Repository selbst wird nichts angefasst.
+ * einem Wegwerf-Ordner (die Skripte, `.github`, die Waechter-Uebersicht, beide
+ * `package.json` und die Einstellungsdateien, alle aus dem Arbeitsbaum kopiert).
+ * Dort wird eine Datei veraendert, und der Waechter muss anhalten. Im
+ * Repository selbst wird nichts angefasst.
  *
  * Zwei Sorten von Faellen:
  *   · Pruefsumme — die Aenderung allein macht den Waechter rot.
@@ -32,6 +40,15 @@ const RELEASE = ".github/workflows/release.yml";
 const AUTOMERGE = ".github/workflows/dependabot-automerge.yml";
 const DEPENDABOT = ".github/dependabot.yml";
 const DEPLOY = "scripts/deploy.sh";
+const PAKET = "package.json";
+const PAKET_SERVER = "functions/package.json";
+const VITEST = "vitest.config.js";
+const PLAYWRIGHT = "playwright.config.js";
+const ESLINT = "eslint.config.mjs";
+const ESLINT_SERVER = "functions/eslint.config.js";
+const PRETTIER_AUSNAHMEN = ".prettierignore";
+/* Was der Waechter ausserhalb von scripts/, .github und docs/ liest. */
+const EINZELDATEIEN = [PAKET, PAKET_SERVER, VITEST, PLAYWRIGHT, ESLINT, ESLINT_SERVER, PRETTIER_AUSNAHMEN];
 
 const CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1";
 const GITLEAKS = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0";
@@ -52,6 +69,8 @@ function aufbauen() {
   }
   fs.cpSync(path.join(WURZEL, ".github"), path.join(nachbau, ".github"), { recursive: true });
   fs.copyFileSync(path.join(WURZEL, "docs", "WAECHTER.md"), path.join(nachbau, "docs", "WAECHTER.md"));
+  fs.mkdirSync(path.join(nachbau, "functions"), { recursive: true });
+  for (const datei of EINZELDATEIEN) fs.copyFileSync(path.join(WURZEL, datei), path.join(nachbau, datei));
 }
 
 beforeAll(() => {
@@ -102,6 +121,9 @@ function aendern(datei, umbau) {
   fs.writeFileSync(pfad, nachher);
 }
 
+/* `--vertrag-summen` nennt beide Tabellen mit ihrem Namen. */
+const RAHMEN_DER_SUMMEN = ["VERTRAG_SUMMEN = {", "EINSTELLUNG_SUMMEN = {", "}"];
+
 /** Traegt im Nachbau die Pruefsummen nach, wie es bei einer bewussten Aenderung
  *  geschieht: Ausgabe von `--vertrag-summen` in die Liste des Waechters. */
 function summenNachtragen() {
@@ -110,13 +132,23 @@ function summenNachtragen() {
   const pfad = path.join(nachbau, WAECHTER);
   let text = fs.readFileSync(pfad, "utf8");
   for (const zeile of zeilen) {
+    if (RAHMEN_DER_SUMMEN.includes(zeile)) continue;
     const m = zeile.match(/^\s*"([^"]+)": "([0-9a-f]{16})",$/);
     if (!m) throw new Error(`unerwartete Zeile von --vertrag-summen: ${zeile}`);
     const eintrag = new RegExp(`("${m[1].replace(/\./g, "\\.")}": ")[0-9a-f]{16}(",)`);
-    if (!eintrag.test(text)) throw new Error(`kein Eintrag fuer ${m[1]} in VERTRAG_SUMMEN`);
+    if (!eintrag.test(text)) throw new Error(`kein Eintrag fuer ${m[1]} in den Tabellen der Pruefsummen`);
     text = text.replace(eintrag, `$1${m[2]}$2`);
   }
   fs.writeFileSync(pfad, text);
+}
+
+/** Macht aus dem Nachbau ein git-Repository, in dem alles eingecheckt ist. */
+function alsGitRepository() {
+  const umgebung = { ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" };
+  for (const name of ["GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"]) delete umgebung[name];
+  const git = (...argumente) => execFileSync("git", argumente, { cwd: nachbau, env: umgebung, stdio: "pipe" });
+  git("-c", "init.defaultBranch=main", "init", "--quiet");
+  git("add", "-A");
 }
 
 const zeileWeg = (zeile) => (t) => einmal(t, `${zeile}\n`, "");
@@ -130,6 +162,9 @@ describe("Vertrag der Pipeline-Dateien — der Erfolgsweg", () => {
     /* Und der Vertrag ist wirklich gemessen worden, nicht nur verschwiegen. */
     expect(r.ausgabe).toMatch(/6 Dateien entsprechen dem festgeschriebenen Stand/);
     expect(r.ausgabe).toMatch(/jeder der 6 Pflicht-Jobs fuehrt seine Pruefbefehle aus/);
+    expect(r.ausgabe).toMatch(/11 npm-Skripte hinter den Pflicht-Schritten, die Jest-Einstellung/);
+    expect(r.ausgabe).toMatch(/und 5 Einstellungsdateien der Pruefwerkzeuge lauten wie festgelegt/);
+    expect(r.ausgabe).toMatch(/keine eingecheckte Datei ist von \.gitignore erfasst/);
   });
 
   test("der Nachbau verhaelt sich wie das Repository (Messmittel-Probe)", () => {
@@ -137,6 +172,17 @@ describe("Vertrag der Pipeline-Dateien — der Erfolgsweg", () => {
        folgenden Faelle aus dem falschen Grund rot. */
     const r = waechter();
     expect(r.ausgabe).not.toMatch(/FEHLT|NICHT MESSBAR/);
+    expect(r.code).toBe(0);
+    /* Der Nachbau ist kein git-Repository. Die eine Frage, die git braucht,
+       gilt dort ausdruecklich als nicht gemessen — nicht als bestanden. */
+    expect(r.ausgabe).toMatch(/NICHT GEMESSEN: ob \.gitignore eingecheckte Dateien erfasst/);
+    expect(r.ausgabe).not.toMatch(/keine eingecheckte Datei ist von \.gitignore erfasst/);
+  });
+
+  test("als git-Repository: der Nachbau besteht, und die Frage nach .gitignore ist gemessen", () => {
+    alsGitRepository();
+    const r = waechter();
+    expect(r.ausgabe).toMatch(/keine eingecheckte Datei ist von \.gitignore erfasst/);
     expect(r.code).toBe(0);
   });
 
@@ -159,8 +205,25 @@ describe("Vertrag der Pipeline-Dateien — der Erfolgsweg", () => {
   test("`--vertrag-summen` nennt genau die eingetragenen Werte", () => {
     const ausgabe = waechter(nachbau, "--vertrag-summen").ausgabe.split("\n").filter(Boolean);
     const skript = fs.readFileSync(path.join(nachbau, WAECHTER), "utf8");
-    expect(ausgabe).toHaveLength(6);
-    for (const zeile of ausgabe) expect(skript).toContain(zeile.trim());
+    /* Sechs Pipeline-Dateien und fuenf Einstellungsdateien, jede Tabelle mit Kopf- und Schlusszeile. */
+    const summen = ausgabe.filter((zeile) => !RAHMEN_DER_SUMMEN.includes(zeile));
+    expect(summen).toHaveLength(11);
+    expect(ausgabe).toHaveLength(15);
+    for (const zeile of summen) {
+      expect(zeile).toMatch(/^ {4}"[^"]+": "[0-9a-f]{16}",$/);
+      expect(skript).toContain(zeile);
+    }
+  });
+
+  test("eine bewusst geaenderte Einstellungsdatei besteht wieder, sobald ihre Pruefsumme nachgetragen ist", () => {
+    /* Der vorgesehene Weg fuer eine gewollte Aenderung. Er zeigt auch die Grenze:
+       Fuer diese Dateien gibt es nur die Pruefsumme, keinen inhaltlichen Teil. */
+    aendern(PLAYWRIGHT, (t) => einmal(t, "  timeout: 30000,\n", "  timeout: 45000,\n"));
+    expect(waechter().ausgabe).toContain("playwright.config.js weicht vom festgeschriebenen Stand ab");
+    summenNachtragen();
+    const r = waechter();
+    expect(r.ausgabe).not.toMatch(/FEHLT/);
+    expect(r.code).toBe(0);
   });
 });
 
@@ -286,6 +349,50 @@ describe("Vertrag der Pipeline-Dateien — die Pruefsumme haelt jede Datei fest"
       RELEASE,
       (t) => einmal(t, "permissions:\n  contents: write\n", "permissions:\n  contents: write\n  actions: write\n"),
     ],
+    /* Die Einstellungsdateien der Pruefwerkzeuge: Skript und Schritt bleiben
+       wortgleich, das Werkzeug sieht aber keine oder weniger Dateien an. */
+    [
+      "e1",
+      "vitest.config.js: keine Testdatei mehr, und das gilt als bestanden",
+      VITEST,
+      (t) => einmal(t, 'include: ["public/__tests__/**/*.test.js"],', "include: [],\n    passWithNoTests: true,"),
+    ],
+    [
+      "e2",
+      "playwright.config.js: nur noch eine Testdatei",
+      PLAYWRIGHT,
+      (t) => einmal(t, '  testDir: "./e2e",\n', '  testDir: "./e2e",\n  testMatch: /smoke\\.test\\.js/,\n'),
+    ],
+    [
+      "e3",
+      "playwright.config.js: ohne den Durchlauf in Chromium",
+      PLAYWRIGHT,
+      (t) => einmal(t, '    { name: "chromium", use: { browserName: "chromium" } },\n', ""),
+    ],
+    [
+      "e4",
+      "playwright.config.js: ein roter Test wird wiederholt, bis er gruen ist",
+      PLAYWRIGHT,
+      (t) => einmal(t, "  retries: 0,\n", "  retries: 5,\n"),
+    ],
+    [
+      "e5",
+      "functions/eslint.config.js: eine Datei aus dem Lint genommen",
+      ESLINT_SERVER,
+      (t) =>
+        einmal(
+          t,
+          'ignores: ["node_modules/", "coverage/"]',
+          'ignores: ["node_modules/", "coverage/", "src/config.js"]'
+        ),
+    ],
+    [
+      "e6",
+      "eslint.config.mjs: der Lint der Website sieht public/js nicht mehr an",
+      ESLINT,
+      (t) => einmal(t, '"public/lib/", "public/fonts/"]', '"public/lib/", "public/fonts/", "public/js/"]'),
+    ],
+    ["e7", ".prettierignore: die Formatpruefung laesst public/ aus", PRETTIER_AUSNAHMEN, (t) => `${t}public/\n`],
   ];
 
   test.each(FAELLE)("%s — %s: der Waechter haelt an", (_kuerzel, _was, datei, umbau) => {
@@ -435,6 +542,17 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       /Job secret-scan traegt die Bedingung/,
     ],
     [
+      "dieselbe Bedingung am Job mit dem Schluessel in Anfuehrungszeichen",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "  secret-scan:\n    runs-on: ubuntu-latest\n",
+          '  secret-scan:\n    "if": false\n    runs-on: ubuntu-latest\n'
+        ),
+      /Job secret-scan traegt die Bedingung \['false'\]/,
+    ],
+    [
       "ein roter Schritt zaehlt als gruen (continue-on-error am Schritt)",
       CI,
       (t) => einmal(t, "      - run: npm test\n", "      - run: npm test\n        continue-on-error: true\n"),
@@ -446,6 +564,12 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       (t) =>
         einmal(t, "    needs: playwright-version\n", "    needs: playwright-version\n    continue-on-error: true\n"),
       /Job test-e2e traegt 'continue-on-error'/,
+    ],
+    [
+      "continue-on-error mit dem Schluessel in Anfuehrungszeichen",
+      CI,
+      (t) => einmal(t, "      - run: npm test\n", '      - run: npm test\n        "continue-on-error": true\n'),
+      /Job test-backend traegt 'continue-on-error'/,
     ],
     [
       "Schreibrechte fuer das Pipeline-Token",
@@ -461,6 +585,17 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
           t,
           "  secret-scan:\n    runs-on: ubuntu-latest\n",
           "  secret-scan:\n    permissions: write-all\n    runs-on: ubuntu-latest\n"
+        ),
+      /Job secret-scan setzt eigene Rechte/,
+    ],
+    [
+      "eigene Rechte am Job mit dem Schluessel in Anfuehrungszeichen",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "  secret-scan:\n    runs-on: ubuntu-latest\n",
+          "  secret-scan:\n    'permissions': write-all\n    runs-on: ubuntu-latest\n"
         ),
       /Job secret-scan setzt eigene Rechte/,
     ],
@@ -494,6 +629,177 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       (t) => alle(t, "          fetch-depth: 0\n", "          fetch-depth: 1\n"),
       /Job `pruefungen` braucht die Historie, checkt aber flach aus/,
     ],
+    /* Der Schritt behaelt seinen Wortlaut — und laeuft nicht, oder anders. */
+    [
+      "die Server-Tests laufen nie (if: false am Schritt)",
+      CI,
+      (t) => einmal(t, "      - run: npm test\n", "      - run: npm test\n        if: false\n"),
+      /Job test-backend: der Schritt 'npm test' traegt 'if' \['false'\] — er koennte still entfallen/,
+    ],
+    [
+      "dieselbe Bedingung als erste Zeile des Schritts",
+      CI,
+      (t) => einmal(t, "      - run: npm test\n", "      - if: false\n        run: npm test\n"),
+      /Job test-backend: der Schritt 'npm test' traegt 'if' \['false'\]/,
+    ],
+    [
+      "dieselbe Bedingung mit dem Schluessel in Anfuehrungszeichen",
+      CI,
+      (t) => einmal(t, "      - run: npm test\n", '      - run: npm test\n        "if": false\n'),
+      /Job test-backend: der Schritt 'npm test' traegt 'if' \['false'\]/,
+    ],
+    [
+      "die Browser-Durchlaeufe laufen nur noch bei einem Push (Bedingung am Schritt)",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm run test:e2e\n",
+          "      - run: npm run test:e2e\n        if: github.event_name == 'push'\n"
+        ),
+      /Job test-e2e: der Schritt 'npm run test:e2e' traegt 'if' \["github\.event_name == 'push'"\]/,
+    ],
+    [
+      "die Geheimnis-Suche laeuft nie (Bedingung an einer Action)",
+      CI,
+      (t) => einmal(t, `      - uses: ${GITLEAKS}\n`, `      - uses: ${GITLEAKS}\n        if: false\n`),
+      /Job secret-scan: der Schritt 'uses: gitleaks\/gitleaks-action' traegt 'if' \['false'\]/,
+    ],
+    [
+      "ein Waechter-Schritt laeuft nie (if: false im Job pruefungen)",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "      - run: bash scripts/selbstpruefung-waechter.sh\n",
+          "      - run: bash scripts/selbstpruefung-waechter.sh\n        if: false\n"
+        ),
+      /Job pruefungen: der Schritt 'bash scripts\/selbstpruefung-waechter\.sh' traegt 'if' \['false'\]/,
+    ],
+    [
+      "die Server-Tests laufen in einer Shell, die nichts ausfuehrt",
+      CI,
+      (t) => einmal(t, "      - run: npm test\n", '      - run: npm test\n        shell: "true {0}"\n'),
+      /Job test-backend: der Schritt 'npm test' traegt 'shell'/,
+    ],
+    [
+      "die Server-Tests laufen in einem anderen Ordner",
+      CI,
+      (t) => einmal(t, "      - run: npm test\n", "      - run: npm test\n        working-directory: scripts\n"),
+      /Job test-backend: der Schritt 'npm test' traegt 'working-directory' \['scripts'\] — derselbe Wortlaut liefe/,
+    ],
+    [
+      "der festgelegte Ordner eines Schritts ist ein anderer",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend\n        working-directory: .\n",
+          "      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend\n        working-directory: ..\n"
+        ),
+      /der Schritt 'sh scripts\/pruefe-zeitzuender\.sh \. --nur backend' traegt 'working-directory' \['\.\.'\] statt \['\.'\]/,
+    ],
+    [
+      "die Server-Tests bekommen eine Umgebung, die die Shell umlenkt",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm test\n",
+          "      - run: npm test\n        env:\n          BASH_ENV: scripts/ende.sh\n"
+        ),
+      /Job test-backend: der Schritt 'npm test' traegt 'env' \['BASH_ENV: scripts\/ende\.sh'\]/,
+    ],
+    [
+      "die Geheimnis-Suche bekommt eine zusaetzliche Umgebungsvariable",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n",
+          "          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n          GITLEAKS_CONFIG: leer.toml\n"
+        ),
+      /der Schritt 'uses: gitleaks\/gitleaks-action' traegt 'env' .* statt \['GITHUB_TOKEN: /,
+    ],
+    [
+      "alle Schritte eines Jobs laufen in einer Shell, die nichts ausfuehrt (defaults am Job)",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "  test-frontend:\n    runs-on: ubuntu-latest\n",
+          '  test-frontend:\n    runs-on: ubuntu-latest\n    defaults:\n      run:\n        shell: "true {0}"\n'
+        ),
+      /Job test-frontend traegt 'defaults' \['run:', 'shell: "true \{0\}"'\] statt None/,
+    ],
+    [
+      "der Server-Job laeuft in einem anderen Ordner (defaults am Job)",
+      CI,
+      (t) => einmal(t, "        working-directory: functions\n", "        working-directory: scripts\n"),
+      /Job test-backend traegt 'defaults' \['run:', 'working-directory: scripts'\] statt \['run:', 'working-directory: functions'\]/,
+    ],
+    [
+      "ein Job setzt eine Umgebung, die jedes npm-Skript ins Leere laufen laesst",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "  test-frontend:\n    runs-on: ubuntu-latest\n",
+          "  test-frontend:\n    runs-on: ubuntu-latest\n    env:\n      npm_config_script_shell: /usr/bin/true\n"
+        ),
+      /Job test-frontend setzt die Umgebung \['npm_config_script_shell: \/usr\/bin\/true'\] statt None/,
+    ],
+    [
+      "dieselbe Umgebung ganz oben in der Datei — sie gilt fuer jeden Job",
+      CI,
+      (t) => einmal(t, "\njobs:\n", "\nenv:\n  npm_config_script_shell: /usr/bin/true\n\njobs:\n"),
+      /ci\.yml: env\/defaults auf oberster Ebene/,
+    ],
+    [
+      "eine Shell fuer alle Jobs ganz oben in der Datei, Schluessel in Anfuehrungszeichen",
+      CI,
+      (t) => einmal(t, "\njobs:\n", '\n"defaults":\n  run:\n    shell: "true {0}"\n\njobs:\n'),
+      /ci\.yml: env\/defaults auf oberster Ebene/,
+    ],
+    [
+      "die Schritte eines Jobs sind anders eingerueckt — eine Bedingung darin waere nicht lesbar",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          `      - uses: ${GITLEAKS}\n        env:\n          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}\n`,
+          `      -   uses: ${GITLEAKS}\n          if: false\n          env:\n            GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}\n`
+        ),
+      /Job secret-scan steht nicht in der ueblichen Schreibweise — der Vertrag kann seine Schluessel nicht lesen/,
+    ],
+    [
+      "der Wortlaut der Server-Tests steht nur noch als Umgebungswert eines anderen Schritts da",
+      CI,
+      (t) => einmal(t, "      - run: npm test\n", "      - run: echo ok\n        env:\n          run: npm test\n"),
+      /Job test-backend: 'npm test' steht im Job, aber nicht als Befehl eines eigenen Schritts/,
+    ],
+    [
+      "der Wortlaut der Browser-Durchlaeufe steht nur noch als Textzeile in einem mehrzeiligen Befehl",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm run test:e2e\n",
+          "      - run: |\n          cat <<'ENDE'\n          run: npm run test:e2e\n          ENDE\n"
+        ),
+      /Job test-e2e: 'npm run test:e2e' steht im Job, aber nicht als Befehl eines eigenen Schritts/,
+    ],
+    [
+      "die Geheimnis-Suche steht nur noch als Eingabewert eines anderen Schritts da",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          `      - uses: ${GITLEAKS}\n        env:\n          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}\n`,
+          `      - run: echo ok\n        env:\n          uses: ${GITLEAKS}\n`
+        ),
+      /Job secret-scan: 'uses: gitleaks\/gitleaks-action' steht im Job, aber nicht als Befehl eines eigenen Schritts/,
+    ],
   ];
 
   test.each(FAELLE)("%s", (_was, datei, umbau, meldung) => {
@@ -525,5 +831,281 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
     const r = waechter();
     expect(r.code).toBe(1);
     expect(r.ausgabe).toMatch(/deploy\.sh nennt keine Liste PFLICHT/);
+  });
+});
+
+describe("Vertrag der npm-Skripte — was hinter einem Pflicht-Schritt steht", () => {
+  /* Der Schritt in ci.yml bleibt in jedem dieser Faelle wortgleich; an ci.yml
+     aendert sich nichts, keine Pruefsumme schlaegt an. Gemessen am 04.10.2026:
+     Vor dieser Festlegung blieb jeder Waechter und jeder Test gruen. */
+  const json = (umbau) => (t) => {
+    const daten = JSON.parse(t);
+    umbau(daten);
+    return `${JSON.stringify(daten, null, 2)}\n`;
+  };
+
+  const FAELLE = [
+    [
+      "die Browser-Modul-Tests sind nur noch ein echo",
+      PAKET,
+      json((d) => (d.scripts["test:frontend"] = "echo ok")),
+      /^.*package\.json: npm-Skript 'test:frontend' lautet 'echo ok' statt 'vitest run'/m,
+    ],
+    [
+      "die Browser-Durchlaeufe sind nur noch ein echo",
+      PAKET,
+      json((d) => (d.scripts["test:e2e"] = "echo ok")),
+      /package\.json: npm-Skript 'test:e2e' lautet 'echo ok' statt 'playwright test'/,
+    ],
+    [
+      "die Server-Tests sind nur noch ein echo",
+      PAKET_SERVER,
+      json((d) => (d.scripts.test = "echo ok")),
+      /functions\/package\.json: npm-Skript 'test' lautet 'echo ok' statt 'jest --forceExit --detectOpenHandles'/,
+    ],
+    [
+      "die Server-Tests laufen mit einem Filter, der nichts trifft",
+      PAKET_SERVER,
+      json((d) => (d.scripts.test += " --passWithNoTests --testPathPattern=nichts")),
+      /functions\/package\.json: npm-Skript 'test' lautet/,
+    ],
+    [
+      "der Server-Lint darf scheitern",
+      PAKET_SERVER,
+      json((d) => (d.scripts.lint += " || true")),
+      /functions\/package\.json: npm-Skript 'lint' lautet 'eslint --max-warnings=0 src\/ \|\| true'/,
+    ],
+    [
+      "die Formatpruefung des Servers schreibt, statt zu pruefen",
+      PAKET_SERVER,
+      json((d) => (d.scripts["format:check"] = "prettier --write src/")),
+      /functions\/package\.json: npm-Skript 'format:check' lautet/,
+    ],
+    [
+      "der Lint der Website sieht nur noch eine Datei an",
+      PAKET,
+      json((d) => (d.scripts["lint:frontend"] = "eslint --max-warnings=0 public/app.js")),
+      /package\.json: npm-Skript 'lint:frontend' lautet/,
+    ],
+    [
+      "die Formatpruefung der Website laesst die Tests aus",
+      PAKET,
+      json((d) => (d.scripts["format:frontend:check"] = "prettier --check public/js/ public/app.js")),
+      /package\.json: npm-Skript 'format:frontend:check' lautet/,
+    ],
+    [
+      "ein Skript hinter einem Pflicht-Schritt ist geloescht",
+      PAKET,
+      json((d) => delete d.scripts["test:e2e"]),
+      /package\.json: npm-Skript 'test:e2e' lautet None statt 'playwright test'/,
+    ],
+    [
+      "der Sammelbefehl fuer den Lint laesst den Server aus (ihn ruft der Ersatzlauf der Auslieferung)",
+      PAKET,
+      json((d) => (d.scripts.lint = "npm run lint:frontend")),
+      /package\.json: npm-Skript 'lint' lautet 'npm run lint:frontend' statt/,
+    ],
+    [
+      "der Sammelbefehl fuer die Tests laesst den Server aus",
+      PAKET,
+      json((d) => (d.scripts.test = "npm run test:frontend")),
+      /package\.json: npm-Skript 'test' lautet/,
+    ],
+    [
+      "der Weiterreicher an die Server-Tests ist nur noch ein echo",
+      PAKET,
+      json((d) => (d.scripts["test:backend"] = "echo ok")),
+      /package\.json: npm-Skript 'test:backend' lautet 'echo ok'/,
+    ],
+    [
+      "ein Skript, das npm ungefragt VOR den Server-Tests ausfuehrt",
+      PAKET_SERVER,
+      json((d) => (d.scripts.pretest = "rm -rf src/__tests__")),
+      /functions\/package\.json: npm-Skript 'pretest' — npm fuehrt es ungefragt mit 'test' aus/,
+    ],
+    [
+      "ein Skript, das npm ungefragt NACH den Browser-Durchlaeufen ausfuehrt",
+      PAKET,
+      json((d) => (d.scripts["posttest:e2e"] = "exit 0")),
+      /package\.json: npm-Skript 'posttest:e2e' — npm fuehrt es ungefragt mit 'test:e2e' aus/,
+    ],
+    [
+      "Jest nimmt per Einstellung alle Testdateien heraus, und das gilt als bestanden",
+      PAKET_SERVER,
+      json((d) => {
+        d.jest.testPathIgnorePatterns.push("/src/__tests__/");
+        d.jest.passWithNoTests = true;
+      }),
+      /functions\/package\.json: die Jest-Einstellung lautet .*passWithNoTests/,
+    ],
+    [
+      "Jest fuehrt per Einstellung nur noch eine Testdatei aus",
+      PAKET_SERVER,
+      json((d) => (d.jest.testMatch = ["**/doku-drift.test.js"])),
+      /functions\/package\.json: die Jest-Einstellung lautet .*testMatch/,
+    ],
+    [
+      "Jest nimmt eine einzelne Testdatei heraus",
+      PAKET_SERVER,
+      json((d) => d.jest.testPathIgnorePatterns.push("/deploy-verhalten")),
+      /functions\/package\.json: die Jest-Einstellung lautet/,
+    ],
+    [
+      "Jest verliert den Riegel gegen die echte Datenbank (Vorbereitungsdatei ausgetragen)",
+      PAKET_SERVER,
+      json((d) => delete d.jest.setupFilesAfterEnv),
+      /functions\/package\.json: die Jest-Einstellung lautet/,
+    ],
+    [
+      "die Jest-Einstellung steht nicht mehr in package.json",
+      PAKET_SERVER,
+      json((d) => delete d.jest),
+      /functions\/package\.json: die Jest-Einstellung lautet None statt/,
+    ],
+    [
+      "package.json ist kein gueltiges JSON mehr",
+      PAKET,
+      (t) => t.replace(/\}\s*$/, ""),
+      /^.*package\.json ist nicht lesbar oder nennt keine npm-Skripte/m,
+    ],
+    [
+      "package.json nennt gar keine Skripte mehr",
+      PAKET_SERVER,
+      json((d) => delete d.scripts),
+      /functions\/package\.json ist nicht lesbar oder nennt keine npm-Skripte/,
+    ],
+  ];
+
+  test.each(FAELLE)("%s", (_was, datei, umbau, meldung) => {
+    aendern(datei, umbau);
+    const r = waechter();
+    expect(r.ausgabe).toMatch(meldung);
+    /* Kein anderer Teil des Vertrags schlaegt an: Rot wird es wegen dieser Regel. */
+    expect(r.ausgabe).not.toMatch(ABWEICHUNG);
+    expect(r.code).toBe(1);
+  });
+
+  test("Messmittel-Probe: eine neu geschriebene, inhaltlich gleiche package.json besteht", () => {
+    /* Die Faelle oben schreiben die Datei neu. Laege es an der Schreibweise
+       statt am Inhalt, waeren sie aus dem falschen Grund rot. */
+    aendern(PAKET, (t) => `${JSON.stringify(JSON.parse(t), null, 4)}\n`);
+    aendern(PAKET_SERVER, (t) => `${JSON.stringify(JSON.parse(t), null, 4)}\n`);
+    const r = waechter();
+    expect(r.ausgabe).not.toMatch(/FEHLT/);
+    expect(r.code).toBe(0);
+  });
+
+  test("ein weiteres Skript und eine angehobene Paketversion bleiben frei", () => {
+    /* So sehen Updates von Dependabot aus, und so ein neues Hilfsskript. */
+    aendern(
+      PAKET,
+      json((d) => {
+        d.scripts["test:frontend:ui"] = "vitest --ui";
+        d.devDependencies.vitest = "^99.0.0";
+      })
+    );
+    expect(waechter().code).toBe(0);
+  });
+
+  test("eine geloeschte package.json faellt auf", () => {
+    fs.rmSync(path.join(nachbau, PAKET_SERVER));
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/functions\/package\.json fehlt/);
+  });
+
+  test("ein Pflichtbefehl mit npm braucht seine Festlegung: fehlt sie im Waechter, haelt er an", () => {
+    /* Sonst kaeme mit einem neuen `npm run …` in ci.yml wieder ein Schritt
+       dazu, dessen Inhalt niemand festhaelt. */
+    aendern(WAECHTER, (t) => einmal(t, '        "test:e2e": "playwright test",\n', ""));
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(
+      /Job test-e2e ruft das npm-Skript 'test:e2e' aus package\.json auf — was es tut, ist nicht festgelegt/
+    );
+  });
+
+  test("der Server-Job meint die package.json unter functions/, nicht die der Wurzel", () => {
+    /* `npm test` steht in beiden Dateien. Fuer den Job test-backend zaehlt die
+       Festlegung dort, wo er laeuft. */
+    aendern(WAECHTER, (t) => einmal(t, '        "test": "jest --forceExit --detectOpenHandles",\n', ""));
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/Job test-backend ruft das npm-Skript 'test' aus functions\/package\.json auf/);
+  });
+});
+
+describe("Vertrag der Einstellungsdateien — nichts stellt ein Pruefwerkzeug nebenher um", () => {
+  const FREMD = [
+    ["vitest.config.ts", "sie hat Vorrang vor vitest.config.js"],
+    ["vite.config.js", "Vitest liest sie, wenn es sie gibt"],
+    ["vitest.workspace.js", "sie ersetzt die Auswahl der Testdateien"],
+    ["playwright.config.ts", "sie hat Vorrang vor playwright.config.js"],
+    ["eslint.config.js", "sie hat Vorrang vor eslint.config.mjs"],
+    [".npmrc", "script-shell laesst jedes npm-Skript ins Leere laufen"],
+    ["functions/.npmrc", "dasselbe fuer die Skripte des Servers"],
+    ["functions/jest.config.js", "eine zweite Jest-Einstellung"],
+    ["functions/eslint.config.mjs", "eine zweite Lint-Einstellung fuer den Server"],
+    ["functions/.prettierignore", "die Formatpruefung des Servers liesse Ordner aus"],
+  ];
+
+  test.each(FREMD)("%s (%s): der Waechter haelt an", (datei) => {
+    fs.writeFileSync(path.join(nachbau, datei), "");
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toContain(`Vertrag ${datei} ist nicht vorgesehen`);
+  });
+
+  test("Messmittel-Probe: eine Datei mit anderem Namen stoert nicht", () => {
+    fs.writeFileSync(path.join(nachbau, "notiz.txt"), "");
+    fs.writeFileSync(path.join(nachbau, "functions", "notiz.txt"), "");
+    expect(waechter().code).toBe(0);
+  });
+
+  test.each([VITEST, PLAYWRIGHT, ESLINT, ESLINT_SERVER, PRETTIER_AUSNAHMEN])(
+    "eine geloeschte Einstellungsdatei faellt auf: %s",
+    (datei) => {
+      fs.rmSync(path.join(nachbau, datei));
+      const r = waechter();
+      expect(r.code).toBe(1);
+      expect(r.ausgabe).toContain(`Vertrag ${datei} fehlt`);
+    }
+  );
+
+  test("selbst ein geaenderter Kommentar zaehlt: bei diesen Dateien ist keine Zeile frei", () => {
+    aendern(VITEST, (t) => `// Ein neuer Kommentar.\n${t}`);
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toContain("vitest.config.js weicht vom festgeschriebenen Stand ab");
+  });
+});
+
+describe("Vertrag: keine eingecheckte Datei ist von .gitignore erfasst", () => {
+  /* Prettier laesst aus, was .gitignore nennt. Ein Eintrag dort naehme die
+     Dateien aus der Formatpruefung, ohne dass sich Skript oder Einstellung aendern. */
+  test("ein Eintrag fuer einen eingecheckten Ordner: der Waechter haelt an", () => {
+    alsGitRepository();
+    fs.writeFileSync(path.join(nachbau, ".gitignore"), "scripts/\n");
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/Vertrag \.gitignore erfasst \d+ eingecheckte Datei\(en\), zuerst scripts\//);
+  });
+
+  test("auch eine neue .gitignore in einem Unterordner zaehlt", () => {
+    alsGitRepository();
+    fs.writeFileSync(path.join(nachbau, "functions", ".gitignore"), "package.json\n");
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(
+      /Vertrag \.gitignore erfasst 1 eingecheckte Datei\(en\), zuerst functions\/package\.json/
+    );
+  });
+
+  test("ein Eintrag fuer etwas, das nicht eingecheckt ist, stoert nicht", () => {
+    alsGitRepository();
+    fs.writeFileSync(path.join(nachbau, ".gitignore"), "node_modules/\ncoverage/\n");
+    const r = waechter();
+    expect(r.ausgabe).toMatch(/keine eingecheckte Datei ist von \.gitignore erfasst/);
+    expect(r.code).toBe(0);
   });
 });

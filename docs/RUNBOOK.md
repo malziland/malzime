@@ -23,14 +23,21 @@ selbst — also in der Datei, die ohne ihn nie laeuft. Ein frischer Klon hatte
 den Riegel damit stillschweigend nicht (gemessen: Push mit entwaffnetem
 deploy.sh ging durch).
 
-**Pipeline-Datei geändert?** Dann meldet die Vorabprüfung „Pruefungen:
-Deploy-Riegel" rot: Alle fünf Workflows unter `.github/workflows/` und
-`.github/dependabot.yml` sind per Prüfsumme festgeschrieben. War die Änderung
-beabsichtigt, die neue Summe nachtragen — `python3 scripts/pruefe-deploy-riegel.py
---vertrag-summen` zeigt sie, eingetragen wird sie in `VERTRAG_SUMMEN` im selben
-Skript. Bleibt der Riegel danach rot, fehlt in `ci.yml` etwas, das ein Pflicht-Job
-tun muss; die Meldung nennt Job und Befehl (Begründung: `docs/SECURITY-MODEL.md`,
-Absatz „Festgeschrieben").
+**Pipeline-Datei oder Einstellung eines Prüfwerkzeugs geändert?** Dann meldet die
+Vorabprüfung „Pruefungen: Deploy-Riegel" rot: Alle fünf Workflows unter
+`.github/workflows/`, `.github/dependabot.yml` und die Einstellungsdateien der
+Prüfwerkzeuge (`vitest.config.js`, `playwright.config.js`, `eslint.config.mjs`,
+`functions/eslint.config.js`, `.prettierignore`) sind per Prüfsumme festgeschrieben.
+War die Änderung beabsichtigt, die neue Summe nachtragen — `python3
+scripts/pruefe-deploy-riegel.py --vertrag-summen` zeigt beide Tabellen, eingetragen
+wird sie in `VERTRAG_SUMMEN` bzw. `EINSTELLUNG_SUMMEN` im selben Skript. Bleibt der
+Riegel danach rot, geht es um den Inhalt: In `ci.yml` fehlt etwas, das ein Pflicht-Job
+tun muss, oder ein Pflicht-Schritt trägt eine Bedingung; ein npm-Skript hinter einem
+Pflicht-Schritt oder die Jest-Einstellung in `package.json` lautet anders als
+festgelegt. Die Meldung nennt Datei, Job und Befehl. Soll das neue Skript gelten, wird
+die Festlegung im Riegel mitgeändert (`NPM_SKRIPTE`, `JEST_EINSTELLUNG`) — im selben
+Commit, damit die Änderung im Diff als das dasteht, was sie ist (Begründung:
+`docs/SECURITY-MODEL.md`, Absatz „Festgeschrieben").
 
 ## Normalbetrieb (Soll-Zustand)
 

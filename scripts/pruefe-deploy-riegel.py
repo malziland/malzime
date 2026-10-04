@@ -28,7 +28,10 @@ WAS HIER BLEIBT, sind die Fragen, bei denen es wirklich um Text geht:
      dazu je Pflicht-Job, welche Pruefbefehle er ausfuehren muss
      (OPS-2026-10-03-12). Ein Pflicht-Job bleibt gruen, wenn man seinen
      Testlauf streicht — der Zweigschutz und `deploy.sh` sehen nur Name und
-     Ergebnis, nicht, was der Job getan hat.
+     Ergebnis, nicht, was der Job getan hat. Festgelegt ist auch, was HINTER
+     einem solchen Schritt steht: der Inhalt der npm-Skripte in beiden
+     `package.json` und die Einstellungen der Pruefwerkzeuge. Sonst behielte
+     `npm test` seinen Wortlaut und fuehrte `echo ok` aus.
 
 BEKANNTE GRENZE (Runde 4, F-4): Wer `deploy-verhalten.test.js` loescht, faellt
 hier nicht auf — dieses Skript kennt die Datei nicht. Der Schutz dagegen liegt
@@ -38,7 +41,12 @@ in `pruefe-kopplung.py` ("UNVERZICHTBARE PRUEFUNG FEHLT") und in
 NICHT — die urspruengliche Zuschreibung war falsch (Runde 7, K-5).
 """
 
+import fnmatch
+import hashlib
+import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -172,6 +180,92 @@ PFLICHTJOBS_CI = {
 # wertet das nie als bestanden.
 JOB_BEDINGUNG_CI = {"test-e2e": "needs.playwright-version.outputs.nur_nachtrag != 'ja'"}
 
+# ── Unter welchen Umstaenden ein Pflichtbefehl laeuft (OPS-2026-10-03-12) ─────
+#
+# Der Wortlaut eines Schritts sagt nicht, OB er laeuft und WAS er dabei
+# ausfuehrt. Mit `if: false` behaelt `- run: npm test` seinen Wortlaut und laeuft
+# nie. Ein anderer Arbeitsordner laesst denselben Wortlaut eine andere
+# `package.json` meinen, eine andere Shell fuehrt ihn gar nicht aus, und ueber
+# die Umgebung laesst sich npm ebenso umlenken wie die Shell.
+#
+# Deshalb gilt fuer jeden Schritt mit einem Pflichtbefehl: Die Schluessel aus
+# SCHRITT_SCHLUESSEL stehen dort nur mit dem Wert, der hier festgelegt ist —
+# sonst gar nicht. Auf der Ebene des Jobs gilt dasselbe fuer `defaults` (der
+# Arbeitsordner aller Schritte) und `env`; ganz oben in der Datei steht keins
+# von beiden. `continue-on-error` ist im ganzen Job verboten, siehe `vertrag_ci`.
+#
+# Ein Wert ist die Liste seiner Zeilen: der Text hinter dem Doppelpunkt, dann
+# die tiefer eingerueckten Zeilen darunter, jeweils ohne Einzug.
+SCHRITT_SCHLUESSEL = ("if", "shell", "working-directory", "env")
+SCHRITT_FESTLEGUNG_CI = {
+    # Der Job laeuft in functions/, dieses eine Skript in der Wurzel.
+    ("test-backend", "sh scripts/pruefe-zeitzuender.sh . --nur backend"): {"working-directory": ["."]},
+    ("secret-scan", "uses: gitleaks/gitleaks-action"): {"env": ["GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}"]},
+    ("playwright-version", "sh scripts/nur-nachtrag.sh"): {
+        "env": ["BASIS: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}"]
+    },
+}
+JOB_ORDNER_CI = {"test-backend": "functions"}
+JOB_UMGEBUNG_CI = {"test-e2e": ["HOME: /root"]}
+
+# ── Was HINTER den Pflicht-Schritten steht (OPS-2026-10-03-12) ────────────────
+#
+# `ci.yml` haelt den Wortlaut fest: `npm test`. Was dieses Skript ausfuehrt,
+# steht in `package.json`. Ersetzt jemand dort den Inhalt durch `echo ok`,
+# bleibt der Schritt wortgleich und gruen — und geprueft wird nichts mehr.
+#
+# Deshalb steht hier je Datei, was die Skripte tun, die ein Pflicht-Schritt
+# aufruft, und dazu die Sammelbefehle, die diese Skripte ihrerseits aufrufen:
+# `deploy.sh` nimmt sie fuer seine Ersatzlaeufe, `pruefstand.sh` fuer die
+# Zahlen in docs/VERIFICATION.md. Zu keinem dieser Skripte gibt es ein
+# `pre…` oder `post…`, das npm ungefragt mitlaufen liesse.
+NPM_SKRIPTE = {
+    "functions/package.json": {
+        "test": "jest --forceExit --detectOpenHandles",
+        "lint": "eslint --max-warnings=0 src/",
+        "format:check": "prettier --check src/",
+    },
+    "package.json": {
+        "test:frontend": "vitest run",
+        "test:e2e": "playwright test",
+        "lint:frontend": "eslint --max-warnings=0 public/js/ public/app.js public/__tests__/",
+        "format:frontend:check": "prettier --check public/js/ public/app.js public/__tests__/",
+        "test": "npm run test:backend && npm run test:frontend",
+        "test:backend": "npm test --prefix functions",
+        "lint": "npm run lint:frontend && npm run lint --prefix functions",
+        "format:check": "npm run format:frontend:check && npm run format:check --prefix functions",
+    },
+}
+# Dasselbe eine Ebene tiefer: Auch bei wortgleichem Skript entscheidet die
+# Einstellung des Werkzeugs, WELCHE Dateien es ansieht. Gemessen am 04.10.2026:
+# Mit einer geaenderten Einstellung meldete jeder der drei Testlaeufer "gruen",
+# ohne eine Testdatei auszufuehren, und Prettier liess ganze Ordner aus.
+#
+# Jest liest seine Einstellung aus `functions/package.json`; sie steht hier im
+# Wortlaut. Die uebrigen Dateien sind per Pruefsumme festgeschrieben — ueber
+# jedes Byte, ohne Ausnahme fuer Kommentare (anders als bei den Workflows gibt
+# es hier keine Zeile, die Dependabot aendert).
+JEST_EINSTELLUNG = {
+    "testPathIgnorePatterns": ["/node_modules/", "/__tests__/hilfen/"],
+    "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
+}
+EINSTELLUNG_SUMMEN = {
+    "vitest.config.js": "1851f0fc6e40147a",
+    "playwright.config.js": "ebfb94e2a8886607",
+    "eslint.config.mjs": "e4f7e95827ef01ba",
+    "functions/eslint.config.js": "ca9536911333625f",
+    ".prettierignore": "ee7c566a5bcc22f7",
+}
+# Dateien, die es NICHT gibt und nicht geben darf, ohne dass sie hier stehen:
+# Ein Werkzeug liest sie vor oder neben der festgeschriebenen Einstellung
+# (`vitest.config.ts` hat Vorrang vor `vitest.config.js`), und eine `.npmrc`
+# kann jedes npm-Skript ins Leere laufen lassen (`script-shell`). Je Ordner die
+# Muster der Dateinamen; was in EINSTELLUNG_SUMMEN steht, ist ausgenommen.
+EINSTELLUNG_FREMD = {
+    "": ("vitest.config.*", "vite.config.*", "vitest.workspace.*", "playwright.config.*", "eslint.config.*", ".npmrc"),
+    "functions": ("jest.config.*", "eslint.config.*", ".prettierignore", ".npmrc"),
+}
+
 
 def _ohne_kommentarzeilen(text):
     return "\n".join(z for z in text.split("\n") if not z.lstrip().startswith("#"))
@@ -221,7 +315,7 @@ def _summe(text):
 def _kopfteil_maengel(text, name):
     maengel = []
     kopf = text.split("\njobs:\n", 1)[0]
-    if re.search(r"(?m)^(env|defaults):", kopf):
+    if re.search(r"""(?m)^["']?(env|defaults)["']?\s*:""", kopf):
         maengel.append(f"{name}: env/defaults auf oberster Ebene — koennte jede Pruefung umlenken")
     return maengel
 
@@ -300,6 +394,72 @@ def _schritte(block):
     return laeufe + actions
 
 
+def _ebene(zeilen, einzug):
+    """Die Schluessel einer YAML-Ebene mit ihrem Wert (Liste der Zeilen: Text
+    hinter dem Doppelpunkt, dann die tiefer eingerueckten Zeilen darunter).
+    Ein Schluessel in Anfuehrungszeichen zaehlt wie einer ohne. Eine Zeile, die
+    auf dieser Ebene kein Schluessel ist, landet unter "?" — der Vertrag wertet
+    das als Mangel, statt etwas zu uebersehen, das er nicht lesen kann."""
+    muster = re.compile(r"""^ {%d}["']?([A-Za-z][A-Za-z0-9_-]*)["']?\s*:(?:\s+(.*))?$""" % einzug)
+    werte = {}
+    aktuell = None
+    for zeile in zeilen:
+        if not zeile.strip(" "):
+            continue
+        treffer = muster.match(zeile)
+        if treffer:
+            aktuell = treffer.group(1)
+            werte.setdefault(aktuell, [])
+            if (treffer.group(2) or "").strip(" "):
+                werte[aktuell].append(treffer.group(2).strip(" "))
+        elif aktuell is not None and zeile.startswith(" " * (einzug + 1)):
+            werte[aktuell].append(zeile.strip(" "))
+        else:
+            werte.setdefault("?", []).append(zeile.strip(" "))
+    return werte
+
+
+def _schrittbloecke(block):
+    """Die Schritte eines Job-Blocks in der ueblichen Schreibweise (`steps:`
+    mit vier Leerzeichen Einzug, jeder Schritt beginnt mit `      - `): je
+    Schritt seine Schluessel wie in `_ebene`. None, wenn `steps:` so nicht
+    dasteht."""
+    zeilen = block.split("\n")
+    anfang = next((i for i, z in enumerate(zeilen) if re.match(r"^    steps:\s*$", z)), None)
+    if anfang is None:
+        return None
+    schritte = []
+    for zeile in zeilen[anfang + 1 :]:
+        if not zeile.strip(" "):
+            continue
+        if zeile.startswith("      - "):
+            # Der Strich steht fuer zwei Leerzeichen: Danach liegen alle
+            # Schluessel des Schritts auf derselben Ebene.
+            schritte.append(["        " + zeile[8:]])
+        elif zeile.startswith("        ") and schritte:
+            schritte[-1].append(zeile)
+        else:
+            break
+    return [_ebene(schritt, 8) for schritt in schritte]
+
+
+def _befehl(schritt):
+    """Der Befehl eines Schritts in der Schreibweise von PFLICHTJOBS_CI."""
+    if schritt.get("run"):
+        return schritt["run"][0]
+    if schritt.get("uses"):
+        return "uses: " + schritt["uses"][0].split("@", 1)[0]
+    return None
+
+
+def _npm_skript(befehl):
+    """Name des npm-Skripts, das ein Pflichtbefehl aufruft — sonst None."""
+    if befehl == "npm test":
+        return "test"
+    treffer = re.fullmatch(r"npm run ([A-Za-z][A-Za-z0-9:_-]*)", befehl)
+    return treffer.group(1) if treffer else None
+
+
 def vertrag_ci(ci_text, deploy_text):
     """Der inhaltliche Vertrag fuer `ci.yml`: Was jeder Pflicht-Job tun muss.
     `deploy_text` ist deploy.sh ohne Kommentarzeilen — von dort kommt die Liste
@@ -325,6 +485,10 @@ def vertrag_ci(ci_text, deploy_text):
     if not rechte or [z.strip() for z in rechte.group(1).splitlines()] != ["contents: read"]:
         m.append("ci.yml: Rechte des Pipeline-Tokens sind nicht genau 'permissions: contents: read'")
 
+    # Ganz oben in der Datei steht weder `env` noch `defaults`: Beides gaelte
+    # fuer jeden Schritt jedes Jobs.
+    m.extend(_kopfteil_maengel(t, "ci.yml"))
+
     bloecke = _jobbloecke(t)
     for job, befehle in PFLICHTJOBS_CI.items():
         if job not in bloecke:
@@ -335,17 +499,177 @@ def vertrag_ci(ci_text, deploy_text):
         for befehl in befehle:
             if befehl not in vorhanden:
                 m.append(f"ci.yml: Job {job} fuehrt '{befehl}' nicht mehr als eigenen Schritt aus")
-        if re.search(r"(?m)^\s+(?:- )?continue-on-error\s*:", b):
+            # Ein npm-Skript hinter einem Pflichtbefehl braucht seine Festlegung
+            # in NPM_SKRIPTE — in der package.json des Ordners, in dem der
+            # Schritt laeuft.
+            skript = _npm_skript(befehl)
+            if skript:
+                ordner = SCHRITT_FESTLEGUNG_CI.get((job, befehl), {}).get("working-directory", [JOB_ORDNER_CI.get(job, ".")])[0]
+                paket = "package.json" if ordner == "." else f"{ordner}/package.json"
+                if skript not in NPM_SKRIPTE.get(paket, {}):
+                    m.append(
+                        f"ci.yml: Job {job} ruft das npm-Skript '{skript}' aus {paket} auf — "
+                        "was es tut, ist nicht festgelegt (NPM_SKRIPTE)"
+                    )
+        if re.search(r"""(?m)^\s+(?:- )?["']?continue-on-error["']?\s*:""", b):
             m.append(f"ci.yml: Job {job} traegt 'continue-on-error' — ein roter Schritt zaehlte als gruen")
-        if re.search(r"(?m)^\s+permissions\s*:", b):
+        if re.search(r"""(?m)^\s+["']?permissions["']?\s*:""", b):
             m.append(f"ci.yml: Job {job} setzt eigene Rechte ('permissions')")
-        # Schluessel des Jobs stehen mit vier Leerzeichen Einzug; Bedingungen an
-        # einzelnen Schritten (tiefer eingerueckt) sind hier nicht gemeint.
-        bedingungen = [w.strip() for w in re.findall(r"(?m)^    if:\s*(.*)$", b)]
-        erlaubt = [JOB_BEDINGUNG_CI[job]] if job in JOB_BEDINGUNG_CI else []
-        if bedingungen and bedingungen != erlaubt:
+
+        # Ab hier werden die Schluessel des Jobs (vier Leerzeichen Einzug) und
+        # die seiner Schritte gelesen. Was sich so nicht lesen laesst, ist ein
+        # Mangel — sonst reichte eine andere Einrueckung, um eine Bedingung an
+        # diesem Vertrag vorbeizufuehren.
+        kopf = _ebene(b.split("\n")[1:], 4)
+        schritte = _schrittbloecke(b)
+        if "?" in kopf or schritte is None or any("?" in schritt for schritt in schritte):
+            m.append(
+                f"ci.yml: Job {job} steht nicht in der ueblichen Schreibweise — "
+                "der Vertrag kann seine Schluessel nicht lesen"
+            )
+            continue
+        bedingungen = kopf.get("if")
+        erlaubt = [JOB_BEDINGUNG_CI[job]] if job in JOB_BEDINGUNG_CI else None
+        if bedingungen is not None and bedingungen != erlaubt:
             m.append(f"ci.yml: Job {job} traegt die Bedingung {bedingungen!r} — er koennte still entfallen")
+        ordner = JOB_ORDNER_CI.get(job)
+        soll = ["run:", f"working-directory: {ordner}"] if ordner else None
+        if kopf.get("defaults") != soll:
+            m.append(
+                f"ci.yml: Job {job} traegt 'defaults' {kopf.get('defaults')!r} statt {soll!r} — "
+                "Arbeitsordner oder Shell seiner Schritte waeren andere"
+            )
+        if kopf.get("env") != JOB_UMGEBUNG_CI.get(job):
+            m.append(
+                f"ci.yml: Job {job} setzt die Umgebung {kopf.get('env')!r} statt {JOB_UMGEBUNG_CI.get(job)!r} — "
+                "darueber liessen sich npm und die Shell umlenken"
+            )
+        for befehl in befehle:
+            if befehl not in vorhanden:
+                continue
+            treffer = [schritt for schritt in schritte if _befehl(schritt) == befehl]
+            if not treffer:
+                # Der Wortlaut kommt im Job vor, aber kein Schritt fuehrt ihn
+                # aus: etwa als Umgebungswert `run: npm test` unter `env:` oder
+                # als Textzeile in einem mehrzeiligen Befehl.
+                m.append(
+                    f"ci.yml: Job {job}: '{befehl}' steht im Job, aber nicht als Befehl eines eigenen Schritts — "
+                    "ausgefuehrt wird er so nicht"
+                )
+            festgelegt = SCHRITT_FESTLEGUNG_CI.get((job, befehl), {})
+            for schritt in treffer:
+                for schluessel in SCHRITT_SCHLUESSEL:
+                    ist = schritt.get(schluessel)
+                    if ist == festgelegt.get(schluessel):
+                        continue
+                    statt = f" statt {festgelegt[schluessel]!r}" if schluessel in festgelegt else ""
+                    m.append(
+                        f"ci.yml: Job {job}: der Schritt '{befehl}' traegt '{schluessel}' {ist!r}{statt} — "
+                        + _SCHRITT_FOLGE[schluessel]
+                    )
     return m
+
+
+_SCHRITT_FOLGE = {
+    "if": "er koennte still entfallen",
+    "shell": "derselbe Wortlaut fuehrte etwas anderes aus",
+    "working-directory": "derselbe Wortlaut liefe in einem anderen Ordner",
+    "env": "darueber liessen sich npm und die Shell umlenken",
+}
+
+
+def vertrag_npm():
+    """Was die npm-Skripte hinter den Pflicht-Schritten tun, und womit Jest
+    eingestellt ist (NPM_SKRIPTE, JEST_EINSTELLUNG)."""
+    m = []
+    for pfad, soll in NPM_SKRIPTE.items():
+        datei = WURZEL / pfad
+        if not datei.is_file():
+            m.append(f"{pfad} fehlt — dort stehen die npm-Skripte, die die Pflicht-Schritte aufrufen")
+            continue
+        try:
+            daten = json.loads(datei.read_text(encoding="utf-8"))
+        except ValueError:
+            daten = None
+        skripte = daten.get("scripts") if isinstance(daten, dict) else None
+        if not isinstance(skripte, dict):
+            m.append(f"{pfad} ist nicht lesbar oder nennt keine npm-Skripte")
+            continue
+        for name, befehl in soll.items():
+            if skripte.get(name) != befehl:
+                m.append(
+                    f"{pfad}: npm-Skript '{name}' lautet {skripte.get(name)!r} statt {befehl!r} — "
+                    "der Schritt, der es aufruft, pruefte etwas anderes"
+                )
+            for vorsilbe in ("pre", "post"):
+                if vorsilbe + name in skripte:
+                    m.append(
+                        f"{pfad}: npm-Skript '{vorsilbe}{name}' — npm fuehrt es ungefragt mit '{name}' aus; "
+                        "es koennte den Lauf veraendern, ohne dass sich dessen Wortlaut aendert"
+                    )
+        if pfad == "functions/package.json" and daten.get("jest") != JEST_EINSTELLUNG:
+            m.append(
+                f"{pfad}: die Jest-Einstellung lautet {daten.get('jest')!r} statt {JEST_EINSTELLUNG!r} — "
+                "sie bestimmt, welche Testdateien 'npm test' ausfuehrt"
+            )
+    return m
+
+
+def _summe_roh(pfad):
+    return hashlib.sha256((WURZEL / pfad).read_bytes()).hexdigest()[:16]
+
+
+def vertrag_einstellungen():
+    """Die Einstellungsdateien der Pruefwerkzeuge (EINSTELLUNG_SUMMEN) und die
+    Dateien, die es daneben nicht geben darf (EINSTELLUNG_FREMD)."""
+    m = []
+    for pfad, soll in EINSTELLUNG_SUMMEN.items():
+        if not (WURZEL / pfad).is_file():
+            m.append(f"{pfad} fehlt — die Datei bestimmt, was ein Pflicht-Schritt prueft")
+        elif _summe_roh(pfad) != soll:
+            m.append(f"{pfad} weicht vom festgeschriebenen Stand ab (Pruefsumme der ganzen Datei)")
+    for ordner, muster in EINSTELLUNG_FREMD.items():
+        verzeichnis = WURZEL / ordner if ordner else WURZEL
+        if not verzeichnis.is_dir():
+            continue
+        for eintrag in sorted(verzeichnis.iterdir()):
+            pfad = f"{ordner}/{eintrag.name}" if ordner else eintrag.name
+            if pfad not in EINSTELLUNG_SUMMEN and any(fnmatch.fnmatchcase(eintrag.name, mu) for mu in muster):
+                m.append(
+                    f"{pfad} ist nicht vorgesehen — die Datei stellt ein Pruefwerkzeug um, "
+                    "ohne dass sich die festgeschriebene Einstellung aendert"
+                )
+    return m
+
+
+def vertrag_gitignore():
+    """Keine eingecheckte Datei ist zugleich von `.gitignore` erfasst. Prettier
+    laesst aus, was `.gitignore` nennt: Ein Eintrag dort naehme die Dateien aus
+    der Format-Pruefung, ohne dass sich an Skript oder Einstellung etwas
+    aendert. Liefert (Maengel, gemessen) — ausserhalb eines git-Repositorys
+    (entpackte Kopie) ist die Frage nicht messbar."""
+    # Gefragt sind die `.gitignore`-Dateien DIESES Ordners, nicht die
+    # persoenliche Ausschlussliste des Rechners — und das Repository, in dem
+    # dieses Skript liegt, auch wenn ein git-Hook ein anderes vorgibt.
+    umgebung = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+    try:
+        lauf = subprocess.run(
+            ["git", "-C", str(WURZEL), "ls-files", "-z", "--cached", "--ignored", "--exclude-per-directory=.gitignore"],
+            capture_output=True,
+            timeout=60,
+            env=umgebung,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return [], False
+    if lauf.returncode != 0:
+        return [], False
+    namen = [n for n in lauf.stdout.decode("utf-8", "replace").split("\0") if n]
+    if not namen:
+        return [], True
+    return [
+        f".gitignore erfasst {len(namen)} eingecheckte Datei(en), zuerst {namen[0]} — "
+        "Prettier laesst solche Dateien stillschweigend aus"
+    ], True
 
 
 def vertrag_actions():
@@ -362,9 +686,15 @@ def vertrag_actions():
 
 
 def vertrag_summen_ausgeben():
+    print("VERTRAG_SUMMEN = {")
     for name in VERTRAG_SUMMEN:
         text = _vertragsdatei(name).read_text(encoding="utf-8")
         print(f'    "{name}": "{_summe(text)}",')
+    print("}")
+    print("EINSTELLUNG_SUMMEN = {")
+    for pfad in EINSTELLUNG_SUMMEN:
+        print(f'    "{pfad}": "{_summe_roh(pfad)}",')
+    print("}")
 
 def main():
     # BEFUND 01.09.2026: Dreimal an einem Tag scheiterte eine neue Pruefung
@@ -715,7 +1045,11 @@ def main():
         + vertrag_weitere_summen()
         + vertrag_ci(ci, text)
         + vertrag_actions()
+        + vertrag_npm()
+        + vertrag_einstellungen()
     )
+    gitignore_maengel, gitignore_gemessen = vertrag_gitignore()
+    vertrags_maengel += gitignore_maengel
     waechter_fehlt = []
     for datei in skripte:
         if datei.name in NUR_LOKAL:
@@ -764,11 +1098,19 @@ def main():
             print(f"  FEHLT   Vertrag {mangel}")
         if any("weicht vom festgeschriebenen Stand ab" in mangel for mangel in vertrags_maengel):
             print("          War die Aenderung beabsichtigt? Dann die neue Pruefsumme in")
-            print("          VERTRAG_SUMMEN nachtragen — sie steht in der Ausgabe von:")
-            print("          python3 scripts/pruefe-deploy-riegel.py --vertrag-summen")
+            print("          VERTRAG_SUMMEN oder EINSTELLUNG_SUMMEN nachtragen — sie steht in der")
+            print("          Ausgabe von: python3 scripts/pruefe-deploy-riegel.py --vertrag-summen")
     else:
         print(f"  ok      {len(VERTRAG_SUMMEN)} Dateien entsprechen dem festgeschriebenen Stand;")
         print(f"          jeder der {len(PFLICHTJOBS_CI)} Pflicht-Jobs fuehrt seine Pruefbefehle aus")
+        print(
+            f"  ok      {sum(len(s) for s in NPM_SKRIPTE.values())} npm-Skripte hinter den Pflicht-Schritten, die Jest-Einstellung"
+        )
+        print(f"          und {len(EINSTELLUNG_SUMMEN)} Einstellungsdateien der Pruefwerkzeuge lauten wie festgelegt")
+    if gitignore_gemessen and not gitignore_maengel:
+        print("  ok      keine eingecheckte Datei ist von .gitignore erfasst")
+    elif not gitignore_gemessen:
+        print("  --      NICHT GEMESSEN: ob .gitignore eingecheckte Dateien erfasst (kein git-Repository)")
     print()
     # BEFUND 01.09.2026 (erster echter Pipeline-Lauf): VIER Fehler derselben
     # Bauart an einem Tag. Beim Einfuegen neuer Schritte in ci.yml sind Zeilen

@@ -6,12 +6,90 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
-### Behoben
+Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
+
+### Behoben — Kinderschutz
+
+- **Werbe-Ideen zu Alkohol, Waffen und Co. werden verlässlicher gestrichen.**
+  Der Filter für Werbe-Kärtchen kennt jetzt die gängigen Wörter seiner Themen
+  in Deutsch und Englisch — auch in Zusammensetzungen („Pornoseite“,
+  „Waffenladen“, „Wettbüro“) und in anderer Schreibweise („Only Fans“,
+  „Sex-Shop“). Bei Kindern und Jugendlichen verschwinden damit Kärtchen wie
+  „Jägermeister“, „Teilzahlung“ oder „Interwetten“, bei allen solche wie
+  „Softair-Pistole“.
+- **Harmlose Wörter bleiben stehen.** „Wetter“ ist keine Wette, „Insekt“ kein
+  Sekt, „Waffel“ keine Waffe, „Rumänien“ kein Rum. Auch frühere Fehlgriffe sind
+  weg: „Glocke“, „Klarname“ und „Terrorvogel“ wurden bisher mitgefangen.
+- **Steht das Alter eines Kindes hinter „ca.“ oder nur als Wort da** („ein
+  Mädchen“, „Volksschulkind“), greift der Schutz für Kinder jetzt ebenfalls.
+  Nennt die KI das Alter nicht am Anfang der Alterskarte, gilt es als nicht
+  lesbar: Der Schutz greift, und die Karte zeigt den festen Hinweis statt
+  einer Zahl.
+- Der Filter bleibt eine Wortliste: Was nicht in ihr steht, erkennt er nicht.
+  Für die Auswertung: Die Zähler des Kinderschutz-Protokolls sind mit Zahlen
+  vor dieser Fassung nicht vergleichbar, weil die Liste mehr Wörter kennt.
+
+### Behoben — Datenschutz
+
+- **Beispielbilder fragen nichts mehr bei OpenStreetMap an.** Wer ein
+  Beispielbild wählt, sieht Adresse und Karte des erfundenen Aufnahmeorts wie
+  bisher — beides kommt jetzt aus der Seite selbst. Der Browser ruft dafür
+  weder die Ortsauflösung noch die Kartenkacheln ab; die IP-Adresse geht bei
+  einem Beispielbild nicht mehr an OpenStreetMap. Die Karte ist dort ein fester
+  Ausschnitt und lässt sich nicht bewegen. Bei einem eigenen Foto mit Ortsdaten
+  bleibt alles wie bisher.
+- **Formulare auf der Seite dürfen nur noch an malziME selbst senden.** Die
+  Sicherheitsrichtlinie der Seite nennt jetzt auch Formularziele.
+
+### Behoben — was Besucher merken
 
 - **Nach einer gescheiterten Analyse verschwinden auch die schon gezeigten
   Merkmale.** Scheiterte eine Analyse, nachdem schon erste Merkmal-Karten zu
   sehen waren, standen diese halb gefüllt neben der Fehlermeldung. Jetzt
   räumt jeder Fehlerweg sie mit ab.
+- Wer von einem eigenen Foto auf ein Beispielbild wechselt, sieht die
+  bewegliche Karte sofort verschwinden.
+
+### Behoben — Prüfungen, die nicht mehr prüften
+
+- **Der Wächter über die Alarme prüft jetzt alle fünf Alarmregeln.** Vor jeder
+  Auslieferung wird je Regel nachgesehen, ob es sie gibt, ob sie eingeschaltet
+  ist, ob eine E-Mail-Adresse dranhängt und ob sie jeden Dienst abdeckt.
+  Bisher sah die Prüfung nur eine der fünf.
+- **Die öffentliche Nachprüfung lässt sich nicht mehr durch Weglassen
+  täuschen.** `sh scripts/pruefe-live.sh` prüft jetzt jede Datei, die laut
+  veröffentlichtem Quelltext ausgeliefert sein muss — nicht nur die, die der
+  Server selbst auflistet. Eine Datei, die in seiner Liste fehlt, wird gemeldet.
+- **Die Auslieferung sieht alle Prüfergebnisse eines Standes**, auch wenn sich
+  über mehrere Tage viele angesammelt haben, und hält an, wenn sich die
+  Version des Auslieferungswerkzeugs nicht lesen lässt.
+
+### Geändert — Auslieferung und Betrieb
+
+- **Zu Google geht beim Ausliefern nur noch das Programm selbst.** Testdateien,
+  Hilfsskripte und lokale Einstellungsdateien bleiben auf dem Rechner. Die
+  Auslieferung startet nicht, wenn im Server-Ordner eine Einstellungsdatei
+  (`.env`) liegt oder eine Datei, die nicht im offenen Quelltext steht.
+- **Der Server wird nur noch zusammen mit der Website ausgeliefert.** Der
+  Fingerabdruck auf der Seite nennt damit bei jeder Auslieferung genau das
+  Server-Programm, das hinausgegangen ist.
+- **Test-Schalter können in der Produktion nichts mehr anrichten.** Drei
+  Einstellungen sind nur für Läufe am eigenen Rechner gedacht (erfundene
+  Beispiel-Antwort statt echter KI, lokale Warteschlange, stumme
+  Benachrichtigung). Jetzt wirken sie in der Produktion nicht — und eine
+  Fassung, bei der einer davon eingeschaltet ist, startet dort gar nicht erst.
+  Lokale Einstellungen haben genau einen Ort: `functions/.env.local`.
+- **Der eigene Benachrichtigungs-Server wird mitbeobachtet.** Er läuft in neuer
+  Fassung unter einem eigenen, eingeschränkten Konto. Der Nachtlauf meldet,
+  wenn es für ihn eine Sicherheitsmeldung gibt oder seit mehr als 30 Tagen eine
+  neuere Fassung; vor jeder Auslieferung wird beides nachgeprüft.
+- **Die Auslieferung meldet, wenn die nächtliche Sicherheitsprüfung nicht mehr
+  von selbst läuft.** Die Meldung steht vor dem Hochladen und noch einmal am
+  Ende des Protokolls.
+- **Dokumentiert: Der Push aufs Handy kann abends ausbleiben.** Die Nachricht
+  liegt dann in der App; die E-Mail zu jedem Alarm kommt weiterhin.
+- Außerhalb des Programms eingeschaltet: die Sperre gegen versehentlich
+  hochgeladene Geheimnisse bei GitHub und der Löschschutz der Datenbank.
 
 ## [4.13.2] — 2026-10-01
 

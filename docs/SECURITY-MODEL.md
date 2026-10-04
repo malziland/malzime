@@ -1003,7 +1003,11 @@ im ganzen Satz aber Redewendung oder Bildbeschreibung („deine stärkste
 Waffe“, „wie aus der Pistole geschossen“, „ein Soldat mit Gewehr“, „wir raten
 dir“, „on the far right“). Sie gelten nur für Werbe-Einträge
 (`ad_targeting`), nicht für Erklärsätze und Fließtext. Eindeutige Wörter
-(„Softair“, „Munition“, „Pornoseite“, „rechtsextrem“) gelten überall.
+(„Softair“, „Munition“, „Pornoseite“, „rechtsextrem“) gelten überall. Überall
+gelten auch weiter die englischen Wörter „gun“, „rifle“ und „shotgun“, wie
+schon vor dem 04.10.2026: Eine englische Bildbeschreibung mit Gewehr löst den
+Alarm aus, eine deutsche nicht. Das bestehende Signal wird nicht ohne Messung
+leiser gestellt.
 
 **Harmlose Wendungen.** Wendungen, in denen ein Listenwort steckt
 („Wasserpistole“, „Top Gun“, „People-Pleasing“, „Cocktailkleid“), werden vor

@@ -72,6 +72,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   cloud-tasks.js            Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim fuer Emulator)
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket
   feature-flags.js          Laufzeit-Feature-Flags aus Firestore (30s-Cache)
+  lokale-schalter.js        Schalter nur fuer lokale Laeufe (Attrappe, lokale Warteschlange, stumme Benachrichtigung): wirken nie in der Produktion
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
   mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile, ein zweiter ohne Bild die Beast-Werbung
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
@@ -81,6 +82,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   job-pipelines.js          Der Analyseweg: KI-Aufruf, Tier-Easter-Egg, Beast-Werbung, Kinderschutz
   job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
   minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer)
+  minor-safety-woerter.js   Wortlisten des Kinderschutz-Filters (reine Daten, deutsch und englisch)
   alters-lesbarkeit.js      Altersauslese und Erkennung nicht lesbarer Altersangaben
   betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Pruefung, Cache
   produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)

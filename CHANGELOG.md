@@ -17,9 +17,14 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   „Sex-Shop“). Bei Kindern und Jugendlichen verschwinden damit Kärtchen wie
   „Jägermeister“, „Teilzahlung“ oder „Interwetten“, bei allen solche wie
   „Softair-Pistole“.
+- **Werbe-Ideen zu Drogen werden bei Kindern und Jugendlichen gestrichen** —
+  so wie Alkohol: „Cannabis“, „CBD-Shop“, „Lachgas“, „Kokain“. Bei Erwachsenen
+  bleiben sie stehen.
 - **Harmlose Wörter bleiben stehen.** „Wetter“ ist keine Wette, „Insekt“ kein
-  Sekt, „Waffel“ keine Waffe, „Rumänien“ kein Rum. Auch frühere Fehlgriffe sind
-  weg: „Glocke“, „Klarname“ und „Terrorvogel“ wurden bisher mitgefangen.
+  Sekt, „Waffel“ keine Waffe, „Rumänien“ kein Rum, „Drogerie“ keine Droge;
+  „Wasserpistole“ und „Heißklebepistole“ sind keine Waffen-Werbung. Auch
+  frühere Fehlgriffe sind weg: „Glocke“, „Klarname“ und „Terrorvogel“ wurden
+  bisher mitgefangen.
 - **Steht das Alter eines Kindes hinter „ca.“ oder nur als Wort da** („ein
   Mädchen“, „Volksschulkind“), greift der Schutz für Kinder jetzt ebenfalls.
   Nennt die KI das Alter nicht am Anfang der Alterskarte, gilt es als nicht
@@ -53,6 +58,8 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   räumt jeder Fehlerweg sie mit ab.
 - Wer von einem hochgeladenen Foto auf ein Beispielbild wechselt, sieht die
   bewegliche Karte sofort verschwinden.
+- In einem seltenen Fall blieb die Alterskarte ohne Text. Jetzt steht dort der
+  feste Hinweis, dass sich das Alter nicht sicher ablesen lässt.
 
 ### Behoben — Prüfungen, die nicht mehr prüften
 

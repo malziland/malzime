@@ -53,6 +53,9 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   middleware.js      Rate Limiting (IP-basiert, Grenze+Fenster aus dem Einstellungssatz), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
+  minor-safety.js    Kinderschutz-Filter fuer Werbe-Eintraege: Stufe 1 fuer alle, Stufe 2 bis zur Untergrenze SCHUTZ_BIS
+  minor-safety-woerter.js  Die Wortlisten dazu (reine Daten, deutsch und englisch); jedes Listenwort braucht ein Beispiel in der Pruefreihe
+  alters-lesbarkeit.js  Altersauslese aus dem KI-Text: erster Satz einer Karte, nicht lesbares Alter
   mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call) + generateBeastAds (zweiter Aufruf ohne Bild)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
@@ -61,6 +64,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useBeastAdsCall, useGemesseneDauer), 30s-Cache, fail-safe
+  lokale-schalter.js  Schalter nur fuer lokale Laeufe (MISTRAL_MOCK, QUEUE_LOCAL, NTFY_STUMM): wirken nie in der Produktion; steht dort einer auf 1, startet index.js nicht
   --- Queue-Architektur (v2.0) — der einzige Pfad seit v2.10 ---
   handle-enqueue.js  Queue-Annahme: Validierung -> Bild in Storage -> Job anlegen -> in Cloud Tasks einreihen
   handle-process-job.js  Queue-Worker (nur Cloud Tasks): claimt Job, fuehrt Mistral-Pipeline aus, schreibt Ergebnis

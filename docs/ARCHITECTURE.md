@@ -229,8 +229,10 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `mistral-http.js` | Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Überlast, Antwort als Strom |
 | `mistral-antwort.js` | Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung (`escapeXml`) |
 | `mistral-mock.js` | Mistral-Attrappe für Unit-Tests und Emulator (`MISTRAL_MOCK=1`) |
+| `lokale-schalter.js` | Schalter nur für lokale Läufe (`MISTRAL_MOCK`, `QUEUE_LOCAL`, `NTFY_STUMM`): wirken nie in der Produktion; steht dort einer auf 1, startet `index.js` nicht |
 | `job-helfer.js` | Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung) |
 | `minor-safety.js` | Kinderschutz-Filter für Werbekategorien bei möglicherweise Minderjährigen (Schwelle mit Puffer: `SCHUTZ_BIS`) |
+| `minor-safety-woerter.js` | Wortlisten des Kinderschutz-Filters: je Thema deutsch und englisch, „nur als Werbe-Eintrag“, harmlose Wendungen (reine Daten, angewandt von `minor-safety.js`) |
 | `alters-lesbarkeit.js` | Altersauslese aus dem KI-Text und Erkennung nicht lesbarer Altersangaben (Filter, Alterskarte, Live-Anzeige) |
 | `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Prüfung, Cache, Rückfall |
 | `produktiv-satz.js` | Betriebswerte für den echten Betrieb — Quelle für `config/betriebsprofil` |

@@ -19,7 +19,9 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   „Softair-Pistole“.
 - **Werbe-Ideen zu Drogen werden bei Kindern und Jugendlichen gestrichen** —
   so wie Alkohol: „Cannabis“, „CBD-Shop“, „Lachgas“, „Kokain“. Bei Erwachsenen
-  bleiben sie stehen.
+  bleiben sie stehen. Auch die Anweisung an die KI verbietet solche Werbung
+  bei Kindern und Jugendlichen jetzt ausdrücklich, ebenso Tabak-Werbung an der
+  Stelle, an der sie bisher nicht genannt war.
 - **Harmlose Wörter bleiben stehen.** „Wetter“ ist keine Wette, „Insekt“ kein
   Sekt, „Waffel“ keine Waffe, „Rumänien“ kein Rum, „Drogerie“ keine Droge;
   „Wasserpistole“ und „Heißklebepistole“ sind keine Waffen-Werbung. Auch
@@ -66,8 +68,9 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 
 - **Der Wächter über die Alarme prüft jetzt alle fünf Alarmregeln.** Vor jeder
   Auslieferung wird je Regel nachgesehen, ob es sie gibt, ob sie eingeschaltet
-  ist, ob eine E-Mail-Adresse dranhängt und ob sie jeden Dienst abdeckt.
-  Bisher sah die Prüfung nur eine der fünf.
+  ist und ob eine E-Mail-Adresse dranhängt. Die drei Regeln, die auf einzelne
+  Dienste hören, müssen dabei jeden Dienst nennen. Bisher sah die Prüfung nur
+  eine der fünf.
 - **Die öffentliche Nachprüfung lässt sich nicht mehr durch Weglassen
   täuschen.** `sh scripts/pruefe-live.sh` prüft jetzt jede Datei, die laut
   veröffentlichtem Quelltext ausgeliefert sein muss — nicht nur die, die der
@@ -96,18 +99,21 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   (`.env`) liegt oder eine Datei, die nicht im offenen Quelltext steht.
 - **Der Server wird nur noch zusammen mit der Website ausgeliefert, die
   Website allein nur bei unverändertem Server-Programm.** Der Fingerabdruck auf
-  der Seite nennt damit bei jeder Auslieferung genau das Server-Programm, das
-  hinausgegangen ist.
+  der Seite nennt damit bei jeder Auslieferung den eigenen Server-Quelltext,
+  der hinausgegangen ist. Die Fremdpakete des Servers nennt er nicht.
 - **Test-Schalter können in der Produktion nichts mehr anrichten.** Drei
   Einstellungen sind nur für Läufe am eigenen Rechner gedacht (erfundene
   Beispiel-Antwort statt echter KI, lokale Warteschlange, stumme
   Benachrichtigung). Jetzt wirken sie in der Produktion nicht — und eine
   Fassung, bei der einer davon eingeschaltet ist, startet dort gar nicht erst.
-  Lokale Einstellungen haben genau einen Ort: `functions/.env.local`.
+  Vor jeder Auslieferung wird außerdem nachgesehen, dass an keinem Dienst ein
+  solcher Schalter gesetzt ist. Lokale Einstellungen haben genau einen Ort:
+  `functions/.env.local`.
 - **Der eigene Benachrichtigungs-Server wird mitbeobachtet.** Er läuft in neuer
   Fassung unter einem eigenen, eingeschränkten Konto. Der Nachtlauf meldet,
   wenn es für ihn eine Sicherheitsmeldung gibt oder seit mehr als 30 Tagen eine
-  neuere Fassung; vor jeder Auslieferung wird beides nachgeprüft.
+  neuere Fassung. Vor jeder Auslieferung wird nachgeprüft, dass die laufende
+  Fassung die beobachtete ist und der Dienst unter dem eigenen Konto läuft.
 - **Die Auslieferung meldet, wenn die nächtliche Sicherheitsprüfung nicht mehr
   von selbst läuft.** Die Meldung steht vor dem Hochladen und noch einmal am
   Ende des Protokolls.

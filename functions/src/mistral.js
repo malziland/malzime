@@ -418,15 +418,20 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      "weiblich"), der erste Satz der Karte aber schon, steht dieser vorn — der
      Anker wuerde das Alter sonst verdraengen. Traegt der Beleg-Satz einen
      Platzhalter, bleibt die Altersangabe allein stehen. Ist das Alter nicht
-     lesbar, steht ein fester Satz da — nie ein geflickter Text mit Luecken. */
+     lesbar, steht ein fester Satz da — nie ein geflickter Text mit Luecken.
+     Dasselbe gilt, wenn ohne den Platzhalter nichts uebrig bleibt (Anker
+     fehlt, Alter nur auf der anderen Karte): fester Satz, nie eine Karte
+     ohne Text. */
   function alterskarteText(modellwert) {
     const wert = String(modellwert || "");
     if (alterUnlesbar) return alterNichtLesbarText([ankerRoh, wert], prompts);
     const satz = ersterSatz(wert);
     const altersSatz = hatLesbaresAlter(ankerRoh) ? ankerRoh : hatLesbaresAlter(satz) ? satz : ankerRoh;
     let text = mitAnkerVoran(altersSatz, wert);
-    if (hatAltersPlatzhalter(text)) text = mitAnkerVoran(altersSatz, "");
-    if (hatAltersPlatzhalter(text)) return alterNichtLesbarText([ankerRoh, wert], prompts);
+    if (hatAltersPlatzhalter(text)) {
+      text = mitAnkerVoran(altersSatz, "");
+      if (!text.trim() || hatAltersPlatzhalter(text)) return alterNichtLesbarText([ankerRoh, wert], prompts);
+    }
     return ohneZiffernKlammern(text);
   }
 

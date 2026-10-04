@@ -1030,6 +1030,18 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
     expect(r.karte).toBe(IM_ZWEITEN_SATZ);
   });
 
+  /* Fehlt der Anker und trägt die Standard-Karte einen Platzhalter, die
+     Beast-Karte aber ein Alter, bleibt nach dem Entfernen des Platzhalters
+     nichts übrig. Dann steht der feste Satz da — nie eine Karte ohne Text. */
+  test("Anker fehlt, Standard-Karte mit Platzhalter, Beast-Karte mit Alter: fester Satz statt leerer Karte", async () => {
+    const r = await beides(
+      antwort(undefined, "Du bist weiblich, ~‹Zahl› Jahre alt." + BELEG, "Weiblich, ~13 Jahre alt. Leichte Beute.")
+    );
+    expect(r).toMatchObject({ liveStandard: false, liveBeast: true, festerSatz: true, festerSatzBeast: false });
+    expect(r.karte).toBe("Du bist weiblich. " + FESTER_SATZ);
+    expect(r.karteBeast).toBe("Weiblich, ~13 Jahre alt. Leichte Beute.");
+  });
+
   /* Umgekehrt ist die Standard-Karte schon da, wenn die Beast-Karte ankommt:
      Die Beast-Karte entscheidet mit beiden Karten, wie das Endergebnis. */
   const OHNE_ALTERSVERSUCH = "Es gibt keine klaren Bildsignale. Die Person ist von hinten zu sehen.";

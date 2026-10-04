@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-pruefe-deploy-riegel.py — zwei Pruefungen an der Auslieferungskette.
+pruefe-deploy-riegel.py — Pruefungen an der Auslieferungskette, die Text lesen.
 
 WAS DIESES SKRIPT NICHT (MEHR) TUT: Es prueft KEINE Riegel in `deploy.sh`.
 
@@ -14,12 +14,21 @@ Es fuehrt `deploy.sh` in einem Wegwerf-Klon aus, mit Attrappen fuer firebase,
 gh, verify-infrastructure und live-smoke. Rueckbauproben belegen, dass
 jeder Fall rot wird, wenn der zugehoerige Riegel faellt.
 
-WAS HIER BLEIBT, sind die zwei Fragen, bei denen es wirklich um Text geht:
+WAS HIER BLEIBT, sind die Fragen, bei denen es wirklich um Text geht:
 
   1. Wird jeder Notschalter (SKIP_*) in der Schlussbilanz genannt? Sonst sieht
      ein Lauf gruen aus, obwohl eine Pruefung uebersprungen wurde.
   2. Ist die concurrency-Einstellung der Pipeline richtig? Geprueft wird der
      VERGLEICH, nicht nur das Vorkommen der Woerter.
+  3. Bekommt jeder Job die Historie, die er braucht, und jede Action nur
+     Eingaben, die sie kennt?
+  4. Wird jeder Waechter aufgerufen — aus der Pipeline und vor dem Push?
+  5. Entsprechen die Pipeline-Dateien ihrem Vertrag? Alle fuenf Workflows und
+     `dependabot.yml` sind per Pruefsumme festgeschrieben; fuer `ci.yml` steht
+     dazu je Pflicht-Job, welche Pruefbefehle er ausfuehren muss
+     (OPS-2026-10-03-12). Ein Pflicht-Job bleibt gruen, wenn man seinen
+     Testlauf streicht — der Zweigschutz und `deploy.sh` sehen nur Name und
+     Ergebnis, nicht, was der Job getan hat.
 
 BEKANNTE GRENZE (Runde 4, F-4): Wer `deploy-verhalten.test.js` loescht, faellt
 hier nicht auf — dieses Skript kennt die Datei nicht. Der Schutz dagegen liegt
@@ -77,12 +86,12 @@ PRUEFJOBS_NACHTS = {
     "mitgelieferte-bibliotheken": "node scripts/pruefe-fremd-meldungen.mjs",
     "abkuendigungen": "node scripts/pruefe-abkuendigungen.mjs",
 }
-# Pruefsummen der beiden Workflow-Dateien, VOLLSTAENDIG (Befund J-01,
-# 30.09.2026). Die erste Fassung schrieb nur einzelne Jobs fest und liess
-# jede Zeile mit "uses:" aus — 23 Veraenderungen bestanden sie, darunter ein
-# geloeschter Monats-Zeitplan, Schluessel in Anfuehrungszeichen, Job-env und
-# eine Kommentarzeile mitten in einem mehrzeiligen Befehl. Jetzt zaehlt die
-# ganze Datei. Normalisiert wird nur, was nachweislich nichts bewirkt:
+# Pruefsummen der Pipeline-Dateien, VOLLSTAENDIG (Befund J-01, 30.09.2026).
+# Die erste Fassung schrieb nur einzelne Jobs fest und liess jede Zeile mit
+# "uses:" aus — 23 Veraenderungen bestanden sie, darunter ein geloeschter
+# Monats-Zeitplan, Schluessel in Anfuehrungszeichen, Job-env und eine
+# Kommentarzeile mitten in einem mehrzeiligen Befehl. Jetzt zaehlt die ganze
+# Datei. Normalisiert wird nur, was nachweislich nichts bewirkt:
 #   · ganze Zeilen der Form `uses: owner/repo@<40 hex> # vN` — SHA und
 #     Kommentar (Dependabot hebt sie an); owner/repo zaehlt weiter,
 #   · Kommentar- und Leerzeilen AUSSERHALB von Blockskalaren (| >). Innerhalb
@@ -95,11 +104,73 @@ PRUEFJOBS_NACHTS = {
 # `python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`. Die Summe
 # schuetzt vor Versehen, nicht vor Absicht — die Aenderung am Workflow steht
 # im selben Pull Request sichtbar im Diff.
+#
+# OPS-2026-10-03-12: Festgeschrieben sind ALLE Dateien, die bestimmen, was die
+# Pipeline prueft und was ohne Mensch auf `main` gelangt — nicht nur die beiden
+# Sicherheits-Workflows. `ci.yml` ist die Quelle aller sechs Pflicht-Checks;
+# `release.yml` und `dependabot-automerge.yml` laufen mit Schreibrechten;
+# `dependabot.yml` bestimmt, welche Pakete ueberhaupt Updates bekommen.
 VERTRAG_SUMMEN = {
     "sicherheit-nachts.yml": "46e7e74b721601db",
     "libheif-bau.yml": "39f0db0be0a0a3e0",
+    "ci.yml": "93fb5679107cde7f",
+    "release.yml": "1fd803f6e5167738",
+    "dependabot-automerge.yml": "1a3aa65db26ff8bd",
+    "dependabot.yml": "204892976a7df7e5",
 }
+# Wo die Dateien liegen: alle unter .github/workflows — bis auf diese.
+VERTRAG_ORT = {"dependabot.yml": ".github/dependabot.yml"}
 _USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[0-9a-f]{40} # .*$")
+
+# ── Was jeder Pflicht-Job der Pipeline ausfuehren MUSS (OPS-2026-10-03-12) ────
+#
+# Die sechs Jobs sind die Pflicht-Checks des Zweigschutzes, und `deploy.sh`
+# verlangt jeden davon gruen (Liste PFLICHT dort). Beide sehen aber nur NAME
+# und ERGEBNIS eines Jobs. Streicht jemand beim Ueberarbeiten von `ci.yml` den
+# Testlauf aus einem Job, bleibt der Job gruen, der Pull Request geht durch, und
+# die Auslieferung auch.
+#
+# Deshalb steht hier je Job, welche Schritte ihn ausmachen. Gemessen werden die
+# tatsaechlichen Schritte des Jobs, nicht ein Vorkommen im Text: Der Kommentar
+# ueber einem Schritt nennt meist genau den Namen, um den es geht. Ein Eintrag
+# ist ein `run:`-Befehl im Wortlaut; "uses: owner/repo" verlangt eine Action.
+#
+# Weitere Schritte sind erlaubt (Einrichtung, neue Waechter). Dass kein Aufruf
+# eines Waechters verloren geht, prueft der Abschnitt "Wird jeder Waechter auch
+# aufgerufen?"; alles Uebrige an der Datei haelt die Pruefsumme oben. Die Liste
+# hier ist der Teil, der auch dann rot bleibt, wenn jemand die Summe nachtraegt.
+PFLICHTJOBS_CI = {
+    "test-backend": [
+        "node ../scripts/audit-gate.mjs functions .",
+        "npm run lint",
+        "npm run format:check",
+        "npm test",
+        "sh scripts/pruefe-zeitzuender.sh . --nur backend",
+    ],
+    "test-frontend": [
+        "npm run lint:frontend",
+        "npm run format:frontend:check",
+        "npm run test:frontend",
+        "sh scripts/pruefe-zeitzuender.sh . --nur frontend",
+    ],
+    "test-e2e": ["npm run test:e2e"],
+    "secret-scan": ["uses: gitleaks/gitleaks-action"],
+    "playwright-version": ["sh scripts/nur-nachtrag.sh"],
+    "pruefungen": [
+        "sh scripts/pruefungen/selbstpruefung.sh",
+        "python3 scripts/pruefungen/checks/aussentext.py .",
+        "python3 scripts/pruefungen/checks/fakten-drift.py .",
+        "python3 scripts/pruefungen/checks/stiller-fehlschlag.py .",
+        "python3 scripts/pruefungen/checks/stiller-fehlschlag.py .github",
+        "python3 scripts/pruefungen/checks/test-blind.py .",
+        "bash scripts/selbstpruefung-waechter.sh",
+    ],
+}
+# Die einzige Bedingung, unter der ein Pflicht-Job entfallen darf: Der
+# Browser-Test bei einem reinen Auslieferungs-Nachtrag (docs/SECURITY-MODEL.md,
+# "Nachtrag ohne Browser-Test"). Er steht dann auf "skipped", und `deploy.sh`
+# wertet das nie als bestanden.
+JOB_BEDINGUNG_CI = {"test-e2e": "needs.playwright-version.outputs.nur_nachtrag != 'ja'"}
 
 
 def _ohne_kommentarzeilen(text):
@@ -200,9 +271,99 @@ def vertrag_libheif_bau():
     return m
 
 
+def _vertragsdatei(name):
+    return WURZEL / VERTRAG_ORT.get(name, f".github/workflows/{name}")
+
+
+def vertrag_weitere_summen():
+    """Die Pipeline-Dateien, fuer die es ueber die Pruefsumme hinaus keinen
+    eigenen Vertrag gibt (und `ci.yml`, deren inhaltlicher Teil in
+    `vertrag_ci` steht)."""
+    m = []
+    for name in VERTRAG_SUMMEN:
+        if name in ("sicherheit-nachts.yml", "libheif-bau.yml"):
+            continue  # haben ihren eigenen Vertrag samt Summe, siehe oben
+        datei = _vertragsdatei(name)
+        if not datei.exists():
+            m.append(f"{name} fehlt — die Datei gehoert zum festgeschriebenen Stand der Pipeline")
+            continue
+        if _summe(datei.read_text(encoding="utf-8")) != VERTRAG_SUMMEN[name]:
+            m.append(f"{name} weicht vom festgeschriebenen Stand ab (Pruefsumme der ganzen Datei)")
+    return m
+
+
+def _schritte(block):
+    """Die Schritte eines Job-Blocks: jeder `run:`-Befehl im Wortlaut, jede
+    Action als "uses: owner/repo" (ohne Versionskennung)."""
+    laeufe = [befehl.strip() for befehl in re.findall(r"(?m)^\s+(?:- )?run:\s*(.*)$", block)]
+    actions = ["uses: " + a for a in re.findall(r"(?m)^\s+(?:- )?uses:\s*([^@\s]+)", block)]
+    return laeufe + actions
+
+
+def vertrag_ci(ci_text, deploy_text):
+    """Der inhaltliche Vertrag fuer `ci.yml`: Was jeder Pflicht-Job tun muss.
+    `deploy_text` ist deploy.sh ohne Kommentarzeilen — von dort kommt die Liste
+    der Pflicht-Checks, die die Auslieferung verlangt."""
+    t = _ohne_kommentarzeilen(ci_text)
+    m = []
+
+    # Die Pflicht-Jobs hier und die Pflicht-Checks in deploy.sh muessen dieselben
+    # sein. Sonst verlangt die Auslieferung einen Check, dessen Inhalt niemand
+    # festhaelt — oder dieser Vertrag einen, den die Auslieferung nicht verlangt.
+    treffer = re.search(r'(?m)^\s*PFLICHT="([^"]*)"', deploy_text)
+    if not treffer:
+        m.append("deploy.sh nennt keine Liste PFLICHT — welche Pflicht-Checks die Auslieferung verlangt, ist nicht lesbar")
+    elif set(treffer.group(1).split()) != set(PFLICHTJOBS_CI):
+        m.append(
+            f"deploy.sh verlangt die Pflicht-Checks {sorted(treffer.group(1).split())}, "
+            f"der Vertrag der Pipeline nennt {sorted(PFLICHTJOBS_CI)} — beide Listen muessen gleich sein"
+        )
+
+    # Rechte des Pipeline-Tokens: nur lesen, und kein Job hebt das fuer sich auf.
+    kopf = t.split("\njobs:\n", 1)[0]
+    rechte = re.search(r"(?m)^permissions:[ ]*\n((?:[ ]+\S.*\n?)+)", kopf)
+    if not rechte or [z.strip() for z in rechte.group(1).splitlines()] != ["contents: read"]:
+        m.append("ci.yml: Rechte des Pipeline-Tokens sind nicht genau 'permissions: contents: read'")
+
+    bloecke = _jobbloecke(t)
+    for job, befehle in PFLICHTJOBS_CI.items():
+        if job not in bloecke:
+            m.append(f"ci.yml: Pflicht-Job {job} fehlt")
+            continue
+        b = bloecke[job]
+        vorhanden = _schritte(b)
+        for befehl in befehle:
+            if befehl not in vorhanden:
+                m.append(f"ci.yml: Job {job} fuehrt '{befehl}' nicht mehr als eigenen Schritt aus")
+        if re.search(r"(?m)^\s+(?:- )?continue-on-error\s*:", b):
+            m.append(f"ci.yml: Job {job} traegt 'continue-on-error' — ein roter Schritt zaehlte als gruen")
+        if re.search(r"(?m)^\s+permissions\s*:", b):
+            m.append(f"ci.yml: Job {job} setzt eigene Rechte ('permissions')")
+        # Schluessel des Jobs stehen mit vier Leerzeichen Einzug; Bedingungen an
+        # einzelnen Schritten (tiefer eingerueckt) sind hier nicht gemeint.
+        bedingungen = [w.strip() for w in re.findall(r"(?m)^    if:\s*(.*)$", b)]
+        erlaubt = [JOB_BEDINGUNG_CI[job]] if job in JOB_BEDINGUNG_CI else []
+        if bedingungen and bedingungen != erlaubt:
+            m.append(f"ci.yml: Job {job} traegt die Bedingung {bedingungen!r} — er koennte still entfallen")
+    return m
+
+
+def vertrag_actions():
+    """Jede fremde Action ist per Commit-Kennung (40 Zeichen) festgenagelt —
+    in allen Workflows. Ein Etikett (`@v7`) oder ein Zweig (`@master`) kann
+    morgen anderen Code bezeichnen; GitHub erzwingt das Festnageln nicht."""
+    m = []
+    for datei in sorted((WURZEL / ".github" / "workflows").glob("*.y*ml")):
+        t = _ohne_kommentarzeilen(datei.read_text(encoding="utf-8"))
+        for wert in re.findall(r"(?m)^\s+(?:- )?uses:\s*(\S+)", t):
+            if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}", wert):
+                m.append(f"{datei.name}: Action '{wert}' ist nicht per Commit-Kennung (40 Zeichen) festgenagelt")
+    return m
+
+
 def vertrag_summen_ausgeben():
-    for name in ("sicherheit-nachts.yml", "libheif-bau.yml"):
-        text = (WURZEL / ".github/workflows" / name).read_text(encoding="utf-8")
+    for name in VERTRAG_SUMMEN:
+        text = _vertragsdatei(name).read_text(encoding="utf-8")
         print(f'    "{name}": "{_summe(text)}",')
 
 def main():
@@ -312,6 +473,11 @@ def main():
     # Wer die Historie braucht, muss sie bekommen. Das ist aus dem Aufruf
     # ablesbar — also pruefbar.
     print("── Bekommt jeder Job die Historie, die er braucht? ──")
+    # Ein Merker fuer alle Pruefungen an ci.yml in diesem und den folgenden
+    # Abschnitten. Er steht VOR der ersten davon: Wird er weiter unten noch
+    # einmal auf False gesetzt, geht ihr Befund verloren — die Zeile "FEHLT"
+    # stuende dann da, der Rueckgabewert bliebe 0.
+    ci_fehlt = False
     BRAUCHT_HISTORIE = ("origin/main", "pruefe-mutationen", "pruefe-mitzieher")
     job_zeilen = ci.split("\n")
     aktueller_job = None
@@ -347,7 +513,6 @@ def main():
     print()
 
     print("── Bricht ein neuer Push den vorigen Lauf ab? ──")
-    ci_fehlt = False
     if True:
         # BEFUND 31.08.2026 (Runde 3): Hier wurde nur geprueft, OB die Woerter
         # vorkommen. `cancel-in-progress: true` haette weiter "ok" gemeldet,
@@ -541,7 +706,16 @@ def main():
     # kann. Der Alarm-Job und die Jobs des Nachbaus sind per Pruefsumme
     # festgeschrieben — eine bewusste Aenderung dort traegt man hier nach
     # (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen`).
-    nachts_maengel = vertrag_nachts(nachts_text) + vertrag_libheif_bau()
+    # OPS-2026-10-03-12: Derselbe Vertrag gilt fuer die uebrigen Pipeline-
+    # Dateien; `ci.yml` hat dazu einen inhaltlichen Teil (Pflichtbefehle je
+    # Pflicht-Job), und in keinem Workflow steht eine Action ohne Commit-Kennung.
+    vertrags_maengel = (
+        vertrag_nachts(nachts_text)
+        + vertrag_libheif_bau()
+        + vertrag_weitere_summen()
+        + vertrag_ci(ci, text)
+        + vertrag_actions()
+    )
     waechter_fehlt = []
     for datei in skripte:
         if datei.name in NUR_LOKAL:
@@ -567,8 +741,6 @@ def main():
         print("  NICHT MESSBAR: docs/WAECHTER.md fehlt.")
         return 2
     text_uebersicht = uebersicht.read_text(encoding="utf-8")
-    for mangel in nachts_maengel:
-        waechter_fehlt.append(("vertrag", mangel))
     undokumentiert = [d.name for d in skripte if d.name not in text_uebersicht]
     if undokumentiert:
         for name in undokumentiert:
@@ -581,13 +753,22 @@ def main():
         for name, wo in waechter_fehlt:
             if wo == "docs/WAECHTER.md":
                 continue
-            if name == "vertrag":
-                print(f"  FEHLT   Vertrag {wo}")
-                continue
             print(f"  FEHLT   {name} wird nicht aufgerufen aus: {wo}")
         print("          Ein Waechter, den niemand aufruft, ist kein Waechter.")
     else:
         print(f"  ok      alle {len(skripte)} Waechter sind aus beiden Listen erreichbar")
+    print()
+    print("── Entsprechen die Pipeline-Dateien ihrem Vertrag? ──")
+    if vertrags_maengel:
+        for mangel in vertrags_maengel:
+            print(f"  FEHLT   Vertrag {mangel}")
+        if any("weicht vom festgeschriebenen Stand ab" in mangel for mangel in vertrags_maengel):
+            print("          War die Aenderung beabsichtigt? Dann die neue Pruefsumme in")
+            print("          VERTRAG_SUMMEN nachtragen — sie steht in der Ausgabe von:")
+            print("          python3 scripts/pruefe-deploy-riegel.py --vertrag-summen")
+    else:
+        print(f"  ok      {len(VERTRAG_SUMMEN)} Dateien entsprechen dem festgeschriebenen Stand;")
+        print(f"          jeder der {len(PFLICHTJOBS_CI)} Pflicht-Jobs fuehrt seine Pruefbefehle aus")
     print()
     # BEFUND 01.09.2026 (erster echter Pipeline-Lauf): VIER Fehler derselben
     # Bauart an einem Tag. Beim Einfuegen neuer Schritte in ci.yml sind Zeilen
@@ -682,7 +863,15 @@ def main():
 
     print()
 
-    anzahl = len(fehlt) + len(falsch_platziert) + len(ohne_abbruch) + len(ohne_bilanz) + (1 if ci_fehlt else 0) + len(waechter_fehlt)
+    anzahl = (
+        len(fehlt)
+        + len(falsch_platziert)
+        + len(ohne_abbruch)
+        + len(ohne_bilanz)
+        + (1 if ci_fehlt else 0)
+        + len(waechter_fehlt)
+        + len(vertrags_maengel)
+    )
     if anzahl == 0:
         print("  ERGEBNIS: Notschalter vollstaendig gemeldet, Pipeline-Einstellung ok.")
         print("  (Die Riegel SELBST prueft deploy-verhalten.test.js — ausgefuehrt, nicht gelesen.)")

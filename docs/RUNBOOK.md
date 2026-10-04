@@ -23,6 +23,15 @@ selbst — also in der Datei, die ohne ihn nie laeuft. Ein frischer Klon hatte
 den Riegel damit stillschweigend nicht (gemessen: Push mit entwaffnetem
 deploy.sh ging durch).
 
+**Pipeline-Datei geändert?** Dann meldet die Vorabprüfung „Pruefungen:
+Deploy-Riegel" rot: Alle fünf Workflows unter `.github/workflows/` und
+`.github/dependabot.yml` sind per Prüfsumme festgeschrieben. War die Änderung
+beabsichtigt, die neue Summe nachtragen — `python3 scripts/pruefe-deploy-riegel.py
+--vertrag-summen` zeigt sie, eingetragen wird sie in `VERTRAG_SUMMEN` im selben
+Skript. Bleibt der Riegel danach rot, fehlt in `ci.yml` etwas, das ein Pflicht-Job
+tun muss; die Meldung nennt Job und Befehl (Begründung: `docs/SECURITY-MODEL.md`,
+Absatz „Festgeschrieben").
+
 ## Normalbetrieb (Soll-Zustand)
 
 - **Analyse-Weg:** Upload → Cloud-Tasks-Queue → ein Aufruf an Mistral Large
@@ -565,6 +574,16 @@ oder die Live-Smoke-Probe „Direktweg" ist rot, während `/api/stats` über
 3. `./scripts/deploy.sh hosting` — die Seite ruft danach wieder `/api/…` über
    Hosting auf. Browser mit alter `app.js` im Zwischenspeicher laufen ohnehin
    über die Umleitungen weiter.
+
+**Dieser Weg ist nur offen, solange der Server-Code unverändert ist.** Vor dem
+Hochladen vergleicht `deploy.sh hosting` den Server-Code des ausgecheckten Standes
+mit dem, den die Seite heute ausweist (`https://malzi.me/build-info.json`, Feld
+`serverDateien`), und bricht bei einer Abweichung ab — sonst wiese die Seite danach
+ein Server-Programm aus, das nie hinausging (ARCH-2026-10-03-10). Für diesen Hebel
+also nur die zwei Dateien oben ändern, nichts unter `functions/src/`. Bricht das
+Skript an dieser Stelle ab oder ist die Seite nicht lesbar, gibt es keinen
+Notschalter: `./scripts/deploy.sh` ohne Argument liefert Website und Server zusammen
+aus.
 
 Zurück auf den direkten Weg: beides wieder auf `true`, Hosting-Deploy.
 

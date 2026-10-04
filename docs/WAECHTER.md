@@ -23,7 +23,7 @@ die Frage: Deckt ein bestehender dieselbe Fehlerklasse schon ab?
 
 | Wächter | Fehlerklasse | Ausgelöst durch | Laufzeit |
 |---|---|---|---|
-| `pruefe-deploy-riegel.py` | Notschalter, die in der Schlussbilanz fehlen; Pipeline-Einstellung; **Wächter, die niemand mehr aufruft**; **verrutschte Eingaben in `ci.yml`**; **Vertrag der Sicherheits-Workflows** (`sicherheit-nachts.yml`, `libheif-bau.yml` vollständig per Prüfsumme; frei nur die Versionskennungen der Actions) | Runde 7 (K-7): Ein Prüfschritt liess sich aus der Pipeline entfernen, ohne dass etwas rot wurde. 01.09.: Vier Einfüge-Fehler in `ci.yml` an einem Tag, drei Pipeline-Läufe verbrannt | 24 ms |
+| `pruefe-deploy-riegel.py` | Notschalter, die in der Schlussbilanz fehlen; Pipeline-Einstellung; **Wächter, die niemand mehr aufruft**; **verrutschte Eingaben in `ci.yml`**; **Vertrag der Pipeline-Dateien**: alle fünf Workflows und `dependabot.yml` vollständig per Prüfsumme (frei nur die Versionskennungen der Actions); für `ci.yml` dazu je Pflicht-Job die Prüfbefehle, die er als eigenen Schritt ausführen muss, dieselben sechs Pflicht-Jobs wie in `deploy.sh`, keine stille Entwertung (`continue-on-error`, Bedingung am Job, Schreibrechte); jede Action per Commit-Kennung festgenagelt | Runde 7 (K-7): Ein Prüfschritt liess sich aus der Pipeline entfernen, ohne dass etwas rot wurde. 01.09.: Vier Einfüge-Fehler in `ci.yml` an einem Tag, drei Pipeline-Läufe verbrannt. OPS-2026-10-03-12: Die Zeilen der Server-Tests, der Browser-Modul-Tests, der Browser-Durchläufe und des Server-Lint liessen sich aus `ci.yml` streichen — der Job blieb grün, und Zweigschutz wie Auslieferung sehen nur Name und Ergebnis eines Jobs | rund 40 ms; Proben gegen einen Nachbau in `pipeline-vertrag-script.test.js` |
 | `pruefe-workflows-gueltig.mjs` | Workflow-Dateien, die GitHub nicht lesen kann (Zeichen und Größe, die GitHubs Server-Leser ablehnt; YAML-Fehler; fehlendes Grundgerüst) — sie laufen nie, und der Pull Request zeigt den Fehllauf nicht an; mit Positivkontrolle | Befunde K-01 (30.09.2026) und N-01 (01.10.2026): In Proben hätte ein Kommentar mit zu wenig Einzug oder ein Tab vor einem Kommentar den Nachtlauf samt Alarm stillgelegt, und jede Prüfung wäre grün geblieben | 40 ms |
 | `pruefe-doppelte-werte.py` | Betriebswerte, die im Code UND im Einstellungssatz stehen | Firestore-Umbau 30.08.: Die Doku nannte Werte, die so nicht liefen | 44 ms |
 | `pruefe-i18n-fallbacks.py` | Sichtbarer Text, der von seiner Sprachdatei abweicht | Fund 21.08.: Im HTML stand ein anderer Satz als in der Sprachdatei | 35 ms |
@@ -74,8 +74,10 @@ verstreut in den Dateien; hier ist die vollständige Liste mit dem Grund.
 | `.github/fremd-meldungen-ausnahmen.json` | einzelne Herstellermeldungen je Bibliothek | Meldungen ohne auswertbare Versionsangabe, bei denen am Quelltext belegt ist, dass unser Stand nicht betroffen ist; Pflichtfelder Begründung und Ablaufdatum, jede Ausnahme steht in jeder Ausgabe |
 | `.github/abkuendigungen-ausnahmen.json` | einzelne GitHub-Hinweise (Textmuster) | Hinweise, bei denen bewusst nichts zu tun ist (etwa die Umstellung von `ubuntu-latest`); Pflichtfelder Begründung und Ablaufdatum |
 | `pruefe-deploy-riegel.py` → `NUR_PIPELINE` | `pruefe-mutationen.mjs` | Braucht Minuten und installierte Pakete; vor dem Push würde es aus 14 Sekunden Minuten machen |
-| `vor-dem-push-script.test.js` → `BEWUSST_DRAUSSEN` | `npm ci`, `npm test`, `npm run test:e2e`, Mutationsprobe | Installation bzw. lange Suiten — die deckt `scripts/pruefstand.sh` ab |
-| `vor-dem-push-script.test.js` → `ANDERS_BENANNT` | `secret-scan-lokal.sh` | Die Pipeline hat dafür den eigenen Job `secret-scan` mit gitleaks |
+| `vor-dem-push-script.test.js` → `BEWUSST_DRAUSSEN` | `npm ci`, `npm test`, `npm run test:e2e`, Mutationsprobe | Installation bzw. lange Suiten — die deckt `scripts/pruefstand.sh` ab. Dass die PIPELINE die beiden langen Suiten fährt, hält `LANGE_SUITEN` im selben Test fest: jede als Schritt ihres Pflicht-Jobs |
+| `vor-dem-push-script.test.js` → `ANDERS_BENANNT` | `secret-scan-lokal.sh`; der gezielte Testlauf bei geänderter Pipeline | Lokal heisst es anders, die Pipeline prüft dasselbe: Für das eine hat sie den Job `secret-scan` mit der gitleaks-Action, für das andere fährt sie die ganze Server-Suite. Der Test verlangt den genannten Schritt im selben Job |
+| `vor-dem-push-script.test.js` → `NUR_LOKAL` | `pruefe-pipeline-schritte.mjs` | Führt geänderte Pipeline-Schritte vor dem Push aus — in der Pipeline liefe er gegen sich selbst |
+| `pruefe-deploy-riegel.py` → `JOB_BEDINGUNG_CI` | Der Job `test-e2e` darf eine Bedingung tragen — genau eine | Beim reinen Auslieferungs-Nachtrag entfällt der Browser-Test und steht auf „skipped"; `deploy.sh` wertet das nie als bestanden (`docs/SECURITY-MODEL.md`, „Nachtrag ohne Browser-Test"). Jede andere Bedingung an einem Pflicht-Job ist ein Befund |
 | `pruefe-doppelte-werte.py` → Auswertungsregeln | `ANHALTEND_TAGE`, `BLIND_TAGE`, Schwellen der Wachen | Keine Stellschrauben des Betriebs: Sie ändern nicht, wie schnell analysiert wird, sondern ab wann ein Ausfall laut wird |
 | `pruefe-mutationen.mjs` → Vorgabewerte | `x \|\| ""`, `port \|\| 5001` | Ein Test dagegen wäre künstlich; er prüfte eine Zeile, nicht ein Verhalten |
 | `skript-rechte.test.js` | `scripts/pruefungen/negativprobe/**` | Beispielmaterial für die Prüfungen — absichtlich kaputte Skripte, die niemand ausführt |
@@ -113,7 +115,21 @@ Ehrlich benannt, damit niemand sich darauf verlässt:
   ob `ci.yml` strukturell stimmt. Vier Einfüge-Fehler an einem Tag — Zeilen
   unter dem falschen Schritt — blieben lokal unsichtbar, weil das YAML gültig
   bleibt und alle Tests grün. Sichtbar wurden sie erst, als GitHub die Datei
-  ausführte. Das kostete drei Läufe und rund vierzig Minuten.
+  ausführte. Das kostete drei Läufe und rund vierzig Minuten. Und bis zum
+  04.10.2026 hielt nichts fest, WAS die sechs Pflicht-Jobs ausführen: Ein Job
+  ohne seinen Testlauf blieb grün (OPS-2026-10-03-12). Seither gibt es den
+  Vertrag der Pipeline-Dateien — mit zwei Grenzen:
+  - *Er schützt vor Versehen, nicht vor Absicht.* Wer eine Pipeline-Datei
+    ändert, kann die Prüfsumme mitändern; beides steht dann im selben Pull
+    Request. Der Vertrag läuft im Pflicht-Job `pruefungen`, seine Gegenprobe
+    (`vor-dem-push-script.test.js`) im Pflicht-Job `test-backend`: Fällt einer
+    der beiden Aufrufe weg, meldet es der andere. Fallen beide im selben Pull
+    Request weg, sieht es nur noch die Vorabprüfung vor dem Push.
+  - *Er sieht nicht, was GitHub verlangt.* Welche Checks der Zweigschutz zur
+    Pflicht macht, steht bei GitHub (Soll-Zustand: `docs/RUNBOOK.md`, „Branch
+    Protection"). Der Vertrag hält `ci.yml` und `deploy.sh` zusammen; kommt
+    bei GitHub ein Pflicht-Check dazu oder fällt einer weg, merkt es hier
+    niemand.
 
 - **Sie ist selbst fehleranfällig.** In acht Prüfrunden sassen die meisten
   Befunde nicht in der Anwendung, sondern in dieser Schicht. Zwei Werkzeuge,

@@ -742,17 +742,35 @@ automatisch gelöscht. Am 1. jedes Monats kommt eine sichtbare Probe; bleibt sie
 ist der Alarmweg gestört. Ist in einem Probelauf eine Prüfung nicht grün, meldet
 der Push „ROT", nicht „PROBE".
 
-*Festgeschrieben:* Die beiden Sicherheits-Workflows sind im Deploy-Riegel
-(`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben. Frei
-bleiben nur, was nachweislich nichts bewirkt: die Versionskennungen der Actions
-(`uses: owner/repo@<SHA> # vN` — SHA und Kommentar; Dependabot hebt sie an),
-Kommentar- und Leerzeilen außerhalb mehrzeiliger Befehle und Ausdrücke sowie
-Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leerzeichen — einen Tab
-vor einem Kommentar lehnt GitHub ab, er macht die Summe deshalb rot. Jede andere
-Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
-(`--vertrag-summen`). Zusätzlich prüft er inhaltlich: genau ein festgelegter Befehl
-je Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte,
-ein täglicher Zeitplan.
+*Festgeschrieben:* Die Pipeline-Dateien sind im Deploy-Riegel
+(`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben: seit
+30.09.2026 die beiden Sicherheits-Workflows, seit 04.10.2026 auch `ci.yml`,
+`release.yml`, `dependabot-automerge.yml` und `.github/dependabot.yml`
+(OPS-2026-10-03-12) — also alles, was bestimmt, was die Pipeline prüft und was ohne
+Mensch auf `main` gelangt. Frei bleibt nur, was nachweislich nichts bewirkt: die
+Versionskennungen der Actions (`uses: owner/repo@<SHA> # vN` — SHA und Kommentar;
+Dependabot hebt sie an), Kommentar- und Leerzeilen außerhalb mehrzeiliger Befehle und
+Ausdrücke sowie Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leerzeichen
+— einen Tab vor einem Kommentar lehnt GitHub ab, er macht die Summe deshalb rot. Jede
+andere Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
+(`--vertrag-summen`).
+
+Zusätzlich prüft er inhaltlich. Im Nachtlauf: genau ein festgelegter Befehl je
+Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte, ein
+täglicher Zeitplan. In `ci.yml`: Jeder der sechs Pflicht-Jobs führt die Prüfbefehle,
+die ihn ausmachen, als eigenen Schritt aus — Server-Tests, Lint und Formatprüfung,
+Abhängigkeits-Gate, Browser-Modul-Tests, Browser-Durchläufe, Geheimnis-Suche,
+Nachtrag-Erkennung, die Prüfungen samt ihrer Selbstprüfung (Liste `PFLICHTJOBS_CI` im
+Riegel). Kein Pflicht-Job trägt `continue-on-error` oder eine Bedingung, außer der des
+Browser-Tests beim reinen Nachtrag (unten, „Nachtrag ohne Browser-Test"); das
+Pipeline-Token darf nur lesen; und die Pflicht-Jobs sind dieselben sechs, die
+`scripts/deploy.sh` grün verlangt. In allen Workflows ist jede Action per
+Commit-Kennung festgenagelt.
+*Warum der Inhalt, wenn die Summe schon jede Zeile hält:* Der Zweigschutz und
+`deploy.sh` sehen von einem Pflicht-Check nur Name und Ergebnis. Ein Job, aus dem der
+Testlauf gestrichen wurde, bleibt grün. `ci.yml` wird mehrmals im Monat bewusst
+geändert; wer dabei die Summe nachträgt, soll einen verlorenen Testlauf nicht mit
+nachtragen können.
 *Lesbarkeit:* Eine Workflow-Datei, die GitHub nicht lesen kann, läuft nie — und der
 Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` prüft
 im Pull Request und vor dem Push jede Datei unter `.github/workflows` in zwei Schritten:
@@ -764,7 +782,12 @@ Grundgerüst (`on`, Jobs mit `runs-on` oder `uses`); beides mit Positivkontrolle
 wer den Workflow ändert, kann die Summe mitändern; beides steht dann im selben Pull
 Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig. Weitere
 Stellen, an denen GitHubs Server strenger liest als diese Prüfung, sieht sie nicht;
-das fängt der Deploy auf (nächster Absatz).
+das fängt der Deploy auf (nächster Absatz). Der Vertrag läuft im Pflicht-Job
+`pruefungen`, seine Gegenprobe (`vor-dem-push-script.test.js`) im Pflicht-Job
+`test-backend`: Fällt einer der beiden Aufrufe weg, meldet es der andere; fallen
+beide im selben Pull Request weg, sieht es nur noch die Vorabprüfung vor dem Push.
+Welche Checks der Zweigschutz bei GitHub zur Pflicht macht, sieht der Vertrag nicht
+(Soll-Zustand: RUNBOOK, „Branch Protection").
 
 *Restrisiken:*
 - Ob GitHub den Nachtlauf tatsächlich ausführt, sieht der Vertrag nicht (60-Tage-

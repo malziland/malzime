@@ -15,6 +15,9 @@
 #   ./scripts/deploy.sh hosting      # nur die Website
 # Den Server allein liefert dieses Skript nicht aus (ARCH-2026-10-03-10, Riegel
 # gleich unten): Der Fingerabdruck des Server-Codes geht mit der Website hinaus.
+# Aus demselben Grund geht die Website nur dann allein hinaus, wenn der
+# Server-Code seit dem Stand unveraendert ist, den die Seite heute ausweist
+# (Riegel nach dem Erzeugen des Fingerabdrucks).
 #
 # Notschalter, alle nur im Notfall und alle einzeln zu begruenden:
 #   SKIP_STAND=1      Stand-Bindung an die CI-Freigabe aus; dann laufen Lint
@@ -911,6 +914,107 @@ IFS=$ALT_IFS
 if ! node scripts/build-info.mjs "$VERSION"; then
   echo "FEHLER: build-info.json konnte nicht erzeugt werden." >&2
   exit 1
+fi
+
+# ── ARCH-2026-10-03-10, Gegenrichtung: Die Website allein geht nur hinaus, wenn der Server-Code unveraendert ist ──
+# Der eben erzeugte Fingerabdruck weist den Server-Code des AUSGECHECKTEN
+# Standes aus (Feld `serverDateien`), Datei fuer Datei. Steht `functions` nicht
+# im Ziel, wird dieser Code aber nicht ausgeliefert. Hat er sich seit der
+# letzten Auslieferung geaendert, wiese die Seite danach ein Server-Programm
+# aus, das nie hinausging.
+#
+# Verglichen wird mit dem, was die Seite HEUTE ausweist: dem Fingerabdruck, der
+# live steht. Bewusst nicht mit der eingecheckten Datei — der Fingerabdruck
+# einer Auslieferung kommt erst mit dem Nachtrag ins Repository. Gerade wenn
+# der reine Website-Weg gebraucht wird (docs/RUNBOOK.md, Hebel 5a: die Proben
+# nach einer Auslieferung sind rot), ist der Nachtrag noch nicht geschrieben;
+# die eingecheckte Datei traegt dann den Stand DAVOR.
+#
+# `functions` muss als Ganzes im Ziel stehen: Eine einzelne Function
+# (`functions:name`) liefert nicht den ganzen ausgewiesenen Server-Code aus.
+#
+# Kein Notschalter. Der Ausweg ist die vollstaendige Auslieferung ohne Argument
+# — sie liefert den ausgewiesenen Server-Code mit aus. Laesst sich der Vergleich
+# nicht fuehren (Seite nicht erreichbar, Antwort kein Fingerabdruck), gilt er
+# als nicht bestanden. Bricht der Riegel ab, nimmt die Aufraeumfalle die
+# Cache-Kennung und den Fingerabdruck zurueck; hochgeladen ist bis hierher nichts.
+if [[ ",$TARGET," != *",functions,"* ]]; then
+  FINGERABDRUCK_LIVE_URL="https://malzi.me/build-info.json"
+  AUSGEWIESEN_RC=0
+  AUSGEWIESEN=$(curl -s --max-time 20 "$FINGERABDRUCK_LIVE_URL" 2>/dev/null) || AUSGEWIESEN_RC=$?
+  if [ "$AUSGEWIESEN_RC" -ne 0 ]; then
+    echo "FEHLER: $FINGERABDRUCK_LIVE_URL war nicht erreichbar (curl-Rueckgabewert $AUSGEWIESEN_RC)." >&2
+    echo "        Damit ist nicht gemessen, welchen Server-Code die Seite heute ausweist. Ohne diesen" >&2
+    echo "        Vergleich geht die Website nicht allein hinaus. Netz pruefen und erneut starten —" >&2
+    echo "        oder Website und Server zusammen ausliefern: ./scripts/deploy.sh (ohne Argument)." >&2
+    exit 1
+  fi
+  # Rueckgabewert des Vergleichs: 0 gleich (Ausgabe: Zahl der Dateien und der
+  # live ausgewiesene Commit), 1 abweichend (Ausgabe: die abweichenden Dateien),
+  # 2 nicht messbar (Ausgabe: LIVE oder NEU — welche Seite sich nicht lesen liess).
+  # Ohne Pipe, damit der Rueckgabewert der des Vergleichs ist.
+  VERGLEICH_RC=0
+  VERGLEICH=$(node -e '
+    const fs = require("fs");
+    const lesen = (text) => {
+      try {
+        return JSON.parse(text);
+      } catch {
+        return null;
+      }
+    };
+    const serverDateien = (f) =>
+      f && f.serverDateien && typeof f.serverDateien === "object" && !Array.isArray(f.serverDateien)
+        ? f.serverDateien
+        : null;
+    const live = lesen(fs.readFileSync(0, "utf8"));
+    const neu = serverDateien(lesen(fs.readFileSync(process.argv[1], "utf8")));
+    const alt = serverDateien(live);
+    if (!neu || Object.keys(neu).length === 0) {
+      console.log("NEU");
+      process.exit(2);
+    }
+    if (!alt || Object.keys(alt).length === 0) {
+      console.log("LIVE");
+      process.exit(2);
+    }
+    const namen = [...new Set([...Object.keys(alt), ...Object.keys(neu)])].sort();
+    const anders = namen.filter((n) => alt[n] !== neu[n]);
+    if (anders.length === 0) {
+      const commit = /^[0-9a-f]{7,40}$/.test(String(live.commitKurz)) ? live.commitKurz : "unbekannt";
+      console.log(`${namen.length} ${commit}`);
+      process.exit(0);
+    }
+    for (const n of anders.slice(0, 12)) {
+      console.log(`${n} (${!(n in alt) ? "neu" : !(n in neu) ? "entfaellt" : "geaendert"})`);
+    }
+    if (anders.length > 12) console.log(`... und ${anders.length - 12} weitere`);
+    process.exit(1);
+  ' public/build-info.json <<<"$AUSGEWIESEN") || VERGLEICH_RC=$?
+  if [ "$VERGLEICH_RC" -eq 1 ]; then
+    echo "FEHLER: Server-Code hat sich seit dem ausgewiesenen Stand geaendert — ohne Argument ausliefern." >&2
+    echo "        Das Ziel \"$TARGET\" liefert den Server nicht aus. Der Fingerabdruck der Website" >&2
+    echo "        (public/build-info.json) wiese danach einen Server-Code aus, der nie hinausging." >&2
+    echo "        Abweichend gegenueber dem, was $FINGERABDRUCK_LIVE_URL heute ausweist:" >&2
+    printf '%s\n' "$VERGLEICH" | sed 's/^/          /' >&2
+    echo "        Website und Server zusammen: ./scripts/deploy.sh (ohne Argument)." >&2
+    exit 1
+  fi
+  if [ "$VERGLEICH_RC" -ne 0 ]; then
+    if [ "$VERGLEICH" = "LIVE" ]; then
+      echo "FEHLER: Die Antwort von $FINGERABDRUCK_LIVE_URL ist kein Fingerabdruck mit Server-Dateien" >&2
+      echo "        (Feld serverDateien fehlt, ist leer oder die Antwort ist kein JSON)." >&2
+    elif [ "$VERGLEICH" = "NEU" ]; then
+      echo "FEHLER: Der eben erzeugte Fingerabdruck (public/build-info.json) nennt keine Server-Dateien." >&2
+    else
+      echo "FEHLER: Der Vergleich der Fingerabdruecke liess sich nicht ausfuehren (Code $VERGLEICH_RC)." >&2
+    fi
+    echo "        Damit ist nicht gemessen, ob sich der Server-Code seit dem ausgewiesenen Stand" >&2
+    echo "        geaendert hat. Ohne diesen Vergleich geht die Website nicht allein hinaus." >&2
+    echo "        Website und Server zusammen: ./scripts/deploy.sh (ohne Argument)." >&2
+    exit 1
+  fi
+  echo "Server-Code unveraendert gegenueber dem ausgewiesenen Stand (${VERGLEICH% *} Dateien, live Commit ${VERGLEICH#* }) — die Website kann allein hinaus."
 fi
 
 echo ""

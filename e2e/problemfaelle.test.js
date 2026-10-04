@@ -27,6 +27,7 @@ import { test, expect } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Buffer } from "node:buffer";
+import { URL } from "node:url";
 
 /* Basis ist das Arbeitsverzeichnis, nicht `import.meta.url` — Playwright laedt
    Testdateien nicht als echte ES-Module (siehe a11y.test.js). */
@@ -65,11 +66,32 @@ const MOCK_RESPONSE = {
   meta: { requestId: "problemfall-123", mode: "multimodal", subject: "HUMAN" },
 };
 
+/* Ein gueltiges Bild als Kartenkachel (ein Bildpunkt genuegt, siehe
+   e2e/karte.test.js). */
+const KACHEL = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
+  "base64"
+);
+
+/* Anfragen an fremde Adressen, fuer die es in diesem Test keine Antwort gab.
+   Sie werden abgebrochen, nicht durchgelassen — und nach jedem Test muss die
+   Liste leer sein. So faellt eine neue Abfrage nach aussen im Testlauf auf,
+   statt still hinauszugehen. */
+let unbeantwortet = [];
+test.beforeEach(() => {
+  unbeantwortet = [];
+});
+test.afterEach(() => {
+  expect(unbeantwortet, "Anfrage an eine fremde Adresse ohne vorgesehene Antwort").toEqual([]);
+});
+
 /* Einreihung abfangen, Warteschlange antwortet "wartet" — die Probe endet vor
    jedem kostenpflichtigen Schritt. */
 async function seiteMitAbgefangenerEinreihung(page, { ergebnisLiefern = false } = {}) {
   const gefangen = [];
   const geladen = [];
+  /* Jede Anfrage an eine fremde Adresse, ob beantwortet oder abgebrochen. */
+  const fremd = [];
   page.on("request", (r) => geladen.push(r.url()));
   await page.route("**/api/stats", (r) =>
     r.fulfill({
@@ -98,14 +120,32 @@ async function seiteMitAbgefangenerEinreihung(page, { ergebnisLiefern = false } 
       ),
     })
   );
-  await page.route("**/nominatim.openstreetmap.org/**", (r) =>
-    r.fulfill({ status: 200, contentType: "application/json", body: "[]" })
+  /* Nichts verlaesst den Testlauf: Was nicht an den Testserver geht, wird hier
+     beantwortet oder abgebrochen. Verglichen wird der NAME DES RECHNERS, nicht
+     ein Muster ueber die ganze Adresse: Die Kartenkacheln kommen von
+     a./b./c.tile.openstreetmap.org, und ein Muster, das vor
+     "tile.openstreetmap.org" einen Schraegstrich verlangt, trifft diese
+     Unterdomaenen nicht (gemessen 04.10.2026). */
+  await page.route(
+    (url) => /^https?:$/.test(url.protocol) && url.hostname !== "localhost",
+    (route) => {
+      const url = new URL(route.request().url());
+      fremd.push(url.href);
+      if (url.hostname === "nominatim.openstreetmap.org") {
+        return route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      }
+      if (url.hostname.endsWith(".tile.openstreetmap.org")) {
+        return route.fulfill({ status: 200, contentType: "image/png", body: KACHEL });
+      }
+      unbeantwortet.push(url.href);
+      return route.abort();
+    }
   );
   await page.route("**/api/errors", (r) => r.fulfill({ status: 204 }));
   await page.setViewportSize(HANDY);
   await page.goto("/");
   await expect(page.locator("#fileInput")).toBeAttached();
-  return { gefangen, geladen };
+  return { gefangen, geladen, fremd };
 }
 
 function upload(page, datei, mimeType) {
@@ -255,13 +295,30 @@ test("Problemfall HEIC mit GPS: die Karte erscheint im Browser — GPS wurde gel
   page,
 }) => {
   test.slow(); /* HEIC-Dekoder auf dem Pipeline-Laeufer, siehe oben */
-  const { gefangen } = await seiteMitAbgefangenerEinreihung(page, { ergebnisLiefern: true });
+  const { gefangen, fremd } = await seiteMitAbgefangenerEinreihung(page, { ergebnisLiefern: true });
   await upload(page, "heic-samsung-mit-gps.heic", "image/heic");
   await expect.poll(() => gefangen.length, { timeout: 60000 }).toBe(1);
   await expect(page.locator("#simulation")).not.toBeEmpty({ timeout: 30000 });
   /* Die Karte erscheint nur, wenn der Browser die Koordinaten kennt — aus dem
      HEIC gelesen, im Browser geblieben (der Upload hatte sie nicht). */
   await expect(page.locator("#gpsMap .leaflet-container")).toBeVisible({ timeout: 15000 });
+  /* Die Karte hat ihre Kacheln angefragt — und bekommen hat sie die Antwort
+     dieses Tests, nicht die von OpenStreetMap (Messmittel-Probe fuer das
+     Abfangen: Ohne angefragte Kachel bewiese die leere Liste `unbeantwortet`
+     nichts). */
+  await expect
+    .poll(() => fremd.filter((u) => new URL(u).hostname.endsWith(".tile.openstreetmap.org")).length, {
+      timeout: 15000,
+      message: "die Karte muss Kacheln anfragen",
+    })
+    .toBeGreaterThan(0);
+  await expect
+    /* eslint-disable-next-line no-undef -- laeuft im Browser */
+    .poll(() => page.evaluate(() => document.querySelectorAll("#gpsMap img.leaflet-tile-loaded").length), {
+      timeout: 15000,
+      message: "mindestens eine Kachel muss geladen sein",
+    })
+    .toBeGreaterThan(0);
 });
 
 const FEHLER = [

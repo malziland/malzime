@@ -26,9 +26,16 @@ const ATTRAPPEN = path.join(WURZEL, "scripts", "test-attrappen");
    der Waechter die Bibliothek trotzdem — in functions/, weil der Pipeline-Job
    dieser Suite nur dort Pakete installiert. */
 const MODULE = path.join(WURZEL, "functions", "node_modules");
-const { ghSeitenAttrappeAnlegen, lauf, fremdeLaeufe, pflichtLaeufe } = require("./hilfen/gh-seiten-attrappe");
+const { ghSeitenAttrappeAnlegen, lauf, fremdeLaeufe, pflichtLaeufe, PFLICHT } = require("./hilfen/gh-seiten-attrappe");
+const { curlFingerabdruckAttrappeAnlegen } = require("./hilfen/curl-fingerabdruck-attrappe");
 
 let klon;
+/* Was die "Live-Seite" in diesen Tests ausweist: ein Ordner mit einer
+   curl-Attrappe (beantwortet die Abfrage des Fingerabdrucks, sonst nichts) und
+   der Fingerabdruck selbst. Er wird einmal aus dem Klon errechnet — so, als
+   waere genau dieser Stand zuletzt ausgeliefert worden. */
+let fingerabdruckOrdner;
+let fingerabdruckLive;
 
 /* Ein Klon je Testdatei: Das Anlegen dauert, die Faelle sind unabhaengig, und
    jeder Fall raeumt seine Aenderungen selbst wieder weg. */
@@ -75,17 +82,46 @@ beforeAll(() => {
      wie beim Textmuster-Waechter.
      Deshalb wird das Skript, um das es geht, AUS DEM ARBEITSBAUM kopiert. */
   skripteEinspielen();
+  /* Der Stand der "Live-Seite": Der Fingerabdruck, den das echte
+     build-info.mjs fuer den Klon errechnet. deploy.sh liest ihn vor einer
+     reinen Website-Auslieferung (ARCH-2026-10-03-10, Gegenrichtung). */
+  fingerabdruckOrdner = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-fingerabdruck-"));
+  curlFingerabdruckAttrappeAnlegen(fingerabdruckOrdner);
+  fingerabdruckLive = path.join(fingerabdruckOrdner, "live-build-info.json");
+  fs.writeFileSync(fingerabdruckLive, fingerabdruckDesKlons());
 }, 60000);
 
 afterAll(() => {
   if (klon) fs.rmSync(klon, { recursive: true, force: true });
   if (protokollOrdner) fs.rmSync(protokollOrdner, { recursive: true, force: true });
+  if (fingerabdruckOrdner) fs.rmSync(fingerabdruckOrdner, { recursive: true, force: true });
 });
+
+/** Der Fingerabdruck des Klons, wie ihn das echte build-info.mjs errechnet —
+ *  als Text. Der Arbeitsbaum des Klons bleibt dabei, wie er war. */
+function fingerabdruckDesKlons() {
+  const datei = path.join(klon, "public", "build-info.json");
+  const vorher = fs.readFileSync(datei, "utf8");
+  try {
+    execFileSync("node", ["scripts/build-info-echt.mjs", "2026010101"], { cwd: klon, stdio: "pipe" });
+    return fs.readFileSync(datei, "utf8");
+  } finally {
+    fs.writeFileSync(datei, vorher);
+  }
+}
 
 /** Fuehrt deploy.sh im Klon aus und gibt Rueckgabewert und Ausgabe zurueck. */
 function deploy(umgebung = {}, ziel = "hosting", ohneGh = false) {
   /* ziel === null: ganz ohne Argument aufrufen — dann greift der Standard
      `hosting,functions` aus deploy.sh:362 (Runde 7, K-13). */
+  /* PFAD_DAVOR: Ordner mit weiteren Attrappen, die VOR den Standard-Attrappen
+     im Suchpfad stehen sollen (etwa eine gh-Attrappe mit Seiten oder eine
+     npm-Attrappe). Ein eigener PATH in `umgebung` wuerfe die curl-Attrappe
+     fuer den Fingerabdruck mit hinaus. */
+  const { PFAD_DAVOR = [], ...weitere } = umgebung;
+  /* ohneGh: Attrappen-Verzeichnis ohne gh — so laesst sich der Fall
+     "Werkzeug fehlt" pruefen, ohne den echten PATH anzutasten. */
+  const standard = ohneGh ? ohneGhBin() : `${ATTRAPPEN}:${process.env.PATH}`;
   try {
     /* BEFUND 31.08.2026 (Runde 4): Hier stand "sh". Auf ubuntu-latest — also in
        der Pipeline — ist `sh` gleich `dash`, und deploy.sh nutzt
@@ -101,10 +137,13 @@ function deploy(umgebung = {}, ziel = "hosting", ohneGh = false) {
       stdio: "pipe",
       env: {
         ...process.env,
-        /* ohneGh: Attrappen-Verzeichnis ohne gh — so laesst sich der Fall
-           "Werkzeug fehlt" pruefen, ohne den echten PATH anzutasten. */
-        PATH: ohneGh ? ohneGhBin() : `${ATTRAPPEN}:${process.env.PATH}`,
+        PATH: [...PFAD_DAVOR, fingerabdruckOrdner, standard].join(":"),
         NODE_PATH: MODULE,
+        /* Die curl-Attrappe fuer den Fingerabdruck beantwortet nur diese eine
+           Abfrage; alles andere (der Einstellungssatz) geht an die
+           Standard-Attrappe weiter. */
+        ATTRAPPE_CURL_WEITER: path.join(ATTRAPPEN, "curl"),
+        ATTRAPPE_FINGERABDRUCK_LIVE: fingerabdruckLive,
         /* BEFUND 31.08.2026: Ohne diese drei Schalter brach das Skript ab,
            BEVOR es die Cache-Kennung schreibt — an zwei Riegeln, fuer die es
            keine Attrappe gibt. `expect(code).not.toBe(0)` war damit trivial
@@ -121,7 +160,7 @@ function deploy(umgebung = {}, ziel = "hosting", ohneGh = false) {
            malzi.me") traegt nicht: curl laesst sich wie firebase und gh durch
            eine Attrappe ersetzen. Sie liegt jetzt in scripts/test-attrappen/
            und liefert einen gueltigen Satz; ATTRAPPE_STATS steuert sie. */
-        ...umgebung,
+        ...weitere,
       },
     });
     return { code: 0, ausgabe };
@@ -159,18 +198,28 @@ function skripteEinspielen() {
     "scripts/verify-infrastructure.sh": "INFRA",
     "scripts/live-smoke.sh": "SMOKE",
   };
-  /* build-info.mjs ist ein Node-Skript, keine Shell — es braucht eine eigene
-     Attrappe. Es erzeugt den Echtheitsbeweis der Auslieferung; scheitert es,
-     muss der Deploy anhalten (Befund Runde 6). */
+  /* build-info.mjs erzeugt den Echtheitsbeweis der Auslieferung; scheitert
+     es, muss der Deploy anhalten (Befund Runde 6). Im Klon laeuft das ECHTE
+     Skript — es liest nur Dateien und git, keinen Dienst —, und zwar hinter
+     einer Huelle, die auf Kommando scheitert. Eine Attrappe, die irgendetwas
+     in die Datei schreibt, genuegte nicht mehr: deploy.sh vergleicht die
+     Server-Dateien des neuen Fingerabdrucks mit denen, die die Seite ausweist
+     (ARCH-2026-10-03-10, Gegenrichtung). */
   const bi = path.join(klon, "scripts", "build-info.mjs");
   if (fs.existsSync(bi)) {
+    fs.copyFileSync(path.join(WURZEL, "scripts", "build-info.mjs"), path.join(klon, "scripts", "build-info-echt.mjs"));
     fs.writeFileSync(
       bi,
       'if (process.env.ATTRAPPE_BUILDINFO_ROT === "1") {\n' +
         '  console.error("ATTRAPPE build-info: scheitert (so gewollt)");\n' +
         "  process.exit(1);\n}\n" +
-        'import { writeFileSync } from "fs";\n' +
-        'writeFileSync("public/build-info.json", JSON.stringify({ attrappe: true, version: process.argv[2] }));\n'
+        'await import("./build-info-echt.mjs");\n' +
+        /* Fuer den Fall "der neue Fingerabdruck nennt keine Server-Dateien". */
+        'if (process.env.ATTRAPPE_BUILDINFO_OHNE_SERVER === "1") {\n' +
+        '  const { readFileSync, writeFileSync } = await import("fs");\n' +
+        '  const f = JSON.parse(readFileSync("public/build-info.json", "utf8"));\n' +
+        "  delete f.serverDateien;\n" +
+        '  writeFileSync("public/build-info.json", JSON.stringify(f, null, 2) + "\\n");\n}\n'
     );
   }
   for (const [datei, name] of Object.entries(eigene)) {
@@ -472,6 +521,29 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     });
     expect(r.code).not.toBe(0);
     expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+  });
+
+  /* OPS-2026-10-03-12: Der Fall darueber traegt ZWEI Merkmale eines fremden
+     Laufs — das Ereignis `pull_request` und das fremde Repository. Den Filter
+     auf die Herkunft allein misst er nicht: Den Lauf verwirft schon der Filter
+     auf das Ereignis. Ein Lauf NACH ZEITPLAN in einer fremden Kopie sieht bis
+     auf das Repository genauso aus wie der eigene (`branch=main` liefert auch
+     Laeufe aus Kopien, deren Zweig "main" heisst). */
+  const fremderZeitplanLauf = (minutenAlt) =>
+    nachtLauf(minutenAlt, { head_repository: { full_name: "jemand/malzime" } });
+
+  test("ein frischer Lauf nach Zeitplan aus einer fremden Kopie zaehlt nicht als Nachtlauf", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_NACHT_LAEUFE: nacht(fremderZeitplanLauf(10)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Nachtlauf .*fehlt/);
+    expect(r.uploads).toEqual([]);
+  });
+
+  test("... und er verdeckt auch keinen zu alten eigenen", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_NACHT_LAEUFE: nacht(fremderZeitplanLauf(10), nachtLauf(40 * 60)) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/aelter als 1560 min/);
+    expect(r.uploads).toEqual([]);
   });
 
   test("fehlender Nachtlauf haelt die Auslieferung an", () => {
@@ -879,12 +951,20 @@ describe("deploy.sh — der Probelauf", () => {
   afterEach(aufraeumen);
 
   test("laeuft durch und liefert NICHTS aus", () => {
-    const r = deploy({ PROBELAUF: "1" });
+    const r = deployMitProtokoll({ PROBELAUF: "1" });
     expect(r.code).toBe(0);
     expect(r.ausgabe).toMatch(/PROBELAUF: bis hierher waere alles bereit/);
-    /* Die Attrappe meldet jeden Aufruf. Kommt kein `deploy` vor, ist auch
-       keines versucht worden. */
-    expect(r.ausgabe).not.toMatch(/ATTRAPPE firebase: deploy/);
+    /* Gemessen am Aufruf selbst: Die Attrappe schreibt jeden Aufruf von
+       `firebase` mit. Ohne `--dry-run` darf keiner dabei sein — weder die
+       Firestore-Regeln noch Website oder Server. */
+    expect(r.uploads).toEqual([]);
+    /* Messmittel-Probe: Das Protokoll schreibt wirklich mit — die beiden
+       Trockenlaeufe stehen darin. Ein leeres Protokoll hiesse sonst auch
+       "nichts hochgeladen". */
+    expect(r.aufrufe.filter((zeile) => zeile.startsWith("firebase deploy") && zeile.includes("--dry-run"))).toEqual([
+      "firebase deploy --only firestore:malzime-eu --dry-run",
+      "firebase deploy --only hosting --dry-run",
+    ]);
   });
 
   test("aber die Riegel und der Trockenlauf laufen wirklich", () => {
@@ -914,9 +994,11 @@ describe("deploy.sh — der Probelauf", () => {
   });
 
   test("ohne PROBELAUF wird ausgeliefert — der Schalter ist nicht dauerhaft an", () => {
-    const r = deploy();
+    const r = deployMitProtokoll();
     expect(r.code).toBe(0);
-    expect(r.ausgabe).toMatch(/ATTRAPPE firebase: deploy|Deploy abgeschlossen/i);
+    /* Am Aufruf gemessen, wie im ersten Fall dieses Blocks. */
+    expect(r.uploads).toEqual(["firebase deploy --only firestore:malzime-eu", "firebase deploy --only hosting"]);
+    expect(r.ausgabe).toMatch(/Deploy abgeschlossen/);
     expect(r.ausgabe).not.toMatch(/PROBELAUF: bis hierher waere alles bereit/);
   });
 });
@@ -1199,7 +1281,7 @@ describe("deploy.sh — viele Pruefergebnisse an einem Commit", () => {
     fs.writeFileSync(laeufeDatei, JSON.stringify(laeufe));
     fs.rmSync(abfragenDatei, { force: true });
     const r = deployMitProtokoll({
-      PATH: `${seitenOrdner}:${ATTRAPPEN}:${process.env.PATH}`,
+      PFAD_DAVOR: [seitenOrdner],
       ATTRAPPE_WEITER: path.join(ATTRAPPEN, "gh"),
       ATTRAPPE_CHECK_LAEUFE: laeufeDatei,
       ATTRAPPE_CHECK_AUFRUFE: abfragenDatei,
@@ -1367,5 +1449,360 @@ describe("deploy.sh — laeuft der Nachtlauf noch nach Zeitplan", () => {
     expect(r.code).not.toBe(0);
     expect(r.ausgabe).toMatch(/aelter als 1560 min/);
     expect(r.ausgabe).not.toMatch(/Der Zeitplan selbst laeuft nicht/);
+  });
+});
+
+/* ── Jeder der sechs Pflicht-Checks, einzeln (OPS-2026-10-03-12) ─────────
+ *
+ * Die Faelle weiter oben machen `test-backend`, `test-e2e` und `pruefungen`
+ * rot. Die uebrigen Namen liessen sich aus der Liste PFLICHT in deploy.sh
+ * nehmen, ohne dass ein Test es merkte — und ein roter Check dieses Namens
+ * hielte die Auslieferung dann nicht mehr an.
+ *
+ * Die sechs Namen stehen fuer die Tests an EINER Stelle
+ * (hilfen/gh-seiten-attrappe.js). Dass deploy.sh genau diese sechs verlangt,
+ * haelt der erste Fall fest; dass die Pipeline sie unter diesen Namen fuehrt,
+ * der Vertrag in scripts/pruefe-deploy-riegel.py.
+ * ──────────────────────────────────────────────────────────────────────── */
+describe("deploy.sh — jeder der sechs Pflicht-Checks haelt fuer sich an", () => {
+  afterEach(aufraeumen);
+
+  /** Alle sechs gruen, nur `name` traegt `ergebnis` (null: der Check fehlt ganz). */
+  const lage = (name, ergebnis) =>
+    PFLICHT.filter((n) => n !== name || ergebnis !== null)
+      .map((n) => `${n}=${n === name ? ergebnis : "success"}`)
+      .join("\n");
+  const firebaseDeploy = (aufrufe) => aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"));
+
+  test("deploy.sh verlangt genau diese sechs", () => {
+    const skript = fs.readFileSync(path.join(WURZEL, "scripts", "deploy.sh"), "utf8");
+    const liste = skript.match(/^\s*PFLICHT="([^"]+)"$/m);
+    expect(liste).not.toBeNull();
+    expect(liste[1].split(" ").sort()).toEqual([...PFLICHT].sort());
+    expect(PFLICHT).toHaveLength(6);
+  });
+
+  test.each(PFLICHT)("%s rot, die anderen fuenf gruen: Abbruch mit seinem Namen, nichts ausgeliefert", (name) => {
+    const r = deployMitProtokoll({ ATTRAPPE_CHECKS: lage(name, "failure") });
+    expect(r.code).not.toBe(0);
+    /* Die Meldung DIESES Riegels mit DIESEM Namen — ein Abbruch an anderer
+       Stelle belegte nichts. */
+    expect(r.ausgabe).toMatch(
+      new RegExp(`Pflicht-Check ${name} ist fuer [0-9a-f]{40} nicht grün \\(Ist: ${name}=failure\\)`)
+    );
+    /* Nicht einmal der Trockenlauf beginnt. */
+    expect(firebaseDeploy(r.aufrufe)).toEqual([]);
+  });
+
+  test.each(PFLICHT)("%s ohne Ergebnis (der Lauf fehlt): Abbruch, nichts ausgeliefert", (name) => {
+    const r = deployMitProtokoll({ ATTRAPPE_CHECKS: lage(name, null) });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(new RegExp(`Pflicht-Check ${name} ist fuer [0-9a-f]{40} nicht grün \\(Ist: fehlt\\)`));
+    expect(firebaseDeploy(r.aufrufe)).toEqual([]);
+  });
+
+  test("ein uebersprungener Browser-Test (skipped) gilt nicht als bestanden", () => {
+    /* So steht `test-e2e` nach einem reinen Auslieferungs-Nachtrag da: Der
+       Zweigschutz laesst das durch, die Auslieferung nicht
+       (docs/SECURITY-MODEL.md, "Nachtrag ohne Browser-Test"). */
+    const r = deployMitProtokoll({ ATTRAPPE_CHECKS: lage("test-e2e", "skipped") });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: test-e2e=skipped\)/);
+    expect(firebaseDeploy(r.aufrufe)).toEqual([]);
+  });
+
+  test("alle sechs gruen: die Auslieferung laeuft durch — der Riegel schlaegt nicht immer zu", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_CHECKS: lage(null, null) });
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/alle sechs Pflicht-Checks grün/);
+    expect(r.uploads).toContain("firebase deploy --only hosting");
+  });
+});
+
+/* ── Die Ersatzlaeufe des Notschalters SKIP_STAND (OPS-2026-10-03-12) ────
+ *
+ * Mit SKIP_STAND=1 faellt die Bindung an die Pipeline weg. Dann sind Lint,
+ * Server-Tests und Browser-Modul-Tests das Einzige, was zwischen ungepruefte
+ * Aenderungen und die Produktion tritt — sie laufen in diesem Fall im
+ * Auslieferskript selbst (docs/RUNBOOK.md: "Faellt sie aus, laufen sie
+ * vollstaendig").
+ *
+ * `npm` ist hier eine Attrappe, die jeden Aufruf mitschreibt und auf Kommando
+ * scheitert. Die echten Suiten startet dieser Test nicht.
+ * ──────────────────────────────────────────────────────────────────────── */
+describe("deploy.sh — die Ersatzlaeufe, wenn die Stand-Bindung abgeschaltet ist", () => {
+  afterEach(aufraeumen);
+
+  const ERSATZLAEUFE = ["npm run lint", "npm test --prefix functions", "npm run test:frontend"];
+  const npmAufrufe = (aufrufe) => aufrufe.filter((zeile) => zeile.startsWith("npm "));
+  const firebaseDeploy = (aufrufe) => aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"));
+
+  let npmOrdner;
+  afterAll(() => {
+    if (npmOrdner) fs.rmSync(npmOrdner, { recursive: true, force: true });
+  });
+
+  /** deploy.sh mit einer npm-Attrappe vorn im Suchpfad. */
+  function deployMitNpmAttrappe(umgebung = {}) {
+    if (!npmOrdner) {
+      npmOrdner = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-npm-attrappe-"));
+      fs.writeFileSync(
+        path.join(npmOrdner, "npm"),
+        "#!/bin/sh\n# ATTRAPPE (Testlauf) — startet keine echte Suite.\n" +
+          '[ -n "${ATTRAPPE_PROTOKOLL:-}" ] && echo "npm $*" >> "$ATTRAPPE_PROTOKOLL"\n' +
+          'if [ -n "${ATTRAPPE_NPM_ROT:-}" ] && [ "npm $*" = "$ATTRAPPE_NPM_ROT" ]; then\n' +
+          '  echo "ATTRAPPE npm: [$*] scheitert (so gewollt)" >&2\n  exit 1\nfi\n' +
+          'echo "ATTRAPPE npm: ok [$*]"\nexit 0\n'
+      );
+      fs.chmodSync(path.join(npmOrdner, "npm"), 0o755);
+    }
+    return deployMitProtokoll({ PFAD_DAVOR: [npmOrdner], ...umgebung });
+  }
+
+  test("Lint, Server-Tests und Browser-Modul-Tests laufen dann hier — alle drei, vor dem ersten Schritt zu Firebase", () => {
+    const r = deployMitNpmAttrappe({ SKIP_STAND: "1" });
+    expect(r.code).toBe(0);
+    expect(npmAufrufe(r.aufrufe)).toEqual(ERSATZLAEUFE);
+    /* Vor dem Trockenlauf, erst recht vor dem Upload: Ein roter Lauf soll
+       anhalten, bevor irgendetwas bei Firebase ankommt. */
+    const ersterSchritt = r.aufrufe.findIndex((zeile) => zeile.startsWith("firebase deploy"));
+    expect(ersterSchritt).toBeGreaterThan(-1);
+    expect(r.aufrufe.lastIndexOf(ERSATZLAEUFE[2])).toBeLessThan(ersterSchritt);
+    expect(r.uploads).toContain("firebase deploy --only hosting");
+    /* Und der Notschalter steht in der Schlussbilanz. */
+    expect(r.ausgabe).toMatch(/ÜBERSPRUNGENE RIEGEL:.*SKIP_STAND/);
+  });
+
+  test.each(ERSATZLAEUFE)("scheitert `%s`, wird nichts ausgeliefert", (befehl) => {
+    const r = deployMitNpmAttrappe({ SKIP_STAND: "1", ATTRAPPE_NPM_ROT: befehl });
+    expect(r.code).not.toBe(0);
+    /* Messmittel-Probe: Gescheitert ist wirklich dieser Lauf. */
+    expect(r.ausgabe).toContain(`ATTRAPPE npm: [${befehl.replace(/^npm /, "")}] scheitert`);
+    expect(firebaseDeploy(r.aufrufe)).toEqual([]);
+  });
+
+  test("mit Stand-Bindung laeuft keiner der drei hier — die Pipeline hat sie belegt", () => {
+    /* Gegenrichtung: Die Ersatzlaeufe gehoeren zum Notschalter, nicht zu
+       jeder Auslieferung. */
+    const r = deployMitNpmAttrappe();
+    expect(r.code).toBe(0);
+    expect(npmAufrufe(r.aufrufe)).toEqual([]);
+    expect(r.ausgabe).toMatch(/Lint und Tests uebersprungen: Die Stand-Bindung hat sie bereits belegt/);
+  });
+
+  test("SKIP_TESTS=1 schaltet auch sie ab — und beide Schalter stehen in der Schlussbilanz", () => {
+    const r = deployMitNpmAttrappe({ SKIP_STAND: "1", SKIP_TESTS: "1" });
+    expect(r.code).toBe(0);
+    expect(npmAufrufe(r.aufrufe)).toEqual([]);
+    expect(r.ausgabe).toMatch(/ÜBERSPRUNGENE RIEGEL:.*SKIP_STAND.*SKIP_TESTS/);
+  });
+});
+
+/* ── Die Website allein: nur mit unveraendertem Server-Code ──────────────
+ * (ARCH-2026-10-03-10, Gegenrichtung)
+ *
+ * Der Fingerabdruck der Website weist auch den Server-Code aus, Datei fuer
+ * Datei. `deploy.sh hosting` liefert den Server nicht aus. Hat sich der
+ * Server-Code seit der letzten Auslieferung geaendert, wiese die Seite danach
+ * ein Server-Programm aus, das nie hinausging.
+ *
+ * Verglichen wird mit dem, was die Seite heute ausweist. In diesen Tests ist
+ * das der Fingerabdruck des Klons, wie er beim Aufbau errechnet wurde (so, als
+ * waere genau dieser Stand zuletzt ausgeliefert worden); eine curl-Attrappe
+ * liefert ihn. Im Klon laeuft dafuer das echte build-info.mjs.
+ * ──────────────────────────────────────────────────────────────────────── */
+describe("deploy.sh — die Website geht nur allein hinaus, wenn der Server-Code unveraendert ist", () => {
+  afterEach(aufraeumen);
+
+  const MELDUNG = /Server-Code hat sich seit dem ausgewiesenen Stand geaendert — ohne Argument ausliefern/;
+  const fingerabdruckAbfragen = (aufrufe) =>
+    aufrufe.filter((zeile) => zeile.startsWith("curl ") && zeile.includes("build-info.json"));
+  const baumOffen = () => execSync(`git -C "${klon}" status --porcelain`, { encoding: "utf8" }).trim();
+  const serverDatei = (name) => path.join(klon, "functions", "src", name);
+  const serverCodeAendern = () => fs.appendFileSync(serverDatei("config.js"), "\n// Probe: geaenderter Server-Code\n");
+
+  /** Die Cache-Kennung im Klon, wie sie public/index.html zeigt. */
+  function kennung() {
+    const html = fs.readFileSync(path.join(klon, "public", "index.html"), "utf8");
+    const m = /styles\.css\?v=(\d+)/.exec(html);
+    return m ? m[1] : null;
+  }
+
+  /** Bringt den Klon einen Commit weiter (`aenderung` veraendert Dateien; der
+   *  Commit ist danach HEAD und main), fuehrt `tun` aus und stellt den Stand
+   *  davor wieder her. */
+  function mitNeuemStand(aenderung, tun) {
+    const vorher = execSync(`git -C "${klon}" rev-parse HEAD`, { encoding: "utf8" }).trim();
+    try {
+      aenderung();
+      execSync(
+        [
+          `git -C "${klon}" add -A`,
+          `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q -m "Probe: neuer Stand"`,
+          `git -C "${klon}" branch -f main HEAD`,
+        ].join(" && "),
+        { stdio: "pipe" }
+      );
+      return tun();
+    } finally {
+      execSync(`git -C "${klon}" reset -q --hard ${vorher} && git -C "${klon}" branch -f main ${vorher}`, {
+        stdio: "pipe",
+      });
+    }
+  }
+
+  test("Server-Code geaendert, Ziel `hosting`: Abbruch vor jedem Upload — mit dem Namen der Datei", () => {
+    mitNeuemStand(serverCodeAendern, () => {
+      const vorher = kennung();
+      const r = deployMitProtokoll();
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(MELDUNG);
+      expect(r.ausgabe).toMatch(/^\s+config\.js \(geaendert\)$/m);
+      /* Genau diese eine Meldung — nicht zusaetzlich die einer gescheiterten
+         Messung. Gemessen ist hier ja etwas: eine Abweichung. */
+      expect(r.ausgabe).not.toMatch(/nicht gemessen|liess sich nicht ausfuehren/);
+      expect(r.uploads).toEqual([]);
+      /* Messmittel-Probe: Der Lauf kam bis zu diesem Riegel — die Seite wurde
+         gefragt. Ein Abbruch weiter vorn belegte nichts. */
+      expect(fingerabdruckAbfragen(r.aufrufe)).toHaveLength(1);
+      /* Und der Arbeitsbaum ist, wie er war: Kennung und Fingerabdruck sind
+         zurueckgenommen, der naechste Versuch bleibt nicht am Sauberkeits-Riegel haengen. */
+      expect(kennung()).toBe(vorher);
+      expect(baumOffen()).toBe("");
+    });
+  });
+
+  test("derselbe Stand ohne Argument (Website und Server zusammen): laeuft durch — die Seite wird gar nicht gefragt", () => {
+    /* Der Ausweg, den die Meldung nennt. Der Riegel gilt nur, wenn der Server
+       NICHT mit ausgeliefert wird. */
+    mitNeuemStand(serverCodeAendern, () => {
+      const r = deployMitProtokoll({}, null);
+      expect(r.code).toBe(0);
+      expect(r.uploads).toContain("firebase deploy --only hosting,functions");
+      expect(fingerabdruckAbfragen(r.aufrufe)).toEqual([]);
+      expect(r.ausgabe).not.toMatch(MELDUNG);
+    });
+  });
+
+  test("Server-Code unveraendert, nur die Website geaendert: `hosting` laeuft durch — der Website-Weg bleibt offen", () => {
+    /* Der Fall von Hebel 5a im Betriebshandbuch: eine Datei der Website, kein
+       Server-Code. Ein Riegel, der immer zuschlaegt, waere so schlecht wie keiner. */
+    mitNeuemStand(
+      () => fs.appendFileSync(path.join(klon, "public", "js", "api-basis.js"), "\n// Probe: geaenderte Website\n"),
+      () => {
+        const r = deployMitProtokoll();
+        expect(r.code).toBe(0);
+        expect(r.uploads).toContain("firebase deploy --only hosting");
+        /* Der Riegel hat wirklich verglichen, nicht nur geschwiegen. */
+        expect(r.ausgabe).toMatch(
+          /Server-Code unveraendert gegenueber dem ausgewiesenen Stand \(\d{2,} Dateien, live Commit [0-9a-f]{7,40}\)/
+        );
+        expect(fingerabdruckAbfragen(r.aufrufe)).toHaveLength(1);
+      }
+    );
+  });
+
+  test("Aenderungen an den Tests des Servers zaehlen nicht — sie werden nicht ausgeliefert", () => {
+    mitNeuemStand(
+      () => fs.writeFileSync(serverDatei(path.join("__tests__", "probe-nur-test.test.js")), "// Probe\n"),
+      () => {
+        const r = deployMitProtokoll();
+        expect(r.code).toBe(0);
+        expect(r.uploads).toContain("firebase deploy --only hosting");
+      }
+    );
+  });
+
+  test("eine neue und eine entfallene Server-Datei zaehlen wie eine geaenderte", () => {
+    mitNeuemStand(
+      () => {
+        fs.writeFileSync(serverDatei("probe-neu.js"), "module.exports = {};\n");
+        fs.rmSync(serverDatei("animal.js"));
+      },
+      () => {
+        const r = deployMitProtokoll();
+        expect(r.code).not.toBe(0);
+        expect(r.ausgabe).toMatch(MELDUNG);
+        expect(r.ausgabe).toMatch(/^\s+animal\.js \(entfaellt\)$/m);
+        expect(r.ausgabe).toMatch(/^\s+probe-neu\.js \(neu\)$/m);
+        expect(r.uploads).toEqual([]);
+      }
+    );
+  });
+
+  test("eine einzelne Function im Ziel zaehlt nicht als Auslieferung des Servers", () => {
+    /* `hosting,functions:enqueue` lieferte nur eine der Functions aus — der
+       Fingerabdruck wiese trotzdem den ganzen Server-Code aus. */
+    mitNeuemStand(serverCodeAendern, () => {
+      const r = deployMitProtokoll({}, "hosting,functions:enqueue");
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(MELDUNG);
+      expect(r.uploads).toEqual([]);
+    });
+  });
+
+  test("auch der Probelauf haelt an — er sagt, ob die Auslieferung durchginge", () => {
+    mitNeuemStand(serverCodeAendern, () => {
+      const r = deployMitProtokoll({ PROBELAUF: "1" });
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toMatch(MELDUNG);
+      expect(r.ausgabe).not.toMatch(/PROBELAUF: bis hierher waere alles bereit/);
+    });
+  });
+
+  /* Fehlt die Vergleichsgrundlage oder laesst sie sich nicht lesen, ist nichts
+     gemessen — und ungeprueft gilt als nicht bestanden. Der Server-Code ist in
+     diesen Faellen UNVERAENDERT: Mit lesbarer Grundlage ginge der Lauf durch
+     (das belegt jeder durchlaufende Fall dieser Datei). */
+  test.each([
+    [
+      "der Abruf scheitert",
+      { ATTRAPPE_FINGERABDRUCK_ROT: "1" },
+      /build-info\.json war nicht erreichbar \(curl-Rueckgabewert 7\)/,
+      /ist kein Fingerabdruck/,
+    ],
+    [
+      "die Antwort ist die Startseite, kein Fingerabdruck",
+      { ATTRAPPE_FINGERABDRUCK_ANTWORT: "<!doctype html><html><body>malziME</body></html>" },
+      /build-info\.json ist kein Fingerabdruck mit Server-Dateien/,
+      /war nicht erreichbar/,
+    ],
+    [
+      "die Antwort ist leer",
+      { ATTRAPPE_FINGERABDRUCK_ANTWORT: "" },
+      /build-info\.json ist kein Fingerabdruck mit Server-Dateien/,
+      /war nicht erreichbar/,
+    ],
+    [
+      "der Fingerabdruck der Seite nennt keine Server-Dateien",
+      { ATTRAPPE_FINGERABDRUCK_ANTWORT: '{"commitKurz":"abc1234","dateien":{"app.js":"sha256:00"}}' },
+      /build-info\.json ist kein Fingerabdruck mit Server-Dateien/,
+      /war nicht erreichbar/,
+    ],
+    [
+      "die Liste der Server-Dateien der Seite ist leer",
+      { ATTRAPPE_FINGERABDRUCK_ANTWORT: '{"commitKurz":"abc1234","serverDateien":{}}' },
+      /build-info\.json ist kein Fingerabdruck mit Server-Dateien/,
+      /war nicht erreichbar/,
+    ],
+    [
+      "der eben erzeugte Fingerabdruck nennt keine Server-Dateien",
+      { ATTRAPPE_BUILDINFO_OHNE_SERVER: "1" },
+      /Der eben erzeugte Fingerabdruck \(public\/build-info\.json\) nennt keine Server-Dateien/,
+      /war nicht erreichbar|ist kein Fingerabdruck/,
+    ],
+  ])("die Vergleichsgrundlage fehlt — %s: Abbruch, nichts ausgeliefert", (_was, umgebung, meldung, andereMeldung) => {
+    const vorher = kennung();
+    const r = deployMitProtokoll(umgebung);
+    expect(r.code).not.toBe(0);
+    /* Die Meldung, die zu DIESER Ursache gehoert — und nur sie. */
+    expect(r.ausgabe).toMatch(meldung);
+    expect(r.ausgabe).not.toMatch(andereMeldung);
+    expect(r.ausgabe).toMatch(/Ohne diesen\s+Vergleich geht die Website nicht allein hinaus/);
+    /* Eine gescheiterte Messung ist keine Aussage ueber den Server-Code. */
+    expect(r.ausgabe).not.toMatch(MELDUNG);
+    expect(r.uploads).toEqual([]);
+    expect(kennung()).toBe(vorher);
+    expect(baumOffen()).toBe("");
   });
 });

@@ -28,7 +28,7 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 - **Datenwert-Rechner**: Zeigt was ein Profil fuer Datenbroker wert ist
 - **Privacy-Check**: Erkennt ungewollt preisgegebene Informationen (Telefonnummern, Adressen, Kennzeichen)
 - **EXIF-Analyse**: Zeigt versteckte Kamera-Metadaten (client-seitig extrahiert)
-- **GPS-Karte**: Zeigt den Aufnahmeort auf einer Karte (GPS-Daten erreichen nie unsere Server; die Karte lädt der Browser direkt bei OpenStreetMap)
+- **GPS-Karte**: Zeigt den Aufnahmeort auf einer Karte (GPS-Daten erreichen nie unsere Server; bei einem eigenen Foto lädt der Browser die Karte direkt bei OpenStreetMap, bei den Demo-Fotos kommt ein fester Kartenausschnitt aus der Seite selbst)
 - **Easter Egg**: Tierfotos bekommen ein lustiges Spass-Profil
 - **PDF-Export**: Ergebnisse als PDF speichern (fuer Workshop-Diskussionen)
 - **Demo-Fotos**: 3 anklickbare KI-generierte Demo-Fotos (keine realen Personen, siehe `public/img/demo/LICENSE.md`) mit Fake-EXIF fuer Workshops (echte KI-Analyse, kein vorgefertigtes Ergebnis)
@@ -378,7 +378,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
 - KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.
 - Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) bei Google Ireland in europe-west1; statische Seiten ueber ein weltweites CDN. Google als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
-- GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser direkt bei OpenStreetMap bzw. Nominatim)
+- GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser bei einem eigenen Foto direkt bei OpenStreetMap bzw. Nominatim; bei den Demo-Fotos fragt er nichts an)
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 
 ## Laeuft wirklich, was hier offen liegt?
@@ -425,10 +425,11 @@ Poppins (SIL Open Font License 1.1) liegen selbst gehostet im Repository und sin
 seinen eigenen Lizenztext mit; die Uebersicht steht in
 [THIRD-PARTY.md](THIRD-PARTY.md).
 
-**OpenStreetMap:** Kartenkacheln und Adressaufloesung kommen zur Laufzeit direkt
-vom Browser der Besucher — im Repository liegt kein OSM-Material, und die
-MIT-Lizenz bleibt davon unberuehrt. Die Namensnennung mit Verweis auf die
-Lizenzseite steht in der Karte selbst.
+**OpenStreetMap:** Bei einem eigenen Foto kommen Kartenkacheln und Adressaufloesung
+zur Laufzeit direkt vom Browser der Besucher. Im Repository liegt OSM-Material nur
+fuer die Demo-Fotos: feste Kartenausschnitte und Adressen ihrer erfundenen Orte
+(`public/img/demo/LICENSE.md`); sie sind **nicht** von der MIT-Lizenz umfasst. Die
+Namensnennung mit Verweis auf die Lizenzseite steht in der Karte selbst.
 
 ---
 

@@ -163,7 +163,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 |-------|---------------------|
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
-| `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call) |
+| `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call, nur bei eigenen Fotos); bei den Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite |
 | `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Status abfragen, Ergebnis zustellen, Wiederaufnahme nach Neuladen — mit AbortController + Stale-Guard |
 | `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
 | `js/auftrag-speicher.js` | Auftragsgedächtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, 15-Minuten-Frist für ein zugestelltes Ergebnis |
@@ -318,7 +318,8 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 - GPS erreicht NIE unsere Server — Nominatim und die Kartenkacheln ruft der Browser
   direkt auf, die Koordinaten verlassen das Geraet also sehr wohl, nur nie in Richtung
   malziME (Formulierung nach DOC-2026-08-12-05: die alte Fassung war im Netzwerk-Tab
-  widerlegbar)
+  widerlegbar). Bei den Demo-Fotos fragt der Browser nichts nach aussen: Adresse und
+  Kartenausschnitt ihrer erfundenen Orte liegen in der Seite
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr, libheif)
 - CSP nur self + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen (`europe-west1`)

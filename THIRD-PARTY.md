@@ -33,18 +33,27 @@ an fremdem Code fällt dadurch im Bau auf.
 
 ## Karte und Adressen: OpenStreetMap
 
-Die Kartenkacheln und die Adressauflösung kommen zur Laufzeit direkt vom Browser
-der Besucherin oder des Besuchers. **In diesem Repository liegt kein Material von
-OpenStreetMap.**
+Bei einem eigenen Foto mit Ortsdaten kommen die Kartenkacheln und die
+Adressauflösung zur Laufzeit direkt vom Browser der Besucherin oder des Besuchers.
+
+**Im Repository liegt OpenStreetMap-Material nur für die Demo-Fotos:** sechs feste
+Kartenausschnitte (`public/img/demo/karte-*.webp`) und die Adressen ihrer drei
+erfundenen Aufnahmeorte (`demo.place.*` in den Sprachdateien). Damit fragt der
+Browser bei einem Demo-Foto nichts bei OpenStreetMap an. Herkunft, Herstellung und
+Lizenz stehen in `public/img/demo/LICENSE.md`.
 
 - Kartendaten: [Open Database License (ODbL) 1.0](https://opendatacommons.org/licenses/odbl/)
-- Gerenderte Kacheln: CC-BY-SA 2.0
+- Gerenderte Kacheln und die daraus gebauten Kartenausschnitte: seit 1. Juli 2020
+  ein „Produced Work" unter der ODbL (vorher CC-BY-SA 2.0), siehe
+  [Licence and Legal FAQ](https://osmfoundation.org/wiki/Licence/Licence_and_Legal_FAQ)
+  der OpenStreetMap Foundation
 - Adressauflösung: [Nominatim](https://nominatim.org), betrieben von der OpenStreetMap Foundation
 
 Daraus folgt keine Auflage für den Quelltext dieses Projekts. Die Auflage, die
 tatsächlich gilt, ist die **Namensnennung mit Verweis auf die Lizenzseite** — sie
-steht in der Karte selbst (`js/render.js`, Textbaustein `gps.osmCredit`) und wird
-von `e2e/karte.test.js` dauerhaft geprüft.
+steht in der Karte selbst (`js/render.js` und `js/geocoding.js`, Textbaustein
+`gps.osmCredit`) — bei der beweglichen Karte wie beim festen Ausschnitt — und wird
+von `e2e/karte.test.js` und `e2e/beispielbild-ohne-ortsabfrage.test.js` dauerhaft geprüft.
 
 ## Beim Einbau eines neuen fremden Bestandteils
 

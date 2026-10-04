@@ -37,7 +37,8 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 ## Schutzschichten (Kurzreferenz)
 
 - **Client:** EXIF/GPS bleiben im Browser (Canvas-Recompress entfernt Metadaten);
-  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS. Foto und
+  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS. Bei den Demo-Fotos
+  ruft der Browser nichts bei OpenStreetMap ab (feste Adresse, fester Kartenausschnitt). Foto und
   Analysedaten gehen direkt an die Cloud-Run-Adressen in `europe-west1`, nicht
   über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026, s. u.).
 - **Einlass:** Maintenance-Check → IP-Rate-Limit → Honeypot/Timing → MIME +

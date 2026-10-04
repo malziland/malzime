@@ -105,34 +105,79 @@ const WOERTER = require("./minor-safety-woerter");
    zerlegte und Vollbreite-Zeichen, unsichtbare Trennzeichen (Cf), Akzente;
    Bindestriche (Pd), Schraegstrich, "&" und Leerraum werden ein Leerzeichen. */
 const UMLAUT = { ä: "ae", ö: "oe", ü: "ue", ß: "ss" };
-function vereinheitlicht(text) {
-  return String(text ?? "")
+const grundform = (text) =>
+  String(text ?? "")
     .normalize("NFKC")
     .toLowerCase()
     .replace(/[\p{Cf}'`´‘’]/gu, "")
     .replace(/[äöüß]/g, (z) => UMLAUT[z])
     .normalize("NFD")
     .replace(/\p{M}+/gu, "")
-    .replace(/[\s\p{Pd}_/&]+/gu, " ");
+    .replace(/\p{Pd}+/gu, "-");
+const trennerAlsLeerzeichen = (s) => s.replace(/[\s\-_/&]+/g, " ");
+const vereinheitlicht = (text) => trennerAlsLeerzeichen(grundform(text));
+
+/* Ein Bindestrich im Wort aendert nichts: Jeder Text wird auch so gelesen,
+   als stuende der Bindestrich nicht da ("Soft-Air" als "softair"). Die erste
+   Sicht ist die gewohnte (Bindestrich als Leerzeichen: "Gin-Tonic" trifft
+   "gin"). Bis zu drei Bindestriche werden einzeln durchgespielt, damit auch
+   "Soft-Air-Pistole" und "Na-zi-Shirt" treffen; bei mehr gibt es zwei
+   Sichten: alle als Leerzeichen, alle weggelassen. */
+const BINDESTRICH_IM_WORT = /(?<=[a-z0-9])-(?=[a-z0-9])/g;
+/* BLEIBT IM CODE — Teil der Kinderschutz-Regel, kein Betriebswert: Die Zahl
+   bestimmt, was der Filter faengt, und begrenzt die Sichten je Text auf acht.
+   Sie aendert sich nur mit Test und Deploy. */
+const EINZELN_BIS = 3;
+function sichten(text) {
+  const roh = grundform(text);
+  const stellen = [...roh.matchAll(BINDESTRICH_IM_WORT)].map((m) => m.index);
+  const anzahl = stellen.length === 0 ? 1 : stellen.length <= EINZELN_BIS ? 2 ** stellen.length : 2;
+  const aus = [];
+  for (let wahl = 0; wahl < anzahl; wahl++) {
+    const zeichen = [...roh];
+    stellen.forEach((stelle, i) => {
+      if (anzahl === 2 ? wahl === 1 : (wahl >> i) & 1) zeichen[stelle] = "";
+    });
+    aus.push(trennerAlsLeerzeichen(zeichen.join("")));
+  }
+  return aus;
 }
 
-/* Ein Listeneintrag als Suchmuster ueber dem vereinheitlichten Text. */
-function muster(wort) {
+/* Ein Listeneintrag als Suchmuster ueber dem vereinheitlichten Text.
+   - Ein Leerzeichen im Eintrag steht zwischen zwei Woertern einer festen
+     Fuegung ("pall mall"): Dort darf nichts oder ein Leerzeichen stehen — in
+     jeder Sicht.
+   - Ein "+" im Eintrag ist die Wortfuge einer Zusammensetzung
+     ("miet+kauf"): zusammen ueberall, getrennt ("Miet Kauf") nur als
+     Werbe-Eintrag. Im Fliesstext stehen dieselben zwei Woerter oft
+     zufaellig nebeneinander ("Sex spielt keine Rolle").
+   Leerzeichen an beliebiger Stelle zu ueberbruecken, traefe Alltagstext
+   ("Islam ist", "Code in"); deshalb notiert die Liste die Wortfugen. */
+function musterMitFuge(wort, fuge) {
   const kern = wort
     .replace(/\*/g, "")
-    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/[.?^${}()|[\]\\]/g, "\\$&")
     .replace(/[äöüß]/g, (z) => UMLAUT[z])
-    .replace(/ /g, " ?");
+    .replace(/ /g, " ?")
+    .replace(/\+/g, fuge);
   return `${wort.startsWith("*") ? "" : "(?<![a-z0-9])"}${kern}${wort.endsWith("*") ? "" : "(?![a-z0-9])"}`;
 }
+/* muster: als Werbe-Eintrag (und fuer harmlose Wendungen). musterImSatz: im
+   Fliesstext und in Erklaersaetzen. */
+const muster = (wort) => musterMitFuge(wort, " ?");
+const musterImSatz = (wort) => musterMitFuge(wort, "");
 const woerter = (text) => text.split(/\s*,\s*/).filter(Boolean);
-const suche = (liste, schalter) => new RegExp(liste.map(muster).join("|"), schalter);
+const suche = (liste, schalter, alsMuster = muster) => new RegExp(liste.map((w) => alsMuster(w)).join("|"), schalter);
 const HARMLOS = suche(woerter(WOERTER.HARMLOS), "g");
 
 /* satz: gilt ueberall. werbung: dazu die Woerter "nur als Werbung". */
 function sperrliste(ueberall, nurAlsWerbung) {
   const liste = { ueberall: woerter(ueberall.join(",")), nurAlsWerbung: woerter(nurAlsWerbung) };
-  return { ...liste, satz: suche(liste.ueberall), werbung: suche([...liste.ueberall, ...liste.nurAlsWerbung]) };
+  return {
+    ...liste,
+    satz: suche(liste.ueberall, undefined, musterImSatz),
+    werbung: suche([...liste.ueberall, ...liste.nurAlsWerbung]),
+  };
 }
 
 /* IMMER_VERBOTEN gilt fuer alle, NUR_MINDERJAEHRIG nur bis SCHUTZ_BIS. */
@@ -161,8 +206,12 @@ const WERBE_ANFORDERUNG = WERBE_ANZAHL + 2;
    alsWerbung: Der Text ist ein Werbe-Eintrag; dann gelten auch die Woerter
    "nur als Werbung". */
 function stichwort(liste, eintrag, alsWerbung = false) {
-  const m = (alsWerbung ? liste.werbung : liste.satz).exec(vereinheitlicht(eintrag).replace(HARMLOS, " "));
-  return m ? m[0].trim().slice(0, 30) : null;
+  const suchmuster = alsWerbung ? liste.werbung : liste.satz;
+  for (const sicht of sichten(eintrag)) {
+    const m = suchmuster.exec(sicht.replace(HARMLOS, " "));
+    if (m) return m[0].trim().slice(0, 30);
+  }
+  return null;
 }
 
 const istImmerVerboten = (eintrag, alsWerbung = true) => stichwort(IMMER_VERBOTEN, eintrag, alsWerbung) !== null;

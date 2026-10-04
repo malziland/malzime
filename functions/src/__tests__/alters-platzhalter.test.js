@@ -23,14 +23,19 @@ const {
   hatAltersPlatzhalter,
   istAlterUnlesbar,
   hatLesbaresAlter,
+  hatAltersversuch,
   alterNichtLesbarText,
   ersterSatz,
   untereAltersgrenze: _untereAltersgrenze,
+  obereAltersgrenze,
+  _VERSUCH_BIS,
+  ankerAlsText,
+  ankerZusatz,
 } = require("../alters-lesbarkeit");
 const DE = require("../locales/de/prompts");
 const EN = require("../locales/en/prompts");
 const { runSingleLargeCall, setFetchForTest, _extrahiereLiveText } = require("../mistral");
-const { applyMinorSafety } = require("../minor-safety");
+const { applyMinorSafety, SCHUTZ_ALTER } = require("../minor-safety");
 const { REQUIRED_CARDS } = require("../mistral-antwort");
 const { _setRateIntervalMs, _resetRateBucket } = require("../throttle");
 
@@ -871,6 +876,379 @@ describe("SEC-2026-10-03-02 — Alter hinter einem Abkürzungspunkt oder nur als
       expect(_untereAltersgrenze("weiblich, geboren 2012, also etwa 14")).toBe(14);
     });
   });
+
+  /* ── Nachschärfung nach der fremden Prüfreihe (B-02) ──────────────────
+     Die Regel bleibt: Als Altersangabe zählt der Anker, sonst der erste
+     Satz; ohne jeden Altersversuch wird nicht gefiltert. Geschärft ist, was
+     als Kindwort, als Satzende und als Altersversuch gilt. */
+  describe("Nachschärfung nach der fremden Prüfreihe", () => {
+    test.each([
+      ["Du wirkst u. a. wegen der Wangen wie 12. Runde Wangen.", "Du wirkst u. a. wegen der Wangen wie 12."],
+      ["Du bist im sog. Teenageralter. Runde Wangen.", "Du bist im sog. Teenageralter."],
+      ["Weiblich, Jg. 2012. Runde Wangen.", "Weiblich, Jg. 2012."],
+      ["Weiblich, geb. 2012. Runde Wangen.", "Weiblich, geb. 2012."],
+      ["You are young, i.e. about 12. Round cheeks.", "You are young, i.e. about 12."],
+      ["You look like, e.g., a 12 year old. Round cheeks.", "You look like, e.g., a 12 year old."],
+      ["Du wirkst wie z. B. 12 Jahre alt. Runde Wangen.", "Du wirkst wie z. B. 12 Jahre alt."],
+      ["Du wirkst wie z.B. 12 Jahre alt. Runde Wangen.", "Du wirkst wie z.B. 12 Jahre alt."],
+      ["Du bist jung, d. h. etwa 12 Jahre. Runde Wangen.", "Du bist jung, d. h. etwa 12 Jahre."],
+    ])("der Alterssatz endet nicht an der Abkürzung: %s", (text, erster) => {
+      expect(ersterSatz(text)).toBe(erster);
+    });
+
+    /* Gegenprobe: „u. a.“ am Satzende bleibt ein Satzende — sonst läse der
+       Filter Zahlen aus dem Beleg-Satz. */
+    test.each([
+      ["Du magst Sport, Musik u. a. Deine 7 Ringe glänzen.", "Du magst Sport, Musik u. a."],
+      ["Du bist weiblich. Geb. 2012 steht auf dem Shirt.", "Du bist weiblich."],
+    ])("echtes Satzende bleibt: %s", (text, erster) => {
+      expect(ersterSatz(text)).toBe(erster);
+    });
+
+    /* Die Fälle der Prüfreihe, je mit dem Alter, das der Filter liest. */
+    test.each([
+      ["Du wirkst u. a. wegen der Wangen wie 12.", 12],
+      ["Du bist im sog. Teenageralter.", 13],
+      ["You are young, i.e. about 12.", 12],
+      ["du bist ein junge.", 8],
+      ["Du bist ein Bursche.", 13],
+      ["Du bist ein fescher Bursch.", 13],
+      ["Du bist ein Knabe.", 8],
+      ["Du bist ein Gymnasiast.", 10],
+      ["Du bist eine Gymnasiastin.", 10],
+      ["Du gehst in die Unterstufe.", 10],
+      ["Du gehst in die Oberstufe.", 14],
+      ["Du bist ein Kindergartenkind.", 3],
+      ["You are a kindergartner.", 3],
+      ["You are a preschooler.", 3],
+      ["Du bist ein Heranwachsender.", 13],
+      ["Du wirkst kindlich.", 8],
+      ["Du bist ein Dirndl.", 8],
+      ["Du bist ein junges Dirndl.", 8],
+      ["Du bist ein Lausbub.", 8],
+      ["You are a middle school student.", 11],
+      ["You are a high schooler.", 14],
+      ["You are a high school student.", 14],
+      ["You are a youngster.", 13],
+      ["You are a juvenile.", 13],
+      ["You are a youth.", 13],
+      ["Du bist dreizehneinhalb.", 13],
+    ])("Kindwort oder Kategorie: %s → %p", async (karte, alter) => {
+      expect(_untereAltersgrenze(karte)).toBe(alter);
+      const r = await analyse(undefined, karte + BELEG);
+      expect(r).toMatchObject({ stufe2: true, alter, unlesbar: false, kreditBleibt: false, harmlosBleibt: true });
+    });
+
+    /* Gegenproben gegen Erwachsenen-Formen: kein Alter und kein
+       Altersversuch. */
+    test.each([
+      ["Du trägst ein Dirndl."],
+      ["Du stehst im Dirndl auf der Wiese."],
+      ["Auf deinem Shirt steht Girl Boss."],
+      ["Du siehst aus wie aus einer Boy Band."],
+      ["Du hältst einen Game Boy in der Hand."],
+      ["Auf deinem Shirt steht Girl Power."],
+      ["Du gibst den Bad Boy."],
+      ["Du posierst wie ein It-Girl."],
+      ["Oh boy, was für ein Outfit."],
+      ["Du wirkst burschikos."],
+      ["Du bist in einer Burschenschaft."],
+      ["Du hast ein Lausbubengesicht."],
+      ["Du bist Gymnasiallehrerin."],
+      ["Du bist Unterstufenlehrerin."],
+      ["You are a high school teacher."],
+      ["You are a middle school teacher."],
+      ["Du bist High-School-Lehrer."],
+      ["Du bist Kindergärtnerin."],
+      ["You look youthful."],
+      ["eine junge Frau"],
+      ["ein junger Mann"],
+      ["You are a university student."],
+    ])("kein Kind in: %s", (text) => {
+      expect(_untereAltersgrenze(text)).toBeNull();
+      expect(hatAltersversuch(text)).toBe(false);
+    });
+
+    test.each([["Weiblich, Jg. 2012."], ["Weiblich, geb. 2012."], ["Weiblich, Jahrg. 2012."]])(
+      "Geburtsjahr hinter einer Abkürzung: Altersversuch ohne lesbares Alter: %s",
+      async (karte) => {
+        expect(istAlterUnlesbar(karte)).toBe(true);
+        const r = await analyse(undefined, karte + BELEG);
+        expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false });
+      }
+    );
+
+    /* Dezimalzahlen: Die Stelle hinter dem Komma ist kein Alter. */
+    test.each([
+      ["Du bist 12,5 Jahre alt.", 12, 12],
+      ["You are 12.5 years old.", 12, 12],
+      ["Du bist weiblich, ~13,5 Jahre alt (Spanne 12,5-14,5).", 12, 14],
+      ["Du bist männlich, 32,5 Jahre alt.", 32, 32],
+    ])("%s → von %p bis %p", (text, von, bis) => {
+      expect(_untereAltersgrenze(text)).toBe(von);
+      expect(obereAltersgrenze(text)).toBe(bis);
+    });
+
+    test("32,5 Jahre: Erwachsener bleibt ungefiltert", async () => {
+      const r = await analyse(undefined, "Du bist männlich, 32,5 Jahre alt. Die Linien bleiben.");
+      expect(r).toMatchObject({ stufe2: false, alter: 32, unlesbar: false, kreditBleibt: true });
+    });
+
+    /* Altersversuch außerhalb des ersten Satzes: Kindwort oder Näherung mit
+       kleiner Zahl ohne „Jahre“. An der Stelle, die zählt, ist kein Alter
+       lesbar — das Alter gilt als nicht lesbar: Stufe 2, fester Satz. */
+    test.each([
+      [undefined, "Du bist weiblich. Ein Mädchen mit runden Wangen."],
+      [undefined, "Du bist weiblich. Etwa 13, mit runden Wangen und Zahnspange."],
+      ["weiblich", "Weiblich. Höchstens 12, die Zähne wirken gross fürs Gesicht."],
+      [undefined, "Du bist weiblich. Ca. 9."],
+      [undefined, "Du bist weiblich. Vielleicht 12 oder 13."],
+      [undefined, "You are female. Around 12, with braces."],
+      [undefined, "Du bist weiblich. Die Zahnspange passt zu einer Schülerin."],
+      [undefined, "Du bist weiblich. ~13, runde Wangen."],
+    ])("Anker %p, Karte „%s“: nicht lesbar, Stufe 2 greift", async (anker, karte) => {
+      expect(hatAltersversuch(karte)).toBe(true);
+      const r = await analyse(anker, karte);
+      expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false, harmlosBleibt: true });
+      expect(r.karte).toContain(NICHT_LESBAR_DE);
+    });
+
+    /* Erwachsene MIT lesbarem Alter im Anker oder im ersten Satz bleiben
+       unberührt — was auch immer im Beleg-Satz steht. */
+    test.each([
+      ["männlich, ~40 Jahre alt (Spanne 38-45)", "Du bist männlich, ~40 Jahre alt (Spanne 38-45). Etwa 7 Kopflängen."],
+      ["weiblich, ~35 Jahre alt (Spanne 33-38)", "Du bist weiblich, ~35 Jahre alt. Ein Trikot mit der Nummer acht."],
+      ["weiblich, ~40 Jahre alt (Spanne 38-45)", "Du bist weiblich, ~40 Jahre alt. Du hältst ein Kind an der Hand."],
+      [undefined, "Du bist weiblich, ~40 Jahre alt (Spanne 38-45). Du trägst ein Baby im Tragetuch."],
+      [undefined, "Du bist Kindergärtnerin, ~30 Jahre alt (Spanne 28-33). Etwa 12, höchstens 15 Kinder um dich."],
+      [undefined, "Du bist ~45 Jahre alt (Spanne 42-48) und stehst vor Schülern. Ein Mädchen lacht."],
+      ["männlich, ~50 Jahre alt (Spanne 48-53)", "Du bist ~50. Etwa 10, vielleicht 12 Jahre im selben Büro."],
+    ])("Erwachsener mit Anker %p bleibt unberührt: %s", async (anker, karte) => {
+      const r = await analyse(anker, karte);
+      expect(r).toMatchObject({ stufe2: false, unlesbar: false, kreditBleibt: true });
+      expect(r.alter).toBeGreaterThanOrEqual(26);
+      expect(r.karte).not.toContain(NICHT_LESBAR_DE);
+    });
+
+    /* Kein Altersversuch: Zahl mit Einheit oder Zählwort, Uhrzeit,
+       Körpergröße, Näherung über der Schutzgrenze. Bleibt ungefiltert. */
+    test.each([
+      ["Du bist weiblich. Etwa 7 Kopflängen passen in die Körperhöhe."],
+      ["Du bist weiblich. Sie trägt ein Trikot mit der Nummer 8."],
+      ["Du bist männlich. Aufgenommen um etwa 14:30."],
+      ["Du bist männlich. Ca. 1,80 groß."],
+      ["Du bist männlich. Etwa 20 % Akku."],
+      ["Du bist männlich. Etwa 40, mit grauen Schläfen."],
+      ["Du bist weiblich. Rund 10 Freunde stehen um dich."],
+      ["Keine klaren Bildsignale. Die Person ist von hinten zu sehen."],
+    ])("kein Altersversuch, bleibt ungefiltert: %s", async (karte) => {
+      expect(hatAltersversuch(karte)).toBe(false);
+      const r = await analyse("weiblich", karte);
+      expect(r).toMatchObject({ stufe2: false, alter: null, unlesbar: false, kreditBleibt: true });
+    });
+
+    /* Getragene Richtung: Fehlt jedes lesbare Alter an den Stellen, die
+       zählen, und nennt die Karte irgendwo ein Kind, wird geschützt — auch
+       wenn das Kind nicht die Person selbst ist. */
+    test.each([
+      ["Du trägst ein Baby im Tragetuch.", 1, false],
+      ["Du trägst eine Warnweste wie ein Schülerlotse.", 10, false],
+      ["Keine klaren Bildsignale. Im Hintergrund spielt ein Kind.", null, true],
+      ["Du bist weiblich. Du hältst ein Kind an der Hand.", null, true],
+    ])("getragene Richtung, ohne lesbares Alter: %s", async (karte, alter, unlesbar) => {
+      const r = await analyse(undefined, karte);
+      expect(r).toMatchObject({ stufe2: true, alter, unlesbar, kreditBleibt: false });
+    });
+
+    test("die Grenze für „kleine Zahl“ ist die Schutzgrenze des Filters", () => {
+      expect(_VERSUCH_BIS).toBe(SCHUTZ_ALTER);
+      expect(hatAltersversuch(`Du bist weiblich. Etwa ${SCHUTZ_ALTER}, vielleicht.`)).toBe(true);
+      expect(hatAltersversuch(`Du bist weiblich. Etwa ${SCHUTZ_ALTER + 1}, vielleicht.`)).toBe(false);
+    });
+  });
+
+  /* ── Nachträge der zweiten Prüfreihe ────────────────────────────────── */
+  describe("Nachträge der zweiten Prüfreihe", () => {
+    /* a) Steht das Alterswort direkt hinter einer Näherungs-Abkürzung, endet
+       der Alterssatz dort nicht — auch wenn es groß geschrieben ist. */
+    test.each([
+      ["Du bist ca. Volksschulalter. Milchzähne.", "Du bist ca. Volksschulalter.", 8],
+      ["Du bist vermutl. Teenager. Zahnspange.", "Du bist vermutl. Teenager.", 13],
+      ["Du bist evtl. Schülerin. Schulranzen.", "Du bist evtl. Schülerin.", 10],
+      ["Du bist wahrsch. Jugendliche. Zahnspange.", "Du bist wahrsch. Jugendliche.", 13],
+      ["Du bist ca. Dreizehn. Zahnspange.", "Du bist ca. Dreizehn.", 13],
+      ["Du bist ca. Mitte zwanzig. Bart.", "Du bist ca. Mitte zwanzig.", 20],
+      ["Du bist weibl. Teenager. Zahnspange.", "Du bist weibl. Teenager.", 13],
+      ["Du bist männl. Jugendlicher. Flaum.", "Du bist männl. Jugendlicher.", 13],
+    ])("Abkürzung vor dem Alterswort: %s", async (karte, erster, alter) => {
+      expect(ersterSatz(karte)).toBe(erster);
+      const r = await analyse(undefined, karte);
+      expect(r).toMatchObject({ stufe2: true, alter, unlesbar: false, kreditBleibt: false, harmlosBleibt: true });
+    });
+
+    /* Gegenprobe: Trägt das nächste Wort kein Alter, bleibt die Abkürzung vor
+       einem Großbuchstaben ein Satzende — ein Name ist keine Abkürzung. */
+    test.each([
+      ["Du bist Max. Deine Wangen sind rund.", "Du bist Max."],
+      ["Du gibst max. Gas auf dem Rad.", "Du gibst max."],
+      ["Du bist weiblich, ca. 13. Deine 7 Ringe glänzen.", "Du bist weiblich, ca. 13."],
+    ])("echtes Satzende bleibt: %s", (text, erster) => {
+      expect(ersterSatz(text)).toBe(erster);
+    });
+
+    /* Sichere Richtung: Ein Alter über der Schutzgrenze hinter der Abkürzung
+       verlängert den Alterssatz nicht — es würde das Kindwort davor
+       verdrängen (Zahl vor Kategorie). */
+    test.each([
+      ["Du bist ein Mädchen, ca. Dreißig Kerzen brennen hinter dir.", "Du bist ein Mädchen, ca.", 8],
+      ["Du bist ein Teenager, max. Vierzig Leute stehen um dich.", "Du bist ein Teenager, max.", 13],
+    ])("höheres Alter hinter der Abkürzung verlängert nicht: %s", async (karte, erster, alter) => {
+      expect(ersterSatz(karte)).toBe(erster);
+      const r = await analyse(undefined, karte);
+      expect(r).toMatchObject({ stufe2: true, alter, unlesbar: false, kreditBleibt: false });
+    });
+
+    /* b) Weitere Wörter für Kinder und Jugendliche. */
+    test.each([
+      ["Du bist im Kindesalter.", 3],
+      ["Du bist im Kindergartenalter.", 3],
+      ["Du bist im Vorschulalter.", 3],
+      ["Du bist im Kleinkindalter.", 3],
+      ["Du gehst in den Kindergarten.", 3],
+      ["Du bist im Schulalter.", 6],
+      ["Du bist im Jugendalter.", 13],
+      ["Du bist ein Erstklässler.", 6],
+      ["Du bist eine Fünftklässlerin.", 6],
+      ["Du bist ein Zwoelftklaessler.", 6],
+      ["You are a first grader.", 6],
+      ["You are a sixth-grader.", 6],
+      ["Du bist ein Lehrling.", 15],
+      ["Du bist Azubi.", 15],
+      ["Du bist eine Auszubildende.", 15],
+      ["You are an apprentice.", 15],
+    ])("gelesen als Altersstufe: %s → %p", async (karte, alter) => {
+      expect(_untereAltersgrenze(karte)).toBe(alter);
+      const r = await analyse(undefined, `${karte} Das zeigt das Bild.`);
+      expect(r).toMatchObject({ stufe2: true, alter, unlesbar: false, kreditBleibt: false });
+    });
+
+    /* Gegenproben gegen Erwachsenen-Formen und Alltagswörter. */
+    test.each([
+      ["Du bist Lehrlingsausbilder."],
+      ["Du bist Kindergartenpädagogin."],
+      ["Du bist Kindergärtnerin."],
+      ["Du bist die Kindesmutter."],
+      ["Du schiebst einen Kinderwagen."],
+      ["Du bist von Kindesbeinen an sportlich."],
+      ["You are a grader at the factory."],
+    ])("kein Kind in: %s", (text) => {
+      expect(_untereAltersgrenze(text)).toBeNull();
+      expect(hatAltersversuch(text)).toBe(false);
+    });
+
+    /* „Sehr jung“ nennt kein Alter, ist aber ein Altersversuch: Ohne lesbares
+       Alter greift der Schutz. */
+    test.each([
+      ["Du bist noch sehr jung. Milchzähne."],
+      ["Du bist weiblich und sehr jung. Runde Wangen."],
+      ["You look very young. Round cheeks."],
+    ])("„sehr jung“ ohne lesbares Alter: %s", async (karte) => {
+      expect(hatAltersversuch(karte)).toBe(true);
+      const r = await analyse(undefined, karte);
+      expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false });
+    });
+
+    test.each([["Du bist jung geblieben. Graue Schläfen."], ["Du hast eine junge Katze auf dem Arm."]])(
+      "kein Altersversuch: %s",
+      (karte) => {
+        expect(hatAltersversuch(karte)).toBe(false);
+      }
+    );
+
+    test("„sehr jung“ ändert nichts, wenn der Anker ein Alter nennt", async () => {
+      const r = await analyse("männlich, ~40 Jahre alt (Spanne 38-45)", "Du wirkst sehr jung für dein Alter.");
+      expect(r).toMatchObject({ stufe2: false, alter: 38, unlesbar: false, kreditBleibt: true });
+    });
+
+    /* c) Der Altersanker ist laut Schema ein Text. Liefert die KI eine Zahl,
+       eine Liste oder ein Objekt, wird der Inhalt gelesen statt verworfen. */
+    test.each([
+      [13, 13, true],
+      [{ alter: 13, geschlecht: "weiblich" }, 13, true],
+      [["weiblich", "13"], 13, true],
+      [{ alter: "12-14" }, 12, true],
+      [{ alter: { von: 12, bis: 14 } }, 12, true],
+      [40, 40, false],
+    ])("Anker als %p: gelesen wird %p", async (anker, alter, stufe2) => {
+      const r = await analyse(anker, "Du bist weiblich. Zahnspange.");
+      expect(r).toMatchObject({ stufe2, alter, unlesbar: false, kreditBleibt: !stufe2, harmlosBleibt: true });
+      /* Angezeigt wird weiter nur ein Anker, der Text ist. */
+      expect(r.karte).toBe("Du bist weiblich. Zahnspange.");
+    });
+
+    test.each([
+      ["Text bleibt Text", "weiblich, 13", "weiblich, 13"],
+      ["Zahl", 13, "13"],
+      ["Liste", ["weiblich", 13], "weiblich, 13"],
+      ["Objekt", { alter: 13, geschlecht: "weiblich" }, "alter 13, geschlecht weiblich"],
+      ["nichts", null, ""],
+      ["nichts", undefined, ""],
+      ["Wahrheitswert", true, ""],
+      ["leeres Objekt", {}, ""],
+      ["keine endliche Zahl", NaN, ""],
+    ])("ankerAlsText — %s", (_name, wert, erwartet) => {
+      expect(ankerAlsText(wert)).toBe(erwartet);
+    });
+
+    test.each([
+      ["senkt die Auslese: zählt", { alter: 13 }, "Du bist ~40 Jahre alt.", "alter 13"],
+      ["hebt die Auslese an: zählt nicht", { alter: 40 }, "Du bist ein Mädchen.", ""],
+      ["hebt die Auslese an: zählt nicht", 30, "Du bist ca. 13 Jahre alt.", ""],
+      ["Karte ohne Alter: zählt", 40, "Du bist weiblich.", "40"],
+      [
+        "Anker ohne Alter: zählt (ändert nichts)",
+        { geschlecht: "weiblich" },
+        "Du bist ~13 Jahre alt.",
+        "geschlecht weiblich",
+      ],
+      [
+        "Anker mit Platzhalter: zählt (Alter nicht lesbar)",
+        { alter: "~‹Zahl› Jahre" },
+        "Du bist weiblich.",
+        "alter ~‹Zahl› Jahre",
+      ],
+    ])("ankerZusatz — %s", (_name, wert, saetze, erwartet) => {
+      expect(ankerZusatz(wert, saetze)).toBe(erwartet);
+    });
+
+    test("ankerAlsText begrenzt Tiefe und Länge", () => {
+      expect(ankerAlsText({ a: { b: { c: { d: { e: 13 } } } } })).not.toContain("13");
+      expect(ankerAlsText(Array.from({ length: 500 }, () => "weiblich")).length).toBeLessThanOrEqual(200);
+    });
+
+    /* Sichere Richtung: Ein Anker, der kein Text ist, wird nur mitgelesen. Er
+       kann die Altersauslese der Karte senken, nie anheben — auch ein
+       Kindwort ohne Zahl verdrängt er nicht. */
+    test.each([
+      [30, "Du bist weiblich, ca. 13 Jahre alt (Spanne 12-14). Zahnspange.", 12],
+      [{ alter: 40 }, "Du bist ein Mädchen. Zahnspange.", 8],
+      [40, "Du bist ein Teenager. Zahnspange.", 13],
+      [{ alter: 13 }, "Du bist männlich, ~40 Jahre alt (Spanne 38-45). Graue Schläfen.", 13],
+      [{ alter: 5 }, "Du bist ein Mädchen. Zahnspange.", 5],
+    ])("Anker als %p neben der Karte „%s“: gelesen wird %p", async (anker, karte, alter) => {
+      const r = await analyse(anker, karte);
+      expect(r).toMatchObject({ alter, unlesbar: false, stufe2: alter <= SCHUTZ_ALTER });
+      expect(r.karte).toBe(karte);
+    });
+
+    test("ein Anker ohne Alter, der kein Text ist, ändert nichts", async () => {
+      const r = await analyse(
+        { geschlecht: "weiblich" },
+        "Keine klaren Bildsignale. Die Person ist von hinten zu sehen."
+      );
+      expect(r).toMatchObject({ stufe2: false, alter: null, unlesbar: false, kreditBleibt: true });
+    });
+  });
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -924,8 +1302,20 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
 
   const liveSichtbar = (karten) => karten.some((k) => k.schluessel === "alter_geschlecht");
 
+  /* Der Strom kommt Zeichen für Zeichen an: Was war JEMALS live zu sehen? */
+  function jemalsLive(json) {
+    const gesehen = { standard: false, beast: false };
+    for (let i = 1; i <= json.length; i++) {
+      const teil = _extrahiereLiveText(json.slice(0, i));
+      gesehen.standard = gesehen.standard || liveSichtbar(teil.kartenStandard);
+      gesehen.beast = gesehen.beast || liveSichtbar(teil.kartenBeast);
+    }
+    return gesehen;
+  }
+
   async function beides(body) {
     const live = _extrahiereLiveText(JSON.stringify(body));
+    const jemals = jemalsLive(JSON.stringify(body));
     setFetchForTest(async () => ({
       ok: true,
       status: 200,
@@ -938,6 +1328,8 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
     return {
       liveStandard: liveSichtbar(live.kartenStandard),
       liveBeast: liveSichtbar(live.kartenBeast),
+      jemalsStandard: jemals.standard,
+      jemalsBeast: jemals.beast,
       /* Positivkontrolle der Messung: Andere Karten kommen live an. */
       liveAndereKarten: live.kartenStandard.length,
       festerSatz: fertig.normal.categories.alter_geschlecht.value.includes(FESTER_SATZ),
@@ -977,9 +1369,19 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
     ],
     ["Anker fehlt, Alter erst im zweiten Satz", undefined, IM_ZWEITEN_SATZ, false, true],
     ["Anker nennt nur das Geschlecht, Alter erst im zweiten Satz", "weiblich", IM_ZWEITEN_SATZ, false, true],
+    /* Der Anker ist kein Text: live zählt er nicht (die Karte wartet), im
+       Endergebnis wird er mitgelesen — das Alter ist damit lesbar, die Karte
+       erscheint so, wie die KI sie schrieb. */
     [
       "Anker ist ein Objekt, Alter erst im zweiten Satz",
       { alter: 13, geschlecht: "weiblich" },
+      IM_ZWEITEN_SATZ,
+      false,
+      false,
+    ],
+    [
+      "Anker ist ein Objekt ohne Alter, Alter erst im zweiten Satz",
+      { geschlecht: "weiblich" },
       IM_ZWEITEN_SATZ,
       false,
       true,
@@ -1000,6 +1402,36 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
       false,
       true,
     ],
+    [
+      "Anker fehlt, Kindwort erst im zweiten Satz",
+      undefined,
+      "Du bist weiblich. Ein Mädchen mit runden Wangen.",
+      false,
+      true,
+    ],
+    [
+      "Anker fehlt, „etwa 13“ ohne „Jahre“ im zweiten Satz",
+      undefined,
+      "Du bist weiblich. Etwa 13, mit runden Wangen und Zahnspange.",
+      false,
+      true,
+    ],
+    ["Anker fehlt, Kindwort im ersten Satz", undefined, "Du bist ein Bursche." + BELEG, true, false],
+    ["Anker fehlt, „u. a.“ im ersten Satz", undefined, "Du wirkst u. a. wegen der Wangen wie 12." + BELEG, true, false],
+    [
+      "Anker lesbar, Kind im Beleg-Satz",
+      "weiblich, ~40 Jahre alt (Spanne 38-45)",
+      "Du bist weiblich, ~40 Jahre alt. Du hältst ein Kind an der Hand.",
+      true,
+      false,
+    ],
+    [
+      "kein Altersversuch, Zahl mit Zählwort im Beleg-Satz",
+      "weiblich",
+      "Du bist weiblich. Etwa 7 Kopflängen passen in die Körperhöhe.",
+      true,
+      false,
+    ],
   ])("%s", async (_fall, anker, karte, live, festerSatz) => {
     const r = await beides(antwort(anker, karte));
     expect(r.liveAndereKarten).toBeGreaterThan(5);
@@ -1008,9 +1440,10 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
       liveBeast: live,
       festerSatz,
     });
-    /* Die Zusicherung selbst: nie erst sichtbar und am Ende der feste Satz. */
-    expect(r.festerSatz && r.liveStandard).toBe(false);
-    expect(r.festerSatzBeast && r.liveBeast).toBe(false);
+    /* Die Zusicherung selbst: nie erst sichtbar und am Ende der feste Satz —
+       auch nicht zwischendurch, während der Strom ankommt. */
+    expect(r.festerSatz && (r.liveStandard || r.jemalsStandard)).toBe(false);
+    expect(r.festerSatzBeast && (r.liveBeast || r.jemalsBeast)).toBe(false);
   });
 
   /* Ein Platzhalter erscheint live nie, auch wenn der Anker lesbar ist; das
@@ -1055,5 +1488,68 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
     const r = await beides(antwort(undefined, "Du bist weiblich, ~13 Jahre alt." + BELEG, IM_ZWEITEN_SATZ));
     expect(r).toMatchObject({ liveStandard: true, liveBeast: true, festerSatz: false, festerSatzBeast: false });
     expect(r.karteBeast).toBe(IM_ZWEITEN_SATZ);
+  });
+
+  /* hard_facts ist da, nennt aber kein Altersfeld: Der Kartenschlüssel
+     „alter_geschlecht“ weiter hinten im Strom ist kein Anker — sonst gälte
+     die Karte selbst als lesbarer Anker und erschiene mit der Zahl aus dem
+     zweiten Satz. */
+  test("hard_facts ohne Altersfeld, Alter erst im zweiten Satz der Karte: live verborgen, am Ende der feste Satz", async () => {
+    const body = { hard_facts: { herkunft: "mitteleuropäisch" }, ...antwort(undefined, IM_ZWEITEN_SATZ) };
+    /* Positivkontrolle: hard_facts steht im Strom vor den Profilen. */
+    expect(JSON.stringify(body).indexOf('"hard_facts"')).toBeLessThan(JSON.stringify(body).indexOf('"standard"'));
+    const r = await beides(body);
+    expect(r).toMatchObject({ jemalsStandard: false, jemalsBeast: false, festerSatz: true, festerSatzBeast: true });
+  });
+
+  /* ── Bewusste Ausnahme (SECURITY-MODEL, Abschnitt 17.09.2026, Punkt 3) ──
+     Die Standard-Karte kommt vor der Beast-Karte an. Zeigt erst die
+     Beast-Karte einen Altersversuch ohne lesbares Alter, steht eine
+     Standard-Karte ohne Altersversuch schon da und wechselt mit dem
+     Endergebnis auf den festen Satz. Dasselbe gilt für einen Altersanker,
+     der entgegen dem Schema erst hinter den Profilen steht. Die Tests halten
+     fest, dass es diese Fälle sind — und dass die Beast-Karte selbst in den
+     ersten drei nie erscheint. */
+  const OHNE_ALTER = "Du bist weiblich. Runde Wangen.";
+
+  test.each([
+    [
+      "Beast-Karte mit Alterswort ohne Zahl",
+      undefined,
+      OHNE_ALTER,
+      "Du bist weiblich. Seit Jahren klebst du am Handy.",
+    ],
+    ["Beast-Karte mit Platzhalter", undefined, OHNE_ALTER, "Du bist weiblich, ~‹Zahl› Jahre alt."],
+    [
+      "Anker und Standard-Karte ohne Altersversuch, Beast-Karte mit Alterswort ohne Zahl",
+      "Keine klaren Bildsignale.",
+      "Keine klaren Bildsignale.",
+      "Niemand zu sehen. Die Jacke hängt seit Jahren dort.",
+    ],
+  ])("bewusste Ausnahme — %s: Standard-Karte war zu sehen, am Ende der feste Satz", async (_fall, anker, s, b) => {
+    const r = await beides(antwort(anker, s, b));
+    expect(r).toMatchObject({ jemalsStandard: true, jemalsBeast: false, festerSatz: true, festerSatzBeast: true });
+  });
+
+  test("bewusste Ausnahme — Anker hinter den Profilen und nicht lesbar: beide Karten waren zu sehen, am Ende der feste Satz", async () => {
+    const KIND = "Du bist weiblich, ~13 Jahre alt (Spanne 12-14).";
+    const { hard_facts: _weg, ...profile } = antwort(undefined, KIND + BELEG, KIND + " Leichte Beute.");
+    const body = { ...profile, hard_facts: { alter_geschlecht: "Du bist weiblich, ~‹Zahl› Jahre alt." } };
+    /* Positivkontrolle: Der Anker steht im Strom wirklich hinter den Profilen. */
+    expect(JSON.stringify(body).indexOf('"hard_facts"')).toBeGreaterThan(JSON.stringify(body).indexOf('"beast"'));
+    const r = await beides(body);
+    expect(r).toMatchObject({ jemalsStandard: true, jemalsBeast: true, festerSatz: true, festerSatzBeast: true });
+    /* Live zählt nur, was VOR den Profilen steht: Eine Karte, die schon zu
+       sehen war, nimmt die Live-Anzeige nicht zurück, wenn der Anker
+       nachkommt. */
+    expect(r).toMatchObject({ liveStandard: true, liveBeast: true });
+  });
+
+  /* Gegenprobe: Steht derselbe Anker dort, wo das Schema ihn vorsieht (vor
+     den Profilen), erscheint keine der beiden Karten. */
+  test("derselbe Anker vor den Profilen: beide Karten bleiben verborgen", async () => {
+    const KIND = "Du bist weiblich, ~13 Jahre alt (Spanne 12-14).";
+    const r = await beides(antwort("Du bist weiblich, ~‹Zahl› Jahre alt.", KIND + BELEG, KIND + " Leichte Beute."));
+    expect(r).toMatchObject({ jemalsStandard: false, jemalsBeast: false, festerSatz: true, festerSatzBeast: true });
   });
 });

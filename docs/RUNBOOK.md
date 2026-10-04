@@ -807,6 +807,14 @@ Lesart:
   (die Liste liegt seither in `functions/src/minor-safety-woerter.js`) kennt
   sie mehr Wörter, das Thema Drogen und einige Wörter nur noch als
   Werbe-Eintrag. Zahlen davor und danach nicht miteinander vergleichen.
+- `durchgerutscht` zählt Listenwörter, keine Aussagen: „Du trinkst keinen
+  Alkohol.“ zählt wie „Du trinkst Alkohol.“ Wörter, die im Satz meist
+  Redewendung oder Tunwort sind („wieder wett“, „schulden“, „rauchen“, „deine
+  Droge“, „Lottogewinn“, „ein Jackpot“, „I bet“), gelten nur als Werbe-Eintrag
+  und werden im Fließtext nicht gezählt; „alkoholfrei“ ist ausgenommen. Ein
+  Anstieg heißt deshalb nur, dass die KI öfter Wörter der Liste schreibt — ob
+  sie dabei eine Regel des Prompts bricht, zeigt nur das Nachstellen mit
+  eigenen Fotos.
 - `werbung` unter 8 heißt beim Beast-Modus nur dann „mehr als zwei Einträge
   gestrichen“, wenn der zweite Werbe-Aufruf geliefert hat (zehn Einträge
   angefordert). Sonst stammt die Liste wie die Standard-Liste aus dem

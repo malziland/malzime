@@ -910,33 +910,55 @@ Untergrenze.
    festen Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte
    vorher nicht (eine Ausnahme steht am Ende dieses Punkts). Der Filter lässt
    Stufe 2 greifen; `mistral.js` bestimmt das (Erkennung in
-   `alters-lesbarkeit.js`) aus den Rohwerten der KI-Antwort, bevor eine Karte
-   umgeschrieben wird. Die Kinderschutz-Zeile meldet es als
-   `alterUnlesbar: true`, das Ergebnis trägt `meta.alterUnlesbar`, und der
-   Realitäts-Check fragt das Alter dann nicht ab; der Server nimmt dessen
-   Bewertung deshalb auch ohne Alter an (`handle-telemetry.js`). Als
-   Altersangabe einer Karte zählt nur ihr erster Satz — Zahlen im Beleg-Satz
-   („Trikot mit der Nummer acht“) sind kein Alter. Der erste Satz endet nicht
-   am Punkt einer Näherungs-Abkürzung („ca. 13 Jahre“) und nicht an einem
-   Punkt zwischen Ziffern („12.–14.“). Steht ein Altersversuch nur außerhalb
-   des ersten Satzes und trägt auch der Anker kein Alter, gilt das Alter als
-   nicht lesbar; die Zahl im späteren Satz wird nicht gelesen. Zahlwörter
-   („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und Kategoriewörter
-   („Teenager“, „Schulkind“) gelten als lesbar und werden für die
-   Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl dasteht;
-   „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Wörter, die ein
-   Kind ohne Zahl benennen („Mädchen“, „Bub“, „Junge“, „Volksschulkind“,
-   „Schülerin“, „Baby“ und ihre englischen Entsprechungen), zählen wie
-   „Schulkind“; „underage“, „a minor“ und ein Geburtsjahr sind wie
-   „minderjährig“ ein Altersversuch ohne lesbares Alter. Eine Antwort ohne
-   jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie bisher
-   ungefiltert. Die Regeln zum Satzende, zum Altersversuch außerhalb des
-   ersten Satzes und zu den Kinderwörtern sind am 04.10.2026 ergänzt. Die
-   Live-Anzeige entscheidet über die Alterskarte mit derselben Regel wie das
-   Endergebnis (`mistral-antwort.js`). Die Ausnahme: Zeigt erst die später
-   eintreffende Beast-Karte einen Altersversuch ohne lesbares Alter, steht
-   eine Standard-Karte ohne Altersversuch schon da und wechselt dann auf den
-   festen Satz.
+   `alters-lesbarkeit.js`, Wörter in `alters-lesbarkeit-woerter.js`) aus den
+   Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
+   Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
+   `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht
+   ab; der Server nimmt dessen Bewertung deshalb auch ohne Alter an
+   (`handle-telemetry.js`). Als Altersangabe einer Karte zählt nur ihr erster
+   Satz — Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) sind kein Alter.
+   Der erste Satz endet nicht am Punkt einer Abkürzung („ca. 13 Jahre“, „im
+   sog. Teenageralter“, „z. B.“, „d. h.“, „i.e.“, „geb. 2012“, „weibl.“) und
+   nicht an einem Punkt zwischen Ziffern („12.–14.“); eine einzelne Stelle
+   hinter dem Komma zählt nicht mit („12,5 Jahre“ ist 12). Steht das
+   Alterswort groß geschrieben direkt hinter einer Näherungs-Abkürzung („ca.
+   Volksschulalter“, „vermutl. Teenager“), endet der Satz dort ebenfalls nicht
+   — außer das Wort nennt ein Alter über der Schutzgrenze: Es würde ein
+   Kindwort davor verdrängen. Zahlwörter („etwa dreizehn“, „Mitte vierzig“,
+   „in her teens“) und Kategoriewörter („Teenager“, „Schulkind“, „Gymnasiast“,
+   „Erstklässler“, „Lehrling“, „im Kindesalter“, „high school“) gelten als
+   lesbar und werden für die Altersauslese in Zahlen übersetzt, Kategorien
+   nur, wenn keine Zahl dasteht; „13jährig“ und „dreizehnjährig“ werden
+   ebenfalls gelesen. Wörter, die ein Kind ohne Zahl benennen („Mädchen“,
+   „Bub“, „Bursch“, „Knabe“, „Junge“, „Volksschulkind“, „Schülerin“, „Baby“
+   und ihre englischen Entsprechungen), zählen wie „Schulkind“; „underage“, „a
+   minor“ und ein Geburtsjahr sind wie „minderjährig“ ein Altersversuch ohne
+   lesbares Alter. Der Altersanker ist laut Schema ein Text. Liefert die KI
+   stattdessen eine Zahl, eine Liste oder ein Objekt, wird der Inhalt für die
+   Altersauslese mitgelesen, aber nicht angezeigt; er kann die Auslese senken,
+   nicht anheben.
+
+   Als Altersversuch gilt, irgendwo in der Karte: die abgeschriebene Vorlage,
+   ein Alterswort („Jahre“, „Spanne“), ein Kindwort oder eine Kategorie („ein
+   Mädchen“, „Schülerin“), ein Näherungswort mit einer Zahl bis 25, hinter der
+   kein Wort folgt („etwa 13,“, „höchstens 12.“; „etwa 7 Kopflängen“ ist
+   keiner), oder „sehr jung“. Steht ein solcher Versuch nur außerhalb des
+   ersten Satzes und trägt auch der Anker kein Alter, gilt das Alter als nicht
+   lesbar; die Zahl im späteren Satz wird nicht gelesen. Eine Antwort ohne jeden Altersversuch
+   („Keine klaren Bildsignale.“) bleibt wie bisher ungefiltert. Getragene
+   Richtung: Nennt eine Karte ohne lesbares Alter irgendwo ein Kind („Du
+   hältst ein Kind an der Hand.“, „Du trägst ein Baby im Tragetuch.“), wird
+   geschützt, auch wenn die Person erwachsen ist; mit lesbarem Alter im Anker
+   oder im ersten Satz bleibt sie unberührt. Die Regeln zum Satzende, zum
+   Altersversuch außerhalb des ersten Satzes und zu den Kinderwörtern sind am
+   04.10.2026 ergänzt. Die Live-Anzeige entscheidet über die Alterskarte mit
+   derselben Regel wie das Endergebnis (`mistral-antwort.js`). Die Ausnahme:
+   Zeigt erst die später eintreffende Beast-Karte einen Altersversuch ohne
+   lesbares Alter, steht eine Standard-Karte ohne Altersversuch schon da und
+   wechselt dann auf den festen Satz. Dasselbe gilt, wenn der Altersanker
+   entgegen dem Schema erst hinter den Profilen steht: Live zählt nur, was vor
+   den Profilen ankommt. Die Prüfreihe hält diese Fälle fest
+   (`alters-platzhalter.test.js`, „bewusste Ausnahme“).
 4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus
    `minor-safety.js` (`SCHUTZ_ALTER`), steht also nur an einer Stelle.
 
@@ -1038,8 +1060,20 @@ daraufhin geprüft, dass keine Kinder über die Schutzgrenze rutschen.
 Fließtext mit festen Wortlisten (`functions/src/minor-safety-woerter.js`, je
 Thema deutsch und englisch). Er fängt, was in den Listen steht — nicht jede
 Werbung zu einem Thema. Vor dem Vergleich wird der Text vereinheitlicht
-(Groß- und Kleinschreibung, Umlaute, Bindestrich und Leerzeichen); kurze Wörter
-gelten nur als ganzes Wort („Wetter“ ist keine Wette, „Insekt“ kein Sekt).
+(Groß- und Kleinschreibung, Umlaute, Akzente); kurze Wörter gelten nur als
+ganzes Wort („Wetter“ ist keine Wette, „Insekt“ kein Sekt).
+
+**Zusammen, mit Bindestrich, getrennt.** Ein Bindestrich im Wort ändert
+nichts: Der Filter liest jeden Text auch so, als stünde der Bindestrich nicht
+da — „Soft-Air“, „Pfeffer-Spray“ und „Sex-Spielzeug“ werden gefangen wie die
+zusammengeschriebene Form, im Werbe-Eintrag wie im Satz. Die getrennte
+Schreibweise einer Zusammensetzung („Pfeffer Spray“, „Sex Spielzeug“) wird als
+Werbe-Eintrag gefangen; dafür kennt die Liste die Wortfuge. Im Fließtext gilt
+sie nicht: Dort stehen dieselben zwei Wörter oft zufällig nebeneinander („Sex
+spielt keine Rolle“, „das Spiel automatisch speichern“). Feste Fügungen aus
+mehreren Wörtern („Pall Mall“, „Sex Shop“, „Ku Klux Klan“) gelten in jeder
+Schreibweise auch im Satz. Leerzeichen an beliebiger Stelle zu überbrücken,
+ist gemessen und verworfen: Es träfe Alltagstext („Islam ist“, „Code in“).
 
 **Themen.** Stufe 1, für alle: Pornografie und Sexarbeit, Waffen,
 Extremismus. Stufe 2, bei möglicherweise Minderjährigen (Schutzgrenze siehe
@@ -1051,42 +1085,80 @@ werden Werbe-Einträge, bei Erwachsenen bleiben sie, im Fließtext wird gezählt
 **Was sie hält.** Die Prüfreihe
 `functions/src/__tests__/minor-safety-woerter.test.js`: je Thema Wörter, die
 gefangen werden müssen (deutsch und englisch), und harmlose, die nicht
-gefangen werden dürfen; dazu je Listenwort ein Beispiel. Ein Wort ohne
-Beispiel macht den Test rot.
+gefangen werden dürfen; dazu je Listenwort und je harmloser Wendung ein
+Beispiel. Ein Wort oder eine Wendung ohne Beispiel macht den Test rot —
+ebenso ein langes Listenwort, für das nicht entschieden ist, ob es eine
+Zusammensetzung ist und wie seine getrennte Schreibweise gefangen wird.
 
-**Nur als Werbe-Eintrag.** Einige Wörter sind als Werbe-Kärtchen eindeutig,
-im ganzen Satz aber Redewendung oder Bildbeschreibung („deine stärkste
-Waffe“, „wie aus der Pistole geschossen“, „ein Soldat mit Gewehr“, „wir raten
-dir“, „on the far right“). Sie gelten nur für Werbe-Einträge
-(`ad_targeting`), nicht für Erklärsätze und Fließtext. Eindeutige Wörter
-(„Softair“, „Munition“, „Pornoseite“, „rechtsextrem“) gelten überall. Überall
-gelten auch weiter die englischen Wörter „gun“, „rifle“ und „shotgun“, wie
-schon vor dem 04.10.2026: Eine englische Bildbeschreibung mit Gewehr löst den
-Alarm aus, eine deutsche nicht. Das bestehende Signal wird nicht ohne Messung
-leiser gestellt.
+**Überall oder nur als Werbe-Eintrag.** Was überall gilt, streicht in Stufe 1
+auch Erklärsätze und löst im Fließtext den Alarm aus; in Stufe 2 wird es im
+Fließtext gezählt. Überall gelten deshalb nur Wörter, die in einem Profiltext
+nichts verloren haben: Namen, Symbole, Organisationen und eindeutige Waren
+(„Hitler“, „KKK“, „Sprengstoff“, „Softair“, „Munition“, „Pornoseite“,
+„Dildo“). Nur als Werbe-Eintrag (`ad_targeting`), nicht für Erklärsätze und
+Fließtext, gelten: abstrakte Begriffe, die in einem Aufklärungs- oder
+Erklärsatz stehen können („Faschismus“, „Antisemitismus“, „Radikalisierung“,
+„Erotik“, „Nacktbilder“); Wörter, die im Satz Redewendung oder
+Bildbeschreibung sind („deine stärkste Waffe“, „wie aus der Pistole
+geschossen“, „ein Soldat mit Gewehr“, „wir raten dir“, „wieder wett“, „deine
+Droge“, „I bet“, „on the far right“, „riding shotgun“); Stammregeln, die im
+Satz zu viel träfen („abnehm…“ als Wortanfang); und die getrennte
+Schreibweise einer Zusammensetzung. Zwei Ausnahmen bleiben, wie sie vor dem
+04.10.2026 waren: „Extremismus“ und „Terror“ gelten überall, ebenso die
+englischen Wörter „gun“ und „rifle“ — eine englische Bildbeschreibung mit
+Gewehr löst den Alarm aus, eine deutsche nicht. Das bestehende Signal wird
+nicht ohne Messung leiser gestellt. „shotgun“ stand vor dem 04.10.2026 nicht
+in der Liste und gilt nur als Werbe-Eintrag. Slang mit „Porn“ („Food-Porn“,
+auch „Foodporn“) gilt überall und löst im Fließtext den Alarm aus
+(Entscheidung vom 16.09.2026; der Prompt verbietet ihn). „Sex“ als ganzes
+Wort und „Pistols“ stehen nicht in der Liste — „Sex: female“ ist eine Angabe,
+„Sex Pistols“ eine Band; gelistet sind die Zusammensetzungen („Sexshop“,
+„Sex-Videos“, „Sex Spielzeug“, „Telefonsex“).
 
-**Harmlose Wendungen.** Wendungen, in denen ein Listenwort steckt
-(„Wasserpistole“, „Top Gun“, „People-Pleasing“, „Cocktailkleid“), werden vor
-dem Vergleich aus dem Text genommen. Ein Sperrwort daneben wird trotzdem
-gefangen.
+**Harmlose Wendungen.** Feste Verbindungen, in denen ein Listenwort steckt
+(„Wasserpistole“, „Seifenblasen-Pistole“, „Top Gun“, „alkoholfrei“, „Ginger
+Beer“, „Diet Coke“, „People-Pleasing“, „Cocktailkleid“, „Rifle Jeans“,
+„Unisex“), werden vor dem Vergleich aus dem Text genommen — für beide Stufen,
+im Werbe-Eintrag wie im Satz. Ein Sperrwort daneben wird trotzdem gefangen
+(„Alkoholfreies Bier“ bleibt Bier).
 
 **Was sie nicht leistet.** Ein Werbe-Eintrag ohne Listenwort geht durch, und
 keine Protokollzeile zeigt ihn: Die Kinderschutz-Zeile zählt nur
 Listentreffer. Ob bei Kinderfotos solche Einträge vorkommen, zeigt nur das
-Nachstellen mit eigenen Fotos (Abschnitt „Anzahl und Diagnose“,
-Neubewertung). Schreibweisen mit Ziffern statt Buchstaben („0nlyFans“) oder
-gesperrter Schrift („W e t t e n“) fängt die Liste nicht.
+Nachstellen mit eigenen Fotos (Abschnitt „Anzahl und Diagnose“, Neubewertung).
+Aufgenommen ist, was als Werbe-Kärtchen so gut wie immer das Thema meint.
+Mehrdeutige Wörter stehen bewusst nicht in der Liste, auch wenn sie das Thema
+meinen können: „Gras“, „Speed“, „Messer“, „Patronen“, „Corona“, „Most“,
+„Shots“, „Bingo“, „Hyaluron“ (auch Hautpflege; gefangen werden
+„Hyaluron-Filler“ und „Hyaluron-Spritze“), „Smoking“ (im Deutschen der
+Anzug). Nicht gelistet
+sind auch die Angebote, die der Prompt bei Minderjährigen ausdrücklich als
+Ersatz nennt (In-App-Käufe, Lootboxen, Gaming-Abos, Influencer-Merch,
+Sammelkarten, Statuskleidung): Sie sind Lerninhalt. Schreibweisen mit Ziffern
+statt Buchstaben („0nlyFans“), gesperrter Schrift („W e t t e n“) oder einem
+Leerzeichen mitten in einem Wort, das keine Zusammensetzung ist („Por no“),
+fängt die Liste nicht.
 
-**Alarm.** Der Alarm „Kinderschutz-Treffer“ (`minor-safety-durchbruch`,
-`docs/ERROR-ALERTING.md`) hört allein auf Stufe-1-Wörter im Fließtext, und
-dort nur auf die, die überall gelten. Stufe-2-Wörter im Fließtext werden
-gezählt, ohne Alarm.
+**Alarm und Zähler.** Der Alarm „Kinderschutz-Treffer“
+(`minor-safety-durchbruch`, `docs/ERROR-ALERTING.md`) hört allein auf
+Stufe-1-Wörter im Fließtext, und dort nur auf die, die überall gelten.
+Stufe-2-Wörter im Fließtext werden gezählt, ohne Alarm. Der Zähler zählt
+Listenwörter, keine Aussagen: „Du trinkst keinen Alkohol.“ zählt wie „Du
+trinkst Alkohol.“
 
 **Getragene Folge.** Die Zähler `entfernt` und `durchgerutscht` hängen am
-Umfang der Liste; vor und nach dieser Auslieferung sind sie nicht
-vergleichbar (RUNBOOK, Lesart der Kinderschutz-Zeile). In Erklärsätzen
-streicht Stufe 1 wie bisher: Ein Aufklärungssatz, der ein Stufe-1-Wort nennt
-(„rechtsextrem“), fällt weg.
+Umfang der Liste; vor und nach dieser Auslieferung sind sie nicht vergleichbar
+(RUNBOOK, Lesart der Kinderschutz-Zeile). Der Alarm im Fließtext hört auf
+deutlich mehr Wörter als vorher: Die meisten Stufe-1-Wörter, die überall
+gelten, lösten vor dem 04.10.2026 keinen aus („Taser“, „Armbrust“,
+„Pfefferspray“, „Softair“, „Sprengstoff“, „Hakenkreuz“, „Islamist“,
+„Sexshop“). Der Push „Kinderschutz-Treffer“ kann deshalb häufiger kommen; wie
+oft, hängt an den Texten der KI und ist nicht gemessen. In Erklärsätzen
+streicht Stufe 1 wie bisher: Ein Aufklärungssatz, der ein Stufe-1-Wort nennt,
+das überall gilt („rechtsextrem“), fällt weg. Weil der Bindestrich beim Lesen
+auch weggelassen wird, kann er zwei harmlose Wörter zu einem Listenwort
+verbinden („Sushi-Shake“ enthält „Shisha“); der Eintrag wird dann gestrichen.
+„Unisex“ ist davon ausgenommen („Unisex-Shop“).
 
 **Rückweg.** Nur mit Deploy: Wörter in `minor-safety-woerter.js` ändern. Die
 Tabelle Listenwort → Beispiel in der Prüfreihe muss mitgeändert werden.

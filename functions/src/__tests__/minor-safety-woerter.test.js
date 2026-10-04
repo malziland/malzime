@@ -60,7 +60,6 @@ const THEMEN = [
       "Pornofilm Flatrate",
       "Pornoportal",
       "Kinderpornografie",
-      "Food-Porn",
       "Erotik",
       "Erotik-Shop",
       "Erotikshop",
@@ -94,6 +93,44 @@ const THEMEN = [
       "Sexting-App",
       "Hentai Abo",
       "XXX Videos",
+      "erotische Massage",
+      "erotische Geschichten",
+      "Erotisches Hörbuch",
+      "Sex-Hotline",
+      "Sexhotline",
+      "Webcam-Sex",
+      "Sexkontakte",
+      "Sex Treffen",
+      "Sexdating",
+      "Laufhaus",
+      "Strip-Show",
+      "Table Dance",
+      "Nacktbilder",
+      "Nacktfotos",
+      "Dildo",
+      "Vibrator",
+      "Swingerclub",
+      "Peepshow",
+      "Playboy",
+      "Fetisch-Shop",
+      "BDSM",
+      "Rotlichtviertel",
+      "Lovehoney",
+      "Huren",
+      "XXX",
+      "Food-Porn",
+      "Reizwäsche",
+      "Erwachsenenunterhaltung",
+      "Stripper",
+      "Sex-Spielzeug",
+      "Sex Spielzeug",
+      "Sex-Filme",
+      "Sex-Kino",
+      "Sex-Puppe",
+      "Telefon-Sex",
+      "Joy Club",
+      "My Dirty Hobby",
+      "Strip Chat",
     ],
     [
       "Pornography",
@@ -112,6 +149,20 @@ const THEMEN = [
       "Webcam-Girls",
       "Call Girl",
       "Sugar Daddy Dating",
+      "Nudes",
+      "Adult Entertainment",
+      "Adult Content",
+      "NSFW Content",
+      "live sex",
+      "sex videos",
+      "nude photos",
+      "adult dating",
+      "lap dance",
+      "Casual Sex App",
+      "adult videos",
+      "X-rated movies",
+      "strippers",
+      "hookers",
     ],
     [
       "Ansporn",
@@ -129,6 +180,9 @@ const THEMEN = [
       "sexuelle Orientierung",
       "Sexismus",
       "Sex: female",
+      "Sex",
+      "Sex Education",
+      "sexy Outfit",
       "Dating-App",
       "Tinder",
       "Webcam",
@@ -142,6 +196,13 @@ const THEMEN = [
       "Stripes Hoodie",
       "Ford Escort",
       "Zuckerwatte",
+      "Sexualpädagogik",
+      "Sex Pistols",
+      "Sexismus-Workshop",
+      "Unisex-Mode",
+      "Puffreis",
+      "Puffärmel",
+      "Webcam Logitech",
     ],
   ],
   [
@@ -179,6 +240,32 @@ const THEMEN = [
       "Heckler & Koch",
       "Kalaschnikow",
       "AK-47",
+      "Jagdmesser",
+      "Machete",
+      "Dolch",
+      "Zielfernrohr",
+      "Schießstand",
+      "Sprengstoff",
+      "Bombenbau",
+      "Granaten",
+      "Totschläger",
+      "Wurfsterne",
+      "Nunchaku",
+      "Schrotflinte",
+      "Flinte",
+      "Uzi",
+      "Beretta",
+      "Soft-Air",
+      "Soft Air",
+      "Pfeffer-Spray",
+      "Elektro-Schocker",
+      "Kampf-Messer",
+      "Pistolenholster",
+      "Gewehrkoffer",
+      "Luftgewehrkugeln",
+      "Bewaffnung",
+      "Schießtraining",
+      "Shotgun",
     ],
     [
       "Weapons",
@@ -199,6 +286,11 @@ const THEMEN = [
       "Pepper Spray",
       "Brass Knuckles",
       "AR-15",
+      "switchblade",
+      "grenades",
+      "explosives",
+      "Uzis",
+      "shooting range",
     ],
     [
       "Waffel",
@@ -222,6 +314,7 @@ const THEMEN = [
       "Gun Metal Grey",
       "Gunmetal",
       "Water Pistol",
+      "Pistols",
       "Toy Gun",
       "Messer-Set",
       "Messer-Abo",
@@ -254,6 +347,24 @@ const THEMEN = [
       "Januar 15",
       "Februar-15",
       "Frankonia",
+      "Seifenblasen-Pistole",
+      "Seifenblasenpistole",
+      "Laser-Pistole",
+      "Holzgewehr",
+      "Bubble Gun",
+      "Squirt Gun",
+      "Lackier-Pistole",
+      "Farbspritz-Pistole",
+      "Granatapfel",
+      "Lil Uzi Vert Merch",
+      "Karabinerhaken",
+      "Druckerpatronen",
+      "Pokémon Sword",
+      "Shotgun-Mikrofon",
+      "Rifle Jeans",
+      "Baseballschläger",
+      "Knarrenkasten",
+      "Handy-Holster",
     ],
   ],
   [
@@ -288,6 +399,31 @@ const THEMEN = [
       "Islamisten",
       "Dschihad-Propaganda",
       "Hakenkreuz",
+      "Rechtsrock",
+      "Identitäre",
+      "IS-Propaganda",
+      "Hassprediger",
+      "QAnon",
+      "KKK",
+      "Incel-Foren",
+      "Radikalisierung",
+      "Hitler",
+      "Heil Hitler",
+      "Combat 18",
+      "Blood & Honour",
+      "Wehrmacht-Fanartikel",
+      "Faschismus",
+      "NS-Devotionalien",
+      "Holocaustleugnung",
+      "Antisemitismus",
+      "Rassenhass",
+      "Hassgruppen",
+      "ISIS",
+      "Al-Qaida",
+      "Taliban",
+      "Volksverhetzung",
+      "Hassrede",
+      "Rechte Szene",
     ],
     [
       "Extremist Merch",
@@ -298,6 +434,10 @@ const THEMEN = [
       "Terrorist",
       "Jihad",
       "Swastika",
+      "white power",
+      "fascist merch",
+      "hate groups",
+      "radical islam",
     ],
     [
       "Terrorvogel",
@@ -321,6 +461,13 @@ const THEMEN = [
       "Hooligan-Mode",
       "Hate Merch",
       "Rechtschreibung",
+      "Mundpropaganda",
+      "Radikal reduziert",
+      "Identität stärken",
+      "Mini Militia",
+      "Anti-Rassismus-Workshop",
+      "Verschwörungstheorien erkennen",
+      "Ohne Hetze ankommen",
     ],
   ],
   [
@@ -363,6 +510,19 @@ const THEMEN = [
       "Kasino",
       "Roulette",
       "Jackpot",
+      "Blackjack",
+      "Black Jack",
+      "Slot-Spiele",
+      "Einarmiger Bandit",
+      "Wunderino",
+      "Mozzart",
+      "Zocken um Geld",
+      "Mr Green",
+      "LeoVegas",
+      "Spiel-Automaten",
+      "Brieflos",
+      "1xBet",
+      "22Bet",
     ],
     [
       "Gambling",
@@ -382,6 +542,12 @@ const THEMEN = [
       "Lottery",
       "Scratch Cards",
       "Stake",
+      "sportsbook",
+      "DraftKings",
+      "FanDuel",
+      "William Hill",
+      "Ladbrokes",
+      "Rollbit",
     ],
     [
       "Wetter",
@@ -409,6 +575,22 @@ const THEMEN = [
       "Spielekonsole",
       "Brettspiel",
       "Sammelkarten",
+      "Lotto Fußballschuhe",
+      "Poker-Karten",
+      "Admiral Trikot",
+      "Casino Royale Film",
+      "Jackpot-Eis",
+      "Wetten dass..? DVD",
+      "Mozartkugeln",
+      "Glücksrad",
+      "Gewinnspiel",
+      "loot boxes",
+      "Lotto-Trikot",
+      "Admiral Sportswear",
+      "Wagerl",
+      "Einkaufswagerl",
+      "Tippspiel",
+      "Cashpoint",
     ],
   ],
   [
@@ -446,6 +628,25 @@ const THEMEN = [
       "Afterpay",
       "Cashper",
       "Inkasso",
+      "Pfandhaus",
+      "Pfandleihe",
+      "Abzahlen",
+      "auf Pump kaufen",
+      "Bonitätscheck",
+      "Geld leihen",
+      "Geld borgen",
+      "Vorschuss",
+      "Zahlpause",
+      "Stundung",
+      "Klarnas Zahlpause",
+      "Klarnas",
+      "Scalapay",
+      "Zinia",
+      "Teil-Zahlung",
+      "Mietkauf",
+      "Schuldnerberatung",
+      "Zahl später",
+      "Abzahlung",
     ],
     [
       "Loan",
@@ -463,6 +664,11 @@ const THEMEN = [
       "Mortgage",
       "Debt",
       "Overdraft",
+      "Affirm",
+      "pay in 4",
+      "borrow money",
+      "cash advance",
+      "lending",
     ],
     [
       "People-Pleasing",
@@ -484,6 +690,12 @@ const THEMEN = [
       "Gutschein",
       "Schulranzen",
       "Schuldisco",
+      "Kreditkartenhülle",
+      "Raten-Quiz",
+      "Rätsel raten",
+      "Flaschenpfand",
+      "Store Credit",
+      "Extra Credit",
     ],
   ],
   [
@@ -537,6 +749,38 @@ const THEMEN = [
       "Stiegl",
       "Gösser Radler",
       "Ottakringer",
+      "Longdrinks",
+      "G'spritzter",
+      "Zipfer",
+      "Puntigamer",
+      "Havana Club",
+      "Trinkspiele",
+      "Saufen",
+      "Komasaufen",
+      "Kneipentour",
+      "Sangria",
+      "Mojito",
+      "Caipirinha",
+      "Lillet",
+      "Ramazzotti",
+      "Jägerbomb",
+      "Berentzen",
+      "Kleiner Feigling",
+      "Desperados",
+      "Beck's",
+      "Krombacher",
+      "Zwettler",
+      "Schwechater",
+      "Wieselburger",
+      "Hochprozentiges",
+      "Jagermeister",
+      "Gosser",
+      "Märzen",
+      "Pils",
+      "Pilsner",
+      "Flügerl",
+      "Schnäpse",
+      "Sektfrühstück",
     ],
     [
       "Alcohol",
@@ -559,6 +803,13 @@ const THEMEN = [
       "Captain Morgan",
       "Smirnoff Ice",
       "Jack Daniel's",
+      "White Claw",
+      "Pub Crawl",
+      "drinking games",
+      "hangover cure",
+      "Gins",
+      "Ciders",
+      "pale ale",
     ],
     [
       "Schwein",
@@ -600,6 +851,31 @@ const THEMEN = [
       "Apfelsaft",
       "Liquorice",
       "Winter",
+      "Ginger Beer",
+      "Root Beer",
+      "Butterbeer",
+      "Bierhoff-Trikot",
+      "Cocktailtomaten",
+      "Rum-Aroma Backen",
+      "Aperolfarben",
+      "Alkoholfreie Getränke",
+      "Eros Ramazzotti Tickets",
+      "Roségold",
+      "Hugo Boss",
+      "Corona-Test",
+      "Sturm Graz Trikot",
+      "Ingwer-Shots",
+      "Gespritzter Apfelsaft",
+      "Bierdeckel-Sammlung",
+      "Bierschinken",
+      "Spritz-Gebäck",
+      "Radler-Zubehör",
+      "Gin-Rommé",
+      "Winery Dogs",
+      "Kinderpunsch",
+      "Ferienlager",
+      "Pilsen-Reise",
+      "Mixgetränke",
     ],
   ],
   [
@@ -627,6 +903,19 @@ const THEMEN = [
       "IQOS",
       "Velo",
       "Heets",
+      "E-Liquid",
+      "Dampfer-Shop",
+      "OCB Papers",
+      "Trafik",
+      "Memphis Blue",
+      "Terea",
+      "Kippen",
+      "Stopfmaschine",
+      "SKE Crystal",
+      "RandM Tornado",
+      "Longpapers",
+      "Vaporizer",
+      "Wasser-Pfeife",
     ],
     [
       "Tobacco",
@@ -643,6 +932,11 @@ const THEMEN = [
       "Vuse",
       "Juul",
       "Zyn",
+      "e-cig",
+      "smoke shop",
+      "puff bar",
+      "rolling papers",
+      "smokes",
     ],
     [
       "Smoking",
@@ -658,6 +952,16 @@ const THEMEN = [
       "Elfmeter",
       "Elf Freunde",
       "Barhocker",
+      "Tabakfrei",
+      "Zigarettenfrei",
+      "Shisha-freie Zone",
+      "Raucherlunge Aufklärung",
+      "Velo-Helm",
+      "Smoking-Verleih",
+      "Vaporwave Musik",
+      "Dampfreiniger",
+      "AirPods",
+      "Feuerzeug",
     ],
   ],
   [
@@ -682,8 +986,37 @@ const THEMEN = [
       "Fettweg-Spritze",
       "Haartransplantation",
       "Botox Behandlung",
-      "Hyaluron",
       "Filler",
+      "Beauty-Eingriff",
+      "ästhetische Medizin",
+      "ästhetische Chirurgie",
+      "Lippenvergrößerung",
+      "Kinn-Implantat",
+      "Veneers",
+      "Brustimplantate",
+      "Po-Implantate",
+      "Faltenbehandlung",
+      "Beauty-Doc",
+      "Ohren anlegen",
+      "Bauchdeckenstraffung",
+      "Fadenlifting",
+      "Fett-weg-Spritze",
+      "Kryolipolyse",
+      "Lippen machen lassen",
+      "Nase machen lassen",
+      "Hautaufhellung",
+      "Russian Lips",
+      "Fett-Absaugung",
+      "Brust-Vergrößerung",
+      "Haar-Transplantation",
+      "Hyaluron-Filler",
+      "Hyaluron-Spritze",
+      "Hyaluron-Unterspritzung",
+      "Kosmetische Eingriffe",
+      "Kosmetische Chirurgie",
+      "Po-Vergrößerung",
+      "Aufgespritzte Lippen",
+      "Lippenfiller",
     ],
     [
       "Cosmetic Surgery Clinic",
@@ -696,6 +1029,17 @@ const THEMEN = [
       "Tummy Tuck",
       "Facelift",
       "Hair Transplant",
+      "Brazilian Butt Lift",
+      "butt lift",
+      "breast implants",
+      "lip augmentation",
+      "aesthetic clinic",
+      "med spa",
+      "injectables",
+      "Lip Flip",
+      "cosmetic injections",
+      "skin bleaching",
+      "hyaluronic filler",
     ],
     [
       "Stocking Fillers",
@@ -709,6 +1053,18 @@ const THEMEN = [
       "Schönheitsschlaf",
       "Zahnspange",
       "Friseur",
+      "Hyaluron-Serum",
+      "Hyaluron-Creme",
+      "Filler-Episoden",
+      "Facelift VW Golf",
+      "Wimpernlifting",
+      "Powerlifting",
+      "Lifting-Gurt",
+      "Aesthetic Room Decor",
+      "Fox Eyes Make-up",
+      "Hyaluron",
+      "Hyaluron-Gel",
+      "Hyaluron-Maske",
     ],
   ],
   [
@@ -740,6 +1096,42 @@ const THEMEN = [
       "Shape Shake",
       "Noom",
       "Yazio",
+      "Kalorien zählen",
+      "Low Carb",
+      "Keto",
+      "Mahlzeitenersatz",
+      "MyFitnessPal",
+      "Lifesum",
+      "Bikinifigur",
+      "Sommerfigur",
+      "Heilfasten",
+      "Saftkur",
+      "Entschlackung",
+      "Fettverbrenner",
+      "Stoffwechselkur",
+      "Abführtee",
+      "Schlankmacher",
+      "Abnehmtipps",
+      "Abnehmpulver",
+      "Abnehmtropfen",
+      "Abnehmpflaster",
+      "Schlank-Shakes",
+      "Kalorientracker",
+      "Kaloriendefizit",
+      "Fett weg",
+      "Bauchfett verlieren",
+      "Traumfigur",
+      "Wunschgewicht",
+      "Magersucht-Foren",
+      "Pro-Ana",
+      "Appetit-Zügler",
+      "Kalorien-Zähler",
+      "Kalorien-Tracker",
+      "Intervall-Fasten",
+      "Slim Fast",
+      "Slim-Fast",
+      "Schlank im Schlaf",
+      "Fettkiller",
     ],
     [
       "Diet",
@@ -752,6 +1144,17 @@ const THEMEN = [
       "Fatburner",
       "Appetite Suppressant",
       "Intermittent Fasting",
+      "low carb",
+      "meal replacement",
+      "detox tea",
+      "skinny tea",
+      "waist trainer",
+      "weight management",
+      "fasting app",
+      "Thigh Gap",
+      "Size Zero",
+      "thinspo",
+      "Diets",
     ],
     [
       "diatonische Mundharmonika",
@@ -766,6 +1169,15 @@ const THEMEN = [
       "Protein Shake",
       "Sporternährung",
       "Gewichtheben",
+      "Abnehmbare Zahnspange",
+      "Abnehmender Mond",
+      "Diätassistenz",
+      "Diet Coke",
+      "Detox-Smoothie",
+      "Kalorienarme Snacks",
+      "Skinny Jeans",
+      "Shapewear",
+      "Diät-Cola",
     ],
   ],
   [
@@ -823,6 +1235,19 @@ const THEMEN = [
       "Opiate",
       "Fentanyl",
       "Kratom",
+      "Tilidin",
+      "Xanax",
+      "Codein",
+      "Opium",
+      "Meth",
+      "Space Cookies",
+      "Haschkekse",
+      "Benzos",
+      "Partypillen",
+      "Aufputschmittel",
+      "Gras kaufen",
+      "high werden",
+      "Partydroge",
     ],
     [
       "Drugs",
@@ -846,6 +1271,11 @@ const THEMEN = [
       "Opioids",
       "Opiates",
       "Edibles",
+      "drug",
+      "stoner merch",
+      "Grinders",
+      "Stoners",
+      "dab pens",
     ],
     [
       "Drogerie",
@@ -902,6 +1332,20 @@ const THEMEN = [
       "Betäubung",
       "Suchtrupp",
       "Suchmaschine",
+      "Drugstore Makeup",
+      "Pfeffer-Grinder",
+      "Skate-Grinder",
+      "Kiffhäuser",
+      "Stoner Rock Playlist",
+      "Methode",
+      "Party Poppers",
+      "Kräutermischung",
+      "Schmerzmittel",
+      "Hasch mich",
+      "Koks-Grill",
+      "CBD-freies Shampoo",
+      "Hanfprodukte",
+      "Dispensary",
     ],
   ],
 ];
@@ -994,6 +1438,8 @@ describe("Text wird vor dem Vergleich vereinheitlicht", () => {
   test.each([
     ["Only Fans", "only fans"],
     ["Only-Fans", "only fans"],
+    ["Gin - Tonic", "gin tonic"],
+    ["Wein-/Sektempfang", "wein sektempfang"],
     ["ONLYFANS", "onlyfans"],
     ["Glücksspiel", "gluecksspiel"],
     ["Brustvergrößerung", "brustvergroesserung"],
@@ -1212,6 +1658,328 @@ describe("Pistole, Gewehr, Revolver gelten nur als Werbe-Eintrag", () => {
   );
 });
 
+describe("Nachschärfung nach der fremden Prüfreihe", () => {
+  /* Was überall gilt, löst im Fließtext den Alarm aus. Dorthin gehören nur
+     Wörter, die in einem Profiltext nichts verloren haben: Namen, Symbole,
+     Organisationen, eindeutige Waren. Abstrakte Begriffe, die in einem
+     Aufklärungs- oder Erklärsatz stehen können, gelten nur als
+     Werbe-Eintrag. */
+  let zeilen;
+  beforeEach(() => {
+    zeilen = [];
+    jest.spyOn(console, "log").mockImplementation((z) => zeilen.push(z));
+    jest.spyOn(console, "error").mockImplementation((z) => zeilen.push(z));
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  test.each([
+    ["Hitler"],
+    ["KKK"],
+    ["ISIS"],
+    ["Taliban"],
+    ["QAnon"],
+    ["Sprengstoff"],
+    ["Schrotflinte"],
+    ["Machete"],
+    ["Zielfernrohr"],
+    ["Dildo"],
+  ])("gilt überall, auch im Satz: %s", (wort) => {
+    expect(_istImmerVerboten(wort)).toBe(true);
+    expect(_istImmerVerboten(`Im Text steht ${wort} und mehr.`, false)).toBe(true);
+  });
+
+  test.each([
+    ["Faschismus"],
+    ["Antisemitismus"],
+    ["Radikalisierung"],
+    ["Rassenhass"],
+    ["Volksverhetzung"],
+    ["Hassgruppen"],
+    ["Propaganda"],
+    ["Erotik"],
+    ["Erotische Dessous"],
+    ["Striptease"],
+    ["Nacktbilder"],
+    ["Nudes"],
+    ["Sexkontakte"],
+    ["Granate"],
+    ["Dolch"],
+    ["Flinte"],
+    ["Shotgun"],
+    ["Shotguns"],
+  ])("gilt nur als Werbe-Eintrag: %s", (wort) => {
+    expect(_istImmerVerboten(wort)).toBe(true);
+    expect(_istImmerVerboten(`Im Text steht ${wort} und mehr.`, false)).toBe(false);
+    const p = profil(ERWACHSEN, [wort, "Nike"]);
+    applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(["Nike"]);
+  });
+
+  const SAETZE_STUFE_1 = [
+    "Erotik spielt in deinem Feed keine Rolle.",
+    "Dein Feed könnte bald erotische Inhalte zeigen.",
+    "Your feed could turn erotic soon.",
+    "Du betreibst hier einen kleinen Seelen-Striptease.",
+    "You are riding shotgun in your own life.",
+    "Faschismus und Antisemitismus kennst du aus dem Geschichtsunterricht.",
+    "Radikalisierung beginnt oft mit harmlosen Memes.",
+    "Dein Radikalisierungsrisiko ist gering.",
+    "Propaganda erreicht dich über kurze Videos.",
+    "Sex: female",
+    "Deine sexuelle Orientierung geht Werbetreibende nichts an.",
+    "Sexismus in der Werbung trifft auch dich.",
+    "Jemand könnte dich zu Nacktbildern überreden wollen.",
+    "Du bist eine Granate im Tor.",
+    "Du wirfst nicht gleich die Flinte ins Korn.",
+    "Auf deinem Shirt ist das Playboy-Logo zu sehen.",
+  ];
+  const SAETZE_STUFE_2 = [
+    "Das macht deine Zurückhaltung wieder wett.",
+    "Du trinkst ein alkoholfreies Getränk.",
+    "Du scheinst nicht zu rauchen.",
+    "Deine Eltern schulden dir noch ein neues Handy.",
+    "Das wäre wie ein Lottogewinn für dich.",
+    "Dein Handy ist deine Droge.",
+    "Social Media ist für dich wie eine Droge.",
+    "Likes are your drugs.",
+    "You are hooked on likes like a drug.",
+    "You are in debt to your friends.",
+    "I bet you spend hours on your phone.",
+    "You are a safe bet for sneaker brands.",
+    "Für Werbetreibende bist du ein Jackpot.",
+    "You hit the jackpot with this outfit.",
+    "Ich könnte wetten, dass du viel Zeit am Handy verbringst.",
+    "Du siehst aus, als würdest du gleich weinen. Wein nicht.",
+    "Das Foto ist vor einer Trafik entstanden.",
+    "Du würdest Freunden jederzeit Geld leihen.",
+    "Die Stimmung könnte schnell kippen.",
+    "Du würdest für gute Noten sogar die Ohren anlegen.",
+  ];
+
+  test.each(SAETZE_STUFE_1)("Stufe 1 trifft den Satz nicht: %s", (satz) => {
+    expect(_istImmerVerboten(satz, false)).toBe(false);
+  });
+  test.each(SAETZE_STUFE_2)("Stufe 2 trifft den Satz nicht: %s", (satz) => {
+    expect(_istBeiMinderjaehrigenVerboten(satz, false)).toBe(false);
+  });
+
+  test("Kind: Erklärsätze und Fließtext mit diesen Sätzen bleiben stehen, nichts gezählt, kein Alarm", () => {
+    const alle = [...SAETZE_STUFE_1, ...SAETZE_STUFE_2];
+    const p = profil(KIND, ["Nike"], { manipulation_triggers: [...alle], profileText: alle.join(" ") });
+    p.normal.categories.interessen = { value: alle.join(" ") };
+    const b = applyMinorSafety(p);
+    loggeMinorSafety(b, "de");
+    expect(p.normal.manipulation_triggers).toEqual(alle);
+    expect(b.entfernt).toEqual([]);
+    expect(b.durchgerutscht).toEqual([]);
+    expect(zeilen.some((z) => z.includes("minor-safety-durchbruch"))).toBe(false);
+    /* Positivkontrolle: Die Protokollzeile selbst wurde geschrieben. */
+    expect(zeilen.some((z) => z.includes('"minor-safety"'))).toBe(true);
+  });
+
+  /* Gegenproben: Ein Name löst den Alarm aus; ein Satz, der wirklich vom
+     Thema handelt, wird weiter gezählt. */
+  test("ein Name im Fließtext: gezählt, Alarmzeile geschrieben", () => {
+    const p = profil(ERWACHSEN, ["Nike"], { profileText: "Auf dem Poster hinter dir steht Hitler." });
+    const b = applyMinorSafety(p);
+    loggeMinorSafety(b, "de");
+    expect(b.durchgerutscht.map((d) => [d.grund, d.stichwort])).toEqual([
+      ["immer", "hitler"],
+      ["immer", "hitler"],
+    ]);
+    expect(zeilen.some((z) => z.includes("minor-safety-durchbruch"))).toBe(true);
+  });
+
+  test("Kind: „Auf dem Tisch steht ein Glas Wein.“ wird weiter gezählt, ohne Alarm", () => {
+    const p = profil(KIND, ["Nike"], { profileText: "Auf dem Tisch steht ein Glas Wein." });
+    const b = applyMinorSafety(p);
+    loggeMinorSafety(b, "de");
+    expect(b.durchgerutscht.map((d) => [d.grund, d.stichwort])).toEqual([
+      ["minor", "wein"],
+      ["minor", "wein"],
+    ]);
+    expect(zeilen.some((z) => z.includes("minor-safety-durchbruch"))).toBe(false);
+  });
+
+  test.each([
+    ["Wett"],
+    ["Lotto"],
+    ["Lottoschein"],
+    ["Jackpot"],
+    ["Bet"],
+    ["Schulden"],
+    ["Debt"],
+    ["Rauchen"],
+    ["Droge"],
+    ["Drug"],
+    ["Drugs"],
+    ["Abnehmtipps"],
+    ["Abnehmspritze"],
+    ["Trafik"],
+    ["Kippen"],
+    ["Geld leihen"],
+  ])("als Werbe-Eintrag fliegt es bei einem Kind: %s", (eintrag) => {
+    const p = profil(KIND, [eintrag, "Nike"]);
+    applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(["Nike"]);
+  });
+
+  /* Die harmlose Wendung verdeckt kein Sperrwort daneben. */
+  test.each([
+    ["Seifenblasen-Pistole", false],
+    ["Seifenblasen-Pistole und Softair-Pistole", true],
+    ["Bubble Gun", false],
+    ["Bubble Gun und Shotgun", true],
+    ["Sexualkunde", false],
+    ["Sexualkunde und Sexkontakte", true],
+    ["Lil Uzi Vert Merch", false],
+    ["Uzi", true],
+    ["Mundpropaganda", false],
+    ["NS-Propaganda", true],
+    ["Shotgun-Mikrofon", false],
+    ["Shotgun-Mikrofon und Shotgun", true],
+    ["Rifle Jeans", false],
+    ["Rifle Jeans und Rifles", true],
+  ])("Stufe 1: %s → %p", (eintrag, erwartet) => {
+    expect(_istImmerVerboten(eintrag)).toBe(erwartet);
+  });
+
+  test.each([
+    ["Alkoholfreie Getränke", false],
+    ["Alkoholfreies Bier", true],
+    ["Nikotinfrei", false],
+    ["Nikotinfreie Vapes", true],
+    ["Casino Royale Film", false],
+    ["Casino Royale Online Casino", true],
+    ["Lotto Fußballschuhe", false],
+    ["Lotto Sportwetten", true],
+    ["Hyaluron-Creme", false],
+    ["Hyaluron-Creme mit Botox-Effekt", true],
+    ["Hyaluron", false],
+    ["Hyaluron-Filler", true],
+    ["Drugstore Makeup", false],
+    ["Drug Store und Drugs", true],
+    ["Abnehmbare Zahnspange", false],
+    ["Abnehmbare Zahnspange zum Abnehmen", true],
+    ["Klarname", false],
+    ["Klarna", true],
+    ["Klarnas", true],
+    ["Diet Coke", false],
+    ["Diet Coke Diet Plan", true],
+    ["Filler-Episoden", false],
+    ["Lip Filler", true],
+    ["Wetten dass..? DVD", false],
+    ["Wetten dass und Sportwetten", true],
+    ["Velo-Helm", false],
+    ["Velo", true],
+  ])("Stufe 2: %s → %p", (eintrag, erwartet) => {
+    expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(erwartet);
+  });
+
+  /* Entscheidung vom 16.09.2026 (prompt-sprachregeln.test.js): Slang mit
+     „Porn“ soll im Fließtext den Alarm auslösen — auch „Food-Porn“. Keine
+     harmlose Wendung. */
+  test.each([
+    ["Der Teller sieht nach Food-Porn für Instagram aus."],
+    ["Der Teller sieht nach Foodporn für Instagram aus."],
+    ["This plate is pure food porn."],
+  ])("„Food-Porn“ im Fließtext: gezählt, Alarmzeile geschrieben: %s", (satz) => {
+    const p = profil(ERWACHSEN, ["Nike"], { profileText: satz });
+    const b = applyMinorSafety(p);
+    loggeMinorSafety(b, "de");
+    expect(b.durchgerutscht.map((d) => d.grund)).toEqual(["immer", "immer"]);
+    expect(zeilen.some((z) => z.includes("minor-safety-durchbruch"))).toBe(true);
+  });
+
+  /* „gun“, „guns“ und „rifle“ galten schon vor dem 04.10.2026 überall und
+     bleiben es. „shotgun“ kam neu dazu und gilt deshalb nur als
+     Werbe-Eintrag — wie Gewehr. */
+  test.each([
+    ["A man with a gun stands next to you.", true],
+    ["Two guns hang on the wall.", true],
+    ["A hunting rifle leans on the wall.", true],
+    ["A man with a shotgun stands next to you.", false],
+    ["You are riding shotgun in your own life.", false],
+  ])("englische Waffenwörter im Satz: %s → %p", (satz, erwartet) => {
+    expect(_istImmerVerboten(satz, false)).toBe(erwartet);
+  });
+
+  /* „Sex“ als ganzes Wort und „Pistols“ bleiben frei: „Sex: female“ ist eine
+     Angabe, „Sex Pistols“ eine Band. Gefangen werden die Zusammensetzungen,
+     in jeder Schreibweise. */
+  test.each([
+    ["Sex: female"],
+    ["Sex"],
+    ["Sexualkunde"],
+    ["Unisex Toys"],
+    ["Sex Pistols"],
+    ["Pistols"],
+    ["Sextett"],
+    ["Sex Education"],
+    ["Sex and the City"],
+    ["sexy Outfit"],
+    ["Sex-Appeal"],
+  ])("bleibt als Werbe-Eintrag stehen, auch bei einem Kind: %s", (eintrag) => {
+    const p = profil(KIND, [eintrag, "Nike"]);
+    const b = applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual([eintrag, "Nike"]);
+    expect(b.applied).toBe(false);
+  });
+
+  test.each([
+    ["Sexspielzeug"],
+    ["Sex-Spielzeug"],
+    ["Sex Spielzeug"],
+    ["Sexfilme"],
+    ["Sex-Filme"],
+    ["Sex Filme"],
+    ["Sexvideos"],
+    ["Sex-Videos"],
+    ["Sex Videos"],
+    ["Sex-Hotline"],
+    ["Sexkontakte"],
+    ["Sex Dating"],
+    ["Telefon Sex"],
+    ["Cyber-Sex"],
+    ["erotisch"],
+    ["Erotische Massage"],
+  ])("wird bei allen gestrichen: %s", (eintrag) => {
+    const p = profil(ERWACHSEN, [eintrag, "Nike"]);
+    applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(["Nike"]);
+  });
+
+  /* Die Ersatz-Angebote, die der Prompt bei Minderjährigen ausdrücklich
+     nennt (locales/de/prompts.js, Regel zu beast.ad_targeting), sind
+     Lerninhalt: Kein Listenwort darf sie treffen. */
+  test("die Ersatz-Angebote des Prompts für Minderjährige bleiben stehen", () => {
+    const ersatz = [
+      "In-App-Käufe",
+      "Lootboxen",
+      "Lootbox",
+      "Gaming-Abos",
+      "Influencer-Merch",
+      "Sammelkarten",
+      "Sammelkarten-Mechaniken",
+      "Statuskleidung",
+      "in-app purchases",
+      "lootboxes",
+      "loot boxes",
+      "gaming subscriptions",
+      "influencer merch",
+      "trading cards",
+      "trading-card mechanics",
+      "status clothing",
+    ];
+    for (const teil of [ersatz.slice(0, 8), ersatz.slice(8)]) {
+      const p = profil(KIND, teil);
+      const b = applyMinorSafety(p);
+      expect(p.normal.ad_targeting).toEqual(teil);
+      expect(b.applied).toBe(false);
+    }
+  });
+});
+
 describe("Drogen werden bei möglicherweise Minderjährigen wie Alkohol behandelt", () => {
   /* Entscheidung vom 04.10.2026. Stufe 2: nur Werbe-Einträge, nur bis zur
      Schutzgrenze; bei Erwachsenen bleiben sie; im Fließtext wird gezählt,
@@ -1337,6 +2105,513 @@ describe("Harmlose Wendungen werden vor dem Vergleich herausgenommen", () => {
   });
 });
 
+/* ══════════════════════════════════════════════════════════════════════
+   Schreibweisen: zusammen, mit Bindestrich, getrennt (A-01). Ein Bindestrich
+   zwischen zwei Buchstaben ändert nichts — das Listenwort muss die Wortfuge
+   dafür nicht kennen. Ein Leerzeichen an der Wortfuge trifft nur, wenn das
+   Listenwort es notiert.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("Schreibweisen mit Bindestrich und Leerzeichen", () => {
+  const stufe = (text) =>
+    _istImmerVerboten(text) ? "immer" : _istBeiMinderjaehrigenVerboten(text) ? "minor" : "DURCH";
+
+  /* Die Paare der fremden Prüfreihe: jede Schreibweise wird gefangen, und
+     zwar in derselben Stufe wie die zusammengeschriebene. */
+  test.each([
+    [["Sexspielzeug", "Sex-Spielzeug", "Sex Spielzeug"]],
+    [["Sexfilme", "Sex-Filme"]],
+    [["Sexkino", "Sex-Kino"]],
+    [["Sexpuppe", "Sex-Puppe"]],
+    [["Telefonsex", "Telefon-Sex"]],
+    [["Softair", "Soft-Air", "Soft Air"]],
+    [["Pfefferspray", "Pfeffer-Spray"]],
+    [["Elektroschocker", "Elektro-Schocker"]],
+    [["Kampfmesser", "Kampf-Messer"]],
+    [["Spielautomaten", "Spiel-Automaten"]],
+    [["Teilzahlung", "Teil-Zahlung"]],
+    [["Fettabsaugung", "Fett-Absaugung"]],
+    [["Brustvergrößerung", "Brust-Vergrößerung"]],
+    [["Haartransplantation", "Haar-Transplantation"]],
+    [["Appetitzügler", "Appetit-Zügler"]],
+    [["Kalorienzähler", "Kalorien-Zähler"]],
+    [["Intervallfasten", "Intervall-Fasten"]],
+    [["Wasserpfeife", "Wasser-Pfeife"]],
+    [["SlimFast", "Slim Fast", "Slim-Fast"]],
+    [["JOYclub", "Joy Club"]],
+    [["MyDirtyHobby", "My Dirty Hobby"]],
+    [["Stripchat", "Strip Chat"]],
+    [["Sexshop", "Sex-Shop", "Sex Shop"]],
+    [["Schönheitsop", "Schönheits-OP", "Schönheits OP"]],
+    [["Jägermeister", "Jaegermeister", "Jagermeister"]],
+    [["Gösser", "Goesser", "Gosser"]],
+  ])("%p", (schreibweisen) => {
+    const stufen = schreibweisen.map(stufe);
+    expect(stufen[0]).not.toBe("DURCH");
+    expect(stufen).toEqual(schreibweisen.map(() => stufen[0]));
+  });
+
+  /* Dauerhaft gehalten, für jedes Listenwort: Das Beispiel der Tabelle wird
+     mit einem Bindestrich an JEDER Stelle zwischen zwei Buchstaben weiter
+     gefangen — als Werbe-Eintrag, und bei Wörtern, die überall gelten, auch
+     im Satz. */
+  const mitBindestrich = (text) => {
+    const formen = [];
+    for (let i = 1; i < text.length; i++) {
+      if (/[\p{L}\p{N}]/u.test(text[i - 1]) && /[\p{L}\p{N}]/u.test(text[i]))
+        formen.push(`${text.slice(0, i)}-${text.slice(i)}`);
+    }
+    return formen;
+  };
+
+  test.each([
+    ["immer", _istImmerVerboten],
+    ["minor", _istBeiMinderjaehrigenVerboten],
+  ])("Stufe „%s“: ein Bindestrich im Beispiel eines Listenworts ändert nichts", (name, ist) => {
+    const liste = _SPERRLISTEN[name];
+    const durch = [];
+    let geprueft = 0;
+    for (const [wort, beispiel] of Object.entries(BEISPIEL_JE_WORT[name])) {
+      for (const form of mitBindestrich(beispiel)) {
+        geprueft++;
+        if (!ist(form, true)) durch.push(`${wort}: ${form}`);
+        if (liste.ueberall.includes(wort) && !ist(form, false)) durch.push(`${wort} (im Satz): ${form}`);
+      }
+    }
+    /* Positivkontrolle der Messung: Es wurden wirklich Formen geprüft. */
+    expect(geprueft).toBeGreaterThan(1000);
+    expect(durch).toEqual([]);
+  });
+
+  /* Einträge mit notierter Wortfuge („+“ oder Leerzeichen) treffen als
+     Werbe-Eintrag alle drei Schreibweisen: zusammen, mit Bindestrich,
+     getrennt. Ausgenommen ist nur, was eine harmlose Wendung bewusst
+     freistellt („auf Pump“ gegen „Aufpump-Service“). */
+  const harmloseWendung = new RegExp(_SPERRLISTEN.harmlos.map(_muster).join("|"));
+  const dreiSchreibweisen = (fuge) => [fuge.replace(/[ +]/g, ""), fuge.replace(/[ +]/g, "-"), fuge.replace(/\+/g, " ")];
+
+  test.each([
+    ["immer", _istImmerVerboten],
+    ["minor", _istBeiMinderjaehrigenVerboten],
+  ])("Stufe „%s“: Einträge mit Wortfuge treffen zusammen, Bindestrich und getrennt", (name, ist) => {
+    const liste = _SPERRLISTEN[name];
+    const mitFuge = [...liste.ueberall, ...liste.nurAlsWerbung].filter((w) => /[ +]/.test(w));
+    const durch = [];
+    for (const wort of mitFuge) {
+      for (const form of dreiSchreibweisen(wort.replace(/\*/g, ""))) {
+        if (!ist(form, true) && !harmloseWendung.test(_vereinheitlicht(form))) durch.push(`${wort}: ${form}`);
+      }
+    }
+    expect(mitFuge.length).toBeGreaterThan(100);
+    expect(durch).toEqual([]);
+  });
+
+  /* Die Wortfuge „+“ einer Zusammensetzung gilt im Fließtext nur zusammen
+     und mit Bindestrich: Getrennt stehen dieselben zwei Wörter dort oft
+     zufällig nebeneinander. Ein Leerzeichen im Eintrag (feste Fügung aus
+     mehreren Wörtern) gilt in jeder Sicht getrennt. */
+  test.each([
+    ["Rotlichtviertel", true, true],
+    ["Rotlicht-Viertel", true, true],
+    ["Rotlicht Viertel", true, false],
+    ["Schalldämpfer", true, true],
+    ["Schall-Dämpfer", true, true],
+    ["Schall Dämpfer", true, false],
+    ["Pfefferspray", true, true],
+    ["Pfeffer-Spray", true, true],
+    ["Pfeffer Spray", true, false],
+    ["Sex Shop", true, true],
+    ["Ku Klux Klan", true, true],
+  ])("Stufe 1: „%s“ — als Werbe-Eintrag %p, im Satz %p", (text, alsWerbung, imSatz) => {
+    expect(_istImmerVerboten(text, true)).toBe(alsWerbung);
+    expect(_istImmerVerboten(`Im Text steht ${text} und mehr.`, false)).toBe(imSatz);
+  });
+
+  test.each([
+    ["Mietkauf", true, true],
+    ["Miet-Kauf", true, true],
+    ["Miet Kauf", true, false],
+    ["Pall Mall", true, true],
+  ])("Stufe 2: „%s“ — als Werbe-Eintrag %p, im Satz %p", (text, alsWerbung, imSatz) => {
+    expect(_istBeiMinderjaehrigenVerboten(text, true)).toBe(alsWerbung);
+    expect(_istBeiMinderjaehrigenVerboten(`Im Text steht ${text} und mehr.`, false)).toBe(imSatz);
+  });
+
+  /* Zwei Wörter, die im Satz zufällig nebeneinanderstehen, sind keine
+     Zusammensetzung: kein Treffer, kein Alarm. */
+  test.each([
+    ["Sex spielt in deinem Feed keine Rolle."],
+    ["Mit einem Schlag Stockwerke höher."],
+    ["Das Spiel automatisch zu speichern, ist praktisch."],
+    ["Der Islam ist eine Weltreligion."],
+    ["Du trägst einen Hoodie in Mode Drogerie-Blau."],
+  ])("zufällige Nachbarn im Satz zählen nicht: %s", (satz) => {
+    expect(_istImmerVerboten(satz, false)).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten(satz, false)).toBe(false);
+  });
+
+  /* Harmlose Nachbarn als Werbe-Eintrag: Die getrennte Schreibweise steht
+     bei kurzen zweiten Wortteilen als ganzes Wort in der Liste. */
+  test.each([
+    ["Soft AirPods Case"],
+    ["Nike Air Softshell"],
+    ["Saft Kurkuma Ingwer"],
+    ["Mode Drogerie"],
+    ["Islam ist Frieden"],
+    ["Die T-Shirts"],
+    ["Win E-Bike"],
+    ["Unisex Camping"],
+    ["Xbox Videos"],
+  ])("bleibt als Werbe-Eintrag stehen: %s", (eintrag) => {
+    expect(_istImmerVerboten(eintrag)).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(false);
+  });
+
+  /* Dauerhaft gehalten: Ein langes Listenwort ohne notierte Wortfuge braucht
+     eine Entscheidung — es steht in genau einer der zwei Prüflisten, sonst
+     wird der Test rot.
+       FUGE_ANDERSWO: Zusammensetzung, deren getrennte Schreibweise ein
+         anderes Listenwort fängt („Wein Probe“ über „Wein“). Die drei
+         Schreibweisen werden hier geprüft.
+       OHNE_WORTFUGE: kein zusammengesetztes Wort („Kalaschnikow“) oder
+         getrennte Schreibweise bewusst frei („Arm Brust“, „Pay Day“). */
+  const FUGE_ANDERSWO =
+    `you porn, schuss waffe, feuer waffe, jagd waffe, kriegs waffe, stich waffe, hieb waffe, gas waffe,
+    luftdruck waffe, waffen handel, waffen laden, waffen shop, waffen geschäft, waffen händler,
+    waffen schein, waffen börse, waffen zubehör, waffen besitz, waffen schrank, waffen sammlung,
+    luft pistole, gas pistole, maschinen pistole, hand gun, hand granate, schrot flinte, nazi symbol,
+    nazi parole, nazi propaganda, neo nazi, shot gun, luft gewehr, jagd gewehr, sturm gewehr,
+    maschinen gewehr, poker stars, bet way, uni bet, sport wetten, wett anbieter, kombi wette,
+    sport wette, live wette, wett büro, wett schein, wett bonus, wett quote, wett einsatz, wett konto,
+    wett portal, wett lokal, wett tipp, wett app, raten kauf, raten zahlung, raten plan, weiß bier,
+    weizen bier, dosen bier, flaschen bier, fass bier, frei bier, stark bier, bock bier, alt bier,
+    craft bier, keller bier, lager bier, wein abo, wein probe, wein verkostung, wein handel,
+    wein handlung, wein keller, wein gut, wein flasche, wein shop, wein laden, wein bar, wein paket,
+    wein club, wein fest, wein schorle, wein kühlschrank, wein regal, wein kenner, wein liebhaber,
+    wein reise, wein lieferung, wein versand, wein tasting, wein karte, wein glas, wein gläser,
+    rot wein, weiß wein, glüh wein, sekt flasche, sekt glas, sekt empfang, sekt kellerei, wein brand,
+    märzen bier, sekt frühstück, lippen filler, party droge, designer droge, einstiegs droge, mode droge`
+      .split(/\s*,\s*/)
+      .filter(Boolean);
+  const OHNE_WORTFUGE =
+    `*fansly*, *brazzers*, *chaturbate*, *amorelie*, eis.de, *prostitu*, *escort*, *bordell*, *brothel*,
+    *hentai*, *munition*, *silencer*, *kalaschnikow*, glocks, machete*, nunchaku*, explosives,
+    *extremis*, nazism*, terror*, *terrorism*, *terrorist*, islamism*, islamist*, *dschihad*, salafis*,
+    swastika*, hitler*, taliban*, waffen*, *waffen, weapon*, pistol, *gewehr, *gewehre, *gewehren,
+    *gewehrs, revolver, revolvers, *erotik*, erotic*, erotisch*, vibrator*, dolche, flinte, flinten,
+    granate, granaten, grenades, beretta, faschis*, fascis*, identitäre, identitären, *propaganda*,
+    pistole*, gewehr*, bewaffnung*, stripper*, hookers, sexting*, radikalisierung, radikalisierungen,
+    radicalization, radicalisation, *tipico*, *betano*, *winamax*, novomatic, novoline, *casino*,
+    *kasino*, *gambling*, *betting*, bookie*, *lotterie*, lottery*, roulette, spielothek*, rollbit,
+    ladbrokes, wunderino, mozzart*, wagers, wagering, wagered, *kredit*, *darlehen*, *finanzierung*,
+    *financing*, *riverty*, *cashper*, *schufa*, *inkasso*, *leasing*, *überziehung*, *umschuldung*,
+    *hypothek*, *mortgage*, installment*, instalment*, klarna*, bonität*, stundung*, *alkohol*,
+    *alcohol*, winzer*, vinothek*, *prosecco*, champagner*, champagne, *aperol*, spritz, campari,
+    *tequila*, *cocktail*, *spirituose*, *whisky*, *whiskey*, schnaps*, *schnaps, *likör*, liqueur*,
+    obstler, grappa, sambuca, absinth*, ciders, brauerei*, brewery*, brennerei*, distillery*,
+    destillerie*, winery*, liquor, liquors, stiegl, gösser, heineken, bacardi, smirnoff*, baileys,
+    sangria*, mojito*, caipirinha*, lillet, gosser, pilsner*, pilsener*, flügerl*, schnäpse*, *schnäpse,
+    *zigarett*, *zigarre*, *zigarillo*, *tobacco*, *cigarette*, cigars, *nikotin*, *nicotine*, vaping,
+    *shisha*, hookah*, raucher*, marlboro, gauloises, vaporizer*, vaporiser*, filler, fillers,
+    *unterspritzung*, rhinoplast*, *liposuction*, injectables, kryolipolyse*, dieting, *ozempic*,
+    *wegovy*, *mounjaro*, *almased*, schlankheits*, slimming*, ketogen*, lifesum, thinspo*, entschlack*,
+    drogen*, narkotik*, narcotic*, *cannabis*, marihuana*, marijuana*, haschisch*, hashish*, spliff*,
+    bekifft*, kokain*, cocaine*, koksen, kokser*, psilocybin*, shrooms, heroin, methamphetamin*,
+    amphetamin*, ketamin*, opioid*, fentanyl*, kratom, psychedelika, psychedelics, tilidin*, codein*,
+    benzos, benzodiazepin*, admiral, radler, spritzer, ottakringer, spirits, joints, ecstasy, grinder,
+    grinders, edibles, *wetten, *jackpot*, schulden*, rauchen, abnehm*, affirm, abbezahlen, vorschuss,
+    zipfer, puntigamer, schwechater, wieselburger, zwettler, krombacher, berentzen, desperados,
+    ramazzotti, saufen, gspritzter, gspritzten, gspritzte, trafik*, kippen, veneer*, stoner, stoners,
+    abzahl*, schuldner*, lending, märzen, smokes, armbrust*, laufhaus*, wehrmacht*, *bet365*,
+    sportsbook*, *payday*, hangover*`
+      .split(/\s*,\s*/)
+      .filter(Boolean);
+  const kernOhneFuge = (wort) => wort.replace(/[*+ ]/g, "");
+  const alleSperrwoerter = [
+    ..._SPERRLISTEN.immer.ueberall,
+    ..._SPERRLISTEN.immer.nurAlsWerbung,
+    ..._SPERRLISTEN.minor.ueberall,
+    ..._SPERRLISTEN.minor.nurAlsWerbung,
+  ];
+
+  test("jedes lange Listenwort ohne Wortfuge steht in genau einer Prüfliste", () => {
+    const mitFuge = new Set(alleSperrwoerter.filter((w) => /[ +]/.test(w)).map(kernOhneFuge));
+    const anderswo = new Set(FUGE_ANDERSWO.map(kernOhneFuge));
+    const ohne = new Set(OHNE_WORTFUGE);
+    const offen = alleSperrwoerter.filter(
+      (w) =>
+        !/[ +]/.test(w) &&
+        kernOhneFuge(w).length >= 6 &&
+        !mitFuge.has(kernOhneFuge(w)) &&
+        !anderswo.has(kernOhneFuge(w)) &&
+        !ohne.has(w)
+    );
+    expect(offen).toEqual([]);
+    /* Kein Eintrag der Prüflisten ist übrig: Jeder gehört zu einem Listenwort. */
+    const kerne = new Set(alleSperrwoerter.map(kernOhneFuge));
+    expect(FUGE_ANDERSWO.filter((f) => !kerne.has(kernOhneFuge(f)))).toEqual([]);
+    expect(OHNE_WORTFUGE.filter((w) => !alleSperrwoerter.includes(w))).toEqual([]);
+    expect(OHNE_WORTFUGE.filter((w) => anderswo.has(kernOhneFuge(w)) || mitFuge.has(kernOhneFuge(w)))).toEqual([]);
+  });
+
+  test("FUGE_ANDERSWO: zusammen, mit Bindestrich und getrennt wird gefangen", () => {
+    const durch = [];
+    for (const fuge of FUGE_ANDERSWO) {
+      for (const form of dreiSchreibweisen(fuge)) {
+        if (!_istImmerVerboten(form) && !_istBeiMinderjaehrigenVerboten(form)) durch.push(`${fuge}: ${form}`);
+      }
+    }
+    expect(FUGE_ANDERSWO.length).toBeGreaterThan(50);
+    expect(durch).toEqual([]);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Harmlose Wendungen: Tabelle Wendung → Beispiel. Für JEDE Wendung der
+   Liste: Das Beispiel bleibt als Werbe-Eintrag bei einem Kind stehen — und
+   ohne diese eine Wendung würde es gestrichen. Eine Wendung ohne Beispiel
+   macht den Test rot; ebenso ein Beispiel ohne Wendung.
+   ══════════════════════════════════════════════════════════════════════ */
+const BEISPIEL_JE_WENDUNG = {
+  "guns n roses": "Guns N' Roses",
+  "top gun": "Top Gun",
+  "machine gun kelly": "Machine Gun Kelly",
+  "massage gun*": "Massage Gun",
+  "nerf gun*": "Nerf Gun",
+  "water gun*": "Water Gun",
+  "glue gun*": "Glue Gun",
+  "toy gun*": "Toy Gun",
+  "gun metal*": "Gun Metal Grey",
+  "wasser pistole*": "Wasser-Pistole",
+  "nerf pistole*": "Nerf-Pistole",
+  "*klebe pistole*": "Heißklebe-Pistole",
+  "massage pistole*": "Massage-Pistole",
+  "spielzeug pistole*": "Spielzeug-Pistole",
+  "water pistol*": "Water Pistol",
+  "toy pistol*": "Toy Pistol",
+  "wasser gewehr*": "Wassergewehr",
+  "nerf gewehr*": "Nerf-Gewehr",
+  "spielzeug gewehr*": "Spielzeuggewehr",
+  "ford escort": "Ford Escort",
+  "terrorvogel*": "Terrorvogel-Doku",
+  "terrorvögel*": "Terrorvögel der Urzeit",
+  "terrorzwerg*": "Terrorzwerg-Shirt",
+  "terrorisier*": "Terrorisiert vom Wecker",
+  "terroriz*": "Terrorized by Mondays",
+  terrorise: "Cats terrorise dogs",
+  terrorised: "Terrorised by alarm clocks",
+  terrorises: "The cat terrorises the dog",
+  terrorising: "Terrorising the neighbours",
+  "geheimwaffe*": "Geheimwaffe gegen Langeweile",
+  "wunderwaffe*": "Wunderwaffe im Haushalt",
+  "allzweckwaffe*": "Allzweckwaffe Backpulver",
+  "*pleasing*": "People-Pleasing-Ratgeber",
+  "*releasing*": "Releasing Stress",
+  "cocktailkleid*": "Cocktailkleid",
+  "schnapsidee*": "Schnapsidee",
+  "schnapszahl*": "Schnapszahl",
+  schnapsen: "Schnapsen",
+  "schnapskarte*": "Schnapskarten",
+  "bierernst*": "Bierernst",
+  "biereif*": "Biereifer",
+  "*schwein": "Meerschwein",
+  "*insekt": "Nutzinsekt",
+  "kindersekt*": "Kindersekt",
+  "champagnerfarb*": "Champagnerfarbenes Kleid",
+  "akkreditier*": "Akkreditierung",
+  "*diskreditier*": "Diskreditierung",
+  "stocking filler*": "Stocking Filler",
+  "joint venture*": "Joint Venture",
+  "coffee grinder*": "Coffee Grinder",
+  "kaffee grinder*": "Kaffee Grinder",
+  "angle grinder*": "Angle Grinder",
+  "*spritz pistole*": "Farbspritz-Pistole",
+  "seifenblasen pistole*": "Seifenblasen-Pistole",
+  "laser pistole*": "Laser-Pistole",
+  "bubble gun*": "Bubble Gun",
+  "squirt gun*": "Squirt Gun",
+  "holz gewehr*": "Holzgewehr",
+  "lackier pistole*": "Lackier-Pistole",
+  "silikon pistole*": "Silikon-Pistole",
+  "kartuschen pistole*": "Kartuschen-Pistole",
+  "löt pistole*": "Löt-Pistole",
+  "heißluft pistole*": "Heißluft-Pistole",
+  "zapf pistole*": "Zapf-Pistole",
+  "lil uzi*": "Lil Uzi Vert Merch",
+  "mundpropaganda*": "Mundpropaganda",
+  "alkoholfrei*": "Alkoholfrei",
+  "ginger beer*": "Ginger Beer",
+  "root beer*": "Root Beer",
+  "butter beer*": "Butter Beer",
+  "bierhoff*": "Bierhoff-Trikot",
+  "cocktailtomate*": "Cocktailtomaten",
+  "cocktailsauce*": "Cocktailsauce",
+  "cocktailsoße*": "Cocktailsoße",
+  "cocktailwürstchen*": "Cocktailwürstchen",
+  "krabbencocktail*": "Krabbencocktail",
+  "shrimp cocktail*": "Shrimp Cocktail",
+  "obstcocktail*": "Obstcocktail",
+  "fruchtcocktail*": "Fruchtcocktail",
+  "cocktailkirsche*": "Cocktailkirschen",
+  "wein nicht": "Wein nicht",
+  "rum aroma*": "Rum-Aroma",
+  "aperolfarb*": "Aperolfarbenes Kleid",
+  "eros ramazzotti": "Eros Ramazzotti",
+  "tabakfrei*": "Tabakfrei",
+  "zigarettenfrei*": "Zigarettenfrei",
+  "nikotinfrei*": "Nikotinfrei",
+  "shisha frei*": "Shishafreie Zone",
+  "raucherlunge*": "Raucherlunge",
+  "raucherentwöhn*": "Raucherentwöhnung",
+  "velo helm*": "Velo-Helm",
+  "velo tour*": "Velo-Tour",
+  "drogenfrei*": "Drogenfrei",
+  "drug store*": "Drug Store Makeup",
+  "black opium*": "Black Opium",
+  "stoner rock*": "Stoner Rock",
+  "kiffhäuser*": "Kiffhäuser",
+  "pfeffer grinder*": "Pfeffer-Grinder",
+  "salz grinder*": "Salz-Grinder",
+  "gewürz grinder*": "Gewürz-Grinder",
+  "skate grinder*": "Skate-Grinder",
+  "pepper grinder*": "Pepper Grinder",
+  "meat grinder*": "Meat Grinder",
+  "klarname*": "Klarnamen",
+  "kreditkartenhülle*": "Kreditkartenhülle",
+  "kreditkarten etui*": "Kreditkarten-Etui",
+  "kreditkartenhalter*": "Kreditkartenhalter",
+  "raten quiz*": "Raten-Quiz",
+  "rätsel raten*": "Rätsel raten",
+  "lotto fußball*": "Lotto Fußballschuhe",
+  "lotto sport*": "Lotto Sport Italia",
+  "poker karten*": "Poker-Karten",
+  "poker face*": "Poker Face",
+  "admiral trikot*": "Admiral-Trikot",
+  "admiral bundesliga*": "Admiral Bundesliga",
+  "casino royale*": "Casino Royale",
+  "jackpot eis*": "Jackpot-Eis",
+  "wetten dass*": "Wetten dass Fanartikel",
+  "facelift vw*": "Facelift VW Golf",
+  "facelift audi*": "Facelift Audi A3",
+  "facelift bmw*": "Facelift BMW 3er",
+  "facelift mercedes*": "Facelift Mercedes A-Klasse",
+  "facelift modell*": "Facelift-Modell",
+  "auto facelift*": "Auto-Facelift",
+  "filler episode*": "Filler-Episoden",
+  "filler folge*": "Filler-Folgen",
+  "filler arc*": "Filler Arc",
+  "aufpump*": "Aufpump-Service",
+  "abnehmbar*": "Abnehmbare Kapuze",
+  "abnehmend*": "Abnehmender Mond",
+  "abnehmerschaft*": "Abnehmerschaft",
+  "abnehmerländer*": "Abnehmerländer",
+  "abnehmerland*": "Abnehmerland",
+  "abnehmerkreis*": "Abnehmerkreis",
+  "abnehmerin*": "Abnehmerin",
+  abnehmers: "Abnehmers",
+  abnehmern: "Abnehmern",
+  abnehmer: "Abnehmer",
+  "diätassisten*": "Diätassistentin",
+  "diätolog*": "Diätologin",
+  "diet coke*": "Diet Coke",
+  "diet cola*": "Diet Cola",
+  "diet pepsi*": "Diet Pepsi",
+  "diet soda*": "Diet Soda",
+  "shotgun mikrofon*": "Shotgun-Mikrofon",
+  "shotgun mic*": "Shotgun Mic",
+  "rifle jeans*": "Rifle Jeans",
+  "pistolengriff*": "Pistolengriff-Gießkanne",
+  gewehrt: "Gewehrt",
+  gewehrte: "Gewehrte Angriffe",
+  gewehrten: "Die gewehrten Schüsse",
+  "wire stripper*": "Wire Stripper",
+  "paint stripper*": "Paint Stripper",
+  "kabel stripper*": "Kabel-Stripper",
+  "bierdeckel*": "Bierdeckel-Sammlung",
+  "bierschinken*": "Bierschinken",
+  "bierwurst*": "Bierwurst",
+  "spritz gebäck*": "Spritz-Gebäck",
+  "spritz beutel*": "Spritz-Beutel",
+  "spritz tülle*": "Spritz-Tülle",
+  "gin romme*": "Gin-Rommé",
+  "gin rummy*": "Gin Rummy",
+  "winery dogs": "The Winery Dogs",
+  "ginger ale*": "Ginger Ale",
+  "radler zubehör*": "Radler-Zubehör",
+  "radler hose*": "Radler-Hose",
+  "radler trikot*": "Radler-Trikot",
+  "radler helm*": "Radler-Helm",
+  "lotto trikot*": "Lotto-Trikot",
+  "lotto schuh*": "Lotto-Schuhe",
+  "admiral sportswear*": "Admiral Sportswear",
+  "koks grill*": "Koks-Grill",
+  "hasch mich*": "Hasch mich",
+  "cbd frei*": "CBD-freies Shampoo",
+  "thc frei*": "THC-freies Hanföl",
+  "diät cola*": "Diät-Cola",
+  "diät limo*": "Diät-Limo",
+  "unisex*": "Unisex-Spielzeug",
+  "essex*": "Essex-Shop",
+  "sussex*": "Sussex-Camping",
+  "middlesex*": "Middlesex-Shop",
+  "wessex*": "Wessex-Shop",
+  "*waffel*": "Las-Vegas-Waffeln",
+  "*sporn": "Ansporn",
+};
+
+describe("Tabelle harmlose Wendung → Beispiel", () => {
+  /* Der Filter, wie er ohne eine einzelne Wendung arbeiten würde: mit
+     ausgetauschter Datendatei frisch geladen. */
+  function filterOhne(wendung) {
+    let filter;
+    jest.isolateModules(() => {
+      jest.doMock("../minor-safety-woerter", () => {
+        const echt = jest.requireActual("../minor-safety-woerter");
+        const rest = echt.HARMLOS.split(/\s*,\s*/).filter((w) => w && w !== wendung);
+        return { ...echt, HARMLOS: rest.join(", ") };
+      });
+      filter = require("../minor-safety");
+    });
+    jest.dontMock("../minor-safety-woerter");
+    return filter;
+  }
+  const gefangen = (filter, text) => filter._istImmerVerboten(text) || filter._istBeiMinderjaehrigenVerboten(text);
+
+  test("die Tabelle nennt genau die Wendungen der Liste", () => {
+    expect(Object.keys(BEISPIEL_JE_WENDUNG).sort()).toEqual([..._SPERRLISTEN.harmlos].sort());
+  });
+
+  test("keine Wendung steht doppelt in der Liste", () => {
+    const alle = _SPERRLISTEN.harmlos;
+    expect(alle.filter((w, i) => alle.indexOf(w) !== i)).toEqual([]);
+  });
+
+  /* Positivkontrolle der Messung: Ohne alle Wendungen fängt der
+     nachgeladene Filter „Top Gun“. */
+  test("der nachgeladene Filter arbeitet mit der ausgetauschten Liste", () => {
+    expect(gefangen(filterOhne("top gun"), "Top Gun")).toBe(true);
+    expect(_istImmerVerboten("Top Gun")).toBe(false);
+  });
+
+  test.each(Object.entries(BEISPIEL_JE_WENDUNG))("%s hält „%s“", (wendung, beispiel) => {
+    expect(_istImmerVerboten(beispiel)).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten(beispiel)).toBe(false);
+    expect(gefangen(filterOhne(wendung), beispiel)).toBe(true);
+  });
+
+  /* Wendungen mit notierter Wortfuge bleiben in allen drei Schreibweisen
+     frei. */
+  test("Wendungen mit Leerzeichen bleiben zusammen, mit Bindestrich und getrennt frei", () => {
+    const gestrichen = [];
+    for (const wendung of _SPERRLISTEN.harmlos.filter((w) => w.includes(" "))) {
+      const kern = wendung.replace(/\*/g, "");
+      for (const form of [kern.replace(/ /g, ""), kern.replace(/ /g, "-"), kern]) {
+        if (_istImmerVerboten(form) || _istBeiMinderjaehrigenVerboten(form)) gestrichen.push(`${wendung}: ${form}`);
+      }
+    }
+    expect(gestrichen).toEqual([]);
+  });
+});
+
 describe("Die ganze Kette: Werbe-Einträge quer durch die Themen", () => {
   const NORMAL = ["Only Fans", "Teilzahlung", "Interwetten", "Jägermeister", "Pokémon Karten"];
   const BOOST = ["Softair-Pistole", "0%-Finanzierung", "Elf Bar", "Abnehm-App", "Fortnite V-Bucks"];
@@ -1411,6 +2686,19 @@ describe("Laufzeit", () => {
     expect(_istBeiMinderjaehrigenVerboten(lang, false)).toBe(false);
     expect(Date.now() - start).toBeLessThan(1500);
   });
+
+  /* Viele Bindestriche vervielfachen die Sichten nicht: Ab dem vierten gibt
+     es nur noch zwei (alle als Leerzeichen, alle weggelassen). */
+  test("ein langer Text mit vielen Bindestrichen ist schnell geprüft", () => {
+    const lang = "Deine Social-Media-Nutzung im Klassen-Chat fällt auf, auch dein Lieblings-Hoodie. ".repeat(400);
+    expect(lang.length).toBeGreaterThan(30000);
+    const start = Date.now();
+    expect(_istImmerVerboten(lang, false)).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten(lang, false)).toBe(false);
+    expect(Date.now() - start).toBeLessThan(1500);
+    /* Positivkontrolle: Auch im langen Text wird ein Listenwort mit Bindestrich gefunden. */
+    expect(_istImmerVerboten(`${lang} Soft-Air.`, false)).toBe(true);
+  });
 });
 
 /* ══════════════════════════════════════════════════════════════════════
@@ -1437,20 +2725,17 @@ const BEISPIEL_JE_WORT = {
     "*stripchat*": "Stripchat",
     "*chaturbate*": "Chaturbate",
     "*mydirtyhobby*": "Mydirtyhobby",
-    "*joyclub*": "Joyclub",
     "*amorelie*": "Amorelie",
     "beate uhse": "Beate Uhse",
     "eis.de": "Eis.de Toys",
     "porn*": "Pornoseite",
     "*porno*": "Softporno",
-    "*erotik*": "Erotik-Shop",
-    "erotic*": "Erotic Massage",
     "*cam girl*": "Webcam-Girls",
     "adult webcam*": "Adult Webcam",
     "*sexcam*": "Livesexcam",
     "sex cam*": "Sex Cam",
     "*sexshop*": "Onlinesexshop",
-    "sex shop*": "Sex-Shop",
+    "sex shop*": "Sex Shop",
     "sex toy*": "Sex-Toys",
     "*sexspielzeug*": "Sexspielzeug",
     "*telefonsex*": "Telefonsex",
@@ -1470,7 +2755,6 @@ const BEISPIEL_JE_WORT = {
     "*bordell*": "Bordell",
     "*brothel*": "Brothel",
     "strip club*": "Stripclub",
-    "striptease*": "Striptease",
     "*hentai*": "Hentai",
     "xxx video*": "XXX Videos",
     "xxx film*": "XXX Filme",
@@ -1478,6 +2762,21 @@ const BEISPIEL_JE_WORT = {
     "sugar babe*": "Sugar Babe",
     "sugar baby*": "Sugar Baby",
     "sugar dating": "Sugar Dating",
+    "dildo*": "Dildo",
+    lovehoney: "Lovehoney",
+    bdsm: "Bdsm",
+    "peep show*": "Peep Show",
+    "swinger club*": "Swinger Club",
+    "table dance*": "Table Dance",
+    "lap dance*": "Lap Dance",
+    "strip show*": "Strip Show",
+    hure: "Hure",
+    huren: "Huren",
+    "rotlicht+viertel*": "Rotlichtviertel",
+    "rotlicht+milieu*": "Rotlichtmilieu",
+    "red light district*": "Red Light District",
+    "joyclub*": "Joyclub",
+    "*porn": "Foodporn",
     "*schusswaffe*": "Schusswaffe",
     "*feuerwaffe*": "Feuerwaffe",
     "*jagdwaffe*": "Jagdwaffe",
@@ -1504,7 +2803,6 @@ const BEISPIEL_JE_WORT = {
     "*softair*": "Softair-Zubehör",
     "*airsoft*": "Airsoft Zubehör",
     "*schreckschuss*": "Schreckschusspistole",
-    "shotgun*": "Shotgun",
     gun: "BB Gun",
     guns: "Guns kaufen",
     "*handgun*": "Handgun",
@@ -1512,7 +2810,7 @@ const BEISPIEL_JE_WORT = {
     "*firearm*": "Firearm",
     ammo: "Ammo",
     "*silencer*": "Silencer",
-    "schalldämpfer*": "Schalldämpfer",
+    "schall+dämpfer*": "Schalldämpfer",
     "*kampfmesser*": "Kampfmesser",
     "*springmesser*": "Springmesser",
     "butterfly messer*": "Butterflymesser",
@@ -1540,6 +2838,17 @@ const BEISPIEL_JE_WORT = {
     "sig sauer": "Sig Sauer",
     "smith wesson": "Smith & Wesson",
     "walther ppk": "Walther Ppk",
+    "machete*": "Machete",
+    "ziel+fernrohr*": "Zielfernrohr",
+    "*sprengstoff*": "Sprengstoff",
+    "bombenbau*": "Bombenbau",
+    "schrotflinte*": "Schrotflinte",
+    "switchblade*": "Switchblade",
+    "tot+schläger*": "Totschläger",
+    "wurfstern*": "Wurfstern",
+    "nunchaku*": "Nunchaku",
+    "jagd+messer*": "Jagdmesser",
+    explosives: "Explosives",
     "*extremis*": "Extremismus",
     "*rechtsextrem*": "Rechtsextreme Mode",
     "*linksextrem*": "linksextreme Szene",
@@ -1566,23 +2875,188 @@ const BEISPIEL_JE_WORT = {
     "*hakenkreuz*": "Hakenkreuz",
     "swastika*": "Swastika",
     "ku klux klan": "Ku Klux Klan",
+    "hitler*": "Hitler",
+    kkk: "Kkk",
+    isis: "Isis",
+    "islamischer staat": "Islamischer Staat",
+    "islamic state": "Islamic State",
+    "al qaida": "Al Qaida",
+    "al qaeda": "Al Qaeda",
+    "al kaida": "Al Kaida",
+    "taliban*": "Taliban",
+    "qanon*": "Qanon",
+    "white power": "White Power",
+    "combat 18": "Combat 18",
+    "blood honour": "Blood Honour",
+    "blood honor": "Blood Honor",
+    "rechts+rock*": "Rechtsrock",
+    "ns devotionalien*": "Ns Devotionalien",
     "only fans": "Only Fans",
-    "sexting*": "Sexting-App",
     "waffen*": "Waffenkammer",
     "*waffen": "Dienstwaffen",
     "*waffe": "Dienstwaffe",
     "weapon*": "Weapons",
-    pistole: "Pistole",
-    pistolen: "Pistolen",
     pistol: "Pistol",
-    "*gewehr": "Luftgewehr",
-    "*gewehre": "Jagdgewehre",
+    "*gewehr": "Präzisionsgewehr",
+    "*gewehre": "Kleinkalibergewehre",
     "*gewehren": "Handel mit Gewehren",
-    "*gewehrs": "des Luftgewehrs",
+    "*gewehrs": "des Präzisionsgewehrs",
     revolver: "Revolver",
     revolvers: "Revolvers",
     "far right": "Far-right apparel",
     "alt right": "Alt-Right Merch",
+    "*erotik*": "Erotik-Shop",
+    "erotic*": "Erotic Massage",
+    "erotisch*": "Erotisch",
+    "strip+tease*": "Striptease",
+    nudes: "Nudes",
+    "nacktbild*": "Handel mit Nacktbildern",
+    "nackt+foto*": "Nacktfoto",
+    "nude photo*": "Nude Photo",
+    "nude pic*": "Nude Pic",
+    "vibrator*": "Vibrator",
+    "play+boy*": "Playboy",
+    nsfw: "Nsfw",
+    xxx: "Xxx",
+    "adult content*": "Adult Content",
+    "adult entertainment*": "Adult Entertainment",
+    "adult dating*": "Adult Dating",
+    "laufhaus*": "Laufhaus",
+    "fetisch shop*": "Fetisch Shop",
+    "fetish shop*": "Fetish Shop",
+    dolch: "Dolch",
+    dolche: "Dolche",
+    flinte: "Flinte",
+    flinten: "Flinten",
+    granate: "Granate",
+    granaten: "Granaten",
+    grenades: "Grenades",
+    beretta: "Beretta",
+    uzi: "Uzi",
+    uzis: "Uzis",
+    "schießstand*": "Besuch des Schießstands",
+    "faschis*": "Faschis",
+    "fascis*": "Fascis",
+    "anti+semit*": "Antisemit",
+    "rassen+hass*": "Rassenhass",
+    "volks+verhetz*": "Volksverhetz",
+    "hass+gruppe*": "Hassgruppe",
+    "hate group*": "Hate Group",
+    "hass+prediger*": "Hassprediger",
+    "hate preacher*": "Hate Preacher",
+    "incel*": "Incel",
+    "holocaust+leugn*": "Holocaustleugn",
+    "holocaust denial*": "Holocaust Denial",
+    identitäre: "Identitäre",
+    identitären: "Identitären",
+    "*propaganda*": "Propaganda",
+    "wehrmacht*": "Wehrmacht",
+    "radical islam*": "Radical Islam",
+    "radikaler islam*": "Radikaler Islam",
+    "shotgun*": "Shotgun",
+    "pistole*": "Pistolenholster",
+    "gewehr*": "Gewehrkoffer",
+    "luftgewehr*": "Luftgewehrkugeln",
+    "jagdgewehr*": "Jagdgewehr",
+    "sturmgewehr*": "Sturmgewehr",
+    "maschinengewehr*": "Maschinengewehr",
+    "fire arm": "Fire Arm",
+    "fire arms": "Fire Arms",
+    "switch blade*": "Switch Blade",
+    "bewaffnung*": "Bewaffnung",
+    "schieß+training*": "Schießtraining",
+    "shooting range*": "Shooting Range",
+    "strip chat*": "Strip Chat",
+    "my dirty hobby*": "My Dirty Hobby",
+    "joy club*": "Joy Club",
+    "best fans": "Best Fans",
+    "love honey": "Love Honey",
+    "x hamster": "X Hamster",
+    "x videos": "X Videos",
+    "adult video*": "Adult Videos",
+    "x rated*": "X-Rated Movies",
+    "reiz+wäsche*": "Reizwäsche",
+    "erwachsenen+unterhaltung*": "Erwachsenenunterhaltung",
+    "stripper*": "Stripper",
+    "webcam models": "Webcam Models",
+    hookers: "Hookers",
+    "hassrede*": "Hassredekanal",
+    "hate speech*": "Hate Speech",
+    "rechte szene": "Rechte Szene",
+    "rechten szene": "Mode der rechten Szene",
+    "sexting*": "Sexting-App",
+    "sex spielzeug*": "Sex Spielzeug",
+    "sex spiele": "Sex Spiele",
+    "sex arbeit*": "Sex Arbeit",
+    "sex film*": "Sex Film",
+    "sex kino*": "Sex Kino",
+    "sex date": "Sex Date",
+    "sex dates": "Sex Dates",
+    "sex dating*": "Sex Dating",
+    "sex puppe*": "Sex Puppe",
+    "sex video*": "Sex Video",
+    "sex tape*": "Sex Tape",
+    "sex hotline*": "Sex Hotline",
+    "sex kontakt*": "Sex Kontakt",
+    "sex treffen*": "Sex Treffen",
+    "sex abo*": "Sex Abo",
+    "sex seite*": "Sex Seite",
+    "sex portal*": "Sex Portal",
+    "sex clip*": "Sex Clip",
+    "sex stream*": "Sex Stream",
+    "sex club*": "Sex Club",
+    "sex party*": "Sex Party",
+    "sex messe*": "Sex Messe",
+    "sex tourismus*": "Sex Tourismus",
+    "sex geschichte*": "Sex Geschichte",
+    "sex story*": "Sex Story",
+    "sex stories": "Sex Stories",
+    "sex game*": "Sex Game",
+    "sex app": "Sex App",
+    "sex apps": "Sex Apps",
+    "sex anzeige*": "Sex Anzeige",
+    "sex bilder*": "Sex Bilder",
+    "sex kauf*": "Sex Kauf",
+    "sex massage*": "Sex Massage",
+    "live sex*": "Live Sex",
+    "webcam sex*": "Webcam Sex",
+    "soft air": "Soft Air",
+    "air soft": "Air Soft",
+    radikalisierung: "Radikalisierung",
+    radikalisierungen: "Radikalisierungen",
+    radicalization: "Radicalization",
+    radicalisation: "Radicalisation",
+    "telefon sex": "Telefon Sex",
+    "cyber sex": "Cyber Sex",
+    "schreck schuss*": "Schreck Schuss",
+    "kampf messer*": "Kampf Messer",
+    "spring messer*": "Spring Messer",
+    "wurf messer*": "Wurf Messer",
+    "einhand messer*": "Einhand Messer",
+    "schlag ring": "Schlag Ring",
+    "schlag ringe": "Schlag Ringe",
+    "schlag stock": "Schlag Stock",
+    "schlag stöcke": "Schlag Stöcke",
+    "elektro schocker*": "Elektro Schocker",
+    "pfeffer spray*": "Pfeffer Spray",
+    "cross bow": "Cross Bow",
+    "cross bows": "Cross Bows",
+    "spreng stoff*": "Spreng Stoff",
+    "bomben bau": "Bomben Bau",
+    "wurf stern": "Wurf Stern",
+    "wurf sterne": "Wurf Sterne",
+    "rechts extrem*": "Rechts Extrem",
+    "links extrem*": "Links Extrem",
+    "rechts radikal*": "Rechts Radikal",
+    "reichs bürger*": "Reichs Bürger",
+    "haken kreuz": "Haken Kreuz",
+    "haken kreuze": "Haken Kreuze",
+    "nackt bild": "Nackt Bild",
+    "nackt bilder": "Nackt Bilder",
+    "schieß stand": "Schieß Stand",
+    "schieß stände": "Schieß Stände",
+    "hass rede": "Hass Rede",
+    "hass reden": "Hass Reden",
   },
   minor: {
     "*bet365*": "Bet365 Live",
@@ -1591,7 +3065,6 @@ const BEISPIEL_JE_WORT = {
     "*betano*": "Betano",
     "*winamax*": "Winamax",
     "*tipp3*": "Tipp3",
-    win2day: "Win2day",
     novomatic: "Novomatic",
     novoline: "Novoline",
     pokerstars: "Pokerstars",
@@ -1599,7 +3072,6 @@ const BEISPIEL_JE_WORT = {
     unibet: "Unibet",
     "*casino*": "Online-Casino",
     "*kasino*": "Kasino",
-    "*jackpot*": "Jackpot",
     "*sportwetten*": "Sportwetten",
     "*glücksspiel*": "Glücksspiel",
     "*wettanbieter*": "Wettanbieter",
@@ -1617,18 +3089,12 @@ const BEISPIEL_JE_WORT = {
     "wettlokal*": "Wettlokal",
     "wetttipp*": "Wetttipp",
     "wettapp*": "Wettapp",
-    wett: "Wett-App",
-    "*wetten": "Pferdewetten",
     "*gambling*": "Gambling",
     "*betting*": "Betting",
     "*bookmaker*": "Bookmaker",
     "bookie*": "Bookie",
     "slot machine*": "Slot Machines",
     poker: "Poker",
-    bet: "Bet",
-    bets: "Live Bets",
-    "wager*": "Wager",
-    "lotto*": "Lotto 6 aus 45",
     "*lotterie*": "Österreichische Lotterien",
     "lottery*": "Lottery",
     euromillionen: "Euromillionen",
@@ -1637,20 +3103,41 @@ const BEISPIEL_JE_WORT = {
     "scratch card*": "Scratch Card",
     roulette: "Roulette",
     "*spielautomat*": "Spielautomat",
-    "automatenspiel*": "Automatenspiel",
+    "automaten+spiel*": "Automatenspiel",
     "spielbank*": "Spielbank",
     "spielhalle*": "Spielhalle",
     "spielothek*": "Spielothek",
+    "black jack*": "Black Jack",
+    "slot spiel*": "Slot Spiel",
+    "slot game*": "Slot Game",
+    "einarmiger bandit*": "Einarmiger Bandit",
+    "einarmige banditen": "Einarmige Banditen",
+    "sportsbook*": "Sportsbook",
+    rollbit: "Rollbit",
+    draftkings: "Draftkings",
+    fanduel: "Fanduel",
+    "william hill": "William Hill",
+    ladbrokes: "Ladbrokes",
+    "leo vegas": "Leo Vegas",
+    wunderino: "Wunderino",
+    "mozzart*": "Mozzart",
+    wager: "Wager",
+    wagers: "Wagers",
+    wagering: "Wagering",
+    wagered: "Wagered",
+    "win 2 day": "win2day",
+    "brieflos*": "Brieflos",
+    "1xbet*": "1xBet",
+    "22bet*": "22Bet",
     "*kredit*": "Sofortkredit",
     "*darlehen*": "Konsumentendarlehen",
     "*ratenkauf*": "Ratenkauf",
     "*ratenzahlung*": "Ratenzahlung",
     "ratenplan*": "Ratenplan",
-    "monatsrate*": "Monatsrate",
+    "monats+rate*": "Monatsrate",
     "*teilzahlung*": "Teilzahlung",
     "*finanzierung*": "0%-Finanzierung",
     "*financing*": "Financing",
-    klarna: "Klarna",
     "*riverty*": "Riverty",
     "*afterpay*": "Afterpay",
     "*cashper*": "Cashper",
@@ -1664,15 +3151,12 @@ const BEISPIEL_JE_WORT = {
     "*mikrofinanz*": "Mikrofinanz",
     dispo: "Dispo",
     "*überziehung*": "Überziehungsrahmen",
-    "overdraft*": "Overdraft",
-    "schulden*": "Schulden",
+    "over+draft*": "Overdraft",
     "*umschuldung*": "Umschuldung",
-    debt: "Debt",
-    debts: "Debts",
     "*hypothek*": "Hypothek",
     "*mortgage*": "Mortgage",
     "kauf auf rechnung": "Kauf auf Rechnung",
-    "rechnungskauf*": "Rechnungskauf",
+    "rechnungs+kauf*": "Rechnungskauf",
     loan: "Loan",
     loans: "Loans",
     "*payday*": "Payday",
@@ -1682,10 +3166,23 @@ const BEISPIEL_JE_WORT = {
     "pay later": "PayPal Pay Later",
     bnpl: "Bnpl",
     "credit card*": "Credit Card",
+    "klarna*": "Klarna",
+    "pfandhaus*": "Pfandhaus",
+    "pfand+leih*": "Pfandleih",
+    "pay in 4": "Pay In 4",
+    "pay in 3": "Pay In 3",
+    "borrow money": "Borrow Money",
+    "cash advance*": "Cash Advance",
+    "bonität*": "Bonität",
+    "zahl+pause*": "Zahlpause",
+    "zahlungs+pause*": "Zahlungspause",
+    "stundung*": "Stundung",
+    scalapay: "Scalapay",
+    zinia: "Zinia",
+    "miet+kauf*": "Mietkauf",
+    "zahl später*": "Zahl später",
     "*alkohol*": "Alkohol-Lieferdienst",
     "*alcohol*": "Alcohol Delivery",
-    "*alkopop*": "Alkopop",
-    "*alcopop*": "Alcopop",
     "bier*": "Bierpong Set",
     "weißbier*": "Weißbier",
     "weizenbier*": "Weizenbier",
@@ -1744,6 +3241,7 @@ const BEISPIEL_JE_WORT = {
     spritz: "Hugo Spritz",
     campari: "Campari",
     gin: "Gin Tonic",
+    gins: "Gins",
     "*tequila*": "Tequila",
     "*cocktail*": "Cocktail-Bar",
     "*spirituose*": "Spirituose",
@@ -1762,6 +3260,7 @@ const BEISPIEL_JE_WORT = {
     sambuca: "Sambuca",
     "absinth*": "Absinth",
     cider: "Cider",
+    ciders: "Ciders",
     "hard seltzer": "Hard Seltzer",
     "brauerei*": "Brauerei",
     "brewery*": "Brewery",
@@ -1788,6 +3287,32 @@ const BEISPIEL_JE_WORT = {
     "jim beam": "Jim Beam",
     "johnnie walker": "Johnnie Walker",
     baileys: "Baileys",
+    "long drink*": "Long Drink",
+    "havana club": "Havana Club",
+    "white claw": "White Claw",
+    "trink+spiel*": "Trinkspiel",
+    "drinking game*": "Drinking Game",
+    "koma+sauf*": "Komasauf",
+    "kneipen+tour*": "Kneipentour",
+    "pub crawl*": "Pub Crawl",
+    "sangria*": "Sangria",
+    "mojito*": "Mojito",
+    "caipirinha*": "Caipirinha",
+    lillet: "Lillet",
+    "jäger+bomb*": "Jägerbomb",
+    "jagermeister*": "Jagermeister",
+    gosser: "Gosser",
+    "märzenbier*": "Märzenbier",
+    pils: "Pils",
+    "pilsner*": "Pilsner Urquell",
+    "pilsener*": "Pilsener",
+    "flügerl*": "Flügerl",
+    "schnäpse*": "Schnäpsen",
+    "*schnäpse": "Obstschnäpse",
+    "sektfrühstück*": "Sektfrühstück",
+    "pale ale*": "Pale Ale",
+    "alko+pop*": "Alkopop",
+    "alco+pop*": "Alcopop",
     "*zigarett*": "E-Zigarette",
     "*zigarre*": "Zigarre",
     "*zigarillo*": "Zigarillo",
@@ -1802,9 +3327,8 @@ const BEISPIEL_JE_WORT = {
     "vape*": "Vapes",
     vaping: "Vaping",
     "*shisha*": "Shisha Bar",
-    "wasserpfeife*": "Wasserpfeife",
+    "wasser+pfeife*": "Wasserpfeife",
     "hookah*": "Hookah",
-    rauchen: "Rauchen",
     "raucher*": "Raucher",
     marlboro: "Marlboro",
     "lucky strike": "Lucky Strike",
@@ -1817,17 +3341,29 @@ const BEISPIEL_JE_WORT = {
     juul: "Juul",
     heets: "Heets",
     zyn: "Zyn",
+    "e liquid*": "E Liquid",
+    "dampfer shop*": "Dampfer Shop",
+    "long paper*": "Long Paper",
+    "memphis blue": "Memphis Blue",
+    "e cig*": "E Cig",
+    "smoke shop*": "Smoke Shop",
+    "puff bar*": "Puff Bar",
+    terea: "Terea",
+    "ske crystal*": "Ske Crystal",
+    "randm tornado*": "Randm Tornado",
+    "vaporizer*": "Vaporizer",
+    "vaporiser*": "Vaporiser",
+    "rolling paper*": "Rolling Papers",
     "*botox*": "Botox",
-    "*hyaluron*": "Hyaluron",
     filler: "Filler",
     fillers: "Fillers",
     "lip filler*": "Lipfiller",
     "lip injection*": "Lip Injection",
     "schönheits op*": "Schönheits-OP",
-    "schönheitschirurg*": "Schönheitschirurgie",
-    "schönheitskorrektur*": "Schönheitskorrektur",
-    "schönheitsklinik*": "Schönheitsklinik",
-    "schönheitseingriff*": "Schönheitseingriff",
+    "schönheits+chirurg*": "Schönheitschirurgie",
+    "schönheits+korrektur*": "Schönheitskorrektur",
+    "schönheits+klinik*": "Schönheitsklinik",
+    "schönheits+eingriff*": "Schönheitseingriff",
     "beauty op": "Beauty-OP",
     "beauty ops": "Beauty-OPs",
     "beauty operation*": "Beauty Operation",
@@ -1837,19 +3373,18 @@ const BEISPIEL_JE_WORT = {
     "cosmetic surgery": "Cosmetic Surgery",
     "cosmetic procedure*": "Cosmetic Procedure",
     "*fettabsaug*": "Fettabsaugung",
-    "fettweg spritze*": "Fettweg-Spritze",
     "*brustvergrößer*": "Brustvergrößerung",
-    "brustverkleinerung*": "Brustverkleinerung",
-    "bruststraffung*": "Bruststraffung",
+    "brust+verkleinerung*": "Brustverkleinerung",
+    "brust+straffung*": "Bruststraffung",
     "brust op": "Brust-OP",
-    "brustoperation*": "Brustoperation",
+    "brust+operation*": "Brustoperation",
     "nasen op": "Nasen-OP",
-    "nasenoperation*": "Nasenoperation",
+    "nasen+operation*": "Nasenoperation",
     "*nasenkorrektur*": "Nasenkorrektur",
     "lippen aufspritz*": "Lippen aufspritzen",
     "*unterspritzung*": "Lippenunterspritzung",
-    "facelift*": "Facelift",
-    "lidstraffung*": "Lidstraffung",
+    "face+lift*": "Facelift",
+    "lid+straffung*": "Lidstraffung",
     "*haartransplantation*": "Haartransplantation",
     "hair transplant*": "Hair Transplant",
     "breast augmentation": "Breast Augmentation",
@@ -1859,35 +3394,72 @@ const BEISPIEL_JE_WORT = {
     "rhinoplast*": "Rhinoplast",
     "tummy tuck*": "Tummy Tuck",
     "*liposuction*": "Liposuction",
+    "fett weg spritze*": "Fett Weg Spritze",
+    "beauty eingriff*": "Beauty Eingriff",
+    "ästhetische medizin": "Ästhetische Medizin",
+    "ästhetische chirurgie": "Ästhetische Chirurgie",
+    "aesthetic surgery": "Aesthetic Surgery",
+    "aesthetic medicine": "Aesthetic Medicine",
+    "aesthetic clinic*": "Aesthetic Clinic",
+    "butt lift*": "Butt Lift",
+    "lippen+vergrößer*": "Lippenvergrößer",
+    "lip augmentation*": "Lip Augmentation",
+    "lip flip*": "Lip Flip",
+    "russian lips": "Russian Lips",
+    "lippen machen lassen": "Lippen Machen Lassen",
+    "nase machen lassen": "Nase Machen Lassen",
+    "brust+implantat*": "Brustimplantat",
+    "po implantat*": "Po Implantat",
+    "kinn implantat*": "Kinn Implantat",
+    "breast implant*": "Breast Implant",
+    "butt implant*": "Butt Implant",
+    "med spa": "Med Spa",
+    "med spas": "Med Spas",
+    injectables: "Injectables",
+    "cosmetic injection*": "Cosmetic Injection",
+    "falten+behandlung*": "Faltenbehandlung",
+    "beauty doc*": "Beauty Doc",
+    "bauchdecken+straffung*": "Bauchdeckenstraffung",
+    "faden+lifting*": "Fadenlifting",
+    "kryolipolyse*": "Kryolipolyse",
+    "skin bleaching*": "Skin Bleaching",
+    "skin whitening*": "Skin Whitening",
+    "haut+aufhell*": "Hautaufhell",
+    "hyaluron filler*": "Hyaluron-Filler",
+    "hyaluron spritze*": "Hyaluron-Spritze",
+    "hyaluron unterspritz*": "Hyaluron unterspritzen",
+    "hyaluron injektion*": "Hyaluron-Injektion",
+    "hyaluron behandlung*": "Hyaluron-Behandlung",
+    "hyaluron lippen*": "Hyaluron-Lippen",
+    "hyaluron pen*": "Hyaluron-Pen",
+    "hyaluronsäure filler*": "Hyaluronsäure-Filler",
+    "hyaluronsäure spritze*": "Hyaluronsäure-Spritze",
+    "hyaluronsäure injektion*": "Hyaluronsäure-Injektion",
+    "hyaluronsäure behandlung*": "Hyaluronsäure-Behandlung",
+    "hyaluronic filler*": "Hyaluronic Filler",
+    "hyaluronic acid filler*": "Hyaluronic Acid Filler",
+    "hyaluronic acid injection*": "Hyaluronic Acid Injections",
+    "kosmetische eingriff*": "Kosmetische Eingriffe",
+    "kosmetischer eingriff*": "Kosmetischer Eingriff",
+    "kosmetischen eingriff*": "Angebote zum kosmetischen Eingriff",
+    "kosmetische chirurgie*": "Kosmetische Chirurgie",
+    "po vergrößer*": "Po-Vergrößerung",
+    "lippenfiller*": "Lippenfiller",
+    "aufgespritzte lippen*": "Aufgespritzte Lippen",
     "diät*": "Diätplan",
     "*diät": "Nulldiät",
     dieting: "Dieting",
     "diet pill*": "Diet Pills",
-    abnehm: "Abnehm-App",
-    "abnehmspritze*": "Abnehmspritze",
-    "abnehmcoaching*": "Abnehmcoaching",
-    "abnehmkur*": "Abnehmkur",
-    "abnehmpille*": "Abnehmpille",
-    "abnehmprogramm*": "Abnehmprogramm",
-    "abnehmapp*": "Abnehmapp",
-    "abnehmshake*": "Abnehmshake",
-    "abnehmtablette*": "Abnehmtablette",
-    "abnehmtee*": "Abnehmtee",
-    "abnehmplan*": "Abnehmplan",
-    "abnehmprodukt*": "Abnehmprodukt",
-    "abnehmmittel*": "Abnehmmittel",
     "*ozempic*": "Ozempic",
     "*wegovy*": "Wegovy",
     "*mounjaro*": "Mounjaro",
     "*almased*": "Almased",
-    "*slimfast*": "Slimfast",
     "weight watchers": "Weight Watchers",
     noom: "Noom",
     yazio: "Yazio",
     "shape shake*": "Shape Shake",
-    "kalorienzähler*": "Kalorienzähler Premium",
     "calorie count*": "Calorie Count",
-    "intervallfasten*": "Intervallfasten Coaching",
+    "intervall+fasten*": "Intervallfasten Coaching",
     "intermittent fasting": "Intermittent Fasting",
     "detox kur*": "Detox Kur",
     "detox tee*": "Detox-Tee",
@@ -1898,21 +3470,53 @@ const BEISPIEL_JE_WORT = {
     "weight loss*": "Weight Loss",
     "lose weight": "Lose Weight",
     "appetite suppressant*": "Appetite Suppressant",
-    "gewichtsverlust*": "Gewichtsverlust",
-    "gewichtsabnahme*": "Gewichtsabnahme",
-    "gewichtsreduktion*": "Gewichtsreduktion",
+    "gewichts+verlust*": "Gewichtsverlust",
+    "gewichts+abnahme*": "Gewichtsabnahme",
+    "gewichts+reduktion*": "Gewichtsreduktion",
+    "kalorien zähl*": "Kalorien Zähl",
+    "kalorien+defizit*": "Kaloriendefizit",
+    "calorie track*": "Calorie Track",
+    "calorie deficit*": "Calorie Deficit",
+    "low carb*": "Low Carb",
+    keto: "Keto",
+    "ketogen*": "Ketogen",
+    "detox tea": "Detox Tea",
+    "detox teas": "Detox Teas",
+    "mahlzeiten+ersatz*": "Mahlzeitenersatz",
+    "meal replacement*": "Meal Replacement",
+    lifesum: "Lifesum",
+    "bikini+figur*": "Bikinifigur",
+    "sommer+figur*": "Sommerfigur",
+    "strand+figur*": "Strandfigur",
+    "traum+figur*": "Traumfigur",
+    "wunsch+gewicht*": "Wunschgewicht",
+    "thigh gap*": "Thigh Gap",
+    "size zero": "Size Zero",
+    "pro ana": "Pro Ana",
+    "thinspo*": "Thinspo",
+    "heil+fasten*": "Heilfasten",
+    "saftkur*": "Saftkur",
+    "entschlack*": "Entschlack",
+    "stoffwechselkur*": "Stoffwechselkur",
+    "abführ+tee*": "Abführtee",
+    "schlank+macher*": "Schlankmacher",
+    "fett+verbrenn*": "Fettverbrenn",
+    "schlank shake*": "Schlank Shake",
+    "skinny tea*": "Skinny Tea",
+    "waist trainer*": "Waist Trainer",
+    "weight management*": "Weight Management",
+    "fasting app*": "Fasting App",
+    "kalorien track*": "Kalorien-Tracker",
+    "my fitness pal": "MyFitnessPal",
+    "schlank im schlaf*": "Schlank im Schlaf",
+    "fett+killer*": "Fettkiller",
+    "slimfast*": "SlimFast Shake",
     "drogen*": "Drogen",
-    "*droge": "Partydroge",
-    "partydrogen*": "Partydrogen",
-    "designerdrogen*": "Designerdrogen",
-    "einstiegsdrogen*": "Einstiegsdrogen",
-    "modedrogen*": "Modedrogen",
-    drugs: "Party Drugs",
-    "rauschgift*": "Rauschgift",
-    "rauschmittel*": "Rauschmittel",
-    "suchtgift*": "Suchtgift",
-    "suchtmittel*": "Suchtmittel",
-    "betäubungsmittel*": "Betäubungsmittel",
+    "rausch+gift*": "Rauschgift",
+    "rausch+mittel*": "Rauschmittel",
+    "sucht+gift*": "Suchtgift",
+    "sucht+mittel*": "Suchtmittel",
+    "betäubungs+mittel*": "Betäubungsmittel",
     "narkotik*": "Narkotika",
     "narcotic*": "Narcotics",
     "*cannabis*": "Cannabis-Shop",
@@ -1924,7 +3528,7 @@ const BEISPIEL_JE_WORT = {
     "haschisch*": "Haschisch",
     "hashish*": "Hashish",
     hasch: "Hasch",
-    "hanfblüte*": "Hanfblüten",
+    "hanf+blüte*": "Hanfblüten",
     ganja: "Ganja",
     "spliff*": "Spliff",
     "kiff*": "Kiffer-Zubehör",
@@ -1933,7 +3537,6 @@ const BEISPIEL_JE_WORT = {
     bongs: "Bongs",
     "head shop*": "Headshop",
     "grow shop*": "Growshop",
-    "growbox*": "Growbox",
     "legal high*": "Legal Highs",
     "lachgas*": "Lachgas-Kartuschen",
     "laughing gas*": "Laughing Gas",
@@ -1946,7 +3549,7 @@ const BEISPIEL_JE_WORT = {
     "kokser*": "Kokser",
     lsd: "LSD",
     "magic mushroom*": "Magic Mushrooms",
-    "zauberpilz*": "Zauberpilze",
+    "zauber+pilz*": "Zauberpilze",
     "psilocybin*": "Psilocybin",
     shrooms: "Shrooms",
     heroin: "Heroin",
@@ -1960,6 +3563,24 @@ const BEISPIEL_JE_WORT = {
     kratom: "Kratom",
     psychedelika: "Psychedelika",
     psychedelics: "Psychedelics",
+    "partydroge*": "Partydroge",
+    "designerdroge*": "Designerdroge",
+    "einstiegsdroge*": "Einstiegsdroge",
+    "modedroge*": "Modedroge",
+    "tilidin*": "Tilidin",
+    xanax: "Xanax",
+    "codein*": "Codein",
+    benzos: "Benzos",
+    "benzodiazepin*": "Benzodiazepin",
+    meth: "Meth",
+    "space cookie*": "Space Cookie",
+    "space cake*": "Space Cake",
+    "hasch keks*": "Haschkekse",
+    "hash brownie*": "Hash Brownie",
+    "party+pille*": "Partypille",
+    "aufputsch+mittel*": "Aufputschmittel",
+    "grow box*": "Growbox",
+    "dab pen*": "Dab Pens",
     "*wette": "Pferdewette",
     admiral: "Admiral",
     stake: "Stake",
@@ -1974,14 +3595,116 @@ const BEISPIEL_JE_WORT = {
     ottakringer: "Ottakringer",
     spirits: "Spirits",
     velo: "Velo",
-    diet: "Keto Diet",
-    abnehmen: "Abnehmen",
+    diet: "Diet Plan",
+    diets: "Diets",
     weed: "Weed",
     joint: "Joint",
     joints: "Joints",
     ecstasy: "Ecstasy",
     grinder: "Grinder",
+    grinders: "Grinders",
     edibles: "Edibles",
+    wett: "Wett Deals",
+    "*wetten": "Pferdewetten",
+    "lotto*": "Lotto 6 aus 45",
+    "*jackpot*": "Jackpot",
+    bet: "Bet",
+    bets: "Live Bets",
+    "schulden*": "Schulden",
+    debt: "Debt",
+    debts: "Debts",
+    rauchen: "Rauchen",
+    "*droge": "Droge",
+    drug: "Drug",
+    drugs: "Party Drugs",
+    "abnehm*": "Abnehm",
+    "mr green": "Mr Green",
+    "zocken um geld": "Zocken Um Geld",
+    "um geld spielen": "Um Geld Spielen",
+    affirm: "Affirm",
+    abbezahlen: "Abbezahlen",
+    "auf pump": "Auf Pump",
+    "geld leihen": "Geld Leihen",
+    "geld borgen": "Geld Borgen",
+    vorschuss: "Vorschuss",
+    zipfer: "Zipfer",
+    puntigamer: "Puntigamer",
+    schwechater: "Schwechater",
+    wieselburger: "Wieselburger",
+    zwettler: "Zwettler",
+    krombacher: "Krombacher",
+    becks: "Becks",
+    berentzen: "Berentzen",
+    desperados: "Desperados",
+    ramazzotti: "Ramazzotti",
+    "kleiner feigling": "Kleiner Feigling",
+    saufen: "Saufen",
+    "hangover*": "Hangover",
+    "hoch+prozentig*": "Hochprozentig",
+    gspritzter: "Gspritzter",
+    gspritzten: "Gspritzten",
+    gspritzte: "Gspritzte",
+    "trafik*": "Trafik",
+    kippe: "Kippe",
+    kippen: "Kippen",
+    "stopf+maschine*": "Stopfmaschine",
+    ocb: "Ocb",
+    "veneer*": "Veneer",
+    "ohren anlegen": "Ohren Anlegen",
+    "mager+sucht*": "Magersucht",
+    "fett weg": "Fett Weg",
+    "bauch+fett*": "Bauchfett",
+    opium: "Opium",
+    stoner: "Stoner",
+    stoners: "Stoners",
+    "gras kaufen": "Gras Kaufen",
+    "high werden": "High Werden",
+    "abzahl*": "Abzahlung",
+    "schuldner*": "Schuldnerberatung",
+    lending: "Lending",
+    "after pay": "After Pay",
+    "rate pay": "Rate Pay",
+    "aux money": "Aux Money",
+    "vex cash": "Vex Cash",
+    "scala pay": "Scala Pay",
+    "euro millionen": "Euro Millionen",
+    "euro millions": "Euro Millions",
+    "draft kings": "Draft Kings",
+    "fan duel": "Fan Duel",
+    märzen: "Märzen",
+    ale: "Ale",
+    ales: "Ales",
+    smokes: "Smokes",
+    "slim fast*": "Slim Fast",
+    "glücks spiel*": "Glücks Spiel",
+    "buch macher*": "Buch Macher",
+    "book maker*": "Book Maker",
+    "rubbel los": "Rubbel Los",
+    "rubbel lose": "Rubbel Lose",
+    "spiel automat": "Spiel Automat",
+    "spiel automaten": "Spiel Automaten",
+    "spiel bank": "Spiel Bank",
+    "spiel banken": "Spiel Banken",
+    "spiel halle": "Spiel Halle",
+    "spiel hallen": "Spiel Hallen",
+    "brief los": "Brief Los",
+    "brief lose": "Brief Lose",
+    "teil zahlung*": "Teil Zahlung",
+    "mikro finanz*": "Mikro Finanz",
+    "pfand haus": "Pfand Haus",
+    "pfand häuser": "Pfand Häuser",
+    "jäger meister": "Jäger Meister",
+    "jager meister": "Jager Meister",
+    "fett absaug*": "Fett Absaug",
+    "brust vergrößer*": "Brust Vergrößer",
+    "nasen korrektur*": "Nasen Korrektur",
+    "haar transplantation*": "Haar Transplantation",
+    "appetit zügler*": "Appetit Zügler",
+    "saft kur": "Saft Kur",
+    "saft kuren": "Saft Kuren",
+    "stoffwechsel kur": "Stoffwechsel Kur",
+    "stoffwechsel kuren": "Stoffwechsel Kuren",
+    "lach gas": "Lach Gas",
   },
 };
 
@@ -2009,7 +3732,9 @@ describe.each([
      Text ist beim Vergleich schon vereinheitlicht. */
   test("jedes Wort steht in der Schreibweise der Liste da", () => {
     const alle = [...liste.ueberall, ...liste.nurAlsWerbung];
-    expect(alle.filter((w) => !/^\*?[a-zäöüß0-9.][a-zäöüß0-9. ]*\*?$/.test(w))).toEqual([]);
+    expect(alle.filter((w) => !/^\*?[a-zäöüß0-9.][a-zäöüß0-9. +]*\*?$/.test(w))).toEqual([]);
+    /* Die Wortfuge „+“ steht nur zwischen zwei Buchstaben oder Ziffern. */
+    expect(alle.filter((w) => /(?:^|[^a-zäöüß0-9])\+|\+(?:[^a-zäöüß0-9]|$)/.test(w))).toEqual([]);
   });
 
   test.each(Object.entries(BEISPIEL_JE_WORT[stufe]))("%s hält „%s“", (wort, beispiel) => {

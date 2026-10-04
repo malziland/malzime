@@ -202,7 +202,12 @@ function extrahiereKarten(jsonPraefix, vonIdx, bisIdx, alterVerbergen = () => fa
     const dazwischen = bereich.slice(idx + marke.length, wert.schluesselIdx);
     if (REQUIRED_CARDS.some((k) => k !== schluessel && dazwischen.includes(`"${k}"`))) continue;
     /* Die Alterskarte erscheint live nur, wenn sie am Ende auch so stehen
-       bleibt; sonst bekommt die fertige Karte den festen Satz (mistral.js). */
+       bleibt; sonst bekommt die fertige Karte den festen Satz (mistral.js).
+       Bewusste Ausnahme (SECURITY-MODEL, 17.09.2026, Punkt 3): Was erst NACH
+       dieser Karte ankommt, ist hier noch nicht da. Bringt erst die
+       Beast-Karte — oder ein Anker, der entgegen dem Schema hinter den
+       Profilen steht — einen Altersversuch ohne lesbares Alter, steht die
+       Standard-Karte schon da und wechselt am Ende auf den festen Satz. */
     if (schluessel === "alter_geschlecht" && alterVerbergen(wert.text)) continue;
     fertige.push({ schluessel, bezeichnung: bezeichnung.text, wert: wert.text });
   }

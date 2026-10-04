@@ -14,6 +14,24 @@
  * Anzeigetexte; der feste Satz fuer die Karte steht in den Sprachdateien.
  */
 
+/* Zahlwoerter, Kategorien, Kindwoerter und Abkuerzungen: reine Daten in
+   alters-lesbarkeit-woerter.js. */
+const {
+  ZAHLWOERTER,
+  EINER,
+  ONES,
+  ZEHNER_DE,
+  ZEHNER_EN,
+  KATEGORIEN,
+  KINDWOERTER,
+  ABKUERZUNGEN,
+  ABKUERZUNGEN_IMMER,
+  ABKUERZUNGEN_MEHRTEILIG,
+  ABKUERZUNG_UND_ANDERE,
+  NAEHERUNGSWOERTER,
+  SEHR_JUNG,
+} = require("./alters-lesbarkeit-woerter");
+
 /* ── Nicht lesbares Alter (17.09.2026) ────────────────────────────────────
    Das Formatbeispiel im Prompt zeigt das Alter nur noch als "~‹Zahl› Jahre
    alt (Spanne ‹Zahl›-‹Zahl›)" — eine Beispielzahl zog die Schaetzungen an.
@@ -53,74 +71,20 @@ const PLATZHALTER_NACKT =
    angehaengt sein ("dreizehnjaehrig", "minderjaehrig"). "underage" und
    "a minor" sagen dasselbe wie "minderjaehrig": unter 18, aber ohne Zahl.
    "minor" zaehlt nur vor einem Satzzeichen oder am Textende — in "minor
-   details" ist es kein Alter. Ein Geburtsjahr ("geboren 2012") ist ebenfalls
-   ein Altersversuch ohne lesbares Alter; "geboren fuer die Buehne" nicht. */
+   details" ist es kein Alter. Ein Geburtsjahr ("geboren 2012", "geb. 2012",
+   "Jg. 2012") ist ebenfalls ein Altersversuch ohne lesbares Alter; "geboren
+   fuer die Buehne" nicht. */
 const ALTERSWORT =
-  /(?<!\p{L})(?:jahre|jahren|years?|yrs|spanne|range|under-?age)(?!\p{L})|(?<!\p{L})minors?(?=\s*(?:[.,;:!?)]|$))|(?<!\p{L})(?:geboren|jahrgang|born)(?!\p{L})[^.!?\d]{0,12}(?:19|20)\d\d(?!\d)|j\u00e4hrig/iu;
+  /(?<!\p{L})(?:jahre|jahren|years?|yrs|spanne|range|under-?age)(?!\p{L})|(?<!\p{L})minors?(?=\s*(?:[.,;:!?)]|$))|(?<!\p{L})(?:geboren|jahrgang|born)(?!\p{L})[^.!?\d]{0,12}(?:19|20)\d\d(?!\d)|(?<!\p{L})(?:geb|jg|jhg|jahrg)\.\s*(?:19|20)\d\d(?!\d)|j\u00e4hrig/iu;
 
-const ZAHLWOERTER = {
-  fünf: 5,
-  sechs: 6,
-  sieben: 7,
-  acht: 8,
-  neun: 9,
-  zehn: 10,
-  elf: 11,
-  zwölf: 12,
-  dreizehn: 13,
-  vierzehn: 14,
-  fünfzehn: 15,
-  sechzehn: 16,
-  siebzehn: 17,
-  achtzehn: 18,
-  neunzehn: 19,
-  zwanzig: 20,
-  dreißig: 30,
-  vierzig: 40,
-  fünfzig: 50,
-  sechzig: 60,
-  siebzig: 70,
-  achtzig: 80,
-  five: 5,
-  six: 6,
-  seven: 7,
-  eight: 8,
-  nine: 9,
-  ten: 10,
-  eleven: 11,
-  twelve: 12,
-  thirteen: 13,
-  fourteen: 14,
-  fifteen: 15,
-  sixteen: 16,
-  seventeen: 17,
-  eighteen: 18,
-  nineteen: 19,
-  twenty: 20,
-  thirty: 30,
-  forty: 40,
-  fifty: 50,
-  sixty: 60,
-  seventy: 70,
-  eighty: 80,
-  twenties: 20,
-  thirties: 30,
-  forties: 40,
-  fifties: 50,
-  sixties: 60,
-  seventies: 70,
-};
 /* Wortgrenzen ueber Buchstaben (auch Umlaute): "acht" trifft nicht in
    "achtzehn", "zehn" nicht in "dreizehn", "ten" nicht in "often". */
-/* Ein Zahlwort darf ein "-jaehrig" tragen ("dreizehnjaehrig"). */
-const WORTENDE = "(?=-?j\\u00e4hrig|(?!\\p{L}))";
+/* Ein Zahlwort darf ein "-jaehrig" oder "einhalb" tragen ("dreizehnjaehrig",
+   "dreizehneinhalb"). */
+const WORTENDE = "(?=-?j\\u00e4hrig|einhalb(?!\\p{L})|(?!\\p{L}))";
 const ZAHLWORT = new RegExp(`(?<!\\p{L})(${Object.keys(ZAHLWOERTER).join("|")})${WORTENDE}`, "giu");
 
 /* Zusammengesetzte Zahlen: "fuenfundzwanzig", "twenty-five". */
-const EINER = { ein: 1, zwei: 2, drei: 3, vier: 4, fünf: 5, sechs: 6, sieben: 7, acht: 8, neun: 9 };
-const ONES = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
-const ZEHNER_DE = { zwanzig: 20, dreißig: 30, vierzig: 40, fünfzig: 50, sechzig: 60, siebzig: 70, achtzig: 80 };
-const ZEHNER_EN = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80 };
 const ZUSAMMEN_DE = new RegExp(
   `(?<!\\p{L})(${Object.keys(EINER).join("|")})und(${Object.keys(ZEHNER_DE).join("|")})${WORTENDE}`,
   "giu"
@@ -130,36 +94,17 @@ const ZUSAMMEN_EN = new RegExp(
   "giu"
 );
 
+/* Zahlwoerter in Ziffern. Dazu faellt eine einzelne Stelle hinter Komma oder
+   Punkt weg ("12,5 Jahre" → "12 Jahre"): Sie ist kein Alter und wuerde sonst
+   als 5 gelesen. "1,80" und "14.30" bleiben, wie sie sind. */
+const NACHKOMMASTELLE = /(?<!\d)(\d{1,2})[.,]\d(?!\d)/g;
 function mitZiffern(text) {
   return String(text || "")
     .replace(ZUSAMMEN_DE, (_w, e, z) => String(EINER[e.toLowerCase()] + ZEHNER_DE[z.toLowerCase()]))
     .replace(ZUSAMMEN_EN, (_w, z, e) => String(ZEHNER_EN[z.toLowerCase()] + ONES[e.toLowerCase()]))
-    .replace(ZAHLWORT, (w) => String(ZAHLWOERTER[w.toLowerCase()]));
+    .replace(ZAHLWORT, (w) => String(ZAHLWOERTER[w.toLowerCase()]))
+    .replace(NACHKOMMASTELLE, "$1");
 }
-
-/* Kategorien ("Teenager", "jugendlich", "Schulkind") — zaehlen NUR, wenn
-   keine Zahl dasteht: "~35 Jahre, jugendlich wirkend" ist 35, nicht 13.
-   "Kind" nur gross geschrieben — das englische "kind" (freundlich) ist kein
-   Alter. Seit SEC-2026-10-03-02 auch Volksschul..., Schueler..., Baby und
-   die englischen Entsprechungen. */
-const KATEGORIEN = [
-  [/(?<!\p{L})(?:teen\p{L}*|jugendlich\p{L}*|adolescent\p{L}*)/iu, 13],
-  [/(?<!\p{L})pubert\p{L}*/iu, 12],
-  [/(?<!\p{L})(?:school(?:girl|boy|child|kid)\p{L}*|pupil|pre-?teen\p{L}*|tween\p{L}*)(?!\p{L})|sch(?:ü|ue)ler/iu, 10],
-  [/(?<!\p{L})(?:schul|klein|vorschul)kind\p{L}*|(?:grund|volks)sch(?:u|ü|ue)l\p{L}*/iu, 8],
-  [/(?<!\p{L})(?:elementary|primary|grade)[ -]school/iu, 8],
-  [/(?<!\p{L})Kind(?:er)?(?!\p{L})|(?<!\p{L})(?:child\p{L}*|kids?)(?!\p{L})/u, 8],
-  [/(?<!\p{L})toddlers?(?!\p{L})/iu, 2],
-  [/(?<!\p{L})(?:bab(?:y|ys|ies)|infants?)(?!\p{L})|s(?:ä|ae)ugling/iu, 1],
-];
-/* Maedchen, Bub, Junge, girl, boy: ein Kind, aber ohne Altersstufe — zaehlt
-   deshalb nur, wenn keine Kategorie oben greift ("teenage girl" bleibt 13).
-   "Junge" nur als Hauptwort: gross geschrieben, nach einem Wort oder Komma
-   und nicht vor einem Hauptwort — "Junge Frau" ist kein Kind. */
-const KINDWOERTER = [
-  /m(?:ä|ae)dchen|m(?:ä|ae)dels?(?!\p{L})|(?<!\p{L})(?:girls?|boys?)(?!\p{L})/iu,
-  /(?<!\p{L})(?:Schulb|B)ub(?:en)?(?!\p{L})|(?<=[\p{L},:]\s)(?:Jung(?:e|en|s)|Schuljungen?)(?!\p{L})(?!\s+\p{Lu})/u,
-];
 
 function kategorieAlter(text) {
   const s = String(text || "");
@@ -195,13 +140,37 @@ function hatLesbaresAlter(text) {
   return !hatAltersPlatzhalter(s) && untereAltersgrenze(s) !== null;
 }
 
-/* Steht irgendwo im Text ein Altersversuch — Platzhalter oder Alterswort?
-   Fuer ganze Karten gedacht: Ob der Versuch LESBAR ist, entscheidet allein
-   die Stelle, die als Altersangabe zaehlt (Anker, sonst erster Satz). Eine
-   Zahl im Beleg-Satz macht ihn nicht lesbar (SEC-2026-10-03-02). */
+/* Naeherungswort und kleine Zahl ohne "Jahre": "etwa 13,", "hoechstens 12.",
+   "around 12", "~13,". Zaehlt nur, wenn nach der Zahl kein Wort folgt
+   (Satzzeichen, Textende, "oder 13", "bis 14") — "etwa 7 Kopflaengen" und
+   "rund 10 Freunde" sind kein Alter, "1,80" und "14:30" auch nicht. */
+/* BLEIBT IM CODE — "klein" heisst: bis zur Schutzgrenze des Filters
+   (SCHUTZ_ALTER in minor-safety.js; alters-platzhalter.test.js haelt beide
+   gleich). Darueber ist niemand zu schuetzen. */
+const VERSUCH_BIS = 25;
+const NAEHERUNG = new RegExp(
+  `(?:~\\s*|(?<!\\p{L})(?:${NAEHERUNGSWOERTER.map((w) => w.replace(/\./g, "\\.")).join("|")})\\s+)` +
+    `(\\d{1,2})(?![.,:]?\\d)(?=\\s*(?:[.,;:!?)]|$|(?:oder|or|bis|to|[-–])\\s*\\d))`,
+  "giu"
+);
+function hatNaeherungsAlter(s) {
+  for (const m of s.matchAll(NAEHERUNG)) {
+    const n = Number(m[1]);
+    if (n >= 1 && n <= VERSUCH_BIS) return true;
+  }
+  return SEHR_JUNG.test(s); /* "sehr jung", "very young": ungefaehr, ohne Zahl */
+}
+
+/* Steht irgendwo im Text ein Altersversuch? Platzhalter, Alterswort, Kindwort
+   oder Kategorie ("ein Maedchen", "Schuelerin"), Naeherungswort mit kleiner
+   Zahl, "sehr jung". Fuer ganze Karten: Ob der Versuch LESBAR ist, entscheidet
+   allein die Stelle, die als Altersangabe zaehlt (Anker, sonst erster Satz);
+   steht dort kein Alter, gilt es als nicht lesbar, und Stufe 2 greift
+   (SEC-2026-10-03-02). Getragene Richtung: Das trifft auch Erwachsene ohne
+   lesbares Alter, in deren Karte ein Kind vorkommt. */
 function hatAltersversuch(text) {
   const s = pruefText(text);
-  return hatAltersPlatzhalter(s) || ALTERSWORT.test(s);
+  return hatAltersPlatzhalter(s) || ALTERSWORT.test(s) || kategorieAlter(s) !== null || hatNaeherungsAlter(s);
 }
 
 /* ── Erster Satz einer Karte (SEC-2026-10-03-02) ──────────────────────────
@@ -210,25 +179,57 @@ function hatAltersversuch(text) {
    ("ca. 13 Jahre", "approx. 14") und nicht an einem Punkt zwischen Ziffern
    ("12.–14.", "1.80"): Sonst endete der Satz vor dem Alter. Eine Abkuerzung
    zaehlt nur, wenn danach weder ein Grossbuchstabe noch das Textende kommt
-   ("Du bist Max. Deine Wangen ..." bleibt ein Satzende). Bewusst ohne
-   i-Schalter: Mit ihm traefe die Grossbuchstaben-Klasse auch Kleinbuchstaben. */
-const ABKUERZUNGEN = "ca cca ungef ugf approx appr zw rd mind max min evtl vermutl wahrsch est abt bzw".split(" ");
+   ("Du bist Max. Deine Wangen ..." bleibt ein Satzende); dasselbe gilt fuer
+   "u. a." — dort beendet aber nie der innere Punkt den Satz. "sog.", "geb.",
+   "Jg." und die mehrteiligen ("z. B.", "d. h.", "i.e.", "e.g.") stehen nie am
+   Satzende. Bewusst ohne i-Schalter: Mit ihm traefe die
+   Grossbuchstaben-Klasse auch Kleinbuchstaben. */
+const GROSS_UND_KLEIN = (a) => [a, a[0].toUpperCase() + a.slice(1)];
+const MIT_PUNKTEN = (a) => a.split(" ").join("\\.\\s?");
+const UND_ANDERE = ABKUERZUNG_UND_ANDERE.split(" ");
 const KEIN_SATZENDE = new RegExp(
-  `(?<!\\p{L})(?:${ABKUERZUNGEN.flatMap((a) => [a, a[0].toUpperCase() + a.slice(1)]).join("|")})\\.(?!\\s*(?:\\p{Lu}|$))` +
+  `(?<!\\p{L})(?:${[...ABKUERZUNGEN, MIT_PUNKTEN(ABKUERZUNG_UND_ANDERE)].flatMap(GROSS_UND_KLEIN).join("|")})\\.(?!\\s*(?:\\p{Lu}|$))` +
+    `|(?<!\\p{L})(?:${[...ABKUERZUNGEN_IMMER, ...ABKUERZUNGEN_MEHRTEILIG.map(MIT_PUNKTEN)].flatMap(GROSS_UND_KLEIN).join("|")})\\.` +
+    `|(?<!\\p{L})(?:${GROSS_UND_KLEIN(UND_ANDERE[0]).join("|")})\\.(?=\\s?${UND_ANDERE[1]}\\.)` +
     `|(?<=\\d)\\.(?=\\d|\\s*[-–—]\\s*\\d)`,
   "gu"
 );
+
+/* Auch vor einem Grossbuchstaben endet der Satz nicht an der Abkuerzung, wenn
+   das naechste Wort ein Alter bis zur Schutzgrenze traegt ("ca. Volksschulalter",
+   "vermutl. Teenager"). Ein hoeheres koennte ein Kindwort davor verdraengen. */
+const VOR_ALTERSWORT = new RegExp(
+  `(?<!\\p{L})(?:${ABKUERZUNGEN.flatMap(GROSS_UND_KLEIN).join("|")})\\.(?=\\s*((?:(?:Anfang|Mitte|Ende)\\s+)?[\\p{L}\\d]+))`,
+  "gu"
+);
+const OHNE_PUNKT = (t) => t.replace(/\./g, "_");
+const JUNG = (wort) => (untereAltersgrenze(wort) ?? VERSUCH_BIS + 1) <= VERSUCH_BIS;
 
 /* [erster Satz, Rest dahinter]. Die Punkte, die kein Satzende sind, werden
    nur fuer die Suche ausgeblendet — gleich lang, damit die Stelle stimmt. */
 function satzUndRest(text) {
   const s = String(text || "");
-  const m = /[.!?]/.exec(s.replace(KEIN_SATZENDE, (t) => `${t.slice(0, -1)}_`));
+  const such = s.replace(KEIN_SATZENDE, OHNE_PUNKT).replace(VOR_ALTERSWORT, (t, w) => (JUNG(w) ? OHNE_PUNKT(t) : t));
+  const m = /[.!?]/.exec(such);
   const ende = m ? m.index + 1 : s.length;
   return [s.slice(0, ende).trim(), s.slice(ende).trim()];
 }
 const ersterSatz = (text) => satzUndRest(text)[0];
 const nachErstemSatz = (text) => satzUndRest(text)[1];
+
+/* Der Altersanker als Text: Liefert das Modell statt eines Textes eine Zahl,
+   eine Liste oder ein Objekt, wird der Inhalt gelesen statt verworfen. */
+function ankerAlsText(wert, tiefe = 0) {
+  if (typeof wert === "string") return wert;
+  if (typeof wert === "number") return Number.isFinite(wert) ? String(wert) : "";
+  if (!wert || typeof wert !== "object" || tiefe > 2) return "";
+  const name = (k) => (Array.isArray(wert) ? "" : k);
+  const teile = Object.entries(wert).map(([k, w]) => `${name(k)} ${ankerAlsText(w, tiefe + 1)}`.trim());
+  return teile.filter(Boolean).join(", ").slice(0, 200);
+}
+/* Mitgelesen wird er nur, wenn er die Altersauslese der Karten nicht anhebt. */
+const ankerZusatz = (wert, saetze, z = ankerAlsText(wert)) =>
+  (untereAltersgrenze(z) ?? 0) > (untereAltersgrenze(saetze) ?? 999) ? "" : z;
 
 /* Fuer die Anzeige: Ziffern in Klammern auspacken ("~‹14›" → "~14"). */
 function ohneZiffernKlammern(text) {
@@ -389,6 +390,10 @@ module.exports = {
   hatAltersversuch,
   ersterSatz,
   nachErstemSatz,
+  ankerAlsText,
+  ankerZusatz,
   alterNichtLesbarText,
   ohneZiffernKlammern,
+  /* Für Tests */
+  _VERSUCH_BIS: VERSUCH_BIS,
 };

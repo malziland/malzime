@@ -52,6 +52,7 @@ const {
   hatAltersversuch,
   ersterSatz,
   nachErstemSatz,
+  ankerZusatz,
   alterNichtLesbarText,
   ohneZiffernKlammern,
 } = require("./alters-lesbarkeit");
@@ -408,9 +409,12 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   const rohBeast = rohKarte("beast");
   const satzStandard = ersterSatz(rohStandard);
   const satzBeast = ersterSatz(rohBeast);
-  const irgendeinAlterLesbar = [ankerRoh, satzStandard, satzBeast].some(hatLesbaresAlter);
+  const saetze = [satzStandard, satzBeast].filter(Boolean).join(" ");
+  /* Ein Anker, der kein Text ist (Zahl, Liste, Objekt), wird mitgelesen, aber nie gezeigt. */
+  const ankerMit = ankerRoh ? "" : ankerZusatz(hardFacts.alter_geschlecht, saetze);
+  const irgendeinAlterLesbar = [ankerRoh, ankerMit, satzStandard, satzBeast].some(hatLesbaresAlter);
   const alterUnlesbar =
-    istAlterUnlesbar(ankerRoh) ||
+    istAlterUnlesbar(ankerRoh || ankerMit) ||
     (!irgendeinAlterLesbar && (hatAltersversuch(rohStandard) || hatAltersversuch(rohBeast)));
 
   /* Was die Alterskarte zeigt. Normalfall wie bisher: Anker vorn, Beleg-Satz
@@ -490,7 +494,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        beider unveraenderten Karten — die niedrigste Zahl darin zaehlt; der
        Beleg-Satz bleibt draussen. */
     alterAnker:
-      (hatLesbaresAlter(ankerRoh) ? ankerRoh : [satzStandard, satzBeast].filter(Boolean).join(" ") || ankerRoh) || null,
+      (hatLesbaresAlter(ankerRoh) ? ankerRoh : [saetze, ankerMit].filter(Boolean).join(" ") || ankerRoh) || null,
     alterUnlesbar,
   };
 }

@@ -86,7 +86,8 @@ describe("i18n Guardian (Backend)", () => {
       "animal.js", // German + English animal keywords for SUBJECT classification — not translatable
       "minor-safety.js", // German letters in the text normalisation (ä, ö, ü, ß) — filter logic, never shown to users
       "minor-safety-woerter.js", // German + English blocklist words (glücksspiel, schönheits op) — filter data, never shown to users
-      "alters-lesbarkeit.js", // German number words and age patterns (fünf, jährig) — detection logic, never shown to users
+      "alters-lesbarkeit.js", // German age patterns (jährig, Jahre) — detection logic, never shown to users
+      "alters-lesbarkeit-woerter.js", // German number words and child words (fünf, Mädchen) — detection data, never shown to users
     ];
 
     /* Infrastructure files — no user-facing text, permanently excluded.

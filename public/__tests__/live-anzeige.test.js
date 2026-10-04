@@ -665,6 +665,30 @@ describe("Live-Anzeige (v3.0)", () => {
 
   const sichtbar = (el) => !!el && !el.classList.contains("lv-verdeckt");
 
+  /* Nachlauf 04.10.2026: Was während eines Laufs früh gezeigt wurde, merkt
+     sich das Modul, damit die Enthüllung es nicht erneut verdeckt. Dieser
+     Merker gehört zum Lauf. Nach zuruecksetzen() beginnt die nächste
+     Enthüllung ohne Vorgeschichte — auch wenn ihr keine Live-Welle vorausgeht
+     (dann setzt ihn kein neuer Lauf zurück). */
+  it("zuruecksetzen: eine Enthüllung ohne neue Live-Welle verdeckt wieder alles, auch nach einem Lauf mit früh gezeigten Karten", async () => {
+    liveAnzeige.welle({
+      standard: "Du bist alt",
+      beast: null,
+      kartenStandard: [{ schluessel: "alter_geschlecht", bezeichnung: "Alter", wert: "ALTERWERT-FRUEH" }],
+    });
+    await vi.advanceTimersByTimeAsync(5000);
+    /* Kontrolle: Der Lauf hat wirklich früh Karten gezeigt. */
+    expect(elements.facts.textContent).toContain("ALTERWERT-FRUEH");
+
+    liveAnzeige.zuruecksetzen();
+    baueGerendertesErgebnis();
+    liveAnzeige.starteEnthuellung();
+
+    expect(sichtbar(elements.privacy)).toBe(false);
+    expect(sichtbar(elements.gpsMap)).toBe(false);
+    expect(Array.from(elements.facts.children).some(sichtbar)).toBe(false);
+  });
+
   it("Enthüllungs-Reihenfolge: privacy vor GPS vor Kategorien vor Werbung vor Manipulation vor Datenwert vor PDF", async () => {
     baueGerendertesErgebnis();
     liveAnzeige.starteEnthuellung();

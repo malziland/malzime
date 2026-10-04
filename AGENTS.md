@@ -10,7 +10,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
     api.js           API-Client: Einreihen, Statusabfrage, Wiederaufnahme (analyzeImageQueued, pollJob, resumeQueueJob)
     dom.js           DOM-Helpers (escapeHtml, sanitize)
     exif.js          Client-seitige EXIF-Extraktion (exifr)
-    geocoding.js     Nominatim Reverse Geocoding (client-seitig, nur fuer eigene Fotos); fuer die Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite, ohne Abfrage — fuehrt die Liste der Demo-Fotos
+    geocoding.js     Nominatim Reverse Geocoding (client-seitig, nur fuer hochgeladene Fotos); fuer die Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite, ohne Abfrage — fuehrt die Liste der Demo-Fotos
     render.js        Ergebnis-Rendering (Profile, EXIF, Karte, Datenwert)
     state.js         Globaler State (requestId, isAnalyzing)
     ui.js            UI-Komponenten (Maintenance-Modal, Scan-Animation, Bias-Toggle, Limit-Banner, Warteschlangen-Anzeige)

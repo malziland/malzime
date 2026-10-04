@@ -163,7 +163,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 |-------|---------------------|
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
-| `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call, nur bei eigenen Fotos); bei den Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite |
+| `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call, nur bei hochgeladenen Fotos); bei den Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite |
 | `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Status abfragen, Ergebnis zustellen, Wiederaufnahme nach Neuladen — mit AbortController + Stale-Guard |
 | `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
 | `js/auftrag-speicher.js` | Auftragsgedächtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, 15-Minuten-Frist für ein zugestelltes Ergebnis |

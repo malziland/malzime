@@ -33,7 +33,7 @@ an fremdem Code fällt dadurch im Bau auf.
 
 ## Karte und Adressen: OpenStreetMap
 
-Bei einem eigenen Foto mit Ortsdaten kommen die Kartenkacheln und die
+Bei einem hochgeladenen Foto mit Ortsdaten kommen die Kartenkacheln und die
 Adressauflösung zur Laufzeit direkt vom Browser der Besucherin oder des Besuchers.
 
 **Im Repository liegt OpenStreetMap-Material nur für die Demo-Fotos:** sechs feste

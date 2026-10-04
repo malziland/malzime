@@ -36,8 +36,12 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   bisher — beides kommt jetzt aus der Seite selbst. Der Browser ruft dafür
   weder die Ortsauflösung noch die Kartenkacheln ab; die IP-Adresse geht bei
   einem Beispielbild nicht mehr an OpenStreetMap. Die Karte ist dort ein fester
-  Ausschnitt und lässt sich nicht bewegen. Bei einem eigenen Foto mit Ortsdaten
-  bleibt alles wie bisher.
+  Ausschnitt und lässt sich nicht bewegen. Bei einem hochgeladenen Foto mit
+  Ortsdaten bleibt alles wie bisher.
+- **Datenschutzerklärung und Impressum sagen jetzt genau, wann OpenStreetMap
+  gefragt wird:** nur wenn ein hochgeladenes Foto Ortsdaten trägt, bei den
+  Demo-Fotos nicht. Das Impressum nennt für die Karten die heute gültige
+  Lizenz (ODbL).
 - **Formulare auf der Seite dürfen nur noch an malziME selbst senden.** Die
   Sicherheitsrichtlinie der Seite nennt jetzt auch Formularziele.
 
@@ -47,7 +51,7 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   Merkmale.** Scheiterte eine Analyse, nachdem schon erste Merkmal-Karten zu
   sehen waren, standen diese halb gefüllt neben der Fehlermeldung. Jetzt
   räumt jeder Fehlerweg sie mit ab.
-- Wer von einem eigenen Foto auf ein Beispielbild wechselt, sieht die
+- Wer von einem hochgeladenen Foto auf ein Beispielbild wechselt, sieht die
   bewegliche Karte sofort verschwinden.
 
 ### Behoben — Prüfungen, die nicht mehr prüften

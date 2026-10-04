@@ -185,7 +185,7 @@ Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. D
 - Run `cd functions && npm run lint && npm run format:check` before committing backend changes
 - Run `npm run lint:frontend && npm run format:frontend:check` before committing frontend changes
 - The cache-buster `?v=YYYYMMDDNN` is bumped by `scripts/deploy.sh` on every deploy (every deploy includes the website) — never by hand
-- Whoever changes a file under `.github/workflows/` or `.github/dependabot.yml` updates its checksum in `scripts/pruefe-deploy-riegel.py` in the same commit (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen` prints the new values); Dependabot's bumps of pinned actions are exempt
+- Whoever changes a file under `.github/workflows/`, `.github/dependabot.yml` or one of the tool configs pinned there (`vitest.config.js`, `playwright.config.js`, `eslint.config.mjs`, `functions/eslint.config.js`, `.prettierignore`) updates its checksum in `scripts/pruefe-deploy-riegel.py` in the same commit (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen` prints the new values); Dependabot's bumps of pinned actions are exempt. Whoever changes an npm script behind a required CI step, or the Jest settings in `functions/package.json`, updates the pinned wording there (`NPM_SKRIPTE`) in the same commit
 - Both profiles (normal + boost) come from ONE call (`runSingleLargeCall` in `mistral.js`); the prompt text lives in `locales/*/prompts.js` (`singleLargePrompt`)
 - Bei Aenderungen an der Architektur oder neuen Features: README.md, AGENTS.md, CHANGELOG.md, docs/SETUP.md und docs/SELF-HOSTING.md aktualisieren
 - Bei neuen Features: Dokumentation und Anleitungen mitliefern

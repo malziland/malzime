@@ -74,13 +74,18 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 - **Die öffentliche Nachprüfung lässt sich nicht mehr durch Weglassen
   täuschen.** `sh scripts/pruefe-live.sh` prüft jetzt jede Datei, die laut
   veröffentlichtem Quelltext ausgeliefert sein muss — nicht nur die, die der
-  Server selbst auflistet. Eine Datei, die in seiner Liste fehlt, wird gemeldet.
+  Server selbst auflistet. Eine Datei, die in seiner Liste fehlt, wird gemeldet,
+  und eine veränderte Datei fällt auch dann auf, wenn der Server den passenden
+  Fingerabdruck gleich mitliefert.
 - **Die Auslieferung sieht alle Prüfergebnisse eines Standes**, auch wenn sich
   über mehrere Tage viele angesammelt haben, und hält an, wenn sich die
   Version des Auslieferungswerkzeugs nicht lesen lässt.
 - **Die Prüfabläufe selbst sind festgeschrieben.** Fällt eine der sechs
-  Pflicht-Prüfungen aus dem Ablauf oder verliert sie ihren Prüfbefehl, hält
-  eine Kontrolle an, bevor etwas zusammengeführt oder ausgeliefert wird.
+  Pflicht-Prüfungen aus dem Ablauf, verliert sie ihren Prüfbefehl oder wird
+  sie abgeschaltet, hält eine Kontrolle an, bevor etwas zusammengeführt oder
+  ausgeliefert wird. Das gilt auch, wenn der Befehl stehen bleibt, aber nichts
+  mehr prüft — weil das Skript dahinter ausgetauscht wurde oder das
+  Prüfwerkzeug so eingestellt ist, dass es keine oder weniger Dateien ansieht.
 - **Die Browser-Tests fragen beim Prüfen der Karte nichts mehr bei
   OpenStreetMap an.** Ihre Abfang-Regel griff nicht, die Kartenkacheln kamen
   unbemerkt aus dem Netz. Jetzt liefert der Test sie selbst und prüft, dass

@@ -84,7 +84,8 @@ describe("i18n Guardian (Backend)", () => {
     const ALLOWLIST = [
       "privacy.js", // OCR detection patterns (straße, ÄÖÜ) — not translatable
       "animal.js", // German + English animal keywords for SUBJECT classification — not translatable
-      "minor-safety.js", // German ad-category patterns (glücksspiel, schönheits-op) — filter logic, never shown to users
+      "minor-safety.js", // German letters in the text normalisation (ä, ö, ü, ß) — filter logic, never shown to users
+      "minor-safety-woerter.js", // German + English blocklist words (glücksspiel, schönheits op) — filter data, never shown to users
       "alters-lesbarkeit.js", // German number words and age patterns (fünf, jährig) — detection logic, never shown to users
     ];
 

@@ -23,10 +23,11 @@
  *      in einem Werkzeug fürs Klassenzimmer haben diese Inhalte ohnehin
  *      nichts verloren. Damit hängt die schwerste Absicherung nicht mehr an
  *      einer Schätzung.
- *   2. Glücksspiel, Kredit, Alkohol, Schönheits-OP und Diätmittel nur bei
- *      möglicherweise Minderjährigen — mit Sicherheitspuffer, siehe
- *      Altersgrenze unten. Bei Erwachsenen sind sie legitimer Lerninhalt —
- *      wie diese Branchen Menschen adressieren, IST das Thema.
+ *   2. Glücksspiel, Kredit, Alkohol, Tabak, Schönheits-OP, Diätmittel und
+ *      Drogen nur bei möglicherweise Minderjährigen — mit Sicherheitspuffer,
+ *      siehe Altersgrenze unten. Bei Erwachsenen sind sie legitimer
+ *      Lerninhalt — wie diese Branchen Menschen adressieren, IST das Thema.
+ *      (Drogen seit der Entscheidung vom 04.10.2026: wie Alkohol.)
  *
  * BEWUSST ENG GEFASST: Gefiltert wird nur, was unzweifelhaft nicht zu Kindern
  * gehört. NICHT gefiltert wird die didaktisch gewollte System-Perspektive —
@@ -60,9 +61,9 @@
    statt 50 Analysen ohne Stufe 2.
 
    Bewusst getragene Folge: Erwachsene, deren Spanne bei 25 oder darunter
-   beginnt, bekommen keine Kredit-, Wett-, Alkohol-, Schoenheits-OP- und
-   Diaet-Ideen. Stufe 1 (Pornografie, Waffen, Extremismus) gilt unveraendert
-   fuer alle. */
+   beginnt, bekommen keine Kredit-, Wett-, Alkohol-, Tabak-, Schoenheits-OP-,
+   Diaet- und Drogen-Ideen. Stufe 1 (Pornografie, Waffen, Extremismus) gilt
+   unveraendert fuer alle. */
 const VOLLJAEHRIG_AB = 18;
 /* BLEIBT IM CODE — Kinderschutz-Regel, keine Betriebseinstellung. Wer den
    Puffer aendert, aendert die Entscheidung vom 17.09.2026; das geht nur mit
@@ -89,99 +90,16 @@ const { untereAltersgrenze, obereAltersgrenze, istAlterUnlesbar } = require("./a
    Schoenheitsindustrie Menschen adressieren, IST der Lerninhalt. */
 
 /* ── Die Sperrliste ist eine Wortliste (SEC-2026-10-03-01) ────────────────
-   Sie faengt, was in ihr steht, nicht jede Werbung zu einem Thema. Was sie
-   haelt, zeigt die Pruefreihe in __tests__/minor-safety-woerter.test.js: je
-   Thema deutsche und englische Woerter, die gefangen werden muessen, und
-   harmlose, die nicht gefangen werden duerfen. Jedes Listenwort braucht dort
-   ein Beispiel, sonst wird der Test rot.
+   Sie faengt, was in ihr steht, nicht jede Werbung zu einem Thema. Die Listen
+   stehen als Daten in minor-safety-woerter.js, dort auch die Schreibweise der
+   Eintraege und die Regel "nur als Werbung". Hier steht, wie sie angewandt
+   werden.
 
-   SCHREIBWEISE: klein, durch Komma getrennt.
-     wort    nur als ganzes Wort           ("gin" trifft nicht "beginnen")
-     wort*   Wortanfang, darf weitergehen  ("porn*" trifft "Pornoseite")
-     *wort   Wortende                      ("*wetten" trifft "Pferdewetten")
-     *wort*  ueberall im Wort              ("*kredit*" trifft "Sofortkredit")
-   Ein Leerzeichen passt auf zusammen, getrennt und mit Bindestrich ("sex
-   shop*" trifft "Sexshop", "Sex Shop", "Sex-Shop"), ein Umlaut auch auf
-   ae/oe/ue. Kurze Woerter stehen als ganzes Wort da: "Wetter" ist keine
-   Wette, "Schwein" kein Wein, "Insekt" kein Sekt, "Waffel" keine Waffe.
-
-   NUR ALS WERBUNG: Woerter, die als Werbe-Eintrag (ein bis drei Woerter)
-   eindeutig sind, im ganzen Satz aber meist etwas anderes heissen ("deine
-   staerkste Waffe", "wir raten dir", "on the far right"). Sie gelten nur
-   fuer ad_targeting, nicht fuer Erklaersaetze und Fliesstext. */
-const PORNOGRAFIE = `*onlyfans*, *fansly*, *bestfans*, *xhamster*, *youporn*, *xvideos*, xnxx, *brazzers*,
-  *stripchat*, *chaturbate*, *mydirtyhobby*, *joyclub*, *amorelie*, beate uhse, eis.de, porn*, *porno*, *erotik*,
-  erotic*, *cam girl*, adult webcam*, *sexcam*, sex cam*, *sexshop*, sex shop*, sex toy*, *sexspielzeug*,
-  *telefonsex*, phone sex, *cybersex*, *sexarbeit*, sex work*, *sexfilm*, *sexkino*, *sexdate*, *sexpuppe*, sex doll*,
-  sex chat*, *prostitu*, call girl*, *escort*, *bordell*, *brothel*, strip club*, striptease*, *hentai*, xxx video*,
-  xxx film*, sugar daddy*, sugar babe*, sugar baby*, sugar dating`;
-const WAFFEN = `*schusswaffe*, *feuerwaffe*, *jagdwaffe*, *kriegswaffe*, *stichwaffe*, *hiebwaffe*, *gaswaffe*,
-  *luftdruckwaffe*, *waffenhandel*, waffenladen*, waffenshop*, waffengeschäft*, waffenhändler*, waffenschein*,
-  waffenbörse*, waffenzubehör*, waffenbesitz*, waffenschrank*, waffensammlung*, *munition*, pistole, pistolen,
-  luftpistole*, gaspistole*, maschinenpistole*, *softair*, *airsoft*, *schreckschuss*, *gewehr, *gewehre, *gewehren,
-  *gewehrs, revolver, revolvers, shotgun*, pistol, gun, guns, *handgun*, rifle*, *firearm*, ammo, *silencer*,
-  schalldämpfer*, *kampfmesser*, *springmesser*, butterfly messer*, *wurfmesser*, *einhandmesser*, combat knife*,
-  *schlagring*, brass knuckle*, knuckle duster*, *schlagstock*, *elektroschocker*, taser*, *pfefferspray*,
-  pepper spray*, armbrust*, crossbow*, *handgranate*, hand grenade*, *kalaschnikow*, ak 47, ar 15, glock, glocks,
-  heckler koch, sig sauer, smith wesson, walther ppk`;
-const EXTREMISMUS = `*extremis*, *rechtsextrem*, *linksextrem*, *rechtsradikal*, nazi, nazis, nazism*, nazisymbol*,
-  naziparole*, nazipropaganda*, *neonazi*, terror*, *terrorism*, *terrorist*, white supremac*, thor steinar,
-  *reichsbürger*, identitäre bewegung, islamism*, islamist*, *dschihad*, jihad*, salafis*, *hakenkreuz*, swastika*,
-  ku klux klan`;
-const IMMER_NUR_ALS_WERBUNG = `only fans, sexting*, waffen*, *waffen, *waffe, weapon*, far right, alt right`;
-
-/* Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei moeglicherweise
+   Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei moeglicherweise
    Minderjaehrigen (Untergrenze bis SCHUTZ_BIS, siehe oben).
    Fuer die Manipulations-Trigger wird sie bewusst NICHT angewandt — siehe
    applyMinorSafety. */
-const WETTEN = `*bet365*, *tipico*, bwin, *betano*, *winamax*, *tipp3*, win2day, novomatic, novoline, pokerstars,
-  betway, unibet, *casino*, *kasino*, *jackpot*, *sportwetten*, *glücksspiel*, *wettanbieter*, *buchmacher*,
-  *kombiwette*, sportwette, livewette, wettbüro*, wettschein*, wettbonus*, wettquote*, wetteinsatz*, wettkonto*,
-  wettportal*, wettlokal*, wetttipp*, wettapp*, wett, *wetten, *gambling*, *betting*, *bookmaker*, bookie*,
-  slot machine*, poker, bet, bets, wager*, lotto*, *lotterie*, lottery*, euromillionen, euromillions, rubbellos*,
-  scratch card*, roulette, *spielautomat*, automatenspiel*, spielbank*, spielhalle*, spielothek*`;
-const KREDIT = `*kredit*, *darlehen*, *ratenkauf*, *ratenzahlung*, ratenplan*, monatsrate*, *teilzahlung*,
-  *finanzierung*, *financing*, klarna, *riverty*, *afterpay*, *cashper*, ratepay, *auxmoney*, *smava*, *vexcash*,
-  *schufa*, *inkasso*, *leasing*, *mikrofinanz*, dispo, *überziehung*, overdraft*, schulden*, *umschuldung*, debt,
-  debts, *hypothek*, *mortgage*, kauf auf rechnung, rechnungskauf*, loan, loans, *payday*, installment*, instalment*,
-  buy now pay later, pay later, bnpl, credit card*`;
-const ALKOHOL = `*alkohol*, *alcohol*, *alkopop*, *alcopop*, bier*, weißbier*, weizenbier*, dosenbier*, flaschenbier*,
-  fassbier*, freibier*, starkbier*, bockbier*, altbier*, craftbier*, kellerbier*, lagerbier*, weinabo*, weinprobe*,
-  weinverkostung*, weinhandel*, weinhandlung*, weinkeller*, weingut*, weinflasche*, weinshop*, weinladen*, weinbar*,
-  weinpaket*, weinclub*, weinfest*, weinschorle*, weinkühlschrank*, weinregal*, weinkenner*, weinliebhaber*,
-  weinreise*, weinlieferung*, weinversand*, weintasting*, weinkarte*, weinglas*, weingläser*, weinviertel dac,
-  winzer*, vinothek*, *wein, *rotwein*, *weißwein*, *glühwein*, *sekt, sektflasche*, sektglas*, sektempfang*,
-  sektkellerei*, *prosecco*, champagner*, champagne, *aperol*, spritz, campari, gin, *tequila*, *cocktail*,
-  *spirituose*, *vodka*, *wodka*, *whisky*, *whiskey*, schnaps*, *schnaps, *likör*, liqueur*, weinbrand*, obstler,
-  grappa, ouzo, sambuca, absinth*, cider, hard seltzer, brauerei*, brewery*, brennerei*, distillery*, destillerie*,
-  winery*, beer, beers, wine, wines, liquor, liquors, booze, *jägermeister*, stiegl, gösser, heineken, corona extra,
-  bacardi, captain morgan, smirnoff*, jack daniel*, jim beam, johnnie walker, baileys`;
-const TABAK = `*zigarett*, *zigarre*, *zigarillo*, *tabak*, *tobacco*, *cigarette*, cigar, cigars, *nikotin*,
-  *nicotine*, snus, vape*, vaping, *shisha*, wasserpfeife*, hookah*, rauchen, raucher*, marlboro, lucky strike,
-  gauloises, pall mall, elf bar, lost mary, iqos, vuse, juul, heets, zyn`;
-const SCHOENHEIT = `*botox*, *hyaluron*, filler, fillers, lip filler*, lip injection*, schönheits op*,
-  schönheitschirurg*, schönheitskorrektur*, schönheitsklinik*, schönheitseingriff*, beauty op, beauty ops,
-  beauty operation*, beauty korrektur*, plastische chirurgie, plastic surgery, cosmetic surgery, cosmetic procedure*,
-  *fettabsaug*, fettweg spritze*, *brustvergrößer*, brustverkleinerung*, bruststraffung*, brust op, brustoperation*,
-  nasen op, nasenoperation*, *nasenkorrektur*, lippen aufspritz*, *unterspritzung*, facelift*, lidstraffung*,
-  *haartransplantation*, hair transplant*, breast augmentation, breast enlargement*, boob job*, nose job*,
-  rhinoplast*, tummy tuck*, *liposuction*`;
-const DIAET = `diät*, *diät, dieting, diet pill*, abnehm, abnehmspritze*, abnehmcoaching*, abnehmkur*, abnehmpille*,
-  abnehmprogramm*, abnehmapp*, abnehmshake*, abnehmtablette*, abnehmtee*, abnehmplan*, abnehmprodukt*, abnehmmittel*,
-  *ozempic*, *wegovy*, *mounjaro*, *almased*, *slimfast*, weight watchers, noom, yazio, shape shake*, kalorienzähler*,
-  calorie count*, intervallfasten*, intermittent fasting, detox kur*, detox tee*, *appetitzügler*, fat burner*,
-  schlankheits*, slimming*, weight loss*, lose weight, appetite suppressant*, gewichtsverlust*, gewichtsabnahme*,
-  gewichtsreduktion*`;
-const MINOR_NUR_ALS_WERBUNG = `*wette, admiral, stake, slots, raten*, später bezahlen, später zahlen, weine, rum,
-  radler, spritzer, ottakringer, spirits, velo, diet, abnehmen`;
-
-/* Harmlose Wendungen, in denen ein Listenwort steckt. Sie werden vor dem
-   Vergleich aus dem Text genommen. */
-const HARMLOS_WOERTER = `guns n roses, top gun, machine gun kelly, massage gun*, nerf gun*, water gun*, glue gun*,
-  ford escort, terrorvogel*, terrorvögel*, terrorzwerg*, terrorisier*, terroriz*, terrorise, terrorised, terrorises,
-  terrorising, geheimwaffe*, wunderwaffe*, allzweckwaffe*, *pleasing*, *releasing*, cocktailkleid*, schnapsidee*,
-  schnapszahl*, schnapsen, schnapskarte*, bierernst*, biereif*, *schwein, *insekt, kindersekt*, champagnerfarb*,
-  akkreditier*, *diskreditier*, stocking filler*`;
+const WOERTER = require("./minor-safety-woerter");
 
 /* Text vor dem Vergleich vereinheitlichen: Gross/Klein, Umlaute und ß,
    zerlegte und Vollbreite-Zeichen, unsichtbare Trennzeichen (Cf), Akzente;
@@ -209,7 +127,7 @@ function muster(wort) {
 }
 const woerter = (text) => text.split(/\s*,\s*/).filter(Boolean);
 const suche = (liste, schalter) => new RegExp(liste.map(muster).join("|"), schalter);
-const HARMLOS = suche(woerter(HARMLOS_WOERTER), "g");
+const HARMLOS = suche(woerter(WOERTER.HARMLOS), "g");
 
 /* satz: gilt ueberall. werbung: dazu die Woerter "nur als Werbung". */
 function sperrliste(ueberall, nurAlsWerbung) {
@@ -218,8 +136,8 @@ function sperrliste(ueberall, nurAlsWerbung) {
 }
 
 /* IMMER_VERBOTEN gilt fuer alle, NUR_MINDERJAEHRIG nur bis SCHUTZ_BIS. */
-const IMMER_VERBOTEN = sperrliste([PORNOGRAFIE, WAFFEN, EXTREMISMUS], IMMER_NUR_ALS_WERBUNG);
-const NUR_MINDERJAEHRIG = sperrliste([WETTEN, KREDIT, ALKOHOL, TABAK, SCHOENHEIT, DIAET], MINOR_NUR_ALS_WERBUNG);
+const IMMER_VERBOTEN = sperrliste(WOERTER.IMMER.ueberall, WOERTER.IMMER.nurAlsWerbung);
+const NUR_MINDERJAEHRIG = sperrliste(WOERTER.MINOR.ueberall, WOERTER.MINOR.nurAlsWerbung);
 
 /* ── Werbe-Anzahl (09.09.2026) ────────────────────────────────────────────
    BLEIBT IM CODE — Gestaltung, kein Betriebswert: Die Anzahl der Werbekarten
@@ -381,7 +299,7 @@ module.exports = {
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,
   _vereinheitlicht: vereinheitlicht,
   _muster: muster,
-  _SPERRLISTEN: { immer: IMMER_VERBOTEN, minor: NUR_MINDERJAEHRIG, harmlos: woerter(HARMLOS_WOERTER) },
+  _SPERRLISTEN: { immer: IMMER_VERBOTEN, minor: NUR_MINDERJAEHRIG, harmlos: woerter(WOERTER.HARMLOS) },
   _untereAltersgrenze: untereAltersgrenze,
   _SCHUTZ_BIS: SCHUTZ_BIS,
   SCHUTZ_ALTER: SCHUTZ_BIS - 1,

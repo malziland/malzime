@@ -707,10 +707,12 @@ Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
 
 ### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
 
-Der Filter (`functions/src/minor-safety.js`) ist eine Wortliste. Er streicht
-einen Werbeeintrag, wenn darin ein Wort der Liste steht: bei allen zu
-Pornografie, Waffen und Extremismus, bei möglicherweise Minderjährigen
-zusätzlich zu Alkohol, Tabak, Wetten, Kredit, Diät und Schönheits-OP. Treffer
+Der Filter (`functions/src/minor-safety.js`) ist eine Wortliste
+(`functions/src/minor-safety-woerter.js`). Er streicht einen Werbeeintrag,
+wenn darin ein Wort der Liste steht: bei allen zu Pornografie, Waffen und
+Extremismus, bei möglicherweise Minderjährigen zusätzlich zu Alkohol, Tabak,
+Wetten, Kredit, Diät, Schönheits-OP und Drogen (Entscheidung vom 04.10.2026:
+Drogen werden bei möglicherweise Minderjährigen wie Alkohol behandelt). Treffer
 im Fließtext meldet er, ohne dort etwas zu streichen. Ein Werbeeintrag ohne
 Listenwort geht durch und hinterlässt keine Spur im Log; was die Liste fängt
 und was nicht, zeigt die Prüfreihe
@@ -762,6 +764,11 @@ Lesart:
   „Weniger Angaben im Diagnose-Protokoll“ tragen zusätzlich `entfernte` und
   `durchgerutschte` mit Feld und Wort. Ob die Sperrliste zu grob ist, lässt
   sich danach nur mit eigenen Fotos nachstellen.
+- `entfernt` und `durchgerutscht` zählen Treffer der Wortliste und hängen
+  deshalb an ihrem Umfang. Ab der Auslieferung, mit der die Liste in
+  `functions/src/minor-safety-woerter.js` liegt (Oktober 2026), kennt sie
+  mehr Wörter, das Thema Drogen und einige Wörter nur noch als Werbe-Eintrag.
+  Zahlen davor und danach nicht miteinander vergleichen.
 - `werbung` unter 8 heißt beim Beast-Modus nur dann „mehr als zwei Einträge
   gestrichen“, wenn der zweite Werbe-Aufruf geliefert hat (zehn Einträge
   angefordert). Sonst stammt die Liste wie die Standard-Liste aus dem

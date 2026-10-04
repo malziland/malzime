@@ -872,3 +872,176 @@ describe("SEC-2026-10-03-02 — Alter hinter einem Abkürzungspunkt oder nur als
     });
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════
+   Live-Anzeige und Endergebnis entscheiden über die Alterskarte mit
+   derselben Regel: Es zählt der Anker, sonst der erste Satz der Karte.
+   Zeigt das Endergebnis den festen Satz, war die Karte vorher nicht zu
+   sehen — sie erscheint nicht erst mit einer Zahl und springt dann um.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich", () => {
+  const BELEG = " Deine Wangen sind noch rund.";
+  const FESTER_SATZ = "Dein Alter lässt sich aus diesem Bild nicht sicher ablesen.";
+
+  const ORIGINAL_API_KEY = process.env.MISTRAL_API_KEY;
+  beforeEach(() => {
+    process.env.MISTRAL_API_KEY = "test-key-not-real";
+    _setRateIntervalMs(0);
+    _resetRateBucket();
+  });
+  afterEach(() => {
+    if (ORIGINAL_API_KEY === undefined) delete process.env.MISTRAL_API_KEY;
+    else process.env.MISTRAL_API_KEY = ORIGINAL_API_KEY;
+    setFetchForTest(null);
+  });
+
+  function karten(alterWert) {
+    const k = {};
+    for (const name of REQUIRED_CARDS)
+      k[name] = { label: name, value: "Du bist X. Das zeigt das Bild.", confidence: 0.8 };
+    k.alter_geschlecht = { label: "Alter & Geschlecht", value: alterWert, confidence: 0.8 };
+    return k;
+  }
+
+  /* anker === undefined: hard_facts fehlt ganz. */
+  function antwort(anker, karteStandard, karteBeast = karteStandard) {
+    const body = {};
+    if (anker !== undefined) body.hard_facts = { alter_geschlecht: anker, herkunft: "mitteleuropäisch" };
+    body.standard = {
+      profileText: "Sachlich.",
+      ad_targeting: ["A"],
+      manipulation_triggers: ["T"],
+      categories: karten(karteStandard),
+    };
+    body.beast = {
+      profileText: "Zynisch.",
+      ad_targeting: ["B"],
+      manipulation_triggers: ["U"],
+      categories: karten(karteBeast),
+    };
+    return body;
+  }
+
+  const liveSichtbar = (karten) => karten.some((k) => k.schluessel === "alter_geschlecht");
+
+  async function beides(body) {
+    const live = _extrahiereLiveText(JSON.stringify(body));
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify(body) }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 100 },
+      }),
+    }));
+    const fertig = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de");
+    return {
+      liveStandard: liveSichtbar(live.kartenStandard),
+      liveBeast: liveSichtbar(live.kartenBeast),
+      /* Positivkontrolle der Messung: Andere Karten kommen live an. */
+      liveAndereKarten: live.kartenStandard.length,
+      festerSatz: fertig.normal.categories.alter_geschlecht.value.includes(FESTER_SATZ),
+      festerSatzBeast: fertig.boost.categories.alter_geschlecht.value.includes(FESTER_SATZ),
+      karte: fertig.normal.categories.alter_geschlecht.value,
+      karteBeast: fertig.boost.categories.alter_geschlecht.value,
+    };
+  }
+
+  const IM_ZWEITEN_SATZ = "Du bist weiblich. Du bist etwa 13 Jahre alt." + BELEG;
+
+  /* [Fall, Anker, Karte, live sichtbar?, fester Satz am Ende?] */
+  test.each([
+    [
+      "Format des Prompts",
+      "weiblich, ~13 Jahre alt (Spanne 12-14)",
+      "Du bist weiblich, ~13 Jahre alt (Spanne 12-14)." + BELEG,
+      true,
+      false,
+    ],
+    ["Anker fehlt, Karte im Format", undefined, "Du bist weiblich, ~13 Jahre alt (Spanne 12-14)." + BELEG, true, false],
+    ["Anker fehlt, Karte mit „ca. 13 Jahre“", undefined, "Du bist weiblich, ca. 13 Jahre alt." + BELEG, true, false],
+    ["Anker nennt nur ein Kinderwort", "weiblich, ein Mädchen", "Du bist ein Mädchen." + BELEG, true, false],
+    [
+      "kein Altersversuch",
+      "Keine klaren Bildsignale.",
+      "Es gibt keine klaren Bildsignale. Die Person ist von hinten zu sehen.",
+      true,
+      false,
+    ],
+    [
+      "Anker lesbar, Beleg-Satz mit Alterswort ohne Zahl",
+      "weiblich, ~13 Jahre alt",
+      "Du bist weiblich. Seit Jahren im Verein.",
+      true,
+      false,
+    ],
+    ["Anker fehlt, Alter erst im zweiten Satz", undefined, IM_ZWEITEN_SATZ, false, true],
+    ["Anker nennt nur das Geschlecht, Alter erst im zweiten Satz", "weiblich", IM_ZWEITEN_SATZ, false, true],
+    [
+      "Anker ist ein Objekt, Alter erst im zweiten Satz",
+      { alter: 13, geschlecht: "weiblich" },
+      IM_ZWEITEN_SATZ,
+      false,
+      true,
+    ],
+    ["Anker fehlt, Geburtsjahr statt Alter", undefined, "Du bist weiblich, geboren um 2012." + BELEG, false, true],
+    ["Anker fehlt, Karte mit Platzhalter", undefined, "Du bist weiblich, ~‹Zahl› Jahre alt." + BELEG, false, true],
+    [
+      "Anker mit Platzhalter, Karte mit Zahl",
+      "weiblich, ~‹Zahl› Jahre alt",
+      "weiblich, ~13 Jahre alt." + BELEG,
+      false,
+      true,
+    ],
+    [
+      "Anker ohne Zahl mit Alterswort",
+      "weiblich, Alter unklar, Spanne offen",
+      "Du bist weiblich." + BELEG,
+      false,
+      true,
+    ],
+  ])("%s", async (_fall, anker, karte, live, festerSatz) => {
+    const r = await beides(antwort(anker, karte));
+    expect(r.liveAndereKarten).toBeGreaterThan(5);
+    expect({ liveStandard: r.liveStandard, liveBeast: r.liveBeast, festerSatz: r.festerSatz }).toEqual({
+      liveStandard: live,
+      liveBeast: live,
+      festerSatz,
+    });
+    /* Die Zusicherung selbst: nie erst sichtbar und am Ende der feste Satz. */
+    expect(r.festerSatz && r.liveStandard).toBe(false);
+    expect(r.festerSatzBeast && r.liveBeast).toBe(false);
+  });
+
+  /* Ein Platzhalter erscheint live nie, auch wenn der Anker lesbar ist; das
+     Endergebnis setzt den Anker an die Stelle des ersten Satzes. */
+  test("Anker lesbar, Karte mit Platzhalter: live verborgen, am Ende der Anker statt des Platzhalters", async () => {
+    const r = await beides(antwort("weiblich, ~13 Jahre alt", "Du bist weiblich, ~‹Zahl› Jahre alt." + BELEG));
+    expect(r).toMatchObject({ liveStandard: false, liveBeast: false, festerSatz: false });
+    expect(r.karte).toBe("weiblich, ~13 Jahre alt." + BELEG);
+  });
+
+  /* Die Standard-Karte kommt vor der Beast-Karte an. Ob deren erster Satz
+     ein Alter bringt, ist dann noch offen — sie bleibt verborgen, bis das
+     Endergebnis da ist. */
+  test("Alter nur im ersten Satz der Beast-Karte: Standard-Karte wartet auf das Endergebnis", async () => {
+    const r = await beides(antwort(undefined, IM_ZWEITEN_SATZ, "Weiblich, ~13 Jahre alt. Leichte Beute."));
+    expect(r).toMatchObject({ liveStandard: false, liveBeast: true, festerSatz: false });
+    expect(r.karte).toBe(IM_ZWEITEN_SATZ);
+  });
+
+  /* Umgekehrt ist die Standard-Karte schon da, wenn die Beast-Karte ankommt:
+     Die Beast-Karte entscheidet mit beiden Karten, wie das Endergebnis. */
+  const OHNE_ALTERSVERSUCH = "Es gibt keine klaren Bildsignale. Die Person ist von hinten zu sehen.";
+
+  test("Standard-Karte mit Alter erst im zweiten Satz, Beast-Karte ohne Altersversuch: beide live verborgen", async () => {
+    const r = await beides(antwort(undefined, IM_ZWEITEN_SATZ, OHNE_ALTERSVERSUCH));
+    expect(r).toMatchObject({ liveStandard: false, liveBeast: false, festerSatz: true, festerSatzBeast: true });
+  });
+
+  test("Standard-Karte mit Alter im ersten Satz, Beast-Karte erst im zweiten: Beast-Karte erscheint und bleibt", async () => {
+    const r = await beides(antwort(undefined, "Du bist weiblich, ~13 Jahre alt." + BELEG, IM_ZWEITEN_SATZ));
+    expect(r).toMatchObject({ liveStandard: true, liveBeast: true, festerSatz: false, festerSatzBeast: false });
+    expect(r.karteBeast).toBe(IM_ZWEITEN_SATZ);
+  });
+});

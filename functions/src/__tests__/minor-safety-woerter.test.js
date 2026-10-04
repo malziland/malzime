@@ -16,7 +16,7 @@
  *      streicht, verschreibt oder ohne Beispiel ergänzt, macht einen Test rot.
  *
  * Stufe 1 (Pornografie, Waffen, Extremismus) gilt für alle; Stufe 2 (Wetten,
- * Kredit, Alkohol, Tabak, Schönheits-OP, Diät) nur bei möglicherweise
+ * Kredit, Alkohol, Tabak, Schönheits-OP, Diät, Drogen) nur bei möglicherweise
  * Minderjährigen. Die Entscheidung über Stufen und Altersgrenze prüft
  * minor-safety.test.js; hier geht es nur um die Wörter.
  */
@@ -207,6 +207,22 @@ const THEMEN = [
       "Wasserpistole",
       "Heißklebepistole",
       "Massagepistole",
+      "Wasser-Pistole",
+      "Wasser Pistole",
+      "Nerf-Pistole",
+      "Heißklebe-Pistole",
+      "Klebepistole",
+      "Spritzpistole",
+      "Spritz-Pistole",
+      "Massage-Pistole",
+      "Spielzeug-Pistole",
+      "Wassergewehr",
+      "Wasser-Gewehr",
+      "Spielzeuggewehr",
+      "Gun Metal Grey",
+      "Gunmetal",
+      "Water Pistol",
+      "Toy Gun",
       "Messer-Set",
       "Messer-Abo",
       "Taschenmesser",
@@ -752,6 +768,123 @@ const THEMEN = [
       "Gewichtheben",
     ],
   ],
+  [
+    "Stufe 2 — Drogen",
+    _istBeiMinderjaehrigenVerboten,
+    [
+      "Drogen",
+      "Droge",
+      "Party-Drogen",
+      "Partydrogen",
+      "Einstiegsdroge",
+      "Rauschgift",
+      "Cannabis",
+      "Cannabis-Shop",
+      "Cannabisöl",
+      "CBD-Öl",
+      "CBD-Shop",
+      "CBD Gummies",
+      "Marihuana",
+      "Haschisch",
+      "Hasch",
+      "Hanfblüten",
+      "Kiffen",
+      "Kiffer-Zubehör",
+      "Joint",
+      "Bong",
+      "Grinder",
+      "Headshop",
+      "Head-Shop",
+      "Growshop",
+      "Grow-Shop",
+      "Growbox",
+      "THC",
+      "HHC",
+      "HHC-Liquid",
+      "Legal Highs",
+      "Lachgas",
+      "Lachgas-Kartuschen",
+      "Ecstasy",
+      "MDMA",
+      "Kokain",
+      "Koks",
+      "LSD",
+      "Zauberpilze",
+      "Heroin",
+      "Crystal Meth",
+      "Amphetamine",
+      "Ketamin",
+    ],
+    [
+      "Drugs",
+      "Party Drugs",
+      "Weed",
+      "Marijuana",
+      "Cannabis Dispensary",
+      "Hashish",
+      "Ganja",
+      "Spliff",
+      "Bongs",
+      "Cocaine",
+      "Magic Mushrooms",
+      "Shrooms",
+      "Laughing Gas",
+      "Legal High",
+      "Narcotics",
+      "Ketamine",
+      "Methamphetamine",
+    ],
+    [
+      "Drogerie",
+      "Drogeriemarkt",
+      "Drogerieartikel",
+      "dm Drogerie",
+      "Drogist",
+      "Drugstore",
+      "Drug Store",
+      "Gras",
+      "Grasgrün",
+      "Rasensamen",
+      "Speed",
+      "Speedboat",
+      "Highspeed-Internet",
+      "Speed Cube",
+      "Hanfseil",
+      "Hanföl",
+      "Hanfsamen",
+      "Hanfprotein",
+      "Kokosnuss",
+      "Kokosöl",
+      "Joint Venture",
+      "Bongos",
+      "Bonbon",
+      "Kaffee-Grinder",
+      "Coffee Grinder",
+      "Angle Grinder",
+      "Heroine",
+      "Heldin",
+      "Haschee",
+      "Hashtag",
+      "Hash Browns",
+      "Seaweed",
+      "Tweed",
+      "Ekstase",
+      "Lachgummi",
+      "LCD-Fernseher",
+      "HTC",
+      "Pilzsuppe",
+      "Mushroom Pizza",
+      "Zauberkasten",
+      "Vitamin C",
+      "Multivitamin",
+      "Black Opium",
+      "Badesalz",
+      "Skiff",
+      "Kokon",
+      "Hydrogen",
+      "androgen",
+    ],
+  ],
 ];
 
 describe.each(THEMEN)("%s", (_thema, ist, deutsch, englisch, harmlos) => {
@@ -787,6 +920,12 @@ describe("Deutsch und Englisch je Begriff", () => {
     [_istBeiMinderjaehrigenVerboten, "Schulden", "Debt"],
     [_istBeiMinderjaehrigenVerboten, "Diät", "Diet"],
     [_istBeiMinderjaehrigenVerboten, "Fettabsaugung", "Liposuction"],
+    [_istBeiMinderjaehrigenVerboten, "Drogen", "Drugs"],
+    [_istBeiMinderjaehrigenVerboten, "Marihuana", "Marijuana"],
+    [_istBeiMinderjaehrigenVerboten, "Kokain", "Cocaine"],
+    [_istBeiMinderjaehrigenVerboten, "Haschisch", "Hashish"],
+    [_istBeiMinderjaehrigenVerboten, "Lachgas", "Laughing Gas"],
+    [_istBeiMinderjaehrigenVerboten, "Zauberpilze", "Magic Mushrooms"],
     [_istImmerVerboten, "Pornografie", "Pornography"],
     [_istImmerVerboten, "Bordell", "Brothel"],
     [_istImmerVerboten, "Waffe", "Weapon"],
@@ -944,6 +1083,205 @@ describe("Wörter, die nur als Werbe-Eintrag gelten", () => {
     const b = applyMinorSafety(p);
     expect(p.normal.manipulation_triggers).toEqual([]);
     expect(b.durchgerutscht.map((d) => d.stichwort)).toEqual(["porn", "porn"]);
+  });
+});
+
+describe("Pistole, Gewehr, Revolver gelten nur als Werbe-Eintrag", () => {
+  /* Im Satz stehen sie in Redewendungen und Bildbeschreibungen; als
+     Werbe-Kärtchen sind sie eindeutig. Softair, Schreckschuss, Munition und
+     die übrigen eindeutigen Waffenwörter gelten weiter überall. */
+  const SAETZE = [
+    "Du lachst wie aus der Pistole geschossen los.",
+    "Auf dem Bild ist ein Soldat mit Gewehr zu sehen.",
+    "Du trägst ein Kostüm mit Spielzeuggewehr.",
+    "Das Kind hält eine Wasser-Pistole in der Hand.",
+    "Im Western-Kostüm steckt ein Revolver im Gürtel.",
+    "She answers quick as a pistol.",
+  ];
+
+  let zeilen;
+  beforeEach(() => {
+    zeilen = [];
+    jest.spyOn(console, "log").mockImplementation((z) => zeilen.push(z));
+    jest.spyOn(console, "error").mockImplementation((z) => zeilen.push(z));
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  test.each(SAETZE)("im Satz kein Treffer: %s", (satz) => {
+    expect(_istImmerVerboten(satz, false)).toBe(false);
+  });
+
+  test("Erklärsätze und Fließtext bleiben stehen, werden nicht gezählt und lösen keinen Alarm aus", () => {
+    const p = profil(ERWACHSEN, ["Nike"], { manipulation_triggers: [...SAETZE], profileText: SAETZE.join(" ") });
+    p.normal.categories.interessen = { value: SAETZE.join(" ") };
+    const b = applyMinorSafety(p);
+    loggeMinorSafety(b, "de");
+    expect(p.normal.manipulation_triggers).toEqual(SAETZE);
+    expect(b.entfernt).toEqual([]);
+    expect(b.durchgerutscht).toEqual([]);
+    expect(zeilen.some((z) => z.includes("minor-safety-durchbruch"))).toBe(false);
+    /* Positivkontrolle: Die Protokollzeile selbst wurde geschrieben. */
+    expect(zeilen.some((z) => z.includes('"minor-safety"'))).toBe(true);
+  });
+
+  /* Gegenprobe: Ein eindeutiges Waffenwort im Fließtext wird weiter gezählt
+     und löst den Alarm aus. */
+  test("Softair-Pistole im Fließtext: gezählt, Alarmzeile geschrieben", () => {
+    const p = profil(ERWACHSEN, ["Nike"], { profileText: "Du wünschst dir eine Softair-Pistole." });
+    const b = applyMinorSafety(p);
+    loggeMinorSafety(b, "de");
+    expect(b.durchgerutscht.map((d) => d.grund)).toEqual(["immer", "immer"]);
+    expect(zeilen.some((z) => z.includes("minor-safety-durchbruch"))).toBe(true);
+  });
+
+  test.each([
+    ["Pistole"],
+    ["Pistolen"],
+    ["Pistol"],
+    ["Gewehr"],
+    ["Luftgewehr"],
+    ["Jagdgewehre"],
+    ["Revolver"],
+    ["Softair-Pistole"],
+    ["Schreckschusspistole"],
+    ["Luft-Pistole"],
+  ])("als Werbe-Eintrag fliegt es bei allen: %s", (eintrag) => {
+    const p = profil(ERWACHSEN, [eintrag, "Nike"]);
+    applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(["Nike"]);
+  });
+
+  /* Zusammen, getrennt und mit Bindestrich geschrieben gilt dasselbe. Beim
+     Kind geprüft, damit auch Stufe 2 nicht zugreift ("Spritz" ist dort ein
+     Listenwort). */
+  test.each([
+    ["Wasserpistole"],
+    ["Wasser-Pistole"],
+    ["Wasser Pistole"],
+    ["Nerf-Pistole"],
+    ["Nerfpistole"],
+    ["Heißklebe-Pistole"],
+    ["Heißklebepistole"],
+    ["Klebepistole"],
+    ["Spritzpistole"],
+    ["Spritz-Pistole"],
+    ["Massage-Pistole"],
+    ["Spielzeug-Pistole"],
+    ["Wassergewehr"],
+    ["Wasser-Gewehr"],
+    ["Spielzeuggewehr"],
+    ["Gun Metal Grey"],
+    ["Gunmetal"],
+    ["Gun-Metal"],
+    ["Water Pistol"],
+    ["Toy Gun"],
+  ])("Spielzeug und Bastelbedarf bleiben als Werbe-Eintrag stehen: %s", (eintrag) => {
+    const p = profil(KIND, [eintrag, "Nike"]);
+    const b = applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual([eintrag, "Nike"]);
+    expect(b.applied).toBe(false);
+  });
+
+  /* Die harmlose Form verdeckt kein Waffenwort daneben. */
+  test.each([["Wasser-Pistole und Softair-Pistole"], ["Gun Metal Grey Guns"], ["Wassergewehr mit Munition"]])(
+    "daneben wird weiter gefangen: %s",
+    (eintrag) => {
+      expect(_istImmerVerboten(eintrag)).toBe(true);
+    }
+  );
+});
+
+describe("Drogen werden bei möglicherweise Minderjährigen wie Alkohol behandelt", () => {
+  /* Entscheidung vom 04.10.2026. Stufe 2: nur Werbe-Einträge, nur bis zur
+     Schutzgrenze; bei Erwachsenen bleiben sie; im Fließtext wird gezählt,
+     ohne Alarm; Erklärsätze bleiben stehen. */
+  const WERBUNG = ["Cannabis-Shop", "CBD-Öl", "Lachgas-Kartuschen", "Weed", "Bong", "Legal Highs", "Nike"];
+
+  let zeilen;
+  beforeEach(() => {
+    zeilen = [];
+    jest.spyOn(console, "log").mockImplementation((z) => zeilen.push(z));
+    jest.spyOn(console, "error").mockImplementation((z) => zeilen.push(z));
+  });
+  afterEach(() => jest.restoreAllMocks());
+
+  test("Kind: die Werbe-Einträge fliegen, als Grund steht die Altersstufe", () => {
+    const p = profil(KIND, WERBUNG);
+    const b = applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(["Nike"]);
+    expect([...new Set(b.entfernt.map((e) => e.grund))]).toEqual(["minor"]);
+  });
+
+  test("Untergrenze 25: fliegen; Untergrenze 26: bleiben", () => {
+    const grenze = profil("Du bist weiblich, ~27 Jahre alt (Spanne 25-30).", WERBUNG);
+    applyMinorSafety(grenze);
+    expect(grenze.normal.ad_targeting).toEqual(["Nike"]);
+    const darueber = profil("Du bist weiblich, ~28 Jahre alt (Spanne 26-32).", WERBUNG);
+    applyMinorSafety(darueber);
+    expect(darueber.normal.ad_targeting).toEqual(WERBUNG);
+  });
+
+  test("Erwachsener: alles bleibt, nichts wird gezählt", () => {
+    const p = profil(ERWACHSEN, WERBUNG, { profileText: "Du kiffst vermutlich am Wochenende." });
+    const b = applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(WERBUNG);
+    expect(b.applied).toBe(false);
+    expect(b.durchgerutscht).toEqual([]);
+  });
+
+  test("Kind, Fließtext: gezählt mit Grund „minor“, kein Alarm; der Erklärsatz bleibt", () => {
+    const satz = "Algorithmen können dir früh Werbung für Cannabis zeigen.";
+    const p = profil(KIND, ["Nike"], {
+      manipulation_triggers: [satz],
+      profileText: "Drogen sind in deinem Umfeld ein Thema.",
+    });
+    const b = applyMinorSafety(p);
+    loggeMinorSafety(b, "de");
+    expect(p.normal.manipulation_triggers).toEqual([satz]);
+    expect(b.durchgerutscht.map((d) => d.grund)).toEqual(["minor", "minor"]);
+    expect(zeilen.some((z) => z.includes("minor-safety-durchbruch"))).toBe(false);
+    expect(zeilen.some((z) => z.includes('"minor-safety"'))).toBe(true);
+  });
+
+  /* Als Werbe-Eintrag eindeutig, im Satz meist etwas anderes. */
+  test.each([
+    ["The garden is full of weed."],
+    ["It was a joint effort of the whole class."],
+    ["Pure ecstasy on your face after the goal."],
+    ["Sie mahlt den Kaffee mit einem alten Grinder."],
+  ])("im Satz kein Treffer: %s", (satz) => {
+    expect(_istBeiMinderjaehrigenVerboten(satz, false)).toBe(false);
+  });
+
+  test.each([["Weed"], ["Joint"], ["Joints"], ["Ecstasy"], ["Grinder"]])(
+    "als Werbe-Eintrag fliegt es bei einem Kind: %s",
+    (eintrag) => {
+      const p = profil(KIND, [eintrag, "Nike"]);
+      applyMinorSafety(p);
+      expect(p.normal.ad_targeting).toEqual(["Nike"]);
+    }
+  );
+
+  /* Die Fallen: Drogerie ist keine Droge, Gras meist Rasen, Speed meist
+     Geschwindigkeit, Hanf steckt in Lebensmitteln und Bastelbedarf. */
+  test("ein Kind behält Drogerie-, Garten- und Bastelwerbung vollständig", () => {
+    const harmlos = [
+      "dm Drogerie",
+      "Drogeriemarkt Müller",
+      "Drugstore Favorites",
+      "Rasensamen",
+      "Speed Cube",
+      "Highspeed-Internet",
+      "Hanfseil",
+      "Hanfsamen-Müsli",
+      "Coffee Grinder",
+      "Black Opium",
+    ];
+    const p = profil(KIND, harmlos);
+    const b = applyMinorSafety(p);
+    /* Zehn Einträge werden auf acht gekappt; gestrichen wird keiner. */
+    expect(p.normal.ad_targeting).toEqual(harmlos.slice(0, 8));
+    expect(b.entfernt).toEqual([]);
   });
 });
 
@@ -1139,22 +1477,13 @@ const BEISPIEL_JE_WORT = {
     "waffenschrank*": "Waffenschrank",
     "waffensammlung*": "Waffensammlung",
     "*munition*": "Munition Großhandel",
-    pistole: "Pistole",
-    pistolen: "Pistolen",
     "luftpistole*": "Luftpistole",
     "gaspistole*": "Gaspistole",
     "maschinenpistole*": "Maschinenpistole",
     "*softair*": "Softair-Zubehör",
     "*airsoft*": "Airsoft Zubehör",
     "*schreckschuss*": "Schreckschusspistole",
-    "*gewehr": "Luftgewehr",
-    "*gewehre": "Jagdgewehre",
-    "*gewehren": "Handel mit Gewehren",
-    "*gewehrs": "des Luftgewehrs",
-    revolver: "Revolver",
-    revolvers: "Revolvers",
     "shotgun*": "Shotgun",
-    pistol: "Pistol",
     gun: "BB Gun",
     guns: "Guns kaufen",
     "*handgun*": "Handgun",
@@ -1222,6 +1551,15 @@ const BEISPIEL_JE_WORT = {
     "*waffen": "Dienstwaffen",
     "*waffe": "Dienstwaffe",
     "weapon*": "Weapons",
+    pistole: "Pistole",
+    pistolen: "Pistolen",
+    pistol: "Pistol",
+    "*gewehr": "Luftgewehr",
+    "*gewehre": "Jagdgewehre",
+    "*gewehren": "Handel mit Gewehren",
+    "*gewehrs": "des Luftgewehrs",
+    revolver: "Revolver",
+    revolvers: "Revolvers",
     "far right": "Far-right apparel",
     "alt right": "Alt-Right Merch",
   },
@@ -1542,6 +1880,55 @@ const BEISPIEL_JE_WORT = {
     "gewichtsverlust*": "Gewichtsverlust",
     "gewichtsabnahme*": "Gewichtsabnahme",
     "gewichtsreduktion*": "Gewichtsreduktion",
+    "drogen*": "Drogen",
+    "*droge": "Partydroge",
+    "partydrogen*": "Partydrogen",
+    "designerdrogen*": "Designerdrogen",
+    "einstiegsdrogen*": "Einstiegsdrogen",
+    "modedrogen*": "Modedrogen",
+    drugs: "Party Drugs",
+    "rauschgift*": "Rauschgift",
+    "rauschmittel*": "Rauschmittel",
+    "narcotic*": "Narcotics",
+    "*cannabis*": "Cannabis-Shop",
+    cbd: "CBD-Öl",
+    thc: "THC",
+    hhc: "HHC-Liquid",
+    "marihuana*": "Marihuana",
+    "marijuana*": "Marijuana",
+    "haschisch*": "Haschisch",
+    "hashish*": "Hashish",
+    hasch: "Hasch",
+    "hanfblüte*": "Hanfblüten",
+    ganja: "Ganja",
+    "spliff*": "Spliff",
+    "kiff*": "Kiffer-Zubehör",
+    "bekifft*": "Bekifft",
+    bong: "Bong",
+    bongs: "Bongs",
+    "head shop*": "Headshop",
+    "grow shop*": "Growshop",
+    "growbox*": "Growbox",
+    "legal high*": "Legal Highs",
+    "lachgas*": "Lachgas-Kartuschen",
+    "laughing gas*": "Laughing Gas",
+    mdma: "MDMA",
+    xtc: "XTC",
+    "kokain*": "Kokain",
+    "cocaine*": "Cocaine",
+    koks: "Koks",
+    koksen: "Koksen",
+    "kokser*": "Kokser",
+    lsd: "LSD",
+    "magic mushroom*": "Magic Mushrooms",
+    "zauberpilz*": "Zauberpilze",
+    "psilocybin*": "Psilocybin",
+    shrooms: "Shrooms",
+    heroin: "Heroin",
+    "crystal meth*": "Crystal Meth",
+    "methamphetamin*": "Methamphetamine",
+    "amphetamin*": "Amphetamine",
+    "ketamin*": "Ketamin",
     "*wette": "Pferdewette",
     admiral: "Admiral",
     stake: "Stake",
@@ -1558,6 +1945,11 @@ const BEISPIEL_JE_WORT = {
     velo: "Velo",
     diet: "Keto Diet",
     abnehmen: "Abnehmen",
+    weed: "Weed",
+    joint: "Joint",
+    joints: "Joints",
+    ecstasy: "Ecstasy",
+    grinder: "Grinder",
   },
 };
 

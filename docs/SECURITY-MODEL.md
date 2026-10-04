@@ -858,22 +858,32 @@ Untergrenze.
    Positivliste fest, welche Spannen im Altersteil noch stehen dürfen (die
    Merkmals-Tabellen).
 3. Ist das Alter nicht lesbar — abgeschriebene Vorlage in beliebiger Klammer,
-   oder ein Altersversuch ohne jede Zahl —, zeigt die Alterskarte einen festen
-   Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte vorher
-   nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das (Erkennung
-   in `alters-lesbarkeit.js`) aus den
-   Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
-   Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
-   `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht
-   ab; der Server nimmt dessen Bewertung deshalb auch ohne Alter an
-   (`handle-telemetry.js`). Als Altersangabe einer Karte zählt nur ihr erster
-   Satz — Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) sind kein
-   Alter. Zahlwörter („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und
-   Kategoriewörter („Teenager“, „Schulkind“) gelten als lesbar und werden für
-   die Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl
-   dasteht; „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Eine
-   Antwort ohne jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie
-   bisher ungefiltert.
+   oder ein Altersversuch ohne lesbares Alter —, zeigt die Alterskarte einen
+   festen Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte
+   vorher nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das
+   (Erkennung in `alters-lesbarkeit.js`) aus den Rohwerten der KI-Antwort,
+   bevor eine Karte umgeschrieben wird. Die Kinderschutz-Zeile meldet es als
+   `alterUnlesbar: true`, das Ergebnis trägt `meta.alterUnlesbar`, und der
+   Realitäts-Check fragt das Alter dann nicht ab; der Server nimmt dessen
+   Bewertung deshalb auch ohne Alter an (`handle-telemetry.js`). Als
+   Altersangabe einer Karte zählt nur ihr erster Satz — Zahlen im Beleg-Satz
+   („Trikot mit der Nummer acht“) sind kein Alter. Der erste Satz endet nicht
+   am Punkt einer Näherungs-Abkürzung („ca. 13 Jahre“) und nicht an einem
+   Punkt zwischen Ziffern („12.–14.“). Steht ein Altersversuch nur außerhalb
+   des ersten Satzes und trägt auch der Anker kein Alter, gilt das Alter als
+   nicht lesbar; die Zahl im späteren Satz wird nicht gelesen. Zahlwörter
+   („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und Kategoriewörter
+   („Teenager“, „Schulkind“) gelten als lesbar und werden für die
+   Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl
+   dasteht; „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Wörter,
+   die ein Kind ohne Zahl benennen („Mädchen“, „Bub“, „Junge“,
+   „Volksschulkind“, „Schülerin“, „Baby“ und ihre englischen Entsprechungen),
+   zählen wie „Schulkind“; „underage“, „a minor“ und ein Geburtsjahr sind wie
+   „minderjährig“ ein Altersversuch ohne lesbares Alter. Eine Antwort ohne
+   jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie bisher
+   ungefiltert. (Die Regeln zum Satzende, zum Altersversuch außerhalb des
+   ersten Satzes und zu den Kinderwörtern gelten seit 04.10.2026; die
+   Live-Anzeige entscheidet seither mit derselben Regel wie das Endergebnis.)
 4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus
    `minor-safety.js` (`SCHUTZ_ALTER`), steht also nur an einer Stelle.
 
@@ -960,6 +970,61 @@ Spannen das Alter überwiegend einschließen, ist „zu jung“ Breite und kein
 Schätzfehler; am Alters-Prompt ändert sich dann nichts. Verfehlen sie es
 überwiegend, wird der Alters-Prompt überarbeitet und vor der Auslieferung
 daraufhin geprüft, dass keine Kinder über die Schutzgrenze rutschen.
+
+## Kinderschutz-Filter: Die Sperrliste ist eine Wortliste (04.10.2026)
+
+**Was sie ist.** Der Filter vergleicht Werbe-Einträge, Erklärsätze und
+Fließtext mit festen Wortlisten (`functions/src/minor-safety-woerter.js`, je
+Thema deutsch und englisch). Er fängt, was in den Listen steht — nicht jede
+Werbung zu einem Thema. Vor dem Vergleich wird der Text vereinheitlicht
+(Groß- und Kleinschreibung, Umlaute, Bindestrich und Leerzeichen); kurze Wörter
+gelten nur als ganzes Wort („Wetter“ ist keine Wette, „Insekt“ kein Sekt).
+
+**Themen.** Stufe 1, für alle: Pornografie und Sexarbeit, Waffen,
+Extremismus. Stufe 2, bei möglicherweise Minderjährigen (Schutzgrenze siehe
+Abschnitt vom 17.09.2026): Wetten und Glücksspiel, Kredit und Raten, Alkohol,
+Tabak, Schönheits-OP, Diät und Drogen. Entscheidung vom 04.10.2026: Drogen
+werden bei möglicherweise Minderjährigen wie Alkohol behandelt — gestrichen
+werden Werbe-Einträge, bei Erwachsenen bleiben sie, im Fließtext wird gezählt.
+
+**Was sie hält.** Die Prüfreihe
+`functions/src/__tests__/minor-safety-woerter.test.js`: je Thema Wörter, die
+gefangen werden müssen (deutsch und englisch), und harmlose, die nicht
+gefangen werden dürfen; dazu je Listenwort ein Beispiel. Ein Wort ohne
+Beispiel macht den Test rot.
+
+**Nur als Werbe-Eintrag.** Einige Wörter sind als Werbe-Kärtchen eindeutig,
+im ganzen Satz aber Redewendung oder Bildbeschreibung („deine stärkste
+Waffe“, „wie aus der Pistole geschossen“, „ein Soldat mit Gewehr“, „wir raten
+dir“, „on the far right“). Sie gelten nur für Werbe-Einträge
+(`ad_targeting`), nicht für Erklärsätze und Fließtext. Eindeutige Wörter
+(Softair, Munition, die Pornografie- und Extremismus-Wörter) gelten überall.
+
+**Harmlose Wendungen.** Wendungen, in denen ein Listenwort steckt
+(„Wasserpistole“, „Top Gun“, „People-Pleasing“, „Cocktailkleid“), werden vor
+dem Vergleich aus dem Text genommen. Ein Sperrwort daneben wird trotzdem
+gefangen.
+
+**Was sie nicht leistet.** Ein Werbe-Eintrag ohne Listenwort geht durch, und
+keine Protokollzeile zeigt ihn: Die Kinderschutz-Zeile zählt nur
+Listentreffer. Ob bei Kinderfotos solche Einträge vorkommen, zeigt nur das
+Nachstellen mit eigenen Fotos (Abschnitt „Anzahl und Diagnose“,
+Neubewertung). Schreibweisen mit Ziffern statt Buchstaben oder gesperrter
+Schrift fängt die Liste nicht; der Auslöser ist die Antwort der KI.
+
+**Alarm.** Der Alarm „Kinderschutz-Treffer“ (`minor-safety-durchbruch`,
+`docs/ERROR-ALERTING.md`) hört allein auf Stufe-1-Wörter im Fließtext, und
+dort nur auf die, die überall gelten. Stufe-2-Wörter im Fließtext werden
+gezählt, ohne Alarm.
+
+**Getragene Folge.** Die Zähler `entfernt` und `durchgerutscht` hängen am
+Umfang der Liste; vor und nach dieser Auslieferung sind sie nicht
+vergleichbar (RUNBOOK, Lesart der Kinderschutz-Zeile). In Erklärsätzen
+streicht Stufe 1 wie bisher: Ein Aufklärungssatz, der ein Stufe-1-Wort nennt
+(„rechtsextrem“), fällt weg.
+
+**Rückweg.** Nur mit Deploy: Wörter in `minor-safety-woerter.js` ändern. Die
+Tabelle Listenwort → Beispiel in der Prüfreihe muss mitgeändert werden.
 
 ## Erfolgsweg eines Auftrags ohne Kennung im Log (26./27.09.2026)
 

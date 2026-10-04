@@ -75,6 +75,12 @@ function fingerabdruckAendern(aendere) {
   fs.writeFileSync(p, JSON.stringify(daten, null, 2) + "\n");
 }
 
+/** Prüfsumme einer ausgelieferten Datei, so wie der Fingerabdruck sie schreibt. */
+function summeLive(rel) {
+  const inhalt = fs.readFileSync(path.join(live, rel));
+  return `sha256:${require("crypto").createHash("sha256").update(inhalt).digest("hex")}`;
+}
+
 beforeAll(() => {
   basis = fs.mkdtempSync(path.join(os.tmpdir(), "pruefe-live-"));
 
@@ -94,6 +100,8 @@ beforeAll(() => {
       "done",
       "PFAD=$(printf '%s' \"$URL\" | sed 's|^[a-z]*://[^/]*/||')",
       '[ -n "${ATTRAPPE_TRANSPORTFEHLER:-}" ] && [ "$PFAD" = "$ATTRAPPE_TRANSPORTFEHLER" ] && { echo "curl: (7) Verbindung abgelehnt" >&2; exit 7; }',
+      /* Eine echte Fehlerantwort des Servers: `curl -f` meldet sie mit Rückgabewert 22. */
+      '[ -n "${ATTRAPPE_NICHT_GEFUNDEN:-}" ] && [ "$PFAD" = "$ATTRAPPE_NICHT_GEFUNDEN" ] && { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }',
       /* Firebase Hosting beantwortet einen unbekannten Pfad mit der Startseite (Status 200). */
       'if [ -f "$ATTRAPPE_LIVE/$PFAD" ]; then QUELLE="$ATTRAPPE_LIVE/$PFAD"; else QUELLE="$ATTRAPPE_LIVE/index.html"; fi',
       'if [ -n "$AUS" ]; then cp "$QUELLE" "$AUS"; else cat "$QUELLE"; fi',
@@ -201,6 +209,25 @@ describe("pruefe-live.sh am nachgebauten Live-Stand", () => {
     expect(r.aus).toContain("entspricht NICHT dem genannten Commit");
   });
 
+  test("Datei live verändert UND ihr Wert im Fingerabdruck angepasst → 1 (das fängt nur der Vergleich mit dem Commit)", () => {
+    /* Wer die Auslieferung in der Hand hat, liefert zur veränderten Datei den
+       passenden Fingerabdruck gleich mit. Der Server stimmt dann mit sich selbst
+       überein: nichts fehlt, keine Prüfsumme weicht ab. */
+    fs.appendFileSync(path.join(live, "app.js"), "/* fremder Code */\n");
+    fingerabdruckAendern((d) => (d.dateien["app.js"] = summeLive("app.js")));
+    const r = pruefen(frischerKlon("klon"));
+    /* Messmittel-Probe: Kein anderer Zähler trägt den Rückgabewert. */
+    expect(r.aus).not.toMatch(/^\s*ABWEICHUNG: /m);
+    expect(r.aus).not.toContain("FEHLT");
+    expect(r.aus).not.toContain("NICHT IM COMMIT");
+    expect(r.aus).toContain("ERGEBNIS: 0 Abweichung(en), 0 fehlend, bei 3 geprueften Dateien.");
+    expect(r.aus).toContain("ABWEICHUNG zum Commit: app.js (Inhalt, nicht nur die Cache-Kennung)");
+    expect(r.aus).toContain(`Dazu 1 Abweichung(en) gegenueber dem Inhalt von ${commitA}.`);
+    expect(r.aus).toContain("Der ausgelieferte Stand entspricht NICHT dem genannten Commit.");
+    expect(r.aus).not.toContain(`entspricht Commit ${commitA}`);
+    expect(r.code).toBe(1);
+  });
+
   test("Datei unverändert, aber aus dem Fingerabdruck gestrichen → 1 (die Liste des Commits gilt)", () => {
     fingerabdruckAendern((d) => delete d.dateien["js/a.js"]);
     const r = pruefen(frischerKlon("klon"));
@@ -263,6 +290,17 @@ describe("pruefe-live.sh am nachgebauten Live-Stand", () => {
     expect(r.aus).toContain("ABWEICHUNG: js/a.js");
   });
 
+  test("der Server antwortet für eine Datei mit 404 → 1 (sie fehlt wirklich; kein Messproblem)", () => {
+    const r = pruefen(frischerKlon("klon"), { ATTRAPPE_NICHT_GEFUNDEN: "js/a.js" });
+    expect(r.aus).toContain("FEHLT auf dem Server: js/a.js");
+    /* Messmittel-Probe: Kein anderer Zähler trägt den Rückgabewert. */
+    expect(r.aus).not.toContain("ABWEICHUNG");
+    expect(r.aus).not.toContain("NICHT MESSBAR");
+    expect(r.aus).toContain("ERGEBNIS: 0 Abweichung(en), 1 fehlend, bei 2 geprueften Dateien.");
+    expect(r.aus).toContain("Der ausgelieferte Stand entspricht NICHT dem genannten Commit.");
+    expect(r.code).toBe(1);
+  });
+
   test("eine zusätzliche Datei wird ausgeliefert und genannt, steht aber nicht im Commit → 1", () => {
     fs.writeFileSync(path.join(live, "fremd.js"), "fremd();\n");
     const summe = require("crypto").createHash("sha256").update("fremd();\n").digest("hex");
@@ -319,5 +357,30 @@ describe("pruefe-live.sh ohne den genannten Commit", () => {
     expect(r.aus).toContain("nicht pruefbar (kein git-Repository)");
     expect(r.aus).toContain("Dieser Commit wurde NICHT gegengerechnet");
     expect(r.aus).toContain("Server-Code: 3 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
+  });
+
+  test("kein git-Repository, eine Server-Datei im Ordner ist eine andere als die ausgewiesene → 1", () => {
+    const klon = frischerKlon("klon");
+    fs.rmSync(path.join(klon, ".git"), { recursive: true, force: true });
+    fs.appendFileSync(path.join(klon, "functions/src/config.js"), "// nicht der ausgelieferte Stand\n");
+    const r = pruefen(klon, { GIT_CEILING_DIRECTORIES: basis });
+    expect(r.aus).toContain("nicht pruefbar (kein git-Repository)");
+    expect(r.aus).toContain("ABWEICHUNG im Server-Code: functions/src/config.js");
+    expect(r.aus).toContain("Server-Code: 3 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
+    expect(r.aus).toContain("ERGEBNIS: 0 Abweichung(en), 0 fehlend, bei 3 geprueften Dateien.");
+    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Code.");
+    expect(r.code).toBe(1);
+  });
+
+  test("Commit lokal unbekannt, eine ausgewiesene Server-Datei fehlt im Ordner → 1", () => {
+    fingerabdruckAendern((d) => (d.commit = "0".repeat(40)));
+    const klon = frischerKlon("klon");
+    fs.rmSync(path.join(klon, "functions/src/config.js"));
+    const r = pruefen(klon);
+    expect(r.aus).toContain("Commit im Repository: NEIN");
+    expect(r.aus).toContain("FEHLT in diesem Ordner: functions/src/config.js");
+    expect(r.aus).toContain("Server-Code: 2 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
+    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Code.");
+    expect(r.code).toBe(1);
   });
 });

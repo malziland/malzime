@@ -35,6 +35,13 @@
 #      Ein Messfehler darf nie als Befund durchgehen (und umgekehrt) — und nie
 #      als bestandene Pruefung.
 #
+# Ohne den genannten Commit ist ein Befund (1) nur, was auch ohne ihn
+# feststeht: Der Server stimmt mit sich selbst nicht ueberein — eine
+# ausgelieferte Datei passt nicht zu ihrem Wert im Fingerabdruck, oder eine
+# dort genannte Datei gibt es nicht. Dass die Dateien IN DIESEM ORDNER andere
+# sind, ist dann kein Befund: Eine aeltere Kopie des Repositories hat aeltere
+# Dateien, ohne dass an der Auslieferung etwas falsch waere. Das endet mit 2.
+#
 # Kein `set -e`: Das Skript soll ALLE Abweichungen zeigen, nicht bei der
 # ersten stehenbleiben.
 
@@ -407,6 +414,8 @@ fi
 # ist ein Befund.
 SERVER_ABWEICHUNG=0
 SERVER_GEPRUEFT=0
+ORDNER_ABWEICHUNG=0
+ORDNER_GEPRUEFT=0
 python3 -c "
 import json, sys
 d = json.load(open(sys.argv[1]))
@@ -448,24 +457,37 @@ if [ "$COMMIT_DA" = "ja" ]; then
   fi
   echo "  $SERVER_NAME: $SERVER_GEPRUEFT Datei(en) gegen Commit $COMMIT geprueft."
   echo "-----------------------------------------------------------"
+elif [ "$REPO_DA" = "ja" ]; then
+  # Dieses Repository kennt den genannten Commit nicht. Die Dateien im Ordner
+  # gehoeren dann zu einem ANDEREN Stand — meist einem aelteren: Die Kopie
+  # stammt von vor der letzten Auslieferung. Sie mit dem Fingerabdruck zu
+  # vergleichen, meldete bei einer einwandfreien Auslieferung eine Abweichung
+  # je geaenderter Datei. Das waere ein Messproblem im Gewand eines Befunds.
+  # Gerechnet wird hier deshalb nichts; das Skript endet unten mit 2 und dem
+  # Hinweis auf `git fetch`.
+  echo "  $SERVER_NAME: nicht nachgerechnet — dieses Repository kennt den genannten Commit nicht."
+  echo "-----------------------------------------------------------"
 elif [ -s "$ARBEIT/server-soll.txt" ]; then
-  # Ohne den Commit bleibt nur der Vergleich mit dem, was im Ordner liegt.
+  # Kein Repository (entpackte Kopie): Ohne git steht nicht fest, ob dieser
+  # Ordner ueberhaupt der ausgelieferte Stand ist. Der Vergleich bleibt als
+  # HINWEIS — er zaehlt weder als Befund noch als Nachweis; das Skript endet
+  # unten mit 2.
   while IFS="$(printf '\t')" read -r PFAD SOLL; do
     [ -z "$PFAD" ] && continue
     QUELLE="$SERVER_PRAEFIX$PFAD"
     if [ ! -f "$QUELLE" ]; then
-      echo "  FEHLT in diesem Ordner: $QUELLE"
-      SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+      echo "  HINWEIS: fehlt in diesem Ordner: $QUELLE"
+      ORDNER_ABWEICHUNG=$((ORDNER_ABWEICHUNG + 1))
       continue
     fi
     IST="sha256:$($SUMME "$QUELLE" | cut -d' ' -f1)"
-    SERVER_GEPRUEFT=$((SERVER_GEPRUEFT + 1))
+    ORDNER_GEPRUEFT=$((ORDNER_GEPRUEFT + 1))
     if [ "$IST" != "$SOLL" ]; then
-      echo "  ABWEICHUNG im $SERVER_NAME: $QUELLE"
-      SERVER_ABWEICHUNG=$((SERVER_ABWEICHUNG + 1))
+      echo "  HINWEIS: weicht in diesem Ordner ab: $QUELLE"
+      ORDNER_ABWEICHUNG=$((ORDNER_ABWEICHUNG + 1))
     fi
   done < "$ARBEIT/server-soll.txt"
-  echo "  $SERVER_NAME: $SERVER_GEPRUEFT Datei(en) gegen die Dateien in diesem Ordner geprueft."
+  echo "  $SERVER_NAME: $ORDNER_GEPRUEFT Datei(en) gegen die Dateien in diesem Ordner geprueft."
   echo "-----------------------------------------------------------"
 fi
 
@@ -512,6 +534,10 @@ if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ] && [ "$SERVER_ABWEICHUNG" -eq
   elif [ "$REPO_DA" != "ja" ]; then
     echo "             Fuer den Nachweis in einer Kopie des Repositories laufen lassen" >&2
     echo "             (git clone, dann erneut)." >&2
+    if [ "$ORDNER_ABWEICHUNG" -gt 0 ]; then
+      echo "             $ORDNER_ABWEICHUNG Datei(en) in diesem Ordner sind andere als die ausgewiesenen (HINWEIS oben)." >&2
+      echo "             Das ist kein Befund: Ohne git steht nicht fest, ob dieser Ordner der ausgelieferte Stand ist." >&2
+    fi
   fi
   exit 2
 fi

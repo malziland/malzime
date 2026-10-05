@@ -207,6 +207,24 @@ beforeEach(() => {
   fs.cpSync(liveVorlage, live, { recursive: true });
 });
 
+/** Legt über Stand A einen Commit an, liefert ihn aus (echter Erzeuger) und
+ *  macht die Auslieferung zum Live-Stand. Gibt den Klon und den Fingerabdruck
+ *  zurück. Das veröffentlichte Repository (`quelle`) erfährt von dem neuen
+ *  Commit nichts — ein frischer Klon davon ist dann eine ÄLTERE Kopie. */
+function ausliefern(aendere) {
+  const ordner = frischerKlon("lieferung", "main");
+  aendere(ordner);
+  git(ordner, "add", "-A");
+  git(ordner, "commit", "--quiet", "-m", "weiterer Stand");
+  execFileSync("node", ["scripts/build-info.mjs", "2026030303"], {
+    cwd: ordner,
+    env: { ...GIT_UMGEBUNG, NODE_PATH: MODULE },
+  });
+  fs.copyFileSync(path.join(ordner, "public/build-info.json"), path.join(live, "build-info.json"));
+  fs.copyFileSync(path.join(ordner, "public/index.html"), path.join(live, "index.html"));
+  return { ordner, daten: JSON.parse(fs.readFileSync(path.join(live, "build-info.json"), "utf8")) };
+}
+
 describe("pruefe-live.sh am nachgebauten Live-Stand", () => {
   test("Aufbau stimmt: der Fingerabdruck nennt drei Website-Dateien und jede Datei des Server-Pakets", () => {
     const daten = JSON.parse(fs.readFileSync(path.join(live, "build-info.json"), "utf8"));
@@ -523,28 +541,97 @@ describe("pruefe-live.sh ohne den genannten Commit", () => {
     expect(r.aus).toContain("Server-Paket: 7 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
   });
 
-  test("kein git-Repository, eine Server-Datei im Ordner ist eine andere als die ausgewiesene → 1", () => {
+  test("kein git-Repository, eine Server-Datei im Ordner ist eine andere als die ausgewiesene → 2 mit Hinweis, kein Befund", () => {
+    /* Ohne git steht nicht fest, ob dieser Ordner überhaupt der ausgelieferte
+       Stand ist. Dass er abweicht, sagt deshalb nichts über die Auslieferung. */
     const klon = frischerKlon("klon");
     fs.rmSync(path.join(klon, ".git"), { recursive: true, force: true });
     fs.appendFileSync(path.join(klon, "functions/src/config.js"), "// nicht der ausgelieferte Stand\n");
     const r = pruefen(klon, { GIT_CEILING_DIRECTORIES: basis });
     expect(r.aus).toContain("nicht pruefbar (kein git-Repository)");
-    expect(r.aus).toContain("ABWEICHUNG im Server-Paket: functions/src/config.js");
+    expect(r.aus).toContain("HINWEIS: weicht in diesem Ordner ab: functions/src/config.js");
     expect(r.aus).toContain("Server-Paket: 7 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
-    expect(r.aus).toContain("ERGEBNIS: 0 Abweichung(en), 0 fehlend, bei 3 geprueften Dateien.");
-    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Paket.");
+    expect(r.aus).toContain("1 Datei(en) in diesem Ordner sind andere als die ausgewiesenen");
+    expect(r.aus).toContain("Ohne git steht nicht fest, ob dieser Ordner der ausgelieferte Stand ist");
+    expect(r.aus).toContain("MESSPROBLEM: Der genannte Commit wurde NICHT gegengerechnet");
+    expect(r.aus).not.toContain("entspricht NICHT");
+    expect(r.aus).not.toMatch(/^\s*ABWEICHUNG/m);
+    expect(r.code).toBe(2);
+  });
+
+  test("kein git-Repository, eine ausgewiesene Server-Datei fehlt im Ordner → 2 mit Hinweis, kein Befund", () => {
+    const klon = frischerKlon("klon");
+    fs.rmSync(path.join(klon, ".git"), { recursive: true, force: true });
+    fs.rmSync(path.join(klon, "functions/package-lock.json"));
+    const r = pruefen(klon, { GIT_CEILING_DIRECTORIES: basis });
+    expect(r.aus).toContain("HINWEIS: fehlt in diesem Ordner: functions/package-lock.json");
+    expect(r.aus).toContain("Server-Paket: 6 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
+    expect(r.aus).toContain("1 Datei(en) in diesem Ordner sind andere als die ausgewiesenen");
+    expect(r.aus).not.toContain("entspricht NICHT");
+    expect(r.code).toBe(2);
+  });
+
+  test("kein git-Repository, aber die Seite widerspricht sich selbst (Datei live verändert) → 1", () => {
+    /* Das steht auch ohne Repository fest: Die ausgelieferte Datei passt nicht
+       zu dem Wert, den derselbe Server für sie ausweist. */
+    fs.appendFileSync(path.join(live, "app.js"), "/* fremder Code */\n");
+    const klon = frischerKlon("klon");
+    fs.rmSync(path.join(klon, ".git"), { recursive: true, force: true });
+    const r = pruefen(klon, { GIT_CEILING_DIRECTORIES: basis });
+    expect(r.aus).toContain("ABWEICHUNG: app.js");
+    expect(r.aus).toContain("ERGEBNIS: 1 Abweichung(en), 0 fehlend, bei 3 geprueften Dateien.");
     expect(r.code).toBe(1);
   });
 
-  test("Commit lokal unbekannt, eine ausgewiesene Server-Datei fehlt im Ordner → 1", () => {
+  test("ältere Kopie des Repositorys, einwandfreie Auslieferung → 2, nicht 1", () => {
+    /* Der häufigste Fall bei Dritten: Die Kopie stammt von vor der letzten
+       Auslieferung und kennt deren Commit nicht. Ihre Dateien sind älter —
+       an der Auslieferung ist nichts falsch. Das ist ein Messproblem (erst
+       `git fetch`), kein Befund. */
+    ausliefern((o) => {
+      fs.appendFileSync(path.join(o, "functions/src/config.js"), "// neuer als die Kopie des Prüfenden\n");
+      schreibe(o, "functions/src/neu.js", "module.exports = 5;\n");
+      fs.appendFileSync(path.join(o, "functions/package-lock.json"), "\n");
+    });
+    const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain("Commit im Repository: NEIN");
+    expect(r.aus).toContain("Server-Paket: nicht nachgerechnet — dieses Repository kennt den genannten Commit nicht.");
+    expect(r.aus).toContain("MESSPROBLEM: Der genannte Commit wurde NICHT gegengerechnet");
+    expect(r.aus).toContain("'git fetch --all' ausfuehren");
+    /* Kein Vergleich mit dem Ordner, also auch keine Zeile dazu. */
+    expect(r.aus).not.toMatch(/in diesem Ordner/);
+    expect(r.aus).not.toMatch(/ABWEICHUNG|FEHLT/);
+    expect(r.aus).not.toContain("entspricht NICHT");
+    expect(r.aus).not.toContain("entspricht Commit");
+    expect(r.code).toBe(2);
+  });
+
+  test("Commit lokal unbekannt, eine ausgewiesene Server-Datei fehlt im Ordner → 2: der Ordner wird gar nicht verglichen", () => {
     fingerabdruckAendern((d) => (d.commit = "0".repeat(40)));
     const klon = frischerKlon("klon");
     fs.rmSync(path.join(klon, "functions/src/config.js"));
     const r = pruefen(klon);
     expect(r.aus).toContain("Commit im Repository: NEIN");
-    expect(r.aus).toContain("FEHLT in diesem Ordner: functions/src/config.js");
-    expect(r.aus).toContain("Server-Paket: 6 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
-    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Paket.");
+    expect(r.aus).toContain("Server-Paket: nicht nachgerechnet — dieses Repository kennt den genannten Commit nicht.");
+    expect(r.aus).not.toMatch(/in diesem Ordner/);
+    expect(r.aus).not.toContain("entspricht NICHT");
+    expect(r.code).toBe(2);
+  });
+
+  test("ältere Kopie, aber die Seite widerspricht sich selbst (Datei live verändert) → 1", () => {
+    ausliefern((o) => fs.appendFileSync(path.join(o, "functions/src/config.js"), "// neuer als die Kopie\n"));
+    fs.appendFileSync(path.join(live, "js/a.js"), "/* fremder Code */\n");
+    const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain("Commit im Repository: NEIN");
+    expect(r.aus).toContain("ABWEICHUNG: js/a.js");
+    expect(r.aus).toContain("Der ausgelieferte Stand entspricht NICHT dem genannten Commit.");
+    expect(r.code).toBe(1);
+  });
+
+  test("ältere Kopie, eine im Fingerabdruck genannte Website-Datei gibt es auf dem Server nicht (404) → 1", () => {
+    ausliefern((o) => fs.appendFileSync(path.join(o, "functions/src/config.js"), "// neuer als die Kopie\n"));
+    const r = pruefen(frischerKlon("klon"), { ATTRAPPE_NICHT_GEFUNDEN: "app.js" });
+    expect(r.aus).toContain("FEHLT auf dem Server: app.js");
     expect(r.code).toBe(1);
   });
 });
@@ -555,22 +642,6 @@ describe("pruefe-live.sh rechnet das Server-Paket nach denselben Regeln wie das 
      Installation). Diese Fälle liefern je einen eigenen Stand mit dem echten
      Erzeuger aus und lassen die Nachprüfung dagegen laufen: Listeten die
      beiden verschieden, meldete sie eine Datei als fehlend oder als fremd. */
-
-  /** Legt über Stand A einen Commit an, liefert ihn aus (echter Erzeuger) und
-   *  macht die Auslieferung zum Live-Stand. Gibt den Klon und den Fingerabdruck zurück. */
-  function ausliefern(aendere) {
-    const ordner = frischerKlon("lieferung", "main");
-    aendere(ordner);
-    git(ordner, "add", "-A");
-    git(ordner, "commit", "--quiet", "-m", "weiterer Stand");
-    execFileSync("node", ["scripts/build-info.mjs", "2026030303"], {
-      cwd: ordner,
-      env: { ...GIT_UMGEBUNG, NODE_PATH: MODULE },
-    });
-    fs.copyFileSync(path.join(ordner, "public/build-info.json"), path.join(live, "build-info.json"));
-    fs.copyFileSync(path.join(ordner, "public/index.html"), path.join(live, "index.html"));
-    return { ordner, daten: JSON.parse(fs.readFileSync(path.join(live, "build-info.json"), "utf8")) };
-  }
 
   const konfigAendern = (ordner, aendere) => {
     const datei = path.join(ordner, "firebase.json");

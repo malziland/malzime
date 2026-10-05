@@ -203,6 +203,80 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     expect(elements.facts.innerHTML).toBe("");
   });
 
+  /* Dasselbe auf den übrigen Fehlerwegen: Jeder von ihnen räumt die Karten an
+     einer eigenen Stelle ab. (Den Zweig „Ergebnis leer“ in renderQueueResult
+     erreicht kein Weg — pollJob meldet ein leeres Ergebnis schon als Fehler,
+     das ist der Fall „failed“ oben.) */
+  it("Fehlerweg (Auftrag verworfen): auch die schon gezeigten Kategorie-Karten verschwinden", async () => {
+    mockeStatusFolge([
+      { status: "processing", liveText: "Erste Welle" },
+      { status: "processing", liveText: "Erste Welle, zweite" },
+      { status: "abandoned" },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(2500);
+    elements.facts.innerHTML = '<div class="cat-card">ALTERWERT-LIVE</div>';
+    await vi.advanceTimersByTimeAsync(10000);
+    await p;
+    expect(liveAnzeige.abbrechen).toHaveBeenCalled();
+    expect(elements.facts.innerHTML).toBe("");
+  });
+
+  it("Fehlerweg (fertig gemeldet, aber ohne Ergebnis): die Karten verschwinden, angezeigt wird nichts", async () => {
+    mockeStatusFolge([
+      { status: "processing", liveText: "Erste Welle" },
+      { status: "processing", liveText: "Erste Welle, zweite" },
+      { status: "done", result: null },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(2500);
+    elements.facts.innerHTML = '<div class="cat-card">ALTERWERT-LIVE</div>';
+    await vi.advanceTimersByTimeAsync(10000);
+    await p;
+    expect(liveAnzeige.abbrechen).toHaveBeenCalled();
+    expect(elements.facts.innerHTML).toBe("");
+    expect(renderCurrentMode).not.toHaveBeenCalled();
+  });
+
+  it("Fehlerweg (harter Fehler beim Anzeigen des Ergebnisses): die Karten verschwinden", async () => {
+    /* Nur für diesen einen Aufruf: Die Attrappe gehört allen Tests der Datei,
+       eine dauerhaft gesetzte Antwort bliebe für die folgenden stehen. */
+    renderCurrentMode.mockImplementationOnce(() => {
+      elements.facts.innerHTML = '<div class="cat-card">HALB-GERENDERT</div>';
+      throw new Error("Anzeige kaputt");
+    });
+    mockeStatusFolge([
+      { status: "processing", liveText: "Erste Welle" },
+      { status: "done", result: DONE_RESULT },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(12000);
+    await p;
+    /* Positivkontrolle: Der Fehler ist wirklich beim Anzeigen entstanden. */
+    expect(renderCurrentMode).toHaveBeenCalledTimes(1);
+    expect(liveAnzeige.abbrechen).toHaveBeenCalled();
+    expect(elements.facts.innerHTML).toBe("");
+  });
+
+  it.each([["failed"], ["abandoned"]])(
+    "Fehlerweg (Wiederaufnahme, Auftrag %s): stehende Karten verschwinden, ohne Fehlermeldung",
+    async (status) => {
+      sessionStorage.setItem("malzime.queueJobId", "job-resumed");
+      sessionStorage.setItem("malzime.queueResultToken", "tok-1");
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (url) => {
+        if (!String(url).includes("job-status")) return jsonResponse({ ok: true });
+        return jsonResponse({ status });
+      });
+      elements.facts.innerHTML = '<div class="cat-card">ALTERWERT-LIVE</div>';
+      const p = resumeQueueJob();
+      await vi.advanceTimersByTimeAsync(8000);
+      await p;
+      expect(liveAnzeige.abbrechen).toHaveBeenCalled();
+      expect(elements.facts.innerHTML).toBe("");
+      expect(renderCurrentMode).not.toHaveBeenCalled();
+    }
+  );
+
   it("Erfolg: der Ergebnis-Bereich wird NICHT geleert (Gegenprobe)", async () => {
     mockeStatusFolge([
       { status: "processing", liveText: "Erste Welle" },

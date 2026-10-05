@@ -25,8 +25,9 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 - **Harmlose Wörter bleiben stehen.** „Wetter“ ist keine Wette, „Insekt“ kein
   Sekt, „Waffel“ keine Waffe, „Rumänien“ kein Rum, „Drogerie“ keine Droge;
   „Wasserpistole“ und „Heißklebepistole“ sind keine Waffen-Werbung, „Diet
-  Coke“ ist keine Diät. Auch frühere Fehlgriffe sind weg: „Glocke“, „Klarname“
-  und „Terrorvogel“ wurden bisher mitgefangen.
+  Coke“ ist keine Diät. Waffen-Skins aus Spielen („Fortnite Waffen-Skins“,
+  „Weapon Skins“) bleiben ebenfalls stehen. Auch frühere Fehlgriffe sind weg:
+  „Glocke“, „Klarname“ und „Terrorvogel“ wurden bisher mitgefangen.
 - **Steht das Alter eines Kindes hinter „ca.“, als bloße Zahl oder nur als Wort
   da** („ein Mädchen“, „Volksschulkind“, „Firmling“, „13 J.“), greift der
   Schutz für Kinder jetzt ebenfalls. Nennt die KI weder in ihrer Altersangabe
@@ -50,7 +51,8 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   nicht aus („wie aus der Pistole geschossen“, „deine stärkste Waffe“).
 - Der Filter bleibt eine Wortliste: Was nicht in ihr steht, erkennt er nicht —
   mehrdeutige Wörter wie „Messer“, „Gras“ oder „Corona“ stehen bewusst nicht
-  darin. Für die Auswertung: Die Zähler des Kinderschutz-Protokolls sind mit
+  darin, und ein Wort mit fehlendem Umlaut („Glucksspiel“) erkennt er nicht
+  mehr. Für die Auswertung: Die Zähler des Kinderschutz-Protokolls sind mit
   Zahlen vor dieser Fassung nicht vergleichbar — die Liste kennt mehr Wörter,
   und „wetten“ und „Jackpot“ zählt sie im Text des Profils nicht mehr mit,
   weil sie dort meist Redewendung sind („Wetten, dass …?“).

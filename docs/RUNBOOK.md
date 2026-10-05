@@ -27,7 +27,8 @@ deploy.sh ging durch).
 Vorabprüfung „Pruefungen: Deploy-Riegel" rot: Alle fünf Workflows unter
 `.github/workflows/`, `.github/dependabot.yml` und die Einstellungsdateien der
 Prüfwerkzeuge (`vitest.config.js`, `playwright.config.js`, `eslint.config.mjs`,
-`functions/eslint.config.js`, `.prettierignore`) sind per Prüfsumme festgeschrieben.
+`functions/eslint.config.js`, `.prettierignore`, `functions/jest.setup.js`) sind per
+Prüfsumme festgeschrieben.
 War die Änderung beabsichtigt, die neue Summe nachtragen — `python3
 scripts/pruefe-deploy-riegel.py --vertrag-summen` zeigt beide Tabellen, eingetragen
 wird sie in `VERTRAG_SUMMEN` bzw. `EINSTELLUNG_SUMMEN` im selben Skript. Bleibt der

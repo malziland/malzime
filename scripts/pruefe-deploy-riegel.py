@@ -245,6 +245,11 @@ NPM_SKRIPTE = {
 # Wortlaut. Die uebrigen Dateien sind per Pruefsumme festgeschrieben — ueber
 # jedes Byte, ohne Ausnahme fuer Kommentare (anders als bei den Workflows gibt
 # es hier keine Zeile, die Dependabot aendert).
+#
+# Dazu gehoert die Vorbereitungsdatei, die Jest vor jeder Testdatei ausfuehrt
+# (`functions/jest.setup.js`, in JEST_EINSTELLUNG genannt): Sie ist Programm,
+# keine Liste — eine einzige Zeile darin kann `test` durch eine Fassung
+# ersetzen, die jeden Test ueberspringt, und der Lauf endet gruen.
 JEST_EINSTELLUNG = {
     "testPathIgnorePatterns": ["/node_modules/", "/__tests__/hilfen/"],
     "setupFilesAfterEnv": ["<rootDir>/jest.setup.js"],
@@ -255,6 +260,7 @@ EINSTELLUNG_SUMMEN = {
     "eslint.config.mjs": "e4f7e95827ef01ba",
     "functions/eslint.config.js": "ca9536911333625f",
     ".prettierignore": "ee7c566a5bcc22f7",
+    "functions/jest.setup.js": "bb2f276fb49ed0f0",
 }
 # Dateien, die es NICHT gibt und nicht geben darf, ohne dass sie hier stehen:
 # Ein Werkzeug liest sie vor oder neben der festgeschriebenen Einstellung

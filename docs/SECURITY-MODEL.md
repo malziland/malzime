@@ -759,8 +759,8 @@ Ausdrücke sowie Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leer
 andere Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
 (`--vertrag-summen`). Seit 05.10.2026 sind ebenso die Einstellungsdateien der
 Prüfwerkzeuge festgeschrieben — `vitest.config.js`, `playwright.config.js`, die beiden
-ESLint-Einstellungen und `.prettierignore` —, bei ihnen über jedes Byte, ohne freie
-Zeilen.
+ESLint-Einstellungen, `.prettierignore` und die Vorbereitungsdatei von Jest
+(`functions/jest.setup.js`) —, bei ihnen über jedes Byte, ohne freie Zeilen.
 
 Zusätzlich prüft er inhaltlich. Im Nachtlauf: genau ein festgelegter Befehl je
 Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte, ein

@@ -47,8 +47,18 @@ const PLAYWRIGHT = "playwright.config.js";
 const ESLINT = "eslint.config.mjs";
 const ESLINT_SERVER = "functions/eslint.config.js";
 const PRETTIER_AUSNAHMEN = ".prettierignore";
+const JEST_VORBEREITUNG = "functions/jest.setup.js";
 /* Was der Waechter ausserhalb von scripts/, .github und docs/ liest. */
-const EINZELDATEIEN = [PAKET, PAKET_SERVER, VITEST, PLAYWRIGHT, ESLINT, ESLINT_SERVER, PRETTIER_AUSNAHMEN];
+const EINZELDATEIEN = [
+  PAKET,
+  PAKET_SERVER,
+  VITEST,
+  PLAYWRIGHT,
+  ESLINT,
+  ESLINT_SERVER,
+  PRETTIER_AUSNAHMEN,
+  JEST_VORBEREITUNG,
+];
 
 const CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1";
 const GITLEAKS = "gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0";
@@ -163,7 +173,7 @@ describe("Vertrag der Pipeline-Dateien — der Erfolgsweg", () => {
     expect(r.ausgabe).toMatch(/6 Dateien entsprechen dem festgeschriebenen Stand/);
     expect(r.ausgabe).toMatch(/jeder der 6 Pflicht-Jobs fuehrt seine Pruefbefehle aus/);
     expect(r.ausgabe).toMatch(/11 npm-Skripte hinter den Pflicht-Schritten, die Jest-Einstellung/);
-    expect(r.ausgabe).toMatch(/und 5 Einstellungsdateien der Pruefwerkzeuge lauten wie festgelegt/);
+    expect(r.ausgabe).toMatch(/und 6 Einstellungsdateien der Pruefwerkzeuge lauten wie festgelegt/);
     expect(r.ausgabe).toMatch(/keine eingecheckte Datei ist von \.gitignore erfasst/);
   });
 
@@ -205,10 +215,10 @@ describe("Vertrag der Pipeline-Dateien — der Erfolgsweg", () => {
   test("`--vertrag-summen` nennt genau die eingetragenen Werte", () => {
     const ausgabe = waechter(nachbau, "--vertrag-summen").ausgabe.split("\n").filter(Boolean);
     const skript = fs.readFileSync(path.join(nachbau, WAECHTER), "utf8");
-    /* Sechs Pipeline-Dateien und fuenf Einstellungsdateien, jede Tabelle mit Kopf- und Schlusszeile. */
+    /* Sechs Pipeline-Dateien und sechs Einstellungsdateien, jede Tabelle mit Kopf- und Schlusszeile. */
     const summen = ausgabe.filter((zeile) => !RAHMEN_DER_SUMMEN.includes(zeile));
-    expect(summen).toHaveLength(11);
-    expect(ausgabe).toHaveLength(15);
+    expect(summen).toHaveLength(12);
+    expect(ausgabe).toHaveLength(16);
     for (const zeile of summen) {
       expect(zeile).toMatch(/^ {4}"[^"]+": "[0-9a-f]{16}",$/);
       expect(skript).toContain(zeile);
@@ -393,6 +403,20 @@ describe("Vertrag der Pipeline-Dateien — die Pruefsumme haelt jede Datei fest"
       (t) => einmal(t, '"public/lib/", "public/fonts/"]', '"public/lib/", "public/fonts/", "public/js/"]'),
     ],
     ["e7", ".prettierignore: die Formatpruefung laesst public/ aus", PRETTIER_AUSNAHMEN, (t) => `${t}public/\n`],
+    [
+      "e8",
+      "functions/jest.setup.js: eine Zeile ersetzt `test` durch eine Fassung, die jeden Test ueberspringt",
+      JEST_VORBEREITUNG,
+      (t) => `${t}\nglobal.test = Object.assign((name, fn, zeit) => global.it.skip(name, fn, zeit), global.test);\n`,
+    ],
+    [
+      "e9",
+      "functions/jest.setup.js: der Riegel gegen die echte Datenbank ist auskommentiert",
+      JEST_VORBEREITUNG,
+      (t) =>
+        einmal(t, 'jest.mock("firebase-admin/firestore", () => {', '/* jest.mock("firebase-admin/firestore", () => {') +
+        "*/\n",
+    ],
   ];
 
   test.each(FAELLE)("%s — %s: der Waechter haelt an", (_kuerzel, _was, datei, umbau) => {
@@ -1062,7 +1086,7 @@ describe("Vertrag der Einstellungsdateien — nichts stellt ein Pruefwerkzeug ne
     expect(waechter().code).toBe(0);
   });
 
-  test.each([VITEST, PLAYWRIGHT, ESLINT, ESLINT_SERVER, PRETTIER_AUSNAHMEN])(
+  test.each([VITEST, PLAYWRIGHT, ESLINT, ESLINT_SERVER, PRETTIER_AUSNAHMEN, JEST_VORBEREITUNG])(
     "eine geloeschte Einstellungsdatei faellt auf: %s",
     (datei) => {
       fs.rmSync(path.join(nachbau, datei));

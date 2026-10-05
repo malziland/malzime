@@ -1533,8 +1533,9 @@ html {
 
 /* ── Fester Kartenausschnitt der Beispielbilder (PRIV-2026-10-03-38) ──
    Für ein Beispielbild fragt der Browser nichts bei OpenStreetMap an. Statt
-   der beweglichen Karte steht hier eine Bilddatei der Seite (js/render.js,
-   renderFesteKarte). Höhe, Rand und Rundung wie bei #gpsMapLeaflet, damit
+   der beweglichen Karte steht hier eine Bilddatei der Seite (gebaut in
+   js/geocoding.js, festerOrtsbereichHtml; eingesetzt von renderGpsMap in
+   js/render.js). Höhe, Rand und Rundung wie bei #gpsMapLeaflet, damit
    beide Karten gleich aussehen. Die Kartenfläche bleibt in beiden Themen hell
    — wie die bewegliche Karte, deren Kacheln das dunkle Thema auch nicht
    umfärbt. Im Druck ist der ganze Abschnitt #gpsMap ausgeblendet (@media

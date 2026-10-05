@@ -207,6 +207,12 @@ def main():
     # Riegel gegen Testlaeufe an echtem Speicher und echter Warteschlange,
     # Sperrliste, Alterslesung, Verbotssatz der KI-Anweisung, Beispielbilder
     # ohne Abfrage nach aussen).
+    # Seit 05.10.2026 dazu: der Test des Infrastruktur-Waechters (Alarmregeln,
+    # Benachrichtigungs-Server), die Weitergabe des Alters an den
+    # Kinderschutz-Filter, der Test des Nachtlaufs fuer mitgelieferte
+    # Bibliotheken und die zwei Modultests der Beispielbilder (woran ein
+    # Beispielbild erkannt wird; ob Karte, Adresse und Quellenangabe zu den
+    # Ortsdaten der Bilddateien passen).
     UNVERZICHTBAR = [
         "functions/src/__tests__/deploy-verhalten.test.js",
         "functions/src/__tests__/pipeline-vertrag-script.test.js",
@@ -220,6 +226,11 @@ def main():
         "functions/src/__tests__/minor-safety-woerter.test.js",
         "functions/src/__tests__/alters-platzhalter.test.js",
         "functions/src/__tests__/prompt-verbot-themen.test.js",
+        "functions/src/__tests__/verify-infrastructure-script.test.js",
+        "functions/src/__tests__/job-pipelines-profile.test.js",
+        "functions/src/__tests__/fremd-meldungen-script.test.js",
+        "public/__tests__/beispielbild-ort.test.js",
+        "public/__tests__/beispielbild-karten.test.js",
         "e2e/beispielbild-ohne-ortsabfrage.test.js",
         "functions/jest.setup.js",
         "scripts/selbstpruefung-waechter.sh",

@@ -1147,6 +1147,15 @@ statt Buchstaben („0nlyFans“), gesperrter Schrift („W e t t e n“) oder e
 Leerzeichen mitten in einem Wort, das keine Zusammensetzung ist („Por no“),
 fängt die Liste nicht.
 
+**Feste Tier-Profile.** Bei einem reinen Tierfoto zeigt die Seite feste, vom
+Projekt geschriebene Profile (`functions/src/locales/*/animals.js`). Sie laufen
+nicht durch den Filter: Im Bild ist kein Mensch, es gibt kein Alter. Am Gerät
+sitzt trotzdem oft ein Kind. Deshalb gilt für die festen Einträge selbst, dass
+keiner von ihnen einer wäre, den der Filter bei einem Kind streichen würde —
+`animal.test.js` prüft das für jede Tierart in beiden Sprachen (Entscheidung
+vom 05.10.2026; vorher stand in der Beast-Ansicht eine Kredit-Werbung für die
+Tierarztrechnung).
+
 **Alarm und Zähler.** Der Alarm „Kinderschutz-Treffer“
 (`minor-safety-durchbruch`, `docs/ERROR-ALERTING.md`) hört allein auf
 Stufe-1-Wörter im Fließtext, und dort nur auf die, die überall gelten.

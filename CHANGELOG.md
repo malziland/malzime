@@ -34,6 +34,10 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   ungefähre kleine Zahl („etwa 13“), gilt das Alter als nicht lesbar: Der
   Schutz greift, und die Karte zeigt den festen Hinweis statt einer Zahl.
   Nennt die Karte nichts dergleichen, wird wie bisher nicht gefiltert.
+- **Im Spaß-Profil für Tierfotos steht keine Kredit-Werbung mehr.** Die festen
+  Texte laufen nicht durch den Filter, weil kein Mensch im Bild ist; jetzt ist
+  festgehalten, dass keiner ihrer Einträge einer wäre, den der Filter bei einem
+  Kind streichen würde.
 - **Der Alarm „Kinderschutz-Treffer“ hört im Text des Profils auf mehr
   eindeutige Wörter als bisher** (etwa „Pfefferspray“) und kann deshalb
   häufiger kommen. Wörter, die im Satz meist etwas anderes heißen, lösen ihn

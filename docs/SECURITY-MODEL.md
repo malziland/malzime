@@ -1066,7 +1066,15 @@ ganzes Wort („Wetter“ ist keine Wette, „Insekt“ kein Sekt).
 **Zusammen, mit Bindestrich, getrennt.** Ein Bindestrich im Wort ändert
 nichts: Der Filter liest jeden Text auch so, als stünde der Bindestrich nicht
 da — „Soft-Air“, „Pfeffer-Spray“ und „Sex-Spielzeug“ werden gefangen wie die
-zusammengeschriebene Form, im Werbe-Eintrag wie im Satz. Die getrennte
+zusammengeschriebene Form, im Werbe-Eintrag wie im Satz, auch hinter einem
+Emoji. Eine Grenze bleibt: Hat ein Text mehr als drei Bindestriche, liest der
+Filter nur zwei Fassungen — alle Bindestriche als Leerzeichen und alle
+weggelassen. Ein dreiteiliges Wort, bei dem nur einer der Bindestriche
+wegfallen müsste, löst in einem langen Text deshalb keinen Alarm aus
+(„Online-Waffen-Laden“; in einem kurzen Satz schon). Als Werbe-Eintrag wird es
+weiter gefangen, weil die Liste dort die Wortfuge kennt
+(„Top-Online-Waffen-Laden-Set“); eine Silbentrennung mitten im Wort („Na-zi“)
+liest der Filter nur bis zu drei Bindestrichen im Eintrag. Die getrennte
 Schreibweise einer Zusammensetzung („Pfeffer Spray“, „Sex Spielzeug“) wird als
 Werbe-Eintrag gefangen; dafür kennt die Liste die Wortfuge. Im Fließtext gilt
 sie nicht: Dort stehen dieselben zwei Wörter oft zufällig nebeneinander („Sex

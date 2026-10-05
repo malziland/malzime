@@ -2182,6 +2182,64 @@ describe("Schreibweisen mit Bindestrich und Leerzeichen", () => {
     expect(durch).toEqual([]);
   });
 
+  /* Dasselbe hinter einem Emoji. Ein Emoji belegt im Text zwei Plätze; die
+     Stelle des Bindestrichs darf sich dadurch nicht verschieben — sonst
+     bliebe der Bindestrich stehen, und das Wort ginge durch. Gebaut über die
+     Nummer des Zeichens: 0x1f525 = Flamme. */
+  const EMOJI = String.fromCodePoint(0x1f525);
+
+  test.each([
+    ["immer", _istImmerVerboten],
+    ["minor", _istBeiMinderjaehrigenVerboten],
+  ])("Stufe „%s“: auch hinter einem Emoji ändert ein Bindestrich nichts", (name, ist) => {
+    /* Positivkontrolle: Das Zeichen belegt wirklich zwei Plätze. */
+    expect(EMOJI).toHaveLength(2);
+    const liste = _SPERRLISTEN[name];
+    const durch = [];
+    let geprueft = 0;
+    for (const [wort, beispiel] of Object.entries(BEISPIEL_JE_WORT[name])) {
+      for (const form of mitBindestrich(beispiel)) {
+        geprueft++;
+        if (!ist(`${EMOJI} ${form}`, true)) durch.push(`${wort}: ${form}`);
+        if (liste.ueberall.includes(wort) && !ist(`${EMOJI} ${form}`, false)) durch.push(`${wort} (im Satz): ${form}`);
+      }
+    }
+    expect(geprueft).toBeGreaterThan(1000);
+    expect(durch).toEqual([]);
+  });
+
+  /* Im Satz, auch mit mehr als drei Bindestrichen davor (dann gibt es nur
+     die zwei Sichten „alle als Leerzeichen“ und „alle weggelassen“). */
+  const VIELE_BINDESTRICHE = "Erst E-Mail, Know-how und Do-it-yourself.";
+
+  test.each([
+    ["Du spielst Soft-Air.", _istImmerVerboten],
+    ["Du hast ein Pfeffer-Spray dabei.", _istImmerVerboten],
+    ["Zum Fest gibt es Wod-ka.", _istBeiMinderjaehrigenVerboten],
+  ])("im Satz hinter einem Emoji: „%s“ wird gelesen wie ohne", (satz, ist) => {
+    expect(ist(satz, false)).toBe(true);
+    expect(ist(`${VIELE_BINDESTRICHE} ${satz}`, false)).toBe(true);
+    expect(ist(`${EMOJI} ${satz}`, false)).toBe(true);
+    expect(ist(`${EMOJI}${EMOJI} ${VIELE_BINDESTRICHE} ${satz}`, false)).toBe(true);
+  });
+
+  /* Benannte Grenze (SECURITY-MODEL, „Zusammen, mit Bindestrich, getrennt“):
+     Ab dem vierten Bindestrich im Text liest der Filter nur noch zwei
+     Fassungen — alle Bindestriche als Leerzeichen, alle weggelassen. Ein Wort,
+     das eine gemischte Lesart braucht (ein Bindestrich fällt weg, der andere
+     trennt), wird im langen Text nicht gelesen. Als Werbe-Eintrag trägt die
+     notierte Wortfuge weiter. Wer die Grenze verschiebt, ändert diesen Test
+     und den Absatz im SECURITY-MODEL. */
+  test("Grenze: gemischte Lesart nur bis drei Bindestriche im Text", () => {
+    for (const satz of ["Du trägst ein Na-zi-Shirt.", "Du suchst einen Online-Waffen-Laden."]) {
+      expect(_istImmerVerboten(satz, false)).toBe(true);
+      expect(_istImmerVerboten(`${EMOJI} ${satz}`, false)).toBe(true);
+      expect(_istImmerVerboten(`${VIELE_BINDESTRICHE} ${satz}`, false)).toBe(false);
+    }
+    expect(_istImmerVerboten("Top-Online-Waffen-Laden-Set", true)).toBe(true);
+    expect(_istImmerVerboten(`${EMOJI} Top-Online-Waffen-Laden-Set`, true)).toBe(true);
+  });
+
   /* Einträge mit notierter Wortfuge („+“ oder Leerzeichen) treffen als
      Werbe-Eintrag alle drei Schreibweisen: zusammen, mit Bindestrich,
      getrennt. Ausgenommen ist nur, was eine harmlose Wendung bewusst

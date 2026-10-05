@@ -134,7 +134,9 @@ function sichten(text) {
   const anzahl = stellen.length === 0 ? 1 : stellen.length <= EINZELN_BIS ? 2 ** stellen.length : 2;
   const aus = [];
   for (let wahl = 0; wahl < anzahl; wahl++) {
-    const zeichen = [...roh];
+    /* Nach Plaetzen zerlegt, nicht nach Zeichen: Die Stellen oben zaehlen
+       Plaetze, und ein Emoji belegt zwei. */
+    const zeichen = roh.split("");
     stellen.forEach((stelle, i) => {
       if (anzahl === 2 ? wahl === 1 : (wahl >> i) & 1) zeichen[stelle] = "";
     });

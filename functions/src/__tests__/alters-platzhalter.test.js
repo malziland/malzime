@@ -2643,7 +2643,7 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     expect(r).toMatchObject({ stufe2: true, alter: 13, unlesbar: false, kreditBleibt: false });
   });
 
-  /* ── Jahrzehnt als Mehrzahl oder als Person ───────────────────────────────
+  /* ── Die Zwanziger als Mehrzahl oder als Person ───────────────────────────
      „in den Zwanzigern“ und „Mittzwanzigerin“ lesen sich wie „Mitte zwanzig“
      und „in her twenties“: als 20. Das obere Ende bleibt offen. */
   test.each([
@@ -2652,11 +2652,6 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     ["männlich, Endzwanziger", 20],
     ["männlich, ein Anfangszwanziger", 20],
     ["weiblich, eine Zwanzigerin", 20],
-    ["männlich, in den Dreißigern", 30],
-    ["weiblich, Mittdreißigerin", 30],
-    ["männlich, in den Dreissigern", 30],
-    ["weiblich, in den Vierzigern", 40],
-    ["männlich, Endfünfziger", 50],
     [`${FEUER} weiblich, in den Zwanzigern`, 20],
   ])("Jahrzehnt gelesen: %s → %p", async (anker, alter) => {
     expect(_untereAltersgrenze(anker)).toBe(alter);
@@ -2667,14 +2662,33 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
   });
 
   /* Ohne „in den …ern“ und ohne Vorsilbe ist es ein Geldschein oder ein
-     Jahrzehnt der Geschichte, kein Alter — und es verdrängt kein Kindwort. */
+     Jahrzehnt der Geschichte, kein Alter — und es verdrängt kein Kindwort.
+     Ein höheres Jahrzehnt als die Zwanziger wird nie als Alter gelesen: Es
+     meint oft die Zeit („wie in den Achtzigern“) und höbe als Zahl den Schutz
+     auf, den ein Kindwort daneben auslöst. */
   test.each([
     ["Du hältst einen Zwanziger in der Hand."],
     ["Du trägst Mode der Fünfziger."],
     ["Die Frisur stammt aus den Fünfzigerjahren."],
     ["Du hältst einen Fünfziger in der Hand."],
+    ["männlich, in den Dreißigern"],
+    ["weiblich, Mittdreißigerin"],
+    ["männlich, in den Dreissigern"],
+    ["weiblich, in den Vierzigern"],
+    ["männlich, Endfünfziger"],
+    ["Du bist gekleidet wie in den Achtzigern."],
   ])("kein Jahrzehnt als Alter: %s", (text) => {
     expect(_untereAltersgrenze(text)).toBeNull();
+  });
+
+  test.each([
+    ["weiblich", "Du bist eine Schülerin, gekleidet wie in den Achtzigern. Deine Wangen sind rund.", 10],
+    [undefined, "Du bist ein Teenager mit einer Frisur aus den Achtzigern. Deine Wangen sind rund.", 13],
+    [undefined, `${FEUER} Du bist ein Mädchen im Stil der Mittfünfziger. Deine Wangen sind rund.`, null],
+  ])("ein Jahrzehnt neben einem Kindwort hebt den Schutz nicht auf: %p, %s", async (anker, karte, alter) => {
+    const r = await lauf(anker, karte);
+    expect(r).toMatchObject({ stufe2: true, kreditBleibt: false });
+    if (alter !== null) expect(r.alter).toBe(alter);
   });
 
   test("„in den 20ern“: das obere Ende bleibt offen", () => {

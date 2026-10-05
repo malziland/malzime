@@ -46,17 +46,17 @@ const ZUSAMMEN_EN = new RegExp(
   "giu"
 );
 
-/* Ein Jahrzehnt als Mehrzahl oder als Person: "in den Zwanzigern",
+/* Die Zwanziger als Mehrzahl oder als Person: "in den Zwanzigern",
    "Zwanzigerin", "Mittzwanziger" → 20, wie "Mitte zwanzig" und "in her
-   twenties". Die nackte Form ("ein Zwanziger", "Mode der Fuenfziger") ist ein
-   Geldschein oder ein Jahrzehnt der Geschichte und zaehlt nicht — sie wuerde
-   sonst ein Kindwort daneben verdraengen. */
-const ZEHNER_FORM = { ...ZEHNER_DE, dreissig: 30 };
-const ZEHNER_WORT = Object.keys(ZEHNER_FORM).join("|");
-const JAHRZEHNT_PERSON = new RegExp(
-  `(?<!\\p{L})(?:(?:mitt|end|anfangs)-?(${ZEHNER_WORT})er(?:n|s|in|innen)?|(${ZEHNER_WORT})er(?:n|in|innen))(?!\\p{L})`,
-  "giu"
-);
+   twenties". Die nackte Form ("ein Zwanziger") ist ein Geldschein und zaehlt
+   nicht.
+   NUR die Zwanziger: 20 liegt unter der Schutzgrenze, die Form kann den
+   Schutz also ausloesen, nie aufheben. Ein hoeheres Jahrzehnt meint oft die
+   Zeit und nicht das Alter ("gekleidet wie in den Achtzigern") und wuerde als
+   Zahl ein Kindwort daneben verdraengen — "eine Schuelerin, gekleidet wie in
+   den Achtzigern" gaelte als 80. Solche Formen werden nicht als Alter gelesen. */
+const JAHRZEHNT_PERSON =
+  /(?<!\p{L})(?:(?:mitt|end|anfangs)-?zwanziger(?:n|s|in|innen)?|zwanziger(?:n|in|innen))(?!\p{L})/giu;
 
 /* Zahlwoerter in Ziffern. Dazu faellt eine einzelne Stelle hinter Komma oder
    Punkt weg ("12,5 Jahre" → "12 Jahre"): Sie ist kein Alter und wuerde sonst
@@ -64,7 +64,7 @@ const JAHRZEHNT_PERSON = new RegExp(
 const NACHKOMMASTELLE = /(?<!\d)(\d{1,2})[.,]\d(?!\d)/g;
 function mitZiffern(text) {
   return String(text || "")
-    .replace(JAHRZEHNT_PERSON, (_w, a, b) => String(ZEHNER_FORM[(a || b).toLowerCase()]))
+    .replace(JAHRZEHNT_PERSON, "20")
     .replace(ZUSAMMEN_DE, (_w, e, z) => String(EINER[e.toLowerCase()] + ZEHNER_DE[z.toLowerCase()]))
     .replace(ZUSAMMEN_EN, (_w, z, e) => String(ZEHNER_EN[z.toLowerCase()] + ONES[e.toLowerCase()]))
     .replace(ZAHLWORT, (w) => String(ZAHLWOERTER[w.toLowerCase()]))

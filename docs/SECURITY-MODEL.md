@@ -1205,8 +1205,11 @@ im Werbe-Eintrag wie im Satz. Ein Sperrwort daneben wird trotzdem gefangen
 und „Insekt“ dort als ganze Wörter aufgezählt (Meer-, Spar-, Wild-,
 Glücksschwein; Ansporn, Rittersporn; Nutzinsekt): Ein Wort, das nur so endet,
 wird wieder gefangen („Tischwein“, „Teensporn“, „Rheinsekt“). Was nicht
-aufgezählt ist („Wollschwein“), liest der Filter als Wein; ein Test hält
-fest, dass keine Wendung mehr das Ende eines fremden Wortes mitnimmt.
+aufgezählt ist („Wollschwein“), liest der Filter als Wein — auch mit
+Bindestrich, weil er jedes Wort auch ohne Bindestrich liest („Woll-Schwein“).
+Aufgezählt sind deshalb auch die gängigen Stofftiere („Plüschschwein“,
+„Kuschel-Schwein“, „Stoffschwein“). Ein Test hält fest, dass keine Wendung
+mehr das Ende eines fremden Wortes mitnimmt.
 Waffen-Skins („Fortnite Waffen-Skins“, „Weapon Skins“, „Gun Skins“) sind
 Spiele-Käufe und bleiben stehen. Anderes mit „Waffen“ wird weiter für alle
 gestrichen („Waffen-Baupläne“, „Waffen-Pack“): Ein Bauplan kann auch eine

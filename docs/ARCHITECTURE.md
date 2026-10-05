@@ -233,8 +233,9 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `job-helfer.js` | Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung) |
 | `minor-safety.js` | Kinderschutz-Filter für Werbekategorien bei möglicherweise Minderjährigen (Schwelle mit Puffer: `SCHUTZ_BIS`) |
 | `minor-safety-woerter.js` | Wortlisten des Kinderschutz-Filters: je Thema deutsch und englisch, „nur als Werbe-Eintrag“, harmlose Wendungen (reine Daten, angewandt von `minor-safety.js`) |
-| `alters-lesbarkeit.js` | Altersauslese aus dem KI-Text und Erkennung nicht lesbarer Altersangaben (Filter, Alterskarte, Live-Anzeige) |
-| `alters-lesbarkeit-woerter.js` | Wörter, Kategorien und Abkürzungen der Altersauslese (reine Daten, angewandt von `alters-lesbarkeit.js`) |
+| `alters-lesbarkeit.js` | Erkennung nicht lesbarer Altersangaben: erster Satz einer Karte, Altersversuch (Filter, Alterskarte, Live-Anzeige) |
+| `alters-auslese.js` | Altersauslese aus dem KI-Text: Zahlwörter, Kategorien, untere und obere Altersgrenze (weitergereicht von `alters-lesbarkeit.js`) |
+| `alters-lesbarkeit-woerter.js` | Wörter, Kategorien und Abkürzungen der Altersauslese (reine Daten, angewandt von `alters-auslese.js` und `alters-lesbarkeit.js`) |
 | `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Prüfung, Cache, Rückfall |
 | `produktiv-satz.js` | Betriebswerte für den echten Betrieb — Quelle für `config/betriebsprofil` |
 | `test-satz.js` | Einstellungssatz für die Tests |

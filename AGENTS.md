@@ -55,7 +55,8 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
   minor-safety.js    Kinderschutz-Filter fuer Werbe-Eintraege: Stufe 1 fuer alle, Stufe 2 bis zur Untergrenze SCHUTZ_BIS
   minor-safety-woerter.js  Die Wortlisten dazu (reine Daten, deutsch und englisch); jedes Listenwort braucht ein Beispiel in der Pruefreihe
-  alters-lesbarkeit.js  Altersauslese aus dem KI-Text: erster Satz einer Karte, nicht lesbares Alter
+  alters-lesbarkeit.js  Lesbarkeit der Altersangabe im KI-Text: erster Satz einer Karte, Altersversuch, nicht lesbares Alter
+  alters-auslese.js     Die Zahl-Lesung dazu: Zahlwoerter, Kategorien, untere und obere Altersgrenze
   alters-lesbarkeit-woerter.js  Die Woerter, Kategorien und Abkuerzungen dazu (reine Daten)
   mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call) + generateBeastAds (zweiter Aufruf ohne Bild)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)

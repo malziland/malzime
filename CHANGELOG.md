@@ -27,13 +27,19 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   „Wasserpistole“ und „Heißklebepistole“ sind keine Waffen-Werbung, „Diet
   Coke“ ist keine Diät. Auch frühere Fehlgriffe sind weg: „Glocke“, „Klarname“
   und „Terrorvogel“ wurden bisher mitgefangen.
-- **Steht das Alter eines Kindes hinter „ca.“ oder nur als Wort da** („ein
-  Mädchen“, „Volksschulkind“), greift der Schutz für Kinder jetzt ebenfalls.
-  Nennt die KI im ersten Satz der Alterskarte kein lesbares Alter, schreibt
-  aber irgendwo in der Karte ein Alter, ein Wort für ein Kind oder eine
-  ungefähre kleine Zahl („etwa 13“), gilt das Alter als nicht lesbar: Der
-  Schutz greift, und die Karte zeigt den festen Hinweis statt einer Zahl.
-  Nennt die Karte nichts dergleichen, wird wie bisher nicht gefiltert.
+- **Steht das Alter eines Kindes hinter „ca.“, als bloße Zahl oder nur als Wort
+  da** („ein Mädchen“, „Volksschulkind“, „Firmling“, „13 J.“), greift der
+  Schutz für Kinder jetzt ebenfalls. Nennt die KI weder in ihrer Altersangabe
+  noch im ersten Satz der Alterskarte ein lesbares Alter, schreibt aber
+  irgendwo in der Alterskarte ein Alter, ein Wort für ein Kind, „jung“ oder
+  irgendeine kleine Zahl („Alter: 13.“, „Du bist 13.“, „3. Klasse“), gilt das
+  Alter als nicht lesbar: Der Schutz greift, und die Karte zeigt den festen
+  Hinweis statt einer Zahl. Das trifft auch Erwachsene, bei denen die KI kein
+  Alter nennt, aber eine kleine Zahl schreibt („Trikot mit der Nummer 8“).
+  Nennt die Antwort nichts dergleichen, wird wie bisher nicht gefiltert.
+- „In den Zwanzigern“ und „Mittzwanzigerin“ werden jetzt wie „Mitte zwanzig“
+  gelesen. Die Alterskarte nennt das Alter nicht mehr doppelt, wenn die KI
+  davor eine ungewöhnliche Abkürzung schreibt („etw. 13“).
 - **Im Spaß-Profil für Tierfotos steht keine Kredit-Werbung mehr.** Die festen
   Texte laufen nicht durch den Filter, weil kein Mensch im Bild ist; jetzt ist
   festgehalten, dass keiner ihrer Einträge einer wäre, den der Filter bei einem

@@ -83,7 +83,8 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
   minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer)
   minor-safety-woerter.js   Wortlisten des Kinderschutz-Filters (reine Daten, deutsch und englisch; mit Wortfuge fuer zusammengesetzte Woerter)
-  alters-lesbarkeit.js      Altersauslese und Erkennung nicht lesbarer Altersangaben
+  alters-lesbarkeit.js      Erkennung nicht lesbarer Altersangaben (erster Satz, Altersversuch)
+  alters-auslese.js         Altersauslese: Zahlwoerter, Kategorien, untere und obere Altersgrenze
   alters-lesbarkeit-woerter.js  Woerter, Kategorien und Abkuerzungen der Altersauslese (reine Daten)
   betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Pruefung, Cache
   produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)

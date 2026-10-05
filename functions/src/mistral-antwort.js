@@ -215,9 +215,11 @@ function extrahiereKarten(jsonPraefix, vonIdx, bisIdx, alterVerbergen = () => fa
 }
 
 /* Was sagt der Altersanker aus hard_facts (steht im Schema VOR den Profilen)?
-   "unlesbar": ein Altersversuch ohne lesbares Alter — die fertige Karte zeigt
-   dann den festen Satz. "lesbar": Er traegt das Alter. null: Er fehlt, ist
-   noch nicht ganz da, ist kein Text oder nennt kein Alter. */
+   "unlesbar": Vorlage abgeschrieben oder Alterswort ohne Zahl — die fertige
+   Karte zeigt dann den festen Satz. "lesbar": Er traegt das Alter.
+   "versuch": Er deutet ein Alter nur an ("jung", "noch im Wachstum") — die
+   Karte erscheint dann nur, wenn ihr erster Satz ein Alter nennt. null: Er
+   fehlt, ist noch nicht ganz da, ist kein Text oder nennt kein Alter. */
 const HARD_FACTS_SCHLUESSEL = '"hard_facts"';
 const ALTER_SCHLUESSEL = '"alter_geschlecht"';
 
@@ -228,13 +230,14 @@ function liveAnker(jsonPraefix, standardIdx) {
   if (!anker || !anker.abgeschlossen) return null;
   if (standardIdx >= 0 && anker.schluesselIdx > standardIdx) return null;
   if (istAlterUnlesbar(anker.text)) return "unlesbar";
-  return hatLesbaresAlter(anker.text) ? "lesbar" : null;
+  if (hatLesbaresAlter(anker.text)) return "lesbar";
+  return hatAltersversuch(anker.text) ? "versuch" : null;
 }
 
 /* Dieselbe Regel wie beim Endergebnis (mistral.js): Es zaehlt der Anker, sonst
    der erste Satz einer Karte. Ohne lesbares Alter an diesen Stellen macht ein
-   Altersversuch irgendwo in einer Karte das Alter "nicht lesbar" — die Karte
-   erscheint dann live nicht, statt erst mit einer Zahl aus dem Beleg-Satz
+   Altersversuch im Anker oder in einer Karte das Alter "nicht lesbar" — die
+   Karte erscheint dann live nicht, statt erst mit einer Zahl aus dem Beleg-Satz
    dazustehen und am Ende auf den festen Satz zu springen. Ein Platzhalter
    erscheint live nie. `vorher` ist die Standard-Karte, wenn die Beast-Karte
    ankommt; umgekehrt ist die Beast-Karte noch nicht da — bringt erst sie das
@@ -243,7 +246,8 @@ function alterskarteVerbergen(anker, karte, vorher = "") {
   if (anker === "unlesbar" || hatAltersPlatzhalter(karte)) return true;
   if (anker === "lesbar") return false;
   const karten = [karte, vorher];
-  return !karten.some((k) => hatLesbaresAlter(ersterSatz(k))) && karten.some(hatAltersversuch);
+  const versuch = anker === "versuch" || karten.some(hatAltersversuch);
+  return versuch && !karten.some((k) => hatLesbaresAlter(ersterSatz(k)));
 }
 
 function extrahiereLiveText(jsonPraefix) {

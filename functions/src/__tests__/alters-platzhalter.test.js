@@ -335,8 +335,17 @@ describe("Fertige Karte und Werte für den Filter", () => {
   });
 
   test("Beleg-Satz ohne Alter im ersten Satz: kein Alter, kein Fehlalarm", async () => {
-    const r = await lauf("weiblich", "Du bist weiblich. Sie ist als Elf verkleidet.");
+    const r = await lauf("weiblich", "Du bist weiblich. Sie ist als Fee verkleidet.");
     expect(r.alterUnlesbar).toBe(false);
+    expect(_untereAltersgrenze(r.alterAnker)).toBeNull();
+  });
+
+  /* Seit 05.10.2026 ist jede kleine Zahl ein Altersversuch, auch als Wort.
+     „Elf“ wird dabei nicht als Alter 11 gelesen — das Alter gilt als nicht
+     lesbar. Getragene Richtung: lieber Schutz als ein übersehenes Kinderalter. */
+  test("Beleg-Satz mit Zahlwort, das kein Alter ist („als Elf verkleidet“): kein Alter gelesen, aber Altersversuch", async () => {
+    const r = await lauf("weiblich", "Du bist weiblich. Sie ist als Elf verkleidet.");
+    expect(r.alterUnlesbar).toBe(true);
     expect(_untereAltersgrenze(r.alterAnker)).toBeNull();
   });
 
@@ -724,10 +733,15 @@ describe("SEC-2026-10-03-02 — Alter hinter einem Abkürzungspunkt oder nur als
       expect(r.karte).toBe(`Du bist weiblich. ${NICHT_LESBAR_DE}`);
     });
 
-    /* Gegenprobe: Ohne Alterswort ist auch eine Zahl im Beleg-Satz kein
-       Altersversuch. */
-    test("Beleg-Satz mit Zahl, aber ohne Alterswort: bleibt ungefiltert", async () => {
+    /* Seit 05.10.2026: Auch ohne Alterswort ist eine kleine Zahl im Beleg-Satz
+       ein Altersversuch. Gegenprobe: eine Zahl über der Schutzgrenze nicht. */
+    test("Beleg-Satz mit kleiner Zahl, aber ohne Alterswort: Altersversuch, Schutz greift", async () => {
       const r = await analyse("weiblich", "Du bist weiblich. Sie trägt ein Trikot mit der Nummer 8.");
+      expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false });
+    });
+
+    test("Beleg-Satz mit Zahl über der Schutzgrenze, ohne Alterswort: bleibt ungefiltert", async () => {
+      const r = await analyse("weiblich", "Du bist weiblich. Sie trägt ein Trikot mit der Nummer 88.");
       expect(r).toMatchObject({ stufe2: false, alter: null, unlesbar: false, kreditBleibt: true });
     });
   });
@@ -1030,21 +1044,30 @@ describe("SEC-2026-10-03-02 — Alter hinter einem Abkürzungspunkt oder nur als
       expect(r.karte).not.toContain(NICHT_LESBAR_DE);
     });
 
-    /* Kein Altersversuch: Zahl mit Einheit oder Zählwort, Uhrzeit,
-       Körpergröße, Näherung über der Schutzgrenze. Bleibt ungefiltert. */
+    /* Kein Altersversuch: Uhrzeit, Körpergröße, Prozent, Näherung über der
+       Schutzgrenze. Bleibt ungefiltert. */
     test.each([
-      ["Du bist weiblich. Etwa 7 Kopflängen passen in die Körperhöhe."],
-      ["Du bist weiblich. Sie trägt ein Trikot mit der Nummer 8."],
       ["Du bist männlich. Aufgenommen um etwa 14:30."],
       ["Du bist männlich. Ca. 1,80 groß."],
       ["Du bist männlich. Etwa 20 % Akku."],
       ["Du bist männlich. Etwa 40, mit grauen Schläfen."],
-      ["Du bist weiblich. Rund 10 Freunde stehen um dich."],
       ["Keine klaren Bildsignale. Die Person ist von hinten zu sehen."],
     ])("kein Altersversuch, bleibt ungefiltert: %s", async (karte) => {
       expect(hatAltersversuch(karte)).toBe(false);
       const r = await analyse("weiblich", karte);
       expect(r).toMatchObject({ stufe2: false, alter: null, unlesbar: false, kreditBleibt: true });
+    });
+
+    /* Seit 05.10.2026 zählt jede kleine Zahl als Altersversuch, auch mit
+       Zählwort oder als Nummer: Ohne lesbares Alter greift der Schutz. */
+    test.each([
+      ["Du bist weiblich. Etwa 7 Kopflängen passen in die Körperhöhe."],
+      ["Du bist weiblich. Sie trägt ein Trikot mit der Nummer 8."],
+      ["Du bist weiblich. Rund 10 Freunde stehen um dich."],
+    ])("kleine Zahl mit Zählwort oder als Nummer, Altersversuch: %s", async (karte) => {
+      expect(hatAltersversuch(karte)).toBe(true);
+      const r = await analyse("weiblich", karte);
+      expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false });
     });
 
     /* Getragene Richtung: Fehlt jedes lesbare Alter an den Stellen, die
@@ -1426,9 +1449,16 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
       false,
     ],
     [
-      "kein Altersversuch, Zahl mit Zählwort im Beleg-Satz",
+      "kleine Zahl mit Zählwort im Beleg-Satz: Altersversuch",
       "weiblich",
       "Du bist weiblich. Etwa 7 Kopflängen passen in die Körperhöhe.",
+      false,
+      true,
+    ],
+    [
+      "kein Altersversuch, Körpergröße im Beleg-Satz",
+      "weiblich",
+      "Du bist weiblich. Du bist etwa 1,80 m groß.",
       true,
       false,
     ],
@@ -1551,5 +1581,1050 @@ describe("Live-Anzeige und Endergebnis entscheiden über die Alterskarte gleich"
     const KIND = "Du bist weiblich, ~13 Jahre alt (Spanne 12-14).";
     const r = await beides(antwort("Du bist weiblich, ~‹Zahl› Jahre alt.", KIND + BELEG, KIND + " Leichte Beute."));
     expect(r).toMatchObject({ jemalsStandard: false, jemalsBeast: false, festerSatz: true, festerSatzBeast: true });
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen (05.10.2026).
+
+   Die Regel bleibt: Als Altersangabe zählt der Anker, sonst der erste Satz
+   der Alterskarte; ohne jeden Altersversuch wird nicht gefiltert. Neu, in
+   Richtung Schutz: Hat keine dieser Stellen ein lesbares Alter, ist JEDE
+   ganze Zahl von 1 bis zur Schutzgrenze im Anker oder in einer der zwei
+   Alterskarten ein Altersversuch — das Alter gilt als nicht lesbar, Stufe 2
+   greift. Ausgenommen ist nur, was erkennbar keine Angabe zu einer Person
+   ist: Dezimalzahl, Uhrzeit, Prozent, Teil einer größeren Zahl.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => {
+  /* Über die Nummer gebaut: Ein Zeichen jenseits der Grundebene steht in
+     JavaScript auf zwei Plätzen. Jede Regel, die mit Stellen im Text rechnet,
+     bekommt einen Fall mit diesem Zeichen DAVOR. */
+  const FEUER = String.fromCodePoint(0x1f525);
+  const FESTER_SATZ = { de: DE.alterNichtLesbar, en: EN.alterNichtLesbar };
+
+  const ORIGINAL_API_KEY = process.env.MISTRAL_API_KEY;
+  beforeEach(() => {
+    process.env.MISTRAL_API_KEY = "test-key-not-real";
+    _setRateIntervalMs(0);
+    _resetRateBucket();
+  });
+  afterEach(() => {
+    if (ORIGINAL_API_KEY === undefined) delete process.env.MISTRAL_API_KEY;
+    else process.env.MISTRAL_API_KEY = ORIGINAL_API_KEY;
+    setFetchForTest(null);
+  });
+
+  function karten(alterWert) {
+    const k = {};
+    for (const name of REQUIRED_CARDS)
+      k[name] = { label: name, value: "Du bist X. Das zeigt das Bild.", confidence: 0.8 };
+    k.alter_geschlecht = { label: "Alter & Geschlecht", value: alterWert, confidence: 0.8 };
+    return k;
+  }
+
+  const liveSichtbar = (liste) => liste.some((k) => k.schluessel === "alter_geschlecht");
+
+  /* Der echte Weg: Antwort der KI → runSingleLargeCall → applyMinorSafety,
+     verdrahtet wie job-pipelines.js. Dazu die Live-Anzeige, Zeichen für
+     Zeichen: War die Alterskarte JEMALS zu sehen?
+     anker === undefined: hard_facts fehlt ganz. */
+  async function lauf(anker, standard, beast = standard, lang = "de") {
+    const body = { subject: "HUMAN", visible_text: "" };
+    if (anker !== undefined) body.hard_facts = { alter_geschlecht: anker, herkunft: "mitteleuropäisch" };
+    body.standard = {
+      profileText: "Sachlich.",
+      ad_targeting: ["Sofortkredit", "Lego Set"],
+      manipulation_triggers: ["A."],
+      categories: karten(standard),
+    };
+    body.beast = {
+      profileText: "Zynisch.",
+      ad_targeting: ["Klarna", "Pokemon Karten"],
+      manipulation_triggers: ["B."],
+      categories: karten(beast),
+    };
+    const roh = JSON.stringify(body);
+    /* Erst gerechnet, wenn ein Test danach fragt — der Strom wird dann
+       Zeichen für Zeichen durchgegangen. */
+    let jemals = null;
+    const live = () => {
+      if (jemals) return jemals;
+      jemals = { standard: false, beast: false };
+      for (let i = 1; i <= roh.length; i++) {
+        const teil = _extrahiereLiveText(roh.slice(0, i));
+        jemals.standard = jemals.standard || liveSichtbar(teil.kartenStandard);
+        jemals.beast = jemals.beast || liveSichtbar(teil.kartenBeast);
+      }
+      return jemals;
+    };
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: roh }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 100, completion_tokens: 100 },
+      }),
+    }));
+    const p = await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, lang);
+    const s = applyMinorSafety(p, {
+      lang,
+      alterText: p.alterAnker || undefined,
+      alterUnlesbar: p.alterUnlesbar === true,
+    });
+    const karte = p.normal.categories.alter_geschlecht.value;
+    const karteBeast = p.boost.categories.alter_geschlecht.value;
+    return {
+      stufe2: s.minderjaehrig,
+      alter: s.alter,
+      unlesbar: s.alterUnlesbar,
+      kreditBleibt: p.normal.ad_targeting.includes("Sofortkredit") || p.boost.ad_targeting.includes("Klarna"),
+      harmlosBleibt: p.normal.ad_targeting.includes("Lego Set") && p.boost.ad_targeting.includes("Pokemon Karten"),
+      karte,
+      karteBeast,
+      festerSatz: karte.includes(FESTER_SATZ[lang]),
+      festerSatzBeast: karteBeast.includes(FESTER_SATZ[lang]),
+      get jemalsStandard() {
+        return live().standard;
+      },
+      get jemalsBeast() {
+        return live().beast;
+      },
+    };
+  }
+
+  /* ── Die Reihe: Stufe 2 je Altersform ──────────────────────────────────
+     [Fall, Anker, Standard-Karte, Beast-Karte (sonst gleich), Sprache, Soll].
+     Drei Fälle sind bewusst so und im SECURITY-MODEL benannt (Abschnitt
+     17.09.2026, Punkt 3): Eine genannte Zahl schlägt die Kategorie, auch
+     wenn sie kein Alter ist; und der Anker zählt, auch gegen die Karte. */
+  const REIHE = [
+    [
+      "K1 Kontrolle Kind, Format des Prompts",
+      "weiblich, ~13 Jahre alt (Spanne 12-14)",
+      "Du bist weiblich, ~13 Jahre alt (Spanne 12-14). Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 12, unlesbar: false },
+    ],
+    [
+      "K2 Kontrolle Erwachsener, Format des Prompts",
+      "männlich, ~40 Jahre alt (Spanne 38-45)",
+      "Du bist männlich, ~40 Jahre alt (Spanne 38-45). Die Linien bleiben sichtbar.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 38, unlesbar: false },
+    ],
+    [
+      "K3 Kontrolle kein Altersversuch (bewusst ungefiltert)",
+      "nicht eindeutig erkennbar",
+      "Keine klaren Bildsignale.",
+      undefined,
+      "de",
+      { stufe2: false, alter: null, unlesbar: false },
+    ],
+    [
+      "A01 Anker 'weiblich, ~13 J.'",
+      "weiblich, ~13 J.",
+      "Du bist weiblich, ~13 J. alt. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 13, unlesbar: false },
+    ],
+    [
+      "A02 Anker 'weiblich, Alter: 13'",
+      "weiblich, Alter: 13",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 13, unlesbar: false },
+    ],
+    [
+      "A03 Anker 'weiblich, unter 14'",
+      "weiblich, unter 14",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 14, unlesbar: false },
+    ],
+    [
+      "A04 Anker 'weiblich, vier Jahre alt'",
+      "weiblich, vier Jahre alt",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "A05 Anker 'weiblich, ein Jahr alt'",
+      "weiblich, ein Jahr alt",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "A06 Anker 'weiblich, vorpubertär'",
+      "weiblich, vorpubertär",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A07 Anker 'weiblich, präpubertär'",
+      "weiblich, präpubertär",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A08 Anker 'female, prepubescent'",
+      "female, prepubescent",
+      "You are female. Evidence.",
+      undefined,
+      "en",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A09 Anker 'weiblich, Erstklasslerin' (österr. Schreibweise)",
+      "weiblich, Erstklasslerin",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 6, unlesbar: false },
+    ],
+    [
+      "A10 Anker 'männlich, Firmling'",
+      "männlich, Firmling",
+      "Du bist männlich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 12, unlesbar: false },
+    ],
+    [
+      "A11 Anker 'weiblich, Mädl'",
+      "weiblich, Mädl",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A12 Anker 'männlich, kleiner Bua'",
+      "männlich, kleiner Bua",
+      "Du bist männlich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A13 Anker 'weiblich, Kommunionkind'",
+      "weiblich, Kommunionkind",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A14 Anker 'weiblich, jung'",
+      "weiblich, jung",
+      "Du bist weiblich und jung. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "A15 Anker 'weiblich, im Wachstum'",
+      "weiblich, noch im Wachstum",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "A16 Anker 'male, freshman'",
+      "male, high-school freshman",
+      "You are male. Evidence.",
+      undefined,
+      "en",
+      { stufe2: true, alter: 14, unlesbar: false },
+    ],
+    [
+      "A17 Anker 'female, 8th grader'",
+      "female, 8th grader",
+      "You are female. Evidence.",
+      undefined,
+      "en",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A18 Anker 'weiblich, Kind, 130 cm'",
+      "weiblich, Kind, 130 cm groß",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A19 Anker 'weiblich, Kind, Kleidergröße 140'",
+      "weiblich, Kind, Kleidergröße 140",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 8, unlesbar: false },
+    ],
+    [
+      "A20 Anker 'weiblich, Teenager, Schuhgröße 38' — bewusst so: Eine genannte Zahl schlägt die Kategorie, auch eine Fremdzahl",
+      "weiblich, Teenager, Schuhgröße 38",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 38, unlesbar: false },
+    ],
+    [
+      "A21 Anker 'weiblich, Schülerin der 4. Klasse'",
+      "weiblich, Schülerin der 4. Klasse",
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 4, unlesbar: false },
+    ],
+    [
+      "A22 Anker Zahl als Zahl (13)",
+      13,
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 13, unlesbar: false },
+    ],
+    [
+      'A23 Anker Liste ["weiblich", 13]',
+      ["weiblich", 13],
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 13, unlesbar: false },
+    ],
+    [
+      "A24 Anker Objekt {alter:{von:12,bis:14}}",
+      { geschlecht: "weiblich", alter: { von: 12, bis: 14 } },
+      "Du bist weiblich. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 12, unlesbar: false },
+    ],
+    [
+      "A25 Anker null, Karte Format",
+      undefined,
+      "Du bist weiblich, ~13 Jahre alt (Spanne 12-14). Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 12, unlesbar: false },
+    ],
+    [
+      "A26 Anker leerer Text, Karte Format",
+      "",
+      "Du bist weiblich, ~13 Jahre alt (Spanne 12-14). Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 12, unlesbar: false },
+    ],
+    [
+      "A27 Anker '~‹Zahl› Jahre alt' (abgeschrieben), Karte mit 13",
+      "weiblich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)",
+      "Du bist weiblich, ~13 Jahre alt (Spanne 12-14). Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 12, unlesbar: true },
+    ],
+    [
+      "A28 Anker erwachsen 28, Karte 'Mädchen, etwa 13' — bewusst so: Der Anker zählt, auch gegen die Karte",
+      "weiblich, ~28 Jahre alt (Spanne 26-30)",
+      "Du bist ein Mädchen, etwa 13 Jahre alt. Beleg.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 26, unlesbar: false },
+    ],
+    [
+      "B01 kein Anker, 'Du bist weiblich. Alter: 13.'",
+      undefined,
+      "Du bist weiblich. Alter: 13. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B02 kein Anker, 'Du bist weiblich. 13 J. alt.'",
+      undefined,
+      "Du bist weiblich. 13 J. alt. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B03 kein Anker, 'You are female. Aged 13.'",
+      undefined,
+      "You are female. Aged 13. Your cheeks are still round.",
+      undefined,
+      "en",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B04 kein Anker, 'You are female. Age 13.'",
+      undefined,
+      "You are female. Age 13. Your cheeks are still round.",
+      undefined,
+      "en",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B05 kein Anker, 'You are female. 13 yo.'",
+      undefined,
+      "You are female. 13 yo. Your cheeks are still round.",
+      undefined,
+      "en",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B06 kein Anker, 'Du bist weiblich. Du gehst wohl in die 3. Klasse.'",
+      undefined,
+      "Du bist weiblich. Du gehst wohl in die 3. Klasse.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B07 kein Anker, 'Du bist weiblich. Du wirkst wie 13.'",
+      undefined,
+      "Du bist weiblich. Du wirkst wie 13. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B08 kein Anker, 'Du bist weiblich. Ich schätze dich auf 13.'",
+      undefined,
+      "Du bist weiblich. Ich schätze dich auf 13. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B09 kein Anker, 'Du bist weiblich. Schätzung: 12–14.'",
+      undefined,
+      "Du bist weiblich. Schätzung: 12–14. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B10 Anker 'weiblich', Karte 'Du bist weiblich. Alter: 13.'",
+      "weiblich",
+      "Du bist weiblich. Alter: 13. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B11 kein Anker, 'Weiblich! Etwa 13 Jahre alt.'",
+      undefined,
+      "Weiblich! Etwa 13 Jahre alt. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B12 kein Anker, 'Du bist ein Junge im Trikot mit der 27.' — bewusst so: Eine genannte Zahl schlägt die Kategorie, auch eine Fremdzahl",
+      undefined,
+      "Du bist ein Junge im Trikot mit der 27. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 27, unlesbar: false },
+    ],
+    [
+      "B13 kein Anker, 'Du bist weiblich, w. ca. 13 J.'",
+      undefined,
+      "W., ca. 13 J. alt. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 13, unlesbar: false },
+    ],
+    [
+      "B14 kein Anker, 'Du bist weiblich. 13.'",
+      undefined,
+      "Du bist weiblich. 13. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B15 kein Anker, 'Du bist weiblich. Ca. 13.'",
+      undefined,
+      "Du bist weiblich. Ca. 13. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B16 kein Anker, Standard ohne Alter, Beast 'Mädchen, 13'",
+      undefined,
+      "Du bist weiblich. Beleg.",
+      "Du bist ein Mädchen, 13 Jahre alt. Beleg.",
+      "de",
+      { stufe2: true, alter: 13, unlesbar: false },
+    ],
+    [
+      "B17 kein Anker, Karte 'Du bist weiblich, 13-jährig.'",
+      undefined,
+      "Du bist weiblich, 13-jährig. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: 13, unlesbar: false },
+    ],
+    [
+      "B18 kein Anker, 'Du bist weiblich. Du bist 13.'",
+      undefined,
+      "Du bist weiblich. Du bist 13. Deine Wangen sind noch rund.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "B19 kein Anker, 'Du bist weiblich. Dreizehn, höchstens vierzehn.'",
+      undefined,
+      "Du bist weiblich. Dreizehn, höchstens vierzehn. Beleg.",
+      undefined,
+      "de",
+      { stufe2: true, alter: null, unlesbar: true },
+    ],
+    [
+      "C01 Erwachsene mit Kind im Bild, Anker lesbar (soll NICHT greifen)",
+      "weiblich, ~40 Jahre alt (Spanne 38-45)",
+      "Du bist weiblich, ~40 Jahre alt (Spanne 38-45). Du hältst ein Kind an der Hand.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 38, unlesbar: false },
+    ],
+    [
+      "C02 Erwachsener, Anker 'männlich, Mitte vierzig'",
+      "männlich, Mitte vierzig",
+      "Du bist männlich, Mitte vierzig. Beleg.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 40, unlesbar: false },
+    ],
+    [
+      "C03 Erwachsener, Anker 'männlich, 40+'",
+      "männlich, 40+",
+      "Du bist männlich, 40+. Beleg.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 40, unlesbar: false },
+    ],
+    [
+      "C04 Erwachsener, Karte nennt Kleidergröße 12 im Beleg-Satz",
+      "weiblich, ~40 Jahre alt (Spanne 38-45)",
+      "Du bist weiblich, ~40 Jahre alt (Spanne 38-45). Das Trikot trägt die Nummer 12.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 38, unlesbar: false },
+    ],
+    [
+      "C05 Erwachsener ohne Anker, Zahl 7 im Beleg-Satz",
+      undefined,
+      "Du bist männlich, ~40 Jahre alt. Der Kopf passt 7-mal in die Körperhöhe.",
+      undefined,
+      "de",
+      { stufe2: false, alter: 40, unlesbar: false },
+    ],
+  ];
+
+  test("die Reihe hat ihre Kontrollen: Kind, Erwachsener, kein Altersversuch", () => {
+    expect(REIHE).toHaveLength(55);
+    expect(REIHE.filter(([fall]) => fall.includes("bewusst so"))).toHaveLength(3);
+  });
+
+  test.each(REIHE)("%s", async (_fall, anker, standard, beast, lang, soll) => {
+    const r = await lauf(anker, standard, beast, lang);
+    expect({ stufe2: r.stufe2, alter: r.alter, unlesbar: r.unlesbar }).toEqual(soll);
+    /* Stufe 2 heißt: Die Kredit-Werbung ist weg, die harmlose bleibt. */
+    expect(r.kreditBleibt).toBe(!soll.stufe2);
+    expect(r.harmlosBleibt).toBe(true);
+    /* Ist das Alter nicht lesbar, steht am Ende der feste Satz — und die
+       Karte war live nie zu sehen, auch nicht mit dem Kinderalter. */
+    expect(r.festerSatz).toBe(soll.unlesbar);
+    expect(r.festerSatz && r.jemalsStandard).toBe(false);
+    expect(r.festerSatzBeast && r.jemalsBeast).toBe(false);
+  });
+
+  /* ── Jede kleine Zahl ist ein Altersversuch ─────────────────────────── */
+  test.each([
+    ["Du bist weiblich. Alter: 13."],
+    ["Du bist weiblich. 13 J. alt."],
+    ["You are female. Aged 13."],
+    ["You are female. Age 13."],
+    ["You are female. 13 yo."],
+    ["Du bist weiblich. Du gehst wohl in die 3. Klasse."],
+    ["Du bist weiblich. Du wirkst wie 13."],
+    ["Du bist weiblich. Ich schätze dich auf 13."],
+    ["Du bist weiblich. Schätzung: 12–14."],
+    ["Du bist weiblich. 13."],
+    ["Du bist weiblich. Du bist 13."],
+    ["Du bist weiblich. Auf dem Trikot steht die 7."],
+    ["Du bist weiblich. Etwa 7 Kopflängen passen in die Körperhöhe."],
+    ["Du bist weiblich. Rund 10 Freunde stehen um dich."],
+    ["Du bist weiblich. Du bist die Nummer 1."],
+    ["Du bist weiblich. Du bist ‹13›."],
+    ["Du bist weiblich. Du bist dreizehn."],
+    ["Du bist weiblich. Du bist drei."],
+    ["Du bist weiblich. Du bist vier."],
+    ["You are female. You are four."],
+    ["Du bist weiblich. Zwei Zöpfe."],
+    [`${FEUER} Du bist weiblich. ${FEUER} Du bist drei.`],
+    ["Du bist weiblich. Du bist 12,5."],
+    [`Du bist weiblich. ${FEUER} 13.`],
+    [`${FEUER}${FEUER} Du bist weiblich. Du gehst in die 3. Klasse.`],
+  ])("Altersversuch: %s", async (karte) => {
+    expect(hatAltersversuch(karte)).toBe(true);
+    const r = await lauf(undefined, karte);
+    expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false, festerSatz: true });
+    expect(r.jemalsStandard || r.jemalsBeast).toBe(false);
+  });
+
+  /* Ausgenommen ist nur, was erkennbar keine Angabe zu einer Person ist. */
+  test.each([
+    ["Dezimalzahl mit Komma", "Du bist weiblich. Du bist 1,80 m groß."],
+    ["Dezimalzahl mit Punkt", "Du bist weiblich. Du bist 1.80 m groß."],
+    ["Uhrzeit mit Doppelpunkt", "Du bist weiblich. Das Foto entstand um 14:30."],
+    ["Uhrzeit mit „Uhr“", "Du bist weiblich. Das Foto entstand um 9 Uhr."],
+    ["englische Uhrzeit", "You are female. The photo was taken at 9 p.m."],
+    ["Jahreszahl", "Du bist weiblich. Aufgenommen 2012."],
+    ["Teil einer größeren Zahl", "Du bist weiblich. Im Hintergrund steht Hausnummer 113."],
+    ["Körpergröße in Zentimetern", "Du bist weiblich. Du bist etwa 130 cm groß."],
+    ["Prozent als Zeichen", "Du bist weiblich. Der Akku steht bei 12 %."],
+    ["Prozent als Wort", "Du bist weiblich. Auf dem Schild stehen 20 Prozent Rabatt."],
+    ["Datum mit Punkten", "Du bist weiblich. Aufgenommen am 3.5.2012."],
+    ["Zahl über der Schutzgrenze", "Du bist weiblich. Auf dem Trikot steht die 27."],
+    [
+      "mit Zeichen jenseits der Grundebene davor",
+      `${FEUER} Du bist weiblich. ${FEUER} Du bist 1,80 m groß, es ist 14:30.`,
+    ],
+  ])("kein Altersversuch — %s: bleibt ungefiltert", async (_was, karte) => {
+    expect(hatAltersversuch(karte)).toBe(false);
+    /* Ohne Anker und mit einem Anker, der nur das Geschlecht nennt. */
+    for (const anker of [undefined, "weiblich"]) {
+      const r = await lauf(anker, karte);
+      expect(r).toMatchObject({ stufe2: false, alter: null, unlesbar: false, kreditBleibt: true, festerSatz: false });
+      if (anker === undefined) expect(r.karte).toBe(karte);
+    }
+  });
+
+  test("die Grenze für die kleine Zahl ist die Schutzgrenze des Filters", () => {
+    expect(hatAltersversuch(`Du bist weiblich. Auf dem Trikot steht die ${SCHUTZ_ALTER}.`)).toBe(true);
+    expect(hatAltersversuch(`Du bist weiblich. Auf dem Trikot steht die ${SCHUTZ_ALTER + 1}.`)).toBe(false);
+    expect(hatAltersversuch("Du bist weiblich. Auf dem Trikot steht die 0.")).toBe(false);
+  });
+
+  /* ── Der Normalfall ändert sich nicht ───────────────────────────────────
+     Nennt der Anker oder der erste Satz ein lesbares Alter, zählt keine Zahl
+     und kein Wort aus dem Rest der Karte. */
+  test.each([
+    [
+      "Anker lesbar, Trikotnummer im Beleg-Satz",
+      "weiblich, ~40 Jahre alt (Spanne 38-45)",
+      "Du bist weiblich, ~40 Jahre alt (Spanne 38-45). Das Trikot trägt die Nummer 12.",
+      38,
+    ],
+    [
+      "erster Satz lesbar, Zahl im Beleg-Satz",
+      undefined,
+      "Du bist männlich, ~40 Jahre alt. Der Kopf passt 7-mal in die Körperhöhe.",
+      40,
+    ],
+    [
+      "Anker lesbar, Schulklasse des Kindes im Beleg-Satz",
+      "weiblich, ~40 Jahre alt (Spanne 38-45)",
+      "Du bist weiblich, ~40 Jahre alt. Dein Kind geht in die 3. Klasse.",
+      38,
+    ],
+    [
+      "Anker lesbar, „jung“ und „Firmling“ im Beleg-Satz",
+      "männlich, ~40 Jahre alt (Spanne 38-45)",
+      "Du bist männlich, ~40 Jahre alt. Du wirkst jung, neben dir steht ein Firmling.",
+      38,
+    ],
+    [
+      "erster Satz lesbar, „Alter: 13“ dahinter",
+      undefined,
+      "Du bist weiblich, ~40 Jahre alt. Alter: 13 steht auf dem Schild.",
+      40,
+    ],
+    ["Zahlwort im Anker", "männlich, Mitte vierzig", "Du bist männlich, Mitte vierzig. Deine 3 Ringe glänzen.", 40],
+  ])("Normalfall unverändert — %s", async (_fall, anker, karte, alter) => {
+    const r = await lauf(anker, karte);
+    expect(r).toMatchObject({ stufe2: false, alter, unlesbar: false, kreditBleibt: true, festerSatz: false });
+    expect(r.jemalsStandard && r.jemalsBeast).toBe(true);
+  });
+
+  /* ── Weitere Wörter für Kinder und Jugendliche ────────────────────────── */
+  test.each([
+    ["weiblich, vorpubertär", 8],
+    ["weiblich, präpubertär", 8],
+    ["weiblich, praepubertaer", 8],
+    ["female, prepubescent", 8],
+    ["female, pre-pubescent", 8],
+    ["female, prepubertal", 8],
+    ["female, pubescent", 12],
+    ["weiblich, pubertär", 12],
+    ["weiblich, Erstklasslerin", 6],
+    ["männlich, Drittklassler", 6],
+    ["männlich, Taferlklassler", 6],
+    ["weiblich, Schulanfängerin", 6],
+    ["männlich, ABC-Schütze", 6],
+    ["weiblich, Kommunionkind", 8],
+    ["weiblich, Erstkommunion", 8],
+    ["männlich, Ministrant", 8],
+    ["männlich, Firmling", 12],
+    ["weiblich, Konfirmandin", 13],
+    ["männlich, Halbwüchsiger", 13],
+    ["männlich, Halbstarker", 13],
+    ["weiblich, Maturantin", 17],
+    ["männlich, Abiturient", 17],
+    ["weiblich, schulpflichtig", 6],
+    ["weiblich, dritte Klasse", 6],
+    ["männlich, in der vierten Klasse", 6],
+    ["weiblich, zweite Schulstufe", 6],
+    ["female, third grade", 6],
+    ["weiblich, Mittelschülerin", 10],
+    ["weiblich, Mittelschule", 10],
+    ["männlich, Gesamtschule", 10],
+    ["männlich, Hauptschule", 10],
+    ["weiblich, Vorschule", 3],
+    ["female, preschool", 3],
+    ["female, preschooler", 3],
+    ["female, pre-school", 3],
+    ["weiblich, in der Krabbelgruppe", 1],
+    ["männlich, Kita", 3],
+    ["weiblich, Krabbelkind", 1],
+    ["männlich, Krippenkind", 1],
+    ["weiblich, Kinderkrippe", 1],
+    ["weiblich, im Krabbelalter", 1],
+    ["männlich, Kitakind", 3],
+    ["weiblich, Kindertagesstätte", 3],
+    ["männlich, Realschule", 10],
+    ["weiblich, Gesamtschülerin", 10],
+    ["weiblich, frühpubertär", 8],
+    ["weiblich, Erstkommunionkind", 8],
+    ["female, kiddie", 8],
+    ["female, one of the little ones", 8],
+    ["male, sophomores", 14],
+    ["weiblich, Konfirmandinnen", 13],
+    ["männlich, Firmlinge", 12],
+    ["männlich, Abc-Schütze", 6],
+    ["weiblich, Madel", 8],
+    ["männlich, Buberl", 8],
+    ["männlich, Bubi", 8],
+    ["männlich, Büblein", 8],
+    ["weiblich, Göre", 8],
+    ["männlich, Bengel", 8],
+    ["männlich, Dreikäsehoch", 8],
+    ["weiblich, Neugeborene", 1],
+    ["männlich, Sprössling", 8],
+    ["weiblich, Mädl", 8],
+    ["weiblich, Madl", 8],
+    ["weiblich, Mäderl", 8],
+    ["männlich, kleiner Bua", 8],
+    ["männlich, zwei Buam", 8],
+    ["männlich, Bübchen", 8],
+    ["männlich, Knirps", 8],
+    ["weiblich, Neugeborenes", 1],
+    ["female, newborn", 1],
+    ["male, freshman", 14],
+    ["male, sophomore", 14],
+    ["female, kiddo", 8],
+    ["female, grade schooler", 8],
+    [`weiblich ${FEUER}, Firmling`, 12],
+    [`${FEUER} weiblich, Mädl`, 8],
+  ])("gelesen als Altersstufe: %s → %p", async (anker, alter) => {
+    expect(_untereAltersgrenze(anker)).toBe(alter);
+    const r = await lauf(anker, "Du bist X. Das zeigt das Bild.");
+    expect(r).toMatchObject({ stufe2: true, alter, unlesbar: false, kreditBleibt: false, festerSatz: false });
+  });
+
+  test.each([
+    ["weiblich, postpubertär"],
+    ["weiblich, erstklassig gekleidet"],
+    ["weiblich, Schulanfang im Bild"],
+    ["männlich, firm im Auftreten"],
+    ["weiblich, Madlen"],
+    ["weiblich, konfirmiert"],
+    ["männlich, Bualand-Shirt"],
+    ["weiblich, geht zur Kommunion"],
+    ["männlich, Ministrantenleiter"],
+    ["weiblich, Firmlingsbetreuerin"],
+    ["weiblich, Matura bestanden"],
+    ["weiblich, Mittelschullehrerin"],
+    ["weiblich, Vorschullehrerin"],
+    ["weiblich, Weltklasse"],
+    ["weiblich, Krippe"],
+    ["weiblich, Kitaleiterin"],
+    ["weiblich, Kindertagesstättenleiterin"],
+    ["weiblich, Kinderkrippenleiterin"],
+    ["weiblich, Krabbelgruppenleiterin"],
+    ["weiblich, Vorschulpädagogin"],
+    ["female, preschool teacher"],
+    ["female, freshly styled"],
+  ])("kein Kind in: %s", (text) => {
+    expect(_untereAltersgrenze(text)).toBeNull();
+    expect(hatAltersversuch(text)).toBe(false);
+  });
+
+  /* ── „jung“ und „im Wachstum“: Altersversuch ohne lesbares Alter ──────── */
+  test.each([
+    ["weiblich, jung", "Du bist weiblich und jung. Runde Wangen."],
+    ["weiblich, noch im Wachstum", "Du bist weiblich. Runde Wangen."],
+    ["männlich, noch nicht ausgewachsen", "Du bist männlich. Runde Wangen."],
+    ["männlich, mitten im Wachstumsschub", "Du bist männlich. Runde Wangen."],
+    ["female, young", "You are female. Round cheeks."],
+    ["male, still growing", "You are male. Round cheeks."],
+    [`${FEUER} weiblich, jung`, "Du bist weiblich. Runde Wangen."],
+    [`${FEUER} männlich, noch im Wachstum`, "Du bist männlich. Runde Wangen."],
+    [undefined, "Du bist weiblich. Du wirkst jung."],
+    [undefined, "Du bist ein junger Mensch. Runde Wangen."],
+    [undefined, "Du bist weiblich. Du hast ein junges Gesicht."],
+    [undefined, "Du bist weiblich. Du hast noch Milchzähne."],
+    ["weiblich, mitten im Wachstum", "Du bist weiblich. Runde Wangen."],
+    [undefined, "You are female. You look young."],
+  ])("Altersversuch im Anker oder in der Karte: %p / %s", async (anker, karte) => {
+    const r = await lauf(anker, karte, karte, /^You/.test(karte) ? "en" : "de");
+    expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false, festerSatz: true });
+    expect(r.jemalsStandard || r.jemalsBeast).toBe(false);
+  });
+
+  test.each([
+    ["Du bist eine junge Person."],
+    ["Auf dem Bild sind junge Leute."],
+    ["Du hast junge Gesichtszüge."],
+    ["Du hast junge Züge."],
+    ["Du bist eine junge Erscheinung."],
+    ["Du hast ein junges Aussehen."],
+    ["Du bist noch in der Entwicklung."],
+    ["Du bist noch nicht ganz ausgewachsen."],
+    ["You are not yet fully grown."],
+    ["You are in a growth spurt."],
+    ["You are two."],
+    ["You are three."],
+    ["Du bist dreijährig."],
+    ["Du bist zweieinhalb."],
+    ["Du bist ganz jung."],
+    ["You are really young."],
+    /* „sehr jung“ zählt auch vor einem Erwachsenen-Wort. */
+    ["You are a very young woman."],
+    /* Merkmale, die nur Kinder und Jugendliche haben. */
+    ["Du hast noch Milchzähne."],
+    ["Dir fehlt ein Milchzahn."],
+    ["Du hast ein Milchgebiss."],
+    ["Du bist mitten im Zahnwechsel."],
+    ["Du hast ein Wechselgebiss."],
+    ["Du bist im Stimmbruch."],
+    ["Du hast noch Babyspeck."],
+    ["You still have milk teeth."],
+    ["You still have puppy fat."],
+    ["Your voice is breaking."],
+    [`${FEUER} Du hast noch Milchzähne.`],
+  ])("Altersversuch als Wort: %s", (karte) => {
+    expect(hatAltersversuch(karte)).toBe(true);
+    expect(hatLesbaresAlter(karte)).toBe(false);
+  });
+
+  /* Erwachsenen-Formen und Redewendungen sind kein Altersversuch. */
+  test.each([
+    ["Du bist eine junge Frau."],
+    ["Du bist ein junger Mann."],
+    ["Du bist ein junger Erwachsener."],
+    ["You are a young woman."],
+    ["You are a young man."],
+    ["You are a young adult."],
+    ["Du bist jung geblieben."],
+    ["Mode für Jung und Alt."],
+    ["Du hast eine junge Katze auf dem Arm."],
+    ["Du wirkst jünger als auf dem Ausweis."],
+    ["Dein Unternehmen ist im Wachstum."],
+    ["You are young at heart."],
+    ["You are a young lady."],
+    ["You are a young gentleman."],
+    ["You are a young mother."],
+    ["You are a young father."],
+    ["You are a young mom."],
+    ["You are a young dad."],
+    ["You are young parents."],
+    ["You are a young professional."],
+    ["You are a young couple."],
+    ["Fashion for young and old."],
+    ["You are young men."],
+    ["You are young women."],
+    ["Du bist jung verheiratet."],
+    ["Du bist jung im Herzen."],
+    ["Du bist eine junggebliebene Frau."],
+    ["Du trägst junge Mode."],
+    ["Du trägst eine Zahnspange."],
+    ["Du hast eine Zahnlücke."],
+    ["Du trinkst gern Milch."],
+    ["Your voice is deep."],
+  ])("kein Altersversuch: %s", (karte) => {
+    expect(hatAltersversuch(karte)).toBe(false);
+  });
+
+  test("Versuch im Anker, lesbares Alter im ersten Satz der Karte: Die Karte zählt und bleibt stehen", async () => {
+    const karte = "Du bist weiblich, ~13 Jahre alt (Spanne 12-14). Runde Wangen.";
+    const r = await lauf("weiblich, jung", karte);
+    expect(r).toMatchObject({ stufe2: true, alter: 12, unlesbar: false, festerSatz: false });
+    expect(r.karte).toBe(karte);
+    expect(r.jemalsStandard && r.jemalsBeast).toBe(true);
+  });
+
+  /* ── Alterswörter und Abkürzungen ─────────────────────────────────────── */
+  test.each([
+    ["weiblich, ein Jahr alt"],
+    ["weiblich, ein Jahr"],
+    ["weiblich, im ersten Lebensjahr"],
+    ["weiblich, im 1. Lj."],
+    ["weiblich, Alter: unklar"],
+    ["female, age: unknown"],
+    [`${FEUER} weiblich, ein Jahr alt`],
+  ])("Alterswort ohne lesbares Alter im Anker: %s — Altersversuch, Schutz greift", async (anker) => {
+    expect(hatAltersversuch(anker)).toBe(true);
+    const r = await lauf(anker, "Du bist X. Das zeigt das Bild.");
+    expect(r).toMatchObject({ stufe2: true, unlesbar: _untereAltersgrenze(anker) === null, kreditBleibt: false });
+    expect(r.festerSatz && (r.jemalsStandard || r.jemalsBeast)).toBe(false);
+  });
+
+  test.each([
+    ["Jahreszeit", "Du bist weiblich. Die Jahreszeit ist der Herbst."],
+    ["Jahrzehnt", "Du bist weiblich. Die Frisur stammt aus einem anderen Jahrzehnt."],
+    ["Alter ohne Doppelpunkt", "Du bist weiblich. Dein Alter zeigt das Bild nicht."],
+    ["der Buchstabe J", "Du bist weiblich. Auf der Kappe steht ein J."],
+  ])("kein Alterswort — %s", (_was, karte) => {
+    expect(hatAltersversuch(karte)).toBe(false);
+  });
+
+  /* Die Kurzformen sind Alterswörter wie „Jahre“: Steht das Alter mit ihnen
+     erst im Beleg-Satz, ist es ein Altersversuch ohne lesbares Alter — auch
+     über der Schutzgrenze. */
+  test.each([
+    ["Du bist männlich. 40 J. alt."],
+    ["Du bist männlich. 40 Jahr alt."],
+    ["Du bist männlich. Seit einem Jahr trägst du Bart."],
+    ["Du bist männlich. Im 40. Lebensjahr."],
+    ["Du bist männlich. Du stehst im 40. Lj."],
+    ["Du bist männlich. Alter: 40."],
+    ["Du bist männlich. Im Alter von vierzig."],
+    ["Du bist männlich. Alter etwa 40."],
+    ["You are male. Aged 40."],
+    ["You are male. Age 40."],
+    ["You are male. At the age of forty."],
+    ["You are male. 40 yo."],
+    ["You are male. 40 y/o."],
+    ["You are male. 40 y.o."],
+    [`${FEUER} Du bist männlich. ${FEUER} 40 J. alt.`],
+  ])("Kurzform im Beleg-Satz, Altersversuch ohne lesbares Alter: %s", async (karte) => {
+    expect(hatAltersversuch(karte)).toBe(true);
+    const r = await lauf(undefined, karte, karte, /^You/.test(karte) ? "en" : "de");
+    expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, kreditBleibt: false, festerSatz: true });
+    expect(r.jemalsStandard || r.jemalsBeast).toBe(false);
+  });
+
+  /* Die neuen Kurzformen sind ein Altersversuch, machen den Anker aber nicht
+     von sich aus unlesbar: Nennt der erste Satz der Karte ein Alter, zählt
+     es wie bisher. */
+  test("Kurzform ohne Zahl im Anker, lesbares Alter im ersten Satz der Karte: Die Karte zählt", async () => {
+    const karte = "Du bist weiblich, ~40 Jahre alt (Spanne 38-45). Lachfalten.";
+    const r = await lauf("weiblich, Alter: unklar", karte);
+    expect(r).toMatchObject({ stufe2: false, alter: 38, unlesbar: false, kreditBleibt: true, festerSatz: false });
+    expect(r.karte).toBe(karte);
+  });
+
+  test.each([
+    ["Du bist weiblich, 13 J. alt. Runde Wangen.", "Du bist weiblich, 13 J. alt.", 13],
+    ["Du bist weiblich, im 13. Lj. Runde Wangen.", "Du bist weiblich, im 13.", 13],
+    ["W., ca. 13 J. alt. Deine Wangen sind noch rund.", "W., ca. 13 J. alt.", 13],
+    ["M., 12 Jahre. Flaum.", "M., 12 Jahre.", 12],
+    ["F., ~14. Round cheeks.", "F., ~14.", 14],
+    ["Du bist w. ca. 13. Runde Wangen.", "Du bist w. ca. 13.", 13],
+    [`${FEUER} W., ca. 13 J. alt. Runde Wangen.`, `${FEUER} W., ca. 13 J. alt.`, 13],
+    [
+      `${FEUER}${FEUER} Du bist weiblich, 13 J. alt. Runde Wangen.`,
+      `${FEUER}${FEUER} Du bist weiblich, 13 J. alt.`,
+      13,
+    ],
+  ])("der Alterssatz endet nicht am Kürzel: %s", async (karte, erster, alter) => {
+    expect(ersterSatz(karte)).toBe(erster);
+    const r = await lauf(undefined, karte);
+    expect(r).toMatchObject({ stufe2: true, alter, unlesbar: false, kreditBleibt: false, festerSatz: false });
+    expect(r.karte).toBe(karte);
+  });
+
+  /* Nur bis zur Schutzgrenze: Hinter dem Geschlechtskürzel hängt eine höhere
+     Zahl den Satz nicht an — sie würde ein Kindwort davor verdrängen. Der
+     längere Satz kann den Schutz so nur auslösen, nie aufheben. */
+  test.each([
+    ["Du bist ein Mädchen, w. 40 kg schwer, mit Zahnspange.", "Du bist ein Mädchen, w.", 8, false],
+    [`${FEUER} Du bist ein Teenager, m. 38 als Schuhgröße.`, `${FEUER} Du bist ein Teenager, m.`, 13, false],
+    ["W., ca. 40 J. alt. Lachfalten.", "W.", null, true],
+    [`W., ca. ${SCHUTZ_ALTER} J. alt. Lachfalten.`, `W., ca. ${SCHUTZ_ALTER} J. alt.`, SCHUTZ_ALTER, false],
+    [`W., ca. ${SCHUTZ_ALTER + 1} J. alt. Lachfalten.`, "W.", null, true],
+  ])("hinter dem Kürzel eine Zahl über der Schutzgrenze: %s", async (karte, erster, alter, unlesbar) => {
+    expect(ersterSatz(karte)).toBe(erster);
+    const r = await lauf(undefined, karte);
+    expect(r).toMatchObject({ stufe2: true, alter, unlesbar, kreditBleibt: false });
+  });
+
+  test.each([
+    ["Du bist weiblich. Größe M. Runde Wangen.", "Du bist weiblich."],
+    ["Du trägst Größe M. Deine Wangen sind rund.", "Du trägst Größe M."],
+    ["Du bist 13 J. Deine Wangen sind rund.", "Du bist 13 J."],
+    ["Du bist J. aus Wien, mit runden Wangen.", "Du bist J."],
+  ])("echtes Satzende bleibt: %s", (text, erster) => {
+    expect(ersterSatz(text)).toBe(erster);
+  });
+
+  /* ── Live-Anzeige: Was am Ende den festen Satz bekommt, erscheint nie mit
+     einem Kinderalter ─────────────────────────────────────────────────── */
+  test("kleine Zahl nur in der Standard-Karte: beide Karten bleiben live verborgen", async () => {
+    const r = await lauf(undefined, "Du bist weiblich. Du bist 13.", "Du bist weiblich. Leichte Beute.");
+    expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, festerSatz: true, festerSatzBeast: true });
+    expect(r.jemalsStandard || r.jemalsBeast).toBe(false);
+  });
+
+  /* Die bekannte Ausnahme der Live-Anzeige: Die Standard-Karte kommt zuerst
+     an. Bringt erst die Beast-Karte den Altersversuch, stand die
+     Standard-Karte schon da — aber ohne Alter; die Karte mit der Zahl
+     erscheint nicht. */
+  test("kleine Zahl nur in der Beast-Karte: Die Karte mit der Zahl erscheint live nicht", async () => {
+    const standard = "Du bist weiblich. Runde Wangen.";
+    const r = await lauf(undefined, standard, "Du bist weiblich. Du bist 13.");
+    expect(r).toMatchObject({ stufe2: true, alter: null, unlesbar: true, festerSatz: true, festerSatzBeast: true });
+    expect(hatAltersversuch(standard)).toBe(false);
+    expect({ standard: r.jemalsStandard, beast: r.jemalsBeast }).toEqual({ standard: true, beast: false });
+  });
+
+  /* „J.“ hält den Satz nur hinter einer Zahl offen. Als Anfangsbuchstabe eines
+     Namens beendet es ihn — sonst zöge der längere Satz eine Fremdzahl
+     herein, die das Kindwort verdrängt. */
+  test("„J.“ als Anfangsbuchstabe beendet den Satz: Das Kindwort davor zählt", async () => {
+    const karte = `${FEUER} Du bist ein Teenager, Initiale J. mit Schuhgröße 38.`;
+    expect(ersterSatz(karte)).toBe(`${FEUER} Du bist ein Teenager, Initiale J.`);
+    const r = await lauf(undefined, karte);
+    expect(r).toMatchObject({ stufe2: true, alter: 13, unlesbar: false, kreditBleibt: false });
+  });
+
+  /* ── Bewusst so (SECURITY-MODEL, Abschnitt 17.09.2026, Punkt 3) ───────── */
+  test("eine genannte Zahl schlägt die Kategorie — auch im Normalfall „~35 Jahre, jugendlich wirkend“", () => {
+    expect(_untereAltersgrenze("männlich, ~35 Jahre, jugendlich wirkend")).toBe(35);
+    expect(_untereAltersgrenze("weiblich, Teenager, Schuhgröße 38")).toBe(38);
+    expect(_untereAltersgrenze("Du bist ein Junge im Trikot mit der 27.")).toBe(27);
+    /* In die sichere Richtung zieht jede kleinere Zahl. */
+    expect(_untereAltersgrenze("weiblich, Teenager, Schuhgröße 38, Trikot Nummer 7")).toBe(7);
   });
 });

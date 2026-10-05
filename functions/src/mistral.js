@@ -394,12 +394,12 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
 
   /* Nicht lesbares Alter (17.09.2026, siehe alters-lesbarkeit.js): aus den
      ROHWERTEN bestimmt, bevor eine Karte umgeschrieben wird. Unlesbar ist das
-     Alter, wenn der Anker einen Altersversuch ohne lesbare Zahl enthaelt,
-     oder wenn weder der Anker noch der erste Satz einer Karte ein lesbares
-     Alter hat und eine Karte irgendwo einen Altersversuch zeigt (Platzhalter
-     oder Alterswort). Nur der ERSTE Satz einer Karte zaehlt als Altersangabe
-     — der Beleg-Satz danach ("Trikot mit der Nummer acht") ist kein Alter
-     und macht einen Altersversuch auch nicht lesbar (SEC-2026-10-03-02). */
+     Alter, wenn der Anker ein Alterswort ohne lesbare Zahl enthaelt, oder
+     wenn weder der Anker noch der erste Satz einer Karte ein lesbares Alter
+     hat und der Anker oder eine Karte irgendwo einen Altersversuch zeigt
+     (hatAltersversuch). Nur der ERSTE Satz einer Karte zaehlt als Altersangabe
+     — eine Zahl im Beleg-Satz danach ("Trikot mit der Nummer acht") wird nicht
+     als Alter gelesen, ist aber ein Altersversuch (SEC-2026-10-03-02). */
   const ankerRoh = typeof hardFacts.alter_geschlecht === "string" ? hardFacts.alter_geschlecht : "";
   const rohKarte = (modus) => {
     const w = parsed[modus]?.categories?.alter_geschlecht?.value;
@@ -415,7 +415,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   const irgendeinAlterLesbar = [ankerRoh, ankerMit, satzStandard, satzBeast].some(hatLesbaresAlter);
   const alterUnlesbar =
     istAlterUnlesbar(ankerRoh || ankerMit) ||
-    (!irgendeinAlterLesbar && (hatAltersversuch(rohStandard) || hatAltersversuch(rohBeast)));
+    (!irgendeinAlterLesbar && [ankerRoh || ankerMit, rohStandard, rohBeast].some(hatAltersversuch));
 
   /* Was die Alterskarte zeigt. Normalfall wie bisher: Anker vorn, Beleg-Satz
      des Modells dahinter. Hat der Anker kein lesbares Alter (etwa nur

@@ -908,57 +908,98 @@ Untergrenze.
 3. Ist das Alter nicht lesbar — abgeschriebene Vorlage in beliebiger Klammer,
    oder ein Altersversuch ohne lesbares Alter —, zeigt die Alterskarte einen
    festen Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte
-   vorher nicht (eine Ausnahme steht am Ende dieses Punkts). Der Filter lässt
-   Stufe 2 greifen; `mistral.js` bestimmt das (Erkennung in
-   `alters-lesbarkeit.js`, Wörter in `alters-lesbarkeit-woerter.js`) aus den
-   Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
-   Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
-   `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht
-   ab; der Server nimmt dessen Bewertung deshalb auch ohne Alter an
-   (`handle-telemetry.js`). Als Altersangabe einer Karte zählt nur ihr erster
-   Satz — Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) sind kein Alter.
-   Der erste Satz endet nicht am Punkt einer Abkürzung („ca. 13 Jahre“, „im
-   sog. Teenageralter“, „z. B.“, „d. h.“, „i.e.“, „geb. 2012“, „weibl.“) und
-   nicht an einem Punkt zwischen Ziffern („12.–14.“); eine einzelne Stelle
-   hinter dem Komma zählt nicht mit („12,5 Jahre“ ist 12). Steht das
-   Alterswort groß geschrieben direkt hinter einer Näherungs-Abkürzung („ca.
-   Volksschulalter“, „vermutl. Teenager“), endet der Satz dort ebenfalls nicht
-   — außer das Wort nennt ein Alter über der Schutzgrenze: Es würde ein
-   Kindwort davor verdrängen. Zahlwörter („etwa dreizehn“, „Mitte vierzig“,
-   „in her teens“) und Kategoriewörter („Teenager“, „Schulkind“, „Gymnasiast“,
-   „Erstklässler“, „Lehrling“, „im Kindesalter“, „high school“) gelten als
-   lesbar und werden für die Altersauslese in Zahlen übersetzt, Kategorien
-   nur, wenn keine Zahl dasteht; „13jährig“ und „dreizehnjährig“ werden
-   ebenfalls gelesen. Wörter, die ein Kind ohne Zahl benennen („Mädchen“,
-   „Bub“, „Bursch“, „Knabe“, „Junge“, „Volksschulkind“, „Schülerin“, „Baby“
-   und ihre englischen Entsprechungen), zählen wie „Schulkind“; „underage“, „a
-   minor“ und ein Geburtsjahr sind wie „minderjährig“ ein Altersversuch ohne
-   lesbares Alter. Der Altersanker ist laut Schema ein Text. Liefert die KI
-   stattdessen eine Zahl, eine Liste oder ein Objekt, wird der Inhalt für die
-   Altersauslese mitgelesen, aber nicht angezeigt; er kann die Auslese senken,
-   nicht anheben.
+   vorher nicht (zwei Ausnahmen stehen am Ende dieses Punkts). Der Filter lässt
+   Stufe 2 greifen; `mistral.js` bestimmt das aus den Rohwerten der
+   KI-Antwort, bevor eine Karte umgeschrieben wird (Erkennung in
+   `alters-lesbarkeit.js`, Zahl-Lesung in `alters-auslese.js`, Wörter in
+   `alters-lesbarkeit-woerter.js`). Die Kinderschutz-Zeile meldet es als
+   `alterUnlesbar: true`, das Ergebnis trägt `meta.alterUnlesbar`, und der
+   Realitäts-Check fragt das Alter dann nicht ab; der Server nimmt dessen
+   Bewertung deshalb auch ohne Alter an (`handle-telemetry.js`).
 
-   Als Altersversuch gilt, irgendwo in der Karte: die abgeschriebene Vorlage,
-   ein Alterswort („Jahre“, „Spanne“), ein Kindwort oder eine Kategorie („ein
-   Mädchen“, „Schülerin“), ein Näherungswort mit einer Zahl bis 25, hinter der
-   kein Wort folgt („etwa 13,“, „höchstens 12.“; „etwa 7 Kopflängen“ ist
-   keiner), oder „sehr jung“. Steht ein solcher Versuch nur außerhalb des
-   ersten Satzes und trägt auch der Anker kein Alter, gilt das Alter als nicht
-   lesbar; die Zahl im späteren Satz wird nicht gelesen. Eine Antwort ohne jeden Altersversuch
-   („Keine klaren Bildsignale.“) bleibt wie bisher ungefiltert. Getragene
-   Richtung: Nennt eine Karte ohne lesbares Alter irgendwo ein Kind („Du
-   hältst ein Kind an der Hand.“, „Du trägst ein Baby im Tragetuch.“), wird
-   geschützt, auch wenn die Person erwachsen ist; mit lesbarem Alter im Anker
-   oder im ersten Satz bleibt sie unberührt. Die Regeln zum Satzende, zum
-   Altersversuch außerhalb des ersten Satzes und zu den Kinderwörtern sind am
-   04.10.2026 ergänzt. Die Live-Anzeige entscheidet über die Alterskarte mit
-   derselben Regel wie das Endergebnis (`mistral-antwort.js`). Die Ausnahme:
-   Zeigt erst die später eintreffende Beast-Karte einen Altersversuch ohne
-   lesbares Alter, steht eine Standard-Karte ohne Altersversuch schon da und
-   wechselt dann auf den festen Satz. Dasselbe gilt, wenn der Altersanker
-   entgegen dem Schema erst hinter den Profilen steht: Live zählt nur, was vor
-   den Profilen ankommt. Die Prüfreihe hält diese Fälle fest
-   (`alters-platzhalter.test.js`, „bewusste Ausnahme“).
+   **Was als Altersangabe zählt.** Der Altersanker, sonst der erste Satz der
+   Alterskarte. Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) werden
+   nicht als Alter gelesen. Der erste Satz endet nicht am Punkt einer
+   Abkürzung („ca. 13 Jahre“, „13 J. alt“, „im sog. Teenageralter“, „z. B.“,
+   „d. h.“, „i.e.“, „geb. 2012“, „weibl.“) und nicht an einem Punkt zwischen
+   Ziffern („12.–14.“); eine einzelne Stelle hinter dem Komma zählt nicht mit
+   („12,5 Jahre“ ist 12). Steht das Alterswort groß geschrieben direkt hinter
+   einer Näherungs-Abkürzung („ca. Volksschulalter“, „vermutl. Teenager“)
+   oder das Alter direkt hinter einem Geschlechtskürzel („W., ca. 13 J.“),
+   endet der Satz dort ebenfalls nicht — außer es ist ein Alter über der
+   Schutzgrenze: Es würde ein Kindwort davor verdrängen. Der Altersanker ist
+   laut Schema ein Text. Liefert die KI stattdessen eine Zahl, eine Liste
+   oder ein Objekt, wird der Inhalt für die Altersauslese mitgelesen, aber
+   nicht angezeigt; er kann die Auslese senken, nicht anheben.
+
+   **Was als lesbares Alter gilt.** Jede Zahl von 1 bis 100 an diesen
+   Stellen; stehen mehrere da, zählt die kleinste. Zahlwörter („etwa
+   dreizehn“, „Mitte vierzig“, „in her teens“), „13jährig“ und
+   „dreizehnjährig“ werden wie Zahlen gelesen. Kategoriewörter („Teenager“,
+   „Schulkind“, „Gymnasiast“, „Erstklässler“, „Lehrling“, „im Kindesalter“,
+   „high school“) und Wörter, die ein Kind ohne Zahl benennen („Mädchen“,
+   „Bub“, „Bursch“, „Knabe“, „Junge“, „Volksschulkind“, „Schülerin“, „Baby“
+   und ihre englischen Entsprechungen), gelten als junges Alter — aber nur,
+   wenn keine Zahl dasteht. Seit 05.10.2026 gehören dazu auch „vorpubertär“,
+   „prepubescent“, „Firmling“, „Kommunionkind“, „Taferlklassler“, „dritte
+   Klasse“, „Kita“, „Mädl“ und „Bua“; die ganze Liste steht in
+   `alters-lesbarkeit-woerter.js`.
+
+   **Was als Altersversuch gilt** — im Anker oder irgendwo in einer der zwei
+   Alterskarten:
+   - die abgeschriebene Vorlage;
+   - ein Alterswort oder seine Kurzform („Jahre“, „Jahr“, „Spanne“, „13 J.“,
+     „Lj.“, „Alter:“, „aged 13“, „13 yo“), „underage“, „a minor“ oder ein
+     Geburtsjahr;
+   - ein Kindwort oder eine Kategorie („ein Mädchen“, „Schülerin“);
+   - jede ganze Zahl von 1 bis zur Schutzgrenze aus Punkt 1, als Ziffer oder
+     als Wort (ab „zwei“), auch als Ordnungszahl („Du bist 13.“, „3. Klasse“,
+     „etwa 7 Kopflängen“). Ausgenommen ist nur, was erkennbar keine Angabe zu
+     einer Person ist: Dezimalzahl („1,80“), Uhrzeit („14:30“, „9 Uhr“),
+     Prozent und der Teil einer größeren Zahl (Jahreszahl, „130 cm“);
+   - „jung“ und „young“ (nicht „junge Frau“, „junger Mann“, „young adult“,
+     „jung geblieben“), „noch im Wachstum“, „noch nicht ausgewachsen“ und
+     Merkmale, die nur Kinder und Jugendliche haben („Milchzähne“,
+     „Zahnwechsel“, „Stimmbruch“).
+
+   Hat weder der Anker noch ein erster Satz ein lesbares Alter und steht
+   irgendwo ein solcher Versuch, gilt das Alter als nicht lesbar; eine Zahl
+   im späteren Satz wird nicht als Alter gelesen. Eine Antwort ohne jeden
+   Altersversuch („Keine klaren Bildsignale.“) bleibt wie bisher
+   ungefiltert. Die Regeln zum Satzende, zum Altersversuch außerhalb des
+   ersten Satzes und zu den Kinderwörtern sind am 04.10.2026 ergänzt; die
+   bloße Zahl, der Altersversuch im Anker, die Kurzformen, „jung“ und die
+   Merkmale am 05.10.2026.
+
+   **Getragene Grenzen.**
+   - Zu viel Schutz ohne lesbares Alter: Nennt die KI an den Stellen, die
+     zählen, kein Alter, schützt jedes Kindwort, jede kleine Zahl und „jung“
+     irgendwo in der Karte — auch bei Erwachsenen („Du hältst ein Kind an der
+     Hand.“, „Trikot mit der Nummer 8“, „rund 10 Freunde“, „als Elf
+     verkleidet“). Die Karte zeigt dann den festen Satz. Mit lesbarem Alter
+     im Anker oder im ersten Satz bleibt die Person unberührt.
+   - Eine genannte Zahl ersetzt die Kategorie: „~35 Jahre, jugendlich
+     wirkend“ ist 35, nicht 13. Das gilt für jede Zahl im Anker oder im
+     ersten Satz, auch für eine, die kein Alter ist. Eine solche Fremdzahl
+     bis zur Schutzgrenze löst den Schutz aus; eine darüber hebt ihn neben
+     einem Kindwort auf: „Teenager, Schuhgröße 38“ und „ein Junge im Trikot
+     mit der 27“ werden als 38 und 27 gelesen, Stufe 2 greift nicht.
+   - Der Anker zählt, auch gegen die Karte: Nennt der Anker ein lesbares
+     Alter über der Schutzgrenze und die Karte ein Kind („~28 Jahre“ im
+     Anker, „ein Mädchen, etwa 13“ in der Karte), gilt der Anker, und Stufe 2
+     greift nicht.
+
+   **Live-Anzeige.** Sie entscheidet über die Alterskarte mit derselben
+   Regel wie das Endergebnis (`mistral-antwort.js`): Was am Ende den festen
+   Satz bekommt, erscheint vorher nicht. Zwei Ausnahmen: Zeigt erst die
+   später eintreffende Beast-Karte einen Altersversuch ohne lesbares Alter,
+   steht eine Standard-Karte ohne Altersversuch schon da und wechselt dann
+   auf den festen Satz — sie enthält selbst weder ein Alter noch eine kleine
+   Zahl. Und steht der Altersanker entgegen dem Schema erst hinter den
+   Profilen, zählt er live nicht: Ist er nicht lesbar, stehen die Karten
+   schon da, auch mit einem Alter, und wechseln am Ende auf den festen Satz.
+   Die Prüfreihe hält diese Fälle fest (`alters-platzhalter.test.js`,
+   „bewusste Ausnahme“).
 4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus
    `minor-safety.js` (`SCHUTZ_ALTER`), steht also nur an einer Stelle.
 
@@ -1015,7 +1056,7 @@ einschließt, ließ sich damit nicht auswerten: „8–13“ und „8–9“ erg
 dieselbe Zeile.
 
 **Entscheidung.** Die Zeile trägt zusätzlich `alterBis`: das obere Ende der
-geschätzten Spanne (`obereAltersgrenze` in `functions/src/alters-lesbarkeit.js`,
+geschätzten Spanne (`obereAltersgrenze` in `functions/src/alters-auslese.js`,
 Regeln und Beispiele dort). Gelesen wird zuerst eine erkannte Spanne oder
 Plus-Minus-Angabe, sonst eine Zahl mit Altersbezug. Fremdzahlen wie
 Körpergröße oder Uhrzeit zählen nicht — anders als bei der Untergrenze, wo sie

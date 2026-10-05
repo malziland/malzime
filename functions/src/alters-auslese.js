@@ -80,9 +80,15 @@ function ohneZiffernKlammern(text) {
      "weiblich, 16 bis 22"                               -> 16
 
    Bewusst das MINIMUM aller plausiblen Alterswerte im Text: Streut eine
-   Fremdzahl herein, zieht sie das Ergebnis nach unten und damit in Richtung
-   MEHR Schutz. Der Fehler geht so immer auf die sichere Seite. Nach oben kann
-   ihn keine Zahl verschieben — das wäre die gefährliche Richtung. */
+   Fremdzahl zwischen andere Zahlen, zieht sie das Ergebnis nach unten und
+   damit in Richtung MEHR Schutz.
+
+   Eine genannte Zahl ersetzt aber die Kategorie ("~35 Jahre, jugendlich
+   wirkend" ist 35, nicht 13). Das gilt für JEDE Zahl, auch für eine, die
+   kein Alter ist: Steht neben einem Kindwort nur eine Fremdzahl über der
+   Schutzgrenze ("Teenager, Schuhgröße 38"), liest die Auslese 38, und der
+   Schutz greift nicht. Bewusst so, als Grenze benannt in
+   docs/SECURITY-MODEL.md (Abschnitt 17.09.2026, Punkt 3). */
 function untereAltersgrenze(text) {
   const s = mitZiffern(text).toLowerCase();
   const plausibel = (n) => Number.isFinite(n) && n >= 1 && n <= 100;

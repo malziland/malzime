@@ -25,7 +25,8 @@ const {
   ABKUERZUNGEN_MEHRTEILIG,
   ABKUERZUNG_UND_ANDERE,
   NAEHERUNGSWOERTER,
-  SEHR_JUNG,
+  VERSUCHSWOERTER,
+  ALTERSWORT_KURZ,
 } = require("./alters-lesbarkeit-woerter");
 const {
   KLAMMER_AUF,
@@ -107,37 +108,46 @@ function hatLesbaresAlter(text) {
   return !hatAltersPlatzhalter(s) && untereAltersgrenze(s) !== null;
 }
 
-/* Naeherungswort und kleine Zahl ohne "Jahre": "etwa 13,", "hoechstens 12.",
-   "around 12", "~13,". Zaehlt nur, wenn nach der Zahl kein Wort folgt
-   (Satzzeichen, Textende, "oder 13", "bis 14") — "etwa 7 Kopflaengen" und
-   "rund 10 Freunde" sind kein Alter, "1,80" und "14:30" auch nicht. */
+/* Jede ganze Zahl von 1 bis zur Schutzgrenze ist ein Altersversuch ("Alter:
+   13.", "Du bist 13.", "3. Klasse", "Trikot mit der 7") — auch ohne
+   Alterswort und ohne Naeherungswort. Zahlwoerter zaehlen wie Ziffern
+   ("Du bist dreizehn"; "zwei" bis "vier" stehen bei den Versuchswoertern, sie
+   werden nicht als Alter gelesen). Ausgenommen ist nur, was erkennbar keine
+   Angabe zu einer Person ist: Dezimalzahl ("1,80"), Uhrzeit ("14:30", "9
+   Uhr"), Prozent, Teil einer groesseren Zahl (Jahreszahl, "130 cm"). Eine
+   einzelne Stelle hinter dem Komma faellt wie bei der Altersauslese weg
+   ("12,5" zaehlt als 12).
+   Die Regel wirkt nur, wenn weder der Anker noch ein erster Satz ein
+   lesbares Alter hat: dann lieber Schutz als ein uebersehenes Kinderalter. */
 /* BLEIBT IM CODE — "klein" heisst: bis zur Schutzgrenze des Filters
    (SCHUTZ_ALTER in minor-safety.js; alters-platzhalter.test.js haelt beide
    gleich). Darueber ist niemand zu schuetzen. */
 const VERSUCH_BIS = 25;
-const NAEHERUNG = new RegExp(
-  `(?:~\\s*|(?<!\\p{L})(?:${NAEHERUNGSWOERTER.map((w) => w.replace(/\./g, "\\.")).join("|")})\\s+)` +
-    `(\\d{1,2})(?![.,:]?\\d)(?=\\s*(?:[.,;:!?)]|$|(?:oder|or|bis|to|[-–])\\s*\\d))`,
-  "giu"
-);
-function hatNaeherungsAlter(s) {
-  for (const m of s.matchAll(NAEHERUNG)) {
+const KLEINE_ZAHL =
+  /(?<!\d)(?<!\d[.,:])(\d{1,2})(?!\d|[.,:]\d|\s*(?:%|prozent|percent|(?:uhr|o'?clock|a\.m\.|p\.m\.|pm)(?!\p{L})))/giu;
+function hatKleineZahl(s) {
+  for (const m of s.matchAll(KLEINE_ZAHL)) {
     const n = Number(m[1]);
     if (n >= 1 && n <= VERSUCH_BIS) return true;
   }
-  return SEHR_JUNG.test(s); /* "sehr jung", "very young": ungefaehr, ohne Zahl */
+  return false;
 }
 
-/* Steht irgendwo im Text ein Altersversuch? Platzhalter, Alterswort, Kindwort
-   oder Kategorie ("ein Maedchen", "Schuelerin"), Naeherungswort mit kleiner
-   Zahl, "sehr jung". Fuer ganze Karten: Ob der Versuch LESBAR ist, entscheidet
-   allein die Stelle, die als Altersangabe zaehlt (Anker, sonst erster Satz);
-   steht dort kein Alter, gilt es als nicht lesbar, und Stufe 2 greift
-   (SEC-2026-10-03-02). Getragene Richtung: Das trifft auch Erwachsene ohne
-   lesbares Alter, in deren Karte ein Kind vorkommt. */
+/* Steht irgendwo im Text ein Altersversuch? Platzhalter, Alterswort oder
+   -kuerzel ("Jahre", "13 J.", "Alter:"), Kindwort oder Kategorie ("ein
+   Maedchen", "Schuelerin"), jede kleine Zahl, "jung", "noch im Wachstum",
+   "Milchzaehne".
+   Fuer den Anker und fuer ganze Karten: Ob der Versuch LESBAR ist,
+   entscheidet allein die Stelle, die als Altersangabe zaehlt (Anker, sonst
+   erster Satz); steht dort kein Alter, gilt es als nicht lesbar, und Stufe 2
+   greift (SEC-2026-10-03-02). Getragene Richtung: Das trifft auch Erwachsene
+   ohne lesbares Alter, in deren Karte ein Kind oder eine kleine Zahl
+   vorkommt ("Trikot mit der 7"). */
 function hatAltersversuch(text) {
   const s = pruefText(text);
-  return hatAltersPlatzhalter(s) || ALTERSWORT.test(s) || kategorieAlter(s) !== null || hatNaeherungsAlter(s);
+  if (hatAltersPlatzhalter(s) || ALTERSWORT.test(s) || ALTERSWORT_KURZ.test(s) || kategorieAlter(s) !== null)
+    return true;
+  return hatKleineZahl(s) || VERSUCHSWOERTER.some((re) => re.test(s));
 }
 
 /* ── Erster Satz einer Karte (SEC-2026-10-03-02) ──────────────────────────
@@ -149,7 +159,9 @@ function hatAltersversuch(text) {
    ("Du bist Max. Deine Wangen ..." bleibt ein Satzende); dasselbe gilt fuer
    "u. a." — dort beendet aber nie der innere Punkt den Satz. "sog.", "geb.",
    "Jg." und die mehrteiligen ("z. B.", "d. h.", "i.e.", "e.g.") stehen nie am
-   Satzende. Bewusst ohne i-Schalter: Mit ihm traefe die
+   Satzende. "J." fuer Jahre zaehlt wie eine Naeherungs-Abkuerzung, aber nur
+   direkt hinter einer Zahl ("13 J. alt") — als Anfangsbuchstabe eines Namens
+   beendet es den Satz. Bewusst ohne i-Schalter: Mit ihm traefe die
    Grossbuchstaben-Klasse auch Kleinbuchstaben. */
 const GROSS_UND_KLEIN = (a) => [a, a[0].toUpperCase() + a.slice(1)];
 const MIT_PUNKTEN = (a) => a.split(" ").join("\\.\\s?");
@@ -158,7 +170,8 @@ const KEIN_SATZENDE = new RegExp(
   `(?<!\\p{L})(?:${[...ABKUERZUNGEN, MIT_PUNKTEN(ABKUERZUNG_UND_ANDERE)].flatMap(GROSS_UND_KLEIN).join("|")})\\.(?!\\s*(?:\\p{Lu}|$))` +
     `|(?<!\\p{L})(?:${[...ABKUERZUNGEN_IMMER, ...ABKUERZUNGEN_MEHRTEILIG.map(MIT_PUNKTEN)].flatMap(GROSS_UND_KLEIN).join("|")})\\.` +
     `|(?<!\\p{L})(?:${GROSS_UND_KLEIN(UND_ANDERE[0]).join("|")})\\.(?=\\s?${UND_ANDERE[1]}\\.)` +
-    `|(?<=\\d)\\.(?=\\d|\\s*[-–—]\\s*\\d)`,
+    `|(?<=\\d)\\.(?=\\d|\\s*[-–—]\\s*\\d)` +
+    `|(?<=\\d\\s?)[Jj]\\.(?!\\s*(?:\\p{Lu}|$))`,
   "gu"
 );
 
@@ -172,11 +185,25 @@ const VOR_ALTERSWORT = new RegExp(
 const OHNE_PUNKT = (t) => t.replace(/\./g, "_");
 const JUNG = (wort) => (untereAltersgrenze(wort) ?? VERSUCH_BIS + 1) <= VERSUCH_BIS;
 
+/* Ein Geschlechtskuerzel ("w.", "m.", "f.") beendet den Satz nicht, wenn
+   direkt danach ein junges Alter folgt ("W., ca. 13 J. alt"). Nur bis zur
+   Schutzgrenze: Der laengere Satz kann den Schutz dann nur ausloesen, nie
+   aufheben — eine hoehere Zahl wuerde ein Kindwort davor verdraengen ("ein
+   Maedchen, w. 40 kg"). */
+const NAEHER = NAEHERUNGSWOERTER.map((w) => w.replace(/\./g, "\\.")).join("|");
+const KUERZEL_VOR_ALTER = new RegExp(
+  `(?<!\\p{L})[WwMmFf]\\.(?=\\s*,?\\s*(?:(?:${NAEHER})\\s*|~\\s*)?(\\d{1,2})(?!\\d))`,
+  "gu"
+);
+
 /* [erster Satz, Rest dahinter]. Die Punkte, die kein Satzende sind, werden
    nur fuer die Suche ausgeblendet — gleich lang, damit die Stelle stimmt. */
 function satzUndRest(text) {
   const s = String(text || "");
-  const such = s.replace(KEIN_SATZENDE, OHNE_PUNKT).replace(VOR_ALTERSWORT, (t, w) => (JUNG(w) ? OHNE_PUNKT(t) : t));
+  const such = s
+    .replace(KUERZEL_VOR_ALTER, (t, n) => (Number(n) <= VERSUCH_BIS ? OHNE_PUNKT(t) : t))
+    .replace(KEIN_SATZENDE, OHNE_PUNKT)
+    .replace(VOR_ALTERSWORT, (t, w) => (JUNG(w) ? OHNE_PUNKT(t) : t));
   const m = /[.!?]/.exec(such);
   const ende = m ? m.index + 1 : s.length;
   return [s.slice(0, ende).trim(), s.slice(ende).trim()];

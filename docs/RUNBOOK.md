@@ -775,7 +775,7 @@ Lesart:
   haben das Feld nicht. `null` heißt: kein oberes Ende in der Angabe (keine
   Zahl, nur ein Kategoriewort, oder ein Jahrzehnt wie „Ende zwanzig“). Wie
   das obere Ende gelesen wird, steht bei `obereAltersgrenze` in
-  `functions/src/alters-lesbarkeit.js`. `alterBis` entscheidet über nichts;
+  `functions/src/alters-auslese.js`. `alterBis` entscheidet über nichts;
   Stufe 2 hängt wie bisher an `alter` und am lesbaren Alter.
 - Für die Frage „schließt die Spanne ein bekanntes Alter ein?“ nicht auf
   `minderjaehrig=true` filtern — sonst fehlen gerade die Zeilen, deren Spanne
@@ -790,10 +790,18 @@ Lesart:
   CHANGELOG) umfasst das auch Untergrenzen bis 25 und nicht lesbare Alter;
   davor nur Untergrenzen bis 18. Wer Zeiträume vergleicht, zählt deshalb
   `alter` selbst (zum Beispiel unter 19).
-- `alterUnlesbar=true` (ab derselben Auslieferung): Die KI hat die Vorlage
-  „‹Zahl›“ abgeschrieben oder ein Alter ganz ohne Zahl genannt (Zahlwörter wie
-  „dreizehn“ zählen als Zahl). Die Karte zeigt dann einen festen Satz statt
-  eines Alters.
+- `alterUnlesbar=true` (ab derselben Auslieferung): Im Altersanker und im
+  ersten Satz der Alterskarte steht kein lesbares Alter, die Antwort enthält
+  aber einen Altersversuch. Die Karte zeigt dann einen festen Satz statt
+  eines Alters, und Stufe 2 greift. Anfangs hieß das nur: Vorlage „‹Zahl›“
+  abgeschrieben oder ein Alter ganz ohne Zahl (Zahlwörter wie „dreizehn“
+  zählen als Zahl). Ab der Auslieferung mit dem CHANGELOG-Eintrag, der mit
+  „Steht das Alter eines Kindes hinter „ca.““ beginnt, zählt auch ein Alter
+  oder ein Kindwort, das erst im Beleg-Satz steht, jede Zahl bis zur
+  Schutzgrenze irgendwo in der Alterskarte und „jung“ — auch bei
+  Erwachsenen, bei denen die KI kein Alter nennt. Der Wert kommt seither häufiger vor; Zahlen davor und
+  danach nicht miteinander vergleichen. Was genau zählt, steht in
+  `docs/SECURITY-MODEL.md` (Abschnitt vom 17.09.2026, Punkt 3).
 - `entfernt` zählt gestrichene Werbeeinträge, `durchgerutscht` Treffer im
   Profiltext oder in einer Kategorie-Karte (nur gemeldet); `gruende` und
   `durchgerutschtGruende` sagen, ob die Treffer aus der Liste „immer“ oder

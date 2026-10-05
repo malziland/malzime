@@ -1531,6 +1531,77 @@ html {
   filter: drop-shadow(0 2px 3px rgba(23, 29, 31, 0.35));
 }
 
+/* ── Fester Kartenausschnitt der Beispielbilder (PRIV-2026-10-03-38) ──
+   Für ein Beispielbild fragt der Browser nichts bei OpenStreetMap an. Statt
+   der beweglichen Karte steht hier eine Bilddatei der Seite (gebaut in
+   js/geocoding.js, festerOrtsbereichHtml; eingesetzt von renderGpsMap in
+   js/render.js). Höhe, Rand und Rundung wie bei #gpsMapLeaflet, damit
+   beide Karten gleich aussehen. Die Kartenfläche bleibt in beiden Themen hell
+   — wie die bewegliche Karte, deren Kacheln das dunkle Thema auch nicht
+   umfärbt. Im Druck ist der ganze Abschnitt #gpsMap ausgeblendet (@media
+   print), das gilt für beide Karten. */
+.gps-festkarte {
+  position: relative;
+  /* Eigener Stapel-Kontext wie bei #gpsMapLeaflet: Zeiger und Quellenangabe
+     bleiben unter der geklebten Umschalt-Leiste. */
+  z-index: 0;
+  height: 240px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  /* Grund der beweglichen Karte, solange ihr Bild lädt. */
+  background: #ddd;
+  /* Die Fläche ist immer hell — der helle Fokus-Ring des dunklen Themas wäre
+     darauf nicht zu sehen. */
+  --fokus-ring: #156480;
+}
+
+/* Das Bild misst 640 × 238 Bildpunkte: genau die Höhe der Fläche innerhalb
+   des Randes und breiter als jede Darstellung. Es wird deshalb nie
+   umgerechnet, sondern links und rechts gleich weit beschnitten — der Ort
+   bleibt in der Mitte, der Maßstab derselbe wie auf der beweglichen Karte. */
+.gps-festkarte img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Die Spitze des Zeigers sitzt auf der Bildmitte — dort liegt der Ort. */
+.gps-festkarte .gps-zeiger {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 37px;
+  margin: -37px 0 0 -14px;
+}
+
+/* Quellenangabe unten rechts, in Schrift, Größe und Farben wie die der
+   beweglichen Karte (lib/leaflet/leaflet.css, .leaflet-control-attribution). */
+.gps-festkarte-quelle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 0 5px;
+  background: rgba(255, 255, 255, 0.8);
+  color: #333;
+  font-family: "Helvetica Neue", Arial, Helvetica, sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.gps-festkarte-quelle a {
+  color: #0078a8;
+  text-decoration: underline;
+}
+
+/* Der Ring nach innen, sonst schneidet ihn der Kartenrand ab. */
+.gps-festkarte-quelle a:focus-visible {
+  outline-offset: -1px;
+}
+
 .gps-hinweis {
   margin-top: 10px;
   font-size: 0.78rem;

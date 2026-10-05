@@ -179,7 +179,7 @@ module.exports = {
         cat: "Vase insurance",
         _: "Stress-relief snacks",
       },
-      "Installment credit for vet bill",
+      "Pet health insurance (premium plan)",
     ],
     manipulation_triggers: [
       "\u201cLook at me with these eyes\u201d \u2014 evolution made {{dein}} {{tierName}} the perfect manipulation machine",

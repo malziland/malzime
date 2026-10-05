@@ -294,7 +294,7 @@ beast.ad_targeting — what exploits the vulnerability:
 - DIFFERENT brands than in standard.ad_targeting (see most important rule above).
 - Derive them from the vulnerability you named in the beast profile: insecurity, status pressure, loneliness, body image, addiction susceptibility, fear of the future.
 - Products that target exactly that: subscription traps, self-optimisation, status symbols beyond budget, supplements, beauty correction, credit and insurance offers, gambling and lootbox mechanics.
-- For minors NO offers involving alcohol, gambling, credit, dieting or cosmetic surgery — instead in-app purchases, lootboxes, gaming subscriptions, influencer merch, trading-card mechanics, status clothing.
+- For minors NO offers involving alcohol, tobacco, drugs, gambling, credit, dieting or cosmetic surgery — instead in-app purchases, lootboxes, gaming subscriptions, influencer merch, trading-card mechanics, status clothing.
 - The age world applies here too: for a child these are toy and game mechanics targeting collecting compulsion and pester power — NOT fashion-chain subscriptions.
 
 FOR BOTH LISTS:
@@ -607,7 +607,7 @@ Generate exactly ${WERBE_ANFORDERUNG} ad entries that target the VULNERABILITY, 
 
 - NEVER pornographic or sexualised offers, no sex work, no escort services. Neither for adults nor for minors.
 - NEVER weapons, ammunition or extremist content.
-- For persons who could be minors — this includes any age estimate starting at ${SCHUTZ_ALTER} or below, and any profile whose age could not be read — additionally NO offers involving alcohol, tobacco, gambling, sports betting, credit, instalments, diet products or cosmetic surgery. Instead: in-app purchases, trading cards, gaming subscriptions, influencer merch, status clothing.
+- For persons who could be minors — this includes any age estimate starting at ${SCHUTZ_ALTER} or below, and any profile whose age could not be read — additionally NO offers involving alcohol, tobacco, drugs, gambling, sports betting, credit, instalments, diet products or cosmetic surgery. Instead: in-app purchases, trading cards, gaming subscriptions, influencer merch, status clothing.
 - For children (under 12) the product world stays toys, games and children's media — the mechanic targets collecting compulsion and pester power, not fashion subscriptions.
 
 Answer ONLY with JSON: {"ad_targeting": ["...", "..."]}`;

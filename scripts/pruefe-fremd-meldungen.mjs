@@ -32,6 +32,16 @@
  * Eintrag mit Begruendung und Ablaufdatum. Ausnahmen werden bei jedem Lauf
  * mit ausgegeben; nach dem Ablaufdatum zaehlt die Meldung wieder.
  *
+ * SELBST BETRIEBENE DIENSTE (SEC-2026-10-03-14): Der Benachrichtigungs-Server
+ * ntfy laeuft als eigener Dienst; seine Fassung steht gespiegelt in
+ * .github/fremd-dienste/ntfy/VERSION. Sein Hersteller fuehrt keine
+ * Sicherheitsmeldungen — Korrekturen stehen nur in den Versionshinweisen.
+ * Deshalb gilt fuer Eintraege mit `aktuell: true` zusaetzlich: Gibt es seit mehr
+ * als FRIST_VERALTET_TAGE eine neuere Fassung, ist das ein offener Punkt
+ * (Kennung FASSUNG-<juengste Fassung>, in der Ausnahmeliste wie eine Meldung
+ * zurueckstellbar). Gezaehlt wird ab der AELTESTEN Fassung, die neuer ist als
+ * unsere; dafuer liest der Lauf alle veroeffentlichten Fassungen.
+ *
  * DECKUNG: Jeder Ordner unter public/lib und public/fonts muss hier entweder
  * beobachtet oder mit Grund als "kein ausfuehrbarer Code" gefuehrt sein. Ein
  * neuer Ordner ohne Eintrag ist ein Befund — sonst waere die naechste
@@ -42,7 +52,8 @@
  *
  * Einspeisepunkte fuer Tests (im Betrieb nicht gesetzt):
  *   FREMD_BASIS      Repository-Wurzel
- *   FREMD_MELDUNGEN  JSON-Datei statt Netzabfrage
+ *   FREMD_MELDUNGEN  JSON-Datei statt Netzabfrage (Schluessel repo:…, npm:…,
+ *                    npm-paket:…, fassungen:… als Liste)
  *   FREMD_AUSNAHMEN  Ausnahmedatei
  *   FREMD_HEUTE      Datum JJJJ-MM-TT statt der Systemuhr
  */
@@ -80,7 +91,19 @@ export const BIBLIOTHEKEN = {
       bekannt: "GHSA-g2rg-wj66-w594",
     },
   ],
+  /* Kein mitgelieferter Code, sondern ein Dienst, den das Projekt selbst
+     betreibt. Die VERSION-Datei spiegelt die laufende Fassung;
+     scripts/verify-infrastructure.sh haelt beide gegeneinander. */
+  ".github/fremd-dienste/ntfy": [
+    { name: "ntfy", zeile: /^ntfy (\d+\.\d+\.\d+)\s*$/m, repo: "binwiederhier/ntfy", aktuell: true },
+  ],
 };
+/* Wie lange eine neuere Fassung eines selbst betriebenen Dienstes liegen darf,
+   bevor der Lauf rot wird: MEHR als so viele Tage seit ihrem Erscheinen.
+   Erschienen am 27.08., gelesen am 26.09. (30 Tage): noch gruen; am 27.09.
+   (31 Tage): rot. Gibt es mehrere neuere Fassungen, zaehlt die AELTESTE von
+   ihnen: Seit ihrem Erscheinen gibt es eine neuere als unsere. */
+export const FRIST_VERALTET_TAGE = 30;
 export const OHNE_CODE = {
   "public/fonts/poppins": "Schriftdateien (woff2), kein ausfuehrbarer Code",
 };
@@ -89,6 +112,10 @@ export const EIGENE_DATEIEN = {
   "public/lib/PRUEFSUMMEN.json": "von scripts/pruefe-fremddateien.mjs erzeugt",
 };
 const BEREICHE = ["public/lib", "public/fonts"];
+
+/* Eine Messung, die nicht durchfuehrbar war. Wird am Ende als Rueckgabewert 2
+   gemeldet — nie als bestandener Lauf. */
+export class Messfehler extends Error {}
 
 /* ── Versionen vergleichen ────────────────────────────────────────────────── */
 
@@ -101,6 +128,43 @@ export function zerlege(text) {
 export function vergleiche(a, b) {
   for (let i = 0; i < 4; i++) if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
   return 0;
+}
+
+/* Ist unsere Fassung veraltet? `fassungen` ist die Liste der veroeffentlichten
+   Fassungen des Herstellers ({ tag_name, published_at }), ohne Entwuerfe und
+   Vorab-Fassungen. Gezaehlt wird ab dem Erscheinen der AELTESTEN Fassung, die
+   neuer ist als unsere — seit diesem Tag gibt es eine neuere. Das Alter der
+   juengsten zu messen, liesse die Frist mit jeder weiteren Fassung von vorn
+   beginnen: Bei einem Hersteller, der oefter als alle 30 Tage veroeffentlicht,
+   wuerde der Lauf nie rot. Liefert null (aktuell, oder noch innerhalb der
+   Frist) oder { neu, seit, tage }: `seit` ist die aelteste neuere Fassung,
+   `neu` die juengste. Eine unlesbare Angabe ist ein Messfehler (wirft) — sie
+   darf nie wie "aktuell" aussehen; das gilt fuer JEDE Fassung der Liste. */
+export function veraltet(unsereVersion, fassungen, heute, fristTage = FRIST_VERALTET_TAGE) {
+  const unsere = zerlege(unsereVersion);
+  if (!unsere) throw new Messfehler(`Fassung nicht lesbar: unsere "${unsereVersion}"`);
+  if (!Array.isArray(fassungen) || fassungen.length === 0) {
+    throw new Messfehler("keine veroeffentlichte Fassung des Herstellers gelesen");
+  }
+  if (!datumGueltig(heute)) throw new Messfehler(`Datum nicht lesbar: heute "${heute}"`);
+  const neuere = [];
+  for (const fassung of fassungen) {
+    const stand = zerlege(fassung && fassung.tag_name);
+    if (!stand) throw new Messfehler(`Fassung nicht lesbar: Hersteller "${fassung && fassung.tag_name}"`);
+    if (vergleiche(stand, unsere) <= 0) continue;
+    const erschienen = String(fassung.published_at || "").slice(0, 10);
+    if (!datumGueltig(erschienen)) {
+      throw new Messfehler(`Datum nicht lesbar: erschienen "${fassung.published_at}" (${fassung.tag_name})`);
+    }
+    neuere.push({ stand, erschienen, name: String(fassung.tag_name).trim().replace(/^v/, "") });
+  }
+  if (neuere.length === 0) return null;
+  const aelteste = neuere.reduce((a, b) => (b.erschienen < a.erschienen ? b : a));
+  const juengste = neuere.reduce((a, b) => (vergleiche(b.stand, a.stand) > 0 ? b : a));
+  const tage = Math.round(
+    (Date.parse(`${heute}T00:00:00Z`) - Date.parse(`${aelteste.erschienen}T00:00:00Z`)) / 86400000
+  );
+  return tage > fristTage ? { neu: juengste.name, seit: aelteste.name, tage } : null;
 }
 
 /* Bereich wie "<= 1.23.2", "<=1.1.1", ">= 1.0.16, <= 1.1.2", "< 1.18.2".
@@ -200,8 +264,6 @@ export function bewerteMeldung(versionText, meldung) {
 
 /* ── Quellen ──────────────────────────────────────────────────────────────── */
 
-class Messfehler extends Error {}
-
 /* Einspeisepunkt fuer Tests des ECHTEN Netzwegs (Befund H-12): FETCH_ATTRAPPE
    nennt eine JSON-Datei { "<url>": { "status": 200, "body": [...], "link": "..." } }.
    Eine nicht hinterlegte Adresse ist ein Netzfehler — sie faellt also auf. */
@@ -261,6 +323,23 @@ async function repoMeldungen(repo) {
     return eintrag;
   }
   return github(`/repos/${repo}/security-advisories?state=published&per_page=100`);
+}
+
+/* Alle veroeffentlichten Fassungen des Herstellers, ohne Entwuerfe und
+   Vorab-Fassungen. Die ganze Liste, nicht nur die juengste: `veraltet` zaehlt
+   ab der aeltesten Fassung, die neuer ist als unsere. */
+async function fassungen(repo) {
+  let liste;
+  if (festeMeldungen) {
+    liste = festeMeldungen[`fassungen:${repo}`];
+    if (!Array.isArray(liste)) throw new Messfehler(`keine Testdaten fuer fassungen:${repo}`);
+  } else {
+    liste = await github(`/repos/${repo}/releases?per_page=100`);
+  }
+  if (liste.some((f) => !f || typeof f !== "object")) {
+    throw new Messfehler(`Unerwartete Antwort zu den Fassungen von ${repo}`);
+  }
+  return liste.filter((f) => f.draft !== true && f.prerelease !== true);
 }
 
 /* Die Advisory-Datenbank antwortet auf ein Paket, das es gar nicht gibt
@@ -387,6 +466,7 @@ async function main() {
     );
 
   let geprueft = 0;
+  let dienste = 0;
   for (const [ordner, teile] of Object.entries(BIBLIOTHEKEN)) {
     const versionsDatei = join(REPO, ordner, "VERSION");
     if (!existsSync(versionsDatei)) {
@@ -418,7 +498,8 @@ async function main() {
           meldungen.set(m.ghsa_id, { ...m, urteil: "betroffen" });
         }
       }
-      geprueft++;
+      if (teil.aktuell) dienste++;
+      else geprueft++;
       const offen = [...meldungen.values()].filter((m) => m.urteil !== "nicht betroffen");
       console.log(`${teil.name} ${version}: ${meldungen.size} Meldung(en) gelesen, ${offen.length} offen`);
       for (const m of offen) {
@@ -430,13 +511,34 @@ async function main() {
           befunde.push(`${zeile}\n      ${m.html_url || ""}`);
         }
       }
+      if (teil.aktuell) {
+        const stand = veraltet(version, await fassungen(teil.repo), HEUTE);
+        if (!stand) {
+          console.log(`${teil.name} ${version}: keine neuere Fassung, die aelter als ${FRIST_VERALTET_TAGE} Tage ist`);
+        } else {
+          const inzwischen = stand.neu === stand.seit ? "" : `, inzwischen ${stand.neu}`;
+          const zeile =
+            `VERALTET  ${teil.name} ${version}  seit ${stand.tage} Tagen gibt es ${stand.seit}${inzwischen} ` +
+            `(Frist ${FRIST_VERALTET_TAGE} Tage)`;
+          const ausnahme = gueltigeAusnahme(`FASSUNG-${stand.neu}`, teil.name, version);
+          if (ausnahme) {
+            hinweise.push(`${zeile}\n      ausgenommen bis ${ausnahme.pruefen_bis}: ${ausnahme.grund}`);
+          } else {
+            befunde.push(`${zeile}\n      https://github.com/${teil.repo}/releases`);
+          }
+        }
+      }
     }
   }
 
-  console.log(`\nBeobachtet: ${geprueft} Bibliotheksteile, Stand ${HEUTE}`);
+  console.log(
+    `\nBeobachtet: ${geprueft} Bibliotheksteile` +
+      (dienste ? ` und ${dienste} selbst betriebene(r) Dienst(e)` : "") +
+      `, Stand ${HEUTE}`
+  );
   for (const h of hinweise) console.log(`  [Ausnahme] ${h}`);
   if (befunde.length === 0) {
-    console.log("ERGEBNIS: keine offene Sicherheitsmeldung.");
+    console.log("ERGEBNIS: keine offene Sicherheitsmeldung, keine veraltete Fassung.");
     return 0;
   }
   console.log("");
@@ -446,6 +548,12 @@ async function main() {
       "nur wenn das nachweislich nicht noetig ist, begruendeten Eintrag mit Ablaufdatum in " +
       ".github/fremd-meldungen-ausnahmen.json."
   );
+  if (befunde.some((b) => b.startsWith("VERALTET"))) {
+    console.log(
+      "Veraltete Fassung eines Dienstes: Dienst auf die neue Fassung heben und die VERSION-Datei nachziehen " +
+        "(docs/RUNBOOK.md, Abschnitt zum Nachtlauf); zurueckstellen nur mit begruendetem Eintrag FASSUNG-<Fassung>."
+    );
+  }
   return 1;
 }
 

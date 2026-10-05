@@ -118,6 +118,17 @@ beforeEach(() => {
   storage.storeImage.mockResolvedValue("queue-uploads/test.jpg");
   storage.deleteImage.mockResolvedValue();
   tasks.enqueueJob.mockResolvedValue("projects/p/locations/l/queues/q/tasks/t");
+  /* Reihenfolge-unabhaengig (01.10.2026, gefunden mit --randomize):
+     clearAllMocks loescht nur die Aufrufe, nicht ein in einem Test gesetztes
+     Verhalten. Eine dauerhaft werfende Warteschlangen-Zaehlung aus einem
+     frueheren Test liess spaetere mit 429 statt 200 enden. */
+  jobs.countQueuedJobs.mockReset().mockResolvedValue(0);
+  jobs.platzBestaetigen.mockReset().mockResolvedValue(true);
+  jobs.getJob.mockReset().mockImplementation(async (id) => ({ id, status: "queued", createdAt: Date.now() }));
+  jobs.abandonJob.mockReset().mockResolvedValue(true);
+  betriebsprofil.geltendeWerte
+    .mockReset()
+    .mockImplementation(require("../test-satz").betriebsprofilMock().geltendeWerte);
 });
 
 /* ── detectImageType (Magic Bytes) ───────────────────────────────── */

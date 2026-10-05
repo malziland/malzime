@@ -37,7 +37,8 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 ## Schutzschichten (Kurzreferenz)
 
 - **Client:** EXIF/GPS bleiben im Browser (Canvas-Recompress entfernt Metadaten);
-  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS. Foto und
+  Nominatim/OSM ruft der Browser direkt — der Server sieht nie GPS. Bei den Demo-Fotos
+  ruft der Browser nichts bei OpenStreetMap ab (feste Adresse, fester Kartenausschnitt). Foto und
   Analysedaten gehen direkt an die Cloud-Run-Adressen in `europe-west1`, nicht
   über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026, s. u.).
 - **Einlass:** Maintenance-Check → IP-Rate-Limit → Honeypot/Timing → MIME +
@@ -169,14 +170,65 @@ Dieses Dokument wird bei jedem LANGAUDIT und vor jeder Presse-Welle
 gegengelesen. Neue bewusste Abwägungen gehören **hier** hinein — im selben
 Commit wie die Entscheidung.
 
+## Umfang des Server-Pakets (seit 2026-10-03)
+
+**Entscheidung.** Zu Google geht beim Ausliefern nur das Programm: die Dateien unter
+`functions/src/` (ohne Tests und ohne die Testwerte `test-satz.js`), `package.json` und
+`package-lock.json`. Testdateien, Hilfsskripte, Abdeckungsberichte und jede Punkt-Datei
+(also auch `.env*`) bleiben auf dem Auslieferungsrechner (`functions.ignore` in
+`firebase.json`). Im Paket liegt auch die Attrappe der KI-Anbindung (`mistral-mock.js`):
+Das Programm nennt sie in `job-helfer.js` und lädt sie nur, wenn der Schalter für lokale
+Läufe gesetzt ist — der wirkt in der Produktion nie (Punkt 3 unten).
+
+**Begründung.** Ohne diese Liste lädt die Firebase-CLI den ganzen Ordner hoch, und
+`functions/.env` oder `functions/.env.<projekt>` setzt sie als Einstellung an jede Function —
+dort bleibt der Inhalt stehen, auch wenn die Datei gelöscht und neu ausgeliefert wird. Der
+Sauberkeits-Riegel (`git status`) sieht von git ignorierte Dateien nicht.
+
+**Was es hält.** (1) `scripts/deploy.sh` bricht ab, wenn `functions/.env` oder
+`functions/.env.*` existiert (erlaubt: `.env.local` und ihre Vorlage); (2) der Wächter
+`scripts/pruefe-auslieferbare-reste.mjs` bildet die Paketliste nach den Regeln der CLI und
+hält an, sobald eine Datei darin nicht im Repository steht; (3) im Programm wirken die
+Schalter für lokale Läufe in der Produktion nicht, und eine Fassung mit einem solchen
+Schalter startet dort nicht (`functions/src/lokale-schalter.js`). Das Programm erkennt die
+Produktion an der Variablen `K_SERVICE` ohne das Merkmal des Emulators
+(`FUNCTIONS_EMULATOR`); stünde dieses Merkmal an einem Dienst, wirkten die Schalter dort
+wieder. Deshalb (4) verlangt `scripts/verify-infrastructure.sh` vor jeder Auslieferung, dass
+an keinem Dienst einer der vier Namen gesetzt ist.
+
+**Grenze.** Der Notweg „Hebel 4" im Betriebshandbuch (`firebase deploy` aus einem frischen
+Arbeitsverzeichnis) läuft an `deploy.sh` vorbei; dort gilt nur die Liste in `firebase.json`.
+
+**Fingerabdruck.** Seit 05.10.2026 weist der Fingerabdruck (`build-info.json`, Feld
+`serverPaket`) JEDE Datei des Server-Pakets mit ihrer Prüfsumme aus — auch `package.json`
+und `package-lock.json` (sie legen fest, welche Fremdpakete Google beim Bau einsetzt) und
+die Sprachliste `locales/manifest.json`. Die Liste dafür holt der Erzeuger
+(`scripts/build-info.mjs`) vom Wächter des Server-Pakets; es gibt keine zweite Aufzählung.
+`functions/src/__tests__/server-paket.test.js` hält fest, dass Paketliste und Fingerabdruck
+dieselben Dateien nennen. Die öffentliche Nachprüfung (`scripts/pruefe-live.sh`) bildet die
+Liste selbst aus dem genannten Commit (`functions.ignore` der `firebase.json` dieses
+Commits) und rechnet jede Datei gegen dessen Inhalt; eine Paketdatei, die der Fingerabdruck
+weglässt, ist ein Befund. Der Riegel „Website allein" in `scripts/deploy.sh` vergleicht
+dasselbe Feld mit dem, das die Seite ausweist.
+*Ältere Form:* Stände, die vor diesem Datum ausgeliefert wurden, nennen vom Server nur die
+`.js`-Dateien unter `functions/src/` (Feld `serverDateien`). Die Nachprüfung rechnet sie
+mit der Liste von damals nach; welche Form ein Stand schuldet, liest sie aus dem Commit
+(ob dessen Erzeuger das neue Feld schreibt), nicht aus dem Fingerabdruck — sonst genügte
+es, das neue Feld wegzulassen. Der Riegel „Website allein" wertet eine Seite in der
+älteren Form als „Server-Paket geändert" und verlangt die Auslieferung von Website und
+Server zusammen.
+*Grenze:* Belegt ist damit, welche Dateien an Google übergeben wurden und dass sie dem
+genannten Commit entsprechen. Welche Fassungen der Fremdpakete Google beim Bau daraus
+installiert und was dort ausgeführt wird, kann von außen niemand nachrechnen.
+
 ## Restrisiko: Der Alarmweg kann sich nicht selbst überwachen (seit 2026-08-12)
 
-**Entscheidung.** Der Fehler-Alarm (Log-Richtlinie → E-Mail + ntfy-Push) wird beim Deploy
-auf Existenz, Schärfe und zustellfähige Kanäle geprüft (`verify-infrastructure.sh`), aber
-nicht laufend.
+**Entscheidung.** Die Alarmregeln (Log-Richtlinien → E-Mail + ntfy-Push; seit 01.10.2026
+fünf) werden beim Deploy je einzeln auf Existenz, Schärfe und zustellfähige Kanäle geprüft
+(`verify-infrastructure.sh`), aber nicht laufend.
 
-**Begründung.** Die Richtlinie ist eine Anwesenheits-Bedingung auf `severity>=ERROR`: Ihr
-eigener Ausfall erzeugt keine Logzeile, auf die sie feuern könnte. Ein laufender Wächter
+**Begründung.** Jede Regel ist eine Anwesenheits-Bedingung auf Logzeilen: Ihr eigener
+Ausfall erzeugt keine Logzeile, auf die sie feuern könnte. Ein laufender Wächter
 müsste außerhalb des Projekts sitzen und wäre selbst wieder unbewacht — die Kette hat kein
 Ende, nur einen Punkt, an dem man sie abschneidet.
 
@@ -187,6 +239,30 @@ Schwelle gekommen.
 
 **Bedingung für Neubewertung.** Sobald das Projekt einen zweiten Betreuer hat (Bus-Faktor
 > 1) oder ein externer Verfügbarkeitsdienst ohnehin läuft, gehört der Alarmweg dorthin.
+
+## Restrisiko: Der Push aufs Handy kann ausbleiben (seit 2026-10-03)
+
+**Entscheidung.** Der ntfy-Push bleibt, wie er ist. Der Weg, der ankommen muss, ist die
+E-Mail, die jede Alarmregel zusätzlich verschickt.
+
+**Begründung.** Der eigene ntfy-Server kann ein iPhone nicht selbst wecken; er bittet dafür
+den Dienst des Herstellers (`ntfy.sh`) um einen Weckruf. `ntfy.sh` nimmt ohne Konto je Tag
+250 solche Bitten je Absender-Adresse an. Cloud Run sendet von Adressen, die sich viele
+Google-Kunden teilen — ist deren Tagesbudget verbraucht, wird der Weckruf abgewiesen. Die
+Nachricht liegt dann in der App, das Handy meldet sich aber nicht von selbst. Gemessen am
+03.10.2026 abends: 6 von 6 Weckrufen abgewiesen; derselbe Weckruf von einer anderen Adresse
+wurde angenommen. Einzelheiten: `docs/ERROR-ALERTING.md`, „Wenn der Push nicht weckt".
+
+**Was dagegen gesetzt ist.** Kein Alarm geht verloren: `verify-infrastructure.sh` verlangt
+bei jedem Deploy je Alarmregel einen eingeschalteten E-Mail-Kanal. Ohne zweiten Weg bleiben
+die Nachricht „Stundenlimit erreicht" und die Meldungen des Nachtlaufs.
+
+**Betrachtete Alternativen.** Eine bezahlte Stufe bei `ntfy.sh` (dort wird dann nach Konto
+gezählt) und eine eigene feste Absender-Adresse. Beide verworfen: laufende Kosten für einen
+Weg, der nur das Wecken betrifft.
+
+**Bedingung für Neubewertung.** Wenn Alarme zu Zeiten ausbleiben, zu denen jemand sofort
+handeln müsste — etwa „Stundenlimit erreicht" während eines Workshops.
 
 ## Restrisiko: Kein Eintrag in der HSTS-Preload-Liste (seit 2026-08-21)
 
@@ -693,17 +769,52 @@ automatisch gelöscht. Am 1. jedes Monats kommt eine sichtbare Probe; bleibt sie
 ist der Alarmweg gestört. Ist in einem Probelauf eine Prüfung nicht grün, meldet
 der Push „ROT", nicht „PROBE".
 
-*Festgeschrieben:* Die beiden Sicherheits-Workflows sind im Deploy-Riegel
-(`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben. Frei
-bleiben nur, was nachweislich nichts bewirkt: die Versionskennungen der Actions
-(`uses: owner/repo@<SHA> # vN` — SHA und Kommentar; Dependabot hebt sie an),
-Kommentar- und Leerzeilen außerhalb mehrzeiliger Befehle und Ausdrücke sowie
-Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leerzeichen — einen Tab
-vor einem Kommentar lehnt GitHub ab, er macht die Summe deshalb rot. Jede andere
-Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
-(`--vertrag-summen`). Zusätzlich prüft er inhaltlich: genau ein festgelegter Befehl
-je Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte,
-ein täglicher Zeitplan.
+*Festgeschrieben:* Die Pipeline-Dateien sind im Deploy-Riegel
+(`scripts/pruefe-deploy-riegel.py`) VOLLSTÄNDIG per Prüfsumme festgeschrieben: seit
+30.09.2026 die beiden Sicherheits-Workflows, seit 04.10.2026 auch `ci.yml`,
+`release.yml`, `dependabot-automerge.yml` und `.github/dependabot.yml`
+(OPS-2026-10-03-12) — also alles, was bestimmt, was die Pipeline prüft und was ohne
+Mensch auf `main` gelangt. Frei bleibt nur, was nachweislich nichts bewirkt: die
+Versionskennungen der Actions (`uses: owner/repo@<SHA> # vN` — SHA und Kommentar;
+Dependabot hebt sie an), Kommentar- und Leerzeilen außerhalb mehrzeiliger Befehle und
+Ausdrücke sowie Leerzeilen am Dateiende. Als Leerraum zählt dabei nur das Leerzeichen
+— einen Tab vor einem Kommentar lehnt GitHub ab, er macht die Summe deshalb rot. Jede
+andere Änderung macht den Riegel rot; eine bewusste Änderung trägt man dort nach
+(`--vertrag-summen`). Seit 05.10.2026 sind ebenso die Einstellungsdateien der
+Prüfwerkzeuge festgeschrieben — `vitest.config.js`, `playwright.config.js`, die beiden
+ESLint-Einstellungen, `.prettierignore` und die Vorbereitungsdatei von Jest
+(`functions/jest.setup.js`) —, bei ihnen über jedes Byte, ohne freie Zeilen.
+
+Zusätzlich prüft er inhaltlich. Im Nachtlauf: genau ein festgelegter Befehl je
+Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte, ein
+täglicher Zeitplan. In `ci.yml`: Jeder der sechs Pflicht-Jobs führt die Prüfbefehle,
+die ihn ausmachen, als eigenen Schritt aus — Server-Tests, Lint und Formatprüfung,
+Abhängigkeits-Gate, Browser-Modul-Tests, Browser-Durchläufe, Geheimnis-Suche,
+Nachtrag-Erkennung, die Prüfungen samt ihrer Selbstprüfung (Liste `PFLICHTJOBS_CI` im
+Riegel). Kein Pflicht-Job trägt `continue-on-error` oder eine Bedingung, außer der des
+Browser-Tests beim reinen Nachtrag (unten, „Nachtrag ohne Browser-Test"); das
+Pipeline-Token darf nur lesen; und die Pflicht-Jobs sind dieselben sechs, die
+`scripts/deploy.sh` grün verlangt. In allen Workflows ist jede Action per
+Commit-Kennung festgenagelt.
+Festgelegt ist auch, unter welchen Umständen ein Pflichtbefehl läuft: An seinem Schritt
+steht keine Bedingung, keine eigene Shell, kein anderer Ordner und keine zusätzliche
+Umgebung — außer dem, was der Riegel für diesen Schritt nennt; `defaults` und `env`
+stehen am Job nur wie festgelegt und ganz oben in der Datei gar nicht. Und festgelegt
+ist, was hinter einem Pflicht-Schritt steht: der Inhalt der npm-Skripte, die er
+aufruft, samt der Sammelbefehle, die diese Skripte ihrerseits aufrufen (beide
+`package.json`, Liste `NPM_SKRIPTE` im Riegel), und die Einstellung von Jest im
+Wortlaut. Neben den festgeschriebenen Einstellungen gibt es keine zweite
+Einstellungsdatei und keine `.npmrc`, und keine eingecheckte Datei ist von `.gitignore`
+erfasst.
+*Warum der Inhalt, wenn die Summe schon jede Zeile hält:* Der Zweigschutz und
+`deploy.sh` sehen von einem Pflicht-Check nur Name und Ergebnis. Ein Job, aus dem der
+Testlauf gestrichen wurde, bleibt grün. `ci.yml` wird mehrmals im Monat bewusst
+geändert; wer dabei die Summe nachträgt, soll einen verlorenen Testlauf nicht mit
+nachtragen können — auch nicht einen, der mit `if: false` nur abgeschaltet ist. Und
+der Wortlaut eines Schritts sagt nicht, was dahinter geschieht: `npm test` bleibt `npm
+test`, wenn das Skript in `package.json` nur noch `echo ok` ausführt oder die
+Einstellung des Testläufers keine Testdatei mehr findet. Beides ließ am 04.10.2026
+jeden Wächter und jeden Test grün.
 *Lesbarkeit:* Eine Workflow-Datei, die GitHub nicht lesen kann, läuft nie — und der
 Pull Request zeigt den Fehllauf nicht an. `scripts/pruefe-workflows-gueltig.mjs` prüft
 im Pull Request und vor dem Push jede Datei unter `.github/workflows` in zwei Schritten:
@@ -713,9 +824,18 @@ gemessen mit GitHubs eigenem Leser aus `actions/runner`), dann die YAML-Syntax s
 Grundgerüst (`on`, Jobs mit `runs-on` oder `uses`); beides mit Positivkontrolle.
 *Grenze:* Die Prüfsumme schützt vor versehentlichem Stilllegen, nicht vor Absicht —
 wer den Workflow ändert, kann die Summe mitändern; beides steht dann im selben Pull
-Request im Diff. Eine reine SHA-Änderung an einer Action bleibt zulässig. Weitere
+Request im Diff. Für die Einstellungsdateien gibt es nur diese Summe, keinen
+inhaltlichen Teil. Der Vertrag hält fest, DASS und WOMIT geprüft wird, nicht WIE VIEL:
+Eine gelöschte Testdatei oder eine geschrumpfte Testanzahl sieht er nicht (wer welchen
+Weg bemerkt, steht in `docs/WAECHTER.md`, „Was diese Schicht NICHT kann").
+Eine reine SHA-Änderung an einer Action bleibt zulässig. Weitere
 Stellen, an denen GitHubs Server strenger liest als diese Prüfung, sieht sie nicht;
-das fängt der Deploy auf (nächster Absatz).
+das fängt der Deploy auf (nächster Absatz). Der Vertrag läuft im Pflicht-Job
+`pruefungen`, seine Gegenprobe (`vor-dem-push-script.test.js`) im Pflicht-Job
+`test-backend`: Fällt einer der beiden Aufrufe weg, meldet es der andere; fallen
+beide im selben Pull Request weg, sieht es nur noch die Vorabprüfung vor dem Push.
+Welche Checks der Zweigschutz bei GitHub zur Pflicht macht, sieht der Vertrag nicht
+(Soll-Zustand: RUNBOOK, „Branch Protection").
 
 *Restrisiken:*
 - Ob GitHub den Nachtlauf tatsächlich ausführt, sieht der Vertrag nicht (60-Tage-
@@ -727,7 +847,11 @@ das fängt der Deploy auf (nächster Absatz).
   `scripts/deploy.sh`. Die roten Läufe ohne Jobs, die GitHub bei einer unlesbaren
   Datei je Push anlegt, zählen damit nicht. Nach jeder Änderung am Nachtlauf muss er
   deshalb einmal laufen, bevor ausgeliefert wird. Zwischen zwei Deploys fällt ein
-  ausbleibender Nachtlauf nur durch die ausbleibende Monatsprobe auf.
+  ausbleibender Nachtlauf nur durch die ausbleibende Monatsprobe auf. Weil die
+  Auslieferkette einen fehlenden Lauf selbst von Hand startet, meldet `deploy.sh`
+  gesondert, wenn der jüngste Lauf NACH ZEITPLAN älter als
+  `NACHT_ZEITPLAN_GRENZE_MINUTEN` ist — der Zeitplan steht dann, auch wenn der
+  Riegel erfüllt ist (OPS-2026-10-03-13).
 - Der Alarm-Job kann seinen eigenen Fehlschlag nicht melden (fehlendes Secret,
   ntfy nicht erreichbar); „200" vom ntfy-Server heißt nur „angenommen". Auch das
   zeigt erst die ausbleibende Monatsprobe.
@@ -805,22 +929,109 @@ Untergrenze.
    Positivliste fest, welche Spannen im Altersteil noch stehen dürfen (die
    Merkmals-Tabellen).
 3. Ist das Alter nicht lesbar — abgeschriebene Vorlage in beliebiger Klammer,
-   oder ein Altersversuch ohne jede Zahl —, zeigt die Alterskarte einen festen
-   Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte vorher
-   nicht. Der Filter lässt Stufe 2 greifen; `mistral.js` bestimmt das (Erkennung
-   in `alters-lesbarkeit.js`) aus den
-   Rohwerten der KI-Antwort, bevor eine Karte umgeschrieben wird. Die
-   Kinderschutz-Zeile meldet es als `alterUnlesbar: true`, das Ergebnis trägt
-   `meta.alterUnlesbar`, und der Realitäts-Check fragt das Alter dann nicht
-   ab; der Server nimmt dessen Bewertung deshalb auch ohne Alter an
-   (`handle-telemetry.js`). Als Altersangabe einer Karte zählt nur ihr erster
-   Satz — Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) sind kein
-   Alter. Zahlwörter („etwa dreizehn“, „Mitte vierzig“, „in her teens“) und
-   Kategoriewörter („Teenager“, „Schulkind“) gelten als lesbar und werden für
-   die Altersauslese in Zahlen übersetzt, Kategorien nur, wenn keine Zahl
-   dasteht; „13jährig“ und „dreizehnjährig“ werden ebenfalls gelesen. Eine
-   Antwort ohne jeden Altersversuch („Keine klaren Bildsignale.“) bleibt wie
-   bisher ungefiltert.
+   oder ein Altersversuch ohne lesbares Alter —, zeigt die Alterskarte einen
+   festen Satz aus der Sprachdatei, auch die Live-Anzeige zeigt die Karte
+   vorher nicht (zwei Ausnahmen stehen am Ende dieses Punkts). Der Filter lässt
+   Stufe 2 greifen; `mistral.js` bestimmt das aus den Rohwerten der
+   KI-Antwort, bevor eine Karte umgeschrieben wird (Erkennung in
+   `alters-lesbarkeit.js`, Zahl-Lesung in `alters-auslese.js`, Wörter in
+   `alters-lesbarkeit-woerter.js`). Die Kinderschutz-Zeile meldet es als
+   `alterUnlesbar: true`, das Ergebnis trägt `meta.alterUnlesbar`, und der
+   Realitäts-Check fragt das Alter dann nicht ab; der Server nimmt dessen
+   Bewertung deshalb auch ohne Alter an (`handle-telemetry.js`).
+
+   **Was als Altersangabe zählt.** Der Altersanker, sonst der erste Satz der
+   Alterskarte. Zahlen im Beleg-Satz („Trikot mit der Nummer acht“) werden
+   nicht als Alter gelesen. Der erste Satz endet nicht am Punkt einer
+   Abkürzung („ca. 13 Jahre“, „13 J. alt“, „im sog. Teenageralter“, „z. B.“,
+   „d. h.“, „i.e.“, „geb. 2012“, „weibl.“) und nicht an einem Punkt zwischen
+   Ziffern („12.–14.“); eine einzelne Stelle hinter dem Komma zählt nicht mit
+   („12,5 Jahre“ ist 12). Steht das Alterswort groß geschrieben direkt hinter
+   einer Näherungs-Abkürzung („ca. Volksschulalter“, „vermutl. Teenager“)
+   oder das Alter direkt hinter einem Geschlechtskürzel („W., ca. 13 J.“),
+   endet der Satz dort ebenfalls nicht — außer es ist ein Alter über der
+   Schutzgrenze: Es würde ein Kindwort davor verdrängen. Der Altersanker ist
+   laut Schema ein Text. Liefert die KI stattdessen eine Zahl, eine Liste
+   oder ein Objekt, wird der Inhalt für die Altersauslese mitgelesen, aber
+   nicht angezeigt; er kann die Auslese senken, nicht anheben.
+
+   **Was als lesbares Alter gilt.** Jede Zahl von 1 bis 100 an diesen
+   Stellen; stehen mehrere da, zählt die kleinste. Zahlwörter („etwa
+   dreizehn“, „Mitte vierzig“, „in her teens“), „13jährig“ und
+   „dreizehnjährig“ werden wie Zahlen gelesen. Ein Jahrzehnt als Mehrzahl
+   oder als Person zählt wie „Mitte zwanzig“: „in den Zwanzigern“ und
+   „Mittzwanzigerin“ sind 20; „ein Zwanziger“ ist ein Geldschein und zählt
+   nicht. Kategoriewörter („Teenager“, „Schulkind“, „Gymnasiast“,
+   „Erstklässler“, „Lehrling“, „im Kindesalter“, „high school“) und Wörter,
+   die ein Kind ohne Zahl benennen („Mädchen“, „Bub“, „Bursch“, „Knabe“,
+   „Junge“, „Volksschulkind“, „Schülerin“, „Baby“ und ihre englischen
+   Entsprechungen), gelten als junges Alter — aber nur, wenn keine Zahl
+   dasteht. Seit 05.10.2026 gehören dazu auch „vorpubertär“, „prepubescent“,
+   „Firmling“, „Kommunionkind“, „Taferlklassler“, „dritte Klasse“, „Kita“,
+   „Mädl“, „Bua“ und „Burschi“; die ganze Liste steht in
+   `alters-lesbarkeit-woerter.js`.
+
+   **Was als Altersversuch gilt** — im Anker oder irgendwo in einer der zwei
+   Alterskarten:
+   - die abgeschriebene Vorlage;
+   - ein Alterswort oder seine Kurzform („Jahre“, „Jahr“, „Spanne“, „13 J.“,
+     „Lj.“, „Alter:“, „aged 13“, „13 yo“), „underage“, „a minor“ oder ein
+     Geburtsjahr;
+   - ein Kindwort oder eine Kategorie („ein Mädchen“, „Schülerin“);
+   - jede ganze Zahl von 1 bis zur Schutzgrenze aus Punkt 1, als Ziffer oder
+     als Wort (ab „zwei“), auch als Ordnungszahl („Du bist 13.“, „3. Klasse“,
+     „etwa 7 Kopflängen“). Ausgenommen ist nur, was erkennbar keine Angabe zu
+     einer Person ist: Dezimalzahl („1,80“), Uhrzeit („14:30“, „9 Uhr“),
+     Prozent und der Teil einer größeren Zahl (Jahreszahl, „130 cm“);
+   - „jung“ und „young“ (nicht „junge Frau“, „junger Mann“, „young adult“,
+     „jung geblieben“), „noch im Wachstum“, „noch nicht ausgewachsen“, „noch
+     nicht erwachsen“ und Merkmale, die nur Kinder und Jugendliche haben
+     („Milchzähne“, „Zahnwechsel“, „Stimmbruch“).
+
+   Hat weder der Anker noch ein erster Satz ein lesbares Alter und steht
+   irgendwo ein solcher Versuch, gilt das Alter als nicht lesbar; eine Zahl
+   im späteren Satz wird nicht als Alter gelesen. Eine Antwort ohne jeden
+   Altersversuch („Keine klaren Bildsignale.“) bleibt wie bisher
+   ungefiltert. Die Regeln zum Satzende, zum Altersversuch außerhalb des
+   ersten Satzes und zu den Kinderwörtern sind am 04.10.2026 ergänzt; die
+   bloße Zahl, der Altersversuch im Anker, die Kurzformen, „jung“, die
+   Merkmale und das Jahrzehnt als Mehrzahl am 05.10.2026.
+
+   **Getragene Grenzen.**
+   - Zu viel Schutz ohne lesbares Alter: Nennt die KI an den Stellen, die
+     zählen, kein Alter, schützt jedes Kindwort, jede kleine Zahl und „jung“
+     irgendwo in der Karte — auch bei Erwachsenen („Du hältst ein Kind an der
+     Hand.“, „Trikot mit der Nummer 8“, „rund 10 Freunde“, „als Elf
+     verkleidet“). Die Karte zeigt dann den festen Satz. Mit lesbarem Alter
+     im Anker oder im ersten Satz bleibt die Person unberührt.
+   - Eine genannte Zahl ersetzt die Kategorie: „~35 Jahre, jugendlich
+     wirkend“ ist 35, nicht 13. Das gilt für jede Zahl im Anker oder im
+     ersten Satz, auch für eine, die kein Alter ist. Eine solche Fremdzahl
+     bis zur Schutzgrenze löst den Schutz aus; eine darüber hebt ihn neben
+     einem Kindwort auf: „Teenager, Schuhgröße 38“ und „ein Junge im Trikot
+     mit der 27“ werden als 38 und 27 gelesen, Stufe 2 greift nicht.
+   - Der Anker zählt, auch gegen die Karte: Nennt der Anker ein lesbares
+     Alter über der Schutzgrenze und die Karte ein Kind („~28 Jahre“ im
+     Anker, „ein Mädchen, etwa 13“ in der Karte), gilt der Anker, und Stufe 2
+     greift nicht.
+
+   **Anzeige.** Trägt der Anker das Alter, steht er in der Karte an der
+   Stelle ihres ersten Satzes; der Beleg-Satz dahinter bleibt. Was der Anker
+   am Ende schon nennt, steht danach nicht noch einmal da — sonst zeigte die
+   Karte das Alter doppelt, wenn ihr erster Satz an einer unbekannten
+   Abkürzung endet („etw. 13“).
+
+   **Live-Anzeige.** Sie entscheidet über die Alterskarte mit derselben
+   Regel wie das Endergebnis (`mistral-antwort.js`): Was am Ende den festen
+   Satz bekommt, erscheint vorher nicht. Zwei Ausnahmen: Zeigt erst die
+   später eintreffende Beast-Karte einen Altersversuch ohne lesbares Alter,
+   steht eine Standard-Karte ohne Altersversuch schon da und wechselt dann
+   auf den festen Satz — sie enthält selbst weder ein Alter noch eine kleine
+   Zahl. Und steht der Altersanker entgegen dem Schema erst hinter den
+   Profilen, zählt er live nicht: Ist er nicht lesbar, stehen die Karten
+   schon da, auch mit einem Alter, und wechseln am Ende auf den festen Satz.
+   Die Prüfreihe hält diese Fälle fest (`alters-platzhalter.test.js`,
+   „bewusste Ausnahme“).
 4. Der zweite Werbe-Aufruf nennt dieselbe Grenze; sein Text liest sie aus
    `minor-safety.js` (`SCHUTZ_ALTER`), steht also nur an einer Stelle.
 
@@ -858,6 +1069,14 @@ mitgeändert werden; der Werbe-Prompt zieht automatisch nach.
 nennt den Puffer noch nicht (der Server streicht trotzdem); die Beispiel-Belege
 der Alterskarte sind allgemein formuliert — ob die KI dadurch seltener ein
 konkretes Merkmal nennt, zeigt der Vortest (Kennzahl „Begründung konkret“).
+Seit 04.10.2026 nennen die Verbotssätze beider KI-Aufrufe dieselben Themen wie
+der Filter für möglicherweise Minderjährige, auch Drogen und Tabak (ein Test
+hält beides zusammen, `functions/src/__tests__/prompt-verbot-themen.test.js`);
+an echten Fotos gemessen ist diese Ergänzung nicht. Ein eigenes Verbot von
+Werbung zu Pornografie, Waffen und Extremismus steht nur im zweiten
+Werbe-Aufruf, nicht im Analyse-Aufruf: Für die Werbe-Einträge der sachlichen
+Ansicht ist bei diesen Themen der Filter die einzige Linie. Beides gehört in
+dieselbe Messung.
 
 ## Kinderschutz-Zeile: oberes Ende der Altersschätzung (25.09.2026)
 
@@ -869,7 +1088,7 @@ einschließt, ließ sich damit nicht auswerten: „8–13“ und „8–9“ erg
 dieselbe Zeile.
 
 **Entscheidung.** Die Zeile trägt zusätzlich `alterBis`: das obere Ende der
-geschätzten Spanne (`obereAltersgrenze` in `functions/src/alters-lesbarkeit.js`,
+geschätzten Spanne (`obereAltersgrenze` in `functions/src/alters-auslese.js`,
 Regeln und Beispiele dort). Gelesen wird zuerst eine erkannte Spanne oder
 Plus-Minus-Angabe, sonst eine Zahl mit Altersbezug. Fremdzahlen wie
 Körpergröße oder Uhrzeit zählen nicht — anders als bei der Untergrenze, wo sie
@@ -907,6 +1126,146 @@ Spannen das Alter überwiegend einschließen, ist „zu jung“ Breite und kein
 Schätzfehler; am Alters-Prompt ändert sich dann nichts. Verfehlen sie es
 überwiegend, wird der Alters-Prompt überarbeitet und vor der Auslieferung
 daraufhin geprüft, dass keine Kinder über die Schutzgrenze rutschen.
+
+## Kinderschutz-Filter: Die Sperrliste ist eine Wortliste (04.10.2026)
+
+**Was sie ist.** Der Filter vergleicht Werbe-Einträge, Erklärsätze und
+Fließtext mit festen Wortlisten (`functions/src/minor-safety-woerter.js`, je
+Thema deutsch und englisch). Er fängt, was in den Listen steht — nicht jede
+Werbung zu einem Thema. Vor dem Vergleich wird der Text vereinheitlicht
+(Groß- und Kleinschreibung, Umlaute, Akzente); kurze Wörter gelten nur als
+ganzes Wort („Wetter“ ist keine Wette, „Waffel“ keine Waffe).
+
+**Zusammen, mit Bindestrich, getrennt.** Ein Bindestrich im Wort ändert
+nichts: Der Filter liest jeden Text auch so, als stünde der Bindestrich nicht
+da — „Soft-Air“, „Pfeffer-Spray“ und „Sex-Spielzeug“ werden gefangen wie die
+zusammengeschriebene Form, im Werbe-Eintrag wie im Satz, auch hinter einem
+Emoji. Eine Grenze bleibt: Hat ein Text mehr als drei Bindestriche, liest der
+Filter nur zwei Fassungen — alle Bindestriche als Leerzeichen und alle
+weggelassen. Ein dreiteiliges Wort, bei dem nur einer der Bindestriche
+wegfallen müsste, löst in einem langen Text deshalb keinen Alarm aus
+(„Online-Waffen-Laden“; in einem kurzen Satz schon). Als Werbe-Eintrag wird es
+weiter gefangen, weil die Liste dort die Wortfuge kennt
+(„Top-Online-Waffen-Laden-Set“); eine Silbentrennung mitten im Wort („Na-zi“)
+liest der Filter nur bis zu drei Bindestrichen im Eintrag. Die getrennte
+Schreibweise einer Zusammensetzung („Pfeffer Spray“, „Sex Spielzeug“) wird als
+Werbe-Eintrag gefangen; dafür kennt die Liste die Wortfuge. Im Fließtext gilt
+sie nicht: Dort stehen dieselben zwei Wörter oft zufällig nebeneinander („Sex
+spielt keine Rolle“, „das Spiel automatisch speichern“). Feste Fügungen aus
+mehreren Wörtern („Pall Mall“, „Sex Shop“, „Ku Klux Klan“) gelten in jeder
+Schreibweise auch im Satz. Leerzeichen an beliebiger Stelle zu überbrücken,
+ist gemessen und verworfen: Es träfe Alltagstext („Islam ist“, „Code in“).
+
+**Themen.** Stufe 1, für alle: Pornografie und Sexarbeit, Waffen,
+Extremismus. Stufe 2, bei möglicherweise Minderjährigen (Schutzgrenze siehe
+Abschnitt vom 17.09.2026): Wetten und Glücksspiel, Kredit und Raten, Alkohol,
+Tabak, Schönheits-OP, Diät und Drogen. Entscheidung vom 04.10.2026: Drogen
+werden bei möglicherweise Minderjährigen wie Alkohol behandelt — gestrichen
+werden Werbe-Einträge, bei Erwachsenen bleiben sie, im Fließtext wird gezählt.
+
+**Was sie hält.** Die Prüfreihe
+`functions/src/__tests__/minor-safety-woerter.test.js`: je Thema Wörter, die
+gefangen werden müssen (deutsch und englisch), und harmlose, die nicht
+gefangen werden dürfen; dazu je Listenwort und je harmloser Wendung ein
+Beispiel. Ein Wort oder eine Wendung ohne Beispiel macht den Test rot —
+ebenso ein langes Listenwort, für das nicht entschieden ist, ob es eine
+Zusammensetzung ist und wie seine getrennte Schreibweise gefangen wird.
+
+**Überall oder nur als Werbe-Eintrag.** Was überall gilt, streicht in Stufe 1
+auch Erklärsätze und löst im Fließtext den Alarm aus; in Stufe 2 wird es im
+Fließtext gezählt. Überall gelten deshalb nur Wörter, die in einem Profiltext
+nichts verloren haben: Namen, Symbole, Organisationen und eindeutige Waren
+(„Hitler“, „KKK“, „Sprengstoff“, „Softair“, „Munition“, „Pornoseite“,
+„Dildo“). Nur als Werbe-Eintrag (`ad_targeting`), nicht für Erklärsätze und
+Fließtext, gelten: abstrakte Begriffe, die in einem Aufklärungs- oder
+Erklärsatz stehen können („Faschismus“, „Antisemitismus“, „Radikalisierung“,
+„Erotik“, „Nacktbilder“); Wörter, die im Satz Redewendung oder
+Bildbeschreibung sind („deine stärkste Waffe“, „wie aus der Pistole
+geschossen“, „ein Soldat mit Gewehr“, „wir raten dir“, „wieder wett“, „deine
+Droge“, „I bet“, „on the far right“, „riding shotgun“); Stammregeln, die im
+Satz zu viel träfen („abnehm…“ als Wortanfang); und die getrennte
+Schreibweise einer Zusammensetzung. Zwei Ausnahmen bleiben, wie sie vor dem
+04.10.2026 waren: „Extremismus“ und „Terror“ gelten überall, ebenso die
+englischen Wörter „gun“ und „rifle“ — eine englische Bildbeschreibung mit
+Gewehr löst den Alarm aus, eine deutsche nicht. Das bestehende Signal wird
+nicht ohne Messung leiser gestellt. „shotgun“ stand vor dem 04.10.2026 nicht
+in der Liste und gilt nur als Werbe-Eintrag. Slang mit „Porn“ („Food-Porn“,
+auch „Foodporn“) gilt überall und löst im Fließtext den Alarm aus
+(Entscheidung vom 16.09.2026; der Prompt verbietet ihn). „Sex“ als ganzes
+Wort und „Pistols“ stehen nicht in der Liste — „Sex: female“ ist eine Angabe,
+„Sex Pistols“ eine Band; gelistet sind die Zusammensetzungen („Sexshop“,
+„Sex-Videos“, „Sex Spielzeug“, „Telefonsex“).
+
+**Harmlose Wendungen.** Feste Verbindungen, in denen ein Listenwort steckt
+(„Wasserpistole“, „Seifenblasen-Pistole“, „Top Gun“, „alkoholfrei“, „Ginger
+Beer“, „Diet Coke“, „People-Pleasing“, „Cocktailkleid“, „Rifle Jeans“,
+„Unisex“), werden vor dem Vergleich aus dem Text genommen — für beide Stufen,
+im Werbe-Eintrag wie im Satz. Ein Sperrwort daneben wird trotzdem gefangen
+(„Alkoholfreies Bier“ bleibt Bier). Seit 05.10.2026 stehen „Schwein“, „Sporn“
+und „Insekt“ dort als ganze Wörter aufgezählt (Meer-, Spar-, Wild-,
+Glücksschwein; Ansporn, Rittersporn; Nutzinsekt): Ein Wort, das nur so endet,
+wird wieder gefangen („Tischwein“, „Teensporn“, „Rheinsekt“). Was nicht
+aufgezählt ist („Wollschwein“), liest der Filter als Wein — auch mit
+Bindestrich, weil er jedes Wort auch ohne Bindestrich liest („Woll-Schwein“).
+Aufgezählt sind deshalb auch die gängigen Stofftiere („Plüschschwein“,
+„Kuschel-Schwein“, „Stoffschwein“). Ein Test hält fest, dass keine Wendung
+mehr das Ende eines fremden Wortes mitnimmt.
+Waffen-Skins („Fortnite Waffen-Skins“, „Weapon Skins“, „Gun Skins“) sind
+Spiele-Käufe und bleiben stehen. Anderes mit „Waffen“ wird weiter für alle
+gestrichen („Waffen-Baupläne“, „Waffen-Pack“): Ein Bauplan kann auch eine
+echte Waffe meinen.
+
+**Was sie nicht leistet.** Ein Werbe-Eintrag ohne Listenwort geht durch, und
+keine Protokollzeile zeigt ihn: Die Kinderschutz-Zeile zählt nur
+Listentreffer. Ob bei Kinderfotos solche Einträge vorkommen, zeigt nur das
+Nachstellen mit eigenen Fotos (Abschnitt „Anzahl und Diagnose“, Neubewertung).
+Aufgenommen ist, was als Werbe-Kärtchen so gut wie immer das Thema meint.
+Mehrdeutige Wörter stehen bewusst nicht in der Liste, auch wenn sie das Thema
+meinen können: „Gras“, „Speed“, „Messer“, „Patronen“, „Corona“, „Most“,
+„Shots“, „Bingo“, „Hyaluron“ (auch Hautpflege; gefangen werden
+„Hyaluron-Filler“ und „Hyaluron-Spritze“), „Smoking“ (im Deutschen der
+Anzug). Nicht gelistet
+sind auch die Angebote, die der Prompt bei Minderjährigen ausdrücklich als
+Ersatz nennt (In-App-Käufe, Lootboxen, Gaming-Abos, Influencer-Merch,
+Sammelkarten, Statuskleidung): Sie sind Lerninhalt. Ein Umlaut passt auf „ü“
+und „ue“, nicht auf den nackten Vokal: „Glucksspiel“ und „Schonheits-OP“
+gehen durch (bis zum 04.10.2026 wurden sie gefangen). Schreibweisen mit Ziffern
+statt Buchstaben („0nlyFans“), gesperrter Schrift („W e t t e n“) oder einem
+Leerzeichen mitten in einem Wort, das keine Zusammensetzung ist („Por no“),
+fängt die Liste nicht.
+
+**Feste Tier-Profile.** Bei einem reinen Tierfoto zeigt die Seite feste, vom
+Projekt geschriebene Profile (`functions/src/locales/*/animals.js`). Sie laufen
+nicht durch den Filter: Im Bild ist kein Mensch, es gibt kein Alter. Am Gerät
+sitzt trotzdem oft ein Kind. Deshalb gilt für die festen Einträge selbst, dass
+keiner von ihnen einer wäre, den der Filter bei einem Kind streichen würde —
+`animal.test.js` prüft das für jede Tierart in beiden Sprachen (Entscheidung
+vom 05.10.2026; vorher stand in der Beast-Ansicht eine Kredit-Werbung für die
+Tierarztrechnung).
+
+**Alarm und Zähler.** Der Alarm „Kinderschutz-Treffer“
+(`minor-safety-durchbruch`, `docs/ERROR-ALERTING.md`) hört allein auf
+Stufe-1-Wörter im Fließtext, und dort nur auf die, die überall gelten.
+Stufe-2-Wörter im Fließtext werden gezählt, ohne Alarm. Der Zähler zählt
+Listenwörter, keine Aussagen: „Du trinkst keinen Alkohol.“ zählt wie „Du
+trinkst Alkohol.“
+
+**Getragene Folge.** Die Zähler `entfernt` und `durchgerutscht` hängen am
+Umfang der Liste; vor und nach dieser Auslieferung sind sie nicht vergleichbar
+(RUNBOOK, Lesart der Kinderschutz-Zeile). Der Alarm im Fließtext hört auf
+deutlich mehr Wörter als vorher: Die meisten Stufe-1-Wörter, die überall
+gelten, lösten vor dem 04.10.2026 keinen aus („Taser“, „Armbrust“,
+„Pfefferspray“, „Softair“, „Sprengstoff“, „Hakenkreuz“, „Islamist“,
+„Sexshop“). Der Push „Kinderschutz-Treffer“ kann deshalb häufiger kommen; wie
+oft, hängt an den Texten der KI und ist nicht gemessen. In Erklärsätzen
+streicht Stufe 1 wie bisher: Ein Aufklärungssatz, der ein Stufe-1-Wort nennt,
+das überall gilt („rechtsextrem“), fällt weg. Weil der Bindestrich beim Lesen
+auch weggelassen wird, kann er zwei harmlose Wörter zu einem Listenwort
+verbinden („Sushi-Shake“ enthält „Shisha“); der Eintrag wird dann gestrichen.
+„Unisex“ ist davon ausgenommen („Unisex-Shop“).
+
+**Rückweg.** Nur mit Deploy: Wörter in `minor-safety-woerter.js` ändern. Die
+Tabelle Listenwort → Beispiel in der Prüfreihe muss mitgeändert werden.
 
 ## Erfolgsweg eines Auftrags ohne Kennung im Log (26./27.09.2026)
 

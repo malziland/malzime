@@ -4,6 +4,163 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
+
+### Behoben — Kinderschutz
+
+- **Werbe-Ideen zu Alkohol, Waffen und Co. werden verlässlicher gestrichen.**
+  Der Filter für Werbe-Kärtchen kennt jetzt deutlich mehr Wörter seiner Themen
+  in Deutsch und Englisch — auch in Zusammensetzungen („Pornoseite“,
+  „Waffenladen“, „Wettbüro“), mit Bindestrich („Soft-Air“, „Sex-Spielzeug“)
+  und getrennt geschrieben („Only Fans“, „Pfeffer Spray“). Bei Kindern und
+  Jugendlichen verschwinden damit Kärtchen wie „Jägermeister“, „Teilzahlung“
+  oder „Interwetten“, bei allen solche wie „Softair-Pistole“.
+- **Werbe-Ideen zu Drogen werden bei Kindern und Jugendlichen gestrichen** —
+  so wie Alkohol: „Cannabis“, „CBD-Shop“, „Lachgas“, „Kokain“. Bei Erwachsenen
+  bleiben sie stehen. Auch die Anweisung an die KI verbietet solche Werbung
+  bei Kindern und Jugendlichen jetzt ausdrücklich, ebenso Tabak-Werbung an der
+  Stelle, an der sie bisher nicht genannt war.
+- **Harmlose Wörter bleiben stehen.** „Wetter“ ist keine Wette, „Insekt“ kein
+  Sekt, „Waffel“ keine Waffe, „Rumänien“ kein Rum, „Drogerie“ keine Droge;
+  „Wasserpistole“ und „Heißklebepistole“ sind keine Waffen-Werbung, „Diet
+  Coke“ ist keine Diät. Waffen-Skins aus Spielen („Fortnite Waffen-Skins“,
+  „Weapon Skins“) bleiben ebenfalls stehen. Auch frühere Fehlgriffe sind weg:
+  „Glocke“, „Klarname“ und „Terrorvogel“ wurden bisher mitgefangen.
+- **Steht das Alter eines Kindes hinter „ca.“, als bloße Zahl oder nur als Wort
+  da** („ein Mädchen“, „Volksschulkind“, „Firmling“, „13 J.“), greift der
+  Schutz für Kinder jetzt ebenfalls. Nennt die KI weder in ihrer Altersangabe
+  noch im ersten Satz der Alterskarte ein lesbares Alter, schreibt aber
+  irgendwo in der Alterskarte ein Alter, ein Wort für ein Kind, „jung“ oder
+  irgendeine kleine Zahl („Alter: 13.“, „Du bist 13.“, „3. Klasse“), gilt das
+  Alter als nicht lesbar: Der Schutz greift, und die Karte zeigt den festen
+  Hinweis statt einer Zahl. Das trifft auch Erwachsene, bei denen die KI kein
+  Alter nennt, aber eine kleine Zahl schreibt („Trikot mit der Nummer 8“).
+  Nennt die Antwort nichts dergleichen, wird wie bisher nicht gefiltert.
+- „In den Zwanzigern“ und „Mittzwanzigerin“ werden jetzt wie „Mitte zwanzig“
+  gelesen. Die Alterskarte nennt das Alter nicht mehr doppelt, wenn die KI
+  davor eine ungewöhnliche Abkürzung schreibt („etw. 13“).
+- **Im Spaß-Profil für Tierfotos steht keine Kredit-Werbung mehr.** Die festen
+  Texte laufen nicht durch den Filter, weil kein Mensch im Bild ist; jetzt ist
+  festgehalten, dass keiner ihrer Einträge einer wäre, den der Filter bei einem
+  Kind streichen würde.
+- **Der Alarm „Kinderschutz-Treffer“ hört im Text des Profils auf mehr
+  eindeutige Wörter als bisher** (etwa „Pfefferspray“) und kann deshalb
+  häufiger kommen. Wörter, die im Satz meist etwas anderes heißen, lösen ihn
+  nicht aus („wie aus der Pistole geschossen“, „deine stärkste Waffe“).
+- Der Filter bleibt eine Wortliste: Was nicht in ihr steht, erkennt er nicht —
+  mehrdeutige Wörter wie „Messer“, „Gras“ oder „Corona“ stehen bewusst nicht
+  darin, und ein Wort mit fehlendem Umlaut („Glucksspiel“) erkennt er nicht
+  mehr. Für die Auswertung: Die Zähler des Kinderschutz-Protokolls sind mit
+  Zahlen vor dieser Fassung nicht vergleichbar — die Liste kennt mehr Wörter,
+  und „wetten“ und „Jackpot“ zählt sie im Text des Profils nicht mehr mit,
+  weil sie dort meist Redewendung sind („Wetten, dass …?“).
+
+### Behoben — Datenschutz
+
+- **Beispielbilder fragen nichts mehr bei OpenStreetMap an.** Wer ein
+  Beispielbild wählt, sieht Adresse und Karte des erfundenen Aufnahmeorts wie
+  bisher — beides kommt jetzt aus der Seite selbst. Der Browser ruft dafür
+  weder die Ortsauflösung noch die Kartenkacheln ab; die IP-Adresse geht bei
+  einem Beispielbild nicht mehr an OpenStreetMap. Die Karte ist dort ein fester
+  Ausschnitt und lässt sich nicht bewegen. Bei einem hochgeladenen Foto mit
+  Ortsdaten bleibt alles wie bisher.
+- **Datenschutzerklärung und Impressum sagen jetzt genau, wann OpenStreetMap
+  gefragt wird:** nur wenn ein hochgeladenes Foto Ortsdaten trägt, bei den
+  Demo-Fotos nicht. Das Impressum nennt für die Karten die heute gültige
+  Lizenz (ODbL).
+- **Formulare auf der Seite dürfen nur noch an malziME selbst senden.** Die
+  Sicherheitsrichtlinie der Seite nennt jetzt auch Formularziele; ein Test im
+  Browser hält es fest.
+
+### Behoben — was Besucher merken
+
+- **Nach einer gescheiterten Analyse verschwinden auch die schon gezeigten
+  Merkmale.** Scheiterte eine Analyse, nachdem schon erste Merkmal-Karten zu
+  sehen waren, standen diese halb gefüllt neben der Fehlermeldung. Jetzt
+  räumt jeder Fehlerweg sie mit ab.
+- Wer von einem hochgeladenen Foto auf ein Beispielbild wechselt, sieht die
+  bewegliche Karte sofort verschwinden.
+- In einem seltenen Fall blieb die Alterskarte ohne Text. Jetzt steht dort der
+  feste Hinweis, dass sich das Alter nicht sicher ablesen lässt.
+
+### Behoben — Prüfungen, die nicht mehr prüften
+
+- **Der Wächter über die Alarme prüft jetzt alle fünf Alarmregeln.** Vor jeder
+  Auslieferung wird je Regel nachgesehen, ob es sie gibt, ob sie eingeschaltet
+  ist und ob eine E-Mail-Adresse dranhängt. Die drei Regeln, die auf einzelne
+  Dienste hören, müssen dabei jeden Dienst nennen. Bisher sah die Prüfung nur
+  eine der fünf.
+- **Die öffentliche Nachprüfung lässt sich nicht mehr durch Weglassen
+  täuschen.** `sh scripts/pruefe-live.sh` prüft jetzt jede Datei, die laut
+  veröffentlichtem Quelltext ausgeliefert sein muss — nicht nur die, die der
+  Server selbst auflistet. Eine Datei, die in seiner Liste fehlt, wird gemeldet,
+  und eine veränderte Datei fällt auch dann auf, wenn der Server den passenden
+  Fingerabdruck gleich mitliefert. Nennt der Server einen Stand, den der
+  Quelltext nicht kennt, oder läuft die Prüfung außerhalb einer Kopie des
+  Quelltextes, endet sie als Messproblem — nie als bestanden.
+- **Der Fingerabdruck nennt jetzt jede Datei, die an Google übergeben wird** —
+  auch `package.json`, `package-lock.json` und die Sprachliste, nicht nur die
+  Programmdateien. `sh scripts/pruefe-live.sh` rechnet jede davon gegen den
+  veröffentlichten Quelltext nach, und die Website geht nur allein hinaus, wenn
+  dieses Paket unverändert ist. Die Testwerte (`test-satz.js`) gehen nicht
+  mehr mit.
+- **Wer mit einer älteren Kopie des Quelltexts nachprüft, bekommt keinen
+  Fehlalarm mehr:** Kennt die Kopie den ausgelieferten Stand nicht, meldet
+  `pruefe-live.sh` ein Messproblem mit dem Hinweis auf `git fetch` — nicht
+  mehr eine Abweichung.
+- **Die Auslieferung sieht alle Prüfergebnisse eines Standes**, auch wenn sich
+  über mehrere Tage viele angesammelt haben, und hält an, wenn sich die
+  Version des Auslieferungswerkzeugs nicht lesen lässt.
+- **Die Prüfabläufe selbst sind festgeschrieben.** Fällt eine der sechs
+  Pflicht-Prüfungen aus dem Ablauf, verliert sie ihren Prüfbefehl oder wird
+  sie abgeschaltet, hält eine Kontrolle an, bevor etwas zusammengeführt oder
+  ausgeliefert wird. Das gilt auch, wenn der Befehl stehen bleibt, aber nichts
+  mehr prüft — weil das Skript dahinter ausgetauscht wurde oder das
+  Prüfwerkzeug so eingestellt ist, dass es keine oder weniger Dateien ansieht.
+  Dazu gehört auch die Vorbereitungsdatei der Server-Tests.
+- **Die Browser-Tests fragen beim Prüfen der Karte nichts mehr bei
+  OpenStreetMap an.** Ihre Abfang-Regel griff nicht, die Kartenkacheln kamen
+  unbemerkt aus dem Netz. Jetzt liefert der Test sie selbst und prüft, dass
+  sie angekommen sind.
+- **Tests halten jetzt fest, was bisher nur das Programm sicherstellte:** dass
+  keine IP-Adresse im Protokoll landet, dass die Löschfristen stimmen und dass
+  ein Testlauf nie den echten Foto-Speicher oder die echte Warteschlange
+  anfasst. Die Schutzstellen wirkten schon; ihr Wegfall wäre aber keinem Test
+  aufgefallen.
+
+### Geändert — Auslieferung und Betrieb
+
+- **Zu Google geht beim Ausliefern nur noch das Programm selbst.** Testdateien,
+  Hilfsskripte und lokale Einstellungsdateien bleiben auf dem Rechner. Die
+  Auslieferung startet nicht, wenn im Server-Ordner eine Einstellungsdatei
+  (`.env`) liegt oder eine Datei, die nicht im offenen Quelltext steht.
+- **Der Server wird nur noch zusammen mit der Website ausgeliefert, die
+  Website allein nur bei unverändertem Server-Programm.** Der Fingerabdruck auf
+  der Seite nennt damit bei jeder Auslieferung den eigenen Server-Quelltext,
+  der hinausgegangen ist. Die Fremdpakete des Servers nennt er nicht.
+- **Test-Schalter können in der Produktion nichts mehr anrichten.** Drei
+  Einstellungen sind nur für Läufe am eigenen Rechner gedacht (erfundene
+  Beispiel-Antwort statt echter KI, lokale Warteschlange, stumme
+  Benachrichtigung). Jetzt wirken sie in der Produktion nicht — und eine
+  Fassung, bei der einer davon eingeschaltet ist, startet dort gar nicht erst.
+  Vor jeder Auslieferung wird außerdem nachgesehen, dass an keinem Dienst ein
+  solcher Schalter gesetzt ist. Lokale Einstellungen haben genau einen Ort:
+  `functions/.env.local`.
+- **Der eigene Benachrichtigungs-Server wird mitbeobachtet.** Er läuft in neuer
+  Fassung unter einem eigenen, eingeschränkten Konto. Der Nachtlauf meldet,
+  wenn es für ihn eine Sicherheitsmeldung gibt oder seit mehr als 30 Tagen eine
+  neuere Fassung. Vor jeder Auslieferung wird nachgeprüft, dass die laufende
+  Fassung die beobachtete ist und der Dienst unter dem eigenen Konto läuft.
+- **Die Auslieferung meldet, wenn die nächtliche Sicherheitsprüfung nicht mehr
+  von selbst läuft.** Die Meldung steht vor dem Hochladen und noch einmal am
+  Ende des Protokolls.
+- **Dokumentiert: Der Push aufs Handy kann abends ausbleiben.** Die Nachricht
+  liegt dann in der App; die E-Mail zu jedem Alarm kommt weiterhin.
+- Außerhalb des Programms eingeschaltet: die Sperre gegen versehentlich
+  hochgeladene Geheimnisse bei GitHub und der Löschschutz der Datenbank.
+
 ## [4.13.2] — 2026-10-01
 
 ### Geändert

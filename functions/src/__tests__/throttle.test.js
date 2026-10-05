@@ -117,11 +117,17 @@ describe("withMistralSlot wrapper", () => {
 
   test("allows multiple concurrent operations within limit", async () => {
     let maxObservedInFlight = 0;
+    /* Den Satz mitgeben: Ohne ihn galt die Grenze, die ein frueherer Test
+       eingestellt hatte — lief dieser Test zuerst, war es die Vorgabe der
+       Drossel (gefunden mit --randomize, 01.10.2026). Ohne Token-Abstand wie
+       im beforeEach: Mit den 800 ms des Satzes lief der Test je nach
+       Reihenfolge in seine Zeitgrenze. */
+    const satzOhneAbstand = { ...SATZ, tokenAbstandGrossMs: 0 };
     const ops = Array.from({ length: 5 }, () =>
       withMistralSlot(async () => {
         maxObservedInFlight = Math.max(maxObservedInFlight, getMistralStats().inFlight);
         await new Promise((r) => setTimeout(r, 10));
-      })
+      }, satzOhneAbstand)
     );
     await Promise.all(ops);
     /* Mindestens 2 parallel sollten gesehen worden sein */

@@ -21,6 +21,8 @@ const path = require("path");
  */
 
 const WURZEL = path.join(__dirname, "../../..");
+/* Von git ausgenommene Ordner mit privaten Arbeitsnotizen (siehe .gitignore). */
+const PRIVATE_DOKU_ORDNER = ["docs/audit", "docs/handover"];
 
 function lies(datei) {
   return fs.readFileSync(path.join(WURZEL, datei), "utf8");
@@ -81,16 +83,30 @@ describe("Doku-Drift-Wächter", () => {
        hält die Architekturentscheidungen. Tote Verweise blieben dort grün,
        also genau dort, wo "die Drift, die ein öffentliches Repo unglaubwürdig
        macht" (Kommentar dieses Tests) am teuersten ist. */
+    /* Geprüft wird, was im Repository liegt. Prüfberichte und Übergaben sind
+       private Arbeitsnotizen: Sie liegen auf dem Entwicklungsrechner in docs/,
+       sind aber von git ausgenommen (.gitignore) und gehören nicht zur
+       veröffentlichten Doku. Ohne diese Ausnahme wird der Wächter auf dem
+       Entwicklungsrechner rot, sobald eine solche Notiz einen Beispiel-Verweis
+       enthält — in der Pipeline, wo es die Ordner nicht gibt, bleibt er grün. */
+    const gitignore = lies(".gitignore").split("\n");
+    for (const ordner of PRIVATE_DOKU_ORDNER) {
+      /* Die Ausnahme darf nie einen Ordner treffen, der veröffentlicht wird. */
+      expect(gitignore).toContain(`${ordner}/`);
+    }
     const markdownUnter = (rel) => {
       const voll = path.join(WURZEL, rel);
       if (!fs.existsSync(voll)) return [];
       return fs.readdirSync(voll, { withFileTypes: true }).flatMap((eintrag) => {
         const kind = path.join(rel, eintrag.name);
-        if (eintrag.isDirectory()) return markdownUnter(kind);
+        if (eintrag.isDirectory()) return PRIVATE_DOKU_ORDNER.includes(kind) ? [] : markdownUnter(kind);
         return eintrag.name.endsWith(".md") ? [kind] : [];
       });
     };
     const dateien = ["README.md"].concat(markdownUnter("docs"));
+    /* Positivkontrolle: Die Unterordner, um die es geht, werden weiter gelesen. */
+    expect(dateien.some((d) => d.startsWith("docs/adr/"))).toBe(true);
+    expect(dateien.some((d) => d.startsWith("docs/barrierefreiheit/"))).toBe(true);
 
     const tote = [];
     for (const datei of dateien) {

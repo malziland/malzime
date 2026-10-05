@@ -11,7 +11,7 @@
  * kein Mistral-Aufruf, kein echtes Firestore.
  */
 
-const mockDoc = { daten: undefined, fehler: null, verzoegerung: 0, sofortWurf: null };
+const mockDoc = { daten: undefined, fehler: null, verzoegerung: 0, sofortWurf: null, offen: [] };
 let lesevorgaenge = 0;
 
 jest.mock("../db", () => ({
@@ -20,11 +20,15 @@ jest.mock("../db", () => ({
     if (mockDoc.sofortWurf) throw new Error(mockDoc.sofortWurf);
     return {
       doc: () => ({
-        async get() {
+        get() {
           lesevorgaenge += 1;
-          if (mockDoc.verzoegerung) await new Promise((f) => setTimeout(f, mockDoc.verzoegerung));
-          if (mockDoc.fehler) throw new Error(mockDoc.fehler);
-          return { exists: mockDoc.daten !== undefined, data: () => mockDoc.daten };
+          const lesen = (async () => {
+            if (mockDoc.verzoegerung) await new Promise((f) => setTimeout(f, mockDoc.verzoegerung));
+            if (mockDoc.fehler) throw new Error(mockDoc.fehler);
+            return { exists: mockDoc.daten !== undefined, data: () => mockDoc.daten };
+          })();
+          mockDoc.offen.push(lesen.catch(() => {}));
+          return lesen;
         },
       }),
     };
@@ -48,6 +52,13 @@ function setze(daten, fehler = null, verzoegerung = 0) {
 const satz = (w, n = "t1") => ({ aktiv: n, profile: { [n]: w } });
 
 beforeEach(() => setze(undefined));
+/* Ein Lesevorgang, der das Zeitlimit reisst, kommt Sekunden spaeter doch noch
+   an und protokolliert dann seine Dauer ("spaete-antwort"). Ohne Abwarten
+   geschah das nach dem Testende ("Cannot log after tests are done"). */
+afterEach(async () => {
+  await Promise.all(mockDoc.offen.splice(0));
+  await new Promise((r) => setTimeout(r, 0));
+});
 
 describe("NOTAUSSTIEG — zurueck ohne Auslieferung", () => {
   test("Umschalten auf einen anderen Satz wirkt sofort", async () => {

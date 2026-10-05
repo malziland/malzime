@@ -231,13 +231,21 @@ describe("OPS-2026-08-31-15 — enqueueJob ist genauso verriegelt", () => {
     frisch.setClientForTest(null);
     const alterLokal = process.env.QUEUE_LOCAL;
     process.env.QUEUE_LOCAL = "1";
+    const log = jest.spyOn(console, "log").mockImplementation(() => {});
     try {
       /* Darf NICHT am Riegel scheitern. Der lokale Dispatch laeuft ins Leere
          (kein Emulator), aber eben nicht mit der Riegel-Meldung. */
       await frisch.enqueueJob("probe-lokal").catch((e) => {
         expect(String(e.message)).not.toMatch(/Attrappe|Emulator/i);
       });
+      /* Der Versand laeuft nebenher und scheitert ohne Emulator erst danach —
+         abwarten, sonst schreibt er nach dem Testende ins Protokoll ("Cannot
+         log after tests are done"). Laeuft doch ein Emulator, endet das nach
+         spaetestens zwei Sekunden. */
+      const gescheitert = () => log.mock.calls.some((c) => String(c[0]).includes("local-dispatch-failed"));
+      for (let i = 0; i < 100 && !gescheitert(); i += 1) await new Promise((r) => setTimeout(r, 20));
     } finally {
+      log.mockRestore();
       if (alterLokal === undefined) delete process.env.QUEUE_LOCAL;
       else process.env.QUEUE_LOCAL = alterLokal;
     }

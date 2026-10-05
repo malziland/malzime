@@ -14,6 +14,20 @@
 
 const { _bewerte, _baueMeldung } = require("../kapazitaets-wache");
 
+/* Reihenfolge-unabhaengig (01.10.2026, gefunden mit --randomize): Die Wache
+   liest die Warteschlange nur mit Projektkennung. Bisher setzte sie erst ein
+   frueherer Test nebenbei — lief die Rate-Pruefung zuerst, war sie "nicht
+   messbar". Jetzt fuer jeden Test gesetzt und am Ende zurueckgestellt, damit
+   sie nicht in andere Testdateien desselben Prozesses leckt. */
+const alteProjektkennung = process.env.GCLOUD_PROJECT;
+beforeEach(() => {
+  process.env.GCLOUD_PROJECT = "malzime-test";
+});
+afterAll(() => {
+  if (alteProjektkennung === undefined) delete process.env.GCLOUD_PROJECT;
+  else process.env.GCLOUD_PROJECT = alteProjektkennung;
+});
+
 describe("Abgleich Code gegen echte Warteschlange", () => {
   test("gleiche Werte sind unauffaellig", () => {
     const b = _bewerte(7, 7);

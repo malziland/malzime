@@ -1359,6 +1359,7 @@ export function zuruecksetzen() {
   liveLief = false;
   aktuellerVersuch = 1;
   datenAusVorversuch = false;
+  fruehGezeigt = { daten: false, fakten: false };
 }
 
 /* Nur für Tests: verkürzt oder verlängert den Zeit-Anlauf gezielt —

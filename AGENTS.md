@@ -10,7 +10,7 @@ public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
     api.js           API-Client: Einreihen, Statusabfrage, Wiederaufnahme (analyzeImageQueued, pollJob, resumeQueueJob)
     dom.js           DOM-Helpers (escapeHtml, sanitize)
     exif.js          Client-seitige EXIF-Extraktion (exifr)
-    geocoding.js     Nominatim Reverse Geocoding (client-seitig)
+    geocoding.js     Nominatim Reverse Geocoding (client-seitig, nur fuer hochgeladene Fotos); fuer die Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite, ohne Abfrage — fuehrt die Liste der Demo-Fotos
     render.js        Ergebnis-Rendering (Profile, EXIF, Karte, Datenwert)
     state.js         Globaler State (requestId, isAnalyzing)
     ui.js            UI-Komponenten (Maintenance-Modal, Scan-Animation, Bias-Toggle, Limit-Banner, Warteschlangen-Anzeige)
@@ -53,6 +53,11 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   middleware.js      Rate Limiting (IP-basiert, Grenze+Fenster aus dem Einstellungssatz), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung aus Mistrals "Sichtbarer Text"-Feld
+  minor-safety.js    Kinderschutz-Filter fuer Werbe-Eintraege: Stufe 1 fuer alle, Stufe 2 bis zur Untergrenze SCHUTZ_BIS
+  minor-safety-woerter.js  Die Wortlisten dazu (reine Daten, deutsch und englisch); jedes Listenwort braucht ein Beispiel in der Pruefreihe
+  alters-lesbarkeit.js  Lesbarkeit der Altersangabe im KI-Text: erster Satz einer Karte, Altersversuch, nicht lesbares Alter
+  alters-auslese.js     Die Zahl-Lesung dazu: Zahlwoerter, Kategorien, untere und obere Altersgrenze
+  alters-lesbarkeit-woerter.js  Die Woerter, Kategorien und Abkuerzungen dazu (reine Daten)
   mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call) + generateBeastAds (zweiter Aufruf ohne Bild)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
@@ -61,6 +66,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1)
   domains.js         Zentrale CORS-/Origin-Whitelist (ALLOWED_ORIGINS)
   i18n.js            Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   feature-flags.js   Laufzeit-Feature-Flags aus Firestore (useBeastAdsCall, useGemesseneDauer), 30s-Cache, fail-safe
+  lokale-schalter.js  Schalter nur fuer lokale Laeufe (MISTRAL_MOCK, QUEUE_LOCAL, NTFY_STUMM): wirken nie in der Produktion; steht dort einer auf 1, startet index.js nicht
   --- Queue-Architektur (v2.0) — der einzige Pfad seit v2.10 ---
   handle-enqueue.js  Queue-Annahme: Validierung -> Bild in Storage -> Job anlegen -> in Cloud Tasks einreihen
   handle-process-job.js  Queue-Worker (nur Cloud Tasks): claimt Job, fuehrt Mistral-Pipeline aus, schreibt Ergebnis
@@ -103,7 +109,7 @@ Einzelbefehle:
 - `npm run lint:frontend` — ESLint frontend
 - `npm run format:frontend:check` — Prettier frontend
 - `firebase emulators:start --only functions,hosting` — local dev
-- `./scripts/deploy.sh [hosting|functions]` — deploy (only with the owner's explicit release; the script runs the gates, the dry run and the live smoke — never `firebase deploy` directly, see docs/RUNBOOK.md)
+- `./scripts/deploy.sh [hosting]` — deploy website and server (no argument) or the website only (`hosting`, refused if the server code changed since the last deploy); the server alone is refused, because the server fingerprint ships with the website (only with the owner's explicit release; the script runs the gates, the dry run and the live smoke — never `firebase deploy` directly, see docs/RUNBOOK.md)
 
 ## Coding Style & Naming Conventions
 
@@ -133,19 +139,23 @@ Einzelbefehle:
 - EXIF wird client-seitig extrahiert (exifr im Browser)
 - GPS erreicht NIE unsere Server — Nominatim und die Kartenkacheln ruft der Browser direkt
   auf, die Koordinaten verlassen das Gerät also sehr wohl, nur nie in Richtung malziME.
+  Ausnahme seit 03.10.2026: Bei den Demo-Fotos fragt der Browser nichts nach außen (feste
+  Adresse und fester Kartenausschnitt, `e2e/beispielbild-ohne-ortsabfrage.test.js`).
   Diese Formulierung ist verbindlich (DOC-2026-08-12-05); die frühere Fassung war im
   Netzwerk-Tab widerlegbar und steht auf der Sperrliste in `.pruefungen/aussentext.txt`
 - Server bekommt nur: komprimiertes Bild + Kamera-Metadaten (make, model) OHNE GPS, OHNE dateTimeOriginal
 - Keine externen Scripts: Alles self-hosted (Fonts, Leaflet, exifr, libheif). Kein CDN, kein reCAPTCHA, kein Firebase SDK
 - Selbst gehostet heisst selbst gewartet: Dependabot und npm audit sehen `public/lib` nicht. Das
   uebernimmt der Nachtlauf `sicherheit-nachts.yml` (`scripts/pruefe-fremd-meldungen.mjs`); eine
-  neue Bibliothek unter `public/lib` braucht dort einen Eintrag, sonst wird der Lauf rot
+  neue Bibliothek unter `public/lib` braucht dort einen Eintrag, sonst wird der Lauf rot. Derselbe
+  Lauf beobachtet den selbst betriebenen ntfy-Server (Fassung gespiegelt in
+  `.github/fremd-dienste/ntfy/VERSION`; nach jedem Update des Dienstes nachziehen)
 - Bot-Schutz: Rate Limiting (IP) + Honeypot + Timing-Check
 - CSP: nur 'self' + OpenStreetMap Tiles + Cloud Functions Endpoint + Nominatim
 
 ## Security & Configuration
 
-- Use `functions/.env` for local config (see `functions/.env.example`)
+- Use `functions/.env.local` for local config (see `functions/.env.local.example`). Never create `functions/.env`: `firebase deploy` would attach its content to every production function; `scripts/deploy.sh` aborts when such a file exists
 - Never commit secrets or API keys
 - CSP headers configured in `firebase.json`
 - Honeypot field for bot protection
@@ -176,7 +186,8 @@ Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. D
 - Always run `npm run test:frontend` after frontend changes
 - Run `cd functions && npm run lint && npm run format:check` before committing backend changes
 - Run `npm run lint:frontend && npm run format:frontend:check` before committing frontend changes
-- The cache-buster `?v=YYYYMMDDNN` is bumped by `scripts/deploy.sh` on every hosting deploy — never by hand
+- The cache-buster `?v=YYYYMMDDNN` is bumped by `scripts/deploy.sh` on every deploy (every deploy includes the website) — never by hand
+- Whoever changes a file under `.github/workflows/`, `.github/dependabot.yml` or one of the tool configs pinned there (`vitest.config.js`, `playwright.config.js`, `eslint.config.mjs`, `functions/eslint.config.js`, `.prettierignore`, `functions/jest.setup.js`) updates its checksum in `scripts/pruefe-deploy-riegel.py` in the same commit (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen` prints the new values); Dependabot's bumps of pinned actions are exempt. Whoever changes an npm script behind a required CI step, or the Jest settings in `functions/package.json`, updates the pinned wording there (`NPM_SKRIPTE`) in the same commit
 - Both profiles (normal + boost) come from ONE call (`runSingleLargeCall` in `mistral.js`); the prompt text lives in `locales/*/prompts.js` (`singleLargePrompt`)
 - Bei Aenderungen an der Architektur oder neuen Features: README.md, AGENTS.md, CHANGELOG.md, docs/SETUP.md und docs/SELF-HOSTING.md aktualisieren
 - Bei neuen Features: Dokumentation und Anleitungen mitliefern

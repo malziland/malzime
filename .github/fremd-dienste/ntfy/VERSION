@@ -1,0 +1,13 @@
+ntfy 2.28.0
+Source: https://github.com/binwiederhier/ntfy
+License: Apache-2.0 / GPL-2.0
+
+Kein mitgelieferter Code: Diese Datei spiegelt, welche Fassung des
+Benachrichtigungs-Servers das Projekt selbst betreibt (Cloud Run, eigener
+Bauweg ausserhalb dieses Repositorys). Der Nachtlauf
+(scripts/pruefe-fremd-meldungen.mjs) liest die erste Zeile und meldet, wenn es
+beim Hersteller eine Sicherheitsmeldung oder seit mehr als 30 Tagen eine neuere
+Fassung gibt. scripts/verify-infrastructure.sh haelt diese Zeile bei jeder
+Auslieferung gegen den laufenden Dienst.
+
+Nach jedem Update des Dienstes die erste Zeile im selben Zug nachziehen.

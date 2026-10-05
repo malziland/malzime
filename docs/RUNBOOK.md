@@ -23,6 +23,23 @@ selbst — also in der Datei, die ohne ihn nie laeuft. Ein frischer Klon hatte
 den Riegel damit stillschweigend nicht (gemessen: Push mit entwaffnetem
 deploy.sh ging durch).
 
+**Pipeline-Datei oder Einstellung eines Prüfwerkzeugs geändert?** Dann meldet die
+Vorabprüfung „Pruefungen: Deploy-Riegel" rot: Alle fünf Workflows unter
+`.github/workflows/`, `.github/dependabot.yml` und die Einstellungsdateien der
+Prüfwerkzeuge (`vitest.config.js`, `playwright.config.js`, `eslint.config.mjs`,
+`functions/eslint.config.js`, `.prettierignore`, `functions/jest.setup.js`) sind per
+Prüfsumme festgeschrieben.
+War die Änderung beabsichtigt, die neue Summe nachtragen — `python3
+scripts/pruefe-deploy-riegel.py --vertrag-summen` zeigt beide Tabellen, eingetragen
+wird sie in `VERTRAG_SUMMEN` bzw. `EINSTELLUNG_SUMMEN` im selben Skript. Bleibt der
+Riegel danach rot, geht es um den Inhalt: In `ci.yml` fehlt etwas, das ein Pflicht-Job
+tun muss, oder ein Pflicht-Schritt trägt eine Bedingung; ein npm-Skript hinter einem
+Pflicht-Schritt oder die Jest-Einstellung in `package.json` lautet anders als
+festgelegt. Die Meldung nennt Datei, Job und Befehl. Soll das neue Skript gelten, wird
+die Festlegung im Riegel mitgeändert (`NPM_SKRIPTE`, `JEST_EINSTELLUNG`) — im selben
+Commit, damit die Änderung im Diff als das dasteht, was sie ist (Begründung:
+`docs/SECURITY-MODEL.md`, Absatz „Festgeschrieben").
+
 ## Normalbetrieb (Soll-Zustand)
 
 - **Analyse-Weg:** Upload → Cloud-Tasks-Queue → ein Aufruf an Mistral Large
@@ -55,7 +72,10 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 3. CHANGELOG: Sobald deployt wird, ist das ein Release — den
    `[Unveröffentlicht]`-Abschnitt im selben Schritt auf neue Versionsnummer und
    Datum stempeln.
-4. Deploy über `./scripts/deploy.sh [hosting|functions]`.
+4. Deploy über `./scripts/deploy.sh` (Website und Server; nur die Website: `./scripts/deploy.sh hosting`).
+   Der Server allein wird abgelehnt — der Fingerabdruck des Server-Codes geht mit der Website hinaus.
+   Die Website allein geht nur hinaus, solange der Server-Code seit der letzten Auslieferung
+   unverändert ist (Hebel 5a); sonst hält das Skript an und verlangt die vollständige Auslieferung.
 
    **Seit 31.08.2026 läuft ein Trockenlauf** (nach Stand-Bindung,
    Sauberkeits-Prüfung, CLI-Version, Infrastruktur-Prüfung und
@@ -102,16 +122,22 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
      ihr Ergebnis von gestern sagt nichts über heute. Sie muss auf `main`
      selbst grün sein.
 
-   Das Skript prüft weiter die Version der Firebase-CLI gegen die
-   in `deploy.sh` hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`; eine
-   nicht ermittelbare Version bricht ab, statt durchzuwinken —
-   `OPS-2026-08-12-25`) und zählt dann den Cache-Buster in allen
-   ausgelieferten Seiten automatisch hoch — welche das sind, fragt das Skript
-   beim Dateisystem ab, es führt keine eigene Liste (DOC-2026-08-20-13: hier
-   stand „fünf HTML-Seiten", real sind es seit den englischen Rechtsseiten zehn
-   plus `js/demo.js`) (Konvention `?v=YYYYMMDDNN`: gleicher Tag
-   → laufende Nummer +1, sonst neuer Tag mit `01`; nur bei Hosting-Deploys
-   relevant, reine Functions-Deploys brauchen keinen).
+   Das Skript prüft weiter die Version der Firebase-CLI gegen die in `deploy.sh`
+   hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`). Eine nicht
+   ermittelbare Version bricht ab, statt durchzuwinken (`OPS-2026-08-12-25`) —
+   und nicht ermittelbar ist jede Ausgabe von `firebase --version`, deren erste
+   Zeile nicht genau aus drei Zahlen besteht (etwa `15.1.0`): eine leere Ausgabe
+   ebenso wie eine Warnung, eine Fehlermeldung oder eine Vorabversion
+   (`OPS-2026-10-03-16`).
+
+   Danach zählt es den Cache-Buster in allen ausgelieferten Seiten automatisch
+   hoch — welche das sind, fragt das Skript beim Dateisystem ab, es führt keine
+   eigene Liste (DOC-2026-08-20-13: hier stand „fünf HTML-Seiten", real sind es
+   seit den englischen Rechtsseiten zehn plus `js/demo.js`). Konvention
+   `?v=YYYYMMDDNN`: gleicher Tag → laufende Nummer +1, sonst neuer Tag mit `01`.
+   Die Website gehört zu jeder Auslieferung über das Skript, der Buster also
+   auch: Ein Ziel ohne `hosting` lehnt es ab (`ARCH-2026-10-03-10`, Begründung
+   bei Hebel 4).
 5. `release.yml` legt automatisch einen GitHub-Release an, sobald die neue
    CHANGELOG-Version auf `main` landet (idempotent).
 
@@ -182,6 +208,7 @@ gestartet werden.
 | Firestore | genau **eine** Datenbank: `malzime-eu` in `europe-west1` |
 | Worker-IAM | `processjob` und `reapjobs` ohne `allUsers`/`allAuthenticatedUsers` (nicht öffentlich; die `/api/*`-Functions sind bewusst öffentlich, Hosting reicht durch) |
 | Functions-Regionen | alle in `europe-west1` |
+| Schalter für lokale Läufe | an **keinem** Dienst steht `MISTRAL_MOCK`, `QUEUE_LOCAL`, `NTFY_STUMM` oder `FUNCTIONS_EMULATOR` als Umgebungsvariable (gelesen werden nur die Namen). Seit 04.10.2026: Das Programm hält die Schalter von der Produktion fern, erkennt die Produktion aber an `K_SERVICE` ohne das Emulator-Merkmal — stünde dieses an einem Dienst, wirkten sie wieder |
 | Logging | `_Default`-Ausschluss `exclude_run_requests_ip` aktiv (Request-Logs vollständig, **ohne** Schwere-Bedingung — sie sind der einzige Träger von Client-IPs, und `_Default` liegt fest auf Standort `global`), Sink `client-diagnostics-sink` vorhanden |
 
 Exit-Codes: 0 = grün, 1 = Abweichung (Deploy stoppt), 2 = Voraussetzung fehlt
@@ -226,11 +253,25 @@ Webseite etwas Unbelegtes, und genau davor schützt der Wächter.
 
 ## Wächter über den Alarmweg (seit 2026-08-12)
 
-`scripts/verify-infrastructure.sh` prüft seit OPS-2026-08-12-09 vor jedem Deploy mit:
-Gibt es noch eine Richtlinie mit `severity>=ERROR`, ist sie scharf, hat sie
-Benachrichtigungskanäle, und sind die Kanäle eingeschaltet? Vier Ausfallarten führen zu
-rot: Richtlinie fehlt, Richtlinie aus, kein Kanal, Kanal abgeschaltet — dazu „nicht
-geprüft" bei einer gescheiterten Messung.
+`scripts/verify-infrastructure.sh` prüft seit OPS-2026-08-12-09 vor jedem Deploy mit — seit
+03.10.2026 jede der fünf Alarmregeln einzeln nach ihrem Namen (Liste `ALARM_REGELN` im
+Skript; beschrieben sind die Regeln in `docs/ERROR-ALERTING.md`, ein Test hält beides
+gegeneinander): Gibt es die Regel, ist sie scharf, hat sie Benachrichtigungskanäle, und ist
+ein eingeschalteter E-Mail-Kanal dabei? Dazu: Sind alle Kanäle eingeschaltet, und gibt es im
+Projekt eine Alarmregel, die nicht auf der Liste steht? Sechs Ausfallarten führen zu rot:
+Regel fehlt, Regel aus, kein Kanal, kein E-Mail-Kanal, Kanal abgeschaltet, Regel ohne
+Wächter — dazu „nicht geprüft" bei einer gescheiterten Messung.
+
+Drei der fünf Regeln hören auf einzelne Dienste (Liste `ALARM_REGELN_MIT_DIENSTLISTE` im
+Skript). Für jede davon wird einzeln geprüft, dass ihr Filter jeden Dienst nennt, der nicht
+benannte Ausnahme ist. Führt eine dieser Regeln keine Dienstliste mehr — etwa weil ihr Filter
+auf einen einzelnen Dienst umgestellt wurde —, ist das seit 04.10.2026 rot; vorher erschien
+für sie dann gar keine Zeile. Die zwei übrigen Regeln zählen eine Kennzahl und kommen in
+dieser Prüfung nicht vor.
+
+Kommt eine Alarmregel dazu oder wird eine umbenannt: Namen in `ALARM_REGELN` (und, wenn sie
+auf einzelne Dienste hört, in `ALARM_REGELN_MIT_DIENSTLISTE`) und in
+`docs/ERROR-ALERTING.md` im selben Schritt nachziehen, sonst wird die nächste Auslieferung rot.
 
 **Grenze dieser Maßnahme, ausdrücklich:** Sie greift zur Deploy-Zeit, nicht in der Minute
 des Ausfalls. Zwischen zwei Deploys kann der Alarmweg tot sein, ohne dass es auffällt. Ein
@@ -463,6 +504,26 @@ git worktree remove /tmp/malzime-rollback
 
 Das Haupt-Arbeitsverzeichnis bleibt dabei unberührt.
 
+**Nach diesem Notweg stimmt der Fingerabdruck nicht mehr.** Er läuft am
+Auslieferskript vorbei und wechselt nur den Server-Code. Die Website — und mit ihr
+`build-info.json` — bleibt, wie sie ist, und weist weiter den Server-Stand von VOR
+dem Rollback aus. `scripts/pruefe-live.sh` hält den Fingerabdruck gegen das
+Repository, nicht gegen den laufenden Server: Es meldet „deckungsgleich", obwohl ein
+anderer Server-Code läuft. Die Angabe auf der Seite, welcher Server-Code ausgeliefert
+wurde, stimmt in dieser Zeit nicht.
+
+Wieder richtig wird er nur durch eine Auslieferung von Website und Server zusammen:
+`./scripts/deploy.sh` ohne Argument. Nur auf diesem Weg entsteht der Fingerabdruck
+neu; ein Ziel ohne Website lehnt das Skript deshalb ab (ARCH-2026-10-03-10).
+
+- *Die Störung ist behoben:* den reparierten Stand per PR auf `main` bringen und
+  normal ausliefern.
+- *Der alte Stand soll vorerst bleiben:* die Änderungen seit dem Release-Tag per PR
+  auf `main` zurücknehmen und normal ausliefern. Website und Server stehen dann
+  beide auf diesem Stand, und der Fingerabdruck weist ihn aus.
+
+Bis dahin in der Übergabe festhalten, seit wann der Server auf welchem Tag läuft.
+
 **Rollback auf 4.8.2 oder früher (seit 4.9.0, 10.09.2026).** Diese Fassungen
 lesen im Einstellungssatz drei Felder, die 4.9.0 entfernt hat
 (`describeMaxTokens`, `profileMaxTokens`, `tokenAbstandKleinMs`), und fallen
@@ -498,6 +559,11 @@ Schnellster Weg: Firebase Console → Hosting → Release-Verlauf → **Rollback
 (ein Klick, stellt den vorherigen Stand wieder her). Alternativ: früheren Stand wie
 in Hebel 4 auschecken und `firebase deploy --only hosting`.
 
+**Der Fingerabdruck stimmt danach nicht:** Die zurückgeholte Website weist den
+Server-Stand ihrer eigenen Auslieferung aus, während der neuere Server weiterläuft.
+Richtig wird die Angabe erst mit der nächsten vollständigen Auslieferung
+(`./scripts/deploy.sh` ohne Argument).
+
 **Webseite nur zusammen mit den Functions auf 4.9.0 zurück.** Die
 4.9.0-Webseite baut den DE/EN-Umschalter nur, wenn `/api/stats` das Feld
 `sprachumschalter: true` liefert; die neuen Functions liefern es nicht mehr. Die
@@ -527,6 +593,19 @@ oder die Live-Smoke-Probe „Direktweg" ist rot, während `/api/stats` über
 3. `./scripts/deploy.sh hosting` — die Seite ruft danach wieder `/api/…` über
    Hosting auf. Browser mit alter `app.js` im Zwischenspeicher laufen ohnehin
    über die Umleitungen weiter.
+
+**Dieser Weg ist nur offen, solange das Server-Paket unverändert ist.** Vor dem
+Hochladen vergleicht `deploy.sh hosting` das Server-Paket des ausgecheckten Standes
+mit dem, das die Seite heute ausweist (`https://malzi.me/build-info.json`, Feld
+`serverPaket`: jede Datei, die zu Google geht), und bricht bei einer Abweichung ab —
+sonst wiese die Seite danach ein Server-Programm aus, das nie hinausging
+(ARCH-2026-10-03-10). Für diesen Hebel also nur die zwei Dateien oben ändern, nichts
+unter `functions/` — auch nicht `package.json` oder `package-lock.json`. Bricht das
+Skript an dieser Stelle ab oder ist die Seite nicht lesbar, gibt es keinen
+Notschalter: `./scripts/deploy.sh` ohne Argument liefert Website und Server zusammen
+aus. Dasselbe gilt, solange die Seite ihren Server noch in der Form vor dem 05.10.2026
+ausweist (nur die Programmdateien): Daran lässt sich das Paket nicht vergleichen, es
+gilt als geändert.
 
 Zurück auf den direkten Weg: beides wieder auf `true`, Hosting-Deploy.
 
@@ -669,9 +748,16 @@ Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
 
 ### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
 
-Der Filter (`functions/src/minor-safety.js`) streicht bei möglicherweise
-Minderjährigen Werbeeinträge zu Alkohol, Tabak, Wetten, Kredit, Diät und
-Schönheits-OP und meldet Treffer im Fließtext, ohne dort etwas zu streichen.
+Der Filter (`functions/src/minor-safety.js`) ist eine Wortliste
+(`functions/src/minor-safety-woerter.js`). Er streicht einen Werbeeintrag,
+wenn darin ein Wort der Liste steht: bei allen zu Pornografie, Waffen und
+Extremismus, bei möglicherweise Minderjährigen zusätzlich zu Alkohol, Tabak,
+Wetten, Kredit, Diät, Schönheits-OP und Drogen (Entscheidung vom 04.10.2026:
+Drogen werden bei möglicherweise Minderjährigen wie Alkohol behandelt). Treffer
+im Fließtext meldet er, ohne dort etwas zu streichen. Ein Werbeeintrag ohne
+Listenwort geht durch und hinterlässt keine Spur im Log; was die Liste fängt
+und was nicht, zeigt die Prüfreihe
+`functions/src/__tests__/minor-safety-woerter.test.js`.
 „Möglicherweise minderjährig“ heißt: Untergrenze der Altersschätzung bis
 `SCHUTZ_BIS` (mit Puffer) oder ein Alter, das sich nicht lesen ließ. Im Log
 stehen Anzahl und Grund der Treffer, dazu die Anzahl der gezeigten
@@ -693,7 +779,7 @@ Lesart:
   haben das Feld nicht. `null` heißt: kein oberes Ende in der Angabe (keine
   Zahl, nur ein Kategoriewort, oder ein Jahrzehnt wie „Ende zwanzig“). Wie
   das obere Ende gelesen wird, steht bei `obereAltersgrenze` in
-  `functions/src/alters-lesbarkeit.js`. `alterBis` entscheidet über nichts;
+  `functions/src/alters-auslese.js`. `alterBis` entscheidet über nichts;
   Stufe 2 hängt wie bisher an `alter` und am lesbaren Alter.
 - Für die Frage „schließt die Spanne ein bekanntes Alter ein?“ nicht auf
   `minderjaehrig=true` filtern — sonst fehlen gerade die Zeilen, deren Spanne
@@ -708,10 +794,18 @@ Lesart:
   CHANGELOG) umfasst das auch Untergrenzen bis 25 und nicht lesbare Alter;
   davor nur Untergrenzen bis 18. Wer Zeiträume vergleicht, zählt deshalb
   `alter` selbst (zum Beispiel unter 19).
-- `alterUnlesbar=true` (ab derselben Auslieferung): Die KI hat die Vorlage
-  „‹Zahl›“ abgeschrieben oder ein Alter ganz ohne Zahl genannt (Zahlwörter wie
-  „dreizehn“ zählen als Zahl). Die Karte zeigt dann einen festen Satz statt
-  eines Alters.
+- `alterUnlesbar=true` (ab derselben Auslieferung): Im Altersanker und im
+  ersten Satz der Alterskarte steht kein lesbares Alter, die Antwort enthält
+  aber einen Altersversuch. Die Karte zeigt dann einen festen Satz statt
+  eines Alters, und Stufe 2 greift. Anfangs hieß das nur: Vorlage „‹Zahl›“
+  abgeschrieben oder ein Alter ganz ohne Zahl (Zahlwörter wie „dreizehn“
+  zählen als Zahl). Ab der Auslieferung mit dem CHANGELOG-Eintrag, der mit
+  „Steht das Alter eines Kindes hinter „ca.““ beginnt, zählt auch ein Alter
+  oder ein Kindwort, das erst im Beleg-Satz steht, jede Zahl bis zur
+  Schutzgrenze irgendwo in der Alterskarte und „jung“ — auch bei
+  Erwachsenen, bei denen die KI kein Alter nennt. Der Wert kommt seither häufiger vor; Zahlen davor und
+  danach nicht miteinander vergleichen. Was genau zählt, steht in
+  `docs/SECURITY-MODEL.md` (Abschnitt vom 17.09.2026, Punkt 3).
 - `entfernt` zählt gestrichene Werbeeinträge, `durchgerutscht` Treffer im
   Profiltext oder in einer Kategorie-Karte (nur gemeldet); `gruende` und
   `durchgerutschtGruende` sagen, ob die Treffer aus der Liste „immer“ oder
@@ -719,6 +813,20 @@ Lesart:
   „Weniger Angaben im Diagnose-Protokoll“ tragen zusätzlich `entfernte` und
   `durchgerutschte` mit Feld und Wort. Ob die Sperrliste zu grob ist, lässt
   sich danach nur mit eigenen Fotos nachstellen.
+- `entfernt` und `durchgerutscht` zählen Treffer der Wortliste und hängen
+  deshalb an ihrem Umfang. Ab der Auslieferung mit dem CHANGELOG-Eintrag
+  „Werbe-Ideen zu Alkohol, Waffen und Co. werden verlässlicher gestrichen“
+  (die Liste liegt seither in `functions/src/minor-safety-woerter.js`) kennt
+  sie mehr Wörter, das Thema Drogen und einige Wörter nur noch als
+  Werbe-Eintrag. Zahlen davor und danach nicht miteinander vergleichen.
+- `durchgerutscht` zählt Listenwörter, keine Aussagen: „Du trinkst keinen
+  Alkohol.“ zählt wie „Du trinkst Alkohol.“ Wörter, die im Satz meist
+  Redewendung oder Tunwort sind („wieder wett“, „schulden“, „rauchen“, „deine
+  Droge“, „Lottogewinn“, „ein Jackpot“, „I bet“), gelten nur als Werbe-Eintrag
+  und werden im Fließtext nicht gezählt; „alkoholfrei“ ist ausgenommen. Ein
+  Anstieg heißt deshalb nur, dass die KI öfter Wörter der Liste schreibt — ob
+  sie dabei eine Regel des Prompts bricht, zeigt nur das Nachstellen mit
+  eigenen Fotos.
 - `werbung` unter 8 heißt beim Beast-Modus nur dann „mehr als zwei Einträge
   gestrichen“, wenn der zweite Werbe-Aufruf geliefert hat (zehn Einträge
   angefordert). Sonst stammt die Liste wie die Standard-Liste aus dem
@@ -851,7 +959,7 @@ tun ist:
 | Roter Job | Bedeutung | Was tun |
 |---|---|---|
 | `npm-luecken` | Neue High/Critical-Lücke in einem npm-Paket (beide Bäume, auch Werkzeuge) | Wie „Audit-Gate rot" oben. Oft kommt Dependabot binnen eines Tages mit einem PR; sonst selbst anheben |
-| `mitgelieferte-bibliotheken` | Veröffentlichte Herstellermeldung zu einer Bibliothek unter `public/lib`, oder ein neuer Ordner dort ohne Beobachtung | Betroffen: Bibliothek neu bauen (libheif, siehe unten) oder neu kopieren. **Unklar**: am Quelltext des Herstellers klären; ist unser Stand nachweislich nicht betroffen, begründeter Eintrag mit Ablaufdatum in `.github/fremd-meldungen-ausnahmen.json` |
+| `mitgelieferte-bibliotheken` | Veröffentlichte Herstellermeldung zu einer Bibliothek unter `public/lib` oder zum selbst betriebenen ntfy-Server; ein neuer Ordner unter `public/lib` ohne Beobachtung; oder **VERALTET**: für den ntfy-Server gibt es seit mehr als 30 Tagen eine neuere Fassung (sein Hersteller führt keine Sicherheitsmeldungen, Korrekturen stehen nur in den Versionshinweisen) | Betroffen: Bibliothek neu bauen (libheif, siehe unten) oder neu kopieren. **Unklar**: am Quelltext des Herstellers klären; ist unser Stand nachweislich nicht betroffen, begründeter Eintrag mit Ablaufdatum in `.github/fremd-meldungen-ausnahmen.json`. **VERALTET**: Versionshinweise lesen, den Dienst über seinen eigenen Bauweg auf die neue Fassung heben und im selben Zug die erste Zeile von `.github/fremd-dienste/ntfy/VERSION` nachziehen (`scripts/verify-infrastructure.sh` hält sie gegen den laufenden Dienst); zurückstellen nur mit begründetem Eintrag `FASSUNG-<neue Fassung>` und Ablaufdatum in derselben Ausnahmeliste |
 | `abkuendigungen` | GitHub meldet an einem Lauf auf main einen abgekündigten Baustein oder eine Frist | Betroffene Action anheben (mit SHA-Pin, Release-Notes lesen). Ist bewusst nichts zu tun, begründeter Eintrag mit Ablaufdatum in `.github/abkuendigungen-ausnahmen.json` |
 
 „MESSUNG NICHT DURCHFÜHRBAR" (Rückgabewert 2) ist kein Fund, aber auch kein
@@ -866,18 +974,37 @@ Schutz still ausfällt, und was sie auffängt:
 
 - *Der Nachtlauf läuft nicht* (GitHub schaltet geplante Workflows in öffentlichen
   Repositories nach 60 Tagen ohne Aktivität ab, verwirft unter Last gelegentlich
-  geplante Läufe, oder die Datei ist für GitHub unlesbar). `scripts/deploy.sh` bricht
-  ab, wenn auf `main` kein Nachtlauf wirklich gelaufen ist — mit der ausgelieferten
-  Fassung von `sicherheit-nachts.yml` und nicht älter als `NACHT_GRENZE_MINUTEN` in
-  `scripts/deploy.sh`; die Kriterien stehen in `docs/SECURITY-MODEL.md`. Geprüft wird
-  nicht die Farbe: Ein roter Nachtlauf hat Alarm gegeben. Dann: `gh workflow run
-  sicherheit-nachts.yml`, abwarten (rund eine Minute), erneut deployen; ist der
-  Workflow abgeschaltet, unter „Actions" einschalten. **Nach jeder Änderung an
-  `sicherheit-nachts.yml`** gilt dasselbe: nach dem Merge und der grünen Pipeline des
-  Merge-Commits einmal von Hand starten, sonst bricht der Deploy ab.
+  geplante Läufe, oder die Datei ist für GitHub unlesbar). `scripts/deploy.sh`
+  verlangt auf `main` einen Nachtlauf, der wirklich gelaufen ist — mit der
+  ausgelieferten Fassung von `sicherheit-nachts.yml` und nicht älter als
+  `NACHT_GRENZE_MINUTEN` in `scripts/deploy.sh`; die Kriterien stehen in
+  `docs/SECURITY-MODEL.md`. Geprüft wird nicht die Farbe: Ein roter Nachtlauf hat
+  Alarm gegeben. Fehlt ein solcher Lauf, bricht das Skript ab; dann: `gh workflow run
+  sicherheit-nachts.yml`, abwarten (rund eine Minute), erneut deployen.
+
+  **Dieser Auffang hält einen stehenden Zeitplan nicht an.** Dem Riegel genügt auch
+  ein von Hand gestarteter Lauf, und die Auslieferkette startet einen fehlenden Lauf
+  selbst. Zwei Fälle sind deshalb zu trennen:
+
+  - *Die Fassung von `sicherheit-nachts.yml` hat sich geändert.* Der Handstart ist
+    richtig: nach dem Merge und der grünen Pipeline des Merge-Commits einmal von
+    Hand starten, sonst bricht der Deploy ab.
+  - *Der Lauf nach Zeitplan fehlt oder ist alt.* Ist der jüngste Lauf, den GitHub
+    selbst nach Zeitplan gestartet hat, älter als `NACHT_ZEITPLAN_GRENZE_MINUTEN`
+    (ebenfalls nur in `scripts/deploy.sh`), liefert das Skript aus, setzt aber einen
+    Kasten „ACHTUNG: Der Nachtlauf … läuft nicht nach Zeitplan" ins Protokoll — vor
+    dem Hochladen und noch einmal am Ende. Dann unter „Actions" nachsehen, ob der
+    Workflow abgeschaltet ist, und ihn einschalten. Wer die Auslieferung fährt, gibt
+    diese Meldung weiter; ein Handstart allein behebt die Ursache nicht.
+
+  Zwischen zwei Auslieferungen fällt ein ausbleibender Nachtlauf weiterhin nur durch
+  die ausbleibende Monatsprobe auf (nächster Punkt; bewusst getragen,
+  `docs/SECURITY-MODEL.md`).
 - *Der Alarmweg ist kaputt* (Secret, ntfy-Server, Thema). Am 1. jedes Monats kommt
-  eine sichtbare Probe aufs Handy; bleibt sie aus, ist der Weg gestört
-  (`docs/ERROR-ALERTING.md`). Von Hand: `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
+  eine Probe aufs Handy. Meldet sich das Handy nicht von selbst, in der ntfy-App
+  nachsehen — der Weckruf kann ausbleiben (`docs/ERROR-ALERTING.md`, „Wenn der Push
+  nicht weckt"); steht die Probe auch dort nicht, ist der Weg gestört. Von Hand:
+  `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`.
 
 **Einmalig nach dem Zusammenführen des Sicherheitspakets (PR #294):** Auf `main`
 gibt es noch keinen Nachtlauf, der Deploy bricht deshalb ab, bis einer gelaufen

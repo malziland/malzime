@@ -35,7 +35,7 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **Queue worker not publicly reachable**: `processJob` runs with `invoker: private` — only Google Cloud Tasks can invoke it, authenticated via an OIDC service-account token
 - **No tracking**: No cookies, no analytics, no advertising
 - **GPS never reaches our servers**: Coordinates are read in the browser and used there for the map. Reverse geocoding goes directly from the browser to OpenStreetMap Nominatim — the coordinates leave the browser, but never touch malziME infrastructure
-- **Content Security Policy**: Strict whitelist (self + OpenStreetMap tiles + Nominatim)
+- **Content Security Policy**: Strict whitelist (self + OpenStreetMap tiles + Nominatim + the project's own Cloud Run endpoints); forms may only submit to the site itself (`form-action 'self'`)
 - **HSTS** — enforced for two years including subdomains; the `preload` directive is sent,
   but the site is deliberately **not** on the browser preload list (see `docs/SECURITY-MODEL.md`)
 - **Rate limiting**: Per-IP request limits

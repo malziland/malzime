@@ -68,6 +68,11 @@ afterEach(() => {
   jest.useRealTimers();
   jest.resetModules();
   jest.restoreAllMocks();
+  /* jest.doMock gilt ueber resetModules hinaus. Lief ein Test mit einer
+     Attrappe von "../mistral" zuerst, bekamen die KI-Tests danach die
+     Attrappe statt des echten Moduls (gefunden mit --randomize, 01.10.2026).
+     Jeder Test meldet seine Attrappen selbst wieder an. */
+  for (const m of ["../betriebsprofil", "../throttle", "../mistral", "../queue-storage", "../db"]) jest.dontMock(m);
 });
 
 /* ════════════════════════════════════════════════════════════════════

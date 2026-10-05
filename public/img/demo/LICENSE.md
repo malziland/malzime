@@ -22,7 +22,34 @@ mit `node scripts/ki-wasserzeichen.mjs [--lang=en]`; die un-gekennzeichneten
 Originale liegen bewusst außerhalb von `public/` (in `.demo-originale/`), damit
 sie nicht ausgeliefert werden.
 
-Lizenz: wie das Repository — **MIT** (siehe [`/LICENSE`](../../../LICENSE)).
+**Feste Kartenausschnitte und Adressen (OpenStreetMap).** Für die Ortsdaten
+eines Demo-Fotos fragt der Browser nichts bei OpenStreetMap an. Die
+Ergebnis-Seite zeigt je Ort einen mitgelieferten Kartenausschnitt und eine
+mitgelieferte Adresse:
+
+- `karte-selfie.webp`, `karte-cafe.webp`, `karte-hiker.webp` — 640 × 238
+  Bildpunkte, Zoomstufe 15, der Ort liegt in der Bildmitte; dazu je eine Fassung
+  `-2x` mit doppelter Punktdichte (1280 × 476, Zoomstufe 16).
+- Die Adressen stehen in `public/locales/de.json` und `en.json` (`demo.place.*`),
+  im Wortlaut der Ortsauflösung Nominatim für diese Koordinaten.
+
+Quelle der Kartenausschnitte und der Adressen: **© OpenStreetMap-Mitwirkende**.
+Die Daten stehen unter der Open Database License (ODbL) 1.0 —
+<https://www.openstreetmap.org/copyright>. Abgerufen einmalig am 03.10.2026
+(Kacheln von `tile.openstreetmap.org`, Adressen von
+`nominatim.openstreetmap.org`); die Kacheln wurden aneinandergelegt,
+zugeschnitten und für die Auslieferung komprimiert. Die Quellenangabe steht auf
+der Seite an der Karte und in den Metadaten jeder Datei. Die Kartenausschnitte
+sind keine KI-Bilder und tragen deshalb keine KI-Kennzeichnung.
+
+Ändern sich die Ortsdaten eines Demo-Fotos, gehören Kartenausschnitt und Adresse
+neu erzeugt — `public/__tests__/beispielbild-karten.test.js` wird sonst rot. Wie
+die Kartenausschnitte hergestellt werden, steht als Rezept in
+`scripts/demo-karten/` (drei Schritte: Kacheln laden, zuschneiden, ausgeben).
+
+Lizenz der Demo-Fotos: wie das Repository — **MIT** (siehe
+[`/LICENSE`](../../../LICENSE)). Die Kartenausschnitte und Adressen sind davon
+nicht umfasst; für sie gilt die Quellenangabe oben.
 
 ---
 
@@ -33,7 +60,9 @@ deceased persons would be purely coincidental. The EXIF data (camera, location,
 date) is **intentionally fictional**, serving malziME's demo purpose of making
 hidden photo metadata visible.
 
-License: same as the repository — **MIT** (see [`/LICENSE`](../../../LICENSE)).
+License of the demo photos: same as the repository — **MIT** (see
+[`/LICENSE`](../../../LICENSE)). The map sections and addresses described below
+are not covered by it; the attribution given there applies to them.
 
 **Two language variants.** The AI marking is burned into the image pixels and
 therefore cannot be translated at runtime. Each image exists twice: without
@@ -42,3 +71,27 @@ suffix showing „KI ERSTELLT" (German) and with `-en` showing „AI GENERATED"
 originals via `node scripts/ki-wasserzeichen.mjs [--lang=en]`; the unmarked
 originals deliberately live outside `public/` (in `.demo-originale/`) so they are
 never served.
+
+**Fixed map sections and addresses (OpenStreetMap).** For the location data of a
+demo photo, the browser requests nothing from OpenStreetMap. For each location,
+the result page shows a map section and an address that ship with the site:
+
+- `karte-selfie.webp`, `karte-cafe.webp`, `karte-hiker.webp` — 640 × 238 pixels,
+  zoom level 15, the location sits at the centre of the image; plus one `-2x`
+  variant each at double pixel density (1280 × 476, zoom level 16).
+- The addresses are in `public/locales/de.json` and `en.json` (`demo.place.*`),
+  worded as the Nominatim geocoder returns them for these coordinates.
+
+Source of the map sections and addresses: **© OpenStreetMap contributors**. The
+data is available under the Open Database License (ODbL) 1.0 —
+<https://www.openstreetmap.org/copyright>. Retrieved once on 3 October 2026
+(tiles from `tile.openstreetmap.org`, addresses from
+`nominatim.openstreetmap.org`); the tiles were joined, cropped and compressed for
+delivery. The attribution is shown on the page next to the map and stored in the
+metadata of each file. The map sections are not AI images and therefore carry no
+AI marking.
+
+If the location data of a demo photo changes, its map section and address must
+be regenerated — otherwise `public/__tests__/beispielbild-karten.test.js` fails.
+How the map sections are produced is recorded as a recipe in
+`scripts/demo-karten/` (three steps: fetch the tiles, crop, write the files).

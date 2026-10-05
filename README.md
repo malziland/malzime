@@ -28,7 +28,7 @@ Workshop-Tool fuer Medienkompetenz und Datenschutz-Sensibilisierung. Zeigt Teiln
 - **Datenwert-Rechner**: Zeigt was ein Profil fuer Datenbroker wert ist
 - **Privacy-Check**: Erkennt ungewollt preisgegebene Informationen (Telefonnummern, Adressen, Kennzeichen)
 - **EXIF-Analyse**: Zeigt versteckte Kamera-Metadaten (client-seitig extrahiert)
-- **GPS-Karte**: Zeigt den Aufnahmeort auf einer Karte (GPS-Daten erreichen nie unsere Server; die Karte lädt der Browser direkt bei OpenStreetMap)
+- **GPS-Karte**: Zeigt den Aufnahmeort auf einer Karte (GPS-Daten erreichen nie unsere Server; bei einem hochgeladenen Foto lädt der Browser die Karte direkt bei OpenStreetMap, bei den Demo-Fotos kommt ein fester Kartenausschnitt aus der Seite selbst)
 - **Easter Egg**: Tierfotos bekommen ein lustiges Spass-Profil
 - **PDF-Export**: Ergebnisse als PDF speichern (fuer Workshop-Diskussionen)
 - **Demo-Fotos**: 3 anklickbare KI-generierte Demo-Fotos (keine realen Personen, siehe `public/img/demo/LICENSE.md`) mit Fake-EXIF fuer Workshops (echte KI-Analyse, kein vorgefertigtes Ergebnis)
@@ -72,6 +72,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   cloud-tasks.js            Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim fuer Emulator)
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket
   feature-flags.js          Laufzeit-Feature-Flags aus Firestore (30s-Cache)
+  lokale-schalter.js        Schalter nur fuer lokale Laeufe (Attrappe, lokale Warteschlange, stumme Benachrichtigung): wirken nie in der Produktion
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
   mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile, ein zweiter ohne Bild die Beast-Werbung
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
@@ -81,7 +82,10 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   job-pipelines.js          Der Analyseweg: KI-Aufruf, Tier-Easter-Egg, Beast-Werbung, Kinderschutz
   job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
   minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer)
-  alters-lesbarkeit.js      Altersauslese und Erkennung nicht lesbarer Altersangaben
+  minor-safety-woerter.js   Wortlisten des Kinderschutz-Filters (reine Daten, deutsch und englisch; mit Wortfuge fuer zusammengesetzte Woerter)
+  alters-lesbarkeit.js      Erkennung nicht lesbarer Altersangaben (erster Satz, Altersversuch)
+  alters-auslese.js         Altersauslese: Zahlwoerter, Kategorien, untere und obere Altersgrenze
+  alters-lesbarkeit-woerter.js  Woerter, Kategorien und Abkuerzungen der Altersauslese (reine Daten)
   betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Pruefung, Cache
   produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)
   test-satz.js              Einstellungssatz fuer die Tests
@@ -378,7 +382,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
 - KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.
 - Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) bei Google Ireland in europe-west1; statische Seiten ueber ein weltweites CDN. Google als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
-- GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser direkt bei OpenStreetMap bzw. Nominatim)
+- GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser bei einem hochgeladenen Foto direkt bei OpenStreetMap bzw. Nominatim; bei den Demo-Fotos fragt er nichts an)
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 
 ## Laeuft wirklich, was hier offen liegt?
@@ -395,11 +399,18 @@ Datei. Wer nachrechnen will, braucht einen Befehl:
 sh scripts/pruefe-live.sh
 ```
 
-Das Skript holt den Fingerabdruck von malzi.me, prueft ob der genannte Commit in
-diesem Repository existiert, laedt jede gelistete Datei vom Server und vergleicht
-die Pruefsummen. Rueckgabewerte sind bewusst getrennt: `0` deckungsgleich,
-`1` Abweichung gefunden, `2` Messproblem (kein Netz, Werkzeug fehlt) — ein
-Messfehler darf nie als Befund durchgehen.
+Das Skript holt den Fingerabdruck von malzi.me und bildet aus dem dort genannten
+Commit **selbst** die Liste der Dateien, die ausgeliefert sein muessen — die Liste
+des Servers allein genuegt nicht, er koennte eine veraenderte Datei einfach
+weglassen. Dann laedt es jede dieser Dateien vom Server und vergleicht sie mit dem
+Fingerabdruck und mit dem Inhalt des Commits; die Pruefsummen des Server-Pakets
+(das Programm, `package.json`, `package-lock.json`, die Sprachliste — alles, was
+an Google uebergeben wird) haelt es gegen denselben Commit. Eine Datei, die im Fingerabdruck fehlt, ist ein
+Befund. Rueckgabewerte sind bewusst getrennt: `0` deckungsgleich und gegen den
+genannten Commit nachgerechnet, `1` Abweichung gefunden, `2` Messproblem (kein
+Netz, Werkzeug fehlt — oder der genannte Commit liess sich nicht gegenrechnen,
+etwa in einer veralteten Kopie oder ausserhalb eines Repositories) — ein
+Messfehler darf nie als Befund durchgehen und nie als bestandene Pruefung.
 
 Was das NICHT beweist: was auf dem Server passiert. Die Cloud Functions baut
 Google aus dem Quelltext; eine nachrechenbare Bestaetigung dafuer gibt es nicht.
@@ -421,10 +432,11 @@ Poppins (SIL Open Font License 1.1) liegen selbst gehostet im Repository und sin
 seinen eigenen Lizenztext mit; die Uebersicht steht in
 [THIRD-PARTY.md](THIRD-PARTY.md).
 
-**OpenStreetMap:** Kartenkacheln und Adressaufloesung kommen zur Laufzeit direkt
-vom Browser der Besucher — im Repository liegt kein OSM-Material, und die
-MIT-Lizenz bleibt davon unberuehrt. Die Namensnennung mit Verweis auf die
-Lizenzseite steht in der Karte selbst.
+**OpenStreetMap:** Bei einem hochgeladenen Foto kommen Kartenkacheln und Adressaufloesung
+zur Laufzeit direkt vom Browser der Besucher. Im Repository liegt OSM-Material nur
+fuer die Demo-Fotos: feste Kartenausschnitte und Adressen ihrer erfundenen Orte
+(`public/img/demo/LICENSE.md`); sie sind **nicht** von der MIT-Lizenz umfasst. Die
+Namensnennung mit Verweis auf die Lizenzseite steht in der Karte selbst.
 
 ---
 

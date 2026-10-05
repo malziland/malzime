@@ -51,6 +51,8 @@
  * Pipeline nutzt ausschliesslich Mistral AI.
  */
 
+const { lokalSchalterAn } = require("./lokale-schalter");
+
 /* BLEIBT IM CODE — Sicherheitsgrenze.
    Die groesste Datei, die der Server ueberhaupt annimmt. Waere sie im Store,
    liesse sich der Schutz gegen ueberlange Uploads zur Laufzeit stilllegen:
@@ -254,10 +256,11 @@ const QUEUE_UPLOAD_PREFIX = "queue-uploads/";
    Tasks keinen Emulator gibt, werden im Lokal-Modus Cloud Tasks und der
    GCS-Bucket durch lokale Ersatz-Implementierungen abgelöst (direkter HTTP-
    Dispatch bzw. Dateisystem-Ablage). Aktiv per QUEUE_LOCAL=1 — ausschließlich
-   für lokalen Durchklick/Lasttest, NIE in Produktion gesetzt. Zur Laufzeit
-   gelesen, damit Tests es pro Fall setzen können. */
+   für lokalen Durchklick/Lasttest. In der Produktion wirkt der Schalter nie,
+   auch wenn er dort gesetzt wäre (lokale-schalter.js). Zur Laufzeit gelesen,
+   damit Tests es pro Fall setzen können. */
 function isLocalQueueMode() {
-  return process.env.QUEUE_LOCAL === "1";
+  return lokalSchalterAn("QUEUE_LOCAL");
 }
 
 /* Drosselung des lokalen Cloud-Tasks-Ersatzes: so viele Jobs gleichzeitig in

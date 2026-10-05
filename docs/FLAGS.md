@@ -100,6 +100,15 @@ Emulator läuft der Datenstrom ebenfalls immer (`QUEUE_LOCAL_LIVE` entfällt).
 | `QUEUE_LOCAL=1` | Emulator-Modus: Shims ersetzen Cloud Tasks (direkter HTTP-Dispatch) und den GCS-Bucket (Dateisystem). Siehe [QUEUE-EMULATOR.md](QUEUE-EMULATOR.md). |
 | `QUEUE_LOCAL_CONCURRENCY` | Parallelität im Lokal-Modus (Default 3). |
 | `MISTRAL_MOCK=1` | Mistral-Attrappe statt echter API (kostenlose Tests, Emulator-Durchklick). |
+| `NTFY_STUMM=1` | Keine Benachrichtigung verschicken (im Emulator ohnehin unterdrückt). |
+
+Für `QUEUE_LOCAL`, `MISTRAL_MOCK` und `NTFY_STUMM` erzwingt das Programm die Regel selbst
+(`functions/src/lokale-schalter.js`): In der Produktion wirken sie nicht, und eine Fassung, bei
+der einer davon auf 1 steht, startet dort gar nicht erst. Die Produktion erkennt das Programm
+an `K_SERVICE` ohne das Emulator-Merkmal `FUNCTIONS_EMULATOR`; dass an keinem Dienst einer
+dieser vier Namen gesetzt ist, prüft `scripts/verify-infrastructure.sh` vor jeder
+Auslieferung. Lokal stehen die Werte in `functions/.env.local` (Vorlage
+`functions/.env.local.example`), nie in `functions/.env`.
 
 ## Regeln
 

@@ -163,7 +163,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 |-------|---------------------|
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
-| `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call) |
+| `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call, nur bei hochgeladenen Fotos); bei den Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite |
 | `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Status abfragen, Ergebnis zustellen, Wiederaufnahme nach Neuladen — mit AbortController + Stale-Guard |
 | `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
 | `js/auftrag-speicher.js` | Auftragsgedächtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, 15-Minuten-Frist für ein zugestelltes Ergebnis |
@@ -229,9 +229,13 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `mistral-http.js` | Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Überlast, Antwort als Strom |
 | `mistral-antwort.js` | Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung (`escapeXml`) |
 | `mistral-mock.js` | Mistral-Attrappe für Unit-Tests und Emulator (`MISTRAL_MOCK=1`) |
+| `lokale-schalter.js` | Schalter nur für lokale Läufe (`MISTRAL_MOCK`, `QUEUE_LOCAL`, `NTFY_STUMM`): wirken nie in der Produktion; steht dort einer auf 1, startet `index.js` nicht |
 | `job-helfer.js` | Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung) |
 | `minor-safety.js` | Kinderschutz-Filter für Werbekategorien bei möglicherweise Minderjährigen (Schwelle mit Puffer: `SCHUTZ_BIS`) |
-| `alters-lesbarkeit.js` | Altersauslese aus dem KI-Text und Erkennung nicht lesbarer Altersangaben (Filter, Alterskarte, Live-Anzeige) |
+| `minor-safety-woerter.js` | Wortlisten des Kinderschutz-Filters: je Thema deutsch und englisch, „nur als Werbe-Eintrag“, harmlose Wendungen (reine Daten, angewandt von `minor-safety.js`) |
+| `alters-lesbarkeit.js` | Erkennung nicht lesbarer Altersangaben: erster Satz einer Karte, Altersversuch (Filter, Alterskarte, Live-Anzeige) |
+| `alters-auslese.js` | Altersauslese aus dem KI-Text: Zahlwörter, Kategorien, untere und obere Altersgrenze (weitergereicht von `alters-lesbarkeit.js`) |
+| `alters-lesbarkeit-woerter.js` | Wörter, Kategorien und Abkürzungen der Altersauslese (reine Daten, angewandt von `alters-auslese.js` und `alters-lesbarkeit.js`) |
 | `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Prüfung, Cache, Rückfall |
 | `produktiv-satz.js` | Betriebswerte für den echten Betrieb — Quelle für `config/betriebsprofil` |
 | `test-satz.js` | Einstellungssatz für die Tests |
@@ -318,7 +322,8 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
 - GPS erreicht NIE unsere Server — Nominatim und die Kartenkacheln ruft der Browser
   direkt auf, die Koordinaten verlassen das Geraet also sehr wohl, nur nie in Richtung
   malziME (Formulierung nach DOC-2026-08-12-05: die alte Fassung war im Netzwerk-Tab
-  widerlegbar)
+  widerlegbar). Bei den Demo-Fotos fragt der Browser nichts nach aussen: Adresse und
+  Kartenausschnitt ihrer erfundenen Orte liegen in der Seite
 - Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr, libheif)
 - CSP nur self + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen (`europe-west1`)

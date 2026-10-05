@@ -179,7 +179,7 @@ module.exports = {
         cat: "Vasen-Versicherung",
         _: "Nervennahrung",
       },
-      "Spar-Kredit für Tierarztrechnung",
+      "Tierkranken-Versicherung (Premium-Tarif)",
     ],
     manipulation_triggers: [
       "\u201eSchau mich an mit diesen Augen\u201c \u2014 Evolution hat {{dein}} {{tierName}} zur perfekten Manipulationsmaschine gemacht",

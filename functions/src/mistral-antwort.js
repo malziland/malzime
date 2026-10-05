@@ -162,7 +162,13 @@ const REQUIRED_CARDS = [
 ];
 
 /* Nicht lesbares Alter (17.09.2026): Erkennung in alters-lesbarkeit.js. */
-const { istAlterUnlesbar } = require("./alters-lesbarkeit");
+const {
+  istAlterUnlesbar,
+  hatLesbaresAlter,
+  hatAltersPlatzhalter,
+  hatAltersversuch,
+  ersterSatz,
+} = require("./alters-lesbarkeit");
 
 /* ── Live-Text und Karten aus dem laufenden Strom ─────────────────────────
    HERGEZOGEN AUS mistral.js am 31.08.2026, zweiter Schnitt.
@@ -175,7 +181,7 @@ const STANDARD_SCHLUESSEL = '"standard"';
 
 const BEAST_SCHLUESSEL = '"beast"';
 
-function extrahiereKarten(jsonPraefix, vonIdx, bisIdx, alterVerbergen = false) {
+function extrahiereKarten(jsonPraefix, vonIdx, bisIdx, alterVerbergen = () => false) {
   if (typeof jsonPraefix !== "string" || vonIdx < 0) return [];
   const bereich = bisIdx > vonIdx ? jsonPraefix.slice(0, bisIdx) : jsonPraefix;
   const fertige = [];
@@ -195,28 +201,53 @@ function extrahiereKarten(jsonPraefix, vonIdx, bisIdx, alterVerbergen = false) {
        standard/beast, nur eine Ebene tiefer. */
     const dazwischen = bereich.slice(idx + marke.length, wert.schluesselIdx);
     if (REQUIRED_CARDS.some((k) => k !== schluessel && dazwischen.includes(`"${k}"`))) continue;
-    /* Eine Alterskarte mit nicht lesbarem Alter — in der Karte selbst oder im
-       schon angekommenen Anker — erscheint live gar nicht; die fertige Karte
-       bekommt danach den festen Satz (mistral.js). */
-    if (schluessel === "alter_geschlecht" && (alterVerbergen || istAlterUnlesbar(wert.text))) continue;
+    /* Die Alterskarte erscheint live nur, wenn sie am Ende auch so stehen
+       bleibt; sonst bekommt die fertige Karte den festen Satz (mistral.js).
+       Bewusste Ausnahme (SECURITY-MODEL, 17.09.2026, Punkt 3): Was erst NACH
+       dieser Karte ankommt, ist hier noch nicht da. Bringt erst die
+       Beast-Karte — oder ein Anker, der entgegen dem Schema hinter den
+       Profilen steht — einen Altersversuch ohne lesbares Alter, steht die
+       Standard-Karte schon da und wechselt am Ende auf den festen Satz. */
+    if (schluessel === "alter_geschlecht" && alterVerbergen(wert.text)) continue;
     fertige.push({ schluessel, bezeichnung: bezeichnung.text, wert: wert.text });
   }
   return fertige;
 }
 
-/* Ist der Altersanker aus hard_facts (steht im Schema VOR den Profilen)
-   schon komplett da und nicht lesbar? Dann zeigt die fertige Karte den
-   festen Satz — live soll die Alterskarte vorher nicht aufscheinen. */
+/* Was sagt der Altersanker aus hard_facts (steht im Schema VOR den Profilen)?
+   "unlesbar": Vorlage abgeschrieben oder Alterswort ohne Zahl — die fertige
+   Karte zeigt dann den festen Satz. "lesbar": Er traegt das Alter.
+   "versuch": Er deutet ein Alter nur an ("jung", "noch im Wachstum") — die
+   Karte erscheint dann nur, wenn ihr erster Satz ein Alter nennt. null: Er
+   fehlt, ist noch nicht ganz da, ist kein Text oder nennt kein Alter. */
 const HARD_FACTS_SCHLUESSEL = '"hard_facts"';
 const ALTER_SCHLUESSEL = '"alter_geschlecht"';
 
-function liveAnkerUnlesbar(jsonPraefix, standardIdx) {
+function liveAnker(jsonPraefix, standardIdx) {
   const hf = jsonPraefix.indexOf(HARD_FACTS_SCHLUESSEL);
-  if (hf < 0 || (standardIdx >= 0 && hf > standardIdx)) return false;
+  if (hf < 0 || (standardIdx >= 0 && hf > standardIdx)) return null;
   const anker = findeProfileTextWert(jsonPraefix, hf, ALTER_SCHLUESSEL);
-  if (!anker || !anker.abgeschlossen) return false;
-  if (standardIdx >= 0 && anker.schluesselIdx > standardIdx) return false;
-  return istAlterUnlesbar(anker.text);
+  if (!anker || !anker.abgeschlossen) return null;
+  if (standardIdx >= 0 && anker.schluesselIdx > standardIdx) return null;
+  if (istAlterUnlesbar(anker.text)) return "unlesbar";
+  if (hatLesbaresAlter(anker.text)) return "lesbar";
+  return hatAltersversuch(anker.text) ? "versuch" : null;
+}
+
+/* Dieselbe Regel wie beim Endergebnis (mistral.js): Es zaehlt der Anker, sonst
+   der erste Satz einer Karte. Ohne lesbares Alter an diesen Stellen macht ein
+   Altersversuch im Anker oder in einer Karte das Alter "nicht lesbar" — die
+   Karte erscheint dann live nicht, statt erst mit einer Zahl aus dem Beleg-Satz
+   dazustehen und am Ende auf den festen Satz zu springen. Ein Platzhalter
+   erscheint live nie. `vorher` ist die Standard-Karte, wenn die Beast-Karte
+   ankommt; umgekehrt ist die Beast-Karte noch nicht da — bringt erst sie das
+   Alter, wartet die Standard-Karte auf das Endergebnis. */
+function alterskarteVerbergen(anker, karte, vorher = "") {
+  if (anker === "unlesbar" || hatAltersPlatzhalter(karte)) return true;
+  if (anker === "lesbar") return false;
+  const karten = [karte, vorher];
+  const versuch = anker === "versuch" || karten.some(hatAltersversuch);
+  return versuch && !karten.some((k) => hatLesbaresAlter(ersterSatz(k)));
 }
 
 function extrahiereLiveText(jsonPraefix) {
@@ -251,13 +282,17 @@ function extrahiereLiveText(jsonPraefix) {
      unveraendert — alte Aufrufer merken nichts. */
   const standardBis = beastIdx > standardIdx ? beastIdx : -1;
   const erstesProfil = [standardIdx, beastIdx].filter((i) => i >= 0);
-  const ankerUnlesbar = liveAnkerUnlesbar(jsonPraefix, erstesProfil.length ? Math.min(...erstesProfil) : -1);
-  return {
-    standard: erster ? erster.text : null,
-    beast: zweiter ? zweiter.text : null,
-    kartenStandard: extrahiereKarten(jsonPraefix, standardIdx, standardBis, ankerUnlesbar),
-    kartenBeast: extrahiereKarten(jsonPraefix, beastIdx, -1, ankerUnlesbar),
-  };
+  const anker = liveAnker(jsonPraefix, erstesProfil.length ? Math.min(...erstesProfil) : -1);
+  /* Die Standard-Alterskarte merken — die Beast-Karte entscheidet mit ihr. */
+  let alterStandard = "";
+  const kartenStandard = extrahiereKarten(jsonPraefix, standardIdx, standardBis, (karte) => {
+    alterStandard = karte;
+    return alterskarteVerbergen(anker, karte);
+  });
+  const kartenBeast = extrahiereKarten(jsonPraefix, beastIdx, -1, (karte) =>
+    alterskarteVerbergen(anker, karte, alterStandard)
+  );
+  return { standard: erster ? erster.text : null, beast: zweiter ? zweiter.text : null, kartenStandard, kartenBeast };
 }
 
 /* HERGEZOGEN 31.08.2026: Welche Karten in einer Antwort fehlen — das ist

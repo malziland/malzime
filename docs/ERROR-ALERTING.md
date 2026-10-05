@@ -64,7 +64,10 @@ Jede Art Fehlerzeile bekommt eine eigene Richtlinie mit eigenem Betreff — der
 Betreff steht in der E-Mail und als Titel im Push, also sieht man schon auf dem
 Sperrbildschirm, was los ist. Alle drei haben dieselben Dienste im Filter und
 dieselben Kanäle; zusammen decken sie genau das ab, was vorher eine einzige
-Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung.
+Richtlinie mit `severity>=ERROR` abdeckte, ohne Überschneidung. Dass jede der
+drei wirklich jeden Dienst nennt, prüft `scripts/verify-infrastructure.sh` bei
+jeder Auslieferung je Richtlinie — kommt ein Dienst dazu, muss er in alle drei
+Filter (oder mit Begründung auf die Ausnahmeliste im Skript).
 
 | Richtlinie | Betreff | Filter (nach dem gemeinsamen Teil) |
 |---|---|---|
@@ -287,8 +290,10 @@ denselben ntfy-Server und dasselbe Thema wie die übrigen Alarme.
 - **Warum nicht nur die GitHub-Mail:** GitHub-Benachrichtigungen werden beim
   Empfänger automatisch gelöscht; eine Warnung per Mail käme also nie an.
 - **Monatliche Probe:** Am 1. jedes Monats (08:07 UTC) kommt „malziME PROBE:
-  Sicherheit nachts", auch wenn alles grün ist. **Bleibt sie aus, ist der Alarmweg
-  gestört** — dann sofort nachsehen (Lauf unter „Actions", Secrets, ntfy-Server).
+  Sicherheit nachts", auch wenn alles grün ist. Meldet sich das Handy nicht von
+  selbst, in der ntfy-App nachsehen — der Weckruf kann ausbleiben (unten, „Wenn der
+  Push nicht weckt"). **Steht sie auch dort nicht, ist der Alarmweg gestört** — dann
+  sofort nachsehen (Lauf unter „Actions", Secrets, ntfy-Server).
   Ohne diese Probe fiele ein kaputter Alarmweg erst auf, wenn ein echter Alarm nicht
   ankommt: Der Job `alarm` kann seinen eigenen Fehlschlag nicht melden, und die
   Mail von GitHub wird gelöscht.
@@ -309,6 +314,29 @@ denselben ntfy-Server und dasselbe Thema wie die übrigen Alarme.
 
 Was bei einem roten Nachtlauf zu tun ist: `docs/RUNBOOK.md`, Abschnitt
 „Nachtlauf Sicherheit nachts rot".
+
+## Wenn der Push nicht weckt (bekannt seit 2026-10-03)
+
+Der eigene ntfy-Server kann ein iPhone nicht selbst wecken. Er bittet dafür bei jeder
+Nachricht den Dienst des Herstellers (`ntfy.sh`) um einen Weckruf; den Inhalt der
+Nachricht bekommt dieser Dienst nicht, nur eine Kennung. `ntfy.sh` nimmt ohne Konto je Tag
+250 solche Bitten je Absender-Adresse an. Cloud Run sendet von Adressen, die sich viele
+Google-Kunden teilen — ist deren Tagesbudget verbraucht, wird der Weckruf abgewiesen. Die
+Nachricht liegt dann in der App, aber das Handy meldet sich nicht von selbst.
+
+- **Gemessen am 03.10.2026 abends:** 6 von 6 Weckrufen abgewiesen (zwei Instanzen des
+  Dienstes); derselbe Weckruf von einer anderen Adresse wurde angenommen. Laut Hersteller
+  wird der Zähler täglich um 00:00 UTC zurückgesetzt.
+- **Woran man es sieht:** im Protokoll des ntfy-Dienstes an der Zeile
+  `Unable to publish poll request … HTTP 429` (Aufbewahrung ein Tag). Einen Alarm dazu
+  gibt es nicht.
+- **Was das für die Alarme heißt:** Keiner geht verloren. Jede der fünf Alarmregeln
+  verschickt zusätzlich eine E-Mail; `scripts/verify-infrastructure.sh` prüft bei jeder
+  Auslieferung je Regel, dass ein eingeschalteter E-Mail-Kanal dranhängt. Die Nachricht
+  „Stundenlimit erreicht" und die Meldungen des Nachtlaufs kennen keinen zweiten Weg —
+  sie stehen dann in der App, ohne zu wecken.
+- **Entscheidung:** Es bleibt dabei (`docs/SECURITY-MODEL.md`, „Der Push aufs Handy kann
+  ausbleiben").
 
 ## Was passiert dann?
 

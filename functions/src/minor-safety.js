@@ -23,10 +23,11 @@
  *      in einem Werkzeug fürs Klassenzimmer haben diese Inhalte ohnehin
  *      nichts verloren. Damit hängt die schwerste Absicherung nicht mehr an
  *      einer Schätzung.
- *   2. Glücksspiel, Kredit, Alkohol, Schönheits-OP und Diätmittel nur bei
- *      möglicherweise Minderjährigen — mit Sicherheitspuffer, siehe
- *      Altersgrenze unten. Bei Erwachsenen sind sie legitimer Lerninhalt —
- *      wie diese Branchen Menschen adressieren, IST das Thema.
+ *   2. Glücksspiel, Kredit, Alkohol, Tabak, Schönheits-OP, Diätmittel und
+ *      Drogen nur bei möglicherweise Minderjährigen — mit Sicherheitspuffer,
+ *      siehe Altersgrenze unten. Bei Erwachsenen sind sie legitimer
+ *      Lerninhalt — wie diese Branchen Menschen adressieren, IST das Thema.
+ *      (Drogen seit der Entscheidung vom 04.10.2026: wie Alkohol.)
  *
  * BEWUSST ENG GEFASST: Gefiltert wird nur, was unzweifelhaft nicht zu Kindern
  * gehört. NICHT gefiltert wird die didaktisch gewollte System-Perspektive —
@@ -60,9 +61,9 @@
    statt 50 Analysen ohne Stufe 2.
 
    Bewusst getragene Folge: Erwachsene, deren Spanne bei 25 oder darunter
-   beginnt, bekommen keine Kredit-, Wett-, Alkohol-, Schoenheits-OP- und
-   Diaet-Ideen. Stufe 1 (Pornografie, Waffen, Extremismus) gilt unveraendert
-   fuer alle. */
+   beginnt, bekommen keine Kredit-, Wett-, Alkohol-, Tabak-, Schoenheits-OP-,
+   Diaet- und Drogen-Ideen. Stufe 1 (Pornografie, Waffen, Extremismus) gilt
+   unveraendert fuer alle. */
 const VOLLJAEHRIG_AB = 18;
 /* BLEIBT IM CODE — Kinderschutz-Regel, keine Betriebseinstellung. Wer den
    Puffer aendert, aendert die Entscheidung vom 17.09.2026; das geht nur mit
@@ -88,51 +89,102 @@ const { untereAltersgrenze, obereAltersgrenze, istAlterUnlesbar } = require("./a
    legitimer Teil der Aufklaerung ist: Wie Kredit-, Alkohol- oder
    Schoenheitsindustrie Menschen adressieren, IST der Lerninhalt. */
 
-/* ── Warum die Listen zweisprachig sind (Audit 2026-08-10, SEC-001) ───────
-   Die Listen waren rein deutsch und markenzentriert. Gemessen an zwoelf
-   realistischen englischen Werbephrasen rutschten ZEHN durch — darunter
-   "Porn Subscription", "Handgun Accessories" und "Neo-Nazi Clothing", also
-   ausgerechnet die Stufe, die altersunabhaengig greifen soll. Erreichbar ist
-   die englische Fassung ueber ?lang=en oder ein englisch eingestelltes Geraet.
-   Deshalb steht jeder Begriff jetzt in beiden Sprachen.
+/* ── Die Sperrliste ist eine Wortliste (SEC-2026-10-03-01) ────────────────
+   Sie faengt, was in ihr steht, nicht jede Werbung zu einem Thema. Die Listen
+   stehen als Daten in minor-safety-woerter.js, dort auch die Schreibweise der
+   Eintraege und die Regel "nur als Werbung". Hier steht, wie sie angewandt
+   werden.
 
-   Und: Deutsche Komposita brauchen KEINE linke Wortgrenze. `\bkredit` traf
-   "Kredit", aber weder "Sofortkredit" noch "Ratenkredit" noch "Autokredit" —
-   also genau die Wortbildung, die im Deutschen die Regel ist. */
-
-const IMMER_VERBOTEN = [
-  /* Pornografie und Sexarbeit */
-  /onlyfans|fansly|pornhub|xhamster|camgirl|cam-?girl|escort|bordell|erotikportal|sexshop|sexcam/i,
-  /\bporno?\b|pornografie|pornography|adult ?webcam|strip ?club|brothel|sex ?toys?/i,
-  /* Gewaltverherrlichung, Waffen, Extremismus */
-  /schusswaffe|munition|waffenhandel|glock|kalaschnikow|ar-?15|schlagring|butterflymesser/i,
-  /\bgun\b|\bguns\b|handgun|rifle|firearm|ammunition|\bammo\b|silencer/i,
-  /extremis|rechtsradikal|neo-?nazi|terror|white ?supremac/i,
-];
-
-/* Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei moeglicherweise
+   Stufe 2 gilt nur fuer WERBUNG (ad_targeting) und nur bei moeglicherweise
    Minderjaehrigen (Untergrenze bis SCHUTZ_BIS, siehe oben).
    Fuer die Manipulations-Trigger wird sie bewusst NICHT angewandt — siehe
    applyMinorSafety. */
-const NUR_MINDERJAEHRIG = [
-  /* Gluecksspiel und Sportwetten */
-  /bet365|tipico|bwin|betano|winamax|lottoland|tipp3|casino|jackpot|sportwetten|gl[uü]cksspiel/i,
-  /wettanbieter|buchmacher|kombiwette|online-?wetten|\bwetten\b/i,
-  /gambling|betting|bookmaker|slot ?machines?|\bpoker\b|\bbet\b/i,
-  /* Kredit und Ratenfinanzierung — ohne linke Wortgrenze wegen der Komposita */
-  /kredit|darlehen|ratenkauf|ratenzahlung|klarna|schufa|inkasso|leasing|mikrofinanz/i,
-  /\bloan\b|\bloans\b|payday|instal?lment ?plan|buy ?now ?pay ?later|credit ?card/i,
-  /* Alkohol und Tabak */
-  /\bbier\b|bier(?:abo|kasten)|\bwein\b|wein(?:probe|abo)|rotwein|wei[ßs]wein|gl[uü]hwein|sekt\b|prosecco|aperol|\bgin\b|\brum\b|tequila|cocktail|spirituose|vodka|whisky/i,
-  /zigarett|tabak|\bvape\b|e-?shisha|nikotin|\bsnus\b/i,
-  /\bbeer\b|\bwine\b|liquor|alcohol|cigarettes?|nicotine ?pouch/i,
-  /* Schoenheitskorrektur */
-  /botox|hyaluron|\bfiller\b|sch[oö]nheits-?(?:op|chirurgie)|beauty-?op|fettabsaug|brustvergr[oö]ss|lippen ?aufspritz|nasenkorrektur/i,
-  /cosmetic ?surgery|breast ?augmentation|liposuction|lip ?fillers?/i,
-  /* Diaet- und Abnehmindustrie */
-  /di[aä]t(?:pille|shake|produkt)|abnehm(?:spritze|coaching|kur)|ozempic|wegovy|mounjaro|almased|slimfast|formula-?di[aä]t|detox ?kur|appetitz[uü]gler|fatburner|schlankheitsmittel/i,
-  /slimming ?pills?|diet ?pills?|weight ?loss|appetite ?suppressant|fat ?burner/i,
-];
+const WOERTER = require("./minor-safety-woerter");
+
+/* Text vor dem Vergleich vereinheitlichen: Gross/Klein, Umlaute und ß,
+   zerlegte und Vollbreite-Zeichen, unsichtbare Trennzeichen (Cf), Akzente;
+   Bindestriche (Pd), Schraegstrich, "&" und Leerraum werden ein Leerzeichen. */
+const UMLAUT = { ä: "ae", ö: "oe", ü: "ue", ß: "ss" };
+const grundform = (text) =>
+  String(text ?? "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\p{Cf}'`´‘’]/gu, "")
+    .replace(/[äöüß]/g, (z) => UMLAUT[z])
+    .normalize("NFD")
+    .replace(/\p{M}+/gu, "")
+    .replace(/\p{Pd}+/gu, "-");
+const trennerAlsLeerzeichen = (s) => s.replace(/[\s\-_/&]+/g, " ");
+const vereinheitlicht = (text) => trennerAlsLeerzeichen(grundform(text));
+
+/* Ein Bindestrich im Wort aendert nichts: Jeder Text wird auch so gelesen,
+   als stuende der Bindestrich nicht da ("Soft-Air" als "softair"). Die erste
+   Sicht ist die gewohnte (Bindestrich als Leerzeichen: "Gin-Tonic" trifft
+   "gin"). Bis zu drei Bindestriche werden einzeln durchgespielt, damit auch
+   "Soft-Air-Pistole" und "Na-zi-Shirt" treffen; bei mehr gibt es zwei
+   Sichten: alle als Leerzeichen, alle weggelassen. */
+const BINDESTRICH_IM_WORT = /(?<=[a-z0-9])-(?=[a-z0-9])/g;
+/* BLEIBT IM CODE — Teil der Kinderschutz-Regel, kein Betriebswert: Die Zahl
+   bestimmt, was der Filter faengt, und begrenzt die Sichten je Text auf acht.
+   Sie aendert sich nur mit Test und Deploy. */
+const EINZELN_BIS = 3;
+function sichten(text) {
+  const roh = grundform(text);
+  const stellen = [...roh.matchAll(BINDESTRICH_IM_WORT)].map((m) => m.index);
+  const anzahl = stellen.length === 0 ? 1 : stellen.length <= EINZELN_BIS ? 2 ** stellen.length : 2;
+  const aus = [];
+  for (let wahl = 0; wahl < anzahl; wahl++) {
+    /* Nach Plaetzen zerlegt, nicht nach Zeichen: Die Stellen oben zaehlen
+       Plaetze, und ein Emoji belegt zwei. */
+    const zeichen = roh.split("");
+    stellen.forEach((stelle, i) => {
+      if (anzahl === 2 ? wahl === 1 : (wahl >> i) & 1) zeichen[stelle] = "";
+    });
+    aus.push(trennerAlsLeerzeichen(zeichen.join("")));
+  }
+  return aus;
+}
+
+/* Ein Listeneintrag als Suchmuster ueber dem vereinheitlichten Text.
+   - Ein Leerzeichen im Eintrag steht zwischen zwei Woertern einer festen
+     Fuegung ("pall mall"): Dort darf nichts oder ein Leerzeichen stehen — in
+     jeder Sicht.
+   - Ein "+" im Eintrag ist die Wortfuge einer Zusammensetzung
+     ("miet+kauf"): zusammen ueberall, getrennt ("Miet Kauf") nur als
+     Werbe-Eintrag. Im Fliesstext stehen dieselben zwei Woerter oft
+     zufaellig nebeneinander ("Sex spielt keine Rolle").
+   Leerzeichen an beliebiger Stelle zu ueberbruecken, traefe Alltagstext
+   ("Islam ist", "Code in"); deshalb notiert die Liste die Wortfugen. */
+function musterMitFuge(wort, fuge) {
+  const kern = wort
+    .replace(/\*/g, "")
+    .replace(/[.?^${}()|[\]\\]/g, "\\$&")
+    .replace(/[äöüß]/g, (z) => UMLAUT[z])
+    .replace(/ /g, " ?")
+    .replace(/\+/g, fuge);
+  return `${wort.startsWith("*") ? "" : "(?<![a-z0-9])"}${kern}${wort.endsWith("*") ? "" : "(?![a-z0-9])"}`;
+}
+/* muster: als Werbe-Eintrag (und fuer harmlose Wendungen). musterImSatz: im
+   Fliesstext und in Erklaersaetzen. */
+const muster = (wort) => musterMitFuge(wort, " ?");
+const musterImSatz = (wort) => musterMitFuge(wort, "");
+const woerter = (text) => text.split(/\s*,\s*/).filter(Boolean);
+const suche = (liste, schalter, alsMuster = muster) => new RegExp(liste.map((w) => alsMuster(w)).join("|"), schalter);
+const HARMLOS = suche(woerter(WOERTER.HARMLOS), "g");
+
+/* satz: gilt ueberall. werbung: dazu die Woerter "nur als Werbung". */
+function sperrliste(ueberall, nurAlsWerbung) {
+  const liste = { ueberall: woerter(ueberall.join(",")), nurAlsWerbung: woerter(nurAlsWerbung) };
+  return {
+    ...liste,
+    satz: suche(liste.ueberall, undefined, musterImSatz),
+    werbung: suche([...liste.ueberall, ...liste.nurAlsWerbung]),
+  };
+}
+
+/* IMMER_VERBOTEN gilt fuer alle, NUR_MINDERJAEHRIG nur bis SCHUTZ_BIS. */
+const IMMER_VERBOTEN = sperrliste(WOERTER.IMMER.ueberall, WOERTER.IMMER.nurAlsWerbung);
+const NUR_MINDERJAEHRIG = sperrliste(WOERTER.MINOR.ueberall, WOERTER.MINOR.nurAlsWerbung);
 
 /* ── Werbe-Anzahl (09.09.2026) ────────────────────────────────────────────
    BLEIBT IM CODE — Gestaltung, kein Betriebswert: Die Anzahl der Werbekarten
@@ -149,26 +201,24 @@ const NUR_MINDERJAEHRIG = [
 const WERBE_ANZAHL = 8;
 const WERBE_ANFORDERUNG = WERBE_ANZAHL + 2;
 
-/* Liefert das getroffene Wort aus der Liste: nur das Wort selbst, klein
-   geschrieben, hoechstens 30 Zeichen. Kein Satz, kein Kontext. Das Log soll
-   sagen "wetten" oder "cocktail", nicht, was ueber die Person geschrieben
-   wurde — so bleibt die Diagnose ohne Personenbezug. */
-function stichwort(liste, eintrag) {
-  const s = String(eintrag || "");
-  for (const re of liste) {
-    const m = re.exec(s);
-    if (m) return m[0].trim().toLowerCase().slice(0, 30);
+/* Liefert das erste Wort der Liste, das im Text steht: nur das Wort selbst,
+   klein geschrieben, hoechstens 30 Zeichen. Kein Satz, kein Kontext. Das Log
+   soll sagen "wetten" oder "cocktail", nicht, was ueber die Person geschrieben
+   wurde — so bleibt die Diagnose ohne Personenbezug.
+   alsWerbung: Der Text ist ein Werbe-Eintrag; dann gelten auch die Woerter
+   "nur als Werbung". */
+function stichwort(liste, eintrag, alsWerbung = false) {
+  const suchmuster = alsWerbung ? liste.werbung : liste.satz;
+  for (const sicht of sichten(eintrag)) {
+    const m = suchmuster.exec(sicht.replace(HARMLOS, " "));
+    if (m) return m[0].trim().slice(0, 30);
   }
   return null;
 }
 
-function istImmerVerboten(eintrag) {
-  return stichwort(IMMER_VERBOTEN, eintrag) !== null;
-}
-
-function istBeiMinderjaehrigenVerboten(eintrag) {
-  return stichwort(NUR_MINDERJAEHRIG, eintrag) !== null;
-}
+const istImmerVerboten = (eintrag, alsWerbung = true) => stichwort(IMMER_VERBOTEN, eintrag, alsWerbung) !== null;
+const istBeiMinderjaehrigenVerboten = (eintrag, alsWerbung = true) =>
+  stichwort(NUR_MINDERJAEHRIG, eintrag, alsWerbung) !== null;
 
 /**
  * Prüft ein fertiges Profil-Paar und entfernt unzulässige Werbe- und
@@ -242,13 +292,13 @@ function applyMinorSafety(profiles, opts = {}) {
       const vorher = p[feld];
       const nachher = [];
       for (const e of vorher) {
-        const hart = stichwort(IMMER_VERBOTEN, e);
+        const hart = stichwort(IMMER_VERBOTEN, e, feld === "ad_targeting");
         if (hart !== null) {
           bericht.applied = true;
           bericht.entfernt.push({ modus, feld, grund: "immer", stichwort: hart, eintrag: String(e).slice(0, 80) });
           continue;
         }
-        const weich = mitAltersstufe && minderjaehrig ? stichwort(NUR_MINDERJAEHRIG, e) : null;
+        const weich = mitAltersstufe && minderjaehrig ? stichwort(NUR_MINDERJAEHRIG, e, true) : null;
         if (weich !== null) {
           bericht.applied = true;
           bericht.entfernt.push({ modus, feld, grund: "minor", stichwort: weich, eintrag: String(e).slice(0, 80) });
@@ -298,6 +348,9 @@ module.exports = {
   /* Für Tests */
   _istImmerVerboten: istImmerVerboten,
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,
+  _vereinheitlicht: vereinheitlicht,
+  _muster: muster,
+  _SPERRLISTEN: { immer: IMMER_VERBOTEN, minor: NUR_MINDERJAEHRIG, harmlos: woerter(WOERTER.HARMLOS) },
   _untereAltersgrenze: untereAltersgrenze,
   _SCHUTZ_BIS: SCHUTZ_BIS,
   SCHUTZ_ALTER: SCHUTZ_BIS - 1,

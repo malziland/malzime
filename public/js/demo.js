@@ -1,6 +1,8 @@
 import { elements } from "./dom.js";
 import { state } from "./state.js";
 import { analyzeImage } from "./api.js";
+import { merkeBeispielbild, BEISPIEL_SCHLUESSEL } from "./geocoding.js";
+import { kartenAufbauVerwerfen } from "./render.js";
 import { klangAktivieren } from "./klang.js";
 import { t } from "./i18n.js";
 import { setStatus, stopScanAnim } from "./ui.js";
@@ -29,7 +31,9 @@ function demoBildPfad(key) {
   return `${sicher}${DEMO_BUSTER}`;
 }
 
-const DEMO_KEYS = ["selfie", "cafe", "hiker"];
+/* Welche Beispielbilder es gibt, steht an EINER Stelle (js/geocoding.js) —
+   dort hängt auch, dass für ein Beispielbild nichts nach außen gefragt wird. */
+const DEMO_KEYS = BEISPIEL_SCHLUESSEL;
 
 /* `bereit`: ein Versprechen, das erfuellt ist, sobald die Uebersetzung
    geladen ist. BELEG (Pipeline-Lauf 34149354681, 07.09.2026): Die Knoepfe
@@ -66,6 +70,11 @@ async function loadDemoImage(url, name) {
   }
   state.pendingGeocode = null;
   state.geocodeCache = null; /* BUG-2026-08-20-06: neue Analyse, neue Aufnahme */
+  /* PRIV-2026-10-03-38: Ab der Wahl eines Beispielbilds fragt der Browser
+     nichts mehr nach außen. Die bewegliche Karte des Fotos davor wird deshalb
+     sofort abgebaut, und ein Kartenaufbau, der noch auf die eben abgebrochene
+     Ortsauflösung wartet, zeichnet nichts mehr. */
+  kartenAufbauVerwerfen();
 
   const prev = elements.imagePreview.querySelector("img");
   if (prev) URL.revokeObjectURL(prev.src);
@@ -74,6 +83,12 @@ async function loadDemoImage(url, name) {
     const response = await fetch(url);
     const blob = await response.blob();
     const file = new File([blob], `demo-${name}.jpg`, { type: "image/jpeg" });
+    /* PRIV-2026-10-03-38: Diese Datei ist ein Beispielbild. Für ihre erfundenen
+       Ortsdaten fragt der Browser nichts nach außen — Adresse und
+       Kartenausschnitt liefert die Seite mit (js/geocoding.js). Das Merkmal
+       hängt an genau dieser Datei, nicht an einem Schalter: Ein eigenes Foto
+       ist immer eine andere Datei. */
+    merkeBeispielbild(file, name);
 
     const previewUrl = URL.createObjectURL(file);
     const img = document.createElement("img");

@@ -7,9 +7,24 @@
       "indexes": "firestore.indexes.json"
     }
   ],
+  "_kommentar_functions": "ignore bestimmt, was als Server-Paket zu Google geht: nur das Programm (functions/src ohne Tests und ohne die Testwerte test-satz.js) samt package.json und package-lock.json. Jede Datei des Pakets steht mit Pruefsumme im Fingerabdruck (public/build-info.json, Feld serverPaket). Ist die Liste gesetzt, gilt GENAU sie — node_modules und .git muessen deshalb selbst darin stehen. Jedes Muster ist ein blosser Datei- oder Ordnername ohne Schraegstrich; das Werkzeug vergleicht ihn auf jeder Ebene mit dem Namen (minimatch, matchBase und dot). Den Soll-Umfang haelt functions/src/__tests__/server-paket.test.js fest, Reste auf dem Auslieferungsrechner meldet scripts/pruefe-auslieferbare-reste.mjs (OPS-2026-10-03-09).",
   "functions": {
     "source": "functions",
-    "runtime": "nodejs24"
+    "runtime": "nodejs24",
+    "ignore": [
+      "node_modules",
+      ".git",
+      "firebase-debug.log",
+      "firebase-debug.*.log",
+      "*.log",
+      ".*",
+      "__tests__",
+      "coverage",
+      "scripts",
+      "eslint.config.js",
+      "jest.setup.js",
+      "test-satz.js"
+    ]
   },
   "emulators": {
     "functions": {
@@ -61,7 +76,7 @@
           },
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; font-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org https://enqueue-5ymhpdpqcq-ew.a.run.app https://jobstatus-5ymhpdpqcq-ew.a.run.app https://stats-5ymhpdpqcq-ew.a.run.app https://errors-5ymhpdpqcq-ew.a.run.app https://telemetry-5ymhpdpqcq-ew.a.run.app; frame-src 'none'; object-src 'none'; base-uri 'self'"
+            "value": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; font-src 'self'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org https://enqueue-5ymhpdpqcq-ew.a.run.app https://jobstatus-5ymhpdpqcq-ew.a.run.app https://stats-5ymhpdpqcq-ew.a.run.app https://errors-5ymhpdpqcq-ew.a.run.app https://telemetry-5ymhpdpqcq-ew.a.run.app; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
           },
           {
             "key": "Permissions-Policy",
@@ -78,7 +93,7 @@
         "headers": [
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'"
+            "value": "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; form-action 'self'"
           }
         ]
       },

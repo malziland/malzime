@@ -171,3 +171,50 @@ describe("Kein Widerspruchs-Netz mehr (entfernt 2026-08-10)", () => {
     expect(tier.hasPerson).toBe(false);
   });
 });
+
+describe("Feste Tier-Profile und der Kinderschutz-Filter", () => {
+  /* Tier-Profile sind feste Texte des Projekts und laufen nicht durch den
+     Kinderschutz-Filter (im Bild ist kein Mensch, es gibt kein Alter). Am Gerät
+     sitzt trotzdem oft ein Kind. Deshalb gilt für die festen Einträge selbst:
+     Keiner davon wäre einer, den der Filter bei einem Kind streichen würde.
+     Entscheidung vom 05.10.2026 (vorher stand in der Beast-Ansicht eine
+     Kredit-Werbung für die Tierarztrechnung). */
+  const { _istImmerVerboten, _istBeiMinderjaehrigenVerboten } = require("../minor-safety");
+  const SPRACHEN = ["de", "en"];
+  const TIERARTEN = Object.keys(require("../locales/de/animals.js").types);
+
+  test("Positivkontrolle: Die Prüfung erkennt eine Kredit-Werbung", () => {
+    expect(_istBeiMinderjaehrigenVerboten("Spar-Kredit für Tierarztrechnung", true)).toBe(true);
+    expect(_istBeiMinderjaehrigenVerboten("Installment credit for vet bill", true)).toBe(true);
+    expect(TIERARTEN).toContain("generic");
+    expect(TIERARTEN.length).toBeGreaterThan(5);
+  });
+
+  test.each(SPRACHEN)("%s: kein fester Werbe-Eintrag und kein fester Trigger würde gestrichen", (sprache) => {
+    const gestrichen = [];
+    let geprueft = 0;
+    for (const tierart of TIERARTEN) {
+      const { normalProfile, boostProfile } = buildAnimalProfiles(tierart, sprache);
+      for (const [ansicht, profil] of [
+        ["normal", normalProfile],
+        ["beast", boostProfile],
+      ]) {
+        for (const eintrag of profil.ad_targeting) {
+          geprueft++;
+          if (_istImmerVerboten(eintrag, true) || _istBeiMinderjaehrigenVerboten(eintrag, true)) {
+            gestrichen.push(`${tierart}/${ansicht}/Werbung: ${eintrag}`);
+          }
+        }
+        /* Trigger prüft der Filter nur gegen Stufe 1 und als Satz, nicht als
+           Werbe-Eintrag („eine evolutionäre Waffe“ bleibt stehen) — hier genauso. */
+        for (const eintrag of profil.manipulation_triggers) {
+          geprueft++;
+          if (_istImmerVerboten(eintrag, false)) gestrichen.push(`${tierart}/${ansicht}/Trigger: ${eintrag}`);
+        }
+      }
+    }
+    /* Es wurden wirklich Einträge geprüft, nicht leere Listen. */
+    expect(geprueft).toBeGreaterThan(TIERARTEN.length * 10);
+    expect(gestrichen).toEqual([]);
+  });
+});

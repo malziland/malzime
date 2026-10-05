@@ -58,6 +58,9 @@ const BEKANNT = {
   "repo:strukturag/libde265": meldung("GHSA-g2rg-wj66-w594", "< 0.0.1", "0.0.1"),
 };
 
+/* Die Fassung des selbst betriebenen Dienstes, wie der Hersteller sie führt. */
+const LAUFENDE_FASSUNG = { tag_name: "v2.28.0", published_at: "2026-08-27T10:00:00Z" };
+
 /* Alle Quellen leer (bis auf die bekannten Meldungen), einzelne per Überschreibung befüllt. */
 function meldungen(ueberschreibung = {}, { exifr = "7.1.3", leaflet = "1.9.4", ohneBekannte = false } = {}) {
   const daten = {
@@ -72,7 +75,7 @@ function meldungen(ueberschreibung = {}, { exifr = "7.1.3", leaflet = "1.9.4", o
     /* Der selbst betriebene Dienst: keine Meldung, und die juengste Fassung des
        Herstellers ist die, die laeuft. */
     "repo:binwiederhier/ntfy": [],
-    "fassung:binwiederhier/ntfy": { tag_name: "v2.28.0", published_at: "2026-08-27T10:00:00Z" },
+    "fassungen:binwiederhier/ntfy": [LAUFENDE_FASSUNG],
     ...ueberschreibung,
   };
   if (!ohneBekannte) {
@@ -146,9 +149,14 @@ describe("pruefe-fremd-meldungen: Grundfall", () => {
    Sicherheitsmeldungen; beobachtet wird deshalb zusaetzlich, ob es seit mehr
    als 30 Tagen eine neuere Fassung gibt. */
 describe("pruefe-fremd-meldungen: selbst betriebener Dienst (ntfy)", () => {
-  const neuere = (erschienen, tag = "v2.29.0") => ({
-    "fassung:binwiederhier/ntfy": { tag_name: tag, published_at: `${erschienen}T10:00:00Z` },
+  const fassung = (tag, erschienen, zusatz = {}) => ({
+    tag_name: tag,
+    published_at: `${erschienen}T10:00:00Z`,
+    ...zusatz,
   });
+  const liste = (...fassungen) => ({ "fassungen:binwiederhier/ntfy": fassungen });
+  /* Der Hersteller führt die laufende Fassung und eine weitere. */
+  const neuere = (erschienen, tag = "v2.29.0") => liste(fassung(tag, erschienen), LAUFENDE_FASSUNG);
 
   test("Erfolgsweg: laufende Fassung ist die juengste — gruen, und der Dienst wurde wirklich geprueft", () => {
     versionen();
@@ -221,13 +229,117 @@ describe("pruefe-fremd-meldungen: selbst betriebener Dienst (ntfy)", () => {
     expect(r.aus).toContain("BETROFFEN  ntfy 2.28.0  GHSA-ntfy-0000-0001");
   });
 
-  test.each([
-    ["Fassung des Herstellers nicht lesbar", { tag_name: "latest", published_at: "2026-08-27T10:00:00Z" }],
-    ["Erscheinungsdatum nicht lesbar", { tag_name: "v2.29.0", published_at: "irgendwann" }],
-    ["Erscheinungsdatum fehlt", { tag_name: "v2.29.0" }],
-  ])("%s: 2, nicht gruen", (_name, fassung) => {
+  /* Der Fall, für den die Beobachtung da ist: Der Hersteller veröffentlicht
+     öfter als alle 30 Tage. Gezählt wird ab der ÄLTESTEN Fassung, die neuer
+     ist als unsere — nicht ab der jüngsten, sonst begänne die Frist mit jeder
+     weiteren Fassung von vorn und der Lauf würde nie rot. */
+  test("mehrere neuere Fassungen, die jüngste erst drei Tage alt: rot, gezählt ab der ältesten", () => {
     versionen();
-    const r = lauf({ meldungenPfad: meldungen({ "fassung:binwiederhier/ntfy": fassung }) });
+    const r = lauf({
+      meldungenPfad: meldungen(
+        liste(
+          fassung("v2.31.0", "2026-09-27"),
+          fassung("v2.30.0", "2026-09-05"),
+          fassung("v2.29.0", "2026-08-30"),
+          LAUFENDE_FASSUNG
+        )
+      ),
+      heute: "2026-09-30",
+    });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("VERALTET  ntfy 2.28.0  seit 31 Tagen gibt es 2.29.0, inzwischen 2.31.0 (Frist 30 Tage)");
+  });
+
+  test("mehrere neuere Fassungen, die älteste seit GENAU 30 Tagen: noch grün", () => {
+    versionen();
+    const r = lauf({
+      meldungenPfad: meldungen(
+        liste(fassung("v2.30.0", "2026-09-27"), fassung("v2.29.0", "2026-08-31"), LAUFENDE_FASSUNG)
+      ),
+      heute: "2026-09-30",
+    });
+    expect(r.code).toBe(0);
+    expect(r.aus).not.toContain("VERALTET");
+  });
+
+  test("die Reihenfolge der Liste spielt keine Rolle", () => {
+    versionen();
+    const r = lauf({
+      meldungenPfad: meldungen(
+        liste(LAUFENDE_FASSUNG, fassung("v2.29.0", "2026-08-30"), fassung("v2.31.0", "2026-09-27"))
+      ),
+      heute: "2026-09-30",
+    });
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("seit 31 Tagen gibt es 2.29.0, inzwischen 2.31.0");
+  });
+
+  /* Die echte Veröffentlichungsfolge des Herstellers im Frühjahr 2026: zwischen
+     zwei Fassungen lagen nie mehr als 27 Tage. Wer auf 2.19.0 bleibt, hat seit
+     dem 16.03. eine neuere Fassung vor sich. */
+  test.each([
+    ["2026-04-15", 0, null],
+    ["2026-04-16", 1, "seit 31 Tagen gibt es 2.19.1, inzwischen 2.21.0"],
+    ["2026-09-26", 1, "seit 194 Tagen gibt es 2.19.1, inzwischen 2.28.0"],
+  ])("dichte Folge des Herstellers, wir bleiben auf 2.19.0, gelesen am %s: Rückgabewert %i", (heute, code, text) => {
+    versionen({ ntfy: "2.19.0" });
+    const folge = [
+      ["v2.19.0", "2026-03-15"],
+      ["v2.19.1", "2026-03-16"],
+      ["v2.19.2", "2026-03-17"],
+      ["v2.20.0", "2026-03-26"],
+      ["v2.20.1", "2026-03-27"],
+      ["v2.21.0", "2026-03-30"],
+      ["v2.22.0", "2026-04-21"],
+      ["v2.23.0", "2026-05-18"],
+      ["v2.24.0", "2026-06-04"],
+      ["v2.25.0", "2026-06-24"],
+      ["v2.26.0", "2026-07-09"],
+      ["v2.26.3", "2026-07-20"],
+      ["v2.27.0", "2026-08-04"],
+      ["v2.28.0", "2026-08-27"],
+    ];
+    const bisHeute = folge.filter(([, tag]) => tag <= heute).map(([name, tag]) => fassung(name, tag));
+    const r = lauf({ meldungenPfad: meldungen(liste(...bisHeute)), heute });
+    expect(r.code).toBe(code);
+    if (text) expect(r.aus).toContain(`VERALTET  ntfy 2.19.0  ${text} (Frist 30 Tage)`);
+    else expect(r.aus).not.toContain("VERALTET");
+  });
+
+  test("Entwürfe und Vorab-Fassungen zählen nicht", () => {
+    versionen();
+    const r = lauf({
+      meldungenPfad: meldungen(
+        liste(
+          fassung("v3.0.0", "2026-06-01", { prerelease: true }),
+          fassung("v2.29.0", "2026-06-01", { draft: true }),
+          LAUFENDE_FASSUNG
+        )
+      ),
+      heute: "2026-09-30",
+    });
+    expect(r.code).toBe(0);
+    expect(r.aus).not.toContain("VERALTET");
+  });
+
+  test.each([
+    ["Fassung des Herstellers nicht lesbar", [{ tag_name: "latest", published_at: "2026-08-27T10:00:00Z" }]],
+    [
+      "eine ältere Fassung der Liste nicht lesbar",
+      [LAUFENDE_FASSUNG, { tag_name: "nightly", published_at: "2025-01-01T10:00:00Z" }],
+    ],
+    ["Erscheinungsdatum nicht lesbar", [{ tag_name: "v2.29.0", published_at: "irgendwann" }]],
+    ["Erscheinungsdatum fehlt", [{ tag_name: "v2.29.0" }]],
+    ["Liste der Fassungen leer", []],
+    [
+      "nur Vorab-Fassungen in der Liste",
+      [{ tag_name: "v3.0.0", published_at: "2026-06-01T10:00:00Z", prerelease: true }],
+    ],
+    ["Eintrag der Liste ist kein Objekt", [LAUFENDE_FASSUNG, "v2.29.0"]],
+    ["statt einer Liste ein einzelner Eintrag", LAUFENDE_FASSUNG],
+  ])("%s: 2, nicht gruen", (_name, fassungen) => {
+    versionen();
+    const r = lauf({ meldungenPfad: meldungen({ "fassungen:binwiederhier/ntfy": fassungen }) });
     expect(r.code).toBe(2);
     expect(r.fehler).toContain("MESSUNG NICHT DURCHFUEHRBAR");
   });
@@ -529,7 +641,7 @@ describe("pruefe-fremd-meldungen: Deckung und Messfehler", () => {
 describe("pruefe-fremd-meldungen: Netzweg mit Blättern", () => {
   const API = "https://api.github.com";
   const repoUrl = (repo, seite = "") => `${API}/repos/${repo}/security-advisories?state=published&per_page=100${seite}`;
-  const fassungUrl = (repo) => `${API}/repos/${repo}/releases/latest`;
+  const fassungUrl = (repo, seite = "") => `${API}/repos/${repo}/releases?per_page=100${seite}`;
   const npmUrl = (paket, version) =>
     `${API}/advisories?ecosystem=npm&affects=${encodeURIComponent(`${paket}@${version}`)}&per_page=100`;
 
@@ -550,7 +662,7 @@ describe("pruefe-fremd-meldungen: Netzweg mit Blättern", () => {
       [repoUrl("strukturag/libde265")]: { body: [BEKANNT["repo:strukturag/libde265"]] },
       /* Der selbst betriebene Dienst: keine Meldung, juengste Fassung = laufende. */
       [repoUrl("binwiederhier/ntfy")]: { body: [] },
-      [fassungUrl("binwiederhier/ntfy")]: { body: { tag_name: "v2.28.0", published_at: "2026-08-27T10:00:00Z" } },
+      [fassungUrl("binwiederhier/ntfy")]: { body: [LAUFENDE_FASSUNG] },
     };
   }
 
@@ -596,16 +708,35 @@ describe("pruefe-fremd-meldungen: Netzweg mit Blättern", () => {
   test("neuere Fassung des Dienstes ueber den echten Netzweg: rot nach der Frist", () => {
     versionen();
     const k = karte([]);
-    k[fassungUrl("binwiederhier/ntfy")] = { body: { tag_name: "v2.29.0", published_at: "2026-08-01T10:00:00Z" } };
+    k[fassungUrl("binwiederhier/ntfy")] = {
+      body: [{ tag_name: "v2.29.0", published_at: "2026-08-01T10:00:00Z" }, LAUFENDE_FASSUNG],
+    };
     const r = netzLauf(k);
     expect(r.code).toBe(1);
-    expect(r.aus).toContain("VERALTET  ntfy 2.28.0  seit 60 Tagen gibt es 2.29.0");
+    expect(r.aus).toContain("VERALTET  ntfy 2.28.0  seit 60 Tagen gibt es 2.29.0 (Frist 30 Tage)");
   });
 
-  test("Abfrage der juengsten Fassung scheitert oder liefert Unerwartetes: 2, nicht gruen", () => {
+  test("die älteste neuere Fassung steht erst auf Seite 2 der Liste: gefunden, rot", () => {
+    versionen();
+    const k = karte([]);
+    k[fassungUrl("binwiederhier/ntfy")] = {
+      body: [{ tag_name: "v2.30.0", published_at: "2026-09-28T10:00:00Z" }],
+      link: `<${fassungUrl("binwiederhier/ntfy", "&page=2")}>; rel="next"`,
+    };
+    k[fassungUrl("binwiederhier/ntfy", "&page=2")] = {
+      body: [{ tag_name: "v2.29.0", published_at: "2026-08-01T10:00:00Z" }, LAUFENDE_FASSUNG],
+    };
+    const r = netzLauf(k);
+    expect(r.code).toBe(1);
+    expect(r.aus).toContain("VERALTET  ntfy 2.28.0  seit 60 Tagen gibt es 2.29.0, inzwischen 2.30.0 (Frist 30 Tage)");
+  });
+
+  test("Abfrage der Fassungen scheitert oder liefert Unerwartetes: 2, nicht gruen", () => {
     versionen();
     const k = karte([]);
     k[fassungUrl("binwiederhier/ntfy")] = { status: 404, body: {} };
+    expect(netzLauf(k).code).toBe(2);
+    k[fassungUrl("binwiederhier/ntfy")] = { body: {} };
     expect(netzLauf(k).code).toBe(2);
     k[fassungUrl("binwiederhier/ntfy")] = { body: [] };
     expect(netzLauf(k).code).toBe(2);

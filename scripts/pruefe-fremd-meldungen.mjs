@@ -38,8 +38,9 @@
  * Sicherheitsmeldungen — Korrekturen stehen nur in den Versionshinweisen.
  * Deshalb gilt fuer Eintraege mit `aktuell: true` zusaetzlich: Gibt es seit mehr
  * als FRIST_VERALTET_TAGE eine neuere Fassung, ist das ein offener Punkt
- * (Kennung FASSUNG-<neue Fassung>, in der Ausnahmeliste wie eine Meldung
- * zurueckstellbar).
+ * (Kennung FASSUNG-<juengste Fassung>, in der Ausnahmeliste wie eine Meldung
+ * zurueckstellbar). Gezaehlt wird ab der AELTESTEN Fassung, die neuer ist als
+ * unsere; dafuer liest der Lauf alle veroeffentlichten Fassungen.
  *
  * DECKUNG: Jeder Ordner unter public/lib und public/fonts muss hier entweder
  * beobachtet oder mit Grund als "kein ausfuehrbarer Code" gefuehrt sein. Ein
@@ -52,7 +53,7 @@
  * Einspeisepunkte fuer Tests (im Betrieb nicht gesetzt):
  *   FREMD_BASIS      Repository-Wurzel
  *   FREMD_MELDUNGEN  JSON-Datei statt Netzabfrage (Schluessel repo:…, npm:…,
- *                    npm-paket:…, fassung:…)
+ *                    npm-paket:…, fassungen:… als Liste)
  *   FREMD_AUSNAHMEN  Ausnahmedatei
  *   FREMD_HEUTE      Datum JJJJ-MM-TT statt der Systemuhr
  */
@@ -100,7 +101,8 @@ export const BIBLIOTHEKEN = {
 /* Wie lange eine neuere Fassung eines selbst betriebenen Dienstes liegen darf,
    bevor der Lauf rot wird: MEHR als so viele Tage seit ihrem Erscheinen.
    Erschienen am 27.08., gelesen am 26.09. (30 Tage): noch gruen; am 27.09.
-   (31 Tage): rot. */
+   (31 Tage): rot. Gibt es mehrere neuere Fassungen, zaehlt die AELTESTE von
+   ihnen: Seit ihrem Erscheinen gibt es eine neuere als unsere. */
 export const FRIST_VERALTET_TAGE = 30;
 export const OHNE_CODE = {
   "public/fonts/poppins": "Schriftdateien (woff2), kein ausfuehrbarer Code",
@@ -128,25 +130,41 @@ export function vergleiche(a, b) {
   return 0;
 }
 
-/* Ist unsere Fassung veraltet? `fassung` ist die juengste des Herstellers
-   ({ tag_name, published_at }). Liefert null (aktuell, oder die neuere Fassung
-   ist noch innerhalb der Frist) oder { neu, tage }. Eine unlesbare Angabe ist
-   ein Messfehler (wirft) — sie darf nie wie "aktuell" aussehen. */
-export function veraltet(unsereVersion, fassung, heute, fristTage = FRIST_VERALTET_TAGE) {
+/* Ist unsere Fassung veraltet? `fassungen` ist die Liste der veroeffentlichten
+   Fassungen des Herstellers ({ tag_name, published_at }), ohne Entwuerfe und
+   Vorab-Fassungen. Gezaehlt wird ab dem Erscheinen der AELTESTEN Fassung, die
+   neuer ist als unsere — seit diesem Tag gibt es eine neuere. Das Alter der
+   juengsten zu messen, liesse die Frist mit jeder weiteren Fassung von vorn
+   beginnen: Bei einem Hersteller, der oefter als alle 30 Tage veroeffentlicht,
+   wuerde der Lauf nie rot. Liefert null (aktuell, oder noch innerhalb der
+   Frist) oder { neu, seit, tage }: `seit` ist die aelteste neuere Fassung,
+   `neu` die juengste. Eine unlesbare Angabe ist ein Messfehler (wirft) — sie
+   darf nie wie "aktuell" aussehen; das gilt fuer JEDE Fassung der Liste. */
+export function veraltet(unsereVersion, fassungen, heute, fristTage = FRIST_VERALTET_TAGE) {
   const unsere = zerlege(unsereVersion);
-  const neu = zerlege(fassung && fassung.tag_name);
-  if (!unsere || !neu) {
-    throw new Messfehler(
-      `Fassung nicht lesbar: unsere "${unsereVersion}", Hersteller "${fassung && fassung.tag_name}"`
-    );
+  if (!unsere) throw new Messfehler(`Fassung nicht lesbar: unsere "${unsereVersion}"`);
+  if (!Array.isArray(fassungen) || fassungen.length === 0) {
+    throw new Messfehler("keine veroeffentlichte Fassung des Herstellers gelesen");
   }
-  if (vergleiche(neu, unsere) <= 0) return null;
-  const erschienen = String((fassung && fassung.published_at) || "").slice(0, 10);
-  if (!datumGueltig(erschienen) || !datumGueltig(heute)) {
-    throw new Messfehler(`Datum nicht lesbar: erschienen "${fassung && fassung.published_at}", heute "${heute}"`);
+  if (!datumGueltig(heute)) throw new Messfehler(`Datum nicht lesbar: heute "${heute}"`);
+  const neuere = [];
+  for (const fassung of fassungen) {
+    const stand = zerlege(fassung && fassung.tag_name);
+    if (!stand) throw new Messfehler(`Fassung nicht lesbar: Hersteller "${fassung && fassung.tag_name}"`);
+    if (vergleiche(stand, unsere) <= 0) continue;
+    const erschienen = String(fassung.published_at || "").slice(0, 10);
+    if (!datumGueltig(erschienen)) {
+      throw new Messfehler(`Datum nicht lesbar: erschienen "${fassung.published_at}" (${fassung.tag_name})`);
+    }
+    neuere.push({ stand, erschienen, name: String(fassung.tag_name).trim().replace(/^v/, "") });
   }
-  const tage = Math.round((Date.parse(`${heute}T00:00:00Z`) - Date.parse(`${erschienen}T00:00:00Z`)) / 86400000);
-  return tage > fristTage ? { neu: String(fassung.tag_name).trim().replace(/^v/, ""), tage } : null;
+  if (neuere.length === 0) return null;
+  const aelteste = neuere.reduce((a, b) => (b.erschienen < a.erschienen ? b : a));
+  const juengste = neuere.reduce((a, b) => (vergleiche(b.stand, a.stand) > 0 ? b : a));
+  const tage = Math.round(
+    (Date.parse(`${heute}T00:00:00Z`) - Date.parse(`${aelteste.erschienen}T00:00:00Z`)) / 86400000
+  );
+  return tage > fristTage ? { neu: juengste.name, seit: aelteste.name, tage } : null;
 }
 
 /* Bereich wie "<= 1.23.2", "<=1.1.1", ">= 1.0.16, <= 1.1.2", "< 1.18.2".
@@ -307,28 +325,21 @@ async function repoMeldungen(repo) {
   return github(`/repos/${repo}/security-advisories?state=published&per_page=100`);
 }
 
-/* Juengste veroeffentlichte Fassung des Herstellers. GitHub zaehlt hier weder
-   Entwuerfe noch Vorab-Fassungen mit. */
-async function neuesteFassung(repo) {
+/* Alle veroeffentlichten Fassungen des Herstellers, ohne Entwuerfe und
+   Vorab-Fassungen. Die ganze Liste, nicht nur die juengste: `veraltet` zaehlt
+   ab der aeltesten Fassung, die neuer ist als unsere. */
+async function fassungen(repo) {
+  let liste;
   if (festeMeldungen) {
-    const eintrag = festeMeldungen[`fassung:${repo}`];
-    if (!eintrag || typeof eintrag !== "object") throw new Messfehler(`keine Testdaten fuer fassung:${repo}`);
-    return eintrag;
+    liste = festeMeldungen[`fassungen:${repo}`];
+    if (!Array.isArray(liste)) throw new Messfehler(`keine Testdaten fuer fassungen:${repo}`);
+  } else {
+    liste = await github(`/repos/${repo}/releases?per_page=100`);
   }
-  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
-  const kopf = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
-  if (token) kopf.Authorization = `Bearer ${token}`;
-  const url = `https://api.github.com/repos/${repo}/releases/latest`;
-  let antwort;
-  try {
-    antwort = await fetch(url, { headers: kopf });
-  } catch (fehler) {
-    throw new Messfehler(`Netzfehler bei ${url}: ${fehler.message}`);
+  if (liste.some((f) => !f || typeof f !== "object")) {
+    throw new Messfehler(`Unerwartete Antwort zu den Fassungen von ${repo}`);
   }
-  if (!antwort.ok) throw new Messfehler(`GitHub antwortete ${antwort.status} auf ${url}`);
-  const daten = await antwort.json();
-  if (!daten || typeof daten.tag_name !== "string") throw new Messfehler(`Unerwartete Antwort von ${url}`);
-  return daten;
+  return liste.filter((f) => f.draft !== true && f.prerelease !== true);
 }
 
 /* Die Advisory-Datenbank antwortet auf ein Paket, das es gar nicht gibt
@@ -501,12 +512,13 @@ async function main() {
         }
       }
       if (teil.aktuell) {
-        const stand = veraltet(version, await neuesteFassung(teil.repo), HEUTE);
+        const stand = veraltet(version, await fassungen(teil.repo), HEUTE);
         if (!stand) {
           console.log(`${teil.name} ${version}: keine neuere Fassung, die aelter als ${FRIST_VERALTET_TAGE} Tage ist`);
         } else {
+          const inzwischen = stand.neu === stand.seit ? "" : `, inzwischen ${stand.neu}`;
           const zeile =
-            `VERALTET  ${teil.name} ${version}  seit ${stand.tage} Tagen gibt es ${stand.neu} ` +
+            `VERALTET  ${teil.name} ${version}  seit ${stand.tage} Tagen gibt es ${stand.seit}${inzwischen} ` +
             `(Frist ${FRIST_VERALTET_TAGE} Tage)`;
           const ausnahme = gueltigeAusnahme(`FASSUNG-${stand.neu}`, teil.name, version);
           if (ausnahme) {

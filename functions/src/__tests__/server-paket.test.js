@@ -434,6 +434,65 @@ describe("Server-Paket: der Waechter sieht, was die Liste nicht kennt", () => {
   });
 });
 
+describe("Server-Paket: ohne Liste kein Fingerabdruck", () => {
+  /* Der Erzeuger holt die Liste vom Waechter. Laesst sie sich nicht bilden,
+     darf er keinen Fingerabdruck schreiben, in dem das Server-Paket fehlt oder
+     nur zum Teil steht — die Auslieferung haelt dann an (deploy.sh bricht ab,
+     wenn der Erzeuger scheitert). */
+  let stand;
+  const zielDatei = () => path.join(stand, "public", "build-info.json");
+
+  /** Der Erzeuger im Wegwerf-Verzeichnis, mit eigener Umgebung. */
+  function erzeuger(umgebung) {
+    try {
+      const ausgabe = execFileSync(process.execPath, [path.join(stand, "scripts", "build-info.mjs"), "2026010101"], {
+        cwd: stand,
+        encoding: "utf8",
+        stdio: "pipe",
+        env: { ...process.env, NODE_PATH: MODULE, ...umgebung },
+      });
+      return { code: 0, ausgabe };
+    } catch (e) {
+      return { code: e.status, ausgabe: `${e.stdout || ""}${e.stderr || ""}` };
+    }
+  }
+
+  beforeEach(() => {
+    stand = pruefstand();
+  }, 60000);
+
+  test("Messmittel-Probe: im unveraenderten Wegwerf-Stand schreibt der Erzeuger den Fingerabdruck", () => {
+    expect(fs.existsSync(zielDatei())).toBe(false);
+    const r = erzeuger({});
+    expect(r.code).toBe(0);
+    expect(Object.keys(JSON.parse(fs.readFileSync(zielDatei(), "utf8")).serverPaket).length).toBeGreaterThan(20);
+  });
+
+  test("der Waechter kann die Muster nicht auswerten (minimatch fehlt): Rueckgabewert 2, keine Datei", () => {
+    const r = erzeuger({ NODE_PATH: "" });
+    expect(r.code).toBe(2);
+    expect(r.ausgabe).toMatch(/Die Dateiliste des Server-Pakets liess sich nicht bilden/);
+    expect(r.ausgabe).toMatch(/NICHT MESSBAR: minimatch/);
+    expect(fs.existsSync(zielDatei())).toBe(false);
+  });
+
+  test("firebase.json nennt keinen Ordner fuer das Server-Paket: Rueckgabewert 2, keine Datei", () => {
+    mitListe(stand, (f) => delete f.source);
+    const r = erzeuger({});
+    expect(r.code).toBe(2);
+    expect(r.ausgabe).toMatch(/functions\.source/);
+    expect(fs.existsSync(zielDatei())).toBe(false);
+  });
+
+  test("die Liste schloesse alles aus: Rueckgabewert 2, keine Datei", () => {
+    mitListe(stand, (f) => f.ignore.push("*"));
+    const r = erzeuger({});
+    expect(r.code).toBe(2);
+    expect(r.ausgabe).toMatch(/Die Dateiliste des Server-Pakets liess sich nicht bilden/);
+    expect(fs.existsSync(zielDatei())).toBe(false);
+  });
+});
+
 describe("Server-Paket: Form der Muster in firebase.json", () => {
   const liste = JSON.parse(fs.readFileSync(path.join(WURZEL, "firebase.json"), "utf8")).functions.ignore;
 

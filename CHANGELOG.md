@@ -11,12 +11,12 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 ### Behoben — Kinderschutz
 
 - **Werbe-Ideen zu Alkohol, Waffen und Co. werden verlässlicher gestrichen.**
-  Der Filter für Werbe-Kärtchen kennt jetzt die gängigen Wörter seiner Themen
+  Der Filter für Werbe-Kärtchen kennt jetzt deutlich mehr Wörter seiner Themen
   in Deutsch und Englisch — auch in Zusammensetzungen („Pornoseite“,
-  „Waffenladen“, „Wettbüro“) und in anderer Schreibweise („Only Fans“,
-  „Sex-Shop“). Bei Kindern und Jugendlichen verschwinden damit Kärtchen wie
-  „Jägermeister“, „Teilzahlung“ oder „Interwetten“, bei allen solche wie
-  „Softair-Pistole“.
+  „Waffenladen“, „Wettbüro“), mit Bindestrich („Soft-Air“, „Sex-Spielzeug“)
+  und getrennt geschrieben („Only Fans“, „Pfeffer Spray“). Bei Kindern und
+  Jugendlichen verschwinden damit Kärtchen wie „Jägermeister“, „Teilzahlung“
+  oder „Interwetten“, bei allen solche wie „Softair-Pistole“.
 - **Werbe-Ideen zu Drogen werden bei Kindern und Jugendlichen gestrichen** —
   so wie Alkohol: „Cannabis“, „CBD-Shop“, „Lachgas“, „Kokain“. Bei Erwachsenen
   bleiben sie stehen. Auch die Anweisung an die KI verbietet solche Werbung
@@ -24,17 +24,24 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   Stelle, an der sie bisher nicht genannt war.
 - **Harmlose Wörter bleiben stehen.** „Wetter“ ist keine Wette, „Insekt“ kein
   Sekt, „Waffel“ keine Waffe, „Rumänien“ kein Rum, „Drogerie“ keine Droge;
-  „Wasserpistole“ und „Heißklebepistole“ sind keine Waffen-Werbung. Auch
-  frühere Fehlgriffe sind weg: „Glocke“, „Klarname“ und „Terrorvogel“ wurden
-  bisher mitgefangen.
+  „Wasserpistole“ und „Heißklebepistole“ sind keine Waffen-Werbung, „Diet
+  Coke“ ist keine Diät. Auch frühere Fehlgriffe sind weg: „Glocke“, „Klarname“
+  und „Terrorvogel“ wurden bisher mitgefangen.
 - **Steht das Alter eines Kindes hinter „ca.“ oder nur als Wort da** („ein
   Mädchen“, „Volksschulkind“), greift der Schutz für Kinder jetzt ebenfalls.
-  Nennt die KI das Alter nicht am Anfang der Alterskarte, gilt es als nicht
-  lesbar: Der Schutz greift, und die Karte zeigt den festen Hinweis statt
-  einer Zahl.
-- Der Filter bleibt eine Wortliste: Was nicht in ihr steht, erkennt er nicht.
-  Für die Auswertung: Die Zähler des Kinderschutz-Protokolls sind mit Zahlen
-  vor dieser Fassung nicht vergleichbar, weil die Liste mehr Wörter kennt.
+  Nennt die KI im ersten Satz der Alterskarte kein lesbares Alter, schreibt
+  aber irgendwo in der Karte ein Alter, ein Wort für ein Kind oder eine
+  ungefähre kleine Zahl („etwa 13“), gilt das Alter als nicht lesbar: Der
+  Schutz greift, und die Karte zeigt den festen Hinweis statt einer Zahl.
+  Nennt die Karte nichts dergleichen, wird wie bisher nicht gefiltert.
+- **Der Alarm „Kinderschutz-Treffer“ hört im Text des Profils auf mehr
+  eindeutige Wörter als bisher** und kann deshalb häufiger kommen.
+  Redewendungen („wieder wett“, „deine Droge“, „alkoholfrei“) lösen weder ihn
+  noch den Zähler aus.
+- Der Filter bleibt eine Wortliste: Was nicht in ihr steht, erkennt er nicht —
+  mehrdeutige Wörter wie „Messer“, „Gras“ oder „Corona“ stehen bewusst nicht
+  darin. Für die Auswertung: Die Zähler des Kinderschutz-Protokolls sind mit
+  Zahlen vor dieser Fassung nicht vergleichbar, weil die Liste mehr Wörter kennt.
 
 ### Behoben — Datenschutz
 

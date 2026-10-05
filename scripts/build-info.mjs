@@ -8,9 +8,10 @@
  * in dem Teil, den jeder herunterladen kann.
  *
  * Erzeugt `public/build-info.json` mit Commit, Zeitpunkt, Cache-Buster und
- * einer SHA-256-Pruefsumme jeder ausgelieferten Datei. Wer wissen will, ob
- * malzi.me wirklich diesen Stand ausliefert, rechnet es mit
- * scripts/pruefe-live.sh nach.
+ * einer SHA-256-Pruefsumme jeder ausgelieferten Datei — der Website (Feld
+ * `dateien`) und des Server-Pakets, das zu Google geht (Feld `serverPaket`).
+ * Wer wissen will, ob malzi.me wirklich diesen Stand ausliefert, rechnet es
+ * mit scripts/pruefe-live.sh nach.
  *
  * WICHTIG: Muss NACH der Cache-Buster-Ersetzung laufen. Sonst stehen in der
  * Datei die Pruefsummen des Zustands VOR der Ersetzung, und jede Nachpruefung
@@ -125,41 +126,65 @@ for (const rel of dateien) {
   summen[rel] = pruefsumme(voll);
 }
 
-/* ── Server-Code ───────────────────────────────────────────────────────────
-   Bis 2026-08-18 nannte der Fingerabdruck den Server-Teil nur ueber den
-   Commit. Das genuegt, solange die Auslieferung sauber an einen
-   veroeffentlichten Stand gebunden ist — genau diese Bindung laesst sich aber
-   mit SKIP_STAND=1 umgehen. Dann waere die Commit-Angabe irrefuehrend, ohne
-   dass es jemand sehen koennte.
-   Mit Pruefsummen ueber functions/src/ ist auch der Server-Teil Datei fuer
-   Datei festgenagelt: Wer das Repository hat, rechnet nach, ob der Code darin
-   byte-genau der ist, aus dem ausgeliefert wurde.
+/* ── Server-Paket ──────────────────────────────────────────────────────────
+   Der Fingerabdruck nennt JEDE Datei, die als Server-Paket zu Google geht —
+   das Programm unter functions/src/ ebenso wie package.json und
+   package-lock.json (sie legen fest, welche Fremdpakete Google beim Bau
+   einsetzt) und die Sprachliste, die das Programm beim Start liest.
+
+   Welche Dateien das sind, bestimmt `functions.ignore` in firebase.json. Die
+   Liste dazu bildet der Waechter des Server-Pakets nach den Regeln des
+   Werkzeugs; hier wird sie von ihm GEHOLT, nicht ein zweites Mal aufgezaehlt.
+   Zwei Aufzaehlungen laufen auseinander: Bis zum 05.10.2026 stand hier eine
+   eigene (nur .js-Dateien unter functions/src/) — drei Dateien des Pakets
+   fehlten im Fingerabdruck, und keine Pruefung sah eine Aenderung an ihnen.
+
+   Die Pfade sind relativ zum Quellordner des Pakets (functions/).
+   scripts/pruefe-live.sh rechnet jede Datei gegen den Inhalt des genannten
+   Commits nach und bildet die Liste dafuer selbst aus dem Commit.
+
    Was das WEITERHIN nicht beweist: dass Google genau diesen Code ausfuehrt.
    Diese Grenze bleibt und wird auch so benannt. */
-const SERVER = join(WURZEL, "functions", "src");
-function serverDateienSammeln(ordner, gesammelt = []) {
-  for (const e of readdirSync(ordner, { withFileTypes: true })) {
-    const voll = join(ordner, e.name);
-    /* Tests und Testdaten laufen nicht im Betrieb — sie gehoeren nicht in
-       eine Aussage darueber, was ausgeliefert wurde. */
-    if (e.isDirectory()) {
-      if (e.name === "__tests__" || e.name === "node_modules") continue;
-      serverDateienSammeln(voll, gesammelt);
-      continue;
-    }
-    if (!e.name.endsWith(".js")) continue;
-    gesammelt.push(relative(SERVER, voll));
+function serverQuelle() {
+  let konfig;
+  try {
+    konfig = JSON.parse(readFileSync(join(WURZEL, "firebase.json"), "utf8"));
+  } catch (err) {
+    fehler(`firebase.json nicht lesbar: ${err.message}`);
   }
-  return gesammelt.sort();
+  const server =
+    Array.isArray(konfig.functions) && konfig.functions.length === 1 ? konfig.functions[0] : konfig.functions;
+  if (!server || Array.isArray(server) || typeof server.source !== "string" || !server.source) {
+    fehler("firebase.json nennt kein (einzelnes) functions.source — der Ordner des Server-Pakets ist unbekannt.");
+  }
+  return server.source;
 }
 
-const serverDateien = serverDateienSammeln(SERVER);
-if (serverDateien.length === 0) {
-  fehler("Keine Dateien unter functions/src/ gefunden — das kann nicht stimmen.");
+function serverPaketliste() {
+  let ausgabe;
+  try {
+    ausgabe = execFileSync(
+      process.execPath,
+      [join(WURZEL, "scripts", "pruefe-auslieferbare-reste.mjs"), "--paketliste"],
+      { cwd: WURZEL, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+    );
+  } catch (err) {
+    fehler(
+      "Die Dateiliste des Server-Pakets liess sich nicht bilden " +
+        `(scripts/pruefe-auslieferbare-reste.mjs --paketliste): ${String(err.stderr || err.message).trim()}`
+    );
+  }
+  return ausgabe.split("\n").filter(Boolean);
 }
-const serverSummen = {};
-for (const rel of serverDateien) {
-  serverSummen[rel] = pruefsumme(join(SERVER, rel));
+
+const SERVER = join(WURZEL, serverQuelle());
+const paketDateien = serverPaketliste();
+if (paketDateien.length === 0) {
+  fehler("Das Server-Paket enthielte keine einzige Datei — das kann nicht stimmen.");
+}
+const paketSummen = {};
+for (const rel of paketDateien) {
+  paketSummen[rel] = pruefsumme(join(SERVER, rel));
 }
 
 const jetzt = new Date();
@@ -188,11 +213,11 @@ const inhalt = {
   cacheBuster: version,
   ausgeliefertAm: jetzt.toISOString(),
   dateien: summen,
-  serverDateien: serverSummen,
+  serverPaket: paketSummen,
 };
 
 writeFileSync(ZIEL, JSON.stringify(inhalt, null, 2) + "\n", "utf8");
 console.log(
   `  build-info.json geschrieben: ${Object.keys(summen).length} Website-Dateien + ` +
-    `${Object.keys(serverSummen).length} Server-Dateien, Commit ${inhalt.commitKurz}`
+    `${Object.keys(paketSummen).length} Dateien des Server-Pakets, Commit ${inhalt.commitKurz}`
 );

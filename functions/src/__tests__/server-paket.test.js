@@ -6,18 +6,27 @@
  * Liste, geht der ganze Ordner mit: Tests, Hilfsskripte, ein alter
  * Abdeckungsbericht und jede `.env`-Datei, die dort gerade liegt.
  *
- * Diese Datei haelt fest, was im Paket sein darf: genau die Programmdateien,
- * die auch der Fingerabdruck (`public/build-info.json`, Feld `serverDateien`)
- * ausweist, dazu die zwei Dateien, aus denen Google die Fremdpakete
- * installiert. Mehr nicht — und auch nicht weniger, sonst startet das Programm
- * nach der Auslieferung nicht.
+ * Diese Datei haelt fest, was im Paket sein darf: die Programmdateien, dazu
+ * die zwei Dateien, aus denen Google die Fremdpakete installiert, und die
+ * Sprachliste, die das Programm beim Start liest. Mehr nicht — und auch nicht
+ * weniger, sonst startet das Programm nach der Auslieferung nicht.
  *
- * WIE GEMESSEN WIRD: Beide Listen entstehen aus den ECHTEN Skripten, in einem
+ * Und sie haelt fest, dass der Fingerabdruck (`public/build-info.json`, Feld
+ * `serverPaket`) GENAU diese Dateien ausweist, jede mit ihrer Pruefsumme —
+ * und dass die oeffentliche Nachpruefung dieselbe Liste aus dem Commit bildet.
+ * Drei Stellen, eine Liste: was zu Google geht, was die Seite ausweist, was
+ * ein Dritter nachrechnet.
+ *
+ * WIE GEMESSEN WIRD: Alle drei entstehen aus den ECHTEN Skripten, in einem
  * Wegwerf-Verzeichnis mit einer Kopie des eingecheckten Standes:
- *   · der Fingerabdruck aus `scripts/build-info.mjs`,
  *   · die Paketliste aus `scripts/pruefe-auslieferbare-reste.mjs --paketliste`,
  *     das den Dateilauf des Werkzeugs nachbildet (firebase-tools, fsAsync.js:
- *     minimatch mit matchBase und dot auf den vollen Pfad).
+ *     minimatch mit matchBase und dot auf den vollen Pfad),
+ *   · der Fingerabdruck aus `scripts/build-info.mjs` (holt die Liste vom
+ *     Waechter),
+ *   · die Nachpruefung aus `scripts/pruefe-live.sh` (bildet die Liste selbst
+ *     aus dem Commit, ohne Installation — eine curl-Attrappe liefert ihr die
+ *     Dateien aus dem Wegwerf-Verzeichnis).
  * Eine Kopie der Regeln hier im Test liefe auseinander, ohne dass es jemand
  * merkt. Kein Netz, kein Deploy, keine Schreibzugriffe im Projekt.
  *
@@ -28,10 +37,12 @@
  * (siehe "Form der Muster").
  */
 
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const { curlLiveAttrappeAnlegen } = require("./hilfen/curl-live-attrappe");
 
 const WURZEL = path.join(__dirname, "../../..");
 const FUNCTIONS = path.join(WURZEL, "functions");
@@ -41,10 +52,9 @@ const MODULE = path.join(FUNCTIONS, "node_modules");
 
 /* Was der Bau bei Google zusaetzlich zum Programm braucht. */
 const BAU = ["package.json", "package-lock.json"];
-/* Was das Programm beim Start liest, der Fingerabdruck aber nicht fuehrt: Er
-   nennt nur .js-Dateien. `i18n.js` liest diese Datei beim Laden — fehlte sie
-   im Paket, startete keine einzige Funktion. */
-const LAUFZEIT_OHNE_FINGERABDRUCK = ["src/locales/manifest.json"];
+/* Was das Programm beim Start von der Platte liest: `i18n.js` liest diese
+   Datei beim Laden — fehlte sie im Paket, startete keine einzige Funktion. */
+const LAUFZEIT = ["src/locales/manifest.json"];
 
 /* Was auf einem Auslieferungsrechner unter functions/ liegen kann und NICHT
    ins Paket darf. Jede Zeile ist ein Fall, den die Liste abdecken muss. */
@@ -89,6 +99,7 @@ function pruefstand() {
     ".gitignore",
     "scripts/build-info.mjs",
     "scripts/pruefe-auslieferbare-reste.mjs",
+    "scripts/pruefe-live.sh",
   ]) {
     kopiere(rel);
   }
@@ -139,14 +150,30 @@ function paketliste(stand) {
   return r.ausgabe.split("\n").filter(Boolean);
 }
 
-/** Die Server-Dateien, die der Fingerabdruck ausweist — als Pfade im Paket. */
+/** Was der Fingerabdruck als Server-Paket ausweist: Pfad im Paket → Pruefsumme. */
 function fingerabdruck(stand) {
   const r = lauf(stand, "build-info.mjs", "2026010101");
   if (r.code !== 0) throw new Error(`Fingerabdruck nicht erzeugbar (Code ${r.code}): ${r.ausgabe}`);
   const info = JSON.parse(fs.readFileSync(path.join(stand, "public", "build-info.json"), "utf8"));
-  return Object.keys(info.serverDateien)
-    .map((datei) => `src/${datei}`)
-    .sort();
+  if (!info.serverPaket) throw new Error("Der Fingerabdruck nennt kein Feld serverPaket.");
+  return info.serverPaket;
+}
+
+/** Die oeffentliche Nachpruefung gegen den Stand im Wegwerf-Verzeichnis: Als
+ *  "ausgeliefert" gilt dessen Ordner public/ samt dem eben erzeugten Fingerabdruck. */
+function nachpruefung(stand) {
+  const attrappe = curlLiveAttrappeAnlegen(path.join(stand, ".attrappe"));
+  try {
+    const aus = execFileSync("sh", ["scripts/pruefe-live.sh"], {
+      cwd: stand,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, PATH: `${attrappe}:${process.env.PATH}`, ATTRAPPE_LIVE: path.join(stand, "public") },
+    });
+    return { code: 0, aus };
+  } catch (e) {
+    return { code: e.status, aus: `${e.stdout || ""}${e.stderr || ""}` };
+  }
 }
 
 /** Legt Dateien unter functions/ des Wegwerf-Verzeichnisses an. */
@@ -173,27 +200,66 @@ afterAll(() => {
 describe("Server-Paket: Umfang am eingecheckten Stand", () => {
   let stand;
   let paket;
-  let programm;
+  let ausgewiesen;
 
   beforeAll(() => {
     stand = pruefstand();
     paket = paketliste(stand);
-    programm = fingerabdruck(stand);
+    ausgewiesen = fingerabdruck(stand);
   }, 60000);
 
   test("beide Messungen sehen das Programm (Positivkontrolle)", () => {
     /* Eine leere oder verfehlte Liste liesse jeden Vergleich unten gruen. */
-    expect(programm).toContain("src/index.js");
-    expect(programm.length).toBeGreaterThan(20);
+    expect(Object.keys(ausgewiesen)).toContain("src/index.js");
+    expect(Object.keys(ausgewiesen).length).toBeGreaterThan(20);
     expect(paket).toContain("src/index.js");
   });
 
-  test("im Paket liegt genau das Programm aus dem Fingerabdruck, dazu die Bau-Dateien", () => {
-    const soll = [...programm, ...BAU, ...LAUFZEIT_OHNE_FINGERABDRUCK].sort();
+  test("der Fingerabdruck weist genau die Dateien des Pakets aus — keine fehlt, keine ist zu viel", () => {
+    /* Die Datenschutzerklaerung sagt, der Programmcode, der zu Google geht,
+       stehe im Fingerabdruck, Datei fuer Datei. Das gilt nur, wenn beide
+       Listen dieselbe sind — auch fuer package.json, package-lock.json und die
+       Sprachliste, die keine Programmdateien sind. */
+    expect(Object.keys(ausgewiesen).sort()).toEqual(paket);
+    for (const datei of [...BAU, ...LAUFZEIT]) expect(Object.keys(ausgewiesen)).toContain(datei);
+  });
+
+  test("jede Pruefsumme im Fingerabdruck ist die der Datei, die ins Paket ginge", () => {
+    const falsch = paket.filter((rel) => {
+      const inhalt = fs.readFileSync(path.join(stand, "functions", rel));
+      return ausgewiesen[rel] !== `sha256:${crypto.createHash("sha256").update(inhalt).digest("hex")}`;
+    });
+    expect(falsch).toEqual([]);
+  });
+
+  test("die oeffentliche Nachpruefung bildet dieselbe Liste aus dem Commit und rechnet jede Datei nach", () => {
+    /* pruefe-live.sh kennt weder npm noch minimatch; es liest functions.ignore
+       aus der firebase.json des Commits und wertet die Muster selbst aus.
+       Wiche seine Liste von der des Waechters ab, meldete es hier eine Datei
+       als fehlend oder als fremd. */
+    const r = nachpruefung(stand);
+    expect(r.aus).not.toMatch(/FEHLT|NICHT IM COMMIT|ABWEICHUNG|MESSPROBLEM/);
+    expect(r.aus).toMatch(
+      new RegExp(`Server-Paket: ${paket.length} Datei\\(en\\) gegen Commit [0-9a-f]{40} geprueft\\.`)
+    );
+    expect(r.aus).toMatch(/Der ausgelieferte Stand entspricht Commit [0-9a-f]{40}\./);
+    expect(r.code).toBe(0);
+  });
+
+  test("im Paket liegen nur Programmdateien, die zwei Bau-Dateien und die Sprachliste", () => {
     /* Zwei Richtungen in einer Zusicherung: Eine Datei zu viel (Test,
        Hilfsskript, Konfiguration fuer Werkzeuge) faellt ebenso auf wie eine
        zu wenig (das Programm startete nicht). */
-    expect(paket).toEqual(soll);
+    const keinProgramm = paket.filter((rel) => !(rel.startsWith("src/") && rel.endsWith(".js")));
+    expect(keinProgramm).toEqual([...BAU, ...LAUFZEIT].sort());
+  });
+
+  test("die Testwerte gehen nicht mit — das Programm laedt sie nicht", () => {
+    /* `src/test-satz.js` liegt neben dem Programm, weil die Tests und die
+       lokalen Werkzeuge sie dort suchen. Geladen wird sie von keiner
+       Programmdatei (der Test darunter laedt das Paket ohne sie). */
+    expect(paket).not.toContain("src/test-satz.js");
+    expect(fs.existsSync(path.join(stand, "functions", "src", "test-satz.js"))).toBe(true);
   });
 
   test("keine Testdatei, keine Umgebungsdatei, kein Hilfsskript", () => {

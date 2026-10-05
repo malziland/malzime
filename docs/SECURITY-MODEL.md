@@ -173,9 +173,12 @@ Commit wie die Entscheidung.
 ## Umfang des Server-Pakets (seit 2026-10-03)
 
 **Entscheidung.** Zu Google geht beim Ausliefern nur das Programm: die Dateien unter
-`functions/src/` (ohne Tests), `package.json` und `package-lock.json`. Testdateien,
-Hilfsskripte, Abdeckungsberichte und jede Punkt-Datei (also auch `.env*`) bleiben auf dem
-Auslieferungsrechner (`functions.ignore` in `firebase.json`).
+`functions/src/` (ohne Tests und ohne die Testwerte `test-satz.js`), `package.json` und
+`package-lock.json`. Testdateien, Hilfsskripte, Abdeckungsberichte und jede Punkt-Datei
+(also auch `.env*`) bleiben auf dem Auslieferungsrechner (`functions.ignore` in
+`firebase.json`). Im Paket liegt auch die Attrappe der KI-Anbindung (`mistral-mock.js`):
+Das Programm nennt sie in `job-helfer.js` und lädt sie nur, wenn der Schalter für lokale
+Läufe gesetzt ist — der wirkt in der Produktion nie (Punkt 3 unten).
 
 **Begründung.** Ohne diese Liste lädt die Firebase-CLI den ganzen Ordner hoch, und
 `functions/.env` oder `functions/.env.<projekt>` setzt sie als Einstellung an jede Function —
@@ -195,8 +198,28 @@ an keinem Dienst einer der vier Namen gesetzt ist.
 
 **Grenze.** Der Notweg „Hebel 4" im Betriebshandbuch (`firebase deploy` aus einem frischen
 Arbeitsverzeichnis) läuft an `deploy.sh` vorbei; dort gilt nur die Liste in `firebase.json`.
-Der Fingerabdruck (`build-info.json`) nennt die `.js`-Dateien unter `functions/src/`, nicht
-`package.json`, `package-lock.json` und `locales/manifest.json`.
+
+**Fingerabdruck.** Seit 05.10.2026 weist der Fingerabdruck (`build-info.json`, Feld
+`serverPaket`) JEDE Datei des Server-Pakets mit ihrer Prüfsumme aus — auch `package.json`
+und `package-lock.json` (sie legen fest, welche Fremdpakete Google beim Bau einsetzt) und
+die Sprachliste `locales/manifest.json`. Die Liste dafür holt der Erzeuger
+(`scripts/build-info.mjs`) vom Wächter des Server-Pakets; es gibt keine zweite Aufzählung.
+`functions/src/__tests__/server-paket.test.js` hält fest, dass Paketliste und Fingerabdruck
+dieselben Dateien nennen. Die öffentliche Nachprüfung (`scripts/pruefe-live.sh`) bildet die
+Liste selbst aus dem genannten Commit (`functions.ignore` der `firebase.json` dieses
+Commits) und rechnet jede Datei gegen dessen Inhalt; eine Paketdatei, die der Fingerabdruck
+weglässt, ist ein Befund. Der Riegel „Website allein" in `scripts/deploy.sh` vergleicht
+dasselbe Feld mit dem, das die Seite ausweist.
+*Ältere Form:* Stände, die vor diesem Datum ausgeliefert wurden, nennen vom Server nur die
+`.js`-Dateien unter `functions/src/` (Feld `serverDateien`). Die Nachprüfung rechnet sie
+mit der Liste von damals nach; welche Form ein Stand schuldet, liest sie aus dem Commit
+(ob dessen Erzeuger das neue Feld schreibt), nicht aus dem Fingerabdruck — sonst genügte
+es, das neue Feld wegzulassen. Der Riegel „Website allein" wertet eine Seite in der
+älteren Form als „Server-Paket geändert" und verlangt die Auslieferung von Website und
+Server zusammen.
+*Grenze:* Belegt ist damit, welche Dateien an Google übergeben wurden und dass sie dem
+genannten Commit entsprechen. Welche Fassungen der Fremdpakete Google beim Bau daraus
+installiert und was dort ausgeführt wird, kann von außen niemand nachrechnen.
 
 ## Restrisiko: Der Alarmweg kann sich nicht selbst überwachen (seit 2026-08-12)
 

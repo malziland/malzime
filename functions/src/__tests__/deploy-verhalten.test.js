@@ -103,7 +103,12 @@ function fingerabdruckDesKlons() {
   const datei = path.join(klon, "public", "build-info.json");
   const vorher = fs.readFileSync(datei, "utf8");
   try {
-    execFileSync("node", ["scripts/build-info-echt.mjs", "2026010101"], { cwd: klon, stdio: "pipe" });
+    /* Der Erzeuger holt die Liste des Server-Pakets vom Waechter, und der braucht minimatch. */
+    execFileSync("node", ["scripts/build-info-echt.mjs", "2026010101"], {
+      cwd: klon,
+      stdio: "pipe",
+      env: { ...process.env, NODE_PATH: MODULE },
+    });
     return fs.readFileSync(datei, "utf8");
   } finally {
     fs.writeFileSync(datei, vorher);
@@ -202,8 +207,8 @@ function skripteEinspielen() {
      es, muss der Deploy anhalten (Befund Runde 6). Im Klon laeuft das ECHTE
      Skript — es liest nur Dateien und git, keinen Dienst —, und zwar hinter
      einer Huelle, die auf Kommando scheitert. Eine Attrappe, die irgendetwas
-     in die Datei schreibt, genuegte nicht mehr: deploy.sh vergleicht die
-     Server-Dateien des neuen Fingerabdrucks mit denen, die die Seite ausweist
+     in die Datei schreibt, genuegte nicht mehr: deploy.sh vergleicht das
+     Server-Paket des neuen Fingerabdrucks mit dem, das die Seite ausweist
      (ARCH-2026-10-03-10, Gegenrichtung). */
   const bi = path.join(klon, "scripts", "build-info.mjs");
   if (fs.existsSync(bi)) {
@@ -218,7 +223,7 @@ function skripteEinspielen() {
         'if (process.env.ATTRAPPE_BUILDINFO_OHNE_SERVER === "1") {\n' +
         '  const { readFileSync, writeFileSync } = await import("fs");\n' +
         '  const f = JSON.parse(readFileSync("public/build-info.json", "utf8"));\n' +
-        "  delete f.serverDateien;\n" +
+        "  delete f.serverPaket;\n" +
         '  writeFileSync("public/build-info.json", JSON.stringify(f, null, 2) + "\\n");\n}\n'
     );
   }
@@ -1657,7 +1662,7 @@ describe("deploy.sh — die Website geht nur allein hinaus, wenn der Server-Code
       const r = deployMitProtokoll();
       expect(r.code).not.toBe(0);
       expect(r.ausgabe).toMatch(MELDUNG);
-      expect(r.ausgabe).toMatch(/^\s+config\.js \(geaendert\)$/m);
+      expect(r.ausgabe).toMatch(/^\s+src\/config\.js \(geaendert\)$/m);
       /* Genau diese eine Meldung — nicht zusaetzlich die einer gescheiterten
          Messung. Gemessen ist hier ja etwas: eine Abweichung. */
       expect(r.ausgabe).not.toMatch(/nicht gemessen|liess sich nicht ausfuehren/);
@@ -1723,11 +1728,58 @@ describe("deploy.sh — die Website geht nur allein hinaus, wenn der Server-Code
         const r = deployMitProtokoll();
         expect(r.code).not.toBe(0);
         expect(r.ausgabe).toMatch(MELDUNG);
-        expect(r.ausgabe).toMatch(/^\s+animal\.js \(entfaellt\)$/m);
-        expect(r.ausgabe).toMatch(/^\s+probe-neu\.js \(neu\)$/m);
+        expect(r.ausgabe).toMatch(/^\s+src\/animal\.js \(entfaellt\)$/m);
+        expect(r.ausgabe).toMatch(/^\s+src\/probe-neu\.js \(neu\)$/m);
         expect(r.uploads).toEqual([]);
       }
     );
+  });
+
+  test.each([
+    ["package.json (welche Fremdpakete Google beim Bau einsetzt)", "package.json"],
+    ["package-lock.json (in welcher Fassung)", "package-lock.json"],
+    ["die Sprachliste, die das Programm beim Start liest", "src/locales/manifest.json"],
+  ])("auch %s gehoert zum Server-Paket: geaendert, Ziel `hosting` → Abbruch", (_was, datei) => {
+    /* Keine dieser drei ist eine Programmdatei unter functions/src/*.js — und
+       jede geht zu Google. Aendert sich eine, ohne dass der Server mit
+       ausgeliefert wird, wiese die Seite ein Paket aus, das nie hinausging. */
+    mitNeuemStand(
+      () => fs.appendFileSync(path.join(klon, "functions", datei), "\n"),
+      () => {
+        const r = deployMitProtokoll();
+        expect(r.code).not.toBe(0);
+        expect(r.ausgabe).toMatch(MELDUNG);
+        expect(r.ausgabe).toContain(`${datei} (geaendert)`);
+        expect(r.ausgabe).not.toMatch(/nicht gemessen|liess sich nicht ausfuehren|aelteren Form/);
+        expect(r.uploads).toEqual([]);
+        expect(fingerabdruckAbfragen(r.aufrufe)).toHaveLength(1);
+        expect(baumOffen()).toBe("");
+      }
+    );
+  });
+
+  test("die Seite weist ihren Server noch in der aelteren Form aus: das Paket gilt als geaendert — Abbruch", () => {
+    /* Bis zum 05.10.2026 nannte der Fingerabdruck nur die Programmdateien
+       (Feld serverDateien). Daran laesst sich nicht messen, ob package.json,
+       package-lock.json oder die Sprachliste seither anders sind. "Nicht
+       vergleichbar" darf nicht wie "unveraendert" enden. */
+    const vorher = kennung();
+    const aeltereForm = JSON.stringify({
+      commitKurz: "abc1234",
+      dateien: { "app.js": "sha256:00" },
+      serverDateien: { "index.js": "sha256:00", "config.js": "sha256:00" },
+    });
+    const r = deployMitProtokoll({ ATTRAPPE_FINGERABDRUCK_ANTWORT: aeltereForm });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Server-Paket gilt als geaendert — ohne Argument ausliefern/);
+    expect(r.ausgabe).toMatch(/noch in der aelteren Form/);
+    /* Genau diese Meldung: weder "gemessen und abweichend" noch "nicht messbar". */
+    expect(r.ausgabe).not.toMatch(MELDUNG);
+    expect(r.ausgabe).not.toMatch(/ist kein Fingerabdruck|war nicht erreichbar/);
+    expect(r.uploads).toEqual([]);
+    expect(fingerabdruckAbfragen(r.aufrufe)).toHaveLength(1);
+    expect(kennung()).toBe(vorher);
+    expect(baumOffen()).toBe("");
   });
 
   test("eine einzelne Function im Ziel zaehlt nicht als Auslieferung des Servers", () => {
@@ -1781,7 +1833,7 @@ describe("deploy.sh — die Website geht nur allein hinaus, wenn der Server-Code
     ],
     [
       "die Liste der Server-Dateien der Seite ist leer",
-      { ATTRAPPE_FINGERABDRUCK_ANTWORT: '{"commitKurz":"abc1234","serverDateien":{}}' },
+      { ATTRAPPE_FINGERABDRUCK_ANTWORT: '{"commitKurz":"abc1234","serverPaket":{}}' },
       /build-info\.json ist kein Fingerabdruck mit Server-Dateien/,
       /war nicht erreichbar/,
     ],

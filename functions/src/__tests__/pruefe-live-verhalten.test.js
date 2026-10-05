@@ -9,6 +9,8 @@
  *
  * Hier läuft das echte Skript gegen eine nachgebaute Auslieferung, ohne Netz:
  *   · ein kleines Repository mit Website- und Server-Dateien,
+ *   · mit einem Server-Paket nach `functions.ignore` (Programm, package.json,
+ *     package-lock.json, Sprachliste, eine Datei, die kein Programm ist),
  *   · „ausgeliefert" mit dem echten scripts/build-info.mjs (Erzeuger und Prüfer
  *     müssen zusammenpassen),
  *   · eine Attrappe von curl, die Adressen auf ein Verzeichnis abbildet und bei
@@ -19,8 +21,24 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
+const { curlLiveAttrappeAnlegen } = require("./hilfen/curl-live-attrappe");
 
 const WURZEL = path.join(__dirname, "../../..");
+/* Der Erzeuger holt die Liste des Server-Pakets vom Wächter, und der braucht
+   minimatch. Das nachgebaute Repository hat keine node_modules; über NODE_PATH
+   findet er die Bibliothek trotzdem. */
+const MODULE = path.join(WURZEL, "functions", "node_modules");
+/* Was im nachgebauten Stand als Server-Paket zu Google ginge (functions.ignore
+   unten nimmt Tests, Punkt-Dateien und Protokolle heraus). */
+const PAKET = [
+  "package-lock.json",
+  "package.json",
+  "src/config.js",
+  "src/hinweis.md",
+  "src/index.js",
+  "src/locales/de/prompts.js",
+  "src/locales/manifest.json",
+];
 const GIT_UMGEBUNG = {
   ...process.env,
   GIT_AUTHOR_NAME: "Probe",
@@ -36,6 +54,7 @@ let quelle; // das "veröffentlichte" Repository
 let liveVorlage; // der unveränderte ausgelieferte Stand
 let live; // der Stand, gegen den ein Test prüft (frische Kopie je Test)
 let commitA;
+let commitAlt; // ein Stand, dessen Erzeuger den Fingerabdruck noch in der älteren Form schrieb
 
 const git = (ordner, ...args) => execFileSync("git", args, { cwd: ordner, env: GIT_UMGEBUNG, encoding: "utf8" }).trim();
 
@@ -75,6 +94,8 @@ function fingerabdruckAendern(aendere) {
   fs.writeFileSync(p, JSON.stringify(daten, null, 2) + "\n");
 }
 
+const summe = (inhalt) => `sha256:${require("crypto").createHash("sha256").update(inhalt).digest("hex")}`;
+
 /** Prüfsumme einer ausgelieferten Datei, so wie der Fingerabdruck sie schreibt. */
 function summeLive(rel) {
   const inhalt = fs.readFileSync(path.join(live, rel));
@@ -85,31 +106,7 @@ beforeAll(() => {
   basis = fs.mkdtempSync(path.join(os.tmpdir(), "pruefe-live-"));
 
   /* curl-Attrappe: bildet https://…/<pfad> auf $ATTRAPPE_LIVE/<pfad> ab. */
-  schreibe(
-    basis,
-    "bin/curl",
-    [
-      "#!/bin/sh",
-      'URL=""; AUS=""',
-      "while [ $# -gt 0 ]; do",
-      '  case "$1" in',
-      '    -o) AUS="$2"; shift ;;',
-      '    http*://*) URL="$1" ;;',
-      "  esac",
-      "  shift",
-      "done",
-      "PFAD=$(printf '%s' \"$URL\" | sed 's|^[a-z]*://[^/]*/||')",
-      '[ -n "${ATTRAPPE_TRANSPORTFEHLER:-}" ] && [ "$PFAD" = "$ATTRAPPE_TRANSPORTFEHLER" ] && { echo "curl: (7) Verbindung abgelehnt" >&2; exit 7; }',
-      /* Eine echte Fehlerantwort des Servers: `curl -f` meldet sie mit Rückgabewert 22. */
-      '[ -n "${ATTRAPPE_NICHT_GEFUNDEN:-}" ] && [ "$PFAD" = "$ATTRAPPE_NICHT_GEFUNDEN" ] && { echo "curl: (22) The requested URL returned error: 404" >&2; exit 22; }',
-      /* Firebase Hosting beantwortet einen unbekannten Pfad mit der Startseite (Status 200). */
-      'if [ -f "$ATTRAPPE_LIVE/$PFAD" ]; then QUELLE="$ATTRAPPE_LIVE/$PFAD"; else QUELLE="$ATTRAPPE_LIVE/index.html"; fi',
-      'if [ -n "$AUS" ]; then cp "$QUELLE" "$AUS"; else cat "$QUELLE"; fi',
-      "exit 0",
-      "",
-    ].join("\n")
-  );
-  fs.chmodSync(path.join(basis, "bin/curl"), 0o755);
+  curlLiveAttrappeAnlegen(path.join(basis, "bin"));
 
   /* Das veröffentlichte Repository. */
   quelle = path.join(basis, "quelle");
@@ -130,6 +127,7 @@ beforeAll(() => {
           "lib/PRUEFSUMMEN.json",
         ],
       },
+      functions: { source: "functions", ignore: ["node_modules", ".git", ".*", "__tests__", "*.log"] },
     })
   );
   schreibe(quelle, "public/index.html", '<!doctype html>\n<script type="module" src="app.js?v=2026010101"></script>\n');
@@ -146,7 +144,13 @@ beforeAll(() => {
   schreibe(quelle, "functions/src/locales/de/prompts.js", "module.exports = {};\n");
   schreibe(quelle, "functions/src/__tests__/index.test.js", "// Test\n");
   schreibe(quelle, "functions/src/hinweis.md", "kein Programm\n");
-  for (const skript of ["pruefe-live.sh", "build-info.mjs"]) {
+  schreibe(quelle, "functions/src/locales/manifest.json", '{"default":"de"}\n');
+  schreibe(quelle, "functions/package.json", '{"main":"src/index.js","dependencies":{"fremdpaket":"1.0.0"}}\n');
+  schreibe(quelle, "functions/package-lock.json", '{"lockfileVersion":3,"packages":{}}\n');
+  /* Was functions.ignore herausnimmt, darf die Nachprüfung auch nicht verlangen. */
+  schreibe(quelle, "functions/.env.local", "NUR_LOKAL=1\n");
+  schreibe(quelle, "functions/lasttest.log", "Protokoll\n");
+  for (const skript of ["pruefe-live.sh", "build-info.mjs", "pruefe-auslieferbare-reste.mjs"]) {
     schreibe(quelle, `scripts/${skript}`, fs.readFileSync(path.join(WURZEL, "scripts", skript), "utf8"));
   }
   git(quelle, "add", "-A");
@@ -158,13 +162,42 @@ beforeAll(() => {
   const auslieferung = frischerKlon("auslieferung");
   const start = path.join(auslieferung, "public/index.html");
   fs.writeFileSync(start, fs.readFileSync(start, "utf8").replace("?v=2026010101", "?v=2026020202"));
-  execFileSync("node", ["scripts/build-info.mjs", "2026020202"], { cwd: auslieferung, env: GIT_UMGEBUNG });
+  execFileSync("node", ["scripts/build-info.mjs", "2026020202"], {
+    cwd: auslieferung,
+    env: { ...GIT_UMGEBUNG, NODE_PATH: MODULE },
+  });
   liveVorlage = path.join(basis, "live-vorlage");
   fs.cpSync(path.join(auslieferung, "public"), liveVorlage, { recursive: true });
   for (const nichtAusgeliefert of ["__tests__", ".versteckt", "lib", "img"]) {
     fs.rmSync(path.join(liveVorlage, nichtAusgeliefert), { recursive: true, force: true });
   }
+
+  /* Ein Stand in der Form bis zum 05.10.2026: Sein Erzeuger schrieb das Feld
+     `serverDateien` (nur die .js-Dateien unter functions/src/). Für die
+     Nachprüfung zählt, was im Commit steht — dieser Erzeuger wird hier nicht
+     ausgeführt. */
+  const alt = frischerKlon("alt", "main");
+  schreibe(
+    alt,
+    "scripts/build-info.mjs",
+    "// Erzeuger der älteren Form.\nconst inhalt = {\n  dateien: {},\n  serverDateien: {},\n};\n"
+  );
+  git(alt, "commit", "--quiet", "-am", "Stand in der älteren Form");
+  commitAlt = git(alt, "rev-parse", "HEAD");
+  git(quelle, "fetch", "--quiet", alt, `${commitAlt}:refs/heads/alt`);
 });
+
+/** Macht aus dem ausgelieferten Stand einen in der älteren Form: Er nennt
+ *  `commitAlt` und vom Server nur die .js-Dateien unter functions/src/. */
+function alsAeltereForm() {
+  const lies = (rel) => fs.readFileSync(path.join(quelle, "functions/src", rel));
+  fingerabdruckAendern((d) => {
+    d.commit = commitAlt;
+    delete d.serverPaket;
+    d.serverDateien = {};
+    for (const rel of ["config.js", "index.js", "locales/de/prompts.js"]) d.serverDateien[rel] = summe(lies(rel));
+  });
+}
 
 afterAll(() => fs.rmSync(basis, { recursive: true, force: true }));
 
@@ -175,10 +208,14 @@ beforeEach(() => {
 });
 
 describe("pruefe-live.sh am nachgebauten Live-Stand", () => {
-  test("Aufbau stimmt: der Fingerabdruck nennt drei Website- und drei Server-Dateien", () => {
+  test("Aufbau stimmt: der Fingerabdruck nennt drei Website-Dateien und jede Datei des Server-Pakets", () => {
     const daten = JSON.parse(fs.readFileSync(path.join(live, "build-info.json"), "utf8"));
     expect(Object.keys(daten.dateien).sort()).toEqual(["app.js", "index.html", "js/a.js"]);
-    expect(Object.keys(daten.serverDateien).sort()).toEqual(["config.js", "index.js", "locales/de/prompts.js"]);
+    /* Auch package.json, package-lock.json, die Sprachliste und eine Datei, die
+       kein Programm ist — alles, was zu Google ginge. Tests, Punkt-Dateien und
+       Protokolle nicht. */
+    expect(Object.keys(daten.serverPaket).sort()).toEqual(PAKET);
+    expect(daten.serverDateien).toBeUndefined();
     expect(daten.commit).toBe(commitA);
   });
 
@@ -188,7 +225,8 @@ describe("pruefe-live.sh am nachgebauten Live-Stand", () => {
     expect(r.aus).toContain("Dateien laut Commit: 3");
     expect(r.aus).toContain("der Commit verlangt 3 Website-Dateien, keine fehlt im Fingerabdruck.");
     expect(r.aus).toContain("Davon 1 nur in der Cache-Kennung abweichend");
-    expect(r.aus).toContain(`Server-Code: 3 Datei(en) gegen Commit ${commitA} geprueft.`);
+    expect(r.aus).toContain(`Server-Paket: 7 Datei(en) gegen Commit ${commitA} geprueft.`);
+    expect(r.aus).not.toMatch(/FEHLT|NICHT IM COMMIT|ABWEICHUNG/);
     expect(r.code).toBe(0);
   });
 
@@ -243,34 +281,67 @@ describe("pruefe-live.sh am nachgebauten Live-Stand", () => {
     expect(pruefen(frischerKlon("klon")).code).toBe(1);
   });
 
-  test("Fingerabdruck ohne das Feld serverDateien → 1 (vorher: 0)", () => {
-    fingerabdruckAendern((d) => delete d.serverDateien);
+  test("Fingerabdruck ohne das Feld serverPaket → 1", () => {
+    fingerabdruckAendern((d) => delete d.serverPaket);
     const r = pruefen(frischerKlon("klon"));
     expect(r.code).toBe(1);
+    expect(r.aus).toContain(
+      `FEHLT IM FINGERABDRUCK: die Server-Dateien — Commit ${commitA} hat 7, der Server nennt keine`
+    );
+  });
+
+  test("Fingerabdruck nennt vom Server nur noch die Programmdateien, im älteren Feld → 1", () => {
+    /* Der Rückweg in die ältere Form: Mit ihr wären package.json,
+       package-lock.json und die Sprachliste wieder ungeprüft. Welche Form ein
+       Stand schuldet, sagt deshalb der Commit — sein Erzeuger schreibt
+       `serverPaket` —, nicht der Fingerabdruck. */
+    fingerabdruckAendern((d) => {
+      d.serverDateien = {};
+      for (const [pfad, wert] of Object.entries(d.serverPaket)) {
+        if (pfad.startsWith("src/") && pfad.endsWith(".js")) d.serverDateien[pfad.slice(4)] = wert;
+      }
+      delete d.serverPaket;
+    });
+    const r = pruefen(frischerKlon("klon"));
     expect(r.aus).toContain("FEHLT IM FINGERABDRUCK: die Server-Dateien");
+    expect(r.aus).toContain("(Feld serverPaket)");
+    expect(r.aus).not.toContain("entspricht Commit");
+    expect(r.code).toBe(1);
+  });
+
+  /* Jede Datei des Pakets, auch die drei, die keine Programmdateien sind: Über
+     package.json und package-lock.json entscheidet sich, welche Fremdpakete
+     Google beim Bau einsetzt. */
+  describe.each(PAKET)("Server-Paket, Datei %s", (datei) => {
+    test("fehlt im Fingerabdruck → 1", () => {
+      fingerabdruckAendern((d) => delete d.serverPaket[datei]);
+      const r = pruefen(frischerKlon("klon"));
+      expect(r.aus).toContain(`FEHLT IM FINGERABDRUCK (Server-Paket): functions/${datei}`);
+      expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Paket.");
+      expect(r.aus).toContain("Der ausgelieferte Stand entspricht NICHT dem genannten Commit.");
+      expect(r.code).toBe(1);
+    });
+
+    test("trägt eine andere Prüfsumme als im Commit → 1", () => {
+      /* So sähe es aus, wenn eine andere Fassung dieser Datei zu Google ging. */
+      fingerabdruckAendern((d) => (d.serverPaket[datei] = summe(`andere Fassung von ${datei}`)));
+      const r = pruefen(frischerKlon("klon"));
+      expect(r.aus).toContain(`ABWEICHUNG im Server-Paket: functions/${datei}`);
+      expect(r.aus).toContain("Server-Paket: 7 Datei(en) gegen Commit");
+      expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Paket.");
+      expect(r.code).toBe(1);
+    });
   });
 
   test.each([
-    [
-      "eine Server-Datei fehlt in der Liste",
-      (d) => delete d.serverDateien["config.js"],
-      "FEHLT IM FINGERABDRUCK (Server-Code): functions/src/config.js",
-    ],
-    [
-      "eine Server-Datei trägt eine falsche Prüfsumme",
-      (d) => (d.serverDateien["config.js"] = "sha256:" + "0".repeat(64)),
-      "ABWEICHUNG im Server-Code: functions/src/config.js",
-    ],
-    [
-      "eine Server-Datei steht in der Liste, aber nicht im Commit",
-      (d) => (d.serverDateien["fremd.js"] = "sha256:" + "0".repeat(64)),
-      "NICHT IM COMMIT (Server-Code): functions/src/fremd.js",
-    ],
-  ])("Server-Code: %s → 1", (_name, aendere, meldung) => {
-    fingerabdruckAendern(aendere);
+    ["eine Programmdatei, die der Commit nicht kennt", "src/fremd.js"],
+    ["eine Datei, die functions.ignore aus dem Paket nimmt (Test)", "src/__tests__/index.test.js"],
+    ["eine Punkt-Datei mit lokalen Einstellungen", ".env.local"],
+  ])("Server-Paket: der Fingerabdruck nennt %s → 1", (_was, datei) => {
+    fingerabdruckAendern((d) => (d.serverPaket[datei] = "sha256:" + "0".repeat(64)));
     const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain(`NICHT IM COMMIT (Server-Paket): functions/${datei}`);
     expect(r.code).toBe(1);
-    expect(r.aus).toContain(meldung);
   });
 
   test("das Repository ist der Auslieferung einen Commit voraus → 0 (vorher: Fehlalarm)", () => {
@@ -337,6 +408,79 @@ describe("pruefe-live.sh: Messproblem ist kein Befund und kein Erfolg", () => {
     expect(r.code).toBe(2);
     expect(r.aus).toContain("unbekanntes Hosting-Muster in firebase.json: **/*.md");
   });
+
+  /** Legt über Stand A einen Commit mit geändertem Server-Ordner an und lässt
+   *  die Seite ihn nennen. */
+  function standMit(aendere) {
+    const arbeit = frischerKlon("arbeit", "main");
+    aendere(arbeit);
+    git(arbeit, "add", "-A");
+    git(arbeit, "commit", "--quiet", "-m", "geänderter Stand");
+    fingerabdruckAendern((d) => (d.commit = git(arbeit, "rev-parse", "HEAD")));
+    return arbeit;
+  }
+
+  test.each([
+    ["mit Schrägstrich", "src/**/*.md"],
+    ["mit Ausrufezeichen", "!src"],
+    ["mit Klammern", "*.{log,md}"],
+  ])("der genannte Commit hat in functions.ignore ein Muster %s, das das Skript nicht kennt → 2", (_form, muster) => {
+    const arbeit = standMit((ordner) => {
+      const konfig = JSON.parse(fs.readFileSync(path.join(ordner, "firebase.json"), "utf8"));
+      konfig.functions.ignore.push(muster);
+      fs.writeFileSync(path.join(ordner, "firebase.json"), JSON.stringify(konfig));
+    });
+    const r = pruefen(arbeit);
+    expect(r.aus).toContain(`unbekanntes Muster in functions.ignore der firebase.json: ${muster}`);
+    expect(r.aus).not.toContain("entspricht Commit");
+    expect(r.code).toBe(2);
+  });
+
+  test("der genannte Commit nennt keinen Ordner für das Server-Paket → 2", () => {
+    const arbeit = standMit((ordner) => {
+      const konfig = JSON.parse(fs.readFileSync(path.join(ordner, "firebase.json"), "utf8"));
+      delete konfig.functions.source;
+      fs.writeFileSync(path.join(ordner, "firebase.json"), JSON.stringify(konfig));
+    });
+    const r = pruefen(arbeit);
+    expect(r.aus).toContain("nennt kein (einzelnes) functions.source");
+    expect(r.code).toBe(2);
+  });
+
+  test("im Server-Ordner des Commits liegt ein Verweis statt einer Datei → 2", () => {
+    /* Das Werkzeug folgte dem Verweis und packte sein Ziel ein; git kennt nur
+       den Namen des Ziels. Die Paketliste lässt sich daraus nicht bilden. */
+    const arbeit = standMit((ordner) =>
+      fs.symlinkSync("../../public/app.js", path.join(ordner, "functions/src/verweis.js"))
+    );
+    const r = pruefen(arbeit);
+    expect(r.aus).toContain("functions/src/verweis.js");
+    expect(r.aus).toContain("ist keine gewoehnliche Datei");
+    expect(r.code).toBe(2);
+  });
+
+  test("im Server-Ordner des Commits liegt eine Datei mit Tabulator im Namen → 2", () => {
+    /* Die Listen des Skripts sind zeilen- und spaltenweise aufgebaut; ein
+       solcher Name ließe sich darin nicht eindeutig führen. */
+    const arbeit = standMit((ordner) => schreibe(ordner, "functions/src/a\tb.js", "module.exports = 4;\n"));
+    const r = pruefen(arbeit);
+    expect(r.aus).toContain("enthaelt einen Zeilenumbruch oder Tabulator");
+    expect(r.code).toBe(2);
+  });
+
+  test("Gegenprobe: ein weiteres Muster in der bekannten Form ist kein Messproblem — die Datei fällt aus der Liste", () => {
+    /* Der Fingerabdruck nennt hinweis.md noch; der neue Stand nimmt die Datei
+       aus dem Paket. Das ist ein Befund über diese eine Datei, kein Messproblem. */
+    const arbeit = standMit((ordner) => {
+      const konfig = JSON.parse(fs.readFileSync(path.join(ordner, "firebase.json"), "utf8"));
+      konfig.functions.ignore.push("*.md");
+      fs.writeFileSync(path.join(ordner, "firebase.json"), JSON.stringify(konfig));
+    });
+    const r = pruefen(arbeit);
+    expect(r.aus).toContain("NICHT IM COMMIT (Server-Paket): functions/src/hinweis.md");
+    expect(r.aus).toContain("Server-Paket: 6 Datei(en) gegen Commit");
+    expect(r.code).toBe(1);
+  });
 });
 
 describe("pruefe-live.sh ohne den genannten Commit", () => {
@@ -367,7 +511,7 @@ describe("pruefe-live.sh ohne den genannten Commit", () => {
     expect(r.aus).not.toContain("entspricht Commit");
   });
 
-  test("kein git-Repository (entpackte Kopie) → 2, NICHT gegengerechnet, Server-Code gegen den Ordner", () => {
+  test("kein git-Repository (entpackte Kopie) → 2, NICHT gegengerechnet, Server-Paket gegen den Ordner", () => {
     const klon = frischerKlon("klon");
     fs.rmSync(path.join(klon, ".git"), { recursive: true, force: true });
     const r = pruefen(klon, { GIT_CEILING_DIRECTORIES: basis });
@@ -376,7 +520,7 @@ describe("pruefe-live.sh ohne den genannten Commit", () => {
     expect(r.aus).toContain("MESSPROBLEM: Der genannte Commit wurde NICHT gegengerechnet");
     expect(r.aus).toContain("in einer Kopie des Repositories laufen lassen");
     expect(r.aus).not.toContain("entspricht Commit");
-    expect(r.aus).toContain("Server-Code: 3 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
+    expect(r.aus).toContain("Server-Paket: 7 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
   });
 
   test("kein git-Repository, eine Server-Datei im Ordner ist eine andere als die ausgewiesene → 1", () => {
@@ -385,10 +529,10 @@ describe("pruefe-live.sh ohne den genannten Commit", () => {
     fs.appendFileSync(path.join(klon, "functions/src/config.js"), "// nicht der ausgelieferte Stand\n");
     const r = pruefen(klon, { GIT_CEILING_DIRECTORIES: basis });
     expect(r.aus).toContain("nicht pruefbar (kein git-Repository)");
-    expect(r.aus).toContain("ABWEICHUNG im Server-Code: functions/src/config.js");
-    expect(r.aus).toContain("Server-Code: 3 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
+    expect(r.aus).toContain("ABWEICHUNG im Server-Paket: functions/src/config.js");
+    expect(r.aus).toContain("Server-Paket: 7 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
     expect(r.aus).toContain("ERGEBNIS: 0 Abweichung(en), 0 fehlend, bei 3 geprueften Dateien.");
-    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Code.");
+    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Paket.");
     expect(r.code).toBe(1);
   });
 
@@ -399,8 +543,127 @@ describe("pruefe-live.sh ohne den genannten Commit", () => {
     const r = pruefen(klon);
     expect(r.aus).toContain("Commit im Repository: NEIN");
     expect(r.aus).toContain("FEHLT in diesem Ordner: functions/src/config.js");
-    expect(r.aus).toContain("Server-Code: 2 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
-    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Code.");
+    expect(r.aus).toContain("Server-Paket: 6 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
+    expect(r.aus).toContain("Dazu 1 Abweichung(en) im Server-Paket.");
+    expect(r.code).toBe(1);
+  });
+});
+
+describe("pruefe-live.sh rechnet das Server-Paket nach denselben Regeln wie das Werkzeug", () => {
+  /* Zwei Stellen bilden die Liste des Pakets: der Wächter (für den Erzeuger,
+     mit der Bibliothek des Werkzeugs) und die Nachprüfung (für Dritte, ohne
+     Installation). Diese Fälle liefern je einen eigenen Stand mit dem echten
+     Erzeuger aus und lassen die Nachprüfung dagegen laufen: Listeten die
+     beiden verschieden, meldete sie eine Datei als fehlend oder als fremd. */
+
+  /** Legt über Stand A einen Commit an, liefert ihn aus (echter Erzeuger) und
+   *  macht die Auslieferung zum Live-Stand. Gibt den Klon und den Fingerabdruck zurück. */
+  function ausliefern(aendere) {
+    const ordner = frischerKlon("lieferung", "main");
+    aendere(ordner);
+    git(ordner, "add", "-A");
+    git(ordner, "commit", "--quiet", "-m", "weiterer Stand");
+    execFileSync("node", ["scripts/build-info.mjs", "2026030303"], {
+      cwd: ordner,
+      env: { ...GIT_UMGEBUNG, NODE_PATH: MODULE },
+    });
+    fs.copyFileSync(path.join(ordner, "public/build-info.json"), path.join(live, "build-info.json"));
+    fs.copyFileSync(path.join(ordner, "public/index.html"), path.join(live, "index.html"));
+    return { ordner, daten: JSON.parse(fs.readFileSync(path.join(live, "build-info.json"), "utf8")) };
+  }
+
+  const konfigAendern = (ordner, aendere) => {
+    const datei = path.join(ordner, "firebase.json");
+    const konfig = JSON.parse(fs.readFileSync(datei, "utf8"));
+    aendere(konfig.functions);
+    fs.writeFileSync(datei, JSON.stringify(konfig));
+  };
+
+  test("ohne functions.ignore gilt die Vorgabe des Werkzeugs: alles außer node_modules und .git — und nie die Debug-Protokolle", () => {
+    const { ordner, daten } = ausliefern((o) => {
+      konfigAendern(o, (f) => delete f.ignore);
+      schreibe(o, "functions/firebase-debug.log", "Protokoll des Werkzeugs\n");
+      schreibe(o, "functions/firebase-debug.1.log", "Protokoll des Werkzeugs\n");
+      schreibe(o, "functions/.runtimeconfig.json", "{}\n");
+      schreibe(o, "functions/node_modules/fremd/index.js", "module.exports = 1;\n");
+    });
+    /* Jetzt gehen auch der Test, die Punkt-Datei und das Protokoll des Lasttests mit … */
+    const erwartet = [...PAKET, ".env.local", "lasttest.log", "src/__tests__/index.test.js"].sort();
+    expect(Object.keys(daten.serverPaket).sort()).toEqual(erwartet);
+    /* … und die Nachprüfung sieht es genauso. */
+    const r = pruefen(ordner);
+    expect(r.aus).not.toMatch(/FEHLT|NICHT IM COMMIT|ABWEICHUNG|MESSPROBLEM/);
+    expect(r.aus).toContain(`Server-Paket: ${erwartet.length} Datei(en) gegen Commit`);
+    expect(r.code).toBe(0);
+  });
+
+  test("ein Muster mit Stern gilt auf jeder Ebene, ein Ordnername nimmt den ganzen Ordner heraus", () => {
+    const { ordner, daten } = ausliefern((o) => {
+      konfigAendern(o, (f) => f.ignore.push("*.md", "locales"));
+      schreibe(o, "functions/LIESMICH.md", "oben\n");
+      schreibe(o, "functions/src/tief/unten/notiz.md", "unten\n");
+      schreibe(o, "functions/src/tief/unten/programm.js", "module.exports = 2;\n");
+    });
+    const erwartet = [
+      "package-lock.json",
+      "package.json",
+      "src/config.js",
+      "src/index.js",
+      "src/tief/unten/programm.js",
+    ];
+    expect(Object.keys(daten.serverPaket).sort()).toEqual(erwartet);
+    const r = pruefen(ordner);
+    expect(r.aus).not.toMatch(/FEHLT|NICHT IM COMMIT|ABWEICHUNG|MESSPROBLEM/);
+    expect(r.aus).toContain("Server-Paket: 5 Datei(en) gegen Commit");
+    expect(r.code).toBe(0);
+  });
+
+  test("ein Dateiname mit Leerzeichen und Umlaut steht im Fingerabdruck und wird nachgerechnet", () => {
+    const { ordner, daten } = ausliefern((o) => schreibe(o, "functions/src/wörter liste.js", "module.exports = 3;\n"));
+    expect(Object.keys(daten.serverPaket)).toContain("src/wörter liste.js");
+    const r = pruefen(ordner);
+    expect(r.aus).not.toMatch(/FEHLT|NICHT IM COMMIT|ABWEICHUNG|MESSPROBLEM/);
+    expect(r.aus).toContain("Server-Paket: 8 Datei(en) gegen Commit");
+    expect(r.code).toBe(0);
+  });
+});
+
+describe("pruefe-live.sh an einem Stand in der älteren Form des Fingerabdrucks", () => {
+  /* Bis zum 05.10.2026 nannte der Fingerabdruck vom Server nur die .js-Dateien
+     unter functions/src/ (Feld `serverDateien`). Ein solcher Stand bleibt
+     nachrechenbar, mit der Liste von damals — sonst meldete das Skript für die
+     Auslieferung, die gerade live steht, einen Befund, den es nicht gibt. */
+  test("unveränderter Stand → 0, gerechnet mit der Liste von damals", () => {
+    alsAeltereForm();
+    const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain(`Server-Code: 3 Datei(en) gegen Commit ${commitAlt} geprueft.`);
+    expect(r.aus).toContain(`Der ausgelieferte Stand entspricht Commit ${commitAlt}.`);
+    expect(r.aus).not.toMatch(/FEHLT|NICHT IM COMMIT|ABWEICHUNG/);
+    expect(r.code).toBe(0);
+  });
+
+  test("eine Programmdatei mit anderer Prüfsumme → 1", () => {
+    alsAeltereForm();
+    fingerabdruckAendern((d) => (d.serverDateien["config.js"] = "sha256:" + "0".repeat(64)));
+    const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain("ABWEICHUNG im Server-Code: functions/src/config.js");
+    expect(r.code).toBe(1);
+  });
+
+  test("eine Programmdatei fehlt in der Liste → 1", () => {
+    alsAeltereForm();
+    fingerabdruckAendern((d) => delete d.serverDateien["config.js"]);
+    const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain("FEHLT IM FINGERABDRUCK (Server-Code): functions/src/config.js");
+    expect(r.code).toBe(1);
+  });
+
+  test("ganz ohne Server-Dateien → 1", () => {
+    alsAeltereForm();
+    fingerabdruckAendern((d) => delete d.serverDateien);
+    const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain("FEHLT IM FINGERABDRUCK: die Server-Dateien");
+    expect(r.aus).toContain("(Feld serverDateien)");
     expect(r.code).toBe(1);
   });
 });

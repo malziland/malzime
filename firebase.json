@@ -7,7 +7,7 @@
       "indexes": "firestore.indexes.json"
     }
   ],
-  "_kommentar_functions": "ignore bestimmt, was als Server-Paket zu Google geht: nur das Programm (functions/src ohne Tests) samt package.json und package-lock.json. Ist die Liste gesetzt, gilt GENAU sie — node_modules und .git muessen deshalb selbst darin stehen. Jedes Muster ist ein blosser Datei- oder Ordnername ohne Schraegstrich; das Werkzeug vergleicht ihn auf jeder Ebene mit dem Namen (minimatch, matchBase und dot). Den Soll-Umfang haelt functions/src/__tests__/server-paket.test.js fest, Reste auf dem Auslieferungsrechner meldet scripts/pruefe-auslieferbare-reste.mjs (OPS-2026-10-03-09).",
+  "_kommentar_functions": "ignore bestimmt, was als Server-Paket zu Google geht: nur das Programm (functions/src ohne Tests und ohne die Testwerte test-satz.js) samt package.json und package-lock.json. Jede Datei des Pakets steht mit Pruefsumme im Fingerabdruck (public/build-info.json, Feld serverPaket). Ist die Liste gesetzt, gilt GENAU sie — node_modules und .git muessen deshalb selbst darin stehen. Jedes Muster ist ein blosser Datei- oder Ordnername ohne Schraegstrich; das Werkzeug vergleicht ihn auf jeder Ebene mit dem Namen (minimatch, matchBase und dot). Den Soll-Umfang haelt functions/src/__tests__/server-paket.test.js fest, Reste auf dem Auslieferungsrechner meldet scripts/pruefe-auslieferbare-reste.mjs (OPS-2026-10-03-09).",
   "functions": {
     "source": "functions",
     "runtime": "nodejs24",
@@ -22,7 +22,8 @@
       "coverage",
       "scripts",
       "eslint.config.js",
-      "jest.setup.js"
+      "jest.setup.js",
+      "test-satz.js"
     ]
   },
   "emulators": {

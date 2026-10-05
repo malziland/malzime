@@ -917,11 +917,12 @@ if ! node scripts/build-info.mjs "$VERSION"; then
 fi
 
 # ── ARCH-2026-10-03-10, Gegenrichtung: Die Website allein geht nur hinaus, wenn der Server-Code unveraendert ist ──
-# Der eben erzeugte Fingerabdruck weist den Server-Code des AUSGECHECKTEN
-# Standes aus (Feld `serverDateien`), Datei fuer Datei. Steht `functions` nicht
-# im Ziel, wird dieser Code aber nicht ausgeliefert. Hat er sich seit der
-# letzten Auslieferung geaendert, wiese die Seite danach ein Server-Programm
-# aus, das nie hinausging.
+# Der eben erzeugte Fingerabdruck weist das Server-Paket des AUSGECHECKTEN
+# Standes aus (Feld `serverPaket`), Datei fuer Datei: das Programm, dazu
+# package.json und package-lock.json (welche Fremdpakete Google einsetzt) und
+# die Sprachliste. Steht `functions` nicht im Ziel, wird dieses Paket aber
+# nicht ausgeliefert. Hat es sich seit der letzten Auslieferung geaendert,
+# wiese die Seite danach ein Server-Programm aus, das nie hinausging.
 #
 # Verglichen wird mit dem, was die Seite HEUTE ausweist: dem Fingerabdruck, der
 # live steht. Bewusst nicht mit der eingecheckten Datei — der Fingerabdruck
@@ -936,7 +937,10 @@ fi
 # Kein Notschalter. Der Ausweg ist die vollstaendige Auslieferung ohne Argument
 # — sie liefert den ausgewiesenen Server-Code mit aus. Laesst sich der Vergleich
 # nicht fuehren (Seite nicht erreichbar, Antwort kein Fingerabdruck), gilt er
-# als nicht bestanden. Bricht der Riegel ab, nimmt die Aufraeumfalle die
+# als nicht bestanden. Weist die Seite ihren Server noch in der Form bis zum
+# 05.10.2026 aus (Feld `serverDateien`: nur die .js-Dateien unter
+# functions/src/), laesst sich das Paket daran nicht vergleichen — es gilt dann
+# als geaendert. Bricht der Riegel ab, nimmt die Aufraeumfalle die
 # Cache-Kennung und den Fingerabdruck zurueck; hochgeladen ist bis hierher nichts.
 if [[ ",$TARGET," != *",functions,"* ]]; then
   FINGERABDRUCK_LIVE_URL="https://malzi.me/build-info.json"
@@ -951,7 +955,8 @@ if [[ ",$TARGET," != *",functions,"* ]]; then
   fi
   # Rueckgabewert des Vergleichs: 0 gleich (Ausgabe: Zahl der Dateien und der
   # live ausgewiesene Commit), 1 abweichend (Ausgabe: die abweichenden Dateien),
-  # 2 nicht messbar (Ausgabe: LIVE oder NEU — welche Seite sich nicht lesen liess).
+  # 2 nicht messbar (Ausgabe: LIVE oder NEU — welche Seite sich nicht lesen liess),
+  # 3 die Seite weist ihren Server in der aelteren Form aus (nicht vergleichbar).
   # Ohne Pipe, damit der Rueckgabewert der des Vergleichs ist.
   VERGLEICH_RC=0
   VERGLEICH=$(node -e '
@@ -963,18 +968,19 @@ if [[ ",$TARGET," != *",functions,"* ]]; then
         return null;
       }
     };
-    const serverDateien = (f) =>
-      f && f.serverDateien && typeof f.serverDateien === "object" && !Array.isArray(f.serverDateien)
-        ? f.serverDateien
+    const liste = (f, feld) =>
+      f && f[feld] && typeof f[feld] === "object" && !Array.isArray(f[feld]) && Object.keys(f[feld]).length > 0
+        ? f[feld]
         : null;
     const live = lesen(fs.readFileSync(0, "utf8"));
-    const neu = serverDateien(lesen(fs.readFileSync(process.argv[1], "utf8")));
-    const alt = serverDateien(live);
-    if (!neu || Object.keys(neu).length === 0) {
+    const neu = liste(lesen(fs.readFileSync(process.argv[1], "utf8")), "serverPaket");
+    const alt = liste(live, "serverPaket");
+    if (!neu) {
       console.log("NEU");
       process.exit(2);
     }
-    if (!alt || Object.keys(alt).length === 0) {
+    if (!alt) {
+      if (liste(live, "serverDateien")) process.exit(3);
       console.log("LIVE");
       process.exit(2);
     }
@@ -1000,10 +1006,18 @@ if [[ ",$TARGET," != *",functions,"* ]]; then
     echo "        Website und Server zusammen: ./scripts/deploy.sh (ohne Argument)." >&2
     exit 1
   fi
+  if [ "$VERGLEICH_RC" -eq 3 ]; then
+    echo "FEHLER: Server-Paket gilt als geaendert — ohne Argument ausliefern." >&2
+    echo "        $FINGERABDRUCK_LIVE_URL weist den Server noch in der aelteren Form aus: nur die" >&2
+    echo "        Programmdateien, ohne package.json, package-lock.json und die Sprachliste. Ob sich" >&2
+    echo "        das Server-Paket seit jener Auslieferung geaendert hat, laesst sich daran nicht messen." >&2
+    echo "        Website und Server zusammen: ./scripts/deploy.sh (ohne Argument)." >&2
+    exit 1
+  fi
   if [ "$VERGLEICH_RC" -ne 0 ]; then
     if [ "$VERGLEICH" = "LIVE" ]; then
       echo "FEHLER: Die Antwort von $FINGERABDRUCK_LIVE_URL ist kein Fingerabdruck mit Server-Dateien" >&2
-      echo "        (Feld serverDateien fehlt, ist leer oder die Antwort ist kein JSON)." >&2
+      echo "        (Feld serverPaket fehlt, ist leer oder die Antwort ist kein JSON)." >&2
     elif [ "$VERGLEICH" = "NEU" ]; then
       echo "FEHLER: Der eben erzeugte Fingerabdruck (public/build-info.json) nennt keine Server-Dateien." >&2
     else

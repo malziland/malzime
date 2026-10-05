@@ -594,15 +594,18 @@ oder die Live-Smoke-Probe „Direktweg" ist rot, während `/api/stats` über
    Hosting auf. Browser mit alter `app.js` im Zwischenspeicher laufen ohnehin
    über die Umleitungen weiter.
 
-**Dieser Weg ist nur offen, solange der Server-Code unverändert ist.** Vor dem
-Hochladen vergleicht `deploy.sh hosting` den Server-Code des ausgecheckten Standes
-mit dem, den die Seite heute ausweist (`https://malzi.me/build-info.json`, Feld
-`serverDateien`), und bricht bei einer Abweichung ab — sonst wiese die Seite danach
-ein Server-Programm aus, das nie hinausging (ARCH-2026-10-03-10). Für diesen Hebel
-also nur die zwei Dateien oben ändern, nichts unter `functions/src/`. Bricht das
+**Dieser Weg ist nur offen, solange das Server-Paket unverändert ist.** Vor dem
+Hochladen vergleicht `deploy.sh hosting` das Server-Paket des ausgecheckten Standes
+mit dem, das die Seite heute ausweist (`https://malzi.me/build-info.json`, Feld
+`serverPaket`: jede Datei, die zu Google geht), und bricht bei einer Abweichung ab —
+sonst wiese die Seite danach ein Server-Programm aus, das nie hinausging
+(ARCH-2026-10-03-10). Für diesen Hebel also nur die zwei Dateien oben ändern, nichts
+unter `functions/` — auch nicht `package.json` oder `package-lock.json`. Bricht das
 Skript an dieser Stelle ab oder ist die Seite nicht lesbar, gibt es keinen
 Notschalter: `./scripts/deploy.sh` ohne Argument liefert Website und Server zusammen
-aus.
+aus. Dasselbe gilt, solange die Seite ihren Server noch in der Form vor dem 05.10.2026
+ausweist (nur die Programmdateien): Daran lässt sich das Paket nicht vergleichen, es
+gilt als geändert.
 
 Zurück auf den direkten Weg: beides wieder auf `true`, Hosting-Deploy.
 

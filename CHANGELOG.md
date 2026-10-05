@@ -35,13 +35,15 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   Schutz greift, und die Karte zeigt den festen Hinweis statt einer Zahl.
   Nennt die Karte nichts dergleichen, wird wie bisher nicht gefiltert.
 - **Der Alarm „Kinderschutz-Treffer“ hört im Text des Profils auf mehr
-  eindeutige Wörter als bisher** und kann deshalb häufiger kommen.
-  Redewendungen („wieder wett“, „deine Droge“, „alkoholfrei“) lösen weder ihn
-  noch den Zähler aus.
+  eindeutige Wörter als bisher** (etwa „Pfefferspray“) und kann deshalb
+  häufiger kommen. Wörter, die im Satz meist etwas anderes heißen, lösen ihn
+  nicht aus („wie aus der Pistole geschossen“, „deine stärkste Waffe“).
 - Der Filter bleibt eine Wortliste: Was nicht in ihr steht, erkennt er nicht —
   mehrdeutige Wörter wie „Messer“, „Gras“ oder „Corona“ stehen bewusst nicht
   darin. Für die Auswertung: Die Zähler des Kinderschutz-Protokolls sind mit
-  Zahlen vor dieser Fassung nicht vergleichbar, weil die Liste mehr Wörter kennt.
+  Zahlen vor dieser Fassung nicht vergleichbar — die Liste kennt mehr Wörter,
+  und „wetten“ und „Jackpot“ zählt sie im Text des Profils nicht mehr mit,
+  weil sie dort meist Redewendung sind („Wetten, dass …?“).
 
 ### Behoben — Datenschutz
 

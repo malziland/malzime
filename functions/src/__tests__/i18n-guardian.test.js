@@ -88,6 +88,7 @@ describe("i18n Guardian (Backend)", () => {
       "minor-safety-woerter.js", // German + English blocklist words (glücksspiel, schönheits op) — filter data, never shown to users
       "alters-lesbarkeit.js", // German age patterns (jährig, Jahre) — detection logic, never shown to users
       "alters-lesbarkeit-woerter.js", // German number words and child words (fünf, Mädchen) — detection data, never shown to users
+      "alters-auslese.js", // German age patterns (jährig, Jahre) in the number reading — detection logic, never shown to users
     ];
 
     /* Infrastructure files — no user-facing text, permanently excluded.

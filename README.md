@@ -404,9 +404,11 @@ des Servers allein genuegt nicht, er koennte eine veraenderte Datei einfach
 weglassen. Dann laedt es jede dieser Dateien vom Server und vergleicht sie mit dem
 Fingerabdruck und mit dem Inhalt des Commits; die Pruefsummen des Server-Codes
 haelt es gegen denselben Commit. Eine Datei, die im Fingerabdruck fehlt, ist ein
-Befund. Rueckgabewerte sind bewusst getrennt: `0` deckungsgleich,
-`1` Abweichung gefunden, `2` Messproblem (kein Netz, Werkzeug fehlt) — ein
-Messfehler darf nie als Befund durchgehen.
+Befund. Rueckgabewerte sind bewusst getrennt: `0` deckungsgleich und gegen den
+genannten Commit nachgerechnet, `1` Abweichung gefunden, `2` Messproblem (kein
+Netz, Werkzeug fehlt — oder der genannte Commit liess sich nicht gegenrechnen,
+etwa in einer veralteten Kopie oder ausserhalb eines Repositories) — ein
+Messfehler darf nie als Befund durchgehen und nie als bestandene Pruefung.
 
 Was das NICHT beweist: was auf dem Server passiert. Die Cloud Functions baut
 Google aus dem Quelltext; eine nachrechenbare Bestaetigung dafuer gibt es nicht.

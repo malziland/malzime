@@ -85,7 +85,9 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   veröffentlichtem Quelltext ausgeliefert sein muss — nicht nur die, die der
   Server selbst auflistet. Eine Datei, die in seiner Liste fehlt, wird gemeldet,
   und eine veränderte Datei fällt auch dann auf, wenn der Server den passenden
-  Fingerabdruck gleich mitliefert.
+  Fingerabdruck gleich mitliefert. Nennt der Server einen Stand, den der
+  Quelltext nicht kennt, oder läuft die Prüfung außerhalb einer Kopie des
+  Quelltextes, endet sie als Messproblem — nie als bestanden.
 - **Die Auslieferung sieht alle Prüfergebnisse eines Standes**, auch wenn sich
   über mehrere Tage viele angesammelt haben, und hält an, wenn sich die
   Version des Auslieferungswerkzeugs nicht lesen lässt.

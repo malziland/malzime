@@ -21,10 +21,14 @@
 #          Standard: https://malzi.me
 #
 # Rueckgabewerte, bewusst getrennt:
-#   0  alles deckungsgleich
+#   0  alles deckungsgleich — und gegen den Inhalt des genannten Commits
+#      nachgerechnet
 #   1  BEFUND: mindestens eine Datei weicht ab
-#   2  MESSPROBLEM: kein Netz, kein Werkzeug, Datei nicht lesbar
-#      Ein Messfehler darf nie als Befund durchgehen (und umgekehrt).
+#   2  MESSPROBLEM: kein Netz, kein Werkzeug, Datei nicht lesbar — oder der
+#      genannte Commit liess sich nicht gegenrechnen (dieses Repository kennt
+#      ihn nicht, oder das Skript laeuft ausserhalb eines Repositories)
+#      Ein Messfehler darf nie als Befund durchgehen (und umgekehrt) — und nie
+#      als bestandene Pruefung.
 #
 # Kein `set -e`: Das Skript soll ALLE Abweichungen zeigen, nicht bei der
 # ersten stehenbleiben.
@@ -85,10 +89,12 @@ echo "  Dateien:       $ANZAHL"
 
 # ── 2. Kennt das lokale Repository diesen Commit? ───────────────────────────
 COMMIT_DA=nein
+REPO_DA=nein
 REPO_GEPRUEFT=0
 REPO_ABWEICHUNG=0
 NUR_KENNUNG=0
 if git rev-parse --git-dir >/dev/null 2>&1; then
+  REPO_DA=ja
   if git cat-file -e "${COMMIT}^{commit}" 2>/dev/null; then
     echo "  Commit im Repository: ja"
     COMMIT_DA=ja
@@ -386,11 +392,22 @@ if [ "$ABWEICHUNG" -eq 0 ] && [ "$FEHLEND" -eq 0 ] && [ "$SERVER_ABWEICHUNG" -eq
     echo "Der ausgelieferte Stand entspricht Commit $COMMIT."
     exit 0
   fi
+  # Den Commit, gegen den gerechnet wird, nennt der Server, der geprueft wird.
+  # Laesst er sich nicht gegenrechnen, stammen Sollwerte und Dateien beide von
+  # ihm: Das ist kein Nachweis und endet deshalb nie mit 0.
   echo "Der ausgelieferte Stand ist in sich schluessig; er nennt Commit $COMMIT."
-  echo "ACHTUNG: Dieser Commit wurde NICHT gegengerechnet — Sollwerte und Dateien"
-  echo "         stammen beide vom Server. Fuer den vollen Nachweis in einer Kopie"
-  echo "         des Repositories laufen lassen (git clone, dann erneut)."
-  exit 0
+  echo "MESSPROBLEM: Der genannte Commit wurde NICHT gegengerechnet — Sollwerte und" >&2
+  echo "             Dateien stammen beide vom Server. Das ist keine bestandene Pruefung." >&2
+  if [ "$REPO_DA" = "ja" ] && [ "$COMMIT_DA" != "ja" ]; then
+    echo "             Dieses Repository kennt den Commit nicht: 'git fetch --all' ausfuehren," >&2
+    echo "             dann erneut pruefen. Kennt es ihn danach immer noch nicht, nennt die" >&2
+    echo "             Seite einen Stand, den es im veroeffentlichten Quelltext nicht gibt —" >&2
+    echo "             das ist dann ein BEFUND." >&2
+  elif [ "$REPO_DA" != "ja" ]; then
+    echo "             Fuer den Nachweis in einer Kopie des Repositories laufen lassen" >&2
+    echo "             (git clone, dann erneut)." >&2
+  fi
+  exit 2
 fi
 
 echo "ERGEBNIS: $ABWEICHUNG Abweichung(en), $FEHLEND fehlend, bei $GEPRUEFT geprueften Dateien."

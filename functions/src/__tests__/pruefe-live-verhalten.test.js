@@ -340,22 +340,42 @@ describe("pruefe-live.sh: Messproblem ist kein Befund und kein Erfolg", () => {
 });
 
 describe("pruefe-live.sh ohne den genannten Commit", () => {
-  test("Commit lokal unbekannt → 0, aber ausdrücklich NICHT gegengerechnet", () => {
+  test("Datei live verändert, Fingerabdruck angepasst UND ein Commit genannt, den es nicht gibt → 2, nie 0", () => {
+    /* Wer die Auslieferung in der Hand hat, bestimmt auch das Feld `commit`.
+       Nennt es einen Stand, den das Repository nicht kennt, entfällt der
+       Vergleich mit dem Quelltext — das darf nie wie eine bestandene Prüfung
+       enden. */
+    fs.appendFileSync(path.join(live, "app.js"), "/* fremder Code */\n");
+    fingerabdruckAendern((d) => {
+      d.dateien["app.js"] = summeLive("app.js");
+      d.commit = "1234567890abcdef1234567890abcdef12345678";
+    });
+    const r = pruefen(frischerKlon("klon"));
+    expect(r.aus).toContain("Commit im Repository: NEIN");
+    expect(r.aus).not.toContain("entspricht Commit");
+    expect(r.aus).toContain("MESSPROBLEM: Der genannte Commit wurde NICHT gegengerechnet");
+    expect(r.code).toBe(2);
+  });
+
+  test("Commit lokal unbekannt, sonst alles deckungsgleich → 2: nicht gegengerechnet ist nicht bestanden", () => {
     fingerabdruckAendern((d) => (d.commit = "0".repeat(40)));
     const r = pruefen(frischerKlon("klon"));
-    expect(r.code).toBe(0);
+    expect(r.code).toBe(2);
     expect(r.aus).toContain("Commit im Repository: NEIN");
-    expect(r.aus).toContain("Dieser Commit wurde NICHT gegengerechnet");
+    expect(r.aus).toContain("MESSPROBLEM: Der genannte Commit wurde NICHT gegengerechnet");
+    expect(r.aus).toContain("'git fetch --all' ausfuehren");
     expect(r.aus).not.toContain("entspricht Commit");
   });
 
-  test("kein git-Repository (entpackte Kopie) → 0, NICHT gegengerechnet, Server-Code gegen den Ordner", () => {
+  test("kein git-Repository (entpackte Kopie) → 2, NICHT gegengerechnet, Server-Code gegen den Ordner", () => {
     const klon = frischerKlon("klon");
     fs.rmSync(path.join(klon, ".git"), { recursive: true, force: true });
     const r = pruefen(klon, { GIT_CEILING_DIRECTORIES: basis });
-    expect(r.code).toBe(0);
+    expect(r.code).toBe(2);
     expect(r.aus).toContain("nicht pruefbar (kein git-Repository)");
-    expect(r.aus).toContain("Dieser Commit wurde NICHT gegengerechnet");
+    expect(r.aus).toContain("MESSPROBLEM: Der genannte Commit wurde NICHT gegengerechnet");
+    expect(r.aus).toContain("in einer Kopie des Repositories laufen lassen");
+    expect(r.aus).not.toContain("entspricht Commit");
     expect(r.aus).toContain("Server-Code: 3 Datei(en) gegen die Dateien in diesem Ordner geprueft.");
   });
 

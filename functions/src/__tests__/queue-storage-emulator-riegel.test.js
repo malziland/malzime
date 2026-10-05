@@ -63,7 +63,13 @@ const EMULATOREN = [
 
 const PRODUKTION = { K_SERVICE: "enqueue" };
 
-const LOKALE_ABLAGE = path.join(os.tmpdir(), "malzime-queue-uploads");
+/* Eigene Ablage fuer diese Testdatei: queue-storage.js legt im Lokal-Modus
+   unter os.tmpdir() ab. Ein gemeinsamer Ordner liesse zwei Testdateien — oder
+   zwei Testlaeufe zur selben Zeit — einander die Dateien loeschen; der Test
+   wuerde dann rot, obwohl nichts kaputt ist. */
+const EIGENER_TMP = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-test-riegel-"));
+const LOKALE_ABLAGE = path.join(EIGENER_TMP, "malzime-queue-uploads");
+afterAll(() => fs.rmSync(EIGENER_TMP, { recursive: true, force: true }));
 
 let vorher;
 let dienst;
@@ -103,6 +109,7 @@ beforeEach(() => {
   getStorage.mockReset().mockReturnValue(dienst);
   storage.setBucketForTest(null);
   jest.spyOn(console, "error").mockImplementation(() => {});
+  jest.spyOn(os, "tmpdir").mockReturnValue(EIGENER_TMP);
 });
 
 afterEach(() => {

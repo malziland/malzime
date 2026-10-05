@@ -131,16 +131,25 @@ describe("Lokal-Modus (QUEUE_LOCAL=1, Emulator)", () => {
   const os = require("os");
   const nodePath = require("path");
   const fs = require("fs");
-  const localDir = nodePath.join(os.tmpdir(), "malzime-queue-uploads");
+  /* Eigene Ablage fuer diese Testdatei (unter einem frisch angelegten Ordner):
+     Ein gemeinsamer Ordner unter os.tmpdir() liesse zwei Testdateien oder zwei
+     Testlaeufe zur selben Zeit einander die Dateien loeschen. */
+  const eigenerTmp = fs.mkdtempSync(nodePath.join(os.tmpdir(), "malzime-test-ablage-"));
+  const localDir = nodePath.join(eigenerTmp, "malzime-queue-uploads");
+  let tmpdirSpy;
 
   beforeEach(() => {
     process.env.QUEUE_LOCAL = "1";
+    tmpdirSpy = jest.spyOn(os, "tmpdir").mockReturnValue(eigenerTmp);
   });
 
   afterEach(async () => {
     delete process.env.QUEUE_LOCAL;
+    tmpdirSpy.mockRestore();
     await fs.promises.rm(localDir, { recursive: true, force: true });
   });
+
+  afterAll(() => fs.rmSync(eigenerTmp, { recursive: true, force: true }));
 
   test("storeImage → loadImage → deleteImage über das Dateisystem", async () => {
     const objectPath = await storage.storeImage(Buffer.from("lokaler-inhalt"), "image/png");

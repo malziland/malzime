@@ -212,7 +212,10 @@ def main():
     # Kinderschutz-Filter, der Test des Nachtlaufs fuer mitgelieferte
     # Bibliotheken und die zwei Modultests der Beispielbilder (woran ein
     # Beispielbild erkannt wird; ob Karte, Adresse und Quellenangabe zu den
-    # Ortsdaten der Bilddateien passen).
+    # Ortsdaten der Bilddateien passen). Ebenso: dass auch die Werbung des
+    # zweiten KI-Aufrufs durch den Kinderschutz-Filter laeuft, dass kein
+    # fester Eintrag der Tier-Profile einer waere, den der Filter streicht,
+    # und dass jeder Fehlerweg der Analyse die schon gezeigten Karten abraeumt.
     UNVERZICHTBAR = [
         "functions/src/__tests__/deploy-verhalten.test.js",
         "functions/src/__tests__/pipeline-vertrag-script.test.js",
@@ -229,6 +232,9 @@ def main():
         "functions/src/__tests__/verify-infrastructure-script.test.js",
         "functions/src/__tests__/job-pipelines-profile.test.js",
         "functions/src/__tests__/fremd-meldungen-script.test.js",
+        "functions/src/__tests__/job-pipelines-zweite-werbung.test.js",
+        "functions/src/__tests__/animal.test.js",
+        "public/__tests__/queue-livetext.test.js",
         "public/__tests__/beispielbild-ort.test.js",
         "public/__tests__/beispielbild-karten.test.js",
         "e2e/beispielbild-ohne-ortsabfrage.test.js",

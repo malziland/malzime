@@ -151,7 +151,8 @@ Job `alarm`, der Push aufs Handy, läuft nur im Original-Repository `malziland/m
 GitHub-Secrets `NTFY_URL_EU` und `NTFY_TOPIC_EU` und passt die Bedingung
 `github.repository` im Workflow an. Der Deploy-Riegel hält alle fünf Workflows,
 `.github/dependabot.yml` und die Einstellungsdateien der Prüfwerkzeuge (`vitest.config.js`,
-`playwright.config.js`, beide ESLint-Einstellungen, `.prettierignore`) per Prüfsumme fest,
+`playwright.config.js`, beide ESLint-Einstellungen, `.prettierignore`,
+`functions/jest.setup.js`) per Prüfsumme fest,
 dazu den Wortlaut der npm-Skripte hinter den Pflicht-Schritten: Nach jeder Änderung an
 einer dieser Stellen die neue Summe bzw. den neuen Wortlaut eintragen
 (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen` zeigt die Summen), sonst wird

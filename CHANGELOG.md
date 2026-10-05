@@ -98,6 +98,16 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   Fingerabdruck gleich mitliefert. Nennt der Server einen Stand, den der
   Quelltext nicht kennt, oder läuft die Prüfung außerhalb einer Kopie des
   Quelltextes, endet sie als Messproblem — nie als bestanden.
+- **Der Fingerabdruck nennt jetzt jede Datei, die an Google übergeben wird** —
+  auch `package.json`, `package-lock.json` und die Sprachliste, nicht nur die
+  Programmdateien. `sh scripts/pruefe-live.sh` rechnet jede davon gegen den
+  veröffentlichten Quelltext nach, und die Website geht nur allein hinaus, wenn
+  dieses Paket unverändert ist. Die Testwerte (`test-satz.js`) gehen nicht
+  mehr mit.
+- **Wer mit einer älteren Kopie des Quelltexts nachprüft, bekommt keinen
+  Fehlalarm mehr:** Kennt die Kopie den ausgelieferten Stand nicht, meldet
+  `pruefe-live.sh` ein Messproblem mit dem Hinweis auf `git fetch` — nicht
+  mehr eine Abweichung.
 - **Die Auslieferung sieht alle Prüfergebnisse eines Standes**, auch wenn sich
   über mehrere Tage viele angesammelt haben, und hält an, wenn sich die
   Version des Auslieferungswerkzeugs nicht lesen lässt.
@@ -107,6 +117,7 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   ausgeliefert wird. Das gilt auch, wenn der Befehl stehen bleibt, aber nichts
   mehr prüft — weil das Skript dahinter ausgetauscht wurde oder das
   Prüfwerkzeug so eingestellt ist, dass es keine oder weniger Dateien ansieht.
+  Dazu gehört auch die Vorbereitungsdatei der Server-Tests.
 - **Die Browser-Tests fragen beim Prüfen der Karte nichts mehr bei
   OpenStreetMap an.** Ihre Abfang-Regel griff nicht, die Kartenkacheln kamen
   unbemerkt aus dem Netz. Jetzt liefert der Test sie selbst und prüft, dass

@@ -403,8 +403,9 @@ Das Skript holt den Fingerabdruck von malzi.me und bildet aus dem dort genannten
 Commit **selbst** die Liste der Dateien, die ausgeliefert sein muessen — die Liste
 des Servers allein genuegt nicht, er koennte eine veraenderte Datei einfach
 weglassen. Dann laedt es jede dieser Dateien vom Server und vergleicht sie mit dem
-Fingerabdruck und mit dem Inhalt des Commits; die Pruefsummen des Server-Codes
-haelt es gegen denselben Commit. Eine Datei, die im Fingerabdruck fehlt, ist ein
+Fingerabdruck und mit dem Inhalt des Commits; die Pruefsummen des Server-Pakets
+(das Programm, `package.json`, `package-lock.json`, die Sprachliste — alles, was
+an Google uebergeben wird) haelt es gegen denselben Commit. Eine Datei, die im Fingerabdruck fehlt, ist ein
 Befund. Rueckgabewerte sind bewusst getrennt: `0` deckungsgleich und gegen den
 genannten Commit nachgerechnet, `1` Abweichung gefunden, `2` Messproblem (kein
 Netz, Werkzeug fehlt — oder der genannte Commit liess sich nicht gegenrechnen,

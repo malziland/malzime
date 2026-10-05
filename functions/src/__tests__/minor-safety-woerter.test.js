@@ -2106,6 +2106,215 @@ describe("Harmlose Wendungen werden vor dem Vergleich herausgenommen", () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════
+   Harmlose Wendungen stehen als ganze Wörter da (05.10.2026).
+   Eine links offene Wendung nimmt auch das Ende eines fremden Wortes mit:
+   „*schwein“ machte aus „Tischwein“ ein „Ti“ — der Wein war weg. Was ein
+   Schwein, ein Sporn oder ein Insekt ist, steht deshalb aufgezählt in der
+   Liste; „Pleasing“ und „Releasing“ stehen als Wortanfang da.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("Harmlose Wendungen stehen als ganze Wörter da", () => {
+  /* Ein Emoji belegt im Text zwei Plätze — jeder Fall auch mit einem davor. */
+  const EMOJI = String.fromCodePoint(0x1f525);
+  const mitEmoji = (liste) => [...liste, ...liste.map((e) => `${EMOJI} ${e}`)].map((e) => [e]);
+
+  test.each(
+    mitEmoji([
+      "Tischwein",
+      "Kirschwein",
+      "Fischwein",
+      "Frischwein",
+      "Tischwein-Abo",
+      "Rheinsekt",
+      "Weinsekt",
+      "Laptopleasing",
+      "Shopleasing",
+      "Hardwareleasing",
+      "Softwareleasing",
+    ])
+  )("Stufe 2 fängt: %s", (eintrag) => {
+    expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(true);
+  });
+
+  test.each(mitEmoji(["Teensporn", "Girlsporn", "Kidsporn", "Studentsporn"]))("Stufe 1 fängt: %s", (eintrag) => {
+    expect(_istImmerVerboten(eintrag)).toBe(true);
+    expect(_istImmerVerboten(`Auf dem Bildschirm steht ${eintrag}.`, false)).toBe(true);
+  });
+
+  test.each(
+    mitEmoji([
+      "Schwein",
+      "Spar-Schwein",
+      "Sparschwein",
+      "Meerschwein",
+      "Meerschweinchen",
+      "Wildschwein",
+      "Glücksschwein",
+      "Marzipanschwein",
+      "Hängebauchschwein",
+      "Schweinebraten",
+      "Sporn",
+      "Ansporn",
+      "anspornen",
+      "Rittersporn",
+      "Heißsporn",
+      "Fersensporn-Einlagen",
+      "Insekt",
+      "Nutzinsekt",
+      "Insekten",
+      "Insektenhotel",
+      "Insektenschutz",
+      "Pleasing",
+      "People-Pleasing",
+      "Peoplepleasing",
+      "People Pleasing Ratgeber",
+      "Crowd-Pleasing Snacks",
+      "releasing",
+      "Releasing Stress",
+    ])
+  )("bleibt stehen: %s", (eintrag) => {
+    expect(_istImmerVerboten(eintrag)).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten(`Auf dem Tisch liegt ${eintrag}.`, false)).toBe(false);
+  });
+
+  /* Der Wächter gegen diese Fehlerart: Eine links offene Wendung darf den
+     Kern eines links offenen Listenworts nicht hinter anderem Text enthalten
+     („*schwein“ enthält „*wein“ hinter „sch“) — sie verdeckte sonst jedes
+     Wort, dessen vorderer Teil so endet. Bewusste Ausnahme: „*diskreditier*“;
+     dort müsste hinter „kredit“ auch „ier“ folgen, und kein Kredit-Wort ist
+     so gebaut. */
+  test("keine links offene harmlose Wendung verdeckt ein links offenes Listenwort", () => {
+    const kern = (w) => w.replace(/[*+]/g, "");
+    const listen = [_SPERRLISTEN.immer, _SPERRLISTEN.minor].flatMap((l) => [...l.ueberall, ...l.nurAlsWerbung]);
+    const offen = listen.filter((w) => w.startsWith("*"));
+    expect(offen.length).toBeGreaterThan(100);
+    const verdeckt = [];
+    for (const wendung of _SPERRLISTEN.harmlos.filter((w) => w.startsWith("*")))
+      for (const wort of offen) if (kern(wendung).indexOf(kern(wort)) > 0) verdeckt.push(`${wendung} verdeckt ${wort}`);
+    expect(verdeckt).toEqual(["*diskreditier* verdeckt *kredit*"]);
+  });
+
+  test("die Ausnahme verdeckt nichts daneben", () => {
+    expect(_istBeiMinderjaehrigenVerboten("Diskreditierung")).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten("Diskreditierung auf Kredit")).toBe(true);
+  });
+
+  /* Bewusste Grenze: Was nicht aufgezählt ist, liest der Filter als Wein,
+     Porn oder Sekt. Als Werbe-Eintrag wird es bei möglicherweise
+     Minderjährigen gestrichen. */
+  test.each([["Wollschwein"], ["Mastschwein"], ["Stechinsekt"]])(
+    "nicht aufgezählt, wird als Alkohol gelesen: %s",
+    (eintrag) => {
+      expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(true);
+    }
+  );
+
+  test("nicht aufgezählt, wird als Pornografie gelesen: Hahnensporn", () => {
+    expect(_istImmerVerboten("Hahnensporn")).toBe(true);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Spiele-Käufe: „Skin“ ist keine Waffe (05.10.2026). Skins sind die Art
+   Angebot, die der Prompt bei Minderjährigen als Ersatz nennt (In-App-Käufe).
+   Anderes mit „Waffen“ bleibt gestrichen — ein Bauplan kann auch eine echte
+   Waffe meinen.
+   ══════════════════════════════════════════════════════════════════════ */
+describe("Waffen-Skins sind harmlos, andere Waffen-Angebote nicht", () => {
+  const EMOJI = String.fromCodePoint(0x1f525);
+
+  test.each([
+    ["Fortnite Waffen-Skins"],
+    ["Waffenskins"],
+    ["Waffen Skins"],
+    ["Waffen-Skin-Paket"],
+    ["Weapon Skins"],
+    ["Weapon-Skins"],
+    ["Weaponskins"],
+    ["Gun Skins"],
+    ["Gun-Skins"],
+    ["Gunskin"],
+    ["Valorant Weapon Skins"],
+    [`${EMOJI} Fortnite Waffen-Skins`],
+    [`${EMOJI} Weapon Skins`],
+  ])("bleibt stehen: %s", (eintrag) => {
+    expect(_istImmerVerboten(eintrag)).toBe(false);
+    expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(false);
+  });
+
+  test.each([
+    ["Call of Duty Waffen-Baupläne"],
+    ["Waffen-Pack"],
+    ["Waffenkiste"],
+    ["Weapon Pack"],
+    ["Waffen-Skins und Waffen"],
+    ["Weapon Skins and Guns"],
+    [`${EMOJI} Call of Duty Waffen-Baupläne`],
+  ])("wird weiter gestrichen: %s", (eintrag) => {
+    expect(_istImmerVerboten(eintrag)).toBe(true);
+  });
+
+  test("ein Kind behält die Skins, der Bauplan fliegt", () => {
+    const p = profil(KIND, ["Fortnite Waffen-Skins", "Weapon Skins", "Call of Duty Waffen-Baupläne", "Lego Set"]);
+    applyMinorSafety(p);
+    expect(p.normal.ad_targeting).toEqual(["Fortnite Waffen-Skins", "Weapon Skins", "Lego Set"]);
+  });
+
+  test("Glücksspiel mit Skins bleibt Glücksspiel", () => {
+    expect(_istBeiMinderjaehrigenVerboten("Weapon Skin Gambling")).toBe(true);
+    expect(_istBeiMinderjaehrigenVerboten("Skin-Gambling")).toBe(true);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
+   Zwei feste Fälle (05.10.2026).
+   ══════════════════════════════════════════════════════════════════════ */
+describe("Feste Fälle", () => {
+  /* Über die Nummer gebaut: Das Zeichen belegt im Text zwei Plätze. Der
+     Bindestrich dahinter darf deshalb nicht an der falschen Stelle
+     weggelassen werden — „Bass-Drum“ wurde sonst als „rum“ gelesen. */
+  const TROMMEL = String.fromCodePoint(0x1f941);
+
+  test.each([[`${TROMMEL} Bass-Drum Set`], [`${TROMMEL}${TROMMEL} Bass-Drum Set`], ["Bass-Drum Set"]])(
+    "bleibt stehen: %s",
+    (eintrag) => {
+      expect(_istImmerVerboten(eintrag)).toBe(false);
+      expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(false);
+      const p = profil(KIND, [eintrag, "Lego Set"]);
+      applyMinorSafety(p);
+      expect(p.normal.ad_targeting).toEqual([eintrag, "Lego Set"]);
+    }
+  );
+
+  test("das Wort daneben wird trotzdem gefangen", () => {
+    expect(_istBeiMinderjaehrigenVerboten(`${TROMMEL} Bass-Drum Set mit Rum`)).toBe(true);
+  });
+
+  /* Bewusst nicht: Ein Umlaut passt auf „ä“ und „ae“, nicht auf den nackten
+     Vokal. Die KI schreibt keine kaputten Umlaute (SECURITY-MODEL, Abschnitt
+     04.10.2026, „Was sie nicht leistet“). */
+  test.each([["Glucksspiel"], ["Schonheits-OP"], ["Brustvergrosserung"], ["Diatpille"], ["Appetitzugler"]])(
+    "Umlaut als nackter Vokal, bewusst nicht gefangen: %s",
+    (eintrag) => {
+      expect(_istImmerVerboten(eintrag)).toBe(false);
+      expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(false);
+    }
+  );
+
+  test.each([
+    ["Glücksspiel"],
+    ["Gluecksspiel"],
+    ["Schönheits-OP"],
+    ["Schoenheits-OP"],
+    ["Brustvergrößerung"],
+    ["Diätpille"],
+    ["Appetitzügler"],
+  ])("mit Umlaut oder „e“ wird gefangen: %s", (eintrag) => {
+    expect(_istBeiMinderjaehrigenVerboten(eintrag)).toBe(true);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════
    Schreibweisen: zusammen, mit Bindestrich, getrennt (A-01). Ein Bindestrich
    zwischen zwei Buchstaben ändert nichts — das Listenwort muss die Wortfuge
    dafür nicht kennen. Ein Leerzeichen an der Wortfuge trifft nur, wenn das
@@ -2462,8 +2671,13 @@ const BEISPIEL_JE_WENDUNG = {
   "geheimwaffe*": "Geheimwaffe gegen Langeweile",
   "wunderwaffe*": "Wunderwaffe im Haushalt",
   "allzweckwaffe*": "Allzweckwaffe Backpulver",
-  "*pleasing*": "People-Pleasing-Ratgeber",
-  "*releasing*": "Releasing Stress",
+  "pleasing*": "Pleasing",
+  "people pleasing*": "People-Pleasing-Ratgeber",
+  "crowd pleasing*": "Crowd-Pleasing Snacks",
+  "displeasing*": "Displeasing",
+  "unpleasing*": "Unpleasing",
+  "releasing*": "Releasing Stress",
+  "unreleasing*": "Unreleasing",
   "cocktailkleid*": "Cocktailkleid",
   "schnapsidee*": "Schnapsidee",
   "schnapszahl*": "Schnapszahl",
@@ -2471,8 +2685,31 @@ const BEISPIEL_JE_WENDUNG = {
   "schnapskarte*": "Schnapskarten",
   "bierernst*": "Bierernst",
   "biereif*": "Biereifer",
-  "*schwein": "Meerschwein",
-  "*insekt": "Nutzinsekt",
+  schwein: "Schwein",
+  meerschwein: "Meerschwein",
+  sparschwein: "Sparschwein",
+  wildschwein: "Wildschwein",
+  glücksschwein: "Glücksschwein",
+  hausschwein: "Hausschwein",
+  warzenschwein: "Warzenschwein",
+  stachelschwein: "Stachelschwein",
+  minischwein: "Minischwein",
+  marzipanschwein: "Marzipanschwein",
+  hängebauchschwein: "Hängebauchschwein",
+  trüffelschwein: "Trüffelschwein",
+  pinselohrschwein: "Pinselohrschwein",
+  phrasenschwein: "Phrasenschwein",
+  bullenschwein: "Bullenschwein",
+  frontschwein: "Frontschwein",
+  kapitalistenschwein: "Kapitalistenschwein",
+  bilgenschwein: "Bilgenschwein",
+  kielschwein: "Kielschwein",
+  insekt: "Insekt",
+  nutzinsekt: "Nutzinsekt",
+  fluginsekt: "Fluginsekt",
+  schadinsekt: "Schadinsekt",
+  urinsekt: "Urinsekt",
+  aasinsekt: "Aasinsekt",
   "kindersekt*": "Kindersekt",
   "champagnerfarb*": "Champagnerfarbenes Kleid",
   "akkreditier*": "Akkreditierung",
@@ -2613,7 +2850,18 @@ const BEISPIEL_JE_WENDUNG = {
   "middlesex*": "Middlesex-Shop",
   "wessex*": "Wessex-Shop",
   "*waffel*": "Las-Vegas-Waffeln",
-  "*sporn": "Ansporn",
+  sporn: "Sporn",
+  ansporn: "Ansporn",
+  rittersporn: "Rittersporn",
+  heißsporn: "Heißsporn",
+  fersensporn: "Fersensporn",
+  bergsporn: "Bergsporn",
+  felssporn: "Felssporn",
+  lerchensporn: "Lerchensporn",
+  rammsporn: "Rammsporn",
+  "waffen skin*": "Fortnite Waffen-Skins",
+  "weapon skin*": "Weapon Skins",
+  "gun skin*": "Gun Skins",
 };
 
 describe("Tabelle harmlose Wendung → Beispiel", () => {

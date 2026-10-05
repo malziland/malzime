@@ -24,9 +24,10 @@
  *   a+b     Wortfuge einer Zusammensetzung ("miet+kauf*"): zusammen und mit
  *           Bindestrich ueberall, getrennt ("Miet Kauf") nur als
  *           Werbe-Eintrag
- * Ein Umlaut passt auch auf ae/oe/ue. Kurze Woerter stehen als ganzes Wort
- * da: "Wetter" ist keine Wette, "Schwein" kein Wein, "Insekt" kein Sekt,
- * "Waffel" keine Waffe.
+ * Ein Umlaut passt auch auf ae/oe/ue, nicht auf den nackten Vokal
+ * ("Glucksspiel" wird nicht gefangen). Kurze Woerter stehen als ganzes Wort
+ * da: "Wetter" ist keine Wette, "Waffel" keine Waffe. "Schwein" ist kein
+ * Wein und "Insekt" kein Sekt, weil sie bei den harmlosen Wendungen stehen.
  *
  * ZUSAMMEN, MIT BINDESTRICH, GETRENNT: Jede Zusammensetzung haelt als
  * Werbe-Eintrag alle drei Schreibweisen.
@@ -72,8 +73,8 @@
  * __tests__/prompt-sprachregeln.test.js).
  *
  * HARMLOSE WENDUNGEN nehmen ein Listenwort in einer festen Verbindung aus
- * ("Wasserpistole", "alkoholfrei", "Diet Coke", "Rifle Jeans", "Unisex").
- * Sie wirken auf beide Stufen und auf jede Sicht.
+ * ("Wasserpistole", "alkoholfrei", "Diet Coke", "Rifle Jeans", "Unisex",
+ * "Waffen-Skins"). Sie wirken auf beide Stufen und auf jede Sicht.
  *
  * BEWUSST NICHT GELISTET:
  *   - "Sex" als ganzes Wort und "Pistols": "Sex: female" ist eine Angabe,
@@ -208,13 +209,28 @@ const MINOR_NUR_ALS_WERBUNG = `*wette, admiral, stake, slots, raten*, später be
   appetit zügler*, saft kur, saft kuren, stoffwechsel kur, stoffwechsel kuren, lach gas`;
 
 /* Harmlose Wendungen, in denen ein Listenwort steckt. Sie werden vor dem
-   Vergleich aus dem Text genommen. */
+   Vergleich aus dem Text genommen.
+   Was ein Schwein, ein Sporn oder ein Insekt ist, steht als ganzes Wort
+   aufgezaehlt da: Eine links offene Wendung ("*schwein") naehme auch das
+   Ende eines fremden Wortes mit — aus "Tischwein" bliebe "Ti", aus
+   "Teensporn" "Teen", aus "Rheinsekt" "Rhe". Aus demselben Grund stehen
+   "pleasing" und "releasing" als Wortanfang da ("Laptopleasing" ist
+   Leasing). Was nicht aufgezaehlt ist ("Wollschwein"), liest der Filter als
+   Wein. Die Pruefreihe haelt die Fehlerart fest.
+   "Skin": Waffen-Skins sind Spiele-Kaeufe, keine Waffen. Anderes mit
+   "Waffen" bleibt gestrichen ("Waffen-Bauplaene", "Waffen-Pack") — ein
+   Bauplan kann auch eine echte Waffe meinen. */
 const HARMLOS_WOERTER = `guns n roses, top gun, machine gun kelly, massage gun*, nerf gun*, water gun*, glue gun*,
   toy gun*, gun metal*, wasser pistole*, nerf pistole*, *klebe pistole*, massage pistole*, spielzeug pistole*,
   water pistol*, toy pistol*, wasser gewehr*, nerf gewehr*, spielzeug gewehr*, ford escort, terrorvogel*,
   terrorvögel*, terrorzwerg*, terrorisier*, terroriz*, terrorise, terrorised, terrorises, terrorising, geheimwaffe*,
-  wunderwaffe*, allzweckwaffe*, *pleasing*, *releasing*, cocktailkleid*, schnapsidee*, schnapszahl*, schnapsen,
-  schnapskarte*, bierernst*, biereif*, *schwein, *insekt, kindersekt*, champagnerfarb*, akkreditier*, *diskreditier*,
+  wunderwaffe*, allzweckwaffe*, pleasing*, people pleasing*, crowd pleasing*, displeasing*, unpleasing*,
+  releasing*, unreleasing*, cocktailkleid*, schnapsidee*, schnapszahl*, schnapsen,
+  schnapskarte*, bierernst*, biereif*, schwein, meerschwein, sparschwein, wildschwein, glücksschwein,
+  hausschwein, warzenschwein, stachelschwein, minischwein, marzipanschwein, hängebauchschwein, trüffelschwein,
+  pinselohrschwein, phrasenschwein, bullenschwein, frontschwein, kapitalistenschwein, bilgenschwein, kielschwein,
+  insekt, nutzinsekt, fluginsekt, schadinsekt, urinsekt, aasinsekt, kindersekt*, champagnerfarb*,
+  akkreditier*, *diskreditier*,
   stocking filler*, joint venture*, coffee grinder*, kaffee grinder*, angle grinder*, *spritz pistole*,
   seifenblasen pistole*, laser pistole*, bubble gun*, squirt gun*, holz gewehr*, lackier pistole*, silikon pistole*,
   kartuschen pistole*, löt pistole*, heißluft pistole*, zapf pistole*, lil uzi*, mundpropaganda*, alkoholfrei*,
@@ -233,7 +249,8 @@ const HARMLOS_WOERTER = `guns n roses, top gun, machine gun kelly, massage gun*,
   spritz gebäck*, spritz beutel*, spritz tülle*, gin romme*, gin rummy*, winery dogs, ginger ale*, radler zubehör*,
   radler hose*, radler trikot*, radler helm*, lotto trikot*, lotto schuh*, admiral sportswear*, koks grill*,
   hasch mich*, cbd frei*, thc frei*, diät cola*, diät limo*, unisex*, essex*, sussex*, middlesex*, wessex*, *waffel*,
-  *sporn`;
+  sporn, ansporn, rittersporn, heißsporn, fersensporn, bergsporn, felssporn, lerchensporn, rammsporn,
+  waffen skin*, weapon skin*, gun skin*`;
 
 module.exports = {
   IMMER: { ueberall: [PORNOGRAFIE, WAFFEN, EXTREMISMUS], nurAlsWerbung: IMMER_NUR_ALS_WERBUNG },

@@ -1134,7 +1134,7 @@ Fließtext mit festen Wortlisten (`functions/src/minor-safety-woerter.js`, je
 Thema deutsch und englisch). Er fängt, was in den Listen steht — nicht jede
 Werbung zu einem Thema. Vor dem Vergleich wird der Text vereinheitlicht
 (Groß- und Kleinschreibung, Umlaute, Akzente); kurze Wörter gelten nur als
-ganzes Wort („Wetter“ ist keine Wette, „Insekt“ kein Sekt).
+ganzes Wort („Wetter“ ist keine Wette, „Waffel“ keine Waffe).
 
 **Zusammen, mit Bindestrich, getrennt.** Ein Bindestrich im Wort ändert
 nichts: Der Filter liest jeden Text auch so, als stünde der Bindestrich nicht
@@ -1201,7 +1201,16 @@ Wort und „Pistols“ stehen nicht in der Liste — „Sex: female“ ist eine 
 Beer“, „Diet Coke“, „People-Pleasing“, „Cocktailkleid“, „Rifle Jeans“,
 „Unisex“), werden vor dem Vergleich aus dem Text genommen — für beide Stufen,
 im Werbe-Eintrag wie im Satz. Ein Sperrwort daneben wird trotzdem gefangen
-(„Alkoholfreies Bier“ bleibt Bier).
+(„Alkoholfreies Bier“ bleibt Bier). Seit 05.10.2026 stehen „Schwein“, „Sporn“
+und „Insekt“ dort als ganze Wörter aufgezählt (Meer-, Spar-, Wild-,
+Glücksschwein; Ansporn, Rittersporn; Nutzinsekt): Ein Wort, das nur so endet,
+wird wieder gefangen („Tischwein“, „Teensporn“, „Rheinsekt“). Was nicht
+aufgezählt ist („Wollschwein“), liest der Filter als Wein; ein Test hält
+fest, dass keine Wendung mehr das Ende eines fremden Wortes mitnimmt.
+Waffen-Skins („Fortnite Waffen-Skins“, „Weapon Skins“, „Gun Skins“) sind
+Spiele-Käufe und bleiben stehen. Anderes mit „Waffen“ wird weiter für alle
+gestrichen („Waffen-Baupläne“, „Waffen-Pack“): Ein Bauplan kann auch eine
+echte Waffe meinen.
 
 **Was sie nicht leistet.** Ein Werbe-Eintrag ohne Listenwort geht durch, und
 keine Protokollzeile zeigt ihn: Die Kinderschutz-Zeile zählt nur
@@ -1215,7 +1224,9 @@ meinen können: „Gras“, „Speed“, „Messer“, „Patronen“, „Corona
 Anzug). Nicht gelistet
 sind auch die Angebote, die der Prompt bei Minderjährigen ausdrücklich als
 Ersatz nennt (In-App-Käufe, Lootboxen, Gaming-Abos, Influencer-Merch,
-Sammelkarten, Statuskleidung): Sie sind Lerninhalt. Schreibweisen mit Ziffern
+Sammelkarten, Statuskleidung): Sie sind Lerninhalt. Ein Umlaut passt auf „ü“
+und „ue“, nicht auf den nackten Vokal: „Glucksspiel“ und „Schonheits-OP“
+gehen durch (bis zum 04.10.2026 wurden sie gefangen). Schreibweisen mit Ziffern
 statt Buchstaben („0nlyFans“), gesperrter Schrift („W e t t e n“) oder einem
 Leerzeichen mitten in einem Wort, das keine Zusammensetzung ist („Por no“),
 fängt die Liste nicht.

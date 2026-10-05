@@ -84,7 +84,7 @@ const ZEHNER_EN = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, sev
    teacher" nicht. */
 const KATEGORIEN = [
   [
-    /(?<!\p{L})(?:teen\p{L}*|jugendlich\p{L}*|jugendalter\p{L}*|adolescent\p{L}*|heranwachsend\p{L}*|halbw(?:ü|ue)chsig\p{L}*|halbstark\p{L}*|konfirmand(?:en|in|innen)?|youngsters?|juveniles?|youths|bursch(?:e|en)?)(?!\p{L})|(?<!\p{L})a\s+youth(?!\p{L})/iu,
+    /(?<!\p{L})(?:teen\p{L}*|jugendlich\p{L}*|jugendalter\p{L}*|adolescent\p{L}*|heranwachsend\p{L}*|halbw(?:ü|ue)chsig\p{L}*|halbstark\p{L}*|konfirmand(?:en|in|innen)?|youngsters?|juveniles?|youths|bursch(?:e|en|i|is|erl|erln)?)(?!\p{L})|(?<!\p{L})a\s+youth(?!\p{L})/iu,
     13,
   ],
   [/(?<!\p{L})(?:lehrling(?:e|en|s)?|azubis?|auszubildende[rn]?|apprentices?)(?!\p{L})/iu, 15],
@@ -164,7 +164,8 @@ const ABKUERZUNG_UND_ANDERE = "u a";
    woman", "young adult", "young at heart").
    "noch im Wachstum", "noch nicht ausgewachsen", "Wachstumsschub": nur mit
    "noch", "mitten" oder als festes Wort — "im Wachstum" allein steht auch
-   bei Firmen.
+   bei Firmen. "noch nicht erwachsen", "noch kein Erwachsener", "not yet an
+   adult": sagt wie "minderjaehrig" unter 18, ohne Zahl.
    "zwei", "drei", "vier" (und englisch): Die Altersauslese liest Zahlwoerter
    erst ab fuenf als Alter. Als Altersversuch zaehlen auch die kleineren,
    wie jede kleine Zahl ("Du bist drei"). "ein" und "one" nicht — sie sind
@@ -180,6 +181,7 @@ const VERSUCHSWOERTER = [
   /(?<!\p{L})jung(?:e|er|es|en|em)\s+(?:person(?:en)?|mensch(?:en)?|leute|gesicht(?:er|sz(?:ü|ue)ge)?|z(?:ü|ue)ge|erscheinung|aussehen)(?!\p{L})/iu,
   /(?<!\p{L})young(?!\p{L})(?!\s+(?:wom[ae]n|m[ae]n|adults?|lad(?:y|ies)|gentlem[ae]n|mothers?|fathers?|moms?|dads?|parents?|professionals?|couples?|at\s+heart|and\s+old)(?!\p{L}))/iu,
   /(?<!\p{L})(?:noch\s+(?:nicht\s+(?:ganz\s+)?ausgewachsen|im\s+wachstum|in\s+der\s+entwicklung)|mitten\s+im\s+wachstum)(?!\p{L})|(?<!\p{L})wachstumsschub\p{L}*|(?<!\p{L})(?:still\s+growing|not\s+(?:yet\s+)?fully\s+grown|growth\s+spurt)(?!\p{L})/iu,
+  /(?<!\p{L})noch\s+(?:nicht\s+(?:ganz\s+)?erwachsen|kein\p{L}*\s+erwachsene[rn]?)(?!\p{L})|(?<!\p{L})not\s+(?:yet\s+)?(?:an\s+adult|grown[- ]up)(?!\p{L})/iu,
   /(?<!\p{L})(?:milchz(?:a|ä|ae)hn\p{L}*|milchgebiss\p{L}*|zahnwechsel\p{L}*|wechselgebiss\p{L}*|stimmbruch\p{L}*|babyspeck\p{L}*)|(?<!\p{L})(?:milk\s+(?:teeth|tooth)|puppy\s+fat|voice\s+(?:is\s+)?(?:breaking|cracking))(?!\p{L})/iu,
 ];
 

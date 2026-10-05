@@ -51,7 +51,7 @@ const {
   hatLesbaresAlter,
   hatAltersversuch,
   ersterSatz,
-  nachErstemSatz,
+  nachAlterssatz,
   ankerZusatz,
   alterNichtLesbarText,
   ohneZiffernKlammern,
@@ -376,9 +376,9 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        verbindliche Fassung ersetzt, alles DANACH bleibt erhalten.
        Hat die Antwort gar keinen Satzabschluss, gibt es auch keinen zweiten
        Satz: dann bleibt es beim reinen Anker wie bisher, statt den Anker
-       doppelt zu schreiben. Wo der erste Satz endet, sagt dieselbe Regel wie
-       bei der Altersauslese (alters-lesbarkeit.js) — nicht hinter "ca.". */
-    const rest = nachErstemSatz(modellwert);
+       doppelt zu schreiben. Wo der Alterssatz endet, sagt dieselbe Regel wie
+       bei der Altersauslese (nachAlterssatz) — nicht hinter "ca." oder "etw.". */
+    const rest = nachAlterssatz(modellwert, a);
     /* BUG-2026-08-20-26: Der Anker wird NACH applyBounds vorangestellt und umging
        damit die Laengengrenze der Karte. Ein praepariertes Foto (Prompt-Injection
        ueber Bildinhalt) oder ein durchdrehendes Modell konnte so einen bis zu

@@ -211,6 +211,19 @@ function satzUndRest(text) {
 const ersterSatz = (text) => satzUndRest(text)[0];
 const nachErstemSatz = (text) => satzUndRest(text)[1];
 
+/* Was in der Anzeige hinter dem Alterssatz einer Karte steht, wenn der Anker
+   ihn ersetzt. Der Alterssatz ist der erste Satz. Endet er an einer
+   Abkuerzung, die die Liste nicht kennt ("etw. 13"), steht das Alter erst im
+   naechsten Stueck. Was der Anker am Ende schon sagt, wird deshalb nicht
+   wiederholt. Nur fuer die Anzeige: Gelesen wird weiter der erste Satz. */
+const KERN = (t) => t.replace(/[.!?\s]+$/u, "").toLowerCase();
+function nachAlterssatz(text, anker = "") {
+  const rest = nachErstemSatz(text);
+  const [stueck, danach] = satzUndRest(rest);
+  const kern = KERN(stueck);
+  return kern && KERN(String(anker)).endsWith(kern) ? danach : rest;
+}
+
 /* Der Altersanker als Text: Liefert das Modell statt eines Textes eine Zahl,
    eine Liste oder ein Objekt, wird der Inhalt gelesen statt verworfen. */
 function ankerAlsText(wert, tiefe = 0) {
@@ -257,6 +270,7 @@ module.exports = {
   hatAltersversuch,
   ersterSatz,
   nachErstemSatz,
+  nachAlterssatz,
   ankerAlsText,
   ankerZusatz,
   alterNichtLesbarText,

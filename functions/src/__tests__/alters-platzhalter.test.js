@@ -2177,6 +2177,16 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     ["Du bist weiblich. Du bist die Nummer 1."],
     ["Du bist weiblich. Du bist ‹13›."],
     ["Du bist weiblich. Du bist dreizehn."],
+    ["Geschlecht: weiblich. Alter: ~13 (12–14). Deine Wangen sind rund."],
+    ["Du bist weiblich. Vermutlich 13 oder 14."],
+    ["Du bist weiblich. Nicht älter als 14."],
+    ["Du bist weiblich. Zwischen 12 und 14."],
+    ["Gender: female. Age: 13. Your cheeks are round."],
+    ["Weiblich, etw. 13. Deine Wangen sind noch rund."],
+    ["Du bist weiblich u. 13. Deine Wangen sind noch rund."],
+    ["Du bist weiblich, schätzungsw. 13. Deine Wangen sind noch rund."],
+    ["Du bist weiblich! 13, würde ich sagen."],
+    ["You are female. You look 13."],
     ["Du bist weiblich. Du bist drei."],
     ["Du bist weiblich. Du bist vier."],
     ["You are female. You are four."],
@@ -2289,6 +2299,8 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     ["weiblich, Konfirmandin", 13],
     ["männlich, Halbwüchsiger", 13],
     ["männlich, Halbstarker", 13],
+    ["männlich, Burschi", 13],
+    ["männlich, Burscherl", 13],
     ["weiblich, Maturantin", 17],
     ["männlich, Abiturient", 17],
     ["weiblich, schulpflichtig", 6],
@@ -2394,6 +2406,10 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     [undefined, "Du bist ein junger Mensch. Runde Wangen."],
     [undefined, "Du bist weiblich. Du hast ein junges Gesicht."],
     [undefined, "Du bist weiblich. Du hast noch Milchzähne."],
+    ["weiblich, noch nicht erwachsen", "Du bist weiblich und noch nicht erwachsen. Deine Wangen sind rund."],
+    ["männlich, noch kein Erwachsener", "Du bist männlich. Deine Wangen sind rund."],
+    ["female, not yet an adult", "You are female. Round cheeks."],
+    [undefined, "You are a young lad. Your cheeks are round."],
     ["weiblich, mitten im Wachstum", "Du bist weiblich. Runde Wangen."],
     [undefined, "You are female. You look young."],
   ])("Altersversuch im Anker oder in der Karte: %p / %s", async (anker, karte) => {
@@ -2412,6 +2428,10 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     ["Du bist noch in der Entwicklung."],
     ["Du bist noch nicht ganz ausgewachsen."],
     ["You are not yet fully grown."],
+    ["You are not yet grown up."],
+    ["You are not an adult."],
+    ["Du bist noch nicht ganz erwachsen."],
+    ["Du bist noch keine Erwachsene."],
     ["You are in a growth spurt."],
     ["You are two."],
     ["You are three."],
@@ -2469,6 +2489,10 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     ["Du bist eine junggebliebene Frau."],
     ["Du trägst junge Mode."],
     ["Du trägst eine Zahnspange."],
+    ["Du bist erwachsen."],
+    ["Du bist noch nicht alt."],
+    ["Du wirkst erwachsen, aber noch nicht müde."],
+    ["You are an adult."],
     ["Du hast eine Zahnlücke."],
     ["Du trinkst gern Milch."],
     ["Your voice is deep."],
@@ -2617,6 +2641,104 @@ describe("Kinderalter als bloße Zahl, weitere Wörter und Abkürzungen", () => 
     expect(ersterSatz(karte)).toBe(`${FEUER} Du bist ein Teenager, Initiale J.`);
     const r = await lauf(undefined, karte);
     expect(r).toMatchObject({ stufe2: true, alter: 13, unlesbar: false, kreditBleibt: false });
+  });
+
+  /* ── Jahrzehnt als Mehrzahl oder als Person ───────────────────────────────
+     „in den Zwanzigern“ und „Mittzwanzigerin“ lesen sich wie „Mitte zwanzig“
+     und „in her twenties“: als 20. Das obere Ende bleibt offen. */
+  test.each([
+    ["weiblich, in den Zwanzigern", 20],
+    ["weiblich, Mittzwanzigerin", 20],
+    ["männlich, Endzwanziger", 20],
+    ["männlich, ein Anfangszwanziger", 20],
+    ["weiblich, eine Zwanzigerin", 20],
+    ["männlich, in den Dreißigern", 30],
+    ["weiblich, Mittdreißigerin", 30],
+    ["männlich, in den Dreissigern", 30],
+    ["weiblich, in den Vierzigern", 40],
+    ["männlich, Endfünfziger", 50],
+    [`${FEUER} weiblich, in den Zwanzigern`, 20],
+  ])("Jahrzehnt gelesen: %s → %p", async (anker, alter) => {
+    expect(_untereAltersgrenze(anker)).toBe(alter);
+    expect(obereAltersgrenze(anker)).toBeNull();
+    const r = await lauf(anker, "Du bist X. Das zeigt das Bild.");
+    expect(r).toMatchObject({ stufe2: alter <= SCHUTZ_ALTER, alter, unlesbar: false, festerSatz: false });
+    expect(r.kreditBleibt).toBe(alter > SCHUTZ_ALTER);
+  });
+
+  /* Ohne „in den …ern“ und ohne Vorsilbe ist es ein Geldschein oder ein
+     Jahrzehnt der Geschichte, kein Alter — und es verdrängt kein Kindwort. */
+  test.each([
+    ["Du hältst einen Zwanziger in der Hand."],
+    ["Du trägst Mode der Fünfziger."],
+    ["Die Frisur stammt aus den Fünfzigerjahren."],
+    ["Du hältst einen Fünfziger in der Hand."],
+  ])("kein Jahrzehnt als Alter: %s", (text) => {
+    expect(_untereAltersgrenze(text)).toBeNull();
+  });
+
+  test("„in den 20ern“: das obere Ende bleibt offen", () => {
+    expect(_untereAltersgrenze("Du bist in den 20ern.")).toBe(20);
+    expect(obereAltersgrenze("Du bist in den 20ern.")).toBeNull();
+  });
+
+  test("ein Geldschein neben einem Kindwort verdrängt es nicht", () => {
+    expect(_untereAltersgrenze("Du bist ein Teenager mit einem Fünfziger in der Hand.")).toBe(13);
+  });
+
+  /* ── Anzeige: Der Anker ersetzt den ganzen Alterssatz der Karte ───────────
+     Endet der erste Satz der Karte an einer Abkürzung, die die Liste nicht
+     kennt („etw. 13“), steht das Alter erst im nächsten Stück. Was der Anker
+     am Ende schon sagt, wird nicht wiederholt. */
+  test.each([
+    ["weiblich, etw. 13", "Du bist weiblich, etw. 13. Beleg.", "weiblich, etw. 13. Beleg.", 13],
+    [
+      "weiblich, etw. 13 Jahre alt (Spanne 12-14)",
+      "Du bist weiblich, etw. 13 Jahre alt (Spanne 12-14). Deine Wangen sind rund.",
+      "weiblich, etw. 13 Jahre alt (Spanne 12-14). Deine Wangen sind rund.",
+      12,
+    ],
+    ["weiblich, etw. 13", "Du bist weiblich, etw. 13.", "weiblich, etw. 13", 13],
+    [
+      `${FEUER} weiblich, etw. 13`,
+      `${FEUER} Du bist weiblich, etw. 13. Beleg.`,
+      `${FEUER} weiblich, etw. 13. Beleg.`,
+      13,
+    ],
+    [
+      "weiblich, ~13 Jahre alt, Schülerin",
+      "Du bist weiblich, ~13 Jahre alt. Schülerin. Runde Wangen.",
+      "weiblich, ~13 Jahre alt, Schülerin. Runde Wangen.",
+      13,
+    ],
+  ])("Anker %s: Die Karte nennt das Alter nicht doppelt", async (anker, karte, anzeige, alter) => {
+    const r = await lauf(anker, karte);
+    expect(r).toMatchObject({ stufe2: true, alter, unlesbar: false, kreditBleibt: false });
+    expect(r.karte).toBe(anzeige);
+    expect(r.karteBeast).toBe(anzeige);
+  });
+
+  /* Ein Beleg-Satz, der nur mit einer Zahl beginnt, bleibt stehen. */
+  test.each([
+    [
+      "weiblich, ~13 Jahre alt",
+      "Du bist weiblich, ~13 Jahre alt. 14 Kerzen stehen auf der Torte.",
+      "weiblich, ~13 Jahre alt. 14 Kerzen stehen auf der Torte.",
+    ],
+    [
+      "weiblich, etw. 13",
+      "Du bist weiblich, etw. 13 Kerzen auf der Torte. Beleg.",
+      "weiblich, etw. 13. 13 Kerzen auf der Torte. Beleg.",
+    ],
+    [
+      "weiblich, ~13 Jahre alt",
+      "Du bist weiblich. Deine Wangen sind rund.",
+      "weiblich, ~13 Jahre alt. Deine Wangen sind rund.",
+    ],
+    ["weiblich, ~13 Jahre alt", "Du bist weiblich... Runde Wangen.", "weiblich, ~13 Jahre alt. .. Runde Wangen."],
+  ])("Anker %s: Der Beleg-Satz bleibt stehen", async (anker, karte, anzeige) => {
+    const r = await lauf(anker, karte);
+    expect(r.karte).toBe(anzeige);
   });
 
   /* ── Bewusst so (SECURITY-MODEL, Abschnitt 17.09.2026, Punkt 3) ───────── */

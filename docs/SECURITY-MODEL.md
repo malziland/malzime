@@ -935,14 +935,17 @@ Untergrenze.
    **Was als lesbares Alter gilt.** Jede Zahl von 1 bis 100 an diesen
    Stellen; stehen mehrere da, zählt die kleinste. Zahlwörter („etwa
    dreizehn“, „Mitte vierzig“, „in her teens“), „13jährig“ und
-   „dreizehnjährig“ werden wie Zahlen gelesen. Kategoriewörter („Teenager“,
-   „Schulkind“, „Gymnasiast“, „Erstklässler“, „Lehrling“, „im Kindesalter“,
-   „high school“) und Wörter, die ein Kind ohne Zahl benennen („Mädchen“,
-   „Bub“, „Bursch“, „Knabe“, „Junge“, „Volksschulkind“, „Schülerin“, „Baby“
-   und ihre englischen Entsprechungen), gelten als junges Alter — aber nur,
-   wenn keine Zahl dasteht. Seit 05.10.2026 gehören dazu auch „vorpubertär“,
-   „prepubescent“, „Firmling“, „Kommunionkind“, „Taferlklassler“, „dritte
-   Klasse“, „Kita“, „Mädl“ und „Bua“; die ganze Liste steht in
+   „dreizehnjährig“ werden wie Zahlen gelesen. Ein Jahrzehnt als Mehrzahl
+   oder als Person zählt wie „Mitte zwanzig“: „in den Zwanzigern“ und
+   „Mittzwanzigerin“ sind 20; „ein Zwanziger“ ist ein Geldschein und zählt
+   nicht. Kategoriewörter („Teenager“, „Schulkind“, „Gymnasiast“,
+   „Erstklässler“, „Lehrling“, „im Kindesalter“, „high school“) und Wörter,
+   die ein Kind ohne Zahl benennen („Mädchen“, „Bub“, „Bursch“, „Knabe“,
+   „Junge“, „Volksschulkind“, „Schülerin“, „Baby“ und ihre englischen
+   Entsprechungen), gelten als junges Alter — aber nur, wenn keine Zahl
+   dasteht. Seit 05.10.2026 gehören dazu auch „vorpubertär“, „prepubescent“,
+   „Firmling“, „Kommunionkind“, „Taferlklassler“, „dritte Klasse“, „Kita“,
+   „Mädl“, „Bua“ und „Burschi“; die ganze Liste steht in
    `alters-lesbarkeit-woerter.js`.
 
    **Was als Altersversuch gilt** — im Anker oder irgendwo in einer der zwei
@@ -958,9 +961,9 @@ Untergrenze.
      einer Person ist: Dezimalzahl („1,80“), Uhrzeit („14:30“, „9 Uhr“),
      Prozent und der Teil einer größeren Zahl (Jahreszahl, „130 cm“);
    - „jung“ und „young“ (nicht „junge Frau“, „junger Mann“, „young adult“,
-     „jung geblieben“), „noch im Wachstum“, „noch nicht ausgewachsen“ und
-     Merkmale, die nur Kinder und Jugendliche haben („Milchzähne“,
-     „Zahnwechsel“, „Stimmbruch“).
+     „jung geblieben“), „noch im Wachstum“, „noch nicht ausgewachsen“, „noch
+     nicht erwachsen“ und Merkmale, die nur Kinder und Jugendliche haben
+     („Milchzähne“, „Zahnwechsel“, „Stimmbruch“).
 
    Hat weder der Anker noch ein erster Satz ein lesbares Alter und steht
    irgendwo ein solcher Versuch, gilt das Alter als nicht lesbar; eine Zahl
@@ -968,8 +971,8 @@ Untergrenze.
    Altersversuch („Keine klaren Bildsignale.“) bleibt wie bisher
    ungefiltert. Die Regeln zum Satzende, zum Altersversuch außerhalb des
    ersten Satzes und zu den Kinderwörtern sind am 04.10.2026 ergänzt; die
-   bloße Zahl, der Altersversuch im Anker, die Kurzformen, „jung“ und die
-   Merkmale am 05.10.2026.
+   bloße Zahl, der Altersversuch im Anker, die Kurzformen, „jung“, die
+   Merkmale und das Jahrzehnt als Mehrzahl am 05.10.2026.
 
    **Getragene Grenzen.**
    - Zu viel Schutz ohne lesbares Alter: Nennt die KI an den Stellen, die
@@ -988,6 +991,12 @@ Untergrenze.
      Alter über der Schutzgrenze und die Karte ein Kind („~28 Jahre“ im
      Anker, „ein Mädchen, etwa 13“ in der Karte), gilt der Anker, und Stufe 2
      greift nicht.
+
+   **Anzeige.** Trägt der Anker das Alter, steht er in der Karte an der
+   Stelle ihres ersten Satzes; der Beleg-Satz dahinter bleibt. Was der Anker
+   am Ende schon nennt, steht danach nicht noch einmal da — sonst zeigte die
+   Karte das Alter doppelt, wenn ihr erster Satz an einer unbekannten
+   Abkürzung endet („etw. 13“).
 
    **Live-Anzeige.** Sie entscheidet über die Alterskarte mit derselben
    Regel wie das Endergebnis (`mistral-antwort.js`): Was am Ende den festen

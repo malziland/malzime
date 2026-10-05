@@ -46,12 +46,25 @@ const ZUSAMMEN_EN = new RegExp(
   "giu"
 );
 
+/* Ein Jahrzehnt als Mehrzahl oder als Person: "in den Zwanzigern",
+   "Zwanzigerin", "Mittzwanziger" → 20, wie "Mitte zwanzig" und "in her
+   twenties". Die nackte Form ("ein Zwanziger", "Mode der Fuenfziger") ist ein
+   Geldschein oder ein Jahrzehnt der Geschichte und zaehlt nicht — sie wuerde
+   sonst ein Kindwort daneben verdraengen. */
+const ZEHNER_FORM = { ...ZEHNER_DE, dreissig: 30 };
+const ZEHNER_WORT = Object.keys(ZEHNER_FORM).join("|");
+const JAHRZEHNT_PERSON = new RegExp(
+  `(?<!\\p{L})(?:(?:mitt|end|anfangs)-?(${ZEHNER_WORT})er(?:n|s|in|innen)?|(${ZEHNER_WORT})er(?:n|in|innen))(?!\\p{L})`,
+  "giu"
+);
+
 /* Zahlwoerter in Ziffern. Dazu faellt eine einzelne Stelle hinter Komma oder
    Punkt weg ("12,5 Jahre" → "12 Jahre"): Sie ist kein Alter und wuerde sonst
    als 5 gelesen. "1,80" und "14.30" bleiben, wie sie sind. */
 const NACHKOMMASTELLE = /(?<!\d)(\d{1,2})[.,]\d(?!\d)/g;
 function mitZiffern(text) {
   return String(text || "")
+    .replace(JAHRZEHNT_PERSON, (_w, a, b) => String(ZEHNER_FORM[(a || b).toLowerCase()]))
     .replace(ZUSAMMEN_DE, (_w, e, z) => String(EINER[e.toLowerCase()] + ZEHNER_DE[z.toLowerCase()]))
     .replace(ZUSAMMEN_EN, (_w, z, e) => String(ZEHNER_EN[z.toLowerCase()] + ONES[e.toLowerCase()]))
     .replace(ZAHLWORT, (w) => String(ZAHLWOERTER[w.toLowerCase()]))
@@ -139,7 +152,7 @@ function untereAltersgrenze(text) {
      2. sonst eine Zahl mit Altersbezug ("~14", "etwa 14", "14 Jahre",
         "14-jährig") -> dieser Punktwert;
      3. sonst eine Jahrzehnt-Angabe ("Ende zwanzig", "in his twenties",
-        "Mitte 30") -> null, das obere Ende ist offen;
+        "Mitte 30", "Mittzwanzigerin") -> null, das obere Ende ist offen;
      4. sonst die erste Zahl im Text.
    Kategoriewoerter ("Teenager") nennen kein oberes Ende -> null. Zahlen
    gelten von 1 bis 99. Ist der Anker nicht lesbar, liest der Aufrufer die
@@ -171,7 +184,7 @@ const PLUS_MINUS = /(?<!\d)(\d{1,2})[^\d]{0,20}?(?:±|\+\/-|\+-)\s*(\d{1,2})(?!\
 const ALTERSZAHL =
   /(?:~|\b(?:etwa|circa|ca\.|ungefähr|about|around|approximately|aged))\s*(\d{1,2})(?!\d)|(?<!\d)(\d{1,2})\s*(?:-?\s*jährig|jahre|years?|yrs|yo\b)/;
 const JAHRZEHNT_OFFEN =
-  /(?<!\p{L})(?:anfang|mitte|ende|early|mid|late)[\s-]+(?:zwanzig|dreißig|vierzig|fünfzig|sechzig|siebzig|achtzig|[2-8]0)(?!\d|\p{L})|(?<!\p{L})\p{L}*(?:zigern|ßigern)(?!\p{L})|(?<!\p{L})(?:twenties|thirties|forties|fifties|sixties|seventies)(?!\p{L})|(?<!\d)[2-8]0(?:er|s)(?!\p{L})/iu;
+  /(?<!\p{L})(?:anfang|mitte|ende|early|mid|late)[\s-]+(?:zwanzig|dreißig|vierzig|fünfzig|sechzig|siebzig|achtzig|[2-8]0)(?!\d|\p{L})|(?<!\p{L})\p{L}*(?:zig|ßig|ssig)er(?:n|s|in|innen)?(?!\p{L})|(?<!\p{L})(?:twenties|thirties|forties|fifties|sixties|seventies)(?!\p{L})|(?<!\d)[2-8]0(?:ern?|s)(?!\p{L})/iu;
 
 function obereAltersgrenze(text) {
   const roh = String(text || "").toLowerCase();

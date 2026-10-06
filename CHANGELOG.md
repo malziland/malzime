@@ -161,6 +161,19 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 - Außerhalb des Programms eingeschaltet: die Sperre gegen versehentlich
   hochgeladene Geheimnisse bei GitHub und der Löschschutz der Datenbank.
 
+### Sicherheit — mitgelieferte Bausteine
+
+- **Der Baustein, der iPhone- und Samsung-Fotos (HEIC) im Browser öffnet, ist
+  auf dem reparierten Stand des Herstellers** (libheif 1.23.6 statt 1.23.5).
+  Der Hersteller hat am 5. Oktober 2026 elf Sicherheitsmeldungen veröffentlicht
+  und am selben Tag behoben; der nächtliche Sicherheitslauf hat sie am Tag
+  darauf gemeldet. Neun der elf betreffen Teile, die in unserem Baustein gar
+  nicht enthalten sind. Für Besucher ändert sich nichts: Die Fotos öffnen wie
+  bisher, die Umwandlung bleibt vollständig im Browser.
+- **Ein Hilfspaket der Testwerkzeuge ist auf dem reparierten Stand**
+  (source-map-js 1.2.2). Es läuft nur beim Testen und ist weder Teil der
+  Website noch des Servers.
+
 ## [4.13.2] — 2026-10-01
 
 ### Geändert

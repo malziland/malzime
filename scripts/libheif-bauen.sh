@@ -48,13 +48,13 @@ set -euo pipefail
 # ── Festgenagelte Quellen ────────────────────────────────────────────────────
 # Jede Quelle mit Pruefsumme. Die Werte fuer libheif und libde265 1.1.3 stimmen
 # mit den Pruefsummen ueberein, die GitHub auf den Release-Seiten der Hersteller
-# anzeigt (abgeglichen am 30.09.2026). libde265 1.0.15 nennt dort keine; sie wird
-# nur fuer den Kontrollbau gebraucht.
+# anzeigt (abgeglichen am 30.09.2026, libheif 1.23.6 am 06.10.2026). libde265
+# 1.0.15 nennt dort keine; sie wird nur fuer den Kontrollbau gebraucht.
 EMSDK_VERSION="3.1.61"
 EMSDK_COMMIT="ca7b40ae222a2d8763b6ac845388744b0e57cfb7" # Tag 3.1.61 im emsdk-Repository
 
-NEU_LIBHEIF_VERSION="1.23.5"
-NEU_LIBHEIF_SHA256="fd9036064c4432f0550d15072ddf34956a248279ee9aeaff0fba3fa0f77d8f1a"
+NEU_LIBHEIF_VERSION="1.23.6"
+NEU_LIBHEIF_SHA256="4484346dc5995319dbc11e3a1c35d0a2ec46511ce370900869337fd2c7033125"
 NEU_LIBDE265_VERSION="1.1.3"
 NEU_LIBDE265_SHA256="554228bd17788c99a7e63b37ab5634722190e6e2bf60c1dcb01cef328e133905"
 

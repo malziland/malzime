@@ -9,7 +9,7 @@ davon bringt seine eigene Lizenz mit, und die gilt unverändert weiter.
 | [Leaflet](https://leafletjs.com) 1.9.4               | BSD 2-Clause              | Volodymyr Agafonkin; CloudMade | `public/lib/leaflet/LICENSE`   |
 | [exifr](https://github.com/MikeKovarik/exifr) 7.1.3  | MIT                       | Mike Kovařík, Mutiny.cz        | `public/lib/exifr/LICENSE`     |
 | [Poppins](https://fonts.google.com/specimen/Poppins) | SIL Open Font License 1.1 | Indian Type Foundry            | `public/fonts/poppins/OFL.txt` |
-| [libheif](https://github.com/strukturag/libheif) 1.23.5 mit [libde265](https://github.com/strukturag/libde265) 1.1.3, als WebAssembly selbst gebaut aus den Original-Quellen (`scripts/libheif-bauen.sh`) | LGPL 3.0 | Dirk Farin, struktur AG | `public/lib/libheif/LICENSE`, `public/lib/libheif/LICENSE-libde265` |
+| [libheif](https://github.com/strukturag/libheif) 1.23.6 mit [libde265](https://github.com/strukturag/libde265) 1.1.3, als WebAssembly selbst gebaut aus den Original-Quellen (`scripts/libheif-bauen.sh`) | LGPL 3.0 | Dirk Farin, struktur AG | `public/lib/libheif/LICENSE`, `public/lib/libheif/LICENSE-libde265` |
 
 Die Herkunft jeder Datei und jede Abweichung vom Original stehen in der
 `VERSION`-Datei des jeweiligen Ordners.

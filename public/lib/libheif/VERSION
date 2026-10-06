@@ -1,4 +1,4 @@
-libheif 1.23.5
+libheif 1.23.6
 libde265 1.1.3
 
 HEIC-Dekoder als WebAssembly, SELBST GEBAUT aus den Original-Quellen der
@@ -12,7 +12,7 @@ Nachweis: .github/workflows/libheif-bau.yml baut auf GitHub nach und
           vergleicht libheif.js und libheif.wasm Byte fuer Byte mit diesem
           Ordner. Der Kontrollbau darin baut die fruehere Fassung nach; deren
           libheif.wasm war Byte fuer Byte gleich der des Fertigpakets.
-Quellen:  https://github.com/strukturag/libheif/releases/tag/v1.23.5
+Quellen:  https://github.com/strukturag/libheif/releases/tag/v1.23.6
           https://github.com/strukturag/libde265/releases/tag/v1.1.3
 Lizenz:   GNU Lesser General Public License v3.0 — libheif: LICENSE,
           libde265: LICENSE-libde265 (beide woertlich aus den Quellpaketen).

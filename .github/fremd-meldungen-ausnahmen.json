@@ -20,25 +20,25 @@
     {
       "ghsa": "GHSA-5hqq-636x-r3cr",
       "bibliothek": "libheif",
-      "version": "1.23.5",
-      "grund": "Meldung nennt keine Version ('current main at b12b733', 'fixed version unknown'). Behoben mit Commit 40f361a1e1c3 (25.05.2026, Commit-Nachricht nennt GHSA-5hqq-636x-r3cr); laut GitHub-Vergleich 40f361a...v1.23.5 in 1.23.5 enthalten. Betrifft ausserdem die Schreibfunktion heif_region_item_add_region_inline_mask, die post.js und public/js/heic.js nicht aufrufen.",
-      "eingetragen": "2026-09-30",
+      "version": "1.23.6",
+      "grund": "Meldung nennt keine Version ('current main at b12b733', 'fixed version unknown'). Behoben mit Commit 40f361a1e1c3 (25.05.2026, Commit-Nachricht nennt GHSA-5hqq-636x-r3cr); laut GitHub-Vergleich 40f361a...v1.23.6 in 1.23.6 enthalten (v1.23.6 liegt 348 Commits voraus, 0 zurueck). Betrifft ausserdem die Schreibfunktion heif_region_item_add_region_inline_mask, die post.js und public/js/heic.js nicht aufrufen.",
+      "eingetragen": "2026-10-06",
       "pruefen_bis": "2027-03-31"
     },
     {
       "ghsa": "GHSA-h27h-4hc4-5vf5",
       "bibliothek": "libheif",
-      "version": "1.23.5",
-      "grund": "Meldung nennt weder betroffene noch behobene Version. Nullzeiger in HeifFile::get_item_data bei fehlender iloc-Box: libheif 1.23.5 bricht das Einlesen einer Datei ohne iloc-Box bereits ab (libheif/file.cc, Zeilen 618-621), und get_item_data prueft vor dem ersten Zugriff 'if (!m_iloc_box) return Error(...)' (Zeile 899). Die betroffene Funktion heif_item_get_item_data ruft unser Dekodierweg (post.js) ausserdem nicht auf.",
-      "eingetragen": "2026-09-30",
+      "version": "1.23.6",
+      "grund": "Meldung nennt weder betroffene noch behobene Version. Nullzeiger in HeifFile::get_item_data bei fehlender iloc-Box: libheif 1.23.6 bricht das Einlesen einer Datei ohne iloc-Box bereits ab (libheif/file.cc, Zeilen 619-623), und get_item_data prueft vor dem ersten Zugriff 'if (!m_iloc_box) return Error(...)' (Zeilen 900-902). Die betroffene Funktion heif_item_get_item_data ruft unser Dekodierweg (post.js) ausserdem nicht auf.",
+      "eingetragen": "2026-10-06",
       "pruefen_bis": "2027-03-31"
     },
     {
       "ghsa": "GHSA-wjj2-gjqj-5gr4",
       "bibliothek": "libheif",
-      "version": "1.23.5",
-      "grund": "Betrifft heifio/decoder_tiff.cc (TIFF-Leser der Beispielprogramme), nicht die Bibliothek. In unser Ergebnis wird nur libheif/libheif.a eingebunden (build-emscripten.sh, Aufruf von emcc); heifio ist nicht Teil davon.",
-      "eingetragen": "2026-09-30",
+      "version": "1.23.6",
+      "grund": "Betrifft heifio/decoder_tiff.cc (TIFF-Leser der Beispielprogramme), nicht die Bibliothek. In unser Ergebnis wird nur libheif/libheif.a eingebunden (build-emscripten.sh in 1.23.6, Zeilen 161 und 193, Aufruf von emcc); heifio ist nicht Teil davon.",
+      "eingetragen": "2026-10-06",
       "pruefen_bis": "2027-03-31"
     }
   ]

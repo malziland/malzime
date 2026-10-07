@@ -392,6 +392,8 @@ def main():
         "public/__tests__/geraeteangaben-deckung.test.js",
         "public/__tests__/datenschutz-deckung.test.js",
         "e2e/abfolgen.test.js",
+        "functions/src/__tests__/dateilisten-vollstaendig.test.js",
+        "functions/src/__tests__/doku-namen-gegen-quelltext.test.js",
         "functions/jest.setup.js",
         "scripts/selbstpruefung-waechter.sh",
     ]

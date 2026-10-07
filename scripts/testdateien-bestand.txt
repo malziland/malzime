@@ -60,12 +60,14 @@ functions/src/__tests__/config.test.js
 functions/src/__tests__/counter-boost-verfall.test.js
 functions/src/__tests__/counter-realitaets-check.test.js
 functions/src/__tests__/counter.test.js
+functions/src/__tests__/dateilisten-vollstaendig.test.js
 functions/src/__tests__/db-zentral.test.js
 functions/src/__tests__/deploy-buster-script.test.js
 functions/src/__tests__/deploy-standbindung-script.test.js
 functions/src/__tests__/deploy-verhalten.test.js
 functions/src/__tests__/diagnose-freigabeliste.test.js
 functions/src/__tests__/doku-drift.test.js
+functions/src/__tests__/doku-namen-gegen-quelltext.test.js
 functions/src/__tests__/durchsatz-zwei-bremsen.test.js
 functions/src/__tests__/durchsatz.test.js
 functions/src/__tests__/ein-alarm-je-fehlermeldung.test.js

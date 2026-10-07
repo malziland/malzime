@@ -793,3 +793,91 @@ describe("Zeitlimit fuehrt nicht zur Doppelzaehlung", () => {
     expect(mockRunTransaction).toHaveBeenCalledTimes(3);
   }, 20000);
 });
+
+/* ── TEST-2026-10-03-42: vier Schutzstellen des Zaehlers, die kein Test hielt ── */
+
+describe("Fenster des Stundenzaehlers: die Kante (ausschliesslich)", () => {
+  const FENSTER = 60 * 60 * 1000;
+  const JETZT = 1_800_000_000_000;
+
+  test("ein Eintrag, der GENAU so alt ist wie das Fenster, zaehlt nicht mehr", () => {
+    expect(filterRecent([JETZT - FENSTER], JETZT, FENSTER)).toEqual([]);
+  });
+
+  test("eine Millisekunde juenger zaehlt noch", () => {
+    expect(filterRecent([JETZT - FENSTER + 1], JETZT, FENSTER)).toEqual([JETZT - FENSTER + 1]);
+  });
+});
+
+describe("das Stundenlimit kommt aus dem Einstellungssatz, nicht aus einem alten Wert im Zaehler-Dokument", () => {
+  /* Der Satz der Kulisse sagt 500. Im Dokument steht noch ein NIEDRIGERER Wert
+     (etwa aus der Zeit vor einer Erhoehung): Er darf den Satz nicht
+     uebersteuern, sonst wiese der Einlass ab, obwohl der Satz mehr erlaubt. */
+  function dokument(limit, anzahlImFenster) {
+    const jetzt = Date.now();
+    const recent = Array.from({ length: anzahlImFenster }, (_, i) => jetzt - 1000 - i);
+    mockRunTransaction.mockImplementation(async (fn) => {
+      const tx = { get: jest.fn(), set: jest.fn(), update: jest.fn() };
+      tx.get.mockResolvedValue({ exists: true, data: () => ({ recentAnalyses: recent, limit, windowMinutes: 60 }) });
+      return fn(tx);
+    });
+  }
+
+  test("Dokument sagt 300, Satz sagt 500, 400 Analysen im Fenster: eingelassen, Limit 500", async () => {
+    dokument(300, 400);
+
+    const ergebnis = await checkAndIncrement();
+
+    expect(ergebnis.allowed).toBe(true);
+    expect(ergebnis.limit).toBe(500);
+  });
+
+  test("Gegenprobe: bei 500 Analysen im Fenster ist Schluss", async () => {
+    dokument(300, 500);
+
+    const ergebnis = await checkAndIncrement();
+
+    expect(ergebnis.allowed).toBe(false);
+    expect(ergebnis.limit).toBe(500);
+  });
+});
+
+describe("Wartungsmodus: der Zwischenspeicher haelt hoechstens 30 Sekunden", () => {
+  const T0 = 1_800_000_000_000;
+  let lesen;
+  let stand;
+
+  beforeEach(() => {
+    stand = { enabled: false };
+    lesen = jest.fn(async () => ({ exists: true, data: () => stand }));
+    mockDoc.mockReturnValue({ get: lesen, set: mockSet });
+    jest.spyOn(Date, "now").mockReturnValue(T0);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test("eine Millisekunde vor Ablauf gilt noch der gemerkte Stand, genau nach 30 Sekunden wird neu gelesen", async () => {
+    expect((await getMaintenanceStatus()).enabled).toBe(false);
+    stand = { enabled: true, message: "Wartung" };
+
+    Date.now.mockReturnValue(T0 + 30000 - 1);
+    expect((await getMaintenanceStatus()).enabled).toBe(false);
+    expect(lesen).toHaveBeenCalledTimes(1);
+
+    Date.now.mockReturnValue(T0 + 30000);
+    expect((await getMaintenanceStatus()).enabled).toBe(true);
+    expect(lesen).toHaveBeenCalledTimes(2);
+  });
+
+  test("nach dem Umschalten sieht dieselbe Instanz den neuen Stand sofort", async () => {
+    expect((await getMaintenanceStatus()).enabled).toBe(false);
+
+    await setMaintenanceMode(true, "Wartung");
+    stand = { enabled: true, message: "Wartung" };
+
+    expect(await getMaintenanceStatus()).toEqual({ enabled: true, message: "Wartung" });
+    expect(lesen).toHaveBeenCalledTimes(2);
+  });
+});

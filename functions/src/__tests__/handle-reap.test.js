@@ -77,6 +77,23 @@ describe("reapJobs", () => {
     expect(storage.deleteImage).toHaveBeenCalledTimes(1);
   });
 
+  /* TEST-2026-10-03-42: Liess sich das Bild nicht loeschen (deleteImage meldet
+     `false`, wirft nicht), bleibt das Dokument stehen — sonst verschwaende der
+     einzige Verweis auf die Datei, und sie laege bis zur Ein-Tages-Regel. Der
+     naechste Lauf versucht es wieder. */
+  test("zugestellt: bleibt das Bild liegen, bleibt auch das Dokument", async () => {
+    jobs.findZugestellteJobs.mockResolvedValue([
+      { id: "bild-bleibt", imagePath: "queue-uploads/bleibt.jpg" },
+      { id: "bild-weg", imagePath: "queue-uploads/weg.jpg" },
+    ]);
+    storage.deleteImage.mockImplementation(async (pfad) => pfad !== "queue-uploads/bleibt.jpg");
+
+    const result = await reapJobs();
+
+    expect(result.zugestellt).toBe(1);
+    expect(jobs.deleteJob.mock.calls).toEqual([["bild-weg"]]);
+  });
+
   test("PRIV-107b: ein Löschfehler wird geloggt und stoppt weder den Zweig noch den Lauf", async () => {
     jobs.findZugestellteJobs.mockResolvedValue([{ id: "z1" }, { id: "z2" }]);
     jobs.deleteJob.mockRejectedValueOnce(new Error("firestore weg")).mockResolvedValue();

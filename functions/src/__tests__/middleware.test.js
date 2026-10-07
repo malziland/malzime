@@ -87,3 +87,40 @@ describe("Adressliste raeumt sich selbst auf (PRIV-2026-09-10-07)", () => {
     expect(_rateState.get(key).zeitgeber.hasRef()).toBe(false);
   });
 });
+
+/* TEST-2026-10-03-42: Die Obergrenze der Adressliste hielt kein Test — der
+   vorhandene Fall mit 100 Adressen erreicht sie nie. Sie schuetzt den
+   Arbeitsspeicher des Einlasses vor einer Flut verschiedener Adressen. */
+describe("Adressliste: Obergrenze", () => {
+  const { checkRateLimit: pruefe, _rateState: liste, _MAX_RATE_ENTRIES: GRENZE } = require("../middleware");
+  const FENSTER = 600000;
+
+  afterEach(() => {
+    for (const [, eintrag] of liste) clearTimeout(eintrag.zeitgeber);
+    liste.clear();
+  });
+
+  /* Die Zahl steht hier als feste Zahl und nicht aus dem Modul gelesen: Waere
+     die Grenze im Modul verstellt, liefe eine Schleife bis dorthin endlos,
+     statt dass der Test rot wird. */
+  const ERWARTET = 10000;
+
+  test("die Grenze liegt bei 10 000 Adressen", () => {
+    expect(GRENZE).toBe(ERWARTET);
+  });
+
+  test("eine Adresse mehr als die Grenze: die Liste waechst nicht weiter, die aelteste faellt heraus", () => {
+    for (const [, eintrag] of liste) clearTimeout(eintrag.zeitgeber);
+    liste.clear();
+    for (let i = 0; i < ERWARTET; i += 1) pruefe(`adresse-${i}`, 5, FENSTER);
+    expect(liste.size).toBe(ERWARTET);
+    expect(liste.has("adresse-0")).toBe(true);
+
+    expect(pruefe("eine-mehr", 5, FENSTER)).toBe(true);
+
+    expect(liste.size).toBe(ERWARTET);
+    expect(liste.has("adresse-0")).toBe(false);
+    expect(liste.has("adresse-1")).toBe(true);
+    expect(liste.has("eine-mehr")).toBe(true);
+  });
+});

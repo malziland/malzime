@@ -83,5 +83,6 @@ function checkRateLimit(key, grenze, fensterMs) {
 }
 
 /* `_rateState` nur fuer die Pruefung (middleware.test.js): Sie muss sehen,
-   dass ein Eintrag ohne weiteren Aufruf verschwindet. */
-module.exports = { getClientIp, checkRateLimit, _rateState: rateState };
+   dass ein Eintrag ohne weiteren Aufruf verschwindet — und dass die Liste an
+   ihrer Obergrenze nicht weiterwaechst (`_MAX_RATE_ENTRIES`). */
+module.exports = { getClientIp, checkRateLimit, _rateState: rateState, _MAX_RATE_ENTRIES: MAX_RATE_ENTRIES };

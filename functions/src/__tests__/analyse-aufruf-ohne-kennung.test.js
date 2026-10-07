@@ -167,6 +167,17 @@ describe("Fehlertexte mit Kennung (27.09.2026)", () => {
     expect(log).toMatch(/No document to update|NOT_FOUND/);
     pruefeOhneKennung(log);
   });
+
+  /* TEST-2026-10-03-42: Auch der Pfad des Fotos ist je Auftrag eindeutig. Ein
+     Speicherfehler kann ihn nennen; im Protokoll steht er nicht. */
+  test("Fehlertext mit dem Pfad des Fotos: der Pfad steht in keiner Ausgabe", async () => {
+    jobs.completeJob.mockRejectedValue(new Error(`Speicher: Objekt ${JOB.imagePath} nicht lesbar`));
+    const log = await lauf();
+    /* Positivkontrolle: Der Fehlertext selbst ist noch da. */
+    expect(log).toContain("nicht lesbar");
+    expect(log).not.toContain(JOB.imagePath);
+    pruefeOhneKennung(log);
+  });
 });
 
 describe("Positivkontrolle des Messmittels", () => {

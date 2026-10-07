@@ -85,6 +85,13 @@ lauf test-blind.py "$HIER/negativprobe/tabellenform" 1 \
 lauf test-blind.py "$HIER/negativprobe/uebersprungen-begruendet" 0 \
   "begruendet uebersprungen zaehlt nicht als Mangel, bleibt aber sichtbar"
 
+echo ""
+echo "Richtung 6: Formulierung ueber einen Zeilenumbruch (2026-10-07)"
+lauf aussentext.py "$HIER/negativprobe/umbruch" 1 \
+  "eine Formulierung, die ueber einen Zeilenumbruch laeuft, wird gefunden"
+lauf aussentext.py "$HIER/negativprobe/umbruch-absatz" 0 \
+  "ueber eine Leerzeile und ueber Listenpunkte hinweg wird nicht gesucht"
+
 echo "============================================================"
 if [ "$FEHLER" -eq 0 ]; then
   # Die Zahl steht NUR hier und kommt aus dem Zaehler. Sie als Wort zu fuehren

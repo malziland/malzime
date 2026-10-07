@@ -1,0 +1,4 @@
+# ERWARTUNG: Beide Formulierungen laufen im Text ueber einen Zeilenumbruch. Zeile fuer
+# Zeile gesucht findet sie niemand; je Absatz ohne Umbrueche gesucht schon (Exit 1).
+verlaesst nie den Browser|Absolute Zusage ueber Datenfluesse ist im Netzwerk-Tab widerlegbar.
+\b(der|dem|den|des) Betreibers?\b|Keine Zuschreibung in dritter Person.

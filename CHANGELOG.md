@@ -3487,8 +3487,8 @@ fünf Stellen verletzt — sie stand eben nur als Prosa da und lief nirgends als
   Alarmrichtlinie schickt bei solchen Zeilen E-Mail und Push. Unauthentifiziert,
   beliebig wiederholbar. `/api/job-status` prüft die Job-Nummer jetzt gegen das echte
   Firestore-Format und antwortet mit 400, **ohne** die Datenbank überhaupt zu befragen.
-- **Die Sperrliste traf nur den Wortlaut** (`DOC-2026-08-12-05`, P2). „verlässt NIEMALS
-  den Browser" rutschte durch, und `.js`-Dateien wurden gar nicht geprüft — obwohl sie
+- **Die Sperrliste traf nur den Wortlaut** (`DOC-2026-08-12-05`, P2). Die Fassung mit
+  „NIEMALS" statt „nie" rutschte durch, und `.js`-Dateien wurden gar nicht geprüft — obwohl sie
   ausgeliefert werden. Ein Muster deckt jetzt die Varianten ab, die Suchfläche umfasst
   `.js`, `.mjs`, `.ts`. Damit sichtbar geworden und korrigiert: **drei** weitere Stellen
   in `AGENTS.md`, `docs/ARCHITECTURE.md` und `public/js/api.js`.

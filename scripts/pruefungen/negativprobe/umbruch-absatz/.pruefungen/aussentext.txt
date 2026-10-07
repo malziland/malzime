@@ -1,0 +1,4 @@
+# ERWARTUNG: kein Fund (Exit 0). Die Woerter der Formulierung stehen in ZWEI Absaetzen
+# bzw. in zwei Listenpunkten - das ist kein Satz. Ueber eine Leerzeile hinweg wird nicht
+# gesucht, und ein Listenzeichen am Zeilenanfang gehoert zum Text.
+verlaesst nie den Browser|Absolute Zusage ueber Datenfluesse ist im Netzwerk-Tab widerlegbar.

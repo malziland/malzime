@@ -21,6 +21,10 @@ Getrennt wird am LETZTEN |, denn der regulaere Ausdruck darf selbst | enthalten
 Eine Zeile, die sich nicht laden laesst, beendet den Lauf mit Exit 2. Sie als Hinweis
 zu ueberspringen hiesse, mit einer stillschweigend geschwaechten Pruefung
 weiterzuarbeiten - genau die Fehlerform, gegen die diese Pruefungen gebaut sind.
+
+Gesucht wird in zwei Durchgaengen: Zeile fuer Zeile und, je Absatz, im Text ohne
+Zeilenumbrueche. Der zweite Durchgang findet, was im Fliesstext ueber einen Umbruch
+laeuft ("... des" am Zeilenende, "Betreibers ..." am naechsten Zeilenanfang).
 """
 import os
 import re
@@ -51,6 +55,16 @@ militaerisch(?:e|er)? Verschluesselung|Marketingbegriff ohne technischen Gehalt.
 # Ein Satz, der gegen die erste Vorlagenregel verstoesst. Dient der Selbstpruefung.
 KONTROLLSATZ = "Deine Position verlaesst nie den Browser."
 KONTROLLMUSTER = r"verlaesst nie den Browser"
+# Derselbe Satz, im Fliesstext umbrochen und als Kommentar fortgesetzt. Dient der
+# Selbstpruefung des zweiten Durchgangs.
+KONTROLLZEILEN = ["Deine Position verlaesst nie\n", "   * den Browser.\n"]
+
+# TEST-2026-10-03-43 (07.10.2026): Die Suche lief nur Zeile fuer Zeile. Eine
+# Formulierung, die im Fliesstext ueber einen Zeilenumbruch laeuft, fand sie nie -
+# drei echte Verstoesse lagen so unbemerkt in einem Projekt, und der Lauf meldete
+# "kein Verstoss gefunden". Am Anfang einer Folgezeile zaehlen Einrueckung und die
+# Zeichen, mit denen Zitate und Kommentare fortgesetzt werden, nicht zum Text.
+FOLGEZEILE = re.compile(r"^[ \t]*(?:(?:>+|\*+|//+|#+)[ \t]+)*")
 
 
 def regeln_laden(wurzel):
@@ -101,6 +115,61 @@ def positivkontrolle(regeln):
         # Nur aussagekraeftig, wenn die Kontrollregel ueberhaupt geladen ist.
         if any(roh == KONTROLLMUSTER for _, _, roh in regeln):
             return False
+    return True
+
+
+def umbruch_funde(zeilen, regeln):
+    """Treffer, die NUR ueber einen Zeilenumbruch hinweg entstehen.
+
+    Gibt (zeilennummer, formulierung, grund) zurueck; die Zeilennummer ist die der
+    Zeile, in der die Formulierung beginnt. Ein Absatz endet an einer Leerzeile,
+    darueber hinweg wird nicht gesucht. Treffer innerhalb einer einzigen Zeile
+    liefert der erste Durchgang; hier werden sie uebergangen, damit nichts doppelt
+    gemeldet wird."""
+    funde = []
+    absatz = []  # [(zeilennummer, text ohne Einrueckung)]
+
+    def auswerten():
+        if len(absatz) < 2:
+            return
+        text = ""
+        anfaenge = []  # Stelle im zusammengesetzten Text, an der jede Zeile beginnt
+        for i, (_, inhalt) in enumerate(absatz):
+            if i:
+                text += " "
+            anfaenge.append(len(text))
+            text += inhalt
+
+        def zeile_von(stelle):
+            k = 0
+            while k + 1 < len(anfaenge) and anfaenge[k + 1] <= stelle:
+                k += 1
+            return k
+
+        for ausdruck, grund, _ in regeln:
+            for treffer in ausdruck.finditer(text):
+                if treffer.end() == treffer.start():
+                    continue
+                erste = zeile_von(treffer.start())
+                if erste == zeile_von(treffer.end() - 1):
+                    continue
+                funde.append((absatz[erste][0], treffer.group(0), grund))
+
+    for nr, zeile in enumerate(zeilen, 1):
+        inhalt = FOLGEZEILE.sub("", zeile.rstrip("\r\n")).rstrip()
+        if not inhalt:
+            auswerten()
+            absatz = []
+            continue
+        absatz.append((nr, inhalt))
+    auswerten()
+    return funde
+
+
+def positivkontrolle_umbruch(regeln):
+    """Auch der zweite Durchgang muss an einem bekannten Verstoss anschlagen."""
+    if any(roh == KONTROLLMUSTER for _, _, roh in regeln):
+        return bool(umbruch_funde(KONTROLLZEILEN, regeln))
     return True
 
 
@@ -176,7 +245,7 @@ def main():
         print("Keine Regeln geladen. Ohne Regeln keine Aussage, kein bestandener Test.")
         return 2
 
-    if not positivkontrolle(regeln):
+    if not positivkontrolle(regeln) or not positivkontrolle_umbruch(regeln):
         print("FEHLER: Die Positivkontrolle schlaegt nicht an. Die Suche ist kaputt,")
         print("nicht der Text sauber. Ergebnis ist wertlos, bis das behoben ist.")
         return 2
@@ -190,12 +259,17 @@ def main():
                 zeilen = f.readlines()
         except OSError:
             continue
+        kurz = os.path.relpath(pfad, wurzel)
+        in_datei = []
         for nr, zeile in enumerate(zeilen, 1):
             for ausdruck, grund, _ in regeln:
                 treffer = ausdruck.search(zeile)
                 if treffer:
-                    funde.append((os.path.relpath(pfad, wurzel), nr,
-                                  treffer.group(0), grund))
+                    in_datei.append((kurz, nr, treffer.group(0), grund))
+        for nr, text, grund in umbruch_funde(zeilen, regeln):
+            in_datei.append((kurz, nr, text + "  (ueber einen Zeilenumbruch)", grund))
+        in_datei.sort(key=lambda fund: fund[1])
+        funde.extend(in_datei)
 
     print(f"Regeln: {len(regeln)} (Positivkontrolle bestanden)")
     print(f"Dateien: {geprueft}")

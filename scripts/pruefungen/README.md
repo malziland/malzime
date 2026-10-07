@@ -35,6 +35,9 @@ einer Pipe, fehlendes `set -e`. Setzt KERN 5c durch.
 Formulierungen. Mit eingebauter Positivkontrolle: Schlaegt die Suche an einem bekannten
 Verstoss nicht an, meldet die Pruefung, dass sie selbst kaputt ist, statt gruen zu
 werden.
+Gesucht wird Zeile fuer Zeile und zusaetzlich je Absatz im Text ohne Zeilenumbrueche —
+eine Formulierung, die im Fliesstext oder in einem Kommentar ueber einen Umbruch laeuft,
+blieb sonst unsichtbar.
 
 **test-blind.py** findet Tests, die rechnerisch nicht rot werden koennen: ohne
 Zusicherung, uebersprungen, immer wahr. Setzt KERN 4 Frage 2 durch.

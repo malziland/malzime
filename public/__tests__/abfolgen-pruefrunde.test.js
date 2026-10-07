@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setupDOM } from "./setup.js";
 
 /**
- * abfolgen-pruefrunde.test.js — fünf Abfolgen aus der Prüfrunde vom 07.10.2026.
+ * abfolgen-pruefrunde.test.js — sechs Abfolgen aus der Prüfrunde vom 07.10.2026.
  *
  * Jede stellt einen Ablauf am Handy nach, bei dem die Seite etwas schuldig
- * blieb (alle fünf waren am Stand vor der Behebung rot):
+ * blieb (alle sechs waren am Stand vor der Behebung rot):
  *   1. Auftrag wartet, App kurz gewechselt (die Wiederaufnahme übernimmt),
  *      dann ein anderes Foto — der erste Auftrag muss abgemeldet werden.
  *   2. Anderes Foto genau zwischen Kopf und Rumpf der Einreih-Antwort — der
@@ -16,6 +16,8 @@ import { setupDOM } from "./setup.js";
  *      muss wieder frei sein.
  *   5. Auftrag wartet, das Gerät liegt über drei Minuten weg — die Seite
  *      vergisst die Nummer und muss den Auftrag vorher abmelden.
+ *   6. Verbindung reißt ab, dann ein anderes Foto — auch der Auftrag, auf den
+ *      die Seite noch wartete, wird abgemeldet.
  * Dazu der Erfolgsweg: Nach einem fertigen Ergebnis meldet ein neues Foto
  * nichts ab (es gibt nichts abzumelden).
  */
@@ -237,6 +239,33 @@ describe("Abfolgen aus der Prüfrunde", () => {
     state.requestId += 1;
     await vi.advanceTimersByTimeAsync(2500);
     await laufA;
+  });
+
+  it("Verbindung reißt ab, dann ein anderes Foto: der Auftrag, auf den die Seite noch wartete, wird abgemeldet", async () => {
+    prepareImage.mockResolvedValueOnce(AUFBEREITET("Rk9UT19B")).mockResolvedValueOnce(AUFBEREITET("Rk9UT19C"));
+    const laufA = wieHandleNewFile(foto("a"));
+    await vi.waitFor(() => expect(uploads.length).toBe(1), { timeout: 8000 });
+    uploads[0].antworte(antwort({ jobId: "AUFTRAG-A", resultToken: "ta" }));
+    await vi.advanceTimersByTimeAsync(2500);
+    statusAntwort = () => Promise.reject(new TypeError("Failed to fetch"));
+    await vi.advanceTimersByTimeAsync(12000);
+    await laufA;
+    expect(state.wartetAufVerbindung).toBe(true);
+    expect(speicher.getStoredJobId()).toBe("AUFTRAG-A");
+    expect(abmeldungen).toEqual([]);
+
+    const laufB = wieHandleNewFile(foto("b"));
+    await vi.waitFor(() => expect(uploads.length).toBe(2), { timeout: 8000 });
+    expect(abmeldungen).toHaveLength(1);
+    expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
+    expect(state.wartetAufVerbindung).toBe(false);
+    statusAntwort = () => Promise.resolve(antwort({ status: "queued", position: 1, etaSeconds: 30 }));
+    uploads[1].antworte(antwort({ jobId: "AUFTRAG-B", resultToken: "tb" }));
+    await vi.advanceTimersByTimeAsync(2500);
+    state.requestId += 1;
+    await vi.advanceTimersByTimeAsync(2500);
+    await laufB;
+    expect(abmeldungen).toHaveLength(1);
   });
 
   it("nach einem fertigen Ergebnis meldet ein neues Foto nichts ab (Erfolgsweg)", async () => {

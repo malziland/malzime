@@ -453,8 +453,10 @@ function showPhotoDeletedNotice() {
  * v3.0.0: Lief Live-Text, wird VOR dem Rendern der Rest-Puffer im
  * Schnellvorlauf ausgetippt — deshalb async. Das Rendern samt Verdecken der
  * Enthüllung bleibt danach synchron im selben Frame.
+ * @param {object|null} prepared Die Aufbereitung des Fotos, zu dem dieses
+ *        Ergebnis gehört (Ort und Aufnahmedatum daraus bleiben im Browser).
  */
-async function renderQueueResult(data, myId, traceId, timings) {
+async function renderQueueResult(data, myId, traceId, timings, prepared) {
   /* PRIV-107: Ab der ersten Zustellung läuft die Wiederholungs-Frist. */
   markiereErgebnisZustellung();
   if (!data) {
@@ -465,14 +467,17 @@ async function renderQueueResult(data, myId, traceId, timings) {
     return;
   }
   /* Client-seitige Daten injizieren — GPS/dateTimeOriginal erreichen nie unsere
-     Server. Nach einem Reload fehlt state.lastPrepared; dann bleibt GPS leer. */
+     Server. Nach einem Reload fehlt die Aufbereitung; dann bleibt GPS leer.
+     BUG-2026-10-03-45: Eingesetzt wird die Aufbereitung DIESES Durchgangs,
+     die der Aufrufer mitgibt — nicht, was gerade im gemeinsamen Zustand
+     steht. */
   if (!data.exif) data.exif = {};
-  if (state.lastPrepared && state.lastPrepared.gps) {
-    data.exif.gpsLatitude = state.lastPrepared.gps.latitude;
-    data.exif.gpsLongitude = state.lastPrepared.gps.longitude;
+  if (prepared && prepared.gps) {
+    data.exif.gpsLatitude = prepared.gps.latitude;
+    data.exif.gpsLongitude = prepared.gps.longitude;
   }
-  if (state.lastPrepared && state.lastPrepared.dateTimeOriginal) {
-    data.exif.dateTimeOriginal = state.lastPrepared.dateTimeOriginal;
+  if (prepared && prepared.dateTimeOriginal) {
+    data.exif.dateTimeOriginal = prepared.dateTimeOriginal;
   }
 
   const renderStart = Date.now();
@@ -653,18 +658,26 @@ async function analyzeImageQueued() {
   try {
     await acquireWakeLock();
 
-    /* Bild komprimieren + EXIF extrahieren (client-seitig) */
+    /* Bild komprimieren + EXIF extrahieren (client-seitig).
+       BUG-2026-10-03-45: Das Ergebnis bleibt in einer eigenen Variable, bis
+       feststeht, dass dieser Durchgang noch der juengste ist. Die Aufbereitung
+       eines grossen Fotos dauert; waehlt jemand in der Zeit ein anderes, darf
+       das ueberholte weder den gemeinsamen Zustand noch die Vorschau anfassen
+       — sonst stuenden Ort und Aufnahmedatum des ersten Fotos im Ergebnis des
+       zweiten. */
     const prepareStart = Date.now();
-    if (!state.lastPrepared) {
-      state.lastPrepared = await prepareImage(file, { auswahlZeit: state.auswahlZeit });
+    let prepared = state.lastPrepared;
+    if (!prepared) {
+      prepared = await prepareImage(file, { auswahlZeit: state.auswahlZeit });
     }
     timings.prepareImageMs = Date.now() - prepareStart;
-    vorschauAusErgebnisFallsNoetig(state.lastPrepared);
     if (state.requestId !== myId) return;
+    state.lastPrepared = prepared;
+    vorschauAusErgebnisFallsNoetig(prepared);
 
     /* Geocoding parallel starten wenn GPS vorhanden */
-    if (state.lastPrepared.gps) {
-      startGeocoding(state.lastPrepared.gps.latitude, state.lastPrepared.gps.longitude);
+    if (prepared.gps) {
+      startGeocoding(prepared.gps.latitude, prepared.gps.longitude);
     }
 
     /* ── Job einreihen ── */
@@ -675,14 +688,14 @@ async function analyzeImageQueued() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: state.lastPrepared.imageBase64,
-          exif: state.lastPrepared.exif,
+          imageBase64: prepared.imageBase64,
+          exif: prepared.exif,
           /* BUG-2026-08-19-01: Hier standen feste Werte. Der Canvas liefert
              nicht immer JPEG (siehe public/js/exif.js) — die feste Behauptung
              brachte am 19.08. zwei Uploads mit HTTP 400 zu Fall. Gemeldet wird
              jetzt, was tatsaechlich herauskam. */
-          mimeType: state.lastPrepared.mimeType || "image/jpeg",
-          filename: state.lastPrepared.dateiname || "upload.jpg",
+          mimeType: prepared.mimeType || "image/jpeg",
+          filename: prepared.dateiname || "upload.jpg",
           lang: getLanguage(),
           traceId,
         }),
@@ -823,7 +836,7 @@ async function analyzeImageQueued() {
     timings.totalMs = Date.now() - analyzeStartTime;
     /* Das Ergebnis rendert direkt in die Dramaturgie hinein — nach dem
        Schnellvorlauf des restlichen Live-Texts (v3.0.0, daher await). */
-    await renderQueueResult(outcome.result, myId, traceId, timings);
+    await renderQueueResult(outcome.result, myId, traceId, timings, prepared);
   } catch (err) {
     if (state.requestId !== myId) return;
     /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
@@ -928,6 +941,11 @@ export async function resumeQueueJob({ force = false } = {}) {
     setStatus("");
   } else {
     liveAnzeige.zuruecksetzen();
+    /* BUG-2026-10-03-45: Ohne pausierten Lauf fragt die Wiederaufnahme ohne
+       Live-Text weiter — die Merkmal-Karten fuellen sich bis zum Ergebnis
+       nicht mehr. Halb gefuellte Karten neben der Wartefigur saehen aus wie
+       ein haengender Lauf; das fertige Ergebnis baut sie vollstaendig neu. */
+    if (elements.facts) elements.facts.innerHTML = "";
     resetQueueWaiting();
     startScanAnim(false);
     /* FIX 1 (v3.0.1): Auch die Wiederaufnahme startet nie mit leerem Text. */
@@ -982,7 +1000,9 @@ export async function resumeQueueJob({ force = false } = {}) {
        ändert das nichts, denn gespeichert wird nach wie vor nirgends etwas;
        es wird nur nicht weggeworfen, was ohnehin schon angezeigt wird. */
     if (!elements.imagePreview?.querySelector("img")) showPhotoDeletedNotice();
-    await renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime });
+    /* Die Wiederaufnahme hat keine eigene Aufbereitung. Lief die Seite durch,
+       steht die des Fotos noch im Zustand; nach einem Neuladen ist er leer. */
+    await renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime }, state.lastPrepared);
   } catch (err) {
     if (state.requestId !== myId) return;
     clearStoredJobId();

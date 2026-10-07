@@ -163,6 +163,9 @@ function highlightKeyTerms(escapedText) {
 }
 
 function renderCategories(profile) {
+  /* Ein Neuaufbau der Karten macht jede noch ausstehende Einblendung des
+     vorigen Stands gegenstandslos (siehe scharfstellZeitgeber). */
+  scharfstellZeitgeberAbraeumen();
   const categories = profile.categories || {};
   if (Object.keys(categories).length === 0) {
     elements.facts.innerHTML = "";
@@ -271,6 +274,18 @@ const PLATZHALTER_LABEL = "Wird ausgewertet";
 let geruestSteht = false;
 /* Abstand zwischen zwei scharfgestellten Karten. */
 const SCHARFSTELL_TAKT_MS = 400;
+/* BUG-2026-10-03-45: Die noch ausstehenden Scharfstell-Zeitgeber. Sie gehoeren
+   zu EINEM Stand der Karten — einem Lauf und einer Profil-Art. Wechselt der
+   Stand (andere Profil-Art, neuer Lauf, fertiges Ergebnis), werden sie
+   abgeraeumt: Bei 13 Karten laeuft die Einblendung 4,8 Sekunden, und ein
+   Zeitgeber, der danach noch feuert, schriebe den Inhalt der ANDEREN
+   Profil-Art in die Karten — auch in ein schon fertiges Ergebnis. */
+const scharfstellZeitgeber = new Set();
+
+function scharfstellZeitgeberAbraeumen() {
+  for (const zeitgeber of scharfstellZeitgeber) clearTimeout(zeitgeber);
+  scharfstellZeitgeber.clear();
+}
 
 export function zeigeLiveKarten(liveKarten) {
   if (!elements.facts || !Array.isArray(liveKarten)) return;
@@ -327,13 +342,21 @@ export function zeigeLiveKarten(liveKarten) {
       karte.classList.add("cat-card--scharfstellen");
       karte.removeAttribute("aria-hidden");
     };
-    if (i === 0) setzen();
-    else setTimeout(setzen, i * SCHARFSTELL_TAKT_MS);
+    if (i === 0) {
+      setzen();
+      return;
+    }
+    const zeitgeber = setTimeout(() => {
+      scharfstellZeitgeber.delete(zeitgeber);
+      setzen();
+    }, i * SCHARFSTELL_TAKT_MS);
+    scharfstellZeitgeber.add(zeitgeber);
   });
 }
 
 /** Vor jedem neuen Lauf: Die Merkliste der gezeigten Karten leeren. */
 export function liveKartenZuruecksetzen() {
+  scharfstellZeitgeberAbraeumen();
   bereitsGezeigt.clear();
   geruestSteht = false;
 }
@@ -348,6 +371,9 @@ export function liveKartenZuruecksetzen() {
  * aufblitzen, genau das soll nicht passieren.
  */
 export function liveKartenModusWechsel() {
+  /* Auch die Karten, die erst in den naechsten Sekunden scharf geworden
+     waeren, gehoeren dem anderen Profil. */
+  scharfstellZeitgeberAbraeumen();
   bereitsGezeigt.clear();
   /* Die stehenden Inhalte gehören dem anderen Profil — sie dürfen nicht
      stehenbleiben, bis die neuen eintreffen. Am 29.08. gemessen: Nach dem

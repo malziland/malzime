@@ -58,11 +58,18 @@ export function initDemo(bereit = Promise.resolve()) {
 }
 
 async function loadDemoImage(url, name) {
+  /* BUG-2026-10-03-45: Das Bild wird erst geladen, dann analysiert — im
+     Schul-WLAN dauert das. Kommt in dieser Zeit eine neuere Auswahl (ein
+     zweites Beispielbild, ein hochgeladenes Foto), gilt nur noch die: Dieser
+     Ablauf fasst dann weder Vorschau noch Zustand an. Sonst stuende das eine
+     Bild in der Vorschau und das Profil des anderen darunter. */
+  const meineAuswahl = ++state.auswahlNr;
+  const ueberholt = () => state.auswahlNr !== meineAuswahl;
+
   if (state.currentAbortController) {
     state.currentAbortController.abort();
     state.currentAbortController = null;
   }
-  state.isAnalyzing = false;
 
   if (state.geocodeAbortController) {
     state.geocodeAbortController.abort();
@@ -82,6 +89,7 @@ async function loadDemoImage(url, name) {
   try {
     const response = await fetch(url);
     const blob = await response.blob();
+    if (ueberholt()) return;
     const file = new File([blob], `demo-${name}.jpg`, { type: "image/jpeg" });
     /* PRIV-2026-10-03-38: Diese Datei ist ein Beispielbild. Für ihre erfundenen
        Ortsdaten fragt der Browser nichts nach außen — Adresse und
@@ -100,8 +108,14 @@ async function loadDemoImage(url, name) {
     state.lastFile = file;
     state.lastPrepared = null;
     state.lastData = null;
+    /* Erst hier gilt eine noch laufende Analyse als abgeloest — unmittelbar
+       vor dem Start der neuen. Frueher stand das am Anfang, also vor dem
+       Laden: In der Ladezeit hiess es dann „es laeuft nichts", obwohl noch
+       nichts abgeloest war. */
+    state.isAnalyzing = false;
     analyzeImage();
   } catch (err) {
+    if (ueberholt()) return;
     /* UX-2026-08-13-FE-06: Vorher völlig lautlos — der Bildschirm blieb einfach
        stehen, wenn der Abruf scheiterte (Schul-WLAN, Offline-Moment). Die
        Demo-Fotos sind ausgerechnet der Rückfallweg für Workshops. Jetzt Meldung,

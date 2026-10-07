@@ -18,6 +18,12 @@ export const state = {
   auswahlZeit: null,
   lastData: null,
   requestId: 0,
+  /* BUG-2026-10-03-45: Zaehlt jede Auswahl — ein hochgeladenes Foto ebenso
+     wie ein angetipptes Beispielbild. Ein Beispielbild wird erst geladen und
+     dann analysiert; kommt in der Ladezeit eine neuere Auswahl, erkennt der
+     aeltere Ablauf das an dieser Nummer und schreibt nichts mehr. `requestId`
+     reicht dafuer nicht: Die zieht erst der Durchgang, der schon analysiert. */
+  auswahlNr: 0,
   lastTraceId: null,
   /* Promise des /api/stats-Aufrufs. analyzeImage wartet darauf, bevor der
      Upload startet (Wartungsmodus und Stundenlimit stehen dort drin). */

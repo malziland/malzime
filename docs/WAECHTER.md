@@ -46,6 +46,15 @@ laufen sie vor jedem Push. Die Mutationsprobe braucht je Mutation einen
 eigenen Testlauf und läuft deshalb nur in `test-backend`, wo Pakete
 installiert sind.
 
+**Was sie am Arbeitsrechner lesen:** Wer das ganze Verzeichnis durchgeht — der
+Uhr-Wächter und drei der vendorierten Prüfungen (Fakten-Drift, stiller
+Fehlschlag, Tests ohne Zusicherung) —, sieht vor dem Push nur, was git kennt:
+eingecheckte und neue Dateien, keine Ordner, die `.gitignore` ausnimmt
+(private Berichte, Übergaben, Sicherungen). Der Uhr-Wächter fragt git selbst;
+die vendorierten Prüfungen bekommen über `scripts/nur-git-bekannt.py` einen
+Spiegel statt des Projektordners. In der Pipeline gibt es diese Ordner nicht —
+dort läuft der Aufruf unverändert (TEST-2026-10-04-29).
+
 ---
 
 ## Die Selbstprüfung

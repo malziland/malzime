@@ -203,7 +203,22 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
   /* Was lokal anders heisst als in der Pipeline, aber dasselbe prueft: der
      lokale Befehl, der Schritt, der dafuer im SELBEN Job der Pipeline stehen
      muss, und der Grund. */
+  /* TEST-2026-10-04-29: Drei Pruefungen lesen das ganze Verzeichnis. Lokal
+     bekommen sie einen Spiegel mit dem, was git kennt — am Arbeitsrechner
+     liegen im Projektordner auch ausgenommene Ordner, die es in der Pipeline
+     nicht gibt. */
+  const NUR_GIT_BEKANNT = Object.fromEntries(
+    ["fakten-drift", "stiller-fehlschlag", "test-blind"].map((name) => [
+      `python3 scripts/nur-git-bekannt.py python3 scripts/pruefungen/checks/${name}.py`,
+      {
+        pipeline: `python3 scripts/pruefungen/checks/${name}.py .`,
+        grund: "Dieselbe Pruefung; lokal ueber einen Spiegel mit dem, was git kennt (TEST-2026-10-04-29).",
+      },
+    ])
+  );
+
   const ANDERS_BENANNT = {
+    ...NUR_GIT_BEKANNT,
     "sh scripts/secret-scan-lokal.sh": {
       pipeline: "uses: gitleaks/gitleaks-action",
       grund:

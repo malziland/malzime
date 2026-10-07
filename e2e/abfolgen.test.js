@@ -590,3 +590,162 @@ test.describe("Sprachwechsel und Sprachreste", () => {
     });
   });
 });
+
+/* ── UX-2026-10-03-49: Vier Anzeige-Fehler in Randfällen ────────────────────── */
+
+test.describe("Anzeige in Randfällen", () => {
+  const LIMIT_AKTIV = (restSekunden) => ({
+    current: { count: 500, limit: 500, limitActive: true, retryAfterSeconds: restSekunden, hourlyTotal: 500 },
+    totals: { today: 500, week: 900, month: 3000, total: 9000, allTime: 9000 },
+  });
+  const ANSAGE = "#srAnnounce";
+
+  test("gescheiterte Analyse: Angesagt wird die Fehlermeldung, nicht „Analyse abgeschlossen“", async ({
+    page,
+    context,
+  }) => {
+    await grundrouten(page, context);
+    await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+    await page.route("**/api/job-status*", (r) => json(r, 200, { status: "failed", errorReason: "mistral_error" }));
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect(page.locator("#status")).toContainText("Es ist ein Fehler aufgetreten", { timeout: 15000 });
+    await expect(page.locator("#status")).toHaveAttribute("role", "alert");
+    await expect(page.locator(ANSAGE)).not.toHaveText("Analyse abgeschlossen");
+  });
+
+  test("Einlass abgelehnt (Serverfehler): keine Ansage „Analyse abgeschlossen“", async ({ page, context }) => {
+    await grundrouten(page, context);
+    await page.route("**/api/enqueue", (r) => json(r, 500, {}));
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect(page.locator("#status")).toContainText("überlastet", { timeout: 15000 });
+    await expect(page.locator(ANSAGE)).not.toHaveText("Analyse abgeschlossen");
+  });
+
+  test("Erfolgsweg: Nach einer gelungenen Analyse wird „Analyse abgeschlossen“ angesagt", async ({ page, context }) => {
+    await grundrouten(page, context);
+    await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+    await page.route("**/api/job-status*", (r) => json(r, 200, { status: "done", result: ERGEBNIS }));
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 20000 });
+    await expect(page.locator(ANSAGE)).toHaveText("Analyse abgeschlossen");
+  });
+
+  test("Zahlen-Seite bei aktivem Limit: Ein Sprachwechsel setzt die Restzeit nicht zurück", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60000);
+    await grundrouten(page, context, LIMIT_AKTIV(600));
+    await page.goto("/stats.html?lang=de");
+    const feld = page.locator("#limitCountdownStats");
+    await expect(feld).toContainText("Wieder verfügbar", { timeout: 15000 });
+    /* Zahlform der Sprache: deutsch mit Komma. */
+    await expect(page.locator("#limitFree")).toHaveText("0,0 % frei");
+    const sekunden = (text) => {
+      const m = /(\d+):(\d\d)/.exec(text);
+      return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
+    };
+    await expect.poll(async () => sekunden(await feld.innerText()), { timeout: 15000 }).toBeLessThanOrEqual(594);
+    const vorher = sekunden(await feld.innerText());
+    await page.click('.sprach-knopf[data-lang="en"]');
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(feld).toContainText("Available again");
+    const nachher = sekunden(await feld.innerText());
+    /* Die Restzeit läuft weiter: nicht größer als vorher, höchstens zwei Sekunden kleiner. */
+    expect(nachher).toBeLessThanOrEqual(vorher);
+    expect(nachher).toBeGreaterThanOrEqual(vorher - 2);
+    await expect(page.locator("#limitFree")).toHaveText("0.0 % free");
+  });
+
+  test("Limit läuft ab, während ein wiederhergestelltes Profil gelesen wird: Die Seite lädt nicht von selbst neu", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60000);
+    /* Stundenlimit aktiv, Rest 5 Sekunden. */
+    await grundrouten(page, context, LIMIT_AKTIV(5));
+    await page.route("**/api/job-status*", (r) => json(r, 200, { status: "done", result: ERGEBNIS }));
+    /* Der Tab hat ein fertiges Ergebnis gemerkt (Neuladen, oder das Handy hat den Tab neu geladen). */
+    await context.addInitScript(() => {
+      try {
+        sessionStorage.setItem("malzime.queueJobId", "job-1");
+        sessionStorage.setItem("malzime.queueResultToken", "tok");
+      } catch (_) {
+        /* ohne Tab-Speicher prüft der Test nichts — er scheitert dann am fehlenden Ergebnis */
+      }
+    });
+    let ladungen = 0;
+    page.on("load", () => {
+      ladungen += 1;
+    });
+    await page.goto("/?lang=de");
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 20000 });
+    await expect(page.locator("#limitBanner")).toBeVisible();
+    const ladungenBeimLesen = ladungen;
+    /* Der Rückwärtszähler läuft ab: Der Hinweis verschwindet, der Hochlade-Bereich ist wieder frei … */
+    await expect(page.locator("#limitBanner")).toBeHidden({ timeout: 15000 });
+    await expect(page.locator(".upload-section")).not.toHaveClass(/upload-section--limited/);
+    await page.waitForTimeout(3500);
+    /* … und das Profil steht noch da, ohne dass die Seite neu geladen hat. */
+    expect(ladungen).toBe(ladungenBeimLesen);
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible();
+  });
+
+  test("Erfolgsweg: Ohne Ergebnis auf dem Bildschirm lädt die Seite nach Ablauf des Limits neu", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60000);
+    await grundrouten(page, context, LIMIT_AKTIV(3));
+    let ladungen = 0;
+    page.on("load", () => {
+      ladungen += 1;
+    });
+    await page.goto("/?lang=de");
+    await expect(page.locator("#limitBanner")).toBeVisible();
+    await expect.poll(() => ladungen, { timeout: 15000 }).toBeGreaterThanOrEqual(2);
+  });
+
+  test("Abriss in den ersten Sekunden bei gewählter Beast-Art: Nach der Wiederaufnahme ist zu sehen, dass etwas läuft", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(120000);
+    await grundrouten(page, context);
+    await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+    let abfragen = 0;
+    let netzWeg = false;
+    await page.route("**/api/job-status*", (r) => {
+      abfragen += 1;
+      /* Erst zwei Wellen mit seriösem Text (Beast hat das Modell noch nicht begonnen), dann Abriss. */
+      if (abfragen > 2 && !netzWeg) netzWeg = "ja";
+      if (netzWeg === "ja") return r.abort("failed");
+      return json(r, 200, { status: "processing", liveText: "Seriöser Text, erster Teil.", liveTextVersuch: 1 });
+    });
+    await seiteOeffnen(page);
+    await page.click(".bias-opt.boost"); /* erst Beast wählen, dann das Foto */
+    await fotoWaehlen(page);
+    await expect(page.locator("#status")).toContainText("Verbindung unterbrochen", { timeout: 40000 });
+    netzWeg = "vorbei";
+    await page.evaluate(() => window.dispatchEvent(new Event("online")));
+    await expect(page.locator("#status")).toHaveText("", { timeout: 10000 });
+    const lesen = () =>
+      page.evaluate(async () => {
+        const s = (await import("/js/state.js")).state;
+        const q = (id) => document.getElementById(id);
+        return {
+          laeuft: s.isAnalyzing,
+          zeigtEtwas: q("scanAnim").classList.contains("active") || q("liveKarte").classList.contains("active"),
+        };
+      });
+    /* Läuft die Analyse, zeigt die Seite das auch: Wartefigur oder getippter Text. */
+    for (let i = 0; i < 4; i += 1) {
+      const stand = await lesen();
+      expect(stand).toEqual({ laeuft: true, zeigtEtwas: true });
+      await page.waitForTimeout(1000);
+    }
+  });
+});

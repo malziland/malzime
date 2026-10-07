@@ -479,7 +479,7 @@ export function initHintergrundWiederaufnahme() {
         state.wartetAufVerbindung = false;
         verbindungsPruefungStoppen();
         liveAbbrechenWegenFehler();
-        stopScanAnim();
+        stopScanAnim(true);
         textSetzen(elements.scanText, "");
         setStatus(t("error.queueAbandoned"), undefined, "error.queueAbandoned");
         meldeSichtbarenFehler("error.queueAbandoned", "uebergabe-pause");
@@ -765,14 +765,14 @@ async function analyzeImageQueued() {
 
   const file = state.lastFile || elements.fileInput.files[0];
   if (!file) {
-    stopScanAnim();
+    stopScanAnim(true);
     setStatus(t("error.noFile"), undefined, "error.noFile");
     meldeSichtbarenFehler("error.noFile", "datei-fehlt", { requestId: String(myId), traceId });
     beendeAnalyse(myId);
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
-    stopScanAnim();
+    stopScanAnim(true);
     setStatus(t("error.fileTooLarge"), undefined, "error.fileTooLarge");
     meldeSichtbarenFehler("error.fileTooLarge", "datei-zu-gross", {
       requestId: String(myId),
@@ -785,7 +785,7 @@ async function analyzeImageQueued() {
   /* Honeypot — Bots füllen unsichtbare Felder aus */
   const hp = document.getElementById("website");
   if (hp && hp.value) {
-    stopScanAnim();
+    stopScanAnim(true);
     beendeAnalyse(myId);
     return;
   }
@@ -861,7 +861,7 @@ async function analyzeImageQueued() {
     }
 
     if (!enqueueResp.ok) {
-      stopScanAnim();
+      stopScanAnim(true);
       let parsed = null;
       try {
         parsed = await enqueueResp.clone().json();
@@ -925,7 +925,7 @@ async function analyzeImageQueued() {
     const enqueueData = await enqueueResp.jsonMitTimeout();
     const jobId = enqueueData && enqueueData.jobId;
     if (!jobId) {
-      stopScanAnim();
+      stopScanAnim(true);
       setStatus(t("error.queueFailed"), traceId, "error.queueFailed");
       meldeSichtbarenFehler("error.queueFailed", "einreihen-ohne-auftrag", {
         requestId: String(myId),
@@ -956,7 +956,11 @@ async function analyzeImageQueued() {
       return;
     }
 
-    stopScanAnim();
+    /* UX-2026-10-03-49: „Analyse abgeschlossen" wird nur angesagt, wenn ein
+       Ergebnis da ist. Auf jedem Fehlerweg stoppt die Wartefigur leise — die
+       Fehlermeldung traegt ihre Ansage selbst (`role="alert"`); davor
+       „abgeschlossen" zu hoeren, waere falsch. */
+    stopScanAnim(!(outcome && outcome.result));
     textSetzen(elements.scanText, "");
 
     if (!outcome) return;
@@ -1019,7 +1023,7 @@ async function analyzeImageQueued() {
     if (abbruch.signal.aborted) return;
     /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
     liveAbbrechenWegenFehler();
-    stopScanAnim();
+    stopScanAnim(true);
     textSetzen(elements.scanText, "");
 
     let phase;
@@ -1118,6 +1122,17 @@ export async function resumeQueueJob({ force = false } = {}) {
   if (setztLiveTextFort) {
     liveAnzeige.fortsetzen();
     setStatus("");
+    /* UX-2026-10-03-49: Riss die Verbindung ab, bevor das erste Zeichen
+       getippt war (der Anlauf dauert, oder fuer die gewaehlte Profil-Art
+       liegt noch kein Text vor), steht nach dem Fortsetzen nichts auf dem
+       Bildschirm: keine Live-Karte, keine Wartefigur, keine Meldung — obwohl
+       die Analyse laeuft. Dann zeigt die Wartefigur, dass etwas geschieht;
+       das erste getippte Zeichen blendet sie wie gewohnt aus. Leise: Das ist
+       kein neuer Analyse-Start. */
+    if (!elements.liveKarte || !elements.liveKarte.classList.contains("active")) {
+      startScanAnim(false, true);
+      textSetzen(elements.scanText, t("scan.resume"));
+    }
   } else {
     liveAnzeige.zuruecksetzen();
     /* BUG-2026-10-03-45: Ohne pausierten Lauf fragt die Wiederaufnahme ohne
@@ -1141,7 +1156,8 @@ export async function resumeQueueJob({ force = false } = {}) {
     const outcome = await pollJob(jobId, myId, resultToken, true, setztLiveTextFort);
     if (state.requestId !== myId) return;
 
-    stopScanAnim();
+    /* Wie oben: die Abschluss-Ansage nur mit Ergebnis. */
+    stopScanAnim(!(outcome && outcome.result));
     textSetzen(elements.scanText, "");
 
     /* BUG-2026-08-17-03: Ein ABGERISSENER Versuch darf die Job-Nummer nicht
@@ -1189,7 +1205,7 @@ export async function resumeQueueJob({ force = false } = {}) {
   } catch (err) {
     if (state.requestId !== myId) return;
     clearStoredJobId();
-    stopScanAnim();
+    stopScanAnim(true);
     textSetzen(elements.scanText, "");
     setStatus(""); /* stiller Fehler beim Seitenstart — kein Banner */
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });

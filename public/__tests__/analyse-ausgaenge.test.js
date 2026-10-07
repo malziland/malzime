@@ -13,6 +13,10 @@
  *      Ausgang ruft sie. Ein neuer Ausgang ohne den Aufruf fällt hier auf.
  *   2. Das VERHALTEN: Nach jedem auslösbaren Ausgang stehen die Flaggen auf
  *      „aus" — und während des Laufs auf „an" (sonst prüfte der Test nichts).
+ *
+ * An denselben Ausgängen hängt die Ansage für Screenreader
+ * (UX-2026-10-03-49): „Analyse abgeschlossen" wird nur nach einem Ergebnis
+ * angesagt. Auf jedem Fehlerweg trägt die Fehlermeldung die Ansage selbst.
  */
 import { describe, it, test, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
@@ -192,18 +196,22 @@ describe("Verhalten: Nach jedem Ausgang stehen die Flaggen auf „aus“", () =>
     await lauf;
   }
 
-  function flaggenAus() {
+  /* `fehlerweg`: Der Ausgang ist ein Fehler — dann darf im Ansage-Bereich
+     nicht „Analyse abgeschlossen" stehen (der Text-Schlüssel ist `scan.srEnd`). */
+  function flaggenAus({ fehlerweg = true } = {}) {
     expect({ isAnalyzing: state.isAnalyzing, uploadLaeuft: state.uploadLaeuft }).toEqual({
       isAnalyzing: false,
       uploadLaeuft: false,
     });
+    if (fehlerweg) expect(elements.srAnnounce.textContent).not.toBe("scan.srEnd");
+    else expect(elements.srAnnounce.textContent).toBe("scan.srEnd");
   }
 
   it("Erfolg — und während des Uploads stehen beide Flaggen auf „an“", async () => {
     await analysiere(foto());
     expect(waehrendUpload).toEqual({ isAnalyzing: true, uploadLaeuft: true });
     expect(renderCurrentMode).toHaveBeenCalledTimes(1);
-    flaggenAus();
+    flaggenAus({ fehlerweg: false });
     expect(state.wartetAufVerbindung).toBe(false);
   });
 
@@ -253,6 +261,13 @@ describe("Verhalten: Nach jedem Ausgang stehen die Flaggen auf „aus“", () =>
     flaggenAus();
   });
 
+  it("Wartungsfenster beim Einreihen", async () => {
+    einreihen = () => antwort({ maintenance: true, message: "Wartung" }, 503);
+    await analysiere(foto());
+    expect(elements.maintenanceModal.classList.contains("active")).toBe(true);
+    flaggenAus();
+  });
+
   it("Einreihen ohne Auftragsnummer", async () => {
     einreihen = () => antwort({});
     await analysiere(foto());
@@ -297,8 +312,9 @@ describe("Verhalten: Nach jedem Ausgang stehen die Flaggen auf „aus“", () =>
     await vi.advanceTimersByTimeAsync(3000);
     await lauf;
     expect(renderCurrentMode).toHaveBeenCalledTimes(1);
-    flaggenAus();
+    flaggenAus({ fehlerweg: false });
 
+    elements.srAnnounce.textContent = "";
     abruf = () => antwort({ error: "Job not found" }, 404);
     lauf = api.resumeQueueJob({ force: true });
     await vi.advanceTimersByTimeAsync(3000);

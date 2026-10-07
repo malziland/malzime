@@ -181,6 +181,30 @@ export function showLimitBanner(retryAfterSeconds) {
   startLimitCountdown(retryAfterSeconds);
 }
 
+/* UX-2026-10-03-49: Ist das Limit vorbei, lud die Seite bisher immer neu.
+   Steht gerade ein Profil da (nach einem Neuladen wiederhergestellt), nimmt
+   ihm das die Leseposition und einen angefangenen Realitaets-Check — und ist
+   die Zustellung laenger als 15 Minuten her, ist das Profil danach weg. Dann
+   genuegt es, den Hinweis auszublenden und den Hochlade-Bereich wieder
+   freizugeben; ohne Ergebnis auf dem Bildschirm bleibt es beim Neuladen (es
+   holt den frischen Stand vom Server). */
+function limitAufheben() {
+  if (document.documentElement.hasAttribute("data-has-result")) {
+    hideLimitBanner();
+    return;
+  }
+  location.reload();
+}
+
+function hideLimitBanner() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+  if (elements.limitBanner) elements.limitBanner.classList.remove("active");
+  bereicheSchalten(false);
+}
+
 function startLimitCountdown(totalSeconds) {
   if (countdownInterval) clearInterval(countdownInterval);
   let remaining = totalSeconds;
@@ -196,7 +220,7 @@ function startLimitCountdown(totalSeconds) {
       if (elements.limitCountdown) {
         elements.limitCountdown.textContent = t("limit.countdownDone");
       }
-      setTimeout(() => location.reload(), 2000);
+      setTimeout(limitAufheben, 2000);
       return;
     }
     updateCountdownText(remaining);
@@ -208,7 +232,7 @@ function startLimitCountdown(totalSeconds) {
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data && !data.current.limitActive) {
-            location.reload();
+            limitAufheben();
           }
         })
         .catch(() => {});

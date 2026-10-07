@@ -16,6 +16,11 @@ let letzteDaten = null;
    (Sprachwechsel), muss der alte Takt weg, bevor ein neuer beginnt — sonst
    zaehlen zwei Intervalle gleichzeitig herunter und die Anzeige springt. */
 let countdownTakt = null;
+/* UX-2026-10-03-49: Wann das Limit endet — gemerkt beim ersten Zeichnen der
+   geholten Antwort. Ein Sprachwechsel zeichnet aus derselben Antwort neu; ohne
+   den Endzeitpunkt begann der Rueckwaertszaehler dabei wieder beim Anfangswert
+   („9:48" wurde zu „10:00"), und wer oefter umschaltete, kam nie bei null an. */
+let limitEndetUm = 0;
 
 function fmt(n) {
   return new Intl.NumberFormat(getLanguage()).format(n);
@@ -97,7 +102,9 @@ function zeichne(data) {
     el.limitBadge.textContent = t("stats.limitReached");
     el.limitBadge.className = "stats-limit__badge stats-limit__badge--warn";
     if (data.current.retryAfterSeconds > 0) {
-      startCountdown(data.current.retryAfterSeconds, el.limitCountdown);
+      if (!limitEndetUm) limitEndetUm = Date.now() + data.current.retryAfterSeconds * 1000;
+      const rest = Math.max(1, Math.ceil((limitEndetUm - Date.now()) / 1000));
+      startCountdown(rest, el.limitCountdown);
     }
   } else {
     el.limitBadge.textContent = t("stats.available");
@@ -115,6 +122,8 @@ async function loadStats() {
     if (!res.ok) throw new Error(res.status);
     const data = await res.json();
     letzteDaten = data;
+    /* Neue Antwort, neuer Endzeitpunkt (siehe limitEndetUm). */
+    limitEndetUm = 0;
     zeichne(data);
   } catch (_err) {
     elemente().statsError.style.display = "block";

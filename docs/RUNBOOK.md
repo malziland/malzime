@@ -634,7 +634,9 @@ Was jeder `grund` bedeutet, steht in [ERROR-ALERTING.md](ERROR-ALERTING.md)
 (Tabelle unter „Analyse gescheitert“). Weiter je Grund: `blocked.overloaded`
 und `blocked.apiError` → unten „Mistral überlastet / 429 / 5xx“ (dort auch die
 Warnungen des KI-Aufrufs und `step: "bild-laden"`); `blocked.configMissing` →
-[BETRIEBSPROFILE.md](BETRIEBSPROFILE.md); `processing_timeout` → Warnung
+[BETRIEBSPROFILE.md](BETRIEBSPROFILE.md); `ergebnis_speichern` → Firestore
+prüfen, nicht die KI (Warnungen `ergebnis-speichern-fehlgeschlagen` des Dienstes
+`processjob`); `processing_timeout` → Warnung
 `worker-abgestuerzt-verdacht` und Plattform-Fehlerzeilen des Dienstes
 `processjob`; `enqueue_failed` → Cloud Tasks prüfen (Warteschlange pausiert,
 Rechte); `store_failed` und `enqueue_unerwartet` → Zeilen des Dienstes

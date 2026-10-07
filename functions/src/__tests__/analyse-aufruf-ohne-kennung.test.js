@@ -19,6 +19,12 @@ jest.mock("../jobs", () => ({
   getJob: jest.fn(),
   claimJob: jest.fn(),
   completeJob: jest.fn(),
+  /* Der Verarbeiter speichert ueber diese zwei (BUG-2026-10-03-30). Hier
+     reichen sie an die completeJob-Attrappe weiter; Wiederholung und
+     Meldegrund prueft ergebnis-speichern.test.js mit dem echten Modul. */
+  ergebnisSpeichern: (id, result) => require("../jobs").completeJob(id, result),
+  ersatzErgebnisSpeichern: (id, job) =>
+    require("../jobs").completeJob(id, jest.requireActual("../jobs").ersatzErgebnis(job)),
   isAbandoned: jest.fn(),
   abandonJob: jest.fn(),
   countProcessingJobs: jest.fn(),

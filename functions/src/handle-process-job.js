@@ -35,7 +35,8 @@ const { loggeMinorSafety } = require("./job-helfer");
    die Annahme des Auftrags und das Wegschreiben des Ergebnisses. */
 const { runPipeline } = require("./job-pipelines");
 const { incrementTotals, releaseHourlySlot, zaehlerNachtragen } = require("./counter");
-const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
+const { getJob, claimJob, ergebnisSpeichern, ersatzErgebnisSpeichern } = require("./jobs");
+const { isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { geltendeWerte } = require("./betriebsprofil");
 const { deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
@@ -226,7 +227,7 @@ async function handleProcessJob(req, res) {
   const zaehlerNachtrag = job.zaehlerNachtrag === true ? zaehlerNachtragen(job.zaehlerStempel) : null;
   try {
     const { result, success } = await runPipeline(job);
-    /* BUG-2026-08-13-35: Rückgabewert von completeJob auswerten. Er liefert
+    /* BUG-2026-08-13-35: Rückgabewert des Speicherns auswerten. Er liefert
        `false`, wenn der Job nicht mehr `processing` ist (der Reaper hat ihn
        zwischenzeitlich auf `failed` gekippt, und eine CPU-gedrosselt wieder
        auflebende Fortsetzung landet hier). Vorher wurde das verworfen: das
@@ -234,7 +235,7 @@ async function handleProcessJob(req, res) {
        eine Analyse, und die Logzeile behauptete `status: "done"` — das Log log
        aktiv, statt zu schweigen. Seit 01.10.2026 eine Warnung: Den Alarm hat
        der Wechsel auf `failed` bereits ausgeloest (jobs.js). */
-    const gespeichert = await completeJob(jobId, result);
+    const gespeichert = await ergebnisSpeichern(jobId, result);
     if (!gespeichert) {
       console.warn(
         JSON.stringify({
@@ -290,7 +291,8 @@ async function handleProcessJob(req, res) {
     }
   } catch (err) {
     /* Unerwarteter Fehler → trotzdem ein sauberes, renderbares blocked-
-       Ergebnis liefern (wie der synchrone Pfad). */
+       Ergebnis liefern. Liess sich nur das fertige Ergebnis nicht speichern
+       (BUG-2026-10-03-30), nennt die Meldung das Speichern, nicht die KI. */
     console.log(
       JSON.stringify({
         step: "process-job",
@@ -299,13 +301,9 @@ async function handleProcessJob(req, res) {
         totalMs: Date.now() - start,
       })
     );
-    await completeJob(jobId, {
-      profiles: null,
-      blockedReason: "blocked.apiError",
-      privacyRisks: [],
-      exif: job.exif || {},
-      meta: { traceId: job.traceId || null, mode: "blocked" },
-    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", error: ohneKennung(e.message) })));
+    await ersatzErgebnisSpeichern(jobId, job, err && err.code === "ergebnis_speichern" ? err.code : null).catch((e) =>
+      console.log(JSON.stringify({ warning: "completeJob-error", error: ohneKennung(e.message) }))
+    );
   } finally {
     /* Bild immer löschen — Erfolg ODER Fehler. Die Storage-Lifecycle-Regel
        ist das zweite Sicherheitsnetz. */

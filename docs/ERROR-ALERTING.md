@@ -90,6 +90,7 @@ geschlossenem Tab gesehen hätte):
 | `blocked.profileBlocked` | kein verwertbares Profil (KI hat abgelehnt oder unlesbar geantwortet) |
 | `blocked.configMissing` | Einstellungssatz fehlt oder ist ungültig — sofort handeln |
 | `profil_leer_standard`, `profil_leer_beast` | nur ein Teil gerettet, im genannten Modus steht „leeres Profil“ |
+| `ergebnis_speichern` | die Analyse war fertig, das Ergebnis ließ sich in drei Versuchen nicht in die Datenbank schreiben; das Kind sah „technischer Fehler“ (Warnungen `ergebnis-speichern-fehlgeschlagen` davor) |
 | `processing_timeout` | die Bearbeitung wurde nicht fertig (Absturz oder Zeitlimit) |
 | `enqueue_failed` | Cloud Tasks nahm den Auftrag nicht an, das Kind sah „Die KI ist gerade überlastet“ |
 | `store_failed` | Foto oder Auftrag ließ sich beim Hochladen nicht ablegen (Speicher oder Datenbank), Meldung wie oben |

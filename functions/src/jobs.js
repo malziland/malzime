@@ -23,6 +23,7 @@
  * vergleichbar, konsistent mit counter.js, kein FieldValue nötig.
  */
 
+const crypto = require("crypto");
 const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
 const { geltendeWerte, ZUSAGE_LOESCHFRISTEN } = require("./betriebsprofil");
@@ -241,24 +242,102 @@ async function claimJob(jobId) {
  * BUG-001 (Audit 2026-06): bedingter Übergang in einer Transaktion. Ein
  * nachlaufender Worker, dessen Job inzwischen vom Reaper auf `failed`/`abandoned`
  * gesetzt wurde, überschreibt diesen Terminalzustand NICHT mehr.
+ *
+ * `marke` (BUG-2026-10-03-30): Kennzeichen des Schreibers. Wiederholt er den
+ * Aufruf nach einem Fehler und findet den Job schon `done` MIT seiner Marke,
+ * war der erste Versuch angekommen und nur die Bestaetigung ging verloren —
+ * das zaehlt als gelungen, nicht als "ein anderer war schneller".
+ * `meldeGrund`: Grund fuer die Meldung "Analyse gescheitert", wenn er ein
+ * anderer ist als der, den das Kind sieht (`result.blockedReason`).
  * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
-async function completeJob(jobId, result) {
+async function completeJob(jobId, result, { marke = null, meldeGrund = null } = {}) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
   const gemacht = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if (!snap.exists || snap.data().status !== "processing") return false;
-    tx.update(ref, { status: "done", finishedAt: Date.now(), result: result || null, errorReason: null });
+    if (!snap.exists) return false;
+    const daten = snap.data();
+    if (marke && daten.status === "done" && daten.abschlussMarke === marke) return true;
+    if (daten.status !== "processing") return false;
+    tx.update(ref, {
+      status: "done",
+      finishedAt: Date.now(),
+      result: result || null,
+      errorReason: meldeGrund,
+      abschlussMarke: marke,
+    });
     return true;
   });
   /* Ein blockiertes Ergebnis oder ein leeres Profil zeigt dem Kind eine
      Fehlermeldung. */
   if (gemacht) {
-    if (result && result.meta && result.meta.mode === "blocked") meldeGescheiterteAnalyse(result.blockedReason);
+    if (result && result.meta && result.meta.mode === "blocked")
+      meldeGescheiterteAnalyse(meldeGrund || result.blockedReason);
     else if (leeresProfil(result)) meldeGescheiterteAnalyse(leeresProfil(result));
   }
   return gemacht;
+}
+
+/* BLEIBT IM CODE — Schutzgrenze, keine Betriebseinstellung: so oft wird das
+   Speichern eines fertigen Ergebnisses versucht, bevor es als gescheitert gilt. */
+const SPEICHER_VERSUCHE = 3;
+
+/**
+ * Speichert das fertige Ergebnis einer Analyse (BUG-2026-10-03-30). Scheitert
+ * der Schreibvorgang, wird DERSELBE mit DEMSELBEN Ergebnis wiederholt — die
+ * Analyse ist bezahlt und fertig, ein einzelner Datenbankfehler soll sie nicht
+ * kosten. Erst nach dem letzten Versuch wirft die Funktion, mit
+ * `code: "ergebnis_speichern"`; der Verarbeiter schreibt dann das
+ * Ersatz-Ergebnis (ersatzErgebnisSpeichern).
+ *
+ * Die Warnung je gescheitertem Versuch traegt nur Code und Art des Fehlers:
+ * Ein Firestore-Fehlertext kann den Dokumentpfad samt jobId enthalten.
+ * @returns {Promise<boolean>} wie completeJob
+ */
+async function ergebnisSpeichern(jobId, result) {
+  const marke = crypto.randomUUID();
+  for (let versuch = 1; ; versuch += 1) {
+    try {
+      return await completeJob(jobId, result, { marke });
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          severity: "WARNING",
+          step: "process-job",
+          warning: "ergebnis-speichern-fehlgeschlagen",
+          versuch,
+          code: (err && err.code) || null,
+          art: (err && err.name) || null,
+        })
+      );
+      if (versuch >= SPEICHER_VERSUCHE) {
+        const fehler = new Error("Ergebnis nicht speicherbar");
+        fehler.code = "ergebnis_speichern";
+        throw fehler;
+      }
+    }
+  }
+}
+
+/**
+ * Schreibt das Ersatz-Ergebnis "technischer Fehler", wenn der Verarbeiter
+ * unerwartet scheitert — ein sauberes, renderbares Ergebnis statt eines
+ * haengenden Auftrags. Das Kind sieht in jedem Fall `blocked.apiError`;
+ * `meldeGrund` nennt der Meldung den wahren Grund, wenn es nicht die KI war.
+ */
+function ersatzErgebnis(job) {
+  return {
+    profiles: null,
+    blockedReason: "blocked.apiError",
+    privacyRisks: [],
+    exif: (job && job.exif) || {},
+    meta: { traceId: (job && job.traceId) || null, mode: "blocked" },
+  };
+}
+
+async function ersatzErgebnisSpeichern(jobId, job, meldeGrund) {
+  return completeJob(jobId, ersatzErgebnis(job), { meldeGrund: meldeGrund || null });
 }
 
 /**
@@ -657,6 +736,9 @@ module.exports = {
   getJob,
   claimJob,
   completeJob,
+  ergebnisSpeichern,
+  ersatzErgebnis,
+  ersatzErgebnisSpeichern,
   failJob,
   getQueuePosition,
   countQueuedJobs,

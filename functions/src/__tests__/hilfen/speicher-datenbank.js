@@ -15,8 +15,9 @@
 
    Stoerungen: `speicher.vor(fn)` haengt eine Funktion vor jeden Zugriff. Sie
    bekommt `{ art, pfad, daten }` (art: get | set | update | delete | abfrage |
-   zaehlen | transaktion) und darf werfen oder ein Promise zurueckgeben, auf das
-   der Zugriff dann wartet. `speicher.leeren()` nimmt Dokumente und Stoerungen
+   zaehlen | transaktion | transaktion-ende) und darf werfen oder ein Promise
+   zurueckgeben, auf das der Zugriff dann wartet. "transaktion-ende" kommt, wenn
+   die Transaktion schon geschrieben hat. `speicher.leeren()` nimmt Dokumente und Stoerungen
    wieder weg. */
 
 const dokumente = new Map();
@@ -110,7 +111,7 @@ const datenbank = {
   }),
   async runTransaction(fn) {
     await zugriff("transaktion", null);
-    return fn({
+    const ergebnis = await fn({
       get: (ref) => ref.get(),
       update: (ref, aenderung) => {
         if (!dokumente.has(ref.pfad)) throw new Error("update auf ein fehlendes Dokument");
@@ -120,6 +121,10 @@ const datenbank = {
         dokumente.set(ref.pfad, { ...daten });
       },
     });
+    /* Hier ist schon geschrieben. Eine Stoerung an dieser Stelle stellt den Fall
+       nach, dass die Bestaetigung der Datenbank nicht mehr ankommt. */
+    await zugriff("transaktion-ende", null);
+    return ergebnis;
   },
 };
 

@@ -12,8 +12,9 @@
  *     nur aus dem sichtbaren Text
  *   - Telefonnummern, am Stück oder in Zifferngruppen (mit Filter gegen
  *     Stockfoto-Wasserzeichen) — dito
- *   - Kfz-Kennzeichen (deutsches/österreichisches Format) — aus der GANZEN
- *     Beschreibung, weil das Muster spezifisch genug für False-Positive-Freiheit ist
+ *   - Kfz-Kennzeichen (deutsches Format, österreichisches Regel- und
+ *     Wunschformat) — aus der GANZEN Beschreibung, weil die Muster spezifisch
+ *     genug für False-Positive-Freiheit sind
  */
 
 /* Woran der sichtbare Text eine Adresse oder einen Schulbezug verraet. Was
@@ -29,8 +30,10 @@ const ADRESS_WOERTER = ["straße", "strasse", "str.", "schule", "gymnasium"];
 const ADRESS_MUSTER = [
   /* Mozartgasse 3 · Linzer Weg 7 · Hauptplatz 3 */
   /(?:gasse|weg|\p{L}platz)\s+\d{1,4}(?!\d)/u,
-  /* 12 Main Street · 45 Elm Road · 3 Park Avenue */
-  /(?<![\p{L}\d])\d{1,5}[a-z]?\s+(?:[\p{L}'.-]+\s+){1,2}(?:street|road|avenue)(?!\p{L})/u,
+  /* 12 Main Street · 45 Elm Road · 3 Park Avenue · 12 Main St. · 45 Elm Rd. ·
+     3 Park Ave. — die Abkuerzung nur mit Punkt und nur hinter Hausnummer und
+     Name ("St" ohne Punkt steht auf zu vielen Aufdrucken). */
+  /(?<![\p{L}\d])\d{1,5}[a-z]?\s+(?:[\p{L}'.-]+\s+){1,2}(?:street|road|avenue|st\.|rd\.|ave\.)(?!\p{L})/u,
   /* Mill Road 12 */
   /(?<!\p{L})(?:street|road|avenue)\s+\d{1,5}(?!\d)/u,
   /* Springfield Elementary School · Oxford High School. "school" allein
@@ -44,10 +47,30 @@ const ADRESS_MUSTER = [
    "0 1 2 3" ist keine Nummer), die ganze Nummer 9 bis 15 (ein Datum hat
    weniger, eine Kontonummer mehr), und sie beginnt nicht mitten in einer
    laengeren Ziffernfolge. */
+/* Schulformen, die in Oesterreich als Kuerzel auf Schulkleidung und Schildern
+   stehen ("HTL Mödling", "HAK Bregenz"). Verglichen wird am Original, nicht
+   klein geschrieben: als ganzes Wort in Grossbuchstaben. */
+const SCHUL_KUERZEL = /(?<![\p{L}\d])(?:HTL|HAK|HLW|HBLA|NMS|BORG|BRG)(?![\p{L}\d])/u;
+
+/* Kfz-Kennzeichen. Verglichen wird am Original (Grossbuchstaben), damit Prosa
+   nicht trifft ("am 12 uhr").
+   - deutsches Format und oesterreichisches Wunschkennzeichen: M-AB 1234
+   - oesterreichisches Regelformat (Bezirk, Ziffern, Buchstaben): W-12345 X,
+     GU-123 AB, L-1234A. Mit Bindestrich ab zwei Ziffern; mit Leerzeichen oder
+     Mittelpunkt statt Bindestrich erst ab drei Ziffern — sonst traefe ein
+     Groessen-Etikett ("EU 42 UK"). */
+const KENNZEICHEN = [
+  /\b[a-zäöü]{1,3}-[a-zäöü]{1,2} \d{1,4}\b/i,
+  /(?<![\p{L}\d-])[A-ZÄÖÜ]{1,2}-\d{2,5} ?[A-Z]{1,3}(?![\p{L}\d])/u,
+  /(?<![\p{L}\d-])[A-ZÄÖÜ]{1,2}[ ·]\d{3,5} ?[A-Z]{1,3}(?![\p{L}\d])/u,
+];
+
 const TELEFON_IN_GRUPPEN = [
   /(?<![\d.,]|\d[\s/-])0\d{1,4}(?:[\s/-]\d{2,8}){2,5}(?!\d)/g,
   /\+\d{1,3}(?:[\s/-]?\(?\d{1,5}\)?){2,6}(?!\d)/g,
   /\(\d{2,5}\)\s?\d{2,4}(?:[\s/-]\d{2,4}){1,3}(?!\d)/g,
+  /* 555-123-4567 (nordamerikanisch, ohne Klammern) */
+  /(?<![\d-])\d{3}-\d{3}-\d{4}(?![\d-])/g,
 ];
 function hatTelefonInGruppen(text) {
   return TELEFON_IN_GRUPPEN.some((muster) =>
@@ -74,7 +97,11 @@ function buildPrivacyRisks({ visibleText, fullDescription }) {
      nicht auf der Beschreibungsprosa — sonst False Positives (Mistral schreibt
      "sie steht an einer Straße" → würde fälschlich privacy.address auslösen). */
   if (text) {
-    if (ADRESS_WOERTER.some((wort) => text.includes(wort)) || ADRESS_MUSTER.some((muster) => muster.test(text))) {
+    if (
+      ADRESS_WOERTER.some((wort) => text.includes(wort)) ||
+      ADRESS_MUSTER.some((muster) => muster.test(text)) ||
+      SCHUL_KUERZEL.test(visibleText)
+    ) {
       risks.push("privacy.address");
     }
 
@@ -86,20 +113,24 @@ function buildPrivacyRisks({ visibleText, fullDescription }) {
     const isWatermark = /shutterstock|getty|istock|depositphotos|alamy|ki erstellt|ai generated|ki-generiert/i.test(
       text
     );
+    /* Das erste Muster trifft nicht mitten in einer laengeren, mit Bindestrichen
+       gegliederten Nummer — sonst waere eine ISBN auf einem Buchruecken eine
+       Telefonnummer ("978-3-16-148410-0"). */
     if (
       !isWatermark &&
-      (/\b\d{2,3}[\s/-]?\d{6,8}\b/.test(text) || /\b0\d{2,4}[\s/-]?\d{5,8}\b/.test(text) || hatTelefonInGruppen(text))
+      (/(?<!\d-)\b\d{2,3}[\s/-]?\d{6,8}\b(?!-\d)/.test(text) ||
+        /\b0\d{2,4}[\s/-]?\d{5,8}\b/.test(text) ||
+        hatTelefonInGruppen(text))
     ) {
       risks.push("privacy.phone");
     }
   }
 
-  /* Kfz-Kennzeichen: deutsches/österreichisches Format, z.B. "M-AB 1234".
-     Das Muster ist spezifisch genug, dass es gefahrlos über die GANZE
-     Beschreibung laufen kann — fängt damit auch Kennzeichen, die Mistral nur
-     im Fließtext erwähnt statt im sichtbaren Text. */
+  /* Kfz-Kennzeichen (Muster oben): spezifisch genug, dass sie gefahrlos über
+     die GANZE Beschreibung laufen können — fängt damit auch Kennzeichen, die
+     Mistral nur im Fließtext erwähnt statt im sichtbaren Text. */
   const plateScan = `${fullDescription || ""}\n${visibleText || ""}`;
-  if (/\b[a-zäöü]{1,3}-[a-zäöü]{1,2} \d{1,4}\b/i.test(plateScan)) {
+  if (KENNZEICHEN.some((muster) => muster.test(plateScan))) {
     risks.push("privacy.licensePlate");
   }
 

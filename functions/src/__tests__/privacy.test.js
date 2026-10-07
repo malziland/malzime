@@ -139,3 +139,69 @@ describe("Adresse und Telefonnummer in ueblichen Schreibweisen (BUG-2026-10-03-0
     expect(hinweise("Getty Images 0664 123 45 67")).not.toContain("privacy.phone");
   });
 });
+
+/* 07.10.2026: Was in Oesterreich ueblich ist, blieb ohne Hinweis — das
+   Regelformat der Kennzeichen (Bezirk, Ziffern, Buchstaben), die Kuerzel der
+   Schulformen; dazu englische Strassen-Abkuerzungen und die nordamerikanische
+   Telefonnummer ohne Klammern. Je Form ein Treffer und die Gegenstuecke, die
+   KEIN Hinweis sein duerfen. */
+describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
+  const hinweise = (visibleText, fullDescription) => buildPrivacyRisks({ visibleText, fullDescription });
+
+  test.each(["W-12345 X", "GU-123 AB", "L-1234A", "WU-47 XY", "W 12345 X", "G·1234 AB", "Auto: W-98765 Z"])(
+    "oesterreichisches Kennzeichen wird erkannt: %s",
+    (text) => {
+      expect(hinweise(text)).toContain("privacy.licensePlate");
+    }
+  );
+
+  test("auch im Fliesstext der Beschreibung", () => {
+    expect(hinweise("", "Im Hintergrund parkt ein Auto mit dem Kennzeichen GU-123 AB.")).toContain(
+      "privacy.licensePlate"
+    );
+  });
+
+  test("das deutsche Format und das Wunschkennzeichen gelten weiter", () => {
+    expect(hinweise("M-AB 1234")).toContain("privacy.licensePlate");
+    expect(hinweise("ll-ab 1234")).toContain("privacy.licensePlate");
+  });
+
+  test.each([
+    "EU 42 UK 8",
+    "Größe M-8 EU",
+    "am 12 uhr",
+    "Wir treffen uns um 12 Uhr am Platz",
+    "A4 Papier",
+    "T-Shirt XL",
+    "EN-71",
+    "CO2-Wert 120 g",
+    "IPHONE 15 PRO",
+    "Saison 2024 AB",
+  ])("kein Kennzeichen: %s", (text) => {
+    expect(hinweise(text, text)).not.toContain("privacy.licensePlate");
+  });
+
+  test.each(["HTL Mödling", "HAK Bregenz Maturaball", "Abschluss BORG 2026", "NMS"])("Schul-Kuerzel: %s", (text) => {
+    expect(hinweise(text)).toContain("privacy.address");
+  });
+
+  test.each(["htl", "Shakira", "NMSX", "BORGWARD", "Chak-Chak"])("kein Schul-Kuerzel: %s", (text) => {
+    expect(hinweise(text)).not.toContain("privacy.address");
+  });
+
+  test.each(["12 Main St.", "45 Elm Rd.", "3 Park Ave."])("englische Strassen-Abkuerzung: %s", (text) => {
+    expect(hinweise(text)).toContain("privacy.address");
+  });
+
+  test.each(["1st Place", "St. Pauli", "12 points", "Team St Louis"])("keine Adresse: %s", (text) => {
+    expect(hinweise(text)).not.toContain("privacy.address");
+  });
+
+  test("nordamerikanische Telefonnummer ohne Klammern", () => {
+    expect(hinweise("Call 555-123-4567")).toContain("privacy.phone");
+  });
+
+  test.each(["2024-10-07", "ISBN 978-3-16-148410-0", "Art.-Nr. 123-456-78901"])("keine Telefonnummer: %s", (text) => {
+    expect(hinweise(text)).not.toContain("privacy.phone");
+  });
+});

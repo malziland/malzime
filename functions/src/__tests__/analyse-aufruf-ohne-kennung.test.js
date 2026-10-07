@@ -37,6 +37,7 @@ jest.mock("../cloud-tasks", () => ({
   redispatchJobLocal: jest.fn(),
 }));
 
+const util = require("util");
 const { handleProcessJob } = require("../handle-process-job");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
@@ -68,6 +69,22 @@ function makeRes() {
   };
 }
 
+/* Ein Argument einer Konsolenausgabe als Text, in dem sein INHALT steht
+   (TEST-2026-10-04-15): Text bleibt Text; ein Objekt wird als JSON geschrieben,
+   ein Fehler mit Meldung, Stapel und eigenen Feldern. `String(objekt)` ergaebe
+   "[object Object]" — die Suche nach dem Wert einer Kennung saehe nicht hinein.
+   Was sich nicht als JSON schreiben laesst (ein Objekt, das sich selbst
+   enthaelt), klappt util.inspect auf. */
+function alsText(wert) {
+  if (wert === null || typeof wert !== "object") return String(wert);
+  if (wert instanceof Error) return `${wert.stack || wert.message} ${alsText({ ...wert })}`;
+  try {
+    return JSON.stringify(wert);
+  } catch (_) {
+    return util.inspect(wert, { depth: null, maxArrayLength: null, maxStringLength: null, breakLength: Infinity });
+  }
+}
+
 let ausgabe;
 beforeEach(() => {
   jest.clearAllMocks();
@@ -84,7 +101,7 @@ beforeEach(() => {
   storage.deleteImage.mockResolvedValue();
   ausgabe = [];
   for (const art of ["log", "error", "warn", "info"]) {
-    jest.spyOn(console, art).mockImplementation((...args) => ausgabe.push(args.map(String).join(" ")));
+    jest.spyOn(console, art).mockImplementation((...args) => ausgabe.push(args.map(alsText).join(" ")));
   }
 });
 afterEach(() => jest.restoreAllMocks());
@@ -147,6 +164,35 @@ describe("Fehlertexte mit Kennung (27.09.2026)", () => {
 });
 
 describe("Positivkontrolle des Messmittels", () => {
+  /* TEST-2026-10-04-15: Gesucht wird nach dem WERT einer Kennung. Das geht nur,
+     wenn auch ein Objekt oder ein Fehler als Argument einer Konsolenausgabe mit
+     seinem Inhalt gesammelt wird. */
+  test("ein Objekt in einer Konsolenausgabe erscheint als JSON, nicht als [object Object]", () => {
+    console.log("vorgang", { traceId: TRACE_ID, tief: { liste: [{ jobId: JOB_ID }] } });
+    const log = ausgabe.join("\n");
+    expect(log).not.toContain("[object Object]");
+    expect(log).toContain(`vorgang {"traceId":"${TRACE_ID}","tief":{"liste":[{"jobId":"${JOB_ID}"}]}}`);
+  });
+
+  test("ein Fehler als Argument wird mit Meldung und eigenen Feldern gesammelt", () => {
+    console.error(Object.assign(new Error(`kein Dokument jobs/${JOB_ID}`), { traceId: TRACE_ID, code: 5 }));
+    const log = ausgabe.join("\n");
+    expect(log).toContain(`kein Dokument jobs/${JOB_ID}`);
+    expect(log).toContain(TRACE_ID);
+  });
+
+  test("ein Objekt, das sich selbst enthaelt, wirft die Sammlung nicht um", () => {
+    const kreis = { jobId: JOB_ID };
+    kreis.selbst = kreis;
+    expect(() => console.warn(kreis)).not.toThrow();
+    expect(ausgabe.join("\n")).toContain(JOB_ID);
+  });
+
+  test("Text bleibt Text — die Zeilen des Programms stehen unveraendert in der Sammlung", () => {
+    console.info('{"step":"probe"}', 7, null, undefined);
+    expect(ausgabe).toEqual(['{"step":"probe"} 7 null undefined']);
+  });
+
   test("vor dem Claim steht die jobId im Log — die Suche findet sie", async () => {
     jobs.claimJob.mockResolvedValue(false);
     const log = await lauf();

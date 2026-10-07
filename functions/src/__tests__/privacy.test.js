@@ -51,3 +51,84 @@ describe("buildPrivacyRisks — sichtbarer Text mit mehreren Eintraegen", () => 
     expect(require("../privacy").extractVisibleText).toBeUndefined();
   });
 });
+
+/* BUG-2026-10-03-06: Der Hinweis auf eine Adresse oder Telefonnummer haengt am
+   sichtbaren Text des Fotos, nicht an der Sprache der Seite — er muss
+   oesterreichische und englische Schreibweisen kennen. Die Gegenproben halten
+   fest, was KEIN Hinweis ist: Alltagswoerter, in denen ein Strassenwort nur
+   steckt, und Zahlenfolgen, die keine Telefonnummer sind. */
+describe("Adresse und Telefonnummer in ueblichen Schreibweisen (BUG-2026-10-03-06)", () => {
+  const hinweise = (visibleText) => buildPrivacyRisks({ visibleText });
+
+  test.each([
+    "Mozartgasse 3",
+    "Hauptplatz 3",
+    "Am Marktplatz 2",
+    "Linzer Weg 7",
+    "Gymnasium Kirchdorf",
+    "HAUPTSTRASSE 5",
+  ])("deutsch und oesterreichisch: '%s' ist ein Adress-Hinweis", (text) => {
+    expect(hinweise(text)).toContain("privacy.address");
+  });
+
+  test.each([
+    "12 Main Street",
+    "45 Elm Road",
+    "Mill Road 12",
+    "3 Park Avenue",
+    "Springfield Elementary School",
+    "Oxford High School",
+  ])("englisch: '%s' ist ein Adress-Hinweis", (text) => {
+    expect(hinweise(text)).toContain("privacy.address");
+  });
+
+  test.each([
+    "0664 123 45 67",
+    "+43 664 123 45 67",
+    "+43 (0)664 123 45 67",
+    "+436641234567",
+    "(555) 123-4567",
+    "Tel. 01 234 56 78",
+  ])("Telefonnummer mit Zifferngruppen: '%s'", (text) => {
+    expect(hinweise(text)).toContain("privacy.phone");
+  });
+
+  test.each([
+    "Platz 3",
+    "1. Platz beim Vereinsskirennen",
+    "Sackgasse",
+    "Immer unterwegs",
+    "Geh deinen Weg",
+    "Norwegen 2024",
+    "Streetwear",
+    "Street Food Festival 2024",
+    "Roadtrip 2023",
+    "Route 66",
+    "Sportplatz",
+  ])("kein Adress-Hinweis: '%s'", (text) => {
+    expect(hinweise(text)).not.toContain("privacy.address");
+  });
+
+  test.each([
+    "05 12 2024",
+    "2024-05-12",
+    "0 1 2 3 4 5 6 7 8 9",
+    "Trikot 10",
+    "Mo-Fr 08:00-12:00",
+    "AT02 0500 1234 5678 9012",
+    "0,99 Euro",
+    "+3 Punkte 2024",
+    "DE89 3704 0044 0532 0130 00",
+  ])("keine Telefonnummer: '%s'", (text) => {
+    expect(hinweise(text)).not.toContain("privacy.phone");
+  });
+
+  test("die bisherigen Formen gelten weiter", () => {
+    expect(hinweise("Hauptstraße 5")).toContain("privacy.address");
+    expect(hinweise("Mozartstr. 12")).toContain("privacy.address");
+    expect(hinweise("Volksschule Neuhofen")).toContain("privacy.address");
+    expect(hinweise("0664 1234567")).toContain("privacy.phone");
+    expect(hinweise("0664/1234567")).toContain("privacy.phone");
+    expect(hinweise("Getty Images 0664 123 45 67")).not.toContain("privacy.phone");
+  });
+});

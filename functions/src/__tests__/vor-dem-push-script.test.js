@@ -21,30 +21,29 @@ const WURZEL = path.join(__dirname, "../../..");
 const WORKFLOW = path.join(WURZEL, ".github/workflows/ci.yml");
 const SKRIPT = path.join(WURZEL, "scripts/vor-dem-push.sh");
 
-/* Diese Schritte gehören bewusst NICHT ins lokale Skript. Jeder mit Grund —
-   eine Ausnahme, die man nicht liest, ist ein Loch. */
+/* Diese Schritte der billigen Jobs gehören bewusst NICHT ins lokale Skript.
+   Jeder mit Grund — eine Ausnahme, die man nicht liest, ist ein Loch. Und
+   jeder Eintrag muss einen Schritt nennen, den es dort gibt (Test unten). */
 const BEWUSST_DRAUSSEN = {
   "npm ci": "Installation, keine Prüfung",
   "npm ci --prefix functions": "Installation, keine Prüfung",
-  "npm test": "Backend-Suite, läuft lokal so lang wie in der Pipeline (~2,5 min)",
-  "npm run test:e2e": "E2E-Suite, dito (~3,5 min) — beides deckt scripts/pruefstand.sh ab",
-  /* Die Mutationsprobe setzt je geaenderter Zeile eine Aenderung und laesst
-     dafuer Tests laufen. Gemessen am 01.09.2026: Sekunden bei Modulen am
-     Rand, ueber anderthalb Minuten je Mutation bei zentralen Dateien, an
-     denen 18 Testdateien haengen. In der Pipeline laeuft sie neben den langen
-     Suiten; vor dem Push wuerde sie aus 13 Sekunden Minuten machen — und eine
-     Vorabpruefung, die Minuten braucht, wird umgangen. */
-  "node scripts/pruefe-mutationen.mjs --zeitgrenze=3":
-    "Mutationsprobe, Minuten statt Sekunden — laeuft im Job test-backend, " +
-    "weil sie dort installierte Pakete vorfindet",
+  "npm test": "Backend-Suite, läuft lokal so lang wie in der Pipeline (~2,5 min) — deckt scripts/pruefstand.sh ab",
 };
 
-/* Die langen Suiten fehlen im lokalen Skript mit Absicht (oben begruendet).
-   Welcher Pflicht-Job der Pipeline sie faehrt, steht hier — der Test weiter
-   unten verlangt den Befehl als Schritt genau dieses Jobs (OPS-2026-10-03-12). */
+/* Die langen Suiten fehlen im lokalen Skript mit Absicht. Welcher Pflicht-Job
+   der Pipeline sie faehrt, steht hier — der Test weiter unten verlangt den
+   Befehl als Schritt genau dieses Jobs (OPS-2026-10-03-12). Die Browser-
+   Durchlaeufe stehen nur hier: Ihr Job `test-e2e` gehoert nicht zu den
+   billigen Jobs, die der Vergleich "Pipeline -> Skript" liest. */
 const LANGE_SUITEN = {
-  "npm test": "test-backend",
-  "npm run test:e2e": "test-e2e",
+  "npm test": {
+    job: "test-backend",
+    grund: "Server-Suite, läuft lokal so lang wie in der Pipeline (~2,5 min) — deckt scripts/pruefstand.sh ab",
+  },
+  "npm run test:e2e": {
+    job: "test-e2e",
+    grund: "Browser-Durchläufe (~3,5 min), feste Ports — deckt scripts/pruefstand.sh ab",
+  },
 };
 
 /** Die Schritte JEDES Jobs der Workflow-Datei: `run:`-Befehle im Wortlaut,
@@ -136,6 +135,16 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
     for (const [schritt, grund] of Object.entries(BEWUSST_DRAUSSEN)) {
       expect({ schritt, typ: typeof grund }).toEqual({ schritt, typ: "string" });
       expect({ schritt, langGenug: grund.length > 10 }).toEqual({ schritt, langGenug: true });
+    }
+  });
+
+  test("jede Ausnahme nennt einen Schritt, den es in den billigen Jobs der Pipeline gibt", () => {
+    /* TEST-2026-10-04-17: Ein Eintrag ohne Gegenstand ist eine Ausnahme auf
+       Vorrat — der nächste Schritt, der zufällig so heißt, erbte sie, ohne dass
+       jemand entschieden hätte. */
+    const schritte = billigeSchritte();
+    for (const schritt of Object.keys(BEWUSST_DRAUSSEN)) {
+      expect({ schritt, gebraucht: schritte.includes(schritt) }).toEqual({ schritt, gebraucht: true });
     }
   });
 
@@ -296,9 +305,15 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
     const schritte = schritteJeJob();
     /* Positivkontrolle: Die Jobs werden ueberhaupt gelesen. */
     expect(Object.keys(schritte).length).toBeGreaterThan(5);
-    for (const [befehl, job] of Object.entries(LANGE_SUITEN)) {
-      /* Wer hier steht, muss oben als bewusste Auslassung begruendet sein. */
-      expect({ befehl, begruendet: typeof BEWUSST_DRAUSSEN[befehl] }).toEqual({ befehl, begruendet: "string" });
+    const skript = fs.readFileSync(SKRIPT, "utf8");
+    for (const [befehl, { job, grund }] of Object.entries(LANGE_SUITEN)) {
+      /* Wer hier steht, ist eine bewusste Auslassung — mit Begruendung, und im
+         lokalen Skript gibt es ihn wirklich nicht als eigenen Schritt. */
+      expect({ befehl, begruendet: typeof grund === "string" && grund.length > 10 }).toEqual({
+        befehl,
+        begruendet: true,
+      });
+      expect({ befehl, lokal: new RegExp(`^lauf .* ${befehl}$`, "m").test(skript) }).toEqual({ befehl, lokal: false });
       expect({ job, befehl, alsSchritt: (schritte[job] || []).includes(befehl) }).toEqual({
         job,
         befehl,

@@ -345,9 +345,16 @@ describe("deploy.sh — Verhalten der Riegel", () => {
   afterEach(aufraeumen);
 
   test("roter Pflicht-Check haelt die Auslieferung an", () => {
-    const r = deploy({ ATTRAPPE_CHECKS: "test-backend=failure\ntest-frontend=success" });
+    /* Alle sechs Ergebnisse stehen da, nur dieses eine ist rot (TEST-2026-10-04-17).
+       Fehlten die uebrigen, hielte der Lauf auch dann an, wenn ein rotes
+       Ergebnis nur noch gemeldet wuerde — am ersten fehlenden. */
+    const r = deploy({
+      ATTRAPPE_CHECKS: PFLICHT.map((name) => `${name}=${name === "test-backend" ? "failure" : "success"}`).join("\n"),
+    });
     expect(r.code).not.toBe(0);
-    expect(r.ausgabe).toMatch(/test-backend/);
+    expect(r.ausgabe).toMatch(
+      /Pflicht-Check test-backend ist fuer [0-9a-f]{40} nicht grün \(Ist: test-backend=failure\)/
+    );
   });
 
   /* Befunde G-02/H-04 (30.09.2026): Der Herkunftsnachweis des HEIC-Dekoders

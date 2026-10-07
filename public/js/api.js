@@ -806,7 +806,11 @@ async function analyzeImageQueued() {
       kopfLesetest: err.kopfLesetest,
     });
   } finally {
-    releaseWakeLock();
+    /* Der Bildschirm-Wachhalter gehoert dem juengsten Durchgang: Ein
+       abgeloester gibt ihn nicht frei, sonst koennte das Geraet waehrend der
+       Analyse des naechsten Fotos einschlafen. Frei gibt, wer als Letzter
+       fertig wird — auch die Wiederaufnahme (unten). */
+    if (state.requestId === myId) releaseWakeLock();
     /* Der Schalter gilt nur, solange dieser Durchgang hochlaedt. */
     if (state.currentAbortController === abbruch) state.currentAbortController = null;
     beendeAnalyse(myId);
@@ -960,6 +964,10 @@ export async function resumeQueueJob({ force = false } = {}) {
     setStatus(""); /* stiller Fehler beim Seitenstart — kein Banner */
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });
   } finally {
+    /* Hat die Wiederaufnahme einen Durchgang abgeloest, der den Wachhalter
+       hielt, gibt sie ihn am Ende frei (siehe analyzeImageQueued). Ohne
+       Wachhalter ist der Aufruf wirkungslos. */
+    if (state.requestId === myId) releaseWakeLock();
     beendeAnalyse(myId);
   }
 }

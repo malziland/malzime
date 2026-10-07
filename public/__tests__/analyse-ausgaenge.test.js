@@ -348,4 +348,61 @@ describe("Verhalten: Nach jedem Ausgang stehen die Flaggen auf „aus“", () =>
     expect(state.isAnalyzing).toBe(true);
     expect(state.uploadLaeuft).toBe(true);
   });
+
+  /* Der Bildschirm-Wachhalter gehört dem jüngsten Durchgang. Gibt ihn ein
+     überholter beim Aufräumen frei, kann das Gerät während der Analyse des
+     zweiten Fotos einschlafen — die Seite friert ein und der Abruf reißt ab. */
+  describe("Bildschirm-Wachhalter", () => {
+    let sperre;
+    beforeEach(() => {
+      sperre = { release: vi.fn(() => Promise.resolve()) };
+      Object.defineProperty(navigator, "wakeLock", {
+        configurable: true,
+        value: { request: vi.fn(() => Promise.resolve(sperre)) },
+      });
+    });
+    afterEach(() => {
+      delete navigator.wakeLock;
+    });
+
+    it("ein überholter Durchgang gibt ihn nicht frei, solange der jüngere läuft", async () => {
+      let antworte;
+      einreihen = () => new Promise((weiter) => (antworte = weiter));
+      state.lastFile = foto();
+      const lauf = api.analyzeImage();
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(navigator.wakeLock.request).toHaveBeenCalledTimes(1);
+      /* Ein jüngerer Durchgang hat übernommen und läuft noch. */
+      state.requestId += 1;
+      antworte(antwort({}, 500));
+      await vi.advanceTimersByTimeAsync(3000);
+      await lauf;
+      expect(sperre.release).not.toHaveBeenCalled();
+    });
+
+    it("der jüngste Durchgang gibt ihn am Ende frei — nach Erfolg und nach einem Fehler", async () => {
+      await analysiere(foto());
+      expect(navigator.wakeLock.request).toHaveBeenCalledTimes(1);
+      expect(sperre.release).toHaveBeenCalledTimes(1);
+      einreihen = () => antwort({}, 500);
+      await analysiere(foto());
+      expect(navigator.wakeLock.request).toHaveBeenCalledTimes(2);
+      expect(sperre.release).toHaveBeenCalledTimes(2);
+    });
+
+    it("die Wiederaufnahme gibt ihn frei, wenn sie den Durchgang zu Ende bringt", async () => {
+      abruf = () => Promise.reject(new TypeError("Failed to fetch"));
+      await analysiere(foto(), 60000);
+      expect(state.wartetAufVerbindung).toBe(true);
+      const vorher = sperre.release.mock.calls.length;
+      /* Ein neuer Anlauf fordert an (wie beim Tippen auf ein Foto) … */
+      await api.acquireWakeLock();
+      abruf = () => antwort({ status: "done", result: ERGEBNIS() });
+      const wieder = api.resumeQueueJob({ force: true });
+      await vi.advanceTimersByTimeAsync(8000);
+      await wieder;
+      /* … und die Wiederaufnahme, die ihn beendet, gibt wieder frei. */
+      expect(sperre.release.mock.calls.length).toBe(vorher + 1);
+    });
+  });
 });

@@ -46,23 +46,9 @@ function setFetchForTest(impl) {
   fetchImpl = impl || ((...args) => fetch(...args));
 }
 
-function isRateLimitError(err) {
-  /* v1.10.6: Throttle-Queue-Timeout wird auch als Rate-Limit-Signal behandelt.
-     Wenn unsere eigene Drossel in throttle.js auflaeuft, ist Mistral aus
-     Pipeline-Sicht ueberlastet — Der Aufrufer soll das als
-     blocked.overloaded melden, damit der Client den Auto-Retry triggert. */
-  if (err && err.code === "throttle_timeout") return true;
-  /* BEFUND 01.09.2026 (L-16): `isRateLimitError(null)` warf einen TypeError —
-     ausgerechnet in der Behandlung eines Fehlers. Wie isQuotaError in
-     job-helfer.js. */
-  if (!err) return false;
-  const msg = (err.message || "").toLowerCase();
-  return err.status === 429 || msg.includes("429") || msg.includes("rate limit") || msg.includes("rate_limited");
-}
-
 /* Ueberlast und Aussetzer (429, 502, 503, 504): Wartezeiten, Retry-After und
    Logzeile je Wiederholung liegen in ueberlast.js (08.09.2026). */
-const { WIEDERHOLBARE_STATUS, ueberlastWartezeiten, planeWiederholung } = require("./ueberlast");
+const { WIEDERHOLBARE_STATUS, istUeberlast, ueberlastWartezeiten, planeWiederholung } = require("./ueberlast");
 
 function readCachedTokens(usage) {
   const candidates = [
@@ -439,7 +425,9 @@ module.exports = {
   betriebswerteOderAbbruch,
   callMistralRaw,
   callMistralRawUnthrottled,
-  isRateLimitError,
+  /* Die Entscheidung selbst liegt in ueberlast.js — hier nur der Name, unter
+     dem mistral.js und die Attrappe sie fuehren. */
+  isRateLimitError: istUeberlast,
   setFetchForTest,
   _setLiveIntervalMsForTest,
   _ueberlastWartezeiten: ueberlastWartezeiten,

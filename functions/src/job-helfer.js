@@ -28,10 +28,6 @@ function getMistral() {
   return lokalSchalterAn("MISTRAL_MOCK") ? require("./mistral-mock") : require("./mistral");
 }
 
-function isQuotaError(err) {
-  return !!(err && (err.code === "rate_limit" || /rate_limit|quota|429/i.test(err.message || "")));
-}
-
 /* Nimmt BEWUSST keine Vorgangskennung entgegen (26.09.2026): Was nicht
    uebergeben wird, kann nicht ins Log rutschen. */
 function loggeMinorSafety(safety, lang) {
@@ -121,7 +117,6 @@ const hasCategories = (obj) =>
 module.exports = {
   isBeastAdsCallEnabledSafe,
   getMistral,
-  isQuotaError,
   buildPseudoDescription,
   loggeMinorSafety,
   hasCategories,

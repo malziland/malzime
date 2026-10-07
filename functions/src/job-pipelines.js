@@ -29,12 +29,12 @@ const { classifySubject, buildAnimalProfiles } = require("./animal");
 const { setLiveText } = require("./jobs");
 const { geltendeWerte } = require("./betriebsprofil");
 const { loadImage } = require("./queue-storage");
+const { istUeberlast } = require("./ueberlast");
 
 /* Die kleinen Entscheidungen — ausgelagert, damit sie einzeln pruefbar sind. */
 const {
   isBeastAdsCallEnabledSafe,
   getMistral,
-  isQuotaError,
   buildPseudoDescription,
   loggeMinorSafety,
   hasCategories,
@@ -122,7 +122,7 @@ async function runPipeline(job) {
     profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts);
   } catch (err) {
     if (err && err.code === "config_missing") configMissing = true;
-    if (isQuotaError(err)) quotaError = true;
+    if (istUeberlast(err)) quotaError = true;
     else pipelineError = true;
   }
 

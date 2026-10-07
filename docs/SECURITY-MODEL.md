@@ -42,7 +42,10 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
   Analysedaten gehen direkt an die Cloud-Run-Adressen in `europe-west1`, nicht
   über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026, s. u.).
 - **Einlass:** Maintenance-Check → IP-Rate-Limit → Honeypot/Timing → MIME +
-  Magic-Bytes → globales Stundenlimit → Queue-Tiefen-Bremse.
+  Magic-Bytes → Queue-Tiefen-Bremse (Vorprüfung) → globales Stundenlimit →
+  erst der Auftrag, dann das Foto → Queue-Tiefen-Bremse (genaue Prüfung der
+  eigenen Position). Kein Foto liegt im Zwischenspeicher, das kein Auftrag
+  kennt.
 - **Verarbeitung:** Worker `processJob` nur per OIDC (nicht öffentlich, per
   Infra-Skript geprüft); Mistral ausschließlich über `api.eu.mistral.ai`
   (per Unit-Test festgenagelt) mit org-weitem Zero Data Retention.
@@ -85,10 +88,23 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    (Limits, Budgets, Alarme) und einen privaten Notfall-Umschlag, mit dem eine
    Vertrauensperson das System geordnet stoppen kann.
 5. **Öffentliche `/api/*`-Functions.** enqueue, jobStatus, stats, errors,
-   telemetry, admin sind öffentlich aufrufbar (allUsers). *Warum:* Firebase
-   Hosting reicht `/api/*` an sie durch; die Absicherung liegt in den Handlern
-   (Limits, Validierung, HMAC beim Admin). Das Infra-Skript prüft im Gegenzug,
-   dass die Nicht-öffentlichen (`processjob`, `reapjobs`) es auch bleiben.
+   telemetry, admin sind öffentlich aufrufbar (allUsers). *Warum:* Der Browser
+   ruft sie ohne Anmeldung auf — seit 09.09.2026 direkt unter ihren
+   Cloud-Run-Adressen, die Hosting-Umleitungen für `/api/*` bleiben als Rückweg
+   (Abschnitt „Schnittstellen direkt am EU-Server"). Die Absicherung liegt in
+   den Handlern (Limits, Validierung, HMAC beim Admin). Das Infra-Skript prüft
+   im Gegenzug, dass die Nicht-öffentlichen (`processjob`, `reapjobs`) es auch
+   bleiben.
+   *Der Statusabruf hat einen zweiten, schreibenden Weg* (`DELETE
+   /api/job-status`, 07.10.2026, `PRIV-2026-10-03-57`): Der Browser meldet
+   damit einen Auftrag ab, den er nicht mehr abholt, weil jemand ein anderes
+   Foto gewählt hat. *Warum vertretbar:* Der Weg wirkt nur mit dem Abhol-Ticket
+   genau dieses Auftrags (die Auftragsnummer allein genügt nicht) und nur auf
+   einen noch wartenden Auftrag; was in Arbeit oder fertig ist, bleibt
+   unberührt. Er kann nichts, was der Aufräumdienst nach der Karenz nicht
+   ohnehin täte — Auftrag verwerfen, Platz im Stundenfenster zurückgeben, Foto
+   löschen —, nur früher. Seine Warnzeile trägt weder Auftragsnummer noch
+   Fehlertext (`handle-job-status-abmelden.test.js`).
 6. **Durchsatz-Deckel liegt extern.** Mistral-Tier T1 = 0,25 req/s ≈ 7,5
    Analysen/min — die reale Bremse bei Stoßlast. *Status:* bekannt, mit
    Warteschlangen-Ehrlichkeit (Position + ETA) abgefedert; Tier-Hebung ist eine

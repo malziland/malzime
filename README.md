@@ -120,9 +120,9 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
 
 Workshop-Last ist stossweise: 25 Uploads in zwei Minuten. Damit kein Upload an den Rate-Limits des KI-Anbieters scheitert, laeuft die Analyse seit v2.0 ueber eine Warteschlange:
 
-- **`/api/enqueue`** legt einen Job an und reiht ihn in **Google Cloud Tasks** ein. Das Bild liegt waehrenddessen kurz in einem dedizierten EU-Storage-Bucket.
+- **`/api/enqueue`** legt einen Job an, legt danach das Bild kurz in einem dedizierten EU-Storage-Bucket ab und reiht den Job in **Google Cloud Tasks** ein. Erst der Auftrag, dann das Foto: So liegt nie ein Foto im Zwischenspeicher, das kein Auftrag kennt.
 - Cloud Tasks dispatcht die Jobs **dosiert** an den Worker (`processJob`) — die Anbieter-Limits werden so strukturell eingehalten statt im Fehlerfall abgefangen.
-- Der Browser pollt **`/api/job-status`**; jeder Poll ist zugleich ein Liveness-Herzschlag. Verlaesst der Nutzer die Seite, wird der Job verworfen, bevor er einen KI-Call kostet.
+- Der Browser pollt **`/api/job-status`**; jeder Poll ist zugleich ein Liveness-Herzschlag. Verlaesst der Nutzer die Seite, wird der Job verworfen, bevor er einen KI-Call kostet. Waehlt jemand ein anderes Foto, meldet die Seite den noch wartenden Job sofort ab (`DELETE /api/job-status`).
 - Das Bild wird unmittelbar nach der Verarbeitung geloescht, das Job-Dokument (inkl. Ergebnis) spaetestens nach 2 h.
 
 Seit v2.10 ist die Warteschlange der einzige Weg. Der frühere synchrone `/analyze`-Pfad — eine 30-60 s offene Verbindung — ist entfernt: Er war seit Mai 2026 nur noch Rückfall und hätte bei Stoßlast genau das Problem zurückgebracht, wegen dem die Warteschlange gebaut wurde. Als Notfall-Hebel dient stattdessen der Wartungsmodus (siehe [`docs/RUNBOOK.md`](docs/RUNBOOK.md)).
@@ -173,14 +173,21 @@ Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md) | Eigene Instanz aufset
 
 Jede Analyse laeuft ueber zwei Endpunkte — Bild einreihen, Ergebnis abholen:
 
-`POST /api/enqueue` — JSON mit dem Bild als `imageBase64`. Antwort: `{ "jobId": "..." }`
+`POST /api/enqueue` — JSON mit dem Bild als `imageBase64`. Antwort: `{ "jobId": "...", "resultToken": "..." }`.
+`resultToken` ist das Abhol-Ticket: Nur wer es mitschickt, bekommt das Ergebnis.
 
-`GET /api/job-status?jobId=...` — Antwort: `{ "status": "...", "queuePosition": 0, "etaSeconds": 0, "result": { ... } }`.
-`status` ist `queued`, `processing`, `done`, `failed` oder `abandoned`; `result`
-ist gesetzt, sobald `status` `done` ist.
+`GET /api/job-status?jobId=...&token=...` — Antwort: `{ "status": "...", "position": 0, "etaSeconds": 0, "result": { ... } }`.
+`status` ist `queued`, `processing`, `done`, `failed` oder `abandoned`. Status und
+Position gibt es auch ohne Ticket; `result` ist gesetzt, sobald `status` `done` ist
+und das Ticket stimmt.
 
 Jede Statusabfrage ist zugleich ein Lebenszeichen: Verlaesst der Nutzer die
 Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
+
+`DELETE /api/job-status?jobId=...&token=...` — meldet einen Job ab, den der Browser
+nicht mehr abholt. Wirkt nur mit dem Abhol-Ticket und nur, solange der Job wartet:
+kein KI-Aufruf, der Platz im Stundenlimit kommt zurueck, das Bild wird geloescht.
+Antwort: `{ "verworfen": true }` oder `{ "verworfen": false }`.
 
 ### Request (JSON)
 
@@ -342,7 +349,7 @@ cd functions && npm run format:check   # Backend Prettier
 npm run format:frontend:check          # Frontend Prettier
 ```
 
-**Backend:** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
+**Backend:** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus dem Feld `visible_text` der KI-Antwort), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
 
 **Frontend:** DOM-Helpers, State, Scan-Animation, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
 
@@ -380,7 +387,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 - **Mistral-Abh&auml;ngigkeit**: Wenn Mistral nicht erreichbar ist, schlaegt die Analyse fehl (keine Fallback-Provider mehr seit v1.6.0). Der User sieht eine `blocked.apiError`-Antwort. Mistrals SLA + Multi-Region-Setup machen das selten.
 - **Safety-Filter**: Verweigert Mistral bei sensiblen Inhalten die Analyse, liefert die Antwort keine Profile; der User sieht `blocked.profileBlocked` (bzw. `blocked.apiError`, wenn der Aufruf selbst scheitert).
-- **SUBJECT-Klassifikation**: Tier-Easter-Egg-Profile werden ueber die `SUBJECT:`-Kopfzeile in Mistrals Antwort und Keyword-Matching im Beschreibungstext bestimmt (siehe `animal.js`). Bei Unsicherheit faellt die Pipeline auf den normalen Profil-Pfad zur&uuml;ck.
+- **SUBJECT-Klassifikation**: Ob ein Tier-Easter-Egg-Profil gezeigt wird, entscheidet allein das Feld `subject` in Mistrals Antwort; welche Tierart es zeigt, bestimmt Keyword-Matching im Beschreibungstext (siehe `animal.js`). Fehlt das Feld oder ist es ungueltig, laeuft der normale Profil-Pfad.
 - **Alters-Schaetzung**: erfolgt ausschliesslich durch Mistral anhand physischer Merkmale. Seit v1.5.0 mit zwei Anker-Bloecken in den Prompts: Koerperproportionen (Schulter-zu-Kopf, Hand) als primaere Achse fuer Kinder/Teens, plus Zwangs-Mapping fuer Erwachsene (sichtbare Falten/Lid-Erschlaffung/Pigmentflecken haben Mindest-Alter-Schwellen).
 
 ## Datenschutz

@@ -41,7 +41,7 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **Rate limiting**: Per-IP request limits
 - **Prompt injection protection**: user data isolated in XML tags (3-call path); the active single-large prompt states explicitly that text visible in the image is content, never an instruction
 - **Input validation**: File type, size, and format checks
-- **LLM output bounds**: Response size limits enforced server-side (categories, ad_targeting, manipulation_triggers, profileText)
+- **LLM output bounds**: Response size limits enforced server-side (categories, ad_targeting, manipulation_triggers, profileText, and the two `hard_facts` anchors) — for every shape the model may return
 - **Defensive JSON parser**: 4-stage repair layer for LLM responses (`json-repair.js`) — direct parse → heuristic cleanup → json5 → truncation recovery
 - **Per-instance throttle**: Semaphore (`throttle.js`) caps concurrent Mistral API calls per Cloud Function instance — smooths workshop-burst load against provider rate limits
 

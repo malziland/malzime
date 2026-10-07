@@ -39,12 +39,15 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
 │     ├─ Rate-Limit (IP-basiert, Wert im Einstellungssatz)          │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
-│     ├─ Hourly-Limit-Check (Firestore, rollendes Fenster)           │
-│     └─ Einlassgrenze (Messung, sonst warteschlangeTiefe)           │
+│     ├─ Einlassgrenze, Vorprüfung (Messung, sonst                  │
+│     │  warteschlangeTiefe)                                         │
+│     └─ Hourly-Limit-Check (Firestore, rollendes Fenster)           │
 │                                                                    │
-│  Bild → GCS-Bucket, Job-Dokument → Firestore, Task → Cloud Tasks   │
-│  Antwort an den Browser: { jobId } — KEINE Analyse in dieser       │
-│  Function (der synchrone Pfad ist seit v2.10 entfernt).            │
+│  Erst Job-Dokument → Firestore, dann Bild → GCS-Bucket, dann die   │
+│  genaue Prüfung der eigenen Position, dann Task → Cloud Tasks.     │
+│  Antwort an den Browser: { jobId, resultToken }                    │
+│  — KEINE Analyse in dieser Function (der synchrone Pfad ist seit   │
+│  v2.10 entfernt).                                                  │
 └────────────────────────────────────┬───────────────────────────────┘
                                      │ dosiert durch Cloud Tasks
                                      ↓
@@ -58,21 +61,23 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │        UND beide Profile; ein zweiter, kleiner Aufruf ohne Bild    │
 │        erzeugt die Beast-Werbung (seit v2.8)                       │
 │                                                                    │
-│  3. SUBJECT-Klassifikation in animal.js                            │
-│     ├─ classifyDescription() parst die SUBJECT-Zeile                │
-│     ├─ Bei ANIMAL_ONLY: detectAnimalType() matcht Tier-Keywords     │
-│     └─ Default bei fehlender Zeile: HUMAN (restriktivste Annahme)   │
+│  3. Motiv-Entscheidung in animal.js                                │
+│     ├─ classifySubject() liest das Feld subject der KI-Antwort     │
+│     ├─ Bei ANIMAL_ONLY: detectAnimalType() matcht Tier-Keywords    │
+│     └─ Fehlt das Feld oder ist es ungültig: HUMAN (restriktivste   │
+│        Annahme)                                                    │
 │                                                                    │
 │  4. Privacy-Risiken in privacy.js                                  │
-│     ├─ extractVisibleText() parst "Sichtbarer Text:"-Zeile         │
-│     └─ buildPrivacyRisks() matcht Telefon/Adress/Kfz-Patterns       │
+│     └─ buildPrivacyRisks(): Adresse und Telefonnummer aus dem Feld │
+│        visible_text, Kfz-Kennzeichen aus dem ganzen Text           │
 │                                                                    │
 │  5. Ergebnis-Aufbau                                                │
 │     ├─ Profile JSON in Output-Bounds geclampt (SEC-004)            │
 │     └─ Ergebnis ins Job-Dokument, Bild sofort geloescht            │
 └────────────────────────────────────┬───────────────────────────────┘
                                      │
-                                     ↓ GET /api/job-status (Polling, 2 s)
+                                     ↓ GET /api/job-status (Polling, 2 s);
+                                     ↓ DELETE meldet einen wartenden Job ab
 ┌──────────────────────────────────────────────────────────────────┐
 │  Browser                                                           │
 │                                                                    │
@@ -96,10 +101,10 @@ und in Tests (localhost) bleibt der Pfad relativ.
 
 ```
 Browser ──POST /api/enqueue (direkt: https://enqueue-….a.run.app)──► enqueue
-                                 │ Bild → GCS-Bucket
                                  │ Job-Dokument → Firestore-Collection `jobs` (queued)
+                                 │ Bild → GCS-Bucket
                                  │ Task → Cloud-Tasks-Queue `analyze-queue`
-                                 ▼  Antwort: { jobId }
+                                 ▼  Antwort: { jobId, resultToken }
                           Cloud Tasks  (dosiert, maxConcurrentDispatches)
                                  ▼
                           processJob  (OIDC-geschützt, nicht öffentlich)
@@ -108,13 +113,20 @@ Browser ──POST /api/enqueue (direkt: https://enqueue-….a.run.app)──►
                                  │ Bild aus dem Bucket → Mistral-Pipeline                     
                                  │ Ergebnis → Job-Dokument (done), Bild gelöscht
                                  ▼
-Browser ◄──GET /api/job-status?jobId=──  Polling alle 2 s (= Liveness-Herzschlag)
-            Antwort: status, queuePosition, etaSeconds, result (bei done)
+Browser ◄──GET /api/job-status?jobId=…&token=…──  Polling alle 2 s (= Liveness-Herzschlag)
+            Antwort: status, position, etaSeconds, result (bei done, nur mit Abhol-Ticket)
+Browser ──DELETE /api/job-status?jobId=…&token=…──►  meldet einen noch wartenden Job ab
 ```
+
+Die Reihenfolge am Einlass ist bewusst: **erst der Auftrag, dann das Foto.** Der Auftrag trägt
+den Pfad, unter dem das Foto liegen wird; so gibt es zu jedem Foto im Zwischenspeicher einen
+Auftrag, über den der Aufräumdienst es findet — auch wenn das Hochladen mittendrin abbricht.
 
 ### Client-Liveness
 
-Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-Poll schreibt `lastSeenAt`. Bleibt das Lebenszeichen länger als `livenessGnadenfristMs` (Einstellungssatz) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
+Der Client hält keine lange Verbindung mehr, sondern pollt. Ein `job-status`-Poll eines wartenden Jobs frischt `lastSeenAt` auf (nicht bei jedem Poll, sondern erst, wenn das letzte Lebenszeichen einen Mindestabstand alt ist). Bleibt das Lebenszeichen länger als `livenessGnadenfristMs` (Einstellungssatz) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
+
+Der Browser muss darauf nicht warten: Wählt jemand ein anderes Foto, während der erste Auftrag noch wartet, meldet die Seite ihn ab (`DELETE /api/job-status?jobId=…&token=…`). Der Server verwirft ihn dann sofort — kein KI-Aufruf, der Platz im Stundenfenster kommt zurück, das Foto wird gelöscht (`ruecknahme.js`). Zwei Grenzen: nur mit dem Abhol-Ticket dieses Auftrags, und nur, solange er wartet; was schon in Arbeit oder fertig ist, bleibt unberührt. Scheitert die Abmeldung, räumt der Aufräumdienst wie bisher nach der Karenz.
 
 ### Reaper
 
@@ -272,21 +284,16 @@ Mistrals Sub-Prozessoren (Cloud-Provider, Compute) können temporär außerhalb 
 
 ## SUBJECT-Klassifikation
 
-Der Analyse-Aufruf liefert im JSON die Felder `subject` (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`) und `visible_text`. `job-pipelines.js` setzt daraus eine Beschreibung in diesem Format zusammen, die `animal.js` und `privacy.js` auswerten:
+Der Analyse-Aufruf liefert im JSON die Felder `subject` (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`) und `visible_text`. Beide werden als **Felder** ausgewertet (`job-pipelines.js`):
 
-```
-SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER
+- Das Motiv entscheidet sich allein am Wert von `subject` (`animal.js: classifySubject()`):
+  - `ANIMAL_ONLY` → Tier-Easter-Egg-Pfad (Profile aus `animals.js`, keine zweite KI-Anfrage)
+  - `HUMAN` / `MIXED` / `OTHER` → die Profile aus demselben Aufruf werden ausgeliefert
+- Der Hinweis auf eine lesbare Adresse oder Telefonnummer liest allein den Wert von `visible_text` (`privacy.js: buildPrivacyRisks()`).
 
-<Bildbeschreibung Fliesstext...>
+Aus dem zusammengesetzten Text (Profiltext und Kartenwerte) wird nur zweierlei gelesen: welche Tierart das Easter-Egg zeigt (`detectAnimalType()`) und ob ein Kfz-Kennzeichen vorkommt. Eine Zeile in diesem Text entscheidet nichts — ein Wort, das zufällig auf dem Foto oder im Profil steht, macht aus einem Menschen kein Tier.
 
-Sichtbarer Text: <Text 1>; <Text 2>; ...
-```
-
-`animal.js:classifyDescription()` parst die SUBJECT-Zeile und routet:
-- `ANIMAL_ONLY` → Tier-Easter-Egg-Pfad (Profile aus `animals.js`, keine zweite KI-Anfrage)
-- `HUMAN` / `MIXED` / `OTHER` → die Profile aus demselben Aufruf werden ausgeliefert
-
-Bei fehlender SUBJECT-Zeile fällt das System fail-safe auf `HUMAN` zurück — d.h. kein versehentliches Easter-Egg bei kaputter Mistral-Antwort.
+Fehlt das Feld `subject` oder trägt es keinen der vier Werte, gilt fail-safe `HUMAN` — d.h. kein versehentliches Easter-Egg bei kaputter Mistral-Antwort. Fehlt `visible_text`, gilt: kein sichtbarer Text.
 
 ## Fehler-Handling
 

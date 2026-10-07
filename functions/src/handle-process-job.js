@@ -65,14 +65,9 @@ const { merkeDauer } = require("./durchsatz");
    Sie schlaegt regelmaessig auf den Lerninhalt selbst an ("Ratenzahlung" im
    Beast-Text, gemessen 2026-08-11). */
 
-/* v2.2: Single-Large-Call-Pipeline. Ersetzt Describe + 2× Profile durch
-   einen einzigen Large-Aufruf, der das Bild ansieht und beide Profile in
-   einer Antwort liefert. Tier-Easter-Egg und Privacy-Risks bleiben unmittelbar
-   nutzbar; sie laufen heute über die Beschreibung — die liegt im Single-Call
-   aber NICHT mehr als String vor, sondern verteilt im JSON. Wir rekonstruieren
-   einen "kompakten Beschreibungs-Text" aus profileText, damit
-   classifyDescription/extractVisibleText weiter funktionieren. Pragmatischer
-   Workaround, bis der Tier-Pfad bei Bedarf nativ eingebaut wird. */
+/* Der Analyseweg selbst steht in job-pipelines.js: EIN Aufruf an die KI
+   liefert beide Profile; Motiv und sichtbarer Text kommen als Felder
+   (`subject`, `visible_text`) aus derselben Antwort. */
 
 /* Analog fail-safe: Kann das Prompt-Cache-Flag nicht gelesen werden, laeuft der
    Call ohne Cache-Key — also exakt wie vor v2.5. Ein Firestore-Wackler darf

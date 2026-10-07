@@ -224,7 +224,35 @@ function anfrage(adresse, rumpf, optionen = {}) {
       ...(optionen.kopf || {}),
     },
     body: rumpf,
+    /* Multipart-Weg (TEST-2026-10-04-14): Die Laufzeit uebergibt den ganzen
+       Rumpf vorab als `rawBody`; upload.js fuettert die Lese-Bibliothek damit. */
+    ...(optionen.rohRumpf ? { rawBody: optionen.rohRumpf, on() {} } : {}),
   };
+}
+
+/* Ein Formular-Rumpf (multipart/form-data) mit einem Foto und den Feldern, die
+   der Browser auf diesem Weg mitschickt. `ohneDatei` und `endetImFeld` bauen
+   die zwei Fehlerwege der Rumpf-Verarbeitung. */
+const FORMULAR_GRENZE = "----formular-grenze";
+const FORMULAR_KOPF = { "content-type": `multipart/form-data; boundary=${FORMULAR_GRENZE}` };
+function formularRumpf({ ohneDatei = false, endetImFeld = false } = {}) {
+  const feld = (name, wert) => `--${FORMULAR_GRENZE}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${wert}`;
+  /* Das Formular reisst mitten im zweiten Feld ab: kein Zeilenende, keine
+     Abschlussgrenze. */
+  if (endetImFeld) return Buffer.from(`${feld("lang", "de")}\r\n${feld("traceId", "vorgang-a")}`);
+  const puffer = [Buffer.from(`${feld("lang", "de")}\r\n${feld("traceId", "vorgang-abc")}\r\n`)];
+  if (!ohneDatei) {
+    puffer.push(
+      Buffer.from(
+        `--${FORMULAR_GRENZE}\r\nContent-Disposition: form-data; name="image"; filename="foto.jpg"\r\n` +
+          "Content-Type: image/jpeg\r\n\r\n"
+      ),
+      JPEG,
+      Buffer.from("\r\n")
+    );
+  }
+  puffer.push(Buffer.from(`--${FORMULAR_GRENZE}--\r\n`));
+  return Buffer.concat(puffer);
 }
 
 /* Ein Rumpf, dessen Lesen einen Fehler wirft: erreicht den Fehlerzweig der Handler. */
@@ -565,6 +593,30 @@ const EINLASS_WEGE = [
     zeile: "store-or-create-failed",
     rumpf: einlassRumpf(),
     vorbereiten: () => storage.storeImage.mockRejectedValue(new Error("Speicher nicht erreichbar")),
+  },
+  /* TEST-2026-10-04-14: der Formular-Weg (multipart/form-data) der Fotoannahme.
+     Er laeuft durch upload.js (parseMultipart) und bekommt dabei ALLE
+     Kopfzeilen der Anfrage in die Hand — auch die mit der Adresse. */
+  {
+    name: "Formular-Weg: Foto angenommen",
+    status: 200,
+    zeile: '"step":"enqueue","status":"ok"',
+    kopf: FORMULAR_KOPF,
+    rohRumpf: formularRumpf(),
+  },
+  {
+    name: "Formular-Weg: kein Foto im Formular",
+    status: 400,
+    zeile: '"code":"missing_image"',
+    kopf: FORMULAR_KOPF,
+    rohRumpf: formularRumpf({ ohneDatei: true }),
+  },
+  {
+    name: "Formular-Weg: das Formular reisst mitten in einem Feld ab",
+    status: 400,
+    zeile: '"code":"bad_multipart"',
+    kopf: FORMULAR_KOPF,
+    rohRumpf: formularRumpf({ endetImFeld: true }),
   },
   {
     name: "Einreihen in die Warteschlange scheitert",

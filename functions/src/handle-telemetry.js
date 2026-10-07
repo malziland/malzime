@@ -11,8 +11,9 @@
  * STRING_FIELDS).
  */
 
-const { checkRateLimit, getClientIp } = require("./middleware");
-const { geltendeWerte } = require("./betriebsprofil");
+/* Rumpfpruefung, Wertgrenze und Messwert-Pruefung teilt diese Annahmestelle
+   mit handle-errors.js; hier stehen nur ihre eigenen Feldlisten. */
+const { rumpfAnnehmen, einfacheFelder, messwerte } = require("./meldungs-annahme");
 const { zaehleRealitaetsCheck } = require("./counter");
 const { verbraucheRcTicket } = require("./jobs");
 const { sha256Hex } = require("./auth");
@@ -43,18 +44,6 @@ const TIMING_KEYS = ["prepareImageMs", "fetchMs", "enqueueMs", "parseMs", "rende
 /* wakeLock verraet, was der Browser kann — ebenfalls eine Geraeteangabe. */
 const META_STRING_KEYS = { subject: 30, mode: 30, lang: 10, reason: 100 };
 const META_BOOL_KEYS = ["maintenanceTriggered"];
-
-function sanitizeTimings(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const out = {};
-  for (const key of TIMING_KEYS) {
-    const v = raw[key];
-    if (typeof v === "number" && isFinite(v)) {
-      out[key] = Math.max(0, Math.min(600000, Math.round(v)));
-    }
-  }
-  return Object.keys(out).length > 0 ? out : null;
-}
 
 /* ── Realitäts-Check (v3.1): anonyme Selbsteinschätzung ──────────────────
    Erlaubt sind AUSSCHLIESSLICH die Kategorie-Stufen — keine traceId, keine
@@ -162,31 +151,9 @@ function sanitizeMeta(raw) {
 
 async function handleTelemetry(req, res) {
   try {
-    if (req.method !== "POST") {
-      res.status(405).json({ error: "Method not allowed" });
-      return;
-    }
-
-    const ip = getClientIp(req);
-    const { werte: grenzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
-    if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
-      res.status(429).json({ error: "Rate limit exceeded" });
-      return;
-    }
-
-    let body = req.body;
-    if (typeof body === "string") {
-      try {
-        body = JSON.parse(body);
-      } catch (_) {
-        res.status(400).json({ error: "Invalid JSON" });
-        return;
-      }
-    }
-    if (!body || typeof body !== "object") {
-      res.status(400).json({ error: "Invalid body" });
-      return;
-    }
+    const angenommen = await rumpfAnnehmen(req, res);
+    if (!angenommen) return;
+    const { body } = angenommen;
 
     /* Realitäts-Check (v3.1): eigener, minimaler Pfad VOR der allgemeinen
        Feld-Übernahme — für dieses Ereignis darf ausser den Stufen nichts
@@ -198,23 +165,14 @@ async function handleTelemetry(req, res) {
 
     const sanitized = { type: "client-telemetry" };
 
-    for (const [key, maxLen] of Object.entries(STRING_FIELDS)) {
-      const value = body[key];
-      if (typeof value === "string" && value.length > 0) {
-        sanitized[key] = value.slice(0, maxLen);
-      }
-    }
-    for (const key of NUMBER_FIELDS) {
-      const value = body[key];
-      if (typeof value === "number" && isFinite(value)) {
-        sanitized[key] = Math.max(0, Math.min(600000, Math.round(value)));
-      }
-    }
-    for (const key of BOOLEAN_FIELDS) {
-      if (typeof body[key] === "boolean") sanitized[key] = body[key];
-    }
+    einfacheFelder(body, sanitized, {
+      texte: STRING_FIELDS,
+      zahlen: NUMBER_FIELDS,
+      wahrheitswerte: BOOLEAN_FIELDS,
+      kleinsteZahl: 0,
+    });
 
-    const timings = sanitizeTimings(body.timings);
+    const timings = messwerte(body.timings, TIMING_KEYS);
     if (timings) sanitized.timings = timings;
 
     const meta = sanitizeMeta(body.meta);

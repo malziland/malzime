@@ -845,16 +845,19 @@ describe("Waechter: wer die Adresse des Aufrufers liest", () => {
     expect(andere).toEqual([]);
   });
 
-  test("nur die drei Handler dieser Datei lesen sie", () => {
+  test("nur der Einlass und die gemeinsame Annahme der Meldungen lesen sie", () => {
     const leser = programmDateien(SRC)
       .filter((datei) => path.basename(datei) !== "middleware.js")
       .filter((datei) => LIEST_ADRESSE.test(fs.readFileSync(datei, "utf8")))
       .map((datei) => path.relative(SRC, datei))
       .sort();
-    /* Kommt ein vierter Leser dazu: hier eintragen UND einen Weg-Katalog wie oben
+    /* Kommt ein weiterer Leser dazu: hier eintragen UND einen Weg-Katalog wie oben
        fuer ihn anlegen — sonst koennte er die Adresse hinschreiben, ohne dass es
        jemand merkt. middleware.js ist ausgenommen: Dort liegt die Definition, und
-       ein Weg ueber die echte Bremse laeuft in jedem Weg-Katalog oben mit. */
-    expect(leser).toEqual(["handle-enqueue.js", "handle-errors.js", "handle-telemetry.js"]);
+       ein Weg ueber die echte Bremse laeuft in jedem Weg-Katalog oben mit.
+       meldungs-annahme.js liest sie fuer BEIDE Annahmestellen der Meldungen
+       (handle-errors.js, handle-telemetry.js; STRUCT-2026-10-03-56): Deren
+       Weg-Kataloge oben laufen durch dieses Modul. */
+    expect(leser).toEqual(["handle-enqueue.js", "meldungs-annahme.js"]);
   });
 });

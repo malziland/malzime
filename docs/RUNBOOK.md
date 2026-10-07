@@ -160,6 +160,42 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    kostenfreie Proben gegen die Live-API (Upload-Ablehnung 400 mit echter
    Validierungs-Meldung, Honeypot 403, Admin-Zugriffsschutz 403, Stats 200) —
    alle enden vor KI-Aufruf und Stundenzähler. Notschalter `SKIP_SMOKE=1`.
+   Im Wartungsmodus können sie nicht messen; `deploy.sh` gibt dann trotzdem
+   seine Schlussbilanz aus und endet mit dem Rückgabewert 2 (siehe „Die
+   Auslieferung als Kette").
+
+## Die Auslieferung als Kette
+
+`deploy.sh` ist ein Glied, nicht der ganze Ablauf. Ausgeliefert wird als Kette
+im **Wartungsmodus**: Solange Website und Server wechseln, beginnt keine
+Analyse, die auf halbem Weg einen anderen Stand vorfände. Die Kette ist ein
+kurzes Ablaufskript je Auslieferung; es ruft nur die Werkzeuge aus diesem
+Repository auf, in dieser Reihenfolge:
+
+| Schritt | Was geschieht | Womit | Hält an, wenn |
+|---|---|---|---|
+| 1 | Warten, bis die Freigabe erreicht ist — dieselbe Regel, die `deploy.sh` anwendet: sechs Pflicht-Checks für den Commit auf `main` (mit der Baum-Regel aus dem Abschnitt „Deploy"), Herkunftsnachweis des HEIC-Dekoders, ein Nachtlauf innerhalb der Grenze aus `deploy.sh`. `deploy.sh` wartet auf nichts davon, es bricht ab; deshalb wartet die Kette **vor** dem Wartungsmodus. Ist der Nachtlauf zu alt, stößt sie ihn an (`gh workflow run sicherheit-nachts.yml`) | `gh` (lesend, bis auf diesen einen Start) | ein Pflicht-Check rot ist oder die Freigabe ausbleibt |
+| 2 | Einstellungssatz: Datenbank gegen Repository | `node scripts/betriebsprofil-vergleichen.js` (lesend) | beide nicht gleich sind |
+| 3 | Wartungsmodus ein, mit Text für die Besucher; das Skript misst nach | `sh scripts/wartungsmodus.sh ein "…"` | der Zustand nicht bestätigt wird |
+| 4 | Ausliefern. Die Rückfrage entfällt, weil die Freigabe vorliegt — das steht als `DEPLOY_JA(Rueckfrage)` in der Schlussbilanz | `DEPLOY_JA=1 ./scripts/deploy.sh` | siehe Rückgabewerte unten |
+| 5 | Wartungsmodus aus — **immer**, auch wenn Schritt 4 gescheitert ist | `sh scripts/wartungsmodus.sh aus` | — (ein Fehlschlag hier ist selbst ein Fehler der Kette) |
+| 6 | Live-Beweise, erst jetzt messbar: Kennung des ausgelieferten Stands, Nachrechnung der ausgelieferten Dateien, die Live-Proben | `https://malzi.me/build-info.json`, `sh scripts/pruefe-live.sh`, `./scripts/live-smoke.sh <Cache-Kennung>` | einer davon rot ist — dann ist ausgeliefert und der Rückweg zu prüfen („Rollback-Hebel") |
+| 7 | Nachtrag per Pull Request: Cache-Kennung, `public/build-info.json`, CHANGELOG-Stempel, `docs/VERIFICATION.md` | Abschnitt „Deploy", Punkt 5 | — |
+
+**Rückgabewerte von `deploy.sh`** — die Kette entscheidet daran, ob Schritt 4
+gelungen ist:
+
+| Wert | Bedeutung | Was die Kette tut |
+|---|---|---|
+| `0` | ausgeliefert, Live-Proben grün (nur außerhalb des Wartungsmodus möglich) | weiter |
+| `2` | ausgeliefert, die Schlussbilanz ist ausgegeben — nur die Live-Proben konnten nicht messen, weil der Wartungsmodus an ist. Letzte Zeile: `AUSGELIEFERT, LIVE-PROBEN OFFEN (Rueckgabewert 2)`. In der Kette der Normalfall | weiter; Schritt 6 holt die Proben nach |
+| alles andere (üblich `1`) | Abbruch. Vor dem Hochladen ging nichts hinaus, die Cache-Kennung ist zurückgenommen; nach dem Hochladen sagt es die Meldung „Abbruch NACH dem Hochladen" | Schritt 5, dann Ursache klären |
+
+Der Wert `2` gehört allein diesem einen Fall (OPS-2026-10-03-15): Endet ein
+Hilfsschritt mit 2 — etwa die Infrastruktur-Prüfung ohne gcloud-Anmeldung, bevor
+irgendetwas hinausgeht —, macht `deploy.sh` daraus `1`. Vorher sah ein solcher
+Abbruch für die Kette aus wie eine Auslieferung, und die Schlussbilanz der
+übersprungenen Riegel erschien im Wartungsmodus nie.
 
 ## Notschalter des Deploys
 
@@ -1046,7 +1082,7 @@ Schutz still ausfällt, und was sie auffängt:
 
 **Einmalig nach dem Zusammenführen des Sicherheitspakets (PR #294):** Auf `main`
 gibt es noch keinen Nachtlauf, der Deploy bricht deshalb ab, bis einer gelaufen
-ist. In der Deploy-Kette nach dem Merge und NACH der grünen Pipeline des
+ist. In der Deploy-Kette („Die Auslieferung als Kette", Schritt 1) nach dem Merge und NACH der grünen Pipeline des
 Merge-Commits (sonst liest der Job `abkuendigungen` noch die alte Warnung zu
 setup-python 5): `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`
 starten — das belegt zugleich den Alarmweg Ende-zu-Ende; der Empfang der Probe
@@ -1084,8 +1120,8 @@ meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
    Workflow geändert hat: Der jüngste Lauf dieses Workflows muss abgeschlossen und
    grün sein. Nach dem Zusammenführen läuft er auf `main` noch einmal; `deploy.sh`
    wartet NICHT darauf, sondern bricht ab, solange der Lauf fehlt, noch läuft oder
-   rot ist. Die Deploy-Kette wartet deshalb vor dem Wartungsmodus auch auf diesen
-   Lauf, nicht nur auf die sechs Pflicht-Checks.
+   rot ist. Die Deploy-Kette („Die Auslieferung als Kette", Schritt 1) wartet deshalb
+   vor dem Wartungsmodus auch auf diesen Lauf, nicht nur auf die sechs Pflicht-Checks.
 
 Der Job `kontrollbau` baut bei jedem Lauf zusätzlich die bis 30.09.2026
 ausgelieferte Fassung (libheif 1.23.2, libde265 1.0.15) nach und vergleicht sie

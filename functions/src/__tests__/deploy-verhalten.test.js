@@ -235,6 +235,12 @@ function skripteEinspielen() {
       `#!/bin/sh\n# ATTRAPPE (Testlauf) — beruehrt keinen echten Dienst.\n` +
         `if [ "\${ATTRAPPE_${name}_ROT:-0}" = "1" ]; then\n` +
         `  echo "ATTRAPPE ${name}: scheitert (so gewollt)" >&2\n  exit 1\nfi\n` +
+        /* Ein bestimmter Rueckgabewert: 2 heisst bei beiden Skripten "nicht
+           messbar" (die Live-Proben im Wartungsmodus, die Infrastruktur-
+           Pruefung ohne Anmeldung). Die Meldung geht wie bei den echten
+           Skripten auf die Standardausgabe. */
+        `if [ -n "\${ATTRAPPE_${name}_RC:-}" ]; then\n` +
+        `  echo "ATTRAPPE ${name}: endet mit \${ATTRAPPE_${name}_RC} (so gewollt)"\n  exit "\${ATTRAPPE_${name}_RC}"\nfi\n` +
         /* Argumente mitschreiben: Ob live-smoke.sh die Buster-Version
            bekommt, haengt am Deploy-Ziel — ohne diese Zeile laesst sich das
            von aussen nicht unterscheiden (Runde 7, K-13). */
@@ -1023,6 +1029,96 @@ describe("deploy.sh — der Probelauf", () => {
    Fingerabdruck des Server-Codes (public/build-info.json) geht mit der Website
    hinaus; ein reiner Server-Deploy liesse die Seite weiter den vorigen
    Server-Stand ausweisen. */
+/* OPS-2026-10-03-15: Im echten Ablauf laeuft die Auslieferung IM Wartungsmodus.
+   Die Live-Proben koennen dann nicht messen und enden mit 2 — bisher endete
+   damit auch deploy.sh, und zwar VOR der Schlussbilanz: Welche Riegel
+   uebersprungen wurden, stand im echten Ablauf nie am Ende. Und denselben Wert
+   2 lieferte eine Infrastruktur-Pruefung ohne Anmeldung, also ein Abbruch,
+   bei dem nichts hinausging. Jetzt gehoert der Wert 2 von deploy.sh allein dem
+   Fall "ausgeliefert, Live-Proben offen" — nach der Schlussbilanz. */
+describe("deploy.sh — Live-Proben, die nicht messen koennen (Wartungsmodus)", () => {
+  afterEach(aufraeumen);
+
+  const BILANZ = /Deploy abgeschlossen\. Version: \?v=\d{10} — /;
+
+  test("Live-Proben melden 2: ausgeliefert, Schlussbilanz in der Ausgabe, Rueckgabewert 2", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_SMOKE_RC: "2" });
+    expect(r.uploads).toEqual(["firebase deploy --only firestore:malzime-eu", "firebase deploy --only hosting"]);
+    expect(r.ausgabe).toMatch(BILANZ);
+    expect(r.ausgabe).toMatch(/LIVE-PROBEN NICHT GEMESSEN/);
+    /* Der CHANGELOG-Hinweis am Schluss erscheint ebenfalls — das Skript laeuft bis zum Ende. */
+    expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
+    /* Kein Abbruch: Die Falle fuer Abbrueche nach dem Hochladen schweigt. */
+    expect(r.ausgabe).not.toMatch(/Abbruch NACH dem Hochladen/);
+    /* Die letzte Zeile sagt, was offen ist; davor steht die Bilanz. */
+    expect(r.ausgabe.trimEnd().split("\n").pop()).toMatch(/^AUSGELIEFERT, LIVE-PROBEN OFFEN \(Rueckgabewert 2\)/);
+    expect(r.ausgabe.search(BILANZ)).toBeLessThan(r.ausgabe.indexOf("AUSGELIEFERT, LIVE-PROBEN OFFEN"));
+    expect(r.code).toBe(2);
+  });
+
+  test("auch dann nennt die Schlussbilanz jeden uebersprungenen Riegel", () => {
+    const r = deploy({ ATTRAPPE_SMOKE_RC: "2", SKIP_DRYRUN: "1", DEPLOY_JA: "1" });
+    expect(r.code).toBe(2);
+    expect(r.ausgabe).toMatch(/ÜBERSPRUNGENE RIEGEL: SKIP_DRYRUN DEPLOY_JA\(Rueckfrage\)/);
+  });
+
+  test("eine Infrastruktur-Pruefung, die nicht messen kann (2), endet NICHT mit diesem Wert — und nichts geht hinaus", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_INFRA_RC: "2" });
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(
+      /FEHLER: Die Infrastruktur-Pruefung ist nicht bestanden \(Code 2\) — nichts wurde ausgeliefert/
+    );
+    expect(r.aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"))).toEqual([]);
+    expect(r.ausgabe).not.toMatch(BILANZ);
+  });
+
+  test("eine Infrastruktur-Pruefung mit Abweichung (1) haelt an wie bisher", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_INFRA_RC: "1" });
+    expect(r.code).toBe(1);
+    expect(r.aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"))).toEqual([]);
+  });
+
+  test("ein Upload, der mit 2 scheitert, endet mit 1 — und die Cache-Kennung wird zurueckgenommen", () => {
+    /* Der Wert 2 gehoert allein dem Fall oben. Scheitert NACH dem Setzen der
+       Aufraeumfalle ein Werkzeug mit 2, darf das nicht wie "ausgeliefert" aussehen. */
+    const eigene = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-deploy-firebase2-"));
+    try {
+      fs.writeFileSync(
+        path.join(eigene, "firebase"),
+        "#!/bin/sh\n" +
+          'case "$*" in\n' +
+          '  *--dry-run*|--version|*firestore*) exec "$ATTRAPPE_FIREBASE_WEITER" "$@" ;;\n' +
+          "esac\n" +
+          'echo "ATTRAPPE: Upload endet mit 2 (so gewollt)" >&2\nexit 2\n'
+      );
+      fs.chmodSync(path.join(eigene, "firebase"), 0o755);
+      const r = deploy({ PFAD_DAVOR: [eigene], ATTRAPPE_FIREBASE_WEITER: path.join(ATTRAPPEN, "firebase") });
+      expect(r.ausgabe).toMatch(/Upload endet mit 2/);
+      expect(r.code).toBe(1);
+      expect(r.ausgabe).toMatch(/Deploy abgebrochen \(Code 2\) — nehme die Cache-Kennung zurueck/);
+      expect(r.ausgabe).toMatch(/Rueckgabewert 2 ist dem Fall „ausgeliefert, Live-Proben offen“ vorbehalten/);
+      const offen = execSync(`git -C "${klon}" status --porcelain`, { encoding: "utf8" });
+      expect(offen.trim()).toBe("");
+    } finally {
+      fs.rmSync(eigene, { recursive: true, force: true });
+    }
+  });
+
+  test("rote Live-Proben (1) bleiben ein Abbruch nach dem Hochladen — ohne Schlussbilanz", () => {
+    const r = deploy({ ATTRAPPE_SMOKE_RC: "1" });
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/Abbruch NACH dem Hochladen \(Code 1\)/);
+    expect(r.ausgabe).not.toMatch(BILANZ);
+  });
+
+  test("gruene Live-Proben: Rueckgabewert 0, die Bilanz meldet alle Riegel gelaufen", () => {
+    const r = deploy();
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/Deploy abgeschlossen\. Version: \?v=\d{10} — alle Riegel gelaufen\./);
+    expect(r.ausgabe).not.toMatch(/LIVE-PROBEN/);
+  });
+});
+
 /* OPS-2026-10-04-12: Der Trockenlauf schrieb seine zwei Protokolle in feste
    Dateien im System-Temp. Jeder Lauf ueberschrieb sie — auch ein Probelauf oder
    diese Tests das Protokoll, auf das die Fehlermeldung eines anderen Laufs

@@ -302,15 +302,19 @@ async function handleEnqueue(req, res, secrets) {
        das Budget nicht aufbrauchen. */
     const counter = await checkAndIncrement();
     if (counter.justReached) {
-      notifyLimitReached({
-        ntfyUrl: secrets.ntfyUrl.value(),
-        ntfyTopic: secrets.ntfyTopic.value(),
-        adminSecret: secrets.adminSecret.value(),
-        count: counter.count,
-        limit: counter.limit,
-      }).catch((err) => {
-        console.log(JSON.stringify({ warning: "ntfy-error", error: err.message }));
-      });
+      /* Abgewartet, hoechstens 2 s und nur bei der EINEN Anfrage, die das Limit
+         erreicht: Die Nachricht ist das Signal fuer den Boost — neben der Antwort
+         her konnte sie ausbleiben, sobald die Antwort draussen war. */
+      const push = Promise.resolve(
+        notifyLimitReached({
+          ntfyUrl: secrets.ntfyUrl.value(),
+          ntfyTopic: secrets.ntfyTopic.value(),
+          adminSecret: secrets.adminSecret.value(),
+          count: counter.count,
+          limit: counter.limit,
+        })
+      ).catch((err) => console.log(JSON.stringify({ warning: "ntfy-error", error: err.message })));
+      await Promise.race([push, new Promise((fertig) => setTimeout(fertig, 2000).unref())]);
     }
     if (!counter.allowed) {
       /* Der Auftrag kommt nicht zustande; angelegt wurde noch nichts. */

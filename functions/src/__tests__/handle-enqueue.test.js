@@ -63,6 +63,7 @@ const middleware = require("../middleware");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const tasks = require("../cloud-tasks");
+const { zeileAlsText } = require("./hilfen/als-text");
 
 const VALID_JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(20)]);
 
@@ -327,7 +328,7 @@ describe("handleEnqueue — Erfolgsfall", () => {
     vorbereiten();
     const ausgaben = [];
     const spies = ["log", "warn", "error", "info"].map((art) =>
-      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(zeileAlsText(...a)))
     );
     const res = makeRes();
     await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
@@ -897,5 +898,61 @@ describe("STRUCT-2026-10-03-36 — vier bisher ungepruefte Wege", () => {
     expect(res.body).toEqual({ error: "Enqueue failed", code: "unsupported_content_type" });
     expect(jobs.meldeGescheiterteAnalyse).not.toHaveBeenCalled();
     expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+  });
+});
+
+/* 07.10.2026: Die Nachricht "Stundenlimit erreicht" ist das Signal fuer den
+   Boost. Sie lief neben der Antwort her und konnte ausbleiben, sobald die
+   Antwort draussen war. Jetzt wartet der Einlass auf sie — hoechstens zwei
+   Sekunden, und nur bei der einen Anfrage, die das Limit erreicht. */
+describe("Nachricht „Stundenlimit erreicht“ wird abgewartet", () => {
+  const notify = require("../notify");
+  const erreicht = { allowed: true, justReached: true, count: 500, limit: 500 };
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("die Antwort geht erst hinaus, wenn die Nachricht versandt ist", async () => {
+    counter.checkAndIncrement.mockResolvedValueOnce(erreicht);
+    let versandt = false;
+    notify.notifyLimitReached.mockImplementationOnce(
+      () =>
+        new Promise((fertig) =>
+          setTimeout(() => {
+            versandt = true;
+            fertig();
+          }, 40)
+        )
+    );
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(notify.notifyLimitReached).toHaveBeenCalledWith(expect.objectContaining({ count: 500, limit: 500 }));
+    expect(versandt).toBe(true);
+  });
+
+  test("antwortet der Benachrichtigungsdienst nicht, geht es nach zwei Sekunden trotzdem weiter", async () => {
+    jest.useFakeTimers();
+    counter.checkAndIncrement.mockResolvedValueOnce(erreicht);
+    notify.notifyLimitReached.mockImplementationOnce(() => new Promise(() => {}));
+    const res = makeRes();
+    let fertig = false;
+    const lauf = handleEnqueue(jsonReq(), res, SECRETS).then(() => {
+      fertig = true;
+    });
+    await jest.advanceTimersByTimeAsync(1900);
+    expect(fertig).toBe(false);
+    await jest.advanceTimersByTimeAsync(200);
+    await lauf;
+    expect(res.statusCode).toBe(200);
+    expect(res.body.jobId).toBe("job-abc");
+  });
+
+  test("ohne erreichtes Limit wartet der Einlass auf nichts (Erfolgsweg)", async () => {
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(notify.notifyLimitReached).not.toHaveBeenCalled();
   });
 });

@@ -19,9 +19,18 @@ const rateState = new Map();
 const MAX_RATE_ENTRIES = 10000;
 
 function getClientIp(req) {
-  /* SEC-001: req.ip wird von Express/Firebase korrekt aus dem Load-Balancer-Header
-     geparst. Manuelles x-forwarded-for-Parsing ist spoofbar (Angreifer setzt
-     eigenen Wert als ersten Eintrag). */
+  /* `req.ip` liefert der Laufzeit-Rahmen (@google-cloud/functions-framework).
+     Er schaltet bei Express `trust proxy` ein; damit ist `req.ip` der ERSTE
+     (linke) Eintrag der Kopfzeile `X-Forwarded-For` — ein Wert, den der
+     Aufrufer selbst mitschicken kann. Die Adresse ist also NICHT
+     faelschungssicher (SEC-2026-10-03-20; am Rahmen 5.0.5 gemessen, an der
+     Produktion nicht).
+     Das ist hingenommen: Die Begrenzung je Adresse ist der Laermfilter gegen
+     gewoehnliche Haeufung, kein Schutz. Die Kosten halten Stundenlimit und
+     Einlassgrenze, beide unabhaengig von der Adresse (SECURITY-MODEL,
+     Restrisiko 2). Wer hier eine verlaessliche Adresse braucht, nimmt den
+     Eintrag, den Google selbst anhaengt (von rechts gezaehlt), und misst
+     vorher an der Produktion, an welcher Stelle er steht. */
   return req.ip || "unknown";
 }
 
@@ -50,9 +59,9 @@ function loescheAbgelaufene(jetzt) {
  * ohne Netzzugriff bleiben. Die Aufrufer sind ohnehin asynchron und holen die
  * Werte einmal.
  *
- * Fehlen die Werte, gelten die Konstanten aus config.js. Anders als bei den
- * Zeitgrenzen ist der Rueckfall hier richtig: Das Adress-Limit ist eine
- * Schutzgrenze — ohne sie waere der Eingang offen.
+ * Fehlen die Werte, wirft die Funktion — einen Rueckfall auf eine Konstante
+ * gibt es nicht. Der Einlass (handle-enqueue.js) prueft deshalb vorher, ob ein
+ * Einstellungssatz da ist, und antwortet sonst mit "configMissing".
  */
 function checkRateLimit(key, grenze, fensterMs) {
   /* Grenze und Fenster sind Pflicht — sie kommen aus dem Einstellungssatz.

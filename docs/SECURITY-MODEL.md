@@ -71,14 +71,26 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    Warteschlangen-Rate die Kosten weiter deckelt. Bis 30.08.2026 ließ schon der
    Ausfall des Zählers allein durch; warum das falsch war und was daraus
    wurde, steht im Abschnitt „Die Kostenbremse und ihr Netz".
-2. **IP-Rate-Limit ist instanzlokal.** Das 500/10-min-Limit lebt im
-   Arbeitsspeicher jeder Function-Instanz — bei `enqueue`/`jobstatus` bis zu 10
-   Instanzen (gemessen `maxScale`, 2026-08-13), effektiv also ein Mehrfaches der
-   genannten Zahl. Ein verteilter Angreifer kann es umgehen. *Warum:* Es ist der Lärmfilter, nicht die Kostenbremse;
-   die echten Bremsen (Stundenlimit, Queue-Tiefe) sind global. Die Alternative —
-   IP-Ableitungen in Firestore speichern — würde die Kern-Zusage „keine
-   persistente IP" schwächen und träfe im Schul-WLAN ganze Klassen hinter einer
-   IP. Der mögliche Schaden ist Verfügbarkeit (begrenzt durch 500/h), nie Geld.
+2. **Die Begrenzung je IP-Adresse ist ein Lärmfilter, kein Schutz.** Sie lebt
+   im Arbeitsspeicher jeder Function-Instanz (Grenze und Fenster: `adressLimit`
+   und `adressfensterMs` im Einstellungssatz) — bei `enqueue` bis zu 10
+   Instanzen, bei den zwei Meldungs-Annahmen bis zu 3 (`maxInstances` in
+   `functions/src/index.js`), effektiv also ein Mehrfaches des eingestellten
+   Werts. Die Statusabfrage hat bewusst keine solche Begrenzung. Dazu kommt:
+   Die Adresse, nach der gezählt wird, ist nicht fälschungssicher. Der
+   Laufzeit-Rahmen nimmt sie aus der Kopfzeile `X-Forwarded-For`, deren ersten
+   Eintrag der Aufrufer selbst setzen kann (`SEC-2026-10-03-20`; am Rahmen
+   gemessen, an der Produktion nicht). Wer es darauf anlegt, umgeht die
+   Begrenzung also oder lenkt sie auf eine fremde Adresse. *Warum hingenommen:*
+   Sie soll gewöhnliche Häufung bremsen, nicht einen Angreifer; die echten
+   Bremsen (Stundenlimit, Queue-Tiefe) sind global und hängen nicht an der
+   Adresse. Die Alternative — IP-Ableitungen in Firestore speichern — würde die
+   Kern-Zusage „keine persistente IP" schwächen und träfe im Schul-WLAN ganze
+   Klassen hinter einer IP. Der mögliche Schaden ist Verfügbarkeit (ein Netz
+   kann für die Dauer des Fensters vom Hochladen ausgesperrt sein; die Zahl der
+   Analysen begrenzt das Stundenlimit), nie Geld. *Neu bewerten,* sobald eine
+   solche Aussperrung beobachtet wird — dann den Eintrag nehmen, den Google
+   selbst anhängt, nach einer Messung an der Produktion.
 3. **Kein Staging-System.** Deploys gehen direkt in die Produktion.
    *Warum:* Ein zweites Firebase-Projekt verdoppelt Pflege, Secrets und
    Fehlerquellen — beim Ein-Personen-Projekt kostet das mehr Sicherheit, als es

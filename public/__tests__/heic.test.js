@@ -7,7 +7,7 @@
  * wird in e2e/problemfaelle.test.js in Chromium und Firefox gegen echte
  * HEIC-Dateien geprueft. Hier geht es um den Umgang mit ihm.
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { heicZuCanvas, setDekoderLaderForTest } from "../js/heic.js";
 
 /* Attrappe eines libheif-Moduls: liefert ein 2x3-Bild mit bekannten Pixeln. */
@@ -109,5 +109,51 @@ describe("heicZuCanvas", () => {
     setDekoderLaderForTest(async () => modul);
     const err = await heicZuCanvas(new Uint8Array(4)).catch((e) => e);
     expect(err.errorDetail.length).toBeLessThanOrEqual(60);
+  });
+
+  /* BUG-2026-08-20-37: Scheitert es NACH dem Anlegen der Zeichenfläche, wird
+     sie freigegeben — in Originalgröße belegt ein Foto schnell 40 MB und mehr. */
+  describe("Zeichenfläche im Fehlerfall", () => {
+    let flaechen, spion;
+    beforeEach(() => {
+      flaechen = [];
+      const echt = document.createElement.bind(document);
+      spion = vi.spyOn(document, "createElement").mockImplementation((name, ...rest) => {
+        const el = echt(name, ...rest);
+        if (String(name).toLowerCase() === "canvas") flaechen.push(el);
+        return el;
+      });
+    });
+    afterEach(() => spion.mockRestore());
+
+    it("Erfolgsweg: die Fläche bleibt in Originalgröße — sie ist das Ergebnis", async () => {
+      setDekoderLaderForTest(async () => modulAttrappe());
+      const canvas = await heicZuCanvas(new Uint8Array(4));
+      expect(flaechen).toEqual([canvas]);
+      expect([canvas.width, canvas.height]).toEqual([2, 3]);
+    });
+
+    it("kein Zeichen-Kontext: Ort 'heic:canvas', die Fläche ist freigegeben", async () => {
+      let groesseBeimVersuch = null;
+      HTMLCanvasElement.prototype.getContext = function () {
+        groesseBeimVersuch = [this.width, this.height];
+        return null;
+      };
+      setDekoderLaderForTest(async () => modulAttrappe());
+      const err = await heicZuCanvas(new Uint8Array(4)).catch((e) => e);
+      expect(err.message).toBe("image_decode_failed");
+      expect(err.errorDetail).toBe("heic:canvas");
+      expect(groesseBeimVersuch).toEqual([2, 3]);
+      expect(flaechen).toHaveLength(1);
+      expect([flaechen[0].width, flaechen[0].height]).toEqual([0, 0]);
+    });
+
+    it("das Zeichnen scheitert: die Fläche ist freigegeben", async () => {
+      setDekoderLaderForTest(async () => modulAttrappe({ displayScheitert: true }));
+      const err = await heicZuCanvas(new Uint8Array(4)).catch((e) => e);
+      expect(err.errorDetail).toBe("heic:zeichnen");
+      expect(flaechen).toHaveLength(1);
+      expect([flaechen[0].width, flaechen[0].height]).toEqual([0, 0]);
+    });
   });
 });

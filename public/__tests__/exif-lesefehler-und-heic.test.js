@@ -184,3 +184,60 @@ describe("Format, das der Browser nicht kennt", () => {
     expect(heicZuCanvas).not.toHaveBeenCalled();
   });
 });
+
+/* BUG-2026-08-20-37: Kann der Browser keinen Zeichen-Kontext anlegen
+   (Speichergrenze, auf iPhones beim zweiten Bild einer Sitzung schon
+   vorgekommen), bleibt die eben angelegte Zeichenfläche sonst belegt — und
+   macht das nächste Foto noch wahrscheinlicher zum nächsten Fehler. */
+describe("Zeichenfläche ohne Kontext", () => {
+  let flaechen;
+  beforeEach(() => {
+    bildLaedt = true;
+    /* Das geladene Bild hat eine Größe — sonst wäre die Fläche von Anfang an leer. */
+    for (const [seite, wert] of [
+      ["width", 800],
+      ["height", 600],
+    ]) {
+      Object.defineProperty(globalThis.Image.prototype, seite, { configurable: true, get: () => wert });
+    }
+    flaechen = [];
+    const echt = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((name, ...rest) => {
+      const el = echt(name, ...rest);
+      if (String(name).toLowerCase() === "canvas") flaechen.push(el);
+      return el;
+    });
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete globalThis.Image.prototype.width;
+    delete globalThis.Image.prototype.height;
+  });
+
+  it("Erfolgsweg: mit Kontext entsteht das Bild, und die Fläche ist danach freigegeben", async () => {
+    const ergebnis = await prepareImage(datei(JPEG_KOPF), { auswahlZeit: Date.now() });
+    expect(ergebnis.imageBase64).toBe("QUJD");
+    expect(flaechen).toHaveLength(1);
+    expect([flaechen[0].width, flaechen[0].height]).toEqual([0, 0]);
+  });
+
+  it("ohne Kontext: Dekodierfehler mit Diagnose, und die Fläche ist freigegeben", async () => {
+    let groesseBeimVersuch = null;
+    HTMLCanvasElement.prototype.getContext = function () {
+      groesseBeimVersuch = [this.width, this.height];
+      return null;
+    };
+    const err = await prepareImage(datei(JPEG_KOPF), { auswahlZeit: Date.now() - 300 }).catch((x) => x);
+    expect(err.message).toBe("image_decode_failed");
+    /* Die Fläche war wirklich angelegt (800 × 600) … */
+    expect(groesseBeimVersuch).toEqual([800, 600]);
+    /* … und ist nach dem Fehler wieder frei. */
+    expect(flaechen).toHaveLength(1);
+    expect([flaechen[0].width, flaechen[0].height]).toEqual([0, 0]);
+    /* Die Fehlererfassung sieht, WO es scheiterte und bei welcher Art Datei. */
+    expect(err.errorDetail).toBe("canvas");
+    expect(err.fileFormat).toBe("jpeg");
+    expect(err.fileSizeKb).toBe(0);
+    expect(err.msSeitAuswahl).toBeGreaterThanOrEqual(300);
+  });
+});

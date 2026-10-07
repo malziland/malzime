@@ -12,13 +12,21 @@
  * und kein Signal meldet es.
  */
 
-const zustand = { dauer: { sekunden: 60, gemessen: true }, werte: null, flags: { useGemesseneDauer: true } };
+/* Die Dauer-Messung liefert immer auch, ob ihre Werte frisch sind (juenger als
+   eine Woche). Nur dann rechnet die Einlassgrenze mit ihnen. */
+const zustand = {
+  dauer: { sekunden: 60, gemessen: true, frisch: true },
+  werte: null,
+  flags: { useGemesseneDauer: true },
+};
 
 jest.mock("../durchsatz", () => ({ dauerJeAnalyse: async () => zustand.dauer }));
 jest.mock("../feature-flags", () => ({ getFeatureFlags: async () => zustand.flags }));
 jest.mock("../betriebsprofil", () => ({ geltendeWerte: async () => ({ werte: zustand.werte }) }));
 
 const { _aktuelleEinlassgrenze } = require("../handle-enqueue");
+
+const FRISCH_GEMESSEN = { sekunden: 60, gemessen: true, frisch: true };
 
 /* Zentral aus ../test-satz, mit der jeweils zu pruefenden Parallelitaet. */
 const SATZ = (parallel) => ({ ...require("../test-satz").SATZ, parallelitaet: parallel });
@@ -37,7 +45,7 @@ describe("Einlassgrenze folgt dem Einstellungssatz", () => {
   });
 
   test("die Rechnung stimmt: Dauer x Parallelitaet x Sicherheitsabschlag", async () => {
-    zustand.dauer = { sekunden: 60, gemessen: true };
+    zustand.dauer = FRISCH_GEMESSEN;
     zustand.werte = SATZ(7);
     /* 30 min / 60 s = 30 Durchlaeufe, mal 7 parallel, mal 0,8 Abschlag = 168 */
     expect(await _aktuelleEinlassgrenze()).toBe(168);
@@ -67,7 +75,17 @@ describe("Einlassgrenze folgt dem Einstellungssatz", () => {
     /* Nicht mehr die Code-Konstante, sondern der Wert aus dem Satz — sonst
        waere die Einlassgrenze das einzige, was eine Umstellung ignoriert. */
     expect(await _aktuelleEinlassgrenze()).toBe(SATZ(7).warteschlangeTiefe);
-    zustand.dauer = { sekunden: 60, gemessen: true };
+    zustand.dauer = FRISCH_GEMESSEN;
+  });
+
+  /* OPS-2026-10-03-25: Veraltete Messwerte zaehlen nicht — sonst rechnete die
+     Grenze mit beliebig alten Zahlen weiter, waehrend die Wartezeit-Ansage
+     dieselben Werte schon nicht mehr zeigt. */
+  test("mit gemessener, aber veralteter Dauer gilt die Tiefe aus dem Einstellungssatz", async () => {
+    zustand.werte = SATZ(7);
+    zustand.dauer = { sekunden: 25, gemessen: true, frisch: false };
+    expect(await _aktuelleEinlassgrenze()).toBe(SATZ(7).warteschlangeTiefe);
+    zustand.dauer = FRISCH_GEMESSEN;
   });
 
   test("unsinnige Parallelitaet fuehrt nicht zu unsinniger Grenze", async () => {

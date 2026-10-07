@@ -359,9 +359,15 @@ das jede Minute und meldet mit `severity: ERROR`, wenn es älter als neun Tage i
 Marker `erinnerung-lebenszeichen-veraltet`. Damit fällt ein Ausfall der Erinnerung auf,
 obwohl sie selbst bewusst leise bleibt (OPS-2026-08-12-11).
 
+Kann der Reaper das Lebenszeichen nicht LESEN, ist das in einem einzelnen Lauf nur
+eine Warnung (`lebenszeichen-nicht-lesbar`). Bleibt es fünf Läufe in Folge dabei,
+meldet er mit `severity: ERROR` den Marker `lebenszeichen-wiederholt-nicht-lesbar`,
+jede Minute erneut: Der Wächter ist dann blind und würde einen Ausfall der Erinnerung
+nicht bemerken — Firestore und die Rechte des Reapers auf `config/erinnerung` prüfen.
+
 Prüfen von Hand:
 
-    gcloud logging read 'jsonPayload.error="erinnerung-lebenszeichen-veraltet"' \
+    gcloud logging read 'jsonPayload.error=("erinnerung-lebenszeichen-veraltet" OR "lebenszeichen-wiederholt-nicht-lesbar")' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d
 
 (Der Betriebs-Speicher hält einen Tag; der Aufräumer meldet den Zustand jede

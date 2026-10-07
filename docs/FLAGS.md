@@ -21,6 +21,12 @@ nach spätestens ~30 s. Das ist das zentrale Betriebssicherheits-Element (siehe
 > und der Fehlerfall soll keine Messung behaupten, die es nicht gibt (Code:
 > `feature-flags.js`, catch-Zweig; Test: `feature-flags.test.js`). Bis 10.09.2026 stand
 > hier "fail-safe `true`" — das galt nur fuer das fehlende Feld.
+>
+> **Veraltete Messwerte zaehlen nicht (seit 07.10.2026).** Ist der juengste Messwert
+> aelter als eine Woche, zeigt die Wartezeit-Ansage keine Sekundenzahl, und die
+> Einlassgrenze nimmt `warteschlangeTiefe` aus dem Einstellungssatz — beide nach derselben
+> Regel. Scheitert das Fortschreiben der Messung, steht eine Warnung im Log
+> (`merkeDauer-fehlgeschlagen`, `merkeTag-fehlgeschlagen`; Code: `durchsatz.js`).
 
 > **Alte Felder geloescht (11.09.2026).** `usePromptCache`, `useLiveText` und
 > `useSprachumschalter` sind aus `featureFlags/current` entfernt; der heutige Code liest

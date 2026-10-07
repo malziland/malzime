@@ -69,11 +69,29 @@ function _cacheLeeren() {
   cache = { data: null, expiresAt: 0 };
 }
 
+/* Ein Fehlschlag der Messung steht als Warnung im Protokoll (OPS-2026-10-03-25).
+   Vorher schwieg sie; ein anhaltender Ausfall waere unsichtbar geblieben, und
+   Wartezeit-Ansage und Einlassgrenze haetten mit stehengebliebenen Werten
+   gerechnet. Nur Code und Art des Fehlers: Die Zeile entsteht im selben Aufruf
+   wie die Analyse. */
+function meldeFehlschlag(name, err) {
+  console.warn(
+    JSON.stringify({
+      severity: "WARNING",
+      step: "durchsatz",
+      warning: `${name}-fehlgeschlagen`,
+      code: (err && err.code) || null,
+      art: (err && err.name) || null,
+    })
+  );
+}
+
 /**
  * Haengt die Dauer einer abgeschlossenen Analyse an den Ring.
  *
- * Schluckt jeden Fehler: Die Messung ist Komfort, nie Pflicht. Ein Firestore-
- * Ausfall darf keine Analyse kosten, die bereits fertig ist.
+ * Wirft nie: Die Messung ist Komfort, nie Pflicht. Ein Firestore-Ausfall darf
+ * keine Analyse kosten, die bereits fertig ist. Ein Fehlschlag wird gemeldet
+ * (meldeFehlschlag).
  */
 async function merkeDauer(sekunden) {
   if (!Number.isFinite(sekunden) || sekunden < PLAUSIBEL_MIN_S || sekunden > PLAUSIBEL_MAX_S) return;
@@ -88,8 +106,8 @@ async function merkeDauer(sekunden) {
     /* Der eigene Zwischenspeicher ist jetzt veraltet. */
     cache = { data: null, expiresAt: 0 };
     await merkeTag(sekunden);
-  } catch (_) {
-    /* still — siehe Funktionskommentar */
+  } catch (err) {
+    meldeFehlschlag("merkeDauer", err);
   }
 }
 
@@ -117,8 +135,10 @@ async function merkeTag(sekunden) {
         .slice(-TAGE_HISTORIE);
       t.set(ref, { tage: neu }, { merge: true });
     });
-  } catch (_) {
-    /* still — die Historie ist Diagnose, nie Betrieb */
+  } catch (err) {
+    /* Die Historie ist Diagnose, nie Betrieb — aber ihr Ausfall macht die
+       Laufzeit-Wache blind ("zu wenige Analysen" sieht aus wie "unauffaellig"). */
+    meldeFehlschlag("merkeTag", err);
   }
 }
 

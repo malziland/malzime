@@ -351,9 +351,17 @@ const LEBENSZEICHEN_MAX_ALTER_MS = 9 * 24 * 60 * 60 * 1000;
    die Erinnerung am 2026-08-12; der erste echte Lauf ist Montag 2026-08-18. */
 const ERINNERUNG_AUSGELIEFERT_MS = Date.parse("2026-08-12T00:00:00Z");
 
+/* Laeufe hintereinander, in denen das Lebenszeichen nicht LESBAR war
+   (OPS-2026-10-03-25) — gezaehlt wie die Laeufe ohne Betriebswerte oben, mit
+   derselben Schwelle. Ohne die Zaehlung schrieb ein dauerhaft blinder Waechter
+   jede Minute dieselbe Zeile ohne Schweregrad, und fiel in dieser Zeit auch die
+   Erinnerung aus, meldete niemand etwas. */
+let laeufeOhneLebenszeichen = 0;
+
 async function pruefeErinnerungsLebenszeichen() {
   try {
     const snap = await datenbank().doc(LEBENSZEICHEN_DOC).get();
+    laeufeOhneLebenszeichen = 0;
     /* OPS-2026-08-13-44: auf letzterErfolg schauen, nicht letzterLauf — sonst
        hält eine Erinnerung, die jeden Montag NUR läuft aber scheitert (Seite
        nicht lesbar, Datum unlesbar), den Wächter über letzterLauf grün.
@@ -393,7 +401,25 @@ async function pruefeErinnerungsLebenszeichen() {
       })
     );
   } catch (err) {
-    /* Nicht lesbar ist nicht dasselbe wie veraltet — kein Fehlalarm. */
-    console.log(JSON.stringify({ warning: "lebenszeichen-nicht-lesbar", error: err.message }));
+    /* Nicht lesbar ist nicht dasselbe wie veraltet — ein einzelner Lauf ist
+       eine Warnung, kein Fehlalarm. Bleibt es dabei, ist der Waechter blind:
+       ab LAEUFE_BIS_ALARM Laeufen in Folge ein Fehler, jede Minute erneut. */
+    laeufeOhneLebenszeichen += 1;
+    console.warn(
+      JSON.stringify({ severity: "WARNING", step: "reap", warning: "lebenszeichen-nicht-lesbar", error: err.message })
+    );
+    if (laeufeOhneLebenszeichen >= LAEUFE_BIS_ALARM) {
+      console.error(
+        JSON.stringify({
+          severity: "ERROR",
+          step: "reap",
+          error: "lebenszeichen-wiederholt-nicht-lesbar",
+          laeufeInFolge: laeufeOhneLebenszeichen,
+          hinweis:
+            "Der Aufraeumer kann das Lebenszeichen der Wochen-Erinnerung (config/erinnerung) seit mehreren " +
+            "Laeufen nicht lesen — er wuerde ihren Ausfall nicht bemerken. Firestore und Rechte pruefen (RUNBOOK).",
+        })
+      );
+    }
   }
 }

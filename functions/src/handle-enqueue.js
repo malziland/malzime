@@ -44,10 +44,12 @@ async function aktuelleEinlassgrenze() {
   if (!werte) return 0;
   try {
     const flags = await getFeatureFlags();
-    const { sekunden, gemessen } = await dauerJeAnalyse(flags.useGemesseneDauer === true);
-    /* Gemessene Dauer verfuegbar: Grenze daraus rechnen, sonst die Zahl aus
-       dem Einstellungssatz nehmen. */
-    if (!gemessen || !sekunden) return werte.warteschlangeTiefe;
+    const { sekunden, gemessen, frisch } = await dauerJeAnalyse(flags.useGemesseneDauer === true);
+    /* Gemessene Dauer verfuegbar UND frisch: Grenze daraus rechnen, sonst die
+       Zahl aus dem Einstellungssatz nehmen. Veraltete Messwerte (aelter als
+       eine Woche) zaehlen nicht — dieselbe Regel wie bei der Wartezeit-Ansage
+       (OPS-2026-10-03-25). */
+    if (!gemessen || !frisch || !sekunden) return werte.warteschlangeTiefe;
     return Math.max(1, Math.floor(((30 * 60) / sekunden) * werte.parallelitaet * 0.8));
   } catch (_) {
     return werte.warteschlangeTiefe;

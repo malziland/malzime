@@ -280,15 +280,8 @@ async function handleProcessJob(req, res) {
        der Uhr gestorbener Lauf sagt nichts darueber, wie lange eine Analyse
        braucht, und wuerde die Ansage verfaelschen. Abgewartet wie der Zaehler
        oben (BUG-2026-10-03-29): Das Ergebnis steht schon, das Kind wartet nicht. */
-    if (success) {
-      await merkeDauer((Date.now() - start) / 1000).catch((e) =>
-        /* BEFUND 31.08.2026: Der Fehlschlag wurde restlos verschluckt.
-           Scheitert das Fortschreiben dauerhaft, bleibt die Wartezeit-Ansage
-           auf einem alten Wert stehen — sichtbar fuer jeden Besucher, ohne
-           dass irgendwo etwas auffaellt. */
-        console.log(JSON.stringify({ warning: "merkeDauer-fehlgeschlagen", error: ohneKennung(e.message) }))
-      );
-    }
+    /* Wirft nie; einen Fehlschlag meldet die Messung selbst (durchsatz.js). */
+    if (success) await merkeDauer((Date.now() - start) / 1000);
   } catch (err) {
     /* Unerwarteter Fehler → trotzdem ein sauberes, renderbares blocked-
        Ergebnis liefern. Liess sich nur das fertige Ergebnis nicht speichern

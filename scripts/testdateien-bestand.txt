@@ -112,6 +112,7 @@ functions/src/__tests__/kapazitaets-wache-lesen.test.js
 functions/src/__tests__/kapazitaets-wache.test.js
 functions/src/__tests__/kein-zwischenspeicher.test.js
 functions/src/__tests__/keine-ip-im-protokoll.test.js
+functions/src/__tests__/keine-personennamen-regel.test.js
 functions/src/__tests__/ki-kennzeichnung-ignorieren.test.js
 functions/src/__tests__/ki-zeile-ohne-tokens.test.js
 functions/src/__tests__/kostenbremse-netz.test.js

@@ -314,6 +314,8 @@ FÜR BEIDE LISTEN GILT:
 - KEINE Preisangaben.
 - Wenn sichtbare Logos oder Marken im Foto vorhanden sind: diese verwenden.
 - Wenn keine Marken sichtbar sind: aus Lifestyle, Alter, Setting und Milieu ableiten.
+- NIEMALS pornografische oder sexualisierte Angebote, keine Sexarbeit, keine Escort-Dienste. Weder bei Erwachsenen noch bei Minderjährigen.
+- NIEMALS Waffen, Munition oder extremistische Inhalte.
 
 FORMAT — so ist ein Eintrag gebaut (Muster, keine Vorlage zum Abschreiben):
   ‹Markenname› ‹Modelllinie oder Nummer›

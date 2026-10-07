@@ -20,7 +20,7 @@
 
 const de = require("../locales/de/prompts");
 const en = require("../locales/en/prompts");
-const { MINOR } = require("../minor-safety-woerter");
+const { MINOR, IMMER } = require("../minor-safety-woerter");
 
 /* Je Thema der Stufe 2 das Wort, an dem der Verbotssatz es nennt. */
 const THEMEN = [
@@ -94,6 +94,77 @@ describe.each(AUFRUFE)("Verbotssatz für möglicherweise Minderjährige — %s, 
 
   test("nennt jedes Thema, das der Filter bei möglicherweise Minderjährigen streicht", () => {
     expect(fehlendeThemen(verbotsTeil(prompt, sprache, anfang), sprache)).toEqual([]);
+  });
+});
+
+/* STUFE 1 — gilt für alle (SEC-2026-10-04-26): Pornografie, Waffen und
+   Extremismus streicht der Filter bei jedem Alter. Der Werbe-Aufruf nannte
+   das Verbot schon; im Analyse-Aufruf, der ebenfalls Werbe-Einträge schreibt,
+   stand es nicht — dort war der Filter die einzige Linie. Beide Aufrufe
+   nennen jetzt dieselben zwei Sätze; im Analyse-Aufruf stehen sie bei den
+   Regeln für die Werbe-Einträge, nicht irgendwo im Text. */
+const THEMEN_IMMER = [
+  {
+    thema: "Pornografie",
+    de: /NIEMALS pornografische oder sexualisierte Angebote/,
+    en: /NEVER pornographic or sexualised offers/,
+  },
+  { thema: "Waffen", de: /NIEMALS Waffen, Munition/, en: /NEVER weapons, ammunition/ },
+  { thema: "Extremismus", de: /extremistische Inhalte/, en: /extremist content/ },
+];
+
+/* Der Teil des Analyse-Aufrufs, der die Werbe-Einträge regelt: von seiner
+   Überschrift bis zur nächsten. Im Werbe-Aufruf zählt der ganze Text. */
+function werbeRegeln(prompt, aufruf) {
+  if (aufruf !== "Analyse-Aufruf") return prompt;
+  const anfang = prompt.indexOf("═══ AD_TARGETING");
+  if (anfang === -1) return null;
+  const ende = prompt.indexOf("═══ ", prompt.indexOf("═══", anfang + 4) + 4);
+  return ende === -1 ? prompt.slice(anfang) : prompt.slice(anfang, ende);
+}
+
+const fehlendeThemenImmer = (text, sprache) => THEMEN_IMMER.filter((t) => !t[sprache].test(text)).map((t) => t.thema);
+
+describe("Die Tabelle kennt jedes Thema der Stufe 1", () => {
+  test("so viele Zeilen wie Themenlisten im Filter", () => {
+    expect(Array.isArray(IMMER.ueberall)).toBe(true);
+    expect(THEMEN_IMMER).toHaveLength(IMMER.ueberall.length);
+  });
+});
+
+describe.each(AUFRUFE)("Verbot für alle — %s, %s", (sprache, aufruf, prompt) => {
+  test("die Regeln für Werbe-Einträge sind gefunden (Messmittel-Kontrolle)", () => {
+    const regeln = werbeRegeln(prompt, aufruf);
+    expect(regeln).not.toBeNull();
+    expect(regeln).toMatch(/ad_targeting/);
+  });
+
+  test("nennt jedes Thema, das der Filter bei jedem Alter streicht", () => {
+    expect(fehlendeThemenImmer(werbeRegeln(prompt, aufruf), sprache)).toEqual([]);
+  });
+});
+
+describe("Gegenprobe Stufe 1: die Prüfung wird rot, wenn das Verbot fehlt oder woanders steht", () => {
+  test("ohne die zwei Sätze werden alle drei Themen gemeldet", () => {
+    const ohne = de.singleLargePrompt
+      .split("\n")
+      .filter((zeile) => !/^- NIEMALS (pornografische|Waffen)/.test(zeile))
+      .join("\n");
+    expect(fehlendeThemenImmer(werbeRegeln(ohne, "Analyse-Aufruf"), "de")).toEqual([
+      "Pornografie",
+      "Waffen",
+      "Extremismus",
+    ]);
+  });
+
+  test("stehen die Sätze nur außerhalb der Werbe-Regeln, zählen sie im Analyse-Aufruf nicht", () => {
+    const woanders =
+      "═══ ANFANG ═══\n- NIEMALS Waffen, Munition oder extremistische Inhalte.\n═══ AD_TARGETING — X ═══\nad_targeting\n═══ ENDE ═══";
+    expect(fehlendeThemenImmer(werbeRegeln(woanders, "Analyse-Aufruf"), "de")).toEqual([
+      "Pornografie",
+      "Waffen",
+      "Extremismus",
+    ]);
   });
 });
 

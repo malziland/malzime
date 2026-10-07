@@ -305,6 +305,8 @@ FOR BOTH LISTS:
 - NO price specifications.
 - If visible logos or brands are present in the photo: use them.
 - If no brands are visible: infer from lifestyle, age, setting and milieu.
+- NEVER pornographic or sexualised offers, no sex work, no escort services. Neither for adults nor for minors.
+- NEVER weapons, ammunition or extremist content.
 
 FORMAT — this is how an entry is built (pattern, not a template to copy):
   ‹brand name› ‹model line or number›

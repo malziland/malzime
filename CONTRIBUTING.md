@@ -14,8 +14,9 @@ cd functions && npm install && cd ..
 # Frontend-Tests + Linting (Vitest, ESLint, Prettier)
 npm install
 
-# Lokal starten
-firebase emulators:start --only functions,hosting
+# Lokal starten (Functions, Firestore, Hosting, Pub/Sub — Ablauf: docs/QUEUE-EMULATOR.md)
+cp functions/.env.local.example functions/.env.local   # einmalig: Attrappe statt echter KI
+npm run emulator
 ```
 
 Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md)
@@ -33,8 +34,10 @@ Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md)
    Pipeline, dort gaebe es nichts zu gewinnen.
 
 4. Vor einem Release zusaetzlich alle drei Suiten: `sh scripts/pruefstand.sh`
-5. Cache-Buster in `index.html` hochzaehlen bei Frontend-Aenderungen
-6. Pull Request erstellen
+5. Pull Request erstellen
+
+Den Cache-Buster (`?v=YYYYMMDDNN` in den Seiten) fasst du **nicht von Hand** an —
+`scripts/deploy.sh` zaehlt ihn bei jeder Auslieferung selbst hoch.
 
 Die Einzelbefehle, falls du gezielt etwas laufen lassen willst:
 

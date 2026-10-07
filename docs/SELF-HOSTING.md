@@ -38,7 +38,8 @@ malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
 3. API-Key generieren unter https://console.mistral.ai/api-keys/
 4. Key sofort sichern (wird nur einmal angezeigt) — wird in Schritt 5g als Firebase Secret hinterlegt
 
-Kosten: Pay-per-Use, ein Workshop mit 30 Teilnehmer:innen kostet ca. $0.35.
+Kosten: Pay-per-Use. Ein Rechenbeispiel fuer einen Workshop steht an einer Stelle:
+[SETUP.md, Abschnitt „Kosten"](SETUP.md#kosten).
 
 ## 2b. Google Cloud Projekt erstellen (nur fuer Infrastruktur)
 
@@ -50,7 +51,7 @@ Kosten: Pay-per-Use, ein Workshop mit 30 Teilnehmer:innen kostet ca. $0.35.
 
 Im Google Cloud Console unter **APIs & Services > Library**:
 
-- **Cloud Firestore** — Analyse-Zaehler, Stundenlimit, Maintenance-Modus, Queue-Jobs (wird automatisch mit Firebase aktiviert)
+- **Cloud Firestore** — Analyse-Zaehler, Stundenlimit, Maintenance-Modus, Queue-Jobs, Einstellungssatz. Die API wird mit Firebase aktiviert; die **Datenbank selbst legst du in Schritt 3a an** — das Programm benutzt nicht die Standard-Datenbank
 - **Cloud Tasks API** — Warteschlange fuer die Analyse-Jobs (seit v2.0)
 - **Cloud Storage** — temporaere Bild-Ablage der Queue (seit v2.0)
 
@@ -67,6 +68,25 @@ Cloud Vision API und Vertex AI sind NICHT mehr noetig (seit v1.6.0). Falls du si
 firebase login
 firebase use --add   # Deine neue Projekt-ID waehlen
 ```
+
+## 3a. Datenbank anlegen (Pflicht)
+
+malziME spricht ausschliesslich eine **benannte** Firestore-Datenbank an: `malzime-eu` in
+`europe-west1`. Die Standard-Datenbank `(default)`, die Firebase von sich aus anbietet,
+benutzt das Programm nicht — ohne diesen Schritt findet es keine Datenbank.
+
+```bash
+gcloud firestore databases create --database=malzime-eu --location=europe-west1 \
+  --project=DEIN-PROJEKT
+```
+
+Der Standort einer Firestore-Datenbank steht beim Anlegen fest und laesst sich danach nicht
+mehr aendern. Wer zusaetzlich `--delete-protection` angibt, schuetzt die Datenbank vor
+versehentlichem Loeschen.
+
+Der Name ist nur in deinem eigenen Projekt sichtbar; am einfachsten bleibt er, wie er ist.
+Willst du einen anderen, steht er an genau zwei Stellen: `FIRESTORE_DATABASE_ID` in
+`functions/src/config.js` und `"database"` in `firebase.json`.
 
 ## 4. Dependencies installieren
 
@@ -86,25 +106,30 @@ Hier sind alle Stellen die du fuer deine eigene Instanz anpassen musst.
 
 **Datei:** `functions/src/domains.js`
 
-Alle erlaubten Domains sind zentral in einer Datei definiert. Ersetze sie mit deinen eigenen:
+Die Adresse der Seite (`SITE_URL`) und alle erlaubten Domains stehen zentral in dieser einen
+Datei. Aendere **nur die Werte** und lass beide Exporte stehen — `SITE_URL` brauchen die
+Wochen-Erinnerung und die Push-Benachrichtigungen:
 
 ```js
+const SITE_URL = "https://DEINE-DOMAIN.com";
+
 const ALLOWED_ORIGINS = [
-  "https://DEINE-DOMAIN.com",
+  SITE_URL,
   "https://www.DEINE-DOMAIN.com",
   "https://DEIN-PROJEKT.web.app",
   "https://DEIN-PROJEKT.firebaseapp.com",
 ];
 
-module.exports = { ALLOWED_ORIGINS };
+module.exports = { ALLOWED_ORIGINS, SITE_URL };
 ```
 
-Falls du keine eigene Domain hast, reichen die Firebase-Defaults:
+Falls du keine eigene Domain hast, reichen die Firebase-Adressen:
 ```js
-const ALLOWED_ORIGINS = [
-  "https://DEIN-PROJEKT.web.app",
-  "https://DEIN-PROJEKT.firebaseapp.com",
-];
+const SITE_URL = "https://DEIN-PROJEKT.web.app";
+
+const ALLOWED_ORIGINS = [SITE_URL, "https://DEIN-PROJEKT.firebaseapp.com"];
+
+module.exports = { ALLOWED_ORIGINS, SITE_URL };
 ```
 
 ### 5b. Backend: Projekt-ID Fallback (entfaellt seit v1.6.0)
@@ -113,7 +138,7 @@ Vor v1.6.0 stand in `gemini.js` ein hartcodierter Projekt-Fallback (`"malzime"`)
 
 ### 5c. Frontend: Nominatim User-Agent
 
-**Datei:** `public/js/geocoding.js` (Zeile 17)
+**Datei:** `public/js/geocoding.js` (Suche nach `User-Agent`)
 
 Im Code steht ein `User-Agent`-Header fuer Nominatim (OpenStreetMap Geocoding). **Wichtig:** Browser ignorieren diesen Header stillschweigend — er hat keinen Effekt. Nominatim verwendet stattdessen den Standard-User-Agent deines Browsers, was fuer die Nutzung ausreichend ist.
 
@@ -169,9 +194,9 @@ Die UI-Texte, KI-Prompts und Tier-Profile liegen in Locale-Dateien:
 
 | Dateien | Inhalt |
 |---------|--------|
-| `public/locales/de.json` | Alle Frontend-UI-Strings |
-| `functions/src/locales/de/prompts.js` | KI-Prompts (System-Prompts, Labels, jsonSchemaNormal + jsonSchemaBoost) |
-| `functions/src/locales/de/animals.js` | Tier-Easter-Egg-Profile |
+| `public/locales/de.json`, `en.json` | Alle Frontend-UI-Strings (beide Dateien brauchen dieselben Schluessel) |
+| `functions/src/locales/de/prompts.js`, `en/prompts.js` | KI-Prompts (Analyse-Prompt `singleLargePrompt`, die zwei Teile des Werbe-Aufrufs, Marken-Sperre) |
+| `functions/src/locales/de/animals.js`, `en/animals.js` | Tier-Easter-Egg-Profile |
 
 Wenn du die Texte anpassen oder eine neue Sprache hinzufuegen willst:
 - Frontend: Kopiere `de.json` nach `XX.json`, uebersetze die Werte, trage den Code in `manifest.json` ein
@@ -201,18 +226,29 @@ printf "%s" "malzime-alerts"   | gcloud secrets versions add NTFY_TOPIC_EU      
 
 Wenn du keine ntfy-Benachrichtigungen willst, setze die Secrets auf einen Platzhalter-Wert (z.B. `none`). Der Code erkennt ungueltige URLs und sendet dann keine Benachrichtigungen.
 
-### 5h. Stundenlimit anpassen (optional)
+### 5h. Einstellungssatz anlegen (Pflicht)
 
 Das Stundenlimit und alle anderen Betriebswerte stehen **nicht im Code**,
-sondern in Firestore im Dokument `config/betriebsprofil`. Aendern heisst: den
-Wert im aktiven Satz setzen — kein Deploy noetig, wirkt binnen 30 Sekunden.
+sondern in Firestore im Dokument `config/betriebsprofil` (in der Datenbank aus
+Schritt 3a). **Ohne gueltigen Einstellungssatz laeuft keine Analyse** — die
+Seite zeigt dann „Bei uns stimmt gerade eine Einstellung nicht".
 
-Welche 29 Werte es gibt, was sie bedeuten und welche vier Obergrenzen
-Datenschutzzusagen sind, steht in [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md).
+Die Werte fuer den Start stehen in `functions/src/produktiv-satz.js`. Angelegt
+wird der Satz mit einem Skript, **vor** dem ersten Ausliefern:
 
-**Ohne gueltigen Einstellungssatz laeuft keine Analyse.** Beim Aufsetzen einer
-eigenen Instanz ist das Anlegen des Satzes deshalb ein Pflichtschritt, kein
-optionaler.
+```bash
+gcloud auth application-default login
+# In scripts/betriebsprofil-anlegen.js steht die Projekt-ID fest im Aufruf
+# initializeApp(...) — dort vor dem ersten Lauf "malzime" durch deine ersetzen.
+node scripts/betriebsprofil-anlegen.js               # zeigt nur, was es schreiben wuerde
+node scripts/betriebsprofil-anlegen.js --ausfuehren  # schreibt und liest zur Kontrolle zurueck
+```
+
+Aendern heisst spaeter: den Wert im aktiven Satz setzen — kein Deploy noetig,
+wirkt binnen 30 Sekunden. Welche Werte es gibt, was sie bedeuten und welche
+Obergrenzen Datenschutzzusagen sind, steht in
+[BETRIEBSPROFILE.md](BETRIEBSPROFILE.md). Passe vor allem `parallelitaet` und
+`queueRatePerSekunde` an die Grenzen deines Mistral-Tarifs an (Schritt 5j).
 
 ### 5i. Spenden-Button (optional)
 
@@ -243,10 +279,10 @@ gcloud storage buckets create gs://DEIN-PROJEKT-queue-uploads \
 
 Trage den Bucket-Namen in `functions/src/config.js` (`QUEUE_BUCKET`) oder als Umgebungsvariable `QUEUE_BUCKET` ein. Empfohlen: eine Lifecycle-Regel, die Objekte nach 1 Tag löscht (Sicherheitsnetz — die aktive Löschung passiert ohnehin sofort nach der Verarbeitung).
 
-**3. Firestore-Indizes deployen:**
+**3. Firestore-Regeln und -Indizes deployen** (in die Datenbank aus Schritt 3a; `firebase.json` nennt sie):
 
 ```bash
-firebase deploy --only firestore:indexes
+firebase deploy --only firestore
 ```
 
 **4. Feature-Flags:** Die Warteschlange läuft immer; seit v2.10 gibt es keinen zweiten Weg mehr. Im Dokument `featureFlags/current` steuerst du `useBeastAdsCall` (Notausschalter fuer den Werbe-Aufruf) und `useGemesseneDauer` — ohne Deploy umlegbar (Uebersicht in `FLAGS.md`).
@@ -259,23 +295,30 @@ Lokaler Test der Queue ohne Cloud Tasks: [`QUEUE-EMULATOR.md`](QUEUE-EMULATOR.md
 
 ## 6. Lokal testen
 
-Fuer lokale Entwicklung muessen die Google Cloud APIs authentifiziert sein:
+Lokal laeuft alles im Firebase-Emulator, ohne Google-Anmeldung und ohne Kosten:
+Die KI ist durch eine Attrappe ersetzt, Warteschlange und Bild-Ablage durch
+lokale Ersatzstuecke. Der Ablauf steht in [`QUEUE-EMULATOR.md`](QUEUE-EMULATOR.md);
+in Kurzform:
 
 ```bash
-gcloud auth application-default login
-```
-
-Dann den Emulator starten:
-
-```bash
-firebase emulators:start --only functions,hosting
+cp functions/.env.local.example functions/.env.local   # einmalig
+npm run emulator                                        # Functions, Firestore, Hosting, Pub/Sub
+# zweites Terminal — der Emulator beginnt jedes Mal mit leerer Datenbank, also auch
+# ohne Einstellungssatz. Das Skript legt den Satz der Tests an (functions/src/test-satz.js):
+GCLOUD_PROJECT=DEIN-PROJEKT FIRESTORE_EMULATOR_HOST=localhost:8080 \
+  node scripts/lasttest-satz-anlegen.js
 ```
 
 Oeffne http://localhost:5050 — die App sollte funktionieren.
 
-> **Tipp**: Im Emulator braucht die Mistral-API trotzdem Internet-Zugang — die KI-Analyse laeuft nicht lokal.
+> **Echte KI statt Attrappe:** in `functions/.env.local` `MISTRAL_MOCK=0` setzen und
+> `MISTRAL_API_KEY` eintragen. Dann braucht der Emulator Internet-Zugang, und jede
+> Analyse kostet Geld. Lege keine Datei `functions/.env` an (Grund: [SETUP.md](SETUP.md)).
 
 ## 7. Deploy
+
+Reihenfolge: Datenbank (3a), Einstellungssatz (5h) sowie Regeln und Indizes (5j)
+muessen vorher liegen.
 
 ```bash
 # Alles deployen
@@ -297,7 +340,9 @@ Deine Instanz ist jetzt unter `https://DEIN-PROJEKT.web.app` erreichbar.
 
 Bevor du live gehst:
 
-- [ ] `functions/src/domains.js` enthaelt deine Domains
+- [ ] Datenbank `malzime-eu` in `europe-west1` angelegt (Schritt 3a)
+- [ ] Einstellungssatz `config/betriebsprofil` angelegt und zurueckgelesen (Schritt 5h)
+- [ ] `functions/src/domains.js` enthaelt deine Domains und deine `SITE_URL`
 - [ ] Impressum und Datenschutzerklaerung sind auf dich zugeschnitten
 - [ ] Meta-Tags (OG, Twitter, canonical) zeigen auf deine Domain
 - [ ] User-Agent in geocoding.js enthaelt deinen Projektnamen
@@ -305,47 +350,15 @@ Bevor du live gehst:
 - [ ] Locale-Dateien angepasst (falls gewuenscht)
 - [ ] Secrets gesetzt, EU-gebunden: ADMIN_SECRET_EU, MISTRAL_API_KEY_EU, NTFY_URL_EU, NTFY_TOPIC_EU (Namen wie in `functions/src/index.js`)
 - [ ] Firestore Security Rules deployed: `firebase deploy --only firestore`
-- [ ] Queue eingerichtet: Cloud-Tasks-Queue + GCS-Bucket + `QUEUE_BUCKET` gesetzt + Firestore-Indizes deployt (siehe »Queue-Architektur einrichten«)
+- [ ] Queue eingerichtet: Cloud-Tasks-Queue + GCS-Bucket + `QUEUE_BUCKET` gesetzt (siehe »Queue-Architektur einrichten«)
 - [ ] Tests laufen: `cd functions && npm test` und `npm run test:frontend`
 - [ ] Lokal getestet: Bild hochladen funktioniert
 
 ## Kosten
 
-### Was pro Analyse passiert
-
-| API | Aufrufe | Was |
-|-----|---------|-----|
-| **Mistral Large 3** | 1 Call | Bildbeschreibung, SUBJECT-Klassifikation, sichtbarer Text und beide Profile |
-| **Mistral Large 3** | 1 Call | Beast-Werbung (ohne Bild, seit v2.8) |
-| **Cloud Functions** | 1 Invocation | Dauer haengt an der Mistral-Antwortzeit (zuletzt gemessen rund 40 s), 512 MiB RAM |
-
-Bei Tier-Fotos (SUBJECT=ANIMAL_ONLY) entfaellt der zweite Aufruf — das Easter-Egg-Profil wird aus statischen Locale-Daten gebaut.
-
-### Preise (Stand Mai 2026)
-
-**Mistral Scale Tier** (pro 1M Tokens):
-
-| Modell | Input | Output |
-|--------|-------|--------|
-| Large 3 | $0.50 | $1.50 |
-
-**Google Cloud (nur Infrastruktur):**
-
-| Posten | Preis | Kostenlos/Monat |
-|--------|-------|-----------------|
-| Firebase Hosting | $0.15 / GB Transfer | 10 GB/Monat |
-| Cloud Functions | nutzungsbasiert | 2 Mio. Aufrufe/Monat |
-| Cloud Firestore | nutzungsbasiert | 50 K Reads/Tag, 20 K Writes/Tag |
-
-### Rechenbeispiel: Workshop mit 30 Teilnehmer:innen
-
-| Posten | Rechnung | Kosten |
-|--------|----------|--------|
-| Mistral Large 3 (Analyse + Werbe-Aufruf) | 30 Analysen, gemessen am 30.08.2026 mit Prompt-Cache | **rund $0.20–0.25** (unter 1 Cent je Analyse) |
-| Cloud Functions + Hosting | minimal | **$0.00** |
-| **Gesamt** | | **rund $0.20–0.25** |
-
-Neue Google Cloud Konten erhalten **$300 Startguthaben**.
+Was je Analyse aufgerufen wird, die Preise und ein Rechenbeispiel fuer einen Workshop
+stehen an einer Stelle: [SETUP.md, Abschnitt „Kosten"](SETUP.md#kosten). Massgeblich fuer
+die Preise ist dein eigenes Mistral-Konto.
 
 ## Fragen?
 

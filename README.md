@@ -160,8 +160,9 @@ firebase login
 npm install                          # Frontend-Tests (Vitest)
 cd functions && npm install && cd .. # Backend
 
-# 4. Lokal testen
-firebase emulators:start --only functions,hosting
+# 4. Lokal testen (Functions, Firestore, Hosting, Pub/Sub — Ablauf: docs/QUEUE-EMULATOR.md)
+cp functions/.env.local.example functions/.env.local   # einmalig: Attrappe statt echter KI
+npm run emulator
 
 # 5. Deploy (Riegel, Trockenlauf, Live-Smoke — Ablauf in docs/RUNBOOK.md)
 ./scripts/deploy.sh

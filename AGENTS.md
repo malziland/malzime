@@ -153,7 +153,7 @@ Einzelbefehle:
 - `cd functions && npm run format:check` — Prettier backend
 - `npm run lint:frontend` — ESLint frontend
 - `npm run format:frontend:check` — Prettier frontend
-- `firebase emulators:start --only functions,hosting` — local dev
+- `npm run emulator` — local dev (Functions, Firestore, Hosting, Pub/Sub; needs `functions/.env.local` and, after every start, the settings record — see `docs/QUEUE-EMULATOR.md`)
 - `./scripts/deploy.sh [hosting]` — deploy website and server (no argument) or the website only (`hosting`, refused if the server code changed since the last deploy); the server alone is refused, because the server fingerprint ships with the website (only with the owner's explicit release; the script runs the gates, the dry run and the live smoke — never `firebase deploy` directly, see docs/RUNBOOK.md)
 
 ## Coding Style & Naming Conventions

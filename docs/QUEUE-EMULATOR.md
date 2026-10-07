@@ -28,6 +28,19 @@ Das startet Functions-, Firestore-, Hosting- und Pub/Sub-Emulator. Warten bis
 | Functions   | http://localhost:5001 |
 | Firestore   | http://localhost:8080 |
 
+**Danach, in einem zweiten Terminal, den Einstellungssatz anlegen** — der
+Firestore-Emulator beginnt jedes Mal mit leerer Datenbank, und ohne Satz lehnt
+der Einlass jede Analyse ab („Bei uns stimmt gerade eine Einstellung nicht"):
+
+```
+FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/lasttest-satz-anlegen.js
+```
+
+Das Skript schreibt den Satz der Tests (`functions/src/test-satz.js`) in die
+benannte Datenbank des Emulators und weigert sich ohne
+`FIRESTORE_EMULATOR_HOST`. In einem Fork mit eigener Projekt-ID zusätzlich
+`GCLOUD_PROJECT=DEIN-PROJEKT` voranstellen.
+
 ## Was im Lokal-Modus anders ist
 
 `functions/.env.local` setzt `QUEUE_LOCAL=1` und `MISTRAL_MOCK=1` (Datei ist

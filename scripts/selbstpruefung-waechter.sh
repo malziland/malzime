@@ -411,6 +411,32 @@ PYSELF
 probe_text 1 "Grenze|ueberschritten" "gerissene Groessengrenze wird gefunden" python3 scripts/pruefe-kopplung.py
 zurueck scripts/pruefe-kopplung.py
 
+# TEST-2026-10-03-44: Der Waechter sieht auch die oberste Ebene von public/ und
+# die eigenen Skripte. Drei Proben: Das Einstiegs-Skript der Website waechst
+# ueber seine Grenze; und je eine Datei aus den zwei neuen Bereichen verliert
+# ihren Eintrag — dann muss die Nachsuche sie als "ohne Grenze" melden.
+sichern public/app.js
+python3 - <<'PYSELF'
+s = open("public/app.js").read()
+open("public/app.js", "w").write(s + "".join("// Probe %d\n" % i for i in range(600)))
+PYSELF
+probe_text 1 "public/app.js: [0-9]+ Zeilen" "gewachsenes Einstiegs-Skript der Website wird gefunden" python3 scripts/pruefe-kopplung.py
+zurueck public/app.js
+
+for OHNE_EINTRAG in scripts/deploy.sh public/styles.css; do
+  sichern scripts/pruefe-kopplung.py
+  OHNE_EINTRAG="$OHNE_EINTRAG" python3 - <<'PYSELF'
+import os, re
+ziel = os.environ["OHNE_EINTRAG"]
+s = open("scripts/pruefe-kopplung.py").read()
+neu, anzahl = re.subn(r'\n    "%s": \d+,' % re.escape(ziel), "", s)
+assert anzahl == 1, ziel
+open("scripts/pruefe-kopplung.py", "w").write(neu)
+PYSELF
+  probe_text 1 "OHNE GRENZE +[0-9]+ +$OHNE_EINTRAG" "Datei ohne Grenze wird gefunden: $OHNE_EINTRAG" python3 scripts/pruefe-kopplung.py
+  zurueck scripts/pruefe-kopplung.py
+done
+
 # TEST-2026-10-04-28: Eine Testdatei, die verschwindet, faellt auf — auch wenn
 # sie nicht in der Liste der unverzichtbaren Pruefungen steht. Und umgekehrt:
 # Eine Testdatei, die im Bestand fehlt, ebenso (sonst waere sie ungeschuetzt).
@@ -626,9 +652,10 @@ if [ "$FEHLER" -eq 0 ]; then
   # Kommentarzeile im Befehl, vier unlesbare Dateien gegen Leser und
   # Pruefsumme — die mit U+2028 im Kopfkommentar nur gegen den Leser, denn
   # Kommentare ausserhalb von Bloecken zaehlen in der Summe bewusst nicht).
-  # 42 seit 07.10.2026: zwei Proben fuer den Bestand der Testdateien, eine
-  # fuer die eigene Abhaengigkeit des Paket-Waechters.
-  ERWARTETE_PROBEN=42
+  # 45 seit 07.10.2026: zwei Proben fuer den Bestand der Testdateien, eine
+  # fuer die eigene Abhaengigkeit des Paket-Waechters, drei fuer die neuen
+  # Bereiche des Struktur-Waechters.
+  ERWARTETE_PROBEN=45
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

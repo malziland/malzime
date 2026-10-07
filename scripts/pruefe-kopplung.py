@@ -10,6 +10,12 @@ vermischte vier Aufgaben, und an `betriebsprofil.js` haengen 15 Module.
 Aufteilen allein hilft nicht dauerhaft — Dateien wachsen zurueck, wenn niemand
 hinsieht. Dieses Skript sieht hin.
 
+WAS ES ANSIEHT: Programmdateien unter functions/src und public/js, dazu die
+oberste Ebene von public/ (Einstiegs-Skript, Stylesheet, Hauptseite) und die
+eigenen Skripte unter scripts/ — siehe NACHSUCHE. Es misst DATEIEN, nicht
+einzelne Funktionen: Eine Funktion kann in einer Datei innerhalb ihrer Grenze
+beliebig lang werden.
+
 WAS ES NICHT TUT: Es verbietet nichts. Es meldet, wenn eine Datei ueber ihre
 festgehaltene Groesse waechst, und verlangt dann eine Entscheidung: teilen oder
 die Grenze bewusst anheben. Beides ist in Ordnung — unbemerktes Wachsen nicht.
@@ -140,7 +146,41 @@ ZEILEN_GRENZEN = {
     "functions/src/job-helfer.js": 150,
     # Die Sprachdateien sind Inhalt, kein Code — sie duerfen wachsen.
     # Deshalb stehen prompts.js hier bewusst NICHT.
+    #
+    # TEST-2026-10-03-44: Bis 07.10.2026 sah der Waechter nur `.js` unter
+    # functions/src und public/js. Das Einstiegs-Skript der Website, das
+    # Stylesheet, die Hauptseite und die eigenen Skripte der Auslieferung
+    # durften beliebig wachsen (Probe: public/app.js von 432 auf 1032 Zeilen,
+    # Rueckgabewert 0). Die folgenden Grenzen sind der gemessene Stand vom
+    # 07.10.2026 plus rund 5 Prozent — eine Sperrklinke, kein Urteil: Lang sind
+    # diese Dateien heute, weil sie viel erklaeren.
+    "public/app.js": 455,
+    "public/styles.css": 4960,
+    "public/index.html": 620,
+    "scripts/deploy.sh": 1410,
+    "scripts/pruefe-deploy-riegel.py": 1480,
+    "scripts/verify-infrastructure.sh": 915,
+    "scripts/selbstpruefung-waechter.sh": 720,
+    "scripts/pruefe-fremd-meldungen.mjs": 605,
+    "scripts/pruefe-mutationen.mjs": 600,
+    "scripts/pruefe-live.sh": 580,
+    "scripts/pruefe-kopplung.py": 520,
 }
+
+# Wo nach Dateien OHNE Grenze gesucht wird (TEST-2026-10-03-44): Ordner,
+# Dateiendungen, und ob die Unterordner dazugehoeren. Wer hier eine Datei ueber
+# SCHWELLE Zeilen anlegt, bekommt sie gemeldet, bis sie eine Grenze hat.
+#
+# Bewusst NICHT dabei: Tests (`__tests__`, e2e/), Fremdcode (public/lib/,
+# scripts/pruefungen/ — vendoriert), Sprachdateien und die Rechtsseiten unter
+# public/ (Text, ihr Umfang folgt dem Inhalt; nur die Hauptseite index.html
+# steht oben in der Liste).
+NACHSUCHE = (
+    ("functions/src", (".js",), True),
+    ("public/js", (".js",), True),
+    ("public", (".js", ".css"), False),
+    ("scripts", (".sh", ".py", ".mjs", ".js"), False),
+)
 
 # Wie viele Module duerfen an einem einzelnen haengen? Ueber dieser Zahl wird
 # eine Aenderung dort teuer, weil sie ueberallhin ausstrahlt.
@@ -367,10 +407,19 @@ def main():
     # mit 901 Zeilen unter `public/js/` -> "Alles innerhalb der Grenzen";
     # dieselbe Datei unter `functions/src/` -> rot. Die Suche deckt jetzt
     # dieselben Baeume ab wie die Liste, samt Unterordnern.
-    bereiche = sorted({str(Path(g).parent) for g in ZEILEN_GRENZEN})
+    # TEST-2026-10-03-44: Die Bereiche stehen jetzt ausdruecklich in NACHSUCHE
+    # (vorher: die Elternordner der gelisteten Dateien, nur `*.js`). Ein Ordner
+    # aus der Liste, den es nicht gibt, ist ein Messproblem — sonst faende die
+    # Suche dort still nichts.
     kandidaten = []
-    for b in bereiche:
-        kandidaten.extend((WURZEL / b).rglob("*.js"))
+    for ordner, endungen, mit_unterordnern in NACHSUCHE:
+        basis = WURZEL / ordner
+        if not basis.is_dir():
+            fehlend.append(ordner + "/")
+            continue
+        for datei in (basis.rglob("*") if mit_unterordnern else basis.glob("*")):
+            if datei.is_file() and datei.name.endswith(endungen):
+                kandidaten.append(datei)
     for pfad_abs in sorted(set(kandidaten)):
         pfad = str(pfad_abs.relative_to(WURZEL))
         if "/node_modules/" in pfad or "/__tests__/" in pfad:

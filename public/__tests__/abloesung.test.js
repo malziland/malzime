@@ -72,7 +72,7 @@ function jsonResponse(body, ok = true, status = 200) {
 
 describe("Ablösung und Wiederaufnahme", () => {
   let api, state, elements, renderCurrentMode, speicher;
-  let hochgeladen, abruf, abfragen, fehlerMeldungen, sicht, lauscher;
+  let hochgeladen, abruf, abfragen, abmeldungen, fehlerMeldungen, sicht, lauscher;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -83,6 +83,7 @@ describe("Ablösung und Wiederaufnahme", () => {
     steuerung.sofort = null;
     hochgeladen = [];
     abfragen = []; /* Adressen der Statusabfragen */
+    abmeldungen = []; /* Adressen der Abmeldungen (DELETE) — keine Abfragen */
     fehlerMeldungen = []; /* Meldungen an die Fehlererfassung */
     abruf = () => jsonResponse({ status: "done", result: ERGEBNIS() });
     sicht = "visible";
@@ -112,6 +113,10 @@ describe("Ablösung und Wiederaufnahme", () => {
         return jsonResponse({ jobId: "job-" + hochgeladen.length, resultToken: "tok" });
       }
       if (String(url).includes("job-status")) {
+        if (opt && opt.method === "DELETE") {
+          abmeldungen.push(String(url));
+          return jsonResponse({ verworfen: true });
+        }
         abfragen.push(String(url));
         return abruf();
       }
@@ -318,6 +323,11 @@ describe("Ablösung und Wiederaufnahme", () => {
     expect(renderCurrentMode).not.toHaveBeenCalled();
     expect(speicher.getStoredJobId()).toBeNull();
     expect(abfragen.length).toBe(abfragenVorher);
+    /* … und der Auftrag, den niemand mehr abholt, ist dem Server abgemeldet
+       (genau einmal, mit Ticket): Wartet er noch, wird er sofort verworfen. */
+    expect(abmeldungen).toHaveLength(1);
+    expect(abmeldungen[0]).toContain("jobId=job-1");
+    expect(abmeldungen[0]).toContain("token=tok");
     /* … aber auch keine Zusage mehr, die niemand einlöst: Die Meldung sagt,
        was zu tun ist, und geht an die Fehlererfassung. */
     expect(state.wartetAufVerbindung).toBe(false);

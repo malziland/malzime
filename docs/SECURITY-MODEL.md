@@ -304,7 +304,11 @@ wurde angenommen. Einzelheiten: `docs/ERROR-ALERTING.md`, „Wenn der Push nicht
 
 **Was dagegen gesetzt ist.** Kein Alarm geht verloren: `verify-infrastructure.sh` verlangt
 bei jedem Deploy je Alarmregel einen eingeschalteten E-Mail-Kanal. Ohne zweiten Weg bleiben
-die Nachricht „Stundenlimit erreicht" und die Meldungen des Nachtlaufs.
+die Nachricht „Stundenlimit erreicht" und die Meldungen des Nachtlaufs. Die Nachricht
+„Stundenlimit erreicht" wird seit 07.10.2026 abgewartet (höchstens zwei Sekunden, nur bei
+der einen Anfrage, die das Limit erreicht), statt neben der Antwort her zu laufen — sie
+bleibt also nicht mehr schon auf unserer Seite liegen; der Weckruf auf dem Handy kann
+weiterhin abgewiesen werden.
 
 **Betrachtete Alternativen.** Eine bezahlte Stufe bei `ntfy.sh` (dort wird dann nach Konto
 gezählt) und eine eigene feste Absender-Adresse. Beide verworfen: laufende Kosten für einen

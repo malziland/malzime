@@ -185,6 +185,9 @@ und das Ticket stimmt.
 Jede Statusabfrage ist zugleich ein Lebenszeichen: Verlaesst der Nutzer die
 Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
 
+Fehlt der Einstellungssatz, antwortet die Abfrage mit `503` und `{ "error": "config_missing" }`;
+der Browser fragt dann weiter wie bei jeder kurzen Störung.
+
 `DELETE /api/job-status?jobId=...&token=...` — meldet einen Job ab, den der Browser
 nicht mehr abholt. Wirkt nur mit dem Abhol-Ticket und nur, solange der Job wartet:
 kein KI-Aufruf, der Platz im Stundenlimit kommt zurueck, das Bild wird geloescht.

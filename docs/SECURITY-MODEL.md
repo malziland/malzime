@@ -138,6 +138,24 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    Workshop-Stoßlast (1000–2000 Analysen/Vormittag) am Einlass ausbremsen, für
    die der Endpunkt bewusst dünn und schnell ist. *Neu bewerten,* falls je ein
    realer Speicher-Erschöpfungs-Vorfall auftritt (bisher keiner beobachtet).
+   *Nachtrag 07.10.2026 (`SEC-2026-10-03-21`): Schutz (1) trägt nicht für
+   GEPACKTE Rümpfe.* Der Deckel von Cloud Run zählt die übertragenen Bytes; der
+   Laufzeit-Rahmen (`@google-cloud/functions-framework`, gelesen an der Fassung
+   5.0.5) entpackt einen Rumpf mit `Content-Encoding` vollständig, bevor eine
+   Zeile unseres Programms läuft, mit einer festen Grenze von 1024 MB, die sich
+   nicht einstellen lässt. Lokal gemessen: 2 KB gzip stehen im Handler als 2 MB
+   im Speicher; der Tief-Audit vom 03.10.2026 maß 500 Byte → 300 MB. Im
+   Programm lässt sich das Entpacken nicht verhindern. Was es tut: Jede
+   öffentliche Schnittstelle weist eine Anfrage mit `Content-Encoding` sofort
+   mit 415 ab (der eigene Browser schickt keine), arbeitet nicht mit dem Rumpf
+   weiter und schreibt eine Warnung `gepackte-anfrage-abgewiesen` mit der
+   entpackten Größe (`index.js`, `gepackte-anfragen.test.js`). Der Speicherstoß
+   selbst bleibt möglich; ob Cloud Run die Kopfzeile in der Produktion
+   unverändert durchreicht und ob eine Instanz daran stirbt, ist NICHT gemessen
+   (eine Probe gegen die laufende Anwendung braucht Christophs Wort). Der
+   mögliche Schaden ist Verfügbarkeit des Uploads, kein Geld und keine Daten.
+   Wirksam abweisen ließe sich nur VOR dem Rahmen, also außerhalb des
+   Programms (vorgeschalteter Lastverteiler mit Regel) — bisher nicht gebaut.
 
 10. **Neun Bau-Protokolle liegen in einem Google-eigenen Speicher ohne
     Regionswahl.** Cloud Build legt Bau-Protokolle standardmäßig in einem

@@ -71,10 +71,35 @@ function hinweisOhneSatz() {
    Kopfzeile, sobald sie hier eingehaengt wird. kein-zwischenspeicher.test.js
    ruft jede Function mit `invoker: "public"` auf und wird rot, sobald eine
    ohne `no-store` antwortet. processJob ist privat (nur Cloud Tasks) und
-   braucht sie nicht. */
+   braucht sie nicht.
+
+   SEC-2026-10-03-21: An derselben Stelle werden GEPACKTE Anfragen abgewiesen
+   (Kopfzeile `Content-Encoding`). Der eigene Browser schickt nie eine; wer es
+   tut, will einen winzigen Rumpf auf Hunderte Megabyte aufblaehen lassen.
+   EHRLICHE GRENZE: Die Laufzeit entpackt den Rumpf, BEVOR diese Funktion
+   laeuft (am Laufzeit-Rahmen gelesen und lokal gemessen; feste Grenze 1024 MB,
+   nicht einstellbar) — der Speicher ist dann schon belegt. Verhindert wird
+   nur, dass das Programm mit dem Rumpf weiterarbeitet, und der Versuch steht
+   im Protokoll. docs/SECURITY-MODEL.md, Restrisiko 9;
+   gepackte-anfragen.test.js. */
 function ohneZwischenspeicher(handler) {
   return (req, res) => {
     res.setHeader("Cache-Control", "no-store");
+    const kodierung = String((req.headers && req.headers["content-encoding"]) || "")
+      .trim()
+      .toLowerCase();
+    if (kodierung && kodierung !== "identity") {
+      /* Nur die Groesse nach dem Entpacken — keine Adresse, kein Inhalt. */
+      console.warn(
+        JSON.stringify({
+          severity: "WARNING",
+          warning: "gepackte-anfrage-abgewiesen",
+          entpacktBytes: req.rawBody ? req.rawBody.length : null,
+        })
+      );
+      res.status(415).json({ error: "Content-Encoding not supported" });
+      return undefined;
+    }
     return handler(req, res);
   };
 }

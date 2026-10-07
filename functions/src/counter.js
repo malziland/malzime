@@ -922,6 +922,8 @@ module.exports = {
   setMaintenanceMode,
   _clearMaintenanceCache,
   _netzMeldungZuruecksetzen,
+  /* Fuer die Kopplungsregel der Satz-Pruefung (betriebsprofil-kopplung.test.js). */
+  _NACHLAUF_HOECHSTENS_MS: NACHLAUF_HOECHSTENS_MS,
   filterRecent,
   calcRetrySeconds,
   getDateKeys,

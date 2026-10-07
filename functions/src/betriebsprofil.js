@@ -58,6 +58,24 @@ let schonGelesen = false;
 const CACHE_MS = 30 * 1000;
 /* Obergrenze, die Google der Function gibt. Kein Profil darf darueber. */
 const FUNCTION_LIMIT_MS = 540 * 1000;
+/* DREI FESTE GROESSEN FUER DIE KOPPLUNGSREGELN in pruefe() (BUG-2026-10-03-33).
+   Sie beschreiben, wie das Programm gebaut ist, nicht wie es eingestellt wird. */
+
+/* BLEIBT IM CODE — Bauweise, keine Einstellung: So lange laeuft der
+   Werbe-Aufruf hoechstens, und zwar NACH dem Gesamtbudget (mistral.js,
+   generateBeastAds: `timeoutMs`). Dieselbe Zahl an zwei Orten —
+   betriebsprofil-kopplung.test.js haelt sie gleich. */
+const WERBE_AUFRUF_HOECHSTENS_MS = 30 * 1000;
+/* BLEIBT IM CODE — Bauweise, keine Einstellung: was der Verarbeiter um die
+   Analyse herum braucht (Auftrag uebernehmen, Foto laden, Ergebnis speichern
+   mit Wiederholung, Foto loeschen). */
+const RESERVE_NACH_ANALYSE_MS = 10 * 1000;
+/* BLEIBT IM CODE — Schutzgrenze, keine Einstellung: Untergrenze der Karenz fuer
+   verlassene Auftraege. Das Doppelte des Zaehler-Nachlaufs (counter.js,
+   NACHLAUF_HOECHSTENS_MS = 60 s, "klar unter der Karenz") und damit das
+   Vierfache des Mindestabstands, in dem die Statusabfrage das Lebenszeichen
+   schreibt (handle-job-status.js, 30 s). */
+const KARENZ_MINDESTENS_MS = 120 * 1000;
 
 /* WELCHE WERTE EIN EINSTELLUNGSSATZ TRAEGT.
    Alle sind PFLICHT. Es gibt keine Kann-Felder und keine Rueckfallwerte mehr:
@@ -258,6 +276,47 @@ function pruefe(werte) {
   /* Das Gesamtbudget unter dem, was Google der Function gibt. */
   if (werte.requestBudgetMs > FUNCTION_LIMIT_MS) {
     return `requestBudgetMs (${werte.requestBudgetMs} ms) liegt ueber dem Function-Limit (${FUNCTION_LIMIT_MS} ms)`;
+  }
+
+  /* VIER KOPPLUNGSREGELN (BUG-2026-10-03-33). Jeder dieser Werte liegt fuer
+     sich im erlaubten Bereich; zusammen mit einer festen Groesse des Programms
+     wuergt er laufende oder wartende Auftraege ab. */
+
+  /* 1. Das Haenge-Limit nicht unter der Zeitgrenze der Function: So lange darf
+        der Verarbeiter rechnen. Laege das Limit darunter, setzte die
+        Statusabfrage eine laufende Analyse auf "gescheitert", und das fertige
+        Ergebnis wuerde verworfen. */
+  if (werte.verarbeitungsZeitlimitMs < FUNCTION_LIMIT_MS) {
+    return (
+      `verarbeitungsZeitlimitMs (${werte.verarbeitungsZeitlimitMs} ms) liegt unter dem ` +
+      `Function-Limit (${FUNCTION_LIMIT_MS} ms) — laufende Analysen wuerden als gescheitert abgeraeumt`
+    );
+  }
+  /* 2. Nach dem Gesamtbudget laeuft noch der Werbe-Aufruf; dazu die Arbeit um
+        die Analyse herum. Alles zusammen muss in die Zeitgrenze passen. */
+  if (werte.requestBudgetMs + WERBE_AUFRUF_HOECHSTENS_MS + RESERVE_NACH_ANALYSE_MS > FUNCTION_LIMIT_MS) {
+    return (
+      `requestBudgetMs (${werte.requestBudgetMs} ms) laesst dem Werbe-Aufruf ` +
+      `(${WERBE_AUFRUF_HOECHSTENS_MS} ms) und dem Abschluss (${RESERVE_NACH_ANALYSE_MS} ms) keinen Platz ` +
+      `unter dem Function-Limit (${FUNCTION_LIMIT_MS} ms)`
+    );
+  }
+  /* 3. Die Karenz klar ueber dem Nachlauf des Stundenzaehlers und dem Abstand
+        des Lebenszeichens — sonst gilt als verlassen, wer noch wartet. */
+  if (werte.livenessGnadenfristMs < KARENZ_MINDESTENS_MS) {
+    return (
+      `livenessGnadenfristMs (${werte.livenessGnadenfristMs} ms) liegt unter ${KARENZ_MINDESTENS_MS} ms — ` +
+      `wartende Auftraege wuerden als verlassen abgeraeumt, obwohl ihr Browser noch nachfragt`
+    );
+  }
+  /* 4. Ein wartender Auftrag wird nach dem Hoechstalter freigegeben und nach
+        der Aufbewahrung geloescht — in dieser Reihenfolge. */
+  if (werte.wartendesHoechstalterMs > werte.jobAufbewahrungMs) {
+    return (
+      `wartendesHoechstalterMs (${werte.wartendesHoechstalterMs} ms) liegt ueber ` +
+      `jobAufbewahrungMs (${werte.jobAufbewahrungMs} ms) — der Auftrag waere geloescht, ` +
+      `bevor sein Platz freigegeben wird`
+    );
   }
   return null;
 }
@@ -484,4 +543,7 @@ module.exports = {
   _felderLesen: felderLesen,
   _cacheLeeren,
   _FELDER: FELDER,
+  _WERBE_AUFRUF_HOECHSTENS_MS: WERBE_AUFRUF_HOECHSTENS_MS,
+  _RESERVE_NACH_ANALYSE_MS: RESERVE_NACH_ANALYSE_MS,
+  _KARENZ_MINDESTENS_MS: KARENZ_MINDESTENS_MS,
 };

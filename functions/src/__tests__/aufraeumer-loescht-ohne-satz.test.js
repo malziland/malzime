@@ -162,7 +162,9 @@ describe("Aufraeumdienst mit gueltigem Einstellungssatz", () => {
   });
 
   test("der Satz gilt, nicht die Obergrenze: Aufbewahrung 30 Minuten loescht einen 31 Minuten alten Auftrag", async () => {
-    mockSatzDokument = gueltig({ jobAufbewahrungMs: 30 * MINUTE });
+    /* Das Hoechstalter wartender Auftraege darf die Aufbewahrung nicht
+       uebersteigen (Kopplungsregel der Satz-Pruefung), deshalb mit verkuerzt. */
+    mockSatzDokument = gueltig({ jobAufbewahrungMs: 30 * MINUTE, wartendesHoechstalterMs: 20 * MINUTE });
     lege("alt-31", { status: "failed", createdAt: Date.now() - 31 * MINUTE });
     lege("alt-29", { status: "failed", createdAt: Date.now() - 29 * MINUTE });
 

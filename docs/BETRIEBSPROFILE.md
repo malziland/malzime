@@ -216,6 +216,17 @@ Beide Reparaturen sind in `docs/SECURITY-MODEL.md` ausführlich beschrieben.
 - eine Einzelgrenze über dem Gesamtbudget liegt
 - das Budget über dem liegt, was Google der Funktion gibt
 - das Zustellfenster über der Aufbewahrung liegt
+- das Hänge-Limit (`verarbeitungsZeitlimitMs`) unter dem liegt, was Google der
+  Funktion gibt (540 s) — sonst gälte eine Analyse als gescheitert, während sie
+  noch läuft
+- das Budget dem Werbe-Aufruf (30 s) und dem Abschluss (10 s) keinen Platz mehr
+  lässt, also über 500 s liegt
+- die Karenz (`livenessGnadenfristMs`) unter 2 Minuten liegt — sonst würde als
+  verlassen abgeräumt, wer noch wartet
+- das Höchstalter eines Wartenden über der Aufbewahrung liegt
+
+Die letzten vier koppeln einen Wert an eine feste Größe des Programms
+(`betriebsprofil-kopplung.test.js`, je mit dem Fall genau auf der Grenze).
 
 Die Kopplungsprüfung „Textmenge muss in die Zeit passen" ist der Riegel gegen
 den Ausfall vom 17. August 2026. Sie lief früher nur beim Start der Funktion;

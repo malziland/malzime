@@ -157,8 +157,10 @@ function cleanLight(text) {
   cleaned = escapeControlCharsInStrings(cleaned);
   cleaned = escapeInnerQuotes(cleaned);
 
-  /* Trailing Commas: greift auch wenn vorher Whitespace steht (z.B. `1 ,\n}`) */
-  cleaned = cleaned.replace(/\s*,(\s*[}\]])/g, "$1");
+  /* Trailing Commas: greift auch wenn vorher Whitespace steht (z.B. `1 ,\n}`).
+     Der Blick zurueck `(?<!\s)` laesst die Suche nur am Anfang einer Leerraum-
+     Folge ansetzen: gleiches Ergebnis, lineare Rechenzeit (BUG-2026-10-03-04). */
+  cleaned = cleaned.replace(/(?<!\s)\s*,(\s*[}\]])/g, "$1");
 
   return cleaned.trim();
 }
@@ -197,6 +199,15 @@ function tryParseLenient(cleanedText) {
 }
 
 /* ── Stufe 4: Truncation-Recovery ──────────────────────────────────── */
+
+/* Kommas und Leerraum am Textende abschneiden — von hinten gezaehlt: Das
+   Suchmuster `/[,\s]+$/` setzt an jeder Stelle einer Leerraum-Folge neu an und
+   rechnet bei langen Folgen quadratisch (BUG-2026-10-03-04). Gleiches Ergebnis. */
+function ohneKommaUndLeerraumAmEnde(text) {
+  let ende = text.length;
+  while (ende > 0 && (text[ende - 1] === "," || /\s/.test(text[ende - 1]))) ende--;
+  return text.slice(0, ende);
+}
 
 /* Schnelltest: hat der Text unbalancierte Klammern oder endet er mitten in einem
    String? Wenn ja, ist Stufe 4 vor Stufe 2 sinnvoll, weil Stufe 2 sonst durch
@@ -304,7 +315,7 @@ function tryParseTruncated(cleanedText) {
   let truncated = cleanedText.slice(0, lastCleanEnd);
 
   /* Trailing Whitespace und Komma weg (zwischen letzter Value und Cut-Tail) */
-  truncated = truncated.replace(/[,\s]+$/, "");
+  truncated = ohneKommaUndLeerraumAmEnde(truncated);
 
   /* Falls wir mitten in einem "key":value-Paar abgeschnitten haben (Stack zeigt
      `{` an, aber wir enden gerade nach einem String der ein KEY war, nicht
@@ -313,7 +324,7 @@ function tryParseTruncated(cleanedText) {
   /* Trim trailing `"...":` (key gefolgt von Doppelpunkt, kein value) */
   truncated = truncated.replace(/"[^"\\]*(?:\\.[^"\\]*)*"\s*:\s*$/, "");
   /* Trim verbleibendes Komma nach so einer Entfernung */
-  truncated = truncated.replace(/[,\s]+$/, "");
+  truncated = ohneKommaUndLeerraumAmEnde(truncated);
 
   /* Stack ZUM ZEITPUNKT DES CUTS in umgekehrter Reihenfolge schließen
      (nicht den finalen Stack — der gilt für den vollen text, der hier

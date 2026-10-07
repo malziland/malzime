@@ -313,6 +313,39 @@ describe("parseSafely", () => {
 
 /* ── Real-World-Fixtures aus Mistral-Failures ─────────────────────── */
 
+/* BUG-2026-10-03-04: Lange Leerraum-Folgen duerfen die Rechenzeit nicht
+   quadratisch wachsen lassen. Gemessen wird die Zeit je Reparaturweg; die
+   Schwelle von einer Sekunde liegt weit ueber dem Soll (wenige Millisekunden)
+   und weit unter dem, was die frueheren Suchmuster brauchten (mehrere
+   Sekunden bei diesen Laengen). */
+describe("Rechenzeit bei langen Leerraum-Folgen (BUG-2026-10-03-04)", () => {
+  function dauerMs(lauf) {
+    const start = process.hrtime.bigint();
+    const ergebnis = lauf();
+    return { ms: Number(process.hrtime.bigint() - start) / 1e6, ergebnis };
+  }
+
+  test("Leerraum nach dem letzten Komma: 200 000 Zeichen in unter einer Sekunde", () => {
+    const { ms, ergebnis } = dauerMs(() => parseSafely('{"a":"b",' + " ".repeat(200000), { requireSchema: false }));
+    expect(ms).toBeLessThan(1000);
+    expect(ergebnis).toBeNull();
+  });
+
+  test("Leerraum mitten in einer abgeschnittenen Antwort: das Gerettete stimmt, in unter einer Sekunde", () => {
+    const text = '{"standard":{"profileText":"Du bist' + " ".repeat(80000) + 'da."},"beast":{"profileText":"Zyn';
+    const { ms, ergebnis } = dauerMs(() => _tryParseTruncated(text));
+    expect(ms).toBeLessThan(1000);
+    expect(ergebnis.parsed).toEqual({ standard: { profileText: "Du bist" + " ".repeat(80000) + "da." } });
+  });
+
+  test("ueberzaehlige Kommas werden weiter samt Leerraum davor entfernt", () => {
+    expect(cleanHeuristic('{"a":[1,2 \t,\n] ,\n}')).toBe('{"a":[1,2\n]\n}');
+    expect(parseSafely('{"a":[1,2 , ] , }', { requireSchema: false })).toEqual(expect.objectContaining({ a: [1, 2] }));
+    /* abgeschnitten hinter einem Komma: der halbe Schluessel faellt weg */
+    expect(_tryParseTruncated('{"a":{"b":1} ,\n  "c" : ').parsed).toEqual({ a: { b: 1 } });
+  });
+});
+
 describe("real-world fixtures from compare-models failures", () => {
   test("recovers Mistral Large 3 malformed-JSON dump (Position 1937 error)", () => {
     /* Diese Datei enthält normales JSON das aber an Position 1937 einen

@@ -279,6 +279,20 @@ jobs:
     # blockierend (nicht in der Branch Protection) — es dem gepushten Commit
     # zuzuschreiben wäre irreführend. Auf PRs liefe es gegen den falschen Stand,
     # deshalb nur auf push.
+    #
+    # OPS-2026-10-03-19: Bis 07.10.2026 prüfte dieser Job NICHTS. Die Datei
+    # hinter `budgetPath` hatte ein Format, das das Werkzeug ablehnt ("Budget
+    # has unrecognized properties"), und die Action wertet diesen Fehlschlag
+    # nicht aus — der Schritt blieb grün, was immer gemessen wurde.
+    # Jetzt stehen die Schwellen als Zusicherungen in .github/lighthouserc.json
+    # (drei Läufe je Seite):
+    #   Barrierefreiheit, Best Practices, SEO   unter 100  -> der Schritt wird ROT
+    #   Performance (mittlerer der drei Läufe)  unter 80   -> ROT
+    #                                           unter 90   -> Warnung am Lauf
+    # Performance hat zwei Stufen, weil der Wert von Lauf zu Lauf schwankt
+    # (gemessen am 07.10.2026 an derselben Seite: 89 und 98 im Abstand von
+    # Minuten). Nicht blockierend bleibt der Job trotzdem: Er steht nicht im
+    # Zweigschutz und läuft nur nach dem Push auf main.
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
@@ -290,7 +304,7 @@ jobs:
             https://malzi.me
             https://malzi.me/datenschutz
             https://malzi.me/impressum
-          budgetPath: .github/lighthouse-budget.json
+          configPath: .github/lighthouserc.json
           uploadArtifacts: true
 
   # ── Die vier Pruefungen: alle blockierend ──────────────────────────────

@@ -101,6 +101,7 @@ functions/src/__tests__/kostenbremse-netz.test.js
 functions/src/__tests__/laufzeit-wache-zustand.test.js
 functions/src/__tests__/laufzeit-wache.test.js
 functions/src/__tests__/libheif-herkunft.test.js
+functions/src/__tests__/lighthouse-schwellen-script.test.js
 functions/src/__tests__/lokale-schalter.test.js
 functions/src/__tests__/middleware.test.js
 functions/src/__tests__/minor-safety-diagnose.test.js

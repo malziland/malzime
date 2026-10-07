@@ -121,7 +121,7 @@ PRUEFJOBS_NACHTS = {
 VERTRAG_SUMMEN = {
     "sicherheit-nachts.yml": "46e7e74b721601db",
     "libheif-bau.yml": "39f0db0be0a0a3e0",
-    "ci.yml": "93fb5679107cde7f",
+    "ci.yml": "07cdd01ce0f5073d",
     "release.yml": "1fd803f6e5167738",
     "dependabot-automerge.yml": "1a3aa65db26ff8bd",
     "dependabot.yml": "204892976a7df7e5",

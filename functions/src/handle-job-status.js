@@ -112,7 +112,24 @@ async function verwerfeAufWunsch(job, token, res) {
   res.status(200).json({ verworfen });
 }
 
+/* Ohne Einstellungssatz (07.10.2026): Fristen und Wartezeit kommen aus dem
+   Satz; fehlt er, werfen die Stellen, die ihn brauchen. Bisher blieb das
+   ungefangen — der Browser bekam einen Serverfehler, und jede Abfrage (alle
+   zwei Sekunden je wartendem Geraet) schrieb eine Fehlerzeile in den Alarm.
+   Jetzt: 503, eine Warnung ohne Auftragsnummer. Der Browser fragt weiter wie
+   bei jeder kurzen Stoerung; den Alarm zum fehlenden Satz loesen der Einlass
+   und die Satz-Wache aus, nicht jede einzelne Abfrage. */
 async function handleJobStatus(req, res) {
+  try {
+    await beantworte(req, res);
+  } catch (err) {
+    if (!err || err.code !== "config_missing") throw err;
+    console.log(JSON.stringify({ severity: "WARNING", warning: "job-status-ohne-einstellungssatz" }));
+    res.status(503).json({ error: "config_missing" });
+  }
+}
+
+async function beantworte(req, res) {
   if (req.method !== "GET" && req.method !== "DELETE") {
     res.status(405).json({ error: "Method not allowed" });
     return;

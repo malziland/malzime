@@ -86,6 +86,7 @@ functions/src/__tests__/handle-erinnerung.test.js
 functions/src/__tests__/handle-errors.test.js
 functions/src/__tests__/handle-job-status-abmelden.test.js
 functions/src/__tests__/handle-job-status-livetext.test.js
+functions/src/__tests__/handle-job-status-ohne-satz.test.js
 functions/src/__tests__/handle-job-status.test.js
 functions/src/__tests__/handle-process-job-livetext.test.js
 functions/src/__tests__/handle-process-job-priv002.test.js

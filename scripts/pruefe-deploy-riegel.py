@@ -143,10 +143,12 @@ _USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)
 # ueber einem Schritt nennt meist genau den Namen, um den es geht. Ein Eintrag
 # ist ein `run:`-Befehl im Wortlaut; "uses: owner/repo" verlangt eine Action.
 #
-# Weitere Schritte sind erlaubt (Einrichtung, neue Waechter). Dass kein Aufruf
-# eines Waechters verloren geht, prueft der Abschnitt "Wird jeder Waechter auch
-# aufgerufen?"; alles Uebrige an der Datei haelt die Pruefsumme oben. Die Liste
-# hier ist der Teil, der auch dann rot bleibt, wenn jemand die Summe nachtraegt.
+# Die Liste nennt, was einen Job AUSMACHT — nicht alles, was in ihm steht
+# (Einrichtung, weitere Waechter). Jeden Schritt in seiner Reihenfolge haelt
+# SCHRITTFOLGE_CI weiter unten fest; dass kein Aufruf eines Waechters verloren
+# geht, prueft der Abschnitt "Wird jeder Waechter auch aufgerufen?"; alles
+# Uebrige an der Datei haelt die Pruefsumme oben. Beide Listen bleiben auch
+# dann rot, wenn jemand die Summe nachtraegt.
 PFLICHTJOBS_CI = {
     "test-backend": [
         "node ../scripts/audit-gate.mjs functions .",
@@ -207,6 +209,88 @@ SCHRITT_FESTLEGUNG_CI = {
 }
 JOB_ORDNER_CI = {"test-backend": "functions"}
 JOB_UMGEBUNG_CI = {"test-e2e": ["HOME: /root"]}
+
+# ── Die ganze Schrittfolge jedes Pflicht-Jobs (OPS-2026-10-04-27) ─────────────
+#
+# PFLICHTJOBS_CI nennt die Befehle, die einen Job ausmachen. Das genuegt nicht:
+# Ein Schritt, der DAZUKOMMT, laeuft im selben Job und in derselben Arbeitskopie
+# — vor oder zwischen den Pruefungen. Er kann ein npm-Skript erst im Lauf
+# ueberschreiben oder Testdateien entfernen; `package.json` und jeder
+# Pflichtbefehl lauten dann weiter wie festgelegt, und geprueft wird nichts.
+# Dasselbe leistet ein vorhandener Einrichtungsschritt mit einer eigenen Shell,
+# einem angehaengten Befehl oder einem anderen Stand beim Auschecken.
+#
+# Deshalb steht hier je Pflicht-Job JEDER Schritt in seiner Reihenfolge, als
+# eine Zeile im Wortlaut (Schreibweise: `_schritt_wortlaut`). Kommentarzeilen
+# und die Versionskennung hinter einer Action zaehlen nicht. Wer einen Schritt
+# bewusst einfuegt oder aendert, traegt ihn hier nach — lesbar im selben Diff,
+# nicht als Pruefsumme. Die heutige Folge im passenden Format:
+#     python3 scripts/pruefe-deploy-riegel.py --vertrag-schritte
+SCHRITTFOLGE_CI = {
+    "test-backend": [
+        "uses: actions/checkout | with: fetch-depth: 0",
+        "uses: actions/setup-node | with: node-version: \"24\" / cache: npm / cache-dependency-path: functions/package-lock.json",
+        "uses: actions/setup-python | with: python-version: \"3.12\"",
+        "run: npm ci",
+        "run: node ../scripts/audit-gate.mjs functions .",
+        "run: npm run lint",
+        "run: npm run format:check",
+        "run: npm test",
+        "run: sh scripts/pruefe-zeitzuender.sh . --nur backend | working-directory: .",
+    ],
+    "test-frontend": [
+        "uses: actions/checkout",
+        "uses: actions/setup-node | with: node-version: \"24\" / cache: npm / cache-dependency-path: package-lock.json",
+        "uses: actions/setup-python | with: python-version: \"3.12\"",
+        "run: npm ci",
+        "run: npm run lint:frontend",
+        "run: npm run format:frontend:check",
+        "run: npm run test:frontend",
+        "run: sh scripts/pruefe-zeitzuender.sh . --nur frontend",
+    ],
+    "test-e2e": [
+        "uses: actions/checkout",
+        "uses: actions/setup-node | with: node-version: \"24\" / cache: npm / cache-dependency-path: package-lock.json",
+        "run: npm ci",
+        "run: npm run test:e2e",
+        "name: Fehlerbilder und Aufzeichnungen sichern | if: failure() | uses: actions/upload-artifact | with: name: playwright-fehler / path: | / test-results/ / playwright-report/ / retention-days: 7 / if-no-files-found: ignore",
+    ],
+    "secret-scan": [
+        "uses: actions/checkout | with: fetch-depth: 0",
+        "uses: gitleaks/gitleaks-action | env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
+    ],
+    "playwright-version": [
+        "uses: actions/checkout | with: fetch-depth: 0",
+        "id: lesen | run: | / VERSION=$(node -p \"require('./package-lock.json').packages['node_modules/@playwright/test'].version\") / echo \"Playwright laut Lockfile: $VERSION\" / echo \"version=$VERSION\" >> \"$GITHUB_OUTPUT\"",
+        "id: nachtrag | env: BASIS: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }} | run: sh scripts/nur-nachtrag.sh",
+    ],
+    "pruefungen": [
+        "uses: actions/checkout | with: fetch-depth: 0",
+        "uses: actions/setup-node | with: node-version: \"24\"",
+        "uses: actions/setup-python | with: python-version: \"3.12\"",
+        "run: npm ci",
+        "run: npm ci --prefix functions",
+        "run: sh scripts/pruefungen/selbstpruefung.sh",
+        "run: python3 scripts/pruefungen/checks/aussentext.py .",
+        "run: python3 scripts/pruefungen/checks/fakten-drift.py .",
+        "run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .",
+        "run: python3 scripts/pruefungen/checks/stiller-fehlschlag.py .github",
+        "run: python3 scripts/pruefungen/checks/test-blind.py .",
+        "run: python3 scripts/pruefe-i18n-fallbacks.py",
+        "run: python3 scripts/pruefe-tote-geduld.py",
+        "run: sh scripts/pruefe-commit-nachrichten.sh",
+        "run: python3 scripts/pruefe-doppelte-werte.py",
+        "run: python3 scripts/pruefe-mitzieher.py",
+        "run: python3 scripts/pruefe-kopplung.py",
+        "run: python3 scripts/pruefe-deploy-riegel.py",
+        "run: node scripts/pruefe-workflows-gueltig.mjs",
+        "run: bash scripts/selbstpruefung-waechter.sh",
+        "run: node scripts/pruefe-fremddateien.mjs",
+        "run: node scripts/pruefe-fremd-meldungen.mjs --nur-deckung",
+        "run: node scripts/pruefe-auslieferbare-reste.mjs",
+        "run: node scripts/pruefe-vendorierung.mjs",
+    ],
+}
 
 # ── Was HINTER den Pflicht-Schritten steht (OPS-2026-10-03-12) ────────────────
 #
@@ -458,6 +542,44 @@ def _befehl(schritt):
     return None
 
 
+def _schritt_wortlaut(schritt):
+    """Ein Schritt als EINE Zeile, in der Schreibweise von SCHRITTFOLGE_CI: seine
+    Schluessel in der Reihenfolge der Datei, je `schluessel: wert`, getrennt
+    mit " | "; die Zeilen eines mehrzeiligen Werts getrennt mit " / ". Bei
+    `uses` zaehlt nur "owner/repo" — die Versionskennung aendert Dependabot."""
+    teile = []
+    for schluessel, wert in schritt.items():
+        if schluessel == "uses" and wert:
+            wert = [wert[0].split("@", 1)[0]] + wert[1:]
+        teile.append(f"{schluessel}: " + " / ".join(wert))
+    return " | ".join(teile)
+
+
+def _schrittfolgen(ci_text):
+    """Je Pflicht-Job die Schrittfolge, wie sie in `ci.yml` steht — oder None,
+    wenn der Job fehlt oder nicht in der ueblichen Schreibweise dasteht."""
+    bloecke = _jobbloecke(_ohne_kommentarzeilen(ci_text))
+    folgen = {}
+    for job in PFLICHTJOBS_CI:
+        schritte = _schrittbloecke(bloecke[job]) if job in bloecke else None
+        folgen[job] = None if schritte is None else [_schritt_wortlaut(s) for s in schritte]
+    return folgen
+
+
+def vertrag_schritte_ausgeben():
+    """Die Schrittfolgen aus `ci.yml` in der Schreibweise der Liste oben — zum
+    Nachtragen nach einer bewussten Aenderung an einem Pflicht-Job."""
+    import json
+
+    print("SCHRITTFOLGE_CI = {")
+    for job, folge in _schrittfolgen(CI.read_text(encoding="utf-8")).items():
+        print(f'    "{job}": [')
+        for wortlaut in folge or []:
+            print(f"        {json.dumps(wortlaut, ensure_ascii=False)},")
+        print("    ],")
+    print("}")
+
+
 def _npm_skript(befehl):
     """Name des npm-Skripts, das ein Pflichtbefehl aufruft — sonst None."""
     if befehl == "npm test":
@@ -534,6 +656,25 @@ def vertrag_ci(ci_text, deploy_text):
                 "der Vertrag kann seine Schluessel nicht lesen"
             )
             continue
+        # OPS-2026-10-04-27: Die ganze Schrittfolge des Jobs, Wort fuer Wort.
+        ist_folge = [_schritt_wortlaut(schritt) for schritt in schritte]
+        soll_folge = SCHRITTFOLGE_CI.get(job, [])
+        if ist_folge != soll_folge:
+            unbekannt = [w for w in ist_folge if w not in soll_folge]
+            fehlend = [w for w in soll_folge if w not in ist_folge]
+            for wortlaut in unbekannt:
+                m.append(
+                    f"ci.yml: Job {job} enthaelt einen Schritt, den der Vertrag nicht kennt: '{wortlaut}' — "
+                    "er liefe im Pflicht-Job mit und koennte die Arbeitskopie umbauen, bevor geprueft wird "
+                    "(SCHRITTFOLGE_CI)"
+                )
+            for wortlaut in fehlend:
+                m.append(f"ci.yml: Job {job}: der Schritt '{wortlaut}' aus dem Vertrag steht so nicht mehr da (SCHRITTFOLGE_CI)")
+            if not unbekannt and not fehlend:
+                m.append(
+                    f"ci.yml: Job {job}: die Schritte stehen in anderer Reihenfolge oder Anzahl als im Vertrag "
+                    "(SCHRITTFOLGE_CI)"
+                )
         bedingungen = kopf.get("if")
         erlaubt = [JOB_BEDINGUNG_CI[job]] if job in JOB_BEDINGUNG_CI else None
         if bedingungen is not None and bedingungen != erlaubt:
@@ -1106,9 +1247,14 @@ def main():
             print("          War die Aenderung beabsichtigt? Dann die neue Pruefsumme in")
             print("          VERTRAG_SUMMEN oder EINSTELLUNG_SUMMEN nachtragen — sie steht in der")
             print("          Ausgabe von: python3 scripts/pruefe-deploy-riegel.py --vertrag-summen")
+        if any("(SCHRITTFOLGE_CI)" in mangel for mangel in vertrags_maengel):
+            print("          War ein neuer oder geaenderter Schritt beabsichtigt? Dann seinen Wortlaut in")
+            print("          SCHRITTFOLGE_CI nachtragen — die heutige Folge steht in der Ausgabe von:")
+            print("          python3 scripts/pruefe-deploy-riegel.py --vertrag-schritte")
     else:
         print(f"  ok      {len(VERTRAG_SUMMEN)} Dateien entsprechen dem festgeschriebenen Stand;")
         print(f"          jeder der {len(PFLICHTJOBS_CI)} Pflicht-Jobs fuehrt seine Pruefbefehle aus")
+        print(f"          und besteht aus genau seinen {sum(len(f) for f in SCHRITTFOLGE_CI.values())} festgelegten Schritten")
         print(
             f"  ok      {sum(len(s) for s in NPM_SKRIPTE.values())} npm-Skripte hinter den Pflicht-Schritten, die Jest-Einstellung"
         )
@@ -1251,5 +1397,8 @@ def main():
 if __name__ == "__main__":
     if "--vertrag-summen" in sys.argv:
         vertrag_summen_ausgeben()
+        sys.exit(0)
+    if "--vertrag-schritte" in sys.argv:
+        vertrag_schritte_ausgeben()
         sys.exit(0)
     sys.exit(main())

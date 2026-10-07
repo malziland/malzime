@@ -320,6 +320,14 @@ NPM_SKRIPTE = {
         "format:check": "npm run format:frontend:check && npm run format:check --prefix functions",
     },
 }
+# Pakete, die ein eigenes Skript LAEDT, stehen in der genannten package.json
+# als eigene Abhaengigkeit (OSS-2026-10-04-13). Der Paket-Waechter braucht
+# minimatch; bis 07.10.2026 kam es nur als Mitbringsel von eslint herein und
+# waere mit dessen naechstem Umbau verschwunden — der Waechter haette dann
+# "nicht messbar" gemeldet, ohne dass hier jemand etwas geaendert haette.
+SKRIPT_PAKETE = {
+    "package.json": {"minimatch": "scripts/pruefe-auslieferbare-reste.mjs"},
+}
 # Dasselbe eine Ebene tiefer: Auch bei wortgleichem Skript entscheidet die
 # Einstellung des Werkzeugs, WELCHE Dateien es ansieht. Gemessen am 04.10.2026:
 # Mit einer geaenderten Einstellung meldete jeder der drei Testlaeufer "gruen",
@@ -754,6 +762,13 @@ def vertrag_npm():
                         f"{pfad}: npm-Skript '{vorsilbe}{name}' — npm fuehrt es ungefragt mit '{name}' aus; "
                         "es koennte den Lauf veraendern, ohne dass sich dessen Wortlaut aendert"
                     )
+        eigene = {**(daten.get("dependencies") or {}), **(daten.get("devDependencies") or {})}
+        for paket, skript in SKRIPT_PAKETE.get(pfad, {}).items():
+            if paket not in eigene:
+                m.append(
+                    f"{pfad}: '{paket}' steht nicht als eigene Abhaengigkeit da — {skript} laedt es; "
+                    "als Mitbringsel eines anderen Pakets kann es jederzeit wegfallen"
+                )
         if pfad == "functions/package.json" and daten.get("jest") != JEST_EINSTELLUNG:
             m.append(
                 f"{pfad}: die Jest-Einstellung lautet {daten.get('jest')!r} statt {JEST_EINSTELLUNG!r} — "

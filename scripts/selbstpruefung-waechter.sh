@@ -500,7 +500,9 @@ rm -f "$RESTE_PROBE"
 zurueck .gitignore
 
 # OSS-2026-10-04-13: Der Waechter braucht minimatch — als eigene Abhaengigkeit
-# der Wurzel, nicht als Mitbringsel eines anderen Pakets.
+# der Wurzel, nicht als Mitbringsel eines anderen Pakets. Festgehalten ist das
+# im Vertrag (pruefe-deploy-riegel.py), denn der Waechter selbst laeuft auch
+# dort, wo es keine package.json gibt.
 sichern package.json
 python3 - <<'PYSELF'
 import re
@@ -509,7 +511,7 @@ neu, anzahl = re.subn(r'\n\s*"minimatch": "[^"]*",', "", s)
 assert anzahl == 1
 open("package.json", "w").write(neu)
 PYSELF
-probe_text 2 "nicht als eigene Abhaengigkeit" "minimatch nur noch als Mitbringsel: nicht messbar" node scripts/pruefe-auslieferbare-reste.mjs
+probe_text 1 "'minimatch' steht nicht als eigene Abhaengigkeit" "minimatch nur noch als Mitbringsel wird gefunden" python3 scripts/pruefe-deploy-riegel.py
 zurueck package.json
 
 echo

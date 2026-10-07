@@ -989,6 +989,12 @@ describe("Vertrag der npm-Skripte — was hinter einem Pflicht-Schritt steht", (
 
   const FAELLE = [
     [
+      "minimatch steht nicht mehr als eigene Abhaengigkeit da (OSS-2026-10-04-13) — der Paket-Waechter laedt es",
+      PAKET,
+      json((d) => delete d.devDependencies.minimatch),
+      /package\.json: 'minimatch' steht nicht als eigene Abhaengigkeit da — scripts\/pruefe-auslieferbare-reste\.mjs laedt es/,
+    ],
+    [
       "die Browser-Modul-Tests sind nur noch ein echo",
       PAKET,
       json((d) => (d.scripts["test:frontend"] = "echo ok")),

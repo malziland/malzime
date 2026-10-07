@@ -352,7 +352,7 @@ EINSTELLUNG_SUMMEN = {
     "eslint.config.mjs": "e4f7e95827ef01ba",
     "functions/eslint.config.js": "ca9536911333625f",
     ".prettierignore": "ee7c566a5bcc22f7",
-    "functions/jest.setup.js": "bb2f276fb49ed0f0",
+    "functions/jest.setup.js": "b938133bac01c11a",
 }
 # Dateien, die es NICHT gibt und nicht geben darf, ohne dass sie hier stehen:
 # Ein Werkzeug liest sie vor oder neben der festgeschriebenen Einstellung

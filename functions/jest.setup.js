@@ -27,3 +27,16 @@ jest.mock("firebase-admin/firestore", () => {
     },
   };
 });
+
+/* ZWEITER RIEGEL (07.10.2026): der KI-Dienst.
+ *
+ * `mistral-http.js` liest den Zugangsschluessel aus der Umgebung. Steht dort
+ * ein echter (etwa nach einer Messung in derselben Sitzung), haette ein Test
+ * ohne Netz-Attrappe damit eine bezahlte Analyse gestartet — der Dienst war in
+ * Tests nur zu, solange zufaellig kein Schluessel gesetzt war.
+ *
+ * Deshalb gibt es in Tests keinen Schluessel: Beide Namen werden entfernt, bevor
+ * eine Testdatei laeuft. Wer einen braucht, setzt in seiner Datei einen
+ * erfundenen (wie bisher). Den Wert liest diese Datei nie. */
+delete process.env.MISTRAL_API_KEY_EU;
+delete process.env.MISTRAL_API_KEY;

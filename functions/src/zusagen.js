@@ -31,7 +31,9 @@ const FRIST_TAGE = 183;
 /* Wie lange vorher der Push kommt. */
 const VORWARNUNG_TAGE = 7;
 
-/* Die Handpruefung der Barrierefreiheit braucht einen Termin — drei Wochen. */
+/* BLEIBT IM CODE — keine Stellschraube des Betriebs, sondern die Vorwarnzeit
+   einer oeffentlichen Zusage: Die Handpruefung der Barrierefreiheit braucht
+   einen Termin, deshalb drei Wochen statt einer. */
 const VORWARNUNG_HANDPRUEFUNG_TAGE = 21;
 
 const MONATE = {

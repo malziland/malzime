@@ -18,8 +18,11 @@ DIE GRENZEN sind der GEMESSENE Stand vom 31.08.2026, aufgerundet. Sie sind
 kein Ideal, sondern eine Sperrklinke: von hier aus nur noch abwaerts.
 
 AUFRUF:
-    python3 scripts/pruefe-kopplung.py           pruefen
-    python3 scripts/pruefe-kopplung.py --stand   heutige Werte anzeigen
+    python3 scripts/pruefe-kopplung.py             pruefen
+    python3 scripts/pruefe-kopplung.py --stand     heutige Werte anzeigen
+    python3 scripts/pruefe-kopplung.py --bestand   die vorhandenen Testdateien als
+                                                   Bestandsliste ausgeben (zum Nachziehen von
+                                                   scripts/testdateien-bestand.txt)
 
 RUECKGABE: 0 = alles innerhalb der Grenzen, 1 = etwas gewachsen, 2 = nicht messbar.
 """
@@ -166,6 +169,51 @@ ABHAENGIGKEITS_GRENZEN = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DER BESTAND DER TESTDATEIEN (TEST-2026-10-04-28)
+#
+# Die Liste UNVERZICHTBAR in main() nennt die Testdateien, die fuer einen ganzen
+# Bereich der einzige Nachweis sind. Jede andere liess sich loeschen, ohne dass
+# ein Waechter anschlug — die Suite wird dann kleiner und bleibt gruen.
+#
+# Deshalb steht jede Testdatei mit Namen in scripts/testdateien-bestand.txt.
+# Verglichen wird in beide Richtungen: Eine Datei aus dem Bestand, die es nicht
+# mehr gibt, ist ein Fund — und eine Testdatei, die nicht im Bestand steht,
+# auch (sonst waere jede neue Datei wieder ungeschuetzt). Wer eine Testdatei
+# bewusst loescht, streicht ihre Zeile; die Loeschung steht dann zweimal im Diff.
+# ─────────────────────────────────────────────────────────────────────────────
+BESTAND = WURZEL / "scripts" / "testdateien-bestand.txt"
+TEST_BEREICHE = ("functions/src/__tests__", "public/__tests__", "e2e")
+BESTAND_KOPF = """\
+# Bestand der Testdateien. scripts/pruefe-kopplung.py vergleicht diese Liste mit
+# den Ordnern functions/src/__tests__, public/__tests__ und e2e — in beide
+# Richtungen (TEST-2026-10-04-28).
+#
+#   Neue Testdatei:             Zeile eintragen.
+#   Bewusst geloeschte Datei:   Zeile streichen.
+#   Ganze Liste neu schreiben:  python3 scripts/pruefe-kopplung.py --bestand > scripts/testdateien-bestand.txt
+"""
+
+
+def testdateien_vorhanden():
+    """Alle `*.test.js` in den drei Test-Bereichen, als Pfade ab der Projektwurzel."""
+    funde = set()
+    for bereich in TEST_BEREICHE:
+        for datei in (WURZEL / bereich).rglob("*.test.js"):
+            pfad = datei.relative_to(WURZEL).as_posix()
+            if "/node_modules/" not in pfad:
+                funde.add(pfad)
+    return sorted(funde)
+
+
+def testdateien_bestand():
+    """Die Zeilen der Bestandsliste; `None`, wenn es die Datei nicht gibt."""
+    if not BESTAND.exists():
+        return None
+    zeilen_ = (z.strip() for z in BESTAND.read_text(encoding="utf-8").split("\n"))
+    return [z for z in zeilen_ if z and not z.startswith("#")]
+
+
 def zeilen(pfad):
     p = WURZEL / pfad
     if not p.exists():
@@ -186,6 +234,16 @@ def haengen_an(modul):
 
 def main():
     nur_stand = "--stand" in sys.argv
+
+    if "--bestand" in sys.argv:
+        # Nur ausgeben, nichts lesen: Der uebliche Aufruf leitet in die
+        # Bestandsdatei um, und die ist dann schon geleert.
+        vorhanden = testdateien_vorhanden()
+        if not vorhanden:
+            print("NICHT MESSBAR: keine einzige Testdatei gefunden.", file=sys.stderr)
+            return 2
+        sys.stdout.write(BESTAND_KOPF + "\n".join(vorhanden) + "\n")
+        return 0
 
     print("── Waechst wieder zusammen, was getrennt gehoert? ──")
     print()
@@ -249,6 +307,36 @@ def main():
         print("  Ohne sie gibt es fuer einen ganzen Bereich keinen Nachweis mehr.")
         print()
         return 1
+
+    bestand = testdateien_bestand()
+    vorhanden = testdateien_vorhanden()
+    if not bestand or not vorhanden:
+        # Leere Liste oder leere Suche: Dann laege nicht alles im Bestand,
+        # sondern das Messmittel waere blind.
+        print("  NICHT MESSBAR: " + (
+            "scripts/testdateien-bestand.txt fehlt oder ist leer."
+            if not bestand else "in den Test-Ordnern liegt keine einzige *.test.js."))
+        print()
+        return 2
+    geloescht = sorted(set(bestand) - set(vorhanden))
+    nicht_eingetragen = sorted(set(vorhanden) - set(bestand))
+    if geloescht or nicht_eingetragen:
+        if geloescht:
+            print("  TESTDATEI FEHLT — steht im Bestand, gibt es aber nicht mehr:")
+            for d in geloescht:
+                print(f"    {d}")
+            print("  Versehen? Wiederherstellen. Absicht (oder umbenannt)? Die Zeile in")
+            print("  scripts/testdateien-bestand.txt streichen.")
+        if nicht_eingetragen:
+            print("  TESTDATEI NICHT IM BESTAND — vorhanden, aber nicht eingetragen:")
+            for d in nicht_eingetragen:
+                print(f"    {d}")
+            print("  In scripts/testdateien-bestand.txt eintragen; sonst fiele ihr")
+            print("  Verschwinden spaeter niemandem auf.")
+        print()
+        return 1
+    print(f"  Testdateien: {len(vorhanden)} vorhanden, alle im Bestand.")
+    print()
 
     print("  Dateigroessen:")
     for pfad, grenze in sorted(ZEILEN_GRENZEN.items()):

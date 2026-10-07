@@ -411,6 +411,24 @@ PYSELF
 probe_text 1 "Grenze|ueberschritten" "gerissene Groessengrenze wird gefunden" python3 scripts/pruefe-kopplung.py
 zurueck scripts/pruefe-kopplung.py
 
+# TEST-2026-10-04-28: Eine Testdatei, die verschwindet, faellt auf — auch wenn
+# sie nicht in der Liste der unverzichtbaren Pruefungen steht. Und umgekehrt:
+# Eine Testdatei, die im Bestand fehlt, ebenso (sonst waere sie ungeschuetzt).
+sichern functions/src/__tests__/upload.test.js
+rm functions/src/__tests__/upload.test.js
+probe_text 1 "TESTDATEI FEHLT" "geloeschte Testdatei ausserhalb der Pflichtliste wird gefunden" python3 scripts/pruefe-kopplung.py
+zurueck functions/src/__tests__/upload.test.js
+
+sichern scripts/testdateien-bestand.txt
+python3 - <<'PYSELF'
+s = open("scripts/testdateien-bestand.txt").read()
+# Eine Zeile streichen: Die Datei gibt es weiter, im Bestand fehlt sie.
+assert "public/__tests__/state.test.js\n" in s
+open("scripts/testdateien-bestand.txt", "w").write(s.replace("public/__tests__/state.test.js\n", "", 1))
+PYSELF
+probe_text 1 "NICHT IM BESTAND" "Testdatei ohne Eintrag im Bestand wird gefunden" python3 scripts/pruefe-kopplung.py
+zurueck scripts/testdateien-bestand.txt
+
 echo
 
 echo "4. pruefe-mitzieher.py"
@@ -595,7 +613,8 @@ if [ "$FEHLER" -eq 0 ]; then
   # Kommentarzeile im Befehl, vier unlesbare Dateien gegen Leser und
   # Pruefsumme — die mit U+2028 im Kopfkommentar nur gegen den Leser, denn
   # Kommentare ausserhalb von Bloecken zaehlen in der Summe bewusst nicht).
-  ERWARTETE_PROBEN=39
+  # 41 seit 07.10.2026: zwei Proben fuer den Bestand der Testdateien.
+  ERWARTETE_PROBEN=41
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

@@ -105,7 +105,7 @@ function classifySubject(subjectFeld, description = "") {
 
    2. Konstruktionsfehler. Geprueft werden sollte die BILDBESCHREIBUNG des
       Modells. Im aktiven Single-Large-Pfad gibt es die aber nicht mehr —
-      handle-process-job.js baut sie aus dem FERTIGEN PROFIL zusammen. Geprueft
+      job-pipelines.js baut sie aus dem FERTIGEN PROFIL zusammen. Geprueft
       wurde damit ein Text ueber einen Menschen.
 
    Folge: Beim echten Affenbild griff das Netz NICHT (das Modell schreibt dort

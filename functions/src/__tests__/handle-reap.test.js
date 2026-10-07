@@ -31,6 +31,7 @@ const { reapJobs } = require("../handle-reap");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const counter = require("../counter");
+const { zeileAlsText } = require("./hilfen/als-text");
 
 beforeEach(() => {
   mockLebenszeichenGet.mockResolvedValue({ exists: true, data: () => ({ letzterLauf: Date.now() }) });
@@ -222,7 +223,7 @@ describe("reapJobs", () => {
     vorbereiten();
     const ausgaben = [];
     const spies = ["log", "warn", "error", "info"].map((art) =>
-      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(zeileAlsText(...a)))
     );
     await reapJobs();
     spies.forEach((sp) => sp.mockRestore());

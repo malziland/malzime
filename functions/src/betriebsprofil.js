@@ -17,9 +17,9 @@
  *
  * VIER OBERGRENZEN IN FELDER SIND ZUSAGEN, keine Plausibilitaetsgrenzen:
  * jobAufbewahrungMs (2 h), zustellfensterMs (15 min), adressfensterMs
- * (10 min), stundenfensterMinuten (60) stehen so in der Datenschutzerklaerung.
- * Der Satz kann sie nur verkuerzen; wer sie anheben will, aendert zuerst die
- * Erklaerung.
+ * (10 min), stundenfensterMinuten (60) stehen so auf oeffentlichen Seiten
+ * (Wortlaut je Feld: docs/BETRIEBSPROFILE.md). Der Satz kann sie nur
+ * verkuerzen; wer sie anheben will, aendert zuerst die Seite.
  *
  * Was bewusst KEINE Einstellung ist (Upload-Grenze, Feldlaengen der
  * Fehlererfassung, Modell, EU-Endpunkt, Function-Zeitlimit, gemessenes
@@ -91,13 +91,13 @@ const FELDER = {
   warteschlangeTiefe: { min: 1, max: 10000 },
   durchschnittsdauerSekunden: { min: 1, max: 3600 },
   stundenlimit: { min: 1, max: 100000 },
-  /* OBERGRENZE = ZUSAGE: "die Zeitpunkte der Analysen der letzten 60 Minuten"
-     steht so in der Datenschutzerklaerung. Ein groesseres Fenster hiesse:
-     laenger aufbewahrte Zeitstempel, als zugesagt. */
+  /* OBERGRENZE = ZUSAGE: Die Statistik-Seite zeigt "Analysen in der letzten
+     Stunde". Ein groesseres Fenster hiesse: laenger aufbewahrte Zeitstempel,
+     als zugesagt. */
   stundenfensterMinuten: { min: 1, max: 60 },
   adressLimit: { min: 1, max: 100000 },
-  /* OBERGRENZE = ZUSAGE: Die Datenschutzerklaerung sagt "merkt sich deine IP
-     fuer maximal 10 Minuten im Arbeitsspeicher, dann ist sie weg". Ein
+  /* OBERGRENZE = ZUSAGE: Die Datenschutzerklaerung sagt zur IP-Adresse "Rund
+     10 Minuten, nur im Arbeitsspeicher, nie auf einer Festplatte". Ein
      laengeres Fenster waere eine laengere Speicherung — der Satz kann das
      Fenster nur verkuerzen. */
   adressfensterMs: { min: 1000, max: 10 * 60 * 1000 },
@@ -109,7 +109,7 @@ const FELDER = {
   /* --- 4. Ruecksicht auf Mistral: nicht mehr schicken, als die dort erlauben --- */
   drosselMaxParallel: { min: 1, max: 100 },
   drosselWartelimitMs: { min: 1000, max: 30 * 60 * 1000 },
-  tokenAbstandGrossMs: { min: 0, max: 60 * 1000 },
+  tokenAbstandGrossMs: { min: 1, max: 60 * 1000 },
   /* WENN MISTRAL ABLEHNT (429) ODER KURZ WEG IST (502/503/504): Wartezeit vor
      der ersten Wiederholung; jede weitere wartet doppelt so lang. Die Reihe
      10, 20, 40, 80 s ist am Vorfall vom 08.09.2026 nachgerechnet (siehe
@@ -121,8 +121,8 @@ const FELDER = {
   /* --- 5. Fristen: wie lange etwas liegen bleibt, bis aufgeraeumt wird ---
 
      ACHTUNG, HIER IST DIE OBERGRENZE SELBST EINE ZUSAGE:
-     Die Datenschutzerklaerung verspricht an vier Stellen, dass Job-Daten
-     "spaetestens nach rund 2 Stunden" geloescht werden. Waere hier eine
+     Die Datenschutzerklaerung sagt zu Foto und Profil: "Wird es nie
+     abgeholt: nach rund 2 Stunden." Waere hier eine
      hoehere Grenze erlaubt, liesse sich diese Zusage mit einem einzigen
      Datenbankeintrag brechen — ohne Commit, ohne Spur im Quelltext.
 
@@ -130,9 +130,9 @@ const FELDER = {
      nur VERKUERZEN, nie verlaengern. (Befund aus dem eigenen Review,
      30.08.2026 — die Frist war zuvor bis 7 Tage einstellbar.) */
   jobAufbewahrungMs: { min: 60 * 1000, max: 2 * 60 * 60 * 1000 },
-  /* OBERGRENZE = ZUSAGE: "wird wenige Minuten nach der Abholung automatisch
-     geloescht". Fuenfzehn Minuten sind der heutige Wert und die aeusserste
-     Lesart von "wenige Minuten". Wer mehr braucht, aendert ZUERST die
+  /* OBERGRENZE = ZUSAGE: "Rund 15 Minuten, nachdem dein Browser es abgeholt
+     hat." Fuenfzehn Minuten sind der heutige Wert und zugleich die Zahl,
+     die der Text nennt. Wer mehr braucht, aendert ZUERST die
      Datenschutzerklaerung — nicht diesen Wert. */
   zustellfensterMs: { min: 60 * 1000, max: 15 * 60 * 1000 },
   livenessGnadenfristMs: { min: 30 * 1000, max: 60 * 60 * 1000 },

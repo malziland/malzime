@@ -43,10 +43,10 @@ jest.mock("../cloud-tasks", () => ({
   redispatchJobLocal: jest.fn(),
 }));
 
-const util = require("util");
 const { handleProcessJob } = require("../handle-process-job");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
+const { alsText } = require("./hilfen/als-text");
 
 const JOB_ID = "auftrag-geheim-4711";
 const TRACE_ID = "vorgang-geheim-0815";
@@ -75,21 +75,8 @@ function makeRes() {
   };
 }
 
-/* Ein Argument einer Konsolenausgabe als Text, in dem sein INHALT steht
-   (TEST-2026-10-04-15): Text bleibt Text; ein Objekt wird als JSON geschrieben,
-   ein Fehler mit Meldung, Stapel und eigenen Feldern. `String(objekt)` ergaebe
-   "[object Object]" — die Suche nach dem Wert einer Kennung saehe nicht hinein.
-   Was sich nicht als JSON schreiben laesst (ein Objekt, das sich selbst
-   enthaelt), klappt util.inspect auf. */
-function alsText(wert) {
-  if (wert === null || typeof wert !== "object") return String(wert);
-  if (wert instanceof Error) return `${wert.stack || wert.message} ${alsText({ ...wert })}`;
-  try {
-    return JSON.stringify(wert);
-  } catch (_) {
-    return util.inspect(wert, { depth: null, maxArrayLength: null, maxStringLength: null, breakLength: Infinity });
-  }
-}
+/* alsText (TEST-2026-10-04-15) liegt jetzt in hilfen/als-text.js — dieselbe
+   Hilfe fuer alle Tests, die Konsolenausgaben nach einer Kennung durchsuchen. */
 
 let ausgabe;
 beforeEach(() => {

@@ -67,10 +67,11 @@ jest.mock("../counter", () => ({
 jest.mock("../notify", () => ({ notifyLimitReached: jest.fn() }));
 jest.mock("../middleware", () => ({ checkRateLimit: jest.fn(), getClientIp: jest.fn() }));
 jest.mock("../upload", () => ({ parseMultipart: jest.fn(), parseJsonBody: jest.fn() }));
-jest.mock("../privacy", () => ({ buildPrivacyRisks: jest.fn(), extractVisibleText: jest.fn() }));
+jest.mock("../privacy", () => ({ buildPrivacyRisks: jest.fn() }));
 jest.mock("../mistral", () => ({}));
 jest.mock("../animal", () => ({
-  classifyDescription: jest.fn(),
+  classifySubject: jest.fn(),
+  detectAnimalType: jest.fn(),
   buildAnimalProfiles: jest.fn(),
 }));
 jest.mock("../i18n", () => ({

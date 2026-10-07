@@ -19,6 +19,7 @@ jest.mock("../jobs", () => ({
 
 const { handleJobStatus } = require("../handle-job-status");
 const jobs = require("../jobs");
+const { zeileAlsText } = require("./hilfen/als-text");
 
 function makeRes() {
   return {
@@ -261,7 +262,7 @@ describe("handleJobStatus — Auslieferungs-Messung", () => {
     });
     const ausgaben = [];
     const spies = ["log", "warn", "error", "info"].map((art) =>
-      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(zeileAlsText(...a)))
     );
     await handleJobStatus({ method: "GET", query: { jobId: "Aa1Bb2Cc3Dd4Ee5Ff6Gg", token: "ticket-abc" } }, makeRes());
     /* Der Vermerk laeuft nebenlaeufig — seinen .catch abwarten. */

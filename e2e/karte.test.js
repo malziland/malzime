@@ -101,7 +101,8 @@ test.describe("GPS-Karte", () => {
   test("der Ort steht als Zeile da und wird von nichts verdeckt", async ({ page }) => {
     await seiteMitKarte(page);
 
-    /* Die Adresse ist normaler Text — lesbar, kopierbar, im Ausdruck dabei. */
+    /* Die Adresse ist normaler Text — lesbar und kopierbar. (Gedruckt wird der
+       Ortsbereich nicht; das Druck-Stilblatt blendet ihn aus.) */
     await expect(page.locator(".gps-address")).toHaveText(ADRESSE);
 
     /* Und es gibt KEINE Sprechblase mehr. Genau die hat am Handy den halben

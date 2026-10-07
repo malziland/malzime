@@ -92,32 +92,12 @@ export function renderCurrentMode(data) {
 
 /* ── Rendering: Kategorie-Karten ── */
 
-/* Kanonische Reihenfolge der Kategorien — vom Demografischen (am wenigsten
-   heikel) ueber die soziale Verortung und Persoenlichkeit bis zur kommerziellen
-   Verwertung und den Verletzlichkeiten am Ende. Mistral garantiert im JSON-
-   Output keine Key-Reihenfolge, deshalb sortieren wir clientseitig nach dieser
-   Liste — damit Normal und Boost identisch geordnet sind und nicht zwischen
-   Analysen springen. Quelle: das Antwortschema im singleLargePrompt in
-   functions/src/locales/{de,en}/prompts.js. */
-/* eslint-disable-next-line no-unused-vars */
-const CATEGORY_ORDER = [
-  "alter_geschlecht",
-  "herkunft",
-  "einkommen",
-  "bildung",
-  "beziehungsstatus",
-  "interessen",
-  "persoenlichkeit",
-  "charakterzuege",
-  "politisch",
-  "gesundheit",
-  "kaufkraft",
-  "verletzlichkeit",
-  "werbeprofil",
-];
-
-/* sortCategoryEntries wurde in v2.1 entfernt — Reihenfolge ergibt sich aus
-   CATEGORY_GROUPS, kein separates Sortieren mehr nötig. */
+/* Die Reihenfolge der Karten steht in CATEGORY_GROUPS — vom Demografischen
+   ueber Persoenlichkeit und Kaufkraft bis zu den Verletzlichkeiten. Mistral
+   garantiert im JSON-Output keine Key-Reihenfolge; weil die Karten gruppenweise
+   in dieser festen Folge gebaut werden, sind Normal und Boost gleich geordnet
+   und springen nicht zwischen Analysen. Die Schluessel entsprechen dem
+   Antwortschema im singleLargePrompt (functions/src/locales/{de,en}/prompts.js). */
 
 /* v2.0.4: Karten werden in vier farblich markierte Themengruppen sortiert.
    Akzent-Linie links + Gruppen-Überschrift davor. Quelle der Gruppierung:
@@ -565,7 +545,7 @@ async function renderGpsMap(data) {
 
     /* BUG-2026-08-20-06: Beim zweiten Aufbau derselben Analyse (Moduswechsel,
        Ausdruck) ist `pendingGeocode` bereits verbraucht. Ohne Gedaechtnis stuenden
-       dort ab dann nur noch Koordinaten — die Adresse war weg, auch im Ausdruck.
+       dort ab dann nur noch Koordinaten — die Adresse war weg.
        Der Cache haengt an den Koordinaten: Er greift nur, wenn es dieselbe
        Aufnahme ist. */
     const passtZuCache = state.geocodeCache && state.geocodeCache.lat === lat && state.geocodeCache.lng === lng;
@@ -579,8 +559,10 @@ async function renderGpsMap(data) {
        Bis v3.8.1 oeffnete sich eine Leaflet-Sprechblase von selbst und verdeckte
        die halbe Karte — auf dem Handy lief sie ueber den Rand hinaus und die
        Zoom-Tasten schnitten den Text ab ("ur location" statt "Your location").
-       Schloss man sie, war die Adresse ganz weg. Als Zeile ist sie immer da,
-       kopierbar, im Ausdruck enthalten und fuer Screenreader normaler Text. */
+       Schloss man sie, war die Adresse ganz weg. Als Zeile ist sie am
+       Bildschirm immer da, kopierbar und fuer Screenreader normaler Text.
+       (Gedruckt wird der Ortsbereich nicht: Das Druck-Stilblatt blendet
+       `#gpsMap` aus.) */
     const ortText = address ? escapeHtml(address) : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     elements.gpsMap.innerHTML = `
       <div class="map-wrapper">

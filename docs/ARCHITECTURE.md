@@ -319,7 +319,7 @@ Mistral-API liefert gelegentlich invalides JSON (max-tokens-Truncation, unescapt
 3. **json5-Toleranz** — `json5.parse()` toleriert Trailing-Commas, Single-Quotes, Comments.
 4. **Truncation-Recovery** — Stack-basierte Suche nach dem letzten sauber geschlossenen Wert, Auffuellen der offenen Brackets in umgekehrter Reihenfolge.
 
-Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js` faellt dann auf den Mistral-internen Large-3-Backup zurueck.
+Scheitern alle 4 Stufen, liefert `json-repair.js` `null`. Ein zweites Modell als Rückfall gibt es nicht: Die Analyse endet dann mit `blocked.profileBlocked` (Tabelle oben). Ist die Antwort lesbar, aber unvollständig (Karten fehlen), fragt `mistral.js` einmal beim selben Modell nach.
 
 ## Sicherheits-Architektur
 

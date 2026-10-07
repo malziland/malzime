@@ -139,7 +139,7 @@ Datenschutz ist kein Feature — es ist das Fundament:
 - **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
 - **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr, libheif). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK
 - **Bot-Schutz ohne Tracking**: Rate Limiting (IP), Honeypot-Feld, Timing-Check
-- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + `/api/…` (gleiche Domain)
+- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen in `europe-west1` (einzeln genannt, kein Platzhalter)
 
 ## Schnellstart
 
@@ -248,7 +248,7 @@ Das vollständige Sicherheitsmodell — Schutzgüter, Bedrohungsbild und vor all
 die **bewusst getroffenen Abwägungen mit Begründung** — steht in
 [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md). Die wichtigsten Schichten:
 
-- **Content Security Policy** mit strikter Whitelist (`self`; Bilder zusätzlich von OpenStreetMap-Kacheln, Verbindungen zusätzlich zu Nominatim)
+- **Content Security Policy** mit strikter Whitelist (`self`; Bilder zusätzlich von OpenStreetMap-Kacheln, Verbindungen zusätzlich zu Nominatim und zu den Cloud-Run-Adressen der eigenen Schnittstellen in `europe-west1`)
 - **HSTS** — Transportverschlüsselung erzwungen, zwei Jahre, inklusive Unterdomains; die
   `preload`-Angabe wird mitgeliefert, ein Eintrag in der Browser-Liste ist bewusst nicht
   erfolgt (Begründung: `docs/SECURITY-MODEL.md`)

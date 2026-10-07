@@ -30,7 +30,7 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 | Kostenangriff (massenhafte Analysen) | möglich | Stundenlimit (global, Firestore), Queue-Tiefen-Bremse, Job-Höchstalter — alle drei im Einstellungssatz, siehe [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md) |
 | Störangriff auf einen Workshop | möglich, bisher nie beobachtet | dieselben Limits + Boost/Reset-Hebel; Restrisiko akzeptiert (s. u.) |
 | Bots / Scanner-Rauschen | täglich | Honeypot, Timing-Check, IP-Rate-Limit, Magic-Byte-Validierung |
-| Prompt Injection über Bildinhalte | strukturell | XML-Isolation, escapeXml, Output-Clamps; LLM-Ausgaben steuern keine Tools |
+| Prompt Injection über Bildinhalte | strukturell | Regel im Analyse-Prompt (Text im Bild ist Inhalt, nie Anweisung); im zweiten Aufruf Daten-Blöcke + escapeXml; Output-Clamps; LLM-Ausgaben steuern keine Tools |
 | Admin-Missbrauch / Replay | gering | HMAC-Token (30 min) + Einmal-Nonce (5 min, fail-closed seit v3.0.4), Bearer-Secret |
 | Fehlkonfiguration der Cloud | schleichend | `scripts/verify-infrastructure.sh` vor jedem Deploy (nur lesend, CI-erzwungen) |
 
@@ -60,14 +60,17 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 Diese Punkte sind **Entscheidungen, keine Versäumnisse**. Wer sie ändern will,
 muss die Begründung entkräften, nicht nur das Risiko benennen.
 
-1. **Stundenzähler ist fail-open.** Schlägt die Firestore-Abfrage des
-   Stundenlimits fehl, wird die Analyse erlaubt und parallel ein ERROR-Alarm
-   (`counter-fail-open`) ausgelöst, der per E-Mail zugestellt wird.
-   *Warum:* Der häufigste Fehlerfall ist Transaktions-Gedränge im
-   Workshop-Burst — genau dann würde fail-closed echte Schulklassen aussperren,
-   um ein Kostenrisiko abzuwehren, das der Alarm ohnehin überwacht. Geprüft und
-   bestätigt in der externen Review 2026-08-12 (der Reviewer zog seine
-   fail-closed-Empfehlung nach Gegenrede zurück).
+1. **Die Kostenbremse hängt an der Datenbank.** Das Stundenlimit wird in
+   Firestore gezählt. Fällt der Zähler aus — bei Andrang, weil er in ein
+   einziges Dokument schreibt —, übernimmt ein Netz, das nur liest, dieselben
+   Regeln anwendet und am Limit blockiert. Erst wenn Zähler **und** Netz
+   ausfallen, wird eingelassen; dann geht eine Meldung auf beiden Kanälen
+   hinaus (`notbremse-fehlgeschlagen`). *Warum dieser Rest bleibt:* Ohne
+   lesbare Datenbank ist keine Grenze bekannt. Dann alle abzuweisen, hieße, bei
+   jeder Datenbankstörung den Workshop zu stoppen — während die
+   Warteschlangen-Rate die Kosten weiter deckelt. Bis 30.08.2026 ließ schon der
+   Ausfall des Zählers allein durch; warum das falsch war und was daraus
+   wurde, steht im Abschnitt „Die Kostenbremse und ihr Netz".
 2. **IP-Rate-Limit ist instanzlokal.** Das 500/10-min-Limit lebt im
    Arbeitsspeicher jeder Function-Instanz — bei `enqueue`/`jobstatus` bis zu 10
    Instanzen (gemessen `maxScale`, 2026-08-13), effektiv also ein Mehrfaches der
@@ -196,7 +199,7 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
 |---|---|
 | IP-Speicherung (auch gehasht/HMAC) | schwächt die Kern-Zusage „keine persistente IP"; trifft Schul-NAT-Klassen; DSGVO-Pflichten ohne echten Gewinn (Kosten sind global gedeckelt) |
 | WAF / Cloud Armor | kein beobachteter Missbrauch; zusätzliche Komplexität und Kosten; erst bei realem Druck neu bewerten |
-| Fail-closed am Stundenzähler (pauschal) | würde im häufigsten Fehlerfall (Kontention im Workshop-Burst) echte Nutzer aussperren; differenzierte Betrachtung siehe Restrisiko 1 |
+| Bei jedem Fehler des Stundenzählers pauschal abweisen | würde im häufigsten Fehlerfall (Gedränge am Zähler-Dokument bei Andrang) echte Klassen aussperren; stattdessen entscheidet das Netz mit dem echten Stand (Restrisiko 1, Abschnitt „Die Kostenbremse und ihr Netz") |
 
 ## Pflege
 

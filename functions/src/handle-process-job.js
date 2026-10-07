@@ -156,7 +156,7 @@ async function handleProcessJob(req, res) {
     }
     /* BIZ-001: nur freigeben, wenn DIESER Aufruf den Job wirklich verlassen hat
        (sonst Doppel-Freigabe, falls der Reaper parallel war). */
-    releaseHourlySlot(job.zaehlerStempel).catch(() => {});
+    await releaseHourlySlot(job.zaehlerStempel).catch(() => {});
     await deleteImage(job.imagePath);
     console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
     res.status(200).json({ ok: false, reason: "abandoned" });
@@ -249,7 +249,7 @@ async function handleProcessJob(req, res) {
       return;
     }
     if (success) {
-      incrementTotals().catch((err) =>
+      await incrementTotals().catch((err) =>
         console.log(JSON.stringify({ warning: "incrementTotals-error", error: ohneKennung(err.message) }))
       );
     }
@@ -277,10 +277,10 @@ async function handleProcessJob(req, res) {
     /* FEATURE-2026-08-29-02: Die Dauer dieses Laufs fuettert die Wartezeit-
        Ansage der naechsten Besucher. NUR bei Erfolg — ein blockierter oder an
        der Uhr gestorbener Lauf sagt nichts darueber, wie lange eine Analyse
-       braucht, und wuerde die Ansage verfaelschen. Bewusst ohne await: Das
-       Ergebnis steht bereits, niemand soll darauf warten. */
+       braucht, und wuerde die Ansage verfaelschen. Abgewartet wie der Zaehler
+       oben (BUG-2026-10-03-29): Das Ergebnis steht schon, das Kind wartet nicht. */
     if (success) {
-      merkeDauer((Date.now() - start) / 1000).catch((e) =>
+      await merkeDauer((Date.now() - start) / 1000).catch((e) =>
         /* BEFUND 31.08.2026: Der Fehlschlag wurde restlos verschluckt.
            Scheitert das Fortschreiben dauerhaft, bleibt die Wartezeit-Ansage
            auf einem alten Wert stehen — sichtbar fuer jeden Besucher, ohne

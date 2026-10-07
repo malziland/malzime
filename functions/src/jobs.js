@@ -414,7 +414,12 @@ async function markDelivered(jobId, rcTicketHash) {
   if (typeof rcTicketHash === "string" && rcTicketHash.length > 0) {
     patch.rcTicketHash = rcTicketHash;
   }
-  await jobsRef().doc(jobId).update(patch);
+  /* BUG-2026-10-03-29: An diesem Vermerk haengt die Loeschung des Ergebnisses
+     15 Minuten nach der Abholung (findZugestellteJobs). Die Statusabfrage
+     wartet ihn deshalb ab, bevor sie antwortet; scheitert er, wird er hier
+     einmal wiederholt. Erst der zweite Fehlschlag geht an den Aufrufer. */
+  const ref = jobsRef().doc(jobId);
+  await ref.update(patch).catch(() => ref.update(patch));
 }
 
 /**

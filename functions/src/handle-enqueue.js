@@ -369,7 +369,7 @@ async function handleEnqueue(req, res, secrets) {
          auch das nicht gelingt, geht sie hier hinaus. */
       const gemeldet = jobId ? await failJob(jobId, "store_failed").catch(() => false) : false;
       if (!gemeldet) meldeGescheiterteAnalyse("store_failed");
-      releaseHourlySlot(counter.stempel).catch(() => {});
+      await releaseHourlySlot(counter.stempel).catch(() => {});
       /* Ein Speichern, das mit einem Fehler endet, kann trotzdem geschrieben
          haben — deshalb loeschen, sobald es begonnen hat. */
       if (speichernBegonnen) await deleteImage(imagePath);
@@ -398,7 +398,7 @@ async function handleEnqueue(req, res, secrets) {
       if (!(await platzBestaetigen(angelegt, einlassgrenze))) {
         await abandonJob(jobId);
         await deleteImage(imagePath);
-        releaseHourlySlot(counter.stempel).catch(() => {});
+        await releaseHourlySlot(counter.stempel).catch(() => {});
         console.log(JSON.stringify({ requestId, traceId, warning: "queue-too-deep-nachtraeglich" }));
         res.status(429).json({
           blocked: "queueFull",
@@ -437,7 +437,7 @@ async function handleEnqueue(req, res, secrets) {
       console.log(JSON.stringify({ requestId, traceId, jobId, warning: "enqueue-failed", error: err.message }));
       await failJob(jobId, "enqueue_failed");
       /* BIZ-001: Slot zurückgeben — dieser Job löst nie eine echte Analyse aus. */
-      releaseHourlySlot(counter.stempel).catch(() => {});
+      await releaseHourlySlot(counter.stempel).catch(() => {});
       await deleteImage(imagePath);
       res.status(503).json({ error: "Queue unavailable", code: "enqueue_failed" });
       return;

@@ -236,8 +236,8 @@ async function handleJobStatus(req, res) {
        `totalMs` = erstellt → ausgeliefert (die volle serverseitige Kette).
        Erlaubt „done vs. wirklich abgeholt" sauber zu trennen, unabhängig von
        der best-effort Client-Telemetrie. Wiederholte Polls (Reload, zweiter
-       Tab) loggen nicht erneut. Der Schreibvorgang läuft nebenläufig — er darf
-       die Antwort an den wartenden Client nicht verzögern. */
+       Tab) loggen nicht erneut. Der Schreibvorgang wird ABGEWARTET, bevor die
+       Antwort hinausgeht (BUG-2026-10-03-29, siehe unten). */
     const antwort = {
       status: "done",
       result: job.result || null,
@@ -253,17 +253,26 @@ async function handleJobStatus(req, res) {
          es sich (sessionStorage); in der Datenbank liegt nur der Hash. Der
          Telemetrie-Endpunkt zählt eine Realitäts-Check-Stimme nur noch gegen
          ein gültiges, unverbrauchtes Ticket — eine echte Analyse, eine
-         Stimme. Der Schreibvorgang läuft wie markDelivered nebenläufig;
-         schlägt er fehl, verfällt schlimmstenfalls diese eine Stimme. */
+         Stimme. Der Hash wird mit dem Zeitpunkt der Abholung in EINEM
+         Schreibvorgang abgelegt (markDelivered). */
       const rcTicket = randomUUID();
       antwort.rcTicket = rcTicket;
-      /* Ohne jobId und ohne Fehlertext (27.09.2026): Diese Zeile steht im
+      /* BUG-2026-10-03-29: ABWARTEN, dann antworten. Am Zeitpunkt der
+         Abholung haengt die Loeschung des Ergebnisses 15 Minuten spaeter, und
+         nach der Antwort fragt dieser Browser nicht noch einmal. Was erst nach
+         der Antwort zu Ende laeuft, kommt vielleicht nie an (SECURITY-MODEL,
+         "Jeder eingelassene Auftrag zaehlt genau einmal") — das Ergebnis laege
+         dann 2 Stunden statt 15 Minuten. Ein Schreibvorgang, Millisekunden.
+         Scheitert er auch im zweiten Versuch (jobs.js), bekommt das Kind sein
+         Ergebnis trotzdem; dann steht eine Warnung im Protokoll.
+         Ohne jobId und ohne Fehlertext (27.09.2026): Diese Zeile steht im
          selben Aufruf wie `job-delivered` (gemeinsames Label execution_id),
          und ein Firestore-Fehlertext kann den Dokumentpfad samt jobId
          enthalten. Nur der Fehlercode. */
-      markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
-        console.log(
+      await markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
+        console.warn(
           JSON.stringify({
+            severity: "WARNING",
             warning: "markDelivered-error",
             code: (err && err.code) || null,
             art: (err && err.name) || null,

@@ -282,6 +282,17 @@ export async function prepareImage(file, optionen = {}) {
       err.msSeitAuswahl = msSeit(optionen.auswahlZeit);
     }
     throw err;
+  } finally {
+    /* BUG-2026-08-20-37, Erfolgsweg: Kam die Quelle aus dem eigenen
+       HEIC-Dekoder, ist sie eine Zeichenflaeche in Originalgroesse (bei einem
+       Handyfoto rund 12 Megapixel). Nach dem Verkleinern braucht sie niemand
+       mehr — freigeben, ob es geklappt hat oder nicht (Begruendung der
+       Freigabe: BUG-2026-08-19-01 Teil 2, oben). Ein Bild, das der Browser
+       selbst geoeffnet hat, ist keine Zeichenflaeche und bleibt unberuehrt. */
+    if (quelle && typeof quelle.getContext === "function") {
+      quelle.width = 0;
+      quelle.height = 0;
+    }
   }
 
   /* Der Dateiname folgt dem Typ. Ein PNG "upload.jpg" zu nennen waere dieselbe

@@ -155,6 +155,37 @@ describe("Format, das der Browser nicht kennt", () => {
     expect(ergebnis.dateiname).toBe("upload.jpg");
   });
 
+  it("HEIC: die Zeichenflaeche des Dekoders ist nach dem Verkleinern freigegeben", async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 4032;
+    canvas.height = 3024;
+    heicZuCanvas.mockResolvedValue(canvas);
+    const ergebnis = await prepareImage(datei(HEIC_KOPF, { type: "image/heic" }), { auswahlZeit: Date.now() });
+    /* Positivkontrolle: Das Bild ist entstanden … */
+    expect(ergebnis.imageBase64).toBe("QUJD");
+    /* … und die Flaeche in Originalgroesse ist wieder frei. */
+    expect([canvas.width, canvas.height]).toEqual([0, 0]);
+  });
+
+  it("HEIC: scheitert das Verkleinern, ist die Zeichenflaeche des Dekoders trotzdem freigegeben", async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 4032;
+    canvas.height = 3024;
+    heicZuCanvas.mockResolvedValue(canvas);
+    const echterKontext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = () => null;
+    try {
+      const err = await prepareImage(datei(HEIC_KOPF, { type: "image/heic" }), { auswahlZeit: Date.now() }).catch(
+        (x) => x
+      );
+      expect(err.message).toBe("image_decode_failed");
+      expect(err.fileFormat).toBe("heic");
+      expect([canvas.width, canvas.height]).toEqual([0, 0]);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = echterKontext;
+    }
+  });
+
   it("HEIC, das der Browser selbst oeffnen kann (iPhone), braucht den Dekoder nicht", async () => {
     bildLaedt = true;
     await prepareImage(datei(HEIC_KOPF, { type: "image/heic" }));

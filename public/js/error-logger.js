@@ -61,6 +61,27 @@ function zurueckstellen(payload) {
   }
 }
 
+/* Nachsenden nach einer Pause (07.10.2026): Meldet sich der Browser nie als
+   getrennt — bei einem kurzen Abriss im Schul-WLAN der Normalfall —, kommt
+   auch kein „wieder online". Die Meldung laege dann bis zum Verlassen der
+   Seite, und die Auswertung saehe gerade die Verbindungsabrisse verspaetet
+   oder gar nicht. Deshalb drei Versuche in wachsendem Abstand, solange die
+   Seite offen ist. Danach bleiben „wieder online" und das Verlassen der Seite.
+   Abgelegt wird dabei weiterhin nichts — die Uhr lebt wie die Warteschlange
+   nur im Arbeitsspeicher. */
+const NACHSENDE_PAUSEN_MS = [15000, 60000, 180000];
+let nachsendeVersuche = 0;
+let nachsendeUhr = null;
+
+function planeNachsenden() {
+  if (nachsendeUhr !== null || nachsendeVersuche >= NACHSENDE_PAUSEN_MS.length) return;
+  nachsendeUhr = setTimeout(() => {
+    nachsendeUhr = null;
+    nachsendeVersuche += 1;
+    fehlerNachschicken();
+  }, NACHSENDE_PAUSEN_MS[nachsendeVersuche]);
+}
+
 /** Nur fuer Tests und die Selbstpruefung: aktueller Stand der Warteschlange. */
 export function offeneMeldungen() {
   return warteschlange.slice();
@@ -100,13 +121,14 @@ function senden(payload) {
     })
     .catch(() => {
       zurueckstellen(payload);
+      planeNachsenden();
       return false;
     });
 }
 
 /**
- * Schickt zurueckgestellte Meldungen nach. Wird beim Ereignis „wieder online"
- * und beim Verlassen der Seite gerufen.
+ * Schickt zurueckgestellte Meldungen nach. Wird beim Ereignis „wieder online",
+ * beim Verlassen der Seite und nach einer Pause gerufen (planeNachsenden).
  *
  * Die Warteschlange wird VOR dem Senden geleert und eine misslungene Meldung
  * von `senden()` wieder zurueckgelegt. Andernfalls koennte ein Fehlschlag
@@ -118,7 +140,11 @@ export function fehlerNachschicken() {
   if (warteschlange.length === 0) return Promise.resolve(0);
   const offen = warteschlange;
   warteschlange = [];
-  return Promise.all(offen.map((p) => senden(p))).then((ergebnisse) => ergebnisse.filter(Boolean).length);
+  return Promise.all(offen.map((p) => senden(p))).then((ergebnisse) => {
+    /* Alles zugestellt: Die naechste Stoerung bekommt wieder alle Versuche. */
+    if (warteschlange.length === 0) nachsendeVersuche = 0;
+    return ergebnisse.filter(Boolean).length;
+  });
 }
 
 /** Verdrahtet das Nachschicken. Wird einmal beim Seitenstart gerufen. */

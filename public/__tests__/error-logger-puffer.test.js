@@ -164,3 +164,93 @@ describe("Fehler-Nachsendung", () => {
     expect(localStorage.length).toBe(0);
   });
 });
+
+/* 07.10.2026: Meldet sich der Browser nie als getrennt, kommt kein „wieder
+   online" — die Meldung ueber einen Verbindungsabriss laege bis zum Verlassen
+   der Seite. Deshalb schickt die Seite nach einer Pause von selbst nach:
+   dreimal, in wachsendem Abstand, dann Ruhe. */
+describe("Fehler-Nachsendung nach einer Pause", () => {
+  let logClientError, offeneMeldungen;
+  const SEKUNDE = 1000;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    ({ logClientError, offeneMeldungen } = await import("../js/error-logger.js"));
+    Object.defineProperty(navigator, "onLine", { value: true, configurable: true, writable: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("ohne „wieder online“: nach 15 Sekunden geht die Meldung von selbst hinaus", async () => {
+    const f = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("Load failed"))
+      .mockResolvedValue({ ok: true, status: 204 });
+
+    logClientError(new Error("abriss"), { phase: "queue-network" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(offeneMeldungen()).toHaveLength(1);
+
+    /* Kurz davor noch nichts … */
+    await vi.advanceTimersByTimeAsync(14 * SEKUNDE);
+    expect(f).toHaveBeenCalledTimes(1);
+    /* … nach 15 Sekunden der zweite Anlauf, diesmal mit Netz. */
+    await vi.advanceTimersByTimeAsync(1 * SEKUNDE);
+    expect(f).toHaveBeenCalledTimes(2);
+    expect(offeneMeldungen()).toHaveLength(0);
+    expect(JSON.parse(f.mock.calls[1][1].body).errorMessage).toBe("abriss");
+  });
+
+  it("bleibt das Netz weg: drei Versuche (15 s, 60 s, 180 s), dann Ruhe — die Meldung bleibt liegen", async () => {
+    const f = vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Load failed"));
+
+    logClientError(new Error("bleibt_weg"), { phase: "queue-network" });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(f).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(15 * SEKUNDE);
+    expect(f).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(60 * SEKUNDE);
+    expect(f).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(180 * SEKUNDE);
+    expect(f).toHaveBeenCalledTimes(4);
+
+    /* Danach kein weiterer Versuch von selbst, auch nicht nach einer Stunde. */
+    await vi.advanceTimersByTimeAsync(3600 * SEKUNDE);
+    expect(f).toHaveBeenCalledTimes(4);
+    expect(offeneMeldungen()).toHaveLength(1);
+  });
+
+  it("nach einer zugestellten Meldung bekommt die naechste Stoerung wieder alle Versuche", async () => {
+    const f = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("Load failed"))
+      .mockResolvedValueOnce({ ok: true, status: 204 })
+      .mockRejectedValue(new TypeError("Load failed"));
+
+    logClientError(new Error("erste"), { phase: "queue-network" });
+    await vi.advanceTimersByTimeAsync(15 * SEKUNDE);
+    expect(offeneMeldungen()).toHaveLength(0);
+
+    logClientError(new Error("zweite"), { phase: "queue-network" });
+    await vi.advanceTimersByTimeAsync(0);
+    const vorher = f.mock.calls.length;
+    await vi.advanceTimersByTimeAsync((15 + 60 + 180) * SEKUNDE);
+    expect(f.mock.calls.length - vorher).toBe(3);
+  });
+
+  it("ist das Geraet nachweislich offline, wartet die Seite auf „wieder online“ — keine Uhr", async () => {
+    Object.defineProperty(navigator, "onLine", { value: false, configurable: true, writable: true });
+    const f = vi.spyOn(globalThis, "fetch");
+
+    logClientError(new Error("offline"), { phase: "queue-network" });
+    await vi.advanceTimersByTimeAsync(3600 * SEKUNDE);
+
+    expect(f).not.toHaveBeenCalled();
+    expect(offeneMeldungen()).toHaveLength(1);
+  });
+});

@@ -355,6 +355,40 @@ test.describe("Anderes Foto gewählt, während das erste unterwegs ist", () => {
   });
 });
 
+/* ── BUG-2026-10-03-46: „erscheint automatisch" wird eingelöst ─────────────── */
+
+test.describe("Netz weg, ohne dass der Browser sich als getrennt meldet", () => {
+  test("fünf gescheiterte Abfragen, dann ist der Server wieder da: Das Ergebnis erscheint von selbst", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(120000);
+    await grundrouten(page, context);
+    await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+    const abfragen = [];
+    await page.route("**/api/job-status*", async (r) => {
+      abfragen.push(new URL(r.request().url()).searchParams.get("token"));
+      /* Die ersten fünf Abfragen scheitern am Netz (WLAN verbunden, Internet
+         weg) — der Browser bleibt dabei „online". Danach ist der Server wieder
+         erreichbar und hat das fertige Ergebnis. */
+      if (abfragen.length <= 5) return r.abort("failed");
+      return json(r, 200, { status: "done", result: ERGEBNIS });
+    });
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect(page.locator("#status")).toContainText("Verbindung unterbrochen", { timeout: 40000 });
+    expect(await page.evaluate(() => navigator.onLine)).toBe(true);
+    expect(abfragen).toHaveLength(5);
+
+    /* Sitzen bleiben: kein Tab-Wechsel, kein Neuladen, kein Ereignis „online". */
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 45000 });
+    await expect(page.locator("#status")).toHaveText("");
+    /* Die sechste Abfrage war die stille Prüfung ohne Abhol-Ticket, die
+       siebte hat mit Ticket abgeholt. */
+    expect(abfragen.slice(5, 7)).toEqual([null, "tok"]);
+  });
+});
+
 test.describe("Tab kurz weg und zurück mitten im Lauf", () => {
   test.use({ reducedMotion: "reduce" });
 

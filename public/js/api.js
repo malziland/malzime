@@ -345,6 +345,75 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
   }
 }
 
+/* ── Warten auf die Verbindung (BUG-2026-10-03-46) ──────────────────────
+   Nach MAX_POLL_FAILURES gescheiterten Abfragen sagt die Seite zu, die
+   Analyse erscheine automatisch. Eingeloest wurde das nur, wenn der Browser
+   „wieder online" meldete oder der Tab sichtbar wurde. In einem wackeligen
+   Schul-WLAN meldet sich der Browser aber oft gar nicht als getrennt (WLAN
+   verbunden, Internet weg) — dann kam nie ein Ereignis, und die Seite stand.
+
+   Deshalb prueft die Seite, solange sie wartet, von selbst nach: alle zwoelf
+   Sekunden EINE stille Statusabfrage. Erst wenn die gelingt, startet die
+   gewohnte Wiederaufnahme — bis dahin aendert sich auf dem Bildschirm nichts,
+   und die Fehlererfassung bekommt fuer das Weiterwarten keine Meldungen.
+
+   Die stille Abfrage geht OHNE Abhol-Ticket hinaus: Der Server nennt dann nur
+   den Stand und stellt kein Ergebnis zu (das Einmal-Ticket fuer den
+   Realitaets-Check und die Zustellfrist bleiben unberuehrt). Abgeholt wird
+   danach auf dem gewohnten Weg, mit Ticket.
+
+   Obergrenze wie beim Abfragen (MAX_POLL_DURATION_MS ab dem ersten Abriss):
+   Kein Tab fragt stundenlang. Danach bleiben „wieder online", der Tab-Wechsel
+   und das Neuladen als Wege zum Ergebnis. */
+const VERBINDUNG_PRUEF_ABSTAND_MS = 12000;
+const VERBINDUNG_PRUEF_TIMEOUT_MS = 10000;
+let verbindungsPruefer = null;
+let wartetAufVerbindungSeit = 0;
+
+function verbindungsPruefungStoppen() {
+  clearTimeout(verbindungsPruefer);
+  verbindungsPruefer = null;
+}
+
+/* Wird gerufen, sobald ein Durchgang an der Verbindung haengen bleibt. */
+function verbindungsPruefungStarten() {
+  if (!wartetAufVerbindungSeit) wartetAufVerbindungSeit = Date.now();
+  verbindungsPruefungStoppen();
+  verbindungsPruefer = setTimeout(pruefeVerbindung, VERBINDUNG_PRUEF_ABSTAND_MS);
+}
+
+async function pruefeVerbindung() {
+  verbindungsPruefer = null;
+  const jobId = getStoredJobId();
+  if (!state.wartetAufVerbindung || state.uploadLaeuft || !jobId) return;
+  if (Date.now() - wartetAufVerbindungSeit > MAX_POLL_DURATION_MS) return;
+  const stand = state.requestId;
+  let erreichbar = false;
+  try {
+    const resp = await fetchWithTimeout(
+      `${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}`,
+      { cache: "no-store" },
+      VERBINDUNG_PRUEF_TIMEOUT_MS
+    );
+    if (resp.status === 404) {
+      /* Der Server antwortet, der Auftrag ist weg — die Wiederaufnahme raeumt auf. */
+      erreichbar = true;
+    } else if (resp.ok) {
+      /* Nur eine echte Antwort des eigenen Servers zaehlt. Die Anmeldeseite
+         eines Schul-WLANs antwortet auch mit „200", aber nicht mit einem Stand. */
+      const daten = await resp.jsonMitTimeout();
+      erreichbar = Boolean(daten && typeof daten.status === "string");
+    }
+  } catch (_) {
+    /* Weiter keine Verbindung — gleich noch einmal pruefen. */
+  }
+  /* Waehrend der Abfrage kann ein neues Foto, „wieder online" oder ein
+     Tab-Wechsel uebernommen haben. Dann ist hier nichts mehr zu tun. */
+  if (!state.wartetAufVerbindung || state.requestId !== stand || getStoredJobId() !== jobId) return;
+  if (erreichbar) resumeQueueJob({ force: true });
+  else verbindungsPruefungStarten();
+}
+
 /* Wie lange ohne erfolgreiche Statusabfrage, bis der Durchgang als
    steckengeblieben gilt. Zwei normale Abfrage-Intervalle plus Puffer — kurz
    genug, dass niemand lange vor einer toten Seite sitzt, lang genug, dass ein
@@ -397,6 +466,20 @@ export function initHintergrundWiederaufnahme() {
     if (seitWannVerborgen && Date.now() - seitWannVerborgen > UEBERGABE_PAUSE_MS) {
       seitWannVerborgen = 0;
       clearStoredJobId();
+      /* BUG-2026-10-03-46: Wartete die Seite gerade auf die Verbindung, ist
+         mit der Auftragsnummer auch die Zusage „erscheint automatisch"
+         hinfaellig — abgeholt wird ab jetzt nichts mehr (das Geraet gilt als
+         weitergereicht, der Naechste soll das Profil nicht sehen). Die Zusage
+         darf dann nicht stehen bleiben: Die Meldung sagt, was zu tun ist. */
+      if (state.wartetAufVerbindung) {
+        state.wartetAufVerbindung = false;
+        verbindungsPruefungStoppen();
+        liveAbbrechenWegenFehler();
+        stopScanAnim();
+        textSetzen(elements.scanText, "");
+        setStatus(t("error.queueAbandoned"), undefined, "error.queueAbandoned");
+        meldeSichtbarenFehler("error.queueAbandoned", "uebergabe-pause");
+      }
       return;
     }
     seitWannVerborgen = 0;
@@ -600,6 +683,10 @@ async function analyzeImageQueued() {
      erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
      der Anker immer die Lage von JETZT und nicht die von vorhin. */
   state.wartetAufVerbindung = false;
+  /* Neues Foto, neuer Auftrag: Das Nachpruefen fuer den vorigen endet, und
+     seine Obergrenze beginnt fuer den neuen von vorn. */
+  verbindungsPruefungStoppen();
+  wartetAufVerbindungSeit = 0;
   /* UX-001 (Audit 2026-08-10): Ab hier gehoert der Bildschirm dem NEUEN Foto.
      Die Job-Nummer des vorigen Durchgangs bleibt nach einem Erfolg bewusst
      stehen (damit ein Reload das Ergebnis wiederholen kann) — sie darf aber
@@ -866,6 +953,7 @@ async function analyzeImageQueued() {
       else liveAbbrechenWegenFehler();
       /* Anker fuer die Wiederaufnahme — siehe state.js. */
       state.wartetAufVerbindung = Boolean(outcome.transient);
+      if (outcome.transient) verbindungsPruefungStarten();
       /* Nur aufräumen, wenn der Job WIRKLICH weg ist (404, failed, abgelaufen).
          Bei einem Verbindungsabbruch bleibt die Nummer stehen: Sie ist der
          einzige Weg zurück zum fertigen Ergebnis — über die automatische
@@ -974,6 +1062,8 @@ export async function resumeQueueJob({ force = false } = {}) {
      erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
      der Anker immer die Lage von JETZT und nicht die von vorhin. */
   state.wartetAufVerbindung = false;
+  /* Solange dieser Anlauf laeuft, fragt er selbst — das Nachpruefen ruht. */
+  verbindungsPruefungStoppen();
   const myId = ++state.requestId;
   const traceId = generateTraceId();
   const startTime = Date.now();
@@ -1007,6 +1097,9 @@ export async function resumeQueueJob({ force = false } = {}) {
        nicht mehr. Halb gefuellte Karten neben der Wartefigur saehen aus wie
        ein haengender Lauf; das fertige Ergebnis baut sie vollstaendig neu. */
     if (elements.facts) elements.facts.innerHTML = "";
+    /* BUG-2026-10-03-46: Auch hier die Statuszeile leeren — sonst steht
+       „Verbindung unterbrochen" neben der Wartefigur, die gerade abholt. */
+    setStatus("");
     resetQueueWaiting();
     startScanAnim(false);
     /* FIX 1 (v3.0.1): Auch die Wiederaufnahme startet nie mit leerem Text. */
@@ -1033,6 +1126,7 @@ export async function resumeQueueJob({ force = false } = {}) {
     if (outcome && outcome.error && outcome.transient) {
       if (!liveAnzeige.pausieren()) startScanAnim(false);
       state.wartetAufVerbindung = true;
+      verbindungsPruefungStarten();
       setStatus(outcome.error, traceId, "error.connectionLost");
       meldeSichtbarenFehler("error.connectionLost", "resume-verbindung", { requestId: String(myId), traceId });
       return;

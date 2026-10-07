@@ -77,11 +77,14 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
 - **Formulare auf der Seite dürfen nur noch an malziME selbst senden.** Die
   Sicherheitsrichtlinie der Seite nennt jetzt auch Formularziele; ein Test im
   Browser hält es fest.
-- **Ein verworfenes Foto wird nicht weiter hochgeladen und nicht mehr
-  analysiert.** Wer während des Hochladens ein anderes Foto wählt, dessen
-  erstes Foto geht nicht mehr hinaus. Wartet der erste Auftrag schon in der
-  Schlange, meldet die Seite ihn ab: Er wird sofort verworfen, sein Bild
-  gelöscht, die KI bekommt es nie zu sehen.
+- **Ein verworfenes Foto wird nicht weiter hochgeladen und, solange es noch
+  wartet, nicht mehr analysiert.** Wer während des Hochladens ein anderes Foto
+  wählt, dessen erstes Foto geht nicht mehr hinaus. Wartet der erste Auftrag
+  schon in der Schlange, meldet die Seite ihn ab: Er wird sofort verworfen,
+  sein Bild gelöscht, die KI bekommt es nie zu sehen — auch wenn die Seite
+  zwischendurch im Hintergrund war oder neu geladen wurde. Läuft die Analyse
+  schon, läuft sie zu Ende; ihr Ergebnis wird wie jedes andere nach der Frist
+  gelöscht.
 - **Gelöscht wird auch dann pünktlich, wenn etwas schiefgeht.** Fallen die
   Einstellungen aus, löscht der Aufräumdienst trotzdem: jedes Foto und jeden
   Auftrag nach spätestens 2 Stunden, ein abgeholtes Ergebnis 15 Minuten nach
@@ -135,7 +138,8 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
 - **„Verbindung unterbrochen … erscheint automatisch“ stimmt jetzt auch im
   Schul-WLAN.** Die Seite fragt von selbst nach, bis der Server wieder
   antwortet (höchstens 30 Minuten) — auch wenn das Gerät gar nicht merkt, dass
-  das Internet weg war.
+  das Internet weg war. Ist die Analyse in der Zwischenzeit gescheitert, steht
+  das da, mit der Bitte, das Foto noch einmal hochzuladen.
 - **Die Meldungen sagen, was wirklich los ist.** Ist ein Schul-Netz wegen zu
   vieler Anfragen gesperrt, steht das da — statt „KI überlastet“. „Gerade
   überlastet“ erscheint nur noch, wenn die KI wirklich wegen Überlast ablehnt;
@@ -154,12 +158,15 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
   steht. Die Tierart wird nicht mehr von Wörtern wie „Spaßvogel“ oder „Fischöl“
   verfälscht.
 - **Der Hinweis „Das hast du ungewollt verraten“ erkennt mehr.** Adressen mit
-  „Gasse“, „Platz“ und „Weg“, englische Adressen („12 Main Street“, „12 Main
-  St.“) und englische Schulnamen mit Schulart; Schul-Kürzel wie „HTL“ oder
-  „HAK“; Telefonnummern auch in der üblichen Schreibweise mit Abständen („0664
-  123 45 67“, „+43 664 …“); und österreichische Kennzeichen in ihrer üblichen
-  Form („W-12345 X“, „GU-123 AB“) — bisher wurde nur die deutsche Form
-  erkannt. Eine ISBN auf einem Buchrücken gilt nicht mehr als Telefonnummer.
+  „Gasse“, „Platz“, „Weg“, „Ring“, „Allee“, „Kai“ und „Zeile“, englische
+  Adressen („12 Main Street“, „12 Main St.“) und englische Schulnamen mit
+  Schulart; Schul-Kürzel mit Ort („HTL Mödling“, „HAK 1“); Telefonnummern auch
+  in der üblichen Schreibweise mit Abständen („0664 123 45 67“, „+43 664 …“)
+  und mit Durchwahl; und österreichische Kennzeichen in ihrer üblichen Form
+  („W-12345 X“, „GU-123 AB“) — bisher wurde nur die deutsche Form erkannt.
+  Eine ISBN auf einem Buchrücken gilt nicht mehr als Telefonnummer; ein
+  „Wanderweg 3“, ein „Parkplatz 2“ oder Öffnungszeiten („Mo-Fr 8“) lösen den
+  Hinweis nicht aus.
 - Liefert die KI ihre Antwort einmal in unerwarteter Form, kommt kein
   überlanger Text mehr im Ergebnis an; auf der Herkunfts-Karte erscheint kein
   „[object Object]“ mehr. Eine Antwort mit sehr viel Leerraum bremst die
@@ -243,7 +250,10 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
   Datenschutzerklärung.
 - **Die Kontrolle verbotener Formulierungen findet auch, was über einen
   Zeilenumbruch läuft.** Sie suchte Zeile für Zeile; drei Stellen blieben so
-  unbemerkt und sind umformuliert.
+  unbemerkt und sind umformuliert. Zwei Listenpunkte oder zwei Tabellenzeilen
+  hält sie nicht für einen Satz. Ein Test liest dieselben Regeln zusätzlich
+  gegen den Text, wie er gelesen wird: Eine gesperrte Wendung bleibt gesperrt,
+  auch wenn ein Wort darin hervorgehoben ist.
 - **Verschwindet eine Testdatei, fällt das auf** — jede steht jetzt mit Namen
   in einer Liste, die bei jeder Prüfung verglichen wird. In die
   Pflicht-Prüfungen lässt sich kein zusätzlicher Schritt mehr einfügen, der die

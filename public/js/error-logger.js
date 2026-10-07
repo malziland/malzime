@@ -77,6 +77,10 @@ function planeNachsenden() {
   if (nachsendeUhr !== null || nachsendeVersuche >= NACHSENDE_PAUSEN_MS.length) return;
   nachsendeUhr = setTimeout(() => {
     nachsendeUhr = null;
+    /* Inzwischen zugestellt („wieder online", Verlassen der Seite)? Dann war
+       das kein Versuch — sonst begaenne die naechste Stoerung bei 60 statt
+       bei 15 Sekunden. */
+    if (warteschlange.length === 0) return;
     nachsendeVersuche += 1;
     fehlerNachschicken();
   }, NACHSENDE_PAUSEN_MS[nachsendeVersuche]);

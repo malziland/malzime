@@ -90,6 +90,19 @@ export function getStoredJobId() {
   }
 }
 
+/** Der gemerkte Auftrag, solange sein Ergebnis noch NICHT angekommen ist —
+ *  also der, der abzumelden ist, wenn jemand ein anderes Foto wählt. Ein
+ *  Auftrag, dessen Ergebnis schon gezeigt wurde, braucht keine Abmeldung. */
+export function offenerAuftrag() {
+  try {
+    if (sessionStorage.getItem(JOB_DELIVERED_AT_KEY)) return null;
+    const jobId = sessionStorage.getItem(JOB_ID_STORAGE_KEY);
+    return jobId ? { jobId, resultToken: sessionStorage.getItem(JOB_TOKEN_STORAGE_KEY) } : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 /** PRIV-003: Gibt das gespeicherte Abhol-Ticket zurück (oder null). */
 export function getStoredResultToken() {
   try {

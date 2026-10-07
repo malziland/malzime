@@ -64,7 +64,47 @@ KONTROLLZEILEN = ["Deine Position verlaesst nie\n", "   * den Browser.\n"]
 # drei echte Verstoesse lagen so unbemerkt in einem Projekt, und der Lauf meldete
 # "kein Verstoss gefunden". Am Anfang einer Folgezeile zaehlen Einrueckung und die
 # Zeichen, mit denen Zitate und Kommentare fortgesetzt werden, nicht zum Text.
-FOLGEZEILE = re.compile(r"^[ \t]*(?:(?:>+|\*+|//+|#+)[ \t]+)*")
+#
+# Nachtrag 07.10.2026 (Pruefrunde): Zusammengesetzt wird nur, was ein Satz sein
+# kann. Ein Listenpunkt, eine Tabellenzeile, eine Ueberschrift und ein neuer
+# HTML-Block beginnen einen eigenen Absatz - sonst meldete der Durchgang zwei
+# Listenpunkte oder zwei Tabellenzeilen als eine Formulierung, mit einer Fundstelle,
+# die keinen Satz zeigt. Stern und Raute sind doppeldeutig: In Markdown sind sie
+# Listenpunkt und Ueberschrift, ueberall sonst setzen sie einen Kommentar fort.
+ZITAT = re.compile(r"^(?:>+[ \t]*)+")
+KOMMENTAR = re.compile(r"^(?:\*+|//+|#+)(?:[ \t]+|$)")
+LISTENPUNKT = re.compile(r"^(?:[-+*]|\d{1,3}[.)])[ \t]+")
+UEBERSCHRIFT = re.compile(r"^#{1,6}[ \t]+")
+TRENNLINIE = re.compile(r"^(?:[-*_=]{3,}|`{3,}.*|~{3,}.*)$")
+HTML_BLOCK = re.compile(
+    r"^</?(?:p|li|ul|ol|dl|dt|dd|h[1-6]|div|section|article|header|footer|main|nav|aside"
+    r"|table|thead|tbody|tfoot|tr|td|th|caption|blockquote|figure|figcaption|details"
+    r"|summary|title)\b",
+    re.IGNORECASE,
+)
+MARKDOWN_ENDUNGEN = (".md", ".markdown", ".mdx")
+
+
+def zeile_einordnen(zeile, markdown):
+    """Ordnet eine Zeile fuer den zweiten Durchgang ein: (art, text).
+
+    art ist "grenze" (Leerzeile, Tabellenzeile, Ueberschrift, Trennlinie - hier
+    endet der Absatz, die Zeile selbst gehoert zu keinem), "anfang" (Listenpunkt
+    oder neuer HTML-Block - hier beginnt ein Absatz) oder "weiter" (Fortsetzung)."""
+    text = zeile.strip()
+    text = ZITAT.sub("", text)
+    if not markdown:
+        text = KOMMENTAR.sub("", text, count=1)
+    if not text or text.startswith("|") or TRENNLINIE.match(text):
+        return "grenze", ""
+    if markdown and UEBERSCHRIFT.match(text):
+        return "grenze", ""
+    punkt = LISTENPUNKT.match(text)
+    if punkt:
+        return "anfang", text[punkt.end():]
+    if HTML_BLOCK.match(text):
+        return "anfang", text
+    return "weiter", text
 
 
 def regeln_laden(wurzel):
@@ -118,14 +158,15 @@ def positivkontrolle(regeln):
     return True
 
 
-def umbruch_funde(zeilen, regeln):
+def umbruch_funde(zeilen, regeln, markdown=False):
     """Treffer, die NUR ueber einen Zeilenumbruch hinweg entstehen.
 
     Gibt (zeilennummer, formulierung, grund) zurueck; die Zeilennummer ist die der
     Zeile, in der die Formulierung beginnt. Ein Absatz endet an einer Leerzeile,
-    darueber hinweg wird nicht gesucht. Treffer innerhalb einer einzigen Zeile
-    liefert der erste Durchgang; hier werden sie uebergangen, damit nichts doppelt
-    gemeldet wird."""
+    einer Tabellenzeile, einer Ueberschrift und vor jedem Listenpunkt oder neuen
+    HTML-Block; darueber hinweg wird nicht gesucht (zeile_einordnen). Treffer
+    innerhalb einer einzigen Zeile liefert der erste Durchgang; hier werden sie
+    uebergangen, damit nichts doppelt gemeldet wird."""
     funde = []
     absatz = []  # [(zeilennummer, text ohne Einrueckung)]
 
@@ -156,12 +197,12 @@ def umbruch_funde(zeilen, regeln):
                 funde.append((absatz[erste][0], treffer.group(0), grund))
 
     for nr, zeile in enumerate(zeilen, 1):
-        inhalt = FOLGEZEILE.sub("", zeile.rstrip("\r\n")).rstrip()
-        if not inhalt:
+        art, inhalt = zeile_einordnen(zeile, markdown)
+        if art != "weiter":
             auswerten()
             absatz = []
-            continue
-        absatz.append((nr, inhalt))
+        if art != "grenze":
+            absatz.append((nr, inhalt))
     auswerten()
     return funde
 
@@ -266,7 +307,8 @@ def main():
                 treffer = ausdruck.search(zeile)
                 if treffer:
                     in_datei.append((kurz, nr, treffer.group(0), grund))
-        for nr, text, grund in umbruch_funde(zeilen, regeln):
+        markdown = kurz.lower().endswith(MARKDOWN_ENDUNGEN)
+        for nr, text, grund in umbruch_funde(zeilen, regeln, markdown):
             in_datei.append((kurz, nr, text + "  (ueber einen Zeilenumbruch)", grund))
         in_datei.sort(key=lambda fund: fund[1])
         funde.extend(in_datei)

@@ -38,6 +38,11 @@ werden.
 Gesucht wird Zeile fuer Zeile und zusaetzlich je Absatz im Text ohne Zeilenumbrueche —
 eine Formulierung, die im Fliesstext oder in einem Kommentar ueber einen Umbruch laeuft,
 blieb sonst unsichtbar.
+Ein Absatz endet an einer Leerzeile, einer Tabellenzeile und einer Ueberschrift; ein
+Listenpunkt und ein neuer HTML-Block beginnen einen eigenen. Zwei Listenpunkte oder zwei
+Tabellenzeilen sind kein Satz und werden nicht zusammengesetzt. Stern und Raute am
+Zeilenanfang gelten in Markdown als Listenpunkt und Ueberschrift, in allen anderen
+Dateien als Fortsetzung eines Kommentars.
 
 **test-blind.py** findet Tests, die rechnerisch nicht rot werden koennen: ohne
 Zusicherung, uebersprungen, immer wahr. Setzt KERN 4 Frage 2 durch.

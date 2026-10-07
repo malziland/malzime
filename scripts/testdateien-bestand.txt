@@ -179,11 +179,13 @@ functions/src/__tests__/wirkung-jeder-wert.test.js
 functions/src/__tests__/zaehler-genau-einmal.test.js
 functions/src/__tests__/zusagen-frische.test.js
 public/__tests__/a11y.test.js
+public/__tests__/abfolgen-pruefrunde.test.js
 public/__tests__/abloesung.test.js
 public/__tests__/absturz-wache.test.js
 public/__tests__/analyse-ausgaenge.test.js
 public/__tests__/api-basis.test.js
 public/__tests__/api.test.js
+public/__tests__/aussentext-ohne-auszeichnung.test.js
 public/__tests__/beast-lockruf.test.js
 public/__tests__/beispielbild-karten.test.js
 public/__tests__/beispielbild-ort.test.js

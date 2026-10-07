@@ -1,0 +1,4 @@
+# ERWARTUNG: ein Fund (Exit 1). Der Satz steht in EINEM Listenpunkt und laeuft dort
+# ueber einen Zeilenumbruch. Ein Listenpunkt beginnt einen Absatz, seine eingerueckte
+# Fortsetzung gehoert dazu.
+\b(der|dem|den|des) Betreibers?\b|Keine Zuschreibung in dritter Person.

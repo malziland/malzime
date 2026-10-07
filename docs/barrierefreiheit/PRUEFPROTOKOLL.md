@@ -323,6 +323,8 @@ eine Urkunde ohne Prüfweg.
 
 ## 10 Nächste Prüfung
 
-Fällig bei jeder Änderung an Aussehen, Bedienung oder Seitenstruktur, spätestens
-halbjährlich. Die Messungen laufen bei jedem Auslieferungslauf automatisch mit; die
-vier Handprüfungen aus Abschnitt 7 sind bei jeder Prüfung zu wiederholen.
+Die ganze Prüfung samt den vier Handprüfungen aus Abschnitt 7 ist mindestens
+halbjährlich fällig, gerechnet ab dem Datum „zuletzt geprüft“ der Erklärung; drei Wochen
+davor meldet sich die Wochen-Erinnerung (`functions/src/zusagen.js`). Die Messungen laufen
+bei jedem Auslieferungslauf automatisch mit. Was zwischen zwei ganzen Prüfungen dazukommt,
+ist bis zur nächsten nur maschinell gemessen und steht in Abschnitt 2 als solches.

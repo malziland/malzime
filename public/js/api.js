@@ -31,6 +31,7 @@ import {
   clearStoredJobId,
   getStoredJobId,
   getStoredResultToken,
+  offenerAuftrag,
 } from "./auftrag-speicher.js";
 
 /* Wake-Lock und Auftragsgedächtnis liegen seit 10.09.2026 in eigenen Modulen
@@ -112,7 +113,11 @@ const ENQUEUE_TIMEOUT_MS = 90000;
    Stundenkontingent wird frei, das Bild geloescht. Laeuft er schon, aendert
    die Abmeldung nichts. Ohne Abhol-Ticket nimmt der Server sie nicht an.
    Bestmoeglich und still: Scheitert sie, raeumt der Server den Auftrag wie
-   bisher nach seiner Karenz selbst ab. */
+   bisher nach seiner Karenz selbst ab.
+   Abgemeldet wird an zwei Stellen: beim Start jedes neuen Durchgangs (was der
+   Tab bis dahin gemerkt hatte — auch wenn zuletzt eine Wiederaufnahme den
+   Auftrag fuehrte) und wenn ein Auftrag erst zurueckkommt, nachdem schon ein
+   anderes Foto gewaehlt wurde. */
 function meldeAuftragAb(jobId, resultToken) {
   if (!jobId || !resultToken) return;
   try {
@@ -124,6 +129,13 @@ function meldeAuftragAb(jobId, resultToken) {
   } catch (_) {
     /* Abmelden ist ein Zusatz — nie ein Grund fuer eine Fehlermeldung. */
   }
+}
+
+/* Meldet ab, was der Tab gemerkt hat und noch nicht bekommen hat. Ein Auftrag,
+   dessen Ergebnis schon auf dem Bildschirm stand, braucht das nicht. */
+function meldeOffenenAuftragAb() {
+  const offen = offenerAuftrag();
+  if (offen) meldeAuftragAb(offen.jobId, offen.resultToken);
 }
 
 /* ── Warten auf die Verbindung (BUG-2026-10-03-46) ──────────────────────
@@ -449,6 +461,13 @@ function beendeAnalyse(myId) {
   if (state.requestId !== myId) return;
   state.isAnalyzing = false;
   state.uploadLaeuft = false;
+  /* Der Bildschirm-Wachhalter gehoert dem juengsten Durchgang: Ein abgeloester
+     gibt ihn nicht frei, sonst koennte das Geraet waehrend der Analyse des
+     naechsten Fotos einschlafen. Frei gibt, wer als Letzter fertig wird — auf
+     JEDEM Ausgang, auch den fruehen (Datei fehlt, Datei zu gross): Dort gab
+     ihn sonst niemand frei, wenn der Durchgang davor abgeloest war. Ohne
+     Wachhalter ist der Aufruf wirkungslos. */
+  releaseWakeLock();
 }
 
 async function analyzeImageQueued() {
@@ -466,7 +485,10 @@ async function analyzeImageQueued() {
      stehen (damit ein Reload das Ergebnis wiederholen kann) — sie darf aber
      nicht mehr abgeholt werden, sobald ein neues Foto unterwegs ist. Ohne diese
      zwei Zeilen holte ein Tab-Wechsel waehrend des Uploads das ALTE Ergebnis
-     und zeigte es neben dem NEUEN Foto; das neue Foto wurde nie hochgeladen. */
+     und zeigte es neben dem NEUEN Foto; das neue Foto wurde nie hochgeladen.
+     Was der Tab bis hierher gemerkt hatte, holt niemand mehr ab — also
+     abmelden, gleich welcher Durchgang den Auftrag zuletzt fuehrte. */
+  meldeOffenenAuftragAb();
   clearStoredJobId();
   state.uploadLaeuft = true;
   state.lastPollOk = Date.now();
@@ -687,6 +709,8 @@ async function analyzeImageQueued() {
     }
     /* PRIV-003: Abhol-Ticket vom Server merken + bei jedem Poll mitschicken. */
     const resultToken = enqueueData.resultToken || null;
+    /* Kam inzwischen ein anderes Foto, gehoert dieser Auftrag keinem mehr. */
+    if (state.requestId !== myId) return void meldeAuftragAb(jobId, resultToken);
     storeJobId(jobId, resultToken);
     /* Ab hier gibt es wieder eine Job-Nummer, die zum aktuellen Foto gehoert —
        die Hintergrund-Wiederaufnahme darf also wieder uebernehmen. */
@@ -696,15 +720,9 @@ async function analyzeImageQueued() {
        liveErlaubt: nur hier, beim frischen Upload, darf die Live-Anzeige
        mittippen (v3.0) — die Wiederaufnahme unten bleibt beim heutigen Bild. */
     const outcome = await pollJob(jobId, myId, resultToken, false, true);
-    if (state.requestId !== myId) {
-      /* Abgeloest waehrend des Wartens. Gehoert der gemerkte Auftrag des Tabs
-         nicht mehr zu diesem Durchgang, hat ein anderes Foto uebernommen —
-         dann abmelden. Bei der Wiederaufnahme DESSELBEN Auftrags (Tab kam aus
-         dem Hintergrund zurueck) bleibt die Nummer gemerkt, und nichts wird
-         abgemeldet. */
-      if (getStoredJobId() !== jobId) meldeAuftragAb(jobId, resultToken);
-      return;
-    }
+    /* Abgeloest waehrend des Wartens: Ein neues Foto hat den Auftrag beim
+       Start seines Durchgangs abgemeldet; eine Wiederaufnahme fuehrt ihn weiter. */
+    if (state.requestId !== myId) return;
 
     /* UX-2026-10-03-49: „Analyse abgeschlossen" wird nur angesagt, wenn ein
        Ergebnis da ist. Auf jedem Fehlerweg stoppt die Wartefigur leise — die
@@ -806,11 +824,6 @@ async function analyzeImageQueued() {
       kopfLesetest: err.kopfLesetest,
     });
   } finally {
-    /* Der Bildschirm-Wachhalter gehoert dem juengsten Durchgang: Ein
-       abgeloester gibt ihn nicht frei, sonst koennte das Geraet waehrend der
-       Analyse des naechsten Fotos einschlafen. Frei gibt, wer als Letzter
-       fertig wird — auch die Wiederaufnahme (unten). */
-    if (state.requestId === myId) releaseWakeLock();
     /* Der Schalter gilt nur, solange dieser Durchgang hochlaedt. */
     if (state.currentAbortController === abbruch) state.currentAbortController = null;
     beendeAnalyse(myId);
@@ -844,6 +857,8 @@ export async function resumeQueueJob({ force = false } = {}) {
   const resultToken = getStoredResultToken();
 
   state.isAnalyzing = true;
+  /* Stand bis eben die Zusage „erscheint automatisch" auf dem Bildschirm? */
+  const nachAbriss = state.wartetAufVerbindung;
   /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
      erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
      der Anker immer die Lage von JETZT und nicht die von vorhin. */
@@ -937,7 +952,14 @@ export async function resumeQueueJob({ force = false } = {}) {
     if (!outcome || outcome.abandoned || outcome.error) {
       liveAbbrechenWegenFehler();
       clearStoredJobId();
-      setStatus("");
+      /* ANDERS nach einem Verbindungsabriss mitten im Lauf: Dort stand eben
+         noch „deine Analyse laeuft weiter — sie erscheint automatisch". Ist
+         der Auftrag inzwischen gescheitert oder verworfen, bekommt das Kind
+         eine Antwort statt einer leeren Zeile, und die Fehlererfassung auch. */
+      const schluessel =
+        outcome && outcome.abandoned ? "error.queueAbandoned" : (outcome && outcome.error) || "error.queueFailed";
+      setStatus(nachAbriss ? t(schluessel) : "", nachAbriss ? traceId : undefined, nachAbriss ? schluessel : undefined);
+      if (nachAbriss) meldeSichtbarenFehler(schluessel, "resume-nach-abriss", { requestId: String(myId), traceId });
       return;
     }
     /* Erfolg: Ticket behalten, damit auch ein weiterer Reload das Ergebnis
@@ -964,10 +986,8 @@ export async function resumeQueueJob({ force = false } = {}) {
     setStatus(""); /* stiller Fehler beim Seitenstart — kein Banner */
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });
   } finally {
-    /* Hat die Wiederaufnahme einen Durchgang abgeloest, der den Wachhalter
-       hielt, gibt sie ihn am Ende frei (siehe analyzeImageQueued). Ohne
-       Wachhalter ist der Aufruf wirkungslos. */
-    if (state.requestId === myId) releaseWakeLock();
+    /* Gibt auch den Bildschirm-Wachhalter frei, wenn diese Wiederaufnahme der
+       juengste Durchgang ist (beendeAnalyse). */
     beendeAnalyse(myId);
   }
 }

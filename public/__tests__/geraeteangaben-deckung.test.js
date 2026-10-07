@@ -11,7 +11,8 @@
    Deshalb zwei Pruefungen:
    (1) Am Browser: `collectClientContext()` sammelt die drei Angaben nicht,
        auch wenn der Browser sie anbietet. Was der Text nennt (Groessenklasse
-       des Bildschirms, Sprache, Netz), sammelt es weiter.
+       des Bildschirms, Sprache, Netz), sammelt es weiter — und sonst nichts:
+       Die gesammelten Angaben sind genau die der Zuordnungstabelle.
    (2) An der Zuordnungstabelle: Jede Geraete- oder Netzangabe der
        Fehlermeldungen (`client.…`) traegt ein EIGENES Stichwort, das im
        deutschen und im englischen Text steht. Der Sammelsatz gilt dort nicht;
@@ -68,6 +69,30 @@ describe("(1) Der Browser sammelt die drei Angaben nicht", () => {
       saveData: false,
       screen: "small",
     });
+  });
+
+  /* Pruefrunde 07.10.2026: Bis hierher stand nur fest, welche drei Angaben
+     der Browser NICHT sammelt. Eine vierte, neue Angabe waere mit jeder
+     Fehlermeldung hinausgegangen, ohne dass ein Test rot wird — der Server
+     haette sie zwar verworfen, uebertragen waere sie trotzdem. Deshalb: Bietet
+     der Browser alles an, sammelt das Modul GENAU die Angaben der
+     Zuordnungstabelle, keine mehr und keine weniger. */
+  test("ein Browser, der alles anbietet: gesammelt wird genau, was die Zuordnungstabelle nennt", () => {
+    biete(navigator, "deviceMemory", 8);
+    biete(navigator, "hardwareConcurrency", 8);
+    biete(navigator, "maxTouchPoints", 5);
+    biete(navigator, "language", "de-AT");
+    biete(navigator, "webdriver", false);
+    biete(navigator, "connection", { effectiveType: "4g", downlink: 9.5, rtt: 100, saveData: false, type: "wifi" });
+    biete(window, "devicePixelRatio", 2.625);
+    biete(window.screen, "width", 390);
+    biete(window.screen, "height", 844);
+    const tabelle = JSON.parse(lies("public/__tests__/fixtures/datenschutz-deckung.json")).felder["handle-errors"];
+    const genannt = Object.keys(tabelle)
+      .filter((feld) => feld.startsWith("client."))
+      .map((feld) => feld.slice("client.".length));
+    expect(genannt.length).toBeGreaterThan(5);
+    expect(Object.keys(collectClientContext()).sort()).toEqual(genannt.sort());
   });
 });
 

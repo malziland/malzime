@@ -253,4 +253,37 @@ describe("Fehler-Nachsendung nach einer Pause", () => {
     expect(f).not.toHaveBeenCalled();
     expect(offeneMeldungen()).toHaveLength(1);
   });
+
+  /* Prüfrunde 07.10.2026: Die Uhr zählte einen Versuch, auch wenn inzwischen
+     alles zugestellt war — die nächste Störung begann dann bei 60 statt 15
+     Sekunden. */
+  it("stellt „wieder online“ zu, bevor die Uhr läutet, bekommt die nächste Störung wieder alle Versuche", async () => {
+    const logger = await import("../js/error-logger.js");
+    logger.initFehlerNachsendung();
+    let netz = "weg";
+    const aufrufe = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => {
+      aufrufe.push(Date.now());
+      return netz === "weg"
+        ? Promise.reject(new TypeError("Failed to fetch"))
+        : Promise.resolve({ ok: true, status: 200 });
+    });
+    logger.logClientError(new Error("erste"), { phase: "probe" });
+    await vi.advanceTimersByTimeAsync(5000);
+    netz = "da";
+    window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(logger.offeneMeldungen().length).toBe(0); /* zugestellt */
+    await vi.advanceTimersByTimeAsync(20000); /* die 15-s-Uhr läutet ins Leere */
+
+    /* Zweite Störung, später. */
+    netz = "weg";
+    const vorher = aufrufe.length;
+    logger.logClientError(new Error("zweite"), { phase: "probe" });
+    await vi.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(20000);
+    const nach20s = aufrufe.length - vorher;
+    /* Soll laut Kommentar: erster Nachsendeversuch nach 15 s -> nach 20 s zwei Aufrufe (Erstversuch + Nachsenden). */
+    expect(nach20s).toBe(2);
+  });
 });

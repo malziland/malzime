@@ -90,7 +90,11 @@ echo "Richtung 6: Formulierung ueber einen Zeilenumbruch (2026-10-07)"
 lauf aussentext.py "$HIER/negativprobe/umbruch" 1 \
   "eine Formulierung, die ueber einen Zeilenumbruch laeuft, wird gefunden"
 lauf aussentext.py "$HIER/negativprobe/umbruch-absatz" 0 \
-  "ueber eine Leerzeile und ueber Listenpunkte hinweg wird nicht gesucht"
+  "ueber Leerzeile, Listenpunkte, Ueberschrift und Tabellenzeilen hinweg wird nicht gesucht"
+lauf aussentext.py "$HIER/negativprobe/umbruch-listenpunkt" 1 \
+  "die eingerueckte Fortsetzung eines Listenpunkts gehoert zu seinem Satz"
+lauf aussentext.py "$HIER/negativprobe/umbruch-html" 1 \
+  "ein Satz in einem HTML-Absatz wird ueber den Zeilenumbruch gefunden"
 
 echo "============================================================"
 if [ "$FEHLER" -eq 0 ]; then

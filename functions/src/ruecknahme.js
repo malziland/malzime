@@ -25,7 +25,9 @@ const { deleteImage } = require("./queue-storage");
    kann Firestore dort lange auf die Sperre warten (counter.js, Zeitlimit am
    Einlass). Die Aufrufer haben kurze Zeitgrenzen und halten eine Antwort an
    einen wartenden Menschen zurueck. Nach dieser Zeit laeuft die Freigabe
-   weiter, und eine Warnung sagt, dass nicht auf sie gewartet wurde. */
+   weiter, und eine Warnung sagt, dass nicht auf sie gewartet wurde.
+   BLEIBT IM CODE — keine Stellschraube des Betriebs: Der Wert muss nur unter
+   den Zeitgrenzen der Aufrufer bleiben (Statusabfrage, Aufraeumdienst). */
 const FREIGABE_WARTEN_HOECHSTENS_MS = 5000;
 
 /**

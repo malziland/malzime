@@ -353,8 +353,11 @@ praktisch unbenutzbar. Abhilfe: Häufigkeit wird mitgemessen und begrenzt.
 
 ### 5.3 Nächste Prüfung
 
-Bei jeder Änderung an Aussehen, Bedienung oder Seitenstruktur, mindestens halbjährlich.
-Die maschinellen Messungen laufen bei jeder Auslieferung automatisch mit.
+Die ganze Prüfung samt Handprüfung mindestens halbjährlich, gerechnet ab dem Datum
+„zuletzt geprüft“ der Erklärung; drei Wochen davor meldet sich die Wochen-Erinnerung
+(`functions/src/zusagen.js`). Die maschinellen Messungen laufen bei jeder Auslieferung
+automatisch mit. Was zwischen zwei ganzen Prüfungen dazukommt, ist bis zur nächsten nur
+maschinell gemessen und steht in der Seitenliste so vermerkt.
 
 ---
 

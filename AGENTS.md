@@ -130,7 +130,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   scripts/           Dev-Tools (Lasttests, Forschungs-Skripte)
 
 docs/                Setup-Dokumentation
-.github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml, libheif-bau.yml, release.yml, sicherheit-nachts.yml)
+.github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml, libheif-bau.yml, release.yml, sicherheit-nachts.yml); lighthouserc.json: Schwellen des Lighthouse-Jobs
 ```
 
 ## Build, Test, and Development Commands
@@ -188,7 +188,7 @@ Einzelbefehle:
   Adresse und fester Kartenausschnitt, `e2e/beispielbild-ohne-ortsabfrage.test.js`).
   Diese Formulierung ist verbindlich (DOC-2026-08-12-05); die frühere Fassung war im
   Netzwerk-Tab widerlegbar und steht auf der Sperrliste in `.pruefungen/aussentext.txt`
-- Server bekommt nur: komprimiertes Bild + Kamera-Metadaten (make, model) OHNE GPS, OHNE dateTimeOriginal
+- Server bekommt nur: komprimiertes Bild + Kamera-Metadaten (make, model), die Sprache und eine Zufallsnummer des Durchgangs — OHNE GPS, OHNE dateTimeOriginal
 - Keine externen Scripts: Alles self-hosted (Fonts, Leaflet, exifr, libheif). Kein CDN, kein reCAPTCHA, kein Firebase SDK
 - Selbst gehostet heisst selbst gewartet: Dependabot und npm audit sehen `public/lib` nicht. Das
   uebernimmt der Nachtlauf `sicherheit-nachts.yml` (`scripts/pruefe-fremd-meldungen.mjs`); eine
@@ -233,6 +233,9 @@ Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. D
 - Run `npm run lint:frontend && npm run format:frontend:check` before committing frontend changes
 - The cache-buster `?v=YYYYMMDDNN` is bumped by `scripts/deploy.sh` on every deploy (every deploy includes the website) — never by hand
 - Whoever changes a file under `.github/workflows/`, `.github/dependabot.yml` or one of the tool configs pinned there (`vitest.config.js`, `playwright.config.js`, `eslint.config.mjs`, `functions/eslint.config.js`, `.prettierignore`, `functions/jest.setup.js`) updates its checksum in `scripts/pruefe-deploy-riegel.py` in the same commit (`python3 scripts/pruefe-deploy-riegel.py --vertrag-summen` prints the new values); Dependabot's bumps of pinned actions are exempt. Whoever changes an npm script behind a required CI step, or the Jest settings in `functions/package.json`, updates the pinned wording there (`NPM_SKRIPTE`) in the same commit
+- Whoever adds or deletes a test file under `functions/src/__tests__`, `public/__tests__` or `e2e` updates `scripts/testdateien-bestand.txt` in the same commit (`python3 scripts/pruefe-kopplung.py --bestand` prints the list)
+- Whoever changes a step in one of the six required CI jobs also updates `SCHRITTFOLGE_CI` in `scripts/pruefe-deploy-riegel.py` (`python3 scripts/pruefe-deploy-riegel.py --vertrag-schritte` prints it)
+- Checks that walk the whole directory run before the push through `scripts/nur-git-bekannt.py`, so they see only what git knows (no ignored private folders)
 - Both profiles (normal + boost) come from ONE call (`runSingleLargeCall` in `mistral.js`); the prompt text lives in `locales/*/prompts.js` (`singleLargePrompt`)
 - Bei Aenderungen an der Architektur oder neuen Features: README.md, AGENTS.md, CHANGELOG.md, docs/SETUP.md und docs/SELF-HOSTING.md aktualisieren
 - Bei neuen Features: Dokumentation und Anleitungen mitliefern

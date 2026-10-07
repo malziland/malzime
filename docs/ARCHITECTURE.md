@@ -341,7 +341,7 @@ Scheitern alle 4 Stufen, liefert `json-repair.js` `null`. Ein zweites Modell als
   malziME (Formulierung nach DOC-2026-08-12-05: die alte Fassung war im Netzwerk-Tab
   widerlegbar). Bei den Demo-Fotos fragt der Browser nichts nach aussen: Adresse und
   Kartenausschnitt ihrer erfundenen Orte liegen in der Seite
-- Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
+- Server bekommt nur: komprimiertes Bild + Kamera-make/model, die Sprache und eine Zufallsnummer des Durchgangs (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr, libheif)
 - CSP nur self + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen (`europe-west1`)
 - Foto und Analysedaten gehen direkt an den EU-Server, nicht über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026)

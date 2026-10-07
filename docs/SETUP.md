@@ -225,7 +225,7 @@ Die Privacy-Architektur ist ein Kernbestandteil des Projekts:
 
 1. **EXIF im Browser**: Die Library exifr (self-hosted unter `public/lib/exifr/`) parsed Metadaten client-seitig
 2. **GPS erreicht nie unsere Server**: Die Koordinaten liest der Browser aus dem Foto und nutzt sie dort. Die Adresse zum Ort (Nominatim) und die Kartenkacheln ruft der Browser direkt bei OpenStreetMap ab — die Koordinaten verlassen das Geraet also, nur nie in Richtung malziME. Bei den Demo-Fotos fragt der Browser nichts nach aussen
-3. **Server bekommt**: Komprimiertes Bild (max 1280px, JPEG 0.82) + Kamera-Hersteller/Modell. Kein GPS, kein dateTimeOriginal.
+3. **Server bekommt**: Komprimiertes Bild (max 1280px, JPEG 0.82) + Kamera-Hersteller/Modell, die Sprache und eine Zufallsnummer des Durchgangs. Kein GPS, kein dateTimeOriginal.
 4. **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird unmittelbar danach geloescht; das Job-Dokument spaetestens nach 2 h. Das Bild bleibt nie länger als nötig im Speicher
 5. **Keine externen Scripts**: Fonts, Leaflet, exifr und libheif sind self-hosted. Kein CDN, kein Google Fonts, kein Firebase SDK im Frontend
 6. **Bot-Schutz ohne Tracking**: Rate Limiting (IP-basiert), Honeypot-Feld, Timing-Check. Kein reCAPTCHA.

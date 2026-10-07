@@ -4,7 +4,7 @@
 [![Firebase Hosting](https://img.shields.io/badge/Firebase-Hosting-FFCA28?logo=firebase&logoColor=black)](https://malzi.me)
 ![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 [![CI](https://github.com/malziland/malzime/actions/workflows/ci.yml/badge.svg)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
-[![Lighthouse Performance](https://img.shields.io/badge/Performance-%E2%89%A590-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
+[![Lighthouse Performance](https://img.shields.io/badge/Performance-%E2%89%A580-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse Accessibility](https://img.shields.io/badge/Accessibility-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse Best Practices](https://img.shields.io/badge/Best_Practices-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse SEO](https://img.shields.io/badge/SEO-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
@@ -134,7 +134,7 @@ Datenschutz ist kein Feature — es ist das Fundament:
 - **EU-Hosting fuer KI-Analysen**: Alle Bild-Analysen laufen ueber Mistral AI (Paris, EU-DSGVO). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO. Auf dem genutzten kostenpflichtigen API-Tier ist Training auf Eingaben/Ausgaben laut Anbieter-Zusage deaktiviert.
 - **Keine US-KI-Anbieter mehr**: Seit v1.6.0 wurden Google Vertex AI und Cloud Vision aus der Pipeline entfernt. Google bleibt nur fuer die Infrastruktur: Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) in `europe-west1`, statische Seiten ueber ein weltweites Auslieferungsnetz (CDN).
 - **EXIF-Extraktion im Browser**: exifr parsed die Metadaten lokal, GPS erreicht nie unsere Server
-- **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell (ohne GPS, ohne dateTimeOriginal)
+- **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell, die Sprache und eine Zufallsnummer des Durchgangs (ohne GPS, ohne dateTimeOriginal)
 - **Geocoding direkt vom Browser**: Nominatim wird client-seitig aufgerufen, nicht ueber den Server
 - **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
 - **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr, libheif). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK

@@ -238,10 +238,9 @@ wird der Satz mit einem Skript, **vor** dem ersten Ausliefern:
 
 ```bash
 gcloud auth application-default login
-# In scripts/betriebsprofil-anlegen.js steht die Projekt-ID fest im Aufruf
-# initializeApp(...) — dort vor dem ersten Lauf "malzime" durch deine ersetzen.
-node scripts/betriebsprofil-anlegen.js               # zeigt nur, was es schreiben wuerde
-node scripts/betriebsprofil-anlegen.js --ausfuehren  # schreibt und liest zur Kontrolle zurueck
+# Ohne --projekt schreibt das Skript in das Projekt "malzime" — also immer deines nennen.
+node scripts/betriebsprofil-anlegen.js --projekt DEINE-PROJEKT-ID               # zeigt nur, was es schreiben wuerde
+node scripts/betriebsprofil-anlegen.js --projekt DEINE-PROJEKT-ID --ausfuehren  # schreibt und liest zur Kontrolle zurueck
 ```
 
 Aendern heisst spaeter: den Wert im aktiven Satz setzen — kein Deploy noetig,

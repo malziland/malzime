@@ -60,14 +60,20 @@ describe("am Quelltext", () => {
     expect(fundstellen).toEqual([]);
   });
 
-  test("die Hilfe wird an den vier Stellen gerufen, die einen Auftrag zuruecknehmen — und ueberall abgewartet", () => {
+  test("die Hilfe wird an den fuenf Stellen gerufen, die einen Auftrag zuruecknehmen — und ueberall abgewartet", () => {
     const stellen = quellen().flatMap(({ name, zeilen }) =>
       aufrufe(zeilen, "belegtesFreigeben").map(({ nr }) => ({ name, nr }))
     );
     const jeDatei = stellen.reduce((zahl, { name }) => ({ ...zahl, [name]: (zahl[name] || 0) + 1 }), {});
     /* Einlass: eine gemeinsame Rueckabwicklung. Verarbeiter: verlassener
-       Auftrag. Aufraeumdienst: verlassen und ueberfaellig. */
-    expect(jeDatei).toEqual({ "handle-enqueue.js": 1, "handle-process-job.js": 1, "handle-reap.js": 2 });
+       Auftrag. Aufraeumdienst: verlassen und ueberfaellig. Statusabfrage: ein
+       vom Browser abgemeldeter Auftrag (PRIV-2026-10-03-57). */
+    expect(jeDatei).toEqual({
+      "handle-enqueue.js": 1,
+      "handle-job-status.js": 1,
+      "handle-process-job.js": 1,
+      "handle-reap.js": 2,
+    });
 
     const nichtAbgewartet = quellen().flatMap(({ name, zeilen }) =>
       ohneAwait(zeilen, "belegtesFreigeben").map(({ nr }) => `${name}:${nr}`)

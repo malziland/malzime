@@ -25,8 +25,7 @@ const { wartezeitSekunden } = require("./warteschlangen-rechnung");
 const { getFeatureFlags } = require("./feature-flags");
 const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered, abandonJob } = require("./jobs");
 const { safeCompare, sha256Hex } = require("./auth");
-const { releaseHourlySlot } = require("./counter");
-const { deleteImage } = require("./queue-storage");
+const { belegtesFreigeben } = require("./ruecknahme");
 
 /* Firestore-Auto-IDs: genau 20 Zeichen aus [A-Za-z0-9] (jobs.js:58 nutzt
    `jobsRef().doc()` ohne eigenen Namen). Bewusst eng gefasst — alles, was nicht
@@ -84,7 +83,7 @@ async function isGemesseneDauerAn() {
    - Nur ein noch WARTENDER Job. Was schon in Arbeit oder fertig ist, bleibt
      unberührt (`abandonJob` prüft das in einer Transaktion).
 
-   Danach dieselben Schritte wie im Aufräumdienst (handle-reap.js): Platz im
+   Danach dieselbe Rücknahme wie im Aufräumdienst (ruecknahme.js): Platz im
    Stundenkontingent zurückgeben, Bild löschen. Der Aufrufer wertet die
    Antwort nicht aus; scheitert etwas, räumt der Aufräumdienst wie bisher. */
 async function verwerfeAufWunsch(job, token, res) {
@@ -96,8 +95,7 @@ async function verwerfeAufWunsch(job, token, res) {
   try {
     if (job.status === "queued" && (await abandonJob(job.id))) {
       verworfen = true;
-      await releaseHourlySlot(job.zaehlerStempel);
-      await deleteImage(job.imagePath);
+      await belegtesFreigeben(job);
     }
   } catch (err) {
     /* Ohne jobId und ohne Fehlertext (wie in handle-reap.js): Ein

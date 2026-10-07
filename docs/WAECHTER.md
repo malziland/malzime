@@ -173,7 +173,7 @@ Ehrlich benannt, damit niemand sich darauf verlässt:
     | `.gitignore` nennt eingecheckte Dateien (Prettier lässt sie aus) | rot; außerhalb eines git-Repositorys „NICHT GEMESSEN" | — | — |
     | ein Test übersprungen (`.skip`) | **nein** | **nein** | `test-blind.py` wird rot |
     | eine Testdatei gelöscht | **nein** | **nein** | `pruefe-kopplung.py` wird rot: Jede Testdatei steht im Bestand `scripts/testdateien-bestand.txt`. Wer die Zeile mitstreicht, macht ihn wieder grün — die Löschung steht dann zweimal im Diff. Für die Dateien seiner Liste unverzichtbarer Prüfungen genügt das Streichen nicht |
-    | die Testanzahl schrumpft, ohne dass ein Skript oder eine Einstellung sich ändert | **nein** | **nein** | der Prüfstand stempelt jede Zahl größer null nach `docs/VERIFICATION.md`; ein Rückgang steht dort im Diff, hält aber nichts an |
+    | die Testanzahl schrumpft, ohne dass ein Skript oder eine Einstellung sich ändert | **nein** | **nein** | der Prüfstand vergleicht mit dem letzten Stempel in `docs/VERIFICATION.md` und stempelt nichts, wenn eine Testreihe unter 90 % davon liegt (OPS-2026-10-04-25; ein gewollter Rückgang wird mit `PRUEFSTAND_RUECKGANG_ERLAUBT=1` bestätigt). Ein kleinerer Rückgang steht im Diff, hält aber nichts an; der Prüfstand läuft vor einem Release, nicht in der Pipeline |
     | ein ausgetauschtes Paket hinter `jest`, `vitest`, `playwright`, `eslint` oder `prettier` | **nein** | **nein** | Lockfile im Diff, Dependabot |
     | Variablen, die GitHub von außen setzt (Repository- oder Organisations-Variablen) | **nein** | **nein** | stehen nicht im Repository |
 

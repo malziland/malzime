@@ -128,11 +128,43 @@ def anmerkung_aus(zelle):
     return " " + m.group(1).strip() if m else ""
 
 ersetzungen = [
-    (r"(\| Backend-Unit-Tests \|[^|]+\|)([^|]+)\|",  f"✅ {b_text} {stempel_ende}"),
-    (r"(\| Frontend-Unit-Tests \|[^|]+\|)([^|]+)\|", f"✅ {f_text} {stempel_ende}"),
-    (r"(\| E2E kritischster Nutzerfluss[^|]*\|[^|]+\|)([^|]+)\|", f"✅ {e_text} {stempel_ende}"),
+    ("Backend-Unit-Tests", b, r"(\| Backend-Unit-Tests \|[^|]+\|)([^|]+)\|",  f"✅ {b_text} {stempel_ende}"),
+    ("Frontend-Unit-Tests", f, r"(\| Frontend-Unit-Tests \|[^|]+\|)([^|]+)\|", f"✅ {f_text} {stempel_ende}"),
+    ("E2E kritischster Nutzerfluss", e, r"(\| E2E kritischster Nutzerfluss[^|]*\|[^|]+\|)([^|]+)\|", f"✅ {e_text} {stempel_ende}"),
 ]
-for muster, neuer_stand in ersetzungen:
+
+# OPS-2026-10-04-25: Der Stempel nahm jede Zahl groesser null. Faellt aus einer
+# Testreihe der groesste Teil heraus (ein Filter, eine Einstellung, ein ganzer
+# Ordner), laeuft der Rest gruen — und hier stand danach "15/15 gruen", wo
+# vorher 919 standen. Deshalb der Vergleich mit dem letzten Stempel in derselben
+# Zeile: Unter MINDEST_ANTEIL Prozent davon wird NICHTS gestempelt, in keiner
+# der drei Zeilen (geschrieben wird erst ganz am Ende). Genau der Anteil selbst
+# geht noch durch: 900 von 1000 ja, 899 nein.
+#
+# Ein bewusster Rueckgang (Tests zusammengelegt, eine Reihe umgebaut) wird mit
+# PRUEFSTAND_RUECKGANG_ERLAUBT=1 bestaetigt; der Lauf nennt ihn dann laut.
+MINDEST_ANTEIL = 90
+bestaetigt = os.environ.get("PRUEFSTAND_RUECKGANG_ERLAUBT") == "1"
+for name, anzahl, muster, _ in ersetzungen:
+    zeile = re.search(muster, text)
+    if not zeile:
+        continue  # meldet die Schleife unten: "Tabellenaufbau geändert"
+    letzter = re.search(r"(\d+)/\d+ grün", zeile.group(2))
+    if not letzter:
+        print(f"Hinweis: {name}: kein früherer Stempel lesbar — der Vergleich entfällt.")
+        continue
+    if int(anzahl) * 100 >= int(letzter.group(1)) * MINDEST_ANTEIL:
+        continue
+    befund = f"{name}: {anzahl} Tests, im letzten Stempel {letzter.group(1)}"
+    if bestaetigt:
+        print(f"RÜCKGANG BESTÄTIGT (PRUEFSTAND_RUECKGANG_ERLAUBT=1): {befund}.")
+        continue
+    print(f"ABBRUCH: {befund} — weniger als {MINDEST_ANTEIL} % davon. Es wird nichts gestempelt.")
+    print("  Fehlen Tests (Filter, Einstellung, geloeschte Dateien)? Dann zuerst das klaeren.")
+    print("  Ist der Rueckgang gewollt: PRUEFSTAND_RUECKGANG_ERLAUBT=1 ./scripts/pruefstand.sh")
+    sys.exit(1)
+
+for _, _, muster, neuer_stand in ersetzungen:
     def ersatz(m, _neu=neuer_stand):
         return f"{m.group(1)} {_neu.rstrip('|').rstrip()}{anmerkung_aus(m.group(2))} |"
     text, anzahl = re.subn(muster, ersatz, text, count=1)

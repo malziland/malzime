@@ -698,14 +698,20 @@ Nachsehen:
 
 ### Mistral überlastet / 429 / 5xx
 
-Die Queue puffert Stoßlast. Lehnt Mistral trotzdem ab (429) oder ist es kurz
-weg (502, 503, 504), wartet der Auftrag **10, 20, 40 und 80 Sekunden** und
-versucht es jeweils wieder (`ueberlastWarteMs`, `ueberlastVersuche` im
-Einstellungssatz, seit 08.09.2026). Der Nutzer sieht dabei nur eine längere
-Wartezeit. Erst wenn alle Wiederholungen scheitern oder das Restbudget nicht
-mehr reicht, sieht er `blocked.overloaded` bzw. `blocked.apiError`. Vorher
-gab es eine Wiederholung nach zwei Sekunden — bei 15 Aufrufen je Minute
-wirkungslos: Am 08.09.2026 scheiterten so 6 von 47 Analysen einer Klasse.
+Die Queue puffert Stoßlast. Lehnt Mistral den Analyse-Aufruf trotzdem ab (429)
+oder ist es kurz weg (502, 503, 504), wartet der Auftrag **10, 20, 40 und 80
+Sekunden** und versucht es jeweils wieder (`ueberlastWarteMs`,
+`ueberlastVersuche` im Einstellungssatz, seit 08.09.2026). Der Nutzer sieht
+dabei nur eine längere Wartezeit. Erst wenn alle Wiederholungen scheitern oder
+das Restbudget nicht mehr reicht, sieht er `blocked.overloaded` bzw.
+`blocked.apiError`. Vorher gab es eine Wiederholung nach zwei Sekunden — bei 15
+Aufrufen je Minute wirkungslos: Am 08.09.2026 scheiterten so 6 von 47 Analysen
+einer Klasse. Der zweite Aufruf einer Analyse (Beast-Werbung) hat fest 30
+Sekunden und wiederholt deshalb höchstens einmal; fällt er wegen Überlast aus,
+steht eine Warnung `beast-ads-failed` im Log, und das Kind bekommt sein
+Ergebnis mit der Werbeliste aus dem Analyse-Aufruf. Eine FEHLERZEILE
+`beast-ads-failed` heißt dagegen: Der Aufruf scheitert aus einem anderen Grund
+(Schlüssel, Modell, Zeitlimit) — dann dort nachsehen.
 Bei anhaltender Störung: Mistral-Status und **Account-Dashboard** prüfen
 (Limits unterscheiden sich drastisch je Modellversion — immer das Dashboard,
 nicht Code-Kommentare). Notfalls Wartungsmodus (Hebel 1).

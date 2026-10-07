@@ -9,6 +9,7 @@ jest.mock("../jobs", () => ({
   abandonJob: jest.fn(),
   failJob: jest.fn(),
   deleteJob: jest.fn(),
+  nachmeldenBeimLoeschen: jest.fn(),
   /* NEU (BUG-2026-08-30-14): Der Reaper gleicht den Warteschlangen-Zaehler mit
      der Wirklichkeit ab. Ohne diesen Eintrag meldete jeder Reaper-Test einen
      Fehler ins Protokoll — und die Tests, die auf "keine Fehlermeldung"

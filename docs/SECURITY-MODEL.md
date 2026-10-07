@@ -567,15 +567,24 @@ dann liegt die Ursache außerhalb eines Einzelfalls, und `ursache.code` zeigt, w
 **Entscheidung.** Sieht ein Kind nach einer Analyse eine Fehlermeldung, endet
 sein Auftrag `done` mit blockiertem Ergebnis, `done` mit einem leeren Profil in
 einem der beiden Modi (`completeJob`) oder `failed` (`failJob`: der Worker
-wurde nicht fertig, oder schon das Einreihen scheiterte). Dort, und nur wenn
-dieser Aufruf den Übergang gemacht hat, schreibt `jobs.js` die eine
-Fehlerzeile `alert: "analyse-gescheitert"` mit dem Grund (Liste in
-`docs/ERROR-ALERTING.md`). Scheitert das Hochladen, bevor es einen Auftrag
+wurde nicht fertig, oder schon das Einreihen scheiterte). Zu diesem Übergang
+schreibt `jobs.js` die eine Fehlerzeile `alert: "analyse-gescheitert"` mit dem
+Grund (Liste in `docs/ERROR-ALERTING.md`). Seit 07.10.2026 hängt sie am Zustand
+des Auftrags, nicht am einzelnen Aufruf (OPS-2026-10-03-31): Der Auftrag trägt
+ab dem Übergang `gemeldet: false` und nach der Zeile `gemeldet: true`. Endet
+der Übergang mit einem Fehler, wird er einmal wiederholt — kam nur die
+Bestätigung der Datenbank nicht an, erkennt die Wiederholung den eigenen Stand
+und meldet. Was beim Löschen eines Auftrags noch `gemeldet: false` trägt,
+meldet der Aufräumdienst nach (spätestens nach 2 Stunden; scheitert nur der
+Vermerk, kommt die Nachricht dann ein zweites Mal — lieber zwei als keine). Scheitert das Hochladen, bevor es einen Auftrag
 gibt (Speicher oder Datenbank weg, unerwarteter Serverfehler), ruft
 `handle-enqueue.js` dieselbe Meldung; Eingabefehler (4xx) melden sich nicht.
 Auf sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
 Einzelnen beschreiben — KI-Aufruf, Neuversuch, Nachfrage, Foto laden,
-Absturzverdacht, verworfenes Ergebnis —, sind Warnungen. Wie die Richtlinien
+Absturzverdacht, verworfenes Ergebnis, wiederholtes Speichern —, sind
+Warnungen. Ebenso seit 07.10.2026 der Werbe-Aufruf, den Mistral wegen Überlast
+ablehnt (429): Das Kind bekommt sein Ergebnis, eine Nachricht „Fehler im
+Server“ wäre ein Alarm ohne gescheiterte Analyse. Wie die Richtlinien
 filtern und wie oft sie melden: `docs/ERROR-ALERTING.md`.
 
 **Begründung.** Vorher entschied jede Stelle selbst, ob sie alarmiert. Das gab
@@ -587,7 +596,8 @@ obwohl das Kind sein Tierprofil bekam; ein Absturzverdacht meldete sich als
 bekannt, was das Kind sieht. Abgesichert in
 `functions/src/__tests__/ein-alarm-je-fehlermeldung.test.js` über den echten
 Weg (Worker, Pipeline, KI-Aufruf, Auftragsverwaltung): je Fehlerfall genau
-eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine. Ob
+eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine; mit
+verlorener Bestätigung der Datenbank in `meldung-am-zustand.test.js`. Ob
 „leeres Profil“ vorliegt, entscheidet dieselbe Regel wie in
 `public/js/render.js` (Text oder mindestens eine Karte).
 

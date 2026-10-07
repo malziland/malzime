@@ -27,6 +27,7 @@ jest.mock("../jobs", () => ({
   abandonJob: jest.fn(),
   failJob: jest.fn(),
   deleteJob: jest.fn(),
+  nachmeldenBeimLoeschen: jest.fn(),
   platzAbgleichen: jest.fn(async () => ({ vorher: 0, jetzt: 0 })),
 }));
 jest.mock("../queue-storage", () => ({ deleteImage: jest.fn() }));

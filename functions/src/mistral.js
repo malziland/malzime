@@ -570,10 +570,12 @@ async function generateBeastAds(boostProfile, standardAds, lang) {
        Alarm-Policy. Vorher war ein dauerhaft fehlschlagender Zweitaufruf
        voellig unsichtbar: Der Fallback greift, der Nutzer merkt nichts, und
        jede Analyse liefe still mit der schlechteren Werbung aus dem
-       Hauptaufruf. Der Fallback selbst bleibt unveraendert richtig. */
-    console.error(
+       Hauptaufruf. Der Fallback selbst bleibt unveraendert richtig.
+       OPS-2026-10-03-31: Lehnt Mistral wegen Ueberlast ab (429), ist es eine
+       Warnung — unter Andrang erwartbar, und das Kind hat sein Ergebnis. */
+    (err.status === 429 ? console.warn : console.error)(
       JSON.stringify({
-        severity: "ERROR",
+        severity: err.status === 429 ? "WARNING" : "ERROR",
         alert: "beast-ads-failed",
         step: "mistral-beast-ads",
         status: "failed",

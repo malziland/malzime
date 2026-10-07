@@ -94,18 +94,26 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 | `ueberlastWarteMs` | 10000 | Wartezeit vor der ersten Wiederholung, wenn Mistral ablehnt oder kurz weg ist; jede weitere verdoppelt sich |
 | `ueberlastVersuche` | 4 | Wie oft wiederholt wird, bevor der Auftrag als blockiert endet |
 
-**Was die beiden letzten Werte tun (seit 08.09.2026):** Lehnt Mistral einen
-Aufruf ab (HTTP 429, Limit erreicht) oder ist der Dienst kurz weg (502, 503,
-504), wartet der Auftrag 10, 20, 40 und 80 Sekunden und versucht es jeweils
-wieder. Der Platz in der Warteschlange bleibt dabei belegt, das nimmt Last
-von Mistral. Für das Kind vor dem Bildschirm ist das eine längere Wartezeit,
-kein Fehler. Vorher gab es eine Wiederholung nach 2 Sekunden, und die war bei
-einem Limit von 15 Aufrufen je Minute wirkungslos: Am 08.09. scheiterten so
-6 von 47 Analysen einer Klasse. Die Reihe ist an den Messdaten dieses
-Vormittags nachgerechnet (Herleitung in `functions/src/produktiv-satz.js`).
-Die Summe der Wartezeiten muss unter dem Gesamtbudget liegen, sonst wird der
-Satz abgelehnt. Jede Wiederholung steht als Zeile `mistral-wiederholung` im
-Log, mit Wartezeit und einer etwaigen Retry-After-Angabe von Mistral.
+**Was die beiden letzten Werte tun (seit 08.09.2026):** Lehnt Mistral den
+Analyse-Aufruf ab (HTTP 429, Limit erreicht) oder ist der Dienst kurz weg (502,
+503, 504), wartet der Auftrag 10, 20, 40 und 80 Sekunden und versucht es
+jeweils wieder. Der Platz in der Warteschlange bleibt dabei belegt, das nimmt
+Last von Mistral. Für das Kind vor dem Bildschirm ist das eine längere
+Wartezeit, kein Fehler. Vorher gab es eine Wiederholung nach 2 Sekunden, und
+die war bei einem Limit von 15 Aufrufen je Minute wirkungslos: Am 08.09.
+scheiterten so 6 von 47 Analysen einer Klasse. Die Reihe ist an den Messdaten
+dieses Vormittags nachgerechnet (Herleitung in
+`functions/src/produktiv-satz.js`). Die Summe der Wartezeiten muss unter dem
+Gesamtbudget liegen, sonst wird der Satz abgelehnt. Jede Wiederholung steht als
+Zeile `mistral-wiederholung` im Log, mit Wartezeit und einer etwaigen
+Retry-After-Angabe von Mistral.
+
+Für den zweiten, kleinen Aufruf einer Analyse (die Beast-Werbung) gilt die
+ganze Reihe nicht: Er hat fest 30 Sekunden und kommt damit auf höchstens EINE
+Wiederholung nach 10 Sekunden (10 s + 20 s wären schon die 30). Scheitert er,
+bleibt die Werbeliste aus dem Analyse-Aufruf stehen — das Kind bekommt sein
+Ergebnis. Bei einer Ablehnung wegen Überlast (429) steht dazu eine Warnung im
+Log (`beast-ads-failed`), bei jedem anderen Fehlschlag eine Fehlerzeile.
 
 ### 5 · Fristen und Aufräumen
 

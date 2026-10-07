@@ -38,6 +38,7 @@ const {
   abandonJob,
   failJob,
   deleteJob,
+  nachmeldenBeimLoeschen,
 } = require("./jobs");
 const { datenbank } = require("./db");
 const { letzterLeseversuchGescheitert } = require("./betriebsprofil");
@@ -203,6 +204,9 @@ async function reapJobs() {
          Zweig (3) raeumt das Dokument nach 2 h ab. */
       if (job.imagePath && !(await deleteImage(job.imagePath))) continue;
       await deleteJob(job.id);
+      /* OPS-2026-10-03-31: Was eine Fehlermeldung zeigte und noch nicht
+         gemeldet ist, wird jetzt gemeldet — hier und in Zweig (3). */
+      nachmeldenBeimLoeschen(job);
       reapedZugestellt += 1;
     } catch (err) {
       console.log(
@@ -249,6 +253,7 @@ async function reapJobs() {
         );
       }
       await deleteJob(job.id);
+      nachmeldenBeimLoeschen(job);
       reapedExpired += 1;
     } catch (err) {
       console.log(

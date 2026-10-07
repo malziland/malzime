@@ -83,49 +83,34 @@ function jobsRef() {
   return datenbank().collection(JOBS_COLLECTION);
 }
 
-/* EIN ALARM JE GESCHEITERTER ANALYSE (01.10.2026). Endet eine Analyse mit
-   einer Fehlermeldung, endet ihr Auftrag `done` mit blockiertem Ergebnis,
-   `done` mit einem leeren Profil in einem der beiden Modi (completeJob) oder
-   `failed` (failJob — Worker nicht fertig, oder schon das Einreihen scheiterte,
-   `enqueue_failed`). Nur dort, und nur wenn DIESER Aufruf den Uebergang gemacht
-   hat, entsteht die eine Fehlerzeile, auf die der Alarm "Analyse gescheitert"
-   hoert. Scheitert das Einreihen, bevor es einen Auftrag gibt (Speicher oder
-   Datenbank weg), ruft handle-enqueue.js dieselbe Meldung selbst. Die Zeilen, die den Grund im Einzelnen beschreiben (KI-Aufruf, Foto
-   laden, Absturzverdacht, verworfenes Ergebnis), sind Warnungen — sonst kaemen
-   fuer eine Fehlermeldung zwei Nachrichten, und ein Tierfoto, das trotz
-   gescheiterter Nachfrage sein Profil bekommt, loeste einen Fehlalarm aus.
-   Ohne Kennung (handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"): nur
-   der Grund, und nur als feste Kennung wie `blocked.apiError` oder
-   `processing_timeout` — alles andere wird "unbekannt". */
-const GRUND_MUSTER = /^(blocked\.[A-Za-z]{1,40}|[a-z_]{1,40})$/;
+/* Welche Fehlermeldung ein Endzustand dem Kind zeigt und die eine Fehlerzeile
+   dazu ("ein Alarm je gescheiterter Analyse"): analyse-ausgang.js. */
+const { fehlerGrund, meldeGescheiterteAnalyse } = require("./analyse-ausgang");
 
-/* Ein Profil ohne Text und ohne Karten zeigt im jeweiligen Modus "Die KI hat
-   ein leeres Profil zurueckgeliefert" (public/js/render.js, hasContent —
-   dieselbe Regel). Das passiert, wenn nur ein Teil gerettet wurde und die
-   Nachfrage nach den fehlenden Karten scheiterte. Tierprofile sind immer
-   gefuellt, blockierte Ergebnisse haben keine Profile. */
-function leeresProfil(result) {
-  if (!result || !result.profiles || !result.meta || result.meta.mode === "animal") return null;
-  const hatInhalt = (p) =>
-    Boolean(
-      p &&
-      ((typeof p.profileText === "string" && p.profileText.trim()) ||
-        (p.categories && Object.keys(p.categories).length > 0))
-    );
-  if (!hatInhalt(result.profiles.normal)) return "profil_leer_standard";
-  if (!hatInhalt(result.profiles.boost)) return "profil_leer_beast";
-  return null;
+/* Schreibt die Meldung und vermerkt sie am Auftrag (OPS-2026-10-03-31). In
+   dieser Reihenfolge: Scheitert der Vermerk, bleibt `gemeldet: false` stehen,
+   und der Aufraeumdienst meldet beim Loeschen ein zweites Mal — lieber zwei
+   Nachrichten als keine. */
+async function meldenUndVermerken(ref, grund) {
+  meldeGescheiterteAnalyse(grund);
+  await ref.update({ gemeldet: true }).catch(() => {});
 }
 
-function meldeGescheiterteAnalyse(grund) {
-  console.error(
-    JSON.stringify({
-      severity: "ERROR",
-      alert: "analyse-gescheitert",
-      step: "analyse-ausgang",
-      grund: typeof grund === "string" && GRUND_MUSTER.test(grund) ? grund : "unbekannt",
-    })
-  );
+/* Fuehrt einen Uebergang in den Endzustand aus und wiederholt ihn EINMAL, wenn
+   er mit einem Fehler endet. Die Wiederholung traegt dieselbe Marke: Hat der
+   erste Versuch doch geschrieben und nur die Bestaetigung kam nicht an, erkennt
+   sie den eigenen Stand (siehe completeJob, failJob). */
+async function mitWiederholung(uebergang) {
+  const marke = crypto.randomUUID();
+  return uebergang(marke).catch(() => uebergang(marke));
+}
+
+/* Meldet beim Loeschen nach, was im Endzustand eine Fehlermeldung zeigte und
+   noch nicht gemeldet ist — fuer den Aufraeumdienst, NACH dem Loeschen des
+   Auftrags. `gemeldet` ist nur dann `false`, wenn der Uebergang es so gesetzt
+   hat; Auftraege aus der Zeit vor diesem Feld bleiben still. */
+function nachmeldenBeimLoeschen(job) {
+  if (job && job.gemeldet === false && fehlerGrund(job)) meldeGescheiterteAnalyse(fehlerGrund(job));
 }
 
 /**
@@ -254,6 +239,9 @@ async function claimJob(jobId) {
 async function completeJob(jobId, result, { marke = null, meldeGrund = null } = {}) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
+  /* Zeigt dieses Ergebnis dem Kind eine Fehlermeldung (blockiert oder leeres
+     Profil)? Dann traegt der Auftrag ab dem Uebergang `gemeldet: false`. */
+  const grund = fehlerGrund({ status: "done", result, errorReason: meldeGrund });
   const gemacht = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) return false;
@@ -266,16 +254,11 @@ async function completeJob(jobId, result, { marke = null, meldeGrund = null } = 
       result: result || null,
       errorReason: meldeGrund,
       abschlussMarke: marke,
+      gemeldet: grund ? false : null,
     });
     return true;
   });
-  /* Ein blockiertes Ergebnis oder ein leeres Profil zeigt dem Kind eine
-     Fehlermeldung. */
-  if (gemacht) {
-    if (result && result.meta && result.meta.mode === "blocked")
-      meldeGescheiterteAnalyse(meldeGrund || result.blockedReason);
-    else if (leeresProfil(result)) meldeGescheiterteAnalyse(leeresProfil(result));
-  }
+  if (gemacht && grund) await meldenUndVermerken(ref, grund);
   return gemacht;
 }
 
@@ -344,24 +327,27 @@ async function ersatzErgebnisSpeichern(jobId, job, meldeGrund) {
  * Markiert einen Job als gescheitert: NUR aus `queued`/`processing` → `failed`.
  *
  * BUG-001: bedingt — ein bereits `done`/`abandoned` Job wird NICHT überschrieben.
+ * OPS-2026-10-03-31: Endet der Uebergang mit einem Fehler, wird er einmal
+ * wiederholt (mitWiederholung) — kam nur die Bestaetigung nicht an, meldet die
+ * Wiederholung.
  * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
 async function failJob(jobId, reason) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  const gemacht = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) return false;
-    const st = snap.data().status;
-    if (st !== "queued" && st !== "processing") return false;
-    tx.update(ref, {
-      status: "failed",
-      finishedAt: Date.now(),
-      errorReason: typeof reason === "string" ? reason.slice(0, 300) : "unknown",
-    });
-    return true;
-  });
-  if (gemacht) meldeGescheiterteAnalyse(reason);
+  const errorReason = typeof reason === "string" ? reason.slice(0, 300) : "unknown";
+  const gemacht = await mitWiederholung((marke) =>
+    db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return false;
+      const daten = snap.data();
+      if (daten.status === "failed" && daten.abschlussMarke === marke) return true;
+      if (daten.status !== "queued" && daten.status !== "processing") return false;
+      tx.update(ref, { status: "failed", finishedAt: Date.now(), errorReason, abschlussMarke: marke, gemeldet: false });
+      return true;
+    })
+  );
+  if (gemacht) await meldenUndVermerken(ref, reason);
   return gemacht;
 }
 
@@ -748,6 +734,7 @@ module.exports = {
   verbraucheRcTicket,
   setLiveText,
   meldeGescheiterteAnalyse,
+  nachmeldenBeimLoeschen,
   abandonJob,
   isAbandoned,
   findAbandonedJobs,

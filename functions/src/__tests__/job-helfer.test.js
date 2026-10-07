@@ -67,6 +67,10 @@ describe("OPS-2026-09-01 — hasCategories unterscheidet leer von gefuellt", () 
     expect(hasCategories(null)).toBeFalsy();
     expect(hasCategories(undefined)).toBeFalsy();
   });
+
+  test("Karten, die kein Objekt sind, gelten als nicht vorhanden (BUG-2026-10-03-03)", () => {
+    expect(hasCategories({ categories: "Du bist X. Beleg Y." })).toBeFalsy();
+  });
 });
 
 /* BEFUND 01.09.2026 (Runde 7, K-9/L-6): `isQuotaError` kam in KEINER Testdatei

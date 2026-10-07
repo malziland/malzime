@@ -362,6 +362,9 @@ function boundProfileLevel(level) {
       }
     }
     level.categories = bounded;
+  } else if (level.categories !== undefined) {
+    /* Karten, die kein Objekt sind (etwa ein Fliesstext), sind keine Karten. */
+    level.categories = {};
   }
 
   if (!Array.isArray(level.ad_targeting)) {
@@ -395,6 +398,19 @@ function applyBounds(parsed) {
   /* Single-Large-Pfad: die beiden Modus-Ebenen mitnehmen. */
   boundProfileLevel(parsed.standard);
   boundProfileLevel(parsed.beast);
+
+  /* Die beiden Anker aus hard_facts stellt mistral.js den Karten voran. Als
+     Text gilt fuer sie die Laenge eines Kartenwerts; die Herkunft zaehlt nur
+     als Text. Ein Altersanker ohne Textform bleibt stehen: Ihn liest die
+     Altersauslese mit (alters-lesbarkeit.js, ankerAlsText). */
+  const anker = parsed.hard_facts;
+  if (anker && typeof anker === "object") {
+    if (typeof anker.alter_geschlecht === "string") {
+      anker.alter_geschlecht = anker.alter_geschlecht.slice(0, STRING_BOUND_CATEGORY);
+    }
+    if (typeof anker.herkunft === "string") anker.herkunft = anker.herkunft.slice(0, STRING_BOUND_CATEGORY);
+    else if (anker.herkunft !== undefined) anker.herkunft = "";
+  }
 
   if (parsed.categories && typeof parsed.categories === "object") {
     /* SEC-02: Kategorie-Keys landen im Frontend in einem HTML-Attribut

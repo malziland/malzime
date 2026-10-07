@@ -426,5 +426,57 @@ describe("real-world fixtures from compare-models failures", () => {
       expect(r.ad_targeting[0].length).toBe(300);
       expect(r.profileText.length).toBe(2000);
     });
+
+    /* BUG-2026-10-03-03: Die Grenzen gelten fuer jede Form der Antwort — auch
+       wenn die Karten einer Modus-Ebene kein Objekt sind. */
+    test("Karten als Zeichenkette statt als Objekt werden geleert, der Rest der Ebene bleibt", () => {
+      const raw = JSON.stringify({
+        standard: { profileText: "Sachlich.", ad_targeting: ["A"], categories: "K".repeat(30000) },
+        beast: { profileText: "Zynisch.", categories: 7 },
+      });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(r.standard.categories).toEqual({});
+      expect(r.beast.categories).toEqual({});
+      expect(r.standard.profileText).toBe("Sachlich.");
+      expect(r.standard.ad_targeting).toEqual(["A"]);
+      expect(r.beast.profileText).toBe("Zynisch.");
+    });
+
+    test("Karten als Objekt bleiben, wie sie sind", () => {
+      const raw = JSON.stringify({
+        standard: { categories: { einkommen: { label: "Einkommen", value: "Du verdienst gut.", confidence: 0.7 } } },
+      });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(r.standard.categories).toEqual({
+        einkommen: { label: "Einkommen", value: "Du verdienst gut.", confidence: 0.7 },
+      });
+    });
+
+    test("die Anker-Felder in hard_facts: Text wird gekuerzt, die Herkunft gilt nur als Text", () => {
+      const raw = JSON.stringify({
+        hard_facts: { alter_geschlecht: "A".repeat(50000), herkunft: { land: "X".repeat(50000) } },
+        standard: { categories: {} },
+      });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(r.hard_facts.alter_geschlecht.length).toBe(800);
+      expect(r.hard_facts.herkunft).toBe("");
+      const lang = parseSafely(JSON.stringify({ hard_facts: { herkunft: "H".repeat(50000) } }), {
+        requireSchema: false,
+      });
+      expect(lang.hard_facts.herkunft.length).toBe(800);
+    });
+
+    test("uebliche Anker bleiben woertlich; ein Altersanker ohne Textform bleibt lesbar", () => {
+      const ueblich = { alter_geschlecht: "34, weiblich", herkunft: "mitteleuropäisch" };
+      expect(parseSafely(JSON.stringify({ hard_facts: ueblich }), { requireSchema: false }).hard_facts).toEqual(
+        ueblich
+      );
+      const zahl = parseSafely(JSON.stringify({ hard_facts: { alter_geschlecht: 14 } }), { requireSchema: false });
+      expect(zahl.hard_facts.alter_geschlecht).toBe(14);
+      /* Fehlt hard_facts, wird nichts erfunden. */
+      expect(parseSafely(JSON.stringify({ standard: { categories: {} } }), { requireSchema: false }).hard_facts).toBe(
+        undefined
+      );
+    });
   });
 });

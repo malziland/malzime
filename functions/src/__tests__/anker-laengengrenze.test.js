@@ -132,3 +132,62 @@ describe("Anker-Voranstellung haelt die Laengengrenze (BUG-2026-08-20-26)", () =
     expect(wert).toBe(normal);
   });
 });
+
+/* BUG-2026-10-03-03: Die Grenzen gelten fuer jede Form der Antwort. Gemessen
+   wird am Ergebnis von runSingleLargeCall, also an dem, was weitergereicht wird. */
+describe("Groessengrenzen fuer abweichend geformte Antworten (BUG-2026-10-03-03)", () => {
+  function antwortRoh(body) {
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: JSON.stringify(body) } }], usage: {} }),
+    }));
+  }
+  const laengsterText = (wert) =>
+    typeof wert === "string"
+      ? wert.length
+      : wert && typeof wert === "object"
+        ? Math.max(0, ...Object.values(wert).map(laengsterText))
+        : 0;
+
+  test("Karten als Zeichenkette kommen nicht ins Ergebnis", async () => {
+    const ebene = (text) => ({
+      profileText: text,
+      ad_targeting: ["A"],
+      manipulation_triggers: ["T"],
+      categories: "K".repeat(30000),
+    });
+    antwortRoh({
+      subject: "HUMAN",
+      visible_text: "",
+      hard_facts: {},
+      standard: ebene("Sachlich."),
+      beast: ebene("Zynisch."),
+    });
+    const ergebnis = await runSingleLargeCall("BASE64", "image/jpeg", () => 90000, "de");
+    for (const profil of [ergebnis.normal, ergebnis.boost]) {
+      expect(profil === null || typeof profil.categories === "object").toBe(true);
+      if (profil) expect(Object.keys(profil.categories).length).toBeLessThanOrEqual(20);
+    }
+    expect(laengsterText(ergebnis)).toBeLessThanOrEqual(2000);
+  });
+
+  test("ein ueberlanger Altersanker geht gekuerzt an den Kinderschutz-Filter", async () => {
+    antwortMit({ alter_geschlecht: "34, weiblich. " + "A".repeat(50000) }, "Du bist Mitte dreissig. Beleg.");
+    const ergebnis = await runSingleLargeCall("BASE64", "image/jpeg", () => 90000, "de");
+    expect(ergebnis.alterAnker.startsWith("34, weiblich")).toBe(true);
+    expect(ergebnis.alterAnker.length).toBeLessThanOrEqual(STRING_BOUND_CATEGORY);
+  });
+
+  test("eine Herkunft, die kein Text ist, wird der Karte nicht vorangestellt", async () => {
+    antwortMit({ alter_geschlecht: "34, weiblich", herkunft: { region: "Mitteleuropa" } }, "Du bist Mitte dreissig.");
+    const ergebnis = await runSingleLargeCall("BASE64", "image/jpeg", () => 90000, "de");
+    expect(ergebnis.normal.categories.herkunft.value).toBe("Du bist X. Beleg Y.");
+  });
+
+  test("eine Herkunft als Text steht weiter vorn auf der Karte", async () => {
+    antwortMit({ alter_geschlecht: "34, weiblich", herkunft: "mitteleuropäisch" }, "Du bist Mitte dreissig.");
+    const ergebnis = await runSingleLargeCall("BASE64", "image/jpeg", () => 90000, "de");
+    expect(ergebnis.normal.categories.herkunft.value).toBe("mitteleuropäisch. Beleg Y.");
+  });
+});

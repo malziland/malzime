@@ -140,6 +140,7 @@ functions/src/__tests__/mistral-http.test.js
 functions/src/__tests__/mistral-livekarten.test.js
 functions/src/__tests__/mistral-livetext.test.js
 functions/src/__tests__/mistral-mock.test.js
+functions/src/__tests__/mistral-nachfrage-einmischen.test.js
 functions/src/__tests__/mistral-rettung.test.js
 functions/src/__tests__/mistral-rumpf-zeitgrenze.test.js
 functions/src/__tests__/mistral-verbindungsabbruch.test.js

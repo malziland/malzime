@@ -396,6 +396,10 @@ def main():
         "e2e/abfolgen.test.js",
         "functions/src/__tests__/dateilisten-vollstaendig.test.js",
         "functions/src/__tests__/doku-namen-gegen-quelltext.test.js",
+        "functions/src/__tests__/abmelden-ueber-adressgrenze.test.js",
+        "functions/src/__tests__/mistral-nachfrage-einmischen.test.js",
+        "public/__tests__/abfolgen-pruefrunde.test.js",
+        "public/__tests__/aussentext-ohne-auszeichnung.test.js",
         "functions/jest.setup.js",
         "scripts/selbstpruefung-waechter.sh",
     ]

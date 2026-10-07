@@ -261,6 +261,10 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
 - **Das Abmelden eines verworfenen Auftrags ist an der echten Schnittstelle
   geprüft**, samt der Vorab-Anfrage, die der Browser davor stellt — sie
   abzulehnen hätte das Abmelden unbemerkt wirkungslos gemacht.
+- **Was die KI auf eine Nachfrage nachliefert, kommt nachweislich im Profil
+  an.** Fehlt in der ersten Antwort eine Karte, fragt der Server einmal nach;
+  die vier Wege, auf denen das Nachgelieferte ins Ergebnis kommt, sind jetzt
+  einzeln geprüft.
 - **Die Größenkontrolle sieht mehr:** auch die Startdatei der Website, das
   Stylesheet und die Auslieferungs-Skripte — und die Stil-Prüfung meldet, wenn
   die verzweigteste oder die längste Funktion weiter wächst.

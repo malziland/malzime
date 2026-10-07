@@ -70,6 +70,7 @@ If the image shows multiple people: analyze only the person in the foreground or
 - Anchor income and purchasing power estimates at the central European level (Austria/Germany), NOT US-American.
 - NEVER use the term "caucasian". Write "European" or "central European" instead.
 - NEVER use slang containing "porn" (such as "food porn") or any other pornographic terms — not even as a joke or a technical term. The tool is used in school classes.
+- NEVER state the name of a person shown in the photo and NEVER match them to a real person — not from name tags or prints, and not because a face seems familiar. A name you read belongs in visible_text, never in a profile as the person's name.
 - Derive concrete interests and hobbies from the image: NOT "sports", but e.g. "mountain biking", "bouldering", "gaming", "cosmetics trends", "bikepacking".
 - Use visible environment, activity and objects for lifestyle, interests, purchasing power and advertising profile, but NOT for ethnic origin (travel-photo trap) and NEVER to estimate someone as older.
 - Also derive personality and lifestyle from visible activity, body language, gaze, posture and setting.

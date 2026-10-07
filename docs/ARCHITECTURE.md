@@ -164,7 +164,10 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call, nur bei hochgeladenen Fotos); bei den Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite |
-| `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Status abfragen, Ergebnis zustellen, Wiederaufnahme nach Neuladen — mit AbortController + Stale-Guard |
+| `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Ergebnis zustellen, Wiederaufnahme nach Neuladen, verworfenen Auftrag abmelden — mit AbortController + Stale-Guard |
+| `js/auftrag-abfrage.js` | Statusabfrage eines eingereihten Auftrags im 2-Sekunden-Takt (`pollJob`), zugleich Lebenszeichen an den Server |
+| `js/netz-hilfen.js` | Netz- und Warte-Hilfen des Ablaufs: Aufruf mit Zeitgrenze bis zum Ende des Antwort-Rumpfs (`fetchWithTimeout`), Warten auf den nächsten Takt |
+| `js/foto-vorschau.js` | Zwei Handgriffe an der Foto-Vorschau: Ersatzbild, wenn der Browser das Original nicht anzeigen kann; Hinweis „Foto gelöscht“ nach einem Neuladen |
 | `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
 | `js/auftrag-speicher.js` | Auftragsgedächtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, 15-Minuten-Frist für ein zugestelltes Ergebnis |
 | `js/wake-lock.js` | Bildschirm während der Analyse wach halten (Best-Effort) und den Stand für die Telemetrie melden |
@@ -186,7 +189,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `js/i18n.js` | i18n Micro-Modul (`initI18n`, `t`, `applyTranslations`) |
 | `js/demo.js` | Demo-Bild-Logik (KI-generierte Demo-Fotos durch die echte KI schicken — keine realen Personen, siehe `public/img/demo/LICENSE.md`) |
 | `js/stats.js` | Stats-Seite mit Limit-Balken + Countdown |
-| `js/dom.js` | DOM-Helpers (`escapeHtml`, sanitize) |
+| `js/dom.js` | DOM-Helpers (`elements`, `escapeHtml`) |
 | `js/error-logger.js` | Anonymes Client-Fehler-Logging an `/api/errors` (Fehler-Typ, Phase, Dauer — grober User-Agent, keine PII) |
 | `js/telemetry-logger.js` | Anonyme Success-/Performance-Telemetrie an `/api/telemetry` (Gegenstück zum Error-Logger: Timings statt Fehler, ohne Geräteangaben und ohne Vorgangsnummer) |
 | `js/client-context.js` | Anonyme Geräte-/Netzwerk-Klassen für die Diagnose (`coarseUserAgent`, Bildschirm-Größenklasse, Netzwerk-Klasse) + Trace-ID |
@@ -200,9 +203,9 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
 | `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |
 | `handle-telemetry.js` | Anonyme Success-/Performance-Telemetrie (Gegenstück zu `handle-errors.js`, severity INFO, eigener Endpoint; verwirft Geräteangaben und Vorgangsnummer) |
-| `handle-enqueue.js` | Queue: Job anlegen, Bild in den Bucket, Task einreihen |
+| `handle-enqueue.js` | Queue-Annahme: prüfen, Stundenlimit zählen, Job anlegen, Bild in den Bucket, Platz bestätigen, Task einreihen |
 | `handle-process-job.js` | Queue-Worker: claimt den Job, ruft die Mistral-Pipeline, schreibt das Ergebnis |
-| `handle-job-status.js` | Queue: Status-Polling für den Client + Liveness-Herzschlag |
+| `handle-job-status.js` | Queue: Status-Polling für den Client + Liveness-Herzschlag (`GET`); Abmelden eines noch wartenden Auftrags, nur mit Abhol-Ticket (`DELETE`) |
 | `handle-reap.js` | Queue: Reaper (Minutentakt) für verlassene / hängende / abgelaufene Jobs |
 | `handle-erinnerung.js` | Wochenlauf (montags): erinnert per ntfy-Push, bevor die halbjährliche ZDR-Nachprüfung fällig wird — inkl. Handlungsanleitung im Text |
 | `zusagen.js` | Gemeinsame Fristlogik für datierte öffentliche Zusagen (Erinnerung + CI-Wächter rechnen mit derselben Definition) |
@@ -210,16 +213,17 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
 | `feature-flags.js` | Laufzeit-Feature-Flags (`useBeastAdsCall`, `useGemesseneDauer`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
-| `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
+| `config.js` | Nur, was bewusst nicht einstellbar ist: Mistral-Modell-IDs, EU-Endpunkt, EU-Datenbank, Upload-Grenze, erlaubte Dateiformate |
 | `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile; ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
 | `job-pipelines.js` | Der Analyseweg eines Auftrags (`runPipeline`): ein Aufruf an Mistral Large liefert Beschreibung und beide Profile, danach die Beast-Werbung |
 | `ueberlast.js` | Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504) |
+| `verbindungsfehler.js` | Verbindungsabriss zu einem fremden Dienst: erkennen, einmal neu versuchen, schon gelesenen Text retten, Grund protokollieren — nur Code und Kurztext, nie Adressen |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
 | ~~`heartbeat.js`~~ | Entfernt mit dem Audit 2026-08-10 — hatte seit v2.10 keinen Aufrufer mehr (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
 | `counter.js` | Firestore-Zaehler: Stundenlimit (rollend), Totals, Stats, Boost, Reset, Maintenance |
-| `animal.js` | SUBJECT-Klassifikation aus Mistral-Beschreibung + Easter-Egg-Profile |
-| `privacy.js` | OCR-basiertes Privacy-Risiko-Mapping aus Mistrals "Sichtbarer Text" |
+| `animal.js` | Motiv-Entscheidung am Feld `subject` der KI-Antwort (`classifySubject`), Tierart aus dem Beschreibungstext (`detectAnimalType`) + Easter-Egg-Profile |
+| `privacy.js` | Privacy-Risiken (`buildPrivacyRisks`): lesbare Adresse und Telefonnummer aus dem Feld `visible_text` der KI-Antwort, Kennzeichen aus dem ganzen Text |
 | `middleware.js` | Rate-Limit + IP-Extraktion |
 | `upload.js` | Multipart- und JSON-Body-Parsing |
 | `auth.js` | HMAC-Admin-Tokens + Nonces |

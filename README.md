@@ -57,51 +57,59 @@ public/                     Firebase Hosting (SPA, kein Build-Schritt)
 
 functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)
   index.js                  Cloud-Function-Exports + Firebase Secret Bindings
-  config.js                 Konstanten + Mistral-Modell-IDs + Limits
-    handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
+  oeffentliche-huelle.js    Gilt fuer jede oeffentliche Schnittstelle: kein Zwischenspeichern der Antwort, gepackte Anfragen abweisen
+  config.js                 Was bewusst nicht einstellbar ist: Mistral-Modell-IDs, EU-Endpunkt, EU-Datenbank, Upload-Grenze, Dateiformate
+  db.js                     Firestore-Zugang (benannte Datenbank malzime-eu)
+  betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Felder, Grenzen, Cache
+  betriebsprofil-kopplung.js  Welche Werte eines Einstellungssatzes zusammenpassen muessen
+  produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)
+  test-satz.js              Einstellungssatz fuer die Tests
+  handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
   handle-stats.js           Stats-Endpunkt
   handle-errors.js          Anonymes Client-Fehler-Logging (whitelist-validiert, keine PII, severity ERROR)
   handle-telemetry.js       Anonyme Success-/Performance-Telemetrie (ohne Geraeteangaben, severity INFO)
-  handle-enqueue.js         Queue: Job anlegen + in Cloud Tasks einreihen
+  meldungs-annahme.js       Gemeinsame Pruefungen der zwei Annahmestellen fuer Meldungen des Browsers
+  handle-enqueue.js         Queue: Job anlegen, Bild ablegen, in Cloud Tasks einreihen
   handle-process-job.js     Queue: Worker — claimt Job, ruft Mistral, schreibt Ergebnis
-  handle-job-status.js      Queue: Status-Polling + Liveness-Herzschlag
+  handle-job-status.js      Queue: Status-Polling + Liveness-Herzschlag; Abmelden eines wartenden Auftrags
   handle-reap.js            Queue: Reaper fuer verlassene / haengende / abgelaufene Jobs
-  handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung (mit Anleitung)
-  zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen (Erinnerung + CI-Waechter)
+  ruecknahme.js             Queue: gibt zurueck, was ein nie analysierter Auftrag belegt (Platz im Stundenfenster, Foto)
   jobs.js                   Queue: Job-Lebenszyklus (Firestore-Collection `jobs`)
+  analyse-ausgang.js        Queue: welche Fehlermeldung ein Endzustand zeigt, und die eine Fehlerzeile dazu
+  warteschlangen-rechnung.js  Queue: die eine Rechnung fuer Einlassgrenze und Wartezeit-Ansage
+  durchsatz.js              Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze)
   cloud-tasks.js            Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim fuer Emulator)
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket
   feature-flags.js          Laufzeit-Feature-Flags aus Firestore (30s-Cache)
   lokale-schalter.js        Schalter nur fuer lokale Laeufe (Attrappe, lokale Warteschlange, stumme Benachrichtigung): wirken nie in der Produktion
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
   mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile, ein zweiter ohne Bild die Beast-Werbung
-  json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   mistral-http.js           Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Ueberlast, Antwort als Strom
   mistral-antwort.js        Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung
   ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504
+  verbindungsfehler.js      Verbindungsabriss zu einem fremden Dienst: einmal neu versuchen, Teiltext retten, Grund ohne Adressen protokollieren
+  json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
+  throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
   job-pipelines.js          Der Analyseweg: KI-Aufruf, Tier-Easter-Egg, Beast-Werbung, Kinderschutz
   job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
+  animal.js                 Motiv-Entscheidung am Feld `subject` der KI-Antwort + Tier-Easter-Egg-Profile
+  privacy.js                Privacy-Risiken: lesbare Adresse und Telefonnummer aus dem Feld `visible_text` der KI-Antwort, Kennzeichen aus dem ganzen Text
   minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer)
   minor-safety-woerter.js   Wortlisten des Kinderschutz-Filters (reine Daten, deutsch und englisch; mit Wortfuge fuer zusammengesetzte Woerter)
   alters-lesbarkeit.js      Erkennung nicht lesbarer Altersangaben (erster Satz, Altersversuch)
   alters-auslese.js         Altersauslese: Zahlwoerter, Kategorien, untere und obere Altersgrenze
   alters-lesbarkeit-woerter.js  Woerter, Kategorien und Abkuerzungen der Altersauslese (reine Daten)
-  betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Pruefung, Cache
-  produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)
-  test-satz.js              Einstellungssatz fuer die Tests
-  durchsatz.js              Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze)
-  kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
-  laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
-  db.js                     Firestore-Zugang (benannte Datenbank malzime-eu)
-  throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
-    animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
-  privacy.js                OCR-Privacy-Risiken aus Mistrals "Sichtbarer Text"
   counter.js                Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance
+  middleware.js             Rate Limiting (IP-basiert, Grenze und Fenster aus dem Einstellungssatz), IP-Extraktion
+  upload.js                 Multipart- und JSON-Body-Parsing
   auth.js                   HMAC-basierte Admin-Token + Nonces
   domains.js                Zentrale CORS-/Origin-Whitelist
   notify.js                 ntfy Push-Benachrichtigungen bei Limit-Erreichung
-  middleware.js             Rate Limiting (IP-basiert, 500/10min), IP-Extraktion
-  upload.js                 Multipart- und JSON-Body-Parsing
+  kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
+  laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
+  handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung (mit Anleitung)
+  erinnerungs-waechter.js   Meldet, wenn die Wochen-Erinnerung ausbleibt
+  zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen (Erinnerung + CI-Waechter)
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
   __tests__/                Jest Unit-Tests + fixtures/ fuer json-repair

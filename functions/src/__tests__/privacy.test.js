@@ -148,7 +148,7 @@ describe("Adresse und Telefonnummer in ueblichen Schreibweisen (BUG-2026-10-03-0
 describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
   const hinweise = (visibleText, fullDescription) => buildPrivacyRisks({ visibleText, fullDescription });
 
-  test.each(["W-12345 X", "GU-123 AB", "L-1234A", "WU-47 XY", "W 12345 X", "G·1234 AB", "Auto: W-98765 Z"])(
+  test.each(["W-12345 X", "GU-123 AB", "L-1234A", "WU-47 XY", "G-1234 AB", "Auto: W-98765 Z"])(
     "oesterreichisches Kennzeichen wird erkannt: %s",
     (text) => {
       expect(hinweise(text)).toContain("privacy.licensePlate");
@@ -177,16 +177,93 @@ describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
     "CO2-Wert 120 g",
     "IPHONE 15 PRO",
     "Saison 2024 AB",
+    /* Aufdrucke und Etiketten, die wie ein Kennzeichen OHNE Bindestrich
+       aussehen — diese Form zaehlt deshalb bewusst nicht, auch nicht fuer
+       ein echtes Kennzeichen ("W 12345 X"). */
+    "W 12345 X",
+    "NY 1984 USA",
+    "LA 1986 CA",
+    "EU 164 CM",
+    "AB 199 EUR",
+    "HD 1080P",
+    "FC 1910 E.V.",
+    "E 250 CDI",
+    /* Ein einzelner Buchstabe mit zwei Ziffern ist kein Bezirk. */
+    "U-21 EM",
+    /* Oeffnungszeiten */
+    "MO-FR 08-12 13-17",
+    "Mo-Sa 9-18",
+    "Di-Fr 10 Uhr",
+    /* Wunschkennzeichen mit drei und mehr Buchstaben: bewusst nicht. */
+    "T-SHIRT 2",
+    "W-MAX 1",
   ])("kein Kennzeichen: %s", (text) => {
     expect(hinweise(text, text)).not.toContain("privacy.licensePlate");
   });
 
-  test.each(["HTL Mödling", "HAK Bregenz Maturaball", "Abschluss BORG 2026", "NMS"])("Schul-Kuerzel: %s", (text) => {
+  test.each([
+    "HTL Mödling",
+    "HAK Bregenz Maturaball",
+    "Abschluss BORG 2026",
+    "NMS Lustenau",
+    "BHAK Wien 10",
+    "HTBLA Hallstatt",
+    "HTBLuVA Salzburg",
+  ])("Schul-Kuerzel: %s", (text) => {
     expect(hinweise(text)).toContain("privacy.address");
   });
 
-  test.each(["htl", "Shakira", "NMSX", "BORGWARD", "Chak-Chak"])("kein Schul-Kuerzel: %s", (text) => {
+  /* Das Kuerzel allein zaehlt nicht — es steht auch auf Markenkleidung. */
+  test.each(["htl", "Shakira", "NMSX", "BORGWARD", "Chak-Chak", "BJÖRN BORG", "BJORN BORG", "BORG", "NMS", "HAK"])(
+    "kein Schul-Kuerzel: %s",
+    (text) => {
+      expect(hinweise(text)).not.toContain("privacy.address");
+    }
+  );
+
+  test.each(["Opernring 2", "Kärntner Ring 12", "Praterallee 1", "Franz-Josefs-Kai 27", "Linke Wienzeile 4"])(
+    "oesterreichische Strassenform: %s",
+    (text) => {
+      expect(hinweise(text)).toContain("privacy.address");
+    }
+  );
+
+  test.each([
+    "KAI 12",
+    "Zeile 3",
+    "Ring 5",
+    "Boxen im Ring",
+    "Sitzplatz 12",
+    "Parkplatz 2",
+    "Wanderweg 601",
+    "Radweg 5",
+    "1. FC St. Pauli",
+    "12 Monkeys St. Pauli",
+  ])("kein Strassenname: %s", (text) => {
     expect(hinweise(text)).not.toContain("privacy.address");
+  });
+
+  test.each(["01/58858-0", "0732 / 77 20-0", "Tel. 0316/123456-12"])("Festnetz mit Durchwahl: %s", (text) => {
+    expect(hinweise(text)).toContain("privacy.phone");
+  });
+
+  test.each(["03/2026", "Ausgabe 03/2026-04", "Raum 01/23-4", "20261007", "40123455"])(
+    "keine Telefonnummer: %s",
+    (text) => {
+      expect(hinweise(text)).not.toContain("privacy.phone");
+    }
+  );
+
+  test("eine Nummer am Stueck zaehlt mit fuehrender Null, mit Trennzeichen auch ohne (Erfolgsweg)", () => {
+    expect(hinweise("06641234567")).toContain("privacy.phone");
+    expect(hinweise("664 1234567")).toContain("privacy.phone");
+    expect(hinweise("Hauptplatz 3")).toContain("privacy.address");
+    expect(hinweise("Am Sportplatz 3")).toContain("privacy.address");
+    expect(hinweise("Feldweg 7")).toContain("privacy.address");
+  });
+
+  test.each(["Kfz-Nr 12", "F-15 E"])("kein Kennzeichen (Nummern-Angaben): %s", (text) => {
+    expect(hinweise(text, text)).not.toContain("privacy.licensePlate");
   });
 
   test.each(["12 Main St.", "45 Elm Rd.", "3 Park Ave."])("englische Strassen-Abkuerzung: %s", (text) => {

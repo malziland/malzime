@@ -25,7 +25,9 @@ const FUNCTION_LIMIT_MS = 540 * 1000;
 /* BLEIBT IM CODE — Bauweise, keine Einstellung: So lange laeuft der
    Werbe-Aufruf hoechstens, und zwar NACH dem Gesamtbudget (mistral.js,
    generateBeastAds: `timeoutMs`). Dieselbe Zahl an zwei Orten —
-   betriebsprofil-kopplung.test.js haelt sie gleich. */
+   betriebsprofil-kopplung.test.js haelt sie gleich. NICHT mitgerechnet ist
+   die Wartezeit in der eigenen Drossel davor (mistral-http.js): Die Zeitgrenze
+   eines Aufrufs laeuft erst, wenn er die Drossel verlassen hat. */
 const WERBE_AUFRUF_HOECHSTENS_MS = 30 * 1000;
 /* BLEIBT IM CODE — Bauweise, keine Einstellung: was der Verarbeiter um die
    Analyse herum braucht (Auftrag uebernehmen, Foto laden, Ergebnis speichern
@@ -121,13 +123,14 @@ function pruefeKopplungen(werte) {
       `wartende Auftraege wuerden als verlassen abgeraeumt, obwohl ihr Browser noch nachfragt`
     );
   }
-  /* 4. Ein wartender Auftrag wird nach dem Hoechstalter freigegeben und nach
-        der Aufbewahrung geloescht — in dieser Reihenfolge. */
-  if (werte.wartendesHoechstalterMs > werte.jobAufbewahrungMs) {
+  /* 4. Ein Auftrag darf bis zum Hoechstalter warten und danach bis zum
+        Haenge-Limit rechnen. Erst dann darf die Aufbewahrung enden — sonst
+        loeschte der Aufraeumdienst Foto und Auftrag einer LAUFENDEN Analyse. */
+  if (werte.wartendesHoechstalterMs + werte.verarbeitungsZeitlimitMs > werte.jobAufbewahrungMs) {
     return (
-      `wartendesHoechstalterMs (${werte.wartendesHoechstalterMs} ms) liegt ueber ` +
-      `jobAufbewahrungMs (${werte.jobAufbewahrungMs} ms) — der Auftrag waere geloescht, ` +
-      `bevor sein Platz freigegeben wird`
+      `wartendesHoechstalterMs (${werte.wartendesHoechstalterMs} ms) und verarbeitungsZeitlimitMs ` +
+      `(${werte.verarbeitungsZeitlimitMs} ms) liegen zusammen ueber jobAufbewahrungMs ` +
+      `(${werte.jobAufbewahrungMs} ms) — ein Auftrag waere geloescht, waehrend er noch wartet oder rechnet`
     );
   }
   return null;

@@ -90,9 +90,16 @@ describe("Regel 3: Karenz klar ueber Zaehler-Nachlauf und Lebenszeichen-Abstand"
 
 describe("Regel 4: Hoechstalter eines wartenden Auftrags hoechstens die Aufbewahrung", () => {
   test("gleich der Aufbewahrung gilt, eine Millisekunde darueber nicht", () => {
-    expect(_pruefe({ ...SATZ, jobAufbewahrungMs: STUNDE, wartendesHoechstalterMs: STUNDE })).toBeNull();
-    expect(_pruefe({ ...SATZ, jobAufbewahrungMs: STUNDE, wartendesHoechstalterMs: STUNDE + 1 })).toMatch(
-      /wartendesHoechstalterMs \(3600001 ms\).*jobAufbewahrungMs \(3600000 ms\)/
+    /* Seit der Pruefrunde vom 07.10.2026: Die Aufbewahrung muss Warten UND
+       Rechnen abdecken — sonst wuerde eine laufende Analyse geloescht. */
+    const rechnen = SATZ.verarbeitungsZeitlimitMs;
+    expect(_pruefe({ ...SATZ, jobAufbewahrungMs: STUNDE, wartendesHoechstalterMs: STUNDE - rechnen })).toBeNull();
+    expect(_pruefe({ ...SATZ, jobAufbewahrungMs: STUNDE, wartendesHoechstalterMs: STUNDE - rechnen + 1 })).toMatch(
+      /wartendesHoechstalterMs \(\d+ ms\) und verarbeitungsZeitlimitMs \(\d+ ms\).*jobAufbewahrungMs \(3600000 ms\)/
+    );
+    /* Der fruehere Grenzfall — Hoechstalter gleich Aufbewahrung — ist jetzt abgelehnt. */
+    expect(_pruefe({ ...SATZ, jobAufbewahrungMs: STUNDE, wartendesHoechstalterMs: STUNDE })).toMatch(
+      /waehrend er noch wartet oder rechnet/
     );
   });
 });

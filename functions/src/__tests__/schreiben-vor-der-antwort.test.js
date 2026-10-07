@@ -223,6 +223,31 @@ describe("Verarbeiter: Zaehler und Messung sind durch, bevor er der Warteschlang
     expect(speicher.lies(`jobs/${JOB}`).status).toBe("done");
   });
 
+  /* Jeder der zwei Schreibvorgaenge fuer sich: Bremst der Test beide gleich
+     lang, haelt er nur den spaeteren fest — ein fehlendes Abwarten vor dem
+     anderen bliebe gruen (Pruefrunde 07.10.2026). */
+  test.each([
+    ["nur der Tageszaehler ist langsam", "zaehler"],
+    ["nur die Dauer-Messung ist langsam", "messung"],
+  ])("%s: auch darauf wartet der Verarbeiter", async (_name, welcher) => {
+    wartenderAuftrag();
+    pipelines.runPipeline.mockResolvedValue({ result: ERGEBNIS, success: true });
+    const sofort = { fertig: false };
+    const schnell = (attrappe) =>
+      attrappe.mockReset().mockImplementation(async () => {
+        sofort.fertig = true;
+      });
+    const gebremst = langsam(welcher === "zaehler" ? counter.incrementTotals : durchsatz.merkeDauer);
+    schnell(welcher === "zaehler" ? durchsatz.merkeDauer : counter.incrementTotals);
+    const res = antwort(() => gebremst.fertig);
+
+    await verarbeiten(res);
+
+    expect(res.body).toEqual({ ok: true });
+    expect(gebremst.gerufen).toBe(1);
+    expect(res.gesehen).toBe(true);
+  });
+
   test("das Ergebnis steht schon in der Datenbank, waehrend Zaehler und Messung noch schreiben", async () => {
     wartenderAuftrag();
     pipelines.runPipeline.mockResolvedValue({ result: ERGEBNIS, success: true });

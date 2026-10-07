@@ -243,7 +243,8 @@ Beide Reparaturen sind in `docs/SECURITY-MODEL.md` ausführlich beschrieben.
   lässt, also über 500 s liegt
 - die Karenz (`livenessGnadenfristMs`) unter 2 Minuten liegt — sonst würde als
   verlassen abgeräumt, wer noch wartet
-- das Höchstalter eines Wartenden über der Aufbewahrung liegt
+- das Höchstalter eines Wartenden und das Hänge-Limit zusammen über der Aufbewahrung
+  liegen — sonst würde ein Auftrag gelöscht, während er noch wartet oder rechnet
 
 Die letzten vier koppeln einen Wert an eine feste Größe des Programms
 (`betriebsprofil-kopplung.test.js`, je mit dem Fall genau auf der Grenze).

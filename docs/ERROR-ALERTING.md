@@ -263,11 +263,11 @@ selbst (`autoClose: 1800s`). Am 2026-08-10 so verifiziert: E-Mail kam an.
 > zugestellter Benachrichtigungsweg. Nach jeder Änderung an Kanälen oder
 > Richtlinie diesen Test fahren — er kostet nichts und ist der einzige Beleg.
 
-**Stand der Live-Richtlinie (nachgesehen 2026-08-12):** Der Filter deckt
-`admin`, `stats`, `enqueue`, `processjob`, `jobstatus`, `reapjobs` ab. Der
-frühere Eintrag `analyze` (Dienst seit v2.10 abgebaut) ist inzwischen
-entfernt — das oben abgedruckte Policy-Beispiel nennt ihn noch, es ist die
-Aufbau-Vorlage, nicht der Ist-Zustand.
+**Stand der Live-Richtlinien (nachgesehen 2026-10-07):** Es gibt fünf
+Richtlinien, alle eingeschaltet. Die drei log-basierten tragen im Filter genau
+die acht Dienste aus „Gemeinsamer Teil jedes Filters" oben; die zwei
+Schwellen-Richtlinien zählen ihre Metriken. Nachgesehen nur lesend mit
+`gcloud monitoring policies list --project=malzime`.
 
 **Zustellung beider Kanäle belegt (2026-08-12):** Zwei Proben nach dem
 `gcloud logging write`-Rezept oben — die erste kam als **E-Mail** an, die

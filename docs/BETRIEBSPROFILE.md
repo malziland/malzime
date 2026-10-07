@@ -39,8 +39,7 @@ Firestore-Datenbank `malzime-eu`, Dokument **`config/betriebsprofil`**:
   "aktiv": "t1-normal",
   "profile": {
     "t1-normal": { … alle Werte … },
-    "t1-langsam": { … },
-    "t2-schnell": { … }
+    "t1-langsam": { … }
   }
 }
 ```
@@ -132,14 +131,20 @@ Log (`beast-ads-failed`), bei jedem anderen Fehlschlag eine Fehlerzeile.
 ## Vier Obergrenzen sind Zusagen
 
 Bei vier Feldern ist die zulässige Obergrenze **nicht** großzügig gewählt,
-sondern exakt das, was die Datenschutzerklärung öffentlich verspricht:
+sondern exakt das, was eine öffentliche Seite verspricht — drei stehen in der
+Datenschutzerklärung, eine auf der Statistik-Seite:
 
-```
-jobAufbewahrungMs      max 2 h      "nie abgeholte spätestens nach rund 2 Stunden"
-zustellfensterMs       max 15 min   "wenige Minuten nach der Abholung gelöscht"
-adressfensterMs        max 10 min   "merkt sich deine IP für maximal 10 Minuten"
-stundenfensterMinuten  max 60       "die Zeitpunkte der Analysen der letzten 60 Minuten"
-```
+| Feld | Obergrenze | Seite | Wortlaut dort |
+|---|---|---|---|
+| `jobAufbewahrungMs` | höchstens 2 Stunden | `public/datenschutz.html` | „Wird es nie abgeholt: nach rund 2 Stunden.“ |
+| `zustellfensterMs` | höchstens 15 Minuten | `public/datenschutz.html` | „Rund 15 Minuten, nachdem dein Browser es abgeholt hat.“ |
+| `adressfensterMs` | höchstens 10 Minuten | `public/datenschutz.html` | „Rund 10 Minuten, nur im Arbeitsspeicher, nie auf einer Festplatte.“ |
+| `stundenfensterMinuten` | höchstens 60 Minuten | `public/stats.html` | „Analysen in der letzten Stunde“ |
+
+Die Tabelle wird geprüft (`oeffentliche-zahlen-gegen-satz.test.js`): Jede
+Obergrenze muss die der Feldliste sein, jeder Wortlaut auf der genannten Seite
+stehen. Ändert sich dort ein Satz, wird der Test rot, bis diese Tabelle
+nachgezogen ist.
 
 Der Einstellungssatz kann diese Fristen nur **verkürzen**. Wäre es anders,
 ließe sich eine öffentliche Zusage mit einem Datenbankeintrag brechen —
@@ -152,8 +157,15 @@ nach 15 Minuten). Was ohne gültigen Satz steht, ist das vorzeitige Abräumen
 wartender und hängender Aufträge — dafür gibt es keine zugesagte Frist, und die
 Werte dazu kommen nur aus dem Satz (`aufraeumer-loescht-ohne-satz.test.js`).
 
-**Wer eine dieser Grenzen anheben will, ändert zuerst die
-Datenschutzerklärung.**
+**Wer eine dieser Grenzen anheben will, ändert zuerst die Seite, auf der die
+Zusage steht.**
+
+Zwei weitere Zahlen stehen in einem öffentlichen Text, ohne dass eine
+Obergrenze sie hält: `adressLimit` (mit `adressfensterMs`) und `stundenlimit`
+in den Nutzungsbedingungen, Abschnitt „Automatisierte Zugriffe" (deutsch und
+englisch). Derselbe Test hält beide Fassungen gegen
+`functions/src/produktiv-satz.js`. Wer einen dieser Werte im Betrieb umstellt,
+zieht die Nutzungsbedingungen nach.
 
 ---
 
@@ -289,11 +301,10 @@ Das Skript hat vier Sicherungen, weil es in die Produktionsdatenbank schreibt:
 Umstellen heißt: `aktiv` auf einen dieser Namen setzen. Kein Deploy, wirksam
 binnen dreißig Sekunden.
 
-## Zurück auf den Stand davor
+## Zurück auf einen früheren Stand
 
-Der Rückweg führt auf **v4.2.3**. Der Einstellungssatz kann liegen bleiben —
-die alte Fassung ignoriert ihn.
-
-```bash
-git checkout v4.2.3 && bash scripts/deploy.sh
-```
+Die Rückwege stehen an einer Stelle: [RUNBOOK.md](RUNBOOK.md), Abschnitt
+„Rollback-Hebel". Für den Einstellungssatz heißt zurück: `aktiv` wieder auf den
+vorherigen Namen setzen, oder den Satz aus `functions/src/produktiv-satz.js`
+neu schreiben (`node scripts/betriebsprofil-anlegen.js --ausfuehren
+--ueberschreiben`).

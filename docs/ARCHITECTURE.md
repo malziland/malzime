@@ -212,7 +212,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 |-------|---------------------|
 | `index.js` | Cloud-Function-Exports, Secret-Deklarationen (`ADMIN_SECRET_EU`, `MISTRAL_API_KEY_EU`, `NTFY_*_EU`, alle an europe-west1 gebunden) |
 | `handle-stats.js` | GET-only Stats-Endpunkt |
-| `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
+| `handle-admin.js` | Admin-Endpunkte: Boost und Reset per Bearer-Secret oder per Knopf aus der Benachrichtigung (HMAC-Link → Bestätigungsseite → POST mit Einmal-Nonce); Maintenance nur per Bearer-Secret |
 | `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |
 | `handle-telemetry.js` | Anonyme Success-/Performance-Telemetrie (Gegenstück zu `handle-errors.js`, severity INFO, eigener Endpoint; verwirft Geräteangaben und Vorgangsnummer) |
 | `handle-enqueue.js` | Queue-Annahme: prüfen, Stundenlimit zählen, Job anlegen, Bild in den Bucket, Platz bestätigen, Task einreihen |
@@ -232,7 +232,6 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `verbindungsfehler.js` | Verbindungsabriss zu einem fremden Dienst: erkennen, einmal neu versuchen, schon gelesenen Text retten, Grund protokollieren — nur Code und Kurztext, nie Adressen |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
-| ~~`heartbeat.js`~~ | Entfernt mit dem Audit 2026-08-10 — hatte seit v2.10 keinen Aufrufer mehr (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
 | `counter.js` | Firestore-Zaehler: Stundenlimit (rollend), Totals, Stats, Boost, Reset, Maintenance |
 | `animal.js` | Motiv-Entscheidung am Feld `subject` der KI-Antwort (`classifySubject`), Tierart aus dem Beschreibungstext (`detectAnimalType`) + Easter-Egg-Profile |
 | `privacy.js` | Privacy-Risiken (`buildPrivacyRisks`): lesbare Adresse und Telefonnummer aus dem Feld `visible_text` der KI-Antwort, Kennzeichen aus dem ganzen Text |

@@ -57,7 +57,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) â€
   index.js           Cloud-Function-Exports (stats, admin, errors, telemetry, enqueue, processJob, jobStatus, reapJobs, erinnerung, laufzeitWache, satzWache), Secret-Deklarationen (EU-gebunden, Endung _EU, u. a. MISTRAL_API_KEY_EU)
   oeffentliche-huelle.js  Was fuer jede oeffentliche Schnittstelle gilt: Cache-Control no-store, gepackte Anfragen abweisen (von index.js um jede oeffentliche Function gelegt)
   handle-stats.js    Stats-Handler (GET-only)
-  handle-admin.js    Admin-Endpunkte (Boost, Reset, Maintenance) â€” 3-Schritt-Flow mit HMAC + Nonce
+  handle-admin.js    Admin-Endpunkte: Boost und Reset per Bearer-Secret oder per Knopf aus der Benachrichtigung (HMAC-Link -> Bestaetigungsseite -> POST mit Einmal-Nonce); Maintenance nur per Bearer-Secret
   handle-errors.js   Annahme der anonymen Fehlermeldungen des Browsers (Positivliste der Felder, laengenbegrenzt, severity ERROR)
   handle-telemetry.js  Annahme der anonymen Erfolgs- und Dauer-Meldungen (eigene Positivliste ohne Geraeteangaben, severity INFO)
   meldungs-annahme.js  Gemeinsames der zwei Annahmestellen: Rumpfpruefung, Wertgrenze, Messwert-Pruefung; die Feldlisten bleiben bei den Annahmestellen
@@ -130,7 +130,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) â€
   scripts/           Dev-Tools (Lasttests, Forschungs-Skripte)
 
 docs/                Setup-Dokumentation
-.github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml, release.yml)
+.github/             CI/CD Workflows (ci.yml, dependabot-automerge.yml, libheif-bau.yml, release.yml, sicherheit-nachts.yml)
 ```
 
 ## Build, Test, and Development Commands
@@ -205,7 +205,7 @@ Einzelbefehle:
 - CSP headers configured in `firebase.json`
 - Honeypot field for bot protection
 - Prompt-Injection-Schutz: User-Daten in XML-Tags isoliert + escapeXml() auf dynamische Inhalte
-- Admin-Aktionen: GET zeigt Bestaetigungsseite, POST+Nonce fuehrt Mutation aus (SEC-001)
+- Admin-Aktionen Boost und Reset: GET mit HMAC-Token zeigt nur die Bestaetigungsseite, POST+Nonce fuehrt die Mutation aus (SEC-001). Der Wartungsmodus geht nur mit dem Bearer-Secret (`scripts/wartungsmodus.sh`)
 
 ## Mistral-Architektur (seit v1.6.0)
 

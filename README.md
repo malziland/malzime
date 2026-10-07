@@ -196,7 +196,6 @@ Antwort: `{ "verworfen": true }` oder `{ "verworfen": false }`.
 {
   "imageBase64": "...",
   "mimeType": "image/jpeg",
-  "filename": "upload.jpg",
   "exif": { "make": "Apple", "model": "iPhone 15 Pro" },
   "lang": "de"
 }
@@ -210,6 +209,8 @@ Antwort: `{ "verworfen": true }` oder `{ "verworfen": false }`.
 | `lang`        | string | Sprachcode (`de`, `en`, ...). Default: `de`          |
 
 ### Response
+
+Das fertige Ergebnis steht im Feld `result` der Statusantwort:
 
 ```json
 {
@@ -225,8 +226,10 @@ Antwort: `{ "verworfen": true }` oder `{ "verworfen": false }`.
   "privacyRisks": [],
   "exif": {},
   "meta": {
-    "requestId": "abc12345",
-    "mode": "multimodal"
+    "traceId": "…",
+    "mode": "multimodal",
+    "subject": "HUMAN",
+    "alterUnlesbar": false
   }
 }
 ```
@@ -372,7 +375,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 | Komponente         | Technologie                                                                                                                  |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Hosting            | Firebase Hosting — Projektregion Google Ireland (europe-west1), Auslieferung der statischen Dateien ueber ein weltweites CDN |
+| Hosting            | Firebase Hosting — Projektregion `europe-west1` (Belgien), Vertragspartner Google Ireland Ltd.; Auslieferung der statischen Dateien ueber ein weltweites CDN |
 | Backend            | Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)                                                                    |
 | Queue              | Google Cloud Tasks (dosierter Job-Dispatch, europe-west1)                                                                    |
 | Datenbank          | Cloud Firestore (Zaehler, Maintenance-Flag, Queue-Jobs, europe-west1)                                                        |
@@ -397,7 +400,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - Keine Tracking-Cookies, keine Analytics, keine Werbung
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
 - KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.
-- Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) bei Google Ireland in europe-west1; statische Seiten ueber ein weltweites CDN. Google als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
+- Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) in `europe-west1` (Belgien), Vertragspartner Google Ireland Ltd.; statische Seiten ueber ein weltweites CDN. Google als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
 - GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser bei einem hochgeladenen Foto direkt bei OpenStreetMap bzw. Nominatim; bei den Demo-Fotos fragt er nichts an)
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 

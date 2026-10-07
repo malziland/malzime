@@ -158,7 +158,7 @@ Diese Dateien enthalten malziME-spezifische Inhalte (Domain, Firma, Kontakt) die
 | `public/impressum.html` | Kompletter Inhalt — dein eigenes Impressum |
 | `public/datenschutz.html` | Kompletter Inhalt — deine eigene Datenschutzerklaerung |
 | `public/og-image.png` | Eigenes Social-Media-Vorschaubild (1200x630px empfohlen) |
-| `public/site.webmanifest` | App-Name und -Beschreibung |
+| `public/site.webmanifest` | App-Name (`name`, `short_name`) und Farben |
 
 > **Rechtlich wichtig**: Impressum und Datenschutzerklaerung muessen auf dein Unternehmen/deine Person zugeschnitten sein. Kopiere nicht einfach die malziland-Texte.
 

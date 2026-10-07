@@ -8,9 +8,11 @@
 # Dieses Skript macht die Regel „Zusagen über Infrastruktur werden an der
 # Infrastruktur belegt" automatisch statt händisch.
 #
-# Es verändert NICHTS an der Infrastruktur: nur describe/list/get-iam-policy.
+# Es verändert NICHTS an der Infrastruktur: nur describe/list/get-iam-policy,
+# dazu EINE lesende Abfrage bei GitHub (Zweigschutz von main, Abschnitt 10).
 # Der Test functions/src/__tests__/verify-infrastructure-script.test.js
-# erzwingt das (jede gcloud-/gsutil-Zeile muss ein Lese-Kommando sein).
+# erzwingt das (jede gcloud-/gsutil-Zeile muss ein Lese-Kommando sein, der
+# einzige gh-Aufruf traegt keinen Schalter, der etwas aendert).
 #
 # Was es SEHR WOHL tut: Es fragt echte Dienste ab und braucht dafuer eine
 # gcloud-Anmeldung. Ohne sie melden die betroffenen Abschnitte rot. Fuer Tests
@@ -50,7 +52,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}${INFRA_PROBE_DIENST_UMGEBUNG:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}${INFRA_PROBE_DIENST_UMGEBUNG:-}${INFRA_PROBE_ZWEIGSCHUTZ:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -803,6 +805,52 @@ elif echo "$LIVE_RULES" | grep -q "allow read, write: if false"; then
   fi
 else
   rot "Firestore-Regeln erlauben Client-Zugriff — der Einstellungssatz waere von aussen aenderbar"
+fi
+
+# ── 10. Zweigschutz von main: verlangt GitHub noch genau die Pflicht-Pruefungen? ──
+# OPS-2026-10-04-18: Welche Pruefungen ein Pull Request bestehen MUSS, steht
+# bei GitHub, nicht im Repository. Der Vertrag der Pipeline
+# (scripts/pruefe-deploy-riegel.py) haelt ci.yml und deploy.sh zusammen; faellt
+# bei GITHUB ein Name von der Liste, laeuft der Job weiter und haelt keinen
+# Pull Request mehr auf — und niemand misst es.
+#
+# Soll ist die Liste PFLICHT aus scripts/deploy.sh (dieselben Namen verlangt
+# die Auslieferung), dazu: Der Schutz gilt auch fuer Verwalter. Gelesen wird
+# die oeffentliche Angabe zum Zweig — ein lesender Aufruf ohne Verwalterrechte.
+# Einspeisepunkt fuer Tests: INFRA_PROBE_ZWEIGSCHUTZ nennt eine Datei mit der
+# Antwort ("ebene=<Wert>", dann je Zeile "check=<Name>"). In einem Testlauf
+# ueber einen ANDEREN Einspeisepunkt wird GitHub nicht gefragt.
+echo "— Zweigschutz von main (GitHub)"
+ZWEIG_SOLL=$(sed -n 's/^[[:space:]]*PFLICHT="\([^"]*\)"[[:space:]]*$/\1/p' scripts/deploy.sh 2>/dev/null \
+  | head -1 | tr ' ' '\n' | sed '/^$/d' | LC_ALL=C sort)
+if [ -n "${INFRA_PROBE_ZWEIGSCHUTZ:-}" ]; then
+  ZWEIG_ANTWORT=$(cat "$INFRA_PROBE_ZWEIGSCHUTZ")
+elif [ "$PROBEMODUS" = "1" ]; then
+  ZWEIG_ANTWORT=""
+else
+  ZWEIG_ANTWORT=$(gh api "repos/malziland/malzime/branches/main" \
+    --jq '.protection.required_status_checks | "ebene=\(.enforcement_level)", (.contexts[] | "check=\(.)")' 2>/dev/null || true)
+fi
+ZWEIG_EBENE=$(printf '%s\n' "$ZWEIG_ANTWORT" | sed -n 's/^ebene=//p' | head -1)
+ZWEIG_IST=$(printf '%s\n' "$ZWEIG_ANTWORT" | sed -n 's/^check=//p' | LC_ALL=C sort)
+einzeilig() { printf '%s' "$1" | tr '\n' ' ' | sed 's/ $//'; }
+if [ -z "$ZWEIG_SOLL" ]; then
+  rot "Zweigschutz NICHT geprueft (Liste PFLICHT in scripts/deploy.sh nicht lesbar) — ungeprueft gilt als nicht bestanden"
+elif [ -z "$ZWEIG_EBENE" ]; then
+  rot "Zweigschutz NICHT geprueft (GitHub nicht lesbar: gh fehlt, keine Anmeldung oder keine Antwort) — ungeprueft gilt als nicht bestanden"
+else
+  ZWEIG_ANZAHL=$(printf '%s\n' "$ZWEIG_SOLL" | wc -l | tr -d ' ')
+  if [ "$ZWEIG_IST" = "$ZWEIG_SOLL" ]; then
+    gruen "Zweigschutz main verlangt genau die $ZWEIG_ANZAHL Pflicht-Pruefungen der Auslieferung: $(einzeilig "$ZWEIG_IST")"
+  else
+    ZWEIG_FEHLT=$(printf '%s\n' "$ZWEIG_SOLL" | grep -vxF -e "$ZWEIG_IST" || true)
+    ZWEIG_MEHR=$(printf '%s\n' "$ZWEIG_IST" | grep -vxF -e "$ZWEIG_SOLL" || true)
+    ZWEIG_BEFUND=""
+    [ -n "$ZWEIG_FEHLT" ] && ZWEIG_BEFUND=" — es fehlt: $(einzeilig "$ZWEIG_FEHLT")"
+    [ -n "$ZWEIG_MEHR" ] && ZWEIG_BEFUND="$ZWEIG_BEFUND — zusaetzlich verlangt: $(einzeilig "$ZWEIG_MEHR")"
+    rot "Zweigschutz main verlangt NICHT genau die $ZWEIG_ANZAHL Pflicht-Pruefungen der Auslieferung${ZWEIG_BEFUND} (Soll: docs/RUNBOOK.md, „Branch Protection“)"
+  fi
+  pruef "Zweigschutz main gilt auch fuer Verwalter" "everyone" "$ZWEIG_EBENE"
 fi
 
 # ── Ergebnis ──

@@ -141,9 +141,11 @@ Ehrlich benannt, damit niemand sich darauf verlässt:
     Vorabprüfung vor dem Push.
   - *Er sieht nicht, was GitHub verlangt.* Welche Checks der Zweigschutz zur
     Pflicht macht, steht bei GitHub (Soll-Zustand: `docs/RUNBOOK.md`, „Branch
-    Protection"). Der Vertrag hält `ci.yml` und `deploy.sh` zusammen; kommt
-    bei GitHub ein Pflicht-Check dazu oder fällt einer weg, merkt es hier
-    niemand.
+    Protection"). Der Vertrag hält `ci.yml` und `deploy.sh` zusammen. Ob
+    GitHub noch genau diese Namen verlangt, misst `verify-infrastructure.sh`
+    bei jeder Auslieferung (Abschnitt „Zweigschutz von main",
+    OPS-2026-10-04-18) — nicht die Pipeline: Zwischen zwei Auslieferungen
+    bleibt eine Änderung bei GitHub unbemerkt.
   - *Für die Einstellungsdateien gibt es nur die Prüfsumme.* Was die Pflicht-Jobs
     ausführen, unter welchen Umständen ihre Schritte laufen, was die npm-Skripte
     tun und womit Jest eingestellt ist, steht im Wächter im Wortlaut — das

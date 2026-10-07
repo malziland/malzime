@@ -290,6 +290,13 @@ Erwartet: `strict: true`, `admins: true`, sechs Pflicht-Checks —
 `test-backend`, `test-frontend`, `test-e2e`, `secret-scan`, `playwright-version`,
 `pruefungen`.
 
+Gemessen wird das bei jeder Auslieferung: `scripts/verify-infrastructure.sh` liest die
+öffentliche Angabe zum Zweig (lesend, ohne Verwalterrechte) und vergleicht die verlangten
+Namen mit der Liste `PFLICHT` in `scripts/deploy.sh` — fehlt einer oder kommt einer dazu,
+wird der Abschnitt „Zweigschutz von main" rot, ebenso, wenn der Schutz nicht mehr für
+Verwalter gilt (OPS-2026-10-04-18). `strict` zeigt nur die Abfrage oben; sie braucht
+Verwalterrechte und bleibt eine Prüfung von Hand.
+
 `pruefungen` kam am 2026-08-12 dazu (OPS-2026-08-12-04): Der Job lief zwar, stand aber
 nicht auf der Liste — die Zusage „blockierend" in `ci.yml`, README und CHANGELOG war
 damit unbelegt. Eingetragen wurde er erst, nachdem er in fünf Läufen hintereinander grün

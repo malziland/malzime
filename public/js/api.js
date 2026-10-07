@@ -677,6 +677,26 @@ async function renderQueueResult(data, myId, traceId, timings, prepared) {
   finishRender();
 }
 
+/* STRUCT-2026-10-03-54: Der EINE Ort, an dem ein Durchgang seine Flaggen
+   zuruecksetzt. `analyzeImageQueued` und `resumeQueueJob` rufen ihn aus jedem
+   Ausgang — die fruehen direkt vor ihrem `return`, alle uebrigen ueber den
+   `finally`-Block. Bleibt an einem Ausgang eine Flagge stehen, nimmt die
+   Seite kein Foto mehr an oder holt kein Ergebnis mehr ab, ohne Meldung;
+   public/__tests__/analyse-ausgaenge.test.js haelt deshalb fest, dass hier
+   und nur hier zurueckgesetzt wird.
+
+   Nur der JUENGSTE Durchgang setzt zurueck: Ist er abgeloest, gehoeren die
+   Flaggen schon dem Nachfolger.
+
+   `wartetAufVerbindung` gehoert bewusst NICHT dazu: Der Anker muss das Ende
+   des Durchgangs ueberleben (state.js); gesetzt und geloescht wird er dort,
+   wo sich die Lage der Verbindung zeigt. */
+function beendeAnalyse(myId) {
+  if (state.requestId !== myId) return;
+  state.isAnalyzing = false;
+  state.uploadLaeuft = false;
+}
+
 async function analyzeImageQueued() {
   state.isAnalyzing = true;
   /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
@@ -744,8 +764,7 @@ async function analyzeImageQueued() {
     stopScanAnim();
     setStatus(t("error.noFile"), undefined, "error.noFile");
     meldeSichtbarenFehler("error.noFile", "datei-fehlt", { requestId: String(myId), traceId });
-    state.isAnalyzing = false;
-    state.uploadLaeuft = false;
+    beendeAnalyse(myId);
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
@@ -756,16 +775,14 @@ async function analyzeImageQueued() {
       traceId,
       fileSizeKb: Math.round(file.size / 1024),
     });
-    state.isAnalyzing = false;
-    state.uploadLaeuft = false;
+    beendeAnalyse(myId);
     return;
   }
   /* Honeypot — Bots füllen unsichtbare Felder aus */
   const hp = document.getElementById("website");
   if (hp && hp.value) {
     stopScanAnim();
-    state.isAnalyzing = false;
-    state.uploadLaeuft = false;
+    beendeAnalyse(myId);
     return;
   }
   /* Mindest-Interaktionszeit — kein Mensch lädt in < 2s hoch */
@@ -1024,10 +1041,7 @@ async function analyzeImageQueued() {
     releaseWakeLock();
     /* Der Schalter gilt nur, solange dieser Durchgang hochlaedt. */
     if (state.currentAbortController === abbruch) state.currentAbortController = null;
-    if (state.requestId === myId) {
-      state.isAnalyzing = false;
-      state.uploadLaeuft = false;
-    }
+    beendeAnalyse(myId);
   }
 }
 
@@ -1166,6 +1180,6 @@ export async function resumeQueueJob({ force = false } = {}) {
     setStatus(""); /* stiller Fehler beim Seitenstart — kein Banner */
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });
   } finally {
-    if (state.requestId === myId) state.isAnalyzing = false;
+    beendeAnalyse(myId);
   }
 }

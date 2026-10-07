@@ -73,6 +73,7 @@ functions/src/__tests__/einlass-ohne-satz-echt.test.js
 functions/src/__tests__/einlassgrenze-profil.test.js
 functions/src/__tests__/einstiegspunkt-betriebswerte.test.js
 functions/src/__tests__/ergebnis-speichern.test.js
+functions/src/__tests__/erinnerung-barrierefreiheit.test.js
 functions/src/__tests__/feature-flags.test.js
 functions/src/__tests__/fehlermeldung-geraeteangaben.test.js
 functions/src/__tests__/foto-nach-absturz.test.js

@@ -118,9 +118,9 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   --- Wachen und Erinnerung ---
   kapazitaets-wache.js  Meldet, wenn Einstellungssatz und Warteschlange bei Google auseinanderlaufen
   laufzeit-wache.js  Meldet, wenn Analysen an ihre Zeitgrenze stossen
-  handle-erinnerung.js  Wochenlauf (montags): ntfy-Push, bevor die halbjaehrliche ZDR-Nachpruefung faellig wird — mit Handlungsanleitung
+  handle-erinnerung.js  Wochenlauf (montags): ntfy-Push, bevor die halbjaehrliche ZDR-Nachpruefung (eine Woche vorher) oder die halbjaehrliche Pruefung der Barrierefreiheit (drei Wochen vorher) faellig wird — mit Handlungsanleitung
   erinnerungs-waechter.js  Waechter ueber die Wochen-Erinnerung: liest ihr Lebenszeichen, meldet veraltet, nie gelaufen oder wiederholt nicht lesbar (vom Aufraeumdienst je Lauf gerufen)
-  zusagen.js         Gemeinsame Fristlogik fuer datierte oeffentliche Zusagen (Erinnerung und CI-Waechter rechnen mit derselben Definition)
+  zusagen.js         Gemeinsame Fristlogik fuer datierte oeffentliche Zusagen: ZDR-Pruefdatum und Pruefdatum der Barrierefreiheit (Erinnerung und CI-Waechter rechnen mit derselben Definition)
   locales/           Backend-Locale-Dateien
     manifest.json    Verfuegbare Sprachen + Default
     de/prompts.js    Deutsche Prompts (singleLargePrompt mit Alterskalibrierung und SUBJECT-Klassifikation, beastAdsSystem/beastAdsUser, Marken-Sperre, injectionWarning)

@@ -107,9 +107,9 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   notify.js                 ntfy Push-Benachrichtigungen bei Limit-Erreichung
   kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
   laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
-  handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung (mit Anleitung)
+  handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung und der halbjaehrlichen Pruefung der Barrierefreiheit (mit Anleitung)
   erinnerungs-waechter.js   Meldet, wenn die Wochen-Erinnerung ausbleibt
-  zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen (Erinnerung + CI-Waechter)
+  zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen: ZDR-Pruefdatum, Pruefdatum der Barrierefreiheit (Erinnerung + CI-Waechter)
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
   __tests__/                Jest Unit-Tests + fixtures/ fuer json-repair

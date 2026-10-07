@@ -402,6 +402,14 @@ das jede Minute und meldet mit `severity: ERROR`, wenn es älter als neun Tage i
 Marker `erinnerung-lebenszeichen-veraltet`. Damit fällt ein Ausfall der Erinnerung auf,
 obwohl sie selbst bewusst leise bleibt (OPS-2026-08-12-11).
 
+Seit 07.10.2026 prüft derselbe Lauf zwei datierte Zusagen: das ZDR-Prüfdatum der
+Datenschutzerklärung (Push eine Woche vor Ablauf) und das Prüfdatum der Erklärung zur
+Barrierefreiheit (Push drei Wochen vor Ablauf, weil die Handprüfung einen Termin
+braucht). `letzterErfolg` schreibt er nur, wenn BEIDE Fristen gelesen und bewertet
+wurden — ist eine der zwei Seiten nicht lesbar oder ihr Datum nicht mehr zu finden,
+meldet der Wächter das wie einen ausgebliebenen Lauf. Für die Barrierefreiheit gibt es
+bewusst keine Bremse in der Pipeline (Begründung in `functions/src/zusagen.js`).
+
 Kann der Reaper das Lebenszeichen nicht LESEN, ist das in einem einzelnen Lauf nur
 eine Warnung (`lebenszeichen-nicht-lesbar`). Bleibt es fünf Läufe in Folge dabei,
 meldet er mit `severity: ERROR` den Marker `lebenszeichen-wiederholt-nicht-lesbar`,

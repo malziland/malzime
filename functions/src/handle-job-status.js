@@ -128,8 +128,8 @@ async function handleJobStatus(req, res) {
      wirft ("path does not contain an even number of components"). Der Handler
      fing nichts ab, firebase-functions protokollierte "Unhandled error" mit
      severity ERROR, und die Alarmrichtlinie feuert auf genau diesen Dienst —
-     ein beliebiger Dritter konnte so ohne Anmeldung E-Mail und Push beim
-     Inhaber auslösen, alle 5 Minuten, kostenlos.
+     ein beliebiger Dritter konnte so ohne Anmeldung den Fehleralarm (E-Mail
+     und Push) auslösen, alle 5 Minuten, kostenlos.
      Firestore-Auto-IDs sind 20 Zeichen aus [A-Za-z0-9]; alles andere kann kein
      echter Job sein und wird als Eingabefehler beantwortet, nicht als
      Serverabsturz. Im Zweifel verweigern (KERN: fail-closed). */

@@ -47,8 +47,8 @@ bestimmbar. Sie legt fest, mit welchen Kombinationen aus Browser und Hilfsmittel
 funktionieren muss.
 
 **Die Baseline ist breit, und zwar nicht aus Ehrgeiz, sondern aus Sachlage:** malziME läuft
-in Schulworkshops auf den Geräten, die Schülerinnen, Schüler und Lehrkräfte mitbringen. Der
-Betreiber hat darauf keinen Einfluss und kann keine Kombination ausschließen.
+in Schulworkshops auf den Geräten, die Schülerinnen, Schüler und Lehrkräfte mitbringen. Darauf
+hat das Projekt keinen Einfluss, und es kann keine Kombination ausschließen.
 
 Damit gelten als unterstützt:
 

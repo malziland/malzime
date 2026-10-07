@@ -41,6 +41,7 @@ functions/src/__tests__/animal.test.js
 functions/src/__tests__/anker-laengengrenze.test.js
 functions/src/__tests__/annahme-grenzen.test.js
 functions/src/__tests__/aufraeumer-loescht-ohne-satz.test.js
+functions/src/__tests__/auftrag-ohne-zufallsnummer.test.js
 functions/src/__tests__/auftrags-schutzstellen.test.js
 functions/src/__tests__/ausgemustert-uebergang.test.js
 functions/src/__tests__/auth.test.js
@@ -73,6 +74,7 @@ functions/src/__tests__/einlassgrenze-profil.test.js
 functions/src/__tests__/einstiegspunkt-betriebswerte.test.js
 functions/src/__tests__/ergebnis-speichern.test.js
 functions/src/__tests__/feature-flags.test.js
+functions/src/__tests__/fehlermeldung-geraeteangaben.test.js
 functions/src/__tests__/foto-nach-absturz.test.js
 functions/src/__tests__/freigabe-ueber-die-hilfe.test.js
 functions/src/__tests__/fremd-meldungen-script.test.js
@@ -141,6 +143,7 @@ functions/src/__tests__/notify-riegel.test.js
 functions/src/__tests__/notify.test.js
 functions/src/__tests__/nur-git-bekannt-script.test.js
 functions/src/__tests__/nur-nachtrag-script.test.js
+functions/src/__tests__/oeffentliche-zahlen-gegen-satz.test.js
 functions/src/__tests__/ohne-einstellungssatz.test.js
 functions/src/__tests__/pipeline-vertrag-script.test.js
 functions/src/__tests__/primaten-regel.test.js
@@ -195,6 +198,7 @@ public/__tests__/exif-lesefehler-und-heic.test.js
 public/__tests__/exif.test.js
 public/__tests__/fehler-meldewege.test.js
 public/__tests__/geocoding.test.js
+public/__tests__/geraeteangaben-deckung.test.js
 public/__tests__/heic.test.js
 public/__tests__/i18n-guardian.test.js
 public/__tests__/i18n-linksprache.test.js

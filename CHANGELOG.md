@@ -6,7 +6,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
-Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
+Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
+(5. Oktober und mit dieser Fassung), dazu das Sicherheitspaket vom 6. Oktober.
 
 ### Behoben — Kinderschutz
 
@@ -56,6 +57,9 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   Zahlen vor dieser Fassung nicht vergleichbar — die Liste kennt mehr Wörter,
   und „wetten“ und „Jackpot“ zählt sie im Text des Profils nicht mehr mit,
   weil sie dort meist Redewendung sind („Wetten, dass …?“).
+- **Die Anweisung an die KI verbietet Werbe-Ideen zu Pornografie, Waffen und
+  Extremismus jetzt in beiden Aufrufen.** Im ersten Aufruf stand das Verbot
+  bisher nicht; dort fing solche Einträge erst der Filter ab.
 
 ### Behoben — Datenschutz
 
@@ -73,6 +77,44 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
 - **Formulare auf der Seite dürfen nur noch an malziME selbst senden.** Die
   Sicherheitsrichtlinie der Seite nennt jetzt auch Formularziele; ein Test im
   Browser hält es fest.
+- **Ein verworfenes Foto wird nicht weiter hochgeladen und nicht mehr
+  analysiert.** Wer während des Hochladens ein anderes Foto wählt, dessen
+  erstes Foto geht nicht mehr hinaus. Wartet der erste Auftrag schon in der
+  Schlange, meldet die Seite ihn ab: Er wird sofort verworfen, sein Bild
+  gelöscht, die KI bekommt es nie zu sehen.
+- **Gelöscht wird auch dann pünktlich, wenn etwas schiefgeht.** Fallen die
+  Einstellungen aus, löscht der Aufräumdienst trotzdem: jedes Foto und jeden
+  Auftrag nach spätestens 2 Stunden, ein abgeholtes Ergebnis 15 Minuten nach
+  der Abholung. Bisher blieb in diesem Fall alles liegen, bis Googles eigene
+  Löschregeln griffen.
+- **Nach einem Absturz bleibt kein Foto länger liegen als nötig.** Stürzt die
+  Verarbeitung ab, während jemand auf sein Ergebnis wartet, wird das Foto
+  gelöscht, sobald der Auftrag als gescheitert gilt (bisher bis zu 2 Stunden
+  später). Bricht das Hochladen mittendrin ab, findet der Aufräumdienst das
+  Foto nach wenigen Minuten (bisher erst nach einem Tag).
+- Der Vermerk „Ergebnis abgeholt“, an dem die Löschung nach 15 Minuten hängt,
+  wird jetzt sicher gespeichert, bevor das Ergebnis hinausgeht.
+- **Fehlermeldungen des Browsers tragen weniger Angaben über das Gerät.**
+  Arbeitsspeicher, Zahl der Prozessorkerne und Pixeldichte werden nicht mehr
+  mitgeschickt und nicht mehr angenommen — die Datenschutzerklärung nennt sie
+  nicht. Was sie nennt, bleibt: Browsertyp, Bildschirmgröße (klein, mittel,
+  groß), Sprache und Netz.
+- **Der gespeicherte Auftrag führt die Zufallsnummer eines Durchgangs nicht
+  mehr.** Sie wird nur noch für die Fehlersuche gebraucht: in den
+  Fehlermeldungen des Browsers und im technischen Protokoll, wenn das Hochladen
+  scheitert.
+- **Die Anweisung an die KI verbietet ausdrücklich, eine abgebildete Person
+  beim Namen zu nennen oder einer realen Person zuzuordnen** — auch nicht
+  anhand eines Namensschilds oder weil ein Gesicht bekannt vorkommt.
+- **Die Datenschutzerklärung sagt jetzt, dass die KI ein zweites Mal gefragt
+  wird:** ohne das Foto, nur mit einigen Sätzen aus dem Profil, das sie selbst
+  geschrieben hat — für die Werbe-Vorschläge der Beast-Ansicht. Bisher stand
+  dort „Mistral bekommt nur das Foto“. Gestrichen ist der Halbsatz, die Seite
+  merke sich, ob der Hinweis vor der Analyse bestätigt wurde; das tut sie seit
+  August nicht mehr.
+- **Die Zahlen-Seite sagt dasselbe wie die Datenschutzerklärung:** Gespeichert
+  wird, wie viele Analysen es gab, wann die jüngsten waren und wie lange die
+  letzten gedauert haben. Dort stand noch „keine Einzelvorgänge“.
 
 ### Behoben — was Besucher merken
 
@@ -84,6 +126,61 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   bewegliche Karte sofort verschwinden.
 - In einem seltenen Fall blieb die Alterskarte ohne Text. Jetzt steht dort der
   feste Hinweis, dass sich das Alter nicht sicher ablesen lässt.
+- **Das Profil gehört immer zu dem Bild, das in der Vorschau steht.** Wer zwei
+  Beispielbilder kurz nacheinander antippt oder während des Ladens ein Foto
+  hochlädt, bekommt nicht mehr das Ergebnis des falschen Bildes. Ort und
+  Aufnahmedatum eines zuvor gewählten Fotos erscheinen nicht mehr im Ergebnis
+  des nächsten, und nach dem Umschalten zwischen „Seriös“ und „Beast“ steht in
+  den Merkmal-Karten nicht mehr der Text der anderen Ansicht.
+- **„Verbindung unterbrochen … erscheint automatisch“ stimmt jetzt auch im
+  Schul-WLAN.** Die Seite fragt von selbst nach, bis der Server wieder
+  antwortet (höchstens 30 Minuten) — auch wenn das Gerät gar nicht merkt, dass
+  das Internet weg war.
+- **Die Meldungen sagen, was wirklich los ist.** Ist ein Schul-Netz wegen zu
+  vieler Anfragen gesperrt, steht das da — statt „KI überlastet“. „Gerade
+  überlastet“ erscheint nur noch, wenn die KI wirklich wegen Überlast ablehnt;
+  eine Zeitüberschreitung wird nicht mehr als Überlast angezeigt. Beim
+  Stundenlimit steht nur noch der Limit-Hinweis.
+- **Eine fertige Analyse geht nicht mehr verloren, wenn ihr Speichern einmal
+  scheitert** — es wird wiederholt. Und ein einzelner träger Zugriff auf die
+  Einstellungen führt nicht mehr dazu, dass alle, die im selben Augenblick
+  hochladen, „bitte in ein paar Minuten nochmal“ lesen.
+- **Wartezeit und Einlass rechnen genauer.** Die Zahl der Wartenden, die
+  eingelassen werden, und die angesagte Wartezeit berücksichtigen jetzt beide
+  Bremsen der Warteschlange. Wird die KI schneller, werden nicht mehr mehr
+  Kinder eingelassen, als in 30 Minuten drankommen.
+- **Ob ein Tierprofil gezeigt wird, entscheidet allein, was die KI als Motiv
+  angibt** — nicht mehr ein Wort, das zufällig auf dem Foto oder im Profil
+  steht. Die Tierart wird nicht mehr von Wörtern wie „Spaßvogel“ oder „Fischöl“
+  verfälscht.
+- **Der Hinweis „Das hast du ungewollt verraten“ erkennt mehr.** Adressen mit
+  „Gasse“, „Platz“ und „Weg“, englische Adressen („12 Main Street“, „12 Main
+  St.“) und englische Schulnamen mit Schulart; Schul-Kürzel wie „HTL“ oder
+  „HAK“; Telefonnummern auch in der üblichen Schreibweise mit Abständen („0664
+  123 45 67“, „+43 664 …“); und österreichische Kennzeichen in ihrer üblichen
+  Form („W-12345 X“, „GU-123 AB“) — bisher wurde nur die deutsche Form
+  erkannt. Eine ISBN auf einem Buchrücken gilt nicht mehr als Telefonnummer.
+- Liefert die KI ihre Antwort einmal in unerwarteter Form, kommt kein
+  überlanger Text mehr im Ergebnis an; auf der Herkunfts-Karte erscheint kein
+  „[object Object]“ mehr. Eine Antwort mit sehr viel Leerraum bremst die
+  Auswertung nicht mehr aus. Bleibt eine Antwort der KI mittendrin aus, endet
+  der Aufruf verlässlich an seiner Zeitgrenze.
+- **Englische Seite ohne deutsche Reste:** Fehlermeldungen wechseln die Sprache
+  mit, Sprunglink und Platzhalter der Merkmal-Karten sind übersetzt; drei
+  Schreibfehler berichtigt, „1 Sekunde“ statt „1 Sekunden“, Euro-Beträge
+  einheitlich. Scheitert der Sprachwechsel am Netz, sagt die Seite das.
+- Screenreader hören bei einer gescheiterten Analyse die Fehlermeldung, nicht
+  mehr „Analyse abgeschlossen“.
+- Der Bildschirm bleibt auch wach, wenn während einer laufenden Analyse ein
+  zweites Foto gewählt wird.
+- Nach dem Umwandeln eines Fotos im HEIC-Format gibt die Seite den dafür
+  belegten Bildspeicher wieder frei — auf Android und in Firefox blieb er
+  bisher belegt.
+- Zahlen-Seite: Die Restzeit bis zum Ende des Limits springt beim Sprachwechsel
+  nicht mehr zurück. Läuft das Stundenlimit ab, während jemand ein Profil
+  liest, bleibt die Seite stehen, statt neu zu laden.
+- Nach einem frühen Verbindungsabriss zeigt die Seite beim Weitermachen, dass
+  sie arbeitet.
 
 ### Behoben — Prüfungen, die nicht mehr prüften
 
@@ -129,6 +226,49 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   ein Testlauf nie den echten Foto-Speicher oder die echte Warteschlange
   anfasst. Die Schutzstellen wirkten schon; ihr Wegfall wäre aber keinem Test
   aufgefallen.
+- **Neue Prüfungen halten Schutzstellen fest, die sich bisher unbemerkt hätten
+  ausbauen lassen:** die Größengrenze des Uploads, die Einstellungen der
+  Server-Funktionen, den Wartungsmodus und die Kostenbremse.
+- **Zahlen in den Nutzungsbedingungen werden gegen die Einstellungen
+  gehalten.** Die Grenze je IP-Adresse und das Stundenlimit lassen sich im
+  Betrieb umstellen; steht danach in den Nutzungsbedingungen (deutsch oder
+  englisch) eine andere Zahl, wird die Prüfung rot. Für die vier Fristen, die
+  eine öffentliche Seite zusagt, wird geprüft, dass der zugesagte Satz dort
+  noch steht und die Obergrenze im Programm dazu passt.
+- **Für Angaben über das Gerät gilt kein Sammelbegriff mehr.** Jede einzelne
+  Angabe, die eine Fehlermeldung des Browsers über das Gerät trägt, muss in der
+  Datenschutzerklärung genannt sein, deutsch und englisch — sonst wird die
+  Prüfung rot. Ebenso muss die Datenschutzerklärung den zweiten KI-Aufruf
+  nennen, solange es ihn gibt, und die Zahlen-Seite dieselben Angaben wie die
+  Datenschutzerklärung.
+- **Die Kontrolle verbotener Formulierungen findet auch, was über einen
+  Zeilenumbruch läuft.** Sie suchte Zeile für Zeile; drei Stellen blieben so
+  unbemerkt und sind umformuliert.
+- **Verschwindet eine Testdatei, fällt das auf** — jede steht jetzt mit Namen
+  in einer Liste, die bei jeder Prüfung verglichen wird. In die
+  Pflicht-Prüfungen lässt sich kein zusätzlicher Schritt mehr einfügen, der die
+  Prüfung im Lauf entwertet, ohne dass es auffällt.
+- **Die Größenkontrolle sieht mehr:** auch die Startdatei der Website, das
+  Stylesheet und die Auslieferungs-Skripte — und die Stil-Prüfung meldet, wenn
+  die verzweigteste oder die längste Funktion weiter wächst.
+- **Die Messung von Geschwindigkeit, Barrierefreiheit und
+  Suchmaschinen-Tauglichkeit der Live-Seite prüft jetzt wirklich Schwellen** —
+  vorher lief sie mit, ohne etwas zu prüfen.
+- **Die Unterlagen werden gegen das Programm gehalten:** Jede Programmdatei
+  muss in den Dateilisten stehen, und jeder Funktions- oder Feldname, den eine
+  Unterlage nennt, muss es im Projekt noch geben.
+- **In Tests gibt es keinen Zugangsschlüssel für die KI** — ein Test kann
+  keine bezahlte Analyse mehr auslösen, auch wenn in der Umgebung ein echter
+  Schlüssel steht. Tests, die Protokollzeilen nach einer Auftragsnummer
+  durchsuchen, sehen jetzt auch in zusammengesetzte Einträge hinein.
+- Die Testzahlen im Nachweis werden nicht mehr gestempelt, wenn eine Testreihe
+  plötzlich stark geschrumpft ist. Bei jeder Auslieferung wird gemessen, ob
+  GitHub für Änderungen weiterhin genau die sechs Pflicht-Prüfungen verlangt.
+- Geprüft wird vor dem Hochladen nur noch, was zum Projekt gehört: Private
+  Notizen und Sicherungen im Projektordner lösen keinen Fehlalarm mehr aus.
+- Die Prüfung „Beispielbild fragt nichts nach außen“ läuft jetzt in allen drei
+  Browsern. Die Kontrast-Messung wartet, bis eine laufende Einblendung zu Ende
+  ist, und meldet keine Schein-Funde mehr.
 
 ### Geändert — Auslieferung und Betrieb
 
@@ -160,6 +300,71 @@ Erster Teil der Behebung nach dem Lang-Audit vom 3. Oktober 2026.
   liegt dann in der App; die E-Mail zu jedem Alarm kommt weiterhin.
 - Außerhalb des Programms eingeschaltet: die Sperre gegen versehentlich
   hochgeladene Geheimnisse bei GitHub und der Löschschutz der Datenbank.
+- **Einstellungen, mit denen laufende Analysen abgebrochen oder Wartende
+  hinausgeworfen würden, werden nicht mehr angenommen.**
+- **Scheitert eine Analyse, kommt die Nachricht dazu auch dann, wenn die
+  Datenbank die Bestätigung verschluckt.** Fällt nur die Zusatz-Werbung wegen
+  Überlast aus, kommt keine Fehlernachricht mehr — das Ergebnis ist ja da.
+- **Die Nachricht „Stundenlimit erreicht“ wird abgewartet**, bevor die Antwort
+  hinausgeht (höchstens zwei Sekunden, nur bei der einen Anfrage, die das Limit
+  erreicht). Bisher lief sie nebenher und konnte ausbleiben.
+- **Drei Wachen melden sich jetzt, wenn sie blind werden:** die Messung der
+  Analysedauer, der Wächter über die Wochen-Erinnerung und die Laufzeit-Wache,
+  wenn sie ihren Merkzettel nicht schreiben kann.
+- **Die Wochen-Erinnerung meldet auch die halbjährliche Prüfung der
+  Barrierefreiheit** — drei Wochen vor Ablauf, danach jeden Montag.
+- **Gepackte Anfragen werden an allen öffentlichen Schnittstellen
+  abgewiesen.** Ein abgerissenes Upload-Formular wird abgelehnt, statt die
+  Annahme zu beenden.
+- **Fehlen die Einstellungen, antwortet die Statusabfrage mit „vorübergehend
+  nicht verfügbar“** statt mit einem Serverfehler; der Browser fragt weiter,
+  und es entsteht nicht mehr je Abfrage eine Fehlerzeile.
+- **Fehlermeldungen des Browsers gehen nach einem kurzen Verbindungsabriss von
+  selbst nach** (nach 15, 60 und 180 Sekunden). Bisher warteten sie auf das
+  Ereignis „wieder online“ oder das Verlassen der Seite — gerade Abrisse im
+  Schul-WLAN kamen so verspätet oder gar nicht in der Auswertung an.
+- **Nach einer Auslieferung im Wartungsmodus steht am Ende wieder die Liste
+  aller übersprungenen Prüfungen;** ein Abbruch vor der Auslieferung kann nicht
+  mehr wie eine gelungene Auslieferung aussehen. Zwei gleichzeitige Probeläufe
+  überschreiben einander die Protokolle nicht mehr.
+
+### Geändert — Texte der Seite
+
+- **Kurzvorstellung:** Bei großem Ansturm bremst der KI-Anbieter je Minute;
+  die Obergrenze je Stunde ist die eigene Kostenbremse. Dort stand, der
+  KI-Anbieter begrenze je Stunde.
+- **„Foto hochladen“ statt „eigenes Foto“:** Als Gegenstück zu den Demo-Fotos
+  sprechen Kurzvorstellung und Nutzungsbedingungen jetzt vom Hochladen — wer
+  das Foto einer anderen Person hochlädt, war beim Wort „eigenes“ nicht
+  mitgemeint.
+- **Erklärung zur Barrierefreiheit:** Die maschinellen Messungen laufen bei
+  jeder Auslieferung, die ganze Prüfung samt Handprüfung mindestens
+  halbjährlich. Dort stand eine neue Prüfung „bei jeder Änderung“.
+- Das englische Impressum nennt das Datum seiner letzten Änderung.
+
+### Geändert — Unterlagen
+
+- **Die Sicherheits-Unterlagen beschreiben den heutigen Stand.** Fällt der
+  Zähler der Kostenbremse aus, übernimmt eine zweite Prüfung und hält die
+  Grenze — die Unterlagen sagten noch, es werde dann durchgelassen. Die
+  Begrenzung je IP-Adresse ist dort jetzt als das beschrieben, was sie ist: ein
+  Filter gegen gewöhnliche Häufung, kein Schutz gegen einen gezielten Angriff;
+  die Kosten halten das Stundenlimit und die Warteschlange.
+- **Die Anleitung für eine eigene Instanz führt wieder zum Ziel.** Sie nennt
+  die Datenbank, die angelegt werden muss, die Adresse der eigenen Seite, das
+  Anlegen der Einstellungen (das Skript dafür nimmt jetzt das eigene Projekt
+  als Angabe) und den Start am eigenen Rechner; für die Kosten gibt es eine
+  Rechnung statt zwei verschiedener.
+- **Die Dateilisten für Mitwirkende sind vollständig**, und die Beschreibung
+  der Schnittstelle nennt den neuen Weg zum Abmelden eines Auftrags.
+- **Der Prüfbericht zur Barrierefreiheit nennt den heutigen Umfang:** zwölf
+  Seiten statt zehn und 246 Messungen (dort stand durch einen Rechenfehler
+  210). Eine neue Handprüfung war das nicht; der Bericht sagt das dazu.
+- Das Betriebshandbuch beschreibt den ganzen Ablauf einer Auslieferung, Schritt
+  für Schritt; die Wächter-Übersicht nennt jetzt auch die Prüfungen aus dem
+  Regelwerk für Audits, die Prüfung der Abhängigkeiten und den Lauf vor dem
+  Hochladen. Das Abzeichen zur Geschwindigkeit nennt die Schwelle, die wirklich
+  geprüft wird.
 
 ### Sicherheit — mitgelieferte Bausteine
 

@@ -107,6 +107,15 @@ export function getLanguage() {
  * Bei fehlenden Keys bleibt der HTML-Fallback-Text stehen.
  */
 export function applyTranslations() {
+  /* UX-2026-10-03-48: Der Sprunglink steht auf den zwei zweisprachigen Seiten
+     (Startseite, Zahlen-Seite) ohne Uebersetzungs-Merkmal im HTML und blieb
+     auf der englischen Seite deutsch — ein englischer Screenreader las ihn
+     mit englischer Aussprache vor. Er bekommt das Merkmal hier; traegt er es
+     im HTML bereits, bleibt es unberuehrt. */
+  document.querySelectorAll("a.skip-link:not([data-i18n])").forEach((el) => {
+    el.setAttribute("data-i18n", "skip.link");
+  });
+
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.getAttribute("data-i18n");
     const text = t(key);

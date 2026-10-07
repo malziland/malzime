@@ -236,6 +236,10 @@ function waitForNextPoll(ms) {
  *        heutigen Verhalten (Scan-Animation bis zum fertigen Ergebnis).
  * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
  *          — oder null, wenn ein neuer Upload den Lauf abgelöst hat.
+ *          `error` ist der SCHLÜSSEL des Textes (etwa "error.queueFailed"),
+ *          nicht der fertige Text: Der Aufrufer übersetzt und gibt den
+ *          Schlüssel an die Statuszeile weiter, damit die Meldung einen
+ *          Sprachwechsel mitmacht (UX-2026-10-03-48).
  */
 async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveErlaubt = false) {
   let failures = 0;
@@ -253,7 +257,7 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
     if (state.requestId !== myId) return null;
     /* Hängt der Job dauerhaft → nicht endlos weiterpollen. */
     if (Date.now() - pollStart > MAX_POLL_DURATION_MS) {
-      return { error: t("error.timeout") };
+      return { error: "error.timeout" };
     }
 
     let data;
@@ -267,7 +271,7 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
       );
       if (!resp.ok) {
         /* 404 = Job existiert nicht (mehr) — kein transienter Fehler. */
-        if (resp.status === 404) return { error: t("error.queueFailed") };
+        if (resp.status === 404) return { error: "error.queueFailed" };
         throw new Error(`HTTP ${resp.status}`);
       }
       data = await resp.jsonMitTimeout();
@@ -283,7 +287,7 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
            serverseitig weiter und das Ergebnis liegt rund zwei Stunden bereit.
            Der Aufrufer darf die Job-Nummer deshalb nicht wegwerfen — sonst ist
            das fertige Profil unerreichbar, obwohl es existiert. */
-        return { error: t("error.connectionLost"), transient: true };
+        return { error: "error.connectionLost", transient: true };
       }
       continue;
     }
@@ -325,7 +329,7 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
            Zustellung durch: startete die 15-Minuten-Frist und zeigte ein
            Fehler-Banner statt still aufzuräumen. Jetzt wie ein Fehler behandelt. */
         if (data.result == null) {
-          return { error: t("error.queueFailed"), reason: data.tokenRequired ? "token-fehlt" : "kein-ergebnis" };
+          return { error: "error.queueFailed", reason: data.tokenRequired ? "token-fehlt" : "kein-ergebnis" };
         }
         /* KA-02: Das Einmal-Ticket für den Realitäts-Check kommt genau mit
            der ersten Auslieferung (danach nie wieder) — sofort merken, damit
@@ -336,11 +340,11 @@ async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveEr
         if (liveErlaubt) liveAnzeige.versuchAbgleichen(data.liveTextVersuch);
         return { result: data.result };
       case "failed":
-        return { error: t("error.queueFailed"), reason: data.errorReason };
+        return { error: "error.queueFailed", reason: data.errorReason };
       case "abandoned":
         return { abandoned: true };
       default:
-        return { error: t("error.queueFailed") };
+        return { error: "error.queueFailed" };
     }
   }
 }
@@ -865,8 +869,10 @@ async function analyzeImageQueued() {
         /* kein JSON-Body */
       }
       if (enqueueResp.status === 429 && parsed && parsed.blocked === "limit") {
+        /* UX-2026-10-03-47: Nur der Limit-Hinweis, keine zweite Zeile. Er
+           nennt Ursache und Wartezeit; „Zu viele Anfragen aus eurem Netzwerk.
+           Wartet kurz …" daneben widersprach ihm. */
         showLimitBanner(parsed.retryAfterSeconds || 600);
-        setStatus(t("error.rateLimit"), traceId, "error.rateLimit");
       } else if (enqueueResp.status === 429 && parsed && parsed.blocked === "queueFull") {
         /* UX-2026-08-13-FE-02: Die volle Warteschlange ist im Workshop-Burst der
            ERWARTETE Fall, nicht ein Serverfehler. Vorher fiel er in den else-Zweig
@@ -894,6 +900,14 @@ async function analyzeImageQueued() {
         setStatus(t("error.imageTooLarge"), traceId, "error.imageTooLarge");
       } else if (enqueueResp.status === 400) {
         setStatus(t("error.invalidFormat"), traceId, "error.invalidFormat");
+      } else if (enqueueResp.status === 429) {
+        /* UX-2026-10-03-47: Jedes uebrige 429 ist die Sperre je
+           Netzwerk-Adresse (der Server antwortet dort ohne das Merkmal
+           `blocked`). Das ist der Fall „zu viele Anfragen aus eurem Netzwerk"
+           — nicht „KI ueberlastet": Eine Klasse hinter einer gemeinsamen
+           Schul-Adresse bekaeme sonst die falsche Ursache und den falschen
+           Rat. */
+        setStatus(t("error.rateLimit"), traceId, "error.rateLimit");
       } else {
         setStatus(t("error.serverBusy"), traceId, "error.serverBusy");
       }
@@ -976,7 +990,7 @@ async function analyzeImageQueued() {
          einzige Weg zurück zum fertigen Ergebnis — über die automatische
          Wiederaufnahme oder ein Neuladen der Seite. */
       if (!outcome.transient) clearStoredJobId();
-      setStatus(outcome.error, traceId);
+      setStatus(t(outcome.error), traceId, outcome.error);
       logClientError(new Error(outcome.reason || "queue_failed"), {
         phase: "queue-poll",
         durationMs: Date.now() - analyzeStartTime,
@@ -1141,7 +1155,7 @@ export async function resumeQueueJob({ force = false } = {}) {
       if (!liveAnzeige.pausieren()) startScanAnim(false);
       state.wartetAufVerbindung = true;
       verbindungsPruefungStarten();
-      setStatus(outcome.error, traceId, "error.connectionLost");
+      setStatus(t(outcome.error), traceId, outcome.error);
       meldeSichtbarenFehler("error.connectionLost", "resume-verbindung", { requestId: String(myId), traceId });
       return;
     }

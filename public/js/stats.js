@@ -85,7 +85,12 @@ function zeichne(data) {
   el.limitBar.className = "stats-limit__bar-fill " + colorClass;
 
   el.limitLabels.textContent = fmt(data.current.count) + " / " + fmt(data.current.limit);
-  el.limitFree.textContent = t("stats.percentFree", { value: (100 - pct).toFixed(1) });
+  /* Eine Nachkommastelle in der Zahlform der Sprache: deutsch „12,5", englisch „12.5". */
+  el.limitFree.textContent = t("stats.percentFree", {
+    value: new Intl.NumberFormat(getLanguage(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(
+      100 - pct
+    ),
+  });
 
   /* Limit-Status */
   if (data.current.limitActive) {
@@ -131,7 +136,9 @@ function startCountdown(seconds, el) {
     el.textContent =
       m > 0
         ? t("stats.countdownMinutes", { time: m + ":" + String(s).padStart(2, "0") })
-        : t("stats.countdownSeconds", { seconds: s });
+        : s === 1
+          ? t("stats.countdownSecond")
+          : t("stats.countdownSeconds", { seconds: s });
   }
 
   update();

@@ -452,3 +452,141 @@ test.describe("Tab kurz weg und zurück mitten im Lauf", () => {
     expect(danach.karten).toBe(0);
   });
 });
+
+/* ── UX-2026-10-03-48: Die Seite spricht EINE Sprache ───────────────────────── */
+
+test.describe("Sprachwechsel und Sprachreste", () => {
+  const ZU_ENGLISCH = '.sprach-knopf[data-lang="en"]';
+
+  test("gescheiterte Analyse, dann Wechsel auf Englisch: Die Fehlermeldung wechselt mit", async ({ page, context }) => {
+    await grundrouten(page, context);
+    await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+    await page.route("**/api/job-status*", (r) => json(r, 200, { status: "failed", errorReason: "mistral_error" }));
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect(page.locator("#status")).toContainText("Es ist ein Fehler aufgetreten", { timeout: 15000 });
+
+    await page.click(ZU_ENGLISCH);
+    await expect(page.locator("h1")).toHaveText("We see more than your photo.");
+    /* Es läuft nichts und es steht kein Ergebnis da: Wechsel ohne Rückfrage. */
+    await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
+    await expect(page.locator("#status")).toContainText("Something went wrong");
+    await expect(page.locator("#status")).not.toContainText("Es ist ein Fehler");
+  });
+
+  test("englische Seite: Der Sprunglink ist englisch — und deutsch auf der deutschen", async ({ page, context }) => {
+    await grundrouten(page, context);
+    for (const [adresse, text] of [
+      ["/?lang=en", "Skip to content"],
+      ["/?lang=de", "Zum Inhalt springen"],
+      ["/stats.html?lang=en", "Skip to content"],
+      ["/stats.html?lang=de", "Zum Inhalt springen"],
+    ]) {
+      await page.goto(adresse);
+      await expect(page.locator("html")).toHaveAttribute("lang", adresse.slice(-2));
+      await expect(page.locator(".skip-link").first(), adresse).toHaveText(text);
+    }
+    /* Auch nach einem Wechsel im laufenden Betrieb. */
+    await page.click(ZU_ENGLISCH);
+    await expect(page.locator(".skip-link").first()).toHaveText("Skip to content");
+  });
+
+  test("„Verbindung unterbrochen“, dann Wechsel auf Englisch: Die Seite fragt nach und analysiert neu — kein deutsches Profil unter englischer Seite", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(120000);
+    await grundrouten(page, context);
+    const sprachen = [];
+    await page.route("**/api/enqueue", async (r) => {
+      sprachen.push(JSON.parse(r.request().postData()).lang);
+      await json(r, 200, { jobId: `job-${sprachen.length}`, resultToken: "tok" });
+    });
+    let netzWeg = true;
+    await page.route("**/api/job-status*", (r) => {
+      if (r.request().method() === "DELETE") return json(r, 200, { verworfen: true });
+      if (netzWeg) return r.abort("failed");
+      return json(r, 200, { status: "done", result: ERGEBNIS });
+    });
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect(page.locator("#status")).toContainText("Verbindung unterbrochen", { timeout: 40000 });
+
+    await page.click(ZU_ENGLISCH);
+    /* Der wartende Durchgang zählt wie ein laufender: erst die Rückfrage. */
+    await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(1);
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    netzWeg = false;
+    await page.locator(".sw-grund.sichtbar button", { hasText: "Auf Englisch wechseln" }).click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 30000 });
+    /* Das angezeigte Profil stammt aus einem Auftrag in der Sprache der Seite. */
+    expect(sprachen).toEqual(["de", "en"]);
+  });
+
+  test("Sprachdatei nicht ladbar: Der Klick auf „EN“ bleibt nicht ohne Rückmeldung", async ({ page, context }) => {
+    await grundrouten(page, context);
+    await page.route("**/locales/en.json", (r) => r.abort("failed"));
+    await page.goto("/?lang=de");
+    await expect(page.locator("h1")).toHaveText("Wir sehen mehr als dein Foto.");
+    await expect(page.locator("#status")).toHaveText("");
+    await page.click(ZU_ENGLISCH);
+    /* Die Seite bleibt deutsch (kein halb übersetzter Bildschirm) und sagt, warum. */
+    await expect(page.locator("#status")).toContainText("Die Sprache ließ sich gerade nicht wechseln", {
+      timeout: 10000,
+    });
+    await expect(page.locator("#status")).toHaveAttribute("role", "alert");
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    await expect(page.locator("h1")).toHaveText("Wir sehen mehr als dein Foto.");
+  });
+
+  test("Erfolgsweg: Auf der leeren Seite wechselt ein Klick sofort, ohne Meldung", async ({ page, context }) => {
+    await grundrouten(page, context);
+    await page.goto("/?lang=de");
+    await expect(page.locator("h1")).toHaveText("Wir sehen mehr als dein Foto.");
+    await page.click(ZU_ENGLISCH);
+    await expect(page.locator("h1")).toHaveText("We see more than your photo.");
+    await expect(page.locator("#status")).toHaveText("");
+    await expect(page.locator(".sw-grund.sichtbar")).toHaveCount(0);
+  });
+
+  test.describe("reduzierte Bewegung", () => {
+    test.use({ reducedMotion: "reduce" });
+
+    test("englische Seite: In den noch leeren Merkmal-Karten steht kein deutscher Text", async ({ page, context }) => {
+      test.setTimeout(90000);
+      await grundrouten(page, context);
+      await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+      /* Das Modell hat erst 2 von 13 Karten geschrieben — 11 stehen als Platzhalter da. */
+      await page.route("**/api/job-status*", (r) =>
+        json(r, 200, {
+          status: "processing",
+          liveText: "The AI is writing about you.",
+          liveKartenStandard: karten("EN", 2),
+          liveTextVersuch: 1,
+        })
+      );
+      await seiteOeffnen(page, "/?lang=en");
+      await page.click('[data-demo="selfie"]');
+      /* Zwei Karten hat das Modell geschrieben (sie werden nacheinander scharf), elf sind noch leer. */
+      await page.waitForFunction(() => document.querySelectorAll("#facts .cat-card--unscharf").length === 11, null, {
+        timeout: 60000,
+      });
+      const mess = await page.evaluate(() => {
+        const leere = [...document.querySelectorAll("#facts .cat-card--unscharf")];
+        const wert = leere[0].querySelector(".cat-value");
+        return {
+          anzahl: leere.length,
+          texte: [...new Set(leere.map((k) => k.textContent.replace(/\s+/g, " ").trim()))],
+          weichzeichner: getComputedStyle(wert).filter,
+        };
+      });
+      expect(mess.anzahl).toBe(11);
+      /* Bei reduzierter Bewegung sind die Platzhalter LESBAR (kein Weichzeichner)
+         — dann müssen sie in der Sprache der Seite stehen. */
+      expect(mess.weichzeichner).toBe("none");
+      expect(mess.texte.join(" ")).not.toMatch(/Wird (gerade )?ausgewertet/);
+      expect(mess.texte.join(" ")).toMatch(/Being analysed/);
+    });
+  });
+});

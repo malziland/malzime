@@ -220,8 +220,15 @@ function updateCountdownText(seconds) {
   if (!elements.limitCountdown) return;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  const time = m > 0 ? m + ":" + String(s).padStart(2, "0") + " Min" : s + " " + t("limit.seconds");
-  elements.limitCountdown.textContent = t("limit.countdown", { time });
+  /* UX-2026-10-03-48: Einheit und Zahlform stehen im Text der Sprachdatei —
+     „Min" stand fest im Code (auch auf der englischen Seite), und bei einer
+     Sekunde Rest hiess es „1 Sekunden". */
+  elements.limitCountdown.textContent =
+    m > 0
+      ? t("limit.countdownMinutes", { time: m + ":" + String(s).padStart(2, "0") })
+      : s === 1
+        ? t("limit.countdownSecond")
+        : t("limit.countdownSeconds", { seconds: s });
 }
 
 /* ── Maintenance-Modal ── */

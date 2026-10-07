@@ -266,11 +266,13 @@ export function zeigeVersteckteDatenUndKarte() {
 const bereitsGezeigt = new Set();
 /* Reihenfolge der Karten im Geruest — dieselbe wie im fertigen Ergebnis. */
 const ALLE_KARTEN = CATEGORY_GROUPS.flatMap((g) => g.keys);
-/* Fuellwort fuer noch leere Karten. Es wird unscharf gezeichnet und ist
-   deshalb nie lesbar; es traegt nur die Hoehe der Zeile. */
-const PLATZHALTER_TEXT = "Wird gerade ausgewertet und gleich hier stehen.";
-/* Auch die Beschriftung ist zunaechst unscharf — sie kommt vom Modell. */
-const PLATZHALTER_LABEL = "Wird ausgewertet";
+/* Fuelltext und Beschriftung fuer noch leere Karten. Meist unscharf
+   gezeichnet — bei eingestellter „reduzierter Bewegung" nimmt das Stilblatt
+   den Weichzeichner aber weg, dann sind sie LESBAR. Deshalb kommen sie aus
+   der Sprachdatei und werden bei jedem Aufbau frisch geholt (die Sprache kann
+   zwischen zwei Laeufen wechseln). */
+const platzhalterText = () => t("facts.pendingText");
+const platzhalterLabel = () => t("facts.pendingLabel");
 let geruestSteht = false;
 /* Abstand zwischen zwei scharfgestellten Karten. */
 const SCHARFSTELL_TAKT_MS = 400;
@@ -308,7 +310,7 @@ export function zeigeLiveKarten(liveKarten) {
   if (!geruestSteht) {
     const categories = {};
     for (const key of ALLE_KARTEN) {
-      categories[key] = { label: PLATZHALTER_LABEL, value: PLATZHALTER_TEXT };
+      categories[key] = { label: platzhalterLabel(), value: platzhalterText() };
     }
     renderCategories({ categories });
     for (const karte of elements.facts.querySelectorAll(".cat-card")) {
@@ -384,8 +386,8 @@ export function liveKartenModusWechsel() {
   for (const karte of elements.facts.querySelectorAll(".cat-card")) {
     const label = karte.querySelector(".cat-label");
     const wert = karte.querySelector(".cat-value");
-    if (label) label.textContent = PLATZHALTER_LABEL;
-    if (wert) wert.textContent = PLATZHALTER_TEXT;
+    if (label) label.textContent = platzhalterLabel();
+    if (wert) wert.textContent = platzhalterText();
     karte.classList.remove("cat-card--scharfstellen");
     karte.classList.add("cat-card--unscharf");
     karte.setAttribute("aria-hidden", "true");
@@ -827,7 +829,7 @@ function renderDataValue(profile) {
             <div class="dv-bar-track">
               <div class="dv-bar-fill" data-bar-width="${Math.round((item.value / maxVal) * 100)}"></div>
             </div>
-            <span class="dv-bar-val">${fmtNum(item.value)} \u20ac</span>
+            <span class="dv-bar-val">${t("dv.euro", { value: fmtNum(item.value) })}</span>
           </div>
         `
           )

@@ -19,7 +19,7 @@
 
 import { t, getLanguage, setLanguage } from "./i18n.js";
 import { state } from "./state.js";
-import { statusNeuSchreiben } from "./ui.js";
+import { statusNeuSchreiben, setStatus } from "./ui.js";
 
 /* Die Texte sprechen von „der anderen Sprache", ohne sie zu benennen —
    solange es genau zwei gibt, ist das eindeutig. Käme eine dritte dazu,
@@ -68,7 +68,12 @@ let neuZeichnen = null;
  * Wechsel liefe ins Leere und niemand wüsste warum.
  */
 function lage() {
-  const laeuftEtwas = state.isAnalyzing || state.uploadLaeuft;
+  /* UX-2026-10-03-48: Auch ein Durchgang, der auf die Verbindung wartet,
+     „laeuft" — sein Auftrag ist in der alten Sprache unterwegs und wird
+     abgeholt, sobald das Netz zurueck ist. Ohne diese Zeile wechselte die
+     Seite ohne Rueckfrage, und das Profil erschien spaeter in der alten
+     Sprache unter der neuen Oberflaeche. */
+  const laeuftEtwas = state.isAnalyzing || state.uploadLaeuft || state.wartetAufVerbindung;
   if (!laeuftEtwas && !state.lastData) return "leer";
   if (!state.lastFile) return "ohnebild";
   return laeuftEtwas ? "laeuft" : "fertig";
@@ -434,7 +439,13 @@ async function bestaetigt() {
 
 async function wechseln(ziel, neuStarten) {
   const gelang = await setLanguage(ziel);
-  if (!gelang) return;
+  if (!gelang) {
+    /* UX-2026-10-03-48: Die zweite Sprachdatei liess sich nicht laden (Netz
+       kurz weg). Die Seite bleibt in der bisherigen Sprache — sagt das aber
+       auch, statt den Klick ins Leere laufen zu lassen. */
+    if (ziel !== getLanguage()) ladefehlerMelden();
+    return;
+  }
 
   try {
     sessionStorage.setItem(SPEICHER_SCHLUESSEL, ziel);
@@ -497,6 +508,18 @@ function geklickt(ziel, knopfEl) {
      unterscheidet sich: einmal folgt eine neue Analyse, einmal eine leere
      Startseite. */
   modalOeffnen(jetzt === "laeuft" ? "laeuft" : "fertig", ziel, jetzt === "ohnebild", knopfEl);
+}
+
+/* Rückmeldung, wenn der Wechsel scheitert — in der BISHERIGEN Sprache, die
+   andere ließ sich ja nicht laden. Auf der Startseite in der Statuszeile
+   (sichtbar, und als `role="alert"` auch hörbar); Seiten ohne Statuszeile
+   sagen es im Ansage-Bereich des Umschalters an. */
+function ladefehlerMelden() {
+  if (document.getElementById("status")) {
+    setStatus(t("sprache.ladefehler"), undefined, "sprache.ladefehler");
+    return;
+  }
+  sageAn(t("sprache.ladefehler"));
 }
 
 /* ── Ansage für Screenreader ────────────────────────────────────────────── */

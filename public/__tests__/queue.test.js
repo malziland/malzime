@@ -363,14 +363,16 @@ describe("Queue-Modus", () => {
     expect(getStoredJobId()).toBeNull();
   });
 
-  it("enqueue 429 mit blocked:limit → Rate-Limit-Meldung, kein Polling", async () => {
+  it("enqueue 429 mit blocked:limit → nur der Limit-Hinweis, kein Polling", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       jsonResponse({ blocked: "limit", retryAfterSeconds: 600 }, false, 429)
     );
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(5000);
     await p;
-    expect(elements.status.textContent).toContain("error.rateLimit");
+    /* UX-2026-10-03-47: keine zweite Meldung neben dem Limit-Hinweis. */
+    expect(elements.limitBanner.classList.contains("active")).toBe(true);
+    expect(elements.status.textContent).toBe("");
     const urls = globalThis.fetch.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes("/api/job-status"))).toBe(false);
   });

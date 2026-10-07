@@ -39,6 +39,21 @@ const FEHLERBILDER = [
     sichtbar: "#limitBanner",
     /* Erscheint NUR bei Andrang, also im Workshop und bei der Presse-Welle —
        der am schlechtesten geprüfte und am schlechtesten zu erwischende Fall. */
+    /* UX-2026-10-03-47: Der Limit-Hinweis sagt alles („Wieder verfügbar in …").
+       Eine zweite Zeile darunter — bis dahin „Zu viele Anfragen aus eurem
+       Netzwerk. Wartet kurz …" — widersprach ihm. */
+    ohneStatuszeile: true,
+  },
+  {
+    /* UX-2026-10-03-47: Die Sperre je Netzwerk-Adresse. Der Server antwortet
+       mit 429 OHNE das Merkmal `blocked` (functions/src/handle-enqueue.js,
+       checkRateLimit). Eine Klasse hinter einer gemeinsamen Schul-Adresse
+       las hier „Die KI ist gerade überlastet. Bitte 2-3 Minuten warten" —
+       falsche Ursache, falscher Rat. */
+    name: "Netzwerk gesperrt (zu viele Anfragen je Adresse)",
+    antwort: { status: 429, body: { error: "Rate limit exceeded" } },
+    sichtbar: "#status",
+    erwarteterText: { de: /Zu viele Anfragen aus eurem Netzwerk/, en: /Too many requests from your network/ },
   },
   {
     name: "Warteschlange voll",
@@ -76,6 +91,9 @@ const FEHLERBILDER = [
     name: "Server überlastet",
     antwort: { status: 500, body: {} },
     sichtbar: "#status",
+    /* Gegenstück zur Sperre je Adresse: Hier — und nur hier — steht der
+       Überlastungs-Text. */
+    erwarteterText: { de: /Die KI ist gerade überlastet/, en: /The AI is overloaded/ },
   },
   {
     /* NEU 30.08.2026: Seit dem Firestore-Umbau kann eine Analyse daran
@@ -240,6 +258,14 @@ function testFuerSprache(bild, sprache) {
         `„${bild.name}" zeigt einen Kasten, aber nicht den erwarteten Text. ` +
           `Der Teilnehmer muss erfahren, woran es liegt.`
       ).toHaveText(muster, { timeout: 15000 });
+    }
+
+    /* ── 1c. Wo der Hinweis alles sagt, steht keine zweite Meldung daneben ── */
+    if (bild.ohneStatuszeile) {
+      await expect(
+        page.locator("#status"),
+        `Beim Fehlerbild „${bild.name}" darf neben dem Hinweis keine zweite Meldung stehen.`
+      ).toHaveText("");
     }
 
     /* ── 2. Der Seitenkopf springt nicht (BUG-2026-08-21-03) ── */

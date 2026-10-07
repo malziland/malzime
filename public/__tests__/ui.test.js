@@ -162,8 +162,14 @@ describe("Limit Banner", () => {
   });
 
   it("sets countdown text on show", () => {
+    /* UX-2026-10-03-48: Einheit und Zahlform stehen im Text der Sprachdatei —
+       je ein Schlüssel für Minuten, Sekunden und die eine Sekunde. */
     showLimitBanner(120);
-    expect(elements.limitCountdown.textContent).toBe("limit.countdown");
+    expect(elements.limitCountdown.textContent).toBe("limit.countdownMinutes");
+    showLimitBanner(30);
+    expect(elements.limitCountdown.textContent).toBe("limit.countdownSeconds");
+    showLimitBanner(1);
+    expect(elements.limitCountdown.textContent).toBe("limit.countdownSecond");
   });
 
   it("updates countdown text each second", () => {

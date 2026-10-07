@@ -473,6 +473,19 @@ probe_text 1 "wuerden ausgeliefert|ERGEBNIS: [1-9]" "ignorierte, auslieferbare D
 rm -f "$RESTE_PROBE"
 zurueck .gitignore
 
+# OSS-2026-10-04-13: Der Waechter braucht minimatch — als eigene Abhaengigkeit
+# der Wurzel, nicht als Mitbringsel eines anderen Pakets.
+sichern package.json
+python3 - <<'PYSELF'
+import re
+s = open("package.json").read()
+neu, anzahl = re.subn(r'\n\s*"minimatch": "[^"]*",', "", s)
+assert anzahl == 1
+open("package.json", "w").write(neu)
+PYSELF
+probe_text 2 "nicht als eigene Abhaengigkeit" "minimatch nur noch als Mitbringsel: nicht messbar" node scripts/pruefe-auslieferbare-reste.mjs
+zurueck package.json
+
 echo
 
 # BEFUND 01.09.2026 (Punkt 2 des Umbaus): Von elf Waechtern hatten nur vier
@@ -613,8 +626,9 @@ if [ "$FEHLER" -eq 0 ]; then
   # Kommentarzeile im Befehl, vier unlesbare Dateien gegen Leser und
   # Pruefsumme — die mit U+2028 im Kopfkommentar nur gegen den Leser, denn
   # Kommentare ausserhalb von Bloecken zaehlen in der Summe bewusst nicht).
-  # 41 seit 07.10.2026: zwei Proben fuer den Bestand der Testdateien.
-  ERWARTETE_PROBEN=41
+  # 42 seit 07.10.2026: zwei Proben fuer den Bestand der Testdateien, eine
+  # fuer die eigene Abhaengigkeit des Paket-Waechters.
+  ERWARTETE_PROBEN=42
   if [ "$PROBEN" -ne "$ERWARTETE_PROBEN" ]; then
     echo "  NICHT MESSBAR: $PROBEN Proben gelaufen, $ERWARTETE_PROBEN erwartet."
     echo "  Es fehlen welche, oder die Zahl oben wurde nicht nachgezogen."

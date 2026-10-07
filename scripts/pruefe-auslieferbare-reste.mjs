@@ -54,10 +54,20 @@ function nichtMessbar(...zeilen) {
   process.exit(2);
 }
 
-/* minimatch liegt hier nur als Abhaengigkeit einer Abhaengigkeit. Sich darauf
-   zu verlassen hiesse, die Messung von etwas abhaengig zu machen, das ohne
-   Ankuendigung verschwinden kann — dann lieber "nicht messbar" als ein
-   selbstgebauter Muster-Vergleich, der die Faelle halb trifft. */
+/* minimatch steht als EIGENE Abhaengigkeit in der package.json der Wurzel
+   (OSS-2026-10-04-13). Kaeme es nur ueber ein anderes Paket herein (eslint,
+   jest), verschwaende es mit dessen naechstem Umbau, ohne dass hier jemand
+   etwas geaendert haette. Fehlt der Eintrag oder das Paket, heisst das "nicht
+   messbar" — lieber das als ein selbstgebauter Muster-Vergleich, der die
+   Faelle halb trifft. */
+const PAKET = JSON.parse(readFileSync(join(WURZEL, "package.json"), "utf8"));
+if (!{ ...PAKET.dependencies, ...PAKET.devDependencies }.minimatch) {
+  nichtMessbar(
+    "NICHT MESSBAR: minimatch steht nicht als eigene Abhaengigkeit in package.json.",
+    "               Ueber ein anderes Paket mitgebracht, kann es jederzeit wegfallen.",
+    "               Abhilfe: unter devDependencies eintragen (samt package-lock.json)."
+  );
+}
 let passt;
 try {
   const require = createRequire(import.meta.url);

@@ -51,9 +51,6 @@
       "client.screen": "Bildschirmgröße",
       "client.downlinkMbps": "Sprache, Netz",
       "client.rttMs": "Sprache, Netz",
-      "client.deviceMemoryGb": "zusammengefasst",
-      "client.hardwareConcurrency": "zusammengefasst",
-      "client.dpr": "Bildschirmgröße",
       "client.saveData": "Sprache, Netz",
       "client.automatisiert": "zusammengefasst"
     },

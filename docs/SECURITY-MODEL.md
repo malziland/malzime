@@ -1491,6 +1491,22 @@ Datenschutztext an die Zeilen anpassen: verworfen, der Text ist die Vorgabe.
 die Feldmengen-Tests rot werden; wer es braucht, prüft zuerst, ob der
 Datenschutztext es deckt.
 
+**Nachtrag 07.10.2026 (`PRIV-2026-10-03-39`).** Drei Geräteangaben der
+Fehlermeldungen nennt der Datenschutztext nicht: Arbeitsspeicher, Zahl der
+Prozessorkerne, Pixeldichte. Sie werden nicht mehr gesammelt
+(`public/js/client-context.js`) und nicht mehr angenommen
+(`functions/src/handle-errors.js` — auch nicht von einer Seite, die noch im
+Zwischenspeicher eines Browsers liegt). Was der Text nennt, bleibt: Browsertyp,
+Größenklasse des Bildschirms, Sprache, Netz. Die Entscheidung oben, die
+Geräteangaben nicht insgesamt aus den Fehlermeldungen zu nehmen, gilt
+unverändert. Geprüft: `fehlermeldung-geraeteangaben.test.js` (am echten
+Handler: die drei Felder kommen nicht an, die übrigen schon) und
+`public/__tests__/geraeteangaben-deckung.test.js` (jede Geräteangabe braucht
+ein eigenes Stichwort im deutschen und englischen Text; der Sammelsatz „grobe
+Angaben wie" gilt für sie nicht). *Getragene Folge:* Ein Fehler, der nur auf
+Geräten mit wenig Arbeitsspeicher auftritt, ist am Protokoll nicht mehr als
+solcher zu erkennen.
+
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 
 **Was war.** Alle Aufrufe des Browsers an `/api/…` liefen über Firebase Hosting.

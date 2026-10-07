@@ -49,8 +49,14 @@ const BOOLEAN_FIELDS = ["online", "hidden"];
    Unterschied fest). */
 const TIMING_KEYS = ["prepareImageMs", "fetchMs", "parseMs", "renderMs", "totalMs"];
 
+/* Geraete- und Netzangaben: nur, was der Datenschutztext fuer die
+   Fehlermeldungen nennt (Bildschirmgroesse als Klasse, Sprache, Netz).
+   Arbeitsspeicher, Prozessorkerne und Pixeldichte nennt er nicht — sie stehen
+   deshalb nicht auf der Liste und werden verworfen, auch wenn ein aelterer
+   Browser sie noch schickt (PRIV-2026-10-03-39,
+   fehlermeldung-geraeteangaben.test.js). */
 const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
-const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];
+const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs"];
 /* `automatisiert` = navigator.webdriver des Browsers (07.09.2026): Zehn
    "demo-image-load"-Meldungen in 30 Tagen stammten von automatisierten
    Browsern — erkennbar erst nach einer Stunde Messen. Ein Ja/Nein-Wert ohne

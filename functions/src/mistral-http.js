@@ -199,6 +199,9 @@ async function callMistralRaw(options) {
   return { ...result, waitMs };
 }
 
+/* Der Fehler, mit dem ein Aufruf an unserer eigenen Zeitgrenze endet. */
+const zeitFehler = (ms) => Object.assign(new Error(`Mistral request timeout after ${ms}ms`), { code: "timeout" });
+
 async function callMistralRawUnthrottled({
   model,
   messages,
@@ -312,23 +315,18 @@ async function callMistralRawUnthrottled({
       });
     } catch (err) {
       clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
-        const e = new Error(`Mistral request timeout after ${effectiveTimeout}ms`);
-        e.code = "timeout";
-        throw e;
-      }
+      if (err.name === "AbortError") throw zeitFehler(effectiveTimeout);
       throw markiereAbbruch(err, "");
     }
-    /* Im Stream-Modus bleibt der Timeout SCHARF, bis der Stream zu Ende
-       gelesen ist: `fetch` liefert dort schon bei den Headern zurueck, die
-       eigentliche Antwort trudelt danach ueber Minuten ein. Ohne den aktiven
-       Waechter koennte ein haengender Stream den Worker endlos festhalten. */
-    if (!streamen) clearTimeout(timeoutId);
+    /* Der Timeout bleibt SCHARF, bis die Antwort zu Ende gelesen ist — mit
+       und ohne Stream (BUG-2026-10-03-27): `fetch` liefert schon bei den
+       Headern zurueck, der Rumpf kommt danach. Ohne den aktiven Waechter
+       koennte ein ausbleibender Rumpf den Worker endlos festhalten. */
 
     /* Ueberlast (429) oder Aussetzer (502/503/504): warten und wiederholen,
        Hintergrund in ueberlast.js. */
     if (WIEDERHOLBARE_STATUS.has(res.status) && attempt < backoffs.length) {
-      if (streamen) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
       /* KA-09 (Kurzaudit 2026-08-12): Den nie gelesenen Antwortrumpf aktiv
          verwerfen, sonst bleibt die Verbindung bis zum Speicherbereiniger
          offen — bei Workshop-Bursts mit vielen 429ern unnötiger Ballast. */
@@ -349,13 +347,13 @@ async function callMistralRawUnthrottled({
     }
 
     if (!res.ok) {
-      if (streamen) clearTimeout(timeoutId);
       let bodyText = "";
       try {
         bodyText = await res.text();
       } catch (_) {
         /* ignore */
       }
+      clearTimeout(timeoutId);
       const e = new Error(`Mistral HTTP ${res.status}: ${bodyText.slice(0, 200).replace(/\s+/g, " ")}`);
       e.status = res.status;
       throw e;
@@ -371,11 +369,8 @@ async function callMistralRawUnthrottled({
         return { ...(await leseStreamAntwort(res, onLiveText, httpStart, spur)), wiederholungen };
       } catch (err) {
         if (err && err.name === "AbortError") {
-          const e = new Error(`Mistral request timeout after ${effectiveTimeout}ms`);
-          e.code = "timeout";
           /* BUG-2026-08-28-02: Was bis zum Abbruch ankam, faehrt mit. */
-          e.teiltext = spur.text || "";
-          throw e;
+          throw Object.assign(zeitFehler(effectiveTimeout), { teiltext: spur.text || "" });
         }
         throw markiereAbbruch(err, spur.text);
       } finally {
@@ -383,9 +378,14 @@ async function callMistralRawUnthrottled({
       }
     }
 
-    const json = await res.json().catch((err) => {
-      throw markiereAbbruch(err, "");
-    });
+    let json;
+    try {
+      json = await res.json();
+    } catch (err) {
+      throw err && err.name === "AbortError" ? zeitFehler(effectiveTimeout) : markiereAbbruch(err, "");
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const choice = json.choices?.[0];
     let text = "";
     const msgContent = choice?.message?.content;

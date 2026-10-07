@@ -9,12 +9,10 @@ import {
   stopScanAnim,
   showLimitBanner,
   showMaintenanceModal,
-  showQueueWaiting,
   resetQueueWaiting,
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import * as liveAnzeige from "./live-anzeige.js";
-import { speichereRcTicket } from "./rc-ticket.js";
 import * as realitaetsCheck from "./realitaets-check.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
@@ -22,6 +20,9 @@ import { logTelemetry } from "./telemetry-logger.js";
 import { PROFIL_FERTIG } from "./beast-lockruf.js";
 import { generateTraceId } from "./client-context.js";
 import { apiUrl } from "./api-basis.js";
+import { sleep, fetchWithTimeout } from "./netz-hilfen.js";
+import { pollJob, JOB_STATUS_URL, MAX_POLL_DURATION_MS } from "./auftrag-abfrage.js";
+import { vorschauAusErgebnisFallsNoetig, showPhotoDeletedNotice } from "./foto-vorschau.js";
 import { acquireWakeLock, releaseWakeLock, wakeLockStatus } from "./wake-lock.js";
 import {
   storeJobId,
@@ -34,15 +35,14 @@ import {
 
 /* Wake-Lock und Auftragsgedächtnis liegen seit 10.09.2026 in eigenen Modulen
    (js/wake-lock.js, js/auftrag-speicher.js). app.js und die Tests holen diese
-   drei weiter hier. */
+   drei weiter hier. Seit 07.10.2026 ebenso herausgelöst: die Statusabfrage
+   (js/auftrag-abfrage.js), die Netz-Hilfen (js/netz-hilfen.js) und die zwei
+   Handgriffe an der Foto-Vorschau (js/foto-vorschau.js) — unverändert, nur an
+   eigenem Ort; hier bleibt der Ablauf: einreihen, abholen, wiederaufnehmen. */
 export { acquireWakeLock, clearStoredJobId, getStoredJobId };
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /* SICHTBAR HEISST GEMELDET (16.09.2026): Sechs Fehlermeldungen, die ein Kind
    auf dem Bildschirm sieht, gingen nie an die Fehlererfassung — die Auswertung
@@ -60,30 +60,6 @@ function meldeSichtbarenFehler(schluessel, phase, zusatz = {}) {
 function liveAbbrechenWegenFehler() {
   liveAnzeige.abbrechen();
   if (elements.facts) elements.facts.innerHTML = "";
-}
-
-/* Die Vorschau oben zeigt das Original ueber eine Objekt-URL. Kann der
-   Browser das Format nicht anzeigen (HEIC auf Android, 08.09.2026), bleibt
-   dort ein kaputtes Bildsymbol stehen, obwohl die Analyse laeuft. Dann zeigt
-   die Vorschau das, was der Browser aus dem Foto gemacht hat — dasselbe Bild,
-   das auch zum Server geht. Kann der Browser das Original anzeigen, aendert
-   sich nichts. */
-function vorschauAusErgebnisFallsNoetig(prepared) {
-  const img = elements.imagePreview && elements.imagePreview.querySelector("img");
-  if (!img || !prepared || !prepared.imageBase64) return;
-  const ersetzen = () => {
-    try {
-      URL.revokeObjectURL(img.src);
-    } catch (_) {
-      /* Objekt-URL war schon weg — egal. */
-    }
-    img.src = `data:${prepared.mimeType || "image/jpeg"};base64,${prepared.imageBase64}`;
-  };
-  if (img.complete) {
-    if (img.naturalWidth === 0) ersetzen();
-  } else {
-    img.addEventListener("error", ersetzen, { once: true });
-  }
 }
 
 /* v3.0.0: Das frühere Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
@@ -121,63 +97,14 @@ export async function analyzeImage() {
    Warteschlange gebaut wurde: lange offene Verbindungen brechen weg, und der
    Bildschirm-Wachhalter greift auf iPhones nicht. */
 
-/* Adressen aus api-basis.js: im Betrieb direkt Cloud Run (EU), sonst relativ. */
+/* Adresse aus api-basis.js: im Betrieb direkt Cloud Run (EU), sonst relativ.
+   Die Adresse der Statusabfrage und ihre Grenzen stehen bei der Abfrage
+   selbst (js/auftrag-abfrage.js). */
 const ENQUEUE_URL = apiUrl("/api/enqueue");
-const JOB_STATUS_URL = apiUrl("/api/job-status");
-const POLL_INTERVAL_MS = 2000;
-/* Aufeinanderfolgende job-status-Fehler, die der Poll-Loop toleriert, bevor
-   er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
-   das Ergebnis liegt serverseitig sicher. */
-const MAX_POLL_FAILURES = 5;
-/* Gesamt-Obergrenze fürs Pollen. Bei randvollem Stundenbudget kann die ehrliche
-   Wartezeit darüber liegen (Extremfall: ~950 wartende Jobs ≈ 100 min ETA) —
-   dieser Deckel ist der bewusste Schlussstrich, damit kein Tab stundenlang
-   pollt. Der aufgegebene Job wird nach der Herzschlag-Karenz gereapt und gibt
-   seinen Stunden-Slot zurück. */
-const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
-/* Timeouts für die Queue-Fetches: Der Client darf nie vor dem Server aufgeben
-   (enqueue-Function 60 s, job-status 10 s), aber ein Fetch, der nie settelt
-   (Netz-Blackhole auf Mobilgeräten), darf den Wartefluss nicht einfrieren —
-   Ein haengender Aufruf blockiert die Warteschlange damit nicht. */
+/* Zeitgrenze fuers Einreihen: Der Client darf nie vor dem Server aufgeben
+   (enqueue-Function 60 s), aber ein Aufruf, der nie endet (Netz-Blackhole auf
+   Mobilgeraeten), darf den Ablauf nicht einfrieren. */
 const ENQUEUE_TIMEOUT_MS = 90000;
-const POLL_TIMEOUT_MS = 30000;
-
-/* BUG-003 (offen seit dem KURZAUDIT 07/2026, geschlossen 08/2026): Der Timer
-   lief frueher im `.finally()` der fetch-Promise aus — also sobald die
-   Kopfzeilen da waren. Bricht die Verbindung danach mitten im Antwort-Rumpf ab,
-   ohne sich zu schliessen (typisch beim Zellenwechsel im Schulgebaeude), settelt
-   `resp.json()` nie und die Warteschleife friert lautlos ein.
-   Jetzt laeuft der Timer weiter, bis der Rumpf gelesen ist: `fetchWithTimeout`
-   liefert die Antwort samt einer `jsonMitTimeout()`-Methode, die den Abbruch
-   mit abdeckt.
-   `abbruch` (wahlfrei): ein Abbruch-Schalter des Aufrufers. Loest er aus,
-   endet auch dieser Aufruf — getrennt vom Zeitlimit, damit der Aufrufer
-   beides auseinanderhalten kann. */
-function fetchWithTimeout(url, options, timeoutMs, abbruch) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  if (abbruch) {
-    if (abbruch.signal.aborted) controller.abort();
-    else abbruch.signal.addEventListener("abort", () => controller.abort(), { once: true });
-  }
-  return fetch(url, { ...options, signal: controller.signal }).then(
-    (resp) => {
-      const roh = typeof resp.json === "function" ? resp.json.bind(resp) : null;
-      /* Bei Fehlerantworten ist der Rumpf klein und wird ueber clone() gelesen —
-         da braucht es keinen laufenden Timer mehr. Nur im Erfolgsfall bleibt er
-         scharf, bis der Rumpf tatsaechlich gelesen ist. */
-      if (!resp.ok || !roh) clearTimeout(timer);
-      resp.jsonMitTimeout = roh
-        ? () => roh().finally(() => clearTimeout(timer))
-        : () => Promise.reject(new Error("Antwort ohne JSON-Rumpf"));
-      return resp;
-    },
-    (err) => {
-      clearTimeout(timer);
-      throw err;
-    }
-  );
-}
 
 /* PRIV-2026-10-03-57: Meldet dem Server einen Auftrag ab, den dieser Tab
    nicht mehr abholt (ein anderes Foto wurde gewaehlt). Wartet der Auftrag
@@ -196,156 +123,6 @@ function meldeAuftragAb(jobId, resultToken) {
     }).catch(() => {});
   } catch (_) {
     /* Abmelden ist ein Zusatz — nie ein Grund fuer eine Fehlermeldung. */
-  }
-}
-
-/**
- * Wartet bis zum nächsten Poll — weckt aber sofort auf, sobald der Tab wieder
- * sichtbar wird. Hintergrund: Browser drosseln Timer in versteckten Tabs
- * massiv (am Handy frieren sie ganz ein). Ohne dieses Aufwecken holt ein
- * zurückkehrender Nutzer sein längst fertiges Ergebnis erst nach der
- * gedrosselten Verzögerung ab — das fühlt sich wie Minuten totes Warten an.
- * Mit dem visibilitychange-Wecker erscheint das Ergebnis ~1 s nach Rückkehr.
- * Der Listener wird pro Wartezyklus sauber wieder abgemeldet.
- */
-function waitForNextPoll(ms) {
-  return new Promise((resolve) => {
-    let settled = false;
-    let timer = null;
-    const onVisible = () => {
-      if (document.visibilityState === "visible") finish();
-    };
-    function finish() {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-      resolve();
-    }
-    timer = setTimeout(finish, ms);
-    document.addEventListener("visibilitychange", onVisible);
-  });
-}
-
-/**
- * Pollt /api/job-status bis zu einem Terminal-Status. Jeder Poll erneuert
- * serverseitig den Liveness-Herzschlag des Jobs.
- * @param {boolean} [liveErlaubt] v3.0: Live-Text-Wellen aus processing-
- *        Antworten an die Live-Anzeige durchreichen. Nur der frische Upload
- *        setzt das — die Wiederaufnahme nach einem Reload bleibt bewusst beim
- *        heutigen Verhalten (Scan-Animation bis zum fertigen Ergebnis).
- * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
- *          — oder null, wenn ein neuer Upload den Lauf abgelöst hat.
- *          `error` ist der SCHLÜSSEL des Textes (etwa "error.queueFailed"),
- *          nicht der fertige Text: Der Aufrufer übersetzt und gibt den
- *          Schlüssel an die Statuszeile weiter, damit die Meldung einen
- *          Sprachwechsel mitmacht (UX-2026-10-03-48).
- */
-async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveErlaubt = false) {
-  let failures = 0;
-  let firstPoll = true;
-  const pollStart = Date.now();
-  for (;;) {
-    if (state.requestId !== myId) return null;
-    /* Beim Reload-Resume sofort EINMAL fragen statt erst nach 2s — ein bereits
-       fertiges Ergebnis ist dann in ~0,3s da, der „Nachdenk"-Balken blitzt nur
-       kurz auf statt 2s zu laufen. Danach normaler 2s-Takt. */
-    if (!(firstPoll && pollImmediately)) {
-      await waitForNextPoll(POLL_INTERVAL_MS);
-    }
-    firstPoll = false;
-    if (state.requestId !== myId) return null;
-    /* Hängt der Job dauerhaft → nicht endlos weiterpollen. */
-    if (Date.now() - pollStart > MAX_POLL_DURATION_MS) {
-      return { error: "error.timeout" };
-    }
-
-    let data;
-    try {
-      const tokenParam = resultToken ? `&token=${encodeURIComponent(resultToken)}` : "";
-      /* PRIV-2026-09-10-06: traegt das Profil — nie zwischenspeichern, auch ohne Server-Kopfzeile. */
-      const resp = await fetchWithTimeout(
-        `${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}${tokenParam}`,
-        { cache: "no-store" },
-        POLL_TIMEOUT_MS
-      );
-      if (!resp.ok) {
-        /* 404 = Job existiert nicht (mehr) — kein transienter Fehler. */
-        if (resp.status === 404) return { error: "error.queueFailed" };
-        throw new Error(`HTTP ${resp.status}`);
-      }
-      data = await resp.jsonMitTimeout();
-      failures = 0;
-      /* Zeitstempel des letzten erfolgreichen Polls: Daran erkennt die
-         Wiederaufnahme, ob diese Schleife noch lebt oder in einem eingefrorenen
-         fetch feststeckt. */
-      state.lastPollOk = Date.now();
-    } catch (_) {
-      failures += 1;
-      if (failures >= MAX_POLL_FAILURES) {
-        /* transient: Die Verbindung ist weg, NICHT der Job. Der läuft
-           serverseitig weiter und das Ergebnis liegt rund zwei Stunden bereit.
-           Der Aufrufer darf die Job-Nummer deshalb nicht wegwerfen — sonst ist
-           das fertige Profil unerreichbar, obwohl es existiert. */
-        return { error: "error.connectionLost", transient: true };
-      }
-      continue;
-    }
-
-    if (state.requestId !== myId) return null;
-
-    switch (data.status) {
-      case "queued":
-        showQueueWaiting("queued", data.position, data.etaSeconds);
-        break;
-      case "processing":
-        showQueueWaiting("processing");
-        /* v3.0: Liefert der Server schon Live-Text, tippt die Live-Anzeige ihn
-           mit — sie versteckt beim ersten Zeichen selbst die Scan-Animation.
-           Beide Felder gehen als EINE Welle ans Modul: `standard` (liveText)
-           und, sobald das Modell es schreibt, das Beast-Profil (liveTextBeast)
-           — angezeigt wird dort der Puffer des gerade gewählten Modus. Fehlt
-           das Feld noch, passiert hier nichts. Einen Schalter dafür gibt es
-           seit dem 10.09.2026 nicht mehr: Live-Text ist immer an. */
-        if (liveErlaubt && typeof data.liveText === "string") {
-          liveAnzeige.welle({
-            standard: data.liveText,
-            beast: typeof data.liveTextBeast === "string" ? data.liveTextBeast : null,
-            /* FEATURE-2026-08-29-01: Fertige Merkmale derselben Welle. Fehlen
-               sie (noch keine Karte fertig), bleibt es beim reinen Text. */
-            kartenStandard: Array.isArray(data.liveKartenStandard) ? data.liveKartenStandard : null,
-            kartenBeast: Array.isArray(data.liveKartenBeast) ? data.liveKartenBeast : null,
-            /* Neuversuch nach Verbindungsabriss: steigt die Zahl, faengt die
-               Anzeige von vorn an (live-anzeige.js). */
-            versuch: data.liveTextVersuch,
-          });
-        }
-        break;
-      case "done":
-        /* BUG-2026-08-13-FE-05: „fertig ohne Ergebnis" ist keine Zustellung.
-           Der Server schickt {status:"done", result:null, tokenRequired:true},
-           wenn ein Ergebnis existiert, aber das Abhol-Ticket fehlt (etwa wenn
-           sessionStorage beim zweiten Schreibvorgang warf). Vorher lief das als
-           Zustellung durch: startete die 15-Minuten-Frist und zeigte ein
-           Fehler-Banner statt still aufzuräumen. Jetzt wie ein Fehler behandelt. */
-        if (data.result == null) {
-          return { error: "error.queueFailed", reason: data.tokenRequired ? "token-fehlt" : "kein-ergebnis" };
-        }
-        /* KA-02: Das Einmal-Ticket für den Realitäts-Check kommt genau mit
-           der ersten Auslieferung (danach nie wieder) — sofort merken, damit
-           es Reload und Tab-Wiederaufnahme im 15-Minuten-Fenster überlebt. */
-        if (typeof data.rcTicket === "string") speichereRcTicket(data.rcTicket);
-        /* Fragte der Server neu, ohne dass die Anzeige den neuen Versuch sah
-           (kurz offline), wird der alte Text verworfen statt zu Ende getippt. */
-        if (liveErlaubt) liveAnzeige.versuchAbgleichen(data.liveTextVersuch);
-        return { result: data.result };
-      case "failed":
-        return { error: "error.queueFailed", reason: data.errorReason };
-      case "abandoned":
-        return { abandoned: true };
-      default:
-        return { error: "error.queueFailed" };
-    }
   }
 }
 
@@ -533,33 +310,6 @@ export function initHintergrundWiederaufnahme() {
     if (!state.isAnalyzing && !state.wartetAufVerbindung) return;
     resumeQueueJob({ force: true });
   });
-}
-
-/* DATENSCHUTZ-ENTSCHEIDUNG (bewusst): Nach einem Reload zeigen wir das
-   hochgeladene Foto NICHT wieder. Es wird unmittelbar nach der Analyse
-   serverseitig gelöscht und absichtlich NIRGENDS — auch nicht im Browser —
-   zwischengespeichert; Datensparsamkeit hat Vorrang. Statt einer leeren Lücke
-   setzen wir an die Stelle des Fotos einen kurzen, positiven Datenschutz-
-   Hinweis: der „verschwundene" Anblick wird so zum Lerneffekt. */
-function showPhotoDeletedNotice() {
-  if (!elements.imagePreview) return;
-  const note = document.createElement("div");
-  note.className = "photo-deleted-note";
-  note.setAttribute("role", "note");
-
-  /* Das Schloss-Symbol kommt rein dekorativ aus dem CSS (::before) — so bleibt
-     kein hartcodierter Text im JS (i18n-Guardian), und Screenreader lesen es
-     nicht vor. Der eigentliche Text läuft über t() (DE/EN). */
-  const text = document.createElement("span");
-  text.className = "photo-deleted-text";
-  const strong = document.createElement("strong");
-  strong.textContent = t("reload.photoTitle");
-  text.appendChild(strong);
-  text.appendChild(document.createTextNode(" " + t("reload.photoBody")));
-
-  note.appendChild(text);
-  elements.imagePreview.innerHTML = "";
-  elements.imagePreview.appendChild(note);
 }
 
 /**

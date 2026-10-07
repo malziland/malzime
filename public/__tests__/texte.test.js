@@ -197,7 +197,7 @@ describe("Fläche: Jede Meldung der Statuszeile macht einen Sprachwechsel mit", 
   });
 
   it("die Abfrage gibt Schlüssel zurück, keine fertigen Texte", () => {
-    const quelle = readFileSync(join(PUBLIC, "js", "api.js"), "utf8");
+    const quelle = readFileSync(join(PUBLIC, "js", "auftrag-abfrage.js"), "utf8");
     expect(quelle).not.toMatch(/return \{ error: t\(/);
     expect(quelle.match(/return \{ error: "error\.[A-Za-z]+"/g).length).toBeGreaterThanOrEqual(6);
   });

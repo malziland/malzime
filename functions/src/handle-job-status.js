@@ -21,6 +21,7 @@
 const { randomUUID } = require("crypto");
 const { geltendeWerte } = require("./betriebsprofil");
 const { dauerJeAnalyse } = require("./durchsatz");
+const { wartezeitSekunden } = require("./warteschlangen-rechnung");
 const { getFeatureFlags } = require("./feature-flags");
 const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered, abandonJob } = require("./jobs");
 const { safeCompare, sha256Hex } = require("./auth");
@@ -52,10 +53,12 @@ async function etaForPosition(position) {
   if (gemessen && !frisch) return null;
   /* Die Parallelitaet kommt aus dem Einstellungssatz. Frueher stand hier der
      Code-Wert: Wer die Warteschlange umstellte, bekam eine Wartezeit-Ansage,
-     die zur alten Zahl passte — der Fehler war fuer den Wartenden unsichtbar. */
+     die zur alten Zahl passte — der Fehler war fuer den Wartenden unsichtbar.
+     BUG-2026-10-03-35: Gerechnet wird mit der engeren von zwei Bremsen
+     (Parallelitaet und Rate), an derselben Stelle wie die Einlassgrenze. */
   const { werte } = await geltendeWerte();
   if (!werte || !sekunden) return null;
-  return Math.ceil(position / werte.parallelitaet) * sekunden;
+  return wartezeitSekunden(werte, position, sekunden);
 }
 
 /* Flag-Abfrage, die niemals wirft: Ist Firestore nicht erreichbar, gilt der

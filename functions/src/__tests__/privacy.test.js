@@ -78,6 +78,7 @@ describe("Adresse und Telefonnummer in ueblichen Schreibweisen (BUG-2026-10-03-0
     "3 Park Avenue",
     "Springfield Elementary School",
     "Oxford High School",
+    "Lincoln Middle School",
   ])("englisch: '%s' ist ein Adress-Hinweis", (text) => {
     expect(hinweise(text)).toContain("privacy.address");
   });
@@ -105,6 +106,12 @@ describe("Adresse und Telefonnummer in ueblichen Schreibweisen (BUG-2026-10-03-0
     "Roadtrip 2023",
     "Route 66",
     "Sportplatz",
+    /* Aufdrucke auf Kleidung: "school" allein nennt keine Schule. */
+    "Old School",
+    "OLD SCHOOL HIP HOP",
+    "Back to School",
+    "Too cool for school",
+    "High School Musical",
   ])("kein Adress-Hinweis: '%s'", (text) => {
     expect(hinweise(text)).not.toContain("privacy.address");
   });

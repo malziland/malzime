@@ -21,7 +21,7 @@
    deutsche, oesterreichische und englische Formen (BUG-2026-10-03-06).
    Verglichen wird klein geschrieben; "STRASSE" auf einem Schild wird so zu
    "strasse". */
-const ADRESS_WOERTER = ["straße", "strasse", "str.", "schule", "gymnasium", "school"];
+const ADRESS_WOERTER = ["straße", "strasse", "str.", "schule", "gymnasium"];
 
 /* Strassenwoerter, die auch in Alltagswoertern oder Aufdrucken stecken
    ("unterwegs", "Sportplatz", "Platz 3", "Streetwear", "Street Food"), zaehlen
@@ -33,6 +33,10 @@ const ADRESS_MUSTER = [
   /(?<![\p{L}\d])\d{1,5}[a-z]?\s+(?:[\p{L}'.-]+\s+){1,2}(?:street|road|avenue)(?!\p{L})/u,
   /* Mill Road 12 */
   /(?<!\p{L})(?:street|road|avenue)\s+\d{1,5}(?!\d)/u,
+  /* Springfield Elementary School · Oxford High School. "school" allein
+     zaehlt nicht: Es steht als Aufdruck auf Kleidung ("Old School",
+     "Back to School"); "High School Musical" ist ein Filmtitel. */
+  /(?<!\p{L})(?:elementary|primary|middle|high|grammar|secondary|public|community|international)\s+school(?!\p{L})(?!\s+musical)/u,
 ];
 
 /* Telefonnummern in Zifferngruppen: 0664 123 45 67 · +43 (0)664 123 45 67 ·

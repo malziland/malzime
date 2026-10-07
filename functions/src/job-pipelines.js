@@ -150,7 +150,7 @@ async function runPipeline(job) {
         profiles: { normal: normalProfile, boost: boostProfile },
         privacyRisks,
         exif,
-        meta: { traceId: job.traceId || null, mode: "animal" },
+        meta: { mode: "animal" },
       },
       success: true,
     };
@@ -213,7 +213,6 @@ async function runPipeline(job) {
         /* alterUnlesbar (17.09.2026): Die Alterskarte zeigt dann einen festen
            Satz; der Realitaets-Check fragt das Alter nicht ab. Nur Ja/Nein. */
         meta: {
-          traceId: job.traceId || null,
           mode: "multimodal",
           subject,
           alterUnlesbar: safety.alterUnlesbar === true,
@@ -239,7 +238,7 @@ async function runPipeline(job) {
       blockedReason,
       privacyRisks,
       exif,
-      meta: { traceId: job.traceId || null, mode: "blocked" },
+      meta: { mode: "blocked" },
     },
     success: false,
   };

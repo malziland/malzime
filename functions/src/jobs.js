@@ -118,14 +118,13 @@ function nachmeldenBeimLoeschen(job) {
  *
  * @param {object} params
  * @param {string} params.lang       aufgelöste Sprache ("de"/"en")
- * @param {string} [params.traceId]  Trace-ID des Clients (Korrelation), optional
  * @param {string} params.imagePath  Storage-Pfad des zwischengespeicherten Bildes
  * @param {object} [params.exif]     sanitisierte Kamera-Metadaten (make/model),
  *                                   die der Worker an die Profil-Stufe weiterreicht
  * @param {number} [params.zaehlerStempel]  Marke des Einlasses im Stundenfenster
  * @param {boolean} [params.zaehlerNachtrag] true = der Worker traegt die Marke nach
  */
-async function createJob({ lang, traceId, imagePath, exif, resultToken, zaehlerStempel, zaehlerNachtrag }) {
+async function createJob({ lang, imagePath, exif, resultToken, zaehlerStempel, zaehlerNachtrag }) {
   const ref = jobsRef().doc();
   const now = Date.now();
   await ref.set({
@@ -146,7 +145,9 @@ async function createJob({ lang, traceId, imagePath, exif, resultToken, zaehlerS
     finishedAt: null,
     deliveredAt: null,
     lang: lang || "de",
-    traceId: traceId || null,
+    /* OHNE die Zufallsnummer des Browsers (PRIV-2026-10-03-39): Der
+       Datenschutztext nennt fuer den gespeicherten Auftrag Profil, Kamera und
+       Sprache — und nach dem Einlass liest sie niemand mehr. */
     imagePath: imagePath || null,
     exif: exif && typeof exif === "object" ? exif : {},
     /* PRIV-003 (Audit 2026-06): zweites Schloss auf das Ergebnis. Nur wer dieses
@@ -315,7 +316,7 @@ function ersatzErgebnis(job) {
     blockedReason: "blocked.apiError",
     privacyRisks: [],
     exif: (job && job.exif) || {},
-    meta: { traceId: (job && job.traceId) || null, mode: "blocked" },
+    meta: { mode: "blocked" },
   };
 }
 

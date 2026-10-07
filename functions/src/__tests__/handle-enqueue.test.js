@@ -257,7 +257,6 @@ describe("handleEnqueue — Erfolgsfall", () => {
     expect(jobs.createJob).toHaveBeenCalledWith(
       expect.objectContaining({
         lang: "de",
-        traceId: null,
         imagePath: "queue-uploads/test.jpg",
         exif: {},
       })
@@ -273,11 +272,18 @@ describe("handleEnqueue — Erfolgsfall", () => {
     );
   });
 
-  test("gültige Trace-ID wird übernommen", async () => {
+  /* PRIV-2026-10-03-39: Die Zufallsnummer des Browsers kommt in der
+     Antwort-Kopfzeile zurueck, geht aber nicht in den gespeicherten Auftrag. */
+  test("gültige Trace-ID: in der Antwort-Kopfzeile, nicht im Auftrag", async () => {
     const res = makeRes();
     await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
-    expect(jobs.createJob).toHaveBeenCalledWith(expect.objectContaining({ traceId: "abc123XYZ" }));
     expect(res.headers["X-Trace-Id"]).toBe("abc123XYZ");
+    /* Erfolgsweg: Der Auftrag wird angelegt, mit Sprache und Bildpfad. */
+    expect(jobs.createJob).toHaveBeenCalledTimes(1);
+    const auftrag = jobs.createJob.mock.calls[0][0];
+    expect(auftrag).toEqual(expect.objectContaining({ lang: "de", imagePath: expect.any(String) }));
+    expect(auftrag).not.toHaveProperty("traceId");
+    expect(JSON.stringify(auftrag)).not.toContain("abc123XYZ");
   });
 
   /* 27.09.2026: Der Auftrag und die Antwort an den Browser tragen die

@@ -226,7 +226,6 @@ Das fertige Ergebnis steht im Feld `result` der Statusantwort:
   "privacyRisks": [],
   "exif": {},
   "meta": {
-    "traceId": "…",
     "mode": "multimodal",
     "subject": "HUMAN",
     "alterUnlesbar": false

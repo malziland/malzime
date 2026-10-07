@@ -181,7 +181,8 @@ async function handleEnqueue(req, res, secrets) {
       fields = parsed.fields;
     }
 
-    /* i18n + Trace-ID */
+    /* i18n + Trace-ID. Die Zufallsnummer des Browsers steht in der Antwort-Kopfzeile
+       und in den Fehlerzeilen dieses Aufrufs, NICHT im Auftrag (PRIV-2026-10-03-39). */
     const requestedLang = (jsonBody && jsonBody.lang) || (fields && fields.lang) || "";
     const lang = resolveLanguage(requestedLang);
 
@@ -340,7 +341,6 @@ async function handleEnqueue(req, res, secrets) {
          (counter.js, "GENAU EINMAL IM FENSTER"). */
       jobId = await createJob({
         lang,
-        traceId,
         imagePath,
         exif,
         resultToken,

@@ -1397,8 +1397,12 @@ Die Dauern bleiben.
 
 Kennungen tragen nur noch Wege, auf denen der jeweilige Aufruf keine Analyse
 macht: Zeilen des Analyse-Aufrufs vor dem Claim und Fehlerzeilen eines
-gescheiterten Einlasses (dort einmal beide Kennungen zusammen). Auftrag und
-Antwort an den Browser tragen die Vorgangskennung weiter. Geprüft werden
+gescheiterten Einlasses (dort einmal beide Kennungen zusammen). Die Antwort
+des Einlasses gibt dem Browser seine Vorgangskennung in einer Kopfzeile
+zurück. Der gespeicherte Auftrag und sein Ergebnis führen sie seit 07.10.2026
+nicht mehr (`PRIV-2026-10-03-39`): Der Datenschutztext nennt für den
+gespeicherten Auftrag Profil, Kamera und Sprache, und nach dem Einlass liest
+die Kennung niemand mehr (`auftrag-ohne-zufallsnummer.test.js`). Geprüft werden
 jeweils ALLE Ausgaben eines Aufrufs nach den Werten der Kennungen, mit
 Positivkontrolle: `analyse-aufruf-ohne-kennung.test.js` (Erfolgs- und
 Fehlerwege der Analyse, auch mit Firestore-Fehlertexten, die die Kennungen

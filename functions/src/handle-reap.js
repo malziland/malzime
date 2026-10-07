@@ -40,6 +40,7 @@ const {
   deleteJob,
 } = require("./jobs");
 const { datenbank } = require("./db");
+const { letzterLeseversuchGescheitert } = require("./betriebsprofil");
 const { deleteImage } = require("./queue-storage");
 const { releaseHourlySlot } = require("./counter");
 
@@ -270,6 +271,24 @@ async function reapJobs() {
      Erinnerung selbst, die bewusst leise bleibt.
      Schwelle 9 Tage: ein ausgefallener Montag allein loest noch nichts aus. */
   await pruefeErinnerungsLebenszeichen();
+
+  /* BUG-2026-10-03-32: Ist der Einstellungssatz gerade nicht lesbar, liefert
+     betriebsprofil.js den zuletzt gueltig gelesenen weiter — die Abfragen oben
+     laufen dann durch und werfen nicht. Fuer die Zaehlung unten ist so ein
+     Lauf trotzdem einer ohne frisch gelesene Betriebswerte: sonst kaeme der
+     Alarm fuer den Dauerzustand nie mehr. Eine Warnung je Lauf, mit demselben
+     Namensanfang wie die Warnungen der einzelnen Abfragen (die Abfrage im
+     RUNBOOK zaehlt sie nach Minuten). */
+  if (!lauf.ohneBetriebswerte && letzterLeseversuchGescheitert()) {
+    lauf.ohneBetriebswerte = true;
+    console.warn(
+      JSON.stringify({
+        severity: "WARNING",
+        step: "reap",
+        warning: "reap-query-ohne-betriebswerte:letzter-stand",
+      })
+    );
+  }
 
   /* Ohne Betriebswerte in LAEUFE_BIS_ALARM Laeufen hintereinander ist es kein
      Ausrutscher mehr — dann alarmieren, jede Minute erneut, bis es wieder geht. Ein

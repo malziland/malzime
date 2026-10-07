@@ -173,3 +173,72 @@ describe("Aufraeumdienst mit gueltigem Einstellungssatz", () => {
     expect(mockAuftraege.has("alt-29")).toBe(true);
   });
 });
+
+/* BUG-2026-10-03-32: Ist der Satz nur GERADE nicht lesbar, gilt der zuletzt
+   gueltig gelesene weiter — auch fuer den Aufraeumdienst, mit dessen Fristen.
+   Solche Laeufe zaehlen trotzdem als "ohne frisch gelesene Betriebswerte":
+   Bleibt es fuenf Laeufe in Folge dabei, kommt der Alarm wie bisher. */
+describe("Aufraeumdienst, wenn der Satz nach einem gueltigen Stand nicht mehr lesbar ist", () => {
+  let fehler;
+  let versatzMs;
+  const echteUhr = Date.now.bind(Date);
+  const minuteSpaeter = () => {
+    versatzMs += 61 * 1000;
+  };
+  const fehlerNamen = () => fehler.mock.calls.map((aufruf) => JSON.parse(aufruf[0]).error);
+
+  beforeEach(async () => {
+    versatzMs = 0;
+    jest.spyOn(Date, "now").mockImplementation(() => echteUhr() + versatzMs);
+    fehler = console.error;
+    /* Erster Lauf: Der Satz wird gueltig gelesen (Zustellfenster 5 Minuten). */
+    mockSatzDokument = gueltig({ zustellfensterMs: 5 * MINUTE });
+    await reapJobs();
+    expect(warnNamen()).toEqual([]);
+    mockSatzDokument = new Error("UNAVAILABLE");
+    minuteSpaeter();
+  });
+
+  test("er arbeitet mit dem letzten gueltigen Stand weiter und sagt es mit EINER Warnung je Lauf", async () => {
+    lege("abgeholt-6", { deliveredAt: Date.now() - 6 * MINUTE });
+    lege("abgeholt-4", { deliveredAt: Date.now() - 4 * MINUTE });
+
+    const ergebnis = await reapJobs();
+
+    /* Fenster 5 Minuten aus dem letzten Stand, nicht die Obergrenze 15. */
+    expect(ergebnis.zugestellt).toBe(1);
+    expect(mockAuftraege.has("abgeholt-6")).toBe(false);
+    expect(mockAuftraege.has("abgeholt-4")).toBe(true);
+    expect(warnNamen()).toEqual(["reap-query-ohne-betriebswerte:letzter-stand"]);
+    expect(fehler).not.toHaveBeenCalled();
+  });
+
+  test("fuenf solche Laeufe in Folge alarmieren wie bisher", async () => {
+    for (let lauf = 1; lauf <= 4; lauf += 1) {
+      await reapJobs();
+      minuteSpaeter();
+    }
+    expect(fehler).not.toHaveBeenCalled();
+
+    await reapJobs();
+
+    expect(fehlerNamen()).toEqual(["betriebswerte-wiederholt-nicht-lesbar"]);
+  });
+
+  test("ist der Satz wieder lesbar, beginnt die Zaehlung von vorn", async () => {
+    for (let lauf = 1; lauf <= 4; lauf += 1) {
+      await reapJobs();
+      minuteSpaeter();
+    }
+    mockSatzDokument = gueltig();
+    await reapJobs();
+    minuteSpaeter();
+    mockSatzDokument = new Error("UNAVAILABLE");
+    for (let lauf = 1; lauf <= 4; lauf += 1) {
+      await reapJobs();
+      minuteSpaeter();
+    }
+
+    expect(fehler).not.toHaveBeenCalled();
+  });
+});

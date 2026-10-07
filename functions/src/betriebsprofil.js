@@ -161,6 +161,24 @@ const ZUSAGE_LOESCHFRISTEN = Object.freeze({
 });
 
 let cache = { zeit: 0, werte: null, quelle: "code" };
+/* DER ZULETZT GUELTIG GELESENE SATZ (BUG-2026-10-03-32). Kann der Satz gerade
+   nicht GELESEN werden (Zeitlimit, Verbindung), gilt dieser Stand weiter — er
+   stammt aus der Datenbank, nicht aus dem Code, ist also kein Rueckfallwert im
+   Sinn der Regel oben. Ein fehlendes oder abgelehntes Dokument verwirft ihn
+   sofort: Dann ist der Satz wirklich ungueltig.
+   Vorher bekamen bei einem einzelnen traegen Zugriff alle, die im selben
+   Augenblick hochluden, "Einstellung stimmt nicht, in ein paar Minuten
+   nochmal" — obwohl der naechste Versuch sofort gelang. */
+let letzterGueltiger = null;
+/* Scheiterte der juengste Leseversuch? Fuer den Aufraeumdienst, der Laeufe ohne
+   frisch gelesene Betriebswerte zaehlt (handle-reap.js). */
+let leseversuchGescheitert = false;
+/* BLEIBT IM CODE — Schutzgrenze, keine Einstellung: Nach einem gescheiterten
+   Leseversuch wird der letzte gueltige Stand so lange ohne neuen Zugriff
+   ausgegeben. Kurz, damit sich eine Stoerung in Sekunden heilt; lang genug,
+   dass eine Anfrage, die den Satz an mehreren Stellen braucht (der Einlass an
+   drei), nicht an jeder wieder bis zum Zeitlimit wartet. */
+const NEUVERSUCH_NACH_LESEFEHLER_MS = 5000;
 /* Laeuft gerade ein Lesevorgang? Dann warten alle weiteren darauf, statt
    selbst zu lesen.
 
@@ -264,11 +282,10 @@ function felderLesen(satz) {
 /**
  * Liest die geltenden Betriebswerte.
  *
- * Reihenfolge der Rueckfaelle, jede Stufe fuehrt zu den Code-Werten:
- *   kein Dokument · kein aktives Profil · Profil unbekannt · Pruefung
- *   fehlgeschlagen · Firestore nicht lesbar
- *
- * Der schlechteste Fall ist damit der heutige Zustand, nie ein schlechterer.
+ * Ohne Werte endet: kein Dokument · kein aktives Profil · Profil unbekannt ·
+ * Pruefung fehlgeschlagen · Firestore nicht lesbar und noch nie gueltig gelesen.
+ * Ist Firestore nur GERADE nicht lesbar, gilt der zuletzt gueltig gelesene Satz
+ * weiter (`letzterStand: true` in der Antwort, siehe letzterGueltiger).
  */
 /* Eine Kopie herausgeben, nie den zwischengespeicherten Satz selbst.
 
@@ -375,6 +392,15 @@ async function leseFrisch(jetzt) {
      die Herkunft und der Ablehnungsgrund. Keine Nutzerdaten, keine Adressen,
      keine Bildinhalte — der Satz enthaelt nur Zahlen und einen selbstgewaehlten
      Namen. */
+  /* Nur GERADE nicht lesbar: Der letzte gueltige Stand gilt weiter, falls es
+     einen gibt. Alles andere ohne Werte (kein Dokument, kein aktives Profil,
+     abgelehnt) macht ihn ungueltig. */
+  const nichtLesbar = !ergebnis.werte && String(ergebnis.grund).startsWith("nicht lesbar");
+  leseversuchGescheitert = nichtLesbar;
+  if (ergebnis.werte) letzterGueltiger = { werte: ergebnis.werte, profil: ergebnis.profil, gelesen: jetzt };
+  else if (!nichtLesbar) letzterGueltiger = null;
+  const weiterMitLetztem = nichtLesbar && letzterGueltiger !== null;
+
   const wechsel = letzterZustand !== `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
   if (wechsel) {
     letzterZustand = `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
@@ -392,15 +418,44 @@ async function leseFrisch(jetzt) {
       console.log(JSON.stringify(zeile));
     } else {
       /* Kein gueltiger Satz = keine Analyse. Nur GERADE nicht lesbar heilt sich beim
-         naechsten Aufruf und ist eine Warnung; alles andere alarmiert (SECURITY-MODEL, 07.09.2026). */
-      if (String(ergebnis.grund).startsWith("nicht lesbar"))
-        console.warn(JSON.stringify({ ...zeile, severity: "WARNING" }));
+         naechsten Aufruf und ist eine Warnung; alles andere alarmiert (SECURITY-MODEL, 07.09.2026).
+         Die Warnung sagt, ob der letzte gueltige Stand weiter gilt und wie alt er
+         ist — eine Zahl, sonst nichts. */
+      if (nichtLesbar)
+        console.warn(
+          JSON.stringify({
+            ...zeile,
+            severity: "WARNING",
+            letzterStand: weiterMitLetztem,
+            ...(weiterMitLetztem ? { standAlterMs: Date.now() - letzterGueltiger.gelesen } : {}),
+          })
+        );
       else console.error(JSON.stringify(zeile));
     }
   }
 
+  if (weiterMitLetztem) {
+    /* Kurz festhalten, dann neu lesen (NEUVERSUCH_NACH_LESEFEHLER_MS). */
+    cache = {
+      zeit: Date.now() - CACHE_MS + NEUVERSUCH_NACH_LESEFEHLER_MS,
+      werte: letzterGueltiger.werte,
+      quelle: "firestore",
+      grund: null,
+      profil: letzterGueltiger.profil,
+      letzterStand: true,
+    };
+    return alsKopie(cache);
+  }
+
   cache = { zeit: jetzt, ...ergebnis };
   return alsKopie(cache);
+}
+
+/* Fuer den Aufraeumdienst: true, wenn der juengste Leseversuch dieser Instanz
+   scheiterte — die Werte stammen dann aus dem letzten gueltigen Stand oder
+   fehlen. Liest nicht selbst. */
+function letzterLeseversuchGescheitert() {
+  return leseversuchGescheitert;
 }
 
 /* Fuer Tests: Cache leeren, damit jede Pruefung frisch liest. Der Warmlauf
@@ -410,6 +465,10 @@ async function leseFrisch(jetzt) {
 function _cacheLeeren({ warmBleiben = false } = {}) {
   letzterZustand = null;
   cache = { zeit: 0, werte: null, quelle: "code" };
+  /* Auch der letzte gueltige Stand wird vergessen: Wer hier leert (die Wache am
+     Dokument, die Tests), will wissen, was JETZT in der Datenbank steht. */
+  letzterGueltiger = null;
+  leseversuchGescheitert = false;
   /* warmBleiben=true simuliert eine Instanz, die schon einmal gelesen hat:
      Der Cache ist abgelaufen, die Verbindung steht aber. Nur so laesst sich
      pruefen, dass im LAUFENDEN Betrieb weiterhin 2000 ms gelten. */
@@ -418,6 +477,7 @@ function _cacheLeeren({ warmBleiben = false } = {}) {
 
 module.exports = {
   geltendeWerte,
+  letzterLeseversuchGescheitert,
   PFLICHTFELDER,
   ZUSAGE_LOESCHFRISTEN,
   _pruefe: pruefe,

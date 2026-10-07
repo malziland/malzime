@@ -453,6 +453,25 @@ Sekunden gingen zwischen Function und Datenbank verloren. Fünf Minuten
 Verzögerung sind für diesen Alarm unschädlich, weil er nur die Reserve ist:
 Jede Analyse ohne Betriebswerte meldet sich sofort selbst.
 
+**Nachschärfung 07.10.2026: der letzte gültige Stand gilt weiter**
+(BUG-2026-10-03-32). Bis dahin verwarf ein einzelner träger Zugriff den eben noch
+gültigen Satz. Die Folge am Einlass war nicht bedacht: Alle, die im selben
+Augenblick hochluden, bekamen „Einstellung stimmt nicht, in ein paar Minuten
+nochmal“, obwohl der nächste Versuch sofort gelang, und die Statusabfrage eines
+laufenden Auftrags antwortete mit einem Serverfehler. Jetzt gibt
+`betriebsprofil.js` bei „nicht lesbar“ den zuletzt gültig gelesenen Satz weiter
+aus — er stammt aus der Datenbank, nicht aus dem Code — und liest nach fünf
+Sekunden neu. Die Warnung nennt das Alter des Stands (`letzterStand: true`,
+`standAlterMs`). Ein fehlendes, unbenanntes oder abgelehntes Dokument verwirft
+den Stand sofort und bleibt ERROR; eine frisch gestartete Instanz ohne gültigen
+Stand hat weiter „keinen Satz“. Die zwei unten verworfenen Alternativen bleiben
+verworfen: Das Zeitlimit ist weiter zwei Sekunden, je Aufruf gibt es weiter
+einen Leseversuch. Der Aufräumer zählt einen Lauf mit dem alten Stand als Lauf
+ohne Betriebswerte (Warnung `reap-query-ohne-betriebswerte:letzter-stand`), der
+Alarm nach fünf Läufen in Folge bleibt also. Eine Analyse bricht in dieser Zeit
+nicht mehr ab und meldet sich deshalb auch nicht selbst
+(`betriebsprofil-letzter-stand.test.js`, `aufraeumer-loescht-ohne-satz.test.js`).
+
 **Betrachtete Alternative.** Das Zeitlimit von zwei Sekunden anheben. Verworfen:
 Das Limit sitzt im Analysepfad, und jede Sekunde mehr wäre eine Sekunde, die
 JEDE Analyse im Störungsfall länger hängt. Ein eigener zweiter Leseversuch je
@@ -463,9 +482,10 @@ nächste Lauf kommt ohnehin 60 Sekunden später.
 
 **Was weiterhin alarmiert.** Jede Analyse, die ohne Betriebswerte abbricht
 (`kein-einstellungssatz` in `handle-process-job.js`) — sofort; fünf
-Aufräumer-Läufe in Folge (`betriebswerte-wiederholt-nicht-lesbar`); jedes
-kaputte Dokument. Ein Dauerausfall von Firestore fällt damit sofort auf, wenn
-jemand analysiert, und sonst spätestens nach fünf Minuten.
+Aufräumer-Läufe in Folge ohne frisch gelesene Betriebswerte
+(`betriebswerte-wiederholt-nicht-lesbar`); jedes kaputte Dokument. Ein
+Dauerausfall von Firestore fällt damit spätestens nach fünf Minuten auf — und
+sofort, wenn jemand analysiert, denn jeder Auftrag liegt selbst in Firestore.
 
 **Bedingung für Neubewertung.** Warnungen `reap-query-ohne-betriebswerte` in
 mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen

@@ -839,25 +839,33 @@ Lesart:
 (`config/betriebsprofil`). Kam er in FÜNF Läufen hintereinander nicht heran,
 meldet er das mit `severity: ERROR` und der Anzahl der Läufe in Folge — und
 zwar jede Minute erneut, bis es wieder geht. Weniger Läufe in Folge sind nur
-Warnungen (`reap-query-ohne-betriebswerte:<abfrage>`). Die Grenze lag bis
+Warnungen (`reap-query-ohne-betriebswerte:<abfrage>`; `…:letzter-stand`, wenn
+der Aufräumer mit dem zuletzt gültig gelesenen Satz weiterarbeitet). Die Grenze lag bis
 07.09.2026 bei einem Lauf, dann bei zwei, seit 10.09.2026 bei fünf: Beide Male
 hatte ein kurzer Hänger Alarm ausgelöst, obwohl der nächste Lauf gesund war und
 niemand betroffen. Am 10.09. beantwortete Firestore laut Googles eigenen
 Messwerten jede Anfrage in höchstens 0,15 s — die zwei Sekunden gingen auf dem
 Weg zwischen Function und Datenbank verloren, nicht in der Datenbank.
 
-**Ist das schlimm?** Fünf Minuten ohne Betriebswerte heißen: Firestore
-antwortet nicht in zwei Sekunden, oder das Dokument ist weg. Dann laufen auch
-keine Analysen — jede betroffene meldet sich sofort selbst als Fehler
-(`kein-einstellungssatz` in `process-job`). Dieser Alarm hier ist die Reserve
-für die Zeit, in der niemand analysiert.
+**Ist das schlimm?** Fünf Minuten ohne frisch gelesene Betriebswerte heißen:
+Firestore antwortet nicht in zwei Sekunden, oder das Dokument ist weg. Zwei
+Fälle:
 
-Für die liegenden Aufträge heißt es: Wartende und hängende werden in dieser
-Zeit nicht abgeräumt, ihr Platz im Stundenfenster bleibt belegt. Gelöscht wird
-weiter, nach den festen Fristen der Datenschutzerklärung (jeder Auftrag samt
-Foto nach 2 Stunden, ein abgeholtes Ergebnis nach 15 Minuten) — diese zwei
-Fristen hängen nicht am Einstellungssatz. Dasselbe steht in den Nachrichten der
-Wachen („KEIN gueltiger Einstellungssatz“, „UNGUELTIG“).
+- Der Satz war schon einmal gültig gelesen und ist nur gerade nicht lesbar
+  (Warnungen `…:letzter-stand`): Einlass, Analysen und Aufräumer arbeiten mit
+  dem zuletzt gelesenen Satz weiter. Eine Änderung am Satz kommt in dieser Zeit
+  nicht an.
+- Es gibt keinen gültigen Satz (Dokument weg oder abgelehnt, oder die Instanz
+  hat nie einen gelesen): Dann laufen keine Analysen — jede betroffene meldet
+  sich sofort selbst als Fehler (`kein-einstellungssatz` in `process-job`).
+  Wartende und hängende Aufträge werden in dieser Zeit nicht abgeräumt, ihr
+  Platz im Stundenfenster bleibt belegt. Gelöscht wird weiter, nach den festen
+  Fristen der Datenschutzerklärung (jeder Auftrag samt Foto nach 2 Stunden, ein
+  abgeholtes Ergebnis nach 15 Minuten) — diese zwei Fristen hängen nicht am
+  Einstellungssatz. Dasselbe steht in den Nachrichten der Wachen („KEIN
+  gueltiger Einstellungssatz“, „UNGUELTIG“).
+
+Dieser Alarm hier ist die Reserve für die Zeit, in der niemand analysiert.
 
 **Was tun:** Firestore-Status und das Dokument prüfen
 (`scripts/betriebsprofil-vergleichen.js` zeigt, ob es da ist und zum Repo
@@ -872,7 +880,8 @@ Prüfen von Hand:
 Erwartet: keine Zeile. Die Warnungen dazu (einzelne Ausrutscher) zählen — nach
 Minuten, denn ein Lauf ohne Betriebswerte erzeugt bis zu drei Warnungen in
 derselben Minute (je eine für die Abfragen nach verlassenen, hängenden und
-überfälligen Aufträgen) und zählt als EIN Lauf:
+überfälligen Aufträgen; eine einzige, wenn der letzte Stand weiter gilt) und
+zählt als EIN Lauf:
 
     gcloud logging read 'jsonPayload.warning:"reap-query-ohne-betriebswerte"' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp)' | cut -c1-16 | sort -u

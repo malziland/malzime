@@ -74,6 +74,7 @@ function betriebsprofilMock(ueberschreiben) {
   };
   return {
     geltendeWerte: async () => ({ werte, quelle: "firestore", profil: "test", grund: null }),
+    letzterLeseversuchGescheitert: () => false,
     PFLICHTFELDER: Object.keys(SATZ),
     _cacheLeeren: () => {},
     _pruefe: () => null,

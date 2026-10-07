@@ -122,6 +122,34 @@ describe("detectAnimalType", () => {
   });
 });
 
+/* BUG-2026-10-04-09: Ein Tierwort zaehlt nur als ganzes Wort — auch wenn der
+   Buchstabe daneben ein Umlaut oder ein ß ist. */
+describe("Wortgrenze neben Umlaut und ß (BUG-2026-10-04-09)", () => {
+  test.each(["Spaßvogel", "Fischöl", "Hasenöhrl", "hundeähnlich", "Großkatze"])(
+    "'%s' ist kein freistehendes Tierwort",
+    (wort) => {
+      expect(detectAnimalType(`Ein Tier im Gras. ${wort} steht da.`)).toBe("generic");
+    }
+  );
+
+  test("die Tierart folgt dem freistehenden Tierwort, nicht dem Wortteil", () => {
+    const text =
+      "Du bist eine Katze und liegst auf dem Sofa. Du bist ein echter Spaßvogel. Als Spaßvogel wirfst du Gläser um.";
+    expect(classifySubject("ANIMAL_ONLY", text).animalType).toBe("cat");
+  });
+
+  test.each([
+    ["Vögel sitzen auf dem Ast.", "bird"],
+    ["Zwei KÄTZCHEN im Korb.", "cat"],
+    ["Im Bild: (Hund), sonst nichts.", "dog"],
+    ["Ein Pony-Fohlen auf der Weide.", "horse"],
+    ["A guinea  pig in a cage.", "rabbit"],
+    ["Der Hund.", "dog"],
+  ])("freistehende Tierwoerter werden weiter erkannt: %s", (text, art) => {
+    expect(detectAnimalType(text)).toBe(art);
+  });
+});
+
 describe("buildAnimalProfiles", () => {
   test("returns normalProfile and boostProfile for dog", () => {
     const { normalProfile, boostProfile } = buildAnimalProfiles("dog", "de");

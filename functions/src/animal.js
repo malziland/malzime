@@ -48,11 +48,18 @@ const TYPE_KEYWORDS = Object.freeze({
   rabbit: ["kaninchen", "hase", "hasen", "hamster", "meerschweinchen", "rabbit", "bunny", "hamster", "guinea pig"],
 });
 
+/* Ein Tierwort zaehlt nur als ganzes Wort. Die Grenze kennt alle Buchstaben,
+   auch Umlaute und ß: `\b` haelt sie fuer Wortenden und laese "Spaßvogel" als
+   "vogel" und "Fischöl" als "fisch" (BUG-2026-10-04-09). */
+const KEIN_WORTZEICHEN_DAVOR = "(?<![\\p{L}\\p{N}_])";
+const KEIN_WORTZEICHEN_DANACH = "(?![\\p{L}\\p{N}_])";
 const TYPE_PATTERNS = Object.freeze(
   Object.fromEntries(
     Object.entries(TYPE_KEYWORDS).map(([type, kws]) => [
       type,
-      kws.map((kw) => new RegExp(`\\b${kw.replace(/\s+/g, "\\s+")}\\b`, "i")),
+      kws.map(
+        (kw) => new RegExp(`${KEIN_WORTZEICHEN_DAVOR}${kw.replace(/\s+/g, "\\s+")}${KEIN_WORTZEICHEN_DANACH}`, "giu")
+      ),
     ])
   )
 );
@@ -127,7 +134,7 @@ function detectAnimalType(description) {
   for (const [type, patterns] of Object.entries(TYPE_PATTERNS)) {
     let count = 0;
     for (const re of patterns) {
-      const matches = description.match(new RegExp(re.source, "gi"));
+      const matches = description.match(re);
       if (matches) count += matches.length;
     }
     if (count > bestCount) {

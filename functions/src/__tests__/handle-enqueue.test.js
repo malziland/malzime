@@ -46,6 +46,7 @@ jest.mock("../durchsatz", () => ({
   dauerJeAnalyse: jest.fn(async () => ({ sekunden: 65, gemessen: false, frisch: false })),
 }));
 jest.mock("../queue-storage", () => ({
+  neuerBildPfad: jest.fn(),
   storeImage: jest.fn(),
   deleteImage: jest.fn(),
 }));
@@ -115,6 +116,9 @@ beforeEach(() => {
      */
   jobs.createJob.mockResolvedValue("job-abc");
   jobs.failJob.mockResolvedValue();
+  /* Der Pfad steht fest, BEVOR gespeichert wird (PRIV-2026-10-03-28): Der
+     Einlass legt erst den Auftrag mit diesem Pfad an und speichert dann. */
+  storage.neuerBildPfad.mockReset().mockReturnValue("queue-uploads/test.jpg");
   storage.storeImage.mockResolvedValue("queue-uploads/test.jpg");
   storage.deleteImage.mockResolvedValue();
   tasks.enqueueJob.mockResolvedValue("projects/p/locations/l/queues/q/tasks/t");
@@ -217,6 +221,9 @@ describe("handleEnqueue — Erfolgsfall", () => {
     expect(typeof res.body.resultToken).toBe("string");
     expect(res.body.resultToken.length).toBeGreaterThan(0);
     expect(storage.storeImage).toHaveBeenCalledTimes(1);
+    expect(storage.storeImage).toHaveBeenCalledWith(expect.any(Buffer), "image/jpeg", "queue-uploads/test.jpg");
+    /* Erst der Auftrag, dann das Foto. */
+    expect(jobs.createJob.mock.invocationCallOrder[0]).toBeLessThan(storage.storeImage.mock.invocationCallOrder[0]);
     expect(jobs.createJob).toHaveBeenCalledWith(
       expect.objectContaining({
         lang: "de",
@@ -358,25 +365,32 @@ describe("handleEnqueue — Cloud-Tasks-Ausfall", () => {
 /* ── Storage-/Firestore-Ausfall nach gezogenem Stunden-Slot ──────── */
 
 describe("handleEnqueue — Ausfall zwischen Slot und Task", () => {
-  test("schlägt storeImage fehl → 503, Slot zurückgegeben, kein deleteImage nötig", async () => {
+  /* Seit PRIV-2026-10-03-28 legt der Einlass erst den Auftrag an und speichert
+     dann das Foto. Scheitert das Speichern, gibt es den Auftrag schon: Er endet
+     als gescheitert, und was der Speicher trotz Fehler geschrieben haben
+     koennte, wird geloescht. */
+  test("schlägt storeImage fehl → 503, Slot zurückgegeben, Auftrag gescheitert, Bild gelöscht", async () => {
     storage.storeImage.mockRejectedValue(new Error("gcs down"));
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
     expect(res.statusCode).toBe(503);
     expect(res.body.code).toBe("store_failed");
     expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
-    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(jobs.failJob).toHaveBeenCalledWith("job-abc", "store_failed");
+    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
     expect(tasks.enqueueJob).not.toHaveBeenCalled();
   });
 
-  test("schlägt createJob fehl → 503, Slot zurückgegeben UND Bild-Waise gelöscht", async () => {
+  test("schlägt createJob fehl → 503, Slot zurückgegeben, das Bild wird gar nicht erst gespeichert", async () => {
     jobs.createJob.mockRejectedValue(new Error("firestore blip"));
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
     expect(res.statusCode).toBe(503);
     expect(res.body.code).toBe("store_failed");
     expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
-    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
+    expect(storage.storeImage).not.toHaveBeenCalled();
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(jobs.failJob).not.toHaveBeenCalled();
     expect(tasks.enqueueJob).not.toHaveBeenCalled();
   });
 });
@@ -386,13 +400,40 @@ describe("handleEnqueue — Ausfall zwischen Slot und Task", () => {
    kommt dann EINE Nachricht "Analyse gescheitert" — auch auf den zwei Wegen,
    auf denen es noch keinen Auftrag gibt. Eingabefehler (4xx) nicht. */
 describe("handleEnqueue — Nachricht bei gescheitertem Einreihen", () => {
+  /* Scheitert das Speichern, gibt es den Auftrag schon; seinen Uebergang auf
+     "gescheitert" meldet jobs.js selbst (echte Module: foto-nach-absturz.test.js).
+     Der Einlass meldet nur, wenn es keinen Auftrag gibt oder der Uebergang nicht
+     gelang — so bleibt es bei genau einer Meldung. */
   test.each([
-    ["Speicher weg", () => storage.storeImage.mockRejectedValue(new Error("gcs down"))],
-    ["Datenbank weg", () => jobs.createJob.mockRejectedValue(new Error("firestore blip"))],
-  ])("%s → genau eine Meldung store_failed", async (_fall, stoerung) => {
+    ["Datenbank weg (kein Auftrag)", () => jobs.createJob.mockRejectedValue(new Error("firestore blip"))],
+    [
+      "Speicher weg, und der Auftrag laesst sich nicht auf gescheitert setzen",
+      () => {
+        storage.storeImage.mockRejectedValue(new Error("gcs down"));
+        jobs.failJob.mockRejectedValue(new Error("firestore blip"));
+      },
+    ],
+    [
+      "Speicher weg, und der Auftrag war schon beendet",
+      () => {
+        storage.storeImage.mockRejectedValue(new Error("gcs down"));
+        jobs.failJob.mockResolvedValue(false);
+      },
+    ],
+  ])("%s → genau eine Meldung store_failed vom Einlass", async (_fall, stoerung) => {
     stoerung();
-    await handleEnqueue(jsonReq(), makeRes(), SECRETS);
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(503);
     expect(jobs.meldeGescheiterteAnalyse.mock.calls).toEqual([["store_failed"]]);
+  });
+
+  test("Speicher weg → der Uebergang des Auftrags meldet, der Einlass nicht noch einmal", async () => {
+    storage.storeImage.mockRejectedValue(new Error("gcs down"));
+    jobs.failJob.mockResolvedValue(true);
+    await handleEnqueue(jsonReq(), makeRes(), SECRETS);
+    expect(jobs.failJob.mock.calls).toEqual([["job-abc", "store_failed"]]);
+    expect(jobs.meldeGescheiterteAnalyse).not.toHaveBeenCalled();
   });
 
   test("unerwarteter Serverfehler (5xx) → eine Meldung enqueue_unerwartet", async () => {
@@ -449,7 +490,7 @@ describe("SEC-002 — Größe aus der Kopfzeile", () => {
     const req = jsonReq();
     req.headers["content-length"] = String(200 * 1024);
     jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     tasks.enqueueJob.mockResolvedValue();
     const res = makeRes();
     await handleEnqueue(req, res, SECRETS);
@@ -465,7 +506,7 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
     counter.getMaintenanceStatus.mockResolvedValue({ enabled: false });
     counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
     middleware.checkRateLimit.mockReturnValue(true);
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
     tasks.enqueueJob.mockResolvedValue();
   });
@@ -556,7 +597,7 @@ describe("TEST-002 — nachgezogene Upload-Prüfungen", () => {
     jobs.platzBestaetigen.mockResolvedValue(true);
     jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
     middleware.checkRateLimit.mockReturnValue(true);
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     tasks.enqueueJob.mockResolvedValue();
   });
 
@@ -655,7 +696,7 @@ describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
     jest.clearAllMocks();
     counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
     middleware.checkRateLimit.mockReturnValue(true);
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     jobs.createJob.mockResolvedValue("job-abc");
     /* Die zweite Stufe laeuft bei JEDEM Upload (DOC-2026-09-01-04: eine
        80-%-Schwelle stand hier nur im Kommentar, nie im Code). */

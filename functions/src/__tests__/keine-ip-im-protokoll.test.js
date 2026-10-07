@@ -61,7 +61,7 @@ jest.mock("../jobs", () => ({
   meldeGescheiterteAnalyse: jest.fn(),
   verbraucheRcTicket: jest.fn(),
 }));
-jest.mock("../queue-storage", () => ({ storeImage: jest.fn(), deleteImage: jest.fn() }));
+jest.mock("../queue-storage", () => ({ neuerBildPfad: jest.fn(), storeImage: jest.fn(), deleteImage: jest.fn() }));
 jest.mock("../cloud-tasks", () => ({ enqueueJob: jest.fn() }));
 jest.mock("../notify", () => ({ notifyLimitReached: jest.fn() }));
 jest.mock("../feature-flags", () => ({ getFeatureFlags: jest.fn() }));
@@ -331,6 +331,7 @@ beforeEach(() => {
   jobs.abandonJob.mockReset().mockResolvedValue(true);
   jobs.meldeGescheiterteAnalyse.mockReset();
   jobs.verbraucheRcTicket.mockReset().mockResolvedValue(true);
+  storage.neuerBildPfad.mockReset().mockReturnValue("queue-uploads/x.jpg");
   storage.storeImage.mockReset().mockResolvedValue("queue-uploads/x.jpg");
   storage.deleteImage.mockReset().mockResolvedValue(true);
   tasks.enqueueJob.mockReset().mockResolvedValue("projects/p/locations/l/queues/q/tasks/t");

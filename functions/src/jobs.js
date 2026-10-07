@@ -26,6 +26,7 @@
 const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
 const { geltendeWerte, ZUSAGE_LOESCHFRISTEN } = require("./betriebsprofil");
+const { deleteImage } = require("./queue-storage");
 
 /* Holt die Betriebswerte oder bricht ab. Es gibt keine Ersatzzahlen mehr:
    Liegt kein gueltiger Einstellungssatz vor, laeuft auch keine Analyse — dann
@@ -371,7 +372,14 @@ async function markFailedIfStale(job) {
   const werte = await betriebswerteOderAbbruch();
   if (Date.now() - startedAt < werte.verarbeitungsZeitlimitMs) return job;
   const failed = await failJob(job.id, "processing_timeout");
-  if (failed) return { ...job, status: "failed", errorReason: "processing_timeout" };
+  if (failed) {
+    /* Der Verarbeiter ist nicht fertig geworden und loescht das Foto nicht mehr
+       selbst. Der Aufraeumdienst sucht nur haengende Auftraege und faende diesen
+       jetzt nicht mehr — also hier loeschen, sonst laege das Foto bis zur
+       2-Stunden-Frist (PRIV-2026-10-03-28). Ein Fehlschlag meldet sich selbst. */
+    await deleteImage(job.imagePath);
+    return { ...job, status: "failed", errorReason: "processing_timeout" };
+  }
   /* BUG-001: failJob hat NICHT gegriffen — der Job ist inzwischen terminal
      (z.B. der Worker hat doch noch `done` geschrieben). Frischen Stand lesen,
      statt fälschlich „failed" zu melden. */

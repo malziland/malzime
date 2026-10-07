@@ -5,8 +5,8 @@
  *
  * Annahme-Endpoint der Queue — seit v2.10 der einzige Upload-Weg. Validiert
  * die Anfrage (Method, Maintenance, Rate-Limit, Body-Größe, Honeypot, MIME,
- * Magic-Bytes, Warteschlangen-Tiefe, Stundenlimit), legt das Bild kurz ab,
- * erzeugt ein Job-Dokument und reiht es in Cloud Tasks ein. Antwortet SOFORT
+ * Magic-Bytes, Warteschlangen-Tiefe, Stundenlimit), erzeugt ein Job-Dokument,
+ * legt das Bild kurz ab und reiht den Job in Cloud Tasks ein. Antwortet SOFORT
  * mit der `jobId` — die eigentliche Mistral-Pipeline läuft asynchron im
  * Worker `processJob`.
  *
@@ -61,7 +61,7 @@ const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 const { createJob, failJob, platzBestaetigen, getJob, abandonJob, countQueuedJobs } = require("./jobs");
 const { meldeGescheiterteAnalyse } = require("./jobs");
-const { storeImage, deleteImage } = require("./queue-storage");
+const { neuerBildPfad, storeImage, deleteImage } = require("./queue-storage");
 const { enqueueJob } = require("./cloud-tasks");
 
 /**
@@ -331,14 +331,20 @@ async function handleEnqueue(req, res, secrets) {
       return;
     }
 
-    /* ── Bild ablegen → Job anlegen → in Cloud Tasks einreihen ── */
+    /* ── Job anlegen → Bild ablegen → in Cloud Tasks einreihen ── */
     /* PRIV-003: Abhol-Ticket fürs Ergebnis — nur dieser Browser bekommt es von
        job-status zurück (zweites Schloss zusätzlich zur unerratbaren jobId). */
     const resultToken = crypto.randomUUID();
-    let imagePath;
+    /* PRIV-2026-10-03-28: ERST der Auftrag, DANN das Foto. Der Pfad steht vorab
+       fest und im Auftrag. Endet der Einlass zwischen den zwei Schritten, liegt
+       hoechstens ein Auftrag ohne Foto da — nie ein Foto, das kein Auftrag
+       kennt. Den Auftrag raeumt der Aufraeumdienst nach der Karenz ab (dieser
+       Browser hat nie eine Kennung bekommen und fragt nie nach) und loescht
+       ueber den Pfad, was dort liegt. */
+    const imagePath = neuerBildPfad(file.mimeType);
     let jobId;
+    let speichernBegonnen = false;
     try {
-      imagePath = await storeImage(file.buffer, file.mimeType);
       /* Die Marke des Einlasses reist mit dem Auftrag: fuer den Nachtrag im
          Worker und fuer eine Freigabe, die genau diesen Eintrag trifft
          (counter.js, "GENAU EINMAL IM FENSTER"). */
@@ -351,14 +357,22 @@ async function handleEnqueue(req, res, secrets) {
         zaehlerStempel: counter.stempel,
         zaehlerNachtrag: counter.nachtragNoetig === true,
       });
+      speichernBegonnen = true;
+      await storeImage(file.buffer, file.mimeType, imagePath);
     } catch (err) {
       /* Der Stunden-Slot ist hier schon gezogen, aber es entsteht nie eine
-         Analyse — Slot zurückgeben und ein evtl. schon abgelegtes Bild nicht
-         bis zur Lifecycle-Regel liegen lassen. */
+         Analyse — Slot zurückgeben, den Auftrag beenden und ein evtl. schon
+         abgelegtes Bild nicht liegen lassen. */
       console.log(JSON.stringify({ requestId, traceId, warning: "store-or-create-failed", error: err.message }));
-      meldeGescheiterteAnalyse("store_failed"); /* Kind sieht "ueberlastet" — eine Nachricht (jobs.js) */
+      /* Kind sieht "ueberlastet" — eine Nachricht: Gibt es den Auftrag schon,
+         schreibt sie sein Uebergang auf "gescheitert" (jobs.js); sonst, oder wenn
+         auch das nicht gelingt, geht sie hier hinaus. */
+      const gemeldet = jobId ? await failJob(jobId, "store_failed").catch(() => false) : false;
+      if (!gemeldet) meldeGescheiterteAnalyse("store_failed");
       releaseHourlySlot(counter.stempel).catch(() => {});
-      if (imagePath) await deleteImage(imagePath);
+      /* Ein Speichern, das mit einem Fehler endet, kann trotzdem geschrieben
+         haben — deshalb loeschen, sobald es begonnen hat. */
+      if (speichernBegonnen) await deleteImage(imagePath);
       res.status(503).json({ error: "Queue unavailable", code: "store_failed" });
       return;
     }
@@ -383,7 +397,7 @@ async function handleEnqueue(req, res, secrets) {
       const angelegt = await getJob(jobId);
       if (!(await platzBestaetigen(angelegt, einlassgrenze))) {
         await abandonJob(jobId);
-        if (imagePath) await deleteImage(imagePath);
+        await deleteImage(imagePath);
         releaseHourlySlot(counter.stempel).catch(() => {});
         console.log(JSON.stringify({ requestId, traceId, warning: "queue-too-deep-nachtraeglich" }));
         res.status(429).json({

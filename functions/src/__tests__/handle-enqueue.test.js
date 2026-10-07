@@ -178,6 +178,36 @@ describe("handleEnqueue — Abweisungen", () => {
     expect(res.statusCode).toBe(429);
   });
 
+  /* UX-2026-10-03-47: Der Browser zeigt je nach Grund einen anderen Text. Er
+     erkennt die drei Faelle "zu viele Anfragen" am Rumpf: Die Sperre je
+     Netzwerk-Adresse traegt KEIN Merkmal `blocked`, das Stundenlimit `limit`,
+     die volle Warteschlange `queueFull`. Aendert sich einer dieser Ruempfe,
+     zeigt der Browser den falschen Text — deshalb hier woertlich. */
+  test("die drei Antworten 429 sind am Rumpf unterscheidbar", async () => {
+    middleware.checkRateLimit.mockReturnValue(false);
+    const adresse = makeRes();
+    await handleEnqueue(jsonReq(), adresse, SECRETS);
+    middleware.checkRateLimit.mockReturnValue(true);
+
+    counter.checkAndIncrement.mockResolvedValue({ allowed: false, retryAfterSeconds: 120 });
+    const stundenlimit = makeRes();
+    await handleEnqueue(jsonReq(), stundenlimit, SECRETS);
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, justReached: false, count: 1, limit: 1500 });
+
+    jobs.countQueuedJobs.mockResolvedValue(100000);
+    const schlange = makeRes();
+    await handleEnqueue(jsonReq(), schlange, SECRETS);
+
+    expect([adresse.statusCode, stundenlimit.statusCode, schlange.statusCode]).toEqual([429, 429, 429]);
+    expect(adresse.body).toEqual({ error: "Rate limit exceeded" });
+    expect(stundenlimit.body).toEqual({ blocked: "limit", retryAfterSeconds: 120, message: "Stundenlimit erreicht" });
+    expect(schlange.body).toEqual({
+      blocked: "queueFull",
+      retryAfterSeconds: 300,
+      message: "Gerade warten sehr viele Analysen — bitte in ein paar Minuten nochmal.",
+    });
+  });
+
   test("Honeypot ausgefüllt → 403", async () => {
     const res = makeRes();
     await handleEnqueue(jsonReq({ website: "spam" }), res, SECRETS);

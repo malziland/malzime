@@ -26,8 +26,8 @@ const FUNCTION_LIMIT_MS = 540 * 1000;
    Werbe-Aufruf hoechstens, und zwar NACH dem Gesamtbudget (mistral.js,
    generateBeastAds: `timeoutMs`). Dieselbe Zahl an zwei Orten —
    betriebsprofil-kopplung.test.js haelt sie gleich. NICHT mitgerechnet ist
-   die Wartezeit in der eigenen Drossel davor (mistral-http.js): Die Zeitgrenze
-   eines Aufrufs laeuft erst, wenn er die Drossel verlassen hat. */
+   der Abstand, den die eigene Drossel davor einhaelt (mistral-http.js; ein
+   Auftrag je Instanz, also hoechstens der Raten-Abstand `tokenAbstandGrossMs`). */
 const WERBE_AUFRUF_HOECHSTENS_MS = 30 * 1000;
 /* BLEIBT IM CODE — Bauweise, keine Einstellung: was der Verarbeiter um die
    Analyse herum braucht (Auftrag uebernehmen, Foto laden, Ergebnis speichern

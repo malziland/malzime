@@ -114,10 +114,11 @@ const ENQUEUE_TIMEOUT_MS = 90000;
    die Abmeldung nichts. Ohne Abhol-Ticket nimmt der Server sie nicht an.
    Bestmoeglich und still: Scheitert sie, raeumt der Server den Auftrag wie
    bisher nach seiner Karenz selbst ab.
-   Abgemeldet wird an zwei Stellen: beim Start jedes neuen Durchgangs (was der
-   Tab bis dahin gemerkt hatte — auch wenn zuletzt eine Wiederaufnahme den
-   Auftrag fuehrte) und wenn ein Auftrag erst zurueckkommt, nachdem schon ein
-   anderes Foto gewaehlt wurde. */
+   Abgemeldet wird dort, wo die Nummer eines noch offenen Auftrags faellt:
+   beim Start jedes neuen Durchgangs (was der Tab bis dahin gemerkt hatte —
+   auch wenn zuletzt eine Wiederaufnahme den Auftrag fuehrte), wenn das Geraet
+   so lange weg war, dass es als weitergereicht gilt, und wenn ein Auftrag erst
+   zurueckkommt, nachdem schon ein anderes Foto gewaehlt wurde. */
 function meldeAuftragAb(jobId, resultToken) {
   if (!jobId || !resultToken) return;
   try {
@@ -258,6 +259,9 @@ export function initHintergrundWiederaufnahme() {
     /* War die Seite lange genug weg, gilt das Geraet als weitergereicht. */
     if (seitWannVerborgen && Date.now() - seitWannVerborgen > UEBERGABE_PAUSE_MS) {
       seitWannVerborgen = 0;
+      /* Abgeholt wird der Auftrag nicht mehr. Wartet er noch, soll der Server
+         ihn gleich verwerfen statt erst nach seiner Karenz. */
+      meldeOffenenAuftragAb();
       clearStoredJobId();
       /* BUG-2026-10-03-46: Wartete die Seite gerade auf die Verbindung, ist
          mit der Auftragsnummer auch die Zusage „erscheint automatisch"

@@ -2,10 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setupDOM } from "./setup.js";
 
 /**
- * abfolgen-pruefrunde.test.js — vier Abfolgen aus der Prüfrunde vom 07.10.2026.
+ * abfolgen-pruefrunde.test.js — fünf Abfolgen aus der Prüfrunde vom 07.10.2026.
  *
  * Jede stellt einen Ablauf am Handy nach, bei dem die Seite etwas schuldig
- * blieb (alle vier waren am Stand vor der Behebung rot):
+ * blieb (alle fünf waren am Stand vor der Behebung rot):
  *   1. Auftrag wartet, App kurz gewechselt (die Wiederaufnahme übernimmt),
  *      dann ein anderes Foto — der erste Auftrag muss abgemeldet werden.
  *   2. Anderes Foto genau zwischen Kopf und Rumpf der Einreih-Antwort — der
@@ -14,6 +14,8 @@ import { setupDOM } from "./setup.js";
  *      automatisch" braucht es eine Antwort, keine leere Zeile.
  *   4. Laufende Analyse, dann eine zu große Datei — der Bildschirm-Wachhalter
  *      muss wieder frei sein.
+ *   5. Auftrag wartet, das Gerät liegt über drei Minuten weg — die Seite
+ *      vergisst die Nummer und muss den Auftrag vorher abmelden.
  * Dazu der Erfolgsweg: Nach einem fertigen Ergebnis meldet ein neues Foto
  * nichts ab (es gibt nichts abzumelden).
  */
@@ -209,6 +211,32 @@ describe("Abfolgen aus der Prüfrunde", () => {
     await laufA;
     expect(elements.status.textContent).toContain("error.fileTooLarge");
     expect(freigabe).toHaveBeenCalled();
+  });
+
+  it("Auftrag wartet, das Gerät liegt über drei Minuten weg: die Seite meldet ihn ab, bevor sie die Nummer vergisst", async () => {
+    let sicht = "visible";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => sicht });
+    api.initHintergrundWiederaufnahme();
+    prepareImage.mockResolvedValueOnce(AUFBEREITET("Rk9UT19B"));
+    const laufA = wieHandleNewFile(foto("a"));
+    await vi.waitFor(() => expect(uploads.length).toBe(1), { timeout: 8000 });
+    uploads[0].antworte(antwort({ jobId: "AUFTRAG-A", resultToken: "ta" }));
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(speicher.getStoredJobId()).toBe("AUFTRAG-A");
+
+    sicht = "hidden";
+    document.dispatchEvent(new Event("visibilitychange"));
+    vi.setSystemTime(Date.now() + 4 * 60 * 1000);
+    sicht = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(abmeldungen).toHaveLength(1);
+    expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
+    expect(abmeldungen[0]).toContain("token=ta");
+    expect(speicher.getStoredJobId()).toBeNull();
+    state.requestId += 1;
+    await vi.advanceTimersByTimeAsync(2500);
+    await laufA;
   });
 
   it("nach einem fertigen Ergebnis meldet ein neues Foto nichts ab (Erfolgsweg)", async () => {

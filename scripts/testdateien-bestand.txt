@@ -32,6 +32,7 @@ e2e/start-ohne-hinweis.test.js
 e2e/sticky-toggle.test.js
 e2e/tastatur-erreichbarkeit.test.js
 functions/src/__tests__/abkuendigungen-script.test.js
+functions/src/__tests__/abmelden-ueber-adressgrenze.test.js
 functions/src/__tests__/admin.test.js
 functions/src/__tests__/age-markers.test.js
 functions/src/__tests__/alters-obergrenze.test.js

@@ -639,12 +639,12 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
   let aktivesProfil = null;
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
-    /* Betriebsprofil (30.08.2026): Zeitgrenze und Textmenge kommen aus dem
-       aktiven Profil, wenn eines hinterlegt und gueltig ist — sonst aus dem
-       Code. `geltendeWerte()` liefert IMMER einen brauchbaren Satz: Fehlt das
-       Dokument, ist es unlesbar oder besteht das Profil die Kopplungspruefung
-       nicht, sind es die Code-Werte. Der schlechteste Fall ist damit der
-       Zustand von vorher, nie ein schlechterer.
+    /* Betriebsprofil: Zeitgrenze und Textmenge kommen aus dem Einstellungssatz
+       in Firestore. Rueckfallwerte im Code gibt es seit 30.08.2026 nicht mehr:
+       Fehlt der Satz oder besteht er die Kopplungspruefung nicht, bricht
+       `betriebswerteOderAbbruch()` die Analyse ab (`config_missing`). Ist er
+       nur gerade nicht lesbar, gilt der zuletzt gueltig gelesene weiter
+       (betriebsprofil.js).
 
        Die beiden Werte gehoeren zusammen und werden deshalb GEMEINSAM
        gelesen — genau daran waere ein einzelner Firestore-Schalter

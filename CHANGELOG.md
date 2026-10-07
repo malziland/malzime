@@ -82,9 +82,9 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
   wählt, dessen erstes Foto geht nicht mehr hinaus. Wartet der erste Auftrag
   schon in der Schlange, meldet die Seite ihn ab: Er wird sofort verworfen,
   sein Bild gelöscht, die KI bekommt es nie zu sehen — auch wenn die Seite
-  zwischendurch im Hintergrund war oder neu geladen wurde. Läuft die Analyse
-  schon, läuft sie zu Ende; ihr Ergebnis wird wie jedes andere nach der Frist
-  gelöscht.
+  zwischendurch im Hintergrund war oder neu geladen wurde, und ebenso, wenn
+  das Gerät länger als drei Minuten weglag. Läuft die Analyse schon, läuft sie
+  zu Ende; ihr Ergebnis wird wie jedes andere nach der Frist gelöscht.
 - **Gelöscht wird auch dann pünktlich, wenn etwas schiefgeht.** Fallen die
   Einstellungen aus, löscht der Aufräumdienst trotzdem: jedes Foto und jeden
   Auftrag nach spätestens 2 Stunden, ein abgeholtes Ergebnis 15 Minuten nach
@@ -258,6 +258,9 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
   in einer Liste, die bei jeder Prüfung verglichen wird. In die
   Pflicht-Prüfungen lässt sich kein zusätzlicher Schritt mehr einfügen, der die
   Prüfung im Lauf entwertet, ohne dass es auffällt.
+- **Das Abmelden eines verworfenen Auftrags ist an der echten Schnittstelle
+  geprüft**, samt der Vorab-Anfrage, die der Browser davor stellt — sie
+  abzulehnen hätte das Abmelden unbemerkt wirkungslos gemacht.
 - **Die Größenkontrolle sieht mehr:** auch die Startdatei der Website, das
   Stylesheet und die Auslieferungs-Skripte — und die Stil-Prüfung meldet, wenn
   die verzweigteste oder die längste Funktion weiter wächst.

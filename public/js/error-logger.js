@@ -67,6 +67,9 @@ function zurueckstellen(payload) {
    Seite, und die Auswertung saehe gerade die Verbindungsabrisse verspaetet
    oder gar nicht. Deshalb drei Versuche in wachsendem Abstand, solange die
    Seite offen ist. Danach bleiben „wieder online" und das Verlassen der Seite.
+   Gebaut ist das fuer Abrisse und kurze Serverfehler. Lehnt der Server wegen
+   zu vieler Anfragen ab (429), helfen die drei Versuche kaum: Seine Sperre je
+   Adresse dauert laenger als alle drei Pausen zusammen.
    Abgelegt wird dabei weiterhin nichts — die Uhr lebt wie die Warteschlange
    nur im Arbeitsspeicher. */
 const NACHSENDE_PAUSEN_MS = [15000, 60000, 180000];

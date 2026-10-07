@@ -13,8 +13,9 @@ hinsieht. Dieses Skript sieht hin.
 WAS ES ANSIEHT: Programmdateien unter functions/src und public/js, dazu die
 oberste Ebene von public/ (Einstiegs-Skript, Stylesheet, Hauptseite) und die
 eigenen Skripte unter scripts/ — siehe NACHSUCHE. Es misst DATEIEN, nicht
-einzelne Funktionen: Eine Funktion kann in einer Datei innerhalb ihrer Grenze
-beliebig lang werden.
+einzelne Funktionen. Fuer Funktionen haelt seit 07.10.2026 die Stil-Pruefung
+eine eigene Sperrklinke (hoechste Verzweigungszahl und laengste Funktion, in
+eslint.config.mjs und functions/eslint.config.js).
 
 WAS ES NICHT TUT: Es verbietet nichts. Es meldet, wenn eine Datei ueber ihre
 festgehaltene Groesse waechst, und verlangt dann eine Entscheidung: teilen oder
@@ -164,7 +165,30 @@ ZEILEN_GRENZEN = {
     "scripts/pruefe-fremd-meldungen.mjs": 605,
     "scripts/pruefe-mutationen.mjs": 600,
     "scripts/pruefe-live.sh": 580,
-    "scripts/pruefe-kopplung.py": 520,
+    # 07.10.2026: +40 fuer die Eintraege unten und die laengere Liste der
+    # unverzichtbaren Tests — Daten, keine Logik.
+    "scripts/pruefe-kopplung.py": 560,
+    # 07.10.2026: Die Aufteilungen der Behebung nach dem Audit vom 03.10.2026
+    # haben neue Dateien erzeugt, die in keiner Grenze standen — genau das
+    # Schlupfloch, das der Kommentar oben beschreibt (aus einer grossen Datei
+    # werden mehrere kleine, die danach unbemerkt wachsen). Dazu drei Dateien,
+    # die ohne Grenze nahe an der 400er-Schwelle lagen, und die Wochen-
+    # Erinnerung, die eine zweite Zusage bekommen hat. Gemessener Stand plus
+    # rund 5 Prozent.
+    "functions/src/betriebsprofil-kopplung.js": 150,
+    "functions/src/meldungs-annahme.js": 115,
+    "functions/src/erinnerungs-waechter.js": 108,
+    "functions/src/warteschlangen-rechnung.js": 91,
+    "functions/src/analyse-ausgang.js": 83,
+    "functions/src/oeffentliche-huelle.js": 57,
+    "functions/src/ruecknahme.js": 45,
+    "functions/src/index.js": 385,
+    "functions/src/handle-reap.js": 357,
+    "functions/src/handle-job-status.js": 354,
+    "functions/src/handle-erinnerung.js": 273,
+    "public/js/auftrag-abfrage.js": 160,
+    "public/js/netz-hilfen.js": 78,
+    "public/js/foto-vorschau.js": 60,
 }
 
 # Wo nach Dateien OHNE Grenze gesucht wird (TEST-2026-10-03-44): Ordner,
@@ -314,6 +338,16 @@ def main():
     # zweiten KI-Aufrufs durch den Kinderschutz-Filter laeuft, dass kein
     # fester Eintrag der Tier-Profile einer waere, den der Filter streicht,
     # und dass jeder Fehlerweg der Analyse die schon gezeigten Karten abraeumt.
+    # Seit 07.10.2026 dazu die Tests hinter dem, was die zweite Auslieferung
+    # der Audit-Behebung zusagt: Loeschen auch ohne Einstellungssatz und nach
+    # einem Absturz, Speichern vor der Antwort, Abmelden nur mit Abhol-Ticket,
+    # Freigabe an einer Stelle, gepackte Anfragen, die Sperren der Tests gegen
+    # echte Dienste, die Kopplungsregeln des Einstellungssatzes, die Zahlen
+    # der oeffentlichen Seiten gegen den Satz, Geraeteangaben und Auftrag ohne
+    # Zufallsnummer gegen den Datenschutztext, die Erinnerung an die
+    # Barrierefreiheits-Pruefung, die Ueberlast-Entscheidung, die Zeitgrenze
+    # des Antwort-Rumpfs, die Namens-Regel der KI-Anweisung und die Abfolgen
+    # im Browser.
     UNVERZICHTBAR = [
         "functions/src/__tests__/deploy-verhalten.test.js",
         "functions/src/__tests__/pipeline-vertrag-script.test.js",
@@ -336,6 +370,28 @@ def main():
         "public/__tests__/beispielbild-ort.test.js",
         "public/__tests__/beispielbild-karten.test.js",
         "e2e/beispielbild-ohne-ortsabfrage.test.js",
+        "functions/src/__tests__/ueberlast-entscheidung.test.js",
+        "functions/src/__tests__/mistral-rumpf-zeitgrenze.test.js",
+        "functions/src/__tests__/keine-personennamen-regel.test.js",
+        "functions/src/__tests__/handle-process-job-priv002.test.js",
+        "functions/src/__tests__/handle-job-status-abmelden.test.js",
+        "functions/src/__tests__/aufraeumer-loescht-ohne-satz.test.js",
+        "functions/src/__tests__/foto-nach-absturz.test.js",
+        "functions/src/__tests__/schreiben-vor-der-antwort.test.js",
+        "functions/src/__tests__/meldung-am-zustand.test.js",
+        "functions/src/__tests__/gepackte-anfragen.test.js",
+        "functions/src/__tests__/freigabe-ueber-die-hilfe.test.js",
+        "functions/src/__tests__/jest-sperre.test.js",
+        "functions/src/__tests__/einstiegspunkt-betriebswerte.test.js",
+        "functions/src/__tests__/betriebsprofil-kopplung.test.js",
+        "functions/src/__tests__/oeffentliche-zahlen-gegen-satz.test.js",
+        "functions/src/__tests__/fehlermeldung-geraeteangaben.test.js",
+        "functions/src/__tests__/auftrag-ohne-zufallsnummer.test.js",
+        "functions/src/__tests__/erinnerung-barrierefreiheit.test.js",
+        "public/__tests__/analyse-ausgaenge.test.js",
+        "public/__tests__/geraeteangaben-deckung.test.js",
+        "public/__tests__/datenschutz-deckung.test.js",
+        "e2e/abfolgen.test.js",
         "functions/jest.setup.js",
         "scripts/selbstpruefung-waechter.sh",
     ]

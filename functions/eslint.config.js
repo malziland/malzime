@@ -43,10 +43,18 @@ module.exports = [
         },
       ],
       "no-console": "off",
+      /* SPERRKLINKE JE FUNKTION (TEST-2026-10-03-44). Die Zahlen sind der Stand
+         vom 07.10.2026: die verzweigteste und die laengste Funktion des Servers
+         (beide handleEnqueue). Keine Zielwerte — sie verhindern nur, dass es
+         mehr wird. Wer eine der beiden kleiner macht, zieht die Zahl nach. */
+      complexity: ["error", 63],
+      "max-lines-per-function": ["error", { max: 369, skipBlankLines: false, skipComments: false }],
     },
   },
   {
     files: ["src/__tests__/**/*.js"],
+    /* Tests sind lange Gruppen in einer Funktion — die Sperrklinke gilt dem Programm. */
+    rules: { complexity: "off", "max-lines-per-function": "off" },
     languageOptions: {
       globals: {
         test: "readonly",

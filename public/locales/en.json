@@ -176,7 +176,7 @@
   "stats.countdownSecond": "Available again in 1 second",
   "stats.countdownDone": "Unlocking analysis…",
   "stats.infoCountTitle": "What is being counted?",
-  "stats.infoCountText": "Only counts per time period — no individual events. No images, no IP addresses, no user profiles.",
+  "stats.infoCountText": "How many analyses there have been (per day, week, month, year, in total), when the most recent ones were and how long the last ones took. No images, no IP addresses, no user profiles – none of it has anything to do with you as a person.",
   "stats.infoLimitTitle": "Why a limit?",
   "stats.infoLimitText": "Each AI analysis costs money. The hourly limit protects the project from unexpected costs.",
   "stats.infoFundingTitle": "Self-funded — free for everyone",

@@ -176,7 +176,7 @@
   "stats.countdownSecond": "Wieder verfügbar in 1 Sekunde",
   "stats.countdownDone": "Analyse wird wieder freigeschaltet…",
   "stats.infoCountTitle": "Was wird gezählt?",
-  "stats.infoCountText": "Nur Zählwerte je Zeitraum — keine Einzelvorgänge. Keine Bilder, keine IP-Adressen, keine Nutzerprofile.",
+  "stats.infoCountText": "Wie viele Analysen es gab (je Tag, Woche, Monat, Jahr, gesamt), wann die jüngsten waren und wie lange die letzten gedauert haben. Keine Bilder, keine IP-Adressen, keine Nutzerprofile – nichts davon hat mit dir als Person zu tun.",
   "stats.infoLimitTitle": "Warum ein Limit?",
   "stats.infoLimitText": "Jede KI-Analyse kostet Geld. Das Stundenlimit schützt das Projekt vor unerwarteten Kosten.",
   "stats.infoFundingTitle": "Eigenfinanziert — für alle kostenlos",

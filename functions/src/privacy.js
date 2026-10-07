@@ -4,45 +4,29 @@
  * privacy.js — OCR-basierte Datenschutz-Risiko-Erkennung.
  *
  * Der OCR-Text kommt aus dem Feld `visible_text` der KI-Antwort;
- * job-pipelines.js haengt ihn als Zeile "Sichtbarer Text: <text>" an die
- * Beschreibung an, die hier ausgewertet wird.
+ * job-pipelines.js reicht den Wert des Feldes herein. Ausgewertet wird nur
+ * dieses Feld — eine Zeile "Sichtbarer Text:" im Profiltext zaehlt nicht.
  *
  * Erkannt werden:
- *   - Adressen (Straßennamen, Schulen) — nur aus der "Sichtbarer Text:"-Zeile
+ *   - Adressen (Straßennamen, Schulen) — nur aus dem sichtbaren Text
  *   - Telefonnummern (mit Filter gegen Stockfoto-Wasserzeichen) — dito
  *   - Kfz-Kennzeichen (deutsches/österreichisches Format) — aus der GANZEN
  *     Beschreibung, weil das Muster spezifisch genug für False-Positive-Freiheit ist
  */
 
 /**
- * Extrahiert die "Sichtbarer Text: ..."-Zeile aus einer Mistral-Beschreibung.
- * Kommt mit Newlines mitten in der Aufzählung klar (greedy bis Ende oder bis
- * zur nächsten Doppel-Newline).
- *
- * @param {string} description
- * @returns {string}
- */
-function extractVisibleText(description) {
-  if (!description || typeof description !== "string") return "";
-  /* Akzeptiert "Sichtbarer Text:" (de) und "Visible text:" (en) */
-  const match = description.match(/(?:Sichtbarer Text|Visible text):\s*([^\n]*(?:\n(?!\n)[^\n]*)*)/i);
-  if (!match) return "";
-  return match[1].trim();
-}
-
-/**
  * Baut die Privacy-Risiko-Liste aus der Mistral-Bildbeschreibung.
  *
  * @param {{ visibleText?: string, fullDescription?: string }} args
- *   visibleText      — die extrahierte "Sichtbarer Text:"-Zeile (Adresse/Telefon)
- *   fullDescription  — die komplette Mistral-Beschreibung (Kfz-Kennzeichen)
+ *   visibleText      — der Wert des Feldes `visible_text` (Adresse/Telefon)
+ *   fullDescription  — Profiltext und Kartenwerte (Kfz-Kennzeichen)
  * @returns {string[]} — Liste von Risiko-Keys (z.B. "privacy.address")
  */
 function buildPrivacyRisks({ visibleText, fullDescription }) {
   const risks = [];
   const text = (visibleText || "").toLowerCase();
 
-  /* Adresse + Telefon: bewusst NUR auf der expliziten "Sichtbarer Text:"-Zeile,
+  /* Adresse + Telefon: bewusst NUR auf dem sichtbaren Text,
      nicht auf der Beschreibungsprosa — sonst False Positives (Mistral schreibt
      "sie steht an einer Straße" → würde fälschlich privacy.address auslösen). */
   if (text) {
@@ -66,7 +50,7 @@ function buildPrivacyRisks({ visibleText, fullDescription }) {
   /* Kfz-Kennzeichen: deutsches/österreichisches Format, z.B. "M-AB 1234".
      Das Muster ist spezifisch genug, dass es gefahrlos über die GANZE
      Beschreibung laufen kann — fängt damit auch Kennzeichen, die Mistral nur
-     im Fließtext erwähnt statt in der "Sichtbarer Text:"-Zeile. */
+     im Fließtext erwähnt statt im sichtbaren Text. */
   const plateScan = `${fullDescription || ""}\n${visibleText || ""}`;
   if (/\b[a-zäöü]{1,3}-[a-zäöü]{1,2} \d{1,4}\b/i.test(plateScan)) {
     risks.push("privacy.licensePlate");
@@ -75,4 +59,4 @@ function buildPrivacyRisks({ visibleText, fullDescription }) {
   return risks;
 }
 
-module.exports = { buildPrivacyRisks, extractVisibleText };
+module.exports = { buildPrivacyRisks };

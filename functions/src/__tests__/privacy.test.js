@@ -1,4 +1,4 @@
-const { buildPrivacyRisks, extractVisibleText } = require("../privacy");
+const { buildPrivacyRisks } = require("../privacy");
 
 describe("buildPrivacyRisks", () => {
   test("returns empty array for clean input", () => {
@@ -27,7 +27,7 @@ describe("buildPrivacyRisks", () => {
   });
 
   test("detects license plate mentioned only in the description prose", () => {
-    /* Kennzeichen taucht NUR im Fließtext auf, nicht in der Sichtbarer-Text-Zeile */
+    /* Kennzeichen taucht NUR im Fließtext auf, nicht im sichtbaren Text */
     const fullDescription = "Eine Person vor einem geparkten Auto mit dem Kennzeichen W-AB 123.";
     expect(buildPrivacyRisks({ visibleText: "", fullDescription })).toContain("privacy.licensePlate");
   });
@@ -39,50 +39,15 @@ describe("buildPrivacyRisks", () => {
   });
 });
 
-describe("extractVisibleText", () => {
-  test("returns empty string when description is missing", () => {
-    expect(extractVisibleText("")).toBe("");
-    expect(extractVisibleText(null)).toBe("");
-    expect(extractVisibleText(undefined)).toBe("");
-  });
-
-  test("extracts German 'Sichtbarer Text:' line", () => {
-    const desc = `SUBJECT: HUMAN
-
-Eine Frau mit dunklen Haaren steht vor einem Schild.
-
-Sichtbarer Text: Hauptstraße 12; Café Wien; ÖFB`;
-    expect(extractVisibleText(desc)).toBe("Hauptstraße 12; Café Wien; ÖFB");
-  });
-
-  test("extracts English 'Visible text:' line", () => {
-    const desc = `SUBJECT: HUMAN
-
-A person near a sign.
-
-Visible text: Main Street 42; STOP`;
-    expect(extractVisibleText(desc)).toBe("Main Street 42; STOP");
-  });
-
-  test("returns empty when no 'Sichtbarer Text' marker found", () => {
-    const desc = `SUBJECT: ANIMAL_ONLY\n\nEin Hund im Park.`;
-    expect(extractVisibleText(desc)).toBe("");
-  });
-
-  test("trims whitespace from extracted text", () => {
-    const desc = `Sichtbarer Text:    Schule Mustermann  `;
-    expect(extractVisibleText(desc)).toBe("Schule Mustermann");
-  });
-
-  test("end-to-end: privacy risks from Mistral description", () => {
-    const desc = `SUBJECT: HUMAN
-
-Eine Person vor einer Schule.
-
-Sichtbarer Text: Realschule Linz; LL-AB 1234`;
-    const visibleText = extractVisibleText(desc);
-    const risks = buildPrivacyRisks({ visibleText });
+describe("buildPrivacyRisks — sichtbarer Text mit mehreren Eintraegen", () => {
+  test("Schule und Kennzeichen aus demselben sichtbaren Text", () => {
+    const risks = buildPrivacyRisks({ visibleText: "Realschule Linz; LL-AB 1234" });
     expect(risks).toContain("privacy.address");
     expect(risks).toContain("privacy.licensePlate");
+  });
+
+  test("die Funktion, die eine Zeile 'Sichtbarer Text:' aus Fliesstext las, gibt es nicht mehr", () => {
+    /* BUG-2026-10-03-05: Gelesen wird das Feld der Antwort (job-pipelines.js). */
+    expect(require("../privacy").extractVisibleText).toBeUndefined();
   });
 });

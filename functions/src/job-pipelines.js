@@ -23,9 +23,9 @@
  * und aendert sich aus anderen Gruenden.
  */
 
-const { buildPrivacyRisks, extractVisibleText } = require("./privacy");
+const { buildPrivacyRisks } = require("./privacy");
 const { applyMinorSafety } = require("./minor-safety");
-const { classifyDescription, buildAnimalProfiles } = require("./animal");
+const { classifySubject, buildAnimalProfiles } = require("./animal");
 const { setLiveText } = require("./jobs");
 const { geltendeWerte } = require("./betriebsprofil");
 const { loadImage } = require("./queue-storage");
@@ -126,25 +126,24 @@ async function runPipeline(job) {
     else pipelineError = true;
   }
 
-  /* v2.2.x (Audit PRIV-002): Der Analyse-Aufruf liefert subject + visible_text
-     direkt im JSON. Wir bauen daraus eine synthetische Beschreibung mit den
-     Markern, die classifyDescription ("SUBJECT:") und extractVisibleText
-     ("Sichtbarer Text:") erwarten — so funktionieren das Tier-Easter-Egg UND
-     die Datenschutz-Warnung ("das hast du ungewollt verraten"). Fehlen die
-     Felder, bleibt es beim Pseudo-Description-Verhalten (kein Regress). */
+  /* Der Analyse-Aufruf liefert subject + visible_text als Felder im JSON. Beide
+     werden als FELDER ausgewertet (BUG-2026-10-03-05): Das Motiv entscheidet
+     sich am Wert von subject, die Datenschutz-Warnung ("das hast du ungewollt
+     verraten") am Wert von visible_text. Der zusammengesetzte Text aus Profil
+     und Karten dient nur der Auswahl der Tierart und der Kennzeichen-Suche —
+     eine Zeile darin entscheidet nichts. Fehlen die Felder, gilt: Mensch,
+     kein sichtbarer Text. */
   const pseudoDescription = buildPseudoDescription(profiles.normal);
-  const subjectLine = profiles.subject ? `SUBJECT: ${profiles.subject}\n` : "";
-  const visibleLine = profiles.visibleText ? `\nSichtbarer Text: ${profiles.visibleText}` : "";
-  const enrichedDescription = `${subjectLine}${pseudoDescription}${visibleLine}`;
-  const { subject, hasPerson, hasAnimal, animalType } = classifyDescription(enrichedDescription);
-  const visibleText = extractVisibleText(enrichedDescription);
-  const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: enrichedDescription });
+  const visibleText = typeof profiles.visibleText === "string" ? profiles.visibleText.trim() : "";
+  const beschreibung = [pseudoDescription, visibleText].filter(Boolean).join("\n");
+  const { subject, hasPerson, hasAnimal, animalType } = classifySubject(profiles.subject, beschreibung);
+  const privacyRisks = buildPrivacyRisks({ visibleText, fullDescription: pseudoDescription });
 
   /* Tier-Easter-Egg: Nur reines Tier-Bild → vordefinierte Profile.
      Die frueher hier stehende Widerspruchspruefung ist mit dem Audit
      2026-08-10 entfernt — sie pruefte nicht die Bildbeschreibung, sondern
      den erzeugten Profiltext (siehe animal.js). */
-  if (enrichedDescription && !hasPerson && hasAnimal) {
+  if (!hasPerson && hasAnimal) {
     const { normalProfile, boostProfile } = buildAnimalProfiles(animalType || "generic", lang);
     return {
       result: {

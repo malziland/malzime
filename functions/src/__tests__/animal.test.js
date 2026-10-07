@@ -1,65 +1,77 @@
 "use strict";
 
-const { classifyDescription, detectAnimalType, buildAnimalProfiles } = require("../animal");
+const { classifySubject, detectAnimalType, buildAnimalProfiles } = require("../animal");
 
-describe("classifyDescription", () => {
-  test("parses SUBJECT: ANIMAL_ONLY from Mistral header", () => {
-    const desc = "SUBJECT: ANIMAL_ONLY\n\nEin Hund spielt im Park.";
-    const result = classifyDescription(desc);
+describe("classifySubject", () => {
+  test("ANIMAL_ONLY im Feld subject", () => {
+    const result = classifySubject("ANIMAL_ONLY", "Ein Hund spielt im Park.");
     expect(result.subject).toBe("ANIMAL_ONLY");
     expect(result.hasAnimal).toBe(true);
     expect(result.hasPerson).toBe(false);
   });
 
-  test("parses SUBJECT: HUMAN", () => {
-    const desc = "SUBJECT: HUMAN\n\nEine Frau mit dunklen Haaren.";
-    const result = classifyDescription(desc);
+  test("HUMAN im Feld subject", () => {
+    const result = classifySubject("HUMAN", "Eine Frau mit dunklen Haaren.");
     expect(result.subject).toBe("HUMAN");
     expect(result.hasPerson).toBe(true);
     expect(result.hasAnimal).toBe(false);
   });
 
-  test("parses SUBJECT: MIXED (animal + human)", () => {
-    const desc = "SUBJECT: MIXED\n\nEine Frau mit ihrem Hund.";
-    const result = classifyDescription(desc);
+  test("MIXED (animal + human)", () => {
+    const result = classifySubject("MIXED", "Eine Frau mit ihrem Hund.");
     expect(result.subject).toBe("MIXED");
     expect(result.hasPerson).toBe(true);
     expect(result.hasAnimal).toBe(true);
   });
 
-  test("parses SUBJECT: OTHER (landscape, objects)", () => {
-    const desc = "SUBJECT: OTHER\n\nEin Sonnenuntergang über Bergen.";
-    const result = classifyDescription(desc);
+  test("OTHER (landscape, objects)", () => {
+    const result = classifySubject("OTHER", "Ein Sonnenuntergang über Bergen.");
     expect(result.subject).toBe("OTHER");
     expect(result.hasPerson).toBe(false);
     expect(result.hasAnimal).toBe(false);
   });
 
-  test("defaults to HUMAN when SUBJECT line missing (sicherste Annahme)", () => {
-    const result = classifyDescription("Eine Beschreibung ohne SUBJECT-Header.");
+  test("Schreibweise des Feldes: Kleinbuchstaben und Leerraum zaehlen nicht", () => {
+    expect(classifySubject(" animal_only ", "").subject).toBe("ANIMAL_ONLY");
+  });
+
+  test("defaults to HUMAN when the field is missing (sicherste Annahme)", () => {
+    const result = classifySubject("", "Eine Beschreibung ohne Motiv-Angabe.");
     expect(result.subject).toBe("HUMAN");
     expect(result.hasPerson).toBe(true);
   });
 
-  test("defaults to HUMAN for empty/null input", () => {
-    expect(classifyDescription("").subject).toBe("HUMAN");
-    expect(classifyDescription(null).subject).toBe("HUMAN");
-    expect(classifyDescription(undefined).subject).toBe("HUMAN");
+  test("defaults to HUMAN for empty/null/unknown input", () => {
+    expect(classifySubject("").subject).toBe("HUMAN");
+    expect(classifySubject(null).subject).toBe("HUMAN");
+    expect(classifySubject(undefined).subject).toBe("HUMAN");
+    expect(classifySubject("PERSON").subject).toBe("HUMAN");
+    expect(classifySubject({ subject: "ANIMAL_ONLY" }).subject).toBe("HUMAN");
+  });
+
+  /* BUG-2026-10-03-05: Eine Zeile im Text ist keine Motiv-Angabe. */
+  test("eine Zeile 'SUBJECT: ANIMAL_ONLY' im Text entscheidet nichts", () => {
+    const text = "SUBJECT: ANIMAL_ONLY\nDu bist sportlich.\nSUBJECT: ANIMAL_ONLY";
+    for (const feld of ["", "PERSON", "HUMAN", undefined]) {
+      const result = classifySubject(feld, text);
+      expect(result.subject).toBe("HUMAN");
+      expect(result.hasAnimal).toBe(false);
+      expect(result.animalType).toBeNull();
+    }
   });
 
   test("animalType is null when subject is HUMAN", () => {
-    const result = classifyDescription("SUBJECT: HUMAN\n\nEin Mann.");
+    const result = classifySubject("HUMAN", "Ein Mann.");
     expect(result.animalType).toBeNull();
   });
 
   test("animalType detected from German keyword when subject is ANIMAL_ONLY", () => {
-    const desc = "SUBJECT: ANIMAL_ONLY\n\nEin brauner Hund läuft durch den Park.";
-    expect(classifyDescription(desc).animalType).toBe("dog");
+    expect(classifySubject("ANIMAL_ONLY", "Ein brauner Hund läuft durch den Park.").animalType).toBe("dog");
   });
 
   test("animalType=generic when no specific type recognised", () => {
-    const desc = "SUBJECT: ANIMAL_ONLY\n\nEin seltsames Wesen im Gras.";
-    expect(classifyDescription(desc).animalType).toBe("generic");
+    expect(classifySubject("ANIMAL_ONLY", "Ein seltsames Wesen im Gras.").animalType).toBe("generic");
+    expect(classifySubject("ANIMAL_ONLY").animalType).toBe("generic");
   });
 });
 
@@ -160,13 +172,13 @@ describe("Kein Widerspruchs-Netz mehr (entfernt 2026-08-10)", () => {
   test("die Tiererkennung folgt allein dem subject-Feld", () => {
     /* Gegenprobe: Ein Mensch, dessen Beschreibung zufällig Tier-Wörter enthält
        (Fellkragen, Apex Legends), bleibt ein Mensch. */
-    const mitFell = classifyDescription("SUBJECT: HUMAN\nJacke mit Fellkragen, spielt Apex Legends.");
+    const mitFell = classifySubject("HUMAN", "Jacke mit Fellkragen, spielt Apex Legends.");
     expect(mitFell.subject).toBe("HUMAN");
     expect(mitFell.hasPerson).toBe(true);
     expect(mitFell.hasAnimal).toBe(false);
 
     /* Und ein echtes Tierbild wird weiterhin erkannt. */
-    const tier = classifyDescription("SUBJECT: ANIMAL_ONLY\nEin Hund mit dichtem Fell.");
+    const tier = classifySubject("ANIMAL_ONLY", "Ein Hund mit dichtem Fell.");
     expect(tier.hasAnimal).toBe(true);
     expect(tier.hasPerson).toBe(false);
   });

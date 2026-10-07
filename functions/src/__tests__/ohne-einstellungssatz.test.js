@@ -36,6 +36,7 @@ jest.mock("../betriebsprofil", () => ({
     grund: 'Profil "t1-normal" abgelehnt: singleLargeMaxTokens fehlt',
   }),
   _cacheLeeren: () => {},
+  ZUSAGE_LOESCHFRISTEN: jest.requireActual("../betriebsprofil").ZUSAGE_LOESCHFRISTEN,
 }));
 
 const machDoc = () => ({ get: jest.fn(async () => ({ exists: false, data: () => ({}) })) });
@@ -70,18 +71,28 @@ describe("Ohne Einstellungssatz — kein Weg rechnet mit erfundenen Zahlen", () 
   afterEach(() => jest.restoreAllMocks());
 
   /* ── Die Aufräum-Wege ─────────────────────────────────────────────────
-     Der Reaper löscht Bilder und Ergebnisse. Ohne Satz kennt er keine Frist.
-     Früher hätte er die Konstante aus dem Code genommen — und damit
+     Ohne Satz kennt der Reaper keine Frist für wartende und hängende
+     Aufträge. Früher hätte er die Konstante aus dem Code genommen — und damit
      möglicherweise eine ANDERE Frist angewandt als die eingestellte. */
   const jobs = require("../jobs");
   test.each([
     ["findAbandonedJobs", () => jobs.findAbandonedJobs()],
-    ["findExpiredJobs", () => jobs.findExpiredJobs()],
-    ["findZugestellteJobs", () => jobs.findZugestellteJobs()],
     ["findUeberfaelligeJobs", () => jobs.findUeberfaelligeJobs()],
     ["findStaleProcessingJobs", () => jobs.findStaleProcessingJobs()],
-  ])("%s bricht ab, statt mit einer Ersatzfrist zu löschen", async (_name, aufruf) => {
+  ])("%s bricht ab, statt mit einer Ersatzfrist aufzuräumen", async (_name, aufruf) => {
     await expect(aufruf()).rejects.toMatchObject({ code: "config_missing" });
+  });
+
+  /* Die zwei LÖSCHFRISTEN sind keine Betriebseinstellung, sondern Zusagen
+     (2 Stunden, 15 Minuten ab Abholung). Ohne Satz gelten sie selbst — das
+     Löschen steht nicht, nur weil keine Analyse laufen kann
+     (PRIV-2026-10-03-26). Die Größe der Fristen prüfen
+     aufraeumer-loescht-ohne-satz.test.js und jobs-fristen-groesse.test.js. */
+  test.each([
+    ["findExpiredJobs", () => jobs.findExpiredJobs()],
+    ["findZugestellteJobs", () => jobs.findZugestellteJobs()],
+  ])("%s bricht nicht ab: gelöscht wird nach der Zusage", async (_name, aufruf) => {
+    await expect(aufruf()).resolves.toEqual([]);
   });
 
   test("markFailedIfStale bricht ab, statt einen Job nach falscher Frist zu töten", async () => {

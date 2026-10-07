@@ -150,6 +150,16 @@ const FELDER = {
 
 const PFLICHTFELDER = Object.keys(FELDER);
 
+/* DIE ZWEI LOESCHFRISTEN DER ZUSAGE (PRIV-2026-10-03-26). Keine zweiten Zahlen,
+   sondern die Obergrenzen von oben unter eigenem Namen. Der Aufraeumdienst
+   nimmt sie, wenn kein gueltiger Satz vorliegt: Geloescht wird dann nach der
+   Zusage selbst, statt gar nicht. Das sind keine Rueckfallwerte fuer den
+   Betrieb — ohne gueltigen Satz laeuft weiterhin keine Analyse. */
+const ZUSAGE_LOESCHFRISTEN = Object.freeze({
+  jobAufbewahrungMs: FELDER.jobAufbewahrungMs.max,
+  zustellfensterMs: FELDER.zustellfensterMs.max,
+});
+
 let cache = { zeit: 0, werte: null, quelle: "code" };
 /* Laeuft gerade ein Lesevorgang? Dann warten alle weiteren darauf, statt
    selbst zu lesen.
@@ -409,6 +419,7 @@ function _cacheLeeren({ warmBleiben = false } = {}) {
 module.exports = {
   geltendeWerte,
   PFLICHTFELDER,
+  ZUSAGE_LOESCHFRISTEN,
   _pruefe: pruefe,
   _felderLesen: felderLesen,
   _cacheLeeren,

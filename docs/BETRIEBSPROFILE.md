@@ -137,6 +137,13 @@ Der Einstellungssatz kann diese Fristen nur **verkürzen**. Wäre es anders,
 ließe sich eine öffentliche Zusage mit einem Datenbankeintrag brechen —
 während die Erklärung auf der Website weiter dasselbe sagt.
 
+Das gilt auch für einen fehlenden oder ungültigen Satz: Die zwei Löschfristen
+hängen nicht an ihm. Der Aufräumdienst löscht dann nach genau diesen
+Obergrenzen (jeder Auftrag samt Foto nach 2 Stunden, ein abgeholtes Ergebnis
+nach 15 Minuten). Was ohne gültigen Satz steht, ist das vorzeitige Abräumen
+wartender und hängender Aufträge — dafür gibt es keine zugesagte Frist, und die
+Werte dazu kommen nur aus dem Satz (`aufraeumer-loescht-ohne-satz.test.js`).
+
 **Wer eine dieser Grenzen anheben will, ändert zuerst die
 Datenschutzerklärung.**
 

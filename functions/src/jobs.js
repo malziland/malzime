@@ -25,11 +25,12 @@
 
 const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
-const { geltendeWerte } = require("./betriebsprofil");
+const { geltendeWerte, ZUSAGE_LOESCHFRISTEN } = require("./betriebsprofil");
 
 /* Holt die Betriebswerte oder bricht ab. Es gibt keine Ersatzzahlen mehr:
    Liegt kein gueltiger Einstellungssatz vor, laeuft auch keine Analyse — dann
-   entstehen keine neuen Jobs, und die Firestore-TTL raeumt die alten. */
+   entstehen keine neuen Jobs. Die alten loescht der Aufraeumdienst weiter
+   (loeschfrist unten). */
 async function betriebswerteOderAbbruch() {
   const { werte, grund } = await geltendeWerte();
   if (!werte) {
@@ -38,6 +39,23 @@ async function betriebswerteOderAbbruch() {
     throw fehler;
   }
   return werte;
+}
+
+/* BLEIBT IM CODE — Schutzgrenze, keine Betriebseinstellung: wie viele Auftraege
+   ein Lauf des Aufraeumdienstes je Loeschabfrage nimmt, wenn kein gueltiger Satz
+   vorliegt. Der naechste Lauf eine Minute spaeter nimmt den Rest. */
+const LOESCH_STAPEL_OHNE_SATZ = 200;
+
+/* Frist und Stapel fuer die zwei LOESCHABFRAGEN (PRIV-2026-10-03-26). Mit
+   gueltigem Satz gelten seine Werte. Ohne ihn gilt die Zusage selbst
+   (2 Stunden, 15 Minuten ab Abholung) — das Loeschen haengt nicht daran, ob
+   gerade Analysen laufen koennen. Die drei Abfragen nach wartenden und
+   haengenden Auftraegen brechen ohne Satz weiter ab: Fuer sie gibt es keine
+   zugesagte Frist. */
+async function loeschfrist(feld) {
+  const { werte } = await geltendeWerte();
+  if (werte) return { fristMs: werte[feld], stapel: werte.aufraeumStapel };
+  return { fristMs: ZUSAGE_LOESCHFRISTEN[feld], stapel: LOESCH_STAPEL_OHNE_SATZ };
 }
 
 /* ARCH-2026-08-12-27: Frist des Sicherheitsnetzes (Firestore-TTL). Bewusst weit
@@ -591,9 +609,9 @@ async function findStaleProcessingJobs(limit) {
  * automatischen Einzelfeld-Index abgedeckt — kein zusammengesetzter Index.
  */
 async function findExpiredJobs(limit) {
-  const werte = await betriebswerteOderAbbruch();
-  const cutoff = Date.now() - werte.jobAufbewahrungMs;
-  limit = limit || werte.aufraeumStapel;
+  const { fristMs, stapel } = await loeschfrist("jobAufbewahrungMs");
+  const cutoff = Date.now() - fristMs;
+  limit = limit || stapel;
   const snap = await jobsRef().where("createdAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -606,9 +624,9 @@ async function findExpiredJobs(limit) {
  * ohne `deliveredAt` (nie zugestellt) von selbst.
  */
 async function findZugestellteJobs(limit) {
-  const werte = await betriebswerteOderAbbruch();
-  const cutoff = Date.now() - werte.zustellfensterMs;
-  limit = limit || werte.aufraeumStapel;
+  const { fristMs, stapel } = await loeschfrist("zustellfensterMs");
+  const cutoff = Date.now() - fristMs;
+  limit = limit || stapel;
   const snap = await jobsRef().where("deliveredAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }

@@ -469,8 +469,8 @@ jemand analysiert, und sonst spätestens nach fünf Minuten.
 
 **Bedingung für Neubewertung.** Warnungen `reap-query-ohne-betriebswerte` in
 mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
-(Abfrage im RUNBOOK; ein einzelner träger Lauf erzeugt bis zu fünf Warnungen
-in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
+(Abfrage im RUNBOOK; ein einzelner Lauf ohne Betriebswerte erzeugt bis zu drei
+Warnungen in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
 sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
 verschoben. Stand 01.10.2026, 13:00 Wien: drei Minuten an diesem Tag (10:52,
 11:30, 12:57) — an der Grenze, nicht darüber, wie am 10.09.2026. Seit 01.10.2026 protokolliert

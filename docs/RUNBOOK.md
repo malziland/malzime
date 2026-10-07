@@ -852,6 +852,13 @@ keine Analysen — jede betroffene meldet sich sofort selbst als Fehler
 (`kein-einstellungssatz` in `process-job`). Dieser Alarm hier ist die Reserve
 für die Zeit, in der niemand analysiert.
 
+Für die liegenden Aufträge heißt es: Wartende und hängende werden in dieser
+Zeit nicht abgeräumt, ihr Platz im Stundenfenster bleibt belegt. Gelöscht wird
+weiter, nach den festen Fristen der Datenschutzerklärung (jeder Auftrag samt
+Foto nach 2 Stunden, ein abgeholtes Ergebnis nach 15 Minuten) — diese zwei
+Fristen hängen nicht am Einstellungssatz. Dasselbe steht in den Nachrichten der
+Wachen („KEIN gueltiger Einstellungssatz“, „UNGUELTIG“).
+
 **Was tun:** Firestore-Status und das Dokument prüfen
 (`scripts/betriebsprofil-vergleichen.js` zeigt, ob es da ist und zum Repo
 passt). Ein fehlendes oder abgelehntes Dokument meldet `betriebsprofil.js`
@@ -863,8 +870,9 @@ Prüfen von Hand:
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d
 
 Erwartet: keine Zeile. Die Warnungen dazu (einzelne Ausrutscher) zählen — nach
-Minuten, denn ein träger Lauf erzeugt bis zu fünf Warnungen in derselben Minute
-und zählt als EIN Lauf:
+Minuten, denn ein Lauf ohne Betriebswerte erzeugt bis zu drei Warnungen in
+derselben Minute (je eine für die Abfragen nach verlassenen, hängenden und
+überfälligen Aufträgen) und zählt als EIN Lauf:
 
     gcloud logging read 'jsonPayload.warning:"reap-query-ohne-betriebswerte"' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp)' | cut -c1-16 | sort -u

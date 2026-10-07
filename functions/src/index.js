@@ -25,7 +25,7 @@ const { reapJobs } = require("./handle-reap");
 const { pruefeZusagen } = require("./handle-erinnerung");
 const { pruefeLaufzeit } = require("./laufzeit-wache");
 const { pruefeKapazitaet } = require("./kapazitaets-wache");
-const { geltendeWerte, _cacheLeeren } = require("./betriebsprofil");
+const { geltendeWerte, _cacheLeeren, ZUSAGE_LOESCHFRISTEN } = require("./betriebsprofil");
 const { sendeNtfy } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 
@@ -45,6 +45,20 @@ const ntfyTopic = defineSecret("NTFY_TOPIC_EU");
 const mistralApiKey = defineSecret("MISTRAL_API_KEY_EU");
 
 initializeApp();
+
+/* Was ohne gueltigen Einstellungssatz mit den liegenden Auftraegen geschieht.
+   Steht in beiden Nachrichten der Wachen unten, damit der Empfaenger weiss,
+   was steht und was weiterlaeuft (PRIV-2026-10-03-26): Der Aufraeumdienst
+   raeumt wartende und haengende Auftraege dann nicht ab, loescht aber weiter
+   nach den zugesagten Fristen. Die Zahlen kommen aus betriebsprofil.js. */
+function hinweisOhneSatz() {
+  const stunden = ZUSAGE_LOESCHFRISTEN.jobAufbewahrungMs / (60 * 60 * 1000);
+  const minuten = ZUSAGE_LOESCHFRISTEN.zustellfensterMs / (60 * 1000);
+  return (
+    ` Wartende Auftraege werden solange nicht abgeraeumt; geloescht wird weiter nach den festen ` +
+    `Fristen (${stunden} Stunden, ${minuten} Minuten nach der Abholung).`
+  );
+}
 
 /* PRIV-2026-09-10-06: Keine Antwort unserer oeffentlichen Schnittstellen darf
    im Zwischenspeicher des Browsers liegen bleiben — allen voran das fertige
@@ -245,7 +259,8 @@ exports.laufzeitWache = onSchedule(
       if (!werte) {
         const text =
           `KEIN gueltiger Einstellungssatz — es laeuft derzeit KEINE Analyse. ` +
-          `Grund: ${grund || "unbekannt"}. Firestore-Dokument config/betriebsprofil pruefen.`;
+          `Grund: ${grund || "unbekannt"}. Firestore-Dokument config/betriebsprofil pruefen.` +
+          hinweisOhneSatz();
         await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
         console.error(JSON.stringify({ step: "betriebsprofil-wache", status: "kein-satz", grund }));
       } else {
@@ -314,7 +329,8 @@ exports.satzWache = onDocumentWritten(
       const text =
         `ACHTUNG: Der Einstellungssatz wurde geaendert und ist UNGUELTIG — ` +
         `es laeuft ab sofort KEINE Analyse. Grund: ${grund || "unbekannt"}. ` +
-        `Rueckweg: das Feld "aktiv" auf einen gueltigen Satz stellen.`;
+        `Rueckweg: das Feld "aktiv" auf einen gueltigen Satz stellen.` +
+        hinweisOhneSatz();
       await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
       console.error(JSON.stringify({ step: "satz-wache", status: "ungueltig", grund }));
       return;

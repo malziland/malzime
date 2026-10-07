@@ -238,6 +238,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `alters-lesbarkeit-woerter.js` | Wörter, Kategorien und Abkürzungen der Altersauslese (reine Daten, angewandt von `alters-auslese.js` und `alters-lesbarkeit.js`) |
 | `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Felder und Bereiche, Cache; ist der Satz nur gerade nicht lesbar, gilt der zuletzt gültig gelesene weiter |
 | `analyse-ausgang.js` | Welche Fehlermeldung ein Endzustand eines Auftrags zeigt, und die eine Fehlerzeile dazu („ein Alarm je gescheiterter Analyse“) |
+| `erinnerungs-waechter.js` | Wächter über die Wochen-Erinnerung: liest ihr Lebenszeichen, meldet veraltet, nie gelaufen oder wiederholt nicht lesbar (vom Aufräumdienst je Lauf gerufen) |
 | `betriebsprofil-kopplung.js` | Welche Werte eines Satzes zusammenpassen müssen (reine Rechnung, von `betriebsprofil.js` aufgerufen) |
 | `produktiv-satz.js` | Betriebswerte für den echten Betrieb — Quelle für `config/betriebsprofil` |
 | `test-satz.js` | Einstellungssatz für die Tests |

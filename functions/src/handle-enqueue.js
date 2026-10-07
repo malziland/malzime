@@ -25,12 +25,13 @@ const aktuelleEinlassgrenze = async () => einlassgrenzeFuer((await geltendeWerte
 const { getClientIp, checkRateLimit } = require("./middleware");
 const { parseMultipart, parseJsonBody } = require("./upload");
 const { resolveLanguage } = require("./i18n");
-const { checkAndIncrement, getMaintenanceStatus, releaseHourlySlot } = require("./counter");
+const { checkAndIncrement, getMaintenanceStatus } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 const { createJob, failJob, platzBestaetigen, getJob, abandonJob, countQueuedJobs } = require("./jobs");
 const { meldeGescheiterteAnalyse } = require("./jobs");
-const { neuerBildPfad, storeImage, deleteImage } = require("./queue-storage");
+const { neuerBildPfad, storeImage } = require("./queue-storage");
+const { belegtesFreigeben } = require("./ruecknahme");
 const { enqueueJob } = require("./cloud-tasks");
 
 /**
@@ -58,6 +59,26 @@ function sanitizeExif(raw) {
     if (typeof raw.model === "string") safe.model = raw.model.slice(0, 100);
   }
   return safe;
+}
+
+/* DIE EINE RUECKABWICKLUNG des Einlasses (STRUCT-2026-10-03-36). Ab dem
+   gezogenen Stundenplatz kann ein Auftrag an drei Stellen noch scheitern
+   (Anlegen oder Speichern, Warteschlange nachtraeglich voll, Einreihen).
+   EINE Reihenfolge fuer alle:
+     1. den Auftrag beenden — mit `grund` als gescheitert (sein Uebergang
+        schreibt die eine Meldung "Analyse gescheitert"; ohne Auftrag oder
+        ohne gelungenen Uebergang meldet der Einlass selbst), ohne `grund` als
+        verlassen (zu spaet gekommen ist kein Fehler, keine Meldung)
+     2. Platz im Stundenfenster freigeben, Foto loeschen (ruecknahme.js)
+   `imagePath` nur mitgeben, wenn das Speichern begonnen hat. */
+async function einlassZuruecknehmen({ jobId, grund, stempel, imagePath }) {
+  if (grund) {
+    const gemeldet = jobId ? await failJob(jobId, grund).catch(() => false) : false;
+    if (!gemeldet) meldeGescheiterteAnalyse(grund);
+  } else {
+    await abandonJob(jobId);
+  }
+  await belegtesFreigeben({ zaehlerStempel: stempel, imagePath });
 }
 
 async function handleEnqueue(req, res, secrets) {
@@ -330,18 +351,16 @@ async function handleEnqueue(req, res, secrets) {
       await storeImage(file.buffer, file.mimeType, imagePath);
     } catch (err) {
       /* Der Stunden-Slot ist hier schon gezogen, aber es entsteht nie eine
-         Analyse — Slot zurückgeben, den Auftrag beenden und ein evtl. schon
-         abgelegtes Bild nicht liegen lassen. */
+         Analyse — das Kind sieht "ueberlastet". Ein Speichern, das mit einem
+         Fehler endet, kann trotzdem geschrieben haben: deshalb loeschen,
+         sobald es begonnen hat. */
       console.log(JSON.stringify({ requestId, traceId, warning: "store-or-create-failed", error: err.message }));
-      /* Kind sieht "ueberlastet" — eine Nachricht: Gibt es den Auftrag schon,
-         schreibt sie sein Uebergang auf "gescheitert" (jobs.js); sonst, oder wenn
-         auch das nicht gelingt, geht sie hier hinaus. */
-      const gemeldet = jobId ? await failJob(jobId, "store_failed").catch(() => false) : false;
-      if (!gemeldet) meldeGescheiterteAnalyse("store_failed");
-      await releaseHourlySlot(counter.stempel).catch(() => {});
-      /* Ein Speichern, das mit einem Fehler endet, kann trotzdem geschrieben
-         haben — deshalb loeschen, sobald es begonnen hat. */
-      if (speichernBegonnen) await deleteImage(imagePath);
+      await einlassZuruecknehmen({
+        jobId,
+        grund: "store_failed",
+        stempel: counter.stempel,
+        imagePath: speichernBegonnen ? imagePath : null,
+      });
       res.status(503).json({ error: "Queue unavailable", code: "store_failed" });
       return;
     }
@@ -365,9 +384,7 @@ async function handleEnqueue(req, res, secrets) {
       if (einlassgrenze === null) throw { _uebersprungen: true };
       const angelegt = await getJob(jobId);
       if (!(await platzBestaetigen(angelegt, einlassgrenze))) {
-        await abandonJob(jobId);
-        await deleteImage(imagePath);
-        await releaseHourlySlot(counter.stempel).catch(() => {});
+        await einlassZuruecknehmen({ jobId, grund: null, stempel: counter.stempel, imagePath });
         console.log(JSON.stringify({ requestId, traceId, warning: "queue-too-deep-nachtraeglich" }));
         res.status(429).json({
           blocked: "queueFull",
@@ -402,12 +419,10 @@ async function handleEnqueue(req, res, secrets) {
     } catch (err) {
       /* Job ist angelegt, aber Cloud Tasks hat ihn nicht angenommen — sonst
          bliebe er für immer `queued` und der Client pollt ewig. Sauber als
-         `failed` markieren und das Bild gleich wieder löschen. */
+         `failed` markieren, den Platz zurückgeben (BIZ-001: dieser Job löst
+         nie eine echte Analyse aus) und das Bild gleich wieder löschen. */
       console.log(JSON.stringify({ requestId, traceId, jobId, warning: "enqueue-failed", error: err.message }));
-      await failJob(jobId, "enqueue_failed");
-      /* BIZ-001: Slot zurückgeben — dieser Job löst nie eine echte Analyse aus. */
-      await releaseHourlySlot(counter.stempel).catch(() => {});
-      await deleteImage(imagePath);
+      await einlassZuruecknehmen({ jobId, grund: "enqueue_failed", stempel: counter.stempel, imagePath });
       res.status(503).json({ error: "Queue unavailable", code: "enqueue_failed" });
       return;
     }

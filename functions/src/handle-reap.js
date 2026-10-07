@@ -43,7 +43,7 @@ const {
 const { pruefeErinnerungsLebenszeichen } = require("./erinnerungs-waechter");
 const { letzterLeseversuchGescheitert } = require("./betriebsprofil");
 const { deleteImage } = require("./queue-storage");
-const { releaseHourlySlot } = require("./counter");
+const { belegtesFreigeben } = require("./ruecknahme");
 
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
    dass ein extremer Rückstau einen Lauf überlange macht. Der nächste Lauf
@@ -120,9 +120,9 @@ async function reapJobs() {
       /* Schlug der Übergang fehl, hat ein Worker den Job zwischen Query und
          Abbruch geclaimt — er läuft noch und braucht das Bild: nichts anfassen. */
       if (!ok) continue;
-      /* BIZ-001: Stunden-Slot zurückgeben — verlassener Job machte nie eine Analyse. */
-      await releaseHourlySlot(job.zaehlerStempel);
-      await deleteImage(job.imagePath);
+      /* BIZ-001: Stunden-Slot zurückgeben — verlassener Job machte nie eine
+         Analyse — und das Foto loeschen (ruecknahme.js). */
+      await belegtesFreigeben(job);
       reapedAbandoned += 1;
     } catch (err) {
       /* FEHLERZEILEN DES AUFRAEUMDIENSTES OHNE jobId UND OHNE FEHLERTEXT
@@ -175,8 +175,7 @@ async function reapJobs() {
     try {
       const ok = await abandonJob(job.id);
       if (!ok) continue;
-      await releaseHourlySlot(job.zaehlerStempel);
-      await deleteImage(job.imagePath);
+      await belegtesFreigeben(job);
       reapedUeberfaellig += 1;
     } catch (err) {
       console.log(

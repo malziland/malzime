@@ -238,6 +238,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `alters-lesbarkeit-woerter.js` | Wörter, Kategorien und Abkürzungen der Altersauslese (reine Daten, angewandt von `alters-auslese.js` und `alters-lesbarkeit.js`) |
 | `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Felder und Bereiche, Cache; ist der Satz nur gerade nicht lesbar, gilt der zuletzt gültig gelesene weiter |
 | `analyse-ausgang.js` | Welche Fehlermeldung ein Endzustand eines Auftrags zeigt, und die eine Fehlerzeile dazu („ein Alarm je gescheiterter Analyse“) |
+| `ruecknahme.js` | Zurückgeben, was ein nie analysierter Auftrag belegt: Platz im Stundenfenster freigeben, Foto löschen — die eine Stelle dafür, abgewartet |
 | `oeffentliche-huelle.js` | Was für jede öffentliche Schnittstelle gilt: `Cache-Control: no-store`, gepackte Anfragen abweisen (von `index.js` um jede öffentliche Function gelegt) |
 | `warteschlangen-rechnung.js` | Die eine Rechnung für Einlassgrenze und Wartezeit-Ansage: die engere von zwei Bremsen (Parallelität, Rate) |
 | `erinnerungs-waechter.js` | Wächter über die Wochen-Erinnerung: liest ihr Lebenszeichen, meldet veraltet, nie gelaufen oder wiederholt nicht lesbar (vom Aufräumdienst je Lauf gerufen) |

@@ -783,3 +783,113 @@ describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
     jest.restoreAllMocks();
   });
 });
+
+/* STRUCT-2026-10-03-36: Vier Wege des Einlasses betrat bis dahin kein Test
+   (Abdeckungslauf des Audits vom 03.10.2026). Jeder ist ein Riegel oder eine
+   Ausnahme von einer Regel — still ausgebaut, bliebe alles gruen. */
+describe("STRUCT-2026-10-03-36 — vier bisher ungepruefte Wege", () => {
+  const satz = () => require("../test-satz").betriebsprofilMock().geltendeWerte();
+
+  test("der Einstellungssatz verschwindet zwischen den zwei Riegeln: 503 mit Text, nichts angelegt", async () => {
+    /* Erster Zugriff (Riegel vor der Ratenbegrenzung): Satz da. Zweiter
+       (Einlassgrenze): kein Satz mehr — die Einlassgrenze ist dann null. */
+    betriebsprofil.geltendeWerte
+      .mockReset()
+      .mockImplementationOnce(satz)
+      .mockResolvedValue({ werte: null, quelle: "fehlt", profil: null, grund: "kein Dokument" });
+    const res = makeRes();
+
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({
+      blocked: "configMissing",
+      retryAfterSeconds: 300,
+      message: "Bei uns stimmt gerade eine Einstellung nicht — bitte in ein paar Minuten nochmal.",
+    });
+    expect(jobs.countQueuedJobs).not.toHaveBeenCalled();
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+    expect(jobs.createJob).not.toHaveBeenCalled();
+    expect(storage.storeImage).not.toHaveBeenCalled();
+  });
+
+  test("die Einlassgrenze ist nicht ermittelbar: die zweite Stufe wird uebersprungen — ohne Fehlerzeile", async () => {
+    /* Der zweite Zugriff auf den Satz scheitert ganz: Die Grenze bleibt
+       unbekannt. Das ist kein Fehler der Platzbestaetigung und darf nicht als
+       einer im Protokoll stehen, sonst geht der echte im Rauschen unter. */
+    betriebsprofil.geltendeWerte.mockReset().mockImplementationOnce(satz).mockRejectedValueOnce(new Error("weg"));
+    betriebsprofil.geltendeWerte.mockImplementation(satz);
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+    const res = makeRes();
+
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(200);
+    expect(jobs.getJob).not.toHaveBeenCalled();
+    expect(jobs.platzBestaetigen).not.toHaveBeenCalled();
+    expect(tasks.enqueueJob).toHaveBeenCalledWith("job-abc");
+    expect(fehler).not.toHaveBeenCalled();
+    fehler.mockRestore();
+  });
+
+  test("meldet die Rumpf-Verarbeitung eine Datei ueber der Grenze, haelt der Einlass selbst dagegen: 413", async () => {
+    /* Zwei Riegel liegen davor (Base64-Laenge, Grenze der Multipart-Lesung).
+       Dieser dritte prueft die gemeldete Groesse selbst — erreichbar nur, wenn
+       die beiden davor nachgeben. Deshalb hier mit nachgestellter Lesung. */
+    const { MAX_UPLOAD_BYTES } = require("../config");
+    let einlass;
+    jest.isolateModules(() => {
+      jest.doMock("../upload", () => ({
+        parseJsonBody: () => null,
+        parseMultipart: async () => ({
+          fields: {},
+          file: { buffer: VALID_JPEG, mimeType: "image/jpeg", filename: "x.jpg", size: MAX_UPLOAD_BYTES + 1 },
+        }),
+      }));
+      einlass = require("../handle-enqueue").handleEnqueue;
+    });
+    jest.dontMock("../upload");
+    const res = makeRes();
+
+    await einlass({ method: "POST", headers: { "content-type": "multipart/form-data; boundary=x" } }, res, SECRETS);
+
+    expect(res.statusCode).toBe(413);
+    expect(res.body).toEqual({ error: "File too large" });
+  });
+
+  test("genau auf der Grenze geht dieselbe Meldung durch (Grenze einschliesslich)", async () => {
+    const { MAX_UPLOAD_BYTES } = require("../config");
+    let einlass;
+    jest.isolateModules(() => {
+      jest.doMock("../upload", () => ({
+        parseJsonBody: () => null,
+        parseMultipart: async () => ({
+          fields: {},
+          file: { buffer: VALID_JPEG, mimeType: "image/jpeg", filename: "x.jpg", size: MAX_UPLOAD_BYTES },
+        }),
+      }));
+      einlass = require("../handle-enqueue").handleEnqueue;
+    });
+    jest.dontMock("../upload");
+    const res = makeRes();
+
+    await einlass({ method: "POST", headers: { "content-type": "multipart/form-data; boundary=x" } }, res, SECRETS);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  test("ein Eingabefehler der Rumpf-Verarbeitung (4xx) bekommt seinen Status — und loest keine Meldung aus", async () => {
+    /* Weder JSON noch Multipart: Die Rumpf-Verarbeitung wirft 400. Der
+       Fangblock gibt den Status weiter; "Analyse gescheitert" meldet er nur
+       bei Serverfehlern (5xx), sonst koennte jeder von aussen Nachrichten
+       ausloesen. */
+    const res = makeRes();
+
+    await handleEnqueue({ method: "POST", headers: { "content-type": "text/plain" }, body: "x" }, res, SECRETS);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Enqueue failed", code: "unsupported_content_type" });
+    expect(jobs.meldeGescheiterteAnalyse).not.toHaveBeenCalled();
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+  });
+});

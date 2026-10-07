@@ -34,7 +34,8 @@ const { loggeMinorSafety } = require("./job-helfer");
 /* Die beiden Analyse-Wege liegen in einer eigenen Datei — was hier bleibt, ist
    die Annahme des Auftrags und das Wegschreiben des Ergebnisses. */
 const { runPipeline } = require("./job-pipelines");
-const { incrementTotals, releaseHourlySlot, zaehlerNachtragen } = require("./counter");
+const { incrementTotals, zaehlerNachtragen } = require("./counter");
+const { belegtesFreigeben } = require("./ruecknahme");
 const { getJob, claimJob, ergebnisSpeichern, ersatzErgebnisSpeichern } = require("./jobs");
 const { isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { geltendeWerte } = require("./betriebsprofil");
@@ -157,8 +158,7 @@ async function handleProcessJob(req, res) {
     }
     /* BIZ-001: nur freigeben, wenn DIESER Aufruf den Job wirklich verlassen hat
        (sonst Doppel-Freigabe, falls der Reaper parallel war). */
-    await releaseHourlySlot(job.zaehlerStempel).catch(() => {});
-    await deleteImage(job.imagePath);
+    await belegtesFreigeben(job);
     console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
     res.status(200).json({ ok: false, reason: "abandoned" });
     return;

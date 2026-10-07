@@ -117,8 +117,10 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    genau dieses Auftrags (die Auftragsnummer allein genügt nicht) und nur auf
    einen noch wartenden Auftrag; was in Arbeit oder fertig ist, bleibt
    unberührt. Er kann nichts, was der Aufräumdienst nach der Karenz nicht
-   ohnehin täte — Auftrag verwerfen, Platz im Stundenfenster zurückgeben, Foto
-   löschen —, nur früher. Seine Warnzeile trägt weder Auftragsnummer noch
+   ohnehin täte — Auftrag verwerfen, Foto löschen, Platz im Stundenfenster
+   zurückgeben —, nur früher. Das Foto wird zuerst gelöscht; auf die Rückgabe
+   des Platzes wartet der Weg höchstens fünf Sekunden (hängt der Zähler unter
+   Andrang, bleibt so kein verworfenes Foto liegen). Seine Warnzeile trägt weder Auftragsnummer noch
    Fehlertext (`handle-job-status-abmelden.test.js`).
 6. **Durchsatz-Deckel liegt extern.** Mistral-Tier T1 = 0,25 req/s ≈ 7,5
    Analysen/min — die reale Bremse bei Stoßlast. *Status:* bekannt, mit

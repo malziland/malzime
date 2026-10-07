@@ -181,7 +181,9 @@ ZEILEN_GRENZEN = {
     "functions/src/warteschlangen-rechnung.js": 91,
     "functions/src/analyse-ausgang.js": 83,
     "functions/src/oeffentliche-huelle.js": 57,
-    "functions/src/ruecknahme.js": 45,
+    # 07.10.2026 (Pruefrunde): +35 fuer "erst das Foto" und das begrenzte Warten
+    # auf die Freigabe des Platzes, samt Begruendung.
+    "functions/src/ruecknahme.js": 80,
     "functions/src/index.js": 385,
     "functions/src/handle-reap.js": 357,
     "functions/src/handle-job-status.js": 354,

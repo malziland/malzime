@@ -7,7 +7,11 @@
    Abwarten, jede mit etwas anderer Reihenfolge von "Platz zurueckgeben" und
    "Foto loeschen". Eine verlorene Freigabe haelt einen Platz bis zu 60 Minuten
    belegt, ohne Signal. Jetzt gibt es `belegtesFreigeben` (ruecknahme.js): erst
-   der Platz, dann das Foto, beides abgewartet, wirft nie.
+   das Foto, dann der Platz, beides abgewartet, wirft nie.
+   ERST DAS FOTO (07.10.2026): Stand die Freigabe des Platzes vorn und hing
+   sie, blieb das Foto eines schon verworfenen Auftrags bis zur
+   2-Stunden-Loeschung liegen. Auf den Platz wird deshalb auch nur begrenzt
+   gewartet.
 
    Zwei Pruefungen:
      1. am Quelltext: Ausserhalb der Hilfe ruft niemand die Zaehler-Funktion
@@ -111,10 +115,10 @@ describe("die Hilfe selbst", () => {
     jest.dontMock("../queue-storage");
   });
 
-  test("erst der Platz, dann das Foto — beides ist durch, wenn sie zurueckkehrt", async () => {
+  test("erst das Foto, dann der Platz — beides ist durch, wenn sie zurueckkehrt", async () => {
     const geloescht = await belegtesFreigeben({ zaehlerStempel: 4711.5, imagePath: "queue-uploads/x.jpg" });
 
-    expect(ablauf).toEqual(["platz", "foto"]);
+    expect(ablauf).toEqual(["foto", "platz"]);
     expect(counter.releaseHourlySlot).toHaveBeenCalledWith(4711.5);
     expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/x.jpg");
     expect(geloescht).toBe(true);
@@ -132,5 +136,63 @@ describe("die Hilfe selbst", () => {
     storage.deleteImage.mockResolvedValue(false);
 
     expect(await belegtesFreigeben({ zaehlerStempel: 1, imagePath: "queue-uploads/x.jpg" })).toBe(false);
+  });
+
+  test("haengt die Freigabe des Platzes, ist das Foto trotzdem sofort geloescht", async () => {
+    let freigabeFertig;
+    counter.releaseHourlySlot.mockImplementation(() => new Promise((fertig) => (freigabeFertig = fertig)));
+    jest.useFakeTimers();
+    try {
+      let zurueck = null;
+      const lauf = belegtesFreigeben({ zaehlerStempel: 7, imagePath: "queue-uploads/y.jpg" }).then((wert) => {
+        zurueck = wert;
+      });
+      await jest.advanceTimersByTimeAsync(0);
+      /* Das Foto ist weg, obwohl die Freigabe noch haengt. */
+      expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/y.jpg");
+      expect(ablauf).toEqual(["foto"]);
+      expect(zurueck).toBeNull();
+      freigabeFertig();
+      await lauf;
+      expect(zurueck).toBe(true);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test("auf eine haengende Freigabe wartet die Hilfe hoechstens fuenf Sekunden — und sagt es", async () => {
+    const { _FREIGABE_WARTEN_HOECHSTENS_MS } = require("../ruecknahme");
+    expect(_FREIGABE_WARTEN_HOECHSTENS_MS).toBe(5000);
+    counter.releaseHourlySlot.mockImplementation(() => new Promise(() => {}));
+    const warnungen = [];
+    jest.spyOn(console, "warn").mockImplementation((zeile) => warnungen.push(String(zeile)));
+    jest.useFakeTimers();
+    try {
+      let fertig = false;
+      const lauf = belegtesFreigeben({ zaehlerStempel: 7, imagePath: "queue-uploads/y.jpg" }).then((wert) => {
+        fertig = wert;
+      });
+      await jest.advanceTimersByTimeAsync(4900);
+      expect(fertig).toBe(false);
+      await jest.advanceTimersByTimeAsync(200);
+      await lauf;
+      expect(fertig).toBe(true);
+      expect(warnungen).toHaveLength(1);
+      expect(JSON.parse(warnungen[0])).toEqual({ severity: "WARNING", warning: "release-slot-nicht-abgewartet" });
+    } finally {
+      jest.useRealTimers();
+      console.warn.mockRestore();
+    }
+  });
+
+  test("kommt die Freigabe rechtzeitig, gibt es keine Warnung (Erfolgsweg)", async () => {
+    const warnungen = [];
+    jest.spyOn(console, "warn").mockImplementation((zeile) => warnungen.push(String(zeile)));
+    try {
+      await belegtesFreigeben({ zaehlerStempel: 7, imagePath: "queue-uploads/y.jpg" });
+      expect(warnungen).toEqual([]);
+    } finally {
+      console.warn.mockRestore();
+    }
   });
 });

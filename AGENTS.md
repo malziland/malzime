@@ -107,7 +107,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   job-helfer.js      Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung)
   handle-job-status.js   Queue-Polling (GET): Status, Warteschlangen-Position, ETA, Ergebnis; jeder Poll ist Liveness-Herzschlag. Abmelden (DELETE): verwirft einen noch wartenden Auftrag, nur mit Abhol-Ticket
   handle-reap.js     Queue-Reaper (geplant, Minutentakt): markiert verlassene Jobs als abandoned, gibt ihren Platz frei, loescht nach den Fristen
-  ruecknahme.js      Zurueckgeben, was ein nie analysierter Auftrag belegt: Platz im Stundenfenster freigeben, Foto loeschen — die eine Stelle dafuer, abgewartet
+  ruecknahme.js      Zurueckgeben, was ein nie analysierter Auftrag belegt: erst das Foto loeschen, dann den Platz im Stundenfenster freigeben — die eine Stelle dafuer, abgewartet (auf den Platz hoechstens fuenf Sekunden)
   jobs.js            Queue-Job-Lebenszyklus in Firestore (createJob/claimJob/completeJob/failJob/getQueuePosition/touchJob/abandonJob)
   analyse-ausgang.js  Welche Fehlermeldung ein Endzustand eines Auftrags zeigt, und die eine Fehlerzeile dazu („ein Alarm je gescheiterter Analyse“)
   warteschlangen-rechnung.js  Die eine Rechnung fuer Einlassgrenze und Wartezeit-Ansage: die engere von zwei Bremsen (Parallelitaet, Rate)

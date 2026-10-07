@@ -7,6 +7,9 @@
  * den Stand seines Jobs ab und erhält: Status, Warteschlangen-Position,
  * grobe ETA und — sobald fertig — das Ergebnis.
  *
+ * DELETE /job-status?jobId=…&token=… meldet einen noch WARTENDEN Job ab, den
+ * der Browser nicht mehr abholt (siehe verwerfeAufWunsch).
+ *
  * Kein IP-Rate-Limit: Der Endpoint wird konstruktionsbedingt im 2-Sekunden-
  * Takt gepollt; der Upload-Rate-Limiter (für /enqueue) würde legitime
  * Workshop-Klassen hinter einer geteilten Schul-IP sofort aussperren. Schutz
@@ -19,8 +22,10 @@ const { randomUUID } = require("crypto");
 const { geltendeWerte } = require("./betriebsprofil");
 const { dauerJeAnalyse } = require("./durchsatz");
 const { getFeatureFlags } = require("./feature-flags");
-const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
+const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered, abandonJob } = require("./jobs");
 const { safeCompare, sha256Hex } = require("./auth");
+const { releaseHourlySlot } = require("./counter");
+const { deleteImage } = require("./queue-storage");
 
 /* Firestore-Auto-IDs: genau 20 Zeichen aus [A-Za-z0-9] (jobs.js:58 nutzt
    `jobsRef().doc()` ohne eigenen Namen). Bewusst eng gefasst — alles, was nicht
@@ -64,8 +69,50 @@ async function isGemesseneDauerAn() {
   }
 }
 
+/* PRIV-2026-10-03-57: Der Browser meldet einen Job ab, den er nicht mehr
+   abholt — jemand hat ein anderes Foto gewählt. Ohne Abmeldung liefe die
+   Analyse des verworfenen Fotos trotzdem (ein KI-Aufruf, ein Platz im
+   Stundenkontingent), bis die Karenz des Aufräumdienstes greift.
+
+   Zwei Grenzen, beide Pflicht:
+   - Nur mit dem Abhol-Ticket des Jobs (PRIV-003). Die Job-Nummer allein
+     genügt nicht — sonst könnte, wer eine Nummer kennt, fremde Aufträge
+     abräumen.
+   - Nur ein noch WARTENDER Job. Was schon in Arbeit oder fertig ist, bleibt
+     unberührt (`abandonJob` prüft das in einer Transaktion).
+
+   Danach dieselben Schritte wie im Aufräumdienst (handle-reap.js): Platz im
+   Stundenkontingent zurückgeben, Bild löschen. Der Aufrufer wertet die
+   Antwort nicht aus; scheitert etwas, räumt der Aufräumdienst wie bisher. */
+async function verwerfeAufWunsch(job, token, res) {
+  if (!job.resultToken || !safeCompare(token, job.resultToken)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  let verworfen = false;
+  try {
+    if (job.status === "queued" && (await abandonJob(job.id))) {
+      verworfen = true;
+      await releaseHourlySlot(job.zaehlerStempel);
+      await deleteImage(job.imagePath);
+    }
+  } catch (err) {
+    /* Ohne jobId und ohne Fehlertext (wie in handle-reap.js): Ein
+       Firestore-Fehlertext kann den Dokumentpfad samt jobId enthalten. */
+    console.log(
+      JSON.stringify({
+        severity: "WARNING",
+        warning: "job-abmelden-fehlgeschlagen",
+        code: (err && err.code) || null,
+        art: (err && err.name) || null,
+      })
+    );
+  }
+  res.status(200).json({ verworfen });
+}
+
 async function handleJobStatus(req, res) {
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "DELETE") {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
@@ -97,6 +144,11 @@ async function handleJobStatus(req, res) {
   let job = await getJob(jobId);
   if (!job) {
     res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  if (req.method === "DELETE") {
+    await verwerfeAufWunsch(job, token, res);
     return;
   }
 

@@ -149,10 +149,17 @@ const POLL_TIMEOUT_MS = 30000;
    `resp.json()` nie und die Warteschleife friert lautlos ein.
    Jetzt laeuft der Timer weiter, bis der Rumpf gelesen ist: `fetchWithTimeout`
    liefert die Antwort samt einer `jsonMitTimeout()`-Methode, die den Abbruch
-   mit abdeckt. */
-function fetchWithTimeout(url, options, timeoutMs) {
+   mit abdeckt.
+   `abbruch` (wahlfrei): ein Abbruch-Schalter des Aufrufers. Loest er aus,
+   endet auch dieser Aufruf — getrennt vom Zeitlimit, damit der Aufrufer
+   beides auseinanderhalten kann. */
+function fetchWithTimeout(url, options, timeoutMs, abbruch) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (abbruch) {
+    if (abbruch.signal.aborted) controller.abort();
+    else abbruch.signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
   return fetch(url, { ...options, signal: controller.signal }).then(
     (resp) => {
       const roh = typeof resp.json === "function" ? resp.json.bind(resp) : null;
@@ -170,6 +177,26 @@ function fetchWithTimeout(url, options, timeoutMs) {
       throw err;
     }
   );
+}
+
+/* PRIV-2026-10-03-57: Meldet dem Server einen Auftrag ab, den dieser Tab
+   nicht mehr abholt (ein anderes Foto wurde gewaehlt). Wartet der Auftrag
+   noch, verwirft ihn der Server sofort: kein KI-Aufruf, der Platz im
+   Stundenkontingent wird frei, das Bild geloescht. Laeuft er schon, aendert
+   die Abmeldung nichts. Ohne Abhol-Ticket nimmt der Server sie nicht an.
+   Bestmoeglich und still: Scheitert sie, raeumt der Server den Auftrag wie
+   bisher nach seiner Karenz selbst ab. */
+function meldeAuftragAb(jobId, resultToken) {
+  if (!jobId || !resultToken) return;
+  try {
+    fetch(`${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}&token=${encodeURIComponent(resultToken)}`, {
+      method: "DELETE",
+      cache: "no-store",
+      keepalive: true,
+    }).catch(() => {});
+  } catch (_) {
+    /* Abmelden ist ein Zusatz — nie ein Grund fuer eine Fehlermeldung. */
+  }
 }
 
 /**
@@ -588,6 +615,10 @@ async function analyzeImageQueued() {
   const traceId = generateTraceId();
   state.lastTraceId = traceId;
   const timings = {};
+  /* PRIV-2026-10-03-57: Der Abbruch-Schalter dieses Durchgangs. Solange der
+     Upload laeuft, steht er in `state.currentAbortController`; die Wahl eines
+     anderen Fotos (app.js, demo.js) loest ihn aus und beendet den Upload. */
+  const abbruch = new AbortController();
 
   setStatus("");
   /* v3.0: Reste eines vorigen Live-Erlebnisses (Karte, Verdeckungen) räumen —
@@ -682,6 +713,7 @@ async function analyzeImageQueued() {
 
     /* ── Job einreihen ── */
     const enqueueStart = Date.now();
+    state.currentAbortController = abbruch;
     const enqueueResp = await fetchWithTimeout(
       ENQUEUE_URL,
       {
@@ -700,10 +732,25 @@ async function analyzeImageQueued() {
           traceId,
         }),
       },
-      ENQUEUE_TIMEOUT_MS
+      ENQUEUE_TIMEOUT_MS,
+      abbruch
     );
     timings.enqueueMs = Date.now() - enqueueStart;
-    if (state.requestId !== myId) return;
+    /* Der Upload ist durch — ab hier gibt es nichts mehr abzubrechen. */
+    if (state.currentAbortController === abbruch) state.currentAbortController = null;
+    if (state.requestId !== myId) {
+      /* Abgeloest, aber der Server hat das Foto schon angenommen: Den Auftrag
+         holt niemand mehr ab — abmelden statt ihn analysieren zu lassen. */
+      if (enqueueResp.ok) {
+        try {
+          const verwaist = await enqueueResp.jsonMitTimeout();
+          meldeAuftragAb(verwaist && verwaist.jobId, verwaist && verwaist.resultToken);
+        } catch (_) {
+          /* Antwort nicht lesbar — der Server raeumt nach seiner Karenz. */
+        }
+      }
+      return;
+    }
 
     if (!enqueueResp.ok) {
       stopScanAnim();
@@ -781,7 +828,15 @@ async function analyzeImageQueued() {
        liveErlaubt: nur hier, beim frischen Upload, darf die Live-Anzeige
        mittippen (v3.0) — die Wiederaufnahme unten bleibt beim heutigen Bild. */
     const outcome = await pollJob(jobId, myId, resultToken, false, true);
-    if (state.requestId !== myId) return;
+    if (state.requestId !== myId) {
+      /* Abgeloest waehrend des Wartens. Gehoert der gemerkte Auftrag des Tabs
+         nicht mehr zu diesem Durchgang, hat ein anderes Foto uebernommen —
+         dann abmelden. Bei der Wiederaufnahme DESSELBEN Auftrags (Tab kam aus
+         dem Hintergrund zurueck) bleibt die Nummer gemerkt, und nichts wird
+         abgemeldet. */
+      if (getStoredJobId() !== jobId) meldeAuftragAb(jobId, resultToken);
+      return;
+    }
 
     stopScanAnim();
     textSetzen(elements.scanText, "");
@@ -839,6 +894,10 @@ async function analyzeImageQueued() {
     await renderQueueResult(outcome.result, myId, traceId, timings, prepared);
   } catch (err) {
     if (state.requestId !== myId) return;
+    /* PRIV-2026-10-03-57: Der Upload wurde beendet, weil ein anderes Foto
+       gewaehlt wurde. Das ist kein Fehler — keine Meldung, kein Eintrag in
+       der Fehlererfassung; der Bildschirm gehoert schon der neuen Auswahl. */
+    if (abbruch.signal.aborted) return;
     /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
     liveAbbrechenWegenFehler();
     stopScanAnim();
@@ -875,6 +934,8 @@ async function analyzeImageQueued() {
     });
   } finally {
     releaseWakeLock();
+    /* Der Schalter gilt nur, solange dieser Durchgang hochlaedt. */
+    if (state.currentAbortController === abbruch) state.currentAbortController = null;
     if (state.requestId === myId) {
       state.isAnalyzing = false;
       state.uploadLaeuft = false;

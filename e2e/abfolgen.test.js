@@ -271,6 +271,90 @@ test.describe("Zweites Foto, während das erste noch aufbereitet wird", () => {
   });
 });
 
+/* ── PRIV-2026-10-03-57: Ein verworfenes Foto wird nicht weiter verarbeitet ── */
+
+test.describe("Anderes Foto gewählt, während das erste unterwegs ist", () => {
+  test("während des Hochladens: der erste Upload wird abgebrochen, ohne Fehlermeldung", async ({ page, context }) => {
+    test.setTimeout(60000);
+    await grundrouten(page, context);
+    const einreihungen = [];
+    const abgebrochen = [];
+    let ersteFreigeben;
+    const ersteHaengt = new Promise((weiter) => (ersteFreigeben = weiter));
+    page.on("requestfailed", (anfrage) => {
+      if (anfrage.url().includes("/api/enqueue")) abgebrochen.push(anfrage.failure()?.errorText || "");
+    });
+    await page.route("**/api/enqueue", async (r) => {
+      einreihungen.push(r.request());
+      if (einreihungen.length === 1) {
+        /* Langsamer Upload: Die erste Anfrage bekommt bis zum Testende keine Antwort. */
+        await ersteHaengt;
+        return r.abort().catch(() => {});
+      }
+      return json(r, 200, { jobId: "job-2", resultToken: "tok-2" });
+    });
+    const abfragen = [];
+    await page.route("**/api/job-status*", (r) => {
+      abfragen.push(`${r.request().method()} ${new URL(r.request().url()).searchParams.get("jobId")}`);
+      return json(r, 200, { status: "done", result: ERGEBNIS });
+    });
+    await seiteOeffnen(page);
+    await fotoWaehlen(page, "falsches-foto.jpg");
+    await expect.poll(() => einreihungen.length, { timeout: 15000 }).toBe(1);
+    await fotoWaehlen(page, "richtiges-foto.jpg");
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 20000 });
+
+    /* Der Browser hat den ersten Upload selbst beendet, als das zweite Foto kam. */
+    expect(abgebrochen).toHaveLength(1);
+    expect(einreihungen).toHaveLength(2);
+    /* Abgefragt wird nur der Auftrag des zweiten Fotos. */
+    expect(new Set(abfragen)).toEqual(new Set(["GET job-2"]));
+    /* Der Abbruch ist kein Fehler. */
+    await expect(page.locator("#status")).toHaveText("");
+    ersteFreigeben();
+  });
+
+  test("nach dem Einreihen: der Browser meldet den verworfenen Auftrag mit seinem Abhol-Ticket ab", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60000);
+    await grundrouten(page, context);
+    let einreihungen = 0;
+    await page.route("**/api/enqueue", (r) => {
+      einreihungen += 1;
+      return json(r, 200, { jobId: `job-${einreihungen}`, resultToken: `tok-${einreihungen}` });
+    });
+    const abmeldungen = [];
+    const abfragen = [];
+    await page.route("**/api/job-status*", (r) => {
+      const adresse = new URL(r.request().url());
+      const auftrag = adresse.searchParams.get("jobId");
+      if (r.request().method() === "DELETE") {
+        abmeldungen.push(`${auftrag} ${adresse.searchParams.get("token")}`);
+        return json(r, 200, { verworfen: true });
+      }
+      abfragen.push(auftrag);
+      /* Der erste Auftrag wartet in der Schlange, der zweite ist sofort fertig. */
+      if (auftrag === "job-1") return json(r, 200, { status: "queued", position: 3, etaSeconds: 60 });
+      return json(r, 200, { status: "done", result: ERGEBNIS });
+    });
+    await seiteOeffnen(page);
+    await fotoWaehlen(page, "falsches-foto.jpg");
+    /* Erfolgsweg: Solange niemand ein anderes Foto wählt, wird abgefragt und nichts abgemeldet. */
+    await expect.poll(() => abfragen.filter((a) => a === "job-1").length, { timeout: 15000 }).toBeGreaterThan(0);
+    expect(abmeldungen).toEqual([]);
+
+    await fotoWaehlen(page, "richtiges-foto.jpg");
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 20000 });
+    await expect.poll(() => abmeldungen.length, { timeout: 10000 }).toBe(1);
+    expect(abmeldungen).toEqual(["job-1 tok-1"]);
+    /* Der Auftrag des zweiten Fotos bleibt unangetastet. */
+    await page.waitForTimeout(2500);
+    expect(abmeldungen).toEqual(["job-1 tok-1"]);
+  });
+});
+
 test.describe("Tab kurz weg und zurück mitten im Lauf", () => {
   test.use({ reducedMotion: "reduce" });
 

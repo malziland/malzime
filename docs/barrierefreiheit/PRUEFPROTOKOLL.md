@@ -40,6 +40,12 @@ Datenschutz (`/datenschutz`), Impressum (`/impressum`), Nutzungsbedingungen
 englischen Fassungen (`/en/privacy`, `/en/legal-notice`, `/en/terms`,
 `/en/accessibility`).
 
+**Seit 23. August 2026 gibt es zwei weitere Seiten** (`/kurzvorstellung`,
+`/en/introduction`). Die maschinellen Messungen erfassen sie — der Test liest seine
+Seitenliste aus dem Dateisystem (`e2e/barrierefreiheit-protokoll.test.js`, `alleSeiten`).
+In den Handprüfungen dieses Protokolls kommen sie nicht vor (nachgetragen am
+7. Oktober 2026, ohne neue Prüfung).
+
 > **DOC-2026-08-20-31:** Hier standen fünf Seiten — der Umfang der Erstprüfung vom
 > 17.08. —, während weiter unten im selben Dokument bereits von „allen zehn Seiten"
 > die Rede war. Ein extern angebotener Anhang mit zwei Prüfumfängen ist nicht

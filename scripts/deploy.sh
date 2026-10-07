@@ -671,26 +671,38 @@ else
   # trotzdem genau. (Befund 31.08.2026, unvorbelastetes Review.)
   echo "— Trockenlauf (prueft, ohne auszuliefern)"
   DRY_START=$(date +%s)
+  # OPS-2026-10-04-12: Jeder Lauf schreibt seine zwei Protokolle in einen
+  # EIGENEN Ordner. Mit festen Dateinamen ueberschrieb ein zweiter Lauf (ein
+  # Probelauf, ein Test) das Protokoll, auf das die Fehlermeldung des ersten
+  # gerade verweist. Scheitert ein Trockenlauf, bleibt der Ordner liegen — die
+  # Meldung nennt ihn; geht alles durch, wird er entfernt.
+  if ! DRY_ORDNER=$(mktemp -d "${TMPDIR:-/tmp}/malzime-trockenlauf.XXXXXX" 2>/dev/null) || [ ! -d "$DRY_ORDNER" ]; then
+    echo "FEHLER: Fuer die Protokolle des Trockenlaufs liess sich kein Ordner anlegen (unter ${TMPDIR:-/tmp})." >&2
+    echo "        Ohne Protokoll liesse sich ein Fehlschlag nicht nachlesen — nichts wurde ausgeliefert." >&2
+    echo "        Notschalter: SKIP_DRYRUN=1" >&2
+    exit 1
+  fi
 
   if [ "${SKIP_FIRESTORE:-0}" != "1" ]; then
-    if ! firebase deploy --only firestore:malzime-eu --dry-run >/tmp/malzime-dry-firestore.log 2>&1; then
+    if ! firebase deploy --only firestore:malzime-eu --dry-run >"$DRY_ORDNER/firestore.log" 2>&1; then
       echo "FEHLER: Der Trockenlauf fuer Firestore ist gescheitert — nichts wurde ausgeliefert." >&2
-      tail -15 /tmp/malzime-dry-firestore.log | sed 's/^/    /' >&2
-      echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-firestore.log" >&2
+      tail -15 "$DRY_ORDNER/firestore.log" | sed 's/^/    /' >&2
+      echo "        Das vollstaendige Protokoll: $DRY_ORDNER/firestore.log" >&2
       echo "        Notschalter: SKIP_DRYRUN=1" >&2
       exit 1
     fi
     echo "  ok    Firestore-Regeln und Indizes"
   fi
 
-  if ! firebase deploy --only "$TARGET" --dry-run >/tmp/malzime-dry-rest.log 2>&1; then
+  if ! firebase deploy --only "$TARGET" --dry-run >"$DRY_ORDNER/rest.log" 2>&1; then
     echo "FEHLER: Der Trockenlauf fuer $TARGET ist gescheitert — nichts wurde ausgeliefert." >&2
-    tail -15 /tmp/malzime-dry-rest.log | sed 's/^/    /' >&2
-    echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-rest.log" >&2
+    tail -15 "$DRY_ORDNER/rest.log" | sed 's/^/    /' >&2
+    echo "        Das vollstaendige Protokoll: $DRY_ORDNER/rest.log" >&2
     echo "        Notschalter: SKIP_DRYRUN=1" >&2
     exit 1
   fi
   echo "  ok    $TARGET"
+  rm -rf "$DRY_ORDNER"
   echo "Trockenlauf gruen in $(( $(date +%s) - DRY_START )) s — die Auslieferung sollte durchgehen."
 fi
 

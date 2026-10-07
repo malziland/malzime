@@ -1023,6 +1023,70 @@ describe("deploy.sh — der Probelauf", () => {
    Fingerabdruck des Server-Codes (public/build-info.json) geht mit der Website
    hinaus; ein reiner Server-Deploy liesse die Seite weiter den vorigen
    Server-Stand ausweisen. */
+/* OPS-2026-10-04-12: Der Trockenlauf schrieb seine zwei Protokolle in feste
+   Dateien im System-Temp. Jeder Lauf ueberschrieb sie — auch ein Probelauf oder
+   diese Tests das Protokoll, auf das die Fehlermeldung eines anderen Laufs
+   gerade verweist. Jetzt hat jeder Lauf seinen eigenen Ordner. */
+describe("deploy.sh — die Protokolle des Trockenlaufs gehoeren dem Lauf", () => {
+  let ablage;
+  beforeEach(() => {
+    ablage = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-deploy-trockenlauf-"));
+  });
+  afterEach(() => {
+    fs.rmSync(ablage, { recursive: true, force: true });
+    aufraeumen();
+  });
+
+  const protokollPfad = (ausgabe) => (ausgabe.match(/Das vollstaendige Protokoll: (\S+)/) || [])[1];
+  const ordnerDerLaeufe = () => fs.readdirSync(ablage).filter((name) => name.startsWith("malzime-trockenlauf."));
+
+  test("das Skript nennt keine feste Datei im System-Temp", () => {
+    const skript = fs
+      .readFileSync(path.join(WURZEL, "scripts", "deploy.sh"), "utf8")
+      .split("\n")
+      .filter((zeile) => !/^\s*#/.test(zeile))
+      .join("\n");
+    expect(skript).not.toMatch(/\/tmp\/[A-Za-z0-9_.-]+/);
+  });
+
+  test("zwei gescheiterte Probelaeufe: jeder nennt sein eigenes Protokoll, keiner ueberschreibt das des anderen", () => {
+    /* Lauf A scheitert am Trockenlauf fuer Firestore. Lauf B besteht ihn und
+       scheitert erst am zweiten — er schreibt also AUCH ein Firestore-Protokoll,
+       mit anderem Inhalt. */
+    const a = deploy({ PROBELAUF: "1", TMPDIR: ablage, ATTRAPPE_DRYRUN_FIRESTORE_ROT: "1" });
+    expect(a.code).not.toBe(0);
+    const pfadA = protokollPfad(a.ausgabe);
+    expect(pfadA).toBeDefined();
+    const inhaltA = fs.readFileSync(pfadA, "utf8");
+    expect(inhaltA).toMatch(/Trockenlauf Firestore scheitert/);
+
+    const b = deploy({ PROBELAUF: "1", TMPDIR: ablage, ATTRAPPE_DRYRUN_ZIEL_ROT: "1" });
+    expect(b.code).not.toBe(0);
+    const pfadB = protokollPfad(b.ausgabe);
+    expect(fs.readFileSync(pfadB, "utf8")).toMatch(/Trockenlauf Ziel scheitert/);
+
+    /* Jeder Lauf in seinem eigenen Ordner, beide unter der Ablage des Systems. */
+    expect(path.dirname(pfadA)).not.toBe(path.dirname(pfadB));
+    expect(ordnerDerLaeufe()).toHaveLength(2);
+    /* Das Protokoll, auf das die Meldung von A verweist, steht noch so da. */
+    expect(fs.readFileSync(pfadA, "utf8")).toBe(inhaltA);
+  });
+
+  test("ein gruener Trockenlauf hinterlaesst keinen Ordner", () => {
+    const r = deploy({ PROBELAUF: "1", TMPDIR: ablage });
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/Trockenlauf gruen/);
+    expect(ordnerDerLaeufe()).toEqual([]);
+  });
+
+  test("laesst sich kein Ordner anlegen, haelt der Lauf an — statt ohne Protokoll weiterzumachen", () => {
+    const r = deployMitProtokoll({ PROBELAUF: "1", TMPDIR: path.join(ablage, "gibt-es-nicht") });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/FEHLER: Fuer die Protokolle des Trockenlaufs liess sich kein Ordner anlegen/);
+    expect(r.aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"))).toEqual([]);
+  });
+});
+
 describe("deploy.sh — das Deploy-Ziel", () => {
   afterEach(aufraeumen);
 

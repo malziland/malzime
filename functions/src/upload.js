@@ -43,6 +43,17 @@ function parseMultipart(req) {
       file.on("end", () => {
         fileBuffer = Buffer.concat(chunks);
       });
+      /* Reisst das Formular mitten in der Datei ab, meldet die Bibliothek den
+         Fehler auch am Datei-Strom. Ohne Abnehmer hier waere das eine
+         ungefangene Ausnahme, und die Laufzeit beendete die ganze Instanz —
+         samt allen Uploads, die gerade ueber sie laufen. Abgelehnt wird wie
+         beim Formular-Fehler unten. */
+      file.on("error", (err) => {
+        const error = new Error((err && err.message) || "Multipart error");
+        error.status = 400;
+        error.code = "bad_multipart";
+        reject(error);
+      });
     });
 
     busboy.on("field", (name, val) => {

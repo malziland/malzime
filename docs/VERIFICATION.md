@@ -13,9 +13,9 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 
 | Anforderung | Nachweisweg | Letztes Ergebnis |
 |---|---|---|
-| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 5953/5953 grün — `scripts/pruefstand.sh`, Commit 1ec6ba4, 2026-10-06 |
-| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 927/927 grün — `scripts/pruefstand.sh`, Commit 1ec6ba4, 2026-10-06 |
-| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 388/388 grün — `scripts/pruefstand.sh`, Commit 1ec6ba4, 2026-10-06 |
+| Backend-Unit-Tests | CI-Job `test-backend` (jeder Push/PR); lokal `npm test --prefix functions` | ✅ 6744/6744 grün — `scripts/pruefstand.sh`, Commit e8f9fa8, 2026-10-08 |
+| Frontend-Unit-Tests | CI-Job `test-frontend`; lokal `npm run test:frontend` | ✅ 1088/1088 grün — `scripts/pruefstand.sh`, Commit e8f9fa8, 2026-10-08 |
+| E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI-Job `test-e2e` (Playwright, Container-Image = Paketversion); lokal `npm run test:e2e` | ✅ 431/431 grün — `scripts/pruefstand.sh`, Commit e8f9fa8, 2026-10-08 |
 | Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — 2026-08-10 |
 | Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29562535095, 2026-07-17 |
 | Dependency-Audit | CI-Job `test-backend`: `node ../scripts/audit-gate.mjs functions .` (aus `functions/` heraus) — **beide** Abhängigkeitsbäume mit **allen** Abhängigkeiten einschließlich der Werkzeuge (Gate, bricht Build; High/Critical blockieren, Ausnahmen nur begründet **und mit Ablaufdatum** in `.github/audit-allowlist.json`). Bis 30.09.2026 lief das Gate mit `--omit=dev` und sah den Wurzelbaum, der nur aus Werkzeugen besteht, gar nicht | ✅ **0 Meldungen, Ausnahmeliste leer** — Gate-Lauf 2026-09-30 auf Zweig `sicherheit/abhaengigkeiten-libheif`; Gegenprobe: mit dem Wurzel-Lockfile vor #293 (undici 8.9.0) wird das Gate rot, das frühere Gate blieb dabei grün |

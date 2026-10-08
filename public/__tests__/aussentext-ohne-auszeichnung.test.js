@@ -6,15 +6,18 @@
  * Die Kontrolle verbotener Formulierungen (scripts/pruefungen/checks/
  * aussentext.py, Regeln in .pruefungen/aussentext.txt) liest den Quelltext
  * der Seiten. Steht mitten in der Wendung eine Auszeichnung — „verlässt
- * <strong>nie</strong> den Browser“, „verlässt **nie** den Browser“ —, sieht
- * sie zwischen den Wörtern Zeichen, die der Leser nicht sieht, und findet
+ * <strong>nie</strong> den Browser“, „verlässt **nie** den Browser“ —, sah
+ * sie zwischen den Wörtern Zeichen, die der Leser nicht sieht, und fand
  * nichts (Prüfrunde 07.10.2026). Gerade solche Zusagen werden gern betont.
+ * Seit 08.10.2026 liest die Kontrolle jede Zeile zusätzlich ohne Auszeichnung
+ * (an ihrer Quelle geändert); sie arbeitet aber weiter am Quelltext.
  *
- * Deshalb hier dieselben Regeln noch einmal, gegen den Text, WIE ER GELESEN
- * WIRD: je Textblock einer Seite (Absatz, Listenpunkt, Überschrift, Zelle)
- * ohne Auszeichnung; in den Markdown-Unterlagen je Absatz ohne Sternchen,
- * Unterstriche und Rückstriche. Über Blockgrenzen hinweg wird nicht gesucht —
- * zwei Listenpunkte sind kein Satz.
+ * Hier dieselben Regeln von der anderen Seite: gegen den Text, WIE DER
+ * BROWSER IHN ZEIGT — je Textblock einer Seite (Absatz, Listenpunkt,
+ * Überschrift, Zelle), aus dem aufgebauten Dokument gelesen; in den
+ * Markdown-Unterlagen je Absatz ohne Sternchen, Unterstriche und Rückstriche.
+ * Über Blockgrenzen hinweg wird nicht gesucht — zwei Listenpunkte sind kein
+ * Satz. Zwei Wege zum selben Ziel: Fällt einer aus, hält der andere.
  */
 import { describe, test, expect } from "vitest";
 import { readFileSync, readdirSync, existsSync } from "node:fs";

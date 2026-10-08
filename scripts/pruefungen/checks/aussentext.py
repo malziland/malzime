@@ -26,6 +26,7 @@ Gesucht wird in zwei Durchgaengen: Zeile fuer Zeile und, je Absatz, im Text ohne
 Zeilenumbrueche. Der zweite Durchgang findet, was im Fliesstext ueber einen Umbruch
 laeuft ("... des" am Zeilenende, "Betreibers ..." am naechsten Zeilenanfang).
 """
+import html
 import os
 import re
 import subprocess
@@ -83,6 +84,37 @@ HTML_BLOCK = re.compile(
     re.IGNORECASE,
 )
 MARKDOWN_ENDUNGEN = (".md", ".markdown", ".mdx")
+
+
+# TEST-2026-10-07-24 (08.10.2026): Beide Durchgaenge lesen den Quelltext. Steht mitten
+# in der Wendung eine Auszeichnung ("verlaesst <strong>nie</strong> den Browser",
+# "verlaesst **nie** den Browser") oder ein Zeichen in HTML-Schreibweise
+# ("verl&auml;sst", "den&nbsp;Browser"), sieht die Suche etwas, das der Leser nicht
+# sieht - und findet nichts. Gerade solche Zusagen werden gern betont. Deshalb wird
+# jede Zeile und jeder Absatz zusaetzlich so gelesen, wie er erscheint.
+AUSZEICHNUNG = re.compile(
+    r"</?(?:strong|em|b|i|u|s|mark|code|span|abbr|small|sub|sup|q|cite|a|kbd|var|del|ins)\b[^>]*>",
+    re.IGNORECASE,
+)
+ZEILENWECHSEL = re.compile(r"<br\s*/?>", re.IGNORECASE)
+MD_DOPPELT = re.compile(r"\*\*|__|`")
+MD_AUF = re.compile(r"(^|[\s(\[\"'\u201e\u201a])[*_](?=\S)")
+MD_ZU = re.compile(r"(?<=\S)[*_](?=[\s)\].,;:!?\"'\u201c\u201d\u2018\u2019]|$)")
+# Derselbe Kontrollsatz mit einer Hervorhebung mittendrin. Dient der Selbstpruefung
+# des Lesens ohne Auszeichnung.
+KONTROLLSATZ_BETONT = "Deine Position verlaesst <strong>nie</strong> den&nbsp;Browser."
+
+
+def gelesen(text):
+    """Der Text, wie er gelesen wird: ohne Auszeichnung (HTML im Fliesstext,
+    Sternchen, Unterstriche, Rueckstriche), Zeichen in HTML-Schreibweise aufgeloest.
+    Bloecke (Absatz, Listenpunkt, Zelle) bleiben stehen - sie trennen Saetze."""
+    t = ZEILENWECHSEL.sub(" ", text)
+    t = AUSZEICHNUNG.sub("", t)
+    t = html.unescape(t).replace("\u00a0", " ")
+    t = MD_DOPPELT.sub("", t)
+    t = MD_AUF.sub(r"\1", t)
+    return MD_ZU.sub("", t)
 
 
 def zeile_einordnen(zeile, markdown):
@@ -214,6 +246,16 @@ def positivkontrolle_umbruch(regeln):
     return True
 
 
+def positivkontrolle_betont(regeln):
+    """Auch das Lesen ohne Auszeichnung muss an einem bekannten Verstoss anschlagen:
+    Der betonte Kontrollsatz darf roh NICHT treffen und gelesen MUSS er treffen."""
+    for ausdruck, _, roh in regeln:
+        if roh == KONTROLLMUSTER:
+            return (not ausdruck.search(KONTROLLSATZ_BETONT)
+                    and bool(ausdruck.search(gelesen(KONTROLLSATZ_BETONT))))
+    return True
+
+
 def git_dateien(wurzel):
     """Alles, was im Repository landet: verfolgte Dateien PLUS noch nicht
     hinzugefuegte, die nicht ignoriert sind. Gibt None zurueck, wenn hier kein
@@ -286,7 +328,8 @@ def main():
         print("Keine Regeln geladen. Ohne Regeln keine Aussage, kein bestandener Test.")
         return 2
 
-    if not positivkontrolle(regeln) or not positivkontrolle_umbruch(regeln):
+    if not (positivkontrolle(regeln) and positivkontrolle_umbruch(regeln)
+            and positivkontrolle_betont(regeln)):
         print("FEHLER: Die Positivkontrolle schlaegt nicht an. Die Suche ist kaputt,")
         print("nicht der Text sauber. Ergebnis ist wertlos, bis das behoben ist.")
         return 2
@@ -302,14 +345,29 @@ def main():
             continue
         kurz = os.path.relpath(pfad, wurzel)
         in_datei = []
+        lesefassung = [gelesen(zeile) for zeile in zeilen]
         for nr, zeile in enumerate(zeilen, 1):
             for ausdruck, grund, _ in regeln:
                 treffer = ausdruck.search(zeile)
                 if treffer:
                     in_datei.append((kurz, nr, treffer.group(0), grund))
+                    continue
+                # Roh kein Treffer: dieselbe Zeile so lesen, wie sie erscheint.
+                if lesefassung[nr - 1] != zeile:
+                    treffer = ausdruck.search(lesefassung[nr - 1])
+                    if treffer:
+                        in_datei.append((kurz, nr, treffer.group(0)
+                                         + "  (ohne Auszeichnung gelesen)", grund))
         markdown = kurz.lower().endswith(MARKDOWN_ENDUNGEN)
+        ueber_umbruch = set()
         for nr, text, grund in umbruch_funde(zeilen, regeln, markdown):
+            ueber_umbruch.add((nr, grund))
             in_datei.append((kurz, nr, text + "  (ueber einen Zeilenumbruch)", grund))
+        for nr, text, grund in umbruch_funde(lesefassung, regeln, markdown):
+            if (nr, grund) in ueber_umbruch:
+                continue
+            in_datei.append((kurz, nr, text + "  (ueber einen Zeilenumbruch, ohne"
+                             " Auszeichnung gelesen)", grund))
         in_datei.sort(key=lambda fund: fund[1])
         funde.extend(in_datei)
 

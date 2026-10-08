@@ -148,8 +148,8 @@ functions/src/__tests__/mistral-zeitbudget.test.js
 functions/src/__tests__/mistral.test.js
 functions/src/__tests__/notify-riegel.test.js
 functions/src/__tests__/notify.test.js
-functions/src/__tests__/nur-git-bekannt-script.test.js
 functions/src/__tests__/nur-nachtrag-script.test.js
+functions/src/__tests__/nur-was-git-kennt.test.js
 functions/src/__tests__/oeffentliche-zahlen-gegen-satz.test.js
 functions/src/__tests__/ohne-einstellungssatz.test.js
 functions/src/__tests__/pipeline-vertrag-script.test.js

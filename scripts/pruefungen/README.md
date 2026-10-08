@@ -1,6 +1,5 @@
 # PRUEFUNGEN — vier Kontrollen statt vier Bitten
 
-
 > **Herkunft:** Kopie des Werkzeugkastens aus der Audit-Familie
 > (`~/.claude/skills/audit-familie/pruefungen`). **Bearbeitet wird die QUELLE, nie diese
 > Kopie** — danach neu einkopieren und mit `node scripts/pruefe-vendorierung.mjs --aktualisieren`
@@ -43,9 +42,18 @@ Listenpunkt und ein neuer HTML-Block beginnen einen eigenen. Zwei Listenpunkte o
 Tabellenzeilen sind kein Satz und werden nicht zusammengesetzt. Stern und Raute am
 Zeilenanfang gelten in Markdown als Listenpunkt und Ueberschrift, in allen anderen
 Dateien als Fortsetzung eines Kommentars.
+Jede Zeile und jeder Absatz wird zusaetzlich so gelesen, wie er erscheint: ohne
+Auszeichnung im Fliesstext (`<strong>`, `**`, `_`, Rueckstriche) und mit aufgeloesten
+Zeichen in HTML-Schreibweise (`&auml;`, `&nbsp;`). Eine gesperrte Wendung bleibt gesperrt,
+auch wenn ein Wort darin betont ist.
 
 **test-blind.py** findet Tests, die rechnerisch nicht rot werden koennen: ohne
 Zusicherung, uebersprungen, immer wahr. Setzt KERN 4 Frage 2 durch.
+
+**Alle vier Pruefungen lesen nur, was git kennt** (eingecheckt oder neu, nicht
+ausgenommen). Private Ordner, die `.gitignore` ausnimmt, gibt es in der Pipeline nicht -
+am Arbeitsrechner darf eine Pruefung fuer sie nicht rot werden. Ohne git (entpacktes
+Archiv) gilt der Dateibaum. Eine Huelle im Projekt braucht es dafuer nicht mehr.
 
 ## Aufruf
 

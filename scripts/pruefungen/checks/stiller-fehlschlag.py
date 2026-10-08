@@ -10,6 +10,7 @@ Exit 0 = sauber, Exit 1 = Fundstellen, Exit 2 = Aufrufproblem.
 """
 import os
 import re
+import subprocess
 import sys
 
 ENDUNGEN = (".sh", ".bash", ".zsh", ".yml", ".yaml")
@@ -80,13 +81,57 @@ EIGENER_FEHLER_EXIT = re.compile(r"^\s*exit\s+[1-9]", re.M)
 SHELL_ENDUNGEN = (".sh", ".bash", ".zsh")
 
 
-def dateien(wurzel):
+# TEST-2026-10-04-29 (an der Quelle seit 08.10.2026): Die Suche lief ueber den
+# Dateibaum und las damit auch, was git ausnimmt - private Berichte, Uebergaben,
+# Sicherungen. Am Arbeitsrechner wurde die Pruefung rot fuer etwas, das niemand
+# ausliefert; in der Pipeline gibt es diese Ordner nicht. Ein Projekt half sich mit
+# einer Huelle, die der Pruefung einen Spiegel vorsetzte. Jetzt fragt die Pruefung
+# git selbst, wie aussentext.py seit TEST-2026-08-12-29.
+def git_dateien(wurzel):
+    """Alles, was im Repository landet: verfolgte Dateien PLUS noch nicht
+    hinzugefuegte, die nicht ausgenommen sind - als Pfade relativ zu `wurzel`.
+    Gibt None zurueck, wenn hier kein Repository liegt, git fehlt oder git nichts
+    nennt (ein leeres Ergebnis ist zuerst ein Verdacht gegen das Messmittel) -
+    dann faellt die Suche auf den Dateibaum zurueck."""
+    try:
+        roh = subprocess.run(
+            ["git", "-C", wurzel, "ls-files", "--cached", "--others",
+             "--exclude-standard", "-z"],
+            capture_output=True, timeout=20,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if roh.returncode != 0:
+        return None
+    namen = [n for n in roh.stdout.decode("utf-8", "replace").split("\0") if n]
+    return namen or None
+
+
+def kandidaten(wurzel):
+    """Jede Datei unter `wurzel`, die zur Suchflaeche gehoeren kann: was git kennt,
+    ohne git der Dateibaum. Ordner aus UEBERSPRINGEN und Punkt-Ordner bleiben in
+    beiden Faellen aussen vor."""
+    bekannt = git_dateien(wurzel)
+    if bekannt is not None:
+        for rel in bekannt:
+            teile = rel.split("/")
+            if any(t in UEBERSPRINGEN or t.startswith(".") for t in teile[:-1]):
+                continue
+            pfad = os.path.join(wurzel, *teile)
+            if os.path.isfile(pfad):
+                yield pfad
+        return
     for ordner, unterordner, namen in os.walk(wurzel):
         unterordner[:] = [u for u in unterordner
                           if u not in UEBERSPRINGEN and not u.startswith(".")]
         for name in namen:
-            if name.lower().endswith(ENDUNGEN):
-                yield os.path.join(ordner, name)
+            yield os.path.join(ordner, name)
+
+
+def dateien(wurzel):
+    for pfad in kandidaten(wurzel):
+        if os.path.basename(pfad).lower().endswith(ENDUNGEN):
+            yield pfad
 
 
 def main():

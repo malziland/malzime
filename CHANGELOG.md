@@ -251,9 +251,10 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
 - **Die Kontrolle verbotener Formulierungen findet auch, was über einen
   Zeilenumbruch läuft.** Sie suchte Zeile für Zeile; drei Stellen blieben so
   unbemerkt und sind umformuliert. Zwei Listenpunkte oder zwei Tabellenzeilen
-  hält sie nicht für einen Satz. Ein Test liest dieselben Regeln zusätzlich
-  gegen den Text, wie er gelesen wird: Eine gesperrte Wendung bleibt gesperrt,
-  auch wenn ein Wort darin hervorgehoben ist.
+  hält sie nicht für einen Satz. Eine gesperrte Wendung bleibt gesperrt, auch
+  wenn ein Wort darin hervorgehoben ist oder Umlaute in HTML-Schreibweise
+  stehen: Die Kontrolle liest jede Stelle zusätzlich so, wie sie erscheint,
+  und ein Test hält dieselben Regeln gegen den Text, den der Browser zeigt.
 - **Verschwindet eine Testdatei, fällt das auf** — jede steht jetzt mit Namen
   in einer Liste, die bei jeder Prüfung verglichen wird. In die
   Pflicht-Prüfungen lässt sich kein zusätzlicher Schritt mehr einfügen, der die

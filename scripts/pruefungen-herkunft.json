@@ -6,11 +6,26 @@
     "README.md": "trägt hier zusätzlich den Herkunftshinweis; Inhalt sonst identisch"
   },
   "dateien": {
-    "checks/aussentext.py": "sha256:46782f17f68f1babdbbde74e58019a5b83d69aac7ba69c24cf98bab478fa8ff5",
-    "checks/fakten-drift.py": "sha256:3cdaf1f870d78b43d7ce26b1608aa00d2eb8092adc2401dd6dd0fe0ddcb69531",
-    "checks/stiller-fehlschlag.py": "sha256:3c725a18babcef51d8ab083433a27990dc97cf77d96ec81ac6962ffe76c00671",
-    "checks/test-blind.py": "sha256:a518c76ee7cbd684546b0f8e44f3ce526340984d993fc23e91aa9176a255a88b",
+    "checks/aussentext.py": "sha256:14089551b7ebb3cfb24f64c2f046ae7d406541fb780f9ca118afc4111dfd2848",
+    "checks/fakten-drift.py": "sha256:705d348c630682bf1fe012b838ccea41313f48a72fa28e2a22ecd73af9c0ea1c",
+    "checks/stiller-fehlschlag.py": "sha256:bea541b2272e5f742dcd9eb56d07289261a0982f0d9704a6a55250dd4b2f57af",
+    "checks/test-blind.py": "sha256:b3dbf337df605f62d7641b67737b805d5a8a5f843848cbaf0ec4b3785b95cee0",
+    "negativprobe/ausgenommen/.gitignore": "sha256:50a8dccd3ee586ef247218057bcb796655c59abf441a22a28de17890fa219281",
+    "negativprobe/ausgenommen/.pruefungen/aussentext.txt": "sha256:e2c29ab238eba9b86928db67d8cacd1e04c7e4ce3ad7fe4e7f2cc89ff5f18690",
+    "negativprobe/ausgenommen/README.md": "sha256:7daf980bb7612e1cc7f5e89719850f27f45d3452084fdfed87c133537e3880b7",
+    "negativprobe/ausgenommen/deploy.sh": "sha256:360c377cba7f19b144294dadf7ecc8d793c49060b76ea4f17d5889a563c658aa",
+    "negativprobe/ausgenommen/tests/tabelle.test.js": "sha256:0d33d1e0891252a650c51701d56ed8640d3cc452c2429bba9c4e236bc28102d6",
+    "negativprobe/ausgenommen/tests/test_beispiel.py": "sha256:911d24bc48ba9b498329fdc36695abacb9c7fd72c42330a66a7a0ce46b6d1b9d",
     "negativprobe/berichter-ohne-set-e/bericht.sh": "sha256:876b3bffa5c8931569e0cd314442d72e40685a1b20d49f922dbe0756e063c8af",
+    "negativprobe/betont-html/.pruefungen/aussentext.txt": "sha256:2fd144c9731eb541ac3d2eaf9e70f1c1513d511cb06d3ec763641686231d74dc",
+    "negativprobe/betont-html/seite.html": "sha256:39f910ed3ab61d20e387035af0861ebefd4afad3ed015dc1878440baf648620c",
+    "negativprobe/betont-markdown/.pruefungen/aussentext.txt": "sha256:741b41667f586933617b4bdc008b6dad500a3c08923702191be2533530a13127",
+    "negativprobe/betont-markdown/README.md": "sha256:d0129207845e6cd65be98e74aac1c524fe219a965ee7f4fa33ff9106d03ddd76",
+    "negativprobe/betont-sauber/.pruefungen/aussentext.txt": "sha256:59f0e27d4649dd1d59137393dee5f1670e80da0048e9e81deef339a0722701a9",
+    "negativprobe/betont-sauber/README.md": "sha256:99261c684e93e7109715cee1788d1168005954bba652ad0af77061a259a7e7b8",
+    "negativprobe/betont-sauber/liste.html": "sha256:b0744b5cb78eda924da6d4776dd84cb8ecf98932c2bea0b47d4a634ea44379a5",
+    "negativprobe/betont-umbruch/.pruefungen/aussentext.txt": "sha256:a2817aa39694bcdea993c5b50a6560b17492d3c581539232fed1b84cd316f078",
+    "negativprobe/betont-umbruch/README.md": "sha256:528c128636f1cd3d46c6e2b4b6c29a0e0a113c63ad7d06cec588351938377bf4",
     "negativprobe/echte-bedingung/pruefen.sh": "sha256:2ba30bda348d033cecb0d7876c391deff8886ed70c986aee7e0d99b34d10fa50",
     "negativprobe/eigene-muster/.pruefungen/fakten.txt": "sha256:de2b7811013128b9ff391e321bbda7627ce48a6a220a33af19f8043af924d505",
     "negativprobe/eigene-muster/BETRIEB.md": "sha256:760c6a630c1afb5636ccd298594d8360ddf7692f447da2ee5cf7c7391b0da0e4",
@@ -59,6 +74,6 @@
     "negativprobe/umbruch/README.md": "sha256:076d274ae9d7569eee203e18b995c3684e417b94c9f33ec0742dce83444de9a0",
     "negativprobe/umbruch/dienst.js": "sha256:f46846104d726c096645c749068d0485bc87b229c7fa0d68b13e7b49b48deb0b",
     "pruefe-alles.sh": "sha256:a5f1434c5bc3cc90db60252668c738884d2997309ae16c0c8aeaeb9dbb413c37",
-    "selbstpruefung.sh": "sha256:4f62751446307285fa9dd3a92f10a4de2cadc33d2524e2194b1c35ca2a46cc95"
+    "selbstpruefung.sh": "sha256:b47c80f08d07b573752332b4f49963ec206411cbcaab1bdf38003474db15c383"
   }
 }

@@ -15,11 +15,16 @@ const { spawnSync } = require("child_process");
  * Jeder Fall hat seine Gegenprobe: Derselbe Stoff in einem Ordner, den git
  * kennt, MUSS weiter gefunden werden. Ein Wächter, der nur noch grün meldet,
  * wäre schlechter als der alte.
+ *
+ * Bis 08.10.2026 setzte eine Hülle (`scripts/nur-git-bekannt.py`) den drei
+ * einkopierten Prüfungen einen Spiegel vor. Seither fragen sie git selbst —
+ * geändert an ihrer Quelle im Regelwerk. Diese Datei hält das Verhalten am
+ * Projekt fest; die Selbstprüfung der Kopie (`scripts/pruefungen/
+ * selbstpruefung.sh`, Richtung 7) hält es an der Kopie fest.
  */
 
 const WURZEL = path.join(__dirname, "../../..");
 const UHR = path.join(WURZEL, "scripts/pruefe-zeitzuender.py");
-const HUELLE = path.join(WURZEL, "scripts/nur-git-bekannt.py");
 const FAKTEN = path.join(WURZEL, "scripts/pruefungen/checks/fakten-drift.py");
 const STILL = path.join(WURZEL, "scripts/pruefungen/checks/stiller-fehlschlag.py");
 const BLIND = path.join(WURZEL, "scripts/pruefungen/checks/test-blind.py");
@@ -29,7 +34,7 @@ let basis;
 let repo;
 
 beforeEach(() => {
-  basis = fs.mkdtempSync(path.join(os.tmpdir(), "nur-git-bekannt-"));
+  basis = fs.mkdtempSync(path.join(os.tmpdir(), "nur-was-git-kennt-"));
   repo = path.join(basis, "projekt");
   fs.mkdirSync(repo);
 });
@@ -111,29 +116,38 @@ describe("pruefe-zeitzuender.py liest nur, was git kennt", () => {
   });
 });
 
-describe("nur-git-bekannt.py richtet eine Verzeichnis-Prüfung auf das, was git kennt", () => {
+describe("die einkopierten Verzeichnis-Prüfungen lesen nur, was git kennt", () => {
   const MUSTER = "Aktives Modell|modell-(\\d{4})\n";
 
-  function projektMitFakten() {
-    projektMitGit();
+  function faktenDateien() {
     schreibe(".pruefungen/fakten.txt", MUSTER);
     schreibe("README.md", "Die Analyse läuft über modell-2512.\n");
     schreibe("docs/betrieb.md", "Im Betrieb: modell-2512.\n");
+  }
+
+  function projektMitFakten() {
+    projektMitGit();
+    faktenDateien();
   }
 
   test("ein abweichender Wert in einem ausgenommenen Ordner ist kein Drift", () => {
     projektMitFakten();
     schreibe("privat/bericht.md", "Früher lief die Analyse über modell-2411.\n");
 
-    /* Die Probe ist scharf: Ohne die Hülle liest die Prüfung den Ordner mit. */
-    const direkt = starte("python3", [FAKTEN, "."], repo);
-    expect(direkt.rc).toBe(1);
-    expect(direkt.aus).toContain("privat/bericht.md:1");
-
-    const lauf = starte("python3", [HUELLE, "python3", FAKTEN], repo);
+    const lauf = starte("python3", [FAKTEN, "."], repo);
     expect(lauf.aus).toContain("ERGEBNIS: kein Drift gefunden.");
     expect(lauf.aus).not.toContain("privat/");
     expect(lauf.rc).toBe(0);
+  });
+
+  test("die Probe ist scharf: Ohne git liest die Prüfung denselben Ordner mit", () => {
+    schreibe(".gitignore", "privat/\n");
+    faktenDateien();
+    schreibe("privat/bericht.md", "Früher lief die Analyse über modell-2411.\n");
+
+    const lauf = starte("python3", [FAKTEN, "."], repo);
+    expect(lauf.rc).toBe(1);
+    expect(lauf.aus).toContain("privat/bericht.md:1");
   });
 
   test("Gegenprobe: derselbe Wert in einem Ordner, den git kennt, bleibt ein Drift — mit dem Pfad im Projekt", () => {
@@ -141,16 +155,26 @@ describe("nur-git-bekannt.py richtet eine Verzeichnis-Prüfung auf das, was git 
     schreibe("privat/bericht.md", "Früher lief die Analyse über modell-2411.\n");
     schreibe("docs/alt.md", "Früher lief die Analyse über modell-2411.\n");
 
-    const lauf = starte("python3", [HUELLE, "python3", FAKTEN], repo);
+    const lauf = starte("python3", [FAKTEN, "."], repo);
     expect(lauf.rc).toBe(1);
     expect(lauf.aus).toContain("docs/alt.md:1");
     expect(lauf.aus).not.toContain("privat/");
   });
 
-  test("die eigenen Muster des Projekts gelten auch im Spiegel", () => {
+  test("was eingecheckt ist, wird gelesen — auch in einem Ordner, den .gitignore nennt", () => {
+    projektMitFakten();
+    schreibe("privat/bericht.md", "Früher lief die Analyse über modell-2411.\n");
+    git("add", "-f", "privat/bericht.md");
+
+    const lauf = starte("python3", [FAKTEN, "."], repo);
+    expect(lauf.rc).toBe(1);
+    expect(lauf.aus).toContain("privat/bericht.md:1");
+  });
+
+  test("die eigenen Muster des Projekts gelten weiter", () => {
     projektMitFakten();
 
-    const lauf = starte("python3", [HUELLE, "python3", FAKTEN], repo);
+    const lauf = starte("python3", [FAKTEN, "."], repo);
     expect(lauf.aus).toContain("Muster: 1 (aus .pruefungen/fakten.txt)");
     expect(lauf.rc).toBe(0);
   });
@@ -163,64 +187,47 @@ describe("nur-git-bekannt.py richtet eine Verzeichnis-Prüfung auf das, was git 
   ])(
     "%s: ein Fund in einem ausgenommenen Ordner zählt nicht, derselbe in einem bekannten Ordner schon",
     (_name, pruefung, datei, inhalt) => {
-      projektMitGit();
-      schreibe("scripts/sauber.sh", "#!/bin/sh\nset -e\necho ok\n");
-      schreibe("tests/sauber.test.js", 'test("prüft", () => { expect(rechne(2)).toBe(4); });\n');
-      schreibe(`privat/${datei}`, inhalt);
+      const sauberesProjekt = () => {
+        schreibe(".gitignore", "privat/\n");
+        schreibe("scripts/sauber.sh", "#!/bin/sh\nset -e\necho ok\n");
+        schreibe("tests/sauber.test.js", 'test("prüft", () => { expect(rechne(2)).toBe(4); });\n');
+        schreibe(`privat/${datei}`, inhalt);
+      };
 
-      /* Die Probe ist scharf: Ohne die Hülle liest die Prüfung den Ordner mit. */
-      expect(starte("python3", [pruefung, "."], repo).rc).toBe(1);
-      const ausgenommen = starte("python3", [HUELLE, "python3", pruefung], repo);
+      /* Die Probe ist scharf: Ohne git liest die Prüfung den Ordner mit. */
+      sauberesProjekt();
+      const ohneGit = starte("python3", [pruefung, "."], repo);
+      expect(ohneGit.rc).toBe(1);
+      expect(ohneGit.aus).toContain(`privat/${datei}`);
+
+      git("init", "-q");
+      const ausgenommen = starte("python3", [pruefung, "."], repo);
       expect({ rc: ausgenommen.rc, nenntPrivat: ausgenommen.aus.includes("privat/") }).toEqual({
         rc: 0,
         nenntPrivat: false,
       });
 
       schreibe(`offen/${datei}`, inhalt);
-      const bekannt = starte("python3", [HUELLE, "python3", pruefung], repo);
+      const bekannt = starte("python3", [pruefung, "."], repo);
       expect(bekannt.rc).toBe(1);
       expect(bekannt.aus).toContain(`offen/${datei}`);
     }
   );
-
-  test("der Rückgabewert des Befehls kommt unverändert zurück, der Spiegel als letztes Argument", () => {
-    projektMitFakten();
-    schreibe("privat/geheim.txt", "nicht für die Prüfung\n");
-
-    const liste = starte("python3", [HUELLE, "sh", "-c", 'cd "$1" && find . -type l | sort; exit 7', "sh"], repo);
-    expect(liste.rc).toBe(7);
-    expect(liste.aus).toContain("./README.md");
-    expect(liste.aus).toContain("./.pruefungen/fakten.txt");
-    expect(liste.aus).not.toContain("geheim");
-  });
-
-  test("ohne git-Arbeitsbaum: nicht messbar (2), der Befehl läuft nicht", () => {
-    schreibe("README.md", "ohne git\n");
-
-    const lauf = starte("python3", [HUELLE, "sh", "-c", "echo GELAUFEN"], repo);
-    expect(lauf.rc).toBe(2);
-    expect(lauf.aus).toContain("NICHT MESSBAR");
-    expect(lauf.aus).not.toContain("GELAUFEN");
-  });
-
-  test("ohne Befehl: Aufruffehler (2)", () => {
-    projektMitFakten();
-
-    const lauf = starte("python3", [HUELLE], repo);
-    expect(lauf.rc).toBe(2);
-    expect(lauf.aus).toContain("kein Befehl angegeben");
-  });
 });
 
-describe("vor-dem-push.sh richtet die Verzeichnis-Prüfungen auf das, was git kennt", () => {
-  test.each(["fakten-drift", "stiller-fehlschlag", "test-blind"])("%s läuft über nur-git-bekannt.py", (name) => {
-    const skript = fs.readFileSync(path.join(WURZEL, "scripts/vor-dem-push.sh"), "utf8");
+describe("vor-dem-push.sh ruft die Verzeichnis-Prüfungen wie die Pipeline auf", () => {
+  const skript = fs.readFileSync(path.join(WURZEL, "scripts/vor-dem-push.sh"), "utf8");
+
+  test.each(["fakten-drift", "stiller-fehlschlag", "test-blind"])("%s läuft direkt über das Projekt", (name) => {
     const befehle = skript
       .split("\n")
       .filter((z) => /^\s*lauf /.test(z) && z.includes(`checks/${name}.py`))
       .map((z) => z.replace(/^\s*lauf "[^"]*" "[^"]*" /, ""));
-    expect(befehle).toContain(`python3 scripts/nur-git-bekannt.py python3 scripts/pruefungen/checks/${name}.py`);
-    /* Kein zweiter Aufruf, der wieder das ganze Verzeichnis liest. */
-    expect(befehle).not.toContain(`python3 scripts/pruefungen/checks/${name}.py .`);
+    expect(befehle).toContain(`python3 scripts/pruefungen/checks/${name}.py .`);
+  });
+
+  test("die Hülle von früher gibt es nicht mehr — kein Aufruf zeigt ins Leere", () => {
+    expect(skript).not.toContain("nur-git-bekannt");
+    expect(fs.existsSync(path.join(WURZEL, "scripts/nur-git-bekannt.py"))).toBe(false);
   });
 });

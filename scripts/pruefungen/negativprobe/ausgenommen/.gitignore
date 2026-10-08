@@ -1,0 +1,4 @@
+# Der Ordner entsteht erst im Lauf der Selbstpruefung (aus negativprobe/kaputt)
+# und verschwindet danach wieder. Git liefert Ausgenommenes nicht aus - laege er
+# hier fest, gaebe es ihn nach einem frischen Abzug nicht.
+privat/

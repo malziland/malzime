@@ -69,20 +69,20 @@ lauf "Backend: Format" "test-backend" sh -c 'cd functions && npm run --silent fo
 lauf "Pruefungen: Selbstpruefung" "pruefungen" sh scripts/pruefungen/selbstpruefung.sh
 lauf "Pruefungen: Aussentext-Sperrliste" "pruefungen" python3 scripts/pruefungen/checks/aussentext.py .
 # TEST-2026-10-04-29: Die naechsten drei Pruefungen lesen das ganze
-# Verzeichnis — am Arbeitsrechner also auch Ordner, die .gitignore ausnimmt
-# (private Berichte, Uebergaben, Sicherungen). Die Pipeline kennt diese Ordner
-# nicht. Die Werkzeuge sind vendoriert und werden hier nicht bearbeitet;
-# stattdessen bekommen sie einen Spiegel, der nur enthaelt, was git kennt.
-# (Die Aussentext-Sperrliste darueber fragt git selbst.)
-lauf "Pruefungen: Fakten-Drift" "pruefungen" python3 scripts/nur-git-bekannt.py python3 scripts/pruefungen/checks/fakten-drift.py
-lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/nur-git-bekannt.py python3 scripts/pruefungen/checks/stiller-fehlschlag.py
+# Verzeichnis. Am Arbeitsrechner liegen dort auch Ordner, die .gitignore
+# ausnimmt (private Berichte, Uebergaben, Sicherungen); die Pipeline kennt sie
+# nicht. Seit 08.10.2026 fragen die Pruefungen git selbst und lesen nur, was es
+# kennt (an der Quelle im Regelwerk geaendert, wie zuvor schon die
+# Aussentext-Sperrliste) — die Aufrufe sind deshalb dieselben wie in der Pipeline.
+lauf "Pruefungen: Fakten-Drift" "pruefungen" python3 scripts/pruefungen/checks/fakten-drift.py .
+lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
 # BEFUND 01.09.2026 (Runde 7, K-8): Der Aufruf oben ueberspringt Verzeichnisse,
 # die mit einem Punkt beginnen — und ALLE fuenf yml-Dateien dieses Projekts
 # liegen unter .github/. Der Waechter fuer verschluckte Fehler sah also
 # ausgerechnet die Auslieferungskette nie. Das Werkzeug ist vendoriert und wird
 # hier nicht bearbeitet; stattdessen wird es zusaetzlich dorthin gerichtet.
 lauf "Pruefungen: Stiller Fehlschlag (.github)" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .github
-lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/nur-git-bekannt.py python3 scripts/pruefungen/checks/test-blind.py
+lauf "Pruefungen: Tests ohne Zusicherung" "pruefungen" python3 scripts/pruefungen/checks/test-blind.py .
 lauf "Pruefungen: Sichtbare Texte" "pruefungen" python3 scripts/pruefe-i18n-fallbacks.py
 lauf "Pruefungen: Tote Geduld" "pruefungen" python3 scripts/pruefe-tote-geduld.py
 lauf "Pruefungen: Doppelte Betriebswerte" "pruefungen" python3 scripts/pruefe-doppelte-werte.py

@@ -96,6 +96,50 @@ lauf aussentext.py "$HIER/negativprobe/umbruch-listenpunkt" 1 \
 lauf aussentext.py "$HIER/negativprobe/umbruch-html" 1 \
   "ein Satz in einem HTML-Absatz wird ueber den Zeilenumbruch gefunden"
 
+echo ""
+echo "Richtung 8: Formulierung mit einer Hervorhebung mittendrin (2026-10-08)"
+lauf aussentext.py "$HIER/negativprobe/betont-markdown" 1 \
+  "eine Wendung mit einem betonten Wort (Sternchen) wird gefunden"
+lauf aussentext.py "$HIER/negativprobe/betont-html" 1 \
+  "eine Wendung mit Hervorhebung und Zeichen in HTML-Schreibweise wird gefunden"
+lauf aussentext.py "$HIER/negativprobe/betont-umbruch" 1 \
+  "betont UND ueber einen Zeilenumbruch: beide Durchgaenge wirken zusammen"
+lauf aussentext.py "$HIER/negativprobe/betont-sauber" 0 \
+  "Namen mit Unterstrichen, getrennte Listenpunkte und Absaetze bleiben ohne Fund"
+
+echo ""
+echo "Richtung 7: was git ausnimmt, wird nicht gelesen (2026-10-08)"
+# Vorher lasen drei der vier Pruefungen den Dateibaum und damit auch private Ordner,
+# die nie ausgeliefert werden. Die Probe: sauberes Material, daneben ein von git
+# AUSGENOMMENER Ordner mit dem kaputten Beispielmaterial.
+# Git liefert Ausgenommenes nicht aus - nach einem frischen Abzug gaebe es den Ordner
+# nicht, und die Probe waere von selbst gruen. Deshalb entsteht er erst hier und
+# verschwindet danach wieder. Die Gegenprobe zeigt, dass die Probe ueberhaupt misst:
+# Derselbe Inhalt OHNE git (Kopie ausserhalb jedes Repositorys) muss rot werden.
+AUSG="$HIER/negativprobe/ausgenommen"
+OHNE_GIT=$(mktemp -d 2>/dev/null) || OHNE_GIT=""
+aufraeumen() {
+  rm -rf "$AUSG/privat"
+  [ -n "$OHNE_GIT" ] && rm -rf "$OHNE_GIT"
+}
+trap aufraeumen EXIT INT TERM
+if [ -z "$OHNE_GIT" ] || ! git -C "$AUSG" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  PROBEN=$((PROBEN + 1))
+  FEHLER=$((FEHLER + 1))
+  echo "  NEIN  nicht messbar: hier liegt kein git-Arbeitsbaum (oder kein Platz fuer die"
+  echo "        Gegenprobe). Ohne git gibt es nichts Ausgenommenes - das ist kein Bestehen."
+else
+  rm -rf "$AUSG/privat"
+  cp -R "$KAPUTT" "$AUSG/privat"
+  cp -R "$AUSG/." "$OHNE_GIT/"
+  for P in fakten-drift.py stiller-fehlschlag.py test-blind.py aussentext.py; do
+    lauf "$P" "$AUSG" 0 "${P%.py} liest den von git ausgenommenen Ordner nicht"
+    lauf "$P" "$OHNE_GIT" 1 "${P%.py} liest denselben Ordner, wenn kein git da ist (Gegenprobe)"
+  done
+fi
+aufraeumen
+trap - EXIT INT TERM
+
 echo "============================================================"
 if [ "$FEHLER" -eq 0 ]; then
   # Die Zahl steht NUR hier und kommt aus dem Zaehler. Sie als Wort zu fuehren

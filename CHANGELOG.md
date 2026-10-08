@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert — Betrieb
+
+- **Nach einer kurzen Störung läuft ein wartender Auftrag spätestens nach einer
+  Minute weiter.** Antwortet der Server beim Start einer Analyse mit einem
+  Fehler, versucht die Warteschlange es jetzt höchstens im Minutenabstand
+  erneut und hört nach 30 Minuten auf. Bisher galt der Google-Standard: bis zu
+  100 Versuche, der Abstand wuchs bis auf eine Stunde. Die Einstellung liegt
+  bei Google und gilt seit dem 8. Oktober 2026; die Infrastruktur-Prüfung hält
+  sie fest, die Anleitung für Selbstbetreiber nennt sie.
+
 ## [5.0.0] — 2026-10-08
 
 Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen

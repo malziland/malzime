@@ -52,7 +52,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}${INFRA_PROBE_DIENST_UMGEBUNG:-}${INFRA_PROBE_ZWEIGSCHUTZ:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_WIEDERHOLUNG:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}${INFRA_PROBE_DIENST_UMGEBUNG:-}${INFRA_PROBE_ZWEIGSCHUTZ:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -116,6 +116,38 @@ else
   fi
 
   pruef "Queue-Status" "RUNNING" "$QUEUE_STATE"
+fi
+
+# ── 1a. Wiederholungsregel der Warteschlange (OPS-2026-10-03-22) ──
+# Reine Cloud-Einstellung, die `firebase deploy` NICHT verwaltet. Bis zum
+# 08.10.2026 stand sie auf dem Google-Standard: bis 100 Zustellversuche, der
+# Abstand verdoppelte sich bis auf eine Stunde. Antwortete der Verarbeiter mit
+# einem Fehler und war die Stoerung laengst vorbei, wartete ein Auftrag
+# trotzdem viele Minuten auf den naechsten Versuch — laenger, als der Browser
+# wartet (eine halbe Stunde).
+# SOLL: Abstand hoechstens 60 s, Schluss nach 30 Minuten. Cloud Tasks hoert
+# erst auf, wenn die Zeit um ist UND die Mindestzahl an Versuchen erreicht
+# ist — deshalb gehoeren alle drei Werte zusammen. Wie man sie setzt, steht in
+# docs/SELF-HOSTING.md, Abschnitt 5j.
+# Im Probemodus nur mit eigenem Einspeisepunkt (kein Netz aus einem Test).
+# FAIL-CLOSED: nicht ermittelbar gilt als nicht bestanden.
+WIEDERHOLUNG_SOLL="60s 1800s 10"
+echo "— Wiederholungsregel der Warteschlange"
+if [ "$PROBEMODUS" = "1" ] && [ -z "${INFRA_PROBE_WIEDERHOLUNG:-}" ]; then
+  echo "  · uebersprungen (Probemodus ohne INFRA_PROBE_WIEDERHOLUNG)"
+else
+  if [ -n "${INFRA_PROBE_WIEDERHOLUNG:-}" ]; then
+    WIEDERHOLUNG_IST=$(cat "$INFRA_PROBE_WIEDERHOLUNG")
+  else
+    WIEDERHOLUNG_IST=$(gcloud tasks queues describe "$QUEUE" --location="$REGION" --project="$PROJECT" \
+      --format="value(retryConfig.maxBackoff,retryConfig.maxRetryDuration,retryConfig.maxAttempts)" 2>/dev/null || true)
+  fi
+  WIEDERHOLUNG_IST=$(printf '%s' "$WIEDERHOLUNG_IST" | tr '\t' ' ')
+  case "$WIEDERHOLUNG_IST" in
+    "$WIEDERHOLUNG_SOLL") gruen "Wiederholungsregel: Abstand hoechstens 60 s, Schluss nach 30 Minuten (ab 10 Versuchen)" ;;
+    "")                   rot   "Wiederholungsregel NICHT ermittelbar — ungeprueft gilt als nicht bestanden" ;;
+    *)                    rot   "Wiederholungsregel ist »${WIEDERHOLUNG_IST}«, SOLL »${WIEDERHOLUNG_SOLL}« (Abstand hoechstens, Schluss nach, Versuche)" ;;
+  esac
 fi
 
 # ── 1b. Einstellungssatz: Datenbank == Repo ──

@@ -159,9 +159,9 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
   steht. Die Tierart wird nicht mehr von Wörtern wie „Spaßvogel“ oder „Fischöl“
   verfälscht.
 - **Der Hinweis „Das hast du ungewollt verraten“ erkennt mehr.** Adressen mit
-  „Gasse“, „Platz“, „Weg“, „Allee“ und „Kai“, dazu „Kärntner Ring 12“ und
-  „Linke Wienzeile 4“, englische Adressen („12 Main Street“, „12 Main St.“)
-  und englische Schulnamen mit Schulart; Schul-Kürzel mit Ort („HTL Mödling“,
+  „Gasse“, „Platz“, „Weg“ und „Allee“, dazu „Handelskai 94“ und „Linke
+  Wienzeile 4“, englische Adressen („12 Main Street“, „12 Main St.“) und
+  englische Schulnamen mit Schulart; Schul-Kürzel mit Ort („HTL Mödling“,
   „HTL-Mödling“, „HAK 1“); Telefonnummern auch
   in der üblichen Schreibweise mit Abständen („0664 123 45 67“, „+43 664 …“)
   und mit Durchwahl; und österreichische Kennzeichen in ihrer üblichen Form

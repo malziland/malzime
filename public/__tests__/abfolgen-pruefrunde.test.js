@@ -56,13 +56,25 @@ const antwort = (body, ok = true, status = 200) => ({
 
 describe("Abfolgen aus der Prüfrunde", () => {
   let api, state, elements, prepareImage, speicher, render;
-  let uploads, abfragen, abmeldungen, fehlerMeldungen, statusAntwort;
+  let uploads, abfragen, abmeldungen, fehlerMeldungen, statusAntwort, lauscher;
 
   beforeEach(async () => {
     vi.resetModules();
     setupDOM();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     sessionStorage.clear();
+    /* Jeder Test lädt api.js frisch. Die Lauscher, die es an Fenster und
+       Dokument hängt, werden mitgeschrieben und am Ende wieder abgenommen —
+       sonst hörte das Modul eines früheren Tests im nächsten noch mit, und ein
+       Fall bliebe grün, obwohl seine Schutzstelle fehlt (Prüfung 08.10.2026). */
+    lauscher = [];
+    for (const ziel of [window, document]) {
+      const echt = ziel.addEventListener.bind(ziel);
+      vi.spyOn(ziel, "addEventListener").mockImplementation((art, fn, opt) => {
+        lauscher.push([ziel, art, fn, opt]);
+        return echt(art, fn, opt);
+      });
+    }
     api = await import("../js/api.js");
     state = (await import("../js/state.js")).state;
     elements = (await import("../js/dom.js")).elements;
@@ -103,6 +115,8 @@ describe("Abfolgen aus der Prüfrunde", () => {
   });
 
   afterEach(() => {
+    for (const [ziel, art, fn, opt] of lauscher) ziel.removeEventListener(art, fn, opt);
+    vi.clearAllTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
     sessionStorage.clear();
@@ -372,6 +386,119 @@ describe("Abfolgen aus der Prüfrunde", () => {
     await vi.advanceTimersByTimeAsync(2500);
     await laufB;
     expect(abmeldungen).toHaveLength(1);
+  });
+
+  /* Wie ein Server, bei dem der Auftrag noch wartet: bis er abgemeldet wird, dann verworfen. */
+  const wartetOderVerworfen = () =>
+    Promise.resolve(
+      antwort(abmeldungen.length ? { status: "abandoned" } : { status: "queued", position: 7, etaSeconds: 200 })
+    );
+
+  it("Aufwachen nach über drei Minuten, „wieder online“ kommt VOR dem Sichtbarwerden: keine Abmeldung, die Seite holt weiter ab", async () => {
+    const geraet = await auftragWartet();
+    statusAntwort = wartetOderVerworfen;
+    geraet.verbergen();
+    vi.setSystemTime(Date.now() + 4 * 60 * 1000);
+    window.dispatchEvent(new Event("online")); /* die Wiederaufnahme übernimmt denselben Auftrag */
+    geraet.zeigen(); /* die Nummer wird vergessen */
+    await vi.advanceTimersByTimeAsync(6000);
+    await geraet.lauf; /* der abgelöste erste Durchgang ist zurück */
+
+    expect(abmeldungen).toEqual([]);
+    expect(elements.status.textContent).not.toContain("error.queueAbandoned");
+    expect(state.isAnalyzing).toBe(true);
+
+    /* Der Auftrag kommt an die Reihe: Das Ergebnis erscheint. */
+    statusAntwort = fertigOderVerworfen;
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(render.renderCurrentMode).toHaveBeenCalledTimes(1);
+    expect(abmeldungen).toEqual([]);
+  });
+
+  it("eine Wiederaufnahme führt den Auftrag, dann über drei Minuten weg, dann ein anderes Foto: abgemeldet, genau einmal", async () => {
+    const geraet = await auftragWartet();
+    /* kurz gesperrt: die Wiederaufnahme übernimmt */
+    geraet.verbergen();
+    vi.setSystemTime(Date.now() + 30000);
+    geraet.zeigen();
+    await vi.advanceTimersByTimeAsync(2500);
+    await geraet.lauf;
+    expect(abmeldungen).toEqual([]);
+    /* lange weg: die Nummer wird vergessen, die Wiederaufnahme fragt weiter */
+    geraet.verbergen();
+    vi.setSystemTime(Date.now() + 4 * 60 * 1000);
+    geraet.zeigen();
+    await vi.advanceTimersByTimeAsync(4500);
+    expect(speicher.getStoredJobId()).toBeNull();
+    expect(abmeldungen).toEqual([]);
+
+    const laufB = wieHandleNewFile(foto("b"));
+    await vi.waitFor(() => expect(uploads.length).toBe(2), { timeout: 8000 });
+    expect(abmeldungen).toHaveLength(1);
+    expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
+    uploads[1].antworte(antwort({ jobId: "AUFTRAG-B", resultToken: "tb" }));
+    await vi.advanceTimersByTimeAsync(6000);
+    state.requestId += 1;
+    await vi.advanceTimersByTimeAsync(2500);
+    await laufB;
+    expect(abmeldungen).toHaveLength(1);
+  });
+
+  it("über drei Minuten weg, dann reißt die Verbindung ab: keine Zusage, die niemand einlöst — Meldung und Abmeldung", async () => {
+    const geraet = await auftragWartet();
+    geraet.verbergen();
+    vi.setSystemTime(Date.now() + 4 * 60 * 1000);
+    geraet.zeigen();
+    expect(speicher.getStoredJobId()).toBeNull();
+    statusAntwort = () => Promise.reject(new TypeError("Failed to fetch"));
+    await vi.advanceTimersByTimeAsync(13000);
+    await geraet.lauf;
+
+    /* Die Nummer ist vergessen — wieder aufnehmen könnte die Seite nicht. */
+    expect(elements.status.textContent).not.toContain("error.connectionLost");
+    expect(elements.status.textContent).toContain("error.queueAbandoned");
+    expect(state.wartetAufVerbindung).toBe(false);
+    expect(state.isAnalyzing).toBe(false);
+    expect(abmeldungen).toHaveLength(1);
+    expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
+    expect(fehlerMeldungen.length).toBeGreaterThan(0);
+  });
+
+  it("Verbindung reißt ab, die Nummer steht noch im Tab: Die Zusage bleibt, nichts wird abgemeldet (Gegenprobe)", async () => {
+    const geraet = await auftragWartet();
+    statusAntwort = () => Promise.reject(new TypeError("Failed to fetch"));
+    await vi.advanceTimersByTimeAsync(13000);
+    await geraet.lauf;
+
+    expect(elements.status.textContent).toContain("error.connectionLost");
+    expect(state.wartetAufVerbindung).toBe(true);
+    expect(speicher.getStoredJobId()).toBe("AUFTRAG-A");
+    expect(abmeldungen).toEqual([]);
+  });
+
+  it("Wachhalter: Wird eine überholte Anforderung erst nach der Zusage der nächsten abgelehnt, bleibt die Zusage in Kraft und geht am Ende zurück", async () => {
+    const wake = await import("../js/wake-lock.js");
+    const freigabe2 = vi.fn(() => Promise.resolve());
+    let lehneErsteAb, gibZweite;
+    const anforderung = vi
+      .fn()
+      .mockImplementationOnce(() => new Promise((_, nein) => (lehneErsteAb = nein)))
+      .mockImplementationOnce(() => new Promise((ja) => (gibZweite = ja)));
+    Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: anforderung } });
+    wake.acquireWakeLock(); /* Foto 1, Zusage unterwegs */
+    wake.releaseWakeLock(); /* früher Ausgang (Datei zu groß) */
+    wake.acquireWakeLock(); /* Foto 2 */
+    gibZweite({ release: freigabe2 });
+    await vi.advanceTimersByTimeAsync(1);
+    const abgelehnt = new Error("abgelehnt");
+    abgelehnt.name = "NotAllowedError";
+    lehneErsteAb(abgelehnt);
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(wake.wakeLockStatus()).toBe("acquired");
+    expect(freigabe2).not.toHaveBeenCalled();
+    wake.releaseWakeLock(); /* Analyse 2 endet */
+    expect(freigabe2).toHaveBeenCalledTimes(1);
   });
 
   it("nach einem fertigen Ergebnis meldet ein neues Foto nichts ab (Erfolgsweg)", async () => {

@@ -190,7 +190,7 @@ ZEILEN_GRENZEN = {
     "functions/src/handle-erinnerung.js": 273,
     "public/js/auftrag-abfrage.js": 160,
     # 08.10.2026: aus api.js herausgeloest, als die Datei ueber ihre Grenze wuchs.
-    "public/js/auftrag-abmelden.js": 70,
+    "public/js/auftrag-abmelden.js": 90,
     "public/js/netz-hilfen.js": 78,
     "public/js/foto-vorschau.js": 60,
 }

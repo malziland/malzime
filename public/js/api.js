@@ -32,7 +32,7 @@ import {
   getStoredJobId,
   getStoredResultToken,
 } from "./auftrag-speicher.js";
-import { meldeAuftragAb, meldeOffenenAuftragAb, abgeloestNachDemWarten } from "./auftrag-abmelden.js";
+import { meldeAuftragAb, meldeOffenenAuftragAb, alsAuftragDesTabs } from "./auftrag-abmelden.js";
 
 /* Wake-Lock und Auftragsgedächtnis liegen seit 10.09.2026 in eigenen Modulen
    (js/wake-lock.js, js/auftrag-speicher.js). app.js und die Tests holen diese
@@ -234,7 +234,8 @@ export function initHintergrundWiederaufnahme() {
          (unten) — dann soll der Server ihn gleich verwerfen statt erst nach
          seiner Karenz. Laeuft dagegen noch ein Durchgang, fragt er mit seiner
          eigenen Nummer weiter und bekommt sein Ergebnis: Ihn abzumelden hiesse,
-         einem Kind in einer langen Schlange den Platz zu nehmen. */
+         einem Kind in einer langen Schlange den Platz zu nehmen. Er bleibt
+         „in Arbeit" (auftrag-abmelden.js), auch wenn die Nummer hier faellt. */
       if (state.wartetAufVerbindung) meldeOffenenAuftragAb();
       clearStoredJobId();
       /* BUG-2026-10-03-46: Wartete die Seite gerade auf die Verbindung, ist
@@ -697,10 +698,10 @@ async function analyzeImageQueued() {
     /* ── Auf das Ergebnis pollen (jeder Poll = Liveness-Herzschlag) ──
        liveErlaubt: nur hier, beim frischen Upload, darf die Live-Anzeige
        mittippen (v3.0) — die Wiederaufnahme unten bleibt beim heutigen Bild. */
-    const outcome = await pollJob(jobId, myId, resultToken, false, true);
-    /* Abgeloest waehrend des Wartens: Eine Wiederaufnahme fuehrt den Auftrag
-       weiter; hat ein anderes Foto uebernommen, wird er abgemeldet. */
-    if (state.requestId !== myId) return void abgeloestNachDemWarten(jobId, resultToken);
+    const abfrage = () => pollJob(jobId, myId, resultToken, false, true);
+    const outcome = await alsAuftragDesTabs(jobId, resultToken, abfrage);
+    /* Abgeloest waehrend des Wartens: Der Nachfolger fuehrt Buch (auftrag-abmelden.js). */
+    if (state.requestId !== myId) return;
 
     /* UX-2026-10-03-49: „Analyse abgeschlossen" wird nur angesagt, wenn ein
        Ergebnis da ist. Auf jedem Fehlerweg stoppt die Wartefigur leise — die
@@ -904,7 +905,8 @@ export async function resumeQueueJob({ force = false } = {}) {
     /* pollImmediately=true: das fertige Ergebnis sofort holen, ohne 2s-Vorlauf.
        liveErlaubt nur im Fall (a): Nur dort gibt es einen Puffer, an den die
        naechste Welle anschliessen kann. */
-    const outcome = await pollJob(jobId, myId, resultToken, true, setztLiveTextFort);
+    const abfrage = () => pollJob(jobId, myId, resultToken, true, setztLiveTextFort);
+    const outcome = await alsAuftragDesTabs(jobId, resultToken, abfrage);
     if (state.requestId !== myId) return;
 
     /* Wie oben: die Abschluss-Ansage nur mit Ergebnis. */

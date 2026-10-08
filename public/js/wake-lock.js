@@ -56,6 +56,9 @@ export async function acquireWakeLock() {
     wakeLock = zusage;
     status = "acquired";
   } catch (err) {
+    /* Eine ueberholte Anforderung aendert nichts mehr — auch nicht, wenn sie
+       erst abgelehnt wird, nachdem die naechste schon zugesagt ist. */
+    if (meine !== laufendeNummer) return;
     /* Verweigert/nicht verfügbar — kein Abbruch, läuft ohne Wake-Lock weiter. */
     wakeLock = null;
     status = "denied:" + (err && err.name ? err.name : "unknown");

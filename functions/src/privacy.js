@@ -28,27 +28,27 @@ const ADRESS_WOERTER = ["straße", "strasse", "str.", "schule", "gymnasium"];
    ("unterwegs", "Sportplatz", "Platz 3", "Streetwear", "Street Food"), zaehlen
    nur zusammen mit einer Hausnummer. */
 const ADRESS_MUSTER = [
-  /* Mozartgasse 3 · Linzer Weg 7 · Hauptplatz 3 · Praterallee 1 · Kärntner
-     Ring 12 · Dr.-Karl-Renner-Ring 3 · Handelskai 94 · Franz-Josefs-Kai 27 ·
-     Linke Wienzeile 4.
-     "Ring", "Kai" und "Zeile" stecken in zu vielen anderen Woertern und
-     zaehlen deshalb nur in engen Formen: "Ring" als eigenes Wort hinter einem
-     Namen auf "-er" oder hinter einem Bindestrich; "Kai" hinter einem
-     Bindestrich oder als Ende eines laengeren Worts; von "Zeile" nur die
-     Wienzeile. Kein Strassenname: SPRING 2025, ENGINEERING 1985, Hering 3,50,
-     Schlagzeile 1, AKAI 4000, KAI 12, Sitzplatz 12, Parkplatz 2, Wanderweg 601.
-     BEWUSST NICHT: zusammengeschriebene Ring-Namen ("Opernring 2") — sie sind
-     von "Spring 24" und "Touring 500" nicht zu unterscheiden.
+  /* Mozartgasse 3 · Linzer Weg 7 · Hauptplatz 3 · Praterallee 1 · Handelskai 94 ·
+     Franz-Josefs-Kai 27 · Linke Wienzeile 4.
+     "Kai" und "Zeile" stecken in zu vielen anderen Woertern und zaehlen
+     deshalb nur in engen Formen: "Kai" hinter einem Bindestrich oder einem
+     Fugen-s ("Handelskai"), von "Zeile" nur die Wienzeile. Kein Strassenname:
+     Schlagzeile 1, AKAI 4000, MALAKAI 7, KAI 12, Sitzplatz 12, Parkplatz 2,
+     Wanderweg 601.
+     BEWUSST NICHT: "Ring" — weder zusammengeschrieben ("Opernring 2") noch als
+     eigenes Wort ("Kärntner Ring 12"). Von "Spring 24", "Touring 500", "Silber
+     Ring 925" und "Schlüssel-Ring 12" ist es nicht zu unterscheiden.
      Jede Alternative beginnt an einem festen Wort; die Bedingung davor steht
      in einer Rueckschau fester Laenge. So rechnet das Muster auch ueber eine
      endlose Buchstabenkette nur einmal je Stelle. */
-  /(?:gasse|(?<!wander|rad|rund|lehr|pilger|reit|höhen|hoehen)weg|\p{L}(?<!sitz|park|steh|stell|start|liege|camping|lager)platz|(?<=\p{L}{3}er |\p{L}{3}-)ring|allee|wienzeile|(?<=\p{L}{3}|-)kai)\s+\d{1,4}(?!\d)/u,
+  /(?:gasse|(?<!wander|rad|rund|lehr|pilger|reit|höhen|hoehen)weg|\p{L}(?<!sitz|park|steh|stell|start|liege|camping|lager)platz|allee|wienzeile|(?<=\p{L}{3}s|-)kai)\s+\d{1,4}(?!\d)/u,
   /* 12 Main Street · 45 Elm Road · 3 Park Avenue · 12 Main St. · 45 Elm Rd. ·
-     3 Park Ave. · 45 Elm Rd. Apt 3 — die Abkuerzung nur mit Punkt und nur
-     hinter Hausnummer und Name. "St." zaehlt nur, wenn kein Wort folgt: In
-     oesterreichischen Texten ist es fast immer Sankt ("12 Monkeys St. Pauli",
-     "3 km St. Pölten"). BEWUSST NICHT deshalb: "12 Main St. Springfield". */
-  /(?<![\p{L}\d])\d{1,5}[a-z]?\s+(?:[\p{L}'.-]+\s+){1,2}(?:street|road|avenue|st\.(?!\s*\p{L})|(?:rd|ave)\.)(?!\p{L})/u,
+     3 Park Ave. — die Abkuerzung nur mit Punkt, nur hinter Hausnummer und
+     Name und nur, wenn weder Wort noch Zahl folgt: "St." ist in
+     oesterreichischen Texten fast immer Sankt ("12 Monkeys St. Pauli"), "rd."
+     heisst rund ("5 km rd. um den See", "2 Stk. rd. 5 Euro"). BEWUSST NICHT
+     deshalb: "12 Main St. Springfield", "45 Elm Rd. Apt 3". */
+  /(?<![\p{L}\d])\d{1,5}[a-z]?\s+(?:[\p{L}'.-]+\s+){1,2}(?:street|road|avenue|(?:st|rd|ave)\.(?!\s*[\p{L}\d]))(?!\p{L})/u,
   /* Mill Road 12 */
   /(?<!\p{L})(?:street|road|avenue)\s+\d{1,5}(?!\d)/u,
   /* Springfield Elementary School · Oxford High School. "school" allein
@@ -60,12 +60,14 @@ const ADRESS_MUSTER = [
 /* Schulformen, die in Oesterreich als Kuerzel auf Schulkleidung und Schildern
    stehen ("HTL Mödling", "HTL-Mödling", "HAK/HAS Wien", "BHAK Wien 10").
    Verglichen wird am Original, nicht klein geschrieben: als ganzes Wort in
-   Grossbuchstaben, und nur mit einem Ort oder einer Zahl dahinter (nach
-   Leerraum oder Bindestrich) — das Kuerzel allein steht auch auf
-   Markenkleidung ("BORG"). "BORG" zaehlt nie hinter "BJÖRN", auch nicht ueber
-   einen Zeilenumbruch. */
+   Grossbuchstaben, und nur mit einem Ort oder einer Zahl dahinter — das
+   Kuerzel allein steht auch auf Markenkleidung ("BORG"). "BORG" zaehlt nie
+   hinter "BJÖRN", auch nicht ueber einen Zeilenumbruch.
+   Mit Bindestrich zaehlen nur die Kuerzel, die sonst nichts bedeuten, und nur
+   mit einem Wort dahinter: "HTL-Mödling" ja; "HAK-47", "HLW-200 Akku",
+   "BORG-Warner" und "BRG-Racing" nein. */
 const SCHUL_KUERZEL =
-  /(?<![\p{L}\d])(?:HTL|HAK|HLW|HBLA|NMS|BHAK|BHAS|HTBLA|HTBLuVA|HTBLVA|BRG|(?<!BJ[ÖO]RN\s{1,3})BORG)(?:\/(?:HAS|HAK|BHAS|BHAK))?(?:\s+|-)(?:\p{Lu}\p{L}+|\d{1,4}(?!\d))/u;
+  /(?<![\p{L}\d])(?:(?:HTL|HAK|HLW|HBLA|NMS|BHAK|BHAS|HTBLA|HTBLuVA|HTBLVA|BRG|(?<!B[Jj][ÖOöo][Rr][Nn]\s+)BORG)(?:\/(?:HAS|HAK|BHAS|BHAK))?\s+(?:\p{Lu}\p{L}+|\d{1,4}(?!\d))|(?:HTL|HAK|HLW|HBLA|BHAK|BHAS|HTBLA|HTBLuVA|HTBLVA)-\p{Lu}\p{L}+)/u;
 
 /* Kfz-Kennzeichen. Die Muster laufen ueber die ganze Beschreibung und muessen
    deshalb eng sein.

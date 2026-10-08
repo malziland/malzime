@@ -8,6 +8,7 @@ import {
   initHintergrundWiederaufnahme,
   clearStoredJobId,
 } from "./js/api.js";
+import { meldeOffenenAuftragAb } from "./js/auftrag-abmelden.js";
 import { renderCurrentMode } from "./js/render.js";
 import { insertPrintNotes, removePrintNotes, showLimitBanner, showMaintenanceModal } from "./js/ui.js";
 import { initDemo } from "./js/demo.js";
@@ -129,6 +130,7 @@ initSprachumschalter({
      Sprache behalten — er landet auf einer sauberen Startseite. Den gemerkten
      Auftrag vorher verwerfen, sonst holt ihn der nächste Seitenaufruf zurück. */
   zuruecksetze: () => {
+    meldeOffenenAuftragAb();
     clearStoredJobId();
     window.location.reload();
   },

@@ -233,20 +233,23 @@ describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
     "BJORN BORG Sweden",
     "BJÖRN\nBORG Sweden",
     "BJÖRN  BORG Sweden",
+    "BJÖRN    BORG Sweden",
+    "Björn BORG Sweden",
+    /* Mit Bindestrich: Produktnamen und Marken (Pruefung 08.10.2026). */
+    "BORG-Warner",
+    "HAK-47",
+    "BRG-Racing 77",
+    "HLW-200 Akku",
   ])("kein Schul-Kuerzel: %s", (text) => {
     expect(hinweise(text)).not.toContain("privacy.address");
   });
 
-  test.each([
-    "Kärntner Ring 12",
-    "Dr.-Karl-Renner-Ring 3",
-    "Praterallee 1",
-    "Franz-Josefs-Kai 27",
-    "Handelskai 94",
-    "Linke Wienzeile 4",
-  ])("oesterreichische Strassenform: %s", (text) => {
-    expect(hinweise(text)).toContain("privacy.address");
-  });
+  test.each(["Praterallee 1", "Franz-Josefs-Kai 27", "Handelskai 94", "Linke Wienzeile 4"])(
+    "oesterreichische Strassenform: %s",
+    (text) => {
+      expect(hinweise(text)).toContain("privacy.address");
+    }
+  );
 
   test.each([
     "KAI 12",
@@ -267,9 +270,19 @@ describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
     "Schlagzeile 1",
     "Textzeile 3",
     "AKAI 4000",
+    "Silber Ring 925",
+    "Schlüssel-Ring 12",
+    "MALAKAI 7",
     /* Bewusst nicht erkannt (siehe privacy.js): von den Zeilen darueber nicht
        zu unterscheiden. */
     "Opernring 2",
+    "Kärntner Ring 12",
+    "Dr.-Karl-Renner-Ring 3",
+    /* "rd." heisst rund, "ave." average. */
+    "24 Std. rd. um die Uhr",
+    "5 km rd. um den See",
+    "2 Stk. rd. 5 Euro",
+    "10 points ave. per game",
     "Sitzplatz 12",
     "Parkplatz 2",
     "Wanderweg 601",
@@ -303,10 +316,16 @@ describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
     expect(hinweise(text, text)).not.toContain("privacy.licensePlate");
   });
 
-  test.each(["12 Main St.", "45 Elm Rd.", "3 Park Ave.", "45 Elm Rd. Apt 3", "3 Park Ave. New York"])(
-    "englische Strassen-Abkuerzung: %s",
+  test.each(["12 Main St.", "45 Elm Rd.", "3 Park Ave."])("englische Strassen-Abkuerzung: %s", (text) => {
+    expect(hinweise(text)).toContain("privacy.address");
+  });
+
+  /* Bewusst nicht erkannt: Mit einem Wort dahinter ist die Abkuerzung von
+     "Sankt", "rund" und "average" nicht zu unterscheiden (siehe privacy.js). */
+  test.each(["12 Main St. Springfield", "45 Elm Rd. Apt 3", "3 Park Ave. New York"])(
+    "englische Abkuerzung mit Wort dahinter zaehlt nicht: %s",
     (text) => {
-      expect(hinweise(text)).toContain("privacy.address");
+      expect(hinweise(text)).not.toContain("privacy.address");
     }
   );
 

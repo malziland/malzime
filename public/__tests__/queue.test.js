@@ -52,13 +52,28 @@ function jsonResponse(body, ok = true, status = 200) {
 }
 
 describe("Queue-Modus", () => {
-  let analyzeImage, resumeQueueJob, getStoredJobId, state, elements, renderCurrentMode;
+  let analyzeImage, resumeQueueJob, getStoredJobId, state, elements, renderCurrentMode, lauscher;
 
   beforeEach(async () => {
+    /* Jeder Test lädt api.js und seinen Zustand frisch. Bis 08.10.2026 teilten
+       sich alle Tests dieser Datei EIN Modul: Was einer stehen ließ (der Anker
+       „wartet auf die Verbindung", ein laufender Zeitgeber, Lauscher an Fenster
+       und Dokument), sah der nächste — in zufälliger Reihenfolge wurde ein
+       Test rot, der allein grün ist. Die Lauscher werden mitgeschrieben und am
+       Ende wieder abgenommen (wie in abloesung.test.js). */
+    vi.resetModules();
     setupDOM();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(Date.now() + 10000);
     sessionStorage.clear();
+    lauscher = [];
+    for (const ziel of [window, document]) {
+      const echt = ziel.addEventListener.bind(ziel);
+      vi.spyOn(ziel, "addEventListener").mockImplementation((art, fn, opt) => {
+        lauscher.push([ziel, art, fn, opt]);
+        return echt(art, fn, opt);
+      });
+    }
 
     const apiMod = await import("../js/api.js");
     const stateMod = await import("../js/state.js");
@@ -80,6 +95,8 @@ describe("Queue-Modus", () => {
   });
 
   afterEach(() => {
+    for (const [ziel, art, fn, opt] of lauscher) ziel.removeEventListener(art, fn, opt);
+    vi.clearAllTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
     sessionStorage.clear();

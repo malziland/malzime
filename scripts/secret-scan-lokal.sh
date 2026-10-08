@@ -24,11 +24,19 @@ fi
 # nicht verfolgte und ignorierte — bei der ersten Probe meldete es drei Funde
 # in `.claude/settings.local.json`, einer lokalen Datei, die gar nicht im
 # Repository liegt. Die Pipeline scannt das Repository. Also hier auch.
-if gitleaks detect --redact --exit-code 1 >/tmp/malzime-gitleaks.log 2>&1; then
+# Eigene Datei je Lauf: Mit einem festen Namen konnte die Fundliste eines
+# zweiten, gleichzeitigen Laufs die des ersten sein.
+PROTOKOLL=$(mktemp "${TMPDIR:-/tmp}/malzime-gitleaks.XXXXXX") || {
+  echo "NICHT MESSBAR: keine Protokolldatei anlegbar."
+  exit 2
+}
+trap 'rm -f "$PROTOKOLL"' EXIT INT TERM
+
+if gitleaks detect --redact --exit-code 1 >"$PROTOKOLL" 2>&1; then
   echo "kein Fund"
   exit 0
 fi
 
 echo "FUND: gitleaks meldet moegliche Geheimnisse."
-sed 's/^/  /' /tmp/malzime-gitleaks.log | head -20
+sed 's/^/  /' "$PROTOKOLL" | head -20
 exit 1

@@ -1,0 +1,4 @@
+# ERWARTUNG: ein Fund (Exit 1). Der Umlaut steht in HTML-Schreibweise, ein Wort ist
+# hervorgehoben, vor dem letzten Wort steht ein geschuetztes Leerzeichen. Gelesen ist es
+# der gesperrte Satz.
+verl(ae|ä)sst nie den Browser|Absolute Zusage ueber Datenfluesse ist im Netzwerk-Tab widerlegbar.

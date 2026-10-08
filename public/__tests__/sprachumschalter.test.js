@@ -9,8 +9,11 @@ let aktuelleSprache = "de";
 let ladenScheitert = false;
 
 let statusNeuGeschrieben = 0;
+/* Was der Umschalter in die Statuszeile schreibt: [Text, Vorgangskennung, Schlüssel]. */
+let statusGesetzt = [];
 vi.mock("../js/ui.js", () => ({
   statusNeuSchreiben: () => statusNeuGeschrieben++,
+  setStatus: (...werte) => statusGesetzt.push(werte),
 }));
 
 vi.mock("../js/i18n.js", () => ({
@@ -64,6 +67,7 @@ beforeEach(async () => {
   aktuelleSprache = "de";
   document.documentElement.lang = "de";
   ladenScheitert = false;
+  statusGesetzt = [];
   analysiert = [];
   baueSeite();
   await frischLaden();
@@ -269,6 +273,38 @@ describe("Sprachumschalter — Bestätigen", () => {
     await vi.waitFor(() => expect(sichtbaresModal()).toBeNull());
     expect(aktuelleSprache).toBe("de");
     expect(analysiert).toHaveLength(0);
+  });
+
+  /* UX-2026-10-03-48: Der gescheiterte Wechsel bleibt nicht ohne Rückmeldung. */
+  it("scheitert das Laden der Sprachdatei, steht eine Meldung in der Statuszeile (mit Schlüssel)", async () => {
+    const zeile = document.createElement("div");
+    zeile.id = "status";
+    document.body.appendChild(zeile);
+    ladenScheitert = true;
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(statusGesetzt).toHaveLength(1));
+    expect(statusGesetzt[0]).toEqual(["sprache.ladefehler", undefined, "sprache.ladefehler"]);
+    expect(aktuelleSprache).toBe("de");
+  });
+
+  it("Seite ohne Statuszeile: Der gescheiterte Wechsel wird angesagt", async () => {
+    const zeile = document.getElementById("status");
+    if (zeile) zeile.remove();
+    ladenScheitert = true;
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    const ansage = () =>
+      Array.from(document.querySelectorAll('.sr-only[aria-live="polite"]')).map((el) => el.textContent);
+    await vi.waitFor(() => expect(ansage()).toContain("sprache.ladefehler"));
+    expect(statusGesetzt).toEqual([]);
+  });
+
+  it("Erfolgsweg: Ein gelungener Wechsel schreibt keine Fehlermeldung", async () => {
+    langKnopf("en").click();
+    sichtbaresModal().querySelector(".sw-knopf--wechseln").click();
+    await vi.waitFor(() => expect(aktuelleSprache).toBe("en"));
+    expect(statusGesetzt).toEqual([]);
   });
 
   it("merkt die Wahl für das Neuladen im selben Tab", async () => {

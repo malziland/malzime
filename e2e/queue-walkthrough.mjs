@@ -58,7 +58,10 @@ for (let i = 1; i <= 60; i++) {
     resultSeen = true;
     break;
   }
-  const scanText = await page.locator("#scanText").textContent().catch(() => "");
+  const scanText = await page
+    .locator("#scanText")
+    .textContent()
+    .catch(() => "");
   console.log(`  t≈${i * 2}s  #scanText: "${scanText}"`);
   /* Den ersten Warteschlangen-Zustand als Beweis-Screenshot festhalten. */
   if (!positionShot && /Warteschlange|Queue|vor dir|ahead/.test(scanText || "")) {

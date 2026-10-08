@@ -1,0 +1,3 @@
+# ERWARTUNG: ein Fund (Exit 1). Die Wendung ist betont UND laeuft ueber einen
+# Zeilenumbruch - beide Durchgaenge muessen zusammenwirken.
+verl(ae|ä)sst nie den Browser|Absolute Zusage ueber Datenfluesse ist im Netzwerk-Tab widerlegbar.

@@ -32,7 +32,10 @@
    Attrappen fuer diese Funktionen geprueft; hier laufen die echten Funktionen
    gegen eine Datenbank im Arbeitsspeicher. */
 
-jest.mock("../betriebsprofil", () => ({ geltendeWerte: jest.fn() }));
+jest.mock("../betriebsprofil", () => ({
+  ZUSAGE_LOESCHFRISTEN: jest.requireActual("../betriebsprofil").ZUSAGE_LOESCHFRISTEN,
+  geltendeWerte: jest.fn(),
+}));
 jest.mock("../db", () => ({ datenbank: () => mockDatenbank }));
 
 const { SATZ } = require("../test-satz");
@@ -191,9 +194,22 @@ describe("findZugestellteJobs: ein abgeholtes Ergebnis laeuft nach dem Zustellfe
     expect(idsVon(await jobs.findZugestellteJobs())).toEqual([alt, frisch].sort());
   });
 
-  test("ohne Einstellungssatz keine Antwort statt einer Ersatzfrist", async () => {
+  /* PRIV-2026-10-03-26: Das Loeschen haengt nicht am Einstellungssatz. Fehlt er,
+     gilt die zugesagte Obergrenze selbst (15 Minuten ab Abholung) — mit derselben
+     Grenze wie oben. */
+  test("ohne Einstellungssatz gilt die zugesagte Obergrenze von 15 Minuten", async () => {
+    const id = await jobs.createJob({ lang: "de" });
+    await jobs.markDelivered(id);
     betriebsprofil.geltendeWerte.mockReset().mockResolvedValue({ werte: null, quelle: "keiner", grund: "fehlt" });
-    await expect(jobs.findZugestellteJobs()).rejects.toThrow(/Betriebswerte fehlen/);
+
+    uhrStehtBei(T0 + 15 * MINUTE - SEKUNDE);
+    expect(await jobs.findZugestellteJobs()).toEqual([]);
+
+    uhrStehtBei(T0 + 15 * MINUTE);
+    expect(await jobs.findZugestellteJobs()).toEqual([]);
+
+    uhrStehtBei(T0 + 15 * MINUTE + SEKUNDE);
+    expect(idsVon(await jobs.findZugestellteJobs())).toEqual([id]);
   });
 });
 

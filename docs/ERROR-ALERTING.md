@@ -90,6 +90,7 @@ geschlossenem Tab gesehen hätte):
 | `blocked.profileBlocked` | kein verwertbares Profil (KI hat abgelehnt oder unlesbar geantwortet) |
 | `blocked.configMissing` | Einstellungssatz fehlt oder ist ungültig — sofort handeln |
 | `profil_leer_standard`, `profil_leer_beast` | nur ein Teil gerettet, im genannten Modus steht „leeres Profil“ |
+| `ergebnis_speichern` | die Analyse war fertig, das Ergebnis ließ sich in drei Versuchen nicht in die Datenbank schreiben; das Kind sah „technischer Fehler“ (Warnungen `ergebnis-speichern-fehlgeschlagen` davor) |
 | `processing_timeout` | die Bearbeitung wurde nicht fertig (Absturz oder Zeitlimit) |
 | `enqueue_failed` | Cloud Tasks nahm den Auftrag nicht an, das Kind sah „Die KI ist gerade überlastet“ |
 | `store_failed` | Foto oder Auftrag ließ sich beim Hochladen nicht ablegen (Speicher oder Datenbank), Meldung wie oben |
@@ -262,11 +263,11 @@ selbst (`autoClose: 1800s`). Am 2026-08-10 so verifiziert: E-Mail kam an.
 > zugestellter Benachrichtigungsweg. Nach jeder Änderung an Kanälen oder
 > Richtlinie diesen Test fahren — er kostet nichts und ist der einzige Beleg.
 
-**Stand der Live-Richtlinie (nachgesehen 2026-08-12):** Der Filter deckt
-`admin`, `stats`, `enqueue`, `processjob`, `jobstatus`, `reapjobs` ab. Der
-frühere Eintrag `analyze` (Dienst seit v2.10 abgebaut) ist inzwischen
-entfernt — das oben abgedruckte Policy-Beispiel nennt ihn noch, es ist die
-Aufbau-Vorlage, nicht der Ist-Zustand.
+**Stand der Live-Richtlinien (nachgesehen 2026-10-07):** Es gibt fünf
+Richtlinien, alle eingeschaltet. Die drei log-basierten tragen im Filter genau
+die acht Dienste aus „Gemeinsamer Teil jedes Filters" oben; die zwei
+Schwellen-Richtlinien zählen ihre Metriken. Nachgesehen nur lesend mit
+`gcloud monitoring policies list --project=malzime`.
 
 **Zustellung beider Kanäle belegt (2026-08-12):** Zwei Proben nach dem
 `gcloud logging write`-Rezept oben — die erste kam als **E-Mail** an, die
@@ -347,8 +348,8 @@ Nachricht liegt dann in der App, aber das Handy meldet sich nicht von selbst.
 - Handled per-Request-Fehler (HTTP 4xx/5xx an den Client, nur `console.log`)
   lösen **nicht** aus. Die drei log-basierten Richtlinien reagieren auf
   `severity>=ERROR` (Abstürze, OOM, Timeouts, eskalierte Fehler wie
-  `counter-fail-open`, gescheiterte Analysen, Kinderschutz-Treffer) der
-  Server-Dienste. Die zwei Schwellen-Richtlinien zählen Zeilen außerhalb davon:
+  `notbremse-gegriffen` und `notbremse-fehlgeschlagen`, gescheiterte Analysen,
+  Kinderschutz-Treffer) der Server-Dienste. Die zwei Schwellen-Richtlinien zählen Zeilen außerhalb davon:
   die Fehlermeldungen aus Browsern (Dienst `errors`, nicht in der Dienstliste
   der drei Filter) und die Warnungen `abbruch-neuversuch`.
 

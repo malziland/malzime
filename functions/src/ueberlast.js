@@ -23,6 +23,23 @@
 
 const WIEDERHOLBARE_STATUS = new Set([429, 502, 503, 504]);
 
+/* Ist dieser Fehler "Ueberlast"? EINE Entscheidung fuer die Analyse-Strecke,
+   den Ablauf des Auftrags und die Attrappe (BUG-2026-10-03-34). Gelesen
+   werden nur Code und Status, nie der Text der Meldung: Eine
+   Zeitueberschreitung "after 142900ms" oder eine Meldung mit dem Wort "quota"
+   ist keine Ueberlast.
+     Status 429         Mistral lehnt ab
+     throttle_timeout   die eigene Drossel ist aufgelaufen (throttle.js) — aus
+                        Sicht des Auftrags derselbe Zustand
+     rate_limit         so reicht die Analyse-Strecke (und die Attrappe)
+                        Ueberlast an den Ablauf weiter
+   Von dieser Antwort haengt ab, ob der Mensch "ueberlastet" sieht (der
+   Browser versucht es dann von selbst noch einmal) oder "technischer Fehler". */
+const UEBERLAST_CODES = new Set(["rate_limit", "throttle_timeout"]);
+function istUeberlast(err) {
+  return Boolean(err && (UEBERLAST_CODES.has(err.code) || err.status === 429));
+}
+
 /* Die Reihe der Wartezeiten: jede Wiederholung wartet doppelt so lang wie
    die vorige. */
 function ueberlastWartezeiten(werte) {
@@ -78,4 +95,4 @@ function planeWiederholung({ res, attempt, backoffs, aufrufStart, timeoutMs }) {
   return { wartezeitMs, retryAfter, aufgeben };
 }
 
-module.exports = { WIEDERHOLBARE_STATUS, ueberlastWartezeiten, planeWiederholung };
+module.exports = { WIEDERHOLBARE_STATUS, istUeberlast, ueberlastWartezeiten, planeWiederholung };

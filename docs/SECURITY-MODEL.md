@@ -30,7 +30,7 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 | Kostenangriff (massenhafte Analysen) | möglich | Stundenlimit (global, Firestore), Queue-Tiefen-Bremse, Job-Höchstalter — alle drei im Einstellungssatz, siehe [BETRIEBSPROFILE.md](BETRIEBSPROFILE.md) |
 | Störangriff auf einen Workshop | möglich, bisher nie beobachtet | dieselben Limits + Boost/Reset-Hebel; Restrisiko akzeptiert (s. u.) |
 | Bots / Scanner-Rauschen | täglich | Honeypot, Timing-Check, IP-Rate-Limit, Magic-Byte-Validierung |
-| Prompt Injection über Bildinhalte | strukturell | XML-Isolation, escapeXml, Output-Clamps; LLM-Ausgaben steuern keine Tools |
+| Prompt Injection über Bildinhalte | strukturell | Regel im Analyse-Prompt (Text im Bild ist Inhalt, nie Anweisung); im zweiten Aufruf Daten-Blöcke + escapeXml; Output-Clamps; LLM-Ausgaben steuern keine Tools |
 | Admin-Missbrauch / Replay | gering | HMAC-Token (30 min) + Einmal-Nonce (5 min, fail-closed seit v3.0.4), Bearer-Secret |
 | Fehlkonfiguration der Cloud | schleichend | `scripts/verify-infrastructure.sh` vor jedem Deploy (nur lesend, CI-erzwungen) |
 
@@ -42,7 +42,10 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
   Analysedaten gehen direkt an die Cloud-Run-Adressen in `europe-west1`, nicht
   über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026, s. u.).
 - **Einlass:** Maintenance-Check → IP-Rate-Limit → Honeypot/Timing → MIME +
-  Magic-Bytes → globales Stundenlimit → Queue-Tiefen-Bremse.
+  Magic-Bytes → Queue-Tiefen-Bremse (Vorprüfung) → globales Stundenlimit →
+  erst der Auftrag, dann das Foto → Queue-Tiefen-Bremse (genaue Prüfung der
+  eigenen Position). Kein Foto liegt im Zwischenspeicher, das kein Auftrag
+  kennt.
 - **Verarbeitung:** Worker `processJob` nur per OIDC (nicht öffentlich, per
   Infra-Skript geprüft); Mistral ausschließlich über `api.eu.mistral.ai`
   (per Unit-Test festgenagelt) mit org-weitem Zero Data Retention.
@@ -57,22 +60,37 @@ die Nachweise. Meldewege für Sicherheitslücken: [../SECURITY.md](../SECURITY.m
 Diese Punkte sind **Entscheidungen, keine Versäumnisse**. Wer sie ändern will,
 muss die Begründung entkräften, nicht nur das Risiko benennen.
 
-1. **Stundenzähler ist fail-open.** Schlägt die Firestore-Abfrage des
-   Stundenlimits fehl, wird die Analyse erlaubt und parallel ein ERROR-Alarm
-   (`counter-fail-open`) ausgelöst, der per E-Mail zugestellt wird.
-   *Warum:* Der häufigste Fehlerfall ist Transaktions-Gedränge im
-   Workshop-Burst — genau dann würde fail-closed echte Schulklassen aussperren,
-   um ein Kostenrisiko abzuwehren, das der Alarm ohnehin überwacht. Geprüft und
-   bestätigt in der externen Review 2026-08-12 (der Reviewer zog seine
-   fail-closed-Empfehlung nach Gegenrede zurück).
-2. **IP-Rate-Limit ist instanzlokal.** Das 500/10-min-Limit lebt im
-   Arbeitsspeicher jeder Function-Instanz — bei `enqueue`/`jobstatus` bis zu 10
-   Instanzen (gemessen `maxScale`, 2026-08-13), effektiv also ein Mehrfaches der
-   genannten Zahl. Ein verteilter Angreifer kann es umgehen. *Warum:* Es ist der Lärmfilter, nicht die Kostenbremse;
-   die echten Bremsen (Stundenlimit, Queue-Tiefe) sind global. Die Alternative —
-   IP-Ableitungen in Firestore speichern — würde die Kern-Zusage „keine
-   persistente IP" schwächen und träfe im Schul-WLAN ganze Klassen hinter einer
-   IP. Der mögliche Schaden ist Verfügbarkeit (begrenzt durch 500/h), nie Geld.
+1. **Die Kostenbremse hängt an der Datenbank.** Das Stundenlimit wird in
+   Firestore gezählt. Fällt der Zähler aus — bei Andrang, weil er in ein
+   einziges Dokument schreibt —, übernimmt ein Netz, das nur liest, dieselben
+   Regeln anwendet und am Limit blockiert. Erst wenn Zähler **und** Netz
+   ausfallen, wird eingelassen; dann geht eine Meldung auf beiden Kanälen
+   hinaus (`notbremse-fehlgeschlagen`). *Warum dieser Rest bleibt:* Ohne
+   lesbare Datenbank ist keine Grenze bekannt. Dann alle abzuweisen, hieße, bei
+   jeder Datenbankstörung den Workshop zu stoppen — während die
+   Warteschlangen-Rate die Kosten weiter deckelt. Bis 30.08.2026 ließ schon der
+   Ausfall des Zählers allein durch; warum das falsch war und was daraus
+   wurde, steht im Abschnitt „Die Kostenbremse und ihr Netz".
+2. **Die Begrenzung je IP-Adresse ist ein Lärmfilter, kein Schutz.** Sie lebt
+   im Arbeitsspeicher jeder Function-Instanz (Grenze und Fenster: `adressLimit`
+   und `adressfensterMs` im Einstellungssatz) — bei `enqueue` bis zu 10
+   Instanzen, bei den zwei Meldungs-Annahmen bis zu 3 (`maxInstances` in
+   `functions/src/index.js`), effektiv also ein Mehrfaches des eingestellten
+   Werts. Die Statusabfrage hat bewusst keine solche Begrenzung. Dazu kommt:
+   Die Adresse, nach der gezählt wird, ist nicht fälschungssicher. Der
+   Laufzeit-Rahmen nimmt sie aus der Kopfzeile `X-Forwarded-For`, deren ersten
+   Eintrag der Aufrufer selbst setzen kann (`SEC-2026-10-03-20`; am Rahmen
+   gemessen, an der Produktion nicht). Wer es darauf anlegt, umgeht die
+   Begrenzung also oder lenkt sie auf eine fremde Adresse. *Warum hingenommen:*
+   Sie soll gewöhnliche Häufung bremsen, nicht einen Angreifer; die echten
+   Bremsen (Stundenlimit, Queue-Tiefe) sind global und hängen nicht an der
+   Adresse. Die Alternative — IP-Ableitungen in Firestore speichern — würde die
+   Kern-Zusage „keine persistente IP" schwächen und träfe im Schul-WLAN ganze
+   Klassen hinter einer IP. Der mögliche Schaden ist Verfügbarkeit (ein Netz
+   kann für die Dauer des Fensters vom Hochladen ausgesperrt sein; die Zahl der
+   Analysen begrenzt das Stundenlimit), nie Geld. *Neu bewerten,* sobald eine
+   solche Aussperrung beobachtet wird — dann den Eintrag nehmen, den Google
+   selbst anhängt, nach einer Messung an der Produktion.
 3. **Kein Staging-System.** Deploys gehen direkt in die Produktion.
    *Warum:* Ein zweites Firebase-Projekt verdoppelt Pflege, Secrets und
    Fehlerquellen — beim Ein-Personen-Projekt kostet das mehr Sicherheit, als es
@@ -85,10 +103,27 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    (Limits, Budgets, Alarme) und einen privaten Notfall-Umschlag, mit dem eine
    Vertrauensperson das System geordnet stoppen kann.
 5. **Öffentliche `/api/*`-Functions.** enqueue, jobStatus, stats, errors,
-   telemetry, admin sind öffentlich aufrufbar (allUsers). *Warum:* Firebase
-   Hosting reicht `/api/*` an sie durch; die Absicherung liegt in den Handlern
-   (Limits, Validierung, HMAC beim Admin). Das Infra-Skript prüft im Gegenzug,
-   dass die Nicht-öffentlichen (`processjob`, `reapjobs`) es auch bleiben.
+   telemetry, admin sind öffentlich aufrufbar (allUsers). *Warum:* Der Browser
+   ruft sie ohne Anmeldung auf — seit 09.09.2026 direkt unter ihren
+   Cloud-Run-Adressen, die Hosting-Umleitungen für `/api/*` bleiben als Rückweg
+   (Abschnitt „Schnittstellen direkt am EU-Server"). Die Absicherung liegt in
+   den Handlern (Limits, Validierung, HMAC beim Admin). Das Infra-Skript prüft
+   im Gegenzug, dass die Nicht-öffentlichen (`processjob`, `reapjobs`) es auch
+   bleiben.
+   *Der Statusabruf hat einen zweiten, schreibenden Weg* (`DELETE
+   /api/job-status`, 07.10.2026, `PRIV-2026-10-03-57`): Der Browser meldet
+   damit einen Auftrag ab, den er nicht mehr abholt, weil jemand ein anderes
+   Foto gewählt hat. *Warum vertretbar:* Der Weg wirkt nur mit dem Abhol-Ticket
+   genau dieses Auftrags (die Auftragsnummer allein genügt nicht) und nur auf
+   einen noch wartenden Auftrag; was in Arbeit oder fertig ist, bleibt
+   unberührt. Er kann nichts, was der Aufräumdienst nach der Karenz nicht
+   ohnehin täte — Auftrag verwerfen, Foto löschen, Platz im Stundenfenster
+   zurückgeben —, nur früher. Löschen und Rückgabe beginnen gleichzeitig und
+   hängen nicht voneinander ab; auf jedes wartet der Weg höchstens fünf
+   Sekunden (hängt der Zähler unter Andrang, bleibt so kein verworfenes Foto
+   liegen; hängt der Speicher, kommt der Platz trotzdem zurück). Seine
+   Warnzeilen tragen weder Auftragsnummer noch Fehlertext
+   (`handle-job-status-abmelden.test.js`, `freigabe-ueber-die-hilfe.test.js`).
 6. **Durchsatz-Deckel liegt extern.** Mistral-Tier T1 = 0,25 req/s ≈ 7,5
    Analysen/min — die reale Bremse bei Stoßlast. *Status:* bekannt, mit
    Warteschlangen-Ehrlichkeit (Position + ETA) abgefedert; Tier-Hebung ist eine
@@ -138,6 +173,24 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    Workshop-Stoßlast (1000–2000 Analysen/Vormittag) am Einlass ausbremsen, für
    die der Endpunkt bewusst dünn und schnell ist. *Neu bewerten,* falls je ein
    realer Speicher-Erschöpfungs-Vorfall auftritt (bisher keiner beobachtet).
+   *Nachtrag 07.10.2026 (`SEC-2026-10-03-21`): Schutz (1) trägt nicht für
+   GEPACKTE Rümpfe.* Der Deckel von Cloud Run zählt die übertragenen Bytes; der
+   Laufzeit-Rahmen (`@google-cloud/functions-framework`, gelesen an der Fassung
+   5.0.5) entpackt einen Rumpf mit `Content-Encoding` vollständig, bevor eine
+   Zeile unseres Programms läuft, mit einer festen Grenze von 1024 MB, die sich
+   nicht einstellen lässt. Lokal gemessen: 2 KB gzip stehen im Handler als 2 MB
+   im Speicher; der Tief-Audit vom 03.10.2026 maß 500 Byte → 300 MB. Im
+   Programm lässt sich das Entpacken nicht verhindern. Was es tut: Jede
+   öffentliche Schnittstelle weist eine Anfrage mit `Content-Encoding` sofort
+   mit 415 ab (der eigene Browser schickt keine), arbeitet nicht mit dem Rumpf
+   weiter und schreibt eine Warnung `gepackte-anfrage-abgewiesen` mit der
+   entpackten Größe (`index.js`, `gepackte-anfragen.test.js`). Der Speicherstoß
+   selbst bleibt möglich; ob Cloud Run die Kopfzeile in der Produktion
+   unverändert durchreicht und ob eine Instanz daran stirbt, ist NICHT gemessen
+   (eine Probe gegen die laufende Anwendung braucht Christophs Wort). Der
+   mögliche Schaden ist Verfügbarkeit des Uploads, kein Geld und keine Daten.
+   Wirksam abweisen ließe sich nur VOR dem Rahmen, also außerhalb des
+   Programms (vorgeschalteter Lastverteiler mit Regel) — bisher nicht gebaut.
 
 10. **Neun Bau-Protokolle liegen in einem Google-eigenen Speicher ohne
     Regionswahl.** Cloud Build legt Bau-Protokolle standardmäßig in einem
@@ -162,7 +215,7 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
 |---|---|
 | IP-Speicherung (auch gehasht/HMAC) | schwächt die Kern-Zusage „keine persistente IP"; trifft Schul-NAT-Klassen; DSGVO-Pflichten ohne echten Gewinn (Kosten sind global gedeckelt) |
 | WAF / Cloud Armor | kein beobachteter Missbrauch; zusätzliche Komplexität und Kosten; erst bei realem Druck neu bewerten |
-| Fail-closed am Stundenzähler (pauschal) | würde im häufigsten Fehlerfall (Kontention im Workshop-Burst) echte Nutzer aussperren; differenzierte Betrachtung siehe Restrisiko 1 |
+| Bei jedem Fehler des Stundenzählers pauschal abweisen | würde im häufigsten Fehlerfall (Gedränge am Zähler-Dokument bei Andrang) echte Klassen aussperren; stattdessen entscheidet das Netz mit dem echten Stand (Restrisiko 1, Abschnitt „Die Kostenbremse und ihr Netz") |
 
 ## Pflege
 
@@ -255,7 +308,11 @@ wurde angenommen. Einzelheiten: `docs/ERROR-ALERTING.md`, „Wenn der Push nicht
 
 **Was dagegen gesetzt ist.** Kein Alarm geht verloren: `verify-infrastructure.sh` verlangt
 bei jedem Deploy je Alarmregel einen eingeschalteten E-Mail-Kanal. Ohne zweiten Weg bleiben
-die Nachricht „Stundenlimit erreicht" und die Meldungen des Nachtlaufs.
+die Nachricht „Stundenlimit erreicht" und die Meldungen des Nachtlaufs. Die Nachricht
+„Stundenlimit erreicht" wird seit 07.10.2026 abgewartet (höchstens zwei Sekunden, nur bei
+der einen Anfrage, die das Limit erreicht), statt neben der Antwort her zu laufen — sie
+bleibt also nicht mehr schon auf unserer Seite liegen; der Weckruf auf dem Handy kann
+weiterhin abgewiesen werden.
 
 **Betrachtete Alternativen.** Eine bezahlte Stufe bei `ntfy.sh` (dort wird dann nach Konto
 gezählt) und eine eigene feste Absender-Adresse. Beide verworfen: laufende Kosten für einen
@@ -453,6 +510,25 @@ Sekunden gingen zwischen Function und Datenbank verloren. Fünf Minuten
 Verzögerung sind für diesen Alarm unschädlich, weil er nur die Reserve ist:
 Jede Analyse ohne Betriebswerte meldet sich sofort selbst.
 
+**Nachschärfung 07.10.2026: der letzte gültige Stand gilt weiter**
+(BUG-2026-10-03-32). Bis dahin verwarf ein einzelner träger Zugriff den eben noch
+gültigen Satz. Die Folge am Einlass war nicht bedacht: Alle, die im selben
+Augenblick hochluden, bekamen „Einstellung stimmt nicht, in ein paar Minuten
+nochmal“, obwohl der nächste Versuch sofort gelang, und die Statusabfrage eines
+laufenden Auftrags antwortete mit einem Serverfehler. Jetzt gibt
+`betriebsprofil.js` bei „nicht lesbar“ den zuletzt gültig gelesenen Satz weiter
+aus — er stammt aus der Datenbank, nicht aus dem Code — und liest nach fünf
+Sekunden neu. Die Warnung nennt das Alter des Stands (`letzterStand: true`,
+`standAlterMs`). Ein fehlendes, unbenanntes oder abgelehntes Dokument verwirft
+den Stand sofort und bleibt ERROR; eine frisch gestartete Instanz ohne gültigen
+Stand hat weiter „keinen Satz“. Die zwei unten verworfenen Alternativen bleiben
+verworfen: Das Zeitlimit ist weiter zwei Sekunden, je Aufruf gibt es weiter
+einen Leseversuch. Der Aufräumer zählt einen Lauf mit dem alten Stand als Lauf
+ohne Betriebswerte (Warnung `reap-query-ohne-betriebswerte:letzter-stand`), der
+Alarm nach fünf Läufen in Folge bleibt also. Eine Analyse bricht in dieser Zeit
+nicht mehr ab und meldet sich deshalb auch nicht selbst
+(`betriebsprofil-letzter-stand.test.js`, `aufraeumer-loescht-ohne-satz.test.js`).
+
 **Betrachtete Alternative.** Das Zeitlimit von zwei Sekunden anheben. Verworfen:
 Das Limit sitzt im Analysepfad, und jede Sekunde mehr wäre eine Sekunde, die
 JEDE Analyse im Störungsfall länger hängt. Ein eigener zweiter Leseversuch je
@@ -463,14 +539,15 @@ nächste Lauf kommt ohnehin 60 Sekunden später.
 
 **Was weiterhin alarmiert.** Jede Analyse, die ohne Betriebswerte abbricht
 (`kein-einstellungssatz` in `handle-process-job.js`) — sofort; fünf
-Aufräumer-Läufe in Folge (`betriebswerte-wiederholt-nicht-lesbar`); jedes
-kaputte Dokument. Ein Dauerausfall von Firestore fällt damit sofort auf, wenn
-jemand analysiert, und sonst spätestens nach fünf Minuten.
+Aufräumer-Läufe in Folge ohne frisch gelesene Betriebswerte
+(`betriebswerte-wiederholt-nicht-lesbar`); jedes kaputte Dokument. Ein
+Dauerausfall von Firestore fällt damit spätestens nach fünf Minuten auf — und
+sofort, wenn jemand analysiert, denn jeder Auftrag liegt selbst in Firestore.
 
 **Bedingung für Neubewertung.** Warnungen `reap-query-ohne-betriebswerte` in
 mehr als drei verschiedenen Minuten eines Tages, also in mehr als drei Läufen
-(Abfrage im RUNBOOK; ein einzelner träger Lauf erzeugt bis zu fünf Warnungen
-in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
+(Abfrage im RUNBOOK; ein einzelner Lauf ohne Betriebswerte erzeugt bis zu drei
+Warnungen in derselben Minute und zählt einmal) — dann ist es kein Ausrutscher mehr,
 sondern ein Muster, und die Ursache gehört gesucht, nicht die Schwelle
 verschoben. Stand 01.10.2026, 13:00 Wien: drei Minuten an diesem Tag (10:52,
 11:30, 12:57) — an der Grenze, nicht darüber, wie am 10.09.2026. Seit 01.10.2026 protokolliert
@@ -547,15 +624,24 @@ dann liegt die Ursache außerhalb eines Einzelfalls, und `ursache.code` zeigt, w
 **Entscheidung.** Sieht ein Kind nach einer Analyse eine Fehlermeldung, endet
 sein Auftrag `done` mit blockiertem Ergebnis, `done` mit einem leeren Profil in
 einem der beiden Modi (`completeJob`) oder `failed` (`failJob`: der Worker
-wurde nicht fertig, oder schon das Einreihen scheiterte). Dort, und nur wenn
-dieser Aufruf den Übergang gemacht hat, schreibt `jobs.js` die eine
-Fehlerzeile `alert: "analyse-gescheitert"` mit dem Grund (Liste in
-`docs/ERROR-ALERTING.md`). Scheitert das Hochladen, bevor es einen Auftrag
+wurde nicht fertig, oder schon das Einreihen scheiterte). Zu diesem Übergang
+schreibt `jobs.js` die eine Fehlerzeile `alert: "analyse-gescheitert"` mit dem
+Grund (Liste in `docs/ERROR-ALERTING.md`). Seit 07.10.2026 hängt sie am Zustand
+des Auftrags, nicht am einzelnen Aufruf (OPS-2026-10-03-31): Der Auftrag trägt
+ab dem Übergang `gemeldet: false` und nach der Zeile `gemeldet: true`. Endet
+der Übergang mit einem Fehler, wird er einmal wiederholt — kam nur die
+Bestätigung der Datenbank nicht an, erkennt die Wiederholung den eigenen Stand
+und meldet. Was beim Löschen eines Auftrags noch `gemeldet: false` trägt,
+meldet der Aufräumdienst nach (spätestens nach 2 Stunden; scheitert nur der
+Vermerk, kommt die Nachricht dann ein zweites Mal — lieber zwei als keine). Scheitert das Hochladen, bevor es einen Auftrag
 gibt (Speicher oder Datenbank weg, unerwarteter Serverfehler), ruft
 `handle-enqueue.js` dieselbe Meldung; Eingabefehler (4xx) melden sich nicht.
 Auf sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
 Einzelnen beschreiben — KI-Aufruf, Neuversuch, Nachfrage, Foto laden,
-Absturzverdacht, verworfenes Ergebnis —, sind Warnungen. Wie die Richtlinien
+Absturzverdacht, verworfenes Ergebnis, wiederholtes Speichern —, sind
+Warnungen. Ebenso seit 07.10.2026 der Werbe-Aufruf, den Mistral wegen Überlast
+ablehnt (429): Das Kind bekommt sein Ergebnis, eine Nachricht „Fehler im
+Server“ wäre ein Alarm ohne gescheiterte Analyse. Wie die Richtlinien
 filtern und wie oft sie melden: `docs/ERROR-ALERTING.md`.
 
 **Begründung.** Vorher entschied jede Stelle selbst, ob sie alarmiert. Das gab
@@ -567,7 +653,8 @@ obwohl das Kind sein Tierprofil bekam; ein Absturzverdacht meldete sich als
 bekannt, was das Kind sieht. Abgesichert in
 `functions/src/__tests__/ein-alarm-je-fehlermeldung.test.js` über den echten
 Weg (Worker, Pipeline, KI-Aufruf, Auftragsverwaltung): je Fehlerfall genau
-eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine. Ob
+eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine; mit
+verlorener Bestätigung der Datenbank in `meldung-am-zustand.test.js`. Ob
 „leeres Profil“ vorliegt, entscheidet dieselbe Regel wie in
 `public/js/render.js` (Text oder mindestens eine Karte).
 
@@ -1318,8 +1405,12 @@ Die Dauern bleiben.
 
 Kennungen tragen nur noch Wege, auf denen der jeweilige Aufruf keine Analyse
 macht: Zeilen des Analyse-Aufrufs vor dem Claim und Fehlerzeilen eines
-gescheiterten Einlasses (dort einmal beide Kennungen zusammen). Auftrag und
-Antwort an den Browser tragen die Vorgangskennung weiter. Geprüft werden
+gescheiterten Einlasses (dort einmal beide Kennungen zusammen). Die Antwort
+des Einlasses gibt dem Browser seine Vorgangskennung in einer Kopfzeile
+zurück. Der gespeicherte Auftrag und sein Ergebnis führen sie seit 07.10.2026
+nicht mehr (`PRIV-2026-10-03-39`): Der Datenschutztext nennt für den
+gespeicherten Auftrag Profil, Kamera und Sprache, und nach dem Einlass liest
+die Kennung niemand mehr (`auftrag-ohne-zufallsnummer.test.js`). Geprüft werden
 jeweils ALLE Ausgaben eines Aufrufs nach den Werten der Kennungen, mit
 Positivkontrolle: `analyse-aufruf-ohne-kennung.test.js` (Erfolgs- und
 Fehlerwege der Analyse, auch mit Firestore-Fehlertexten, die die Kennungen
@@ -1411,6 +1502,22 @@ Datenschutztext an die Zeilen anpassen: verworfen, der Text ist die Vorgabe.
 **Rückweg.** Nur mit Deploy. Ein zusätzliches Feld in einer der Zeilen lässt
 die Feldmengen-Tests rot werden; wer es braucht, prüft zuerst, ob der
 Datenschutztext es deckt.
+
+**Nachtrag 07.10.2026 (`PRIV-2026-10-03-39`).** Drei Geräteangaben der
+Fehlermeldungen nennt der Datenschutztext nicht: Arbeitsspeicher, Zahl der
+Prozessorkerne, Pixeldichte. Sie werden nicht mehr gesammelt
+(`public/js/client-context.js`) und nicht mehr angenommen
+(`functions/src/handle-errors.js` — auch nicht von einer Seite, die noch im
+Zwischenspeicher eines Browsers liegt). Was der Text nennt, bleibt: Browsertyp,
+Größenklasse des Bildschirms, Sprache, Netz. Die Entscheidung oben, die
+Geräteangaben nicht insgesamt aus den Fehlermeldungen zu nehmen, gilt
+unverändert. Geprüft: `fehlermeldung-geraeteangaben.test.js` (am echten
+Handler: die drei Felder kommen nicht an, die übrigen schon) und
+`public/__tests__/geraeteangaben-deckung.test.js` (jede Geräteangabe braucht
+ein eigenes Stichwort im deutschen und englischen Text; der Sammelsatz „grobe
+Angaben wie" gilt für sie nicht). *Getragene Folge:* Ein Fehler, der nur auf
+Geräten mit wenig Arbeitsspeicher auftritt, ist am Protokoll nicht mehr als
+solcher zu erkennen.
 
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 

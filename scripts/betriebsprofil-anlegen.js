@@ -21,6 +21,7 @@
  * Aufruf:
  *   node scripts/betriebsprofil-anlegen.js                 nur anzeigen
  *   node scripts/betriebsprofil-anlegen.js --ausfuehren    wirklich schreiben
+ *   … --projekt <projekt-id>                               anderes Projekt als "malzime"
  */
 const pfad = require("path");
 const wurzel = pfad.resolve(__dirname, "..");
@@ -47,6 +48,16 @@ const { PROFILE, T1_NORMAL, AKTIV } = require(pfad.join(wurzel, "functions", "sr
 
 const ausfuehren = process.argv.includes("--ausfuehren");
 const ueberschreiben = process.argv.includes("--ueberschreiben");
+
+/* Projekt: ohne Angabe "malzime". Wer das Projekt selbst betreibt, nennt seines
+   ausdruecklich (--projekt mein-projekt). Bewusst kein Griff in die Umgebung:
+   Ein zufaellig gesetztes GCLOUD_PROJECT soll den Schreibweg nicht umlenken. */
+const projektStelle = process.argv.indexOf("--projekt");
+const PROJEKT = projektStelle === -1 ? "malzime" : process.argv[projektStelle + 1];
+if (!PROJEKT || PROJEKT.startsWith("--")) {
+  console.error("FEHLER: --projekt braucht eine Projekt-ID, etwa --projekt mein-projekt");
+  process.exit(2);
+}
 
 /* PRUEFUNG VOR DEM SCHREIBEN — mit derselben Funktion, die auch im Betrieb
    entscheidet. Ein Satz, den das System ablehnen wuerde, darf gar nicht erst
@@ -75,6 +86,7 @@ if (Object.keys(T1_NORMAL).length !== PFLICHTFELDER.length) {
 }
 
 console.log(`\nDatenbank:  ${FIRESTORE_DATABASE_ID}`);
+console.log(`Projekt:    ${PROJEKT}`);
 console.log(`Dokument:   config/betriebsprofil`);
 console.log(`Aktiv:      ${AKTIV}`);
 console.log(`Profile:    ${Object.keys(PROFILE).join(", ")}`);
@@ -87,11 +99,13 @@ for (const feld of ["jobAufbewahrungMs", "zustellfensterMs", "adressfensterMs", 
 
 if (!ausfuehren) {
   console.log(`\nNur angezeigt. Zum wirklichen Schreiben:`);
-  console.log(`  node scripts/betriebsprofil-anlegen.js --ausfuehren`);
+  console.log(
+    `  node scripts/betriebsprofil-anlegen.js${projektStelle === -1 ? "" : ` --projekt ${PROJEKT}`} --ausfuehren`
+  );
   process.exit(0);
 }
 
-initializeApp({ credential: applicationDefault(), projectId: "malzime" });
+initializeApp({ credential: applicationDefault(), projectId: PROJEKT });
 const db = getFirestore(FIRESTORE_DATABASE_ID);
 const ref = db.doc("config/betriebsprofil");
 

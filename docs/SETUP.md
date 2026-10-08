@@ -19,9 +19,11 @@ firebase use --add   # Projekt-ID waehlen
 malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
 
 1. Account erstellen auf [console.mistral.ai](https://console.mistral.ai/)
-2. Stripe-Karte hinterlegen, **Scale Tier** aktivieren (die Limits des Free Tier reichen fuer den Betrieb nicht)
+2. Zahlungsmittel hinterlegen und einen kostenpflichtigen Tarif aktivieren — der kostenlose
+   Tarif reicht fuer Bild-Aufrufe nicht. Die Tarifnamen bei Mistral aendern sich; massgeblich
+   ist das Dashboard, nicht diese Anleitung
 3. API-Key generieren unter https://console.mistral.ai/api-keys/ — Key NUR EINMAL angezeigt, sofort sichern
-4. Key spaeter als Firebase Secret hinterlegen (Schritt 4)
+4. Key spaeter als Firebase Secret hinterlegen (Schritt 5, Abschnitt „Firebase Secrets")
 
 Genutztes Modell (in `functions/src/config.js`): `mistral-large-2512`. Ein Aufruf liefert Bildbeschreibung + beide Profile (seit v2.2), ein zweiter, kleiner Aufruf ohne Bild die Beast-Werbung (seit v2.8). Einen zweiten Analyseweg mit einem anderen Modell gibt es seit 10.09.2026 nicht mehr.
 
@@ -31,7 +33,9 @@ Wenn der Mistral-Call fehlschlaegt, gibt es keinen anderen KI-Provider als Fallb
 
 Im [Google Cloud Console](https://console.cloud.google.com) brauchst du diese APIs zusaetzlich zu Firebase:
 
-- **Cloud Firestore** — Analyse-Zaehler, Maintenance-Flag und Queue-Jobs (wird automatisch mit Firebase aktiviert)
+- **Cloud Firestore** — Analyse-Zaehler, Maintenance-Flag, Queue-Jobs und Einstellungssatz. Das Programm
+  spricht ausschliesslich die **benannte Datenbank `malzime-eu`** in `europe-west1` an, nicht die
+  Standard-Datenbank `(default)`; sie muss eigens angelegt werden (Befehl: [`SELF-HOSTING.md`](SELF-HOSTING.md), Schritt 3a)
 - **Cloud Tasks** — Warteschlange fuer die Analyse-Jobs (seit v2.0)
 - **Cloud Storage** — temporaere Bild-Ablage der Queue (seit v2.0)
 
@@ -45,6 +49,8 @@ Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange — Details in
 
 - Cloud-Tasks-Queue `analyze-queue` (`europe-west1`, `maxConcurrentDispatches` an Mistrals Limits angepasst)
 - GCS-Bucket `malzime-queue-uploads` fuer die temporaere Bild-Ablage (Lifecycle-Regel: 1 Tag)
+- Einstellungssatz im Dokument `config/betriebsprofil` — alle Betriebswerte, umstellbar **ohne Deploy**; ohne
+  gueltigen Satz laeuft keine Analyse (Werte und Anlegen: [`BETRIEBSPROFILE.md`](BETRIEBSPROFILE.md))
 - Firestore-Feature-Flags im Dokument `featureFlags/current` (Uebersicht in [`FLAGS.md`](FLAGS.md)) — umlegbar **ohne Deploy**
 
 Lokaler Durchklick der Queue ohne Cloud Tasks: [`docs/QUEUE-EMULATOR.md`](QUEUE-EMULATOR.md).
@@ -111,17 +117,21 @@ Wenn `NTFY_URL_EU` oder `NTFY_TOPIC_EU` leer sind, werden keine Push-Benachricht
 
 Hinweis: `MISTRAL_API_KEY_EU` ist Pflicht — Mistral ist seit v1.6.0 der einzige KI-Anbieter. Fehlt der Key, schlagen alle Analyse-Anfragen mit einer blockierten Antwort fehl (kein Fallback-Anbieter).
 
-## 5. Lokal testen
+## 6. Lokal testen
 
 ```bash
-firebase emulators:start --only functions,hosting
+npm run emulator   # Functions, Firestore, Hosting, Pub/Sub
+# zweites Terminal — der Emulator beginnt jedes Mal mit leerer Datenbank, also auch ohne
+# Einstellungssatz; ohne ihn lehnt der Einlass jede Analyse ab:
+FIRESTORE_EMULATOR_HOST=localhost:8080 node scripts/lasttest-satz-anlegen.js
 ```
 
-Dann: http://localhost:5050
+Dann: http://localhost:5050 — Einzelheiten und der Durchklick der Warteschlange stehen in
+[`QUEUE-EMULATOR.md`](QUEUE-EMULATOR.md).
 
-**Hinweis**: Mit der Attrappe aus der Vorlage laeuft die Analyse-Pipeline lokal ohne Schluessel. Fuer die echte KI muss `MISTRAL_API_KEY` in `functions/.env.local` gesetzt sein (siehe `functions/.env.local.example`). Der Firestore-Emulator startet automatisch mit, ein Google-Login ist fuer die lokale Entwicklung nicht noetig.
+**Hinweis**: Mit der Attrappe aus der Vorlage laeuft die Analyse-Pipeline lokal ohne Schluessel. Fuer die echte KI muss `MISTRAL_API_KEY` in `functions/.env.local` gesetzt sein (siehe `functions/.env.local.example`). Ein Google-Login ist fuer die lokale Entwicklung nicht noetig.
 
-## 6. Tests ausfuehren
+## 7. Tests ausfuehren
 
 ```bash
 # Backend (Jest)
@@ -135,7 +145,7 @@ npm run test:frontend
 **Frontend** (Anzahl: siehe [VERIFICATION.md](VERIFICATION.md)): DOM-Helpers, State, Scan-Animation, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
 **E2E** (Anzahl: siehe [VERIFICATION.md](VERIFICATION.md)): Playwright Smoke-, A11y- und Tastatur-Tests — Demo-Flow, fehlerfreies Laden, axe-A11y-Gate (Startseite + Profil-Ansicht), Tastatur-Durchlauf.
 
-## 7. Linting + Formatting
+## 8. Linting + Formatting
 
 ```bash
 # Backend
@@ -149,7 +159,7 @@ npm run format:frontend:check
 
 CI prueft Lint + Format automatisch bei jedem Push und Pull Request.
 
-## 8. Deploy
+## 9. Deploy
 
 ```bash
 ./scripts/deploy.sh            # Website + Server
@@ -176,11 +186,15 @@ Bei Tier-Fotos (SUBJECT=ANIMAL_ONLY) entfaellt der zweite Aufruf — das Easter-
 
 ### Preise (Stand Mai 2026)
 
-**Mistral Scale Tier** (pro 1M Tokens):
+**Mistral, kostenpflichtiger Tarif** (Listenpreis pro 1M Tokens):
 
 | Modell | Input | Output |
 |--------|-------|--------|
 | Large 3 (`mistral-large-2512`) | $0.50 | $1.50 |
+
+malziME ruft Mistral ueber den EU-Endpunkt auf (fest im Code, `functions/src/config.js`); dafuer
+berechnet Mistral einen Aufpreis auf den Listenpreis. Massgeblich ist die Abrechnung im
+eigenen Mistral-Konto.
 
 **Google Cloud (nur Infrastruktur):**
 
@@ -210,10 +224,10 @@ Neue Konten erhalten $300 Startguthaben — damit lassen sich tausende Analysen 
 Die Privacy-Architektur ist ein Kernbestandteil des Projekts:
 
 1. **EXIF im Browser**: Die Library exifr (self-hosted unter `public/lib/exifr/`) parsed Metadaten client-seitig
-2. **GPS bleibt lokal**: GPS-Koordinaten werden nie an den Server gesendet. Geocoding (Nominatim) wird direkt vom Browser aufgerufen
-3. **Server bekommt**: Komprimiertes Bild (max 1280px, JPEG 0.82) + Kamera-Hersteller/Modell. Kein GPS, kein dateTimeOriginal.
+2. **GPS erreicht nie unsere Server**: Die Koordinaten liest der Browser aus dem Foto und nutzt sie dort. Die Adresse zum Ort (Nominatim) und die Kartenkacheln ruft der Browser direkt bei OpenStreetMap ab — die Koordinaten verlassen das Geraet also, nur nie in Richtung malziME. Bei den Demo-Fotos fragt der Browser nichts nach aussen
+3. **Server bekommt**: Komprimiertes Bild (max 1280px, JPEG 0.82) + Kamera-Hersteller/Modell, die Sprache und eine Zufallsnummer des Durchgangs. Kein GPS, kein dateTimeOriginal.
 4. **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird unmittelbar danach geloescht; das Job-Dokument spaetestens nach 2 h. Das Bild bleibt nie länger als nötig im Speicher
-5. **Keine externen Scripts**: Fonts, Leaflet und exifr sind self-hosted. Kein CDN, kein Google Fonts, kein Firebase SDK im Frontend
+5. **Keine externen Scripts**: Fonts, Leaflet, exifr und libheif sind self-hosted. Kein CDN, kein Google Fonts, kein Firebase SDK im Frontend
 6. **Bot-Schutz ohne Tracking**: Rate Limiting (IP-basiert), Honeypot-Feld, Timing-Check. Kein reCAPTCHA.
 
 ## CI/CD
@@ -242,11 +256,13 @@ malziME hat ein vollstaendiges i18n-System. Alle UI-Texte, KI-Prompts und Tier-P
 public/locales/                Frontend-Locales
   manifest.json                Verfuegbare Sprachen + Default-Sprache
   de.json                      Deutsche UI-Strings
+  en.json                      Englische UI-Strings (dieselben Schluessel)
 
 functions/src/locales/         Backend-Locales
   manifest.json                Verfuegbare Sprachen + Default-Sprache
-  de/prompts.js                Deutsche KI-Prompts (System-Prompts, Schemas)
+  de/prompts.js                Deutsche KI-Prompts (Analyse-Prompt, Werbe-Aufruf)
   de/animals.js                Deutsche Tier-Easter-Egg-Profile
+  en/prompts.js, en/animals.js Englische Gegenstuecke
 ```
 
 ### Wie es funktioniert
@@ -270,4 +286,4 @@ Sprache per URL-Parameter testen: `https://malzi.me/?lang=XX`
 
 - IP-basierte Rate Limits sind in-memory (pro Cloud Functions Instanz). Das globale Stundenlimit verwendet Firestore und ist instanzuebergreifend
 - Logs enthalten nur Request-ID, Status und Modell-Info — keine Bilddaten
-- Wenn Mistral die Bildbeschreibung verweigert (z.B. bei Grenzfall-Bildern), versucht der Code automatisch einen zweiten, weniger triggernden Prompt. Schlaegt auch der fehl, bekommt der User eine blockierte Antwort
+- Liefert Mistral kein auswertbares Profil, bekommt der User eine blockierte Antwort (`blocked.profileBlocked`). Fehlen in einer sonst lesbaren Antwort einzelne Karten, fragt der Code einmal mit demselben Prompt nach; einen zweiten Prompt oder ein zweites Modell gibt es nicht

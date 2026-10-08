@@ -1,0 +1,4 @@
+# ERWARTUNG: kein Fund (Exit 0). Ein Name mit Unterstrichen ist kein Satz; zwei
+# Listenpunkte und zwei Absaetze bleiben getrennt, auch wenn ein Wort betont ist;
+# Sternchen in Rechnungen und Dateimustern machen aus nichts eine Wendung.
+verl(ae|ä)sst nie den Browser|Absolute Zusage ueber Datenfluesse ist im Netzwerk-Tab widerlegbar.

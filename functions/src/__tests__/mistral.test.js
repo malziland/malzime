@@ -45,12 +45,19 @@ describe("isRateLimitError", () => {
     expect(isRateLimitError(err)).toBe(true);
   });
 
-  test("detects 429 in message", () => {
-    expect(isRateLimitError(new Error("Mistral HTTP 429: Rate limit exceeded"))).toBe(true);
+  /* Seit BUG-2026-10-03-34 zaehlen nur Code und Status (ueberlast.js). */
+  test("the message alone does not decide — the status does", () => {
+    expect(isRateLimitError(new Error("Mistral HTTP 429: Rate limit exceeded"))).toBe(false);
+    expect(isRateLimitError(Object.assign(new Error("Mistral HTTP 429: Rate limit exceeded"), { status: 429 }))).toBe(
+      true
+    );
   });
 
-  test("detects rate_limited code", () => {
-    expect(isRateLimitError(new Error("error type rate_limited"))).toBe(true);
+  test("detects the rate_limit code, not the words", () => {
+    expect(isRateLimitError(new Error("error type rate_limited"))).toBe(false);
+    expect(isRateLimitError(Object.assign(new Error("Mistral rate limit exceeded"), { code: "rate_limit" }))).toBe(
+      true
+    );
   });
 
   test("does not match other errors", () => {

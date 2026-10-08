@@ -181,6 +181,30 @@ export function showLimitBanner(retryAfterSeconds) {
   startLimitCountdown(retryAfterSeconds);
 }
 
+/* UX-2026-10-03-49: Ist das Limit vorbei, lud die Seite bisher immer neu.
+   Steht gerade ein Profil da (nach einem Neuladen wiederhergestellt), nimmt
+   ihm das die Leseposition und einen angefangenen Realitaets-Check — und ist
+   die Zustellung laenger als 15 Minuten her, ist das Profil danach weg. Dann
+   genuegt es, den Hinweis auszublenden und den Hochlade-Bereich wieder
+   freizugeben; ohne Ergebnis auf dem Bildschirm bleibt es beim Neuladen (es
+   holt den frischen Stand vom Server). */
+function limitAufheben() {
+  if (document.documentElement.hasAttribute("data-has-result")) {
+    hideLimitBanner();
+    return;
+  }
+  location.reload();
+}
+
+function hideLimitBanner() {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+  if (elements.limitBanner) elements.limitBanner.classList.remove("active");
+  bereicheSchalten(false);
+}
+
 function startLimitCountdown(totalSeconds) {
   if (countdownInterval) clearInterval(countdownInterval);
   let remaining = totalSeconds;
@@ -196,7 +220,7 @@ function startLimitCountdown(totalSeconds) {
       if (elements.limitCountdown) {
         elements.limitCountdown.textContent = t("limit.countdownDone");
       }
-      setTimeout(() => location.reload(), 2000);
+      setTimeout(limitAufheben, 2000);
       return;
     }
     updateCountdownText(remaining);
@@ -208,7 +232,7 @@ function startLimitCountdown(totalSeconds) {
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data && !data.current.limitActive) {
-            location.reload();
+            limitAufheben();
           }
         })
         .catch(() => {});
@@ -220,8 +244,15 @@ function updateCountdownText(seconds) {
   if (!elements.limitCountdown) return;
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
-  const time = m > 0 ? m + ":" + String(s).padStart(2, "0") + " Min" : s + " " + t("limit.seconds");
-  elements.limitCountdown.textContent = t("limit.countdown", { time });
+  /* UX-2026-10-03-48: Einheit und Zahlform stehen im Text der Sprachdatei —
+     „Min" stand fest im Code (auch auf der englischen Seite), und bei einer
+     Sekunde Rest hiess es „1 Sekunden". */
+  elements.limitCountdown.textContent =
+    m > 0
+      ? t("limit.countdownMinutes", { time: m + ":" + String(s).padStart(2, "0") })
+      : s === 1
+        ? t("limit.countdownSecond")
+        : t("limit.countdownSeconds", { seconds: s });
 }
 
 /* ── Maintenance-Modal ── */

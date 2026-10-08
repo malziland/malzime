@@ -10,6 +10,13 @@ vermischte vier Aufgaben, und an `betriebsprofil.js` haengen 15 Module.
 Aufteilen allein hilft nicht dauerhaft — Dateien wachsen zurueck, wenn niemand
 hinsieht. Dieses Skript sieht hin.
 
+WAS ES ANSIEHT: Programmdateien unter functions/src und public/js, dazu die
+oberste Ebene von public/ (Einstiegs-Skript, Stylesheet, Hauptseite) und die
+eigenen Skripte unter scripts/ — siehe NACHSUCHE. Es misst DATEIEN, nicht
+einzelne Funktionen. Fuer Funktionen haelt seit 07.10.2026 die Stil-Pruefung
+eine eigene Sperrklinke (hoechste Verzweigungszahl und laengste Funktion, in
+eslint.config.mjs und functions/eslint.config.js).
+
 WAS ES NICHT TUT: Es verbietet nichts. Es meldet, wenn eine Datei ueber ihre
 festgehaltene Groesse waechst, und verlangt dann eine Entscheidung: teilen oder
 die Grenze bewusst anheben. Beides ist in Ordnung — unbemerktes Wachsen nicht.
@@ -18,8 +25,11 @@ DIE GRENZEN sind der GEMESSENE Stand vom 31.08.2026, aufgerundet. Sie sind
 kein Ideal, sondern eine Sperrklinke: von hier aus nur noch abwaerts.
 
 AUFRUF:
-    python3 scripts/pruefe-kopplung.py           pruefen
-    python3 scripts/pruefe-kopplung.py --stand   heutige Werte anzeigen
+    python3 scripts/pruefe-kopplung.py             pruefen
+    python3 scripts/pruefe-kopplung.py --stand     heutige Werte anzeigen
+    python3 scripts/pruefe-kopplung.py --bestand   die vorhandenen Testdateien als
+                                                   Bestandsliste ausgeben (zum Nachziehen von
+                                                   scripts/testdateien-bestand.txt)
 
 RUECKGABE: 0 = alles innerhalb der Grenzen, 1 = etwas gewachsen, 2 = nicht messbar.
 """
@@ -137,7 +147,68 @@ ZEILEN_GRENZEN = {
     "functions/src/job-helfer.js": 150,
     # Die Sprachdateien sind Inhalt, kein Code — sie duerfen wachsen.
     # Deshalb stehen prompts.js hier bewusst NICHT.
+    #
+    # TEST-2026-10-03-44: Bis 07.10.2026 sah der Waechter nur `.js` unter
+    # functions/src und public/js. Das Einstiegs-Skript der Website, das
+    # Stylesheet, die Hauptseite und die eigenen Skripte der Auslieferung
+    # durften beliebig wachsen (Probe: public/app.js von 432 auf 1032 Zeilen,
+    # Rueckgabewert 0). Die folgenden Grenzen sind der gemessene Stand vom
+    # 07.10.2026 plus rund 5 Prozent — eine Sperrklinke, kein Urteil: Lang sind
+    # diese Dateien heute, weil sie viel erklaeren.
+    "public/app.js": 455,
+    "public/styles.css": 4960,
+    "public/index.html": 620,
+    "scripts/deploy.sh": 1410,
+    "scripts/pruefe-deploy-riegel.py": 1480,
+    "scripts/verify-infrastructure.sh": 915,
+    "scripts/selbstpruefung-waechter.sh": 720,
+    "scripts/pruefe-fremd-meldungen.mjs": 605,
+    "scripts/pruefe-mutationen.mjs": 600,
+    "scripts/pruefe-live.sh": 580,
+    # 07.10.2026: +40 fuer die Eintraege unten und die laengere Liste der
+    # unverzichtbaren Tests — Daten, keine Logik.
+    "scripts/pruefe-kopplung.py": 560,
+    # 07.10.2026: Die Aufteilungen der Behebung nach dem Audit vom 03.10.2026
+    # haben neue Dateien erzeugt, die in keiner Grenze standen — genau das
+    # Schlupfloch, das der Kommentar oben beschreibt (aus einer grossen Datei
+    # werden mehrere kleine, die danach unbemerkt wachsen). Dazu drei Dateien,
+    # die ohne Grenze nahe an der 400er-Schwelle lagen, und die Wochen-
+    # Erinnerung, die eine zweite Zusage bekommen hat. Gemessener Stand plus
+    # rund 5 Prozent.
+    "functions/src/betriebsprofil-kopplung.js": 150,
+    "functions/src/meldungs-annahme.js": 115,
+    "functions/src/erinnerungs-waechter.js": 108,
+    "functions/src/warteschlangen-rechnung.js": 91,
+    "functions/src/analyse-ausgang.js": 83,
+    "functions/src/oeffentliche-huelle.js": 57,
+    # 07./08.10.2026 (Pruefrunden): +50 — Loeschen und Freigabe beginnen
+    # gleichzeitig, auf beide wird begrenzt gewartet, samt Begruendung.
+    "functions/src/ruecknahme.js": 95,
+    "functions/src/index.js": 385,
+    "functions/src/handle-reap.js": 357,
+    "functions/src/handle-job-status.js": 354,
+    "functions/src/handle-erinnerung.js": 273,
+    "public/js/auftrag-abfrage.js": 160,
+    # 08.10.2026: aus api.js herausgeloest, als die Datei ueber ihre Grenze wuchs.
+    "public/js/auftrag-abmelden.js": 115,
+    "public/js/netz-hilfen.js": 78,
+    "public/js/foto-vorschau.js": 60,
 }
+
+# Wo nach Dateien OHNE Grenze gesucht wird (TEST-2026-10-03-44): Ordner,
+# Dateiendungen, und ob die Unterordner dazugehoeren. Wer hier eine Datei ueber
+# SCHWELLE Zeilen anlegt, bekommt sie gemeldet, bis sie eine Grenze hat.
+#
+# Bewusst NICHT dabei: Tests (`__tests__`, e2e/), Fremdcode (public/lib/,
+# scripts/pruefungen/ — vendoriert), Sprachdateien und die Rechtsseiten unter
+# public/ (Text, ihr Umfang folgt dem Inhalt; nur die Hauptseite index.html
+# steht oben in der Liste).
+NACHSUCHE = (
+    ("functions/src", (".js",), True),
+    ("public/js", (".js",), True),
+    ("public", (".js", ".css"), False),
+    ("scripts", (".sh", ".py", ".mjs", ".js"), False),
+)
 
 # Wie viele Module duerfen an einem einzelnen haengen? Ueber dieser Zahl wird
 # eine Aenderung dort teuer, weil sie ueberallhin ausstrahlt.
@@ -166,6 +237,51 @@ ABHAENGIGKEITS_GRENZEN = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# DER BESTAND DER TESTDATEIEN (TEST-2026-10-04-28)
+#
+# Die Liste UNVERZICHTBAR in main() nennt die Testdateien, die fuer einen ganzen
+# Bereich der einzige Nachweis sind. Jede andere liess sich loeschen, ohne dass
+# ein Waechter anschlug — die Suite wird dann kleiner und bleibt gruen.
+#
+# Deshalb steht jede Testdatei mit Namen in scripts/testdateien-bestand.txt.
+# Verglichen wird in beide Richtungen: Eine Datei aus dem Bestand, die es nicht
+# mehr gibt, ist ein Fund — und eine Testdatei, die nicht im Bestand steht,
+# auch (sonst waere jede neue Datei wieder ungeschuetzt). Wer eine Testdatei
+# bewusst loescht, streicht ihre Zeile; die Loeschung steht dann zweimal im Diff.
+# ─────────────────────────────────────────────────────────────────────────────
+BESTAND = WURZEL / "scripts" / "testdateien-bestand.txt"
+TEST_BEREICHE = ("functions/src/__tests__", "public/__tests__", "e2e")
+BESTAND_KOPF = """\
+# Bestand der Testdateien. scripts/pruefe-kopplung.py vergleicht diese Liste mit
+# den Ordnern functions/src/__tests__, public/__tests__ und e2e — in beide
+# Richtungen (TEST-2026-10-04-28).
+#
+#   Neue Testdatei:             Zeile eintragen.
+#   Bewusst geloeschte Datei:   Zeile streichen.
+#   Ganze Liste neu schreiben:  python3 scripts/pruefe-kopplung.py --bestand > scripts/testdateien-bestand.txt
+"""
+
+
+def testdateien_vorhanden():
+    """Alle `*.test.js` in den drei Test-Bereichen, als Pfade ab der Projektwurzel."""
+    funde = set()
+    for bereich in TEST_BEREICHE:
+        for datei in (WURZEL / bereich).rglob("*.test.js"):
+            pfad = datei.relative_to(WURZEL).as_posix()
+            if "/node_modules/" not in pfad:
+                funde.add(pfad)
+    return sorted(funde)
+
+
+def testdateien_bestand():
+    """Die Zeilen der Bestandsliste; `None`, wenn es die Datei nicht gibt."""
+    if not BESTAND.exists():
+        return None
+    zeilen_ = (z.strip() for z in BESTAND.read_text(encoding="utf-8").split("\n"))
+    return [z for z in zeilen_ if z and not z.startswith("#")]
+
+
 def zeilen(pfad):
     p = WURZEL / pfad
     if not p.exists():
@@ -186,6 +302,16 @@ def haengen_an(modul):
 
 def main():
     nur_stand = "--stand" in sys.argv
+
+    if "--bestand" in sys.argv:
+        # Nur ausgeben, nichts lesen: Der uebliche Aufruf leitet in die
+        # Bestandsdatei um, und die ist dann schon geleert.
+        vorhanden = testdateien_vorhanden()
+        if not vorhanden:
+            print("NICHT MESSBAR: keine einzige Testdatei gefunden.", file=sys.stderr)
+            return 2
+        sys.stdout.write(BESTAND_KOPF + "\n".join(vorhanden) + "\n")
+        return 0
 
     print("── Waechst wieder zusammen, was getrennt gehoert? ──")
     print()
@@ -216,6 +342,16 @@ def main():
     # zweiten KI-Aufrufs durch den Kinderschutz-Filter laeuft, dass kein
     # fester Eintrag der Tier-Profile einer waere, den der Filter streicht,
     # und dass jeder Fehlerweg der Analyse die schon gezeigten Karten abraeumt.
+    # Seit 07.10.2026 dazu die Tests hinter dem, was die zweite Auslieferung
+    # der Audit-Behebung zusagt: Loeschen auch ohne Einstellungssatz und nach
+    # einem Absturz, Speichern vor der Antwort, Abmelden nur mit Abhol-Ticket,
+    # Freigabe an einer Stelle, gepackte Anfragen, die Sperren der Tests gegen
+    # echte Dienste, die Kopplungsregeln des Einstellungssatzes, die Zahlen
+    # der oeffentlichen Seiten gegen den Satz, Geraeteangaben und Auftrag ohne
+    # Zufallsnummer gegen den Datenschutztext, die Erinnerung an die
+    # Barrierefreiheits-Pruefung, die Ueberlast-Entscheidung, die Zeitgrenze
+    # des Antwort-Rumpfs, die Namens-Regel der KI-Anweisung und die Abfolgen
+    # im Browser.
     UNVERZICHTBAR = [
         "functions/src/__tests__/deploy-verhalten.test.js",
         "functions/src/__tests__/pipeline-vertrag-script.test.js",
@@ -238,6 +374,34 @@ def main():
         "public/__tests__/beispielbild-ort.test.js",
         "public/__tests__/beispielbild-karten.test.js",
         "e2e/beispielbild-ohne-ortsabfrage.test.js",
+        "functions/src/__tests__/ueberlast-entscheidung.test.js",
+        "functions/src/__tests__/mistral-rumpf-zeitgrenze.test.js",
+        "functions/src/__tests__/keine-personennamen-regel.test.js",
+        "functions/src/__tests__/handle-process-job-priv002.test.js",
+        "functions/src/__tests__/handle-job-status-abmelden.test.js",
+        "functions/src/__tests__/aufraeumer-loescht-ohne-satz.test.js",
+        "functions/src/__tests__/foto-nach-absturz.test.js",
+        "functions/src/__tests__/schreiben-vor-der-antwort.test.js",
+        "functions/src/__tests__/meldung-am-zustand.test.js",
+        "functions/src/__tests__/gepackte-anfragen.test.js",
+        "functions/src/__tests__/freigabe-ueber-die-hilfe.test.js",
+        "functions/src/__tests__/jest-sperre.test.js",
+        "functions/src/__tests__/einstiegspunkt-betriebswerte.test.js",
+        "functions/src/__tests__/betriebsprofil-kopplung.test.js",
+        "functions/src/__tests__/oeffentliche-zahlen-gegen-satz.test.js",
+        "functions/src/__tests__/fehlermeldung-geraeteangaben.test.js",
+        "functions/src/__tests__/auftrag-ohne-zufallsnummer.test.js",
+        "functions/src/__tests__/erinnerung-barrierefreiheit.test.js",
+        "public/__tests__/analyse-ausgaenge.test.js",
+        "public/__tests__/geraeteangaben-deckung.test.js",
+        "public/__tests__/datenschutz-deckung.test.js",
+        "e2e/abfolgen.test.js",
+        "functions/src/__tests__/dateilisten-vollstaendig.test.js",
+        "functions/src/__tests__/doku-namen-gegen-quelltext.test.js",
+        "functions/src/__tests__/abmelden-ueber-adressgrenze.test.js",
+        "functions/src/__tests__/mistral-nachfrage-einmischen.test.js",
+        "public/__tests__/abfolgen-pruefrunde.test.js",
+        "public/__tests__/aussentext-ohne-auszeichnung.test.js",
         "functions/jest.setup.js",
         "scripts/selbstpruefung-waechter.sh",
     ]
@@ -249,6 +413,36 @@ def main():
         print("  Ohne sie gibt es fuer einen ganzen Bereich keinen Nachweis mehr.")
         print()
         return 1
+
+    bestand = testdateien_bestand()
+    vorhanden = testdateien_vorhanden()
+    if not bestand or not vorhanden:
+        # Leere Liste oder leere Suche: Dann laege nicht alles im Bestand,
+        # sondern das Messmittel waere blind.
+        print("  NICHT MESSBAR: " + (
+            "scripts/testdateien-bestand.txt fehlt oder ist leer."
+            if not bestand else "in den Test-Ordnern liegt keine einzige *.test.js."))
+        print()
+        return 2
+    geloescht = sorted(set(bestand) - set(vorhanden))
+    nicht_eingetragen = sorted(set(vorhanden) - set(bestand))
+    if geloescht or nicht_eingetragen:
+        if geloescht:
+            print("  TESTDATEI FEHLT — steht im Bestand, gibt es aber nicht mehr:")
+            for d in geloescht:
+                print(f"    {d}")
+            print("  Versehen? Wiederherstellen. Absicht (oder umbenannt)? Die Zeile in")
+            print("  scripts/testdateien-bestand.txt streichen.")
+        if nicht_eingetragen:
+            print("  TESTDATEI NICHT IM BESTAND — vorhanden, aber nicht eingetragen:")
+            for d in nicht_eingetragen:
+                print(f"    {d}")
+            print("  In scripts/testdateien-bestand.txt eintragen; sonst fiele ihr")
+            print("  Verschwinden spaeter niemandem auf.")
+        print()
+        return 1
+    print(f"  Testdateien: {len(vorhanden)} vorhanden, alle im Bestand.")
+    print()
 
     print("  Dateigroessen:")
     for pfad, grenze in sorted(ZEILEN_GRENZEN.items()):
@@ -279,10 +473,19 @@ def main():
     # mit 901 Zeilen unter `public/js/` -> "Alles innerhalb der Grenzen";
     # dieselbe Datei unter `functions/src/` -> rot. Die Suche deckt jetzt
     # dieselben Baeume ab wie die Liste, samt Unterordnern.
-    bereiche = sorted({str(Path(g).parent) for g in ZEILEN_GRENZEN})
+    # TEST-2026-10-03-44: Die Bereiche stehen jetzt ausdruecklich in NACHSUCHE
+    # (vorher: die Elternordner der gelisteten Dateien, nur `*.js`). Ein Ordner
+    # aus der Liste, den es nicht gibt, ist ein Messproblem — sonst faende die
+    # Suche dort still nichts.
     kandidaten = []
-    for b in bereiche:
-        kandidaten.extend((WURZEL / b).rglob("*.js"))
+    for ordner, endungen, mit_unterordnern in NACHSUCHE:
+        basis = WURZEL / ordner
+        if not basis.is_dir():
+            fehlend.append(ordner + "/")
+            continue
+        for datei in (basis.rglob("*") if mit_unterordnern else basis.glob("*")):
+            if datei.is_file() and datei.name.endswith(endungen):
+                kandidaten.append(datei)
     for pfad_abs in sorted(set(kandidaten)):
         pfad = str(pfad_abs.relative_to(WURZEL))
         if "/node_modules/" in pfad or "/__tests__/" in pfad:

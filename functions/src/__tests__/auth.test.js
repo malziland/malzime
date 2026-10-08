@@ -110,6 +110,22 @@ describe("verifyAdminToken", () => {
     expect(verifyAdminToken(abgelaufen, "boost", SECRET)).toBe(false);
   });
 
+  /* TEST-2026-10-03-42: die Ablaufkante. Das Ticket gilt bis eine Millisekunde
+     VOR seinem Ablaufzeitpunkt; genau zum Ablaufzeitpunkt ist es abgelaufen. */
+  test("Ablaufkante: eine Millisekunde vorher gueltig, genau zum Ablauf nicht mehr", () => {
+    const start = 1_800_000_000_000;
+    jest.spyOn(Date, "now").mockReturnValue(start);
+    const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
+    const ablauf = Number(token.split(".")[0]);
+    expect(ablauf).toBe(start + SATZ.ticketGueltigkeitMs);
+
+    Date.now.mockReturnValue(ablauf - 1);
+    expect(verifyAdminToken(token, "boost", SECRET)).toBe(true);
+    Date.now.mockReturnValue(ablauf);
+    expect(verifyAdminToken(token, "boost", SECRET)).toBe(false);
+    Date.now.mockRestore();
+  });
+
   test("rejects token with wrong action", () => {
     const token = createAdminToken("boost", SECRET, SATZ.ticketGueltigkeitMs);
     expect(verifyAdminToken(token, "reset", SECRET)).toBe(false);

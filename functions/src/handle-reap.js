@@ -38,10 +38,12 @@ const {
   abandonJob,
   failJob,
   deleteJob,
+  nachmeldenBeimLoeschen,
 } = require("./jobs");
-const { datenbank } = require("./db");
+const { pruefeErinnerungsLebenszeichen } = require("./erinnerungs-waechter");
+const { letzterLeseversuchGescheitert } = require("./betriebsprofil");
 const { deleteImage } = require("./queue-storage");
-const { releaseHourlySlot } = require("./counter");
+const { belegtesFreigeben } = require("./ruecknahme");
 
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
    dass ein extremer Rückstau einen Lauf überlange macht. Der nächste Lauf
@@ -118,9 +120,9 @@ async function reapJobs() {
       /* Schlug der Übergang fehl, hat ein Worker den Job zwischen Query und
          Abbruch geclaimt — er läuft noch und braucht das Bild: nichts anfassen. */
       if (!ok) continue;
-      /* BIZ-001: Stunden-Slot zurückgeben — verlassener Job machte nie eine Analyse. */
-      await releaseHourlySlot(job.zaehlerStempel);
-      await deleteImage(job.imagePath);
+      /* BIZ-001: Foto loeschen und Stunden-Slot zurückgeben — verlassener
+         Job machte nie eine Analyse (ruecknahme.js). */
+      await belegtesFreigeben(job);
       reapedAbandoned += 1;
     } catch (err) {
       /* FEHLERZEILEN DES AUFRAEUMDIENSTES OHNE jobId UND OHNE FEHLERTEXT
@@ -173,8 +175,7 @@ async function reapJobs() {
     try {
       const ok = await abandonJob(job.id);
       if (!ok) continue;
-      await releaseHourlySlot(job.zaehlerStempel);
-      await deleteImage(job.imagePath);
+      await belegtesFreigeben(job);
       reapedUeberfaellig += 1;
     } catch (err) {
       console.log(
@@ -202,6 +203,9 @@ async function reapJobs() {
          Zweig (3) raeumt das Dokument nach 2 h ab. */
       if (job.imagePath && !(await deleteImage(job.imagePath))) continue;
       await deleteJob(job.id);
+      /* OPS-2026-10-03-31: Was eine Fehlermeldung zeigte und noch nicht
+         gemeldet ist, wird jetzt gemeldet — hier und in Zweig (3). */
+      nachmeldenBeimLoeschen(job);
       reapedZugestellt += 1;
     } catch (err) {
       console.log(
@@ -248,6 +252,7 @@ async function reapJobs() {
         );
       }
       await deleteJob(job.id);
+      nachmeldenBeimLoeschen(job);
       reapedExpired += 1;
     } catch (err) {
       console.log(
@@ -269,7 +274,25 @@ async function reapJobs() {
      weil er jede Minute laeuft und in der Alarmrichtlinie steht — anders als die
      Erinnerung selbst, die bewusst leise bleibt.
      Schwelle 9 Tage: ein ausgefallener Montag allein loest noch nichts aus. */
-  await pruefeErinnerungsLebenszeichen();
+  await pruefeErinnerungsLebenszeichen(LAEUFE_BIS_ALARM);
+
+  /* BUG-2026-10-03-32: Ist der Einstellungssatz gerade nicht lesbar, liefert
+     betriebsprofil.js den zuletzt gueltig gelesenen weiter — die Abfragen oben
+     laufen dann durch und werfen nicht. Fuer die Zaehlung unten ist so ein
+     Lauf trotzdem einer ohne frisch gelesene Betriebswerte: sonst kaeme der
+     Alarm fuer den Dauerzustand nie mehr. Eine Warnung je Lauf, mit demselben
+     Namensanfang wie die Warnungen der einzelnen Abfragen (die Abfrage im
+     RUNBOOK zaehlt sie nach Minuten). */
+  if (!lauf.ohneBetriebswerte && letzterLeseversuchGescheitert()) {
+    lauf.ohneBetriebswerte = true;
+    console.warn(
+      JSON.stringify({
+        severity: "WARNING",
+        step: "reap",
+        warning: "reap-query-ohne-betriebswerte:letzter-stand",
+      })
+    );
+  }
 
   /* Ohne Betriebswerte in LAEUFE_BIS_ALARM Laeufen hintereinander ist es kein
      Ausrutscher mehr — dann alarmieren, jede Minute erneut, bis es wieder geht. Ein
@@ -314,62 +337,3 @@ async function reapJobs() {
 }
 
 module.exports = { reapJobs };
-
-/* Liest das Lebenszeichen der Wochen-Erinnerung und meldet laut, wenn es fehlt
-   oder veraltet ist (OPS-2026-08-12-11). */
-const LEBENSZEICHEN_DOC = "config/erinnerung";
-const LEBENSZEICHEN_MAX_ALTER_MS = 9 * 24 * 60 * 60 * 1000;
-/* OPS-2026-08-13-44: Bezugsdatum gegen die unbefristete Gnadenfrist. Vorher
-   kehrte der Wächter bei fehlendem Lebenszeichen einfach zurück — läuft die
-   Erinnerung NIE an (Zeitplan gelöscht, Function nicht deployt, Dauerfehler),
-   schwieg er für immer statt nach neun Tagen zu warnen. Ab diesem Datum + neun
-   Tagen ist ein fehlendes Lebenszeichen selbst ein ERROR. Ausgeliefert wurde
-   die Erinnerung am 2026-08-12; der erste echte Lauf ist Montag 2026-08-18. */
-const ERINNERUNG_AUSGELIEFERT_MS = Date.parse("2026-08-12T00:00:00Z");
-
-async function pruefeErinnerungsLebenszeichen() {
-  try {
-    const snap = await datenbank().doc(LEBENSZEICHEN_DOC).get();
-    /* OPS-2026-08-13-44: auf letzterErfolg schauen, nicht letzterLauf — sonst
-       hält eine Erinnerung, die jeden Montag NUR läuft aber scheitert (Seite
-       nicht lesbar, Datum unlesbar), den Wächter über letzterLauf grün.
-       Rückfall auf letzterLauf für Dokumente aus der Zeit vor diesem Feld. */
-    const daten = snap.exists && snap.data() ? snap.data() : null;
-    const letzterLauf = daten ? Number(daten.letzterErfolg || daten.letzterLauf) : 0;
-    if (!letzterLauf) {
-      /* Noch nie gelaufen. Bis kurz nach der Auslieferung ist das normal —
-         danach hätte längst ein Montag stattgefunden, also ist das Ausbleiben
-         des allerersten Lebenszeichens selbst der Befund. */
-      if (Date.now() - ERINNERUNG_AUSGELIEFERT_MS > LEBENSZEICHEN_MAX_ALTER_MS) {
-        console.error(
-          JSON.stringify({
-            severity: "ERROR",
-            error: "erinnerung-nie-gelaufen",
-            ausgeliefert: new Date(ERINNERUNG_AUSGELIEFERT_MS).toISOString(),
-            hinweis:
-              "Die Wochen-Erinnerung hat seit ihrer Auslieferung KEIN einziges Lebenszeichen geschrieben — " +
-              "sie ist vermutlich nie angelaufen (Zeitplan/Function pruefen, RUNBOOK).",
-          })
-        );
-      }
-      return;
-    }
-    const alter = Date.now() - letzterLauf;
-    if (alter <= LEBENSZEICHEN_MAX_ALTER_MS) return;
-    console.error(
-      JSON.stringify({
-        severity: "ERROR",
-        error: "erinnerung-lebenszeichen-veraltet",
-        letzterLauf: new Date(letzterLauf).toISOString(),
-        alterTage: Math.floor(alter / (24 * 60 * 60 * 1000)),
-        hinweis:
-          "Die Wochen-Erinnerung hat seit ueber neun Tagen nicht gelaufen. Sie meldet " +
-          "ihren eigenen Ausfall bewusst nicht — deshalb diese Meldung. Zeitplan und " +
-          "Function pruefen (RUNBOOK).",
-      })
-    );
-  } catch (err) {
-    /* Nicht lesbar ist nicht dasselbe wie veraltet — kein Fehlalarm. */
-    console.log(JSON.stringify({ warning: "lebenszeichen-nicht-lesbar", error: err.message }));
-  }
-}

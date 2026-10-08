@@ -53,6 +53,13 @@ export default [
         destructuredArrayIgnorePattern: "^_",
       }],
       "no-console": "off",
+      /* SPERRKLINKE JE FUNKTION (TEST-2026-10-03-44). Die Zahlen sind der Stand
+         vom 07.10.2026: die verzweigteste und die laengste Funktion im Browser
+         (beide analyzeImageQueued in api.js). Keine Zielwerte — sie verhindern
+         nur, dass es mehr wird. Wer eine der beiden kleiner macht, zieht die
+         Zahl nach. Gilt nur fuer das Programm, nicht fuer die Tests. */
+      complexity: ["error", 56],
+      "max-lines-per-function": ["error", { max: 359, skipBlankLines: false, skipComments: false }],
     },
   },
   {

@@ -132,7 +132,10 @@ describe("createJob", () => {
     const job = await jobs.getJob(id);
     expect(job.status).toBe("queued");
     expect(job.lang).toBe("de");
-    expect(job.traceId).toBe("abc123");
+    /* PRIV-2026-10-03-39: Der Auftrag fuehrt die Zufallsnummer des Browsers
+       nicht — auch dann nicht, wenn ein Aufrufer sie uebergibt. */
+    expect(job).not.toHaveProperty("traceId");
+    expect(JSON.stringify(job)).not.toContain("abc123");
     expect(job.imagePath).toBe("queue-uploads/x.jpg");
     expect(job.result).toBeNull();
     expect(job.attempts).toBe(0);
@@ -162,7 +165,7 @@ describe("createJob", () => {
     const id = await jobs.createJob({ imagePath: "queue-uploads/y.jpg" });
     const job = await jobs.getJob(id);
     expect(job.lang).toBe("de");
-    expect(job.traceId).toBeNull();
+    expect(job).not.toHaveProperty("traceId");
   });
 });
 

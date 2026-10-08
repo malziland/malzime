@@ -19,6 +19,8 @@ Bewertung der Konformität mit den Web Content Accessibility Guidelines.
 | **Prüfdatum**       | 17.–23. August 2026                                                            |
 | **Geprüfter Stand** | Commit `05e2a71` (v3.4.0), ausgelieferte Kennung `2026081802`                  |
 | **Art der Prüfung** | Selbstbewertung, werkzeuggestützt und teilweise manuell                        |
+| **Seither**         | Die maschinellen Messungen laufen bei jeder Auslieferung mit (Abschnitt 4.2) und erfassen den jeweils ausgelieferten Stand. Die Handprüfungen stammen vom Prüfdatum; eine Wiederholung ist in diesen Unterlagen nicht vermerkt. |
+| **Angaben nachgezogen** | 7. Oktober 2026 — nur, was sich aus dem Repository belegen lässt: Seitenzahl, Modulangabe, Fassung des Hauptwerkzeugs, eine Summe in Abschnitt 4.2. Keine neue Prüfung. |
 
 ---
 
@@ -45,8 +47,8 @@ bestimmbar. Sie legt fest, mit welchen Kombinationen aus Browser und Hilfsmittel
 funktionieren muss.
 
 **Die Baseline ist breit, und zwar nicht aus Ehrgeiz, sondern aus Sachlage:** malziME läuft
-in Schulworkshops auf den Geräten, die Schülerinnen, Schüler und Lehrkräfte mitbringen. Der
-Betreiber hat darauf keinen Einfluss und kann keine Kombination ausschließen.
+in Schulworkshops auf den Geräten, die Schülerinnen, Schüler und Lehrkräfte mitbringen. Darauf
+hat das Projekt keinen Einfluss, und es kann keine Kombination ausschließen.
 
 Damit gelten als unterstützt:
 
@@ -106,10 +108,12 @@ vollständig:
 - **HTML** — statisch ausgeliefert, kein serverseitiges Rendern
 - **CSS** — einschließlich `prefers-reduced-motion`; **kein** `prefers-color-scheme`
   (das dunkle Erscheinungsbild entsteht ausschließlich über den Beast-Schalter)
-- **JavaScript** (22 ES-Module) — ohne JavaScript ist keine Analyse möglich
+- **JavaScript** (ES-Module unter `public/js/`; die Liste steht in `docs/ARCHITECTURE.md`,
+  Abschnitt „Frontend") — ohne JavaScript ist keine Analyse möglich
 - **WAI-ARIA** — im Einsatz: `aria-label`, `aria-labelledby`, `aria-live`, `aria-hidden`,
   `aria-modal`, `aria-atomic`, `aria-pressed`, `role`, `inert`
-- **Fremdbibliotheken**, selbst gehostet: Leaflet (Karte), exifr (Bild-Metadaten)
+- **Fremdbibliotheken**, selbst gehostet: Leaflet (Karte), exifr (Bild-Metadaten), seit
+  September 2026 libheif (öffnet HEIC-Fotos, wird nur bei Bedarf geladen)
 
 ### 2.5 Besondere Seiten
 
@@ -135,6 +139,8 @@ Ausgewählt nach den fünf Kategorien der Methodik:
 | Besondere Seite        | `/en/legal-notice`      | englische Fassung, kürzeste Rechtsseite                 |
 | Besondere Seite        | `/en/terms`             | englische Fassung, nummerierte Abschnitte               |
 | Besondere Seite        | `/en/accessibility`     | englische Fassung dieser Erklärung                      |
+| Besondere Seite        | `/kurzvorstellung`      | seit 23. August 2026; maschinell gemessen, in den Handprüfungen nicht vermerkt |
+| Besondere Seite        | `/en/introduction`      | englische Fassung, seit 23. August 2026; ebenso         |
 | Inhaltstyp-Vielfalt    | `/stats`                | Zahlen, Fortschrittsbalken, automatische Aktualisierung |
 | Funktionale Komponente | Sprachumschalter (Link) | Sprachwechsel ohne JavaScript, Fokus und Trefferfläche  |
 | Funktionale Komponente | Ergebnis mit Karte      | fremder eingebetteter Inhalt                            |
@@ -144,9 +150,9 @@ Ausgewählt nach den fünf Kategorien der Methodik:
 Die Methodik verlangt zusätzlich rund 10 % zufällig gewählter Ansichten als
 Qualitätskontrolle der strukturierten Auswahl.
 
-**Hier nicht anwendbar, mit Begründung:** Die Website hat zehn Seiten — sechs deutsche und
-vier englische, seit dem 19. August 2026. Die strukturierte Auswahl umfasst sie
-**vollständig**; eine Zufallsauswahl könnte nichts finden, was nicht
+**Hier nicht anwendbar, mit Begründung:** Die Website hat zwölf Seiten — sieben deutsche und
+fünf englische, seit dem 23. August 2026 (bis dahin zehn). Die strukturierte Auswahl umfasst
+sie **vollständig**; eine Zufallsauswahl könnte nichts finden, was nicht
 ohnehin geprüft ist. Die Zufallsauswahl dient bei großen Websites dazu, die Repräsentativität
 der Stichprobe zu prüfen — bei einer Vollerhebung entfällt ihr Zweck.
 
@@ -195,7 +201,7 @@ Grenze, keine Lücke.
 
 | Werkzeug                           | Herkunft          | Regelwerk                                   | Rolle                                                                             |
 | ---------------------------------- | ----------------- | ------------------------------------------- | --------------------------------------------------------------------------------- |
-| **axe-core 4.12.1**                | Deque Systems     | eigenes, auf WCAG abgebildet                | Hauptwerkzeug, blockierendes Gate                                                 |
+| **axe-core**                       | Deque Systems     | eigenes, auf WCAG abgebildet                | Hauptwerkzeug, blockierendes Gate. Fassung: die aus `package-lock.json` (am Prüftag 4.12.1, am 7. Oktober 2026 4.13.0) |
 | **pa11y 9.1.1 / HTML_CodeSniffer** | Squiz, quelloffen | **unabhängige** Umsetzung der W3C-Techniken | Zweitmeinung                                                                      |
 | **Lighthouse**                     | Google            | benutzt intern axe                          | Live-Prüfung, keine echte Zweitmeinung                                            |
 | Eigene Messungen                   | —                 | direkt gegen die Kriterientexte             | Zielgrößen, Umbruch, Textgröße, Textabstände, Fokus, Ansagen, Vorlese-Reihenfolge |
@@ -279,7 +285,7 @@ Ursache, Behebung und Dauerprüfung in Anhang A. Zwei davon fand kein Werkzeug, 
 Mensch, der zum ersten Mal mit VoiceOver zuhörte; einen fand die Auflösung der
 Abstentionen.
 
-**Messumfang:** 82 Zustände je Browser-Maschine, drei Maschinen, also 210 Messungen — jede
+**Messumfang:** 82 Zustände je Browser-Maschine, drei Maschinen, also 246 Messungen — jede
 zweifach ausgeführt und nur übernommen, was beide Male auftrat.
 
 Die Zahl stammt nicht aus diesem Text: `e2e/barrierefreiheit-protokoll.test.js` zählt die
@@ -347,8 +353,11 @@ praktisch unbenutzbar. Abhilfe: Häufigkeit wird mitgemessen und begrenzt.
 
 ### 5.3 Nächste Prüfung
 
-Bei jeder Änderung an Aussehen, Bedienung oder Seitenstruktur, mindestens halbjährlich.
-Die maschinellen Messungen laufen bei jeder Auslieferung automatisch mit.
+Die ganze Prüfung samt Handprüfung mindestens halbjährlich, gerechnet ab dem Datum
+„zuletzt geprüft“ der Erklärung; drei Wochen davor meldet sich die Wochen-Erinnerung
+(`functions/src/zusagen.js`). Die maschinellen Messungen laufen bei jeder Auslieferung
+automatisch mit. Was zwischen zwei ganzen Prüfungen dazukommt, ist bis zur nächsten nur
+maschinell gemessen und steht in der Seitenliste so vermerkt.
 
 ---
 

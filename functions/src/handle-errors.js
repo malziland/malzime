@@ -12,8 +12,9 @@
  * Events mit severity INFO.
  */
 
-const { checkRateLimit, getClientIp } = require("./middleware");
-const { geltendeWerte } = require("./betriebsprofil");
+/* Rumpfpruefung, Wertgrenze und Messwert-Pruefung teilt diese Annahmestelle
+   mit handle-telemetry.js; hier stehen nur ihre eigenen Feldlisten. */
+const { rumpfAnnehmen, einfacheFelder, messwerte } = require("./meldungs-annahme");
 
 const STRING_FIELDS = {
   errorName: 100,
@@ -40,27 +41,27 @@ const STRING_FIELDS = {
 const NUMBER_FIELDS = ["durationMs", "httpStatus", "fileSizeKb", "msSeitAuswahl"];
 const BOOLEAN_FIELDS = ["online", "hidden"];
 
+/* OHNE `enqueueMs` (Hochlade-Dauer), anders als bei den Erfolgsmeldungen —
+   bewusst: Kein Fehlermelder des Browsers schickt Messwerte mit. Wer das
+   aendert, nimmt ein neues Feld in den 30-Tage-Speicher auf: dann hier
+   ergaenzen UND in public/__tests__/fixtures/datenschutz-deckung.json
+   (STRUCT-2026-10-03-56; meldungen-gemeinsame-annahme.test.js haelt den
+   Unterschied fest). */
 const TIMING_KEYS = ["prepareImageMs", "fetchMs", "parseMs", "renderMs", "totalMs"];
 
+/* Geraete- und Netzangaben: nur, was der Datenschutztext fuer die
+   Fehlermeldungen nennt (Bildschirmgroesse als Klasse, Sprache, Netz).
+   Arbeitsspeicher, Prozessorkerne und Pixeldichte nennt er nicht — sie stehen
+   deshalb nicht auf der Liste und werden verworfen, auch wenn ein aelterer
+   Browser sie noch schickt (PRIV-2026-10-03-39,
+   fehlermeldung-geraeteangaben.test.js). */
 const CLIENT_STRING_KEYS = { effectiveType: 20, language: 10, screen: 30 };
-const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs", "deviceMemoryGb", "hardwareConcurrency", "dpr"];
+const CLIENT_NUMBER_KEYS = ["downlinkMbps", "rttMs"];
 /* `automatisiert` = navigator.webdriver des Browsers (07.09.2026): Zehn
    "demo-image-load"-Meldungen in 30 Tagen stammten von automatisierten
    Browsern — erkennbar erst nach einer Stunde Messen. Ein Ja/Nein-Wert ohne
    Personenbezug; gefiltert wird nichts. */
 const CLIENT_BOOL_KEYS = ["saveData", "automatisiert"];
-
-function sanitizeTimings(raw) {
-  if (!raw || typeof raw !== "object") return null;
-  const out = {};
-  for (const key of TIMING_KEYS) {
-    const v = raw[key];
-    if (typeof v === "number" && isFinite(v)) {
-      out[key] = Math.max(0, Math.min(600000, Math.round(v)));
-    }
-  }
-  return Object.keys(out).length > 0 ? out : null;
-}
 
 function sanitizeClient(raw) {
   if (!raw || typeof raw !== "object") return null;
@@ -79,51 +80,21 @@ function sanitizeClient(raw) {
 
 async function handleErrors(req, res) {
   try {
-    if (req.method !== "POST") {
-      res.status(405).json({ error: "Method not allowed" });
-      return;
-    }
-
-    const ip = getClientIp(req);
-    const { werte: grenzwerte } = await geltendeWerte().catch(() => ({ werte: null }));
-    if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
-      res.status(429).json({ error: "Rate limit exceeded" });
-      return;
-    }
-
-    let body = req.body;
-    if (typeof body === "string") {
-      try {
-        body = JSON.parse(body);
-      } catch (_) {
-        res.status(400).json({ error: "Invalid JSON" });
-        return;
-      }
-    }
-    if (!body || typeof body !== "object") {
-      res.status(400).json({ error: "Invalid body" });
-      return;
-    }
+    const angenommen = await rumpfAnnehmen(req, res);
+    if (!angenommen) return;
+    const { body } = angenommen;
 
     const sanitized = { type: "client-error" };
 
-    for (const [key, maxLen] of Object.entries(STRING_FIELDS)) {
-      const value = body[key];
-      if (typeof value === "string" && value.length > 0) {
-        sanitized[key] = value.slice(0, maxLen);
-      }
-    }
-    for (const key of NUMBER_FIELDS) {
-      const value = body[key];
-      if (typeof value === "number" && isFinite(value)) {
-        sanitized[key] = Math.max(-1, Math.min(600000, Math.round(value)));
-      }
-    }
-    for (const key of BOOLEAN_FIELDS) {
-      if (typeof body[key] === "boolean") sanitized[key] = body[key];
-    }
+    /* Fehlermeldungen lassen -1 als kleinste Zahl zu (wie seit jeher). */
+    einfacheFelder(body, sanitized, {
+      texte: STRING_FIELDS,
+      zahlen: NUMBER_FIELDS,
+      wahrheitswerte: BOOLEAN_FIELDS,
+      kleinsteZahl: -1,
+    });
 
-    const timings = sanitizeTimings(body.timings);
+    const timings = messwerte(body.timings, TIMING_KEYS);
     if (timings) sanitized.timings = timings;
 
     const client = sanitizeClient(body.client);

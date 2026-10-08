@@ -68,6 +68,12 @@ lauf "Backend: Format" "test-backend" sh -c 'cd functions && npm run --silent fo
 # ── Job: pruefungen ─────────────────────────────────────────────────────────
 lauf "Pruefungen: Selbstpruefung" "pruefungen" sh scripts/pruefungen/selbstpruefung.sh
 lauf "Pruefungen: Aussentext-Sperrliste" "pruefungen" python3 scripts/pruefungen/checks/aussentext.py .
+# TEST-2026-10-04-29: Die naechsten drei Pruefungen lesen das ganze
+# Verzeichnis. Am Arbeitsrechner liegen dort auch Ordner, die .gitignore
+# ausnimmt (private Berichte, Uebergaben, Sicherungen); die Pipeline kennt sie
+# nicht. Seit 08.10.2026 fragen die Pruefungen git selbst und lesen nur, was es
+# kennt (an der Quelle im Regelwerk geaendert, wie zuvor schon die
+# Aussentext-Sperrliste) — die Aufrufe sind deshalb dieselben wie in der Pipeline.
 lauf "Pruefungen: Fakten-Drift" "pruefungen" python3 scripts/pruefungen/checks/fakten-drift.py .
 lauf "Pruefungen: Stiller Fehlschlag" "pruefungen" python3 scripts/pruefungen/checks/stiller-fehlschlag.py .
 # BEFUND 01.09.2026 (Runde 7, K-8): Der Aufruf oben ueberspringt Verzeichnisse,

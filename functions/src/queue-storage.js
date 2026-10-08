@@ -112,12 +112,27 @@ function localPathFor(objectPath) {
 }
 
 /**
- * Legt ein Bild unter `queue-uploads/<uuid>.<ext>` ab.
+ * Bestimmt den Speicherpfad eines Fotos, BEVOR es abgelegt wird
+ * (`queue-uploads/<uuid>.<ext>`). Der Einlass schreibt ihn zuerst in den
+ * Auftrag und speichert dann: So kennt immer ein Auftrag den Pfad eines
+ * liegenden Fotos, und der Aufraeumdienst findet es (PRIV-2026-10-03-28).
+ */
+function neuerBildPfad(mimeType) {
+  const ext = EXT_BY_MIME[mimeType] || "jpg";
+  return `${QUEUE_UPLOAD_PREFIX}${crypto.randomUUID()}.${ext}`;
+}
+
+/**
+ * Legt ein Bild unter `queue-uploads/<uuid>.<ext>` ab — unter `objectPath`,
+ * wenn der Aufrufer den Pfad vorab mit `neuerBildPfad` bestimmt hat.
  * @returns {Promise<string>} der Storage-Pfad (in das Job-Dokument zu schreiben)
  */
-async function storeImage(buffer, mimeType) {
-  const ext = EXT_BY_MIME[mimeType] || "jpg";
-  const objectPath = `${QUEUE_UPLOAD_PREFIX}${crypto.randomUUID()}.${ext}`;
+async function storeImage(buffer, mimeType, objectPath = neuerBildPfad(mimeType)) {
+  /* Nur ins eigene Fach: Die Ein-Tages-Regel des Speichers, das letzte Netz
+     unter der aktiven Loeschung, erfasst nichts ausserhalb davon. */
+  if (typeof objectPath !== "string" || !objectPath.startsWith(QUEUE_UPLOAD_PREFIX)) {
+    throw new Error(`storeImage: Pfad liegt nicht unter ${QUEUE_UPLOAD_PREFIX}`);
+  }
 
   if (isLocalQueueMode()) {
     await fs.promises.mkdir(localDir(), { recursive: true });
@@ -344,6 +359,7 @@ const _bucketFuerTest = () => bucket();
 
 module.exports = {
   _bucketFuerTest,
+  neuerBildPfad,
   storeImage,
   loadImage,
   /* Fuer den Test der echten Verdrahtung (firebase-admin). */

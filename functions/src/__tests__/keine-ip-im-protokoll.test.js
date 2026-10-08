@@ -61,7 +61,7 @@ jest.mock("../jobs", () => ({
   meldeGescheiterteAnalyse: jest.fn(),
   verbraucheRcTicket: jest.fn(),
 }));
-jest.mock("../queue-storage", () => ({ storeImage: jest.fn(), deleteImage: jest.fn() }));
+jest.mock("../queue-storage", () => ({ neuerBildPfad: jest.fn(), storeImage: jest.fn(), deleteImage: jest.fn() }));
 jest.mock("../cloud-tasks", () => ({ enqueueJob: jest.fn() }));
 jest.mock("../notify", () => ({ notifyLimitReached: jest.fn() }));
 jest.mock("../feature-flags", () => ({ getFeatureFlags: jest.fn() }));
@@ -224,7 +224,35 @@ function anfrage(adresse, rumpf, optionen = {}) {
       ...(optionen.kopf || {}),
     },
     body: rumpf,
+    /* Multipart-Weg (TEST-2026-10-04-14): Die Laufzeit uebergibt den ganzen
+       Rumpf vorab als `rawBody`; upload.js fuettert die Lese-Bibliothek damit. */
+    ...(optionen.rohRumpf ? { rawBody: optionen.rohRumpf, on() {} } : {}),
   };
+}
+
+/* Ein Formular-Rumpf (multipart/form-data) mit einem Foto und den Feldern, die
+   der Browser auf diesem Weg mitschickt. `ohneDatei` und `endetImFeld` bauen
+   die zwei Fehlerwege der Rumpf-Verarbeitung. */
+const FORMULAR_GRENZE = "----formular-grenze";
+const FORMULAR_KOPF = { "content-type": `multipart/form-data; boundary=${FORMULAR_GRENZE}` };
+function formularRumpf({ ohneDatei = false, endetImFeld = false } = {}) {
+  const feld = (name, wert) => `--${FORMULAR_GRENZE}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${wert}`;
+  /* Das Formular reisst mitten im zweiten Feld ab: kein Zeilenende, keine
+     Abschlussgrenze. */
+  if (endetImFeld) return Buffer.from(`${feld("lang", "de")}\r\n${feld("traceId", "vorgang-a")}`);
+  const puffer = [Buffer.from(`${feld("lang", "de")}\r\n${feld("traceId", "vorgang-abc")}\r\n`)];
+  if (!ohneDatei) {
+    puffer.push(
+      Buffer.from(
+        `--${FORMULAR_GRENZE}\r\nContent-Disposition: form-data; name="image"; filename="foto.jpg"\r\n` +
+          "Content-Type: image/jpeg\r\n\r\n"
+      ),
+      JPEG,
+      Buffer.from("\r\n")
+    );
+  }
+  puffer.push(Buffer.from(`--${FORMULAR_GRENZE}--\r\n`));
+  return Buffer.concat(puffer);
 }
 
 /* Ein Rumpf, dessen Lesen einen Fehler wirft: erreicht den Fehlerzweig der Handler. */
@@ -331,6 +359,7 @@ beforeEach(() => {
   jobs.abandonJob.mockReset().mockResolvedValue(true);
   jobs.meldeGescheiterteAnalyse.mockReset();
   jobs.verbraucheRcTicket.mockReset().mockResolvedValue(true);
+  storage.neuerBildPfad.mockReset().mockReturnValue("queue-uploads/x.jpg");
   storage.storeImage.mockReset().mockResolvedValue("queue-uploads/x.jpg");
   storage.deleteImage.mockReset().mockResolvedValue(true);
   tasks.enqueueJob.mockReset().mockResolvedValue("projects/p/locations/l/queues/q/tasks/t");
@@ -564,6 +593,30 @@ const EINLASS_WEGE = [
     zeile: "store-or-create-failed",
     rumpf: einlassRumpf(),
     vorbereiten: () => storage.storeImage.mockRejectedValue(new Error("Speicher nicht erreichbar")),
+  },
+  /* TEST-2026-10-04-14: der Formular-Weg (multipart/form-data) der Fotoannahme.
+     Er laeuft durch upload.js (parseMultipart) und bekommt dabei ALLE
+     Kopfzeilen der Anfrage in die Hand — auch die mit der Adresse. */
+  {
+    name: "Formular-Weg: Foto angenommen",
+    status: 200,
+    zeile: '"step":"enqueue","status":"ok"',
+    kopf: FORMULAR_KOPF,
+    rohRumpf: formularRumpf(),
+  },
+  {
+    name: "Formular-Weg: kein Foto im Formular",
+    status: 400,
+    zeile: '"code":"missing_image"',
+    kopf: FORMULAR_KOPF,
+    rohRumpf: formularRumpf({ ohneDatei: true }),
+  },
+  {
+    name: "Formular-Weg: das Formular reisst mitten in einem Feld ab",
+    status: 400,
+    zeile: '"code":"bad_multipart"',
+    kopf: FORMULAR_KOPF,
+    rohRumpf: formularRumpf({ endetImFeld: true }),
   },
   {
     name: "Einreihen in die Warteschlange scheitert",
@@ -844,16 +897,19 @@ describe("Waechter: wer die Adresse des Aufrufers liest", () => {
     expect(andere).toEqual([]);
   });
 
-  test("nur die drei Handler dieser Datei lesen sie", () => {
+  test("nur der Einlass und die gemeinsame Annahme der Meldungen lesen sie", () => {
     const leser = programmDateien(SRC)
       .filter((datei) => path.basename(datei) !== "middleware.js")
       .filter((datei) => LIEST_ADRESSE.test(fs.readFileSync(datei, "utf8")))
       .map((datei) => path.relative(SRC, datei))
       .sort();
-    /* Kommt ein vierter Leser dazu: hier eintragen UND einen Weg-Katalog wie oben
+    /* Kommt ein weiterer Leser dazu: hier eintragen UND einen Weg-Katalog wie oben
        fuer ihn anlegen — sonst koennte er die Adresse hinschreiben, ohne dass es
        jemand merkt. middleware.js ist ausgenommen: Dort liegt die Definition, und
-       ein Weg ueber die echte Bremse laeuft in jedem Weg-Katalog oben mit. */
-    expect(leser).toEqual(["handle-enqueue.js", "handle-errors.js", "handle-telemetry.js"]);
+       ein Weg ueber die echte Bremse laeuft in jedem Weg-Katalog oben mit.
+       meldungs-annahme.js liest sie fuer BEIDE Annahmestellen der Meldungen
+       (handle-errors.js, handle-telemetry.js; STRUCT-2026-10-03-56): Deren
+       Weg-Kataloge oben laufen durch dieses Modul. */
+    expect(leser).toEqual(["handle-enqueue.js", "meldungs-annahme.js"]);
   });
 });

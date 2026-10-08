@@ -63,6 +63,7 @@ const { setFetchForTest } = require("../mistral");
 const { REQUIRED_CARDS } = require("../mistral-antwort");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
+const { zeileAlsText } = require("./hilfen/als-text");
 
 const JOB_ID = "auftrag-4711";
 
@@ -159,7 +160,7 @@ beforeEach(() => {
   storage.deleteImage.mockResolvedValue();
   ausgabe = [];
   for (const art of ["log", "info", "warn", "error"]) {
-    jest.spyOn(console, art).mockImplementation((...args) => ausgabe.push({ art, text: args.map(String).join(" ") }));
+    jest.spyOn(console, art).mockImplementation((...args) => ausgabe.push({ art, text: zeileAlsText(...args) }));
   }
 });
 afterEach(() => {

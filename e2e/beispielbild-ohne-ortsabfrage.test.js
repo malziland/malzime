@@ -178,6 +178,7 @@ async function erwarteFesteKarte(page, adresse) {
 test.describe("Beispielbild: der Browser fragt nichts nach aussen", () => {
   test("Ergebnis, Moduswechsel, Sprachwechsel und Druck: 0 Anfragen an Nominatim und Kachel-Server", async ({
     page,
+    browserName,
   }) => {
     test.slow();
     const netz = await seiteMitZaehler(page);
@@ -204,7 +205,19 @@ test.describe("Beispielbild: der Browser fragt nichts nach aussen", () => {
     await netzRuhe(page, netz);
     erwarteKeineOrtsabfrage(netz, "nach dem Wechsel zurueck in die serioese Ansicht");
 
-    /* Drucken: Knopf druecken, Druck-Stilblatt an und wieder aus. */
+    /* Drucken: Knopf druecken, Druck-Stilblatt an und wieder aus.
+       Firefox haelt den Testbrowser im Druckdialog an — `window.print()` kehrt
+       dort nicht zurueck, und der Klick liefe in die Reissleine (TEST-2026-10-05-11).
+       Nur dort ersetzt eine Attrappe den Dialog; sie loest dieselben Ereignisse
+       aus wie ein echter Druck, sodass die Seite ihren Druckweg ganz durchlaeuft. */
+    if (browserName === "firefox") {
+      await page.evaluate(() => {
+        window.print = () => {
+          window.dispatchEvent(new Event("beforeprint"));
+          window.dispatchEvent(new Event("afterprint"));
+        };
+      });
+    }
     await page.locator("#exportPdf").click();
     await page.emulateMedia({ media: "print", reducedMotion: "reduce" });
     await page.waitForTimeout(500);

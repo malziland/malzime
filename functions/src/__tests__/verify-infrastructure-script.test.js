@@ -742,6 +742,145 @@ describe("verify-infrastructure.sh: Benachrichtigungsdienst (SEC-2026-10-03-14)"
   });
 });
 
+/* OPS-2026-10-04-18: Welche Pruefungen der Zweigschutz von `main` zur Pflicht
+   macht, steht bei GitHub — nicht im Repository. Der Vertrag der Pipeline haelt
+   `ci.yml` und `deploy.sh` zusammen; faellt bei GitHub ein Name weg, sah es
+   niemand. Der Abschnitt liest die Einstellung und vergleicht sie mit der
+   Liste PFLICHT aus deploy.sh. */
+describe("verify-infrastructure.sh: Zweigschutz von main (OPS-2026-10-04-18)", () => {
+  const os = require("os");
+  const { execFileSync } = require("child_process");
+  let dir;
+  const SECHS = ["test-backend", "test-frontend", "test-e2e", "secret-scan", "playwright-version", "pruefungen"];
+
+  beforeAll(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "verify-zweigschutz-"));
+    fs.mkdirSync(path.join(dir, "bin"));
+    /* Kein Werkzeug erreicht im Test einen Dienst — auch gh nicht: Die Attrappe
+       schreibt mit, ob sie gerufen wurde. */
+    for (const w of ["gcloud", "gsutil", "curl", "gh"]) {
+      const ziel = path.join(dir, "bin", w);
+      fs.writeFileSync(ziel, `#!/bin/sh\necho "${w} $*" >> "${path.join(dir, "aufrufe.log")}"\nexit 1\n`);
+      fs.chmodSync(ziel, 0o755);
+    }
+  });
+  afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  /** Die Antwort, wie die Abfrage sie liefert: erst die Ebene, dann je Zeile ein Name. */
+  const antwort = (namen, ebene = "everyone") =>
+    [`ebene=${ebene}`, ...namen.map((n) => `check=${n}`)].join("\n") + "\n";
+
+  function lauf(eingabe, umgebung = {}) {
+    const probe = path.join(dir, "zweigschutz.txt");
+    fs.writeFileSync(probe, eingabe);
+    fs.rmSync(path.join(dir, "aufrufe.log"), { force: true });
+    let aus;
+    let code = 0;
+    try {
+      aus = execFileSync("bash", [SCRIPT], {
+        encoding: "utf8",
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          PATH: `${path.join(dir, "bin")}:${process.env.PATH}`,
+          INFRA_PROBE_ZWEIGSCHUTZ: probe,
+          ...umgebung,
+        },
+      });
+    } catch (e) {
+      aus = (e.stdout || "") + (e.stderr || "");
+      code = e.status;
+    }
+    // eslint-disable-next-line no-control-regex
+    const FARBCODES = /\x1b\[[0-9;]*m/g;
+    const zeilen = aus
+      .replace(FARBCODES, "")
+      .split("\n")
+      .filter((z) => /Zweigschutz/.test(z) && /[✓✗]/.test(z));
+    const aufrufe = fs.existsSync(path.join(dir, "aufrufe.log"))
+      ? fs.readFileSync(path.join(dir, "aufrufe.log"), "utf8")
+      : "";
+    return { zeilen, code, aufrufe };
+  }
+  const enthaelt = (zeilen, text) => zeilen.some((z) => z.includes(text));
+
+  test("Erfolgsweg: genau die sechs Namen, gilt auch fuer Verwalter → zwei gruene Zeilen mit den Namen, keine rote", () => {
+    /* Die Reihenfolge bei GitHub ist eine andere als in deploy.sh — sie zaehlt nicht. */
+    const { zeilen } = lauf(antwort([...SECHS].reverse()));
+    expect(
+      enthaelt(
+        zeilen,
+        "✓ Zweigschutz main verlangt genau die 6 Pflicht-Pruefungen der Auslieferung: " +
+          "playwright-version pruefungen secret-scan test-backend test-e2e test-frontend"
+      )
+    ).toBe(true);
+    expect(enthaelt(zeilen, "✓ Zweigschutz main gilt auch fuer Verwalter: everyone")).toBe(true);
+    expect(zeilen.filter((z) => z.includes("✗"))).toEqual([]);
+  });
+
+  test.each(SECHS)("%s fehlt im Zweigschutz → rot, mit seinem Namen", (name) => {
+    const { zeilen, code } = lauf(antwort(SECHS.filter((n) => n !== name)));
+    expect(
+      enthaelt(
+        zeilen,
+        `✗ Zweigschutz main verlangt NICHT genau die 6 Pflicht-Pruefungen der Auslieferung — es fehlt: ${name}`
+      )
+    ).toBe(true);
+    expect(code).toBe(1);
+  });
+
+  test("ein zusaetzlicher Name, den die Auslieferung nicht kennt → rot, mit seinem Namen", () => {
+    const { zeilen } = lauf(antwort([...SECHS, "lighthouse"]));
+    expect(enthaelt(zeilen, "— zusaetzlich verlangt: lighthouse")).toBe(true);
+    expect(zeilen.filter((z) => z.includes("✓ Zweigschutz main verlangt genau"))).toEqual([]);
+  });
+
+  test("der Schutz gilt nicht fuer Verwalter → rot, auch wenn die sechs Namen stimmen", () => {
+    const { zeilen } = lauf(antwort(SECHS, "non_admins"));
+    expect(enthaelt(zeilen, "✗ Zweigschutz main gilt auch fuer Verwalter: SOLL »everyone«, IST »non_admins«")).toBe(
+      true
+    );
+    expect(enthaelt(zeilen, "✓ Zweigschutz main verlangt genau die 6 Pflicht-Pruefungen")).toBe(true);
+  });
+
+  test("der Schutz ist ganz abgeschaltet → beide Zeilen rot", () => {
+    const { zeilen } = lauf("ebene=off\n");
+    expect(
+      enthaelt(zeilen, "— es fehlt: playwright-version pruefungen secret-scan test-backend test-e2e test-frontend")
+    ).toBe(true);
+    expect(enthaelt(zeilen, "IST »off«")).toBe(true);
+  });
+
+  test("Messfehler (leere Antwort) → ungeprueft gilt als nicht bestanden", () => {
+    const { zeilen, code } = lauf("");
+    expect(enthaelt(zeilen, "✗ Zweigschutz NICHT geprueft (GitHub nicht lesbar")).toBe(true);
+    expect(zeilen.filter((z) => z.includes("✓"))).toEqual([]);
+    expect(code).toBe(1);
+  });
+
+  test("ein Testlauf ueber einen anderen Einspeisepunkt fragt GitHub nicht", () => {
+    const probe = path.join(dir, "ntfy.txt");
+    fs.writeFileSync(probe, "x");
+    const { zeilen, aufrufe } = lauf("", { INFRA_PROBE_ZWEIGSCHUTZ: "", INFRA_PROBE_NTFY: probe });
+    expect(aufrufe).not.toMatch(/^gh /m);
+    expect(enthaelt(zeilen, "✗ Zweigschutz NICHT geprueft")).toBe(true);
+  });
+
+  test("die Abfrage ist ein lesender Aufruf — kein Schalter, der bei GitHub etwas aendert", () => {
+    const skript = fs.readFileSync(SCRIPT, "utf8");
+    const aufrufe = skript.split("\n").filter((z) => /(^\s*|\$\(\s*)gh\b/.test(z.replace(/^\s*#.*/, "")));
+    expect(aufrufe).toHaveLength(1);
+    expect(aufrufe[0]).toMatch(/gh api "repos\/malziland\/malzime\/branches\/main" \\$/);
+    expect(skript).not.toMatch(/gh api[^\n]*(-X|--method|-f |-F |--field|--raw-field|--input)/);
+  });
+
+  test("die Soll-Liste kommt aus deploy.sh — dort stehen genau die sechs Namen", () => {
+    const deploy = fs.readFileSync(DEPLOY, "utf8");
+    const liste = deploy.match(/^\s*PFLICHT="([^"]+)"$/m);
+    expect(liste[1].split(" ").sort()).toEqual([...SECHS].sort());
+  });
+});
+
 /* Nachlauf 04.10.2026: Die Fehlermeldung von gsutil lag in einer festen Datei
    unter /tmp. Liefen zwei Laeufe gleichzeitig — etwa eine Auslieferung und
    diese Tests —, las jeder die Meldung des anderen: Ein Zugriffsfehler galt

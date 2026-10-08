@@ -4,7 +4,7 @@
 [![Firebase Hosting](https://img.shields.io/badge/Firebase-Hosting-FFCA28?logo=firebase&logoColor=black)](https://malzi.me)
 ![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
 [![CI](https://github.com/malziland/malzime/actions/workflows/ci.yml/badge.svg)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
-[![Lighthouse Performance](https://img.shields.io/badge/Performance-%E2%89%A590-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
+[![Lighthouse Performance](https://img.shields.io/badge/Performance-%E2%89%A580-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse Accessibility](https://img.shields.io/badge/Accessibility-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse Best Practices](https://img.shields.io/badge/Best_Practices-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
 [![Lighthouse SEO](https://img.shields.io/badge/SEO-100-brightgreen?logo=lighthouse)](https://github.com/malziland/malzime/actions/workflows/ci.yml)
@@ -57,51 +57,59 @@ public/                     Firebase Hosting (SPA, kein Build-Schritt)
 
 functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)
   index.js                  Cloud-Function-Exports + Firebase Secret Bindings
-  config.js                 Konstanten + Mistral-Modell-IDs + Limits
-    handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
+  oeffentliche-huelle.js    Gilt fuer jede oeffentliche Schnittstelle: kein Zwischenspeichern der Antwort, gepackte Anfragen abweisen
+  config.js                 Was bewusst nicht einstellbar ist: Mistral-Modell-IDs, EU-Endpunkt, EU-Datenbank, Upload-Grenze, Dateiformate
+  db.js                     Firestore-Zugang (benannte Datenbank malzime-eu)
+  betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Felder, Grenzen, Cache
+  betriebsprofil-kopplung.js  Welche Werte eines Einstellungssatzes zusammenpassen muessen
+  produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)
+  test-satz.js              Einstellungssatz fuer die Tests
+  handle-admin.js           Admin-Endpunkte (Boost, Reset, Maintenance)
   handle-stats.js           Stats-Endpunkt
   handle-errors.js          Anonymes Client-Fehler-Logging (whitelist-validiert, keine PII, severity ERROR)
   handle-telemetry.js       Anonyme Success-/Performance-Telemetrie (ohne Geraeteangaben, severity INFO)
-  handle-enqueue.js         Queue: Job anlegen + in Cloud Tasks einreihen
+  meldungs-annahme.js       Gemeinsame Pruefungen der zwei Annahmestellen fuer Meldungen des Browsers
+  handle-enqueue.js         Queue: Job anlegen, Bild ablegen, in Cloud Tasks einreihen
   handle-process-job.js     Queue: Worker — claimt Job, ruft Mistral, schreibt Ergebnis
-  handle-job-status.js      Queue: Status-Polling + Liveness-Herzschlag
+  handle-job-status.js      Queue: Status-Polling + Liveness-Herzschlag; Abmelden eines wartenden Auftrags
   handle-reap.js            Queue: Reaper fuer verlassene / haengende / abgelaufene Jobs
-  handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung (mit Anleitung)
-  zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen (Erinnerung + CI-Waechter)
+  ruecknahme.js             Queue: gibt zurueck, was ein nie analysierter Auftrag belegt (Platz im Stundenfenster, Foto)
   jobs.js                   Queue: Job-Lebenszyklus (Firestore-Collection `jobs`)
+  analyse-ausgang.js        Queue: welche Fehlermeldung ein Endzustand zeigt, und die eine Fehlerzeile dazu
+  warteschlangen-rechnung.js  Queue: die eine Rechnung fuer Einlassgrenze und Wartezeit-Ansage
+  durchsatz.js              Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze)
   cloud-tasks.js            Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim fuer Emulator)
   queue-storage.js          Queue: temporaere Bild-Ablage im GCS-Bucket
   feature-flags.js          Laufzeit-Feature-Flags aus Firestore (30s-Cache)
   lokale-schalter.js        Schalter nur fuer lokale Laeufe (Attrappe, lokale Warteschlange, stumme Benachrichtigung): wirken nie in der Produktion
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
   mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile, ein zweiter ohne Bild die Beast-Werbung
-  json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   mistral-http.js           Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Ueberlast, Antwort als Strom
   mistral-antwort.js        Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung
   ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504
+  verbindungsfehler.js      Verbindungsabriss zu einem fremden Dienst: einmal neu versuchen, Teiltext retten, Grund ohne Adressen protokollieren
+  json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
+  throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
   job-pipelines.js          Der Analyseweg: KI-Aufruf, Tier-Easter-Egg, Beast-Werbung, Kinderschutz
   job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
+  animal.js                 Motiv-Entscheidung am Feld `subject` der KI-Antwort + Tier-Easter-Egg-Profile
+  privacy.js                Privacy-Risiken: lesbare Adresse und Telefonnummer aus dem Feld `visible_text` der KI-Antwort, Kennzeichen aus dem ganzen Text
   minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer)
   minor-safety-woerter.js   Wortlisten des Kinderschutz-Filters (reine Daten, deutsch und englisch; mit Wortfuge fuer zusammengesetzte Woerter)
   alters-lesbarkeit.js      Erkennung nicht lesbarer Altersangaben (erster Satz, Altersversuch)
   alters-auslese.js         Altersauslese: Zahlwoerter, Kategorien, untere und obere Altersgrenze
   alters-lesbarkeit-woerter.js  Woerter, Kategorien und Abkuerzungen der Altersauslese (reine Daten)
-  betriebsprofil.js         Betriebswerte aus Firestore (config/betriebsprofil): Pruefung, Cache
-  produktiv-satz.js         Betriebswerte fuer den echten Betrieb (Quelle fuer config/betriebsprofil)
-  test-satz.js              Einstellungssatz fuer die Tests
-  durchsatz.js              Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze)
-  kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
-  laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
-  db.js                     Firestore-Zugang (benannte Datenbank malzime-eu)
-  throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
-    animal.js                 SUBJECT-Klassifikation + Tier-Easter-Egg-Profile aus Mistral-Beschreibung
-  privacy.js                OCR-Privacy-Risiken aus Mistrals "Sichtbarer Text"
   counter.js                Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset, Maintenance
+  middleware.js             Rate Limiting (IP-basiert, Grenze und Fenster aus dem Einstellungssatz), IP-Extraktion
+  upload.js                 Multipart- und JSON-Body-Parsing
   auth.js                   HMAC-basierte Admin-Token + Nonces
   domains.js                Zentrale CORS-/Origin-Whitelist
   notify.js                 ntfy Push-Benachrichtigungen bei Limit-Erreichung
-  middleware.js             Rate Limiting (IP-basiert, 500/10min), IP-Extraktion
-  upload.js                 Multipart- und JSON-Body-Parsing
+  kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
+  laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
+  handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung und der halbjaehrlichen Pruefung der Barrierefreiheit (mit Anleitung)
+  erinnerungs-waechter.js   Meldet, wenn die Wochen-Erinnerung ausbleibt
+  zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen: ZDR-Pruefdatum, Pruefdatum der Barrierefreiheit (Erinnerung + CI-Waechter)
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
   locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
   __tests__/                Jest Unit-Tests + fixtures/ fuer json-repair
@@ -112,9 +120,9 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
 
 Workshop-Last ist stossweise: 25 Uploads in zwei Minuten. Damit kein Upload an den Rate-Limits des KI-Anbieters scheitert, laeuft die Analyse seit v2.0 ueber eine Warteschlange:
 
-- **`/api/enqueue`** legt einen Job an und reiht ihn in **Google Cloud Tasks** ein. Das Bild liegt waehrenddessen kurz in einem dedizierten EU-Storage-Bucket.
+- **`/api/enqueue`** legt einen Job an, legt danach das Bild kurz in einem dedizierten EU-Storage-Bucket ab und reiht den Job in **Google Cloud Tasks** ein. Erst der Auftrag, dann das Foto: So liegt nie ein Foto im Zwischenspeicher, das kein Auftrag kennt.
 - Cloud Tasks dispatcht die Jobs **dosiert** an den Worker (`processJob`) — die Anbieter-Limits werden so strukturell eingehalten statt im Fehlerfall abgefangen.
-- Der Browser pollt **`/api/job-status`**; jeder Poll ist zugleich ein Liveness-Herzschlag. Verlaesst der Nutzer die Seite, wird der Job verworfen, bevor er einen KI-Call kostet.
+- Der Browser pollt **`/api/job-status`**; jeder Poll ist zugleich ein Liveness-Herzschlag. Verlaesst der Nutzer die Seite, wird der Job verworfen, bevor er einen KI-Call kostet. Waehlt jemand ein anderes Foto, meldet die Seite den noch wartenden Job sofort ab (`DELETE /api/job-status`).
 - Das Bild wird unmittelbar nach der Verarbeitung geloescht, das Job-Dokument (inkl. Ergebnis) spaetestens nach 2 h.
 
 Seit v2.10 ist die Warteschlange der einzige Weg. Der frühere synchrone `/analyze`-Pfad — eine 30-60 s offene Verbindung — ist entfernt: Er war seit Mai 2026 nur noch Rückfall und hätte bei Stoßlast genau das Problem zurückgebracht, wegen dem die Warteschlange gebaut wurde. Als Notfall-Hebel dient stattdessen der Wartungsmodus (siehe [`docs/RUNBOOK.md`](docs/RUNBOOK.md)).
@@ -126,12 +134,12 @@ Datenschutz ist kein Feature — es ist das Fundament:
 - **EU-Hosting fuer KI-Analysen**: Alle Bild-Analysen laufen ueber Mistral AI (Paris, EU-DSGVO). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO. Auf dem genutzten kostenpflichtigen API-Tier ist Training auf Eingaben/Ausgaben laut Anbieter-Zusage deaktiviert.
 - **Keine US-KI-Anbieter mehr**: Seit v1.6.0 wurden Google Vertex AI und Cloud Vision aus der Pipeline entfernt. Google bleibt nur fuer die Infrastruktur: Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) in `europe-west1`, statische Seiten ueber ein weltweites Auslieferungsnetz (CDN).
 - **EXIF-Extraktion im Browser**: exifr parsed die Metadaten lokal, GPS erreicht nie unsere Server
-- **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell (ohne GPS, ohne dateTimeOriginal)
+- **Server bekommt kein GPS**: Nur komprimiertes Bild + Kamera-Hersteller/Modell, die Sprache und eine Zufallsnummer des Durchgangs (ohne GPS, ohne dateTimeOriginal)
 - **Geocoding direkt vom Browser**: Nominatim wird client-seitig aufgerufen, nicht ueber den Server
 - **Keine dauerhafte Speicherung**: Im Queue-Betrieb liegt das Bild nur kurz zur Verarbeitung im EU-Storage und wird sofort danach geloescht; das Job-Dokument spaetestens nach 2 h. Kein Profil bleibt dauerhaft gespeichert
 - **Keine externen Scripts**: Alle Assets self-hosted (Fonts, Leaflet, exifr, libheif). Kein Google Fonts CDN, kein unpkg, kein reCAPTCHA, kein Firebase SDK
 - **Bot-Schutz ohne Tracking**: Rate Limiting (IP), Honeypot-Feld, Timing-Check
-- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + `/api/…` (gleiche Domain)
+- **Strenge CSP**: Nur `self` + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen in `europe-west1` (einzeln genannt, kein Platzhalter)
 
 ## Schnellstart
 
@@ -152,8 +160,9 @@ firebase login
 npm install                          # Frontend-Tests (Vitest)
 cd functions && npm install && cd .. # Backend
 
-# 4. Lokal testen
-firebase emulators:start --only functions,hosting
+# 4. Lokal testen (Functions, Firestore, Hosting, Pub/Sub — Ablauf: docs/QUEUE-EMULATOR.md)
+cp functions/.env.local.example functions/.env.local   # einmalig: Attrappe statt echter KI
+npm run emulator
 
 # 5. Deploy (Riegel, Trockenlauf, Live-Smoke — Ablauf in docs/RUNBOOK.md)
 ./scripts/deploy.sh
@@ -165,14 +174,24 @@ Detaillierte Anleitung: [`docs/SETUP.md`](docs/SETUP.md) | Eigene Instanz aufset
 
 Jede Analyse laeuft ueber zwei Endpunkte — Bild einreihen, Ergebnis abholen:
 
-`POST /api/enqueue` — JSON mit dem Bild als `imageBase64`. Antwort: `{ "jobId": "..." }`
+`POST /api/enqueue` — JSON mit dem Bild als `imageBase64`. Antwort: `{ "jobId": "...", "resultToken": "..." }`.
+`resultToken` ist das Abhol-Ticket: Nur wer es mitschickt, bekommt das Ergebnis.
 
-`GET /api/job-status?jobId=...` — Antwort: `{ "status": "...", "queuePosition": 0, "etaSeconds": 0, "result": { ... } }`.
-`status` ist `queued`, `processing`, `done`, `failed` oder `abandoned`; `result`
-ist gesetzt, sobald `status` `done` ist.
+`GET /api/job-status?jobId=...&token=...` — Antwort: `{ "status": "...", "position": 0, "etaSeconds": 0, "result": { ... } }`.
+`status` ist `queued`, `processing`, `done`, `failed` oder `abandoned`. Status und
+Position gibt es auch ohne Ticket; `result` ist gesetzt, sobald `status` `done` ist
+und das Ticket stimmt.
 
 Jede Statusabfrage ist zugleich ein Lebenszeichen: Verlaesst der Nutzer die
 Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
+
+Fehlt der Einstellungssatz, antwortet die Abfrage mit `503` und `{ "error": "config_missing" }`;
+der Browser fragt dann weiter wie bei jeder kurzen Störung.
+
+`DELETE /api/job-status?jobId=...&token=...` — meldet einen Job ab, den der Browser
+nicht mehr abholt. Wirkt nur mit dem Abhol-Ticket und nur, solange der Job wartet:
+kein KI-Aufruf, der Platz im Stundenlimit kommt zurueck, das Bild wird geloescht.
+Antwort: `{ "verworfen": true }` oder `{ "verworfen": false }`.
 
 ### Request (JSON)
 
@@ -180,7 +199,6 @@ Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
 {
   "imageBase64": "...",
   "mimeType": "image/jpeg",
-  "filename": "upload.jpg",
   "exif": { "make": "Apple", "model": "iPhone 15 Pro" },
   "lang": "de"
 }
@@ -194,6 +212,8 @@ Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
 | `lang`        | string | Sprachcode (`de`, `en`, ...). Default: `de`          |
 
 ### Response
+
+Das fertige Ergebnis steht im Feld `result` der Statusantwort:
 
 ```json
 {
@@ -209,8 +229,9 @@ Seite, wird der Job verworfen, bevor er einen KI-Aufruf kostet.
   "privacyRisks": [],
   "exif": {},
   "meta": {
-    "requestId": "abc12345",
-    "mode": "multimodal"
+    "mode": "multimodal",
+    "subject": "HUMAN",
+    "alterUnlesbar": false
   }
 }
 ```
@@ -233,7 +254,7 @@ Das vollständige Sicherheitsmodell — Schutzgüter, Bedrohungsbild und vor all
 die **bewusst getroffenen Abwägungen mit Begründung** — steht in
 [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md). Die wichtigsten Schichten:
 
-- **Content Security Policy** mit strikter Whitelist (`self`; Bilder zusätzlich von OpenStreetMap-Kacheln, Verbindungen zusätzlich zu Nominatim)
+- **Content Security Policy** mit strikter Whitelist (`self`; Bilder zusätzlich von OpenStreetMap-Kacheln, Verbindungen zusätzlich zu Nominatim und zu den Cloud-Run-Adressen der eigenen Schnittstellen in `europe-west1`)
 - **HSTS** — Transportverschlüsselung erzwungen, zwei Jahre, inklusive Unterdomains; die
   `preload`-Angabe wird mitgeliefert, ein Eintrag in der Browser-Liste ist bewusst nicht
   erfolgt (Begründung: `docs/SECURITY-MODEL.md`)
@@ -334,7 +355,7 @@ cd functions && npm run format:check   # Backend Prettier
 npm run format:frontend:check          # Frontend Prettier
 ```
 
-**Backend:** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus Mistrals "Sichtbarer Text"), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
+**Backend:** HTTP-Handler, Admin-Endpunkte, Stats-Handler, HMAC-Auth, Nonce-Flow, Tier-Erkennung (SUBJECT-basiert), Config, Counter, Middleware (Rate Limiting), Privacy-Risiken (aus dem Feld `visible_text` der KI-Antwort), Upload-Parsing, Magic-Byte-Validierung, XML-Escaping, ntfy-Benachrichtigungen, i18n-Guardian, Mistral-Integration (Mock-Tests), JSON-Repair (4-stufig), Throttle-Semaphore, Queue (Job-Lebenszyklus, Reaper, Feature-Flag, Cloud-Tasks-Anbindung, Abhol-Ticket).
 
 **Frontend:** DOM-Helpers, State, Scan-Animation, Limit-Banner, Maintenance-Modal, Geocoding, Render-Pipeline, API-Integration, Warteschlange samt Wiederaufnahme, Stats-Seite, i18n-Modul, i18n-Guardian.
 
@@ -356,7 +377,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 | Komponente         | Technologie                                                                                                                  |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Hosting            | Firebase Hosting — Projektregion Google Ireland (europe-west1), Auslieferung der statischen Dateien ueber ein weltweites CDN |
+| Hosting            | Firebase Hosting — Projektregion `europe-west1` (Belgien), Vertragspartner Google Ireland Ltd.; Auslieferung der statischen Dateien ueber ein weltweites CDN |
 | Backend            | Firebase Cloud Functions (2nd Gen, Node 24, europe-west1)                                                                    |
 | Queue              | Google Cloud Tasks (dosierter Job-Dispatch, europe-west1)                                                                    |
 | Datenbank          | Cloud Firestore (Zaehler, Maintenance-Flag, Queue-Jobs, europe-west1)                                                        |
@@ -372,7 +393,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 
 - **Mistral-Abh&auml;ngigkeit**: Wenn Mistral nicht erreichbar ist, schlaegt die Analyse fehl (keine Fallback-Provider mehr seit v1.6.0). Der User sieht eine `blocked.apiError`-Antwort. Mistrals SLA + Multi-Region-Setup machen das selten.
 - **Safety-Filter**: Verweigert Mistral bei sensiblen Inhalten die Analyse, liefert die Antwort keine Profile; der User sieht `blocked.profileBlocked` (bzw. `blocked.apiError`, wenn der Aufruf selbst scheitert).
-- **SUBJECT-Klassifikation**: Tier-Easter-Egg-Profile werden ueber die `SUBJECT:`-Kopfzeile in Mistrals Antwort und Keyword-Matching im Beschreibungstext bestimmt (siehe `animal.js`). Bei Unsicherheit faellt die Pipeline auf den normalen Profil-Pfad zur&uuml;ck.
+- **SUBJECT-Klassifikation**: Ob ein Tier-Easter-Egg-Profil gezeigt wird, entscheidet allein das Feld `subject` in Mistrals Antwort; welche Tierart es zeigt, bestimmt Keyword-Matching im Beschreibungstext (siehe `animal.js`). Fehlt das Feld oder ist es ungueltig, laeuft der normale Profil-Pfad.
 - **Alters-Schaetzung**: erfolgt ausschliesslich durch Mistral anhand physischer Merkmale. Seit v1.5.0 mit zwei Anker-Bloecken in den Prompts: Koerperproportionen (Schulter-zu-Kopf, Hand) als primaere Achse fuer Kinder/Teens, plus Zwangs-Mapping fuer Erwachsene (sichtbare Falten/Lid-Erschlaffung/Pigmentflecken haben Mindest-Alter-Schwellen).
 
 ## Datenschutz
@@ -381,7 +402,7 @@ GitHub Actions Workflow `.github/workflows/ci.yml`:
 - Keine Tracking-Cookies, keine Analytics, keine Werbung
 - Kein Firebase SDK im Frontend, kein reCAPTCHA
 - KI-Analyse ausschliesslich ueber Mistral AI (Paris/EU). Mistral als Auftragsverarbeiter nach Art. 28 DSGVO, kein Training auf den Daten.
-- Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) bei Google Ireland in europe-west1; statische Seiten ueber ein weltweites CDN. Google als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
+- Datenverarbeitung (Cloud Functions, Cloud Storage, Firestore) in `europe-west1` (Belgien), Vertragspartner Google Ireland Ltd.; statische Seiten ueber ein weltweites CDN. Google als Auftragsverarbeiter, kein Zugriff auf Bildinhalte.
 - GPS-Daten erreichen nie unsere Server (Karte und Ortsname holt der Browser bei einem hochgeladenen Foto direkt bei OpenStreetMap bzw. Nominatim; bei den Demo-Fotos fragt er nichts an)
 - Details: [malzi.me/datenschutz](https://malzi.me/datenschutz)
 

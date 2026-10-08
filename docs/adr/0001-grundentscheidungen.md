@@ -30,10 +30,15 @@ getroffen — sowie die bewussten Abweichungen vom Standard.
 5. **Sprache: Deutsch** für Doku, Commits, UI und Reports — bewusste Abweichung
    vom Familien-Default Englisch (Solo-Betrieb, deutschsprachige Zielgruppe,
    gewachsene Repo-Konvention).
-6. **Keine Pre-commit-Hooks** — bewusste Abweichung. Die verbindliche Grenze sind
-   die CI-Pflicht-Checks (Tests, Lint, Format, gitleaks-Secret-Scan,
-   npm-audit-Gate) plus Branch Protection; lokale Hooks würden das für einen
-   Solo-Entwickler nur doppeln.
+6. **Kein Hook je Commit, aber ein Riegel vor dem Push.** Die verbindliche
+   Grenze sind die CI-Pflicht-Checks (Tests, Lint, Format, gitleaks-Secret-Scan,
+   npm-audit-Gate) plus Branch Protection. **Stand 2026-09-01:** Dazu kommt ein
+   lokaler Riegel vor jedem Push (`scripts/hooks/pre-push`, eingeschaltet durch
+   `scripts/einrichten.sh`): Er fährt die billigen Prüfungen der Pipeline ab
+   (`scripts/vor-dem-push.sh`), bevor ein Stand das Gerät verlässt. Die frühere
+   Begründung dieser Entscheidung — lokale Hooks würden die Pipeline nur
+   doppeln — gilt für ihn nicht: Er erspart den Umweg über eine rote Pipeline.
+   Einen Hook je Commit gibt es weiterhin nicht.
 7. **Umgebungskapselung: Toolchain-Pinning statt Dev-Container.** Node 24 über
    `.nvmrc`, `engines` und CI; der Playwright-Container-Tag wird aus dem
    Lockfile abgeleitet (Job `playwright-version` in `ci.yml`) — seit 2026-07-29

@@ -7,6 +7,9 @@
  * den Stand seines Jobs ab und erhält: Status, Warteschlangen-Position,
  * grobe ETA und — sobald fertig — das Ergebnis.
  *
+ * DELETE /job-status?jobId=…&token=… meldet einen noch WARTENDEN Job ab, den
+ * der Browser nicht mehr abholt (siehe verwerfeAufWunsch).
+ *
  * Kein IP-Rate-Limit: Der Endpoint wird konstruktionsbedingt im 2-Sekunden-
  * Takt gepollt; der Upload-Rate-Limiter (für /enqueue) würde legitime
  * Workshop-Klassen hinter einer geteilten Schul-IP sofort aussperren. Schutz
@@ -18,9 +21,11 @@
 const { randomUUID } = require("crypto");
 const { geltendeWerte } = require("./betriebsprofil");
 const { dauerJeAnalyse } = require("./durchsatz");
+const { wartezeitSekunden } = require("./warteschlangen-rechnung");
 const { getFeatureFlags } = require("./feature-flags");
-const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered } = require("./jobs");
+const { getJob, getQueuePosition, markFailedIfStale, touchJob, markDelivered, abandonJob } = require("./jobs");
 const { safeCompare, sha256Hex } = require("./auth");
+const { belegtesFreigeben } = require("./ruecknahme");
 
 /* Firestore-Auto-IDs: genau 20 Zeichen aus [A-Za-z0-9] (jobs.js:58 nutzt
    `jobsRef().doc()` ohne eigenen Namen). Bewusst eng gefasst — alles, was nicht
@@ -47,10 +52,12 @@ async function etaForPosition(position) {
   if (gemessen && !frisch) return null;
   /* Die Parallelitaet kommt aus dem Einstellungssatz. Frueher stand hier der
      Code-Wert: Wer die Warteschlange umstellte, bekam eine Wartezeit-Ansage,
-     die zur alten Zahl passte — der Fehler war fuer den Wartenden unsichtbar. */
+     die zur alten Zahl passte — der Fehler war fuer den Wartenden unsichtbar.
+     BUG-2026-10-03-35: Gerechnet wird mit der engeren von zwei Bremsen
+     (Parallelitaet und Rate), an derselben Stelle wie die Einlassgrenze. */
   const { werte } = await geltendeWerte();
   if (!werte || !sekunden) return null;
-  return Math.ceil(position / werte.parallelitaet) * sekunden;
+  return wartezeitSekunden(werte, position, sekunden);
 }
 
 /* Flag-Abfrage, die niemals wirft: Ist Firestore nicht erreichbar, gilt der
@@ -64,8 +71,66 @@ async function isGemesseneDauerAn() {
   }
 }
 
+/* PRIV-2026-10-03-57: Der Browser meldet einen Job ab, den er nicht mehr
+   abholt — jemand hat ein anderes Foto gewählt. Ohne Abmeldung liefe die
+   Analyse des verworfenen Fotos trotzdem (ein KI-Aufruf, ein Platz im
+   Stundenkontingent), bis die Karenz des Aufräumdienstes greift.
+
+   Zwei Grenzen, beide Pflicht:
+   - Nur mit dem Abhol-Ticket des Jobs (PRIV-003). Die Job-Nummer allein
+     genügt nicht — sonst könnte, wer eine Nummer kennt, fremde Aufträge
+     abräumen.
+   - Nur ein noch WARTENDER Job. Was schon in Arbeit oder fertig ist, bleibt
+     unberührt (`abandonJob` prüft das in einer Transaktion).
+
+   Danach dieselbe Rücknahme wie im Aufräumdienst (ruecknahme.js): Bild
+   löschen und Platz im Stundenkontingent zurückgeben. Der Aufrufer wertet die
+   Antwort nicht aus; scheitert etwas, räumt der Aufräumdienst wie bisher. */
+async function verwerfeAufWunsch(job, token, res) {
+  if (!job.resultToken || !safeCompare(token, job.resultToken)) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+  let verworfen = false;
+  try {
+    if (job.status === "queued" && (await abandonJob(job.id))) {
+      verworfen = true;
+      await belegtesFreigeben(job);
+    }
+  } catch (err) {
+    /* Ohne jobId und ohne Fehlertext (wie in handle-reap.js): Ein
+       Firestore-Fehlertext kann den Dokumentpfad samt jobId enthalten. */
+    console.log(
+      JSON.stringify({
+        severity: "WARNING",
+        warning: "job-abmelden-fehlgeschlagen",
+        code: (err && err.code) || null,
+        art: (err && err.name) || null,
+      })
+    );
+  }
+  res.status(200).json({ verworfen });
+}
+
+/* Ohne Einstellungssatz (07.10.2026): Fristen und Wartezeit kommen aus dem
+   Satz; fehlt er, werfen die Stellen, die ihn brauchen. Bisher blieb das
+   ungefangen — der Browser bekam einen Serverfehler, und jede Abfrage (alle
+   zwei Sekunden je wartendem Geraet) schrieb eine Fehlerzeile in den Alarm.
+   Jetzt: 503, eine Warnung ohne Auftragsnummer. Der Browser fragt weiter wie
+   bei jeder kurzen Stoerung; den Alarm zum fehlenden Satz loesen der Einlass
+   und die Satz-Wache aus, nicht jede einzelne Abfrage. */
 async function handleJobStatus(req, res) {
-  if (req.method !== "GET") {
+  try {
+    await beantworte(req, res);
+  } catch (err) {
+    if (!err || err.code !== "config_missing") throw err;
+    console.log(JSON.stringify({ severity: "WARNING", warning: "job-status-ohne-einstellungssatz" }));
+    res.status(503).json({ error: "config_missing" });
+  }
+}
+
+async function beantworte(req, res) {
+  if (req.method !== "GET" && req.method !== "DELETE") {
     res.status(405).json({ error: "Method not allowed" });
     return;
   }
@@ -80,8 +145,8 @@ async function handleJobStatus(req, res) {
      wirft ("path does not contain an even number of components"). Der Handler
      fing nichts ab, firebase-functions protokollierte "Unhandled error" mit
      severity ERROR, und die Alarmrichtlinie feuert auf genau diesen Dienst —
-     ein beliebiger Dritter konnte so ohne Anmeldung E-Mail und Push beim
-     Inhaber auslösen, alle 5 Minuten, kostenlos.
+     ein beliebiger Dritter konnte so ohne Anmeldung den Fehleralarm (E-Mail
+     und Push) auslösen, alle 5 Minuten, kostenlos.
      Firestore-Auto-IDs sind 20 Zeichen aus [A-Za-z0-9]; alles andere kann kein
      echter Job sein und wird als Eingabefehler beantwortet, nicht als
      Serverabsturz. Im Zweifel verweigern (KERN: fail-closed). */
@@ -97,6 +162,11 @@ async function handleJobStatus(req, res) {
   let job = await getJob(jobId);
   if (!job) {
     res.status(404).json({ error: "Job not found" });
+    return;
+  }
+
+  if (req.method === "DELETE") {
+    await verwerfeAufWunsch(job, token, res);
     return;
   }
 
@@ -184,8 +254,8 @@ async function handleJobStatus(req, res) {
        `totalMs` = erstellt → ausgeliefert (die volle serverseitige Kette).
        Erlaubt „done vs. wirklich abgeholt" sauber zu trennen, unabhängig von
        der best-effort Client-Telemetrie. Wiederholte Polls (Reload, zweiter
-       Tab) loggen nicht erneut. Der Schreibvorgang läuft nebenläufig — er darf
-       die Antwort an den wartenden Client nicht verzögern. */
+       Tab) loggen nicht erneut. Der Schreibvorgang wird ABGEWARTET, bevor die
+       Antwort hinausgeht (BUG-2026-10-03-29, siehe unten). */
     const antwort = {
       status: "done",
       result: job.result || null,
@@ -201,17 +271,26 @@ async function handleJobStatus(req, res) {
          es sich (sessionStorage); in der Datenbank liegt nur der Hash. Der
          Telemetrie-Endpunkt zählt eine Realitäts-Check-Stimme nur noch gegen
          ein gültiges, unverbrauchtes Ticket — eine echte Analyse, eine
-         Stimme. Der Schreibvorgang läuft wie markDelivered nebenläufig;
-         schlägt er fehl, verfällt schlimmstenfalls diese eine Stimme. */
+         Stimme. Der Hash wird mit dem Zeitpunkt der Abholung in EINEM
+         Schreibvorgang abgelegt (markDelivered). */
       const rcTicket = randomUUID();
       antwort.rcTicket = rcTicket;
-      /* Ohne jobId und ohne Fehlertext (27.09.2026): Diese Zeile steht im
+      /* BUG-2026-10-03-29: ABWARTEN, dann antworten. Am Zeitpunkt der
+         Abholung haengt die Loeschung des Ergebnisses 15 Minuten spaeter, und
+         nach der Antwort fragt dieser Browser nicht noch einmal. Was erst nach
+         der Antwort zu Ende laeuft, kommt vielleicht nie an (SECURITY-MODEL,
+         "Jeder eingelassene Auftrag zaehlt genau einmal") — das Ergebnis laege
+         dann 2 Stunden statt 15 Minuten. Ein Schreibvorgang, Millisekunden.
+         Scheitert er auch im zweiten Versuch (jobs.js), bekommt das Kind sein
+         Ergebnis trotzdem; dann steht eine Warnung im Protokoll.
+         Ohne jobId und ohne Fehlertext (27.09.2026): Diese Zeile steht im
          selben Aufruf wie `job-delivered` (gemeinsames Label execution_id),
          und ein Firestore-Fehlertext kann den Dokumentpfad samt jobId
          enthalten. Nur der Fehlercode. */
-      markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
-        console.log(
+      await markDelivered(job.id, sha256Hex(rcTicket)).catch((err) =>
+        console.warn(
           JSON.stringify({
+            severity: "WARNING",
             warning: "markDelivered-error",
             code: (err && err.code) || null,
             art: (err && err.name) || null,

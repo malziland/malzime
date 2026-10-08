@@ -12,8 +12,8 @@ const { lokalSchalterAn } = require("./lokale-schalter");
    KEIN VERSAND AUS DEM TESTBETRIEB (30.08.2026)
    ══════════════════════════════════════════════════════════════════════
    VORFALL: Ein Simulator-Lauf reihte 200 Analysen ein, riss damit das
-   Stundenlimit — und schickte eine echte Push-Nachricht auf das Handy des
-   Betreibers. Der Emulator holt sich bei angemeldetem Konto die ECHTEN
+   Stundenlimit — und schickte eine echte Push-Nachricht aufs Handy. Der
+   Emulator holt sich bei angemeldetem Konto die ECHTEN
    Zugangsdaten aus dem Secret Manager; lokale Testwerte gibt es nicht.
 
    Ein Testlauf darf nicht nach aussen wirken. Zwei Erkennungswege, damit es

@@ -15,6 +15,7 @@ Beispiel:
 """
 import os
 import re
+import subprocess
 import sys
 
 # Nur Textdateien, in denen Fakten behauptet werden. Code bleibt aussen vor:
@@ -67,18 +68,74 @@ def eigene_muster(wurzel):
                 print(f"  Hinweis: {pfad}:{nr} ungueltiger Ausdruck: {fehler}")
     return zusatz
 
+# Ein Haken oder ein aeusserer Aufruf kann git-Variablen vererben (GIT_DIR,
+# GIT_WORK_TREE ...). Mit ihnen fragte der Aufruf unten ein ANDERES Repository als
+# das, in dem `wurzel` liegt - oder gar keines. Gefragt wird immer vom Ordner aus.
+GEERBTE_GIT_VARIABLEN = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX",
+                         "GIT_COMMON_DIR", "GIT_NAMESPACE")
 
-def dateien(wurzel):
+
+def git_umgebung():
+    return {k: v for k, v in os.environ.items() if k not in GEERBTE_GIT_VARIABLEN}
+
+
+
+# TEST-2026-10-04-29 (an der Quelle seit 08.10.2026): Die Suche lief ueber den
+# Dateibaum und las damit auch, was git ausnimmt - private Berichte, Uebergaben,
+# Sicherungen. Am Arbeitsrechner wurde die Pruefung rot fuer etwas, das niemand
+# ausliefert; in der Pipeline gibt es diese Ordner nicht. Ein Projekt half sich mit
+# einer Huelle, die der Pruefung einen Spiegel vorsetzte. Jetzt fragt die Pruefung
+# git selbst, wie aussentext.py seit TEST-2026-08-12-29.
+def git_dateien(wurzel):
+    """Alles, was im Repository landet: verfolgte Dateien PLUS noch nicht
+    hinzugefuegte, die nicht ausgenommen sind - als Pfade relativ zu `wurzel`.
+    Gibt None zurueck, wenn hier kein Repository liegt, git fehlt oder git nichts
+    nennt (ein leeres Ergebnis ist zuerst ein Verdacht gegen das Messmittel) -
+    dann faellt die Suche auf den Dateibaum zurueck."""
+    try:
+        roh = subprocess.run(
+            ["git", "-C", wurzel, "ls-files", "--cached", "--others",
+             "--exclude-standard", "-z"],
+            capture_output=True, timeout=20, env=git_umgebung(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if roh.returncode != 0:
+        return None
+    namen = [n for n in roh.stdout.decode("utf-8", "replace").split("\0") if n]
+    return namen or None
+
+
+def kandidaten(wurzel):
+    """Jede Datei unter `wurzel`, die zur Suchflaeche gehoeren kann: was git kennt,
+    ohne git der Dateibaum. Ordner aus UEBERSPRINGEN und Punkt-Ordner bleiben in
+    beiden Faellen aussen vor."""
+    bekannt = git_dateien(wurzel)
+    if bekannt is not None:
+        for rel in bekannt:
+            teile = rel.split("/")
+            if any(t in UEBERSPRINGEN or t.startswith(".") for t in teile[:-1]):
+                continue
+            pfad = os.path.join(wurzel, *teile)
+            if os.path.isfile(pfad):
+                yield pfad
+        return
     for ordner, unterordner, namen in os.walk(wurzel):
         unterordner[:] = [u for u in unterordner
                           if u not in UEBERSPRINGEN and not u.startswith(".")]
         for name in namen:
-            if not name.lower().endswith(ENDUNGEN):
-                continue
-            stamm = os.path.splitext(name)[0].lower()
-            if stamm in HISTORIENDATEIEN:
-                continue
             yield os.path.join(ordner, name)
+
+
+def dateien(wurzel):
+    for pfad in kandidaten(wurzel):
+        name = os.path.basename(pfad)
+        if not name.lower().endswith(ENDUNGEN):
+            continue
+        stamm = os.path.splitext(name)[0].lower()
+        if stamm in HISTORIENDATEIEN:
+            continue
+        yield pfad
 
 
 def main():

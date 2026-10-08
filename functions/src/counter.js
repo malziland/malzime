@@ -756,7 +756,11 @@ async function resetCounter() {
  * (enqueue_failed), haben aber NIE eine echte Mistral-Analyse ausgelöst. Ohne
  * Freigabe würden solche „Phantom-Analysen" das globale Budget verbrauchen und
  * echte Nutzer früher als nötig aussperren. Fail-safe: bei Fehler passiert
- * nichts (das Limit bleibt dann konservativ — kostet nur etwas Verfügbarkeit).
+ * nichts (das Limit bleibt dann konservativ — kostet nur etwas Verfügbarkeit);
+ * der Fehlschlag steht als Warnung im Protokoll.
+ *
+ * Aufgerufen wird sie nur ueber `belegtesFreigeben` (ruecknahme.js), die
+ * abwartet und danach das Foto loescht — nie direkt.
  *
  * @param {number} [stempel] die Marke des Auftrags (`zaehlerStempel` im
  *   Auftrag, `stempel` aus checkAndIncrement). Mit Marke fällt GENAU dieser
@@ -798,7 +802,9 @@ async function releaseHourlySlot(stempel) {
       tx.update(ref, { recentAnalyses: normalized });
     });
   } catch (err) {
-    console.log(JSON.stringify({ warning: "release-slot-error", error: err.message }));
+    /* Mit Schweregrad (STRUCT-2026-10-03-37): Eine verlorene Freigabe haelt
+       einen Platz bis zum Ende des Fensters belegt — vorher ohne jedes Signal. */
+    console.warn(JSON.stringify({ severity: "WARNING", warning: "release-slot-error", error: err.message }));
   }
 }
 
@@ -922,6 +928,8 @@ module.exports = {
   setMaintenanceMode,
   _clearMaintenanceCache,
   _netzMeldungZuruecksetzen,
+  /* Fuer die Kopplungsregel der Satz-Pruefung (betriebsprofil-kopplung.test.js). */
+  _NACHLAUF_HOECHSTENS_MS: NACHLAUF_HOECHSTENS_MS,
   filterRecent,
   calcRetrySeconds,
   getDateKeys,

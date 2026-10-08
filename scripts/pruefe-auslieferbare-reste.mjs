@@ -54,10 +54,14 @@ function nichtMessbar(...zeilen) {
   process.exit(2);
 }
 
-/* minimatch liegt hier nur als Abhaengigkeit einer Abhaengigkeit. Sich darauf
-   zu verlassen hiesse, die Messung von etwas abhaengig zu machen, das ohne
-   Ankuendigung verschwinden kann — dann lieber "nicht messbar" als ein
-   selbstgebauter Muster-Vergleich, der die Faelle halb trifft. */
+/* minimatch steht als EIGENE Abhaengigkeit in der package.json der Wurzel
+   (OSS-2026-10-04-13). Kaeme es nur ueber ein anderes Paket herein (eslint,
+   jest), verschwaende es mit dessen naechstem Umbau, ohne dass hier jemand
+   etwas geaendert haette. Dass der Eintrag bleibt, haelt der Vertrag in
+   scripts/pruefe-deploy-riegel.py fest (SKRIPT_PAKETE) — nicht dieses Skript:
+   Es laeuft auch dort, wo es keine package.json gibt (Nachbau eines
+   ausgelieferten Stands). Fehlt das Paket, heisst das "nicht messbar" — lieber
+   das als ein selbstgebauter Muster-Vergleich, der die Faelle halb trifft. */
 let passt;
 try {
   const require = createRequire(import.meta.url);

@@ -29,9 +29,42 @@
 #   SKIP_SMOKE=1      Live-Probe nach der Auslieferung aus
 #   SKIP_FIRESTORE=1  Firestore-Schritt aus
 #   SKIP_CLI_CHECK=1  Versionspruefung der Firebase-CLI aus
+#
+# Rueckgabewerte (docs/RUNBOOK.md, „Die Auslieferung als Kette“):
+#   0  ausgeliefert, Live-Proben gruen
+#   2  ausgeliefert, Schlussbilanz ausgegeben — nur die Live-Proben konnten nicht
+#      messen (Wartungsmodus). Kein anderer Fall endet mit 2.
+#   1  (oder ein anderer Wert) Abbruch
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+# ── Der Rueckgabewert 2 gehoert EINEM Fall (OPS-2026-10-03-15) ──
+# Im echten Ablauf laeuft die Auslieferung IM Wartungsmodus (docs/RUNBOOK.md,
+# „Die Auslieferung als Kette“). Die Live-Proben am Schluss koennen dann nicht
+# messen und melden 2. Der Ablauf drumherum wertet deshalb 2 als „ausgeliefert,
+# Live-Proben offen“ — und genau das muss der Wert auch immer bedeuten.
+#
+# Vorher war er mehrdeutig: Auch eine Infrastruktur-Pruefung ohne Anmeldung
+# endet mit 2, lange bevor etwas hinausgeht; unter `set -e` reichte dieses
+# Skript jeden solchen Wert einfach durch. Ein Abbruch sah fuer den Ablauf
+# dann aus wie eine Auslieferung.
+#
+# Deshalb: Dieses Skript endet NUR dann mit 2, wenn es selbst am Schluss so
+# entscheidet (LIVE_PROBEN_OFFEN=1, nach der Schlussbilanz). Endet irgendein
+# anderer Schritt mit 2, wird daraus 1 — ein Abbruch ist ein Abbruch. Die
+# Regel haengt am Ende des Skripts (EXIT), zuerst allein, spaeter zusammen mit
+# der Aufraeumfalle.
+LIVE_PROBEN_OFFEN=0
+nur_ein_fall_endet_mit_2() { # $1 = der Wert, mit dem das Skript gerade endet
+  if [ "$1" -eq 2 ] && [ "$LIVE_PROBEN_OFFEN" != "1" ]; then
+    echo "" >&2
+    echo "Ein Schritt endete mit Code 2. Der Rueckgabewert 2 ist dem Fall „ausgeliefert, Live-Proben offen“ vorbehalten —" >&2
+    echo "dieser Lauf endet deshalb mit 1 (Abbruch)." >&2
+    exit 1
+  fi
+}
+trap 'nur_ein_fall_endet_mit_2 $?' EXIT
 
 # ── Einmaliges Infra-Setup (NICHT Teil des regulaeren Deploys) ──
 # Die GCS-Lifecycle-Regel, die zwischengespeicherte Bilder als Sicherheitsnetz
@@ -549,7 +582,16 @@ fi
 if [ "${SKIP_INFRA:-0}" = "1" ]; then
   echo "WARNUNG: SKIP_INFRA=1 gesetzt — Infrastruktur-Pruefung wird UEBERSPRUNGEN."
 else
-  ./scripts/verify-infrastructure.sh
+  # OPS-2026-10-03-15: Der Wert wird gelesen statt durchgereicht. Die Pruefung
+  # kennt zwei Fehlschlaege — Abweichung (1) und „Voraussetzung fehlt“ (2, etwa
+  # ohne gcloud-Anmeldung). Fuer die Auslieferung sind beide dasselbe: Abbruch.
+  INFRA_RC=0
+  ./scripts/verify-infrastructure.sh || INFRA_RC=$?
+  if [ "$INFRA_RC" -ne 0 ]; then
+    echo "FEHLER: Die Infrastruktur-Pruefung ist nicht bestanden (Code $INFRA_RC) — nichts wurde ausgeliefert." >&2
+    echo "        Notschalter: SKIP_INFRA=1" >&2
+    exit 1
+  fi
 fi
 
 # ── Riegel: Liegt der Einstellungssatz? (seit v4.4, 30.08.2026) ──
@@ -671,26 +713,38 @@ else
   # trotzdem genau. (Befund 31.08.2026, unvorbelastetes Review.)
   echo "— Trockenlauf (prueft, ohne auszuliefern)"
   DRY_START=$(date +%s)
+  # OPS-2026-10-04-12: Jeder Lauf schreibt seine zwei Protokolle in einen
+  # EIGENEN Ordner. Mit festen Dateinamen ueberschrieb ein zweiter Lauf (ein
+  # Probelauf, ein Test) das Protokoll, auf das die Fehlermeldung des ersten
+  # gerade verweist. Scheitert ein Trockenlauf, bleibt der Ordner liegen — die
+  # Meldung nennt ihn; geht alles durch, wird er entfernt.
+  if ! DRY_ORDNER=$(mktemp -d "${TMPDIR:-/tmp}/malzime-trockenlauf.XXXXXX" 2>/dev/null) || [ ! -d "$DRY_ORDNER" ]; then
+    echo "FEHLER: Fuer die Protokolle des Trockenlaufs liess sich kein Ordner anlegen (unter ${TMPDIR:-/tmp})." >&2
+    echo "        Ohne Protokoll liesse sich ein Fehlschlag nicht nachlesen — nichts wurde ausgeliefert." >&2
+    echo "        Notschalter: SKIP_DRYRUN=1" >&2
+    exit 1
+  fi
 
   if [ "${SKIP_FIRESTORE:-0}" != "1" ]; then
-    if ! firebase deploy --only firestore:malzime-eu --dry-run >/tmp/malzime-dry-firestore.log 2>&1; then
+    if ! firebase deploy --only firestore:malzime-eu --dry-run >"$DRY_ORDNER/firestore.log" 2>&1; then
       echo "FEHLER: Der Trockenlauf fuer Firestore ist gescheitert — nichts wurde ausgeliefert." >&2
-      tail -15 /tmp/malzime-dry-firestore.log | sed 's/^/    /' >&2
-      echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-firestore.log" >&2
+      tail -15 "$DRY_ORDNER/firestore.log" | sed 's/^/    /' >&2
+      echo "        Das vollstaendige Protokoll: $DRY_ORDNER/firestore.log" >&2
       echo "        Notschalter: SKIP_DRYRUN=1" >&2
       exit 1
     fi
     echo "  ok    Firestore-Regeln und Indizes"
   fi
 
-  if ! firebase deploy --only "$TARGET" --dry-run >/tmp/malzime-dry-rest.log 2>&1; then
+  if ! firebase deploy --only "$TARGET" --dry-run >"$DRY_ORDNER/rest.log" 2>&1; then
     echo "FEHLER: Der Trockenlauf fuer $TARGET ist gescheitert — nichts wurde ausgeliefert." >&2
-    tail -15 /tmp/malzime-dry-rest.log | sed 's/^/    /' >&2
-    echo "        Das vollstaendige Protokoll: /tmp/malzime-dry-rest.log" >&2
+    tail -15 "$DRY_ORDNER/rest.log" | sed 's/^/    /' >&2
+    echo "        Das vollstaendige Protokoll: $DRY_ORDNER/rest.log" >&2
     echo "        Notschalter: SKIP_DRYRUN=1" >&2
     exit 1
   fi
   echo "  ok    $TARGET"
+  rm -rf "$DRY_ORDNER"
   echo "Trockenlauf gruen in $(( $(date +%s) - DRY_START )) s — die Auslieferung sollte durchgehen."
 fi
 
@@ -763,6 +817,11 @@ aufraeumen_bei_abbruch() {
   # OPS-2026-08-13-47 fail-closed gebaut wurde. Dazu haette build-info.json,
   # der Echtheitsbeweis, nicht mehr zur Produktion gepasst.
   if [ "$HOCHGELADEN" = "1" ]; then
+    # OPS-2026-10-03-15: Mit offenen Live-Proben endet das Skript bewusst mit
+    # 2 — das ist kein Abbruch, die Schlusszeile sagt, was zu tun bleibt.
+    if [ "$CODE" -eq 2 ] && [ "$LIVE_PROBEN_OFFEN" = "1" ]; then
+      return
+    fi
     if [ "$CODE" -ne 0 ]; then
       echo ""
       echo "Abbruch NACH dem Hochladen (Code $CODE) — die Cache-Kennung bleibt,"
@@ -839,7 +898,9 @@ aufraeumen_bei_abbruch() {
     fi
   fi
 }
-trap aufraeumen_bei_abbruch EXIT
+# Die Falle liest den Rueckgabewert als Erstes (CODE); danach gilt die Regel
+# vom Anfang des Skripts weiter: Nur ein Fall endet mit 2.
+trap 'aufraeumen_bei_abbruch; nur_ein_fall_endet_mit_2 "$CODE"' EXIT
 
 # Alle Dateien mit ?v=-Verweisen aktualisieren: JEDE HTML-Seite unter public/
 # — auch in Unterordnern wie public/en/ — UND public/js/demo.js, dort haengen
@@ -1158,7 +1219,18 @@ if [ "${SKIP_SMOKE:-0}" = "1" ]; then
 else
   # OPS-2026-08-13-42: Der Smoke bekommt die erwartete Buster-Version und liest
   # sie live zurück.
-  ./scripts/live-smoke.sh "$VERSION"
+  # OPS-2026-10-03-15: Im Wartungsmodus koennen die Proben nicht messen und
+  # melden 2. Das ist kein Abbruch — ausgeliefert ist. Das Skript laeuft dann
+  # bis zur Schlussbilanz weiter und endet erst ganz am Schluss mit 2. Jeder
+  # andere Fehlschlag haelt wie bisher sofort an.
+  SMOKE_RC=0
+  ./scripts/live-smoke.sh "$VERSION" || SMOKE_RC=$?
+  if [ "$SMOKE_RC" -eq 2 ]; then
+    LIVE_PROBEN_OFFEN=1
+    echo "HINWEIS: Die Live-Proben konnten nicht messen (Code 2) — im Wartungsmodus ist das zu erwarten."
+  elif [ "$SMOKE_RC" -ne 0 ]; then
+    exit "$SMOKE_RC"
+  fi
 fi
 
 # ── OPS-2026-08-13-48: Schlussbilanz der übersprungenen Riegel ──
@@ -1184,9 +1256,16 @@ UEBERSPRUNGEN=""
 # soll sehen, dass niemand bestaetigt hat.
 [ -n "${DEPLOY_JA:-}" ]          && UEBERSPRUNGEN="$UEBERSPRUNGEN DEPLOY_JA(Rueckfrage)"
 
+# OPS-2026-10-03-15: „alle Riegel gelaufen“ waere mit offenen Live-Proben zu
+# viel gesagt — sie sind gelaufen, haben aber nichts gemessen.
+PROBEN_OFFEN=""
+[ "$LIVE_PROBEN_OFFEN" = "1" ] && PROBEN_OFFEN=" — ⚠ LIVE-PROBEN NICHT GEMESSEN (Wartungsmodus)"
+
 echo ""
 if [ -n "$UEBERSPRUNGEN" ]; then
-  echo "Deploy abgeschlossen. Version: ?v=$VERSION — ⚠ ÜBERSPRUNGENE RIEGEL:$UEBERSPRUNGEN"
+  echo "Deploy abgeschlossen. Version: ?v=$VERSION — ⚠ ÜBERSPRUNGENE RIEGEL:$UEBERSPRUNGEN$PROBEN_OFFEN"
+elif [ -n "$PROBEN_OFFEN" ]; then
+  echo "Deploy abgeschlossen. Version: ?v=$VERSION — kein Riegel uebersprungen$PROBEN_OFFEN"
 else
   echo "Deploy abgeschlossen. Version: ?v=$VERSION — alle Riegel gelaufen."
 fi
@@ -1249,3 +1328,14 @@ case "$OBERSTE" in
     echo "CHANGELOG: oberste Version ist $OBERSTE — Versionsschnitt gesetzt."
     ;;
 esac
+
+# ── OPS-2026-10-03-15: der eine Fall, der mit 2 endet ──
+# Alles ist ausgeliefert, die Schlussbilanz steht oben — nur die Live-Proben
+# konnten im Wartungsmodus nicht messen. Wer den Ablauf fuehrt, holt sie nach
+# dem Ausschalten des Wartungsmodus nach (docs/RUNBOOK.md, „Die Auslieferung
+# als Kette“). Die Zeile steht bewusst zuletzt.
+if [ "$LIVE_PROBEN_OFFEN" = "1" ]; then
+  echo ""
+  echo "AUSGELIEFERT, LIVE-PROBEN OFFEN (Rueckgabewert 2) — nach „Wartungsmodus aus“ nachholen: ./scripts/live-smoke.sh $VERSION"
+  exit 2
+fi

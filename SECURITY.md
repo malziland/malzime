@@ -21,13 +21,14 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 
 ## Known Accepted Risks
 
+The deliberate trade-offs — each with its reasoning and the condition for re-evaluating it — are documented in one place: [docs/SECURITY-MODEL.md](docs/SECURITY-MODEL.md) (German), section "Bewusste Restrisiken". The table below only names them and points there; it does not describe the behaviour a second time.
+
 | Risk | Mitigation | Status |
 |------|-----------|--------|
-| In-memory rate limit (per instance, not global) | `maxInstances` cap + per-IP rate limit | Accepted for workshop scale |
-| Public endpoint (`invoker: "public"`) | Rate limiting + body-size cap + queue-depth cap + hourly limit (honeypot and timing check are browser-side heuristics and do not stop a direct call) | Accepted for workshop scale |
+| Per-IP rate limit lives in memory, per instance, not globally | It is a noise filter, not the cost brake; the global brakes are the hourly limit and the queue-depth cap (Restrisiko 2) | Accepted for workshop scale |
+| Public endpoints (`invoker: "public"`) | Rate limiting + body-size cap + queue-depth cap + hourly limit (honeypot and timing check are browser-side heuristics and do not stop a direct call) (Restrisiko 5) | Accepted for workshop scale |
 | No authentication required | By design — workshop participants should not need accounts | Accepted |
-| Counter fail-open on Firestore errors (`counter.js`) | App stays available during DB outages; worst case: a few extra analyses beyond hourly limit | Accepted — availability over strict cost control |
-| Nonce replay protection fail-open on Firestore errors (`auth.js`) | Admin actions remain functional during DB outages; nonces are short-lived (5 min TTL) and require valid HMAC | Accepted — admin availability over strict replay prevention |
+| The hourly limit (cost brake) depends on the database | See Restrisiko 1 and the section "Die Kostenbremse und ihr Netz" | Accepted |
 
 ## Security Measures
 
@@ -39,9 +40,10 @@ malziME is a **workshop tool for media literacy education**. It is designed for 
 - **HSTS** — enforced for two years including subdomains; the `preload` directive is sent,
   but the site is deliberately **not** on the browser preload list (see `docs/SECURITY-MODEL.md`)
 - **Rate limiting**: Per-IP request limits
-- **Prompt injection protection**: user data isolated in XML tags (3-call path); the active single-large prompt states explicitly that text visible in the image is content, never an instruction
+- **Admin actions**: HMAC-signed token plus a one-time nonce; if the nonce cannot be checked, the action is refused
+- **Prompt injection protection**: the analysis prompt states explicitly that text visible in the image is content, never an instruction; in the second call (ad categories, no image) the profile data is escaped, wrapped in data blocks and preceded by a warning to ignore instructions inside them
 - **Input validation**: File type, size, and format checks
-- **LLM output bounds**: Response size limits enforced server-side (categories, ad_targeting, manipulation_triggers, profileText)
+- **LLM output bounds**: Response size limits enforced server-side (categories, ad_targeting, manipulation_triggers, profileText, and the two `hard_facts` anchors) — for every shape the model may return
 - **Defensive JSON parser**: 4-stage repair layer for LLM responses (`json-repair.js`) — direct parse → heuristic cleanup → json5 → truncation recovery
 - **Per-instance throttle**: Semaphore (`throttle.js`) caps concurrent Mistral API calls per Cloud Function instance — smooths workshop-burst load against provider rate limits
 

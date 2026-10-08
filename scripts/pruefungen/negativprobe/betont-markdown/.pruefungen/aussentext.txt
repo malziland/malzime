@@ -1,0 +1,3 @@
+# ERWARTUNG: ein Fund (Exit 1). In der Wendung ist ein Wort mit Sternchen betont. Im
+# Quelltext stehen die Sternchen zwischen den Woertern, gelesen wird der Satz ohne sie.
+verl(ae|ä)sst nie den Browser|Absolute Zusage ueber Datenfluesse ist im Netzwerk-Tab widerlegbar.

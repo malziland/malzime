@@ -21,6 +21,13 @@ function abrufAttrappe({ html, seiteOk = true, ntfyOk = true, protokoll }) {
       if (!seiteOk) return { ok: false, status: 503, text: async () => "" };
       return { ok: true, status: 200, text: async () => html };
     }
+    /* Seit 07.10.2026 liest derselbe Lauf auch die Erklaerung zur
+       Barrierefreiheit. Hier steht sie mit frischem Datum da und loest nichts
+       aus; ihre eigenen Faelle stehen in erinnerung-barrierefreiheit.test.js. */
+    if (String(url).includes("barrierefreiheit")) {
+      const frisch = formatiereDatum(new Date(JETZT - 10 * TAG));
+      return { ok: true, status: 200, text: async () => `<p>zuletzt geprüft am ${frisch}</p>` };
+    }
     /* ntfy-Aufruf */
     if (protokoll) protokoll.push(JSON.parse(optionen.body));
     return { ok: ntfyOk, status: ntfyOk ? 200 : 500, text: async () => "" };

@@ -163,6 +163,68 @@ describe("(c) Server-Zeilen im 30-Tage-Speicher: jedes Feld steht im Datenschutz
   }
 });
 
+/* PRIV-2026-09-10-07: Die Statistik-Seite sagte "keine Einzelvorgaenge",
+   waehrend der Datenschutztext seit 10.09.2026 richtig nennt, dass auch die
+   Zeitpunkte der juengsten Analysen und die Dauer der letzten gespeichert
+   werden. Derselbe Satz steht an drei Stellen (Seite, deutsche und englische
+   Sprachdatei) — alle drei muessen die zwei Angaben nennen, die der
+   Datenschutztext nennt. */
+describe("(d) Statistik-Seite: sagt ueber die Zaehler dasselbe wie der Datenschutztext", () => {
+  const STICHWORTE = {
+    de: ["wann die jüngsten waren", "wie lange die letzten gedauert haben"],
+    en: ["when the most recent ones were", "how long the last ones took"],
+  };
+  const SPRACHDATEI = (sprache) => JSON.parse(lies(`public/locales/${sprache}.json`))["stats.infoCountText"];
+  const STELLEN = [
+    ["public/stats.html", "de", () => seitentext("public/stats.html")],
+    ["public/locales/de.json", "de", () => glatt(SPRACHDATEI("de"))],
+    ["public/locales/en.json", "en", () => glatt(SPRACHDATEI("en"))],
+  ];
+
+  test("der Datenschutztext nennt beide Angaben (Messmittel-Kontrolle)", () => {
+    for (const stichwort of STICHWORTE.de) expect(TEXT_DE).toContain(stichwort);
+    for (const stichwort of STICHWORTE.en) expect(TEXT_EN).toContain(stichwort);
+  });
+
+  test.each(STELLEN)("%s nennt Zeitpunkte und Dauer", (_pfad, sprache, text) => {
+    for (const stichwort of STICHWORTE[sprache]) expect(text()).toContain(stichwort);
+  });
+
+  test.each(STELLEN)("%s verspricht nicht mehr, dass es keine Einzelvorgaenge gibt", (_pfad, _sprache, text) => {
+    expect(text()).not.toMatch(/Einzelvorg|individual events/i);
+  });
+});
+
+/* PRIV-2026-10-03-39: Der Text sagte "Mistral bekommt nur das Foto". Der
+   Analyseweg fragt die KI aber ein zweites Mal — ohne Foto, mit Saetzen aus
+   dem Profil — fuer die Werbe-Vorschlaege der Beast-Ansicht. Solange es diesen
+   zweiten Aufruf gibt, muss der Datenschutztext ihn nennen, im Ablauf und bei
+   den Beteiligten. Faellt der Aufruf eines Tages weg, wird diese Pruefung rot
+   und der Satz kommt (mit Freigabe) wieder aus dem Text. */
+describe("(e) zweiter KI-Aufruf: der Datenschutztext nennt ihn, solange es ihn gibt", () => {
+  const ANALYSEWEG = lies("functions/src/job-pipelines.js");
+
+  test("der Analyseweg ruft die KI ein zweites Mal (Messmittel-Kontrolle)", () => {
+    expect(ANALYSEWEG).toMatch(/generateBeastAds\(/);
+  });
+
+  test.each([
+    [
+      "public/datenschutz.html",
+      TEXT_DE,
+      ["ohne das Foto, nur mit einigen Sätzen aus dem Profil", "danach einige Sätze aus dem Profil"],
+    ],
+    [
+      "public/en/privacy.html",
+      TEXT_EN,
+      ["without the photo, only with a few sentences from the profile", "afterwards a few sentences from the profile"],
+    ],
+  ])("%s nennt den zweiten Aufruf im Ablauf und bei den Beteiligten", (_pfad, text, stichworte) => {
+    for (const stichwort of stichworte) expect(text).toContain(stichwort);
+    expect(text).not.toMatch(/bekommt nur das Foto|receives only the photo/);
+  });
+});
+
 describe("englische Fassung", () => {
   test("der englische Seitentext ist lesbar (Messmittel-Kontrolle)", () => {
     expect(TEXT_EN.toLowerCase()).toContain("privacy");

@@ -235,6 +235,12 @@ function skripteEinspielen() {
       `#!/bin/sh\n# ATTRAPPE (Testlauf) — beruehrt keinen echten Dienst.\n` +
         `if [ "\${ATTRAPPE_${name}_ROT:-0}" = "1" ]; then\n` +
         `  echo "ATTRAPPE ${name}: scheitert (so gewollt)" >&2\n  exit 1\nfi\n` +
+        /* Ein bestimmter Rueckgabewert: 2 heisst bei beiden Skripten "nicht
+           messbar" (die Live-Proben im Wartungsmodus, die Infrastruktur-
+           Pruefung ohne Anmeldung). Die Meldung geht wie bei den echten
+           Skripten auf die Standardausgabe. */
+        `if [ -n "\${ATTRAPPE_${name}_RC:-}" ]; then\n` +
+        `  echo "ATTRAPPE ${name}: endet mit \${ATTRAPPE_${name}_RC} (so gewollt)"\n  exit "\${ATTRAPPE_${name}_RC}"\nfi\n` +
         /* Argumente mitschreiben: Ob live-smoke.sh die Buster-Version
            bekommt, haengt am Deploy-Ziel — ohne diese Zeile laesst sich das
            von aussen nicht unterscheiden (Runde 7, K-13). */
@@ -345,9 +351,16 @@ describe("deploy.sh — Verhalten der Riegel", () => {
   afterEach(aufraeumen);
 
   test("roter Pflicht-Check haelt die Auslieferung an", () => {
-    const r = deploy({ ATTRAPPE_CHECKS: "test-backend=failure\ntest-frontend=success" });
+    /* Alle sechs Ergebnisse stehen da, nur dieses eine ist rot (TEST-2026-10-04-17).
+       Fehlten die uebrigen, hielte der Lauf auch dann an, wenn ein rotes
+       Ergebnis nur noch gemeldet wuerde — am ersten fehlenden. */
+    const r = deploy({
+      ATTRAPPE_CHECKS: PFLICHT.map((name) => `${name}=${name === "test-backend" ? "failure" : "success"}`).join("\n"),
+    });
     expect(r.code).not.toBe(0);
-    expect(r.ausgabe).toMatch(/test-backend/);
+    expect(r.ausgabe).toMatch(
+      /Pflicht-Check test-backend ist fuer [0-9a-f]{40} nicht grün \(Ist: test-backend=failure\)/
+    );
   });
 
   /* Befunde G-02/H-04 (30.09.2026): Der Herkunftsnachweis des HEIC-Dekoders
@@ -1016,6 +1029,160 @@ describe("deploy.sh — der Probelauf", () => {
    Fingerabdruck des Server-Codes (public/build-info.json) geht mit der Website
    hinaus; ein reiner Server-Deploy liesse die Seite weiter den vorigen
    Server-Stand ausweisen. */
+/* OPS-2026-10-03-15: Im echten Ablauf laeuft die Auslieferung IM Wartungsmodus.
+   Die Live-Proben koennen dann nicht messen und enden mit 2 — bisher endete
+   damit auch deploy.sh, und zwar VOR der Schlussbilanz: Welche Riegel
+   uebersprungen wurden, stand im echten Ablauf nie am Ende. Und denselben Wert
+   2 lieferte eine Infrastruktur-Pruefung ohne Anmeldung, also ein Abbruch,
+   bei dem nichts hinausging. Jetzt gehoert der Wert 2 von deploy.sh allein dem
+   Fall "ausgeliefert, Live-Proben offen" — nach der Schlussbilanz. */
+describe("deploy.sh — Live-Proben, die nicht messen koennen (Wartungsmodus)", () => {
+  afterEach(aufraeumen);
+
+  const BILANZ = /Deploy abgeschlossen\. Version: \?v=\d{10} — /;
+
+  test("Live-Proben melden 2: ausgeliefert, Schlussbilanz in der Ausgabe, Rueckgabewert 2", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_SMOKE_RC: "2" });
+    expect(r.uploads).toEqual(["firebase deploy --only firestore:malzime-eu", "firebase deploy --only hosting"]);
+    expect(r.ausgabe).toMatch(BILANZ);
+    expect(r.ausgabe).toMatch(/LIVE-PROBEN NICHT GEMESSEN/);
+    /* Der CHANGELOG-Hinweis am Schluss erscheint ebenfalls — das Skript laeuft bis zum Ende. */
+    expect(r.ausgabe).toMatch(/CHANGELOG|Unver/i);
+    /* Kein Abbruch: Die Falle fuer Abbrueche nach dem Hochladen schweigt. */
+    expect(r.ausgabe).not.toMatch(/Abbruch NACH dem Hochladen/);
+    /* Die letzte Zeile sagt, was offen ist; davor steht die Bilanz. */
+    expect(r.ausgabe.trimEnd().split("\n").pop()).toMatch(/^AUSGELIEFERT, LIVE-PROBEN OFFEN \(Rueckgabewert 2\)/);
+    expect(r.ausgabe.search(BILANZ)).toBeLessThan(r.ausgabe.indexOf("AUSGELIEFERT, LIVE-PROBEN OFFEN"));
+    expect(r.code).toBe(2);
+  });
+
+  test("auch dann nennt die Schlussbilanz jeden uebersprungenen Riegel", () => {
+    const r = deploy({ ATTRAPPE_SMOKE_RC: "2", SKIP_DRYRUN: "1", DEPLOY_JA: "1" });
+    expect(r.code).toBe(2);
+    expect(r.ausgabe).toMatch(/ÜBERSPRUNGENE RIEGEL: SKIP_DRYRUN DEPLOY_JA\(Rueckfrage\)/);
+  });
+
+  test("eine Infrastruktur-Pruefung, die nicht messen kann (2), endet NICHT mit diesem Wert — und nichts geht hinaus", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_INFRA_RC: "2" });
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(
+      /FEHLER: Die Infrastruktur-Pruefung ist nicht bestanden \(Code 2\) — nichts wurde ausgeliefert/
+    );
+    expect(r.aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"))).toEqual([]);
+    expect(r.ausgabe).not.toMatch(BILANZ);
+  });
+
+  test("eine Infrastruktur-Pruefung mit Abweichung (1) haelt an wie bisher", () => {
+    const r = deployMitProtokoll({ ATTRAPPE_INFRA_RC: "1" });
+    expect(r.code).toBe(1);
+    expect(r.aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"))).toEqual([]);
+  });
+
+  test("ein Upload, der mit 2 scheitert, endet mit 1 — und die Cache-Kennung wird zurueckgenommen", () => {
+    /* Der Wert 2 gehoert allein dem Fall oben. Scheitert NACH dem Setzen der
+       Aufraeumfalle ein Werkzeug mit 2, darf das nicht wie "ausgeliefert" aussehen. */
+    const eigene = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-deploy-firebase2-"));
+    try {
+      fs.writeFileSync(
+        path.join(eigene, "firebase"),
+        "#!/bin/sh\n" +
+          'case "$*" in\n' +
+          '  *--dry-run*|--version|*firestore*) exec "$ATTRAPPE_FIREBASE_WEITER" "$@" ;;\n' +
+          "esac\n" +
+          'echo "ATTRAPPE: Upload endet mit 2 (so gewollt)" >&2\nexit 2\n'
+      );
+      fs.chmodSync(path.join(eigene, "firebase"), 0o755);
+      const r = deploy({ PFAD_DAVOR: [eigene], ATTRAPPE_FIREBASE_WEITER: path.join(ATTRAPPEN, "firebase") });
+      expect(r.ausgabe).toMatch(/Upload endet mit 2/);
+      expect(r.code).toBe(1);
+      expect(r.ausgabe).toMatch(/Deploy abgebrochen \(Code 2\) — nehme die Cache-Kennung zurueck/);
+      expect(r.ausgabe).toMatch(/Rueckgabewert 2 ist dem Fall „ausgeliefert, Live-Proben offen“ vorbehalten/);
+      const offen = execSync(`git -C "${klon}" status --porcelain`, { encoding: "utf8" });
+      expect(offen.trim()).toBe("");
+    } finally {
+      fs.rmSync(eigene, { recursive: true, force: true });
+    }
+  });
+
+  test("rote Live-Proben (1) bleiben ein Abbruch nach dem Hochladen — ohne Schlussbilanz", () => {
+    const r = deploy({ ATTRAPPE_SMOKE_RC: "1" });
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/Abbruch NACH dem Hochladen \(Code 1\)/);
+    expect(r.ausgabe).not.toMatch(BILANZ);
+  });
+
+  test("gruene Live-Proben: Rueckgabewert 0, die Bilanz meldet alle Riegel gelaufen", () => {
+    const r = deploy();
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/Deploy abgeschlossen\. Version: \?v=\d{10} — alle Riegel gelaufen\./);
+    expect(r.ausgabe).not.toMatch(/LIVE-PROBEN/);
+  });
+});
+
+/* OPS-2026-10-04-12: Der Trockenlauf schrieb seine zwei Protokolle in feste
+   Dateien im System-Temp. Jeder Lauf ueberschrieb sie — auch ein Probelauf oder
+   diese Tests das Protokoll, auf das die Fehlermeldung eines anderen Laufs
+   gerade verweist. Jetzt hat jeder Lauf seinen eigenen Ordner. */
+describe("deploy.sh — die Protokolle des Trockenlaufs gehoeren dem Lauf", () => {
+  let ablage;
+  beforeEach(() => {
+    ablage = fs.mkdtempSync(path.join(os.tmpdir(), "malzime-deploy-trockenlauf-"));
+  });
+  afterEach(() => {
+    fs.rmSync(ablage, { recursive: true, force: true });
+    aufraeumen();
+  });
+
+  const protokollPfad = (ausgabe) => (ausgabe.match(/Das vollstaendige Protokoll: (\S+)/) || [])[1];
+  const ordnerDerLaeufe = () => fs.readdirSync(ablage).filter((name) => name.startsWith("malzime-trockenlauf."));
+
+  test("das Skript nennt keine feste Datei im System-Temp", () => {
+    const skript = fs
+      .readFileSync(path.join(WURZEL, "scripts", "deploy.sh"), "utf8")
+      .split("\n")
+      .filter((zeile) => !/^\s*#/.test(zeile))
+      .join("\n");
+    expect(skript).not.toMatch(/\/tmp\/[A-Za-z0-9_.-]+/);
+  });
+
+  test("zwei gescheiterte Probelaeufe: jeder nennt sein eigenes Protokoll, keiner ueberschreibt das des anderen", () => {
+    /* Lauf A scheitert am Trockenlauf fuer Firestore. Lauf B besteht ihn und
+       scheitert erst am zweiten — er schreibt also AUCH ein Firestore-Protokoll,
+       mit anderem Inhalt. */
+    const a = deploy({ PROBELAUF: "1", TMPDIR: ablage, ATTRAPPE_DRYRUN_FIRESTORE_ROT: "1" });
+    expect(a.code).not.toBe(0);
+    const pfadA = protokollPfad(a.ausgabe);
+    expect(pfadA).toBeDefined();
+    const inhaltA = fs.readFileSync(pfadA, "utf8");
+    expect(inhaltA).toMatch(/Trockenlauf Firestore scheitert/);
+
+    const b = deploy({ PROBELAUF: "1", TMPDIR: ablage, ATTRAPPE_DRYRUN_ZIEL_ROT: "1" });
+    expect(b.code).not.toBe(0);
+    const pfadB = protokollPfad(b.ausgabe);
+    expect(fs.readFileSync(pfadB, "utf8")).toMatch(/Trockenlauf Ziel scheitert/);
+
+    /* Jeder Lauf in seinem eigenen Ordner, beide unter der Ablage des Systems. */
+    expect(path.dirname(pfadA)).not.toBe(path.dirname(pfadB));
+    expect(ordnerDerLaeufe()).toHaveLength(2);
+    /* Das Protokoll, auf das die Meldung von A verweist, steht noch so da. */
+    expect(fs.readFileSync(pfadA, "utf8")).toBe(inhaltA);
+  });
+
+  test("ein gruener Trockenlauf hinterlaesst keinen Ordner", () => {
+    const r = deploy({ PROBELAUF: "1", TMPDIR: ablage });
+    expect(r.code).toBe(0);
+    expect(r.ausgabe).toMatch(/Trockenlauf gruen/);
+    expect(ordnerDerLaeufe()).toEqual([]);
+  });
+
+  test("laesst sich kein Ordner anlegen, haelt der Lauf an — statt ohne Protokoll weiterzumachen", () => {
+    const r = deployMitProtokoll({ PROBELAUF: "1", TMPDIR: path.join(ablage, "gibt-es-nicht") });
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/FEHLER: Fuer die Protokolle des Trockenlaufs liess sich kein Ordner anlegen/);
+    expect(r.aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"))).toEqual([]);
+  });
+});
+
 describe("deploy.sh — das Deploy-Ziel", () => {
   afterEach(aufraeumen);
 

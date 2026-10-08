@@ -39,8 +39,7 @@ Firestore-Datenbank `malzime-eu`, Dokument **`config/betriebsprofil`**:
   "aktiv": "t1-normal",
   "profile": {
     "t1-normal": { … alle Werte … },
-    "t1-langsam": { … },
-    "t2-schnell": { … }
+    "t1-langsam": { … }
   }
 }
 ```
@@ -94,18 +93,26 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 | `ueberlastWarteMs` | 10000 | Wartezeit vor der ersten Wiederholung, wenn Mistral ablehnt oder kurz weg ist; jede weitere verdoppelt sich |
 | `ueberlastVersuche` | 4 | Wie oft wiederholt wird, bevor der Auftrag als blockiert endet |
 
-**Was die beiden letzten Werte tun (seit 08.09.2026):** Lehnt Mistral einen
-Aufruf ab (HTTP 429, Limit erreicht) oder ist der Dienst kurz weg (502, 503,
-504), wartet der Auftrag 10, 20, 40 und 80 Sekunden und versucht es jeweils
-wieder. Der Platz in der Warteschlange bleibt dabei belegt, das nimmt Last
-von Mistral. Für das Kind vor dem Bildschirm ist das eine längere Wartezeit,
-kein Fehler. Vorher gab es eine Wiederholung nach 2 Sekunden, und die war bei
-einem Limit von 15 Aufrufen je Minute wirkungslos: Am 08.09. scheiterten so
-6 von 47 Analysen einer Klasse. Die Reihe ist an den Messdaten dieses
-Vormittags nachgerechnet (Herleitung in `functions/src/produktiv-satz.js`).
-Die Summe der Wartezeiten muss unter dem Gesamtbudget liegen, sonst wird der
-Satz abgelehnt. Jede Wiederholung steht als Zeile `mistral-wiederholung` im
-Log, mit Wartezeit und einer etwaigen Retry-After-Angabe von Mistral.
+**Was die beiden letzten Werte tun (seit 08.09.2026):** Lehnt Mistral den
+Analyse-Aufruf ab (HTTP 429, Limit erreicht) oder ist der Dienst kurz weg (502,
+503, 504), wartet der Auftrag 10, 20, 40 und 80 Sekunden und versucht es
+jeweils wieder. Der Platz in der Warteschlange bleibt dabei belegt, das nimmt
+Last von Mistral. Für das Kind vor dem Bildschirm ist das eine längere
+Wartezeit, kein Fehler. Vorher gab es eine Wiederholung nach 2 Sekunden, und
+die war bei einem Limit von 15 Aufrufen je Minute wirkungslos: Am 08.09.
+scheiterten so 6 von 47 Analysen einer Klasse. Die Reihe ist an den Messdaten
+dieses Vormittags nachgerechnet (Herleitung in
+`functions/src/produktiv-satz.js`). Die Summe der Wartezeiten muss unter dem
+Gesamtbudget liegen, sonst wird der Satz abgelehnt. Jede Wiederholung steht als
+Zeile `mistral-wiederholung` im Log, mit Wartezeit und einer etwaigen
+Retry-After-Angabe von Mistral.
+
+Für den zweiten, kleinen Aufruf einer Analyse (die Beast-Werbung) gilt die
+ganze Reihe nicht: Er hat fest 30 Sekunden und kommt damit auf höchstens EINE
+Wiederholung nach 10 Sekunden (10 s + 20 s wären schon die 30). Scheitert er,
+bleibt die Werbeliste aus dem Analyse-Aufruf stehen — das Kind bekommt sein
+Ergebnis. Bei einer Ablehnung wegen Überlast (429) steht dazu eine Warnung im
+Log (`beast-ads-failed`), bei jedem anderen Fehlschlag eine Fehlerzeile.
 
 ### 5 · Fristen und Aufräumen
 
@@ -124,21 +131,41 @@ Log, mit Wartezeit und einer etwaigen Retry-After-Angabe von Mistral.
 ## Vier Obergrenzen sind Zusagen
 
 Bei vier Feldern ist die zulässige Obergrenze **nicht** großzügig gewählt,
-sondern exakt das, was die Datenschutzerklärung öffentlich verspricht:
+sondern exakt das, was eine öffentliche Seite verspricht — drei stehen in der
+Datenschutzerklärung, eine auf der Statistik-Seite:
 
-```
-jobAufbewahrungMs      max 2 h      "nie abgeholte spätestens nach rund 2 Stunden"
-zustellfensterMs       max 15 min   "wenige Minuten nach der Abholung gelöscht"
-adressfensterMs        max 10 min   "merkt sich deine IP für maximal 10 Minuten"
-stundenfensterMinuten  max 60       "die Zeitpunkte der Analysen der letzten 60 Minuten"
-```
+| Feld | Obergrenze | Seite | Wortlaut dort |
+|---|---|---|---|
+| `jobAufbewahrungMs` | höchstens 2 Stunden | `public/datenschutz.html` | „Wird es nie abgeholt: nach rund 2 Stunden.“ |
+| `zustellfensterMs` | höchstens 15 Minuten | `public/datenschutz.html` | „Rund 15 Minuten, nachdem dein Browser es abgeholt hat.“ |
+| `adressfensterMs` | höchstens 10 Minuten | `public/datenschutz.html` | „Rund 10 Minuten, nur im Arbeitsspeicher, nie auf einer Festplatte.“ |
+| `stundenfensterMinuten` | höchstens 60 Minuten | `public/stats.html` | „Analysen in der letzten Stunde“ |
+
+Die Tabelle wird geprüft (`oeffentliche-zahlen-gegen-satz.test.js`): Jede
+Obergrenze muss die der Feldliste sein, jeder Wortlaut auf der genannten Seite
+stehen. Ändert sich dort ein Satz, wird der Test rot, bis diese Tabelle
+nachgezogen ist.
 
 Der Einstellungssatz kann diese Fristen nur **verkürzen**. Wäre es anders,
 ließe sich eine öffentliche Zusage mit einem Datenbankeintrag brechen —
 während die Erklärung auf der Website weiter dasselbe sagt.
 
-**Wer eine dieser Grenzen anheben will, ändert zuerst die
-Datenschutzerklärung.**
+Das gilt auch für einen fehlenden oder ungültigen Satz: Die zwei Löschfristen
+hängen nicht an ihm. Der Aufräumdienst löscht dann nach genau diesen
+Obergrenzen (jeder Auftrag samt Foto nach 2 Stunden, ein abgeholtes Ergebnis
+nach 15 Minuten). Was ohne gültigen Satz steht, ist das vorzeitige Abräumen
+wartender und hängender Aufträge — dafür gibt es keine zugesagte Frist, und die
+Werte dazu kommen nur aus dem Satz (`aufraeumer-loescht-ohne-satz.test.js`).
+
+**Wer eine dieser Grenzen anheben will, ändert zuerst die Seite, auf der die
+Zusage steht.**
+
+Zwei weitere Zahlen stehen in einem öffentlichen Text, ohne dass eine
+Obergrenze sie hält: `adressLimit` (mit `adressfensterMs`) und `stundenlimit`
+in den Nutzungsbedingungen, Abschnitt „Automatisierte Zugriffe" (deutsch und
+englisch). Derselbe Test hält beide Fassungen gegen
+`functions/src/produktiv-satz.js`. Wer einen dieser Werte im Betrieb umstellt,
+zieht die Nutzungsbedingungen nach.
 
 ---
 
@@ -209,6 +236,18 @@ Beide Reparaturen sind in `docs/SECURITY-MODEL.md` ausführlich beschrieben.
 - eine Einzelgrenze über dem Gesamtbudget liegt
 - das Budget über dem liegt, was Google der Funktion gibt
 - das Zustellfenster über der Aufbewahrung liegt
+- das Hänge-Limit (`verarbeitungsZeitlimitMs`) unter dem liegt, was Google der
+  Funktion gibt (540 s) — sonst gälte eine Analyse als gescheitert, während sie
+  noch läuft
+- das Budget dem Werbe-Aufruf (30 s) und dem Abschluss (10 s) keinen Platz mehr
+  lässt, also über 500 s liegt
+- die Karenz (`livenessGnadenfristMs`) unter 2 Minuten liegt — sonst würde als
+  verlassen abgeräumt, wer noch wartet
+- das Höchstalter eines Wartenden und das Hänge-Limit zusammen über der Aufbewahrung
+  liegen — sonst würde ein Auftrag gelöscht, während er noch wartet oder rechnet
+
+Die letzten vier koppeln einen Wert an eine feste Größe des Programms
+(`betriebsprofil-kopplung.test.js`, je mit dem Fall genau auf der Grenze).
 
 Die Kopplungsprüfung „Textmenge muss in die Zeit passen" ist der Riegel gegen
 den Ausfall vom 17. August 2026. Sie lief früher nur beim Start der Funktion;
@@ -263,11 +302,10 @@ Das Skript hat vier Sicherungen, weil es in die Produktionsdatenbank schreibt:
 Umstellen heißt: `aktiv` auf einen dieser Namen setzen. Kein Deploy, wirksam
 binnen dreißig Sekunden.
 
-## Zurück auf den Stand davor
+## Zurück auf einen früheren Stand
 
-Der Rückweg führt auf **v4.2.3**. Der Einstellungssatz kann liegen bleiben —
-die alte Fassung ignoriert ihn.
-
-```bash
-git checkout v4.2.3 && bash scripts/deploy.sh
-```
+Die Rückwege stehen an einer Stelle: [RUNBOOK.md](RUNBOOK.md), Abschnitt
+„Rollback-Hebel". Für den Einstellungssatz heißt zurück: `aktiv` wieder auf den
+vorherigen Namen setzen, oder den Satz aus `functions/src/produktiv-satz.js`
+neu schreiben (`node scripts/betriebsprofil-anlegen.js --ausfuehren
+--ueberschreiben`).

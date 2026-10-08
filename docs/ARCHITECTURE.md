@@ -39,12 +39,15 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │     ├─ Maintenance-Mode-Check (Firestore, 30s Cache)              │
 │     ├─ Rate-Limit (IP-basiert, Wert im Einstellungssatz)          │
 │     ├─ Honeypot + MIME + Magic-Byte-Validierung                   │
-│     ├─ Hourly-Limit-Check (Firestore, rollendes Fenster)           │
-│     └─ Einlassgrenze (Messung, sonst warteschlangeTiefe)           │
+│     ├─ Einlassgrenze, Vorprüfung (Messung, sonst                  │
+│     │  warteschlangeTiefe)                                         │
+│     └─ Hourly-Limit-Check (Firestore, rollendes Fenster)           │
 │                                                                    │
-│  Bild → GCS-Bucket, Job-Dokument → Firestore, Task → Cloud Tasks   │
-│  Antwort an den Browser: { jobId } — KEINE Analyse in dieser       │
-│  Function (der synchrone Pfad ist seit v2.10 entfernt).            │
+│  Erst Job-Dokument → Firestore, dann Bild → GCS-Bucket, dann die   │
+│  genaue Prüfung der eigenen Position, dann Task → Cloud Tasks.     │
+│  Antwort an den Browser: { jobId, resultToken }                    │
+│  — KEINE Analyse in dieser Function (der synchrone Pfad ist seit   │
+│  v2.10 entfernt).                                                  │
 └────────────────────────────────────┬───────────────────────────────┘
                                      │ dosiert durch Cloud Tasks
                                      ↓
@@ -58,21 +61,23 @@ Seit v1.6.0 läuft die komplette KI-Analyse über Mistral AI (Paris, EU). Google
 │        UND beide Profile; ein zweiter, kleiner Aufruf ohne Bild    │
 │        erzeugt die Beast-Werbung (seit v2.8)                       │
 │                                                                    │
-│  3. SUBJECT-Klassifikation in animal.js                            │
-│     ├─ classifyDescription() parst die SUBJECT-Zeile                │
-│     ├─ Bei ANIMAL_ONLY: detectAnimalType() matcht Tier-Keywords     │
-│     └─ Default bei fehlender Zeile: HUMAN (restriktivste Annahme)   │
+│  3. Motiv-Entscheidung in animal.js                                │
+│     ├─ classifySubject() liest das Feld subject der KI-Antwort     │
+│     ├─ Bei ANIMAL_ONLY: detectAnimalType() matcht Tier-Keywords    │
+│     └─ Fehlt das Feld oder ist es ungültig: HUMAN (restriktivste   │
+│        Annahme)                                                    │
 │                                                                    │
 │  4. Privacy-Risiken in privacy.js                                  │
-│     ├─ extractVisibleText() parst "Sichtbarer Text:"-Zeile         │
-│     └─ buildPrivacyRisks() matcht Telefon/Adress/Kfz-Patterns       │
+│     └─ buildPrivacyRisks(): Adresse und Telefonnummer aus dem Feld │
+│        visible_text, Kfz-Kennzeichen aus dem ganzen Text           │
 │                                                                    │
 │  5. Ergebnis-Aufbau                                                │
 │     ├─ Profile JSON in Output-Bounds geclampt (SEC-004)            │
 │     └─ Ergebnis ins Job-Dokument, Bild sofort geloescht            │
 └────────────────────────────────────┬───────────────────────────────┘
                                      │
-                                     ↓ GET /api/job-status (Polling, 2 s)
+                                     ↓ GET /api/job-status (Polling, 2 s);
+                                     ↓ DELETE meldet einen wartenden Job ab
 ┌──────────────────────────────────────────────────────────────────┐
 │  Browser                                                           │
 │                                                                    │
@@ -96,10 +101,10 @@ und in Tests (localhost) bleibt der Pfad relativ.
 
 ```
 Browser ──POST /api/enqueue (direkt: https://enqueue-….a.run.app)──► enqueue
-                                 │ Bild → GCS-Bucket
                                  │ Job-Dokument → Firestore-Collection `jobs` (queued)
+                                 │ Bild → GCS-Bucket
                                  │ Task → Cloud-Tasks-Queue `analyze-queue`
-                                 ▼  Antwort: { jobId }
+                                 ▼  Antwort: { jobId, resultToken }
                           Cloud Tasks  (dosiert, maxConcurrentDispatches)
                                  ▼
                           processJob  (OIDC-geschützt, nicht öffentlich)
@@ -108,13 +113,20 @@ Browser ──POST /api/enqueue (direkt: https://enqueue-….a.run.app)──►
                                  │ Bild aus dem Bucket → Mistral-Pipeline                     
                                  │ Ergebnis → Job-Dokument (done), Bild gelöscht
                                  ▼
-Browser ◄──GET /api/job-status?jobId=──  Polling alle 2 s (= Liveness-Herzschlag)
-            Antwort: status, queuePosition, etaSeconds, result (bei done)
+Browser ◄──GET /api/job-status?jobId=…&token=…──  Polling alle 2 s (= Liveness-Herzschlag)
+            Antwort: status, position, etaSeconds, result (bei done, nur mit Abhol-Ticket)
+Browser ──DELETE /api/job-status?jobId=…&token=…──►  meldet einen noch wartenden Job ab
 ```
+
+Die Reihenfolge am Einlass ist bewusst: **erst der Auftrag, dann das Foto.** Der Auftrag trägt
+den Pfad, unter dem das Foto liegen wird; so gibt es zu jedem Foto im Zwischenspeicher einen
+Auftrag, über den der Aufräumdienst es findet — auch wenn das Hochladen mittendrin abbricht.
 
 ### Client-Liveness
 
-Der Client hält keine lange Verbindung mehr, sondern pollt. Jeder `job-status`-Poll schreibt `lastSeenAt`. Bleibt das Lebenszeichen länger als `livenessGnadenfristMs` (Einstellungssatz) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
+Der Client hält keine lange Verbindung mehr, sondern pollt. Ein `job-status`-Poll eines wartenden Jobs frischt `lastSeenAt` auf (nicht bei jedem Poll, sondern erst, wenn das letzte Lebenszeichen einen Mindestabstand alt ist). Bleibt das Lebenszeichen länger als `livenessGnadenfristMs` (Einstellungssatz) aus, gilt der Client als weg — der Job wird `abandoned`, ohne Mistral zu rufen, und der Warteschlangen-Platz wird frei.
+
+Der Browser muss darauf nicht warten: Wählt jemand ein anderes Foto, während der erste Auftrag noch wartet, meldet die Seite ihn ab (`DELETE /api/job-status?jobId=…&token=…`). Der Server verwirft ihn dann sofort — kein KI-Aufruf, der Platz im Stundenfenster kommt zurück, das Foto wird gelöscht (`ruecknahme.js`). Zwei Grenzen: nur mit dem Abhol-Ticket dieses Auftrags, und nur, solange er wartet; was schon in Arbeit oder fertig ist, bleibt unberührt. Scheitert die Abmeldung, räumt der Aufräumdienst wie bisher nach der Karenz.
 
 ### Reaper
 
@@ -147,7 +159,7 @@ einzelne Anfragen hingen sechzig Sekunden, 94 von 170 Verbindungen rissen ab.
 Die Lehre gilt über diesen Fall hinaus: **Nicht in ein gemeinsames Dokument
 schreiben, sondern zählen.**
 
-Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab einer Einlassgrenze wartender Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. Die Grenze rechnet `handle-enqueue.js` laufend aus der gemessenen Dauer der letzten Analysen; nur ohne Messung gilt der feste Wert `warteschlangeTiefe`. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt (`parallelitaet` × gemessene Dauer je Analyse). Beide Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
+Der Einlass ist doppelt begrenzt: durch das **globale Stundenlimit** (`stundenlimit` über ein rollendes Fenster in Firestore) und durch die **Queue-Tiefen-Bremse** — ab einer Einlassgrenze wartender Jobs lehnt der Enqueue neue Aufträge ehrlich ab, statt Wartezeiten anzunehmen, die den 30-Minuten-Polling-Deckel des Browsers überschreiten würden. Die Grenze wird laufend aus der gemessenen Dauer der letzten Analysen gerechnet (`warteschlangen-rechnung.js`, dieselbe Stelle wie die Wartezeit-Ansage); ohne Messung oder mit Messwerten, die älter als eine Woche sind, gilt der feste Wert `warteschlangeTiefe`. Den Durchsatz begrenzen zwei Einstellwerte, und es gilt die engere Bremse: `parallelitaet` geteilt durch die gemessene Dauer je Analyse, oder `queueRatePerSekunde`, mit der die Warteschlange Aufträge losschickt. In der Praxis greift fast immer das Stundenlimit zuerst, weil der Einlass über dem Verarbeitungs-Durchsatz liegt. Die Werte stehen im Einstellungssatz und sind hier bewusst nicht als Zahl wiederholt.
 
 Dazu kommt die Selbstregulation: Nutzer sehen Position + ETA sofort nach dem Upload und können selbst entscheiden, ob sie warten. Abbrecher werden nach der Karenz (`livenessGnadenfristMs`) gereapt und geben ihren Stunden-Slot zurück. Wartende Jobs haben zusätzlich ein absolutes Höchstalter (`wartendesHoechstalterMs`) — fortlaufendes Pollen hält einen Job also nicht unbegrenzt am Leben.
 
@@ -164,7 +176,11 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `app.js` | Entry Point, Event-Bindings, Pipeline-Coordinator |
 | `js/exif.js` | EXIF-Extraktion via exifr (lokal im Browser) |
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call, nur bei hochgeladenen Fotos); bei den Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite |
-| `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Status abfragen, Ergebnis zustellen, Wiederaufnahme nach Neuladen — mit AbortController + Stale-Guard |
+| `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Ergebnis zustellen, Wiederaufnahme nach Neuladen, verworfenen Auftrag abmelden — mit AbortController + Stale-Guard |
+| `js/auftrag-abfrage.js` | Statusabfrage eines eingereihten Auftrags im 2-Sekunden-Takt (`pollJob`), zugleich Lebenszeichen an den Server |
+| `js/auftrag-abmelden.js` | Buch darüber, welchen Auftrag der Tab gerade abholt, und Abmelden, wenn er ihn fallen lässt (höchstens einmal je Auftrag, nur mit Abhol-Ticket) |
+| `js/netz-hilfen.js` | Netz- und Warte-Hilfen des Ablaufs: Aufruf mit Zeitgrenze bis zum Ende des Antwort-Rumpfs (`fetchWithTimeout`), Warten auf den nächsten Takt |
+| `js/foto-vorschau.js` | Zwei Handgriffe an der Foto-Vorschau: Ersatzbild, wenn der Browser das Original nicht anzeigen kann; Hinweis „Foto gelöscht“ nach einem Neuladen |
 | `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
 | `js/auftrag-speicher.js` | Auftragsgedächtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, 15-Minuten-Frist für ein zugestelltes Ergebnis |
 | `js/wake-lock.js` | Bildschirm während der Analyse wach halten (Best-Effort) und den Stand für die Telemetrie melden |
@@ -186,7 +202,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `js/i18n.js` | i18n Micro-Modul (`initI18n`, `t`, `applyTranslations`) |
 | `js/demo.js` | Demo-Bild-Logik (KI-generierte Demo-Fotos durch die echte KI schicken — keine realen Personen, siehe `public/img/demo/LICENSE.md`) |
 | `js/stats.js` | Stats-Seite mit Limit-Balken + Countdown |
-| `js/dom.js` | DOM-Helpers (`escapeHtml`, sanitize) |
+| `js/dom.js` | DOM-Helpers (`elements`, `escapeHtml`) |
 | `js/error-logger.js` | Anonymes Client-Fehler-Logging an `/api/errors` (Fehler-Typ, Phase, Dauer — grober User-Agent, keine PII) |
 | `js/telemetry-logger.js` | Anonyme Success-/Performance-Telemetrie an `/api/telemetry` (Gegenstück zum Error-Logger: Timings statt Fehler, ohne Geräteangaben und ohne Vorgangsnummer) |
 | `js/client-context.js` | Anonyme Geräte-/Netzwerk-Klassen für die Diagnose (`coarseUserAgent`, Bildschirm-Größenklasse, Netzwerk-Klasse) + Trace-ID |
@@ -197,29 +213,29 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 |-------|---------------------|
 | `index.js` | Cloud-Function-Exports, Secret-Deklarationen (`ADMIN_SECRET_EU`, `MISTRAL_API_KEY_EU`, `NTFY_*_EU`, alle an europe-west1 gebunden) |
 | `handle-stats.js` | GET-only Stats-Endpunkt |
-| `handle-admin.js` | Admin-Endpunkte (Boost, Reset, Maintenance) — 3-Schritt-Flow mit HMAC + Nonce |
+| `handle-admin.js` | Admin-Endpunkte: Boost und Reset per Bearer-Secret oder per Knopf aus der Benachrichtigung (HMAC-Link → Bestätigungsseite → POST mit Einmal-Nonce); Maintenance nur per Bearer-Secret |
 | `handle-errors.js` | Anonymes Client-Error-Logging (whitelist-validiert, längenbegrenzt; severity ERROR → Log-Bucket `client-diagnostics`) |
 | `handle-telemetry.js` | Anonyme Success-/Performance-Telemetrie (Gegenstück zu `handle-errors.js`, severity INFO, eigener Endpoint; verwirft Geräteangaben und Vorgangsnummer) |
-| `handle-enqueue.js` | Queue: Job anlegen, Bild in den Bucket, Task einreihen |
+| `handle-enqueue.js` | Queue-Annahme: prüfen, Stundenlimit zählen, Job anlegen, Bild in den Bucket, Platz bestätigen, Task einreihen |
 | `handle-process-job.js` | Queue-Worker: claimt den Job, ruft die Mistral-Pipeline, schreibt das Ergebnis |
-| `handle-job-status.js` | Queue: Status-Polling für den Client + Liveness-Herzschlag |
+| `handle-job-status.js` | Queue: Status-Polling für den Client + Liveness-Herzschlag (`GET`); Abmelden eines noch wartenden Auftrags, nur mit Abhol-Ticket (`DELETE`) |
 | `handle-reap.js` | Queue: Reaper (Minutentakt) für verlassene / hängende / abgelaufene Jobs |
-| `handle-erinnerung.js` | Wochenlauf (montags): erinnert per ntfy-Push, bevor die halbjährliche ZDR-Nachprüfung fällig wird — inkl. Handlungsanleitung im Text |
-| `zusagen.js` | Gemeinsame Fristlogik für datierte öffentliche Zusagen (Erinnerung + CI-Wächter rechnen mit derselben Definition) |
+| `handle-erinnerung.js` | Wochenlauf (montags): erinnert per ntfy-Push, bevor die halbjährliche ZDR-Nachprüfung (eine Woche vorher) oder die halbjährliche Prüfung der Barrierefreiheit (drei Wochen vorher) fällig wird — inkl. Handlungsanleitung im Text |
+| `zusagen.js` | Gemeinsame Fristlogik für datierte öffentliche Zusagen: ZDR-Prüfdatum und Prüfdatum der Barrierefreiheit (Erinnerung + CI-Wächter rechnen mit derselben Definition) |
 | `jobs.js` | Queue: Job-Lebenszyklus + Firestore-Zugriff auf die `jobs`-Collection |
 | `cloud-tasks.js` | Queue: Cloud-Tasks-Anbindung (+ Lokal-Shim) |
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
 | `feature-flags.js` | Laufzeit-Feature-Flags (`useBeastAdsCall`, `useGemesseneDauer`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
-| `config.js` | Konstanten, Mistral-Modell-IDs, Limits |
+| `config.js` | Nur, was bewusst nicht einstellbar ist: Mistral-Modell-IDs, EU-Endpunkt, EU-Datenbank, Upload-Grenze, erlaubte Dateiformate |
 | `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile; ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
 | `job-pipelines.js` | Der Analyseweg eines Auftrags (`runPipeline`): ein Aufruf an Mistral Large liefert Beschreibung und beide Profile, danach die Beast-Werbung |
 | `ueberlast.js` | Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504) |
+| `verbindungsfehler.js` | Verbindungsabriss zu einem fremden Dienst: erkennen, einmal neu versuchen, schon gelesenen Text retten, Grund protokollieren — nur Code und Kurztext, nie Adressen |
 | `json-repair.js` | Defensiver JSON-Parser (direkt → heuristisch → json5 → Truncation-Recovery) |
 | `throttle.js` | In-Memory-Semaphore + Token-Bucket gegen Mistral-Bursts (seit v1.7.0 in `mistral.js` aktiv) |
-| ~~`heartbeat.js`~~ | Entfernt mit dem Audit 2026-08-10 — hatte seit v2.10 keinen Aufrufer mehr (Safari kappt fetch-Streams nach ~47 s ohne Bytes) |
 | `counter.js` | Firestore-Zaehler: Stundenlimit (rollend), Totals, Stats, Boost, Reset, Maintenance |
-| `animal.js` | SUBJECT-Klassifikation aus Mistral-Beschreibung + Easter-Egg-Profile |
-| `privacy.js` | OCR-basiertes Privacy-Risiko-Mapping aus Mistrals "Sichtbarer Text" |
+| `animal.js` | Motiv-Entscheidung am Feld `subject` der KI-Antwort (`classifySubject`), Tierart aus dem Beschreibungstext (`detectAnimalType`) + Easter-Egg-Profile |
+| `privacy.js` | Privacy-Risiken (`buildPrivacyRisks`): lesbare Adresse und Telefonnummer aus dem Feld `visible_text` der KI-Antwort, Kennzeichen aus dem ganzen Text |
 | `middleware.js` | Rate-Limit + IP-Extraktion |
 | `upload.js` | Multipart- und JSON-Body-Parsing |
 | `auth.js` | HMAC-Admin-Tokens + Nonces |
@@ -236,7 +252,14 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `alters-lesbarkeit.js` | Erkennung nicht lesbarer Altersangaben: erster Satz einer Karte, Altersversuch (Filter, Alterskarte, Live-Anzeige) |
 | `alters-auslese.js` | Altersauslese aus dem KI-Text: Zahlwörter, Kategorien, untere und obere Altersgrenze (weitergereicht von `alters-lesbarkeit.js`) |
 | `alters-lesbarkeit-woerter.js` | Wörter, Kategorien und Abkürzungen der Altersauslese (reine Daten, angewandt von `alters-auslese.js` und `alters-lesbarkeit.js`) |
-| `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Prüfung, Cache, Rückfall |
+| `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Felder und Bereiche, Cache; ist der Satz nur gerade nicht lesbar, gilt der zuletzt gültig gelesene weiter |
+| `analyse-ausgang.js` | Welche Fehlermeldung ein Endzustand eines Auftrags zeigt, und die eine Fehlerzeile dazu („ein Alarm je gescheiterter Analyse“) |
+| `meldungs-annahme.js` | Gemeinsames der zwei Annahmestellen für Meldungen des Browsers (`handle-errors.js`, `handle-telemetry.js`): Rumpfprüfung, Wertgrenze, Messwert-Prüfung; die Feldlisten bleiben bei den Annahmestellen |
+| `ruecknahme.js` | Zurückgeben, was ein nie analysierter Auftrag belegt: Foto löschen und Platz im Stundenfenster freigeben, beides sofort begonnen — die eine Stelle dafür, abgewartet (auf jedes höchstens fünf Sekunden) |
+| `oeffentliche-huelle.js` | Was für jede öffentliche Schnittstelle gilt: `Cache-Control: no-store`, gepackte Anfragen abweisen (von `index.js` um jede öffentliche Function gelegt) |
+| `warteschlangen-rechnung.js` | Die eine Rechnung für Einlassgrenze und Wartezeit-Ansage: die engere von zwei Bremsen (Parallelität, Rate) |
+| `erinnerungs-waechter.js` | Wächter über die Wochen-Erinnerung: liest ihr Lebenszeichen, meldet veraltet, nie gelaufen oder wiederholt nicht lesbar (vom Aufräumdienst je Lauf gerufen) |
+| `betriebsprofil-kopplung.js` | Welche Werte eines Satzes zusammenpassen müssen (reine Rechnung, von `betriebsprofil.js` aufgerufen) |
 | `produktiv-satz.js` | Betriebswerte für den echten Betrieb — Quelle für `config/betriebsprofil` |
 | `test-satz.js` | Einstellungssatz für die Tests |
 | `durchsatz.js` | Gemessene Analysedauer (Wartezeit-Ansage, Einlassgrenze) |
@@ -261,21 +284,16 @@ Mistrals Sub-Prozessoren (Cloud-Provider, Compute) können temporär außerhalb 
 
 ## SUBJECT-Klassifikation
 
-Der Analyse-Aufruf liefert im JSON die Felder `subject` (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`) und `visible_text`. `job-pipelines.js` setzt daraus eine Beschreibung in diesem Format zusammen, die `animal.js` und `privacy.js` auswerten:
+Der Analyse-Aufruf liefert im JSON die Felder `subject` (`ANIMAL_ONLY | HUMAN | MIXED | OTHER`) und `visible_text`. Beide werden als **Felder** ausgewertet (`job-pipelines.js`):
 
-```
-SUBJECT: ANIMAL_ONLY | HUMAN | MIXED | OTHER
+- Das Motiv entscheidet sich allein am Wert von `subject` (`animal.js: classifySubject()`):
+  - `ANIMAL_ONLY` → Tier-Easter-Egg-Pfad (Profile aus `animals.js`, keine zweite KI-Anfrage)
+  - `HUMAN` / `MIXED` / `OTHER` → die Profile aus demselben Aufruf werden ausgeliefert
+- Der Hinweis auf eine lesbare Adresse oder Telefonnummer liest allein den Wert von `visible_text` (`privacy.js: buildPrivacyRisks()`).
 
-<Bildbeschreibung Fliesstext...>
+Aus dem zusammengesetzten Text (Profiltext und Kartenwerte) wird nur zweierlei gelesen: welche Tierart das Easter-Egg zeigt (`detectAnimalType()`) und ob ein Kfz-Kennzeichen vorkommt. Eine Zeile in diesem Text entscheidet nichts — ein Wort, das zufällig auf dem Foto oder im Profil steht, macht aus einem Menschen kein Tier.
 
-Sichtbarer Text: <Text 1>; <Text 2>; ...
-```
-
-`animal.js:classifyDescription()` parst die SUBJECT-Zeile und routet:
-- `ANIMAL_ONLY` → Tier-Easter-Egg-Pfad (Profile aus `animals.js`, keine zweite KI-Anfrage)
-- `HUMAN` / `MIXED` / `OTHER` → die Profile aus demselben Aufruf werden ausgeliefert
-
-Bei fehlender SUBJECT-Zeile fällt das System fail-safe auf `HUMAN` zurück — d.h. kein versehentliches Easter-Egg bei kaputter Mistral-Antwort.
+Fehlt das Feld `subject` oder trägt es keinen der vier Werte, gilt fail-safe `HUMAN` — d.h. kein versehentliches Easter-Egg bei kaputter Mistral-Antwort. Fehlt `visible_text`, gilt: kein sichtbarer Text.
 
 ## Fehler-Handling
 
@@ -301,7 +319,7 @@ Mistral-API liefert gelegentlich invalides JSON (max-tokens-Truncation, unescapt
 3. **json5-Toleranz** — `json5.parse()` toleriert Trailing-Commas, Single-Quotes, Comments.
 4. **Truncation-Recovery** — Stack-basierte Suche nach dem letzten sauber geschlossenen Wert, Auffuellen der offenen Brackets in umgekehrter Reihenfolge.
 
-Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js` faellt dann auf den Mistral-internen Large-3-Backup zurueck.
+Scheitern alle 4 Stufen, liefert `json-repair.js` `null`. Ein zweites Modell als Rückfall gibt es nicht: Die Analyse endet dann mit `blocked.profileBlocked` (Tabelle oben). Ist die Antwort lesbar, aber unvollständig (Karten fehlen), fragt `mistral.js` einmal beim selben Modell nach.
 
 ## Sicherheits-Architektur
 
@@ -324,7 +342,7 @@ Bei Misserfolg in allen 4 Stufen: `null` zurueck — der Aufrufer in `mistral.js
   malziME (Formulierung nach DOC-2026-08-12-05: die alte Fassung war im Netzwerk-Tab
   widerlegbar). Bei den Demo-Fotos fragt der Browser nichts nach aussen: Adresse und
   Kartenausschnitt ihrer erfundenen Orte liegen in der Seite
-- Server bekommt nur: komprimiertes Bild + Kamera-make/model (KEIN GPS, KEIN dateTimeOriginal)
+- Server bekommt nur: komprimiertes Bild + Kamera-make/model, die Sprache und eine Zufallsnummer des Durchgangs (KEIN GPS, KEIN dateTimeOriginal)
 - Keine externen Scripts: alles self-hosted (Fonts, Leaflet, exifr, libheif)
 - CSP nur self + OpenStreetMap Tiles + Nominatim + die Cloud-Run-Adressen der eigenen Schnittstellen (`europe-west1`)
 - Foto und Analysedaten gehen direkt an den EU-Server, nicht über das Auslieferungsnetz von Firebase Hosting (seit 09.09.2026)

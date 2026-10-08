@@ -22,6 +22,12 @@ let status = "not-attempted";
    nach `await`-Punkten wuerde auf iOS mit NotAllowedError scheitern und den
    bereits gewonnenen Status ueberschreiben. */
 let wakeLockRequested = false;
+/* Zaehlt Anforderungen und Freigaben. Die Zusage des Browsers kommt erst eine
+   Aufgabe nach der Anforderung; endet die Analyse davor (Datei zu gross,
+   Datei fehlt), fand die Freigabe nichts zum Freigeben — und die Zusage, die
+   danach eintraf, blieb gehalten. Traegt die Zusage nicht mehr die juengste
+   Nummer, wurde inzwischen freigegeben: Sie geht sofort zurueck. */
+let laufendeNummer = 0;
 
 /** Stand für die Telemetrie: "not-attempted", "unsupported", "acquired" oder "denied:<FehlerName>". */
 export function wakeLockStatus() {
@@ -40,10 +46,19 @@ export async function acquireWakeLock() {
     status = "unsupported";
     return;
   }
+  const meine = ++laufendeNummer;
   try {
-    wakeLock = await navigator.wakeLock.request("screen");
+    const zusage = await navigator.wakeLock.request("screen");
+    if (meine !== laufendeNummer) {
+      zusage.release().catch(() => {});
+      return;
+    }
+    wakeLock = zusage;
     status = "acquired";
   } catch (err) {
+    /* Eine ueberholte Anforderung aendert nichts mehr — auch nicht, wenn sie
+       erst abgelehnt wird, nachdem die naechste schon zugesagt ist. */
+    if (meine !== laufendeNummer) return;
     /* Verweigert/nicht verfügbar — kein Abbruch, läuft ohne Wake-Lock weiter. */
     wakeLock = null;
     status = "denied:" + (err && err.name ? err.name : "unknown");
@@ -53,6 +68,8 @@ export async function acquireWakeLock() {
 export function releaseWakeLock() {
   /* Guard zuruecksetzen, damit die naechste Analyse wieder anfordern darf. */
   wakeLockRequested = false;
+  /* Eine Zusage, die noch unterwegs ist, gilt ab jetzt als freigegeben. */
+  laufendeNummer += 1;
   if (!wakeLock) return;
   wakeLock.release().catch(() => {});
   wakeLock = null;

@@ -148,3 +148,35 @@ describe("parseMultipart", () => {
     expect(result.file.size).toBe(0);
   });
 });
+
+describe("Formular reißt ab", () => {
+  /* Ein Upload, der mitten in der Datei endet (Verbindung weg), meldet die
+     Bibliothek ZWEIMAL: am Formular und am Datei-Strom. Ein Fehler am
+     Datei-Strom ohne Abnehmer ist eine ungefangene Ausnahme — die Laufzeit
+     beendet dann die ganze Instanz, samt allen Uploads, die gerade über sie
+     laufen. Jest wertet eine ungefangene Ausnahme als Fehlschlag des Tests. */
+  const GRENZE = "----g";
+  const kopf = Buffer.from(
+    `--${GRENZE}\r\nContent-Disposition: form-data; name="image"; filename="a.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`
+  );
+  const anfrage = (rawBody) => ({
+    headers: { "content-type": `multipart/form-data; boundary=${GRENZE}` },
+    rawBody,
+    on() {},
+  });
+  const kurzWarten = () => new Promise((weiter) => setTimeout(weiter, 30));
+
+  test.each([
+    ["mitten in der Datei", Buffer.concat([kopf, Buffer.alloc(100, 1)])],
+    ["nach der Datei, ohne Abschlussgrenze", Buffer.concat([kopf, Buffer.alloc(100, 1), Buffer.from("\r\n")])],
+  ])("%s: abgelehnt, keine ungefangene Ausnahme", async (_name, rumpf) => {
+    await expect(parseMultipart(anfrage(rumpf))).rejects.toMatchObject({ status: 400, code: "bad_multipart" });
+    await kurzWarten();
+  });
+
+  test("Gegenprobe: das vollständige Formular wird angenommen", async () => {
+    const rumpf = Buffer.concat([kopf, Buffer.alloc(100, 1), Buffer.from(`\r\n--${GRENZE}--\r\n`)]);
+    const ergebnis = await parseMultipart(anfrage(rumpf));
+    expect(ergebnis.file.size).toBe(100);
+  });
+});

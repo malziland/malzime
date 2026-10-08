@@ -69,10 +69,12 @@ const T1_NORMAL = {
 
   /* EINLASSGRENZE OHNE MESSUNG: 100, bewusst eine runde Zahl (Festlegung
      11.09.2026; bis dahin 155). Gilt nur, wenn keine gemessene Dauer vorliegt
-     — frische Installation, Messung abgeschaltet, Datenbank hakt. Sonst
-     rechnet handle-enqueue.js laufend aus den letzten 20 Analysen: 30 Minuten
-     Browser-Geduld / Dauer je Analyse (80-Perzentil) × parallelitaet × 0,8
-     Abstand. Zum Vergleich mit derselben Formel und 4 parallel (seit
+     — frische Installation, Messung abgeschaltet oder aelter als eine Woche,
+     Datenbank hakt. Sonst rechnet warteschlangen-rechnung.js laufend aus den
+     letzten 20 Analysen: 30 Minuten Browser-Geduld / Dauer je Analyse
+     (80-Perzentil) × parallelitaet × 0,8 Abstand — hoechstens aber, was
+     queueRatePerSekunde in 30 Minuten losschickt (× 0,8; bei 0,1 je Sekunde
+     144). Zum Vergleich mit derselben Formel und 4 parallel (seit
      16.09.2026): 40 s (Median, gemessen 30.08.2026) ergaeben 144; rund 63 s
      ergaeben 91 (80-Perzentil des Mistral-Aufrufs ueber 567 Analysen vom
      12.08. bis 10.09.2026: 59 s, dazu geschaetzt 4 s fuer den Werbe-Aufruf).

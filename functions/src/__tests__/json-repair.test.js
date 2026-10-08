@@ -313,6 +313,39 @@ describe("parseSafely", () => {
 
 /* ── Real-World-Fixtures aus Mistral-Failures ─────────────────────── */
 
+/* BUG-2026-10-03-04: Lange Leerraum-Folgen duerfen die Rechenzeit nicht
+   quadratisch wachsen lassen. Gemessen wird die Zeit je Reparaturweg; die
+   Schwelle von einer Sekunde liegt weit ueber dem Soll (wenige Millisekunden)
+   und weit unter dem, was die frueheren Suchmuster brauchten (mehrere
+   Sekunden bei diesen Laengen). */
+describe("Rechenzeit bei langen Leerraum-Folgen (BUG-2026-10-03-04)", () => {
+  function dauerMs(lauf) {
+    const start = process.hrtime.bigint();
+    const ergebnis = lauf();
+    return { ms: Number(process.hrtime.bigint() - start) / 1e6, ergebnis };
+  }
+
+  test("Leerraum nach dem letzten Komma: 200 000 Zeichen in unter einer Sekunde", () => {
+    const { ms, ergebnis } = dauerMs(() => parseSafely('{"a":"b",' + " ".repeat(200000), { requireSchema: false }));
+    expect(ms).toBeLessThan(1000);
+    expect(ergebnis).toBeNull();
+  });
+
+  test("Leerraum mitten in einer abgeschnittenen Antwort: das Gerettete stimmt, in unter einer Sekunde", () => {
+    const text = '{"standard":{"profileText":"Du bist' + " ".repeat(80000) + 'da."},"beast":{"profileText":"Zyn';
+    const { ms, ergebnis } = dauerMs(() => _tryParseTruncated(text));
+    expect(ms).toBeLessThan(1000);
+    expect(ergebnis.parsed).toEqual({ standard: { profileText: "Du bist" + " ".repeat(80000) + "da." } });
+  });
+
+  test("ueberzaehlige Kommas werden weiter samt Leerraum davor entfernt", () => {
+    expect(cleanHeuristic('{"a":[1,2 \t,\n] ,\n}')).toBe('{"a":[1,2\n]\n}');
+    expect(parseSafely('{"a":[1,2 , ] , }', { requireSchema: false })).toEqual(expect.objectContaining({ a: [1, 2] }));
+    /* abgeschnitten hinter einem Komma: der halbe Schluessel faellt weg */
+    expect(_tryParseTruncated('{"a":{"b":1} ,\n  "c" : ').parsed).toEqual({ a: { b: 1 } });
+  });
+});
+
 describe("real-world fixtures from compare-models failures", () => {
   test("recovers Mistral Large 3 malformed-JSON dump (Position 1937 error)", () => {
     /* Diese Datei enthält normales JSON das aber an Position 1937 einen
@@ -425,6 +458,58 @@ describe("real-world fixtures from compare-models failures", () => {
       expect(r.categories.einkommen.confidence).toBe(1);
       expect(r.ad_targeting[0].length).toBe(300);
       expect(r.profileText.length).toBe(2000);
+    });
+
+    /* BUG-2026-10-03-03: Die Grenzen gelten fuer jede Form der Antwort — auch
+       wenn die Karten einer Modus-Ebene kein Objekt sind. */
+    test("Karten als Zeichenkette statt als Objekt werden geleert, der Rest der Ebene bleibt", () => {
+      const raw = JSON.stringify({
+        standard: { profileText: "Sachlich.", ad_targeting: ["A"], categories: "K".repeat(30000) },
+        beast: { profileText: "Zynisch.", categories: 7 },
+      });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(r.standard.categories).toEqual({});
+      expect(r.beast.categories).toEqual({});
+      expect(r.standard.profileText).toBe("Sachlich.");
+      expect(r.standard.ad_targeting).toEqual(["A"]);
+      expect(r.beast.profileText).toBe("Zynisch.");
+    });
+
+    test("Karten als Objekt bleiben, wie sie sind", () => {
+      const raw = JSON.stringify({
+        standard: { categories: { einkommen: { label: "Einkommen", value: "Du verdienst gut.", confidence: 0.7 } } },
+      });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(r.standard.categories).toEqual({
+        einkommen: { label: "Einkommen", value: "Du verdienst gut.", confidence: 0.7 },
+      });
+    });
+
+    test("die Anker-Felder in hard_facts: Text wird gekuerzt, die Herkunft gilt nur als Text", () => {
+      const raw = JSON.stringify({
+        hard_facts: { alter_geschlecht: "A".repeat(50000), herkunft: { land: "X".repeat(50000) } },
+        standard: { categories: {} },
+      });
+      const r = parseSafely(raw, { requireSchema: false });
+      expect(r.hard_facts.alter_geschlecht.length).toBe(800);
+      expect(r.hard_facts.herkunft).toBe("");
+      const lang = parseSafely(JSON.stringify({ hard_facts: { herkunft: "H".repeat(50000) } }), {
+        requireSchema: false,
+      });
+      expect(lang.hard_facts.herkunft.length).toBe(800);
+    });
+
+    test("uebliche Anker bleiben woertlich; ein Altersanker ohne Textform bleibt lesbar", () => {
+      const ueblich = { alter_geschlecht: "34, weiblich", herkunft: "mitteleuropäisch" };
+      expect(parseSafely(JSON.stringify({ hard_facts: ueblich }), { requireSchema: false }).hard_facts).toEqual(
+        ueblich
+      );
+      const zahl = parseSafely(JSON.stringify({ hard_facts: { alter_geschlecht: 14 } }), { requireSchema: false });
+      expect(zahl.hard_facts.alter_geschlecht).toBe(14);
+      /* Fehlt hard_facts, wird nichts erfunden. */
+      expect(parseSafely(JSON.stringify({ standard: { categories: {} } }), { requireSchema: false }).hard_facts).toBe(
+        undefined
+      );
     });
   });
 });

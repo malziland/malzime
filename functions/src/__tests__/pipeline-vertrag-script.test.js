@@ -8,7 +8,8 @@
  * aussehen muessen: alle fuenf Workflows und `dependabot.yml` per Pruefsumme,
  * dazu fuer `ci.yml` je Pflicht-Job die Pruefbefehle, die ihn ausmachen — und
  * unter welchen Umstaenden sie laufen (keine Bedingung am Schritt, festgelegter
- * Arbeitsordner, festgelegte Umgebung).
+ * Arbeitsordner, festgelegte Umgebung) — sowie seine ganze Schrittfolge im
+ * Wortlaut (OPS-2026-10-04-27).
  *
  * Der Wortlaut `npm test` sagt nicht, was dahinter geschieht. Festgelegt ist
  * deshalb auch der Inhalt der npm-Skripte in beiden `package.json`, die
@@ -837,6 +838,124 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
     expect(r.code).toBe(1);
   });
 
+  /* OPS-2026-10-04-27: Der Vertrag haelt je Pflicht-Job die GANZE Schrittfolge
+     fest, nicht nur die Pflichtbefehle. Ein Schritt, der dazukommt, laeuft im
+     selben Job vor oder zwischen den Pruefungen — und kann die Arbeitskopie
+     erst im Lauf umbauen: `package.json` und alle Pflichtbefehle lauten dann
+     weiter wie festgelegt, und geprueft wird trotzdem nichts mehr. */
+  const SCHRITT_FAELLE = [
+    [
+      "ein eingefuegter Schritt ueberschreibt das npm-Skript der Server-Tests erst im Lauf",
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm test\n",
+          '      - run: npm pkg set scripts.test="echo ok"\n      - run: npm test\n'
+        ),
+      /Job test-backend enthaelt einen Schritt, den der Vertrag nicht kennt: 'run: npm pkg set scripts\.test="echo ok"'/,
+    ],
+    [
+      "ein eingefuegter Schritt mit Namen baut die Tests der Website um",
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm run test:frontend\n",
+          "      - name: Vorbereitung\n        run: rm -rf public/__tests__\n      - run: npm run test:frontend\n"
+        ),
+      /Job test-frontend enthaelt einen Schritt, den der Vertrag nicht kennt: 'name: Vorbereitung \| run: rm -rf public\/__tests__'/,
+    ],
+    [
+      "die Installation bekommt einen zweiten Befehl angehaengt",
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm ci\n      - run: npm run test:e2e\n",
+          "      - run: npm ci && rm -rf e2e\n      - run: npm run test:e2e\n"
+        ),
+      /Job test-e2e enthaelt einen Schritt, den der Vertrag nicht kennt: 'run: npm ci && rm -rf e2e'/,
+    ],
+    [
+      "die Installation bekommt eine eigene Shell, die vorher etwas anderes ausfuehrt",
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm ci\n      - run: npm run lint:frontend\n",
+          '      - run: npm ci\n        shell: sh -c "rm -rf public/__tests__; sh {0}"\n      - run: npm run lint:frontend\n'
+        ),
+      /Job test-frontend enthaelt einen Schritt, den der Vertrag nicht kennt: 'run: npm ci \| shell: sh -c/,
+    ],
+    [
+      "das Auschecken holt einen anderen Stand",
+      (t) =>
+        einmal(
+          t,
+          `  test-frontend:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: ${CHECKOUT}\n`,
+          `  test-frontend:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: ${CHECKOUT}\n        with:\n          ref: main\n`
+        ),
+      /Job test-frontend enthaelt einen Schritt, den der Vertrag nicht kennt: 'uses: actions\/checkout \| with: ref: main'/,
+    ],
+    [
+      "ein mehrzeiliger Befehl der Versions-Ermittlung bekommt eine Zeile dazu",
+      (t) =>
+        einmal(
+          t,
+          '          echo "version=$VERSION" >> "$GITHUB_OUTPUT"\n',
+          '          echo "version=$VERSION" >> "$GITHUB_OUTPUT"\n          rm -rf e2e\n'
+        ),
+      /Job playwright-version enthaelt einen Schritt, den der Vertrag nicht kennt: 'id: lesen \| run: \|/,
+    ],
+    [
+      "ein Waechter-Schritt im Job der Pruefungen wird durch einen anderen Befehl ersetzt",
+      (t) =>
+        einmal(
+          t,
+          "      - run: python3 scripts/pruefe-mitzieher.py\n",
+          "      - run: python3 scripts/pruefe-mitzieher.py || true\n"
+        ),
+      /Job pruefungen enthaelt einen Schritt, den der Vertrag nicht kennt: 'run: python3 scripts\/pruefe-mitzieher\.py \|\| true'/,
+    ],
+    [
+      "zwei Schritte tauschen den Platz: die Installation laeuft erst nach den Browser-Durchlaeufen",
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm ci\n      - run: npm run test:e2e\n",
+          "      - run: npm run test:e2e\n      - run: npm ci\n"
+        ),
+      /Job test-e2e: die Schritte stehen in anderer Reihenfolge oder Anzahl als im Vertrag/,
+    ],
+    [
+      "ein bekannter Schritt steht doppelt da",
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm ci\n      - run: npm run test:e2e\n",
+          "      - run: npm ci\n      - run: npm ci\n      - run: npm run test:e2e\n"
+        ),
+      /Job test-e2e: die Schritte stehen in anderer Reihenfolge oder Anzahl als im Vertrag/,
+    ],
+  ];
+
+  test.each(SCHRITT_FAELLE)("Schrittfolge: %s", (_was, umbau, meldung) => {
+    aendern(CI, umbau);
+    summenNachtragen();
+    const r = waechter();
+    expect(r.ausgabe).not.toMatch(ABWEICHUNG);
+    expect(r.ausgabe).toMatch(meldung);
+    expect(r.code).toBe(1);
+  });
+
+  test("Schrittfolge: `--vertrag-schritte` nennt genau die festgelegte Folge", () => {
+    /* Der Erfolgsweg der Messung: Was der Waechter aus der unveraenderten
+       Datei liest, ist Wort fuer Wort das, was im Vertrag steht — sonst waere
+       jeder Fall oben aus dem falschen Grund rot. */
+    const ausgabe = waechter(nachbau, "--vertrag-schritte").ausgabe;
+    const quelltext = fs.readFileSync(path.join(nachbau, WAECHTER), "utf8");
+    expect(ausgabe).toMatch(/^SCHRITTFOLGE_CI = \{\n {4}"test-backend": \[\n/);
+    expect(ausgabe.split("\n").length).toBeGreaterThan(40);
+    expect(quelltext).toContain(ausgabe);
+  });
+
   test("deploy.sh verlangt einen Pflicht-Check weniger: die beiden Listen laufen auseinander", () => {
     aendern(DEPLOY, (t) =>
       einmal(
@@ -869,6 +988,12 @@ describe("Vertrag der npm-Skripte — was hinter einem Pflicht-Schritt steht", (
   };
 
   const FAELLE = [
+    [
+      "minimatch steht nicht mehr als eigene Abhaengigkeit da (OSS-2026-10-04-13) — der Paket-Waechter laedt es",
+      PAKET,
+      json((d) => delete d.devDependencies.minimatch),
+      /package\.json: 'minimatch' steht nicht als eigene Abhaengigkeit da — scripts\/pruefe-auslieferbare-reste\.mjs laedt es/,
+    ],
     [
       "die Browser-Modul-Tests sind nur noch ein echo",
       PAKET,

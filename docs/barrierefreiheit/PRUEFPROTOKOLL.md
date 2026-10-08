@@ -40,6 +40,12 @@ Datenschutz (`/datenschutz`), Impressum (`/impressum`), Nutzungsbedingungen
 englischen Fassungen (`/en/privacy`, `/en/legal-notice`, `/en/terms`,
 `/en/accessibility`).
 
+**Seit 23. August 2026 gibt es zwei weitere Seiten** (`/kurzvorstellung`,
+`/en/introduction`). Die maschinellen Messungen erfassen sie — der Test liest seine
+Seitenliste aus dem Dateisystem (`e2e/barrierefreiheit-protokoll.test.js`, `alleSeiten`).
+In den Handprüfungen dieses Protokolls kommen sie nicht vor (nachgetragen am
+7. Oktober 2026, ohne neue Prüfung).
+
 > **DOC-2026-08-20-31:** Hier standen fünf Seiten — der Umfang der Erstprüfung vom
 > 17.08. —, während weiter unten im selben Dokument bereits von „allen zehn Seiten"
 > die Rede war. Ein extern angebotener Anhang mit zwei Prüfumfängen ist nicht
@@ -317,6 +323,8 @@ eine Urkunde ohne Prüfweg.
 
 ## 10 Nächste Prüfung
 
-Fällig bei jeder Änderung an Aussehen, Bedienung oder Seitenstruktur, spätestens
-halbjährlich. Die Messungen laufen bei jedem Auslieferungslauf automatisch mit; die
-vier Handprüfungen aus Abschnitt 7 sind bei jeder Prüfung zu wiederholen.
+Die ganze Prüfung samt den vier Handprüfungen aus Abschnitt 7 ist mindestens
+halbjährlich fällig, gerechnet ab dem Datum „zuletzt geprüft“ der Erklärung; drei Wochen
+davor meldet sich die Wochen-Erinnerung (`functions/src/zusagen.js`). Die Messungen laufen
+bei jedem Auslieferungslauf automatisch mit. Was zwischen zwei ganzen Prüfungen dazukommt,
+ist bis zur nächsten nur maschinell gemessen und steht in Abschnitt 2 als solches.

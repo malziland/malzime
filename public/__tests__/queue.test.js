@@ -52,13 +52,28 @@ function jsonResponse(body, ok = true, status = 200) {
 }
 
 describe("Queue-Modus", () => {
-  let analyzeImage, resumeQueueJob, getStoredJobId, state, elements, renderCurrentMode;
+  let analyzeImage, resumeQueueJob, getStoredJobId, state, elements, renderCurrentMode, lauscher;
 
   beforeEach(async () => {
+    /* Jeder Test lädt api.js und seinen Zustand frisch. Bis 08.10.2026 teilten
+       sich alle Tests dieser Datei EIN Modul: Was einer stehen ließ (der Anker
+       „wartet auf die Verbindung", ein laufender Zeitgeber, Lauscher an Fenster
+       und Dokument), sah der nächste — in zufälliger Reihenfolge wurde ein
+       Test rot, der allein grün ist. Die Lauscher werden mitgeschrieben und am
+       Ende wieder abgenommen (wie in abloesung.test.js). */
+    vi.resetModules();
     setupDOM();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(Date.now() + 10000);
     sessionStorage.clear();
+    lauscher = [];
+    for (const ziel of [window, document]) {
+      const echt = ziel.addEventListener.bind(ziel);
+      vi.spyOn(ziel, "addEventListener").mockImplementation((art, fn, opt) => {
+        lauscher.push([ziel, art, fn, opt]);
+        return echt(art, fn, opt);
+      });
+    }
 
     const apiMod = await import("../js/api.js");
     const stateMod = await import("../js/state.js");
@@ -80,6 +95,8 @@ describe("Queue-Modus", () => {
   });
 
   afterEach(() => {
+    for (const [ziel, art, fn, opt] of lauscher) ziel.removeEventListener(art, fn, opt);
+    vi.clearAllTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
     sessionStorage.clear();
@@ -363,14 +380,16 @@ describe("Queue-Modus", () => {
     expect(getStoredJobId()).toBeNull();
   });
 
-  it("enqueue 429 mit blocked:limit → Rate-Limit-Meldung, kein Polling", async () => {
+  it("enqueue 429 mit blocked:limit → nur der Limit-Hinweis, kein Polling", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       jsonResponse({ blocked: "limit", retryAfterSeconds: 600 }, false, 429)
     );
     const p = analyzeImage();
     await vi.advanceTimersByTimeAsync(5000);
     await p;
-    expect(elements.status.textContent).toContain("error.rateLimit");
+    /* UX-2026-10-03-47: keine zweite Meldung neben dem Limit-Hinweis. */
+    expect(elements.limitBanner.classList.contains("active")).toBe(true);
+    expect(elements.status.textContent).toBe("");
     const urls = globalThis.fetch.mock.calls.map((c) => String(c[0]));
     expect(urls.some((u) => u.includes("/api/job-status"))).toBe(false);
   });

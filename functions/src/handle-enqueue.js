@@ -5,8 +5,8 @@
  *
  * Annahme-Endpoint der Queue — seit v2.10 der einzige Upload-Weg. Validiert
  * die Anfrage (Method, Maintenance, Rate-Limit, Body-Größe, Honeypot, MIME,
- * Magic-Bytes, Warteschlangen-Tiefe, Stundenlimit), legt das Bild kurz ab,
- * erzeugt ein Job-Dokument und reiht es in Cloud Tasks ein. Antwortet SOFORT
+ * Magic-Bytes, Warteschlangen-Tiefe, Stundenlimit), erzeugt ein Job-Dokument,
+ * legt das Bild kurz ab und reiht den Job in Cloud Tasks ein. Antwortet SOFORT
  * mit der `jobId` — die eigentliche Mistral-Pipeline läuft asynchron im
  * Worker `processJob`.
  *
@@ -17,51 +17,21 @@
 
 const crypto = require("crypto");
 const { ALLOWED_MIME, MAX_UPLOAD_BYTES } = require("./config");
-const { dauerJeAnalyse } = require("./durchsatz");
 const { geltendeWerte } = require("./betriebsprofil");
-const { getFeatureFlags } = require("./feature-flags");
-
-/* Wie viele Wartende sind in einer halben Stunde zu schaffen?
-
-   Die Rechnung braucht ZWEI Groessen, und beide kommen aus der Datenbank:
-   die gemessene Dauer einer Analyse (`stats/durchsatz`, laufend aus echten
-   Laeufen fortgeschrieben) und die Parallelitaet aus dem Einstellungssatz.
-
-   BEFUND ARCH-2026-08-30-01 (Kurz-Audit): Die Parallelitaet stammte hier
-   weiterhin aus dem Code. Wer den Einstellungssatz auf einen groesseren Tarif
-   umstellte, sah im Zahlen-Endpunkt "quelle: firestore" und hielt alles fuer
-   umgestellt — die Einlassgrenze rechnete aber weiter mit dem alten Wert. Das
-   waere erst im Workshop unter Last aufgefallen, ohne Signal.
-
-   Faellt die Messung aus, gilt `warteschlangeTiefe` aus dem Einstellungssatz;
-   ohne Satz ist die Einlassgrenze null (siehe unten). Eine Konstante im Code
-   gibt es seit 30.08.2026 nicht mehr: Die Einlassgrenze darf nie fehlen,
-   aber auch nie aus einer zweiten Quelle kommen. */
-async function aktuelleEinlassgrenze() {
-  const { werte } = await geltendeWerte();
-  /* Ohne Einstellungssatz laeuft ohnehin keine Analyse — dann ist die
-     ehrliche Einlassgrenze null, nicht eine Ersatzzahl aus dem Code. */
-  if (!werte) return 0;
-  try {
-    const flags = await getFeatureFlags();
-    const { sekunden, gemessen } = await dauerJeAnalyse(flags.useGemesseneDauer === true);
-    /* Gemessene Dauer verfuegbar: Grenze daraus rechnen, sonst die Zahl aus
-       dem Einstellungssatz nehmen. */
-    if (!gemessen || !sekunden) return werte.warteschlangeTiefe;
-    return Math.max(1, Math.floor(((30 * 60) / sekunden) * werte.parallelitaet * 0.8));
-  } catch (_) {
-    return werte.warteschlangeTiefe;
-  }
-}
+/* Die Einlassgrenze, die jetzt gilt — gerechnet an der einen gemeinsamen Stelle
+   fuer Einlass und Wartezeit-Ansage (warteschlangen-rechnung.js). */
+const { einlassgrenzeFuer } = require("./warteschlangen-rechnung");
+const aktuelleEinlassgrenze = async () => einlassgrenzeFuer((await geltendeWerte()).werte);
 const { getClientIp, checkRateLimit } = require("./middleware");
 const { parseMultipart, parseJsonBody } = require("./upload");
 const { resolveLanguage } = require("./i18n");
-const { checkAndIncrement, getMaintenanceStatus, releaseHourlySlot } = require("./counter");
+const { checkAndIncrement, getMaintenanceStatus } = require("./counter");
 const { notifyLimitReached } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 const { createJob, failJob, platzBestaetigen, getJob, abandonJob, countQueuedJobs } = require("./jobs");
 const { meldeGescheiterteAnalyse } = require("./jobs");
-const { storeImage, deleteImage } = require("./queue-storage");
+const { neuerBildPfad, storeImage } = require("./queue-storage");
+const { belegtesFreigeben } = require("./ruecknahme");
 const { enqueueJob } = require("./cloud-tasks");
 
 /**
@@ -89,6 +59,26 @@ function sanitizeExif(raw) {
     if (typeof raw.model === "string") safe.model = raw.model.slice(0, 100);
   }
   return safe;
+}
+
+/* DIE EINE RUECKABWICKLUNG des Einlasses (STRUCT-2026-10-03-36). Ab dem
+   gezogenen Stundenplatz kann ein Auftrag an drei Stellen noch scheitern
+   (Anlegen oder Speichern, Warteschlange nachtraeglich voll, Einreihen).
+   EINE Reihenfolge fuer alle:
+     1. den Auftrag beenden — mit `grund` als gescheitert (sein Uebergang
+        schreibt die eine Meldung "Analyse gescheitert"; ohne Auftrag oder
+        ohne gelungenen Uebergang meldet der Einlass selbst), ohne `grund` als
+        verlassen (zu spaet gekommen ist kein Fehler, keine Meldung)
+     2. Foto loeschen und Platz im Stundenfenster freigeben (ruecknahme.js)
+   `imagePath` nur mitgeben, wenn das Speichern begonnen hat. */
+async function einlassZuruecknehmen({ jobId, grund, stempel, imagePath }) {
+  if (grund) {
+    const gemeldet = jobId ? await failJob(jobId, grund).catch(() => false) : false;
+    if (!gemeldet) meldeGescheiterteAnalyse(grund);
+  } else {
+    await abandonJob(jobId);
+  }
+  await belegtesFreigeben({ zaehlerStempel: stempel, imagePath });
 }
 
 async function handleEnqueue(req, res, secrets) {
@@ -191,7 +181,8 @@ async function handleEnqueue(req, res, secrets) {
       fields = parsed.fields;
     }
 
-    /* i18n + Trace-ID */
+    /* i18n + Trace-ID. Die Zufallsnummer des Browsers steht in der Antwort-Kopfzeile
+       und in den Fehlerzeilen dieses Aufrufs, NICHT im Auftrag (PRIV-2026-10-03-39). */
     const requestedLang = (jsonBody && jsonBody.lang) || (fields && fields.lang) || "";
     const lang = resolveLanguage(requestedLang);
 
@@ -311,15 +302,19 @@ async function handleEnqueue(req, res, secrets) {
        das Budget nicht aufbrauchen. */
     const counter = await checkAndIncrement();
     if (counter.justReached) {
-      notifyLimitReached({
-        ntfyUrl: secrets.ntfyUrl.value(),
-        ntfyTopic: secrets.ntfyTopic.value(),
-        adminSecret: secrets.adminSecret.value(),
-        count: counter.count,
-        limit: counter.limit,
-      }).catch((err) => {
-        console.log(JSON.stringify({ warning: "ntfy-error", error: err.message }));
-      });
+      /* Abgewartet, hoechstens 2 s und nur bei der EINEN Anfrage, die das Limit
+         erreicht: Die Nachricht ist das Signal fuer den Boost — neben der Antwort
+         her konnte sie ausbleiben, sobald die Antwort draussen war. */
+      const push = Promise.resolve(
+        notifyLimitReached({
+          ntfyUrl: secrets.ntfyUrl.value(),
+          ntfyTopic: secrets.ntfyTopic.value(),
+          adminSecret: secrets.adminSecret.value(),
+          count: counter.count,
+          limit: counter.limit,
+        })
+      ).catch((err) => console.log(JSON.stringify({ warning: "ntfy-error", error: err.message })));
+      await Promise.race([push, new Promise((fertig) => setTimeout(fertig, 2000).unref())]);
     }
     if (!counter.allowed) {
       /* Der Auftrag kommt nicht zustande; angelegt wurde noch nichts. */
@@ -331,34 +326,45 @@ async function handleEnqueue(req, res, secrets) {
       return;
     }
 
-    /* ── Bild ablegen → Job anlegen → in Cloud Tasks einreihen ── */
+    /* ── Job anlegen → Bild ablegen → in Cloud Tasks einreihen ── */
     /* PRIV-003: Abhol-Ticket fürs Ergebnis — nur dieser Browser bekommt es von
        job-status zurück (zweites Schloss zusätzlich zur unerratbaren jobId). */
     const resultToken = crypto.randomUUID();
-    let imagePath;
+    /* PRIV-2026-10-03-28: ERST der Auftrag, DANN das Foto. Der Pfad steht vorab
+       fest und im Auftrag. Endet der Einlass zwischen den zwei Schritten, liegt
+       hoechstens ein Auftrag ohne Foto da — nie ein Foto, das kein Auftrag
+       kennt. Den Auftrag raeumt der Aufraeumdienst nach der Karenz ab (dieser
+       Browser hat nie eine Kennung bekommen und fragt nie nach) und loescht
+       ueber den Pfad, was dort liegt. */
+    const imagePath = neuerBildPfad(file.mimeType);
     let jobId;
+    let speichernBegonnen = false;
     try {
-      imagePath = await storeImage(file.buffer, file.mimeType);
       /* Die Marke des Einlasses reist mit dem Auftrag: fuer den Nachtrag im
          Worker und fuer eine Freigabe, die genau diesen Eintrag trifft
          (counter.js, "GENAU EINMAL IM FENSTER"). */
       jobId = await createJob({
         lang,
-        traceId,
         imagePath,
         exif,
         resultToken,
         zaehlerStempel: counter.stempel,
         zaehlerNachtrag: counter.nachtragNoetig === true,
       });
+      speichernBegonnen = true;
+      await storeImage(file.buffer, file.mimeType, imagePath);
     } catch (err) {
       /* Der Stunden-Slot ist hier schon gezogen, aber es entsteht nie eine
-         Analyse — Slot zurückgeben und ein evtl. schon abgelegtes Bild nicht
-         bis zur Lifecycle-Regel liegen lassen. */
+         Analyse — das Kind sieht "ueberlastet". Ein Speichern, das mit einem
+         Fehler endet, kann trotzdem geschrieben haben: deshalb loeschen,
+         sobald es begonnen hat. */
       console.log(JSON.stringify({ requestId, traceId, warning: "store-or-create-failed", error: err.message }));
-      meldeGescheiterteAnalyse("store_failed"); /* Kind sieht "ueberlastet" — eine Nachricht (jobs.js) */
-      releaseHourlySlot(counter.stempel).catch(() => {});
-      if (imagePath) await deleteImage(imagePath);
+      await einlassZuruecknehmen({
+        jobId,
+        grund: "store_failed",
+        stempel: counter.stempel,
+        imagePath: speichernBegonnen ? imagePath : null,
+      });
       res.status(503).json({ error: "Queue unavailable", code: "store_failed" });
       return;
     }
@@ -382,9 +388,7 @@ async function handleEnqueue(req, res, secrets) {
       if (einlassgrenze === null) throw { _uebersprungen: true };
       const angelegt = await getJob(jobId);
       if (!(await platzBestaetigen(angelegt, einlassgrenze))) {
-        await abandonJob(jobId);
-        if (imagePath) await deleteImage(imagePath);
-        releaseHourlySlot(counter.stempel).catch(() => {});
+        await einlassZuruecknehmen({ jobId, grund: null, stempel: counter.stempel, imagePath });
         console.log(JSON.stringify({ requestId, traceId, warning: "queue-too-deep-nachtraeglich" }));
         res.status(429).json({
           blocked: "queueFull",
@@ -419,12 +423,10 @@ async function handleEnqueue(req, res, secrets) {
     } catch (err) {
       /* Job ist angelegt, aber Cloud Tasks hat ihn nicht angenommen — sonst
          bliebe er für immer `queued` und der Client pollt ewig. Sauber als
-         `failed` markieren und das Bild gleich wieder löschen. */
+         `failed` markieren, den Platz zurückgeben (BIZ-001: dieser Job löst
+         nie eine echte Analyse aus) und das Bild gleich wieder löschen. */
       console.log(JSON.stringify({ requestId, traceId, jobId, warning: "enqueue-failed", error: err.message }));
-      await failJob(jobId, "enqueue_failed");
-      /* BIZ-001: Slot zurückgeben — dieser Job löst nie eine echte Analyse aus. */
-      releaseHourlySlot(counter.stempel).catch(() => {});
-      await deleteImage(imagePath);
+      await einlassZuruecknehmen({ jobId, grund: "enqueue_failed", stempel: counter.stempel, imagePath });
       res.status(503).json({ error: "Queue unavailable", code: "enqueue_failed" });
       return;
     }

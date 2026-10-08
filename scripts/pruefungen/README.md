@@ -1,6 +1,5 @@
 # PRUEFUNGEN — vier Kontrollen statt vier Bitten
 
-
 > **Herkunft:** Kopie des Werkzeugkastens aus der Audit-Familie
 > (`~/.claude/skills/audit-familie/pruefungen`). **Bearbeitet wird die QUELLE, nie diese
 > Kopie** — danach neu einkopieren und mit `node scripts/pruefe-vendorierung.mjs --aktualisieren`
@@ -35,9 +34,29 @@ einer Pipe, fehlendes `set -e`. Setzt KERN 5c durch.
 Formulierungen. Mit eingebauter Positivkontrolle: Schlaegt die Suche an einem bekannten
 Verstoss nicht an, meldet die Pruefung, dass sie selbst kaputt ist, statt gruen zu
 werden.
+Gesucht wird Zeile fuer Zeile und zusaetzlich je Absatz im Text ohne Zeilenumbrueche —
+eine Formulierung, die im Fliesstext oder in einem Kommentar ueber einen Umbruch laeuft,
+blieb sonst unsichtbar.
+Ein Absatz endet an einer Leerzeile, einer Tabellenzeile und einer Ueberschrift; ein
+Listenpunkt und ein neuer HTML-Block beginnen einen eigenen. Zwei Listenpunkte oder zwei
+Tabellenzeilen sind kein Satz und werden nicht zusammengesetzt. Stern und Raute am
+Zeilenanfang gelten in Markdown als Listenpunkt und Ueberschrift, in allen anderen
+Dateien als Fortsetzung eines Kommentars.
+Jede Zeile und jeder Absatz wird zusaetzlich ohne Auszeichnung gelesen: ohne die
+gaengigen Tags im Fliesstext (`<strong>`, `<em>`, `<a>`, `<span>` ...), ohne `**`, `_` und
+Rueckstriche, und mit aufgeloesten Zeichen in HTML-Schreibweise (`&auml;`, `&nbsp;`). Eine
+gesperrte Wendung bleibt gesperrt, auch wenn ein Wort darin betont ist. Nicht aufgeloest
+werden: weiche Trennzeichen (`&shy;`), schmale Leerzeichen, Markdown-Links und Tags, die
+nicht in der Liste stehen - wer den Text braucht, wie der Browser ihn zeigt, prueft
+zusaetzlich am aufgebauten Dokument.
 
 **test-blind.py** findet Tests, die rechnerisch nicht rot werden koennen: ohne
 Zusicherung, uebersprungen, immer wahr. Setzt KERN 4 Frage 2 durch.
+
+**Alle vier Pruefungen lesen nur, was git kennt** (eingecheckt oder neu, nicht
+ausgenommen). Private Ordner, die `.gitignore` ausnimmt, gibt es in der Pipeline nicht -
+am Arbeitsrechner darf eine Pruefung fuer sie nicht rot werden. Ohne git (entpacktes
+Archiv) gilt der Dateibaum. Eine Huelle im Projekt braucht es dafuer nicht mehr.
 
 ## Aufruf
 

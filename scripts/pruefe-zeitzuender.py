@@ -32,6 +32,7 @@ Exit 0 = keine Kandidaten, Exit 1 = Kandidaten vorhanden, Exit 2 = Aufrufproblem
 """
 import os
 import re
+import subprocess
 import sys
 
 # "zeitzuender-proben" und "negativprobe": eigenes Beispielmaterial der Pruefungen.
@@ -58,7 +59,38 @@ TESTPFAD = re.compile(r"(?:^|[/\\])(?:__tests__|tests?|spec|e2e)[/\\]|"
                       r"(?:^|[/\\])(?:test_[^/\\]+|[^/\\]+_test|[^/\\]+\.(?:test|spec))\.[a-z]+$", re.I)
 
 
+def git_bekannt(wurzel):
+    """Die Dateien unter `wurzel`, die git kennt: eingecheckte und neue, aber keine, die
+    `.gitignore` ausnimmt. Pfade relativ zu `wurzel`. `None`, wenn `wurzel` in keinem
+    git-Arbeitsbaum liegt oder git fehlt — dann liest der Aufrufer das Verzeichnis selbst.
+
+    Grund (TEST-2026-10-04-29): Ausgenommene Ordner (private Berichte, Sicherungen) gehen
+    nie in die Pipeline. Liegen dort Kopien von Tests, meldete diese Pruefung sie am
+    Arbeitsrechner als Fund — rot fuer etwas, das niemand ausliefert."""
+    try:
+        lauf = subprocess.run(
+            ["git", "-C", wurzel, "ls-files", "-z", "--cached", "--others",
+             "--exclude-standard", "--", "."],
+            capture_output=True, check=False)
+    except OSError:
+        return None
+    if lauf.returncode != 0:
+        return None
+    return [p for p in lauf.stdout.decode("utf-8", errors="replace").split("\0") if p]
+
+
 def dateien(wurzel):
+    bekannt = git_bekannt(wurzel)
+    if bekannt is not None:
+        for relativ in sorted(set(bekannt)):
+            teile = relativ.split("/")
+            if any(t in UEBERSPRINGEN for t in teile[:-1]):
+                continue
+            pfad = os.path.join(wurzel, *teile)
+            # Im Index, aber im Arbeitsbaum geloescht: nichts zu lesen.
+            if relativ.endswith(QUELLENDUNGEN) and os.path.isfile(pfad):
+                yield pfad
+        return
     for pfad, ordner, namen in os.walk(wurzel):
         ordner[:] = [o for o in ordner if o not in UEBERSPRINGEN]
         for name in namen:

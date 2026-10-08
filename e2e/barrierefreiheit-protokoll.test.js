@@ -370,6 +370,53 @@ async function verstossDiagnose(page, waehler) {
   }, waehler);
 }
 
+/**
+ * Wartet, bis am Element nichts mehr eingeblendet wird (TEST-2026-10-06-01).
+ *
+ * ANLASS 2026-10-06: Ein Pipeline-Lauf mass am Knopf „Projekt unterstuetzen"
+ * Kontrast 1,65 statt der ueblichen gut 9 — weisse Schrift auf einer Flaeche,
+ * die noch nicht voll da war (Diagnose: eine laufende Animation). Der
+ * Wiederholungslauf war gruen. `beruhigen()` wartet zwar auf alle
+ * Animationen, aber VOR den beiden axe-Laeufen; die Bildpunkt-Messung kommt
+ * Sekunden spaeter, und was in der Zwischenzeit beginnt, sah bisher niemand.
+ *
+ * Gewartet wird auf die ENDLICHEN Animationen und Uebergaenge des Elements,
+ * seiner Vorfahren (eine Einblendung des umgebenden Bereichs wirkt auf alles
+ * darin) und seiner Nachfahren. Endlos-Animationen bleiben aussen vor, wie in
+ * `animationsRuhe`. Mit Zeitgrenze: Ein Riegel, der hier haengen bleibt,
+ * verhinderte die Messung, die er schuetzen soll.
+ *
+ * @returns {Promise<{gewartet: boolean}>} ob ueberhaupt etwas lief
+ */
+async function elementRuhe(page, waehler, hoechstensMs = 5000) {
+  return page
+    .locator(waehler)
+    .first()
+    .evaluate((el, grenze) => {
+      const laufende = () => {
+        const alle = new Set(el.getAnimations({ subtree: true }));
+        for (let k = el.parentElement; k; k = k.parentElement) {
+          for (const a of k.getAnimations()) alle.add(a);
+        }
+        return [...alle].filter((a) => {
+          if (a.playState !== "running") return false;
+          try {
+            return a.effect?.getComputedTiming?.().iterations !== Infinity;
+          } catch (_e) {
+            return true; /* im Zweifel warten */
+          }
+        });
+      };
+      const offen = laufende();
+      if (offen.length === 0) return { gewartet: false };
+      return Promise.race([
+        Promise.all(offen.map((a) => a.finished.catch(() => {}))),
+        new Promise((f) => setTimeout(f, grenze)),
+      ]).then(() => ({ gewartet: true }));
+    }, hoechstensMs)
+    .catch(() => ({ gewartet: false }));
+}
+
 async function abstentionenAufloesen(page, incomplete) {
   const offen = [];
   for (const regel of incomplete) {
@@ -386,12 +433,28 @@ async function abstentionenAufloesen(page, incomplete) {
         offen.push({ regel: regel.id, element: waehler, aufloesung: "Ausnahme: " + ausnahme.grund });
         continue;
       }
-      const gemessen = await kontrastAusBildpunkten(page, waehler);
+      /* TEST-2026-10-06-01: erst messen, wenn am Element nichts mehr
+         eingeblendet wird (siehe elementRuhe). */
+      await elementRuhe(page, waehler);
+      let gemessen = await kontrastAusBildpunkten(page, waehler);
       if (gemessen == null) {
         offen.push({ regel: regel.id, element: waehler, aufloesung: "nicht messbar" });
         continue;
       }
       const schwelle = await schwelleFuer(page, waehler);
+      if (gemessen + 0.01 < schwelle) {
+        /* Zu wenig Kontrast. Das Foto holt das Element ins Bild — hat genau
+           das (oder die Seite in derselben Sekunde) noch eine Einblendung
+           angestossen, wird nach deren Ende EINMAL neu gemessen. Lief nichts,
+           gilt die erste Messung. Ein Element, dessen Kontrast wirklich nicht
+           reicht, bleibt auch in der zweiten Messung darunter — die Schwelle
+           aendert sich nicht. */
+        const ruhe = await elementRuhe(page, waehler);
+        if (ruhe.gewartet) {
+          const nachgemessen = await kontrastAusBildpunkten(page, waehler);
+          if (nachgemessen != null) gemessen = nachgemessen;
+        }
+      }
       if (gemessen + 0.01 < schwelle) {
         offen.push({
           regel: regel.id,
@@ -1236,6 +1299,59 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
     });
     const gut = await kontrastAusBildpunkten(page, "#kontrast-probe");
     expect(gut).toBeGreaterThan(4.5);
+  });
+
+  /* TEST-2026-10-06-01: Die Bildpunkt-Messung darf nicht in eine laufende
+     Einblendung fallen. Auf dem Pipeline-Laeufer hat sie einmal den Knopf
+     „Projekt unterstuetzen" gemessen, waehrend seine Flaeche noch nicht voll
+     da war: weisse Schrift auf fast leerem Grund, Kontrast 1,65 — ein
+     Schein-Fund, der den Lauf rot machte. Hier wird genau das nachgestellt:
+     Die Einblendung des Bereichs wird kuenstlich auf drei Sekunden gedehnt und
+     der Aufloeser mitten hinein geschickt.
+
+     Beide Richtungen, sonst belegt der Test nichts: Ein Knopf mit gutem
+     Kontrast darf waehrend der Einblendung KEINEN Fund ergeben — und ein Knopf
+     mit wirklich zu schwachem Kontrast muss trotz Einblendung rot bleiben. */
+  test("Kontrast-Messung faellt nicht in eine laufende Einblendung, ein echter Fehler bleibt rot", async ({ page }) => {
+    await endpunkteStellen(page);
+    await page.goto("/");
+    const KNOPF = 'a[data-i18n="support.button"]';
+    /* So meldet axe den Knopf als „nicht pruefbar" (Verlauf als Hintergrund). */
+    const gemeldet = [{ id: "color-contrast", nodes: [{ target: [KNOPF] }] }];
+    /* Startet die gedehnte Einblendung neu — ueber die Animations-Schnittstelle
+       des Browsers, nicht ueber ein Stilblatt: Die Sicherheitsrichtlinie der
+       Seite laesst kein eingefuegtes Stilblatt zu, und die Regel fuer
+       reduzierte Bewegung kuerzte eine Stil-Animation auf einen Wimpernschlag. */
+    const einblendungStarten = () =>
+      page.evaluate(() => {
+        const bereich = document.querySelector(".support-box");
+        for (const alte of bereich.getAnimations()) alte.cancel();
+        bereich.animate([{ opacity: 0.05 }, { opacity: 1 }], { duration: 3000, easing: "linear", fill: "both" });
+        /* Die Animation laeuft ab dem naechsten Bild. */
+        return new Promise((f) => requestAnimationFrame(() => requestAnimationFrame(f)));
+      });
+
+    /* Ausgangslage: In Ruhe hat der Knopf genug Kontrast. */
+    expect(await kontrastAusBildpunkten(page, KNOPF)).toBeGreaterThan(4.5);
+
+    /* POSITIVKONTROLLE der Nachstellung: Mitten in der Einblendung misst die
+       rohe Bildpunkt-Messung zu wenig — genau der Schein-Fund. */
+    await einblendungStarten();
+    expect(await kontrastAusBildpunkten(page, KNOPF)).toBeLessThan(4.5);
+
+    /* 1. Guter Knopf, Einblendung laeuft: Der Aufloeser wartet sie ab — kein Fund. */
+    await einblendungStarten();
+    expect(await abstentionenAufloesen(page, gemeldet)).toEqual([]);
+
+    /* 2. Wirklich zu blasser Knopf (weiss auf Hellblau, rund 1,6:1), Einblendung
+          laeuft: Das Abwarten rettet ihn nicht — der Fund bleibt. */
+    await page.locator(KNOPF).evaluate((knopf) => knopf.style.setProperty("background", "#9fd3e6", "important"));
+    await einblendungStarten();
+    const funde = await abstentionenAufloesen(page, gemeldet);
+    expect(funde).toHaveLength(1);
+    expect(funde[0].aufloesung).toMatch(/^VERSTOSS/);
+    expect(funde[0].gemessen).toBeLessThan(4.5);
+    expect(funde[0].element).toBe(KNOPF);
   });
 
   test("Prozess-Schritt: Foto gewaehlt, Vorbereitung laeuft", async ({ page }) => {

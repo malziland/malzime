@@ -19,6 +19,12 @@ jest.mock("../jobs", () => ({
   getJob: jest.fn(),
   claimJob: jest.fn(),
   completeJob: jest.fn(),
+  /* Der Verarbeiter speichert ueber diese zwei (BUG-2026-10-03-30). Hier
+     reichen sie an die completeJob-Attrappe weiter; Wiederholung und
+     Meldegrund prueft ergebnis-speichern.test.js mit dem echten Modul. */
+  ergebnisSpeichern: (id, result) => require("../jobs").completeJob(id, result),
+  ersatzErgebnisSpeichern: (id, job) =>
+    require("../jobs").completeJob(id, jest.requireActual("../jobs").ersatzErgebnis(job)),
   isAbandoned: jest.fn(),
   abandonJob: jest.fn(),
   countProcessingJobs: jest.fn(),
@@ -40,6 +46,7 @@ jest.mock("../cloud-tasks", () => ({
 const { handleProcessJob } = require("../handle-process-job");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
+const { alsText } = require("./hilfen/als-text");
 
 const JOB_ID = "auftrag-geheim-4711";
 const TRACE_ID = "vorgang-geheim-0815";
@@ -68,6 +75,9 @@ function makeRes() {
   };
 }
 
+/* alsText (TEST-2026-10-04-15) liegt jetzt in hilfen/als-text.js — dieselbe
+   Hilfe fuer alle Tests, die Konsolenausgaben nach einer Kennung durchsuchen. */
+
 let ausgabe;
 beforeEach(() => {
   jest.clearAllMocks();
@@ -84,7 +94,7 @@ beforeEach(() => {
   storage.deleteImage.mockResolvedValue();
   ausgabe = [];
   for (const art of ["log", "error", "warn", "info"]) {
-    jest.spyOn(console, art).mockImplementation((...args) => ausgabe.push(args.map(String).join(" ")));
+    jest.spyOn(console, art).mockImplementation((...args) => ausgabe.push(args.map(alsText).join(" ")));
   }
 });
 afterEach(() => jest.restoreAllMocks());
@@ -144,9 +154,49 @@ describe("Fehlertexte mit Kennung (27.09.2026)", () => {
     expect(log).toMatch(/No document to update|NOT_FOUND/);
     pruefeOhneKennung(log);
   });
+
+  /* TEST-2026-10-03-42: Auch der Pfad des Fotos ist je Auftrag eindeutig. Ein
+     Speicherfehler kann ihn nennen; im Protokoll steht er nicht. */
+  test("Fehlertext mit dem Pfad des Fotos: der Pfad steht in keiner Ausgabe", async () => {
+    jobs.completeJob.mockRejectedValue(new Error(`Speicher: Objekt ${JOB.imagePath} nicht lesbar`));
+    const log = await lauf();
+    /* Positivkontrolle: Der Fehlertext selbst ist noch da. */
+    expect(log).toContain("nicht lesbar");
+    expect(log).not.toContain(JOB.imagePath);
+    pruefeOhneKennung(log);
+  });
 });
 
 describe("Positivkontrolle des Messmittels", () => {
+  /* TEST-2026-10-04-15: Gesucht wird nach dem WERT einer Kennung. Das geht nur,
+     wenn auch ein Objekt oder ein Fehler als Argument einer Konsolenausgabe mit
+     seinem Inhalt gesammelt wird. */
+  test("ein Objekt in einer Konsolenausgabe erscheint als JSON, nicht als [object Object]", () => {
+    console.log("vorgang", { traceId: TRACE_ID, tief: { liste: [{ jobId: JOB_ID }] } });
+    const log = ausgabe.join("\n");
+    expect(log).not.toContain("[object Object]");
+    expect(log).toContain(`vorgang {"traceId":"${TRACE_ID}","tief":{"liste":[{"jobId":"${JOB_ID}"}]}}`);
+  });
+
+  test("ein Fehler als Argument wird mit Meldung und eigenen Feldern gesammelt", () => {
+    console.error(Object.assign(new Error(`kein Dokument jobs/${JOB_ID}`), { traceId: TRACE_ID, code: 5 }));
+    const log = ausgabe.join("\n");
+    expect(log).toContain(`kein Dokument jobs/${JOB_ID}`);
+    expect(log).toContain(TRACE_ID);
+  });
+
+  test("ein Objekt, das sich selbst enthaelt, wirft die Sammlung nicht um", () => {
+    const kreis = { jobId: JOB_ID };
+    kreis.selbst = kreis;
+    expect(() => console.warn(kreis)).not.toThrow();
+    expect(ausgabe.join("\n")).toContain(JOB_ID);
+  });
+
+  test("Text bleibt Text — die Zeilen des Programms stehen unveraendert in der Sammlung", () => {
+    console.info('{"step":"probe"}', 7, null, undefined);
+    expect(ausgabe).toEqual(['{"step":"probe"} 7 null undefined']);
+  });
+
   test("vor dem Claim steht die jobId im Log — die Suche findet sie", async () => {
     jobs.claimJob.mockResolvedValue(false);
     const log = await lauf();

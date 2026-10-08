@@ -17,9 +17,9 @@
  *
  * VIER OBERGRENZEN IN FELDER SIND ZUSAGEN, keine Plausibilitaetsgrenzen:
  * jobAufbewahrungMs (2 h), zustellfensterMs (15 min), adressfensterMs
- * (10 min), stundenfensterMinuten (60) stehen so in der Datenschutzerklaerung.
- * Der Satz kann sie nur verkuerzen; wer sie anheben will, aendert zuerst die
- * Erklaerung.
+ * (10 min), stundenfensterMinuten (60) stehen so auf oeffentlichen Seiten
+ * (Wortlaut je Feld: docs/BETRIEBSPROFILE.md). Der Satz kann sie nur
+ * verkuerzen; wer sie anheben will, aendert zuerst die Seite.
  *
  * Was bewusst KEINE Einstellung ist (Upload-Grenze, Feldlaengen der
  * Fehlererfassung, Modell, EU-Endpunkt, Function-Zeitlimit, gemessenes
@@ -30,11 +30,8 @@
  */
 
 const { datenbank } = require("./db");
-/* Nur noch das gemessene Schreibtempo — die uebrigen Konstanten sind mit dem
-   Umbau in den Einstellungssatz gewandert und existieren in config.js nicht
-   mehr. Die Importe liefen ins Leere (undefined) und waren nur noch
-   Verwirrung fuer den naechsten Leser. */
-const { MISTRAL_SLOWEST_TOKENS_PER_SECOND } = require("./config");
+/* Welche Werte zusammenpassen muessen, und die festen Groessen dazu. */
+const kopplung = require("./betriebsprofil-kopplung");
 
 const DOKUMENT = "config/betriebsprofil";
 /* Zeitlimit fuer das Lesen. OHNE DAS waere die Rueckfallebene wertlos: Diese
@@ -56,9 +53,6 @@ let schonGelesen = false;
 /* Wie die Feature-Flags: kurz genug, dass eine Umstellung in Sekunden wirkt,
    lang genug, dass nicht jeder Aufruf Firestore liest. */
 const CACHE_MS = 30 * 1000;
-/* Obergrenze, die Google der Function gibt. Kein Profil darf darueber. */
-const FUNCTION_LIMIT_MS = 540 * 1000;
-
 /* WELCHE WERTE EIN EINSTELLUNGSSATZ TRAEGT.
    Alle sind PFLICHT. Es gibt keine Kann-Felder und keine Rueckfallwerte mehr:
    Ein halber Satz ist ein kaputter Satz, und ein Wert, der an zwei Orten
@@ -97,13 +91,13 @@ const FELDER = {
   warteschlangeTiefe: { min: 1, max: 10000 },
   durchschnittsdauerSekunden: { min: 1, max: 3600 },
   stundenlimit: { min: 1, max: 100000 },
-  /* OBERGRENZE = ZUSAGE: "die Zeitpunkte der Analysen der letzten 60 Minuten"
-     steht so in der Datenschutzerklaerung. Ein groesseres Fenster hiesse:
-     laenger aufbewahrte Zeitstempel, als zugesagt. */
+  /* OBERGRENZE = ZUSAGE: Die Statistik-Seite zeigt "Analysen in der letzten
+     Stunde". Ein groesseres Fenster hiesse: laenger aufbewahrte Zeitstempel,
+     als zugesagt. */
   stundenfensterMinuten: { min: 1, max: 60 },
   adressLimit: { min: 1, max: 100000 },
-  /* OBERGRENZE = ZUSAGE: Die Datenschutzerklaerung sagt "merkt sich deine IP
-     fuer maximal 10 Minuten im Arbeitsspeicher, dann ist sie weg". Ein
+  /* OBERGRENZE = ZUSAGE: Die Datenschutzerklaerung sagt zur IP-Adresse "Rund
+     10 Minuten, nur im Arbeitsspeicher, nie auf einer Festplatte". Ein
      laengeres Fenster waere eine laengere Speicherung — der Satz kann das
      Fenster nur verkuerzen. */
   adressfensterMs: { min: 1000, max: 10 * 60 * 1000 },
@@ -115,7 +109,7 @@ const FELDER = {
   /* --- 4. Ruecksicht auf Mistral: nicht mehr schicken, als die dort erlauben --- */
   drosselMaxParallel: { min: 1, max: 100 },
   drosselWartelimitMs: { min: 1000, max: 30 * 60 * 1000 },
-  tokenAbstandGrossMs: { min: 0, max: 60 * 1000 },
+  tokenAbstandGrossMs: { min: 1, max: 60 * 1000 },
   /* WENN MISTRAL ABLEHNT (429) ODER KURZ WEG IST (502/503/504): Wartezeit vor
      der ersten Wiederholung; jede weitere wartet doppelt so lang. Die Reihe
      10, 20, 40, 80 s ist am Vorfall vom 08.09.2026 nachgerechnet (siehe
@@ -127,8 +121,8 @@ const FELDER = {
   /* --- 5. Fristen: wie lange etwas liegen bleibt, bis aufgeraeumt wird ---
 
      ACHTUNG, HIER IST DIE OBERGRENZE SELBST EINE ZUSAGE:
-     Die Datenschutzerklaerung verspricht an vier Stellen, dass Job-Daten
-     "spaetestens nach rund 2 Stunden" geloescht werden. Waere hier eine
+     Die Datenschutzerklaerung sagt zu Foto und Profil: "Wird es nie
+     abgeholt: nach rund 2 Stunden." Waere hier eine
      hoehere Grenze erlaubt, liesse sich diese Zusage mit einem einzigen
      Datenbankeintrag brechen — ohne Commit, ohne Spur im Quelltext.
 
@@ -136,9 +130,9 @@ const FELDER = {
      nur VERKUERZEN, nie verlaengern. (Befund aus dem eigenen Review,
      30.08.2026 — die Frist war zuvor bis 7 Tage einstellbar.) */
   jobAufbewahrungMs: { min: 60 * 1000, max: 2 * 60 * 60 * 1000 },
-  /* OBERGRENZE = ZUSAGE: "wird wenige Minuten nach der Abholung automatisch
-     geloescht". Fuenfzehn Minuten sind der heutige Wert und die aeusserste
-     Lesart von "wenige Minuten". Wer mehr braucht, aendert ZUERST die
+  /* OBERGRENZE = ZUSAGE: "Rund 15 Minuten, nachdem dein Browser es abgeholt
+     hat." Fuenfzehn Minuten sind der heutige Wert und zugleich die Zahl,
+     die der Text nennt. Wer mehr braucht, aendert ZUERST die
      Datenschutzerklaerung — nicht diesen Wert. */
   zustellfensterMs: { min: 60 * 1000, max: 15 * 60 * 1000 },
   livenessGnadenfristMs: { min: 30 * 1000, max: 60 * 60 * 1000 },
@@ -150,7 +144,35 @@ const FELDER = {
 
 const PFLICHTFELDER = Object.keys(FELDER);
 
+/* DIE ZWEI LOESCHFRISTEN DER ZUSAGE (PRIV-2026-10-03-26). Keine zweiten Zahlen,
+   sondern die Obergrenzen von oben unter eigenem Namen. Der Aufraeumdienst
+   nimmt sie, wenn kein gueltiger Satz vorliegt: Geloescht wird dann nach der
+   Zusage selbst, statt gar nicht. Das sind keine Rueckfallwerte fuer den
+   Betrieb — ohne gueltigen Satz laeuft weiterhin keine Analyse. */
+const ZUSAGE_LOESCHFRISTEN = Object.freeze({
+  jobAufbewahrungMs: FELDER.jobAufbewahrungMs.max,
+  zustellfensterMs: FELDER.zustellfensterMs.max,
+});
+
 let cache = { zeit: 0, werte: null, quelle: "code" };
+/* DER ZULETZT GUELTIG GELESENE SATZ (BUG-2026-10-03-32). Kann der Satz gerade
+   nicht GELESEN werden (Zeitlimit, Verbindung), gilt dieser Stand weiter — er
+   stammt aus der Datenbank, nicht aus dem Code, ist also kein Rueckfallwert im
+   Sinn der Regel oben. Ein fehlendes oder abgelehntes Dokument verwirft ihn
+   sofort: Dann ist der Satz wirklich ungueltig.
+   Vorher bekamen bei einem einzelnen traegen Zugriff alle, die im selben
+   Augenblick hochluden, "Einstellung stimmt nicht, in ein paar Minuten
+   nochmal" — obwohl der naechste Versuch sofort gelang. */
+let letzterGueltiger = null;
+/* Scheiterte der juengste Leseversuch? Fuer den Aufraeumdienst, der Laeufe ohne
+   frisch gelesene Betriebswerte zaehlt (handle-reap.js). */
+let leseversuchGescheitert = false;
+/* BLEIBT IM CODE — Schutzgrenze, keine Einstellung: Nach einem gescheiterten
+   Leseversuch wird der letzte gueltige Stand so lange ohne neuen Zugriff
+   ausgegeben. Kurz, damit sich eine Stoerung in Sekunden heilt; lang genug,
+   dass eine Anfrage, die den Satz an mehreren Stellen braucht (der Einlass an
+   drei), nicht an jeder wieder bis zum Zeitlimit wartet. */
+const NEUVERSUCH_NACH_LESEFEHLER_MS = 5000;
 /* Laeuft gerade ein Lesevorgang? Dann warten alle weiteren darauf, statt
    selbst zu lesen.
 
@@ -185,53 +207,8 @@ function pruefe(werte) {
       return `${name} (${werte[name]}) liegt ausserhalb des plausiblen Bereichs ${g.min}–${g.max}`;
     }
   }
-  /* Die Sicherung aus config.js: Die erlaubte Ausgabelaenge muss in die
-     erlaubte Zeit passen. Sonst toetet die Uhr Laeufe, die das Token-Budget
-     ausdruecklich zulaesst (BUG-2026-08-17-01). */
-  const brauchtSekunden = werte.singleLargeMaxTokens / MISTRAL_SLOWEST_TOKENS_PER_SECOND;
-  if (brauchtSekunden > werte.singleLargeTimeoutMs / 1000) {
-    return (
-      `singleLargeMaxTokens (${werte.singleLargeMaxTokens}) braucht bei ` +
-      `${MISTRAL_SLOWEST_TOKENS_PER_SECOND} Token/s ${Math.round(brauchtSekunden)} s, ` +
-      `singleLargeTimeoutMs erlaubt aber nur ${Math.round(werte.singleLargeTimeoutMs / 1000)} s`
-    );
-  }
-  /* Jede Einzelgrenze unter dem Gesamtbudget. */
-  for (const name of ["mistralTimeoutMs", "singleLargeTimeoutMs"]) {
-    if (werte[name] > werte.requestBudgetMs) {
-      return `${name} (${werte[name]} ms) liegt ueber requestBudgetMs (${werte.requestBudgetMs} ms)`;
-    }
-  }
-  /* Die Wartezeiten bei Ueberlast muessen ins Gesamtbudget passen:
-     warte + 2·warte + 4·warte + … = warte·(2^n − 1). Liegt die Summe ueber
-     dem Budget, koennten die letzten Wiederholungen NIE stattfinden — der
-     Satz verspraeche ein Netz, das es nicht gibt. Was der Hauptaufruf vorher
-     verbraucht hat, regelt der Aufruf selbst: Er wiederholt nur, solange das
-     Restbudget fuer die naechste Wartezeit reicht (mistral-http.js). Deshalb
-     zaehlt hier die Summe allein, nicht Summe plus Aufrufdauer — sonst waere
-     der Langsam-Satz (450 s Aufruf) ohne Netz. (08.09.2026) */
-  const wartesummeMs = werte.ueberlastWarteMs * (2 ** werte.ueberlastVersuche - 1);
-  if (wartesummeMs >= werte.requestBudgetMs) {
-    return (
-      `ueberlastWarteMs (${werte.ueberlastWarteMs}) × ${werte.ueberlastVersuche} Wiederholungen ergeben ` +
-      `${Math.round(wartesummeMs / 1000)} s Wartezeit — mehr als requestBudgetMs ` +
-      `(${Math.round(werte.requestBudgetMs / 1000)} s); die letzten Wiederholungen faenden nie statt`
-    );
-  }
-  /* Das Zustellfenster darf die Aufbewahrung nicht ueberschreiten — sonst
-     wartet der Reaper auf ein Fenster, das nach der Loeschung endet. */
-  if (werte.zustellfensterMs > werte.jobAufbewahrungMs) {
-    return (
-      `zustellfensterMs (${werte.zustellfensterMs} ms) liegt ueber ` +
-      `jobAufbewahrungMs (${werte.jobAufbewahrungMs} ms) — das Ergebnis waere ` +
-      `geloescht, bevor das Wiederholungsfenster endet`
-    );
-  }
-  /* Das Gesamtbudget unter dem, was Google der Function gibt. */
-  if (werte.requestBudgetMs > FUNCTION_LIMIT_MS) {
-    return `requestBudgetMs (${werte.requestBudgetMs} ms) liegt ueber dem Function-Limit (${FUNCTION_LIMIT_MS} ms)`;
-  }
-  return null;
+  /* Was zusammenpassen muss: betriebsprofil-kopplung.js. */
+  return kopplung.pruefeKopplungen(werte);
 }
 
 /**
@@ -254,11 +231,10 @@ function felderLesen(satz) {
 /**
  * Liest die geltenden Betriebswerte.
  *
- * Reihenfolge der Rueckfaelle, jede Stufe fuehrt zu den Code-Werten:
- *   kein Dokument · kein aktives Profil · Profil unbekannt · Pruefung
- *   fehlgeschlagen · Firestore nicht lesbar
- *
- * Der schlechteste Fall ist damit der heutige Zustand, nie ein schlechterer.
+ * Ohne Werte endet: kein Dokument · kein aktives Profil · Profil unbekannt ·
+ * Pruefung fehlgeschlagen · Firestore nicht lesbar und noch nie gueltig gelesen.
+ * Ist Firestore nur GERADE nicht lesbar, gilt der zuletzt gueltig gelesene Satz
+ * weiter (`letzterStand: true` in der Antwort, siehe letzterGueltiger).
  */
 /* Eine Kopie herausgeben, nie den zwischengespeicherten Satz selbst.
 
@@ -365,6 +341,15 @@ async function leseFrisch(jetzt) {
      die Herkunft und der Ablehnungsgrund. Keine Nutzerdaten, keine Adressen,
      keine Bildinhalte — der Satz enthaelt nur Zahlen und einen selbstgewaehlten
      Namen. */
+  /* Nur GERADE nicht lesbar: Der letzte gueltige Stand gilt weiter, falls es
+     einen gibt. Alles andere ohne Werte (kein Dokument, kein aktives Profil,
+     abgelehnt) macht ihn ungueltig. */
+  const nichtLesbar = !ergebnis.werte && String(ergebnis.grund).startsWith("nicht lesbar");
+  leseversuchGescheitert = nichtLesbar;
+  if (ergebnis.werte) letzterGueltiger = { werte: ergebnis.werte, profil: ergebnis.profil, gelesen: jetzt };
+  else if (!nichtLesbar) letzterGueltiger = null;
+  const weiterMitLetztem = nichtLesbar && letzterGueltiger !== null;
+
   const wechsel = letzterZustand !== `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
   if (wechsel) {
     letzterZustand = `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
@@ -382,15 +367,44 @@ async function leseFrisch(jetzt) {
       console.log(JSON.stringify(zeile));
     } else {
       /* Kein gueltiger Satz = keine Analyse. Nur GERADE nicht lesbar heilt sich beim
-         naechsten Aufruf und ist eine Warnung; alles andere alarmiert (SECURITY-MODEL, 07.09.2026). */
-      if (String(ergebnis.grund).startsWith("nicht lesbar"))
-        console.warn(JSON.stringify({ ...zeile, severity: "WARNING" }));
+         naechsten Aufruf und ist eine Warnung; alles andere alarmiert (SECURITY-MODEL, 07.09.2026).
+         Die Warnung sagt, ob der letzte gueltige Stand weiter gilt und wie alt er
+         ist — eine Zahl, sonst nichts. */
+      if (nichtLesbar)
+        console.warn(
+          JSON.stringify({
+            ...zeile,
+            severity: "WARNING",
+            letzterStand: weiterMitLetztem,
+            ...(weiterMitLetztem ? { standAlterMs: Date.now() - letzterGueltiger.gelesen } : {}),
+          })
+        );
       else console.error(JSON.stringify(zeile));
     }
   }
 
+  if (weiterMitLetztem) {
+    /* Kurz festhalten, dann neu lesen (NEUVERSUCH_NACH_LESEFEHLER_MS). */
+    cache = {
+      zeit: Date.now() - CACHE_MS + NEUVERSUCH_NACH_LESEFEHLER_MS,
+      werte: letzterGueltiger.werte,
+      quelle: "firestore",
+      grund: null,
+      profil: letzterGueltiger.profil,
+      letzterStand: true,
+    };
+    return alsKopie(cache);
+  }
+
   cache = { zeit: jetzt, ...ergebnis };
   return alsKopie(cache);
+}
+
+/* Fuer den Aufraeumdienst: true, wenn der juengste Leseversuch dieser Instanz
+   scheiterte — die Werte stammen dann aus dem letzten gueltigen Stand oder
+   fehlen. Liest nicht selbst. */
+function letzterLeseversuchGescheitert() {
+  return leseversuchGescheitert;
 }
 
 /* Fuer Tests: Cache leeren, damit jede Pruefung frisch liest. Der Warmlauf
@@ -400,6 +414,10 @@ async function leseFrisch(jetzt) {
 function _cacheLeeren({ warmBleiben = false } = {}) {
   letzterZustand = null;
   cache = { zeit: 0, werte: null, quelle: "code" };
+  /* Auch der letzte gueltige Stand wird vergessen: Wer hier leert (die Wache am
+     Dokument, die Tests), will wissen, was JETZT in der Datenbank steht. */
+  letzterGueltiger = null;
+  leseversuchGescheitert = false;
   /* warmBleiben=true simuliert eine Instanz, die schon einmal gelesen hat:
      Der Cache ist abgelaufen, die Verbindung steht aber. Nur so laesst sich
      pruefen, dass im LAUFENDEN Betrieb weiterhin 2000 ms gelten. */
@@ -408,9 +426,14 @@ function _cacheLeeren({ warmBleiben = false } = {}) {
 
 module.exports = {
   geltendeWerte,
+  letzterLeseversuchGescheitert,
   PFLICHTFELDER,
+  ZUSAGE_LOESCHFRISTEN,
   _pruefe: pruefe,
   _felderLesen: felderLesen,
   _cacheLeeren,
   _FELDER: FELDER,
+  _WERBE_AUFRUF_HOECHSTENS_MS: kopplung.WERBE_AUFRUF_HOECHSTENS_MS,
+  _RESERVE_NACH_ANALYSE_MS: kopplung.RESERVE_NACH_ANALYSE_MS,
+  _KARENZ_MINDESTENS_MS: kopplung.KARENZ_MINDESTENS_MS,
 };

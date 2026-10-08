@@ -50,10 +50,9 @@ function rateLimitError() {
   return e;
 }
 
-/* Schnittstellen-Parität mit mistral.js. */
-function isRateLimitError(err) {
-  return !!(err && err.code === "rate_limit");
-}
+/* Schnittstellen-Parität mit mistral.js: dieselbe Entscheidung, nicht eine
+   eigene (ueberlast.js). */
+const { istUeberlast: isRateLimitError } = require("./ueberlast");
 
 /* ── Vorgefertigtes Profil-JSON ───────────────────────────────────── */
 

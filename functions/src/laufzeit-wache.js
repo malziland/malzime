@@ -129,6 +129,28 @@ function baueMeldung(befund) {
   );
 }
 
+/* Schreibt den Zustand der Wache. Gibt zurueck, ob es gelang, und schweigt bei
+   einem Fehlschlag nicht (07.10.2026): Vorher standen hier drei stumme
+   Fehlerzweige. Wirft nie — die Wache darf an ihrem eigenen Merkzettel nicht
+   scheitern. */
+async function schreibeZustand(daten) {
+  try {
+    await datenbank().doc(ZUSTAND_DOKUMENT).set(daten, { merge: true });
+    return true;
+  } catch (fehler) {
+    console.error(
+      JSON.stringify({
+        severity: "WARNING",
+        step: "laufzeit-wache",
+        grund: "zustand-nicht-schreibbar",
+        dokument: ZUSTAND_DOKUMENT,
+        fehler: fehler?.message || String(fehler),
+      })
+    );
+    return false;
+  }
+}
+
 /**
  * Prueft die Laufzeit und meldet, wenn die Auffaelligkeit anhaelt.
  *
@@ -180,24 +202,18 @@ async function pruefeLaufzeit({ melder, jetzt = Date.now() } = {}) {
     /* Erholung: Zaehler zuruecksetzen, damit ein spaeterer Einbruch wieder
        von vorne zaehlt. Ein Zaehler, der sich nie erholt, erzeugt Dauerrot
        (KERN 4). */
-    if (zustand.auffaelligSeit) {
-      try {
-        await datenbank().doc(ZUSTAND_DOKUMENT).set({ auffaelligSeit: null, gemeldetAm: null }, { merge: true });
-      } catch (_) {
-        /* still */
-      }
-    }
+    if (zustand.auffaelligSeit) await schreibeZustand({ auffaelligSeit: null, gemeldetAm: null });
     return { gemeldet: false, grund: befund.grund, zahlen: befund.zahlen };
   }
 
   const seit = zustand.auffaelligSeit || heute;
   const tageAuffaellig = Math.round((Date.parse(heute) - Date.parse(seit)) / 86400000) + 1;
 
-  try {
-    await datenbank().doc(ZUSTAND_DOKUMENT).set({ auffaelligSeit: seit }, { merge: true });
-  } catch (_) {
-    /* still */
-  }
+  /* 07.10.2026: Laesst sich der Beginn des Einbruchs nicht FESTHALTEN, zaehlt
+     die Wache morgen wieder ab 1 und erreicht die Schwelle nie — dieselbe
+     Stille wie beim unlesbaren Zustand, nur von der Schreibseite her. Deshalb
+     gilt ein gescheitertes Festhalten wie ein unlesbarer Zustand. */
+  if (!(await schreibeZustand({ auffaelligSeit: seit }))) zustandLesbar = false;
 
   /* Ist der Zustand unlesbar, ist `tageAuffaellig` keine Messung, sondern eine
      Annahme (immer 1). Die Schwelle darauf anzuwenden hiesse, den Ausfall in
@@ -218,11 +234,7 @@ async function pruefeLaufzeit({ melder, jetzt = Date.now() } = {}) {
 
   const text = baueMeldung(befund);
   if (typeof melder === "function") await melder(text);
-  try {
-    await datenbank().doc(ZUSTAND_DOKUMENT).set({ auffaelligSeit: seit, gemeldetAm: heute }, { merge: true });
-  } catch (_) {
-    /* still */
-  }
+  await schreibeZustand({ auffaelligSeit: seit, gemeldetAm: heute });
   return { gemeldet: true, grund: befund.grund, text, zahlen: befund.zahlen };
 }
 

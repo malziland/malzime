@@ -6,9 +6,11 @@
  * Funktionen hier entscheiden aber allein, ob ein Fehlschlag als Ueberlastung
  * gilt und ob ein Aufruf ohne Einstellungssatz ueberhaupt losgeht.
  *
- * `isRateLimitError` ist die Schwester von `isQuotaError` aus job-helfer.js —
- * dieselbe Frage, andere Ebene. Sie entscheidet, ob der Client ein
- * blocked.overloaded sieht und selbst neu versucht, oder einen harten Fehler.
+ * `isRateLimitError` ist seit BUG-2026-10-03-34 dieselbe Funktion wie
+ * `istUeberlast` in ueberlast.js (dort entschieden, hier nur der Name; die
+ * ganze Tabelle steht in ueberlast-entscheidung.test.js). Sie entscheidet, ob
+ * der Client ein blocked.overloaded sieht und selbst neu versucht, oder einen
+ * harten Fehler.
  */
 
 const { isRateLimitError } = require("../mistral-http");
@@ -25,12 +27,16 @@ describe("isRateLimitError", () => {
     expect(isRateLimitError({ status: 429 })).toBe(true);
   });
 
+  /* Bis BUG-2026-10-03-34 genuegte der Text der Meldung. Seitdem zaehlen nur
+     Code und Status — sonst wird aus einer Zeitueberschreitung "after
+     142900ms" eine Ueberlast. */
   test.each([
     ["Rate limit exceeded", "Wortlaut des Anbieters"],
     ["RATE_LIMITED", "Grossschreibung"],
     ["Request failed with status code 429", "Zahl in der Nachricht"],
-  ])("erkennt %s (%s)", (nachricht) => {
-    expect(isRateLimitError({ message: nachricht })).toBe(true);
+  ])("der Text allein entscheidet nicht: %s (%s)", (nachricht) => {
+    expect(isRateLimitError({ message: nachricht })).toBe(false);
+    expect(isRateLimitError({ message: nachricht, status: 429 })).toBe(true);
   });
 
   test.each([

@@ -9,12 +9,10 @@ import {
   stopScanAnim,
   showLimitBanner,
   showMaintenanceModal,
-  showQueueWaiting,
   resetQueueWaiting,
 } from "./ui.js";
 import { renderCurrentMode } from "./render.js";
 import * as liveAnzeige from "./live-anzeige.js";
-import { speichereRcTicket } from "./rc-ticket.js";
 import * as realitaetsCheck from "./realitaets-check.js";
 import { t, getLanguage } from "./i18n.js";
 import { logClientError } from "./error-logger.js";
@@ -22,6 +20,9 @@ import { logTelemetry } from "./telemetry-logger.js";
 import { PROFIL_FERTIG } from "./beast-lockruf.js";
 import { generateTraceId } from "./client-context.js";
 import { apiUrl } from "./api-basis.js";
+import { sleep, fetchWithTimeout } from "./netz-hilfen.js";
+import { pollJob, JOB_STATUS_URL, MAX_POLL_DURATION_MS } from "./auftrag-abfrage.js";
+import { vorschauAusErgebnisFallsNoetig, showPhotoDeletedNotice } from "./foto-vorschau.js";
 import { acquireWakeLock, releaseWakeLock, wakeLockStatus } from "./wake-lock.js";
 import {
   storeJobId,
@@ -31,18 +32,18 @@ import {
   getStoredJobId,
   getStoredResultToken,
 } from "./auftrag-speicher.js";
+import { meldeAuftragAb, meldeOffenenAuftragAb, alsAuftragDesTabs, holeAbmeldungenNach } from "./auftrag-abmelden.js";
 
 /* Wake-Lock und Auftragsgedächtnis liegen seit 10.09.2026 in eigenen Modulen
    (js/wake-lock.js, js/auftrag-speicher.js). app.js und die Tests holen diese
-   drei weiter hier. */
+   drei weiter hier. Seit 07.10.2026 ebenso herausgelöst: die Statusabfrage
+   (js/auftrag-abfrage.js), die Netz-Hilfen (js/netz-hilfen.js) und die zwei
+   Handgriffe an der Foto-Vorschau (js/foto-vorschau.js) — unverändert, nur an
+   eigenem Ort; hier bleibt der Ablauf: einreihen, abholen, wiederaufnehmen. */
 export { acquireWakeLock, clearStoredJobId, getStoredJobId };
 
 const PAGE_LOADED_AT = Date.now();
 const MIN_INTERACTION_MS = 2000;
-
-function sleep(ms) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 
 /* SICHTBAR HEISST GEMELDET (16.09.2026): Sechs Fehlermeldungen, die ein Kind
    auf dem Bildschirm sieht, gingen nie an die Fehlererfassung — die Auswertung
@@ -60,30 +61,6 @@ function meldeSichtbarenFehler(schluessel, phase, zusatz = {}) {
 function liveAbbrechenWegenFehler() {
   liveAnzeige.abbrechen();
   if (elements.facts) elements.facts.innerHTML = "";
-}
-
-/* Die Vorschau oben zeigt das Original ueber eine Objekt-URL. Kann der
-   Browser das Format nicht anzeigen (HEIC auf Android, 08.09.2026), bleibt
-   dort ein kaputtes Bildsymbol stehen, obwohl die Analyse laeuft. Dann zeigt
-   die Vorschau das, was der Browser aus dem Foto gemacht hat — dasselbe Bild,
-   das auch zum Server geht. Kann der Browser das Original anzeigen, aendert
-   sich nichts. */
-function vorschauAusErgebnisFallsNoetig(prepared) {
-  const img = elements.imagePreview && elements.imagePreview.querySelector("img");
-  if (!img || !prepared || !prepared.imageBase64) return;
-  const ersetzen = () => {
-    try {
-      URL.revokeObjectURL(img.src);
-    } catch (_) {
-      /* Objekt-URL war schon weg — egal. */
-    }
-    img.src = `data:${prepared.mimeType || "image/jpeg"};base64,${prepared.imageBase64}`;
-  };
-  if (img.complete) {
-    if (img.naturalWidth === 0) ersetzen();
-  } else {
-    img.addEventListener("error", ersetzen, { once: true });
-  }
 }
 
 /* v3.0.0: Das frühere Hinweis-Pop-up vor der Analyse ist ersatzlos entfernt
@@ -121,201 +98,85 @@ export async function analyzeImage() {
    Warteschlange gebaut wurde: lange offene Verbindungen brechen weg, und der
    Bildschirm-Wachhalter greift auf iPhones nicht. */
 
-/* Adressen aus api-basis.js: im Betrieb direkt Cloud Run (EU), sonst relativ. */
+/* Adresse aus api-basis.js: im Betrieb direkt Cloud Run (EU), sonst relativ.
+   Die Adresse der Statusabfrage und ihre Grenzen stehen bei der Abfrage
+   selbst (js/auftrag-abfrage.js). */
 const ENQUEUE_URL = apiUrl("/api/enqueue");
-const JOB_STATUS_URL = apiUrl("/api/job-status");
-const POLL_INTERVAL_MS = 2000;
-/* Aufeinanderfolgende job-status-Fehler, die der Poll-Loop toleriert, bevor
-   er aufgibt — ein Netz-Wackler darf den wartenden User nicht rauswerfen,
-   das Ergebnis liegt serverseitig sicher. */
-const MAX_POLL_FAILURES = 5;
-/* Gesamt-Obergrenze fürs Pollen. Bei randvollem Stundenbudget kann die ehrliche
-   Wartezeit darüber liegen (Extremfall: ~950 wartende Jobs ≈ 100 min ETA) —
-   dieser Deckel ist der bewusste Schlussstrich, damit kein Tab stundenlang
-   pollt. Der aufgegebene Job wird nach der Herzschlag-Karenz gereapt und gibt
-   seinen Stunden-Slot zurück. */
-const MAX_POLL_DURATION_MS = 30 * 60 * 1000;
-/* Timeouts für die Queue-Fetches: Der Client darf nie vor dem Server aufgeben
-   (enqueue-Function 60 s, job-status 10 s), aber ein Fetch, der nie settelt
-   (Netz-Blackhole auf Mobilgeräten), darf den Wartefluss nicht einfrieren —
-   Ein haengender Aufruf blockiert die Warteschlange damit nicht. */
+/* Zeitgrenze fuers Einreihen: Der Client darf nie vor dem Server aufgeben
+   (enqueue-Function 60 s), aber ein Aufruf, der nie endet (Netz-Blackhole auf
+   Mobilgeraeten), darf den Ablauf nicht einfrieren. */
 const ENQUEUE_TIMEOUT_MS = 90000;
-const POLL_TIMEOUT_MS = 30000;
 
-/* BUG-003 (offen seit dem KURZAUDIT 07/2026, geschlossen 08/2026): Der Timer
-   lief frueher im `.finally()` der fetch-Promise aus — also sobald die
-   Kopfzeilen da waren. Bricht die Verbindung danach mitten im Antwort-Rumpf ab,
-   ohne sich zu schliessen (typisch beim Zellenwechsel im Schulgebaeude), settelt
-   `resp.json()` nie und die Warteschleife friert lautlos ein.
-   Jetzt laeuft der Timer weiter, bis der Rumpf gelesen ist: `fetchWithTimeout`
-   liefert die Antwort samt einer `jsonMitTimeout()`-Methode, die den Abbruch
-   mit abdeckt. */
-function fetchWithTimeout(url, options, timeoutMs) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal }).then(
-    (resp) => {
-      const roh = typeof resp.json === "function" ? resp.json.bind(resp) : null;
-      /* Bei Fehlerantworten ist der Rumpf klein und wird ueber clone() gelesen —
-         da braucht es keinen laufenden Timer mehr. Nur im Erfolgsfall bleibt er
-         scharf, bis der Rumpf tatsaechlich gelesen ist. */
-      if (!resp.ok || !roh) clearTimeout(timer);
-      resp.jsonMitTimeout = roh
-        ? () => roh().finally(() => clearTimeout(timer))
-        : () => Promise.reject(new Error("Antwort ohne JSON-Rumpf"));
-      return resp;
-    },
-    (err) => {
-      clearTimeout(timer);
-      throw err;
-    }
-  );
+/* Das Abmelden eines Auftrags, den der Tab nicht mehr abholt
+   (PRIV-2026-10-03-57), steht in js/auftrag-abmelden.js. */
+
+/* ── Warten auf die Verbindung (BUG-2026-10-03-46) ──────────────────────
+   Nach MAX_POLL_FAILURES gescheiterten Abfragen sagt die Seite zu, die
+   Analyse erscheine automatisch. Eingeloest wurde das nur, wenn der Browser
+   „wieder online" meldete oder der Tab sichtbar wurde. In einem wackeligen
+   Schul-WLAN meldet sich der Browser aber oft gar nicht als getrennt (WLAN
+   verbunden, Internet weg) — dann kam nie ein Ereignis, und die Seite stand.
+
+   Deshalb prueft die Seite, solange sie wartet, von selbst nach: alle zwoelf
+   Sekunden EINE stille Statusabfrage. Erst wenn die gelingt, startet die
+   gewohnte Wiederaufnahme — bis dahin aendert sich auf dem Bildschirm nichts,
+   und die Fehlererfassung bekommt fuer das Weiterwarten keine Meldungen.
+
+   Die stille Abfrage geht OHNE Abhol-Ticket hinaus: Der Server nennt dann nur
+   den Stand und stellt kein Ergebnis zu (das Einmal-Ticket fuer den
+   Realitaets-Check und die Zustellfrist bleiben unberuehrt). Abgeholt wird
+   danach auf dem gewohnten Weg, mit Ticket.
+
+   Obergrenze wie beim Abfragen (MAX_POLL_DURATION_MS ab dem ersten Abriss):
+   Kein Tab fragt stundenlang. Danach bleiben „wieder online", der Tab-Wechsel
+   und das Neuladen als Wege zum Ergebnis. */
+const VERBINDUNG_PRUEF_ABSTAND_MS = 12000;
+const VERBINDUNG_PRUEF_TIMEOUT_MS = 10000;
+let verbindungsPruefer = null;
+let wartetAufVerbindungSeit = 0;
+
+function verbindungsPruefungStoppen() {
+  clearTimeout(verbindungsPruefer);
+  verbindungsPruefer = null;
 }
 
-/**
- * Wartet bis zum nächsten Poll — weckt aber sofort auf, sobald der Tab wieder
- * sichtbar wird. Hintergrund: Browser drosseln Timer in versteckten Tabs
- * massiv (am Handy frieren sie ganz ein). Ohne dieses Aufwecken holt ein
- * zurückkehrender Nutzer sein längst fertiges Ergebnis erst nach der
- * gedrosselten Verzögerung ab — das fühlt sich wie Minuten totes Warten an.
- * Mit dem visibilitychange-Wecker erscheint das Ergebnis ~1 s nach Rückkehr.
- * Der Listener wird pro Wartezyklus sauber wieder abgemeldet.
- */
-function waitForNextPoll(ms) {
-  return new Promise((resolve) => {
-    let settled = false;
-    let timer = null;
-    const onVisible = () => {
-      if (document.visibilityState === "visible") finish();
-    };
-    function finish() {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      document.removeEventListener("visibilitychange", onVisible);
-      resolve();
-    }
-    timer = setTimeout(finish, ms);
-    document.addEventListener("visibilitychange", onVisible);
-  });
+/* Wird gerufen, sobald ein Durchgang an der Verbindung haengen bleibt. */
+function verbindungsPruefungStarten() {
+  if (!wartetAufVerbindungSeit) wartetAufVerbindungSeit = Date.now();
+  verbindungsPruefungStoppen();
+  verbindungsPruefer = setTimeout(pruefeVerbindung, VERBINDUNG_PRUEF_ABSTAND_MS);
 }
 
-/**
- * Pollt /api/job-status bis zu einem Terminal-Status. Jeder Poll erneuert
- * serverseitig den Liveness-Herzschlag des Jobs.
- * @param {boolean} [liveErlaubt] v3.0: Live-Text-Wellen aus processing-
- *        Antworten an die Live-Anzeige durchreichen. Nur der frische Upload
- *        setzt das — die Wiederaufnahme nach einem Reload bleibt bewusst beim
- *        heutigen Verhalten (Scan-Animation bis zum fertigen Ergebnis).
- * @returns {Promise<object|null>} {result} | {error,reason} | {abandoned}
- *          — oder null, wenn ein neuer Upload den Lauf abgelöst hat.
- */
-async function pollJob(jobId, myId, resultToken, pollImmediately = false, liveErlaubt = false) {
-  let failures = 0;
-  let firstPoll = true;
-  const pollStart = Date.now();
-  for (;;) {
-    if (state.requestId !== myId) return null;
-    /* Beim Reload-Resume sofort EINMAL fragen statt erst nach 2s — ein bereits
-       fertiges Ergebnis ist dann in ~0,3s da, der „Nachdenk"-Balken blitzt nur
-       kurz auf statt 2s zu laufen. Danach normaler 2s-Takt. */
-    if (!(firstPoll && pollImmediately)) {
-      await waitForNextPoll(POLL_INTERVAL_MS);
+async function pruefeVerbindung() {
+  verbindungsPruefer = null;
+  const jobId = getStoredJobId();
+  if (!state.wartetAufVerbindung || state.uploadLaeuft || !jobId) return;
+  if (Date.now() - wartetAufVerbindungSeit > MAX_POLL_DURATION_MS) return;
+  const stand = state.requestId;
+  let erreichbar = false;
+  try {
+    const resp = await fetchWithTimeout(
+      `${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}`,
+      { cache: "no-store" },
+      VERBINDUNG_PRUEF_TIMEOUT_MS
+    );
+    if (resp.status === 404) {
+      /* Der Server antwortet, der Auftrag ist weg — die Wiederaufnahme raeumt auf. */
+      erreichbar = true;
+    } else if (resp.ok) {
+      /* Nur eine echte Antwort des eigenen Servers zaehlt. Die Anmeldeseite
+         eines Schul-WLANs antwortet auch mit „200", aber nicht mit einem Stand. */
+      const daten = await resp.jsonMitTimeout();
+      erreichbar = Boolean(daten && typeof daten.status === "string");
     }
-    firstPoll = false;
-    if (state.requestId !== myId) return null;
-    /* Hängt der Job dauerhaft → nicht endlos weiterpollen. */
-    if (Date.now() - pollStart > MAX_POLL_DURATION_MS) {
-      return { error: t("error.timeout") };
-    }
-
-    let data;
-    try {
-      const tokenParam = resultToken ? `&token=${encodeURIComponent(resultToken)}` : "";
-      /* PRIV-2026-09-10-06: traegt das Profil — nie zwischenspeichern, auch ohne Server-Kopfzeile. */
-      const resp = await fetchWithTimeout(
-        `${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}${tokenParam}`,
-        { cache: "no-store" },
-        POLL_TIMEOUT_MS
-      );
-      if (!resp.ok) {
-        /* 404 = Job existiert nicht (mehr) — kein transienter Fehler. */
-        if (resp.status === 404) return { error: t("error.queueFailed") };
-        throw new Error(`HTTP ${resp.status}`);
-      }
-      data = await resp.jsonMitTimeout();
-      failures = 0;
-      /* Zeitstempel des letzten erfolgreichen Polls: Daran erkennt die
-         Wiederaufnahme, ob diese Schleife noch lebt oder in einem eingefrorenen
-         fetch feststeckt. */
-      state.lastPollOk = Date.now();
-    } catch (_) {
-      failures += 1;
-      if (failures >= MAX_POLL_FAILURES) {
-        /* transient: Die Verbindung ist weg, NICHT der Job. Der läuft
-           serverseitig weiter und das Ergebnis liegt rund zwei Stunden bereit.
-           Der Aufrufer darf die Job-Nummer deshalb nicht wegwerfen — sonst ist
-           das fertige Profil unerreichbar, obwohl es existiert. */
-        return { error: t("error.connectionLost"), transient: true };
-      }
-      continue;
-    }
-
-    if (state.requestId !== myId) return null;
-
-    switch (data.status) {
-      case "queued":
-        showQueueWaiting("queued", data.position, data.etaSeconds);
-        break;
-      case "processing":
-        showQueueWaiting("processing");
-        /* v3.0: Liefert der Server schon Live-Text, tippt die Live-Anzeige ihn
-           mit — sie versteckt beim ersten Zeichen selbst die Scan-Animation.
-           Beide Felder gehen als EINE Welle ans Modul: `standard` (liveText)
-           und, sobald das Modell es schreibt, das Beast-Profil (liveTextBeast)
-           — angezeigt wird dort der Puffer des gerade gewählten Modus. Fehlt
-           das Feld noch, passiert hier nichts. Einen Schalter dafür gibt es
-           seit dem 10.09.2026 nicht mehr: Live-Text ist immer an. */
-        if (liveErlaubt && typeof data.liveText === "string") {
-          liveAnzeige.welle({
-            standard: data.liveText,
-            beast: typeof data.liveTextBeast === "string" ? data.liveTextBeast : null,
-            /* FEATURE-2026-08-29-01: Fertige Merkmale derselben Welle. Fehlen
-               sie (noch keine Karte fertig), bleibt es beim reinen Text. */
-            kartenStandard: Array.isArray(data.liveKartenStandard) ? data.liveKartenStandard : null,
-            kartenBeast: Array.isArray(data.liveKartenBeast) ? data.liveKartenBeast : null,
-            /* Neuversuch nach Verbindungsabriss: steigt die Zahl, faengt die
-               Anzeige von vorn an (live-anzeige.js). */
-            versuch: data.liveTextVersuch,
-          });
-        }
-        break;
-      case "done":
-        /* BUG-2026-08-13-FE-05: „fertig ohne Ergebnis" ist keine Zustellung.
-           Der Server schickt {status:"done", result:null, tokenRequired:true},
-           wenn ein Ergebnis existiert, aber das Abhol-Ticket fehlt (etwa wenn
-           sessionStorage beim zweiten Schreibvorgang warf). Vorher lief das als
-           Zustellung durch: startete die 15-Minuten-Frist und zeigte ein
-           Fehler-Banner statt still aufzuräumen. Jetzt wie ein Fehler behandelt. */
-        if (data.result == null) {
-          return { error: t("error.queueFailed"), reason: data.tokenRequired ? "token-fehlt" : "kein-ergebnis" };
-        }
-        /* KA-02: Das Einmal-Ticket für den Realitäts-Check kommt genau mit
-           der ersten Auslieferung (danach nie wieder) — sofort merken, damit
-           es Reload und Tab-Wiederaufnahme im 15-Minuten-Fenster überlebt. */
-        if (typeof data.rcTicket === "string") speichereRcTicket(data.rcTicket);
-        /* Fragte der Server neu, ohne dass die Anzeige den neuen Versuch sah
-           (kurz offline), wird der alte Text verworfen statt zu Ende getippt. */
-        if (liveErlaubt) liveAnzeige.versuchAbgleichen(data.liveTextVersuch);
-        return { result: data.result };
-      case "failed":
-        return { error: t("error.queueFailed"), reason: data.errorReason };
-      case "abandoned":
-        return { abandoned: true };
-      default:
-        return { error: t("error.queueFailed") };
-    }
+  } catch (_) {
+    /* Weiter keine Verbindung — gleich noch einmal pruefen. */
   }
+  /* Waehrend der Abfrage kann ein neues Foto, „wieder online" oder ein
+     Tab-Wechsel uebernommen haben. Dann ist hier nichts mehr zu tun. */
+  if (!state.wartetAufVerbindung || state.requestId !== stand || getStoredJobId() !== jobId) return;
+  if (erreichbar) resumeQueueJob({ force: true });
+  else verbindungsPruefungStarten();
 }
 
 /* Wie lange ohne erfolgreiche Statusabfrage, bis der Durchgang als
@@ -369,7 +230,28 @@ export function initHintergrundWiederaufnahme() {
     /* War die Seite lange genug weg, gilt das Geraet als weitergereicht. */
     if (seitWannVerborgen && Date.now() - seitWannVerborgen > UEBERGABE_PAUSE_MS) {
       seitWannVerborgen = 0;
+      /* Wartete die Seite auf die Verbindung, gibt sie den Auftrag jetzt auf
+         (unten) — dann soll der Server ihn gleich verwerfen statt erst nach
+         seiner Karenz. Laeuft dagegen noch ein Durchgang, fragt er mit seiner
+         eigenen Nummer weiter und bekommt sein Ergebnis: Ihn abzumelden hiesse,
+         einem Kind in einer langen Schlange den Platz zu nehmen. Er bleibt
+         „in Arbeit" (auftrag-abmelden.js), auch wenn die Nummer hier faellt. */
+      if (state.wartetAufVerbindung) meldeOffenenAuftragAb();
       clearStoredJobId();
+      /* BUG-2026-10-03-46: Wartete die Seite gerade auf die Verbindung, ist
+         mit der Auftragsnummer auch die Zusage „erscheint automatisch"
+         hinfaellig — abgeholt wird ab jetzt nichts mehr (das Geraet gilt als
+         weitergereicht, der Naechste soll das Profil nicht sehen). Die Zusage
+         darf dann nicht stehen bleiben: Die Meldung sagt, was zu tun ist. */
+      if (state.wartetAufVerbindung) {
+        state.wartetAufVerbindung = false;
+        verbindungsPruefungStoppen();
+        liveAbbrechenWegenFehler();
+        stopScanAnim(true);
+        textSetzen(elements.scanText, "");
+        setStatus(t("error.queueAbandoned"), undefined, "error.queueAbandoned");
+        meldeSichtbarenFehler("error.queueAbandoned", "uebergabe-pause");
+      }
       return;
     }
     seitWannVerborgen = 0;
@@ -410,6 +292,8 @@ export function initHintergrundWiederaufnahme() {
      Schleife noch lebt; hier ist der Ausloeser eindeutig, und jede Sekunde
      Zoegern ist eine Sekunde vor einer toten Seite. */
   window.addEventListener("online", () => {
+    /* Eine Abmeldung, die ohne Netz hinausging, wird jetzt nachgeholt. */
+    holeAbmeldungenNach();
     if (state.uploadLaeuft) return;
     if (!getStoredJobId()) return;
     /* `wartetAufVerbindung` ist hier der eigentliche Fall: Der Durchgang hat
@@ -421,40 +305,15 @@ export function initHintergrundWiederaufnahme() {
   });
 }
 
-/* DATENSCHUTZ-ENTSCHEIDUNG (bewusst): Nach einem Reload zeigen wir das
-   hochgeladene Foto NICHT wieder. Es wird unmittelbar nach der Analyse
-   serverseitig gelöscht und absichtlich NIRGENDS — auch nicht im Browser —
-   zwischengespeichert; Datensparsamkeit hat Vorrang. Statt einer leeren Lücke
-   setzen wir an die Stelle des Fotos einen kurzen, positiven Datenschutz-
-   Hinweis: der „verschwundene" Anblick wird so zum Lerneffekt. */
-function showPhotoDeletedNotice() {
-  if (!elements.imagePreview) return;
-  const note = document.createElement("div");
-  note.className = "photo-deleted-note";
-  note.setAttribute("role", "note");
-
-  /* Das Schloss-Symbol kommt rein dekorativ aus dem CSS (::before) — so bleibt
-     kein hartcodierter Text im JS (i18n-Guardian), und Screenreader lesen es
-     nicht vor. Der eigentliche Text läuft über t() (DE/EN). */
-  const text = document.createElement("span");
-  text.className = "photo-deleted-text";
-  const strong = document.createElement("strong");
-  strong.textContent = t("reload.photoTitle");
-  text.appendChild(strong);
-  text.appendChild(document.createTextNode(" " + t("reload.photoBody")));
-
-  note.appendChild(text);
-  elements.imagePreview.innerHTML = "";
-  elements.imagePreview.appendChild(note);
-}
-
 /**
  * Rendert das fertige Queue-Ergebnis (renderCurrentMode → Success-Telemetrie).
  * v3.0.0: Lief Live-Text, wird VOR dem Rendern der Rest-Puffer im
  * Schnellvorlauf ausgetippt — deshalb async. Das Rendern samt Verdecken der
  * Enthüllung bleibt danach synchron im selben Frame.
+ * @param {object|null} prepared Die Aufbereitung des Fotos, zu dem dieses
+ *        Ergebnis gehört (Ort und Aufnahmedatum daraus bleiben im Browser).
  */
-async function renderQueueResult(data, myId, traceId, timings) {
+async function renderQueueResult(data, myId, traceId, timings, prepared) {
   /* PRIV-107: Ab der ersten Zustellung läuft die Wiederholungs-Frist. */
   markiereErgebnisZustellung();
   if (!data) {
@@ -465,14 +324,17 @@ async function renderQueueResult(data, myId, traceId, timings) {
     return;
   }
   /* Client-seitige Daten injizieren — GPS/dateTimeOriginal erreichen nie unsere
-     Server. Nach einem Reload fehlt state.lastPrepared; dann bleibt GPS leer. */
+     Server. Nach einem Reload fehlt die Aufbereitung; dann bleibt GPS leer.
+     BUG-2026-10-03-45: Eingesetzt wird die Aufbereitung DIESES Durchgangs,
+     die der Aufrufer mitgibt — nicht, was gerade im gemeinsamen Zustand
+     steht. */
   if (!data.exif) data.exif = {};
-  if (state.lastPrepared && state.lastPrepared.gps) {
-    data.exif.gpsLatitude = state.lastPrepared.gps.latitude;
-    data.exif.gpsLongitude = state.lastPrepared.gps.longitude;
+  if (prepared && prepared.gps) {
+    data.exif.gpsLatitude = prepared.gps.latitude;
+    data.exif.gpsLongitude = prepared.gps.longitude;
   }
-  if (state.lastPrepared && state.lastPrepared.dateTimeOriginal) {
-    data.exif.dateTimeOriginal = state.lastPrepared.dateTimeOriginal;
+  if (prepared && prepared.dateTimeOriginal) {
+    data.exif.dateTimeOriginal = prepared.dateTimeOriginal;
   }
 
   const renderStart = Date.now();
@@ -562,18 +424,52 @@ async function renderQueueResult(data, myId, traceId, timings) {
   finishRender();
 }
 
+/* STRUCT-2026-10-03-54: Der EINE Ort, an dem ein Durchgang seine Flaggen
+   zuruecksetzt. `analyzeImageQueued` und `resumeQueueJob` rufen ihn aus jedem
+   Ausgang — die fruehen direkt vor ihrem `return`, alle uebrigen ueber den
+   `finally`-Block. Bleibt an einem Ausgang eine Flagge stehen, nimmt die
+   Seite kein Foto mehr an oder holt kein Ergebnis mehr ab, ohne Meldung;
+   public/__tests__/analyse-ausgaenge.test.js haelt deshalb fest, dass hier
+   und nur hier zurueckgesetzt wird.
+
+   Nur der JUENGSTE Durchgang setzt zurueck: Ist er abgeloest, gehoeren die
+   Flaggen schon dem Nachfolger.
+
+   `wartetAufVerbindung` gehoert bewusst NICHT dazu: Der Anker muss das Ende
+   des Durchgangs ueberleben (state.js); gesetzt und geloescht wird er dort,
+   wo sich die Lage der Verbindung zeigt. */
+function beendeAnalyse(myId) {
+  if (state.requestId !== myId) return;
+  state.isAnalyzing = false;
+  state.uploadLaeuft = false;
+  /* Der Bildschirm-Wachhalter gehoert dem juengsten Durchgang: Ein abgeloester
+     gibt ihn nicht frei, sonst koennte das Geraet waehrend der Analyse des
+     naechsten Fotos einschlafen. Frei gibt, wer als Letzter fertig wird — auf
+     JEDEM Ausgang, auch den fruehen (Datei fehlt, Datei zu gross): Dort gab
+     ihn sonst niemand frei, wenn der Durchgang davor abgeloest war. Ohne
+     Wachhalter ist der Aufruf wirkungslos. */
+  releaseWakeLock();
+}
+
 async function analyzeImageQueued() {
   state.isAnalyzing = true;
   /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
      erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
      der Anker immer die Lage von JETZT und nicht die von vorhin. */
   state.wartetAufVerbindung = false;
+  /* Neues Foto, neuer Auftrag: Das Nachpruefen fuer den vorigen endet, und
+     seine Obergrenze beginnt fuer den neuen von vorn. */
+  verbindungsPruefungStoppen();
+  wartetAufVerbindungSeit = 0;
   /* UX-001 (Audit 2026-08-10): Ab hier gehoert der Bildschirm dem NEUEN Foto.
      Die Job-Nummer des vorigen Durchgangs bleibt nach einem Erfolg bewusst
      stehen (damit ein Reload das Ergebnis wiederholen kann) — sie darf aber
      nicht mehr abgeholt werden, sobald ein neues Foto unterwegs ist. Ohne diese
      zwei Zeilen holte ein Tab-Wechsel waehrend des Uploads das ALTE Ergebnis
-     und zeigte es neben dem NEUEN Foto; das neue Foto wurde nie hochgeladen. */
+     und zeigte es neben dem NEUEN Foto; das neue Foto wurde nie hochgeladen.
+     Was der Tab bis hierher gemerkt hatte, holt niemand mehr ab — also
+     abmelden, gleich welcher Durchgang den Auftrag zuletzt fuehrte. */
+  meldeOffenenAuftragAb();
   clearStoredJobId();
   state.uploadLaeuft = true;
   state.lastPollOk = Date.now();
@@ -583,6 +479,10 @@ async function analyzeImageQueued() {
   const traceId = generateTraceId();
   state.lastTraceId = traceId;
   const timings = {};
+  /* PRIV-2026-10-03-57: Der Abbruch-Schalter dieses Durchgangs. Solange der
+     Upload laeuft, steht er in `state.currentAbortController`; die Wahl eines
+     anderen Fotos (app.js, demo.js) loest ihn aus und beendet den Upload. */
+  const abbruch = new AbortController();
 
   setStatus("");
   /* v3.0: Reste eines vorigen Live-Erlebnisses (Karte, Verdeckungen) räumen —
@@ -618,31 +518,28 @@ async function analyzeImageQueued() {
 
   const file = state.lastFile || elements.fileInput.files[0];
   if (!file) {
-    stopScanAnim();
+    stopScanAnim(true);
     setStatus(t("error.noFile"), undefined, "error.noFile");
     meldeSichtbarenFehler("error.noFile", "datei-fehlt", { requestId: String(myId), traceId });
-    state.isAnalyzing = false;
-    state.uploadLaeuft = false;
+    beendeAnalyse(myId);
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
-    stopScanAnim();
+    stopScanAnim(true);
     setStatus(t("error.fileTooLarge"), undefined, "error.fileTooLarge");
     meldeSichtbarenFehler("error.fileTooLarge", "datei-zu-gross", {
       requestId: String(myId),
       traceId,
       fileSizeKb: Math.round(file.size / 1024),
     });
-    state.isAnalyzing = false;
-    state.uploadLaeuft = false;
+    beendeAnalyse(myId);
     return;
   }
   /* Honeypot — Bots füllen unsichtbare Felder aus */
   const hp = document.getElementById("website");
   if (hp && hp.value) {
-    stopScanAnim();
-    state.isAnalyzing = false;
-    state.uploadLaeuft = false;
+    stopScanAnim(true);
+    beendeAnalyse(myId);
     return;
   }
   /* Mindest-Interaktionszeit — kein Mensch lädt in < 2s hoch */
@@ -653,47 +550,71 @@ async function analyzeImageQueued() {
   try {
     await acquireWakeLock();
 
-    /* Bild komprimieren + EXIF extrahieren (client-seitig) */
+    /* Bild komprimieren + EXIF extrahieren (client-seitig).
+       BUG-2026-10-03-45: Das Ergebnis bleibt in einer eigenen Variable, bis
+       feststeht, dass dieser Durchgang noch der juengste ist. Die Aufbereitung
+       eines grossen Fotos dauert; waehlt jemand in der Zeit ein anderes, darf
+       das ueberholte weder den gemeinsamen Zustand noch die Vorschau anfassen
+       — sonst stuenden Ort und Aufnahmedatum des ersten Fotos im Ergebnis des
+       zweiten. */
     const prepareStart = Date.now();
-    if (!state.lastPrepared) {
-      state.lastPrepared = await prepareImage(file, { auswahlZeit: state.auswahlZeit });
+    let prepared = state.lastPrepared;
+    if (!prepared) {
+      prepared = await prepareImage(file, { auswahlZeit: state.auswahlZeit });
     }
     timings.prepareImageMs = Date.now() - prepareStart;
-    vorschauAusErgebnisFallsNoetig(state.lastPrepared);
     if (state.requestId !== myId) return;
+    state.lastPrepared = prepared;
+    vorschauAusErgebnisFallsNoetig(prepared);
 
     /* Geocoding parallel starten wenn GPS vorhanden */
-    if (state.lastPrepared.gps) {
-      startGeocoding(state.lastPrepared.gps.latitude, state.lastPrepared.gps.longitude);
+    if (prepared.gps) {
+      startGeocoding(prepared.gps.latitude, prepared.gps.longitude);
     }
 
     /* ── Job einreihen ── */
     const enqueueStart = Date.now();
+    state.currentAbortController = abbruch;
     const enqueueResp = await fetchWithTimeout(
       ENQUEUE_URL,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageBase64: state.lastPrepared.imageBase64,
-          exif: state.lastPrepared.exif,
+          imageBase64: prepared.imageBase64,
+          exif: prepared.exif,
           /* BUG-2026-08-19-01: Hier standen feste Werte. Der Canvas liefert
              nicht immer JPEG (siehe public/js/exif.js) — die feste Behauptung
              brachte am 19.08. zwei Uploads mit HTTP 400 zu Fall. Gemeldet wird
              jetzt, was tatsaechlich herauskam. */
-          mimeType: state.lastPrepared.mimeType || "image/jpeg",
-          filename: state.lastPrepared.dateiname || "upload.jpg",
+          mimeType: prepared.mimeType || "image/jpeg",
+          filename: prepared.dateiname || "upload.jpg",
           lang: getLanguage(),
           traceId,
         }),
       },
-      ENQUEUE_TIMEOUT_MS
+      ENQUEUE_TIMEOUT_MS,
+      abbruch
     );
     timings.enqueueMs = Date.now() - enqueueStart;
-    if (state.requestId !== myId) return;
+    /* Der Upload ist durch — ab hier gibt es nichts mehr abzubrechen. */
+    if (state.currentAbortController === abbruch) state.currentAbortController = null;
+    if (state.requestId !== myId) {
+      /* Abgeloest, aber der Server hat das Foto schon angenommen: Den Auftrag
+         holt niemand mehr ab — abmelden statt ihn analysieren zu lassen. */
+      if (enqueueResp.ok) {
+        try {
+          const verwaist = await enqueueResp.jsonMitTimeout();
+          meldeAuftragAb(verwaist && verwaist.jobId, verwaist && verwaist.resultToken);
+        } catch (_) {
+          /* Antwort nicht lesbar — der Server raeumt nach seiner Karenz. */
+        }
+      }
+      return;
+    }
 
     if (!enqueueResp.ok) {
-      stopScanAnim();
+      stopScanAnim(true);
       let parsed = null;
       try {
         parsed = await enqueueResp.clone().json();
@@ -701,8 +622,10 @@ async function analyzeImageQueued() {
         /* kein JSON-Body */
       }
       if (enqueueResp.status === 429 && parsed && parsed.blocked === "limit") {
+        /* UX-2026-10-03-47: Nur der Limit-Hinweis, keine zweite Zeile. Er
+           nennt Ursache und Wartezeit; „Zu viele Anfragen aus eurem Netzwerk.
+           Wartet kurz …" daneben widersprach ihm. */
         showLimitBanner(parsed.retryAfterSeconds || 600);
-        setStatus(t("error.rateLimit"), traceId, "error.rateLimit");
       } else if (enqueueResp.status === 429 && parsed && parsed.blocked === "queueFull") {
         /* UX-2026-08-13-FE-02: Die volle Warteschlange ist im Workshop-Burst der
            ERWARTETE Fall, nicht ein Serverfehler. Vorher fiel er in den else-Zweig
@@ -730,6 +653,14 @@ async function analyzeImageQueued() {
         setStatus(t("error.imageTooLarge"), traceId, "error.imageTooLarge");
       } else if (enqueueResp.status === 400) {
         setStatus(t("error.invalidFormat"), traceId, "error.invalidFormat");
+      } else if (enqueueResp.status === 429) {
+        /* UX-2026-10-03-47: Jedes uebrige 429 ist die Sperre je
+           Netzwerk-Adresse (der Server antwortet dort ohne das Merkmal
+           `blocked`). Das ist der Fall „zu viele Anfragen aus eurem Netzwerk"
+           — nicht „KI ueberlastet": Eine Klasse hinter einer gemeinsamen
+           Schul-Adresse bekaeme sonst die falsche Ursache und den falschen
+           Rat. */
+        setStatus(t("error.rateLimit"), traceId, "error.rateLimit");
       } else {
         setStatus(t("error.serverBusy"), traceId, "error.serverBusy");
       }
@@ -747,7 +678,7 @@ async function analyzeImageQueued() {
     const enqueueData = await enqueueResp.jsonMitTimeout();
     const jobId = enqueueData && enqueueData.jobId;
     if (!jobId) {
-      stopScanAnim();
+      stopScanAnim(true);
       setStatus(t("error.queueFailed"), traceId, "error.queueFailed");
       meldeSichtbarenFehler("error.queueFailed", "einreihen-ohne-auftrag", {
         requestId: String(myId),
@@ -759,6 +690,8 @@ async function analyzeImageQueued() {
     }
     /* PRIV-003: Abhol-Ticket vom Server merken + bei jedem Poll mitschicken. */
     const resultToken = enqueueData.resultToken || null;
+    /* Kam inzwischen ein anderes Foto, gehoert dieser Auftrag keinem mehr. */
+    if (state.requestId !== myId) return void meldeAuftragAb(jobId, resultToken);
     storeJobId(jobId, resultToken);
     /* Ab hier gibt es wieder eine Job-Nummer, die zum aktuellen Foto gehoert —
        die Hintergrund-Wiederaufnahme darf also wieder uebernehmen. */
@@ -767,10 +700,16 @@ async function analyzeImageQueued() {
     /* ── Auf das Ergebnis pollen (jeder Poll = Liveness-Herzschlag) ──
        liveErlaubt: nur hier, beim frischen Upload, darf die Live-Anzeige
        mittippen (v3.0) — die Wiederaufnahme unten bleibt beim heutigen Bild. */
-    const outcome = await pollJob(jobId, myId, resultToken, false, true);
+    const abfrage = () => pollJob(jobId, myId, resultToken, false, true);
+    const outcome = await alsAuftragDesTabs(jobId, resultToken, abfrage);
+    /* Abgeloest waehrend des Wartens: Der Nachfolger fuehrt Buch (auftrag-abmelden.js). */
     if (state.requestId !== myId) return;
 
-    stopScanAnim();
+    /* UX-2026-10-03-49: „Analyse abgeschlossen" wird nur angesagt, wenn ein
+       Ergebnis da ist. Auf jedem Fehlerweg stoppt die Wartefigur leise — die
+       Fehlermeldung traegt ihre Ansage selbst (`role="alert"`); davor
+       „abgeschlossen" zu hoeren, waere falsch. */
+    stopScanAnim(!(outcome && outcome.result));
     textSetzen(elements.scanText, "");
 
     if (!outcome) return;
@@ -798,12 +737,13 @@ async function analyzeImageQueued() {
       else liveAbbrechenWegenFehler();
       /* Anker fuer die Wiederaufnahme — siehe state.js. */
       state.wartetAufVerbindung = Boolean(outcome.transient);
+      if (outcome.transient) verbindungsPruefungStarten();
       /* Nur aufräumen, wenn der Job WIRKLICH weg ist (404, failed, abgelaufen).
          Bei einem Verbindungsabbruch bleibt die Nummer stehen: Sie ist der
          einzige Weg zurück zum fertigen Ergebnis — über die automatische
          Wiederaufnahme oder ein Neuladen der Seite. */
       if (!outcome.transient) clearStoredJobId();
-      setStatus(outcome.error, traceId);
+      setStatus(t(outcome.error), traceId, outcome.error);
       logClientError(new Error(outcome.reason || "queue_failed"), {
         phase: "queue-poll",
         durationMs: Date.now() - analyzeStartTime,
@@ -823,12 +763,16 @@ async function analyzeImageQueued() {
     timings.totalMs = Date.now() - analyzeStartTime;
     /* Das Ergebnis rendert direkt in die Dramaturgie hinein — nach dem
        Schnellvorlauf des restlichen Live-Texts (v3.0.0, daher await). */
-    await renderQueueResult(outcome.result, myId, traceId, timings);
+    await renderQueueResult(outcome.result, myId, traceId, timings, prepared);
   } catch (err) {
     if (state.requestId !== myId) return;
+    /* PRIV-2026-10-03-57: Der Upload wurde beendet, weil ein anderes Foto
+       gewaehlt wurde. Das ist kein Fehler — keine Meldung, kein Eintrag in
+       der Fehlererfassung; der Bildschirm gehoert schon der neuen Auswahl. */
+    if (abbruch.signal.aborted) return;
     /* v3.0: auch beim harten Fehler keinen halben Live-Text stehen lassen. */
     liveAbbrechenWegenFehler();
-    stopScanAnim();
+    stopScanAnim(true);
     textSetzen(elements.scanText, "");
 
     let phase;
@@ -861,11 +805,9 @@ async function analyzeImageQueued() {
       kopfLesetest: err.kopfLesetest,
     });
   } finally {
-    releaseWakeLock();
-    if (state.requestId === myId) {
-      state.isAnalyzing = false;
-      state.uploadLaeuft = false;
-    }
+    /* Der Schalter gilt nur, solange dieser Durchgang hochlaedt. */
+    if (state.currentAbortController === abbruch) state.currentAbortController = null;
+    beendeAnalyse(myId);
   }
 }
 
@@ -896,10 +838,18 @@ export async function resumeQueueJob({ force = false } = {}) {
   const resultToken = getStoredResultToken();
 
   state.isAnalyzing = true;
+  /* Stand bis eben die Zusage „erscheint automatisch" auf dem Bildschirm? */
+  const nachAbriss = state.wartetAufVerbindung;
+  /* Mitten im Lauf (Zusage stand da, oder die Seite kommt aus dem Hintergrund
+     zurueck) oder stiller Seitenstart? Nur `force` und die Zusage kommen von
+     einem Kind, das eben noch gewartet hat. */
+  const mittenImLauf = nachAbriss || force;
   /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
      erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
      der Anker immer die Lage von JETZT und nicht die von vorhin. */
   state.wartetAufVerbindung = false;
+  /* Solange dieser Anlauf laeuft, fragt er selbst — das Nachpruefen ruht. */
+  verbindungsPruefungStoppen();
   const myId = ++state.requestId;
   const traceId = generateTraceId();
   const startTime = Date.now();
@@ -926,8 +876,27 @@ export async function resumeQueueJob({ force = false } = {}) {
   if (setztLiveTextFort) {
     liveAnzeige.fortsetzen();
     setStatus("");
+    /* UX-2026-10-03-49: Riss die Verbindung ab, bevor das erste Zeichen
+       getippt war (der Anlauf dauert, oder fuer die gewaehlte Profil-Art
+       liegt noch kein Text vor), steht nach dem Fortsetzen nichts auf dem
+       Bildschirm: keine Live-Karte, keine Wartefigur, keine Meldung — obwohl
+       die Analyse laeuft. Dann zeigt die Wartefigur, dass etwas geschieht;
+       das erste getippte Zeichen blendet sie wie gewohnt aus. Leise: Das ist
+       kein neuer Analyse-Start. */
+    if (!elements.liveKarte || !elements.liveKarte.classList.contains("active")) {
+      startScanAnim(false, true);
+      textSetzen(elements.scanText, t("scan.resume"));
+    }
   } else {
     liveAnzeige.zuruecksetzen();
+    /* BUG-2026-10-03-45: Ohne pausierten Lauf fragt die Wiederaufnahme ohne
+       Live-Text weiter — die Merkmal-Karten fuellen sich bis zum Ergebnis
+       nicht mehr. Halb gefuellte Karten neben der Wartefigur saehen aus wie
+       ein haengender Lauf; das fertige Ergebnis baut sie vollstaendig neu. */
+    if (elements.facts) elements.facts.innerHTML = "";
+    /* BUG-2026-10-03-46: Auch hier die Statuszeile leeren — sonst steht
+       „Verbindung unterbrochen" neben der Wartefigur, die gerade abholt. */
+    setStatus("");
     resetQueueWaiting();
     startScanAnim(false);
     /* FIX 1 (v3.0.1): Auch die Wiederaufnahme startet nie mit leerem Text. */
@@ -938,10 +907,12 @@ export async function resumeQueueJob({ force = false } = {}) {
     /* pollImmediately=true: das fertige Ergebnis sofort holen, ohne 2s-Vorlauf.
        liveErlaubt nur im Fall (a): Nur dort gibt es einen Puffer, an den die
        naechste Welle anschliessen kann. */
-    const outcome = await pollJob(jobId, myId, resultToken, true, setztLiveTextFort);
+    const abfrage = () => pollJob(jobId, myId, resultToken, true, setztLiveTextFort);
+    const outcome = await alsAuftragDesTabs(jobId, resultToken, abfrage);
     if (state.requestId !== myId) return;
 
-    stopScanAnim();
+    /* Wie oben: die Abschluss-Ansage nur mit Ergebnis. */
+    stopScanAnim(!(outcome && outcome.result));
     textSetzen(elements.scanText, "");
 
     /* BUG-2026-08-17-03: Ein ABGERISSENER Versuch darf die Job-Nummer nicht
@@ -954,7 +925,8 @@ export async function resumeQueueJob({ force = false } = {}) {
     if (outcome && outcome.error && outcome.transient) {
       if (!liveAnzeige.pausieren()) startScanAnim(false);
       state.wartetAufVerbindung = true;
-      setStatus(outcome.error, traceId, "error.connectionLost");
+      verbindungsPruefungStarten();
+      setStatus(t(outcome.error), traceId, outcome.error);
       meldeSichtbarenFehler("error.connectionLost", "resume-verbindung", { requestId: String(myId), traceId });
       return;
     }
@@ -966,7 +938,22 @@ export async function resumeQueueJob({ force = false } = {}) {
     if (!outcome || outcome.abandoned || outcome.error) {
       liveAbbrechenWegenFehler();
       clearStoredJobId();
-      setStatus("");
+      /* ANDERS mitten im Lauf — nach einem Verbindungsabriss stand eben noch
+         „deine Analyse laeuft weiter — sie erscheint automatisch", nach der
+         Rueckkehr aus dem Hintergrund lief die Wartefigur. Ist der Auftrag
+         inzwischen gescheitert oder verworfen, bekommt das Kind eine Antwort
+         statt einer leeren Zeile, und die Fehlererfassung auch. */
+      const schluessel =
+        outcome && outcome.abandoned ? "error.queueAbandoned" : (outcome && outcome.error) || "error.queueFailed";
+      /* Auch der stille Seitenstart meldet sich, wenn die SEITE den Auftrag
+         aufgibt (`aufgegeben`, auftrag-abmelden.js): Dann hat das Kind vor der
+         Wartefigur gesessen, und sie verschwaende sonst wortlos. */
+      const melden = mittenImLauf || Boolean(outcome && outcome.aufgegeben);
+      setStatus(melden ? t(schluessel) : "", melden ? traceId : undefined, melden ? schluessel : undefined);
+      if (melden) {
+        const phase = nachAbriss ? "resume-nach-abriss" : force ? "resume-aus-hintergrund" : "resume-aufgegeben";
+        meldeSichtbarenFehler(schluessel, phase, { requestId: String(myId), traceId });
+      }
       return;
     }
     /* Erfolg: Ticket behalten, damit auch ein weiterer Reload das Ergebnis
@@ -982,15 +969,19 @@ export async function resumeQueueJob({ force = false } = {}) {
        ändert das nichts, denn gespeichert wird nach wie vor nirgends etwas;
        es wird nur nicht weggeworfen, was ohnehin schon angezeigt wird. */
     if (!elements.imagePreview?.querySelector("img")) showPhotoDeletedNotice();
-    await renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime });
+    /* Die Wiederaufnahme hat keine eigene Aufbereitung. Lief die Seite durch,
+       steht die des Fotos noch im Zustand; nach einem Neuladen ist er leer. */
+    await renderQueueResult(outcome.result, myId, traceId, { totalMs: Date.now() - startTime }, state.lastPrepared);
   } catch (err) {
     if (state.requestId !== myId) return;
     clearStoredJobId();
-    stopScanAnim();
+    stopScanAnim(true);
     textSetzen(elements.scanText, "");
     setStatus(""); /* stiller Fehler beim Seitenstart — kein Banner */
     logClientError(err, { phase: "queue-resume", requestId: String(myId), traceId });
   } finally {
-    if (state.requestId === myId) state.isAnalyzing = false;
+    /* Gibt auch den Bildschirm-Wachhalter frei, wenn diese Wiederaufnahme der
+       juengste Durchgang ist (beendeAnalyse). */
+    beendeAnalyse(myId);
   }
 }

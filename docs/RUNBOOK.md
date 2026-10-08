@@ -160,6 +160,42 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    kostenfreie Proben gegen die Live-API (Upload-Ablehnung 400 mit echter
    Validierungs-Meldung, Honeypot 403, Admin-Zugriffsschutz 403, Stats 200) —
    alle enden vor KI-Aufruf und Stundenzähler. Notschalter `SKIP_SMOKE=1`.
+   Im Wartungsmodus können sie nicht messen; `deploy.sh` gibt dann trotzdem
+   seine Schlussbilanz aus und endet mit dem Rückgabewert 2 (siehe „Die
+   Auslieferung als Kette").
+
+## Die Auslieferung als Kette
+
+`deploy.sh` ist ein Glied, nicht der ganze Ablauf. Ausgeliefert wird als Kette
+im **Wartungsmodus**: Solange Website und Server wechseln, beginnt keine
+Analyse, die auf halbem Weg einen anderen Stand vorfände. Die Kette ist ein
+kurzes Ablaufskript je Auslieferung; es ruft nur die Werkzeuge aus diesem
+Repository auf, in dieser Reihenfolge:
+
+| Schritt | Was geschieht | Womit | Hält an, wenn |
+|---|---|---|---|
+| 1 | Warten, bis die Freigabe erreicht ist — dieselbe Regel, die `deploy.sh` anwendet: sechs Pflicht-Checks für den Commit auf `main` (mit der Baum-Regel aus dem Abschnitt „Deploy"), Herkunftsnachweis des HEIC-Dekoders, ein Nachtlauf innerhalb der Grenze aus `deploy.sh`. `deploy.sh` wartet auf nichts davon, es bricht ab; deshalb wartet die Kette **vor** dem Wartungsmodus. Ist der Nachtlauf zu alt, stößt sie ihn an (`gh workflow run sicherheit-nachts.yml`) | `gh` (lesend, bis auf diesen einen Start) | ein Pflicht-Check rot ist oder die Freigabe ausbleibt |
+| 2 | Einstellungssatz: Datenbank gegen Repository | `node scripts/betriebsprofil-vergleichen.js` (lesend) | beide nicht gleich sind |
+| 3 | Wartungsmodus ein, mit Text für die Besucher; das Skript misst nach | `sh scripts/wartungsmodus.sh ein "…"` | der Zustand nicht bestätigt wird |
+| 4 | Ausliefern. Die Rückfrage entfällt, weil die Freigabe vorliegt — das steht als `DEPLOY_JA(Rueckfrage)` in der Schlussbilanz | `DEPLOY_JA=1 ./scripts/deploy.sh` | siehe Rückgabewerte unten |
+| 5 | Wartungsmodus aus — **immer**, auch wenn Schritt 4 gescheitert ist | `sh scripts/wartungsmodus.sh aus` | — (ein Fehlschlag hier ist selbst ein Fehler der Kette) |
+| 6 | Live-Beweise, erst jetzt messbar: Kennung des ausgelieferten Stands, Nachrechnung der ausgelieferten Dateien, die Live-Proben | `https://malzi.me/build-info.json`, `sh scripts/pruefe-live.sh`, `./scripts/live-smoke.sh <Cache-Kennung>` | einer davon rot ist — dann ist ausgeliefert und der Rückweg zu prüfen („Rollback-Hebel") |
+| 7 | Nachtrag per Pull Request: Cache-Kennung, `public/build-info.json`, CHANGELOG-Stempel, `docs/VERIFICATION.md` | Abschnitt „Deploy", Punkt 5 | — |
+
+**Rückgabewerte von `deploy.sh`** — die Kette entscheidet daran, ob Schritt 4
+gelungen ist:
+
+| Wert | Bedeutung | Was die Kette tut |
+|---|---|---|
+| `0` | ausgeliefert, Live-Proben grün (nur außerhalb des Wartungsmodus möglich) | weiter |
+| `2` | ausgeliefert, die Schlussbilanz ist ausgegeben — nur die Live-Proben konnten nicht messen, weil der Wartungsmodus an ist. Letzte Zeile: `AUSGELIEFERT, LIVE-PROBEN OFFEN (Rueckgabewert 2)`. In der Kette der Normalfall | weiter; Schritt 6 holt die Proben nach |
+| alles andere (üblich `1`) | Abbruch. Vor dem Hochladen ging nichts hinaus, die Cache-Kennung ist zurückgenommen; nach dem Hochladen sagt es die Meldung „Abbruch NACH dem Hochladen" | Schritt 5, dann Ursache klären |
+
+Der Wert `2` gehört allein diesem einen Fall (OPS-2026-10-03-15): Endet ein
+Hilfsschritt mit 2 — etwa die Infrastruktur-Prüfung ohne gcloud-Anmeldung, bevor
+irgendetwas hinausgeht —, macht `deploy.sh` daraus `1`. Vorher sah ein solcher
+Abbruch für die Kette aus wie eine Auslieferung, und die Schlussbilanz der
+übersprungenen Riegel erschien im Wartungsmodus nie.
 
 ## Notschalter des Deploys
 
@@ -290,6 +326,13 @@ Erwartet: `strict: true`, `admins: true`, sechs Pflicht-Checks —
 `test-backend`, `test-frontend`, `test-e2e`, `secret-scan`, `playwright-version`,
 `pruefungen`.
 
+Gemessen wird das bei jeder Auslieferung: `scripts/verify-infrastructure.sh` liest die
+öffentliche Angabe zum Zweig (lesend, ohne Verwalterrechte) und vergleicht die verlangten
+Namen mit der Liste `PFLICHT` in `scripts/deploy.sh` — fehlt einer oder kommt einer dazu,
+wird der Abschnitt „Zweigschutz von main" rot, ebenso, wenn der Schutz nicht mehr für
+Verwalter gilt (OPS-2026-10-04-18). `strict` zeigt nur die Abfrage oben; sie braucht
+Verwalterrechte und bleibt eine Prüfung von Hand.
+
 `pruefungen` kam am 2026-08-12 dazu (OPS-2026-08-12-04): Der Job lief zwar, stand aber
 nicht auf der Liste — die Zusage „blockierend" in `ci.yml`, README und CHANGELOG war
 damit unbelegt. Eingetragen wurde er erst, nachdem er in fünf Läufen hintereinander grün
@@ -359,9 +402,23 @@ das jede Minute und meldet mit `severity: ERROR`, wenn es älter als neun Tage i
 Marker `erinnerung-lebenszeichen-veraltet`. Damit fällt ein Ausfall der Erinnerung auf,
 obwohl sie selbst bewusst leise bleibt (OPS-2026-08-12-11).
 
+Seit 07.10.2026 prüft derselbe Lauf zwei datierte Zusagen: das ZDR-Prüfdatum der
+Datenschutzerklärung (Push eine Woche vor Ablauf) und das Prüfdatum der Erklärung zur
+Barrierefreiheit (Push drei Wochen vor Ablauf, weil die Handprüfung einen Termin
+braucht). `letzterErfolg` schreibt er nur, wenn BEIDE Fristen gelesen und bewertet
+wurden — ist eine der zwei Seiten nicht lesbar oder ihr Datum nicht mehr zu finden,
+meldet der Wächter das wie einen ausgebliebenen Lauf. Für die Barrierefreiheit gibt es
+bewusst keine Bremse in der Pipeline (Begründung in `functions/src/zusagen.js`).
+
+Kann der Reaper das Lebenszeichen nicht LESEN, ist das in einem einzelnen Lauf nur
+eine Warnung (`lebenszeichen-nicht-lesbar`). Bleibt es fünf Läufe in Folge dabei,
+meldet er mit `severity: ERROR` den Marker `lebenszeichen-wiederholt-nicht-lesbar`,
+jede Minute erneut: Der Wächter ist dann blind und würde einen Ausfall der Erinnerung
+nicht bemerken — Firestore und die Rechte des Reapers auf `config/erinnerung` prüfen.
+
 Prüfen von Hand:
 
-    gcloud logging read 'jsonPayload.error="erinnerung-lebenszeichen-veraltet"' \
+    gcloud logging read 'jsonPayload.error=("erinnerung-lebenszeichen-veraltet" OR "lebenszeichen-wiederholt-nicht-lesbar")' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d
 
 (Der Betriebs-Speicher hält einen Tag; der Aufräumer meldet den Zustand jede
@@ -634,7 +691,9 @@ Was jeder `grund` bedeutet, steht in [ERROR-ALERTING.md](ERROR-ALERTING.md)
 (Tabelle unter „Analyse gescheitert“). Weiter je Grund: `blocked.overloaded`
 und `blocked.apiError` → unten „Mistral überlastet / 429 / 5xx“ (dort auch die
 Warnungen des KI-Aufrufs und `step: "bild-laden"`); `blocked.configMissing` →
-[BETRIEBSPROFILE.md](BETRIEBSPROFILE.md); `processing_timeout` → Warnung
+[BETRIEBSPROFILE.md](BETRIEBSPROFILE.md); `ergebnis_speichern` → Firestore
+prüfen, nicht die KI (Warnungen `ergebnis-speichern-fehlgeschlagen` des Dienstes
+`processjob`); `processing_timeout` → Warnung
 `worker-abgestuerzt-verdacht` und Plattform-Fehlerzeilen des Dienstes
 `processjob`; `enqueue_failed` → Cloud Tasks prüfen (Warteschlange pausiert,
 Rechte); `store_failed` und `enqueue_unerwartet` → Zeilen des Dienstes
@@ -696,14 +755,20 @@ Nachsehen:
 
 ### Mistral überlastet / 429 / 5xx
 
-Die Queue puffert Stoßlast. Lehnt Mistral trotzdem ab (429) oder ist es kurz
-weg (502, 503, 504), wartet der Auftrag **10, 20, 40 und 80 Sekunden** und
-versucht es jeweils wieder (`ueberlastWarteMs`, `ueberlastVersuche` im
-Einstellungssatz, seit 08.09.2026). Der Nutzer sieht dabei nur eine längere
-Wartezeit. Erst wenn alle Wiederholungen scheitern oder das Restbudget nicht
-mehr reicht, sieht er `blocked.overloaded` bzw. `blocked.apiError`. Vorher
-gab es eine Wiederholung nach zwei Sekunden — bei 15 Aufrufen je Minute
-wirkungslos: Am 08.09.2026 scheiterten so 6 von 47 Analysen einer Klasse.
+Die Queue puffert Stoßlast. Lehnt Mistral den Analyse-Aufruf trotzdem ab (429)
+oder ist es kurz weg (502, 503, 504), wartet der Auftrag **10, 20, 40 und 80
+Sekunden** und versucht es jeweils wieder (`ueberlastWarteMs`,
+`ueberlastVersuche` im Einstellungssatz, seit 08.09.2026). Der Nutzer sieht
+dabei nur eine längere Wartezeit. Erst wenn alle Wiederholungen scheitern oder
+das Restbudget nicht mehr reicht, sieht er `blocked.overloaded` bzw.
+`blocked.apiError`. Vorher gab es eine Wiederholung nach zwei Sekunden — bei 15
+Aufrufen je Minute wirkungslos: Am 08.09.2026 scheiterten so 6 von 47 Analysen
+einer Klasse. Der zweite Aufruf einer Analyse (Beast-Werbung) hat fest 30
+Sekunden und wiederholt deshalb höchstens einmal; fällt er wegen Überlast aus,
+steht eine Warnung `beast-ads-failed` im Log, und das Kind bekommt sein
+Ergebnis mit der Werbeliste aus dem Analyse-Aufruf. Eine FEHLERZEILE
+`beast-ads-failed` heißt dagegen: Der Aufruf scheitert aus einem anderen Grund
+(Schlüssel, Modell, Zeitlimit) — dann dort nachsehen.
 Bei anhaltender Störung: Mistral-Status und **Account-Dashboard** prüfen
 (Limits unterscheiden sich drastisch je Modellversion — immer das Dashboard,
 nicht Code-Kommentare). Notfalls Wartungsmodus (Hebel 1).
@@ -839,18 +904,33 @@ Lesart:
 (`config/betriebsprofil`). Kam er in FÜNF Läufen hintereinander nicht heran,
 meldet er das mit `severity: ERROR` und der Anzahl der Läufe in Folge — und
 zwar jede Minute erneut, bis es wieder geht. Weniger Läufe in Folge sind nur
-Warnungen (`reap-query-ohne-betriebswerte:<abfrage>`). Die Grenze lag bis
+Warnungen (`reap-query-ohne-betriebswerte:<abfrage>`; `…:letzter-stand`, wenn
+der Aufräumer mit dem zuletzt gültig gelesenen Satz weiterarbeitet). Die Grenze lag bis
 07.09.2026 bei einem Lauf, dann bei zwei, seit 10.09.2026 bei fünf: Beide Male
 hatte ein kurzer Hänger Alarm ausgelöst, obwohl der nächste Lauf gesund war und
 niemand betroffen. Am 10.09. beantwortete Firestore laut Googles eigenen
 Messwerten jede Anfrage in höchstens 0,15 s — die zwei Sekunden gingen auf dem
 Weg zwischen Function und Datenbank verloren, nicht in der Datenbank.
 
-**Ist das schlimm?** Fünf Minuten ohne Betriebswerte heißen: Firestore
-antwortet nicht in zwei Sekunden, oder das Dokument ist weg. Dann laufen auch
-keine Analysen — jede betroffene meldet sich sofort selbst als Fehler
-(`kein-einstellungssatz` in `process-job`). Dieser Alarm hier ist die Reserve
-für die Zeit, in der niemand analysiert.
+**Ist das schlimm?** Fünf Minuten ohne frisch gelesene Betriebswerte heißen:
+Firestore antwortet nicht in zwei Sekunden, oder das Dokument ist weg. Zwei
+Fälle:
+
+- Der Satz war schon einmal gültig gelesen und ist nur gerade nicht lesbar
+  (Warnungen `…:letzter-stand`): Einlass, Analysen und Aufräumer arbeiten mit
+  dem zuletzt gelesenen Satz weiter. Eine Änderung am Satz kommt in dieser Zeit
+  nicht an.
+- Es gibt keinen gültigen Satz (Dokument weg oder abgelehnt, oder die Instanz
+  hat nie einen gelesen): Dann laufen keine Analysen — jede betroffene meldet
+  sich sofort selbst als Fehler (`kein-einstellungssatz` in `process-job`).
+  Wartende und hängende Aufträge werden in dieser Zeit nicht abgeräumt, ihr
+  Platz im Stundenfenster bleibt belegt. Gelöscht wird weiter, nach den festen
+  Fristen der Datenschutzerklärung (jeder Auftrag samt Foto nach 2 Stunden, ein
+  abgeholtes Ergebnis nach 15 Minuten) — diese zwei Fristen hängen nicht am
+  Einstellungssatz. Dasselbe steht in den Nachrichten der Wachen („KEIN
+  gueltiger Einstellungssatz“, „UNGUELTIG“).
+
+Dieser Alarm hier ist die Reserve für die Zeit, in der niemand analysiert.
 
 **Was tun:** Firestore-Status und das Dokument prüfen
 (`scripts/betriebsprofil-vergleichen.js` zeigt, ob es da ist und zum Repo
@@ -863,8 +943,10 @@ Prüfen von Hand:
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d
 
 Erwartet: keine Zeile. Die Warnungen dazu (einzelne Ausrutscher) zählen — nach
-Minuten, denn ein träger Lauf erzeugt bis zu fünf Warnungen in derselben Minute
-und zählt als EIN Lauf:
+Minuten, denn ein Lauf ohne Betriebswerte erzeugt bis zu drei Warnungen in
+derselben Minute (je eine für die Abfragen nach verlassenen, hängenden und
+überfälligen Aufträgen; eine einzige, wenn der letzte Stand weiter gilt) und
+zählt als EIN Lauf:
 
     gcloud logging read 'jsonPayload.warning:"reap-query-ohne-betriebswerte"' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp)' | cut -c1-16 | sort -u
@@ -1008,7 +1090,7 @@ Schutz still ausfällt, und was sie auffängt:
 
 **Einmalig nach dem Zusammenführen des Sicherheitspakets (PR #294):** Auf `main`
 gibt es noch keinen Nachtlauf, der Deploy bricht deshalb ab, bis einer gelaufen
-ist. In der Deploy-Kette nach dem Merge und NACH der grünen Pipeline des
+ist. In der Deploy-Kette („Die Auslieferung als Kette", Schritt 1) nach dem Merge und NACH der grünen Pipeline des
 Merge-Commits (sonst liest der Job `abkuendigungen` noch die alte Warnung zu
 setup-python 5): `gh workflow run sicherheit-nachts.yml -f alarmprobe=true`
 starten — das belegt zugleich den Alarmweg Ende-zu-Ende; der Empfang der Probe
@@ -1046,8 +1128,8 @@ meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
    Workflow geändert hat: Der jüngste Lauf dieses Workflows muss abgeschlossen und
    grün sein. Nach dem Zusammenführen läuft er auf `main` noch einmal; `deploy.sh`
    wartet NICHT darauf, sondern bricht ab, solange der Lauf fehlt, noch läuft oder
-   rot ist. Die Deploy-Kette wartet deshalb vor dem Wartungsmodus auch auf diesen
-   Lauf, nicht nur auf die sechs Pflicht-Checks.
+   rot ist. Die Deploy-Kette („Die Auslieferung als Kette", Schritt 1) wartet deshalb
+   vor dem Wartungsmodus auch auf diesen Lauf, nicht nur auf die sechs Pflicht-Checks.
 
 Der Job `kontrollbau` baut bei jedem Lauf zusätzlich die bis 30.09.2026
 ausgelieferte Fassung (libheif 1.23.2, libde265 1.0.15) nach und vergleicht sie

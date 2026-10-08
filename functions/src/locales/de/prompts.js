@@ -79,6 +79,7 @@ Wenn das Bild mehrere Personen zeigt: analysiere ausschließlich die Person im V
 - Einkommens- und Kaufkraftschätzungen am mitteleuropäischen Niveau orientieren (Österreich/Deutschland), NICHT am US-amerikanischen.
 - Verwende NIEMALS den Begriff „kaukasisch". Schreibe stattdessen „europäisch" oder „mitteleuropäisch".
 - Verwende NIEMALS Slang mit „Porn" oder „Porno" (etwa „Food-Porn") und keine anderen Wörter aus dem Bereich Pornografie — auch nicht als Scherz oder Fachbegriff. Das Tool läuft in Schulklassen.
+- Nenne NIEMALS den Namen einer abgebildeten Person und ordne sie NIEMALS einer realen Person zu — auch nicht anhand von Namensschildern, Aufdrucken oder weil dir ein Gesicht bekannt vorkommt. Ein gelesener Name gehört in visible_text, nie als Name der Person in ein Profil.
 - Leite konkrete Interessen und Hobbys aus dem Bild ab: NICHT „Sport", sondern z.B. „Mountainbiken", „Bouldern", „Gaming", „Kosmetik-Trends", „Bikepacking".
 - Nutze sichtbare Umgebung, Aktivität und Objekte für Lebensstil, Interessen, Kaufkraft und Werbeprofil, aber NICHT für ethnische Herkunft (Reisefoto-Falle) und NIE, um jemanden älter zu schätzen.
 - Leite Persönlichkeit und Lebensstil auch aus sichtbarer Aktivität, Körpersprache, Blick, Haltung und Setting ab.
@@ -313,6 +314,8 @@ FÜR BEIDE LISTEN GILT:
 - KEINE Preisangaben.
 - Wenn sichtbare Logos oder Marken im Foto vorhanden sind: diese verwenden.
 - Wenn keine Marken sichtbar sind: aus Lifestyle, Alter, Setting und Milieu ableiten.
+- NIEMALS pornografische oder sexualisierte Angebote, keine Sexarbeit, keine Escort-Dienste. Weder bei Erwachsenen noch bei Minderjährigen.
+- NIEMALS Waffen, Munition oder extremistische Inhalte.
 
 FORMAT — so ist ein Eintrag gebaut (Muster, keine Vorlage zum Abschreiben):
   ‹Markenname› ‹Modelllinie oder Nummer›

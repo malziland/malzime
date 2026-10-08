@@ -28,10 +28,6 @@ function getMistral() {
   return lokalSchalterAn("MISTRAL_MOCK") ? require("./mistral-mock") : require("./mistral");
 }
 
-function isQuotaError(err) {
-  return !!(err && (err.code === "rate_limit" || /rate_limit|quota|429/i.test(err.message || "")));
-}
-
 /* Nimmt BEWUSST keine Vorgangskennung entgegen (26.09.2026): Was nicht
    uebergeben wird, kann nicht ins Log rutschen. */
 function loggeMinorSafety(safety, lang) {
@@ -115,12 +111,12 @@ async function isBeastAdsCallEnabledSafe() {
 
 /* Hat dieses Profil ueberhaupt Karten? Die Frage steht an mehreren Stellen im
    Ablauf — ein leeres Profil ist kein Fehler, aber auch kein Ergebnis. */
-const hasCategories = (obj) => obj && obj.categories && Object.keys(obj.categories).length > 0;
+const hasCategories = (obj) =>
+  obj && obj.categories && typeof obj.categories === "object" && Object.keys(obj.categories).length > 0;
 
 module.exports = {
   isBeastAdsCallEnabledSafe,
   getMistral,
-  isQuotaError,
   buildPseudoDescription,
   loggeMinorSafety,
   hasCategories,

@@ -1,9 +1,15 @@
 /**
- * client-context.js — Anonyme Hardware-/Netzwerk-Kontextdaten für Telemetrie.
+ * client-context.js — grobe Geräte- und Netzangaben für die Fehlermeldungen
+ * des Browsers.
  *
- * Sammelt nur Pseudonymisierungs-Klassen (grobe Bandbreite, Memory-Stufe,
- * CPU-Cores, Screen-Dims). KEINE IP, kein Cookie, keine PII, keine
- * persistente Speicherung. Auf serverseitiger Cloud-Logging-Retention.
+ * Gesammelt wird nur, was die Datenschutzerklärung für die Fehlermeldungen
+ * nennt: Browsertyp (vergröbert), Größenklasse des Bildschirms, Sprache, Netz
+ * — dazu das Ja/Nein, ob ein Test-Browser die Seite aufruft. KEINE IP, kein
+ * Cookie, keine dauerhafte Speicherung im Browser. Arbeitsspeicher, Zahl der
+ * Prozessorkerne und Pixeldichte werden nicht gesammelt (PRIV-2026-10-03-39:
+ * Der Text nennt sie nicht, und der Text ist die Vorgabe). Wer hier ein Feld
+ * ergänzt, ergänzt es zuerst im Text der Datenschutzerklärung
+ * (geraeteangaben-deckung.test.js).
  *
  * Trace-ID: kurze zufaellige ID pro Analyse-Lauf, damit Frontend-Errors
  * mit dem Backend-Request korreliert werden koennen.
@@ -55,8 +61,6 @@ export function collectClientContext() {
         if (typeof conn.rtt === "number") ctx.rttMs = conn.rtt;
         if (typeof conn.saveData === "boolean") ctx.saveData = conn.saveData;
       }
-      if (typeof navigator.deviceMemory === "number") ctx.deviceMemoryGb = navigator.deviceMemory;
-      if (typeof navigator.hardwareConcurrency === "number") ctx.hardwareConcurrency = navigator.hardwareConcurrency;
       if (typeof navigator.language === "string") ctx.language = navigator.language.slice(0, 10);
       /* Weist der Browser sich selbst als automatisiert aus? Jeder
          Test-Browser (Playwright, Puppeteer, Selenium) setzt das Merkmal.
@@ -73,9 +77,6 @@ export function collectClientContext() {
         const maxDim = Math.max(screen.width, screen.height);
         ctx.screen = maxDim < 1000 ? "small" : maxDim < 1800 ? "medium" : "large";
       }
-    }
-    if (typeof window !== "undefined" && typeof window.devicePixelRatio === "number") {
-      ctx.dpr = Math.round(window.devicePixelRatio * 10) / 10;
     }
   } catch (_) {
     /* niemals werfen */

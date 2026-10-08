@@ -13,7 +13,7 @@
  * Datei steht daneben, damit die Mocks dort nichts verdecken.
  */
 
-const mockZustand = { fehler: null, daten: undefined };
+const mockZustand = { fehler: null, daten: undefined, schreibFehler: null };
 let mockSchreibvorgaenge = 0;
 
 jest.mock("../db", () => ({
@@ -28,6 +28,7 @@ jest.mock("../db", () => ({
       },
       async set() {
         mockSchreibvorgaenge += 1;
+        if (mockZustand.schreibFehler) throw new Error(mockZustand.schreibFehler);
       },
     }),
   }),
@@ -61,6 +62,7 @@ const JETZT = Date.parse("2026-08-28T09:00:00Z");
 beforeEach(() => {
   mockZustand.fehler = null;
   mockZustand.daten = undefined;
+  mockZustand.schreibFehler = null;
   mockSchreibvorgaenge = 0;
   mockHistorie.tage = auffaelligeHistorie();
   jest.spyOn(console, "error").mockImplementation(() => {});
@@ -126,4 +128,68 @@ describe("Zustandsdokument unlesbar", () => {
 
 test("Satz vorhanden — sonst misst diese Datei am falschen Riegel", () => {
   expect(SATZ.singleLargeTimeoutMs).toBeGreaterThan(0);
+});
+
+/* 07.10.2026: Dieselbe Stille von der Schreibseite. Laesst sich der Beginn
+   eines Einbruchs nicht festhalten, zaehlt die Wache jeden Tag wieder ab 1 —
+   sie erreicht die Schwelle nie und meldet nie. Vorher: drei stumme
+   Fehlerzweige. */
+describe("Zustandsdokument nicht schreibbar", () => {
+  const warnungen = () =>
+    console.error.mock.calls
+      .map(([z]) => z)
+      .filter((z) => typeof z === "string")
+      .map((z) => JSON.parse(z))
+      .filter((o) => o.grund === "zustand-nicht-schreibbar");
+
+  test("am ersten auffaelligen Tag: die Wache meldet sofort, statt still neu zu zaehlen", async () => {
+    mockZustand.schreibFehler = "PERMISSION_DENIED";
+    const gemeldet = [];
+
+    const ergebnis = await pruefeLaufzeit({ melder: async (t) => gemeldet.push(t), jetzt: JETZT });
+
+    expect(ergebnis.gemeldet).toBe(true);
+    expect(ergebnis.grund).toBe("zustand-unlesbar");
+    expect(gemeldet).toHaveLength(1);
+    expect(warnungen()).toHaveLength(1);
+    expect(warnungen()[0].fehler).toMatch(/PERMISSION_DENIED/);
+  });
+
+  test("scheitert nur der Vermerk „heute gemeldet“, ist die Meldung trotzdem draussen — und es steht eine Warnung da", async () => {
+    mockZustand.daten = { auffaelligSeit: "2026-08-27" };
+    const gemeldet = [];
+    let schreibNr = 0;
+    /* Das Festhalten des Beginns gelingt, der Vermerk danach scheitert. */
+    Object.defineProperty(mockZustand, "schreibFehler", {
+      configurable: true,
+      get: () => ((schreibNr += 1) >= 2 ? "UNAVAILABLE" : null),
+    });
+    try {
+      const ergebnis = await pruefeLaufzeit({ melder: async (t) => gemeldet.push(t), jetzt: JETZT });
+      expect(ergebnis.gemeldet).toBe(true);
+      expect(ergebnis.grund).not.toBe("zustand-unlesbar");
+      expect(gemeldet).toHaveLength(1);
+      expect(warnungen()).toHaveLength(1);
+    } finally {
+      Object.defineProperty(mockZustand, "schreibFehler", { configurable: true, writable: true, value: null });
+    }
+  });
+
+  test("Erholung: scheitert das Zuruecksetzen, wirft die Wache nicht und warnt", async () => {
+    mockHistorie.tage = auffaelligeHistorie().slice(0, 15);
+    mockZustand.daten = { auffaelligSeit: "2026-08-20" };
+    mockZustand.schreibFehler = "UNAVAILABLE";
+
+    const ergebnis = await pruefeLaufzeit({ melder: async () => {}, jetzt: Date.parse("2026-08-25T09:00:00Z") });
+
+    expect(ergebnis.gemeldet).toBe(false);
+    expect(warnungen()).toHaveLength(1);
+  });
+
+  test("gelingt das Schreiben, gibt es keine Warnung (Erfolgsweg)", async () => {
+    mockZustand.daten = { auffaelligSeit: "2026-08-27" };
+    await pruefeLaufzeit({ melder: async () => {}, jetzt: JETZT });
+    expect(warnungen()).toEqual([]);
+    expect(mockSchreibvorgaenge).toBeGreaterThan(0);
+  });
 });

@@ -8,6 +8,7 @@ import {
   initHintergrundWiederaufnahme,
   clearStoredJobId,
 } from "./js/api.js";
+import { meldeOffenenAuftragAb } from "./js/auftrag-abmelden.js";
 import { renderCurrentMode } from "./js/render.js";
 import { insertPrintNotes, removePrintNotes, showLimitBanner, showMaintenanceModal } from "./js/ui.js";
 import { initDemo } from "./js/demo.js";
@@ -129,6 +130,7 @@ initSprachumschalter({
      Sprache behalten — er landet auf einer sauberen Startseite. Den gemerkten
      Auftrag vorher verwerfen, sonst holt ihn der nächste Seitenaufruf zurück. */
   zuruecksetze: () => {
+    meldeOffenenAuftragAb();
     clearStoredJobId();
     window.location.reload();
   },
@@ -162,6 +164,10 @@ function handleNewFile(file) {
      ist die Nutzer-Geste, ohne die Browser keinen Ton erlauben. Reiner
      Best-Effort: ohne Web Audio läuft alles stumm weiter. */
   klangAktivieren();
+
+  /* Diese Auswahl ist ab jetzt die juengste: Ein Beispielbild, das noch
+     laedt, darf danach weder Vorschau noch Analyse uebernehmen (state.js). */
+  state.auswahlNr += 1;
 
   /* Laufende Analyse abbrechen */
   if (state.currentAbortController) {

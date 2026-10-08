@@ -192,7 +192,16 @@ function verkleinernUndKodieren(quelle) {
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) {
-    throw new Error("image_decode_failed");
+    /* BUG-2026-08-20-37: Auch hier die Flaeche freigeben. Der Browser gibt
+       keinen Zeichen-Kontext her, wenn der Speicher fuer Zeichenflaechen
+       knapp ist — bliebe die eben angelegte Flaeche belegt, scheiterte das
+       naechste Foto erst recht (Begruendung der Freigabe: siehe unten,
+       BUG-2026-08-19-01 Teil 2). */
+    canvas.width = 0;
+    canvas.height = 0;
+    const err = new Error("image_decode_failed");
+    err.errorDetail = "canvas";
+    throw err;
   }
   /* Hochwertiges Resampling beim Verkleinern — sonst verschmiert der Canvas
      feine Details (Hautstruktur, feine Linien), die die KI fuer die
@@ -261,7 +270,30 @@ export async function prepareImage(file, optionen = {}) {
      (siehe readFileBytes). Zuerst der Browser selbst; kann er das Format nicht
      und es ist HEIC, uebernimmt der eigene Dekoder (heic.js, 08.09.2026). */
   const quelle = await bildQuelle(bytes, file, optionen.auswahlZeit);
-  const bild = verkleinernUndKodieren(quelle);
+  let bild;
+  try {
+    bild = verkleinernUndKodieren(quelle);
+  } catch (err) {
+    /* Dieselben Diagnosefelder wie beim Oeffnen (bildQuelle): Formatklasse,
+       Groesse, Zeit seit der Auswahl — nichts aus dem Inhalt. */
+    if (err && err.fileFormat === undefined) {
+      err.fileFormat = sniffFormat(bytes);
+      err.fileSizeKb = Math.round((file.size || 0) / 1024);
+      err.msSeitAuswahl = msSeit(optionen.auswahlZeit);
+    }
+    throw err;
+  } finally {
+    /* BUG-2026-08-20-37, Erfolgsweg: Kam die Quelle aus dem eigenen
+       HEIC-Dekoder, ist sie eine Zeichenflaeche in Originalgroesse (bei einem
+       Handyfoto rund 12 Megapixel). Nach dem Verkleinern braucht sie niemand
+       mehr — freigeben, ob es geklappt hat oder nicht (Begruendung der
+       Freigabe: BUG-2026-08-19-01 Teil 2, oben). Ein Bild, das der Browser
+       selbst geoeffnet hat, ist keine Zeichenflaeche und bleibt unberuehrt. */
+    if (quelle && typeof quelle.getContext === "function") {
+      quelle.width = 0;
+      quelle.height = 0;
+    }
+  }
 
   /* Der Dateiname folgt dem Typ. Ein PNG "upload.jpg" zu nennen waere dieselbe
      Unwahrheit eine Ebene tiefer — sie faellt nur nicht auf, weil der Server

@@ -25,7 +25,7 @@ const { reapJobs } = require("./handle-reap");
 const { pruefeZusagen } = require("./handle-erinnerung");
 const { pruefeLaufzeit } = require("./laufzeit-wache");
 const { pruefeKapazitaet } = require("./kapazitaets-wache");
-const { geltendeWerte, _cacheLeeren } = require("./betriebsprofil");
+const { geltendeWerte, _cacheLeeren, ZUSAGE_LOESCHFRISTEN } = require("./betriebsprofil");
 const { sendeNtfy } = require("./notify");
 const { ALLOWED_ORIGINS } = require("./domains");
 
@@ -46,24 +46,27 @@ const mistralApiKey = defineSecret("MISTRAL_API_KEY_EU");
 
 initializeApp();
 
-/* PRIV-2026-09-10-06: Keine Antwort unserer oeffentlichen Schnittstellen darf
-   im Zwischenspeicher des Browsers liegen bleiben — allen voran das fertige
-   Profil aus job-status. Die Datenschutzerklaerung sagt, dass nach dem
-   Schliessen der Seite im Browser nichts mehr da ist; ohne diese Kopfzeile war
-   das nicht abgesichert.
-
-   BEWUSST HIER, an der EINEN Stelle, an der jede oeffentliche Function
-   entsteht, und nicht in jedem Handler: Eine neue Schnittstelle bekommt die
-   Kopfzeile, sobald sie hier eingehaengt wird. kein-zwischenspeicher.test.js
-   ruft jede Function mit `invoker: "public"` auf und wird rot, sobald eine
-   ohne `no-store` antwortet. processJob ist privat (nur Cloud Tasks) und
-   braucht sie nicht. */
-function ohneZwischenspeicher(handler) {
-  return (req, res) => {
-    res.setHeader("Cache-Control", "no-store");
-    return handler(req, res);
-  };
+/* Was ohne gueltigen Einstellungssatz mit den liegenden Auftraegen geschieht.
+   Steht in beiden Nachrichten der Wachen unten, damit der Empfaenger weiss,
+   was steht und was weiterlaeuft (PRIV-2026-10-03-26): Der Aufraeumdienst
+   raeumt wartende und haengende Auftraege dann nicht ab, loescht aber weiter
+   nach den zugesagten Fristen. Die Zahlen kommen aus betriebsprofil.js. */
+function hinweisOhneSatz() {
+  const stunden = ZUSAGE_LOESCHFRISTEN.jobAufbewahrungMs / (60 * 60 * 1000);
+  const minuten = ZUSAGE_LOESCHFRISTEN.zustellfensterMs / (60 * 1000);
+  return (
+    ` Wartende Auftraege werden solange nicht abgeraeumt; geloescht wird weiter nach den festen ` +
+    `Fristen (${stunden} Stunden, ${minuten} Minuten nach der Abholung).`
+  );
 }
+
+/* Jede oeffentliche Function entsteht HIER und wird dabei umhuellt: Die Huelle
+   setzt `Cache-Control: no-store` und weist gepackte Anfragen ab
+   (oeffentliche-huelle.js). Eine neue Schnittstelle bekommt beides, sobald sie
+   hier eingehaengt wird; kein-zwischenspeicher.test.js und
+   gepackte-anfragen.test.js rufen jede Function mit `invoker: "public"` auf.
+   processJob ist privat (nur Cloud Tasks) und braucht die Huelle nicht. */
+const { ohneZwischenspeicher } = require("./oeffentliche-huelle");
 
 exports.stats = onRequest(
   {
@@ -245,7 +248,8 @@ exports.laufzeitWache = onSchedule(
       if (!werte) {
         const text =
           `KEIN gueltiger Einstellungssatz — es laeuft derzeit KEINE Analyse. ` +
-          `Grund: ${grund || "unbekannt"}. Firestore-Dokument config/betriebsprofil pruefen.`;
+          `Grund: ${grund || "unbekannt"}. Firestore-Dokument config/betriebsprofil pruefen.` +
+          hinweisOhneSatz();
         await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
         console.error(JSON.stringify({ step: "betriebsprofil-wache", status: "kein-satz", grund }));
       } else {
@@ -314,7 +318,8 @@ exports.satzWache = onDocumentWritten(
       const text =
         `ACHTUNG: Der Einstellungssatz wurde geaendert und ist UNGUELTIG — ` +
         `es laeuft ab sofort KEINE Analyse. Grund: ${grund || "unbekannt"}. ` +
-        `Rueckweg: das Feld "aktiv" auf einen gueltigen Satz stellen.`;
+        `Rueckweg: das Feld "aktiv" auf einen gueltigen Satz stellen.` +
+        hinweisOhneSatz();
       await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
       console.error(JSON.stringify({ step: "satz-wache", status: "ungueltig", grund }));
       return;

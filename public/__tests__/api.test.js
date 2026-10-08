@@ -153,7 +153,28 @@ describe("analyzeImage", () => {
       text: () => Promise.resolve('{"blocked":"limit","retryAfterSeconds":600}'),
     });
     await analyzeImage();
+    /* UX-2026-10-03-47: Der Limit-Hinweis sagt alles — keine zweite Zeile
+       daneben (bis dahin stand hier „Zu viele Anfragen aus eurem Netzwerk"). */
+    expect(elements.limitBanner.classList.contains("active")).toBe(true);
+    expect(elements.status.textContent).toBe("");
+  });
+
+  it("429 ohne Merkmal (Sperre je Netzwerk-Adresse) zeigt den Netzwerk-Text, nicht „KI überlastet“", async () => {
+    /* Unabhängig von der Reihenfolge: Der Limit-Hinweis ist zu Beginn aus. */
+    elements.limitBanner.classList.remove("active");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 429,
+      clone: function () {
+        return this;
+      },
+      json: () => Promise.resolve({ error: "Rate limit exceeded" }),
+      text: () => Promise.resolve('{"error":"Rate limit exceeded"}'),
+    });
+    await analyzeImage();
     expect(elements.status.textContent).toContain("error.rateLimit");
+    expect(elements.status.textContent).not.toContain("error.serverBusy");
+    expect(elements.limitBanner.classList.contains("active")).toBe(false);
   });
 
   it("shows user-friendly message on 413", async () => {

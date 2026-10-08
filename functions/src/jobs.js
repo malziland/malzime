@@ -23,13 +23,16 @@
  * vergleichbar, konsistent mit counter.js, kein FieldValue nötig.
  */
 
+const crypto = require("crypto");
 const { Timestamp } = require("firebase-admin/firestore");
 const { datenbank } = require("./db");
-const { geltendeWerte } = require("./betriebsprofil");
+const { geltendeWerte, ZUSAGE_LOESCHFRISTEN } = require("./betriebsprofil");
+const { deleteImage } = require("./queue-storage");
 
 /* Holt die Betriebswerte oder bricht ab. Es gibt keine Ersatzzahlen mehr:
    Liegt kein gueltiger Einstellungssatz vor, laeuft auch keine Analyse — dann
-   entstehen keine neuen Jobs, und die Firestore-TTL raeumt die alten. */
+   entstehen keine neuen Jobs. Die alten loescht der Aufraeumdienst weiter
+   (loeschfrist unten). */
 async function betriebswerteOderAbbruch() {
   const { werte, grund } = await geltendeWerte();
   if (!werte) {
@@ -38,6 +41,23 @@ async function betriebswerteOderAbbruch() {
     throw fehler;
   }
   return werte;
+}
+
+/* BLEIBT IM CODE — Schutzgrenze, keine Betriebseinstellung: wie viele Auftraege
+   ein Lauf des Aufraeumdienstes je Loeschabfrage nimmt, wenn kein gueltiger Satz
+   vorliegt. Der naechste Lauf eine Minute spaeter nimmt den Rest. */
+const LOESCH_STAPEL_OHNE_SATZ = 200;
+
+/* Frist und Stapel fuer die zwei LOESCHABFRAGEN (PRIV-2026-10-03-26). Mit
+   gueltigem Satz gelten seine Werte. Ohne ihn gilt die Zusage selbst
+   (2 Stunden, 15 Minuten ab Abholung) — das Loeschen haengt nicht daran, ob
+   gerade Analysen laufen koennen. Die drei Abfragen nach wartenden und
+   haengenden Auftraegen brechen ohne Satz weiter ab: Fuer sie gibt es keine
+   zugesagte Frist. */
+async function loeschfrist(feld) {
+  const { werte } = await geltendeWerte();
+  if (werte) return { fristMs: werte[feld], stapel: werte.aufraeumStapel };
+  return { fristMs: ZUSAGE_LOESCHFRISTEN[feld], stapel: LOESCH_STAPEL_OHNE_SATZ };
 }
 
 /* ARCH-2026-08-12-27: Frist des Sicherheitsnetzes (Firestore-TTL). Bewusst weit
@@ -63,49 +83,34 @@ function jobsRef() {
   return datenbank().collection(JOBS_COLLECTION);
 }
 
-/* EIN ALARM JE GESCHEITERTER ANALYSE (01.10.2026). Endet eine Analyse mit
-   einer Fehlermeldung, endet ihr Auftrag `done` mit blockiertem Ergebnis,
-   `done` mit einem leeren Profil in einem der beiden Modi (completeJob) oder
-   `failed` (failJob — Worker nicht fertig, oder schon das Einreihen scheiterte,
-   `enqueue_failed`). Nur dort, und nur wenn DIESER Aufruf den Uebergang gemacht
-   hat, entsteht die eine Fehlerzeile, auf die der Alarm "Analyse gescheitert"
-   hoert. Scheitert das Einreihen, bevor es einen Auftrag gibt (Speicher oder
-   Datenbank weg), ruft handle-enqueue.js dieselbe Meldung selbst. Die Zeilen, die den Grund im Einzelnen beschreiben (KI-Aufruf, Foto
-   laden, Absturzverdacht, verworfenes Ergebnis), sind Warnungen — sonst kaemen
-   fuer eine Fehlermeldung zwei Nachrichten, und ein Tierfoto, das trotz
-   gescheiterter Nachfrage sein Profil bekommt, loeste einen Fehlalarm aus.
-   Ohne Kennung (handle-process-job.js, "AB HIER KEINE KENNUNG IM LOG"): nur
-   der Grund, und nur als feste Kennung wie `blocked.apiError` oder
-   `processing_timeout` — alles andere wird "unbekannt". */
-const GRUND_MUSTER = /^(blocked\.[A-Za-z]{1,40}|[a-z_]{1,40})$/;
+/* Welche Fehlermeldung ein Endzustand dem Kind zeigt und die eine Fehlerzeile
+   dazu ("ein Alarm je gescheiterter Analyse"): analyse-ausgang.js. */
+const { fehlerGrund, meldeGescheiterteAnalyse } = require("./analyse-ausgang");
 
-/* Ein Profil ohne Text und ohne Karten zeigt im jeweiligen Modus "Die KI hat
-   ein leeres Profil zurueckgeliefert" (public/js/render.js, hasContent —
-   dieselbe Regel). Das passiert, wenn nur ein Teil gerettet wurde und die
-   Nachfrage nach den fehlenden Karten scheiterte. Tierprofile sind immer
-   gefuellt, blockierte Ergebnisse haben keine Profile. */
-function leeresProfil(result) {
-  if (!result || !result.profiles || !result.meta || result.meta.mode === "animal") return null;
-  const hatInhalt = (p) =>
-    Boolean(
-      p &&
-      ((typeof p.profileText === "string" && p.profileText.trim()) ||
-        (p.categories && Object.keys(p.categories).length > 0))
-    );
-  if (!hatInhalt(result.profiles.normal)) return "profil_leer_standard";
-  if (!hatInhalt(result.profiles.boost)) return "profil_leer_beast";
-  return null;
+/* Schreibt die Meldung und vermerkt sie am Auftrag (OPS-2026-10-03-31). In
+   dieser Reihenfolge: Scheitert der Vermerk, bleibt `gemeldet: false` stehen,
+   und der Aufraeumdienst meldet beim Loeschen ein zweites Mal — lieber zwei
+   Nachrichten als keine. */
+async function meldenUndVermerken(ref, grund) {
+  meldeGescheiterteAnalyse(grund);
+  await ref.update({ gemeldet: true }).catch(() => {});
 }
 
-function meldeGescheiterteAnalyse(grund) {
-  console.error(
-    JSON.stringify({
-      severity: "ERROR",
-      alert: "analyse-gescheitert",
-      step: "analyse-ausgang",
-      grund: typeof grund === "string" && GRUND_MUSTER.test(grund) ? grund : "unbekannt",
-    })
-  );
+/* Fuehrt einen Uebergang in den Endzustand aus und wiederholt ihn EINMAL, wenn
+   er mit einem Fehler endet. Die Wiederholung traegt dieselbe Marke: Hat der
+   erste Versuch doch geschrieben und nur die Bestaetigung kam nicht an, erkennt
+   sie den eigenen Stand (siehe completeJob, failJob). */
+async function mitWiederholung(uebergang) {
+  const marke = crypto.randomUUID();
+  return uebergang(marke).catch(() => uebergang(marke));
+}
+
+/* Meldet beim Loeschen nach, was im Endzustand eine Fehlermeldung zeigte und
+   noch nicht gemeldet ist — fuer den Aufraeumdienst, NACH dem Loeschen des
+   Auftrags. `gemeldet` ist nur dann `false`, wenn der Uebergang es so gesetzt
+   hat; Auftraege aus der Zeit vor diesem Feld bleiben still. */
+function nachmeldenBeimLoeschen(job) {
+  if (job && job.gemeldet === false && fehlerGrund(job)) meldeGescheiterteAnalyse(fehlerGrund(job));
 }
 
 /**
@@ -113,14 +118,13 @@ function meldeGescheiterteAnalyse(grund) {
  *
  * @param {object} params
  * @param {string} params.lang       aufgelöste Sprache ("de"/"en")
- * @param {string} [params.traceId]  Trace-ID des Clients (Korrelation), optional
  * @param {string} params.imagePath  Storage-Pfad des zwischengespeicherten Bildes
  * @param {object} [params.exif]     sanitisierte Kamera-Metadaten (make/model),
  *                                   die der Worker an die Profil-Stufe weiterreicht
  * @param {number} [params.zaehlerStempel]  Marke des Einlasses im Stundenfenster
  * @param {boolean} [params.zaehlerNachtrag] true = der Worker traegt die Marke nach
  */
-async function createJob({ lang, traceId, imagePath, exif, resultToken, zaehlerStempel, zaehlerNachtrag }) {
+async function createJob({ lang, imagePath, exif, resultToken, zaehlerStempel, zaehlerNachtrag }) {
   const ref = jobsRef().doc();
   const now = Date.now();
   await ref.set({
@@ -141,7 +145,9 @@ async function createJob({ lang, traceId, imagePath, exif, resultToken, zaehlerS
     finishedAt: null,
     deliveredAt: null,
     lang: lang || "de",
-    traceId: traceId || null,
+    /* OHNE die Zufallsnummer des Browsers (PRIV-2026-10-03-39): Der
+       Datenschutztext nennt fuer den gespeicherten Auftrag Profil, Kamera und
+       Sprache — und nach dem Einlass liest sie niemand mehr. */
     imagePath: imagePath || null,
     exif: exif && typeof exif === "object" ? exif : {},
     /* PRIV-003 (Audit 2026-06): zweites Schloss auf das Ergebnis. Nur wer dieses
@@ -222,48 +228,127 @@ async function claimJob(jobId) {
  * BUG-001 (Audit 2026-06): bedingter Übergang in einer Transaktion. Ein
  * nachlaufender Worker, dessen Job inzwischen vom Reaper auf `failed`/`abandoned`
  * gesetzt wurde, überschreibt diesen Terminalzustand NICHT mehr.
+ *
+ * `marke` (BUG-2026-10-03-30): Kennzeichen des Schreibers. Wiederholt er den
+ * Aufruf nach einem Fehler und findet den Job schon `done` MIT seiner Marke,
+ * war der erste Versuch angekommen und nur die Bestaetigung ging verloren —
+ * das zaehlt als gelungen, nicht als "ein anderer war schneller".
+ * `meldeGrund`: Grund fuer die Meldung "Analyse gescheitert", wenn er ein
+ * anderer ist als der, den das Kind sieht (`result.blockedReason`).
  * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
-async function completeJob(jobId, result) {
+async function completeJob(jobId, result, { marke = null, meldeGrund = null } = {}) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
+  /* Zeigt dieses Ergebnis dem Kind eine Fehlermeldung (blockiert oder leeres
+     Profil)? Dann traegt der Auftrag ab dem Uebergang `gemeldet: false`. */
+  const grund = fehlerGrund({ status: "done", result, errorReason: meldeGrund });
   const gemacht = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
-    if (!snap.exists || snap.data().status !== "processing") return false;
-    tx.update(ref, { status: "done", finishedAt: Date.now(), result: result || null, errorReason: null });
+    if (!snap.exists) return false;
+    const daten = snap.data();
+    if (marke && daten.status === "done" && daten.abschlussMarke === marke) return true;
+    if (daten.status !== "processing") return false;
+    tx.update(ref, {
+      status: "done",
+      finishedAt: Date.now(),
+      result: result || null,
+      errorReason: meldeGrund,
+      abschlussMarke: marke,
+      gemeldet: grund ? false : null,
+    });
     return true;
   });
-  /* Ein blockiertes Ergebnis oder ein leeres Profil zeigt dem Kind eine
-     Fehlermeldung. */
-  if (gemacht) {
-    if (result && result.meta && result.meta.mode === "blocked") meldeGescheiterteAnalyse(result.blockedReason);
-    else if (leeresProfil(result)) meldeGescheiterteAnalyse(leeresProfil(result));
-  }
+  if (gemacht && grund) await meldenUndVermerken(ref, grund);
   return gemacht;
+}
+
+/* BLEIBT IM CODE — Schutzgrenze, keine Betriebseinstellung: so oft wird das
+   Speichern eines fertigen Ergebnisses versucht, bevor es als gescheitert gilt. */
+const SPEICHER_VERSUCHE = 3;
+
+/**
+ * Speichert das fertige Ergebnis einer Analyse (BUG-2026-10-03-30). Scheitert
+ * der Schreibvorgang, wird DERSELBE mit DEMSELBEN Ergebnis wiederholt — die
+ * Analyse ist bezahlt und fertig, ein einzelner Datenbankfehler soll sie nicht
+ * kosten. Erst nach dem letzten Versuch wirft die Funktion, mit
+ * `code: "ergebnis_speichern"`; der Verarbeiter schreibt dann das
+ * Ersatz-Ergebnis (ersatzErgebnisSpeichern).
+ *
+ * Die Warnung je gescheitertem Versuch traegt nur Code und Art des Fehlers:
+ * Ein Firestore-Fehlertext kann den Dokumentpfad samt jobId enthalten.
+ * @returns {Promise<boolean>} wie completeJob
+ */
+async function ergebnisSpeichern(jobId, result) {
+  const marke = crypto.randomUUID();
+  for (let versuch = 1; ; versuch += 1) {
+    try {
+      return await completeJob(jobId, result, { marke });
+    } catch (err) {
+      console.warn(
+        JSON.stringify({
+          severity: "WARNING",
+          step: "process-job",
+          warning: "ergebnis-speichern-fehlgeschlagen",
+          versuch,
+          code: (err && err.code) || null,
+          art: (err && err.name) || null,
+        })
+      );
+      if (versuch >= SPEICHER_VERSUCHE) {
+        const fehler = new Error("Ergebnis nicht speicherbar");
+        fehler.code = "ergebnis_speichern";
+        throw fehler;
+      }
+    }
+  }
+}
+
+/**
+ * Schreibt das Ersatz-Ergebnis "technischer Fehler", wenn der Verarbeiter
+ * unerwartet scheitert — ein sauberes, renderbares Ergebnis statt eines
+ * haengenden Auftrags. Das Kind sieht in jedem Fall `blocked.apiError`;
+ * `meldeGrund` nennt der Meldung den wahren Grund, wenn es nicht die KI war.
+ */
+function ersatzErgebnis(job) {
+  return {
+    profiles: null,
+    blockedReason: "blocked.apiError",
+    privacyRisks: [],
+    exif: (job && job.exif) || {},
+    meta: { mode: "blocked" },
+  };
+}
+
+async function ersatzErgebnisSpeichern(jobId, job, meldeGrund) {
+  return completeJob(jobId, ersatzErgebnis(job), { meldeGrund: meldeGrund || null });
 }
 
 /**
  * Markiert einen Job als gescheitert: NUR aus `queued`/`processing` → `failed`.
  *
  * BUG-001: bedingt — ein bereits `done`/`abandoned` Job wird NICHT überschrieben.
+ * OPS-2026-10-03-31: Endet der Uebergang mit einem Fehler, wird er einmal
+ * wiederholt (mitWiederholung) — kam nur die Bestaetigung nicht an, meldet die
+ * Wiederholung.
  * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
 async function failJob(jobId, reason) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
-  const gemacht = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    if (!snap.exists) return false;
-    const st = snap.data().status;
-    if (st !== "queued" && st !== "processing") return false;
-    tx.update(ref, {
-      status: "failed",
-      finishedAt: Date.now(),
-      errorReason: typeof reason === "string" ? reason.slice(0, 300) : "unknown",
-    });
-    return true;
-  });
-  if (gemacht) meldeGescheiterteAnalyse(reason);
+  const errorReason = typeof reason === "string" ? reason.slice(0, 300) : "unknown";
+  const gemacht = await mitWiederholung((marke) =>
+    db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return false;
+      const daten = snap.data();
+      if (daten.status === "failed" && daten.abschlussMarke === marke) return true;
+      if (daten.status !== "queued" && daten.status !== "processing") return false;
+      tx.update(ref, { status: "failed", finishedAt: Date.now(), errorReason, abschlussMarke: marke, gemeldet: false });
+      return true;
+    })
+  );
+  if (gemacht) await meldenUndVermerken(ref, reason);
   return gemacht;
 }
 
@@ -353,7 +438,14 @@ async function markFailedIfStale(job) {
   const werte = await betriebswerteOderAbbruch();
   if (Date.now() - startedAt < werte.verarbeitungsZeitlimitMs) return job;
   const failed = await failJob(job.id, "processing_timeout");
-  if (failed) return { ...job, status: "failed", errorReason: "processing_timeout" };
+  if (failed) {
+    /* Der Verarbeiter ist nicht fertig geworden und loescht das Foto nicht mehr
+       selbst. Der Aufraeumdienst sucht nur haengende Auftraege und faende diesen
+       jetzt nicht mehr — also hier loeschen, sonst laege das Foto bis zur
+       2-Stunden-Frist (PRIV-2026-10-03-28). Ein Fehlschlag meldet sich selbst. */
+    await deleteImage(job.imagePath);
+    return { ...job, status: "failed", errorReason: "processing_timeout" };
+  }
   /* BUG-001: failJob hat NICHT gegriffen — der Job ist inzwischen terminal
      (z.B. der Worker hat doch noch `done` geschrieben). Frischen Stand lesen,
      statt fälschlich „failed" zu melden. */
@@ -388,7 +480,12 @@ async function markDelivered(jobId, rcTicketHash) {
   if (typeof rcTicketHash === "string" && rcTicketHash.length > 0) {
     patch.rcTicketHash = rcTicketHash;
   }
-  await jobsRef().doc(jobId).update(patch);
+  /* BUG-2026-10-03-29: An diesem Vermerk haengt die Loeschung des Ergebnisses
+     15 Minuten nach der Abholung (findZugestellteJobs). Die Statusabfrage
+     wartet ihn deshalb ab, bevor sie antwortet; scheitert er, wird er hier
+     einmal wiederholt. Erst der zweite Fehlschlag geht an den Aufrufer. */
+  const ref = jobsRef().doc(jobId);
+  await ref.update(patch).catch(() => ref.update(patch));
 }
 
 /**
@@ -591,9 +688,9 @@ async function findStaleProcessingJobs(limit) {
  * automatischen Einzelfeld-Index abgedeckt — kein zusammengesetzter Index.
  */
 async function findExpiredJobs(limit) {
-  const werte = await betriebswerteOderAbbruch();
-  const cutoff = Date.now() - werte.jobAufbewahrungMs;
-  limit = limit || werte.aufraeumStapel;
+  const { fristMs, stapel } = await loeschfrist("jobAufbewahrungMs");
+  const cutoff = Date.now() - fristMs;
+  limit = limit || stapel;
   const snap = await jobsRef().where("createdAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -606,9 +703,9 @@ async function findExpiredJobs(limit) {
  * ohne `deliveredAt` (nie zugestellt) von selbst.
  */
 async function findZugestellteJobs(limit) {
-  const werte = await betriebswerteOderAbbruch();
-  const cutoff = Date.now() - werte.zustellfensterMs;
-  limit = limit || werte.aufraeumStapel;
+  const { fristMs, stapel } = await loeschfrist("zustellfensterMs");
+  const cutoff = Date.now() - fristMs;
+  limit = limit || stapel;
   const snap = await jobsRef().where("deliveredAt", "<", cutoff).limit(limit).get();
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -626,6 +723,9 @@ module.exports = {
   getJob,
   claimJob,
   completeJob,
+  ergebnisSpeichern,
+  ersatzErgebnis,
+  ersatzErgebnisSpeichern,
   failJob,
   getQueuePosition,
   countQueuedJobs,
@@ -635,6 +735,7 @@ module.exports = {
   verbraucheRcTicket,
   setLiveText,
   meldeGescheiterteAnalyse,
+  nachmeldenBeimLoeschen,
   abandonJob,
   isAbandoned,
   findAbandonedJobs,

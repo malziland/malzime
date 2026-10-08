@@ -85,6 +85,76 @@ lauf test-blind.py "$HIER/negativprobe/tabellenform" 1 \
 lauf test-blind.py "$HIER/negativprobe/uebersprungen-begruendet" 0 \
   "begruendet uebersprungen zaehlt nicht als Mangel, bleibt aber sichtbar"
 
+echo ""
+echo "Richtung 6: Formulierung ueber einen Zeilenumbruch (2026-10-07)"
+lauf aussentext.py "$HIER/negativprobe/umbruch" 1 \
+  "eine Formulierung, die ueber einen Zeilenumbruch laeuft, wird gefunden"
+lauf aussentext.py "$HIER/negativprobe/umbruch-absatz" 0 \
+  "ueber Leerzeile, Listenpunkte, Ueberschrift und Tabellenzeilen hinweg wird nicht gesucht"
+lauf aussentext.py "$HIER/negativprobe/umbruch-listenpunkt" 1 \
+  "die eingerueckte Fortsetzung eines Listenpunkts gehoert zu seinem Satz"
+lauf aussentext.py "$HIER/negativprobe/umbruch-html" 1 \
+  "ein Satz in einem HTML-Absatz wird ueber den Zeilenumbruch gefunden"
+
+echo ""
+echo "Richtung 8: Formulierung mit einer Hervorhebung mittendrin (2026-10-08)"
+lauf aussentext.py "$HIER/negativprobe/betont-markdown" 1 \
+  "eine Wendung mit einem betonten Wort (Sternchen) wird gefunden"
+lauf aussentext.py "$HIER/negativprobe/betont-html" 1 \
+  "eine Wendung mit Hervorhebung und Zeichen in HTML-Schreibweise wird gefunden"
+lauf aussentext.py "$HIER/negativprobe/betont-umbruch" 1 \
+  "betont UND ueber einen Zeilenumbruch: beide Durchgaenge wirken zusammen"
+lauf aussentext.py "$HIER/negativprobe/betont-sauber" 0 \
+  "Namen mit Unterstrichen, getrennte Listenpunkte und Absaetze bleiben ohne Fund"
+
+echo ""
+echo "Richtung 7: was git ausnimmt, wird nicht gelesen (2026-10-08)"
+# Vorher lasen drei der vier Pruefungen den Dateibaum und damit auch private Ordner,
+# die nie ausgeliefert werden. Die Probe: sauberes Material, daneben ein von git
+# AUSGENOMMENER Ordner mit dem kaputten Beispielmaterial.
+# Git liefert Ausgenommenes nicht aus - nach einem frischen Abzug gaebe es den Ordner
+# nicht, und die Probe waere von selbst gruen. Deshalb entsteht er erst hier und
+# verschwindet danach wieder. Die Gegenprobe zeigt, dass die Probe ueberhaupt misst:
+# Derselbe Inhalt OHNE git (Kopie ausserhalb jedes Repositorys) muss rot werden.
+AUSG="$HIER/negativprobe/ausgenommen"
+# Laeuft diese Selbstpruefung aus einem Haken heraus, koennen git-Variablen geerbt
+# sein. Die Pruefungen legen sie selbst ab; die eine Abfrage hier unten auch.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
+OHNE_GIT=$(mktemp -d 2>/dev/null) || OHNE_GIT=""
+aufraeumen() {
+  rm -rf "$AUSG/privat"
+  [ -n "$OHNE_GIT" ] && rm -rf "$OHNE_GIT"
+}
+trap aufraeumen EXIT INT TERM
+if [ -z "$OHNE_GIT" ] || ! git -C "$AUSG" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  PROBEN=$((PROBEN + 1))
+  FEHLER=$((FEHLER + 1))
+  echo "  NEIN  nicht messbar: hier liegt kein git-Arbeitsbaum (oder kein Platz fuer die"
+  echo "        Gegenprobe). Ohne git gibt es nichts Ausgenommenes - das ist kein Bestehen."
+else
+  rm -rf "$AUSG/privat"
+  cp -R "$KAPUTT" "$AUSG/privat"
+  cp -R "$AUSG/." "$OHNE_GIT/"
+  for P in fakten-drift.py stiller-fehlschlag.py test-blind.py aussentext.py; do
+    lauf "$P" "$AUSG" 0 "${P%.py} liest den von git ausgenommenen Ordner nicht"
+    lauf "$P" "$OHNE_GIT" 1 "${P%.py} liest denselben Ordner, wenn kein git da ist (Gegenprobe)"
+    # Nennt git zu einem Ordner NICHTS (hier: alles darin ist ausgenommen), ist das
+    # zuerst ein Verdacht gegen das Messmittel. Die Pruefung liest dann den
+    # Dateibaum - sie wird nie gruen, ohne eine Datei gelesen zu haben.
+    lauf "$P" "$AUSG/privat" 1 "${P%.py}: nennt git zu einem Ordner nichts, wird er trotzdem gelesen"
+  done
+  # Eine geerbte git-Variable, die woandershin zeigt, aendert nichts: Gefragt wird das
+  # Repository, in dem der Ordner liegt.
+  GIT_DIR="$OHNE_GIT/gibt-es-nicht"
+  export GIT_DIR
+  for P in fakten-drift.py stiller-fehlschlag.py test-blind.py aussentext.py; do
+    lauf "$P" "$AUSG" 0 "${P%.py} laesst sich von einer geerbten git-Variable nicht umlenken"
+  done
+  unset GIT_DIR
+fi
+aufraeumen
+trap - EXIT INT TERM
+
 echo "============================================================"
 if [ "$FEHLER" -eq 0 ]; then
   # Die Zahl steht NUR hier und kommt aus dem Zaehler. Sie als Wort zu fuehren

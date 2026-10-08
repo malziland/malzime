@@ -46,6 +46,7 @@ jest.mock("../durchsatz", () => ({
   dauerJeAnalyse: jest.fn(async () => ({ sekunden: 65, gemessen: false, frisch: false })),
 }));
 jest.mock("../queue-storage", () => ({
+  neuerBildPfad: jest.fn(),
   storeImage: jest.fn(),
   deleteImage: jest.fn(),
 }));
@@ -62,6 +63,7 @@ const middleware = require("../middleware");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const tasks = require("../cloud-tasks");
+const { zeileAlsText } = require("./hilfen/als-text");
 
 const VALID_JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(20)]);
 
@@ -115,6 +117,9 @@ beforeEach(() => {
      */
   jobs.createJob.mockResolvedValue("job-abc");
   jobs.failJob.mockResolvedValue();
+  /* Der Pfad steht fest, BEVOR gespeichert wird (PRIV-2026-10-03-28): Der
+     Einlass legt erst den Auftrag mit diesem Pfad an und speichert dann. */
+  storage.neuerBildPfad.mockReset().mockReturnValue("queue-uploads/test.jpg");
   storage.storeImage.mockResolvedValue("queue-uploads/test.jpg");
   storage.deleteImage.mockResolvedValue();
   tasks.enqueueJob.mockResolvedValue("projects/p/locations/l/queues/q/tasks/t");
@@ -174,6 +179,36 @@ describe("handleEnqueue — Abweisungen", () => {
     expect(res.statusCode).toBe(429);
   });
 
+  /* UX-2026-10-03-47: Der Browser zeigt je nach Grund einen anderen Text. Er
+     erkennt die drei Faelle "zu viele Anfragen" am Rumpf: Die Sperre je
+     Netzwerk-Adresse traegt KEIN Merkmal `blocked`, das Stundenlimit `limit`,
+     die volle Warteschlange `queueFull`. Aendert sich einer dieser Ruempfe,
+     zeigt der Browser den falschen Text — deshalb hier woertlich. */
+  test("die drei Antworten 429 sind am Rumpf unterscheidbar", async () => {
+    middleware.checkRateLimit.mockReturnValue(false);
+    const adresse = makeRes();
+    await handleEnqueue(jsonReq(), adresse, SECRETS);
+    middleware.checkRateLimit.mockReturnValue(true);
+
+    counter.checkAndIncrement.mockResolvedValue({ allowed: false, retryAfterSeconds: 120 });
+    const stundenlimit = makeRes();
+    await handleEnqueue(jsonReq(), stundenlimit, SECRETS);
+    counter.checkAndIncrement.mockResolvedValue({ allowed: true, justReached: false, count: 1, limit: 1500 });
+
+    jobs.countQueuedJobs.mockResolvedValue(100000);
+    const schlange = makeRes();
+    await handleEnqueue(jsonReq(), schlange, SECRETS);
+
+    expect([adresse.statusCode, stundenlimit.statusCode, schlange.statusCode]).toEqual([429, 429, 429]);
+    expect(adresse.body).toEqual({ error: "Rate limit exceeded" });
+    expect(stundenlimit.body).toEqual({ blocked: "limit", retryAfterSeconds: 120, message: "Stundenlimit erreicht" });
+    expect(schlange.body).toEqual({
+      blocked: "queueFull",
+      retryAfterSeconds: 300,
+      message: "Gerade warten sehr viele Analysen — bitte in ein paar Minuten nochmal.",
+    });
+  });
+
   test("Honeypot ausgefüllt → 403", async () => {
     const res = makeRes();
     await handleEnqueue(jsonReq({ website: "spam" }), res, SECRETS);
@@ -217,10 +252,12 @@ describe("handleEnqueue — Erfolgsfall", () => {
     expect(typeof res.body.resultToken).toBe("string");
     expect(res.body.resultToken.length).toBeGreaterThan(0);
     expect(storage.storeImage).toHaveBeenCalledTimes(1);
+    expect(storage.storeImage).toHaveBeenCalledWith(expect.any(Buffer), "image/jpeg", "queue-uploads/test.jpg");
+    /* Erst der Auftrag, dann das Foto. */
+    expect(jobs.createJob.mock.invocationCallOrder[0]).toBeLessThan(storage.storeImage.mock.invocationCallOrder[0]);
     expect(jobs.createJob).toHaveBeenCalledWith(
       expect.objectContaining({
         lang: "de",
-        traceId: null,
         imagePath: "queue-uploads/test.jpg",
         exif: {},
       })
@@ -236,11 +273,18 @@ describe("handleEnqueue — Erfolgsfall", () => {
     );
   });
 
-  test("gültige Trace-ID wird übernommen", async () => {
+  /* PRIV-2026-10-03-39: Die Zufallsnummer des Browsers kommt in der
+     Antwort-Kopfzeile zurueck, geht aber nicht in den gespeicherten Auftrag. */
+  test("gültige Trace-ID: in der Antwort-Kopfzeile, nicht im Auftrag", async () => {
     const res = makeRes();
     await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
-    expect(jobs.createJob).toHaveBeenCalledWith(expect.objectContaining({ traceId: "abc123XYZ" }));
     expect(res.headers["X-Trace-Id"]).toBe("abc123XYZ");
+    /* Erfolgsweg: Der Auftrag wird angelegt, mit Sprache und Bildpfad. */
+    expect(jobs.createJob).toHaveBeenCalledTimes(1);
+    const auftrag = jobs.createJob.mock.calls[0][0];
+    expect(auftrag).toEqual(expect.objectContaining({ lang: "de", imagePath: expect.any(String) }));
+    expect(auftrag).not.toHaveProperty("traceId");
+    expect(JSON.stringify(auftrag)).not.toContain("abc123XYZ");
   });
 
   /* 27.09.2026: Der Auftrag und die Antwort an den Browser tragen die
@@ -284,7 +328,7 @@ describe("handleEnqueue — Erfolgsfall", () => {
     vorbereiten();
     const ausgaben = [];
     const spies = ["log", "warn", "error", "info"].map((art) =>
-      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(zeileAlsText(...a)))
     );
     const res = makeRes();
     await handleEnqueue(jsonReq({ traceId: "abc123XYZ" }), res, SECRETS);
@@ -358,25 +402,32 @@ describe("handleEnqueue — Cloud-Tasks-Ausfall", () => {
 /* ── Storage-/Firestore-Ausfall nach gezogenem Stunden-Slot ──────── */
 
 describe("handleEnqueue — Ausfall zwischen Slot und Task", () => {
-  test("schlägt storeImage fehl → 503, Slot zurückgegeben, kein deleteImage nötig", async () => {
+  /* Seit PRIV-2026-10-03-28 legt der Einlass erst den Auftrag an und speichert
+     dann das Foto. Scheitert das Speichern, gibt es den Auftrag schon: Er endet
+     als gescheitert, und was der Speicher trotz Fehler geschrieben haben
+     koennte, wird geloescht. */
+  test("schlägt storeImage fehl → 503, Slot zurückgegeben, Auftrag gescheitert, Bild gelöscht", async () => {
     storage.storeImage.mockRejectedValue(new Error("gcs down"));
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
     expect(res.statusCode).toBe(503);
     expect(res.body.code).toBe("store_failed");
     expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
-    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(jobs.failJob).toHaveBeenCalledWith("job-abc", "store_failed");
+    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
     expect(tasks.enqueueJob).not.toHaveBeenCalled();
   });
 
-  test("schlägt createJob fehl → 503, Slot zurückgegeben UND Bild-Waise gelöscht", async () => {
+  test("schlägt createJob fehl → 503, Slot zurückgegeben, das Bild wird gar nicht erst gespeichert", async () => {
     jobs.createJob.mockRejectedValue(new Error("firestore blip"));
     const res = makeRes();
     await handleEnqueue(jsonReq(), res, SECRETS);
     expect(res.statusCode).toBe(503);
     expect(res.body.code).toBe("store_failed");
     expect(counter.releaseHourlySlot).toHaveBeenCalledTimes(1);
-    expect(storage.deleteImage).toHaveBeenCalledWith("queue-uploads/test.jpg");
+    expect(storage.storeImage).not.toHaveBeenCalled();
+    expect(storage.deleteImage).not.toHaveBeenCalled();
+    expect(jobs.failJob).not.toHaveBeenCalled();
     expect(tasks.enqueueJob).not.toHaveBeenCalled();
   });
 });
@@ -386,13 +437,40 @@ describe("handleEnqueue — Ausfall zwischen Slot und Task", () => {
    kommt dann EINE Nachricht "Analyse gescheitert" — auch auf den zwei Wegen,
    auf denen es noch keinen Auftrag gibt. Eingabefehler (4xx) nicht. */
 describe("handleEnqueue — Nachricht bei gescheitertem Einreihen", () => {
+  /* Scheitert das Speichern, gibt es den Auftrag schon; seinen Uebergang auf
+     "gescheitert" meldet jobs.js selbst (echte Module: foto-nach-absturz.test.js).
+     Der Einlass meldet nur, wenn es keinen Auftrag gibt oder der Uebergang nicht
+     gelang — so bleibt es bei genau einer Meldung. */
   test.each([
-    ["Speicher weg", () => storage.storeImage.mockRejectedValue(new Error("gcs down"))],
-    ["Datenbank weg", () => jobs.createJob.mockRejectedValue(new Error("firestore blip"))],
-  ])("%s → genau eine Meldung store_failed", async (_fall, stoerung) => {
+    ["Datenbank weg (kein Auftrag)", () => jobs.createJob.mockRejectedValue(new Error("firestore blip"))],
+    [
+      "Speicher weg, und der Auftrag laesst sich nicht auf gescheitert setzen",
+      () => {
+        storage.storeImage.mockRejectedValue(new Error("gcs down"));
+        jobs.failJob.mockRejectedValue(new Error("firestore blip"));
+      },
+    ],
+    [
+      "Speicher weg, und der Auftrag war schon beendet",
+      () => {
+        storage.storeImage.mockRejectedValue(new Error("gcs down"));
+        jobs.failJob.mockResolvedValue(false);
+      },
+    ],
+  ])("%s → genau eine Meldung store_failed vom Einlass", async (_fall, stoerung) => {
     stoerung();
-    await handleEnqueue(jsonReq(), makeRes(), SECRETS);
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(503);
     expect(jobs.meldeGescheiterteAnalyse.mock.calls).toEqual([["store_failed"]]);
+  });
+
+  test("Speicher weg → der Uebergang des Auftrags meldet, der Einlass nicht noch einmal", async () => {
+    storage.storeImage.mockRejectedValue(new Error("gcs down"));
+    jobs.failJob.mockResolvedValue(true);
+    await handleEnqueue(jsonReq(), makeRes(), SECRETS);
+    expect(jobs.failJob.mock.calls).toEqual([["job-abc", "store_failed"]]);
+    expect(jobs.meldeGescheiterteAnalyse).not.toHaveBeenCalled();
   });
 
   test("unerwarteter Serverfehler (5xx) → eine Meldung enqueue_unerwartet", async () => {
@@ -449,7 +527,7 @@ describe("SEC-002 — Größe aus der Kopfzeile", () => {
     const req = jsonReq();
     req.headers["content-length"] = String(200 * 1024);
     jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     tasks.enqueueJob.mockResolvedValue();
     const res = makeRes();
     await handleEnqueue(req, res, SECRETS);
@@ -465,7 +543,7 @@ describe("ARCH-001 — Warteschlangen-Tiefe", () => {
     counter.getMaintenanceStatus.mockResolvedValue({ enabled: false });
     counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
     middleware.checkRateLimit.mockReturnValue(true);
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
     tasks.enqueueJob.mockResolvedValue();
   });
@@ -556,7 +634,7 @@ describe("TEST-002 — nachgezogene Upload-Prüfungen", () => {
     jobs.platzBestaetigen.mockResolvedValue(true);
     jobs.createJob.mockResolvedValue({ id: "job-1", resultToken: "tok" });
     middleware.checkRateLimit.mockReturnValue(true);
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     tasks.enqueueJob.mockResolvedValue();
   });
 
@@ -655,7 +733,7 @@ describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
     jest.clearAllMocks();
     counter.checkAndIncrement.mockResolvedValue({ allowed: true, count: 1, limit: 500 });
     middleware.checkRateLimit.mockReturnValue(true);
-    storage.storeImage.mockResolvedValue("pfad.jpg");
+    storage.neuerBildPfad.mockReturnValue("pfad.jpg");
     jobs.createJob.mockResolvedValue("job-abc");
     /* Die zweite Stufe laeuft bei JEDEM Upload (DOC-2026-09-01-04: eine
        80-%-Schwelle stand hier nur im Kommentar, nie im Code). */
@@ -710,5 +788,171 @@ describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
     expect(res.statusCode).toBe(200);
     expect(fehler.join(" ")).toContain("platz-bestaetigung-fehlgeschlagen");
     jest.restoreAllMocks();
+  });
+});
+
+/* STRUCT-2026-10-03-36: Vier Wege des Einlasses betrat bis dahin kein Test
+   (Abdeckungslauf des Audits vom 03.10.2026). Jeder ist ein Riegel oder eine
+   Ausnahme von einer Regel — still ausgebaut, bliebe alles gruen. */
+describe("STRUCT-2026-10-03-36 — vier bisher ungepruefte Wege", () => {
+  const satz = () => require("../test-satz").betriebsprofilMock().geltendeWerte();
+
+  test("der Einstellungssatz verschwindet zwischen den zwei Riegeln: 503 mit Text, nichts angelegt", async () => {
+    /* Erster Zugriff (Riegel vor der Ratenbegrenzung): Satz da. Zweiter
+       (Einlassgrenze): kein Satz mehr — die Einlassgrenze ist dann null. */
+    betriebsprofil.geltendeWerte
+      .mockReset()
+      .mockImplementationOnce(satz)
+      .mockResolvedValue({ werte: null, quelle: "fehlt", profil: null, grund: "kein Dokument" });
+    const res = makeRes();
+
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body).toEqual({
+      blocked: "configMissing",
+      retryAfterSeconds: 300,
+      message: "Bei uns stimmt gerade eine Einstellung nicht — bitte in ein paar Minuten nochmal.",
+    });
+    expect(jobs.countQueuedJobs).not.toHaveBeenCalled();
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+    expect(jobs.createJob).not.toHaveBeenCalled();
+    expect(storage.storeImage).not.toHaveBeenCalled();
+  });
+
+  test("die Einlassgrenze ist nicht ermittelbar: die zweite Stufe wird uebersprungen — ohne Fehlerzeile", async () => {
+    /* Der zweite Zugriff auf den Satz scheitert ganz: Die Grenze bleibt
+       unbekannt. Das ist kein Fehler der Platzbestaetigung und darf nicht als
+       einer im Protokoll stehen, sonst geht der echte im Rauschen unter. */
+    betriebsprofil.geltendeWerte.mockReset().mockImplementationOnce(satz).mockRejectedValueOnce(new Error("weg"));
+    betriebsprofil.geltendeWerte.mockImplementation(satz);
+    const fehler = jest.spyOn(console, "error").mockImplementation(() => {});
+    const res = makeRes();
+
+    await handleEnqueue(jsonReq(), res, SECRETS);
+
+    expect(res.statusCode).toBe(200);
+    expect(jobs.getJob).not.toHaveBeenCalled();
+    expect(jobs.platzBestaetigen).not.toHaveBeenCalled();
+    expect(tasks.enqueueJob).toHaveBeenCalledWith("job-abc");
+    expect(fehler).not.toHaveBeenCalled();
+    fehler.mockRestore();
+  });
+
+  test("meldet die Rumpf-Verarbeitung eine Datei ueber der Grenze, haelt der Einlass selbst dagegen: 413", async () => {
+    /* Zwei Riegel liegen davor (Base64-Laenge, Grenze der Multipart-Lesung).
+       Dieser dritte prueft die gemeldete Groesse selbst — erreichbar nur, wenn
+       die beiden davor nachgeben. Deshalb hier mit nachgestellter Lesung. */
+    const { MAX_UPLOAD_BYTES } = require("../config");
+    let einlass;
+    jest.isolateModules(() => {
+      jest.doMock("../upload", () => ({
+        parseJsonBody: () => null,
+        parseMultipart: async () => ({
+          fields: {},
+          file: { buffer: VALID_JPEG, mimeType: "image/jpeg", filename: "x.jpg", size: MAX_UPLOAD_BYTES + 1 },
+        }),
+      }));
+      einlass = require("../handle-enqueue").handleEnqueue;
+    });
+    jest.dontMock("../upload");
+    const res = makeRes();
+
+    await einlass({ method: "POST", headers: { "content-type": "multipart/form-data; boundary=x" } }, res, SECRETS);
+
+    expect(res.statusCode).toBe(413);
+    expect(res.body).toEqual({ error: "File too large" });
+  });
+
+  test("genau auf der Grenze geht dieselbe Meldung durch (Grenze einschliesslich)", async () => {
+    const { MAX_UPLOAD_BYTES } = require("../config");
+    let einlass;
+    jest.isolateModules(() => {
+      jest.doMock("../upload", () => ({
+        parseJsonBody: () => null,
+        parseMultipart: async () => ({
+          fields: {},
+          file: { buffer: VALID_JPEG, mimeType: "image/jpeg", filename: "x.jpg", size: MAX_UPLOAD_BYTES },
+        }),
+      }));
+      einlass = require("../handle-enqueue").handleEnqueue;
+    });
+    jest.dontMock("../upload");
+    const res = makeRes();
+
+    await einlass({ method: "POST", headers: { "content-type": "multipart/form-data; boundary=x" } }, res, SECRETS);
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  test("ein Eingabefehler der Rumpf-Verarbeitung (4xx) bekommt seinen Status — und loest keine Meldung aus", async () => {
+    /* Weder JSON noch Multipart: Die Rumpf-Verarbeitung wirft 400. Der
+       Fangblock gibt den Status weiter; "Analyse gescheitert" meldet er nur
+       bei Serverfehlern (5xx), sonst koennte jeder von aussen Nachrichten
+       ausloesen. */
+    const res = makeRes();
+
+    await handleEnqueue({ method: "POST", headers: { "content-type": "text/plain" }, body: "x" }, res, SECRETS);
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Enqueue failed", code: "unsupported_content_type" });
+    expect(jobs.meldeGescheiterteAnalyse).not.toHaveBeenCalled();
+    expect(counter.checkAndIncrement).not.toHaveBeenCalled();
+  });
+});
+
+/* 07.10.2026: Die Nachricht "Stundenlimit erreicht" ist das Signal fuer den
+   Boost. Sie lief neben der Antwort her und konnte ausbleiben, sobald die
+   Antwort draussen war. Jetzt wartet der Einlass auf sie — hoechstens zwei
+   Sekunden, und nur bei der einen Anfrage, die das Limit erreicht. */
+describe("Nachricht „Stundenlimit erreicht“ wird abgewartet", () => {
+  const notify = require("../notify");
+  const erreicht = { allowed: true, justReached: true, count: 500, limit: 500 };
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  test("die Antwort geht erst hinaus, wenn die Nachricht versandt ist", async () => {
+    counter.checkAndIncrement.mockResolvedValueOnce(erreicht);
+    let versandt = false;
+    notify.notifyLimitReached.mockImplementationOnce(
+      () =>
+        new Promise((fertig) =>
+          setTimeout(() => {
+            versandt = true;
+            fertig();
+          }, 40)
+        )
+    );
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(notify.notifyLimitReached).toHaveBeenCalledWith(expect.objectContaining({ count: 500, limit: 500 }));
+    expect(versandt).toBe(true);
+  });
+
+  test("antwortet der Benachrichtigungsdienst nicht, geht es nach zwei Sekunden trotzdem weiter", async () => {
+    jest.useFakeTimers();
+    counter.checkAndIncrement.mockResolvedValueOnce(erreicht);
+    notify.notifyLimitReached.mockImplementationOnce(() => new Promise(() => {}));
+    const res = makeRes();
+    let fertig = false;
+    const lauf = handleEnqueue(jsonReq(), res, SECRETS).then(() => {
+      fertig = true;
+    });
+    await jest.advanceTimersByTimeAsync(1900);
+    expect(fertig).toBe(false);
+    await jest.advanceTimersByTimeAsync(200);
+    await lauf;
+    expect(res.statusCode).toBe(200);
+    expect(res.body.jobId).toBe("job-abc");
+  });
+
+  test("ohne erreichtes Limit wartet der Einlass auf nichts (Erfolgsweg)", async () => {
+    const res = makeRes();
+    await handleEnqueue(jsonReq(), res, SECRETS);
+    expect(res.statusCode).toBe(200);
+    expect(notify.notifyLimitReached).not.toHaveBeenCalled();
   });
 });

@@ -86,17 +86,33 @@ export async function heicZuCanvas(bytes) {
   const canvas = document.createElement("canvas");
   canvas.width = breite;
   canvas.height = hoehe;
+  /* BUG-2026-08-20-37: Scheitert es ab hier, wird die Flaeche freigegeben.
+     Sie ist in Originalgroesse angelegt und bliebe sonst belegt, bis der
+     Browser von sich aus aufraeumt — auf Geraeten mit knappem Speicher fuer
+     Zeichenflaechen scheitert dann das naechste Foto erst recht. */
+  const freigeben = () => {
+    canvas.width = 0;
+    canvas.height = 0;
+  };
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw fehler("heic:canvas");
-  const daten = ctx.createImageData(breite, hoehe);
-  await new Promise((resolve, reject) => {
-    try {
-      bild.display(daten, (ergebnis) => (ergebnis ? resolve() : reject(fehler("heic:zeichnen"))));
-    } catch (err) {
-      reject(fehler("heic:zeichnen:" + ((err && err.message) || "?")));
-    }
-  });
-  ctx.putImageData(daten, 0, 0);
+  if (!ctx) {
+    freigeben();
+    throw fehler("heic:canvas");
+  }
+  try {
+    const daten = ctx.createImageData(breite, hoehe);
+    await new Promise((resolve, reject) => {
+      try {
+        bild.display(daten, (ergebnis) => (ergebnis ? resolve() : reject(fehler("heic:zeichnen"))));
+      } catch (err) {
+        reject(fehler("heic:zeichnen:" + ((err && err.message) || "?")));
+      }
+    });
+    ctx.putImageData(daten, 0, 0);
+  } catch (err) {
+    freigeben();
+    throw err;
+  }
   return canvas;
 }
 

@@ -63,7 +63,10 @@ export default defineConfig({
          Unterschied einen echten Fehler gezeigt, den Chromium nicht zeigte —
          nur in einem Browser zu messen und "geprueft" zu sagen, waere eine
          halbe Pruefung. */
-      testMatch: /(sprachumschalter|barrierefreiheit-protokoll|problemfaelle).*\.test\.js/,
+      /* Auch die Zusage „Beispielbild fragt nichts nach aussen“ gilt fuer jeden
+         Browser, nicht nur fuer Chromium. */
+      testMatch:
+        /(sprachumschalter|barrierefreiheit-protokoll|problemfaelle|beispielbild-ohne-ortsabfrage).*\.test\.js/,
     },
     /* Firefox — Nutzer-Ansage 2026-08-17: Die Workshops laufen NICHT nur auf
        iPhone und Mac. Schulen und Schueler bringen mit, was sie haben; darauf
@@ -78,7 +81,8 @@ export default defineConfig({
       use: { browserName: "firefox" },
       /* Problemfaelle auch hier: Firefox kann HEIC nicht — der Dekoder muss
          greifen (08.09.2026). */
-      testMatch: /(a11y|tastatur-erreichbarkeit|barrierefreiheit-protokoll|ansagen|problemfaelle)/,
+      testMatch:
+        /(a11y|tastatur-erreichbarkeit|barrierefreiheit-protokoll|ansagen|problemfaelle|beispielbild-ohne-ortsabfrage)/,
     },
   ],
   webServer: {

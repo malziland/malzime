@@ -9,6 +9,7 @@ jest.mock("../jobs", () => ({
   abandonJob: jest.fn(),
   failJob: jest.fn(),
   deleteJob: jest.fn(),
+  nachmeldenBeimLoeschen: jest.fn(),
   /* NEU (BUG-2026-08-30-14): Der Reaper gleicht den Warteschlangen-Zaehler mit
      der Wirklichkeit ab. Ohne diesen Eintrag meldete jeder Reaper-Test einen
      Fehler ins Protokoll — und die Tests, die auf "keine Fehlermeldung"
@@ -30,6 +31,7 @@ const { reapJobs } = require("../handle-reap");
 const jobs = require("../jobs");
 const storage = require("../queue-storage");
 const counter = require("../counter");
+const { zeileAlsText } = require("./hilfen/als-text");
 
 beforeEach(() => {
   mockLebenszeichenGet.mockResolvedValue({ exists: true, data: () => ({ letzterLauf: Date.now() }) });
@@ -74,6 +76,23 @@ describe("reapJobs", () => {
     /* BUG-002-Regel: Bild vor Dokument; ohne imagePath (z2) kein Bild-Aufruf. */
     expect(reihenfolge).toEqual(["bild", "dokument", "dokument"]);
     expect(storage.deleteImage).toHaveBeenCalledTimes(1);
+  });
+
+  /* TEST-2026-10-03-42: Liess sich das Bild nicht loeschen (deleteImage meldet
+     `false`, wirft nicht), bleibt das Dokument stehen — sonst verschwaende der
+     einzige Verweis auf die Datei, und sie laege bis zur Ein-Tages-Regel. Der
+     naechste Lauf versucht es wieder. */
+  test("zugestellt: bleibt das Bild liegen, bleibt auch das Dokument", async () => {
+    jobs.findZugestellteJobs.mockResolvedValue([
+      { id: "bild-bleibt", imagePath: "queue-uploads/bleibt.jpg" },
+      { id: "bild-weg", imagePath: "queue-uploads/weg.jpg" },
+    ]);
+    storage.deleteImage.mockImplementation(async (pfad) => pfad !== "queue-uploads/bleibt.jpg");
+
+    const result = await reapJobs();
+
+    expect(result.zugestellt).toBe(1);
+    expect(jobs.deleteJob.mock.calls).toEqual([["bild-weg"]]);
   });
 
   test("PRIV-107b: ein Löschfehler wird geloggt und stoppt weder den Zweig noch den Lauf", async () => {
@@ -204,7 +223,7 @@ describe("reapJobs", () => {
     vorbereiten();
     const ausgaben = [];
     const spies = ["log", "warn", "error", "info"].map((art) =>
-      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(a.map(String).join(" ")))
+      jest.spyOn(console, art).mockImplementation((...a) => ausgaben.push(zeileAlsText(...a)))
     );
     await reapJobs();
     spies.forEach((sp) => sp.mockRestore());

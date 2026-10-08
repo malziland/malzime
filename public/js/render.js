@@ -92,32 +92,12 @@ export function renderCurrentMode(data) {
 
 /* ── Rendering: Kategorie-Karten ── */
 
-/* Kanonische Reihenfolge der Kategorien — vom Demografischen (am wenigsten
-   heikel) ueber die soziale Verortung und Persoenlichkeit bis zur kommerziellen
-   Verwertung und den Verletzlichkeiten am Ende. Mistral garantiert im JSON-
-   Output keine Key-Reihenfolge, deshalb sortieren wir clientseitig nach dieser
-   Liste — damit Normal und Boost identisch geordnet sind und nicht zwischen
-   Analysen springen. Quelle: das Antwortschema im singleLargePrompt in
-   functions/src/locales/{de,en}/prompts.js. */
-/* eslint-disable-next-line no-unused-vars */
-const CATEGORY_ORDER = [
-  "alter_geschlecht",
-  "herkunft",
-  "einkommen",
-  "bildung",
-  "beziehungsstatus",
-  "interessen",
-  "persoenlichkeit",
-  "charakterzuege",
-  "politisch",
-  "gesundheit",
-  "kaufkraft",
-  "verletzlichkeit",
-  "werbeprofil",
-];
-
-/* sortCategoryEntries wurde in v2.1 entfernt — Reihenfolge ergibt sich aus
-   CATEGORY_GROUPS, kein separates Sortieren mehr nötig. */
+/* Die Reihenfolge der Karten steht in CATEGORY_GROUPS — vom Demografischen
+   ueber Persoenlichkeit und Kaufkraft bis zu den Verletzlichkeiten. Mistral
+   garantiert im JSON-Output keine Key-Reihenfolge; weil die Karten gruppenweise
+   in dieser festen Folge gebaut werden, sind Normal und Boost gleich geordnet
+   und springen nicht zwischen Analysen. Die Schluessel entsprechen dem
+   Antwortschema im singleLargePrompt (functions/src/locales/{de,en}/prompts.js). */
 
 /* v2.0.4: Karten werden in vier farblich markierte Themengruppen sortiert.
    Akzent-Linie links + Gruppen-Überschrift davor. Quelle der Gruppierung:
@@ -163,6 +143,9 @@ function highlightKeyTerms(escapedText) {
 }
 
 function renderCategories(profile) {
+  /* Ein Neuaufbau der Karten macht jede noch ausstehende Einblendung des
+     vorigen Stands gegenstandslos (siehe scharfstellZeitgeber). */
+  scharfstellZeitgeberAbraeumen();
   const categories = profile.categories || {};
   if (Object.keys(categories).length === 0) {
     elements.facts.innerHTML = "";
@@ -263,14 +246,28 @@ export function zeigeVersteckteDatenUndKarte() {
 const bereitsGezeigt = new Set();
 /* Reihenfolge der Karten im Geruest — dieselbe wie im fertigen Ergebnis. */
 const ALLE_KARTEN = CATEGORY_GROUPS.flatMap((g) => g.keys);
-/* Fuellwort fuer noch leere Karten. Es wird unscharf gezeichnet und ist
-   deshalb nie lesbar; es traegt nur die Hoehe der Zeile. */
-const PLATZHALTER_TEXT = "Wird gerade ausgewertet und gleich hier stehen.";
-/* Auch die Beschriftung ist zunaechst unscharf — sie kommt vom Modell. */
-const PLATZHALTER_LABEL = "Wird ausgewertet";
+/* Fuelltext und Beschriftung fuer noch leere Karten. Meist unscharf
+   gezeichnet — bei eingestellter „reduzierter Bewegung" nimmt das Stilblatt
+   den Weichzeichner aber weg, dann sind sie LESBAR. Deshalb kommen sie aus
+   der Sprachdatei und werden bei jedem Aufbau frisch geholt (die Sprache kann
+   zwischen zwei Laeufen wechseln). */
+const platzhalterText = () => t("facts.pendingText");
+const platzhalterLabel = () => t("facts.pendingLabel");
 let geruestSteht = false;
 /* Abstand zwischen zwei scharfgestellten Karten. */
 const SCHARFSTELL_TAKT_MS = 400;
+/* BUG-2026-10-03-45: Die noch ausstehenden Scharfstell-Zeitgeber. Sie gehoeren
+   zu EINEM Stand der Karten — einem Lauf und einer Profil-Art. Wechselt der
+   Stand (andere Profil-Art, neuer Lauf, fertiges Ergebnis), werden sie
+   abgeraeumt: Bei 13 Karten laeuft die Einblendung 4,8 Sekunden, und ein
+   Zeitgeber, der danach noch feuert, schriebe den Inhalt der ANDEREN
+   Profil-Art in die Karten — auch in ein schon fertiges Ergebnis. */
+const scharfstellZeitgeber = new Set();
+
+function scharfstellZeitgeberAbraeumen() {
+  for (const zeitgeber of scharfstellZeitgeber) clearTimeout(zeitgeber);
+  scharfstellZeitgeber.clear();
+}
 
 export function zeigeLiveKarten(liveKarten) {
   if (!elements.facts || !Array.isArray(liveKarten)) return;
@@ -293,7 +290,7 @@ export function zeigeLiveKarten(liveKarten) {
   if (!geruestSteht) {
     const categories = {};
     for (const key of ALLE_KARTEN) {
-      categories[key] = { label: PLATZHALTER_LABEL, value: PLATZHALTER_TEXT };
+      categories[key] = { label: platzhalterLabel(), value: platzhalterText() };
     }
     renderCategories({ categories });
     for (const karte of elements.facts.querySelectorAll(".cat-card")) {
@@ -327,13 +324,21 @@ export function zeigeLiveKarten(liveKarten) {
       karte.classList.add("cat-card--scharfstellen");
       karte.removeAttribute("aria-hidden");
     };
-    if (i === 0) setzen();
-    else setTimeout(setzen, i * SCHARFSTELL_TAKT_MS);
+    if (i === 0) {
+      setzen();
+      return;
+    }
+    const zeitgeber = setTimeout(() => {
+      scharfstellZeitgeber.delete(zeitgeber);
+      setzen();
+    }, i * SCHARFSTELL_TAKT_MS);
+    scharfstellZeitgeber.add(zeitgeber);
   });
 }
 
 /** Vor jedem neuen Lauf: Die Merkliste der gezeigten Karten leeren. */
 export function liveKartenZuruecksetzen() {
+  scharfstellZeitgeberAbraeumen();
   bereitsGezeigt.clear();
   geruestSteht = false;
 }
@@ -348,6 +353,9 @@ export function liveKartenZuruecksetzen() {
  * aufblitzen, genau das soll nicht passieren.
  */
 export function liveKartenModusWechsel() {
+  /* Auch die Karten, die erst in den naechsten Sekunden scharf geworden
+     waeren, gehoeren dem anderen Profil. */
+  scharfstellZeitgeberAbraeumen();
   bereitsGezeigt.clear();
   /* Die stehenden Inhalte gehören dem anderen Profil — sie dürfen nicht
      stehenbleiben, bis die neuen eintreffen. Am 29.08. gemessen: Nach dem
@@ -358,8 +366,8 @@ export function liveKartenModusWechsel() {
   for (const karte of elements.facts.querySelectorAll(".cat-card")) {
     const label = karte.querySelector(".cat-label");
     const wert = karte.querySelector(".cat-value");
-    if (label) label.textContent = PLATZHALTER_LABEL;
-    if (wert) wert.textContent = PLATZHALTER_TEXT;
+    if (label) label.textContent = platzhalterLabel();
+    if (wert) wert.textContent = platzhalterText();
     karte.classList.remove("cat-card--scharfstellen");
     karte.classList.add("cat-card--unscharf");
     karte.setAttribute("aria-hidden", "true");
@@ -537,7 +545,7 @@ async function renderGpsMap(data) {
 
     /* BUG-2026-08-20-06: Beim zweiten Aufbau derselben Analyse (Moduswechsel,
        Ausdruck) ist `pendingGeocode` bereits verbraucht. Ohne Gedaechtnis stuenden
-       dort ab dann nur noch Koordinaten — die Adresse war weg, auch im Ausdruck.
+       dort ab dann nur noch Koordinaten — die Adresse war weg.
        Der Cache haengt an den Koordinaten: Er greift nur, wenn es dieselbe
        Aufnahme ist. */
     const passtZuCache = state.geocodeCache && state.geocodeCache.lat === lat && state.geocodeCache.lng === lng;
@@ -551,8 +559,10 @@ async function renderGpsMap(data) {
        Bis v3.8.1 oeffnete sich eine Leaflet-Sprechblase von selbst und verdeckte
        die halbe Karte — auf dem Handy lief sie ueber den Rand hinaus und die
        Zoom-Tasten schnitten den Text ab ("ur location" statt "Your location").
-       Schloss man sie, war die Adresse ganz weg. Als Zeile ist sie immer da,
-       kopierbar, im Ausdruck enthalten und fuer Screenreader normaler Text. */
+       Schloss man sie, war die Adresse ganz weg. Als Zeile ist sie am
+       Bildschirm immer da, kopierbar und fuer Screenreader normaler Text.
+       (Gedruckt wird der Ortsbereich nicht: Das Druck-Stilblatt blendet
+       `#gpsMap` aus.) */
     const ortText = address ? escapeHtml(address) : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     elements.gpsMap.innerHTML = `
       <div class="map-wrapper">
@@ -801,7 +811,7 @@ function renderDataValue(profile) {
             <div class="dv-bar-track">
               <div class="dv-bar-fill" data-bar-width="${Math.round((item.value / maxVal) * 100)}"></div>
             </div>
-            <span class="dv-bar-val">${fmtNum(item.value)} \u20ac</span>
+            <span class="dv-bar-val">${t("dv.euro", { value: fmtNum(item.value) })}</span>
           </div>
         `
           )

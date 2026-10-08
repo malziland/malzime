@@ -1,15 +1,15 @@
 "use strict";
 
 /**
- * animal.js — Subject-Klassifikation aus Mistral-Beschreibungstext.
+ * animal.js — Subject-Klassifikation aus der KI-Antwort.
  *
  * Seit v1.6.0 (Pure-Mistral-Architektur) gibt es KEINE Vision-API mehr.
  * Tier-/Personen-Erkennung läuft jetzt über zwei Quellen:
  *
  *  1. Feld `subject` der KI-Antwort (ANIMAL_ONLY | HUMAN | MIXED | OTHER).
- *     job-pipelines.js setzt es als Kopfzeile "SUBJECT: …" vor die
- *     Beschreibung, die hier ausgewertet wird (Schema: singleLargePrompt in
- *     prompts.js).
+ *     job-pipelines.js reicht den Wert des Feldes herein; ausgewertet wird
+ *     nur dieses Feld, nie eine Zeile aus Profil- oder Bildtext (Schema:
+ *     singleLargePrompt in prompts.js).
  *
  *  2. Wenn SUBJECT == ANIMAL_ONLY: Keyword-Match im Beschreibungstext,
  *     um die konkrete Tierart fürs Easter-Egg-Profil zu wählen
@@ -21,7 +21,6 @@
 const { loadAnimals } = require("./i18n");
 
 const VALID_SUBJECTS = new Set(["ANIMAL_ONLY", "HUMAN", "MIXED", "OTHER"]);
-const SUBJECT_REGEX = /^SUBJECT:\s*(ANIMAL_ONLY|HUMAN|MIXED|OTHER)\b/im;
 
 /* Tier-Typ-Keywords für Easter-Egg-Auswahl. Pro Typ deutsche UND englische
    Begriffe, damit das System auch in den anderen Locales funktioniert. */
@@ -49,39 +48,44 @@ const TYPE_KEYWORDS = Object.freeze({
   rabbit: ["kaninchen", "hase", "hasen", "hamster", "meerschweinchen", "rabbit", "bunny", "hamster", "guinea pig"],
 });
 
+/* Ein Tierwort zaehlt nur als ganzes Wort. Die Grenze kennt alle Buchstaben,
+   auch Umlaute und ß: `\b` haelt sie fuer Wortenden und laese "Spaßvogel" als
+   "vogel" und "Fischöl" als "fisch" (BUG-2026-10-04-09). */
+const KEIN_WORTZEICHEN_DAVOR = "(?<![\\p{L}\\p{N}_])";
+const KEIN_WORTZEICHEN_DANACH = "(?![\\p{L}\\p{N}_])";
 const TYPE_PATTERNS = Object.freeze(
   Object.fromEntries(
     Object.entries(TYPE_KEYWORDS).map(([type, kws]) => [
       type,
-      kws.map((kw) => new RegExp(`\\b${kw.replace(/\s+/g, "\\s+")}\\b`, "i")),
+      kws.map(
+        (kw) => new RegExp(`${KEIN_WORTZEICHEN_DAVOR}${kw.replace(/\s+/g, "\\s+")}${KEIN_WORTZEICHEN_DANACH}`, "giu")
+      ),
     ])
   )
 );
 
 /**
- * Parst die SUBJECT-Kopfzeile aus Mistrals Bildbeschreibung und entscheidet:
- * Mensch im Bild? Tier im Bild? Wenn Tier-only: welche Art?
+ * Entscheidet aus dem Feld `subject` der KI-Antwort: Mensch im Bild? Tier im
+ * Bild? Wenn Tier-only: welche Art?
  *
- * Fail-safe: wenn keine SUBJECT-Zeile vorhanden ist, gilt das Bild als HUMAN
- * (restriktivste Annahme — kein Easter-Egg, normale Profil-Pipeline läuft).
+ * Fail-safe: Fehlt das Feld oder trägt es keinen der vier erlaubten Werte,
+ * gilt das Bild als HUMAN (restriktivste Annahme — kein Easter-Egg, normale
+ * Profil-Pipeline läuft). Der Text dient nur der Auswahl der Tierart.
  *
- * @param {string} description — Mistral-Beschreibungstext (mit SUBJECT-Kopfzeile)
+ * @param {string} subjectFeld — Wert des Feldes `subject` der KI-Antwort
+ * @param {string} [description] — Profil- und Bildtext, nur für die Tierart
  * @returns {{ subject: string, hasPerson: boolean, hasAnimal: boolean, animalType: string|null }}
  */
-function classifyDescription(description) {
-  if (!description || typeof description !== "string") {
-    return { subject: "HUMAN", hasPerson: true, hasAnimal: false, animalType: null };
-  }
-
-  const match = description.match(SUBJECT_REGEX);
-  const subject = match && VALID_SUBJECTS.has(match[1].toUpperCase()) ? match[1].toUpperCase() : "HUMAN";
+function classifySubject(subjectFeld, description = "") {
+  const wert = typeof subjectFeld === "string" ? subjectFeld.trim().toUpperCase() : "";
+  const subject = VALID_SUBJECTS.has(wert) ? wert : "HUMAN";
 
   const hasPerson = subject === "HUMAN" || subject === "MIXED";
   const hasAnimal = subject === "ANIMAL_ONLY" || subject === "MIXED";
 
   let animalType = null;
   if (subject === "ANIMAL_ONLY") {
-    animalType = detectAnimalType(description);
+    animalType = detectAnimalType(typeof description === "string" ? description : "");
   }
 
   return { subject, hasPerson, hasAnimal, animalType };
@@ -101,7 +105,7 @@ function classifyDescription(description) {
 
    2. Konstruktionsfehler. Geprueft werden sollte die BILDBESCHREIBUNG des
       Modells. Im aktiven Single-Large-Pfad gibt es die aber nicht mehr —
-      handle-process-job.js baut sie aus dem FERTIGEN PROFIL zusammen. Geprueft
+      job-pipelines.js baut sie aus dem FERTIGEN PROFIL zusammen. Geprueft
       wurde damit ein Text ueber einen Menschen.
 
    Folge: Beim echten Affenbild griff das Netz NICHT (das Modell schreibt dort
@@ -130,7 +134,7 @@ function detectAnimalType(description) {
   for (const [type, patterns] of Object.entries(TYPE_PATTERNS)) {
     let count = 0;
     for (const re of patterns) {
-      const matches = description.match(new RegExp(re.source, "gi"));
+      const matches = description.match(re);
       if (matches) count += matches.length;
     }
     if (count > bestCount) {
@@ -175,7 +179,7 @@ function buildProfile(modeData, labels, typeInfo, type) {
 /**
  * Erzeugt das Normal- und Boost-Profil für eine erkannte Tierart.
  *
- * @param {string} animalType — aus classifyDescription().animalType (oder "generic")
+ * @param {string} animalType — aus classifySubject().animalType (oder "generic")
  * @param {string} lang — Sprachcode
  * @returns {{ normalProfile: object, boostProfile: object }}
  */
@@ -190,7 +194,7 @@ function buildAnimalProfiles(animalType, lang) {
 }
 
 module.exports = {
-  classifyDescription,
+  classifySubject,
   detectAnimalType,
   buildAnimalProfiles,
   TYPE_KEYWORDS,

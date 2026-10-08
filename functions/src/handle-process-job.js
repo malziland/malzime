@@ -34,8 +34,10 @@ const { loggeMinorSafety } = require("./job-helfer");
 /* Die beiden Analyse-Wege liegen in einer eigenen Datei — was hier bleibt, ist
    die Annahme des Auftrags und das Wegschreiben des Ergebnisses. */
 const { runPipeline } = require("./job-pipelines");
-const { incrementTotals, releaseHourlySlot, zaehlerNachtragen } = require("./counter");
-const { getJob, claimJob, completeJob, isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
+const { incrementTotals, zaehlerNachtragen } = require("./counter");
+const { belegtesFreigeben } = require("./ruecknahme");
+const { getJob, claimJob, ergebnisSpeichern, ersatzErgebnisSpeichern } = require("./jobs");
+const { isAbandoned, abandonJob, countProcessingJobs } = require("./jobs");
 const { geltendeWerte } = require("./betriebsprofil");
 const { deleteImage } = require("./queue-storage");
 const { redispatchJobLocal } = require("./cloud-tasks");
@@ -63,14 +65,9 @@ const { merkeDauer } = require("./durchsatz");
    Sie schlaegt regelmaessig auf den Lerninhalt selbst an ("Ratenzahlung" im
    Beast-Text, gemessen 2026-08-11). */
 
-/* v2.2: Single-Large-Call-Pipeline. Ersetzt Describe + 2× Profile durch
-   einen einzigen Large-Aufruf, der das Bild ansieht und beide Profile in
-   einer Antwort liefert. Tier-Easter-Egg und Privacy-Risks bleiben unmittelbar
-   nutzbar; sie laufen heute über die Beschreibung — die liegt im Single-Call
-   aber NICHT mehr als String vor, sondern verteilt im JSON. Wir rekonstruieren
-   einen "kompakten Beschreibungs-Text" aus profileText, damit
-   classifyDescription/extractVisibleText weiter funktionieren. Pragmatischer
-   Workaround, bis der Tier-Pfad bei Bedarf nativ eingebaut wird. */
+/* Der Analyseweg selbst steht in job-pipelines.js: EIN Aufruf an die KI
+   liefert beide Profile; Motiv und sichtbarer Text kommen als Felder
+   (`subject`, `visible_text`) aus derselben Antwort. */
 
 /* Analog fail-safe: Kann das Prompt-Cache-Flag nicht gelesen werden, laeuft der
    Call ohne Cache-Key — also exakt wie vor v2.5. Ein Firestore-Wackler darf
@@ -156,8 +153,7 @@ async function handleProcessJob(req, res) {
     }
     /* BIZ-001: nur freigeben, wenn DIESER Aufruf den Job wirklich verlassen hat
        (sonst Doppel-Freigabe, falls der Reaper parallel war). */
-    releaseHourlySlot(job.zaehlerStempel).catch(() => {});
-    await deleteImage(job.imagePath);
+    await belegtesFreigeben(job);
     console.log(JSON.stringify({ step: "process-job", jobId, status: "abandoned" }));
     res.status(200).json({ ok: false, reason: "abandoned" });
     return;
@@ -226,7 +222,7 @@ async function handleProcessJob(req, res) {
   const zaehlerNachtrag = job.zaehlerNachtrag === true ? zaehlerNachtragen(job.zaehlerStempel) : null;
   try {
     const { result, success } = await runPipeline(job);
-    /* BUG-2026-08-13-35: Rückgabewert von completeJob auswerten. Er liefert
+    /* BUG-2026-08-13-35: Rückgabewert des Speicherns auswerten. Er liefert
        `false`, wenn der Job nicht mehr `processing` ist (der Reaper hat ihn
        zwischenzeitlich auf `failed` gekippt, und eine CPU-gedrosselt wieder
        auflebende Fortsetzung landet hier). Vorher wurde das verworfen: das
@@ -234,7 +230,7 @@ async function handleProcessJob(req, res) {
        eine Analyse, und die Logzeile behauptete `status: "done"` — das Log log
        aktiv, statt zu schweigen. Seit 01.10.2026 eine Warnung: Den Alarm hat
        der Wechsel auf `failed` bereits ausgeloest (jobs.js). */
-    const gespeichert = await completeJob(jobId, result);
+    const gespeichert = await ergebnisSpeichern(jobId, result);
     if (!gespeichert) {
       console.warn(
         JSON.stringify({
@@ -249,7 +245,7 @@ async function handleProcessJob(req, res) {
       return;
     }
     if (success) {
-      incrementTotals().catch((err) =>
+      await incrementTotals().catch((err) =>
         console.log(JSON.stringify({ warning: "incrementTotals-error", error: ohneKennung(err.message) }))
       );
     }
@@ -277,20 +273,14 @@ async function handleProcessJob(req, res) {
     /* FEATURE-2026-08-29-02: Die Dauer dieses Laufs fuettert die Wartezeit-
        Ansage der naechsten Besucher. NUR bei Erfolg — ein blockierter oder an
        der Uhr gestorbener Lauf sagt nichts darueber, wie lange eine Analyse
-       braucht, und wuerde die Ansage verfaelschen. Bewusst ohne await: Das
-       Ergebnis steht bereits, niemand soll darauf warten. */
-    if (success) {
-      merkeDauer((Date.now() - start) / 1000).catch((e) =>
-        /* BEFUND 31.08.2026: Der Fehlschlag wurde restlos verschluckt.
-           Scheitert das Fortschreiben dauerhaft, bleibt die Wartezeit-Ansage
-           auf einem alten Wert stehen — sichtbar fuer jeden Besucher, ohne
-           dass irgendwo etwas auffaellt. */
-        console.log(JSON.stringify({ warning: "merkeDauer-fehlgeschlagen", error: ohneKennung(e.message) }))
-      );
-    }
+       braucht, und wuerde die Ansage verfaelschen. Abgewartet wie der Zaehler
+       oben (BUG-2026-10-03-29): Das Ergebnis steht schon, das Kind wartet nicht. */
+    /* Wirft nie; einen Fehlschlag meldet die Messung selbst (durchsatz.js). */
+    if (success) await merkeDauer((Date.now() - start) / 1000);
   } catch (err) {
     /* Unerwarteter Fehler → trotzdem ein sauberes, renderbares blocked-
-       Ergebnis liefern (wie der synchrone Pfad). */
+       Ergebnis liefern. Liess sich nur das fertige Ergebnis nicht speichern
+       (BUG-2026-10-03-30), nennt die Meldung das Speichern, nicht die KI. */
     console.log(
       JSON.stringify({
         step: "process-job",
@@ -299,13 +289,9 @@ async function handleProcessJob(req, res) {
         totalMs: Date.now() - start,
       })
     );
-    await completeJob(jobId, {
-      profiles: null,
-      blockedReason: "blocked.apiError",
-      privacyRisks: [],
-      exif: job.exif || {},
-      meta: { traceId: job.traceId || null, mode: "blocked" },
-    }).catch((e) => console.log(JSON.stringify({ warning: "completeJob-error", error: ohneKennung(e.message) })));
+    await ersatzErgebnisSpeichern(jobId, job, err && err.code === "ergebnis_speichern" ? err.code : null).catch((e) =>
+      console.log(JSON.stringify({ warning: "completeJob-error", error: ohneKennung(e.message) }))
+    );
   } finally {
     /* Bild immer löschen — Erfolg ODER Fehler. Die Storage-Lifecycle-Regel
        ist das zweite Sicherheitsnetz. */

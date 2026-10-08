@@ -93,16 +93,24 @@ probe "4. Datenschutz: Aufbewahrung wieder auf 7 Tage oeffnen" \
   'jobAufbewahrungMs: { min: 60 * 1000, max: 7 * 24 * 60 * 60 * 1000 },' \
   "src/__tests__/betriebsprofil-grenzfaelle.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/betriebsprofil.test.js src/__tests__/satz-gegen-doku.test.js"
 
+# NACHGEZOGEN 08.10.2026: Seit der gemeinsamen Rechnung fuer Einlassgrenze und
+# Wartezeit (warteschlangen-rechnung.js) stehen drei Stellen woanders oder
+# lauten anders: Die Wartezeit-Ansage ruft `wartezeitSekunden`, die
+# Einlassgrenze ohne Satz steht in warteschlangen-rechnung.js, die
+# Kopplungspruefung in betriebsprofil-kopplung.js. Die Proben 5, 6 und 9
+# meldeten "MUSTER FEHLT" — bemerkt erst im Pruefstand-Lauf nach der
+# Auslieferung. Seither haelt src/__tests__/rueckbauprobe-muster.test.js bei
+# jedem Testlauf fest, dass jedes Muster dieser Datei noch im Programm steht.
 probe "5. Wartezeit-Ansage wieder mit fester Zahl rechnen" \
   "src/handle-job-status.js" \
   'const { werte } = await geltendeWerte();
   if (!werte || !sekunden) return null;
-  return Math.ceil(position / werte.parallelitaet) * sekunden;' \
+  return wartezeitSekunden(werte, position, sekunden);' \
   'return Math.ceil(position / 7) * sekunden;' \
   "src/__tests__/ohne-einstellungssatz.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/handle-job-status.test.js src/__tests__/handle-job-status-livetext.test.js"
 
 probe "6. Einlassgrenze ohne Satz wieder auf 155" \
-  "src/handle-enqueue.js" \
+  "src/warteschlangen-rechnung.js" \
   'if (!werte) return 0;' \
   'if (!werte) return 155;' \
   "src/__tests__/ohne-einstellungssatz.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/einlassgrenze-profil.test.js"
@@ -120,10 +128,10 @@ probe "8. Rate-Limit-Rueckfall in middleware.js" \
   "src/__tests__/middleware.test.js src/__tests__/ohne-einstellungssatz.test.js src/__tests__/rueckfall-riegel.test.js"
 
 probe "9. Kopplungspruefung Token/Zeit ausbauen" \
-  "src/betriebsprofil.js" \
+  "src/betriebsprofil-kopplung.js" \
   'if (brauchtSekunden > werte.singleLargeTimeoutMs / 1000) {' \
   'if (false) {' \
-  "src/__tests__/mistral-zeitbudget.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/betriebsprofil.test.js"
+  "src/__tests__/mistral-zeitbudget.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/betriebsprofil.test.js src/__tests__/betriebsprofil-kopplung.test.js"
 
 probe "10. Laufzeit-Wache wieder gegen feste Grenze messen" \
   "src/laufzeit-wache.js" \

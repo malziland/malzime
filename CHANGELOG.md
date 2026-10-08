@@ -4,7 +4,7 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
-## [Unveröffentlicht]
+## [5.0.0] — 2026-10-08
 
 Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
 (5. Oktober und mit dieser Fassung), dazu das Sicherheitspaket vom 6. Oktober.
@@ -289,6 +289,10 @@ Behebung nach dem Lang-Audit vom 3. Oktober 2026, ausgeliefert in zwei Teilen
 - Die Prüfung „Beispielbild fragt nichts nach außen“ läuft jetzt in allen drei
   Browsern. Die Kontrast-Messung wartet, bis eine laufende Einblendung zu Ende
   ist, und meldet keine Schein-Funde mehr.
+- Die Rückbauprobe findet drei Stellen wieder, die beim Umbau in andere
+  Dateien gezogen waren. Ein Test hält jetzt bei jedem Lauf fest, dass jede
+  ihrer zehn Proben ihre Stelle im Programm noch findet; bisher fiel eine
+  blinde Probe erst im Prüfstand-Lauf auf.
 
 ### Geändert — Auslieferung und Betrieb
 

@@ -162,6 +162,7 @@ functions/src/__tests__/pruefstand-script.test.js
 functions/src/__tests__/queue-storage-emulator-riegel.test.js
 functions/src/__tests__/queue-storage-laden.test.js
 functions/src/__tests__/queue-storage.test.js
+functions/src/__tests__/rueckbauprobe-muster.test.js
 functions/src/__tests__/rueckfall-riegel.test.js
 functions/src/__tests__/satz-gegen-doku.test.js
 functions/src/__tests__/schreiben-vor-der-antwort.test.js

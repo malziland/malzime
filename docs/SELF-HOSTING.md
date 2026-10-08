@@ -264,8 +264,11 @@ Seit v2.0 läuft die Analyse über eine Cloud-Tasks-Warteschlange (Details: [`AR
 **1. Cloud-Tasks-Queue anlegen:**
 
 ```bash
-gcloud tasks queues create analyze-queue --location=europe-west1
+gcloud tasks queues create analyze-queue --location=europe-west1 \
+  --max-backoff=60s --max-retry-duration=1800s --max-attempts=10
 ```
+
+Die drei Angaben sind die Wiederholungsregel: Antwortet der Verarbeiter mit einem Fehler, versucht die Warteschlange es höchstens im Minutenabstand erneut und hört nach 30 Minuten auf — so lange wartet auch der Browser höchstens. Ohne sie gilt der Google-Standard (bis 100 Versuche, Abstand bis zu einer Stunde); ein Auftrag bliebe dann nach einer kurzen Störung viele Minuten liegen. Für eine bestehende Warteschlange: derselbe Befehl mit `update` statt `create`. `scripts/verify-infrastructure.sh` prüft die Werte.
 
 Die Parallelität (`--max-concurrent-dispatches`) richtet sich nach den Rate-Limits deines Mistral-Tarifs — starte konservativ (z. B. 3) und taste dich mit Lasttests hoch. Zu hoch gewählt, antwortet Mistral mit `429` und Analysen kommen als `blocked.overloaded` zurück.
 

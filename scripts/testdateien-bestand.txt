@@ -173,6 +173,7 @@ functions/src/__tests__/ueberlast-entscheidung.test.js
 functions/src/__tests__/upload-http.test.js
 functions/src/__tests__/upload.test.js
 functions/src/__tests__/verify-infrastructure-script.test.js
+functions/src/__tests__/verify-infrastructure-wiederholungsregel.test.js
 functions/src/__tests__/vor-dem-push-script.test.js
 functions/src/__tests__/wachen-nachricht-ohne-satz.test.js
 functions/src/__tests__/wachen-nicht-blind.test.js

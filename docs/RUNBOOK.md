@@ -238,6 +238,7 @@ gestartet werden.
 | Bereich | Soll |
 |---|---|
 | Cloud-Tasks-Queue `analyze-queue` | existiert in `europe-west1`, RUNNING, Dosierung == Einstellungssatz |
+| Wiederholungsregel der Warteschlange | Abstand zwischen zwei Zustellversuchen höchstens 60 s, Schluss nach 30 Minuten (ab 10 Versuchen). Seit 08.10.2026 (OPS-2026-10-03-22); vorher Google-Standard: bis 100 Versuche, Abstand bis eine Stunde. Nachziehen: `gcloud tasks queues update analyze-queue --location=europe-west1 --max-backoff=60s --max-retry-duration=1800s --max-attempts=10` |
 | Einstellungssatz `config/betriebsprofil` | **feldweise gleich** `functions/src/produktiv-satz.js` (alle Profile, aktives Profil). Seit 01.09.2026 (OPS-2026-09-01-02). Nachziehen: `node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`; vorher `node scripts/betriebsprofil-vergleichen.js` zeigt die Abweichungen |
 | Bucket `malzime-queue-uploads` | Region `EUROPE-WEST1`, Lifecycle-Löschregel nach 1 Tag aktiv, Soft-Delete 0 |
 | Inhalt des Bildspeichers | **kein Bild älter als 3 Stunden** — ein Auftrag lebt höchstens zwei. Seit 31.08.2026; Anlass waren 4.056 liegengebliebene Testbilder. Ein **leerer** Speicher ist der Sollzustand und kein Fehler (`gsutil` meldet dafür Rückgabewert 1) |

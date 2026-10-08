@@ -9,22 +9,39 @@ import { getStoredJobId, offenerAuftrag } from "./auftrag-speicher.js";
    nicht mehr abholt. Wartet der Auftrag noch, verwirft ihn der Server sofort:
    kein KI-Aufruf, der Platz im Stundenkontingent wird frei, das Bild
    geloescht. Laeuft er schon, aendert die Abmeldung nichts. Ohne Abhol-Ticket
-   nimmt der Server sie nicht an. Bestmoeglich und still: Scheitert sie, raeumt
-   der Server den Auftrag wie bisher nach seiner Karenz selbst ab. Je Auftrag
-   geht hoechstens eine Abmeldung hinaus. */
+   nimmt der Server sie nicht an. Bestmoeglich und still: Kommt sie nicht an,
+   raeumt der Server den Auftrag wie bisher nach seiner Karenz selbst ab.
+
+   Je Auftrag wird einmal abgemeldet. Scheitert der Aufruf am Netz — das ist
+   die Regel, wenn die Seite einen Auftrag WEGEN eines Verbindungsabrisses
+   aufgibt —, wird er genau einmal nachgeholt: sobald der Browser „wieder
+   online" meldet oder das naechste Foto beginnt. Abgelegt wird dafuer nichts;
+   die Liste lebt nur im Arbeitsspeicher der Seite. */
 const abgemeldet = new Set();
-export function meldeAuftragAb(jobId, resultToken) {
-  if (!jobId || !resultToken || abgemeldet.has(jobId)) return;
-  abgemeldet.add(jobId);
+let nachzuholen = [];
+
+function sendeAbmeldung(auftrag, beiFehlschlag) {
+  const adresse = `${JOB_STATUS_URL}?jobId=${encodeURIComponent(auftrag.jobId)}&token=${encodeURIComponent(auftrag.resultToken)}`;
   try {
-    fetch(`${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}&token=${encodeURIComponent(resultToken)}`, {
-      method: "DELETE",
-      cache: "no-store",
-      keepalive: true,
-    }).catch(() => {});
+    fetch(adresse, { method: "DELETE", cache: "no-store", keepalive: true }).catch(beiFehlschlag);
   } catch (_) {
     /* Abmelden ist ein Zusatz — nie ein Grund fuer eine Fehlermeldung. */
   }
+}
+
+export function meldeAuftragAb(jobId, resultToken) {
+  if (!jobId || !resultToken || abgemeldet.has(jobId)) return;
+  abgemeldet.add(jobId);
+  const auftrag = { jobId, resultToken };
+  sendeAbmeldung(auftrag, () => nachzuholen.push(auftrag));
+}
+
+/** Holt Abmeldungen nach, die am Netz gescheitert sind — je Auftrag ein
+ *  zweiter und letzter Versuch. */
+export function holeAbmeldungenNach() {
+  const offen = nachzuholen;
+  nachzuholen = [];
+  for (const auftrag of offen) sendeAbmeldung(auftrag, () => {});
 }
 
 /* ── Welchen Auftrag holt der Tab gerade ab? ─────────────────────────────
@@ -81,6 +98,7 @@ export async function alsAuftragDesTabs(jobId, resultToken, abfrage) {
    ohne Wiederaufnahme, was der Tab gemerkt und noch nicht bekommen hat. Ein
    Auftrag, dessen Ergebnis schon auf dem Bildschirm stand, braucht das nicht. */
 export function meldeOffenenAuftragAb() {
+  holeAbmeldungenNach();
   const offen = inArbeit || offenerAuftrag();
   inArbeit = null;
   if (offen) meldeAuftragAb(offen.jobId, offen.resultToken);

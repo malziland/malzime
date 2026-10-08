@@ -32,7 +32,7 @@ import {
   getStoredJobId,
   getStoredResultToken,
 } from "./auftrag-speicher.js";
-import { meldeAuftragAb, meldeOffenenAuftragAb, alsAuftragDesTabs } from "./auftrag-abmelden.js";
+import { meldeAuftragAb, meldeOffenenAuftragAb, alsAuftragDesTabs, holeAbmeldungenNach } from "./auftrag-abmelden.js";
 
 /* Wake-Lock und Auftragsgedächtnis liegen seit 10.09.2026 in eigenen Modulen
    (js/wake-lock.js, js/auftrag-speicher.js). app.js und die Tests holen diese
@@ -292,6 +292,8 @@ export function initHintergrundWiederaufnahme() {
      Schleife noch lebt; hier ist der Ausloeser eindeutig, und jede Sekunde
      Zoegern ist eine Sekunde vor einer toten Seite. */
   window.addEventListener("online", () => {
+    /* Eine Abmeldung, die ohne Netz hinausging, wird jetzt nachgeholt. */
+    holeAbmeldungenNach();
     if (state.uploadLaeuft) return;
     if (!getStoredJobId()) return;
     /* `wartetAufVerbindung` ist hier der eigentliche Fall: Der Durchgang hat

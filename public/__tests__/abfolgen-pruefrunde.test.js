@@ -56,7 +56,7 @@ const antwort = (body, ok = true, status = 200) => ({
 
 describe("Abfolgen aus der Prüfrunde", () => {
   let api, state, elements, prepareImage, speicher, render;
-  let uploads, abfragen, abmeldungen, fehlerMeldungen, statusAntwort, lauscher;
+  let uploads, abfragen, abmeldungen, abmeldeVersuche, netzFuerAbmeldungWeg, fehlerMeldungen, statusAntwort, lauscher;
 
   beforeEach(async () => {
     vi.resetModules();
@@ -86,7 +86,9 @@ describe("Abfolgen aus der Prüfrunde", () => {
 
     uploads = [];
     abfragen = [];
-    abmeldungen = [];
+    abmeldungen = []; /* Abmeldungen, die am Server ankommen */
+    abmeldeVersuche = []; /* alle Versuche, auch die ohne Netz */
+    netzFuerAbmeldungWeg = false;
     fehlerMeldungen = [];
     statusAntwort = () => Promise.resolve(antwort({ status: "queued", position: 3, etaSeconds: 60 }));
     vi.spyOn(globalThis, "fetch").mockImplementation((url, init = {}) => {
@@ -103,6 +105,8 @@ describe("Abfolgen aus der Prüfrunde", () => {
       }
       if (u.includes("/api/job-status")) {
         if (init.method === "DELETE") {
+          abmeldeVersuche.push(u);
+          if (netzFuerAbmeldungWeg) return Promise.reject(new TypeError("Failed to fetch"));
           abmeldungen.push(u);
           return Promise.resolve(antwort({ verworfen: true }));
         }
@@ -462,6 +466,61 @@ describe("Abfolgen aus der Prüfrunde", () => {
     expect(abmeldungen).toHaveLength(1);
     expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
     expect(fehlerMeldungen.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    ["der Browser meldet „wieder online“", async () => window.dispatchEvent(new Event("online"))],
+    [
+      "das Kind lädt das Foto noch einmal hoch",
+      async () => {
+        wieHandleNewFile(foto("b"));
+        await vi.waitFor(() => expect(uploads.length).toBe(2), { timeout: 8000 });
+      },
+    ],
+  ])(
+    "die Abmeldung beim Aufgeben geht ohne Netz hinaus und scheitert: Sie wird einmal nachgeholt, sobald %s",
+    async (_name, netzIstZurueck) => {
+      const geraet = await auftragWartet();
+      geraet.verbergen();
+      vi.setSystemTime(Date.now() + 4 * 60 * 1000);
+      geraet.zeigen();
+      statusAntwort = () => Promise.reject(new TypeError("Failed to fetch"));
+      netzFuerAbmeldungWeg = true;
+      await vi.advanceTimersByTimeAsync(13000);
+      await geraet.lauf;
+      expect(elements.status.textContent).toContain("error.queueAbandoned");
+      expect(abmeldeVersuche).toHaveLength(1);
+      expect(abmeldungen).toEqual([]); /* am Server kam nichts an */
+
+      netzFuerAbmeldungWeg = false;
+      statusAntwort = () => Promise.resolve(antwort({ status: "queued", position: 1, etaSeconds: 30 }));
+      await netzIstZurueck();
+      await vi.advanceTimersByTimeAsync(100);
+      expect(abmeldungen).toHaveLength(1);
+      expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
+      expect(abmeldungen[0]).toContain("token=ta");
+
+      /* Ein zweiter Anlass holt nichts mehr nach: je Auftrag ein zweiter und letzter Versuch. */
+      window.dispatchEvent(new Event("online"));
+      await vi.advanceTimersByTimeAsync(100);
+      expect(abmeldeVersuche.filter((u) => u.includes("AUFTRAG-A"))).toHaveLength(2);
+      state.requestId += 1;
+      await vi.advanceTimersByTimeAsync(2500);
+    }
+  );
+
+  it("eine Abmeldung, die ankommt, wird nicht wiederholt", async () => {
+    const geraet = await auftragWartet();
+    wieHandleNewFile(foto("b"));
+    await vi.waitFor(() => expect(uploads.length).toBe(2), { timeout: 8000 });
+    await vi.advanceTimersByTimeAsync(2500);
+    await geraet.lauf;
+    expect(abmeldungen).toHaveLength(1);
+    window.dispatchEvent(new Event("online"));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(abmeldeVersuche).toHaveLength(1);
+    state.requestId += 1;
+    await vi.advanceTimersByTimeAsync(2500);
   });
 
   it("Verbindung reißt ab, die Nummer steht noch im Tab: Die Zusage bleibt, nichts wird abgemeldet (Gegenprobe)", async () => {

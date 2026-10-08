@@ -83,8 +83,8 @@ async function isGemesseneDauerAn() {
    - Nur ein noch WARTENDER Job. Was schon in Arbeit oder fertig ist, bleibt
      unberührt (`abandonJob` prüft das in einer Transaktion).
 
-   Danach dieselbe Rücknahme wie im Aufräumdienst (ruecknahme.js): Platz im
-   Stundenkontingent zurückgeben, Bild löschen. Der Aufrufer wertet die
+   Danach dieselbe Rücknahme wie im Aufräumdienst (ruecknahme.js): Bild
+   löschen und Platz im Stundenkontingent zurückgeben. Der Aufrufer wertet die
    Antwort nicht aus; scheitert etwas, räumt der Aufräumdienst wie bisher. */
 async function verwerfeAufWunsch(job, token, res) {
   if (!job.resultToken || !safeCompare(token, job.resultToken)) {

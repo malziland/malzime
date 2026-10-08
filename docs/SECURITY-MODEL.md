@@ -118,10 +118,12 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    einen noch wartenden Auftrag; was in Arbeit oder fertig ist, bleibt
    unberührt. Er kann nichts, was der Aufräumdienst nach der Karenz nicht
    ohnehin täte — Auftrag verwerfen, Foto löschen, Platz im Stundenfenster
-   zurückgeben —, nur früher. Das Foto wird zuerst gelöscht; auf die Rückgabe
-   des Platzes wartet der Weg höchstens fünf Sekunden (hängt der Zähler unter
-   Andrang, bleibt so kein verworfenes Foto liegen). Seine Warnzeile trägt weder Auftragsnummer noch
-   Fehlertext (`handle-job-status-abmelden.test.js`).
+   zurückgeben —, nur früher. Löschen und Rückgabe beginnen gleichzeitig und
+   hängen nicht voneinander ab; auf jedes wartet der Weg höchstens fünf
+   Sekunden (hängt der Zähler unter Andrang, bleibt so kein verworfenes Foto
+   liegen; hängt der Speicher, kommt der Platz trotzdem zurück). Seine
+   Warnzeilen tragen weder Auftragsnummer noch Fehlertext
+   (`handle-job-status-abmelden.test.js`, `freigabe-ueber-die-hilfe.test.js`).
 6. **Durchsatz-Deckel liegt extern.** Mistral-Tier T1 = 0,25 req/s ≈ 7,5
    Analysen/min — die reale Bremse bei Stoßlast. *Status:* bekannt, mit
    Warteschlangen-Ehrlichkeit (Position + ETA) abgefedert; Tier-Hebung ist eine

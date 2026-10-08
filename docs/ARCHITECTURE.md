@@ -178,6 +178,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `js/geocoding.js` | Nominatim Reverse-Geocoding (direkter Browser-Call, nur bei hochgeladenen Fotos); bei den Demo-Fotos feste Adresse und fester Kartenausschnitt aus der Seite |
 | `js/api.js` | Analyse-Ablauf im Browser: Bild einreihen, Ergebnis zustellen, Wiederaufnahme nach Neuladen, verworfenen Auftrag abmelden — mit AbortController + Stale-Guard |
 | `js/auftrag-abfrage.js` | Statusabfrage eines eingereihten Auftrags im 2-Sekunden-Takt (`pollJob`), zugleich Lebenszeichen an den Server |
+| `js/auftrag-abmelden.js` | Abmelden eines Auftrags, den der Tab nicht mehr abholt (höchstens einmal je Auftrag, nur mit Abhol-Ticket) |
 | `js/netz-hilfen.js` | Netz- und Warte-Hilfen des Ablaufs: Aufruf mit Zeitgrenze bis zum Ende des Antwort-Rumpfs (`fetchWithTimeout`), Warten auf den nächsten Takt |
 | `js/foto-vorschau.js` | Zwei Handgriffe an der Foto-Vorschau: Ersatzbild, wenn der Browser das Original nicht anzeigen kann; Hinweis „Foto gelöscht“ nach einem Neuladen |
 | `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |
@@ -254,7 +255,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `betriebsprofil.js` | Betriebswerte aus Firestore (`config/betriebsprofil`): Felder und Bereiche, Cache; ist der Satz nur gerade nicht lesbar, gilt der zuletzt gültig gelesene weiter |
 | `analyse-ausgang.js` | Welche Fehlermeldung ein Endzustand eines Auftrags zeigt, und die eine Fehlerzeile dazu („ein Alarm je gescheiterter Analyse“) |
 | `meldungs-annahme.js` | Gemeinsames der zwei Annahmestellen für Meldungen des Browsers (`handle-errors.js`, `handle-telemetry.js`): Rumpfprüfung, Wertgrenze, Messwert-Prüfung; die Feldlisten bleiben bei den Annahmestellen |
-| `ruecknahme.js` | Zurückgeben, was ein nie analysierter Auftrag belegt: erst das Foto löschen, dann den Platz im Stundenfenster freigeben — die eine Stelle dafür, abgewartet (auf den Platz höchstens fünf Sekunden) |
+| `ruecknahme.js` | Zurückgeben, was ein nie analysierter Auftrag belegt: Foto löschen und Platz im Stundenfenster freigeben, beides sofort begonnen — die eine Stelle dafür, abgewartet (auf jedes höchstens fünf Sekunden) |
 | `oeffentliche-huelle.js` | Was für jede öffentliche Schnittstelle gilt: `Cache-Control: no-store`, gepackte Anfragen abweisen (von `index.js` um jede öffentliche Function gelegt) |
 | `warteschlangen-rechnung.js` | Die eine Rechnung für Einlassgrenze und Wartezeit-Ansage: die engere von zwei Bremsen (Parallelität, Rate) |
 | `erinnerungs-waechter.js` | Wächter über die Wochen-Erinnerung: liest ihr Lebenszeichen, meldet veraltet, nie gelaufen oder wiederholt nicht lesbar (vom Aufräumdienst je Lauf gerufen) |

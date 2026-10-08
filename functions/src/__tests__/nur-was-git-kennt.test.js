@@ -171,6 +171,35 @@ describe("die einkopierten Verzeichnis-Prüfungen lesen nur, was git kennt", () 
     expect(lauf.aus).toContain("privat/bericht.md:1");
   });
 
+  /* Nennt git zu einem Ordner nichts (hier: alles darin ist ausgenommen), ist
+     das zuerst ein Verdacht gegen das Messmittel. Die Prüfung liest dann den
+     Dateibaum — sie wird nie grün, ohne eine Datei gelesen zu haben. */
+  test("auf den ausgenommenen Ordner selbst gerichtet, liest die Prüfung ihn", () => {
+    projektMitFakten();
+    schreibe("privat/.pruefungen/fakten.txt", MUSTER);
+    schreibe("privat/bericht.md", "Früher lief die Analyse über modell-2411.\n");
+    schreibe("privat/notiz.md", "Heute läuft sie über modell-2512.\n");
+
+    const lauf = starte("python3", [FAKTEN, "privat"], repo);
+    expect(lauf.rc).toBe(1);
+    expect(lauf.aus).toContain("bericht.md:1");
+  });
+
+  /* Ein Haken oder ein äußerer Aufruf kann git-Variablen vererben. Gefragt
+     wird trotzdem das Repository, in dem der geprüfte Ordner liegt. */
+  test("eine geerbte git-Variable lenkt die Suche nicht um", () => {
+    projektMitFakten();
+    schreibe("privat/bericht.md", "Früher lief die Analyse über modell-2411.\n");
+
+    const lauf = spawnSync("python3", [FAKTEN, "."], {
+      cwd: repo,
+      encoding: "utf8",
+      env: { ...umgebung(), GIT_DIR: path.join(basis, "gibt-es-nicht") },
+    });
+    expect(`${lauf.stdout}${lauf.stderr}`).not.toContain("privat/");
+    expect(lauf.status).toBe(0);
+  });
+
   test("die eigenen Muster des Projekts gelten weiter", () => {
     projektMitFakten();
 

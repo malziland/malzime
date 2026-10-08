@@ -31,8 +31,8 @@ import {
   clearStoredJobId,
   getStoredJobId,
   getStoredResultToken,
-  offenerAuftrag,
 } from "./auftrag-speicher.js";
+import { meldeAuftragAb, meldeOffenenAuftragAb, abgeloestNachDemWarten } from "./auftrag-abmelden.js";
 
 /* Wake-Lock und Auftragsgedächtnis liegen seit 10.09.2026 in eigenen Modulen
    (js/wake-lock.js, js/auftrag-speicher.js). app.js und die Tests holen diese
@@ -107,37 +107,8 @@ const ENQUEUE_URL = apiUrl("/api/enqueue");
    Mobilgeraeten), darf den Ablauf nicht einfrieren. */
 const ENQUEUE_TIMEOUT_MS = 90000;
 
-/* PRIV-2026-10-03-57: Meldet dem Server einen Auftrag ab, den dieser Tab
-   nicht mehr abholt (ein anderes Foto wurde gewaehlt). Wartet der Auftrag
-   noch, verwirft ihn der Server sofort: kein KI-Aufruf, der Platz im
-   Stundenkontingent wird frei, das Bild geloescht. Laeuft er schon, aendert
-   die Abmeldung nichts. Ohne Abhol-Ticket nimmt der Server sie nicht an.
-   Bestmoeglich und still: Scheitert sie, raeumt der Server den Auftrag wie
-   bisher nach seiner Karenz selbst ab.
-   Abgemeldet wird dort, wo die Nummer eines noch offenen Auftrags faellt:
-   beim Start jedes neuen Durchgangs (was der Tab bis dahin gemerkt hatte —
-   auch wenn zuletzt eine Wiederaufnahme den Auftrag fuehrte), wenn das Geraet
-   so lange weg war, dass es als weitergereicht gilt, und wenn ein Auftrag erst
-   zurueckkommt, nachdem schon ein anderes Foto gewaehlt wurde. */
-function meldeAuftragAb(jobId, resultToken) {
-  if (!jobId || !resultToken) return;
-  try {
-    fetch(`${JOB_STATUS_URL}?jobId=${encodeURIComponent(jobId)}&token=${encodeURIComponent(resultToken)}`, {
-      method: "DELETE",
-      cache: "no-store",
-      keepalive: true,
-    }).catch(() => {});
-  } catch (_) {
-    /* Abmelden ist ein Zusatz — nie ein Grund fuer eine Fehlermeldung. */
-  }
-}
-
-/* Meldet ab, was der Tab gemerkt hat und noch nicht bekommen hat. Ein Auftrag,
-   dessen Ergebnis schon auf dem Bildschirm stand, braucht das nicht. */
-function meldeOffenenAuftragAb() {
-  const offen = offenerAuftrag();
-  if (offen) meldeAuftragAb(offen.jobId, offen.resultToken);
-}
+/* Das Abmelden eines Auftrags, den der Tab nicht mehr abholt
+   (PRIV-2026-10-03-57), steht in js/auftrag-abmelden.js. */
 
 /* ── Warten auf die Verbindung (BUG-2026-10-03-46) ──────────────────────
    Nach MAX_POLL_FAILURES gescheiterten Abfragen sagt die Seite zu, die
@@ -259,9 +230,12 @@ export function initHintergrundWiederaufnahme() {
     /* War die Seite lange genug weg, gilt das Geraet als weitergereicht. */
     if (seitWannVerborgen && Date.now() - seitWannVerborgen > UEBERGABE_PAUSE_MS) {
       seitWannVerborgen = 0;
-      /* Abgeholt wird der Auftrag nicht mehr. Wartet er noch, soll der Server
-         ihn gleich verwerfen statt erst nach seiner Karenz. */
-      meldeOffenenAuftragAb();
+      /* Wartete die Seite auf die Verbindung, gibt sie den Auftrag jetzt auf
+         (unten) — dann soll der Server ihn gleich verwerfen statt erst nach
+         seiner Karenz. Laeuft dagegen noch ein Durchgang, fragt er mit seiner
+         eigenen Nummer weiter und bekommt sein Ergebnis: Ihn abzumelden hiesse,
+         einem Kind in einer langen Schlange den Platz zu nehmen. */
+      if (state.wartetAufVerbindung) meldeOffenenAuftragAb();
       clearStoredJobId();
       /* BUG-2026-10-03-46: Wartete die Seite gerade auf die Verbindung, ist
          mit der Auftragsnummer auch die Zusage „erscheint automatisch"
@@ -724,9 +698,9 @@ async function analyzeImageQueued() {
        liveErlaubt: nur hier, beim frischen Upload, darf die Live-Anzeige
        mittippen (v3.0) — die Wiederaufnahme unten bleibt beim heutigen Bild. */
     const outcome = await pollJob(jobId, myId, resultToken, false, true);
-    /* Abgeloest waehrend des Wartens: Ein neues Foto hat den Auftrag beim
-       Start seines Durchgangs abgemeldet; eine Wiederaufnahme fuehrt ihn weiter. */
-    if (state.requestId !== myId) return;
+    /* Abgeloest waehrend des Wartens: Eine Wiederaufnahme fuehrt den Auftrag
+       weiter; hat ein anderes Foto uebernommen, wird er abgemeldet. */
+    if (state.requestId !== myId) return void abgeloestNachDemWarten(jobId, resultToken);
 
     /* UX-2026-10-03-49: „Analyse abgeschlossen" wird nur angesagt, wenn ein
        Ergebnis da ist. Auf jedem Fehlerweg stoppt die Wartefigur leise — die
@@ -863,6 +837,10 @@ export async function resumeQueueJob({ force = false } = {}) {
   state.isAnalyzing = true;
   /* Stand bis eben die Zusage „erscheint automatisch" auf dem Bildschirm? */
   const nachAbriss = state.wartetAufVerbindung;
+  /* Mitten im Lauf (Zusage stand da, oder die Seite kommt aus dem Hintergrund
+     zurueck) oder stiller Seitenstart? Nur `force` und die Zusage kommen von
+     einem Kind, das eben noch gewartet hat. */
+  const mittenImLauf = nachAbriss || force;
   /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
      erneut an der Verbindung, setzt ihn der Fehlerpfad wieder — so bleibt
      der Anker immer die Lage von JETZT und nicht die von vorhin. */
@@ -956,14 +934,22 @@ export async function resumeQueueJob({ force = false } = {}) {
     if (!outcome || outcome.abandoned || outcome.error) {
       liveAbbrechenWegenFehler();
       clearStoredJobId();
-      /* ANDERS nach einem Verbindungsabriss mitten im Lauf: Dort stand eben
-         noch „deine Analyse laeuft weiter — sie erscheint automatisch". Ist
-         der Auftrag inzwischen gescheitert oder verworfen, bekommt das Kind
-         eine Antwort statt einer leeren Zeile, und die Fehlererfassung auch. */
+      /* ANDERS mitten im Lauf — nach einem Verbindungsabriss stand eben noch
+         „deine Analyse laeuft weiter — sie erscheint automatisch", nach der
+         Rueckkehr aus dem Hintergrund lief die Wartefigur. Ist der Auftrag
+         inzwischen gescheitert oder verworfen, bekommt das Kind eine Antwort
+         statt einer leeren Zeile, und die Fehlererfassung auch. */
       const schluessel =
         outcome && outcome.abandoned ? "error.queueAbandoned" : (outcome && outcome.error) || "error.queueFailed";
-      setStatus(nachAbriss ? t(schluessel) : "", nachAbriss ? traceId : undefined, nachAbriss ? schluessel : undefined);
-      if (nachAbriss) meldeSichtbarenFehler(schluessel, "resume-nach-abriss", { requestId: String(myId), traceId });
+      setStatus(
+        mittenImLauf ? t(schluessel) : "",
+        mittenImLauf ? traceId : undefined,
+        mittenImLauf ? schluessel : undefined
+      );
+      if (mittenImLauf) {
+        const phase = nachAbriss ? "resume-nach-abriss" : "resume-aus-hintergrund";
+        meldeSichtbarenFehler(schluessel, phase, { requestId: String(myId), traceId });
+      }
       return;
     }
     /* Erfolg: Ticket behalten, damit auch ein weiterer Reload das Ergebnis

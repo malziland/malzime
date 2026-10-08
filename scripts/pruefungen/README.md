@@ -42,10 +42,13 @@ Listenpunkt und ein neuer HTML-Block beginnen einen eigenen. Zwei Listenpunkte o
 Tabellenzeilen sind kein Satz und werden nicht zusammengesetzt. Stern und Raute am
 Zeilenanfang gelten in Markdown als Listenpunkt und Ueberschrift, in allen anderen
 Dateien als Fortsetzung eines Kommentars.
-Jede Zeile und jeder Absatz wird zusaetzlich so gelesen, wie er erscheint: ohne
-Auszeichnung im Fliesstext (`<strong>`, `**`, `_`, Rueckstriche) und mit aufgeloesten
-Zeichen in HTML-Schreibweise (`&auml;`, `&nbsp;`). Eine gesperrte Wendung bleibt gesperrt,
-auch wenn ein Wort darin betont ist.
+Jede Zeile und jeder Absatz wird zusaetzlich ohne Auszeichnung gelesen: ohne die
+gaengigen Tags im Fliesstext (`<strong>`, `<em>`, `<a>`, `<span>` ...), ohne `**`, `_` und
+Rueckstriche, und mit aufgeloesten Zeichen in HTML-Schreibweise (`&auml;`, `&nbsp;`). Eine
+gesperrte Wendung bleibt gesperrt, auch wenn ein Wort darin betont ist. Nicht aufgeloest
+werden: weiche Trennzeichen (`&shy;`), schmale Leerzeichen, Markdown-Links und Tags, die
+nicht in der Liste stehen - wer den Text braucht, wie der Browser ihn zeigt, prueft
+zusaetzlich am aufgebauten Dokument.
 
 **test-blind.py** findet Tests, die rechnerisch nicht rot werden koennen: ohne
 Zusicherung, uebersprungen, immer wahr. Setzt KERN 4 Frage 2 durch.

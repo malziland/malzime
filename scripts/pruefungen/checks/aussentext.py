@@ -91,7 +91,9 @@ MARKDOWN_ENDUNGEN = (".md", ".markdown", ".mdx")
 # "verlaesst **nie** den Browser") oder ein Zeichen in HTML-Schreibweise
 # ("verl&auml;sst", "den&nbsp;Browser"), sieht die Suche etwas, das der Leser nicht
 # sieht - und findet nichts. Gerade solche Zusagen werden gern betont. Deshalb wird
-# jede Zeile und jeder Absatz zusaetzlich so gelesen, wie er erscheint.
+# jede Zeile und jeder Absatz zusaetzlich ohne Auszeichnung gelesen. Das ist nicht der
+# Text, wie der Browser ihn zeigt: Weiche Trennzeichen, schmale Leerzeichen,
+# Markdown-Links und Tags ausserhalb der Liste bleiben stehen.
 AUSZEICHNUNG = re.compile(
     r"</?(?:strong|em|b|i|u|s|mark|code|span|abbr|small|sub|sup|q|cite|a|kbd|var|del|ins)\b[^>]*>",
     re.IGNORECASE,
@@ -106,8 +108,8 @@ KONTROLLSATZ_BETONT = "Deine Position verlaesst <strong>nie</strong> den&nbsp;Br
 
 
 def gelesen(text):
-    """Der Text, wie er gelesen wird: ohne Auszeichnung (HTML im Fliesstext,
-    Sternchen, Unterstriche, Rueckstriche), Zeichen in HTML-Schreibweise aufgeloest.
+    """Der Text ohne Auszeichnung: ohne die gaengigen Tags im Fliesstext, ohne
+    Sternchen, Unterstriche und Rueckstriche, Zeichen in HTML-Schreibweise aufgeloest.
     Bloecke (Absatz, Listenpunkt, Zelle) bleiben stehen - sie trennen Saetze."""
     t = ZEILENWECHSEL.sub(" ", text)
     t = AUSZEICHNUNG.sub("", t)
@@ -255,6 +257,17 @@ def positivkontrolle_betont(regeln):
                     and bool(ausdruck.search(gelesen(KONTROLLSATZ_BETONT))))
     return True
 
+# Ein Haken oder ein aeusserer Aufruf kann git-Variablen vererben (GIT_DIR,
+# GIT_WORK_TREE ...). Mit ihnen fragte der Aufruf unten ein ANDERES Repository als
+# das, in dem `wurzel` liegt - oder gar keines. Gefragt wird immer vom Ordner aus.
+GEERBTE_GIT_VARIABLEN = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX",
+                         "GIT_COMMON_DIR", "GIT_NAMESPACE")
+
+
+def git_umgebung():
+    return {k: v for k, v in os.environ.items() if k not in GEERBTE_GIT_VARIABLEN}
+
+
 
 def git_dateien(wurzel):
     """Alles, was im Repository landet: verfolgte Dateien PLUS noch nicht
@@ -271,7 +284,7 @@ def git_dateien(wurzel):
         roh = subprocess.run(
             ["git", "-C", wurzel, "ls-files", "--cached", "--others",
              "--exclude-standard", "-z"],
-            capture_output=True, timeout=20,
+            capture_output=True, timeout=20, env=git_umgebung(),
         )
     except (OSError, subprocess.SubprocessError):
         return None

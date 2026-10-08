@@ -69,7 +69,7 @@ function sanitizeExif(raw) {
         schreibt die eine Meldung "Analyse gescheitert"; ohne Auftrag oder
         ohne gelungenen Uebergang meldet der Einlass selbst), ohne `grund` als
         verlassen (zu spaet gekommen ist kein Fehler, keine Meldung)
-     2. Platz im Stundenfenster freigeben, Foto loeschen (ruecknahme.js)
+     2. Foto loeschen und Platz im Stundenfenster freigeben (ruecknahme.js)
    `imagePath` nur mitgeben, wenn das Speichern begonnen hat. */
 async function einlassZuruecknehmen({ jobId, grund, stempel, imagePath }) {
   if (grund) {

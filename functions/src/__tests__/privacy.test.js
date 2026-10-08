@@ -209,30 +209,67 @@ describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
     "BHAK Wien 10",
     "HTBLA Hallstatt",
     "HTBLuVA Salzburg",
+    "HTL-Mödling",
+    "HAK/HAS Wien",
+    "BORG Wien",
   ])("Schul-Kuerzel: %s", (text) => {
     expect(hinweise(text)).toContain("privacy.address");
   });
 
   /* Das Kuerzel allein zaehlt nicht — es steht auch auf Markenkleidung. */
-  test.each(["htl", "Shakira", "NMSX", "BORGWARD", "Chak-Chak", "BJÖRN BORG", "BJORN BORG", "BORG", "NMS", "HAK"])(
-    "kein Schul-Kuerzel: %s",
-    (text) => {
-      expect(hinweise(text)).not.toContain("privacy.address");
-    }
-  );
+  test.each([
+    "htl",
+    "Shakira",
+    "NMSX",
+    "BORGWARD",
+    "Chak-Chak",
+    "BJÖRN BORG",
+    "BJORN BORG",
+    "BORG",
+    "NMS",
+    "HAK",
+    /* Die Marke mit einem Wort dahinter — erst damit ist die Ausnahme scharf. */
+    "BJÖRN BORG Sweden",
+    "BJORN BORG Sweden",
+    "BJÖRN\nBORG Sweden",
+    "BJÖRN  BORG Sweden",
+  ])("kein Schul-Kuerzel: %s", (text) => {
+    expect(hinweise(text)).not.toContain("privacy.address");
+  });
 
-  test.each(["Opernring 2", "Kärntner Ring 12", "Praterallee 1", "Franz-Josefs-Kai 27", "Linke Wienzeile 4"])(
-    "oesterreichische Strassenform: %s",
-    (text) => {
-      expect(hinweise(text)).toContain("privacy.address");
-    }
-  );
+  test.each([
+    "Kärntner Ring 12",
+    "Dr.-Karl-Renner-Ring 3",
+    "Praterallee 1",
+    "Franz-Josefs-Kai 27",
+    "Handelskai 94",
+    "Linke Wienzeile 4",
+  ])("oesterreichische Strassenform: %s", (text) => {
+    expect(hinweise(text)).toContain("privacy.address");
+  });
 
   test.each([
     "KAI 12",
     "Zeile 3",
     "Ring 5",
     "Boxen im Ring",
+    "Der Ring 3",
+    /* Pruefung 08.10.2026: Woerter auf "ring", "zeile" und "kai", wie sie auf
+       Kleidung, Plakaten und Preisschildern stehen. */
+    "SPRING 2025",
+    "Spring 24 Collection",
+    "ENGINEERING 1985",
+    "TOURING 500",
+    "Magic The Gathering 2025",
+    "NOW HIRING 2 COOKS",
+    "Hering 3,50",
+    "Catering 2024",
+    "Schlagzeile 1",
+    "Textzeile 3",
+    "AKAI 4000",
+    /* Bewusst nicht erkannt (siehe privacy.js): von den Zeilen darueber nicht
+       zu unterscheiden. */
+    "Opernring 2",
     "Sitzplatz 12",
     "Parkplatz 2",
     "Wanderweg 601",
@@ -266,9 +303,12 @@ describe("Kennzeichen, Schul-Kuerzel und englische Kurzformen", () => {
     expect(hinweise(text, text)).not.toContain("privacy.licensePlate");
   });
 
-  test.each(["12 Main St.", "45 Elm Rd.", "3 Park Ave."])("englische Strassen-Abkuerzung: %s", (text) => {
-    expect(hinweise(text)).toContain("privacy.address");
-  });
+  test.each(["12 Main St.", "45 Elm Rd.", "3 Park Ave.", "45 Elm Rd. Apt 3", "3 Park Ave. New York"])(
+    "englische Strassen-Abkuerzung: %s",
+    (text) => {
+      expect(hinweise(text)).toContain("privacy.address");
+    }
+  );
 
   test.each(["1st Place", "St. Pauli", "12 points", "Team St Louis"])("keine Adresse: %s", (text) => {
     expect(hinweise(text)).not.toContain("privacy.address");

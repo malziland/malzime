@@ -115,7 +115,7 @@ describe("die Hilfe selbst", () => {
     jest.dontMock("../queue-storage");
   });
 
-  test("erst das Foto, dann der Platz — beides ist durch, wenn sie zurueckkehrt", async () => {
+  test("Foto und Platz — beides ist durch, wenn sie zurueckkehrt", async () => {
     const geloescht = await belegtesFreigeben({ zaehlerStempel: 4711.5, imagePath: "queue-uploads/x.jpg" });
 
     expect(ablauf).toEqual(["foto", "platz"]);
@@ -161,8 +161,8 @@ describe("die Hilfe selbst", () => {
   });
 
   test("auf eine haengende Freigabe wartet die Hilfe hoechstens fuenf Sekunden — und sagt es", async () => {
-    const { _FREIGABE_WARTEN_HOECHSTENS_MS } = require("../ruecknahme");
-    expect(_FREIGABE_WARTEN_HOECHSTENS_MS).toBe(5000);
+    const { _WARTEN_HOECHSTENS_MS } = require("../ruecknahme");
+    expect(_WARTEN_HOECHSTENS_MS).toBe(5000);
     counter.releaseHourlySlot.mockImplementation(() => new Promise(() => {}));
     const warnungen = [];
     jest.spyOn(console, "warn").mockImplementation((zeile) => warnungen.push(String(zeile)));
@@ -179,6 +179,70 @@ describe("die Hilfe selbst", () => {
       expect(fertig).toBe(true);
       expect(warnungen).toHaveLength(1);
       expect(JSON.parse(warnungen[0])).toEqual({ severity: "WARNING", warning: "release-slot-nicht-abgewartet" });
+    } finally {
+      jest.useRealTimers();
+      console.warn.mockRestore();
+    }
+  });
+
+  /* Pruefung 08.10.2026: Mit dem Foto vorn hing an einem haengenden Speicher
+     die Freigabe des Platzes — sie begann nie, und nichts meldete es. */
+  test("haengt das Loeschen des Fotos, wird der Platz trotzdem sofort freigegeben", async () => {
+    storage.deleteImage.mockImplementation(() => new Promise(() => {}));
+    jest.useFakeTimers();
+    try {
+      const lauf = belegtesFreigeben({ zaehlerStempel: 7, imagePath: "queue-uploads/y.jpg" });
+      await jest.advanceTimersByTimeAsync(10);
+      expect(counter.releaseHourlySlot).toHaveBeenCalledWith(7);
+      expect(ablauf).toEqual(["platz"]);
+      jest.spyOn(console, "warn").mockImplementation(() => {});
+      await jest.advanceTimersByTimeAsync(5000);
+      await lauf;
+    } finally {
+      jest.useRealTimers();
+      if (console.warn.mockRestore) console.warn.mockRestore();
+    }
+  });
+
+  test("auf ein haengendes Loeschen wartet die Hilfe hoechstens fuenf Sekunden — sagt es und meldet das Foto als nicht geloescht", async () => {
+    storage.deleteImage.mockImplementation(() => new Promise(() => {}));
+    const warnungen = [];
+    jest.spyOn(console, "warn").mockImplementation((zeile) => warnungen.push(String(zeile)));
+    jest.useFakeTimers();
+    try {
+      let zurueck = null;
+      const lauf = belegtesFreigeben({ zaehlerStempel: 7, imagePath: "queue-uploads/y.jpg" }).then((wert) => {
+        zurueck = wert;
+      });
+      await jest.advanceTimersByTimeAsync(4900);
+      expect(zurueck).toBeNull();
+      await jest.advanceTimersByTimeAsync(200);
+      await lauf;
+      expect(zurueck).toBe(false);
+      expect(warnungen.map((zeile) => JSON.parse(zeile))).toEqual([
+        { severity: "WARNING", warning: "foto-loeschen-nicht-abgewartet" },
+      ]);
+    } finally {
+      jest.useRealTimers();
+      console.warn.mockRestore();
+    }
+  });
+
+  test("haengen beide, dauert die Hilfe trotzdem nur fuenf Sekunden, nicht zehn", async () => {
+    storage.deleteImage.mockImplementation(() => new Promise(() => {}));
+    counter.releaseHourlySlot.mockImplementation(() => new Promise(() => {}));
+    const warnungen = [];
+    jest.spyOn(console, "warn").mockImplementation((zeile) => warnungen.push(String(zeile)));
+    jest.useFakeTimers();
+    try {
+      let fertig = false;
+      const lauf = belegtesFreigeben({ zaehlerStempel: 7, imagePath: "queue-uploads/y.jpg" }).then(() => {
+        fertig = true;
+      });
+      await jest.advanceTimersByTimeAsync(5100);
+      await lauf;
+      expect(fertig).toBe(true);
+      expect(warnungen).toHaveLength(2);
     } finally {
       jest.useRealTimers();
       console.warn.mockRestore();

@@ -181,14 +181,16 @@ ZEILEN_GRENZEN = {
     "functions/src/warteschlangen-rechnung.js": 91,
     "functions/src/analyse-ausgang.js": 83,
     "functions/src/oeffentliche-huelle.js": 57,
-    # 07.10.2026 (Pruefrunde): +35 fuer "erst das Foto" und das begrenzte Warten
-    # auf die Freigabe des Platzes, samt Begruendung.
-    "functions/src/ruecknahme.js": 80,
+    # 07./08.10.2026 (Pruefrunden): +50 — Loeschen und Freigabe beginnen
+    # gleichzeitig, auf beide wird begrenzt gewartet, samt Begruendung.
+    "functions/src/ruecknahme.js": 95,
     "functions/src/index.js": 385,
     "functions/src/handle-reap.js": 357,
     "functions/src/handle-job-status.js": 354,
     "functions/src/handle-erinnerung.js": 273,
     "public/js/auftrag-abfrage.js": 160,
+    # 08.10.2026: aus api.js herausgeloest, als die Datei ueber ihre Grenze wuchs.
+    "public/js/auftrag-abmelden.js": 70,
     "public/js/netz-hilfen.js": 78,
     "public/js/foto-vorschau.js": 60,
 }

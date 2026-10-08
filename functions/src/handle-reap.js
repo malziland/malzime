@@ -120,8 +120,8 @@ async function reapJobs() {
       /* Schlug der Übergang fehl, hat ein Worker den Job zwischen Query und
          Abbruch geclaimt — er läuft noch und braucht das Bild: nichts anfassen. */
       if (!ok) continue;
-      /* BIZ-001: Stunden-Slot zurückgeben — verlassener Job machte nie eine
-         Analyse — und das Foto loeschen (ruecknahme.js). */
+      /* BIZ-001: Foto loeschen und Stunden-Slot zurückgeben — verlassener
+         Job machte nie eine Analyse (ruecknahme.js). */
       await belegtesFreigeben(job);
       reapedAbandoned += 1;
     } catch (err) {

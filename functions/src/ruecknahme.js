@@ -20,51 +20,67 @@
 const { releaseHourlySlot } = require("./counter");
 const { deleteImage } = require("./queue-storage");
 
-/* So lange wartet die Hilfe hoechstens auf die Freigabe des Platzes. Die
-   Freigabe ist eine Transaktion auf dem EINEN Zaehlerdokument; unter Andrang
-   kann Firestore dort lange auf die Sperre warten (counter.js, Zeitlimit am
-   Einlass). Die Aufrufer haben kurze Zeitgrenzen und halten eine Antwort an
-   einen wartenden Menschen zurueck. Nach dieser Zeit laeuft die Freigabe
-   weiter, und eine Warnung sagt, dass nicht auf sie gewartet wurde.
+/* So lange wartet die Hilfe hoechstens — auf das Loeschen wie auf die
+   Freigabe. Die Freigabe ist eine Transaktion auf dem EINEN Zaehlerdokument;
+   unter Andrang kann Firestore dort lange auf die Sperre warten (counter.js,
+   Zeitlimit am Einlass). Das Loeschen geht an den Speicher und hat keine
+   eigene Zeitgrenze. Die Aufrufer haben kurze Zeitgrenzen und halten eine
+   Antwort an einen wartenden Menschen zurueck. Nach dieser Zeit laeuft der
+   Vorgang weiter, und eine Warnung sagt, dass nicht auf ihn gewartet wurde.
    BLEIBT IM CODE — keine Stellschraube des Betriebs: Der Wert muss nur unter
    den Zeitgrenzen der Aufrufer bleiben (Statusabfrage, Aufraeumdienst). */
-const FREIGABE_WARTEN_HOECHSTENS_MS = 5000;
+const WARTEN_HOECHSTENS_MS = 5000;
+const ZU_LANGE = Symbol("zu-lange");
+
+/** Wartet hoechstens WARTEN_HOECHSTENS_MS auf `vorgang`; dauert er laenger, kommt `ersatz` zurueck und eine Warnzeile. */
+async function hoechstens(vorgang, warnung, ersatz) {
+  let uhr = null;
+  const zuLange = new Promise((fertig) => {
+    uhr = setTimeout(() => fertig(ZU_LANGE), WARTEN_HOECHSTENS_MS);
+  });
+  const ergebnis = await Promise.race([vorgang, zuLange]);
+  clearTimeout(uhr);
+  if (ergebnis !== ZU_LANGE) return ergebnis;
+  console.warn(JSON.stringify({ severity: "WARNING", warning: warnung }));
+  return ersatz;
+}
 
 /**
- * Loescht das Foto und gibt den Platz im Stundenfenster frei — in dieser
- * Reihenfolge. Wirft nie.
+ * Loescht das Foto und gibt den Platz im Stundenfenster frei. Beides beginnt
+ * SOFORT und haengt nicht voneinander ab; gewartet wird auf jedes hoechstens
+ * fuenf Sekunden. Wirft nie.
  *
- * ERST DAS FOTO (07.10.2026): Stand die Freigabe vorn und hing sie, blieb das
- * Foto eines schon verworfenen Auftrags liegen, sobald die Function darueber
- * an ihre Zeitgrenze kam — bis zur 2-Stunden-Loeschung und ohne
- * Protokollzeile, denn einen verworfenen Auftrag fasst der Aufraeumdienst
- * vorher nicht mehr an. Das Foto ist das, was nicht liegen bleiben darf. Ein
- * Platz, der nicht zurueckkommt, kostet hoechstens 60 Minuten Kapazitaet und
- * meldet sich selbst.
+ * WARUM NICHT NACHEINANDER (07./08.10.2026): Stand die Freigabe vorn und hing
+ * sie, blieb das Foto eines schon verworfenen Auftrags bis zur
+ * 2-Stunden-Loeschung liegen — einen verworfenen Auftrag fasst der
+ * Aufraeumdienst vorher nicht mehr an. Stand das Loeschen vorn und hing es,
+ * begann die Freigabe nie, und nichts meldete es. Das Foto ist das, was nicht
+ * liegen bleiben darf; ein Platz, der nicht zurueckkommt, kostet hoechstens
+ * 60 Minuten Kapazitaet.
  *
  * @param {{ zaehlerStempel?: number, imagePath?: string|null }} auftrag
  *   die Marke des Einlasses und der Pfad des Fotos (ein Auftragsdokument
  *   passt so, wie es ist). Ohne Pfad wird nur der Platz freigegeben.
  * @returns {Promise<boolean>} ob das Foto weg ist (wie deleteImage: `true`
- *   auch, wenn es keines gab)
+ *   auch, wenn es keines gab; `false` auch, wenn nicht darauf gewartet wurde)
  */
 async function belegtesFreigeben(auftrag) {
-  /* deleteImage faengt seine Fehler selbst (liefert dann `false`). Sollte es
-     je werfen, darf die Freigabe des Platzes nicht daran haengen. */
-  const fotoWeg = auftrag.imagePath ? await Promise.resolve(deleteImage(auftrag.imagePath)).catch(() => false) : true;
-
-  /* Die Zaehler-Funktion faengt ihre Fehler ebenfalls selbst und meldet sie
-     (`release-slot-error`). */
-  let uhr = null;
-  const freigabe = Promise.resolve(releaseHourlySlot(auftrag.zaehlerStempel)).catch(() => {});
-  const zuLange = new Promise((fertig) => {
-    uhr = setTimeout(() => fertig("zu-lange"), FREIGABE_WARTEN_HOECHSTENS_MS);
-  });
-  if ((await Promise.race([freigabe, zuLange])) === "zu-lange") {
-    console.warn(JSON.stringify({ severity: "WARNING", warning: "release-slot-nicht-abgewartet" }));
-  }
-  clearTimeout(uhr);
+  /* Beide Funktionen fangen ihre Fehler selbst (deleteImage liefert dann
+     `false`, der Zaehler meldet `release-slot-error`). Sollte eine je werfen,
+     darf die andere nicht daran haengen. */
+  const loeschen = auftrag.imagePath
+    ? Promise.resolve()
+        .then(() => deleteImage(auftrag.imagePath))
+        .catch(() => false)
+    : Promise.resolve(true);
+  const freigabe = Promise.resolve()
+    .then(() => releaseHourlySlot(auftrag.zaehlerStempel))
+    .catch(() => {});
+  const [fotoWeg] = await Promise.all([
+    hoechstens(loeschen, "foto-loeschen-nicht-abgewartet", false),
+    hoechstens(freigabe, "release-slot-nicht-abgewartet", undefined),
+  ]);
   return fotoWeg;
 }
 
-module.exports = { belegtesFreigeben, _FREIGABE_WARTEN_HOECHSTENS_MS: FREIGABE_WARTEN_HOECHSTENS_MS };
+module.exports = { belegtesFreigeben, _WARTEN_HOECHSTENS_MS: WARTEN_HOECHSTENS_MS };

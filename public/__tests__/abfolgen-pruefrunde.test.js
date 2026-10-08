@@ -2,22 +2,28 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setupDOM } from "./setup.js";
 
 /**
- * abfolgen-pruefrunde.test.js — sechs Abfolgen aus der Prüfrunde vom 07.10.2026.
+ * abfolgen-pruefrunde.test.js — Abfolgen am Handy aus den Prüfrunden vom
+ * 07. und 08.10.2026.
  *
- * Jede stellt einen Ablauf am Handy nach, bei dem die Seite etwas schuldig
- * blieb (alle sechs waren am Stand vor der Behebung rot):
+ * Jede stellt einen Ablauf nach, bei dem die Seite etwas schuldig blieb oder
+ * zu viel tat (am Stand vor der jeweiligen Behebung rot):
  *   1. Auftrag wartet, App kurz gewechselt (die Wiederaufnahme übernimmt),
- *      dann ein anderes Foto — der erste Auftrag muss abgemeldet werden.
+ *      dann ein anderes Foto — der erste Auftrag muss abgemeldet werden,
+ *      genau einmal.
  *   2. Anderes Foto genau zwischen Kopf und Rumpf der Einreih-Antwort — der
  *      alte Auftrag darf nicht als „der des Tabs" gemerkt werden.
  *   3. Verbindung reißt ab, der Auftrag scheitert derweil — nach „erscheint
  *      automatisch" braucht es eine Antwort, keine leere Zeile.
  *   4. Laufende Analyse, dann eine zu große Datei — der Bildschirm-Wachhalter
- *      muss wieder frei sein.
- *   5. Auftrag wartet, das Gerät liegt über drei Minuten weg — die Seite
- *      vergisst die Nummer und muss den Auftrag vorher abmelden.
+ *      muss wieder frei sein; ebenso, wenn die Zusage des Browsers erst nach
+ *      dem frühen Ende eintrifft.
+ *   5. Auftrag wartet, das Gerät liegt über drei Minuten weg, die Seite fragt
+ *      weiter — NICHT abmelden: Das Kind bekommt sein Ergebnis. Wählt es danach
+ *      ein anderes Foto, wird der erste Auftrag abgemeldet.
  *   6. Verbindung reißt ab, dann ein anderes Foto — auch der Auftrag, auf den
  *      die Seite noch wartete, wird abgemeldet.
+ *   7. Handy kurz gesperrt, der Auftrag scheitert derweil — die Seite sagt es,
+ *      statt die Wartefigur wortlos zu entfernen.
  * Dazu der Erfolgsweg: Nach einem fertigen Ergebnis meldet ein neues Foto
  * nichts ab (es gibt nichts abzumelden).
  */
@@ -49,7 +55,7 @@ const antwort = (body, ok = true, status = 200) => ({
 });
 
 describe("Abfolgen aus der Prüfrunde", () => {
-  let api, state, elements, prepareImage, speicher;
+  let api, state, elements, prepareImage, speicher, render;
   let uploads, abfragen, abmeldungen, fehlerMeldungen, statusAntwort;
 
   beforeEach(async () => {
@@ -62,6 +68,8 @@ describe("Abfolgen aus der Prüfrunde", () => {
     elements = (await import("../js/dom.js")).elements;
     prepareImage = (await import("../js/exif.js")).prepareImage;
     speicher = await import("../js/auftrag-speicher.js");
+    render = await import("../js/render.js");
+    render.renderCurrentMode.mockClear();
     vi.setSystemTime(Date.now() + 60000);
 
     uploads = [];
@@ -138,7 +146,8 @@ describe("Abfolgen aus der Prüfrunde", () => {
     state.requestId += 1;
     await vi.advanceTimersByTimeAsync(2500);
     await laufB;
-    expect(abmeldungen.some((u) => u.includes("AUFTRAG-A"))).toBe(true);
+    /* Genau eine: Der neue Durchgang meldet ab, der abgelöste nicht noch einmal. */
+    expect(abmeldungen.filter((u) => u.includes("AUFTRAG-A"))).toHaveLength(1);
   });
 
   it("anderes Foto zwischen Kopf und Rumpf der Einreih-Antwort: der alte Auftrag wird nicht gemerkt, sondern abgemeldet", async () => {
@@ -215,31 +224,128 @@ describe("Abfolgen aus der Prüfrunde", () => {
     expect(freigabe).toHaveBeenCalled();
   });
 
-  it("Auftrag wartet, das Gerät liegt über drei Minuten weg: die Seite meldet ihn ab, bevor sie die Nummer vergisst", async () => {
+  it("zu große Datei als erste Wahl, Wachhalter wie in app.js ohne Warten angefordert: die verspätete Zusage geht zurück", async () => {
+    const freigabe = vi.fn(() => Promise.resolve());
+    const anforderung = vi.fn(() => new Promise((gib) => setTimeout(() => gib({ release: freigabe }), 5)));
+    Object.defineProperty(navigator, "wakeLock", { configurable: true, value: { request: anforderung } });
+    const gross = foto("gross");
+    Object.defineProperty(gross, "size", { value: 26 * 1024 * 1024 });
+    api.acquireWakeLock(); /* wie app.js: ohne auf die Zusage zu warten */
+    await wieHandleNewFile(gross);
+    expect(elements.status.textContent).toContain("error.fileTooLarge");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(anforderung).toHaveBeenCalledTimes(1);
+    expect(freigabe).toHaveBeenCalledTimes(1);
+
+    /* Die nächste Analyse darf wieder anfordern und behält ihre Zusage. */
+    prepareImage.mockResolvedValueOnce(AUFBEREITET("Rk9UT19B"));
+    api.acquireWakeLock();
+    const lauf = wieHandleNewFile(foto("a"));
+    await vi.waitFor(() => expect(uploads.length).toBe(1), { timeout: 8000 });
+    expect(anforderung).toHaveBeenCalledTimes(2);
+    expect(freigabe).toHaveBeenCalledTimes(1);
+    statusAntwort = () => Promise.resolve(antwort({ status: "queued", position: 1, etaSeconds: 30 }));
+    uploads[0].antworte(antwort({ jobId: "AUFTRAG-A", resultToken: "ta" }));
+    await vi.advanceTimersByTimeAsync(2500);
+    state.requestId += 1;
+    await vi.advanceTimersByTimeAsync(2500);
+    await lauf;
+  });
+
+  const FERTIG = { status: "done", result: { profiles: { normal: { categories: {} }, boost: { categories: {} } } } };
+
+  /* Wie ein Server: Ein abgemeldeter Auftrag gilt als verworfen, sonst ist er fertig. */
+  const fertigOderVerworfen = () => Promise.resolve(antwort(abmeldungen.length ? { status: "abandoned" } : FERTIG));
+
+  async function auftragWartet() {
     let sicht = "visible";
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => sicht });
     api.initHintergrundWiederaufnahme();
-    prepareImage.mockResolvedValueOnce(AUFBEREITET("Rk9UT19B"));
-    const laufA = wieHandleNewFile(foto("a"));
+    prepareImage.mockResolvedValueOnce(AUFBEREITET("Rk9UT19B")).mockResolvedValueOnce(AUFBEREITET("Rk9UT19C"));
+    const lauf = wieHandleNewFile(foto("a"));
     await vi.waitFor(() => expect(uploads.length).toBe(1), { timeout: 8000 });
     uploads[0].antworte(antwort({ jobId: "AUFTRAG-A", resultToken: "ta" }));
     await vi.advanceTimersByTimeAsync(2500);
     expect(speicher.getStoredJobId()).toBe("AUFTRAG-A");
+    return {
+      lauf,
+      verbergen() {
+        sicht = "hidden";
+        document.dispatchEvent(new Event("visibilitychange"));
+      },
+      zeigen() {
+        sicht = "visible";
+        document.dispatchEvent(new Event("visibilitychange"));
+      },
+    };
+  }
 
-    sicht = "hidden";
-    document.dispatchEvent(new Event("visibilitychange"));
+  it.each([
+    ["Tab im Hintergrund, die Seite fragt weiter ab", (ms) => vi.advanceTimersByTimeAsync(ms)],
+    ["Handy gesperrt, die Seite ist eingefroren", async (ms) => vi.setSystemTime(Date.now() + ms)],
+  ])("Auftrag wartet, über drei Minuten weg (%s): keine Abmeldung, das Ergebnis kommt an", async (_name, vergehen) => {
+    const geraet = await auftragWartet();
+    geraet.verbergen();
+    await vergehen(4 * 60 * 1000);
+    statusAntwort = fertigOderVerworfen;
+    geraet.zeigen();
+    await vi.advanceTimersByTimeAsync(5000);
+    await geraet.lauf;
+
+    expect(abmeldungen).toEqual([]);
+    expect(render.renderCurrentMode).toHaveBeenCalledTimes(1);
+    expect(elements.status.textContent).not.toContain("error.queueAbandoned");
+    expect(fehlerMeldungen).toEqual([]);
+  });
+
+  it("über drei Minuten weg, danach ein anderes Foto: der erste Auftrag wird abgemeldet, genau einmal", async () => {
+    const geraet = await auftragWartet();
+    geraet.verbergen();
     vi.setSystemTime(Date.now() + 4 * 60 * 1000);
-    sicht = "visible";
-    document.dispatchEvent(new Event("visibilitychange"));
+    geraet.zeigen();
+    /* Die Nummer ist vergessen (das Gerät gilt als weitergereicht) — der
+       Durchgang fragt aber noch ab. */
+    expect(speicher.getStoredJobId()).toBeNull();
+    expect(abmeldungen).toEqual([]);
 
+    const laufB = wieHandleNewFile(foto("b"));
+    await vi.waitFor(() => expect(uploads.length).toBe(2), { timeout: 8000 });
+    await vi.advanceTimersByTimeAsync(2500);
+    await geraet.lauf;
     expect(abmeldungen).toHaveLength(1);
     expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
     expect(abmeldungen[0]).toContain("token=ta");
-    expect(speicher.getStoredJobId()).toBeNull();
+
+    uploads[1].antworte(antwort({ jobId: "AUFTRAG-B", resultToken: "tb" }));
+    await vi.advanceTimersByTimeAsync(2500);
     state.requestId += 1;
     await vi.advanceTimersByTimeAsync(2500);
-    await laufA;
+    await laufB;
+    expect(abmeldungen.filter((u) => u.includes("AUFTRAG-A"))).toHaveLength(1);
   });
+
+  it.each([
+    ["gescheitert", { status: "failed", errorReason: "blocked.apiError" }, "error.queueFailed"],
+    ["verworfen", { status: "abandoned" }, "error.queueAbandoned"],
+  ])(
+    "Handy eine Minute gesperrt, der Auftrag ist derweil %s: Meldung statt leerer Seite, auch an die Fehlererfassung",
+    async (_name, serverSagt, meldung) => {
+      const geraet = await auftragWartet();
+      geraet.verbergen();
+      vi.setSystemTime(Date.now() + 60 * 1000);
+      statusAntwort = () => Promise.resolve(antwort(serverSagt));
+      geraet.zeigen();
+      await vi.advanceTimersByTimeAsync(5000);
+      await geraet.lauf;
+
+      expect(elements.status.textContent).toContain(meldung);
+      expect(speicher.getStoredJobId()).toBeNull();
+      expect(state.isAnalyzing).toBe(false);
+      expect(fehlerMeldungen.map((m) => JSON.parse(m).phase)).toContain("resume-aus-hintergrund");
+      expect(abmeldungen).toEqual([]);
+    }
+  );
 
   it("Verbindung reißt ab, dann ein anderes Foto: der Auftrag, auf den die Seite noch wartete, wird abgemeldet", async () => {
     prepareImage.mockResolvedValueOnce(AUFBEREITET("Rk9UT19B")).mockResolvedValueOnce(AUFBEREITET("Rk9UT19C"));

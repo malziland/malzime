@@ -6,10 +6,10 @@
     "README.md": "trägt hier zusätzlich den Herkunftshinweis; Inhalt sonst identisch"
   },
   "dateien": {
-    "checks/aussentext.py": "sha256:14089551b7ebb3cfb24f64c2f046ae7d406541fb780f9ca118afc4111dfd2848",
-    "checks/fakten-drift.py": "sha256:705d348c630682bf1fe012b838ccea41313f48a72fa28e2a22ecd73af9c0ea1c",
-    "checks/stiller-fehlschlag.py": "sha256:bea541b2272e5f742dcd9eb56d07289261a0982f0d9704a6a55250dd4b2f57af",
-    "checks/test-blind.py": "sha256:b3dbf337df605f62d7641b67737b805d5a8a5f843848cbaf0ec4b3785b95cee0",
+    "checks/aussentext.py": "sha256:9079aab28933c932b0b75810b8ee2692bced88c55c2db387aa4c7f5e7d6d105d",
+    "checks/fakten-drift.py": "sha256:8e29f9e34e096356c33aeff8db1c033cb55debaa1da6a4f8f8e11c281a14d3c3",
+    "checks/stiller-fehlschlag.py": "sha256:411a79b31d807fecd2b978c35bfd2ace1913d8bc8e4697954bc00fc944ad7795",
+    "checks/test-blind.py": "sha256:7fb8aef203d4b46083013e6f37a2f4cfec96dfbca7ae89f714b999309a10ce6b",
     "negativprobe/ausgenommen/.gitignore": "sha256:50a8dccd3ee586ef247218057bcb796655c59abf441a22a28de17890fa219281",
     "negativprobe/ausgenommen/.pruefungen/aussentext.txt": "sha256:e2c29ab238eba9b86928db67d8cacd1e04c7e4ce3ad7fe4e7f2cc89ff5f18690",
     "negativprobe/ausgenommen/README.md": "sha256:7daf980bb7612e1cc7f5e89719850f27f45d3452084fdfed87c133537e3880b7",
@@ -74,6 +74,6 @@
     "negativprobe/umbruch/README.md": "sha256:076d274ae9d7569eee203e18b995c3684e417b94c9f33ec0742dce83444de9a0",
     "negativprobe/umbruch/dienst.js": "sha256:f46846104d726c096645c749068d0485bc87b229c7fa0d68b13e7b49b48deb0b",
     "pruefe-alles.sh": "sha256:a5f1434c5bc3cc90db60252668c738884d2997309ae16c0c8aeaeb9dbb413c37",
-    "selbstpruefung.sh": "sha256:b47c80f08d07b573752332b4f49963ec206411cbcaab1bdf38003474db15c383"
+    "selbstpruefung.sh": "sha256:13047e0c847c24d74bf1852d58315593edbfb4a1356733b2d10bfb2aeb8c6981"
   }
 }

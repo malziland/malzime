@@ -68,6 +68,17 @@ def eigene_muster(wurzel):
                 print(f"  Hinweis: {pfad}:{nr} ungueltiger Ausdruck: {fehler}")
     return zusatz
 
+# Ein Haken oder ein aeusserer Aufruf kann git-Variablen vererben (GIT_DIR,
+# GIT_WORK_TREE ...). Mit ihnen fragte der Aufruf unten ein ANDERES Repository als
+# das, in dem `wurzel` liegt - oder gar keines. Gefragt wird immer vom Ordner aus.
+GEERBTE_GIT_VARIABLEN = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_PREFIX",
+                         "GIT_COMMON_DIR", "GIT_NAMESPACE")
+
+
+def git_umgebung():
+    return {k: v for k, v in os.environ.items() if k not in GEERBTE_GIT_VARIABLEN}
+
+
 
 # TEST-2026-10-04-29 (an der Quelle seit 08.10.2026): Die Suche lief ueber den
 # Dateibaum und las damit auch, was git ausnimmt - private Berichte, Uebergaben,
@@ -85,7 +96,7 @@ def git_dateien(wurzel):
         roh = subprocess.run(
             ["git", "-C", wurzel, "ls-files", "--cached", "--others",
              "--exclude-standard", "-z"],
-            capture_output=True, timeout=20,
+            capture_output=True, timeout=20, env=git_umgebung(),
         )
     except (OSError, subprocess.SubprocessError):
         return None

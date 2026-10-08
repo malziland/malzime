@@ -476,6 +476,55 @@ describe("Abfolgen aus der Prüfrunde", () => {
     expect(abmeldungen).toEqual([]);
   });
 
+  it("nach einem Neuladen wartet die Seite weiter; über drei Minuten weg, dann reißt die Verbindung ab: Meldung und Abmeldung statt leerer Seite", async () => {
+    let sicht = "visible";
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => sicht });
+    api.initHintergrundWiederaufnahme();
+    speicher.storeJobId("AUFTRAG-A", "ta"); /* wie nach einem Neuladen */
+    const lauf = api.resumeQueueJob(); /* stiller Seitenstart */
+    await vi.advanceTimersByTimeAsync(2500);
+    expect(state.isAnalyzing).toBe(true);
+
+    sicht = "hidden";
+    document.dispatchEvent(new Event("visibilitychange"));
+    vi.setSystemTime(Date.now() + 4 * 60 * 1000);
+    sicht = "visible";
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(speicher.getStoredJobId()).toBeNull();
+    statusAntwort = () => Promise.reject(new TypeError("Failed to fetch"));
+    await vi.advanceTimersByTimeAsync(13000);
+    await lauf;
+
+    expect(elements.status.textContent).toContain("error.queueAbandoned");
+    expect(state.isAnalyzing).toBe(false);
+    expect(abmeldungen).toHaveLength(1);
+    expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
+    expect(fehlerMeldungen.map((m) => JSON.parse(m).phase)).toContain("resume-aufgegeben");
+  });
+
+  it("nach einem Neuladen ist der Auftrag schon weg: Die Seite bleibt still (Gegenprobe zum stillen Seitenstart)", async () => {
+    speicher.storeJobId("AUFTRAG-A", "ta");
+    statusAntwort = () => Promise.resolve(antwort({ status: "failed", errorReason: "blocked.apiError" }));
+    await api.resumeQueueJob();
+
+    expect(elements.status.textContent).toBe("");
+    expect(fehlerMeldungen).toEqual([]);
+    expect(abmeldungen).toEqual([]);
+    expect(speicher.getStoredJobId()).toBeNull();
+  });
+
+  it("die Seite gibt das Warten nach der Höchstdauer auf, der Auftrag wartet am Server noch: Er wird abgemeldet", async () => {
+    const { MAX_POLL_DURATION_MS } = await import("../js/auftrag-abfrage.js");
+    const geraet = await auftragWartet();
+    await vi.advanceTimersByTimeAsync(MAX_POLL_DURATION_MS + 10000);
+    await geraet.lauf;
+
+    expect(elements.status.textContent).toContain("error.timeout");
+    expect(abmeldungen).toHaveLength(1);
+    expect(abmeldungen[0]).toContain("jobId=AUFTRAG-A");
+    expect(abmeldungen[0]).toContain("token=ta");
+  });
+
   it("Wachhalter: Wird eine überholte Anforderung erst nach der Zusage der nächsten abgelehnt, bleibt die Zusage in Kraft und geht am Ende zurück", async () => {
     const wake = await import("../js/wake-lock.js");
     const freigabe2 = vi.fn(() => Promise.resolve());

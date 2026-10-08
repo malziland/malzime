@@ -49,21 +49,30 @@ let inArbeit = null;
  *  dann nicht mehr an.
  *
  *  Reisst die Verbindung ab, bleibt der Auftrag in Arbeit: Die Seite holt ihn
- *  spaeter ab. Das kann sie aber nur, wenn seine Nummer noch im Tab steht. Ist
- *  sie nach langer Pause vergessen, gibt die Seite den Auftrag hier auf: Er
- *  wird abgemeldet, und der Durchgang bekommt „verworfen" zurueck — die
- *  Meldung bittet dann ums erneute Hochladen, statt ein Ergebnis zuzusagen,
- *  das niemand mehr abholen kann. */
+ *  spaeter ab. Das kann sie aber nur, wenn seine Nummer noch im Tab steht.
+ *
+ *  Zwei Ausgaenge, an denen die SEITE einen Auftrag aufgibt, der am Server
+ *  noch warten kann — beide Male wird er abgemeldet:
+ *  - Verbindungsabriss, und die Nummer ist nach langer Pause vergessen: Der
+ *    Durchgang bekommt „verworfen" zurueck (mit `aufgegeben`), und die Meldung
+ *    bittet ums erneute Hochladen, statt ein Ergebnis zuzusagen, das niemand
+ *    mehr abholen kann.
+ *  - Die Hoechstdauer des Wartens ist erreicht (`error.timeout`). */
 export async function alsAuftragDesTabs(jobId, resultToken, abfrage) {
   const marke = { jobId, resultToken };
   inArbeit = marke;
   const ausgang = await abfrage();
   if (inArbeit !== marke) return ausgang;
-  if (!(ausgang && ausgang.transient)) inArbeit = null;
-  else if (getStoredJobId() !== jobId) {
-    inArbeit = null;
+  const abriss = Boolean(ausgang && ausgang.transient);
+  if (abriss && getStoredJobId() === jobId) return ausgang;
+  inArbeit = null;
+  if (abriss) {
     meldeAuftragAb(jobId, resultToken);
-    return { abandoned: true };
+    return { abandoned: true, aufgegeben: true };
+  }
+  if (ausgang && ausgang.error === "error.timeout") {
+    meldeAuftragAb(jobId, resultToken);
+    return { ...ausgang, aufgegeben: true };
   }
   return ausgang;
 }

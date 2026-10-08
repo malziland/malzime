@@ -943,13 +943,13 @@ export async function resumeQueueJob({ force = false } = {}) {
          statt einer leeren Zeile, und die Fehlererfassung auch. */
       const schluessel =
         outcome && outcome.abandoned ? "error.queueAbandoned" : (outcome && outcome.error) || "error.queueFailed";
-      setStatus(
-        mittenImLauf ? t(schluessel) : "",
-        mittenImLauf ? traceId : undefined,
-        mittenImLauf ? schluessel : undefined
-      );
-      if (mittenImLauf) {
-        const phase = nachAbriss ? "resume-nach-abriss" : "resume-aus-hintergrund";
+      /* Auch der stille Seitenstart meldet sich, wenn die SEITE den Auftrag
+         aufgibt (`aufgegeben`, auftrag-abmelden.js): Dann hat das Kind vor der
+         Wartefigur gesessen, und sie verschwaende sonst wortlos. */
+      const melden = mittenImLauf || Boolean(outcome && outcome.aufgegeben);
+      setStatus(melden ? t(schluessel) : "", melden ? traceId : undefined, melden ? schluessel : undefined);
+      if (melden) {
+        const phase = nachAbriss ? "resume-nach-abriss" : force ? "resume-aus-hintergrund" : "resume-aufgegeben";
         meldeSichtbarenFehler(schluessel, phase, { requestId: String(myId), traceId });
       }
       return;

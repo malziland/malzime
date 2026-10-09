@@ -749,3 +749,112 @@ test.describe("Anzeige in Randfällen", () => {
     }
   });
 });
+
+/* ── Foto nicht lesbar: was die Fehlermeldung an den Server dazu sagt ────────
+ *
+ * Workshop 09.10.2026: Auf mehreren Android-Handys gab Chrome das gewählte
+ * Foto nicht an die Seite heraus (`NotReadableError` auf jedem Leseweg). Am
+ * Prüfgerät ließ sich dasselbe Bild nur erzeugen, wenn sich die Zeit der Datei
+ * zwischen Auswahl und Lesen ändert; warum sie das auf den betroffenen Handys
+ * tut, ist offen. Die Meldung trägt deshalb zwei Wörter: welche Art Zeit der
+ * Browser zur Datei hatte, und ob sich diese Zeit geändert hat, wenn dieselbe
+ * Datei noch einmal gewählt wird.
+ *
+ * Nachgestellt wird hier der Fehler selbst (das Lesen der Datei scheitert).
+ */
+test.describe("Foto nicht lesbar: Angaben in der Fehlermeldung", () => {
+  const UNLESBAR = "vom-geraet-nicht-herausgegeben.jpg";
+  const TEXT = JSON.parse(readFileSync(join(process.cwd(), "public", "locales", "de.json"), "utf8"))[
+    "error.readFailed"
+  ];
+
+  /* Jede Datei dieses Namens ist für die Seite nicht lesbar — auf dem neuen und
+     auf dem älteren Leseweg, so wie es die Handys im Workshop meldeten. */
+  async function geraetGibtDateiNichtHeraus(page) {
+    await page.addInitScript((name) => {
+      const fehler = () => new DOMException("nicht lesbar", "NotReadableError");
+      const echtBytes = Blob.prototype.arrayBuffer;
+      Blob.prototype.arrayBuffer = function () {
+        if (this instanceof File && this.name === name) return Promise.reject(fehler());
+        return echtBytes.call(this);
+      };
+      const echtLesen = FileReader.prototype.readAsArrayBuffer;
+      FileReader.prototype.readAsArrayBuffer = function (blob) {
+        if (blob instanceof File && blob.name === name) {
+          Object.defineProperty(this, "error", { configurable: true, get: fehler });
+          setTimeout(() => this.onerror && this.onerror(new ProgressEvent("error")), 0);
+          return undefined;
+        }
+        return echtLesen.call(this, blob);
+      };
+    }, UNLESBAR);
+  }
+
+  /* Schneidet mit, was die Seite als Fehlermeldung an den Server schickt. */
+  async function fehlermeldungenMitschneiden(page) {
+    const meldungen = [];
+    await page.route("**/api/errors", async (r) => {
+      meldungen.push(JSON.parse(r.request().postData()));
+      await r.fulfill({ status: 204, body: "" });
+    });
+    return meldungen;
+  }
+
+  const lesefehler = (meldungen) => meldungen.filter((m) => m.phase === "image-read");
+  const unlesbaresFoto = (page) =>
+    page.setInputFiles("#fileInput", { name: UNLESBAR, mimeType: "image/jpeg", buffer: MINI_JPEG });
+
+  test("zwei Wörter zur Zeit der Datei: erst „neu“, bei derselben Datei noch einmal nicht mehr „neu“", async ({
+    page,
+    context,
+  }) => {
+    test.setTimeout(60000);
+    await geraetGibtDateiNichtHeraus(page);
+    await grundrouten(page, context);
+    const meldungen = await fehlermeldungenMitschneiden(page);
+    await seiteOeffnen(page);
+
+    await unlesbaresFoto(page);
+    await expect(page.locator("#status")).toContainText(TEXT, { timeout: 15000 });
+    await expect.poll(() => lesefehler(meldungen).length).toBe(1);
+
+    /* Dasselbe Foto noch einmal — das tun Kinder nach der Fehlermeldung. */
+    await unlesbaresFoto(page);
+    await expect.poll(() => lesefehler(meldungen).length, { timeout: 15000 }).toBe(2);
+
+    const [erste, zweite] = lesefehler(meldungen);
+    expect(erste.zeitsprung).toBe("neu");
+    expect(["gleich", "bis-2s", "stunden", "anders"]).toContain(zweite.zeitsprung);
+    /* Feste Wörter, kein Datum und keine Zahl — und kein Dateiname in der Meldung. */
+    for (const m of [erste, zweite]) {
+      expect(["keine", "sekunden", "millisekunden", "unbekannt"]).toContain(m.dateizeit);
+      expect(JSON.stringify(m)).not.toContain(UNLESBAR);
+    }
+  });
+
+  test("Erfolgsweg: Andere Fehlermeldungen tragen diese zwei Wörter nicht", async ({ page, context }) => {
+    await grundrouten(page, context);
+    const meldungen = await fehlermeldungenMitschneiden(page);
+    await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+    await page.route("**/api/job-status*", (r) => json(r, 200, { status: "failed", errorReason: "mistral_error" }));
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect.poll(() => meldungen.length, { timeout: 15000 }).toBeGreaterThan(0);
+    for (const m of meldungen) {
+      expect(m.dateizeit == null).toBe(true);
+      expect(m.zeitsprung == null).toBe(true);
+    }
+  });
+
+  test("Erfolgsweg: Ein lesbares Foto läuft durch wie bisher, ohne Lesefehler-Meldung", async ({ page, context }) => {
+    await geraetGibtDateiNichtHeraus(page);
+    await grundrouten(page, context);
+    const meldungen = await fehlermeldungenMitschneiden(page);
+    await page.route("**/api/enqueue", (r) => json(r, 200, { jobId: "job-1", resultToken: "tok" }));
+    await page.route("**/api/job-status*", (r) => json(r, 200, { status: "done", result: ERGEBNIS }));
+    await seiteOeffnen(page);
+    await fotoWaehlen(page);
+    await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 20000 });
+    expect(lesefehler(meldungen)).toHaveLength(0);
+  });
+});

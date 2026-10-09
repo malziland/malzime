@@ -138,6 +138,53 @@ describe("handleErrors", () => {
     expect(logged.kopfLesetest.startsWith("NotReadableError")).toBe(true);
   });
 
+  test("Dateizeit und Zeitsprung (09.10.2026): kommen als Stichworte an, gekappt auf 15 und 10 Zeichen", async () => {
+    /* Workshop 09.10.: neun Lesefehler in Chrome auf Android. Die zwei Worte
+       sagen, welche Art Zeit der Browser zur Datei hatte und ob sich diese
+       Zeit zwischen zwei Auswahlen derselben Datei geaendert hat — ohne
+       Datum, ohne Dateiname. */
+    const res = mockRes();
+    await handleErrors(
+      mockReq({
+        errorMessage: "read_failed",
+        phase: "image-read",
+        dateizeit: "millisekunden" + "x".repeat(50),
+        zeitsprung: "stunden" + "x".repeat(50),
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(204);
+    const logged = loggedPayload();
+    expect(logged.dateizeit).toBe("millisekundenxx");
+    expect(logged.zeitsprung).toBe("stundenxxx");
+  });
+
+  test("Erfolgsweg: Die erlaubten Worte kommen unverändert an", async () => {
+    for (const [dateizeit, zeitsprung] of [
+      ["keine", "neu"],
+      ["sekunden", "gleich"],
+      ["millisekunden", "bis-2s"],
+      ["unbekannt", "stunden"],
+      ["sekunden", "anders"],
+    ]) {
+      errorSpy.mockClear();
+      const res = mockRes();
+      await handleErrors(mockReq({ errorMessage: "read_failed", phase: "image-read", dateizeit, zeitsprung }), res);
+      expect(loggedPayload()).toMatchObject({ dateizeit, zeitsprung });
+    }
+  });
+
+  test("Dateizeit und Zeitsprung mit falschem Typ oder leer werden verworfen", async () => {
+    for (const wert of [1791555880537, { datum: "2026-10-09" }, "", null]) {
+      errorSpy.mockClear();
+      const res = mockRes();
+      await handleErrors(mockReq({ errorMessage: "x", phase: "p", dateizeit: wert, zeitsprung: wert }), res);
+      expect(res.statusCode).toBe(204);
+      expect(loggedPayload().dateizeit == null).toBe(true);
+      expect(loggedPayload().zeitsprung == null).toBe(true);
+    }
+  });
+
   test("Kopf-Lesetest mit falschem Typ oder leer wird verworfen", async () => {
     for (const wert of [16, { ok: true }, ""]) {
       errorSpy.mockClear();

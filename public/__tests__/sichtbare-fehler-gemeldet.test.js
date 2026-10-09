@@ -48,7 +48,14 @@ vi.mock("../js/render.js", () => ({
 
 /* ── 1. Die Flaeche ─────────────────────────────────────────────────────── */
 
-const MELDUNG = /\b(logClientError|meldeSichtbarenFehler)\s*\(/;
+/* Drei Wege melden: der Melder selbst und zwei Helfer, die ihn aufrufen. Dass
+   die Helfer das wirklich tun, steht unten als eigene Probe — sonst liesse
+   sich die Pruefung mit einem Helfer, der nichts meldet, umgehen. */
+const MELDUNG = /\b(logClientError|meldeSichtbarenFehler|meldeFotoFehler)\s*\(/;
+const MELDE_HELFER = [
+  ["meldeSichtbarenFehler", "js/api.js"],
+  ["meldeFotoFehler", "js/foto-fehler.js"],
+];
 const REICHWEITE_ZEILEN = 40;
 
 /** Liefert je `setStatus(`-Stelle mit Text: Zeilennummer und ob davor-vor-return gemeldet wird. */
@@ -87,6 +94,18 @@ describe("Flaeche: jede sichtbare Fehlermeldung wird gemeldet", () => {
   test("keine Fehlermeldung ohne Meldung vor dem naechsten return", () => {
     const ungemeldet = alle.filter((s) => !s.gemeldet).map((s) => `${s.datei}:${s.zeile} ${s.text}`);
     expect(ungemeldet).toEqual([]);
+  });
+
+  test("die Melde-Helfer rufen den Melder wirklich auf", () => {
+    for (const [name, datei] of MELDE_HELFER) {
+      const quelle = readFileSync(join(PUBLIC, datei), "utf8");
+      const anfang = quelle.indexOf(`function ${name}(`);
+      expect(anfang, `${name} fehlt in ${datei}`).toBeGreaterThan(-1);
+      /* Der Rumpf endet an der ersten Zeile, die nur aus der schliessenden
+         Klammer besteht. */
+      const rumpf = quelle.slice(anfang, quelle.indexOf("\n}\n", anfang));
+      expect(rumpf, `${name} meldet nicht`).toMatch(/\blogClientError\(/);
+    }
   });
 
   test("leere Dateiauswahl kehrt nicht mehr still zurueck", () => {

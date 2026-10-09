@@ -16,6 +16,12 @@ export const state = {
   lastFile: null,
   /* Zeitpunkt der Dateiauswahl (08.09.2026) — fuer die Lesefehler-Diagnose. */
   auswahlZeit: null,
+  /* LESEFEHLER-DIAGNOSE (09.10.2026): Name, Groesse und Zeit der zuletzt
+     gewaehlten Datei — nur hier im Tab, fuer den Vergleich mit der naechsten
+     Auswahl (zeitsprungArt in exif.js) — und das Ergebnis dieses Vergleichs
+     fuer die laufende Auswahl. Uebertragen wird nur das Ergebnis-Wort. */
+  vorigeAuswahl: null,
+  zeitsprung: "neu",
   lastData: null,
   requestId: 0,
   /* BUG-2026-10-03-45: Zaehlt jede Auswahl — ein hochgeladenes Foto ebenso

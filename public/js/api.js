@@ -23,6 +23,7 @@ import { apiUrl } from "./api-basis.js";
 import { sleep, fetchWithTimeout } from "./netz-hilfen.js";
 import { pollJob, JOB_STATUS_URL, MAX_POLL_DURATION_MS } from "./auftrag-abfrage.js";
 import { vorschauAusErgebnisFallsNoetig, showPhotoDeletedNotice } from "./foto-vorschau.js";
+import { meldeFotoFehler } from "./foto-fehler.js";
 import { acquireWakeLock, releaseWakeLock, wakeLockStatus } from "./wake-lock.js";
 import {
   storeJobId,
@@ -789,20 +790,12 @@ async function analyzeImageQueued() {
       phase = "queue-network";
       setStatus(t("error.networkError"), traceId, "error.networkError");
     }
-    logClientError(err, {
+    meldeFotoFehler(err, {
       phase,
       durationMs: Date.now() - analyzeStartTime,
       requestId: String(myId),
       traceId,
       wakeLock: wakeLockStatus(),
-      fileFormat: err.fileFormat,
-      errorDetail: err.errorDetail,
-      fileSizeKb: err.fileSizeKb,
-      /* Lesefehler-Diagnose (08.09.2026): Zeit seit der Auswahl und das
-         Ergebnis des zweiten Lesewegs — beides ohne Personenbezug. */
-      msSeitAuswahl: err.msSeitAuswahl,
-      zweiterLeseweg: err.zweiterLeseweg,
-      kopfLesetest: err.kopfLesetest,
     });
   } finally {
     /* Der Schalter gilt nur, solange dieser Durchgang hochlaedt. */

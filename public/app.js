@@ -23,6 +23,7 @@ import { initSprachumschalter } from "./js/sprachumschalter.js";
 import { initBeastLockruf } from "./js/beast-lockruf.js";
 import { pruefeSeiteNachDruck } from "./js/druck-wache.js";
 import { apiUrl } from "./js/api-basis.js";
+import { zeitsprungArt } from "./js/exif.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
    Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
@@ -195,6 +196,9 @@ function handleNewFile(file) {
   elements.imagePreview.appendChild(img);
 
   state.lastFile = file;
+  /* Lesefehler-Diagnose: Vergleich mit der vorigen Auswahl (exif.js). */
+  state.zeitsprung = zeitsprungArt(state.vorigeAuswahl, file);
+  state.vorigeAuswahl = { name: file.name, size: file.size, lastModified: file.lastModified };
   state.auswahlZeit = Date.now();
   state.lastPrepared = null;
   state.lastData = null;

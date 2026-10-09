@@ -36,6 +36,13 @@ const STRING_FIELDS = {
      lesen? "ok", "leer" oder ein Fehlername. Trennt "Geraet gibt die Datei gar
      nicht heraus" von "nicht vollstaendig". Kein Inhalt, kein Dateiname. */
   kopfLesetest: 40,
+  /* Lesefehler (09.10.2026): Art der Zeitangabe, die der Browser zur Datei
+     hatte ("keine", "sekunden", "millisekunden", "unbekannt"), und der
+     Vergleich mit der vorigen Auswahl derselben Datei ("neu", "gleich",
+     "bis-2s", "stunden", "anders"). Feste Woerter aus dem Browser, hier nur
+     gekappt. Kein Datum, kein Alter des Fotos, kein Dateiname. */
+  dateizeit: 15,
+  zeitsprung: 10,
 };
 /* `msSeitAuswahl`: Zeit zwischen Dateiauswahl und Leseversuch (08.09.2026). */
 const NUMBER_FIELDS = ["durationMs", "httpStatus", "fileSizeKb", "msSeitAuswahl"];

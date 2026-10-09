@@ -18,7 +18,7 @@ vi.mock("../js/heic.js", () => ({
   heicZuCanvas: vi.fn(),
 }));
 import { heicZuCanvas } from "../js/heic.js";
-import { prepareImage } from "../js/exif.js";
+import { prepareImage, dateizeitArt, zeitsprungArt } from "../js/exif.js";
 
 const HEIC_KOPF = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0, 0, 0, 0]);
 const JPEG_KOPF = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1]);
@@ -140,6 +140,90 @@ describe("Lesefehler: zweiter Leseweg", () => {
     const err = await prepareImage(f).catch((e) => e);
     expect(err.msSeitAuswahl).toBeNull();
   }, 10000);
+});
+
+/* Am Android-Prüfgerät gemessen (09.10.2026, Chromium 157): Foto-Fenster des
+   Systems (Android 15) → die Zeit liegt im Augenblick der Auswahl (11 bis 54 ms
+   davor); Chromiums eigenes Foto-Fenster (Android 10), Dateien-Dialog und
+   Galerie-App → die echte Änderungszeit, auf Sekunden oder Millisekunden. */
+describe("Lesefehler: Art der Zeitangabe der Datei", () => {
+  const AUSWAHL = 1791555880537;
+
+  it("Zeit der Datei liegt im Augenblick der Auswahl: der Browser kennt keine eigene", () => {
+    expect(dateizeitArt({ lastModified: AUSWAHL - 52 }, AUSWAHL)).toBe("keine");
+    expect(dateizeitArt({ lastModified: AUSWAHL - 11 }, AUSWAHL)).toBe("keine");
+    expect(dateizeitArt({ lastModified: AUSWAHL + 3 }, AUSWAHL)).toBe("keine");
+  });
+
+  it("echte Zeit der Datei, auf volle Sekunden", () => {
+    expect(dateizeitArt({ lastModified: 1786372853000 }, AUSWAHL)).toBe("sekunden");
+  });
+
+  it("echte Zeit der Datei, auf Millisekunden", () => {
+    expect(dateizeitArt({ lastModified: 1791556068149 - 600000 }, AUSWAHL)).toBe("millisekunden");
+  });
+
+  it("Grenze: knapp unter zwei Sekunden Abstand zählt als „keine“, genau zwei Sekunden nicht mehr", () => {
+    expect(dateizeitArt({ lastModified: AUSWAHL - 1999 }, AUSWAHL)).toBe("keine");
+    expect(dateizeitArt({ lastModified: AUSWAHL - 2000 }, AUSWAHL)).toBe("millisekunden");
+  });
+
+  it("ohne Zeit der Datei oder ohne Zeitpunkt der Auswahl: „unbekannt“", () => {
+    expect(dateizeitArt({}, AUSWAHL)).toBe("unbekannt");
+    expect(dateizeitArt({ lastModified: NaN }, AUSWAHL)).toBe("unbekannt");
+    expect(dateizeitArt(null, AUSWAHL)).toBe("unbekannt");
+    expect(dateizeitArt({ lastModified: AUSWAHL }, null)).toBe("unbekannt");
+  });
+
+  it("der Lesefehler trägt das Stichwort, und nur ein Wort aus der festen Liste", async () => {
+    const f = datei(JPEG_KOPF, { arrayBufferWirft: true, readerWirft: true });
+    const err = await prepareImage(f, { auswahlZeit: Date.now() }).catch((e) => e);
+    expect(err.message).toBe("read_failed");
+    expect(["keine", "sekunden", "millisekunden", "unbekannt"]).toContain(err.dateizeit);
+  }, 10000);
+});
+
+/* Dieselbe Datei zweimal hintereinander gewählt: Hat sich ihre Zeit geändert?
+   Am Prüfgerät blieb sie gleich; auf den betroffenen Handys ist das die offene
+   Frage hinter dem Lesefehler. */
+describe("Lesefehler: Vergleich mit der vorigen Auswahl", () => {
+  const ZEIT = 1791557378000;
+  const vorige = { name: "foto.jpg", size: 277504, lastModified: ZEIT };
+  const datei = (aenderung = {}) => ({ name: "foto.jpg", size: 277504, lastModified: ZEIT, ...aenderung });
+
+  it("ohne vorige Auswahl oder bei einer anderen Datei: „neu“", () => {
+    expect(zeitsprungArt(null, datei())).toBe("neu");
+    expect(zeitsprungArt(vorige, datei({ name: "anderes.jpg" }))).toBe("neu");
+    expect(zeitsprungArt(vorige, datei({ size: 277505 }))).toBe("neu");
+  });
+
+  it("Erfolgsweg der Messung: dieselbe Datei mit derselben Zeit ist „gleich“", () => {
+    expect(zeitsprungArt(vorige, datei())).toBe("gleich");
+  });
+
+  it("kleiner Sprung: unter zwei Sekunden, vor oder zurück", () => {
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 1000 }))).toBe("bis-2s");
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT - 1 }))).toBe("bis-2s");
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 1999 }))).toBe("bis-2s");
+  });
+
+  it("ganze Stunden, wie bei einer verschobenen Zeitzone (zwei Sekunden Spiel)", () => {
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 3600000 }))).toBe("stunden");
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT - 2 * 3600000 }))).toBe("stunden");
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 3600000 - 1500 }))).toBe("stunden");
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 3600000 + 1999 }))).toBe("stunden");
+  });
+
+  it("Grenze: genau zwei Sekunden und alles, was nicht auf Stunden fällt, ist „anders“", () => {
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 2000 }))).toBe("anders");
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 3600000 + 2000 }))).toBe("anders");
+    expect(zeitsprungArt(vorige, datei({ lastModified: ZEIT + 3572000 }))).toBe("anders");
+  });
+
+  it("fehlt eine der Zeiten, gilt die Auswahl als „neu“ (kein Wort, das etwas behauptet)", () => {
+    expect(zeitsprungArt(vorige, datei({ lastModified: undefined }))).toBe("neu");
+    expect(zeitsprungArt({ ...vorige, lastModified: NaN }, datei())).toBe("neu");
+  });
 });
 
 describe("Format, das der Browser nicht kennt", () => {

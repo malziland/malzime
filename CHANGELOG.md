@@ -6,6 +6,17 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Geändert — Fehlersuche
+
+- **Die anonyme Fehlermeldung zu einem nicht lesbaren Foto hält fest, wie sich
+  die Zeitangabe der Datei auf dem Gerät verhält** — zwei feste Wörter: welche
+  Art Zeit der Browser zur Datei hatte, und ob sie sich geändert hat, wenn
+  dasselbe Foto noch einmal gewählt wird. Kein Datum, kein Dateiname. Für die
+  Nutzerinnen und Nutzer ändert sich nichts. Hintergrund: Chrome gibt auf
+  manchen älteren Android-Handys ein gewähltes Foto nicht heraus, wenn sich
+  die Zeit der Datei zwischen Auswahl und Lesen ändert; was sie dort ändert,
+  ist offen.
+
 ### Geändert — Betrieb
 
 - **Nach einer kurzen Störung läuft ein wartender Auftrag spätestens nach einer

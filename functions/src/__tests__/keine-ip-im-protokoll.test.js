@@ -280,6 +280,8 @@ const VOLLE_FEHLERMELDUNG = {
   errorDetail: "NotReadableError",
   zweiterLeseweg: "NotReadableError",
   kopfLesetest: "ok",
+  dateizeit: "millisekunden",
+  zeitsprung: "gleich",
   durationMs: 1234,
   httpStatus: 0,
   fileSizeKb: 4321,

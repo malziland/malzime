@@ -32,6 +32,9 @@ const ERLAUBTE_FELDER = new Set([
   "zweiterLeseweg",
   /* Kopf-Lesetest (16.09.2026), gespiegelt in handle-errors.js. */
   "kopfLesetest",
+  /* Dateizeit und Zeitsprung (09.10.2026), gespiegelt in handle-errors.js. */
+  "dateizeit",
+  "zeitsprung",
   "timings",
 ]);
 

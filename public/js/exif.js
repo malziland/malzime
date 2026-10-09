@@ -75,6 +75,7 @@ async function readFileBytes(file, auswahlZeit) {
       wrapped.fileSizeKb = Math.round((file.size || 0) / 1024);
       wrapped.zweiterLeseweg = zweiter.ergebnis;
       wrapped.kopfLesetest = kopf;
+      wrapped.dateizeit = dateizeitArt(file, auswahlZeit);
       wrapped.msSeitAuswahl = msSeit(auswahlZeit);
       throw wrapped;
     }
@@ -86,6 +87,50 @@ async function readFileBytes(file, auswahlZeit) {
    Lesen verfaellt. Ohne Zeitstempel bleibt das eine Vermutung. */
 function msSeit(auswahlZeit) {
   return typeof auswahlZeit === "number" && auswahlZeit > 0 ? Math.max(0, Math.round(Date.now() - auswahlZeit)) : null;
+}
+
+/* DATEIZEIT (09.10.2026): Welche Art Zeitangabe hat der Browser zu dieser
+   Datei? Gemessen am Android-Pruefgeraet mit Chromium 157: Auf Android 15
+   oeffnet die Auswahl das Foto-Fenster des Systems; die Datei traegt dann den
+   Augenblick ihrer (ersten) Auswahl als Zeit, und Chromium las sie immer. Auf
+   Android 10 oeffnet Chromium ein eigenes Foto-Fenster; die Datei traegt ihre
+   echte Aenderungszeit, und aendert die sich zwischen Auswahl und Lesen,
+   verweigert Chromium die Datei mit `NotReadableError` — dasselbe bei einer
+   Galerie-App als Quelle. Das Stichwort sagt, welche Art Zeit vorlag:
+   "keine" = die Zeit liegt im Augenblick der Auswahl, "sekunden" oder
+   "millisekunden" = eine andere Zeit, so genau. Uebertragen wird nur dieses
+   Wort — kein Datum, kein Alter des Fotos. Unschaerfe: Ein Foto, das in den
+   zwei Sekunden um die Auswahl gespeichert wurde, zaehlt als "keine"; wird
+   dieselbe Datei im Foto-Fenster des Systems erneut gewaehlt, kommt
+   "millisekunden". Exportiert fuer Tests. */
+const DATEIZEIT_NAEHE_MS = 2000;
+export function dateizeitArt(file, auswahlZeit) {
+  const zeit = file ? file.lastModified : null;
+  if (typeof zeit !== "number" || !Number.isFinite(zeit)) return "unbekannt";
+  if (typeof auswahlZeit !== "number" || !(auswahlZeit > 0)) return "unbekannt";
+  if (Math.abs(auswahlZeit - zeit) < DATEIZEIT_NAEHE_MS) return "keine";
+  return zeit % 1000 === 0 ? "sekunden" : "millisekunden";
+}
+
+/* ZEITSPRUNG (09.10.2026): Wird dieselbe Datei zweimal hintereinander gewaehlt
+   — nach einem Lesefehler tun Kinder genau das —, sagt der Vergleich der zwei
+   Zeitangaben, ob sich die Zeit der Datei auf diesem Geraet von selbst
+   aendert. Das ist die offene Frage hinter dem Lesefehler: Am Pruefgeraet
+   blieb die Zeit zwischen zwei Auswahlen gleich. Verglichen wird im Browser
+   (Name und Groesse der Datei bleiben hier); uebertragen wird nur das Wort:
+   "neu" (andere Datei als zuvor oder erste Auswahl), "gleich", "bis-2s",
+   "stunden" (ganze Stunden, wie bei einer verschobenen Zeitzone) oder
+   "anders". Exportiert fuer Tests. */
+const STUNDE_MS = 3600000;
+export function zeitsprungArt(vorige, file) {
+  if (!vorige || !file || vorige.name !== file.name || vorige.size !== file.size) return "neu";
+  const sprung = Math.abs(file.lastModified - vorige.lastModified);
+  if (!Number.isFinite(sprung)) return "neu";
+  if (sprung === 0) return "gleich";
+  if (sprung < DATEIZEIT_NAEHE_MS) return "bis-2s";
+  const rest = sprung % STUNDE_MS;
+  if (rest < DATEIZEIT_NAEHE_MS || STUNDE_MS - rest < DATEIZEIT_NAEHE_MS) return "stunden";
+  return "anders";
 }
 
 /* Liest ueber den aelteren FileReader-Weg statt ueber file.arrayBuffer().

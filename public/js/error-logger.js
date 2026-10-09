@@ -193,6 +193,12 @@ export function logClientError(error, context = {}) {
       zweiterLeseweg: typeof context.zweiterLeseweg === "string" ? context.zweiterLeseweg : null,
       /* Kopf-Lesetest (16.09.2026): "ok", "leer" oder ein Fehlername — kein Inhalt. */
       kopfLesetest: typeof context.kopfLesetest === "string" ? context.kopfLesetest.slice(0, 40) : null,
+      /* Lesefehler (09.10.2026): Art der Zeitangabe der Datei ("keine",
+         "sekunden", "millisekunden", "unbekannt") und Vergleich mit der
+         vorigen Auswahl ("neu", "gleich", "bis-2s", "stunden", "anders") —
+         feste Woerter, kein Datum, kein Dateiname. */
+      dateizeit: typeof context.dateizeit === "string" ? context.dateizeit.slice(0, 15) : null,
+      zeitsprung: typeof context.zeitsprung === "string" ? context.zeitsprung.slice(0, 10) : null,
       timings: context.timings && typeof context.timings === "object" ? context.timings : null,
       client: clientCtx,
     };

@@ -35,6 +35,8 @@
       "errorDetail": "Fehlerart",
       "zweiterLeseweg": "zusammengefasst",
       "kopfLesetest": "zusammengefasst",
+      "dateizeit": "zusammengefasst",
+      "zeitsprung": "zusammengefasst",
       "durationMs": "Fehlerart, Dauer",
       "httpStatus": "Fehlerart",
       "fileSizeKb": "dessen Format und Größe",

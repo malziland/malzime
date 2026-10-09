@@ -721,23 +721,61 @@ erreichte Phase (`letztePhase`) und ob ein Auftrag offen war
 Ursache. Kein Treffer nach einem Workshop heißt: Die Schleife ist dort nicht
 aufgetreten. Manuelles Neuladen zählt seit v2.12.3 nicht mehr mit.
 
-### „Bild konnte nicht geöffnet werden" (`error.readFailed`)
+### „Dein Gerät hat das Foto nicht übergeben" (`error.readFailed`)
 
-Der Browser bekommt die Datei vom Gerät nicht — kein Formatproblem. Stand
-16.09.2026: bisher ausschließlich Chrome 151/152 auf Android (Pixeldichte der
-Meldungen passt zu Samsung-Galaxy-Geräten), 20 Fälle in 30 Tagen, davon 11 an
-einem Workshop-Tag; Samsung Internet war nicht betroffen. Die Seite liest die
-Datei zweimal über `arrayBuffer()` und dann über `FileReader` (seit 08.09.2026)
-— der zweite Weg hat im Workshop in keinem der 11 Fälle geholfen. Die Ursache
-ist noch offen.
+Der Browser bekommt die gewählte Datei nicht zu lesen — kein Formatproblem und
+keine Ablehnung des Servers. Stand 09.10.2026: 27 Fälle in 30 Tagen, alle in
+Chrome auf Android (Fassungen 135 und 152 bis 155), immer `NotReadableError`,
+auf jedem Leseweg, spätestens 0,7 Sekunden nach der Auswahl; betroffen waren
+laut Beobachtung im Workshop Samsung-Handys. Auch die erneute Auswahl desselben
+Fotos scheiterte dort.
 
-**Was die Meldung jetzt mitbringt** (Diagnose-Speicher, 30 Tage): `errorDetail`
+**Was am Android-Prüfgerät gemessen ist (09.10.2026, Chromium 157, dazu Chrome
+124):** Chromium merkt sich bei der Auswahl Größe und Zeit der Datei und
+verweigert sie, wenn die Zeit beim Lesen nicht mehr passt — mit genau diesem
+Fehlerbild. Wo das greift:
+
+| Woher die Datei kommt | Zeit, die Chromium zur Datei führt | Zeit nach der Auswahl geändert |
+|---|---|---|
+| Android 15, erster Tipp: Foto-Fenster des Systems | Augenblick der ersten Auswahl | lesbar |
+| Android 10, erster Tipp: Chromiums eigenes Foto-Fenster | echte Änderungszeit | `NotReadableError` |
+| Galerie-App als Quelle (Google Fotos), beide Android-Fassungen | echte Änderungszeit | `NotReadableError` |
+| Dateien-Dialog (Downloads) | echte Änderungszeit | lesbar (in Chrome 124: `NotReadableError`) |
+
+Eine gelöschte Datei ergibt `NotFoundError`, also einen anderen Namen.
+Verweigert Chromium, scheitert jeder weitere Zugriff auf dieselbe Auswahl mit,
+auch die Vorschau. Im Geräteprotokoll steht dazu nichts.
+
+**Nicht auslösbar war der Fehler** ohne Eingriff nach der Auswahl: frisches
+Kamerafoto und frischer Screenshot, sofort gewählt (Android 15, elfmal; Android
+10 nur Screenshot, dreimal); Zeit im Foto-Verzeichnis des Geräts und Zeit der
+Datei schon vor der Auswahl verschieden (Android 10, siebenmal). **Offen** ist
+damit, was auf den betroffenen Handys die Zeit der Datei zwischen Auswahl und
+Lesen ändert. **Nicht gemessen:** ein Samsung-Gerät, die Samsung-Galerie, eine
+Speicherkarte, Chrome 135 und 152 bis 155.
+
+**Was die Meldung mitbringt** (Diagnose-Speicher, 30 Tage): `errorDetail`
 (Fehlername), `fileFormat` (vom Browser angegebener Typ), `fileSizeKb`,
-`msSeitAuswahl`, `zweiterLeseweg` und seit 16.09.2026 `kopfLesetest`: `ok`
-heißt, der Anfang der Datei war lesbar, nur das Ganze nicht (Datei verändert
-oder unvollständig); ein Fehlername heißt, das Gerät gibt die Datei gar nicht
-heraus (etwa ein Foto, das nur in der Cloud liegt). Übertragen wird nur dieses
-Stichwort, nie Bytes.
+`msSeitAuswahl`, `zweiterLeseweg`, `kopfLesetest` und seit 09.10.2026:
+
+- `dateizeit`: `keine` (die Zeit der Datei liegt im Augenblick der Auswahl, wie
+  beim Foto-Fenster des Systems), `sekunden` oder `millisekunden` (eine andere
+  Zeit, so genau — wie bei Chromiums eigenem Foto-Fenster oder einer
+  Galerie-App), `unbekannt`. Wird dieselbe Datei im Foto-Fenster des Systems
+  erneut gewählt, kommt `millisekunden`.
+- `zeitsprung`: Vergleich mit der vorigen Auswahl, wenn es dieselbe Datei war —
+  `gleich`, `bis-2s`, `stunden` (ganze Stunden, wie bei einer verschobenen
+  Zeitzone), `anders`; sonst `neu`. Zeigt, ob sich die Zeit der Datei auf dem
+  Gerät von selbst ändert.
+
+Übertragen werden nur diese Wörter, kein Datum, kein Alter des Fotos, kein
+Dateiname. `kopfLesetest` grenzt die Ursache **nicht** ein: Verweigert Chromium
+die Datei, scheitert auch das Lesen der ersten 16 Bytes (16 von 16 Fällen seit
+17.09.2026, am Prüfgerät bestätigt).
+
+**Prüfgeräte:** `pruefgeraet` (Android 15) und seit 09.10.2026 `pruefgeraet-alt`
+(Android 10, Abbild `system-images;android-29;google_apis;arm64-v8a`), beide mit
+Chromium 157 aus Googles Snapshot-Ablage (Paket `org.chromium.chrome`).
 
 **Seit 16.09.2026 werden auch diese sichtbaren Meldungen erfasst** (Phase in
 Klammern): Datei fehlt (`datei-fehlt`), Datei zu groß (`datei-zu-gross`, mit
@@ -752,7 +790,7 @@ Nachsehen:
     gcloud logging read 'resource.labels.service_name="errors"' \
       --project=malzime --bucket=client-diagnostics --location=europe-west1 \
       --view=_AllLogs --freshness=30d \
-      --format='value(timestamp,jsonPayload.phase,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest)'
+      --format='value(timestamp,jsonPayload.phase,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.dateizeit,jsonPayload.zeitsprung,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest)'
 
 ### Mistral überlastet / 429 / 5xx
 

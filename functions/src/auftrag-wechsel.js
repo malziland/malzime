@@ -37,10 +37,12 @@ const { loadPrompts } = require("./i18n");
 
    KEINE MARKE STEHT IN ALLEN SETS (13.10.2026). Bis dahin stand Garmin in
    jedem der sechs und war damit bei jeder Analyse gesperrt (ausser sichtbar
-   im Bild), auch wenn die Marke zur Person passte. Entscheidung des Inhabers:
-   Die Sperre soll abwechseln, nicht ausschliessen. Garmin steht jetzt in
-   keinem Set. Anhaltspunkt aus der Messung ganz OHNE Sperre (15 Fotos,
-   13.10.2026): Garmin bei 3 von 15. */
+   im Bild), auch wenn die Marke zur Person passte. Die Sperre soll
+   abwechseln, nicht ausschliessen: Garmin steht jetzt in keinem Set.
+   Gemessen am selben Tag (15 Fotos, je Foto dieselbe Vorlage und dasselbe
+   Set wie in der Vergleichsreihe): Garmin vorher bei 0, jetzt bei 5 von 15,
+   immer in der sachlichen Werbung; dasselbe Radsport-Foto sechsmal: 6 von 6.
+   Die wechselnde Sperre selbst hielt: 0 Verstoesse in 102 Eintraegen. */
 const BRAND_BLOCKLIST_SETS = [
   ["Rapha", "Wahoo", "Specialized", "Komoot", "Ortlieb", "Red Bull", "Apple Watch", "Nike Metcon"],
   ["Rapha", "Wahoo", "Specialized", "Nike", "Adidas", "Apple", "Samsung", "Puma"],

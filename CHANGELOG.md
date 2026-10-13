@@ -13,7 +13,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Sperrlisten mit. Garmin stand als einzige Marke in allen sechs und war
   damit bei jeder Analyse gesperrt, auch wenn sie zur Person passte. Jetzt
   steht keine Marke mehr in allen Listen; Tests halten das fest. Die übrigen
-  Marken der Listen sind unverändert.
+  Marken der Listen sind unverändert. Gemessen an 15 Fotos mit je einer
+  Analyse: Garmin vorher bei keinem, jetzt bei 5, jeweils in der sachlichen
+  Werbung. Bei einem Radsport-Foto, sechsmal analysiert, steht Garmin in
+  jeder Analyse – so wie dort schon bisher mehrere andere Radmarken.
 
 ## [5.2.0] — 2026-10-13
 

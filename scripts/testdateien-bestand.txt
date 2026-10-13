@@ -157,6 +157,7 @@ functions/src/__tests__/primaten-regel.test.js
 functions/src/__tests__/privacy.test.js
 functions/src/__tests__/prompt-sprachregeln.test.js
 functions/src/__tests__/prompt-verbot-themen.test.js
+functions/src/__tests__/prompt-vorlagen.test.js
 functions/src/__tests__/pruefe-live-verhalten.test.js
 functions/src/__tests__/pruefstand-script.test.js
 functions/src/__tests__/queue-storage-emulator-riegel.test.js

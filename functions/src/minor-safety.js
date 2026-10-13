@@ -186,20 +186,40 @@ function sperrliste(ueberall, nurAlsWerbung) {
 const IMMER_VERBOTEN = sperrliste(WOERTER.IMMER.ueberall, WOERTER.IMMER.nurAlsWerbung);
 const NUR_MINDERJAEHRIG = sperrliste(WOERTER.MINOR.ueberall, WOERTER.MINOR.nurAlsWerbung);
 
-/* ── Werbe-Anzahl (09.09.2026) ────────────────────────────────────────────
+/* ── Werbe-Anzahl (09.09.2026, Vorrat und Auswahl 13.10.2026) ─────────────
+   Der Werbe-Aufruf liefert WERBE_ANFORDERUNG Eintraege, gezeigt werden
+   hoechstens WERBE_ANZAHL. Der Vorrat ist doppelt so gross wie die Anzeige,
+   aus zwei Gruenden:
+   1. Streicht der Filter bei einem Kind Eintraege, sah das Kind vorher
+      weniger Werbeideen als ein Erwachsener — die Anzahl verriet den Filter.
+      Mit Reserve stimmt die Anzahl auch nach dem Streichen.
+   2. Gezeigt wird eine AUSWAHL aus dem Vorrat (waehleAus), nicht immer die
+      ersten acht. Gemessen am 13.10.2026: Dasselbe Foto zeigte in drei
+      Durchlaeufen fast dieselben Anzeigen. Ein Werbesystem hat fuer eine
+      Person viele passende Anzeigen und zeigt nicht jedes Mal dieselben.
+   Nachgefuellt wird nichts: Ersatz aus einer festen Liste waere keine
+   Analyse mehr. Jeder gezeigte Eintrag stammt aus dem Aufruf fuer genau
+   diese Person. Die Prompt-Dateien unter locales lesen WERBE_ANFORDERUNG von
+   hier, damit die Zahl nur einmal steht.
+
    BLEIBT IM CODE — Gestaltung, kein Betriebswert: Die Anzahl der Werbekarten
    ist Teil des Bildschirms, nicht der Last, und der Prompt liest sie von
-   hier; ueber Firestore veraenderbar hiesse, Prompt und Kappung koennten
-   auseinanderlaufen.
-   Der Werbe-Aufruf liefert WERBE_ANFORDERUNG Eintraege, gezeigt werden
-   hoechstens WERBE_ANZAHL. Grund: Streicht der Filter bei einem Kind zwei
-   Eintraege, sah das Kind vorher sechs Werbeideen, ein Erwachsener acht —
-   die Anzahl verriet den Filter. Mit zwei Eintraegen Reserve stimmt die
-   Anzahl auch nach dem Streichen. Nachgefuellt wird nichts: Ersatz aus einer
-   festen Liste waere keine Analyse mehr. Die Prompt-Dateien unter locales
-   lesen WERBE_ANFORDERUNG von hier, damit die Zahl nur einmal steht. */
+   hier; ueber Firestore veraenderbar hiesse, Prompt und Auswahl koennten
+   auseinanderlaufen. */
 const WERBE_ANZAHL = 8;
-const WERBE_ANFORDERUNG = WERBE_ANZAHL + 2;
+const WERBE_ANFORDERUNG = WERBE_ANZAHL * 2;
+
+/* Zieht `anzahl` Eintraege aus der Liste; ihre Reihenfolge bleibt. `zufall`
+   liefert Zahlen von 0 bis unter 1 und ist nur fuer Tests vorgebbar. */
+function waehleAus(liste, anzahl, zufall = Math.random) {
+  const stellen = liste.map((_, i) => i);
+  for (let i = stellen.length - 1; i > 0; i--) {
+    const j = Math.floor(zufall() * (i + 1));
+    [stellen[i], stellen[j]] = [stellen[j], stellen[i]];
+  }
+  const gewaehlt = new Set(stellen.slice(0, anzahl));
+  return liste.filter((_, i) => gewaehlt.has(i));
+}
 
 /* Liefert das erste Wort der Liste, das im Text steht: nur das Wort selbst,
    klein geschrieben, hoechstens 30 Zeichen. Kein Satz, kein Kontext. Das Log
@@ -306,11 +326,12 @@ function applyMinorSafety(profiles, opts = {}) {
         }
         nachher.push(e);
       }
-      /* Kappen erst NACH dem Filter, nur die Werbung (siehe WERBE_ANZAHL).
-         Die Trigger sind Erklaersaetze und bleiben vollstaendig. */
+      /* Auswaehlen erst NACH dem Filter, nur die Werbung (siehe WERBE_ANZAHL):
+         Was gestrichen ist, kann nicht mehr gezogen werden. Die Trigger sind
+         Erklaersaetze und bleiben vollstaendig. */
       let ergebnis = nachher;
       if (feld === "ad_targeting" && ergebnis.length > WERBE_ANZAHL) {
-        ergebnis = ergebnis.slice(0, WERBE_ANZAHL);
+        ergebnis = waehleAus(ergebnis, WERBE_ANZAHL, opts.zufall);
         bericht.gekappt.push({ modus, feld, von: nachher.length, auf: WERBE_ANZAHL });
       }
       if (ergebnis.length !== vorher.length) p[feld] = ergebnis;

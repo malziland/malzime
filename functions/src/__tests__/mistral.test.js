@@ -590,10 +590,27 @@ describe("runSingleLargeCall", () => {
     expect(user.content[0].type).toBe("image_url");
   });
 
-  test("der statische Teil ist ueber Aufrufe hinweg bitgleich — sonst kein Cache-Treffer", async () => {
+  /* Seit 13.10.2026 endet der Auftrag mit einer von mehreren Vorlagen. Ein
+     Treffer im Zwischenspeicher deckt entweder den ganzen Auftrag (dieselbe
+     Vorlage) oder den Teil VOR der Vorlage — gemessen an der echten
+     Schnittstelle am selben Tag (Zahlen in mistral.js). Beides haengt daran,
+     dass dieser Teil sich nie aendert und dieselbe Vorlage Zeichen fuer
+     Zeichen gleich bleibt. */
+  test("der Teil vor der Vorlage ist ueber Aufrufe hinweg bitgleich — sonst kein Cache-Treffer", async () => {
     const seen = captureBody();
-    await runSingleLargeCall(Buffer.from("bild-eins"), "image/jpeg", () => 60000, "de");
-    await runSingleLargeCall(Buffer.from("bild-zwei"), "image/jpeg", () => 60000, "de");
+    const TRENN = "═══ JSON-SCHEMA ═══";
+    for (let i = 0; i < 12; i++) {
+      await runSingleLargeCall(Buffer.from(`bild-${i}`), "image/jpeg", () => 60000, "de");
+    }
+    const regelteile = new Set(seen.map((b) => b.messages[0].content.split(TRENN)[0]));
+    expect(regelteile.size).toBe(1);
+    expect([...regelteile][0].length).toBeGreaterThan(30000);
+  });
+
+  test("mit derselben Vorlage ist der ganze Auftrag bitgleich", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("bild-eins"), "image/jpeg", () => 60000, "de", { musterIndex: 1 });
+    await runSingleLargeCall(Buffer.from("bild-zwei"), "image/jpeg", () => 60000, "de", { musterIndex: 1 });
     expect(seen[0].messages[0].content).toBe(seen[1].messages[0].content);
   });
 

@@ -24,11 +24,13 @@ const en = require("../locales/en/prompts");
  *   3. Deutsch und Englisch müssen dieselben Merkmale führen.
  */
 
-/* Beide Stellen, an denen die Kalibrierung steht — hier zusammengefasst, damit
-   jeder Test automatisch BEIDE prüft. */
+/* Alle Aufträge, die an die KI gehen können — hier zusammengefasst, damit
+   jeder Test automatisch JEDEN prüft. Seit 13.10.2026 endet der Auftrag mit
+   einer von mehreren Vorlagen (locales/<sprache>/muster.js); was über Alter
+   im Beispiel gilt, muss für jede von ihnen gelten. */
 const PROMPTS = [
-  ["de/singleLargePrompt (aktiver Pfad)", de.singleLargePrompt],
-  ["en/singleLargePrompt (aktiver Pfad)", en.singleLargePrompt],
+  ...de.singleLargePromptVarianten.map((auftrag, i) => [`de/Auftrag mit Vorlage ${i + 1}`, auftrag]),
+  ...en.singleLargePromptVarianten.map((auftrag, i) => [`en/Auftrag mit Vorlage ${i + 1}`, auftrag]),
 ];
 
 /* Marker, die bei Jungen und Mädchen gleich schnell laufen. Je Sprache die

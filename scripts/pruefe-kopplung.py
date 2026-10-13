@@ -68,8 +68,19 @@ ZEILEN_GRENZEN = {
     # Die beiden Prompt-Dateien sind bewusst gross: Sie enthalten die Texte,
     # nicht Logik. Eine Grenze haben sie trotzdem — waechst dort Code hinein,
     # soll es auffallen.
-    "functions/src/locales/de/prompts.js": 1190,
-    "functions/src/locales/en/prompts.js": 1140,
+    #
+    # GESENKT 13.10.2026 von 1190 und 1140: Die ausgefuellten Beispiel-Antworten
+    # am Ende des Analyse-Auftrags stehen jetzt in muster.js (es sind mehrere
+    # geworden, je Analyse geht eine mit). Ohne die Senkung haette jede der
+    # beiden Dateien 650 Zeilen Luft, und die Grenze saehe nichts mehr.
+    "functions/src/locales/de/prompts.js": 530,
+    "functions/src/locales/en/prompts.js": 500,
+    # Die Vorlagen selbst: reine Daten, drei Stueck je Sprache. Eine weitere
+    # Vorlage aendert, was die KI schreibt, und braucht eine Messung
+    # (Regeln im Kopf von de/muster.js) — die Grenze schlaegt dann an, und
+    # das soll sie.
+    "functions/src/locales/de/muster.js": 470,
+    "functions/src/locales/en/muster.js": 445,
     "public/js/realitaets-check.js": 460,
     "public/js/sprachumschalter.js": 680,
     # BEFUND 31.08.2026 (Runde 3): Diese vier standen in KEINER Grenze und
@@ -103,6 +114,9 @@ ZEILEN_GRENZEN = {
     # das Feld `ursache` in zwei Fehlerzeilen. Sie herauszuloesen hiesse, den
     # Ablauf des Normalfalls zu verstecken.
     "functions/src/mistral.js": 790,
+    # Abgetrennt 13.10.2026: was am Auftrag je Analyse wechselt (Marken-Sperre,
+    # Formvorlage). mistral.js waere mit der Vorlagenwahl auf 814 gewachsen.
+    "functions/src/auftrag-wechsel.js": 95,
     # Abgetrennt 01.10.2026 — sonst waere die Grenze oben umgehbar.
     # 150 -> 170 noch am selben Tag: Die Positivliste der zulaessigen
     # Fehlertexte (Befund R-03, Datenschutz) ersetzt die Maskierung nach
@@ -167,7 +181,9 @@ ZEILEN_GRENZEN = {
     "scripts/pruefe-live.sh": 580,
     # 07.10.2026: +40 fuer die Eintraege unten und die laengere Liste der
     # unverzichtbaren Tests — Daten, keine Logik.
-    "scripts/pruefe-kopplung.py": 560,
+    # 13.10.2026: +20 fuer drei neue Dateien (Vorlagen in zwei Sprachen,
+    # auftrag-wechsel.js) samt Begruendung — Daten, keine Logik.
+    "scripts/pruefe-kopplung.py": 580,
     # 07.10.2026: Die Aufteilungen der Behebung nach dem Audit vom 03.10.2026
     # haben neue Dateien erzeugt, die in keiner Grenze standen — genau das
     # Schlupfloch, das der Kommentar oben beschreibt (aus einer grossen Datei

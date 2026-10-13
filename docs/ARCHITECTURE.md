@@ -228,7 +228,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `queue-storage.js` | Queue: temporäre Bild-Ablage im GCS-Bucket |
 | `feature-flags.js` | Laufzeit-Feature-Flags (`useBeastAdsCall`, `useGemesseneDauer`; Firestore, 30 s Cache, je Flag ein fail-safe-Wert, siehe `FLAGS.md`) |
 | `config.js` | Nur, was bewusst nicht einstellbar ist: Mistral-Modell-IDs, EU-Endpunkt, EU-Datenbank, Upload-Grenze, erlaubte Dateiformate |
-| `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile; ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
+| `mistral.js` | Mistral AI: ein Aufruf an `mistral-large-2512` liefert Beschreibung + beide Profile, je Analyse mit einer von mehreren Formvorlagen (`locales/*/muster.js`); ein zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung |
 | `job-pipelines.js` | Der Analyseweg eines Auftrags (`runPipeline`): ein Aufruf an Mistral Large liefert Beschreibung und beide Profile, danach die Beast-Werbung |
 | `ueberlast.js` | Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504) |
 | `verbindungsfehler.js` | Verbindungsabriss zu einem fremden Dienst: erkennen, einmal neu versuchen, schon gelesenen Text retten, Grund protokollieren — nur Code und Kurztext, nie Adressen |
@@ -245,6 +245,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `i18n.js` | Backend-Locale-Loader |
 | `mistral-http.js` | Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Überlast, Antwort als Strom |
 | `mistral-antwort.js` | Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung (`escapeXml`) |
+| `auftrag-wechsel.js` | Was am Analyse-Auftrag je Analyse wechselt: die Marken-Sperre hinter dem Bild und die Formvorlage am Ende |
 | `mistral-mock.js` | Mistral-Attrappe für Unit-Tests und Emulator (`MISTRAL_MOCK=1`) |
 | `lokale-schalter.js` | Schalter nur für lokale Läufe (`MISTRAL_MOCK`, `QUEUE_LOCAL`, `NTFY_STUMM`): wirken nie in der Produktion; steht dort einer auf 1, startet `index.js` nicht |
 | `job-helfer.js` | Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung) |

@@ -958,10 +958,13 @@ Kind. Die Zeile war zudem nach einem Tag gelöscht.
 
 **Entscheidung.**
 
-1. Der Werbe-Aufruf fordert zehn Einträge an, gezeigt werden höchstens acht
+1. Der Werbe-Aufruf fordert mehr Einträge an, als gezeigt werden
    (`WERBE_ANFORDERUNG`, `WERBE_ANZAHL` in `functions/src/minor-safety.js`,
-   die Prompts lesen die Zahl von dort). Gekappt wird erst nach dem Filter,
-   nur die Werbung, nie die Manipulations-Trigger. Nachgefüllt wird nichts.
+   die Prompts lesen die Zahl von dort). Auf die gezeigte Anzahl gebracht wird
+   erst nach dem Filter, nur die Werbung, nie die Manipulations-Trigger.
+   Nachgefüllt wird nichts. Wie groß der Vorrat ist und welche Einträge daraus
+   gezeigt werden, steht im Abschnitt „Werbung und Vorlagen: passend statt
+   gleich“.
 2. Je Treffer standen im Log das Feld (`boost.ad_targeting`,
    `normal.profileText`, `boost.categories.kaufkraft`) und das getroffene
    Stichwort aus der festen Sperrliste, klein geschrieben, höchstens 30
@@ -1651,3 +1654,110 @@ Code) und kleinere, alle vor dem Merge behoben und nachgeprüft.
 die Cache-Kennung anders als über `?v=<10 Ziffern>"` trägt, wenn GitHub
 übersprungene Pflicht-Checks anders behandelt, oder wenn ein Fehler auftritt,
 den nur der Browser-Test in einem Nachtrag gefunden hätte.
+
+## Werbung und Vorlagen: passend statt gleich (13.10.2026)
+
+**Was war.** Der Auftrag an die KI endete mit genau einem ausgefüllten
+Beispiel, einem Ausdauersportler. Gemessen an einem Foto, das zu diesem Beispiel
+passte, in drei Durchläufen über die Live-Seite: 32 % gleicher Wortlaut zwischen
+zwei Durchläufen, 19 % des Wortlauts standen im Beispiel, darunter in zwei von
+drei Ergebnissen eine Haarfarbe, die auf dem Foto anders aussah. Gemessen an 42
+Analysen von 14 anderen Fotos (07.10.2026): 71 % der Beast-Texte begannen mit
+dem Satzbau des Beispiels, 62 % endeten mit seinem Schlusssatz. Der Auftrag für
+die Beast-Werbung nannte fünf Branchen und ordnete einer Schwäche
+„Statussymbole über Budget“ zu; gemessen an 17 Profilen in je drei Durchläufen
+kamen dieselbe Luxusuhr und dieselbe Versicherung bei 9 von 17 Personen, ein
+Coaching einer Unternehmensberatung, das es so nicht gibt, bei 8.
+
+**Entscheidung.**
+
+1. Es gibt drei Vorlagen mit verschiedenen Menschen
+   (`functions/src/locales/de/muster.js`, `en/muster.js`), je Analyse geht eine
+   mit (`functions/src/auftrag-wechsel.js`). Der Teil des Auftrags davor ist in
+   allen Fassungen derselbe. Die Wahl ist ein gewöhnlicher Zufall ohne
+   Schutzzweck; welche Vorlage lief, wird nicht protokolliert.
+2. Eine Vorlage zeigt eine erwachsene Person in einer Umgebung, die auf Fotos
+   von Schulklassen selten vorkommt. Beim Alter steht nur der Platzhalter.
+   Herkunft, Einkommensspanne und Abschluss sind in allen Vorlagen gleich,
+   damit die Einschätzung desselben Fotos nicht davon abhängt, welche Vorlage
+   gezogen wurde. Der Beleg zur Herkunft nennt, woran die Einordnung hängt,
+   aber keine Ausprägung.
+3. Der Werbe-Aufruf liefert doppelt so viele Einträge, wie gezeigt werden.
+   Erst streicht der Kinderschutz-Filter, dann wird aus dem Rest zufällig die
+   gezeigte Anzahl gezogen (`waehleAus` in `functions/src/minor-safety.js`).
+   Was gestrichen ist, kann nicht gezogen werden; nachgefüllt wird nichts.
+4. Der Auftrag für die Beast-Werbung nennt eine feste, breitere Liste von
+   Feldern und verlangt, dass jeder Eintrag zu Alter und Einkommen im Profil
+   passt.
+
+**Was die Messung vom 13.10.2026 zeigt.** 48 Analysen mit den drei Vorlagen
+(14 Fotos mit bekanntem Alter je Vorlage einmal, dazu das passende Foto je
+Vorlage zweimal), verglichen mit den 42 Analysen vom 07.10.2026:
+
+- Kinderschutz greift bei Minderjährigen: 21 von 21, vorher 21 von 21.
+- Alter bei Kindern und Jugendlichen: mittlere Abweichung 1,1 Jahre, vorher
+  1,0; bei Erwachsenen 9,4 Jahre, vorher 8,6. Geschlecht richtig: 36 von 42,
+  vorher 36 von 42. Zwischen den drei Vorlagen gibt es darin keinen Unterschied.
+- Alle Karten vorhanden: 42 von 42, vorher 42 von 42; keine Nachfrage wegen
+  fehlender Karten.
+- Beast-Text beginnt mit dem Satzbau des früheren Beispiels: 5 %, vorher 71 %.
+  Gleicher Wortlaut bei zwei verschiedenen Fotos: 1,7 %, vorher 4,1 %.
+- Das passende Foto: gleicher Wortlaut zwischen zwei Durchläufen 11 % bei
+  verschiedener und 19 % bei derselben Vorlage, vorher 32 %; die Altersangabe
+  lag viermal bei 38 und zweimal bei 35, vorher dreimal bei 38. An den 14
+  anderen Fotos schwankt die Altersangabe desselben Fotos im Mittel um
+  1,1 Jahre, vorher um 0,9.
+- Beast-Werbung, nur die gezeigten acht Einträge: Wer dasselbe Profil zweimal
+  auswerten lässt, sieht im Mittel 2,4 Marken wieder, vorher 4,6. Gezeigte
+  Einträge mit einem Wort der Sperrliste: keiner, vorher keiner.
+
+**Was schlechter geworden ist, bewusst hingenommen.**
+
+- Bei Profilen, für die der Kinderschutz gilt, schlägt die KI öfter einen
+  Eintrag vor, den der Filter streichen muss: 11 statt 7 in 30 Listen, vor
+  allem Leasing und Finanzierung. Die Felderliste nennt diese Bereiche. Der
+  Filter bleibt eine Wortliste (Abschnitt vom 04.10.2026); was sie nicht
+  kennt, hält er nicht auf.
+- Der zweite Aufruf dauert rund 1,4 Sekunden länger, weil er doppelt so viele
+  Einträge schreibt.
+- Der Zwischenspeicher bei Mistral greift seltener. In einer nachgestellten
+  Workshop-Lage (24 Analysen, drei gleichzeitig) bei 11 von 24 Analysen, bei
+  gleicher Dauer wie zuvor; im echten Workshop am Vortag mit dem einen
+  Beispiel bei 48 von 56. Einzeln nacheinander im Abstand von rund 50 Sekunden
+  bei 4 von 60, mit dem früheren Beispiel am selben Tag bei 8 von 12. Ohne
+  Treffer wird die Eingabe zum vollen Preis berechnet.
+- Die Karte zur Herkunft ist allgemeiner als zuvor. Vorher stand in 9 von 16
+  Karten wortgleich die Hautton-Angabe des Beispiels, nachher nennt keine von
+  42 Karten eine Ausprägung.
+
+**Betrachtete Alternativen**, alle am 13.10.2026 gemessen und verworfen:
+
+- Den Werbe-Auftrag ohne Felderliste, nur mit dem Verbot, beim Hobby zu
+  bleiben: Die Werbung fiel in die Produktwelt des Fotos zurück.
+- Die Felder je Aufruf würfeln: mehr Abwechslung, aber Einträge, die nicht zur
+  Person passen. Ein gewürfelter Inhalt erzwingt Unpassendes; eine gewürfelte
+  Vorlage tut das nicht, weil sie nur die Form zeigt.
+- Zuerst die Schwachstellen nennen lassen, dann die Werbung: wieder die
+  Produktwelt des Fotos.
+- Den früheren Werbe-Auftrag mit doppeltem Vorrat: noch mehr Luxusangebote.
+- Einen höheren Zufallsgrad im Werbe-Aufruf: kaum Unterschied.
+- Ein einziges anderes Beispiel statt dreier: hätte das eine Foto entlastet,
+  aber weiter den Satzbau aller Ergebnisse geprägt.
+- Die Vorlage als eigene zweite Nachricht: kein Vorteil im Zwischenspeicher.
+
+**Geprüft durch** `functions/src/__tests__/prompt-vorlagen.test.js` (Form,
+Länge, gleiche Werte, keine Ausprägung, kein Kind, je mit Gegenprobe),
+`age-markers.test.js` (läuft über jeden der Aufträge),
+`minor-safety-diagnose.test.js` (Auswahl nach dem Filter, Gestrichenes kommt
+nie zurück), `mistral-ads-split.test.js` und `mistral.test.js` (derselbe
+Auftrag bei Nachfrage, gleicher Teil vor der Vorlage). Die Rohdaten der
+Messungen enthalten Ergebnisse zu Fotos realer Personen und liegen deshalb
+nicht im Repository. Prüfung und Messung stammen von derselben Instanz, die
+die Änderung gebaut hat; eine unabhängige Abnahme steht aus.
+
+**Neubewertung**, wenn eine Vorlage dazukommt oder geändert wird (dann mit
+Messung an Fotos mit bekanntem Alter), wenn das Modell wechselt, wenn in
+Workshops auffällt, dass sich Ergebnisse mit derselben Vorlage zu sehr
+gleichen, wenn der Filter einen Eintrag der neuen Felder durchlässt, oder wenn
+das Mistral-Dashboard nach der Auslieferung deutlich höhere Kosten je Analyse
+zeigt.

@@ -56,6 +56,8 @@ const {
   alterNichtLesbarText,
   ohneZiffernKlammern,
 } = require("./alters-lesbarkeit");
+const { WERBE_ANFORDERUNG } = require("./minor-safety");
+const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = require("./auftrag-wechsel");
 
 /* Für Tests: erlaubt fetch zu mocken ohne globalThis zu überschreiben. */
 
@@ -161,58 +163,28 @@ const {
    neben MISTRAL_SINGLE_LARGE_TIMEOUT_MS: Die beiden Werte sind nur gemeinsam
    richtig, und getrennt aufgestellt sah jeder fuer sich plausibel aus. */
 
-/* ── Marken-Sperre (v2.7) ─────────────────────────────────────────────────
-   Mistral folgt Beispielen, nicht Regeln. Solange konkrete Marken im Prompt
-   standen, kamen sie auch zurueck: bei einem Radsport-Foto lieferte die alte
-   Fassung ALLE acht Marken aus der Beispielliste. Die Beispiele sind deshalb
-   ersatzlos aus dem Prompt geflogen (nur noch Format-Platzhalter) — und hier
-   steht eine ROTIERENDE Sperrliste dagegen, damit das Modell nicht einfach
-   einen neuen Liebling entwickelt.
-
-   Set 0 sind die im alten Prompt verbrannten Dauerbrenner; die weiteren Sets
-   decken die Marken ab, die erfahrungsgemaess als Zweitwahl nachruecken, damit
-   die Rotation nicht bloss von Anker A auf Anker B umschaltet.
-
-   Gemessen (84 Analysen, 2026-08-09): Anteil Werbe-Eintraege aus den
-   Prompt-Beispielen 7,5 % -> 0,9 %, verschiedene Marken 95 -> 270,
-   Sperrlisten-Verstoesse 0. */
-const BRAND_BLOCKLIST_SETS = [
-  ["Garmin", "Rapha", "Wahoo", "Specialized", "Komoot", "Ortlieb", "Red Bull", "Apple Watch", "Nike Metcon"],
-  ["Garmin", "Rapha", "Wahoo", "Specialized", "Nike", "Adidas", "Apple", "Samsung", "Puma"],
-  ["Garmin", "Komoot", "Ortlieb", "Red Bull", "Zalando", "H&M", "Zara", "Douglas", "Sephora"],
-  [
-    "Garmin",
-    "Rapha",
-    "Apple Watch",
-    "Lululemon",
-    "Under Armour",
-    "The North Face",
-    "Patagonia",
-    "Salomon",
-    "On Running",
-  ],
-  ["Garmin", "Wahoo", "Specialized", "Nike", "L'Oréal", "Maybelline", "Nivea", "Rituals", "Yves Rocher"],
-  ["Garmin", "Red Bull", "Apple", "PlayStation", "Nintendo", "Xbox", "Netflix", "Spotify", "TikTok"],
-];
-
-function buildBrandBlocklistBlock(lang, index) {
-  /* Ohne vorgegebenen Index zufaellig rotieren. Determinismus ist hier nicht
-     noetig (es geht nur um Abwechslung), aber Tests koennen ihn vorgeben. */
-  const i =
-    typeof index === "number" && Number.isFinite(index)
-      ? Math.abs(Math.trunc(index))
-      : Math.floor(Math.random() * BRAND_BLOCKLIST_SETS.length);
-  const set = BRAND_BLOCKLIST_SETS[i % BRAND_BLOCKLIST_SETS.length];
-
-  /* Der Text selbst liegt in den Locale-Dateien — Backend-JS bleibt frei von
-     hartcodierter Sprache (i18n-Guardian). */
-  const prompts = loadPrompts(lang || "de");
-  return prompts.brandBlocklistBlock(set.join(", "));
-}
+/* Was am Auftrag je Analyse wechselt (Marken-Sperre, Formvorlage), steht seit
+   13.10.2026 in auftrag-wechsel.js. */
 
 async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, opts = {}) {
   const prompts = loadPrompts(lang || "de");
   const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBuffer.toString("base64")}`;
+  /* EINE Vorlage je Analyse — auch die Nachfrage nach fehlenden Karten und
+     ein Neuversuch nach Verbindungsabriss laufen mit derselben.
+     Die Vorlage steht am ENDE der system-Nachricht und wechselt. Mistral
+     nutzt den gleichen Anfang weiter: Ein Treffer im Zwischenspeicher deckt
+     entweder die ganze Nachricht (dieselbe Vorlage) oder den Teil vor der
+     Vorlage. Gemessen an der echten Schnittstelle am 13.10.2026:
+       - 24 Analysen mit Foto, drei gleichzeitig, zufaellige Vorlage:
+         Treffer bei 11 von 24 (je 70-89 % der Eingabe), Dauer wie zuvor.
+       - Analysen einzeln nacheinander im Abstand von rund 50 s: Treffer bei
+         4 von 60; mit dem frueheren einen Beispiel waren es am selben Tag
+         8 von 12. Im Einzelbetrieb der Live-Seite griff der Zwischenspeicher
+         allerdings schon vorher selten (3 von 26 am Vorabend).
+     Eine eigene zweite system-Nachricht fuer die Vorlage brachte nichts.
+     Bedingung fuer jeden Treffer: Der Teil vor der Vorlage aendert sich nie
+     (prompt-vorlagen.test.js, mistral.test.js). */
+  const auftrag = waehleAuftrag(prompts, opts.musterIndex);
 
   /* v2.5: Cache-Schluessel pro Sprache — de und en haben verschiedene Prompts
      und damit verschiedene Praefixe. Ein gemeinsamer Key wuerde die Trefferquote
@@ -241,7 +213,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   const blocklistBlock = buildBrandBlocklistBlock(lang, opts.blocklistIndex);
 
   const messages = [
-    { role: "system", content: prompts.singleLargePrompt },
+    { role: "system", content: auftrag },
     {
       role: "user",
       content: [
@@ -305,7 +277,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        zweiten Anlauf wieder auf die verbrauchten Marken zurueckfallen.
        Bleibt im dynamischen Teil, der statische Anfang ist bitgleich. */
     const retryMessages = [
-      { role: "system", content: prompts.singleLargePrompt },
+      { role: "system", content: auftrag },
       {
         role: "user",
         content: [
@@ -547,8 +519,11 @@ async function generateBeastAds(boostProfile, standardAds, lang) {
       cacheKey: `malzime-beast-ads-${lang || "de"}`,
     });
     const parsed = parseSafely(result.text, { requireSchema: false });
+    /* Der ganze angeforderte Vorrat geht weiter: Aus ihm zieht der
+       Kinderschutz-Filter nach dem Streichen die gezeigte Auswahl
+       (minor-safety.js, waehleAus). Mehr als angefordert braucht niemand. */
     const ads = Array.isArray(parsed?.ad_targeting)
-      ? parsed.ad_targeting.filter((e) => typeof e === "string" && e.trim()).slice(0, 12)
+      ? parsed.ad_targeting.filter((e) => typeof e === "string" && e.trim()).slice(0, WERBE_ANFORDERUNG)
       : [];
     console.log(
       JSON.stringify({
@@ -782,6 +757,7 @@ module.exports = {
      nicht sichtbar. Die Rueckbauprobe blieb genau daran gruen. */
   _callMistralRawUnthrottled: callMistralRawUnthrottled,
   _buildBrandBlocklistBlock: buildBrandBlocklistBlock,
+  _waehleAuftrag: waehleAuftrag,
   _BRAND_BLOCKLIST_SETS: BRAND_BLOCKLIST_SETS,
   _extrahiereLiveText: extrahiereLiveText,
   _setLiveIntervalMsForTest,

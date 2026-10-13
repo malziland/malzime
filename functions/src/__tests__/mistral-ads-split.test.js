@@ -184,11 +184,14 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
 
   test("der gecachte system-Teil ist über verschiedene Sperrlisten hinweg bitgleich", async () => {
     const captured = mockAnswer(answerSplit());
+    /* Dieselbe Vorlage in beiden Aufrufen: Hier geht es um die Sperrliste. */
     await runSingleLargeCall(Buffer.from("x"), "image/jpeg", () => 60000, "de", {
       blocklistIndex: 0,
+      musterIndex: 0,
     });
     await runSingleLargeCall(Buffer.from("y"), "image/jpeg", () => 60000, "de", {
       blocklistIndex: 3,
+      musterIndex: 0,
     });
 
     const sys0 = captured[0].messages.find((m) => m.role === "system").content;
@@ -396,6 +399,49 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
   test("verträgt ein Profil ohne Kategorien", async () => {
     expect(await mistral.generateBeastAds(null, [], "de")).toBeNull();
     expect(await mistral.generateBeastAds({}, [], "de")).toBeNull();
+  });
+
+  /* 13.10.2026: Der Vorrat ist doppelt so groß wie die Anzeige, damit die
+     Auswahl wechseln kann. Hier darf er nicht wieder beschnitten werden. */
+  test("lässt den ganzen angeforderten Vorrat durch, aber nicht mehr", async () => {
+    const { WERBE_ANFORDERUNG } = require("../minor-safety");
+    const viele = Array.from({ length: WERBE_ANFORDERUNG + 6 }, (_, i) => `Marke ${i + 1}`);
+    setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        choices: [{ message: { content: JSON.stringify({ ad_targeting: viele }) } }],
+        usage: {},
+      }),
+    }));
+    const ads = await mistral.generateBeastAds(boostProfil, [], "de");
+    expect(ads).toEqual(viele.slice(0, WERBE_ANFORDERUNG));
+  });
+
+  /* 13.10.2026, gemessen an 17 Profilen in je drei Durchläufen: Fünf genannte
+     Branchen und die Zuordnung „Statussymbole über Budget“ ergaben bei jeder
+     zweiten Person dieselbe Luxusuhr und dieselbe Versicherung. Der Auftrag
+     nennt jetzt mehr Felder und verlangt, dass jeder Eintrag zu Alter und
+     Einkommen passt. */
+  test("der Auftrag verlangt Passung zur Person und nennt nicht mehr nur fünf Branchen", () => {
+    const de = require("../locales/de/prompts").beastAdsSystem;
+    const en = require("../locales/en/prompts").beastAdsSystem;
+    expect(de).not.toMatch(/Pharma, Versicherung, Finanz/);
+    expect(en).not.toMatch(/pharma, insurance, finance/i);
+    expect(de).not.toMatch(/Statussymbole über Budget/);
+    expect(en).not.toMatch(/status symbols beyond budget/i);
+    expect(de).toMatch(/genau dieser Person/);
+    expect(en).toMatch(/exactly this person/);
+    expect(de).toMatch(/passt zu Alter und Einkommen/);
+    expect(en).toMatch(/fits the age and income/);
+    expect(de).toMatch(/NUR aus denen, die zu einer Aussage im Profil passen/);
+    expect(en).toMatch(/ONLY from those that fit a statement in the profile/);
+    /* Was aus der Messung vom August bleibt: an der Schwachstelle ansetzen,
+       nicht am Hobby, und keine Marke der sachlichen Liste. */
+    expect(de).toMatch(/VERLETZLICHKEIT ansetzen, nicht am Hobby/);
+    expect(en).toMatch(/target the VULNERABILITY, not the hobby/);
+    expect(de).toMatch(/KEINE Marke/);
+    expect(en).toMatch(/Do NOT reuse any brand/);
   });
 
   test("nutzt einen Cache-Schlüssel, der Anweisungsteil ist konstant", async () => {

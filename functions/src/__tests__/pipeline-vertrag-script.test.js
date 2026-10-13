@@ -1010,7 +1010,7 @@ describe("Vertrag der npm-Skripte — was hinter einem Pflicht-Schritt steht", (
       "die Server-Tests sind nur noch ein echo",
       PAKET_SERVER,
       json((d) => (d.scripts.test = "echo ok")),
-      /functions\/package\.json: npm-Skript 'test' lautet 'echo ok' statt 'jest --forceExit --detectOpenHandles'/,
+      /functions\/package\.json: npm-Skript 'test' lautet 'echo ok' statt 'jest --forceExit'/,
     ],
     [
       "die Server-Tests laufen mit einem Filter, der nichts trifft",
@@ -1177,7 +1177,7 @@ describe("Vertrag der npm-Skripte — was hinter einem Pflicht-Schritt steht", (
   test("der Server-Job meint die package.json unter functions/, nicht die der Wurzel", () => {
     /* `npm test` steht in beiden Dateien. Fuer den Job test-backend zaehlt die
        Festlegung dort, wo er laeuft. */
-    aendern(WAECHTER, (t) => einmal(t, '        "test": "jest --forceExit --detectOpenHandles",\n', ""));
+    aendern(WAECHTER, (t) => einmal(t, '        "test": "jest --forceExit",\n', ""));
     const r = waechter();
     expect(r.code).toBe(1);
     expect(r.ausgabe).toMatch(/Job test-backend ruft das npm-Skript 'test' aus functions\/package\.json auf/);

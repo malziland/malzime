@@ -305,7 +305,7 @@ SCHRITTFOLGE_CI = {
 # `pre…` oder `post…`, das npm ungefragt mitlaufen liesse.
 NPM_SKRIPTE = {
     "functions/package.json": {
-        "test": "jest --forceExit --detectOpenHandles",
+        "test": "jest --forceExit",
         "lint": "eslint --max-warnings=0 src/",
         "format:check": "prettier --check src/",
     },

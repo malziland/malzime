@@ -4,6 +4,20 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Tests
+
+- **Die Server-Tests laufen nebeneinander statt hintereinander.** Der
+  Testbefehl verliert den Schalter `--detectOpenHandles`; mit ihm fuhr Jest
+  alle Testdateien nacheinander in einem Prozess. Gemessen am 13.10.2026: in
+  der Pipeline 136 bis 161 statt 311 Sekunden (fünf Läufe, alle grün), lokal
+  90 bis 91 statt 347 Sekunden. Lokal ist in 30 Läufen zweimal ein
+  Arbeitsprozess von Node in der Speicherbereinigung abgestürzt; ein solcher
+  Lauf wird rot und muss wiederholt werden, er wird nie fälschlich grün. Der
+  festgehaltene Wortlaut des Testbefehls (`scripts/pruefe-deploy-riegel.py`)
+  ist mitgezogen.
+
 ## [5.2.1] — 2026-10-13
 
 ### Geändert — Analyse

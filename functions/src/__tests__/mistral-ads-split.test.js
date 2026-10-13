@@ -228,6 +228,20 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
     expect(Math.max(...zahl.values())).toBeGreaterThan(1);
   });
 
+  /* Abnahme 13.10.2026: Die Zählung oben vergleicht Schreibweisen. „Apple“
+     und „Apple Watch“ zusammen könnten eine Marke trotzdem in jeden Block
+     bringen. Deshalb hier am fertigen Text: Kein Markenname steht in allen
+     Blöcken, auch nicht als Teil eines längeren Eintrags. */
+  test("kein Markenname steht im Text aller Sperr-Blöcke", () => {
+    const bloecke = _BRAND_BLOCKLIST_SETS.map((_, i) => _buildBrandBlocklistBlock("de", i).toLowerCase());
+    const namen = new Set(_BRAND_BLOCKLIST_SETS.flat().map((m) => m.toLowerCase()));
+    const inAllen = [...namen].filter((name) => bloecke.every((b) => b.includes(name)));
+    expect(inAllen).toEqual([]);
+    /* Gegenprobe: Der Vergleich am Text findet Teil-Einträge („apple“ steht
+       auch in den Blöcken mit „Apple Watch“). */
+    expect(bloecke.filter((b) => b.includes("apple")).length).toBeGreaterThan(2);
+  });
+
   test("Garmin ist in keiner Sprache und in keinem Set gesperrt", () => {
     for (const lang of ["de", "en"]) {
       for (let i = 0; i < _BRAND_BLOCKLIST_SETS.length; i++) {
@@ -236,6 +250,17 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
     }
     /* Gegenprobe: Der Block nennt die Marken seines Sets wirklich. */
     expect(_buildBrandBlocklistBlock("de", 0)).toMatch(/rapha/i);
+  });
+
+  test("auch die Aufträge an die KI nennen Garmin nirgends (kein Verbot an anderer Stelle)", () => {
+    const fs = require("fs");
+    const path = require("path");
+    for (const datei of ["de/prompts.js", "en/prompts.js", "de/muster.js", "en/muster.js"]) {
+      const text = fs.readFileSync(path.join(__dirname, "..", "locales", datei), "utf8");
+      expect(text).not.toMatch(/garmin/i);
+      /* Gegenprobe: Die Datei ist wirklich gelesen. */
+      expect(text.length).toBeGreaterThan(1000);
+    }
   });
 
   test("Index läuft sicher über die Setgrenze hinaus", () => {

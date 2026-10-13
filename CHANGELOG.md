@@ -10,10 +10,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 - **Garmin ist in der Werbung nicht mehr dauerhaft gesperrt.** Damit nicht jede
   Analyse dieselben Marken nennt, geht je Analyse eine von sechs wechselnden
-  Sperrlisten mit. Garmin stand als einzige Marke in allen sechs und kam
-  deshalb nie vor, auch wenn sie zur Person passte. Jetzt steht keine Marke
-  mehr in allen Listen; ein Test hält das fest. Die übrigen Marken der Listen
-  sind unverändert.
+  Sperrlisten mit. Garmin stand als einzige Marke in allen sechs und war
+  damit bei jeder Analyse gesperrt, auch wenn sie zur Person passte. Jetzt
+  steht keine Marke mehr in allen Listen; Tests halten das fest. Die übrigen
+  Marken der Listen sind unverändert.
 
 ## [5.2.0] — 2026-10-13
 

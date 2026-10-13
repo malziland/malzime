@@ -26,7 +26,8 @@ const { loadPrompts } = require("./i18n");
    steht eine ROTIERENDE Sperrliste dagegen, damit das Modell nicht einfach
    einen neuen Liebling entwickelt.
 
-   Set 0 sind die im alten Prompt verbrannten Dauerbrenner; die weiteren Sets
+   Set 0 sind die im alten Prompt verbrannten Dauerbrenner (seit 13.10.2026
+   ohne Garmin, siehe unten); die weiteren Sets
    decken die Marken ab, die erfahrungsgemaess als Zweitwahl nachruecken, damit
    die Rotation nicht bloss von Anker A auf Anker B umschaltet.
 
@@ -35,10 +36,11 @@ const { loadPrompts } = require("./i18n");
    Sperrlisten-Verstoesse 0.
 
    KEINE MARKE STEHT IN ALLEN SETS (13.10.2026). Bis dahin stand Garmin in
-   jedem der sechs — die Marke war damit nie waehlbar, auch wenn sie zur
-   Person passte. Das war nie beabsichtigt: Die Sperre soll abwechseln, nicht
-   ausschliessen. Garmin steht jetzt in keinem Set. Gemessen ohne jede Sperre
-   (15 Fotos, 13.10.2026): Garmin bei 3 von 15. */
+   jedem der sechs und war damit bei jeder Analyse gesperrt (ausser sichtbar
+   im Bild), auch wenn die Marke zur Person passte. Entscheidung des Inhabers:
+   Die Sperre soll abwechseln, nicht ausschliessen. Garmin steht jetzt in
+   keinem Set. Anhaltspunkt aus der Messung ganz OHNE Sperre (15 Fotos,
+   13.10.2026): Garmin bei 3 von 15. */
 const BRAND_BLOCKLIST_SETS = [
   ["Rapha", "Wahoo", "Specialized", "Komoot", "Ortlieb", "Red Bull", "Apple Watch", "Nike Metcon"],
   ["Rapha", "Wahoo", "Specialized", "Nike", "Adidas", "Apple", "Samsung", "Puma"],

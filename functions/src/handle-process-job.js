@@ -132,9 +132,16 @@ async function handleProcessJob(req, res) {
      löschen, fertig. Backstop für die Lücke, bis der Reaper den Job erwischt. */
   const { werte: betriebsW, grund: betriebsGrund } = await geltendeWerte();
   if (!betriebsW) {
-    /* Ohne Einstellungssatz laeuft keine Analyse. Der Job bleibt liegen und
-       wird nach der Wiederholung ehrlich als Fehler gemeldet, statt mit
-       erfundenen Werten zu rechnen. */
+    /* Ohne Einstellungssatz laeuft keine Analyse, statt mit erfundenen Werten
+       zu rechnen. Jeder Versuch schreibt die Fehlerzeile unten (sie loest den
+       Alarm aus) und antwortet 503. Die Warteschlange versucht es hoechstens
+       im Minutenabstand erneut und hoert nach 30 Minuten auf (Regel bei
+       Google, scripts/verify-infrastructure.sh Abschnitt 1a). Als gescheitert
+       markiert wird der Auftrag hier NICHT: Er bleibt wartend. Kommt der Satz
+       zurueck, laeuft er mit dem naechsten Versuch an; sonst gibt der Browser
+       nach 30 Minuten mit „dauert zu lange" auf, und der Aufraeumdienst
+       verwirft den Auftrag nach `wartendesHoechstalterMs`, sobald er selbst
+       wieder Betriebswerte hat. */
     console.error(
       JSON.stringify({ step: "process-job", jobId, status: "kein-einstellungssatz", grund: betriebsGrund })
     );

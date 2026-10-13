@@ -590,13 +590,34 @@ describe("runSingleLargeCall", () => {
     expect(user.content[0].type).toBe("image_url");
   });
 
-  test("der statische Teil ist ueber Aufrufe hinweg bitgleich — sonst kein Cache-Treffer", async () => {
+  /* Seit 13.10.2026 endet der Auftrag mit einer von mehreren Vorlagen. Ein
+     Treffer im Zwischenspeicher deckt entweder den ganzen Auftrag (dieselbe
+     Vorlage) oder den Teil VOR der Vorlage — gemessen an der echten
+     Schnittstelle am selben Tag (Zahlen in mistral.js). Beides haengt daran,
+     dass dieser Teil sich nie aendert und dieselbe Vorlage Zeichen fuer
+     Zeichen gleich bleibt. */
+  test("der Teil vor der Vorlage ist ueber Aufrufe hinweg bitgleich — sonst kein Cache-Treffer", async () => {
     const seen = captureBody();
-    await runSingleLargeCall(Buffer.from("bild-eins"), "image/jpeg", () => 60000, "de");
-    await runSingleLargeCall(Buffer.from("bild-zwei"), "image/jpeg", () => 60000, "de");
+    const TRENN = "═══ JSON-SCHEMA ═══";
+    for (let i = 0; i < 12; i++) {
+      await runSingleLargeCall(Buffer.from(`bild-${i}`), "image/jpeg", () => 60000, "de");
+    }
+    const regelteile = new Set(seen.map((b) => b.messages[0].content.split(TRENN)[0]));
+    expect(regelteile.size).toBe(1);
+    expect([...regelteile][0].length).toBeGreaterThan(30000);
+  });
+
+  test("mit derselben Vorlage ist der ganze Auftrag bitgleich", async () => {
+    const seen = captureBody();
+    await runSingleLargeCall(Buffer.from("bild-eins"), "image/jpeg", () => 60000, "de", { musterIndex: 1 });
+    await runSingleLargeCall(Buffer.from("bild-zwei"), "image/jpeg", () => 60000, "de", { musterIndex: 1 });
     expect(seen[0].messages[0].content).toBe(seen[1].messages[0].content);
   });
 
+  /* Zwoelf Analysen hintereinander (Abnahme 13.10.2026): Der Auftrag endet mit
+     einer von drei gewuerfelten Vorlagen. Wuerfelte die Nachfrage neu, bliebe
+     ein einzelner Durchlauf in einem von drei Faellen trotzdem gruen; ueber
+     zwoelf faellt es auf. */
   test("Retry haengt den Hinweis UNTEN an — die system-Message bleibt unveraendert", async () => {
     const seen = [];
     let call = 0;
@@ -604,7 +625,7 @@ describe("runSingleLargeCall", () => {
       seen.push(JSON.parse(init.body));
       /* 1. Antwort unvollstaendig => loest den Retry aus, 2. vollstaendig. */
       const incomplete = { ...makeCompleteResponse(), beast: { profileText: "x", categories: {} } };
-      const payload = call++ === 0 ? incomplete : makeCompleteResponse();
+      const payload = call++ % 2 === 0 ? incomplete : makeCompleteResponse();
       return {
         ok: true,
         status: 200,
@@ -615,13 +636,21 @@ describe("runSingleLargeCall", () => {
       };
     });
 
-    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
-    expect(seen).toHaveLength(2);
-    /* Der cachebare Anfang muss in beiden Anfragen identisch sein ... */
-    expect(seen[1].messages[0].role).toBe("system");
-    expect(seen[1].messages[0].content).toBe(seen[0].messages[0].content);
-    /* ... und der Hinweis unten in der user-Message stehen. */
-    const retryUser = seen[1].messages[1].content;
-    expect(retryUser[retryUser.length - 1].text).toContain("HINWEIS");
+    const vorlagen = new Set();
+    for (let lauf = 0; lauf < 12; lauf++) {
+      seen.length = 0;
+      await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
+      expect(seen).toHaveLength(2);
+      /* Der cachebare Anfang muss in beiden Anfragen identisch sein ... */
+      expect(seen[1].messages[0].role).toBe("system");
+      expect(seen[1].messages[0].content).toBe(seen[0].messages[0].content);
+      /* ... und der Hinweis unten in der user-Message stehen. */
+      const retryUser = seen[1].messages[1].content;
+      expect(retryUser[retryUser.length - 1].text).toContain("HINWEIS");
+      vorlagen.add(seen[0].messages[0].content);
+    }
+    /* Gegenprobe: Es wurde wirklich gewuerfelt — sonst haette die Schleife
+       nichts geprueft. */
+    expect(vorlagen.size).toBeGreaterThan(1);
   });
 });

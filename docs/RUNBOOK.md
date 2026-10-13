@@ -931,11 +931,13 @@ Lesart:
   Anstieg heißt deshalb nur, dass die KI öfter Wörter der Liste schreibt — ob
   sie dabei eine Regel des Prompts bricht, zeigt nur das Nachstellen mit
   eigenen Fotos.
-- `werbung` unter 8 heißt beim Beast-Modus nur dann „mehr als zwei Einträge
-  gestrichen“, wenn der zweite Werbe-Aufruf geliefert hat (zehn Einträge
-  angefordert). Sonst stammt die Liste wie die Standard-Liste aus dem
-  Hauptaufruf mit sechs bis acht Einträgen — dort zeigt nur `entfernt`, ob
-  gestrichen wurde.
+- `werbung` unter 8 heißt beim Beast-Modus nur dann, dass der Filter mehr
+  gestrichen hat, als der Vorrat ausgleicht, wenn der zweite Werbe-Aufruf
+  geliefert hat. Er liefert doppelt so viele Einträge, wie gezeigt werden
+  (`WERBE_ANFORDERUNG` in `functions/src/minor-safety.js`); gezeigt wird eine
+  Auswahl aus dem, was nach dem Filter übrig ist. Sonst stammt die Liste wie
+  die Standard-Liste aus dem Hauptaufruf mit sechs bis acht Einträgen — dort
+  zeigt nur `entfernt`, ob gestrichen wurde.
 
 ### »betriebswerte-wiederholt-nicht-lesbar« — der Aufräumer kommt nicht an die Betriebswerte
 

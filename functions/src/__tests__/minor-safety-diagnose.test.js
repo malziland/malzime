@@ -71,9 +71,9 @@ describe("Stichwort im Bericht", () => {
 });
 
 describe("Werbe-Anzahl", () => {
-  test("angefordert werden zwei mehr, als gezeigt werden", () => {
+  test("angefordert wird das Doppelte dessen, was gezeigt wird", () => {
     expect(WERBE_ANZAHL).toBe(8);
-    expect(WERBE_ANFORDERUNG).toBe(WERBE_ANZAHL + 2);
+    expect(WERBE_ANFORDERUNG).toBe(WERBE_ANZAHL * 2);
   });
   test("beide Prompts fordern genau diese Zahl an", () => {
     const de = require("../locales/de/prompts").beastAdsSystem;
@@ -83,12 +83,52 @@ describe("Werbe-Anzahl", () => {
     expect(de).not.toMatch(/6-8/);
     expect(en).not.toMatch(/6-8/);
   });
-  test("Erwachsener: zehn Eintraege werden auf acht gekappt, Reihenfolge bleibt", () => {
+  test("Erwachsener: aus zehn Eintraegen werden acht gezeigt, Reihenfolge bleibt", () => {
     const p = profil(ERWACHSEN, zehnAds());
     const b = applyMinorSafety(p);
-    expect(p.boost.ad_targeting).toEqual(zehnAds().slice(0, 8));
+    expect(p.boost.ad_targeting).toHaveLength(8);
+    expect(zehnAds().filter((e) => p.boost.ad_targeting.includes(e))).toEqual(p.boost.ad_targeting);
     expect(b.werbung).toEqual({ normal: 8, boost: 8 });
     expect(b.gekappt).toHaveLength(2);
+  });
+  /* 13.10.2026: Dasselbe Foto zeigte jedes Mal dieselben acht Eintraege, weil
+     immer die ersten acht genommen wurden. Gezeigt wird jetzt eine Auswahl aus
+     dem ganzen Vorrat — jeder Eintrag stammt weiter aus der Analyse. */
+  test("welche acht gezeigt werden, wechselt von Mal zu Mal", () => {
+    const vorrat = Array.from({ length: WERBE_ANFORDERUNG }, (_, i) => `Marke ${i + 1}`);
+    const gezeigt = new Set();
+    const auswahlen = new Set();
+    for (let i = 0; i < 200; i++) {
+      const p = profil(ERWACHSEN, vorrat);
+      applyMinorSafety(p);
+      expect(p.boost.ad_targeting).toHaveLength(WERBE_ANZAHL);
+      p.boost.ad_targeting.forEach((e) => gezeigt.add(e));
+      auswahlen.add(p.boost.ad_targeting.join("|"));
+    }
+    expect([...gezeigt].sort()).toEqual([...vorrat].sort());
+    expect(auswahlen.size).toBeGreaterThan(20);
+  });
+  test("mit vorgegebenem Zufall ist die Auswahl wiederholbar", () => {
+    const vorrat = Array.from({ length: WERBE_ANFORDERUNG }, (_, i) => `Marke ${i + 1}`);
+    const lauf = () => {
+      let n = 0;
+      const p = profil(ERWACHSEN, vorrat);
+      applyMinorSafety(p, { zufall: () => ((n++ * 7) % 10) / 10 });
+      return p.boost.ad_targeting;
+    };
+    expect(lauf()).toEqual(lauf());
+    expect(lauf()).not.toEqual(vorrat.slice(0, WERBE_ANZAHL));
+  });
+  test("Kind: gestrichene Eintraege kommen auch ueber die Auswahl nie zurueck", () => {
+    const verboten = ["Bet365 Live-Wetten", "Klarna Ratenkauf", "Aperol Spritz", "Tipico Sportwetten", "Jack Daniel's"];
+    const vorrat = Array.from({ length: WERBE_ANFORDERUNG }, (_, i) => verboten[i] || `Marke ${i + 1}`);
+    for (let i = 0; i < 50; i++) {
+      const p = profil(KIND, vorrat);
+      const b = applyMinorSafety(p);
+      expect(b.entfernt.filter((e) => e.modus === "boost")).toHaveLength(verboten.length);
+      expect(p.boost.ad_targeting).toHaveLength(WERBE_ANZAHL);
+      expect(p.boost.ad_targeting.filter((e) => verboten.includes(e))).toEqual([]);
+    }
   });
   test("Kind mit zwei gestrichenen Eintraegen sieht trotzdem acht", () => {
     const p = profil(KIND, zehnAds("Bet365 Live-Wetten", "Klarna Ratenkauf"));

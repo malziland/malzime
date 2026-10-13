@@ -83,9 +83,10 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   feature-flags.js          Laufzeit-Feature-Flags aus Firestore (30s-Cache)
   lokale-schalter.js        Schalter nur fuer lokale Laeufe (Attrappe, lokale Warteschlange, stumme Benachrichtigung): wirken nie in der Produktion
   mistral-mock.js           Mistral-Mock fuer Emulator-Lasttests (QUEUE_LOCAL)
-  mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile, ein zweiter ohne Bild die Beast-Werbung
+  mistral.js                Mistral AI: ein Aufruf an Large erstellt Beschreibung + beide Profile (je Analyse mit einer von mehreren Formvorlagen), ein zweiter ohne Bild die Beast-Werbung
   mistral-http.js           Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Ueberlast, Antwort als Strom
   mistral-antwort.js        Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung
+  auftrag-wechsel.js        Was am Analyse-Auftrag je Analyse wechselt: Marken-Sperre und Formvorlage
   ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504
   verbindungsfehler.js      Verbindungsabriss zu einem fremden Dienst: einmal neu versuchen, Teiltext retten, Grund ohne Adressen protokollieren
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
@@ -94,7 +95,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   job-helfer.js             Kleine Entscheidungen im Analyseablauf (Schalter, Fehlerarten)
   animal.js                 Motiv-Entscheidung am Feld `subject` der KI-Antwort + Tier-Easter-Egg-Profile
   privacy.js                Privacy-Risiken: lesbare Adresse und Telefonnummer aus dem Feld `visible_text` der KI-Antwort, Kennzeichen aus dem ganzen Text
-  minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer)
+  minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer); zieht danach die gezeigten Eintraege aus dem Vorrat
   minor-safety-woerter.js   Wortlisten des Kinderschutz-Filters (reine Daten, deutsch und englisch; mit Wortfuge fuer zusammengesetzte Woerter)
   alters-lesbarkeit.js      Erkennung nicht lesbarer Altersangaben (erster Satz, Altersversuch)
   alters-auslese.js         Altersauslese: Zahlwoerter, Kategorien, untere und obere Altersgrenze
@@ -111,7 +112,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   erinnerungs-waechter.js   Meldet, wenn die Wochen-Erinnerung ausbleibt
   zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen: ZDR-Pruefdatum, Pruefdatum der Barrierefreiheit (Erinnerung + CI-Waechter)
   i18n.js                   Backend-Locale-Loader (loadPrompts, loadAnimals, resolveLanguage)
-  locales/                  Backend-Locale-Dateien (de/prompts.js, de/animals.js, en/..., manifest.json)
+  locales/                  Backend-Locale-Dateien (de/prompts.js, de/muster.js, de/animals.js, en/..., manifest.json)
   __tests__/                Jest Unit-Tests + fixtures/ fuer json-repair
   scripts/                  Dev-Tools (queue-emulator-loadtest.js — Lasttest gegen den Emulator)
 ```

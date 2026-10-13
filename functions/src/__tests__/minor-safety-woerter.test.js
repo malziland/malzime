@@ -2071,8 +2071,9 @@ describe("Drogen werden bei möglicherweise Minderjährigen wie Alkohol behandel
     ];
     const p = profil(KIND, harmlos);
     const b = applyMinorSafety(p);
-    /* Zehn Einträge werden auf acht gekappt; gestrichen wird keiner. */
-    expect(p.normal.ad_targeting).toEqual(harmlos.slice(0, 8));
+    /* Aus zehn Einträgen werden acht gezeigt; gestrichen wird keiner. */
+    expect(p.normal.ad_targeting).toHaveLength(8);
+    expect(p.normal.ad_targeting.filter((e) => !harmlos.includes(e))).toEqual([]);
     expect(b.entfernt).toEqual([]);
   });
 });

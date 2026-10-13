@@ -195,7 +195,8 @@ Die UI-Texte, KI-Prompts und Tier-Profile liegen in Locale-Dateien:
 | Dateien | Inhalt |
 |---------|--------|
 | `public/locales/de.json`, `en.json` | Alle Frontend-UI-Strings (beide Dateien brauchen dieselben Schluessel) |
-| `functions/src/locales/de/prompts.js`, `en/prompts.js` | KI-Prompts (Analyse-Prompt `singleLargePrompt`, die zwei Teile des Werbe-Aufrufs, Marken-Sperre) |
+| `functions/src/locales/de/prompts.js`, `en/prompts.js` | KI-Prompts (Regelteil des Analyse-Auftrags, die zwei Teile des Werbe-Aufrufs, Marken-Sperre) |
+| `functions/src/locales/de/muster.js`, `en/muster.js` | Die ausgefuellten Beispiel-Antworten am Ende des Analyse-Auftrags; je Analyse geht eine mit. Regeln fuer eine neue Vorlage stehen im Kopf von `de/muster.js` |
 | `functions/src/locales/de/animals.js`, `en/animals.js` | Tier-Easter-Egg-Profile |
 
 Wenn du die Texte anpassen oder eine neue Sprache hinzufuegen willst:

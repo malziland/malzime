@@ -85,14 +85,15 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) â€
   middleware.js      Rate Limiting (IP-basiert, Grenze+Fenster aus dem Einstellungssatz), IP-Extraktion
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung (buildPrivacyRisks): lesbare Adresse und Telefonnummer aus dem Feld visible_text der KI-Antwort, Kennzeichen aus dem ganzen Text
-  minor-safety.js    Kinderschutz-Filter fuer Werbe-Eintraege: Stufe 1 fuer alle, Stufe 2 bis zur Untergrenze SCHUTZ_BIS
+  minor-safety.js    Kinderschutz-Filter fuer Werbe-Eintraege: Stufe 1 fuer alle, Stufe 2 bis zur Untergrenze SCHUTZ_BIS; zieht danach aus dem Vorrat die gezeigten Eintraege (Anzahl und Vorrat: WERBE_ANZAHL, WERBE_ANFORDERUNG)
   minor-safety-woerter.js  Die Wortlisten dazu (reine Daten, deutsch und englisch); jedes Listenwort braucht ein Beispiel in der Pruefreihe
   alters-lesbarkeit.js  Lesbarkeit der Altersangabe im KI-Text: erster Satz einer Karte, Altersversuch, nicht lesbares Alter
   alters-auslese.js     Die Zahl-Lesung dazu: Zahlwoerter, Kategorien, untere und obere Altersgrenze
   alters-lesbarkeit-woerter.js  Die Woerter, Kategorien und Abkuerzungen dazu (reine Daten)
-  mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call) + generateBeastAds (zweiter Aufruf ohne Bild)
+  mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call; je Analyse geht eine der Formvorlagen mit) + generateBeastAds (zweiter Aufruf ohne Bild)
   mistral-http.js    Netzschicht zu Mistral: Zugangsschluessel, Zeitgrenzen, Antwort als Strom, Ueberlastmeldung erkennen
   mistral-antwort.js  Antwort der KI auseinandernehmen (reine Funktionen): Live-Text, fehlende Karten, Maskierung (escapeXml)
+  auftrag-wechsel.js  Was am Analyse-Auftrag je Analyse wechselt: die Marken-Sperre hinter dem Bild und die Formvorlage am Ende (beide gewuerfelt, fuer Tests und Messungen vorgebbar)
   ueberlast.js       Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
@@ -125,9 +126,11 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) â€
   zusagen.js         Gemeinsame Fristlogik fuer datierte oeffentliche Zusagen: ZDR-Pruefdatum und Pruefdatum der Barrierefreiheit (Erinnerung und CI-Waechter rechnen mit derselben Definition)
   locales/           Backend-Locale-Dateien
     manifest.json    Verfuegbare Sprachen + Default
-    de/prompts.js    Deutsche Prompts (singleLargePrompt mit Alterskalibrierung und SUBJECT-Klassifikation, beastAdsSystem/beastAdsUser, Marken-Sperre, injectionWarning)
+    de/prompts.js    Deutsche Prompts (Analyse-Auftrag mit Alterskalibrierung und SUBJECT-Klassifikation: ein Regelteil, daran je eine Formvorlage = singleLargePromptVarianten; beastAdsSystem/beastAdsUser, Marken-Sperre, injectionWarning)
+    de/muster.js     Deutsche Formvorlagen am Ende des Analyse-Auftrags (reine Daten: mehrere ausgefuellte Beispiel-Antworten, je Analyse geht eine mit; Regeln fuer eine neue Vorlage im Kopf der Datei)
     de/animals.js    Deutsche Tier-Easter-Egg-Profile
     en/prompts.js    Englische Prompts (Spiegelung von de/prompts.js)
+    en/muster.js     Englische Formvorlagen (Spiegelung von de/muster.js)
   __tests__/         Jest Unit-Tests + fixtures/ fuer json-repair
   scripts/           Dev-Tools (Lasttests, Forschungs-Skripte)
 
@@ -215,8 +218,12 @@ Die komplette KI-Pipeline laeuft ueber Mistral AI, in genau einem Weg:
 `runSingleLargeCall` in `mistral.js` schickt das Bild EINMAL an Mistral Large (2512)
 und erhaelt Beschreibung + beide Profile (Normal + Beast) in einer Antwort. Laeuft im
 Queue-Worker `handle-process-job.js`; SUBJECT-Klassifikation + Privacy-Risks werden
-aus den `subject`/`visible_text`-Feldern der Antwort abgeleitet. Ein zweiter, kleiner
-Aufruf ohne Bild erzeugt die Beast-Werbung (`generateBeastAds`). Alle LLM-Ausgaben
+aus den `subject`/`visible_text`-Feldern der Antwort abgeleitet. Der Auftrag endet
+mit einem ausgefuellten Beispiel; davon gibt es mehrere (`locales/*/muster.js`), je
+Analyse geht eines mit, damit kein einzelnes Beispiel alle Antworten praegt. Ein
+zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung (`generateBeastAds`): Er
+liefert doppelt so viele Eintraege, wie gezeigt werden, und nach dem Kinderschutz-Filter
+wird daraus die gezeigte Auswahl gezogen (`minor-safety.js`). Alle LLM-Ausgaben
 gehen durch `json-repair.js` (4-stufige defensive Reparatur).
 
 Den aelteren Drei-Aufruf-Weg (Large beschreibt, Small profiliert; bis v2.1 aktiv,
@@ -238,7 +245,7 @@ Wenn Mistral nicht antwortet, gibt es keinen anderen KI-Provider als Fallback. D
 - Whoever adds or deletes a test file under `functions/src/__tests__`, `public/__tests__` or `e2e` updates `scripts/testdateien-bestand.txt` in the same commit (`python3 scripts/pruefe-kopplung.py --bestand` prints the list)
 - Whoever changes a step in one of the six required CI jobs also updates `SCHRITTFOLGE_CI` in `scripts/pruefe-deploy-riegel.py` (`python3 scripts/pruefe-deploy-riegel.py --vertrag-schritte` prints it)
 - Checks that walk the whole directory (the clock guard and the vendored checks under `scripts/pruefungen/`) ask git themselves and read only what git knows (no ignored private folders); before the push they run exactly as in the pipeline
-- Both profiles (normal + boost) come from ONE call (`runSingleLargeCall` in `mistral.js`); the prompt text lives in `locales/*/prompts.js` (`singleLargePrompt`)
+- Both profiles (normal + boost) come from ONE call (`runSingleLargeCall` in `mistral.js`); the prompt text lives in `locales/*/prompts.js` â€” one rule part, followed by one of several format templates from `locales/*/muster.js` (`singleLargePromptVarianten`, one per analysis). Whoever adds or changes a template follows the rules in the header of `de/muster.js` and mirrors it in `en/muster.js`
 - Bei Aenderungen an der Architektur oder neuen Features: README.md, AGENTS.md, CHANGELOG.md, docs/SETUP.md und docs/SELF-HOSTING.md aktualisieren
 - Bei neuen Features: Dokumentation und Anleitungen mitliefern
 - dateTimeOriginal wird NICHT an die KI gesendet (verleitet zu falschen Altersschaetzungen)

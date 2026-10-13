@@ -32,24 +32,20 @@ const { loadPrompts } = require("./i18n");
 
    Gemessen (84 Analysen, 2026-08-09): Anteil Werbe-Eintraege aus den
    Prompt-Beispielen 7,5 % -> 0,9 %, verschiedene Marken 95 -> 270,
-   Sperrlisten-Verstoesse 0. */
+   Sperrlisten-Verstoesse 0.
+
+   KEINE MARKE STEHT IN ALLEN SETS (13.10.2026). Bis dahin stand Garmin in
+   jedem der sechs — die Marke war damit nie waehlbar, auch wenn sie zur
+   Person passte. Das war nie beabsichtigt: Die Sperre soll abwechseln, nicht
+   ausschliessen. Garmin steht jetzt in keinem Set. Gemessen ohne jede Sperre
+   (15 Fotos, 13.10.2026): Garmin bei 3 von 15. */
 const BRAND_BLOCKLIST_SETS = [
-  ["Garmin", "Rapha", "Wahoo", "Specialized", "Komoot", "Ortlieb", "Red Bull", "Apple Watch", "Nike Metcon"],
-  ["Garmin", "Rapha", "Wahoo", "Specialized", "Nike", "Adidas", "Apple", "Samsung", "Puma"],
-  ["Garmin", "Komoot", "Ortlieb", "Red Bull", "Zalando", "H&M", "Zara", "Douglas", "Sephora"],
-  [
-    "Garmin",
-    "Rapha",
-    "Apple Watch",
-    "Lululemon",
-    "Under Armour",
-    "The North Face",
-    "Patagonia",
-    "Salomon",
-    "On Running",
-  ],
-  ["Garmin", "Wahoo", "Specialized", "Nike", "L'Oréal", "Maybelline", "Nivea", "Rituals", "Yves Rocher"],
-  ["Garmin", "Red Bull", "Apple", "PlayStation", "Nintendo", "Xbox", "Netflix", "Spotify", "TikTok"],
+  ["Rapha", "Wahoo", "Specialized", "Komoot", "Ortlieb", "Red Bull", "Apple Watch", "Nike Metcon"],
+  ["Rapha", "Wahoo", "Specialized", "Nike", "Adidas", "Apple", "Samsung", "Puma"],
+  ["Komoot", "Ortlieb", "Red Bull", "Zalando", "H&M", "Zara", "Douglas", "Sephora"],
+  ["Rapha", "Apple Watch", "Lululemon", "Under Armour", "The North Face", "Patagonia", "Salomon", "On Running"],
+  ["Wahoo", "Specialized", "Nike", "L'Oréal", "Maybelline", "Nivea", "Rituals", "Yves Rocher"],
+  ["Red Bull", "Apple", "PlayStation", "Nintendo", "Xbox", "Netflix", "Spotify", "TikTok"],
 ];
 
 function buildBrandBlocklistBlock(lang, index) {

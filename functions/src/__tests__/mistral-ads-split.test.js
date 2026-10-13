@@ -211,8 +211,31 @@ describe("Marken-Sperre gegen Wiederholung (v2.7)", () => {
     }
     expect(seen.size).toBe(_BRAND_BLOCKLIST_SETS.length);
     /* Set 0 sind die im alten Prompt verbrannten Marken */
-    expect(_buildBrandBlocklistBlock("de", 0)).toContain("Garmin");
     expect(_buildBrandBlocklistBlock("de", 0)).toContain("Rapha");
+    expect(_buildBrandBlocklistBlock("de", 0)).toContain("Wahoo");
+  });
+
+  /* 13.10.2026: Garmin stand in allen sechs Sets und war damit bei jeder
+     Analyse gesperrt. Die Sperre soll abwechseln, nicht ausschließen. */
+  test("keine Marke steht in allen Sets — die Sperre wechselt ab, sie schließt nichts aus", () => {
+    const zahl = new Map();
+    for (const set of _BRAND_BLOCKLIST_SETS) {
+      for (const marke of new Set(set)) zahl.set(marke, (zahl.get(marke) || 0) + 1);
+    }
+    const immerGesperrt = [...zahl].filter(([, n]) => n >= _BRAND_BLOCKLIST_SETS.length).map(([m]) => m);
+    expect(immerGesperrt).toEqual([]);
+    /* Gegenprobe: Die Zählung findet Marken, die in mehreren Sets stehen. */
+    expect(Math.max(...zahl.values())).toBeGreaterThan(1);
+  });
+
+  test("Garmin ist in keiner Sprache und in keinem Set gesperrt", () => {
+    for (const lang of ["de", "en"]) {
+      for (let i = 0; i < _BRAND_BLOCKLIST_SETS.length; i++) {
+        expect(_buildBrandBlocklistBlock(lang, i)).not.toMatch(/garmin/i);
+      }
+    }
+    /* Gegenprobe: Der Block nennt die Marken seines Sets wirklich. */
+    expect(_buildBrandBlocklistBlock("de", 0)).toMatch(/rapha/i);
   });
 
   test("Index läuft sicher über die Setgrenze hinaus", () => {

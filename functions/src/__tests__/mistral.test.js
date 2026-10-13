@@ -614,6 +614,10 @@ describe("runSingleLargeCall", () => {
     expect(seen[0].messages[0].content).toBe(seen[1].messages[0].content);
   });
 
+  /* Zwoelf Analysen hintereinander (Abnahme 13.10.2026): Der Auftrag endet mit
+     einer von drei gewuerfelten Vorlagen. Wuerfelte die Nachfrage neu, bliebe
+     ein einzelner Durchlauf in einem von drei Faellen trotzdem gruen; ueber
+     zwoelf faellt es auf. */
   test("Retry haengt den Hinweis UNTEN an — die system-Message bleibt unveraendert", async () => {
     const seen = [];
     let call = 0;
@@ -621,7 +625,7 @@ describe("runSingleLargeCall", () => {
       seen.push(JSON.parse(init.body));
       /* 1. Antwort unvollstaendig => loest den Retry aus, 2. vollstaendig. */
       const incomplete = { ...makeCompleteResponse(), beast: { profileText: "x", categories: {} } };
-      const payload = call++ === 0 ? incomplete : makeCompleteResponse();
+      const payload = call++ % 2 === 0 ? incomplete : makeCompleteResponse();
       return {
         ok: true,
         status: 200,
@@ -632,13 +636,21 @@ describe("runSingleLargeCall", () => {
       };
     });
 
-    await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
-    expect(seen).toHaveLength(2);
-    /* Der cachebare Anfang muss in beiden Anfragen identisch sein ... */
-    expect(seen[1].messages[0].role).toBe("system");
-    expect(seen[1].messages[0].content).toBe(seen[0].messages[0].content);
-    /* ... und der Hinweis unten in der user-Message stehen. */
-    const retryUser = seen[1].messages[1].content;
-    expect(retryUser[retryUser.length - 1].text).toContain("HINWEIS");
+    const vorlagen = new Set();
+    for (let lauf = 0; lauf < 12; lauf++) {
+      seen.length = 0;
+      await runSingleLargeCall(Buffer.from("fake"), "image/jpeg", () => 60000, "de");
+      expect(seen).toHaveLength(2);
+      /* Der cachebare Anfang muss in beiden Anfragen identisch sein ... */
+      expect(seen[1].messages[0].role).toBe("system");
+      expect(seen[1].messages[0].content).toBe(seen[0].messages[0].content);
+      /* ... und der Hinweis unten in der user-Message stehen. */
+      const retryUser = seen[1].messages[1].content;
+      expect(retryUser[retryUser.length - 1].text).toContain("HINWEIS");
+      vorlagen.add(seen[0].messages[0].content);
+    }
+    /* Gegenprobe: Es wurde wirklich gewuerfelt — sonst haette die Schleife
+       nichts geprueft. */
+    expect(vorlagen.size).toBeGreaterThan(1);
   });
 });

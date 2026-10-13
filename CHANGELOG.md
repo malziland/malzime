@@ -12,9 +12,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   KI endete bisher mit einem einzigen ausgefüllten Beispiel. Es prägte den
   Satzbau aller Ergebnisse, und bei Fotos, die dem Beispiel ähnelten, standen
   ganze Sätze daraus im Ergebnis. Jetzt gibt es drei Beispiele mit
-  verschiedenen Menschen, und je Analyse geht eines mit. Gemessen am
-  13. Oktober 2026 an 14 Fotos mit bekanntem Alter, je drei Analysen vorher
-  und nachher: Der Beast-Text beginnt in 5 % der Fälle mit dem Satzbau des
+  verschiedenen Menschen, und je Analyse geht eines mit. Gemessen an 14 Fotos
+  mit bekanntem Alter, je drei Analysen mit der bisherigen Fassung
+  (7. Oktober 2026) und mit der neuen (13. Oktober 2026): Der Beast-Text
+  beginnt in 5 % der Fälle mit dem Satzbau des
   früheren Beispiels (vorher 71 %), und zwei verschiedene Fotos teilen 1,7 %
   ihres Wortlauts (vorher 4,1 %). Alter und Geschlecht werden so getroffen
   wie zuvor, und der Kinderschutz griff vorher wie nachher bei 21 von 21
@@ -29,10 +30,12 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Der Auftrag nennt jetzt mehr Felder und verlangt, dass jede Anzeige zu Alter
   und Einkommen passt. Die KI liefert doppelt so viele Anzeigen, wie gezeigt
   werden; nachdem der Kinderschutz-Filter gestrichen hat, wird daraus jedes
-  Mal eine andere Auswahl gezeigt. Gemessen an 17 Profilen in je drei
-  Durchläufen: Wer dasselbe Foto zweimal analysiert, sieht im Mittel 2,4 statt
-  4,6 von acht Marken wieder. Der zweite Aufruf an die KI dauert dadurch rund
-  1,4 Sekunden länger.
+  Mal eine andere Auswahl gezeigt. Gemessen an 17 fertigen Profilen, je
+  dreimal durch den Werbe-Aufruf geschickt: Zwei Durchläufe desselben Profils
+  zeigen im Mittel 2,4 statt 4,6 gleiche Marken von acht. Bei den Analysen
+  Minderjähriger stand unter den gezeigten Anzeigen kein Angebot für
+  Erwachsene. Der zweite Aufruf an die KI dauert dadurch rund 1,4 Sekunden
+  länger.
 
 ## [5.1.0] — 2026-10-09
 

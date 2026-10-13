@@ -436,6 +436,20 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
     expect(en).toMatch(/fits the age and income/);
     expect(de).toMatch(/NUR aus denen, die zu einer Aussage im Profil passen/);
     expect(en).toMatch(/ONLY from those that fit a statement in the profile/);
+  });
+
+  /* Abnahme 13.10.2026: Bei Kindern ist die Welt der Schutzregeln (Spielzeug,
+     Spiele, Kindermedien) dieselbe wie die der sachlichen Werbung. Die Vorgabe
+     „aus anderen Branchen“ widerspräche dem, wenn der Vorrang nicht dastünde. */
+  test("die Schutzregeln gehen den Vorgaben zur Auswahl ausdrücklich vor", () => {
+    const de = require("../locales/de/prompts").beastAdsSystem;
+    const en = require("../locales/en/prompts").beastAdsSystem;
+    const vorrangDe = de.indexOf("gehen sie allen Vorgaben dieser Liste vor");
+    const vorrangEn = en.indexOf("they override every instruction in this list");
+    expect(vorrangDe).toBeGreaterThan(de.indexOf("MINDESTENS"));
+    expect(vorrangDe).toBeLessThan(de.indexOf("═══ SCHUTZREGELN"));
+    expect(vorrangEn).toBeGreaterThan(en.indexOf("AT LEAST"));
+    expect(vorrangEn).toBeLessThan(en.indexOf("═══ SAFETY RULES"));
     /* Was aus der Messung vom August bleibt: an der Schwachstelle ansetzen,
        nicht am Hobby, und keine Marke der sachlichen Liste. */
     expect(de).toMatch(/VERLETZLICHKEIT ansetzen, nicht am Hobby/);

@@ -1688,7 +1688,10 @@ Coaching einer Unternehmensberatung, das es so nicht gibt, bei 8.
    Was gestrichen ist, kann nicht gezogen werden; nachgefüllt wird nichts.
 4. Der Auftrag für die Beast-Werbung nennt eine feste, breitere Liste von
    Feldern und verlangt, dass jeder Eintrag zu Alter und Einkommen im Profil
-   passt.
+   passt. Sein letzter Punkt stellt klar, dass die Schutzregeln diesen
+   Vorgaben vorgehen: Bei Kindern ist die Welt der Schutzregeln dieselbe wie
+   die der sachlichen Werbung, und die Vorgabe, aus anderen Branchen zu
+   wählen, widerspräche dem sonst.
 
 **Was die Messung vom 13.10.2026 zeigt.** 48 Analysen mit den drei Vorlagen
 (14 Fotos mit bekanntem Alter je Vorlage einmal, dazu das passende Foto je
@@ -1708,16 +1711,25 @@ Vorlage zweimal), verglichen mit den 42 Analysen vom 07.10.2026:
   anderen Fotos schwankt die Altersangabe desselben Fotos im Mittel um
   1,1 Jahre, vorher um 0,9.
 - Beast-Werbung, nur die gezeigten acht Einträge: Wer dasselbe Profil zweimal
-  auswerten lässt, sieht im Mittel 2,4 Marken wieder, vorher 4,6. Gezeigte
-  Einträge mit einem Wort der Sperrliste: keiner, vorher keiner.
+  auswerten lässt, sieht im Mittel 2,4 Marken wieder, vorher 4,6.
+- Beast-Werbung bei Minderjährigen, von Hand gelesen: Unter den 168 gezeigten
+  Einträgen der 21 Analysen steht kein Angebot aus der Erwachsenenwelt
+  (Versicherung, Auto, Finanzen, Karriere, Therapie); mit der bisherigen
+  Fassung waren es drei. Dass kein gezeigter Eintrag ein Wort der Sperrliste
+  trägt, ist dagegen kein Messwert: Genau diese Wörter streicht der Filter.
 
 **Was schlechter geworden ist, bewusst hingenommen.**
 
 - Bei Profilen, für die der Kinderschutz gilt, schlägt die KI öfter einen
-  Eintrag vor, den der Filter streichen muss: 11 statt 7 in 30 Listen, vor
-  allem Leasing und Finanzierung. Die Felderliste nennt diese Bereiche. Der
-  Filter bleibt eine Wortliste (Abschnitt vom 04.10.2026); was sie nicht
-  kennt, hält er nicht auf.
+  Eintrag vor, den der Filter streichen muss: 10 statt 7 in 30 Listen, vor
+  allem Leasing und Finanzierung. Die Felderliste nennt diese Bereiche. Zu
+  diesen 30 Listen gehören auch junge Erwachsene, weil die Schutzgrenze einen
+  Puffer hat. Der Filter bleibt eine Wortliste (Abschnitt vom 04.10.2026);
+  was sie nicht kennt, hält er nicht auf.
+- Die Vorlagen beschreiben Erwachsene, auch ihre Kleidung und ihren Körper
+  (etwa abgetragene Arbeitskleidung, kräftige Unterarme). In den 21 Analysen
+  Minderjähriger wurde keine dieser Stellen übernommen; ausgeschlossen ist es
+  nicht.
 - Der zweite Aufruf dauert rund 1,4 Sekunden länger, weil er doppelt so viele
   Einträge schreibt.
 - Der Zwischenspeicher bei Mistral greift seltener. In einer nachgestellten
@@ -1749,15 +1761,24 @@ Vorlage zweimal), verglichen mit den 42 Analysen vom 07.10.2026:
 Länge, gleiche Werte, keine Ausprägung, kein Kind, je mit Gegenprobe),
 `age-markers.test.js` (läuft über jeden der Aufträge),
 `minor-safety-diagnose.test.js` (Auswahl nach dem Filter, Gestrichenes kommt
-nie zurück), `mistral-ads-split.test.js` und `mistral.test.js` (derselbe
-Auftrag bei Nachfrage, gleicher Teil vor der Vorlage). Die Rohdaten der
-Messungen enthalten Ergebnisse zu Fotos realer Personen und liegen deshalb
-nicht im Repository. Prüfung und Messung stammen von derselben Instanz, die
-die Änderung gebaut hat; eine unabhängige Abnahme steht aus.
+nie zurück), `mistral-ads-split.test.js`, `mistral.test.js` und
+`mistral-verbindungsabbruch.test.js` (derselbe Auftrag bei Nachfrage und
+Neuversuch, je über zwölf Durchläufe; gleicher Teil vor der Vorlage; Vorrang
+der Schutzregeln). Rückbauprobe 13.10.2026: Würfelt die Nachfrage eine neue
+Vorlage, wird der Test rot. Die Rohdaten der Messungen enthalten Ergebnisse
+zu Fotos realer Personen und liegen deshalb nicht im Repository.
+Unabhängige Abnahme am 13.10.2026 durch eine Instanz, die die Änderung nicht
+gebaut hat: zwei mittlere Befunde (widersprüchliche Vorgaben im Werbe-Auftrag
+für Kinder; eine Kennzahl, die nicht scheitern konnte) und fünf kleinere, alle
+vor der Auslieferung behandelt und der Werbe-Auftrag danach nachgemessen
+(gezeigte Anzeigen und Minderjährige unverändert).
 
 **Neubewertung**, wenn eine Vorlage dazukommt oder geändert wird (dann mit
 Messung an Fotos mit bekanntem Alter), wenn das Modell wechselt, wenn in
 Workshops auffällt, dass sich Ergebnisse mit derselben Vorlage zu sehr
-gleichen, wenn der Filter einen Eintrag der neuen Felder durchlässt, oder wenn
+gleichen (welche Vorlage lief, wird nicht protokolliert; man erkennt es nur
+am Einstieg des Beast-Texts), wenn der Filter einen Eintrag der neuen Felder
+durchlässt, wenn ein Ergebnis für ein Kind eine Stelle aus einer Vorlage
+übernimmt, oder wenn
 das Mistral-Dashboard nach der Auslieferung deutlich höhere Kosten je Analyse
 zeigt.

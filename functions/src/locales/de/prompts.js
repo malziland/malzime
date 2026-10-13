@@ -406,7 +406,7 @@ Antworte JETZT mit dem JSON-Objekt, beginnend mit { und endend mit }. Kein Markd
 /* Je Vorlage ein vollstaendiger Auftrag. Der Teil VOR der Vorlage ist in allen
    derselbe (prompt-vorlagen.test.js) — an ihm haengen die Regel-Pruefungen und
    der Zwischenspeicher bei Mistral. Welcher Auftrag geht, entscheidet
-   mistral.js je Analyse. */
+   auftrag-wechsel.js je Analyse. */
 module.exports.singleLargePromptVarianten = MUSTER.map((vorlage) => ANWEISUNG + JSON.stringify(vorlage, null, 2));
 
 /* Der erste dieser Auftraege: fuer alles, was nur den gemeinsamen Regelteil
@@ -414,7 +414,7 @@ module.exports.singleLargePromptVarianten = MUSTER.map((vorlage) => ANWEISUNG + 
 module.exports.singleLargePrompt = module.exports.singleLargePromptVarianten[0];
 
 /* v2.7: Marken-Sperre gegen Wiederholung. Wird pro Analyse HINTER das Bild
-   gehaengt (dynamischer Teil, kein Cache-Verlust — siehe mistral.js). */
+   gehaengt (dynamischer Teil, kein Cache-Verlust — siehe auftrag-wechsel.js). */
 module.exports.brandBlocklistBlock = (brands) => `═══ MARKEN-SPERRE FÜR DIESE ANALYSE ═══
 
 Diese Marken sind für diese Analyse VERBRAUCHT und dürfen in ad_targeting NICHT vorkommen:
@@ -452,7 +452,11 @@ EINZIGE AUSNAHME: Ist eine dieser Marken im Foto tatsächlich sichtbar (Logo, Au
    Werbung faellt dann in die Produktwelt des Fotos zurueck, ein Verbot
    allein haelt sie nicht davon ab) und die Felder je Aufruf zu wuerfeln (das
    Modell bedient dann auch Felder, die nicht zur Person passen). Deshalb
-   bleibt die Liste fest und im cachebaren Teil. */
+   bleibt die Liste fest und im cachebaren Teil.
+   Der letzte Punkt der Liste stellt klar, dass die Schutzregeln vorgehen
+   (Abnahme 13.10.2026): Bei Kindern ist die Welt der Schutzregeln dieselbe
+   wie die der sachlichen Werbung; ohne den Satz widerspraeche das der
+   Vorgabe, aus anderen Branchen zu waehlen. */
 module.exports.beastAdsSystem = `Du bist der Werbe-Algorithmus eines Tech-Konzerns. Du bekommst ein fertiges Profil und erzeugst daraus die Werbeliste, die die Schwachstellen genau dieser Person ausnutzt.
 
 ═══ DEINE AUFGABE ═══
@@ -467,6 +471,7 @@ Erzeuge genau ${WERBE_ANFORDERUNG} Werbeeinträge, die an der VERLETZLICHKEIT an
 - Nimm nicht reflexhaft die bekannteste Marke eines Feldes, und nur Angebote, die es von dieser Marke wirklich gibt.
 - KEINE Marke aus der bestehenden sachlichen Werbung wiederverwenden.
 - Je 1-3 Wörter. Echte Marken aus dem mitteleuropäischen Markt. KEINE Preisangaben.
+- Gelten für diese Person die Schutzregeln unten, gehen sie allen Vorgaben dieser Liste vor: Dann kommen alle Einträge aus der dort genannten Welt, auch wenn sie der sachlichen Werbung ähnelt.
 
 ═══ SCHUTZREGELN — GELTEN IMMER ═══
 

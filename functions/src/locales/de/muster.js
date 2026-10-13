@@ -11,7 +11,7 @@
  * übernommen, auch ein Merkmal, das auf dem Foto anders aussah.
  *
  * Jetzt gibt es mehrere Vorlagen mit verschiedenen Menschen, und je Analyse
- * geht eine davon mit (Auswahl in mistral.js). Was für eine neue Vorlage gilt:
+ * geht eine davon mit (Auswahl in auftrag-wechsel.js). Was für eine neue Vorlage gilt:
  *   - Eine erwachsene Person in einer Umgebung, die auf Fotos von
  *     Schulklassen selten vorkommt. Ein Beispiel mit einem Kind würde die
  *     Ergebnisse ganzer Workshops prägen.
@@ -47,7 +47,7 @@ const LABEL = {
 };
 
 /* Die Platzhalter für Hebel und Werbung sind in jeder Vorlage dieselben:
-   Marken stehen bewusst nirgends im Auftrag (Marken-Sperre in mistral.js). */
+   Marken stehen bewusst nirgends im Auftrag (Marken-Sperre in auftrag-wechsel.js). */
 const HEBEL_SACHLICH = Array(4).fill("‹Hebel sachlich benannt, 1-2 Sätze›");
 const HEBEL_BEAST = Array(4).fill("‹derselbe Hebel aus Täterperspektive, 1-2 Sätze›");
 const WERBUNG_SACHLICH = [

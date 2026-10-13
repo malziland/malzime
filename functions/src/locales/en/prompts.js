@@ -397,7 +397,7 @@ Reply NOW with the JSON object, beginning with { and ending with }. No markdown,
 /* Je Vorlage ein vollstaendiger Auftrag. Der Teil VOR der Vorlage ist in allen
    derselbe (prompt-vorlagen.test.js) — an ihm haengen die Regel-Pruefungen und
    der Zwischenspeicher bei Mistral. Welcher Auftrag geht, entscheidet
-   mistral.js je Analyse. */
+   auftrag-wechsel.js je Analyse. */
 module.exports.singleLargePromptVarianten = MUSTER.map((vorlage) => ANWEISUNG + JSON.stringify(vorlage, null, 2));
 
 /* Der erste dieser Auftraege: fuer alles, was nur den gemeinsamen Regelteil
@@ -405,7 +405,7 @@ module.exports.singleLargePromptVarianten = MUSTER.map((vorlage) => ANWEISUNG + 
 module.exports.singleLargePrompt = module.exports.singleLargePromptVarianten[0];
 
 /* v2.7: Brand block against repetition — appended AFTER the image per
-   analysis (dynamic part, no cache loss — see mistral.js). */
+   analysis (dynamic part, no cache loss — see auftrag-wechsel.js). */
 module.exports.brandBlocklistBlock = (brands) => `═══ BRAND BLOCK FOR THIS ANALYSIS ═══
 
 These brands are USED UP for this analysis and must NOT appear in ad_targeting:
@@ -440,6 +440,7 @@ Generate exactly ${WERBE_ANFORDERUNG} ad entries that target the VULNERABILITY, 
 - Do not reach for the best-known brand of a field by reflex, and only offers this brand really sells.
 - Do NOT reuse any brand from the existing factual ads.
 - 1-3 words each. Real brands from the central European market. NO prices.
+- If the safety rules below apply to this person, they override every instruction in this list: all entries then come from the world named there, even if it resembles the factual ads.
 
 ═══ SAFETY RULES — ALWAYS APPLY ═══
 

@@ -189,6 +189,31 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     keineAdressenImProtokoll();
   });
 
+  /* Abnahme 13.10.2026: Der Auftrag endet mit einer von drei gewuerfelten
+     Vorlagen. Der Neuversuch muss mit DERSELBEN laufen — sonst ersetzt den
+     halben Text des ersten Versuchs einer mit anderem Satzbau. Zwoelf
+     Durchlaeufe, weil ein neues Wuerfeln in einem von drei Faellen zufaellig
+     dieselbe Vorlage traefe. */
+  test("der Neuversuch laeuft mit demselben Auftrag wie der erste Versuch", async () => {
+    const vorlagen = new Set();
+    for (let lauf = 0; lauf < 12; lauf++) {
+      const auftraege = [];
+      setFetchForTest(async (_url, init) => {
+        if (!mitBild(init)) return WERBUNG;
+        auftraege.push(JSON.parse(init.body).messages[0].content);
+        return auftraege.length === 1
+          ? stromDerAbreisst('{"subject":"HUMAN","standard":{"profileText":"Du bist alt')
+          : stromVollstaendig(VOLLSTAENDIG);
+      });
+      await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 240000, "de", { onLiveText: () => {} });
+      expect(auftraege).toHaveLength(2);
+      expect(auftraege[1]).toBe(auftraege[0]);
+      vorlagen.add(auftraege[0]);
+    }
+    /* Gegenprobe: Es wurde wirklich gewuerfelt. */
+    expect(vorlagen.size).toBeGreaterThan(1);
+  });
+
   /* Befund R-01 (01.10.2026): Lief der Neuversuch ohne Live-Text, blieb der
      halbe Text des ersten Versuchs rund 40 s stehen, und am Ende ersetzte ihn
      ein ANDERER Text. Jetzt laeuft auch der Neuversuch als Strom; seine erste

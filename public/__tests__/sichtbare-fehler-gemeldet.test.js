@@ -55,6 +55,7 @@ const MELDUNG = /\b(logClientError|meldeSichtbarenFehler|meldeFotoFehler)\s*\(/;
 const MELDE_HELFER = [
   ["meldeSichtbarenFehler", "js/api.js"],
   ["meldeFotoFehler", "js/foto-fehler.js"],
+  ["meldeLeereAuswahl", "js/foto-fehler.js"],
 ];
 const REICHWEITE_ZEILEN = 40;
 
@@ -112,8 +113,9 @@ describe("Flaeche: jede sichtbare Fehlermeldung wird gemeldet", () => {
     const app = readFileSync(join(PUBLIC, "app.js"), "utf8");
     const handler = app.slice(app.indexOf('elements.fileInput.addEventListener("change"'));
     const bisZumReturn = handler.slice(0, handler.indexOf("return;"));
-    expect(bisZumReturn).toMatch(/logClientError\(/);
-    expect(bisZumReturn).toMatch(/auswahl-leer/);
+    /* Seit 14.10.2026 meldet der Helfer meldeLeereAuswahl (js/foto-fehler.js);
+       dass er wirklich meldet, pruefen der Test der Melde-Helfer und Teil 3. */
+    expect(bisZumReturn).toMatch(/meldeLeereAuswahl\(Boolean\(state\.lastFile\)\)/);
   });
 });
 
@@ -204,6 +206,23 @@ describe("Verhalten: die Meldung geht wirklich raus", () => {
 /* ── 3. Dauer der leeren Fotoauswahl (14.10.2026) ──────────────────────── */
 
 describe("Dauer der leeren Fotoauswahl", () => {
+  let gesendet;
+
+  beforeEach(() => {
+    gesendet = [];
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(Date.now() + 60000);
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (url, optionen = {}) => {
+      if (String(url).includes("/api/errors")) gesendet.push(JSON.parse(optionen.body));
+      return { ok: true, status: 204 };
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
   test("misst ab dem Oeffnen und verbraucht den Start bei der Rueckkehr", async () => {
     const { merkeAuswahlGeoeffnet, auswahlOffenMs } = await import("../js/foto-fehler.js");
     merkeAuswahlGeoeffnet(1000);
@@ -220,23 +239,36 @@ describe("Dauer der leeren Fotoauswahl", () => {
     expect(auswahlOffenMs(4000)).toBeUndefined();
   });
 
-  test("app.js merkt den Start beim Oeffnen und schickt die Dauer bei leerer Auswahl mit", () => {
-    const app = readFileSync(join(PUBLIC, "app.js"), "utf8");
-    expect(app).toMatch(/elements\.fileInput\.addEventListener\("click", \(\) => merkeAuswahlGeoeffnet\(\)\)/);
-    const handler = app.slice(app.indexOf('elements.fileInput.addEventListener("change"'));
-    const bisZumReturn = handler.slice(0, handler.indexOf("return;"));
-    /* Die Dauer wird VOR der Weiche gelesen (verbraucht den Start in beiden
-       Faellen) und im leeren Fall mitgeschickt. */
-    expect(bisZumReturn.indexOf("auswahlOffenMs()")).toBeGreaterThan(-1);
-    expect(bisZumReturn.indexOf("auswahlOffenMs()")).toBeLessThan(bisZumReturn.indexOf("if (!file)"));
-    expect(bisZumReturn).toMatch(/durationMs: offenMs/);
+  test("die Meldung traegt Phase und Dauer — wirklich gesendet", async () => {
+    const { merkeAuswahlGeoeffnet, meldeLeereAuswahl } = await import("../js/foto-fehler.js");
+    merkeAuswahlGeoeffnet(1000);
+    meldeLeereAuswahl(false, 1450);
+    await vi.waitFor(() => expect(gesendet.length).toBe(1));
+    expect(gesendet[0].phase).toBe("auswahl-leer");
+    expect(gesendet[0].errorMessage).toBe("auswahl_leer");
+    expect(gesendet[0].durationMs).toBe(450);
   });
 
-  test("die Dauer kommt im Feld durationMs bei der Fehlererfassung an", async () => {
-    const quelle = readFileSync(join(PUBLIC, "js/error-logger.js"), "utf8");
-    /* Das Feld nimmt nur endliche Zahlen; fehlt die Dauer, steht dort 0 wie bisher. */
-    expect(quelle).toMatch(
-      /durationMs: typeof context\.durationMs === "number" && isFinite\(context\.durationMs\) \? context\.durationMs : 0/
-    );
+  test("ohne Oeffnen steht in der Meldung 0, nach einem Foto die eigene Phase", async () => {
+    const { auswahlOffenMs, meldeLeereAuswahl } = await import("../js/foto-fehler.js");
+    auswahlOffenMs(0);
+    vi.setSystemTime(Date.now() + 60000);
+    meldeLeereAuswahl(true, 9999);
+    await vi.waitFor(() => expect(gesendet.length).toBe(1));
+    expect(gesendet[0].phase).toBe("auswahl-leer-nach-foto");
+    expect(gesendet[0].durationMs).toBe(0);
+  });
+
+  test("app.js merkt den Start VOR dem ersten Warten und verbraucht ihn bei jeder Rueckkehr", () => {
+    const app = readFileSync(join(PUBLIC, "app.js"), "utf8");
+    const klick = app.indexOf('elements.fileInput.addEventListener("click", () => merkeAuswahlGeoeffnet())');
+    expect(klick, "Klick-Merker fehlt").toBeGreaterThan(-1);
+    /* Vor dem ersten Warten der Seite verdrahtet — sonst verpasst ein frueher
+       Klick den Start (Abnahme 14.10.2026, Rueckbauprobe A). */
+    expect(klick).toBeLessThan(app.indexOf("await uebersetzungBereit"));
+    const handler = app.slice(app.indexOf('elements.fileInput.addEventListener("change"'));
+    const rumpf = handler.slice(0, handler.indexOf("\n});"));
+    expect(rumpf).toMatch(/meldeLeereAuswahl\(Boolean\(state\.lastFile\)\)/);
+    expect(rumpf.slice(rumpf.indexOf("return;"))).toMatch(/auswahlOffenMs\(\)/);
   });
 });

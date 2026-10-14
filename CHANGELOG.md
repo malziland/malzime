@@ -24,8 +24,12 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Wächter-Selbstprüfung hatte dieselbe Form und hätte eine Probe dadurch
   fälschlich grün melden können. Beide lesen den Text jetzt fertig ein, bevor
   sie suchen; eine neue Prüfung (`pipefail-suche.test.js`) hält die Form aus
-  allen Skripten mit dieser Fehlerregel heraus, mit einer festgehaltenen
-  Ausnahme im Bau-Rezept des HEIC-Dekoders.
+  allen Skripten und GitHub-Abläufen mit dieser Fehlerregel heraus, mit
+  einer festgehaltenen Ausnahme im Bau-Rezept des HEIC-Dekoders.
+- **Die Dependabot-Automatik hält Updates an Workflow-Dateien verlässlich an.**
+  Ihre Prüfung „berührt der PR `.github/`?“ hatte dieselbe Form; schlug der
+  Wettlauf zu, hätte sie ein solches Update für harmlos gehalten und selbst
+  zusammengeführt (Sicherung aus Audit-Befund OSS-2026-08-12-20).
 
 ## [5.2.3] — 2026-10-14
 

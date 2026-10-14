@@ -23,20 +23,58 @@ const path = require("path");
 const { spawnSync } = require("child_process");
 
 const WURZEL = path.join(__dirname, "..", "..", "..");
-const SKRIPTE = path.join(WURZEL, "scripts");
 
-/** Shell-Skripte unter scripts/, in denen `pipefail` eingeschaltet wird. */
-function skripteMitPipefail() {
-  return fs
-    .readdirSync(SKRIPTE)
-    .filter((n) => n.endsWith(".sh"))
-    .filter((n) => /^\s*set\s+-[a-z]*o\s+pipefail\b/m.test(fs.readFileSync(path.join(SKRIPTE, n), "utf8")))
-    .map((n) => path.join("scripts", n));
+const PIPEFAIL = /^\s*set\s+-[a-z]*o\s+pipefail\b|^\s*shell:\s*bash\s*$/m;
+
+/** Shell-Skripte unter scripts/ und GitHub-Ablaeufe, in denen `pipefail` gilt
+    (`set -o pipefail`, oder `shell: bash`, das GitHub mit pipefail startet). */
+function dateienMitPipefail() {
+  const aus = (ordner, endung) =>
+    fs
+      .readdirSync(path.join(WURZEL, ordner))
+      .filter((n) => n.endsWith(endung))
+      .map((n) => path.join(ordner, n));
+  return [...aus("scripts", ".sh"), ...aus(path.join(".github", "workflows"), ".yml")].filter((datei) =>
+    PIPEFAIL.test(fs.readFileSync(path.join(WURZEL, datei), "utf8"))
+  );
 }
 
-/* Eine Pipe, deren letztes Glied ein `grep -q…` ist — die gefaehrliche Form.
-   `||` ist keine Pipe, sondern "oder". Kommentarzeilen zaehlen nicht. */
-const GEFAHR = /(?<!\|)\|(?!\|)\s*grep\s+-[A-Za-z]*q/;
+/* Eine Pipe (nicht `||`), deren Glied ein grep ist, das vorzeitig aufhoert zu
+   lesen: -q, -m, -l/-L als Kurzoption (auch gebuendelt oder einzeln
+   hinter -E), --quiet, --silent, --max-count, --files-with(out)-match(es);
+   auch egrep/fgrep, mit Umgebungsvariable, `command` oder Pfad davor. */
+const PIPE_GREP = /(?<!\|)\|(?!\|)\s*(?:[A-Za-z_]\w*=\S*\s+)*(?:command\s+)?(?:\S*\/)?[ef]?grep(?=\s|$)((?:\s+-\S+)*)/g;
+function istGefahr(zeile) {
+  for (const treffer of zeile.matchAll(PIPE_GREP)) {
+    const optionen = treffer[1].trim().split(/\s+/).filter(Boolean);
+    if (
+      optionen.some(
+        (o) =>
+          /^--(quiet|silent|max-count|files-with(out)?-match(es)?)\b/.test(o) || /^-(?!-)[A-Za-z0-9]*[qmlL]/.test(o)
+      )
+    )
+      return true;
+  }
+  return false;
+}
+
+/** Fundstellen einer Datei; Zeilen mit `\` am Ende werden mit der naechsten
+    zusammengelesen, Kommentarzeilen zaehlen nicht. */
+function fundstellen(datei) {
+  const logisch = [];
+  let offen = "";
+  for (const zeile of fs.readFileSync(path.join(WURZEL, datei), "utf8").split("\n")) {
+    if (/\\\s*$/.test(zeile)) {
+      offen += zeile.replace(/\\\s*$/, " ");
+      continue;
+    }
+    logisch.push(offen + zeile);
+    offen = "";
+  }
+  return logisch
+    .filter((zeile) => !/^\s*#/.test(zeile) && istGefahr(zeile))
+    .map((zeile) => `${datei}: ${zeile.trim()}`);
+}
 
 /* BEWUSSTE AUSNAHME (14.10.2026), wortgleich festgehalten — jede weitere
    Fundstelle, auch in dieser Datei, macht den Test rot.
@@ -47,15 +85,6 @@ const GEFAHR = /(?<!\|)\|(?!\|)\s*grep\s+-[A-Za-z]*q/;
    scheitert), nie faelschlich gruen. Umstellen mit dem naechsten Eingriff ins
    Rezept. */
 const AUSNAHMEN = ['scripts/libheif-bauen.sh: if ! versionen_im_wasm "$QUELLE/libheif.wasm" | grep -qxF "$v"; then'];
-
-function fundstellen(datei) {
-  return fs
-    .readFileSync(path.join(WURZEL, datei), "utf8")
-    .split("\n")
-    .map((zeile, i) => ({ zeile, nr: i + 1 }))
-    .filter(({ zeile }) => !/^\s*#/.test(zeile) && GEFAHR.test(zeile))
-    .map(({ zeile }) => `${datei}: ${zeile.trim()}`);
-}
 
 function bash(befehl) {
   return spawnSync("bash", ["-c", befehl], { encoding: "utf8" }).status;
@@ -76,18 +105,37 @@ describe("pipefail und vorzeitig endende Suche", () => {
     expect(neu).toBe(0);
   });
 
-  test("es gibt Skripte mit pipefail, darunter deploy.sh", () => {
+  test("es gibt Dateien mit pipefail, darunter deploy.sh und die Dependabot-Automatik", () => {
     /* Sonst waere die Suche unten trivial leer. */
-    expect(skripteMitPipefail()).toContain(path.join("scripts", "deploy.sh"));
+    const dateien = dateienMitPipefail();
+    expect(dateien).toContain(path.join("scripts", "deploy.sh"));
+    expect(dateien).toContain(path.join(".github", "workflows", "dependabot-automerge.yml"));
   });
 
-  test("die Suche erkennt die alte Form aus deploy.sh und laesst `||` in Ruhe", () => {
-    expect(GEFAHR.test(`if ! printf '%s\\n' "$LAGE" | grep -qx "\${CHECK}=success"; then`)).toBe(true);
-    expect(GEFAHR.test(`if grep -aqF "$A" "$f" || grep -aqF "$B" "$f"; then`)).toBe(false);
+  test.each([
+    [`if ! printf '%s\\n' "$LAGE" | grep -qx "\${CHECK}=success"; then`, true],
+    [`if printf '%s\\n' "$DATEIEN" | grep -q '^\\.github/'; then`, true],
+    [`x | egrep -q a`, true],
+    [`x | fgrep -q a`, true],
+    [`x | grep -E -q a`, true],
+    [`x | grep --quiet a`, true],
+    [`x | grep --silent a`, true],
+    [`x | grep -m1 a`, true],
+    [`x | grep -m 1 a`, true],
+    [`x | grep -l a`, true],
+    [`x | LC_ALL=C grep -q a`, true],
+    [`x | command grep -q a`, true],
+    [`x | /usr/bin/grep -q a`, true],
+    [`if grep -aqF "$A" "$f" || grep -aqF "$B" "$f"; then`, false],
+    [`x | grep -c a`, false],
+    [`x | grep -oE '[0-9]+' | head -1 || true`, false],
+    [`grep -q a <<<"$T"`, false],
+  ])("Suche: %s -> %s", (zeile, erwartet) => {
+    expect(istGefahr(zeile)).toBe(erwartet);
   });
 
-  test("kein Skript mit pipefail fuehrt Text per Pipe in `grep -q` (ausser der einen festgehaltenen Ausnahme)", () => {
-    const funde = skripteMitPipefail().flatMap(fundstellen);
+  test("keine Datei mit pipefail fuehrt Text per Pipe in ein vorzeitig endendes grep (ausser der einen festgehaltenen Ausnahme)", () => {
+    const funde = dateienMitPipefail().flatMap(fundstellen);
     expect(funde.filter((f) => !AUSNAHMEN.includes(f))).toEqual([]);
     /* Die Ausnahme muss noch dastehen — ist sie behoben, faellt sie hier auf
        und wird aus der Liste gestrichen. */

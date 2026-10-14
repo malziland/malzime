@@ -275,8 +275,10 @@ else
     # Protokoll, die wie Rauschen aussieht.
     # BEFUND 14.10.2026 (PR #324, test-backend rot): Unter `pipefail` darf vor
     # `grep -q` keine Pipe stehen. `grep -q` hoert beim ersten Treffer auf zu
-    # lesen; schreibt printf danach noch (bash schreibt zeilenweise), stirbt es
-    # an SIGPIPE, die Pipe meldet 141 — und der Treffer zaehlt als keiner. So
+    # lesen; schreibt printf danach noch, stirbt es an SIGPIPE, die Pipe meldet
+    # 141 — und der Treffer zaehlt als keiner. (Dass die bash auf GitHub
+    # zeilenweise schreibt, ist Vermutung, nicht gemessen; mit bash 3.2 auf
+    # macOS liess es sich ohne kuenstliche Pause nicht nachstellen.) So
     # meldete diese Stelle "test-e2e ist nicht gruen (Ist: test-e2e=success)".
     # Der Text geht deshalb als Here-String hinein: fertig geschrieben, bevor
     # grep liest. Waechter: functions/src/__tests__/pipefail-suche.test.js.

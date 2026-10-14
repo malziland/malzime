@@ -16,6 +16,16 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Zeitbudget, dass die zu lange Pause gar nicht erst geplant wird, und die
   zwei Laufzeit-Proben der Altersauslese die eigene Rechenzeit statt der
   Uhrzeit.
+- **Der Riegel vor der Auslieferung meldet einen grünen Check nicht mehr
+  zufällig als rot.** `deploy.sh` las die Prüfergebnisse über eine Pipe in eine
+  Suche, die beim ersten Treffer aufhört. Schrieb die Gegenseite danach noch,
+  zählte das unter der strengen Fehlerregel als Fehlschlag — so meldete der
+  Riegel am 14.10.2026 auf GitHub „test-e2e nicht grün (Ist: success)“. Die
+  Wächter-Selbstprüfung hatte dieselbe Form und hätte eine Probe dadurch
+  fälschlich grün melden können. Beide lesen den Text jetzt fertig ein, bevor
+  sie suchen; eine neue Prüfung (`pipefail-suche.test.js`) hält die Form aus
+  allen Skripten mit dieser Fehlerregel heraus, mit einer festgehaltenen
+  Ausnahme im Bau-Rezept des HEIC-Dekoders.
 
 ## [5.2.3] — 2026-10-14
 

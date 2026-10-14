@@ -200,3 +200,43 @@ describe("Verhalten: die Meldung geht wirklich raus", () => {
     expect(phasen()).toEqual(["auftrag-verworfen"]);
   });
 });
+
+/* ── 3. Dauer der leeren Fotoauswahl (14.10.2026) ──────────────────────── */
+
+describe("Dauer der leeren Fotoauswahl", () => {
+  test("misst ab dem Oeffnen und verbraucht den Start bei der Rueckkehr", async () => {
+    const { merkeAuswahlGeoeffnet, auswahlOffenMs } = await import("../js/foto-fehler.js");
+    merkeAuswahlGeoeffnet(1000);
+    expect(auswahlOffenMs(1450.4)).toBe(450);
+    /* Gegenprobe: Ein zweites Zurueckkommen ohne neues Oeffnen hat keine Dauer. */
+    expect(auswahlOffenMs(2000)).toBeUndefined();
+  });
+
+  test("ohne gemerkten Start und bei rueckwaerts laufender Uhr keine Zahl", async () => {
+    const { merkeAuswahlGeoeffnet, auswahlOffenMs } = await import("../js/foto-fehler.js");
+    auswahlOffenMs(0);
+    expect(auswahlOffenMs(5000)).toBeUndefined();
+    merkeAuswahlGeoeffnet(5000);
+    expect(auswahlOffenMs(4000)).toBeUndefined();
+  });
+
+  test("app.js merkt den Start beim Oeffnen und schickt die Dauer bei leerer Auswahl mit", () => {
+    const app = readFileSync(join(PUBLIC, "app.js"), "utf8");
+    expect(app).toMatch(/elements\.fileInput\.addEventListener\("click", \(\) => merkeAuswahlGeoeffnet\(\)\)/);
+    const handler = app.slice(app.indexOf('elements.fileInput.addEventListener("change"'));
+    const bisZumReturn = handler.slice(0, handler.indexOf("return;"));
+    /* Die Dauer wird VOR der Weiche gelesen (verbraucht den Start in beiden
+       Faellen) und im leeren Fall mitgeschickt. */
+    expect(bisZumReturn.indexOf("auswahlOffenMs()")).toBeGreaterThan(-1);
+    expect(bisZumReturn.indexOf("auswahlOffenMs()")).toBeLessThan(bisZumReturn.indexOf("if (!file)"));
+    expect(bisZumReturn).toMatch(/durationMs: offenMs/);
+  });
+
+  test("die Dauer kommt im Feld durationMs bei der Fehlererfassung an", async () => {
+    const quelle = readFileSync(join(PUBLIC, "js/error-logger.js"), "utf8");
+    /* Das Feld nimmt nur endliche Zahlen; fehlt die Dauer, steht dort 0 wie bisher. */
+    expect(quelle).toMatch(
+      /durationMs: typeof context\.durationMs === "number" && isFinite\(context\.durationMs\) \? context\.durationMs : 0/
+    );
+  });
+});

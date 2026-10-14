@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert — Fehlererfassung
+
+- **Eine leer zurückgekommene Fotoauswahl meldet jetzt, wie lange sie offen
+  war.** Am 14.10.2026 kam im Workshop auf einem Samsung-Handy die
+  Fotoauswahl zweimal ohne Foto zurück, ohne dass vorher ein Foto gewählt war;
+  die Meldung konnte nicht zeigen, ob die Auswahl versagt hat oder abgebrochen
+  wurde. Die Dauer vom Tippen auf die Auswahl bis zu ihrer Rückkehr steht jetzt
+  im Feld „Dauer“ der Meldung, das die Datenschutzerklärung schon nennt. Kein
+  neues Feld, keine Angabe über Kind oder Gerät; am Verhalten der Seite ändert
+  sich nichts.
+
 ## [5.2.2] — 2026-10-13
 
 ### Tests

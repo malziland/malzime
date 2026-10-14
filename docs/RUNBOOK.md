@@ -782,15 +782,22 @@ Klammern): Datei fehlt (`datei-fehlt`), Datei zu groß (`datei-zu-gross`, mit
 Größe), fertig ohne Ergebnis (`ergebnis-leer`), Einreihen ohne Auftragsnummer
 (`einreihen-ohne-auftrag`), Auftrag verworfen (`auftrag-verworfen`),
 Wiederaufnahme ohne Verbindung (`resume-verbindung`) sowie eine Dateiauswahl,
-die ohne Datei zurückkam (`auswahl-leer`, `auswahl-leer-nach-foto` — letzteres
-kann auch ein Abbrechen der Auswahl sein).
+die ohne Datei zurückkam (`auswahl-leer`; `auswahl-leer-nach-foto`, wenn im Tab
+vorher schon ein Foto gewählt war).
+
+**Seit 14.10.2026 trägt die leere Dateiauswahl ihre Dauer** im Feld `durationMs`:
+wie lange die Auswahl offen war, gemessen ab dem Tippen auf die Auswahl (0 =
+nicht gemessen). Sofort leer zurück oder erst nach einer Weile — was das am
+Gerät bedeutet, zeigt erst der Versuch dort. Nicht mit „Abbrechen“
+gleichsetzen: In Chromium löst ein echtes Abbrechen ohne vorheriges Foto gar
+keine Meldung aus (Abnahme 14.10.2026; am Samsung-Gerät nicht geprüft).
 
 Nachsehen:
 
     gcloud logging read 'resource.labels.service_name="errors"' \
       --project=malzime --bucket=client-diagnostics --location=europe-west1 \
       --view=_AllLogs --freshness=30d \
-      --format='value(timestamp,jsonPayload.phase,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.dateizeit,jsonPayload.zeitsprung,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest)'
+      --format='value(timestamp,jsonPayload.phase,jsonPayload.durationMs,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.dateizeit,jsonPayload.zeitsprung,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest)'
 
 ### Mistral überlastet / 429 / 5xx
 

@@ -24,6 +24,7 @@ import { initBeastLockruf } from "./js/beast-lockruf.js";
 import { pruefeSeiteNachDruck } from "./js/druck-wache.js";
 import { apiUrl } from "./js/api-basis.js";
 import { zeitsprungArt } from "./js/exif.js";
+import { merkeAuswahlGeoeffnet, auswahlOffenMs, meldeLeereAuswahl } from "./js/foto-fehler.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
    Startet die Seite mehrfach binnen einer Minute, meldet sie das einmalig und
@@ -50,18 +51,19 @@ initDemo(uebersetzungBereit);
    der Auswahl (Lesefehler-Diagnose) entsteht erst in handleNewFile, also nach
    dem Warten — nur im Sonderfall der noch ladenden Sprachdatei um diese
    Wartezeit versetzt. */
+/* Das Tippen auf die Fotoauswahl oeffnet sie (auch ueber das Etikett und per
+   Tastatur kommt hier ein Klick an) — ab hier misst die Dauer, falls die
+   Auswahl leer zurueckkommt (js/foto-fehler.js). */
+elements.fileInput.addEventListener("click", () => merkeAuswahlGeoeffnet());
 elements.fileInput.addEventListener("change", () => {
   const file = elements.fileInput.files[0];
   if (!file) {
-    /* LEERE AUSWAHL (16.09.2026): Kommt die Auswahl ohne Datei zurueck, sieht
-       das Kind gar nichts — und die Fehlererfassung bisher auch nicht. Die
-       Phase sagt, ob vorher schon ein Foto gewaehlt war (dann kann es auch ein
-       Abbrechen der Auswahl sein). */
-    logClientError(new Error("auswahl_leer"), {
-      phase: state.lastFile ? "auswahl-leer-nach-foto" : "auswahl-leer",
-    });
+    /* Leere Auswahl: Meldung samt Phase und Dauer (js/foto-fehler.js). */
+    meldeLeereAuswahl(Boolean(state.lastFile));
     return;
   }
+  /* Ein Foto kam an: Der gemerkte Start ist damit verbraucht. */
+  auswahlOffenMs();
   uebersetzungBereit.then(() => handleNewFile(file));
 });
 document.querySelector(".file-drop").addEventListener("drop", (e) => {

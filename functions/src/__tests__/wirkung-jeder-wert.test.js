@@ -476,10 +476,22 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
     expect(weit).toBeGreaterThan(2);
   });
 
+  /* OHNE VERGLEICH ZWEIER UHRZEITEN (14.10.2026): Seit 5.2.2 laufen die
+     Testdateien nebeneinander. Die Nebenlast schwankt dann so stark, dass der
+     Vergleich zweier gemessener Laufzeiten zufaellig kippt — am 14.10.2026
+     auf main um eine Millisekunde (182 statt mehr als 182). Geprueft wird
+     deshalb, was der Einstellungssatz wirklich steuert: die geplanten
+     Wartezeiten (abgehoert an setTimeout) und eine Untergrenze der Laufzeit,
+     die Last nur verlaengern, nie verkuerzen kann. */
+  function geplanteWartezeiten(spion) {
+    return spion.mock.calls.map((c) => c[1]).filter((ms) => typeof ms === "number" && ms > 0 && ms < 1000);
+  }
+
   test("tokenAbstandGrossMs wirkt: größerer Abstand, längerer Lauf", async () => {
-    async function dauerFuerAbstand(abstand) {
+    async function laufMitAbstand(abstand) {
       jest.resetModules();
       const { withMistralSlot } = require("../throttle");
+      const spion = jest.spyOn(global, "setTimeout");
       const start = Date.now();
       for (let i = 0; i < 3; i += 1) {
         await withMistralSlot(async () => {}, {
@@ -488,11 +500,19 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
           tokenAbstandGrossMs: abstand,
         });
       }
-      return Date.now() - start;
+      const dauer = Date.now() - start;
+      const wartezeiten = geplanteWartezeiten(spion);
+      spion.mockRestore();
+      return { dauer, wartezeiten };
     }
-    const ohne = await dauerFuerAbstand(0);
-    const mitAbstand = await dauerFuerAbstand(60);
-    expect(mitAbstand).toBeGreaterThan(ohne + 60);
+    const ohne = await laufMitAbstand(0);
+    const mit = await laufMitAbstand(60);
+    /* Ohne Abstand wird gar nicht gewartet ... */
+    expect(ohne.wartezeiten).toEqual([]);
+    /* ... mit Abstand vor dem zweiten und dritten Start, und die drei Starts
+       liegen zusammen mindestens 2 x 60 ms auseinander. */
+    expect(mit.wartezeiten.length).toBeGreaterThanOrEqual(2);
+    expect(mit.dauer).toBeGreaterThanOrEqual(118);
   }, 15000);
 
   test("drosselWartelimitMs wirkt: zu langes Warten wird abgebrochen", async () => {
@@ -516,6 +536,7 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
       versuche += 1;
       return { ok: false, status: 429, text: async () => "rate limited" };
     });
+    const spion = jest.spyOn(global, "setTimeout");
     const start = Date.now();
     await expect(
       callMistralRawUnthrottled({
@@ -527,8 +548,11 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
         ueberlastWartezeitenMs: wartezeiten,
       })
     ).rejects.toMatchObject({ status: 429 });
+    const dauer = Date.now() - start;
+    const pausen = geplanteWartezeiten(spion);
+    spion.mockRestore();
     setFetchForTest(null);
-    return { versuche, dauer: Date.now() - start };
+    return { versuche, dauer, pausen };
   }
 
   test("ueberlastVersuche wirkt: mehr Versuche aus dem Satz, mehr Aufrufe", async () => {
@@ -554,8 +578,11 @@ describe("Gruppe 4 — die Drosselung gegenüber Mistral", () => {
     const lang = await versucheUndDauerBei(
       _ueberlastWartezeiten({ ...SATZ, ueberlastWarteMs: 60, ueberlastVersuche: 2 })
     );
-    /* 60 + 120 = 180 ms Wartezeit gegenueber 1 + 2 = 3 ms. */
-    expect(lang.dauer).toBeGreaterThan(kurz.dauer + 150);
+    /* Geplant genau die Pausen aus dem Satz: 1 und 2 ms gegenueber 60 und
+       120 ms — und der lange Lauf dauert mindestens deren Summe. */
+    expect(kurz.pausen).toEqual([1, 2]);
+    expect(lang.pausen).toEqual([60, 120]);
+    expect(lang.dauer).toBeGreaterThanOrEqual(175);
   }, 15000);
 });
 

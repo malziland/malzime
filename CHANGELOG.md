@@ -4,6 +4,19 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Tests
+
+- **Vier Tests messen nicht mehr mit der Uhr gegen eine enge Grenze.** Seit
+  die Server-Tests nebeneinander laufen (5.2.2), schwankt die Nebenlast; am
+  14.10.2026 kippte deshalb ein Test auf dem Hauptzweig um eine Millisekunde.
+  Die zwei Tests zu Wartezeiten und Drosselung prüfen jetzt die geplanten
+  Wartezeiten selbst und nur noch eine Untergrenze der Laufzeit, der Test zum
+  Zeitbudget, dass die zu lange Pause gar nicht erst geplant wird, und die
+  zwei Laufzeit-Proben der Altersauslese die eigene Rechenzeit statt der
+  Uhrzeit.
+
 ## [5.2.3] — 2026-10-14
 
 ### Geändert — Fehlererfassung

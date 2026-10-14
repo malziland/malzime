@@ -273,7 +273,16 @@ else
     # ausgeliefert wird. Durch `|| true` wurde der Fehlschlag geschluckt, die
     # Abkuerzung griff NIE, und der einzige Hinweis war eine Fehlerzeile im
     # Protokoll, die wie Rauschen aussieht.
-    if printf '%s\n' "$LAGE" | grep -qE '=(pending|null)$'; then
+    # BEFUND 14.10.2026 (PR #324, test-backend rot): Unter `pipefail` darf vor
+    # `grep -q` keine Pipe stehen. `grep -q` hoert beim ersten Treffer auf zu
+    # lesen; schreibt printf danach noch, stirbt es an SIGPIPE, die Pipe meldet
+    # 141 — und der Treffer zaehlt als keiner. (Dass die bash auf GitHub
+    # zeilenweise schreibt, ist Vermutung, nicht gemessen; mit bash 3.2 auf
+    # macOS liess es sich ohne kuenstliche Pause nicht nachstellen.) So
+    # meldete diese Stelle "test-e2e ist nicht gruen (Ist: test-e2e=success)".
+    # Der Text geht deshalb als Here-String hinein: fertig geschrieben, bevor
+    # grep liest. Waechter: functions/src/__tests__/pipefail-suche.test.js.
+    if grep -qE '=(pending|null)$' <<<"$LAGE"; then
       PRNR=$(git log -1 --format=%s | grep -oE '#[0-9]+' | tail -1 | tr -d '#' || true)
       if [ -n "$PRNR" ] && command -v gh >/dev/null 2>&1; then
         PRKOPF=$(gh pr view "$PRNR" --json headRefOid -q .headRefOid 2>/dev/null || true)
@@ -368,7 +377,7 @@ else
       exit 1
     fi
     for CHECK in $PFLICHT; do
-      if ! printf '%s\n' "$LAGE" | grep -qx "${CHECK}=success"; then
+      if ! grep -qx "${CHECK}=success" <<<"$LAGE"; then
         echo "FEHLER: Pflicht-Check ${CHECK} ist fuer $SHA nicht grün (Ist: $(printf '%s\n' "$LAGE" | grep "^${CHECK}=" || echo "fehlt"))." >&2
         echo "        Notschalter: SKIP_STAND=1" >&2
         exit 1

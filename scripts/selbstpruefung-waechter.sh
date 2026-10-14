@@ -148,7 +148,11 @@ probe_ausgabe() {
   MUSTER="$1"; NICHT="$2"; WAS="$3"; shift 3
   PROBEN=$((PROBEN + 1))
   AUSGABE="$("$@" 2>&1)"
-  if printf '%s' "$AUSGABE" | grep -qE "$MUSTER" && ! printf '%s' "$AUSGABE" | grep -qE "$NICHT"; then
+  # Here-String statt Pipe (14.10.2026): unter `pipefail` kann `printf | grep -q`
+  # trotz Treffer 141 melden — hier haette das `! … grep -qE "$NICHT"` eine
+  # Probe GRUEN gemacht, deren Ausgabe den verbotenen Text enthaelt. Grund und
+  # Waechter: functions/src/__tests__/pipefail-suche.test.js.
+  if grep -qE "$MUSTER" <<<"$AUSGABE" && ! grep -qE "$NICHT" <<<"$AUSGABE"; then
     echo "  ja    $WAS"
     return 0
   fi
@@ -169,7 +173,7 @@ probe_text() {
   PROBEN=$((PROBEN + 1))
   AUSGABE="$("$@" 2>&1)"
   IST=$?
-  if [ "$IST" -eq "$ERWARTET" ] && printf '%s' "$AUSGABE" | grep -qE "$MUSTER"; then
+  if [ "$IST" -eq "$ERWARTET" ] && grep -qE "$MUSTER" <<<"$AUSGABE"; then
     echo "  ja    $WAS (Rueckgabe $IST, Text passt)"
     return 0
   fi

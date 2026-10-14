@@ -152,6 +152,7 @@ functions/src/__tests__/nur-nachtrag-script.test.js
 functions/src/__tests__/nur-was-git-kennt.test.js
 functions/src/__tests__/oeffentliche-zahlen-gegen-satz.test.js
 functions/src/__tests__/ohne-einstellungssatz.test.js
+functions/src/__tests__/pipefail-suche.test.js
 functions/src/__tests__/pipeline-vertrag-script.test.js
 functions/src/__tests__/primaten-regel.test.js
 functions/src/__tests__/privacy.test.js

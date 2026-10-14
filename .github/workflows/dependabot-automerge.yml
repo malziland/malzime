@@ -35,7 +35,12 @@ jobs:
             echo "kette=ja" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if printf '%s\n' "$DATEIEN" | grep -q '^\.github/'; then
+          # Here-String statt `printf | grep -q` (14.10.2026): Unter pipefail
+          # kann die Pipe trotz Treffer 141 melden (grep endet beim ersten
+          # Treffer, printf schreibt noch) — dann stuende hier kette=nein und
+          # ein Workflow-Update liefe durch die Automatik. Waechter:
+          # functions/src/__tests__/pipefail-suche.test.js.
+          if grep -q '^\.github/' <<<"$DATEIEN"; then
             echo "kette=ja" >> "$GITHUB_OUTPUT"
           else
             echo "kette=nein" >> "$GITHUB_OUTPUT"

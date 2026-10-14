@@ -155,12 +155,17 @@ describe("callMistralRaw bei 429 (Vorfall 08.09.2026)", () => {
       versuche += 1;
       return ueberlastet();
     });
-    const start = Date.now();
     /* Budget 100 ms: Erster Versuch, dann 40 ms warten, zweiter Versuch, die
-       naechste Pause (80 ms) passt nicht mehr hinein -> Schluss, ohne Warten. */
+       naechste Pause (80 ms) passt nicht mehr hinein -> Schluss, ohne Warten.
+       Seit 14.10.2026 ohne obere Zeitgrenze (sie kippt, wenn die Testdateien
+       nebeneinander laufen): Geprueft wird, dass die 80-ms-Pause gar nicht
+       erst geplant wird — abgehoert an setTimeout. */
+    const spion = jest.spyOn(global, "setTimeout");
     await expect(_callMistralRaw({ ...AUFRUF, timeoutMs: 100 })).rejects.toMatchObject({ status: 429 });
+    const pausen = spion.mock.calls.map((c) => c[1]).filter((ms) => ms === WARTE_MS || ms === WARTE_MS * 2);
+    spion.mockRestore();
     expect(versuche).toBeLessThanOrEqual(2);
-    expect(Date.now() - start).toBeLessThan(100 + 50);
+    expect(pausen).not.toContain(WARTE_MS * 2);
   }, 10000);
 
   test("ein 5xx-Aussetzer folgt derselben Reihe (kein eigener Sonderweg)", async () => {

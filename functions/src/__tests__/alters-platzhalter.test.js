@@ -39,6 +39,16 @@ const { applyMinorSafety, SCHUTZ_ALTER } = require("../minor-safety");
 const { REQUIRED_CARDS } = require("../mistral-antwort");
 const { _setRateIntervalMs, _resetRateBucket } = require("../throttle");
 
+/* RECHENZEIT STATT UHRZEIT (14.10.2026): Die Laufzeit-Proben unten messen die
+   Rechenzeit dieses Prozesses, nicht die verstrichene Zeit. Laufen die
+   Testdateien nebeneinander, verlaengert die Last der anderen Prozesse die
+   Uhrzeit, aber nicht die eigene Rechenzeit — eine langsame Regel faellt
+   trotzdem auf. */
+function rechenzeitMs() {
+  const { user, system } = process.cpuUsage();
+  return (user + system) / 1000;
+}
+
 describe("Erkennung", () => {
   test.each([
     ["männlich, ~‹Zahl› Jahre alt (Spanne ‹Zahl›-‹Zahl›)"],
@@ -174,10 +184,10 @@ describe("Erkennung", () => {
 
   test("bleibt auch bei sehr langen Texten schnell", () => {
     const lang = "(" + "Spanne x ".repeat(2000) + " Zahl";
-    const start = Date.now();
+    const start = rechenzeitMs();
     istAlterUnlesbar(lang);
     hatAltersPlatzhalter(lang);
-    expect(Date.now() - start).toBeLessThan(200);
+    expect(rechenzeitMs() - start).toBeLessThan(200);
   });
 
   test("fester Satz übernimmt das Geschlecht, wenn es vorn klar dasteht", () => {
@@ -637,9 +647,9 @@ describe("SEC-2026-10-03-02 — Alter hinter einem Abkürzungspunkt oder nur als
     test("bleibt bei sehr langen Texten schnell", () => {
       /* Kein echtes Satzende im ganzen Text: der ungünstigste Fall. */
       const lang = "ca. 1.2 ".repeat(20000);
-      const start = Date.now();
+      const start = rechenzeitMs();
       expect(ersterSatz(lang)).toHaveLength(lang.trim().length);
-      expect(Date.now() - start).toBeLessThan(200);
+      expect(rechenzeitMs() - start).toBeLessThan(200);
     });
   });
 

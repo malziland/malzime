@@ -215,7 +215,11 @@ versionen_im_wasm() {
   grep -aoE '[0-9]+\.[0-9]+\.[0-9]+' "$1" | sort -u
 }
 for v in "$LIBDE265_VERSION" "$LIBHEIF_VERSION"; do
-  if ! versionen_im_wasm "$QUELLE/libheif.wasm" | grep -qxF "$v"; then
+  # Here-String statt Pipe (15.10.2026): Unter pipefail kann `… | grep -q`
+  # trotz Treffer 141 melden (grep endet beim ersten Treffer, sort schreibt
+  # noch) — dann scheiterte der Bau grundlos. Waechter:
+  # functions/src/__tests__/pipefail-suche.test.js.
+  if ! grep -qxF "$v" <<<"$(versionen_im_wasm "$QUELLE/libheif.wasm")"; then
     echo "FEHLER: Version $v ist im Ergebnis nicht nachweisbar." >&2
     echo "  gefunden: $(versionen_im_wasm "$QUELLE/libheif.wasm" | tr '\n' ' ')" >&2
     exit 1

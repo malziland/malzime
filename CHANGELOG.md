@@ -23,9 +23,10 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Riegel am 14.10.2026 auf GitHub „test-e2e nicht grün (Ist: success)“. Die
   Wächter-Selbstprüfung hatte dieselbe Form und hätte eine Probe dadurch
   fälschlich grün melden können. Beide lesen den Text jetzt fertig ein, bevor
-  sie suchen; eine neue Prüfung (`pipefail-suche.test.js`) hält die Form aus
-  allen Skripten und GitHub-Abläufen mit dieser Fehlerregel heraus, mit
-  einer festgehaltenen Ausnahme im Bau-Rezept des HEIC-Dekoders.
+  sie suchen, ebenso das Bau-Rezept des HEIC-Dekoders, das dadurch grundlos
+  hätte scheitern können. Eine neue Prüfung (`pipefail-suche.test.js`) hält
+  die Form aus allen Skripten und GitHub-Abläufen mit dieser Fehlerregel
+  heraus.
 - **Die Dependabot-Automatik hält Updates an Workflow-Dateien verlässlich an.**
   Ihre Prüfung „berührt der PR `.github/`?“ hatte dieselbe Form; schlug der
   Wettlauf zu, hätte sie ein solches Update für harmlos gehalten und selbst

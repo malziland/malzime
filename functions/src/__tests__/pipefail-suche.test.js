@@ -76,16 +76,6 @@ function fundstellen(datei) {
     .map((zeile) => `${datei}: ${zeile.trim()}`);
 }
 
-/* BEWUSSTE AUSNAHME (14.10.2026), wortgleich festgehalten — jede weitere
-   Fundstelle, auch in dieser Datei, macht den Test rot.
-   scripts/libheif-bauen.sh ist das Bau-Rezept des HEIC-Dekoders. Jede Aenderung
-   daran loest den Nachbau samt Kontrollbau aus (Workflow libheif-bau.yml), und
-   deploy.sh verlangt danach einen neuen gruenen Herkunftsnachweis. Die Stelle
-   kann nur faelschlich ROT melden ("Version nicht nachweisbar", der Bau
-   scheitert), nie faelschlich gruen. Umstellen mit dem naechsten Eingriff ins
-   Rezept. */
-const AUSNAHMEN = ['scripts/libheif-bauen.sh: if ! versionen_im_wasm "$QUELLE/libheif.wasm" | grep -qxF "$v"; then'];
-
 function bash(befehl) {
   return spawnSync("bash", ["-c", befehl], { encoding: "utf8" }).status;
 }
@@ -134,11 +124,9 @@ describe("pipefail und vorzeitig endende Suche", () => {
     expect(istGefahr(zeile)).toBe(erwartet);
   });
 
-  test("keine Datei mit pipefail fuehrt Text per Pipe in ein vorzeitig endendes grep (ausser der einen festgehaltenen Ausnahme)", () => {
-    const funde = dateienMitPipefail().flatMap(fundstellen);
-    expect(funde.filter((f) => !AUSNAHMEN.includes(f))).toEqual([]);
-    /* Die Ausnahme muss noch dastehen — ist sie behoben, faellt sie hier auf
-       und wird aus der Liste gestrichen. */
-    expect(AUSNAHMEN.filter((a) => !funde.includes(a))).toEqual([]);
+  test("keine Datei mit pipefail fuehrt Text per Pipe in ein vorzeitig endendes grep", () => {
+    /* Bis 15.10.2026 stand hier eine Ausnahme fuer das Bau-Rezept des
+       HEIC-Dekoders (scripts/libheif-bauen.sh); sie ist umgestellt. */
+    expect(dateienMitPipefail().flatMap(fundstellen)).toEqual([]);
   });
 });

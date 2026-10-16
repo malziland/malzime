@@ -35,3 +35,10 @@ test("Startseite und HEIC-Dekoder kommen mit der Sicherheitsrichtlinie der Produ
     expect(ist["x-content-type-options"], `${adresse}: nosniff`).toBe(soll["x-content-type-options"]);
   }
 });
+
+// ROTE PROBE 16.10.2026 (PR #326): absichtlich rot, damit belegt ist, dass ein
+// roter Teil den Pflicht-Check test-e2e rot macht. Wird im naechsten Commit
+// zurueckgenommen und nie zusammengefuehrt.
+test("ROTE PROBE: absichtlich rot, wird sofort zurueckgenommen", () => {
+  expect(1, "absichtlich rot (Probe des Sammel-Checks)").toBe(2);
+});

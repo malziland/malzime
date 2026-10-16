@@ -35,7 +35,7 @@ QUEUE="analyze-queue"
 # Sollwert: Aufbewahrung des Log-Speichers betrieb-eu in Tagen. EINE Stelle —
 # scripts/log-aufbewahrung-umstellen.sh liest ihn von hier, und
 # verify-infrastructure-script.test.js haelt ihn gegen die Datenschutzerklaerung
-# (deutsch und englisch). Seit 16.10.2026: 30 statt 1 (Auftrag des Inhabers).
+# (deutsch und englisch). Seit 16.10.2026: 30 statt 1.
 LOG_AUFBEWAHRUNG_TAGE=30
 
 FEHLER=0

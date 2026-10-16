@@ -3,7 +3,7 @@
 /**
  * statistik.js — dauerhafte, anonyme Zaehler in der Sammlung `statistik`.
  *
- * WARUM (Auftrag des Inhabers, 16.10.2026): Was im Betrieb hakt, steht bisher
+ * WARUM (Auftrag vom 16.10.2026): Was im Betrieb hakt, steht bisher
  * nur im technischen Protokoll — und das war nach einem Tag weg. Gezaehlt wird
  * jetzt ohne Ablaufdatum, aber nur als SUMME:
  *
@@ -49,7 +49,7 @@ const SAMMLUNG = "statistik";
 
 /* BLEIBT IM CODE — Zaehlformat, keine Betriebseinstellung: Wer die
    Fensterbreite aendert, macht alle bisherigen Fenster unvergleichbar. Vorgabe
-   des Inhabers (16.10.2026): 10 Minuten. */
+   vom 16.10.2026: 10 Minuten. */
 const FENSTER_MS = 10 * 60 * 1000;
 
 /* BLEIBT IM CODE — Zaehlformat (Vorgabe 16.10.2026): die Obergrenzen der

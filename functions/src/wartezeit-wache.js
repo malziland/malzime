@@ -3,7 +3,7 @@
 /**
  * wartezeit-wache.js — Push, wenn eine Analyse zu lange auf ihren Start wartet.
  *
- * WARUM (Auftrag des Inhabers, 16.10.2026): Wartet ein Kind im Workshop
+ * WARUM (Auftrag vom 16.10.2026): Wartet ein Kind im Workshop
  * minutenlang, bevor seine Analyse ueberhaupt beginnt, soll das Handy es
  * sagen — waehrend es passiert, nicht erst in der Auswertung danach.
  *
@@ -32,7 +32,7 @@ const { countQueuedJobs } = require("./jobs");
 const MARKE_DOKUMENT = "stats/wartezeit-wache";
 
 /* BLEIBT IM CODE — Schwelle der Alarmierung, keine Betriebseinstellung (wie
-   die Schwellen der Laufzeit-Wache): Vorgabe des Inhabers vom 16.10.2026,
+   die Schwellen der Laufzeit-Wache): Vorgabe vom 16.10.2026,
    5 Minuten, AUSSCHLIESSLICH (erst darueber wird gemeldet). Sie aendert
    nichts am Ablauf einer Analyse; ein Wert im Einstellungssatz haette vor der
    Auslieferung einen Schreibvorgang in die echte Datenbank verlangt. */

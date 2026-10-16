@@ -11,7 +11,7 @@
 # (Reihenfolge: docs/RUNBOOK.md, „Logs und Aufbewahrung“).
 #
 # SCHREIBT BEI GOOGLE (nur mit --ausfuehren). Das ist eine Aenderung an einer
-# fremden Oberflaeche und braucht die Freigabe des Inhabers.
+# fremden Oberflaeche und braucht eine ausdrueckliche Freigabe.
 #
 # Der Sollwert steht an EINER Stelle: LOG_AUFBEWAHRUNG_TAGE in
 # scripts/verify-infrastructure.sh. Dieses Skript liest ihn von dort.

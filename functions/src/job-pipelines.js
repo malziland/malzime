@@ -40,11 +40,27 @@ const {
   hasCategories,
 } = require("./job-helfer");
 
+/* Die Kennzahlen eines Laufs fuer die dauerhaften Zaehler (statistik.js):
+   Dauer der KI-Aufrufe (Uhrzeit, samt Warten auf einen Platz, Neuversuch,
+   Nachfrage und Werbe-Aufruf), zusaetzliche Versuche und Textmenge. Keine
+   Kennung, kein Inhalt. Sie reisen mit dem Ergebnis in den Auftrag
+   (jobs.completeJob) und gehen mit ihm weg. */
+function kennzahlenAus(messung, kiMs) {
+  return {
+    kiMs: Math.max(0, Math.round(kiMs)),
+    kiWiederholungen: messung.zusatzversuche || 0,
+    tokenEingabe: messung.tokenEingabe || 0,
+    tokenZwischenspeicher: messung.tokenZwischenspeicher || 0,
+    tokenAusgabe: messung.tokenAusgabe || 0,
+  };
+}
+
 /**
  * Führt die Analyse für einen Job aus.
- * @returns {Promise<{result: object, success: boolean}>}  result hat dieselbe
- *          Struktur wie die synchrone /analyze-Antwort; success=false bei einem
- *          blocked-Ergebnis.
+ * @returns {Promise<{result: object, success: boolean, kennzahlen: object}>}
+ *          result hat dieselbe Struktur wie die synchrone /analyze-Antwort;
+ *          success=false bei einem blocked-Ergebnis; kennzahlen siehe
+ *          kennzahlenAus.
  */
 async function runPipeline(job) {
   const mistral = getMistral();
@@ -108,7 +124,10 @@ async function runPipeline(job) {
       if (naechste) schreibe(naechste);
     });
   };
+  const messung = {};
+  let kiMs = 0;
   const opts = {
+    messung,
     onLiveText: (texte) => {
       const jetzt = Date.now();
       const versuch = (texte && texte.versuch) || 1;
@@ -118,6 +137,7 @@ async function runPipeline(job) {
       schreibe(texte);
     },
   };
+  const kiStart = Date.now();
   try {
     profiles = await mistral.runSingleLargeCall(buffer, mimeType, remainingBudget, lang, opts);
   } catch (err) {
@@ -125,6 +145,7 @@ async function runPipeline(job) {
     if (istUeberlast(err)) quotaError = true;
     else pipelineError = true;
   }
+  kiMs += Date.now() - kiStart;
 
   /* Der Analyse-Aufruf liefert subject + visible_text als Felder im JSON. Beide
      werden als FELDER ausgewertet (BUG-2026-10-03-05): Das Motiv entscheidet
@@ -153,6 +174,7 @@ async function runPipeline(job) {
         meta: { mode: "animal" },
       },
       success: true,
+      kennzahlen: kennzahlenAus(messung, kiMs),
     };
   }
 
@@ -169,14 +191,16 @@ async function runPipeline(job) {
       typeof mistral.generateBeastAds === "function" &&
       (await isBeastAdsCallEnabledSafe())
     ) {
+      const werbeStart = Date.now();
       try {
-        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang);
+        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang, messung);
         if (neueAds) profiles.boost.ad_targeting = neueAds;
       } catch (err) {
         /* Nie die Analyse daran scheitern lassen — die Liste aus dem
            Hauptaufruf bleibt als Rueckfall stehen. */
         console.log(JSON.stringify({ step: "beast-ads-skip", error: err.message }));
       }
+      kiMs += Date.now() - werbeStart;
     }
 
     /* Serverseitiges Netz, bevor irgendetwas ausgeliefert wird: Pornografie,
@@ -219,6 +243,7 @@ async function runPipeline(job) {
         },
       },
       success: true,
+      kennzahlen: kennzahlenAus(messung, kiMs),
     };
   }
 
@@ -241,6 +266,7 @@ async function runPipeline(job) {
       meta: { mode: "blocked" },
     },
     success: false,
+    kennzahlen: kennzahlenAus(messung, kiMs),
   };
 }
 

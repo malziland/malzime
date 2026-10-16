@@ -180,8 +180,14 @@ exports.reapJobs = onSchedule(
     schedule: "every 1 minutes",
     memory: "256MiB",
     timeoutSeconds: 120,
+    /* Seit 16.10.2026 fuer die Wartezeit-Wache (wartezeit-wache.js). */
+    secrets: [ntfyUrl, ntfyTopic],
   },
-  () => reapJobs()
+  () =>
+    reapJobs({
+      melder: (text) =>
+        sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text, titel: "malziME: lange Wartezeit" }),
+    })
 );
 
 /* erinnerung — geplanter Lauf (montags 9 Uhr Wien): schickt einen ntfy-Push,

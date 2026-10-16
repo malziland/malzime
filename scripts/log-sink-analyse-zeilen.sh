@@ -9,8 +9,8 @@
 # keine IPs") bekommt zwei Server-Zeilen dazu — die zwei Eintraege je
 # Analyse, die der Datenschutztext nennt (Abschnitt Kinderschutz-Auswertung):
 #   - `step:"mistral-single-large"`: nur die Dauer (seit 26.09.2026; Modell,
-#     Status und Token-Zahlen stehen in `mistral-single-large-details`,
-#     1 Tag), hoechstens eine Zeile je Analyse, auch bei Nachfrage an die KI
+#     Status und Token-Zahlen stehen in `mistral-single-large-details` im
+#     Betriebs-Speicher), hoechstens eine Zeile je Analyse, auch bei Nachfrage an die KI
 #     (27.09.2026).
 #   - `step:"minor-safety"` (seit 09.09.2026): geschaetztes Alter,
 #     Filterentscheidung, Anzahl und Grund der Sperrwort-Treffer — seit

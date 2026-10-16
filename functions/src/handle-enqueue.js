@@ -33,6 +33,7 @@ const { meldeGescheiterteAnalyse } = require("./jobs");
 const { neuerBildPfad, storeImage } = require("./queue-storage");
 const { belegtesFreigeben } = require("./ruecknahme");
 const { enqueueJob } = require("./cloud-tasks");
+const { zaehleAbweisung } = require("./statistik");
 
 /**
  * Magic-Byte-Erkennung — prüft den echten Datei-Inhalt gegen den vom Client
@@ -75,11 +76,21 @@ async function einlassZuruecknehmen({ jobId, grund, stempel, imagePath }) {
   if (grund) {
     const gemeldet = jobId ? await failJob(jobId, grund).catch(() => false) : false;
     if (!gemeldet) meldeGescheiterteAnalyse(grund);
+    if (!jobId) await zaehleAbweisung("anlegenGescheitert"); /* mit Auftrag: zaehlt der Aufraeumdienst */
   } else {
-    await abandonJob(jobId);
+    await abandonJob(jobId, "einlass"); /* zaehlt als Abweisung, nicht als verworfen */
   }
   await belegtesFreigeben({ zaehlerStempel: stempel, imagePath });
 }
+
+/* JEDE ABWEISUNG ZAEHLT (16.10.2026, statistik.js), mit festem Grund und VOR
+   der Antwort (was danach laeuft, kommt vielleicht nie an); begrenzt
+   abgewartet, wirft nie, meist nur gesammelt. Die Antwort bleibt dieselbe. */
+async function abweisen(res, grund, status, rumpf) {
+  await zaehleAbweisung(grund);
+  res.status(status).json(rumpf);
+}
+const grundNachStatus = (status) => (status >= 500 ? "unerwartet" : "ungueltig"); /* 4xx: Eingabe */
 
 async function handleEnqueue(req, res, secrets) {
   /* Die Einlassgrenze wird in der Vorpruefung ermittelt und von der zweiten
@@ -97,7 +108,7 @@ async function handleEnqueue(req, res, secrets) {
     /* Kill-Switch: Maintenance-Modus (30s Cache, fail-open) */
     const maintenance = await getMaintenanceStatus();
     if (maintenance.enabled) {
-      res.status(503).json({ maintenance: true, message: maintenance.message });
+      await abweisen(res, "wartung", 503, { maintenance: true, message: maintenance.message });
       return;
     }
 
@@ -115,7 +126,7 @@ async function handleEnqueue(req, res, secrets) {
        Der Riegel steht jetzt VOR jeder Pruefung, die Satzwerte braucht. */
     if (!grenzwerte) {
       console.log(JSON.stringify({ requestId, warning: "kein-einstellungssatz", stelle: "vor-ratenbegrenzung" }));
-      res.status(503).json({
+      await abweisen(res, "satzFehlt", 503, {
         blocked: "configMissing",
         retryAfterSeconds: 300,
       });
@@ -123,7 +134,7 @@ async function handleEnqueue(req, res, secrets) {
     }
 
     if (!checkRateLimit(ip, grenzwerte?.adressLimit, grenzwerte?.adressfensterMs)) {
-      res.status(429).json({ error: "Rate limit exceeded" });
+      await abweisen(res, "adresslimit", 429, { error: "Rate limit exceeded" });
       return;
     }
 
@@ -146,7 +157,7 @@ async function handleEnqueue(req, res, secrets) {
     const MAX_BODY_BYTES = Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 64 * 1024;
     if (gemeldeteLaenge > MAX_BODY_BYTES) {
       console.log(JSON.stringify({ requestId, warning: "body-too-large", bytes: gemeldeteLaenge }));
-      res.status(413).json({ error: "File too large" });
+      await abweisen(res, "zuGross", 413, { error: "File too large" });
       return;
     }
 
@@ -165,11 +176,11 @@ async function handleEnqueue(req, res, secrets) {
     if (jsonBody && jsonBody.imageBase64) {
       const b64 = String(jsonBody.imageBase64);
       if (/[^A-Za-z0-9+/=\s]/.test(b64.slice(0, 256))) {
-        res.status(400).json({ error: "Invalid image data" });
+        await abweisen(res, "ungueltig", 400, { error: "Invalid image data" });
         return;
       }
       if (Math.ceil((b64.length * 3) / 4) > MAX_UPLOAD_BYTES) {
-        res.status(413).json({ error: "File too large" });
+        await abweisen(res, "zuGross", 413, { error: "File too large" });
         return;
       }
       const buffer = Buffer.from(b64, "base64");
@@ -195,17 +206,17 @@ async function handleEnqueue(req, res, secrets) {
     /* Honeypot */
     const honeypot = (jsonBody && jsonBody.website) || (fields && fields.website) || "";
     if (honeypot) {
-      res.status(403).json({ error: "Forbidden" });
+      await abweisen(res, "honeypot", 403, { error: "Forbidden" });
       return;
     }
 
     /* ── Validierung ── */
     if (!file || !file.buffer) {
-      res.status(400).json({ error: "Missing image" });
+      await abweisen(res, "ungueltig", 400, { error: "Missing image" });
       return;
     }
     if (!file.mimeType || !ALLOWED_MIME.includes(file.mimeType)) {
-      res.status(400).json({ error: "Invalid file type. Allowed: JPEG, PNG, WEBP, GIF" });
+      await abweisen(res, "ungueltig", 400, { error: "Invalid file type. Allowed: JPEG, PNG, WEBP, GIF" });
       return;
     }
     /* SEC-2026-08-12-19: Der erkannte Typ wurde bisher nur auf "ueberhaupt ein
@@ -217,7 +228,7 @@ async function handleEnqueue(req, res, secrets) {
        echtes JPEG (public/js/exif.js, toDataURL("image/jpeg")). */
     const erkannterTyp = detectImageType(file.buffer);
     if (!erkannterTyp) {
-      res.status(400).json({ error: "Invalid image data" });
+      await abweisen(res, "ungueltig", 400, { error: "Invalid image data" });
       return;
     }
     if (erkannterTyp !== file.mimeType) {
@@ -229,11 +240,11 @@ async function handleEnqueue(req, res, secrets) {
           erkannt: erkannterTyp,
         })
       );
-      res.status(400).json({ error: "Invalid file type. Allowed: JPEG, PNG, WEBP, GIF" });
+      await abweisen(res, "ungueltig", 400, { error: "Invalid file type. Allowed: JPEG, PNG, WEBP, GIF" });
       return;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      res.status(413).json({ error: "File too large" });
+      await abweisen(res, "zuGross", 413, { error: "File too large" });
       return;
     }
 
@@ -273,7 +284,7 @@ async function handleEnqueue(req, res, secrets) {
          Er braucht die Zaehlung nicht und steht deshalb jetzt davor. */
       if (einlassgrenze === 0) {
         console.log(JSON.stringify({ requestId, warning: "kein-einstellungssatz" }));
-        res.status(503).json({
+        await abweisen(res, "satzFehlt", 503, {
           blocked: "configMissing",
           retryAfterSeconds: 300,
           message: "Bei uns stimmt gerade eine Einstellung nicht — bitte in ein paar Minuten nochmal.",
@@ -286,7 +297,7 @@ async function handleEnqueue(req, res, secrets) {
         console.log(
           JSON.stringify({ requestId, warning: "queue-too-deep", wartende: schonWartend, grenze: einlassgrenze })
         );
-        res.status(429).json({
+        await abweisen(res, "schlangeVoll", 429, {
           blocked: "queueFull",
           retryAfterSeconds: 300,
           message: "Gerade warten sehr viele Analysen — bitte in ein paar Minuten nochmal.",
@@ -318,7 +329,7 @@ async function handleEnqueue(req, res, secrets) {
     }
     if (!counter.allowed) {
       /* Der Auftrag kommt nicht zustande; angelegt wurde noch nichts. */
-      res.status(429).json({
+      await abweisen(res, "stundenlimit", 429, {
         blocked: "limit",
         retryAfterSeconds: counter.retryAfterSeconds,
         message: "Stundenlimit erreicht",
@@ -390,7 +401,7 @@ async function handleEnqueue(req, res, secrets) {
       if (!(await platzBestaetigen(angelegt, einlassgrenze))) {
         await einlassZuruecknehmen({ jobId, grund: null, stempel: counter.stempel, imagePath });
         console.log(JSON.stringify({ requestId, traceId, warning: "queue-too-deep-nachtraeglich" }));
-        res.status(429).json({
+        await abweisen(res, "schlangeVoll", 429, {
           blocked: "queueFull",
           retryAfterSeconds: 300,
           message: "Gerade warten sehr viele Analysen — bitte in ein paar Minuten nochmal.",
@@ -447,7 +458,7 @@ async function handleEnqueue(req, res, secrets) {
        und darum nie pollt. */
     console.log(JSON.stringify({ requestId, traceId, status: "error", code, error: err.message }));
     if (status >= 500) meldeGescheiterteAnalyse("enqueue_unerwartet"); /* 4xx = Eingabefehler, keine Nachricht */
-    res.status(status).json({ error: "Enqueue failed", code });
+    await abweisen(res, grundNachStatus(status), status, { error: "Enqueue failed", code });
   }
 }
 

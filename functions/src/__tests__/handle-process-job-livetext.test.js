@@ -122,7 +122,9 @@ describe("runPipeline — Live-Text ist fest eingebaut (seit 10.09.2026)", () =>
     expect(mistral.runSingleLargeCall).toHaveBeenCalledTimes(1);
     /* Kein Flag mehr, kein usePromptCache mehr — der Cache ist in mistral.js
        fest. Haette sich die Form der opts geaendert, faellt dieser Test um. */
-    expect(Object.keys(letzteOpts())).toEqual(["onLiveText"]);
+    /* Seit 16.10.2026 dazu `messung`: das Objekt, in das der KI-Aufruf
+       Textmenge und Wiederholungen fuer die dauerhaften Zaehler schreibt. */
+    expect(Object.keys(letzteOpts()).sort()).toEqual(["messung", "onLiveText"]);
     expect(typeof letzteOpts().onLiveText).toBe("function");
   });
 });

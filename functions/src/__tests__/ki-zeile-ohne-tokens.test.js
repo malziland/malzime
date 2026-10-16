@@ -3,7 +3,7 @@
 
    Der Datenschutztext nennt fuer den 30-Tage-Eintrag der KI nur, wie lange
    sie gebraucht hat. Modell, Status und Textmenge (Token) stehen in der
-   Tageszeile `mistral-single-large-details`; das technische Protokoll (1 Tag)
+   Zeile `mistral-single-large-details`; das technische Protokoll
    nennt "wie viel Text die KI verarbeitet hat". Die Eingabe-Token verraten
    zudem das Format des Fotos.
 

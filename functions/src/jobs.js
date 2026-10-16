@@ -237,7 +237,7 @@ async function claimJob(jobId) {
  * anderer ist als der, den das Kind sieht (`result.blockedReason`).
  * @returns {Promise<boolean>} true, wenn dieser Aufruf den Übergang gemacht hat
  */
-async function completeJob(jobId, result, { marke = null, meldeGrund = null } = {}) {
+async function completeJob(jobId, result, { marke = null, meldeGrund = null, kennzahlen = null } = {}) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
   /* Zeigt dieses Ergebnis dem Kind eine Fehlermeldung (blockiert oder leeres
@@ -256,6 +256,11 @@ async function completeJob(jobId, result, { marke = null, meldeGrund = null } = 
       errorReason: meldeGrund,
       abschlussMarke: marke,
       gemeldet: grund ? false : null,
+      /* Die wenigen Kennzahlen der KI (Dauer, Wiederholungen, Textmenge) fuer
+         die dauerhaften Zaehler (statistik.js). Sie reisen im selben
+         Schreibvorgang mit, also ohne Last im Analyseweg, und gehen mit dem
+         Auftrag weg; gezaehlt werden sie vom Aufraeumdienst vor dem Loeschen. */
+      ...(kennzahlen && typeof kennzahlen === "object" ? { kennzahlen } : {}),
     });
     return true;
   });
@@ -279,11 +284,11 @@ const SPEICHER_VERSUCHE = 3;
  * Ein Firestore-Fehlertext kann den Dokumentpfad samt jobId enthalten.
  * @returns {Promise<boolean>} wie completeJob
  */
-async function ergebnisSpeichern(jobId, result) {
+async function ergebnisSpeichern(jobId, result, kennzahlen = null) {
   const marke = crypto.randomUUID();
   for (let versuch = 1; ; versuch += 1) {
     try {
-      return await completeJob(jobId, result, { marke });
+      return await completeJob(jobId, result, { marke, kennzahlen });
     } catch (err) {
       console.warn(
         JSON.stringify({
@@ -590,8 +595,13 @@ async function setLiveText(jobId, texte) {
  * Markiert einen Job als `abandoned` — der Client hat die Seite verlassen,
  * bevor der Job verarbeitet wurde. Kein Fehler, sondern ein bewusst
  * eingesparter Lauf (kein Mistral-Call).
+ *
+ * `art` "einlass": Die Annahmestelle nimmt einen gerade angelegten Auftrag
+ * zurueck, weil die Warteschlange voll war. Sie zaehlt ihn selbst als
+ * Abweisung; die Marke sagt den dauerhaften Zaehlern (statistik.js), dass er
+ * nicht noch einmal als "in der Schlange verworfen" zaehlt.
  */
-async function abandonJob(jobId) {
+async function abandonJob(jobId, art = null) {
   const db = datenbank();
   const ref = db.collection(JOBS_COLLECTION).doc(jobId);
   return db.runTransaction(async (tx) => {
@@ -599,7 +609,7 @@ async function abandonJob(jobId) {
     /* BUG-001: nur einen noch `queued` Job verlassen — ein inzwischen in
        Verarbeitung gegangener (oder fertiger) Job wird NICHT abgewürgt. */
     if (!snap.exists || snap.data().status !== "queued") return false;
-    tx.update(ref, { status: "abandoned", finishedAt: Date.now() });
+    tx.update(ref, { status: "abandoned", finishedAt: Date.now(), ...(art === "einlass" ? { abbruchArt: art } : {}) });
     return true;
   });
 }

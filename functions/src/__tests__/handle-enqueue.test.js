@@ -56,6 +56,8 @@ jest.mock("../cloud-tasks", () => ({
 jest.mock("../notify", () => ({
   notifyLimitReached: jest.fn(() => Promise.resolve()),
 }));
+/* Die Zaehlung der Abweisungen prueft abweisungen-zaehlen.test.js; hier stumm. */
+jest.mock("../statistik", () => ({ zaehleAbweisung: jest.fn(async () => {}) }));
 
 const { handleEnqueue, detectImageType } = require("../handle-enqueue");
 const counter = require("../counter");
@@ -749,7 +751,9 @@ describe("Einlassgrenze, zweite Stufe (BUG-2026-08-30-14)", () => {
     expect(res.statusCode).toBe(429);
     expect(res.body.blocked).toBe("queueFull");
     /* Und es bleibt nichts liegen: */
-    expect(jobs.abandonJob).toHaveBeenCalledWith("job-abc");
+    /* Mit der Marke "einlass": Er zaehlt als Abweisung, nicht als in der
+       Schlange verworfen (statistik.js). */
+    expect(jobs.abandonJob).toHaveBeenCalledWith("job-abc", "einlass");
     expect(storage.deleteImage).toHaveBeenCalledWith("pfad.jpg");
     expect(counter.releaseHourlySlot).toHaveBeenCalled();
     /* Vor allem: Der Auftrag wird NICHT in die Verarbeitung geschickt. */

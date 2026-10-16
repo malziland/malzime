@@ -194,6 +194,8 @@ Stelle:
 | Erlaubte Dateiformate | Sicherheitsliste |
 | Gekürzte Feldlängen der Fehlerprotokolle | Datenschutz in Zahlenform |
 | Langsamste gemessene KI-Geschwindigkeit | Messergebnis, kein Sollwert |
+| Schwellen der Wachen (z. B. Wartezeit-Alarm ab mehr als 5 Minuten, höchstens eine Nachricht je 30 Minuten) | sagen, wann jemand Bescheid bekommt, ändern keinen Ablauf |
+| Format der dauerhaften Zähler (10-Minuten-Fenster, Dauer-Klassen) | eine Änderung machte alle bisherigen Zähler unvergleichbar |
 
 Zwei Mechanismen halten die Trennung aufrecht:
 

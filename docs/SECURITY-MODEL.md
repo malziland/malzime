@@ -152,9 +152,10 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    Umhängen der Weiche ohne Zusatzangaben nichts mehr fände. Diese Abwägung
    wurde am 09.09.2026 verworfen: Die Zusage „alles auf EU-Servern" gilt ohne
    Ausnahme für alles, was wir steuern können. Seither zeigt die Weiche
-   `_Default` auf den eigenen Speicher `betrieb-eu` (europe-west1, 1 Tag); alle
-   Rezepte im RUNBOOK nennen den Speicher ausdrücklich, und der Deploy-Riegel
-   prüft Ziel, Aufbewahrung und Ausschluss. *Was bleibt und nicht änderbar
+   `_Default` auf den eigenen Speicher `betrieb-eu` (europe-west1; Aufbewahrung:
+   RUNBOOK, „Logs und Aufbewahrung“, Abwägung unten im Abschnitt „Technisches
+   Protokoll: 30 Tage statt 1 Tag“); alle Rezepte im RUNBOOK nennen den Speicher
+   ausdrücklich, und der Deploy-Riegel prüft Ziel, Aufbewahrung und Ausschluss. *Was bleibt und nicht änderbar
    ist:* Googles Pflichtprotokoll `_Required` (global, 400 Tage) mit unseren
    eigenen Verwaltungszugriffen, und die Alarm-Kanäle mit unserer Adresse.
    Keine Nutzerdaten. *Regel daraus:* Jede Abwägung, die eine Zusage nach
@@ -596,7 +597,8 @@ ist nur eingeschränkt belegbar: Der 30-Tage-Speicher enthält Fehlerzeilen der 
 nur aus der Zeit vor der Umstellung des Diagnose-Speichers (Abschnitt
 „Diagnose-Speicher: nur, was der Datenschutztext nennt“) — darin kein Abriss,
 gefunden wurden nur Überlastungen (429) und ein 503 am 07./08.09.2026; seither
-bleiben Fehlerzeilen nur einen Tag.
+stehen Fehlerzeilen nur im technischen Protokoll, das bis zur Auslieferung der
+30-Tage-Aufbewahrung (Oktober 2026) nur einen Tag hielt.
 
 **Datenschutz.** Ins technische Protokoll kommt der Grund nur als
 `ursache: { code, text }`: der Fehlercode als feste Kennung (z. B.
@@ -1491,8 +1493,9 @@ Altersschätzung über die Uhrzeit einem Gerät zuordnen.
 sich nicht mehr auswerten. Welches Wort der Sperrliste in welchem Feld stand,
 zeigt das Protokoll nicht mehr; ob die Sperrliste zu grob ist, lässt sich nur
 noch mit eigenen Fotos nachstellen, nicht aus 30 Tagen Betrieb ablesen. Status, Modell, Token-Zahlen und Scheitern der
-KI-Aufrufe gibt es nur noch einen Tag; das Herausrechnen der Beispielfotos
-über die Token-Zahlen geht nur innerhalb dieses Tages. Die Kinderschutz-Zeile
+KI-Aufrufe stehen nur im technischen Protokoll (Aufbewahrung: RUNBOOK, „Logs und
+Aufbewahrung“; bis zur Auslieferung vom Oktober 2026 ein Tag); das Herausrechnen
+der Beispielfotos über die Token-Zahlen geht nur innerhalb dieser Frist. Die Kinderschutz-Zeile
 nennt keine Sprache mehr; ein Ausfall nur einer Sprache ist darin nicht mehr
 getrennt zu sehen.
 
@@ -1521,6 +1524,103 @@ ein eigenes Stichwort im deutschen und englischen Text; der Sammelsatz „grobe
 Angaben wie" gilt für sie nicht). *Getragene Folge:* Ein Fehler, der nur auf
 Geräten mit wenig Arbeitsspeicher auftritt, ist am Protokoll nicht mehr als
 solcher zu erkennen.
+
+## Technisches Protokoll: 30 Tage statt 1 Tag (16.10.2026)
+
+**Entscheidung (16.10.2026).** Der Speicher `betrieb-eu` (das „technische
+Protokoll“ der Datenschutzerklärung) hält 30 Tage statt einem. Text und
+Einstellung gehen am selben Tag live; die Reihenfolge (erst die Einstellung, dann
+der Text) steht im RUNBOOK, „Aufbewahrung des Betriebs-Speichers umstellen“.
+
+**Warum.** Fehler, die nur in manchen Workshops auftreten (etwa die Lesefehler auf
+Samsung-Geräten), ließen sich nach einem Tag nicht mehr über das Server-Protokoll
+verfolgen; die Auswertung hing an der Uhrzeit der nächsten Sitzung.
+
+**Was damit 30 Tage liegt.** Alles, was der Text für das technische Protokoll
+nennt: Schritt, Erfolg, Dauer, Textmenge der KI (die Eingabe-Token verraten das
+Format des Fotos) und die Zufallsnummer. Weiter nicht darin: Foto, Profil,
+IP-Adresse (die Request-Logs sind ausgeschlossen, `exclude_run_requests_ip`,
+vom Deploy-Riegel bewacht). Der Erfolgsweg einer Analyse trägt weiterhin keine
+Kennung (Abschnitt „Erfolgsweg eines Auftrags ohne Kennung im Log“); die längere
+Frist ändert daran nichts. Im selben Speicher liegen auch die Zeilen des
+selbst betriebenen Benachrichtigungsdienstes (ntfy) — er stellt nur Nachrichten an
+die eigenen Geräte von malziland zu.
+
+**Kosten.** Bis 30 Tage berechnet Google für einen eigenen Log-Speicher keine
+Aufbewahrung (laut Google-Dokumentation zu Log-Speichern, gelesen am 16.10.2026;
+gemessen wird es an der ersten Rechnung danach).
+
+**Betrachtete Alternativen.** Nur einzelne Zeilenarten in den 30-Tage-Speicher
+`client-diagnostics` umleiten: verworfen — dessen Inhalt ist im Datenschutztext
+eng beschrieben (Abschnitt „Diagnose-Speicher“), und die Fehlersuche braucht
+gerade die Zeilen, die man vorher nicht kennt.
+
+**Rückweg.** RUNBOOK, „Aufbewahrung des Betriebs-Speichers umstellen“.
+
+**Neubewertung**, wenn das technische Protokoll eine Angabe aufnehmen soll, die
+der Datenschutztext nicht nennt, oder wenn Google für 30 Tage Kosten berechnet.
+
+## Dauerhafte Zähler und Wartezeit-Wache (16.10.2026)
+
+**Warum.** Was im Betrieb hakt — Wartezeiten, Abweisungen, gescheiterte
+Analysen, Fehler auf bestimmten Geräten —, stand nur im technischen Protokoll
+und verschwand mit ihm. Gezählt wird jetzt ohne Ablaufdatum, aber nur als Summe
+(`functions/src/statistik.js`, Sammlung `statistik`; Felder und Klassen dort und
+im RUNBOOK, „Zähler auswerten“).
+
+**Entscheidung.**
+
+1. **Nur Summen.** Je 10-Minuten-Fenster und je Tag, keine Zeile je Analyse,
+   keine Kennung, kein Alter, keine Werte des Kinderschutzes (bei der
+   Entscheidung ausdrücklich gestrichen). Dauern nur in Klassen. Die Textmenge der KI nur je
+   Tag, nicht je Fenster: Je Fenster verriete sie bei einer einzelnen Analyse
+   das Format des Fotos. Geprüft in `statistik.test.js` („trägt keine Kennung,
+   kein Alter, nichts vom Kinderschutz“).
+2. **Fenster in UTC, Tage nach Wiener Datum.** Ein Fenster in Wiener Ortszeit
+   gäbe es in der Nacht der Zeitumstellung doppelt; Wien weicht um ganze
+   Stunden ab, jedes Fenster liegt deshalb in genau einem Wiener Tag.
+3. **Keine Last im Analyseweg.** Der Arbeiter schreibt die Kennzahlen der KI im
+   selben Schreibvorgang wie das Ergebnis in den Auftrag. Gezählt wird im
+   Aufräumdienst, unmittelbar vor dem Löschen.
+4. **Löschen geht vor Zählen.** Scheitert das Zählen oder dauert es länger als
+   zehn Sekunden je Fenster, wird trotzdem gelöscht; die Löschfristen sind
+   Zusagen, die Zähler Statistik. Warnzeile je Lauf, Fehlerzeile (Alarm) nach
+   fünf Läufen in Folge.
+5. **Nie doppelt.** Eine Transaktion je Fenster liest die Aufträge frisch, zählt
+   nur die noch nicht markierten und markiert genau diese (`gezaehlt: true`) im
+   selben Schritt. Scheitert danach das Löschen, zählt der nächste Lauf den
+   Auftrag nicht noch einmal (`zaehlen-vor-dem-loeschen.test.js`).
+6. **Sammler statt Schreibvorgang je Anfrage.** Abweisungen und Browser-Fehler
+   kommen von öffentlichen Schnittstellen. Ein Schreibvorgang je Anfrage hätte
+   jede Flut abgewiesener Anfragen in bezahlte Datenbankzugriffe verwandelt.
+   Jede Instanz schreibt deshalb höchstens alle zwei Sekunden, dazwischen sammelt
+   sie im Speicher; die Antwort wartet höchstens eine Sekunde. Phasen der
+   Browser-Fehler werden nur aus einer festen Liste zu Feldnamen
+   (`statistik-phasen.test.js`), alles andere zählt als „andere“.
+7. **Wartezeit-Wache im Aufräumdienst, Schwellen im Code.** Begründung in
+   `docs/ERROR-ALERTING.md`, „Push „lange Wartezeit““. Die Schwellen (5 Minuten,
+   30 Minuten Ruhe) sind keine Betriebswerte: Sie ändern keinen Ablauf, und ein
+   neues Pflichtfeld im Einstellungssatz hätte vor der Auslieferung einen
+   Schreibvorgang in die echte Datenbank verlangt.
+
+**Getragene Folge.** Die Zähler können zu niedrig sein, nie zu hoch: wenn das
+Zählen scheitert, wenn Firestore einen Auftrag über das 24-Stunden-Netz statt
+über den Aufräumdienst löscht, wenn ein Sammel-Schreibvorgang scheitert oder
+eine Instanz mit Gesammeltem endet (dann fehlt der Rest eines Andrangs). Aufträge
+zählen erst beim Löschen, also bis zu zwei Stunden später, im Fenster ihres
+Einreihens. Ein Fenster mit einer einzigen Analyse verrät deren Klassen — ohne
+Nummer, die zu ihr führt.
+
+**Betrachtete Alternativen.** Eine Zeile je Analyse (bei der Entscheidung gestrichen).
+Zählen im Arbeiter (Last und ein weiterer Fehlerweg im Analyseweg). Ein
+Schreibvorgang je Abweisung (Kostenverstärker, siehe 6). Ein Wert für die
+Wartezeit-Grenze im Einstellungssatz (siehe 7).
+
+**Rückweg.** Nur mit Deploy. Die Sammlung `statistik` kann liegen bleiben; sie
+enthält keine Personendaten. Die Marke `stats/wartezeit-wache` ebenso.
+
+**Neubewertung**, wenn ein neuer Zähler eine Angabe bräuchte, die eine einzelne
+Analyse kenntlich macht, oder wenn die Zähler regelmäßig Lücken zeigen.
 
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 

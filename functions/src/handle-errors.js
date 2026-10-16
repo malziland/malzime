@@ -15,6 +15,7 @@
 /* Rumpfpruefung, Wertgrenze und Messwert-Pruefung teilt diese Annahmestelle
    mit handle-telemetry.js; hier stehen nur ihre eigenen Feldlisten. */
 const { rumpfAnnehmen, einfacheFelder, messwerte } = require("./meldungs-annahme");
+const { zaehleBrowserFehler } = require("./statistik");
 
 const STRING_FIELDS = {
   errorName: 100,
@@ -109,6 +110,15 @@ async function handleErrors(req, res) {
 
     /* console.error → severity ERROR in Cloud Logging → alarmierbar. */
     console.error(JSON.stringify(sanitized));
+
+    /* Dauerhafter Tageszaehler (16.10.2026, statistik.js): nur Phase und
+       Geraetefamilie, abgeleitet aus den schon groben Angaben oben — keine
+       Nummer, kein Text. Bestmoeglich: wirft nie, wartet hoechstens kurz. */
+    await zaehleBrowserFehler({
+      phase: sanitized.phase,
+      userAgent: sanitized.userAgent,
+      bildschirm: client ? client.screen : undefined,
+    });
 
     res.status(204).end();
   } catch (err) {

@@ -31,6 +31,12 @@ jest.mock("../jobs", () => ({
   platzAbgleichen: jest.fn(async () => ({ vorher: 0, jetzt: 0 })),
 }));
 jest.mock("../queue-storage", () => ({ deleteImage: jest.fn() }));
+/* Seit 16.10.2026 zaehlt der Aufraeumdienst vor dem Loeschen (statistik.js)
+   und fragt die Wartezeit-Wache (wartezeit-wache.js). Beide haben eigene
+   Pruefungen (statistik.test.js, wartezeit-wache.test.js,
+   zaehlen-vor-dem-loeschen.test.js); hier bleiben sie stumm. */
+jest.mock("../statistik", () => ({ zaehleVorDemLoeschen: jest.fn(async () => ({ gezaehlt: 0, gescheitert: 0 })) }));
+jest.mock("../wartezeit-wache", () => ({ pruefeWartezeit: jest.fn(async () => ({ status: "im-rahmen" })) }));
 jest.mock("../counter", () => ({ releaseHourlySlot: jest.fn() }));
 jest.mock("../db", () => ({
   datenbank: () => ({

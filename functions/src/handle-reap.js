@@ -24,6 +24,8 @@
  *     wird endgültig gelöscht (Datensparsamkeit: das fertige Profil im Feld
  *     `result` soll nicht unbegrenzt liegen bleiben).
  *
+ * Vor dem Loeschen in (2c)/(3) zaehlt er (statistik.js), am Ende schaut die
+ * Wartezeit-Wache auf die Schlange (wartezeit-wache.js) — beide seit 16.10.2026.
  * Bei (1) und (2) wird das zwischengespeicherte Bild mitgelöscht (die GCS-
  * Lifecycle-Regel bleibt nur das Sicherheitsnetz).
  *
@@ -44,6 +46,8 @@ const { pruefeErinnerungsLebenszeichen } = require("./erinnerungs-waechter");
 const { letzterLeseversuchGescheitert } = require("./betriebsprofil");
 const { deleteImage } = require("./queue-storage");
 const { belegtesFreigeben } = require("./ruecknahme");
+const { zaehleVorDemLoeschen } = require("./statistik");
+const { pruefeWartezeit } = require("./wartezeit-wache");
 
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
    dass ein extremer Rückstau einen Lauf überlange macht. Der nächste Lauf
@@ -109,7 +113,8 @@ async function sicherFinden(name, fn, lauf) {
   }
 }
 
-async function reapJobs() {
+/* melder: Versandweg der Wartezeit-Wache (index.js: ntfy); ohne ihn nur Protokoll. */
+async function reapJobs({ melder = null } = {}) {
   const lauf = { ohneBetriebswerte: false };
   /* (1) Verlassene wartende Jobs → abandoned. */
   const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs(), lauf);
@@ -193,6 +198,9 @@ async function reapJobs() {
      Fenster löschen — Bild zuerst (BUG-002-Regel), defensiv: normal ist es
      nach der Analyse längst weg. */
   const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs(), lauf);
+  /* ZAEHLEN VOR DEM LOESCHEN (16.10.2026): wirft nie, wartet begrenzt; scheitert
+     es, wird trotzdem geloescht, doppelt zaehlt nichts (statistik.js). */
+  await zaehleVorDemLoeschen(zugestellt);
   let reapedZugestellt = 0;
   for (const job of zugestellt) {
     try {
@@ -221,6 +229,7 @@ async function reapJobs() {
 
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
   const expired = await sicherFinden("expired", () => findExpiredJobs(), lauf);
+  await zaehleVorDemLoeschen(expired); /* wie in (2c) */
 
   let reapedExpired = 0;
   for (const job of expired) {
@@ -275,6 +284,10 @@ async function reapJobs() {
      Erinnerung selbst, die bewusst leise bleibt.
      Schwelle 9 Tage: ein ausgefallener Montag allein loest noch nichts aus. */
   await pruefeErinnerungsLebenszeichen(LAEUFE_BIS_ALARM);
+
+  /* Wartezeit-Wache: hier, weil dieser Lauf jede Minute kommt, auch wenn die
+     Schlange steht (wartezeit-wache.js). Wirft nie. */
+  await pruefeWartezeit({ melder });
 
   /* BUG-2026-10-03-32: Ist der Einstellungssatz gerade nicht lesbar, liefert
      betriebsprofil.js den zuletzt gueltig gelesenen weiter — die Abfragen oben

@@ -145,7 +145,8 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    16.09.2026). Ändert ein Pull Request nur die Cache-Kennung in den Seiten,
    `public/build-info.json`, das CHANGELOG und `docs/VERIFICATION.md`,
    erkennt das `scripts/nur-nachtrag.sh` im Pflicht-Job `playwright-version`
-   (Protokollzeile `nur_nachtrag=ja`). Der Job `test-e2e` steht dann auf
+   (Protokollzeile `nur_nachtrag=ja`). Die Browser-Teile `test-e2e-teil`
+   entfallen dann, und der Pflicht-Check `test-e2e` steht auf
    „skipped“: Der Branch-Schutz lässt den PR durch, `deploy.sh` und die
    Baum-Regel werten „skipped“ aber nie als bestandenen Browser-Test. Die
    Regel ist eng: nur geänderte gewöhnliche Dateien (keine Symlinks,
@@ -346,6 +347,18 @@ Rückweg, falls er je klemmt (nimmt nur `pruefungen` heraus):
       --input - <<'JSON'
     {"strict":true,"contexts":["test-backend","test-frontend","test-e2e","secret-scan","playwright-version"]}
     JSON
+
+**Browser-Tests verteilt (seit 16.10.2026).** Die Browser-Tests laufen in den
+Teil-Jobs `test-e2e-teil (1)`, `test-e2e-teil (2)` usw.; der Pflicht-Check
+`test-e2e` sammelt sie ein und ist erst da, wenn alle Teile fertig sind. Die
+Teile gehören NICHT in die Liste oben — sie sind keine Pflicht-Checks, und mit
+einer anderen Zahl von Teilen hießen sie anders. Ein roter Teil: dessen
+Protokoll und das Artefakt `playwright-fehler-teil-<Nummer>` ansehen. Lokal
+nachstellen mit `npm run test:e2e -- --shard=<Nummer>/<Zahl der Teile>` (dann
+läuft dieselbe Auswahl wie auf GitHub). Rückweg: den Commit, der die Teilung
+eingeführt hat, mit `git revert` zurücknehmen und wie jede Änderung per PR
+zusammenführen; der Zweigschutz bleibt unverändert, weil der Name `test-e2e`
+gleich bleibt.
 
 ## Automatische Löschregel der Datenbank (seit 2026-08-12)
 

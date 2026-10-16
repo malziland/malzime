@@ -32,6 +32,9 @@ WAS HIER BLEIBT, sind die Fragen, bei denen es wirklich um Text geht:
      einem solchen Schritt steht: der Inhalt der npm-Skripte in beiden
      `package.json` und die Einstellungen der Pruefwerkzeuge. Sonst behielte
      `npm test` seinen Wortlaut und fuehrte `echo ok` aus.
+     Verteilt ein Pflicht-Job seine Arbeit auf Teil-Jobs (seit 16.10.2026 die
+     Browser-Tests), gilt all das fuer jeden Teil-Job ebenso; dazu steht fest,
+     worauf der Pflicht-Job wartet und wie geteilt wird (TEILJOBS_CI).
 
 BEKANNTE GRENZE (Runde 4, F-4): Wer `deploy-verhalten.test.js` loescht, faellt
 hier nicht auf — dieses Skript kennt die Datei nicht. Der Schutz dagegen liegt
@@ -121,7 +124,7 @@ PRUEFJOBS_NACHTS = {
 VERTRAG_SUMMEN = {
     "sicherheit-nachts.yml": "46e7e74b721601db",
     "libheif-bau.yml": "39f0db0be0a0a3e0",
-    "ci.yml": "07cdd01ce0f5073d",
+    "ci.yml": "c578946f73e74042",
     "release.yml": "1fd803f6e5167738",
     "dependabot-automerge.yml": "df4eb0944834a25b",
     "dependabot.yml": "204892976a7df7e5",
@@ -149,6 +152,9 @@ _USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)
 # geht, prueft der Abschnitt "Wird jeder Waechter auch aufgerufen?"; alles
 # Uebrige an der Datei haelt die Pruefsumme oben. Beide Listen bleiben auch
 # dann rot, wenn jemand die Summe nachtraegt.
+SAMMELSCHRITT_E2E = (
+    'echo "playwright-version=$VERSION test-e2e-teil=$TEILE" && test "$VERSION" = success && test "$TEILE" = success'
+)
 PFLICHTJOBS_CI = {
     "test-backend": [
         "node ../scripts/audit-gate.mjs functions .",
@@ -163,7 +169,10 @@ PFLICHTJOBS_CI = {
         "npm run test:frontend",
         "sh scripts/pruefe-zeitzuender.sh . --nur frontend",
     ],
-    "test-e2e": ["npm run test:e2e"],
+    # Der Pflicht-Check test-e2e faehrt die Browser-Tests nicht selbst: Er
+    # sammelt die Ergebnisse der Teil-Jobs ein (TEILJOBS_CI) und ist nur gruen,
+    # wenn jeder Teil gruen ist.
+    "test-e2e": [SAMMELSCHRITT_E2E],
     "secret-scan": ["uses: gitleaks/gitleaks-action"],
     "playwright-version": ["sh scripts/nur-nachtrag.sh"],
     "pruefungen": [
@@ -176,11 +185,49 @@ PFLICHTJOBS_CI = {
         "bash scripts/selbstpruefung-waechter.sh",
     ],
 }
-# Die einzige Bedingung, unter der ein Pflicht-Job entfallen darf: Der
-# Browser-Test bei einem reinen Auslieferungs-Nachtrag (docs/SECURITY-MODEL.md,
-# "Nachtrag ohne Browser-Test"). Er steht dann auf "skipped", und `deploy.sh`
+
+# ── Teil-Jobs: ein Pflicht-Job verteilt seine Arbeit (16.10.2026) ─────────────
+#
+# Die Browser-Tests laufen auf mehreren Maschinen (Playwright `--shard`). Die
+# Teile sind KEINE Pflicht-Checks — der Zweigschutz und `deploy.sh` sehen nur
+# den Pflicht-Job, der ihre Ergebnisse einsammelt. Fuer jeden Teil-Job gilt
+# deshalb alles, was hier fuer einen Pflicht-Job gilt: seine Befehle, seine
+# Schrittfolge, seine Bedingung, Ordner und Umgebung, kein
+# `continue-on-error`, keine eigenen Rechte. Dazu kommt, was nur ein Teil-Job
+# braucht:
+#   · Der sammelnde Pflicht-Job wartet auf ihn (`needs`, JOB_WARTET_CI) und
+#     prueft sein Ergebnis (der Sammelschritt in SCHRITT_FESTLEGUNG_CI).
+#   · Die Teilung ist genau `fail-fast: false` und `matrix: teil: [1, ..., N]`,
+#     lueckenlos ab 1 und ohne weitere Achse. Der Testschritt teilt durch
+#     `strategy.job-total`; eine Luecke oder ein doppelter Wert liesse einen
+#     Teil doppelt laufen und einen anderen nie — und alle waeren gruen.
+#     N selbst ist frei: Mehr oder weniger Maschinen aendern nur die Liste
+#     (und die Pruefsumme von ci.yml).
+TEILJOBS_CI = {
+    "test-e2e-teil": {
+        "sammler": "test-e2e",
+        "befehle": ["npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}"],
+    },
+}
+
+# Die einzige Bedingung, unter der die Browser-Tests entfallen duerfen: ein
+# reiner Auslieferungs-Nachtrag (docs/SECURITY-MODEL.md, "Nachtrag ohne
+# Browser-Test"). Der Pflicht-Check steht dann auf "skipped", und `deploy.sh`
 # wertet das nie als bestanden.
-JOB_BEDINGUNG_CI = {"test-e2e": "needs.playwright-version.outputs.nur_nachtrag != 'ja'"}
+# Der Sammel-Job traegt dazu `always()`: Ohne diese Angabe entfiele er, sobald
+# ein Teil rot ist — und ein entfallener Pflicht-Check gilt beim Zweigschutz
+# als bestanden (fail-open). Wer `always()` streicht, macht ihn rot.
+JOB_BEDINGUNG_CI = {
+    "test-e2e": "always() && needs.playwright-version.outputs.nur_nachtrag != 'ja'",
+    "test-e2e-teil": "needs.playwright-version.outputs.nur_nachtrag != 'ja'",
+}
+# Worauf ein Job wartet (`needs`). Ein Job, der hier nicht steht, wartet auf
+# nichts: Ein Pflicht-Job hinter einem fremden Job entfiele, sobald dieser rot
+# ist — und stuende auf "skipped".
+JOB_WARTET_CI = {
+    "test-e2e": ["[playwright-version, test-e2e-teil]"],
+    "test-e2e-teil": ["playwright-version"],
+}
 
 # ── Unter welchen Umstaenden ein Pflichtbefehl laeuft (OPS-2026-10-03-12) ─────
 #
@@ -206,9 +253,13 @@ SCHRITT_FESTLEGUNG_CI = {
     ("playwright-version", "sh scripts/nur-nachtrag.sh"): {
         "env": ["BASIS: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}"]
     },
+    # Der Sammelschritt liest die Ergebnisse genau dieser beiden Vorgaenger.
+    ("test-e2e", SAMMELSCHRITT_E2E): {
+        "env": ["VERSION: ${{ needs.playwright-version.result }}", "TEILE: ${{ needs.test-e2e-teil.result }}"]
+    },
 }
 JOB_ORDNER_CI = {"test-backend": "functions"}
-JOB_UMGEBUNG_CI = {"test-e2e": ["HOME: /root"]}
+JOB_UMGEBUNG_CI = {"test-e2e-teil": ["HOME: /root"]}
 
 # ── Die ganze Schrittfolge jedes Pflicht-Jobs (OPS-2026-10-04-27) ─────────────
 #
@@ -249,11 +300,14 @@ SCHRITTFOLGE_CI = {
         "run: sh scripts/pruefe-zeitzuender.sh . --nur frontend",
     ],
     "test-e2e": [
+        "env: VERSION: ${{ needs.playwright-version.result }} / TEILE: ${{ needs.test-e2e-teil.result }} | run: echo \"playwright-version=$VERSION test-e2e-teil=$TEILE\" && test \"$VERSION\" = success && test \"$TEILE\" = success",
+    ],
+    "test-e2e-teil": [
         "uses: actions/checkout",
         "uses: actions/setup-node | with: node-version: \"24\" / cache: npm / cache-dependency-path: package-lock.json",
         "run: npm ci",
-        "run: npm run test:e2e",
-        "name: Fehlerbilder und Aufzeichnungen sichern | if: failure() | uses: actions/upload-artifact | with: name: playwright-fehler / path: | / test-results/ / playwright-report/ / retention-days: 7 / if-no-files-found: ignore",
+        "run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}",
+        "name: Fehlerbilder und Aufzeichnungen sichern | if: failure() | uses: actions/upload-artifact | with: name: playwright-fehler-teil-${{ matrix.teil }} / path: | / test-results/ / playwright-report/ / retention-days: 7 / if-no-files-found: ignore",
     ],
     "secret-scan": [
         "uses: actions/checkout | with: fetch-depth: 0",
@@ -568,7 +622,7 @@ def _schrittfolgen(ci_text):
     wenn der Job fehlt oder nicht in der ueblichen Schreibweise dasteht."""
     bloecke = _jobbloecke(_ohne_kommentarzeilen(ci_text))
     folgen = {}
-    for job in PFLICHTJOBS_CI:
+    for job in _vertragsjobs():
         schritte = _schrittbloecke(bloecke[job]) if job in bloecke else None
         folgen[job] = None if schritte is None else [_schritt_wortlaut(s) for s in schritte]
     return folgen
@@ -589,11 +643,43 @@ def vertrag_schritte_ausgeben():
 
 
 def _npm_skript(befehl):
-    """Name des npm-Skripts, das ein Pflichtbefehl aufruft — sonst None."""
+    """Name des npm-Skripts, das ein Pflichtbefehl aufruft — sonst None.
+    Argumente hinter `--` gehen an das Skript; welche, legt der Wortlaut des
+    Befehls in PFLICHTJOBS_CI oder TEILJOBS_CI fest."""
     if befehl == "npm test":
         return "test"
-    treffer = re.fullmatch(r"npm run ([A-Za-z][A-Za-z0-9:_-]*)", befehl)
+    treffer = re.fullmatch(r"npm run ([A-Za-z][A-Za-z0-9:_-]*)(?: -- .+)?", befehl)
     return treffer.group(1) if treffer else None
+
+
+def _vertragsjobs():
+    """Jeder Job, dessen Inhalt der Vertrag festhaelt, je mit den Befehlen, die
+    ihn ausmachen: die Pflicht-Jobs, jeder gefolgt von seinen Teil-Jobs."""
+    jobs = {}
+    for job, befehle in PFLICHTJOBS_CI.items():
+        jobs[job] = befehle
+        for teil, angaben in TEILJOBS_CI.items():
+            if angaben["sammler"] == job:
+                jobs[teil] = angaben["befehle"]
+    return jobs
+
+
+def _teilung_maengel(job, strategie):
+    """Die Teilung eines Teil-Jobs: genau `fail-fast: false`, `matrix:` und
+    `teil: [1, ..., N]`, lueckenlos ab 1. Jeder andere Job hat keine."""
+    if job not in TEILJOBS_CI:
+        if strategie is not None:
+            return [f"ci.yml: Job {job} traegt eine Teilung ('strategy') — er hiesse dann anders und sein Ergebnis kaeme mehrfach"]
+        return []
+    zeilen = strategie or []
+    teile = re.fullmatch(r"teil: \[(\d+(?:, \d+)*)\]", zeilen[2]) if len(zeilen) == 3 else None
+    zahlen = [int(z) for z in teile.group(1).split(", ")] if teile else []
+    if zeilen[:2] != ["fail-fast: false", "matrix:"] or not zahlen or zahlen != list(range(1, len(zahlen) + 1)):
+        return [
+            f"ci.yml: Teil-Job {job} teilt nicht genau mit 'fail-fast: false' und 'matrix: teil: [1, ..., N]' "
+            f"(Ist: {strategie!r}) — ein Teil liefe doppelt oder nie, und alle waeren gruen"
+        ]
+    return []
 
 
 def vertrag_ci(ci_text, deploy_text):
@@ -626,9 +712,10 @@ def vertrag_ci(ci_text, deploy_text):
     m.extend(_kopfteil_maengel(t, "ci.yml"))
 
     bloecke = _jobbloecke(t)
-    for job, befehle in PFLICHTJOBS_CI.items():
+    for job, befehle in _vertragsjobs().items():
         if job not in bloecke:
-            m.append(f"ci.yml: Pflicht-Job {job} fehlt")
+            art = "Teil-Job" if job in TEILJOBS_CI else "Pflicht-Job"
+            m.append(f"ci.yml: {art} {job} fehlt")
             continue
         b = bloecke[job]
         vorhanden = _schritte(b)
@@ -685,8 +772,19 @@ def vertrag_ci(ci_text, deploy_text):
                 )
         bedingungen = kopf.get("if")
         erlaubt = [JOB_BEDINGUNG_CI[job]] if job in JOB_BEDINGUNG_CI else None
-        if bedingungen is not None and bedingungen != erlaubt:
-            m.append(f"ci.yml: Job {job} traegt die Bedingung {bedingungen!r} — er koennte still entfallen")
+        if bedingungen != erlaubt:
+            # Seit 16.10.2026 auch die FEHLENDE Bedingung: Ohne `always()`
+            # entfiele der Sammel-Job bei einem roten Teil (fail-open).
+            m.append(
+                f"ci.yml: Job {job} traegt die Bedingung {bedingungen!r} statt {erlaubt!r} — "
+                "er koennte still entfallen"
+            )
+        if kopf.get("needs") != JOB_WARTET_CI.get(job):
+            m.append(
+                f"ci.yml: Job {job} wartet auf {kopf.get('needs')!r} statt {JOB_WARTET_CI.get(job)!r} (JOB_WARTET_CI) — "
+                "er entfiele mit einem fremden Job oder saehe das Ergebnis seiner Teile nicht"
+            )
+        m.extend(_teilung_maengel(job, kopf.get("strategy")))
         ordner = JOB_ORDNER_CI.get(job)
         soll = ["run:", f"working-directory: {ordner}"] if ordner else None
         if kopf.get("defaults") != soll:
@@ -1268,7 +1366,9 @@ def main():
             print("          python3 scripts/pruefe-deploy-riegel.py --vertrag-schritte")
     else:
         print(f"  ok      {len(VERTRAG_SUMMEN)} Dateien entsprechen dem festgeschriebenen Stand;")
-        print(f"          jeder der {len(PFLICHTJOBS_CI)} Pflicht-Jobs fuehrt seine Pruefbefehle aus")
+        print(
+            f"          jeder der {len(PFLICHTJOBS_CI)} Pflicht-Jobs und {len(TEILJOBS_CI)} Teil-Job(s) fuehrt seine Pruefbefehle aus"
+        )
         print(f"          und besteht aus genau seinen {sum(len(f) for f in SCHRITTFOLGE_CI.values())} festgelegten Schritten")
         print(
             f"  ok      {sum(len(s) for s in NPM_SKRIPTE.values())} npm-Skripte hinter den Pflicht-Schritten, die Jest-Einstellung"

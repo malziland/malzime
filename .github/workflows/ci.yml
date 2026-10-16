@@ -209,15 +209,39 @@ jobs:
           BASIS: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}
         run: sh scripts/nur-nachtrag.sh
 
-  test-e2e:
+  # ── Browser-Tests, auf mehrere Maschinen verteilt (16.10.2026) ─────────────
+  #
+  # Bis 16.10.2026 liefen alle Browser-Tests in EINEM Job auf einer Maschine
+  # mit vier Kernen: gemessen 546 s reine Testzeit plus 41 s Anlauf (Lauf auf
+  # main vom 15.10.2026), der laengste Schritt jeder Auslieferung. Jetzt teilt
+  # Playwright die Tests auf mehrere gleich gebaute Maschinen auf (`--shard`);
+  # jede faehrt ihren Teil mit vier Arbeitern. Gestrichen wird kein Test: Die
+  # Teile zusammen sind genau die ganze Reihe (gemessen mit `--list`, je Teil
+  # und gesamt).
+  #
+  # Der Pflicht-Check heisst weiter `test-e2e` — der Zweigschutz kennt nur
+  # diesen Namen. Er ist der Sammel-Job weiter unten; die Teile laufen als
+  # `test-e2e-teil (1)` usw. und sind selbst keine Pflicht-Checks.
+  test-e2e-teil:
     needs: playwright-version
-    # Reiner Nachtrag (siehe playwright-version): Der GANZE Job entfaellt und
-    # steht auf "skipped" — nicht auf "success". Der Branch-Schutz laesst einen
-    # uebersprungenen Pflicht-Check durch; scripts/deploy.sh und die Baum-Regel
-    # verlangen dagegen "success" und werten ihn nie als bestandenen
-    # Browser-Test (Befund der unabhaengigen Pruefung, 16.09.2026).
+    # Reiner Nachtrag (siehe playwright-version): Alle Teile entfallen, und der
+    # Sammel-Job `test-e2e` steht auf "skipped" — nicht auf "success". Der
+    # Branch-Schutz laesst einen uebersprungenen Pflicht-Check durch;
+    # scripts/deploy.sh und die Baum-Regel verlangen dagegen "success" und
+    # werten ihn nie als bestandenen Browser-Test (Befund der unabhaengigen
+    # Pruefung, 16.09.2026).
     if: needs.playwright-version.outputs.nur_nachtrag != 'ja'
     runs-on: ubuntu-latest
+    # Die Zahl der Teile steht NUR in der Liste `teil`: Der Testschritt rechnet
+    # mit `strategy.job-total`, also mit der Laenge dieser Liste. Die Liste muss
+    # lueckenlos 1, 2, ... sein — sonst liefe ein Teil doppelt und ein anderer
+    # nie (der Vertrag in scripts/pruefe-deploy-riegel.py haelt sie fest).
+    # `fail-fast: false`: Ein roter Teil bricht die anderen nicht ab. So zeigt
+    # ein Lauf alle roten Tests auf einmal, wie vorher der eine Job.
+    strategy:
+      fail-fast: false
+      matrix:
+        teil: [1, 2, 3, 4]
     # Offizielles Playwright-Image mit VORINSTALLIERTEM Chromium (Browser-Version
     # exakt passend zur installierten @playwright/test). Damit entfaellt der
     # fehleranfaellige Browser-Download von cdn.playwright.dev komplett — der
@@ -254,21 +278,58 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - run: npm ci
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}
 
       # Ohne diesen Schritt hinterlaesst ein roter Browser-Test NICHTS — kein
       # Bild, kein Ablaufprotokoll. Ein Fehler, der sich lokal nicht
       # nachstellen laesst, bleibt damit grundsaetzlich unaufklaerbar.
+      # Der Name traegt die Nummer des Teils: Zwei Teile mit demselben Namen
+      # lehnt die Ablage ab, und die Bilder des zweiten roten Teils fehlten.
       - name: Fehlerbilder und Aufzeichnungen sichern
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: playwright-fehler
+          name: playwright-fehler-teil-${{ matrix.teil }}
           path: |
             test-results/
             playwright-report/
           retention-days: 7
           if-no-files-found: ignore
+
+  # Der Pflicht-Check `test-e2e`: gruen genau dann, wenn JEDER Teil gruen ist.
+  #
+  # FAIL-OPEN VERHINDERN: Ein uebersprungener Pflicht-Check gilt beim
+  # Zweigschutz als bestanden. Mit blossem `needs:` stuende dieser Job bei
+  # einem roten Teil auf "skipped" — und der Pull Request liesse sich
+  # zusammenfuehren. Deshalb `always()`: Der Job laeuft auch, wenn ein Teil
+  # rot, abgebrochen oder uebersprungen ist, auch wenn `playwright-version` rot
+  # ist und sogar, wenn der ganze Lauf abgebrochen wurde — und verlangt dann
+  # von jedem Vorgaenger "success". `!cancelled()` genuegte nicht: Bei einem
+  # abgebrochenen Lauf entfiele der Job, und ob GitHub ihn dann als "skipped"
+  # (= bestanden) oder "cancelled" fuehrt, ist nicht gemessen. Mit `always()`
+  # stellt sich die Frage nicht.
+  #
+  # Entfallen darf er nur beim reinen Nachtrag, genau wie vorher der eine
+  # Browser-Job (Bedingung hinter dem `&&`; Begruendung beim Teil-Job oben).
+  #
+  # Bei einer Matrix meldet `needs.<job>.result` EIN Ergebnis fuer alle Teile
+  # (laut GitHub: "success" nur, wenn jeder Teil "success" ist; ein roter oder
+  # abgebrochener Teil macht es "failure" bzw. "cancelled").
+  #
+  # Dieser Job entsteht bei GitHub erst, wenn alle Teile fertig sind (gemessen
+  # am Browser-Job, der auf playwright-version wartet). Bis dahin FEHLT
+  # `test-e2e` in der Liste der Pruefungen, statt "laeuft" zu melden —
+  # scripts/deploy.sh wertet das in der Baum-Regel wie "laeuft".
+  test-e2e:
+    needs: [playwright-version, test-e2e-teil]
+    if: always() && needs.playwright-version.outputs.nur_nachtrag != 'ja'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          VERSION: ${{ needs.playwright-version.result }}
+          TEILE: ${{ needs.test-e2e-teil.result }}
+        run: echo "playwright-version=$VERSION test-e2e-teil=$TEILE" && test "$VERSION" = success && test "$TEILE" = success
 
   lighthouse:
     # Misst die LIVE-Domain, nicht den geprüften Stand. K12 (Audit 2026-08-13):

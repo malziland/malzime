@@ -449,8 +449,6 @@ und entscheidet, was online geht.
 
 Bevor etwas online geht, laufen automatische Prüfungen: Tests, Sicherheits- und
 Datenschutzprüfungen. [Der ganze Code ist offen.](https://github.com/malziland/malzime)
-Bei jeder Änderung, an der die KI mitgeschrieben hat, steht das in der
-Versionsgeschichte dazu.
 
 Übrigens: Die KI, die dein Foto liest, ist eine andere – Mistral Large, in der EU.
 

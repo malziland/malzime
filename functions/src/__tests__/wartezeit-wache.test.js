@@ -116,6 +116,59 @@ describe("Hoechstens eine Nachricht je 30 Minuten", () => {
   });
 });
 
+describe("Die Marke bleibt nur, wenn die Nachricht hinausging (Abnahme-Befund P2)", () => {
+  const warnTexte = () => warnungen.mock.calls.map((c) => String(c[0])).join("\n");
+
+  test("Erfolg (melder liefert true): Marke gesetzt, Status gemeldet", async () => {
+    wartend("a", 6 * MIN);
+    const r = await wache.pruefeWartezeit({ melder, jetzt: T });
+    expect(r.status).toBe("gemeldet");
+    expect(speicher.lies("stats/wartezeit-wache")).toEqual({ letzterAlarm: T });
+  });
+
+  test("melder liefert false (ntfy weg oder abgewiesen): Marke zurueck, Warnung nicht zugestellt, naechster Lauf meldet", async () => {
+    wartend("a", 6 * MIN);
+    melder.mockResolvedValueOnce(false);
+    const r = await wache.pruefeWartezeit({ melder, jetzt: T });
+    expect(r.status).toBe("nicht-zugestellt");
+    expect(speicher.lies("stats/wartezeit-wache")).toEqual({ letzterAlarm: null });
+    expect(warnTexte()).toContain("wartezeit-wache-nicht-zugestellt");
+    expect(warnTexte()).not.toContain('"status":"gemeldet"');
+    /* Eine Minute spaeter: keine 30-Minuten-Sperre, der zweite Versuch geht hinaus. */
+    const r2 = await wache.pruefeWartezeit({ melder, jetzt: T + MIN });
+    expect(r2.status).toBe("gemeldet");
+    expect(melder).toHaveBeenCalledTimes(2);
+    expect(speicher.lies("stats/wartezeit-wache")).toEqual({ letzterAlarm: T + MIN });
+  });
+
+  test("melder wirft: Marke zurueck auf die vorige, Warnung, Wache wirft nicht", async () => {
+    speicher.lege("stats/wartezeit-wache", { letzterAlarm: T - 40 * MIN });
+    wartend("a", 6 * MIN);
+    melder.mockRejectedValueOnce(new Error("Netz weg"));
+    await expect(wache.pruefeWartezeit({ melder, jetzt: T })).resolves.toMatchObject({ status: "nicht-zugestellt" });
+    expect(speicher.lies("stats/wartezeit-wache")).toEqual({ letzterAlarm: T - 40 * MIN });
+    expect(warnTexte()).toContain("wartezeit-wache-nicht-zugestellt");
+  });
+
+  test("ohne Versandweg: nicht zugestellt, keine Sperre", async () => {
+    wartend("a", 6 * MIN);
+    const r = await wache.pruefeWartezeit({ jetzt: T });
+    expect(r.status).toBe("nicht-zugestellt");
+    expect(speicher.lies("stats/wartezeit-wache")).toEqual({ letzterAlarm: null });
+  });
+
+  test("hat inzwischen eine andere Instanz gemeldet, bleibt deren Marke stehen", async () => {
+    wartend("a", 6 * MIN);
+    melder.mockImplementationOnce(async () => {
+      /* waehrend dieser Versand haengt, meldet eine andere Instanz erfolgreich */
+      speicher.lege("stats/wartezeit-wache", { letzterAlarm: T + 1 });
+      return false;
+    });
+    await wache.pruefeWartezeit({ melder, jetzt: T });
+    expect(speicher.lies("stats/wartezeit-wache")).toEqual({ letzterAlarm: T + 1 });
+  });
+});
+
 describe("Ausfall der Wache", () => {
   test("wirft nie; ein Lauf ohne Messung ist eine Warnung, fuenf in Folge ein Fehler", async () => {
     speicher.vor(({ art }) => {

@@ -94,25 +94,47 @@ function alsMinuten(ms) {
 
 /** Text der Nachricht (reine Rechnung). */
 function baueMeldung(laengsteMs, wartende) {
-  const wer = wartende === 1 ? "1 Analyse wartet" : `${wartende} Analysen warten`;
-  return (
-    `malziME: Eine Analyse hat ${alsMinuten(laengsteMs)} auf ihren Start gewartet ` +
-    `(Grenze ${alsMinuten(GRENZE_MS)}). Gerade ${wer}.`
-  );
+  const wer =
+    typeof wartende !== "number"
+      ? "Wie viele gerade warten, war nicht lesbar."
+      : `Gerade ${wartende === 1 ? "1 Analyse wartet" : `${wartende} Analysen warten`}.`;
+  return `malziME: Eine Analyse hat ${alsMinuten(laengsteMs)} auf ihren Start gewartet (Grenze ${alsMinuten(GRENZE_MS)}). ${wer}`;
 }
 
 /* Setzt die Marke, wenn die Ruhezeit um ist — in einer Transaktion, damit
-   zwei gleichzeitige Laeufe nicht beide melden. true = diese Instanz meldet. */
+   zwei gleichzeitige Laeufe nicht beide melden. Die Marke ist zunaechst nur
+   eine Reservierung: Geht die Nachricht nicht hinaus, nimmt markeZuruecknehmen
+   sie zurueck (Abnahme-Befund P2, 16.10.2026 — vorher blieb sie stehen, und
+   ein Ausfall von ntfy sperrte den Alarm 30 Minuten lang).
+   Rueckgabe: { gesetzt, vorher } — vorher = die Marke davor (oder null). */
 async function markeSetzen(jetzt) {
   const db = datenbank();
   const ref = db.doc(MARKE_DOKUMENT);
   return db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     const letzte = snap.exists ? snap.get("letzterAlarm") : null;
-    if (typeof letzte === "number" && jetzt - letzte < RUHE_MS) return false;
+    if (typeof letzte === "number" && jetzt - letzte < RUHE_MS) return { gesetzt: false, vorher: letzte };
     tx.set(ref, { letzterAlarm: jetzt }, { merge: true });
-    return true;
+    return { gesetzt: true, vorher: typeof letzte === "number" ? letzte : null };
   });
+}
+
+/* Nimmt die eigene Reservierung zurueck — nur, wenn sie noch die eigene ist
+   (sonst haette eine andere Instanz inzwischen gemeldet). Danach darf der
+   naechste Lauf es wieder versuchen. Wirft nicht; scheitert es, bleibt die
+   Sperre stehen, und die Warnzeile sagt es. */
+async function markeZuruecknehmen(jetzt, vorher) {
+  try {
+    const db = datenbank();
+    const ref = db.doc(MARKE_DOKUMENT);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      if (snap.exists && snap.get("letzterAlarm") === jetzt) tx.set(ref, { letzterAlarm: vorher }, { merge: true });
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -133,18 +155,42 @@ async function pruefeWartezeit({ melder = null, jetzt = Date.now() } = {}) {
     const laengsteMs = kandidaten.length ? Math.max(...kandidaten) : 0;
     if (!zuLang(laengsteMs)) return { status: "im-rahmen", laengsteMs };
 
-    if (!(await markeSetzen(jetzt))) {
+    const marke = await markeSetzen(jetzt);
+    if (!marke.gesetzt) {
       console.log(JSON.stringify({ step: "wartezeit-wache", status: "ruhezeit", laengsteMs }));
       return { status: "ruhezeit", laengsteMs };
     }
-    const wartende = await countQueuedJobs();
+    const wartende = await countQueuedJobs().catch(() => null);
     const text = baueMeldung(laengsteMs, wartende);
-    if (melder) await melder(text);
+    /* Zugestellt heisst: der Versandweg meldet Erfolg (sendeNtfy: true). false,
+       ein Wurf oder gar kein Versandweg heisst: nicht hinausgegangen — dann
+       die Marke zuruecknehmen, damit der naechste Lauf es wieder versucht. */
+    const zugestellt = melder
+      ? await Promise.resolve(melder(text)).then(
+          (r) => r === true,
+          () => false
+        )
+      : false;
     /* Auch hier keine Kennung: nur die zwei Zahlen der Nachricht. */
+    if (zugestellt) {
+      console.warn(
+        JSON.stringify({ severity: "WARNING", step: "wartezeit-wache", status: "gemeldet", laengsteMs, wartende })
+      );
+      return { status: "gemeldet", laengsteMs, wartende };
+    }
+    const zurueck = await markeZuruecknehmen(jetzt, marke.vorher);
     console.warn(
-      JSON.stringify({ severity: "WARNING", step: "wartezeit-wache", status: "gemeldet", laengsteMs, wartende })
+      JSON.stringify({
+        severity: "WARNING",
+        step: "wartezeit-wache",
+        status: "nicht-zugestellt",
+        warning: "wartezeit-wache-nicht-zugestellt",
+        markeZurueckgenommen: zurueck,
+        laengsteMs,
+        wartende,
+      })
     );
-    return { status: "gemeldet", laengsteMs, wartende };
+    return { status: "nicht-zugestellt", laengsteMs, wartende };
   } catch (err) {
     fehlerInFolge += 1;
     const zeile = {

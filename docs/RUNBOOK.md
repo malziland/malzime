@@ -734,6 +734,9 @@ Warteschlange bei Google (`sh scripts/warteschlange-pruefen.sh`), Mistral
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
       --format='value(timestamp,jsonPayload.status,jsonPayload.laengsteMs,jsonPayload.wartende)'
 
+`status` „nicht-zugestellt“ heißt: Der Push ging nicht hinaus (den ntfy-Dienst
+prüfen, etwa mit `./scripts/verify-infrastructure.sh`, Abschnitt
+„Benachrichtigungsdienst (ntfy)“); die Wache versucht es jede Minute erneut.
 Kann die Wache fünf Läufe in Folge nicht messen, schreibt sie eine Fehlerzeile
 `wartezeit-wache-nicht-messbar` (Alarm „Function Errors“) — Firestore und die
 Indizes der Sammlung `jobs` prüfen. Für „nicht abgeholt“ gibt es bewusst keine

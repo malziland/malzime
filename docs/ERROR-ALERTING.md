@@ -352,7 +352,11 @@ Titel „malziME: lange Wartezeit“.
   die in den letzten zwei Minuten gestartet sind.
 - **Wie oft:** höchstens eine Nachricht je 30 Minuten. Die Marke liegt in
   Firestore (`stats/wartezeit-wache`) und gilt damit für alle Instanzen; zwei
-  gleichzeitige Läufe melden nicht doppelt (Transaktion).
+  gleichzeitige Läufe melden nicht doppelt (Transaktion). Sie bleibt nur
+  stehen, wenn der Versand Erfolg meldet; scheitert er (ntfy weg, Antwort kein
+  Erfolg), nimmt die Wache sie zurück, schreibt die Warnung
+  `wartezeit-wache-nicht-zugestellt`, und der nächste Lauf eine Minute später
+  versucht es wieder.
 - **Inhalt:** längste Wartezeit und wie viele gerade warten — keine Kennung.
 - **Wo:** im Aufräumdienst (`reapJobs`, jede Minute), nicht im Arbeiter: Der
   Arbeiter sieht eine Wartezeit erst, wenn sie vorbei ist, und bei stehender

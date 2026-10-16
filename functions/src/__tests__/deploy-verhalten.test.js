@@ -992,6 +992,26 @@ describe("deploy.sh — Baum-Regel: ein Pflicht-Check, den main noch nicht angel
     expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: test-e2e=failure\)/);
   });
 
+  /* Befund P3 der Abnahme (16.10.2026): Ist auf main schon ein Teil nicht
+     gruen, steht das Ergebnis von test-e2e dort fest — auch wenn der
+     Sammel-Check noch nicht angelegt ist. Das gruene PR-Ergebnis darf es dann
+     nicht ueberdecken. Die Gegenprobe (Teile nur laufend oder gruen -> das
+     PR-Ergebnis gilt) ist der erste Fall dieses Blocks. */
+  test.each(["failure", "cancelled", "timed_out"])(
+    "ein Teil ist auf main schon %s, die anderen laufen: das PR-Ergebnis gilt nicht, der Riegel haelt an",
+    (ergebnis) => {
+      const r = deployBeiGleichemBaum(
+        MAIN_TEILE_LAUFEN.replace("test-e2e-teil (1)=success", `test-e2e-teil (1)=${ergebnis}`),
+        GRUEN_PR
+      );
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toContain(
+        `Stand-Bindung: test-e2e fehlt auf main, ein Teil ist dort schon nicht gruen (test-e2e-teil (1)=${ergebnis})`
+      );
+      expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: fehlt\)/);
+    }
+  );
+
   test("der PR hat test-e2e auch nicht: der Riegel haelt an (Ist: fehlt)", () => {
     const r = deployBeiGleichemBaum(MAIN_TEILE_LAUFEN, GRUEN_PR.replace("test-e2e=success\n", ""));
     expect(r.code).not.toBe(0);

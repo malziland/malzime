@@ -378,6 +378,21 @@ else
                 if grep -q "^${CHECK}=" <<<"$NEUE_LAGE"; then
                   continue
                 fi
+                # Befund P3 der Abnahme (16.10.2026): Ist auf main schon ein
+                # Teil (`<check>-teil (n)`) nicht gruen, wird der Check rot —
+                # dann gilt das PR-Ergebnis nicht, er bleibt fehlend. Ohne
+                # Pipe und ohne grep: nichts, was still scheitern koennte.
+                TEIL_ROT=""
+                while IFS= read -r ZEILE; do
+                  case "$ZEILE" in
+                    "${CHECK}-teil"*=success | "${CHECK}-teil"*=pending | "${CHECK}-teil"*=null | "${CHECK}-teil"*=) ;;
+                    "${CHECK}-teil"*=*) TEIL_ROT="$ZEILE" ;;
+                  esac
+                done <<<"$LAGE"
+                if [ -n "$TEIL_ROT" ]; then
+                  echo "Stand-Bindung: ${CHECK} fehlt auf main, ein Teil ist dort schon nicht gruen (${TEIL_ROT}) — das PR-Ergebnis gilt nicht."
+                  continue
+                fi
                 UEBERSPRINGEN=0
                 for Z in $ZEITABHAENGIG; do
                   [ "$CHECK" = "$Z" ] && UEBERSPRINGEN=1

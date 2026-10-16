@@ -1052,6 +1052,16 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
     ],
   ];
 
+  test("ein Teil-Job ohne bekannten Pflicht-Job faellt nicht still aus dem Vertrag", () => {
+    /* deploy.sh erkennt rote Teile auf main am Namen `<Pflicht-Job>-teil`
+       (Befund P3, 16.10.2026); ein Teil-Job mit anderem Sammler stuende gar
+       nicht mehr im Vertrag. */
+    aendern(WAECHTER, (t) => einmal(t, '"sammler": "test-e2e",', '"sammler": "test-e2e-alt",'));
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/Teil-Job test-e2e-teil gehoert nicht als '<Pflicht-Job>-teil' zu einem Pflicht-Job/);
+  });
+
   test("die Zahl der Browser-Teile ist frei: eine lueckenlose Liste besteht mit nachgetragener Summe", () => {
     /* Erfolgsweg zu den Teilungs-Faellen oben: Sonst waere unklar, ob die
        Pruefung jede Teilung ablehnt oder nur die kaputten. */

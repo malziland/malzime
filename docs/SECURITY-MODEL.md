@@ -1683,9 +1683,13 @@ seine Vorgänger fertig sind (gemessen am Lauf vom 15.10.2026). Solange die Teil
 auf `main` laufen, fehlt `test-e2e` deshalb, statt „läuft“ zu melden. Die
 Baum-Regel in `scripts/deploy.sh` behandelt einen fehlenden Pflicht-Check wie
 einen laufenden — nur solange `main` noch prüft, nur bei gleichem Baum, nie
-für `test-backend`. Geprüft in `deploy-verhalten.test.js` (Erfolgsweg und vier
-Abbrüche, Rückbauprobe 16.10.2026: ohne den Nachtrag hält der Riegel mit
-„Ist: fehlt“).
+für `test-backend`, und nie, wenn auf `main` schon ein Teil (`test-e2e-teil (n)`)
+nicht grün ist: Dann steht das Ergebnis dort fest, und der Riegel hält an
+(Befund P3 der unabhängigen Abnahme). Den Namen `<Pflicht-Job>-teil`, an dem
+`deploy.sh` die Teile erkennt, hält `scripts/pruefe-deploy-riegel.py` fest.
+Geprüft in `deploy-verhalten.test.js` (Erfolgsweg und sieben Abbrüche);
+Rückbauproben 16.10.2026: ohne den Nachtrag hält der Riegel mit „Ist: fehlt“,
+ohne die Prüfung der Teile werden die drei Fälle mit rotem Teil rot.
 
 **Restrisiko.** Dass `needs.<job>.result` bei einer Matrix „success“ nur meldet,
 wenn jeder Teil grün ist, ist die Angabe von GitHub, nicht hier gemessen; der

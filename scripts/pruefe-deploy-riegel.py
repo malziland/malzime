@@ -711,6 +711,13 @@ def vertrag_ci(ci_text, deploy_text):
     # fuer jeden Schritt jedes Jobs.
     m.extend(_kopfteil_maengel(t, "ci.yml"))
 
+    # Ein Teil-Job heisst `<Pflicht-Job>-teil`: `deploy.sh` erkennt seine roten
+    # Laeufe auf main an diesem Namen (Befund P3, 16.10.2026), und nur ein
+    # Teil-Job mit bekanntem Pflicht-Job steht ueberhaupt im Vertrag.
+    for teil, angaben in TEILJOBS_CI.items():
+        if angaben["sammler"] not in PFLICHTJOBS_CI or teil != angaben["sammler"] + "-teil":
+            m.append(f"ci.yml: Teil-Job {teil} gehoert nicht als '<Pflicht-Job>-teil' zu einem Pflicht-Job (TEILJOBS_CI)")
+
     bloecke = _jobbloecke(t)
     for job, befehle in _vertragsjobs().items():
         if job not in bloecke:

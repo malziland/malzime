@@ -128,6 +128,38 @@ test("Dokument-Loeschen wirft: naechster Lauf loescht, ohne erneut zu zaehlen", 
   expect(fensterVon(createdAt)).toMatchObject({ eingereiht: 1, fertig: 1, abgeholt: 1 });
 });
 
+test("HAENGENDE DATENBANK beim Zaehlen: der Lauf loescht nach hoechstens 30 s Zaehlzeit trotzdem alles (Befund P3)", async () => {
+  jest.useFakeTimers({ now: jetzt });
+  try {
+    /* Auftraege in fuenf verschiedenen Fenstern, alle zugestellt und faellig. */
+    for (let i = 0; i < 5; i += 1) {
+      speicher.lege(`jobs/p${i}`, {
+        status: "done",
+        createdAt: jetzt - 60 * MIN + i * 11 * MIN,
+        startedAt: jetzt - 60 * MIN + i * 11 * MIN + 1000,
+        finishedAt: jetzt - 60 * MIN + i * 11 * MIN + 60000,
+        deliveredAt: jetzt - 20 * MIN,
+        imagePath: null,
+        result: PROFIL,
+      });
+    }
+    speicher.vor(({ art }) => (art === "transaktion" ? new Promise(() => {}) : undefined));
+    let fertig = false;
+    const lauf = reapJobs().then((r) => {
+      fertig = true;
+      return r;
+    });
+    await jest.advanceTimersByTimeAsync(30000);
+    expect(fertig).toBe(true);
+    const r = await lauf;
+    expect(r.zugestellt).toBe(5);
+    expect(speicher.pfade("jobs")).toEqual([]);
+    expect(speicher.pfade("statistik")).toEqual([]);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
 test("abgelaufene Auftraege (2 h): verworfen und nie abgeholt zaehlen, die Einlass-Ruecknahme nicht", async () => {
   const alt = jetzt - 3 * 60 * MIN;
   speicher.lege("jobs/v", { status: "abandoned", createdAt: alt, startedAt: null, finishedAt: alt + MIN });

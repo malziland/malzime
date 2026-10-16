@@ -1583,8 +1583,9 @@ im RUNBOOK, „Zähler auswerten“).
    selben Schreibvorgang wie das Ergebnis in den Auftrag. Gezählt wird im
    Aufräumdienst, unmittelbar vor dem Löschen.
 4. **Löschen geht vor Zählen.** Scheitert das Zählen oder dauert es länger als
-   zehn Sekunden je Fenster, wird trotzdem gelöscht; die Löschfristen sind
-   Zusagen, die Zähler Statistik. Warnzeile je Lauf, Fehlerzeile (Alarm) nach
+   zehn Sekunden je Fenster, wird trotzdem gelöscht; insgesamt zählt ein Lauf
+   höchstens 30 Sekunden (über beide Löschzweige), danach löscht er nur noch.
+   Die Löschfristen sind Zusagen, die Zähler Statistik. Warnzeile je Lauf, Fehlerzeile (Alarm) nach
    fünf Läufen in Folge.
 5. **Nie doppelt.** Eine Transaktion je Fenster liest die Aufträge frisch, zählt
    nur die noch nicht markierten und markiert genau diese (`gezaehlt: true`) im

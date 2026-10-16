@@ -303,6 +303,54 @@ describe("zaehleVorDemLoeschen", () => {
   });
 });
 
+describe("Gesamtgrenze je Lauf (Abnahme-Befund P3)", () => {
+  /* Fuenf Fenster, die Datenbank haengt bei jeder Transaktion. Ohne
+     Gesamtgrenze dauerte das 5 x 10 s = 50 s; mit ihr hoechstens 30 s. */
+  function fuenfFenster() {
+    return [0, 1, 2, 3, 4].map((i) => lege(`h${i}`, { createdAt: T + i * 11 * MIN, status: "abandoned" }));
+  }
+
+  test("haengende Datenbank: nach 30 s Schluss, der Rest wird nicht gezaehlt (Warnzeile), nichts markiert", async () => {
+    jest.useFakeTimers();
+    try {
+      speicher.vor(({ art }) => (art === "transaktion" ? new Promise(() => {}) : undefined));
+      let fertig = false;
+      const lauf = statistik.zaehleVorDemLoeschen(fuenfFenster()).then((r) => {
+        fertig = true;
+        return r;
+      });
+      await jest.advanceTimersByTimeAsync(29999);
+      expect(fertig).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(fertig).toBe(true);
+      await expect(lauf).resolves.toEqual({ gezaehlt: 0, gescheitert: 5 });
+      /* Drei Fenster je 10 s versucht, zwei gar nicht erst angefangen. */
+      expect(speicher.protokoll.filter((p) => p.art === "transaktion")).toHaveLength(3);
+      const zeilen = warnTexte();
+      expect(zeilen.filter((z) => z.includes("statistik-zaehlen-nicht-abgewartet"))).toHaveLength(3);
+      expect(zeilen.find((z) => z.includes("statistik-zaehlen-zeit-um"))).toContain('"auftraege":2');
+      for (let i = 0; i < 5; i += 1) expect(speicher.lies(`jobs/h${i}`).gezaehlt).toBeUndefined();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test("die Grenze gilt fuer den ganzen Lauf: der zweite Zweig mit derselben Frist faengt gar nicht mehr an", async () => {
+    const lauf = { zaehlenBis: Date.now() - 1 };
+    const r = await statistik.zaehleVorDemLoeschen([lege("z1", { createdAt: T, status: "abandoned" })], lauf);
+    expect(r).toEqual({ gezaehlt: 0, gescheitert: 1 });
+    expect(speicher.protokoll.filter((p) => p.art === "transaktion")).toHaveLength(0);
+    expect(warnTexte().some((z) => z.includes("statistik-zaehlen-zeit-um"))).toBe(true);
+  });
+
+  test("ohne Stoerung: Frist wird gesetzt, alles gezaehlt", async () => {
+    const lauf = {};
+    const r = await statistik.zaehleVorDemLoeschen(fuenfFenster(), lauf);
+    expect(r).toEqual({ gezaehlt: 5, gescheitert: 0 });
+    expect(typeof lauf.zaehlenBis).toBe("number");
+  });
+});
+
 /* ── Sammler: Abweisungen und Browser-Fehler ──────────────────────────── */
 
 describe("Sammler fuer oeffentliche Schnittstellen", () => {

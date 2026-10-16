@@ -1316,7 +1316,9 @@ ist ein Ergebnis, kein Fehler — vor dem ersten Lauf des Aufräumdienstes mit
 dieser Fassung gibt es keine. Aufträge zählt der Aufräumdienst erst beim
 Löschen (abgeholte nach rund 15 Minuten, alle anderen nach rund 2 Stunden); die
 jüngsten zwei Stunden sind deshalb unvollständig, das Werkzeug sagt es dazu.
-Lücken entstehen, wenn das Zählen scheitert (Warnung `statistik-zaehlen-fehlgeschlagen`,
+Lücken entstehen, wenn das Zählen scheitert oder seine Zeit je Lauf (30 s) um
+ist (Warnungen `statistik-zaehlen-fehlgeschlagen`, `statistik-zaehlen-nicht-abgewartet`,
+`statistik-zaehlen-zeit-um`;
 nach fünf Läufen in Folge Fehlerzeile `statistik-zaehlen-wiederholt-gescheitert`)
 oder Firestore einen Auftrag über sein Sicherheitsnetz (24 h) statt über den
 Aufräumdienst löscht — gezählt wird dann nichts, doppelt nie.

@@ -79,6 +79,12 @@ const SAMMEL_WARTEN_MS = 1000;
    Fenster hoechstens auf das Zaehlen, dann loescht er trotzdem (die
    Loeschfrist geht vor). Weit unter seiner Zeitgrenze von 120 s. */
 const ZAEHLEN_WARTEN_MS = 10 * 1000;
+/* BLEIBT IM CODE — Schutzgrenze (Abnahme-Befund P3, 16.10.2026): So lange
+   zaehlt ein Lauf des Aufraeumdienstes INSGESAMT hoechstens, ueber alle
+   Fenster und beide Loeschzweige. Haengt die Datenbank und liegen viele
+   Fenster an, haette die Grenze je Fenster allein das Loeschen um Minuten
+   verzoegert. Danach wird nicht mehr gezaehlt, sondern nur geloescht. */
+const ZAEHLEN_GESAMT_MS = 30 * 1000;
 /* BLEIBT IM CODE — Grenze von Firestore: hoechstens 500 Schreibvorgaenge je
    Transaktion. Ein Fenster mit mehr Auftraegen in einem Lauf wird geteilt. */
 const AUFTRAEGE_JE_TRANSAKTION = 400;
@@ -390,11 +396,16 @@ async function zaehleTeil(refs, fensterName, beginn) {
  * Warnzeile im Protokoll, und der Auftrag fehlt in der Zaehlung (nie doppelt:
  * Die Marke entsteht nur zusammen mit der Erhoehung).
  *
+ * Insgesamt je Lauf hoechstens ZAEHLEN_GESAMT_MS: `lauf` ist das gemeinsame
+ * Objekt des Aufraeumlaufs (beide Loeschzweige), die erste Nutzung setzt die
+ * Frist. Was danach noch kaeme, wird nicht gezaehlt (Warnzeile).
+ *
  * @param {Array<{id: string, createdAt?: number, gezaehlt?: boolean}>} auftraege
  *   die Liste aus der Loeschabfrage
+ * @param {{zaehlenBis?: number}} [lauf] gemeinsame Frist des Laufs
  * @returns {Promise<{gezaehlt: number, gescheitert: number}>}
  */
-async function zaehleVorDemLoeschen(auftraege) {
+async function zaehleVorDemLoeschen(auftraege, lauf = {}) {
   const ergebnis = { gezaehlt: 0, gescheitert: 0 };
   const offen = (auftraege || []).filter(
     (j) => j && typeof j.id === "string" && j.gezaehlt !== true && typeof j.createdAt === "number"
@@ -414,12 +425,19 @@ async function zaehleVorDemLoeschen(auftraege) {
     ergebnis.gescheitert = offen.length;
     return zaehlLaufAbschliessen(ergebnis);
   }
+  if (typeof lauf.zaehlenBis !== "number") lauf.zaehlenBis = Date.now() + ZAEHLEN_GESAMT_MS;
+  let ausgelassen = 0;
   for (const [name, gruppe] of gruppen) {
     for (let i = 0; i < gruppe.ids.length; i += AUFTRAEGE_JE_TRANSAKTION) {
       const teil = gruppe.ids.slice(i, i + AUFTRAEGE_JE_TRANSAKTION);
+      const rest = lauf.zaehlenBis - Date.now();
+      if (rest <= 0) {
+        ausgelassen += teil.length;
+        continue;
+      }
       try {
         const refs = teil.map((id) => db.collection("jobs").doc(id));
-        const n = await hoechstens(zaehleTeil(refs, name, gruppe.beginn), ZAEHLEN_WARTEN_MS);
+        const n = await hoechstens(zaehleTeil(refs, name, gruppe.beginn), Math.min(ZAEHLEN_WARTEN_MS, rest));
         if (n === ZU_LANGE) {
           /* Die Transaktion laeuft vielleicht noch und zaehlt dann richtig —
              oder sie scheitert am inzwischen geloeschten Auftrag. Doppelt
@@ -434,6 +452,10 @@ async function zaehleVorDemLoeschen(auftraege) {
         ergebnis.gescheitert += teil.length;
       }
     }
+  }
+  if (ausgelassen > 0) {
+    warne("statistik-zaehlen-zeit-um", null, { auftraege: ausgelassen });
+    ergebnis.gescheitert += ausgelassen;
   }
   return zaehlLaufAbschliessen(ergebnis);
 }

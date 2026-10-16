@@ -200,7 +200,8 @@ async function reapJobs({ melder = null } = {}) {
   const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs(), lauf);
   /* ZAEHLEN VOR DEM LOESCHEN (16.10.2026): wirft nie, wartet begrenzt; scheitert
      es, wird trotzdem geloescht, doppelt zaehlt nichts (statistik.js). */
-  await zaehleVorDemLoeschen(zugestellt);
+  const zaehlLauf = {}; /* eine Zeitgrenze fuer beide Zweige */
+  await zaehleVorDemLoeschen(zugestellt, zaehlLauf);
   let reapedZugestellt = 0;
   for (const job of zugestellt) {
     try {
@@ -229,7 +230,7 @@ async function reapJobs({ melder = null } = {}) {
 
   /* (3) Abgelaufene Job-Dokumente → gelöscht. */
   const expired = await sicherFinden("expired", () => findExpiredJobs(), lauf);
-  await zaehleVorDemLoeschen(expired); /* wie in (2c) */
+  await zaehleVorDemLoeschen(expired, zaehlLauf); /* wie in (2c) */
 
   let reapedExpired = 0;
   for (const job of expired) {

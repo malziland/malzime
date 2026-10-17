@@ -11,11 +11,12 @@
 #
 # Aufruf: sh scripts/pruefe-zeitzuender.sh [verzeichnis] [--nur backend|frontend]
 #
-# Der Lauf braucht den jeweiligen Test-Runner. In der Pipeline liegen die Pakete nicht
-# in einem gemeinsamen Job: `test-backend` hat jest (npm ci --prefix functions),
-# `test-frontend` hat vitest (npm ci im Wurzelverzeichnis), und der schlanke Job
-# `pruefungen` hat bewusst gar keine. Deshalb der Filter — jeder Job prueft die
-# Kandidaten, die er auch ausfuehren KANN. Ohne Filter (lokal, vor-dem-push) laeuft alles.
+# Der Lauf braucht beide Test-Runner, jest (npm ci --prefix functions) und vitest
+# (npm ci im Wurzelverzeichnis). Seit 17.10.2026 laeuft die Probe in der Pipeline als
+# Ganzes im Job `datumspruefungen`, der beide installiert — und nur dort, weil sie von
+# der Uhr abhaengt (docs/SECURITY-MODEL.md, „Pruefungen, die von der Uhr abhaengen“).
+# Der Filter `--nur` stammt aus der Zeit, als sie je zur Haelfte in `test-backend` und
+# `test-frontend` lief; er bleibt fuer Einzellaeufe. Ohne Filter laeuft alles.
 #
 # Exit 0 = kein Zeitzuender, 1 = Fundstelle, 2 = Messproblem (NIE als bestanden werten).
 

@@ -47,11 +47,11 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # AUDIT-BEFUND OPS-2026-08-12-11: Die harte Frist-Bremse (zusagen-frische.test.js)
-  # haengt in `test-backend` — lief aber nur bei Push und Pull-Request. Ohne Commit
-  # kein Lauf, ohne Lauf keine Bremse. Damit waren BEIDE Schichten (Wochen-
-  # Erinnerung und CI-Waechter) ereignisgesteuert und konnten gemeinsam
-  # verstummen. Der Zeitplan gibt der Bremse eine eigene Uhr.
+  # AUDIT-BEFUND OPS-2026-08-12-11: Die harte Frist-Bremse (seit 17.10.2026
+  # scripts/pruefe-zusagen-frist.mjs im Job `datumspruefungen`) lief nur bei
+  # Push und Pull-Request. Ohne Commit kein Lauf, ohne Lauf keine Bremse. Damit
+  # waren BEIDE Schichten (Wochen-Erinnerung und CI-Waechter) ereignisgesteuert
+  # und konnten gemeinsam verstummen. Der Zeitplan gibt der Bremse eine eigene Uhr.
   schedule:
     - cron: "17 6 * * 1" # montags 06:17 UTC, vor der Wochen-Erinnerung um 07:00 UTC
 
@@ -88,31 +88,13 @@ jobs:
 
       - run: npm ci
 
-      # Audit-Gate mit begruendeter, ABLAUFENDER Ausnahmeliste statt nacktem
-      # `npm audit --audit-level=high`. Grund: das nackte audit blockiert bei
-      # einer unreparierbaren Fremd-Luecke JEDEN PR — am 2026-07-01 sind daran
-      # alle acht Dependabot-PRs gescheitert. Details: scripts/audit-gate.mjs
-      # Geprueft werden beide Baeume mit ALLEN Abhaengigkeiten, auch den
-      # Werkzeugen (OSS-2026-08-12-23, OSS-2026-09-30-06): Der Wurzel-Baum
-      # besteht nur aus Werkzeugen (Playwright, Vitest, ESLint), die hier ueber
-      # dem ausgecheckten Repository laufen. Bis 30.09.2026 lief das Gate mit
-      # --omit=dev und sah diesen Baum deshalb gar nicht.
-      - run: node ../scripts/audit-gate.mjs functions .
-
+      # Das Abhaengigkeits-Gate und die Zeitzuender-Probe liefen bis 17.10.2026
+      # hier mit. Beide haengen von der Uhr ab, nicht nur vom Inhalt — sie
+      # stehen jetzt im Job `datumspruefungen` (Begruendung dort). Dieser Job
+      # prueft nur noch, was der Inhalt des Commits entscheidet.
       - run: npm run lint
       - run: npm run format:check
       - run: npm test
-
-      # TEST-2026-08-20-01: Ein Test verglich die ECHTE Uhr mit einem festen Datum im
-      # Produktivcode. Er war gruen — bis zu einem berechenbaren Tag, ab dem er bei
-      # jedem Lauf rot geworden waere und als Pflicht-Check jede Auslieferung blockiert
-      # haette, ohne dass jemand etwas geaendert hat. Die Pruefung misst die WIRKUNG:
-      # Sie sucht Tests zu Code mit festem Zeitpunkt und laesst genau die mit
-      # vorgestellter Uhr laufen. Sie haengt an den Test-Jobs, weil sie den jeweiligen
-      # Runner braucht — der schlanke Job `pruefungen` hat bewusst keine Pakete.
-      # Exit 2 (Messproblem) gilt nie als bestanden.
-      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend
-        working-directory: .
 
       # MUTATIONSPROBE: LAEUFT VORERST NICHT IN DER PIPELINE (01.09.2026)
       #
@@ -166,16 +148,85 @@ jobs:
       - run: npm run lint:frontend
       - run: npm run format:frontend:check
       - run: npm run test:frontend
+      # Die Zeitzuender-Probe der Website-Tests lief bis 17.10.2026 hier mit;
+      # sie haengt von der Uhr ab und steht jetzt im Job `datumspruefungen`.
+
+  # ── Die Pruefungen, die von der UHR abhaengen (17.10.2026) ─────────────────
+  #
+  # Drei Pruefungen koennen heute rot sein, obwohl sie gestern ueber genau
+  # denselben Inhalt gruen waren:
+  #   · das Abhaengigkeits-Gate — `npm audit` fragt eine Datenbank, die sich
+  #     taeglich aendert, und die Ausnahmeliste hat Ablaufdaten,
+  #   · die Frist-Bremse fuer die datierte ZDR-Zusage — sie rechnet das
+  #     Pruefdatum der Datenschutzerklaerung gegen heute,
+  #   · die Zeitzuender-Probe — sie stellt die Uhr um 400 Tage ab HEUTE vor.
+  # Bis 17.10.2026 liefen sie in `test-backend` und `test-frontend`. Deshalb
+  # durfte die Auslieferung das Ergebnis von test-backend nie aus dem Pull
+  # Request uebernehmen (Baum-Regel in scripts/deploy.sh) und wartete nach dem
+  # Zusammenfuehren jedes Mal auf die ganze Server-Suite (gemessen 191 s am
+  # 16.10.2026). Hier laufen sie zusammen in einem kurzen Job; die beiden
+  # Test-Jobs pruefen nur noch, was der Inhalt entscheidet. Gestrichen und
+  # abgeschwaecht ist nichts — jede der drei laeuft wie vorher bei jedem Pull
+  # Request, auf main und im Zeitplan.
+  #
+  # Dieser Job ist KEIN eigener Pflicht-Check im Zweigschutz. Sein Ergebnis
+  # sammelt der Pflicht-Check `pruefungen` ein (letzter Schritt dort): Ein roter
+  # Datums-Job macht `pruefungen` rot, und der Pull Request laesst sich nicht
+  # zusammenfuehren — wie vorher ein rotes test-backend. scripts/deploy.sh
+  # verlangt ihn zusaetzlich SELBST gruen fuer den Commit auf main
+  # (ZEITABHAENGIG dort) und nimmt sein Ergebnis nie aus dem Pull Request.
+  #
+  # Die Pakete beider Baeume braucht die Zeitzuender-Probe: Sie startet je
+  # Kandidat jest (functions/) oder vitest (Wurzel). Das Gate und die
+  # Frist-Bremse brauchen keine.
+  datumspruefungen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          # Beide Lockfiles (Wurzel und functions/); vor `npm ci` gibt es
+          # keine weiteren.
+          cache-dependency-path: "**/package-lock.json"
+      # Die Kandidatensuche der Zeitzuender-Probe laeuft mit python3 — mit
+      # festgelegter Fassung statt der, die das Runner-Image gerade mitbringt
+      # (Begruendung beim Job test-backend, Befund L-15).
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - run: npm ci
+      - run: npm ci --prefix functions
+
+      # Audit-Gate mit begruendeter, ABLAUFENDER Ausnahmeliste statt nacktem
+      # `npm audit --audit-level=high`. Grund: das nackte audit blockiert bei
+      # einer unreparierbaren Fremd-Luecke JEDEN PR — am 2026-07-01 sind daran
+      # alle acht Dependabot-PRs gescheitert. Details: scripts/audit-gate.mjs
+      # Geprueft werden beide Baeume mit ALLEN Abhaengigkeiten, auch den
+      # Werkzeugen (OSS-2026-08-12-23, OSS-2026-09-30-06): Der Wurzel-Baum
+      # besteht nur aus Werkzeugen (Playwright, Vitest, ESLint), die hier ueber
+      # dem ausgecheckten Repository laufen. Bis 30.09.2026 lief das Gate mit
+      # --omit=dev und sah diesen Baum deshalb gar nicht.
+      - run: node scripts/audit-gate.mjs functions .
+
+      # Die harte Bremse fuer die datierte ZDR-Zusage der Datenschutzerklaerung
+      # (bis 17.10.2026 ein Test in der Server-Suite, zusagen-frische.test.js).
+      # Handlungsanleitung bei Rot: Kopf von scripts/pruefe-zusagen-frist.mjs.
+      - run: node scripts/pruefe-zusagen-frist.mjs .
 
       # TEST-2026-08-20-01: Ein Test verglich die ECHTE Uhr mit einem festen Datum im
       # Produktivcode. Er war gruen — bis zu einem berechenbaren Tag, ab dem er bei
       # jedem Lauf rot geworden waere und als Pflicht-Check jede Auslieferung blockiert
       # haette, ohne dass jemand etwas geaendert hat. Die Pruefung misst die WIRKUNG:
       # Sie sucht Tests zu Code mit festem Zeitpunkt und laesst genau die mit
-      # vorgestellter Uhr laufen. Sie haengt an den Test-Jobs, weil sie den jeweiligen
-      # Runner braucht — der schlanke Job `pruefungen` hat bewusst keine Pakete.
+      # vorgestellter Uhr laufen — die Server- und die Website-Kandidaten in einem
+      # Lauf (bis 17.10.2026 je zur Haelfte in den beiden Test-Jobs).
       # Exit 2 (Messproblem) gilt nie als bestanden.
-      - run: sh scripts/pruefe-zeitzuender.sh . --nur frontend
+      - run: sh scripts/pruefe-zeitzuender.sh .
 
   # Liest die Playwright-Version aus dem Lockfile und reicht sie an test-e2e
   # weiter. Frueher stand die Version an zwei Stellen (package.json UND
@@ -383,7 +434,20 @@ jobs:
   #
   # Konfiguration im Projekt: .pruefungen/aussentext.txt (Sperrliste) und
   # .pruefungen/fakten.txt (welche Zahlen genau einen Wert haben duerfen).
+  #
+  # SAMMELT SEIT 17.10.2026 DEN JOB `datumspruefungen` EIN (letzter Schritt).
+  # Der Zweigschutz kennt nur die sechs Pflicht-Checks; die Pruefungen, die von
+  # der Uhr abhaengen, sind ueber diesen Job Merge-Voraussetzung geblieben.
+  # FAIL-OPEN VERHINDERN wie beim Sammel-Job test-e2e: Mit blossem `needs:`
+  # stuende `pruefungen` bei einem roten Datums-Job auf "skipped" — und ein
+  # uebersprungener Pflicht-Check gilt beim Zweigschutz als bestanden. Deshalb
+  # `always()`: Dieser Job laeuft immer, seine eigenen Pruefungen auch, und der
+  # letzte Schritt verlangt von `datumspruefungen` genau "success". Der Preis:
+  # `pruefungen` beginnt erst, wenn der Datums-Job fertig ist (rund eine
+  # Minute); beide zusammen bleiben weit unter den Browser-Tests.
   pruefungen:
+    needs: datumspruefungen
+    if: always()
     runs-on: ubuntu-latest
     steps:
       # fetch-depth: 0 holt die volle Historie. Sie wird von
@@ -537,3 +601,9 @@ jobs:
       # verschweigen.
       - run: node scripts/pruefe-vendorierung.mjs
 
+      # Das Ergebnis des Jobs `datumspruefungen` (Begruendung am Kopf dieses
+      # Jobs). Er steht am Ende, damit ein roter Datums-Job die Pruefungen
+      # dieses Jobs nicht verdeckt: Beide Befunde stehen dann im selben Lauf.
+      - env:
+          DATUM: ${{ needs.datumspruefungen.result }}
+        run: echo "datumspruefungen=$DATUM" && test "$DATUM" = success

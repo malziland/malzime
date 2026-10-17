@@ -18,7 +18,7 @@ Einträge mit Status **offen** sind bewusst als offen ausgewiesen.
 | E2E kritischster Nutzerfluss (Demo-Foto → Queue → Disclaimer → Profil) | CI: Teil-Jobs `test-e2e-teil` (Playwright `--shard`, Container-Image = Paketversion), Pflicht-Check `test-e2e` sammelt ein; lokal `npm run test:e2e` | ✅ 434/434 grün — `scripts/pruefstand.sh`, Commit 6c63bb2, 2026-10-17 |
 | Lint + Format (Backend & Frontend) | Teil der CI-Jobs `test-backend`/`test-frontend` (ESLint, Prettier `--check`) | ✅ sauber — 2026-08-10 |
 | Secret-Scan (inkl. voller Historie) | CI-Job `secret-scan` (gitleaks v3.0.0, SHA-gepinnt, `fetch-depth: 0`) | ✅ kein Fund — CI-Run 29562535095, 2026-07-17 |
-| Dependency-Audit | CI-Job `test-backend`: `node ../scripts/audit-gate.mjs functions .` (aus `functions/` heraus) — **beide** Abhängigkeitsbäume mit **allen** Abhängigkeiten einschließlich der Werkzeuge (Gate, bricht Build; High/Critical blockieren, Ausnahmen nur begründet **und mit Ablaufdatum** in `.github/audit-allowlist.json`). Bis 30.09.2026 lief das Gate mit `--omit=dev` und sah den Wurzelbaum, der nur aus Werkzeugen besteht, gar nicht | ✅ **0 Meldungen, Ausnahmeliste leer** — Gate-Lauf 2026-09-30 auf Zweig `sicherheit/abhaengigkeiten-libheif`; Gegenprobe: mit dem Wurzel-Lockfile vor #293 (undici 8.9.0) wird das Gate rot, das frühere Gate blieb dabei grün |
+| Dependency-Audit | CI-Job `datumspruefungen`: `node scripts/audit-gate.mjs functions .` (seit 17.10.2026 dort, weil es von der Uhr abhängt — vorher im Server-Job; nachts zusätzlich im Nachtlauf) — **beide** Abhängigkeitsbäume mit **allen** Abhängigkeiten einschließlich der Werkzeuge (Gate, bricht Build; High/Critical blockieren, Ausnahmen nur begründet **und mit Ablaufdatum** in `.github/audit-allowlist.json`). Bis 30.09.2026 lief das Gate mit `--omit=dev` und sah den Wurzelbaum, der nur aus Werkzeugen besteht, gar nicht | ✅ **0 Meldungen, Ausnahmeliste leer** — Gate-Lauf 2026-09-30 auf Zweig `sicherheit/abhaengigkeiten-libheif`; Gegenprobe: mit dem Wurzel-Lockfile vor #293 (undici 8.9.0) wird das Gate rot, das frühere Gate blieb dabei grün |
 | Lockfile ↔ package.json synchron (Linux-CI) | `npm ci --dry-run` in Root und `functions/` — reproduziert den `EUSAGE`-Abbruch lokal, den eine Textsuche nach „linux" im Lockfile **nicht** findet | ✅ beide exit 0 — 2026-07-29 |
 | Web-Schicht (Multipart-Streaming, Body-/Query-Parsing) | `functions/src/__tests__/upload-http.test.js` — echter HTTP-Server + echtes Express gegen den echten Parser, in beiden Betriebsarten `pipe` und `rawBody` (Firebase-Produktion nachgebildet). **Schließt die Lücke, dass alle übrigen Backend-Tests `onRequest` durch eine Attrappe ersetzen und die Express-Schicht überspringen.** | ✅ 12/12 grün; Gegenprobe: ohne die `rawBody`-Behandlung in `upload.js` fallen 3 davon durch — 2026-07-29 |
 | Queue-Robustheit unter Stoßlast (kein Job verloren) | Queue-Emulator-Lasttest: `firebase emulators:exec` + `functions/scripts/queue-emulator-loadtest.js` (Mistral-Mock, `QUEUE_LOCAL=1`) | ✅ 100 Jobs: 100 done / 0 failed / 0 abandoned / 0 verloren — 2026-07-17 |
@@ -62,9 +62,16 @@ oder ein neuer Pflicht-Nachweis entsteht (z. B. neue Profilpflicht, behobenes
 Audit-Finding). Die Rollback-Probe wird bei größeren Toolchain-Wechseln (Node-Major,
 Test-Runner) wiederholt, nicht bei jedem Release.
 
-**Die drei Suiten-Zeilen oben stempelt `scripts/pruefstand.sh` automatisch** —
-das Skript lässt alle drei Suiten laufen und trägt Anzahl, Commit und Datum
-selbst ein; bei einer roten Suite wird nichts gestempelt. Von Hand gepflegte
-Zahlen sind in diesen drei Zeilen nicht mehr vorgesehen. Der CI-Test
+**Die drei Suiten-Zeilen oben stempelt `scripts/pruefstand.sh` automatisch**,
+auf einem von zwei Wegen, und der Stempel nennt, welcher es war. Ohne Argument
+lässt das Skript alle drei Suiten auf dem Rechner laufen. Mit `--aus-github
+<commit>` (seit 17.10.2026; so stempelt die Auslieferung nach dem Live-Gang)
+liest es die Zahlen aus den Protokollen der GitHub-Jobs genau dieses Commits
+(`scripts/pruefstand-github.py`) und nennt den GitHub-Lauf. In beiden Fällen
+läuft die Rückbauprobe auf dem Rechner, und gestempelt wird nur, was grün und
+lesbar ist: Bei einer roten Suite, einem fehlenden, laufenden oder roten Job,
+einem fehlenden Teil der Browser-Tests oder einer nicht lesbaren Zahl wird
+nichts gestempelt. Von Hand gepflegte Zahlen sind in diesen drei Zeilen nicht
+mehr vorgesehen. Der CI-Test
 `doku-drift.test.js` wacht darüber, dass das README zahlenfrei bleibt, interne
 Doku-Links existieren und die Suiten-Zeilen datiert sind.

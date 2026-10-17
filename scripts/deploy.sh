@@ -245,7 +245,15 @@ else
     SHA=$(git rev-parse HEAD)
     # Die sechs Pflicht-Checks müssen für DIESEN Commit success sein. Fehlt ein
     # Ergebnis (Lauf noch nicht durch), ist das kein Freibrief — dann Abbruch.
+    # Es sind genau die Pflicht-Checks des Zweigschutzes; die
+    # Infrastruktur-Pruefung vergleicht beide Listen.
     PFLICHT="test-backend test-frontend test-e2e secret-scan playwright-version pruefungen"
+    # Dazu die Pruefungen, die von der UHR abhaengen (seit 17.10.2026 der Job
+    # `datumspruefungen`, Begruendung in ci.yml): Sie muessen ebenso gruen sein,
+    # und zwar auf main SELBST — die Baum-Regel unten nimmt ihr Ergebnis nie aus
+    # dem Pull Request. Im Zweigschutz stehen sie nicht als eigener Check; dort
+    # sammelt `pruefungen` sie ein.
+    ZEITABHAENGIG="datumspruefungen"
     # Je Check der juengste Lauf, ueber alle Seiten der Antwort — check_lage oben.
     LAGE=$(check_lage "$SHA")
 
@@ -325,19 +333,22 @@ else
               # ausgenommen (Befund 31.08.2026, unvorbelastetes Review).
               #
               # Die Begruendung "gleicher Baum, gleiches Ergebnis" gilt nur
-              # fuer Pruefungen, die ausschliesslich den Code ansehen.
-              # `test-backend` fuehrt drei Pruefungen, die von der UHR
-              # abhaengen: audit-gate mit ablaufender Ausnahmeliste, die
-              # Frist-Bremse zusagen-frische, und npm audit gegen eine
-              # Datenbank, die sich taeglich aendert. Ein gruenes Ergebnis von
-              # gestern kann heute falsch sein, ohne dass sich eine Zeile
-              # geaendert hat — genau deshalb gibt es den woechentlichen
-              # Zeitplan-Lauf (OPS-2026-08-20-03, vierzig Zeilen weiter oben).
+              # fuer Pruefungen, die ausschliesslich den Code ansehen. Drei
+              # haengen von der UHR ab: das Abhaengigkeits-Gate (Ausnahmeliste
+              # mit Ablaufdaten, npm audit gegen eine Datenbank, die sich
+              # taeglich aendert), die Frist-Bremse der ZDR-Zusage und die
+              # Zeitzuender-Probe. Ein gruenes Ergebnis von gestern kann dort
+              # heute falsch sein, ohne dass sich eine Zeile geaendert hat —
+              # genau deshalb gibt es den woechentlichen Zeitplan-Lauf
+              # (OPS-2026-08-20-03, bei check_lage oben). Sie stehen in
+              # ZEITABHAENGIG (oben bei PFLICHT) und werden nie nachgetragen.
               #
-              # Der Verlust ist klein: test-backend dauert 179 s, der teure
-              # test-e2e 521 s. Die Abkuerzung spart also weiterhin den
-              # groesseren Teil.
-              ZEITABHAENGIG="test-backend"
+              # Bis 17.10.2026 liefen die drei in test-backend, und deshalb war
+              # test-backend hier ausgenommen: Nach jedem Zusammenfuehren wartete
+              # die Auslieferung auf die ganze Server-Suite (191 s im Lauf von
+              # main auf 6c63bb2, 17.10.2026). Seit sie im kurzen Job
+              # `datumspruefungen` stehen, sieht test-backend nur noch den
+              # Inhalt und folgt derselben Regel wie die anderen Checks.
               NEUE_LAGE=""
               # BEFUND aus Runde 1: `for X in $VAR` ohne `set -f` laesst die
               # Shell Platzhalter aufloesen. Ein Check-Name mit `*` oder `?`
@@ -421,7 +432,9 @@ else
       echo "        Notschalter: SKIP_STAND=1" >&2
       exit 1
     fi
-    for CHECK in $PFLICHT; do
+    # Die zeitabhaengigen zuletzt: Ist ein Pflicht-Check rot, nennt die
+    # Meldung zuerst ihn.
+    for CHECK in $PFLICHT $ZEITABHAENGIG; do
       if ! grep -qx "${CHECK}=success" <<<"$LAGE"; then
         echo "FEHLER: Pflicht-Check ${CHECK} ist fuer $SHA nicht grün (Ist: $(printf '%s\n' "$LAGE" | grep "^${CHECK}=" || echo "fehlt"))." >&2
         echo "        Notschalter: SKIP_STAND=1" >&2
@@ -549,7 +562,7 @@ else
     else
       echo "Nachtlauf: juengster Lauf nach Zeitplan vor ${NACHT_PLAN_MINUTEN} min (Meldung ab ${NACHT_ZEITPLAN_GRENZE_MINUTEN} min)."
     fi
-    echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks grün für $SHA (jüngster Lauf je Check)."
+    echo "Stand-Bindung: HEAD == origin/main, alle sechs Pflicht-Checks und die Datumspruefungen grün für $SHA (jüngster Lauf je Check)."
   fi
 fi
 
@@ -578,7 +591,7 @@ elif [ "${SKIP_STAND:-0}" = "1" ]; then
   npm run test:frontend
 else
   echo "— Lint und Tests uebersprungen: Die Stand-Bindung hat sie bereits belegt"
-  echo "  (sauberer Baum, HEAD == origin/main, sechs Pflicht-Checks gruen)."
+  echo "  (sauberer Baum, HEAD == origin/main, sechs Pflicht-Checks und die Datumspruefungen gruen)."
 fi
 
 # ── OPS-2026-08-12-25: Riegel gegen ein unbekanntes Auslieferungswerkzeug ──

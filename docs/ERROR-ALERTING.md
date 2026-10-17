@@ -278,7 +278,8 @@ nur eingerichtet.
 ## Dritter Kanal: Nachtlauf „Sicherheit nachts" (seit 2026-09-30)
 
 Nicht aus Google Cloud, sondern aus GitHub: Der Workflow
-`.github/workflows/sicherheit-nachts.yml` prüft täglich um 03:43 UTC auf neue
+`.github/workflows/sicherheit-nachts.yml` prüft täglich (geplant 03:43 UTC, von
+GitHub oft Stunden später gestartet) auf neue
 Sicherheitslücken (npm-Pakete, Herstellermeldungen zu `public/lib`) und auf
 Abkündigungshinweise von GitHub. Ist auf `main` einer seiner Prüf-Jobs rot oder
 abgebrochen, schickt der Job `alarm` einen **ntfy-Push mit Stufe „urgent" (5)** an

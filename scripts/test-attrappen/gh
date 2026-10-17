@@ -2,7 +2,8 @@
 # Attrappe fuer die GitHub-CLI.
 #
 #   ATTRAPPE_CHECKS   Zeilen "name=conclusion" fuer die Pflicht-Checks.
-#                     Vorgabe: alle sechs auf success.
+#                     Vorgabe: die sechs Pflicht-Checks und der Datums-Job
+#                     (datumspruefungen, seit 17.10.2026), alle auf success.
 [ -n "${ATTRAPPE_PROTOKOLL:-}" ] && echo "gh $*" >> "$ATTRAPPE_PROTOKOLL"
 
 VORGABE='test-backend=success
@@ -10,7 +11,8 @@ test-frontend=success
 test-e2e=success
 secret-scan=success
 playwright-version=success
-pruefungen=success'
+pruefungen=success
+datumspruefungen=success'
 
 if [ "${ATTRAPPE_GH_ROT:-0}" = "1" ]; then
   echo "ATTRAPPE gh: nicht erreichbar (so gewollt)" >&2

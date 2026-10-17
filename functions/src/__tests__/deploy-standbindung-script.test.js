@@ -2,7 +2,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { ghSeitenAttrappeAnlegen, lauf, fremdeLaeufe, pflichtLaeufe, PFLICHT } = require("./hilfen/gh-seiten-attrappe");
+const { ghSeitenAttrappeAnlegen, lauf, fremdeLaeufe, pflichtLaeufe, VERLANGT } = require("./hilfen/gh-seiten-attrappe");
 
 /**
  * Wächter für die Stand-Bindung in scripts/deploy.sh.
@@ -155,20 +155,21 @@ describe("Stand-Bindung in deploy.sh", () => {
       expect(abfragen()[0]).toMatch(/\/check-runs\?per_page=100&page=1$/);
     });
 
-    test("31 Läufe: der Pflicht-Check an Stelle 31 fehlt nicht", () => {
-      const laeufe = [...fremdeLaeufe(25), ...pflichtLaeufe()];
+    test("31 Läufe: der verlangte Check an Stelle 31 fehlt nicht", () => {
+      /* pflichtLaeufe(): die sechs Pflicht-Checks und der Datums-Job. */
+      const laeufe = [...fremdeLaeufe(24), ...pflichtLaeufe()];
       expect(laeufe).toHaveLength(31);
-      expect(laeufe[30].name).toBe("pruefungen");
+      expect(laeufe[30].name).toBe("datumspruefungen");
       const zeilen = lageAuswerten({ check_runs: laeufe });
-      expect(zeilen).toContain("pruefungen=success");
-      expect(bindungLaesstDurch(zeilen, PFLICHT)).toBe(true);
+      expect(zeilen).toContain("datumspruefungen=success");
+      expect(bindungLaesstDurch(zeilen, VERLANGT)).toBe(true);
     });
 
     test("Gegenprobe: 30 je Seite und nur die erste Seite — dann fehlt genau dieser Check", () => {
       /* Belegt, dass die Attrappe die Lücke überhaupt nachbilden kann. Die
          Abfrage unten ist die frühere: ohne Seitenlänge, ohne Blättern, mit
          der Auswertung je Antwort. */
-      const laeufe = [...fremdeLaeufe(25), ...pflichtLaeufe()];
+      const laeufe = [...fremdeLaeufe(24), ...pflichtLaeufe()];
       const laeufeDatei = path.join(attrappe(), "laeufe.json");
       fs.writeFileSync(laeufeDatei, JSON.stringify(laeufe));
       const frueher = execFileSync(
@@ -184,23 +185,24 @@ describe("Stand-Bindung in deploy.sh", () => {
         .trim()
         .split("\n");
       expect(frueher).toContain("test-backend=success");
-      expect(frueher).not.toContain("pruefungen=success");
-      expect(bindungLaesstDurch(frueher, PFLICHT)).toBe(false);
+      expect(frueher).toContain("pruefungen=success");
+      expect(frueher).not.toContain("datumspruefungen=success");
+      expect(bindungLaesstDurch(frueher, VERLANGT)).toBe(false);
     });
 
     test("genau 100 Läufe: eine volle Seite — es wird nach der nächsten gefragt, nichts fehlt", () => {
-      const laeufe = [...fremdeLaeufe(94), ...pflichtLaeufe()];
+      const laeufe = [...fremdeLaeufe(93), ...pflichtLaeufe()];
       expect(laeufe).toHaveLength(100);
       const zeilen = lageAuswerten({ check_runs: laeufe });
       expect(abfragen().map((a) => a.replace(/.*&page=/, ""))).toEqual(["1", "2"]);
-      expect(bindungLaesstDurch(zeilen, PFLICHT)).toBe(true);
+      expect(bindungLaesstDurch(zeilen, VERLANGT)).toBe(true);
     });
 
     test("250 Läufe: drei Seiten, und die Pflicht-Checks auf der letzten zählen mit", () => {
-      const laeufe = [...fremdeLaeufe(244), ...pflichtLaeufe()];
+      const laeufe = [...fremdeLaeufe(243), ...pflichtLaeufe()];
       const zeilen = lageAuswerten({ check_runs: laeufe });
       expect(abfragen().map((a) => a.replace(/.*&page=/, ""))).toEqual(["1", "2", "3"]);
-      expect(bindungLaesstDurch(zeilen, PFLICHT)).toBe(true);
+      expect(bindungLaesstDurch(zeilen, VERLANGT)).toBe(true);
       /* Je Check genau EINE Zeile — auch für die vier Namen, die auf jeder
          Seite vorkommen. */
       expect(zeilen.filter((z) => z.startsWith("alarm="))).toEqual(["alarm=success"]);
@@ -216,7 +218,7 @@ describe("Stand-Bindung in deploy.sh", () => {
       ];
       const zeilen = lageAuswerten({ check_runs: laeufe });
       expect(zeilen.filter((z) => z.startsWith("test-backend="))).toEqual(["test-backend=failure"]);
-      expect(bindungLaesstDurch(zeilen, PFLICHT)).toBe(false);
+      expect(bindungLaesstDurch(zeilen, VERLANGT)).toBe(false);
     });
 
     test("und umgekehrt: ein jüngerer grüner auf Seite 2 hebt den älteren roten auf Seite 1 auf", () => {
@@ -229,7 +231,7 @@ describe("Stand-Bindung in deploy.sh", () => {
       ];
       const zeilen = lageAuswerten({ check_runs: laeufe });
       expect(zeilen.filter((z) => z.startsWith("test-e2e="))).toEqual(["test-e2e=success"]);
-      expect(bindungLaesstDurch(zeilen, PFLICHT)).toBe(true);
+      expect(bindungLaesstDurch(zeilen, VERLANGT)).toBe(true);
     });
 
     test("scheitert eine Folgeseite, gibt es KEIN Teilergebnis", () => {
@@ -238,7 +240,7 @@ describe("Stand-Bindung in deploy.sh", () => {
       const laeufe = [...pflichtLaeufe(), ...fremdeLaeufe(100)];
       expect(lageAuswerten({ check_runs: laeufe }, { seiteRot: 2 })).toEqual([]);
       /* Gegenrichtung: Ohne den Fehlschlag kommt die Lage vollständig. */
-      expect(bindungLaesstDurch(lageAuswerten({ check_runs: laeufe }), PFLICHT)).toBe(true);
+      expect(bindungLaesstDurch(lageAuswerten({ check_runs: laeufe }), VERLANGT)).toBe(true);
     });
   });
 
@@ -294,11 +296,18 @@ describe("Stand-Bindung in deploy.sh", () => {
 
     test("zeitabhaengige Pruefungen sind ausgenommen", () => {
       const a = abschnitt();
-      /* test-backend fuehrt audit-gate mit ablaufender Ausnahmeliste, die
-         Frist-Bremse und npm audit. Ein gruenes Ergebnis von gestern kann
-         dort heute falsch sein, ohne dass sich eine Zeile geaendert hat. */
-      expect(a).toContain("ZEITABHAENGIG=");
-      expect(a).toContain("test-backend");
+      /* Der Job datumspruefungen fuehrt audit-gate mit ablaufender
+         Ausnahmeliste und npm audit, die Frist-Bremse und den Zeitzuender. Ein
+         gruenes Ergebnis von gestern kann dort heute falsch sein, ohne dass
+         sich eine Zeile geaendert hat. Seit 17.10.2026 steht die Liste neben
+         PFLICHT (sie gilt auch fuer die Schlusspruefung); der Abschnitt nimmt
+         jeden ihrer Namen von der Abkuerzung aus. Dass ein Name darin wirklich
+         wirkt, belegt deploy-verhalten.test.js im Lauf. */
+      expect(skript).toMatch(/^\s*ZEITABHAENGIG="datumspruefungen"$/m);
+      expect(a).toMatch(/for Z in \$ZEITABHAENGIG; do/);
+      /* Nur EINE Definition — eine zweite im Abschnitt ueberschriebe die erste. */
+      expect(skript.match(/^\s*ZEITABHAENGIG=/gm)).toHaveLength(1);
+      expect(a).not.toMatch(/^\s*ZEITABHAENGIG=/m);
     });
 
     test("ohne Baumgleichheit passiert gar nichts", () => {

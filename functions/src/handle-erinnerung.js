@@ -13,7 +13,7 @@
  *
  * Zwei Schichten, bewusst getrennt:
  *   - hier die freundliche Vorwarnung (eine Woche vorher, aufs Handy)
- *   - in der CI die harte Bremse (`__tests__/zusagen-frische.test.js`),
+ *   - in der CI die harte Bremse (`scripts/pruefe-zusagen-frist.mjs`),
  *     falls die Vorwarnung untergeht (nur fuer die ZDR-Zusage)
  *
  * Das Pruefdatum wird aus der LIVE-Seite gelesen, nicht aus einer Kopie:

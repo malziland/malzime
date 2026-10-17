@@ -4,6 +4,41 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert — Website
+
+- **Fußzeile ohne KI-Link.** Der Link „Mit KI-Unterstützung gebaut“ steht nicht
+  mehr in der Fußzeile jeder Seite. Wie malziME mit KI entstanden ist, steht
+  weiter in Abschnitt 07 der Kurzvorstellung und im README.
+- **Datenschutzerklärung: Das fertige Profil ist nur Text.** Beim Eintrag „Dein
+  fertiges Profil“ steht jetzt, dass nur der Text des Profils aufgehoben wird,
+  nicht das Foto (deutsch und englisch).
+
+### Geändert — Auslieferung
+
+- **Nach dem Zusammenführen wartet die Auslieferung nicht mehr auf die
+  Server-Tests.** Die drei Prüfungen, die vom Tag abhängen
+  (Abhängigkeits-Gate, Frist der ZDR-Zusage, Zeitzünder), laufen in einem
+  eigenen kurzen Job `datumspruefungen`, und nur dort. Er muss für den
+  ausgelieferten Commit selbst grün sein; die Server- und Website-Tests prüfen
+  nur noch den Inhalt, ihr Ergebnis aus dem Pull Request gilt bei bitgleichem
+  Stand wie bei den anderen Checks. Keine Prüfung entfällt. Der neue Job ist
+  kein eigener Pflicht-Check: `pruefungen` wartet auf ihn und wird rot, wenn
+  er nicht grün ist. Die Frist der ZDR-Zusage ist dafür vom Test zum Skript
+  geworden (`scripts/pruefe-zusagen-frist.mjs`, ein nicht lesbares Datum ist
+  rot).
+- **Der Prüfstand-Stempel nach dem Live-Gang kommt aus GitHub.** Die drei
+  Testreihen laufen dafür nicht mehr ein drittes Mal auf dem Rechner: Die
+  Zahlen kommen aus den Protokollen der GitHub-Jobs des ausgelieferten
+  Commits, und der Stempel nennt den Lauf (`scripts/pruefstand.sh
+  --aus-github`). Fehlt ein Job oder ein Teil der Browser-Tests, ist einer rot
+  oder eine Zahl nicht lesbar, wird nichts gestempelt. Die Rückbauprobe läuft
+  weiter auf dem Rechner.
+- **Der Kommentar zum Nachtlauf sagt, wann er wirklich startet:** geplant
+  03:43 UTC, von GitHub oft Stunden später gestartet (Messung im Kommentar von
+  `.github/workflows/sicherheit-nachts.yml`).
+
 ## [5.3.0] — 2026-10-17
 
 ### Neu — Betrieb

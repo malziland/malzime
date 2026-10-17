@@ -1,6 +1,7 @@
 /* pipeline-vertrag-script.test.js — faellt es auf, wenn aus der Pipeline etwas verschwindet?
  *
- * Der Zweigschutz und `scripts/deploy.sh` verlangen sechs gruene Pflicht-Checks.
+ * Der Zweigschutz und `scripts/deploy.sh` verlangen sechs gruene Pflicht-Checks,
+ * `deploy.sh` dazu den Job `datumspruefungen` (seit 17.10.2026).
  * Beide sehen nur NAME und ERGEBNIS eines Jobs — nicht, was er getan hat. Ein
  * Job, aus dem der Testlauf gestrichen wurde, bleibt gruen (OPS-2026-10-03-12).
  *
@@ -172,7 +173,9 @@ describe("Vertrag der Pipeline-Dateien — der Erfolgsweg", () => {
     expect(r.code).toBe(0);
     /* Und der Vertrag ist wirklich gemessen worden, nicht nur verschwiegen. */
     expect(r.ausgabe).toMatch(/6 Dateien entsprechen dem festgeschriebenen Stand/);
-    expect(r.ausgabe).toMatch(/jeder der 6 Pflicht-Jobs und 1 Teil-Job\(s\) fuehrt seine Pruefbefehle aus/);
+    expect(r.ausgabe).toMatch(
+      /jeder der 6 Pflicht-Jobs, 1 Datums-Job\(s\) und 1 Teil-Job\(s\) fuehrt seine Pruefbefehle aus/
+    );
     expect(r.ausgabe).toMatch(/11 npm-Skripte hinter den Pflicht-Schritten, die Jest-Einstellung/);
     expect(r.ausgabe).toMatch(/und 6 Einstellungsdateien der Pruefwerkzeuge lauten wie festgelegt/);
     expect(r.ausgabe).toMatch(/keine eingecheckte Datei ist von \.gitignore erfasst/);
@@ -350,7 +353,7 @@ describe("Vertrag der Pipeline-Dateien — die Pruefsumme haelt jede Datei fest"
       "x7",
       "ci.yml: das Abhaengigkeits-Gate geloescht",
       CI,
-      zeileWeg("      - run: node ../scripts/audit-gate.mjs functions ."),
+      zeileWeg("      - run: node scripts/audit-gate.mjs functions ."),
     ],
     [
       "x9",
@@ -477,15 +480,37 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
     [
       "das Abhaengigkeits-Gate geloescht (der Kommentar darueber nennt es weiter)",
       CI,
-      zeileWeg("      - run: node ../scripts/audit-gate.mjs functions ."),
-      /Job test-backend fuehrt 'node \.\.\/scripts\/audit-gate\.mjs functions \.' nicht mehr/,
+      zeileWeg("      - run: node scripts/audit-gate.mjs functions ."),
+      /Job datumspruefungen fuehrt 'node scripts\/audit-gate\.mjs functions \.' nicht mehr/,
     ],
     [
-      "die Zeitzuender-Pruefung des Servers geloescht (die der Website steht weiter da)",
+      "die Zeitzuender-Pruefung geloescht",
+      CI,
+      zeileWeg("      - run: sh scripts/pruefe-zeitzuender.sh ."),
+      /Job datumspruefungen fuehrt 'sh scripts\/pruefe-zeitzuender\.sh \.' nicht mehr/,
+    ],
+    [
+      "die Frist-Bremse der ZDR-Zusage geloescht",
+      CI,
+      zeileWeg("      - run: node scripts/pruefe-zusagen-frist.mjs ."),
+      /Job datumspruefungen fuehrt 'node scripts\/pruefe-zusagen-frist\.mjs \.' nicht mehr/,
+    ],
+    [
+      "die Frist-Bremse mit vorgegebener Uhr — sie waere fuer immer gruen",
       CI,
       (t) =>
-        einmal(t, "      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend\n        working-directory: .\n", ""),
-      /Job test-backend fuehrt 'sh scripts\/pruefe-zeitzuender\.sh \. --nur backend' nicht mehr/,
+        einmal(
+          t,
+          "      - run: node scripts/pruefe-zusagen-frist.mjs .\n",
+          "      - run: node scripts/pruefe-zusagen-frist.mjs . --jetzt 1786000000000\n"
+        ),
+      /Job datumspruefungen fuehrt 'node scripts\/pruefe-zusagen-frist\.mjs \.' nicht mehr/,
+    ],
+    [
+      "der Sammelschritt fuer die Datumspruefungen geloescht",
+      CI,
+      zeileWeg('        run: echo "datumspruefungen=$DATUM" && test "$DATUM" = success'),
+      /Job pruefungen fuehrt 'echo "datumspruefungen=\$DATUM" && test "\$DATUM" = success' nicht mehr/,
     ],
     [
       "die Browser-Modul-Tests geloescht",
@@ -830,15 +855,26 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       /Job test-backend: der Schritt 'npm test' traegt 'working-directory' \['scripts'\] — derselbe Wortlaut liefe/,
     ],
     [
-      "der festgelegte Ordner eines Schritts ist ein anderer",
+      "die Zeitzuender-Pruefung laeuft in einem anderen Ordner",
       CI,
       (t) =>
         einmal(
           t,
-          "      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend\n        working-directory: .\n",
-          "      - run: sh scripts/pruefe-zeitzuender.sh . --nur backend\n        working-directory: ..\n"
+          "      - run: sh scripts/pruefe-zeitzuender.sh .\n",
+          "      - run: sh scripts/pruefe-zeitzuender.sh .\n        working-directory: functions\n"
         ),
-      /der Schritt 'sh scripts\/pruefe-zeitzuender\.sh \. --nur backend' traegt 'working-directory' \['\.\.'\] statt \['\.'\]/,
+      /Job datumspruefungen: der Schritt 'sh scripts\/pruefe-zeitzuender\.sh \.' traegt 'working-directory' \['functions'\]/,
+    ],
+    [
+      "der Sammelschritt liest das Ergebnis eines anderen Jobs",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "          DATUM: ${{ needs.datumspruefungen.result }}\n",
+          "          DATUM: ${{ needs.secret-scan.result }}\n"
+        ),
+      /Job pruefungen: der Schritt 'echo "datumspruefungen=\$DATUM"[^']*' traegt 'env' \['DATUM: \$\{\{ needs\.secret-scan\.result \}\}'\]/,
     ],
     [
       "die Server-Tests bekommen eine Umgebung, die die Shell umlenkt",
@@ -1110,6 +1146,121 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
     const r = waechter();
     expect(r.code).toBe(1);
     expect(r.ausgabe).toMatch(/deploy\.sh nennt keine Liste PFLICHT/);
+  });
+
+  /* Seit 17.10.2026: Die Pruefungen, die von der Uhr abhaengen, stehen in
+     deploy.sh in einer eigenen Liste. Leert sie jemand, nimmt die Baum-Regel
+     ihr Ergebnis aus dem Pull Request — eines von gestern fuer heute. */
+  test("deploy.sh nimmt den Datums-Job aus der Liste ZEITABHAENGIG: der Waechter haelt an", () => {
+    aendern(DEPLOY, (t) => einmal(t, 'ZEITABHAENGIG="datumspruefungen"', 'ZEITABHAENGIG=""'));
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(
+      /deploy\.sh nennt die zeitabhaengigen Pruefungen \[\], der Vertrag der Pipeline \['datumspruefungen'\]/
+    );
+  });
+
+  test("deploy.sh nennt gar keine Liste ZEITABHAENGIG mehr", () => {
+    aendern(DEPLOY, (t) => einmal(t, 'ZEITABHAENGIG="datumspruefungen"', 'ZEITLICH="datumspruefungen"'));
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/deploy\.sh nennt keine Liste ZEITABHAENGIG/);
+  });
+
+  test("deploy.sh fuehrt den Datums-Job als gewoehnlichen Pflicht-Check: der Waechter haelt an", () => {
+    /* Dann griffe die Baum-Regel fuer ihn — er stuende in PFLICHT statt in ZEITABHAENGIG. */
+    aendern(DEPLOY, (t) =>
+      einmal(
+        einmal(t, 'ZEITABHAENGIG="datumspruefungen"', 'ZEITABHAENGIG=""'),
+        'PFLICHT="test-backend test-frontend test-e2e secret-scan playwright-version pruefungen"',
+        'PFLICHT="test-backend test-frontend test-e2e secret-scan playwright-version pruefungen datumspruefungen"'
+      )
+    );
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/deploy\.sh verlangt die Pflicht-Checks .* beide Listen muessen gleich sein/);
+    expect(r.ausgabe).toMatch(/deploy\.sh nennt die zeitabhaengigen Pruefungen \[\]/);
+  });
+
+  /* Der Datums-Job ist kein Pflicht-Check des Zweigschutzes. Merge-Voraussetzung
+     bleibt er nur, solange `pruefungen` ihn einsammelt: wartet, mit always()
+     laeuft und sein Ergebnis prueft. Jede dieser drei Stellen allein darf nicht
+     fallen — auch nicht mit nachgetragener Pruefsumme. */
+  test.each([
+    [
+      "pruefungen wartet nicht mehr auf den Datums-Job",
+      zeileWeg("    needs: datumspruefungen"),
+      /Job pruefungen wartet auf None statt \['datumspruefungen'\]/,
+    ],
+    [
+      "pruefungen laeuft ohne always() — bei rotem Datums-Job stuende es auf skipped",
+      zeileWeg("    if: always()"),
+      /Job pruefungen traegt die Bedingung None statt \['always\(\)'\]/,
+    ],
+  ])("Sammler: %s", (_was, umbau, meldung) => {
+    aendern(CI, umbau);
+    summenNachtragen();
+    const r = waechter();
+    expect(r.ausgabe).not.toMatch(ABWEICHUNG);
+    expect(r.ausgabe).toMatch(meldung);
+    expect(r.code).toBe(1);
+  });
+
+  test("Sammler: always() aus ci.yml UND aus der Tabelle genommen — die Tabellen passen nicht mehr zusammen", () => {
+    /* Wer die Bedingung bewusst streicht und die Tabelle mitzieht, besteht die
+       Regel je Job. Dann haelt der Abgleich der Tabellen an: ZEITABHAENGIG_CI
+       verlangt einen Sammler mit always(). */
+    aendern(CI, zeileWeg("    if: always()"));
+    aendern(WAECHTER, (t) => einmal(t, '    "pruefungen": "always()",\n', ""));
+    summenNachtragen();
+    const r = waechter();
+    expect(r.ausgabe).not.toMatch(ABWEICHUNG);
+    expect(r.ausgabe).not.toMatch(/traegt die Bedingung/);
+    expect(r.ausgabe).toMatch(
+      /der zeitabhaengige Job datumspruefungen wird nicht vollstaendig von pruefungen eingesammelt/
+    );
+    expect(r.code).toBe(1);
+  });
+
+  /* DATUMSSKRIPTE: Kaeme eine Pruefung, die von der Uhr abhaengt, in einen
+     anderen Job zurueck, waere jener wieder zeitabhaengig — und deploy.sh
+     naehme sein Ergebnis trotzdem aus dem Pull Request. Der Fall traegt
+     Pruefsumme UND Schrittfolge nach: So sieht eine bewusste Aenderung aus. */
+  test("ein Datumsskript kommt in test-backend zurueck, Summe und Schrittfolge nachgetragen: der Waechter haelt an", () => {
+    aendern(CI, (t) =>
+      einmal(
+        t,
+        "      - run: npm run format:check\n",
+        "      - run: npm run format:check\n      - run: node ../scripts/audit-gate.mjs functions .\n"
+      )
+    );
+    aendern(WAECHTER, (t) =>
+      einmal(
+        t,
+        '        "run: npm run format:check",\n        "run: npm test",\n',
+        '        "run: npm run format:check",\n        "run: node ../scripts/audit-gate.mjs functions .",\n        "run: npm test",\n'
+      )
+    );
+    summenNachtragen();
+    const r = waechter();
+    expect(r.ausgabe).not.toMatch(ABWEICHUNG);
+    expect(r.ausgabe).not.toMatch(/SCHRITTFOLGE_CI/);
+    expect(r.ausgabe).toMatch(/ci\.yml: Job test-backend nennt audit-gate\.mjs .*\(DATUMSSKRIPTE\)/);
+    expect(r.code).toBe(1);
+  });
+
+  test("die Zeitzuender-Probe im Browser-Teil: auch dort ein Befund", () => {
+    aendern(CI, (t) =>
+      einmal(
+        t,
+        "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+        "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n      - run: sh scripts/pruefe-zeitzuender.sh . --nur frontend\n"
+      )
+    );
+    summenNachtragen();
+    const r = waechter();
+    expect(r.ausgabe).toMatch(/ci\.yml: Job test-e2e-teil nennt pruefe-zeitzuender\.sh/);
+    expect(r.code).toBe(1);
   });
 });
 

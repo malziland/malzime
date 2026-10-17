@@ -179,7 +179,14 @@ ZEILEN_GRENZEN = {
     # 16.10.2026: 1480 -> 1600 (gemessen 1520 + rund 5 %). Neu: der Vertrag der Teil-Jobs
     # (verteilte Browser-Tests) — er liest dieselben Job-Bloecke mit denselben Helfern.
     # Naechster Schnitt, wenn sie wieder waechst: die Pruefsummen (VERTRAG_SUMMEN usw.).
-    "scripts/pruefe-deploy-riegel.py": 1600,
+    # 17.10.2026: 1600 -> 1700 (gemessen 1614 + rund 5 %). Neu: der Vertrag des
+    # Datums-Jobs (ZEITABHAENGIG_CI, DATUMSSKRIPTE, Sammler) — er liest dieselben
+    # Job-Bloecke und dieselben Tabellen wie der Rest von vertrag_ci und gehoert
+    # deshalb hierher. Den Schnitt der Pruefsummen NICHT mitgemacht: Er verlegt
+    # die Stelle, die AGENTS.md, der Mitzieher und die Tests fuer jede
+    # Pipeline-Aenderung nennen — ein eigener Umbau, kein Beiwerk. Er bleibt der
+    # naechste Schnitt.
+    "scripts/pruefe-deploy-riegel.py": 1700,
     "scripts/verify-infrastructure.sh": 915,
     "scripts/selbstpruefung-waechter.sh": 720,
     "scripts/pruefe-fremd-meldungen.mjs": 605,

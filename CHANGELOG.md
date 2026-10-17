@@ -47,8 +47,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   (vollständig und ohne Doppelte, gemessen mit `--list`). Der
   Pflicht-Check `test-e2e` sammelt die Teile ein und wird rot, sobald ein Teil
   rot, abgebrochen oder übersprungen ist — er bleibt nie still „übersprungen“,
-  außer beim reinen Auslieferungs-Nachtrag wie bisher. Gerechnet rund 5½ statt
-  knapp 10 Minuten; die echte Dauer zeigt erst der erste Lauf auf GitHub.
+  außer beim reinen Auslieferungs-Nachtrag wie bisher. Gemessen auf GitHub am
+  17.10.2026: der ganze Prüflauf rund 5 statt 10 Minuten.
   `deploy.sh` wartet dabei richtig: Der Sammel-Check entsteht erst, wenn alle
   Teile fertig sind, und gilt bis dahin als „läuft“ statt als fehlend.
 - **Vier Tests messen nicht mehr mit der Uhr gegen eine enge Grenze.** Seit

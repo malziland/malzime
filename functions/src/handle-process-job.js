@@ -228,7 +228,7 @@ async function handleProcessJob(req, res) {
      (counter.js, "GENAU EINMAL IM FENSTER"). Wirft nie. */
   const zaehlerNachtrag = job.zaehlerNachtrag === true ? zaehlerNachtragen(job.zaehlerStempel) : null;
   try {
-    const { result, success } = await runPipeline(job);
+    const { result, success, kennzahlen } = await runPipeline(job);
     /* BUG-2026-08-13-35: Rückgabewert des Speicherns auswerten. Er liefert
        `false`, wenn der Job nicht mehr `processing` ist (der Reaper hat ihn
        zwischenzeitlich auf `failed` gekippt, und eine CPU-gedrosselt wieder
@@ -237,7 +237,9 @@ async function handleProcessJob(req, res) {
        eine Analyse, und die Logzeile behauptete `status: "done"` — das Log log
        aktiv, statt zu schweigen. Seit 01.10.2026 eine Warnung: Den Alarm hat
        der Wechsel auf `failed` bereits ausgeloest (jobs.js). */
-    const gespeichert = await ergebnisSpeichern(jobId, result);
+    /* Mit den Kennzahlen fuer die dauerhaften Zaehler — im selben
+       Schreibvorgang wie das Ergebnis, kein zusaetzlicher (statistik.js). */
+    const gespeichert = await ergebnisSpeichern(jobId, result, kennzahlen);
     if (!gespeichert) {
       console.warn(
         JSON.stringify({

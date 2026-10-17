@@ -33,6 +33,7 @@ e2e/sticky-toggle.test.js
 e2e/tastatur-erreichbarkeit.test.js
 functions/src/__tests__/abkuendigungen-script.test.js
 functions/src/__tests__/abmelden-ueber-adressgrenze.test.js
+functions/src/__tests__/abweisungen-zaehlen.test.js
 functions/src/__tests__/admin.test.js
 functions/src/__tests__/age-markers.test.js
 functions/src/__tests__/alters-obergrenze.test.js
@@ -52,6 +53,7 @@ functions/src/__tests__/betriebsprofil-grenzfaelle.test.js
 functions/src/__tests__/betriebsprofil-kopplung.test.js
 functions/src/__tests__/betriebsprofil-letzter-stand.test.js
 functions/src/__tests__/betriebsprofil.test.js
+functions/src/__tests__/browserfehler-zaehlen.test.js
 functions/src/__tests__/build-info-script.test.js
 functions/src/__tests__/changelog-oberste-version-script.test.js
 functions/src/__tests__/changelog-version-script.test.js
@@ -117,6 +119,7 @@ functions/src/__tests__/kapazitaets-wache.test.js
 functions/src/__tests__/kein-zwischenspeicher.test.js
 functions/src/__tests__/keine-ip-im-protokoll.test.js
 functions/src/__tests__/keine-personennamen-regel.test.js
+functions/src/__tests__/kennzahlen-im-auftrag.test.js
 functions/src/__tests__/ki-kennzeichnung-ignorieren.test.js
 functions/src/__tests__/ki-zeile-ohne-tokens.test.js
 functions/src/__tests__/kostenbremse-netz.test.js
@@ -124,6 +127,7 @@ functions/src/__tests__/laufzeit-wache-zustand.test.js
 functions/src/__tests__/laufzeit-wache.test.js
 functions/src/__tests__/libheif-herkunft.test.js
 functions/src/__tests__/lighthouse-schwellen-script.test.js
+functions/src/__tests__/log-aufbewahrung.test.js
 functions/src/__tests__/lokale-schalter.test.js
 functions/src/__tests__/meldung-am-zustand.test.js
 functions/src/__tests__/meldungen-gemeinsame-annahme.test.js
@@ -170,6 +174,8 @@ functions/src/__tests__/satz-gegen-doku.test.js
 functions/src/__tests__/schreiben-vor-der-antwort.test.js
 functions/src/__tests__/server-paket.test.js
 functions/src/__tests__/skript-rechte.test.js
+functions/src/__tests__/statistik-phasen.test.js
+functions/src/__tests__/statistik.test.js
 functions/src/__tests__/throttle.test.js
 functions/src/__tests__/ueberlast-entscheidung.test.js
 functions/src/__tests__/upload-http.test.js
@@ -180,8 +186,11 @@ functions/src/__tests__/vor-dem-push-script.test.js
 functions/src/__tests__/wachen-nachricht-ohne-satz.test.js
 functions/src/__tests__/wachen-nicht-blind.test.js
 functions/src/__tests__/warteschlange-nachziehen.test.js
+functions/src/__tests__/wartezeit-wache.test.js
 functions/src/__tests__/werbe-aufruf-ueberlast.test.js
 functions/src/__tests__/wirkung-jeder-wert.test.js
+functions/src/__tests__/zaehlen-vor-dem-loeschen.test.js
+functions/src/__tests__/zaehler-auswerten.test.js
 functions/src/__tests__/zaehler-genau-einmal.test.js
 functions/src/__tests__/zusagen-frische.test.js
 public/__tests__/a11y.test.js

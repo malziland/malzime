@@ -324,6 +324,14 @@ const FEHLERARTEN = ["api_error", "leer", "rate_limit"];
  * dann die Karten einzeln. Genau diese Reihenfolge erzeugt im Betrieb die
  * Wartezeit, in der der Bildschirm bisher stillstand.
  */
+/* Feste Textmenge der Attrappe fuer die dauerhaften Zaehler (statistik.js):
+   wie die echte runSingleLargeCall fuellt sie `opts.messung`, damit der
+   Emulator-Durchlauf die Tageszaehler pruefen kann. Erfundene Werte. */
+function messungFuellen(opts) {
+  if (!opts || !opts.messung || typeof opts.messung !== "object") return;
+  Object.assign(opts.messung, { tokenEingabe: 1000, tokenZwischenspeicher: 600, tokenAusgabe: 400, zusatzversuche: 0 });
+}
+
 async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, opts = {}) {
   const fail = process.env.MISTRAL_MOCK_FAIL;
   if (fail) {
@@ -339,6 +347,7 @@ async function runSingleLargeCall(_buffer, _mimeType, _remainingBudget, lang, op
     }
     return { normal: null, boost: null, subject: "", visibleText: "" };
   }
+  messungFuellen(opts);
   const resolved = lang === "en" ? "en" : "de";
   const normal = mockProfile("normal", resolved);
   const boost = mockProfile("boost", resolved);

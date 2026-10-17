@@ -232,7 +232,9 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   /* Dauer der Versuche mit Antwort, addiert: Die 30-Tage-Zeile entsteht
      HOECHSTENS EINMAL je Analyse, auch wenn nachgefragt wird (siehe
      loggeKiDauer). */
-  const dauer = { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false };
+  /* `opts.messung` (statistik.js) ist dieses Objekt: Textmenge und zusaetzliche
+     Versuche, lesbar auch, wenn der Aufruf wirft — nicht fuer die 30-Tage-Zeile. */
+  const dauer = Object.assign(opts.messung || {}, { httpMs: 0, waitMs: 0, wiederholungen: 0, gemessen: false });
   /* Workshop 01.10.2026: Reisst die Verbindung ab (nicht: Antwort von
      Mistral, unser Zeitlimit), wird EINMAL neu gefragt, mit dem Restbudget.
      Der gezeigte Text stammt dann aus einer verworfenen Antwort: Jede Welle des
@@ -480,7 +482,18 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
    Der Aufruf ist klein (~870 Tokens) und laeuft auf demselben Modell wie die
    Analyse. Faellt er aus, bleibt die Werbung aus dem Hauptaufruf stehen — eine
    Analyse darf daran NIE scheitern. */
-async function generateBeastAds(boostProfile, standardAds, lang) {
+/* Textmenge und zusaetzliche Versuche eines KI-Aufrufs, aufaddiert fuer die
+   dauerhaften Zaehler (statistik.js, 16.10.2026). Ohne Ziel: nichts. */
+function textmengeZaehlen(ziel, result) {
+  if (!ziel || typeof ziel !== "object") return;
+  const n = (wert) => (typeof wert === "number" && wert > 0 ? wert : 0);
+  ziel.tokenEingabe = n(ziel.tokenEingabe) + n(result.promptTokens);
+  ziel.tokenZwischenspeicher = n(ziel.tokenZwischenspeicher) + n(result.cachedTokens);
+  ziel.tokenAusgabe = n(ziel.tokenAusgabe) + n(result.outputTokens);
+  ziel.zusatzversuche = n(ziel.zusatzversuche) + n(result.wiederholungen);
+}
+
+async function generateBeastAds(boostProfile, standardAds, lang, messung = null) {
   if (!boostProfile || !boostProfile.categories) return null;
   const prompts = loadPrompts(lang || "de");
   if (typeof prompts.beastAdsSystem !== "string" || typeof prompts.beastAdsUser !== "function") return null;
@@ -518,6 +531,7 @@ async function generateBeastAds(boostProfile, standardAds, lang) {
          10.09.2026; vorher per Flag abschaltbar, Audit OPS-008). */
       cacheKey: `malzime-beast-ads-${lang || "de"}`,
     });
+    textmengeZaehlen(messung, result);
     const parsed = parseSafely(result.text, { requireSchema: false });
     /* Der ganze angeforderte Vorrat geht weiter: Aus ihm zieht der
        Kinderschutz-Filter nach dem Streichen die gezeigte Auswahl
@@ -587,7 +601,8 @@ function hatProfilText(block) {
    eine Antwort der KI erhalten hat; ein abgebrochener Versuch zaehlt nicht,
    auch wenn aus seinem Teiltext gerettet wird. Alles Weitere (Modell,
    Status, Textmenge, Versuch) steht je Versuch in
-   `mistral-single-large-details` und bleibt im Betriebsprotokoll (1 Tag),
+   `mistral-single-large-details` und bleibt im Betriebsprotokoll (Dauer:
+   docs/RUNBOOK.md, "Logs und Aufbewahrung"),
    dessen Beschreibung auch "wie viel Text die KI verarbeitet hat" nennt. Die
    Eingabe-Token verraten zudem das Format des Fotos. Feldmenge
    festgeschrieben in ki-zeile-ohne-tokens.test.js, gegen den Text geprueft
@@ -612,6 +627,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
      im try angelegte Variable gibt es im catch nicht. Genau daran sind beim
      ersten Anlauf zwei Pruefungen umgefallen. */
   let aktivesProfil = null;
+  if (dauer && attemptLabel !== "first") textmengeZaehlen(dauer, { wiederholungen: 1 }); /* zusaetzlicher Versuch */
   try {
     const budget = remainingBudget ? remainingBudget() : undefined;
     /* Betriebsprofil: Zeitgrenze und Textmenge kommen aus dem Einstellungssatz
@@ -652,6 +668,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       dauer.waitMs += result.waitMs || 0;
       dauer.wiederholungen += result.wiederholungen || 0;
       dauer.gemessen = true;
+      textmengeZaehlen(dauer, result);
     }
     console.log(
       JSON.stringify({
@@ -708,6 +725,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        scheiterte). Diese Warnung sagt, WARUM; ein Tierfoto, das trotzdem
        sein Profil bekommt, loest so keinen Fehlalarm mehr aus. */
     /* Erster Abriss: Warnung, es folgt ein Neuversuch (runSingleLargeCall). */
+    if (dauer) textmengeZaehlen(dauer, { wiederholungen: err && err.wiederholungen });
     if (err && err.verbindungsabbruch && attemptLabel === "first") {
       meldeAbbruchMitNeuversuch({ profil: aktivesProfil, attempt: attemptLabel, err });
       throw err;

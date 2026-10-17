@@ -329,7 +329,8 @@ Nachricht liegt dann in der App, aber das Handy meldet sich nicht von selbst.
   Dienstes); derselbe Weckruf von einer anderen Adresse wurde angenommen. Laut Hersteller
   wird der Zähler täglich um 00:00 UTC zurückgesetzt.
 - **Woran man es sieht:** im Protokoll des ntfy-Dienstes an der Zeile
-  `Unable to publish poll request … HTTP 429` (Aufbewahrung ein Tag). Einen Alarm dazu
+  `Unable to publish poll request … HTTP 429` (Betriebs-Speicher `betrieb-eu`, Aufbewahrung:
+  RUNBOOK, „Logs und Aufbewahrung“). Einen Alarm dazu
   gibt es nicht.
 - **Was das für die Alarme heißt:** Keiner geht verloren. Jede der fünf Alarmregeln
   verschickt zusätzlich eine E-Mail; `scripts/verify-infrastructure.sh` prüft bei jeder
@@ -338,6 +339,41 @@ Nachricht liegt dann in der App, aber das Handy meldet sich nicht von selbst.
   sie stehen dann in der App, ohne zu wecken.
 - **Entscheidung:** Es bleibt dabei (`docs/SECURITY-MODEL.md`, „Der Push aufs Handy kann
   ausbleiben").
+
+## Push „lange Wartezeit“ (seit Oktober 2026)
+
+Kein Alarm aus einer Fehlerzeile, sondern ein eigener Push über denselben
+ntfy-Weg wie „Stundenlimit erreicht“ (`sendeNtfy` in `functions/src/notify.js`),
+Titel „malziME: lange Wartezeit“.
+
+- **Wann:** Eine Analyse hat LÄNGER als 5 Minuten vom Einreihen bis zum Start
+  gewartet. Genau 5:00 meldet nicht, 5:01 schon (`wartezeit-wache.test.js`).
+  Geprüft werden der Auftrag, der gerade am längsten wartet, und die Aufträge,
+  die in den letzten zwei Minuten gestartet sind.
+- **Wie oft:** höchstens eine Nachricht je 30 Minuten. Die Marke liegt in
+  Firestore (`stats/wartezeit-wache`) und gilt damit für alle Instanzen; zwei
+  gleichzeitige Läufe melden nicht doppelt (Transaktion). Sie bleibt nur
+  stehen, wenn der Versand Erfolg meldet; scheitert er (ntfy weg, Antwort kein
+  Erfolg), nimmt die Wache sie zurück, schreibt die Warnung
+  `wartezeit-wache-nicht-zugestellt`, und der nächste Lauf eine Minute später
+  versucht es wieder.
+- **Inhalt:** längste Wartezeit und wie viele gerade warten — keine Kennung.
+- **Wo:** im Aufräumdienst (`reapJobs`, jede Minute), nicht im Arbeiter: Der
+  Arbeiter sieht eine Wartezeit erst, wenn sie vorbei ist, und bei stehender
+  Schlange gar nicht. Der Analyseweg trägt dafür nichts. `reapJobs` braucht
+  dafür die Secrets `NTFY_URL_EU` und `NTFY_TOPIC_EU` (in `index.js` deklariert).
+- **Grenzen im Code, nicht im Einstellungssatz** (`BLEIBT IM CODE` in
+  `wartezeit-wache.js`): Sie ändern nichts am Ablauf einer Analyse, sondern nur,
+  wann jemand Bescheid bekommt — wie die Schwellen der Laufzeit-Wache.
+- **Wenn die Wache selbst ausfällt:** Ein Lauf ohne Messung ist eine Warnung;
+  fünf in Folge schreiben die Fehlerzeile `wartezeit-wache-nicht-messbar`, die in
+  die Richtlinie „Function Errors“ fällt (`reapjobs` steht in deren Dienstliste).
+- **Bewusst kein Alarm** für nie abgeholte Ergebnisse: Am Ende eines Workshops
+  legen Kinder die Handys weg; das ist normal und steht nur in den Zählern.
+- Wie bei allen ntfy-Nachrichten kann der Weckruf ausbleiben (Abschnitt oben);
+  eine E-Mail gibt es für diesen Push nicht.
+
+Was dann zu tun ist: [RUNBOOK.md](RUNBOOK.md), „Nachricht „lange Wartezeit““.
 
 ## Was passiert dann?
 

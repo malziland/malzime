@@ -435,8 +435,8 @@ Prüfen von Hand:
     gcloud logging read 'jsonPayload.error=("erinnerung-lebenszeichen-veraltet" OR "lebenszeichen-wiederholt-nicht-lesbar")' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d
 
-(Der Betriebs-Speicher hält einen Tag; der Aufräumer meldet den Zustand jede
-Minute erneut, ein Tag reicht also.)
+(Der Aufräumer meldet den Zustand jede Minute erneut — ein Tag Rückblick
+reicht, auch wenn der Betriebs-Speicher länger hält.)
 
 Erwartet: keine Zeile.
 
@@ -714,6 +714,34 @@ Rechte); `store_failed` und `enqueue_unerwartet` → Zeilen des Dienstes
 `enqueue` (`store-or-create-failed` bzw. `status: "error"`), Speicher und
 Firestore prüfen.
 
+### Nachricht „lange Wartezeit“ (seit Oktober 2026)
+
+Eine Analyse hat länger als 5 Minuten vom Einreihen bis zum Start gewartet
+(genau 5:00 meldet nicht). Die Nachricht nennt die längste Wartezeit und wie
+viele gerade warten; danach schweigt sie 30 Minuten (Marke
+`stats/wartezeit-wache` in Firestore, gilt für alle Instanzen). Sie kommt vom
+Aufräumdienst, der jede Minute läuft — auch wenn die Schlange ganz steht.
+Aufbau: [ERROR-ALERTING.md](ERROR-ALERTING.md), „Push „lange Wartezeit““.
+
+Was tun: Warten viele, ist es Andrang — Wartezeit-Anzeige und Einlassgrenze
+greifen von selbst; ein Boost hilft hier nicht, er hebt nur das Stundenlimit,
+nicht das Tempo. Warten wenige und steht die Schlange, nacheinander prüfen:
+Einstellungssatz (Nachricht „KEIN gültiger Einstellungssatz“?), die
+Warteschlange bei Google (`sh scripts/warteschlange-pruefen.sh`), Mistral
+(„Mistral überlastet / 429 / 5xx“ unten). Die Meldungen der Wache selbst:
+
+    gcloud logging read 'jsonPayload.step="wartezeit-wache"' \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
+      --format='value(timestamp,jsonPayload.status,jsonPayload.laengsteMs,jsonPayload.wartende)'
+
+`status` „nicht-zugestellt“ heißt: Der Push ging nicht hinaus (den ntfy-Dienst
+prüfen, etwa mit `./scripts/verify-infrastructure.sh`, Abschnitt
+„Benachrichtigungsdienst (ntfy)“); die Wache versucht es jede Minute erneut.
+Kann die Wache fünf Läufe in Folge nicht messen, schreibt sie eine Fehlerzeile
+`wartezeit-wache-nicht-messbar` (Alarm „Function Errors“) — Firestore und die
+Indizes der Sammlung `jobs` prüfen. Für „nicht abgeholt“ gibt es bewusst keine
+Nachricht: Am Ende eines Workshops legen Kinder die Handys weg.
+
 ### Verdacht auf Absturz-Schleife (Safari: „wiederholt ein Problem aufgetreten")
 
 Die Absturz-Wache (`public/js/absturz-wache.js`, seit v2.12.2) erkennt drei
@@ -866,9 +894,10 @@ Scheitert das Laden des Fotos endgültig, steht eine Warnung mit
     gcloud logging read 'jsonPayload.status="abbruch-neuversuch"' \
       --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d --format='value(timestamp,jsonPayload.ursache.code,jsonPayload.ursache.text)'
 
-(Beide Abfragen sehen einen Tag zurück — länger hält der Betriebs-Speicher
-nicht. Für Wochenvergleiche von Dauer und Wiederholungen zählt die Zeile `mistral-single-large` im
-Diagnose-Speicher, siehe „Logs und Aufbewahrung".)
+(Beide Abfragen sehen einen Tag zurück. Weiter zurück geht es bis zur
+Aufbewahrung des Betriebs-Speichers, etwa mit `--freshness=7d` — Dauer: Tabelle in
+„Logs und Aufbewahrung". Für Wochenvergleiche zählen außerdem die dauerhaften
+Zähler, siehe „Zähler auswerten".)
 
 ### Kinderschutz-Filter: Was hat er gefunden? (seit 09.09.2026)
 
@@ -1222,14 +1251,77 @@ leeres Ergebnis ohne diese Angaben ist ein Messfehler, kein Befund.
 
 | Speicher | Standort | Aufbewahrung | Inhalt |
 |---|---|---|---|
-| `betrieb-eu` (Ziel der Weiche `_Default`) | europe-west1 | **1 Tag** — bewusst kurz | Programmausgaben der Functions (Request-ID, Schritt, Status, Token-Zahlen), Aufräumer- und Zeitplan-Läufe. Cloud-Run-Request-Logs, der einzige IP-Träger, sind per Ausschluss `exclude_run_requests_ip` gar nicht erst darin |
+| `betrieb-eu` (Ziel der Weiche `_Default`) | europe-west1 | **30 Tage** (seit der Auslieferung vom Oktober 2026; vorher 1 Tag) — lang genug, um Fehler über mehrere Workshops hinweg zu verfolgen; die Datenschutzerklärung nennt dieselbe Dauer („Technisches Protokoll“) | Programmausgaben der Functions (Request-ID, Schritt, Status, Token-Zahlen), Aufräumer- und Zeitplan-Läufe. Cloud-Run-Request-Logs, der einzige IP-Träger, sind per Ausschluss `exclude_run_requests_ip` gar nicht erst darin |
 | `client-diagnostics` | europe-west1 | 30 Tage | anonyme `client-error`/`client-telemetry`-Einträge sowie zwei Server-Zeilen ohne Personenbezug, die `scripts/log-sink-analyse-zeilen.sh` in den Filter setzt: `mistral-single-large` (Dauer und Wiederholungen; seit 12.08.2026, Token-Zahlen, Modell und Status seit 26.09.2026 nur noch in `mistral-single-large-details` im Betriebs-Speicher; höchstens eine Zeile je Analyse ab der Auslieferung mit dem CHANGELOG-Eintrag „Weniger Angaben im Diagnose-Protokoll“) und `minor-safety` (geschätztes Alter, Anzahl und Grund der Sperrwort-Treffer, Werbe-Anzahl; seit 09.09.2026; Feld und Wort der Treffer nur bis zu derselben Auslieferung; „Alter nicht lesbar“ ja/nein ab der Auslieferung der Puffer-Regel; oberes Ende der geschätzten Spanne ab der Auslieferung mit dem CHANGELOG-Eintrag „Kinderschutz-Protokoll mit oberem Ende der Altersschätzung“) |
 | `_Default` (Googles Ablage) | global, nicht änderbar | 1 Tag | seit 09.09.2026 **leer** — bekommt nichts mehr; existiert weiter, weil Google sie nicht löschen lässt |
 | `_Required` (Googles Pflichtprotokoll) | global, nicht änderbar, gesperrt | 400 Tage | unsere eigenen Verwaltungszugriffe (Kontoadresse, Aufruf-IP unseres Rechners). Keine Nutzerdaten. Google-Vorgabe |
 
 Der Deploy-Riegel (`scripts/verify-infrastructure.sh`) prüft bei jedem Deploy:
-Weiche zeigt auf `betrieb-eu`, Aufbewahrung 1 Tag, IP-Ausschluss aktiv,
-Diagnose-Filter unverändert.
+Weiche zeigt auf `betrieb-eu`, Aufbewahrung wie oben (Sollwert
+`LOG_AUFBEWAHRUNG_TAGE` im Skript, gegen die Datenschutzerklärung gehalten von
+`log-aufbewahrung.test.js`), IP-Ausschluss aktiv, Diagnose-Filter unverändert.
+
+### Aufbewahrung des Betriebs-Speichers umstellen
+
+Die Dauer steht an zwei Orten, die am selben Tag zusammenpassen müssen: im
+Text der Datenschutzerklärung (ausgeliefert mit der Website) und in der
+Einstellung bei Google (nicht Teil von `firebase deploy`). Der Riegel vor dem
+Deploy lässt erst durch, wenn die Einstellung dem Sollwert im Repo entspricht.
+Deshalb diese Reihenfolge, beide Schritte nur mit Freigabe der Auslieferung:
+
+```bash
+# 1. Ansehen — ändert nichts, zeigt IST und SOLL
+sh scripts/log-aufbewahrung-umstellen.sh
+# 2. Umstellen und nachmessen (Rückgabe 0 = Sollwert steht, gemessen an Google)
+sh scripts/log-aufbewahrung-umstellen.sh --ausfuehren
+# 3. Riegel lesend gegenprüfen — die Zeile „betrieb-eu: Aufbewahrung …“ muss ✓ sein
+./scripts/verify-infrastructure.sh
+# 4. Erst jetzt die Auslieferung mit dem neuen Text (Kette oder scripts/deploy.sh)
+```
+
+Zwischen Schritt 2 und dem Live-Gang hält der Speicher schon länger, als der
+noch ausgelieferte Text sagt — deshalb unmittelbar hintereinander, nie über
+Nacht. Ob Google die neue Dauer auch auf die schon gespeicherten Zeilen
+anwendet, sagt die Dokumentation nicht eindeutig („applies going forward and not
+retroactively“); messbar ist es am Tag danach: Zeilen, die älter als einen Tag
+sind, gibt es dann oder nicht.
+
+**Rückweg:** den Commit mit dem neuen Sollwert und Text zurücknehmen und
+ausliefern, davor den Speicher zurückstellen
+(`gcloud logging buckets update betrieb-eu --location=europe-west1 --project=malzime --retention-days=1`).
+Beim Verkürzen hält Google abgelaufene Zeilen noch sieben Tage unsichtbar vor,
+bevor sie gelöscht werden (Google-Dokumentation zu Log-Speichern).
+
+## Zähler auswerten
+
+Seit Oktober 2026 zählt malziME dauerhaft und anonym mit (`functions/src/statistik.js`,
+Sammlung `statistik` in `malzime-eu`): je 10-Minuten-Fenster (benannt in UTC,
+ausgegeben in Wiener Zeit) eingereiht, abgewiesen je Grund, in der Schlange
+verworfen, fertig, gescheitert je Grund, abgeholt, nie abgeholt, Wartezeit,
+Gesamtzeit und KI-Dauer in Klassen (unter 30 s, 1, 2, 4, 8 min, länger),
+KI-Wiederholungen; je Wiener Tag Browser-Fehler nach Phase und Gerätefamilie und
+die Textmenge der KI. Keine Zeile je Analyse, keine Kennung, kein Alter.
+
+Nur lesend, gegen die echte Datenbank (gcloud-Anmeldung genügt), den Emulator
+(`FIRESTORE_EMULATOR_HOST` gesetzt) oder eine Datei (`--datei x.json`):
+
+```bash
+node scripts/zaehler-auswerten.js tag 2026-10-16          # ein Tag
+node scripts/zaehler-auswerten.js bloecke 2026-10-16      # Blöcke: Lücke > 30 min trennt
+node scripts/zaehler-auswerten.js vergleich 2026-10-14 2026-10-15..2026-10-16
+```
+
+Rückgabe 0 = ausgewertet, 2 = nicht messbar. „keine Zähler in diesem Zeitraum"
+ist ein Ergebnis, kein Fehler — vor dem ersten Lauf des Aufräumdienstes mit
+dieser Fassung gibt es keine. Aufträge zählt der Aufräumdienst erst beim
+Löschen (abgeholte nach rund 15 Minuten, alle anderen nach rund 2 Stunden); die
+jüngsten zwei Stunden sind deshalb unvollständig, das Werkzeug sagt es dazu.
+Lücken entstehen, wenn das Zählen scheitert oder seine Zeit je Lauf (30 s) um
+ist (Warnungen `statistik-zaehlen-fehlgeschlagen`, `statistik-zaehlen-nicht-abgewartet`,
+`statistik-zaehlen-zeit-um`;
+nach fünf Läufen in Folge Fehlerzeile `statistik-zaehlen-wiederholt-gescheitert`)
+oder Firestore einen Auftrag über sein Sicherheitsnetz (24 h) statt über den
+Aufräumdienst löscht — gezählt wird dann nichts, doppelt nie.
 
 ## Prüfgerät Android (Emulator auf dem Entwicklungsrechner, seit 08.09.2026)
 

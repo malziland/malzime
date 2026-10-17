@@ -108,6 +108,8 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   notify.js                 ntfy Push-Benachrichtigungen bei Limit-Erreichung
   kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
   laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
+  wartezeit-wache.js        Push, wenn eine Analyse laenger als 5 Minuten auf ihren Start wartet (vom Aufraeumdienst je Lauf gerufen)
+  statistik.js              Dauerhafte, anonyme Zaehler (Sammlung statistik): je 10 Minuten Ausgaenge und Dauer-Klassen, je Tag Browser-Fehler und Textmenge der KI
   handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung und der halbjaehrlichen Pruefung der Barrierefreiheit (mit Anleitung)
   erinnerungs-waechter.js   Meldet, wenn die Wochen-Erinnerung ausbleibt
   zusagen.js                Gemeinsame Fristlogik fuer datierte Zusagen: ZDR-Pruefdatum, Pruefdatum der Barrierefreiheit (Erinnerung + CI-Waechter)
@@ -437,6 +439,18 @@ Messfehler darf nie als Befund durchgehen und nie als bestandene Pruefung.
 Was das NICHT beweist: was auf dem Server passiert. Die Cloud Functions baut
 Google aus dem Quelltext; eine nachrechenbare Bestaetigung dafuer gibt es nicht.
 Der Teil, der beweisbar ist, ist beweisbar gemacht.
+
+## Wie malziME entstanden ist
+
+malziME ist mit KI-Unterstützung entstanden. Den Großteil des Programmcodes hat der
+KI-Assistent Claude (Anthropic) geschrieben – im Auftrag von Christoph Krieger,
+malziland - learning | training | consulting e.U. Er gibt Ziel, Inhalt und Gestaltung vor
+und entscheidet, was online geht.
+
+Bevor etwas online geht, laufen automatische Prüfungen: Tests, Sicherheits- und
+Datenschutzprüfungen. [Der ganze Code ist offen.](https://github.com/malziland/malzime)
+
+Übrigens: Die KI, die dein Foto liest, ist eine andere – Mistral Large, in der EU.
 
 ## Lizenz
 

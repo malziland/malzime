@@ -111,7 +111,7 @@ Das Laufzeit-Dienstkonto der Functions braucht auf jedem Secret die Rolle
 | `ADMIN_SECRET_EU` | Ja | Bearer-Token fuer Admin-Endpunkte (Boost, Reset, Wartungsmodus) |
 | `MISTRAL_API_KEY_EU` | Ja | Mistral AI API-Key |
 | `NTFY_URL_EU` | Nein | URL des ntfy-Servers fuer Push-Benachrichtigungen |
-| `NTFY_TOPIC_EU` | Nein | ntfy-Topic fuer Limit-Benachrichtigungen |
+| `NTFY_TOPIC_EU` | Nein | ntfy-Topic fuer Push-Benachrichtigungen (Stundenlimit, Wachen, lange Wartezeit) |
 
 Wenn `NTFY_URL_EU` oder `NTFY_TOPIC_EU` leer sind, werden keine Push-Benachrichtigungen gesendet.
 

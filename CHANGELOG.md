@@ -6,6 +6,40 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Neu — Betrieb
+
+- **Dauerhafte, anonyme Zähler.** Je 10 Minuten zählt malziME, wie viele Fotos
+  eingereiht, abgewiesen (je Grund), in der Schlange verworfen, fertig
+  analysiert oder gescheitert (je Grund) sind und wie viele Ergebnisse abgeholt
+  wurden, dazu Wartezeit, Gesamtzeit und Dauer der KI in groben Stufen und die
+  Zahl der KI-Wiederholungen; je Tag die Fehlermeldungen der Browser nach Phase
+  und Gerätegruppe und die Textmenge der KI. Nur Summen, ohne Ablaufdatum, ohne
+  Eintrag je Analyse, ohne Kennung und ohne Alter. Gezählt wird beim Aufräumen,
+  unmittelbar vor dem Löschen; der Analyseweg trägt dafür keinen zusätzlichen
+  Zugriff, das Löschen geht immer vor, und doppelt gezählt wird nie. Auswerten:
+  `node scripts/zaehler-auswerten.js` (ein Tag, die Blöcke eines Tages, zwei
+  Zeiträume im Vergleich).
+- **Push bei langer Wartezeit.** Wartet eine Analyse länger als 5 Minuten auf
+  ihren Start, kommt eine Nachricht aufs Handy — mit der längsten Wartezeit und
+  der Zahl der Wartenden, höchstens eine je 30 Minuten.
+- **Das technische Protokoll bleibt 30 Tage statt einem Tag.** Datenschutz-
+  erklärung (deutsch und englisch) und die Prüfung vor jeder Auslieferung
+  nennen dieselbe Dauer; die Einstellung bei Google stellt
+  `scripts/log-aufbewahrung-umstellen.sh` um, als erster Schritt der
+  Auslieferung.
+- **Datenschutzerklärung übersichtlicher (deutsch und englisch).** „Was wir
+  nie tun“ steht jetzt im Kasten „Das Wichtigste in Kürze“, ohne Doppelungen.
+  „Was wir aufheben“ ist nach Dauer geordnet, vom Foto bis zu den Zählern. Die
+  Zähler heißen „dauerhaft“ statt „laufend“ und sind kurz beschrieben, samt
+  dem, was neu gezählt wird.
+
+### Neu — Website
+
+- **Offen gelegt, wie malziME entstanden ist.** Die Kurzvorstellung hat einen
+  Abschnitt 07 „Gebaut mit KI – und offen gelegt“ (englisch „Built with AI –
+  and out in the open“), die Fußzeile jeder Seite einen Link „Mit
+  KI-Unterstützung gebaut“ dorthin, das README denselben Abschnitt.
+
 ### Tests
 
 - **Die Browser-Tests laufen auf GitHub auf vier Maschinen gleichzeitig statt
@@ -13,8 +47,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   (vollständig und ohne Doppelte, gemessen mit `--list`). Der
   Pflicht-Check `test-e2e` sammelt die Teile ein und wird rot, sobald ein Teil
   rot, abgebrochen oder übersprungen ist — er bleibt nie still „übersprungen“,
-  außer beim reinen Auslieferungs-Nachtrag wie bisher. Gerechnet rund 5½ statt
-  knapp 10 Minuten; die echte Dauer zeigt erst der erste Lauf auf GitHub.
+  außer beim reinen Auslieferungs-Nachtrag wie bisher. Gemessen auf GitHub am
+  17.10.2026: der ganze Prüflauf rund 5 statt 10 Minuten.
   `deploy.sh` wartet dabei richtig: Der Sammel-Check entsteht erst, wenn alle
   Teile fertig sind, und gilt bis dahin als „läuft“ statt als fehlend.
 - **Vier Tests messen nicht mehr mit der Uhr gegen eine enge Grenze.** Seit

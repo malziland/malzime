@@ -87,7 +87,7 @@ ZEILEN_GRENZEN = {
     # waren damit von der Sperrklinke nicht erfasst. Die Grenzen sind der
     # gemessene Stand plus rund 5 Prozent Luft — wie bei allen anderen auch.
     "functions/src/betriebsprofil.js": 440,
-    "functions/src/handle-enqueue.js": 455,  # 01.09.2026: +15 fuer den
+    "functions/src/handle-enqueue.js": 480,  # 01.09.2026: +15 fuer den
     # configMissing-Riegel VOR der Ratenbegrenzung. Die Simulation zeigte,
     # dass ohne Satz `checkRateLimit` wirft und der Einlass mit HTTP 500
     # antwortet statt mit dem freundlichen 503. Der Riegel ist kein neuer
@@ -97,6 +97,9 @@ ZEILEN_GRENZEN = {
     # Fehlerwege ohne Auftrag (Speicher/Datenbank weg, unerwarteter 5xx)
     # melden sich selbst (je eine Zeile plus Import); die Meldung selbst
     # liegt in jobs.js, hier steht nur der Aufruf.
+    # ANGEHOBEN 16.10.2026 auf 480 (gemessen 466): Jede Ablehnungsstelle zaehlt
+    # ihren Grund in die dauerhaften Zaehler, VOR der Antwort. Der Aufruf gehoert
+    # an die Stelle der Antwort; Zaehlen und Sammeln selbst liegen in statistik.js.
     "functions/src/json-repair.js": 585,
     "functions/src/mistral-mock.js": 465,
     # Der grosse Brocken. Nach drei Schnitten (Antwort-Parser, Live-Text,
@@ -186,7 +189,8 @@ ZEILEN_GRENZEN = {
     # unverzichtbaren Tests — Daten, keine Logik.
     # 13.10.2026: +20 fuer drei neue Dateien (Vorlagen in zwei Sprachen,
     # auftrag-wechsel.js) samt Begruendung — Daten, keine Logik.
-    "scripts/pruefe-kopplung.py": 580,
+    # 16.10.2026: +20 fuer die Grenzen und Begruendungen der dauerhaften Zaehler.
+    "scripts/pruefe-kopplung.py": 600,
     # 07.10.2026: Die Aufteilungen der Behebung nach dem Audit vom 03.10.2026
     # haben neue Dateien erzeugt, die in keiner Grenze standen — genau das
     # Schlupfloch, das der Kommentar oben beschreibt (aus einer grossen Datei
@@ -212,6 +216,10 @@ ZEILEN_GRENZEN = {
     "public/js/auftrag-abmelden.js": 115,
     "public/js/netz-hilfen.js": 78,
     "public/js/foto-vorschau.js": 60,
+    # 16.10.2026, neu: die dauerhaften Zaehler (Rechnung, Zaehlen vor dem
+    # Loeschen, Sammler der oeffentlichen Schnittstellen). Gemessen 563 plus
+    # rund 5 Prozent; die Haelfte sind Begruendungen der Abwaegungen.
+    "functions/src/statistik.js": 590,
 }
 
 # Wo nach Dateien OHNE Grenze gesucht wird (TEST-2026-10-03-44): Ordner,
@@ -252,7 +260,12 @@ ABHAENGIGKEITS_GRENZEN = {
     # die Zahl der Abhaengigen. Der Gewinn steht daneben: mistral.js ist von
     # 1681 auf 696 Zeilen gefallen.
     "config": 14,
-    "db": 10,  # heute 9
+    # ANGEHOBEN 16.10.2026 von 10 auf 13: db.js ist mit Absicht die EINZIGE
+    # Stelle, an der eine Datenbankverbindung entsteht (db-zentral.test.js).
+    # Wer eine eigene Sammlung oder Marke schreibt (statistik.js,
+    # wartezeit-wache.js), haengt daran — Durchreichen waere die schlechtere
+    # Kopplung.
+    "db": 13,
 }
 
 

@@ -32,6 +32,11 @@ PROJECT="malzime"
 REGION="europe-west1"
 BUCKET="gs://malzime-queue-uploads"
 QUEUE="analyze-queue"
+# Sollwert: Aufbewahrung des Log-Speichers betrieb-eu in Tagen. EINE Stelle —
+# scripts/log-aufbewahrung-umstellen.sh liest ihn von hier, und
+# verify-infrastructure-script.test.js haelt ihn gegen die Datenschutzerklaerung
+# (deutsch und englisch). Seit 16.10.2026: 30 statt 1.
+LOG_AUFBEWAHRUNG_TAGE=30
 
 FEHLER=0
 
@@ -52,7 +57,7 @@ pruef() { # $1 Beschreibung, $2 Soll, $3 Ist
 # Anmeldung verlangen, sonst bräche das Skript vor dem geprüften Abschnitt ab
 # (und der Riegel liesse sich, wie vier Wochen lang, gar nicht testen).
 PROBEMODUS=0
-if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_WIEDERHOLUNG:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}${INFRA_PROBE_DIENST_UMGEBUNG:-}${INFRA_PROBE_ZWEIGSCHUTZ:-}" ]; then
+if [ -n "${INFRA_PROBE_BUCKET:-}${INFRA_PROBE_WIEDERHOLUNG:-}${INFRA_PROBE_TTL:-}${INFRA_PROBE_SCHEDULER:-}${INFRA_PROBE_BILDER:-}${INFRA_PROBE_SATZ:-}${INFRA_PROBE_ALARMREGELN:-}${INFRA_PROBE_ALARMKANAELE:-}${INFRA_PROBE_DIENSTE:-}${INFRA_PROBE_NTFY:-}${INFRA_PROBE_DIENST_UMGEBUNG:-}${INFRA_PROBE_ZWEIGSCHUTZ:-}${INFRA_PROBE_LOG_AUFBEWAHRUNG:-}" ]; then
   PROBEMODUS=1
 fi
 if ! command -v gcloud >/dev/null 2>&1 && [ "$PROBEMODUS" = "0" ]; then
@@ -371,7 +376,8 @@ esac
 # ── 6. Logging: EU-Speicher, Routine-Ausschlüsse + Diagnose-Sink ──
 echo "— Logging"
 # 09.09.2026: Die Weiche _Default zeigt seit dem Umzug auf unseren Speicher
-# betrieb-eu (europe-west1, 1 Tag). Googles globale Ablage bekommt nichts mehr.
+# betrieb-eu (europe-west1; Aufbewahrung: LOG_AUFBEWAHRUNG_TAGE oben). Googles
+# globale Ablage bekommt nichts mehr.
 # Drei Ausfallarten unterscheidbar: nicht messbar, falsches Ziel, falsche
 # Aufbewahrung — sonst sähe ein gescheiterter Aufruf aus wie ein bestandener.
 ZIEL_SOLL="logging.googleapis.com/projects/${PROJECT}/locations/europe-west1/buckets/betrieb-eu"
@@ -383,11 +389,17 @@ elif [ "$ZIEL_IST" = "$ZIEL_SOLL" ]; then
 else
   rot "_Default: Log-Weiche zeigt NICHT auf den EU-Speicher (IST: $ZIEL_IST)"
 fi
-AUFBEWAHRUNG=$(gcloud logging buckets describe betrieb-eu --location=europe-west1 --project="$PROJECT" --format='value(retentionDays)' 2>/dev/null || true)
+# Einspeisepunkt fuer die Negativprobe: eine Datei mit der Zahl, die gcloud
+# liefern wuerde (verify-infrastructure-script.test.js).
+if [ -n "${INFRA_PROBE_LOG_AUFBEWAHRUNG:-}" ]; then
+  AUFBEWAHRUNG=$(cat "$INFRA_PROBE_LOG_AUFBEWAHRUNG" 2>/dev/null || true)
+else
+  AUFBEWAHRUNG=$(gcloud logging buckets describe betrieb-eu --location=europe-west1 --project="$PROJECT" --format='value(retentionDays)' 2>/dev/null || true)
+fi
 case "$AUFBEWAHRUNG" in
   "")  rot "betrieb-eu: Aufbewahrung NICHT MESSBAR (Speicher fehlt oder gcloud lieferte nichts)" ;;
-  1)   gruen "betrieb-eu: Aufbewahrung 1 Tag (Datenschutz-Zusage)" ;;
-  *)   rot "betrieb-eu: Aufbewahrung ist $AUFBEWAHRUNG Tage, Zusage sagt 1" ;;
+  "$LOG_AUFBEWAHRUNG_TAGE") gruen "betrieb-eu: Aufbewahrung $LOG_AUFBEWAHRUNG_TAGE Tage (Datenschutz-Zusage)" ;;
+  *)   rot "betrieb-eu: Aufbewahrung ist $AUFBEWAHRUNG Tage, Zusage sagt $LOG_AUFBEWAHRUNG_TAGE (Umstellen: sh scripts/log-aufbewahrung-umstellen.sh)" ;;
 esac
 # AUDIT-BEFUND PRIV-2026-08-12-12: Der _Default-Speicher liegt auf Standort
 # `global` und lässt sich nicht nach Europa verschieben. Einziger Träger von

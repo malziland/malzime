@@ -33,15 +33,18 @@ const BEWUSST_DRAUSSEN = {
 /* Die langen Suiten fehlen im lokalen Skript mit Absicht. Welcher Pflicht-Job
    der Pipeline sie faehrt, steht hier — der Test weiter unten verlangt den
    Befehl als Schritt genau dieses Jobs (OPS-2026-10-03-12). Die Browser-
-   Durchlaeufe stehen nur hier: Ihr Job `test-e2e` gehoert nicht zu den
-   billigen Jobs, die der Vergleich "Pipeline -> Skript" liest. */
+   Durchlaeufe stehen nur hier: Ihr Job gehoert nicht zu den billigen Jobs,
+   die der Vergleich "Pipeline -> Skript" liest. Seit 16.10.2026 laufen sie
+   verteilt im Teil-Job `test-e2e-teil` (der Pflicht-Check `test-e2e` sammelt
+   nur ein); `schritt` nennt den Wortlaut dort, mit der Teilung. */
 const LANGE_SUITEN = {
   "npm test": {
     job: "test-backend",
     grund: "Server-Suite, läuft lokal so lang wie in der Pipeline (~2,5 min) — deckt scripts/pruefstand.sh ab",
   },
   "npm run test:e2e": {
-    job: "test-e2e",
+    job: "test-e2e-teil",
+    schritt: "npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}",
     grund: "Browser-Durchläufe (~3,5 min), feste Ports — deckt scripts/pruefstand.sh ab",
   },
 };
@@ -294,7 +297,7 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
     /* Positivkontrolle: Die Jobs werden ueberhaupt gelesen. */
     expect(Object.keys(schritte).length).toBeGreaterThan(5);
     const skript = fs.readFileSync(SKRIPT, "utf8");
-    for (const [befehl, { job, grund }] of Object.entries(LANGE_SUITEN)) {
+    for (const [befehl, { job, schritt = befehl, grund }] of Object.entries(LANGE_SUITEN)) {
       /* Wer hier steht, ist eine bewusste Auslassung — mit Begruendung, und im
          lokalen Skript gibt es ihn wirklich nicht als eigenen Schritt. */
       expect({ befehl, begruendet: typeof grund === "string" && grund.length > 10 }).toEqual({
@@ -302,9 +305,9 @@ describe("vor-dem-push.sh deckt die billigen Pipeline-Schritte ab", () => {
         begruendet: true,
       });
       expect({ befehl, lokal: new RegExp(`^lauf .* ${befehl}$`, "m").test(skript) }).toEqual({ befehl, lokal: false });
-      expect({ job, befehl, alsSchritt: (schritte[job] || []).includes(befehl) }).toEqual({
+      expect({ job, schritt, alsSchritt: (schritte[job] || []).includes(schritt) }).toEqual({
         job,
-        befehl,
+        schritt,
         alsSchritt: true,
       });
     }

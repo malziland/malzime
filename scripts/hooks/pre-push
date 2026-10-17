@@ -23,14 +23,26 @@
 # ---------------------------------------------------------------------------
 set -uo pipefail
 
-WURZEL="$(cd "$(dirname "$0")/../.." && pwd)"
-
 if [ "${OHNE_VORABPRUEFUNG:-0}" = "1" ]; then
   echo ""
   echo "  ⚠  OHNE_VORABPRUEFUNG=1 — die Vorabpruefung wurde UEBERSPRUNGEN."
   echo "     Wenn die Pipeline gleich rot wird, liegt es daran."
   echo ""
   exit 0
+fi
+
+# Geprueft wird der Arbeitsbaum, AUS DEM gepusht wird — nicht der Ordner, in
+# dem dieser Haken liegt. BEFUND 16.10.2026: Hier stand die Wurzel relativ zum
+# Haken. Steht `core.hooksPath` als absoluter Pfad auf den Haupt-Checkout,
+# pruefte ein Push aus einer zweiten Arbeitskopie (git worktree) dessen Stand
+# statt des gepushten Zweigs (gemessen: "Arbeitsbaum nicht sauber", obwohl
+# beide Baeume sauber waren). Git startet den Haken in der Wurzel des
+# Arbeitsbaums, aus dem gepusht wird; die fragen wir ab. Fail-closed: Ohne
+# ermittelbare Wurzel kein Push.
+if ! WURZEL="$(git rev-parse --show-toplevel 2>/dev/null)" || [ -z "$WURZEL" ]; then
+  echo "FEHLER: Wurzel des Arbeitsbaums nicht ermittelbar (git rev-parse) — Push angehalten." >&2
+  echo "        Notausgang: OHNE_VORABPRUEFUNG=1 git push" >&2
+  exit 1
 fi
 
 if [ ! -x "$WURZEL/scripts/vor-dem-push.sh" ] && [ ! -f "$WURZEL/scripts/vor-dem-push.sh" ]; then

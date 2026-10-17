@@ -360,6 +360,51 @@ else
                 NEUE_LAGE="$NEUE_LAGE$EINTRAG
 "
               done
+              # NOCH NICHT ANGELEGT zaehlt wie "laeuft" (16.10.2026). Seit die
+              # Browser-Tests auf mehrere Maschinen verteilt sind, sammelt der
+              # Pflicht-Check `test-e2e` nur noch die Ergebnisse der Teile ein
+              # — und GitHub legt einen Job mit `needs` erst an, wenn seine
+              # Vorgaenger fertig sind (gemessen am Lauf vom 15.10.2026:
+              # test-e2e entstand in der Sekunde, in der playwright-version
+              # fertig war). Solange die Teile auf main laufen, FEHLT er also,
+              # statt "pending" zu melden. Ohne diesen Nachtrag haelt dieser
+              # Riegel dann mit "Ist: fehlt" an, obwohl nur gewartet wird.
+              # Es gilt dieselbe Regel wie oben: nur solange main noch prueft
+              # (sonst kaemen wir gar nicht hierher), nur bei gleichem Baum,
+              # nie fuer die zeitabhaengigen, und was der PR meldet, gilt —
+              # auch ein rotes Ergebnis. Fehlt er auch beim PR, bleibt er
+              # fehlend und der Riegel haelt an.
+              for CHECK in $PFLICHT; do
+                if grep -q "^${CHECK}=" <<<"$NEUE_LAGE"; then
+                  continue
+                fi
+                # Befund P3 der Abnahme (16.10.2026): Ist auf main schon ein
+                # Teil (`<check>-teil (n)`) nicht gruen, wird der Check rot —
+                # dann gilt das PR-Ergebnis nicht, er bleibt fehlend. Ohne
+                # Pipe und ohne grep: nichts, was still scheitern koennte.
+                TEIL_ROT=""
+                while IFS= read -r ZEILE; do
+                  case "$ZEILE" in
+                    "${CHECK}-teil"*=success | "${CHECK}-teil"*=pending | "${CHECK}-teil"*=null | "${CHECK}-teil"*=) ;;
+                    "${CHECK}-teil"*=*) TEIL_ROT="$ZEILE" ;;
+                  esac
+                done <<<"$LAGE"
+                if [ -n "$TEIL_ROT" ]; then
+                  echo "Stand-Bindung: ${CHECK} fehlt auf main, ein Teil ist dort schon nicht gruen (${TEIL_ROT}) — das PR-Ergebnis gilt nicht."
+                  continue
+                fi
+                UEBERSPRINGEN=0
+                for Z in $ZEITABHAENGIG; do
+                  [ "$CHECK" = "$Z" ] && UEBERSPRINGEN=1
+                done
+                if [ "$UEBERSPRINGEN" = "0" ]; then
+                  ERSATZ=$(printf '%s\n' "$LAGE_PR" | grep "^${CHECK}=" || true)
+                  if [ -n "$ERSATZ" ]; then
+                    NEUE_LAGE="$NEUE_LAGE$ERSATZ
+"
+                  fi
+                fi
+              done
               echo "Stand-Bindung: main prueft noch, PR #${PRNR} hat denselben Baum"
               echo "               (${BAUM_HIER:0:8}) — dessen Ergebnisse gelten fuer die"
               echo "               noch ausstehenden Pruefungen. Rote bleiben rot."

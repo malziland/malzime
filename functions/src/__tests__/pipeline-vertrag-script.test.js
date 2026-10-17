@@ -172,7 +172,7 @@ describe("Vertrag der Pipeline-Dateien — der Erfolgsweg", () => {
     expect(r.code).toBe(0);
     /* Und der Vertrag ist wirklich gemessen worden, nicht nur verschwiegen. */
     expect(r.ausgabe).toMatch(/6 Dateien entsprechen dem festgeschriebenen Stand/);
-    expect(r.ausgabe).toMatch(/jeder der 6 Pflicht-Jobs fuehrt seine Pruefbefehle aus/);
+    expect(r.ausgabe).toMatch(/jeder der 6 Pflicht-Jobs und 1 Teil-Job\(s\) fuehrt seine Pruefbefehle aus/);
     expect(r.ausgabe).toMatch(/11 npm-Skripte hinter den Pflicht-Schritten, die Jest-Einstellung/);
     expect(r.ausgabe).toMatch(/und 6 Einstellungsdateien der Pruefwerkzeuge lauten wie festgelegt/);
     expect(r.ausgabe).toMatch(/keine eingecheckte Datei ist von \.gitignore erfasst/);
@@ -300,7 +300,12 @@ describe("Vertrag der Pipeline-Dateien — die Pruefsumme haelt jede Datei fest"
       "m",
       "ci.yml: Browser-Durchlaeufe durch echo ersetzt",
       CI,
-      (t) => einmal(t, "      - run: npm run test:e2e\n", "      - run: echo uebersprungen\n"),
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+          "      - run: echo uebersprungen\n"
+        ),
     ],
     [
       "q",
@@ -334,7 +339,12 @@ describe("Vertrag der Pipeline-Dateien — die Pruefsumme haelt jede Datei fest"
       (t) => einmal(t, "      - run: npm test\n", "      # - run: npm test\n"),
     ],
     ["x2", "ci.yml: die Browser-Modul-Tests geloescht", CI, zeileWeg("      - run: npm run test:frontend")],
-    ["x3", "ci.yml: die Browser-Durchlaeufe geloescht", CI, zeileWeg("      - run: npm run test:e2e")],
+    [
+      "x3",
+      "ci.yml: die Browser-Durchlaeufe geloescht",
+      CI,
+      zeileWeg("      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}"),
+    ],
     ["x5", "ci.yml: der Server-Lint geloescht", CI, zeileWeg("      - run: npm run lint")],
     [
       "x7",
@@ -498,14 +508,19 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
     [
       "die Browser-Durchlaeufe geloescht",
       CI,
-      zeileWeg("      - run: npm run test:e2e"),
-      /Job test-e2e fuehrt 'npm run test:e2e' nicht mehr/,
+      zeileWeg("      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}"),
+      /Job test-e2e-teil fuehrt 'npm run test:e2e -- --shard=[^']+' nicht mehr/,
     ],
     [
       "die Browser-Durchlaeufe durch echo ersetzt",
       CI,
-      (t) => einmal(t, "      - run: npm run test:e2e\n", "      - run: echo uebersprungen\n"),
-      /Job test-e2e fuehrt 'npm run test:e2e' nicht mehr/,
+      (t) =>
+        einmal(
+          t,
+          "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+          "      - run: echo uebersprungen\n"
+        ),
+      /Job test-e2e-teil fuehrt 'npm run test:e2e -- --shard=[^']+' nicht mehr/,
     ],
     [
       "die Server-Tests laufen mit einem Filter, der nichts trifft",
@@ -553,7 +568,7 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       "die Browser-Durchlaeufe dauerhaft uebersprungen (if: false)",
       CI,
       (t) => einmal(t, "    if: needs.playwright-version.outputs.nur_nachtrag != 'ja'\n", "    if: false\n"),
-      /Job test-e2e traegt die Bedingung \['false'\]/,
+      /Job test-e2e-teil traegt die Bedingung \['false'\]/,
     ],
     [
       "ein anderer Pflicht-Job bekommt eine Bedingung",
@@ -588,7 +603,108 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       CI,
       (t) =>
         einmal(t, "    needs: playwright-version\n", "    needs: playwright-version\n    continue-on-error: true\n"),
+      /Job test-e2e-teil traegt 'continue-on-error'/,
+    ],
+    /* Browser-Tests verteilt (16.10.2026): Der Pflicht-Check test-e2e sammelt die
+       Ergebnisse der Teile nur ein. Jeder dieser Rueckbauten liesse ihn gruen
+       oder "skipped" stehen, obwohl ein Teil rot war oder nie lief. */
+    [
+      "der Sammel-Job verliert always() — bei einem roten Teil stuende er auf skipped, und der gilt als bestanden",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "    if: always() && needs.playwright-version.outputs.nur_nachtrag != 'ja'\n",
+          "    if: needs.playwright-version.outputs.nur_nachtrag != 'ja'\n"
+        ),
+      /Job test-e2e traegt die Bedingung \["needs\.playwright-version\.outputs\.nur_nachtrag != 'ja'"\]/,
+    ],
+    [
+      "der Sammel-Job verliert seine Bedingung ganz",
+      CI,
+      zeileWeg("    if: always() && needs.playwright-version.outputs.nur_nachtrag != 'ja'"),
+      /Job test-e2e traegt die Bedingung None statt/,
+    ],
+    [
+      "der Sammel-Job wartet nicht mehr auf die Teile",
+      CI,
+      (t) => einmal(t, "    needs: [playwright-version, test-e2e-teil]\n", "    needs: playwright-version\n"),
+      /Job test-e2e wartet auf \['playwright-version'\] statt/,
+    ],
+    [
+      "der Sammelschritt prueft die Teile nicht mehr",
+      CI,
+      (t) => einmal(t, ' && test "$TEILE" = success', ""),
+      /Job test-e2e fuehrt 'echo "playwright-version=\$VERSION test-e2e-teil=\$TEILE" && .*' nicht mehr/,
+    ],
+    [
+      "der Sammelschritt liest als Ergebnis der Teile etwas anderes",
+      CI,
+      (t) => einmal(t, "TEILE: ${{ needs.test-e2e-teil.result }}", "TEILE: ${{ needs.playwright-version.result }}"),
+      /Job test-e2e: der Schritt 'echo .*' traegt 'env'/,
+    ],
+    [
+      "ein roter Sammel-Job zaehlt als gruen (continue-on-error)",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "    needs: [playwright-version, test-e2e-teil]\n",
+          "    needs: [playwright-version, test-e2e-teil]\n    continue-on-error: true\n"
+        ),
       /Job test-e2e traegt 'continue-on-error'/,
+    ],
+    [
+      "die Teilung hat eine Luecke — Teil 3 von 4 liefe nie",
+      CI,
+      (t) => einmal(t, "        teil: [1, 2, 3, 4]\n", "        teil: [1, 2, 4]\n"),
+      /Teil-Job test-e2e-teil teilt nicht genau/,
+    ],
+    [
+      "die Teilung nennt einen Teil doppelt",
+      CI,
+      (t) => einmal(t, "        teil: [1, 2, 3, 4]\n", "        teil: [1, 1, 2, 3]\n"),
+      /Teil-Job test-e2e-teil teilt nicht genau/,
+    ],
+    [
+      "die Teilung bekommt eine zweite Achse — job-total verdoppelte sich, die Haelfte liefe nie",
+      CI,
+      (t) => einmal(t, "        teil: [1, 2, 3, 4]\n", "        teil: [1, 2, 3, 4]\n        browser: [a, b]\n"),
+      /Teil-Job test-e2e-teil teilt nicht genau/,
+    ],
+    [
+      "der Testschritt teilt fest durch 4 statt durch die Zahl der Teile",
+      CI,
+      (t) => einmal(t, "--shard=${{ matrix.teil }}/${{ strategy.job-total }}", "--shard=${{ matrix.teil }}/4"),
+      /Job test-e2e-teil fuehrt 'npm run test:e2e -- --shard=[^']+' nicht mehr/,
+    ],
+    [
+      "die Browser-Teile verlieren HOME=/root",
+      CI,
+      (t) => einmal(t, "    env:\n      HOME: /root\n", ""),
+      /Job test-e2e-teil setzt die Umgebung None statt \['HOME: \/root'\]/,
+    ],
+    [
+      "ein anderer Pflicht-Job bekommt eine Teilung",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "  test-frontend:\n    runs-on: ubuntu-latest\n",
+          "  test-frontend:\n    runs-on: ubuntu-latest\n    strategy:\n      matrix:\n        teil: [1, 2]\n"
+        ),
+      /Job test-frontend traegt eine Teilung/,
+    ],
+    [
+      "ein anderer Pflicht-Job wartet auf einen fremden Job — er entfiele, wenn der rot ist",
+      CI,
+      (t) =>
+        einmal(
+          t,
+          "  secret-scan:\n    runs-on: ubuntu-latest\n",
+          "  secret-scan:\n    needs: lighthouse\n    runs-on: ubuntu-latest\n"
+        ),
+      /Job secret-scan wartet auf \['lighthouse'\] statt None/,
     ],
     [
       "continue-on-error mit dem Schluessel in Anfuehrungszeichen",
@@ -679,10 +795,10 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       (t) =>
         einmal(
           t,
-          "      - run: npm run test:e2e\n",
-          "      - run: npm run test:e2e\n        if: github.event_name == 'push'\n"
+          "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+          "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n        if: github.event_name == 'push'\n"
         ),
-      /Job test-e2e: der Schritt 'npm run test:e2e' traegt 'if' \["github\.event_name == 'push'"\]/,
+      /Job test-e2e-teil: der Schritt 'npm run test:e2e -- --shard=[^']+' traegt 'if' \["github\.event_name == 'push'"\]/,
     ],
     [
       "die Geheimnis-Suche laeuft nie (Bedingung an einer Action)",
@@ -809,10 +925,10 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       (t) =>
         einmal(
           t,
-          "      - run: npm run test:e2e\n",
-          "      - run: |\n          cat <<'ENDE'\n          run: npm run test:e2e\n          ENDE\n"
+          "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+          "      - run: |\n          cat <<'ENDE'\n          run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n          ENDE\n"
         ),
-      /Job test-e2e: 'npm run test:e2e' steht im Job, aber nicht als Befehl eines eigenen Schritts/,
+      /Job test-e2e-teil: 'npm run test:e2e -- --shard=[^']+' steht im Job, aber nicht als Befehl eines eigenen Schritts/,
     ],
     [
       "die Geheimnis-Suche steht nur noch als Eingabewert eines anderen Schritts da",
@@ -869,10 +985,10 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       (t) =>
         einmal(
           t,
-          "      - run: npm ci\n      - run: npm run test:e2e\n",
-          "      - run: npm ci && rm -rf e2e\n      - run: npm run test:e2e\n"
+          "      - run: npm ci\n      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+          "      - run: npm ci && rm -rf e2e\n      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n"
         ),
-      /Job test-e2e enthaelt einen Schritt, den der Vertrag nicht kennt: 'run: npm ci && rm -rf e2e'/,
+      /Job test-e2e-teil enthaelt einen Schritt, den der Vertrag nicht kennt: 'run: npm ci && rm -rf e2e'/,
     ],
     [
       "die Installation bekommt eine eigene Shell, die vorher etwas anderes ausfuehrt",
@@ -919,22 +1035,42 @@ describe("Vertrag der Pipeline-Dateien — der Inhalt bleibt rot, auch mit nachg
       (t) =>
         einmal(
           t,
-          "      - run: npm ci\n      - run: npm run test:e2e\n",
-          "      - run: npm run test:e2e\n      - run: npm ci\n"
+          "      - run: npm ci\n      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+          "      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n      - run: npm ci\n"
         ),
-      /Job test-e2e: die Schritte stehen in anderer Reihenfolge oder Anzahl als im Vertrag/,
+      /Job test-e2e-teil: die Schritte stehen in anderer Reihenfolge oder Anzahl als im Vertrag/,
     ],
     [
       "ein bekannter Schritt steht doppelt da",
       (t) =>
         einmal(
           t,
-          "      - run: npm ci\n      - run: npm run test:e2e\n",
-          "      - run: npm ci\n      - run: npm ci\n      - run: npm run test:e2e\n"
+          "      - run: npm ci\n      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n",
+          "      - run: npm ci\n      - run: npm ci\n      - run: npm run test:e2e -- --shard=${{ matrix.teil }}/${{ strategy.job-total }}\n"
         ),
-      /Job test-e2e: die Schritte stehen in anderer Reihenfolge oder Anzahl als im Vertrag/,
+      /Job test-e2e-teil: die Schritte stehen in anderer Reihenfolge oder Anzahl als im Vertrag/,
     ],
   ];
+
+  test("ein Teil-Job ohne bekannten Pflicht-Job faellt nicht still aus dem Vertrag", () => {
+    /* deploy.sh erkennt rote Teile auf main am Namen `<Pflicht-Job>-teil`
+       (Befund P3, 16.10.2026); ein Teil-Job mit anderem Sammler stuende gar
+       nicht mehr im Vertrag. */
+    aendern(WAECHTER, (t) => einmal(t, '"sammler": "test-e2e",', '"sammler": "test-e2e-alt",'));
+    const r = waechter();
+    expect(r.code).toBe(1);
+    expect(r.ausgabe).toMatch(/Teil-Job test-e2e-teil gehoert nicht als '<Pflicht-Job>-teil' zu einem Pflicht-Job/);
+  });
+
+  test("die Zahl der Browser-Teile ist frei: eine lueckenlose Liste besteht mit nachgetragener Summe", () => {
+    /* Erfolgsweg zu den Teilungs-Faellen oben: Sonst waere unklar, ob die
+       Pruefung jede Teilung ablehnt oder nur die kaputten. */
+    aendern(CI, (t) => einmal(t, "        teil: [1, 2, 3, 4]\n", "        teil: [1, 2, 3]\n"));
+    summenNachtragen();
+    const r = waechter();
+    expect(r.ausgabe).not.toMatch(/FEHLT/);
+    expect(r.code).toBe(0);
+  });
 
   test.each(SCHRITT_FAELLE)("Schrittfolge: %s", (_was, umbau, meldung) => {
     aendern(CI, umbau);
@@ -1170,7 +1306,7 @@ describe("Vertrag der npm-Skripte — was hinter einem Pflicht-Schritt steht", (
     const r = waechter();
     expect(r.code).toBe(1);
     expect(r.ausgabe).toMatch(
-      /Job test-e2e ruft das npm-Skript 'test:e2e' aus package\.json auf — was es tut, ist nicht festgelegt/
+      /Job test-e2e-teil ruft das npm-Skript 'test:e2e' aus package\.json auf — was es tut, ist nicht festgelegt/
     );
   });
 

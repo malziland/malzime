@@ -1615,8 +1615,10 @@ lief trotzdem voll — gut zehn Minuten über Dateien, die sich von der geprüft
 Fassung nur in Cache-Kennungen unterscheiden.
 
 **Entscheidung.** `scripts/nur-nachtrag.sh` erkennt einen solchen PR im
-Pflicht-Job `playwright-version`; der Job `test-e2e` entfällt dann als Ganzes
-und steht auf „skipped“. „Ja“ nur, wenn jede geänderte Datei eine geänderte
+Pflicht-Job `playwright-version`; der Browser-Test entfällt dann als Ganzes:
+Alle Teile `test-e2e-teil` entfallen, und der Pflicht-Check `test-e2e` steht
+auf „skipped“ (seit 16.10.2026 sammelt er die Teile ein, siehe „Browser-Tests
+verteilt“). „Ja“ nur, wenn jede geänderte Datei eine geänderte
 gewöhnliche Datei ist (Status M, Modus 100644 vorher und nachher) und eine von
 vier Arten: CHANGELOG, `docs/VERIFICATION.md`, ein Fingerabdruck mit allen
 Pflichtfeldern, der nur vorhandene Dateien nennt, oder eine Seite aus der
@@ -1654,6 +1656,48 @@ Code) und kleinere, alle vor dem Merge behoben und nachgeprüft.
 die Cache-Kennung anders als über `?v=<10 Ziffern>"` trägt, wenn GitHub
 übersprungene Pflicht-Checks anders behandelt, oder wenn ein Fehler auftritt,
 den nur der Browser-Test in einem Nachtrag gefunden hätte.
+
+## Browser-Tests verteilt: der Sammel-Check (16.10.2026)
+
+**Lage.** Die Browser-Tests liefen auf GitHub in einem Job auf einer Maschine
+(am 15.10.2026 gemessen: 546 s Testzeit plus 41 s Anlauf) und waren der längste
+Schritt jeder Auslieferung. Sie laufen jetzt auf mehreren Maschinen
+(Playwright `--shard`, Teil-Job `test-e2e-teil`); die Zahl der Teile steht nur
+in der Matrix in `ci.yml`. Der Zweigschutz kennt nur den Namen `test-e2e`, also
+sammelt ein Job dieses Namens die Ergebnisse der Teile ein.
+
+**Das Risiko.** Ein übersprungener Pflicht-Check gilt beim Zweigschutz als
+bestanden. Ein Sammel-Job mit bloßem `needs:` stünde bei einem roten Teil auf
+„skipped“ — der Pull Request ließe sich mit rotem Browser-Test zusammenführen.
+
+**Entscheidung.** Der Sammel-Job läuft mit `always()` und verlangt von
+`playwright-version` und vom Ergebnis der Teile wörtlich `success`; rot,
+abgebrochen oder übersprungen macht ihn rot. Entfallen darf er nur beim reinen
+Nachtrag (Abschnitt oben). `!cancelled()` statt `always()` wurde verworfen: Bei
+einem abgebrochenen Lauf entfiele der Job, und ob GitHub ihn dann als „skipped“
+führt, ist nicht gemessen. `scripts/pruefe-deploy-riegel.py` hält Bedingung,
+Wartebeziehung, Sammelschritt und Teilung fest (`docs/WAECHTER.md`).
+
+**Folge für die Auslieferung.** GitHub legt einen Job mit `needs` erst an, wenn
+seine Vorgänger fertig sind (gemessen am Lauf vom 15.10.2026). Solange die Teile
+auf `main` laufen, fehlt `test-e2e` deshalb, statt „läuft“ zu melden. Die
+Baum-Regel in `scripts/deploy.sh` behandelt einen fehlenden Pflicht-Check wie
+einen laufenden — nur solange `main` noch prüft, nur bei gleichem Baum, nie
+für `test-backend`, und nie, wenn auf `main` schon ein Teil (`test-e2e-teil (n)`)
+nicht grün ist: Dann steht das Ergebnis dort fest, und der Riegel hält an
+(Befund P3 der unabhängigen Abnahme). Den Namen `<Pflicht-Job>-teil`, an dem
+`deploy.sh` die Teile erkennt, hält `scripts/pruefe-deploy-riegel.py` fest.
+Geprüft in `deploy-verhalten.test.js` (Erfolgsweg und sieben Abbrüche);
+Rückbauproben 16.10.2026: ohne den Nachtrag hält der Riegel mit „Ist: fehlt“,
+ohne die Prüfung der Teile werden die drei Fälle mit rotem Teil rot.
+
+**Restrisiko.** Dass `needs.<job>.result` bei einer Matrix „success“ nur meldet,
+wenn jeder Teil grün ist, ist die Angabe von GitHub, nicht hier gemessen; der
+erste rote Teil auf GitHub ist der Beleg.
+
+**Neubewertung**, wenn GitHub übersprungene Pflicht-Checks oder das Ergebnis
+einer Matrix anders behandelt, oder wenn ein Teil-Job selbst Pflicht-Check
+werden soll.
 
 ## Werbung und Vorlagen: passend statt gleich (13.10.2026)
 

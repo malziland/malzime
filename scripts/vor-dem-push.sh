@@ -96,7 +96,8 @@ lauf "Pruefungen: Waechter-Selbstpruefung" "pruefungen" bash scripts/selbstpruef
 # Deshalb konnten zerstoerte Paketnamen ("eslint --max-warnings=0" als
 # Abhaengigkeit) durch diese Vorabpruefung gehen: 22 Schritte gruen, waehrend
 # `npm ci` in beiden Baeumen abbrach. npm ci ist der ERSTE Schritt von
-# test-backend, test-frontend und test-e2e — drei der sechs Pflicht-Checks.
+# test-backend, test-frontend und den Browser-Teilen, die test-e2e einsammelt
+# — drei der sechs Pflicht-Checks haengen daran.
 lauf "Lockfile: npm ci (Wurzel)" "test-frontend" npm ci --dry-run
 lauf "Lockfile: npm ci (functions)" "test-backend" npm ci --dry-run --prefix functions
 # BEFUND 31.08.2026 (Runde 3): `secret-scan` ist ein Pflicht-Check und laeuft

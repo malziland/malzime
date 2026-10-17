@@ -173,7 +173,10 @@ ZEILEN_GRENZEN = {
     "public/styles.css": 4960,
     "public/index.html": 620,
     "scripts/deploy.sh": 1410,
-    "scripts/pruefe-deploy-riegel.py": 1480,
+    # 16.10.2026: 1480 -> 1600 (gemessen 1520 + rund 5 %). Neu: der Vertrag der Teil-Jobs
+    # (verteilte Browser-Tests) — er liest dieselben Job-Bloecke mit denselben Helfern.
+    # Naechster Schnitt, wenn sie wieder waechst: die Pruefsummen (VERTRAG_SUMMEN usw.).
+    "scripts/pruefe-deploy-riegel.py": 1600,
     "scripts/verify-infrastructure.sh": 915,
     "scripts/selbstpruefung-waechter.sh": 720,
     "scripts/pruefe-fremd-meldungen.mjs": 605,

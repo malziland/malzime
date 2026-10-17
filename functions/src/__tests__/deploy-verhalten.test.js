@@ -928,6 +928,110 @@ describe("deploy.sh — Verhalten der Riegel", () => {
  * Dieser Fall ist das Gegengewicht: Er verlangt, dass ein Lauf mit lauter
  * gruenen Bedingungen auch WIRKLICH durchlaeuft.
  * ──────────────────────────────────────────────────────────────────────── */
+/* BROWSER-TESTS VERTEILT (16.10.2026): Der Pflicht-Check `test-e2e` sammelt
+   nur noch die Ergebnisse der Teil-Jobs `test-e2e-teil (1)` usw. ein, und
+   GitHub legt ihn erst an, wenn alle Teile fertig sind. Solange sie auf main
+   laufen, FEHLT er in der Liste, statt "pending" zu melden. Die Baum-Regel
+   muss "noch nicht angelegt" deshalb wie "laeuft" behandeln — sonst hielte
+   jede Auslieferung, die vor dem Ende der Browser-Tests auf main startet, mit
+   "Ist: fehlt" an. Der erste Fall ist der Erfolgsweg dazu; ohne ihn bewiesen
+   die uebrigen nur, dass der Riegel anhaelt. */
+describe("deploy.sh — Baum-Regel: ein Pflicht-Check, den main noch nicht angelegt hat", () => {
+  afterEach(aufraeumen);
+
+  const GRUEN_PR =
+    "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success";
+  /* main: alles fertig ausser den Browser-Teilen; test-e2e gibt es noch nicht. */
+  const MAIN_TEILE_LAUFEN =
+    "test-backend=success\ntest-frontend=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success\n" +
+    "test-e2e-teil (1)=success\ntest-e2e-teil (2)=pending\ntest-e2e-teil (3)=pending\ntest-e2e-teil (4)=success";
+
+  /** deploy.sh, waehrend ein PR-Kopf mit DEMSELBEN Baum existiert — die Lage,
+   *  in der die Baum-Regel ueberhaupt greift (Bauart wie im Fall "rotes
+   *  Ergebnis auf main wird nicht ... verdraengt"). */
+  function deployBeiGleichemBaum(lageMain, lagePr) {
+    const betreff = execSync(`git -C "${klon}" log -1 --format=%s`, { encoding: "utf8" }).trim();
+    const mainNachziehen = [
+      `git -C "${klon}" branch -f main HEAD`,
+      `git -C "${klon}" fetch -q origin main`,
+      `git -C "${klon}" update-ref refs/remotes/origin/main HEAD`,
+    ];
+    execSync(
+      [
+        `git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend -m "test: Probe (#235)"`,
+        ...mainNachziehen,
+      ].join(" && "),
+      { stdio: "pipe" }
+    );
+    const baum = execSync(`git -C "${klon}" rev-parse "HEAD^{tree}"`, { encoding: "utf8" }).trim();
+    const prKopf = execSync(`git -C "${klon}" -c user.email=t@t -c user.name=t commit-tree ${baum} -m "PR-Kopf"`, {
+      encoding: "utf8",
+    }).trim();
+    try {
+      return deploy({ ATTRAPPE_PR_KOPF: prKopf, ATTRAPPE_CHECKS: lageMain, ATTRAPPE_CHECKS_PR: lagePr });
+    } finally {
+      execSync(
+        [`git -C "${klon}" -c user.email=t@t -c user.name=t commit -q --amend -m "${betreff}"`, ...mainNachziehen].join(
+          " && "
+        ),
+        { stdio: "pipe" }
+      );
+    }
+  }
+
+  test("test-e2e noch nicht angelegt, Teile laufen, PR gruen: die Auslieferung geht weiter", () => {
+    const r = deployBeiGleichemBaum(MAIN_TEILE_LAUFEN, GRUEN_PR);
+    expect(r.ausgabe).toMatch(/Stand-Bindung: main prueft noch, PR #235 hat denselben Baum/);
+    expect(r.ausgabe).not.toMatch(/Pflicht-Check test-e2e/);
+    expect(r.code).toBe(0);
+  });
+
+  test("der PR meldet test-e2e rot: der Riegel haelt an, mit dem Ergebnis des PR", () => {
+    const r = deployBeiGleichemBaum(MAIN_TEILE_LAUFEN, GRUEN_PR.replace("test-e2e=success", "test-e2e=failure"));
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: test-e2e=failure\)/);
+  });
+
+  /* Befund P3 der Abnahme (16.10.2026): Ist auf main schon ein Teil nicht
+     gruen, steht das Ergebnis von test-e2e dort fest — auch wenn der
+     Sammel-Check noch nicht angelegt ist. Das gruene PR-Ergebnis darf es dann
+     nicht ueberdecken. Die Gegenprobe (Teile nur laufend oder gruen -> das
+     PR-Ergebnis gilt) ist der erste Fall dieses Blocks. */
+  test.each(["failure", "cancelled", "timed_out"])(
+    "ein Teil ist auf main schon %s, die anderen laufen: das PR-Ergebnis gilt nicht, der Riegel haelt an",
+    (ergebnis) => {
+      const r = deployBeiGleichemBaum(
+        MAIN_TEILE_LAUFEN.replace("test-e2e-teil (1)=success", `test-e2e-teil (1)=${ergebnis}`),
+        GRUEN_PR
+      );
+      expect(r.code).not.toBe(0);
+      expect(r.ausgabe).toContain(
+        `Stand-Bindung: test-e2e fehlt auf main, ein Teil ist dort schon nicht gruen (test-e2e-teil (1)=${ergebnis})`
+      );
+      expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: fehlt\)/);
+    }
+  );
+
+  test("der PR hat test-e2e auch nicht: der Riegel haelt an (Ist: fehlt)", () => {
+    const r = deployBeiGleichemBaum(MAIN_TEILE_LAUFEN, GRUEN_PR.replace("test-e2e=success\n", ""));
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: fehlt\)/);
+  });
+
+  test("main ist fertig und test-e2e fehlt trotzdem: keine Abkuerzung, der Riegel haelt an", () => {
+    const r = deployBeiGleichemBaum(MAIN_TEILE_LAUFEN.replace(/=pending/g, "=success"), GRUEN_PR);
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).not.toMatch(/Stand-Bindung: main prueft noch/);
+    expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: fehlt\)/);
+  });
+
+  test("die zeitabhaengige Suite wird auch dann nicht aus dem PR genommen, wenn sie auf main noch fehlt", () => {
+    const r = deployBeiGleichemBaum(MAIN_TEILE_LAUFEN.replace("test-backend=success\n", ""), GRUEN_PR);
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toMatch(/Pflicht-Check test-backend ist fuer [0-9a-f]{40} nicht grün \(Ist: fehlt\)/);
+  });
+});
+
 describe("deploy.sh — der Erfolgsweg", () => {
   afterEach(aufraeumen);
 

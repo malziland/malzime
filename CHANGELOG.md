@@ -26,8 +26,12 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   erklärung (deutsch und englisch) und die Prüfung vor jeder Auslieferung
   nennen dieselbe Dauer; die Einstellung bei Google stellt
   `scripts/log-aufbewahrung-umstellen.sh` um, als erster Schritt der
-  Auslieferung. Der Eintrag „Zähler“ der Datenschutzerklärung nennt jetzt
-  genau, was gezählt wird.
+  Auslieferung.
+- **Datenschutzerklärung übersichtlicher (deutsch und englisch).** „Was wir
+  nie tun“ steht jetzt im Kasten „Das Wichtigste in Kürze“, ohne Doppelungen.
+  „Was wir aufheben“ ist nach Dauer geordnet, vom Foto bis zu den Zählern. Die
+  Zähler heißen „dauerhaft“ statt „laufend“ und sind kurz beschrieben, samt
+  dem, was neu gezählt wird.
 
 ### Neu — Website
 

@@ -10,12 +10,40 @@
 # ist. Schlägt eine Suite fehl, wird NICHTS gestempelt.
 #
 # Nutzung: ./scripts/pruefstand.sh   (Dauer ~8 min, E2E und Rueckbauprobe inklusive)
+#          ./scripts/pruefstand.sh --aus-github <commit, 40 Zeichen>
+#
+# --aus-github (seit 17.10.2026, Konzept „schnellere Auslieferung“, Schritt 3):
+# Die Zahlen der drei Suiten kommen aus den Protokollen der GitHub-Jobs genau
+# dieses Commits (scripts/pruefstand-github.py), statt dass die Suiten hier ein
+# weiteres Mal laufen. Das nutzt die Auslieferkette nach dem Live-Gang: GitHub
+# hat den ausgelieferten Commit schon vollstaendig geprueft. Hier laeuft dann
+# nur noch die Rueckbauprobe — sie gibt es bei GitHub nicht. Der Stempel nennt
+# den GitHub-Lauf als Herkunft. Fail-closed wie der Rest: sind die Zahlen dort
+# nicht lesbar, wird nichts gestempelt.
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+QUELLE=lokal
+GH_SHA=""
+if [ "${1:-}" = "--aus-github" ]; then
+  QUELLE=github
+  GH_SHA="${2:-}"
+  if ! [[ "$GH_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "ABBRUCH: --aus-github braucht die volle Kennung des Commits (40 Zeichen) — es wird nichts gestempelt."
+    exit 1
+  fi
+elif [ -n "${1:-}" ]; then
+  echo "Aufruf: $0 [--aus-github <commit, 40 Zeichen>]"
+  exit 2
+fi
+
 DATUM=$(date +%Y-%m-%d)
-COMMIT=$(git rev-parse --short HEAD)
+if [ "$QUELLE" = github ]; then
+  COMMIT=${GH_SHA:0:7}
+else
+  COMMIT=$(git rev-parse --short HEAD)
+fi
 MATRIX="${PRUEFSTAND_MATRIX:-docs/VERIFICATION.md}"
 
 # ── Einspeisepunkte für Proben (OPS-2026-08-13-32, zweiter Teil) ──
@@ -40,6 +68,35 @@ probe_oder_lauf() {
   fi
 }
 
+if [ "$QUELLE" = github ]; then
+  echo "Prüfstand für Commit $COMMIT ($DATUM) — Zahlen aus den Protokollen der GitHub-Jobs, danach Rückbauprobe und Stempel."
+  # Der Grund eines Abbruchs steht auf der Fehlerausgabe des Helfers (oben).
+  GH_AUS=$(python3 scripts/pruefstand-github.py "$GH_SHA") || {
+    echo "ABBRUCH: Zahlen aus GitHub für $COMMIT nicht lesbar (scripts/pruefstand-github.py) — es wird nichts gestempelt."
+    exit 1
+  }
+  # Ohne Pipe: Ein Wert, der fehlt, bleibt leer und faellt unten bei der
+  # Plausibilitaet auf — er kann nicht unterwegs verschwinden.
+  gh_wert() {
+    local zeile
+    while IFS= read -r zeile; do
+      case "$zeile" in "$1="*) printf '%s' "${zeile#*=}"; return 0 ;; esac
+    done <<<"$GH_AUS"
+  }
+  LAUF=$(gh_wert LAUF)
+  BACKEND=$(gh_wert BACKEND)
+  BACKEND_GESAMT=$(gh_wert BACKEND_GESAMT)
+  FRONTEND=$(gh_wert FRONTEND)
+  FRONTEND_SKIP=$(gh_wert FRONTEND_SKIP)
+  E2E=$(gh_wert E2E)
+  E2E_SKIP=$(gh_wert E2E_SKIP)
+  if ! [[ "$LAUF" =~ ^[0-9]+$ ]]; then
+    echo "ABBRUCH: Kennung des GitHub-Laufs nicht lesbar (LAUF=$LAUF) — es wird nichts gestempelt."
+    exit 1
+  fi
+  QUELLE_TEXT="\`scripts/pruefstand.sh --aus-github\`: Protokolle des GitHub-Laufs $LAUF"
+else
+QUELLE_TEXT="\`scripts/pruefstand.sh\`"
 echo "Prüfstand-Lauf auf Commit $COMMIT ($DATUM) — alle drei Suiten, danach Stempel."
 
 # ── 1. Backend (Jest) ──
@@ -73,6 +130,7 @@ echo "— E2E-Suite läuft (dauert am längsten)…"
 E2E_LOG=$(probe_oder_lauf PRUEFSTAND_PROBE_E2E npm run test:e2e) || { echo "$E2E_LOG" | tail -20; echo "ABBRUCH: E2E-Suite rot — es wird nichts gestempelt."; exit 1; }
 E2E=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ passed" | grep -Eo "[0-9]+" | tail -1 || true)
 E2E_SKIP=$(printf "%s" "$E2E_LOG" | grep -Eo "[0-9]+ skipped" | grep -Eo "[0-9]+" | head -1 || true)
+fi
 
 # ── 4. Rueckbauprobe (seit 10.09.2026) ──
 # Baut zehn behobene Befunde absichtlich zurueck und prueft, ob die Tests es
@@ -90,16 +148,23 @@ for WERT in "$BACKEND" "$FRONTEND" "$E2E"; do
   fi
 done
 
-echo "Alle Suiten grün: Backend $BACKEND · Frontend $FRONTEND · E2E $E2E — Stempel wird gesetzt."
+if [ "$QUELLE" = github ]; then
+  echo "GitHub-Lauf $LAUF für $COMMIT: Backend $BACKEND · Frontend $FRONTEND · E2E $E2E, Rückbauprobe grün — Stempel wird gesetzt."
+else
+  echo "Alle Suiten grün: Backend $BACKEND · Frontend $FRONTEND · E2E $E2E — Stempel wird gesetzt."
+fi
 
 # ── Stempeln: nur die Ergebnis-Zelle der drei Suiten-Zeilen ersetzen ──
-BACKEND="$BACKEND" BACKEND_GESAMT="$BACKEND_GESAMT" FRONTEND="$FRONTEND" FRONTEND_SKIP="$FRONTEND_SKIP" E2E="$E2E" E2E_SKIP="$E2E_SKIP" COMMIT="$COMMIT" DATUM="$DATUM" python3 - "$MATRIX" <<'EOF'
+BACKEND="$BACKEND" BACKEND_GESAMT="$BACKEND_GESAMT" FRONTEND="$FRONTEND" FRONTEND_SKIP="$FRONTEND_SKIP" E2E="$E2E" E2E_SKIP="$E2E_SKIP" COMMIT="$COMMIT" DATUM="$DATUM" QUELLE_TEXT="$QUELLE_TEXT" python3 - "$MATRIX" <<'EOF'
 import os, re, sys
 
 pfad = sys.argv[1]
 text = open(pfad, encoding="utf-8").read()
 b, f, e = os.environ["BACKEND"], os.environ["FRONTEND"], os.environ["E2E"]
-stempel_ende = f"— `scripts/pruefstand.sh`, Commit {os.environ['COMMIT']}, {os.environ['DATUM']} |"
+# Herkunft, Stand und Datum (Beweisformat): `scripts/pruefstand.sh`, wenn die
+# Suiten hier liefen; mit --aus-github der GitHub-Lauf, aus dessen Protokollen
+# die Zahlen stammen.
+stempel_ende = f"— {os.environ['QUELLE_TEXT']}, Commit {os.environ['COMMIT']}, {os.environ['DATUM']} |"
 
 # OPS-2026-08-13-32/46: Ein uebersprungener Test wird AUSGEWIESEN, nicht
 # weggerechnet — "n/n gruen" bei n+1 Tests waere eine stille Schoenung. Gilt

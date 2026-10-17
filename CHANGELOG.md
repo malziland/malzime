@@ -19,6 +19,13 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   er nicht grün ist. Die Frist der ZDR-Zusage ist dafür vom Test zum Skript
   geworden (`scripts/pruefe-zusagen-frist.mjs`, ein nicht lesbares Datum ist
   rot).
+- **Der Prüfstand-Stempel nach dem Live-Gang kommt aus GitHub.** Die drei
+  Testreihen laufen dafür nicht mehr ein drittes Mal auf dem Rechner: Die
+  Zahlen kommen aus den Protokollen der GitHub-Jobs des ausgelieferten
+  Commits, und der Stempel nennt den Lauf (`scripts/pruefstand.sh
+  --aus-github`). Fehlt ein Job oder ein Teil der Browser-Tests, ist einer rot
+  oder eine Zahl nicht lesbar, wird nichts gestempelt. Die Rückbauprobe läuft
+  weiter auf dem Rechner.
 - **Der Kommentar zum Nachtlauf sagt, wann er wirklich startet:** geplant
   03:43 UTC, von GitHub oft Stunden später gestartet (Messung im Kommentar von
   `.github/workflows/sicherheit-nachts.yml`).

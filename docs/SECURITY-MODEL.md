@@ -1856,6 +1856,35 @@ Ergebnis von gestern würde dann heute übernommen.
 Datums-Job und nach `DATUMSSKRIPTE`), wenn der Datums-Job selbst Pflicht-Check
 werden soll, oder wenn GitHub übersprungene Pflicht-Checks anders behandelt.
 
+## Prüfstand-Stempel aus den Protokollen von GitHub (17.10.2026)
+
+**Lage.** Nach dem Live-Gang fuhr die Auslieferung die drei Testreihen auf dem
+Rechner ein drittes Mal auf demselben Stand (bei 5.3.0: 7 min 40 s), um die
+Zahlen in `docs/VERIFICATION.md` zu stempeln. GitHub hatte genau diesen Commit
+da schon vollständig geprüft.
+
+**Entscheidung.** Gestempelt wird aus den Protokollen der GitHub-Jobs des
+ausgelieferten Commits (`scripts/pruefstand.sh --aus-github <commit>`, Helfer
+`scripts/pruefstand-github.py`); der Stempel nennt den Lauf, den Commit und das
+Datum. Vorher wartet die Auslieferung, bis die Prüfungen dieses Commits grün
+sind. Der Helfer nimmt je Job den jüngsten Lauf und verlangt: abgeschlossen und
+grün, derselbe Commit, für alle Jobs derselbe Lauf, alle Teile der
+Browser-Tests, die `ci.yml` an diesem Commit festlegt, und in jedem Protokoll
+die Zeile mit den Zahlen genau einmal. Sonst gibt es keine Zahlen und keinen
+Stempel. Die Rückbauprobe läuft weiter auf dem Rechner, weil es sie bei GitHub
+nicht gibt. Gegenprobe am 17.10.2026: Für 6c63bb2 liefert der neue Weg
+dieselben Zahlen wie der lokale Stempel von 5.3.0.
+
+**Restrisiko.** Die Zahlen kommen aus dem Text, den GitHub liefert, in den
+Formaten von Jest, Vitest und Playwright. Ändert ein Werkzeug sein Format, hält
+der Stempel an, statt etwas Falsches einzutragen; die Auslieferung endet dann
+ohne Nachtrag, bis das Muster nachgezogen ist. Der lokale Weg
+(`./scripts/pruefstand.sh` ohne Argument) bleibt jederzeit möglich.
+
+**Neubewertung**, wenn GitHub Protokolle anders ausliefert, wenn ein
+Testwerkzeug gewechselt wird, oder wenn die Rückbauprobe in die Pipeline
+wandert.
+
 ## Werbung und Vorlagen: passend statt gleich (13.10.2026)
 
 **Was war.** Der Auftrag an die KI endete mit genau einem ausgefüllten

@@ -62,9 +62,16 @@ oder ein neuer Pflicht-Nachweis entsteht (z. B. neue Profilpflicht, behobenes
 Audit-Finding). Die Rollback-Probe wird bei größeren Toolchain-Wechseln (Node-Major,
 Test-Runner) wiederholt, nicht bei jedem Release.
 
-**Die drei Suiten-Zeilen oben stempelt `scripts/pruefstand.sh` automatisch** —
-das Skript lässt alle drei Suiten laufen und trägt Anzahl, Commit und Datum
-selbst ein; bei einer roten Suite wird nichts gestempelt. Von Hand gepflegte
-Zahlen sind in diesen drei Zeilen nicht mehr vorgesehen. Der CI-Test
+**Die drei Suiten-Zeilen oben stempelt `scripts/pruefstand.sh` automatisch**,
+auf einem von zwei Wegen, und der Stempel nennt, welcher es war. Ohne Argument
+lässt das Skript alle drei Suiten auf dem Rechner laufen. Mit `--aus-github
+<commit>` (seit 17.10.2026; so stempelt die Auslieferung nach dem Live-Gang)
+liest es die Zahlen aus den Protokollen der GitHub-Jobs genau dieses Commits
+(`scripts/pruefstand-github.py`) und nennt den GitHub-Lauf. In beiden Fällen
+läuft die Rückbauprobe auf dem Rechner, und gestempelt wird nur, was grün und
+lesbar ist: Bei einer roten Suite, einem fehlenden, laufenden oder roten Job,
+einem fehlenden Teil der Browser-Tests oder einer nicht lesbaren Zahl wird
+nichts gestempelt. Von Hand gepflegte Zahlen sind in diesen drei Zeilen nicht
+mehr vorgesehen. Der CI-Test
 `doku-drift.test.js` wacht darüber, dass das README zahlenfrei bleibt, interne
 Doku-Links existieren und die Suiten-Zeilen datiert sind.

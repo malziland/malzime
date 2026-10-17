@@ -1820,7 +1820,11 @@ Art, mit dieser Umstellung geschlossen.
 dort. `test-backend` und `test-frontend` prüfen nur noch den Inhalt und folgen
 der Baum-Regel (Abschnitt „Deploy" in `docs/RUNBOOK.md`). Für den Datums-Job
 gilt sie nie (Liste `ZEITABHAENGIG` in `deploy.sh`): Er muss für den Commit auf
-`main` selbst grün sein, also am Tag der Auslieferung. Jede Prüfung läuft damit
+`main` selbst grün sein. Wie alt dieser Lauf ist, prüft `deploy.sh` nicht: Wird
+erst Tage nach dem Zusammenführen ausgeliefert, gilt der Lauf vom Tag des
+Zusammenführens. Das fangen drei andere Fristen ab: Der Nachtlauf (höchstens
+26 h alt) fährt das Abhängigkeits-Gate, die ZDR-Frist warnt 7 Tage vorher, der
+Zeitzünder rechnet mit 400 Tagen Vorlauf. Jede Prüfung läuft damit
 weiter genau einmal auf genau dem Stand, der live geht, bevor er live geht —
 die inhaltlichen am bitgleichen Baum im Pull Request, die vom Tag abhängigen am
 Commit auf `main`.

@@ -33,6 +33,12 @@ if [ "${1:-}" = "--aus-github" ]; then
     echo "ABBRUCH: --aus-github braucht die volle Kennung des Commits (40 Zeichen) — es wird nichts gestempelt."
     exit 1
   fi
+  # Die Rueckbauprobe laeuft auf dem lokalen Stand; gestempelt wird nur, wenn
+  # er genau der Commit ist, dessen Zahlen aus GitHub kommen (Abnahme 17.10.2026).
+  if [ "$(git rev-parse HEAD)" != "$GH_SHA" ]; then
+    echo "ABBRUCH: lokaler Stand $(git rev-parse --short HEAD) ist nicht der Commit ${GH_SHA:0:7} — es wird nichts gestempelt."
+    exit 1
+  fi
 elif [ -n "${1:-}" ]; then
   echo "Aufruf: $0 [--aus-github <commit, 40 Zeichen>]"
   exit 2

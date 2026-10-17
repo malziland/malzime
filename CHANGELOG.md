@@ -12,8 +12,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   mehr in der Fußzeile jeder Seite. Wie malziME mit KI entstanden ist, steht
   weiter in Abschnitt 07 der Kurzvorstellung und im README.
 - **Datenschutzerklärung: Das fertige Profil ist nur Text.** Beim Eintrag „Dein
-  fertiges Profil“ steht jetzt, dass nur der Text der KI aufgehoben wird, nicht
-  das Foto (deutsch und englisch).
+  fertiges Profil“ steht jetzt, dass nur der Text des Profils aufgehoben wird,
+  nicht das Foto (deutsch und englisch).
 
 ### Geändert — Auslieferung
 

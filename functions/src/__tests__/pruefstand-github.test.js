@@ -343,6 +343,20 @@ describe("pruefstand.sh --aus-github — Stempel aus GitHub", () => {
     expect(fs.readFileSync(m, "utf8")).toBe(vorher);
   });
 
+  test("fremder Commit: Abbruch vor jeder Abfrage, die Rueckbauprobe liefe sonst auf einem anderen Stand", () => {
+    lage();
+    const m = matrix();
+    const vorher = fs.readFileSync(m, "utf8");
+    const fremd = SHA.startsWith("0") ? "1".repeat(40) : "0".repeat(40);
+    const r = spawnSync("bash", [PRUEFSTAND, "--aus-github", fremd], {
+      encoding: "utf8",
+      env: umgebung({ PRUEFSTAND_MATRIX: m }),
+    });
+    expect(r.status).toBe(1);
+    expect(r.stdout).toMatch(/ABBRUCH: lokaler Stand .* ist nicht der Commit .* es wird nichts gestempelt/);
+    expect(fs.readFileSync(m, "utf8")).toBe(vorher);
+  });
+
   test("ohne volle Kennung: Abbruch vor jeder Abfrage", () => {
     const m = matrix();
     const r = spawnSync("bash", [PRUEFSTAND, "--aus-github", "abc1234"], {

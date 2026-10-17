@@ -124,7 +124,7 @@ PRUEFJOBS_NACHTS = {
 VERTRAG_SUMMEN = {
     "sicherheit-nachts.yml": "a25c259e1d8e350d",
     "libheif-bau.yml": "39f0db0be0a0a3e0",
-    "ci.yml": "c578946f73e74042",
+    "ci.yml": "3e5fbf49956ef4a8",
     "release.yml": "1fd803f6e5167738",
     "dependabot-automerge.yml": "df4eb0944834a25b",
     "dependabot.yml": "204892976a7df7e5",
@@ -135,9 +135,12 @@ _USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)
 
 # ── Was jeder Pflicht-Job der Pipeline ausfuehren MUSS (OPS-2026-10-03-12) ────
 #
-# Die sechs Jobs sind die Pflicht-Checks des Zweigschutzes, und `deploy.sh`
-# verlangt jeden davon gruen (Liste PFLICHT dort). Beide sehen aber nur NAME
-# und ERGEBNIS eines Jobs. Streicht jemand beim Ueberarbeiten von `ci.yml` den
+# Sechs dieser Jobs sind die Pflicht-Checks des Zweigschutzes, und `deploy.sh`
+# verlangt jeden davon gruen (Liste PFLICHT dort). Der siebte,
+# `datumspruefungen`, haengt von der Uhr ab: `deploy.sh` verlangt ihn
+# zusaetzlich (Liste ZEITABHAENGIG dort, nie aus dem Pull Request genommen), und
+# im Zweigschutz sammelt ihn der Pflicht-Check `pruefungen` ein
+# (ZEITABHAENGIG_CI unten). Alle sehen aber nur NAME und ERGEBNIS eines Jobs. Streicht jemand beim Ueberarbeiten von `ci.yml` den
 # Testlauf aus einem Job, bleibt der Job gruen, der Pull Request geht durch, und
 # die Auslieferung auch.
 #
@@ -155,19 +158,24 @@ _USES_ZEILE = re.compile(r"^([ ]*(?:- )?uses: )([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)
 SAMMELSCHRITT_E2E = (
     'echo "playwright-version=$VERSION test-e2e-teil=$TEILE" && test "$VERSION" = success && test "$TEILE" = success'
 )
+SAMMELSCHRITT_DATUM = 'echo "datumspruefungen=$DATUM" && test "$DATUM" = success'
 PFLICHTJOBS_CI = {
     "test-backend": [
-        "node ../scripts/audit-gate.mjs functions .",
         "npm run lint",
         "npm run format:check",
         "npm test",
-        "sh scripts/pruefe-zeitzuender.sh . --nur backend",
     ],
     "test-frontend": [
         "npm run lint:frontend",
         "npm run format:frontend:check",
         "npm run test:frontend",
-        "sh scripts/pruefe-zeitzuender.sh . --nur frontend",
+    ],
+    # Die drei Pruefungen, die von der Uhr abhaengen (17.10.2026; bis dahin in
+    # test-backend und test-frontend). Begruendung am Job in ci.yml.
+    "datumspruefungen": [
+        "node scripts/audit-gate.mjs functions .",
+        "node scripts/pruefe-zusagen-frist.mjs .",
+        "sh scripts/pruefe-zeitzuender.sh .",
     ],
     # Der Pflicht-Check test-e2e faehrt die Browser-Tests nicht selbst: Er
     # sammelt die Ergebnisse der Teil-Jobs ein (TEILJOBS_CI) und ist nur gruen,
@@ -183,8 +191,29 @@ PFLICHTJOBS_CI = {
         "python3 scripts/pruefungen/checks/stiller-fehlschlag.py .github",
         "python3 scripts/pruefungen/checks/test-blind.py .",
         "bash scripts/selbstpruefung-waechter.sh",
+        # Das Ergebnis von `datumspruefungen` (ZEITABHAENGIG_CI unten).
+        SAMMELSCHRITT_DATUM,
     ],
 }
+
+# ── Pruefungen, die von der UHR abhaengen (17.10.2026) ───────────────────────
+#
+# Fuer sie gilt die Baum-Regel nicht: Bei gleichem Inhalt kann ihr Ergebnis
+# heute ein anderes sein als gestern. `deploy.sh` nennt sie in der Liste
+# ZEITABHAENGIG, verlangt sie gruen und nimmt ihr Ergebnis nie aus dem Pull
+# Request. Je Job steht hier, welcher Pflicht-Check des Zweigschutzes sie
+# einsammelt — ohne diesen Sammler waeren sie keine Merge-Voraussetzung mehr.
+# Der Sammler wartet auf sie (JOB_WARTET_CI), laeuft mit `always()`
+# (JOB_BEDINGUNG_CI; ohne das stuende er bei einem roten Datums-Job auf
+# "skipped", und das laesst der Zweigschutz durch) und prueft ihr Ergebnis im
+# Sammelschritt (SCHRITT_FESTLEGUNG_CI).
+#
+# DATUMSSKRIPTE: Die Skripte, die von der Uhr abhaengen, stehen NUR in diesen
+# Jobs. Kaeme eines davon in einen anderen Job zurueck, waere jener Job wieder
+# von der Uhr abhaengig — und `deploy.sh` naehme sein Ergebnis trotzdem aus dem
+# Pull Request. Deshalb ist jede Nennung ausserhalb ein Mangel.
+ZEITABHAENGIG_CI = {"datumspruefungen": "pruefungen"}
+DATUMSSKRIPTE = ("audit-gate.mjs", "pruefe-zusagen-frist.mjs", "pruefe-zeitzuender.sh")
 
 # ── Teil-Jobs: ein Pflicht-Job verteilt seine Arbeit (16.10.2026) ─────────────
 #
@@ -220,6 +249,8 @@ TEILJOBS_CI = {
 JOB_BEDINGUNG_CI = {
     "test-e2e": "always() && needs.playwright-version.outputs.nur_nachtrag != 'ja'",
     "test-e2e-teil": "needs.playwright-version.outputs.nur_nachtrag != 'ja'",
+    # Sammelt `datumspruefungen` ein (ZEITABHAENGIG_CI) — dieselbe Begruendung.
+    "pruefungen": "always()",
 }
 # Worauf ein Job wartet (`needs`). Ein Job, der hier nicht steht, wartet auf
 # nichts: Ein Pflicht-Job hinter einem fremden Job entfiele, sobald dieser rot
@@ -227,6 +258,7 @@ JOB_BEDINGUNG_CI = {
 JOB_WARTET_CI = {
     "test-e2e": ["[playwright-version, test-e2e-teil]"],
     "test-e2e-teil": ["playwright-version"],
+    "pruefungen": ["datumspruefungen"],
 }
 
 # ── Unter welchen Umstaenden ein Pflichtbefehl laeuft (OPS-2026-10-03-12) ─────
@@ -247,8 +279,6 @@ JOB_WARTET_CI = {
 # die tiefer eingerueckten Zeilen darunter, jeweils ohne Einzug.
 SCHRITT_SCHLUESSEL = ("if", "shell", "working-directory", "env")
 SCHRITT_FESTLEGUNG_CI = {
-    # Der Job laeuft in functions/, dieses eine Skript in der Wurzel.
-    ("test-backend", "sh scripts/pruefe-zeitzuender.sh . --nur backend"): {"working-directory": ["."]},
     ("secret-scan", "uses: gitleaks/gitleaks-action"): {"env": ["GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}"]},
     ("playwright-version", "sh scripts/nur-nachtrag.sh"): {
         "env": ["BASIS: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || '' }}"]
@@ -257,6 +287,8 @@ SCHRITT_FESTLEGUNG_CI = {
     ("test-e2e", SAMMELSCHRITT_E2E): {
         "env": ["VERSION: ${{ needs.playwright-version.result }}", "TEILE: ${{ needs.test-e2e-teil.result }}"]
     },
+    # Und dieser genau das Ergebnis des Datums-Jobs.
+    ("pruefungen", SAMMELSCHRITT_DATUM): {"env": ["DATUM: ${{ needs.datumspruefungen.result }}"]},
 }
 JOB_ORDNER_CI = {"test-backend": "functions"}
 JOB_UMGEBUNG_CI = {"test-e2e-teil": ["HOME: /root"]}
@@ -283,11 +315,9 @@ SCHRITTFOLGE_CI = {
         "uses: actions/setup-node | with: node-version: \"24\" / cache: npm / cache-dependency-path: functions/package-lock.json",
         "uses: actions/setup-python | with: python-version: \"3.12\"",
         "run: npm ci",
-        "run: node ../scripts/audit-gate.mjs functions .",
         "run: npm run lint",
         "run: npm run format:check",
         "run: npm test",
-        "run: sh scripts/pruefe-zeitzuender.sh . --nur backend | working-directory: .",
     ],
     "test-frontend": [
         "uses: actions/checkout",
@@ -297,7 +327,16 @@ SCHRITTFOLGE_CI = {
         "run: npm run lint:frontend",
         "run: npm run format:frontend:check",
         "run: npm run test:frontend",
-        "run: sh scripts/pruefe-zeitzuender.sh . --nur frontend",
+    ],
+    "datumspruefungen": [
+        "uses: actions/checkout",
+        "uses: actions/setup-node | with: node-version: \"24\" / cache: npm / cache-dependency-path: \"**/package-lock.json\"",
+        "uses: actions/setup-python | with: python-version: \"3.12\"",
+        "run: npm ci",
+        "run: npm ci --prefix functions",
+        "run: node scripts/audit-gate.mjs functions .",
+        "run: node scripts/pruefe-zusagen-frist.mjs .",
+        "run: sh scripts/pruefe-zeitzuender.sh .",
     ],
     "test-e2e": [
         "env: VERSION: ${{ needs.playwright-version.result }} / TEILE: ${{ needs.test-e2e-teil.result }} | run: echo \"playwright-version=$VERSION test-e2e-teil=$TEILE\" && test \"$VERSION\" = success && test \"$TEILE\" = success",
@@ -343,6 +382,7 @@ SCHRITTFOLGE_CI = {
         "run: node scripts/pruefe-fremd-meldungen.mjs --nur-deckung",
         "run: node scripts/pruefe-auslieferbare-reste.mjs",
         "run: node scripts/pruefe-vendorierung.mjs",
+        "env: DATUM: ${{ needs.datumspruefungen.result }} | run: echo \"datumspruefungen=$DATUM\" && test \"$DATUM\" = success",
     ],
 }
 
@@ -692,14 +732,51 @@ def vertrag_ci(ci_text, deploy_text):
     # Die Pflicht-Jobs hier und die Pflicht-Checks in deploy.sh muessen dieselben
     # sein. Sonst verlangt die Auslieferung einen Check, dessen Inhalt niemand
     # festhaelt — oder dieser Vertrag einen, den die Auslieferung nicht verlangt.
+    # Seit 17.10.2026 in zwei Listen: PFLICHT (die Checks des Zweigschutzes)
+    # und ZEITABHAENGIG (von der Uhr abhaengig, nie aus dem Pull Request).
+    zweigschutz = sorted(set(PFLICHTJOBS_CI) - set(ZEITABHAENGIG_CI))
     treffer = re.search(r'(?m)^\s*PFLICHT="([^"]*)"', deploy_text)
     if not treffer:
         m.append("deploy.sh nennt keine Liste PFLICHT — welche Pflicht-Checks die Auslieferung verlangt, ist nicht lesbar")
-    elif set(treffer.group(1).split()) != set(PFLICHTJOBS_CI):
+    elif sorted(set(treffer.group(1).split())) != zweigschutz:
         m.append(
             f"deploy.sh verlangt die Pflicht-Checks {sorted(treffer.group(1).split())}, "
-            f"der Vertrag der Pipeline nennt {sorted(PFLICHTJOBS_CI)} — beide Listen muessen gleich sein"
+            f"der Vertrag der Pipeline nennt {zweigschutz} — beide Listen muessen gleich sein"
         )
+    zeit = re.search(r'(?m)^\s*ZEITABHAENGIG="([^"]*)"', deploy_text)
+    if not zeit:
+        m.append(
+            "deploy.sh nennt keine Liste ZEITABHAENGIG — welche Pruefungen von der Uhr abhaengen "
+            "und nie aus dem Pull Request genommen werden duerfen, ist nicht lesbar"
+        )
+    elif sorted(set(zeit.group(1).split())) != sorted(ZEITABHAENGIG_CI):
+        m.append(
+            f"deploy.sh nennt die zeitabhaengigen Pruefungen {sorted(zeit.group(1).split())}, "
+            f"der Vertrag der Pipeline {sorted(ZEITABHAENGIG_CI)} — sonst naehme die Baum-Regel "
+            "ein Ergebnis von gestern fuer heute"
+        )
+    # Die Tabellen fuer die Sammler passen zusammen: Ein zeitabhaengiger Job
+    # ist kein Check des Zweigschutzes, sein Sammler schon; der Sammler wartet
+    # auf ihn, laeuft mit always() und liest sein Ergebnis.
+    for job, sammler in ZEITABHAENGIG_CI.items():
+        sammelschritt = [
+            befehl
+            for (j, befehl), festlegung in SCHRITT_FESTLEGUNG_CI.items()
+            if j == sammler and any(f"needs.{job}.result" in w for w in festlegung.get("env", []))
+        ]
+        if (
+            sammler not in zweigschutz
+            or job not in PFLICHTJOBS_CI
+            or job not in " ".join(JOB_WARTET_CI.get(sammler, []))
+            or not JOB_BEDINGUNG_CI.get(sammler, "").startswith("always()")
+            or not sammelschritt
+            or sammelschritt[0] not in PFLICHTJOBS_CI.get(sammler, [])
+        ):
+            m.append(
+                f"Vertrag: der zeitabhaengige Job {job} wird nicht vollstaendig von {sammler} eingesammelt "
+                "(ZEITABHAENGIG_CI, JOB_WARTET_CI, JOB_BEDINGUNG_CI, SCHRITT_FESTLEGUNG_CI) — er waere "
+                "keine Merge-Voraussetzung mehr"
+            )
 
     # Rechte des Pipeline-Tokens: nur lesen, und kein Job hebt das fuer sich auf.
     kopf = t.split("\njobs:\n", 1)[0]
@@ -719,6 +796,16 @@ def vertrag_ci(ci_text, deploy_text):
             m.append(f"ci.yml: Teil-Job {teil} gehoert nicht als '<Pflicht-Job>-teil' zu einem Pflicht-Job (TEILJOBS_CI)")
 
     bloecke = _jobbloecke(t)
+    for job, block in bloecke.items():
+        if job in ZEITABHAENGIG_CI:
+            continue
+        for skript in DATUMSSKRIPTE:
+            if skript in block:
+                m.append(
+                    f"ci.yml: Job {job} nennt {skript} — diese Pruefung haengt von der Uhr ab und gehoert "
+                    f"nur in {sorted(ZEITABHAENGIG_CI)}; sonst naehme die Baum-Regel in deploy.sh das "
+                    "Ergebnis dieses Jobs von gestern fuer heute (DATUMSSKRIPTE)"
+                )
     for job, befehle in _vertragsjobs().items():
         if job not in bloecke:
             art = "Teil-Job" if job in TEILJOBS_CI else "Pflicht-Job"
@@ -1374,7 +1461,8 @@ def main():
     else:
         print(f"  ok      {len(VERTRAG_SUMMEN)} Dateien entsprechen dem festgeschriebenen Stand;")
         print(
-            f"          jeder der {len(PFLICHTJOBS_CI)} Pflicht-Jobs und {len(TEILJOBS_CI)} Teil-Job(s) fuehrt seine Pruefbefehle aus"
+            f"          jeder der {len(PFLICHTJOBS_CI) - len(ZEITABHAENGIG_CI)} Pflicht-Jobs, "
+            f"{len(ZEITABHAENGIG_CI)} Datums-Job(s) und {len(TEILJOBS_CI)} Teil-Job(s) fuehrt seine Pruefbefehle aus"
         )
         print(f"          und besteht aus genau seinen {sum(len(f) for f in SCHRITTFOLGE_CI.values())} festgelegten Schritten")
         print(

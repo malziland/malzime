@@ -26,7 +26,15 @@ const ATTRAPPEN = path.join(WURZEL, "scripts", "test-attrappen");
    der Waechter die Bibliothek trotzdem — in functions/, weil der Pipeline-Job
    dieser Suite nur dort Pakete installiert. */
 const MODULE = path.join(WURZEL, "functions", "node_modules");
-const { ghSeitenAttrappeAnlegen, lauf, fremdeLaeufe, pflichtLaeufe, PFLICHT } = require("./hilfen/gh-seiten-attrappe");
+const {
+  ghSeitenAttrappeAnlegen,
+  lauf,
+  fremdeLaeufe,
+  pflichtLaeufe,
+  PFLICHT,
+  ZEITABHAENGIG,
+  VERLANGT,
+} = require("./hilfen/gh-seiten-attrappe");
 const { curlFingerabdruckAttrappeAnlegen } = require("./hilfen/curl-fingerabdruck-attrappe");
 
 let klon;
@@ -708,10 +716,10 @@ describe("deploy.sh — Verhalten der Riegel", () => {
         /* main: e2e ROT, zwei stehen noch aus — der Fall, in dem die
            Abkuerzung greifen darf. */
         ATTRAPPE_CHECKS:
-          "test-backend=success\ntest-frontend=success\ntest-e2e=failure\nsecret-scan=pending\nplaywright-version=pending\npruefungen=success",
+          "test-backend=success\ntest-frontend=success\ntest-e2e=failure\nsecret-scan=pending\nplaywright-version=pending\npruefungen=success\ndatumspruefungen=success",
         /* Der PR ist vollstaendig gruen. */
         ATTRAPPE_CHECKS_PR:
-          "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+          "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success\ndatumspruefungen=success",
       });
       expect(r.code).not.toBe(0);
       expect(r.ausgabe).toMatch(/test-e2e/);
@@ -731,11 +739,13 @@ describe("deploy.sh — Verhalten der Riegel", () => {
   });
 
   /* BEFUND 31.08.2026 (Runde 5, H-2): Dieselbe Bauart wie beim PR-Rueckfall.
-     `ZEITABHAENGIG="test-backend"` nimmt die zeitabhaengige Suite von der
+     `ZEITABHAENGIG` nimmt die Pruefungen, die von der Uhr abhaengen, von der
      Abkuerzung aus — ihr Ergebnis von gestern sagt nichts ueber heute. Wer die
      Liste leert, hebt das lautlos auf; abgesichert war es nur durch ein
-     Textmuster. */
-  test("test-backend wird nicht durch ein PR-Ergebnis ersetzt", () => {
+     Textmuster. Bis 17.10.2026 stand dort test-backend, seither der Job
+     `datumspruefungen` (die Gegenprobe — test-backend WIRD uebernommen — steht
+     im Block zur Baum-Regel weiter unten). */
+  test("der Datums-Job wird nicht durch ein PR-Ergebnis ersetzt", () => {
     const betreff = execSync(`git -C "${klon}" log -1 --format=%s`, { encoding: "utf8" }).trim();
     execSync(
       [
@@ -753,15 +763,17 @@ describe("deploy.sh — Verhalten der Riegel", () => {
     try {
       const r = deploy({
         ATTRAPPE_PR_KOPF: prKopf,
-        /* Auf main steht NUR test-backend aus — genau die Suite, die nicht
+        /* Auf main steht NUR der Datums-Job aus — genau der, der nicht
            uebernommen werden darf. Alles andere ist gruen. */
         ATTRAPPE_CHECKS:
-          "test-backend=pending\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+          "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success\ndatumspruefungen=pending",
         ATTRAPPE_CHECKS_PR:
-          "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+          "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success\ndatumspruefungen=success",
       });
       expect(r.code).not.toBe(0);
-      expect(r.ausgabe).toMatch(/test-backend/);
+      expect(r.ausgabe).toMatch(
+        /Pflicht-Check datumspruefungen ist fuer [0-9a-f]{40} nicht grün \(Ist: datumspruefungen=pending\)/
+      );
     } finally {
       execSync(
         [
@@ -859,7 +871,7 @@ describe("deploy.sh — Verhalten der Riegel", () => {
        durch. Der Test haelt das fest, damit es so bleibt. */
     const r = deploy({
       ATTRAPPE_CHECKS:
-        "test-backend=success\ntest-frontend=success\ntest-e2e=cancelled\nsecret-scan=success\nplaywright-version=success\npruefungen=success",
+        "test-backend=success\ntest-frontend=success\ntest-e2e=cancelled\nsecret-scan=success\nplaywright-version=success\npruefungen=success\ndatumspruefungen=success",
     });
     expect(r.code).not.toBe(0);
     expect(r.ausgabe).toMatch(/test-e2e.*cancelled|cancelled/i);
@@ -940,10 +952,12 @@ describe("deploy.sh — Baum-Regel: ein Pflicht-Check, den main noch nicht angel
   afterEach(aufraeumen);
 
   const GRUEN_PR =
-    "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success";
+    "test-backend=success\ntest-frontend=success\ntest-e2e=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success\n" +
+    "datumspruefungen=success";
   /* main: alles fertig ausser den Browser-Teilen; test-e2e gibt es noch nicht. */
   const MAIN_TEILE_LAUFEN =
     "test-backend=success\ntest-frontend=success\nsecret-scan=success\nplaywright-version=success\npruefungen=success\n" +
+    "datumspruefungen=success\n" +
     "test-e2e-teil (1)=success\ntest-e2e-teil (2)=pending\ntest-e2e-teil (3)=pending\ntest-e2e-teil (4)=success";
 
   /** deploy.sh, waehrend ein PR-Kopf mit DEMSELBEN Baum existiert — die Lage,
@@ -1025,10 +1039,56 @@ describe("deploy.sh — Baum-Regel: ein Pflicht-Check, den main noch nicht angel
     expect(r.ausgabe).toMatch(/Pflicht-Check test-e2e ist fuer [0-9a-f]{40} nicht grün \(Ist: fehlt\)/);
   });
 
-  test("die zeitabhaengige Suite wird auch dann nicht aus dem PR genommen, wenn sie auf main noch fehlt", () => {
+  /* SEIT 17.10.2026: Die Pruefungen, die von der Uhr abhaengen, laufen im
+     eigenen Job `datumspruefungen`. Fuer ihn gilt die Baum-Regel nie — er muss
+     auf main SELBST gruen sein. test-backend sieht nur noch den Inhalt und wird
+     uebernommen wie die anderen. Der erste Fall ist der Erfolgsweg: Ohne ihn
+     bewiesen die uebrigen nur, dass der Riegel anhaelt. */
+  test("test-backend laeuft auf main noch, PR gruen, Datums-Job auf main gruen: die Auslieferung geht weiter", () => {
+    const r = deployBeiGleichemBaum(
+      MAIN_TEILE_LAUFEN.replace("test-backend=success", "test-backend=pending"),
+      GRUEN_PR
+    );
+    expect(r.ausgabe).toMatch(/Stand-Bindung: main prueft noch, PR #235 hat denselben Baum/);
+    expect(r.ausgabe).not.toMatch(/Pflicht-Check test-backend/);
+    expect(r.ausgabe).toMatch(/alle sechs Pflicht-Checks und die Datumspruefungen grün/);
+    expect(r.code).toBe(0);
+  });
+
+  test("test-backend fehlt auf main noch: wird ebenso aus dem PR genommen", () => {
     const r = deployBeiGleichemBaum(MAIN_TEILE_LAUFEN.replace("test-backend=success\n", ""), GRUEN_PR);
+    expect(r.ausgabe).not.toMatch(/Pflicht-Check test-backend/);
+    expect(r.code).toBe(0);
+  });
+
+  test("der PR meldet test-backend rot: der Riegel haelt an, mit dem Ergebnis des PR", () => {
+    const r = deployBeiGleichemBaum(
+      MAIN_TEILE_LAUFEN.replace("test-backend=success", "test-backend=pending"),
+      GRUEN_PR.replace("test-backend=success", "test-backend=failure")
+    );
     expect(r.code).not.toBe(0);
-    expect(r.ausgabe).toMatch(/Pflicht-Check test-backend ist fuer [0-9a-f]{40} nicht grün \(Ist: fehlt\)/);
+    expect(r.ausgabe).toMatch(
+      /Pflicht-Check test-backend ist fuer [0-9a-f]{40} nicht grün \(Ist: test-backend=failure\)/
+    );
+  });
+
+  test.each([
+    [
+      "laeuft auf main noch",
+      (lage) => lage.replace("datumspruefungen=success", "datumspruefungen=pending"),
+      "datumspruefungen=pending",
+    ],
+    ["fehlt auf main noch", (lage) => lage.replace("datumspruefungen=success\n", ""), "fehlt"],
+    [
+      "ist auf main rot",
+      (lage) => lage.replace("datumspruefungen=success", "datumspruefungen=failure"),
+      "datumspruefungen=failure",
+    ],
+  ])("der Datums-Job %s, der PR hat ihn gruen: nie aus dem PR genommen, der Riegel haelt an", (_was, umbau, ist) => {
+    const r = deployBeiGleichemBaum(umbau(MAIN_TEILE_LAUFEN), GRUEN_PR);
+    expect(r.code).not.toBe(0);
+    expect(r.ausgabe).toContain(`Pflicht-Check datumspruefungen ist fuer `);
+    expect(r.ausgabe).toContain(`nicht grün (Ist: ${ist})`);
   });
 });
 
@@ -1568,35 +1628,37 @@ describe("deploy.sh — viele Pruefergebnisse an einem Commit", () => {
     return { ...r, abfragen };
   }
 
-  test("31 Pruefergebnisse, alle sechs Pflicht-Checks gruen: die Auslieferung laeuft durch", () => {
-    /* 25 Laeufe aus Nachtlaeufen, dahinter die sechs Pflicht-Checks — der
-       letzte steht an Stelle 31 und laege bei 30 je Seite auf der zweiten. */
-    const laeufe = [...fremdeLaeufe(25), ...pflichtLaeufe()];
+  test("31 Pruefergebnisse, alle verlangten Checks gruen: die Auslieferung laeuft durch", () => {
+    /* 24 Laeufe aus Nachtlaeufen, dahinter die sechs Pflicht-Checks und der
+       Datums-Job — der letzte steht an Stelle 31 und laege bei 30 je Seite auf
+       der zweiten. */
+    const laeufe = [...fremdeLaeufe(24), ...pflichtLaeufe()];
     expect(laeufe).toHaveLength(31);
     const r = deployMitLaeufen(laeufe);
     expect(r.ausgabe).not.toMatch(/Pflicht-Check .* nicht grün/);
     expect(r.code).toBe(0);
-    expect(r.ausgabe).toMatch(/alle sechs Pflicht-Checks grün/);
+    expect(r.ausgabe).toMatch(/alle sechs Pflicht-Checks und die Datumspruefungen grün/);
     expect(r.uploads).toContain("firebase deploy --only hosting");
     /* Messmittel-Probe: Die Abfrage ging wirklich an die Seiten-Attrappe. */
     expect(r.abfragen.length).toBeGreaterThan(0);
     expect(r.abfragen[0]).toMatch(/\/check-runs\?per_page=100&page=1$/);
   });
 
-  test("ein roter Pflicht-Check an Stelle 31 haelt die Auslieferung an", () => {
+  test("ein roter Check an Stelle 31 haelt die Auslieferung an", () => {
     /* Die Gegenrichtung: Mehr Seiten duerfen nicht heissen, dass ein rotes
-       Ergebnis untergeht. */
-    const laeufe = [...fremdeLaeufe(25), ...pflichtLaeufe()];
-    laeufe[30] = lauf("pruefungen", "failure", "2026-08-31T10:00:00Z");
+       Ergebnis untergeht. An Stelle 31 steht der Datums-Job. */
+    const laeufe = [...fremdeLaeufe(24), ...pflichtLaeufe()];
+    expect(laeufe[30].name).toBe("datumspruefungen");
+    laeufe[30] = lauf("datumspruefungen", "failure", "2026-08-31T10:00:00Z");
     const r = deployMitLaeufen(laeufe);
     expect(r.code).not.toBe(0);
-    expect(r.ausgabe).toMatch(/Pflicht-Check pruefungen .* nicht grün \(Ist: pruefungen=failure\)/);
+    expect(r.ausgabe).toMatch(/Pflicht-Check datumspruefungen .* nicht grün \(Ist: datumspruefungen=failure\)/);
     expect(r.uploads).toEqual([]);
   });
 
   test("ueber 100 Laeufe: ein juengerer roter Lauf auf der zweiten Seite haelt an", () => {
-    /* Auf der ersten Seite stehen alle sechs gruen; der juengere, rote Lauf
-       von test-backend steht als Nummer 107 auf der zweiten. */
+    /* Auf der ersten Seite stehen alle verlangten gruen; der juengere, rote
+       Lauf von test-backend steht als Nummer 108 auf der zweiten. */
     const laeufe = [
       ...pflichtLaeufe("2026-08-17T07:15:00Z"),
       ...fremdeLaeufe(100),
@@ -1728,37 +1790,42 @@ describe("deploy.sh — laeuft der Nachtlauf noch nach Zeitplan", () => {
   });
 });
 
-/* ── Jeder der sechs Pflicht-Checks, einzeln (OPS-2026-10-03-12) ─────────
+/* ── Jeder verlangte Check, einzeln (OPS-2026-10-03-12) ──────────────────
  *
  * Die Faelle weiter oben machen `test-backend`, `test-e2e` und `pruefungen`
- * rot. Die uebrigen Namen liessen sich aus der Liste PFLICHT in deploy.sh
- * nehmen, ohne dass ein Test es merkte — und ein roter Check dieses Namens
- * hielte die Auslieferung dann nicht mehr an.
+ * rot. Die uebrigen Namen liessen sich aus den Listen in deploy.sh nehmen,
+ * ohne dass ein Test es merkte — und ein roter Check dieses Namens hielte die
+ * Auslieferung dann nicht mehr an.
  *
- * Die sechs Namen stehen fuer die Tests an EINER Stelle
- * (hilfen/gh-seiten-attrappe.js). Dass deploy.sh genau diese sechs verlangt,
+ * Die Namen stehen fuer die Tests an EINER Stelle
+ * (hilfen/gh-seiten-attrappe.js): die sechs Pflicht-Checks des Zweigschutzes
+ * und, seit 17.10.2026, der Datums-Job. Dass deploy.sh genau diese verlangt,
  * haelt der erste Fall fest; dass die Pipeline sie unter diesen Namen fuehrt,
  * der Vertrag in scripts/pruefe-deploy-riegel.py.
  * ──────────────────────────────────────────────────────────────────────── */
-describe("deploy.sh — jeder der sechs Pflicht-Checks haelt fuer sich an", () => {
+describe("deploy.sh — jeder verlangte Check haelt fuer sich an", () => {
   afterEach(aufraeumen);
 
-  /** Alle sechs gruen, nur `name` traegt `ergebnis` (null: der Check fehlt ganz). */
+  /** Alle gruen, nur `name` traegt `ergebnis` (null: der Check fehlt ganz). */
   const lage = (name, ergebnis) =>
-    PFLICHT.filter((n) => n !== name || ergebnis !== null)
+    VERLANGT.filter((n) => n !== name || ergebnis !== null)
       .map((n) => `${n}=${n === name ? ergebnis : "success"}`)
       .join("\n");
   const firebaseDeploy = (aufrufe) => aufrufe.filter((zeile) => zeile.startsWith("firebase deploy"));
 
-  test("deploy.sh verlangt genau diese sechs", () => {
+  test("deploy.sh verlangt genau diese sechs Pflicht-Checks und den Datums-Job", () => {
     const skript = fs.readFileSync(path.join(WURZEL, "scripts", "deploy.sh"), "utf8");
     const liste = skript.match(/^\s*PFLICHT="([^"]+)"$/m);
     expect(liste).not.toBeNull();
     expect(liste[1].split(" ").sort()).toEqual([...PFLICHT].sort());
     expect(PFLICHT).toHaveLength(6);
+    const zeit = skript.match(/^\s*ZEITABHAENGIG="([^"]+)"$/m);
+    expect(zeit).not.toBeNull();
+    expect(zeit[1].split(" ").sort()).toEqual([...ZEITABHAENGIG].sort());
+    expect(ZEITABHAENGIG).toEqual(["datumspruefungen"]);
   });
 
-  test.each(PFLICHT)("%s rot, die anderen fuenf gruen: Abbruch mit seinem Namen, nichts ausgeliefert", (name) => {
+  test.each(VERLANGT)("%s rot, die anderen gruen: Abbruch mit seinem Namen, nichts ausgeliefert", (name) => {
     const r = deployMitProtokoll({ ATTRAPPE_CHECKS: lage(name, "failure") });
     expect(r.code).not.toBe(0);
     /* Die Meldung DIESES Riegels mit DIESEM Namen — ein Abbruch an anderer
@@ -1770,7 +1837,7 @@ describe("deploy.sh — jeder der sechs Pflicht-Checks haelt fuer sich an", () =
     expect(firebaseDeploy(r.aufrufe)).toEqual([]);
   });
 
-  test.each(PFLICHT)("%s ohne Ergebnis (der Lauf fehlt): Abbruch, nichts ausgeliefert", (name) => {
+  test.each(VERLANGT)("%s ohne Ergebnis (der Lauf fehlt): Abbruch, nichts ausgeliefert", (name) => {
     const r = deployMitProtokoll({ ATTRAPPE_CHECKS: lage(name, null) });
     expect(r.code).not.toBe(0);
     expect(r.ausgabe).toMatch(new RegExp(`Pflicht-Check ${name} ist fuer [0-9a-f]{40} nicht grün \\(Ist: fehlt\\)`));
@@ -1787,10 +1854,10 @@ describe("deploy.sh — jeder der sechs Pflicht-Checks haelt fuer sich an", () =
     expect(firebaseDeploy(r.aufrufe)).toEqual([]);
   });
 
-  test("alle sechs gruen: die Auslieferung laeuft durch — der Riegel schlaegt nicht immer zu", () => {
+  test("alle gruen: die Auslieferung laeuft durch — der Riegel schlaegt nicht immer zu", () => {
     const r = deployMitProtokoll({ ATTRAPPE_CHECKS: lage(null, null) });
     expect(r.code).toBe(0);
-    expect(r.ausgabe).toMatch(/alle sechs Pflicht-Checks grün/);
+    expect(r.ausgabe).toMatch(/alle sechs Pflicht-Checks und die Datumspruefungen grün/);
     expect(r.uploads).toContain("firebase deploy --only hosting");
   });
 });

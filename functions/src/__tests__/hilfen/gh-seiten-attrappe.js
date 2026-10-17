@@ -77,11 +77,18 @@ function fremdeLaeufe(anzahl) {
   return laeufe;
 }
 
+/* Die Pflicht-Checks des Zweigschutzes (Liste PFLICHT in deploy.sh). */
 const PFLICHT = ["test-backend", "test-frontend", "test-e2e", "secret-scan", "playwright-version", "pruefungen"];
+/* Die Pruefungen, die von der Uhr abhaengen (Liste ZEITABHAENGIG in deploy.sh,
+   seit 17.10.2026): kein Check des Zweigschutzes, aber von deploy.sh verlangt
+   und nie aus dem Pull Request genommen. */
+const ZEITABHAENGIG = ["datumspruefungen"];
+/* Alles, was deploy.sh fuer den Commit gruen verlangt. */
+const VERLANGT = [...PFLICHT, ...ZEITABHAENGIG];
 
-/** Die sechs Pflicht-Checks, alle gruen, gestartet zur genannten Zeit. */
+/** Alle von deploy.sh verlangten Checks, alle gruen, gestartet zur genannten Zeit. */
 function pflichtLaeufe(started_at = "2026-08-31T10:00:00Z", conclusion = "success") {
-  return PFLICHT.map((name) => lauf(name, conclusion, started_at));
+  return VERLANGT.map((name) => lauf(name, conclusion, started_at));
 }
 
-module.exports = { ghSeitenAttrappeAnlegen, lauf, fremdeLaeufe, pflichtLaeufe, PFLICHT };
+module.exports = { ghSeitenAttrappeAnlegen, lauf, fremdeLaeufe, pflichtLaeufe, PFLICHT, ZEITABHAENGIG, VERLANGT };

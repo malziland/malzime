@@ -72,11 +72,12 @@ function schritteJeJob() {
   return jobs;
 }
 
-/** Alle `- run:`-Schritte der drei billigen Jobs aus der Workflow-Datei. */
+/** Alle `- run:`-Schritte der billigen Jobs aus der Workflow-Datei (seit 17.10.2026 mit dem
+ *  Datums-Job: Gate, Frist-Bremse und Zeitzuender-Probe laufen vor dem Push genauso). */
 function billigeSchritte() {
   const yml = fs.readFileSync(WORKFLOW, "utf8");
   const zeilen = yml.split("\n");
-  const jobs = ["test-frontend:", "test-backend:", "pruefungen:"];
+  const jobs = ["test-frontend:", "test-backend:", "datumspruefungen:", "pruefungen:"];
   const schritte = [];
   let inJob = false;
 

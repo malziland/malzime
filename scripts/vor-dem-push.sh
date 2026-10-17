@@ -61,7 +61,6 @@ lauf "Frontend: Format" "test-frontend" npm run --silent format:frontend:check
 lauf "Frontend: Unit-Tests" "test-frontend" npm run --silent test:frontend
 
 # ── Job: test-backend (ohne die lange Suite) ────────────────────────────────
-lauf "Backend: Abhaengigkeits-Gate" "test-backend" node scripts/audit-gate.mjs functions .
 lauf "Backend: Lint" "test-backend" sh -c 'cd functions && npm run --silent lint'
 lauf "Backend: Format" "test-backend" sh -c 'cd functions && npm run --silent format:check'
 
@@ -133,8 +132,14 @@ lauf "Pruefungen: Mitgelieferte Bibliotheken beobachtet" "pruefungen" node scrip
 # liefert sie trotzdem aus, wenn firebase.json sie nicht ausschliesst.
 lauf "Pruefungen: Auslieferbare Reste" "pruefungen" node scripts/pruefe-auslieferbare-reste.mjs
 lauf "Pruefungen: Vendorierung" "pruefungen" node scripts/pruefe-vendorierung.mjs
-lauf "Zeitzuender (Backend)" "test-backend" sh scripts/pruefe-zeitzuender.sh . --nur backend
-lauf "Zeitzuender (Frontend)" "test-frontend" sh scripts/pruefe-zeitzuender.sh . --nur frontend
+
+# ── Job: datumspruefungen (seit 17.10.2026) ─────────────────────────────────
+# Die drei Pruefungen, die von der Uhr abhaengen (Begruendung am Job in ci.yml).
+# Bis dahin standen das Gate unter test-backend und die Zeitzuender-Probe je zur
+# Haelfte unter test-backend und test-frontend.
+lauf "Datum: Abhaengigkeits-Gate" "datumspruefungen" node scripts/audit-gate.mjs functions .
+lauf "Datum: Frist der ZDR-Zusage" "datumspruefungen" node scripts/pruefe-zusagen-frist.mjs .
+lauf "Datum: Zeitzuender" "datumspruefungen" sh scripts/pruefe-zeitzuender.sh .
 
 DAUER=$(($(date +%s) - START))
 echo "-----------------------------------------------------------"

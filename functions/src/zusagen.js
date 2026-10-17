@@ -8,8 +8,9 @@
  * halbjaehrlich". Zwei Stellen wachen darueber — und beide benutzen bewusst
  * DIESE Datei, damit die Frist nur an einer Stelle definiert ist:
  *
- *  1. `__tests__/zusagen-frische.test.js` — harte Bremse: die CI wird rot,
- *     sobald das Datum im Quelltext der Seite zu alt ist.
+ *  1. `scripts/pruefe-zusagen-frist.mjs` (CI-Job `datumspruefungen`) — harte
+ *     Bremse: die CI wird rot, sobald das Datum im Quelltext der Seite zu
+ *     alt ist (bis 17.10.2026 ein Test der Server-Suite).
  *  2. `handle-erinnerung.js` — freundliche Vorwarnung: eine Woche vorher
  *     kommt ein ntfy-Push mit der Handlungsanleitung.
  *

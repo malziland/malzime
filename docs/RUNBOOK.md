@@ -69,6 +69,10 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
    (test-backend, test-frontend, test-e2e, secret-scan, playwright-version,
    pruefungen) sind Merge-Voraussetzung. Kanonisch ist die Branch Protection,
    siehe Abschnitt weiter unten (DOC-2026-08-20-13: hier standen vier).
+   Seit 17.10.2026 laufen die Prüfungen, die von der Uhr abhängen, im eigenen
+   Job `datumspruefungen`. Er ist kein eigener Pflicht-Check: `pruefungen`
+   wartet auf ihn und wird rot, wenn er nicht grün ist
+   (`docs/SECURITY-MODEL.md`, „Prüfungen, die von der Uhr abhängen“).
 3. CHANGELOG: Sobald deployt wird, ist das ein Release — den
    `[Unveröffentlicht]`-Abschnitt im selben Schritt auf neue Versionsnummer und
    Datum stempeln.
@@ -102,7 +106,8 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
 
    **Lint und Unit-Tests laufen nur noch, wenn die Stand-Bindung NICHT
    gegriffen hat.** Sie verlangt ohnehin einen sauberen Arbeitsbaum,
-   `HEAD == origin/main` und sechs grüne Pflicht-Checks — damit sind dieselben
+   `HEAD == origin/main`, sechs grüne Pflicht-Checks und den grünen Job
+   `datumspruefungen` — damit sind dieselben
    Suiten über bitgenau denselben Code bereits belegt. Fällt sie aus
    (`SKIP_STAND=1`), laufen sie vollständig.
 
@@ -118,9 +123,15 @@ läuft der Ablauf vollständig durch (dokumentiert in ADR-0001).
      Checks, die auf `pending` oder ohne Ergebnis stehen. Ein `failure` auf
      `main` bleibt ein `failure` — sonst könnte ein grünes PR-Ergebnis ein
      rotes von `main` verdrängen.
-   - **`test-backend` ist ausgenommen.** Diese Suite hängt an der echten Uhr;
-     ihr Ergebnis von gestern sagt nichts über heute. Sie muss auf `main`
-     selbst grün sein.
+   - **Der Job `datumspruefungen` ist ausgenommen** (Liste `ZEITABHAENGIG` in
+     `deploy.sh`). Er fährt die drei Prüfungen, die von der Uhr abhängen:
+     Abhängigkeits-Gate samt `npm audit` und Ausnahmen mit Ablaufdatum, die
+     Frist der ZDR-Zusage und den Zeitzünder. Ihr Ergebnis von gestern sagt
+     nichts über heute; der Job muss auf `main` selbst grün sein. Er ist
+     kurz: keine ganze Testreihe, nur diese drei. Bis 17.10.2026 standen sie in
+     `test-backend`, das deshalb ausgenommen war und nach dem Zusammenführen
+     die volle Server-Suite lang auf sich warten ließ; seither sieht
+     `test-backend` nur den Inhalt und folgt der Regel wie die anderen.
 
    Das Skript prüft weiter die Version der Firebase-CLI gegen die in `deploy.sh`
    hinterlegte Untergrenze (Notschalter `SKIP_CLI_CHECK=1`). Eine nicht
@@ -175,7 +186,7 @@ Repository auf, in dieser Reihenfolge:
 
 | Schritt | Was geschieht | Womit | Hält an, wenn |
 |---|---|---|---|
-| 1 | Warten, bis die Freigabe erreicht ist — dieselbe Regel, die `deploy.sh` anwendet: sechs Pflicht-Checks für den Commit auf `main` (mit der Baum-Regel aus dem Abschnitt „Deploy"), Herkunftsnachweis des HEIC-Dekoders, ein Nachtlauf innerhalb der Grenze aus `deploy.sh`. `deploy.sh` wartet auf nichts davon, es bricht ab; deshalb wartet die Kette **vor** dem Wartungsmodus. Ist der Nachtlauf zu alt, stößt sie ihn an (`gh workflow run sicherheit-nachts.yml`) | `gh` (lesend, bis auf diesen einen Start) | ein Pflicht-Check rot ist oder die Freigabe ausbleibt |
+| 1 | Warten, bis die Freigabe erreicht ist — dieselbe Regel, die `deploy.sh` anwendet: sechs Pflicht-Checks und der Job `datumspruefungen` für den Commit auf `main` (mit der Baum-Regel aus dem Abschnitt „Deploy", die den Datums-Job nie übernimmt), Herkunftsnachweis des HEIC-Dekoders, ein Nachtlauf innerhalb der Grenze aus `deploy.sh`. `deploy.sh` wartet auf nichts davon, es bricht ab; deshalb wartet die Kette **vor** dem Wartungsmodus. Ist der Nachtlauf zu alt, stößt sie ihn an (`gh workflow run sicherheit-nachts.yml`) | `gh` (lesend, bis auf diesen einen Start) | ein Pflicht-Check rot ist oder die Freigabe ausbleibt |
 | 2 | Einstellungssatz: Datenbank gegen Repository | `node scripts/betriebsprofil-vergleichen.js` (lesend) | beide nicht gleich sind |
 | 3 | Wartungsmodus ein, mit Text für die Besucher; das Skript misst nach | `sh scripts/wartungsmodus.sh ein "…"` | der Zustand nicht bestätigt wird |
 | 4 | Ausliefern. Die Rückfrage entfällt, weil die Freigabe vorliegt — das steht als `DEPLOY_JA(Rueckfrage)` in der Schlussbilanz | `DEPLOY_JA=1 ./scripts/deploy.sh` | siehe Rückgabewerte unten |
@@ -273,9 +284,13 @@ rechnen mit derselben Frist aus `functions/src/zusagen.js`:
    fail-soft: Seite nicht erreichbar, Datum unlesbar oder ntfy weg werden nur
    als Warnung geloggt (nie `severity ERROR`, sonst löst die Erinnerung den
    Fehleralarm aus).
-2. **Harte Bremse:** `functions/src/__tests__/zusagen-frische.test.js` macht
-   die CI rot, sobald das Prüfdatum älter als 183 Tage ist — falls die
-   Vorwarnung untergeht.
+2. **Harte Bremse:** `node scripts/pruefe-zusagen-frist.mjs .` (Job
+   `datumspruefungen`, auch vor dem Push) macht die CI rot, sobald das
+   Prüfdatum älter ist als die Frist `FRIST_TAGE` in `functions/src/zusagen.js`
+   — falls die Vorwarnung untergeht. Ein nicht lesbares Datum ist ebenfalls rot.
+   Bis 17.10.2026 war das ein Test in der Server-Suite
+   (`zusagen-frische.test.js`; dort stehen jetzt die Proben der Bremse mit
+   vorgegebener Uhr).
 
 Ablauf, wenn die Erinnerung kommt (oder der Bau rot wird) — **in dieser
 Reihenfolge**:
@@ -326,7 +341,8 @@ Soll-Zustand, auslesbar:
 
 Erwartet: `strict: true`, `admins: true`, sechs Pflicht-Checks —
 `test-backend`, `test-frontend`, `test-e2e`, `secret-scan`, `playwright-version`,
-`pruefungen`.
+`pruefungen`. Der Job `datumspruefungen` steht bewusst nicht darin: `pruefungen`
+sammelt ihn ein, und `deploy.sh` verlangt ihn zusätzlich selbst.
 
 Gemessen wird das bei jeder Auslieferung: `scripts/verify-infrastructure.sh` liest die
 öffentliche Angabe zum Zweig (lesend, ohne Verwalterrechte) und vergleicht die verlangten
@@ -1073,7 +1089,7 @@ Admin-Boost (+100 je Aufruf) über `/api/admin/boost`, Zähler-Reset über
 ### Audit-Gate rot / Dependabot-PRs bleiben liegen
 
 Erst nachsehen, **was** rot ist: `node scripts/audit-gate.mjs functions .` (läuft
-lokal identisch zur CI, prüft beide Bäume mit allen Abhängigkeiten einschließlich
+lokal identisch zum CI-Job `datumspruefungen`, prüft beide Bäume mit allen Abhängigkeiten einschließlich
 der Werkzeuge und nennt Paket, Advisory und Kette).
 
 - **Es gibt eine reparierte Version** → anheben, Tests laufen lassen, committen.
@@ -1220,7 +1236,7 @@ meist ein roter Job `mitgelieferte-bibliotheken` im Nachtlauf.
    grün sein. Nach dem Zusammenführen läuft er auf `main` noch einmal; `deploy.sh`
    wartet NICHT darauf, sondern bricht ab, solange der Lauf fehlt, noch läuft oder
    rot ist. Die Deploy-Kette („Die Auslieferung als Kette", Schritt 1) wartet deshalb
-   vor dem Wartungsmodus auch auf diesen Lauf, nicht nur auf die sechs Pflicht-Checks.
+   vor dem Wartungsmodus auch auf diesen Lauf, nicht nur auf die Pflicht-Checks.
 
 Der Job `kontrollbau` baut bei jedem Lauf zusätzlich die bis 30.09.2026
 ausgelieferte Fassung (libheif 1.23.2, libde265 1.0.15) nach und vergleicht sie

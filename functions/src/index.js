@@ -192,7 +192,7 @@ exports.reapJobs = onSchedule(
 
 /* erinnerung — geplanter Lauf (montags 9 Uhr Wien): schickt einen ntfy-Push,
    wenn die halbjaehrliche ZDR-Nachpruefung binnen einer Woche faellig wird.
-   Freundliche Vorwarnung VOR der harten CI-Bremse (zusagen-frische.test.js).
+   Freundliche Vorwarnung VOR der harten CI-Bremse (scripts/pruefe-zusagen-frist.mjs).
    Siehe handle-erinnerung.js. */
 exports.erinnerung = onSchedule(
   {

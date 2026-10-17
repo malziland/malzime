@@ -876,14 +876,16 @@ ESLint-Einstellungen, `.prettierignore` und die Vorbereitungsdatei von Jest
 
 Zusätzlich prüft er inhaltlich. Im Nachtlauf: genau ein festgelegter Befehl je
 Prüf-Job, kein `if`, kein `continue-on-error`, keine umlenkenden Umgebungswerte, ein
-täglicher Zeitplan. In `ci.yml`: Jeder der sechs Pflicht-Jobs führt die Prüfbefehle,
-die ihn ausmachen, als eigenen Schritt aus — Server-Tests, Lint und Formatprüfung,
-Abhängigkeits-Gate, Browser-Modul-Tests, Browser-Durchläufe, Geheimnis-Suche,
-Nachtrag-Erkennung, die Prüfungen samt ihrer Selbstprüfung (Liste `PFLICHTJOBS_CI` im
+täglicher Zeitplan. In `ci.yml`: Jeder der sechs Pflicht-Jobs und der Datums-Job
+führen die Prüfbefehle, die sie ausmachen, als eigenen Schritt aus — Server-Tests, Lint
+und Formatprüfung, Browser-Modul-Tests, Browser-Durchläufe, Geheimnis-Suche,
+Nachtrag-Erkennung, die Prüfungen samt ihrer Selbstprüfung, und im Datums-Job
+Abhängigkeits-Gate, Frist der ZDR-Zusage und Zeitzünder (Liste `PFLICHTJOBS_CI` im
 Riegel). Kein Pflicht-Job trägt `continue-on-error` oder eine Bedingung, außer der des
-Browser-Tests beim reinen Nachtrag (unten, „Nachtrag ohne Browser-Test"); das
-Pipeline-Token darf nur lesen; und die Pflicht-Jobs sind dieselben sechs, die
-`scripts/deploy.sh` grün verlangt. In allen Workflows ist jede Action per
+Browser-Tests beim reinen Nachtrag (unten, „Nachtrag ohne Browser-Test") und dem
+`always()` der beiden Sammel-Jobs; das Pipeline-Token darf nur lesen; und die
+Pflicht-Jobs sind dieselben sechs, die `scripts/deploy.sh` grün verlangt — dazu
+verlangt es den Datums-Job (unten, „Prüfungen, die von der Uhr abhängen"). In allen Workflows ist jede Action per
 Commit-Kennung festgenagelt.
 Festgelegt ist auch, unter welchen Umständen ein Pflichtbefehl läuft: An seinem Schritt
 steht keine Bedingung, keine eigene Shell, kein anderer Ordner und keine zusätzliche
@@ -1784,7 +1786,7 @@ seine Vorgänger fertig sind (gemessen am Lauf vom 15.10.2026). Solange die Teil
 auf `main` laufen, fehlt `test-e2e` deshalb, statt „läuft“ zu melden. Die
 Baum-Regel in `scripts/deploy.sh` behandelt einen fehlenden Pflicht-Check wie
 einen laufenden — nur solange `main` noch prüft, nur bei gleichem Baum, nie
-für `test-backend`, und nie, wenn auf `main` schon ein Teil (`test-e2e-teil (n)`)
+für den Datums-Job (unten), und nie, wenn auf `main` schon ein Teil (`test-e2e-teil (n)`)
 nicht grün ist: Dann steht das Ergebnis dort fest, und der Riegel hält an
 (Befund P3 der unabhängigen Abnahme). Den Namen `<Pflicht-Job>-teil`, an dem
 `deploy.sh` die Teile erkennt, hält `scripts/pruefe-deploy-riegel.py` fest.
@@ -1799,6 +1801,60 @@ erste rote Teil auf GitHub ist der Beleg.
 **Neubewertung**, wenn GitHub übersprungene Pflicht-Checks oder das Ergebnis
 einer Matrix anders behandelt, oder wenn ein Teil-Job selbst Pflicht-Check
 werden soll.
+
+## Prüfungen, die von der Uhr abhängen (17.10.2026)
+
+**Lage.** Drei Prüfungen hängen nicht nur vom Inhalt ab, sondern vom Tag: das
+Abhängigkeits-Gate (`npm audit` fragt die Datenbank von heute; Ausnahmen laufen
+an einem Datum ab), die Frist der ZDR-Zusage (rot, sobald das Prüfdatum der
+Datenschutzerklärung älter ist als die versprochene Frist) und der Zeitzünder
+(fährt die Tests, die nach festen Daten aussehen, mit 400 Tage vorgestellter
+Uhr). Bis 17.10.2026 liefen sie in `test-backend` und `test-frontend`. Deshalb
+nahm `scripts/deploy.sh` für `test-backend` nie das Ergebnis des Pull Requests,
+und jede Auslieferung wartete nach dem Zusammenführen die ganze Server-Suite ab
+(191 s im Lauf von `main` auf 6c63bb2). `test-frontend` dagegen wurde
+übernommen, obwohl dort der Zeitzünder der Website lief — eine Lücke derselben
+Art, mit dieser Umstellung geschlossen.
+
+**Entscheidung.** Die drei laufen im eigenen Job `datumspruefungen`, und nur
+dort. `test-backend` und `test-frontend` prüfen nur noch den Inhalt und folgen
+der Baum-Regel (Abschnitt „Deploy" in `docs/RUNBOOK.md`). Für den Datums-Job
+gilt sie nie (Liste `ZEITABHAENGIG` in `deploy.sh`): Er muss für den Commit auf
+`main` selbst grün sein, also am Tag der Auslieferung. Jede Prüfung läuft damit
+weiter genau einmal auf genau dem Stand, der live geht, bevor er live geht —
+die inhaltlichen am bitgleichen Baum im Pull Request, die vom Tag abhängigen am
+Commit auf `main`.
+
+Der Job ist kein Pflicht-Check des Zweigschutzes. Merge-Voraussetzung ist er
+trotzdem: Der Pflicht-Job `pruefungen` wartet auf ihn, läuft mit `always()` und
+verlangt als letzten Schritt sein Ergebnis wörtlich `success`. Ohne `always()`
+stünde `pruefungen` bei rotem Datums-Job auf „skipped“, und das gilt beim
+Zweigschutz als bestanden (Abschnitt „Browser-Tests verteilt“). Ein eigener
+Pflicht-Check wurde verworfen: Er bräuchte eine Änderung des Zweigschutzes,
+und `scripts/verify-infrastructure.sh` hält den Zweigschutz gleich der Liste
+`PFLICHT` in `deploy.sh`.
+
+`scripts/pruefe-deploy-riegel.py` hält fest: die Befehle des Datums-Jobs,
+Wartebeziehung, Bedingung und Sammelschritt von `pruefungen`, die Liste
+`ZEITABHAENGIG` in `deploy.sh`, und dass keines der drei Skripte in einem
+anderen Job steht (`DATUMSSKRIPTE`). Die Frist-Bremse war bis dahin ein Test
+der Server-Suite; sie ist jetzt `scripts/pruefe-zusagen-frist.mjs` (ein nicht
+lesbares Datum ist rot), und `zusagen-frische.test.js` prüft sie mit
+vorgegebener Uhr. Vor dem Push läuft der Job ebenso (`scripts/vor-dem-push.sh`).
+
+**Folge.** Nach dem Zusammenführen wartet die Auslieferung nur noch auf den
+Datums-Job und den kurzen Job `pruefungen` dahinter, nicht mehr auf die
+Server-Suite.
+
+**Restrisiko.** Ein neuer Test, der auf andere Art vom Tag abhängt als über
+ein festes Datum, machte `test-backend` oder `test-frontend` wieder
+zeitabhängig, ohne dass ein Wächter es merkt: `DATUMSSKRIPTE` kennt nur die
+drei Skripte, der Zeitzünder nur Tests, die nach festen Daten aussehen. Ein
+Ergebnis von gestern würde dann heute übernommen.
+
+**Neubewertung**, wenn eine weitere Prüfung vom Tag abhängt (sie gehört in den
+Datums-Job und nach `DATUMSSKRIPTE`), wenn der Datums-Job selbst Pflicht-Check
+werden soll, oder wenn GitHub übersprungene Pflicht-Checks anders behandelt.
 
 ## Werbung und Vorlagen: passend statt gleich (13.10.2026)
 

@@ -30,8 +30,15 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 on:
+  # Der taegliche Lauf ist fuer 03:43 UTC GEPLANT. GitHub startet geplante
+  # Laeufe aber oft Stunden spaeter: Gemessen an den 16 Nachtlaeufen vom 02.
+  # bis 17.10.2026 begannen sie 4,3 bis 7,6 Stunden verspaetet (zwischen 10:02
+  # und 13:19 Uhr Wiener Zeit statt 05:43); zwei aufeinanderfolgende Laeufe
+  # lagen hoechstens 25,0 Stunden auseinander. Die Auslieferung verlangt einen
+  # gelaufenen Nachtlauf, der hoechstens 26 Stunden alt ist
+  # (NACHT_GRENZE_MINUTEN in scripts/deploy.sh).
   schedule:
-    - cron: "43 3 * * *" # taeglich 03:43 UTC, vor dem Arbeitstag in Wien
+    - cron: "43 3 * * *" # geplant 03:43 UTC, Start oft Stunden spaeter (siehe oben)
     # Monatliche Probe des Alarmwegs (Befund H-03): Am 1. jedes Monats kommt
     # "malziME PROBE (monatlich)" aufs Handy, auch wenn alles gruen ist. Bleibt
     # sie aus, ist der Weg gestoert (Secret, ntfy-Server, Thema) — das faellt

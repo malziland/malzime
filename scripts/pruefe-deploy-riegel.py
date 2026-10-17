@@ -122,7 +122,7 @@ PRUEFJOBS_NACHTS = {
 # `release.yml` und `dependabot-automerge.yml` laufen mit Schreibrechten;
 # `dependabot.yml` bestimmt, welche Pakete ueberhaupt Updates bekommen.
 VERTRAG_SUMMEN = {
-    "sicherheit-nachts.yml": "46e7e74b721601db",
+    "sicherheit-nachts.yml": "a25c259e1d8e350d",
     "libheif-bau.yml": "39f0db0be0a0a3e0",
     "ci.yml": "c578946f73e74042",
     "release.yml": "1fd803f6e5167738",

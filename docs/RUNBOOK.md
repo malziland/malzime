@@ -1122,7 +1122,8 @@ scharf gestellt, wartet aber auf einen Check, der nie grün wird.
 
 ### Nachtlauf „Sicherheit nachts" rot
 
-Der Workflow `.github/workflows/sicherheit-nachts.yml` läuft täglich um 03:43 UTC.
+Der Workflow `.github/workflows/sicherheit-nachts.yml` läuft täglich, geplant für
+03:43 UTC; GitHub startet ihn oft Stunden später (Messung im Kommentar der Datei).
 Ist auf `main` einer seiner Prüf-Jobs rot, kommt ein ntfy-Push mit Stufe „urgent"
 (Titel „malziME: Sicherheit nachts ROT", Link zum Lauf; Einrichtung in
 `docs/ERROR-ALERTING.md`). Die drei Prüf-Jobs; der Name des roten Jobs sagt, was zu

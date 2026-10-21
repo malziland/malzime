@@ -1641,8 +1641,8 @@ Analyse-Aufruf (Rückfall in `job-pipelines.js`).
 1. **Ein kurzer Aussetzer des Werbe-Aufrufs ist eine Warnung, kein Alarm**:
    Überlast (429 und die eigene Drossel, wie schon seit 07.10.2026), 502, 503,
    504, die Zeitgrenze des Aufrufs und ein Verbindungsabriss
-   (`istKurzerAussetzer` in `mistral.js`; entschieden wird nur an Code, Status
-   und Markierung, nie am Text der Meldung).
+   (`istKurzerAussetzer` in `ueberlast.js`; es entscheiden Code, Status und
+   Markierung, nie eine Zahl im freien Text der Meldung).
 2. **Jeder andere Fehlschlag bleibt eine Fehlerzeile mit Alarm** (400, 401, 404,
    500, unlesbare Antwort, fehlender Schlüssel). Das ist eine Antwort auf genau
    diese Anfrage oder etwas Kaputtes — der Fall, für den OPS-004 (Audit

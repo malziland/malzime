@@ -94,7 +94,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) â€
   mistral-http.js    Netzschicht zu Mistral: Zugangsschluessel, Zeitgrenzen, Antwort als Strom, Ueberlastmeldung erkennen
   mistral-antwort.js  Antwort der KI auseinandernehmen (reine Funktionen): Live-Text, fehlende Karten, Maskierung (escapeXml)
   auftrag-wechsel.js  Was am Analyse-Auftrag je Analyse wechselt: die Marken-Sperre hinter dem Bild und die Formvorlage am Ende (beide gewuerfelt, fuer Tests und Messungen vorgebbar)
-  ueberlast.js       Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504)
+  ueberlast.js       Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504); was beim Werbe-Aufruf als kurzer Aussetzer gilt (istKurzerAussetzer)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
   verbindungsfehler.js  Verbindungsabriss zu einem fremden Dienst: erkennen, markieren, einmal neu versuchen, Teiltext retten, Grund protokollieren â€” nur Code und Kurztext, nie Adressen

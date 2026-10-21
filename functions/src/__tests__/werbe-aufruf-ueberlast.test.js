@@ -168,6 +168,36 @@ describe("jeder andere Fehlschlag: weiter eine Fehlerzeile mit Alarm", () => {
   });
 });
 
+/* Die Entscheidung selbst (ueberlast.js): Code, Status und Markierung —
+   nie eine Zahl im freien Text, wie bei istUeberlast (BUG-2026-10-03-34). */
+describe("istKurzerAussetzer", () => {
+  const { istKurzerAussetzer } = require("../ueberlast");
+  const mit = (felder, text = "x") => Object.assign(new Error(text), felder);
+
+  test.each([
+    ["429", mit({ status: 429 })],
+    ["eigene Drossel aufgelaufen", mit({ code: "throttle_timeout" })],
+    ["502", mit({ status: 502 })],
+    ["503", mit({ status: 503 })],
+    ["504", mit({ status: 504 })],
+    ["Zeitgrenze", mit({ code: "timeout" })],
+    ["markierter Abriss", mit({ verbindungsabbruch: true })],
+    ["Abriss mit Fehlercode", verbindungReisstAb()],
+  ])("%s: kurzer Aussetzer", (_name, err) => {
+    expect(istKurzerAussetzer(err)).toBe(true);
+  });
+
+  test.each([
+    ["500", mit({ status: 500 })],
+    ["400", mit({ status: 400 })],
+    ["503 nur im Text", mit({}, "Mistral HTTP 503: kurz weg")],
+    ["timeout nur im Text", mit({}, "timeout nach 30000 ms")],
+    ["kein Fehler", null],
+  ])("%s: kein kurzer Aussetzer", (_name, err) => {
+    expect(istKurzerAussetzer(err)).toBe(false);
+  });
+});
+
 describe("Ergebnis in der Messung bei einer Antwort", () => {
   test("Erfolg: weder Warnung noch Fehlerzeile, Ergebnis ok", async () => {
     kiAntwortet(200);

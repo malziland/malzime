@@ -9,7 +9,7 @@
  * Nachricht "Fehler im Server" kam wiederholt — dabei waren alle 81 Analysen des Tages
  * fertig, und die Kinder sahen die Werbung aus der Hauptanalyse (Rueckfall in
  * job-pipelines.js). Seitdem ist ein kurzer Aussetzer des Werbe-Aufrufs nur
- * noch eine Warnung (mistral.js, istKurzerAussetzer). Damit ein LANGER
+ * noch eine Warnung (ueberlast.js, istKurzerAussetzer). Damit ein LANGER
  * Ausfall trotzdem auffaellt, gibt es diese Wache.
  *
  * DIE REGEL (Vorgabe 21.10.2026, beide Grenzen in werbe-wache.test.js von

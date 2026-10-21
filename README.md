@@ -87,7 +87,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   mistral-http.js           Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Ueberlast, Antwort als Strom
   mistral-antwort.js        Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung
   auftrag-wechsel.js        Was am Analyse-Auftrag je Analyse wechselt: Marken-Sperre und Formvorlage
-  ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504
+  ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504; kurzer Aussetzer beim Werbe-Aufruf
   verbindungsfehler.js      Verbindungsabriss zu einem fremden Dienst: einmal neu versuchen, Teiltext retten, Grund ohne Adressen protokollieren
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)

@@ -19,11 +19,13 @@ jest.mock("../queue-storage", () => ({
   deleteImage: jest.fn(),
 }));
 /* Seit 16.10.2026 zaehlt der Aufraeumdienst vor dem Loeschen (statistik.js)
-   und fragt die Wartezeit-Wache (wartezeit-wache.js). Beide haben eigene
-   Pruefungen (statistik.test.js, wartezeit-wache.test.js,
-   zaehlen-vor-dem-loeschen.test.js); hier bleiben sie stumm. */
+   und fragt die Wartezeit-Wache (wartezeit-wache.js), seit 21.10.2026 auch
+   die Werbe-Wache (werbe-wache.js). Alle drei haben eigene Pruefungen
+   (statistik.test.js, zaehlen-vor-dem-loeschen.test.js,
+   wartezeit-wache.test.js, werbe-wache.test.js); hier bleiben sie stumm. */
 jest.mock("../statistik", () => ({ zaehleVorDemLoeschen: jest.fn(async () => ({ gezaehlt: 0, gescheitert: 0 })) }));
 jest.mock("../wartezeit-wache", () => ({ pruefeWartezeit: jest.fn(async () => ({ status: "im-rahmen" })) }));
+jest.mock("../werbe-wache", () => ({ pruefeWerbung: jest.fn(async () => ({ status: "im-rahmen" })) }));
 jest.mock("../counter", () => ({
   releaseHourlySlot: jest.fn(),
 }));
@@ -62,6 +64,34 @@ describe("reapJobs", () => {
     const [[, ersterLauf], [, zweiterLauf]] = statistik.zaehleVorDemLoeschen.mock.calls;
     expect(ersterLauf).toEqual(expect.any(Object));
     expect(zweiterLauf).toBe(ersterLauf);
+  });
+
+  test("jeder Lauf fragt beide Wachen, jede mit ihrem eigenen Versandweg (21.10.2026)", async () => {
+    const { pruefeWartezeit } = require("../wartezeit-wache");
+    const { pruefeWerbung } = require("../werbe-wache");
+    const melder = jest.fn();
+    const werbeMelder = jest.fn();
+    await reapJobs({ melder, werbeMelder });
+    expect(pruefeWartezeit).toHaveBeenCalledWith({ melder });
+    expect(pruefeWerbung).toHaveBeenCalledWith({ melder: werbeMelder });
+  });
+
+  /* Das Zustellfenster ist ab 60 s einstellbar (betriebsprofil.js). Liefe die
+     Werbe-Wache erst nach dem Loeschen, koennte ein zugestellter Auftrag weg
+     sein, bevor sie sein Ergebnis gezaehlt hat. */
+  test("die Werbe-Wache laeuft, bevor zugestellte Auftraege geloescht werden (21.10.2026)", async () => {
+    const { pruefeWerbung } = require("../werbe-wache");
+    const reihenfolge = [];
+    pruefeWerbung.mockImplementationOnce(async () => {
+      reihenfolge.push("werbe-wache");
+      return { status: "im-rahmen" };
+    });
+    jobs.findZugestellteJobs.mockResolvedValue([{ id: "z1", imagePath: null }]);
+    jobs.deleteJob.mockImplementation(async (id) => {
+      reihenfolge.push(`geloescht ${id}`);
+    });
+    await reapJobs();
+    expect(reihenfolge).toEqual(["werbe-wache", "geloescht z1"]);
   });
 
   test("leerer Lauf — nichts zu tun", async () => {

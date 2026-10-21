@@ -94,7 +94,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   mistral-http.js    Netzschicht zu Mistral: Zugangsschluessel, Zeitgrenzen, Antwort als Strom, Ueberlastmeldung erkennen
   mistral-antwort.js  Antwort der KI auseinandernehmen (reine Funktionen): Live-Text, fehlende Karten, Maskierung (escapeXml)
   auftrag-wechsel.js  Was am Analyse-Auftrag je Analyse wechselt: die Marken-Sperre hinter dem Bild und die Formvorlage am Ende (beide gewuerfelt, fuer Tests und Messungen vorgebbar)
-  ueberlast.js       Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504)
+  ueberlast.js       Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504); was beim Werbe-Aufruf als kurzer Aussetzer gilt (istKurzerAussetzer)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
   throttle.js        In-Memory-Semaphore gegen Mistral-Bursts (AKTIV: withMistralSlot umschliesst jeden Mistral-Call)
   verbindungsfehler.js  Verbindungsabriss zu einem fremden Dienst: erkennen, markieren, einmal neu versuchen, Teiltext retten, Grund protokollieren — nur Code und Kurztext, nie Adressen
@@ -109,7 +109,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   job-pipelines.js   Der Analyseweg eines Auftrags (runPipeline): KI-Aufruf, Motiv und sichtbarer Text aus den Feldern der Antwort, Tier-Easter-Egg, Beast-Werbung, Kinderschutz
   job-helfer.js      Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung)
   handle-job-status.js   Queue-Polling (GET): Status, Warteschlangen-Position, ETA, Ergebnis; jeder Poll ist Liveness-Herzschlag. Abmelden (DELETE): verwirft einen noch wartenden Auftrag, nur mit Abhol-Ticket
-  handle-reap.js     Queue-Reaper (geplant, Minutentakt): markiert verlassene Jobs als abandoned, gibt ihren Platz frei, zaehlt jeden Auftrag in die dauerhaften Zaehler (statistik.js) und loescht ihn dann nach den Fristen; ruft am Ende die Wartezeit-Wache
+  handle-reap.js     Queue-Reaper (geplant, Minutentakt): markiert verlassene Jobs als abandoned, gibt ihren Platz frei, zaehlt jeden Auftrag in die dauerhaften Zaehler (statistik.js) und loescht ihn dann nach den Fristen; ruft vor dem Loeschen die Werbe-Wache und am Ende die Wartezeit-Wache
   ruecknahme.js      Zurueckgeben, was ein nie analysierter Auftrag belegt: Foto loeschen und Platz im Stundenfenster freigeben, beides sofort begonnen — die eine Stelle dafuer, abgewartet (auf jedes hoechstens fuenf Sekunden)
   jobs.js            Queue-Job-Lebenszyklus in Firestore (createJob/claimJob/completeJob/failJob/getQueuePosition/touchJob/abandonJob)
   analyse-ausgang.js  Welche Fehlermeldung ein Endzustand eines Auftrags zeigt, und die eine Fehlerzeile dazu („ein Alarm je gescheiterter Analyse“)
@@ -122,6 +122,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   kapazitaets-wache.js  Meldet, wenn Einstellungssatz und Warteschlange bei Google auseinanderlaufen
   laufzeit-wache.js  Meldet, wenn Analysen an ihre Zeitgrenze stossen
   wartezeit-wache.js  Push, wenn eine Analyse laenger als 5 Minuten vom Einreihen bis zum Start wartet; hoechstens eine Nachricht je 30 Minuten (Marke stats/wartezeit-wache); vom Aufraeumdienst je Lauf gerufen
+  werbe-wache.js     Push, wenn die Beast-Werbung laenger als 30 Minuten am Stueck ausfaellt (mindestens 10 gescheiterte Versuche — Aussetzer, leer oder Fehler —, kein Erfolg dazwischen, auch ueber Pausen); eine Nachricht je Ausfall, Marke erst nach bestaetigtem Versand (Zustand stats/werbe-wache); liest das Ergebnis des Werbe-Aufrufs aus den Kennzahlen der Auftraege; vom Aufraeumdienst je Lauf gerufen, vor dem Loeschen der zugestellten Auftraege
   statistik.js       Dauerhafte, anonyme Zaehler (Sammlung statistik, ohne Ablaufdatum, nur Summen): je 10-Minuten-Fenster (UTC) Ausgaenge, Abweisungen je Grund, Dauer-Klassen; je Tag (Wiener Datum) Browser-Fehler nach Phase und Geraetefamilie, Textmenge der KI. Der Aufraeumdienst zaehlt jeden Auftrag vor dem Loeschen (zaehleVorDemLoeschen, nie doppelt); Abweisungen und Browser-Fehler ueber einen Sammler
   handle-erinnerung.js  Wochenlauf (montags): ntfy-Push, bevor die halbjaehrliche ZDR-Nachpruefung (eine Woche vorher) oder die halbjaehrliche Pruefung der Barrierefreiheit (drei Wochen vorher) faellig wird — mit Handlungsanleitung
   erinnerungs-waechter.js  Waechter ueber die Wochen-Erinnerung: liest ihr Lebenszeichen, meldet veraltet, nie gelaufen oder wiederholt nicht lesbar (vom Aufraeumdienst je Lauf gerufen)

@@ -641,10 +641,12 @@ gibt (Speicher oder Datenbank weg, unerwarteter Serverfehler), ruft
 Auf sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
 Einzelnen beschreiben — KI-Aufruf, Neuversuch, Nachfrage, Foto laden,
 Absturzverdacht, verworfenes Ergebnis, wiederholtes Speichern —, sind
-Warnungen. Ebenso seit 07.10.2026 der Werbe-Aufruf, den Mistral wegen Überlast
-ablehnt (429): Das Kind bekommt sein Ergebnis, eine Nachricht „Fehler im
-Server“ wäre ein Alarm ohne gescheiterte Analyse. Wie die Richtlinien
-filtern und wie oft sie melden: `docs/ERROR-ALERTING.md`.
+Warnungen. Ebenso der Werbe-Aufruf bei einem kurzen Aussetzer von Mistral
+(Überlast 429 seit 07.10.2026; 502, 503, 504, Zeitgrenze und Verbindungsabriss
+seit 21.10.2026): Das Kind bekommt sein Ergebnis, eine Nachricht „Fehler im
+Server“ wäre ein Alarm ohne gescheiterte Analyse (Abwägung im Abschnitt „Kurze
+Aussetzer beim Werbe-Aufruf und Werbe-Wache“). Wie die Richtlinien filtern und
+wie oft sie melden: `docs/ERROR-ALERTING.md`.
 
 **Begründung.** Vorher entschied jede Stelle selbst, ob sie alarmiert. Das gab
 Lücken und Doppelungen: Eine unlesbare KI-Antwort endete als
@@ -1624,6 +1626,86 @@ enthält keine Personendaten. Die Marke `stats/wartezeit-wache` ebenso.
 
 **Neubewertung**, wenn ein neuer Zähler eine Angabe bräuchte, die eine einzelne
 Analyse kenntlich macht, oder wenn die Zähler regelmäßig Lücken zeigen.
+
+## Kurze Aussetzer beim Werbe-Aufruf und Werbe-Wache (21.10.2026)
+
+**Anlass.** Am 21.10.2026 zwischen 10:25 und 10:40 (Wien) antwortete Mistral auf
+den Werbe-Aufruf 14-mal mit 503 und blieb 4-mal über der Zeitgrenze. Jede dieser
+18 Zeilen war eine Fehlerzeile; die Nachricht „Fehler im Server“ kam wiederholt.
+Alle 81 Analysen des Tages waren fertig, der Analyse-Aufruf selbst lief ohne
+einen Fehler, und die Kinder sahen im Beast-Modus die Werbung aus dem
+Analyse-Aufruf (Rückfall in `job-pipelines.js`).
+
+**Entscheidung** (Christoph, 21.10.2026).
+
+1. **Ein kurzer Aussetzer des Werbe-Aufrufs ist eine Warnung, kein Alarm**:
+   Überlast (429 und die eigene Drossel, wie schon seit 07.10.2026), 502, 503,
+   504, die Zeitgrenze des Aufrufs und ein Verbindungsabriss
+   (`istKurzerAussetzer` in `ueberlast.js`; es entscheiden Code, Status und
+   Markierung, nie eine Zahl im freien Text der Meldung).
+2. **Jeder andere Fehlschlag bleibt eine Fehlerzeile mit Alarm** (400, 401, 404,
+   500, ein unlesbarer HTTP-Antwortrumpf, fehlender Schlüssel). Das ist eine
+   Antwort auf genau diese Anfrage oder etwas Kaputtes — der Fall, für den
+   OPS-004 (Audit 10.08.2026) die Zeile zur Fehlerzeile gemacht hat. Eine
+   Antwort 200 ohne verwertbare Einträge (Ergebnis „leer“) schreibt weiter
+   keine Fehlerzeile, wie schon vor dem 21.10.2026.
+3. **Ein langer Ausfall meldet sich über die Werbe-Wache** (`werbe-wache.js`,
+   im Aufräumdienst vor dem Löschen der zugestellten Aufträge). Wortlaut der
+   Vorgabe: „dazwischen klappt die Werbung kein einziges Mal, mindestens 10
+   gescheiterte Versuche“. Gescheitert ist deshalb jeder Werbe-Aufruf außer
+   „ok“ — Aussetzer, leere Antwort, anderer Fehler; nur ein Auftrag, in dem der
+   Aufruf nicht lief, zählt nicht. Gemeldet wird, wenn der Ausfall LÄNGER als
+   30 Minuten am Stück dauert UND mindestens 10 gescheiterte Versuche hat, am
+   Stück auch über eine Pause hinweg, eine Nachricht je Ausfall. So fällt auch
+   ein dauerhaft unverwertbarer Werbe-Inhalt auf, der nie eine Fehlerzeile
+   schreibt. Grenzen von beiden Seiten geprüft in `werbe-wache.test.js`;
+   Einzelheiten in `docs/ERROR-ALERTING.md`, „Push „Beast-Werbung fällt aus““.
+4. **Zustellung: lieber doppelt als keine.** Die Wache reserviert die Nachricht
+   vor dem Versand für fünf Minuten und setzt die Marke „gemeldet“ erst nach
+   bestätigtem Versand. Scheitert der Versand, endet der Lauf vorher oder
+   scheitert das Setzen der Marke, versucht es nach Ablauf der Reservierung
+   ein neuer Lauf — im letzten Fall kommt dieselbe Nachricht zweimal.
+5. **Datenquelle ohne Kennung.** Der Werbe-Aufruf vermerkt sein Ergebnis
+   (`ok`, `leer`, `aussetzer`, `fehler`) in den Kennzahlen des Auftrags, im
+   ohnehin geschriebenen Abschluss; es geht mit dem Auftrag weg. Die Wache hält
+   nur Zeitpunkte und eine Anzahl fest (`stats/werbe-wache`). Die dauerhaften
+   Zähler (`statistik.js`) lesen das Feld nicht.
+
+**Getragene Folge.** Ein Ausfall unter 30 Minuten oder mit weniger als 10
+gescheiterten Versuchen meldet sich nicht — Aussetzer und andere Fehler stehen
+im Protokoll, das Kind hat sein Ergebnis. Ein dauerhafter Ausfall meldet sich
+spätestens nach etwas mehr als 30 Minuten aktiver Nutzung. Ein Auftrag, dessen
+Abschluss erst später als 30 Sekunden nach seiner Fertigzeit in der Datenbank
+sichtbar wird, fällt für die Wache aus (dann fehlt ein Datenpunkt, die Zählung
+läuft weiter). Bleibt der Aufräumdienst länger als 9 Minuten 30 Sekunden aus
+(10 Minuten Blick zurück minus 30 Sekunden Nachlauf), sieht die Wache die
+Aufträge dieser Zeit nicht. Die Folge der Läufe ohne Messung (ab fünf eine
+Fehlerzeile) zählt jede Instanz für sich, wie bei der Wartezeit-Wache: Wechselt
+der Aufräumdienst die Instanz, beginnt sie von vorn, und der Alarm kommt
+später. Weil die Wache vor dem Löschen der zugestellten Aufträge läuft, wartet
+der Aufräumdienst höchstens 30 Sekunden auf sie; die Löschfrist geht vor. Je Minute kostet die Wache einen Lesevorgang für ihren Zustand und eine
+Abfrage; geschrieben wird nur in Minuten mit fertigen Aufträgen oder einem
+Versuch der Nachricht.
+
+**Betrachtete Alternativen.** Alles so lassen (jede Kurzstörung von Mistral
+weckt, obwohl alle Analysen laufen). Alle Fehlschläge des Werbe-Aufrufs zur
+Warnung machen (ein dauerhaft kaputter Aufruf wäre unsichtbar, genau der Befund
+OPS-004). Eine Schwellen-Richtlinie in Cloud Monitoring über eine log-basierte
+Metrik (zählt nur Treffer in einem Zeitfenster, kennt kein „am Stück“ und keinen
+Erfolg dazwischen; dazu eine Änderung an der Konsole statt im Code). Grenzen im
+Einstellungssatz (wie bei der Wartezeit-Wache verworfen: Sie ändern keinen
+Ablauf, ein neues Pflichtfeld hätte vor der Auslieferung einen Schreibvorgang in
+die echte Datenbank verlangt). Nur Aussetzer zählen (erste Fassung; nach der
+Abnahme verworfen: Eine dauerhaft leere Antwort bliebe ganz still). Die Marke
+vor dem Versand setzen und bei Misserfolg zurücknehmen (erste Fassung;
+verworfen: Scheitert die Rücknahme, bliebe der Ausfall für immer ungemeldet).
+
+**Rückweg.** Nur mit Deploy. Das Dokument `stats/werbe-wache` kann liegen
+bleiben; es enthält keine Personendaten.
+
+**Neubewertung**, wenn die Werbe-Wache einen Ausfall meldet, den das Protokoll
+nicht bestätigt, wenn ein langer Ausfall ohne ihre Nachricht bleibt, oder wenn
+der Werbe-Aufruf auf ein anderes Modell oder einen anderen Anbieter wechselt.
 
 ## Schnittstellen direkt am EU-Server, nicht über das Auslieferungsnetz (09.09.2026)
 

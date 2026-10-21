@@ -189,6 +189,7 @@ functions/src/__tests__/wachen-nicht-blind.test.js
 functions/src/__tests__/warteschlange-nachziehen.test.js
 functions/src/__tests__/wartezeit-wache.test.js
 functions/src/__tests__/werbe-aufruf-ueberlast.test.js
+functions/src/__tests__/werbe-wache.test.js
 functions/src/__tests__/wirkung-jeder-wert.test.js
 functions/src/__tests__/zaehlen-vor-dem-loeschen.test.js
 functions/src/__tests__/zaehler-auswerten.test.js

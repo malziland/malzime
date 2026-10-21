@@ -24,8 +24,8 @@
  *     wird endgültig gelöscht (Datensparsamkeit: das fertige Profil im Feld
  *     `result` soll nicht unbegrenzt liegen bleiben).
  *
- * Vor dem Loeschen in (2c)/(3) zaehlt er (statistik.js), am Ende schaut die
- * Wartezeit-Wache auf die Schlange (wartezeit-wache.js) — beide seit 16.10.2026.
+ * Vor dem Loeschen in (2c)/(3) zaehlen die Werbe-Wache (werbe-wache.js) und
+ * statistik.js, am Ende schaut die Wartezeit-Wache (wartezeit-wache.js).
  * Bei (1) und (2) wird das zwischengespeicherte Bild mitgelöscht (die GCS-
  * Lifecycle-Regel bleibt nur das Sicherheitsnetz).
  *
@@ -48,6 +48,7 @@ const { deleteImage } = require("./queue-storage");
 const { belegtesFreigeben } = require("./ruecknahme");
 const { zaehleVorDemLoeschen } = require("./statistik");
 const { pruefeWartezeit } = require("./wartezeit-wache");
+const { pruefeWerbung } = require("./werbe-wache");
 
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
    dass ein extremer Rückstau einen Lauf überlange macht. Der nächste Lauf
@@ -113,8 +114,8 @@ async function sicherFinden(name, fn, lauf) {
   }
 }
 
-/* melder: Versandweg der Wartezeit-Wache (index.js: ntfy); ohne ihn nur Protokoll. */
-async function reapJobs({ melder = null } = {}) {
+/* melder, werbeMelder: Versandwege der zwei Wachen (index.js: ntfy); ohne sie nur Protokoll. */
+async function reapJobs({ melder = null, werbeMelder = null } = {}) {
   const lauf = { ohneBetriebswerte: false };
   /* (1) Verlassene wartende Jobs → abandoned. */
   const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs(), lauf);
@@ -196,7 +197,9 @@ async function reapJobs({ melder = null } = {}) {
 
   /* (2c) PRIV-107b: Zugestellte Ergebnisse nach dem Browser-Wiederholungs-
      Fenster löschen — Bild zuerst (BUG-002-Regel), defensiv: normal ist es
-     nach der Analyse längst weg. */
+     nach der Analyse längst weg. Davor die Werbe-Wache (wirft nie): Ein kurzes
+     Zustellfenster naehme ihr sonst Auftraege weg, bevor sie sie zaehlt. */
+  await pruefeWerbung({ melder: werbeMelder });
   const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs(), lauf);
   /* ZAEHLEN VOR DEM LOESCHEN (16.10.2026): wirft nie, wartet begrenzt; scheitert
      es, wird trotzdem geloescht, doppelt zaehlt nichts (statistik.js). */

@@ -31,6 +31,7 @@ const {
   setFetchForTest,
   _setLiveIntervalMsForTest,
 } = require("./mistral-http");
+const { istKurzerAussetzer } = require("./ueberlast");
 const {
   ursacheVon,
   meldeAbbruchMitNeuversuch,
@@ -551,20 +552,25 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
         wiederholungen: result.wiederholungen || 0,
       })
     );
+    /* Ergebnis fuer den Auftrag (kennzahlen.werbeAufruf, job-pipelines.js):
+       Datenquelle der Werbe-Wache, kein Inhalt, keine Kennung. */
+    if (messung) messung.werbeAufruf = ads.length ? "ok" : "leer";
     return ads.length ? ads : null;
   } catch (err) {
-    /* Bewusst still: Der Hauptpfad hat bereits eine Werbeliste. */
-    /* OPS-004 (Audit 2026-08-10): console.error statt console.log — das ergibt
-       severity ERROR in Cloud Logging und faellt damit unter die bestehende
-       Alarm-Policy. Vorher war ein dauerhaft fehlschlagender Zweitaufruf
-       voellig unsichtbar: Der Fallback greift, der Nutzer merkt nichts, und
-       jede Analyse liefe still mit der schlechteren Werbung aus dem
-       Hauptaufruf. Der Fallback selbst bleibt unveraendert richtig.
-       OPS-2026-10-03-31: Lehnt Mistral wegen Ueberlast ab (429), ist es eine
-       Warnung — unter Andrang erwartbar, und das Kind hat sein Ergebnis. */
-    (err.status === 429 ? console.warn : console.error)(
+    /* Der Rueckfall greift (Werbeliste aus dem Hauptaufruf), das Kind hat
+       sein Ergebnis. Ein kurzer Aussetzer von Mistral (istKurzerAussetzer,
+       ueberlast.js) ist deshalb nur eine Warnung (seit OPS-2026-10-03-31 fuer
+       429). Beleg 21.10.2026, 10:25–10:40 Wien: 14-mal 503, 4-mal Zeitgrenze,
+       der Alarm kam wiederholt, alle 81 Analysen waren fertig. Jeder andere
+       Fehlschlag bleibt eine Fehlerzeile mit Alarm (OPS-004: ein dauerhaft
+       kaputter Zweitaufruf faellt sofort auf). Einen langen Aussetzer meldet
+       die Werbe-Wache. Vorgabe Christoph 21.10.2026; Abwaegung:
+       docs/SECURITY-MODEL.md, "Kurze Aussetzer beim Werbe-Aufruf". */
+    const aussetzer = istKurzerAussetzer(err);
+    if (messung) messung.werbeAufruf = aussetzer ? "aussetzer" : "fehler";
+    (aussetzer ? console.warn : console.error)(
       JSON.stringify({
-        severity: err.status === 429 ? "WARNING" : "ERROR",
+        severity: aussetzer ? "WARNING" : "ERROR",
         alert: "beast-ads-failed",
         step: "mistral-beast-ads",
         status: "failed",

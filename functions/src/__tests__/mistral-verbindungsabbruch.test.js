@@ -413,7 +413,10 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     keineAdressenImProtokoll();
   });
 
-  test("auch die Fehlerzeile des Werbe-Aufrufs nennt den Grund — ohne Adressen", async () => {
+  /* Seit 21.10.2026 ist ein Abriss beim Werbe-Aufruf ein kurzer Aussetzer —
+     eine Warnung, keine Fehlerzeile (werbe-aufruf-ueberlast.test.js). Der
+     Grund steht trotzdem darin, und nie eine Adresse. */
+  test("auch die Warnung des Werbe-Aufrufs nennt den Grund — ohne Adressen", async () => {
     setFetchForTest(async () => {
       const grund = new Error("connect ECONNREFUSED ::ffff:104.18.33.7:443");
       grund.code = "ECONNREFUSED";
@@ -421,8 +424,8 @@ describe("Verbindungsabriss beim Single-Large-Aufruf", () => {
     });
     const liste = await generateBeastAds({ profileText: "x", categories: {} }, ["A"], "de");
     expect(liste).toBeNull();
-    const f = JSON.parse(zeilen("error").find((t) => t.includes("beast-ads-failed")));
-    expect(f.ursache).toEqual({ code: "ECONNREFUSED", text: null });
+    const w = JSON.parse(zeilen("warn").find((t) => t.includes("beast-ads-failed")));
+    expect(w.ursache).toEqual({ code: "ECONNREFUSED", text: null });
     keineAdressenImProtokoll();
   });
 });

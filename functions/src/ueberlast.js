@@ -21,6 +21,8 @@
  * mistral-503-wiederholung.test.js.)
  */
 
+const { istVerbindungsabbruch } = require("./verbindungsfehler");
+
 const WIEDERHOLBARE_STATUS = new Set([429, 502, 503, 504]);
 
 /* Ist dieser Fehler "Ueberlast"? EINE Entscheidung fuer die Analyse-Strecke,
@@ -38,6 +40,29 @@ const WIEDERHOLBARE_STATUS = new Set([429, 502, 503, 504]);
 const UEBERLAST_CODES = new Set(["rate_limit", "throttle_timeout"]);
 function istUeberlast(err) {
   return Boolean(err && (UEBERLAST_CODES.has(err.code) || err.status === 429));
+}
+
+/* Ist ein Fehlschlag ein KURZER AUSSETZER von Mistral? Gilt nur fuer den
+   Werbe-Aufruf (mistral.js, generateBeastAds), der scheitern darf: Ein kurzer
+   Aussetzer ist dort eine Warnung, jeder andere Fehlschlag eine Fehlerzeile
+   (Vorgabe 21.10.2026, Abwaegung in docs/SECURITY-MODEL.md). Wie bei
+   istUeberlast entscheiden Code, Status und Markierung, nie eine Zahl im
+   freien Text der Meldung:
+     istUeberlast       429, eigene Drossel aufgelaufen
+     502, 503, 504      Mistral kurz weg, auch nach den Wiederholungen
+     code "timeout"     Zeitgrenze des Aufrufs oder Restbudget erschoepft
+     Verbindungsabriss  wie verbindungsfehler.js ihn erkennt und markiert
+                        (Fehlercode oder feste Meldung von Node.js) */
+const AUSSETZER_STATUS = new Set([502, 503, 504]);
+function istKurzerAussetzer(err) {
+  if (!err) return false;
+  return (
+    istUeberlast(err) ||
+    AUSSETZER_STATUS.has(err.status) ||
+    err.code === "timeout" ||
+    err.verbindungsabbruch === true ||
+    istVerbindungsabbruch(err)
+  );
 }
 
 /* Die Reihe der Wartezeiten: jede Wiederholung wartet doppelt so lang wie
@@ -95,4 +120,4 @@ function planeWiederholung({ res, attempt, backoffs, aufrufStart, timeoutMs }) {
   return { wartezeitMs, retryAfter, aufgeben };
 }
 
-module.exports = { WIEDERHOLBARE_STATUS, istUeberlast, ueberlastWartezeiten, planeWiederholung };
+module.exports = { WIEDERHOLBARE_STATUS, istUeberlast, istKurzerAussetzer, ueberlastWartezeiten, planeWiederholung };

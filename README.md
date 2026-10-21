@@ -87,7 +87,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   mistral-http.js           Netzschicht zu Mistral: Zeitgrenzen, Wiederholung bei Ueberlast, Antwort als Strom
   mistral-antwort.js        Auswertung der KI-Antwort: Live-Text, fehlende Karten, Maskierung
   auftrag-wechsel.js        Was am Analyse-Auftrag je Analyse wechselt: Marken-Sperre und Formvorlage
-  ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504
+  ueberlast.js              Wartezeiten und Wiederholung bei 429/502/503/504; kurzer Aussetzer beim Werbe-Aufruf
   verbindungsfehler.js      Verbindungsabriss zu einem fremden Dienst: einmal neu versuchen, Teiltext retten, Grund ohne Adressen protokollieren
   json-repair.js            Defensiver JSON-Parser fuer LLM-Outputs (4-Stufen-Repair)
   throttle.js               In-Memory-Semaphore gegen Mistral-Bursts (aktiv: jeder Mistral-Call laeuft durch die Drossel)
@@ -109,6 +109,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
   laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
   wartezeit-wache.js        Push, wenn eine Analyse laenger als 5 Minuten auf ihren Start wartet (vom Aufraeumdienst je Lauf gerufen)
+  werbe-wache.js            Push, wenn die Beast-Werbung laenger als 30 Minuten am Stueck ausfaellt (vom Aufraeumdienst je Lauf gerufen)
   statistik.js              Dauerhafte, anonyme Zaehler (Sammlung statistik): je 10 Minuten Ausgaenge und Dauer-Klassen, je Tag Browser-Fehler und Textmenge der KI
   handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung und der halbjaehrlichen Pruefung der Barrierefreiheit (mit Anleitung)
   erinnerungs-waechter.js   Meldet, wenn die Wochen-Erinnerung ausbleibt

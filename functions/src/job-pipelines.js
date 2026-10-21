@@ -40,11 +40,13 @@ const {
   hasCategories,
 } = require("./job-helfer");
 
-/* Die Kennzahlen eines Laufs fuer die dauerhaften Zaehler (statistik.js):
-   Dauer der KI-Aufrufe (Uhrzeit, samt Warten auf einen Platz, Neuversuch,
-   Nachfrage und Werbe-Aufruf), zusaetzliche Versuche und Textmenge. Keine
-   Kennung, kein Inhalt. Sie reisen mit dem Ergebnis in den Auftrag
-   (jobs.completeJob) und gehen mit ihm weg. */
+/* Die Kennzahlen eines Laufs: Dauer der KI-Aufrufe (Uhrzeit, samt Warten auf
+   einen Platz, Neuversuch, Nachfrage und Werbe-Aufruf), zusaetzliche Versuche
+   und Textmenge fuer die dauerhaften Zaehler (statistik.js); seit 21.10.2026
+   dazu das Ergebnis des Werbe-Aufrufs ("ok", "leer", "aussetzer", "fehler")
+   fuer die Werbe-Wache (werbe-wache.js) — nur, wenn er lief. Keine Kennung,
+   kein Inhalt. Sie reisen mit dem Ergebnis in den Auftrag (jobs.completeJob)
+   und gehen mit ihm weg. */
 function kennzahlenAus(messung, kiMs) {
   return {
     kiMs: Math.max(0, Math.round(kiMs)),
@@ -52,6 +54,7 @@ function kennzahlenAus(messung, kiMs) {
     tokenEingabe: messung.tokenEingabe || 0,
     tokenZwischenspeicher: messung.tokenZwischenspeicher || 0,
     tokenAusgabe: messung.tokenAusgabe || 0,
+    ...(typeof messung.werbeAufruf === "string" ? { werbeAufruf: messung.werbeAufruf } : {}),
   };
 }
 

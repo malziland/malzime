@@ -108,6 +108,28 @@ Kleinste, was Google zulässt). Scheitern in dieser Zeit mehrere Analysen, kommt
 eine Nachricht; wie viele es waren, zeigt die Abfrage der Zeile im Protokoll.
 Darum sagt der Betreff „mindestens ein Kind“.
 
+**Keine Fehlerzeile: kurze Aussetzer und leere Antworten beim Werbe-Aufruf.**
+Der zweite, kleine Aufruf einer Analyse (Beast-Werbung, `generateBeastAds` in
+`mistral.js`) darf scheitern — dann bleibt die Werbeliste aus dem
+Analyse-Aufruf stehen, und das Kind bekommt sein Ergebnis. Was er dann
+schreibt, hängt vom Grund ab:
+
+- **Kurzer Aussetzer von Mistral** (Überlast 429 seit 07.10.2026; seit
+  21.10.2026 auch 502, 503, 504, die Zeitgrenze des Aufrufs und ein
+  Verbindungsabriss): nur die Warnung `beast-ads-failed`, die keine Richtlinie
+  auslöst. Anlass: Am 21.10.2026 zwischen 10:25 und 10:40 schrieb er so 18
+  Fehlerzeilen, und die Nachricht „Fehler im Server“ kam wiederholt (höchstens
+  eine je fünf Minuten), obwohl alle Analysen fertig wurden.
+- **Antwort 200 ohne verwertbare Einträge** (Ergebnis „leer“): keine Warnung,
+  keine Fehlerzeile, nur die Protokollzeile `status: "empty"` — wie schon vor
+  dem 21.10.2026.
+- **Jeder andere Grund** (400, 401, 404, 500, ein unlesbarer Antwortrumpf,
+  fehlender Schlüssel): weiter die Fehlerzeile `beast-ads-failed` und damit
+  „Fehler im Server“.
+
+Alle drei Arten des Scheiterns zählt die Werbe-Wache; dauert es zu lange, kommt
+der Push „Beast-Werbung fällt aus“ (unten).
+
 Dazu kommt eine Schwellen-Richtlinie (wie die für Browser-Fehler unten):
 `malziME KI-Verbindung bricht gehäuft ab` — Betreff „malziME: KI-Verbindung bricht
 gehäuft ab (mehr als 3 Neuversuche an einem Tag)“, zählt die log-basierte Metrik
@@ -375,6 +397,60 @@ Titel „malziME: lange Wartezeit“.
   eine E-Mail gibt es für diesen Push nicht.
 
 Was dann zu tun ist: [RUNBOOK.md](RUNBOOK.md), „Nachricht „lange Wartezeit““.
+
+## Push „Beast-Werbung fällt aus“ (seit 21.10.2026)
+
+Kein Alarm aus einer Fehlerzeile, sondern ein eigener Push über denselben
+ntfy-Weg wie „lange Wartezeit“, Titel „malziME: Beast-Werbung faellt aus“
+(ohne Umlaut, wie alle Texte im Server-Code). Er fängt auf, was oben keine
+Fehlerzeile schreibt: kurze Aussetzer, die sich zu einem langen Ausfall
+reihen, und eine dauerhaft leere Antwort, die nie eine geschrieben hat.
+
+- **Wann:** Die Beast-Werbung klappt LÄNGER als 30 Minuten am Stück nicht und
+  ist dabei mindestens 10-mal gescheitert. 30:00 meldet nicht, 30:01 schon; 9
+  gescheiterte Versuche melden nicht, 10 schon (`werbe-wache.test.js`).
+  Gescheitert ist jeder Werbe-Aufruf außer „ok“: Aussetzer, leere Antwort,
+  anderer Fehler. Ein Auftrag, in dem der Werbe-Aufruf nicht lief, zählt
+  nicht. „Am Stück“: vom ersten gescheiterten Versuch nach dem letzten
+  gelungenen bis zum jüngsten — auch über eine Pause hinweg. Scheitert die
+  Werbung am Ende eines Workshops und am Anfang des nächsten ohne Erfolg
+  dazwischen, ist das ein Ausfall.
+- **Wie oft:** eine Nachricht je Ausfall. Ein gelungener Aufruf beendet ihn,
+  danach zählt alles neu.
+- **Woher:** Der Werbe-Aufruf vermerkt sein Ergebnis in den Kennzahlen des
+  Auftrags (`kennzahlen.werbeAufruf`: `ok`, `leer`, `aussetzer`, `fehler`). Die
+  Wache liest je Lauf nur die Aufträge, die seit ihrem letzten Lauf fertig
+  wurden (Fertigzeit und dieses Feld), und hält das Ergebnis in
+  `stats/werbe-wache` fest — für alle Instanzen. Gezählt wird nur bis 30
+  Sekunden vor dem Lauf, damit kein Auftrag zwischen zwei Läufen durchfällt.
+  Sie läuft vor dem Löschen der zugestellten Aufträge, damit ein kurzes
+  Zustellfenster (einstellbar ab 60 Sekunden) keinen Auftrag wegnimmt, bevor
+  sie ihn gezählt hat.
+- **Inhalt:** seit wann (Wiener Zeit), wie viele Versuche, wie lange — keine
+  Kennung.
+- **Zustellung — lieber doppelt als keine:** Vor dem Versand reserviert die
+  Wache die Nachricht für fünf Minuten, damit kein zweiter Lauf zugleich
+  sendet. Als gemeldet gilt der Ausfall erst, wenn der Versand Erfolg meldet.
+  Geht der Versand nicht hinaus (Warnung `werbe-wache-nicht-zugestellt`) oder
+  endet der Lauf zwischen Reservierung und Versand, versucht es nach Ablauf
+  der Reservierung der nächste Lauf. Lässt sich nach gelungenem Versand die
+  Marke nicht setzen (Warnung `werbe-wache-marke-nicht-gesetzt`), kommt
+  dieselbe Nachricht nach Ablauf ein zweites Mal.
+- **Wo:** im Aufräumdienst (`reapJobs`, jede Minute), mit denselben Secrets
+  `NTFY_URL_EU` und `NTFY_TOPIC_EU`. Der Analyseweg trägt dafür nur ein Feld im
+  ohnehin geschriebenen Abschluss.
+- **Grenzen im Code, nicht im Einstellungssatz** (`BLEIBT IM CODE` in
+  `werbe-wache.js`), aus demselben Grund wie bei der Wartezeit-Wache.
+- **Wenn die Wache selbst ausfällt:** Ein Lauf ohne Messung ist eine Warnung;
+  fünf in Folge schreiben die Fehlerzeile `werbe-wache-nicht-messbar`
+  (Richtlinie „Function Errors“). Die Folge zählt jede Instanz für sich, wie
+  bei der Wartezeit-Wache. Hängt die Datenbank bei der Wache, wartet der
+  Aufräumdienst höchstens 30 Sekunden auf sie und löscht dann weiter (Feld
+  `grund: "zeitgrenze"`); auch das ist ein Lauf ohne Messung.
+- Wie bei allen ntfy-Nachrichten kann der Weckruf ausbleiben; eine E-Mail gibt
+  es für diesen Push nicht.
+
+Was dann zu tun ist: [RUNBOOK.md](RUNBOOK.md), „Nachricht „Beast-Werbung fällt aus““.
 
 ## Was passiert dann?
 

@@ -111,8 +111,11 @@ Für den zweiten, kleinen Aufruf einer Analyse (die Beast-Werbung) gilt die
 ganze Reihe nicht: Er hat fest 30 Sekunden und kommt damit auf höchstens EINE
 Wiederholung nach 10 Sekunden (10 s + 20 s wären schon die 30). Scheitert er,
 bleibt die Werbeliste aus dem Analyse-Aufruf stehen — das Kind bekommt sein
-Ergebnis. Bei einer Ablehnung wegen Überlast (429) steht dazu eine Warnung im
-Log (`beast-ads-failed`), bei jedem anderen Fehlschlag eine Fehlerzeile.
+Ergebnis. Bei einem kurzen Aussetzer (429, 502, 503, 504, Zeitgrenze,
+Verbindungsabriss) steht dazu eine Warnung im Log (`beast-ads-failed`), bei
+einer Antwort ohne verwertbare Einträge nur die gewöhnliche Protokollzeile, bei
+jedem anderen Fehlschlag eine Fehlerzeile. Fällt die Werbung länger aus, gleich aus welchem dieser
+Gründe, meldet das die Werbe-Wache (`docs/ERROR-ALERTING.md`).
 
 ### 5 · Fristen und Aufräumen
 

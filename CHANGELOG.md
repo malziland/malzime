@@ -4,6 +4,22 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert — Betrieb
+
+- **Kurze Aussetzer bei der Beast-Werbung wecken niemanden mehr.** Scheitert
+  der zweite, kleine Aufruf für die Beast-Werbung, weil Mistral kurz weg oder zu
+  langsam ist (502, 503, 504, Zeitgrenze, Verbindungsabriss — wie schon bei
+  Überlast), ist das nur noch eine Warnung statt der Nachricht „Fehler im
+  Server“. Die Kinder sehen dann wie bisher die Werbung aus der Hauptanalyse.
+  Jeder andere Fehlschlag des Aufrufs meldet sich weiter sofort.
+- **Neu: Nachricht „Beast-Werbung faellt aus“.** Klappt die Beast-Werbung
+  länger als 30 Minuten am Stück nicht (mindestens 10 Versuche, keiner
+  gelungen — gleich ob Mistral kurz weg war, mit einem Fehler antwortete oder
+  nur leere Antworten lieferte), kommt ein Push aufs Handy, einmal je Ausfall.
+  Geht er nicht hinaus, versucht die Wache es nach fünf Minuten erneut.
+
 ## [5.3.1] — 2026-10-17
 
 ### Geändert — Website

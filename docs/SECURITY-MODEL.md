@@ -1682,7 +1682,8 @@ läuft weiter). Bleibt der Aufräumdienst länger als 9 Minuten 30 Sekunden aus
 Aufträge dieser Zeit nicht. Die Folge der Läufe ohne Messung (ab fünf eine
 Fehlerzeile) zählt jede Instanz für sich, wie bei der Wartezeit-Wache: Wechselt
 der Aufräumdienst die Instanz, beginnt sie von vorn, und der Alarm kommt
-später. Je Minute kostet die Wache einen Lesevorgang für ihren Zustand und eine
+später. Weil die Wache vor dem Löschen der zugestellten Aufträge läuft, wartet
+der Aufräumdienst höchstens 30 Sekunden auf sie; die Löschfrist geht vor. Je Minute kostet die Wache einen Lesevorgang für ihren Zustand und eine
 Abfrage; geschrieben wird nur in Minuten mit fertigen Aufträgen oder einem
 Versuch der Nachricht.
 

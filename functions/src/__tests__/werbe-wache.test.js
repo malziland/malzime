@@ -424,4 +424,29 @@ describe("nie still ausfallen", () => {
     for (let i = 1; i < wache.FEHLER_BIS_ALARM; i++) await laufNach(T + (10 + i) * MIN);
     expect(fehler).not.toHaveBeenCalled();
   });
+
+  /* Nachpruefung der Abnahme 21.10.2026: Die Wache laeuft vor dem Loeschen der
+     zugestellten Auftraege. Haengt die Datenbank bei ihr, darf das Loeschen
+     nicht mithaengen — nach WARTEN_MS kehrt sie zurueck, keinen Augenblick
+     frueher. */
+  test("haengt die Datenbank, kehrt die Wache nach der Zeitgrenze zurueck", async () => {
+    jest.useFakeTimers();
+    try {
+      speicher.vor(({ art }) => (art === "get" ? new Promise(() => {}) : undefined));
+      let zurueck = false;
+      const lauf = laufNach(T).then((r) => {
+        zurueck = true;
+        return r;
+      });
+      await jest.advanceTimersByTimeAsync(wache.WARTEN_MS - 1);
+      expect(zurueck).toBe(false);
+      await jest.advanceTimersByTimeAsync(1);
+      expect((await lauf).status).toBe("nicht-messbar");
+      expect(wacheZeilen()).toEqual([
+        expect.objectContaining({ warning: "werbe-wache-nicht-messbar", grund: "zeitgrenze", laeufeInFolge: 1 }),
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
 });

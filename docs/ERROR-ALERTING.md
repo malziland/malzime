@@ -444,7 +444,9 @@ reihen, und eine dauerhaft leere Antwort, die nie eine geschrieben hat.
 - **Wenn die Wache selbst ausfällt:** Ein Lauf ohne Messung ist eine Warnung;
   fünf in Folge schreiben die Fehlerzeile `werbe-wache-nicht-messbar`
   (Richtlinie „Function Errors“). Die Folge zählt jede Instanz für sich, wie
-  bei der Wartezeit-Wache.
+  bei der Wartezeit-Wache. Hängt die Datenbank bei der Wache, wartet der
+  Aufräumdienst höchstens 30 Sekunden auf sie und löscht dann weiter (Feld
+  `grund: "zeitgrenze"`); auch das ist ein Lauf ohne Messung.
 - Wie bei allen ntfy-Nachrichten kann der Weckruf ausbleiben; eine E-Mail gibt
   es für diesen Push nicht.
 

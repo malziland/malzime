@@ -86,6 +86,12 @@ const RESERVIERUNG_MS = 5 * 60 * 1000;
    so viele Laeufe hintereinander ohne Messung, dann ERROR. Gezaehlt je
    Instanz, wie dort. */
 const FEHLER_BIS_ALARM = 5;
+/* BLEIBT IM CODE — Schutzgrenze, keine Betriebseinstellung: So lange wartet
+   der Aufraeumdienst hoechstens auf die Wache. Sie laeuft VOR dem Loeschen der
+   zugestellten Auftraege; haengt die Datenbank bei ihr, geht die Loeschfrist
+   vor — wie beim Zaehlen (ZAEHLEN_GESAMT_MS in statistik.js). Nachpruefung
+   der Abnahme, 21.10.2026. */
+const WARTEN_MS = 30 * 1000;
 
 let fehlerInFolge = 0;
 
@@ -212,13 +218,43 @@ async function markeSetzen(ref, ausfallSeit) {
 
 const laufStatus = (z) => (z.ausfallSeit === null ? "im-rahmen" : "ausfall-laeuft");
 
+/* Ein Lauf ohne Messung: Warnung, ab dem FEHLER_BIS_ALARM-ten in Folge ERROR. */
+function nichtMessbar(err, grund = null) {
+  fehlerInFolge += 1;
+  const zeile = {
+    severity: fehlerInFolge >= FEHLER_BIS_ALARM ? "ERROR" : "WARNING",
+    step: "werbe-wache",
+    warning: "werbe-wache-nicht-messbar",
+    laeufeInFolge: fehlerInFolge,
+    ...(grund ? { grund } : {}),
+    code: (err && err.code) || null,
+    art: (err && err.name) || null,
+  };
+  (fehlerInFolge >= FEHLER_BIS_ALARM ? console.error : console.warn)(JSON.stringify(zeile));
+  return { status: "nicht-messbar" };
+}
+
 /**
- * Ein Durchgang der Wache. Wirft nie.
+ * Ein Durchgang der Wache, hoechstens WARTEN_MS lang. Wirft nie.
+ * Laeuft die Zeit ab, kehrt sie zurueck, und der Aufraeumdienst loescht weiter.
+ * Der haengende Durchgang wird dabei nicht abgebrochen (das kann Promise.race
+ * nicht), richtet aber nichts an: Er zaehlt nur in der Transaktion mit dem
+ * Schutz gegen einen anderen Lauf, und eine Nachricht reserviert er vorher.
  * @param {{melder?: (text: string) => Promise<unknown>, jetzt?: number}} [opts]
  *   melder: schickt die Nachricht (index.js: sendeNtfy); ohne melder nur Protokoll
  * @returns {Promise<{status: string, fehlversuche?: number, dauerMs?: number}>}
  */
-async function pruefeWerbung({ melder = null, jetzt = Date.now() } = {}) {
+async function pruefeWerbung(opts = {}) {
+  let uhr;
+  const abgelaufen = new Promise((fertig) => {
+    uhr = setTimeout(() => fertig(null), WARTEN_MS);
+  });
+  const ergebnis = await Promise.race([durchgang(opts), abgelaufen]);
+  clearTimeout(uhr);
+  return ergebnis || nichtMessbar(null, "zeitgrenze");
+}
+
+async function durchgang({ melder = null, jetzt = Date.now() } = {}) {
   try {
     const db = datenbank();
     const ref = db.doc(ZUSTAND_DOKUMENT);
@@ -297,17 +333,7 @@ async function pruefeWerbung({ melder = null, jetzt = Date.now() } = {}) {
     );
     return { status: "gemeldet", ...zahlen };
   } catch (err) {
-    fehlerInFolge += 1;
-    const zeile = {
-      severity: fehlerInFolge >= FEHLER_BIS_ALARM ? "ERROR" : "WARNING",
-      step: "werbe-wache",
-      warning: "werbe-wache-nicht-messbar",
-      laeufeInFolge: fehlerInFolge,
-      code: (err && err.code) || null,
-      art: (err && err.name) || null,
-    };
-    (fehlerInFolge >= FEHLER_BIS_ALARM ? console.error : console.warn)(JSON.stringify(zeile));
-    return { status: "nicht-messbar" };
+    return nichtMessbar(err);
   }
 }
 
@@ -327,4 +353,5 @@ module.exports = {
   MINDEST_FEHLVERSUCHE,
   RESERVIERUNG_MS,
   FEHLER_BIS_ALARM,
+  WARTEN_MS,
 };

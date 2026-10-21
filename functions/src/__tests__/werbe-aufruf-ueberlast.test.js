@@ -100,7 +100,8 @@ async function erwarteAussetzer() {
 }
 
 /* Jeder andere Fehlschlag: eine Fehlerzeile mit alert, keine Warnung,
-   Ergebnis "fehler" in der Messung. */
+   Ergebnis "fehler" in der Messung. Gibt die Fehlerzeile zurueck; der Test
+   prueft daran, dass sie den richtigen Grund nennt. */
 async function erwarteFehler() {
   const messung = {};
   const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de", messung);
@@ -109,6 +110,7 @@ async function erwarteFehler() {
   expect(werbeZeilen(fehler)).toHaveLength(1);
   expect(werbeZeilen(fehler)[0]).toMatchObject({ severity: "ERROR", step: "mistral-beast-ads", status: "failed" });
   expect(messung.werbeAufruf).toBe("fehler");
+  return werbeZeilen(fehler)[0];
 }
 
 describe("kurze Aussetzer: Warnung, kein Alarm", () => {
@@ -141,7 +143,7 @@ describe("kurze Aussetzer: Warnung, kein Alarm", () => {
 describe("jeder andere Fehlschlag: weiter eine Fehlerzeile mit Alarm", () => {
   test.each([[400], [401], [404], [500]])("HTTP %i", async (status) => {
     kiAntwortet(status);
-    await erwarteFehler();
+    expect((await erwarteFehler()).error).toContain(`HTTP ${status}`);
   });
 
   test("Antwort-Rumpf ist kein JSON", async () => {
@@ -152,7 +154,7 @@ describe("jeder andere Fehlschlag: weiter eine Fehlerzeile mit Alarm", () => {
         throw new SyntaxError("Unexpected token < in JSON at position 0");
       },
     }));
-    await erwarteFehler();
+    expect((await erwarteFehler()).error).toMatch(/JSON/);
   });
 
   test("Zugangsschluessel fehlt", async () => {
@@ -161,7 +163,7 @@ describe("jeder andere Fehlschlag: weiter eine Fehlerzeile mit Alarm", () => {
     delete process.env.MISTRAL_API_KEY_EU;
     try {
       kiAntwortet(200);
-      await erwarteFehler();
+      expect((await erwarteFehler()).error).toMatch(/MISTRAL_API_KEY/);
     } finally {
       if (euVorher !== undefined) process.env.MISTRAL_API_KEY_EU = euVorher;
     }

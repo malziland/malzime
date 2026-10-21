@@ -105,7 +105,14 @@ test("der Werbe-Aufruf zaehlt seine Textmenge dazu", async () => {
     "de",
     messung
   );
-  expect(messung).toEqual({ tokenEingabe: 810, tokenZwischenspeicher: 0, tokenAusgabe: 95, zusatzversuche: 1 });
+  expect(messung).toEqual({
+    tokenEingabe: 810,
+    tokenZwischenspeicher: 0,
+    tokenAusgabe: 95,
+    zusatzversuche: 1,
+    /* Seit 21.10.2026: Ergebnis des Werbe-Aufrufs fuer die Werbe-Wache. */
+    werbeAufruf: "ok",
+  });
 });
 
 test("das Ergebnis traegt die Kennzahlen im selben Schreibvorgang in den Auftrag", async () => {

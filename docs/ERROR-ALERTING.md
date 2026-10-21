@@ -108,6 +108,20 @@ Kleinste, was Google zulässt). Scheitern in dieser Zeit mehrere Analysen, kommt
 eine Nachricht; wie viele es waren, zeigt die Abfrage der Zeile im Protokoll.
 Darum sagt der Betreff „mindestens ein Kind“.
 
+**Keine Fehlerzeile: kurze Aussetzer beim Werbe-Aufruf.** Der zweite, kleine
+Aufruf einer Analyse (Beast-Werbung, `generateBeastAds` in `mistral.js`) darf
+scheitern — dann bleibt die Werbeliste aus dem Analyse-Aufruf stehen, und das
+Kind bekommt sein Ergebnis. Ist der Grund ein kurzer Aussetzer von Mistral
+(Überlast 429 seit 07.10.2026; seit 21.10.2026 auch 502, 503, 504, die
+Zeitgrenze des Aufrufs und ein Verbindungsabriss), schreibt er nur die Warnung
+`beast-ads-failed`, die keine Richtlinie auslöst. Anlass: Am 21.10.2026
+zwischen 10:25 und 10:40 schrieb er so 18 Fehlerzeilen, und die Nachricht
+„Fehler im Server“ kam wiederholt (höchstens eine je fünf Minuten), obwohl
+alle Analysen fertig wurden. Jeder andere Grund (400, 401, 404, 500, unlesbare
+Antwort, fehlender Schlüssel) bleibt die Fehlerzeile `beast-ads-failed` und
+damit „Fehler im Server“. Einen LANGEN Aussetzer meldet die Werbe-Wache (Push
+„Beast-Werbung fällt aus“ unten).
+
 Dazu kommt eine Schwellen-Richtlinie (wie die für Browser-Fehler unten):
 `malziME KI-Verbindung bricht gehäuft ab` — Betreff „malziME: KI-Verbindung bricht
 gehäuft ab (mehr als 3 Neuversuche an einem Tag)“, zählt die log-basierte Metrik
@@ -375,6 +389,49 @@ Titel „malziME: lange Wartezeit“.
   eine E-Mail gibt es für diesen Push nicht.
 
 Was dann zu tun ist: [RUNBOOK.md](RUNBOOK.md), „Nachricht „lange Wartezeit““.
+
+## Push „Beast-Werbung fällt aus“ (seit 21.10.2026)
+
+Kein Alarm aus einer Fehlerzeile, sondern ein eigener Push über denselben
+ntfy-Weg wie „lange Wartezeit“, Titel „malziME: Beast-Werbung faellt aus“
+(ohne Umlaut, wie alle Texte im Server-Code).
+Gegenstück dazu, dass ein kurzer Aussetzer des Werbe-Aufrufs nur noch eine
+Warnung ist (oben, „Keine Fehlerzeile“).
+
+- **Wann:** Die Beast-Werbung fällt LÄNGER als 30 Minuten am Stück aus UND
+  hatte dabei mindestens 10 Aussetzer. 30:00 meldet nicht, 30:01 schon; 9
+  Aussetzer melden nicht, 10 schon (`werbe-wache.test.js`). „Am Stück“: vom
+  ersten Aussetzer nach dem letzten gelungenen Werbe-Aufruf bis zum jüngsten
+  Aussetzer — auch über eine Pause hinweg. Scheitert die Werbung am Ende eines
+  Workshops und am Anfang des nächsten ohne Erfolg dazwischen, ist das ein
+  Ausfall.
+- **Wie oft:** höchstens eine Nachricht je Ausfall. Ein gelungener Aufruf
+  beendet ihn, danach zählt alles neu. Antworten ohne Einträge und andere
+  Fehlschläge (die schon selbst alarmieren) ändern nichts.
+- **Woher:** Der Werbe-Aufruf vermerkt sein Ergebnis in den Kennzahlen des
+  Auftrags (`kennzahlen.werbeAufruf`: `ok`, `leer`, `aussetzer`, `fehler`). Die
+  Wache liest je Lauf nur die Aufträge, die seit ihrem letzten Lauf fertig
+  wurden (Fertigzeit und dieses Feld), und hält das Ergebnis in
+  `stats/werbe-wache` fest — für alle Instanzen. Gezählt wird nur bis 30
+  Sekunden vor dem Lauf, damit kein Auftrag zwischen zwei Läufen durchfällt.
+- **Inhalt:** seit wann (Wiener Zeit), wie viele Versuche, wie lange — keine
+  Kennung.
+- **Zustellung:** Die Marke „gemeldet“ bleibt nur stehen, wenn der Versand
+  Erfolg meldet; sonst nimmt die Wache sie zurück, schreibt die Warnung
+  `werbe-wache-nicht-zugestellt`, und der nächste Lauf versucht es wieder —
+  wie bei „lange Wartezeit“.
+- **Wo:** im Aufräumdienst (`reapJobs`, jede Minute), mit denselben Secrets
+  `NTFY_URL_EU` und `NTFY_TOPIC_EU`. Der Analyseweg trägt dafür nur ein Feld im
+  ohnehin geschriebenen Abschluss.
+- **Grenzen im Code, nicht im Einstellungssatz** (`BLEIBT IM CODE` in
+  `werbe-wache.js`), aus demselben Grund wie bei der Wartezeit-Wache.
+- **Wenn die Wache selbst ausfällt:** Ein Lauf ohne Messung ist eine Warnung;
+  fünf in Folge schreiben die Fehlerzeile `werbe-wache-nicht-messbar`
+  (Richtlinie „Function Errors“).
+- Wie bei allen ntfy-Nachrichten kann der Weckruf ausbleiben; eine E-Mail gibt
+  es für diesen Push nicht.
+
+Was dann zu tun ist: [RUNBOOK.md](RUNBOOK.md), „Nachricht „Beast-Werbung fällt aus““.
 
 ## Was passiert dann?
 

@@ -25,7 +25,9 @@
  *     `result` soll nicht unbegrenzt liegen bleiben).
  *
  * Vor dem Loeschen in (2c)/(3) zaehlt er (statistik.js), am Ende schaut die
- * Wartezeit-Wache auf die Schlange (wartezeit-wache.js) — beide seit 16.10.2026.
+ * Wartezeit-Wache auf die Schlange (wartezeit-wache.js) — beide seit 16.10.2026
+ * — und die Werbe-Wache darauf, ob die Beast-Werbung zu lange am Stueck
+ * ausfaellt (werbe-wache.js, seit 21.10.2026).
  * Bei (1) und (2) wird das zwischengespeicherte Bild mitgelöscht (die GCS-
  * Lifecycle-Regel bleibt nur das Sicherheitsnetz).
  *
@@ -48,6 +50,7 @@ const { deleteImage } = require("./queue-storage");
 const { belegtesFreigeben } = require("./ruecknahme");
 const { zaehleVorDemLoeschen } = require("./statistik");
 const { pruefeWartezeit } = require("./wartezeit-wache");
+const { pruefeWerbung } = require("./werbe-wache");
 
 /* Obergrenze der Jobs, die ein einzelner Lauf je Sorte abräumt — verhindert,
    dass ein extremer Rückstau einen Lauf überlange macht. Der nächste Lauf
@@ -113,8 +116,9 @@ async function sicherFinden(name, fn, lauf) {
   }
 }
 
-/* melder: Versandweg der Wartezeit-Wache (index.js: ntfy); ohne ihn nur Protokoll. */
-async function reapJobs({ melder = null } = {}) {
+/* melder, werbeMelder: Versandwege der Wartezeit-Wache und der Werbe-Wache
+   (index.js: ntfy, je mit eigenem Titel); ohne sie nur Protokoll. */
+async function reapJobs({ melder = null, werbeMelder = null } = {}) {
   const lauf = { ohneBetriebswerte: false };
   /* (1) Verlassene wartende Jobs → abandoned. */
   const abandoned = await sicherFinden("abandoned", () => findAbandonedJobs(), lauf);
@@ -289,6 +293,11 @@ async function reapJobs({ melder = null } = {}) {
   /* Wartezeit-Wache: hier, weil dieser Lauf jede Minute kommt, auch wenn die
      Schlange steht (wartezeit-wache.js). Wirft nie. */
   await pruefeWartezeit({ melder });
+
+  /* Werbe-Wache: Faellt die Beast-Werbung zu lange am Stueck aus? Kurze
+     Aussetzer melden seit 21.10.2026 keinen Alarm mehr (werbe-wache.js).
+     Wirft nie. */
+  await pruefeWerbung({ melder: werbeMelder });
 
   /* BUG-2026-10-03-32: Ist der Einstellungssatz gerade nicht lesbar, liefert
      betriebsprofil.js den zuletzt gueltig gelesenen weiter — die Abfragen oben

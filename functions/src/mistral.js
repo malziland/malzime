@@ -31,7 +31,9 @@ const {
   setFetchForTest,
   _setLiveIntervalMsForTest,
 } = require("./mistral-http");
+const { istUeberlast } = require("./ueberlast");
 const {
+  istVerbindungsabbruch,
   ursacheVon,
   meldeAbbruchMitNeuversuch,
   mitEinemNeuversuchBeiAbbruch,
@@ -493,6 +495,34 @@ function textmengeZaehlen(ziel, result) {
   ziel.zusatzversuche = n(ziel.zusatzversuche) + n(result.wiederholungen);
 }
 
+/* Ist dieser Fehlschlag des Werbe-Aufrufs ein kurzer Aussetzer von Mistral
+   (Vorgabe 21.10.2026)? Gelesen werden nur Code, Status und Markierung, nie
+   der Text der Meldung.
+     istUeberlast       429, eigene Drossel aufgelaufen (ueberlast.js)
+     502, 503, 504      Mistral kurz weg — nach den Wiederholungen der
+                        Netzschicht immer noch
+     code "timeout"     Zeitgrenze des Aufrufs oder Restbudget erschoepft
+     Verbindungsabriss  wie verbindungsfehler.js ihn erkennt und markiert */
+const AUSSETZER_STATUS = new Set([502, 503, 504]);
+function istKurzerAussetzer(err) {
+  if (!err) return false;
+  return (
+    istUeberlast(err) ||
+    AUSSETZER_STATUS.has(err.status) ||
+    err.code === "timeout" ||
+    err.verbindungsabbruch === true ||
+    istVerbindungsabbruch(err)
+  );
+}
+
+/* Ergebnis des Werbe-Aufrufs fuer den Auftrag: "ok", "leer", "aussetzer"
+   oder "fehler" — kein Inhalt, keine Kennung. Reist mit den Kennzahlen in den
+   Auftrag (job-pipelines.js) und ist die Datenquelle der Werbe-Wache. Ohne
+   Ziel: nichts. */
+function werbeErgebnisVermerken(ziel, ergebnis) {
+  if (ziel && typeof ziel === "object") ziel.werbeAufruf = ergebnis;
+}
+
 async function generateBeastAds(boostProfile, standardAds, lang, messung = null) {
   if (!boostProfile || !boostProfile.categories) return null;
   const prompts = loadPrompts(lang || "de");
@@ -551,20 +581,36 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
         wiederholungen: result.wiederholungen || 0,
       })
     );
+    werbeErgebnisVermerken(messung, ads.length ? "ok" : "leer");
     return ads.length ? ads : null;
   } catch (err) {
-    /* Bewusst still: Der Hauptpfad hat bereits eine Werbeliste. */
-    /* OPS-004 (Audit 2026-08-10): console.error statt console.log — das ergibt
-       severity ERROR in Cloud Logging und faellt damit unter die bestehende
-       Alarm-Policy. Vorher war ein dauerhaft fehlschlagender Zweitaufruf
-       voellig unsichtbar: Der Fallback greift, der Nutzer merkt nichts, und
-       jede Analyse liefe still mit der schlechteren Werbung aus dem
-       Hauptaufruf. Der Fallback selbst bleibt unveraendert richtig.
-       OPS-2026-10-03-31: Lehnt Mistral wegen Ueberlast ab (429), ist es eine
-       Warnung — unter Andrang erwartbar, und das Kind hat sein Ergebnis. */
-    (err.status === 429 ? console.warn : console.error)(
+    /* Faellt der Aufruf aus, bleibt die Werbeliste aus dem Hauptaufruf stehen
+       — das Kind bekommt sein Ergebnis. Wie laut der Ausfall gemeldet wird,
+       haengt an seiner Art:
+
+       - KURZER AUSSETZER (istKurzerAussetzer): WARNING, kein Alarm. Beleg
+         21.10.2026, 10:25–10:40 Wien: Mistral antwortete 14-mal "503" und
+         blieb 4-mal ueber der Zeitgrenze; 18 Fehlerzeilen, die Nachricht
+         "Fehler im Server" kam wiederholt — alle 81 Analysen des Tages waren
+         fertig, der Rueckfall griff jedes Mal. Seit OPS-2026-10-03-31 galt das
+         schon fuer 429. Vorgabe Christoph 21.10.2026: kurze Aussetzer nicht
+         mehr alarmieren.
+       - JEDER ANDERE FEHLER (400, 401, 404, 500, unlesbare Antwort, fehlender
+         Schluessel): ERROR mit alert, also sofort Alarm. Das ist eine Antwort
+         auf genau diese Anfrage oder etwas Kaputtes, kein Aussetzer — und der
+         Grund, warum OPS-004 (Audit 2026-08-10) die Zeile ueberhaupt zur
+         Fehlerzeile gemacht hat: Ein dauerhaft scheiternder Zweitaufruf waere
+         sonst unsichtbar, jede Analyse liefe still mit der schlechteren
+         Werbung.
+
+       Damit auch ein LANGER Aussetzer auffaellt, vermerkt der Aufruf sein
+       Ergebnis im Auftrag (werbeErgebnisVermerken); die Werbe-Wache
+       (werbe-wache.js) meldet, wenn die Werbung zu lange am Stueck ausfaellt. */
+    const aussetzer = istKurzerAussetzer(err);
+    werbeErgebnisVermerken(messung, aussetzer ? "aussetzer" : "fehler");
+    (aussetzer ? console.warn : console.error)(
       JSON.stringify({
-        severity: err.status === 429 ? "WARNING" : "ERROR",
+        severity: aussetzer ? "WARNING" : "ERROR",
         alert: "beast-ads-failed",
         step: "mistral-beast-ads",
         status: "failed",

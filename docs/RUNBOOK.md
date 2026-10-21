@@ -758,6 +758,41 @@ Kann die Wache fünf Läufe in Folge nicht messen, schreibt sie eine Fehlerzeile
 Indizes der Sammlung `jobs` prüfen. Für „nicht abgeholt“ gibt es bewusst keine
 Nachricht: Am Ende eines Workshops legen Kinder die Handys weg.
 
+### Nachricht „Beast-Werbung fällt aus“ (seit 21.10.2026)
+
+Der zweite, kleine Aufruf einer Analyse (Beast-Werbung) ist länger als 30
+Minuten am Stück gescheitert, mit mindestens 10 Aussetzern und ohne einen
+einzigen Erfolg dazwischen (auch über eine Pause hinweg). Die Analysen laufen
+weiter; die Kinder sehen im Beast-Modus die Werbung aus dem Analyse-Aufruf.
+Eine Nachricht je Ausfall; nach dem nächsten Erfolg zählt alles neu. Aufbau und
+Grenzen: [ERROR-ALERTING.md](ERROR-ALERTING.md), „Push „Beast-Werbung fällt
+aus““.
+
+Was tun: Nicht eilig — kein Kind sieht einen Fehler. Die Warnungen des
+Werbe-Aufrufs zeigen, woran es liegt (`error`: HTTP-Status, Zeitgrenze;
+`ursache`: Grund eines Abrisses):
+
+    gcloud logging read 'jsonPayload.step="mistral-beast-ads" AND jsonPayload.status="failed"' \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
+      --format='value(timestamp,severity,jsonPayload.error,jsonPayload.ursache.code)'
+
+Lauter 503 oder Zeitgrenzen: Mistral-Status und Account-Dashboard prüfen
+(„Mistral überlastet / 429 / 5xx“ unten). Läuft die Störung tagelang, kann der
+Werbe-Aufruf über das Feature-Flag abgeschaltet werden (Abschnitt „3a.
+Beast-Werbung im zweiten Aufruf zurückbauen“) — dann gilt immer die Werbeliste
+aus dem Analyse-Aufruf. Die Meldungen der Wache selbst:
+
+    gcloud logging read 'jsonPayload.step="werbe-wache"' \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
+      --format='value(timestamp,jsonPayload.status,jsonPayload.aussetzer,jsonPayload.dauerMs)'
+
+`status` „nicht-zugestellt“: Der Push ging nicht hinaus (ntfy prüfen); die
+Wache versucht es jede Minute erneut. Fünf Läufe in Folge ohne Messung ergeben
+die Fehlerzeile `werbe-wache-nicht-messbar` (Alarm „Function Errors“) —
+Firestore und den Einzelfeld-Index auf `finishedAt` der Sammlung `jobs` prüfen.
+Den Stand der Wache zeigt das Dokument `stats/werbe-wache` (Beginn und jüngster
+Aussetzer des laufenden Ausfalls, Zahl der Aussetzer).
+
 ### Verdacht auf Absturz-Schleife (Safari: „wiederholt ein Problem aufgetreten")
 
 Die Absturz-Wache (`public/js/absturz-wache.js`, seit v2.12.2) erkennt drei
@@ -867,11 +902,14 @@ das Restbudget nicht mehr reicht, sieht er `blocked.overloaded` bzw.
 `blocked.apiError`. Vorher gab es eine Wiederholung nach zwei Sekunden — bei 15
 Aufrufen je Minute wirkungslos: Am 08.09.2026 scheiterten so 6 von 47 Analysen
 einer Klasse. Der zweite Aufruf einer Analyse (Beast-Werbung) hat fest 30
-Sekunden und wiederholt deshalb höchstens einmal; fällt er wegen Überlast aus,
-steht eine Warnung `beast-ads-failed` im Log, und das Kind bekommt sein
-Ergebnis mit der Werbeliste aus dem Analyse-Aufruf. Eine FEHLERZEILE
-`beast-ads-failed` heißt dagegen: Der Aufruf scheitert aus einem anderen Grund
-(Schlüssel, Modell, Zeitlimit) — dann dort nachsehen.
+Sekunden und wiederholt deshalb höchstens einmal; fällt er wegen eines kurzen
+Aussetzers aus (429, 502, 503, 504, Zeitgrenze, Verbindungsabriss), steht eine
+Warnung `beast-ads-failed` im Log, und das Kind bekommt sein Ergebnis mit der
+Werbeliste aus dem Analyse-Aufruf. Eine FEHLERZEILE `beast-ads-failed` heißt
+dagegen: Der Aufruf scheitert aus einem anderen Grund (Schlüssel, Modell,
+abgelehnte Anfrage, unlesbare Antwort) — dann dort nachsehen. Hält der
+Aussetzer lange an, kommt die Nachricht „Beast-Werbung fällt aus“ (Abschnitt
+oben).
 Bei anhaltender Störung: Mistral-Status und **Account-Dashboard** prüfen
 (Limits unterscheiden sich drastisch je Modellversion — immer das Dashboard,
 nicht Code-Kommentare). Notfalls Wartungsmodus (Hebel 1).

@@ -1,14 +1,20 @@
 "use strict";
 
-/* Lehnt der KI-Dienst den Werbe-Aufruf wegen Ueberlast ab (429), ist das eine
-   Warnung, kein Fehler (OPS-2026-10-03-31).
+/* Wie laut ein Ausfall des Werbe-Aufrufs gemeldet wird (mistral.js,
+   generateBeastAds).
 
-   Der Werbe-Aufruf ist der zweite Aufruf einer Analyse und fuellt unter Andrang
-   das Minutenlimit. Faellt er aus, bleibt die Werbeliste aus dem Hauptaufruf
-   stehen — das Kind bekommt sein Ergebnis. Die Zeile `beast-ads-failed` loeste
-   trotzdem die Nachricht "Fehler im Server" aus. Jeder andere Fehlschlag des
-   Aufrufs bleibt eine Fehlerzeile: Ein dauerhaft scheiternder Zweitaufruf soll
-   auffallen. */
+   Faellt der Aufruf aus, bleibt die Werbeliste aus dem Hauptaufruf stehen —
+   das Kind bekommt sein Ergebnis. Ein KURZER AUSSETZER von Mistral ist deshalb
+   nur eine Warnung, kein Alarm: Ueberlast (429, seit OPS-2026-10-03-31) und
+   seit 21.10.2026 auch 502/503/504, die Zeitgrenze und ein Verbindungsabriss.
+   Beleg 21.10.2026, 10:25–10:40 Wien: 14-mal 503 und 4-mal Zeitgrenze, 18
+   Fehlerzeilen, die Nachricht "Fehler im Server" kam wiederholt, obwohl alle
+   81 Analysen fertig waren. Vorgabe Christoph 21.10.2026.
+
+   JEDER ANDERE Fehlschlag bleibt eine Fehlerzeile mit Alarm: Ein dauerhaft
+   kaputter Zweitaufruf soll sofort auffallen (OPS-004). Einen langen
+   Aussetzer meldet die Werbe-Wache (werbe-wache.test.js) — dafuer vermerkt
+   der Aufruf sein Ergebnis in der Messung (werbeAufruf). */
 
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
@@ -32,7 +38,7 @@ let aufrufe;
 const zeilen = (spion) => spion.mock.calls.map((aufruf) => JSON.parse(aufruf[0]));
 const werbeZeilen = (spion) => zeilen(spion).filter((zeile) => zeile.alert === "beast-ads-failed");
 
-function kiAntwortet(status) {
+function kiAntwortet(status, inhalt = '{"ad_targeting":["A","B"]}') {
   aufrufe = 0;
   mistral.setFetchForTest(async () => {
     aufrufe += 1;
@@ -40,10 +46,30 @@ function kiAntwortet(status) {
     return {
       ok: true,
       status: 200,
-      json: async () => ({ choices: [{ message: { content: '{"ad_targeting":["A","B"]}' } }], usage: {} }),
+      json: async () => ({ choices: [{ message: { content: inhalt } }], usage: {} }),
     };
   });
 }
+
+/* Der Aufruf wirft, bevor eine Antwort kommt. */
+function kiWirft(fabrik) {
+  aufrufe = 0;
+  mistral.setFetchForTest(async () => {
+    aufrufe += 1;
+    throw fabrik();
+  });
+}
+
+/* So meldet Node.js einen Abbruch durch den eigenen Zeitwaechter (der
+   AbortController der Netzschicht): Die Netzschicht macht daraus ihren
+   Zeitgrenzen-Fehler (code "timeout"). Nachgestellt ohne 30 s zu warten. */
+const zeitwaechterBrichtAb = () => Object.assign(new Error("This operation was aborted"), { name: "AbortError" });
+/* So meldet Node.js (undici) eine abgerissene Verbindung. */
+const verbindungReisstAb = () => {
+  const grund = new Error("read ECONNRESET");
+  grund.code = "ECONNRESET";
+  return new TypeError("fetch failed", { cause: grund });
+};
 
 beforeEach(() => {
   process.env.MISTRAL_API_KEY = "test-key-not-real";
@@ -61,35 +87,110 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-test("429 bei jedem Versuch: keine Werbeliste, eine Warnung, keine Fehlerzeile", async () => {
-  kiAntwortet(429);
-
-  const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de");
-
+/* Ein kurzer Aussetzer: keine Werbeliste, genau eine Warnung, keine
+   Fehlerzeile, Ergebnis "aussetzer" in der Messung. */
+async function erwarteAussetzer() {
+  const messung = {};
+  const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de", messung);
   expect(liste).toBeNull();
-  expect(aufrufe).toBeGreaterThan(1);
   expect(fehler).not.toHaveBeenCalled();
   expect(werbeZeilen(warnung)).toHaveLength(1);
   expect(werbeZeilen(warnung)[0]).toMatchObject({ severity: "WARNING", step: "mistral-beast-ads", status: "failed" });
-});
+  expect(messung.werbeAufruf).toBe("aussetzer");
+}
 
-test.each([[400], [401], [500]])("HTTP %i: weiter eine Fehlerzeile", async (status) => {
-  kiAntwortet(status);
-
-  const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de");
-
+/* Jeder andere Fehlschlag: eine Fehlerzeile mit alert, keine Warnung,
+   Ergebnis "fehler" in der Messung. */
+async function erwarteFehler() {
+  const messung = {};
+  const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de", messung);
   expect(liste).toBeNull();
   expect(werbeZeilen(warnung)).toHaveLength(0);
   expect(werbeZeilen(fehler)).toHaveLength(1);
   expect(werbeZeilen(fehler)[0]).toMatchObject({ severity: "ERROR", step: "mistral-beast-ads", status: "failed" });
+  expect(messung.werbeAufruf).toBe("fehler");
+}
+
+describe("kurze Aussetzer: Warnung, kein Alarm", () => {
+  test("429 bei jedem Versuch (Ueberlast)", async () => {
+    kiAntwortet(429);
+    await erwarteAussetzer();
+    expect(aufrufe).toBeGreaterThan(1);
+  });
+
+  test.each([[502], [503], [504]])("HTTP %i bei jedem Versuch (Mistral kurz weg)", async (status) => {
+    kiAntwortet(status);
+    await erwarteAussetzer();
+    /* Die Netzschicht hat es wiederholt, bevor sie aufgab. */
+    expect(aufrufe).toBeGreaterThan(1);
+  });
+
+  test("Zeitgrenze des Aufrufs", async () => {
+    kiWirft(zeitwaechterBrichtAb);
+    await erwarteAussetzer();
+    expect(werbeZeilen(warnung)[0].error).toMatch(/timeout/);
+  });
+
+  test("Verbindungsabriss — der Grund steht in der Warnung, ohne Adressen", async () => {
+    kiWirft(verbindungReisstAb);
+    await erwarteAussetzer();
+    expect(werbeZeilen(warnung)[0].ursache).toEqual({ code: "ECONNRESET", text: "read ECONNRESET" });
+  });
 });
 
-test("Erfolg: weder Warnung noch Fehlerzeile", async () => {
-  kiAntwortet(200);
+describe("jeder andere Fehlschlag: weiter eine Fehlerzeile mit Alarm", () => {
+  test.each([[400], [401], [404], [500]])("HTTP %i", async (status) => {
+    kiAntwortet(status);
+    await erwarteFehler();
+  });
 
-  const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de");
+  test("Antwort-Rumpf ist kein JSON", async () => {
+    mistral.setFetchForTest(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => {
+        throw new SyntaxError("Unexpected token < in JSON at position 0");
+      },
+    }));
+    await erwarteFehler();
+  });
 
-  expect(liste).toEqual(["A", "B"]);
-  expect(werbeZeilen(warnung)).toHaveLength(0);
-  expect(fehler).not.toHaveBeenCalled();
+  test("Zugangsschluessel fehlt", async () => {
+    const euVorher = process.env.MISTRAL_API_KEY_EU;
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.MISTRAL_API_KEY_EU;
+    try {
+      kiAntwortet(200);
+      await erwarteFehler();
+    } finally {
+      if (euVorher !== undefined) process.env.MISTRAL_API_KEY_EU = euVorher;
+    }
+  });
+});
+
+describe("Ergebnis in der Messung bei einer Antwort", () => {
+  test("Erfolg: weder Warnung noch Fehlerzeile, Ergebnis ok", async () => {
+    kiAntwortet(200);
+    const messung = {};
+    const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de", messung);
+    expect(liste).toEqual(["A", "B"]);
+    expect(werbeZeilen(warnung)).toHaveLength(0);
+    expect(fehler).not.toHaveBeenCalled();
+    expect(messung.werbeAufruf).toBe("ok");
+  });
+
+  test("Antwort ohne Eintraege: keine Liste, kein Alarm, Ergebnis leer", async () => {
+    kiAntwortet(200, '{"ad_targeting":[]}');
+    const messung = {};
+    const liste = await mistral.generateBeastAds(PROFIL, ["X"], "de", messung);
+    expect(liste).toBeNull();
+    expect(werbeZeilen(warnung)).toHaveLength(0);
+    expect(fehler).not.toHaveBeenCalled();
+    expect(messung.werbeAufruf).toBe("leer");
+  });
+
+  test("ohne Messung laeuft der Aufruf wie vorher", async () => {
+    kiAntwortet(503);
+    await expect(mistral.generateBeastAds(PROFIL, ["X"], "de")).resolves.toBeNull();
+  });
 });

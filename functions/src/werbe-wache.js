@@ -6,38 +6,50 @@
  * WARUM (Vorgabe vom 21.10.2026): Am 21.10.2026 zwischen 10:25 und 10:40
  * Wien antwortete Mistral auf den Werbe-Aufruf 14-mal "503" und blieb 4-mal
  * ueber der Zeitgrenze. Jede dieser Zeilen war eine Fehlerzeile, und die
- * Nachricht "Fehler im Server" kam wiederholt — dabei waren alle 81 Analysen des Tages
- * fertig, und die Kinder sahen die Werbung aus der Hauptanalyse (Rueckfall in
- * job-pipelines.js). Seitdem ist ein kurzer Aussetzer des Werbe-Aufrufs nur
- * noch eine Warnung (ueberlast.js, istKurzerAussetzer). Damit ein LANGER
- * Ausfall trotzdem auffaellt, gibt es diese Wache.
+ * Nachricht "Fehler im Server" kam wiederholt — dabei waren alle 81 Analysen
+ * des Tages fertig, und die Kinder sahen die Werbung aus der Hauptanalyse
+ * (Rueckfall in job-pipelines.js). Seitdem ist ein kurzer Aussetzer des
+ * Werbe-Aufrufs nur noch eine Warnung (ueberlast.js, istKurzerAussetzer).
+ * Damit ein LANGER Ausfall trotzdem auffaellt, gibt es diese Wache.
  *
- * DIE REGEL (Vorgabe 21.10.2026, beide Grenzen in werbe-wache.test.js von
- * beiden Seiten geprueft):
- *   - Ein Ausfall "am Stueck" beginnt mit dem ersten Aussetzer nach dem
- *     letzten gelungenen Werbe-Aufruf und reicht bis zum juengsten Aussetzer —
- *     auch ueber eine Pause hinweg: Scheitert die Werbung am Ende eines
- *     Workshops und am Anfang des naechsten, ohne Erfolg dazwischen, ist das
- *     EIN Ausfall.
+ * DIE REGEL (Vorgabe Christoph 21.10.2026: "dazwischen klappt die Werbung
+ * kein einziges Mal, mindestens 10 gescheiterte Versuche"; beide Grenzen in
+ * werbe-wache.test.js von beiden Seiten geprueft):
+ *   - Gescheitert ist jeder Werbe-Aufruf ausser "ok": ein kurzer Aussetzer
+ *     ("aussetzer"), jeder andere Fehlschlag ("fehler") und eine Antwort ohne
+ *     verwertbare Eintraege ("leer"). "leer" schreibt keine Fehlerzeile
+ *     (mistral.js) — ohne die Wache bliebe ein dauerhaft unverwertbarer
+ *     Werbe-Inhalt ganz still. Ein Auftrag ohne Werbe-Aufruf (Feld fehlt)
+ *     aendert nichts.
+ *   - Ein Ausfall "am Stueck" reicht vom ersten gescheiterten Versuch nach dem
+ *     letzten gelungenen bis zum juengsten — auch ueber eine Pause hinweg:
+ *     Scheitert die Werbung am Ende eines Workshops und am Anfang des
+ *     naechsten, ohne Erfolg dazwischen, ist das EIN Ausfall.
  *   - Gemeldet wird, wenn er LAENGER als 30 Minuten dauert (30:00 nein,
- *     30:01 ja) UND mindestens 10 Aussetzer hat (9 nein, 10 ja).
- *   - Hoechstens eine Nachricht je Ausfall; ein gelungener Aufruf beendet ihn,
- *     danach zaehlt alles neu.
- *   - "leer" (Antwort ohne Eintraege) und "fehler" (jeder andere Fehlschlag)
- *     aendern nichts: Fehler alarmieren schon selbst (Fehlerzeile in
- *     mistral.js), eine leere Antwort ist kein Aussetzer.
+ *     30:01 ja) UND mindestens 10 gescheiterte Versuche hat (9 nein, 10 ja).
+ *   - Eine Nachricht je Ausfall; ein gelungener Aufruf beendet ihn, danach
+ *     zaehlt alles neu.
+ *
+ * ZUSTELLUNG — lieber doppelt als keine: Vor dem Versand reserviert die Wache
+ * die Nachricht fuer fuenf Minuten (reserviertFuer, reserviertBis), damit kein
+ * zweiter Lauf zugleich sendet. Die Marke gemeldetFuer setzt sie erst, wenn
+ * der Versand Erfolg meldet. Geht der Versand nicht hinaus, endet der Lauf
+ * zwischen Reservierung und Versand oder scheitert das Setzen der Marke,
+ * versucht es nach Ablauf der Reservierung der naechste Lauf — im letzten Fall
+ * kommt dieselbe Nachricht ein zweites Mal.
  *
  * WOHER SIE ES WEISS: Der Werbe-Aufruf vermerkt sein Ergebnis in den
  * Kennzahlen des Auftrags (`kennzahlen.werbeAufruf`, job-pipelines.js). Die
  * Wache liest die Auftraege, die seit ihrem letzten Lauf fertig wurden — nur
  * Fertigzeit und dieses eine Feld, keine Kennung, kein Inhalt. Was sie daraus
- * behaelt, sind vier Zahlen im Dokument `stats/werbe-wache` (damit es fuer
- * alle Instanzen gilt): bis wann gezaehlt ist, Beginn und juengster Aussetzer
- * des laufenden Ausfalls, die Zahl der Aussetzer — plus die Marke, fuer
- * welchen Ausfall schon gemeldet wurde.
+ * behaelt, steht im Dokument `stats/werbe-wache` (damit es fuer alle
+ * Instanzen gilt): bis wann gezaehlt ist, Beginn und juengster Fehlversuch des
+ * laufenden Ausfalls, die Zahl der Fehlversuche, Reservierung und Marke —
+ * nur Zeitpunkte und eine Anzahl.
  *
- * WO SIE LAEUFT — im Aufraeumdienst (handle-reap.js), wie die Wartezeit-
- * Wache: Er laeuft jede Minute ohnehin und belastet keinen Analyseweg.
+ * WO SIE LAEUFT — im Aufraeumdienst (handle-reap.js), VOR dem Loeschen der
+ * zugestellten Auftraege: Er laeuft jede Minute ohnehin und belastet keinen
+ * Analyseweg.
  */
 
 const { datenbank } = require("./db");
@@ -47,25 +59,32 @@ const ZUSTAND_DOKUMENT = "stats/werbe-wache";
 /* BLEIBT IM CODE — Schwelle der Alarmierung, keine Betriebseinstellung (wie
    die Schwellen der Wartezeit-Wache): Vorgabe vom 21.10.2026, 30 Minuten,
    AUSSCHLIESSLICH (erst darueber wird gemeldet). Gemessen vom ersten bis zum
-   juengsten Aussetzer des Ausfalls. */
+   juengsten Fehlversuch des Ausfalls. */
 const GRENZE_MS = 30 * 60 * 1000;
 /* BLEIBT IM CODE — Schwelle der Alarmierung: Vorgabe vom 21.10.2026,
-   mindestens 10 Aussetzer im Ausfall, EINSCHLIESSLICH (10 meldet, 9 nicht).
-   Sie haelt zwei vereinzelte Aussetzer ueber eine lange Pause hinweg davon ab,
-   als "langer Ausfall" zu gelten. */
-const MINDEST_AUSSETZER = 10;
+   mindestens 10 gescheiterte Versuche im Ausfall, EINSCHLIESSLICH (10 meldet,
+   9 nicht). Sie haelt zwei vereinzelte Fehlversuche ueber eine lange Pause
+   hinweg davon ab, als "langer Ausfall" zu gelten. */
+const MINDEST_FEHLVERSUCHE = 10;
 /* BLEIBT IM CODE — Schutzgrenze der Messung: So weit schaut die Wache
-   hoechstens zurueck. Ein zugestellter Auftrag wird 15 Minuten nach der
-   Zustellung geloescht; zehn Minuten reichen, damit ein paar ausgefallene
-   Laeufe des Aufraeumdienstes keine Luecke lassen. */
+   hoechstens zurueck. Im Minutentakt sieht sie jeden fertigen Auftrag, bevor
+   der Aufraeumdienst ihn loescht: Sie laeuft dort vor dem Loeschen der
+   zugestellten Auftraege, und deren Zustellfenster (einstellbar ab 60 s)
+   beginnt fruehestens mit der Fertigzeit. Bleibt der Aufraeumdienst laenger
+   als 9 min 30 s aus (Blick zurueck minus Nachlauf), fehlen ihr die Auftraege
+   dieser Zeit. */
 const BLICK_ZURUECK_MS = 10 * 60 * 1000;
 /* BLEIBT IM CODE — Schutzgrenze der Messung: Gezaehlt wird nur bis 30 s vor
    dem Lauf. Ein Auftrag traegt seine Fertigzeit schon, bevor die Datenbank
    den Abschluss bestaetigt; ohne den Abstand koennte er nach dem Lauf
    auftauchen, aber vor dem neuen Zaehlstand liegen — und fiele durch. */
 const NACHLAUF_MS = 30 * 1000;
+/* BLEIBT IM CODE — Schutzgrenze der Zustellung: So lange gilt eine
+   Reservierung. Danach versucht es ein neuer Lauf, falls die Marke fehlt. */
+const RESERVIERUNG_MS = 5 * 60 * 1000;
 /* BLEIBT IM CODE — Schutzgrenze der Alarmierung wie bei der Wartezeit-Wache:
-   so viele Laeufe hintereinander ohne Messung, dann ERROR. */
+   so viele Laeufe hintereinander ohne Messung, dann ERROR. Gezaehlt je
+   Instanz, wie dort. */
 const FEHLER_BIS_ALARM = 5;
 
 let fehlerInFolge = 0;
@@ -75,13 +94,15 @@ const zahlOderNull = (wert) => (typeof wert === "number" && Number.isFinite(wert
 /** Zustand aus dem Dokument, jedes Feld geprueft (reine Rechnung). */
 function normalisiere(daten) {
   const d = daten && typeof daten === "object" ? daten : {};
-  const aussetzer = Number.isInteger(d.aussetzer) && d.aussetzer > 0 ? d.aussetzer : 0;
+  const fehlversuche = Number.isInteger(d.fehlversuche) && d.fehlversuche > 0 ? d.fehlversuche : 0;
   return {
     geprueftBis: zahlOderNull(d.geprueftBis),
     ausfallSeit: zahlOderNull(d.ausfallSeit),
-    letzterAussetzer: zahlOderNull(d.letzterAussetzer),
-    aussetzer,
+    letzterFehlversuch: zahlOderNull(d.letzterFehlversuch),
+    fehlversuche,
     gemeldetFuer: zahlOderNull(d.gemeldetFuer),
+    reserviertFuer: zahlOderNull(d.reserviertFuer),
+    reserviertBis: zahlOderNull(d.reserviertBis),
   };
 }
 
@@ -95,40 +116,42 @@ function fortschreiben(zustand, ereignisse) {
   const z = { ...normalisiere(zustand) };
   const rang = (e) => (e.werbeAufruf === "ok" ? 1 : 0);
   const sortiert = (ereignisse || [])
-    .filter((e) => e && zahlOderNull(e.finishedAt) !== null)
+    .filter((e) => e && zahlOderNull(e.finishedAt) !== null && typeof e.werbeAufruf === "string")
     .sort((a, b) => a.finishedAt - b.finishedAt || rang(a) - rang(b));
   for (const e of sortiert) {
     if (e.werbeAufruf === "ok") {
       z.ausfallSeit = null;
-      z.letzterAussetzer = null;
-      z.aussetzer = 0;
-    } else if (e.werbeAufruf === "aussetzer") {
+      z.letzterFehlversuch = null;
+      z.fehlversuche = 0;
+    } else {
       if (z.ausfallSeit === null) z.ausfallSeit = e.finishedAt;
-      z.aussetzer += 1;
-      z.letzterAussetzer = Math.max(z.letzterAussetzer ?? e.finishedAt, e.finishedAt);
+      z.fehlversuche += 1;
+      z.letzterFehlversuch = Math.max(z.letzterFehlversuch ?? e.finishedAt, e.finishedAt);
     }
-    /* "leer", "fehler" und Auftraege ohne Werbe-Aufruf aendern nichts. */
   }
   return z;
 }
 
-/** Dauer des laufenden Ausfalls in ms (erster bis juengster Aussetzer), oder 0. */
+/** Dauer des laufenden Ausfalls in ms (erster bis juengster Fehlversuch), oder 0. */
 function ausfallDauer(zustand) {
   const z = normalisiere(zustand);
-  return z.ausfallSeit === null || z.letzterAussetzer === null ? 0 : z.letzterAussetzer - z.ausfallSeit;
+  return z.ausfallSeit === null || z.letzterFehlversuch === null ? 0 : z.letzterFehlversuch - z.ausfallSeit;
 }
 
 /** Ist der laufende Ausfall lang genug fuer eine Nachricht — ohne Blick auf
- *  die Marke? 30:00 nein, 30:01 ja; 9 Aussetzer nein, 10 ja. */
+ *  Marke und Reservierung? 30:00 nein, 30:01 ja; 9 Fehlversuche nein, 10 ja. */
 function langerAusfall(zustand) {
   const z = normalisiere(zustand);
-  return z.ausfallSeit !== null && z.aussetzer >= MINDEST_AUSSETZER && ausfallDauer(z) > GRENZE_MS;
+  return z.ausfallSeit !== null && z.fehlversuche >= MINDEST_FEHLVERSUCHE && ausfallDauer(z) > GRENZE_MS;
 }
 
-/** Steht fuer diesen Ausfall noch eine Nachricht aus? */
-function meldungFaellig(zustand) {
+/** Darf dieser Lauf die Nachricht fuer den laufenden Ausfall jetzt versuchen?
+ *  Nein, wenn sie zugestellt ist (Marke) oder ein Lauf sie gerade versucht
+ *  (Reservierung fuer diesen Ausfall, noch nicht abgelaufen). */
+function meldungFaellig(zustand, jetzt) {
   const z = normalisiere(zustand);
-  return langerAusfall(z) && z.gemeldetFuer !== z.ausfallSeit;
+  if (!langerAusfall(z) || z.gemeldetFuer === z.ausfallSeit) return false;
+  return !(z.reserviertFuer === z.ausfallSeit && z.reserviertBis !== null && jetzt < z.reserviertBis);
 }
 
 const WIENER_ZEIT = new Intl.DateTimeFormat("de-AT", {
@@ -152,7 +175,7 @@ function baueMeldung(zustand) {
   const seit = WIENER_ZEIT.format(new Date(z.ausfallSeit)).replace(",", "");
   return (
     `malziME: Die Beast-Werbung klappt seit ${seit} (Wiener Zeit) nicht mehr — ` +
-    `${z.aussetzer} Versuche am Stueck, keiner gelungen (ueber ${alsDauer(ausfallDauer(z))}). ` +
+    `${z.fehlversuche} Versuche am Stueck, keiner gelungen (ueber ${alsDauer(ausfallDauer(z))}). ` +
     "Die Analysen laufen weiter, die Kinder sehen die Werbung aus der Hauptanalyse. " +
     'Was tun: RUNBOOK, "Beast-Werbung faellt aus".'
   );
@@ -176,29 +199,24 @@ async function ergebnisseFertigZwischen(seit, bis) {
   });
 }
 
-/* Nimmt die eigene Reservierung zurueck, wenn die Nachricht nicht hinausging
-   — nur, wenn sie noch die eigene ist. Danach versucht es der naechste Lauf
-   wieder (wie markeZuruecknehmen in wartezeit-wache.js). Wirft nicht. */
-async function reservierungZuruecknehmen(ausfallSeit, vorher) {
+/* Marke nach bestaetigtem Versand. Scheitert sie, kommt nach Ablauf der
+   Reservierung eine zweite Nachricht — lieber doppelt als keine. Wirft nicht. */
+async function markeSetzen(ref, ausfallSeit) {
   try {
-    const db = datenbank();
-    const ref = db.doc(ZUSTAND_DOKUMENT);
-    await db.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      if (snap.exists && snap.get("gemeldetFuer") === ausfallSeit)
-        tx.set(ref, { gemeldetFuer: vorher }, { merge: true });
-    });
+    await ref.set({ gemeldetFuer: ausfallSeit }, { merge: true });
     return true;
   } catch (_) {
     return false;
   }
 }
 
+const laufStatus = (z) => (z.ausfallSeit === null ? "im-rahmen" : "ausfall-laeuft");
+
 /**
  * Ein Durchgang der Wache. Wirft nie.
  * @param {{melder?: (text: string) => Promise<unknown>, jetzt?: number}} [opts]
  *   melder: schickt die Nachricht (index.js: sendeNtfy); ohne melder nur Protokoll
- * @returns {Promise<{status: string, aussetzer?: number, dauerMs?: number}>}
+ * @returns {Promise<{status: string, fehlversuche?: number, dauerMs?: number}>}
  */
 async function pruefeWerbung({ melder = null, jetzt = Date.now() } = {}) {
   try {
@@ -211,11 +229,11 @@ async function pruefeWerbung({ melder = null, jetzt = Date.now() } = {}) {
     const ereignisse = bis > seit ? await ergebnisseFertigZwischen(seit, bis) : [];
     fehlerInFolge = 0;
 
-    /* Nichts Neues und nichts mehr zu melden: nichts schreiben. Der naechste
-       Lauf liest ab demselben Stand — doppelt sieht er dabei nichts, denn in
-       diesem Abschnitt war kein Auftrag. */
-    if (ereignisse.length === 0 && !meldungFaellig(z0)) {
-      return { status: z0.ausfallSeit === null ? "im-rahmen" : "ausfall-laeuft", aussetzer: z0.aussetzer };
+    /* Nichts Neues und keine Nachricht zu versuchen: nichts schreiben. Der
+       naechste Lauf liest ab demselben Stand — doppelt sieht er dabei nichts,
+       denn in diesem Abschnitt war kein Auftrag. */
+    if (ereignisse.length === 0 && !meldungFaellig(z0, jetzt)) {
+      return { status: laufStatus(z0), fehlversuche: z0.fehlversuche };
     }
 
     /* Fortschreiben und, wenn faellig, die Nachricht reservieren — in einer
@@ -227,55 +245,57 @@ async function pruefeWerbung({ melder = null, jetzt = Date.now() } = {}) {
       if (z.geprueftBis !== z0.geprueftBis) return { andererLauf: true };
       const neu = fortschreiben(z, ereignisse);
       if (ereignisse.length > 0) neu.geprueftBis = bis;
-      const faellig = meldungFaellig(neu);
-      const vorher = neu.gemeldetFuer;
-      if (faellig) neu.gemeldetFuer = neu.ausfallSeit;
+      const faellig = meldungFaellig(neu, jetzt);
+      if (faellig) {
+        neu.reserviertFuer = neu.ausfallSeit;
+        neu.reserviertBis = jetzt + RESERVIERUNG_MS;
+      }
       tx.set(ref, neu);
-      return { neu, faellig, vorher };
+      return { neu, faellig };
     });
     if (schritt.andererLauf) return { status: "anderer-lauf" };
 
-    const { neu, faellig, vorher } = schritt;
+    const { neu, faellig } = schritt;
     const dauerMs = ausfallDauer(neu);
-    if (!faellig) {
-      return { status: neu.ausfallSeit === null ? "im-rahmen" : "ausfall-laeuft", aussetzer: neu.aussetzer, dauerMs };
-    }
+    const zahlen = { fehlversuche: neu.fehlversuche, dauerMs };
+    if (!faellig) return { status: laufStatus(neu), ...zahlen };
 
-    const text = baueMeldung(neu);
     /* Zugestellt heisst: der Versandweg meldet Erfolg (sendeNtfy: true) — wie
-       bei der Wartezeit-Wache. Sonst die Reservierung zuruecknehmen. */
+       bei der Wartezeit-Wache. Auch ein Melder, der sofort wirft, gilt als
+       nicht zugestellt. */
+    const text = baueMeldung(neu);
     const zugestellt = melder
-      ? await Promise.resolve(melder(text)).then(
-          (r) => r === true,
-          () => false
-        )
+      ? await Promise.resolve()
+          .then(() => melder(text))
+          .then(
+            (r) => r === true,
+            () => false
+          )
       : false;
-    /* Keine Kennung: nur die zwei Zahlen der Nachricht. */
-    if (zugestellt) {
+    /* Keine Kennung im Protokoll: nur die zwei Zahlen der Nachricht. */
+    if (!zugestellt) {
       console.warn(
         JSON.stringify({
           severity: "WARNING",
           step: "werbe-wache",
-          status: "gemeldet",
-          aussetzer: neu.aussetzer,
-          dauerMs,
+          status: "nicht-zugestellt",
+          warning: "werbe-wache-nicht-zugestellt",
+          ...zahlen,
         })
       );
-      return { status: "gemeldet", aussetzer: neu.aussetzer, dauerMs };
+      return { status: "nicht-zugestellt", ...zahlen };
     }
-    const zurueck = await reservierungZuruecknehmen(neu.ausfallSeit, vorher);
+    const markeGesetzt = await markeSetzen(ref, neu.ausfallSeit);
     console.warn(
       JSON.stringify({
         severity: "WARNING",
         step: "werbe-wache",
-        status: "nicht-zugestellt",
-        warning: "werbe-wache-nicht-zugestellt",
-        reservierungZurueckgenommen: zurueck,
-        aussetzer: neu.aussetzer,
-        dauerMs,
+        status: "gemeldet",
+        ...zahlen,
+        ...(markeGesetzt ? {} : { warning: "werbe-wache-marke-nicht-gesetzt" }),
       })
     );
-    return { status: "nicht-zugestellt", aussetzer: neu.aussetzer, dauerMs };
+    return { status: "gemeldet", ...zahlen };
   } catch (err) {
     fehlerInFolge += 1;
     const zeile = {
@@ -304,6 +324,7 @@ module.exports = {
   baueMeldung,
   _zuruecksetzen,
   GRENZE_MS,
-  MINDEST_AUSSETZER,
+  MINDEST_FEHLVERSUCHE,
+  RESERVIERUNG_MS,
   FEHLER_BIS_ALARM,
 };

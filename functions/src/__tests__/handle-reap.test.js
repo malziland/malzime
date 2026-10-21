@@ -76,6 +76,24 @@ describe("reapJobs", () => {
     expect(pruefeWerbung).toHaveBeenCalledWith({ melder: werbeMelder });
   });
 
+  /* Das Zustellfenster ist ab 60 s einstellbar (betriebsprofil.js). Liefe die
+     Werbe-Wache erst nach dem Loeschen, koennte ein zugestellter Auftrag weg
+     sein, bevor sie sein Ergebnis gezaehlt hat. */
+  test("die Werbe-Wache laeuft, bevor zugestellte Auftraege geloescht werden (21.10.2026)", async () => {
+    const { pruefeWerbung } = require("../werbe-wache");
+    const reihenfolge = [];
+    pruefeWerbung.mockImplementationOnce(async () => {
+      reihenfolge.push("werbe-wache");
+      return { status: "im-rahmen" };
+    });
+    jobs.findZugestellteJobs.mockResolvedValue([{ id: "z1", imagePath: null }]);
+    jobs.deleteJob.mockImplementation(async (id) => {
+      reihenfolge.push(`geloescht ${id}`);
+    });
+    await reapJobs();
+    expect(reihenfolge).toEqual(["werbe-wache", "geloescht z1"]);
+  });
+
   test("leerer Lauf — nichts zu tun", async () => {
     const result = await reapJobs();
     expect(result).toEqual({ abandoned: 0, staleProcessing: 0, expired: 0, ueberfaellig: 0, zugestellt: 0 });

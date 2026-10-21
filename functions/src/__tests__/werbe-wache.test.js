@@ -1,13 +1,18 @@
 "use strict";
 
 /* Werbe-Wache (21.10.2026, werbe-wache.js): Push, wenn die Beast-Werbung zu
-   lange am Stueck ausfaellt. Vorgabe Christoph 21.10.2026:
-     - LAENGER als 30 Minuten vom ersten bis zum juengsten Aussetzer
+   lange am Stueck ausfaellt. Vorgabe Christoph 21.10.2026 ("dazwischen klappt
+   die Werbung kein einziges Mal, mindestens 10 gescheiterte Versuche"):
+     - LAENGER als 30 Minuten vom ersten bis zum juengsten Fehlversuch
        (30:00 kein Alarm, 30:01 Alarm),
-     - UND mindestens 10 Aussetzer (9 kein Alarm, 10 Alarm),
+     - UND mindestens 10 gescheiterte Versuche (9 kein Alarm, 10 Alarm),
+     - gescheitert ist alles ausser "ok" (aussetzer, fehler, leer); ein
+       Auftrag ohne Werbe-Aufruf aendert nichts,
      - am Stueck = kein gelungener Werbe-Aufruf dazwischen, auch ueber eine
        Pause hinweg,
-     - eine Nachricht je Ausfall, nach einem Erfolg zaehlt alles neu.
+     - eine Nachricht je Ausfall, nach einem Erfolg zaehlt alles neu,
+     - Zustellung: lieber doppelt als keine (Reservierung mit Ablauf, Marke
+       erst nach bestaetigtem Versand).
    Gegen eine Datenbank im Arbeitsspeicher. */
 
 jest.mock("../db", () => ({ datenbank: () => require("./hilfen/speicher-datenbank").datenbank }));
@@ -27,11 +32,13 @@ const wien = (hhmmss) => {
 
 const A = "aussetzer";
 const OK = "ok";
-/* n Aussetzer gleichmaessig von `von` bis `bis` (beide eingeschlossen). */
-const reihe = (n, von, bis) =>
+const LEER = "leer";
+const FEHLER = "fehler";
+/* n gescheiterte Versuche gleichmaessig von `von` bis `bis` (beide eingeschlossen). */
+const reihe = (n, von, bis, werbeAufruf = A) =>
   Array.from({ length: n }, (_, i) => ({
     finishedAt: n === 1 ? von : von + ((bis - von) * i) / (n - 1),
-    werbeAufruf: A,
+    werbeAufruf,
   }));
 
 let warnungen;
@@ -66,6 +73,7 @@ async function laufeJedeMinute(von, bis) {
   for (let t = von; t <= bis; t += MIN) r = await laufNach(t);
   return r;
 }
+const wacheZeilen = () => warnungen.mock.calls.map((c) => JSON.parse(c[0])).filter((z) => z.step === "werbe-wache");
 
 describe("Regel (reine Rechnung)", () => {
   test.each([
@@ -77,9 +85,9 @@ describe("Regel (reine Rechnung)", () => {
     [31 * MIN, 20, true],
     [31 * MIN, 9, false],
     [31 * MIN, 10, true],
-  ])("Dauer %i ms, %i Aussetzer -> langer Ausfall: %s", (dauer, n, erwartet) => {
+  ])("Dauer %i ms, %i Fehlversuche -> langer Ausfall: %s", (dauer, n, erwartet) => {
     const z = wache.fortschreiben({}, reihe(n, T, T + dauer));
-    expect(z.aussetzer).toBe(n);
+    expect(z.fehlversuche).toBe(n);
     expect(wache.langerAusfall(z)).toBe(erwartet);
   });
 
@@ -90,7 +98,7 @@ describe("Regel (reine Rechnung)", () => {
       ...reihe(9, T + 27 * MIN, T + 60 * MIN),
     ]);
     expect(z.ausfallSeit).toBe(T + 27 * MIN);
-    expect(z.aussetzer).toBe(9);
+    expect(z.fehlversuche).toBe(9);
     expect(wache.langerAusfall(z)).toBe(false);
   });
 
@@ -98,18 +106,27 @@ describe("Regel (reine Rechnung)", () => {
     const gestern = T - 24 * 60 * MIN;
     const z = wache.fortschreiben({}, [...reihe(5, gestern, gestern + 5 * MIN), ...reihe(5, T, T + 2 * MIN)]);
     expect(z.ausfallSeit).toBe(gestern);
-    expect(z.aussetzer).toBe(10);
+    expect(z.fehlversuche).toBe(10);
     expect(wache.langerAusfall(z)).toBe(true);
   });
 
-  test("leer, fehler und Auftraege ohne Werbe-Aufruf aendern nichts", () => {
+  test("leer und fehler sind gescheiterte Versuche wie ein Aussetzer", () => {
     const vorher = wache.fortschreiben({}, reihe(5, T, T + 10 * MIN));
     const nachher = wache.fortschreiben(vorher, [
-      { finishedAt: T + 11 * MIN, werbeAufruf: "leer" },
-      { finishedAt: T + 12 * MIN, werbeAufruf: "fehler" },
-      { finishedAt: T + 13 * MIN, werbeAufruf: null },
+      { finishedAt: T + 11 * MIN, werbeAufruf: LEER },
+      { finishedAt: T + 12 * MIN, werbeAufruf: FEHLER },
     ]);
+    expect(nachher).toMatchObject({ ausfallSeit: T, fehlversuche: 7, letzterFehlversuch: T + 12 * MIN });
+  });
+
+  test("ein Auftrag ohne Werbe-Aufruf aendert nichts", () => {
+    const vorher = wache.fortschreiben({}, reihe(5, T, T + 10 * MIN));
+    const nachher = wache.fortschreiben(vorher, [{ finishedAt: T + 13 * MIN, werbeAufruf: null }]);
     expect(nachher).toEqual(vorher);
+  });
+
+  test.each([[LEER], [FEHLER]])("nur %s, 31 min, 10 Versuche: langer Ausfall", (art) => {
+    expect(wache.langerAusfall(wache.fortschreiben({}, reihe(10, T, T + 31 * MIN, art)))).toBe(true);
   });
 
   test("Reihenfolge der Eingabe egal; gleiche Fertigzeit: der Erfolg zaehlt zuletzt", () => {
@@ -119,7 +136,7 @@ describe("Regel (reine Rechnung)", () => {
       { finishedAt: T, werbeAufruf: A },
     ]);
     expect(z.ausfallSeit).toBeNull();
-    expect(z.aussetzer).toBe(0);
+    expect(z.fehlversuche).toBe(0);
   });
 
   test("21.10.2026, 10:25–10:40 (echte Zeiten aus dem Protokoll): kein Alarm", () => {
@@ -167,35 +184,36 @@ describe("Regel (reine Rechnung)", () => {
 });
 
 describe("Laeufe gegen die Datenbank", () => {
-  test("Ausfall genau 30:00 mit 10 Aussetzern — kein Alarm", async () => {
+  test("Ausfall genau 30:00 mit 10 Fehlversuchen — kein Alarm", async () => {
     for (const e of reihe(10, T, T + 30 * MIN)) fertig(e.finishedAt, A);
     expect((await laufeJedeMinute(T, T + 40 * MIN)).status).toBe("ausfall-laeuft");
     expect(melder).not.toHaveBeenCalled();
-    expect(speicher.lies("stats/werbe-wache")).toMatchObject({ ausfallSeit: T, aussetzer: 10 });
+    expect(speicher.lies("stats/werbe-wache")).toMatchObject({ ausfallSeit: T, fehlversuche: 10 });
   });
 
-  test("Ausfall 30:01 mit 10 Aussetzern — Alarm, einmal", async () => {
+  test("Ausfall 30:01 mit 10 Fehlversuchen — Alarm, einmal", async () => {
     for (const e of reihe(10, T, T + 30 * MIN + 1 * SEK)) fertig(e.finishedAt, A);
     await laufeJedeMinute(T, T + 40 * MIN);
     expect(melder).toHaveBeenCalledTimes(1);
     expect(melder.mock.calls[0][0]).toContain("10 Versuche am Stueck");
-    const w = warnungen.mock.calls.map((c) => JSON.parse(c[0])).find((z) => z.step === "werbe-wache");
-    expect(w).toEqual({
-      severity: "WARNING",
-      step: "werbe-wache",
-      status: "gemeldet",
-      aussetzer: 10,
-      dauerMs: 30 * MIN + 1 * SEK,
-    });
+    expect(wacheZeilen()).toEqual([
+      { severity: "WARNING", step: "werbe-wache", status: "gemeldet", fehlversuche: 10, dauerMs: 30 * MIN + 1 * SEK },
+    ]);
     expect(fehler).not.toHaveBeenCalled();
   });
 
-  test("31 Minuten, aber nur 9 Aussetzer — kein Alarm; der zehnte loest ihn aus", async () => {
+  test("31 Minuten, aber nur 9 Fehlversuche — kein Alarm; der zehnte loest ihn aus", async () => {
     for (const e of reihe(9, T, T + 31 * MIN)) fertig(e.finishedAt, A);
     expect((await laufeJedeMinute(T, T + 31 * MIN)).status).toBe("ausfall-laeuft");
     expect(melder).not.toHaveBeenCalled();
     fertig(T + 32 * MIN, A);
     expect((await laufNach(T + 32 * MIN)).status).toBe("gemeldet");
+    expect(melder).toHaveBeenCalledTimes(1);
+  });
+
+  test("ein dauerhaft unverwertbarer Werbe-Inhalt (nur leere Antworten) meldet sich", async () => {
+    for (const e of reihe(10, T, T + 31 * MIN, LEER)) fertig(e.finishedAt, LEER);
+    expect((await laufeJedeMinute(T, T + 31 * MIN)).status).toBe("gemeldet");
     expect(melder).toHaveBeenCalledTimes(1);
   });
 
@@ -208,7 +226,7 @@ describe("Laeufe gegen die Datenbank", () => {
 
     fertig(T + 34 * MIN, OK);
     expect((await laufNach(T + 34 * MIN)).status).toBe("im-rahmen");
-    expect(speicher.lies("stats/werbe-wache")).toMatchObject({ ausfallSeit: null, aussetzer: 0 });
+    expect(speicher.lies("stats/werbe-wache")).toMatchObject({ ausfallSeit: null, fehlversuche: 0 });
 
     const neuBeginn = T + 35 * MIN;
     for (const e of reihe(10, neuBeginn, neuBeginn + 31 * MIN)) fertig(e.finishedAt, A);
@@ -229,7 +247,7 @@ describe("Laeufe gegen die Datenbank", () => {
   test("ein Auftrag, den mehrere Laeufe sehen koennten, zaehlt einmal", async () => {
     fertig(T, A);
     await laufeJedeMinute(T, T + 5 * MIN);
-    expect(speicher.lies("stats/werbe-wache").aussetzer).toBe(1);
+    expect(speicher.lies("stats/werbe-wache").fehlversuche).toBe(1);
   });
 
   test("ein Auftrag im Nachlauf (juenger als 30 s) zaehlt erst im naechsten Lauf", async () => {
@@ -237,7 +255,7 @@ describe("Laeufe gegen die Datenbank", () => {
     await wache.pruefeWerbung({ melder, jetzt: T + 10 * SEK });
     expect(speicher.lies("stats/werbe-wache")).toBeUndefined();
     await wache.pruefeWerbung({ melder, jetzt: T + 70 * SEK });
-    expect(speicher.lies("stats/werbe-wache").aussetzer).toBe(1);
+    expect(speicher.lies("stats/werbe-wache").fehlversuche).toBe(1);
   });
 
   test("ohne neue Auftraege schreibt ein Lauf nichts", async () => {
@@ -246,28 +264,117 @@ describe("Laeufe gegen die Datenbank", () => {
     expect(speicher.protokoll.filter((z) => z.art === "transaktion")).toHaveLength(0);
   });
 
-  test("Auftraege ohne Werbe-Aufruf, leer und fehler aendern den Ausfall nicht", async () => {
+  test("leer und fehler verlaengern den Ausfall, ein Auftrag ohne Werbe-Aufruf nicht", async () => {
     for (const e of reihe(5, T, T + 10 * MIN)) fertig(e.finishedAt, A);
-    fertig(T + 11 * MIN, "leer");
-    fertig(T + 12 * MIN, "fehler");
+    fertig(T + 11 * MIN, LEER);
+    fertig(T + 12 * MIN, FEHLER);
     fertig(T + 13 * MIN, null);
     await laufeJedeMinute(T, T + 13 * MIN);
-    expect(speicher.lies("stats/werbe-wache")).toMatchObject({ ausfallSeit: T, aussetzer: 5 });
+    expect(speicher.lies("stats/werbe-wache")).toMatchObject({
+      ausfallSeit: T,
+      fehlversuche: 7,
+      letzterFehlversuch: T + 12 * MIN,
+    });
   });
 
-  test("Push geht nicht hinaus: Reservierung zurueck, der naechste Lauf versucht es wieder", async () => {
-    for (const e of reihe(10, T, T + 31 * MIN)) fertig(e.finishedAt, A);
-    melder.mockResolvedValue(false);
-    expect((await laufeJedeMinute(T, T + 31 * MIN)).status).toBe("nicht-zugestellt");
-    expect(speicher.lies("stats/werbe-wache").gemeldetFuer).toBeNull();
-    const w = warnungen.mock.calls.map((c) => JSON.parse(c[0])).find((z) => z.step === "werbe-wache");
-    expect(w).toMatchObject({ status: "nicht-zugestellt", reservierungZurueckgenommen: true });
+  /* Lauf A schiebt sich zwischen Abfrage und Transaktion von Lauf B: B hat
+     dieselben Auftraege gelesen wie A und darf sie nicht noch einmal zaehlen. */
+  test("zwei Laeufe zugleich: gezaehlt wird einmal, der zweite meldet anderer-lauf", async () => {
+    fertig(T, A);
+    let laufA = null;
+    speicher.vor(async ({ art }) => {
+      if (art === "transaktion" && laufA === null) {
+        laufA = wache.pruefeWerbung({ melder, jetzt: T + 31 * SEK });
+        await laufA;
+      }
+    });
+    const b = await wache.pruefeWerbung({ melder, jetzt: T + 31 * SEK });
+    expect((await laufA).status).toBe("ausfall-laeuft");
+    expect(b.status).toBe("anderer-lauf");
+    expect(speicher.lies("stats/werbe-wache").fehlversuche).toBe(1);
+  });
+});
 
-    /* Ohne neuen Auftrag: der naechste Lauf meldet nach. */
-    melder.mockResolvedValue(true);
-    expect((await laufNach(T + 32 * MIN)).status).toBe("gemeldet");
+describe("Zustellung: lieber doppelt als keine", () => {
+  /* 10 Fehlversuche von T bis T+31 min; der Lauf um T+31:31 versucht die
+     Nachricht und reserviert sie bis T+36:31. */
+  async function bisZumErstenVersuch() {
+    for (const e of reihe(10, T, T + 31 * MIN)) fertig(e.finishedAt, A);
+    return laufeJedeMinute(T, T + 31 * MIN);
+  }
+
+  test("Versand gelingt: keine zweite Nachricht, auch nach Ablauf der Reservierung", async () => {
+    expect((await bisZumErstenVersuch()).status).toBe("gemeldet");
+    fertig(T + 33 * MIN, A);
+    fertig(T + 40 * MIN, FEHLER);
+    await laufeJedeMinute(T + 32 * MIN, T + 45 * MIN);
+    expect(melder).toHaveBeenCalledTimes(1);
     expect(speicher.lies("stats/werbe-wache").gemeldetFuer).toBe(T);
-    expect((await laufNach(T + 33 * MIN)).status).toBe("ausfall-laeuft");
+  });
+
+  test("Push geht nicht hinaus, jeder weitere Schreibvorgang scheitert: vor Ablauf kein Versuch, danach schon", async () => {
+    melder.mockResolvedValue(false);
+    speicher.vor(({ art }) => {
+      if (art === "set") throw new Error("nicht erreichbar");
+    });
+    expect((await bisZumErstenVersuch()).status).toBe("nicht-zugestellt");
+    expect(wacheZeilen()).toEqual([
+      {
+        severity: "WARNING",
+        step: "werbe-wache",
+        status: "nicht-zugestellt",
+        warning: "werbe-wache-nicht-zugestellt",
+        fehlversuche: 10,
+        dauerMs: 31 * MIN,
+      },
+    ]);
+    expect(speicher.lies("stats/werbe-wache").gemeldetFuer).toBeNull();
+
+    expect((await laufeJedeMinute(T + 32 * MIN, T + 35 * MIN)).status).toBe("ausfall-laeuft");
+    expect(melder).toHaveBeenCalledTimes(1);
+    expect((await laufNach(T + 36 * MIN)).status).toBe("nicht-zugestellt");
+    expect(melder).toHaveBeenCalledTimes(2);
+  });
+
+  test("Lauf endet zwischen Reservierung und Versand: vor Ablauf kein Versuch, danach schon", async () => {
+    for (const e of reihe(10, T, T + 31 * MIN)) fertig(e.finishedAt, A);
+    await laufeJedeMinute(T, T + 30 * MIN);
+    let abbrechen = true;
+    /* Die Transaktion hat geschrieben (Reservierung steht), dann endet der Lauf. */
+    speicher.vor(({ art }) => {
+      if (abbrechen && art === "transaktion-ende") throw new Error("Instanz beendet");
+    });
+    expect((await laufNach(T + 31 * MIN)).status).toBe("nicht-messbar");
+    abbrechen = false;
+    expect(speicher.lies("stats/werbe-wache")).toMatchObject({ reserviertFuer: T, gemeldetFuer: null });
+    expect(melder).not.toHaveBeenCalled();
+
+    await laufeJedeMinute(T + 32 * MIN, T + 35 * MIN);
+    expect(melder).not.toHaveBeenCalled();
+    expect((await laufNach(T + 36 * MIN)).status).toBe("gemeldet");
+    expect(melder).toHaveBeenCalledTimes(1);
+  });
+
+  test("Versand gelingt, die Marke laesst sich nicht setzen: nach Ablauf kommt die Nachricht ein zweites Mal", async () => {
+    speicher.vor(({ art }) => {
+      if (art === "set") throw new Error("nicht erreichbar");
+    });
+    expect((await bisZumErstenVersuch()).status).toBe("gemeldet");
+    expect(wacheZeilen()[0]).toMatchObject({ status: "gemeldet", warning: "werbe-wache-marke-nicht-gesetzt" });
+    await laufNach(T + 35 * MIN);
+    expect(melder).toHaveBeenCalledTimes(1);
+    expect((await laufNach(T + 36 * MIN)).status).toBe("gemeldet");
+    expect(melder).toHaveBeenCalledTimes(2);
+  });
+
+  test("Melder wirft sofort: nicht zugestellt, nach Ablauf neuer Versuch", async () => {
+    melder = jest.fn(() => {
+      throw new Error("kaputt");
+    });
+    expect((await bisZumErstenVersuch()).status).toBe("nicht-zugestellt");
+    expect(fehler).not.toHaveBeenCalled();
+    expect((await laufNach(T + 36 * MIN)).status).toBe("nicht-zugestellt");
+    expect(melder).toHaveBeenCalledTimes(2);
   });
 
   test("ohne Versandweg: nicht zugestellt, keine Kennung im Protokoll", async () => {

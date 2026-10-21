@@ -24,9 +24,8 @@
  *     wird endgültig gelöscht (Datensparsamkeit: das fertige Profil im Feld
  *     `result` soll nicht unbegrenzt liegen bleiben).
  *
- * Vor dem Loeschen in (2c)/(3) zaehlt er (statistik.js), am Ende laufen die
- * Wartezeit-Wache (wartezeit-wache.js, seit 16.10.2026) und die Werbe-Wache
- * (werbe-wache.js, seit 21.10.2026).
+ * Vor dem Loeschen in (2c)/(3) zaehlen die Werbe-Wache (werbe-wache.js) und
+ * statistik.js, am Ende schaut die Wartezeit-Wache (wartezeit-wache.js).
  * Bei (1) und (2) wird das zwischengespeicherte Bild mitgelöscht (die GCS-
  * Lifecycle-Regel bleibt nur das Sicherheitsnetz).
  *
@@ -198,7 +197,9 @@ async function reapJobs({ melder = null, werbeMelder = null } = {}) {
 
   /* (2c) PRIV-107b: Zugestellte Ergebnisse nach dem Browser-Wiederholungs-
      Fenster löschen — Bild zuerst (BUG-002-Regel), defensiv: normal ist es
-     nach der Analyse längst weg. */
+     nach der Analyse längst weg. Davor die Werbe-Wache (wirft nie): Ein kurzes
+     Zustellfenster naehme ihr sonst Auftraege weg, bevor sie sie zaehlt. */
+  await pruefeWerbung({ melder: werbeMelder });
   const zugestellt = await sicherFinden("zugestellt", () => findZugestellteJobs(), lauf);
   /* ZAEHLEN VOR DEM LOESCHEN (16.10.2026): wirft nie, wartet begrenzt; scheitert
      es, wird trotzdem geloescht, doppelt zaehlt nichts (statistik.js). */
@@ -288,10 +289,9 @@ async function reapJobs({ melder = null, werbeMelder = null } = {}) {
      Schwelle 9 Tage: ein ausgefallener Montag allein loest noch nichts aus. */
   await pruefeErinnerungsLebenszeichen(LAEUFE_BIS_ALARM);
 
-  /* Wartezeit-Wache und Werbe-Wache: hier, weil dieser Lauf jede Minute
-     kommt, auch wenn die Schlange steht. Beide werfen nie. */
+  /* Wartezeit-Wache: hier, weil dieser Lauf jede Minute kommt, auch wenn die
+     Schlange steht (wartezeit-wache.js). Wirft nie. */
   await pruefeWartezeit({ melder });
-  await pruefeWerbung({ melder: werbeMelder });
 
   /* BUG-2026-10-03-32: Ist der Einstellungssatz gerade nicht lesbar, liefert
      betriebsprofil.js den zuletzt gueltig gelesenen weiter — die Abfragen oben

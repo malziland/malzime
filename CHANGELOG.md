@@ -16,7 +16,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Jeder andere Fehlschlag des Aufrufs meldet sich weiter sofort.
 - **Neu: Nachricht „Beast-Werbung faellt aus“.** Klappt die Beast-Werbung
   länger als 30 Minuten am Stück nicht (mindestens 10 Versuche, keiner
-  gelungen), kommt einmal ein Push aufs Handy.
+  gelungen — gleich ob Mistral kurz weg war, mit einem Fehler antwortete oder
+  nur leere Antworten lieferte), kommt ein Push aufs Handy, einmal je Ausfall.
+  Geht er nicht hinaus, versucht die Wache es nach fünf Minuten erneut.
 
 ## [5.3.1] — 2026-10-17
 

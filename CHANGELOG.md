@@ -11,6 +11,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **HEIC-Dekoder auf libheif 1.23.7.** Der Hersteller hat 16 Sicherheitsmeldungen
   behoben, 14 davon hoch. Der Dekoder läuft nur im Browser und nur für das
   ausgewählte Foto, wenn der Browser es nicht selbst öffnen kann.
+- **Server-Baustein body-parser auf 2.4.0.** Behebt eine Meldung zu gepackten
+  Anfragen. Der Weg war schon gesperrt: Der Server weist solche Anfragen ab.
 
 ## [5.3.2] — 2026-10-21
 

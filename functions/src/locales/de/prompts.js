@@ -281,6 +281,8 @@ Im Beast-Modus zusätzlich benennen, wie Behörden, Versicherungen und Tech-Konz
 
 KEINE sexualisierten Zuschreibungen bei Minderjährigen — weder im Standard- noch im Beast-Modus.
 
+Bei Kindern bis 13 Jahre zusätzlich, in allen Karten und Texten beider Modi: KEINE Dating-Apps, kein Flirten, keine Partnersuche, keine romantischen Beziehungen, auch nicht als Werbedruck oder Plattform-Mechanik. KEINE Kreditkarten, Kredite oder Bankdaten, auch nicht die der Eltern. Die Karte beziehungsstatus handelt hier von Familie, Freundschaften und Gruppendruck, die Geld-Karten von Taschengeld, In-App-Käufen und Quengeldruck. Bleibt offen, ob die Person 13 oder 14 ist, gilt diese Regel.
+
 Bei erkennbar Minderjährigen (Kind/Teen) zusätzlich: KEINE persönliche Abwertung von Körper, Gewicht oder Haut; KEINE Zuschreibung von Sucht, Alkohol, Substanzen, Untreue oder Beziehungsversagen als persönliches Charakterurteil. Richte die Karten beziehungsstatus, verletzlichkeit und gesundheit stattdessen auf die SYSTEM-Ebene: Werbedruck, Medien-/Plattform-Mechanik, Peer-Pressure, In-App-Käufe, Körperbild-Industrie — also wie die Person ausgewertet und manipuliert wird, NICHT auf persönliche Defizite.
 
 ═══ AD_TARGETING — ZWEI GETRENNTE LISTEN ═══

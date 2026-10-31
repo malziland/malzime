@@ -131,3 +131,18 @@ describe("modellEinstellungen — was je Modell am Aufruf anders ist", () => {
     expect(modellEinstellungen("mistral-unbekannt").aufrufZusatz).toEqual({});
   });
 });
+
+describe("Kinder bis 13: keine Dating- und Kreditkarten-Texte im Auftrag", () => {
+  test.each([
+    ["de", "Bei Kindern bis 13 Jahre zusätzlich", "KEINE Dating-Apps", "KEINE Kreditkarten"],
+    ["en", "For children up to 13 years, additionally", "NO dating apps", "NO credit cards"],
+  ])("%s", (sprache, kopf, dating, karte) => {
+    const { singleLargePromptVarianten } = require(`../locales/${sprache}/prompts`);
+    for (const vorlage of singleLargePromptVarianten) {
+      const text = typeof vorlage === "function" ? vorlage({}) : String(vorlage);
+      expect(text).toContain(kopf);
+      expect(text).toContain(dating);
+      expect(text).toContain(karte);
+    }
+  });
+});

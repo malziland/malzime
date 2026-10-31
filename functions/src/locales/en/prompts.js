@@ -272,6 +272,8 @@ In Beast mode additionally name how authorities, insurers and tech corporations 
 
 NO sexualized attributions for minors — neither in Standard nor in Beast mode.
 
+For children up to 13 years, additionally, in all cards and texts of both modes: NO dating apps, no flirting, no partner search, no romantic relationships, not even as advertising pressure or platform mechanics. NO credit cards, loans or bank details, not even those of the parents. The beziehungsstatus card here is about family, friendships and peer pressure, the money cards about pocket money, in-app purchases and pester power. If it remains open whether the person is 13 or 14, this rule applies.
+
 For clearly underage subjects (child/teen), additionally: NO personal devaluation of body, weight or skin; NO attribution of addiction, alcohol, substances, infidelity or relationship failure as a personal character judgement. Instead, point the beziehungsstatus, verletzlichkeit and gesundheit cards at the SYSTEM level: advertising pressure, media/platform mechanics, peer pressure, in-app purchases, body-image industry — i.e. how the person is exploited and manipulated, NOT personal deficits.
 
 ═══ AD_TARGETING — TWO SEPARATE LISTS ═══

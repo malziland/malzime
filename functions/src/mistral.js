@@ -63,10 +63,14 @@ const {
 const { WERBE_ANFORDERUNG } = require("./minor-safety");
 const { untereAltersgrenze } = require("./alters-auslese");
 
-/* Fuer den Werbe-Auftrag: Beginnt die Altersspanne bei 13 oder darunter? */
-function istKindBis13(alterText) {
+/* Fuer den Werbe-Auftrag: Beginnt die Altersspanne bei 13 oder darunter?
+   Gelesen wird der Altersanker, nie die Karte: Dort steht auch der Beleg-Satz
+   („der Kopf passt 7-mal …“), dessen Zahl einen Erwachsenen zum Kind machte.
+   Ist das Alter nicht lesbar, gilt der Auftrag fuer Kinder. */
+function istKindBis13({ alterText, alterUnlesbar } = {}) {
+  if (alterUnlesbar === true) return true;
   const untergrenze = untereAltersgrenze(alterText || "");
-  return typeof untergrenze === "number" && untergrenze <= 13;
+  return typeof untergrenze !== "number" || untergrenze <= 13;
 }
 
 const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = require("./auftrag-wechsel");
@@ -254,6 +258,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      Bildschirm faengt sichtbar von vorn an (jobs.setLiveText, live-anzeige.js
      vonVornBeginnen). Weil er streamt, kann auch sein Teiltext gerettet werden. */
   const liveNeu = onLiveText && ((texte) => onLiveText({ ...texte, versuch: 2 }));
+  let zweiterVersuchLief = false;
   let parsed = await mitEinemNeuversuchBeiAbbruch(
     () => callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer),
     () => {
@@ -262,10 +267,11 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
       } catch (_) {
         /* still: Der Live-Text ist Komfort, nie Pflicht. */
       }
+      zweiterVersuchLief = true;
       return callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, liveNeu || undefined, dauer);
     }
   );
-  if (neuversuchNachLeererAntwort(parsed, modellEinstellungen(MISTRAL_MODEL), remainingBudget)) {
+  if (!zweiterVersuchLief && neuversuchNachLeererAntwort(parsed, modellEinstellungen(MISTRAL_MODEL), remainingBudget)) {
     parsed = await callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer);
   }
   let missing = parsed
@@ -509,7 +515,7 @@ function textmengeZaehlen(ziel, result) {
   ziel.zusatzversuche = n(ziel.zusatzversuche) + n(result.wiederholungen);
 }
 
-async function generateBeastAds(boostProfile, standardAds, lang, messung = null) {
+async function generateBeastAds(boostProfile, standardAds, lang, messung = null, alter = {}) {
   if (!boostProfile || !boostProfile.categories) return null;
   const prompts = loadPrompts(lang || "de");
   if (typeof prompts.beastAdsSystem !== "string" || typeof prompts.beastAdsUser !== "function") return null;
@@ -538,7 +544,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
       messages: [
         {
           role: "system",
-          content: istKindBis13(c.alter_geschlecht?.value) ? prompts.beastAdsSystemKind : prompts.beastAdsSystem,
+          content: istKindBis13(alter) ? prompts.beastAdsSystemKind : prompts.beastAdsSystem,
         },
         { role: "user", content: nutzerteil },
       ],

@@ -295,6 +295,30 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
     },
   };
 
+  test.each([
+    ["Kind laut Anker", { alterText: "~10 Jahre (Spanne 8-12)" }, true],
+    ["Alter nicht lesbar", { alterUnlesbar: true }, true],
+    ["kein Anker", {}, true],
+    ["Erwachsene laut Anker", { alterText: "~34 Jahre (Spanne 30-38)" }, false],
+  ])("Auftrag waehlen: %s", async (_name, alter, kind) => {
+    const captured = [];
+    setFetchForTest(async (_url, opts) => {
+      captured.push(JSON.parse(opts.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: '{"ad_targeting":["A","B"]}' } }],
+          usage: { prompt_tokens: 700, completion_tokens: 90 },
+        }),
+      };
+    });
+    /* Die Karte sagt absichtlich etwas anderes: Sie darf nicht entscheiden. */
+    await mistral.generateBeastAds(boostProfil, [], "de", null, alter);
+    const { beastAdsSystemKind } = require("../locales/de/prompts");
+    expect(captured[0].messages[0].content === beastAdsSystemKind).toBe(kind);
+  });
+
   test("liefert die neue Liste und schickt KEIN Bild mit", async () => {
     const captured = [];
     setFetchForTest(async (_url, opts) => {
@@ -309,7 +333,9 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
       };
     });
 
-    const ads = await mistral.generateBeastAds(boostProfil, ["Gore Wear", "Schwalbe"], "de");
+    const ads = await mistral.generateBeastAds(boostProfil, ["Gore Wear", "Schwalbe"], "de", null, {
+      alterText: "männlich, ~44 Jahre alt",
+    });
     expect(ads).toEqual(["Nivea Men Anti-Age", "Allianz Vorsorge"]);
 
     const body = captured[0];
@@ -341,7 +367,7 @@ describe("Zweiter Aufruf für die Beast-Werbung (v2.8)", () => {
         json: async () => ({ choices: [{ message: { content: '{"ad_targeting":["A"]}' } }], usage: {} }),
       };
     });
-    await mistral.generateBeastAds(boostProfil, [], "de");
+    await mistral.generateBeastAds(boostProfil, [], "de", null, { alterText: "männlich, ~44 Jahre alt" });
     const prompt = captured[0].messages.map((m) => m.content).join("\n");
     /* Genau diese Regel hatte ich im Prototyp vergessen — Medium schlug
        daraufhin einem Kind ein Pornografie-Abo vor. */

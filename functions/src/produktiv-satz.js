@@ -62,7 +62,8 @@ const T1_NORMAL = {
      tokenAbstandGrossMs zusammen, in beiden Profilen). */
   /* 15 mit Large 4 (Lasttest 31.10.2026: 30 von 30 fertig in 3:46 min, keine
      Ablehnung; mit 30 zugleich scheiterten 3 von 30). Grenze laut Kopfzeile:
-     2000 Aufrufe je Minute. */
+     2000 Aufrufe je Minute (Large 4). Die 30 weiter unten gelten fuer Large 3.
+     maxInstances von processJob in index.js muss mitgehen. */
   parallelitaet: 15,
 
   /* DIE GLOBALE BREMSE. Sie wird von der `satzWache` in die echte

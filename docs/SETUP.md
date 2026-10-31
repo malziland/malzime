@@ -180,7 +180,7 @@ ausliefern — dann fehlen alle Riegel.
 |-----|---------|-----|
 | **Mistral Large 4** | 1 Call | Bildbeschreibung, SUBJECT-Klassifikation, sichtbarer Text und beide Profile |
 | **Mistral Large 4** | 1 Call | Beast-Werbung (ohne Bild, seit v2.8) |
-| **Cloud Functions** | 1 Invocation | Dauer haengt an der Mistral-Antwortzeit (zuletzt gemessen rund 40 s), 512 MiB RAM |
+| **Cloud Functions** | 1 Invocation | Dauer haengt an der Mistral-Antwortzeit (zuletzt gemessen rund 80 s), 512 MiB RAM |
 
 Bei Tier-Fotos (SUBJECT=ANIMAL_ONLY) entfaellt der zweite Aufruf — das Easter-Egg-Profil wird aus statischen Locale-Daten gebaut.
 

@@ -21,12 +21,12 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   Kreditkarten, auch nicht als Werbedruck.
 - **Eigene Beast-Werbeliste für Kinder bis 13:** Sie zeigt, womit Werbung Kinder
   dieses Alters wirklich unter Druck setzt, von Spielwährung bis Gruppendruck.
-- **Absagen der KI** erscheinen nie als Werbe-Eintrag.
+- **Absagen der KI** werden erkannt und nicht als Werbe-Eintrag gezeigt.
 
 ### Behoben
 
-- Liefert die KI keine lesbare Antwort, versucht sie es einmal still neu, statt
-  eine Fehlermeldung zu zeigen.
+- Liefert die KI keine lesbare Antwort, versucht sie es still ein zweites Mal,
+  statt gleich eine Fehlermeldung zu zeigen.
 
 ## [5.3.4] — 2026-10-31
 

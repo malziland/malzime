@@ -201,3 +201,10 @@ describe("neuversuchNachLeererAntwort — keine lesbare Antwort", () => {
     expect(pruefe(null, modellEinstellungen("mistral-large-2512"), () => 300_000)).toBe(false);
   });
 });
+
+describe("Absagen der KI, weitere Wortlaute", () => {
+  const { ohneWerbeAbsagen } = require("../mistral-antwort");
+  test.each(["Tut mir leid", "Das kann ich nicht erfüllen.", "I’m sorry", "I apologize"])("%s", (satz) => {
+    expect(ohneWerbeAbsagen([satz, "Roblox"])).toEqual(["Roblox"]);
+  });
+});

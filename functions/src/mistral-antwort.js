@@ -324,7 +324,7 @@ function escapeXml(str) {
    Large 4 am 31.10.2026 in 6 von 42 Analysen, 5 davon bei Kindern. */
 const MAX_WOERTER_WERBE_EINTRAG = 8;
 const WERBE_ABSAGE_ANFANG =
-  /^(ich (kann|darf|werde|erstelle|m(?:oe|\u00f6)chte)|i (can|cannot|can't|won't|will not|am|'m)|i'm|sorry|leider|entschuldigung|unfortunately)\b/i;
+  /^(ich (kann|darf|werde|erstelle|m(?:oe|\u00f6)chte)|das kann ich|tut mir|i (can|cannot|can't|won't|will not|am|'m|apologi[sz]e)|i['\u2019]m|sorry|leider|entschuldigung|unfortunately)\b/i;
 
 function istWerbeAbsage(eintrag) {
   const text = eintrag.trim();

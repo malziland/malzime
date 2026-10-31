@@ -85,7 +85,7 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    vorher die Tier-Stufe im Mistral-Dashboard pruefen, nicht diesen Kommentar.
 
    API-Key kommt aus `process.env.MISTRAL_API_KEY_EU` (Firebase Secret, EU-gebunden; lokal `MISTRAL_API_KEY`). */
-/* v1.10.7: Large fest auf -2512 gepinnt statt -latest-Alias. Hintergrund:
+/* v1.10.7: Large fest auf eine Fassung gepinnt statt -latest-Alias. Hintergrund:
    Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
    umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren
    wir Versions-Wechsel selbst. (Zu Rate-Limits: Stufen-System, s. oben.) */

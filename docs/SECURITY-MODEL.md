@@ -124,7 +124,7 @@ muss die Begründung entkräften, nicht nur das Risiko benennen.
    liegen; hängt der Speicher, kommt der Platz trotzdem zurück). Seine
    Warnzeilen tragen weder Auftragsnummer noch Fehlertext
    (`handle-job-status-abmelden.test.js`, `freigabe-ueber-die-hilfe.test.js`).
-6. **Durchsatz-Deckel liegt extern.** Mistral-Tier T1 = 0,25 req/s ≈ 7,5
+6. **Durchsatz-Deckel liegt extern.** Mistral-Grenze: 30 Aufrufe je Minute (gemessen 31.10.2026) ≈ 15
    Analysen/min — die reale Bremse bei Stoßlast. *Status:* bekannt, mit
    Warteschlangen-Ehrlichkeit (Position + ETA) abgefedert; Tier-Hebung ist eine
    bewusste Kostenentscheidung, kein technisches Versäumnis.

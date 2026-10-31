@@ -78,7 +78,7 @@ describe("Instanzgrenzen", () => {
     ["telemetry", 3],
     ["enqueue", 10],
     ["jobStatus", 10],
-    ["processJob", 10],
+    ["processJob", 15],
   ])("%s: hoechstens %i Instanzen", (name, grenze) => {
     expect(einstellungen(name).maxInstances).toBe(grenze);
   });

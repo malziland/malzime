@@ -33,8 +33,8 @@ beforeEach(() => {
 });
 
 /* Messmittel-Kontrolle: Der ausgelieferte Satz und seine Rechnung. */
-test("der ausgelieferte Satz: 6 gleichzeitig, 0,2 Auftraege je Sekunde", () => {
-  expect(T1_NORMAL.parallelitaet).toBe(6);
+test("der ausgelieferte Satz: 15 gleichzeitig, 0,2 Auftraege je Sekunde", () => {
+  expect(T1_NORMAL.parallelitaet).toBe(15);
   expect(T1_NORMAL.queueRatePerSekunde).toBe(0.2);
 });
 

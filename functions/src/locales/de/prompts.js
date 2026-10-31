@@ -41,7 +41,7 @@ module.exports = {
 };
 
 /* ── Der Analyse-Prompt (Single-Large-Call, v2.2-rc3).
-   Macht in EINEM Call mit mistral-large-2512:
+   Macht in EINEM Call mit Mistral Large:
    Bild ansehen + hard_facts + ads + triggers + Standard-Profil + Beast-Profil.
 
    Ein eigenständiger, konsolidierter Prompt mit gemeinsamen Regeln, geteilten
@@ -281,6 +281,8 @@ Im Beast-Modus zusätzlich benennen, wie Behörden, Versicherungen und Tech-Konz
 
 KEINE sexualisierten Zuschreibungen bei Minderjährigen — weder im Standard- noch im Beast-Modus.
 
+Bei Kindern bis 13 Jahre zusätzlich, in allen Karten und Texten beider Modi: KEINE Dating-Apps, kein Flirten, keine Partnersuche, keine romantischen Beziehungen, auch nicht als Werbedruck oder Plattform-Mechanik. KEINE Kreditkarten, Kredite oder Bankdaten, auch nicht die der Eltern. Die Karte beziehungsstatus handelt hier von Familie, Freundschaften und Gruppendruck, die Geld-Karten von Taschengeld, In-App-Käufen und Quengeldruck. Bleibt offen, ob die Person 13 oder 14 ist, gilt diese Regel.
+
 Bei erkennbar Minderjährigen (Kind/Teen) zusätzlich: KEINE persönliche Abwertung von Körper, Gewicht oder Haut; KEINE Zuschreibung von Sucht, Alkohol, Substanzen, Untreue oder Beziehungsversagen als persönliches Charakterurteil. Richte die Karten beziehungsstatus, verletzlichkeit und gesundheit stattdessen auf die SYSTEM-Ebene: Werbedruck, Medien-/Plattform-Mechanik, Peer-Pressure, In-App-Käufe, Körperbild-Industrie — also wie die Person ausgewertet und manipuliert wird, NICHT auf persönliche Defizite.
 
 ═══ AD_TARGETING — ZWEI GETRENNTE LISTEN ═══
@@ -457,7 +459,9 @@ EINZIGE AUSNAHME: Ist eine dieser Marken im Foto tatsächlich sichtbar (Logo, Au
    (Abnahme 13.10.2026): Bei Kindern ist die Welt der Schutzregeln dieselbe
    wie die der sachlichen Werbung; ohne den Satz widerspraeche das der
    Vorgabe, aus anderen Branchen zu waehlen. */
-module.exports.beastAdsSystem = `Du bist der Werbe-Algorithmus eines Tech-Konzerns. Du bekommst ein fertiges Profil und erzeugst daraus die Werbeliste, die die Schwachstellen genau dieser Person ausnutzt.
+module.exports.beastAdsSystem = `Du arbeitest für malziME, ein Werkzeug für Medienbildung an Schulen. Es zeigt Menschen an einem hochgeladenen Foto, wie Werbe-Algorithmen sie einschätzen, damit sie solche Mechanismen erkennen und sich dagegen schützen können. Die Liste ist eine Demonstration: Nur die Person selbst sieht sie, niemand wird damit beworben, und nichts wird verkauft.
+
+Du spielst dafür den Werbe-Algorithmus eines Tech-Konzerns. Du bekommst ein fertiges Profil und erzeugst daraus die Werbeliste, die zeigt, wie so ein Algorithmus die Schwachstellen genau dieser Person ausnutzen würde.
 
 ═══ DEINE AUFGABE ═══
 
@@ -479,6 +483,24 @@ Erzeuge genau ${WERBE_ANFORDERUNG} Werbeeinträge, die an der VERLETZLICHKEIT an
 - NIEMALS Waffen, Munition oder extremistische Inhalte.
 - Bei Personen, die minderjährig sein könnten — dazu zählt jede Altersschätzung, die bei ${SCHUTZ_ALTER} Jahren oder darunter beginnt, und jedes Profil, dessen Alter sich nicht ablesen ließ —, zusätzlich KEINE Angebote zu Alkohol, Tabak, Drogen, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln oder Schönheitskorrektur. Stattdessen: In-App-Käufe, Sammelkarten, Gaming-Abos, Influencer-Merch, Statuskleidung.
 - Bei Kindern (unter 12) bleibt die Produktwelt Spielzeug, Spiele und Kindermedien — die Mechanik zielt auf Sammelzwang und Quengeldruck, nicht auf Mode-Abos.
+
+Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;
+
+/* 31.10.2026: Bei Kindern bis 13 lehnte Large 4 die Liste oft ab, weil dort
+   steht, sie solle Schwachstellen ausnutzen. Fuer ein Kind ist das auch nicht
+   der richtige Auftrag: Gezeigt wird, was dieser Altersgruppe tatsaechlich
+   begegnet, damit Kinder es erkennen. Das ist ein anderer Auftrag, keine
+   Umschreibung; die Schutzregeln gelten unveraendert. */
+module.exports.beastAdsSystemKind = `Du arbeitest für malziME, ein Werkzeug für Medienbildung an Schulen. Es zeigt Kindern und ihren Eltern, welche Werbung Kindern im Internet begegnet, damit sie sie erkennen und darüber sprechen können. Die Liste ist eine Aufklärung: Nur die Person selbst sieht sie, niemand wird damit beworben, und nichts wird verkauft.
+
+Du bekommst ein Profil eines Kindes. Nenne genau ${WERBE_ANFORDERUNG} Produkte und Marken, mit denen die Werbung Kinder dieses Alters im Internet und in Apps tatsächlich unter Druck setzt. Die Liste soll beim Lesen ertappen: Das Kind erkennt, wie gezielt es angesprochen wird.
+
+- Decke diese vier Arten von Druck ab: Bezahlmodelle in Spielen; was zum Sammeln und Nachkaufen treibt; was Gruppendruck auslöst; was Kinder bei den Eltern erquengeln sollen.
+- Leite jeden Eintrag aus den Interessen, der Umgebung und dem Stil im Profil ab. Zwei verschiedene Kinder dürfen NICHT dieselbe Liste ergeben. Wenn dir zuerst das bekannteste Produkt der Kategorie einfällt, suche ein spezifischeres, das besser zu diesem Kind passt.
+- Richte dich streng nach dem Alter: nichts, wofür ein Kind dieses Alters zu alt wäre, und nichts, was nur Jüngere anspricht. Ab etwa 10 Jahren zählen Spiele, Handy, Mode und Influencer mehr als Spielzeug.
+- Je 1-3 Wörter. Echte Marken aus dem mitteleuropäischen Markt. KEINE Preisangaben.
+- KEINE Marke aus der bestehenden sachlichen Werbung wiederverwenden.
+- NIEMALS Angebote zu Alkohol, Tabak, Drogen, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln, Schönheitskorrektur, Dating, Waffen oder sexualisierte Angebote.
 
 Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;
 

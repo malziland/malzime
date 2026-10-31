@@ -138,6 +138,27 @@ async function mitEinemNeuversuchBeiAbbruch(erster, neuversuch) {
   }
 }
 
+/* BLEIBT IM CODE — Rechengrenze des Neuversuchs, kein Betriebswert.
+   Mindestens so viel Budget muss bleiben, sonst lohnt ein zweiter Versuch nicht. */
+const MIN_REST_FUER_NEUVERSUCH_MS = 60_000;
+
+/** Lief ein Aufruf in die Zeitgrenze, und erlaubt das Modell einen zweiten
+ *  Versuch, fuer den noch genug Budget da ist? */
+function neuversuchNachZeitgrenze(err, modell, restBudget) {
+  if (!err || err.code !== "timeout" || !modell || !modell.neuversuchBeiZeitgrenze) return false;
+  const rest = typeof restBudget === "function" ? restBudget() : 0;
+  return rest >= MIN_REST_FUER_NEUVERSUCH_MS;
+}
+
+/** Kam keine lesbare Antwort zurueck (gemessen 31.10.2026: Large 4 verbrauchte
+ *  die erlaubten Token, 1 von 84 Laeufen), und reicht das Budget fuer einen
+ *  zweiten Versuch? Ohne ihn bekaeme die Person eine Fehlermeldung. */
+function neuversuchNachLeererAntwort(parsed, modell, restBudget) {
+  if (parsed || !modell || !modell.neuversuchBeiZeitgrenze) return false;
+  const rest = typeof restBudget === "function" ? restBudget() : 0;
+  return rest >= MIN_REST_FUER_NEUVERSUCH_MS;
+}
+
 /** Liegt ein gelesener Teiltext vor, der gerettet werden kann (Zeitlimit
  *  oder Abriss mitten im Strom)? */
 function hatRettbarenTeiltext(err) {
@@ -155,5 +176,7 @@ module.exports = {
   markiereAbbruch,
   meldeAbbruchMitNeuversuch,
   mitEinemNeuversuchBeiAbbruch,
+  neuversuchNachZeitgrenze,
+  neuversuchNachLeererAntwort,
   hatRettbarenTeiltext,
 };

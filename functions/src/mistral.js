@@ -7,7 +7,7 @@
  *       → { normal, boost, subject, visibleText }
  *   - generateBeastAds(boostProfile, standardAds, lang) → Liste | null
  *
- * Architektur: EIN Aufruf an Mistral Large (mistral-large-2512, multimodal)
+ * Architektur: EIN Aufruf an Mistral Large (MISTRAL_MODEL, multimodal)
  * liefert Bildbeschreibung und beide Profile; ein zweiter, kleiner Aufruf ohne
  * Bild erzeugt die Beast-Werbung. Den aelteren Drei-Aufruf-Weg (Large
  * beschreibt, Small profiliert) gibt es seit 10.09.2026 nicht mehr.
@@ -15,7 +15,7 @@
  * API-Key kommt aus process.env.MISTRAL_API_KEY_EU (Firebase Secret, EU-gebunden; lokal MISTRAL_API_KEY).
  */
 
-const { MISTRAL_MODEL } = require("./config");
+const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 /* AUFGETEILT 31.08.2026: Das Auseinandernehmen der Antworten steht jetzt in
@@ -36,6 +36,8 @@ const {
   ursacheVon,
   meldeAbbruchMitNeuversuch,
   mitEinemNeuversuchBeiAbbruch,
+  neuversuchNachZeitgrenze,
+  neuversuchNachLeererAntwort,
   hatRettbarenTeiltext,
 } = require("./verbindungsfehler");
 
@@ -45,6 +47,7 @@ const {
   REQUIRED_CARDS,
   findMissingCards,
   escapeXml,
+  ohneWerbeAbsagen,
 } = require("./mistral-antwort");
 const {
   hatAltersPlatzhalter,
@@ -58,6 +61,18 @@ const {
   ohneZiffernKlammern,
 } = require("./alters-lesbarkeit");
 const { WERBE_ANFORDERUNG } = require("./minor-safety");
+const { untereAltersgrenze } = require("./alters-auslese");
+
+/* Fuer den Werbe-Auftrag: Beginnt die Altersspanne bei 13 oder darunter?
+   Gelesen wird der Altersanker, nie die Karte: Dort steht auch der Beleg-Satz
+   („der Kopf passt 7-mal …“), dessen Zahl einen Erwachsenen zum Kind machte.
+   Ist das Alter nicht lesbar, gilt der Auftrag fuer Kinder. */
+function istKindBis13({ alterText, alterUnlesbar } = {}) {
+  if (alterUnlesbar === true) return true;
+  const untergrenze = untereAltersgrenze(alterText || "");
+  return typeof untergrenze !== "number" || untergrenze <= 13;
+}
+
 const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = require("./auftrag-wechsel");
 
 /* Für Tests: erlaubt fetch zu mocken ohne globalThis zu überschreiben. */
@@ -154,7 +169,7 @@ const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = requir
    fehlenden Karten. */
 
 /* ── v2.2: Single-Large-Call ──
-   Macht in EINEM mistral-large-2512-Call:
+   Macht in EINEM Large-Call:
      Bild sehen + Beschreibung + hard_facts + ads + triggers + Standard + Beast.
    Hat die fruehere Kette aus drei Aufrufen (Beschreibung + 2× Profil)
    abgeloest; Token-Einsparung in lokalen Tests (3 Bilder): ~70%
@@ -243,6 +258,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
      Bildschirm faengt sichtbar von vorn an (jobs.setLiveText, live-anzeige.js
      vonVornBeginnen). Weil er streamt, kann auch sein Teiltext gerettet werden. */
   const liveNeu = onLiveText && ((texte) => onLiveText({ ...texte, versuch: 2 }));
+  let zweiterVersuchLief = false;
   let parsed = await mitEinemNeuversuchBeiAbbruch(
     () => callSingleLarge(messages, remainingBudget, "first", cacheKey, onLiveText, dauer),
     () => {
@@ -251,9 +267,13 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
       } catch (_) {
         /* still: Der Live-Text ist Komfort, nie Pflicht. */
       }
+      zweiterVersuchLief = true;
       return callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, liveNeu || undefined, dauer);
     }
   );
+  if (!zweiterVersuchLief && neuversuchNachLeererAntwort(parsed, modellEinstellungen(MISTRAL_MODEL), remainingBudget)) {
+    parsed = await callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer);
+  }
   let missing = parsed
     ? collectMissingForBothModes(parsed)
     : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };
@@ -329,7 +349,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   /* Hard-Facts server-seitig in beide Modi überschreiben. Mistral kann die
      Vorgabe ignorieren; hier garantieren wir Konsistenz. */
   const hardFacts = parsed.hard_facts || {};
-  const ads = Array.isArray(parsed.ad_targeting) ? parsed.ad_targeting : [];
+  const ads = ohneWerbeAbsagen(parsed.ad_targeting);
   const triggers = Array.isArray(parsed.manipulation_triggers) ? parsed.manipulation_triggers : [];
 
   /* BIZ-001 (Audit 2026-08-10): Der Anker aus hard_facts wird VORANGESTELLT,
@@ -428,7 +448,8 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        didaktisch entwertete (zynischer Text, brave Werbung darunter).
        Rueckfall auf die obere Liste, falls das Modell die alte Form liefert —
        dann ist es wie frueher, statt gar keiner Werbung. */
-    const modeAds = Array.isArray(src.ad_targeting) && src.ad_targeting.length > 0 ? src.ad_targeting : ads;
+    const eigeneAds = ohneWerbeAbsagen(src.ad_targeting);
+    const modeAds = eigeneAds.length > 0 ? eigeneAds : ads;
 
     /* v2.8: manipulation_triggers ebenfalls pro Modus. Sie stehen im Frontend
        direkt neben der Werbung (public/js/render.js) — identische Trigger neben
@@ -494,7 +515,7 @@ function textmengeZaehlen(ziel, result) {
   ziel.zusatzversuche = n(ziel.zusatzversuche) + n(result.wiederholungen);
 }
 
-async function generateBeastAds(boostProfile, standardAds, lang, messung = null) {
+async function generateBeastAds(boostProfile, standardAds, lang, messung = null, alter = {}) {
   if (!boostProfile || !boostProfile.categories) return null;
   const prompts = loadPrompts(lang || "de");
   if (typeof prompts.beastAdsSystem !== "string" || typeof prompts.beastAdsUser !== "function") return null;
@@ -517,17 +538,20 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
 
   try {
     const result = await callMistralRaw({
-      model: MISTRAL_MODEL /* Large 2512 — gleiches Modell wie die Analyse */,
+      model: MISTRAL_MODEL /* gleiches Modell wie die Analyse */,
       /* OPS-008: system = konstante Anweisungen, user = nur das Profil.
          Der Cache greift ausschliesslich auf einem konstanten Anfang. */
       messages: [
-        { role: "system", content: prompts.beastAdsSystem },
+        {
+          role: "system",
+          content: istKindBis13(alter) ? prompts.beastAdsSystemKind : prompts.beastAdsSystem,
+        },
         { role: "user", content: nutzerteil },
       ],
-      maxTokens: 600,
+      maxTokens: modellEinstellungen(MISTRAL_MODEL).werbeMaxTokens,
       temperature: 0.5,
       forceJSON: true,
-      timeoutMs: 30_000,
+      timeoutMs: modellEinstellungen(MISTRAL_MODEL).werbeZeitgrenzeMs,
       /* Konstanter Cache-Schluessel je Sprache, ohne Nutzerbezug (fest seit
          10.09.2026; vorher per Flag abschaltbar, Audit OPS-008). */
       cacheKey: `malzime-beast-ads-${lang || "de"}`,
@@ -537,9 +561,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
     /* Der ganze angeforderte Vorrat geht weiter: Aus ihm zieht der
        Kinderschutz-Filter nach dem Streichen die gezeigte Auswahl
        (minor-safety.js, waehleAus). Mehr als angefordert braucht niemand. */
-    const ads = Array.isArray(parsed?.ad_targeting)
-      ? parsed.ad_targeting.filter((e) => typeof e === "string" && e.trim()).slice(0, WERBE_ANFORDERUNG)
-      : [];
+    const ads = ohneWerbeAbsagen(parsed?.ad_targeting).slice(0, WERBE_ANFORDERUNG);
     console.log(
       JSON.stringify({
         step: "mistral-beast-ads",
@@ -649,7 +671,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     const { werte: betriebswerte, profil } = await betriebswerteOderAbbruch();
     aktivesProfil = profil;
     const result = await callMistralRaw({
-      model: MISTRAL_MODEL /* Large 2512 — multimodal, 2M TPM */,
+      model: MISTRAL_MODEL /* multimodal */,
       messages,
       maxTokens: betriebswerte.singleLargeMaxTokens,
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
@@ -657,7 +679,10 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       timeoutMs: budget,
       /* BUG-2026-08-17-01: eigenes Zeitbudget statt der allgemeinen 90 s —
          siehe Herleitung an der Konstante in config.js. */
-      timeoutCapMs: betriebswerte.singleLargeTimeoutMs,
+      timeoutCapMs: Math.min(
+        betriebswerte.singleLargeTimeoutMs,
+        modellEinstellungen(MISTRAL_MODEL).analyseZeitgrenzeMs || betriebswerte.singleLargeTimeoutMs
+      ),
       cacheKey,
       /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
          Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */
@@ -732,6 +757,12 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        sein Profil bekommt, loest so keinen Fehlalarm mehr aus. */
     /* Erster Abriss: Warnung, es folgt ein Neuversuch (runSingleLargeCall). */
     if (dauer) textmengeZaehlen(dauer, { wiederholungen: err && err.wiederholungen });
+    if (
+      attemptLabel === "first" &&
+      neuversuchNachZeitgrenze(err, modellEinstellungen(MISTRAL_MODEL), remainingBudget)
+    ) {
+      err.verbindungsabbruch = true; /* derselbe Weg wie ein Abriss: ein stiller zweiter Versuch */
+    }
     if (err && err.verbindungsabbruch && attemptLabel === "first") {
       meldeAbbruchMitNeuversuch({ profil: aktivesProfil, attempt: attemptLabel, err });
       throw err;

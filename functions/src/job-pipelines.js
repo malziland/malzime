@@ -196,7 +196,10 @@ async function runPipeline(job) {
     ) {
       const werbeStart = Date.now();
       try {
-        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang, messung);
+        const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang, messung, {
+          alterText: profiles.alterAnker || undefined,
+          alterUnlesbar: profiles.alterUnlesbar === true,
+        });
         if (neueAds) profiles.boost.ad_targeting = neueAds;
       } catch (err) {
         /* Nie die Analyse daran scheitern lassen — die Liste aus dem

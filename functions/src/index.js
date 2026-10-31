@@ -147,7 +147,7 @@ exports.processJob = onRequest(
     memory: "512MiB",
     invoker: "private",
     concurrency: 1,
-    maxInstances: 10,
+    maxInstances: 15 /* gleich parallelitaet im Einstellungssatz (produktiv-satz.js) */,
     timeoutSeconds: 540,
     secrets: [mistralApiKey],
   },

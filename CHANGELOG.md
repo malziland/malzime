@@ -4,6 +4,30 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert — KI
+
+- **Neues Modell: Mistral Large 4.** Das Alter von Erwachsenen trifft die KI
+  deutlich besser (gemessen ±3,1 statt ±8,9 Jahre), und Erwachsene landen viel
+  seltener fälschlich im Kinderschutz. Eine Analyse dauert dafür rund 80 statt
+  33 Sekunden und kostet rund das Dreifache.
+- **15 Analysen gleichzeitig** statt 6. Eine Klasse mit 30 Fotos kam im Lasttest
+  in rund vier Minuten vollständig durch.
+
+### Geändert — Kinderschutz
+
+- **Texte über Kinder bis 13** sprechen nicht mehr von Dating-Apps oder
+  Kreditkarten, auch nicht als Werbedruck.
+- **Eigene Beast-Werbeliste für Kinder bis 13:** Sie zeigt, womit Werbung Kinder
+  dieses Alters wirklich unter Druck setzt, von Spielwährung bis Gruppendruck.
+- **Absagen der KI** werden erkannt und nicht als Werbe-Eintrag gezeigt.
+
+### Behoben
+
+- Liefert die KI keine lesbare Antwort, versucht sie es still ein zweites Mal,
+  statt gleich eine Fehlermeldung zu zeigen.
+
 ## [5.3.4] — 2026-10-31
 
 ### Geändert — Betrieb

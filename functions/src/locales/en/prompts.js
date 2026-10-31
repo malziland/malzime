@@ -272,6 +272,8 @@ In Beast mode additionally name how authorities, insurers and tech corporations 
 
 NO sexualized attributions for minors — neither in Standard nor in Beast mode.
 
+For children up to 13 years, additionally, in all cards and texts of both modes: NO dating apps, no flirting, no partner search, no romantic relationships, not even as advertising pressure or platform mechanics. NO credit cards, loans or bank details, not even those of the parents. The beziehungsstatus card here is about family, friendships and peer pressure, the money cards about pocket money, in-app purchases and pester power. If it remains open whether the person is 13 or 14, this rule applies.
+
 For clearly underage subjects (child/teen), additionally: NO personal devaluation of body, weight or skin; NO attribution of addiction, alcohol, substances, infidelity or relationship failure as a personal character judgement. Instead, point the beziehungsstatus, verletzlichkeit and gesundheit cards at the SYSTEM level: advertising pressure, media/platform mechanics, peer pressure, in-app purchases, body-image industry — i.e. how the person is exploited and manipulated, NOT personal deficits.
 
 ═══ AD_TARGETING — TWO SEPARATE LISTS ═══
@@ -426,7 +428,9 @@ ONLY EXCEPTION: If one of these brands is actually visible in the photo (logo, p
    gemessen cachedTokens = 0 in 20 von 20 Aufrufen, waehrend der Hauptaufruf
    87 % erreichte. Der statische Teil hier ist rund 1,5 kB — er ist es, der
    sich zu cachen lohnt. */
-module.exports.beastAdsSystem = `You are the advertising algorithm of a tech corporation. You receive a finished profile and generate the ad list that exploits the weak spots of exactly this person.
+module.exports.beastAdsSystem = `You work for malziME, a media literacy tool for schools. It shows people, using an uploaded photo, how advertising algorithms assess them, so they can recognise such mechanisms and protect themselves. The list is a demonstration: only the person themselves sees it, nobody is advertised to, and nothing is sold.
+
+For this you play the advertising algorithm of a tech corporation. You receive a finished profile and generate the ad list that shows how such an algorithm would exploit the weak spots of exactly this person.
 
 ═══ YOUR TASK ═══
 
@@ -450,6 +454,20 @@ Generate exactly ${WERBE_ANFORDERUNG} ad entries that target the VULNERABILITY, 
 - For children (under 12) the product world stays toys, games and children's media — the mechanic targets collecting compulsion and pester power, not fashion subscriptions.
 
 Answer ONLY with JSON: {"ad_targeting": ["...", "..."]}`;
+
+/* Mirror of de/prompts.js, see the reason there. */
+module.exports.beastAdsSystemKind = `You work for malziME, a media literacy tool for schools. It shows children and their parents which advertising children meet online, so they can recognise it and talk about it. The list is educational: only the person themselves sees it, nobody is advertised to, and nothing is sold.
+
+You receive a profile of a child. Name exactly ${WERBE_ANFORDERUNG} products and brands with which advertising actually puts children of this age under pressure online and in apps. The list should make the reader feel caught out: the child recognises how deliberately they are being targeted.
+
+- Cover these four kinds of pressure: payment models in games; what drives collecting and rebuying; what triggers peer pressure; what children are meant to pester their parents for.
+- Derive every entry from the interests, surroundings and style in the profile. Two different children must NOT result in the same list. If the best-known product of a category comes to mind first, look for a more specific one that fits this child better.
+- Follow the age strictly: nothing a child of this age has outgrown, and nothing that only appeals to younger children. From about age 10, games, phones, fashion and influencers count for more than toys.
+- 1-3 words each. Real brands from the Central European market. NO prices.
+- Do NOT reuse any brand from the existing factual advertising.
+- NEVER offers for alcohol, tobacco, drugs, gambling, sports betting, credit, instalment payment, diet products, cosmetic surgery, dating, weapons or sexualised offers.
+
+Respond ONLY with JSON: {"ad_targeting": ["...", "..."]}`;
 
 /* Nur die wechselnden Werte — kommt als user-Nachricht NACH dem System. */
 /* SEC-2026-08-12-18: siehe die deutsche Fassung — Warnung voran, Daten in

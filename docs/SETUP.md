@@ -25,7 +25,7 @@ malziME nutzt seit v1.6.0 ausschliesslich Mistral AI fuer KI-Analysen.
 3. API-Key generieren unter https://console.mistral.ai/api-keys/ — Key NUR EINMAL angezeigt, sofort sichern
 4. Key spaeter als Firebase Secret hinterlegen (Schritt 5, Abschnitt „Firebase Secrets")
 
-Genutztes Modell (in `functions/src/config.js`): `mistral-large-2512`. Ein Aufruf liefert Bildbeschreibung + beide Profile (seit v2.2), ein zweiter, kleiner Aufruf ohne Bild die Beast-Werbung (seit v2.8). Einen zweiten Analyseweg mit einem anderen Modell gibt es seit 10.09.2026 nicht mehr.
+Genutztes Modell (in `functions/src/config.js`): `mistral-large-4`, Nachdenk-Stufe `low`. Ein Aufruf liefert Bildbeschreibung + beide Profile (seit v2.2), ein zweiter, kleiner Aufruf ohne Bild die Beast-Werbung (seit v2.8). Einen zweiten Analyseweg mit einem anderen Modell gibt es seit 10.09.2026 nicht mehr.
 
 Wenn der Mistral-Call fehlschlaegt, gibt es keinen anderen KI-Provider als Fallback. Der User sieht eine `blocked.apiError`- oder `blocked.overloaded`-Antwort.
 
@@ -178,19 +178,19 @@ ausliefern — dann fehlen alle Riegel.
 
 | API | Aufrufe | Was |
 |-----|---------|-----|
-| **Mistral Large 3** | 1 Call | Bildbeschreibung, SUBJECT-Klassifikation, sichtbarer Text und beide Profile |
-| **Mistral Large 3** | 1 Call | Beast-Werbung (ohne Bild, seit v2.8) |
-| **Cloud Functions** | 1 Invocation | Dauer haengt an der Mistral-Antwortzeit (zuletzt gemessen rund 40 s), 512 MiB RAM |
+| **Mistral Large 4** | 1 Call | Bildbeschreibung, SUBJECT-Klassifikation, sichtbarer Text und beide Profile |
+| **Mistral Large 4** | 1 Call | Beast-Werbung (ohne Bild, seit v2.8) |
+| **Cloud Functions** | 1 Invocation | Dauer haengt an der Mistral-Antwortzeit (zuletzt gemessen rund 80 s), 512 MiB RAM |
 
 Bei Tier-Fotos (SUBJECT=ANIMAL_ONLY) entfaellt der zweite Aufruf — das Easter-Egg-Profil wird aus statischen Locale-Daten gebaut.
 
-### Preise (Stand Mai 2026)
+### Preise (Stand Oktober 2026)
 
 **Mistral, kostenpflichtiger Tarif** (Listenpreis pro 1M Tokens):
 
 | Modell | Input | Output |
 |--------|-------|--------|
-| Large 3 (`mistral-large-2512`) | $0.50 | $1.50 |
+| Large 4 (`mistral-large-4`) | siehe Preisliste von Mistral | siehe Preisliste von Mistral |
 
 malziME ruft Mistral ueber den EU-Endpunkt auf (fest im Code, `functions/src/config.js`); dafuer
 berechnet Mistral einen Aufpreis auf den Listenpreis. Massgeblich ist die Abrechnung im
@@ -208,12 +208,12 @@ eigenen Mistral-Konto.
 
 | Posten | Rechnung | Kosten |
 |--------|----------|--------|
-| Mistral Large 3 (Analyse + Werbe-Aufruf) | 30 Analysen, gemessen am 30.08.2026 mit Prompt-Cache | **rund $0.20–0.25** (unter 1 Cent je Analyse) |
+| Mistral Large 4 (Analyse + Werbe-Aufruf) | 30 Analysen, gerechnet aus den Token vom 31.10.2026 | **rund $0.90** (rund 3 Cent je Analyse) |
 | Cloud Functions | 30 Aufrufe × ~1 Min. | **$0.00** |
 | Firebase Hosting | Statische Dateien, wenige MB | **$0.00** |
-| **Gesamt** | | **rund $0.20–0.25** |
+| **Gesamt** | | **rund $0.90** |
 
-Mistral berechnet pro 1M Tokens unabhaengig vom Volumen, kein Frei-Kontingent. Beide Aufrufe laufen ueber Mistral Large 3; der gleichbleibende Prompt-Anfang wird zum Cache-Preis (10 %) berechnet. Die Schätzung ist gerundet; die genauen Kosten zeigt das eigene Mistral-Konto.
+Mistral berechnet pro 1M Tokens unabhaengig vom Volumen, kein Frei-Kontingent. Beide Aufrufe laufen ueber Mistral Large 4; der gleichbleibende Prompt-Anfang wird zum Cache-Preis (10 %) berechnet. Die Schätzung ist gerundet; die genauen Kosten zeigt das eigene Mistral-Konto.
 
 ### Tipp fuer neue Google Cloud Konten
 

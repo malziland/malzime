@@ -66,7 +66,7 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /* ── Mistral-Modell ──
-   Ein Modell fuer alles: mistral-large-2512 (Large 3, multimodal). Es liefert
+   Ein Modell fuer alles: mistral-large-4 (Large 4, multimodal). Es liefert
    Bildbeschreibung und beide Profile in einem Aufruf und schreibt in einem
    zweiten Aufruf ohne Bild die Beast-Werbung. Das kleinere mistral-small-2603
    lief bis 10.09.2026 im ausgebauten Drei-Aufruf-Weg.
@@ -85,7 +85,7 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    vorher die Tier-Stufe im Mistral-Dashboard pruefen, nicht diesen Kommentar.
 
    API-Key kommt aus `process.env.MISTRAL_API_KEY_EU` (Firebase Secret, EU-gebunden; lokal `MISTRAL_API_KEY`). */
-/* v1.10.7: Large fest auf -2512 gepinnt statt -latest-Alias. Hintergrund:
+/* v1.10.7: Large fest auf eine Fassung gepinnt statt -latest-Alias. Hintergrund:
    Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
    umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren
    wir Versions-Wechsel selbst. (Zu Rate-Limits: Stufen-System, s. oben.) */
@@ -93,7 +93,28 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    WELCHES Modell rechnet, steht auf der Website und in den Rechtstexten.
    Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein anderes
    Modell, waehrend die Seite weiter das alte nennt. */
-const MISTRAL_MODEL = "mistral-large-2512";
+const MISTRAL_MODEL = "mistral-large-4";
+/* BLEIBT IM CODE — was je Modell am Aufruf anders ist, an einer Stelle.
+   Large 4 denkt vor jeder Antwort nach, und das Nachdenken zaehlt zu den
+   Antwort-Token. Die kleinste Stufe ist seit Oktober 2026 "low"; "none" lehnt
+   Mistral ab (gemessen 31.10.2026, HTTP 400). Deshalb braucht der kleine
+   Werbe-Aufruf dort mehr Platz: Bei 600 Token brach er in 13 von 42 Laeufen ab.
+   Ein unbekanntes Modell bekommt nichts dazu: Der Aufruf bleibt wie bisher. */
+const MODELL_EINSTELLUNGEN = {
+  "mistral-large-2512": { aufrufZusatz: {}, werbeMaxTokens: 600, werbeZeitgrenzeMs: 30_000 },
+  /* Lasttest 31.10.2026, 30 zugleich: Fertige Analysen brauchten bis 170 s, zwei
+     hingen bis zur Zeitgrenze von 280 s, dieselben Fotos liefen sonst durch.
+     Darum 200 s und ein zweiter Versuch statt langem Warten. Die Werbung lief
+     unter Last in ihre 30 s; 45 s kosten nur, wenn Mistral haengt. */
+  "mistral-large-4": {
+    aufrufZusatz: { reasoning_effort: "low" },
+    werbeMaxTokens: 8000,
+    werbeZeitgrenzeMs: 45_000,
+    analyseZeitgrenzeMs: 200_000,
+    neuversuchBeiZeitgrenze: true,
+  },
+};
+const modellEinstellungen = (modell) => MODELL_EINSTELLUNGEN[modell] || MODELL_EINSTELLUNGEN["mistral-large-2512"];
 /* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des
    globalen — Mistral sichert damit VERTRAGLICH zu, dass die Inferenz in
    EU-/EFTA-Rechenzentren laeuft (der globale Endpunkt verspricht nur
@@ -312,6 +333,7 @@ module.exports = {
   MAX_UPLOAD_BYTES,
   ALLOWED_MIME,
   MISTRAL_MODEL,
+  modellEinstellungen,
   MISTRAL_ENDPOINT,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,
   QUEUE_NAME,

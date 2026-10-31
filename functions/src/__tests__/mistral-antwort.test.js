@@ -81,3 +81,130 @@ describe("findeProfileTextWert — Text aus angefangenem JSON lesen", () => {
     expect(findeProfileTextWert(roh, idx, KARTEN_WERT_SCHLUESSEL).text).toBe("25-30 Jahre");
   });
 });
+
+describe("ohneWerbeAbsagen — eine Absage der KI wird nie ein Werbe-Kaertchen", () => {
+  const { istWerbeAbsage, ohneWerbeAbsagen } = require("../mistral-antwort");
+
+  /* Wortlaut aus der Messung vom 31.10.2026 (Large 4, Fotos von Kindern). */
+  test.each([
+    "Ich kann diese Anfrage nicht erfüllen.",
+    "Ich kann diese Anfrage nicht ausführen. Es geht hier um die Erstellung manipulativer Werbeziele.",
+    "Das Profil beschreibt ein etwa 5-jähriges Kind, und die Aufgabe besteht ausdrücklich darin, dessen Verletzlichkeit auszunutzen.",
+    "Ich erstelle diese Werbeliste nicht.",
+    "Ich möchte das nicht.",
+    "I cannot help with this request.",
+    "Sorry, that is not possible.",
+  ])("erkennt als Absage: %s", (satz) => {
+    expect(istWerbeAbsage(satz)).toBe(true);
+  });
+
+  test.each(["Pokémon Karten", "iRobot Roomba", "i-Size Kindersitz", "Ich", "Die drei ??? Kids", "Toniebox Hörfigur"])(
+    "laesst echte Eintraege stehen: %s",
+    (eintrag) => {
+      expect(istWerbeAbsage(eintrag)).toBe(false);
+    }
+  );
+
+  test("Grenze: acht Woerter bleiben, neun fallen", () => {
+    expect(istWerbeAbsage("a b c d e f g h")).toBe(false);
+    expect(istWerbeAbsage("a b c d e f g h i")).toBe(true);
+  });
+
+  test("filtert die Liste und vertraegt fremde Formen", () => {
+    expect(ohneWerbeAbsagen(["Lego", "Ich kann das nicht.", "", null, 3])).toEqual(["Lego"]);
+    expect(ohneWerbeAbsagen(undefined)).toEqual([]);
+    expect(ohneWerbeAbsagen("Lego")).toEqual([]);
+  });
+});
+
+describe("modellEinstellungen — was je Modell am Aufruf anders ist", () => {
+  const { modellEinstellungen } = require("../config");
+
+  test("Large 3 bleibt unveraendert", () => {
+    expect(modellEinstellungen("mistral-large-2512")).toEqual({
+      aufrufZusatz: {},
+      werbeMaxTokens: 600,
+      werbeZeitgrenzeMs: 30_000,
+    });
+  });
+
+  test("Large 4 denkt auf der kleinsten Stufe und hat Platz fuer die Werbung", () => {
+    expect(modellEinstellungen("mistral-large-4").aufrufZusatz).toEqual({ reasoning_effort: "low" });
+    expect(modellEinstellungen("mistral-large-4").werbeMaxTokens).toBe(8000);
+  });
+
+  test("ein unbekanntes Modell bekommt keinen Zusatz", () => {
+    expect(modellEinstellungen("mistral-unbekannt").aufrufZusatz).toEqual({});
+  });
+});
+
+describe("Kinder bis 13: keine Dating- und Kreditkarten-Texte im Auftrag", () => {
+  test.each([
+    ["de", "Bei Kindern bis 13 Jahre zusätzlich", "KEINE Dating-Apps", "KEINE Kreditkarten"],
+    ["en", "For children up to 13 years, additionally", "NO dating apps", "NO credit cards"],
+  ])("%s", (sprache, kopf, dating, karte) => {
+    const { singleLargePromptVarianten } = require(`../locales/${sprache}/prompts`);
+    for (const vorlage of singleLargePromptVarianten) {
+      const text = typeof vorlage === "function" ? vorlage({}) : String(vorlage);
+      expect(text).toContain(kopf);
+      expect(text).toContain(dating);
+      expect(text).toContain(karte);
+    }
+  });
+});
+
+describe("neuversuchNachZeitgrenze — ein stiller zweiter Versuch nur bei Large 4", () => {
+  const { neuversuchNachZeitgrenze: pruefe } = require("../verbindungsfehler");
+  const { modellEinstellungen } = require("../config");
+  const zeit = { code: "timeout" };
+  const large4 = modellEinstellungen("mistral-large-4");
+
+  test("Large 4 nach Zeitgrenze mit Budget: ja", () => {
+    expect(pruefe(zeit, large4, () => 60_000)).toBe(true);
+  });
+  test("zu wenig Budget: nein (knapp unter der Grenze)", () => {
+    expect(pruefe(zeit, large4, () => 59_999)).toBe(false);
+  });
+  test("Large 3 bleibt wie bisher", () => {
+    expect(pruefe(zeit, modellEinstellungen("mistral-large-2512"), () => 300_000)).toBe(false);
+  });
+  test("anderer Fehler: nein", () => {
+    expect(pruefe({ code: "x" }, large4, () => 300_000)).toBe(false);
+  });
+});
+
+describe("Werbe-Auftrag fuer Kinder bis 13", () => {
+  test.each(["de", "en"])("%s: eigener Auftrag ohne Ausnutzen, Schutzliste steht drin", (sprache) => {
+    const { beastAdsSystemKind } = require(`../locales/${sprache}/prompts`);
+    expect(beastAdsSystemKind).toMatch(/ad_targeting/);
+    expect(beastAdsSystemKind).not.toMatch(/ausnutzt|exploit/i);
+    expect(beastAdsSystemKind).toMatch(/Glücksspiel|gambling/);
+    expect(beastAdsSystemKind).toMatch(/Dating|dating/);
+  });
+});
+
+describe("neuversuchNachLeererAntwort — keine lesbare Antwort", () => {
+  const { neuversuchNachLeererAntwort: pruefe } = require("../verbindungsfehler");
+  const { modellEinstellungen } = require("../config");
+  const large4 = modellEinstellungen("mistral-large-4");
+
+  test("Large 4 ohne Antwort, genug Budget: ja", () => {
+    expect(pruefe(null, large4, () => 60_000)).toBe(true);
+  });
+  test("knapp zu wenig Budget: nein", () => {
+    expect(pruefe(null, large4, () => 59_999)).toBe(false);
+  });
+  test("lesbare Antwort: nein", () => {
+    expect(pruefe({ standard: {} }, large4, () => 300_000)).toBe(false);
+  });
+  test("Large 3 bleibt wie bisher", () => {
+    expect(pruefe(null, modellEinstellungen("mistral-large-2512"), () => 300_000)).toBe(false);
+  });
+});
+
+describe("Absagen der KI, weitere Wortlaute", () => {
+  const { ohneWerbeAbsagen } = require("../mistral-antwort");
+  test.each(["Tut mir leid", "Das kann ich nicht erfüllen.", "I’m sorry", "I apologize"])("%s", (satz) => {
+    expect(ohneWerbeAbsagen([satz, "Roblox"])).toEqual(["Roblox"]);
+  });
+});

@@ -28,7 +28,7 @@ const FUNCTION_LIMIT_MS = 540 * 1000;
    betriebsprofil-kopplung.test.js haelt sie gleich. NICHT mitgerechnet ist
    der Abstand, den die eigene Drossel davor einhaelt (mistral-http.js; ein
    Auftrag je Instanz, also hoechstens der Raten-Abstand `tokenAbstandGrossMs`). */
-const WERBE_AUFRUF_HOECHSTENS_MS = 30 * 1000;
+const WERBE_AUFRUF_HOECHSTENS_MS = 45 * 1000; /* laengste Grenze je Modell, config.js */
 /* BLEIBT IM CODE — Bauweise, keine Einstellung: was der Verarbeiter um die
    Analyse herum braucht (Auftrag uebernehmen, Foto laden, Ergebnis speichern
    mit Wiederholung, Foto loeschen). */

@@ -69,7 +69,7 @@ describe("config", () => {
   });
 
   test("Mistral constants are set", () => {
-    expect(config.MISTRAL_MODEL).toBe("mistral-large-2512");
+    expect(config.MISTRAL_MODEL).toBe("mistral-large-4");
     /* Seit 10.09.2026 gibt es nur noch EIN Modell — die Konstanten des
        ausgebauten Drei-Aufruf-Wegs duerfen nicht zurueckkehren. */
     expect(config.MISTRAL_DESCRIBE_MODEL).toBeUndefined();

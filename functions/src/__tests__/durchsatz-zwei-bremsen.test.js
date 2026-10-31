@@ -10,9 +10,9 @@
    als rund 32 Sekunden je Analyse, liess der Einlass mehr ein, als in 30
    Minuten zu schaffen ist (bei 25 Sekunden 230 statt 144).
 
-   Echte Funktionen von Einlass und Statusabfrage, mit den Werten des
-   ausgelieferten Satzes (4 gleichzeitig, 0,1 je Sekunde). Nachgestellt ist nur
-   die gemessene Dauer. */
+   Echte Funktionen von Einlass und Statusabfrage, mit festen Rechenwerten
+   (4 gleichzeitig, 0,1 je Sekunde), damit die Beispiele unten stehen bleiben,
+   wenn sich der ausgelieferte Satz aendert. */
 
 const mockLage = { werte: null, dauer: null };
 
@@ -28,14 +28,14 @@ const HALBE_STUNDE = 30 * 60;
 const gemessen = (sekunden) => ({ sekunden, gemessen: true, frisch: true });
 
 beforeEach(() => {
-  mockLage.werte = { ...T1_NORMAL };
+  mockLage.werte = { ...T1_NORMAL, parallelitaet: 4, queueRatePerSekunde: 0.1 };
   mockLage.dauer = gemessen(40);
 });
 
-/* Messmittel-Kontrolle: Der Test rechnet mit den ausgelieferten Zahlen. */
-test("der ausgelieferte Satz: 4 gleichzeitig, 0,1 Auftraege je Sekunde", () => {
-  expect(T1_NORMAL.parallelitaet).toBe(4);
-  expect(T1_NORMAL.queueRatePerSekunde).toBe(0.1);
+/* Messmittel-Kontrolle: Der ausgelieferte Satz und seine Rechnung. */
+test("der ausgelieferte Satz: 6 gleichzeitig, 0,2 Auftraege je Sekunde", () => {
+  expect(T1_NORMAL.parallelitaet).toBe(6);
+  expect(T1_NORMAL.queueRatePerSekunde).toBe(0.2);
 });
 
 describe("Einlassgrenze: was in 30 Minuten zu schaffen ist, mit 20 % Abschlag", () => {

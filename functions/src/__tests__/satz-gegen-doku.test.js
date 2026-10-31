@@ -102,24 +102,25 @@ describe("Einstellungssatz und Dokumentation stimmen überein", () => {
      gibt es nur noch einen — der zweite gehörte zum kleinen Modell des
      ausgebauten Drei-Aufruf-Wegs. */
   test("der Abstand zwischen KI-Aufrufen hält die Mistral-Stufe ein", () => {
-    /* T1 erlaubt 0,25 Anfragen pro Sekunde -> ein Aufruf alle 4000 ms.
-       Diese Zahl steht bewusst hier und nicht im Einstellungssatz: Sie ist
-       keine Betriebsentscheidung, sondern eine Eigenschaft des Anbieters. */
-    const T1_MINDESTABSTAND_MS = 4000;
-    expect(ausDoku.tokenAbstandGrossMs).toBeGreaterThanOrEqual(T1_MINDESTABSTAND_MS);
+    /* Mistral erlaubt 30 Aufrufe je Minute (Kopfzeilen, gemessen 31.10.2026)
+       -> ein Aufruf alle 2000 ms. Diese Zahl steht bewusst hier und nicht im
+       Einstellungssatz: Sie ist keine Betriebsentscheidung, sondern eine
+       Eigenschaft des Anbieters. */
+    const MINDESTABSTAND_MS = 2000;
+    expect(ausDoku.tokenAbstandGrossMs).toBeGreaterThanOrEqual(MINDESTABSTAND_MS);
   });
 
   test("die Warteschlangen-Rate passt zur Mistral-Stufe", () => {
     /* Die eigentliche Bremse: Jede Analyse macht zwei Mistral-Aufrufe
-       (Analyse + Beast-Werbung). Bei 0,25 erlaubten Aufrufen pro Sekunde
-       dürfen also höchstens 0,125 Analysen pro Sekunde losgeschickt werden.
+       (Analyse + Beast-Werbung). Bei 0,5 erlaubten Aufrufen pro Sekunde
+       dürfen also höchstens 0,25 Analysen pro Sekunde losgeschickt werden.
 
        Ohne diese Prüfung lässt sich die Rate versehentlich anheben, und der
        Fehler zeigt sich erst beim nächsten Workshop — als Fehlermeldung bei
        Kindern, nicht als roter Test. */
-    const T1_AUFRUFE_PRO_SEKUNDE = 0.25;
+    const AUFRUFE_PRO_SEKUNDE = 0.5;
     const AUFRUFE_JE_ANALYSE = 2;
-    expect(ausDoku.queueRatePerSekunde).toBeLessThanOrEqual(T1_AUFRUFE_PRO_SEKUNDE / AUFRUFE_JE_ANALYSE);
+    expect(ausDoku.queueRatePerSekunde).toBeLessThanOrEqual(AUFRUFE_PRO_SEKUNDE / AUFRUFE_JE_ANALYSE);
   });
 
   test("das Wiederholungsfenster liegt innerhalb der Aufbewahrung", () => {

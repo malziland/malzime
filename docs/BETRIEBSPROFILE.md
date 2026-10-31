@@ -67,8 +67,8 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `parallelitaet` | 4 | Wie viele Analysen gleichzeitig laufen |
-| `queueRatePerSekunde` | 0.1 | Wie schnell die Warteschlange Aufträge losschickt |
+| `parallelitaet` | 6 | Wie viele Analysen gleichzeitig laufen |
+| `queueRatePerSekunde` | 0.2 | Wie schnell die Warteschlange Aufträge losschickt |
 | `warteschlangeTiefe` | 100 | Ab wie vielen Wartenden abgelehnt wird, wenn keine gemessene Dauer vorliegt |
 | `durchschnittsdauerSekunden` | 40 | Ausgangswert der Wartezeit-Ansage |
 | `stundenlimit` | 500 | Analysen pro Zeitfenster |
@@ -87,9 +87,9 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `drosselMaxParallel` | 4 | Gleichzeitige Aufrufe an Mistral |
+| `drosselMaxParallel` | 6 | Gleichzeitige Aufrufe an Mistral |
 | `drosselWartelimitMs` | 360000 | Wie lange ein Aufruf auf seinen Platz wartet |
-| `tokenAbstandGrossMs` | 4000 | Mindestabstand zwischen zwei KI-Aufrufen (je Server-Instanz) |
+| `tokenAbstandGrossMs` | 2500 | Mindestabstand zwischen zwei KI-Aufrufen (je Server-Instanz) |
 | `ueberlastWarteMs` | 10000 | Wartezeit vor der ersten Wiederholung, wenn Mistral ablehnt oder kurz weg ist; jede weitere verdoppelt sich |
 | `ueberlastVersuche` | 4 | Wie oft wiederholt wird, bevor der Auftrag als blockiert endet |
 

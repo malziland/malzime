@@ -4,6 +4,14 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert — Betrieb
+
+- **Kürzere Warteschlange.** Sechs statt vier Analysen laufen gleichzeitig, die
+  Warteschlange schickt doppelt so viele Aufträge los. Eine Klasse mit 30 Fotos
+  kommt damit rechnerisch in gut drei statt rund fünf Minuten durch.
+
 ## [5.3.3] — 2026-10-31
 
 ### Sicherheit

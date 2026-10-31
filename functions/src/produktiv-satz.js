@@ -46,8 +46,13 @@ const T1_NORMAL = {
      niemand über 3 Minuten, im Mittel 2 Ablehnungen (höchstens 6), die das
      Netz auffängt, 0 gescheiterte Analysen; bei 30 % schnellerem Mistral
      rund 30 Ablehnungen, weiterhin 0 gescheiterte. Rückweg: 3 eintragen,
-     die satzWache zieht die Warteschlange binnen Sekunden nach. */
-  parallelitaet: 4,
+     die satzWache zieht die Warteschlange binnen Sekunden nach.
+
+     6 SEIT 31.10.2026 (Vorgabe Christoph). Gemessen mit 30 Fotos direkt gegen
+     Mistral, 8 zugleich: 30 von 30 fertig in 145 s, 60 Aufrufe, keine
+     Ablehnung, zuletzt nur 5 von 30 Aufrufen je Minute frei. 8 waere fuer eine
+     zweite Klasse zu knapp, deshalb 6. Rueckweg: 4 eintragen. */
+  parallelitaet: 6,
 
   /* DIE GLOBALE BREMSE. Sie wird von der `satzWache` in die echte
      Cloud-Tasks-Queue übertragen (`maxDispatchesPerSecond`) und wirkt damit
@@ -64,8 +69,14 @@ const T1_NORMAL = {
      Aufrufe), ein Fünftel Abstand.
 
      BEI EINER HÖHEREN MISTRAL-STUFE darf der Wert steigen — aber erst nach
-     einem Blick ins Mistral-Dashboard, nicht nach Gefühl. */
-  queueRatePerSekunde: 0.1,
+     einem Blick ins Mistral-Dashboard, nicht nach Gefühl.
+
+     0,2 SEIT 31.10.2026: Mistral meldet in den Kopfzeilen jeder Antwort 30
+     Aufrufe je Minute (x-ratelimit-limit-req-minute, gemessen 31.10.2026).
+     Das sind 15 Analysen je Minute = 0,25 je Sekunde; 0,2 hält wieder ein
+     Fünftel Abstand (12 je Minute, 24 Aufrufe). Mit 0,1 bliebe die höhere
+     Parallelität wirkungslos. */
+  queueRatePerSekunde: 0.2,
 
   /* EINLASSGRENZE OHNE MESSUNG: 100, bewusst eine runde Zahl (Festlegung
      11.09.2026; bis dahin 155). Gilt nur, wenn keine gemessene Dauer vorliegt
@@ -92,19 +103,22 @@ const T1_NORMAL = {
   adressfensterMs: 600000,
   boostFaktor: 2,
   boostFristMs: 7200000,
-  /* FOLGT `parallelitaet` (30.08.2026 6 → 4, 08.09. → 3, 16.09. wieder 4).
+  /* FOLGT `parallelitaet` (30.08.2026 6 → 4, 08.09. → 3, 16.09. wieder 4, 31.10. 6).
      Die Drossel darf nie groesser sein als die Warteschlange durchlaesst —
      eine Bremse hinter einer schaerferen Bremse ist keine Bremse, sondern
      toter Code mit dem Anschein von Sicherheit. Der Doku-Test erzwingt das
      Verhaeltnis. Und sie zaehlt nur je Server-Instanz: Am 08.09. liefen
      sieben Instanzen zugleich, jede hielt fuer sich Abstand. */
-  drosselMaxParallel: 4,
+  drosselMaxParallel: 6,
   drosselWartelimitMs: 360000,
 
   /* MINDESTABSTAND ZWISCHEN KI-AUFRUFEN, gemessen 30.08.2026. Hier standen
      800 ms; erlaubt sind auf Stufe T1 vier Sekunden. Wirkt nur innerhalb einer
      Instanz — die verlässliche Bremse ist `queueRatePerSekunde`. */
-  tokenAbstandGrossMs: 4000,
+  /* 2500 SEIT 31.10.2026: 24 Aufrufe je Minute je Instanz, passend zur Rate
+     oben. Mit 4000 (15 je Minute) waere das die dritte, heimliche Bremse: Bei
+     einer einzigen Instanz kaemen 0,2 Analysen je Sekunde nie an. */
+  tokenAbstandGrossMs: 2500,
 
   /* DAS NETZ UNTER DER BREMSE (08.09.2026). Lehnt Mistral ab (429) oder ist
      kurz weg (502/503/504), wartet der Auftrag 10, 20, 40, 80 Sekunden und

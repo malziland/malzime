@@ -1,6 +1,6 @@
 {
   "_hinweis": "Pruefsummen der selbst gehosteten Fremddateien (AUDIT-BEFUND OSS-2026-08-12-22). Ohne sie faellt eine Aenderung an minifiziertem Fremdcode niemandem auf — ausgerechnet exifr liest die GPS-Daten, deren Nichtweitergabe die Kernzusage ist. Geprueft von scripts/pruefe-fremddateien.mjs, im CI-Job 'pruefungen'.",
-  "_erstellt": "2026-10-06",
+  "_erstellt": "2026-10-31",
   "_herkunft": {
     "public/lib/leaflet": "npm leaflet@1.9.4, dist/ — leaflet.js ohne die sourceMappingURL-Zeile (siehe VERSION); LICENSE woertlich aus dem Leaflet-Repository (2026-08-19)",
     "public/lib/exifr": "npm exifr@7.1.3, dist/lite.esm.mjs — in 7.1.0 bis 7.1.3 byte-gleich (abgeglichen 2026-09-30); LICENSE woertlich aus dem exifr-Repository (2026-08-19)",
@@ -31,9 +31,9 @@
     "public/lib/leaflet/leaflet.js": "sha256:dc71f8a6880bc3ca1bd9fa8dc5f1af48c702dc510b0a78240a07c5feed7ce935",
     "public/fonts/poppins/VERSION": "sha256:8799ca17fd5928e88739429f2fc1d7d8c5241e6ff58d46d81b4996de1d5609cc",
     "public/lib/libheif/LICENSE": "sha256:fa81ce652315b013359d6e8e4744335f31a50c7c192907176d3632f78a3b4596",
-    "public/lib/libheif/VERSION": "sha256:45bc1a7d1ce5b7d18670317c58612b6b7bcb7e253b4ffdaeaee178c3dc879aaf",
-    "public/lib/libheif/libheif.js": "sha256:a8959e9fb4dfe3924ada79e3b7d5d58a99f2389ac99b6ff5ecc1f0fa8123bb05",
-    "public/lib/libheif/libheif.wasm": "sha256:ff92b22192d8eb506d66377a1d8c74429c1ed58a2e502e4c4b4f68091c7973c3",
+    "public/lib/libheif/VERSION": "sha256:d2d8b8def661d72a1bd21e9b975aedb3e69a50d345e8784672e0b884c7d0c73a",
+    "public/lib/libheif/libheif.js": "sha256:0e7623ee1a63daacb65a48bac25c5e346011b8d80c47ae96da71e6e121e33efe",
+    "public/lib/libheif/libheif.wasm": "sha256:2cab476885e14056f7b343f2b57e225d1be484f076954cdab57e7933cc5cf03f",
     "public/lib/libheif/LICENSE-libde265": "sha256:02cc1585a20677992e0ba578fa692635dc193735f2691dc81de924b51c4e8020"
   }
 }

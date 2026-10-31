@@ -49,14 +49,14 @@ describe("Regel 1: Haenge-Limit nicht unter der Zeitgrenze der Funktion", () => 
 describe("Regel 2: Budget plus Werbe-Aufruf plus Reserve passen in die Zeitgrenze der Funktion", () => {
   const hoechstens = FUNKTION_MS - betriebsprofil._WERBE_AUFRUF_HOECHSTENS_MS - betriebsprofil._RESERVE_NACH_ANALYSE_MS;
 
-  test("die Grenze liegt bei 500 Sekunden", () => {
-    expect(hoechstens).toBe(500 * 1000);
+  test("die Grenze liegt bei 485 Sekunden", () => {
+    expect(hoechstens).toBe(485 * 1000);
   });
 
   test("genau die Grenze gilt, eine Millisekunde darueber nicht", () => {
     expect(_pruefe({ ...SATZ, requestBudgetMs: hoechstens })).toBeNull();
     expect(_pruefe({ ...SATZ, requestBudgetMs: hoechstens + 1 })).toMatch(
-      /requestBudgetMs \(500001 ms\).*Werbe-Aufruf/
+      /requestBudgetMs \(485001 ms\).*Werbe-Aufruf/
     );
   });
 

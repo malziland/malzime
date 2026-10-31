@@ -7,7 +7,7 @@
  *       → { normal, boost, subject, visibleText }
  *   - generateBeastAds(boostProfile, standardAds, lang) → Liste | null
  *
- * Architektur: EIN Aufruf an Mistral Large (mistral-large-2512, multimodal)
+ * Architektur: EIN Aufruf an Mistral Large (MISTRAL_MODEL, multimodal)
  * liefert Bildbeschreibung und beide Profile; ein zweiter, kleiner Aufruf ohne
  * Bild erzeugt die Beast-Werbung. Den aelteren Drei-Aufruf-Weg (Large
  * beschreibt, Small profiliert) gibt es seit 10.09.2026 nicht mehr.
@@ -165,7 +165,7 @@ const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = requir
    fehlenden Karten. */
 
 /* ── v2.2: Single-Large-Call ──
-   Macht in EINEM mistral-large-2512-Call:
+   Macht in EINEM Large-Call:
      Bild sehen + Beschreibung + hard_facts + ads + triggers + Standard + Beast.
    Hat die fruehere Kette aus drei Aufrufen (Beschreibung + 2× Profil)
    abgeloest; Token-Einsparung in lokalen Tests (3 Bilder): ~70%
@@ -532,7 +532,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
 
   try {
     const result = await callMistralRaw({
-      model: MISTRAL_MODEL /* Large 2512 — gleiches Modell wie die Analyse */,
+      model: MISTRAL_MODEL /* gleiches Modell wie die Analyse */,
       /* OPS-008: system = konstante Anweisungen, user = nur das Profil.
          Der Cache greift ausschliesslich auf einem konstanten Anfang. */
       messages: [
@@ -665,7 +665,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     const { werte: betriebswerte, profil } = await betriebswerteOderAbbruch();
     aktivesProfil = profil;
     const result = await callMistralRaw({
-      model: MISTRAL_MODEL /* Large 2512 — multimodal, 2M TPM */,
+      model: MISTRAL_MODEL /* multimodal */,
       messages,
       maxTokens: betriebswerte.singleLargeMaxTokens,
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,

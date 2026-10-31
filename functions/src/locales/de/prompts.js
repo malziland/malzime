@@ -41,7 +41,7 @@ module.exports = {
 };
 
 /* ── Der Analyse-Prompt (Single-Large-Call, v2.2-rc3).
-   Macht in EINEM Call mit mistral-large-2512:
+   Macht in EINEM Call mit Mistral Large:
    Bild ansehen + hard_facts + ads + triggers + Standard-Profil + Beast-Profil.
 
    Ein eigenständiger, konsolidierter Prompt mit gemeinsamen Regeln, geteilten

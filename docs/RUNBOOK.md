@@ -572,7 +572,10 @@ drei Minuten. Die Nachrechnung mit den Daten dieses Tages ergab für 4 und 0,1
 einen Median um 60 s, im Mittel 2 Ablehnungen, die das Netz auffängt, und
 keine gescheiterte Analyse — daher ab 16.09.2026 wieder 4. Am 31.10.2026
 lief ein Lasttest mit 8 gleichzeitig durch (30 von 30 in 145 s, keine
-Ablehnung, zuletzt 5 von 30 Aufrufen frei); gewählt wurden 6 mit Abstand.
+Ablehnung, zuletzt 5 von 30 Aufrufen frei); gewählt wurden 6 mit Abstand. Mit
+Large 4 gelten 15 gleichzeitig: Lasttest am 31.10.2026 mit 30 Fotos, 30 von 30
+fertig in rund vier Minuten, 30 von 30 mit Werbeliste; mit 30 gleichzeitig
+scheiterten 3 von 30.
 Rückweg: `git revert` der Änderung, dann `node scripts/betriebsprofil-anlegen.js
 --ausfuehren --ueberschreiben`.
 

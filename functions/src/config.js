@@ -66,7 +66,7 @@ const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 /* ── Mistral-Modell ──
-   Ein Modell fuer alles: mistral-large-2512 (Large 3, multimodal). Es liefert
+   Ein Modell fuer alles: mistral-large-4 (Large 4, multimodal). Es liefert
    Bildbeschreibung und beide Profile in einem Aufruf und schreibt in einem
    zweiten Aufruf ohne Bild die Beast-Werbung. Das kleinere mistral-small-2603
    lief bis 10.09.2026 im ausgebauten Drei-Aufruf-Weg.

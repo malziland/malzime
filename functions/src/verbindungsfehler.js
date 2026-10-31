@@ -138,6 +138,17 @@ async function mitEinemNeuversuchBeiAbbruch(erster, neuversuch) {
   }
 }
 
+/* Mindestens so viel Budget muss bleiben, sonst lohnt ein zweiter Versuch nicht. */
+const MIN_REST_FUER_NEUVERSUCH_MS = 60_000;
+
+/** Lief ein Aufruf in die Zeitgrenze, und erlaubt das Modell einen zweiten
+ *  Versuch, fuer den noch genug Budget da ist? */
+function neuversuchNachZeitgrenze(err, modell, restBudget) {
+  if (!err || err.code !== "timeout" || !modell || !modell.neuversuchBeiZeitgrenze) return false;
+  const rest = typeof restBudget === "function" ? restBudget() : 0;
+  return rest >= MIN_REST_FUER_NEUVERSUCH_MS;
+}
+
 /** Liegt ein gelesener Teiltext vor, der gerettet werden kann (Zeitlimit
  *  oder Abriss mitten im Strom)? */
 function hatRettbarenTeiltext(err) {
@@ -155,5 +166,6 @@ module.exports = {
   markiereAbbruch,
   meldeAbbruchMitNeuversuch,
   mitEinemNeuversuchBeiAbbruch,
+  neuversuchNachZeitgrenze,
   hatRettbarenTeiltext,
 };

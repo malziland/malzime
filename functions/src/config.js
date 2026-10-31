@@ -101,8 +101,18 @@ const MISTRAL_MODEL = "mistral-large-2512";
    Werbe-Aufruf dort mehr Platz: Bei 600 Token brach er in 13 von 42 Laeufen ab.
    Ein unbekanntes Modell bekommt nichts dazu: Der Aufruf bleibt wie bisher. */
 const MODELL_EINSTELLUNGEN = {
-  "mistral-large-2512": { aufrufZusatz: {}, werbeMaxTokens: 600 },
-  "mistral-large-4": { aufrufZusatz: { reasoning_effort: "low" }, werbeMaxTokens: 4000 },
+  "mistral-large-2512": { aufrufZusatz: {}, werbeMaxTokens: 600, werbeZeitgrenzeMs: 30_000 },
+  /* Lasttest 31.10.2026, 30 zugleich: Fertige Analysen brauchten bis 170 s, zwei
+     hingen bis zur Zeitgrenze von 280 s, dieselben Fotos liefen sonst durch.
+     Darum 200 s und ein zweiter Versuch statt langem Warten. Die Werbung lief
+     unter Last in ihre 30 s; 45 s kosten nur, wenn Mistral haengt. */
+  "mistral-large-4": {
+    aufrufZusatz: { reasoning_effort: "low" },
+    werbeMaxTokens: 4000,
+    werbeZeitgrenzeMs: 45_000,
+    analyseZeitgrenzeMs: 200_000,
+    neuversuchBeiZeitgrenze: true,
+  },
 };
 const modellEinstellungen = (modell) => MODELL_EINSTELLUNGEN[modell] || MODELL_EINSTELLUNGEN["mistral-large-2512"];
 /* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des

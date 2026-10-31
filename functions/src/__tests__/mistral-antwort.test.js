@@ -121,7 +121,11 @@ describe("modellEinstellungen — was je Modell am Aufruf anders ist", () => {
   const { modellEinstellungen } = require("../config");
 
   test("Large 3 bleibt unveraendert", () => {
-    expect(modellEinstellungen("mistral-large-2512")).toEqual({ aufrufZusatz: {}, werbeMaxTokens: 600 });
+    expect(modellEinstellungen("mistral-large-2512")).toEqual({
+      aufrufZusatz: {},
+      werbeMaxTokens: 600,
+      werbeZeitgrenzeMs: 30_000,
+    });
   });
 
   test("Large 4 denkt auf der kleinsten Stufe und hat Platz fuer die Werbung", () => {
@@ -146,5 +150,25 @@ describe("Kinder bis 13: keine Dating- und Kreditkarten-Texte im Auftrag", () =>
       expect(text).toContain(dating);
       expect(text).toContain(karte);
     }
+  });
+});
+
+describe("neuversuchNachZeitgrenze — ein stiller zweiter Versuch nur bei Large 4", () => {
+  const { neuversuchNachZeitgrenze: pruefe } = require("../verbindungsfehler");
+  const { modellEinstellungen } = require("../config");
+  const zeit = { code: "timeout" };
+  const large4 = modellEinstellungen("mistral-large-4");
+
+  test("Large 4 nach Zeitgrenze mit Budget: ja", () => {
+    expect(pruefe(zeit, large4, () => 60_000)).toBe(true);
+  });
+  test("zu wenig Budget: nein (knapp unter der Grenze)", () => {
+    expect(pruefe(zeit, large4, () => 59_999)).toBe(false);
+  });
+  test("Large 3 bleibt wie bisher", () => {
+    expect(pruefe(zeit, modellEinstellungen("mistral-large-2512"), () => 300_000)).toBe(false);
+  });
+  test("anderer Fehler: nein", () => {
+    expect(pruefe({ code: "x" }, large4, () => 300_000)).toBe(false);
   });
 });

@@ -36,6 +36,7 @@ const {
   ursacheVon,
   meldeAbbruchMitNeuversuch,
   mitEinemNeuversuchBeiAbbruch,
+  neuversuchNachZeitgrenze,
   hatRettbarenTeiltext,
 } = require("./verbindungsfehler");
 
@@ -529,7 +530,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
       maxTokens: modellEinstellungen(MISTRAL_MODEL).werbeMaxTokens,
       temperature: 0.5,
       forceJSON: true,
-      timeoutMs: 30_000,
+      timeoutMs: modellEinstellungen(MISTRAL_MODEL).werbeZeitgrenzeMs,
       /* Konstanter Cache-Schluessel je Sprache, ohne Nutzerbezug (fest seit
          10.09.2026; vorher per Flag abschaltbar, Audit OPS-008). */
       cacheKey: `malzime-beast-ads-${lang || "de"}`,
@@ -657,7 +658,10 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       timeoutMs: budget,
       /* BUG-2026-08-17-01: eigenes Zeitbudget statt der allgemeinen 90 s —
          siehe Herleitung an der Konstante in config.js. */
-      timeoutCapMs: betriebswerte.singleLargeTimeoutMs,
+      timeoutCapMs: Math.min(
+        betriebswerte.singleLargeTimeoutMs,
+        modellEinstellungen(MISTRAL_MODEL).analyseZeitgrenzeMs || betriebswerte.singleLargeTimeoutMs
+      ),
       cacheKey,
       /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
          Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */
@@ -732,6 +736,12 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        sein Profil bekommt, loest so keinen Fehlalarm mehr aus. */
     /* Erster Abriss: Warnung, es folgt ein Neuversuch (runSingleLargeCall). */
     if (dauer) textmengeZaehlen(dauer, { wiederholungen: err && err.wiederholungen });
+    if (
+      attemptLabel === "first" &&
+      neuversuchNachZeitgrenze(err, modellEinstellungen(MISTRAL_MODEL), remainingBudget)
+    ) {
+      err.verbindungsabbruch = true; /* derselbe Weg wie ein Abriss: ein stiller zweiter Versuch */
+    }
     if (err && err.verbindungsabbruch && attemptLabel === "first") {
       meldeAbbruchMitNeuversuch({ profil: aktivesProfil, attempt: attemptLabel, err });
       throw err;

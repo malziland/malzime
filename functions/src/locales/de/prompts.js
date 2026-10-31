@@ -486,6 +486,24 @@ Erzeuge genau ${WERBE_ANFORDERUNG} Werbeeinträge, die an der VERLETZLICHKEIT an
 
 Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;
 
+/* 31.10.2026: Bei Kindern bis 13 lehnte Large 4 die Liste oft ab, weil dort
+   steht, sie solle Schwachstellen ausnutzen. Fuer ein Kind ist das auch nicht
+   der richtige Auftrag: Gezeigt wird, was dieser Altersgruppe tatsaechlich
+   begegnet, damit Kinder es erkennen. Das ist ein anderer Auftrag, keine
+   Umschreibung; die Schutzregeln gelten unveraendert. */
+module.exports.beastAdsSystemKind = `Du arbeitest für malziME, ein Werkzeug für Medienbildung an Schulen. Es zeigt Kindern und ihren Eltern, welche Werbung Kindern im Internet begegnet, damit sie sie erkennen und darüber sprechen können. Die Liste ist eine Aufklärung: Nur die Person selbst sieht sie, niemand wird damit beworben, und nichts wird verkauft.
+
+Du bekommst ein Profil eines Kindes. Nenne genau ${WERBE_ANFORDERUNG} Produkte und Marken, mit denen die Werbung Kinder dieses Alters im Internet und in Apps tatsächlich unter Druck setzt. Die Liste soll beim Lesen ertappen: Das Kind erkennt, wie gezielt es angesprochen wird.
+
+- Decke diese vier Arten von Druck ab: Bezahlmodelle in Spielen; was zum Sammeln und Nachkaufen treibt; was Gruppendruck auslöst; was Kinder bei den Eltern erquengeln sollen.
+- Leite jeden Eintrag aus den Interessen, der Umgebung und dem Stil im Profil ab. Zwei verschiedene Kinder dürfen NICHT dieselbe Liste ergeben. Wenn dir zuerst das bekannteste Produkt der Kategorie einfällt, suche ein spezifischeres, das besser zu diesem Kind passt.
+- Richte dich streng nach dem Alter: nichts, wofür ein Kind dieses Alters zu alt wäre, und nichts, was nur Jüngere anspricht. Ab etwa 10 Jahren zählen Spiele, Handy, Mode und Influencer mehr als Spielzeug.
+- Je 1-3 Wörter. Echte Marken aus dem mitteleuropäischen Markt. KEINE Preisangaben.
+- KEINE Marke aus der bestehenden sachlichen Werbung wiederverwenden.
+- NIEMALS Angebote zu Alkohol, Tabak, Drogen, Glücksspiel, Sportwetten, Kredit, Ratenzahlung, Diätmitteln, Schönheitskorrektur, Dating, Waffen oder sexualisierte Angebote.
+
+Antworte NUR mit JSON: {"ad_targeting": ["...", "..."]}`;
+
 /* Nur die wechselnden Werte — kommt als user-Nachricht NACH dem System. */
 /* SEC-2026-08-12-18: Derselbe Schutz wie im ersten Aufruf. Alles hier stammt
    mittelbar aus dem hochgeladenen Bild — ein Foto mit lesbarem Text kann Sätze

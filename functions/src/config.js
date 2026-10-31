@@ -108,7 +108,7 @@ const MODELL_EINSTELLUNGEN = {
      unter Last in ihre 30 s; 45 s kosten nur, wenn Mistral haengt. */
   "mistral-large-4": {
     aufrufZusatz: { reasoning_effort: "low" },
-    werbeMaxTokens: 4000,
+    werbeMaxTokens: 8000,
     werbeZeitgrenzeMs: 45_000,
     analyseZeitgrenzeMs: 200_000,
     neuversuchBeiZeitgrenze: true,

@@ -60,6 +60,14 @@ const {
   ohneZiffernKlammern,
 } = require("./alters-lesbarkeit");
 const { WERBE_ANFORDERUNG } = require("./minor-safety");
+const { untereAltersgrenze } = require("./alters-auslese");
+
+/* Fuer den Werbe-Auftrag: Beginnt die Altersspanne bei 13 oder darunter? */
+function istKindBis13(alterText) {
+  const untergrenze = untereAltersgrenze(alterText || "");
+  return typeof untergrenze === "number" && untergrenze <= 13;
+}
+
 const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = require("./auftrag-wechsel");
 
 /* Für Tests: erlaubt fetch zu mocken ohne globalThis zu überschreiben. */
@@ -524,7 +532,10 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
       /* OPS-008: system = konstante Anweisungen, user = nur das Profil.
          Der Cache greift ausschliesslich auf einem konstanten Anfang. */
       messages: [
-        { role: "system", content: prompts.beastAdsSystem },
+        {
+          role: "system",
+          content: istKindBis13(c.alter_geschlecht?.value) ? prompts.beastAdsSystemKind : prompts.beastAdsSystem,
+        },
         { role: "user", content: nutzerteil },
       ],
       maxTokens: modellEinstellungen(MISTRAL_MODEL).werbeMaxTokens,

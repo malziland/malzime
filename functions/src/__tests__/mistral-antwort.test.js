@@ -130,7 +130,7 @@ describe("modellEinstellungen — was je Modell am Aufruf anders ist", () => {
 
   test("Large 4 denkt auf der kleinsten Stufe und hat Platz fuer die Werbung", () => {
     expect(modellEinstellungen("mistral-large-4").aufrufZusatz).toEqual({ reasoning_effort: "low" });
-    expect(modellEinstellungen("mistral-large-4").werbeMaxTokens).toBe(4000);
+    expect(modellEinstellungen("mistral-large-4").werbeMaxTokens).toBe(8000);
   });
 
   test("ein unbekanntes Modell bekommt keinen Zusatz", () => {
@@ -170,5 +170,15 @@ describe("neuversuchNachZeitgrenze — ein stiller zweiter Versuch nur bei Large
   });
   test("anderer Fehler: nein", () => {
     expect(pruefe({ code: "x" }, large4, () => 300_000)).toBe(false);
+  });
+});
+
+describe("Werbe-Auftrag fuer Kinder bis 13", () => {
+  test.each(["de", "en"])("%s: eigener Auftrag ohne Ausnutzen, Schutzliste steht drin", (sprache) => {
+    const { beastAdsSystemKind } = require(`../locales/${sprache}/prompts`);
+    expect(beastAdsSystemKind).toMatch(/ad_targeting/);
+    expect(beastAdsSystemKind).not.toMatch(/ausnutzt|exploit/i);
+    expect(beastAdsSystemKind).toMatch(/Glücksspiel|gambling/);
+    expect(beastAdsSystemKind).toMatch(/Dating|dating/);
   });
 });

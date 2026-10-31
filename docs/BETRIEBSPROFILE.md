@@ -311,6 +311,7 @@ binnen dreißig Sekunden.
 
 Die Rückwege stehen an einer Stelle: [RUNBOOK.md](RUNBOOK.md), Abschnitt
 „Rollback-Hebel". Für den Einstellungssatz heißt zurück: `aktiv` wieder auf den
-vorherigen Namen setzen, oder den Satz aus `functions/src/produktiv-satz.js`
-neu schreiben (`node scripts/betriebsprofil-anlegen.js --ausfuehren
---ueberschreiben`).
+vorherigen Namen setzen, oder, wenn beide Profile den neuen Wert tragen, die
+Änderung per `git revert` zurücknehmen und den Satz aus
+`functions/src/produktiv-satz.js` neu schreiben
+(`node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`).

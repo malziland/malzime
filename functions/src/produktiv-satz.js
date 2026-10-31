@@ -51,7 +51,10 @@ const T1_NORMAL = {
      6 SEIT 31.10.2026 (Vorgabe Christoph). Gemessen mit 30 Fotos direkt gegen
      Mistral, 8 zugleich: 30 von 30 fertig in 145 s, 60 Aufrufe, keine
      Ablehnung, zuletzt nur 5 von 30 Aufrufen je Minute frei. 8 waere fuer eine
-     zweite Klasse zu knapp, deshalb 6. Rueckweg: 4 eintragen. */
+     zweite Klasse zu knapp, deshalb 6. Rueckweg: `git revert` dieser Aenderung,
+     dann `node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`
+     (die vier Felder parallelitaet, queueRatePerSekunde, drosselMaxParallel,
+     tokenAbstandGrossMs zusammen, in beiden Profilen). */
   parallelitaet: 6,
 
   /* DIE GLOBALE BREMSE. Sie wird von der `satzWache` in die echte
@@ -65,7 +68,7 @@ const T1_NORMAL = {
      Aufrufe angenommen worden waren). Jede Analyse macht zwei Aufrufe
      (Analyse + Beast-Werbung), also höchstens 7,5 Analysen je Minute =
      0,125 je Sekunde. GENAU DIESER WERT stand hier bis zum 08.09. — ohne
-     Abstand zur Grenze, und die Grenze riss. Jetzt 0,1 (6 je Minute, 12
+     Abstand zur Grenze, und die Grenze riss. Danach 0,1 (6 je Minute, 12
      Aufrufe), ein Fünftel Abstand.
 
      BEI EINER HÖHEREN MISTRAL-STUFE darf der Wert steigen — aber erst nach
@@ -84,10 +87,10 @@ const T1_NORMAL = {
      Datenbank hakt. Sonst rechnet warteschlangen-rechnung.js laufend aus den
      letzten 20 Analysen: 30 Minuten Browser-Geduld / Dauer je Analyse
      (80-Perzentil) × parallelitaet × 0,8 Abstand — hoechstens aber, was
-     queueRatePerSekunde in 30 Minuten losschickt (× 0,8; bei 0,1 je Sekunde
-     144). Zum Vergleich mit derselben Formel und 4 parallel (seit
-     16.09.2026): 40 s (Median, gemessen 30.08.2026) ergaeben 144; rund 63 s
-     ergaeben 91 (80-Perzentil des Mistral-Aufrufs ueber 567 Analysen vom
+     queueRatePerSekunde in 30 Minuten losschickt (× 0,8; bei 0,2 je Sekunde
+     288). Zum Vergleich mit derselben Formel und 6 parallel (seit
+     31.10.2026): 40 s (Median, gemessen 30.08.2026) ergaeben 216; rund 63 s
+     ergaeben 137 (80-Perzentil des Mistral-Aufrufs ueber 567 Analysen vom
      12.08. bis 10.09.2026: 59 s, dazu geschaetzt 4 s fuer den Werbe-Aufruf).
      Die 155 stammten aus der Rechnung mit 7 parallel und 65 s. */
   warteschlangeTiefe: 100,
@@ -113,11 +116,10 @@ const T1_NORMAL = {
   drosselWartelimitMs: 360000,
 
   /* MINDESTABSTAND ZWISCHEN KI-AUFRUFEN, gemessen 30.08.2026. Hier standen
-     800 ms; erlaubt sind auf Stufe T1 vier Sekunden. Wirkt nur innerhalb einer
-     Instanz — die verlässliche Bremse ist `queueRatePerSekunde`. */
-  /* 2500 SEIT 31.10.2026: 24 Aufrufe je Minute je Instanz, passend zur Rate
-     oben. Mit 4000 (15 je Minute) waere das die dritte, heimliche Bremse: Bei
-     einer einzigen Instanz kaemen 0,2 Analysen je Sekunde nie an. */
+     800 ms, dann bis 31.10.2026 4000. Seither 2500 = 24 Aufrufe je Minute,
+     passend zur gemessenen Grenze. Wirkt nur innerhalb einer Instanz und die
+     traegt bei concurrency 1 nur einen Auftrag, praktisch also keine Bremse.
+     Die verlässliche Bremse ist `queueRatePerSekunde`. */
   tokenAbstandGrossMs: 2500,
 
   /* DAS NETZ UNTER DER BREMSE (08.09.2026). Lehnt Mistral ab (429) oder ist
@@ -159,9 +161,9 @@ const PROFILE = {
     ...T1_NORMAL,
     singleLargeTimeoutMs: 450000,
     durchschnittsdauerSekunden: 110,
-    /* Dieselbe Formel wie oben mit 110 s und 4 parallel (seit 16.09.2026):
-       1800 / 110 × 4 × 0,8 = 52 (vorher mit 3 parallel: 39). */
-    warteschlangeTiefe: 52,
+    /* Dieselbe Formel wie oben mit 110 s und 6 parallel (seit 31.10.2026):
+       1800 / 110 × 6 × 0,8 = 78 (vorher mit 4 parallel: 52). */
+    warteschlangeTiefe: 78,
   },
 };
 

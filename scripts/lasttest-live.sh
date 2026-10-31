@@ -8,7 +8,7 @@
 # Emulator mit einer Mistral-Attrappe — echte Warteschlange, echte
 # Positionsrechnung, aber KEINE echten KI-Aufrufe und keine Kosten. Es kann
 # deshalb genau das nicht zeigen, worauf es hier ankommt: ob Mistral bei der
-# T1-Rate (0,25 Anfragen/s) mitkommt und wie lange eine Analyse unter echter
+# gemessenen Grenze (30 Aufrufe je Minute, 31.10.2026) mitkommt und wie lange eine Analyse unter echter
 # Last wirklich braucht.
 #
 # DIESER LAUF KOSTET GELD UND VERAENDERT DIE OEFFENTLICHE STATISTIK.

@@ -78,8 +78,8 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    2026-05-19) sind UEBERHOLT. Mistral vergibt Limits heute als
    STUFEN-SYSTEM nach kumuliertem Umsatz (org-weit, auch am EU-Endpunkt):
    T1 = 0,25 req/s (bis 20 $), T2 ab 20 $, T3 ab 100 $, T4 ab 500 $ —
-   kein Vorkauf moeglich. Aktuell gilt T1: 0,25 req/s = die REALE
-   Durchsatzbremse (~7,5 Analysen/min bei 2 Calls je Analyse). Unter dieser
+   kein Vorkauf moeglich. Gemessen 31.10.2026 in den Kopfzeilen der
+   Antwort: 30 Aufrufe je Minute (15 Analysen, 2 Calls je Analyse). Unter dieser
    Decke halten den Durchsatz `parallelitaet` und `queueRatePerSekunde` im
    Einstellungssatz (Rechnung in produktiv-satz.js) — wer sie hochdreht, MUSS
    vorher die Tier-Stufe im Mistral-Dashboard pruefen, nicht diesen Kommentar.

@@ -547,17 +547,20 @@ und `queueRatePerSekunde` im Einstellungssatz neu rechnen — vorher ins
 Mistral-Dashboard sehen. Kein Deploy nötig; die `satzWache` überträgt die Werte in
 die Queue.
 
-**Warum die Dosierung so steht, wie sie steht (Stand 16.09.2026):** Mistral
-erlaubt auf der Stufe T1 **15 Aufrufe je 60 Sekunden** (gemessen 08.09.2026:
-jede Ablehnung kam genau dann, wenn in den 60 s davor 15 Aufrufe angenommen
-waren; abgelehnte zählen nicht mit). Jede Analyse macht zwei Aufrufe (Analyse
-+ Beast-Werbung), also wären 7,5 Analysen je Minute die Kante. Die Queue
-schickt höchstens **0,1 Analysen pro Sekunde** los (6 je Minute, 12 Aufrufe) —
-ein Fünftel Abstand — bei einer Parallelität von **4**. Die Parallelität
-deckelt den Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch),
-die Rate die Dauerlast. Lehnt Mistral trotzdem ab, wartet der Auftrag und
-versucht es erneut (Abschnitt „Mistral überlastet“); Ablehnungen sind dadurch
-längere Wartezeit, kein Fehler.
+**Warum die Dosierung so steht, wie sie steht (Stand 31.10.2026):** Mistral
+meldet in den Kopfzeilen jeder Antwort **30 Aufrufe je Minute** (gemessen
+31.10.2026, `x-ratelimit-limit-req-minute`). Jede Analyse macht zwei Aufrufe
+(Analyse + Beast-Werbung), also wären 15 Analysen je Minute die Kante. Die Queue
+schickt höchstens **0,2 Analysen pro Sekunde** los (12 je Minute, 24 Aufrufe) —
+ein Fünftel Abstand — bei einer Parallelität von **6**. Bei rund 40 s je Analyse
+bremst die Parallelität (0,15 je Sekunde), die Rate erst unter 30 s. Der
+Anfangsschub (die Queue lässt bis zu 10 Aufträge sofort durch) kann kurz an die
+Grenze stoßen. Lehnt Mistral trotzdem ab, wartet der Auftrag und versucht es
+erneut (Abschnitt „Mistral überlastet“); Ablehnungen sind dadurch längere
+Wartezeit, kein Fehler. Die Mistral-Stufe ändert sich nur monatlich: Nach einem
+Monatswechsel die Kopfzeile nachlesen, bei 15 je Minute sofort zurück auf 4 und
+0,1. Das Stundenlimit kann bei rund einer Stunde Dauerlast nun greifen, das ist
+als Kostenbremse gewollt.
 
 Die Geschichte der Zahl: 7 (65 s je Analyse angenommen); ab 30.08.2026 4 und
 0,125 — exakt am Limit, und bei Ablehnung nur ein Versuch nach 2 s. Am
@@ -567,8 +570,11 @@ scheiterten; danach 3 und 0,1 plus das Wiederholungsnetz. Am 16.09.2026
 vom Einreihen bis zum Ergebnis im Median bei 126 s, 43 von 193 warteten über
 drei Minuten. Die Nachrechnung mit den Daten dieses Tages ergab für 4 und 0,1
 einen Median um 60 s, im Mittel 2 Ablehnungen, die das Netz auffängt, und
-keine gescheiterte Analyse — daher seit 16.09.2026 wieder 4. Rückweg: 3
-eintragen.
+keine gescheiterte Analyse — daher ab 16.09.2026 wieder 4. Am 31.10.2026
+lief ein Lasttest mit 8 gleichzeitig durch (30 von 30 in 145 s, keine
+Ablehnung, zuletzt 5 von 30 Aufrufen frei); gewählt wurden 6 mit Abstand.
+Rückweg: `git revert` der Änderung, dann `node scripts/betriebsprofil-anlegen.js
+--ausfuehren --ueberschreiben`.
 
 **Beide Werte stehen im Einstellungssatz und werden automatisch übertragen.**
 Wer sie ändert, ändert die laufende Queue — kein Deploy, kein gcloud-Befehl.

@@ -4,8 +4,8 @@
  * throttle.js — Per-Instance-Semaphore für Mistral-Bursts.
  *
  * RATE-LIMITS, STAND 2026-08-11 (KA-07): Mistral vergibt Limits als
- * STUFEN-SYSTEM nach kumuliertem Umsatz (T1 = 0,25 req/s bis 20 $; T2/T3/T4
- * darüber) — die früher hier notierten „6 RPS" stammen vom Mai-Dashboard und
+ * STUFEN-SYSTEM nach kumuliertem Umsatz (gemessen 31.10.2026: 30 Aufrufe je
+ * Minute) — die früher hier notierten „6 RPS" stammen vom Mai-Dashboard und
  * sind ÜBERHOLT. Die reale Durchsatzbremse ist heute die Tier-Stufe, in der
  * Praxis gehalten durch `queueRatePerSekunde` im Einstellungssatz (die
  * globale Bremse der Warteschlange). Vor jeder Änderung an Nebenläufigkeit
@@ -127,8 +127,7 @@ const mistralSemaphore = createSemaphore();
  * entzerrt das: Jeder Caller wartet, bis seit dem letzten Start genug Zeit
  * verstrichen ist (`tokenAbstandGrossMs`). Er zaehlt nur je Instanz — die
  * verlaessliche Bremse ueber alle Instanzen ist `queueRatePerSekunde` in der
- * Warteschlange (KA-07: Mistral vergibt Limits als Stufen, T1 = 0,25 req/s
- * org-weit). Wer hier schneller drehen will, prueft ZUERST die Tier-Stufe im
+ * Warteschlange (KA-07: Mistral vergibt Limits als Stufen, org-weit). Wer hier schneller drehen will, prueft ZUERST die Tier-Stufe im
  * Mistral-Dashboard.
  *
  * Bis 10.09.2026 gab es je Modell-Typ einen eigenen Bucket (v1.10.8); seit dem

@@ -27,8 +27,13 @@
    Kommentare an den Stellen, wo die Begründung nicht offensichtlich ist. */
 const T1_NORMAL = {
   mistralTimeoutMs: 90000,
-  singleLargeTimeoutMs: 300000,
-  singleLargeMaxTokens: 5000,
+  /* 410 s: 16000 Token bei der langsamsten je gemessenen Geschwindigkeit
+     (39,4 Token/s). Die Kopplung verlangt das. Large 4 selbst bricht frueher ab
+     (analyseZeitgrenzeMs in config.js) und versucht es ein zweites Mal. */
+  singleLargeTimeoutMs: 410000,
+  /* 16000 seit dem Wechsel auf Large 4: Das Nachdenken zaehlt zu den
+     Antwort-Token (gemessen 31.10.2026 rund 10.500 je Analyse, Spitze 15.500). */
+  singleLargeMaxTokens: 16000,
   requestBudgetMs: 480000,
 
   /* WIEDER 4 SEIT 16.09.2026 (Freigabe Christoph nach dem Workshop-Tag).
@@ -55,7 +60,10 @@ const T1_NORMAL = {
      dann `node scripts/betriebsprofil-anlegen.js --ausfuehren --ueberschreiben`
      (die vier Felder parallelitaet, queueRatePerSekunde, drosselMaxParallel,
      tokenAbstandGrossMs zusammen, in beiden Profilen). */
-  parallelitaet: 6,
+  /* 15 mit Large 4 (Lasttest 31.10.2026: 30 von 30 fertig in 3:46 min, keine
+     Ablehnung; mit 30 zugleich scheiterten 3 von 30). Grenze laut Kopfzeile:
+     2000 Aufrufe je Minute. */
+  parallelitaet: 15,
 
   /* DIE GLOBALE BREMSE. Sie wird von der `satzWache` in die echte
      Cloud-Tasks-Queue übertragen (`maxDispatchesPerSecond`) und wirkt damit
@@ -98,7 +106,7 @@ const T1_NORMAL = {
   /* GEMESSEN 30.08.2026 an der Produktion: Median 40 s (Spanne 34–41), nicht
      65. Der Wert steuert die angezeigte Wartezeit — zu hoch heißt, die Leute
      warten auf eine Zahl, die nie eintrifft. */
-  durchschnittsdauerSekunden: 40,
+  durchschnittsdauerSekunden: 80,
 
   stundenlimit: 500,
   stundenfensterMinuten: 60,
@@ -112,7 +120,7 @@ const T1_NORMAL = {
      toter Code mit dem Anschein von Sicherheit. Der Doku-Test erzwingt das
      Verhaeltnis. Und sie zaehlt nur je Server-Instanz: Am 08.09. liefen
      sieben Instanzen zugleich, jede hielt fuer sich Abstand. */
-  drosselMaxParallel: 6,
+  drosselMaxParallel: 15,
   drosselWartelimitMs: 360000,
 
   /* MINDESTABSTAND ZWISCHEN KI-AUFRUFEN, gemessen 30.08.2026. Hier standen

@@ -58,8 +58,8 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `singleLargeTimeoutMs` | 300000 | Wie lange ein Analyse-Aufruf dauern darf |
-| `singleLargeMaxTokens` | 5000 | Wie viel Text die KI ausgeben darf |
+| `singleLargeTimeoutMs` | 410000 | Wie lange ein Analyse-Aufruf dauern darf |
+| `singleLargeMaxTokens` | 16000 | Wie viel Text die KI ausgeben darf |
 | `mistralTimeoutMs` | 90000 | Zeitgrenze der übrigen Aufrufe |
 | `requestBudgetMs` | 480000 | Gesamtbudget eines Durchlaufs |
 
@@ -67,10 +67,10 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `parallelitaet` | 6 | Wie viele Analysen gleichzeitig laufen |
+| `parallelitaet` | 15 | Wie viele Analysen gleichzeitig laufen |
 | `queueRatePerSekunde` | 0.2 | Wie schnell die Warteschlange Aufträge losschickt |
 | `warteschlangeTiefe` | 100 | Ab wie vielen Wartenden abgelehnt wird, wenn keine gemessene Dauer vorliegt |
-| `durchschnittsdauerSekunden` | 40 | Ausgangswert der Wartezeit-Ansage |
+| `durchschnittsdauerSekunden` | 80 | Ausgangswert der Wartezeit-Ansage |
 | `stundenlimit` | 500 | Analysen pro Zeitfenster |
 | `stundenfensterMinuten` | 60 | Größe dieses Fensters |
 | `adressLimit` | 500 | Anfragen je Internetanschluss |
@@ -87,7 +87,7 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 
 | Feld | heute | Bedeutung |
 |---|---|---|
-| `drosselMaxParallel` | 6 | Gleichzeitige Aufrufe an Mistral |
+| `drosselMaxParallel` | 15 | Gleichzeitige Aufrufe an Mistral |
 | `drosselWartelimitMs` | 360000 | Wie lange ein Aufruf auf seinen Platz wartet |
 | `tokenAbstandGrossMs` | 2500 | Mindestabstand zwischen zwei KI-Aufrufen (je Server-Instanz) |
 | `ueberlastWarteMs` | 10000 | Wartezeit vor der ersten Wiederholung, wenn Mistral ablehnt oder kurz weg ist; jede weitere verdoppelt sich |

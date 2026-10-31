@@ -93,7 +93,7 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    WELCHES Modell rechnet, steht auf der Website und in den Rechtstexten.
    Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein anderes
    Modell, waehrend die Seite weiter das alte nennt. */
-const MISTRAL_MODEL = "mistral-large-2512";
+const MISTRAL_MODEL = "mistral-large-4";
 /* BLEIBT IM CODE — was je Modell am Aufruf anders ist, an einer Stelle.
    Large 4 denkt vor jeder Antwort nach, und das Nachdenken zaehlt zu den
    Antwort-Token. Die kleinste Stufe ist seit Oktober 2026 "low"; "none" lehnt

@@ -36,7 +36,7 @@ const SATZ = {
   boostFaktor: 2,
   boostFristMs: 7200000,
   /* Drosselung */
-  drosselMaxParallel: 5,
+  drosselMaxParallel: 14,
   drosselWartelimitMs: 360000,
   tokenAbstandGrossMs: 800,
   /* Bewusst andere Zahlen als die Produktion (10000 / 4). */

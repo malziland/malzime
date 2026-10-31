@@ -138,7 +138,8 @@ async function mitEinemNeuversuchBeiAbbruch(erster, neuversuch) {
   }
 }
 
-/* Mindestens so viel Budget muss bleiben, sonst lohnt ein zweiter Versuch nicht. */
+/* BLEIBT IM CODE — Rechengrenze des Neuversuchs, kein Betriebswert.
+   Mindestens so viel Budget muss bleiben, sonst lohnt ein zweiter Versuch nicht. */
 const MIN_REST_FUER_NEUVERSUCH_MS = 60_000;
 
 /** Lief ein Aufruf in die Zeitgrenze, und erlaubt das Modell einen zweiten

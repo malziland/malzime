@@ -73,7 +73,9 @@ ZEILEN_GRENZEN = {
     # am Ende des Analyse-Auftrags stehen jetzt in muster.js (es sind mehrere
     # geworden, je Analyse geht eine mit). Ohne die Senkung haette jede der
     # beiden Dateien 650 Zeilen Luft, und die Grenze saehe nichts mehr.
-    "functions/src/locales/de/prompts.js": 530,
+    # ANGEHOBEN 01.11.2026 fuer den Wechsel auf Large 4: der eigene Werbe-Auftrag fuer Kinder ist
+    # eine Vorlage neben den anderen, keine Logik.
+    "functions/src/locales/de/prompts.js": 540,
     "functions/src/locales/en/prompts.js": 500,
     # Die Vorlagen selbst: reine Daten, drei Stueck je Sprache. Eine weitere
     # Vorlage aendert, was die KI schreibt, und braucht eine Messung
@@ -116,7 +118,9 @@ ZEILEN_GRENZEN = {
     # der Neuversuch um den ersten Aufruf, die Warnung beim ersten Abriss und
     # das Feld `ursache` in zwei Fehlerzeilen. Sie herauszuloesen hiesse, den
     # Ablauf des Normalfalls zu verstecken.
-    "functions/src/mistral.js": 790,
+    # ANGEHOBEN 01.11.2026 fuer den Wechsel auf Large 4: Auswahl des Werbe-Auftrags und zweiter
+    # Versuch gehoeren in den Ablauf des Aufrufs.
+    "functions/src/mistral.js": 830,
     # Abgetrennt 13.10.2026: was am Auftrag je Analyse wechselt (Marken-Sperre,
     # Formvorlage). mistral.js waere mit der Vorlagenwahl auf 814 gewachsen.
     "functions/src/auftrag-wechsel.js": 95,
@@ -124,7 +128,9 @@ ZEILEN_GRENZEN = {
     # 150 -> 170 noch am selben Tag: Die Positivliste der zulaessigen
     # Fehlertexte (Befund R-03, Datenschutz) ersetzt die Maskierung nach
     # Mustern und ist eine Liste, keine Logik.
-    "functions/src/verbindungsfehler.js": 170,
+    # ANGEHOBEN 01.11.2026 fuer den Wechsel auf Large 4: zwei kurze Entscheidungen zum zweiten
+    # Versuch, gleiche Aufgabe wie der Rest der Datei.
+    "functions/src/verbindungsfehler.js": 190,
     # Der Netzzugriff, dritter Schnitt.
     "functions/src/mistral-http.js": 450,
     # Die abgetrennte Haelfte — sonst waere die Grenze oben umgehbar.
@@ -138,7 +144,9 @@ ZEILEN_GRENZEN = {
     # Das ist die zulaessige Antwort auf eine Grenzverletzung: anheben UND
     # begruenden. Der Gewinn steht daneben — mistral.js ist im selben Schritt
     # von 1681 auf 1438 Zeilen gefallen.
-    "functions/src/mistral-antwort.js": 340,
+    # ANGEHOBEN 01.11.2026 fuer den Wechsel auf Large 4: Erkennung von KI-Absagen, reine Funktionen
+    # wie der Rest der Datei.
+    "functions/src/mistral-antwort.js": 360,
     # Die Live-Anzeige im Browser. Noch nicht angefasst.
     "public/js/live-anzeige.js": 1370,
     # Der Netzzugriff des Frontends. 10.09.2026: Wake-Lock und
@@ -197,7 +205,8 @@ ZEILEN_GRENZEN = {
     # 13.10.2026: +20 fuer drei neue Dateien (Vorlagen in zwei Sprachen,
     # auftrag-wechsel.js) samt Begruendung — Daten, keine Logik.
     # 16.10.2026: +20 fuer die Grenzen und Begruendungen der dauerhaften Zaehler.
-    "scripts/pruefe-kopplung.py": 600,
+    # ANGEHOBEN 01.11.2026: Die Liste der Grenzen waechst mit ihren Begruendungen.
+    "scripts/pruefe-kopplung.py": 620,
     # 07.10.2026: Die Aufteilungen der Behebung nach dem Audit vom 03.10.2026
     # haben neue Dateien erzeugt, die in keiner Grenze standen — genau das
     # Schlupfloch, das der Kommentar oben beschreibt (aus einer grossen Datei

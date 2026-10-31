@@ -322,6 +322,7 @@ function escapeXml(str) {
    stattdessen ein Satz darin ("Ich kann diese Anfrage nicht erfuellen."), und
    ohne diese Pruefung landete er als Werbe-Kaertchen beim Kind: gemessen mit
    Large 4 am 31.10.2026 in 6 von 42 Analysen, 5 davon bei Kindern. */
+/* BLEIBT IM CODE — Erkennungsmerkmal einer Absage, kein Betriebswert. */
 const MAX_WOERTER_WERBE_EINTRAG = 8;
 const WERBE_ABSAGE_ANFANG =
   /^(ich (kann|darf|werde|erstelle|m(?:oe|\u00f6)chte)|das kann ich|tut mir|i (can|cannot|can't|won't|will not|am|'m|apologi[sz]e)|i['\u2019]m|sorry|leider|entschuldigung|unfortunately)\b/i;

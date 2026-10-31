@@ -94,6 +94,17 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein anderes
    Modell, waehrend die Seite weiter das alte nennt. */
 const MISTRAL_MODEL = "mistral-large-2512";
+/* BLEIBT IM CODE — was je Modell am Aufruf anders ist, an einer Stelle.
+   Large 4 denkt vor jeder Antwort nach, und das Nachdenken zaehlt zu den
+   Antwort-Token. Die kleinste Stufe ist seit Oktober 2026 "low"; "none" lehnt
+   Mistral ab (gemessen 31.10.2026, HTTP 400). Deshalb braucht der kleine
+   Werbe-Aufruf dort mehr Platz: Bei 600 Token brach er in 13 von 42 Laeufen ab.
+   Ein unbekanntes Modell bekommt nichts dazu: Der Aufruf bleibt wie bisher. */
+const MODELL_EINSTELLUNGEN = {
+  "mistral-large-2512": { aufrufZusatz: {}, werbeMaxTokens: 600 },
+  "mistral-large-4": { aufrufZusatz: { reasoning_effort: "low" }, werbeMaxTokens: 4000 },
+};
+const modellEinstellungen = (modell) => MODELL_EINSTELLUNGEN[modell] || MODELL_EINSTELLUNGEN["mistral-large-2512"];
 /* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des
    globalen — Mistral sichert damit VERTRAGLICH zu, dass die Inferenz in
    EU-/EFTA-Rechenzentren laeuft (der globale Endpunkt verspricht nur
@@ -312,6 +323,7 @@ module.exports = {
   MAX_UPLOAD_BYTES,
   ALLOWED_MIME,
   MISTRAL_MODEL,
+  modellEinstellungen,
   MISTRAL_ENDPOINT,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,
   QUEUE_NAME,

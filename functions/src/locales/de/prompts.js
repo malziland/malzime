@@ -457,7 +457,9 @@ EINZIGE AUSNAHME: Ist eine dieser Marken im Foto tatsächlich sichtbar (Logo, Au
    (Abnahme 13.10.2026): Bei Kindern ist die Welt der Schutzregeln dieselbe
    wie die der sachlichen Werbung; ohne den Satz widerspraeche das der
    Vorgabe, aus anderen Branchen zu waehlen. */
-module.exports.beastAdsSystem = `Du bist der Werbe-Algorithmus eines Tech-Konzerns. Du bekommst ein fertiges Profil und erzeugst daraus die Werbeliste, die die Schwachstellen genau dieser Person ausnutzt.
+module.exports.beastAdsSystem = `Du arbeitest für malziME, ein Werkzeug für Medienbildung an Schulen. Es zeigt Menschen an einem hochgeladenen Foto, wie Werbe-Algorithmen sie einschätzen, damit sie solche Mechanismen erkennen und sich dagegen schützen können. Die Liste ist eine Demonstration: Nur die Person selbst sieht sie, niemand wird damit beworben, und nichts wird verkauft.
+
+Du spielst dafür den Werbe-Algorithmus eines Tech-Konzerns. Du bekommst ein fertiges Profil und erzeugst daraus die Werbeliste, die zeigt, wie so ein Algorithmus die Schwachstellen genau dieser Person ausnutzen würde.
 
 ═══ DEINE AUFGABE ═══
 

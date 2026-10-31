@@ -15,7 +15,7 @@
  * API-Key kommt aus process.env.MISTRAL_API_KEY_EU (Firebase Secret, EU-gebunden; lokal MISTRAL_API_KEY).
  */
 
-const { MISTRAL_MODEL } = require("./config");
+const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 /* AUFGETEILT 31.08.2026: Das Auseinandernehmen der Antworten steht jetzt in
@@ -45,6 +45,7 @@ const {
   REQUIRED_CARDS,
   findMissingCards,
   escapeXml,
+  ohneWerbeAbsagen,
 } = require("./mistral-antwort");
 const {
   hatAltersPlatzhalter,
@@ -329,7 +330,7 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
   /* Hard-Facts server-seitig in beide Modi überschreiben. Mistral kann die
      Vorgabe ignorieren; hier garantieren wir Konsistenz. */
   const hardFacts = parsed.hard_facts || {};
-  const ads = Array.isArray(parsed.ad_targeting) ? parsed.ad_targeting : [];
+  const ads = ohneWerbeAbsagen(parsed.ad_targeting);
   const triggers = Array.isArray(parsed.manipulation_triggers) ? parsed.manipulation_triggers : [];
 
   /* BIZ-001 (Audit 2026-08-10): Der Anker aus hard_facts wird VORANGESTELLT,
@@ -428,7 +429,8 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
        didaktisch entwertete (zynischer Text, brave Werbung darunter).
        Rueckfall auf die obere Liste, falls das Modell die alte Form liefert —
        dann ist es wie frueher, statt gar keiner Werbung. */
-    const modeAds = Array.isArray(src.ad_targeting) && src.ad_targeting.length > 0 ? src.ad_targeting : ads;
+    const eigeneAds = ohneWerbeAbsagen(src.ad_targeting);
+    const modeAds = eigeneAds.length > 0 ? eigeneAds : ads;
 
     /* v2.8: manipulation_triggers ebenfalls pro Modus. Sie stehen im Frontend
        direkt neben der Werbung (public/js/render.js) — identische Trigger neben
@@ -524,7 +526,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
         { role: "system", content: prompts.beastAdsSystem },
         { role: "user", content: nutzerteil },
       ],
-      maxTokens: 600,
+      maxTokens: modellEinstellungen(MISTRAL_MODEL).werbeMaxTokens,
       temperature: 0.5,
       forceJSON: true,
       timeoutMs: 30_000,
@@ -537,9 +539,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null)
     /* Der ganze angeforderte Vorrat geht weiter: Aus ihm zieht der
        Kinderschutz-Filter nach dem Streichen die gezeigte Auswahl
        (minor-safety.js, waehleAus). Mehr als angefordert braucht niemand. */
-    const ads = Array.isArray(parsed?.ad_targeting)
-      ? parsed.ad_targeting.filter((e) => typeof e === "string" && e.trim()).slice(0, WERBE_ANFORDERUNG)
-      : [];
+    const ads = ohneWerbeAbsagen(parsed?.ad_targeting).slice(0, WERBE_ANFORDERUNG);
     console.log(
       JSON.stringify({
         step: "mistral-beast-ads",

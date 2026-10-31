@@ -20,7 +20,7 @@
 
 const { extrahiereLiveText } = require("./mistral-antwort");
 
-const { MISTRAL_ENDPOINT } = require("./config");
+const { MISTRAL_ENDPOINT, modellEinstellungen } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
 const { withMistralSlot } = require("./throttle");
 /* Workshop 01.10.2026: Ein Verbindungsabriss ("terminated", "fetch failed")
@@ -212,6 +212,7 @@ async function callMistralRawUnthrottled({
     messages,
     max_tokens: maxTokens,
     temperature,
+    ...modellEinstellungen(model).aufrufZusatz,
   };
   if (streamen) body.stream = true;
   if (forceJSON) body.response_format = { type: "json_object" };

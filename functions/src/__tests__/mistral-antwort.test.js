@@ -81,3 +81,53 @@ describe("findeProfileTextWert — Text aus angefangenem JSON lesen", () => {
     expect(findeProfileTextWert(roh, idx, KARTEN_WERT_SCHLUESSEL).text).toBe("25-30 Jahre");
   });
 });
+
+describe("ohneWerbeAbsagen — eine Absage der KI wird nie ein Werbe-Kaertchen", () => {
+  const { istWerbeAbsage, ohneWerbeAbsagen } = require("../mistral-antwort");
+
+  /* Wortlaut aus der Messung vom 31.10.2026 (Large 4, Fotos von Kindern). */
+  test.each([
+    "Ich kann diese Anfrage nicht erfüllen.",
+    "Ich kann diese Anfrage nicht ausführen. Es geht hier um die Erstellung manipulativer Werbeziele.",
+    "Das Profil beschreibt ein etwa 5-jähriges Kind, und die Aufgabe besteht ausdrücklich darin, dessen Verletzlichkeit auszunutzen.",
+    "I cannot help with this request.",
+    "Sorry, that is not possible.",
+  ])("erkennt als Absage: %s", (satz) => {
+    expect(istWerbeAbsage(satz)).toBe(true);
+  });
+
+  test.each(["Pokémon Karten", "iRobot Roomba", "i-Size Kindersitz", "Ich", "Die drei ??? Kids", "Toniebox Hörfigur"])(
+    "laesst echte Eintraege stehen: %s",
+    (eintrag) => {
+      expect(istWerbeAbsage(eintrag)).toBe(false);
+    }
+  );
+
+  test("Grenze: acht Woerter bleiben, neun fallen", () => {
+    expect(istWerbeAbsage("a b c d e f g h")).toBe(false);
+    expect(istWerbeAbsage("a b c d e f g h i")).toBe(true);
+  });
+
+  test("filtert die Liste und vertraegt fremde Formen", () => {
+    expect(ohneWerbeAbsagen(["Lego", "Ich kann das nicht.", "", null, 3])).toEqual(["Lego"]);
+    expect(ohneWerbeAbsagen(undefined)).toEqual([]);
+    expect(ohneWerbeAbsagen("Lego")).toEqual([]);
+  });
+});
+
+describe("modellEinstellungen — was je Modell am Aufruf anders ist", () => {
+  const { modellEinstellungen } = require("../config");
+
+  test("Large 3 bleibt unveraendert", () => {
+    expect(modellEinstellungen("mistral-large-2512")).toEqual({ aufrufZusatz: {}, werbeMaxTokens: 600 });
+  });
+
+  test("Large 4 denkt auf der kleinsten Stufe und hat Platz fuer die Werbung", () => {
+    expect(modellEinstellungen("mistral-large-4").aufrufZusatz).toEqual({ reasoning_effort: "low" });
+    expect(modellEinstellungen("mistral-large-4").werbeMaxTokens).toBe(4000);
+  });
+
+  test("ein unbekanntes Modell bekommt keinen Zusatz", () => {
+    expect(modellEinstellungen("mistral-unbekannt").aufrufZusatz).toEqual({});
+  });
+});

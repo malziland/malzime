@@ -318,8 +318,28 @@ function escapeXml(str) {
     .replace(/'/g, "&#39;");
 }
 
+/* Ein Werbe-Eintrag hat 1 bis 3 Woerter. Lehnt die KI die Liste ab, steht
+   stattdessen ein Satz darin ("Ich kann diese Anfrage nicht erfuellen."), und
+   ohne diese Pruefung landete er als Werbe-Kaertchen beim Kind: gemessen mit
+   Large 4 am 31.10.2026 in 6 von 42 Analysen, 5 davon bei Kindern. */
+const MAX_WOERTER_WERBE_EINTRAG = 8;
+const WERBE_ABSAGE_ANFANG =
+  /^(ich (kann|darf|werde|moechte|möchte)|i (can|cannot|can't|won't|will not|am|'m)|i'm|sorry|leider|entschuldigung|unfortunately)\b/i;
+
+function istWerbeAbsage(eintrag) {
+  const text = eintrag.trim();
+  return text.split(/\s+/).length > MAX_WOERTER_WERBE_EINTRAG || WERBE_ABSAGE_ANFANG.test(text);
+}
+
+function ohneWerbeAbsagen(liste) {
+  if (!Array.isArray(liste)) return [];
+  return liste.filter((e) => typeof e === "string" && e.trim() && !istWerbeAbsage(e));
+}
+
 module.exports = {
   findeProfileTextWert,
+  istWerbeAbsage,
+  ohneWerbeAbsagen,
   extrahiereLiveText,
   KARTEN_WERT_SCHLUESSEL,
   KARTEN_LABEL_SCHLUESSEL,

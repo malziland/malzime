@@ -37,6 +37,7 @@ const {
   meldeAbbruchMitNeuversuch,
   mitEinemNeuversuchBeiAbbruch,
   neuversuchNachZeitgrenze,
+  neuversuchNachLeererAntwort,
   hatRettbarenTeiltext,
 } = require("./verbindungsfehler");
 
@@ -264,6 +265,9 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
       return callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, liveNeu || undefined, dauer);
     }
   );
+  if (neuversuchNachLeererAntwort(parsed, modellEinstellungen(MISTRAL_MODEL), remainingBudget)) {
+    parsed = await callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer);
+  }
   let missing = parsed
     ? collectMissingForBothModes(parsed)
     : { standard: REQUIRED_CARDS.slice(), beast: REQUIRED_CARDS.slice() };

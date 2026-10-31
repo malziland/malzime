@@ -182,3 +182,22 @@ describe("Werbe-Auftrag fuer Kinder bis 13", () => {
     expect(beastAdsSystemKind).toMatch(/Dating|dating/);
   });
 });
+
+describe("neuversuchNachLeererAntwort — keine lesbare Antwort", () => {
+  const { neuversuchNachLeererAntwort: pruefe } = require("../verbindungsfehler");
+  const { modellEinstellungen } = require("../config");
+  const large4 = modellEinstellungen("mistral-large-4");
+
+  test("Large 4 ohne Antwort, genug Budget: ja", () => {
+    expect(pruefe(null, large4, () => 60_000)).toBe(true);
+  });
+  test("knapp zu wenig Budget: nein", () => {
+    expect(pruefe(null, large4, () => 59_999)).toBe(false);
+  });
+  test("lesbare Antwort: nein", () => {
+    expect(pruefe({ standard: {} }, large4, () => 300_000)).toBe(false);
+  });
+  test("Large 3 bleibt wie bisher", () => {
+    expect(pruefe(null, modellEinstellungen("mistral-large-2512"), () => 300_000)).toBe(false);
+  });
+});

@@ -149,6 +149,15 @@ function neuversuchNachZeitgrenze(err, modell, restBudget) {
   return rest >= MIN_REST_FUER_NEUVERSUCH_MS;
 }
 
+/** Kam keine lesbare Antwort zurueck (gemessen 31.10.2026: Large 4 verbrauchte
+ *  die erlaubten Token, 1 von 84 Laeufen), und reicht das Budget fuer einen
+ *  zweiten Versuch? Ohne ihn bekaeme die Person eine Fehlermeldung. */
+function neuversuchNachLeererAntwort(parsed, modell, restBudget) {
+  if (parsed || !modell || !modell.neuversuchBeiZeitgrenze) return false;
+  const rest = typeof restBudget === "function" ? restBudget() : 0;
+  return rest >= MIN_REST_FUER_NEUVERSUCH_MS;
+}
+
 /** Liegt ein gelesener Teiltext vor, der gerettet werden kann (Zeitlimit
  *  oder Abriss mitten im Strom)? */
 function hatRettbarenTeiltext(err) {
@@ -167,5 +176,6 @@ module.exports = {
   meldeAbbruchMitNeuversuch,
   mitEinemNeuversuchBeiAbbruch,
   neuversuchNachZeitgrenze,
+  neuversuchNachLeererAntwort,
   hatRettbarenTeiltext,
 };

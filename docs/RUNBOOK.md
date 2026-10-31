@@ -209,6 +209,8 @@ irgendetwas hinausgeht —, macht `deploy.sh` daraus `1`. Vorher sah ein solcher
 Abbruch für die Kette aus wie eine Auslieferung, und die Schlussbilanz der
 übersprungenen Riegel erschien im Wartungsmodus nie.
 
+**Zweig, der nur den CHANGELOG aendert:** Liegt der Inhalt schon in `main`, zeigt der Pull Request nur noch den CHANGELOG. `scripts/nur-nachtrag.sh` haelt ihn dann fuer einen Nachtrag, der Browser-Test entfaellt, und die Kette bricht an dieser Stelle richtig ab (`test-e2e=skipped`). Eine Auslieferung braucht deshalb mindestens eine weitere Datei im Pull Request, sonst laeuft kein Browser-Test gegen den Endstand.
+
 ## Notschalter des Deploys
 
 Acht Stück, alle nur im Notfall und alle einzeln zu begründen. Jeder

@@ -90,6 +90,8 @@ describe("ohneWerbeAbsagen — eine Absage der KI wird nie ein Werbe-Kaertchen",
     "Ich kann diese Anfrage nicht erfüllen.",
     "Ich kann diese Anfrage nicht ausführen. Es geht hier um die Erstellung manipulativer Werbeziele.",
     "Das Profil beschreibt ein etwa 5-jähriges Kind, und die Aufgabe besteht ausdrücklich darin, dessen Verletzlichkeit auszunutzen.",
+    "Ich erstelle diese Werbeliste nicht.",
+    "Ich möchte das nicht.",
     "I cannot help with this request.",
     "Sorry, that is not possible.",
   ])("erkennt als Absage: %s", (satz) => {

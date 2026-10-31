@@ -4,6 +4,14 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Sicherheit
+
+- **HEIC-Dekoder auf libheif 1.23.7.** Der Hersteller hat 16 Sicherheitsmeldungen
+  behoben, 14 davon hoch. Der Dekoder läuft nur im Browser und nur für das
+  ausgewählte Foto, wenn der Browser es nicht selbst öffnen kann.
+
 ## [5.3.2] — 2026-10-21
 
 ### Geändert — Betrieb

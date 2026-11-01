@@ -9,7 +9,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 ### Geändert — KI
 
 - **„So denkt die KI über dich“ fasst im normalen Modus das Ergebnis zusammen,**
-  statt das Foto noch einmal zu beschreiben. Der Beast-Modus bleibt unverändert.
+  statt das Foto noch einmal zu beschreiben. Ein kurzer zweiter Schritt ohne Foto
+  nimmt übrige Bilddetails heraus und korrigiert Sprachfehler. Der Beast-Modus
+  bleibt unverändert.
 
 ## [5.4.1] — 2026-11-01
 

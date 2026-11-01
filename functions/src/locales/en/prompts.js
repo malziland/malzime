@@ -491,3 +491,5 @@ The person already receives these ads in the factual mode — they reflect the v
 <bestehende_werbung>
 ${p.standardAds}
 </bestehende_werbung>`;
+
+Object.assign(module.exports, require("./lektor"));

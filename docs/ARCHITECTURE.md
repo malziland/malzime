@@ -270,6 +270,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `kapazitaets-wache.js` | Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen |
 | `laufzeit-wache.js` | Meldet, wenn Analysen an ihre Zeitgrenze stoßen |
 | `wartezeit-wache.js` | Push, wenn eine Analyse länger als 5 Minuten auf ihren Start wartet (vom Aufräumdienst je Lauf gerufen) |
+| `text-lektor.js` | Bereinigt die seriöse Zusammenfassung in einem kurzen Aufruf ohne Foto |
 | `werbe-wache.js` | Push, wenn die Beast-Werbung länger als 30 Minuten am Stück ausfällt (vom Aufräumdienst je Lauf gerufen) |
 | `statistik.js` | Dauerhafte, anonyme Zähler (Sammlung `statistik`): je 10-Minuten-Fenster Ausgänge und Dauer-Klassen, je Tag Browser-Fehler und Textmenge der KI; der Aufräumdienst zählt vor dem Löschen |
 | `db.js` | Firestore-Zugang (benannte Datenbank `malzime-eu`) |

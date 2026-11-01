@@ -3,7 +3,7 @@
    Hier ist ALLES gemockt (auch mistral.js und die Feature-Flags), denn
    geprueft wird ausschliesslich die Verdrahtung in runPipeline:
      - Flag AN  → runSingleLargeCall bekommt einen onLiveText-Callback, der
-       (auf 1 Schreibvorgang je 2 s gedrosselt) jobs.setLiveText ruft.
+       nur noch beim Neuversuch jobs.setLiveText ruft (leere Welle).
      - Flag AUS → die opts sind EXAKT die heutigen — kein onLiveText,
        kein Stream, kein Schreibvorgang. Das ist die zentrale
        „ohne Flag aendert sich nichts"-Garantie des Workers. */
@@ -130,122 +130,55 @@ describe("runPipeline — Live-Text ist fest eingebaut (seit 10.09.2026)", () =>
 });
 
 describe("runPipeline — Live-Text schreiben", () => {
-  test("runSingleLargeCall bekommt einen onLiveText-Callback, der setLiveText mit jobId und BEIDEN Texten ruft", async () => {
+  /* Der Rohtext darf nicht vor dem Lektor auf dem Bildschirm stehen. */
+  test("Rohtext geht nicht hinaus, weder Standard noch Beast", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-      expect(typeof opts.onLiveText).toBe("function");
-      opts.onLiveText({ standard: "Du bist", beast: null });
+      opts.onLiveText({ standard: "Du bist", beast: "Wir wissen" });
       return PROFIL;
     });
     await handleProcessJob(postReq(), makeRes());
-    expect(jobs.setLiveText).toHaveBeenCalledTimes(1);
-    /* EIN Schreibvorgang traegt beide Felder — das Objekt geht 1:1 durch. */
-    expect(jobs.setLiveText).toHaveBeenCalledWith("job-1", { standard: "Du bist", beast: null });
+    expect(jobs.setLiveText).not.toHaveBeenCalled();
   });
 
-  test("Drossel: zwei Wellen innerhalb von 2 s ergeben nur EINEN Schreibvorgang", async () => {
-    mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-      opts.onLiveText({ standard: "Du bist", beast: null });
-      /* unmittelbar danach → gedrosselt, auch wenn Beast inzwischen da ist */
-      opts.onLiveText({ standard: "Du bist sportlich", beast: "Du bist ein" });
-      return PROFIL;
-    });
-    await handleProcessJob(postReq(), makeRes());
-    expect(jobs.setLiveText).toHaveBeenCalledTimes(1);
-    expect(jobs.setLiveText).toHaveBeenCalledWith("job-1", { standard: "Du bist", beast: null });
-  });
-
-  test("nach Ablauf der 2-s-Drossel wird erneut geschrieben — dann mit dem Beast-Stand", async () => {
-    const echteNow = Date.now.bind(Date);
-    let versatzMs = 0;
-    const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => echteNow() + versatzMs);
-    try {
-      mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-        opts.onLiveText({ standard: "Du bist", beast: null });
-        versatzMs += 2500; /* die Drossel-Frist ist abgelaufen */
-        opts.onLiveText({ standard: "Du bist sportlich", beast: "Du bist ein" });
-        return PROFIL;
-      });
-      await handleProcessJob(postReq(), makeRes());
-    } finally {
-      nowSpy.mockRestore();
-    }
-    expect(jobs.setLiveText).toHaveBeenCalledTimes(2);
-    expect(jobs.setLiveText).toHaveBeenLastCalledWith("job-1", { standard: "Du bist sportlich", beast: "Du bist ein" });
-  });
-
-  /* Neuversuch nach Verbindungsabriss (01.10.2026): Die erste Welle des neuen
-     Versuchs setzt den Bildschirm zurueck und darf nicht in der Drossel
-     haengen bleiben — sonst stuende der alte Text bis zu 2 s weiter da. */
-  test("Drossel: die erste Welle eines neuen Versuchs geht sofort durch, danach wird wieder gedrosselt", async () => {
+  /* Neuversuch nach Verbindungsabriss: Die Welle setzt die Anzeige zurueck und
+     traegt auch dann keinen Text, wenn das Modell schon geschrieben hat. */
+  test("ein neuer Versuch schickt genau eine leere Welle", async () => {
     mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
       opts.onLiveText({ standard: "Du bist alt", beast: null });
-      opts.onLiveText({ standard: "", beast: null, versuch: 2 });
-      opts.onLiveText({ standard: "Du bist neu", beast: null, versuch: 2 });
+      opts.onLiveText({ standard: "Du bist neu", beast: "Wir", versuch: 2 });
+      opts.onLiveText({ standard: "Du bist neuer", beast: "Wir", versuch: 2 });
       return PROFIL;
     });
     await handleProcessJob(postReq(), makeRes());
-    expect(jobs.setLiveText.mock.calls.map((c) => c[1])).toEqual([
-      { standard: "Du bist alt", beast: null },
-      { standard: "", beast: null, versuch: 2 },
-    ]);
+    expect(jobs.setLiveText.mock.calls.map((c) => c[1])).toEqual([{ standard: "", beast: null, versuch: 2 }]);
   });
 
-  /* Befunde U-05/V-04: Zwei gleichzeitige update-Aufrufe kommen in Firestore
-     in beliebiger Reihenfolge an — eine spaete Welle des ersten Versuchs
-     koennte die leere des zweiten ueberschreiben. Darum nacheinander. */
-  test("Schreibvorgaenge laufen nacheinander: der zweite beginnt erst, wenn der erste fertig ist", async () => {
-    const erledigt = [];
-    let ersterFertig;
-    jobs.setLiveText.mockImplementationOnce(
-      () =>
-        new Promise((aufloesen) => {
-          ersterFertig = () => {
-            erledigt.push("erster fertig");
-            aufloesen();
-          };
-        })
-    );
-    jobs.setLiveText.mockImplementationOnce(async () => {
-      erledigt.push("zweiter beginnt");
+  test("der bereinigte Text ersetzt nur den seriösen Text, Beast bleibt", async () => {
+    mistral.textBereinigen = jest.fn().mockResolvedValue("Bereinigt.");
+    mistral.runSingleLargeCall.mockResolvedValue({
+      ...PROFIL,
+      normal: { ...PROFIL.normal },
+      boost: { ...PROFIL.normal, profileText: "Wir wissen." },
     });
-    mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-      opts.onLiveText({ standard: "Du bist alt", beast: null });
-      opts.onLiveText({ standard: "", beast: null, versuch: 2 });
-      await new Promise((r) => setTimeout(r, 0));
-      expect(erledigt).toEqual([]);
-      ersterFertig();
-      await new Promise((r) => setTimeout(r, 0));
-      return PROFIL;
-    });
-    await handleProcessJob(postReq(), makeRes());
-    expect(erledigt).toEqual(["erster fertig", "zweiter beginnt"]);
-  });
-
-  /* Befund W-01 (Gegenpruefung 01.10.2026): Ist die Datenbank langsam, darf
-     sich nichts stauen — hinter dem laufenden Schreibvorgang wartet nur der
-     juengste Stand, Zwischenstaende entfallen (jede Welle traegt alles). */
-  test("langsame Datenbank: hinter dem laufenden Schreibvorgang wartet nur der juengste Stand", async () => {
-    const echteNow = Date.now.bind(Date);
-    let versatzMs = 0;
-    const nowSpy = jest.spyOn(Date, "now").mockImplementation(() => echteNow() + versatzMs);
-    let ersterFertig;
-    jobs.setLiveText.mockImplementationOnce(() => new Promise((aufloesen) => (ersterFertig = aufloesen)));
     try {
-      mistral.runSingleLargeCall.mockImplementation(async (_b, _m, _r, _l, opts) => {
-        for (const text of ["Du", "Du bist", "Du bist neu", "Du bist neugierig"]) {
-          opts.onLiveText({ standard: text, beast: null });
-          versatzMs += 2500; /* jede Welle nach Ablauf der Drossel */
-        }
-        expect(jobs.setLiveText).toHaveBeenCalledTimes(1);
-        ersterFertig();
-        await new Promise((r) => setTimeout(r, 0));
-        return PROFIL;
-      });
       await handleProcessJob(postReq(), makeRes());
+      expect(mistral.textBereinigen).toHaveBeenCalledWith("Du bist sportlich.", expect.anything(), expect.anything());
+      const ergebnis = jobs.completeJob.mock.calls[0][1];
+      expect(ergebnis.profiles.normal.profileText).toBe("Bereinigt.");
+      expect(ergebnis.profiles.boost.profileText).toBe("Wir wissen.");
     } finally {
-      nowSpy.mockRestore();
+      delete mistral.textBereinigen;
     }
-    expect(jobs.setLiveText.mock.calls.map((c) => c[1].standard)).toEqual(["Du", "Du bist neugierig"]);
+  });
+
+  test("scheitert der Lektor, bleibt der Text der Analyse stehen", async () => {
+    mistral.textBereinigen = jest.fn().mockResolvedValue(null);
+    try {
+      await handleProcessJob(postReq(), makeRes());
+      expect(jobs.completeJob.mock.calls[0][1].profiles.normal.profileText).toBe("Du bist sportlich.");
+    } finally {
+      delete mistral.textBereinigen;
+    }
   });
 
   test("das Analyse-Ergebnis bleibt mit Flag identisch — completeJob bekommt das normale Profil", async () => {

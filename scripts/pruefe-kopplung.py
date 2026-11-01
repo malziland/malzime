@@ -147,8 +147,8 @@ ZEILEN_GRENZEN = {
     # ANGEHOBEN 01.11.2026 fuer den Wechsel auf Large 4: Erkennung von KI-Absagen, reine Funktionen
     # wie der Rest der Datei.
     "functions/src/mistral-antwort.js": 360,
-    # Die Live-Anzeige im Browser. Noch nicht angefasst.
-    "public/js/live-anzeige.js": 1370,
+    # 1410 seit 01.11.2026: Der Schlusstext fuer Large 4 gehoert zur Tipp-Schleife.
+    "public/js/live-anzeige.js": 1410,
     # Der Netzzugriff des Frontends. 10.09.2026: Wake-Lock und
     # Auftragsgedaechtnis ausgelagert (js/wake-lock.js, js/auftrag-speicher.js),
     # 1079 -> 952 Zeilen; die Grenze sinkt mit, sonst waechst die Datei

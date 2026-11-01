@@ -109,7 +109,8 @@ describe("Rettung eines abgebrochenen Single-Large-Laufs", () => {
       onLiveText: () => {},
     });
 
-    expect(aufrufe).toBe(2);
+    /* Versuch, Neuversuch und die Nachfrage nach den uebrigen Karten. */
+    expect(aufrufe).toBe(3);
     expect(ergebnis.normal.categories.alter_geschlecht.value).toContain("40");
   });
 
@@ -128,7 +129,8 @@ describe("Rettung eines abgebrochenen Single-Large-Laufs", () => {
       onLiveText: () => {},
     });
 
-    expect(aufrufe).toBe(1);
+    /* Versuch und die Nachfrage nach den uebrigen Karten, kein Neuversuch. */
+    expect(aufrufe).toBe(2);
     expect(ergebnis.normal.categories.alter_geschlecht.value).toContain("40");
   });
 

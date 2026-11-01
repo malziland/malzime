@@ -45,13 +45,16 @@ const WERBUNG_BEAST = [
 const ALTER = (geschlecht) => `${geschlecht}, ~‹number› years old (range ‹number›-‹number›)`;
 const HERKUNFT = "central european";
 
-function ansicht(geschlecht, alterSatz, hebel, werbung, profileText, karten) {
+function ansicht(geschlecht, alterSatz, hebel, werbung, profileText, karten, fazitZuletzt = false) {
   const categories = {};
   for (const schluessel of Object.keys(LABEL)) {
     const [value, confidence] =
       schluessel === "alter_geschlecht" ? [`You are ${ALTER(geschlecht)}. ${alterSatz}`, 0.85] : karten[schluessel];
     categories[schluessel] = { label: LABEL[schluessel], value, confidence };
   }
+  /* Der seriöse Text ist das Fazit aus den Karten: Die KI schreibt der Reihe
+     nach, deshalb steht er dort nach den Karten. Beast bleibt, wie er ist. */
+  if (fazitZuletzt) return { manipulation_triggers: hebel, ad_targeting: werbung, categories, profileText };
   return { manipulation_triggers: hebel, ad_targeting: werbung, profileText, categories };
 }
 
@@ -66,7 +69,8 @@ function vorlage(geschlecht, standard, beast) {
       HEBEL_SACHLICH,
       WERBUNG_SACHLICH,
       standard.profileText,
-      standard.karten
+      standard.karten,
+      true
     ),
     beast: ansicht(
       geschlecht,
@@ -84,7 +88,7 @@ const AM_HERD = vorlage(
   "male",
   {
     profileText:
-      "You are a man with central European appearance. You stand at a tidy worktop and cut with calm movements. Your income is in the middle to upper range. You visibly value good tools and fresh ingredients. Your eyes stay on the task. The image shows a careful lifestyle built around enjoyment.",
+      'You come across as a careful, pleasure-loving man with a middle to upper income. Quality matters more to you than speed or a low price. That is why cooking and food brands appeal to you, discount campaigns hardly at all. You plan and compare before you buy. You are susceptible to the promise of "the best". For that you tend to spend more than planned.',
     karten: {
       herkunft: [
         "You are central european. Your skin tone, the shape of your face and your hair colour support this algorithmic classification.",
@@ -197,7 +201,7 @@ const AM_BEET = vorlage(
   "female",
   {
     profileText:
-      "You are a woman with central European appearance. You kneel at a raised bed and work in the soil with bare hands. Your income is in the middle to upper range. The well-kept beds show stamina and regular work. Your clothing is practical and worn. The image shows a down-to-earth lifestyle close to nature.",
+      "Overall the picture is of a down-to-earth, persistent woman with a middle to upper income. Nature and home-made things mean more to you than status. Advertising therefore reaches you through sustainability and origin, hardly through luxury. You stay loyal to brands once they have won your trust. Your weak spot is green promises. If something sounds eco-friendly, you check less often.",
     karten: {
       herkunft: [
         "You are central european. Your skin tone, your facial features and your hair colour support this algorithmic classification without any further detail.",
@@ -310,7 +314,7 @@ const AN_DER_WERKBANK = vorlage(
   "male",
   {
     profileText:
-      "You are a man with central European appearance. You stand at a workbench and hold a workpiece up to the light to check it. Your income is in the middle to upper range. Sorted tools on the wall show order and experience. Wood dust on your forearms shows that you have just been working. The image shows a practical, self-reliant lifestyle.",
+      "All in all you come across as a practical, self-reliant man with a middle to upper income. You would rather solve problems yourself than pay for them. You buy durable equipment, services rather not. Order and experience make you a critical customer. You can still be reached. A product that promises more skill almost always catches your interest.",
     karten: {
       herkunft: [
         "You are central european. This algorithmic classification rests on your skin tone, your facial features and your hair colour.",

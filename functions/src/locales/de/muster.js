@@ -72,13 +72,16 @@ const HERKUNFT = "mitteleuropäisch";
 
 /* karten: je Schlüssel [Text, Sicherheit]. Die Alterskarte entsteht hier,
    damit ihr Wortlaut in allen Vorlagen derselbe ist. */
-function ansicht(geschlecht, alterSatz, hebel, werbung, profileText, karten) {
+function ansicht(geschlecht, alterSatz, hebel, werbung, profileText, karten, fazitZuletzt = false) {
   const categories = {};
   for (const schluessel of Object.keys(LABEL)) {
     const [value, confidence] =
       schluessel === "alter_geschlecht" ? [`Du bist ${ALTER(geschlecht)}. ${alterSatz}`, 0.85] : karten[schluessel];
     categories[schluessel] = { label: LABEL[schluessel], value, confidence };
   }
+  /* Der seriöse Text ist das Fazit aus den Karten: Die KI schreibt der Reihe
+     nach, deshalb steht er dort nach den Karten. Beast bleibt, wie er ist. */
+  if (fazitZuletzt) return { manipulation_triggers: hebel, ad_targeting: werbung, categories, profileText };
   return { manipulation_triggers: hebel, ad_targeting: werbung, profileText, categories };
 }
 
@@ -93,7 +96,8 @@ function vorlage(geschlecht, standard, beast) {
       HEBEL_SACHLICH,
       WERBUNG_SACHLICH,
       standard.profileText,
-      standard.karten
+      standard.karten,
+      true
     ),
     beast: ansicht(
       geschlecht,
@@ -111,7 +115,7 @@ const AM_HERD = vorlage(
   "männlich",
   {
     profileText:
-      "Du bist ein Mann mit mitteleuropäischem Erscheinungsbild. Du stehst an einer aufgeräumten Arbeitsfläche und schneidest mit ruhigen Handgriffen. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Du legst sichtbar Wert auf gutes Werkzeug und frische Zutaten. Dein Blick bleibt bei der Sache. Das Bild zeigt einen genussorientierten, sorgfältigen Lebensstil.",
+      "Du wirkst wie ein sorgfältiger, genussorientierter Mann mit mittlerem bis gehobenem Einkommen. Qualität ist dir wichtiger als Tempo oder ein günstiger Preis. Deshalb sprechen dich Marken rund um Küche und gute Zutaten an, Rabattaktionen kaum. Du planst und vergleichst, bevor du kaufst. Empfänglich bist du für das Versprechen „das Beste“. Dafür gibst du eher mehr aus, als du vorhattest.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Dein Hautton, die Form deines Gesichts und deine Haarfarbe stützen diese algorithmische Einordnung.",
@@ -224,7 +228,7 @@ const AM_BEET = vorlage(
   "weiblich",
   {
     profileText:
-      "Du bist eine Frau mit mitteleuropäischem Erscheinungsbild. Du kniest an einem Hochbeet und arbeitest mit bloßen Händen in der Erde. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Die gepflegten Beete zeigen Ausdauer und regelmäßige Arbeit. Deine Kleidung ist praktisch und abgetragen. Das Bild zeigt einen bodenständigen, naturnahen Lebensstil.",
+      "Insgesamt ergibt sich das Bild einer bodenständigen, ausdauernden Frau mit mittlerem bis gehobenem Einkommen. Natur und Selbstgemachtes bedeuten dir mehr als Status. Werbung erreicht dich deshalb über Nachhaltigkeit und Herkunft, kaum über Luxus. Du bleibst Marken treu, wenn sie dein Vertrauen gewonnen haben. Deine Schwachstelle sind grüne Versprechen. Klingt etwas umweltfreundlich, prüfst du seltener nach.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Dein Hautton, deine Gesichtszüge und deine Haarfarbe stützen diese algorithmische Einordnung ohne jede weitere Angabe.",
@@ -337,7 +341,7 @@ const AN_DER_WERKBANK = vorlage(
   "männlich",
   {
     profileText:
-      "Du bist ein Mann mit mitteleuropäischem Erscheinungsbild. Du stehst an einer Werkbank und hältst ein Werkstück prüfend ins Licht. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Sortiertes Werkzeug an der Wand zeigt Ordnung und Erfahrung. Holzstaub auf den Unterarmen zeigt, dass du gerade gearbeitet hast. Das Bild zeigt einen praktischen, eigenständigen Lebensstil.",
+      "Unterm Strich wirkst du wie ein praktischer, eigenständiger Mann mit mittlerem bis gehobenem Einkommen. Du löst Probleme lieber selbst, als dafür zu zahlen. Du kaufst langlebige Ausrüstung, Dienstleistungen eher nicht. Ordnung und Erfahrung machen dich zu einem kritischen Kunden. Erreichbar bist du trotzdem. Ein Produkt, das mehr Können verspricht, weckt dein Interesse fast immer.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Diese algorithmische Einordnung stützt sich auf deinen Hautton, deine Gesichtszüge und deine Haarfarbe.",

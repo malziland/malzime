@@ -92,6 +92,48 @@ describe("Rettung eines abgebrochenen Single-Large-Laufs", () => {
     expect(ergebnis.boost.profileText).toContain("wanderst");
   });
 
+  /* Der seriöse Text steht hinter den Karten: Reisst die Uhr in beiden Versuchen
+     davor, zaehlen die Karten. Im ersten Versuch wird neu versucht. */
+  test("bricht auch der zweite Versuch vor dem Text ab, bleiben die Karten", async () => {
+    const nurKarten = JSON.stringify({
+      subject: "HUMAN",
+      standard: { categories: { alter_geschlecht: { value: "Du bist 40." } } },
+    }).slice(0, -2);
+    let aufrufe = 0;
+    setFetchForTest(async () => {
+      aufrufe += 1;
+      return sseStromDerAbbricht(nurKarten);
+    });
+
+    const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 999_999, "de", {
+      onLiveText: () => {},
+    });
+
+    /* Versuch, Neuversuch und die Nachfrage nach den uebrigen Karten. */
+    expect(aufrufe).toBe(3);
+    expect(ergebnis.normal.categories.alter_geschlecht.value).toContain("40");
+  });
+
+  test("reicht die Zeit nicht fuer einen zweiten Versuch, bleiben die Karten sofort", async () => {
+    const nurKarten = JSON.stringify({
+      subject: "HUMAN",
+      standard: { categories: { alter_geschlecht: { value: "Du bist 40." } } },
+    }).slice(0, -2);
+    let aufrufe = 0;
+    setFetchForTest(async () => {
+      aufrufe += 1;
+      return sseStromDerAbbricht(nurKarten);
+    });
+
+    const ergebnis = await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", null, "de", {
+      onLiveText: () => {},
+    });
+
+    /* Versuch und die Nachfrage nach den uebrigen Karten, kein Neuversuch. */
+    expect(aufrufe).toBe(2);
+    expect(ergebnis.normal.categories.alter_geschlecht.value).toContain("40");
+  });
+
   test("ohne brauchbaren Teiltext bleibt es beim Fehler", async () => {
     setFetchForTest(async () => sseStromDerAbbricht('{"subj'));
 

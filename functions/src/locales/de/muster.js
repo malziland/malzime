@@ -115,7 +115,7 @@ const AM_HERD = vorlage(
   "männlich",
   {
     profileText:
-      "Für uns bist du ein sorgfältiger, genussorientierter Mann mit mittlerem bis gehobenem Einkommen. Qualität ist dir wichtiger als Tempo oder ein günstiger Preis. Das macht dich für Marken rund um Küche und gute Zutaten interessant, weniger für Rabattaktionen. Du planst und vergleichst, bevor du kaufst. Angreifbar bist du beim Versprechen „das Beste“. Dafür gibst du eher mehr aus, als du vorhattest.",
+      "Du wirkst wie ein sorgfältiger, genussorientierter Mann mit mittlerem bis gehobenem Einkommen. Qualität ist dir wichtiger als Tempo oder ein günstiger Preis. Deshalb sprechen dich Marken rund um Küche und gute Zutaten an, Rabattaktionen kaum. Du planst und vergleichst, bevor du kaufst. Empfänglich bist du für das Versprechen „das Beste“. Dafür gibst du eher mehr aus, als du vorhattest.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Dein Hautton, die Form deines Gesichts und deine Haarfarbe stützen diese algorithmische Einordnung.",
@@ -228,7 +228,7 @@ const AM_BEET = vorlage(
   "weiblich",
   {
     profileText:
-      "Dein Profil ergibt eine bodenständige, ausdauernde Frau mit mittlerem bis gehobenem Einkommen. Natur und Selbstgemachtes bedeuten dir mehr als Status. Werbung erreicht dich deshalb über Nachhaltigkeit und Herkunft, kaum über Luxus. Du bleibst Marken treu, wenn sie dein Vertrauen gewonnen haben. Deine Schwachstelle sind grüne Versprechen. Klingt etwas umweltfreundlich, prüfst du seltener nach.",
+      "Insgesamt ergibt sich das Bild einer bodenständigen, ausdauernden Frau mit mittlerem bis gehobenem Einkommen. Natur und Selbstgemachtes bedeuten dir mehr als Status. Werbung erreicht dich deshalb über Nachhaltigkeit und Herkunft, kaum über Luxus. Du bleibst Marken treu, wenn sie dein Vertrauen gewonnen haben. Deine Schwachstelle sind grüne Versprechen. Klingt etwas umweltfreundlich, prüfst du seltener nach.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Dein Hautton, deine Gesichtszüge und deine Haarfarbe stützen diese algorithmische Einordnung ohne jede weitere Angabe.",
@@ -341,7 +341,7 @@ const AN_DER_WERKBANK = vorlage(
   "männlich",
   {
     profileText:
-      "Unterm Strich wirkst du wie ein praktischer, eigenständiger Mann mit mittlerem bis gehobenem Einkommen. Du löst Probleme lieber selbst, als dafür zu zahlen. Für Werbung zählst du als Käufer von langlebiger Ausrüstung, nicht von Dienstleistungen. Ordnung und Erfahrung machen dich zu einem kritischen Kunden. Erreichbar bist du trotzdem. Ein Produkt, das mehr Können verspricht, weckt dein Interesse fast immer.",
+      "Unterm Strich wirkst du wie ein praktischer, eigenständiger Mann mit mittlerem bis gehobenem Einkommen. Du löst Probleme lieber selbst, als dafür zu zahlen. Du kaufst langlebige Ausrüstung, Dienstleistungen eher nicht. Ordnung und Erfahrung machen dich zu einem kritischen Kunden. Erreichbar bist du trotzdem. Ein Produkt, das mehr Können verspricht, weckt dein Interesse fast immer.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Diese algorithmische Einordnung stützt sich auf deinen Hautton, deine Gesichtszüge und deine Haarfarbe.",

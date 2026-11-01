@@ -946,6 +946,30 @@ export function welle(texte) {
   }
 }
 
+/* Der Rest des gerade gezeigten Puffers soll in rund fünf Sekunden durch sein. */
+function vorlaufTempoSetzen(mein) {
+  const p = mein.puffer[mein.aktiv];
+  mein.vorlaufTempo = Math.max(
+    (p.text.length - p.fest) / SCHNELLVORLAUF_SEKUNDEN,
+    SCHNELLVORLAUF_MIN_ZEICHEN_PRO_SEKUNDE
+  );
+}
+
+export function schlusstext(texte) {
+  /* Large 4 liefert den Text oft erst, wenn die Analyse schon fertig ist: Dann
+     kam keine einzige Welle beim Browser an, und ohne diesen Schritt würde gar
+     nicht getippt. Der fertige Text geht deshalb als letzte Welle in die
+     Anzeige. Ein Ersatzfall (Tier, Sperre, Neuladen) ruft das nicht auf. */
+  if (enthuellungGestartet) return;
+  welle({
+    standard: texte.standard || "",
+    beast: texte.beast || null,
+    versuch: aktuellerVersuch,
+    kartenStandard: [],
+    kartenBeast: [],
+  });
+}
+
 /**
  * Meldet, dass der Server fertig ist (api.js ruft das bei `done`, BEVOR das
  * Ergebnis gerendert wird): Der noch ungetippte Rest des aktiven Puffers
@@ -955,20 +979,6 @@ export function welle(texte) {
  * Ohne gelaufenen Live-Text (oder bei reduzierter Bewegung, wo der Text
  * längst vollständig steht) löst es sofort auf.
  */
-export function schlusstext(texte) {
-  /* Large 4 liefert den Text oft erst, wenn die Analyse schon fertig ist: Dann
-     kam keine einzige Welle beim Browser an, und ohne diesen Schritt würde gar
-     nicht getippt. Der fertige Text geht deshalb als letzte Welle in die
-     Anzeige. Ein Ersatzfall (Tier, Sperre, Neuladen) ruft das nicht auf. */
-  if (enthuellungGestartet) return;
-  welle({
-    standard: texte.standard || texte.beast || "",
-    beast: texte.beast || null,
-    kartenStandard: [],
-    kartenBeast: [],
-  });
-}
-
 export function schnellVorlauf() {
   return new Promise((aufloesen) => {
     const mein = lauf;
@@ -983,11 +993,7 @@ export function schnellVorlauf() {
       aufloesen();
       return;
     }
-    const start = mein.puffer[mein.aktiv];
-    mein.vorlaufTempo = Math.max(
-      (start.text.length - start.fest) / SCHNELLVORLAUF_SEKUNDEN,
-      SCHNELLVORLAUF_MIN_ZEICHEN_PRO_SEKUNDE
-    );
+    vorlaufTempoSetzen(mein);
     mein.schnellvorlauf = true;
     /* Not-Deckel: Das fertige Ergebnis darf hier nie hängen bleiben. */
     const frist = Date.now() + SCHNELLVORLAUF_DECKEL_MS;
@@ -1016,6 +1022,7 @@ export function modusWechsel() {
   const neu = aktiverModus();
   if (neu === lauf.aktiv) return;
   lauf.aktiv = neu;
+  if (lauf.schnellvorlauf) vorlaufTempoSetzen(lauf);
   /* Der andere Modus hat eigene Karten: Inhalte neu setzen, Gerüst behalten. */
   zuletztGezeigt[neu] = 0;
   liveKartenModusWechsel();

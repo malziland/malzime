@@ -215,6 +215,20 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent).toBe(text);
   });
 
+  it("Schlusstext zählt für den laufenden Versuch und lässt bei leerem Standard-Text nichts Beast tippen", async () => {
+    liveAnzeige.welle({ standard: "", beast: null, versuch: 2 });
+    liveAnzeige.schlusstext({ standard: "C".repeat(120), beast: null });
+    const vorlauf = liveAnzeige.schnellVorlauf();
+    await vi.advanceTimersByTimeAsync(3000);
+    await vorlauf;
+    expect(elements.liveTextFest.textContent).toBe("C".repeat(120));
+
+    liveAnzeige.zuruecksetzen();
+    liveAnzeige.schlusstext({ standard: "", beast: "B".repeat(120) });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(elements.liveTextFest.textContent).toBe("");
+  });
+
   it("Rausch-Schweif nur bei Bewegung — bei leerem Puffer bleibt nur der Cursor", async () => {
     w("A".repeat(300));
     await vi.advanceTimersByTimeAsync(1000);

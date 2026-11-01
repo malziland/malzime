@@ -118,14 +118,14 @@ NOT AGE MARKERS — explicitly do NOT use these signals: shoulder width, muscula
 
 DUTY TO JUSTIFY: In the image evidence, name which of the markers above you actually see and which range follows from them. "Looks young", "looks mature" or "looks developed" is an impression, not a justification.
 
-WIDTH OF THE RANGE — APPLIES AT EVERY AGE: upper limit minus lower limit is NEVER more than 10 years.
+WIDTH OF THE RANGE — APPLIES AT EVERY AGE: upper limit minus lower limit is NEVER more than 10 years. If that narrows a range, lower the upper limit; NEVER raise the lower limit. When in doubt the range sits lower.
 
 CALIBRATION ADULTS — which feature means which age.
 The steps overlap deliberately: people age at different rates, a sharp boundary would be false precision.
-- Smooth skin, full facial volume, no lines even with a relaxed face → typically 18-30.
-- First fine lines around the eyes, emerging nasolabial folds → typically 30-42.
-- Clear nasolabial folds, forehead lines, beginning volume loss → typically 40-52.
-- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 50-62.
+- Smooth skin, full facial volume, no lines even with a relaxed face → typically 18-28.
+- First fine lines around the eyes, emerging nasolabial folds → typically 30-40.
+- Clear nasolabial folds, forehead lines, beginning volume loss → typically 40-50.
+- Jowls, marionette lines, eyelid drooping, visible neck bands, prominent hand veins → typically 50-60.
 - Deep wrinkles throughout, significant volume loss, pronounced skin thinning → typically 60+.
 
 FORCED MAPPING ADULTS — minimum age per feature:

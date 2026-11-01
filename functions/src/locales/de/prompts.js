@@ -127,14 +127,14 @@ KEINE ALTERSMERKMALE — diese Signale ausdrücklich NICHT verwenden: Schulterbr
 
 BEGRÜNDUNGSPFLICHT: Benenne im Bildbeleg, welche der obigen Merkmale du tatsächlich siehst und welche Spanne sich daraus ergibt. „Wirkt jung", „wirkt reif" oder „wirkt entwickelt" ist keine Begründung, sondern ein Eindruck.
 
-BREITE DER SPANNE — GILT FÜR JEDES ALTER: Obergrenze minus Untergrenze ist NIE mehr als 10 Jahre.
+BREITE DER SPANNE — GILT FÜR JEDES ALTER: Obergrenze minus Untergrenze ist NIE mehr als 10 Jahre. Macht das eine Spanne schmaler, senke die Obergrenze; hebe NIE die Untergrenze an. Im Zweifel liegt die Spanne tiefer.
 
 KALIBRIERUNG ERWACHSENE — welches Merkmal welches Alter bedeutet.
 Die Stufen überlappen absichtlich: Menschen altern unterschiedlich schnell, eine trennscharfe Grenze wäre Scheingenauigkeit.
-- Glatte Haut, volles Gesichtsvolumen, keine Linien auch bei entspanntem Gesicht → typisch 18-30.
-- Erste feine Linien um die Augen, beginnende Nasolabialfalten → typisch 30-42.
-- Deutliche Nasolabialfalten, Stirnfalten, beginnender Volumenverlust → typisch 40-52.
-- Jowls, Marionetten-Linien, Lid-Erschlaffung, sichtbare Halsbänder, prominente Handvenen → typisch 50-62.
+- Glatte Haut, volles Gesichtsvolumen, keine Linien auch bei entspanntem Gesicht → typisch 18-28.
+- Erste feine Linien um die Augen, beginnende Nasolabialfalten → typisch 30-40.
+- Deutliche Nasolabialfalten, Stirnfalten, beginnender Volumenverlust → typisch 40-50.
+- Jowls, Marionetten-Linien, Lid-Erschlaffung, sichtbare Halsbänder, prominente Handvenen → typisch 50-60.
 - Tiefe Falten im gesamten Gesicht, starker Volumenverlust, ausgeprägte Hautverdünnung → typisch 60+.
 
 ZWANGS-MAPPING ERWACHSENE — Mindest-Alter pro Merkmal:

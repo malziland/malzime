@@ -57,6 +57,19 @@ describe("textBereinigen", () => {
     expect(messung.lektor).toBe("verworfen");
   });
 
+  test("ein verbogenes Wort wird verworfen", async () => {
+    const alt = "Deine größte Angriffsfläche ist der stille Wunsch nach Anerkennung im Beruf.";
+    antwort(alt.replace("Angriffsfläche", "Angstsfläche"));
+    await expect(textBereinigen(alt, "de")).resolves.toBeNull();
+  });
+
+  test("eine korrigierte Endung und ein neues Wort gelten", async () => {
+    const alt = "Werbung erreicht dich über Angebote von Marken. Dein Ring zeigt eine feste Beziehung zu jemandem.";
+    const neu = "Werbung erreicht dich über Angeboten von Marken. Du lebst in einer festen Partnerschaft zu jemandem.";
+    antwort(neu);
+    await expect(textBereinigen(alt, "de")).resolves.toBe(neu);
+  });
+
   test("knapp innerhalb der Grenzen gilt die Antwort noch", async () => {
     const lang = "a".repeat(100);
     antwort("b".repeat(60));

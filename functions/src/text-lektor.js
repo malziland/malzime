@@ -17,6 +17,7 @@ const { loadPrompts } = require("./i18n");
 
 const MINDESTANTEIL = 0.6;
 const HOECHSTANTEIL = 1.15;
+const VERBOGEN_ANTEIL = 0.35;
 
 /* Nur was escapeXml erzeugt hat, wird zurückgeholt: Sonst stünde im Ergebnis
    „Salt &amp; Lake“ statt „Salt & Lake“. */
@@ -29,8 +30,38 @@ function ohneMaskierung(text) {
     .replace(/&amp;/g, "&");
 }
 
+function abstand(a, b) {
+  let zeile = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    const naechste = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      naechste[j] = Math.min(naechste[j - 1] + 1, zeile[j] + 1, zeile[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    zeile = naechste;
+  }
+  return zeile[b.length];
+}
+
+const woerter = (text) => text.toLowerCase().match(/[\p{L}-]{6,}/gu) || [];
+
+/* Der Lektor soll streichen, nicht buchstabieren: Gemessen wurde aus
+   „Angriffsfläche“ das Fehlwort „Angstsfläche“. Ein neues Wort, das einem alten
+   ähnelt, ohne nur eine andere Endung zu haben, gilt deshalb als verbogen. */
+function hatVerbogenesWort(neu, alt) {
+  const bekannt = new Set(woerter(alt));
+  return woerter(neu).some(
+    (wort) =>
+      !bekannt.has(wort) &&
+      [...bekannt].some((a) => {
+        const stamm = Math.min(a.length, wort.length) - 3;
+        if (a.slice(0, stamm) === wort.slice(0, stamm)) return false;
+        return abstand(a, wort) <= Math.max(a.length, wort.length) * VERBOGEN_ANTEIL;
+      })
+  );
+}
+
 function brauchbar(neu, alt) {
-  if (!neu || /<\/?text>/.test(neu) || beginntWieAbsage(neu)) return false;
+  if (!neu || /<\/?text>/.test(neu) || beginntWieAbsage(neu) || hatVerbogenesWort(neu, alt)) return false;
   return neu.length >= alt.length * MINDESTANTEIL && neu.length <= alt.length * HOECHSTANTEIL;
 }
 

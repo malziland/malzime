@@ -228,7 +228,11 @@ mit einem ausgefuellten Beispiel; davon gibt es mehrere (`locales/*/muster.js`),
 Analyse geht eines mit, damit kein einzelnes Beispiel alle Antworten praegt. Ein
 zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung (`generateBeastAds`): Er
 liefert doppelt so viele Eintraege, wie gezeigt werden, und nach dem Kinderschutz-Filter
-wird daraus die gezeigte Auswahl gezogen (`minor-safety.js`). Alle LLM-Ausgaben
+wird daraus die gezeigte Auswahl gezogen (`minor-safety.js`). Gleichzeitig bereinigt ein
+kurzer Aufruf ohne Bild die seriöse Zusammenfassung (`text-lektor.js`, Modell ohne
+Nachdenk-Schritt: `LEKTOR_MODELL`, Mistral Large 3, muss vor dessen Abschaltung am 30.04.2027
+umgestellt werden); deshalb geht kein Rohtext mehr live an den Browser, getippt wird der
+fertige Text. Scheitert der Lektor, bleibt der Text der Analyse stehen. Alle LLM-Ausgaben
 gehen durch `json-repair.js` (4-stufige defensive Reparatur).
 
 Den aelteren Drei-Aufruf-Weg (Large beschreibt, Small profiliert; bis v2.1 aktiv,

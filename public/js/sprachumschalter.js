@@ -269,8 +269,11 @@ function beschriften() {
     b.setAttribute("aria-pressed", String(an));
     /* Der Name wird IMMER in der jeweiligen Sprache angesagt („Deutsch",
        „English") — nicht in der gerade eingestellten. Sonst hört jemand
-       „Englisch" und findet auf einer englischen Seite kein „English". */
-    b.setAttribute("aria-label", t(`sprache.name.${b.dataset.lang}`));
+       „Englisch" und findet auf einer englischen Seite kein „English". Der
+       sichtbare Text steht mit im Namen (WCAG 2.5.3): Wer per Sprachsteuerung
+       „DE" sagt, muss den Knopf treffen. */
+    const kuerzel = b.dataset.lang.toUpperCase();
+    b.setAttribute("aria-label", `${kuerzel} – ${t(`sprache.name.${b.dataset.lang}`)}`);
   });
 
   pille.classList.toggle("rechts", getLanguage() === SPRACHEN[1]);

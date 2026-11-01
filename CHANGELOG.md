@@ -4,6 +4,13 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Die Sprachknöpfe heißen für Sprachsteuerung und Vorleseprogramme jetzt wie auf dem
+  Bildschirm** („DE – Deutsch“, „EN – English“).
+
 ## [5.4.2] — 2026-11-01
 
 ### Geändert — KI

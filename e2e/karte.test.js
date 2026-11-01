@@ -226,6 +226,7 @@ test.describe("GPS-Karte", () => {
        Fenster, und wo genau das liegt, haengt von Fensterbreite und
        Leistenhoehe ab. Eine feste Stellung war zweimal gruen, obwohl die
        Behebung ausgebaut war. */
+    await page.evaluate((t) => window.scrollTo({ top: t, behavior: "instant" }), k.oben + k.hoehe);
     await expect(page.locator(".bias-toggle-wrap")).toHaveClass(/is-stuck/);
     const treffer = [];
     let ueberlappt = false;

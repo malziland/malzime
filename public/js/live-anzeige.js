@@ -113,13 +113,16 @@ const MAX_ZEICHEN_PRO_SEKUNDE = 90;
    25 s auf ausdrückliche Ansage (11.08. abends): „die Box ist
    oft fertig und dann passiert eine Weile nichts" — also später starten,
    damit Tippen und Analyse gemeinsamer enden. Meldet der Server vorher
-   „fertig", greift sofort der Schnellvorlauf. (let wegen
-   _setzeTippAnlaufMsFuerTest.) */
-let TIPP_ANLAUF_MS = 25000;
+   „fertig", greift sofort der Schnellvorlauf. 2 s seit Large 4 (01.11.2026):
+   Das Modell denkt rund 60 s, dann kommt der Text in einem Zug und die Analyse
+   ist nach rund 20 s fertig. Mit 25 s wurde gar nicht mehr sichtbar getippt.
+   (let wegen _setzeTippAnlaufMsFuerTest.) */
+let TIPP_ANLAUF_MS = 2000;
 /* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
    zügig, aber noch als Tippen erkennbar ausgetippt — erst danach beginnt die
-   Enthüllung. So endet der Lauf ohne harten Textsprung. */
-const SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE = 150;
+   Enthüllung. So endet der Lauf ohne harten Textsprung. 90 statt 150 seit
+   Large 4: Der Vorlauf traegt jetzt oft den Grossteil des Texts. */
+const SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE = 90;
 /* Not-Deckel für den Schnellvorlauf: Er darf das fertige Ergebnis niemals
    dauerhaft blockieren, falls die Tipp-Schleife aus irgendeinem Grund nicht
    mehr vorankommt. */

@@ -113,14 +113,14 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
   });
 
-  it("v3.0.2: der Standard-Anlauf beträgt 25 s — bei 24 s tippt noch nichts, kurz danach schon", async () => {
+  it("Der Standard-Anlauf beträgt 2 s — bei 1,9 s tippt noch nichts, kurz danach schon", async () => {
     /* Frischer Modul-Import, damit wirklich der STANDARDWERT geprüft wird —
        der beforeEach oben stellt den Anlauf für alle übrigen Tests auf 0. */
     vi.resetModules();
     const frisch = await import("../js/live-anzeige.js");
     const { elements: el } = await import("../js/dom.js");
     frisch.welle({ standard: "A".repeat(2000), beast: null });
-    await vi.advanceTimersByTimeAsync(24000);
+    await vi.advanceTimersByTimeAsync(1900);
     expect(el.liveKarte.classList.contains("active")).toBe(false);
     expect(el.liveTextFest.textContent.length).toBe(0);
     await vi.advanceTimersByTimeAsync(1500);
@@ -173,7 +173,7 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent.endsWith("B")).toBe(true);
   });
 
-  it("Schnellvorlauf: nach der Fertig-Meldung tippt der Rest mit ~150 Z/s aus, erst dann löst das Versprechen auf", async () => {
+  it("Schnellvorlauf: nach der Fertig-Meldung tippt der Rest mit ~90 Z/s aus, erst dann löst das Versprechen auf", async () => {
     w("A".repeat(600)); /* adaptiv: 600/30 = 20 Z/s */
     await vi.advanceTimersByTimeAsync(1000);
     const vorher = elements.liveTextFest.textContent.length;
@@ -184,12 +184,12 @@ describe("Live-Anzeige (v3.0)", () => {
       aufgeloest = true;
     });
     await vi.advanceTimersByTimeAsync(1000);
-    /* ~150 weitere Zeichen in einer Sekunde — klar über dem Normal-Deckel
-       von 90 Z/s. Diese Probe wird ROT, wenn der Schnellvorlauf fehlt. */
-    expect(elements.liveTextFest.textContent.length - vorher).toBeGreaterThan(100);
+    /* ~90 weitere Zeichen in einer Sekunde — klar über den 20 Z/s des normalen
+       Tempos. Diese Probe wird ROT, wenn der Schnellvorlauf fehlt. */
+    expect(elements.liveTextFest.textContent.length - vorher).toBeGreaterThan(60);
     expect(aufgeloest).toBe(false);
 
-    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(7000);
     await vorlauf;
     expect(aufgeloest).toBe(true);
     expect(elements.liveTextFest.textContent.length).toBe(600);

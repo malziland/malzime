@@ -10,7 +10,7 @@
  * abgebrochener Rest oder ein frei neu geschriebener Text.
  */
 
-const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
+const { LEKTOR_MODELL, LEKTOR_MAX_TOKENS, LEKTOR_ZEITGRENZE_MS } = require("./config");
 const { callMistralRaw } = require("./mistral-http");
 const { escapeXml, beginntWieAbsage } = require("./mistral-antwort");
 const { loadPrompts } = require("./i18n");
@@ -38,17 +38,16 @@ async function textBereinigen(text, lang, messung = null) {
   if (typeof text !== "string" || !text.trim()) return null;
   const prompts = loadPrompts(lang || "de");
   if (typeof prompts.lektorSystem !== "string" || typeof prompts.lektorUser !== "function") return null;
-  const einstellungen = modellEinstellungen(MISTRAL_MODEL);
   try {
     const result = await callMistralRaw({
-      model: MISTRAL_MODEL,
+      model: LEKTOR_MODELL,
       messages: [
         { role: "system", content: prompts.lektorSystem },
         { role: "user", content: prompts.lektorUser(escapeXml(text)) },
       ],
-      maxTokens: einstellungen.werbeMaxTokens,
+      maxTokens: LEKTOR_MAX_TOKENS,
       temperature: 0.1,
-      timeoutMs: einstellungen.werbeZeitgrenzeMs,
+      timeoutMs: LEKTOR_ZEITGRENZE_MS,
       cacheKey: `malzime-lektor-${lang || "de"}`,
     });
     const neu = ohneMaskierung(String(result.text || "").trim());
@@ -57,6 +56,8 @@ async function textBereinigen(text, lang, messung = null) {
       JSON.stringify({
         step: "mistral-lektor",
         status: ok ? "ok" : "verworfen",
+        laengeAlt: text.length,
+        laengeNeu: neu.length,
         promptTokens: result.promptTokens,
         outputTokens: result.outputTokens,
         httpMs: result.httpMs,

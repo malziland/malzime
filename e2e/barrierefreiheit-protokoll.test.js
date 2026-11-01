@@ -1242,6 +1242,23 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
         { timeout: 20000, message: "Weder #liveTextFest noch #scanText tragen Live-Text" }
       )
       .toBeGreaterThan(0);
+    /* Seit dem kurzen Tipp-Anlauf tippt die Karte schon waehrend der Messung und
+       zieht die Seite weich mit. Ein Foto mitten in dieser Bewegung zeigt das
+       Element nicht und ergibt Kontrast 1:1. Erst messen, wenn der Text steht und
+       die Seite still liegt. */
+    await expect(page.locator("#liveTextFest")).toHaveText(/Mitte zwanzig und/, { timeout: 20000 });
+    let letzteLage = -1;
+    await expect
+      .poll(
+        async () => {
+          const lage = await page.evaluate(() => window.scrollY);
+          const still = lage === letzteLage;
+          letzteLage = lage;
+          return still;
+        },
+        { timeout: 10000, intervals: [300] }
+      )
+      .toBe(true);
     await messen(page, "Live-Text", "Modell schreibt mit");
   });
 

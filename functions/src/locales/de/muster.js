@@ -72,13 +72,16 @@ const HERKUNFT = "mitteleuropäisch";
 
 /* karten: je Schlüssel [Text, Sicherheit]. Die Alterskarte entsteht hier,
    damit ihr Wortlaut in allen Vorlagen derselbe ist. */
-function ansicht(geschlecht, alterSatz, hebel, werbung, profileText, karten) {
+function ansicht(geschlecht, alterSatz, hebel, werbung, profileText, karten, fazitZuletzt = false) {
   const categories = {};
   for (const schluessel of Object.keys(LABEL)) {
     const [value, confidence] =
       schluessel === "alter_geschlecht" ? [`Du bist ${ALTER(geschlecht)}. ${alterSatz}`, 0.85] : karten[schluessel];
     categories[schluessel] = { label: LABEL[schluessel], value, confidence };
   }
+  /* Der seriöse Text ist das Fazit aus den Karten: Die KI schreibt der Reihe
+     nach, deshalb steht er dort nach den Karten. Beast bleibt, wie er ist. */
+  if (fazitZuletzt) return { manipulation_triggers: hebel, ad_targeting: werbung, categories, profileText };
   return { manipulation_triggers: hebel, ad_targeting: werbung, profileText, categories };
 }
 
@@ -93,7 +96,8 @@ function vorlage(geschlecht, standard, beast) {
       HEBEL_SACHLICH,
       WERBUNG_SACHLICH,
       standard.profileText,
-      standard.karten
+      standard.karten,
+      true
     ),
     beast: ansicht(
       geschlecht,

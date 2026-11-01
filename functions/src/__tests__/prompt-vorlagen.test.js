@@ -90,7 +90,12 @@ describe.each(SPRACHEN)("Vorlagen %s", (sprache, prompts, muster, trenn) => {
   test.each(muster.map((m, i) => [i + 1, m]))("Vorlage %i hat den festen Aufbau und alle Karten", (_nr, m) => {
     expect(Object.keys(m)).toEqual(["subject", "visible_text", "hard_facts", "standard", "beast"]);
     for (const ansicht of ANSICHTEN) {
-      expect(Object.keys(m[ansicht])).toEqual(["manipulation_triggers", "ad_targeting", "profileText", "categories"]);
+      /* Der seriöse Text ist das Fazit und steht deshalb nach den Karten. */
+      const aufbau =
+        ansicht === "standard"
+          ? ["manipulation_triggers", "ad_targeting", "categories", "profileText"]
+          : ["manipulation_triggers", "ad_targeting", "profileText", "categories"];
+      expect(Object.keys(m[ansicht])).toEqual(aufbau);
       expect(Object.keys(m[ansicht].categories).sort()).toEqual([...REQUIRED_CARDS].sort());
       for (const karte of Object.values(m[ansicht].categories)) {
         expect(Object.keys(karte)).toEqual(["label", "value", "confidence"]);

@@ -111,7 +111,7 @@ const AM_HERD = vorlage(
   "männlich",
   {
     profileText:
-      "Du bist ein Mann mit mitteleuropäischem Erscheinungsbild. Du stehst an einer aufgeräumten Arbeitsfläche und schneidest mit ruhigen Handgriffen. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Du legst sichtbar Wert auf gutes Werkzeug und frische Zutaten. Dein Blick bleibt bei der Sache. Das Bild zeigt einen genussorientierten, sorgfältigen Lebensstil.",
+      "Für uns bist du ein sorgfältiger, genussorientierter Mann mit mittlerem bis gehobenem Einkommen. Qualität ist dir wichtiger als Tempo oder ein günstiger Preis. Das macht dich für Marken rund um Küche und gute Zutaten interessant, weniger für Rabattaktionen. Du planst und vergleichst, bevor du kaufst. Angreifbar bist du beim Versprechen „das Beste“. Dafür gibst du eher mehr aus, als du vorhattest.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Dein Hautton, die Form deines Gesichts und deine Haarfarbe stützen diese algorithmische Einordnung.",
@@ -224,7 +224,7 @@ const AM_BEET = vorlage(
   "weiblich",
   {
     profileText:
-      "Du bist eine Frau mit mitteleuropäischem Erscheinungsbild. Du kniest an einem Hochbeet und arbeitest mit bloßen Händen in der Erde. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Die gepflegten Beete zeigen Ausdauer und regelmäßige Arbeit. Deine Kleidung ist praktisch und abgetragen. Das Bild zeigt einen bodenständigen, naturnahen Lebensstil.",
+      "Dein Profil ergibt eine bodenständige, ausdauernde Frau mit mittlerem bis gehobenem Einkommen. Natur und Selbstgemachtes bedeuten dir mehr als Status. Werbung erreicht dich deshalb über Nachhaltigkeit und Herkunft, kaum über Luxus. Du bleibst Marken treu, wenn sie dein Vertrauen gewonnen haben. Deine Schwachstelle sind grüne Versprechen. Klingt etwas umweltfreundlich, prüfst du seltener nach.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Dein Hautton, deine Gesichtszüge und deine Haarfarbe stützen diese algorithmische Einordnung ohne jede weitere Angabe.",
@@ -337,7 +337,7 @@ const AN_DER_WERKBANK = vorlage(
   "männlich",
   {
     profileText:
-      "Du bist ein Mann mit mitteleuropäischem Erscheinungsbild. Du stehst an einer Werkbank und hältst ein Werkstück prüfend ins Licht. Dein Einkommen liegt im mittleren bis gehobenen Bereich. Sortiertes Werkzeug an der Wand zeigt Ordnung und Erfahrung. Holzstaub auf den Unterarmen zeigt, dass du gerade gearbeitet hast. Das Bild zeigt einen praktischen, eigenständigen Lebensstil.",
+      "Unterm Strich wirkst du wie ein praktischer, eigenständiger Mann mit mittlerem bis gehobenem Einkommen. Du löst Probleme lieber selbst, als dafür zu zahlen. Für Werbung zählst du als Käufer von langlebiger Ausrüstung, nicht von Dienstleistungen. Ordnung und Erfahrung machen dich zu einem kritischen Kunden. Erreichbar bist du trotzdem. Ein Produkt, das mehr Können verspricht, weckt dein Interesse fast immer.",
     karten: {
       herkunft: [
         "Du bist mitteleuropäisch. Diese algorithmische Einordnung stützt sich auf deinen Hautton, deine Gesichtszüge und deine Haarfarbe.",

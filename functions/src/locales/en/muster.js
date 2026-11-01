@@ -84,7 +84,7 @@ const AM_HERD = vorlage(
   "male",
   {
     profileText:
-      "You are a man with central European appearance. You stand at a tidy worktop and cut with calm movements. Your income is in the middle to upper range. You visibly value good tools and fresh ingredients. Your eyes stay on the task. The image shows a careful lifestyle built around enjoyment.",
+      'For us you are a careful, pleasure-loving man with a middle to upper income. Quality matters more to you than speed or a low price. That makes you interesting for cooking and food brands, less so for discount campaigns. You plan and compare before you buy. You are vulnerable to the promise of "the best". For that you tend to spend more than planned.',
     karten: {
       herkunft: [
         "You are central european. Your skin tone, the shape of your face and your hair colour support this algorithmic classification.",
@@ -197,7 +197,7 @@ const AM_BEET = vorlage(
   "female",
   {
     profileText:
-      "You are a woman with central European appearance. You kneel at a raised bed and work in the soil with bare hands. Your income is in the middle to upper range. The well-kept beds show stamina and regular work. Your clothing is practical and worn. The image shows a down-to-earth lifestyle close to nature.",
+      "Your profile adds up to a down-to-earth, persistent woman with a middle to upper income. Nature and home-made things mean more to you than status. Advertising therefore reaches you through sustainability and origin, hardly through luxury. You stay loyal to brands once they have won your trust. Your weak spot is green promises. If something sounds eco-friendly, you check less often.",
     karten: {
       herkunft: [
         "You are central european. Your skin tone, your facial features and your hair colour support this algorithmic classification without any further detail.",
@@ -310,7 +310,7 @@ const AN_DER_WERKBANK = vorlage(
   "male",
   {
     profileText:
-      "You are a man with central European appearance. You stand at a workbench and hold a workpiece up to the light to check it. Your income is in the middle to upper range. Sorted tools on the wall show order and experience. Wood dust on your forearms shows that you have just been working. The image shows a practical, self-reliant lifestyle.",
+      "All in all you come across as a practical, self-reliant man with a middle to upper income. You would rather solve problems yourself than pay for them. For advertisers you count as a buyer of durable equipment, not of services. Order and experience make you a critical customer. You can still be reached. A product that promises more skill almost always catches your interest.",
     karten: {
       herkunft: [
         "You are central european. This algorithmic classification rests on your skin tone, your facial features and your hair colour.",

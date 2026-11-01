@@ -107,6 +107,15 @@ describe.each(SPRACHEN)("Vorlagen %s", (sprache, prompts, muster, trenn) => {
     }
   );
 
+  test.each(muster.map((m, i) => [i + 1, m]))(
+    "Vorlage %i: seriöser Text ist ein Fazit, keine Bildbeschreibung",
+    (_nr, m) => {
+      expect(m.standard.profileText).not.toMatch(
+        /\b(stehst|kniest|Das Bild zeigt|You stand|You kneel|The image shows)\b/
+      );
+    }
+  );
+
   test.each(muster.map((m, i) => [i + 1, m]))("Vorlage %i: Fließtexte in der bisherigen Länge", (_nr, m) => {
     expect(saetze(m.standard.profileText)).toHaveLength(6);
     expect(saetze(m.beast.profileText)).toHaveLength(10);

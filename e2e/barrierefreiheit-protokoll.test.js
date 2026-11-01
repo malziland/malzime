@@ -1247,16 +1247,19 @@ test.describe("Prüfprotokoll WCAG 2.2 AA", () => {
        Element nicht und ergibt Kontrast 1:1. Erst messen, wenn der Text steht und
        die Seite still liegt. */
     await expect(page.locator("#liveTextFest")).toHaveText(/Mitte zwanzig und/, { timeout: 20000 });
+    /* Eine gleiche Lage zweimal hintereinander genuegte nicht: Die weiche Bewegung
+       kann kurz stocken, gemessen wurde dann weiter ein Foto mitten im Lauf. */
     let letzteLage = -1;
+    let stilleMessungen = 0;
     await expect
       .poll(
         async () => {
           const lage = await page.evaluate(() => window.scrollY);
-          const still = lage === letzteLage;
+          stilleMessungen = lage === letzteLage ? stilleMessungen + 1 : 0;
           letzteLage = lage;
-          return still;
+          return stilleMessungen >= 4;
         },
-        { timeout: 10000, intervals: [300] }
+        { timeout: 15000, intervals: [300] }
       )
       .toBe(true);
     await messen(page, "Live-Text", "Modell schreibt mit");

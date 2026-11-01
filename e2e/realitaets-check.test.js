@@ -152,7 +152,8 @@ test("Realitäts-Check: tippen → absenden → Ring mit richtiger Prozentzahl �
   await expect(page.locator("#simulation .verdict")).toBeVisible({ timeout: 30000 });
   await expect(page.locator("#realCheck")).toBeVisible({ timeout: 30000 });
   await expect(page.locator("#rcErgebnis")).toBeHidden();
-  await expect(page.locator("#rcAbsenden")).toBeVisible();
+  /* Die Enthuellung zeigt den Knopf gestaffelt, erst am Ende steht er da. */
+  await expect(page.locator("#rcAbsenden")).toBeVisible({ timeout: 30000 });
   await expect(page.locator("#rcAbsenden")).toBeDisabled();
   await expect(page.locator("#realCheck .rc-knopf.gewaehlt")).toHaveCount(0);
 });

@@ -113,14 +113,14 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent.length).toBeGreaterThan(0);
   });
 
-  it("v3.0.2: der Standard-Anlauf beträgt 25 s — bei 24 s tippt noch nichts, kurz danach schon", async () => {
+  it("Der Standard-Anlauf beträgt 2 s — bei 1,9 s tippt noch nichts, kurz danach schon", async () => {
     /* Frischer Modul-Import, damit wirklich der STANDARDWERT geprüft wird —
        der beforeEach oben stellt den Anlauf für alle übrigen Tests auf 0. */
     vi.resetModules();
     const frisch = await import("../js/live-anzeige.js");
     const { elements: el } = await import("../js/dom.js");
     frisch.welle({ standard: "A".repeat(2000), beast: null });
-    await vi.advanceTimersByTimeAsync(24000);
+    await vi.advanceTimersByTimeAsync(1900);
     expect(el.liveKarte.classList.contains("active")).toBe(false);
     expect(el.liveTextFest.textContent.length).toBe(0);
     await vi.advanceTimersByTimeAsync(1500);
@@ -173,7 +173,7 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent.endsWith("B")).toBe(true);
   });
 
-  it("Schnellvorlauf: nach der Fertig-Meldung tippt der Rest mit ~150 Z/s aus, erst dann löst das Versprechen auf", async () => {
+  it("Schnellvorlauf: nach der Fertig-Meldung tippt der Rest in rund 5 s aus, erst dann löst das Versprechen auf", async () => {
     w("A".repeat(600)); /* adaptiv: 600/30 = 20 Z/s */
     await vi.advanceTimersByTimeAsync(1000);
     const vorher = elements.liveTextFest.textContent.length;
@@ -184,7 +184,7 @@ describe("Live-Anzeige (v3.0)", () => {
       aufgeloest = true;
     });
     await vi.advanceTimersByTimeAsync(1000);
-    /* ~150 weitere Zeichen in einer Sekunde — klar über dem Normal-Deckel
+    /* ~116 weitere Zeichen in einer Sekunde — klar über dem Normal-Deckel
        von 90 Z/s. Diese Probe wird ROT, wenn der Schnellvorlauf fehlt. */
     expect(elements.liveTextFest.textContent.length - vorher).toBeGreaterThan(100);
     expect(aufgeloest).toBe(false);
@@ -195,6 +195,40 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextFest.textContent.length).toBe(600);
   });
 
+  it("Large 4: kam keine Welle an, tippt der fertige Text rund 5 s, erst dann folgt das Ergebnis", async () => {
+    const text = "A".repeat(700);
+    liveAnzeige.schlusstext({ standard: text, beast: "B".repeat(700) });
+
+    let fertig = false;
+    const vorlauf = liveAnzeige.schnellVorlauf().then(() => {
+      fertig = true;
+    });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(liveAnzeige.hatLiveGelaufen()).toBe(true);
+    expect(elements.liveTextFest.textContent.length).toBeGreaterThan(300);
+    expect(elements.liveTextFest.textContent.length).toBeLessThan(700);
+    expect(fertig).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(3500);
+    await vorlauf;
+    expect(fertig).toBe(true);
+    expect(elements.liveTextFest.textContent).toBe(text);
+  });
+
+  it("Schlusstext zählt für den laufenden Versuch und lässt bei leerem Standard-Text nichts Beast tippen", async () => {
+    liveAnzeige.welle({ standard: "", beast: null, versuch: 2 });
+    liveAnzeige.schlusstext({ standard: "C".repeat(120), beast: null });
+    const vorlauf = liveAnzeige.schnellVorlauf();
+    await vi.advanceTimersByTimeAsync(3000);
+    await vorlauf;
+    expect(elements.liveTextFest.textContent).toBe("C".repeat(120));
+
+    liveAnzeige.zuruecksetzen();
+    liveAnzeige.schlusstext({ standard: "", beast: "B".repeat(120) });
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(elements.liveTextFest.textContent).toBe("");
+  });
+
   it("Rausch-Schweif nur bei Bewegung — bei leerem Puffer bleibt nur der Cursor", async () => {
     w("A".repeat(300));
     await vi.advanceTimersByTimeAsync(1000);
@@ -202,10 +236,10 @@ describe("Live-Anzeige (v3.0)", () => {
     expect(elements.liveTextRausch.textContent.length).toBeGreaterThan(0);
     expect(elements.liveTextRausch.textContent.length).toBeLessThanOrEqual(7);
 
-    /* Puffer per Schnellvorlauf leeren (300 Zeichen / 150 pro s = 2 s):
+    /* Puffer per Schnellvorlauf leeren (300 Zeichen / 60 pro s = 5 s):
        Schweif weg, nur der Cursor blinkt. */
     const vorlauf = liveAnzeige.schnellVorlauf();
-    await vi.advanceTimersByTimeAsync(3000);
+    await vi.advanceTimersByTimeAsync(6000);
     await vorlauf;
     expect(elements.liveTextFest.textContent.length).toBe(300);
     expect(elements.liveTextRausch.textContent).toBe("");

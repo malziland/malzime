@@ -39,6 +39,7 @@ vi.mock("../js/live-anzeige.js", () => ({
   modusWechsel: vi.fn(),
   hatLiveGelaufen: vi.fn(() => false),
   schnellVorlauf: vi.fn(() => Promise.resolve()),
+  schlusstext: vi.fn(),
   starteEnthuellung: vi.fn(),
   enthuellungAbkuerzen: vi.fn(),
   abbrechen: vi.fn(),

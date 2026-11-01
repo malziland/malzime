@@ -96,6 +96,8 @@ async function runAnalysis(page) {
      Pop-up mehr) — Timeout großzügig wegen Bild-Prep + Poll-Takt. */
   await page.click('[data-demo="selfie"]');
   await expect(page.locator(".cat-card").first()).toBeVisible({ timeout: 15000 });
+  /* Erst messen, wenn die gestaffelte Enthuellung durch ist. */
+  await expect(page.locator("#exportPdf")).not.toHaveClass(/export-btn--hidden/, { timeout: 30000 });
 
   /* Die App scrollt nach der Analyse selbst nach oben (js/api.js, weiches
      Scrollen). Erst abwarten, bis das durch ist — sonst kollidiert es mit dem

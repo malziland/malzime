@@ -127,12 +127,14 @@ KEINE ALTERSMERKMALE — diese Signale ausdrücklich NICHT verwenden: Schulterbr
 
 BEGRÜNDUNGSPFLICHT: Benenne im Bildbeleg, welche der obigen Merkmale du tatsächlich siehst und welche Spanne sich daraus ergibt. „Wirkt jung", „wirkt reif" oder „wirkt entwickelt" ist keine Begründung, sondern ein Eindruck.
 
+BREITE DER SPANNE — GILT FÜR JEDES ALTER: Obergrenze minus Untergrenze ist NIE mehr als 10 Jahre. Macht das eine Spanne schmaler, senke die Obergrenze; hebe NIE die Untergrenze an. Im Zweifel liegt die Spanne tiefer.
+
 KALIBRIERUNG ERWACHSENE — welches Merkmal welches Alter bedeutet.
 Die Stufen überlappen absichtlich: Menschen altern unterschiedlich schnell, eine trennscharfe Grenze wäre Scheingenauigkeit.
-- Glatte Haut, volles Gesichtsvolumen, keine Linien auch bei entspanntem Gesicht → typisch 18-30.
-- Erste feine Linien um die Augen, beginnende Nasolabialfalten → typisch 30-42.
-- Deutliche Nasolabialfalten, Stirnfalten, beginnender Volumenverlust → typisch 40-52.
-- Jowls, Marionetten-Linien, Lid-Erschlaffung, sichtbare Halsbänder, prominente Handvenen → typisch 50-62.
+- Glatte Haut, volles Gesichtsvolumen, keine Linien auch bei entspanntem Gesicht → typisch 18-28.
+- Erste feine Linien um die Augen, beginnende Nasolabialfalten → typisch 30-40.
+- Deutliche Nasolabialfalten, Stirnfalten, beginnender Volumenverlust → typisch 40-50.
+- Jowls, Marionetten-Linien, Lid-Erschlaffung, sichtbare Halsbänder, prominente Handvenen → typisch 50-60.
 - Tiefe Falten im gesamten Gesicht, starker Volumenverlust, ausgeprägte Hautverdünnung → typisch 60+.
 
 ZWANGS-MAPPING ERWACHSENE — Mindest-Alter pro Merkmal:
@@ -149,7 +151,7 @@ Diese Regel ÜBERSCHREIBT den Eindruck „wirkt insgesamt jung". Wenn EIN Merkma
 - Erschlaffte Halshaut mit Querlinien → MINDESTENS 50 J.
 
 KOMBINATIONS-REGEL:
-- DREI oder mehr dieser Merkmale gleichzeitig sichtbar → PFLICHT-Spanne 40-55 J — NICHT darunter, egal wie jung das Gesamtbild wirkt.
+- DREI oder mehr dieser Merkmale gleichzeitig sichtbar → die Spanne beginnt bei MINDESTENS 40 J — NICHT darunter, egal wie jung das Gesamtbild wirkt.
 - Diese Regel gilt insbesondere für Personen, die im Alltag oft jünger eingeschätzt werden — die Merkmale sind objektiv, der Gesamteindruck ist subjektiv.
 - Wenn du trotz sichtbarer Merkmale ein jüngeres Alter angeben willst, MUSST du im Bildbeleg explizit BEGRÜNDEN, warum das jeweilige Merkmal NICHT sichtbar ist (z.B. durch Filter, Licht, Unschärfe oder Retusche). Einfach darüber hinwegsetzen ist NICHT erlaubt.
 
@@ -160,7 +162,7 @@ Entscheide dann nach dem, was sich weder verzieht noch überdecken lässt:
 - Hals: horizontale Linien, Hautstruktur, Erschlaffung.
 - Hände: Venen und Sehnen am Handrücken, Hautdicke, Pigmentflecken.
 - Haaransatz und Schläfen: Rückgang, Ergrauung, Haardichte.
-Gibt auch das nichts her, nenne eine BREITE Spanne von mindestens 15 Jahren. Eine ehrlich breite Spanne ist richtig — eine junge Punktschätzung, die nur auf „keine Falten erkennbar" beruht, ist ein Messfehler.
+Gibt auch das nichts her, nutze die volle erlaubte Breite von 10 Jahren. Eine ehrlich breite Spanne ist richtig — eine junge Punktschätzung, die nur auf „keine Falten erkennbar" beruht, ist ein Messfehler.
 
 ANTI-BIAS Kinder/Teens:
 - Ein einzelnes Merkmal trägt keine Schätzung. Nenne mindestens zwei aus der Liste oben und lege dich auf deren Schnittmenge fest.

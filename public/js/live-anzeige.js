@@ -113,13 +113,17 @@ const MAX_ZEICHEN_PRO_SEKUNDE = 90;
    25 s auf ausdrückliche Ansage (11.08. abends): „die Box ist
    oft fertig und dann passiert eine Weile nichts" — also später starten,
    damit Tippen und Analyse gemeinsamer enden. Meldet der Server vorher
-   „fertig", greift sofort der Schnellvorlauf. (let wegen
-   _setzeTippAnlaufMsFuerTest.) */
-let TIPP_ANLAUF_MS = 25000;
+   „fertig", greift sofort der Schnellvorlauf. 2 s seit Large 4 (01.11.2026):
+   Das Modell denkt rund eine Minute und liefert den Text erst in den letzten
+   Sekunden der Analyse. (let wegen _setzeTippAnlaufMsFuerTest.) */
+let TIPP_ANLAUF_MS = 2000;
 /* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
-   zügig, aber noch als Tippen erkennbar ausgetippt — erst danach beginnt die
-   Enthüllung. So endet der Lauf ohne harten Textsprung. */
-const SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE = 150;
+   in rund fünf Sekunden ausgetippt, egal wie lang er ist — erst danach beginnt
+   die Enthüllung. So gibt es immer ein paar Sekunden Tippen, ohne dass das
+   fertige Ergebnis lange warten muss. Kurze Reste laufen mit dem Mindesttempo
+   und sind früher fertig. */
+const SCHNELLVORLAUF_SEKUNDEN = 5;
+const SCHNELLVORLAUF_MIN_ZEICHEN_PRO_SEKUNDE = 60;
 /* Not-Deckel für den Schnellvorlauf: Er darf das fertige Ergebnis niemals
    dauerhaft blockieren, falls die Tipp-Schleife aus irgendeinem Grund nicht
    mehr vorankommt. */
@@ -730,7 +734,7 @@ function allesAufdecken() {
    der Rest wächst mit jeder Welle und schrumpft mit jedem Zeichen. Nach der
    Fertig-Meldung des Servers gilt stattdessen das Schnellvorlauf-Tempo. */
 function aktuellesTempo(mein, rest) {
-  if (mein.schnellvorlauf) return SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE;
+  if (mein.schnellvorlauf) return mein.vorlaufTempo;
   return Math.min(Math.max(rest / ZIEL_ABTROPF_SEKUNDEN, MIN_ZEICHEN_PRO_SEKUNDE), MAX_ZEICHEN_PRO_SEKUNDE);
 }
 
@@ -942,6 +946,30 @@ export function welle(texte) {
   }
 }
 
+/* Der Rest des gerade gezeigten Puffers soll in rund fünf Sekunden durch sein. */
+function vorlaufTempoSetzen(mein) {
+  const p = mein.puffer[mein.aktiv];
+  mein.vorlaufTempo = Math.max(
+    (p.text.length - p.fest) / SCHNELLVORLAUF_SEKUNDEN,
+    SCHNELLVORLAUF_MIN_ZEICHEN_PRO_SEKUNDE
+  );
+}
+
+export function schlusstext(texte) {
+  /* Large 4 liefert den Text oft erst, wenn die Analyse schon fertig ist: Dann
+     kam keine einzige Welle beim Browser an, und ohne diesen Schritt würde gar
+     nicht getippt. Der fertige Text geht deshalb als letzte Welle in die
+     Anzeige. Ein Ersatzfall (Tier, Sperre, Neuladen) ruft das nicht auf. */
+  if (enthuellungGestartet) return;
+  welle({
+    standard: texte.standard || "",
+    beast: texte.beast || null,
+    versuch: aktuellerVersuch,
+    kartenStandard: [],
+    kartenBeast: [],
+  });
+}
+
 /**
  * Meldet, dass der Server fertig ist (api.js ruft das bei `done`, BEVOR das
  * Ergebnis gerendert wird): Der noch ungetippte Rest des aktiven Puffers
@@ -965,6 +993,7 @@ export function schnellVorlauf() {
       aufloesen();
       return;
     }
+    vorlaufTempoSetzen(mein);
     mein.schnellvorlauf = true;
     /* Not-Deckel: Das fertige Ergebnis darf hier nie hängen bleiben. */
     const frist = Date.now() + SCHNELLVORLAUF_DECKEL_MS;
@@ -993,6 +1022,7 @@ export function modusWechsel() {
   const neu = aktiverModus();
   if (neu === lauf.aktiv) return;
   lauf.aktiv = neu;
+  if (lauf.schnellvorlauf) vorlaufTempoSetzen(lauf);
   /* Der andere Modus hat eigene Karten: Inhalte neu setzen, Gerüst behalten. */
   zuletztGezeigt[neu] = 0;
   liveKartenModusWechsel();

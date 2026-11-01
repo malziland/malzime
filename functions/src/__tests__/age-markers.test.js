@@ -302,7 +302,7 @@ describe("Zahlenspannen im Alters- und Sprachteil nur aus der Positivliste", () 
      muss eine der Merkmals-Spannen sein. Eine neue oder veränderte Spanne
      ("typisch 19-30", "19–25" mit Halbgeviertstrich) fällt damit auf und muss
      bewusst hier eingetragen werden. */
-  const ERLAUBT = ["2-6", "7-11", "6-8", "7-10", "11-14", "10-14", "7-12", "18-30", "30-42", "40-52", "50-62", "40-55"];
+  const ERLAUBT = ["2-6", "7-11", "6-8", "7-10", "11-14", "10-14", "7-12", "18-28", "30-40", "40-50", "50-60"];
   const ABSCHNITTE = {
     de: [
       ["═══ ALTERSKALIBRIERUNG", "═══ GESCHLECHT"],
@@ -335,7 +335,7 @@ describe("Zahlenspannen im Alters- und Sprachteil nur aus der Positivliste", () 
 
   test.each(PROMPTS)("%s: die Prüfung erkennt neue und veränderte Spannen (Gegenprobe)", (name, prompt) => {
     const sprache = name.startsWith("de") ? "de" : "en";
-    expect(fremdeSpannen(prompt.replace("18-30", "19-30"), sprache)).toEqual(["19-30"]);
+    expect(fremdeSpannen(prompt.replace("18-28", "19-30"), sprache)).toEqual(["19-30"]);
     const kopf = ABSCHNITTE[sprache][0][0];
     expect(fremdeSpannen(prompt.replace(kopf, `${kopf} 19–25`), sprache)).toEqual(["19-25"]);
     expect(fremdeSpannen(prompt.replace(kopf, `${kopf} 19 bis 25`), sprache)).toEqual(["19-25"]);
@@ -369,7 +369,7 @@ describe("Erwachsene — Lücke bei unlesbarem Gesicht", () => {
     for (const alt of [/28-35/, /35-45/, /45-55/, /unter 25/, /under 25/]) {
       expect(prompt).not.toMatch(alt);
     }
-    for (const neu of [/30-42/, /40-52/, /50-62/]) {
+    for (const neu of [/30-40/, /40-50/, /50-60/]) {
       expect(prompt).toMatch(neu);
     }
   });

@@ -208,7 +208,9 @@ describe("Verhalten: Nach jedem Ausgang stehen die Flaggen auf „aus“", () =>
   }
 
   it("Erfolg — und während des Uploads stehen beide Flaggen auf „an“", async () => {
-    await analysiere(foto());
+    /* 30 s: Der fertige Text wird getippt und dann gestaffelt enthuellt; die
+       Ansage „abgeschlossen“ kommt erst am Ende davon. */
+    await analysiere(foto(), 30000);
     expect(waehrendUpload).toEqual({ isAnalyzing: true, uploadLaeuft: true });
     expect(renderCurrentMode).toHaveBeenCalledTimes(1);
     flaggenAus({ fehlerweg: false });

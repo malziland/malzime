@@ -630,7 +630,8 @@ test.describe("Anzeige in Randfällen", () => {
     await seiteOeffnen(page);
     await fotoWaehlen(page);
     await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 20000 });
-    await expect(page.locator(ANSAGE)).toHaveText("Analyse abgeschlossen");
+    /* Die Ansage kommt am Ende der gestaffelten Enthuellung. */
+    await expect(page.locator(ANSAGE)).toHaveText("Analyse abgeschlossen", { timeout: 30000 });
   });
 
   test("Zahlen-Seite bei aktivem Limit: Ein Sprachwechsel setzt die Restzeit nicht zurück", async ({

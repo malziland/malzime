@@ -83,6 +83,9 @@ async function seiteMitKarte(page) {
   await page.waitForTimeout(600);
   await page.setInputFiles("#fileInput", EIGENES_FOTO);
   await expect(page.locator("#gpsMapLeaflet")).toBeVisible({ timeout: 40000 });
+  /* Erst messen, wenn die gestaffelte Enthuellung durch ist: Waehrenddessen
+     steht das Ergebnis noch nicht in voller Hoehe. */
+  await expect(page.locator("#exportPdf")).not.toHaveClass(/export-btn--hidden/, { timeout: 30000 });
   /* POSITIVKONTROLLE der Attrappe: Sie muss die Kacheln wirklich geliefert
      haben. Bleibt der Zaehler bei null, ging die Anfrage an ihr vorbei ins
      Netz — und ohne Netz staende die Karte leer da. */
@@ -223,6 +226,7 @@ test.describe("GPS-Karte", () => {
        Fenster, und wo genau das liegt, haengt von Fensterbreite und
        Leistenhoehe ab. Eine feste Stellung war zweimal gruen, obwohl die
        Behebung ausgebaut war. */
+    await page.evaluate((t) => window.scrollTo({ top: t, behavior: "instant" }), k.oben + k.hoehe);
     await expect(page.locator(".bias-toggle-wrap")).toHaveClass(/is-stuck/);
     const treffer = [];
     let ueberlappt = false;

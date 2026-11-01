@@ -4,6 +4,18 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Der Text wird wieder getippt.** Large 4 liefert den Text erst spät, deshalb
+  sprang das Ergebnis oft ohne Tippen ins Bild. Jetzt tippt jede Analyse ein paar
+  Sekunden, danach kommen die Module nacheinander.
+
+### Geändert — KI
+
+- **Die Altersspanne umfasst höchstens 10 Jahre,** bei jedem Alter.
+
 ## [5.4.0] — 2026-11-01
 
 ### Geändert — KI

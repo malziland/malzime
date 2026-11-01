@@ -109,7 +109,6 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   kapazitaets-wache.js      Meldet, wenn Einstellungssatz und Warteschlange auseinanderlaufen
   laufzeit-wache.js         Meldet, wenn Analysen an ihre Zeitgrenze stossen
   wartezeit-wache.js        Push, wenn eine Analyse laenger als 5 Minuten auf ihren Start wartet (vom Aufraeumdienst je Lauf gerufen)
-  text-lektor.js            Bereinigt die seriöse Zusammenfassung in einem kurzen Aufruf ohne Foto
   werbe-wache.js            Push, wenn die Beast-Werbung laenger als 30 Minuten am Stueck ausfaellt (vom Aufraeumdienst je Lauf gerufen)
   statistik.js              Dauerhafte, anonyme Zaehler (Sammlung statistik): je 10 Minuten Ausgaenge und Dauer-Klassen, je Tag Browser-Fehler und Textmenge der KI
   handle-erinnerung.js      Wochenlauf: ntfy-Push vor Ablauf der halbjaehrlichen ZDR-Nachpruefung und der halbjaehrlichen Pruefung der Barrierefreiheit (mit Anleitung)

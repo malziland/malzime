@@ -332,10 +332,6 @@ function istWerbeAbsage(eintrag) {
   return text.split(/\s+/).length > MAX_WOERTER_WERBE_EINTRAG || WERBE_ABSAGE_ANFANG.test(text);
 }
 
-function beginntWieAbsage(text) {
-  return WERBE_ABSAGE_ANFANG.test(text.trim());
-}
-
 function ohneWerbeAbsagen(liste) {
   if (!Array.isArray(liste)) return [];
   return liste.filter((e) => typeof e === "string" && e.trim() && !istWerbeAbsage(e));
@@ -344,7 +340,6 @@ function ohneWerbeAbsagen(liste) {
 module.exports = {
   findeProfileTextWert,
   istWerbeAbsage,
-  beginntWieAbsage,
   ohneWerbeAbsagen,
   extrahiereLiveText,
   KARTEN_WERT_SCHLUESSEL,

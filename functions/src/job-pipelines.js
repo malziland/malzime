@@ -54,7 +54,6 @@ function kennzahlenAus(messung, kiMs) {
     tokenEingabe: messung.tokenEingabe || 0,
     tokenZwischenspeicher: messung.tokenZwischenspeicher || 0,
     tokenAusgabe: messung.tokenAusgabe || 0,
-    ...(typeof messung.lektor === "string" ? { lektor: messung.lektor } : {}),
     ...(typeof messung.werbeAufruf === "string" ? { werbeAufruf: messung.werbeAufruf } : {}),
   };
 }
@@ -91,21 +90,54 @@ async function runPipeline(job) {
      Nutzers, und er besteht fort, bis ihn jemand behebt. */
   let configMissing = false;
   let pipelineError = false;
+  /* Live-Text-Strom (v3.0, fest eingebaut seit 10.09.2026, vorher Flag
+     `useLiveText`): Der Mistral-Aufruf bekommt einen Callback, der die bereits
+     angekommenen Profiltexte ({ standard, beast }) ins Job-Dokument legt — der
+     pollende Client sieht schon Text, waehrend das Modell noch schreibt. Den
+     Prompt-Zwischenspeicher nutzt mistral.js seit demselben Tag immer.
+
+     Zusaetzliche Drossel VOR dem Firestore-Schreiben: mistral.js ruft den
+     Callback zwar selbst nur ~alle 2 s, aber dieser Riegel gehoert dem
+     Schreiber — er schuetzt das Job-Dokument auch dann noch, wenn sich die
+     Aufruf-Frequenz in mistral.js einmal aendert. EIN Schreibvorgang traegt
+     beide Felder (Standard + Beast, jobs.js). setLiveText selbst schluckt
+     jeden Firestore-Fehler. Die erste Welle eines NEUEN Versuchs (Neuversuch
+     nach Verbindungsabriss, mistral.js) geht sofort durch — sie setzt den
+     Bildschirm zurueck und darf nicht bis zu 2 s hinter dem alten Text haengen.
+     Die Schreibvorgaenge laufen NACHEINANDER: Zwei gleichzeitige
+     update-Aufrufe kommen in Firestore in beliebiger Reihenfolge an, und eine
+     spaete Welle des ersten Versuchs koennte die leere des zweiten
+     ueberschreiben. Hoechstens einer ist unterwegs, dahinter wartet nur der
+     JUENGSTE Stand — bei langsamer Datenbank staut sich nichts (jede Welle
+     traegt den ganzen Stand). setLiveText wirft nie. */
+  let letzterSchreibMs = 0;
   let letzterVersuch = 1;
+  let schreibtGerade = false;
+  let wartend = null;
+  const schreibe = (texte) => {
+    if (schreibtGerade) {
+      wartend = texte;
+      return;
+    }
+    schreibtGerade = true;
+    Promise.resolve(setLiveText(job.id, texte)).then(() => {
+      schreibtGerade = false;
+      const naechste = wartend;
+      wartend = null;
+      if (naechste) schreibe(naechste);
+    });
+  };
   const messung = {};
   let kiMs = 0;
   const opts = {
     messung,
-    /* Seit dem Lektor (01.11.2026) geht kein Rohtext mehr hinaus: Er darf nicht
-       vor seiner Bereinigung auf dem Bildschirm stehen, getippt wird der fertige
-       Text (live-anzeige.js, schlusstext). Es bleibt die leere Welle eines neuen
-       Versuchs nach einem Verbindungsabriss, sie setzt die Anzeige zurueck.
-       setLiveText wirft nie. */
     onLiveText: (texte) => {
+      const jetzt = Date.now();
       const versuch = (texte && texte.versuch) || 1;
-      if (versuch === letzterVersuch) return;
+      if (versuch === letzterVersuch && jetzt - letzterSchreibMs < 2000) return;
+      letzterSchreibMs = jetzt;
       letzterVersuch = versuch;
-      setLiveText(job.id, { standard: "", beast: null, versuch });
+      schreibe(texte);
     },
   };
   const kiStart = Date.now();
@@ -156,15 +188,13 @@ async function runPipeline(job) {
        Schwachstelle (gemessen ueber fuenf A/B-Runden). Faellt der Aufruf aus,
        bleibt die Liste aus dem Hauptaufruf stehen — die Analyse scheitert nie
        daran. */
-    const werbeAufruf = async () => {
-      if (
-        !profiles.boost ||
-        !hasCategories(profiles.boost) ||
-        typeof mistral.generateBeastAds !== "function" ||
-        !(await isBeastAdsCallEnabledSafe())
-      ) {
-        return;
-      }
+    if (
+      profiles.boost &&
+      hasCategories(profiles.boost) &&
+      typeof mistral.generateBeastAds === "function" &&
+      (await isBeastAdsCallEnabledSafe())
+    ) {
+      const werbeStart = Date.now();
       try {
         const neueAds = await mistral.generateBeastAds(profiles.boost, profiles.normal?.ad_targeting, lang, messung, {
           alterText: profiles.alterAnker || undefined,
@@ -176,17 +206,8 @@ async function runPipeline(job) {
            Hauptaufruf bleibt als Rueckfall stehen. */
         console.log(JSON.stringify({ step: "beast-ads-skip", error: err.message }));
       }
-    };
-    /* Der Lektor laeuft gleichzeitig mit dem Werbe-Aufruf: So wartet niemand
-       zweimal. Scheitert er, bleibt der Text der Analyse stehen. */
-    const lektor = async () => {
-      if (typeof mistral.textBereinigen !== "function" || !profiles.normal?.profileText) return;
-      const neu = await mistral.textBereinigen(profiles.normal.profileText, lang, messung);
-      if (neu) profiles.normal.profileText = neu;
-    };
-    const zweiterSchrittStart = Date.now();
-    await Promise.all([werbeAufruf(), lektor()]);
-    kiMs += Date.now() - zweiterSchrittStart;
+      kiMs += Date.now() - werbeStart;
+    }
 
     /* Serverseitiges Netz, bevor irgendetwas ausgeliefert wird: Pornografie,
        Waffen und Extremismus fliegen immer raus, Gluecksspiel/Kredit/Alkohol

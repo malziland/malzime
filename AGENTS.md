@@ -93,7 +93,6 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) ‚Ä
   mistral.js         Mistral AI: runSingleLargeCall (Large macht Beschreibung + beide Profile in EINEM Call; je Analyse geht eine der Formvorlagen mit) + generateBeastAds (zweiter Aufruf ohne Bild)
   mistral-http.js    Netzschicht zu Mistral: Zugangsschluessel, Zeitgrenzen, Antwort als Strom, Ueberlastmeldung erkennen
   mistral-antwort.js  Antwort der KI auseinandernehmen (reine Funktionen): Live-Text, fehlende Karten, Maskierung (escapeXml)
-  text-lektor.js     Bereinigt die seri√∂se Zusammenfassung in einem kurzen Aufruf ohne Foto: nimmt Bilddetails heraus, korrigiert Sprachfehler; scheitert er, bleibt der Text der Analyse stehen
   auftrag-wechsel.js  Was am Analyse-Auftrag je Analyse wechselt: die Marken-Sperre hinter dem Bild und die Formvorlage am Ende (beide gewuerfelt, fuer Tests und Messungen vorgebbar)
   ueberlast.js       Was ein Mistral-Aufruf tut, wenn Mistral ablehnt (429) oder kurz weg ist (502, 503, 504); was beim Werbe-Aufruf als kurzer Aussetzer gilt (istKurzerAussetzer)
   json-repair.js     Defensiver JSON-Parser fuer LLM-Outputs (direkt -> heuristisch -> json5 -> Truncation-Recovery)
@@ -131,7 +130,6 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) ‚Ä
   locales/           Backend-Locale-Dateien
     manifest.json    Verfuegbare Sprachen + Default
     de/prompts.js    Deutsche Prompts (Analyse-Auftrag mit Alterskalibrierung und SUBJECT-Klassifikation: ein Regelteil, daran je eine Formvorlage = singleLargePromptVarianten; beastAdsSystem/beastAdsUser, Marken-Sperre, injectionWarning)
-    de/lektor.js     Auftrag an den Lektor der seri√∂sen Zusammenfassung (Spiegelung: en/lektor.js)
     de/muster.js     Deutsche Formvorlagen am Ende des Analyse-Auftrags (reine Daten: mehrere ausgefuellte Beispiel-Antworten, je Analyse geht eine mit; Regeln fuer eine neue Vorlage im Kopf der Datei)
     de/animals.js    Deutsche Tier-Easter-Egg-Profile
     en/prompts.js    Englische Prompts (Spiegelung von de/prompts.js)
@@ -228,11 +226,7 @@ mit einem ausgefuellten Beispiel; davon gibt es mehrere (`locales/*/muster.js`),
 Analyse geht eines mit, damit kein einzelnes Beispiel alle Antworten praegt. Ein
 zweiter, kleiner Aufruf ohne Bild erzeugt die Beast-Werbung (`generateBeastAds`): Er
 liefert doppelt so viele Eintraege, wie gezeigt werden, und nach dem Kinderschutz-Filter
-wird daraus die gezeigte Auswahl gezogen (`minor-safety.js`). Gleichzeitig bereinigt ein
-kurzer Aufruf ohne Bild die seri√∂se Zusammenfassung (`text-lektor.js`, Modell ohne
-Nachdenk-Schritt: `LEKTOR_MODELL`, Mistral Large 3, muss vor dessen Abschaltung am 30.04.2027
-umgestellt werden); deshalb geht kein Rohtext mehr live an den Browser, getippt wird der
-fertige Text. Scheitert der Lektor, bleibt der Text der Analyse stehen. Alle LLM-Ausgaben
+wird daraus die gezeigte Auswahl gezogen (`minor-safety.js`). Alle LLM-Ausgaben
 gehen durch `json-repair.js` (4-stufige defensive Reparatur).
 
 Den aelteren Drei-Aufruf-Weg (Large beschreibt, Small profiliert; bis v2.1 aktiv,

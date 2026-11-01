@@ -802,7 +802,6 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
 module.exports = {
   runSingleLargeCall,
   generateBeastAds,
-  textBereinigen: require("./text-lektor").textBereinigen,
   isRateLimitError,
   /* Für Tests */
   setFetchForTest,

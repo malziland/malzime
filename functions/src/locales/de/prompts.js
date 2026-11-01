@@ -531,5 +531,3 @@ Diese Werbung bekommt die Person bereits im sachlichen Modus — sie zeigt den s
 <bestehende_werbung>
 ${p.standardAds}
 </bestehende_werbung>`;
-
-Object.assign(module.exports, require("./lektor"));

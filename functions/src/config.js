@@ -114,11 +114,6 @@ const MODELL_EINSTELLUNGEN = {
     neuversuchBeiZeitgrenze: true,
   },
 };
-/* BLEIBT IM CODE — Der Lektor (text-lektor.js) braucht kein Nachdenken: Large 4
-   lief mit bis zu 5.600 Antwort-Token in die Zeitgrenze (01.11.2026). */
-const LEKTOR_MODELL = "mistral-large-2512";
-const LEKTOR_MAX_TOKENS = 1200;
-const LEKTOR_ZEITGRENZE_MS = 30_000;
 const modellEinstellungen = (modell) => MODELL_EINSTELLUNGEN[modell] || MODELL_EINSTELLUNGEN["mistral-large-2512"];
 /* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des
    globalen — Mistral sichert damit VERTRAGLICH zu, dass die Inferenz in
@@ -338,9 +333,6 @@ module.exports = {
   MAX_UPLOAD_BYTES,
   ALLOWED_MIME,
   MISTRAL_MODEL,
-  LEKTOR_MODELL,
-  LEKTOR_MAX_TOKENS,
-  LEKTOR_ZEITGRENZE_MS,
   modellEinstellungen,
   MISTRAL_ENDPOINT,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,

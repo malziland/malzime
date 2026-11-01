@@ -114,15 +114,16 @@ const MAX_ZEICHEN_PRO_SEKUNDE = 90;
    oft fertig und dann passiert eine Weile nichts" — also später starten,
    damit Tippen und Analyse gemeinsamer enden. Meldet der Server vorher
    „fertig", greift sofort der Schnellvorlauf. 2 s seit Large 4 (01.11.2026):
-   Das Modell denkt rund 60 s, dann kommt der Text in einem Zug und die Analyse
-   ist nach rund 20 s fertig. Mit 25 s wurde gar nicht mehr sichtbar getippt.
-   (let wegen _setzeTippAnlaufMsFuerTest.) */
+   Das Modell denkt rund eine Minute und liefert den Text erst in den letzten
+   Sekunden der Analyse. (let wegen _setzeTippAnlaufMsFuerTest.) */
 let TIPP_ANLAUF_MS = 2000;
 /* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
-   zügig, aber noch als Tippen erkennbar ausgetippt — erst danach beginnt die
-   Enthüllung. So endet der Lauf ohne harten Textsprung. 90 statt 150 seit
-   Large 4: Der Vorlauf traegt jetzt oft den Grossteil des Texts. */
-const SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE = 90;
+   in rund fünf Sekunden ausgetippt, egal wie lang er ist — erst danach beginnt
+   die Enthüllung. So gibt es immer ein paar Sekunden Tippen, ohne dass das
+   fertige Ergebnis lange warten muss. Kurze Reste laufen mit dem Mindesttempo
+   und sind früher fertig. */
+const SCHNELLVORLAUF_SEKUNDEN = 5;
+const SCHNELLVORLAUF_MIN_ZEICHEN_PRO_SEKUNDE = 60;
 /* Not-Deckel für den Schnellvorlauf: Er darf das fertige Ergebnis niemals
    dauerhaft blockieren, falls die Tipp-Schleife aus irgendeinem Grund nicht
    mehr vorankommt. */
@@ -733,7 +734,7 @@ function allesAufdecken() {
    der Rest wächst mit jeder Welle und schrumpft mit jedem Zeichen. Nach der
    Fertig-Meldung des Servers gilt stattdessen das Schnellvorlauf-Tempo. */
 function aktuellesTempo(mein, rest) {
-  if (mein.schnellvorlauf) return SCHNELLVORLAUF_ZEICHEN_PRO_SEKUNDE;
+  if (mein.schnellvorlauf) return mein.vorlaufTempo;
   return Math.min(Math.max(rest / ZIEL_ABTROPF_SEKUNDEN, MIN_ZEICHEN_PRO_SEKUNDE), MAX_ZEICHEN_PRO_SEKUNDE);
 }
 
@@ -954,6 +955,20 @@ export function welle(texte) {
  * Ohne gelaufenen Live-Text (oder bei reduzierter Bewegung, wo der Text
  * längst vollständig steht) löst es sofort auf.
  */
+export function schlusstext(texte) {
+  /* Large 4 liefert den Text oft erst, wenn die Analyse schon fertig ist: Dann
+     kam keine einzige Welle beim Browser an, und ohne diesen Schritt würde gar
+     nicht getippt. Der fertige Text geht deshalb als letzte Welle in die
+     Anzeige. Ein Ersatzfall (Tier, Sperre, Neuladen) ruft das nicht auf. */
+  if (enthuellungGestartet) return;
+  welle({
+    standard: texte.standard || texte.beast || "",
+    beast: texte.beast || null,
+    kartenStandard: [],
+    kartenBeast: [],
+  });
+}
+
 export function schnellVorlauf() {
   return new Promise((aufloesen) => {
     const mein = lauf;
@@ -968,6 +983,11 @@ export function schnellVorlauf() {
       aufloesen();
       return;
     }
+    const start = mein.puffer[mein.aktiv];
+    mein.vorlaufTempo = Math.max(
+      (start.text.length - start.fest) / SCHNELLVORLAUF_SEKUNDEN,
+      SCHNELLVORLAUF_MIN_ZEICHEN_PRO_SEKUNDE
+    );
     mein.schnellvorlauf = true;
     /* Not-Deckel: Das fertige Ergebnis darf hier nie hängen bleiben. */
     const frist = Date.now() + SCHNELLVORLAUF_DECKEL_MS;

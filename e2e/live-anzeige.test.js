@@ -163,6 +163,33 @@ test("Live-Erlebnis: Karte tippt wachsenden Text, danach Enthüllung bis zum PDF
   await expect(page.locator("#simulation .verdict")).toContainText(/nichts davon ist wahr|none of this is true/i);
 });
 
+test("Large 4: kam kein Text während der Analyse, wird der fertige Text ein paar Sekunden getippt", async ({
+  page,
+}) => {
+  test.setTimeout(60000);
+  await basisRouten(page);
+  let abfragen = 0;
+  await page.route("**/api/job-status**", (route) => {
+    abfragen += 1;
+    const antwort = abfragen < 2 ? { status: "processing" } : { status: "done", result: MOCK_RESPONSE };
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(antwort) });
+  });
+  await page.goto("/");
+  await page.click('[data-demo="selfie"]');
+
+  await expect(page.locator("#liveKarte")).toHaveClass(/active/, { timeout: 15000 });
+  const start = Date.now();
+  await expect
+    .poll(async () => (await page.locator("#liveTextFest").textContent()).length, { timeout: 8000 })
+    .toBeGreaterThan(50);
+  /* Das Ergebnis wartet, bis der Text steht: nicht sofort, aber auch nicht lange. */
+  await expect(page.locator("#simulation .verdict")).toBeVisible({ timeout: 12000 });
+  const tippDauer = Date.now() - start;
+  expect(tippDauer).toBeGreaterThan(3000);
+  expect(tippDauer).toBeLessThan(9000);
+  await expect(page.locator("#facts .cat-card").first()).toBeVisible({ timeout: 30000 });
+});
+
 test("Modus-Wechsel mitten im Stream: die Live-Karte springt auf den Beast-Text und tippt dort weiter", async ({
   page,
 }) => {

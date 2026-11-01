@@ -302,7 +302,7 @@ describe("Zahlenspannen im Alters- und Sprachteil nur aus der Positivliste", () 
      muss eine der Merkmals-Spannen sein. Eine neue oder veränderte Spanne
      ("typisch 19-30", "19–25" mit Halbgeviertstrich) fällt damit auf und muss
      bewusst hier eingetragen werden. */
-  const ERLAUBT = ["2-6", "7-11", "6-8", "7-10", "11-14", "10-14", "7-12", "18-30", "30-42", "40-52", "50-62", "40-55"];
+  const ERLAUBT = ["2-6", "7-11", "6-8", "7-10", "11-14", "10-14", "7-12", "18-30", "30-42", "40-52", "50-62"];
   const ABSCHNITTE = {
     de: [
       ["═══ ALTERSKALIBRIERUNG", "═══ GESCHLECHT"],

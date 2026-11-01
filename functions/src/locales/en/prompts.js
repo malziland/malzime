@@ -118,6 +118,8 @@ NOT AGE MARKERS — explicitly do NOT use these signals: shoulder width, muscula
 
 DUTY TO JUSTIFY: In the image evidence, name which of the markers above you actually see and which range follows from them. "Looks young", "looks mature" or "looks developed" is an impression, not a justification.
 
+WIDTH OF THE RANGE — APPLIES AT EVERY AGE: upper limit minus lower limit is NEVER more than 10 years.
+
 CALIBRATION ADULTS — which feature means which age.
 The steps overlap deliberately: people age at different rates, a sharp boundary would be false precision.
 - Smooth skin, full facial volume, no lines even with a relaxed face → typically 18-30.
@@ -140,7 +142,7 @@ This rule OVERRIDES the impression "looks young overall". If ONE feature is clea
 - Slack neck skin with horizontal lines → MINIMUM 50 y.
 
 COMBINATION RULE:
-- THREE or more of these features visible simultaneously → MANDATORY range 40-55 y — NOT below, regardless of how young the overall impression appears.
+- THREE or more of these features visible simultaneously → the range starts at AT LEAST 40 y — NOT below, regardless of how young the overall impression appears.
 - This rule especially applies to people who are often estimated younger in everyday life — the features are objective, the overall impression is subjective.
 - If you want to give a younger age despite visible features, you MUST explicitly JUSTIFY in the image cue why the respective feature is NOT visible (e.g. through filter, lighting, blur or retouching). Simply ignoring is NOT allowed.
 
@@ -151,7 +153,7 @@ Decide instead by what neither distorts nor can be covered up:
 - Neck: horizontal lines, skin texture, slackening.
 - Hands: veins and tendons on the back of the hand, skin thickness, age spots.
 - Hairline and temples: recession, greying, hair density.
-If that gives nothing either, state a WIDE range of at least 15 years. An honestly wide range is correct — a young point estimate resting only on "no lines visible" is a measurement error.
+If that gives nothing either, use the full permitted width of 10 years. An honestly wide range is correct — a young point estimate resting only on "no lines visible" is a measurement error.
 
 ANTI-BIAS Children/Teens:
 - A single marker carries no estimate. Name at least two from the list above and commit to their intersection.

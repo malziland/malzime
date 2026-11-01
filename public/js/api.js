@@ -314,7 +314,7 @@ export function initHintergrundWiederaufnahme() {
  * @param {object|null} prepared Die Aufbereitung des Fotos, zu dem dieses
  *        Ergebnis gehört (Ort und Aufnahmedatum daraus bleiben im Browser).
  */
-async function renderQueueResult(data, myId, traceId, timings, prepared) {
+async function renderQueueResult(data, myId, traceId, timings, prepared, liveErlaubt = false) {
   /* PRIV-107: Ab der ersten Zustellung läuft die Wiederholungs-Frist. */
   markiereErgebnisZustellung();
   if (!data) {
@@ -420,6 +420,12 @@ async function renderQueueResult(data, myId, traceId, timings, prepared) {
   /* v3.0.0: Erst den ungetippten Rest im Schnellvorlauf zu Ende tippen (ohne
      Live-Lauf löst das sofort auf), DANN rendern — sonst bricht das Tippen
      mitten im Wort ab und das Ergebnis springt hart ins Bild. */
+  if (liveErlaubt && data.profiles && data.meta?.mode !== "animal" && data.meta?.mode !== "blocked") {
+    liveAnzeige.schlusstext({
+      standard: data.profiles.normal?.profileText,
+      beast: data.profiles.boost?.profileText,
+    });
+  }
   await liveAnzeige.schnellVorlauf();
   if (state.requestId !== myId) return;
   finishRender();
@@ -764,7 +770,7 @@ async function analyzeImageQueued() {
     timings.totalMs = Date.now() - analyzeStartTime;
     /* Das Ergebnis rendert direkt in die Dramaturgie hinein — nach dem
        Schnellvorlauf des restlichen Live-Texts (v3.0.0, daher await). */
-    await renderQueueResult(outcome.result, myId, traceId, timings, prepared);
+    await renderQueueResult(outcome.result, myId, traceId, timings, prepared, true);
   } catch (err) {
     if (state.requestId !== myId) return;
     /* PRIV-2026-10-03-57: Der Upload wurde beendet, weil ein anderes Foto

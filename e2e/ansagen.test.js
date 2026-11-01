@@ -283,7 +283,7 @@ test.describe("Ansage-Protokoll", () => {
     await expect(aktiv).toHaveAttribute("aria-current", "page");
     await expect(aktiv).toHaveAttribute("lang", "de");
     await expect(verweis).toHaveAttribute("lang", "en");
-    await expect(verweis).toHaveAttribute("aria-label", "English");
+    await expect(verweis).toHaveAttribute("aria-label", "EN – English");
 
     const zeilen = await baumLesen(page, "Sprachumschalter");
     expect(zeilen.length).toBeGreaterThan(3);

@@ -177,6 +177,7 @@ functions/src/__tests__/server-paket.test.js
 functions/src/__tests__/skript-rechte.test.js
 functions/src/__tests__/statistik-phasen.test.js
 functions/src/__tests__/statistik.test.js
+functions/src/__tests__/text-lektor.test.js
 functions/src/__tests__/throttle.test.js
 functions/src/__tests__/ueberlast-entscheidung.test.js
 functions/src/__tests__/upload-http.test.js

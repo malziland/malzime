@@ -151,8 +151,8 @@ const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = requir
  */
 /* FEATURE-2026-08-29-01: Fertige Kategorie-Karten aus dem laufenden Strom lesen.
 
-   WARUM: Ein Profil besteht aus `profileText` UND 13 Karten, und der Prompt
-   verlangt den Text ZUERST. Bis hierher wanderte nur der Text in die Live-
+   WARUM: Ein Profil besteht aus `profileText` UND 13 Karten; der Prompt verlangte
+   damals den Text ZUERST (seit 01.11.2026 im Standard-Teil zuletzt). Bis hierher wanderte nur der Text in die Live-
    Anzeige — die Karten entstanden unsichtbar. Gemessen am 28.08.: Standard-Text
    nach 34,6 s fertig, Beast-Text ab ~85 s. Dazwischen 50 Sekunden, in denen der
    Bildschirm stillsteht, obwohl die Hälfte der Arbeit genau dort passiert. Der
@@ -736,7 +736,17 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
         requireSchema: false,
         onRepair: (stufe, e) => rettungsStufen.push(stufe + (e ? `:${e.name || "Error"}` : "")),
       });
-      const brauchbar = gerettet && (hatProfilText(gerettet.standard) || hatProfilText(gerettet.beast));
+      /* Der seriöse Text steht seit 01.11.2026 hinter den Karten: Bricht die Antwort
+         davor ab und folgt kein zweiter Versuch mehr, sind die Karten mehr wert als
+         gar kein Ergebnis. Folgt einer, ist er der bessere Weg. */
+      const folgtNeuversuch =
+        attemptLabel === "first" &&
+        (err.verbindungsabbruch || neuversuchNachZeitgrenze(err, modellEinstellungen(MISTRAL_MODEL), remainingBudget));
+      const brauchbar =
+        gerettet &&
+        (hatProfilText(gerettet.standard) ||
+          hatProfilText(gerettet.beast) ||
+          (!folgtNeuversuch && Object.keys(gerettet.standard?.categories || {}).length > 0));
       console.log(
         JSON.stringify({
           step: "single-large-rettung",

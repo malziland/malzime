@@ -529,18 +529,13 @@ async function main() {
         const liste = await fassungen(teil.repo);
         const stand = veraltet(version, liste, HEUTE);
         const bald = stand ? null : veraltet(version, liste, HEUTE, VORWARNUNG_TAGE);
-        const baldAusnahme = bald ? gueltigeAusnahme(`FASSUNG-${bald.neu}`, teil.name, version) : null;
-        if (bald && baldAusnahme) {
-          hinweise.push(
-            `BALD FAELLIG  ${teil.name} ${version}  seit ${bald.tage} Tagen gibt es ${bald.seit}\n` +
-              `      ausgenommen bis ${baldAusnahme.pruefen_bis}: ${baldAusnahme.grund}`
-          );
+        const baldAusnahme = bald && gueltigeAusnahme(`FASSUNG-${bald.neu}`, teil.name, version);
+        const baldZeile = bald && `BALD FAELLIG  ${teil.name} ${version}  seit ${bald.tage} Tagen gibt es ${bald.seit}`;
+        if (baldAusnahme) {
+          hinweise.push(`${baldZeile}\n      ausgenommen bis ${baldAusnahme.pruefen_bis}: ${baldAusnahme.grund}`);
         } else if (bald) {
-          const rest = FRIST_VERALTET_TAGE + 1 - bald.tage;
-          const zeile =
-            `BALD FAELLIG  ${teil.name} ${version}  seit ${bald.tage} Tagen gibt es ${bald.seit}` +
-            (bald.neu === bald.seit ? "" : `, inzwischen ${bald.neu}`) +
-            `; rot in ${rest} Tag(en)`;
+          const inzwischen = bald.neu === bald.seit ? "" : `, inzwischen ${bald.neu}`;
+          const zeile = `${baldZeile}${inzwischen}; rot in ${FRIST_VERALTET_TAGE + 1 - bald.tage} Tag(en)`;
           vorwarnungen.push({ zeile, push: erinnerungstag(bald.tage) });
         } else if (!stand) {
           console.log(`${teil.name} ${version}: keine neuere Fassung, die aelter als ${FRIST_VERALTET_TAGE} Tage ist`);

@@ -4,6 +4,21 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Sicherheit
+
+- **`glob` und `minimatch` im Server auf korrigierte Fassungen** (GHSA-3g3m-2fjr-6pw4,
+  GHSA-g3hv-75wg-m249, beide „mittel“). Sie kamen über Googles Firestore-Unterbau
+  (`google-gax` 5 → `rimraf` 5), der `rimraf` zwar mitbringt, aber nie aufruft. Per
+  `overrides`-Eintrag `google-gax → rimraf ^6.1.4` in `functions/package.json` angehoben;
+  danach enthält der Server nur noch `glob` 14.0.4 und `minimatch` 11.0.5. Zurückbauen,
+  sobald `@google-cloud/firestore` einen Firestore-Unterbau mit `google-gax` 6 anfordert
+  (der hat `rimraf` nicht mehr). Dieselben Meldungen in Test- und Prüfwerkzeugen (Jest,
+  ESLint) und `deepmerge` (GHSA-gcqx-w48m-w2h4, „niedrig“, nur Jest) haben beim Hersteller
+  noch keine Korrektur; sie verarbeiten nur eigene Muster aus dem Repository, nie Daten von
+  Besuchern, und sind bei GitHub begründet als hinnehmbar markiert.
+
 ## [5.4.3] — 2026-11-01
 
 ### Behoben

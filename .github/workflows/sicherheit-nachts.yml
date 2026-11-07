@@ -13,7 +13,8 @@ name: Sicherheit nachts
 # ntfy-Push aufs Handy, Stufe "urgent" (5) — nur so erscheint er als sichtbare
 # Meldung, nicht still in der App. Die Mail von GitHub allein reicht nicht: Sie
 # wird beim Empfaenger automatisch geloescht (Befund G-05, 30.09.2026; Zustellung
-# eines Probealarms mit Stufe 5 am selben Tag bestaetigt). Adresse und Thema
+# eines Probealarms mit Stufe 5 am selben Tag bestaetigt). Eine Vorwarnung
+# ("Update bald faellig", seit 07.11.2026) geht allein mit Stufe 3. Adresse und Thema
 # liegen als GitHub-Secrets NTFY_URL_EU / NTFY_TOPIC_EU vor, nie im Repository.
 # Drei getrennte Jobs, damit sofort sichtbar ist, WELCHE Pruefung rot ist.
 # Was bei Rot zu tun ist: docs/RUNBOOK.md, Abschnitt "Nachtlauf Sicherheit rot".
@@ -80,12 +81,19 @@ jobs:
 
   mitgelieferte-bibliotheken:
     runs-on: ubuntu-latest
+    # Vorwarnung (07.11.2026): Gibt es fuer einen selbst betriebenen Dienst seit
+    # mehr als 20 Tagen eine neuere Fassung, bleibt der Job gruen und schreibt an
+    # den Erinnerungstagen (21, 24, 27, 30) eine Zeile, die der Job alarm als
+    # ruhige Push-Nachricht verschickt — damit der Lauf nicht erst rot wird.
+    outputs:
+      vorwarnung: ${{ steps.fremd.outputs.vorwarnung }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "24"
-      - run: node scripts/pruefe-fremd-meldungen.mjs
+      - id: fremd
+        run: node scripts/pruefe-fremd-meldungen.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -112,10 +120,11 @@ jobs:
       always() && github.ref == 'refs/heads/main' && github.repository == 'malziland/malzime' &&
       (needs.npm-luecken.result != 'success' || needs.mitgelieferte-bibliotheken.result != 'success' ||
       needs.abkuendigungen.result != 'success' || inputs.alarmprobe == true ||
+      needs.mitgelieferte-bibliotheken.outputs.vorwarnung != '' ||
       github.event.schedule == '7 8 1 * *')
     runs-on: ubuntu-latest
     steps:
-      - name: Push an ntfy (Stufe urgent)
+      - name: Push an ntfy (Stufe urgent; Vorwarnung allein Stufe 3)
         env:
           NTFY_URL: ${{ secrets.NTFY_URL_EU }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC_EU }}
@@ -124,6 +133,7 @@ jobs:
           BIBLIOTHEKEN: ${{ needs.mitgelieferte-bibliotheken.result }}
           ABKUENDIGUNGEN: ${{ needs.abkuendigungen.result }}
           PROBE: ${{ inputs.alarmprobe == true || github.event.schedule == '7 8 1 * *' }}
+          VORWARNUNG: ${{ needs.mitgelieferte-bibliotheken.outputs.vorwarnung }}
         run: |
           if [ -z "$NTFY_URL" ] || [ -z "$NTFY_TOPIC" ]; then
             echo "::error::Secrets NTFY_URL_EU / NTFY_TOPIC_EU fehlen — der Alarm kann nicht hinaus."
@@ -135,12 +145,24 @@ jobs:
             TITEL="malziME: Sicherheit nachts ROT"
             TEXT="npm: $NPM, Bibliotheken: $BIBLIOTHEKEN, Abkuendigungen: $ABKUENDIGUNGEN. Was tun: docs/RUNBOOK.md, Nachtlauf rot."
             [ "$PROBE" = "true" ] && TEXT="$TEXT (Lauf war zugleich eine Probe.)"
-          else
+          elif [ "$PROBE" = "true" ]; then
             TITEL="malziME PROBE: Sicherheit nachts"
             TEXT="Probe des Alarmwegs (monatlich oder von Hand): alle drei Pruefungen gruen."
+          else
+            # Nur die Vorwarnung: alles gruen, ein Update wird bald faellig.
+            # Ruhige Stufe 3, kein Weckruf (docs/RUNBOOK.md, Nachtlauf).
+            TITEL="malziME: Update bald faellig"
+            TEXT="$VORWARNUNG. Was tun: docs/RUNBOOK.md, Nachtlauf, VERALTET."
+            STUFE=3
+            MARKE=hourglass
           fi
-          BODY=$(jq -n --arg t "$NTFY_TOPIC" --arg ti "$TITEL" --arg m "$TEXT" --arg c "$LAUF" \
-            '{topic: $t, title: $ti, message: $m, priority: 5, tags: ["rotating_light"], click: $c}')
+          if [ -n "$VORWARNUNG" ] && [ "$TITEL" != "malziME: Update bald faellig" ]; then
+            TEXT="$TEXT Ausserdem: $VORWARNUNG."
+          fi
+          STUFE="${STUFE:-5}"
+          MARKE="${MARKE:-rotating_light}"
+          BODY=$(jq -n --arg t "$NTFY_TOPIC" --arg ti "$TITEL" --arg m "$TEXT" --arg c "$LAUF" --argjson p "$STUFE" --arg g "$MARKE" \
+            '{topic: $t, title: $ti, message: $m, priority: $p, tags: [$g], click: $c}')
           CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X POST \
             -H 'Content-Type: application/json; charset=utf-8' --data "$BODY" "$NTFY_URL")
           echo "ntfy antwortete HTTP $CODE"

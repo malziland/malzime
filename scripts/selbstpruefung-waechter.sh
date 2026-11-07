@@ -253,7 +253,8 @@ sichern .github/workflows/sicherheit-nachts.yml
 python3 - <<'PYSELF'
 p = ".github/workflows/sicherheit-nachts.yml"
 s = open(p).read()
-s = s.replace("priority: 5", "priority: 3", 1)
+s = s.replace('STUFE="${STUFE:-5}"', 'STUFE="${STUFE:-3}"', 1)
+assert s != open(p).read(), "Probe greift nicht: Stufe des Alarms nicht gefunden"
 open(p, "w").write(s)
 PYSELF
 probe_text 1 "sicherheit-nachts.yml weicht" "abgeschwaechter Alarm im Nachtlauf wird gefunden" python3 scripts/pruefe-deploy-riegel.py

@@ -182,6 +182,68 @@ describe("pruefe-fremd-meldungen: selbst betriebener Dienst (ntfy)", () => {
     expect(r.aus).toContain("Veraltete Fassung eines Dienstes");
   });
 
+  /* Vorwarnung (07.11.2026): Der Lauf wurde rot, ohne vorher ein Zeichen zu geben.
+     Ab Tag 21 meldet er "BALD FAELLIG" und bleibt gruen; an Tag 21, 24, 27 und 30
+     schreibt er die Zeile fuer die ruhige Push-Nachricht nach GITHUB_OUTPUT. */
+  function laufMitAusgabe(erschienen, heute) {
+    const ausgabe = path.join(basis, "github-output.txt");
+    fs.writeFileSync(ausgabe, "");
+    const alt = process.env.GITHUB_OUTPUT;
+    process.env.GITHUB_OUTPUT = ausgabe;
+    try {
+      const r = lauf({ meldungenPfad: meldungen(neuere(erschienen)), heute });
+      return { ...r, output: fs.readFileSync(ausgabe, "utf8") };
+    } finally {
+      if (alt === undefined) delete process.env.GITHUB_OUTPUT;
+      else process.env.GITHUB_OUTPUT = alt;
+    }
+  }
+
+  test("Vorwarnung: seit GENAU 20 Tagen noch still", () => {
+    versionen();
+    const r = laufMitAusgabe("2026-09-10", "2026-09-30");
+    expect(r.code).toBe(0);
+    expect(r.aus).not.toContain("BALD FAELLIG");
+    expect(r.output).toBe("");
+  });
+
+  test("Vorwarnung: seit 21 Tagen gruen, BALD FAELLIG mit Resttagen, Push-Zeile geschrieben", () => {
+    versionen();
+    const r = laufMitAusgabe("2026-09-09", "2026-09-30");
+    expect(r.code).toBe(0);
+    expect(r.aus).toContain(
+      "BALD FAELLIG  ntfy 2.28.0  seit 21 Tagen gibt es 2.29.0; rot in 10 Tag(en)  (Erinnerung heute)"
+    );
+    expect(r.output).toBe("vorwarnung=BALD FAELLIG  ntfy 2.28.0  seit 21 Tagen gibt es 2.29.0; rot in 10 Tag(en)\n");
+  });
+
+  test("Vorwarnung: an Tag 22 sichtbar, aber keine Push-Zeile; an Tag 30 wieder eine", () => {
+    versionen();
+    const t22 = laufMitAusgabe("2026-09-08", "2026-09-30");
+    expect(t22.aus).toContain("BALD FAELLIG  ntfy 2.28.0  seit 22 Tagen");
+    expect(t22.output).toBe("");
+    const t30 = laufMitAusgabe("2026-08-31", "2026-09-30");
+    expect(t30.code).toBe(0);
+    expect(t30.output).toContain("rot in 1 Tag(en)");
+  });
+
+  test("Vorwarnung: ab Tag 31 rot statt BALD FAELLIG, keine Push-Zeile (der Alarm uebernimmt)", () => {
+    versionen();
+    const r = laufMitAusgabe("2026-08-30", "2026-09-30");
+    expect(r.code).toBe(1);
+    expect(r.aus).not.toContain("BALD FAELLIG");
+    expect(r.output).toBe("");
+  });
+
+  test("erinnerungstag: genau Tag 21, 24, 27, 30", () => {
+    /* Jest laedt das ES-Modul nicht direkt; ein eigener Node-Aufruf importiert es. */
+    const code =
+      `import(${JSON.stringify(SKRIPT)}).then(({ erinnerungstag }) => {` +
+      "const t = []; for (let i = 0; i <= 40; i++) if (erinnerungstag(i)) t.push(i); console.log(JSON.stringify(t)); })";
+    const aus = execFileSync("node", ["--input-type=module", "-e", code], { encoding: "utf8" });
+    expect(JSON.parse(aus)).toEqual([21, 24, 27, 30]);
+  });
+
   test("der Hersteller ist NICHT weiter als wir (gleich oder aelter): gruen, egal wie alt", () => {
     versionen();
     expect(lauf({ meldungenPfad: meldungen(neuere("2025-01-01", "v2.28.0")) }).code).toBe(0);

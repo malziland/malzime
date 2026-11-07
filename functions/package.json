@@ -25,7 +25,10 @@
     "firebase-functions": {
       "firebase-admin": "$firebase-admin"
     },
-    "uuid": "^11.1.1"
+    "uuid": "^11.1.1",
+    "google-gax": {
+      "rimraf": "^6.1.4"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

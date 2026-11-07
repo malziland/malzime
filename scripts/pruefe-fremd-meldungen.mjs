@@ -57,7 +57,7 @@
  *   FREMD_AUSNAHMEN  Ausnahmedatei
  *   FREMD_HEUTE      Datum JJJJ-MM-TT statt der Systemuhr
  */
-import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, statSync, appendFileSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -104,6 +104,19 @@ export const BIBLIOTHEKEN = {
    (31 Tage): rot. Gibt es mehrere neuere Fassungen, zaehlt die AELTESTE von
    ihnen: Seit ihrem Erscheinen gibt es eine neuere als unsere. */
 export const FRIST_VERALTET_TAGE = 30;
+/* Vorwarnung (07.11.2026): Der Lauf wurde am 07.11. rot, ohne dass es vorher ein
+   Zeichen gab — die Frist war seit dem Erscheinen von ntfy 2.29.0 am 07.10.
+   absehbar. Liegt eine neuere Fassung MEHR als VORWARNUNG_TAGE (aber hoechstens
+   FRIST_VERALTET_TAGE) Tage, bleibt der Lauf gruen und meldet "BALD FAELLIG".
+   An den Erinnerungstagen (erinnerungstag) geht die Zeile als ruhige
+   Push-Nachricht hinaus (Job alarm in sicherheit-nachts.yml, Stufe 3). */
+export const VORWARNUNG_TAGE = 20;
+/* Nicht taeglich, aber mehrfach: Tag 21, 24, 27 und 30. Mehrere Tage, weil
+   GitHub geplante Laeufe gelegentlich verwirft; ein ausgefallener Lauf darf die
+   einzige Vorwarnung nicht verschlucken. */
+export function erinnerungstag(tage) {
+  return tage > VORWARNUNG_TAGE && tage <= FRIST_VERALTET_TAGE && (tage - VORWARNUNG_TAGE - 1) % 3 === 0;
+}
 export const OHNE_CODE = {
   "public/fonts/poppins": "Schriftdateien (woff2), kein ausfuehrbarer Code",
 };
@@ -411,6 +424,7 @@ export function datumGueltig(text) {
 async function main() {
   const befunde = [];
   const hinweise = [];
+  const vorwarnungen = [];
   /* --nur-deckung (Befund H-11): nur die Deckungspruefung, ohne Netz. Laeuft
      in jedem Pull Request und vor dem Push, damit eine neue, unbeobachtete
      Bibliothek gar nicht erst ausgeliefert wird — nicht erst nachts auffaellt. */
@@ -512,10 +526,20 @@ async function main() {
         }
       }
       if (teil.aktuell) {
-        const stand = veraltet(version, await fassungen(teil.repo), HEUTE);
-        if (!stand) {
+        const liste = await fassungen(teil.repo);
+        const stand = veraltet(version, liste, HEUTE);
+        const bald = stand ? null : veraltet(version, liste, HEUTE, VORWARNUNG_TAGE);
+        if (bald && !gueltigeAusnahme(`FASSUNG-${bald.neu}`, teil.name, version)) {
+          const rest = FRIST_VERALTET_TAGE + 1 - bald.tage;
+          const zeile =
+            `BALD FAELLIG  ${teil.name} ${version}  seit ${bald.tage} Tagen gibt es ${bald.seit}` +
+            (bald.neu === bald.seit ? "" : `, inzwischen ${bald.neu}`) +
+            `; rot in ${rest} Tag(en)`;
+          vorwarnungen.push({ zeile, push: erinnerungstag(bald.tage) });
+        } else if (!stand) {
           console.log(`${teil.name} ${version}: keine neuere Fassung, die aelter als ${FRIST_VERALTET_TAGE} Tage ist`);
-        } else {
+        }
+        if (stand) {
           const inzwischen = stand.neu === stand.seit ? "" : `, inzwischen ${stand.neu}`;
           const zeile =
             `VERALTET  ${teil.name} ${version}  seit ${stand.tage} Tagen gibt es ${stand.seit}${inzwischen} ` +
@@ -537,6 +561,11 @@ async function main() {
       `, Stand ${HEUTE}`
   );
   for (const h of hinweise) console.log(`  [Ausnahme] ${h}`);
+  for (const v of vorwarnungen) console.log(`  ${v.zeile}${v.push ? "  (Erinnerung heute)" : ""}`);
+  const zuSenden = vorwarnungen.filter((v) => v.push).map((v) => v.zeile);
+  if (zuSenden.length && process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `vorwarnung=${zuSenden.join(" | ").replace(/[\r\n]/g, " ")}\n`);
+  }
   if (befunde.length === 0) {
     console.log("ERGEBNIS: keine offene Sicherheitsmeldung, keine veraltete Fassung.");
     return 0;

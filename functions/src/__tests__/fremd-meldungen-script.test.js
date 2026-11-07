@@ -235,6 +235,37 @@ describe("pruefe-fremd-meldungen: selbst betriebener Dienst (ntfy)", () => {
     expect(r.output).toBe("");
   });
 
+  test("Vorwarnung mit Ausnahme FASSUNG-<neu>: keine Push-Zeile, aber als Ausnahme sichtbar", () => {
+    versionen();
+    const ausgabe = path.join(basis, "github-output.txt");
+    fs.writeFileSync(ausgabe, "");
+    const alt = process.env.GITHUB_OUTPUT;
+    process.env.GITHUB_OUTPUT = ausgabe;
+    try {
+      const r = lauf({
+        meldungenPfad: meldungen(neuere("2026-09-09")),
+        ausnahmenPfad: ausnahmen([
+          {
+            ghsa: "FASSUNG-2.29.0",
+            bibliothek: "ntfy",
+            version: "2.28.0",
+            grund: "Update eingeplant",
+            eingetragen: "2026-09-30",
+            pruefen_bis: "2026-10-15",
+          },
+        ]),
+        heute: "2026-09-30",
+      });
+      expect(r.code).toBe(0);
+      expect(r.aus).toContain("[Ausnahme] BALD FAELLIG  ntfy 2.28.0  seit 21 Tagen gibt es 2.29.0");
+      expect(r.aus).not.toContain("keine neuere Fassung, die aelter als 30 Tage ist");
+      expect(fs.readFileSync(ausgabe, "utf8")).toBe("");
+    } finally {
+      if (alt === undefined) delete process.env.GITHUB_OUTPUT;
+      else process.env.GITHUB_OUTPUT = alt;
+    }
+  });
+
   test("erinnerungstag: genau Tag 21, 24, 27, 30", () => {
     /* Jest laedt das ES-Modul nicht direkt; ein eigener Node-Aufruf importiert es. */
     const code =

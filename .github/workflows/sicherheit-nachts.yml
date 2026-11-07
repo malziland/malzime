@@ -139,6 +139,10 @@ jobs:
             echo "::error::Secrets NTFY_URL_EU / NTFY_TOPIC_EU fehlen — der Alarm kann nicht hinaus."
             exit 1
           fi
+          # Stufe fest vorbelegt, nicht aus der Umgebung uebernommen: Nur der
+          # Zweig "nur Vorwarnung" senkt sie (Abnahme 07.11.2026, P2-1).
+          STUFE=5
+          MARKE=rotating_light
           # ROT hat Vorrang: Ist eine Pruefung nicht erfolgreich, darf eine
           # gleichzeitige Probe das nicht verdecken (J-04).
           if [ "$NPM" != "success" ] || [ "$BIBLIOTHEKEN" != "success" ] || [ "$ABKUENDIGUNGEN" != "success" ]; then
@@ -159,8 +163,6 @@ jobs:
           if [ -n "$VORWARNUNG" ] && [ "$TITEL" != "malziME: Update bald faellig" ]; then
             TEXT="$TEXT Ausserdem: $VORWARNUNG."
           fi
-          STUFE="${STUFE:-5}"
-          MARKE="${MARKE:-rotating_light}"
           BODY=$(jq -n --arg t "$NTFY_TOPIC" --arg ti "$TITEL" --arg m "$TEXT" --arg c "$LAUF" --argjson p "$STUFE" --arg g "$MARKE" \
             '{topic: $t, title: $ti, message: $m, priority: $p, tags: [$g], click: $c}')
           CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 -X POST \

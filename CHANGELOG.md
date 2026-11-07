@@ -11,7 +11,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **`glob` und `minimatch` im Server auf korrigierte Fassungen** (GHSA-3g3m-2fjr-6pw4,
   GHSA-g3hv-75wg-m249, beide „mittel“). Sie kamen über Googles Firestore-Unterbau
   (`google-gax` 5 → `rimraf` 5), der `rimraf` zwar mitbringt, aber nie aufruft. Per
-  `overrides`-Eintrag `google-gax → rimraf ^6.1.4` in `functions/package.json` angehoben;
+  `overrides`-Eintrag `google-gax → rimraf ^6.1.4` in `functions/package.json` angehoben
+  (er gilt im ganzen Unterbau von `google-gax`, also auch für `gaxios`, das `rimraf` ebenso
+  nie aufruft);
   danach enthält der Server nur noch `glob` 14.0.4 und `minimatch` 11.0.5. Zurückbauen,
   sobald `@google-cloud/firestore` einen Firestore-Unterbau mit `google-gax` 6 anfordert
   (der hat `rimraf` nicht mehr). Dieselben Meldungen in Test- und Prüfwerkzeugen (Jest,

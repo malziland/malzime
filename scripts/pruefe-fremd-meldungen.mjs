@@ -529,7 +529,13 @@ async function main() {
         const liste = await fassungen(teil.repo);
         const stand = veraltet(version, liste, HEUTE);
         const bald = stand ? null : veraltet(version, liste, HEUTE, VORWARNUNG_TAGE);
-        if (bald && !gueltigeAusnahme(`FASSUNG-${bald.neu}`, teil.name, version)) {
+        const baldAusnahme = bald ? gueltigeAusnahme(`FASSUNG-${bald.neu}`, teil.name, version) : null;
+        if (bald && baldAusnahme) {
+          hinweise.push(
+            `BALD FAELLIG  ${teil.name} ${version}  seit ${bald.tage} Tagen gibt es ${bald.seit}\n` +
+              `      ausgenommen bis ${baldAusnahme.pruefen_bis}: ${baldAusnahme.grund}`
+          );
+        } else if (bald) {
           const rest = FRIST_VERALTET_TAGE + 1 - bald.tage;
           const zeile =
             `BALD FAELLIG  ${teil.name} ${version}  seit ${bald.tage} Tagen gibt es ${bald.seit}` +

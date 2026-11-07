@@ -253,7 +253,7 @@ sichern .github/workflows/sicherheit-nachts.yml
 python3 - <<'PYSELF'
 p = ".github/workflows/sicherheit-nachts.yml"
 s = open(p).read()
-s = s.replace('STUFE="${STUFE:-5}"', 'STUFE="${STUFE:-3}"', 1)
+s = s.replace("          STUFE=5\n", "          STUFE=3\n", 1)
 assert s != open(p).read(), "Probe greift nicht: Stufe des Alarms nicht gefunden"
 open(p, "w").write(s)
 PYSELF

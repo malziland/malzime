@@ -35,7 +35,11 @@ vi.mock("../js/i18n.js", () => ({
   initI18n: () => Promise.resolve(),
   applyTranslations: () => {},
 }));
-vi.mock("../js/exif.js", () => ({ prepareImage: vi.fn(() => steuerung.aufbereitung()) }));
+vi.mock("../js/exif.js", () => ({
+  /* Seit 09.11.2026 liest app.js/api.js das Foto vor der Aufbereitung (leseFoto). */
+  leseFoto: vi.fn(async (datei) => ({ byteLength: (datei && datei.size) || 3 })),
+  prepareImage: vi.fn(() => steuerung.aufbereitung()),
+}));
 vi.mock("../js/geocoding.js", () => ({ startGeocoding: vi.fn() }));
 vi.mock("../js/render.js", () => ({
   renderCurrentMode: vi.fn(),
@@ -105,11 +109,15 @@ describe("Fläche: zurückgesetzt wird an EINER Stelle", () => {
     }
   );
 
-  it("analyzeImageQueued hat genau die drei bekannten frühen Ausgänge", () => {
+  /* Seit 09.11.2026 zwei statt drei: Die Pruefung "Datei zu gross" steht
+     hinter dem Lesen des Fotos im try-Block (Begruendung in api.js und app.js:
+     erst lesen, dann Groesse oder Zeit anfassen) und endet damit ueber den
+     finally-Zweig. */
+  it("analyzeImageQueued hat genau die zwei bekannten frühen Ausgänge", () => {
     const zeilen = funktion("async function analyzeImageQueued(");
     const versuch = zeilen.findIndex((z) => z === "  try {");
     const fruehe = zeilen.slice(0, versuch).filter((z) => /^\s+return\b/.test(z));
-    expect(fruehe).toHaveLength(3);
+    expect(fruehe).toHaveLength(2);
   });
 });
 

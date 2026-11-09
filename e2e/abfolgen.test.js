@@ -764,6 +764,11 @@ test.describe("Anzeige in Randfällen", () => {
  * Nachgestellt wird hier der Fehler selbst (das Lesen der Datei scheitert).
  */
 test.describe("Foto nicht lesbar: Angaben in der Fehlermeldung", () => {
+  /* Hier wird die Meldung geprueft, wenn ALLE Lesewege scheitern. Seit
+     09.11.2026 rettet die Hilfsdatei (public/foto-helfer-sw.js) ein solches Foto
+     in Chromium — sie liest ausserhalb der Seite, die Attrappe unten greift dort
+     nicht. Darum ist sie hier gesperrt; die Rettung prueft der Block danach. */
+  test.use({ serviceWorkers: "block" });
   const UNLESBAR = "vom-geraet-nicht-herausgegeben.jpg";
   const TEXT = JSON.parse(readFileSync(join(process.cwd(), "public", "locales", "de.json"), "utf8"))[
     "error.readFailed"
@@ -857,5 +862,64 @@ test.describe("Foto nicht lesbar: Angaben in der Fehlermeldung", () => {
     await fotoWaehlen(page);
     await expect(page.locator(ERGEBNIS_SICHTBAR)).toBeVisible({ timeout: 20000 });
     expect(lesefehler(meldungen)).toHaveLength(0);
+  });
+});
+
+/* AUSWEICHWEG (09.11.2026): Laesst der Browser die Seite ein Foto nicht lesen
+ * (am Android-Pruefgeraet nachgestellt: Chrome nach Neuanlage der Datei), holt
+ * die Seite es ueber die Hilfsdatei im Browser. Hier: beide Lesewege der Seite
+ * scheitern, die Hilfsdatei bekommt die Datei ueber ein Formular. Erwartet:
+ * Erfolgsmeldung foto-ausweichweg-ok, die Analyse wird eingereiht, KEINE
+ * Lesefehler-Meldung — und keine Anfrage an unseren Server mit dem Foto
+ * ausser der Einreihung selbst. */
+test.describe("Foto nicht lesbar: der Ausweichweg rettet es", () => {
+  const UNLESBAR = "vom-geraet-nicht-herausgegeben.jpg";
+
+  // pruefungen:uebersprungen-weil Firefox und WebKit sperren die Hilfsdatei im Testlauf (playwright.config.js); der Lesefehler betrifft nur Chrome auf Android
+  test.skip(({ browserName }) => browserName !== "chromium", "Hilfsdatei nur in Chromium im Testlauf");
+
+  test("Hilfsdatei steuert, Foto wird eingereiht, keine Lesefehler-Meldung", async ({ page, context }) => {
+    test.setTimeout(60000);
+    await page.addInitScript((name) => {
+      const fehler = () => new DOMException("nicht lesbar", "NotReadableError");
+      const echtBytes = Blob.prototype.arrayBuffer;
+      Blob.prototype.arrayBuffer = function () {
+        if (this instanceof File && this.name === name) return Promise.reject(fehler());
+        return echtBytes.call(this);
+      };
+      const echtLesen = FileReader.prototype.readAsArrayBuffer;
+      FileReader.prototype.readAsArrayBuffer = function (blob) {
+        if (blob instanceof File && blob.name === name) {
+          Object.defineProperty(this, "error", { configurable: true, get: fehler });
+          setTimeout(() => this.onerror && this.onerror(new ProgressEvent("error")), 0);
+          return undefined;
+        }
+        return echtLesen.call(this, blob);
+      };
+    }, UNLESBAR);
+    await grundrouten(page, context);
+    const meldungen = [];
+    const telemetrie = [];
+    const eingereiht = [];
+    await page.route("**/api/errors", async (r) => {
+      meldungen.push(JSON.parse(r.request().postData()));
+      await r.fulfill({ status: 204, body: "" });
+    });
+    await page.route("**/api/telemetry", async (r) => {
+      telemetrie.push(JSON.parse(r.request().postData()));
+      await r.fulfill({ status: 204, body: "" });
+    });
+    await page.route("**/api/enqueue", async (r) => {
+      eingereiht.push(r.request().postData() || "");
+      await json(r, 200, { jobId: "job-1", resultToken: "tok" });
+    });
+    await page.route("**/api/job-status*", (r) => json(r, 200, { status: "done", result: ERGEBNIS }));
+    await seiteOeffnen(page);
+    await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+    await page.setInputFiles("#fileInput", { name: UNLESBAR, mimeType: "image/jpeg", buffer: MINI_JPEG });
+    await expect.poll(() => eingereiht.length, { timeout: 20000 }).toBe(1);
+    expect(telemetrie.map((t) => t.eventType)).toContain("foto-ausweichweg-ok");
+    expect(meldungen.filter((m) => m.phase === "image-read")).toHaveLength(0);
   });
 });

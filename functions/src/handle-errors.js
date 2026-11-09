@@ -37,6 +37,11 @@ const STRING_FIELDS = {
      lesen? "ok", "leer" oder ein Fehlername. Trennt "Geraet gibt die Datei gar
      nicht heraus" von "nicht vollstaendig". Kein Inhalt, kein Dateiname. */
   kopfLesetest: 40,
+  /* Ausweichweg (09.11.2026): Ergebnis, wenn die Seite das Foto ueber die
+     Hilfsdatei im Browser holt (public/foto-helfer-sw.js) — "kein-helfer",
+     "status-422:NotReadableError", "leer" oder ein Fehlername. Kein Inhalt,
+     kein Dateiname. */
+  ausweichweg: 40,
   /* Lesefehler (09.10.2026): Art der Zeitangabe, die der Browser zur Datei
      hatte ("keine", "sekunden", "millisekunden", "unbekannt"), und der
      Vergleich mit der vorigen Auswahl derselben Datei ("neu", "gleich",

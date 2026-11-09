@@ -61,8 +61,10 @@ describe("Doku-Drift-Wächter", () => {
     expect(bytes).not.toBeNull();
     const mb = Number(bytes[1]);
 
-    // Frontend-Konstante (api.js): dieselbe Byte-Rechnung.
-    const apiMb = lies("public/js/api.js").match(/file\.size\s*>\s*(\d+)\s*\*\s*1024\s*\*\s*1024/);
+    // Frontend-Konstante (api.js): dieselbe Byte-Rechnung. Seit 09.11.2026 an
+    // den gelesenen Bytes (bytes.byteLength), nicht mehr an file.size — erst
+    // lesen, dann die Datei anfassen (js/foto-auswahl.js).
+    const apiMb = lies("public/js/api.js").match(/bytes\.byteLength\s*>\s*(\d+)\s*\*\s*1024\s*\*\s*1024/);
     expect(apiMb).not.toBeNull();
     expect(Number(apiMb[1])).toBe(mb);
 

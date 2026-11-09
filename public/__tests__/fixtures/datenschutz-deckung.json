@@ -35,6 +35,7 @@
       "errorDetail": "Fehlerart",
       "zweiterLeseweg": "zusammengefasst",
       "kopfLesetest": "zusammengefasst",
+      "ausweichweg": "zusammengefasst",
       "dateizeit": "zusammengefasst",
       "zeitsprung": "zusammengefasst",
       "durationMs": "Fehlerart, Dauer",

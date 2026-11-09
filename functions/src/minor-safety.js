@@ -100,6 +100,7 @@ const { untereAltersgrenze, obereAltersgrenze, istAlterUnlesbar } = require("./a
    Fuer die Manipulations-Trigger wird sie bewusst NICHT angewandt — siehe
    applyMinorSafety. */
 const WOERTER = require("./minor-safety-woerter");
+const saetzeFilter = require("./minor-safety-saetze"); /* ganze Saetze entfernen, 09.11.2026 */
 
 /* Text vor dem Vergleich vereinheitlichen: Gross/Klein, Umlaute und ß,
    zerlegte und Vollbreite-Zeichen, unsichtbare Trennzeichen (Cf), Akzente;
@@ -237,6 +238,9 @@ function stichwort(liste, eintrag, alsWerbung = false) {
 }
 
 const istImmerVerboten = (eintrag, alsWerbung = true) => stichwort(IMMER_VERBOTEN, eintrag, alsWerbung) !== null;
+
+const { ohneHarteSaetze, liveOhneHarteWoerter } = saetzeFilter((text) => stichwort(IMMER_VERBOTEN, text) !== null);
+
 const istBeiMinderjaehrigenVerboten = (eintrag, alsWerbung = true) =>
   stichwort(NUR_MINDERJAEHRIG, eintrag, alsWerbung) !== null;
 
@@ -254,6 +258,8 @@ function applyMinorSafety(profiles, opts = {}) {
     alterBis: null,
     entfernt: [],
     durchgerutscht: [],
+    /* Felder, aus denen ganze Saetze entfernt wurden (ohne Wort, ohne Satz). */
+    satzEntfernt: [],
     /* Anzahl der Werbeeintraege je Modus, nachdem Filter und Kappung durch
        sind — also das, was das Kind tatsaechlich sieht. */
     werbung: {},
@@ -338,7 +344,9 @@ function applyMinorSafety(profiles, opts = {}) {
     }
     bericht.werbung[modus] = Array.isArray(p.ad_targeting) ? p.ad_targeting.length : null;
 
-    /* ── Fliesstext: nur melden, nicht entfernen ────────────────────────
+    /* ── Fliesstext: melden; seit 09.11.2026 bei moeglicherweise
+       Minderjaehrigen den ganzen Satz mit einem Wort der harten Liste
+       entfernen (ohneHarteSaetze). Fruehere Fassung: ────────────────────
        SEC-001: Der Filter fasste nur zwei von rund fuenfzehn Textfeldern an.
        Derselbe String "OnlyFans" wurde in ad_targeting entfernt und in
        profileText ausgeliefert — auch die altersunabhaengige Stufe.
@@ -354,8 +362,19 @@ function applyMinorSafety(profiles, opts = {}) {
       if (typeof text !== "string" || !text) continue;
       const hart = stichwort(IMMER_VERBOTEN, text);
       const weich = hart === null && minderjaehrig ? stichwort(NUR_MINDERJAEHRIG, text) : null;
-      if (hart !== null) bericht.durchgerutscht.push({ modus, feld, grund: "immer", stichwort: hart });
-      else if (weich !== null) bericht.durchgerutscht.push({ modus, feld, grund: "minor", stichwort: weich });
+      if (hart !== null) {
+        bericht.durchgerutscht.push({ modus, feld, grund: "immer", stichwort: hart });
+        if (minderjaehrig) {
+          const neu = ohneHarteSaetze(text);
+          if (feld === "profileText") p.profileText = neu;
+          else {
+            const key = feld.slice("categories.".length);
+            if (neu) p.categories[key].value = neu;
+            else delete p.categories[key];
+          }
+          bericht.satzEntfernt.push({ modus, feld });
+        }
+      } else if (weich !== null) bericht.durchgerutscht.push({ modus, feld, grund: "minor", stichwort: weich });
     }
   }
 
@@ -367,6 +386,8 @@ module.exports = {
   WERBE_ANZAHL,
   WERBE_ANFORDERUNG,
   /* Für Tests */
+  liveOhneHarteWoerter,
+  _ohneHarteSaetze: ohneHarteSaetze,
   _istImmerVerboten: istImmerVerboten,
   _istBeiMinderjaehrigenVerboten: istBeiMinderjaehrigenVerboten,
   _vereinheitlicht: vereinheitlicht,

@@ -96,6 +96,7 @@ functions/src/              Firebase Cloud Functions (2nd Gen, Node 24, europe-w
   animal.js                 Motiv-Entscheidung am Feld `subject` der KI-Antwort + Tier-Easter-Egg-Profile
   privacy.js                Privacy-Risiken: lesbare Adresse und Telefonnummer aus dem Feld `visible_text` der KI-Antwort, Kennzeichen aus dem ganzen Text
   minor-safety.js           Kinderschutz-Filter fuer Werbekategorien (Schwelle mit Puffer); zieht danach die gezeigten Eintraege aus dem Vorrat
+  minor-safety-saetze.js    Ganze Saetze mit einem Wort der harten Liste entfernen (moeglicherweise Minderjaehrige), auch live
   minor-safety-woerter.js   Wortlisten des Kinderschutz-Filters (reine Daten, deutsch und englisch; mit Wortfuge fuer zusammengesetzte Woerter)
   alters-lesbarkeit.js      Erkennung nicht lesbarer Altersangaben (erster Satz, Altersversuch)
   alters-auslese.js         Altersauslese: Zahlwoerter, Kategorien, untere und obere Altersgrenze

@@ -1,3 +1,5 @@
+import { leseUeberHelfer } from "./foto-helfer.js";
+import { logTelemetry } from "./telemetry-logger.js";
 import exifr from "../lib/exifr/lite.esm.mjs";
 import { heicZuCanvas } from "./heic.js";
 
@@ -61,6 +63,16 @@ async function readFileBytes(file, auswahlZeit) {
          erklaert. */
       const zweiter = await zweiterLeseweg(file);
       if (zweiter.bytes) return zweiter.bytes;
+      /* AUSWEICHWEG (09.11.2026): Chrome verweigert jeden Lesezugriff, wenn
+         Android das Foto nach der Auswahl neu angelegt hat — das Hochladen
+         kommt aber durch. Die Hilfsdatei faengt dieses Hochladen auf dem
+         Geraet ab und gibt die Bytes zurueck; nichts geht ans Netz
+         (../foto-helfer-sw.js). Am Pruefgeraet: Chromium 156 6/6, 157 3/3. */
+      const ausweich = await leseUeberHelfer(file);
+      if (ausweich.bytes) {
+        logTelemetry("foto-ausweichweg-ok", { durationMs: msSeit(auswahlZeit) || 0 });
+        return ausweich.bytes;
+      }
       /* KOPF-LESETEST (16.09.2026): Im Workshop scheiterte der zweite Leseweg in
          11 von 11 Faellen — er hat die Ursache nicht eingegrenzt. Offen blieb:
          Gibt das Geraet die Datei GAR NICHT heraus, oder nur nicht vollstaendig?
@@ -74,6 +86,7 @@ async function readFileBytes(file, auswahlZeit) {
       wrapped.fileFormat = "decl:" + (file.type || "ohne-mime");
       wrapped.fileSizeKb = Math.round((file.size || 0) / 1024);
       wrapped.zweiterLeseweg = zweiter.ergebnis;
+      wrapped.ausweichweg = ausweich.ergebnis;
       wrapped.kopfLesetest = kopf;
       wrapped.dateizeit = dateizeitArt(file, auswahlZeit);
       wrapped.msSeitAuswahl = msSeit(auswahlZeit);
@@ -286,8 +299,17 @@ function verkleinernUndKodieren(quelle) {
   };
 }
 
+/* Liest das gewaehlte Foto in den Speicher (mit allen Ersatzwegen, siehe
+   readFileBytes). Eigene Ausfuhr, damit app.js gleich bei der Auswahl lesen
+   kann — VOR jedem anderen Zugriff auf die Datei (Groesse, Zeit, Vorschau):
+   Am Pruefgeraet scheiterte der Ausweichweg 3 von 3, wenn die Seite Groesse
+   und Zeit schon vorher abgefragt hatte. */
+export function leseFoto(file, auswahlZeit) {
+  return readFileBytes(file, auswahlZeit);
+}
+
 export async function prepareImage(file, optionen = {}) {
-  const buffer = await readFileBytes(file, optionen.auswahlZeit);
+  const buffer = optionen.bytes || (await readFileBytes(file, optionen.auswahlZeit));
   const bytes = new Uint8Array(buffer);
 
   /* EXIF im Browser parsen — GPS bleibt lokal, nur Kamera-Daten an Server */

@@ -1,4 +1,4 @@
-import { initI18n, applyTranslations, t } from "./js/i18n.js";
+import { initI18n, applyTranslations } from "./js/i18n.js";
 import { elements } from "./js/dom.js";
 import { state } from "./js/state.js";
 import {
@@ -23,7 +23,8 @@ import { initSprachumschalter } from "./js/sprachumschalter.js";
 import { initBeastLockruf } from "./js/beast-lockruf.js";
 import { pruefeSeiteNachDruck } from "./js/druck-wache.js";
 import { apiUrl } from "./js/api-basis.js";
-import { zeitsprungArt } from "./js/exif.js";
+import { starteFotoHelfer } from "./js/foto-helfer.js";
+import { lesenUndVorschau } from "./js/foto-auswahl.js";
 import { merkeAuswahlGeoeffnet, auswahlOffenMs, meldeLeereAuswahl } from "./js/foto-fehler.js";
 
 /* ── Absturz-Wache: als ALLERERSTES, vor jedem await ──
@@ -40,6 +41,9 @@ merkePhase("start");
    auf sie statt zu verpuffen (07.09.2026, Hergang in js/demo.js). */
 const uebersetzungBereit = initI18n();
 initDemo(uebersetzungBereit);
+/* Ausweichweg fuer unlesbare Fotos bereitstellen — so frueh wie moeglich,
+   damit er vor dem ersten Tippen auf "Foto waehlen" bereitsteht (js/foto-helfer.js). */
+starteFotoHelfer();
 
 /* Datei-Auswahl und Ablegen SOFORT verdrahten — dasselbe Muster wie bei den
    Demo-Fotos (09.09.2026, Pipeline-Lauf 34379594749): Beide Handler standen
@@ -189,21 +193,16 @@ function handleNewFile(file) {
 
   const prev = elements.imagePreview.querySelector("img");
   if (prev) URL.revokeObjectURL(prev.src);
-
-  const url = URL.createObjectURL(file);
-  const img = document.createElement("img");
-  img.src = url;
-  img.alt = t("preview.alt");
   elements.imagePreview.innerHTML = "";
-  elements.imagePreview.appendChild(img);
 
   state.lastFile = file;
-  /* Lesefehler-Diagnose: Vergleich mit der vorigen Auswahl (exif.js). */
-  state.zeitsprung = zeitsprungArt(state.vorigeAuswahl, file);
-  state.vorigeAuswahl = { name: file.name, size: file.size, lastModified: file.lastModified };
   state.auswahlZeit = Date.now();
   state.lastPrepared = null;
   state.lastData = null;
+
+  /* ZUERST LESEN (09.11.2026): vor jedem anderen Zugriff auf die Datei —
+     Begruendung bei lesenUndVorschau (js/foto-auswahl.js). */
+  state.fotoLesen = lesenUndVorschau(file);
   analyzeImage();
 }
 

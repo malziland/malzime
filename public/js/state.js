@@ -30,6 +30,8 @@ export const state = {
      aeltere Ablauf das an dieser Nummer und schreibt nichts mehr. `requestId`
      reicht dafuer nicht: Die zieht erst der Durchgang, der schon analysiert. */
   auswahlNr: 0,
+  /* Das Lesen des zuletzt gewaehlten Fotos (Promise der Bytes, app.js). */
+  fotoLesen: null,
   lastTraceId: null,
   /* Promise des /api/stats-Aufrufs. analyzeImage wartet darauf, bevor der
      Upload startet (Wartungsmodus und Stundenlimit stehen dort drin). */

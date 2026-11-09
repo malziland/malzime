@@ -137,9 +137,12 @@ describe("Sicherheitsrichtlinie (firebase.json) und api-basis.js sind eine Liste
     expect(fremd).toEqual([]);
   });
 
-  it("connect-src bleibt sonst eng: 'self' und Nominatim, kein Platzhalter", () => {
+  /* https://foto-lokal.invalid (09.11.2026): die Adresse des Ausweichwegs fuer
+     unlesbare Fotos (js/foto-helfer.js). Die Endung .invalid gibt es nach
+     RFC 6761 nie — nur die Hilfsdatei im Browser beantwortet sie. */
+  it("connect-src bleibt sonst eng: 'self', Nominatim, die nie erreichbare Foto-Adresse", () => {
     const rest = erlaubteHosts.filter((h) => !h.includes("run.app"));
-    expect(rest).toEqual(["'self'", "https://nominatim.openstreetmap.org"]);
+    expect(rest).toEqual(["'self'", "https://nominatim.openstreetmap.org", "https://foto-lokal.invalid"]);
     expect(csp).not.toMatch(/\*\.run\.app|\*\.a\.run\.app/);
   });
 });

@@ -57,7 +57,8 @@ export default defineConfig({
        Zusatzinstallation mit. */
     {
       name: "webkit-sprachumschalter",
-      use: { browserName: "webkit", viewport: { width: 390, height: 844 } },
+      /* serviceWorkers "block": siehe firefox-barrierefreiheit (09.11.2026). */
+      use: { browserName: "webkit", viewport: { width: 390, height: 844 }, serviceWorkers: "block" },
       /* Auch das Barrierefreiheits-Protokoll laeuft hier: Die Workshops finden
          auf iPhones statt, also auf WebKit. Am 2026-08-17 hat genau dieser
          Unterschied einen echten Fehler gezeigt, den Chromium nicht zeigte —
@@ -78,7 +79,13 @@ export default defineConfig({
        waechst. */
     {
       name: "firefox-barrierefreiheit",
-      use: { browserName: "firefox" },
+      /* serviceWorkers "block" (09.11.2026): Steuert die Hilfsdatei des
+         Ausweichwegs (public/foto-helfer-sw.js) die Seite, sieht page.route in
+         Firefox und WebKit die Anfragen der Seite nicht mehr — die abgefangene Einreihung
+         kam nie an. Echte Nutzer betrifft das nicht (die Hilfsdatei reicht alle
+         anderen Anfragen unberuehrt durch). Chromium laeuft weiter MIT
+         Hilfsdatei. */
+      use: { browserName: "firefox", serviceWorkers: "block" },
       /* Problemfaelle auch hier: Firefox kann HEIC nicht — der Dekoder muss
          greifen (08.09.2026). */
       testMatch:

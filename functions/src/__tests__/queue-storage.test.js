@@ -125,6 +125,60 @@ describe("deleteImage", () => {
     expect(zeile).not.toHaveProperty("message");
     fehlerSpy.mockRestore();
   });
+
+  /* 09.11.2026: ein 503 beim Loeschen, das Foto blieb bis zum Aufraeumdienst
+     liegen. Ein kurzer Aussetzer bekommt jetzt EINEN zweiten Versuch. */
+  test("kurzer Aussetzer (503): zweiter Versuch nach einer Sekunde, Foto weg, keine Meldung", async () => {
+    jest.useFakeTimers();
+    let versuche = 0;
+    jest.spyOn(bucket, "file").mockReturnValue({
+      async delete() {
+        versuche += 1;
+        if (versuche === 1) throw Object.assign(new Error("Service Unavailable"), { code: 503 });
+      },
+    });
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const lauf = storage.deleteImage("queue-uploads/x.jpg");
+    await jest.advanceTimersByTimeAsync(1000);
+    await expect(lauf).resolves.toBe(true);
+    expect(versuche).toBe(2);
+    expect(fehlerSpy).not.toHaveBeenCalled();
+    fehlerSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  test("scheitert auch der zweite Versuch, meldet er wie bisher (false, severity ERROR)", async () => {
+    jest.useFakeTimers();
+    let versuche = 0;
+    jest.spyOn(bucket, "file").mockReturnValue({
+      async delete() {
+        versuche += 1;
+        throw Object.assign(new Error("Service Unavailable"), { code: 503 });
+      },
+    });
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    const lauf = storage.deleteImage("queue-uploads/x.jpg");
+    await jest.advanceTimersByTimeAsync(1000);
+    await expect(lauf).resolves.toBe(false);
+    expect(versuche).toBe(2);
+    expect(JSON.parse(fehlerSpy.mock.calls[0][0]).code).toBe(503);
+    fehlerSpy.mockRestore();
+    jest.useRealTimers();
+  });
+
+  test("ein Fehler, der kein Aussetzer ist (403), wird NICHT wiederholt", async () => {
+    let versuche = 0;
+    jest.spyOn(bucket, "file").mockReturnValue({
+      async delete() {
+        versuche += 1;
+        throw Object.assign(new Error("verboten"), { code: 403 });
+      },
+    });
+    const fehlerSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    await expect(storage.deleteImage("queue-uploads/x.jpg")).resolves.toBe(false);
+    expect(versuche).toBe(1);
+    fehlerSpy.mockRestore();
+  });
 });
 
 describe("Lokal-Modus (QUEUE_LOCAL=1, Emulator)", () => {

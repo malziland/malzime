@@ -6,12 +6,15 @@
 public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   index.html         Hauptseite (Cache-Busting: ?v=YYYYMMDDNN an CSS/JS)
   app.js             Entry Point (ES Module)
+  foto-helfer-sw.js  Hilfsdatei (Service Worker) des Ausweichwegs: beantwortet nur POST an https://foto-lokal.invalid/foto (eine Adresse, die es nie gibt — faellt die Hilfsdatei aus, findet das Netz kein Ziel) mit den Bytes des Fotos, reicht nie etwas ans Netz weiter
   js/                Frontend-Module (jede Datei unter public/js/*.js hat hier genau eine Zeile)
     api.js           Analyse-Ablauf im Browser: Foto einreihen, Ergebnis zeigen, Wiederaufnahme nach Neuladen; entscheidet, wann ein verworfener Auftrag abgemeldet wird (analyzeImage, resumeQueueJob)
     auftrag-abfrage.js  Statusabfrage eines eingereihten Auftrags im 2-Sekunden-Takt (pollJob), zugleich Lebenszeichen an den Server
     auftrag-abmelden.js  Buch darueber, welchen Auftrag der Tab gerade abholt, und Abmelden, wenn er ihn fallen laesst (hoechstens einmal je Auftrag, nur mit Abhol-Ticket)
     netz-hilfen.js   Netz- und Warte-Hilfen des Ablaufs: Aufruf mit Zeitgrenze bis zum Ende des Antwort-Rumpfs (fetchWithTimeout), Warten auf den naechsten Takt
+    foto-auswahl.js  Was mit einem gewaehlten Foto zuerst geschieht: lesen VOR jedem anderen Zugriff auf die Datei, Vorschau aus den gelesenen Bytes, danach die Lesefehler-Diagnose (lesenUndVorschau)
     foto-vorschau.js  Zwei Handgriffe an der Foto-Vorschau: Ersatzbild, wenn der Browser das Original nicht anzeigen kann; Hinweis „Foto geloescht“
+    foto-helfer.js   Ausweichweg fuer Fotos, die Chrome auf Android nicht lesen laesst: meldet die Hilfsdatei ../foto-helfer-sw.js an und gleich wieder ab (kein dauerhafter Speicher) und holt das Foto ueber sie, nur wenn sie die Seite steuert — das Foto verlaesst das Geraet nie
     foto-fehler.js   Meldung an die Fehlererfassung, wenn ein Foto nicht gelesen, geoeffnet oder hochgeladen wird — samt den Diagnosefeldern der Datei (meldeFotoFehler); misst, wie lange eine leer zurueckgekommene Fotoauswahl offen war (merkeAuswahlGeoeffnet, auswahlOffenMs)
     api-basis.js     Die eine Stelle fuer die Server-Adressen: im Betrieb direkt Cloud Run in europe-west1, lokal relativ
     auftrag-speicher.js  Auftragsgedaechtnis des Tabs (sessionStorage): Auftragsnummer, Abhol-Ticket, Frist fuer ein zugestelltes Ergebnis
@@ -86,6 +89,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung (buildPrivacyRisks): lesbare Adresse und Telefonnummer aus dem Feld visible_text der KI-Antwort, Kennzeichen aus dem ganzen Text
   minor-safety.js    Kinderschutz-Filter fuer Werbe-Eintraege: Stufe 1 fuer alle, Stufe 2 bis zur Untergrenze SCHUTZ_BIS; zieht danach aus dem Vorrat die gezeigten Eintraege (Anzahl und Vorrat: WERBE_ANZAHL, WERBE_ANFORDERUNG)
+  minor-safety-saetze.js  Ganze Saetze mit einem Wort der harten Liste entfernen (moeglicherweise Minderjaehrige) und die Live-Anzeige davon frei halten; die Wortpruefung kommt aus minor-safety.js
   minor-safety-woerter.js  Die Wortlisten dazu (reine Daten, deutsch und englisch); jedes Listenwort braucht ein Beispiel in der Pruefreihe
   alters-lesbarkeit.js  Lesbarkeit der Altersangabe im KI-Text: erster Satz einer Karte, Altersversuch, nicht lesbares Alter
   alters-auslese.js     Die Zahl-Lesung dazu: Zahlwoerter, Kategorien, untere und obere Altersgrenze
@@ -204,7 +208,7 @@ Einzelbefehle:
   Lauf beobachtet den selbst betriebenen ntfy-Server (Fassung gespiegelt in
   `.github/fremd-dienste/ntfy/VERSION`; nach jedem Update des Dienstes nachziehen)
 - Bot-Schutz: Rate Limiting (IP) + Honeypot + Timing-Check
-- CSP: nur 'self' + OpenStreetMap Tiles + Cloud Functions Endpoint + Nominatim
+- CSP: nur 'self' + OpenStreetMap Tiles + Cloud Functions Endpoint + Nominatim + die nie erreichbare Foto-Adresse des Ausweichwegs (`https://foto-lokal.invalid`)
 
 ## Security & Configuration
 

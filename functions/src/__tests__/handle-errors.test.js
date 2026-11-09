@@ -123,6 +123,24 @@ describe("handleErrors", () => {
     expect(logged.zweiterLeseweg == null).toBe(true);
   });
 
+  test("Ausweichweg (09.11.2026): kommt als Stichwort an, auf 40 Zeichen gekappt", async () => {
+    /* Ergebnis der Hilfsdatei im Browser, wenn auch sie das Foto nicht holen
+       konnte — ohne Inhalt, ohne Dateiname. */
+    const res = mockRes();
+    await handleErrors(
+      mockReq({
+        errorMessage: "read_failed",
+        phase: "image-read",
+        ausweichweg: "status-422:NotReadableError" + "y".repeat(100),
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(204);
+    const logged = loggedPayload();
+    expect(logged.ausweichweg).toHaveLength(40);
+    expect(logged.ausweichweg.startsWith("status-422:NotReadableError")).toBe(true);
+  });
+
   test("Kopf-Lesetest (16.09.2026): kommt als Stichwort an, auf 40 Zeichen gekappt", async () => {
     /* Workshop 16.09.: elf Lesefehler auf Android, zweiter Leseweg jedes Mal
        ohne Erfolg. Das Stichwort trennt "Geraet gibt nichts heraus" von

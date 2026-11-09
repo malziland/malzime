@@ -909,12 +909,30 @@ Gerät bedeutet, zeigt erst der Versuch dort. Nicht mit „Abbrechen“
 gleichsetzen: In Chromium löst ein echtes Abbrechen ohne vorheriges Foto gar
 keine Meldung aus (Abnahme 14.10.2026; am Samsung-Gerät nicht geprüft).
 
+**Seit 09.11.2026 gibt es einen Ausweichweg** (Ursache am Prüfgerät nachgestellt:
+Chrome merkt sich bei der Auswahl die Zeitangabe des Fotos; legt Android die
+Datei danach neu an, verweigert Chrome jeden Lesezugriff der Seite — das
+Hochladen per Formular kommt aber durch). Scheitern beide Lesewege, holt die
+Seite das Foto über eine Hilfsdatei im Browser (`public/foto-helfer-sw.js`,
+Service Worker), die genau dieses Hochladen auf dem Gerät abfängt; es geht nichts
+ans Netz. Die Hilfsdatei wird gleich nach dem Start wieder abgemeldet (kein
+dauerhafter Speicher). Dazu liest die Seite das Foto, bevor sie Größe, Zeit oder
+Vorschau anfasst (`js/foto-auswahl.js`) — sonst scheitert auch der Ausweichweg.
+
+- Gelingt er: Telemetrie `eventType="foto-ausweichweg-ok"` (ohne Geräteangaben),
+  keine Fehlermeldung. Zählen:
+  `gcloud logging read 'jsonPayload.eventType="foto-ausweichweg-ok"' --project=malzime --bucket=client-diagnostics --location=europe-west1 --view=_AllLogs --freshness=7d --format='value(timestamp)'`
+- Scheitert er: die Lesefehler-Meldung trägt `ausweichweg` — `kein-helfer` (die
+  Hilfsdatei steuerte die Seite noch nicht oder der Browser kann keine),
+  `status-422:<Fehlername>` (auch die Hilfsdatei bekam die Datei nicht), `leer`
+  oder ein Fehlername.
+
 Nachsehen:
 
     gcloud logging read 'resource.labels.service_name="errors"' \
       --project=malzime --bucket=client-diagnostics --location=europe-west1 \
       --view=_AllLogs --freshness=30d \
-      --format='value(timestamp,jsonPayload.phase,jsonPayload.durationMs,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.dateizeit,jsonPayload.zeitsprung,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest)'
+      --format='value(timestamp,jsonPayload.phase,jsonPayload.durationMs,jsonPayload.userAgent,jsonPayload.errorDetail,jsonPayload.dateizeit,jsonPayload.zeitsprung,jsonPayload.zweiterLeseweg,jsonPayload.kopfLesetest,jsonPayload.ausweichweg)'
 
 ### Mistral überlastet / 429 / 5xx
 

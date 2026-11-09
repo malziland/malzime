@@ -316,12 +316,9 @@ async function ladeVomSpeicher(b, objectPath) {
  * Ein bereits gelöschtes Objekt (404) bleibt KEIN Fehler — das ist der Normalfall,
  * wenn der Worker schon aufgeräumt hat. Alles andere ist einer und wird laut.
  */
-/* ZWEITER VERSUCH (09.11.2026): Am 09.11. scheiterte das Loeschen eines Fotos
-   einmal mit 503 — der Speicher war kurz nicht erreichbar. Das Foto blieb dann
-   liegen, bis der Aufraeumdienst es eine Minute spaeter holte, und die Zusage
-   "unmittelbar geloescht" war fuer dieses Foto gebrochen (samt Alarm). Bei
-   einem kurzen Aussetzer (429, 5xx, Netz) wird nach einer Sekunde EINMAL neu
-   versucht; jeder andere Fehler geht sofort weiter wie bisher. */
+/* ZWEITER VERSUCH (09.11.2026): Ein 503 beim Loeschen liess ein Foto bis zum
+   Aufraeumdienst liegen ("unmittelbar geloescht" gebrochen, samt Alarm). Bei
+   kurzem Aussetzer (429, 5xx, Netz) EINMAL nach 1 s neu; sonst wie bisher. */
 const LOESCH_WIEDERHOLUNG_MS = 1000;
 
 function istKurzerSpeicherAussetzer(err) {

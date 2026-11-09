@@ -10,8 +10,7 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 - **Bei Personen, die minderjährig sein könnten, nennt die KI in keiner Karte und keinem
   Text mehr Wörter aus Extremismus, Terror, Waffen oder Pornografie**, auch nicht verneint
-  oder als Warnung. Das Radikalisierungsrisiko heißt jetzt „Radikalisierung“,
-  „Hassbotschaften“ oder „Gruppendruck in Online-Gruppen“. Anlass: Am 09.11.2026 stand
+  oder als Warnung, und bringt diese Themen nicht von sich aus auf. Anlass: Am 09.11.2026 stand
   zweimal ein solches Wort im Beast-Text (Karten „politisch“ und „Verletzlichkeit“); die
   Werbung war beide Male sauber.
 

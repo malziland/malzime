@@ -875,8 +875,10 @@ test.describe("Foto nicht lesbar: Angaben in der Fehlermeldung", () => {
 test.describe("Foto nicht lesbar: der Ausweichweg rettet es", () => {
   const UNLESBAR = "vom-geraet-nicht-herausgegeben.jpg";
 
-  test("Hilfsdatei steuert, Foto wird eingereiht, keine Lesefehler-Meldung", async ({ page, context, browserName }) => {
-    test.skip(browserName !== "chromium", "Hilfsdatei nur in Chromium im Testlauf (playwright.config.js)");
+  // pruefungen:uebersprungen-weil Firefox und WebKit sperren die Hilfsdatei im Testlauf (playwright.config.js); der Lesefehler betrifft nur Chrome auf Android
+  test.skip(({ browserName }) => browserName !== "chromium", "Hilfsdatei nur in Chromium im Testlauf");
+
+  test("Hilfsdatei steuert, Foto wird eingereiht, keine Lesefehler-Meldung", async ({ page, context }) => {
     test.setTimeout(60000);
     await page.addInitScript((name) => {
       const fehler = () => new DOMException("nicht lesbar", "NotReadableError");

@@ -318,7 +318,8 @@ async function ladeVomSpeicher(b, objectPath) {
  */
 /* ZWEITER VERSUCH (09.11.2026): Ein 503 beim Loeschen liess ein Foto bis zum
    Aufraeumdienst liegen ("unmittelbar geloescht" gebrochen, samt Alarm). Bei
-   kurzem Aussetzer (429, 5xx, Netz) EINMAL nach 1 s neu; sonst wie bisher. */
+   kurzem Aussetzer (429, 5xx, Netz) EINMAL nach 1 s neu; sonst wie bisher.
+   BLEIBT IM CODE — Wiederholungstakt einer Bibliotheks-Stoerung, kein Betriebswert. */
 const LOESCH_WIEDERHOLUNG_MS = 1000;
 
 function istKurzerSpeicherAussetzer(err) {

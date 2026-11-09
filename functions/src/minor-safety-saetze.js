@@ -3,7 +3,7 @@
    minor-safety.js herein (hart), damit hier keine zweite Wortliste entsteht. */
 
 module.exports = function saetzeFilter(hart) {
-  /* SATZ ENTFERNEN (09.11.2026, Entscheidung des Inhabers): Steht im Text eines
+  /* SATZ ENTFERNEN (entschieden am 09.11.2026): Steht im Text eines
      moeglicherweise minderjaehrigen Profils ein Wort der harten Liste, faellt der
      GANZE Satz weg — kein Halbsatz (die fruehere Sorge in SEC-001 war ein
      unlesbarer Rest). Anlass: drei solche Treffer am 09.11.2026 in Beast-Karten,

@@ -6,6 +6,15 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ## [Unveröffentlicht]
 
+### Geändert
+
+- **Kinderschutz: Ein Satz mit einem Wort aus Extremismus, Terror, Waffen oder Pornografie
+  wird bei Personen, die minderjährig sein könnten, jetzt ganz aus der Karte und dem Fazit
+  entfernt**, bevor er erscheint — auch während der Analyse in der Live-Anzeige. Die Regel
+  im Auftrag an die KI (5.4.5) hält das meist schon ab; am 09.11. rutschten trotzdem drei
+  solche Wörter in Beast-Karten durch. Bleibt von einer Karte nichts übrig, fällt sie weg.
+  Bei Erwachsenen bleibt der Text wie bisher.
+
 ### Behoben
 
 - **Fotos, die Chrome auf manchen Android-Handys nicht lesen ließ, kommen jetzt durch.**
@@ -14,7 +23,8 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
   freiräumt), sperrt Chrome jeden Lesezugriff der Seite („Foto konnte nicht gelesen
   werden“). Die Seite holt das Foto dann über eine kleine Hilfsdatei im Browser, die
   das Foto auf dem Gerät weiterreicht — es verlässt das Gerät dabei nie, und die
-  Hilfsdatei verschwindet mit dem Tab. Kein zusätzlicher Knopf.
+  Hilfsdatei verschwindet mit dem Tab, auch wenn die Seite in mehreren Tabs offen ist.
+  Kein zusätzlicher Knopf.
 - **Ein Foto wird auch dann sofort gelöscht, wenn der Speicher kurz nicht antwortet**:
   ein zweiter Versuch nach einer Sekunde. Bisher blieb es in diesem Fall liegen, bis
   der Aufräumdienst es eine Minute später entfernte.

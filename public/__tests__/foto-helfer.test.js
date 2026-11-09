@@ -115,6 +115,43 @@ describe("starteFotoHelfer: kein dauerhafter Speicher", () => {
     expect(unregister).toHaveBeenCalledTimes(1);
   });
 
+  /* 09.11.2026, am Pruefgeraet gemessen: Im zweiten Tab steuert die Hilfsdatei
+     nicht von selbst; ohne Nachricht und ohne Frist blieb sie dauerhaft
+     angemeldet. */
+  it("zweiter Tab: bittet um Uebernahme und meldet nach der Frist IMMER ab", async () => {
+    vi.useFakeTimers();
+    const unregister = vi.fn(async () => true);
+    const postMessage = vi.fn();
+    setzeSw({
+      register: vi.fn(async () => ({ unregister })),
+      controller: null,
+      ready: Promise.resolve({ active: { postMessage } }),
+      addEventListener: vi.fn(),
+    });
+    const lauf = starteFotoHelfer();
+    await vi.advanceTimersByTimeAsync(4999);
+    expect(unregister).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(await lauf).toBe("nicht-gesteuert");
+    expect(postMessage).toHaveBeenCalledWith("uebernehmen");
+    expect(unregister).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
+  it("scheitert register nicht, aber das Warten, wird trotzdem abgemeldet", async () => {
+    const unregister = vi.fn(async () => true);
+    setzeSw({
+      register: vi.fn(async () => ({ unregister })),
+      controller: null,
+      ready: Promise.resolve({ active: { postMessage: vi.fn() } }),
+      addEventListener: vi.fn(() => {
+        throw new Error("kaputt");
+      }),
+    });
+    expect(await starteFotoHelfer()).toBe("fehler");
+    expect(unregister).toHaveBeenCalledTimes(1);
+  });
+
   it("ohne Service-Worker-Unterstuetzung passiert nichts", async () => {
     setzeSw(undefined);
     expect(await starteFotoHelfer()).toBe("kein-sw");
@@ -157,6 +194,25 @@ describe("foto-helfer-sw.js: beantwortet nur die eine Adresse und reicht nichts 
     const r = await antwort;
     expect(r.status).toBe(200);
     expect(Array.from(new Uint8Array(await r.arrayBuffer()))).toEqual([7, 8, 9]);
+  });
+
+  it("Nachricht uebernehmen: steuert auch einen weiteren Tab (clients.claim)", () => {
+    const quelle = readFileSync(join(HIER, "..", "foto-helfer-sw.js"), "utf8");
+    const hoerer = {};
+    const claim = vi.fn(async () => {});
+    const fakeSelf = {
+      location: { origin: "https://malzi.me" },
+      addEventListener: (art, fn) => (hoerer[art] = fn),
+      skipWaiting: vi.fn(),
+      clients: { claim },
+    };
+    new Function("self", "URL", "Response", quelle)(fakeSelf, URL, Response);
+    const waitUntil = vi.fn();
+    hoerer.message({ data: "anderes", waitUntil });
+    expect(claim).not.toHaveBeenCalled();
+    hoerer.message({ data: "uebernehmen", waitUntil });
+    expect(claim).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
   });
 
   it("jede andere Anfrage bleibt unberuehrt", () => {

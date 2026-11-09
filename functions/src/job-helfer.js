@@ -60,7 +60,9 @@ function loggeMinorSafety(safety, lang) {
       alterUnlesbar: safety.alterUnlesbar === true,
       entfernt: safety.entfernt.length,
       gruende: [...new Set(safety.entfernt.map((e) => e.grund))],
-      /* Treffer im Fliesstext: nicht entfernt, aber gemeldet — je Stufe. */
+      /* Treffer im Fliesstext, je Stufe. Ein Wort der harten Liste nimmt bei
+         moeglicherweise Minderjaehrigen seit 09.11.2026 den ganzen Satz mit
+         (minor-safety.js, ohneHarteSaetze); gemeldet wird es weiterhin. */
       durchgerutscht: safety.durchgerutscht.length,
       durchgerutschtGruende: [...new Set(safety.durchgerutscht.map((d) => d.grund))],
       /* Welches Wort der Sperrliste in welchem Feld stand, steht seit

@@ -33,6 +33,12 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+/* Ein weiterer Tab, den die Hilfsdatei nicht von selbst steuert, bittet per
+   Nachricht darum (js/foto-helfer.js, ZWEITER TAB). */
+self.addEventListener("message", (event) => {
+  if (event.data === "uebernehmen") event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("fetch", (event) => {
   const anfrage = event.request;
   if (anfrage.method !== "POST") return;

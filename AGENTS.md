@@ -89,6 +89,7 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) â€
   upload.js          Multipart + JSON Body Parsing
   privacy.js         Privacy-Risiko-Erkennung (buildPrivacyRisks): lesbare Adresse und Telefonnummer aus dem Feld visible_text der KI-Antwort, Kennzeichen aus dem ganzen Text
   minor-safety.js    Kinderschutz-Filter fuer Werbe-Eintraege: Stufe 1 fuer alle, Stufe 2 bis zur Untergrenze SCHUTZ_BIS; zieht danach aus dem Vorrat die gezeigten Eintraege (Anzahl und Vorrat: WERBE_ANZAHL, WERBE_ANFORDERUNG)
+  minor-safety-saetze.js  Ganze Saetze mit einem Wort der harten Liste entfernen (moeglicherweise Minderjaehrige) und die Live-Anzeige davon frei halten; die Wortpruefung kommt aus minor-safety.js
   minor-safety-woerter.js  Die Wortlisten dazu (reine Daten, deutsch und englisch); jedes Listenwort braucht ein Beispiel in der Pruefreihe
   alters-lesbarkeit.js  Lesbarkeit der Altersangabe im KI-Text: erster Satz einer Karte, Altersversuch, nicht lesbares Alter
   alters-auslese.js     Die Zahl-Lesung dazu: Zahlwoerter, Kategorien, untere und obere Altersgrenze

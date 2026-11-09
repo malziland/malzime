@@ -19,6 +19,7 @@
  */
 
 const { extrahiereLiveText } = require("./mistral-antwort");
+const { liveOhneHarteWoerter } = require("./minor-safety");
 
 const { MISTRAL_ENDPOINT, modellEinstellungen } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
@@ -134,7 +135,9 @@ async function leseStreamAntwort(res, onLiveText, httpStart, spur) {
     if (jetzt - letzteWelle >= liveIntervalMs) {
       letzteWelle = jetzt;
       try {
-        const live = extrahiereLiveText(volltext);
+        /* Kinderschutz: Karten mit einem Wort der harten Liste erscheinen live
+           nicht, das Fazit nur bis vor den Treffer (minor-safety.js). */
+        const live = liveOhneHarteWoerter(extrahiereLiveText(volltext));
         /* Callback nicht awaiten (nebenlaeufig) — aber eine Rejection MUSS
            abgefangen werden, sonst stuerzt der Prozess ab. */
         if (live.standard !== null) Promise.resolve(onLiveText(live)).catch(() => {});

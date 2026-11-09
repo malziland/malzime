@@ -134,6 +134,7 @@ functions/src/__tests__/meldungen-gemeinsame-annahme.test.js
 functions/src/__tests__/meldungs-schluessel.test.js
 functions/src/__tests__/middleware.test.js
 functions/src/__tests__/minor-safety-diagnose.test.js
+functions/src/__tests__/minor-safety-satz-entfernen.test.js
 functions/src/__tests__/minor-safety-woerter.test.js
 functions/src/__tests__/minor-safety.test.js
 functions/src/__tests__/mistral-429-wiederholung.test.js

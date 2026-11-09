@@ -254,6 +254,7 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `lokale-schalter.js` | Schalter nur für lokale Läufe (`MISTRAL_MOCK`, `QUEUE_LOCAL`, `NTFY_STUMM`): wirken nie in der Produktion; steht dort einer auf 1, startet `index.js` nicht |
 | `job-helfer.js` | Kleine Entscheidungen im Analyseablauf (Werbe-Schalter, Fehlerarten, Ersatzbeschreibung) |
 | `minor-safety.js` | Kinderschutz-Filter für Werbekategorien bei möglicherweise Minderjährigen (Schwelle mit Puffer: `SCHUTZ_BIS`) |
+| `minor-safety-saetze.js` | Ganze Sätze mit einem Wort der harten Liste entfernen (bei möglicherweise Minderjährigen) und die Live-Anzeige davon frei halten; die Wortprüfung kommt aus `minor-safety.js` |
 | `minor-safety-woerter.js` | Wortlisten des Kinderschutz-Filters: je Thema deutsch und englisch, „nur als Werbe-Eintrag“, harmlose Wendungen (reine Daten, angewandt von `minor-safety.js`) |
 | `alters-lesbarkeit.js` | Erkennung nicht lesbarer Altersangaben: erster Satz einer Karte, Altersversuch (Filter, Alterskarte, Live-Anzeige) |
 | `alters-auslese.js` | Altersauslese aus dem KI-Text: Zahlwörter, Kategorien, untere und obere Altersgrenze (weitergereicht von `alters-lesbarkeit.js`) |

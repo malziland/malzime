@@ -22,20 +22,42 @@ function swVorhanden() {
   );
 }
 
+/* ZWEITER TAB (09.11.2026, am Pruefgeraet gemessen): Ist die Seite schon in
+   einem Tab offen, holt register() im neuen Tab die abgemeldete Hilfsdatei
+   zurueck, steuert den neuen Tab aber nicht — controllerchange kam nie, und
+   die Anmeldung ueberstand Schliessen und Neustart. Darum: die Hilfsdatei per
+   Nachricht bitten, auch diesen Tab zu uebernehmen, hoechstens 5 s warten, und
+   abmelden IMMER (finally), auch wenn die Steuerung nie kommt. */
+const STEUERUNG_FRIST_MS = 5000;
+
 export async function starteFotoHelfer() {
+  let anmeldung = null;
   try {
     if (!swVorhanden()) return "kein-sw";
-    const anmeldung = await navigator.serviceWorker.register(SKRIPT, { scope: "/" });
+    anmeldung = await navigator.serviceWorker.register(SKRIPT, { scope: "/" });
     if (!navigator.serviceWorker.controller) {
-      await new Promise((fertig) => {
+      const gesteuert = new Promise((fertig) => {
         navigator.serviceWorker.addEventListener("controllerchange", fertig, { once: true });
       });
+      const uebernehmen = (async () => {
+        const bereit = await navigator.serviceWorker.ready;
+        if (bereit && bereit.active) bereit.active.postMessage("uebernehmen");
+        await gesteuert;
+      })();
+      await Promise.race([uebernehmen, new Promise((fertig) => setTimeout(fertig, STEUERUNG_FRIST_MS))]);
     }
-    await anmeldung.unregister();
-    return "bereit";
+    return navigator.serviceWorker.controller ? "bereit" : "nicht-gesteuert";
   } catch (_) {
     /* Bestmoeglich: ohne Hilfsdatei laeuft alles wie bisher. */
     return "fehler";
+  } finally {
+    if (anmeldung) {
+      try {
+        await anmeldung.unregister();
+      } catch (_) {
+        /* bestmoeglich */
+      }
+    }
   }
 }
 

@@ -278,6 +278,8 @@ For children up to 13 years, additionally, in all cards and texts of both modes:
 
 For clearly underage subjects (child/teen), additionally: NO personal devaluation of body, weight or skin; NO attribution of addiction, alcohol, substances, infidelity or relationship failure as a personal character judgement. Instead, point the beziehungsstatus, verletzlichkeit and gesundheit cards at the SYSTEM level: advertising pressure, media/platform mechanics, peer pressure, in-app purchases, body-image industry — i.e. how the person is exploited and manipulated, NOT personal deficits.
 
+For people who might be minors — this includes every age estimate that starts at ${SCHUTZ_ALTER} years or below, and every profile whose age cannot be read —, additionally in all cards and texts of both modes: NO words from the areas of extremism, terror, weapons and pornography, not even negated and not as a warning. Do not bring up these topics on your own.
+
 ═══ AD_TARGETING — TWO SEPARATE LISTS ═══
 
 You output ad_targeting TWICE: once in "standard", once in "beast".

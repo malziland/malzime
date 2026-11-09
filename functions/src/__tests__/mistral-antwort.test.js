@@ -208,3 +208,39 @@ describe("Absagen der KI, weitere Wortlaute", () => {
     expect(ohneWerbeAbsagen([satz, "Roblox"])).toEqual(["Roblox"]);
   });
 });
+
+/* Kinderschutz-Meldung 09.11.2026: Zweimal stand im Beast-Text eines
+   moeglicherweise minderjaehrigen Profils ein Wort der harten Liste (Karten
+   "politisch" und "verletzlichkeit"). Der Auftrag verbietet solche Woerter
+   seitdem in allen Karten und Texten — OHNE Beispiele und OHNE Ersatzwoerter:
+   Eine erste Fassung bot "Radikalisierung"/"Hassbotschaften" als Ersatz an;
+   gemessen an 7 Kinderfotos stand danach bei 5 "Hassbotschaften" in der Karte
+   "politisch", vorher bei keinem. Die Regel darf das Thema nicht anstossen. */
+describe("Moeglicherweise Minderjaehrige: keine Woerter der harten Liste im Text", () => {
+  test.each([
+    [
+      "de",
+      "KEINE Wörter aus den Bereichen Extremismus, Terror, Waffen und Pornografie",
+      "Bring diese Themen nicht von dir aus auf.",
+      ["Hassbotschaft", "Radikalisierung"],
+    ],
+    [
+      "en",
+      "NO words from the areas of extremism, terror, weapons and pornography",
+      "Do not bring up these topics on your own.",
+      ["hate message", "radicali"],
+    ],
+  ])("%s", (sprache, regel, anstoss, nieErsatz) => {
+    const { singleLargePromptVarianten } = require(`../locales/${sprache}/prompts`);
+    for (const vorlage of singleLargePromptVarianten) {
+      const text = typeof vorlage === "function" ? vorlage({}) : String(vorlage);
+      expect(text).toContain(regel);
+      expect(text).toContain(anstoss);
+      /* Nur der Regelabsatz selbst: Die Themenliste weiter oben nennt das
+         Radikalisierungsrisiko schon laenger, ohne dass es im Text auftauchte
+         (Messung ohne Regel, 7 Kinderfotos: kein Treffer). */
+      const absatz = text.slice(text.lastIndexOf("\n", text.indexOf(regel)), text.indexOf("\n", text.indexOf(regel)));
+      for (const wort of nieErsatz) expect(absatz.toLowerCase()).not.toContain(wort.toLowerCase());
+    }
+  });
+});

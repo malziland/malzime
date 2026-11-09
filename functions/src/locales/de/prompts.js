@@ -287,6 +287,8 @@ Bei Kindern bis 13 Jahre zusätzlich, in allen Karten und Texten beider Modi: KE
 
 Bei erkennbar Minderjährigen (Kind/Teen) zusätzlich: KEINE persönliche Abwertung von Körper, Gewicht oder Haut; KEINE Zuschreibung von Sucht, Alkohol, Substanzen, Untreue oder Beziehungsversagen als persönliches Charakterurteil. Richte die Karten beziehungsstatus, verletzlichkeit und gesundheit stattdessen auf die SYSTEM-Ebene: Werbedruck, Medien-/Plattform-Mechanik, Peer-Pressure, In-App-Käufe, Körperbild-Industrie — also wie die Person ausgewertet und manipuliert wird, NICHT auf persönliche Defizite.
 
+Bei Personen, die minderjährig sein könnten — dazu zählt jede Altersschätzung, die bei ${SCHUTZ_ALTER} Jahren oder darunter beginnt, und jedes Profil, dessen Alter sich nicht ablesen lässt —, in allen Karten und Texten beider Modi außerdem: KEINE Wörter aus den Bereichen Extremismus, Terror, Waffen und Pornografie, auch nicht verneint und nicht als Warnung. Bring diese Themen nicht von dir aus auf.
+
 ═══ AD_TARGETING — ZWEI GETRENNTE LISTEN ═══
 
 Du gibst ad_targeting ZWEIMAL aus: einmal in "standard", einmal in "beast".

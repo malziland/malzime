@@ -182,6 +182,8 @@ Für Google Cloud Tasks gibt es keinen Emulator. Im Lokal-Modus (`QUEUE_LOCAL=1`
 | `js/auftrag-abfrage.js` | Statusabfrage eines eingereihten Auftrags im 2-Sekunden-Takt (`pollJob`), zugleich Lebenszeichen an den Server |
 | `js/auftrag-abmelden.js` | Buch darüber, welchen Auftrag der Tab gerade abholt, und Abmelden, wenn er ihn fallen lässt (höchstens einmal je Auftrag, nur mit Abhol-Ticket) |
 | `js/netz-hilfen.js` | Netz- und Warte-Hilfen des Ablaufs: Aufruf mit Zeitgrenze bis zum Ende des Antwort-Rumpfs (`fetchWithTimeout`), Warten auf den nächsten Takt |
+| `js/foto-auswahl.js` | Was mit einem gewählten Foto zuerst geschieht: lesen, bevor die Seite Größe, Zeit oder Vorschau der Datei anfasst; Vorschau aus den gelesenen Bytes (`lesenUndVorschau`) |
+| `js/foto-helfer.js` | Ausweichweg für Fotos, die Chrome auf Android nicht lesen lässt: meldet die Hilfsdatei `foto-helfer-sw.js` an und gleich wieder ab und holt das Foto über sie — nur wenn sie die Seite steuert, das Foto verlässt das Gerät nie |
 | `js/foto-vorschau.js` | Zwei Handgriffe an der Foto-Vorschau: Ersatzbild, wenn der Browser das Original nicht anzeigen kann; Hinweis „Foto gelöscht“ nach einem Neuladen |
 | `js/foto-fehler.js` | Meldung an die Fehlererfassung, wenn ein Foto nicht gelesen, geöffnet oder hochgeladen wird — samt den Diagnosefeldern der Datei (`meldeFotoFehler`); misst, wie lange eine leer zurückgekommene Fotoauswahl offen war (`merkeAuswahlGeoeffnet`, `auswahlOffenMs`) |
 | `js/api-basis.js` | Die eine Stelle für die Server-Adressen: im Betrieb direkt Cloud Run in `europe-west1`, sonst relativ |

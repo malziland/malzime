@@ -316,6 +316,30 @@ async function ladeVomSpeicher(b, objectPath) {
  * Ein bereits gelöschtes Objekt (404) bleibt KEIN Fehler — das ist der Normalfall,
  * wenn der Worker schon aufgeräumt hat. Alles andere ist einer und wird laut.
  */
+/* ZWEITER VERSUCH (09.11.2026): Am 09.11. scheiterte das Loeschen eines Fotos
+   einmal mit 503 — der Speicher war kurz nicht erreichbar. Das Foto blieb dann
+   liegen, bis der Aufraeumdienst es eine Minute spaeter holte, und die Zusage
+   "unmittelbar geloescht" war fuer dieses Foto gebrochen (samt Alarm). Bei
+   einem kurzen Aussetzer (429, 5xx, Netz) wird nach einer Sekunde EINMAL neu
+   versucht; jeder andere Fehler geht sofort weiter wie bisher. */
+const LOESCH_WIEDERHOLUNG_MS = 1000;
+
+function istKurzerSpeicherAussetzer(err) {
+  const code = err && err.code;
+  if (code === 429 || (typeof code === "number" && code >= 500 && code < 600)) return true;
+  return ["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN", "ECONNREFUSED", "EPIPE"].includes(code);
+}
+
+async function loeschenMitZweitemVersuch(objectPath) {
+  try {
+    await bucket().file(objectPath).delete();
+  } catch (err) {
+    if (!istKurzerSpeicherAussetzer(err)) throw err;
+    await new Promise((r) => setTimeout(r, LOESCH_WIEDERHOLUNG_MS));
+    await bucket().file(objectPath).delete();
+  }
+}
+
 async function deleteImage(objectPath) {
   if (!objectPath) return true;
   try {
@@ -323,7 +347,7 @@ async function deleteImage(objectPath) {
       await fs.promises.unlink(localPathFor(objectPath));
       return true;
     }
-    await bucket().file(objectPath).delete();
+    await loeschenMitZweitemVersuch(objectPath);
     return true;
   } catch (err) {
     /* 404 = schon weg. Kein Fehler, keine Meldung. */

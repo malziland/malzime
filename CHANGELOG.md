@@ -4,6 +4,21 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Behoben
+
+- **Fotos, die Chrome auf manchen Android-Handys nicht lesen ließ, kommen jetzt durch.**
+  Am Android-Prüfgerät nachgestellt: Chrome merkt sich beim Auswählen eine Zeitangabe
+  des Fotos; legt das Handy die Datei kurz danach neu an (etwa wenn es Speicher
+  freiräumt), sperrt Chrome jeden Lesezugriff der Seite („Foto konnte nicht gelesen
+  werden“). Die Seite holt das Foto dann über eine kleine Hilfsdatei im Browser, die
+  das Foto auf dem Gerät weiterreicht — es verlässt das Gerät dabei nie, und die
+  Hilfsdatei verschwindet mit dem Tab. Kein zusätzlicher Knopf.
+- **Ein Foto wird auch dann sofort gelöscht, wenn der Speicher kurz nicht antwortet**:
+  ein zweiter Versuch nach einer Sekunde. Bisher blieb es in diesem Fall liegen, bis
+  der Aufräumdienst es eine Minute später entfernte.
+
 ## [5.4.5] — 2026-11-09
 
 ### Geändert — Kinderschutz

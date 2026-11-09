@@ -221,6 +221,7 @@ public/__tests__/exif-gps.test.js
 public/__tests__/exif-lesefehler-und-heic.test.js
 public/__tests__/exif.test.js
 public/__tests__/fehler-meldewege.test.js
+public/__tests__/foto-helfer.test.js
 public/__tests__/geocoding.test.js
 public/__tests__/geraeteangaben-deckung.test.js
 public/__tests__/heic.test.js

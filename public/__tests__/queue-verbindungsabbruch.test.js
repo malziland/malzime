@@ -25,6 +25,8 @@ vi.mock("../js/i18n.js", () => ({
 }));
 
 vi.mock("../js/exif.js", () => ({
+  /* Seit 09.11.2026 liest app.js/api.js das Foto vor der Aufbereitung (leseFoto). */
+  leseFoto: vi.fn(async (datei) => ({ byteLength: (datei && datei.size) || 3 })),
   prepareImage: vi.fn().mockResolvedValue({
     imageBase64: "QUFB",
     exif: { make: "Apple", model: "iPhone" },

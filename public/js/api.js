@@ -1,6 +1,6 @@
 import { elements } from "./dom.js";
 import { state } from "./state.js";
-import { prepareImage } from "./exif.js";
+import { prepareImage, leseFoto } from "./exif.js";
 import { startGeocoding } from "./geocoding.js";
 import {
   setStatus,
@@ -458,6 +458,12 @@ function beendeAnalyse(myId) {
   releaseWakeLock();
 }
 
+/* Die Bytes des Fotos: das Lesen, das app.js gleich bei der Auswahl
+   begonnen hat (state.fotoLesen), sonst ein eigenes. */
+function gelesenesFoto(file) {
+  return state.fotoLesen && state.lastFile === file ? state.fotoLesen : leseFoto(file, state.auswahlZeit);
+}
+
 async function analyzeImageQueued() {
   state.isAnalyzing = true;
   /* v3.3.1: Ein neuer Anlauf loescht den Verbindungs-Anker. Scheitert er
@@ -531,17 +537,6 @@ async function analyzeImageQueued() {
     beendeAnalyse(myId);
     return;
   }
-  if (file.size > 25 * 1024 * 1024) {
-    stopScanAnim(true);
-    setStatus(t("error.fileTooLarge"), undefined, "error.fileTooLarge");
-    meldeSichtbarenFehler("error.fileTooLarge", "datei-zu-gross", {
-      requestId: String(myId),
-      traceId,
-      fileSizeKb: Math.round(file.size / 1024),
-    });
-    beendeAnalyse(myId);
-    return;
-  }
   /* Honeypot — Bots füllen unsichtbare Felder aus */
   const hp = document.getElementById("website");
   if (hp && hp.value) {
@@ -567,7 +562,22 @@ async function analyzeImageQueued() {
     const prepareStart = Date.now();
     let prepared = state.lastPrepared;
     if (!prepared) {
-      prepared = await prepareImage(file, { auswahlZeit: state.auswahlZeit });
+      /* Die Bytes liest app.js gleich bei der Auswahl (state.fotoLesen) — erst
+         danach darf die Seite Groesse oder Zeit der Datei anfassen (Begruendung
+         dort). Ohne gemerktes Lesen (anderes Foto als zuletzt gewaehlt) wird
+         hier gelesen. */
+      const bytes = await gelesenesFoto(file);
+      if (bytes.byteLength > 25 * 1024 * 1024) {
+        stopScanAnim(true);
+        setStatus(t("error.fileTooLarge"), undefined, "error.fileTooLarge");
+        meldeSichtbarenFehler("error.fileTooLarge", "datei-zu-gross", {
+          requestId: String(myId),
+          traceId,
+          fileSizeKb: Math.round(bytes.byteLength / 1024),
+        });
+        return; /* beendeAnalyse uebernimmt der finally-Zweig */
+      }
+      prepared = await prepareImage(file, { auswahlZeit: state.auswahlZeit, bytes });
     }
     timings.prepareImageMs = Date.now() - prepareStart;
     if (state.requestId !== myId) return;

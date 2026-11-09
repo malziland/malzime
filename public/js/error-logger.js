@@ -193,6 +193,9 @@ export function logClientError(error, context = {}) {
       zweiterLeseweg: typeof context.zweiterLeseweg === "string" ? context.zweiterLeseweg : null,
       /* Kopf-Lesetest (16.09.2026): "ok", "leer" oder ein Fehlername — kein Inhalt. */
       kopfLesetest: typeof context.kopfLesetest === "string" ? context.kopfLesetest.slice(0, 40) : null,
+      /* Ausweichweg (09.11.2026): "ok" kommt hier nie an; sonst "kein-helfer",
+         "status-422:NotReadableError", "leer" oder ein Fehlername — kein Inhalt. */
+      ausweichweg: typeof context.ausweichweg === "string" ? context.ausweichweg.slice(0, 40) : null,
       /* Lesefehler (09.10.2026): Art der Zeitangabe der Datei ("keine",
          "sekunden", "millisekunden", "unbekannt") und Vergleich mit der
          vorigen Auswahl ("neu", "gleich", "bis-2s", "stunden", "anders") —

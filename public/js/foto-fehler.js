@@ -55,6 +55,8 @@ export function meldeFotoFehler(err, kontext) {
     msSeitAuswahl: err.msSeitAuswahl,
     zweiterLeseweg: err.zweiterLeseweg,
     kopfLesetest: err.kopfLesetest,
+    /* 09.11.2026: Ergebnis des Ausweichwegs ueber die Hilfsdatei (foto-helfer.js). */
+    ausweichweg: err.ausweichweg,
     /* 09.10.2026: Art der Zeitangabe der Datei und Vergleich mit der vorigen
        Auswahl (beides exif.js) — nur beim Lesefehler, feste Woerter. */
     dateizeit: err.dateizeit,

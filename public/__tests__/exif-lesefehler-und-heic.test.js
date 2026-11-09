@@ -17,6 +17,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 vi.mock("../js/heic.js", () => ({
   heicZuCanvas: vi.fn(),
 }));
+/* Ausweichweg (09.11.2026): gesteuert je Test, Standard "keine Hilfsdatei". */
+vi.mock("../js/foto-helfer.js", () => ({
+  leseUeberHelfer: vi.fn(async () => ({ bytes: null, ergebnis: "kein-helfer" })),
+}));
+vi.mock("../js/telemetry-logger.js", () => ({ logTelemetry: vi.fn() }));
+import { leseUeberHelfer } from "../js/foto-helfer.js";
+import { logTelemetry } from "../js/telemetry-logger.js";
 import { heicZuCanvas } from "../js/heic.js";
 import { prepareImage, dateizeitArt, zeitsprungArt } from "../js/exif.js";
 
@@ -89,6 +96,41 @@ beforeEach(() => {
   heicZuCanvas.mockReset();
 });
 afterEach(() => vi.useRealTimers());
+
+describe("Lesefehler: Ausweichweg ueber die Hilfsdatei (09.11.2026)", () => {
+  it("scheitern beide Lesewege, holt die Seite das Foto ueber die Hilfsdatei und analysiert weiter", async () => {
+    bildLaedt = true;
+    const f = datei(JPEG_KOPF, { arrayBufferWirft: true, readerWirft: true });
+    leseUeberHelfer.mockResolvedValueOnce({ bytes: f._buffer, ergebnis: "ok" });
+    const ergebnis = await prepareImage(f, { auswahlZeit: Date.now() - 600 });
+    expect(ergebnis.imageBase64).toBe("QUJD");
+    expect(leseUeberHelfer).toHaveBeenCalledWith(f);
+    expect(logTelemetry).toHaveBeenCalledWith("foto-ausweichweg-ok", expect.any(Object));
+  }, 10000);
+
+  it("scheitert auch sie, traegt der Fehler ihr Stichwort", async () => {
+    const f = datei(JPEG_KOPF, { arrayBufferWirft: true, readerWirft: true });
+    leseUeberHelfer.mockResolvedValueOnce({ bytes: null, ergebnis: "status-422:NotReadableError" });
+    const err = await prepareImage(f, { auswahlZeit: Date.now() }).catch((e) => e);
+    expect(err.message).toBe("read_failed");
+    expect(err.ausweichweg).toBe("status-422:NotReadableError");
+  }, 10000);
+
+  it("liest der normale Weg, wird die Hilfsdatei nicht gefragt", async () => {
+    bildLaedt = true;
+    leseUeberHelfer.mockClear();
+    const f = datei(JPEG_KOPF);
+    await prepareImage(f, { auswahlZeit: Date.now() });
+    expect(leseUeberHelfer).not.toHaveBeenCalled();
+  });
+
+  it("bringt der Aufrufer die Bytes schon mit, liest prepareImage die Datei nicht noch einmal", async () => {
+    bildLaedt = true;
+    const f = datei(JPEG_KOPF, { arrayBufferWirft: true, readerWirft: true });
+    const ergebnis = await prepareImage(f, { auswahlZeit: Date.now(), bytes: f._buffer });
+    expect(ergebnis.imageBase64).toBe("QUJD");
+  });
+});
 
 describe("Lesefehler: zweiter Leseweg", () => {
   it("liest FileReader die Datei doch, laeuft die Analyse mit diesen Bytes weiter", async () => {

@@ -11,7 +11,15 @@
       wenn sie die Seite gerade steuert; sonst ginge die Anfrage ans Netz, und
       das Foto darf das Geraet nie verlassen. */
 
-const PFAD = "/__foto-lokal";
+/* NIE ERREICHBARE ADRESSE (09.11.2026, Befund der unabhaengigen Pruefung):
+   Startet die Hilfsdatei im Moment der Anfrage nicht (etwa bei Speicherdruck),
+   schickt der Browser die Anfrage laut Fetch-Standard ganz normal ans Netz.
+   Unter einer Adresse der eigenen Seite kaeme das Originalfoto dann bei
+   unserem Hosting an. Darum geht die Anfrage an eine Endung, die es nach
+   RFC 6761 nie gibt (.invalid): Die Hilfsdatei beantwortet sie, das Netz
+   findet kein Ziel — es kann nichts ankommen. Die CSP erlaubt genau diese
+   Adresse (firebase.json, connect-src). */
+const PFAD = "https://foto-lokal.invalid/foto";
 const SKRIPT = "/foto-helfer-sw.js";
 
 function swVorhanden() {
@@ -69,7 +77,7 @@ export async function leseUeberHelfer(datei) {
     if (!swVorhanden() || !navigator.serviceWorker.controller) return { bytes: null, ergebnis: "kein-helfer" };
     const formular = new FormData();
     formular.append("foto", datei);
-    const antwort = await fetch(PFAD, { method: "POST", body: formular, cache: "no-store" });
+    const antwort = await fetch(PFAD, { method: "POST", body: formular, cache: "no-store", credentials: "omit" });
     if (!antwort.ok) {
       const grund = antwort.headers.get("X-Foto-Fehler") || "";
       return { bytes: null, ergebnis: `status-${antwort.status}${grund ? ":" + grund : ""}`.slice(0, 40) };

@@ -10,14 +10,19 @@ module.exports = function saetzeFilter(hart) {
      live nicht nachstellbar; das Wort selbst wird bewusst nicht protokolliert.
      Satzgrenze: . ! ? oder … (samt schliessendem Anfuehrungszeichen). Bleibt der
      Treffer ueber eine Satzgrenze hinweg bestehen, faellt der ganze Text. */
-  const SAETZE = /[^.!?…]+(?:[.!?…]+["“”»«')]*\s*|$)/g;
-  const inSaetze = (text) => text.match(SAETZE) || [text];
+  /* Satzgrenze nur, wo nach . ! ? … ein Leerraum und ein Grossbuchstabe (oder
+     ein oeffnendes Zeichen) folgt — und nicht nach einer Abkuerzung oder einem
+     einzelnen Buchstaben ("z. B. Netflix", "Dr. Kim"). So bleibt ein Wort mit
+     Punkt (eis.de) und eine Zahl (3.5) im Satz (Befund der Pruefung, 09.11.). */
+  const GRENZE =
+    /(?<=[.!?…]["“”»«')]*)(?<!(?:^|[\s(„"])(?:\p{L}|[Cc]a|[Bb]zw|[Uu]sw|[Ee]tc|[Vv]gl|[Ee]vtl|[Gg]gf|[Bb]spw|[Ii]nkl|[Ss]td|[Mm]in|Nr|Dr|St|Mio|Mrd|[Vv]s|[Zz]\.\s?B|[Dd]\.\s?h|[Uu]\.\s?a|[Ee]\.g|[Ii]\.e)\.)\s+(?=[„"“»(\p{Lu}])/u;
+  const inSaetze = (text) => text.split(GRENZE);
 
   function ohneHarteSaetze(text) {
     const saetze = inSaetze(text);
     const rest = saetze
       .filter((satz) => !hart(satz))
-      .join("")
+      .join(" ")
       .trim();
     return !hart(rest) ? rest : "";
   }
@@ -33,12 +38,15 @@ module.exports = function saetzeFilter(hart) {
     const fazit = (text) => {
       if (typeof text !== "string" || !hart(text)) return text;
       const saetze = inSaetze(text);
-      let bis = "";
+      const vorher = [];
       for (const satz of saetze) {
         if (hart(satz)) break;
-        bis += satz;
+        vorher.push(satz);
       }
-      return bis.trim();
+      /* Zur Sicherheit noch einmal als Ganzes pruefen (Wort ueber eine
+         Satzgrenze hinweg): dann lieber nichts zeigen. */
+      const bis = vorher.join(" ").trim();
+      return hart(bis) ? "" : bis;
     };
     const karten = (liste) => (Array.isArray(liste) ? liste.filter((k) => !k || !hart(String(k.wert || ""))) : liste);
     return {

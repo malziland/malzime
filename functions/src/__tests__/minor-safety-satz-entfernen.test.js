@@ -79,6 +79,46 @@ describe("ganzer Satz faellt bei moeglicherweise Minderjaehrigen weg", () => {
   });
 });
 
+/* Befund der unabhaengigen Pruefung (09.11.2026): Die erste Satzteilung trennte
+   an jedem Punkt — "eis.de" fiel auseinander und wurde live nicht erkannt;
+   "z. B." und "3.5" hinterliessen unsinnige Reste. */
+describe("Satzgrenzen", () => {
+  test("Wort mit Punkt (eis.de) wird erkannt, live und am Ende", () => {
+    const text = "Du liest gern. Bestell doch bei eis.de etwas. Du bist nett.";
+    expect(_ohneHarteSaetze(text)).toBe("Du liest gern. Du bist nett.");
+    expect(liveOhneHarteWoerter({ standard: text, beast: null, kartenStandard: [], kartenBeast: [] }).standard).toBe(
+      "Du liest gern."
+    );
+  });
+  test("Abkuerzung und Zahl bleiben im Satz, der ganze Satz faellt", () => {
+    expect(_ohneHarteSaetze("Du bist neugierig. Du kaufst z. B. bei OnlyFans ein. Du lachst.")).toBe(
+      "Du bist neugierig. Du lachst."
+    );
+    expect(_ohneHarteSaetze("Du lachst. Ca. 3.5 Std. am Tag schaust du Pornos. Du schläfst.")).toBe(
+      "Du lachst. Du schläfst."
+    );
+  });
+  test("Satzende mit Anfuehrungszeichen und Ausrufezeichen", () => {
+    expect(_ohneHarteSaetze("„Los!“ Munition reizt dich! Du bist ruhig.")).toBe("„Los!“ Du bist ruhig.");
+  });
+});
+
+describe("Alter nicht lesbar zaehlt als moeglicherweise minderjaehrig", () => {
+  test("ohne lesbares Alter faellt der Satz ebenfalls", () => {
+    const p = profil(
+      "Alter: schwer zu sagen.",
+      {},
+      {
+        verletzlichkeit: { value: "Du suchst Halt. Munition wäre ein Köder." },
+      }
+    );
+    /* So meldet der Analyseweg ein nicht lesbares Alter (job-pipelines.js). */
+    const b = applyMinorSafety(p, { alterUnlesbar: true });
+    expect(b.minderjaehrig).toBe(true);
+    expect(p.normal.categories.verletzlichkeit.value).toBe("Du suchst Halt.");
+  });
+});
+
 describe("Live-Anzeige waehrend der Analyse", () => {
   test("Karte mit dem Wort erscheint nicht, Fazit nur bis vor den Treffer", () => {
     const live = liveOhneHarteWoerter({

@@ -6,7 +6,7 @@
 public/              Firebase Hosting SPA (Vanilla JS, kein Build-Schritt)
   index.html         Hauptseite (Cache-Busting: ?v=YYYYMMDDNN an CSS/JS)
   app.js             Entry Point (ES Module)
-  foto-helfer-sw.js  Hilfsdatei (Service Worker) des Ausweichwegs: beantwortet nur POST /__foto-lokal mit den Bytes des Fotos, reicht nie etwas ans Netz weiter
+  foto-helfer-sw.js  Hilfsdatei (Service Worker) des Ausweichwegs: beantwortet nur POST an https://foto-lokal.invalid/foto (eine Adresse, die es nie gibt — faellt die Hilfsdatei aus, findet das Netz kein Ziel) mit den Bytes des Fotos, reicht nie etwas ans Netz weiter
   js/                Frontend-Module (jede Datei unter public/js/*.js hat hier genau eine Zeile)
     api.js           Analyse-Ablauf im Browser: Foto einreihen, Ergebnis zeigen, Wiederaufnahme nach Neuladen; entscheidet, wann ein verworfener Auftrag abgemeldet wird (analyzeImage, resumeQueueJob)
     auftrag-abfrage.js  Statusabfrage eines eingereihten Auftrags im 2-Sekunden-Takt (pollJob), zugleich Lebenszeichen an den Server
@@ -208,7 +208,7 @@ Einzelbefehle:
   Lauf beobachtet den selbst betriebenen ntfy-Server (Fassung gespiegelt in
   `.github/fremd-dienste/ntfy/VERSION`; nach jedem Update des Dienstes nachziehen)
 - Bot-Schutz: Rate Limiting (IP) + Honeypot + Timing-Check
-- CSP: nur 'self' + OpenStreetMap Tiles + Cloud Functions Endpoint + Nominatim
+- CSP: nur 'self' + OpenStreetMap Tiles + Cloud Functions Endpoint + Nominatim + die nie erreichbare Foto-Adresse des Ausweichwegs (`https://foto-lokal.invalid`)
 
 ## Security & Configuration
 

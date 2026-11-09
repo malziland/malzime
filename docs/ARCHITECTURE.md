@@ -333,7 +333,7 @@ Scheitern alle 4 Stufen, liefert `json-repair.js` `null`. Ein zweites Modell als
 
 ## Sicherheits-Architektur
 
-- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim + die fünf Cloud-Run-Adressen unserer Schnittstellen in `europe-west1` (`connect-src`; Liste identisch mit `public/js/api-basis.js`, Wächter `public/__tests__/api-basis.test.js`)
+- **CSP** auf `firebase.json` — nur self + OpenStreetMap-Tiles + Nominatim + die fünf Cloud-Run-Adressen unserer Schnittstellen in `europe-west1` (`connect-src`; Liste identisch mit `public/js/api-basis.js`, Wächter `public/__tests__/api-basis.test.js`); dazu `https://foto-lokal.invalid`, die Adresse des Ausweichwegs für unlesbare Fotos — es gibt sie nie (RFC 6761), nur die Hilfsdatei im Browser beantwortet sie
 - **CORS** auf den öffentlichen Functions — nur unsere eigenen Ursprünge (`functions/src/domains.js`), keine Platzhalter
 - **HSTS** mit Preload
 - **Magic-Byte-Validierung** der hochgeladenen Bilder

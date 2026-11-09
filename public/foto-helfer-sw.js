@@ -21,7 +21,8 @@
 
 /* global self, URL, Response */
 
-const PFAD = "/__foto-lokal";
+/* Nie erreichbare Adresse (RFC 6761), Begruendung in js/foto-helfer.js. */
+const ZIEL = "https://foto-lokal.invalid/foto";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
@@ -48,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   } catch {
     return;
   }
-  if (adresse.origin !== self.location.origin || adresse.pathname !== PFAD) return;
+  if (adresse.href !== ZIEL) return;
   event.respondWith(fotoZurueck(anfrage));
 });
 

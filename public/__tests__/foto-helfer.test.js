@@ -58,7 +58,7 @@ describe("leseUeberHelfer: das Foto verlaesst das Geraet nie", () => {
     const ergebnis = await leseUeberHelfer(new Blob(["x"]));
     expect(ergebnis).toEqual({ bytes, ergebnis: "ok" });
     const [adresse, optionen] = globalThis.fetch.mock.calls[0];
-    expect(adresse).toBe("/__foto-lokal");
+    expect(adresse).toBe("https://foto-lokal.invalid/foto");
     expect(optionen.method).toBe("POST");
     expect(optionen.body).toBeInstanceOf(FormData);
   });
@@ -184,11 +184,11 @@ describe("foto-helfer-sw.js: beantwortet nur die eine Adresse und reicht nichts 
     };
   }
 
-  it("POST an /__foto-lokal: antwortet mit genau den Bytes der Datei", async () => {
+  it("POST an die nie erreichbare Adresse: antwortet mit genau den Bytes der Datei", async () => {
     const { fetch: abfangen } = ladeSw();
     let antwort;
     abfangen({
-      request: anfrage("https://malzi.me/__foto-lokal", "POST", new Blob([new Uint8Array([7, 8, 9])])),
+      request: anfrage("https://foto-lokal.invalid/foto", "POST", new Blob([new Uint8Array([7, 8, 9])])),
       respondWith: (p) => (antwort = p),
     });
     const r = await antwort;
@@ -219,7 +219,9 @@ describe("foto-helfer-sw.js: beantwortet nur die eine Adresse und reicht nichts 
     const { fetch: abfangen } = ladeSw();
     const respondWith = vi.fn();
     abfangen({ request: anfrage("https://malzi.me/api/enqueue", "POST"), respondWith });
-    abfangen({ request: anfrage("https://malzi.me/__foto-lokal", "GET"), respondWith });
+    abfangen({ request: anfrage("https://foto-lokal.invalid/foto", "GET"), respondWith });
+    abfangen({ request: anfrage("https://malzi.me/foto", "POST"), respondWith });
+    abfangen({ request: anfrage("https://malzi.me/__foto-lokal", "POST"), respondWith });
     abfangen({ request: anfrage("https://andere.example/__foto-lokal", "POST"), respondWith });
     expect(respondWith).not.toHaveBeenCalled();
   });
@@ -227,7 +229,7 @@ describe("foto-helfer-sw.js: beantwortet nur die eine Adresse und reicht nichts 
   it("ohne Foto im Formular: Fehlerantwort, nie Weitergabe ans Netz", async () => {
     const { fetch: abfangen } = ladeSw();
     let antwort;
-    abfangen({ request: anfrage("https://malzi.me/__foto-lokal", "POST"), respondWith: (p) => (antwort = p) });
+    abfangen({ request: anfrage("https://foto-lokal.invalid/foto", "POST"), respondWith: (p) => (antwort = p) });
     expect((await antwort).status).toBe(400);
   });
 });

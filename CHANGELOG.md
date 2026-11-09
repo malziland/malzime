@@ -11,8 +11,9 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 - **Kinderschutz: Ein Satz mit einem Wort aus Extremismus, Terror, Waffen oder Pornografie
   wird bei Personen, die minderjährig sein könnten, jetzt ganz aus der Karte und dem Fazit
   entfernt**, bevor er erscheint — auch während der Analyse in der Live-Anzeige. Die Regel
-  im Auftrag an die KI (5.4.5) hält das meist schon ab; am 09.11. rutschten trotzdem drei
-  solche Wörter in Beast-Karten durch. Bleibt von einer Karte nichts übrig, fällt sie weg.
+  im Auftrag an die KI (5.4.5) hält das meist schon ab; am 09.11. rutschte nach der Regel
+  noch einmal ein solches Wort in eine Beast-Karte durch. Bleibt von einer Karte nichts übrig,
+  fällt sie weg.
   Bei Erwachsenen bleibt der Text wie bisher.
 
 ### Behoben

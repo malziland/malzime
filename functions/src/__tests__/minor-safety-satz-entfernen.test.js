@@ -1,9 +1,9 @@
 /**
  * Kinderschutz: ganzen Satz entfernen (09.11.2026, Entscheidung des Inhabers).
  *
- * Anlass: Am 09.11.2026 meldete der Filter drei Treffer der harten Liste
+ * Anlass: Am 09.11.2026 meldete der Filter Treffer der harten Liste
  * (Extremismus, Terror, Waffen, Pornografie) in Beast-Karten bei moeglicherweise
- * Minderjaehrigen — auch nach der Prompt-Regel aus 5.4.5. Die Messung mit 27
+ * Minderjaehrigen — zwei vor und einer nach der Prompt-Regel aus 5.4.5. Die Messung mit 27
  * Kinderfotos traf keinen; das Wort ist live nicht nachstellbar. Deshalb:
  *   1. Bei moeglicherweise Minderjaehrigen faellt der ganze Satz mit dem Wort
  *      weg (Karte und Fazit), die Meldung bleibt.

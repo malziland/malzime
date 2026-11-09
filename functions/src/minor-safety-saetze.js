@@ -6,7 +6,7 @@ module.exports = function saetzeFilter(hart) {
   /* SATZ ENTFERNEN (entschieden am 09.11.2026): Steht im Text eines
      moeglicherweise minderjaehrigen Profils ein Wort der harten Liste, faellt der
      GANZE Satz weg — kein Halbsatz (die fruehere Sorge in SEC-001 war ein
-     unlesbarer Rest). Anlass: drei solche Treffer am 09.11.2026 in Beast-Karten,
+     unlesbarer Rest). Anlass: ein Treffer in einer Beast-Karte am 09.11.2026 trotz Regel 5.4.5,
      live nicht nachstellbar; das Wort selbst wird bewusst nicht protokolliert.
      Satzgrenze: . ! ? oder … (samt schliessendem Anfuehrungszeichen). Bleibt der
      Treffer ueber eine Satzgrenze hinweg bestehen, faellt der ganze Text. */

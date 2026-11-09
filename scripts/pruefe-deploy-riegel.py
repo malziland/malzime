@@ -442,7 +442,7 @@ JEST_EINSTELLUNG = {
 }
 EINSTELLUNG_SUMMEN = {
     "vitest.config.js": "1851f0fc6e40147a",
-    "playwright.config.js": "794814e3b370477b",
+    "playwright.config.js": "4a4332ecf1c585ed",
     "eslint.config.mjs": "468030e3c89b3468",
     "functions/eslint.config.js": "2d4fdc7b434dd749",
     ".prettierignore": "ee7c566a5bcc22f7",

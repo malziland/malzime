@@ -215,6 +215,23 @@ describe("foto-helfer-sw.js: beantwortet nur die eine Adresse und reicht nichts 
     expect(waitUntil).toHaveBeenCalledTimes(1);
   });
 
+  it("Lesefehler: 422 mit Fehlername, fuer die Seite lesbar (Expose-Kopf)", async () => {
+    const { fetch: abfangen } = ladeSw();
+    let antwort;
+    const kaputt = {
+      url: "https://foto-lokal.invalid/foto",
+      method: "POST",
+      formData: async () => {
+        throw Object.assign(new Error("x"), { name: "NotReadableError" });
+      },
+    };
+    abfangen({ request: kaputt, respondWith: (p) => (antwort = p) });
+    const r = await antwort;
+    expect(r.status).toBe(422);
+    expect(r.headers.get("X-Foto-Fehler")).toBe("NotReadableError");
+    expect(r.headers.get("Access-Control-Expose-Headers")).toBe("X-Foto-Fehler");
+  });
+
   it("jede andere Anfrage bleibt unberuehrt", () => {
     const { fetch: abfangen } = ladeSw();
     const respondWith = vi.fn();

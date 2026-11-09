@@ -68,6 +68,11 @@ async function fotoZurueck(anfrage) {
   } catch (err) {
     /* Nur der Fehlername geht an die Seite, kein Inhalt. */
     const name = (err && err.name) || "Fehler";
-    return new Response(null, { status: 422, headers: { "Cache-Control": "no-store", "X-Foto-Fehler": name } });
+    /* Die Anfrage geht an eine fremde Adresse (foto-lokal.invalid): ohne
+       Expose-Kopf koennte die Seite den Fehlernamen nicht lesen. */
+    return new Response(null, {
+      status: 422,
+      headers: { "Cache-Control": "no-store", "X-Foto-Fehler": name, "Access-Control-Expose-Headers": "X-Foto-Fehler" },
+    });
   }
 }

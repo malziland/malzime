@@ -76,8 +76,8 @@ Filter (oder mit Begründung auf die Ausnahmeliste im Skript).
 | `malziME Function Errors` | „malziME: Fehler im Server (Details im Text)“ | `severity>=ERROR AND NOT jsonPayload.step="minor-safety-durchbruch" AND NOT jsonPayload.alert="analyse-gescheitert"` |
 
 **Analyse gescheitert: eine Zeile je gescheiterter Analyse (seit Release 4.13.2).**
-Die Zeile `alert: "analyse-gescheitert"` schreibt allein `functions/src/jobs.js`,
-und zwar wenn ein Auftrag mit einem blockierten Ergebnis, mit einem leeren
+Die Zeile `alert: "analyse-gescheitert"` schreibt allein
+`functions/src/analyse-ausgang.js`, gerufen von `functions/src/jobs.js`, und zwar wenn ein Auftrag mit einem blockierten Ergebnis, mit einem leeren
 Profil in einem der beiden Modi oder als `failed` endet; scheitert schon das
 Hochladen, bevor es einen Auftrag gibt, ruft `handle-enqueue.js` dieselbe
 Meldung. Das Feld `grund` sagt, welche Meldung das Kind sah (bzw. bei
@@ -147,7 +147,9 @@ gemeinsamer Teil unten, dazu `jsonPayload.alert="analyse-abgelehnt"`) zählt sie
 und die Schwellen-Richtlinie `malziME KI lehnt gehäuft ab` — Betreff „malziME:
 KI lehnt gehäuft ab (3 oder mehr Fotos ohne Profil in einer Stunde)“ — meldet
 sich ab **drei** Absagen in einer Stunde (Schwelle „mehr als 2“; zwei melden
-sich nicht, drei schon). Anlass: Am 13.11.2026 um 10:06 und 10:27 kam für je
+sich nicht, drei schon). Die Stunde gleitet: Google zählt bei Alarmen immer die
+letzten 60 Minuten, nicht feste Stundenblöcke (Absagen um 10:55, 10:58 und 11:05
+melden sich). Anlass: Am 13.11.2026 um 10:06 und 10:27 kam für je
 eine einzelne Absage die Nachricht „Analyse gescheitert“, obwohl nichts zu tun
 war; vom 15.09. bis 13.11.2026 waren es zwei Absagen in rund 800 Analysen.
 

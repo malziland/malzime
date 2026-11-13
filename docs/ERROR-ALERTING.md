@@ -87,7 +87,7 @@ geschlossenem Tab gesehen hätte):
 |---|---|
 | `blocked.overloaded` | Mistral überlastet, auch nach den Wiederholungen |
 | `blocked.apiError` | technischer Fehler: KI-Aufruf ohne Ergebnis oder Foto nicht ladbar |
-| `blocked.profileBlocked` | kein verwertbares Profil (KI hat abgelehnt oder unlesbar geantwortet) |
+| `blocked.profileBlocked` | kein verwertbares Profil (KI hat abgelehnt oder unlesbar geantwortet) — seit 13.11.2026 KEINE Fehlerzeile mehr, sondern die Warnung `analyse-abgelehnt`; gemeldet erst gehäuft (unten) |
 | `blocked.configMissing` | Einstellungssatz fehlt oder ist ungültig — sofort handeln |
 | `profil_leer_standard`, `profil_leer_beast` | nur ein Teil gerettet, im genannten Modus steht „leeres Profil“ |
 | `ergebnis_speichern` | die Analyse war fertig, das Ergebnis ließ sich in drei Versuchen nicht in die Datenbank schreiben; das Kind sah „technischer Fehler“ (Warnungen `ergebnis-speichern-fehlgeschlagen` davor) |
@@ -136,6 +136,20 @@ gehäuft ab (mehr als 3 Neuversuche an einem Tag)“, zählt die log-basierte Me
 `ki_verbindungsabriss` (Filter: Dienst `processjob`,
 `jsonPayload.status="abbruch-neuversuch"`) über 24 Stunden. Sie meldet gehäufte
 Abrisse auch dann, wenn jeder Neuversuch gelang.
+
+**Absagen der KI: erst gehäuft (seit 13.11.2026).** Schreibt die KI zu einem
+Foto kein Profil, auch nicht auf die Nachfrage (`blocked.profileBlocked`: meist
+eine Absage zum Bildinhalt, seltener eine unlesbare Antwort), schreibt
+`functions/src/analyse-ausgang.js` statt der Fehlerzeile die Warnung
+`alert: "analyse-abgelehnt"`. Sie löst weder „Analyse gescheitert“ noch
+„Fehler im Server“ aus. Die log-basierte Metrik `ki_ablehnung` (Filter:
+gemeinsamer Teil unten, dazu `jsonPayload.alert="analyse-abgelehnt"`) zählt sie,
+und die Schwellen-Richtlinie `malziME KI lehnt gehäuft ab` — Betreff „malziME:
+KI lehnt gehäuft ab (3 oder mehr Fotos ohne Profil in einer Stunde)“ — meldet
+sich ab **drei** Absagen in einer Stunde (Schwelle „mehr als 2“; zwei melden
+sich nicht, drei schon). Anlass: Am 13.11.2026 um 10:06 und 10:27 kam für je
+eine einzelne Absage die Nachricht „Analyse gescheitert“, obwohl nichts zu tun
+war; vom 15.09. bis 13.11.2026 waren es zwei Absagen in rund 800 Analysen.
 
 Gemeinsamer Teil jedes Filters:
 `resource.type="cloud_run_revision" AND resource.labels.service_name=("admin" OR "stats" OR "enqueue" OR "processjob" OR "jobstatus" OR "reapjobs" OR "laufzeitwache" OR "satzwache")`.

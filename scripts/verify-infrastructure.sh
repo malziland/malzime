@@ -501,7 +501,8 @@ ALARM_REGELN='malziME Function Errors
 malziME Analyse gescheitert
 malziME Kinderschutz-Treffer
 malziME Client-Fehler-Haeufung
-malziME KI-Verbindung bricht gehäuft ab'
+malziME KI-Verbindung bricht gehäuft ab
+malziME KI lehnt gehäuft ab'
 
 # Einspeisepunkte fuer Tests: INFRA_PROBE_ALARMREGELN und INFRA_PROBE_ALARMKANAELE
 # nennen je eine Datei mit der Antwort, die sonst gcloud liefert.

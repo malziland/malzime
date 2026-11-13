@@ -741,6 +741,23 @@ Rechte); `store_failed` und `enqueue_unerwartet` → Zeilen des Dienstes
 `enqueue` (`store-or-create-failed` bzw. `status: "error"`), Speicher und
 Firestore prüfen.
 
+### Nachricht „KI lehnt gehäuft ab“ (seit 13.11.2026)
+
+Die KI hat in einer Stunde zu mindestens drei Fotos kein Profil geschrieben,
+auch nicht auf die Nachfrage; die Kinder sahen „Für dieses Foto kann kein
+Profil erstellt werden“. Eine einzelne Absage meldet sich nicht (Aufbau in
+[ERROR-ALERTING.md](ERROR-ALERTING.md), „Absagen der KI“). Zeitpunkte:
+
+    gcloud logging read 'jsonPayload.alert="analyse-abgelehnt"' \
+      --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1d \
+      --format='value(timestamp)'
+
+Davor steht je Absage die Zeile `step: "mistral-single-large-details"` mit
+`status: "incomplete-retry"` (fehlende Karten) und kleinen `outputTokens`
+(unter etwa 500 = kurze Absage statt Profil). Viele Absagen in kurzer Zeit:
+Mistral-Status und Ankündigungen prüfen (geänderte Inhaltsregeln); unlesbare
+Antworten zeigen sich an `repairStages` jenseits von `direct`.
+
 ### Nachricht „lange Wartezeit“ (seit Oktober 2026)
 
 Eine Analyse hat länger als 5 Minuten vom Einreihen bis zum Start gewartet

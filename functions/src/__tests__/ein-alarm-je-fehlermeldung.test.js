@@ -193,19 +193,44 @@ function fehlerzeilen() {
     });
 }
 
+const bausteine = {
+  kaputt: antwort("das ist kein json {{{"),
+  abriss,
+  http400: () => ({ ok: false, status: 400, text: async () => '{"message":"bad"}' }),
+  leer: antwort(JSON.stringify({ subject: "HUMAN" })),
+};
+
+/* Ablehnung nur gehaeuft (13.11.2026): Schreibt die KI zu einem Foto kein
+   Profil, auch nicht auf die Nachfrage, sieht das Kind "kein Profil moeglich".
+   Das ist keine Stoerung des Programms. Darum KEINE Fehlerzeile (sonst kaeme
+   "Analyse gescheitert" oder "Fehler im Server"), sondern genau eine Warnung
+   `analyse-abgelehnt`; die Metrik ki_ablehnung zaehlt sie, gemeldet wird erst
+   ab drei in einer Stunde (docs/ERROR-ALERTING.md). Der Fall "leer, leer" ist
+   der vom 13.11.2026 10:06 und 10:27: kurze Antwort ohne Karten, zweimal. */
+describe("Die KI schreibt kein Profil: keine Fehlerzeile, genau eine Warnung", () => {
+  test.each([
+    ["Absage ohne Karten, auch auf die Nachfrage (13.11.2026)", ["leer", "leer"]],
+    ["unlesbare KI-Antwort (Befund T-05)", ["kaputt"]],
+    ["Antwort ohne Profil, die Nachfrage scheitert", ["leer", "abriss"]],
+  ])("%s", async (_fall, folge) => {
+    mistralAntwortet(...folge.map((n) => bausteine[n]));
+    await lauf();
+
+    expect(mockStore.get(JOB_ID).result.blockedReason).toBe("blocked.profileBlocked");
+    expect(fehlerzeilen()).toEqual([]);
+    const absagen = ausgabe.filter((z) => /"alert":"analyse-abgelehnt"/.test(z.text)).map((z) => JSON.parse(z.text));
+    expect(absagen).toEqual([
+      { severity: "WARNING", alert: "analyse-abgelehnt", step: "analyse-ausgang", grund: "blocked.profileBlocked" },
+    ]);
+    expect(JSON.stringify(absagen)).not.toContain(JOB_ID);
+  });
+});
+
 describe("Fehlermeldung beim Kind: genau eine Fehlerzeile, und es ist die des Alarms", () => {
   test.each([
-    ["unlesbare KI-Antwort (Befund T-05)", ["kaputt"], "blocked.profileBlocked"],
     ["Verbindung reisst zweimal ab", ["abriss", "abriss"], "blocked.apiError"],
     ["Mistral meldet einen Fehler (400)", ["http400"], "blocked.apiError"],
-    ["Antwort ohne Profil, die Nachfrage scheitert", ["leer", "abriss"], "blocked.profileBlocked"],
   ])("%s", async (_fall, folge, grund) => {
-    const bausteine = {
-      kaputt: antwort("das ist kein json {{{"),
-      abriss,
-      http400: () => ({ ok: false, status: 400, text: async () => '{"message":"bad"}' }),
-      leer: antwort(JSON.stringify({ subject: "HUMAN" })),
-    };
     mistralAntwortet(...folge.map((n) => bausteine[n]));
     await lauf();
 

@@ -45,9 +45,8 @@ function leeresProfil(result) {
   return null;
 }
 
-/* ABLEHNUNG NUR GEHAEUFT (13.11.2026): Kein Profil von der KI, auch nicht auf
-   die Nachfrage, ist keine Stoerung — Warnung `analyse-abgelehnt`, Alarm erst ab
-   drei je Stunde (Metrik ki_ablehnung, docs/ERROR-ALERTING.md). */
+/* ABSAGE DER KI (13.11.2026): keine Stoerung, nur Warnung `analyse-abgelehnt`;
+   Alarm erst ab drei je Stunde (Metrik ki_ablehnung, docs/ERROR-ALERTING.md). */
 function meldeGescheiterteAnalyse(grund) {
   const sauber = typeof grund === "string" && GRUND_MUSTER.test(grund) ? grund : "unbekannt";
   const absage = sauber === "blocked.profileBlocked";

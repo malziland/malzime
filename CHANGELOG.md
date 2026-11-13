@@ -4,6 +4,14 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Lehnt die KI ein einzelnes Foto ab, kommt keine Alarm-Nachricht mehr.** Die Absage
+  wird weiter gezählt; eine Nachricht kommt erst, wenn es in einer Stunde drei oder mehr
+  sind. Echte Störungen melden sich weiter sofort.
+
 ## [5.4.6] — 2026-11-09
 
 ### Geändert

@@ -638,7 +638,10 @@ meldet der Aufräumdienst nach (spätestens nach 2 Stunden; scheitert nur der
 Vermerk, kommt die Nachricht dann ein zweites Mal — lieber zwei als keine). Scheitert das Hochladen, bevor es einen Auftrag
 gibt (Speicher oder Datenbank weg, unerwarteter Serverfehler), ruft
 `handle-enqueue.js` dieselbe Meldung; Eingabefehler (4xx) melden sich nicht.
-Auf sie hört die Nachricht „Analyse gescheitert“. Alle Zeilen, die den Grund im
+Auf sie hört die Nachricht „Analyse gescheitert“. Ausnahme seit 13.11.2026: Schreibt
+die KI kein Profil (`blocked.profileBlocked`), ist das eine Warnung `analyse-abgelehnt`,
+gemeldet erst ab drei in einer Stunde — eine einzelne Absage ist keine Störung und
+verlangt kein Handeln (`docs/ERROR-ALERTING.md`, „Absagen der KI“). Alle Zeilen, die den Grund im
 Einzelnen beschreiben — KI-Aufruf, Neuversuch, Nachfrage, Foto laden,
 Absturzverdacht, verworfenes Ergebnis, wiederholtes Speichern —, sind
 Warnungen. Ebenso der Werbe-Aufruf bei einem kurzen Aussetzer von Mistral
@@ -657,7 +660,8 @@ obwohl das Kind sein Tierprofil bekam; ein Absturzverdacht meldete sich als
 bekannt, was das Kind sieht. Abgesichert in
 `functions/src/__tests__/ein-alarm-je-fehlermeldung.test.js` über den echten
 Weg (Worker, Pipeline, KI-Aufruf, Auftragsverwaltung): je Fehlerfall genau
-eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine; mit
+eine Fehlerzeile, bei Erfolg, gelungenem Neuversuch und Tierfoto keine, bei
+einer Absage der KI keine, aber genau eine Warnung `analyse-abgelehnt`; mit
 verlorener Bestätigung der Datenbank in `meldung-am-zustand.test.js`. Ob
 „leeres Profil“ vorliegt, entscheidet dieselbe Regel wie in
 `public/js/render.js` (Text oder mindestens eine Karte).

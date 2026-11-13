@@ -47,7 +47,9 @@ const JOB = "C".repeat(20);
 const MINUTE = 60 * 1000;
 const BLOCKIERT = {
   profiles: null,
-  blockedReason: "blocked.profileBlocked",
+  /* Ein Grund, der sofort alarmiert. Nicht blocked.profileBlocked: Die Absage
+     der KI meldet sich seit 13.11.2026 nur gehaeuft (analyse-ausgang.js). */
+  blockedReason: "blocked.apiError",
   privacyRisks: [],
   exif: {},
   meta: { traceId: null, mode: "blocked" },
@@ -117,8 +119,8 @@ describe("die Bestaetigung der Datenbank kommt nicht an", () => {
     await handleProcessJob({ method: "POST", body: { jobId: JOB }, headers: {} }, antwort());
 
     expect(auftrag().status).toBe("done");
-    expect(auftrag().result.blockedReason).toBe("blocked.profileBlocked");
-    expect(meldungen()).toEqual(["blocked.profileBlocked"]);
+    expect(auftrag().result.blockedReason).toBe("blocked.apiError");
+    expect(meldungen()).toEqual(["blocked.apiError"]);
     expect(auftrag().gemeldet).toBe(true);
   });
 
@@ -176,7 +178,7 @@ describe("der Aufraeumdienst meldet nach, was beim Loeschen noch nicht gemeldet 
     const lauf = await reapJobs();
 
     expect(lauf.zugestellt).toBe(1);
-    expect(meldungen()).toEqual(["blocked.profileBlocked"]);
+    expect(meldungen()).toEqual(["blocked.apiError"]);
   });
 
   test.each([
@@ -212,7 +214,7 @@ describe("ohne Stoerung", () => {
 
     expect(await jobs.completeJob(JOB, BLOCKIERT)).toBe(true);
 
-    expect(meldungen()).toEqual(["blocked.profileBlocked"]);
+    expect(meldungen()).toEqual(["blocked.apiError"]);
     expect(auftrag().gemeldet).toBe(true);
   });
 

@@ -257,6 +257,7 @@ describe("verify-infrastructure.sh", () => {
       "malziME Kinderschutz-Treffer",
       "malziME Client-Fehler-Haeufung",
       "malziME KI-Verbindung bricht gehäuft ab",
+      "malziME KI lehnt gehäuft ab",
     ];
     /* Farbcodes der Ausgabe (gruen/rot) fuer den Textvergleich entfernen. */
     // eslint-disable-next-line no-control-regex

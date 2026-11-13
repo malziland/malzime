@@ -14,8 +14,7 @@
    `done` mit einem leeren Profil in einem der beiden Modi (completeJob) oder
    `failed` (failJob — Worker nicht fertig, oder schon das Einreihen scheiterte,
    `enqueue_failed`). Zu diesem Uebergang gehoert die eine Fehlerzeile, auf die
-   der Alarm "Analyse gescheitert" hoert (Ausnahme: Absage der KI, siehe
-   meldeGescheiterteAnalyse); der Auftrag traegt bis dahin
+   der Alarm "Analyse gescheitert" hoert (Absage der KI: siehe unten); der Auftrag traegt bis dahin
    `gemeldet: false` (jobs.js, OPS-2026-10-03-31). Scheitert das Einreihen,
    bevor es einen Auftrag gibt (Speicher oder Datenbank weg), ruft
    handle-enqueue.js dieselbe Meldung selbst. Die Zeilen, die den Grund im
@@ -46,30 +45,16 @@ function leeresProfil(result) {
   return null;
 }
 
-/* ABLEHNUNG NUR GEHAEUFT (13.11.2026). `blocked.profileBlocked` heisst: Die KI
-   hat zu diesem Foto kein Profil geschrieben (meist eine Absage zum
-   Bildinhalt, seltener eine unlesbare Antwort), auch nicht auf die Nachfrage.
-   Das Programm ist dabei nicht kaputt, und eine einzelne Absage verlangt
-   kein Handeln. Sie schreibt darum eine WARNUNG mit `alert:
-   "analyse-abgelehnt"` statt der Fehlerzeile; die log-basierte Metrik
-   `ki_ablehnung` zaehlt sie, und die Richtlinie "malziME KI lehnt gehaeuft
-   ab" meldet sich ab drei in einer Stunde (docs/ERROR-ALERTING.md). Anlass:
-   Am 13.11.2026 kamen fuer zwei einzelne Absagen je eine Nachricht
-   "Analyse gescheitert". Jeder andere Grund bleibt die Fehlerzeile. */
-const GEHAEUFT_GEMELDET = new Set(["blocked.profileBlocked"]);
-
+/* ABLEHNUNG NUR GEHAEUFT (13.11.2026): Kein Profil von der KI, auch nicht auf
+   die Nachfrage, ist keine Stoerung — Warnung `analyse-abgelehnt`, Alarm erst ab
+   drei je Stunde (Metrik ki_ablehnung, docs/ERROR-ALERTING.md). */
 function meldeGescheiterteAnalyse(grund) {
   const sauber = typeof grund === "string" && GRUND_MUSTER.test(grund) ? grund : "unbekannt";
-  if (GEHAEUFT_GEMELDET.has(sauber)) {
-    console.warn(
-      JSON.stringify({ severity: "WARNING", alert: "analyse-abgelehnt", step: "analyse-ausgang", grund: sauber })
-    );
-    return;
-  }
-  console.error(
+  const absage = sauber === "blocked.profileBlocked";
+  (absage ? console.warn : console.error)(
     JSON.stringify({
-      severity: "ERROR",
-      alert: "analyse-gescheitert",
+      severity: absage ? "WARNING" : "ERROR",
+      alert: absage ? "analyse-abgelehnt" : "analyse-gescheitert",
       step: "analyse-ausgang",
       grund: sauber,
     })

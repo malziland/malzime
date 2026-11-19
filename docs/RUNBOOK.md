@@ -593,7 +593,7 @@ Kostenmaßnahme ohne Einfluss auf Modell, Ergebnis oder Durchsatz. Ein Verdacht,
 dass er an einer Störung beteiligt ist, wird über einen Functions-Rollback
 (Hebel 4) geklärt, nicht über einen Schalter.
 
-### 3c. Mistral-Modell wechseln (seit 19.11.2026)
+### 3c. Mistral-Modell wechseln (seit 19.11.2026, ohne Auslieferung)
 
 **Wann:** Das eingestellte Modell ist bei Mistral dauerhaft langsam oder fällt
 aus, und das andere erlaubte Modell ist nachweislich besser. Anlass war der
@@ -601,50 +601,68 @@ aus, und das andere erlaubte Modell ist nachweislich besser. Anlass war der
 Analysen liefen in die Zeitgrenze, 15 von 82 scheiterten. Der Vergleich am
 19.11.2026 (Café-Demofoto, je drei Läufe gleichzeitig): Large 3 37 bis 39 s,
 Large 4 140 bis 188 s, Ergebnis gleichwertig. Large 4 traf in der Messung vom
-31.10.2026 das Alter Erwachsener besser — das ist der Preis eines Wechsels
-auf Large 3.
+31.10.2026 das Alter Erwachsener besser — das ist der Preis von Large 3.
 
-**Was verknüpft ist:** Erlaubt sind genau die Modelle in
-`MODELL_EINSTELLUNGEN` (`functions/src/config.js`): `mistral-large-2512`
-(Large 3) und `mistral-large-4` (Large 4). Jedes bringt dort seine eigenen
-Grenzen mit — wie lange ein Analyse-Aufruf laufen darf (`analyseZeitgrenzeMs`,
-Large 3 300 s, Large 4 200 s mit einem zweiten Versuch), wie viel Text es
-mindestens braucht (`mindestAusgabeToken`), die Grenzen des Werbe-Aufrufs und
-der Nachdenk-Zusatz von Large 4. Der Einstellungssatz in Firestore hält Werte,
-die für beide passen; das prüft `betriebsprofil-kopplung.test.js` am
-produktiven Satz. Beim Lesen aus Firestore prüft `betriebsprofil-kopplung.js`
-den Satz zusätzlich gegen das eingestellte Modell und lehnt ihn ab, wenn er dem
-Modell zu wenig Text erlaubt — dann meldet sich die satzWache.
+**Wie es funktioniert:** Das Feld `modell` im Dokument `config/betriebsprofil`
+(neben `aktiv`) wählt das Modell. Fehlt es, gilt `MISTRAL_MODEL` aus
+`functions/src/config.js`. Erlaubt sind genau die Modelle in
+`MODELL_EINSTELLUNGEN` (ebenda): `mistral-large-2512` (Large 3) und
+`mistral-large-4` (Large 4). Jedes bringt dort seine Grenzen mit und sie
+wechseln mit: wie lange ein Analyse-Aufruf laufen darf (Large 3 300 s, Large 4
+200 s mit einem zweiten Versuch), wie viel Text es mindestens braucht, die
+Grenzen des Werbe-Aufrufs, der Nachdenk-Zusatz von Large 4, der Faktor für
+die geschätzte Wartezeit, solange keine gemessene Dauer vorliegt, und der
+Anlauf des Tippens in der Live-Anzeige (Large 3 25 s, Large 4 2 s; der Server
+schickt ihn mit dem Auftragsstatus an den Browser). Der
+produktive Satz passt zu beiden Modellen (geprüft in
+`betriebsprofil-kopplung.test.js` und vom Anlege-Skript). Ein nicht erlaubtes
+Modell oder ein Satz, der nicht zum Modell passt, legt den Satz still — dann
+läuft keine Analyse, und die satzWache meldet sich. Das Umschalt-Skript
+verhindert beides vor dem Schreiben.
 
-**Schritte (rund 15 Minuten Arbeit, auf Large 4 rund eine Stunde wegen des Testsatzes, dann die Auslieferung):**
-1. In `functions/src/config.js` die Zeile `const MISTRAL_MODEL = …` auf das
-   andere Modell setzen, Begründung mit Messung in den Kommentar darüber.
-2. `functions/src/__tests__/config.test.js` (Erwartung des Modellnamens) und
-   die Doku mitziehen: AGENTS.md, SECURITY.md, docs/ARCHITECTURE.md,
-   docs/SETUP.md (Modell und Kostenbeispiel), CHANGELOG.
-3. `cd functions && npm test` — die Prüfung „Modell und Einstellungssatz
-   passen zusammen“ muss grün sein. Firestore wird nicht angefasst: Der
-   produktive Satz passt zu beiden Modellen. Der TESTSATZ
-   (`functions/src/test-satz.js`, 300000 ms und 5000 Token) passt dagegen nur
-   zu Large 3 — beim Wechsel auf Large 4 lehnt die Prüfung ihn ab, und rund 56
-   Tests werden rot (Abnahme 19.11.2026). Dann im Testsatz
-   `singleLargeMaxTokens` auf mindestens 16000 und `singleLargeTimeoutMs` auf
-   mindestens 410000 heben (die Kopplung verlangt 16000 Token bei 39,4 Token/s)
-   und die rund 14 Tests nachziehen, die mit den alten Testzahlen rechnen.
-   Bewusst so gelassen: Diese Tests heute umzustellen, brächte dem Betrieb
-   nichts, und der Testsatz soll ohnehin andere Zahlen tragen als die Produktion.
-4. Auslieferung mit der Kette (`docs/handover/auslieferung.sh`).
-5. Danach eine echte Analyse (`sh scripts/lasttest-live.sh 1`) und im Protokoll
-   nachsehen, welches Modell rechnete:
+**Schritte (rund 5 Minuten):**
+1. Anzeigen, was sich ändern würde (schreibt nichts):
 
+       node scripts/modell-umschalten.js mistral-large-4
+
+2. Umschalten (schreibt nur das Feld `modell` und liest es zurück):
+
+       node scripts/modell-umschalten.js mistral-large-4 --ausfuehren
+
+3. Rund eine Minute warten (Zwischenspeicher je Instanz 30 s). Eine laufende
+   Analyse bleibt bei ihrem Modell, auch bei Nachfrage und Werbe-Aufruf.
+4. Prüfen, von außen und im Protokoll:
+
+       curl -s https://stats-5ymhpdpqcq-ew.a.run.app | jq .betrieb
+       sh scripts/lasttest-live.sh 1
        gcloud logging read 'jsonPayload.step="mistral-single-large-details"' \
          --project=malzime --bucket=betrieb-eu --location=europe-west1 --view=_AllLogs --freshness=1h \
          --format='value(timestamp,jsonPayload.model,jsonPayload.status)'
 
+   `betrieb.modell` und das Feld `model` der letzten Analyse müssen das neue
+   Modell zeigen, `betrieb.analyseZeitgrenzeMs` seine Zeitgrenze.
+5. Begründung mit Messung in `docs/SECURITY-MODEL.md` nachtragen.
+
+Zurück geht es genauso, mit dem anderen Modellnamen. Der Abgleich vor jeder
+Auslieferung (`betriebsprofil-vergleichen.js`) duldet ein umgeschaltetes Modell
+— es ist ein Betriebsschalter, kein Wert aus dem Repo — und zeigt an, welches
+gilt. Das Anlege-Skript lässt das Feld beim Nachziehen des Satzes stehen.
+
+**Die Vorgabe im Code ändern** (nur wenn das andere Modell auf Dauer bleiben
+soll): Zeile `MISTRAL_MODEL` in `config.js`, Erwartung in `config.test.js`,
+Doku (AGENTS.md, SECURITY.md, docs/ARCHITECTURE.md, docs/SETUP.md, CHANGELOG),
+dann Auslieferung. Für Large 4 zusätzlich den Testsatz
+(`functions/src/test-satz.js`, heute 300000 ms und 5000 Token, passt nur zu
+Large 3) auf mindestens 16000 Token und 410000 ms heben und die rund 14 Tests
+nachziehen, die mit den alten Testzahlen rechnen (Abnahme 19.11.2026: sonst
+rund 56 rote Tests). Danach das Feld `modell` in der Datenbank wieder
+entfernen oder auf denselben Wert setzen.
+
 **Nicht anfassen:** die Rechtstexte nennen nur „Mistral Large, in der EU“ und
 gelten für beide Modelle; die Zusage, dass Mistral nichts speichert, gilt für
 die ganze Organisation. Ein drittes Modell braucht vorher eine eigene Messung,
-einen Eintrag in `MODELL_EINSTELLUNGEN` und die Prüfung der Rechtstexte.
+einen Eintrag in `MODELL_EINSTELLUNGEN` (mit Auslieferung) und die Prüfung der
+Rechtstexte.
 
 **Frist:** Mistral schaltet Large 3 am 30.04.2027 ab. Bis dahin muss ein
 Nachfolger gemessen und eingestellt sein.

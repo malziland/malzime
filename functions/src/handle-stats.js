@@ -1,5 +1,6 @@
 const { getStats, getMaintenanceStatus, leseRealitaetsCheck } = require("./counter");
 const { geltendeWerte } = require("./betriebsprofil");
+const { MISTRAL_MODEL, wirksameZeitgrenzeMs } = require("./config");
 
 async function handleStats(req, res) {
   if (req.method !== "GET") {
@@ -38,13 +39,20 @@ async function handleStats(req, res) {
   }
   /* Nur die Werte, die der Browser wirklich braucht — nicht das ganze Profil.
      Die Zeitgrenze sagt ihm, wie lange er mindestens durchhalten muss. */
-  const betriebswerte = betrieb
-    ? {
-        profil: betrieb.profil || null,
-        quelle: betrieb.quelle,
-        analyseZeitgrenzeMs: betrieb.werte.singleLargeTimeoutMs,
-      }
-    : undefined;
+  /* Die WIRKSAME Zeitgrenze: die kleinere aus Satz und Modell (dieselbe
+     Rechnung wie in mistral.js). Bis 19.11.2026 stand hier nur der Satzwert
+     (410 s), obwohl Large 3 nach 300 s und Large 4 nach 200 s abbricht. Das
+     Modell steht mit dabei, damit ein Umschalten von aussen pruefbar ist. */
+  const modell = (betrieb && betrieb.modell) || MISTRAL_MODEL;
+  const betriebswerte =
+    betrieb && betrieb.werte
+      ? {
+          profil: betrieb.profil || null,
+          quelle: betrieb.quelle,
+          modell,
+          analyseZeitgrenzeMs: wirksameZeitgrenzeMs(betrieb.werte.singleLargeTimeoutMs, modell),
+        }
+      : undefined;
   res.json({ ...data, maintenance, realitaetsCheck, betrieb: betriebswerte });
 }
 

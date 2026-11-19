@@ -21,7 +21,7 @@
 const { extrahiereLiveText } = require("./mistral-antwort");
 const { liveOhneHarteWoerter } = require("./minor-safety");
 
-const { MISTRAL_ENDPOINT, modellEinstellungen } = require("./config");
+const { MISTRAL_ENDPOINT, MISTRAL_MODEL, modellEinstellungen } = require("./config");
 const { geltendeWerte } = require("./betriebsprofil");
 const { withMistralSlot } = require("./throttle");
 /* Workshop 01.10.2026: Ein Verbindungsabriss ("terminated", "fetch failed")
@@ -414,13 +414,15 @@ async function callMistralRawUnthrottled({
  * still mit irgendwelchen Zahlen weiterzumachen.
  */
 async function betriebswerteOderAbbruch() {
-  const { werte, profil, grund } = await geltendeWerte();
+  const { werte, profil, grund, modell } = await geltendeWerte();
   if (!werte) {
     const fehler = new Error(`Betriebswerte fehlen: ${grund || "unbekannt"}`);
     fehler.code = "config_missing";
     throw fehler;
   }
-  return { werte, profil: profil || null };
+  /* Das Modell aus dem Einstellungssatz (betriebsprofil.js); ohne Angabe das
+     aus config.js — so auch in Tests, deren Satz kein Modell nennt. */
+  return { werte, profil: profil || null, modell: modell || MISTRAL_MODEL };
 }
 
 module.exports = {

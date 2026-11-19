@@ -174,6 +174,18 @@ describe("Queue-Verdrahtung des Live-Texts (v3.0)", () => {
     expect(liveAnzeige.welle).toHaveBeenCalledWith(expect.objectContaining({ standard: "", versuch: 2 }));
   });
 
+  /* 19.11.2026: Der Server schickt den Tipp-Anlauf des gewaehlten Modells mit. */
+  it("tippAnlaufMs geht mit der Welle ans Modul", async () => {
+    mockeStatusFolge([
+      { status: "processing", liveText: "Text", tippAnlaufMs: 25000 },
+      { status: "done", result: DONE_RESULT },
+    ]);
+    const p = analyzeImage();
+    await vi.advanceTimersByTimeAsync(12000);
+    await p;
+    expect(liveAnzeige.welle).toHaveBeenCalledWith(expect.objectContaining({ standard: "Text", tippAnlaufMs: 25000 }));
+  });
+
   it("done mit liveTextVersuch → die Live-Anzeige gleicht den Versuch ab, bevor gerendert wird", async () => {
     mockeStatusFolge([
       { status: "processing", liveText: "Erste Welle" },

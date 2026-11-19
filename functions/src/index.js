@@ -10,7 +10,7 @@ const { onDocumentWritten } = require("firebase-functions/v2/firestore");
 const { initializeApp } = require("firebase-admin/app");
 const { defineSecret } = require("firebase-functions/params");
 
-const { FIRESTORE_DATABASE_ID } = require("./config");
+const { FIRESTORE_DATABASE_ID, MISTRAL_MODEL, wirksameZeitgrenzeMs } = require("./config");
 const { handleStats } = require("./handle-stats");
 const { handleAdmin } = require("./handle-admin");
 const { handleErrors } = require("./handle-errors");
@@ -326,13 +326,13 @@ exports.satzWache = onDocumentWritten(
     /* Der Zwischenspeicher haelt den alten Stand bis zu 30 Sekunden — hier
        interessiert der NEUE, also frisch lesen. */
     _cacheLeeren();
-    const { werte, quelle, profil, grund } = await geltendeWerte();
+    const { werte, quelle, profil, grund, modell } = await geltendeWerte();
 
     if (!werte) {
       const text =
         `ACHTUNG: Der Einstellungssatz wurde geaendert und ist UNGUELTIG — ` +
         `es laeuft ab sofort KEINE Analyse. Grund: ${grund || "unbekannt"}. ` +
-        `Rueckweg: das Feld "aktiv" auf einen gueltigen Satz stellen.` +
+        `Rueckweg: das Feld "aktiv" auf einen gueltigen Satz stellen; steht "modell" falsch, mit scripts/modell-umschalten.js korrigieren.` +
         hinweisOhneSatz();
       await sendeNtfy({ ntfyUrl: ntfyUrl.value(), ntfyTopic: ntfyTopic.value(), text });
       console.error(JSON.stringify({ step: "satz-wache", status: "ungueltig", grund }));
@@ -368,8 +368,8 @@ exports.satzWache = onDocumentWritten(
     }
 
     const text =
-      `Einstellungssatz geaendert und uebernommen: "${profil}". ` +
-      `Zeitgrenze ${Math.round(werte.singleLargeTimeoutMs / 1000)} s, ` +
+      `Einstellungssatz geaendert und uebernommen: "${profil}", Modell ${modell || MISTRAL_MODEL}. ` +
+      `Zeitgrenze ${Math.round(wirksameZeitgrenzeMs(werte.singleLargeTimeoutMs, modell || MISTRAL_MODEL) / 1000)} s, ` +
       `${werte.singleLargeMaxTokens} Token, ${werte.parallelitaet} parallel, ` +
       `${werte.stundenlimit} pro Stunde.` +
       queueSatz;

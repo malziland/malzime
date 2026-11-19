@@ -329,7 +329,7 @@ describe("Gruppe 2 — Andrang und Einlass", () => {
     expect(await grenze(300)).toBe(300);
   });
 
-  test("durchschnittsdauerSekunden wirkt: die Ausgangsdauer folgt dem Satz", async () => {
+  test("durchschnittsdauerSekunden wirkt: die Ausgangsdauer folgt dem Satz (mal dauerFaktor des Modells)", async () => {
     /* ../durchsatz wird im Test darueber gemockt; die Registrierung ueberlebt
        resetModules. Ohne dieses unmock kam immer die gemockte 60 zurueck —
        der Test haette jeden Wert bestanden, auch einen falschen. */
@@ -339,8 +339,11 @@ describe("Gruppe 2 — Andrang und Einlass", () => {
       const e = await m.dauerJeAnalyse(false);
       return e.sekunden;
     }
-    expect(await dauer(50)).toBe(50);
-    expect(await dauer(90)).toBe(90);
+    /* Seit 19.11.2026 mal dauerFaktor des eingestellten Modells (config.js). */
+    const { MISTRAL_MODEL, modellEinstellungen } = require("../config");
+    const faktor = modellEinstellungen(MISTRAL_MODEL).dauerFaktor;
+    expect(await dauer(50)).toBe(Math.round(50 * faktor));
+    expect(await dauer(90)).toBe(Math.round(90 * faktor));
   });
 
   test("stundenlimit und stundenfensterMinuten wirken", async () => {

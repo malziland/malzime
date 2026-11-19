@@ -16,6 +16,9 @@
 jest.mock("../betriebsprofil", () => require("../test-satz").betriebsprofilMock());
 
 const { SATZ } = require("../test-satz");
+const { MISTRAL_MODEL, modellEinstellungen } = require("../config");
+/* Ohne Messung: Satzwert mal dauerFaktor des Modells (seit 19.11.2026). */
+const ERSATZ = Math.round(SATZ.durchschnittsdauerSekunden * modellEinstellungen(MISTRAL_MODEL).dauerFaktor);
 
 const mockDoc = { daten: undefined };
 
@@ -107,7 +110,7 @@ describe("Ausgangswert aus dem Einstellungssatz", () => {
     werteSetzen([200, 210, 220, 230, 240]);
     const ergebnis = await dauerJeAnalyse(false);
 
-    expect(ergebnis.sekunden).toBe(SATZ.durchschnittsdauerSekunden);
+    expect(ergebnis.sekunden).toBe(ERSATZ);
     expect(ergebnis.gemessen).toBe(false);
   });
 
@@ -115,8 +118,24 @@ describe("Ausgangswert aus dem Einstellungssatz", () => {
     werteSetzen([200, 210]);
     const ergebnis = await dauerJeAnalyse(true);
 
-    expect(ergebnis.sekunden).toBe(SATZ.durchschnittsdauerSekunden);
+    expect(ergebnis.sekunden).toBe(ERSATZ);
     expect(ergebnis.gemessen).toBe(false);
+  });
+
+  /* Der Satzwert ist an Large 4 gemessen (80 s); Large 3 braucht rund die
+     Haelfte. Das Modell kommt aus dem Einstellungssatz (Feld modell). */
+  test.each([
+    ["mistral-large-2512", 0.5],
+    ["mistral-large-4", 1],
+  ])("ohne Messung rechnet %s mit Faktor %d", async (modell, faktor) => {
+    const satz = require("../betriebsprofil");
+    satz._setzeModell(modell);
+    try {
+      const ergebnis = await dauerJeAnalyse(false);
+      expect(ergebnis.sekunden).toBe(Math.round(SATZ.durchschnittsdauerSekunden * faktor));
+    } finally {
+      satz._setzeModell(null);
+    }
   });
 
   test("mit genug Messwerten gilt die Messung", async () => {

@@ -117,6 +117,13 @@ const MAX_ZEICHEN_PRO_SEKUNDE = 90;
    Das Modell denkt rund eine Minute und liefert den Text erst in den letzten
    Sekunden der Analyse. (let wegen _setzeTippAnlaufMsFuerTest.) */
 let TIPP_ANLAUF_MS = 2000;
+/* Seit 19.11.2026 schickt der Server den Anlauf des gewaehlten Modells mit
+   (Large 3: 25 s, Large 4: 2 s). Fehlt er oder ist er unplausibel, gilt der
+   Wert oben. Hoechstens 60 s: Laenger darf die Scan-Animation nie allein
+   tragen, auch nicht bei einem Tippfehler am Server. */
+function anlaufAus(vomServer) {
+  return Number.isFinite(vomServer) && vomServer >= 0 && vomServer <= 60000 ? vomServer : TIPP_ANLAUF_MS;
+}
 /* Schnellvorlauf, sobald der Server „fertig" meldet: Der Rest-Puffer wird
    in rund fünf Sekunden ausgetippt, egal wie lang er ist — erst danach beginnt
    die Enthüllung. So gibt es immer ein paar Sekunden Tippen, ohne dass das
@@ -941,7 +948,7 @@ export function welle(texte) {
      11.08.: Sofort-Start bedeutete minutenlanges Kriech-Tempo). */
   if (!lauf.tippt && (lauf.puffer.standard.text.length > 0 || lauf.puffer.beast.text.length > 0)) {
     lauf.tippt = true;
-    lauf.tippStartAb = Date.now() + TIPP_ANLAUF_MS;
+    lauf.tippStartAb = Date.now() + anlaufAus(texte.tippAnlaufMs);
     tippSchleife(lauf);
   }
 }

@@ -193,3 +193,25 @@ describe("Zustandsdokument nicht schreibbar", () => {
     expect(mockSchreibvorgaenge).toBeGreaterThan(0);
   });
 });
+
+/* Abnahme 19.11.2026, P2-3: Die Wache misst gegen die Zeitgrenze, die WIRKLICH
+   gilt — der kleinere Wert aus Satz und Modell. Der Testsatz traegt 300 s,
+   Large 4 kuerzt auf 200 s: Analysen mit 180 s sind dann „nah an der Grenze“
+   (ab 160 s), gegen 300 s waeren sie es nicht (ab 240 s). */
+test("Large 4 gewaehlt: die Wache misst gegen 200 s, nicht gegen den Satzwert", async () => {
+  const satz = require("../betriebsprofil");
+  satz._setzeModell("mistral-large-4");
+  jest.spyOn(console, "log").mockImplementation(() => {});
+  jest.spyOn(console, "error").mockImplementation(() => {});
+  mockZustand.fehler = null;
+  mockZustand.daten = {};
+  mockHistorie.tage = [tag("2026-08-26", 180), tag("2026-08-27", 180), tag("2026-08-28", 180)];
+  try {
+    const ergebnis = await pruefeLaufzeit({ melder: async () => {}, jetzt: JETZT });
+    expect(ergebnis.zahlen.grenzeSekunden).toBe(160);
+    expect(SATZ.singleLargeTimeoutMs).toBe(300000);
+  } finally {
+    satz._setzeModell(null);
+    jest.restoreAllMocks();
+  }
+});

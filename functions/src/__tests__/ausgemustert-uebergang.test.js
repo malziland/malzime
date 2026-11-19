@@ -89,3 +89,22 @@ describe("Abgleich vor dem Deploy", () => {
     expect(abweichungen(daten, VORHER, { ...PROBE, felder: ["parallelitaet"] }).length).toBe(1);
   });
 });
+
+/* Das Feld modell (seit 19.11.2026) ist ein Betriebsschalter
+   (scripts/modell-umschalten.js): Ein erlaubtes Modell darf vom Repo
+   abweichen, sonst sperrte jedes Umschalten die naechste Auslieferung. */
+describe("Abgleich: Feld modell", () => {
+  const { ERLAUBTE_MODELLE } = require("../config");
+
+  test("fehlt es, ist das keine Abweichung (heutiger Stand der Datenbank)", () => {
+    expect(abweichungen(wieImRepo())).toEqual([]);
+  });
+
+  test.each(ERLAUBTE_MODELLE)("%s ist keine Abweichung", (modell) => {
+    expect(abweichungen({ ...wieImRepo(), modell })).toEqual([]);
+  });
+
+  test.each([["mistral-small-latest"], [""], [null]])("%p ist eine Abweichung", (modell) => {
+    expect(abweichungen({ ...wieImRepo(), modell })).toEqual([expect.stringMatching(/^modell: .*nicht erlaubt/)]);
+  });
+});

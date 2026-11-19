@@ -77,8 +77,29 @@ describe("handleStats", () => {
          mindestens durchhalten muss. */
       /* Seit 30.08.2026 kommen die Betriebswerte ausschliesslich aus Firestore;
          der gestellte Satz oben liefert "firestore" und den Namen. */
-      betrieb: { profil: "test", quelle: "firestore", analyseZeitgrenzeMs: 300000 },
+      betrieb: { profil: "test", quelle: "firestore", modell: "mistral-large-2512", analyseZeitgrenzeMs: 300000 },
     });
+  });
+
+  /* Bis 19.11.2026 stand hier der Satzwert, obwohl das Modell frueher abbricht
+     (Large 4 nach 200 s). Gemeldet wird jetzt die wirksame, kleinere Grenze. */
+  test("meldet die wirksame Zeitgrenze und das Modell aus dem Einstellungssatz", async () => {
+    const satz = require("../betriebsprofil");
+    satz._setzeModell("mistral-large-4");
+    try {
+      getStats.mockResolvedValue({ current: { count: 0 } });
+      getMaintenanceStatus.mockResolvedValue(false);
+      const res = mockRes();
+      await handleStats(mockReq(), res);
+      expect(res.json.mock.calls[0][0].betrieb).toEqual({
+        profil: "test",
+        quelle: "firestore",
+        modell: "mistral-large-4",
+        analyseZeitgrenzeMs: 200000,
+      });
+    } finally {
+      satz._setzeModell(null);
+    }
   });
 
   test("includes maintenance: true when maintenance is active", async () => {

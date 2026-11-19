@@ -4,6 +4,27 @@ Alle relevanten Aenderungen an malziME werden hier dokumentiert.
 
 Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+- **Das KI-Modell lässt sich im Betrieb umschalten, ohne neue Fassung.** Ein Feld im
+  Einstellungssatz wählt zwischen Mistral Large 3 und Large 4; nach rund einer halben
+  Minute rechnet das andere Modell, mit seinen eigenen Zeitgrenzen. Andere Modelle
+  lassen sich dort nicht eintragen. Welches Modell rechnet, zeigt die Statistik-
+  Schnittstelle (`/api/stats`, Feld `betrieb.modell`).
+- **Die Wartezeit-Ansage rechnet ohne Messwerte mit der Dauer des eingestellten
+  Modells** (bei Large 3 rund 40 statt 80 Sekunden), und die Statistik-Schnittstelle
+  meldet die Zeitgrenze, die wirklich gilt (bei Large 3 300 statt 410 Sekunden).
+- **Die Laufzeit-Wache misst gegen die Zeitgrenze, die wirklich gilt** (Large 3 300 s,
+  Large 4 200 s) statt gegen 410 Sekunden aus dem Einstellungssatz. Vorher konnte sie
+  „Analysen nah an der Zeitgrenze“ nie melden. Die Nachricht beim Ändern des
+  Einstellungssatzes nennt jetzt auch das Modell.
+- **Die Live-Anzeige beginnt zu tippen, wie es zum Modell passt.** Mit Large 3 wartet
+  sie wieder 25 Sekunden, bevor sie tippt (wie bis 01.11.2026), mit Large 4 zwei
+  Sekunden. Vorher galten die zwei Sekunden von Large 4 für jedes Modell, und bei
+  Large 3 kroch das Tippen dem Text hinterher.
+
 ## [5.5.0] — 2026-11-19
 
 ### Geändert

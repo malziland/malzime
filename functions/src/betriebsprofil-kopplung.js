@@ -44,7 +44,7 @@ const KARENZ_MINDESTENS_MS = 120 * 1000;
  * Gibt `null` zurueck, wenn die Werte zusammenpassen, sonst den Grund im
  * Klartext.
  */
-function pruefeKopplungen(werte) {
+function pruefeKopplungen(werte, modell = MISTRAL_MODEL) {
   /* Die Sicherung aus config.js: Die erlaubte Ausgabelaenge muss in die
      erlaubte Zeit passen. Sonst toetet die Uhr Laeufe, die das Token-Budget
      ausdruecklich zulaesst (BUG-2026-08-17-01). */
@@ -56,9 +56,9 @@ function pruefeKopplungen(werte) {
       `singleLargeTimeoutMs erlaubt aber nur ${Math.round(werte.singleLargeTimeoutMs / 1000)} s`
     );
   }
-  const mindest = modellEinstellungen(MISTRAL_MODEL).mindestAusgabeToken;
+  const mindest = modellEinstellungen(modell).mindestAusgabeToken;
   if (mindest && werte.singleLargeMaxTokens < mindest) {
-    return `singleLargeMaxTokens (${werte.singleLargeMaxTokens}) ist fuer ${MISTRAL_MODEL} zu klein — das Modell braucht mindestens ${mindest} (config.js, MODELL_EINSTELLUNGEN)`;
+    return `singleLargeMaxTokens (${werte.singleLargeMaxTokens}) ist fuer ${modell} zu klein — das Modell braucht mindestens ${mindest} (config.js, MODELL_EINSTELLUNGEN)`;
   }
   /* Jede Einzelgrenze unter dem Gesamtbudget. */
   for (const name of ["mistralTimeoutMs", "singleLargeTimeoutMs"]) {

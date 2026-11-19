@@ -37,6 +37,7 @@ Firestore-Datenbank `malzime-eu`, Dokument **`config/betriebsprofil`**:
 ```json
 {
   "aktiv": "t1-normal",
+  "modell": "mistral-large-2512",
   "profile": {
     "t1-normal": { … alle Werte … },
     "t1-langsam": { … }
@@ -46,6 +47,17 @@ Firestore-Datenbank `malzime-eu`, Dokument **`config/betriebsprofil`**:
 
 **Umstellen heißt: das Feld `aktiv` ändern.** Alle Werte des Satzes ziehen
 mit.
+
+**Das Feld `modell` wählt das Mistral-Modell** (seit 19.11.2026). Erlaubt sind
+nur die Modelle mit eigenen Einstellungen in `functions/src/config.js`
+(`MODELL_EINSTELLUNGEN`, heute Large 3 und Large 4); jeder andere Wert legt den
+Satz still. Fehlt das Feld, gilt die Vorgabe `MISTRAL_MODEL` aus `config.js`.
+Der aktive Satz muss zum gewählten Modell passen (genug Text), sonst wird er
+abgelehnt. Zeitgrenze des Aufrufs, Werbe-Aufruf, Ersatz-Wartezeit und Tipp-Anlauf wechseln
+mit dem Modell. Umgeschaltet wird mit `scripts/modell-umschalten.js`, das vor
+dem Schreiben beides prüft (`docs/RUNBOOK.md`, Abschnitt 3c). Der Abgleich vor
+der Auslieferung duldet jedes erlaubte Modell: Es ist ein Schalter für den
+Betrieb, kein Wert aus dem Repo.
 
 Ein Satz muss **vollständig** sein. Fehlt ein Feld, wird der ganze Satz
 abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
@@ -70,7 +82,7 @@ abgelehnt — es gibt nichts, womit sich das fehlende Feld ersetzen ließe.
 | `parallelitaet` | 15 | Wie viele Analysen gleichzeitig laufen |
 | `queueRatePerSekunde` | 0.2 | Wie schnell die Warteschlange Aufträge losschickt |
 | `warteschlangeTiefe` | 100 | Ab wie vielen Wartenden abgelehnt wird, wenn keine gemessene Dauer vorliegt |
-| `durchschnittsdauerSekunden` | 80 | Ausgangswert der Wartezeit-Ansage |
+| `durchschnittsdauerSekunden` | 80 | Ausgangswert der Wartezeit-Ansage, gemessen an Large 4; je Modell mal `dauerFaktor` (`config.js`: Large 3 0,5, Large 4 1), nur solange keine gemessene Dauer vorliegt |
 | `stundenlimit` | 500 | Analysen pro Zeitfenster |
 | `stundenfensterMinuten` | 60 | Größe dieses Fensters |
 | `adressLimit` | 500 | Anfragen je Internetanschluss |
@@ -192,7 +204,7 @@ Stelle:
 |---|---|
 | EU-Endpunkt `api.eu.mistral.ai` | Datenschutzzusage |
 | EU-Datenbank `malzime-eu` | Datenschutzzusage |
-| Die benannten KI-Modelle | Zusage, welches Modell rechnet |
+| Welche KI-Modelle überhaupt wählbar sind, mit ihren Grenzen (`MODELL_EINSTELLUNGEN`) | Zusage, welches Modell rechnen kann; gewählt wird im Satz (Feld `modell`), nur aus dieser Liste |
 | Upload-Obergrenze 25 MB | Sicherheitsgrenze |
 | Erlaubte Dateiformate | Sicherheitsliste |
 | Gekürzte Feldlängen der Fehlerprotokolle | Datenschutz in Zahlenform |
@@ -203,8 +215,9 @@ Stelle:
 Zwei Mechanismen halten die Trennung aufrecht:
 
 1. **Der Satz kann diese Werte nicht übernehmen.** Gelesen werden
-   ausschließlich die bekannten Zahlenfelder; alles andere im Dokument wird
-   ignoriert.
+   ausschließlich die bekannten Zahlenfelder und die zwei Wahlfelder `aktiv`
+   und `modell`; `modell` nur aus der Liste im Code. Alles andere im Dokument
+   wird ignoriert.
 2. **`scripts/pruefe-doppelte-werte.py` geht vom Code aus** — nicht von dieser
    Liste — und verlangt für jede Zahlenkonstante eine von zwei Antworten: Sie
    steht im Satz (dann darf sie im Code nicht noch einmal stehen), oder sie

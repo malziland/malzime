@@ -88,7 +88,10 @@ ZEILEN_GRENZEN = {
     # BEFUND 31.08.2026 (Runde 3): Diese vier standen in KEINER Grenze und
     # waren damit von der Sperrklinke nicht erfasst. Die Grenzen sind der
     # gemessene Stand plus rund 5 Prozent Luft — wie bei allen anderen auch.
-    "functions/src/betriebsprofil.js": 440,
+    # ANGEHOBEN 19.11.2026 von 440 auf 455: Das Feld `modell` (Modellschalter,
+    # Vorgabe Christoph) wird dort gelesen, geprueft und protokolliert, wo der
+    # Satz gelesen wird — getrennt waere es ein zweiter Lesevorgang.
+    "functions/src/betriebsprofil.js": 455,
     "functions/src/handle-enqueue.js": 480,  # 01.09.2026: +15 fuer den
     # configMissing-Riegel VOR der Ratenbegrenzung. Die Simulation zeigte,
     # dass ohne Satz `checkRateLimit` wirft und der Einlass mit HTTP 500
@@ -120,7 +123,10 @@ ZEILEN_GRENZEN = {
     # Ablauf des Normalfalls zu verstecken.
     # ANGEHOBEN 01.11.2026 fuer den Wechsel auf Large 4: Auswahl des Werbe-Auftrags und zweiter
     # Versuch gehoeren in den Ablauf des Aufrufs.
-    "functions/src/mistral.js": 830,
+    # ANGEHOBEN 19.11.2026 auf 850 fuer den Modellschalter: Analyse, Neuversuch,
+    # Nachfrage und Werbe-Aufruf halten das Modell des ersten Aufrufs fest —
+    # das gehoert in den Ablauf des Aufrufs, nicht in eine Hilfsdatei.
+    "functions/src/mistral.js": 850,
     # Abgetrennt 13.10.2026: was am Auftrag je Analyse wechselt (Marken-Sperre,
     # Formvorlage). mistral.js waere mit der Vorlagenwahl auf 814 gewachsen.
     "functions/src/auftrag-wechsel.js": 95,
@@ -275,7 +281,13 @@ ABHAENGIGKEITS_GRENZEN = {
     # richtige Richtung (kein Durchreichen durch drei Schichten), erhoeht aber
     # die Zahl der Abhaengigen. Der Gewinn steht daneben: mistral.js ist von
     # 1681 auf 696 Zeilen gefallen.
-    "config": 14,
+    # ANGEHOBEN 19.11.2026 von 14 auf 15: durchsatz.js und handle-stats.js
+    # brauchen die Werte des gewaehlten Modells (Ersatz-Wartezeit, wirksame
+    # Zeitgrenze). Sie fragen danach, statt sie durchgereicht zu bekommen.
+    # ANGEHOBEN 19.11.2026 auf 16: handle-job-status.js schickt den Tipp-Anlauf
+    # des gewaehlten Modells an den Browser. Auf 17: laufzeit-wache.js misst gegen
+    # die wirksame Zeitgrenze des Modells (Abnahme 19.11.2026 P2-3).
+    "config": 17,
     # ANGEHOBEN 16.10.2026 von 10 auf 13: db.js ist mit Absicht die EINZIGE
     # Stelle, an der eine Datenbankverbindung entsteht (db-zentral.test.js).
     # Wer eine eigene Sammlung oder Marke schreibt (statistik.js,

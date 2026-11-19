@@ -95,7 +95,12 @@ describe("betriebswerteOderAbbruch", () => {
     }));
     const { betriebswerteOderAbbruch: fn } = require("../mistral-http");
 
-    await expect(fn()).resolves.toEqual({ werte: SATZ, profil: "t1-single-large" });
+    /* Ohne Feld modell im Dokument gilt das Modell aus config.js. */
+    await expect(fn()).resolves.toEqual({
+      werte: SATZ,
+      profil: "t1-single-large",
+      modell: require("../config").MISTRAL_MODEL,
+    });
   });
 
   test("ein fehlendes Profil wird zu null, nicht zu undefined", async () => {

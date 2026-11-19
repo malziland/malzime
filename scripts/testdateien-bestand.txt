@@ -52,6 +52,7 @@ functions/src/__tests__/betriebsprofil-chaos.test.js
 functions/src/__tests__/betriebsprofil-grenzfaelle.test.js
 functions/src/__tests__/betriebsprofil-kopplung.test.js
 functions/src/__tests__/betriebsprofil-letzter-stand.test.js
+functions/src/__tests__/betriebsprofil-modell.test.js
 functions/src/__tests__/betriebsprofil.test.js
 functions/src/__tests__/browserfehler-zaehlen.test.js
 functions/src/__tests__/build-info-script.test.js
@@ -145,6 +146,7 @@ functions/src/__tests__/mistral-http.test.js
 functions/src/__tests__/mistral-livekarten.test.js
 functions/src/__tests__/mistral-livetext.test.js
 functions/src/__tests__/mistral-mock.test.js
+functions/src/__tests__/mistral-modell-aus-satz.test.js
 functions/src/__tests__/mistral-nachfrage-einmischen.test.js
 functions/src/__tests__/mistral-rettung.test.js
 functions/src/__tests__/mistral-rumpf-zeitgrenze.test.js

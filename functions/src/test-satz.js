@@ -55,7 +55,10 @@ const SATZ = {
 /* Fertiger Mock für jest.mock("../betriebsprofil", ...).
    Als Funktion, damit die Jest-Hoisting-Regel eingehalten wird: Innerhalb der
    Mock-Factory darf nur `require` stehen, keine äußere Variable. */
-function betriebsprofilMock(ueberschreiben) {
+/* `modell` (optional): welches Modell der Satz waehlt (Feld `modell` im
+   Dokument, seit 19.11.2026). Ohne Angabe fehlt es — dann gilt config.js.
+   `_setzeModell` stellt es im laufenden Test um (null = fehlt). */
+function betriebsprofilMock(ueberschreiben, { modell } = {}) {
   const werte = {
     ...SATZ,
     /* KEINE echte Drosselung im Test.
@@ -72,8 +75,18 @@ function betriebsprofilMock(ueberschreiben) {
     ueberlastWarteMs: 1,
     ...(ueberschreiben || {}),
   };
+  let gewaehlt = modell || null;
   return {
-    geltendeWerte: async () => ({ werte, quelle: "firestore", profil: "test", grund: null }),
+    geltendeWerte: async () => ({
+      werte,
+      quelle: "firestore",
+      profil: "test",
+      grund: null,
+      ...(gewaehlt ? { modell: gewaehlt } : {}),
+    }),
+    _setzeModell: (m) => {
+      gewaehlt = m || null;
+    },
     letzterLeseversuchGescheitert: () => false,
     PFLICHTFELDER: Object.keys(SATZ),
     _cacheLeeren: () => {},

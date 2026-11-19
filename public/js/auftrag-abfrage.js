@@ -119,6 +119,8 @@ export async function pollJob(jobId, myId, resultToken, pollImmediately = false,
             /* Neuversuch nach Verbindungsabriss: steigt die Zahl, faengt die
                Anzeige von vorn an (live-anzeige.js). */
             versuch: data.liveTextVersuch,
+            /* Anlauf des Modells, das gerade rechnet (Server, config.js). */
+            tippAnlaufMs: data.tippAnlaufMs,
           });
         }
         break;

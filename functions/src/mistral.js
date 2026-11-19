@@ -15,7 +15,7 @@
  * API-Key kommt aus process.env.MISTRAL_API_KEY_EU (Firebase Secret, EU-gebunden; lokal MISTRAL_API_KEY).
  */
 
-const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
+const { MISTRAL_MODEL, modellEinstellungen, wirksameZeitgrenzeMs } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 /* AUFGETEILT 31.08.2026: Das Auseinandernehmen der Antworten steht jetzt in
@@ -182,6 +182,13 @@ const { BRAND_BLOCKLIST_SETS, buildBrandBlocklistBlock, waehleAuftrag } = requir
 /* Was am Auftrag je Analyse wechselt (Marken-Sperre, Formvorlage), steht seit
    13.10.2026 in auftrag-wechsel.js. */
 
+/* WELCHES MODELL RECHNET (seit 19.11.2026 im Einstellungssatz, Feld `modell`,
+   betriebsprofil.js). Der erste Aufruf einer Analyse liest es und legt es auf
+   die Messung der Analyse; Neuversuch, Nachfrage und Werbe-Aufruf nehmen es von
+   dort. So wechselt eine Analyse nie mitten drin das Modell, auch wenn jemand
+   gerade umschaltet. Ohne Messung (oder vor dem ersten Lesen) gilt config.js. */
+const modellDer = (messung) => (messung && messung.modell) || MISTRAL_MODEL;
+
 async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, opts = {}) {
   const prompts = loadPrompts(lang || "de");
   const dataUrl = `data:${mimeType || "image/jpeg"};base64,${imageBuffer.toString("base64")}`;
@@ -271,7 +278,10 @@ async function runSingleLargeCall(imageBuffer, mimeType, remainingBudget, lang, 
       return callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, liveNeu || undefined, dauer);
     }
   );
-  if (!zweiterVersuchLief && neuversuchNachLeererAntwort(parsed, modellEinstellungen(MISTRAL_MODEL), remainingBudget)) {
+  if (
+    !zweiterVersuchLief &&
+    neuversuchNachLeererAntwort(parsed, modellEinstellungen(modellDer(dauer)), remainingBudget)
+  ) {
     parsed = await callSingleLarge(messages, remainingBudget, "neuversuch", cacheKey, undefined, dauer);
   }
   let missing = parsed
@@ -537,8 +547,10 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null,
   });
 
   try {
+    /* Gleiches Modell wie die Analyse (modellDer); nur ohne Messung frisch gelesen. */
+    const modell = messung && messung.modell ? messung.modell : (await betriebswerteOderAbbruch()).modell;
     const result = await callMistralRaw({
-      model: MISTRAL_MODEL /* gleiches Modell wie die Analyse */,
+      model: modell,
       /* OPS-008: system = konstante Anweisungen, user = nur das Profil.
          Der Cache greift ausschliesslich auf einem konstanten Anfang. */
       messages: [
@@ -548,10 +560,10 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null,
         },
         { role: "user", content: nutzerteil },
       ],
-      maxTokens: modellEinstellungen(MISTRAL_MODEL).werbeMaxTokens,
+      maxTokens: modellEinstellungen(modell).werbeMaxTokens,
       temperature: 0.5,
       forceJSON: true,
-      timeoutMs: modellEinstellungen(MISTRAL_MODEL).werbeZeitgrenzeMs,
+      timeoutMs: modellEinstellungen(modell).werbeZeitgrenzeMs,
       /* Konstanter Cache-Schluessel je Sprache, ohne Nutzerbezug (fest seit
          10.09.2026; vorher per Flag abschaltbar, Audit OPS-008). */
       cacheKey: `malzime-beast-ads-${lang || "de"}`,
@@ -565,6 +577,7 @@ async function generateBeastAds(boostProfile, standardAds, lang, messung = null,
     console.log(
       JSON.stringify({
         step: "mistral-beast-ads",
+        model: modell,
         status: ads.length ? "ok" : "empty",
         count: ads.length,
         promptTokens: result.promptTokens,
@@ -668,10 +681,12 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
        Die beiden Werte gehoeren zusammen und werden deshalb GEMEINSAM
        gelesen — genau daran waere ein einzelner Firestore-Schalter
        gescheitert (BUG-2026-08-17-01). */
-    const { werte: betriebswerte, profil } = await betriebswerteOderAbbruch();
+    const { werte: betriebswerte, profil, modell: gelesen } = await betriebswerteOderAbbruch();
     aktivesProfil = profil;
+    if (dauer && !dauer.modell) dauer.modell = gelesen;
+    const modell = dauer ? dauer.modell : gelesen;
     const result = await callMistralRaw({
-      model: MISTRAL_MODEL /* multimodal */,
+      model: modell /* multimodal */,
       messages,
       maxTokens: betriebswerte.singleLargeMaxTokens,
       temperature: 0.5 /* Kompromiss zwischen Standard (0.3) und Beast (0.8) */,
@@ -679,10 +694,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       timeoutMs: budget,
       /* BUG-2026-08-17-01: eigenes Zeitbudget statt der allgemeinen 90 s —
          siehe Herleitung an der Konstante in config.js. */
-      timeoutCapMs: Math.min(
-        betriebswerte.singleLargeTimeoutMs,
-        modellEinstellungen(MISTRAL_MODEL).analyseZeitgrenzeMs || betriebswerte.singleLargeTimeoutMs
-      ),
+      timeoutCapMs: wirksameZeitgrenzeMs(betriebswerte.singleLargeTimeoutMs, modell),
       cacheKey,
       /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
          Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */
@@ -709,7 +721,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
            bei einem Vorfall die erste Frage. `null` heisst: kein Profil aktiv,
            es galten die Code-Werte. */
         profil: aktivesProfil || null,
-        model: MISTRAL_MODEL,
+        model: modell,
         attempt: attemptLabel,
         status: parsed ? "ok" : "parse-failed",
         finishReason: result.finishReason,
@@ -741,7 +753,8 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
          gar kein Ergebnis. Folgt einer, ist er der bessere Weg. */
       const folgtNeuversuch =
         attemptLabel === "first" &&
-        (err.verbindungsabbruch || neuversuchNachZeitgrenze(err, modellEinstellungen(MISTRAL_MODEL), remainingBudget));
+        (err.verbindungsabbruch ||
+          neuversuchNachZeitgrenze(err, modellEinstellungen(modellDer(dauer)), remainingBudget));
       const brauchbar =
         gerettet &&
         (hatProfilText(gerettet.standard) ||
@@ -769,7 +782,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
     if (dauer) textmengeZaehlen(dauer, { wiederholungen: err && err.wiederholungen });
     if (
       attemptLabel === "first" &&
-      neuversuchNachZeitgrenze(err, modellEinstellungen(MISTRAL_MODEL), remainingBudget)
+      neuversuchNachZeitgrenze(err, modellEinstellungen(modellDer(dauer)), remainingBudget)
     ) {
       err.verbindungsabbruch = true; /* derselbe Weg wie ein Abriss: ein stiller zweiter Versuch */
     }

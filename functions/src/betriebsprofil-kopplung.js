@@ -56,7 +56,6 @@ function pruefeKopplungen(werte) {
       `singleLargeTimeoutMs erlaubt aber nur ${Math.round(werte.singleLargeTimeoutMs / 1000)} s`
     );
   }
-  /* Genug Text fuer das Modell (config.js MODELL_EINSTELLUNGEN), sonst abgeschnittene Antworten. */
   const mindest = modellEinstellungen(MISTRAL_MODEL).mindestAusgabeToken;
   if (mindest && werte.singleLargeMaxTokens < mindest) {
     return `singleLargeMaxTokens (${werte.singleLargeMaxTokens}) ist fuer ${MISTRAL_MODEL} zu klein — das Modell braucht mindestens ${mindest} (config.js, MODELL_EINSTELLUNGEN)`;

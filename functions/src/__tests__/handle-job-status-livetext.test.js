@@ -138,7 +138,10 @@ describe("handleJobStatus — Live-Text bei processing", () => {
     await handleJobStatus(reqMit("Aa1Bb2Cc3Dd4Ee5Ff6Gg", "ticket-abc"), res);
     /* toEqual mit dem VOLLEN Objekt: kein zusaetzliches Feld, nichts fehlt —
        das ist die „ohne Flag aendert sich nichts"-Garantie des Endpoints. */
-    expect(res.body).toEqual({ status: "processing", position: 0, etaSeconds: SATZ.durchschnittsdauerSekunden });
+    /* Ohne Messung: Satzwert mal dauerFaktor des Modells (durchsatz.js). */
+    const { MISTRAL_MODEL, modellEinstellungen } = require("../config");
+    const eta = Math.round(SATZ.durchschnittsdauerSekunden * modellEinstellungen(MISTRAL_MODEL).dauerFaktor);
+    expect(res.body).toEqual({ status: "processing", position: 0, etaSeconds: eta });
   });
 });
 

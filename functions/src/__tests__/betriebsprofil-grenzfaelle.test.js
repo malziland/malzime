@@ -213,11 +213,12 @@ describe("PROTOKOLL — damit ein Ausfall auffindbar ist", () => {
     expect(ausgabe.mock.calls.length).toBe(1);
   });
 
-  test("DATENSCHUTZ: im Protokoll stehen nur Zahlen und der Satzname", async () => {
+  test("DATENSCHUTZ: im Protokoll stehen nur Zahlen, der Satzname und das Modell", async () => {
     setze({ aktiv: "t1", profile: { t1: T1 } });
     await geltendeWerte();
     const zeile = JSON.parse(ausgabe.mock.calls[0][0]);
-    const erlaubt = ["step", "quelle", "profil", "grund", "zeitgrenzeMs", "maxTokens"];
+    /* modell seit 19.11.2026: der Name des gewaehlten Mistral-Modells, kein Nutzerbezug. */
+    const erlaubt = ["step", "quelle", "profil", "modell", "grund", "zeitgrenzeMs", "maxTokens"];
     for (const schluessel of Object.keys(zeile)) {
       expect(erlaubt).toContain(schluessel);
     }

@@ -21,8 +21,15 @@
  * (Wortlaut je Feld: docs/BETRIEBSPROFILE.md). Der Satz kann sie nur
  * verkuerzen; wer sie anheben will, aendert zuerst die Seite.
  *
+ * DAS MODELL (seit 19.11.2026, Vorgabe Christoph): Das Feld `modell` im
+ * Dokument (neben `aktiv`) waehlt, welches Mistral-Modell rechnet — nur eines
+ * aus ERLAUBTE_MODELLE (config.js), sonst wird der Satz abgelehnt. Fehlt es,
+ * gilt MISTRAL_MODEL aus config.js. Der aktive Satz muss zum Modell passen
+ * (betriebsprofil-kopplung.js); Zeitgrenze und Textmenge je Modell stehen in
+ * config.js und wechseln mit. Umschalten: docs/RUNBOOK.md, Abschnitt 3c.
+ *
  * Was bewusst KEINE Einstellung ist (Upload-Grenze, Feldlaengen der
- * Fehlererfassung, Modell, EU-Endpunkt, Function-Zeitlimit, gemessenes
+ * Fehlererfassung, EU-Endpunkt, Function-Zeitlimit, gemessenes
  * Mistral-Tempo) und warum: docs/BETRIEBSPROFILE.md, Abschnitt "Was
  * ausdruecklich nicht einstellbar ist". Die Vorgeschichte (gestrichener
  * Einzelschalter-Vorschlag vom 18.08.2026, HOURLY_LIMIT, Warteschlange bei
@@ -30,6 +37,7 @@
  */
 
 const { datenbank } = require("./db");
+const { MISTRAL_MODEL, ERLAUBTE_MODELLE } = require("./config");
 /* Welche Werte zusammenpassen muessen, und die festen Groessen dazu. */
 const kopplung = require("./betriebsprofil-kopplung");
 
@@ -190,7 +198,7 @@ let letzterZustand = null;
  *
  * Gibt `null` zurueck, wenn alles stimmt, sonst den Grund im Klartext.
  */
-function pruefe(werte) {
+function pruefe(werte, modell = MISTRAL_MODEL) {
   /* Vollstaendigkeit zuerst: Ohne diese Werte kann keine Analyse laufen. */
   for (const name of PFLICHTFELDER) {
     if (werte[name] === undefined) return `${name} fehlt — ohne diesen Wert laeuft keine Analyse`;
@@ -208,7 +216,7 @@ function pruefe(werte) {
     }
   }
   /* Was zusammenpassen muss: betriebsprofil-kopplung.js. */
-  return kopplung.pruefeKopplungen(werte);
+  return kopplung.pruefeKopplungen(werte, modell);
 }
 
 /**
@@ -259,7 +267,7 @@ async function geltendeWerte() {
 }
 
 async function leseFrisch(jetzt) {
-  let ergebnis = { werte: null, quelle: "fehlt", grund: null, profil: null };
+  let ergebnis = { werte: null, quelle: "fehlt", grund: null, profil: null, modell: null };
   /* Der Zeitlimit-Timer wird nach dem Wettlauf AUFGERAEUMT.
      BEFUND (Pruefstand 30.08.2026): Ohne das lief nach jedem erfolgreichen
      Lesevorgang noch zwei Sekunden ein Timer weiter und feuerte anschliessend
@@ -308,17 +316,20 @@ async function leseFrisch(jetzt) {
       const daten = snap.data() || {};
       const aktiv = typeof daten.aktiv === "string" ? daten.aktiv : null;
       const profile = daten.profile && typeof daten.profile === "object" ? daten.profile : {};
-      if (!aktiv) {
+      const modell = daten.modell === undefined ? MISTRAL_MODEL : daten.modell;
+      if (!ERLAUBTE_MODELLE.includes(modell)) {
+        ergebnis.grund = `Modell ${JSON.stringify(modell)} ist nicht erlaubt (erlaubt: ${ERLAUBTE_MODELLE.join(", ")})`;
+      } else if (!aktiv) {
         ergebnis.grund = "kein aktives Profil benannt";
       } else if (!profile[aktiv]) {
         ergebnis.grund = `Profil "${aktiv}" ist nicht hinterlegt`;
       } else {
         const werte = felderLesen(profile[aktiv]);
-        const fehler = pruefe(werte);
+        const fehler = pruefe(werte, modell);
         if (fehler) {
           ergebnis.grund = `Profil "${aktiv}" abgelehnt: ${fehler}`;
         } else {
-          ergebnis = { werte, quelle: "firestore", grund: null, profil: aktiv };
+          ergebnis = { werte, quelle: "firestore", grund: null, profil: aktiv, modell };
         }
       }
     } else {
@@ -346,17 +357,19 @@ async function leseFrisch(jetzt) {
      abgelehnt) macht ihn ungueltig. */
   const nichtLesbar = !ergebnis.werte && String(ergebnis.grund).startsWith("nicht lesbar");
   leseversuchGescheitert = nichtLesbar;
-  if (ergebnis.werte) letzterGueltiger = { werte: ergebnis.werte, profil: ergebnis.profil, gelesen: jetzt };
+  if (ergebnis.werte)
+    letzterGueltiger = { werte: ergebnis.werte, profil: ergebnis.profil, modell: ergebnis.modell, gelesen: jetzt };
   else if (!nichtLesbar) letzterGueltiger = null;
   const weiterMitLetztem = nichtLesbar && letzterGueltiger !== null;
 
-  const wechsel = letzterZustand !== `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
-  if (wechsel) {
-    letzterZustand = `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.grund}`;
+  const zustand = `${ergebnis.quelle}|${ergebnis.profil}|${ergebnis.modell}|${ergebnis.grund}`;
+  if (letzterZustand !== zustand) {
+    letzterZustand = zustand;
     const zeile = {
       step: "betriebsprofil",
       quelle: ergebnis.quelle,
       profil: ergebnis.profil || null,
+      modell: ergebnis.modell || null,
       grund: ergebnis.grund || null,
     };
     if (ergebnis.werte) {
@@ -391,6 +404,7 @@ async function leseFrisch(jetzt) {
       quelle: "firestore",
       grund: null,
       profil: letzterGueltiger.profil,
+      modell: letzterGueltiger.modell,
       letzterStand: true,
     };
     return alsKopie(cache);

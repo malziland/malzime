@@ -81,9 +81,8 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    gleich. Preis: Large 4 traf das Alter Erwachsener in der Messung vom
    31.10.2026 besser. Large 3 wird am 30.04.2027 abgeschaltet — vorher muss
    ein Nachfolger gemessen und eingestellt sein. Die Einstellungen fuer Large 4
-   bleiben unten stehen; der Rueckweg ist die Zeile MISTRAL_MODEL, alles
-   Modellabhaengige wechselt mit; fuer Large 4 muss zusaetzlich der Testsatz
-   mit (docs/RUNBOOK.md, „Mistral-Modell wechseln“).
+   bleiben unten stehen; umgeschaltet wird im Betrieb ueber das Feld `modell`
+   im Einstellungssatz (docs/RUNBOOK.md, „Mistral-Modell wechseln“).
 
    Preis pro 1M Tokens (Stand 2026-05): $0.50 / $1.50 in/out.
 
@@ -103,15 +102,14 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    Mistral koennte das -latest-Alias jederzeit auf eine neuere Version
    umlenken, deren Konditionen wir nicht kennen. Mit dem Pin kontrollieren
    wir Versions-Wechsel selbst. (Zu Rate-Limits: Stufen-System, s. oben.) */
-/* BLEIBT IM CODE — Zusage an die Nutzer.
-   WELCHES Modell rechnet, steht in Doku und Echtheitsnachweis (Website und
-   Rechtstexte nennen „Mistral Large, in der EU“, das deckt Large 3 und
-   Large 4). Zur Laufzeit umschaltbar hiesse: Die Analyse liefe still ein
-   anderes Modell, ohne dass der ausgelieferte Code es zeigt. Ein Schalter in
-   Firestore ist gewuenscht (Christoph, 19.11.2026) und als eigene Aenderung
-   vorgesehen: Er darf nur zwischen ERLAUBTE_MODELLE waehlen und muss im
-   Protokoll jeder Analyse zeigen, welches Modell rechnete. Bis dahin ist der
-   Wechsel diese eine Zeile. */
+/* DIE VORGABE — gilt, solange das Feld `modell` im Einstellungssatz fehlt.
+   Seit 19.11.2026 (Vorgabe Christoph) waehlt dieses Feld das Modell im
+   Betrieb, ohne Auslieferung (betriebsprofil.js, scripts/modell-umschalten.js).
+   Gewaehlt werden kann NUR, was unten in MODELL_EINSTELLUNGEN steht
+   (ERLAUBTE_MODELLE) — ein neues Modell braucht also weiterhin Code, Messung
+   und Auslieferung. Die Rechtstexte nennen „Mistral Large, in der EU“, das
+   deckt beide. Welches Modell rechnete, steht im Protokoll jeder Analyse
+   (mistral-single-large-details, Feld model) und in /api/stats. */
 const MISTRAL_MODEL = "mistral-large-2512";
 /* BLEIBT IM CODE — was je Modell am Aufruf anders ist, an einer Stelle.
    Large 4 denkt vor jeder Antwort nach, und das Nachdenken zaehlt zu den
@@ -122,16 +120,17 @@ const MISTRAL_MODEL = "mistral-large-2512";
 
    MODELL UND WERTE SIND VERKNUEPFT (19.11.2026, Vorgabe Christoph: „Da
    vergessen wir wieder irgendetwas“). Was vom Modell abhaengt, steht HIER und
-   wechselt mit der Zeile MISTRAL_MODEL oben von selbst mit:
+   wechselt mit dem gewaehlten Modell von selbst mit:
      analyseZeitgrenzeMs  wie lange ein Analyse-Aufruf dieses Modells laufen
                           darf (der kleinere Wert aus diesem und
                           singleLargeTimeoutMs im Einstellungssatz gilt)
      mindestAusgabeToken  so viel Text muss der Einstellungssatz diesem Modell
                           mindestens erlauben (singleLargeMaxTokens)
+     dauerFaktor          Ersatz-Wartezeit ohne Messung (siehe unten)
    Der Einstellungssatz in Firestore haelt Werte, die fuer JEDES Modell hier
    passen; das prueft betriebsprofil-kopplung.test.js am produktiven Satz.
    Beim Lesen aus Firestore prueft betriebsprofil-kopplung.js den Satz gegen
-   das gerade eingestellte Modell und lehnt ihn ab, wenn er nicht passt — dann
+   das gewaehlte Modell und lehnt ihn ab, wenn er nicht passt — dann
    meldet sich die satzWache, statt dass Antworten still abgeschnitten werden.
    Gleichzeitige Analysen und Warteschlangen-Rate bleiben modellunabhaengig:
    Die Bremse ist Mistrals Grenze je Minute (produktiv-satz.js). */
@@ -144,6 +143,12 @@ const MODELL_EINSTELLUNGEN = {
     werbeZeitgrenzeMs: 30_000,
     analyseZeitgrenzeMs: 300_000,
     mindestAusgabeToken: 5000,
+    /* Ersatz-Wartezeit = durchschnittsdauerSekunden des Satzes × dauerFaktor,
+       nur solange keine gemessene Dauer vorliegt (durchsatz.js). Der Satz
+       traegt 80 s, gemessen an Large 4 (31.10.2026); Large 3 brauchte am
+       19.11.2026 37–39 s, also die Haelfte. Der Faktor sitzt hier und nicht
+       im Satz, damit derselbe Satz fuer beide Modelle gilt. */
+    dauerFaktor: 0.5,
   },
   /* Lasttest 31.10.2026, 30 zugleich: Fertige Analysen brauchten bis 170 s, zwei
      hingen bis zur Zeitgrenze von 280 s, dieselben Fotos liefen sonst durch.
@@ -158,6 +163,8 @@ const MODELL_EINSTELLUNGEN = {
     /* Das Nachdenken zaehlt zu den Antwort-Token: 31.10.2026 rund 10.500 je
        Analyse, Spitze 15.500; 19.11.2026 bis 12.100. */
     mindestAusgabeToken: 16000,
+    /* Der Satzwert 80 s ist an Large 4 gemessen (31.10.2026). */
+    dauerFaktor: 1,
   },
 };
 /* Die erlaubten Modelle — genau die mit eigenen Einstellungen oben. */

@@ -2145,8 +2145,8 @@ besser. Mit Large 3 kommt die frühere Genauigkeit zurück.
 **Betrachtete Alternativen.** (1) Bei Large 4 bleiben und die Zeitgrenze
 anheben: verworfen — der Neuversuch hatte schon 200 s, die Kinder warteten
 dann noch länger. (2) Das Modell sofort per Firestore umschaltbar machen:
-gewünscht, als eigene Änderung vorgesehen (nur zwischen den erlaubten Modellen,
-mit dem Modell im Protokoll jeder Analyse); für die Rückkehr heute zu langsam.
+gewünscht und im Anschluss gebaut (Abschnitt unten); für die Rückkehr am
+19.11.2026 selbst zu langsam.
 (3) Die Betriebswerte im Satz je Modell umschalten (gleichzeitige Analysen,
 Textmenge): verworfen — die Bremse gegen Mistrals Grenze ist die Rate der
 Warteschlange, die für beide Modelle gilt, und ein Satz für beide erspart den
@@ -2156,3 +2156,32 @@ Schritt in Firestore, der sich mit der Auslieferung nicht gleichzeitig machen l�
 muss ein Nachfolger gemessen und eingestellt sein. Außerdem: Large 4 wieder
 messbar schnell (Median unter 120 s über einen Workshop-Tag), oder die
 Alters-Messung zeigt mit Large 3 Fehlschätzungen, die Large 4 vermeiden würde.
+
+## Das Modell ist im Betrieb umschaltbar (19.11.2026)
+
+**Entscheidung.** Das Feld `modell` im Einstellungssatz (`config/betriebsprofil`)
+wählt, welches Mistral-Modell rechnet — ohne Auslieferung, wirksam nach rund
+30 Sekunden (`scripts/modell-umschalten.js`, Anleitung `docs/RUNBOOK.md` 3c).
+Vorgabe Christoph: Der Rückweg auf Large 3 hatte eine ganze Auslieferung
+gebraucht, obwohl nur ein Name wechselte.
+
+**Warum das die frühere Regel „Modell bleibt im Code“ nicht bricht.** Die Regel
+schützte die Zusage, welches Modell rechnet: Ein Schreibzugriff sollte die
+Analyse nicht still auf ein fremdes Modell lenken können. Das bleibt so —
+wählbar ist nur, was im Code in `MODELL_EINSTELLUNGEN` steht (heute Large 3 und
+Large 4, beide am EU-Endpunkt, beide von „Mistral Large, in der EU“ gedeckt).
+Jeder andere Wert legt den Satz still, statt ihn zu übernehmen. Ein neues
+Modell braucht weiterhin Code, Messung und Auslieferung. Sichtbar ist die Wahl
+im Protokoll jeder Analyse (Feld `model`), in der Zeile des Einstellungssatzes
+(Feld `modell`) und von außen in `/api/stats` (`betrieb.modell`).
+
+**Was mitwechselt.** Zeitgrenze des Analyse-Aufrufs, Mindest-Textmenge,
+Grenzen des Werbe-Aufrufs, Nachdenk-Zusatz und der Faktor der Ersatz-Wartezeit
+hängen am Modell (`config.js`). Eine laufende Analyse behält das Modell ihres
+ersten Aufrufs, auch für Nachfrage und Werbe-Aufruf. Passt der aktive Satz
+nicht zum gewählten Modell, wird er abgelehnt; das Umschalt-Skript prüft das
+vor dem Schreiben mit derselben Funktion.
+
+**Restrisiko.** Wer Schreibrechte auf Firestore hat, kann zwischen den zwei
+erlaubten Modellen wechseln, ohne dass der Quelltext es zeigt. Die Rechtstexte
+bleiben dabei wahr; sichtbar ist die Wahl in `/api/stats`.

@@ -37,7 +37,7 @@ if (process.env.FIRESTORE_EMULATOR_HOST) {
 
 const { initializeApp, applicationDefault } = req("firebase-admin/app");
 const { getFirestore } = req("firebase-admin/firestore");
-const { FIRESTORE_DATABASE_ID } = require(pfad.join(wurzel, "functions", "src", "config.js"));
+const { FIRESTORE_DATABASE_ID, ERLAUBTE_MODELLE } = require(pfad.join(wurzel, "functions", "src", "config.js"));
 const { PFLICHTFELDER, _pruefe, _FELDER } = require(pfad.join(wurzel, "functions", "src", "betriebsprofil.js"));
 
 /* Die Betriebswerte liegen als reines Datenmodul in functions/src/produktiv-satz.js.
@@ -63,15 +63,20 @@ if (!PROJEKT || PROJEKT.startsWith("--")) {
    entscheidet. Ein Satz, den das System ablehnen wuerde, darf gar nicht erst
    in die Datenbank. */
 let fehlerhaft = 0;
+/* Gegen JEDES erlaubte Modell (seit 19.11.2026): Das Modell wird im Betrieb
+   umgeschaltet (scripts/modell-umschalten.js), ohne dass dieser Satz neu
+   geschrieben wird — er muss also zu jedem passen. */
 for (const [name, werte] of Object.entries(PROFILE)) {
-  const grund = _pruefe(werte);
   const felder = Object.keys(werte).length;
-  if (grund) {
-    console.error(`  ABGELEHNT  ${name}: ${grund}`);
-    fehlerhaft += 1;
-  } else {
-    console.log(`  geprueft   ${name}  (${felder} Felder, vollstaendig)`);
+  for (const modell of ERLAUBTE_MODELLE) {
+    const grund = _pruefe(werte, modell);
+    if (grund) {
+      console.error(`  ABGELEHNT  ${name} mit ${modell}: ${grund}`);
+      fehlerhaft += 1;
+    }
   }
+  if (fehlerhaft === 0)
+    console.log(`  geprueft   ${name}  (${felder} Felder, vollstaendig, ${ERLAUBTE_MODELLE.join(" + ")})`);
 }
 if (fehlerhaft > 0) {
   console.error(`\nABBRUCH: ${fehlerhaft} Satz/Saetze wuerden im Betrieb abgelehnt.`);
@@ -117,17 +122,23 @@ const ref = db.doc("config/betriebsprofil");
     process.exit(1);
   }
 
-  await ref.set({ aktiv: AKTIV, profile: PROFILE });
+  /* Das Feld modell bleibt, wie es ist: Es ist ein Betriebsschalter
+     (scripts/modell-umschalten.js), kein Teil des Satzes aus dem Repo. Ohne
+     das wuerde ein Nachziehen des Satzes ein umgeschaltetes Modell still auf
+     die Code-Vorgabe zuruecksetzen. */
+  const modellVorher = vorher.exists ? vorher.data().modell : undefined;
+  await ref.set({ aktiv: AKTIV, profile: PROFILE, ...(modellVorher === undefined ? {} : { modell: modellVorher }) });
 
   /* NACHMESSEN, nicht behaupten: zurueckgelesen und erneut geprueft. */
   const zurueck = await ref.get();
   const daten = zurueck.data();
   const aktiv = daten.profile[daten.aktiv];
-  const grund = _pruefe(aktiv);
+  const grund = _pruefe(aktiv, daten.modell === undefined ? undefined : daten.modell);
 
   console.log(`\nGESCHRIEBEN und nachgemessen:`);
   console.log(`  Dokument existiert:  ${zurueck.exists}`);
   console.log(`  aktiv:               ${daten.aktiv}`);
+  console.log(`  modell:              ${daten.modell === undefined ? "(fehlt, Code-Vorgabe)" : daten.modell}`);
   console.log(`  Felder im Satz:      ${Object.keys(aktiv).length} von ${PFLICHTFELDER.length}`);
   console.log(`  Pruefung:            ${grund || "bestanden"}`);
   if (grund || Object.keys(aktiv).length !== PFLICHTFELDER.length) {

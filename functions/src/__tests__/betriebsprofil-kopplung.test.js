@@ -67,7 +67,7 @@ describe("Regel 2: Budget plus Werbe-Aufruf plus Reserve passen in die Zeitgrenz
   test("die Dauer des Werbe-Aufrufs deckt jedes Modell in config.js ab", () => {
     const quelle = fs.readFileSync(path.join(__dirname, "..", "mistral.js"), "utf8");
     const aufruf = quelle.slice(quelle.indexOf("async function generateBeastAds("));
-    expect(aufruf).toMatch(/timeoutMs:\s*modellEinstellungen\(MISTRAL_MODEL\)\.werbeZeitgrenzeMs/);
+    expect(aufruf).toMatch(/timeoutMs:\s*modellEinstellungen\(modell\)\.werbeZeitgrenzeMs/);
     const { modellEinstellungen } = require("../config");
     const laengste = Math.max(
       modellEinstellungen("mistral-large-2512").werbeZeitgrenzeMs,
@@ -170,7 +170,7 @@ describe("Modell und Einstellungssatz passen zusammen", () => {
   test("der Analyse-Aufruf nimmt die kleinere Zeitgrenze aus Satz und Modell", () => {
     const quelle = fs.readFileSync(path.join(__dirname, "..", "mistral.js"), "utf8");
     expect(quelle).toMatch(
-      /timeoutCapMs:\s*Math\.min\(\s*betriebswerte\.singleLargeTimeoutMs,\s*modellEinstellungen\(MISTRAL_MODEL\)\.analyseZeitgrenzeMs/
+      /timeoutCapMs:\s*Math\.min\(\s*betriebswerte\.singleLargeTimeoutMs,\s*modellEinstellungen\(modell\)\.analyseZeitgrenzeMs/
     );
   });
 });

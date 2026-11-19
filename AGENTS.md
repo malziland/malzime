@@ -75,7 +75,9 @@ functions/src/       Firebase Cloud Functions 2nd Gen (Node 24, europe-west1) �
   betriebsprofil.js  Die einstellbaren Werte (Liste: docs/BETRIEBSPROFILE.md), ihre Grenzen
                      und das Lesen aus Firestore; ist der Satz nur gerade nicht lesbar, gilt
                      der zuletzt gueltig gelesene weiter. Vier Obergrenzen SIND Datenschutzzusagen.
-  betriebsprofil-kopplung.js  Welche Werte eines Satzes zusammenpassen muessen (reine Rechnung, von betriebsprofil.js aufgerufen)
+                     Feld `modell` waehlt das Mistral-Modell (nur ERLAUBTE_MODELLE; Umschalten:
+                     scripts/modell-umschalten.js)
+  betriebsprofil-kopplung.js  Welche Werte eines Satzes zusammenpassen muessen, auch zum gewaehlten Modell (reine Rechnung, von betriebsprofil.js aufgerufen)
   produktiv-satz.js  Die Werte fuer den echten Betrieb — Quelle fuer config/betriebsprofil und fuer die Spalte „heute“ der Doku
   test-satz.js       Der Einstellungssatz fuer die Tests, an einer Stelle
   counter.js         Firestore-Zaehler: Stundenlimit, Totals, Stats, Boost, Reset,
@@ -222,7 +224,7 @@ Einzelbefehle:
 ## Mistral-Architektur (seit v1.6.0)
 
 Die komplette KI-Pipeline laeuft ueber Mistral AI, in genau einem Weg:
-`runSingleLargeCall` in `mistral.js` schickt das Bild EINMAL an Mistral Large 3 (`mistral-large-2512`; seit 19.11.2026 wieder, Large 4 steht als Rückweg im Code, Wechsel: docs/RUNBOOK.md „Mistral-Modell wechseln“)
+`runSingleLargeCall` in `mistral.js` schickt das Bild EINMAL an Mistral Large 3 (`mistral-large-2512`; seit 19.11.2026 wieder; im Betrieb umschaltbar auf Large 4 über das Feld `modell` im Einstellungssatz, nur zwischen `ERLAUBTE_MODELLE` in `config.js`, Wechsel: docs/RUNBOOK.md „Mistral-Modell wechseln“)
 und erhaelt Beschreibung + beide Profile (Normal + Beast) in einer Antwort. Laeuft im
 Queue-Worker `handle-process-job.js`; SUBJECT-Klassifikation + Privacy-Risks werden
 aus den `subject`/`visible_text`-Feldern der Antwort abgeleitet. Der Auftrag endet

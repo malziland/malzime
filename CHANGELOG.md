@@ -8,6 +8,15 @@ Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.1.0/).
 
 ### Geändert
 
+- **Das KI-Modell lässt sich im Betrieb umschalten, ohne neue Fassung.** Ein Feld im
+  Einstellungssatz wählt zwischen Mistral Large 3 und Large 4; nach rund einer halben
+  Minute rechnet das andere Modell, mit seinen eigenen Zeitgrenzen. Andere Modelle
+  lassen sich dort nicht eintragen. Welches Modell rechnet, zeigt die Statistik-
+  Schnittstelle (`/api/stats`, Feld `betrieb.modell`).
+- **Die Wartezeit-Ansage rechnet ohne Messwerte mit der Dauer des eingestellten
+  Modells** (bei Large 3 rund 40 statt 80 Sekunden), und die Statistik-Schnittstelle
+  meldet die Zeitgrenze, die wirklich gilt (bei Large 3 300 statt 410 Sekunden).
+
 - **Die Analyse ist wieder rund viermal so schnell: Es rechnet wieder Mistral Large 3
   statt Large 4.** Seit dem 17.11. brauchte Large 4 bei Mistral deutlich länger; am
   18.11. scheiterte fast jede fünfte Analyse an der Zeitgrenze. Im Vergleich am

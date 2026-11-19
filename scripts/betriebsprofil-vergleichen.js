@@ -32,6 +32,7 @@ const wurzel = pfad.resolve(__dirname, "..");
 const { createRequire } = require("module");
 const req = createRequire(pfad.join(wurzel, "functions", "package.json"));
 const { PROFILE, AKTIV, AUSGEMUSTERT } = require(pfad.join(wurzel, "functions", "src", "produktiv-satz.js"));
+const { MISTRAL_MODEL, ERLAUBTE_MODELLE } = require(pfad.join(wurzel, "functions", "src", "config.js"));
 
 /* Dokumentdaten holen: aus der Datei (Probe) oder aus der echten Datenbank. */
 async function dokumentLesen() {
@@ -74,6 +75,13 @@ function abweichungen(daten, heute = new Date(), aus = AUSGEMUSTERT) {
   if (!daten || typeof daten !== "object") return ["Dokument leer oder kein Objekt"];
   const ok = geduldet(heute, aus);
   if (daten.aktiv !== AKTIV) liste.push(`aktiv: DB=${daten.aktiv} Repo=${AKTIV}`);
+  /* Das Feld modell ist ein BETRIEBSSCHALTER (seit 19.11.2026,
+     scripts/modell-umschalten.js): Es darf vom Repo abweichen, sonst haette
+     jedes Umschalten die naechste Auslieferung gesperrt. Abweichung ist nur
+     ein Wert, den der Betrieb ablehnen wuerde. Fehlt es, gilt config.js. */
+  if (daten.modell !== undefined && !ERLAUBTE_MODELLE.includes(daten.modell)) {
+    liste.push(`modell: DB=${JSON.stringify(daten.modell)} ist nicht erlaubt (${ERLAUBTE_MODELLE.join(", ")})`);
+  }
   const dbProfile = daten.profile && typeof daten.profile === "object" ? daten.profile : {};
   for (const [name, repo] of Object.entries(PROFILE)) {
     const db = dbProfile[name];
@@ -124,6 +132,11 @@ if (require.main === module) {
         console.log(
           `Einstellungssatz: Datenbank und Repo stimmen ueberein ` +
             `(${felder} Felder in ${Object.keys(PROFILE).length} Profilen, aktiv "${AKTIV}")`
+        );
+        console.log(
+          daten.modell === undefined
+            ? `Modell: ${MISTRAL_MODEL} (Feld modell fehlt, Vorgabe aus config.js)`
+            : `Modell: ${daten.modell} (Feld modell in der Datenbank)`
         );
         const reste = geduldeteReste(daten);
         if (reste.length > 0) {

@@ -39,6 +39,7 @@
 
 const { datenbank } = require("./db");
 const { geltendeWerte } = require("./betriebsprofil");
+const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
 
 const DOKUMENT = "stats/durchsatz";
 /* FEATURE-2026-08-29-03: Tageshistorie fuer die Laufzeit-Wache. Getrennt vom
@@ -204,8 +205,11 @@ async function dauerJeAnalyse(flagAn) {
   /* Die Ausgangsdauer kommt aus dem Einstellungssatz, nicht aus dem Code —
      sonst gaebe es dieselbe Zahl zweimal, und die Wartezeit-Ansage haette sich
      an der falschen orientiert. */
-  const { werte } = await geltendeWerte();
-  const ausSatz = werte ? werte.durchschnittsdauerSekunden : null;
+  const { werte, modell } = await geltendeWerte();
+  /* Der Satzwert gilt fuer Large 4; je Modell ein Faktor (config.js,
+     dauerFaktor), seit 19.11.2026. Ohne Modellangabe gilt config.js. */
+  const faktor = modellEinstellungen(modell || MISTRAL_MODEL).dauerFaktor || 1;
+  const ausSatz = werte ? Math.max(1, Math.round(werte.durchschnittsdauerSekunden * faktor)) : null;
   if (!flagAn) return { sekunden: ausSatz, gemessen: false, frisch: false };
   const gemessen = await gemesseneDauer();
   if (!gemessen) return { sekunden: ausSatz, gemessen: false, frisch: false };

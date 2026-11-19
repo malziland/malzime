@@ -74,11 +74,8 @@ const ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
    ZURUECK AUF LARGE 3 SEIT 19.11.2026 (Entscheidung Christoph). Vom 01.11. bis
    19.11.2026 rechnete mistral-large-4. Ab 17.11. wurde Large 4 bei Mistral
    langsam: Median einer fertigen Analyse 184 s am 18.11. (vorher rund 120 s),
-   23 Neuversuche nach der Zeitgrenze von 200 s, 15 von 82 Analysen
-   gescheitert. Vergleich am 19.11.2026 20:04-20:13, Cafe-Demofoto, je drei
-   Laeufe gleichzeitig: Large 3 37/37/39 s (rund 2.800 Ausgabe-Token), Large 4
-   188/183/140 s (9.500-12.100 Token, das Nachdenken); Alter und Vollstaendigkeit
-   gleich. Preis: Large 4 traf das Alter Erwachsener in der Messung vom
+   15 von 82 Analysen gescheitert. Vergleich 19.11.2026, Cafe-Demofoto, je
+   drei Laeufe: Large 3 37-39 s, Large 4 140-188 s; Ergebnis gleichwertig. Preis: Large 4 traf das Alter Erwachsener in der Messung vom
    31.10.2026 besser. Large 3 wird am 30.04.2027 abgeschaltet — vorher muss
    ein Nachfolger gemessen und eingestellt sein. Die Einstellungen fuer Large 4
    bleiben unten stehen; umgeschaltet wird im Betrieb ueber das Feld `modell`
@@ -164,9 +161,10 @@ const MODELL_EINSTELLUNGEN = {
     tippAnlaufMs: 2000 /* Text kommt erst kurz vor Schluss (01.11.2026) */,
   },
 };
-/* Die erlaubten Modelle — genau die mit eigenen Einstellungen oben. */
-const ERLAUBTE_MODELLE = Object.freeze(Object.keys(MODELL_EINSTELLUNGEN));
+const ERLAUBTE_MODELLE = Object.freeze(Object.keys(MODELL_EINSTELLUNGEN)); /* genau die mit Einstellungen */
 const modellEinstellungen = (modell) => MODELL_EINSTELLUNGEN[modell] || MODELL_EINSTELLUNGEN["mistral-large-2512"];
+/* Die Zeitgrenze, die fuer einen Analyse-Aufruf WIRKLICH gilt — die eine Rechnung. */
+const wirksameZeitgrenzeMs = (satzMs, m) => Math.min(satzMs, modellEinstellungen(m).analyseZeitgrenzeMs || satzMs);
 /* v3.0.4 (User-Freigabe 2026-08-11 abends): EU-Regional-Endpunkt statt des
    globalen — Mistral sichert damit VERTRAGLICH zu, dass die Inferenz in
    EU-/EFTA-Rechenzentren laeuft (der globale Endpunkt verspricht nur
@@ -386,6 +384,7 @@ module.exports = {
   ALLOWED_MIME,
   MISTRAL_MODEL,
   modellEinstellungen,
+  wirksameZeitgrenzeMs,
   ERLAUBTE_MODELLE,
   MISTRAL_ENDPOINT,
   MISTRAL_SLOWEST_TOKENS_PER_SECOND,

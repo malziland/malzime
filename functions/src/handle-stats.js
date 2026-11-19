@@ -1,6 +1,6 @@
 const { getStats, getMaintenanceStatus, leseRealitaetsCheck } = require("./counter");
 const { geltendeWerte } = require("./betriebsprofil");
-const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
+const { MISTRAL_MODEL, wirksameZeitgrenzeMs } = require("./config");
 
 async function handleStats(req, res) {
   if (req.method !== "GET") {
@@ -50,10 +50,7 @@ async function handleStats(req, res) {
           profil: betrieb.profil || null,
           quelle: betrieb.quelle,
           modell,
-          analyseZeitgrenzeMs: Math.min(
-            betrieb.werte.singleLargeTimeoutMs,
-            modellEinstellungen(modell).analyseZeitgrenzeMs || betrieb.werte.singleLargeTimeoutMs
-          ),
+          analyseZeitgrenzeMs: wirksameZeitgrenzeMs(betrieb.werte.singleLargeTimeoutMs, modell),
         }
       : undefined;
   res.json({ ...data, maintenance, realitaetsCheck, betrieb: betriebswerte });

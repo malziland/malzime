@@ -35,6 +35,7 @@
 
 const { datenbank } = require("./db");
 const { geltendeWerte } = require("./betriebsprofil");
+const { MISTRAL_MODEL, wirksameZeitgrenzeMs } = require("./config");
 const { tagesHistorie } = require("./durchsatz");
 
 const ZUSTAND_DOKUMENT = "stats/laufzeit-wache";
@@ -162,12 +163,15 @@ async function pruefeLaufzeit({ melder, jetzt = Date.now() } = {}) {
   /* Die Zeitgrenze kommt aus dem Einstellungssatz. Ohne Satz kann die Wache
      nicht bewerten — sie meldet das, statt gegen eine erfundene Grenze zu
      messen. */
-  const { werte } = await geltendeWerte();
+  const { werte, modell } = await geltendeWerte();
   if (!werte) {
     console.error(JSON.stringify({ step: "laufzeit-wache", grund: "kein Einstellungssatz — nicht bewertbar" }));
     return { gemeldet: false, grund: "kein-einstellungssatz" };
   }
-  const befund = bewerte(tage, werte.singleLargeTimeoutMs);
+  /* Gemessen wird gegen die Grenze, die WIRKLICH gilt (Abnahme 19.11.2026,
+     P2-3): Der Satz traegt 410 s, das Modell kuerzt (Large 3 300 s, Large 4
+     200 s) — gegen 410 s waere „nah an der Grenze“ nie erreichbar. */
+  const befund = bewerte(tage, wirksameZeitgrenzeMs(werte.singleLargeTimeoutMs, modell || MISTRAL_MODEL));
   const heute = new Date(jetzt).toISOString().slice(0, 10);
 
   let zustand = {};

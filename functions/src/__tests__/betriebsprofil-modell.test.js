@@ -8,12 +8,13 @@
  * nur eines aus ERLAUBTE_MODELLE, und nur, wenn der aktive Satz dazu passt.
  */
 
-const mockDoc = { daten: undefined };
+const mockDoc = { daten: undefined, wirft: false };
 
 jest.mock("../db", () => ({
   datenbank: () => ({
     doc: () => ({
       async get() {
+        if (mockDoc.wirft) throw new Error("UNAVAILABLE");
         return { exists: mockDoc.daten !== undefined, data: () => mockDoc.daten };
       },
     }),
@@ -79,4 +80,27 @@ describe("Feld modell im Einstellungssatz", () => {
     setze({ aktiv: "t", modell: "mistral-large-2512", profile: { t: SATZ } });
     expect((await geltendeWerte()).werte).not.toBeNull();
   });
+});
+
+/* Abnahme 19.11.2026, P2-2: Ist der Satz nur GERADE nicht lesbar, gilt der
+   letzte gueltige Stand weiter — MIT seinem Modell. Sonst fielen neue
+   Analysen waehrend einer Stoerung still auf die Vorgabe aus config.js
+   zurueck, mit anderer Zeitgrenze und ohne Neuversuch. */
+test("Lesefehler: das zuletzt gelesene Modell (Large 4) gilt weiter", async () => {
+  const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+  const echt = Date.now;
+  try {
+    setze({ aktiv: AKTIV, profile: PROFILE, modell: "mistral-large-4" });
+    expect((await geltendeWerte()).modell).toBe("mistral-large-4");
+    mockDoc.wirft = true;
+    const spaeter = echt() + 31_000;
+    Date.now = () => spaeter;
+    const stand = await geltendeWerte();
+    expect(stand.letzterStand).toBe(true);
+    expect(stand.modell).toBe("mistral-large-4");
+  } finally {
+    Date.now = echt;
+    mockDoc.wirft = false;
+    warn.mockRestore();
+  }
 });

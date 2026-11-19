@@ -127,6 +127,33 @@ describe("Rettung eines abgebrochenen Single-Large-Laufs", () => {
     }
   });
 
+  /* Abnahme 19.11.2026, P2-1: Der Neuversuch haengt am Modell, das der
+     Einstellungssatz WAEHLT — nicht an der Vorgabe in config.js. Steht im
+     Satz Large 4, folgt nach der Zeitgrenze der zweite Versuch (3 Aufrufe),
+     obwohl config.js Large 3 vorgibt. */
+  test("Modell Large 4 aus dem Satz: nach der Zeitgrenze folgt der Neuversuch", async () => {
+    const satz = require("../betriebsprofil");
+    satz._setzeModell("mistral-large-4");
+    const nurKarten = JSON.stringify({
+      subject: "HUMAN",
+      standard: { categories: { alter_geschlecht: { value: "Du bist 40." } } },
+    }).slice(0, -2);
+    let aufrufe = 0;
+    const modelle = [];
+    setFetchForTest(async (_url, init) => {
+      aufrufe += 1;
+      modelle.push(JSON.parse(init.body).model);
+      return sseStromDerAbbricht(nurKarten);
+    });
+    try {
+      await runSingleLargeCall(Buffer.from("bild"), "image/jpeg", () => 999_999, "de", { onLiveText: () => {} });
+      expect(aufrufe).toBe(3);
+      expect(new Set(modelle)).toEqual(new Set(["mistral-large-4"]));
+    } finally {
+      satz._setzeModell(null);
+    }
+  });
+
   test("reicht die Zeit nicht fuer einen zweiten Versuch, bleiben die Karten sofort", async () => {
     const nurKarten = JSON.stringify({
       subject: "HUMAN",

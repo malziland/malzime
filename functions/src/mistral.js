@@ -15,7 +15,7 @@
  * API-Key kommt aus process.env.MISTRAL_API_KEY_EU (Firebase Secret, EU-gebunden; lokal MISTRAL_API_KEY).
  */
 
-const { MISTRAL_MODEL, modellEinstellungen } = require("./config");
+const { MISTRAL_MODEL, modellEinstellungen, wirksameZeitgrenzeMs } = require("./config");
 const { loadPrompts } = require("./i18n");
 const { parseSafely, STRING_BOUND_CATEGORY } = require("./json-repair");
 /* AUFGETEILT 31.08.2026: Das Auseinandernehmen der Antworten steht jetzt in
@@ -694,10 +694,7 @@ async function callSingleLarge(messages, remainingBudget, attemptLabel, cacheKey
       timeoutMs: budget,
       /* BUG-2026-08-17-01: eigenes Zeitbudget statt der allgemeinen 90 s —
          siehe Herleitung an der Konstante in config.js. */
-      timeoutCapMs: Math.min(
-        betriebswerte.singleLargeTimeoutMs,
-        modellEinstellungen(modell).analyseZeitgrenzeMs || betriebswerte.singleLargeTimeoutMs
-      ),
+      timeoutCapMs: wirksameZeitgrenzeMs(betriebswerte.singleLargeTimeoutMs, modell),
       cacheKey,
       /* v3.0 Phase 1: Nur gesetzt, wenn der Worker das Live-Text-Flag an hat.
          Ohne Callback bleibt der Request bitgenau der heutige (kein stream). */

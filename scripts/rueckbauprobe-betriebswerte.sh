@@ -135,9 +135,9 @@ probe "9. Kopplungspruefung Token/Zeit ausbauen" \
 
 probe "10. Laufzeit-Wache wieder gegen feste Grenze messen" \
   "src/laufzeit-wache.js" \
-  'const befund = bewerte(tage, werte.singleLargeTimeoutMs);' \
+  'const befund = bewerte(tage, wirksameZeitgrenzeMs(werte.singleLargeTimeoutMs, modell || MISTRAL_MODEL));' \
   'const befund = bewerte(tage, 300000);' \
-  "src/__tests__/ohne-einstellungssatz.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/laufzeit-wache.test.js src/__tests__/rueckfall-riegel.test.js"
+  "src/__tests__/ohne-einstellungssatz.test.js src/__tests__/rueckfall-riegel.test.js src/__tests__/laufzeit-wache.test.js src/__tests__/laufzeit-wache-zustand.test.js"
 
 echo
 if [ "$UNGEDECKT" -gt 0 ]; then

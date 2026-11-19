@@ -285,8 +285,9 @@ ABHAENGIGKEITS_GRENZEN = {
     # brauchen die Werte des gewaehlten Modells (Ersatz-Wartezeit, wirksame
     # Zeitgrenze). Sie fragen danach, statt sie durchgereicht zu bekommen.
     # ANGEHOBEN 19.11.2026 auf 16: handle-job-status.js schickt den Tipp-Anlauf
-    # des gewaehlten Modells an den Browser (MODELL_EINSTELLUNGEN).
-    "config": 16,
+    # des gewaehlten Modells an den Browser. Auf 17: laufzeit-wache.js misst gegen
+    # die wirksame Zeitgrenze des Modells (Abnahme 19.11.2026 P2-3).
+    "config": 17,
     # ANGEHOBEN 16.10.2026 von 10 auf 13: db.js ist mit Absicht die EINZIGE
     # Stelle, an der eine Datenbankverbindung entsteht (db-zentral.test.js).
     # Wer eine eigene Sammlung oder Marke schreibt (statistik.js,
